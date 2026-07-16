@@ -121,7 +121,10 @@ typedef struct { double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[M
 u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,
     textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS];
 static float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
-float modelMatrices[INSTANCE_COUNT*16]; u8** modelVertices = NULL; u16** modelTriangles = NULL; u32 modelVertexCounts[MAX_MDLS] = {0}; u16 modelTriangleCounts[MAX_MDLS] = {0}; float modelBounds[MAX_MDLS] = {0}; u16 mdlsCnt = 0;
+float modelMatrices[INSTANCE_COUNT*16]; u16** modelTriangles = NULL; u32 modelVertexCounts[MAX_MDLS] = {0}; u16 modelTriangleCounts[MAX_MDLS] = {0}; float modelBounds[MAX_MDLS] = {0}; u16 mdlsCnt = 0;
+float **vPos = NULL;   // [mdlsCnt] -> float[vcnt*3]  (x,y,z per vertex)    Final CPU-side vertex storage: three separate SoA arrays per model (replaces flat modelVertices[])
+float **vNor = NULL;   // [mdlsCnt] -> float[vcnt*3]  (nx,ny,nz per vertex)
+float **vUV  = NULL;   // [mdlsCnt] -> float[vcnt*2]  (u,v per vertex)
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; static int threadCnt=0; static u32 globalframe=0,globalframesPerLastSecond;
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
@@ -187,9 +190,9 @@ void DrawMeshCollider(u16 i) {
     Color col = ColliderColor(i); u16 mi = (World.collider[i] == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
     u32 triCount = modelTriangleCounts[mi]; if (!triCount) return;
     float M[16]; mcpy(M, &modelMatrices[i*16], 64); float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
+    const float* pos = vPos[mi]; const u16* tris = modelTriangles[mi];
     for (u32 j=0; j<triCount; j++) {
-        V3 w[3];
-        for (int k=0; k<3; k++) { float *v = (float*)(modelVertices[mi] + (u32)modelTriangles[mi][j*3+k] * CPU_VRT_SZ); w[k] = (V3){m00*v[0]+m01*v[1]+m02*v[2]+tx, m10*v[0]+m11*v[1]+m12*v[2]+ty, m20*v[0]+m21*v[1]+m22*v[2]+tz}; }
+        V3 w[3]; for (int k=0;k<3;++k) { u32 vi=tris[j*3 + k]; float x=pos[vi*3 + 0]; float y=pos[vi*3 + 1]; float z=pos[vi*3 + 2]; w[k]=(V3){m00*x + m01*y + m02*z + tx, m10*x + m11*y + m12*z + ty, m20*x + m21*y + m22*z + tz}; }
         AddWireLine(w[0],w[1],col); AddWireLine(w[1],w[2],col); AddWireLine(w[2],w[0],col);
     }
     DrawVelocityVector(i);
@@ -1118,6 +1121,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0,lev);
     LoadAllLevels();
     LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); // Must be after entities!  Fast pointer swap to startLevel. Start Actual: Puts player on Medical Level in actual game start position.
+    GenerateConvexAdjacencyLists();
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u);
     World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u);
     World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.

@@ -930,7 +930,7 @@ bool ToggleMode(void) { return GetKeyPressed(26); }     bool Reload(void) { retu
 bool WeaponCycDown(void) { return GetKeyPressed(29); }  bool Grenade(void) { return GetKeyPressed(30); }        bool GrenadeCycUp(void) { return GetKeyPressed(31); }
 bool GrenadeCycDown(void) { return GetKeyPressed(32); } bool ChangeAmmoType(void) { return GetKeyPressed(33); } bool Patch(void) { return GetKeyPressed(34); }
 bool PatchCycUp(void) { return GetKeyPressed(35); }     bool PatchCycDown(void) { return GetKeyPressed(36); }   bool Map(void) { return GetKeyPressed(37); }
-bool SwimUp(void) { return GetKey(38); }                bool SwimDn(void) { return GetKey(39); }                bool Console(void) { return GetKeyPressed(-1); }
+bool SwimUp(void) {return Cheats.noclip && GetKey(38);} bool SwimDn(void) {return Cheats.noclip && GetKey(39);} bool Console(void) { return GetKeyPressed(-1); }
 bool ScrshotPressed(void) { return GetKeyPressed(41); }                void DeactivateVMail(void); void CloseFullmap();
 void ForceShootMode(void) { if (Sys_Settings.NoShootMode){return;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); World.cursorPosition_x=663; World.cursorPosition_y=371/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true; if(World.Sys_UI.vmailActive){DeactivateVMail(); World.Sys_UI.vmailActive=false;} }
 void ForceInventoryMode(void) { World.inventoryMode = true; World.cursorPosition_x = 663; World.cursorPosition_y = 371; ignore_next_mouse_delta = true; } // Centered on UI baseline resolution 1366x768

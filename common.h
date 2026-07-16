@@ -243,7 +243,7 @@ typedef /*FAT*/ struct  {
     TrackType trackType;
     MusicType musicType;
     DoorState doorState;
-    u16 mainSwitchMaterial,deathBurst;
+    u16 mainSwitchMaterial,deathBurst,adjacencyIdx;
     AIState currentState; // NPC logic
     V3 currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;
     char targetname[TARGET_STRING_LENGTH],target[TARGET_STRING_LENGTH],target2[TARGET_STRING_LENGTH],currenttarget[TARGET_STRING_LENGTH],targetIfFalse[TARGET_STRING_LENGTH],texAnimResourceFolder[TARGET_STRING_LENGTH];

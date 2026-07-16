@@ -64,8 +64,8 @@ static u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, 
 }
 
 #define HASH_SIZE 32768
-static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u32* __restrict ht, u32* __restrict ht_used, u16* __restrict ft, u32* __restrict remap_scr, u8* __restrict nv_scr, u8* __restrict cache_scr, u8** ov, u32* ovc, u16** ot, u16* otc, const char* name) {
-    *ov = NULL; *ot = NULL; *ovc = *otc = 0;
+static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u16* __restrict st, u32* __restrict ht, u32* __restrict ht_used, u16* __restrict ft, u32* __restrict remap_scr, u8* __restrict nv_scr, u8* __restrict cache_scr, float** __restrict ov_pos, float** __restrict ov_nor, float** __restrict ov_uv, u32* ovc, u16** ot, u16* otc, const char* name) {
+    *ov_pos = NULL; *ov_nor = NULL; *ov_uv = NULL; *ot = NULL; *ovc = *otc = 0;
     u32 pc=0,nc=0,uc=0,ec=0;
     float mx=1e9f,my=1e9f,mz=1e9f,Mx=-1e9f,My=-1e9f,Mz=-1e9f;
     const char *p = d, *e = d+fs;
@@ -125,11 +125,20 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
     for (u32 i=0;i<ec;++i) ft[i] = (u16)rem[i];
     OptimizeVertexCache(ft,ec,ucnt,cache_scr);
     u8* optv_src = OptimizeVertexFetch((u8*)sv,&ucnt,ft,ec,CPU_VRT_SZ,remap_scr,nv_scr);
-    u8* final_v = OS_Alloc((size_t)ucnt * CPU_VRT_SZ); // Copy out precisely sized final persistent mesh chunks since buffers are recycled
-    mcpy(final_v, optv_src, (size_t)ucnt * CPU_VRT_SZ);
+    // Split optimized interleaved (pos|nor|uv) into three separate SoA arrays for the final persistent CPU copy
+    float* final_pos = (float*)OS_Alloc((size_t)ucnt * 3 * sizeof(float));
+    float* final_nor = (float*)OS_Alloc((size_t)ucnt * 3 * sizeof(float));
+    float* final_uv  = (float*)OS_Alloc((size_t)ucnt * 2 * sizeof(float));
+    const float* osrc = (const float*)optv_src;
+    for (u32 i = 0; i < ucnt; ++i) {
+        const float* v = osrc + (i << 3); // stride 8 floats (CPU_VRT_SZ / sizeof(float))
+        final_pos[i*3+0] = v[0]; final_pos[i*3+1] = v[1]; final_pos[i*3+2] = v[2];
+        final_nor[i*3+0] = v[3]; final_nor[i*3+1] = v[4]; final_nor[i*3+2] = v[5];
+        final_uv [i*2+0] = v[6]; final_uv [i*2+1] = v[7];
+    }
     u16* final_t = OS_Alloc(ec * sizeof(u16));
     mcpy(final_t, ft, ec * sizeof(u16));
-    *ov = final_v; *ovc = ucnt; *ot = final_t; *otc = ec/3; modelBounds[mindex] = vmax(vabs(mx),vmax(vabs(my),vmax(vabs(mz),vmax(Mx,vmax(My,Mz)))));
+    *ov_pos = final_pos; *ov_nor = final_nor; *ov_uv = final_uv; *ovc = ucnt; *ot = final_t; *otc = ec/3; modelBounds[mindex] = vmax(vabs(mx),vmax(vabs(my),vmax(vabs(mz),vmax(Mx,vmax(My,Mz)))));
     for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]] = 0xFFFFFFFFU;}
     return true;
 }
@@ -145,9 +154,7 @@ u32      modelBVHNodeCounts[MAX_MDLS] = {0};
 u32      modelBVHTriOrderCounts[MAX_MDLS] = {0};
 typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 static BvhBuildCtx thrd_bvh_ctx[32];
-
-// Recursive centroid-based octree build. Each triangle goes into exactly one octant (the one containing its centroid), so there is no triangle duplication. The node
-// AABB is the union of its triangles' AABBs (NOT the octant AABB) — this guarantees that any query which overlaps a triangle also overlaps the triangle's ancestor
+// Recursive centroid-based octree build. Each triangle goes into exactly one octant (the one containing its centroid), so there is no triangle duplication. The node AABB is the union of its triangles' AABBs (NOT the octant AABB) — this guarantees that any query which overlaps a triangle also overlaps the triangle's ancestor
 // nodes, so traversal never misses a triangle. triIdxArray is modified in-place: on return it is partitioned by octant so that each child's triangles are contiguous (matches the leaf ranges written to ctx->triOrder).
 static i32 BvhBuildOctree(BvhBuildCtx* __restrict ctx, u16 m, u16* triIdxArray, u32 triCount, u32 depth) {
     if (triCount == 0) return -1;
@@ -160,9 +167,9 @@ static i32 BvhBuildOctree(BvhBuildCtx* __restrict ctx, u16 m, u16* triIdxArray, 
     for (u32 i = 0; i < triCount; i++) { // Compute node AABB = union of triangle AABBs (also needed for centroid computation)
         u32 triIdx = triIdxArray[i];
         u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
-        const float* v0 = (const float*)(modelVertices[m] + (size_t)i0*CPU_VRT_SZ);
-        const float* v1 = (const float*)(modelVertices[m] + (size_t)i1*CPU_VRT_SZ);
-        const float* v2 = (const float*)(modelVertices[m] + (size_t)i2*CPU_VRT_SZ);
+        const float* v0 = vPos[m] + (size_t)i0*3;
+        const float* v1 = vPos[m] + (size_t)i1*3;
+        const float* v2 = vPos[m] + (size_t)i2*3;
         mn.x = vmin(mn.x,vmin(vmin(v0[0],v1[0]),v2[0]));
         mn.y = vmin(mn.y,vmin(vmin(v0[1],v1[1]),v2[1]));
         mn.z = vmin(mn.z,vmin(vmin(v0[2],v1[2]),v2[2]));
@@ -182,9 +189,9 @@ static i32 BvhBuildOctree(BvhBuildCtx* __restrict ctx, u16 m, u16* triIdxArray, 
     for (u32 i=0;i<triCount;++i) {
         u32 triIdx = triIdxArray[i];
         u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
-        const float* v0 = (const float*)(modelVertices[m] + (size_t)i0*CPU_VRT_SZ);
-        const float* v1 = (const float*)(modelVertices[m] + (size_t)i1*CPU_VRT_SZ);
-        const float* v2 = (const float*)(modelVertices[m] + (size_t)i2*CPU_VRT_SZ);
+        const float* v0 = vPos[m] + (size_t)i0*3;
+        const float* v1 = vPos[m] + (size_t)i1*3;
+        const float* v2 = vPos[m] + (size_t)i2*3;
         V3 centroid = {(v0[0]+v1[0]+v2[0])*(1.0f/3.0f), (v0[1]+v1[1]+v2[1])*(1.0f/3.0f), (v0[2]+v1[2]+v2[2])*(1.0f/3.0f)};
         u8 oct = (u8)((centroid.x>=center.x) | ((centroid.y>=center.y)<<1) | ((centroid.z>=center.z)<<2));
         ctx->triOctants[i] = oct;
@@ -212,7 +219,7 @@ static void BuildModelBVH(BvhBuildCtx* ctx, u16 m) {
     modelBVHTriOrderCounts[m] = 0;
     u32 triCount = modelTriangleCounts[m];
     if (triCount == 0 || triCount > BVH_MAX_TRIS_PER_MDL) return;  // too many tris -> skip BVH (linear fallback)
-    if (!modelVertices[m] || !modelTriangles[m]) return;
+    if (!vPos[m] || !modelTriangles[m]) return;
     ctx->nodeCount = ctx->triCount = 0;
     u16* initialTris = ctx->initialTris; // per-thread scratch, avoids an OS_Alloc/OS_Free per model
     for (u32 i = 0; i < triCount; i++) initialTris[i] = (u16)i;
@@ -233,7 +240,7 @@ static void* ModelParsingWorker(void* arg) {
     BvhBuildCtx* bvhCtx = &thrd_bvh_ctx[t->tid];
     for (u32 i = t->start; i < t->end; ++i) {
         RawOBJ obj = t->raw[i]; if (unlikely(!obj.data || obj.size <= 0)) continue;
-        if (!ParseOBJ(i,obj.data,obj.size,thrd_pos[t->tid],thread_temp_nrm[t->tid],thrd_uv[t->tid],thrd_verts[t->tid],thrd_tris[t->tid],thrd_ht[t->tid],thrd_ht_used[t->tid],thrd_ft_scratch[t->tid],thrd_remap_scratch[t->tid],thrd_nv_scratch[t->tid],thrd_cache_scratch[t->tid],&modelVertices[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],obj.name)) continue;
+        if (!ParseOBJ(i,obj.data,obj.size,thrd_pos[t->tid],thread_temp_nrm[t->tid],thrd_uv[t->tid],thrd_verts[t->tid],thrd_tris[t->tid],thrd_ht[t->tid],thrd_ht_used[t->tid],thrd_ft_scratch[t->tid],thrd_remap_scratch[t->tid],thrd_nv_scratch[t->tid],thrd_cache_scratch[t->tid],&vPos[i],&vNor[i],&vUV[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],obj.name)) continue;
         BuildModelBVH(bvhCtx, (u16)i); // Build this model's BVH right away, inside the same worker thread, overlapping with other threads' OBJ parsing instead of a later serial pass.
     }
     return NULL;
@@ -284,11 +291,8 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     return true;
 }
 
-// Transform a local-space AABB to a world-space AABB (smallest world AABB containing
-// the transformed local AABB). Uses the column-major 4x4 matrix mx layout:
-//   col0 = mx[0..2], col1 = mx[4..6], col2 = mx[8..10], translation = mx[12..14]
-// For an affine M = T*R*S, the world AABB half-extents are sum_j(|R[i][j]| * S[j] * localHalf[j])
-// = sum_j(|M[i][j]| * localHalf[j]), and the center is M * localCenter.
+// Transform a local-space AABB to a world-space AABB (smallest world AABB containing the transformed local AABB). Uses the column-major 4x4 matrix mx layout: col0 = mx[0..2], col1 = mx[4..6], col2 = mx[8..10], translation = mx[12..14]
+// For an affine M = T*R*S, the world AABB half-extents are sum_j(|R[i][j]| * S[j] * localHalf[j]) = sum_j(|M[i][j]| * localHalf[j]), and the center is M * localCenter.
 static inline void BvhNodeWorldAABB(const BvhNode* node, const float* mx, V3* wMn, V3* wMx) {
     float m00=mx[0], m10=mx[1], m20=mx[2];
     float m01=mx[4], m11=mx[5], m21=mx[6];
@@ -297,11 +301,8 @@ static inline void BvhNodeWorldAABB(const BvhNode* node, const float* mx, V3* wM
     V3 lc = V3_ScaleByF(V3_AplusB(node->mn, node->mx), 0.5f);
     V3 lh = V3_ScaleByF(V3_AsubB(node->mx, node->mn), 0.5f);
     V3 wc = {m00*lc.x + m01*lc.y + m02*lc.z + tx, m10*lc.x + m11*lc.y + m12*lc.z + ty, m20*lc.x + m21*lc.y + m22*lc.z + tz};
-    V3 wh = {vabs(m00)*lh.x + vabs(m01)*lh.y + vabs(m02)*lh.z,
-             vabs(m10)*lh.x + vabs(m11)*lh.y + vabs(m12)*lh.z,
-             vabs(m20)*lh.x + vabs(m21)*lh.y + vabs(m22)*lh.z};
-    *wMn = V3_AsubB(wc, wh);
-    *wMx = V3_AplusB(wc, wh);
+    V3 wh = {vabs(m00)*lh.x + vabs(m01)*lh.y + vabs(m02)*lh.z,vabs(m10)*lh.x + vabs(m11)*lh.y + vabs(m12)*lh.z,vabs(m20)*lh.x + vabs(m21)*lh.y + vabs(m22)*lh.z};
+    *wMn = V3_AsubB(wc,wh); *wMx = V3_AplusB(wc,wh);
 }
 
 static inline bool BvhSphereAABBOverlap(V3 sc, float sr, V3 mn, V3 mx) { V3 cl = {vclamp(sc.x, mn.x, mx.x), vclamp(sc.y, mn.y, mx.y), vclamp(sc.z, mn.z, mx.z)}; V3 d = V3_AsubB(sc, cl); return V3_dot(d, d) <= sr * sr; }
@@ -345,7 +346,7 @@ void LoadModels() {
     if (!ParseModelData(&mp, MAX_MDLS,"./Data/models.txt")) { DualLogError("Failed models.txt\n"); OS_Exit(1); }
     DualLog("Loading   models (%d) ...",mp.count);
     u32 maxid = 0; for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index != U16_MAX && mp.entries[i].index > maxid) maxid = mp.entries[i].index; } mdlsCnt = (u16)maxid + 1;
-    modelVertices = OS_Alloc(mdlsCnt * sizeof(u8*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
+    vPos = OS_Alloc(mdlsCnt * sizeof(float*)); vNor = OS_Alloc(mdlsCnt * sizeof(float*)); vUV = OS_Alloc(mdlsCnt * sizeof(float*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
     modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
     for (u32 m=0; m<mdlsCnt; ++m) { modelBVHNodes[m] = NULL; modelBVHTriOrder[m] = NULL; } // Pre-allocated up-front (before threads start) so each worker can write modelBVHNodes[i]/modelBVHTriOrder[i] for the models it owns without any synchronization.
     InitializeFloatToHalfLUT();
@@ -403,8 +404,19 @@ void LoadModels() {
         tv += modelVertexCounts[i]; tt += modelTriangleCounts[i]; size_t vcz = (size_t)modelVertexCounts[i] * VRT_ATT_SZ, tcz = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
         glBindBuffer(GL_ARRAY_BUFFER,vbos[i]); glBufferData(GL_ARRAY_BUFFER,vcz,NULL,GL_STATIC_DRAW);
         half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER,0,vcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-        const float* csrc = (const float*)modelVertices[i]; u32 elems = modelVertexCounts[i] * 8;
-        for (u32 k=0;k<elems;++k) mpv[k] = float_to_half(csrc[k]);
+        // Interleave from the three separate SoA arrays (vPos/vNor/vUV) into the GPU's packed half-float vertex buffer
+        u32 vc = modelVertexCounts[i];
+        const float* cpos = vPos[i]; const float* cnor = vNor[i]; const float* cuv = vUV[i];
+        for (u32 k=0;k<vc;++k) {
+            mpv[k*8+0] = float_to_half(cpos[k*3+0]);
+            mpv[k*8+1] = float_to_half(cpos[k*3+1]);
+            mpv[k*8+2] = float_to_half(cpos[k*3+2]);
+            mpv[k*8+3] = float_to_half(cnor[k*3+0]);
+            mpv[k*8+4] = float_to_half(cnor[k*3+1]);
+            mpv[k*8+5] = float_to_half(cnor[k*3+2]);
+            mpv[k*8+6] = float_to_half(cuv[k*2+0]);
+            mpv[k*8+7] = float_to_half(cuv[k*2+1]);
+        }
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         if (raw[i].data) OS_Free((void*)raw[i].data,raw[i].size);
@@ -474,17 +486,14 @@ const AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, 
 void PortalCulling(); bool ToggleDoorPortal(u8,u16,u16);
 void UpdateAnims(void) {
     if (World.paused || World.menuActive) return;
-    
     static double lastPauseTime = 0.0; if (lastPauseTime == 0.0) lastPauseTime = World.pauseRelativeTime;
     double animDT = World.pauseRelativeTime - lastPauseTime; lastPauseTime = World.pauseRelativeTime;
     if (animDT > 0.1) animDT = 0.1; if (animDT <= 0.0) return;
-    
     bool portalsNeedUpdated = false;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
         Entity* e = &World.instances[i];
         if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->numclips == 0 || e->clip >= e->numclips) continue;
         AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue;
-
         e->currentFrameFinished += animDT * clip->speed;
         double timePerFrame = 1.0 / (double)clip->framerate;
         if (e->currentFrameFinished >= timePerFrame) {
@@ -495,8 +504,53 @@ void UpdateAnims(void) {
             if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     }
-    
     if (portalsNeedUpdated) PortalCulling();
 }
 
-void ChangeAnim(Entity* e, u8 clip) { e->clip = clip; e->currentFrameFinished = 0.0; AnimationClip* c = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; e->frame = c->frameStart; } // TODO actually use this!
+void ChangeAnim(Entity* e, u8 clip) { e->clip = clip; e->currentFrameFinished = 0.0; AnimationClip* c = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; e->frame = c->frameStart; } // TODO actually use this!}
+
+// Hill Climb Racer Adjacency List
+#define MAX_UNIQUE_CVX_MESHES 1024
+u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount;
+u32** cvxAdjOffsets = NULL; u16** cvxAdjLists = NULL; // CSR format adjacency data: cvxAdjOffsets[m] has vCount + 1 entries pointing into cvxAdjLists[m]
+u16  lastCvxSupport[MAX_UNIQUE_CVX_MESHES] = {0}; // Persistent hill-climbing state per mesh
+int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
+void GenerateConvexAdjacencyLists() {
+    double start_time = get_time();
+    cvxAdjOffsets=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u32*)); cvxAdjLists=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u16*));
+    for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
+        for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
+            if (World.levelCollider[lev][i] == COLTYPE_CVX) {
+                u16 colMeshIdx = World.levelInstances[lev][i].colMeshIndex; bool isUnique=true; u32 foundIdx=U16_MAX;
+                for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { if (uniqueCvxMeshIndices[u] == colMeshIdx) { isUnique = false; foundIdx = u; break; } }
+                if (isUnique) {
+                    if (uniqueCvxMeshCount >= MAX_UNIQUE_CVX_MESHES) { DualLogWarn("Warning: Exceeded MAX_UNIQUE_CVX_MESHES! Some convex meshes will use slow linear support.\n"); World.levelInstances[lev][i].adjacencyIdx = U16_MAX; continue; }
+                    uniqueCvxMeshIndices[uniqueCvxMeshCount] = colMeshIdx; World.levelInstances[lev][i].adjacencyIdx = (u16)uniqueCvxMeshCount; uniqueCvxMeshCount++;
+                } else { World.levelInstances[lev][i].adjacencyIdx = (u16)foundIdx; }
+            } else { World.levelInstances[lev][i].adjacencyIdx = U16_MAX; }
+        }
+    }
+    for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { // 2. Generate edge adjacency list for each unique mesh
+        u16 m = uniqueCvxMeshIndices[u]; u32 vCount=modelVertexCounts[m], tCount=modelTriangleCounts[m]; if (!vCount || !tCount || m >= MAX_MDLS) continue;
+        u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
+        for (u32 t = 0; t < tCount; ++t) {
+            u16 i0=modelTriangles[m][t*3+0];                               u16 i1=modelTriangles[m][t*3+1];                               u16 i2=modelTriangles[m][t*3+2];
+            tempEdges[edgeCount++]=((u32)vmin(i0,i1) << 16) | vmax(i0,i1); tempEdges[edgeCount++]=((u32)vmin(i1,i2) << 16) | vmax(i1,i2); tempEdges[edgeCount++]=((u32)vmin(i2,i0) << 16) | vmax(i2,i0);
+        }
+        qsort_new(tempEdges,edgeCount,sizeof(u32),EdgeCompare);
+        
+        u32 uniqueEdgeCount=0; 
+        u32* degree=OS_Alloc(vCount * sizeof(u32)); 
+        mset(degree, 0, vCount * sizeof(u32)); // FIX: MUST ZERO OUT DEGREE ARRAY
+        
+        for (u32 i = 0; i < edgeCount; ++i) { if (i == 0 || tempEdges[i] != tempEdges[i-1]) { tempEdges[uniqueEdgeCount++]=tempEdges[i]; u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); degree[a]++; degree[b]++; } }
+        u32* offsets=OS_Alloc((vCount + 1) * sizeof(u32)); offsets[0]=0; for(u32 i=0;i<vCount;++i){offsets[i+1]=offsets[i] + degree[i];}
+        u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));
+        u32* writePos = OS_Alloc(vCount * sizeof(u32));
+        mcpy(writePos, offsets, vCount * sizeof(u32));
+        for (u32 i=0;i<uniqueEdgeCount;++i) { u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); adjList[writePos[a]++]=b; adjList[writePos[b]++]=a; }
+        cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList; lastCvxSupport[u]=0;
+        OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
+    }
+    DualLog("Generating edge adjacency lists for %u convex meshes...took %f secs\n",uniqueCvxMeshCount,get_time() - start_time);
+}
