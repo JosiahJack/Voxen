@@ -1125,6 +1125,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u);
     World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u);
     World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
+    firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
 }
 
 // Init

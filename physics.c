@@ -190,26 +190,41 @@ inline V3 SphSupport(ShapeSphere b, V3 d) { float L=V3_dot(d,d); float safeL=vma
 float copysignf(float magnitude, float sign) { float result; __asm__ ("andps %[sign_mask], %[sign]\n\tandnps %[mag], %[sign_mask]\n\torps %[sign_mask], %[mag]\n\t":[mag] "+x" (magnitude), [sign] "+x" (sign), [sign_mask] "=x" (result): "2" (-0.0f)); return magnitude; } // Loads the sign bit mask (0x80000000) into sign_mask
 inline V3 BoxSupport(ShapeBox b, V3 d) { V3 x, y, z; obb_axes(b.rot, &x, &y, &z); float kx = copysignf(1.0f, V3_dot(d, x)); float ky = copysignf(1.0f, V3_dot(d, y)); float kz = copysignf(1.0f, V3_dot(d, z)); return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr, V3_ScaleByF(x, kx * b.hExt.x)), V3_ScaleByF(y, ky * b.hExt.y)), V3_ScaleByF(z, kz * b.hExt.z)); }
 inline V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db=V3_dot(cap.base,d), dt=V3_dot(cap.tip,d); float mask=(dt > db); V3 best=V3_AplusB(V3_ScaleByF(cap.tip,mask),V3_ScaleByF(cap.base,1.0f - mask)); float L = V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); V3 dir=V3_ScaleByF(d,cap.rad / vsqrtf(safeL)); float lmask=(L >= PHY_EPSILON); return V3_AplusB(best,V3_ScaleByF(dir,lmask)); }
-V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld) {
+V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld) { //OLD VERSION THAT WORKS FINE BUT IS SLOWER
     u32 n = modelVertexCounts[m]; (void)adjIdx;
     float dLocalx,dLocaly,dLocalz; dLocalx=M[0] * dWorld.x + M[1] * dWorld.y + M[2] * dWorld.z; dLocaly=M[4] * dWorld.x + M[5] * dWorld.y + M[6] * dWorld.z; dLocalz=M[8] * dWorld.x + M[9] * dWorld.y + M[10] * dWorld.z;
     const float *p=vPos[m]; V3 bestLocal={p[0],p[1],p[2]}; float top = bestLocal.x*dLocalx + bestLocal.y*dLocaly + bestLocal.z*dLocalz;
     for (u32 i=1;i<n;++i) { p+=3; float dot=p[0]*dLocalx + p[1]*dLocaly + p[2]*dLocalz; if(unlikely(dot > top)){top=dot; bestLocal=(V3){p[0],p[1],p[2]};} }
     return MvVert(M,bestLocal);
 }
-// V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld) {  TODO TOO JITTERY!
-//     V3 dLocal; dLocal.x = M[0] * dWorld.x + M[1] * dWorld.y + M[2] * dWorld.z; dLocal.y = M[4] * dWorld.x + M[5] * dWorld.y + M[6] * dWorld.z; dLocal.z = M[8] * dWorld.x + M[9] * dWorld.y + M[10] * dWorld.z;
-//     const float* p = vPos[m]; u16 curr = lastCvxSupport[adjIdx]; float currDot = p[curr*3]*dLocal.x + p[curr*3+1]*dLocal.y + p[curr*3+2]*dLocal.z;
-//     while (true) {
-//         u16 next = curr; 
-//         float nextDot = currDot; 
-//         u32 start = cvxAdjOffsets[adjIdx][curr]; 
-//         u32 end = cvxAdjOffsets[adjIdx][curr + 1];
-//         for (u32 i=start;i<end;++i) { u16 neighbor=cvxAdjLists[adjIdx][i]; float dot=p[neighbor*3]*dLocal.x + p[neighbor*3+1]*dLocal.y + p[neighbor*3+2]*dLocal.z; if (dot > nextDot || (dot == nextDot && neighbor < next)) {nextDot=dot; next=neighbor;} }
-//         if (next == curr) break; // Converged on local maximum
-//         curr = next; currDot = nextDot;
+
+// u16 cvxSeedVertex[MAX_UNIQUE_CVX_MESHES] = {0};
+// V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld/*, u16* seedInOut*/) {
+//     V3 dLocal = {M[0]*dWorld.x + M[1]*dWorld.y + M[2]*dWorld.z,M[4]*dWorld.x + M[5]*dWorld.y + M[6]*dWorld.z,M[8]*dWorld.x + M[9]*dWorld.y + M[10]*dWorld.z};
+//     const float* p = vPos[m];
+//     u32 n = modelVertexCounts[m];
+//     if (adjIdx >= MAX_UNIQUE_CVX_MESHES || !cvxAdjOffsets[adjIdx] || V3_dot(dLocal,dLocal) < PHY_EPSILON) { // Fallback: no adjacency built, or degenerate query.
+//         V3 bestLocal = { p[0], p[1], p[2] }; float top = bestLocal.x*dLocal.x + bestLocal.y*dLocal.y + bestLocal.z*dLocal.z; const float* q = p;
+//         for (u32 i = 1; i < n; ++i) { q += 3; float dot = q[0]*dLocal.x + q[1]*dLocal.y + q[2]*dLocal.z; if (unlikely(dot > top)) { top = dot; bestLocal = (V3){q[0], q[1], q[2]}; } }
+//         return MvVert(M, bestLocal);
 //     }
-//     lastCvxSupport[adjIdx] = curr;
+//     u16 curr = /*(seedInOut && *seedInOut < n) ? *seedInOut : */cvxSeedVertex[adjIdx]; if (curr >= n) curr = 0; // Choose warm start: caller-provided seed if valid, else per-mesh default.
+//     float currDot = p[curr*3]*dLocal.x + p[curr*3+1]*dLocal.y + p[curr*3+2]*dLocal.z;
+//     float tol  = 1e-6f * vsqrtf(V3_dot(dLocal,dLocal)); // Scale-aware tolerance: proportional to |d| times a small relative eps. 1e-6f * |d| is roughly one ULP for typical world-space extents.
+//     u32 guard = n + 1;
+//     while (guard--) { // Bounded climb. n is a hard upper bound on the number of distinct vertices a strict monotone walk can visit; use it as the safety cap.
+//         u16  bestNext = curr; float bestDot = currDot;
+//         u32 start = cvxAdjOffsets[adjIdx][curr]; u32 end   = cvxAdjOffsets[adjIdx][curr + 1];
+//         for (u32 i = start; i < end; ++i) {
+//             u16 nb = cvxAdjLists[adjIdx][i]; float dot = p[nb*3]*dLocal.x + p[nb*3+1]*dLocal.y + p[nb*3+2]*dLocal.z;
+//             if (dot > bestDot + tol) {  bestDot = dot; bestNext = nb; }// STRICT improvement over the CURRENT vertex; deterministic index tie-break only when a neighbor is essentially equal.
+//             else if (dot > currDot - tol && dot > bestDot - tol && nb < bestNext) { bestDot = dot; bestNext = nb; } // plateau: pick the lowest-index tied neighbor, but never move if it isn't at least as good as `curr`.
+//         }
+//         if (bestNext == curr) break;    // local (== global on a convex hull) max
+//         curr = bestNext;
+//         currDot = bestDot;
+//     }
+// //     if (seedInOut) *seedInOut = curr;   // warm-start next query
 //     V3 bestLocal = { p[curr*3], p[curr*3+1], p[curr*3+2] };
 //     return MvVert(M, bestLocal);
 // }
@@ -268,15 +283,18 @@ void SphTriTest(V3 sc, float sr, u16 mesh, u32 ti, const float* mx, Overlap* r) 
 
 inline V3 TriSupport(V3 ta, V3 tb, V3 tc, V3 d) { float d1=V3_dot(ta,d),d2=V3_dot(tb,d),d3=V3_dot(tc,d); return d1>d2 ? (d1>d3 ? ta : tc) : (d2>d3 ? tb : tc); }
 typedef enum { SUP_HULL_HULL, SUP_PRIM_HULL, SUP_HULL_TRI } SupportType;
-typedef struct { SupportType type; u16 prim,meshA,meshB; const float *matA,*matB; V3 ta,tb,tc; u16 adjA, adjB; } SupportCtx;
-void GetSupportPair(const SupportCtx *ctx, V3 dir, V3 *wA, V3 *wB) {
-    switch (ctx->type) {
-        case SUP_HULL_HULL: *wA=HullSupport(ctx->meshA,ctx->matA,ctx->adjA,dir); *wB=HullSupport(ctx->meshB,ctx->matB,ctx->adjB,(V3){-dir.x,-dir.y,-dir.z}); break;
-        case SUP_PRIM_HULL: *wA= GJKSupport(ctx->prim,dir);                      *wB=HullSupport(ctx->meshA,ctx->matA,ctx->adjA,(V3){-dir.x,-dir.y,-dir.z}); break;
-        case SUP_HULL_TRI:  *wA=HullSupport(ctx->meshA,ctx->matA,ctx->adjA,dir); *wB=TriSupport(ctx->ta,ctx->tb,ctx->tc,(V3){-dir.x,-dir.y,-dir.z}); break;
-    }
-}
-
+typedef struct SupportCtx { V3 (*supA)(const struct SupportCtx *ctx, V3 dir); V3 (*supB)(const struct SupportCtx *ctx, V3 negDir); u16 prim,meshA,meshB; const float *matA,*matB; V3 ta,tb,tc; u16 adjA,adjB; } SupportCtx;
+static inline V3 _supA_hull(const SupportCtx *ctx, V3 d) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, d); }
+static inline V3 _supA_sph(const SupportCtx *ctx, V3 d)  { return SphSupport(Entity_GetSph(ctx->prim), d); }
+static inline V3 _supA_box(const SupportCtx *ctx, V3 d)  { return BoxSupport(Entity_GetBox(ctx->prim), d); }
+static inline V3 _supA_cap(const SupportCtx *ctx, V3 d)  { return CapsuleSupport(Entity_GetCap(ctx->prim), d); }
+static inline V3 _supB_hull(const SupportCtx *ctx, V3 nd)  { return HullSupport(ctx->meshB, ctx->matB, ctx->adjB, nd); }
+static inline V3 _supB_hullA(const SupportCtx *ctx, V3 nd) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, nd); }
+static inline V3 _supB_tri(const SupportCtx *ctx, V3 nd)   { return TriSupport(ctx->ta, ctx->tb, ctx->tc, nd); }
+static inline void GetSupportPair(const SupportCtx *ctx, V3 dir, V3 *wA, V3 *wB) { V3 nd = {-dir.x, -dir.y, -dir.z}; *wA = ctx->supA(ctx, dir); *wB = ctx->supB(ctx, nd); }
+static inline SupportCtx MakeCtx_HullHull(u16 mA, u16 mB, const float *matA, const float *matB, u16 adjA, u16 adjB) { return (SupportCtx){_supA_hull, _supB_hull, .meshA=mA, .meshB=mB, .matA=matA, .matB=matB, .adjA=adjA, .adjB=adjB}; }
+static inline SupportCtx MakeCtx_PrimHull(u16 prim, u16 mesh, const float *mat, u16 adjA) { u8 col = World.collider[prim]; V3 (*supA)(const SupportCtx*, V3) = (col == COLTYPE_SPH) ? _supA_sph : (col == COLTYPE_BOX) ? _supA_box : _supA_cap; return (SupportCtx){supA, _supB_hullA, .prim=prim, .meshA=mesh, .matA=mat, .adjA=adjA}; }
+static inline SupportCtx MakeCtx_HullTri(u16 mesh, const float *mat, u16 adjA, V3 ta, V3 tb, V3 tc) { return (SupportCtx){_supA_hull, _supB_tri, .meshA=mesh, .matA=mat, .adjA=adjA, .ta=ta, .tb=tb, .tc=tc}; }
 typedef struct { Simplex3D s; V3 dir; bool hit; } GJKResult;
 GJKResult RunGJK(const SupportCtx *ctx, int maxIter) {
     GJKResult res = {0}; res.dir = (V3){0, 1, 0}; V3 wA, wB;
@@ -284,13 +302,7 @@ GJKResult RunGJK(const SupportCtx *ctx, int maxIter) {
     res.s.wA[res.s.n] = wA; res.s.wB[res.s.n] = wB; res.s.v[res.s.n++] = V3_AsubB(wA, wB);
     res.dir = (V3){-res.s.v[0].x, -res.s.v[0].y, -res.s.v[0].z};
     if (V3_dot(res.dir, res.dir) < PHY_EPSILON) res.dir = (V3){0, 1, 0};
-    for (int it = 0; it < maxIter; ++it) {
-        GetSupportPair(ctx, res.dir, &wA, &wB);
-        V3 sup = V3_AsubB(wA, wB);
-        if (V3_dot(sup, res.dir) < 0) break;
-        res.s.wA[res.s.n] = wA; res.s.wB[res.s.n] = wB; res.s.v[res.s.n++] = sup;
-        if (!GJKNextSimplex(&res.s, &res.dir)) { res.hit = true; break; }
-    }
+    for (int it = 0; it < maxIter; ++it) { GetSupportPair(ctx, res.dir, &wA, &wB); V3 sup = V3_AsubB(wA, wB); if (V3_dot(sup, res.dir) < 0) {break;} res.s.wA[res.s.n] = wA; res.s.wB[res.s.n] = wB; res.s.v[res.s.n++] = sup; if (!GJKNextSimplex(&res.s, &res.dir)) { res.hit = true; break; } }
     return res;
 }
 
@@ -331,24 +343,26 @@ void BvhWalkSphMsh(V3 sc, float sr, u16 m, const float* mx, Overlap* r) {
 
 Overlap SphMsh(V3 sc, float sr, u16 m, const float* mx) { Overlap r={0}; if(m>=MAX_MDLS)return r; u32 tc=modelTriangleCounts[m]; if(!tc){return r;} if (BvhHasBVH(m)) { BvhWalkSphMsh(sc,sr,m,mx,&r); return r; } for(u32 ti=0;ti<tc;++ti){SphTriTest(sc,sr,m,ti,mx,&r);} return r; }
 Overlap CapMsh(ShapeCapsule c, u16 m, const float* mx) { Overlap best=SphMsh(c.base,c.rad,m,mx), rt=SphMsh(c.tip,c.rad,m,mx); if(rt.pen>best.pen)best=rt; V3 d=V3_AsubB(c.tip,c.base); if(V3_Mag(d)>PHY_EPSILON){/*Hey I was doing a snowman of just the end spheres, don't hate the simplicity, I only use capsules for npcs and player*/for(int k=1;k<6;++k){float t=(float)k/5.0f; Overlap rm=SphMsh(V3_AplusB(c.base,V3_ScaleByF(d,t)),c.rad,m,mx); if(rm.pen>best.pen)best=rm;}} return best; }
-Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx) {
+Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx, u16 adjIdx) {
     Manifold m={0}; if(mesh>=MAX_MDLS||!modelVertexCounts[mesh])return m;
-    SupportCtx ctx = {.type = SUP_PRIM_HULL, .prim = prim, .meshA = mesh, .matA = mx}; GJKResult gjk = RunGJK(&ctx, 64); if(!gjk.hit)return m;
+    SupportCtx ctx = MakeCtx_PrimHull(prim, mesh, mx, adjIdx); 
+    GJKResult gjk = RunGJK(&ctx, 64); if(!gjk.hit)return m;
     if(gjk.s.n<4) RunGJKFallback(&ctx, &gjk.s); if(gjk.s.n<4)return m;
     EPAState epa; SeedEPA(&epa,&gjk.s);
     for(int it=0;it<32;++it){
         int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break;
-        V3 bn=epa.ef[bf].n; V3 wA, wB; GetSupportPair(&ctx,bn,&wA,&wB); V3 sup=V3_AsubB(wA,wB); if(V3_dot(bn,sup)-bd<PHY_EPSILON){return MakeEPAManifold(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c,bn,bd);}
+        V3 bn=epa.ef[bf].n; V3 wA, wB; GetSupportPair(&ctx,bn,&wA,&wB); V3 sup=V3_AsubB(wA,wB); 
+        if(V3_dot(bn,sup)-bd<PHY_EPSILON){return MakeEPAManifold(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c,bn,bd);}
         if (!ExpandEPA(&epa,sup,wA,wB)) break;
     }
     return m;
 }
 
-typedef struct {V3 mn,mx;} AABB3; typedef struct { u16 hullMesh; const float* hullMx; const V3* boxV; u32 boxN; AABB3 hb; float spreadEps,thicknessTolerance; Manifold best; } CvxMshCtx;
+typedef struct {V3 mn,mx;} AABB3; typedef struct { u16 hullMesh; const float* hullMx; const V3* boxV; u32 boxN; AABB3 hb; float spreadEps,thicknessTolerance; Manifold best; u16 adjHull; } CvxMshCtx;
 void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     u16 hullMesh=ctx->hullMesh; const float* hullMx=ctx->hullMx; Manifold* best=&ctx->best; float spreadEps=ctx->spreadEps, thicknessTolerance=ctx->thicknessTolerance;
     if (vmin(ta.x,vmin(tb.x,tc.x))>ctx->hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<ctx->hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>ctx->hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<ctx->hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>ctx->hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<ctx->hb.mn.z) return;
-    SupportCtx supCtx = {.type = SUP_HULL_TRI, .meshA = hullMesh, .matA = hullMx, .ta = ta, .tb = tb, .tc = tc};
+    SupportCtx supCtx = MakeCtx_HullTri(hullMesh, hullMx, ctx->adjHull, ta, tb, tc);
     GJKResult gjk = RunGJK(&supCtx, 32); if(!gjk.hit)return;
     Simplex3D *s = &gjk.s;
     while (s->n<4) {
@@ -405,10 +419,10 @@ void BvhWalkAABB_CvxTri(u16 triMesh, const float* triMx, AABB3 hb, CvxMshCtx* ct
     }
 }
 
-Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx) {
+Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx, u16 adjHull) {
     Manifold z={0}; if(hullMesh>=MAX_MDLS||triMesh>=MAX_MDLS)return z;
     u32 hn=modelVertexCounts[hullMesh]; if(!hn)return z;
-    CvxMshCtx ctx={0}; ctx.hullMesh=hullMesh; ctx.hullMx=hullMx;
+    CvxMshCtx ctx={0}; ctx.hullMesh=hullMesh; ctx.hullMx=hullMx; ctx.adjHull=adjHull;
     AABB3 hb={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}};
     for (u32 i=0;i<hn;++i) { V3 w=MvVert(hullMx,MeshVert(hullMesh,i)); hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); }
     ctx.hb=hb; V3 hext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(hext.x,vmax(hext.y,hext.z))*0.15f);
@@ -419,15 +433,16 @@ Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* tri
     return ctx.best;
 }
 
-Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB) {
+Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 adjA, u16 adjB) {
     Manifold m={0}; if(meshA>=MAX_MDLS||meshB>=MAX_MDLS)return m;
-    SupportCtx ctx = {.type = SUP_HULL_HULL, .meshA = meshA, .meshB = meshB, .matA = matA, .matB = matB};
+    SupportCtx ctx = MakeCtx_HullHull(meshA, meshB, matA, matB, adjA, adjB);
     GJKResult gjk = RunGJK(&ctx, 64); if(!gjk.hit)return m;
     if(gjk.s.n<4) RunGJKFallback(&ctx, &gjk.s); if(gjk.s.n<4)return m;
     EPAState epa; SeedEPA(&epa, &gjk.s);
     for(int it=0;it<32;++it) {
         int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break;
-        V3 bn=epa.ef[bf].n; V3 wA=HullSupport(meshA,matA,ctx.adjA,bn); V3 wB=HullSupport(meshB,matB,ctx.adjB,(V3){-bn.x,-bn.y,-bn.z});
+        V3 bn=epa.ef[bf].n; 
+        V3 wA, wB; GetSupportPair(&ctx, bn, &wA, &wB);
         V3 sup=V3_AsubB(wA,wB);
         if (V3_dot(bn,sup)-bd<PHY_EPSILON) {
             m.normal=bn; m.maxPen=bd; m.n=1; V3 deepPoint=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); m.p[0]=(ManifoldPt){deepPoint,bd};
@@ -456,7 +471,7 @@ Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB) {
 }
 
 Manifold BoxMsh(ShapeBox b,u16 m,const float* mx){
-    CvxMshCtx c={0};if(m>=MAX_MDLS||!modelTriangleCounts[m])return c.best; V3 bv[8]; c.hullMesh=m; c.hullMx=mx; c.boxV=bv; c.boxN=8; V3 a[3]; float h[3]={b.hExt.x,b.hExt.y,b.hExt.z}; obb_axes(b.rot,a,a+1,a+2); AABB3 q={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}};
+    CvxMshCtx c={0}; c.adjHull=U16_MAX; if(m>=MAX_MDLS||!modelTriangleCounts[m])return c.best; V3 bv[8]; c.hullMesh=m; c.hullMx=mx; c.boxV=bv; c.boxN=8; V3 a[3]; float h[3]={b.hExt.x,b.hExt.y,b.hExt.z}; obb_axes(b.rot,a,a+1,a+2); AABB3 q={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}};
     for(int i=0;i<8;i++){V3 p=b.ctr;for(int k=0;k<3;k++)p=V3_AplusB(p,V3_ScaleByF(a[k],((i>>k)&1?1.f:-1.f)*h[k])); bv[i]=p; q.mn.x=vmin(q.mn.x,p.x); q.mn.y=vmin(q.mn.y,p.y); q.mn.z=vmin(q.mn.z,p.z); q.mx.x=vmax(q.mx.x,p.x); q.mx.y=vmax(q.mx.y,p.y); q.mx.z=vmax(q.mx.z,p.z);}
     V3 e=V3_AsubB(q.mx,q.mn),skin={.01f,.01f,.01f}; c.spreadEps=vmax(.02f,vmax(e.x,vmax(e.y,e.z))*.15f); c.thicknessTolerance=vclamp(V3_Mag(b.hExt)*.06f,.003f,.02f); c.hb=(AABB3){V3_AsubB(q.mn,skin),V3_AplusB(q.mx,skin)};
     if (BvhHasBVH(m)) { BvhWalkAABB_CvxTri(m, mx, c.hb, &c); c.best.normal=V3_ScaleByF(c.best.normal,-1.f); return c.best; }
@@ -601,14 +616,14 @@ void Physics(float dt) {
                         else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_MSH) { mf = OverlapToManifold(CapMsh(Entity_GetCap(a),World.instances[b].modelIndex,mxB)); }
                         else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_MSH) { ShapeSphere sa = Entity_GetSph(a); mf = OverlapToManifold(SphMsh(sa.ctr,sa.rad,World.instances[b].modelIndex,mxB)); }
                         else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_MSH) { mf = BoxMsh(Entity_GetBox(a),World.instances[b].modelIndex,mxB); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_MSH) { mf = CvxMsh(World.instances[a].colMeshIndex,mxA,World.instances[b].modelIndex,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CAP) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA); }
-                        else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_SPH) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA); }
-                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_BOX) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA); }
-                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,mxA,mxB); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_MSH) { mf = CvxMsh(World.instances[a].colMeshIndex,mxA,World.instances[b].modelIndex,mxB,World.instances[a].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CAP) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
+                        else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_SPH) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
+                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_BOX) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
+                        else if (World.collider[a] == COLTYPE_CVX && World.collider[b] == COLTYPE_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,mxA,mxB,World.instances[a].adjacencyIdx,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else { mf=OverlapToManifold(SphSph(World.position[a],World.colliderSize[a].x,World.position[b],World.colliderSize[b].x)); }
                         if (likely(mf.n && contactCount < 32)) { contactsMani[contactCount] = mf; contactsOther[contactCount] = b; contactCount++; }
                     }

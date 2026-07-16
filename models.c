@@ -510,7 +510,7 @@ void UpdateAnims(void) {
 void ChangeAnim(Entity* e, u8 clip) { e->clip = clip; e->currentFrameFinished = 0.0; AnimationClip* c = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; e->frame = c->frameStart; } // TODO actually use this!}
 
 // Hill Climb Racer Adjacency List
-#define MAX_UNIQUE_CVX_MESHES 1024
+#define MAX_UNIQUE_CVX_MESHES 64
 u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount;
 u32** cvxAdjOffsets = NULL; u16** cvxAdjLists = NULL; // CSR format adjacency data: cvxAdjOffsets[m] has vCount + 1 entries pointing into cvxAdjLists[m]
 u16  lastCvxSupport[MAX_UNIQUE_CVX_MESHES] = {0}; // Persistent hill-climbing state per mesh
@@ -531,7 +531,8 @@ void GenerateConvexAdjacencyLists() {
         }
     }
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { // 2. Generate edge adjacency list for each unique mesh
-        u16 m = uniqueCvxMeshIndices[u]; u32 vCount=modelVertexCounts[m], tCount=modelTriangleCounts[m]; if (!vCount || !tCount || m >= MAX_MDLS) continue;
+        u16 m = uniqueCvxMeshIndices[u]; if (m >= MAX_MDLS){continue;}
+        u32 vCount=modelVertexCounts[m], tCount=modelTriangleCounts[m]; if (!vCount || !tCount) continue;
         u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
         for (u32 t = 0; t < tCount; ++t) {
             u16 i0=modelTriangles[m][t*3+0];                               u16 i1=modelTriangles[m][t*3+1];                               u16 i2=modelTriangles[m][t*3+2];
@@ -541,8 +542,6 @@ void GenerateConvexAdjacencyLists() {
         
         u32 uniqueEdgeCount=0; 
         u32* degree=OS_Alloc(vCount * sizeof(u32)); 
-        mset(degree, 0, vCount * sizeof(u32)); // FIX: MUST ZERO OUT DEGREE ARRAY
-        
         for (u32 i = 0; i < edgeCount; ++i) { if (i == 0 || tempEdges[i] != tempEdges[i-1]) { tempEdges[uniqueEdgeCount++]=tempEdges[i]; u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); degree[a]++; degree[b]++; } }
         u32* offsets=OS_Alloc((vCount + 1) * sizeof(u32)); offsets[0]=0; for(u32 i=0;i<vCount;++i){offsets[i+1]=offsets[i] + degree[i];}
         u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));

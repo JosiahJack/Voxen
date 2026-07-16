@@ -885,7 +885,9 @@ void InputKey(WinSyswindow* win,int key,int action) {
 
 void InputMouseClick(WinSyswindow* win, int button, int action) { if (button<0 || button>7) {return;} char wasDown = win->mouseButtons[button]; win->mouseButtons[button] = (char)action; bool down = (action == 1); Sys_Input.mouseButtons[button].pressed  = down && !wasDown; Sys_Input.mouseButtons[button].released = !down && wasDown; Sys_Input.mouseButtons[button].down=down; }
 void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) { float yaw=deg2rad(yaw_deg), pitch=deg2rad(pitch_deg), roll=deg2rad(roll_deg/*Around Z (forward)*/); float cy=vcosf(yaw * 0.5f), sy=vsinf(yaw * 0.5f), cp=vcosf(pitch * 0.5f), sp=vsinf(pitch * 0.5f), cr=vcosf(roll * 0.5f), sr=vsinf(roll * 0.5f); q->w=cy*cp*cr + sy*sp*sr; q->x=cy*sp*cr + sy*cp*sr;/*X(pitch)*/ q->y=sy*cp*cr - cy*sp*sr;/*Y(yaw)*/ q->z=cy*cp*sr - sy*sp*cr;/*Z(roll)*/ } // Skipping quat normalization, not needed
+bool firstFrameMouselook = true;
 void InputCursorPos(WinSyswindow* win, double xpos, double ypos) { // static const float HeadBobRate   = 0.2f, HeadBobAmount = 0.08f,bobTarget = 0.3f; TODO
+    if (firstFrameMouselook) { firstFrameMouselook=false; win->virtualCursorPosX = xpos; win->virtualCursorPosY = ypos; }
     if (win->virtualCursorPosX == xpos && win->virtualCursorPosY == ypos) { last_mouse_x=xpos; last_mouse_y=ypos; return;}
     win->virtualCursorPosX = xpos; win->virtualCursorPosY = ypos; if (!window_has_focus){return;}
     if (ignore_next_mouse_delta) { World.currentMouse_dx = World.currentMouse_dy = 0; ignore_next_mouse_delta = mouseMovementThisFrame = false; return; }
