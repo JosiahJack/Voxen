@@ -430,6 +430,13 @@ void LoadModels() {
         for (int i=0;i<threadCnt;++i) OS_ThreadCreate(&th[i],ModelParsingWorker,&tasks[i]);
         for (int i=0;i<threadCnt;++i) OS_ThreadJoin(&th[i]);
     } else { for (int t=0;t<threadCnt;++t) ModelParsingWorker(&tasks[t]); /*Single threaded fallback*/ }
+    
+    physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
+    physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+    physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
+    PhysGeomTask ptasks[32]; OS_Thread pth[32];
+    for (int i=0;i<threadCnt;++i) ptasks[i] = (PhysGeomTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,i};
+    if (threadCnt > 1) {     for (int i=0;i<threadCnt;++i) OS_ThreadCreate(&pth[i],PhysGeomWorker,&ptasks[i]); } // Sneak the physics deduplication passes underneath the GPU upload ;)
     glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
     for (int i=0; i<mdlsCnt; ++i) {
         if (!modelVertexCounts[i]) continue;
@@ -453,13 +460,8 @@ void LoadModels() {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         if (raw[i].data) OS_Free((void*)raw[i].data,raw[i].size);
     }
-    glBindBuffer(GL_ARRAY_BUFFER,0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0); glFlush(); glFinish();
-    physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
-    physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
-    physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
-    PhysGeomTask ptasks[32]; OS_Thread pth[32];
-    for (int i=0;i<threadCnt;++i) ptasks[i] = (PhysGeomTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,i};
-    if (threadCnt > 1) {     for (int i=0;i<threadCnt;++i){OS_ThreadCreate(&pth[i],PhysGeomWorker,&ptasks[i]);}    for(int i=0;i<threadCnt;++i){OS_ThreadJoin(&pth[i]);}    } else { for(int t=0;t<threadCnt;++t){PhysGeomWorker(&ptasks[t]);} /*Single threaded fallback*/}
+    glBindBuffer(GL_ARRAY_BUFFER,0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
+    if (threadCnt > 1) { for(int i=0;i<threadCnt;++i){OS_ThreadJoin(&pth[i]);}    } else { for(int t=0;t<threadCnt;++t){PhysGeomWorker(&ptasks[t]);} /*Single threaded fallback*/} // Regroup the physics deduplication passes after GPU upload, this does save about 0.18secs!
     for (u32 m = 0; m < mdlsCnt; ++m) {
         if (vPos[m]) {
             OS_Free(vPos[m],(size_t)modelVertexCounts[m] * 3 * sizeof(float)); OS_Free(vNor[m],(size_t)modelVertexCounts[m] * 3 * sizeof(float)); OS_Free(vUV[m],(size_t)modelVertexCounts[m] * 2 * sizeof(float)); OS_Free(modelTriangles[m],(size_t)modelTriangleCounts[m] * 3 * sizeof(u16));
