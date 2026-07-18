@@ -190,44 +190,44 @@ inline V3 SphSupport(ShapeSphere b, V3 d) { float L=V3_dot(d,d); float safeL=vma
 float copysignf(float magnitude, float sign) { float result; __asm__ ("andps %[sign_mask], %[sign]\n\tandnps %[mag], %[sign_mask]\n\torps %[sign_mask], %[mag]\n\t":[mag] "+x" (magnitude), [sign] "+x" (sign), [sign_mask] "=x" (result): "2" (-0.0f)); return magnitude; } // Loads the sign bit mask (0x80000000) into sign_mask
 inline V3 BoxSupport(ShapeBox b, V3 d) { V3 x, y, z; obb_axes(b.rot, &x, &y, &z); float kx = copysignf(1.0f, V3_dot(d, x)); float ky = copysignf(1.0f, V3_dot(d, y)); float kz = copysignf(1.0f, V3_dot(d, z)); return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr, V3_ScaleByF(x, kx * b.hExt.x)), V3_ScaleByF(y, ky * b.hExt.y)), V3_ScaleByF(z, kz * b.hExt.z)); }
 inline V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db=V3_dot(cap.base,d), dt=V3_dot(cap.tip,d); float mask=(dt > db); V3 best=V3_AplusB(V3_ScaleByF(cap.tip,mask),V3_ScaleByF(cap.base,1.0f - mask)); float L = V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); V3 dir=V3_ScaleByF(d,cap.rad / vsqrtf(safeL)); float lmask=(L >= PHY_EPSILON); return V3_AplusB(best,V3_ScaleByF(dir,lmask)); }
-V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld) { //OLD VERSION THAT WORKS FINE BUT IS SLOWER
-    u32 n = modelVertexCounts[m]; (void)adjIdx;
-    float dLocalx,dLocaly,dLocalz; dLocalx=M[0] * dWorld.x + M[1] * dWorld.y + M[2] * dWorld.z; dLocaly=M[4] * dWorld.x + M[5] * dWorld.y + M[6] * dWorld.z; dLocalz=M[8] * dWorld.x + M[9] * dWorld.y + M[10] * dWorld.z;
-    const float *p=vPos[m]; V3 bestLocal={p[0],p[1],p[2]}; float top = bestLocal.x*dLocalx + bestLocal.y*dLocaly + bestLocal.z*dLocalz;
-    for (u32 i=1;i<n;++i) { p+=3; float dot=p[0]*dLocalx + p[1]*dLocaly + p[2]*dLocalz; if(unlikely(dot > top)){top=dot; bestLocal=(V3){p[0],p[1],p[2]};} }
-    return MvVert(M,bestLocal);
-}
-
-// u16 cvxSeedVertex[MAX_UNIQUE_CVX_MESHES] = {0};
-// V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld/*, u16* seedInOut*/) {
-//     V3 dLocal = {M[0]*dWorld.x + M[1]*dWorld.y + M[2]*dWorld.z,M[4]*dWorld.x + M[5]*dWorld.y + M[6]*dWorld.z,M[8]*dWorld.x + M[9]*dWorld.y + M[10]*dWorld.z};
-//     const float* p = vPos[m];
-//     u32 n = modelVertexCounts[m];
-//     if (adjIdx >= MAX_UNIQUE_CVX_MESHES || !cvxAdjOffsets[adjIdx] || V3_dot(dLocal,dLocal) < PHY_EPSILON) { // Fallback: no adjacency built, or degenerate query.
-//         V3 bestLocal = { p[0], p[1], p[2] }; float top = bestLocal.x*dLocal.x + bestLocal.y*dLocal.y + bestLocal.z*dLocal.z; const float* q = p;
-//         for (u32 i = 1; i < n; ++i) { q += 3; float dot = q[0]*dLocal.x + q[1]*dLocal.y + q[2]*dLocal.z; if (unlikely(dot > top)) { top = dot; bestLocal = (V3){q[0], q[1], q[2]}; } }
-//         return MvVert(M, bestLocal);
-//     }
-//     u16 curr = /*(seedInOut && *seedInOut < n) ? *seedInOut : */cvxSeedVertex[adjIdx]; if (curr >= n) curr = 0; // Choose warm start: caller-provided seed if valid, else per-mesh default.
-//     float currDot = p[curr*3]*dLocal.x + p[curr*3+1]*dLocal.y + p[curr*3+2]*dLocal.z;
-//     float tol  = 1e-6f * vsqrtf(V3_dot(dLocal,dLocal)); // Scale-aware tolerance: proportional to |d| times a small relative eps. 1e-6f * |d| is roughly one ULP for typical world-space extents.
-//     u32 guard = n + 1;
-//     while (guard--) { // Bounded climb. n is a hard upper bound on the number of distinct vertices a strict monotone walk can visit; use it as the safety cap.
-//         u16  bestNext = curr; float bestDot = currDot;
-//         u32 start = cvxAdjOffsets[adjIdx][curr]; u32 end   = cvxAdjOffsets[adjIdx][curr + 1];
-//         for (u32 i = start; i < end; ++i) {
-//             u16 nb = cvxAdjLists[adjIdx][i]; float dot = p[nb*3]*dLocal.x + p[nb*3+1]*dLocal.y + p[nb*3+2]*dLocal.z;
-//             if (dot > bestDot + tol) {  bestDot = dot; bestNext = nb; }// STRICT improvement over the CURRENT vertex; deterministic index tie-break only when a neighbor is essentially equal.
-//             else if (dot > currDot - tol && dot > bestDot - tol && nb < bestNext) { bestDot = dot; bestNext = nb; } // plateau: pick the lowest-index tied neighbor, but never move if it isn't at least as good as `curr`.
-//         }
-//         if (bestNext == curr) break;    // local (== global on a convex hull) max
-//         curr = bestNext;
-//         currDot = bestDot;
-//     }
-// //     if (seedInOut) *seedInOut = curr;   // warm-start next query
-//     V3 bestLocal = { p[curr*3], p[curr*3+1], p[curr*3+2] };
-//     return MvVert(M, bestLocal);
+// V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld) { //OLD VERSION THAT WORKS FINE BUT IS SLOWER
+//     u32 n = modelVertexCounts[m]; (void)adjIdx;
+//     float dLocalx,dLocaly,dLocalz; dLocalx=M[0] * dWorld.x + M[1] * dWorld.y + M[2] * dWorld.z; dLocaly=M[4] * dWorld.x + M[5] * dWorld.y + M[6] * dWorld.z; dLocalz=M[8] * dWorld.x + M[9] * dWorld.y + M[10] * dWorld.z;
+//     const float *p=vPos[m]; V3 bestLocal={p[0],p[1],p[2]}; float top = bestLocal.x*dLocalx + bestLocal.y*dLocaly + bestLocal.z*dLocalz;
+//     for (u32 i=1;i<n;++i) { p+=3; float dot=p[0]*dLocalx + p[1]*dLocaly + p[2]*dLocalz; if(unlikely(dot > top)){top=dot; bestLocal=(V3){p[0],p[1],p[2]};} }
+//     return MvVert(M,bestLocal);
 // }
+
+u16 cvxSeedVertex[MAX_UNIQUE_CVX_MESHES] = {0};
+V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld/*, u16* seedInOut*/) {
+    V3 dLocal = {M[0]*dWorld.x + M[1]*dWorld.y + M[2]*dWorld.z,M[4]*dWorld.x + M[5]*dWorld.y + M[6]*dWorld.z,M[8]*dWorld.x + M[9]*dWorld.y + M[10]*dWorld.z};
+    const float* p = vPos[m];
+    u32 n = modelVertexCounts[m];
+    if (adjIdx >= MAX_UNIQUE_CVX_MESHES || !cvxAdjOffsets[adjIdx] || V3_dot(dLocal,dLocal) < 0.000001f) { // Fallback: no adjacency built, or degenerate query.
+        V3 bestLocal = { p[0], p[1], p[2] }; float top = bestLocal.x*dLocal.x + bestLocal.y*dLocal.y + bestLocal.z*dLocal.z; const float* q = p;
+        for (u32 i = 1; i < n; ++i) { q += 3; float dot = q[0]*dLocal.x + q[1]*dLocal.y + q[2]*dLocal.z; if (unlikely(dot > top)) { top = dot; bestLocal = (V3){q[0], q[1], q[2]}; } }
+        return MvVert(M, bestLocal);
+    }
+    u16 curr = /*(seedInOut && *seedInOut < n) ? *seedInOut : */cvxSeedVertex[adjIdx]; if (curr >= n) curr = 0; // Choose warm start: caller-provided seed if valid, else per-mesh default.
+    float currDot = p[curr*3]*dLocal.x + p[curr*3+1]*dLocal.y + p[curr*3+2]*dLocal.z;
+    float tol  = 1e-6f * vsqrtf(V3_dot(dLocal,dLocal)); // Scale-aware tolerance: proportional to |d| times a small relative eps. 1e-6f * |d| is roughly one ULP for typical world-space extents.
+    u32 guard = n + 1;
+    while (guard--) { // Bounded climb. n is a hard upper bound on the number of distinct vertices a strict monotone walk can visit; use it as the safety cap.
+        u16  bestNext = curr; float bestDot = currDot;
+        u32 start = cvxAdjOffsets[adjIdx][curr]; u32 end   = cvxAdjOffsets[adjIdx][curr + 1];
+        for (u32 i = start; i < end; ++i) {
+            u16 nb = cvxAdjLists[adjIdx][i]; float dot = p[nb*3]*dLocal.x + p[nb*3+1]*dLocal.y + p[nb*3+2]*dLocal.z;
+            if (dot > bestDot + tol) {  bestDot = dot; bestNext = nb; }// STRICT improvement over the CURRENT vertex; deterministic index tie-break only when a neighbor is essentially equal.
+            else if (dot > currDot - tol && dot > bestDot - tol && nb < bestNext) { bestDot = dot; bestNext = nb; } // plateau: pick the lowest-index tied neighbor, but never move if it isn't at least as good as `curr`.
+        }
+        if (bestNext == curr) break;    // local (== global on a convex hull) max
+        curr = bestNext;
+        currDot = bestDot;
+    }
+//     if (seedInOut) *seedInOut = curr;   // warm-start next query
+    V3 bestLocal = { p[curr*3], p[curr*3+1], p[curr*3+2] };
+    return MvVert(M, bestLocal);
+}
 
 V3 GJKSupport(u16 prim, V3 d) { if(World.collider[prim] == COLTYPE_SPH){return SphSupport(Entity_GetSph(prim),d);} if(World.collider[prim] == COLTYPE_BOX){return BoxSupport(Entity_GetBox(prim),d);} return CapsuleSupport(Entity_GetCap(prim),d); }
 inline void GJKSet(Simplex3D *s, int i, V3 v, V3 wA, V3 wB) { s->v[i] = v; s->wA[i] = wA; s->wB[i] = wB; }

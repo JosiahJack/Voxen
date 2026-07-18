@@ -147,11 +147,8 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
 #define BVH_LEAF_MAX_TRIS 8
 #define BVH_MAX_NODES_PER_MDL 586   // 1 + 8 + 64 + 512 = 585 worst case, +safety
 #define BVH_MAX_TRIS_PER_MDL ((MAX_OUTPUT_VERTS + 2) / 3)  // ~6986
-typedef struct { V3 mn,mx;  u32 triStart;  u16 triCount; i16 children[8]; } BvhNode;
-BvhNode** modelBVHNodes = NULL;          // [mdlsCnt] array of BvhNode arrays (NULL if model has no BVH)
-u16**    modelBVHTriOrder = NULL;        // [mdlsCnt] array of u16 triangle-index arrays (reordered for leaf-contiguous ranges)
-u32      modelBVHNodeCounts[MAX_MDLS] = {0};
-u32      modelBVHTriOrderCounts[MAX_MDLS] = {0};
+typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode; 
+BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
 typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 static BvhBuildCtx thrd_bvh_ctx[32];
 // Recursive centroid-based octree build. Each triangle goes into exactly one octant (the one containing its centroid), so there is no triangle duplication. The node AABB is the union of its triangles' AABBs (NOT the octant AABB) — this guarantees that any query which overlaps a triangle also overlaps the triangle's ancestor
@@ -167,15 +164,9 @@ static i32 BvhBuildOctree(BvhBuildCtx* __restrict ctx, u16 m, u16* triIdxArray, 
     for (u32 i = 0; i < triCount; i++) { // Compute node AABB = union of triangle AABBs (also needed for centroid computation)
         u32 triIdx = triIdxArray[i];
         u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
-        const float* v0 = vPos[m] + (size_t)i0*3;
-        const float* v1 = vPos[m] + (size_t)i1*3;
-        const float* v2 = vPos[m] + (size_t)i2*3;
-        mn.x = vmin(mn.x,vmin(vmin(v0[0],v1[0]),v2[0]));
-        mn.y = vmin(mn.y,vmin(vmin(v0[1],v1[1]),v2[1]));
-        mn.z = vmin(mn.z,vmin(vmin(v0[2],v1[2]),v2[2]));
-        mx.x = vmax(mx.x,vmax(vmax(v0[0],v1[0]),v2[0]));
-        mx.y = vmax(mx.y,vmax(vmax(v0[1],v1[1]),v2[1]));
-        mx.z = vmax(mx.z,vmax(vmax(v0[2],v1[2]),v2[2]));
+        const float* v0 = vPos[m] + (size_t)i0*3; const float* v1 = vPos[m] + (size_t)i1*3; const float* v2 = vPos[m] + (size_t)i2*3;
+        mn.x = vmin(mn.x,vmin(vmin(v0[0],v1[0]),v2[0])); mn.y = vmin(mn.y,vmin(vmin(v0[1],v1[1]),v2[1])); mn.z = vmin(mn.z,vmin(vmin(v0[2],v1[2]),v2[2]));
+        mx.x = vmax(mx.x,vmax(vmax(v0[0],v1[0]),v2[0])); mx.y = vmax(mx.y,vmax(vmax(v0[1],v1[1]),v2[1])); mx.z = vmax(mx.z,vmax(vmax(v0[2],v1[2]),v2[2]));
     }
     node->mn = mn; node->mx = mx;
     if (depth >= BVH_MAX_DEPTH || triCount <= BVH_LEAF_MAX_TRIS || ctx->nodeCount + 8 > BVH_MAX_NODES_PER_MDL) { // Leaf condition: max depth reached, few triangles, or no node budget left for children
