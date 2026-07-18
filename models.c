@@ -4,6 +4,24 @@
 static float **thrd_pos = NULL, **thread_temp_nrm = NULL, **thrd_uv = NULL, **thrd_verts = NULL; static u16** thrd_tris = NULL; static u32** thrd_ht = NULL; static u32** thrd_ht_used = NULL; 
 static u16** thrd_ft_scratch = NULL; static u32** thrd_remap_scratch = NULL; static u8** thrd_nv_scratch = NULL; static u8** thrd_cache_scratch = NULL;
 typedef struct { const char* data; const char* name; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
+typedef struct { u32 start,end; int tid; } PhysGeomTask;
+#define BVH_MAX_DEPTH 3
+#define BVH_LEAF_MAX_TRIS 8
+#define BVH_MAX_NODES_PER_MDL 586   // 1 + 8 + 64 + 512 = 585 worst case, +safety
+#define BVH_MAX_TRIS_PER_MDL ((MAX_OUTPUT_VERTS + 2) / 3)  // ~6986
+#define WELD_EPS 0.0001f
+#define WELD_INV_EPS (1.0f / WELD_EPS)
+#define WELD_HASH_SIZE HASH_SIZE   // reuse the exact same-sized scratch buffers as the OBJ-parse hash (32768) — plenty for any single model's vertex count (<= MAX_OUTPUT_VERTS)
+typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode; 
+BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
+typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
+static BvhBuildCtx thrd_bvh_ctx[32];
+#define MAX_UNIQUE_CVX_MESHES 64
+u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount;
+u32** cvxAdjOffsets = NULL; u16** cvxAdjLists = NULL; // CSR format adjacency data: cvxAdjOffsets[m] has vCount + 1 entries pointing into cvxAdjLists[m]
+u16  cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
+u16  lastCvxSupport[MAX_UNIQUE_CVX_MESHES] = {0}; // Persistent hill-climbing state per mesh
+int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
 static u16 base_table[512]; static u8 shift_table[512];
 void InitializeFloatToHalfLUT() {
     for (int i = 0; i < 256; ++i) {
@@ -143,60 +161,49 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
     return true;
 }
 
-#define BVH_MAX_DEPTH 3
-#define BVH_LEAF_MAX_TRIS 8
-#define BVH_MAX_NODES_PER_MDL 586   // 1 + 8 + 64 + 512 = 585 worst case, +safety
-#define BVH_MAX_TRIS_PER_MDL ((MAX_OUTPUT_VERTS + 2) / 3)  // ~6986
-typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode; 
-BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
-typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
-static BvhBuildCtx thrd_bvh_ctx[32];
 // Recursive centroid-based octree build. Each triangle goes into exactly one octant (the one containing its centroid), so there is no triangle duplication. The node AABB is the union of its triangles' AABBs (NOT the octant AABB) — this guarantees that any query which overlaps a triangle also overlaps the triangle's ancestor
 // nodes, so traversal never misses a triangle. triIdxArray is modified in-place: on return it is partitioned by octant so that each child's triangles are contiguous (matches the leaf ranges written to ctx->triOrder).
-static i32 BvhBuildOctree(BvhBuildCtx* __restrict ctx, u16 m, u16* triIdxArray, u32 triCount, u32 depth) {
+static i32 BvhBuildOctree(BvhBuildCtx* __restrict ctx, u16 m, const float* __restrict pos, const u16* __restrict tris, u16* triIdxArray, u32 triCount, u32 depth) {
     if (triCount == 0) return -1;
-    if (ctx->nodeCount >= BVH_MAX_NODES_PER_MDL) depth = BVH_MAX_DEPTH;  // out of node budget -> force leaf
+    if (ctx->nodeCount >= BVH_MAX_NODES_PER_MDL) depth = BVH_MAX_DEPTH;
     i32 nodeIdx = ctx->nodeCount++;
     BvhNode* node = &ctx->nodes[nodeIdx];
     node->triStart = 0; node->triCount = 0;
     for (int i = 0; i < 8; i++) node->children[i] = -1;
     V3 mn = {1e9f, 1e9f, 1e9f}, mx = {-1e9f, -1e9f, -1e9f};
-    for (u32 i = 0; i < triCount; i++) { // Compute node AABB = union of triangle AABBs (also needed for centroid computation)
-        u32 triIdx = triIdxArray[i];
-        u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
-        const float* v0 = vPos[m] + (size_t)i0*3; const float* v1 = vPos[m] + (size_t)i1*3; const float* v2 = vPos[m] + (size_t)i2*3;
+    for (u32 i = 0; i < triCount; i++) {
+        u32 triIdx = triIdxArray[i]; u32 i0=tris[triIdx*3+0], i1=tris[triIdx*3+1], i2=tris[triIdx*3+2];
+        const float* v0 = pos + (size_t)i0*3; const float* v1 = pos + (size_t)i1*3; const float* v2 = pos + (size_t)i2*3;
         mn.x = vmin(mn.x,vmin(vmin(v0[0],v1[0]),v2[0])); mn.y = vmin(mn.y,vmin(vmin(v0[1],v1[1]),v2[1])); mn.z = vmin(mn.z,vmin(vmin(v0[2],v1[2]),v2[2]));
         mx.x = vmax(mx.x,vmax(vmax(v0[0],v1[0]),v2[0])); mx.y = vmax(mx.y,vmax(vmax(v0[1],v1[1]),v2[1])); mx.z = vmax(mx.z,vmax(vmax(v0[2],v1[2]),v2[2]));
     }
     node->mn = mn; node->mx = mx;
-    if (depth >= BVH_MAX_DEPTH || triCount <= BVH_LEAF_MAX_TRIS || ctx->nodeCount + 8 > BVH_MAX_NODES_PER_MDL) { // Leaf condition: max depth reached, few triangles, or no node budget left for children
+    if (depth >= BVH_MAX_DEPTH || triCount <= BVH_LEAF_MAX_TRIS || ctx->nodeCount + 8 > BVH_MAX_NODES_PER_MDL) {
         u32 startIdx = ctx->triCount;
         for (u32 i = 0; i < triCount && ctx->triCount < BVH_MAX_TRIS_PER_MDL; i++) { ctx->triOrder[ctx->triCount++] = triIdxArray[i]; }
-        node->triStart = startIdx; node->triCount = (u16)triCount;
-        return nodeIdx;
+        node->triStart = startIdx; node->triCount = (u16)triCount; return nodeIdx;
     }
-    V3 center = V3_ScaleByF(V3_AplusB(mn,mx),0.5f); // Centroid-based octant assignment
+    V3 center = V3_ScaleByF(V3_AplusB(mn,mx),0.5f);
     u32 octantCounts[8] = {0};
     for (u32 i=0;i<triCount;++i) {
         u32 triIdx = triIdxArray[i];
-        u32 i0 = modelTriangles[m][triIdx*3+0], i1 = modelTriangles[m][triIdx*3+1], i2 = modelTriangles[m][triIdx*3+2];
-        const float* v0 = vPos[m] + (size_t)i0*3;
-        const float* v1 = vPos[m] + (size_t)i1*3;
-        const float* v2 = vPos[m] + (size_t)i2*3;
+        u32 i0 = tris[triIdx*3+0], i1 = tris[triIdx*3+1], i2 = tris[triIdx*3+2];   // was modelTriangles[m] — now uses the passed-in welded triangle buffer
+        const float* v0 = pos + (size_t)i0*3;                                     // was vPos[m] — now uses the passed-in welded position buffer
+        const float* v1 = pos + (size_t)i1*3;
+        const float* v2 = pos + (size_t)i2*3;
         V3 centroid = {(v0[0]+v1[0]+v2[0])*(1.0f/3.0f), (v0[1]+v1[1]+v2[1])*(1.0f/3.0f), (v0[2]+v1[2]+v2[2])*(1.0f/3.0f)};
         u8 oct = (u8)((centroid.x>=center.x) | ((centroid.y>=center.y)<<1) | ((centroid.z>=center.z)<<2));
-        ctx->triOctants[i] = oct;
-        octantCounts[oct]++;
+        ctx->triOctants[i] = oct; octantCounts[oct]++;
     }
     u32 octantStarts[8];
     u32 total = 0;
-    for (int o = 0; o < 8; o++) { octantStarts[o] = total; total += octantCounts[o]; } // Compute per-octant start offsets in scratch
+    for (int o = 0; o < 8; o++) { octantStarts[o] = total; total += octantCounts[o]; }
     u32 octantFill[8] = {0};
-    for (u32 i = 0; i < triCount; i++) { u8 o = ctx->triOctants[i]; ctx->triScratch[octantStarts[o] + octantFill[o]++] = triIdxArray[i]; } // Partition triangles into scratch (stable per-octant)
-    for (u32 i = 0; i < triCount; i++) { triIdxArray[i] = ctx->triScratch[i]; } // Copy back to triIdxArray (now partitioned by octant, each octant contiguous)
-    for (int o = 0; o < 8; o++) { // Recurse into each non-empty octant. The scratch arrays are reused at each depth because we have already copied the partitioned data back to triIdxArray.
+    for (u32 i = 0; i < triCount; i++) { u8 o = ctx->triOctants[i]; ctx->triScratch[octantStarts[o] + octantFill[o]++] = triIdxArray[i]; }
+    for (u32 i = 0; i < triCount; i++) { triIdxArray[i] = ctx->triScratch[i]; }
+    for (int o = 0; o < 8; o++) {
         if (octantCounts[o] == 0) continue;
-        i32 childIdx = BvhBuildOctree(ctx,m,triIdxArray + octantStarts[o],octantCounts[o],depth + 1);
+        i32 childIdx = BvhBuildOctree(ctx,m,pos,tris,triIdxArray + octantStarts[o],octantCounts[o],depth + 1); // <-- was missing pos,tris
         if (childIdx >= 0) node->children[o] = (i16)childIdx;
     }
     return nodeIdx;
@@ -209,12 +216,12 @@ static void BuildModelBVH(BvhBuildCtx* ctx, u16 m) {
     modelBVHNodeCounts[m] = 0;
     modelBVHTriOrderCounts[m] = 0;
     u32 triCount = modelTriangleCounts[m];
-    if (triCount == 0 || triCount > BVH_MAX_TRIS_PER_MDL) return;  // too many tris -> skip BVH (linear fallback)
-    if (!vPos[m] || !modelTriangles[m]) return;
+    if (triCount == 0 || triCount > BVH_MAX_TRIS_PER_MDL) { DualLogError("Too many verts on model %u!  Could not build a BVH!\n",m); return;}
+    if (!physPos[m] || !physTris[m]) return;
     ctx->nodeCount = ctx->triCount = 0;
-    u16* initialTris = ctx->initialTris; // per-thread scratch, avoids an OS_Alloc/OS_Free per model
+    u16* initialTris = ctx->initialTris;
     for (u32 i = 0; i < triCount; i++) initialTris[i] = (u16)i;
-    i32 rootIdx = BvhBuildOctree(ctx, m, initialTris, triCount, 0);
+    i32 rootIdx = BvhBuildOctree(ctx,m,physPos[m],physTris[m],initialTris,triCount,0);
     if (rootIdx < 0 || ctx->nodeCount == 0) return;
     modelBVHNodes[m] = (BvhNode*)OS_Alloc(ctx->nodeCount * sizeof(BvhNode));
     mcpy(modelBVHNodes[m], ctx->nodes, ctx->nodeCount * sizeof(BvhNode));
@@ -228,11 +235,9 @@ static void BuildModelBVH(BvhBuildCtx* ctx, u16 m) {
 typedef struct { u32 start, end; RawOBJ* raw; int tid; } ModelParseTask;
 static void* ModelParsingWorker(void* arg) {
     ModelParseTask* t = arg;
-    BvhBuildCtx* bvhCtx = &thrd_bvh_ctx[t->tid];
     for (u32 i = t->start; i < t->end; ++i) {
         RawOBJ obj = t->raw[i]; if (unlikely(!obj.data || obj.size <= 0)) continue;
         if (!ParseOBJ(i,obj.data,obj.size,thrd_pos[t->tid],thread_temp_nrm[t->tid],thrd_uv[t->tid],thrd_verts[t->tid],thrd_tris[t->tid],thrd_ht[t->tid],thrd_ht_used[t->tid],thrd_ft_scratch[t->tid],thrd_remap_scratch[t->tid],thrd_nv_scratch[t->tid],thrd_cache_scratch[t->tid],&vPos[i],&vNor[i],&vUV[i],&modelVertexCounts[i],&modelTriangles[i],&modelTriangleCounts[i],obj.name)) continue;
-        BuildModelBVH(bvhCtx, (u16)i); // Build this model's BVH right away, inside the same worker thread, overlapping with other threads' OBJ parsing instead of a later serial pass.
     }
     return NULL;
 }
@@ -330,6 +335,47 @@ static inline float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist
     return tmin;
 }
 
+static inline u32 WeldHash(i32 x, i32 y, i32 z) { u32 h = ((u32)x * 0x8DA6B343u) ^ ((u32)y * 0xD8163841u) ^ ((u32)z * 0xCB1AB31Fu); return h & (WELD_HASH_SIZE - 1); }
+static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap) {
+    u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m];
+    if (!vc || !tc) { physPos[m] = NULL; physTris[m] = NULL; physVertCounts[m] = 0; return; }
+    const float* src = vPos[m];
+    mset(weldHt, 0xFF, WELD_HASH_SIZE * sizeof(u32));
+    u32 usedSlots = 0, weldedCount = 0;
+    float* weldedPos = (float*)OS_Alloc((size_t)vc * 3 * sizeof(float)); // worst case: no duplicates at all
+    for (u32 i = 0; i < vc; ++i) {
+        float x = src[i*3+0], y = src[i*3+1], z = src[i*3+2];
+        i32 cx = (i32)vfloor(x * WELD_INV_EPS), cy = (i32)vfloor(y * WELD_INV_EPS), cz = (i32)vfloor(z * WELD_INV_EPS);
+        u32 found = 0xFFFFFFFFU;
+        for (i32 dz = -1; dz <= 1 && found == 0xFFFFFFFFU; ++dz)
+        for (i32 dy = -1; dy <= 1 && found == 0xFFFFFFFFU; ++dy)
+        for (i32 dx = -1; dx <= 1 && found == 0xFFFFFFFFU; ++dx) {
+            u32 slot = WeldHash(cx+dx, cy+dy, cz+dz);
+            while (weldHt[slot] != 0xFFFFFFFFU) {
+                u32 cand = weldHt[slot];
+                float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z;
+                if (ddx*ddx + ddy*ddy + ddz*ddz <= WELD_EPS * WELD_EPS) { found = cand; break; }
+                slot = (slot + 1) & (WELD_HASH_SIZE - 1);
+            }
+        }
+        if (found == 0xFFFFFFFFU) {
+            found = weldedCount;
+            weldedPos[weldedCount*3+0]=x; weldedPos[weldedCount*3+1]=y; weldedPos[weldedCount*3+2]=z;
+            ++weldedCount;
+            u32 slot = WeldHash(cx, cy, cz);
+            while (weldHt[slot] != 0xFFFFFFFFU) slot = (slot + 1) & (WELD_HASH_SIZE - 1);
+            weldHt[slot] = found; weldHtUsed[usedSlots++] = slot;
+        }
+        remap[i] = (u16)found;
+    }
+    for (u32 i = 0; i < usedSlots; ++i) weldHt[weldHtUsed[i]] = 0xFFFFFFFFU; // reset shared scratch for the next model on this thread
+    u16* weldedTris = (u16*)OS_Alloc((size_t)tc * 3 * sizeof(u16));
+    const u16* srcTris = modelTriangles[m];
+    for (u32 i = 0; i < tc * 3; ++i) weldedTris[i] = remap[srcTris[i]];
+    physPos[m] = weldedPos; physTris[m] = weldedTris; physVertCounts[m] = weldedCount;
+}
+
+static void* PhysGeomWorker(void* a) { PhysGeomTask* t=a; BvhBuildCtx* bvhCtx=&thrd_bvh_ctx[t->tid]; u32* ht = thrd_ht[t->tid]; u32* u=thrd_ht_used[t->tid]; u16* sc=thrd_ft_scratch[t->tid]; for (u32 m = t->start; m < t->end; ++m) { if(m >= mdlsCnt || !modelVertexCounts[m] || !modelTriangleCounts[m]){physPos[m]=NULL; physTris[m]=NULL; physVertCounts[m]=0; continue;}  WeldModelPositions((u16)m,ht,u,sc); BuildModelBVH(bvhCtx,(u16)m); }  return NULL; }
 static inline bool BvhHasBVH(u16 m) { return (m < MAX_MDLS && modelBVHNodeCounts[m] && modelBVHNodes[m] != NULL); }
 void LoadModels() {
     double startModelTime = get_time();
@@ -388,7 +434,7 @@ void LoadModels() {
     if (threadCnt > 1) { // Each worker now parses its model range AND builds each model's BVH right after that model is parsed, all within the same thread -- overlapping BVH build cost with other threads' OBJ parsing instead of a separate serial post-pass.
         for (int i=0;i<threadCnt;++i) OS_ThreadCreate(&th[i],ModelParsingWorker,&tasks[i]);
         for (int i=0;i<threadCnt;++i) OS_ThreadJoin(&th[i]);
-    } else { for (int t=0;t<threadCnt;++t) ModelParsingWorker(&tasks[t]); }
+    } else { for (int t=0;t<threadCnt;++t) ModelParsingWorker(&tasks[t]); /*Single threaded fallback*/ }
     glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
     for (int i=0; i<mdlsCnt; ++i) {
         if (!modelVertexCounts[i]) continue;
@@ -413,6 +459,15 @@ void LoadModels() {
         if (raw[i].data) OS_Free((void*)raw[i].data,raw[i].size);
     }
     glBindBuffer(GL_ARRAY_BUFFER,0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0); glFlush(); glFinish();
+    physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
+    physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+    physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
+    modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*));
+    modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+    PhysGeomTask ptasks[32]; OS_Thread pth[32];
+    for (int i=0;i<threadCnt;++i) ptasks[i] = (PhysGeomTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,i};
+    if (threadCnt > 1) {     for (int i=0;i<threadCnt;++i){OS_ThreadCreate(&pth[i],PhysGeomWorker,&ptasks[i]);}    for(int i=0;i<threadCnt;++i){OS_ThreadJoin(&pth[i]);}    } else { for(int t=0;t<threadCnt;++t){PhysGeomWorker(&ptasks[t]);} /*Single threaded fallback*/}
+    for (u32 m = 0; m < mdlsCnt; ++m) { if (vUV[m]) { OS_Free(vUV[m],(size_t)modelVertexCounts[m]*2*sizeof(float)); vUV[m] = NULL; } }
     OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData));
     u32 totalNodes = 0, totalTris = 0; for (u32 m = 0; m < mdlsCnt; m++) { totalNodes += modelBVHNodeCounts[m]; totalTris += modelBVHTriOrderCounts[m]; }
     DualLog(" %u BVH nodes, %u BVH tri-refs vertices: %u, tris: %u, %f secs\n",totalNodes,totalTris,tv,tt,get_time() - startModelTime);
@@ -501,11 +556,6 @@ void UpdateAnims(void) {
 void ChangeAnim(Entity* e, u8 clip) { e->clip = clip; e->currentFrameFinished = 0.0; AnimationClip* c = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; e->frame = c->frameStart; } // TODO actually use this!}
 
 // Hill Climb Racer Adjacency List
-#define MAX_UNIQUE_CVX_MESHES 64
-u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount;
-u32** cvxAdjOffsets = NULL; u16** cvxAdjLists = NULL; // CSR format adjacency data: cvxAdjOffsets[m] has vCount + 1 entries pointing into cvxAdjLists[m]
-u16  lastCvxSupport[MAX_UNIQUE_CVX_MESHES] = {0}; // Persistent hill-climbing state per mesh
-int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
 void GenerateConvexAdjacencyLists() {
     double start_time = get_time();
     cvxAdjOffsets=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u32*)); cvxAdjLists=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u16*));
@@ -522,15 +572,17 @@ void GenerateConvexAdjacencyLists() {
         }
     }
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { // 2. Generate edge adjacency list for each unique mesh
-        u16 m = uniqueCvxMeshIndices[u]; if (m >= MAX_MDLS){continue;}
-        u32 vCount=modelVertexCounts[m], tCount=modelTriangleCounts[m]; if (!vCount || !tCount) continue;
+        u16 m = uniqueCvxMeshIndices[u]; if (m >= MAX_MDLS) continue;
+        u32 vCount = physVertCounts[m], tCount = modelTriangleCounts[m];
+        if (!vCount || !tCount || !physPos[m] || !physTris[m]) continue;
         u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
         for (u32 t = 0; t < tCount; ++t) {
-            u16 i0=modelTriangles[m][t*3+0];                               u16 i1=modelTriangles[m][t*3+1];                               u16 i2=modelTriangles[m][t*3+2];
-            tempEdges[edgeCount++]=((u32)vmin(i0,i1) << 16) | vmax(i0,i1); tempEdges[edgeCount++]=((u32)vmin(i1,i2) << 16) | vmax(i1,i2); tempEdges[edgeCount++]=((u32)vmin(i2,i0) << 16) | vmax(i2,i0);
+            u16 i0=physTris[m][t*3+0], i1=physTris[m][t*3+1], i2=physTris[m][t*3+2];
+            tempEdges[edgeCount++]=((u32)vmin(i0,i1) << 16) | vmax(i0,i1);
+            tempEdges[edgeCount++]=((u32)vmin(i1,i2) << 16) | vmax(i1,i2);
+            tempEdges[edgeCount++]=((u32)vmin(i2,i0) << 16) | vmax(i2,i0);
         }
         qsort_new(tempEdges,edgeCount,sizeof(u32),EdgeCompare);
-        
         u32 uniqueEdgeCount=0; 
         u32* degree=OS_Alloc(vCount * sizeof(u32)); 
         for (u32 i = 0; i < edgeCount; ++i) { if (i == 0 || tempEdges[i] != tempEdges[i-1]) { tempEdges[uniqueEdgeCount++]=tempEdges[i]; u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); degree[a]++; degree[b]++; } }
