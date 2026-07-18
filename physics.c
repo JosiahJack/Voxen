@@ -114,7 +114,7 @@ Quaternion quat_normalize(Quaternion q) {
     return q;
 }
 
-inline V3 MeshVert(u16 m, u32 i) { const float* p = vPos[m] + i * 3; return (V3){p[0],p[1],p[2]}; }
+inline V3 MeshVert(u16 m, u32 i) { const float* p = physPos[m] + i * 3; return (V3){p[0],p[1],p[2]}; }
 void ComputeConvexMeshInertiaTensor(u16 i) {
     u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i]=false; if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) {return;}
     float acc[6]={0}; float cm[3]={0}; float volAcc=0.0f; u32 triCount = modelTriangleCounts[mi];
@@ -194,7 +194,7 @@ V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld) {
     V3 dLocal = {M[0]*dWorld.x+M[1]*dWorld.y+M[2]*dWorld.z, M[4]*dWorld.x+M[5]*dWorld.y+M[6]*dWorld.z, M[8]*dWorld.x+M[9]*dWorld.y+M[10]*dWorld.z};
     bool haveAdj = adjIdx < uniqueCvxMeshCount && uniqueCvxMeshIndices[adjIdx] == m && cvxAdjOffsets[adjIdx] && physPos[m] && physVertCounts[m];
     if (!haveAdj || V3_dot(dLocal,dLocal) < 0.000001f) {
-        const float* p = vPos[m]; u32 n = modelVertexCounts[m];  // exhaustive fallback: duplicates are harmless here
+        const float* p = physPos[m]; u32 n = modelVertexCounts[m];  // exhaustive fallback: duplicates are harmless here
         V3 bestLocal = {p[0],p[1],p[2]}; float top = bestLocal.x*dLocal.x+bestLocal.y*dLocal.y+bestLocal.z*dLocal.z;
         for (u32 i=1;i<n;++i){const float* q=p+i*3; float d=q[0]*dLocal.x+q[1]*dLocal.y+q[2]*dLocal.z; if(unlikely(d>top)){top=d;bestLocal=(V3){q[0],q[1],q[2]};}}
         return MvVert(M, bestLocal);
@@ -432,7 +432,7 @@ Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 
             u32 nVertsB = modelVertexCounts[meshB];
             if (nVertsB > 0) {
                 float planeDist=V3_dot(bn,deepPoint),wscaleB=V3_Mag((V3){matB[0],matB[1],matB[2]}),thicknessTolerance=vclamp(modelBounds[meshB]*wscaleB*0.06f,0.003f,0.02f);
-                const u8* vb = (u8*)vPos[meshB];
+                const u8* vb = (u8*)physPos[meshB];
                 for(u32 i=0;i<nVertsB;++i) {
                     const u8* p = vb + i * 12; V3 ptLocal = *(V3*)p; V3 pt = MvVert(matB,ptLocal); float distToPlane=V3_dot(bn,pt)-planeDist;
                     if (vabs(distToPlane)<thicknessTolerance) { 

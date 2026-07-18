@@ -121,8 +121,8 @@ typedef struct { double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[M
 u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,
     textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS];
 static float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
-float modelMatrices[INSTANCE_COUNT*16]; u16** modelTriangles; u32 modelVertexCounts[MAX_MDLS] = {0}; u16 modelTriangleCounts[MAX_MDLS] = {0}; float modelBounds[MAX_MDLS]; u16 mdlsCnt;
-float **vPos,**vNor,**vUV,**physPos; u16** physTris; u32* physVertCounts;
+float modelMatrices[INSTANCE_COUNT*16]; u16** modelTriangles; u32 modelVertexCounts[MAX_MDLS]; u16 modelTriangleCounts[MAX_MDLS]; float modelBounds[MAX_MDLS]; u16 mdlsCnt;
+float **physPos; u16** physTris; u32* physVertCounts;
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; static int threadCnt=0; static u32 globalframe=0,globalframesPerLastSecond;
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
@@ -188,7 +188,7 @@ void DrawMeshCollider(u16 i) {
     Color col = ColliderColor(i); u16 mi = (World.collider[i] == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
     u32 triCount = modelTriangleCounts[mi]; if (!triCount) return;
     float M[16]; mcpy(M, &modelMatrices[i*16], 64); float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
-    const float* pos = vPos[mi]; const u16* tris = modelTriangles[mi];
+    const float* pos = physPos[mi]; const u16* tris = modelTriangles[mi];
     for (u32 j=0; j<triCount; j++) {
         V3 w[3]; for (int k=0;k<3;++k) { u32 vi=tris[j*3 + k]; float x=pos[vi*3 + 0]; float y=pos[vi*3 + 1]; float z=pos[vi*3 + 2]; w[k]=(V3){m00*x + m01*y + m02*z + tx, m10*x + m11*y + m12*z + ty, m20*x + m21*y + m22*z + tz}; }
         AddWireLine(w[0],w[1],col); AddWireLine(w[1],w[2],col); AddWireLine(w[2],w[0],col);
@@ -322,7 +322,78 @@ void ApplyPlayerMovements(float dt) {
 }
 #include "console.c" // Console Sys - CHEATS!
 #include "audio.c" // Audio Sys
-#include "ray.c" // Raycast Sys
+// Raycast System.  This is an exact polygonal casting system for high accuracy separate from the physics engine entirely except for layers and shared vertex positions.
+RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC) {
+    V3 AB=V3_AsubB(posB,posA), AC=V3_AsubB(posC,posA); V3 n=V3_Cross(AB,AC); V3 ao=V3_AsubB(origin,posA); V3 dao=V3_Cross(ao,dir);
+    float det=(-V3_dot(dir,n)); float invDet=1.0f / det; float d=V3_dot(ao,n) * invDet; float u=V3_dot(AC,dao) * invDet, v=(-V3_dot(AB,dao)) * invDet; float w=1.0f - u - v;
+    return (RaycastHit){.point=V3_AplusB(origin,V3_ScaleByF(dir,d)), .normal=V3_Normalize(n), .distance=d, .hitInstanceIndex=INSTANCE_COUNT, .hit=vabs(det) >= 0.00000001f && d >= 0 && u >= 0 && v >= 0 && w >= 0};
+}
+
+RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
+    RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
+    for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
+        if (!(layerMask & World.layer[i])) continue;
+        if (!(World.instances[i].entflags & EF_ACTIVE)) continue;
+        u16 mindex = World.instances[i].modelIndex; if (mindex >= mdlsCnt) continue;
+        V3 objPos = World.position[i]; u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); V3 delta = V3_AsubB(objPos,origin); float distSqrd = V3_dot(delta,delta), radBounds = vmax(modelBounds[mindex],1.81f);
+        float maxDistToObj = vmax(maxDist - radBounds,maxDist); if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
+        if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
+        u32 triCount = modelTriangleCounts[mindex]; if (triCount < 1) continue;
+        float M[16]; mcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
+        float m00=M[0], m10=M[1], m20=M[2], m01=M[4], m11=M[5], m21=M[6], m02=M[8], m12=M[9], m22=M[10], tx=M[12], ty=M[13], tz=M[14];
+        float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20); float sclx2 = sclx * sclx; float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21); float scly2 = scly * scly; float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22); float sclz2 = sclz * sclz;
+        V3 rel = {origin.x - tx, origin.y - ty, origin.z - tz};
+        V3 localOrigin = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2, (rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2, (rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2};
+        V3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
+        localDir = V3_Normalize(localDir);
+        const float* posPtr = physPos[mindex]; const u16* tris = physTris[mindex];
+        if (BvhHasBVH(mindex)) {
+            const BvhNode* nodes = modelBVHNodes[mindex]; const u16* triOrder = modelBVHTriOrder[mindex];
+            float minScale = vmin(sclx, vmin(scly, sclz)); if (minScale < 0.0001f) minScale = 0.0001f;
+            float localMax = maxDist / minScale;  // conservative local-space upper bound for the ray
+            float bestT = localMax; const BvhNode* stack[64]; int sp = 0; stack[sp++] = &nodes[0];
+            while (sp > 0) {
+                const BvhNode* node = stack[--sp];
+                float tEntry = BvhRayAABBHit(localOrigin, localDir, node->mn, node->mx, bestT);
+                if (tEntry < 0.0f) continue;  // ray misses node AABB or enters beyond bestT
+                if (node->triCount > 0) {
+                    for (u32 k = 0; k < node->triCount; k++) {
+                        u32 j = triOrder[node->triStart + k];
+                        u32 iA = tris[j*3 + 0];
+                        u32 iB = tris[j*3 + 1];
+                        u32 iC = tris[j*3 + 2];
+                        V3 posA = { posPtr[iA*3], posPtr[iA*3+1], posPtr[iA*3+2] };
+                        V3 posB = { posPtr[iB*3], posPtr[iB*3+1], posPtr[iB*3+2] };
+                        V3 posC = { posPtr[iC*3], posPtr[iC*3+1], posPtr[iC*3+2] };
+                        RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC); if (!tryTri.hit) continue;
+                        V3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz };
+                        float worldDist = V3_Dist(worldPoint,origin); if (worldDist >= result.distance) continue;
+                        V3 worldNormal = { (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z, (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z, (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z };
+                        worldNormal = V3_Normalize(worldNormal);
+                        result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i;
+                        bestT = tryTri.distance;  // tighten BVH pruning for remaining nodes
+                    }
+                } else { for (int o = 0; o < 8; o++) { if (node->children[o] >= 0) {stack[sp++] = &nodes[node->children[o]];} } }
+            }
+            continue;  // next entity
+        }
+        for (u32 j=0;j<triCount;++j) { // Linear fallback (no BVH)
+            u32 iA = tris[j*3 + 0];
+            u32 iB = tris[j*3 + 1];
+            u32 iC = tris[j*3 + 2];
+            V3 posA = { posPtr[iA*3], posPtr[iA*3+1], posPtr[iA*3+2] };
+            V3 posB = { posPtr[iB*3], posPtr[iB*3+1], posPtr[iB*3+2] };
+            V3 posC = { posPtr[iC*3], posPtr[iC*3+1], posPtr[iC*3+2] };
+            RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC); if (!tryTri.hit) continue;
+            V3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz };
+            float worldDist = V3_Dist(worldPoint,origin); if (worldDist >= result.distance) continue;
+            V3 worldNormal = { (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z, (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z, (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z };
+            worldNormal = V3_Normalize(worldNormal);
+            result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i;
+        }
+    }
+    return result;
+}
 #include "credits.h"
 #include "entity.c"
 #include "ai.c"

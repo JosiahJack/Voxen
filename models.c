@@ -1,6 +1,7 @@
 // models.c - 3D Models Loading System
 #define MAX_VERT_ELEMENT_SIZE 6964
 #define MAX_OUTPUT_VERTS 20960
+float **vPos,**vNor,**vUV; // Temporary CPU buffers
 static float **thrd_pos = NULL, **thread_temp_nrm = NULL, **thrd_uv = NULL, **thrd_verts = NULL; static u16** thrd_tris = NULL; static u32** thrd_ht = NULL; static u32** thrd_ht_used = NULL; 
 static u16** thrd_ft_scratch = NULL; static u32** thrd_remap_scratch = NULL; static u8** thrd_nv_scratch = NULL; static u8** thrd_cache_scratch = NULL;
 typedef struct { const char* data; const char* name; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
@@ -352,17 +353,12 @@ static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap) 
         for (i32 dx = -1; dx <= 1 && found == 0xFFFFFFFFU; ++dx) {
             u32 slot = WeldHash(cx+dx, cy+dy, cz+dz);
             while (weldHt[slot] != 0xFFFFFFFFU) {
-                u32 cand = weldHt[slot];
-                float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z;
-                if (ddx*ddx + ddy*ddy + ddz*ddz <= WELD_EPS * WELD_EPS) { found = cand; break; }
+                u32 cand = weldHt[slot]; float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z; if (ddx*ddx + ddy*ddy + ddz*ddz <= WELD_EPS * WELD_EPS) { found = cand; break; }
                 slot = (slot + 1) & (WELD_HASH_SIZE - 1);
             }
         }
         if (found == 0xFFFFFFFFU) {
-            found = weldedCount;
-            weldedPos[weldedCount*3+0]=x; weldedPos[weldedCount*3+1]=y; weldedPos[weldedCount*3+2]=z;
-            ++weldedCount;
-            u32 slot = WeldHash(cx, cy, cz);
+            found = weldedCount; weldedPos[weldedCount*3+0]=x; weldedPos[weldedCount*3+1]=y; weldedPos[weldedCount*3+2]=z; ++weldedCount; u32 slot = WeldHash(cx, cy, cz); 
             while (weldHt[slot] != 0xFFFFFFFFU) slot = (slot + 1) & (WELD_HASH_SIZE - 1);
             weldHt[slot] = found; weldHtUsed[usedSlots++] = slot;
         }
@@ -385,7 +381,6 @@ void LoadModels() {
     u32 maxid = 0; for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index != U16_MAX && mp.entries[i].index > maxid) maxid = mp.entries[i].index; } mdlsCnt = (u16)maxid + 1;
     vPos = OS_Alloc(mdlsCnt * sizeof(float*)); vNor = OS_Alloc(mdlsCnt * sizeof(float*)); vUV = OS_Alloc(mdlsCnt * sizeof(float*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
     modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
-    for (u32 m=0; m<mdlsCnt; ++m) { modelBVHNodes[m] = NULL; modelBVHTriOrder[m] = NULL; } // Pre-allocated up-front (before threads start) so each worker can write modelBVHNodes[i]/modelBVHTriOrder[i] for the models it owns without any synchronization.
     InitializeFloatToHalfLUT();
     size_t ft_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u16), remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), nv_sz = (size_t)MAX_OUTPUT_VERTS * CPU_VRT_SZ, cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16));
     size_t bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode);
@@ -462,12 +457,15 @@ void LoadModels() {
     physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
     physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
     physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
-    modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*));
-    modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
     PhysGeomTask ptasks[32]; OS_Thread pth[32];
     for (int i=0;i<threadCnt;++i) ptasks[i] = (PhysGeomTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,i};
     if (threadCnt > 1) {     for (int i=0;i<threadCnt;++i){OS_ThreadCreate(&pth[i],PhysGeomWorker,&ptasks[i]);}    for(int i=0;i<threadCnt;++i){OS_ThreadJoin(&pth[i]);}    } else { for(int t=0;t<threadCnt;++t){PhysGeomWorker(&ptasks[t]);} /*Single threaded fallback*/}
-    for (u32 m = 0; m < mdlsCnt; ++m) { if (vUV[m]) { OS_Free(vUV[m],(size_t)modelVertexCounts[m]*2*sizeof(float)); vUV[m] = NULL; } }
+    for (u32 m = 0; m < mdlsCnt; ++m) {
+        if (vPos[m]) {
+            OS_Free(vPos[m],(size_t)modelVertexCounts[m] * 3 * sizeof(float)); OS_Free(vNor[m],(size_t)modelVertexCounts[m] * 3 * sizeof(float)); OS_Free(vUV[m],(size_t)modelVertexCounts[m] * 2 * sizeof(float)); OS_Free(modelTriangles[m],(size_t)modelTriangleCounts[m] * 3 * sizeof(u16));
+            vPos[m] = physPos[m]; modelTriangles[m] = physTris[m]; modelVertexCounts[m] = physVertCounts[m]; vNor[m] = vUV[m] = NULL;
+        }
+    }
     OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData));
     u32 totalNodes = 0, totalTris = 0; for (u32 m = 0; m < mdlsCnt; m++) { totalNodes += modelBVHNodeCounts[m]; totalTris += modelBVHTriOrderCounts[m]; }
     DualLog(" %u BVH nodes, %u BVH tri-refs vertices: %u, tris: %u, %f secs\n",totalNodes,totalTris,tv,tt,get_time() - startModelTime);
