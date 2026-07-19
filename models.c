@@ -1,5 +1,5 @@
 // models.c - 3D Models Loading System
-enum{BVH_MAX_DEPTH=3,BVH_LEAF_MAX_TRIS=8,BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585 worst case, +safety*/,BVH_MAX_TRIS_PER_MDL=6986,WELD_HASH_SIZE=32768,MAX_UNIQUE_CVX_MESHES=64,MAX_VERT_ELEMENT_SIZE=6964,MAX_OUTPUT_VERTS=20960};
+enum{BVH_MAX_DEPTH=3,BVH_LEAF_MAX_TRIS=8,BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585 worst case, +safety*/,BVH_MAX_TRIS_PER_MDL=6986,WELD_HASH_SIZE=32768,MAX_UNIQUE_CVX_MESHES=5989,MAX_VERT_ELEMENT_SIZE=6964,MAX_OUTPUT_VERTS=20960};
 float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
 typedef struct { const char* data; const char* name; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
 typedef struct { u32 start,end; int tid; } PhysGeomTask;
@@ -7,7 +7,7 @@ typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNod
 BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
 typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 BvhBuildCtx thrd_bvh_ctx[32];
-u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount;
+u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0;
 u32** cvxAdjOffsets = NULL; u16** cvxAdjLists = NULL; // CSR format adjacency data: cvxAdjOffsets[m] has vCount + 1 entries pointing into cvxAdjLists[m]
 u16  cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
 u16  lastCvxSupport[MAX_UNIQUE_CVX_MESHES] = {0}; // Persistent hill-climbing state per mesh
@@ -34,7 +34,7 @@ typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1)));
 #define _mm_max_ps(A, B) ((__m128)__builtin_ia32_maxps((__v4sf)(A), (__v4sf)(B)))
 INLINE float fast_atof(const char** p) { const char* c=*p; while (*c == ' ' || *c == '\t') {c++;} float s=1.0f; if(*c == '-'){s=-1.0f; c++;} float v=0.0f; while (*c >= '0' && *c <= '9') { v=v * 10.0f + (*c - '0'); c++; } if (*c == '.') { c++; float sub=0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub*=0.1f; c++; } } *p=c; return s * v; }
 INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *c == '\t') {c++;} i32 s=1; if(*c == '-'){s=-1; c++;} i32 v = 0; while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; } *p = c; return v * s; }
-typedef struct { u32 idx,key; } TriSort;
+typedef struct {u32 idx,key;} TriSort;
 int cmp(const void* a, const void* b) { u32 ka=((const TriSort*)a)->key, kb=((const TriSort*)b)->key; return (ka > kb) - (ka < kb); } // branchless 1 or -1
 void OptimizeVertexCache(u16* idx, u32 ic, u32 vc, u8* scratch) {
     if (ic < 3 || !vc) return;
@@ -404,8 +404,7 @@ void LoadModels() {
         if (vPos[m]) { OS_Free(vPos[m],(size_t)modelVertexCounts[m] * CPU_VRT_SZ); OS_Free(modelTriangles[m],(size_t)modelTriangleCounts[m] * 3 * sizeof(u16)); vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; }
     }
     OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData));
-    u32 totalNodes = 0, totalTris = 0; for (u32 m = 0; m < mdlsCnt; m++) { totalNodes += modelBVHNodeCounts[m]; totalTris += modelBVHTriOrderCounts[m]; }
-    DualLog(" BVH nodes: %u, vertices: %u, tris: %u, %f secs\n",totalNodes,tv,tt,get_time() - startModelTime);
+    DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
     DebugRAM("After LoadModels");
 }
 
@@ -489,25 +488,25 @@ void UpdateAnims(void) {
 }
 
 void ChangeAnim(Entity* e, u8 clip) { e->clip = clip; e->currentFrameFinished = 0.0; AnimationClip* c = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; e->frame = c->frameStart; } // TODO actually use this!}
-
-// Hill Climb Racer Adjacency List
-void GenerateConvexAdjacencyLists() {
+void GenerateConvexAdjacencyLists() { // Hill Climb Racer Adjacency List
     double start_time = get_time();
     cvxAdjOffsets=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u32*)); cvxAdjLists=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u16*));
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
-            if (World.levelCollider[lev][i] == COLTYPE_CVX) {
-                u16 colMeshIdx = World.levelInstances[lev][i].colMeshIndex; bool isUnique=true; u32 foundIdx=U16_MAX;
+            if (World.levelCollider[lev][i] == COLTYPE_CVX) { //DualLog("Checking level %u, instance %u with constindex %u for convex mesh uniques, colMeshIndex: %u, current uniqueCvxMeshCount: %u\n",lev,i,World.levelInstances[lev][i].index,World.levelInstances[lev][i].colMeshIndex,uniqueCvxMeshCount);
+                u16 colMeshIdx = World.levelInstances[lev][i].colMeshIndex;// if (colMeshIdx == U16_MAX) continue;
+                if (colMeshIdx > MAX_MDLS) DualLogWarn("Improper convex mesh colMeshIndex on level %u, instance %u with constindex %u for convex mesh uniques, colMeshIndex: %u\n",lev,i,World.levelInstances[lev][i].index,World.levelInstances[lev][i].colMeshIndex);
+                bool isUnique=true; u32 foundIdx=U16_MAX;
                 for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { if (uniqueCvxMeshIndices[u] == colMeshIdx) { isUnique = false; foundIdx = u; break; } }
-                if (isUnique) {
+                if (isUnique) { //DualLog("Processing convex mesh colMeshIndex %u on object %u[%u]\n",colMeshIdx,lev,i);
                     if (uniqueCvxMeshCount >= MAX_UNIQUE_CVX_MESHES) { DualLogWarn("Warning: Exceeded MAX_UNIQUE_CVX_MESHES! Some convex meshes will use slow linear support.\n"); World.levelInstances[lev][i].adjacencyIdx = U16_MAX; continue; }
-                    uniqueCvxMeshIndices[uniqueCvxMeshCount] = colMeshIdx; World.levelInstances[lev][i].adjacencyIdx = (u16)uniqueCvxMeshCount; uniqueCvxMeshCount++;
+                    uniqueCvxMeshIndices[uniqueCvxMeshCount] = colMeshIdx; World.levelInstances[lev][i].adjacencyIdx = (u16)uniqueCvxMeshCount; uniqueCvxMeshCount++; //DualLog("Incremented uniqueCvxMeshCount to %u\n",uniqueCvxMeshCount);
                 } else { World.levelInstances[lev][i].adjacencyIdx = (u16)foundIdx; }
             } else { World.levelInstances[lev][i].adjacencyIdx = U16_MAX; }
         }
     }
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { // 2. Generate edge adjacency list for each unique mesh
-        u16 m = uniqueCvxMeshIndices[u]; if (m >= MAX_MDLS) continue;
+        u16 m = uniqueCvxMeshIndices[u]; if (m >= MAX_MDLS) { continue;}
         u32 vCount = physVertCounts[m], tCount = modelTriangleCounts[m];
         if (!vCount || !tCount || !physPos[m] || !physTris[m]) continue;
         u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));

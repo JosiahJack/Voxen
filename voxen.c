@@ -1272,8 +1272,8 @@ void InitalizeEnvironment() {
     if (World.introNotPlayed) {} // TODO: Play intro
     World.absoluteTime = World.current_time = get_time();
     World.pauseRelativeTime = World.last_physics_time = 0.0;
-    NewGame();
-    PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
+    NewGame(); 
+    //PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
     DebugRAM("InitializeEnvironment end"); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
 }
 
@@ -1286,16 +1286,11 @@ i32 main() {
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
         PSys_Update();     // Before physics to allow for particles to interact with static world.
-        if (!World.paused && !World.menuActive) {
-            double physStart = get_time(); float dt = vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time = World.pauseRelativeTime; World.dt = dt;
-            Physics(dt);
-            physTime = get_time() - physStart;
-        } else physTime = 0.0;
+        if (!World.paused && !World.menuActive) { double ps=get_time(); float dt=vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time=World.pauseRelativeTime; World.dt=dt; Physics(dt); physTime=get_time() - ps; } else physTime=0.0;
         ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
         if (!World.paused && !World.menuActive) {MixAmbs();}
         UpdateMusic();
-        drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0; RenderCameraViews();
-        if (likely(!World.paused && !World.menuActive)) CullCore();
+        drawCalls=uiDrawCalls=shadDrawCalls=vertsRendered=0; RenderCameraViews(); if (likely(!World.paused && !World.menuActive)) CullCore();
         UpdateInstanceMatrix4x4s();
         Render(false/*!camview*/,0u);
         if (ScrshotPressed() && World.current_time > World.screenshotTimeout) Screenshot();

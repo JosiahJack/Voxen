@@ -344,39 +344,68 @@ Memory at end of Cull_Init: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 46
 Player named "" started the game!
 ```
 
-Heap impacts:
-
 ```
-❯ grep -rIn  "alloc("
+❯ grep -rIn  "OS_Alloc"
+voxen.c:30:    INLINE void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); return CloseHandle(m),r;}    
+voxen.c:36:    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
+voxen.c:67:    INLINE void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd){ long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return (void*)r; }
+voxen.c:71:    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
+voxen.c:87:    INLINE int OS_ThreadCreate(OS_Thread* out, void* (*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
+voxen.c:92:INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); } 
+voxen.c:93:INLINE void* OS_Calloc(size_t amount, size_t count) { return OS_Alloc(amount * count); }
+voxen.c:95:INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s){void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
+voxen.c:96:INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
+particles.c:124:    psysVertBuf = (float*)OS_Alloc(MAX_PSYS_PARTICLES * PSYS_QUAD_FLOATS * sizeof(float));
+particles.c:125:    psysSortBuf = (PsDepthSort*)OS_Alloc(MAX_PSYS_PARTICLES * sizeof(PsDepthSort));
+lib.c:127:    u8* pixels = OS_Alloc(w * h * 4 * sizeof(char));
+entity.c:1342:    u8* compBuffer = (u8*)OS_Alloc(maxCompSize);
+entity.c:1359:    u8* compBuffer = (u8*)OS_Alloc(header.compressedSize);
+textures.c:9:void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
+textures.c:139:        u32 nP = (u32)w * h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256 * sizeof(u32)); u32 pSz = 0; 
+textures.c:195:    p->entries = OS_Alloc((p->count = p->capacity = m_idx + 1) * sizeof(TextureData));
+textures.c:239:    i32* parsIdx = OS_Alloc(texCnt * sizeof(i32));
+textures.c:243:    thread_png_arenas = (PngArena*)OS_Alloc((size_t)threadCnt * sizeof(PngArena));
+textures.c:245:    TexResult* texResults = OS_Alloc(texCnt * sizeof(TexResult)); // Unified result struct allocation
+textures.c:255:    void* arena = OS_AllocateRAM(arena_size, 0x1|0x2, 0x20|0x02|0x08000, INVALID_FHANDLE);
+textures.c:258:    i32* textureSizes = OS_Alloc(texCnt * 2 * sizeof(i32));
+textures.c:259:    u32* texturePaletteOffsets = OS_Alloc(texCnt * sizeof(u32));
+textures.c:294:    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,WIN_ICON);   
+text.c:27:    ttAllocs = OS_Alloc(4674 * sizeof(TAlloc));
+text.c:36:    u8*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
+culling.c:41:    u8* cullingFileBuffer = OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8));
+winput.c:825:        WinSys.monitors = WinSys.monitors ? OS_Realloc(WinSys.monitors,monitorAllocationSize,sizeof(WinSysmonitor*) * WinSys.monitorCount) : OS_Alloc(WinSys.monitorCount * sizeof(WinSysmonitor*));
+audio.c:534:    u32 sf = *frames, df = (u32)((u64)sf*AUDIO_RATE/src_rate); float *dst = (float*)OS_Alloc(df*2*sizeof(float)); *sz = df*2*sizeof(float); float ratio = (float)sf/(float)df;
+audio.c:542:    u64 frames = wav.totalPCMFrameCount; float *buf = (float*)OS_Alloc(frames*AUDIO_CHANNELS*sizeof(float)); size_t bufSize = frames*AUDIO_CHANNELS*sizeof(float); u64 got = WavReadPCMFrames(&wav,frames,buf);
+models.c:107:    u16* final_t = OS_Alloc(ec * sizeof(u16)); // Allocate final_t early so we can use it instead of ft_scratch
+models.c:119:    float* final_verts = (float*)OS_Alloc((size_t)ucnt * CPU_VRT_SZ);
+models.c:192:    modelBVHNodes[m] = (BvhNode*)OS_Alloc(ctx->nodeCount * sizeof(BvhNode));
+models.c:196:        modelBVHTriOrder[m] = (u16*)OS_Alloc(ctx->triCount * sizeof(u16));
+models.c:222:    ModelData* ents = OS_Alloc(cnt * sizeof(ModelData));
+models.c:309:    float* weldedPos = (float*)OS_Alloc((size_t)vc * 3 * sizeof(float)); // worst case: no duplicates at all
+models.c:328:    u16* weldedTris = (u16*)OS_Alloc((size_t)tc * 3 * sizeof(u16));
+models.c:342:    vPos = OS_Alloc(mdlsCnt * sizeof(float*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
+models.c:343:    modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+models.c:346:    void* arena_base = OS_Alloc(arena); char* p = arena_base;
+models.c:383:    physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
+models.c:384:    physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+models.c:385:    physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
+models.c:493:    cvxAdjOffsets=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u32*)); cvxAdjLists=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u16*));
+models.c:512:        u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
+models.c:521:        u32* degree=OS_Alloc(vCount * sizeof(u32)); 
+models.c:523:        u32* offsets=OS_Alloc((vCount + 1) * sizeof(u32)); offsets[0]=0; for(u32 i=0;i<vCount;++i){offsets[i+1]=offsets[i] + degree[i];}
+models.c:524:        u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));
+models.c:525:        u32* writePos = OS_Alloc(vCount * sizeof(u32));
+stbtt.h:7:static void* ttalloc(size_t n) { if (tallocCount>=4674) {DualLogError("ttalloc too many!\n"); return NULL;} void*p=OS_Alloc(n); ttAllocs[tallocCount++]=(TAlloc){p,n}; return p; }
 
-```
-(NOTE: Excluded miniaudio, stb_truetype ./External alloc calls)
-
-
-```
-❯ grep -rIn  "OS_AllocateRAM("
-data_fonts.c:214:    u8 *bmp = OS_AllocateRAM(NULL, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(u8), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-os.h:35:    static inline void* OS_AllocateRAM(void* addr, size_t length, int prot, int flags, OsFileHandle fd) {
-os.h:77:    static inline void* OS_AllocateRAM(void* addr, size_t length, int prot, int flags, OsFileHandle fd) {
-os.h:155:        void* ramSpacePointer = OS_AllocateRAM(NULL, size, PROT_READ, MAP_PRIVATE, fileDescriptor);
-data_parser.c:103:    Entity *new_entries = OS_AllocateRAM(NULL, entry_count * sizeof(Entity), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);  
-helpers.c:85:    u8* pixels = OS_AllocateRAM(NULL, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);//malloc(Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
-External/stb_image.h:15:        stbi__arena_base = OS_AllocateRAM(NULL, STBI_ARENA_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-data_textures.c:45:    void* arena = OS_AllocateRAM(NULL, arena_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
-data_models.c:46:    uint8_t *buf = OS_AllocateRAM(NULL, total, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
-data_models.c:80:    modelVertices[i]  = fromCache ? (float*)cached_verts : OS_AllocateRAM(NULL, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-data_models.c:81:    modelTriangles[i] =  fromCache ? (uint32_t*)cached_idx : OS_AllocateRAM(NULL, triCount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-data_models.c:151:    modelVertices  = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(float*),    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-data_models.c:152:    modelTriangles = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-data_models.c:155:    int32_t* indexToParser = OS_AllocateRAM(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INV
 ```
 
 Binary size eval:
 
 ```
 ❯ size ./voxen
-   text     data      bss      dec     hex filename
- 909806 34310772 20152784 55373362 34cee32 ./voxen
+   text     data       bss       dec      hex filename
+ 458838    40072 310849280 311348190 128ecbde  ./voxen
+
 ```
 
 Helper bash commands to generate frame sequences in models.txt:
@@ -402,18 +431,15 @@ VoxenSettings voxen_Settings = {
     .Vsync = false
 };
 
-FPS: 544
-ms: 1.83
-RAM: 774mb (mostly the animation system duplicating models for every frame, stupid but works great!)
-VRAM: 677mb
-Build 438ms
-Init 1.529secs
+FPS: 289
+ms: 3.43
+RAM: 751mb (mostly the animation system duplicating models for every frame, stupid but works great!)
+VRAM: 434mb
+Build 8.4secs
+Init 1.449secs
 
-CPU: 0.23ms
-GPU: 1.83ms
-
-To see binary size impacts:
-../bloaty/build/bloaty ./voxen -d symbols -s file -n 50 --domain=file
+CPU: 3.43ms bottlneck
+GPU: 3.29ms
 
 PMD copy-paste-detector usage
 /home/qmaster/Downloads/pmd/bin/pmd cpd --minimum-tokens 100 --language cpp /home/qmaster/Github/Voxen
