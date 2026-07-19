@@ -427,7 +427,7 @@ void LoadModels() {
     glBindBuffer(GL_ARRAY_BUFFER,0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
     if (threadCnt > 1) { for(int i=0;i<threadCnt;++i){OS_ThreadJoin(&pth[i]);}    } else { for(int t=0;t<threadCnt;++t){PhysGeomWorker(&ptasks[t]);} /*Single threaded fallback*/} // Regroup the physics deduplication passes after GPU upload, this does save about 0.18secs!
     for (u32 m = 0; m < mdlsCnt; ++m) {
-        if (vPos[m]) { OS_Free(vPos[m],(size_t)modelVertexCounts[m] * 3 * sizeof(float)); OS_Free(modelTriangles[m],(size_t)modelTriangleCounts[m] * 3 * sizeof(u16)); vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; }
+        if (vPos[m]) { OS_Free(vPos[m],(size_t)modelVertexCounts[m] * CPU_VRT_SZ); OS_Free(modelTriangles[m],(size_t)modelTriangleCounts[m] * 3 * sizeof(u16)); vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; }
     }
     OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData));
     u32 totalNodes = 0, totalTris = 0; for (u32 m = 0; m < mdlsCnt; m++) { totalNodes += modelBVHNodeCounts[m]; totalTris += modelBVHTriOrderCounts[m]; }
