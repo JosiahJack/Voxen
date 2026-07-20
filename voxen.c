@@ -126,8 +126,6 @@ float **physPos; u16** physTris; u32* physVertCounts;
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; static int threadCnt=0; static u32 globalframe=0,globalframesPerLastSecond;
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
-#define SHADOW_MAP_SIZE 128u
-#define MAX_SHADOWMAPS 128u
 #define NEAR_PLANE (0.02f)
 #define ONE_OVER_SQRT2 0.70710678118f
 InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false};
@@ -135,7 +133,7 @@ static bool shadowBuffersCreated = false;
 typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 CamView camViews[64],levelCamViews[14][64]; u8 camViewCount,levelCamViewCount[14]; u32 camViewTextures[64],levelCamViewTextures[14][64];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
-u16 editModeSelection,editModeTestEntityDefinition=0; double shadowTime; double physTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
+u16 editModeSelection,editModeTestEntityDefinition=0; double shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
 extern Entity EDefs[MAX_ENTITIES];
@@ -809,7 +807,7 @@ static double RenderUI() {
     i16 debugTextStartY = 48; /* Diagnostics / Debugging */
     if (Cheats.showLocation && !World.menuActive) RenderFormattedText(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
     i16 lineSpacing = 18;
-    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, Shadow cpu ms: %.3f, Physics cpu ms: %.3f",playerCellIdx,shadowTime * 1000,physTime * 1000);
+    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, CPU ms::Shad: %.3f, Phys: %.3f, Rendr: %.3f, Pre phys: %.3f, Logic: %.3f",playerCellIdx,shadowTime * 1000,physTime * 1000,renderTime * 1000,prePhys * 1000,gameTime * 1000);
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",World.velocity[PLAYER1].x,World.velocity[PLAYER1].y,World.velocity[PLAYER1].z,World.instances[PLAYER1].entflags & EF_GROUNDED);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPosition_x,World.cursorPosition_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderFormattedText(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
@@ -829,7 +827,6 @@ static double RenderUI() {
 }
 
 #define SHADOW_NEARMESH_MAX 1024
-typedef struct {float depth; u16 index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
 INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex > texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MAX_MDLS || e->texIndex >= MAX_TXRS || otherCondition; }
 static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 currentModelType) {
@@ -842,11 +839,12 @@ static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 
 
 #define SC_MAX (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)
 u16 shadowCasterIndices[SC_MAX],candidates[MAX_SHADOWMAPS];
+bool instVisibleThisFrame[INSTANCE_COUNT];
 static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
-static __attribute__((hot)) void RenderShadowmaps() {    
+void RenderShadowmaps() {    
     double shadowStartTime = get_time();
     mset(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
-    u16 numShadowsCouldRender = 0;
+    u16 numShadowsCouldRender=0;
     V3 playerPos = World.position[PLAYER1], pf = World.instances[PLAYER1].forward;
     for (u16 i = 0; i < World.loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
         if (unlikely(!(World.lights[i].lflags & SHADON) || !(World.lights[i].lflags & LIGHTON))) continue;
@@ -854,7 +852,7 @@ static __attribute__((hot)) void RenderShadowmaps() {
         float intensity = World.lights[i].maxIntensity; /*Much more stable than actual intensity (from fade/flickers).  Since gated by on above, this is fine now.*/ if (unlikely(intensity < 0.1f)) continue;
         float range =  World.lights[i].range; float luminosity = (intensity / (range * range)); if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
         u16 cellX = PosGetCellCoordX(lightPos.x), cellZ = PosGetCellCoordZ(lightPos.z);
-        int lightCellIdx = (cellZ * WORLDX) + cellX; u8 r = vceil(range * (1.0f / CELL_SIZE));
+        int lightCellIdx = (cellZ * WORLDX) + cellX; u8 r = vceil(range * (1.0f / CELLSZ));
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r); if (!inPVS) continue;
         float dx = lightPos.x - playerPos.x, dy = lightPos.y - playerPos.y, dz = lightPos.z - playerPos.z;
@@ -862,35 +860,24 @@ static __attribute__((hot)) void RenderShadowmaps() {
         float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z); if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
         candidates[numShadowsCouldRender] = i; numShadowsCouldRender++; if (numShadowsCouldRender >= MAX_SHADOWMAPS) break;
     }
-    if (numShadowsCouldRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
-        glUseProgram(shadowmapsClearSP); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
-        for (u32 c=0;c<numShadowsCouldRender;++c) { glUniform1ui(0,c); glDispatchCompute(groupX_shadClear,6,1); }
-        shadDrawCalls = 0;
-        glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE);
-        glUseProgram(shadowmapsSP);
-        u32 shadowmapOffsetHead = 0U; mset(shadowCasterIndices,0,SC_MAX*sizeof(u16)); u32 numShadowCasters = 0;
-        for (int i=INSTS_1ST_IDX;i<INSTANCE_COUNT;++i) {
-            if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsDynamicObject(World.instances[i].index)) {continue;}
-            
-            shadowCasterIndices[numShadowCasters] = i; numShadowCasters++; if(numShadowCasters >= (SC_MAX)){break;}/*Ran out of shadowcasters max for frame.*/
-        }
+    if (numShadowsCouldRender > 0U) { // Added since there is now work between here and the for loop so this is beneficial to check.
+        glUseProgram(shadowmapsClearSP); glDispatchCompute(groupX_shadClear,6,numShadowsCouldRender); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
+        shadDrawCalls=0U; glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP); u32 shadowmapOffsetHead=0U; mset(shadowCasterIndices,0,SC_MAX*sizeof(u16)); u32 numShadowCasters=0U;
+        for (int i=INSTS_1ST_IDX;i<INSTANCE_COUNT;++i) { if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsDynamicObject(World.instances[i].index)) {continue;} shadowCasterIndices[numShadowCasters]=i; numShadowCasters++; if(numShadowCasters >= (SC_MAX)){break;} }
         u16 shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0,useDetail=Sys_Settings.ModelDetail;
         for (u32 c = 0; c < numShadowsCouldRender; ++c, ++shadowMapIdx) { // Render top MAX_SHADOWMAPS candidates
             u16 lightIdx = candidates[c];
             float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f); u16 nearbyMeshCount = 0; 
             V3 lpos = World.lights[lightIdx].pos;
-            float cellCenterX=vround(lpos.x / CELL_SIZE) * CELL_SIZE, cellCenterZ=vround(lpos.z / CELL_SIZE) * CELL_SIZE;
-            V3 deltaCellCenter = V3_AsubB((V3){lpos.x,0.0f,lpos.z},(V3){cellCenterX,0.0f,cellCenterZ});
-            float distToCenterSqrd = V3_dot(deltaCellCenter,deltaCellCenter);
-            bool skipNPCs = (distToCenterSqrd < 0.4096f); // 0.64 * 0.64
+            V3 deltaCellCenter = (V3){lpos.x - (/*cell center x*/vround(lpos.x / CELLSZ) * CELLSZ),0.0f,lpos.z - (/*z:*/vround(lpos.z / CELLSZ) * CELLSZ)};
+            bool skipNPCs = (V3_dot(deltaCellCenter,deltaCellCenter) < 0.4096f); // 0.64 * 0.64 dist to center squared check
             for (u16 shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
                 u16 j = shadowCasterIndices[shadowCasterInstanceIdx];
-                Entity* e = &World.instances[j];
                 V3 d = V3_AsubB(World.position[j],lpos);
                 float distToLightSqrd = V3_dot(d,d);
                 float radSum = (effectiveRadius + World.radius[j]);
                 if (distToLightSqrd >= radSum * radSum) continue;
-                if (skipNPCs && IdxIsNPC(e->index)) continue;
+                if (skipNPCs && IdxIsNPC(World.instances[j].index)) continue;
                 shadows_nearMeshes[nearbyMeshCount].index = j; shadows_nearMeshes[nearbyMeshCount].depth = distToLightSqrd; 
                 nearbyMeshCount++; if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping needs larger nearMeshes count than %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
             }
@@ -923,23 +910,6 @@ static __attribute__((hot)) void RenderShadowmaps() {
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
-INLINE bool DetermineIfInstanceVisible(u16 i, bool otherCondition, bool skyVisible, V3 playerPos, float* distSqrd) {
-    if (EntNotVisible(i,otherCondition)) return false; // must be transparent && transparents or neither
-    Entity* e = &World.instances[i]; u16 instCellIdx = e->cellIndex; u16 entIdx = e->index;
-    V3 delta = V3_AsubB(World.position[i],playerPos); *distSqrd = V3_dot(delta,delta);
-    float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
-    if (!SphereInFrustum(playerFrustumPlanes,World.position[i],radius) && (entIdx != 754 || !skyVisible) && i != editModeSelection) return false;
-    if (IdxIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
-        bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
-        if (!inPVS) {inPVS = NeighborhoodInPVS(e->cellX,e->cellZ,2u);} if (!inPVS) return false;
-    } else {
-        if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (entIdx != 754 || !skyVisible)) return false;
-        if (!(gridCellStates[instCellIdx] & CELL_OPEN) && *distSqrd >= 943.7184f && (entIdx != 754 || !skyVisible)) return false; // 30.72 * 30.72, 12 cells
-    }
-    if (World.instances[i].camView != 255) camViews[World.instances[i].camView].visible = true;
-    return true;
-}
-
 float GetPainStatic() { return 0.0f; } // TODO: Hook into pain/health management and shield impact effect
 Color GetPainStaticColor() { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
@@ -995,17 +965,17 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
 }
 
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
-    u16 swidth = camView ? camViews[camViewIdx].width : Sys_Settings.ScreenWidth, sheight = camView ? camViews[camViewIdx].height : Sys_Settings.ScreenHeight;
-    float sfov = camView ? (float)camViews[camViewIdx].fov : (float)Sys_Settings.FOV;
-    float snear = camView ? camViews[camViewIdx].near : NEAR_PLANE; float sfar = camView ? camViews[camViewIdx].far : World.farPlane[World.curLev];
-    V3 playerPos = World.position[PLAYER1];
-    float px=playerPos.x, py=playerPos.y, pz=playerPos.z, aspect3D=(float)swidth / (float)sheight;
+    u16 swidth, sheight; float sfov, snear, sfar;
+    if (camView) { CamView* cv=&camViews[camViewIdx]; swidth=cv->width; sheight=cv->height; sfov=(float)cv->fov; snear=cv->near; sfar=cv->far; }
+    else { swidth=Sys_Settings.ScreenWidth; sheight=Sys_Settings.ScreenHeight; sfov=(float)Sys_Settings.FOV; snear=NEAR_PLANE; sfar=World.farPlane[World.curLev]; }
+    V3 playerPos = World.position[PLAYER1]; float px=playerPos.x, py=playerPos.y, pz=playerPos.z, aspect3D=(float)swidth / (float)sheight;
     float view[16],viewProj[16],invViewRot[9],invViewProj[16];
     GetProjections(view,viewProj,invViewRot,invViewProj,sfov,aspect3D,snear,sfar);
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
     glBindVertexArray(chunkVAO); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
+    double rendStart = get_time();
     UpdateLights(); // This is where the voxels get updated!
     for (int i=0;i<LIGHT_COUNT;++i) flag_set(&World.lights[i].lflags,LDIRTY,false);
     glViewport(0,0,swidth,sheight);
@@ -1013,12 +983,33 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
     u16 visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0, opaqueCount = 0;
-    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX); float distSqrd = sfar * sfar;
+    bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     DepthSort tmpTransparent[1024]; u16 tcnt = 0;
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { // Determine base visibility
-        if (!DetermineIfInstanceVisible(i,false,skyVisible,playerPos,&distSqrd)) continue;
+        if (EntNotVisible(i,false)) continue; // must be transparent && transparents or neither
+        Entity* e = &World.instances[i]; u16 instCellIdx = e->cellIndex; u16 entIdx = e->index;
+        V3 delta = V3_AsubB(World.position[i],playerPos); float distSqrd = V3_dot(delta,delta);
+        float radius = modelBounds[e->modelIndex] * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+        if (!SphereInFrustum(playerFrustumPlanes,World.position[i],radius)) continue;
+        if (IdxIsPortalBlockingDoor(entIdx)) { // Extra checks only needed for opaque portal blocking doors.
+            if (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && !NeighborhoodInPVS(e->cellX,e->cellZ,2u)/*!in pvs*/) continue;
+        } else {
+            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN)) continue;
+            if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f) continue; // 30.72 * 30.72, 12 cells
+        }
+        if (World.instances[i].camView != 255) camViews[World.instances[i].camView].visible = true;
         if (transparentTexture[World.instances[i].texIndex]) { if(tcnt>1023){continue;} tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; }
         else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
+    }
+    if (World.shd1 < U16_MAX && skyVisible) { // Add shield generators in skybox.
+        visibleInstances[opaqueCount].index=World.shd1; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+        visibleInstances[opaqueCount].index=World.shd2; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+        visibleInstances[opaqueCount].index=World.shd3; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+        visibleInstances[opaqueCount].index=World.shd4; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+    }
+    if (editModeSelection < U16_MAX && Cheats.editMode) {
+        if (transparentTexture[World.instances[editModeSelection].texIndex]) { if(tcnt<=1023){ tmpTransparent[tcnt].index = editModeSelection; tmpTransparent[tcnt].depth = 1.28f; tcnt++;} }
+        else { visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }
     }
     mcpy(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
     visibleCount = opaqueCount + tcnt;
@@ -1030,8 +1021,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     for (u16 visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i]; u16 tex = e->texIndex;
-        if (transparentTexture[tex]) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
-        else if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
+        if (unlikely(transparentTexture[tex])) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
+        else if (unlikely(doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f)) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
         currentModelType = GetAndBindModel(i,currentModelType);
         glUniform1ui(3,(u32)tex);
@@ -1042,15 +1033,14 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     bool grayscaleEnabled = ModRequestsGrayscale(), refOn = Sys_Settings.Reflections;              glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = World.fogColor[World.curLev].a + (float)(World.fogFac / 255u); // Alpha is base density for level.
     glUniform3f(12,World.fogColor[World.curLev].r * fogActual,World.fogColor[World.curLev].g * fogActual,World.fogColor[World.curLev].b * fogActual); // Fog Color(which is density)
-    glUniform1ui(14,refOn); glUniform1ui(15,Sys_Settings.Shadows); glUniform2f(8,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); 
-    glUniform3f(10,playerPos.x,playerPos.y,playerPos.z);
+    glUniform1ui(14,refOn); glUniform1ui(15,Sys_Settings.Shadows); glUniform2f(8,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform3f(10,px,py,pz);
     glColorMask(1,1,1,1);   glDepthMask(0);                        glDepthFunc(0x0203/*GL_LEQUAL*/); // Opaque Pass
     visibleCount = currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0;
     glUniform1f(9,0.0f); // Reset heat for infrared vision
     for (u16 visibleIndex = 0; visibleIndex < opaqueCount; ++visibleIndex) { // Opaques (already front-to-back)
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i]; u16 tex = e->texIndex; u32 constIndex = e->index;
-        if (transparentTexture[tex]) continue;
+        if (unlikely(transparentTexture[tex])) continue;
         else if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
         DrawEntity(e,i,constIndex,tex,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType,grayscaleEnabled);
@@ -1059,17 +1049,17 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     for (u16 visibleIndex = opaqueCount; visibleIndex < (opaqueCount + tcnt); ++visibleIndex) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i]; u16 tex = e->texIndex; u32 constIndex = e->index;
-        if (transparentTexture[tex]) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
-        else if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
+        if (likely(transparentTexture[tex])) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
+        else if (unlikely(doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f)) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided (either)
         else continue; // Opaque
-        if ((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573)) glDepthFunc(0x0202/*GL_EQUAL*/); // Cutouts
+        if (unlikely((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573))) glDepthFunc(0x0202/*GL_EQUAL*/); // Cutouts
         else glDepthFunc(0x0203/*GL_LEQUAL*/); // Actual alphas
         DrawEntity(e,i,constIndex,tex,currentNormIndex,currentTexIndex,currentGlowIndex,currentSpecIndex,currentModelType,grayscaleEnabled);
     }
     V3 camUp = quat_rot_v3(World.rotation[PLAYER1],(V3){0,1,0});
     V3 camRight = quat_rot_v3(World.rotation[PLAYER1],(V3){1,0,0});
     PSys_Render(viewProj,playerPos,camUp,camRight,NEAR_PLANE,World.farPlane[World.curLev],inputDepthID); // Particles render
-    if (camView) {
+    if (unlikely(camView)) {
         glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/,gBufferFBO);
         glReadBuffer(GL_COLOR_ATTACHMENT0);
         glBindTexture(GL_TEXTURE_2D,camViewTextures[camViewIdx]);
@@ -1087,6 +1077,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
     glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glViewport(0,0,1366,768);
     glDisable(GL_CULL_FACE);
+    renderTime = get_time() - rendStart;
     World.last_time = RenderUI();
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) RenderUIImage((i16)(World.cursorPosition_x) - 20,(i16)(World.cursorPosition_y) - 20,40,40,GetCursorTexture());
     else if (!Cheats.noHUD) RenderUIImage(663,364,40,40,GetCursorTexture()); // Centered on UI fixed resolution 1366x768 FBO
@@ -1113,12 +1104,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
 
 void RenderCameraViews() { // Render in-world camera views.  Pops player position to elsewhere, renders to tiny fbo, pops player back.
     if (unlikely(World.paused || World.menuActive || camViewCount == 0 || World.curLev >= LEVEL_CYBERSPACE)) return;
-    
     V3 tempPlayerPos = World.position[PLAYER1]; Quaternion tempPlayerRot = World.rotation[PLAYER1];
     for (int cm=0;cm<camViewCount;++cm) {
         if (camViews[cm].finished < World.pauseRelativeTime && camViews[cm].visible) { camViews[cm].finished = World.pauseRelativeTime + 0.5f; World.position[PLAYER1] = camViews[cm].position; World.rotation[PLAYER1] = camViews[cm].rotation; CullCore(); Render(true/*camview*/,cm); }
     }
-
     World.position[PLAYER1] = tempPlayerPos; World.rotation[PLAYER1] = tempPlayerRot; // Restore player for normal render.
 }
 
@@ -1264,7 +1253,7 @@ void InitalizeEnvironment() {
     lightsID         = MakeSSBO(&lightsID,         4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);                      colorBufferID    = MakeSSBO(&colorBufferID,   12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
     if (Sys_Settings.Shadows) CreateShadowBuffers();                    /*5,6*/                                             textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
                                                                                                                             textureSizesID   = MakeSSBO(&textureSizesID,  15,MAX_TXRS * 2 * sizeof(i32),NULL, GL_STATIC_DRAW);
-    glUseProgram(shadowmapsSP);  glUniform1ui( 9,SHADOW_MAP_SIZE); glUseProgram(shadowmapsClearSP);           glUniform1ui(1,SHADOW_MAP_SIZE);
+    glUseProgram(shadowmapsSP);  glUniform1ui( 9,SHADOW_MAP_SIZE); glUseProgram(shadowmapsClearSP);           glUniform1ui(0,SHADOW_MAP_SIZE);
     glUseProgram(chunkSP);       glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE);    glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
     glUseProgram(voxelUpdateSP); glUniform1ui( 4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL);
     RenderLoading(100,"Loading textures..."); LoadTextures();
@@ -1283,13 +1272,17 @@ i32 main() {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
         double curtime = get_time(); World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time,0.0); World.absoluteTime+=World.deltaTime; World.current_time=curtime;
         if (!World.paused && !World.menuActive) { if (World.pauseRelativeTime < 0.001f) {World.pauseRelativeTime = World.last_physics_time = curtime;} World.pauseRelativeTime += World.deltaTime; }
+        double input_start = get_time();
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
         PSys_Update();     // Before physics to allow for particles to interact with static world.
+        prePhys = get_time() - input_start;
         if (!World.paused && !World.menuActive) { double ps=get_time(); float dt=vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time=World.pauseRelativeTime; World.dt=dt; Physics(dt); physTime=get_time() - ps; } else physTime=0.0;
+        double gameT_start = get_time();
         ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
         if (!World.paused && !World.menuActive) {MixAmbs();}
         UpdateMusic();
+        gameTime = get_time() - gameT_start;
         drawCalls=uiDrawCalls=shadDrawCalls=vertsRendered=0; RenderCameraViews(); if (likely(!World.paused && !World.menuActive)) CullCore();
         UpdateInstanceMatrix4x4s();
         Render(false/*!camview*/,0u);

@@ -555,7 +555,7 @@ void Physics(float dt) {
         for (u16 i=0;i<dynamicEntityCount;++i) {
             u16 a = dynamicEntities[i]; if (unlikely(World.collider[a] == COLTYPE_MSH || (Cheats.noclip && a == PLAYER1))) continue;
             i32 cx = PosGetCellCoordX(World.position[a].x), cz = PosGetCellCoordZ(World.position[a].z); u32 mask = GetCollisionMask(World.layer[a]);
-            float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub; i32 radCells = vmax((i32)(searchRad / CELL_SIZE),1);
+            float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub; i32 radCells = vmax((i32)(searchRad / CELLSZ),1);
             Manifold contactsMani[32]; u16 contactsOther[32]; int contactCount = 0;
             for (i32 dx = -radCells; dx <= radCells; ++dx) {
                 for (i32 dz = -radCells; dz <= radCells; ++dz) { // 2. Collisions

@@ -43,9 +43,7 @@ static const PsDef psysDefs[MAX_PSYS_DEFS] = {
     [14]={.name="Graytation",.maxParts=20,.burstCnt=10, .life=0.5f,.lifeRand=0.2f,.startSz=0.04f,.szRand=0.02f,.endSz=0.01f,.endRand=0.005f,.startSpd=3.f,.spdRand=2.f,.gravMod=0.4f,.emitRate=0,.startCol=0xFF888888u,.endCol=0x00444444u,.shapeAngle=25.f,.shapeRad=0.02f,.shape=PSYS_SHAPE_CONE,.emitMode=PSYS_EMIT_BURST,.texStart=758,.texCnt=1,.animFPS=0,.billboard=PSYS_BILLBOARD_SCREEN,.softPart=0,.space=PSYS_SPACE_WORLD,.rotMin=-180.f,.rotMax=180.f},
 };
 
-typedef struct { float depth; u16 index; } PsDepthSort;
-static PsDepthSort* psysSortBuf = NULL;
-
+static DepthSort* psysSortBuf = NULL;
 #define PSys_PlayOneshot(defIdx,pos) PSys_Play(defIdx,pos,QUAT_IDENTITY,0)
 PsParticle psysParts[MAX_PSYS_PARTICLES];
 PsEmitter psysEmitters[MAX_PSYS_EMITTERS];
@@ -122,7 +120,7 @@ void PSys_Init(void) {
     *(u32*)&psysEmitters[MAX_PSYS_EMITTERS - 1].defIdx = MAX_PSYS_EMITTERS;
     psysPartFree = 0; psysEmitterFree = 0; psysAliveCount = 0;
     psysVertBuf = (float*)OS_Alloc(MAX_PSYS_PARTICLES * PSYS_QUAD_FLOATS * sizeof(float));
-    psysSortBuf = (PsDepthSort*)OS_Alloc(MAX_PSYS_PARTICLES * sizeof(PsDepthSort));
+    psysSortBuf = (DepthSort*)OS_Alloc(MAX_PSYS_PARTICLES * sizeof(DepthSort));
     glGenVertexArrays(1, &psysVao); glGenBuffers(1, &psysVbo);
     glBindVertexArray(psysVao); glBindBuffer(GL_ARRAY_BUFFER, psysVbo);
     glBufferData(GL_ARRAY_BUFFER, MAX_PSYS_PARTICLES * PSYS_QUAD_FLOATS * sizeof(float), NULL, GL_DYNAMIC_DRAW);
@@ -222,7 +220,7 @@ static const float psysUVs[4][2] = {{0.f,0.f},{1.f,0.f},{1.f,1.f},{0.f,1.f}};
 static const u16 psysIndices[6] = {0,1,2, 0,2,3};
 
 static i32 psysSortCmp(const void* a, const void* b) {
-    float da = ((const PsDepthSort*)a)->depth, db = ((const PsDepthSort*)b)->depth;
+    float da = ((const DepthSort*)a)->depth, db = ((const DepthSort*)b)->depth;
     return (db > da) - (db < da);
 }
 
@@ -241,12 +239,12 @@ void PSys_Render(float* viewProj, V3 camPos, V3 camUp, V3 camRight, float nearPl
     if (wc > 1) {
         if (wc <= 32) {
             for (u32 i = 1; i < wc; ++i) {
-                PsDepthSort key = psysSortBuf[i]; i32 j = (i32)i - 1;
+                DepthSort key = psysSortBuf[i]; i32 j = (i32)i - 1;
                 while (j >= 0 && psysSortBuf[j].depth < key.depth) { psysSortBuf[j + 1] = psysSortBuf[j]; j--; }
                 psysSortBuf[j + 1] = key;
             }
         } else {
-            qsort_new(psysSortBuf, wc, sizeof(PsDepthSort), psysSortCmp);
+            qsort_new(psysSortBuf, wc, sizeof(DepthSort), psysSortCmp);
         }
     }
 

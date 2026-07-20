@@ -436,7 +436,7 @@ static V3 AIGetAStarPoint(Entity* self) {
     u16 sidx=(u16)(self - World.instances);
     V3 ep = self->enemy ? World.position[self->enemy] : World.position[sidx];
     float px = World.position[sidx].x, py = World.position[sidx].y, pz = World.position[sidx].z;
-    V3 cands[4] = {{px,py,pz + CELL_SIZE},{px,py,pz - CELL_SIZE},{px + CELL_SIZE,py,pz},{px - CELL_SIZE,py,pz}};
+    V3 cands[4] = {{px,py,pz + CELLSZ},{px,py,pz - CELLSZ},{px + CELLSZ,py,pz},{px - CELLSZ,py,pz}};
     int best = -1; float bestD = 1e9f;
     for (int i = 0; i < 4; ++i) {
         if (!PositionVisibleFromPlayerCell(cands[i].x, cands[i].z)) continue;
@@ -482,7 +482,7 @@ static void AIWalk(u16 self) {
             if (npcTable[World.instances[self].index - 419].moveType != AIMoveType_Fly) {
                 V3 spos = ai_sight_pos(&World.instances[self]);
                 V3 cp = { spos.x + World.instances[self].forward.x*0.48f, spos.y, spos.z + World.instances[self].forward.z*0.48f };
-                RaycastHit gh = Raycast(cp,(V3){0,-1,0},CELL_SIZE,LMASK_NPC_COLLISION);
+                RaycastHit gh = Raycast(cp,(V3){0,-1,0},CELLSZ,LMASK_NPC_COLLISION);
                 if (!gh.hit) { mv.x = 0.0f; mv.z = 0.0f; }
             }
             mv.y = World.velocity[sidx].y;

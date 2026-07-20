@@ -281,7 +281,7 @@ void PortalCulling() { // Called just once at end of animation loop for the fram
 void CullCore() {
     playerCellIdx = PosGetCellCoords(World.position[PLAYER1].x,World.position[PLAYER1].z); if (World.curLev >= LEVEL_CYBERSPACE) return;
     u16 cellX = PosGetCellCoordX(World.position[PLAYER1].x), cellZ = PosGetCellCoordZ(World.position[PLAYER1].z);
-    float pos_x = World.worldMin_x[World.curLev] + (cellX * CELL_SIZE), pos_z = World.worldMin_z[World.curLev] + (cellZ * CELL_SIZE);
+    float pos_x = World.worldMin_x[World.curLev] + (cellX * CELLSZ), pos_z = World.worldMin_z[World.curLev] + (cellZ * CELLSZ);
     for (int i=0;i<World.instCount;++i) { float dx = pos_x - World.position[i].x, dz = pos_z - World.position[i].z; float distSqrd = dx*dx + dz*dz; instanceIsLODArray[i] = (distSqrd >= 655.36f);/*25.6f * 25.6f*/ }
     PortalCulling(); // Update based on portal states.
 }

@@ -4,12 +4,6 @@ typedef __INT8_TYPE__   i8; typedef  __UINT8_TYPE__  u8; //  8bit types
 typedef __INT16_TYPE__ i16; typedef __UINT16_TYPE__ u16; typedef u16 half; // 16bit types
 typedef __INT32_TYPE__ i32; typedef __UINT32_TYPE__ u32; // 32bit types
 typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ size_t; // 64bit types
-#ifndef U8_MAX
-    #define U8_MAX 255
-#endif
-#ifndef U16_MAX
-    #define U16_MAX 65535
-#endif
 #define bool u8
 #define true 1
 #define false 0
@@ -25,11 +19,9 @@ typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,sp
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 #define INSTANCE_COUNT 16384 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define LIGHT_COUNT 2048
-enum{MAX_ENTITIES=768,/*Unique entity definition types, different than INSTANCE_COUNT which is the number of instances of any of these entities.*/
-     MAX_LEVELS=14,MAX_MDLS=6000,MAX_TXRS=2048,MAX_TOTAL_PIXELS=29900000u,MAX_UNIQUE_COLORS=1048576u,MAX_ANIMS=64,MAX_ANIMCLIPS=32,MAX_WIRELINE_VRTS=512000,MAX_PORTALS=56/*Max is 49 on Citadel level 7*/,MAX_KEYS=512,MAX_MOUSE_BUTTONS=8,
-     MAX_CHANNELS=48/*Max concurrent sounds, must keep track of for volume setting*/,MAX_GLYPHS=4096};
-#define VRT_ATT_SZ 16 // Half float VRAM representation of vertex for rendering performance.
-#define CPU_VRT_SZ 32 // Full float  RAM representation for physics performance (ironically).
+enum{U16_MAX=65535,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,MAX_ENTITIES=768,/*Unique entity definition types, different than INSTANCE_COUNT which is the number of instances of any of these entities.*/
+     MAX_LEVELS=14,MAX_MDLS=6000,MAX_TXRS=2048,MAX_TOTAL_PIXELS=29900000u,MAX_UNIQUE_COLORS=1048576u,WORLDX=64,WORLDZ=64,WORLDY=18,MAX_ANIMS=64,MAX_ANIMCLIPS=32,MAX_WIRELINE_VRTS=512000,MAX_PORTALS=56/*Max is 49 on Citadel level 7*/,MAX_KEYS=512,MAX_MOUSE_BUTTONS=8,
+     MAX_CHANNELS=48/*Max concurrent sounds, must keep track of for volume setting*/,MAX_GLYPHS=4096,VRT_ATT_SZ=16,CPU_VRT_SZ=32,LEVEL_CYBERSPACE=13,SHADOW_MAP_SIZE=128,MAX_SHADOWMAPS=80,FONT_ATLAS_SIZE=4672};
 #define DOUBLE_CLICK_TIME 0.5f
 #define WALK_SPEED 3.6f
 #define SPRINT_SPEED 8.8f
@@ -46,13 +38,6 @@ enum{MAX_ENTITIES=768,/*Unique entity definition types, different than INSTANCE_
 #define PLAYER_HEIGHT 2.00f
 #define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
 #define ELEVATOR_PAD_TETHER_DIST 2.0f
-#define LEVEL_CYBERSPACE 13
-#define WORLD   0u // Much like Quake, the world is entity 0.  Aand also like Quake, world is nullent and is 0.
-#define PLAYER1 1u
-#define INSTS_1ST_IDX 2
-#define WORLDX 64
-#define WORLDZ 64
-#define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
 #define WORLDX_0BASED (WORLDX - 1)
 #define WORLDZ_0BASED (WORLDZ - 1)
 #define TOTAL_WORLD_CELLS (WORLDX * WORLDY * WORLDZ)
@@ -60,26 +45,22 @@ enum{MAX_ENTITIES=768,/*Unique entity definition types, different than INSTANCE_
 #define VOXELS_X (WORLDX * VOXELS_PER_CELL)
 #define VOXELS_Z (WORLDZ * VOXELS_PER_CELL)
 #define VOXEL_COUNT (VOXELS_X * VOXELS_Z) // 64 * 64 * 8 * 8
-#define CELL_SIZE 2.56f // Each cell is 2.56x2.56
-#define CELLXHALF (CELL_SIZE * 0.5f)
+#define CELLSZ 2.56f // Each cell is 2.56x2.56
+#define CELLXHALF (CELLSZ * 0.5f)
 #define VOXELS_PER_CELL 8
-#define VOXEL_SIZE (CELL_SIZE / (float)VOXELS_PER_CELL)
+#define VOXEL_SIZE (CELLSZ / (float)VOXELS_PER_CELL)
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
 #define TARGET_STRING_LENGTH 38
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
-#define SAVE_REMINDER_TIME 7.0f // 7secs ~is human short-term memory length
 #define CREDITS_PAGES 22
 #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
 #define SOUNDS_COUNT 670
-#define T_DATA_FILEBUFFER_SIZE 65536 // 16 pages
+#define T_DATA_FILEBUFFER_SIZE 65536
 #define T_STRING_COUNT 1100
 #define T_LOCALIZATION_MAX_LENGTH 1280
 #define T_LOGS_COUNT 134
 #define T_BUFFER_SIZE 1024
-#define FONT_ATLAS_SIZE 4672
 #define NUM_AI_TYPES 29
-#define MAX_DYNAMIC_ENTITIES 512
-#define TERMINAL_VELOCITY 10.0f
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
 #define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
@@ -251,10 +232,12 @@ typedef /*FAT*/ struct  {
 typedef struct { Entity* entries; u32 count; u32 capacity; } DataParser;
 typedef __builtin_va_list va_list;
 typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; V3 pos; size_t allocSize; } wav_channel_t;
+typedef struct {float depth; u16 index; } DepthSort;
 typedef struct {
     u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount; // Numbers of instances of entities and lights loaded (always for just the current level)
     float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS];
+    u16 shd1,shd2,shd3,shd4; // ShieldGenerators on this level
     double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp;
     i32 fogFac,cursorPosition_x,cursorPosition_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
     V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
@@ -381,7 +364,7 @@ INLINE u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
 }
 
 INLINE u16 parse_numberu16(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U16_MAX) { DualLogError("Value %u out of range for u16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u16)retval; }
-INLINE u8 parse_numberu8(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U8_MAX) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u8)retval; }
+INLINE u8 parse_numberu8(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > 255) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u8)retval; }
 INLINE bool parse_bool(const char* str, const char* line, u32 lineNum) { u32 parseval = parse_numberu32(str, line, lineNum); if (parseval > 1) {DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);} return parseval > 0 ? true : false; }
 INLINE i32 parse_numberi32(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0; }

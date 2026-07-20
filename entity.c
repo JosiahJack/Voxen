@@ -1152,11 +1152,11 @@ void LoadLevelMod(u8 lev) {
     }
     for (int i=0;i<=lightsIdx;++i) { if (!(lightsFromFile[i].lflags & LSPOT)) {lightsFromFile[i].spotAng = 0.0f;} AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators
-        u16 shd1 = AddInstance(754, (V3){-51.30664f,  -47.42f,  56.42651f}); World.rotation[shd1] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        u16 shd2 = AddInstance(754, (V3){ 71.5f,      -47.42f, -66.6f    }); World.rotation[shd2] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        u16 shd3 = AddInstance(754, (V3){-51.306650f, -47.42f, -66.66652f}); World.rotation[shd3] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        u16 shd4 = AddInstance(754, (V3){ 71.78664f,  -47.42f,  56.42651f}); World.rotation[shd4] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-    }
+        World.shd1 = AddInstance(754, (V3){-51.30664f,  -47.42f,  56.42651f}); World.rotation[World.shd1] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        World.shd2 = AddInstance(754, (V3){ 71.5f,      -47.42f, -66.6f    }); World.rotation[World.shd2] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        World.shd3 = AddInstance(754, (V3){-51.306650f, -47.42f, -66.66652f}); World.rotation[World.shd3] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        World.shd4 = AddInstance(754, (V3){ 71.78664f,  -47.42f,  56.42651f}); World.rotation[World.shd4] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+    } else World.shd1=World.shd2=World.shd3=World.shd4=U16_MAX;
     Light hl = (Light){.pos=World.position[PLAYER1],.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHTON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
     LightAnimation lam = {0};
     headmountedLanternLight = AddLight(&hl, &lam);

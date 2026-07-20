@@ -1,6 +1,6 @@
 // lib.c - LibC replacement functions and other misc helpers.
-static i32 PosGetCellCoordX(float x) { return (u16)clamp((i32)vfloor((x - World.worldMin_x[World.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
-static i32 PosGetCellCoordZ(float z) { return (u16)clamp((i32)vfloor((z - World.worldMin_z[World.curLev] + CELLXHALF) / CELL_SIZE), 0, WORLDX_0BASED); }
+static i32 PosGetCellCoordX(float x) { return (u16)clamp((i32)vfloor((x - World.worldMin_x[World.curLev] + CELLXHALF) / CELLSZ), 0, WORLDX_0BASED); }
+static i32 PosGetCellCoordZ(float z) { return (u16)clamp((i32)vfloor((z - World.worldMin_z[World.curLev] + CELLXHALF) / CELLSZ), 0, WORLDX_0BASED); }
 size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
 char* data_parser_trim(char* s) { while(cEmpty((u8)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((u8)*e)){e--;} e[1]=0; return s; }
 i32 s2i32(const char *str) { // atoi replacement, needed separately from fast_atoi for user console input
