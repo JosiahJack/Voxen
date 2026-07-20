@@ -561,11 +561,11 @@ void Physics(float dt) {
                 for (i32 dz = -radCells; dz <= radCells; ++dz) { // 2. Collisions
                     u32 cell = PosGetCellCoordsP(cx + dx,cz + dz);
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
-                        u16 b = cellLists[cell][k]; if (b == a || b >= INSTANCE_COUNT) continue;
+                        u16 b = cellLists[cell][k]; if (b == a || b >= World.instCount) continue;
                         if (unlikely(Cheats.noclip && b == PLAYER1)) continue;
                         if (!(mask & World.layer[b]) || World.collider[b] == COLTYPE_NONE) continue;
                         if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && b > a)) continue; // Prevent doubled restitutions causing ghosting.
-                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 2.56f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
+                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
                         Manifold mf = {0}; float matA[16], matB[16]; const float *mxA = &modelMatrices[a*16], *mxB = &modelMatrices[b*16];
                         if (World.collider[a] == COLTYPE_CVX) { EntityColliderMatrixNow(a,matA); mxA = matA; } // Not MSH as only CVX is dynamically moving during physics substeps.
                         if (World.collider[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }

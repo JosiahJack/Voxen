@@ -1128,6 +1128,7 @@ void LoadLevelMod(u8 lev) {
             par->texAnimLight  = AddLight(&lit1,&lam);
             par->texAnimLight2 = AddLight(&lit2,&lam);
         } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) { World.position[parent].y += 0.12f; } // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 310) { World.position[parent].y += 0.0975f; } // item_beverage: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx >= 472 && entIdx <= 476) { World.position[parent].y += 0.342f; } // se_crate1, se_crate2, se_crate3, se_crate4, se_crate5: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 279) { // chunk_screen
             V3 ofs1 = GetLocalTransformedPos(par,(V3){0.0f,-0.08f,0.0f});
@@ -1186,7 +1187,7 @@ void LoadLevelData(u8 curlevel) {
         i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
         World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
         World.radius[i] = modelBounds[World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x, World.scale[i].y), World.scale[i].z);
-        World.instances[i].shadRadius = World.radius[i] * 1.41f;
+        World.instances[i].shadRadius = World.radius[i] * 1.70f;
         ComputeConvexMeshInertiaTensor(i);
         if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
     }
