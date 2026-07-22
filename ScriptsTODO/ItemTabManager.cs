@@ -78,13 +78,13 @@ public class ItemTabManager : MonoBehaviour {
 		if (constIndex == 34 || constIndex == 81 || constIndex == 110
 			|| (constIndex >= 83 && constIndex <= 91)) {
 			accessCardList.SetActive(true);
-			AccessCardType acc = AccessCardType_Standard;
-			Array cardTypes = Enum.GetValues(typeof(AccessCardType));
+			AccCardType acc = ACC_Std;
+			Array cardTypes = Enum.GetValues(typeof(AccCardType));
 			StringBuilder s1 = new StringBuilder();
 			s1.Clear();
 			for (int i=0;i<cardTypes.Length;i++) {
-				acc = (AccessCardType)cardTypes.GetValue(i);
-				if (acc == AccessCardType_None) continue;
+				acc = (AccCardType)cardTypes.GetValue(i);
+				if (acc == ACC_None) continue;
 
 				if (World.invP1.HasAccessCard(acc)) s1.Append(" " + AccessCardCodeForType(acc));
 			}

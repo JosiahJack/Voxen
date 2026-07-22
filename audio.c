@@ -1,4 +1,6 @@
 // audio.c - Audio System supporting .mp3 and .wav filetypes only, uses Windows WASAPI and Linux ALSA (uses "default" to work on PulseAudio and PipeWire or just ALSA+dmix systems, with raw ioctl fallback to all ALSA devices if "default" unavailable).  Mixes synthesized sounds as well.
+#include "common.h"
+#include "lib.h"
 #include "tables_audio.h"
 #define AUDIO_RATE      48000
 #define AUDIO_CHANNELS  2
@@ -60,8 +62,8 @@
     typedef struct snd_pcm_mmap_status  pcm_status_t; typedef struct snd_pcm_mmap_control pcm_control_t; typedef struct snd_pcm_hw_params pcm_hw_params_t; typedef struct snd_pcm_sw_params pcm_sw_params_t;
     struct pcm_params { pcm_hw_params_t hw_params; pcm_sw_params_t sw_params; }; typedef struct pcm_params pcm_params_t;
     typedef enum pcm_param {PCM_ACCESS=0,PCM_FORMAT=1,PCM_RATE=11,PCM_CHANNELS=10,PCM_PERIOD_SIZE=13,PCM_BUFFER_SIZE=17,PCM_PERIODS=15,PCM_INTERRUPT=20,PCM_TSTAMP_TYPE=21,PCM_AVAIL_MIN=22,PCM_START_THRESHOLD=23,PCM_XRUN_THRESHOLD=24,PCM_SILENCE_THRESHOLD=25,PCM_SILENCE_SIZE=26} pcm_param_t;
-    static inline struct snd_mask* get_mask_struct(struct snd_pcm_hw_params *p, u32 parameter) { return &p->masks[parameter - 0]; }
-    static inline struct snd_interval* get_interval_struct(struct snd_pcm_hw_params *p, u32 parameter) { return &p->intervals[parameter - 8]; }
+    INLINE struct snd_mask* get_mask_struct(struct snd_pcm_hw_params *p, u32 parameter) { return &p->masks[parameter - 0]; }
+    INLINE struct snd_interval* get_interval_struct(struct snd_pcm_hw_params *p, u32 parameter) { return &p->intervals[parameter - 8]; }
     static void hw_params_set_mask(struct snd_pcm_hw_params *p, int parameter, u32 value) { struct snd_mask *m = get_mask_struct(p,parameter); if (m->bits[((value) / 32)] & (1 << ((value) % 32))) {mset(m, 0x00, sizeof(*m));} m->bits[((value) / 32)] |= (1 << ((value) % 32)); }
     static void hw_params_set_interval(struct snd_pcm_hw_params *p, int parameter, u32 min, u32 max) { struct snd_interval *i = get_interval_struct(p,parameter); i->openmin = i->openmax = 0; i->integer = 1; i->min = min; i->max = max; }
     static void hw_params_set(struct snd_pcm_hw_params *p, int parameter, u32 value) { if ((parameter >= 0 && parameter <= 2)) hw_params_set_mask(p,parameter,value); else if ((parameter >= 8 && parameter <= 19)) hw_params_set_interval(p,parameter,value,value); }
@@ -636,7 +638,7 @@ pthread_t audThreadID; void* AudThread(void* arg);
         while (avail>=(u32)AUDIO_FRAMES) { audio_mix_period(buf); for (i32 i=0;i<pcm_fd_count;i++) { if (pcm_write(buf,AUDIO_FRAMES)<0) {pcm_prepare(pcm_fds[i]);} } avail-=AUDIO_FRAMES; }
     }
     
-    void InitAudio() { FHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS); if (first == INVALID_FHANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; } pcm_fds[0] = first; pcm_fd_count = 1; pthread_create(&audThreadID,NULL,AudThread,NULL); }
+    void InitAudio() { InitSCFTables(); FHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS); if (first == INVALID_FHANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; } pcm_fds[0] = first; pcm_fd_count = 1; pthread_create(&audThreadID,NULL,AudThread,NULL); }
 #else // Linux
     typedef void snd_pcm_t;
     typedef int (*pfnspo)(snd_pcm_t**,const char*,int,int); typedef int (*pfn_snd_pcm_close)(snd_pcm_t*);    typedef int (*pfnspw)(snd_pcm_t*,const void*,u32);
@@ -675,7 +677,7 @@ pthread_t audThreadID; void* AudThread(void* arg);
     }
 
     void AudioUpdate() { if (!apcm) {return;} i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; audio_mix_period(buf); int r = snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); if (r < 0 && snd_pcm_recover(apcm,r,0) >= 0) { snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); } }
-    void InitAudio() { if (!alsa_try_open_default()) { for (i32 card = 0; card < 8; card++) { for (i32 dev = 0; dev < 8; dev++) init_pcm_device(card,dev); } if (pcm_fd_count == 0) {DualLogError("Audio: no output device found\n"); return; } } pthread_create(&audThreadID,NULL,AudThread,NULL); }
+    void InitAudio() { InitSCFTables(); if (!alsa_try_open_default()) { for (i32 card = 0; card < 8; card++) { for (i32 dev = 0; dev < 8; dev++) init_pcm_device(card,dev); } if (pcm_fd_count == 0) {DualLogError("Audio: no output device found\n"); return; } } pthread_create(&audThreadID,NULL,AudThread,NULL); }
 #endif
 
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(1000); } return NULL; }
@@ -687,7 +689,7 @@ static const AmbientDef ambientSounds[MAXAMB] = {
     {621,"airhiss.wav"},        {622,"clicker.wav"},  {623,"compressor.wav"},    {624,"dishwasher.wav"},{625,"drip_amb.wav"},{626,"fan1.wav"},         {627,"generator_gas.wav"},   {628,"gurgle.wav"},    {629,"icemaker.wav"},       {630,"intake.wav"},            {631,"lathe.wav"},        {632,"lev3loop1.wav"},    {633,"lev3loop2.wav"},
     {634,"lev3loop3.wav"},      {635,"lev3loop4.wav"},{636,"liquid_bubble.wav"}, {637,"lava2.wav"},     {638,"rain.wav"},    {639,"machgear_loop.wav"},{640,"machine_ambience.wav"},{641,"machine_go.wav"},{642,"machine_humamb7.wav"},{643,"machine_humlonoise.wav"},{644,"machine_loop1.wav"},{645,"machine_loop2.wav"},{646,"machinea1.wav"},
     {647,"machinevat_loop.wav"},{648,"mist.wav"},     {649,"pipewater_loop.wav"},{650,"powerloom.wav"}, {651,"pump.wav"},    {652,"pump2.wav"},        {653,"rain.wav"},            {654,"steam_loop.wav"},{655,"washing_machine.wav"}};
-void MixAmbs(void) {    
+void MixAmbs() {    
     for (u16 i=0;i<ambs;++i) {
         u16 a = ambReg[i];
         const AmbientDef* def = NULL; for (size_t j=0;j<MAXAMB;++j) { if (ambientSounds[j].index==World.instances[a].index) {def = &ambientSounds[j]; break; } }
@@ -709,7 +711,7 @@ void MixAmbs(void) {
         } else if (SndPlaying(&slot->sound)) SndStop(&slot->sound);
     }
 }
- 
+
 void ResetLevelAudio(void) { ambs=0; mset(ambReg,0,ambs * sizeof(u16)); for (u16 i = INSTS_1ST_IDX; i<World.instCount;++i) { if(IdxIsAmbient(World.instances[i].index)){ambReg[ambs]=i; ambs++; if(ambs >= MAXAMB){DualLogError("Ambient noises %u > %u!\n",ambs,MAXAMB); break;} World.instances[i].volume=EDefs[World.instances[i].index].volume * 0.5f;} } }
 // Music System
 #define BUFFER_MS 50
@@ -767,38 +769,38 @@ const char* levelMusicDeath[MAX_LEVELS] = {"./Audio/music/THM0-17_death.mp3","./
                                            "./Audio/music/THM3-18_death.mp3","./Audio/music/THM0-17_death.mp3","./Audio/music/THM2-17_death.mp3","./Audio/music/THM0-17_death.mp3",
                                            "./Audio/music/THM6-21_death.mp3","./Audio/music/THM0-17_death.mp3","./Audio/music/THM5-17_death.mp3","./Audio/music/THM5-17_death.mp3",
                                            "./Audio/music/THM5-17_death.mp3","./Audio/music/THM10-16_death.mp3"};
-void PlayMenuMusic(void) { mp3_clear(); play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); }
-void PlayGameMusic(void) { mp3_clear(); /*play_mp3("./Audio/music/THM1-19_medicalstart.mp3",100);*/ }
+void PlayMenuMusic() { mp3_clear(); play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); }
+void PlayGameMusic() { mp3_clear(); /*play_mp3("./Audio/music/THM1-19_medicalstart.mp3",100);*/ }
 const char* GetCorrespondingLevelClip(TrackType ttype) {
     switch(ttype) { // Override types, return from these first before special level handling
-        case TrackType_Revive:     return levelMusicRevive[World.curLev];
-        case TrackType_Death:      return levelMusicDeath[World.curLev];
-        case TrackType_Elevator:   return levelMusicElevator[World.curLev];
-        case TrackType_Distortion: return levelMusicDistortion[World.curLev];
+        case TT_Revive:     return levelMusicRevive[World.curLev];
+        case TT_Death:      return levelMusicDeath[World.curLev];
+        case TT_Elevator:   return levelMusicElevator[World.curLev];
+        case TT_Distortion: return levelMusicDistortion[World.curLev];
     }
     if (World.curLev == 0 || World.curLev == 5 || World.curLev == 7) { // 0  REACTOR, 5 FLIGHT, 7 ENGINEERING
         if (World.Sys_Music.levelEntry) return reactorMusic[6];
-        if (ttype == TrackType_Combat)  return reactorMusic[random_range_u8(0,6)];
+        if (ttype == TT_Combat)  return reactorMusic[random_range_u8(0,6)];
         return reactorMusic[random_range_u8(6,13)];
     } else if (World.curLev == 1) { // 1  MEDICAL
         if (World.Sys_Music.levelEntry) return medicalMusic[0];
-        if (ttype == TrackType_Combat)  return medicalMusic[random_range_u8(5,11)];
+        if (ttype == TT_Combat)  return medicalMusic[random_range_u8(5,11)];
         return medicalMusic[random_range_u8(1,5)];
     } else if (World.curLev == 2 || World.curLev == 4) { // 2  SCIENCE, 4 STORAGE
         if (World.Sys_Music.levelEntry) return scienceMusic[0];
-        if (ttype == TrackType_Combat)  return scienceMusic[random_range_u8(8,10)];
+        if (ttype == TT_Combat)  return scienceMusic[random_range_u8(8,10)];
         return scienceMusic[random_range_u8(1,8)];
     } else if (World.curLev == 8) { // 8 SECURITY
         if (World.Sys_Music.levelEntry) return securityMusic[9];
-        if (ttype == TrackType_Combat)  return securityMusic[random_range_u8(0,6)];
+        if (ttype == TT_Combat)  return securityMusic[random_range_u8(0,6)];
         return securityMusic[random_range_u8(6,19)];
     } else if (World.curLev == 6) { // 6 EXECUTIVE
         if (World.Sys_Music.levelEntry) return executiveMusic[0];
-        if (ttype == TrackType_Combat)  return executiveMusic[random_range_u8(9,13)];
+        if (ttype == TT_Combat)  return executiveMusic[random_range_u8(9,13)];
         return executiveMusic[random_range_u8(0,10)];
     } else if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { // 10, 12 GROVES
         if (World.Sys_Music.levelEntry) return groveMusic[19];
-        if (ttype == TrackType_Combat)  return groveMusic[random_range_u8(0,9)];
+        if (ttype == TT_Combat)  return groveMusic[random_range_u8(0,9)];
         return executiveMusic[random_range_u8(9,24)];
     } else if (World.curLev == 13) { // 13 CYBERSPACE
         if (World.Sys_Music.levelEntry)     return cyberMusic[0];
@@ -811,35 +813,36 @@ const char* GetCorrespondingLevelClip(TrackType ttype) {
 
 void PlayTrack(TrackType ttype, MusicType mtype) {
     if (!Sys_Settings.DynamicMusic) { // Looped Music (Dynamic Music off)
-        if (mtype == MusicType_Override) {
-                 if (ttype == TrackType_Revive)     play_mp3(levelMusicRevive[World.curLev],0);
-            else if (ttype == TrackType_Death)      play_mp3(levelMusicDeath[World.curLev],0);
-            else if (ttype == TrackType_Elevator)   play_mp3(levelMusicElevator[World.curLev],0);
-            else if (ttype == TrackType_Distortion) play_mp3(levelMusicDistortion[World.curLev],0);
+        if (mtype == MT_Override) {
+                 if (ttype == TT_Revive)     play_mp3(levelMusicRevive[World.curLev],0);
+            else if (ttype == TT_Death)      play_mp3(levelMusicDeath[World.curLev],0);
+            else if (ttype == TT_Elevator)   play_mp3(levelMusicElevator[World.curLev],0);
+            else if (ttype == TT_Distortion) play_mp3(levelMusicDistortion[World.curLev],0);
         } else play_mp3(levelMusicLooped[World.curLev],0);
         return;
     } // Normal Dynamic Music System
-    if (mtype == MusicType_Override) mp3_clear();
+    if (mtype == MT_Override) mp3_clear();
     play_mp3(GetCorrespondingLevelClip(ttype),BUFFER_MS);
     if (!World.Sys_Music.elevator) World.Sys_Music.levelEntry = false; // already used by GetCorresponding... just now
 }
 
-void UpdateMusic(void) {
+void UpdateMusic() {
     if (World.paused && !World.menuActive) { MP3Pause(); return; }
     MP3Resume();
     float remaining = GetMP3RemainingTime(); if (remaining > AUD_BUFFER_T) return;
     if (World.menuActive) { play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return; }
     if (World.Sys_Music.inCombat && !World.Sys_Music.inZone && World.Sys_Music.combatImpulseFinished < World.pauseRelativeTime) {
         World.Sys_Music.inCombat = false;
-        PlayTrack(TrackType_Combat, MusicType_Override);
+        PlayTrack(TT_Combat, MT_Override);
         World.Sys_Music.combatImpulseFinished = World.pauseRelativeTime + 20.0;
         return;
     }
     if (World.Sys_Music.inZone) {
-        if (World.Sys_Music.distortion) { PlayTrack(TrackType_Distortion, MusicType_Override); return; }
-        if (World.Sys_Music.elevator) { PlayTrack(TrackType_Elevator, MusicType_Override); return; }
+        if (World.Sys_Music.distortion) { PlayTrack(TT_Distortion, MT_Override); return; }
+        if (World.Sys_Music.elevator) { PlayTrack(TT_Elevator, MT_Override); return; }
     }
-    if (Sys_Settings.DynamicMusic || remaining <= AUD_BUFFER_T) PlayTrack(TrackType_Walking, MusicType_Walking);
+    if (Sys_Settings.DynamicMusic || remaining <= AUD_BUFFER_T) PlayTrack(TT_Walking, MT_Walking);
 }
 
 void ResetLevelMusic(void) { mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.clipFinished = World.Sys_Music.combatImpulseFinished = get_time(); World.Sys_Music.combatImpulseFinished += 5.0; }
+void UpdateAudio() { if (!World.paused && !World.menuActive) {MixAmbs();} UpdateMusic(); }

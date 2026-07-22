@@ -1,6 +1,8 @@
 // text.c - Text and Font Rendering/Loading System
+#include "common.h"
+#include "lib.h"
 #include "stbtt.h"
-int numPackedGlyphs=0,numPackedGlyphsStopD=0;
+int numPackedGlyphs=0,numPackedGlyphsStopD=0; extern u32 textVAO,textVBO,textSP;
 u32 fontAtlasTex,fontAtlasTexStopD;
 stbtt_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
 float fixedNumberAdvanceWidth=0.0f,fixedNumberAdvanceWidthStopD=0.0f;
@@ -21,7 +23,7 @@ LoadedFont LoadFallbackFont(const char*path,int fii,int ci){
 }
 int GetGlyphAndFont(u32 cp,stbtt_fontinfo**outFont,u8 fontID){ int g=stbtt_FindGlyphIndex(fontID==FONT_STOPD?&fontInfo[1]:&fontInfo[0],cp);if(g){*outFont=fontID==FONT_STOPD?&fontInfo[1]:&fontInfo[0];return g;} for(int i=0;i<3;i++){g=stbtt_FindGlyphIndex(&fallbackFonts[i].info,cp);if(g){*outFont=&fallbackFonts[i].info;return g;}} return 0; }
 void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp);
-void InitFontAtlasses(){
+void InitFontAtlasses() {
     DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    5 fonts...");
     ttAllocs = OS_Alloc(4674 * sizeof(TAlloc));
@@ -76,7 +78,7 @@ size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
 }
 
 static const char* localizations[8]={"./Data/text_english.txt","./Data/text_espanol.txt","./Data/text_deutsch.txt","./Data/text_francais.txt","./Data/text_nihongo.txt","./Data/text_russkiy.txt","./Data/text_italiano.txt","./Data/text_portugues.txt"};
-void LoadTextForLanguage(u8 lang){
+void LoadTextForLanguage(u8 lang) {
     char tf[256]={0}; sCpy2aSubFromb(tf,255,localizations[lang<8?lang:0],256);
     FHandle dfd=INVALID_FHANDLE;int asz=0;
     if(Sys_Text.file_data){OS_Free(Sys_Text.file_data,Sys_Text.file_size);Sys_Text.file_data=NULL;Sys_Text.file_size=0;}
@@ -86,21 +88,21 @@ void LoadTextForLanguage(u8 lang){
     if(Sys_Text.file_size>=2&&Sys_Text.file_data[0]==0xFF&&Sys_Text.file_data[1]==0xFE){dp=2;utf16=1;}
     else if(Sys_Text.file_size>=3&&Sys_Text.file_data[0]==0xEF&&Sys_Text.file_data[1]==0xBB&&Sys_Text.file_data[2]==0xBF){dp=3;}
     else{size_t nl=0;for(size_t i=1;i<Sys_Text.file_size&&i<1024;i+=2)if(Sys_Text.file_data[i]==0)nl++;if(nl*3>Sys_Text.file_size)utf16=1;}
-    char line[T_LOCALIZATION_MAX_LENGTH];int ln=0;
+    char line[T_LOGSTR_MAX];int ln=0;
     while(dp<Sys_Text.file_size){size_t ls=dp;
         if(utf16){while(dp+1<Sys_Text.file_size){u16 ch=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.file_size){u16 nx=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
         else{while(dp<Sys_Text.file_size){u8 c=Sys_Text.file_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.file_size&&Sys_Text.file_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
-        size_t ll=dp-ls;if(ll==0){if(ln<T_STRING_COUNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
+        size_t ll=dp-ls;if(ll==0){if(ln<T_LOGSTR_CNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
         if(utf16)utf16le_to_utf8(&Sys_Text.file_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1; mcpy(line,&Sys_Text.file_data[ls],ll);line[ll]='\0';}
         size_t sl=slen(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';
-        if(sl==0){if(ln<T_STRING_COUNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
-        if(ln<T_STRING_COUNT) {mcpy(Sys_Text.stringTable[ln],line,sl);Sys_Text.stringTable[ln][sl]='\0';++ln;} }
+        if(sl==0){if(ln<T_LOGSTR_CNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
+        if(ln<T_LOGSTR_CNT) {mcpy(Sys_Text.stringTable[ln],line,sl);Sys_Text.stringTable[ln][sl]='\0';++ln;} }
 }
 
 INLINE int s2i32Len(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
 static const char* logLocalizations[8]={"./Data/logs_english.txt","./Data/logs_espanol.txt","./Data/logs_deutsch.txt","./Data/logs_francais.txt","./Data/logs_nihongo.txt","./Data/logs_russkiy.txt","./Data/logs_italiano.txt","./Data/logs_portugues.txt"};
-void LoadLogTextForLanguage(u8 lang){
-    mset(Sys_Text.audioLogImagesRefIndicesLH,0,T_LOGS_COUNT*sizeof(u16));mset(Sys_Text.audioLogImagesRefIndicesRH,0,T_LOGS_COUNT*sizeof(u16));mset(Sys_Text.audioLogType,0,T_LOGS_COUNT*sizeof(u8));mset(Sys_Text.audioLogLevelFound,0,T_LOGS_COUNT*sizeof(u8));
+void LoadLogTextForLanguage(u8 lang) {
+    mset(Sys_Text.audioLogImagesRefIndicesLH,0,LOGCNT*sizeof(u16));mset(Sys_Text.audioLogImagesRefIndicesRH,0,LOGCNT*sizeof(u16));mset(Sys_Text.audioLogType,0,LOGCNT*sizeof(u8));mset(Sys_Text.audioLogLevelFound,0,LOGCNT*sizeof(u8));
     char tf[256]={0}; sCpy2aSubFromb(tf,255,logLocalizations[lang<8?lang:0],256);
     FHandle dfd=INVALID_FHANDLE;int asz=0;
     if(Sys_Text.filelog_data){OS_Free(Sys_Text.filelog_data,Sys_Text.filelog_size);Sys_Text.filelog_data=NULL;Sys_Text.filelog_size=0;}
@@ -120,21 +122,21 @@ void LoadLogTextForLanguage(u8 lang){
         int li=-1,ilh=-1,irh=-1,lt=0,lf=0,fi=0;char*pos=line;
         while(*pos&&fi<32){while(*pos==' ')++pos;char*st=pos;int q=(*pos=='"');if(q)++pos;while(*pos){if(*pos==','&&!q)break;if(*pos=='"'&&q){if(pos[1]==','){pos++;break;}if(pos[1]=='"'){pos+=2;continue;}}++pos;}char*en=pos;if(q&&*en=='"')--en;size_t tl=(size_t)(en-st);if(!tl){if(*pos==',')++pos;fi++;continue;}
             switch(fi){
-                case 0:  li=s2i32Len(st,tl); if (li<0||li>=T_LOGS_COUNT) goto nxt; break;
+                case 0:  li=s2i32Len(st,tl); if (li<0||li>=LOGCNT) goto nxt; break;
                 case 1:  ilh=s2i32Len(st,tl); break;
                 case 2:  irh=s2i32Len(st,tl); break;
-                case 3:  if(li>=0&&li<T_LOGS_COUNT) sCpy2aSubFromb(World.audiologNames[li],tl,st,sizeof(World.audiologNames[0]));       break;
-                case 4:  if(li>=0&&li<T_LOGS_COUNT) sCpy2aSubFromb(World.audiologSenders[li],tl,st,sizeof(World.audiologSenders[0]));   break;
-                case 5:  if(li>=0&&li<T_LOGS_COUNT) sCpy2aSubFromb(World.audiologSubjects[li],tl,st,sizeof(World.audiologSubjects[0])); break;
+                case 3:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologNames[li],tl,st,sizeof(World.audiologNames[0]));       break;
+                case 4:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologSenders[li],tl,st,sizeof(World.audiologSenders[0]));   break;
+                case 5:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologSubjects[li],tl,st,sizeof(World.audiologSubjects[0])); break;
                 case 6:  lt=s2i32Len(st,tl); break;
                 case 7:  lf=s2i32Len(st,tl); break;
-                default: if(li>=0&&li<T_LOGS_COUNT){char*d=World.audioLogSpeech2Text[li]; size_t cur=slen(d); if(cur>0&&cur<T_LOCALIZATION_MAX_LENGTH*4-2){d[cur++]=',';d[cur]='\0';} size_t left=T_LOCALIZATION_MAX_LENGTH*4-cur-1; if(left>0){size_t cl=tl>left?left:tl;sCpy2aSubFromb(d+cur,cl,st,left+1);}}break;}
+                default: if(li>=0&&li<LOGCNT){char*d=World.audioLogSpeech2Text[li]; size_t cur=slen(d); if(cur>0&&cur<T_LOGSTR_MAX*4-2){d[cur++]=',';d[cur]='\0';} size_t left=T_LOGSTR_MAX*4-cur-1; if(left>0){size_t cl=tl>left?left:tl;sCpy2aSubFromb(d+cur,cl,st,left+1);}}break;}
             if (*pos==',')++pos;fi++;}
-        if (li>=0&&li<T_LOGS_COUNT) {Sys_Text.audioLogImagesRefIndicesLH[li]=(u16)ilh;Sys_Text.audioLogImagesRefIndicesRH[li]=(u16)irh;Sys_Text.audioLogType[li]=(u8)lt;Sys_Text.audioLogLevelFound[li]=(u8)lf;}
+        if (li>=0&&li<LOGCNT) {Sys_Text.audioLogImagesRefIndicesLH[li]=(u16)ilh;Sys_Text.audioLogImagesRefIndicesRH[li]=(u16)irh;Sys_Text.audioLogType[li]=(u8)lt;Sys_Text.audioLogLevelFound[li]=(u8)lf;}
         nxt:continue;}
 }
 
-float textVertexData[8192];
+static float textVertexData[8192]; extern Color textColors[];
 void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char* restrict format,...) {
     va_list args; __builtin_va_start(args,format); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,args); __builtin_va_end(args);
     glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);

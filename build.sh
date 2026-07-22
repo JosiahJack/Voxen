@@ -101,8 +101,8 @@ EOF
 LINUX_CC="zig cc"
 WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wframe-larger-than=65536"
 COMMON_CFLAGS="-ferror-limit=500 -fno-stack-protector -fno-unwind-tables -Wno-format-nonliteral -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
-               -Wshadow -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -Wno-switch -fdeclspec -fomit-frame-pointer -g0 -fstrict-aliasing -fcommon \
-               -Wno-overlength-strings -fno-math-errno -fno-sanitize=all -fno-trapping-math -fmerge-all-constants -m64 -O3 -march=haswell -mf16c -mavx -Wbool-conversion -Wno-empty-body -nostdinc"
+               -Wshadow -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -Wno-switch -fdeclspec -fomit-frame-pointer -g0 -fstrict-aliasing \
+               -Wno-overlength-strings -fno-math-errno -fno-sanitize=all -fno-trapping-math -fmerge-all-constants -m64 -Os -march=haswell -mf16c -mavx -Wbool-conversion -Wno-empty-body -nostdinc"
 COMMON_LFLAGS="-Wl,-z,relro,-z,now,--gc-sections,--as-needed,--build-id=none"
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
@@ -120,20 +120,20 @@ fi
 
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c"
+SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c audio.c textures.c models.c biomonitor.c particles.c input.c culling.c" #synth.c is in audio.c
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -o $BINARY_NAME
 build_end=$(now_ms)
 total_build_time=$((build_end - shader_start))
-echo "Built engine and mod in ${total_build_time} ms"
+echo "Built engine as game in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
 #         windows)  wine ./voxen.exe ;;
-#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
-        *)        ./voxen ;;   # linux
+#         *)        ./voxen ;;   # linux
     esac
     rm -f ./Shaders/*.h "$TEMP_DIR"/*.o ./voxen.upx #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

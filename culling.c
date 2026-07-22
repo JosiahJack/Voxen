@@ -1,46 +1,29 @@
 // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
-#define MAX_CULL_FILESIZE 500000
+#include "common.h"
+#include "lib.h"
 typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead;} Portal;
 u32 gridCellStates[ARRSIZE],precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
 u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u8 numActivePortals = 0;
 __attribute__((pure)) bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
-i32 PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
 bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
 INLINE bool XZPairInBounds(i32 x, i32 z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
 bool SkyIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE); }
 bool SkySunIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); }
 bool NeighborhoodInPVS(u16 cellX, u16 cellZ, u8 r) {
     u32 cellIdx = (cellZ * WORLDX) + cellX;
-    for (int ix = (int)cellX-r; ix <= (int)cellX+r; ++ix) {
-        for (int iz = (int)cellZ-r; iz <= (int)cellZ+r; ++iz) {
-            if (unlikely(!XZPairInBounds(ix,iz))) continue;
-            int subIdx = iz * WORLDX + ix;
-            if (get_cull_bit(precomputedVisibleCellsFromHere, cellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) return true;
-        }
-    }
+    for (int ix=(int)cellX-r;ix<=(int)cellX+r;++ix) { for(int iz=(int)cellZ-r;iz<=(int)cellZ+r;++iz){if (unlikely(!XZPairInBounds(ix,iz))){continue;} int subIdx=iz*WORLDX + ix; if (get_cull_bit(precomputedVisibleCellsFromHere,cellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) return true;} }
     return false;
 }
 
-bool GridCellBlock(u16 i,V3 pos,V3 newPos) {
-    i32 ccx=PosGetCellCoordX(pos.x),    ccz=PosGetCellCoordZ(pos.z);
-    i32 ncx=PosGetCellCoordX(newPos.x), ncz=PosGetCellCoordZ(newPos.z);
-    i32 cc=(ccz*WORLDX)+ccx, nc=(ncz*WORLDX)+ncx;
-    if (ncz>ccz && (gridCellStates[cc]&CELL_CLOSEDNORTH)) { World.velocity[i].z=-0.1f; return true; }
-    if (ncz<ccz && (gridCellStates[cc]&CELL_CLOSEDSOUTH)) { World.velocity[i].z= 0.1f; return true; }
-    if (ncx>ccx && (gridCellStates[cc]&CELL_CLOSEDEAST))  { World.velocity[i].x=-0.1f; return true; }
-    if (ncx<ccx && (gridCellStates[cc]&CELL_CLOSEDWEST))  { World.velocity[i].x= 0.1f; return true; }
-    if (!(gridCellStates[nc]&CELL_OPEN)) { V3 dir=V3_Normalize(World.velocity[i]); World.velocity[i]=V3_ScaleByF(dir,-0.1f); return true; }
-    return false;
-}
-
+#define MAX_CULL_FILESIZE 500000
 static u8* LoadCullPNG(const char* name, int level) {
     char path[256]; sFormat(path, sizeof(path),"./Data/%s_%d.png",name,level);
-    FHandle fp = OS_OpenReadonly(path);
+    FHandle fp=OS_OpenReadonly(path);
     OS_Seek(fp,0,2); size_t size = OS_Tell(fp); if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n",path); OS_Exit(1); }
-    u8* cullingFileBuffer = OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8));
+    u8* cullingFileBuffer=OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8));
     OS_Seek(fp,0,0); size_t read_size = OS_Read(fp,cullingFileBuffer,size); OS_Close(fp); if (read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); }
-    int w, h; u8* pixels = PngLoad(cullingFileBuffer,size,&w,&h,&png_arena_main); if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); }
+    i32 w,h; u8* pixels=PngLoad(cullingFileBuffer,size,&w,&h,&png_arena_main); if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); }
     OS_Free(cullingFileBuffer,MAX_CULL_FILESIZE * sizeof(u8));
     return pixels;
 }

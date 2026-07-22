@@ -1,4 +1,6 @@
 // biomonotor.c - Biomonitor Graph and Text displays.
+#include "common.h"
+#include "lib.h"
 #define BIOM_ERG 0
 #define BIOM_CHI 1
 #define BIOM_ECG 2
@@ -189,14 +191,7 @@ static void Push(int index, float val) {
     }
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-static void BiomonitorEnergyPulse(float take) {
-    Push(0,take); IncrementERG();
-    Push(0,take); IncrementERG();
-}
-#pragma GCC diagnostic pop
-
+void BiomonitorEnergyPulse(float take) { Push(0,take); IncrementERG(); Push(0,take); IncrementERG(); }
 void BioMonitorUpdate() {
     if (!(World.invP1.hasHardware & HW_BIO) || !(World.invP1.hardwareIsActive & HW_BIO)) return;
     bioMonitor.header = 526; bioMonitor.heartRateText = 527; bioMonitor.bpmText = 529; bioMonitor.fatigueDetailText = 531;

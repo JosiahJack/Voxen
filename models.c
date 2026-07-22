@@ -1,9 +1,9 @@
 // models.c - 3D Models Loading System
-enum{BVH_MAX_DEPTH=3,BVH_LEAF_MAX_TRIS=8,BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585 worst case, +safety*/,BVH_MAX_TRIS_PER_MDL=6986,WELD_HASH_SIZE=32768,MAX_UNIQUE_CVX_MESHES=5989,MAX_VERT_ELEMENT_SIZE=6964,MAX_OUTPUT_VERTS=20960};
+#include "common.h"
+#include "lib.h"
 float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
 typedef struct { const char* data; const char* name; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; u32 capacity; } ModelDataParser;
 typedef struct { u32 start,end; int tid; } PhysGeomTask;
-typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode; 
 BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
 typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 BvhBuildCtx thrd_bvh_ctx[32];
@@ -12,26 +12,6 @@ u32** cvxAdjOffsets = NULL; u16** cvxAdjLists = NULL; // CSR format adjacency da
 u16  cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
 u16  lastCvxSupport[MAX_UNIQUE_CVX_MESHES] = {0}; // Persistent hill-climbing state per mesh
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
-typedef float __v8sf __attribute__((__vector_size__(32)));
-typedef float __m256 __attribute__((__vector_size__(32)));
-typedef long long __m128i __attribute__((__vector_size__(16)));
-typedef __m128i __m128i_u __attribute__((__may_alias__, __aligned__(1)));
-typedef __m256 __m256_u __attribute__((__may_alias__, __aligned__(1)));
-typedef float __v4sf __attribute__((__vector_size__(16)));
-typedef int __v4si __attribute__((__vector_size__(16)));
-typedef float __m128 __attribute__((__vector_size__(16)));
-typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1)));
-#define _mm_storeu_si128(P, V) (*(__m128i_u *)(P) = (V))
-#define _mm256_cvtps_ph(A, imm) ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)(A), (int)(imm)))
-#define _mm256_loadu_ps(P) (*(__m256_u const *)(P))
-#define _mm_loadu_ps(P) (*(__m128_u const *)(P))
-#define _mm_set1_ps(A) ((__m128){ (A), (A), (A), (A) })
-#define _mm_setr_ps(e0,e1,e2,e3) ((__m128){ (e0), (e1), (e2), (e3) })
-#define _mm_storeu_ps(P, A) (*(__m128_u *)(P) = (A))
-#define _mm_add_ps(A, B) ((__m128)((__v4sf)(A) + (__v4sf)(B)))
-#define _mm_mul_ps(A, B) ((__m128)((__v4sf)(A) * (__v4sf)(B)))
-#define _mm_min_ps(A, B) ((__m128)__builtin_ia32_minps((__v4sf)(A), (__v4sf)(B)))
-#define _mm_max_ps(A, B) ((__m128)__builtin_ia32_maxps((__v4sf)(A), (__v4sf)(B)))
 INLINE float fast_atof(const char** p) { const char* c=*p; while (*c == ' ' || *c == '\t') {c++;} float s=1.0f; if(*c == '-'){s=-1.0f; c++;} float v=0.0f; while (*c >= '0' && *c <= '9') { v=v * 10.0f + (*c - '0'); c++; } if (*c == '.') { c++; float sub=0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub*=0.1f; c++; } } *p=c; return s * v; }
 INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *c == '\t') {c++;} i32 s=1; if(*c == '-'){s=-1; c++;} i32 v = 0; while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; } *p = c; return v * s; }
 typedef struct {u32 idx,key;} TriSort;
@@ -64,6 +44,8 @@ u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, u32* re
     return nv;
 }
 
+#define _mm_min_ps(A, B) ((__m128)__builtin_ia32_minps((__v4sf)(A), (__v4sf)(B)))
+#define _mm_max_ps(A, B) ((__m128)__builtin_ia32_maxps((__v4sf)(A), (__v4sf)(B)))
 static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* __restrict d, int fs, float* __restrict tp, float* __restrict tn, float* __restrict tu, float* __restrict sv, u32* __restrict ht, u32* __restrict ht_used, u32* __restrict remap_scr, u8* __restrict cache_scr, float** __restrict ov_pos, u32* ovc, u16** ot, u16* otc) {
     *ov_pos=NULL; *ot=NULL; *ovc=*otc=0; u32 pc=0,nc=0,uc=0,ec=0; __m128 mn_v=_mm_set1_ps(1e9f), mx_v=_mm_set1_ps(-1e9f); const char *p=d, *e=d+fs;
     while (likely(p < e)) {
@@ -253,23 +235,7 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     return true;
 }
 
-static inline void BvhNodeWorldAABB(const BvhNode* node, const float* mx, V3* wMn, V3* wMx) {
-    __m128 col0=_mm_loadu_ps(mx + 0); __m128 col1=_mm_loadu_ps(mx + 4); __m128 col2=_mm_loadu_ps(mx + 8); __m128 tr=_mm_loadu_ps(mx + 12);  __m128 mn_v=_mm_setr_ps(node->mn.x,node->mn.y,node->mn.z,0.0f); __m128 mx_v=_mm_setr_ps(node->mx.x,node->mx.y,node->mx.z,0.0f);
-    __m128 lc = _mm_mul_ps(_mm_add_ps(mn_v,mx_v),_mm_set1_ps(0.5f)); // lc = (mn + mx) * 0.5f   
-    __m128 lh = _mm_mul_ps(((__m128)((__v4sf)(mx_v) - (__v4sf)(mn_v))),_mm_set1_ps(0.5f)); // lh = (mx - mn) * 0.5f
-    __m128 lc_x = __builtin_shufflevector(lc,lc,0,0,0,0); __m128 lc_y = __builtin_shufflevector(lc,lc,1,1,1,1); __m128 lc_z = __builtin_shufflevector(lc,lc,2,2,2,2); // Replicate lc.x, lc.y, lc.z across vectors
-    __m128 wc = _mm_add_ps(_mm_add_ps(_mm_mul_ps(col0,lc_x), _mm_mul_ps(col1,lc_y)), _mm_add_ps(_mm_mul_ps(col2,lc_z),tr)); // wc = col0 * lc_x + col1 * lc_y + col2 * lc_z + tr
-    __v4si sign_mask = (__v4si)_mm_set1_ps(-0.0f); __v4si inv_mask = ~sign_mask;
-    __m128 abs_col0 = (__m128)((__v4si)col0 & inv_mask); __m128 abs_col1 = (__m128)((__v4si)col1 & inv_mask); __m128 abs_col2 = (__m128)((__v4si)col2 & inv_mask); // Take absolute value of matrix columns using bitwise AND
-    __m128 lh_x = __builtin_shufflevector(lh,lh,0,0,0,0); __m128 lh_y = __builtin_shufflevector(lh,lh,1,1,1,1); __m128 lh_z = __builtin_shufflevector(lh,lh,2,2,2,2); // Replicate lh components
-    __m128 wh = _mm_add_ps(_mm_add_ps(_mm_mul_ps(abs_col0,lh_x),_mm_mul_ps(abs_col1,lh_y)),_mm_mul_ps(abs_col2,lh_z)); // wh = abs_col0 * lh_x + abs_col1 * lh_y + abs_col2 * lh_z
-    __m128 wMn_v=((__m128)((__v4sf)(wc) - (__v4sf)(wh))); __m128 wMx_v=_mm_add_ps(wc,wh); // wMn = wc - wh, wMx = wc + wh
-    wMn->x = wMn_v[0]; wMn->y = wMn_v[1]; wMn->z = wMn_v[2]; wMx->x = wMx_v[0]; wMx->y = wMx_v[1]; wMx->z = wMx_v[2]; // Store back to V3 (avoids overwriting adjacent struct memory)
-}
-
-static inline bool BvhSphereAABBOverlap(V3 sc, float sr, V3 mn, V3 mx) { V3 cl = {vclamp(sc.x, mn.x, mx.x), vclamp(sc.y, mn.y, mx.y), vclamp(sc.z, mn.z, mx.z)}; V3 d = V3_AsubB(sc, cl); return V3_dot(d, d) <= sr * sr; }
-static inline bool BvhAABBOverlap(V3 aMn, V3 aMx, V3 bMn, V3 bMx) { return (aMx.x >= bMn.x && aMn.x <= bMx.x && aMx.y >= bMn.y && aMn.y <= bMx.y && aMx.z >= bMn.z && aMn.z <= bMx.z); }
-static inline float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { // Ray-vs-AABB slab test. Returns entry t (>=0) if the ray hits the AABB within [0, maxDist], or -1.0f if no hit. Handles axis-aligned rays (zero direction component) correctly.
+float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { // Ray-vs-AABB slab test. Returns entry t (>=0) if the ray hits the AABB within [0, maxDist], or -1.0f if no hit. Handles axis-aligned rays (zero direction component) correctly.
     float tmin = 0.0f, tmax = maxDist;
     if (vabs(dir.x) < 1e-8f) { if (origin.x < mn.x || origin.x > mx.x) return -1.0f; } // X slab
     else {
@@ -301,7 +267,7 @@ static inline float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist
     return tmin;
 }
 
-static inline u32 WeldHash(i32 x, i32 y, i32 z) { u32 h = ((u32)x * 0x8DA6B343u) ^ ((u32)y * 0xD8163841u) ^ ((u32)z * 0xCB1AB31Fu); return h & (WELD_HASH_SIZE - 1); }
+INLINE u32 WeldHash(i32 x, i32 y, i32 z) { u32 h = ((u32)x * 0x8DA6B343u) ^ ((u32)y * 0xD8163841u) ^ ((u32)z * 0xCB1AB31Fu); return h & (WELD_HASH_SIZE - 1); }
 static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap) {
     u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m];
     if (!vc || !tc) { physPos[m] = NULL; physTris[m] = NULL; physVertCounts[m] = 0; return; }
@@ -332,7 +298,7 @@ static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap) 
 }
 
 static void* PhysGeomWorker(void* a) { PhysGeomTask* t=a; BvhBuildCtx* bvhCtx=&thrd_bvh_ctx[t->tid]; u32* ht = thrd_ht[t->tid]; u32* u=thrd_ht_used[t->tid]; u16* sc=(u16*)thrd_remap_scratch[t->tid]; for (u32 m = t->start; m < t->end; ++m) { if(m >= mdlsCnt || !modelVertexCounts[m] || !modelTriangleCounts[m]){physPos[m]=NULL; physTris[m]=NULL; physVertCounts[m]=0; continue;}  WeldModelPositions((u16)m,ht,u,sc); BuildModelBVH(bvhCtx,(u16)m); }  return NULL; }
-static inline bool BvhHasBVH(u16 m) { return (m < MAX_MDLS && modelBVHNodeCounts[m] && modelBVHNodes[m] != NULL); }
+#define _mm256_cvtps_ph(A, imm) ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)(A), (int)(imm)))
 void LoadModels() {
     double startModelTime = get_time();
     ModelDataParser mp = {0};
@@ -393,7 +359,7 @@ void LoadModels() {
         glBindBuffer(GL_ARRAY_BUFFER,vbos[i]); glBufferData(GL_ARRAY_BUFFER,vcz,NULL,GL_STATIC_DRAW);
         half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER,0,vcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
         u32 vc = modelVertexCounts[i]; const float *verts=vPos[i];
-        for (u32 k = 0; k < vc; ++k) { __m256 v_in=_mm256_loadu_ps(&verts[k*8]); __m128i v_half=_mm256_cvtps_ph(v_in,0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/); _mm_storeu_si128((__m128i*)&mpv[k*8],v_half); }
+        for (u32 k = 0; k < vc; ++k) { __m256 v_in=(*(__m256_u const *)(&verts[k*8])); __m128i v_half=_mm256_cvtps_ph(v_in,0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/); _mm_storeu_si128((__m128i*)&mpv[k*8],v_half); }
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         if (raw[i].data) OS_Free((void*)raw[i].data,raw[i].size);

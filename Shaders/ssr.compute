@@ -84,6 +84,6 @@ void main() {
     }
 
     reflectionColor /= totalWeight; // Normalize by total weight
-    vec3 result = reflectionColor * 0.451 * (specColor.rgb + vec3(0.1,0.1,0.1));
+    vec3 result = reflectionColor * 0.651 * (specColor.rgb + vec3(0.1,0.1,0.1));
     imageStore(outputImage,ivec2(pixel),vec4(result, 1.0));
 }

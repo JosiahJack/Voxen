@@ -1,13 +1,8 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
-#define GAME_TITLE "Citadel"
-#define WIN_ICON "./Textures/UI/menudot1.png"
 #include "common.h"
-typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
-#define likely(x)   __builtin_expect(!!(x),1)
-#define unlikely(x) __builtin_expect(!!(x),0)
-#define NULL ((void *)0)
-#define assert(cond) do { if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; } } while(0) // Force a crash for debug
-char* sFindSub(const char* haystack, const char* needle);
+#include "lib.h" // LibC Replacements and Helpers
+#include "credits.h"
+#include "Shaders/shaders.h"
 #if defined(_WIN32)
     #define WINDOWS
     #define MOD_EXTENSION ".dll" // e.g. Citadel.dll
@@ -15,129 +10,105 @@ char* sFindSub(const char* haystack, const char* needle);
     #define OS_DlSym(handle,name) GetProcAddress((handle),(name))
     #define DLL_IMP __declspec (dllimport)
     #define WINAPI __stdcall
-    #define INVALID_FHANDLE ((void*) (i64)-1)
-    typedef void* FHandle; typedef i64 (WINAPI *PROC)(); typedef i64 (WINAPI *FARPROC)(); typedef i64 (WINAPI *NEARPROC)();
+    typedef i64 (WINAPI *PROC)(); typedef i64 (WINAPI *FARPROC)(); typedef i64 (WINAPI *NEARPROC)();
     typedef struct { unsigned long Data1; u16 Data2,Data3; u8 Data4[8]; } GUID; typedef struct { int unused; } *HINSTANCE; typedef HINSTANCE HMODULE;  typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
     typedef struct { i64 QuadPart; } LARGE_INTEGER; typedef LARGE_INTEGER *PLARGE_INTEGER; typedef struct { u64 Internal,InternalHigh; union {struct {u32 Offset,OffsetHigh;} DUMMYSTRUCTNAME; void* Pointer;} DUMMYUNIONNAME; void* hEvent; } OVERLAPPED, *LPOVERLAPPED;
     typedef struct { union { u32 dwOemId; struct { u16 wProcessorArchitecture,wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; u32 dwPageSize; void* lpMinimumApplicationAddress,*lpMaximumApplicationAddress; u64 dwActiveProcessorMask; u32 dwNumberOfProcessors,dwProcessorType,dwAllocationGranularity; u16 wProcessorLevel,wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
     DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*); DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);         DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,LPOVERLAPPED);    DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);          DLL_IMP i32 WINAPI UnmapViewOfFile(void*); DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
     DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);    DLL_IMP void* WINAPI GetStdHandle(u32);           DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);   DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*); DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,LPOVERLAPPED); DLL_IMP i32 WINAPI CloseHandle(void*);     DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
     DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);                  DLL_IMP void WINAPI GetSystemInfo(LPSYSTEM_INFO); DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*); DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64);         DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);              DLL_IMP void* WINAPI CreateFileMappingW(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,u16*);
-    struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; }; typedef uintptr_t pthread_t; typedef intptr_t pthread_mutex_t,pthread_cond_t; typedef int pthread_condattr_t; typedef u32 pthread_mutexattr_t; typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t;
-    int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**); int __cdecl _mkdir(const char* dirname);
-    INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((u32)exitCode); __builtin_unreachable(); }
-    INLINE void OS_Close(FHandle fd) { CloseHandle(fd); }
-    INLINE void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); return CloseHandle(m),r;}    
-    #define OS_MakeFolder(path) _mkdir(path)
-    INLINE long OS_Read(FHandle fd, void* buf, size_t count) { u32 bytesRead = 0; return (ReadFile((void*)fd,buf,(u32)count,&bytesRead,NULL)) ? (long)bytesRead : (long)-1; }
-    INLINE FHandle OS_OpenReadonly(const char* path) { void* f = CreateFileA(path,0x80000000L,1,NULL,3,0x08000080,NULL); return f == (void*)-1 ? DualLogError("Could not open file %s for reading\n",path), (void*)-1 : f; }
-    INLINE FHandle OS_OpenWriteonly(const char* path) { FHandle h = CreateFileA(path,0x40000000L,0,NULL,2,128,NULL); return h == (void*)-1 ? DualLogError("Failed to open %s for writing\n",path),(void*)-1 : h; }
-    INLINE int OS_FileSize(FHandle f) { LARGE_INTEGER s; return (f==(FHandle)-1 || !GetFileSizeEx(f,&s)) ? -1 : (int)s.QuadPart; }
-    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
-    INLINE i64 OS_Seek(FHandle fd, i64 ofs, int whence /*forth and forsooth pray tell*/) { LARGE_INTEGER l={.QuadPart=ofs},n; return SetFilePointerEx((void*)fd,l,&n,whence) ? n.QuadPart : -1; }
-    INLINE i64 OS_Tell(FHandle fd) { LARGE_INTEGER l={0},n; return SetFilePointerEx((void*)fd,l,&n,1) ? n.QuadPart : -1; }
+    __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((u32)exitCode); __builtin_unreachable(); }
+    void OS_Close(FHandle fd) { CloseHandle(fd); }
+    void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); return CloseHandle(m),r;}    
+    int __cdecl _mkdir(const char* dirname);
+    int OS_MakeFolder(const char* path) { _mkdir(path); return 0; }
+    long OS_Read(FHandle fd, void* buf, size_t count) { u32 bytesRead = 0; return (ReadFile((void*)fd,buf,(u32)count,&bytesRead,NULL)) ? (long)bytesRead : (long)-1; }
+    FHandle OS_OpenReadonly(const char* path) { void* f = CreateFileA(path,0x80000000L,1,NULL,3,0x08000080,NULL); return f == (void*)-1 ? DualLogError("Could not open file %s for reading\n",path), (void*)-1 : f; }
+    FHandle OS_OpenWriteonly(const char* path) { FHandle h = CreateFileA(path,0x40000000L,0,NULL,2,128,NULL); return h == (void*)-1 ? DualLogError("Failed to open %s for writing\n",path),(void*)-1 : h; }
+    int OS_FileSize(FHandle f) { LARGE_INTEGER s; return (f==(FHandle)-1 || !GetFileSizeEx(f,&s)) ? -1 : (int)s.QuadPart; }
+    void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
+    i64 OS_Seek(FHandle fd, i64 ofs, int whence /*forth and forsooth pray tell*/) { LARGE_INTEGER l={.QuadPart=ofs},n; return SetFilePointerEx((void*)fd,l,&n,whence) ? n.QuadPart : -1; }
+    i64 OS_Tell(FHandle fd) { LARGE_INTEGER l={0},n; return SetFilePointerEx((void*)fd,l,&n,1) ? n.QuadPart : -1; }
     INLINE int OS_GetNumThreads() { SYSTEM_INFO si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
-    INLINE void OS_Free(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x00008000)) DualLogError("VirtualFree failed\n"); }
-    INLINE i64 OS_RawWrite(FHandle fd, const void* buf, size_t count) { u32 w; return WriteFile((void*)fd,(void*)buf,(u32)count,&w,NULL) ? (i64)w : -1; }
+    void OS_Free(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x00008000)) DualLogError("VirtualFree failed\n"); }
+    i64 OS_RawWrite(FHandle fd, const void* buf, size_t count) { u32 w; return WriteFile((void*)fd,(void*)buf,(u32)count,&w,NULL) ? (i64)w : -1; }
     #define THRSTACKSZ (8 * 1024 * 1024)
-    typedef struct { void* handle; } OS_Thread;
     void* __stdcall GetProcessHeap(); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); void __stdcall Sleep(u32 dwMilliseconds); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
     typedef u32 (__stdcall *LPTHREAD_START_ROUTINE)(void* lpParameter);
     void* __stdcall CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, u32 dwCreationFlags, u32* lpThreadId);
     static u32 WINAPI thrtramp(void* a) { void** b=(void**)a; void*(*fn)(void*)=(void*(*)(void*))b[0]; void* arg=b[1]; HeapFree(GetProcessHeap(),0,b); fn(arg); return 0; }
-    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
-    INLINE void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,0xFFFFFFFFUL); CloseHandle(t->handle); t->handle = NULL; }
-    INLINE void OS_USleep(u32 usec) { Sleep((usec + 999) / 1000); }
+    int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
+    void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,0xFFFFFFFFUL); CloseHandle(t->handle); t->handle = NULL; }
+    void OS_USleep(u32 usec) { Sleep((usec + 999) / 1000); }
     double get_time() { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
 #else
     #define LINUX
     #define MOD_EXTENSION ".so" // e.g. Citadel.so
     #define OS_DlOpen(path)       dlopen((path),2)
     #define OS_DlSym(handle,name) dlsym((handle),(name))
-    #define INVALID_FHANDLE -1
-    struct input_id { u16 bustype,vendor,product,version;}; struct input_absinfo {i32 value,minimum,maximum,fuzz,flat,resolution;}; struct input_event { struct { long tv_sec,tv_usec; } time; u16 type,code; i32 value; };
-    typedef int FHandle; struct timespec {i64 tv_sec,tv_nsec;}; typedef u64 pthread_t; typedef u32 pthread_mutexattr_t; typedef struct {u8 _[40];} pthread_mutex_t; typedef struct {u8 _[48];} pthread_cond_t; typedef int pthread_condattr_t; typedef struct {u32 flags; void* stack;} pthread_attr_t;
-    int pthread_create(pthread_t* restrict,const pthread_attr_t* restrict,void*(*start_routine)(void*),void* restrict); int pthread_join(pthread_t,void**); void *dlopen(const char*,int); void *dlsym(void*,const char *);
+    struct input_id { u16 bustype,vendor,product,version;}; struct input_event { struct { long tv_sec,tv_usec; } time; u16 type,code; i32 value; };
     INLINE int OS_IOControl(int fd, unsigned long req, void* arg) { long r = 16; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(req),"d"(arg):"rcx","r11","memory"); return (int)r; }
-    INLINE int OS_MakeFolder(const char* path) { long r = 83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }
-    INLINE long OS_Read(long f,void*b,size_t c) { long r = 0; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(b),"d"(c):"rcx","r11","memory"); return r; }
-    INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { long r = 231; __asm__ __volatile__("syscall":"+a"(r):"D"(exitCode):"rcx","r11","memory"); __builtin_unreachable(); }
-    INLINE void OS_Close(FHandle fd) { long r = 3; __asm__ __volatile__("syscall":"+a"(r):"D"(fd):"rcx","r11","memory"); }
-    INLINE long OS_Open(const char* path, i32 flags, i32 mode) { long r = 2; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"((long)flags),"d"((long)mode):"rcx","r11","memory"); return r; }
-    INLINE void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd){ long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return (void*)r; }
-    INLINE FHandle OS_OpenReadonly(const char* path) { FHandle f=OS_Open(path,0,0); return f < 0 ? DualLogError("Could not open file %s for reading\n",path), -1 : f; }
-    INLINE FHandle OS_OpenWriteonly(const char* path) { FHandle f=OS_Open(path,1|00000100|00001000,0644); return f < 0 ? DualLogError("Failed to open %s for writing\n",path),-1 : f; }
-    INLINE int OS_FileSize(FHandle f) { long r=5,s[18]; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(s):"rcx","r11","memory"); return (int)s[6]; }
-    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
-    INLINE i64 OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/) { i64 r = 8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(ofs),"d"(whence):"rcx","r11","memory"); return r; }
-    INLINE i64 OS_Tell(FHandle fd) { i64 r=8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(0LL),"d"(1):"rcx","r11","memory"); return r; }
+    int OS_MakeFolder(const char* path) { long r = 83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }
+    long OS_Read(long f,void*b,size_t c) { long r = 0; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(b),"d"(c):"rcx","r11","memory"); return r; }
+    __attribute__((noreturn)) void OS_Exit(i64 exitCode) { long r = 231; __asm__ __volatile__("syscall":"+a"(r):"D"(exitCode):"rcx","r11","memory"); __builtin_unreachable(); }
+    void OS_Close(FHandle fd) { long r = 3; __asm__ __volatile__("syscall":"+a"(r):"D"(fd):"rcx","r11","memory"); }
+    long OS_Open(const char* path, i32 flags, i32 mode) { long r = 2; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"((long)flags),"d"((long)mode):"rcx","r11","memory"); return r; }
+    void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd) { long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return (void*)r; }
+    FHandle OS_OpenReadonly(const char* path) { FHandle f=OS_Open(path,0,0); return f < 0 ? DualLogError("Could not open file %s for reading\n",path), -1 : f; }
+    FHandle OS_OpenWriteonly(const char* path) { FHandle f=OS_Open(path,1|00000100|00001000,0644); return f < 0 ? DualLogError("Failed to open %s for writing\n",path),-1 : f; }
+    int OS_FileSize(FHandle f) { long r=5,s[18]; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(s):"rcx","r11","memory"); return (int)s[6]; }
+    void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
+    i64 OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/) { i64 r = 8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(ofs),"d"(whence):"rcx","r11","memory"); return r; }
+    i64 OS_Tell(FHandle fd) { i64 r=8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(0LL),"d"(1):"rcx","r11","memory"); return r; }
     INLINE int OS_GetNumThreads() { unsigned long m[16]; long r=204; __asm__ __volatile__("syscall":"+a"(r):"D"(0LL),"S"(128LL),"d"(m):"rcx","r11","memory"); int c = 0; for(int i=0;i<(r/8);i++) {c+=__builtin_popcountll(m[i]);} return r < 0 ? 1 : c; }
-    INLINE void OS_Free(void* p,size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
-    INLINE i64 OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
+    void OS_Free(void* p, size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
+    i64 OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
     #define SYSCALL1(n, a) syscall6(n,(long)(a),0,0,0,0,0)
     #define SYSCALL2(n, a, b) syscall6(n,(long)(a),(long)(b),0,0,0,0)
     #define SYSCALL3(n, a, b, c) syscall6(n,(long)(a),(long)(b),(long)(c),0,0,0)
     #define SYSCALL4(n, a, b, c, d) syscall6(n,(long)(a),(long)(b),(long)(c),(long)(d),0,0)
     #define THRSTACKSZ (8 * 1024 * 1024)
     INLINE long syscall6(long n, long a, long b, long c, long d, long e, long f) { register long r=n; register long r10 __asm__("r10") = d; register long r8  __asm__("r8")  = e; register long r9  __asm__("r9")  = f; __asm__ __volatile__("syscall":"+a"(r):"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return r; }
-    typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
-    typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
     __attribute__((naked)) static long OS_CloneSyscall(struct OS_ThreadHead* stack) { __asm__ volatile ("mov %%rdi, %%rsi\nmov $0x50f00, %%edi\nmov $56, %%eax\nsyscall\nmov  %%rsp, %%rdi\nret\n":::"rax","rcx","rsi","rdi","r11","memory"); }
     __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) { head->fn(head->arg); __atomic_store_n(&head->join_futex,1,__ATOMIC_SEQ_CST); SYSCALL3(202,&head->join_futex,1,0x7fffffff);/*futex wake*/  SYSCALL1(60,0); __builtin_unreachable(); }
-    INLINE int OS_ThreadCreate(OS_Thread* out, void* (*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
-    INLINE void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THRSTACKSZ); t->head = NULL; t->stack_base = NULL; }
-    INLINE  void OS_USleep(u32 usec) { long ts[2] = {usec / 1000000,(usec % 1000000) * 1000L}; SYSCALL2(35,ts,ts); }
+    int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
+    void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THRSTACKSZ); t->head = NULL; t->stack_base = NULL; }
+    void OS_USleep(u32 usec) { long ts[2] = {usec / 1000000,(usec % 1000000) * 1000L}; SYSCALL2(35,ts,ts); }
     double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif
-INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); } 
+void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); } 
 INLINE void* OS_Calloc(size_t amount, size_t count) { return OS_Alloc(amount * count); }
-INLINE void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
-INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s){void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
-INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
-enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,
-      GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8};
-typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
-typedef void(*FGL_C)(u32), (*FGL_FL)(),   (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
-typedef void(*FGL_CS)(u32),(*FGL_RB)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32),  (*FGL_CTSI2D)(u32,i32,i32,i32,i32,i32,i32,i32);
-typedef void(*FGL_E)(u32), (*FGL_DF)(u32),(*FGL_LP)(u32),  (*FGL_GB)(i32,u32*), (*FGL_BFB)(u32,u32), (*FGL_GFS)(i32,u32*),  (*FGL_TPI)(u32,u32,i32),    (*FGL_FBT2D)(u32,u32,u32,u32,i32), (*FGL_GSIL)(u32,i32,i32*,char*),         (*FGL_BIT)(u32,u32,i32,bool,i32,u32,u32),       (*FGL_VP)(i32,i32,i32,i32),(*FGL_T2D)(u32,i32,i32,i32,i32,i32,u32,u32,const void*);
-typedef void(*FGL_UP)(u32),(*FGL_D)(u32), (*FGL_DM)(bool), (*FGL_LW)(float),    (*FGL_GIV)(u32,i32*),(*FGL_U1UI)(i32,u32),  (*FGL_GSIV)(u32,u32,i32*),  (*FGL_VAF)(u32,i32,u32,bool,u32),  (*FGL_UM3FV)(i32,i32,bool,const float*), (*FGL_U3F)(i32,float,float,float),              (*FGL_U2F)(i32,float,float);
-typedef u32(*FGL_CFBS)(u32), (*FGL_CP)(), (*FGL_GERR)(), (*FGL_CBFV)(u32,i32,const float*), (*FGL_CRS)(u32); typedef bool(*FGL_UB)(u32);
+void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
+void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
+void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
 FGL_FL glFlush; FGL_AT glActiveTexture; FGL_AS glAttachShader; FGL_CTSI2D glCopyTexSubImage2D;  FGL_BB glBindBuffer;  FGL_BBB glBindBufferBase;    FGL_CPIV glGetProgramiv;FGL_CC glClearColor;    FGL_U4F glUniform4f;        FGL_BFB glBindFramebuffer;FGL_VP glViewport;    FGL_BVA glBindVertexArray; FGL_EVAA glEnableVertexAttribArray; FGL_CFBS glCheckFramebufferStatus;            
 FGL_F glFinish; FGL_UP glUseProgram;    FGL_DM glDepthMask;    FGL_VAB glVertexAttribBinding;   FGL_DF glDepthFunc;   FGL_DC glDispatchCompute;    FGL_DB glDrawBuffers;   FGL_GSIV glGetShaderiv; FGL_BVB glBindVertexBuffer; FGL_LW glLineWidth;       FGL_LP glLinkProgram; FGL_RB glReadBuffer;       FGL_U3F glUniform3f;
-FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram; FGL_CRS glCreateShader; FGL_BFS glBlendFuncSeparate;FGL_CBFV glClearBufferFv; FGL_UB glUnmapBuffer; FGL_UP glUseProgram;       FGL_BD glBufferData;    
+FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram; FGL_CRS glCreateShader; FGL_BFS glBlendFuncSeparate;FGL_CBFV glClearBufferFv; FGL_UB glUnmapBuffer; FGL_BD glBufferData;    
 FGL_C glClear;  FGL_DE glDrawElements;  FGL_U2UI glUniform2ui; FGL_UM4FV glUniformMatrix4fv;    FGL_GIV glGetIntegerv;FGL_GSIL glGetShaderInfoLog; FGL_U2F glUniform2f;    FGL_U1UI glUniform1ui;  FGL_GVA glGenVertexArrays;  FGL_RP glReadPixels;      FGL_SS glShaderSource;FGL_TPI glTexParameteri;   FGL_U1F glUniform1f;
-FGL_E glEnable; FGL_FF glFrontFace;     FGL_GB glGenBuffers;   FGL_FBT2D glFramebufferTexture2D;FGL_GERR glGetError;  FGL_GFS glGenFramebuffers;   FGL_GT glGenTextures;   FGL_BSD glBufferSubData;FGL_MBR glMapBufferRange;   FGL_U1I glUniform1i;      FGL_T2D glTexImage2D; FGL_BIT glBindImageTexture;FGL_BT glBindTexture;   
-typedef enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)} JoyHatId;
-typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,
-             KEY_SEMICOLON=59/* ; */,KEY_EQUAL=61/* = */,KEY_A=65,KEY_B=66,KEY_C=67,KEY_D=68,KEY_E=69,KEY_F=70,KEY_G=71,KEY_H=72,KEY_I=73,KEY_J=74,KEY_K=75,KEY_L=76,KEY_M=77,KEY_N=78,KEY_O=79,KEY_P=80,KEY_Q=81,KEY_R=82,KEY_S=83,KEY_T=84,KEY_U=85,KEY_V=86,KEY_W=87,KEY_X=88,KEY_Y=89,KEY_Z=90,
-             KEY_LEFT_BRACKET=91/* [ */,KEY_BACKSLASH=92/* \ */,KEY_RIGHT_BRACKET=93/* ] */,KEY_GRAVE_ACCENT=96/* ` */,KEY_ESCAPE=256,KEY_ENTER=257,KEY_TAB=258,KEY_BACKSPACE=259,KEY_INSERT=260,KEY_DELETE=261,KEY_RIGHT=262,KEY_LEFT=263,KEY_DOWN=264,KEY_UP=265,KEY_PAGE_UP=266,KEY_PAGE_DOWN=267,
-             KEY_HOME=268,KEY_END=269,KEY_CAPS_LOCK=280,KEY_SCROLL_LOCK=281,KEY_NUM_LOCK=282,KEY_PRINT_SCREEN=283,KEY_PAUSE=284,KEY_F1=290,KEY_F2=291,KEY_F3=292,KEY_F4=293,KEY_F5=294,KEY_F6=295,KEY_F7=296,KEY_F8=297,KEY_F9=298,KEY_F10=299,KEY_F11=300,KEY_F12=301,KEY_KP_0=320,
-             KEY_KP_1=321,KEY_KP_2=322,KEY_KP_3=323,KEY_KP_4=324,KEY_KP_5=325,KEY_KP_6=326,KEY_KP_7=327,KEY_KP_8=328,KEY_KP_9=329,KEY_KP_DECIMAL=330,KEY_KP_DIVIDE=331,KEY_KP_MULTIPLY=332,KEY_KP_SUBTRACT=333,KEY_KP_ADD=334,KEY_KP_ENTER=335,KEY_KP_EQUAL=336,KEY_LEFT_SHIFT=340,
-             KEY_LEFT_CONTROL=341,KEY_LEFT_ALT=342,KEY_LEFT_SUPER=343,KEY_RIGHT_SHIFT=344,KEY_RIGHT_CONTROL=345,KEY_RIGHT_ALT=346,KEY_RIGHT_SUPER=347,KEY_MENU=348} KeyId;
-typedef enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2} MouseButtonId;
-typedef enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15} JoystickId;
-typedef struct { bool down,pressed,released; } KeyState; typedef struct { const char* name; int value; } InputElement; typedef struct { V3 normal; float d; } FrustumPlane; typedef struct PngArena { u8*base,*cursor,*end; } PngArena;
-typedef struct { double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS],joystickButtons[16][16],joystickHats[5]; /* What can I say, I'm a man of many hats. ^^D*/ bool lastUse,isCapsLockOn,joystickPresent[16]; } InputSystem; double last_mouse_x,last_mouse_y;
+FGL_E glEnable; FGL_FF glFrontFace;     FGL_GB glGenBuffers;   FGL_FBT2D glFramebufferTexture2D;FGL_GERR glGetError;  FGL_GFS glGenFramebuffers;   FGL_GT glGenTextures;   FGL_BSD glBufferSubData;FGL_MBR glMapBufferRange;   FGL_U1I glUniform1i;      FGL_T2D glTexImage2D; FGL_BIT glBindImageTexture;FGL_BT glBindTexture;
 u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,
     textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS];
-static float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
+float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 float modelMatrices[INSTANCE_COUNT*16]; u16** modelTriangles; u32 modelVertexCounts[MAX_MDLS]; u16 modelTriangleCounts[MAX_MDLS]; float modelBounds[MAX_MDLS]; u16 mdlsCnt;
 float **physPos; u16** physTris; u32* physVertCounts;
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
-u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; static int threadCnt=0; static u32 globalframe=0,globalframesPerLastSecond;
-#define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
-#define NEAR_PLANE (0.02f)
-#define ONE_OVER_SQRT2 0.70710678118f
-InputSystem Sys_Input; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false};
+u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; i32 threadCnt=0; u32 globalframe=0,globalframesPerLastSecond;
+SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
+    .InputCodeSettings = {
+        5, /*Forward=F*/     0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/   23,/*Prone=X*/    16,/*Lean Left=Q*/   4,/*Lean Right=E*/ 45,/*Sprint=LEFT SHIFT*/ 38,/*Turn Left=LF ARROW*/ 39,/*Turn Right=RT ARROW*/ 36,/*Look Up=UP ARROW*/     37,/*Look Down=DN ARROW*/   20,/*Recent Log=U*/    26,/*Biomonitor=1*/
+        27,/*Sensaround=2*/ 28,/*Lantern=3*/     29,/*Shield=4*/   30,/*Infrared=5*/      31,/*Email=6*/   32,/*Booster=7*/  33,/*Jumpjets=8*/ 56,/*Attack=LMB*/   57,/*Use=RMB*/      99,/*Menu/Back=ESCAPE*/  97,/*Toggle Mode=TAB*/    17,/*Reload=R*/           128,/*Weapon += MWHEEL + */ 129,/* Weapon - = MWHEEL - */ 6,/* Grenade   = G */ 19,/* Grenade + = T  */
+        131,/*Grenade-=*/   21,/*Ammo Type=V*/    9,/*Patch Use=J*/ 8,/*Patch+=I*/       132,/*Patch-=,*/  12,/*Full Map=M*/ 21,/*Swim Up= V*/  2,/*Swim Down=C*/ 102,/*Console=`*/   101/*Screenshot=F12*/},
+    .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u,
+    .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
+    .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
+InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false};
 static bool shadowBuffersCreated = false;
-typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 CamView camViews[64],levelCamViews[14][64]; u8 camViewCount,levelCamViewCount[14]; u32 camViewTextures[64],levelCamViewTextures[14][64];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 u16 editModeSelection,editModeTestEntityDefinition=0; double game_start_time,shadowTime,worstShadTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
-extern Entity EDefs[MAX_ENTITIES];
-#include "lib.c" // LibC Replacements and Helpers
+extern Entity EDefs[MAX_ENTITIES]; GlobalContext World = {0};
 void TurnLightOff(u16 litIdx) { if (litIdx < World.loadedLights) {flag_set(&World.lights[litIdx].lflags,LIGHTON,false);} }
 Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
                       {1.0f,0.498039216f,0.0f,1.0f}, /* 5 Orange T_ORANGE*/ {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red T_STOPD_RED*/ {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
@@ -163,8 +134,8 @@ void AddWireLine(V3 start, V3 end, Color col) {
     World.debugLineVertCount = i;
 }
 
-ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i); void obb_axes(Quaternion q, V3 *ax, V3 *ay, V3 *az);
-inline Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY)) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
+ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i);
+INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY)) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
 void DrawVelocityVector(u16 i) {
     if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;}
     V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f)); AddWireLine(World.position[i],tip,textColors[T_ORANGE]); V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}));
@@ -172,14 +143,24 @@ void DrawVelocityVector(u16 i) {
 }
 
 void DrawBoxColliderColored(u16 i, Color col) {
-    ShapeBox b = Entity_GetBox(i); V3 ax,ay,az,c[8],px,py,pz; obb_axes(b.rot,&ax,&ay,&az); px=V3_ScaleByF(ax,b.hExt.x); py=V3_ScaleByF(ay,b.hExt.y); pz=V3_ScaleByF(az,b.hExt.z);
+    ShapeBox b = Entity_GetBox(i); V3 c[8],px,py,pz, ax=quat_rot_v3(b.rot,(V3){1,0,0}), ay=quat_rot_v3(b.rot,(V3){0,1,0}), az=quat_rot_v3(b.rot,(V3){0,0,1}); px=V3_ScaleByF(ax,b.hExt.x); py=V3_ScaleByF(ay,b.hExt.y); pz=V3_ScaleByF(az,b.hExt.z);
     for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3_AplusB(b.ctr,V3_AplusB(V3_AplusB(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
-    AddWireLine(c[0],c[1],col); AddWireLine(c[2],c[3],col); AddWireLine(c[4],c[5],col); AddWireLine(c[6],c[7],col); AddWireLine(c[0],c[2],col); AddWireLine(c[1],c[3],col); AddWireLine(c[4],c[6],col); AddWireLine(c[5],c[7],col); AddWireLine(c[0],c[4],col); AddWireLine(c[1],c[5],col); AddWireLine(c[2],c[6],col); AddWireLine(c[3],c[7],col);
+    AddWireLine(c[0],c[1],col); AddWireLine(c[2],c[3],col); AddWireLine(c[4],c[5],col); AddWireLine(c[6],c[7],col); AddWireLine(c[0],c[2],col); AddWireLine(c[1],c[3],col);
+    AddWireLine(c[4],c[6],col); AddWireLine(c[5],c[7],col); AddWireLine(c[0],c[4],col); AddWireLine(c[1],c[5],col); AddWireLine(c[2],c[6],col); AddWireLine(c[3],c[7],col);
     DrawVelocityVector(i);
 }
-void DrawBoxCollider(u16 i) { DrawBoxColliderColored(i,ColliderColor(i)); }
 
-void DrawSphereWireframe(Color col, ShapeSphere s) { float step=6.28318530f/12; for (int seg=0;seg<12;seg++) { float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1); AddWireLine(V3_AplusB(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3_AplusB(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col); AddWireLine(V3_AplusB(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3_AplusB(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col); AddWireLine(V3_AplusB(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3_AplusB(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col); } }
+void DrawBoxCollider(u16 i) { DrawBoxColliderColored(i,ColliderColor(i)); }
+void DrawSphereWireframe(Color col, ShapeSphere s) {
+    float step=6.28318530f/12;
+    for (int seg=0;seg<12;seg++) {
+        float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
+        AddWireLine(V3_AplusB(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3_AplusB(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col);
+        AddWireLine(V3_AplusB(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3_AplusB(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col);
+        AddWireLine(V3_AplusB(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3_AplusB(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col);
+    }
+}
+
 void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = Entity_GetSph(i); DrawSphereWireframe(col,s); DrawVelocityVector(i); }
 void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
 void DrawMeshCollider(u16 i) {
@@ -224,102 +205,145 @@ void DrawAngularVelocity(u16 i) {
     V3 axis=dir; V3 p1=V3_Normalize(V3_Cross(axis,ref)); V3 p2=V3_Cross(axis,p1); V3 prev = V3_AplusB(World.position[i], V3_ScaleByF(p1,rad)); // Find two vectors perpendicular to angular axis
     for (int j=1;j<=8;++j) { float a = j * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(World.position[i],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); AddWireLine(prev,cur,purple); prev = cur; }
 }
-
-#include "textures.c" // 2D Texture Load System
-#include "models.c" // 3D Model Load System
-#include "culling.c" // Culling System
-#include "text.c" // Fonts and Text System
-#include "winput.c" // Window + Input System
-#include "trigger.c" // Trigger Volumes System
-#include "physics.c" // Physics System
-#include "particles.c" // Particles System
-// Player Movement
-float GetBasePlayerSpeed(u16 p,bool running){
-    bool sprint=Sprint(); if(Cheats.noclip)return PLAYER_MAX_CYBER_SPEED*(sprint?2.5f:1.5f); if(World.curLev==LEVEL_CYBERSPACE)return PLAYER_MAX_CYBER_SPEED;
-    BodyState b=World.instances[p].bodyState; float v=WALK_SPEED;
-    switch(b){ case BodyState_CrouchingDown: case BodyState_Crouch:v=CROUCH_SPEED; break; case BodyState_Prone: case BodyState_ProningDown: case BodyState_ProningUp:v=PLAYER_MAX_PRONE_SPEED; break; default:break; }
-    if ((sprint||World.boosterActive) && running) { v = World.invP1.fatigue > 80.0f && World.boosterActive ? SPRINT_SPEED_FATIGUED : SPRINT_SPEED;
-    if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown)  v -= (WALK_SPEED-CROUCH_SPEED)*1.5f;
-    else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp)v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;}
-    return v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f);
+#include "winput.c"
+// Console System - CHEATS!
+static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
+static V3 ressurectionLocations[10] = {{-27.386f,-55.488f,26.5941f}/*0/R*/, {40.903f,-42.372f,-30.78f}/*1*/, {30.67407f,-25.832f,10.21412f}/*2*/, {38.26813f,-15.498f,20.37825f}/*3*/, {-19.48f,-7.928f,22.954f}/*4*/, {-24.358f,12.5956f,31.8497f}/*5*/,
+                                       {-22.3568f,33.7845f,-30.728f}/*6*/,  {2.228084f,50.95243f,7.532025f}/*7*/, {10.068f,58.897f,13.973f}/*8*/, {2.303f,106.77f,-38.554f}/*9*/};
+static V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,
+                                         {126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
+static void AddToHistory(const char* entry) {
+    if (slen(entry) == 0 || (numHistory > 0 && sEqual(entry,history[numHistory - 1]))) return;
+    if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],entry,T_BUFFER_SIZE); numHistory++; }
+    else { for (int i = 0; i < 7 - 1; i++) {scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE);/*Shift list toward 0*/} scpy_to_a_from_b(history[7 - 1],entry,T_BUFFER_SIZE); }
 }
 
-inline float smooth_damp(float cur, float targ, float* vel, float tm, float dt) { float o=2.0f / vmax(tm,0.0001f); float x=o * dt; float exp=1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x); float d=cur - targ; float t=(*vel + o * d) * dt; *vel=(*vel - o * t) * exp; return targ + (d + t) * exp; }
-bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
-    float oldHeight = World.colliderSize[playerIdx].y; V3 oldPos = World.position[playerIdx];
-    World.colliderSize[playerIdx].y = targetHeight; // Temporarily morph player into the standing capsule
-    World.position[playerIdx].y += (targetHeight - oldHeight); 
-    bool blocked = false;
-    i32 cx = PosGetCellCoordX(World.position[playerIdx].x);
-    i32 cz = PosGetCellCoordZ(World.position[playerIdx].z);
-    u32 mask = GetCollisionMask(World.layer[playerIdx]);
-    for (i32 dx = -1; dx <= 1 && !blocked; ++dx) {
-        for (i32 dz = -1; dz <= 1 && !blocked; ++dz) {
-            u32 cell = PosGetCellCoordsP(cx + dx, cz + dz);
-            for (u16 k = 0; k < cellCounts[cell]; ++k) {
-                u16 b = cellLists[cell][k]; if (b == playerIdx || !(mask & World.layer[b]) || World.collider[b] == COLTYPE_NONE) continue;
-                if (World.collider[b] == COLTYPE_MSH) { Overlap r = CapMsh(Entity_GetCap(playerIdx),World.instances[b].modelIndex,&modelMatrices[b*16]); if (r.hit && r.pen > 0.08f) { blocked = true; break; } }
-            }
+void RecallHistory(int direction) { // direction 1 up (older), -1 down (newer)
+    if (direction == 1) { // up
+        if (historyPos > 0) { historyPos--; scpy_to_a_from_b(consoleEntryText,history[historyPos],T_BUFFER_SIZE); currentEntryLength = slen(consoleEntryText); }
+    } else if (direction == -1) { // down
+        if (historyPos < numHistory) {
+            historyPos++;
+            if (historyPos == numHistory) { consoleEntryText[0] = currentEntryLength = 0; } else { scpy_to_a_from_b(consoleEntryText,history[historyPos],T_BUFFER_SIZE); currentEntryLength = slen(consoleEntryText); }
         }
     }
-    World.colliderSize[playerIdx].y = oldHeight;
-    World.position[playerIdx] = oldPos;
-    return blocked;
 }
 
-bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){return false;} if (World.pauseRelativeTime < World.invP1.leanLeftTapFinished) { World.invP1.leanLeftTapFinished = 0.0; return true; } World.invP1.leanLeftTapFinished = World.pauseRelativeTime + 0.5; return false; }
-bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.pauseRelativeTime < World.invP1.leanRightTapFinished) { World.invP1.leanRightTapFinished = 0.0; return true; } World.invP1.leanRightTapFinished = World.pauseRelativeTime + 0.5; return false; }
-void ApplyPlayerMovements(float dt) {
-    Entity *p = &World.instances[PLAYER1]; Quaternion r = World.rotation[PLAYER1]; float leanSpeed = 70.0f, leanMaxAngle = 35.0f; float leanInput = (float)LeanLeft() - (float)LeanRight(); bool doubleTapLean = DoubleTapLeanLeft() || DoubleTapLeanRight();
-    bool movingForward = Forward() > 0.1f, leanRight = leanInput < 0.0f, leanLeft = leanInput > 0.0f;
-    if (doubleTapLean) { World.invP1.leanResetting = true; World.invP1.leanVelocity = 0.0f; KeyState *kL = GetCodeMapping(7), *kR = GetCodeMapping(8); kL->pressed = kR->pressed = false; } // Double-tap lean: initiate smooth reset to upright over 0.2 seconds
-    if (World.invP1.leanResetting) { 
-        World.invP1.leanTarget = smooth_damp(World.invP1.leanTarget,0.0f,&World.invP1.leanVelocity,0.2f,dt); 
-        if(vabs(World.invP1.leanTarget) < 0.5f){World.invP1.leanTarget=World.invP1.leanVelocity=0.0f; World.invP1.leanResetting=false;} 
-    } else {
-        if (leanLeft || leanRight) { if(leanLeft){World.invP1.leanRightTapFinished =0;} if(leanRight){World.invP1.leanLeftTapFinished=0;} World.invP1.leanTarget=vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt),-leanMaxAngle,leanMaxAngle); }
-        else if (movingForward) { if (vabs(World.invP1.leanTarget) < 0.5f) { World.invP1.leanTarget = 0.0f; } else { World.invP1.leanTarget -= (World.invP1.leanTarget > 0.0f ? 1.0f : -1.0f) * leanSpeed * dt; } }
-    }
-    World.cam_roll = World.invP1.leanTarget;
-    float targetRatio=1.0f, transitionSec=0.2f; float currentRatio=World.invP1.currentCrouchRatio;
-    if (Crouch()) { // Crouch key always targets crouch ratio from any state
-        if (p->bodyState == BodyState_Crouch) { if (!CantStand(PLAYER1,PLAYER_HEIGHT)){p->bodyState = BodyState_StandingUp;}} // Already at crouch → toggle up to standing
-        else if (currentRatio > PLAYER_CROUCH_RATIO) { p->bodyState = BodyState_CrouchingDown;} // Above crouch → go down to crouch (handles "if standing up will go back to crouched")
-        else {p->bodyState=BodyState_ProningUp;} // Below crouch → go up to crouch (handles "if proning down will go back to crouched")
-    } else if (Prone()) {
-        if (p->bodyState == BodyState_Standing) { p->bodyState = BodyState_ProningDown; } // Standing → go to prone
-        else if (currentRatio > PLAYER_CROUCH_RATIO) { if (!CantStand(PLAYER1,PLAYER_HEIGHT)){p->bodyState=BodyState_StandingUp;}else{p->bodyState = BodyState_ProningDown;} } // Between crouch and standing → up to standing
-        else if (p->bodyState == BodyState_Crouch) { p->bodyState = BodyState_ProningDown; } // Crouch → go to prone
-        else { p->bodyState = BodyState_ProningUp; } // Between prone and crouch, or prone → up to crouch
-    }
-    switch (p->bodyState) {
-        case BodyState_CrouchingDown:targetRatio=-0.01f; break;                       case BodyState_StandingUp:targetRatio=1.01f;  break;      case BodyState_ProningDown:targetRatio=-0.01f; break; 
-        case BodyState_ProningUp:    targetRatio=1.01f; transitionSec+=0.1f; break; case BodyState_Crouch:    targetRatio=PLAYER_CROUCH_RATIO; break; case BodyState_Prone:      targetRatio=PLAYER_PRONE_RATIO; break; default: targetRatio=1.0f; break;
-    }
-    float lastRatio = World.invP1.currentCrouchRatio;
-    World.invP1.currentCrouchRatio = smooth_damp(lastRatio,targetRatio,&World.invP1.crouchingVelocity,transitionSec,dt);
-    if (World.invP1.currentCrouchRatio >= 1.0f) { World.invP1.currentCrouchRatio = 1.0f; if(p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_Standing;} }
-    else if (p->bodyState == BodyState_CrouchingDown && World.invP1.currentCrouchRatio <= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; }
-    else if (p->bodyState == BodyState_ProningUp && World.invP1.currentCrouchRatio >= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; }
-    else if (p->bodyState == BodyState_ProningDown && World.invP1.currentCrouchRatio <= PLAYER_PRONE_RATIO) { World.invP1.currentCrouchRatio = PLAYER_PRONE_RATIO; p->bodyState = BodyState_Prone; }
-    World.colliderSize[PLAYER1].y = PLAYER_HEIGHT * World.invP1.currentCrouchRatio;
-    float h=(float)Forward() - (float)Backpedal(), s=(float)StrafeRight() - (float)StrafeLeft(), vertInput=(float)SwimUp() - (float)SwimDn();
-    float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y;
-    p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
-    V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; 
-    float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > PHY_EPSILON) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0};
-    bool isRunning = (inputLenSq > 0.01f); float speed = GetBasePlayerSpeed(PLAYER1,isRunning) * 1.75f, accel=World.boosterActive ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
-    if (World.invP1.ladderState > 0) {
-        float climbSpeed = (Sprint() && isRunning) ? 1.2f : 0.4f;
-        targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed * 25.0f, p->right.z * s * speed * 0.3f};
-        accel = 5.0f;
-    } else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
-    V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); 
-    dv = (V3){ vclamp(dv.x, -10.0f, 10.0f), vclamp(dv.y, -10.0f, 10.0f), vclamp(dv.z, -10.0f, 10.0f) };
-    World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1], V3_ScaleByF(dv, accel * vclamp(dt, 0.0005f, 0.1f)));
+typedef void (*ConsoleCmdFuncNoArg)(); typedef void (*ConsoleCmdFuncInt)(int); typedef void (*ConsoleCmdFuncStr)(const char*);
+typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {CMD_NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
+int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
+void cmd_noclip() { Cheats.noclip = !Cheats.noclip; if (Cheats.noclip) { World.velocity[PLAYER1] = (V3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
+void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; if (Cheats.showPhys) {CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
+void EnableCheatArsenal(u8 level) { (void)level; } // TODO
+void cmd_kill() { World.instances[PLAYER1].health = World.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
+void cmd_undo() { if (Cheats.editMode) { CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } } // TODO actually track and despawn last
+void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; float shakeForce = (force < 0.48f) ? force : 0.48f; (void)shakeForce; } // TODO actually shake
+void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
+void cmd_shake() { Shake(-1.0f); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
+void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip=Cheats.notarget=true; CenterStatusPrint("edit mode: %s","Edit Mode activated!"); } else { Cheats.noclip=Cheats.notarget=false; CenterStatusPrint("%s","Edit Mode deactivated"); } }
+int ParseLevelArg(const char* arg) {
+    if (!arg || !*arg) return -1;
+    char clean[64] = {0}; int j = 0;
+    for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') clean[j++] = c2Lower((u8)arg[i]); }   clean[j] = '\0';
+    if (sEqual(clean, "r")      || sFindSub(clean, "reactor")) return 0;
+    if (sFindSub(clean, "g1") || sFindSub(clean, "10")) return 10;
+    if (sFindSub(clean, "g2") || sFindSub(clean, "11")) return 11;
+    if (sFindSub(clean, "g4") || sFindSub(clean, "12")) return 12;
+    if (sFindSub(clean, "g3")) { CenterStatusPrint("%s", Sys_Text.stringTable[1001]); return -2; }// "Gamma grove already jettisoned! Those poor arrogant people."
+    int level = s2i32(clean); if (level >= 0 && level < World.numLevels) return level;
+    return -1; // Invalid
 }
-#include "console.c" // Console Sys - CHEATS!
-#include "audio.c" // Audio Sys
+
+u8 queuedLevelToLoad = 255u; V3 queuedLevelPos;
+void LoadLevel(u8 curlevel, V3 pos);
+static void cmd_loadlevel(const char* arg) {
+    if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
+    int level = ParseLevelArg(arg); if (level == -2) return; // Already printed g3 message
+    if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %u",level); return; }
+    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; queuedLevelPos = ressurectionLocations[level > 9 ? 6 : level]; LoadLevel(level,queuedLevelPos); (void)cyberSpaceEntryLocations; // TODO: Handle level 13 entry based on currentLevel
+}
+
+static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }
+static void cmd_summon(int itemConstIndex) { if (!IdxInBounds(itemConstIndex)) { SpawnDynamicObject(itemConstIndex, true); CenterStatusPrint("Summoned object ID %d", itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s", itemConstIndex); } }
+static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
+static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; }
+static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
+static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacker!"); }
+static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
+static void cmd_god() { Cheats.god = !Cheats.god; CenterStatusPrint("god mode: %s", Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
+static void cmd_energy() { Cheats.redbull = !Cheats.redbull; if (Cheats.redbull) {CenterStatusPrint("%s", Sys_Text.stringTable[1006]);/*"I feel the power! 0 energy consumption!"*/} else {CenterStatusPrint("%s", Sys_Text.stringTable[1005]);/*Energy usage normal*/} }
+static void SetSkyRotateSpeed() { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(imageBlitSP); glUniform1f(30,skyRotateSpeeds[Cheats.dizzyLevel]); }
+static void cmd_dizzy() { Cheats.dizzyLevel = (Cheats.dizzyLevel >= 3) ? 0 : Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
+static void cmd_bottomless() { Cheats.bottomless = !Cheats.bottomless; if (Cheats.bottomless) {CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]);/*"Bring it!"*/} else {CenterStatusPrint("%s",Sys_Text.stringTable[1003]);/*"Hose disconnected from interdimensional wormhole. Normal ammo operation restored."*/} }
+static void cmd_nohud() { Cheats.noHUD = !Cheats.noHUD; if (Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
+static void cmd_iamshodan() { Cheats.superoverride = !Cheats.superoverride; if (Cheats.superoverride) {CenterStatusPrint("%s",Sys_Text.stringTable[1010]);/*"Full security override enabled!"*/ } else {CenterStatusPrint("%s",Sys_Text.stringTable[1009]);/*"SHODAN has regained control of security from you"*/} }
+static void cmd_staminup() { Cheats.fatigueCheat = !Cheats.fatigueCheat; if (Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); World.invP1.fatigue=0.0f; } else {CenterStatusPrint("%s",Sys_Text.stringTable[1012]); } }
+static void cmd_mrbean()  { CenterStatusPrint("Nice try, there are no go carts to slow down here"); } static void cmd_simonfoster()   { CenterStatusPrint("Nice try, nothing to paint here"); } static void cmd_richardbranson() { CenterStatusPrint("Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"); } static void cmd_johnwardley()       { CenterStatusPrint("WOW!"); }
+static void cmd_johnmace(){ CenterStatusPrint("Nice try, there's nothing to pay double for here"); }  static void cmd_melaniewarn()   { CenterStatusPrint("I feel happy!!!"); }                 static void cmd_damonhill()      { CenterStatusPrint("Nice try, there are no go carts to speed up here"); }                                       static void cmd_michaelschumacher() { CenterStatusPrint("Nice try, there are no go carts to give ludicrous speed here"); }
+static void cmd_tonyday() { CenterStatusPrint("Ok, now I want a hamburger"); }                        static void cmd_katiebrayshaw() { CenterStatusPrint("Hi there! Hello! Hey! Howdy!"); }
+static void cmd_sudo()    { CenterStatusPrint("Super user access granted...ERROR: access restricted by SHODAN!"); }
+static void cmd_git(const char* arg) {
+    if (!arg) arg = "";
+    static const char* cmds[] = {"pull",  "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.", "fetch", "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.",      "status","Your branch is up to date with origin/triop.\nWorking directory clean.",
+                                 "log",   "<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...",                  "reflog","dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`.", "merge", "Failed, could not connect with origin/triop.",
+                                 "push",  "Could not find Username for 'triopttp://192.168.1.451'.",                                 "clone", "Failed, connection blocked by SHODAN. Employee ID invalid." };
+    for (int i = 0; i < 16; i += 2) { if (sFindSub(arg, cmds[i])) { CenterStatusPrint(cmds[i+1]); return; } }
+    if (sFindSub(arg, "branch") || sFindSub(arg, "-b")) { const char *last = StringFindLastChar(arg, ' '); CenterStatusPrint("Created new branch %s", last ? last + 1 : "unknown"); }
+    else CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
+}
+
+static void cmd_restart()     { CenterStatusPrint("Yeah...better not"); }                             static void cmd_cd()          { CenterStatusPrint("Attempting to access directory... already at root"); }
+static void cmd_justinbailey(){ CenterStatusPrint("Well, you don't have a suit already so..."); }     static void cmd_woodstock()   { CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!"); }
+static void cmd_zelda()       { CenterStatusPrint("Too late, already been to level 1"); }             static void cmd_quarry()      { CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."); }
+static void cmd_iamironman(){ CenterStatusPrint("That's nice dear."); }                               static void cmd_allyourbase() { CenterStatusPrint("ERROR: SHODAN has overriden your command, remove SHODAN first."); }
+static void cmd_idkfa()       { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); } static void cmd_ai()          { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
+static void cmd_quit()      { OS_Exit(0); }                                                           static void cmd_aireal()      { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
+static const ConsoleCommand consoleCmds[] = {
+    {"noclip",         {.noArg=cmd_noclip},        CMD_NOARG},{"idclip",          {.noArg=cmd_noclip},CMD_NOARG},         {"no clip",     {.noArg = cmd_noclip},CMD_NOARG},  {"showphys",      {.noArg = cmd_showphys},CMD_NOARG},  { "god",           {.noArg=cmd_god}, CMD_NOARG},       {"overwhelming",            {.noArg=cmd_god}, CMD_NOARG},
+    {"whosyourdaddy",  {.noArg = cmd_god},         CMD_NOARG},{"iddqd",           {.noArg=cmd_god}, CMD_NOARG},           {"notarget",    {.noArg=cmd_notarget},CMD_NOARG},  {"no target",     {.noArg = cmd_notarget},CMD_NOARG},  {"editmode",       {.noArg=cmd_edit},CMD_NOARG},       {"edit",                    {.noArg=cmd_edit},CMD_NOARG},
+    {"edit mode",      {.noArg = cmd_edit},        CMD_NOARG},{"editor",          {.noArg=cmd_edit},CMD_NOARG},           {"undo",        {.noArg=cmd_undo},    CMD_NOARG},  {"showfps",       {.noArg = cmd_showfps}, CMD_NOARG},  {"show fps",       {.noArg=cmd_showfps},CMD_NOARG},    {"showlocation",            {.noArg=cmd_showlocation},CMD_NOARG},
+    {"show location",  {.noArg = cmd_showlocation},CMD_NOARG},{"nohud",           {.noArg=cmd_nohud},CMD_NOARG},          {"no hud",      {.noArg=cmd_nohud},   CMD_NOARG},  {"bottomlessclip",{.noArg = cmd_bottomless},CMD_NOARG},{"bottomless clip",{.noArg=cmd_bottomless},CMD_NOARG}, {"load",                    {.withStr=cmd_loadlevel},CMD_STR},
+    {"loadarsenal",    {.withStr = cmd_loadarsenal}, CMD_STR},{"load arsenal",    {.withStr = cmd_loadarsenal},CMD_STR},  {"summon_obj",  {.withInt = cmd_summon},CMD_INT},  {"summonobj",     {.withInt = cmd_summon},CMD_INT},    {"motherlode",     {.noArg=cmd_nomoney},   CMD_NOARG}, {"rosebud",                 {.noArg=cmd_nomoney},CMD_NOARG},
+    {"kaching",        {.noArg=cmd_nomoney},       CMD_NOARG},{"money",           {.noArg=cmd_nomoney},CMD_NOARG},        {"dizzy",       {.noArg=cmd_dizzy},   CMD_NOARG},  {"help",          {.noArg=cmd_help},        CMD_NOARG},{"ifeelthepower",  {.noArg = cmd_energy},  CMD_NOARG}, {"power",                   {.noArg=cmd_energy}, CMD_NOARG},
+    {"energy",         {.noArg=cmd_energy},        CMD_NOARG},{"i feel the power",{.noArg = cmd_energy},CMD_NOARG},       {"i am shodan", {.noArg=cmd_iamshodan},CMD_NOARG}, {"iamshodan",     {.noArg=cmd_iamshodan},   CMD_NOARG},{"mr. bean",       {.noArg = cmd_mrbean},  CMD_NOARG}, {"simon foster",            {.noArg=cmd_simonfoster},CMD_NOARG},
+    {"richard branson",{.noArg=cmd_richardbranson},CMD_NOARG},{"john wardley",    {.noArg = cmd_johnwardley},CMD_NOARG},  {"john mace",   {.noArg=cmd_johnmace}, CMD_NOARG}, {"melanie warn",  {.noArg=cmd_melaniewarn}, CMD_NOARG},{"damon hill",     {.noArg = cmd_damonhill},CMD_NOARG},{"michael schumacher",      {.noArg=cmd_michaelschumacher},CMD_NOARG},
+    {"tony day",       {.noArg=cmd_tonyday},       CMD_NOARG},{"katie brayshaw",  {.noArg = cmd_katiebrayshaw},CMD_NOARG},{"sudo",        {.noArg=cmd_sudo},     CMD_NOARG}, {"admin",         {.noArg=cmd_sudo},        CMD_NOARG},{"git",            {.withStr=cmd_git},CMD_STR},        {"restart",                 {.noArg=cmd_restart},CMD_NOARG},
+    {"quit",           {.noArg=cmd_quit},          CMD_NOARG},{"exit",            {.noArg = cmd_quit},         CMD_NOARG},{"cd",          {.noArg=cmd_cd},        CMD_NOARG},{"./",            {.noArg=cmd_cd},          CMD_NOARG},{"kill",           {.noArg = cmd_kill},     CMD_NOARG},{"suicide",                 {.noArg=cmd_kill},CMD_NOARG},
+    {"die",            {.noArg=cmd_kill},          CMD_NOARG},{"justinbailey",    {.noArg = cmd_justinbailey}, CMD_NOARG},{"woodstock",   {.noArg=cmd_woodstock}, CMD_NOARG},{"quarry",        {.noArg=cmd_quarry},      CMD_NOARG},{"zelda",          {.noArg = cmd_zelda},    CMD_NOARG},{"allyourbasearebelongtous",{.noArg=cmd_allyourbase},CMD_NOARG},
+    {"all your base",  {.noArg=cmd_allyourbase},   CMD_NOARG},{"i am iron man",   {.noArg = cmd_iamironman},   CMD_NOARG},{"i am amazing",{.noArg=cmd_iamironman},CMD_NOARG},{"i am cool",     {.noArg=cmd_iamironman},  CMD_NOARG},{"i am best",      {.noArg =cmd_iamironman},CMD_NOARG},{"idkfa",                   {.noArg=cmd_idkfa},      CMD_NOARG},
+    {"impulse 9",      {.noArg=cmd_idkfa},         CMD_NOARG},{"undo",            {.noArg = cmd_undo},         CMD_NOARG},{"shake",       {.noArg=cmd_shake},     CMD_NOARG},{"tired",         {.noArg=cmd_staminup},    CMD_NOARG},{"staminup",       {.noArg = cmd_staminup}, CMD_NOARG},{"grok",                    {.noArg=cmd_ai},         CMD_NOARG},
+    {"chatgpt",        {.noArg=cmd_ai},            CMD_NOARG},{"claude",          {.noArg = cmd_ai},           CMD_NOARG},{"gemini",      {.noArg=cmd_ai},        CMD_NOARG},{"shodan",        {.noArg=cmd_aireal},      CMD_NOARG},{NULL,{.raw = NULL},CMD_NOARG}/*sizeof helper*/ };
+void ToggleConsole();
+void ProcessConsoleCommand(const char* c) {
+    if (c == NULL || slen(c) == 0) { ToggleConsole(); return; }
+    char ts[T_BUFFER_SIZE]; sCpy2aSubFromb(ts,sizeof(ts)-1,c,T_BUFFER_SIZE); ts[sizeof(ts)-1] = '\0';
+    const char* ct=ts; while(*ct && cEmpty((u8)*ct)){ct++;} const char* space=ct; while(*space && !cEmpty((u8)*space)){space++;} const char* arg_start=space; while(*arg_start && cEmpty((u8)*arg_start)){arg_start++;} AddToHistory(c); bool commandProcessed = false;
+    for (u16 i=0;consoleCmds[i].name!=NULL;++i) {
+        const ConsoleCommand* cmd = &consoleCmds[i];
+        if (CommandMatch(ct,cmd->name)) {
+            if (cmd->type == CMD_NOARG) {cmd->func.noArg(); commandProcessed = true; } else if (cmd->type == CMD_STR && *arg_start) { cmd->func.withStr(*arg_start ? arg_start : ""); commandProcessed = true;
+            } else { if(!*arg_start){CenterStatusPrint("Missing argument, usage: %s <number>",cmd->name);}else{cmd->func.withInt(s2i32(arg_start)); commandProcessed=true;} }
+        }
+    }
+    if (!commandProcessed){CenterStatusPrint("%s%s",Sys_Text.stringTable[1014],ct);} /*"Unknown command or function: "*/ consoleEntryText[0] = currentEntryLength = 0; historyPos = numHistory; /*Position beyond newest for empt*/ ToggleConsole();
+}
+
+void ConsoleEmulator(i32 keycode) {
+    if (keycode == KEY_UP || keycode == KEY_DOWN) { RecallHistory(keycode == KEY_UP ? 1 : -1); return; }
+    if (keycode == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]='\0'; currentEntryLength=0; return; } // Clear the input
+    if (keycode >= KEY_A && keycode <= KEY_Z) { // Handle alphabet keys
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { char c = 'a' + (keycode - KEY_A); /*lowercase*/ consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++; }
+    } else if (keycode >= KEY_1 && keycode <= KEY_9) { // Handle number keys 1-9
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { char c = '1' + (keycode - KEY_1); /*Map to '1'-'9'*/ consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++; }
+    } else if (keycode == KEY_0) { // Handle '0'
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]='0'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
+    } else if (keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) {
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=(Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? '_' : '-'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
+    } else if (keycode == KEY_BACKSPACE && currentEntryLength > 0) { currentEntryLength--; consoleEntryText[currentEntryLength]='\0'; } // Handle backspace
+    else if (keycode == KEY_SPACE) { // Handle space
+        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
+    } else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
+}
 // Raycast System.  This is an exact polygonal casting system for high accuracy separate from the physics engine entirely except for layers and shared vertex positions.
 RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC) {
     V3 AB=V3_AsubB(posB,posA), AC=V3_AsubB(posC,posA); V3 n=V3_Cross(AB,AC); V3 ao=V3_AsubB(origin,posA); V3 dao=V3_Cross(ao,dir);
@@ -327,6 +351,7 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC) {
     return (RaycastHit){.point=V3_AplusB(origin,V3_ScaleByF(dir,d)), .normal=V3_Normalize(n), .distance=d, .hitInstanceIndex=INSTANCE_COUNT, .hit=vabs(det) >= 0.00000001f && d >= 0 && u >= 0 && v >= 0 && w >= 0};
 }
 
+float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist);
 RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
     RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
@@ -392,12 +417,6 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
     }
     return result;
 }
-#include "credits.h"
-#include "entity.c"
-#include "ai.c"
-#include "citadel.c"
-#include "weapons.c"
-#include "biomonitor.c" // End game specific code includes
 // Credits Sys
 char creditStats[4096];
 INLINE float GetScore(float stupid, bool isFinal) {
@@ -421,7 +440,6 @@ INLINE void CreditsStats() {
     off += sFormat(creditStats + off,sizeof(creditStats),"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",World.damageDealt,World.damageReceived,World.savesScummed);
 }
 // Rendering Sys
-#include "Shaders/shaders.h"
 INLINE void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
 INLINE u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) ShaderError(s,name); return s; }
 INLINE u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
@@ -456,7 +474,7 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     for (int i=0;i<6;i++) { float len = V3_Mag(ps[i].normal); if(len > 1e-6f){ps[i].normal.x /= len; ps[i].normal.y /= len; ps[i].normal.z /= len; ps[i].d /= len;} } //Normalize (could use V3_Normalize but need len for d term of FrustumPlane).
 }
 
-INLINE void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
+void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
     out[0] =  a[0] * b[0]  + a[4] * b[1]  + a[8]  * b[2] + a[12]  * b[3]; out[1] =  a[1] * b[0]  + a[5] * b[1]  + a[9]  * b[2] + a[13]  * b[3];
     out[2] =  a[2] * b[0]  + a[6] * b[1] + a[10]  * b[2] + a[14]  * b[3]; out[3] =  a[3] * b[0]  + a[7] * b[1] + a[11]  * b[2] + a[15]  * b[3];
     out[4] =  a[0] * b[4]  + a[4] * b[5]  + a[8]  * b[6] + a[12]  * b[7]; out[5] =  a[1] * b[4]  + a[5] * b[5]  + a[9]  * b[6] + a[13]  * b[7];
@@ -476,7 +494,7 @@ void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
 void ClearAll() { glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,0); glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); }
 void RenderLoading(i32 offset, const char * restrict text) { ClearAll(); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); RenderFormattedText(683 - offset,379,T_WHITE,FONT_NORMAL,1.0f,text); ((WinSyswindow*)window)->context.swapBuffers(((WinSyswindow*)window)); }
 void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp) { if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id); glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,bmp); glTexParameteri(GL_TEXTURE_2D,0x2801/*GL_TEXTURE_MIN_FILTER*/,filt); glTexParameteri(GL_TEXTURE_2D,0x2800/*GL_TEXTURE_MAG_FILTER*/,filt); }
-static void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt) { GenerateAndBindTexture(id,internalFormat,width,height,format,type,filt,NULL); }
+void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt) { GenerateAndBindTexture(id,internalFormat,width,height,format,type,filt,NULL); }
 void UpdateScreenSize(i32 width, i32 height) {
     u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); // Cap at minimum Quake resolution and maximum 8k.
     float wf = (float)w, hf = (float)h; Sys_Settings.ScreenCenterX = wf * 0.5f; Sys_Settings.ScreenCenterY = hf * 0.5f;
@@ -501,7 +519,7 @@ void UpdateScreenSize(i32 width, i32 height) {
 }
 
 bool MenuEnter() { return (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
-static inline __attribute__((always_inline,pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) { return World.cursorPosition_x >= startX && World.cursorPosition_x <= endX  /* 0 == left */ && World.cursorPosition_y >= startY && World.cursorPosition_y <= endY; /* 0 ==  top */ }
+INLINE bool CursorIsOverBounds(float startX, float endX, float startY, float endY) { return World.cursorPosition_x >= startX && World.cursorPosition_x <= endX  /* 0 == left */ && World.cursorPosition_y >= startY && World.cursorPosition_y <= endY; /* 0 ==  top */ }
 u8 UI_Interactable(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
     bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y);
     if (cursorIsOver && mouseMovementThisFrame) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} }
@@ -548,6 +566,7 @@ bool UI_Checkbox(i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn) {
 }
 
 void UI_HeaderText(i16 x, const char* text) { RenderFormattedText(x,50,T_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderFormattedText(x,46,T_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderFormattedText(x,48,T_GREEN_MENU,FONT_STOPD,1.75f,text); }
+void PlayGameMusic(); void PlayMenuMusic();
 void MenuGoBack() {
     if (returnToPause) { returnToPause = false; World.paused = true; World.menuActive = false; PlayGameMusic(); }
     if (currentMenuPage == Mpg_Singleplayer || currentMenuPage == Mpg_Multiplayer || currentMenuPage == Mpg_Options) currentMenuPage = Mpg_FrontPage;//News
@@ -730,6 +749,9 @@ void RenderPausedUI() {
 }
 
 u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0;
+#define AVG_CPU_TAPS 2048
+double avgCPUt[AVG_CPU_TAPS]={0};
+int avgCPUt_idx = 0;
 static double RenderUI() {
     drawCallsNormal = drawCalls;
     if (World.creditsActive) { // Render Credits
@@ -807,8 +829,10 @@ static double RenderUI() {
     i16 debugTextStartY = 48; /* Diagnostics / Debugging */
     if (Cheats.showLocation && !World.menuActive) RenderFormattedText(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
     i16 lineSpacing = 18;
-    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, CPU ms::Shad: %.3f(%.3f, %.3f), Phys: %.3f, Rendr: %.3f, Pre phys: %.3f, Logic: %.3f",playerCellIdx,shadowTime * 1000,worstShadTime * 1000,(World.pauseRelativeTime - game_start_time),physTime * 1000,renderTime * 1000,prePhys * 1000,gameTime * 1000);
+    
+    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, CPU ms::Shad: %.3f(wrst:%.3f), Phys: %.3f, Rendr: %.3f, Pre phys: %.3f, Logic: %.3f",playerCellIdx,shadowTime * 1000,worstShadTime * 1000,physTime * 1000,renderTime * 1000,prePhys * 1000,gameTime * 1000);
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",World.velocity[PLAYER1].x,World.velocity[PLAYER1].y,World.velocity[PLAYER1].z,World.instances[PLAYER1].entflags & EF_GROUNDED);
+    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Time Elapsed: %.3f",World.pauseRelativeTime - game_start_time);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPosition_x,World.cursorPosition_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderFormattedText(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (World.statusTextDecayFinished > World.current_time) RenderFormattedText(460,114,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
@@ -816,12 +840,15 @@ static double RenderUI() {
     if (Cheats.showFPS) {
         World.thisFrameTime = (time_now - World.last_time) * 1000.0;
         World.cpuFrameTime = World.cpuTime * 1000.0;
-        u8 timingColor = T_WHITE;
-        if (vabs(World.thisFrameTime - World.cpuFrameTime) < 0.451) timingColor = T_GREEN;
-        if (World.thisFrameTime > 6.944444) timingColor = T_RED;
-        drawCalls += 2; /* Add two more for this text render ;) */
-        RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", World.thisFrameTime,World.cpuFrameTime);
-        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, T_WHITE, FONT_NORMAL,1.0f, "(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
+        u8 timingColor = (World.thisFrameTime > 6.944444) ? T_RED : T_WHITE;
+        drawCalls += 3; /* Add two more for this text render ;) */
+        double avgCPU = 0.0;
+        avgCPUt[avgCPUt_idx] = World.cpuFrameTime; avgCPUt_idx++; if (avgCPUt_idx >= AVG_CPU_TAPS) avgCPUt_idx = 0;
+        for (int i=0;i<AVG_CPU_TAPS;++i) avgCPU += avgCPUt[i];
+        avgCPU /= (double)AVG_CPU_TAPS;
+        RenderFormattedText(16 + 100, debugTextStartY - lineSpacing,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avgCPU);
+        RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime);
+        RenderFormattedText(16 + 250, debugTextStartY - lineSpacing,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
     }
     return time_now;
 }
@@ -829,7 +856,7 @@ static double RenderUI() {
 #define SHADOW_NEARMESH_MAX 1024
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
 INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex > texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MAX_MDLS || e->texIndex >= MAX_TXRS || otherCondition; }
-static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 currentModelType) {
+INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) {
     glUniform1ui(0,i);
     u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex;
     if (currentModelType == modelType && currentModelType != 0) return currentModelType;
@@ -840,180 +867,7 @@ static inline __attribute__((always_inline,hot)) u16 GetAndBindModel(u16 i, u16 
 #define SC_MAX (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; u16 shadowCasterIndices[SC_MAX],candidates[MAX_SHADOWMAPS];
 static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
-// typedef long long __m256i __attribute__((__vector_size__(32)));
-// typedef int __v8si __attribute__((__vector_size__(32)));
-// 
-// static inline __attribute__((always_inline, target("avx2,fma"))) __m256 _mm256_set1_ps(float a) { return (__m256)(__v8sf){a,a,a,a,a,a,a,a}; }
-// static inline __attribute__((always_inline, target("avx2,fma"))) __m256 _mm256_fmadd_ps(__m256 a, __m256 b, __m256 c) { __m256 r=c; __asm__("vfmadd231ps %2, %1, %0":"+x"(r):"x"(a),"x"(b)); return r; }
-// static inline __attribute__((always_inline, target("avx2,fma"))) __m256 _mm256_cmp_ps(__m256 a, __m256 b) { return (__m256)((__v8sf)a < (__v8sf)b); }
-// static inline __attribute__((always_inline, target("avx2,fma"))) __m256 _mm256_or_ps(__m256 a, __m256 b) { return (__m256)((__v8si)a | (__v8si)b); }
-// static inline __attribute__((always_inline, target("avx2,fma"))) __m256 _mm256_xor_ps(__m256 a, __m256 b) { return (__m256)((__v8si)a ^ (__v8si)b); }
-// static inline __attribute__((always_inline, target("avx2,fma"))) int _mm256_movemask_ps(__m256 a) { int r; __asm__("vmovmskps %1, %0":"=r"(r):"x"(a)); return r; }
-// static inline __attribute__((always_inline, target("avx2"))) __m256i _vz_i(void) { return (__m256i)(__v8si){0,0,0,0,0,0,0,0}; }
-// static inline __attribute__((always_inline, target("avx2"))) void _vst_i(void* p, __m256i v) { __builtin_memcpy(p, &v, 32); }
-// static inline __attribute__((always_inline, hot, target("avx2,fma,bmi"))) unsigned _tzcnt_u32(unsigned x) { unsigned r; __asm__("tzcnt %1, %0":"=r"(r):"r"(x):"cc"); return r; }
-// 
-// typedef struct {
-//     u16 origIdx;
-//     u16 idx;
-//     u16 modelType;
-//     u16 texIndex;
-//     u32 flags;   // isTransparent in bit 0
-//     u32 pad;
-// } RenderData;
-// 
-// static float nm_px[SHADOW_NEARMESH_MAX], nm_py[SHADOW_NEARMESH_MAX], nm_pz[SHADOW_NEARMESH_MAX], nm_sr[SHADOW_NEARMESH_MAX];
-// static RenderData nm_render[SHADOW_NEARMESH_MAX];
-// 
-// __attribute__((hot, target("avx2,fma,bmi"))) void RenderShadowmaps(void) {
-//     double shadowStartTime = get_time();
-//     const __m256i z = _vz_i();
-//     { u16* p=candidates; u32 n=MAX_SHADOWMAPS,i=0; for(;i+16<=n;i+=16) _vst_i(p+i,z); for(;i<n;i++) p[i]=0; }
-//     u16 numShadowsCouldRender=0; const V3 playerPos=World.position[PLAYER1], pf=World.instances[PLAYER1].forward;
-//     const bool useDetail = Sys_Settings.ModelDetail < 1u;
-//     for (u16 i=0; i<World.loadedLights; ++i) {
-//         if (unlikely(!(World.lights[i].lflags & SHADON) || !(World.lights[i].lflags & LIGHTON))) continue;
-//         const V3 lightPos=World.lights[i].pos; const float intensity=World.lights[i].maxIntensity;
-//         if (unlikely(intensity < 0.1f)) continue;
-//         const float range=World.lights[i].range, rangeSq=range*range, luminosity=intensity/rangeSq;
-//         if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
-//         const u16 cellX=PosGetCellCoordX(lightPos.x), cellZ=PosGetCellCoordZ(lightPos.z);
-//         const int lightCellIdx=(cellZ*WORLDX)+cellX; const u8 r=vceil(range*(1.0f/CELLSZ));
-//         bool inPVS=(gridCellStates[lightCellIdx] & CELL_VISIBLE);
-//         if (likely(!inPVS)) inPVS=NeighborhoodInPVS(cellX,cellZ,r); if (!inPVS) continue;
-//         const float dx=lightPos.x-playerPos.x, dy=lightPos.y-playerPos.y, dz=lightPos.z-playerPos.z;
-//         const float distSq=__builtin_fmaf(dz,dz,__builtin_fmaf(dy,dy,dx*dx)), dotR=__builtin_fmaf(dz,pf.z,__builtin_fmaf(dy,pf.y,dx*pf.x));
-//         if (dotR < 0.0f && distSq > rangeSq) continue;
-//         candidates[numShadowsCouldRender++]=i; if (numShadowsCouldRender >= MAX_SHADOWMAPS) break;
-//     }
-//     if (numShadowsCouldRender == 0U) { shadowTime = get_time() - shadowStartTime; return; }
-//     glUseProgram(shadowmapsClearSP); glDispatchCompute(groupX_shadClear,6,numShadowsCouldRender);
-//     shadDrawCalls=0U; glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP); u32 shadowmapOffsetHead=0U;
-//     { u16* p=shadowCasterIndices; u32 n=SC_MAX,i=0; for(;i+16<=n;i+=16) _vst_i(p+i,z); for(;i<n;i++) p[i]=0; }
-//     u32 numShadowCasters=0U;
-//     for (int i=INSTS_1ST_IDX; i<INSTANCE_COUNT; ++i) {
-//         if (__builtin_expect(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsDynamicObject(World.instances[i].index),0)) continue;
-//         shadowCasterIndices[numShadowCasters]=(u16)i; if (++numShadowCasters >= SC_MAX) break;
-//     }
-//     u16 shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=false;
-//     
-//     for (u32 c=0; c<numShadowsCouldRender; ++c, ++shadowMapIdx) {
-//         const u16 lightIdx=candidates[c]; const V3 lpos=World.lights[lightIdx].pos;
-//         const float effectiveRadius=vmin(World.lights[lightIdx].range,15.36f); u16 nearbyMeshCount=0;
-//         const float cellCenterX=vround(lpos.x/CELLSZ)*CELLSZ, cellCenterZ=vround(lpos.z/CELLSZ)*CELLSZ;
-//         const float dxC=lpos.x-cellCenterX, dzC=lpos.z-cellCenterZ; const bool skipNPCs=(dxC*dxC+dzC*dzC) < 0.4096f;
-//         const u16* __restrict__ pSC=shadowCasterIndices; const float er=effectiveRadius, lx=lpos.x, ly=lpos.y, lz=lpos.z;
-//         for (u32 sc=0; sc<numShadowCasters; ++sc) {
-//             const u16 j=pSC[sc];
-//             const V3 pos=World.position[j]; const float dx=pos.x-lx, dy=pos.y-ly, dz=pos.z-lz;
-//             const float distToLightSqrd=__builtin_fmaf(dz,dz,__builtin_fmaf(dy,dy,dx*dx)), radSum=er+World.radius[j];
-//             if (distToLightSqrd < radSum*radSum) {
-//                 if (!skipNPCs || !IdxIsNPC(World.instances[j].index)) {
-//                     Entity* e=&World.instances[j];
-//                     nm_px[nearbyMeshCount]=pos.x; nm_py[nearbyMeshCount]=pos.y; nm_pz[nearbyMeshCount]=pos.z; nm_sr[nearbyMeshCount]=e->shadRadius;
-//                     nm_render[nearbyMeshCount].origIdx=nearbyMeshCount;
-//                     nm_render[nearbyMeshCount].idx=j;
-//                     nm_render[nearbyMeshCount].modelType=(instanceIsLODArray[j] || useDetail) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex;
-//                     nm_render[nearbyMeshCount].texIndex=e->texIndex;
-//                     nm_render[nearbyMeshCount].flags=transparentTexture[e->texIndex] ? 1 : 0;
-//                     if (__builtin_expect(++nearbyMeshCount >= SHADOW_NEARMESH_MAX,0)) { DualLogWarn("Shadowmapping needs larger nearMeshes count than %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
-//                 }
-//             }
-//         }
-//         if (unlikely(nearbyMeshCount < 1)) continue;
-//         
-//         /* Sort 16-byte RenderData struct to minimize GL binds */
-//         for (u16 i=1; i<nearbyMeshCount; i++) {
-//             RenderData tmp = nm_render[i];
-//             int j = i - 1;
-//             u32 key1 = ((u32)tmp.modelType << 16) | tmp.texIndex;
-//             while (j >= 0) {
-//                 u32 key2 = ((u32)nm_render[j].modelType << 16) | nm_render[j].texIndex;
-//                 if (key2 <= key1) break;
-//                 nm_render[j+1] = nm_render[j];
-//                 j--;
-//             }
-//             nm_render[j+1] = tmp;
-//         }
-//         
-//         glUniform3f(3,lpos.x,lpos.y,lpos.z); shadowmapIndirectionList[lightIdx]=shadowMapIdx;
-//         const __m256 sign_mask=_mm256_set1_ps(-0.0f);
-//         #pragma GCC unroll 6
-//         for (u8 face=0; face<6; face++) {
-//             glUniform1ui(2,face); glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]); glUniform1ui(7,shadowmapOffsetHead+(face*SHADOW_MAP_SIZE*SHADOW_MAP_SIZE));
-//             const float* __restrict__ pl=(const float*)lightFrustumPlanes[lightIdx][face];
-//             const __m256 p0x=_mm256_set1_ps(pl[0]),p0y=_mm256_set1_ps(pl[1]),p0z=_mm256_set1_ps(pl[2]),p0w=_mm256_set1_ps(pl[3]);
-//             const __m256 p1x=_mm256_set1_ps(pl[4]),p1y=_mm256_set1_ps(pl[5]),p1z=_mm256_set1_ps(pl[6]),p1w=_mm256_set1_ps(pl[7]);
-//             const __m256 p2x=_mm256_set1_ps(pl[8]),p2y=_mm256_set1_ps(pl[9]),p2z=_mm256_set1_ps(pl[10]),p2w=_mm256_set1_ps(pl[11]);
-//             const __m256 p3x=_mm256_set1_ps(pl[12]),p3y=_mm256_set1_ps(pl[13]),p3z=_mm256_set1_ps(pl[14]),p3w=_mm256_set1_ps(pl[15]);
-//             const __m256 p4x=_mm256_set1_ps(pl[16]),p4y=_mm256_set1_ps(pl[17]),p4z=_mm256_set1_ps(pl[18]),p4w=_mm256_set1_ps(pl[19]);
-//             const __m256 p5x=_mm256_set1_ps(pl[20]),p5y=_mm256_set1_ps(pl[21]),p5z=_mm256_set1_ps(pl[22]),p5w=_mm256_set1_ps(pl[23]);
-//             
-//             u64 passMask[16]; // 1024 bits
-//             _vst_i(&passMask[0], z); _vst_i(&passMask[4], z); _vst_i(&passMask[8], z); _vst_i(&passMask[12], z);
-//             
-//             u16 j=0;
-//             for (; j+8 <= nearbyMeshCount; j+=8) {
-//                 __m256 cx=_mm256_loadu_ps(&nm_px[j]), cy=_mm256_loadu_ps(&nm_py[j]), cz=_mm256_loadu_ps(&nm_pz[j]), sr=_mm256_loadu_ps(&nm_sr[j]);
-//                 __m256 negR=_mm256_xor_ps(sr,sign_mask);
-//                 __m256 d0=_mm256_fmadd_ps(p0z,cz,_mm256_fmadd_ps(p0y,cy,_mm256_fmadd_ps(p0x,cx,p0w))), fail=_mm256_cmp_ps(d0,negR);
-//                 __m256 d1=_mm256_fmadd_ps(p1z,cz,_mm256_fmadd_ps(p1y,cy,_mm256_fmadd_ps(p1x,cx,p1w))); fail=_mm256_or_ps(fail,_mm256_cmp_ps(d1,negR));
-//                 __m256 d2=_mm256_fmadd_ps(p2z,cz,_mm256_fmadd_ps(p2y,cy,_mm256_fmadd_ps(p2x,cx,p2w))); fail=_mm256_or_ps(fail,_mm256_cmp_ps(d2,negR));
-//                 __m256 d3=_mm256_fmadd_ps(p3z,cz,_mm256_fmadd_ps(p3y,cy,_mm256_fmadd_ps(p3x,cx,p3w))); fail=_mm256_or_ps(fail,_mm256_cmp_ps(d3,negR));
-//                 __m256 d4=_mm256_fmadd_ps(p4z,cz,_mm256_fmadd_ps(p4y,cy,_mm256_fmadd_ps(p4x,cx,p4w))); fail=_mm256_or_ps(fail,_mm256_cmp_ps(d4,negR));
-//                 __m256 d5=_mm256_fmadd_ps(p5z,cz,_mm256_fmadd_ps(p5y,cy,_mm256_fmadd_ps(p5x,cx,p5w))); fail=_mm256_or_ps(fail,_mm256_cmp_ps(d5,negR));
-//                 int mask = (~_mm256_movemask_ps(fail)) & 0xFF;
-//                 while (mask) {
-//                     int lane = _tzcnt_u32(mask); mask &= mask-1;
-//                     u16 idx = j + lane;
-//                     passMask[idx >> 6] |= 1ULL << (idx & 63);
-//                 }
-//             }
-//             for (; j<nearbyMeshCount; ++j) {
-//                 const float cx=nm_px[j], cy=nm_py[j], cz=nm_pz[j], sr=nm_sr[j], negR=-sr;
-//                 float d0=__builtin_fmaf(pl[2],cz,__builtin_fmaf(pl[1],cy,__builtin_fmaf(pl[0],cx,pl[3]))); if (d0 < negR) continue;
-//                 float d1=__builtin_fmaf(pl[6],cz,__builtin_fmaf(pl[5],cy,__builtin_fmaf(pl[4],cx,pl[7]))); if (d1 < negR) continue;
-//                 float d2=__builtin_fmaf(pl[10],cz,__builtin_fmaf(pl[9],cy,__builtin_fmaf(pl[8],cx,pl[11]))); if (d2 < negR) continue;
-//                 float d3=__builtin_fmaf(pl[14],cz,__builtin_fmaf(pl[13],cy,__builtin_fmaf(pl[12],cx,pl[15]))); if (d3 < negR) continue;
-//                 float d4=__builtin_fmaf(pl[18],cz,__builtin_fmaf(pl[17],cy,__builtin_fmaf(pl[16],cx,pl[19]))); if (d4 < negR) continue;
-//                 float d5=__builtin_fmaf(pl[22],cz,__builtin_fmaf(pl[21],cy,__builtin_fmaf(pl[20],cx,pl[23]))); if (d5 < negR) continue;
-//                 passMask[j >> 6] |= 1ULL << (j & 63);
-//             }
-//             
-//             for (u16 k=0; k<nearbyMeshCount; k++) {
-//                 RenderData r = nm_render[k];
-//                 if (passMask[r.origIdx >> 6] & (1ULL << (r.origIdx & 63))) {
-//                     glUniform1ui(0, r.idx);
-//                     if (currentModelType != r.modelType || currentModelType == 0) { currentModelType=r.modelType; glBindVertexBuffer(0,vbos[r.modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[r.modelType]); }
-//                     if (currentTexIndex != r.texIndex) { currentTexIndex=r.texIndex; glUniform1ui(6,r.texIndex); }
-//                     bool isTransparent = r.flags & 1;
-//                     if (currentIsTransparent != isTransparent) { currentIsTransparent=isTransparent; glUniform1ui(8,(u32)currentIsTransparent); }
-//                     const u32 triCount=modelTriangleCounts[currentModelType], vertCount=triCount*3;
-//                     glDrawElements(0x0004,(int)vertCount,GL_UNSIGNED_SHORT,0); drawCalls++; shadDrawCalls++; vertsRendered += vertCount;
-//                 }
-//             }
-//         }
-//         shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
-//     }
-//     glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); glBindBuffer(GL_SSBO,shadowMapsIndirectionID);
-//     glBufferData(GL_SSBO,World.loadedLights*sizeof(u32),shadowmapIndirectionList,GL_DYNAMIC_DRAW);
-//     shadowTime = get_time() - shadowStartTime;
-//     if ((World.pauseRelativeTime - game_start_time) > 5.0 && shadowTime > worstShadTime) worstShadTime = shadowTime;
-// }
-
-INLINE u8 GetCubemapFaceMask(V3 delta, float radius) {
-    u8 mask = 0;
-    float absX = vabs(delta.x), absY = vabs(delta.y), absZ = vabs(delta.z);
-    // Face 0: +X, Face 1: -X, Face 2: +Y, Face 3: -Y, Face 4: +Z, Face 5: -Z
-    if (delta.x + radius >  absY && delta.x + radius >  absZ) mask |= (1 << 0);
-    if (delta.x - radius < -absY && delta.x - radius < -absZ) mask |= (1 << 1);
-    if (delta.y + radius >  absX && delta.y + radius >  absZ) mask |= (1 << 2);
-    if (delta.y - radius < -absX && delta.y - radius < -absZ) mask |= (1 << 3);
-    if (delta.z + radius >  absX && delta.z + radius >  absY) mask |= (1 << 4);
-    if (delta.z - radius < -absX && delta.z - radius < -absY) mask |= (1 << 5);
-    return mask;
-}
-
+INLINE u8 GetCubemapFaceMask(V3 d, float r) { u8 m=0; float absX=vabs(d.x),absY=vabs(d.y),absZ=vabs(d.z); if (d.x+r>absY && d.x+r>absZ) {m|=(1<<0);} if (d.x-r<-absY && d.x-r<-absZ) {m|=(1<<1);} if (d.y+r>absX && d.y+r>absZ) {m|=(1<<2);} if (d.y-r<-absX && d.y-r<-absZ) {m|=(1<<3);} if (d.z+r>absX && d.z+r>absY) {m|=(1<<4);} if (d.z-r<-absX && d.z-r<-absY) {m|=(1<<5);} return m; }
 __attribute__((hot)) void RenderShadowmaps() {    
     double shadowStartTime = get_time();
     mset(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
@@ -1288,8 +1142,6 @@ void RenderCameraViews() { // Render in-world camera views.  Pops player positio
 }
 
 void UpdateInstanceMatrix4x4s() {
-    if (unlikely(World.paused || World.menuActive)) return;
-
     i32 dirtyMin = -1, dirtyMax = -1;
     for (u32 i = INSTS_1ST_IDX; i < World.instCount; i++) {        
         float x=World.rotation[i].x, y=World.rotation[i].y, z=World.rotation[i].z, w=World.rotation[i].w;
@@ -1301,14 +1153,20 @@ void UpdateInstanceMatrix4x4s() {
         modelMatrices[m+12]=World.position[i].x;     modelMatrices[m+13]=World.position[i].y;     modelMatrices[m+14]=World.position[i].z;      modelMatrices[m+15]=1.0f;
         if (dirtyMin < 0) {dirtyMin = (i32)i;} dirtyMax = (i32)i;
     }
-    
     if (dirtyMin < 0) return;
-    
     glBindBuffer(GL_SSBO,matricesBufferID);
     u32 offsetFloats = (u32)dirtyMin * 16; u32 countFloats  = ((u32)dirtyMax - (u32)dirtyMin + 1) * 16;
     glBufferSubData(GL_SSBO,offsetFloats * sizeof(float),countFloats * sizeof(float),modelMatrices + offsetFloats);
 }
+
+static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0.07f},/*0*/  {0.34509805f,0.38431373f,0.49019608f,0.055f},/*1*/  {0.47058824f,0.3882353f, 0.3928334f,0.05f},/*2*/  {0.32941177f,0.29411766f,0.2509804f,0.065f},/*3*/ {0.3882353f,0.452415f, 0.47058824f,0.075f},/*4*/
+                                          {0.3882353f, 0.4117647f, 0.47058824f,0.03f},/*5*/  {0.3f,       0.24f,      0.33f,      0.070f},/*6*/  {0.38679248f,0.3471719f, 0.3302332f,0.07f},/*7*/  {0.44708973f,0.45681614f,0.4811321f,0.040f},/*8*/ {0.4056604f,0.3992963f,0.36930403f,0.050f},/*9*/
+                                          {0.48235294f,0.58431375f,0.5176471f, 0.04f},/*10*/ {0.52872473f,0.58431375f,0.48235294f,0.040f},/*11*/ {0.48235294f,0.58431375f,0.5176471f,0.05f},/*12*/ {0.0f,       0.0f,       0.0f,      0.005f},/*13*/ };
+                                          static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/
+                                     {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {-64.000f,-60.120f}/*13*/};
+static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 71.68f/*13*/};
 // Init && Main
+void GenerateConvexAdjacencyLists();
 __attribute__((cold)) void NewGame() { // Reset World States
     DualLog("Loading new game...\n");
     RenderLoading(100,"Loading new game...");
@@ -1325,7 +1183,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.scale[PLAYER1] = (V3){1.0f,1.0f,1.0f};
     World.rotation[PLAYER1] = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     World.instances[PLAYER1].entflags = EF_ACTIVE|EF_RIGIDBODY;
-    World.collider[PLAYER1] = COLTYPE_CAP; World.colliderCenter[PLAYER1].y = -PLAYER_CAM_OFFSET_Y; World.colliderSize[PLAYER1] = (V3){PLAYER_RADIUS,PLAYER_HEIGHT,COLLIDER_CAPSULE_DIRECTION_Y_F}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
+    World.collider[PLAYER1] = COLTYPE_CAP; World.colliderCenter[PLAYER1].y = -PLAYER_CAM_OFFSET_Y; World.colliderSize[PLAYER1] = (V3){PLAYER_RADIUS,PLAYER_HEIGHT,COLCAP_DIR_Y_F}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     World.mass[PLAYER1] = 1.0f; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
     World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = World.invP1.leanTarget = World.invP1.leanShift = 0.0f; World.gravity[PLAYER1] = 1.0f; World.dynamicFriction[PLAYER1] = 0.6f; World.staticFriction[PLAYER1] = 0.8f; 
     World.instances[PLAYER1].health = 200.0f; World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime;
@@ -1364,6 +1222,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
 
 // Init
 void GoIntoGame() { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", World.playerName); }
+void LoadModels(); void LoadTextures(); void ModEDefsInitAfterLoad(); void InitAudio(); void LoadConfig();
 void InitalizeEnvironment() {
     game_start_time = get_time(); random_range_rng = (u32)game_start_time; // Seed global rand uniquely with time since system boot.
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
@@ -1414,7 +1273,6 @@ void InitalizeEnvironment() {
     RenderLoading(40,"Loading...");
     float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - NEAR_PLANE);
     m[0]=1.0f; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=1.0f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]=-(lightRangeMax + NEAR_PLANE) / viewRange; m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=0.0f;
-    InitSCFTables();
     InitAudio();
     ModEDefsInitAfterLoad(); // Set the values for all 768 entity definitions, a doozy of a function.
     glGenFramebuffers(1,&gBufferFBO);
@@ -1442,6 +1300,7 @@ void InitalizeEnvironment() {
     DebugRAM("InitializeEnvironment end"); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
 }
 
+void Physics(float dt); void UpdateAnims(void); void UpdateAudio(); bool ScrshotPressed();
 i32 main() {
     InitalizeEnvironment(); 
     while(1) {
@@ -1456,11 +1315,10 @@ i32 main() {
         if (!World.paused && !World.menuActive) { double ps=get_time(); float dt=vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time=World.pauseRelativeTime; World.dt=dt; Physics(dt); physTime=get_time() - ps; } else physTime=0.0;
         double gameT_start = get_time();
         ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
-        if (!World.paused && !World.menuActive) {MixAmbs();}
-        UpdateMusic();
+        UpdateAudio();
         gameTime = get_time() - gameT_start;
         drawCalls=uiDrawCalls=shadDrawCalls=vertsRendered=0; RenderCameraViews(); if (likely(!World.paused && !World.menuActive)) CullCore();
-        UpdateInstanceMatrix4x4s();
+        if (likely(!World.paused && !World.menuActive)) UpdateInstanceMatrix4x4s();
         Render(false/*!camview*/,0u);
         if (ScrshotPressed() && World.current_time > World.screenshotTimeout) Screenshot();
         ResetInput(); globalframe++; World.cpuTime = get_time() - World.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.

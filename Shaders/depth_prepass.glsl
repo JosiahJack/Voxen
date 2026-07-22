@@ -9,16 +9,15 @@ layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; }; // S
 layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430,binding=8) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430,binding=9) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
-const vec4 BYTE_TO_FLOAT = vec4(1.0/255.0);
-vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
-    uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);
-    uint slotIndex = pixelOffset >> 2u;// / 4u;
+vec4 getTextureColor(uint texIdx, ivec2 texCoord) {
+    uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);
+    uint slotIndex = pixelOffset >> 2u;
     uint packedIdx = colors[slotIndex];
-    uint localOffset = pixelOffset & 3u;//% 4u;
-    uint paletteIndex = (packedIdx >> (localOffset << 3u)) & 0xFFu; // << 3u is same as * 8
-    uint paletteOffset = texturePaletteOffsets[texIndex];
+    uint localOffset = pixelOffset & 3u;
+    uint paletteIndex = (packedIdx >> (localOffset << 3u)) & 0xFFu;
+    uint paletteOffset = texturePaletteOffsets[texIdx];
     uint color = texturePalettes[paletteOffset + paletteIndex];
-    return vec4(color & 0xFFu,(color>>8)&0xFFu,(color>>16)&0xFFu,color>>24) * BYTE_TO_FLOAT;
+    return unpackUnorm4x8(color);
 }
 
 void main() {

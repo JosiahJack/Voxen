@@ -1,12 +1,10 @@
 // winput.c - Windowing and Input System interfacing with the OS.
+#include "common.h"
 typedef void (*WinSysglproc)(void); typedef struct WinSyswindow WinSyswindow; WinSyswindow* window; typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } vidmode; typedef struct { u8 buttons[15]; float axes[6]; } WinSysgamepadstate;
 typedef void (*WinSysproc)(void); typedef struct WinSysfbconfig WinSysfbconfig; typedef struct WinSyscontext WinSyscontext; typedef struct WinSyswindow WinSyswindow; typedef struct WinSyslibrary WinSyslibrary; typedef struct WinSysmonitor WinSysmonitor; typedef struct WinSysjoystick WinSysjoystick;
 struct WinSysfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; i32 samples,stereo,sRGB,doublebuffer; uintptr_t handle; }; extern WinSyslibrary WinSys;
-WinSysproc PlatformGetModuleSymbol(void* module, const char* name); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(); void InputWindowFocus(i32); void InputKey(WinSyswindow*,int,int); void InputMouseClick(WinSyswindow*,int,int); void InputCursorPos(WinSyswindow*,double,double); void JoystickConnection(WinSysjoystick*,int); void InputJoystickAxis(WinSysjoystick*,int,float);
+WinSysproc PlatformGetModuleSymbol(void* module, const char* name); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(); void InputWindowFocus(i32); void InputKey(char*,int,int); void InputMouseClick(char*,int,int); void InputCursorPos(double*,double*,double,double); void JoystickConnection(WinSysjoystick*,int); void InputJoystickAxis(WinSysjoystick*,int,float);
 void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSysjoystick*,int,char); void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(const WinSysfbconfig* alternatives, u32); WinSysmonitor* AllocMonitor(const char*,int,int); WinSysjoystick* WinSysAllocJoystick(const char*,const char*,int,int,int); void FreeJoystick(WinSysjoystick*);
-#define INPUT_RELEASE 0
-#define INPUT_PRESS   1
-#define INPUT_REPEAT  2
 #if defined(WINDOWS)
     #define MAKEWORD(a,b) ((u16) (((u8) (((u64) (a)) & 0xff)) | ((u16) ((u8) (((u64) (b)) & 0xff))) << 8))
     #define MAKELONG(a, b) ((i32) (((u16) (((u64) (a)) & 0xffff)) | ((u32) ((u16) (((u64) (b)) & 0xffff))) << 16))
@@ -104,21 +102,21 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
                         key=KEY_LEFT_CONTROL;
                     }
                 } else if (wParam == 0xE5/*VK_PROCESSKEY*/) break;
-                if (action == INPUT_RELEASE && wParam == 0x10/*VK_SHIFT*/) { InputKey(win,KEY_LEFT_SHIFT,action); InputKey(win,KEY_RIGHT_SHIFT,action); }
-                else if (wParam == 0x2C/*VK_SNAPSHOT*/) { InputKey(win,key,INPUT_PRESS); InputKey(win,key,INPUT_RELEASE); }
-                else InputKey(win,key,action);
+                if (action == INPUT_RELEASE && wParam == 0x10/*VK_SHIFT*/) { InputKey(win->keys,KEY_LEFT_SHIFT,action); InputKey(win->keys,KEY_RIGHT_SHIFT,action); }
+                else if (wParam == 0x2C/*VK_SNAPSHOT*/) { InputKey(win->keys,key,INPUT_PRESS); InputKey(win->keys,key,INPUT_RELEASE); }
+                else InputKey(win->keys,key,action);
                 break; }
             case 0x0201/*WM_LBUTTONDOWN*/: case 0x0204/*WM_RBUTTONDOWN*/: case 0x0207/*WM_MBUTTONDOWN*/: case 0x020B/*WM_XBUTTONDOWN*/: case 0x0202/*WM_LBUTTONUP*/:   case 0x0205/*WM_RBUTTONUP*/:   case 0x0208/*WM_MBUTTONUP*/:   case 0x020C/*WM_XBUTTONUP*/: {
                 int i,action,button = (uMsg==0x0201/*WM_LBUTTONDOWN*/ || uMsg == 0x0202/*WM_LBUTTONUP*/) ? MOUSE_BUTTON_LEFT : ((uMsg == 0x0204/*WM_RBUTTONDOWN*/ || uMsg == 0x0205/*WM_RBUTTONUP*/) ? MOUSE_BUTTON_RIGHT : ((uMsg == 0x0207/*WM_MBUTTONDOWN*/ || uMsg == 0x0208/*WM_MBUTTONUP*/) ? MOUSE_BUTTON_MIDDLE : (((HIWORD(wParam)) == 0x0001/*XBUTTON1*/) ? MOUSE_BUTTON_4 : MOUSE_BUTTON_5)));
                 action=(uMsg == 0x0201/*WM_LBUTTONDOWN*/ || uMsg == 0x0204/*WM_RBUTTONDOWN*/ || uMsg == 0x0207/*WM_MBUTTONDOWN*/ || uMsg == 0x020B/*WM_XBUTTONDOWN*/) ? INPUT_PRESS : INPUT_RELEASE;
                 for (i=0;i<=7;i++) { if (win->mouseButtons[i]==INPUT_PRESS) break; }
-                if (i>7) {SetCapture(hWnd);} InputMouseClick(win,button,action);
+                if (i>7) {SetCapture(hWnd);} InputMouseClick(win->mouseButtons,button,action);
                 for (i=0;i<=7;i++) { if (win->mouseButtons[i]==INPUT_PRESS) break; }
                 if (i>7) {ReleaseCapture();} if (uMsg == 0x020B/*WM_XBUTTONDOWN*/ || uMsg == 0x020C/*WM_XBUTTONUP*/) return 1;
                 return 0; }
             case 0x0200/*WM_MOUSEMOVE*/: {                
                 const int x=((int)(i16)(lParam & 0xFFFF)), y=((int)(i16)(lParam >> 16));
-                if (win->cursorMode==0x00034003/*CURSOR_DISABLED*/) { const int dx=x-win->win32.lastCurX,dy=y-win->win32.lastCurY; if (WinSys.win32.disabledCursorWindow!=win) {break;} InputCursorPos(win,win->virtualCursorPosX+dx,win->virtualCursorPosY+dy); }
+                if (win->cursorMode==0x00034003/*CURSOR_DISABLED*/) { const int dx=x-win->win32.lastCurX,dy=y-win->win32.lastCurY; if (WinSys.win32.disabledCursorWindow!=win) {break;} InputCursorPos(&win->virtualCursorPosX,&win->virtualCursorPosY,win->virtualCursorPosX+dx,win->virtualCursorPosY+dy); }
                 win->win32.lastCurX=x; win->win32.lastCurY=y;
                 return 0; }
             case 0x02A3/*WM_MOUSELEAVE*/: { win->win32.cursorTracked=0; return 0; }
@@ -149,7 +147,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
         WinSyswindow* win = GetPropW(handle,L"WinSys"); MSG msg;
         while (PeekMessageW(&msg,NULL,0,0,0x0001)) { if (msg.message==0x0012/*WM_QUIT*/) { OS_Exit(0); } else { TranslateMessage(&msg); DispatchMessageW(&msg); } }
         const int keys[4][2]={{0xA0/*VK_LSHIFT*/,KEY_LEFT_SHIFT},{0xA1/*VK_RSHIFT*/,KEY_RIGHT_SHIFT},{0x5B/*VK_LWIN*/,KEY_LEFT_SUPER},{0x5C/*VK_RWIN*/,KEY_RIGHT_SUPER}};
-        for (int i=0;i<4;i++) { const int vk=keys[i][0],key=keys[i][1]; if ((GetKeyState(vk)&0x8000)||win->keys[key]!=INPUT_PRESS) {continue;} InputKey(win,key,INPUT_RELEASE); }
+        for (int i=0;i<4;i++) { const int vk=keys[i][0],key=keys[i][1]; if ((GetKeyState(vk)&0x8000)||win->keys[key]!=INPUT_PRESS) {continue;} InputKey(win->keys,key,INPUT_RELEASE); }
         win = WinSys.win32.disabledCursorWindow;
         if (win) { int width,height; GetWindowSize(win,&width,&height); if (win->win32.lastCurX != width/2 || win->win32.lastCurY != height/2) {SetCurV(win,width/2,height/2);} }
     }
@@ -373,6 +371,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
                                      PFN_XQueryPointer QueryPointer; PFN_XRaiseWindow RaiseWindow; PFN_XResizeWindow ResizeWindow; PFN_XSaveContext SaveContext; PFN_XSendEvent SendEvent; PFN_XSetICFocus SetICFocus; PFN_XSetInputFocus SetInputFocus; PFN_XSetWMNormalHints SetWMNormalHints; PFN_XSetWMProtocols SetWMProtocols;
                                      PFN_XTranslateCoordinates TranslateCoordinates; PFN_XUndefineCursor UndefineCursor; PFN_XUngrabPointer UngrabPointer; PFN_XUnsetICFocus UnsetICFocus; PFN_XWarpPointer WarpPointer; } xlib;
                                      struct {void* handle; int eventBase,errorBase,major,minor; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary; PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration;}randr; } WinSyslibraryX11;
+    struct input_absinfo {i32 value,minimum,maximum,fuzz,flat,resolution;};
     PFN_XNextEvent XNextEvent; typedef struct WinSysmonitorX11 { RROutput output; RRCrtc crtc; int index; } WinSysmonitorX11; typedef struct WinSysjoystickLinux { FHandle fd; char path[260]; int keyMap[0x300/*KEY_CNT*/ - 0x100/*BTN_MISC*/],absMap[0x40/*ABS_CNT*/]; struct input_absinfo absInfo[0x40/*ABS_CNT*/]; int hats[4][2]; } WinSysjoystickLinux; typedef struct WinSyslibraryLinux { int inotify,watch; i32 dropped; } WinSyslibraryLinux;
     void GetCursorPosV(WinSyswindow*,double*,double*); void SetCurV(WinSyswindow*,double,double);
     struct WinSysjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; u8* buttons; int buttonCount; u8* hats; int hatCount; char name[128],guid[33]; WinSysjoystickLinux linjs; };
@@ -452,20 +451,31 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
             case 21/*ReparentNotify*/: win->x11.parent=e->xreparent.parent; return;
             case 2/*KeyPress*/: case 3/*KeyRelease*/: {
                 const int key=translateKey(keycode); if (key==KEY_UNKNOWN) {return;}
-                if (e->type==3/*KeyRelease*/) { XEvent next; if(WinSys.x11.xlib.CheckTypedWindowEvent(WinSys.x11.display,e->xany.window,2/*KeyPress*/,&next)){ if(next.xkey.keycode == keycode && next.xkey.h /*h is the time field*/ == e->xkey.h){InputKey(win,key,INPUT_PRESS); return;/*Ignore fake one made by repeater.*/}else{InputKey(win,key,INPUT_RELEASE); processEvent(&next); return;} }}
-                const int action=(e->type==2/*KeyPress*/)?INPUT_PRESS:INPUT_RELEASE; InputKey(win,key,action); return; }
+                if (e->type==3/*KeyRelease*/) {
+                    XEvent next;
+                    if(WinSys.x11.xlib.CheckTypedWindowEvent(WinSys.x11.display,e->xany.window,2/*KeyPress*/,&next)){
+                        if(next.xkey.keycode == keycode && next.xkey.h /*h is the time field*/ == e->xkey.h){InputKey(win->keys,key,INPUT_PRESS); return;/*Ignore fake one made by repeater.*/}
+                        else{InputKey(win->keys,key,INPUT_RELEASE); processEvent(&next); return;}
+                    }
+                }
+                const int action=(e->type==2/*KeyPress*/)?INPUT_PRESS:INPUT_RELEASE; InputKey(win->keys,key,action); return; }
             case 4: /* ButtonPress */ case 5: /* ButtonRelease */ {
                 const int btn = e->xbutton.button;
                 const int action = (e->type == 4) ? INPUT_PRESS : INPUT_RELEASE;
-                if      (btn == 1) InputMouseClick(win,MOUSE_BUTTON_LEFT,action);
-                else if (btn == 2) InputMouseClick(win,MOUSE_BUTTON_MIDDLE,action);
-                else if (btn == 3) InputMouseClick(win,MOUSE_BUTTON_RIGHT,action);
+                if      (btn == 1) InputMouseClick(win->mouseButtons,MOUSE_BUTTON_LEFT,action);
+                else if (btn == 2) InputMouseClick(win->mouseButtons,MOUSE_BUTTON_MIDDLE,action);
+                else if (btn == 3) InputMouseClick(win->mouseButtons,MOUSE_BUTTON_RIGHT,action);
                 else if (action == INPUT_PRESS && btn == 4) Sys_Input.scrollDelta += 1.0f;
                 else if (action == INPUT_PRESS && btn == 5) Sys_Input.scrollDelta -= 1.0f;
-                else if (btn > 7) InputMouseClick(win,btn - 5,action);
+                else if (btn > 7) InputMouseClick(win->mouseButtons,btn - 5,action);
                 return; }
-            case 7/*EnterNotify*/: { const int x=e->xcrossing.x,y=e->xcrossing.y; InputCursorPos(win,x,y); win->x11.lastCurX=x; win->x11.lastCurY=y; return; }
-            case 6/*MotionNotify*/: { const int x=e->xmotion.x, y=e->xmotion.y; if (x!=win->x11.warpCursorPosX || y!=win->x11.warpCursorPosY) { if (win->cursorMode==0x00034003/*CURSOR_DISABLED*/) { if(WinSys.x11.disabledCursorWindow!=win){return;} InputCursorPos(win,win->virtualCursorPosX + (x - win->x11.lastCurX),win->virtualCursorPosY + (y - win->x11.lastCurY)); } else {InputCursorPos(win,x,y);} } win->x11.lastCurX=x; win->x11.lastCurY=y; return; }
+            case 7/*EnterNotify*/: { const int x=e->xcrossing.x,y=e->xcrossing.y; InputCursorPos(&win->virtualCursorPosX,&win->virtualCursorPosY,x,y); win->x11.lastCurX=x; win->x11.lastCurY=y; return; }
+            case 6/*MotionNotify*/: { const int x=e->xmotion.x, y=e->xmotion.y;
+                if (x!=win->x11.warpCursorPosX || y!=win->x11.warpCursorPosY) {
+                    if (win->cursorMode==0x00034003/*CURSOR_DISABLED*/) { if(WinSys.x11.disabledCursorWindow!=win){return;} InputCursorPos(&win->virtualCursorPosX,&win->virtualCursorPosY,win->virtualCursorPosX + (x - win->x11.lastCurX),win->virtualCursorPosY + (y - win->x11.lastCurY)); }
+                    else {InputCursorPos(&win->virtualCursorPosX,&win->virtualCursorPosY,x,y);}
+                }
+                win->x11.lastCurX=x; win->x11.lastCurY=y; return; }
             case 22/*ConfigureNotify*/: {
                 if (e->xcfg.width!=win->x11.width || e->xcfg.height!=win->x11.height) { win->x11.width=e->xcfg.width; win->x11.height=e->xcfg.height; UpdateScreenSize(e->xcfg.width,e->xcfg.height); }
                 int xpos=e->xcfg.x, ypos=e->xcfg.y;
@@ -839,147 +849,10 @@ WinSysmonitor* GetPrimaryMonitor(void) { if (!WinSys.monitorCount) {return NULL;
 void WinSysGetMonitorPos(WinSysmonitor* handle, int* xpos, int* ypos) { *xpos = 0; *ypos = 0; WinSysmonitor* monitor = (WinSysmonitor*)handle; GetMonitorPos(monitor,xpos,ypos); }
 void WinSysGetMonitorWorkarea(WinSysmonitor* handle, int* xpos, int* ypos, int* width, int* height) { *xpos=*ypos=*width=*height=0; WinSysmonitor* monitor = (WinSysmonitor*)handle; GetMonitorWorkarea(monitor,xpos,ypos,width,height); }
 const vidmode* WinSysGetVideoMode(WinSysmonitor* handle) { WinSysmonitor* monitor=(WinSysmonitor*)handle; GetVideoMode(monitor,&monitor->currentMode); return &monitor->currentMode; }
-void InputWindowFocus(i32 f) { window_has_focus = f != 0; ignore_next_mouse_delta = true; WinSyswindow* win = (WinSyswindow*)window; if (!f) { for (int k=0;k<=348;++k) { if (win->keys[k] == INPUT_PRESS) {InputKey(win,k,INPUT_RELEASE);} } for (int b=0;b<=  7;++b) { if (win->mouseButtons[b] == INPUT_PRESS) {InputMouseClick(win,b,INPUT_RELEASE);} } } }
+void InputWindowFocus(i32 f) { window_has_focus = f != 0; ignore_next_mouse_delta = true; WinSyswindow* win = (WinSyswindow*)window; if (!f) { for (int k=0;k<=348;++k) { if (win->keys[k] == INPUT_PRESS) {InputKey(win->keys,k,INPUT_RELEASE);} } for (int b=0;b<=  7;++b) { if (win->mouseButtons[b] == INPUT_PRESS) {InputMouseClick(win->mouseButtons,b,INPUT_RELEASE);} } } }
 void VSetWindowIcon(WinSysIcon* images) { SetWindowIcon(images); }
 void VSetWindowSize(int w, int h) { WinSyswindow* win = (WinSyswindow*)window; win->videoMode.width=w; win->videoMode.height=h; SetWindowSize(win,w,h); }
 void WinSysSetWindowMonitor(int xpos, int ypos, int width, int height) { WinSyswindow* win = (WinSyswindow*)window; win->videoMode.width=width; win->videoMode.height=height; SetWindowMonitor(win,xpos,ypos,width,height); }
-InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D},{"E",KEY_E},{"F",KEY_F},{"G",KEY_G},{"H",KEY_H},{"I",KEY_I},{"J",KEY_J},{"K",KEY_K},{"L",KEY_L},{"M",KEY_M},{"N",KEY_N},{"O",KEY_O},{"P",KEY_P},{"Q",KEY_Q},{"R",KEY_R},{"S",KEY_S},{"T",KEY_T},{"U",KEY_U},{"V",KEY_V},{"W",KEY_W},{"X",KEY_X},{"Y",KEY_Y},{"Z",KEY_Z},
-                                 {"1",KEY_1},{"2",KEY_2},{"3",KEY_3},{"4",KEY_4},{"5",KEY_5},{"6",KEY_6},{"7",KEY_7},{"8",KEY_8},{"9",KEY_9},{"0",KEY_0},{"UPARROW",KEY_UP},{"DNARROW",KEY_DOWN},{"LFARROW",KEY_LEFT},{"RTARROW",KEY_RIGHT},{"NUM1",KEY_KP_1},{"NUM2",KEY_KP_2},{"NUM3",KEY_KP_3},{"NUM+",KEY_KP_ADD},{"ENTER",KEY_ENTER},
-                                 {"RIGHTSHIFT",KEY_RIGHT_SHIFT},{"LEFTSHIFT",KEY_LEFT_SHIFT},{"RIGHTCTRL",KEY_RIGHT_CONTROL},{"LEFTCTRL",KEY_LEFT_CONTROL},{"RIGHTALT",KEY_RIGHT_ALT},{"LEFTALT",KEY_LEFT_ALT},{"RIGHTCMD",KEY_RIGHT_SUPER},{"LEFTCMD",KEY_LEFT_SUPER},
-                                 {"LMB",MOUSE_BUTTON_1},{"RMB",MOUSE_BUTTON_2},{"MMB",MOUSE_BUTTON_3},{"MB3",MOUSE_BUTTON_4},{"MB4",MOUSE_BUTTON_5},{"MB5",MOUSE_BUTTON_6},{"MB6",MOUSE_BUTTON_7},{"MB7",MOUSE_BUTTON_8},{"JOY0",JOYSTICK_1},{"JOY1",JOYSTICK_2},{"JOY2",JOYSTICK_3},{"JOY3",JOYSTICK_4},{"JOY4",JOYSTICK_5},{"JOY5",JOYSTICK_6},
-                                 {"JOY6",JOYSTICK_7},{"JOY7",JOYSTICK_8},{"JOY8",JOYSTICK_9},{"JOY9",JOYSTICK_10},{"JOY10",JOYSTICK_11},{"JOY11",JOYSTICK_12},{"JOY12",JOYSTICK_13},{"JOY13",JOYSTICK_14},{"JOY14",JOYSTICK_15},{"JOY15",JOYSTICK_16},{"JOY16",JOYHAT_UP},{"JOY17",JOYHAT_RIGHT},
-                                 {"BACKSPACE",KEY_BACKSPACE},{"TAB",KEY_TAB},{"NUMENTER",KEY_KP_ENTER},{"ESCAPE",KEY_ESCAPE},{"SPACE",KEY_SPACE},{"DELETE",KEY_DELETE},{"INSERT",KEY_INSERT},{"HOME",KEY_HOME},{"END",KEY_END},{"PAGEUP",KEY_PAGE_UP},{"PAGEDN",KEY_PAGE_DOWN},
-                                 {"F1",KEY_F1},{"F2",KEY_F2},{"F3",KEY_F3},{"F4",KEY_F4},{"F5",KEY_F5},{"F6",KEY_F6},{"F7",KEY_F7},{"F8",KEY_F8},{"F9",KEY_F9},{"F10",KEY_F10},{"F11",KEY_F11},{"F12",KEY_F12},{"GRAVE",KEY_GRAVE_ACCENT},{"-",KEY_MINUS},{"=",KEY_EQUAL},{"[",KEY_LEFT_BRACKET},{"]",KEY_RIGHT_BRACKET},{"\\",KEY_BACKSLASH},{"/",KEY_SLASH},
-                                 {".",KEY_PERIOD},{",",KEY_COMMA},{";",KEY_SEMICOLON},{"'",KEY_APOSTROPHE},{"CAPSLOCK",KEY_CAPS_LOCK},{"NUM0",KEY_KP_0},{"NUM4",KEY_KP_4},{"NUM5",KEY_KP_5},{"NUM6",KEY_KP_6},{"NUM7",KEY_KP_7},{"NUM8",KEY_KP_8},{"NUM9",KEY_KP_9},{"NUM*",KEY_KP_MULTIPLY},{"NUM-",KEY_KP_SUBTRACT},{"NUM.",KEY_KP_DECIMAL},{"MENU",KEY_MENU},
-                                 {"PAUSE",KEY_PAUSE},{"NUMLOCK",KEY_NUM_LOCK},{"MWHEEL+",128},{"MWHEEL-",129},/*128,129,Handledspecialcaseformousewheel+/-respectively*/{"PRINT",KEY_PRINT_SCREEN},{"JOY18",JOYHAT_DOWN},{"JOY19",JOYHAT_LEFT},{"UNUSED",0}};
-KeyState* GetCodeMapping(int settingIndex) {
-    i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
-    if (i == 148 || i >= MAX_KEYS) return &Sys_Input.keyStates[MAX_KEYS - 1]; // UNUSED NULL (e.g. setting unbound)
-    if (i >= 53 && i <= 61) return &Sys_Input.mouseButtons[inputElements[i].value];
-    if (i >= 62 && i <= 77) return &Sys_Input.joystickButtons[JOYSTICK_1][inputElements[i].value];
-    if ((i >= 78 && i <= 79) || (i >= 132 && i <= 133)) return &Sys_Input.joystickHats[inputElements[i].value];
-    return &Sys_Input.keyStates[inputElements[i].value];
-}
-
-void TextEntry(i32 k) {
-    if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { World.playerName[0] = '\0'; currentPlayerNameLength = 0; return; }
-    if (k == KEY_ENTER || k == KEY_KP_ENTER) { currentMenuItem++; return; }
-    if (k == KEY_BACKSPACE && currentPlayerNameLength > 0) { World.playerName[--currentPlayerNameLength] = '\0'; return; }
-    if (currentPlayerNameLength >= 26) return;
-    char c = (k >= KEY_A && k <= KEY_Z) ? 'a' + (k - KEY_A) : ((k >= KEY_1 && k <= KEY_9) ? '1' + (k - KEY_1) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0)));
-    if (c) { World.playerName[currentPlayerNameLength] = c; World.playerName[++currentPlayerNameLength] = '\0'; }
-}
-
-void GoIntoGame(); void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName;
-void InputKey(WinSyswindow* win,int key,int action) {
-    if (key >= 0 && key <= 348) { i32 repeated=0; if(action == INPUT_RELEASE && win->keys[key] == INPUT_RELEASE){return;} if (action ==   INPUT_PRESS && win->keys[key] == INPUT_PRESS){repeated=1;} win->keys[key]=(char)action; if(repeated){action=INPUT_REPEAT;} }
-    if (!window_has_focus) return;
-    if (key == KEY_F10 && action) OS_Exit(0);
-    if (World.menuActive && !returnToPause) { if (((key == KEY_RIGHT_ALT || key == KEY_LEFT_ALT) && action && Sys_Input.keyStates[KEY_ENTER].down) || (key == KEY_ENTER && action && (Sys_Input.keyStates[KEY_LEFT_ALT].down || Sys_Input.keyStates[KEY_RIGHT_ALT].down))){GoIntoGame();} }
-    if (key >=0 && key < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {
-        Sys_Input.keyStates[key].down = true; if (action == INPUT_PRESS) Sys_Input.keyStates[key].pressed = true; else Sys_Input.keyStates[key].pressed = false;
-        if (Cheats.consoleActive) ConsoleEmulator(key);
-        else if (enteringPlayerName && World.menuActive) TextEntry(key);
-    } else if (key >= 0 && key < MAX_KEYS && action == INPUT_RELEASE) { Sys_Input.keyStates[key].pressed=false; Sys_Input.keyStates[key].down=false; }
-}
-
-void InputMouseClick(WinSyswindow* win, int button, int action) { if (button<0 || button>7) {return;} char wasDown = win->mouseButtons[button]; win->mouseButtons[button] = (char)action; bool down = (action == 1); Sys_Input.mouseButtons[button].pressed  = down && !wasDown; Sys_Input.mouseButtons[button].released = !down && wasDown; Sys_Input.mouseButtons[button].down=down; }
-void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) { float yaw=deg2rad(yaw_deg), pitch=deg2rad(pitch_deg), roll=deg2rad(roll_deg/*Around Z (forward)*/); float cy=vcosf(yaw * 0.5f), sy=vsinf(yaw * 0.5f), cp=vcosf(pitch * 0.5f), sp=vsinf(pitch * 0.5f), cr=vcosf(roll * 0.5f), sr=vsinf(roll * 0.5f); q->w=cy*cp*cr + sy*sp*sr; q->x=cy*sp*cr + sy*cp*sr;/*X(pitch)*/ q->y=sy*cp*cr - cy*sp*sr;/*Y(yaw)*/ q->z=cy*cp*sr - sy*sp*cr;/*Z(roll)*/ } // Skipping quat normalization, not needed
-bool firstFrameMouselook = true;
-void InputCursorPos(WinSyswindow* win, double xpos, double ypos) { // static const float HeadBobRate   = 0.2f, HeadBobAmount = 0.08f,bobTarget = 0.3f; TODO
-    if (firstFrameMouselook) { firstFrameMouselook=false; win->virtualCursorPosX = xpos; win->virtualCursorPosY = ypos; }
-    if (win->virtualCursorPosX == xpos && win->virtualCursorPosY == ypos) { last_mouse_x=xpos; last_mouse_y=ypos; return;}
-    win->virtualCursorPosX = xpos; win->virtualCursorPosY = ypos; if (!window_has_focus){return;}
-    if (ignore_next_mouse_delta) { World.currentMouse_dx = World.currentMouse_dy = 0; ignore_next_mouse_delta = mouseMovementThisFrame = false; return; }
-    World.currentMouse_dx = (i32)(xpos - last_mouse_x); World.currentMouse_dy = (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos;
-    if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { // Uses UI baseline resolution 1366x768
-        i32 newX = clamp(World.cursorPosition_x + World.currentMouse_dx,0,1366); if (newX != World.cursorPosition_x) {mouseMovementThisFrame = true;} World.cursorPosition_x = newX;
-        i32 newY = clamp(World.cursorPosition_y + World.currentMouse_dy,0, 768); if (newY != World.cursorPosition_y) {mouseMovementThisFrame = true;} World.cursorPosition_y = newY;
-    }
-}
-
-void JoystickConnection(WinSysjoystick* js, int e) { js->connected=(e == 0x00040001/*connected*/) ? 1 : (e == 0x00040002/*disconnected*/) ? 0 : js->connected; int jid=(int)(js - WinSys.joysticks); if(jid > JOYSTICK_LAST){return;} Sys_Input.joystickPresent[jid]=(e == 0x00040001/*connected*/); if(!Sys_Input.joystickPresent[jid]){mset(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); mset(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats));} /*Clear*/ }
-void InputJoystickAxis(WinSysjoystick* js,int axis, float value) { js->axes[axis] = value; }
-void InputJoystickButton(WinSysjoystick* js,int button, char value) { js->buttons[button] = value; }
-void InputJoystickHat(WinSysjoystick* js, int hat, char value) { int base=js->buttonCount + hat * 4; js->buttons[base+0]=(value & 0x01) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+1]=(value & 0x02) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+2]=(value & 0x04) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+3]=(value & 0x08) ? INPUT_PRESS : INPUT_RELEASE; js->hats[hat]=value; }
-WinSysjoystick* WinSysAllocJoystick(const char* name,const char* guid,int axisCount,int buttonCount,int hatCount) {
-    int jid; WinSysjoystick* js;
-    for (jid = 0; jid <= JOYSTICK_LAST; jid++) { if (!WinSys.joysticks[jid].allocated) break; }
-    if (jid > JOYSTICK_LAST) return NULL;
-    js = WinSys.joysticks + jid;
-    js->allocated = 1; js->axisCount = axisCount; js->buttonCount = buttonCount; js->hatCount = hatCount;
-    js->axesSize = axisCount*sizeof(float); js->axes = OS_Calloc(axisCount,sizeof(float)); js->buttonsSize = (buttonCount + (size_t)hatCount * 4);
-    js->buttons = OS_Calloc(buttonCount + (size_t)hatCount * 4,1); js->hatsSize = hatCount; js->hats = OS_Calloc(hatCount,1);
-    scpy_to_a_from_b(js->name,name,sizeof(js->name)); scpy_to_a_from_b(js->guid,guid,sizeof(js->guid));
-    return js;
-}
-
-bool JoystickPresent(int jid) { if (jid < 0 || jid > JOYSTICK_LAST || (!WinSys.joysInited && !InitJoysticks())) {return false;} WinSys.joysInited = 1; WinSysjoystick* js = WinSys.joysticks + jid; return js->connected ? PollJoystick(js) : false; }
-void FreeJoystick(WinSysjoystick* js) { OS_Free(js->axes,js->axesSize); OS_Free(js->buttons,js->buttonsSize); OS_Free(js->hats,js->hatsSize); mset(js,0,sizeof(WinSysjoystick)); }
-bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 128) {return Sys_Input.scrollDelta > 0;} if (i == 129) {return Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
-bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
-bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
-bool Forward(void) { return GetKey(0); }                bool StrafeLeft(void) { return GetKey(1); }             bool Backpedal(void) { return GetKey(2); }
-bool StrafeRight(void) { return GetKey(3); }            bool Jump(void) { return GetKey(4); }                   bool JumpDown(void) { return GetKeyPressed(4); }
-bool Crouch(void) { return GetKeyPressed(5); }          bool Prone(void) { return GetKeyPressed(6); }           bool LeanLeft(void) { return GetKey(7); }
-bool LeanRight(void) { return GetKey(8); }              bool Sprint(void) { return GetKey(9); }                 bool TurnLeft(void) { return GetKey(10); }
-bool TurnRight(void) { return GetKey(11); }             bool LookUp(void) { return GetKey(12); }                bool LookDown(void) { return GetKey(13); }
-bool RecentLog(void) { return GetKeyPressed(14); }      bool Biomonitor(void) { return GetKeyPressed(15); }     bool Sensaround(void) { return GetKeyPressed(16); }
-bool Lantern(void) { return GetKeyPressed(17); }        bool Shield(void) { return GetKeyPressed(18); }         bool Infrared(void) { return GetKeyPressed(19); }
-bool Email(void) { return GetKeyPressed(20); }          bool Booster(void) { return GetKeyPressed(21); }        bool Jumpjets(void) { return GetKeyPressed(22); }
-bool Attack(void) { return GetKeyPressed(23); }         bool Use(void) { return GetKeyPressed(24); }            bool Menu(void) { return GetKeyPressed(25); }
-bool ToggleMode(void) { return GetKeyPressed(26); }     bool Reload(void) { return GetKeyPressed(27); }         bool WeaponCycUp(void) { return GetKeyPressed(28); }
-bool WeaponCycDown(void) { return GetKeyPressed(29); }  bool Grenade(void) { return GetKeyPressed(30); }        bool GrenadeCycUp(void) { return GetKeyPressed(31); }
-bool GrenadeCycDown(void) { return GetKeyPressed(32); } bool ChangeAmmoType(void) { return GetKeyPressed(33); } bool Patch(void) { return GetKeyPressed(34); }
-bool PatchCycUp(void) { return GetKeyPressed(35); }     bool PatchCycDown(void) { return GetKeyPressed(36); }   bool Map(void) { return GetKeyPressed(37); }
-bool SwimUp(void) {return Cheats.noclip && GetKey(38);} bool SwimDn(void) {return Cheats.noclip && GetKey(39);} bool Console(void) { return GetKeyPressed(-1); }
-bool ScrshotPressed(void) { return GetKeyPressed(41); }                void DeactivateVMail(void); void CloseFullmap();
-void ForceShootMode(void) { if (Sys_Settings.NoShootMode){return;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); World.cursorPosition_x=663; World.cursorPosition_y=371/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true; if(World.Sys_UI.vmailActive){DeactivateVMail(); World.Sys_UI.vmailActive=false;} }
-void ForceInventoryMode(void) { World.inventoryMode = true; World.cursorPosition_x = 663; World.cursorPosition_y = 371; ignore_next_mouse_delta = true; } // Centered on UI baseline resolution 1366x768
-void ToggleInventoryMode(void) { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
-void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
-void MenuGoBack(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot); void ApplyPlayerMovements(float dt);
-void play_synth_laser(float volume,float freq,float sweep,float fmrate,float decay); void play_synth_door(float volume,float pitch); void play_synth_impact(float volume,float ring_freq,float decay,float noise_amt,float ring_amt); void play_wav(const char *path,float volume,V3 pos,bool positional);
-void InputProcessing() {
-    mouseMovementThisFrame = false; PollEvents();
-    for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) { // Input Poll
-        if (!JoystickPresent(jid)) continue;
-        WinSysjoystick* js = WinSys.joysticks + jid; if (!js->connected) continue;
-        PollJoystick(js); int totalButtons = js->buttonCount + js->hatCount * 4;
-        for (int i = 0; i < totalButtons && i < 16; ++i) { KeyState* k = &Sys_Input.joystickButtons[jid - JOYSTICK_1][i]; bool down = js->buttons[i] == INPUT_PRESS; k->pressed = down && !k->down; k->released = !down && k->down; k->down = down; }
-        for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
-//         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - JOYSTICK_1][i] = js->axes[i]; } TODO??
-    }
-    if (window_has_focus) {
-        float v = 0.1f;
-        if (Sys_Input.keyStates[KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(V3){0.0f,0.0f,0.0f},false);
-        if (Sys_Input.keyStates[KEY_W].pressed) play_synth_door(v,50); // thud slide
-        if (Sys_Input.keyStates[KEY_T].pressed) play_synth_impact(v,4500,18,0.3f,0.6f); // Glass ting
-        if (Sys_Input.keyStates[KEY_R].pressed) play_synth_impact(v,1800,30,0.5f,0.3f); // cartridge drop
-        if (Sys_Input.keyStates[KEY_Y].pressed) play_synth_laser(v,800,-2.0f,40,12);
-        if (Sys_Input.keyStates[KEY_U].pressed) play_synth_laser(v,800,2.0f,40,12);
-        if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
-        if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; SaveGame(7,"quicksave"); return; }
-        if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
-        if (Console()) ToggleConsole();
-        if (Menu() && !World.menuActive) { World.paused = !World.paused; return; }
-        if (Menu() && World.menuActive) { MenuGoBack(); return; }
-        if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
-        if (ToggleMode()) ToggleInventoryMode();
-        if (Lantern()) World.invP1.hardwareIsActive ^= HW_LAN;
-        if (Infrared()) World.invP1.hardwareIsActive ^= HW_INF;
-        ApplyPlayerMovements(World.dt);
-        if (!World.paused && !World.menuActive) { // Apply mouselook/keyboardlook/joysticklook/lean
-            float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
-            World.cam_yaw += (float)World.currentMouse_dx * s; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if (World.cam_yaw < 0.0f)     {World.cam_yaw  += 360.0f;}
-            World.cam_pitch+=(float)World.currentMouse_dy * s; if (World.cam_pitch > 89.0f) {World.cam_pitch = 89.0f;} if (World.cam_pitch < -89.0f) {World.cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
-            quat_from_yaw_pitch_roll(&World.rotation[PLAYER1],World.cam_yaw,World.cam_pitch,World.cam_roll);
-        }
-    }
-}
-
-void SetVSync() { ((WinSyswindow*)window)->context.swapInterval((i32)Sys_Settings.Vsync); }
-void ResetInput() { for (i32 i=0;i<MAX_KEYS;++i) {Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false;} for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) {Sys_Input.mouseButtons[i].pressed = Sys_Input.mouseButtons[i].released = false;} Sys_Input.scrollDelta = 0; World.currentMouse_dx = World.currentMouse_dy = 0; } // Can't memset as we want to preserve down state
 void CenterWindowOnMonitor() {
     int c; WinSysmonitor** monitors = WinSysGetMonitors(&c); if (Sys_Settings.CurrentMonitor > (c - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
     int mx,my; WinSysmonitor* next = monitors[Sys_Settings.CurrentMonitor]; WinSysGetMonitorPos(next,&mx,&my);
@@ -1041,58 +914,32 @@ void CycleToNextMonitor() {
     SaveConfig(); CenterWindowOnMonitor();
 }
 
-// Configuration Options Settings Sys
-typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType; typedef struct { const char* name; void* ptr; SettingType type; } Setting;
-#define S_U8(n, v)  { n, &Sys_Settings.v, SETTING_U8 }
-#define S_U16(n, v) { n, &Sys_Settings.v, SETTING_U16 }
-#define S_IN(n, i)  { n, &Sys_Settings.InputCodeSettings[i], SETTING_INPUT }
-const Setting configTable[] = {
-    S_U16("ResolutionWidth",ScreenWidth),S_U16("ResolutionHeight",ScreenHeight),S_U8("Fullscreen",Fullscreen),      S_U8("FOV",FOV),                     S_U8("Brightness",Brightness),
-    S_U8("Gamma",Gamma),S_U8("AA",FXAA),  S_U8("Shadows",Shadows),              S_U8("SSR",Reflections),            S_U8("VSync",Vsync),                 S_U8("ModelDetail",ModelDetail),
-    S_U8("GI",GI),                        S_U8("SpeakerMode",SpeakerMode),      S_U8("Reverb",Reverb),              S_U8("VolumeMaster",VolumeMaster),   S_U8("VolumeMusic",VolumeMusic),
-    S_U8("VolumeMessage",VolumeMessage),  S_U8("VolumeEffects",VolumeEffects),  S_U8("Language",Language),          S_U8("DynamicMusic",DynamicMusic),   S_U8("Footsteps",Footsteps),
-    S_U8("InvertLook",InvertLook),        S_U8("Monitor",CurrentMonitor),       
-    S_U8("InvertCyberspaceLook",InvertCyberspaceLook),  S_U8("InvertInventoryCycling",InvertInventoryCycling),S_U8("QuickItemPickup",QuickItemPickup),
-    S_U8("QuickReloadWeapons",QuickReloadWeapons),      S_U8("MouseSensitivity",MouseSensitivity),            S_U8("NoShootMode",NoShootMode),           S_U8("HeadBob",HeadBob),
-    S_IN("Forward",0),    S_IN("Strafe Left",1),S_IN("Backpedal",2), S_IN("Strafe Right",3),S_IN("Jump",4),        S_IN("Crouch",5),    S_IN("Prone",6),       S_IN("Lean Left",7),
-    S_IN("Lean Right",8), S_IN("Sprint",9),     S_IN("Turn Left",10),S_IN("Turn Right",11), S_IN("Look Up",12),    S_IN("Look Down",13),S_IN("Recent Log",14),
-    S_IN("Biomonitor",15),S_IN("Sensaround",16),S_IN("Lantern",17),  S_IN("Shield",18),     S_IN("Infrared",19),   S_IN("Email",20),    S_IN("Booster",21),
-    S_IN("Jumpjets",22),  S_IN("Attack",23),    S_IN("Use",24),      S_IN("Menu/Back",25),  S_IN("Toggle Mode",26),S_IN("Reload",27),
-    S_IN("Weapon +",28),  S_IN("Weapon -",29),  S_IN("Grenade",30),  S_IN("Grenade +",31),  S_IN("Grenade -",32),  S_IN("Ammo Type",33),S_IN("Patch Use",34),
-    S_IN("Patch +",35),   S_IN("Patch -",36),   S_IN("Full Map",37), S_IN("Swim Up",38),    S_IN("Swim Down",39),  S_IN("Screenshot",40)
-};
-
-const int configTableSize = sizeof(configTable) / sizeof(Setting);
-INLINE i32 GetWinSysIndirectionIndexForAnInput(const char* val) { for (int i=0;i<134;++i) {if (sEqual(val,inputElements[i].name)) return i;} return 148; }
-void LoadConfig() {
-    FHandle f = OS_OpenReadonly("./Data/Config.ini");
-    char line[512];
-    while (sUpToEndLine(line,sizeof(line),f)) {
-        char* s = data_parser_trim(line); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
-        char* eq = StringFindFirstCharWithin(s, '='); if (!eq) continue;
-        *eq = 0; char *key = data_parser_trim(s), *val = data_parser_trim(eq + 1);
-        for (int i = 0; i < configTableSize; i++) {
-            if (sEqual(key,configTable[i].name)) {
-                if (configTable[i].type == SETTING_U8)         *( u8*)configTable[i].ptr = (u8)s2i32(val);
-                else if (configTable[i].type == SETTING_U16)   *(u16*)configTable[i].ptr = (u16)s2i32(val);
-                else if (configTable[i].type == SETTING_INPUT) *(u16*)configTable[i].ptr = GetWinSysIndirectionIndexForAnInput(val);
-                break;
-            }
-        }
-    }
-    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320); Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200);
-    OS_Close(f);
+void SetVSync() { ((WinSyswindow*)window)->context.swapInterval((i32)Sys_Settings.Vsync); }
+void JoystickConnection(WinSysjoystick* js, int e) { js->connected=(e == 0x00040001/*connected*/) ? 1 : (e == 0x00040002/*disconnected*/) ? 0 : js->connected; int jid=(int)(js - WinSys.joysticks); if(jid > JOYSTICK_LAST){return;} Sys_Input.joystickPresent[jid]=(e == 0x00040001/*connected*/); if(!Sys_Input.joystickPresent[jid]){mset(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); mset(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats));} /*Clear*/ }
+void InputJoystickAxis(WinSysjoystick* js,int axis, float value) { js->axes[axis] = value; }
+void InputJoystickButton(WinSysjoystick* js,int button, char value) { js->buttons[button] = value; }
+void InputJoystickHat(WinSysjoystick* js, int hat, char value) { int base=js->buttonCount + hat * 4; js->buttons[base+0]=(value & 0x01) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+1]=(value & 0x02) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+2]=(value & 0x04) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+3]=(value & 0x08) ? INPUT_PRESS : INPUT_RELEASE; js->hats[hat]=value; }
+WinSysjoystick* WinSysAllocJoystick(const char* name,const char* guid,int axisCount,int buttonCount,int hatCount) {
+    int jid; WinSysjoystick* js;
+    for (jid = 0; jid <= JOYSTICK_LAST; jid++) { if (!WinSys.joysticks[jid].allocated) break; }
+    if (jid > JOYSTICK_LAST) return NULL;
+    js = WinSys.joysticks + jid;
+    js->allocated = 1; js->axisCount = axisCount; js->buttonCount = buttonCount; js->hatCount = hatCount;
+    js->axesSize = axisCount*sizeof(float); js->axes = OS_Calloc(axisCount,sizeof(float)); js->buttonsSize = (buttonCount + (size_t)hatCount * 4);
+    js->buttons = OS_Calloc(buttonCount + (size_t)hatCount * 4,1); js->hatsSize = hatCount; js->hats = OS_Calloc(hatCount,1);
+    scpy_to_a_from_b(js->name,name,sizeof(js->name)); scpy_to_a_from_b(js->guid,guid,sizeof(js->guid));
+    return js;
 }
 
-void FilePrintString(FHandle f, const char* fmt, ...) { va_list a; __builtin_va_start(a,fmt); char b[128]; va_list c; __builtin_va_copy(c,a); sFormatV(b,sizeof(b),fmt,c); __builtin_va_end(c); OS_RawWrite(f,b,slen(b)); __builtin_va_end(a); }
-void SaveConfig() {
-    DualLog("Saving config\n");
-    FHandle f = OS_OpenWriteonly("./Data/Config.ini");
-    for (int i=0;i<configTableSize;++i) {
-        if (configTable[i].type == SETTING_U8)         FilePrintString(f,"%s = %u\n",configTable[i].name,*(u8*)configTable[i].ptr);
-        else if (configTable[i].type == SETTING_U16)   FilePrintString(f,"%s = %u\n",configTable[i].name,*(u16*)configTable[i].ptr);
-        else if (configTable[i].type == SETTING_INPUT) FilePrintString(f,"%s = %s\n",configTable[i].name,inputElements[*(u16*)configTable[i].ptr].name);
+bool JoystickPresent(int jid) { if (jid < 0 || jid > JOYSTICK_LAST || (!WinSys.joysInited && !InitJoysticks())) {return false;} WinSys.joysInited = 1; WinSysjoystick* js = WinSys.joysticks + jid; return js->connected ? PollJoystick(js) : false; }
+void FreeJoystick(WinSysjoystick* js) { OS_Free(js->axes,js->axesSize); OS_Free(js->buttons,js->buttonsSize); OS_Free(js->hats,js->hatsSize); mset(js,0,sizeof(WinSysjoystick)); }
+void JoysticksPoll() {
+    for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) { // Input Poll
+        if (!JoystickPresent(jid)) continue;
+        WinSysjoystick* js = WinSys.joysticks + jid; if (!js->connected) continue;
+        PollJoystick(js); int totalButtons = js->buttonCount + js->hatCount * 4;
+        for (int i = 0; i < totalButtons && i < 16; ++i) { KeyState* k = &Sys_Input.joystickButtons[jid - JOYSTICK_1][i]; bool down = js->buttons[i] == INPUT_PRESS; k->pressed = down && !k->down; k->released = !down && k->down; k->down = down; }
+        for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
+//         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - JOYSTICK_1][i] = js->axes[i]; } TODO??
     }
-    OS_Close(f);
-    DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",globalframe);
 }

@@ -1,5 +1,7 @@
 // citadel.c - Gamelogic.  Most functionality is trivial so put it here.
 // TODO: Add camera view entities for other levels than just medical, Particle system, Voxel GI?, Directional lights for cyberspace, Directional light for sunlight, Directional light shadowmapping just for sunlight, TARGET ID: Type-LevelNum(0#)EnemyNum(###),Example: Mutant-06003, EXCEPTIONS: Cyborg-00001 is Edward Diego
+#include "common.h"
+#include "lib.h"
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
     float ndcX =  ((World.inventoryMode ? World.cursorPosition_x : 683.0f) - 683.0f) / 384.0f; // Normalize both axes by half-height 384 so aspect handled naturally
@@ -28,7 +30,8 @@ void DropHeldItem() {
     ResetHeldItem();
 }
 
-static const u16 patchMsg[7] = {325,326,327,328,329,330,331}; static const double patchTime[7] = {BERSERK_TIME,DETOX_TIME,GENIUS_TIME,MEDI_TIME,REFLEX_TIME,SIGHT_TIME,STAMINUP_TIME};
+static const u16 patchMsg[7] = {325,326,327,328,329,330,331};
+//static const double patchTime[7] = {BERSERK_TIME,DETOX_TIME,GENIUS_TIME,MEDI_TIME,REFLEX_TIME,SIGHT_TIME,STAMINUP_TIME}; TODO
 void PatchUse(int patchSlot) { (void)patchSlot; if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } World.invP1.patchCounts[patchSlot]--;
     World.invP1.patchActive |= (u16)(1u << patchSlot);
     switch (patchSlot) {
@@ -47,33 +50,33 @@ void PatchUse(int patchSlot) { (void)patchSlot; if (patchSlot < 0 || patchSlot >
 
 void WeaponFireStartWeaponDip(float t) { (void)t; if (t <= 0.0f) { World.invP1.weaponDipLerp = 0.0f; World.invP1.weaponDipFinished = 0.0; return; } World.invP1.weaponDipFinished = World.pauseRelativeTime + (double)t; World.invP1.weaponDipLerp = 1.0f; }
 void WeaponFireCompleteWeaponChange(void) { World.invP1.justChangedWeap = false; World.invP1.weaponCurrentPending = -1; World.invP1.weaponIndexPending = -1; World.invP1.recoiling = false; }
-bool InventoryHasAccessCard(AccessCardType card) { return (World.invP1.accessCardOwned & (1u << card)) != 0; }
+bool InventoryHasAccessCard(AccCardType card) { return (World.invP1.accessCardOwned & (1u << card)) != 0; }
 bool InventoryHasAnyAccessCards() { return World.invP1.accessCardOwned != 0; }
-const char* AccessCardCodeForType(AccessCardType a) { // Called by ItemTabManager
+const char* AccessCardCodeForType(AccCardType a) { // Called by ItemTabManager
     switch(a) {
-        case AccessCardType_Standard:    return "STD";     case AccessCardType_Medical:     return "MED";     case AccessCardType_Science:     return "SCI";
-        case AccessCardType_Admin:       return "ADM";     case AccessCardType_Group1:      return "Group-1"; case AccessCardType_Group2:      return "Group-2";
-        case AccessCardType_Group3:      return "Group-3"; case AccessCardType_Group4:      return "Group-4"; case AccessCardType_GroupA:      return "Group-A";
-        case AccessCardType_GroupB:      return "Group-B"; case AccessCardType_Storage:     return "STO";     case AccessCardType_Engineering: return "ENG";
-        case AccessCardType_Maintenance: return "MTN";     case AccessCardType_Security:    return "SEC";     case AccessCardType_Per1:        return "PER-1";
-        case AccessCardType_Per2:        return "PER-2";   case AccessCardType_Per3:        return "PER-3";   case AccessCardType_Per4:        return "PER-4";
-        case AccessCardType_Per5:        return "PER-5";
+        case ACC_Std:    return "STD";     case ACC_Med:     return "MED";     case ACC_Sci:     return "SCI";
+        case ACC_Admin:       return "ADM";     case ACC_Grp1:      return "Group-1"; case ACC_Grp2:      return "Group-2";
+        case ACC_Grp3:      return "Group-3"; case ACC_Grp4:      return "Group-4"; case ACC_GrpA:      return "Group-A";
+        case ACC_GrpB:      return "Group-B"; case ACC_Stor:     return "STO";     case ACC_Eng: return "ENG";
+        case ACC_Maint: return "MTN";     case ACC_Security:    return "SEC";     case ACC_Per1:        return "PER-1";
+        case ACC_Per2:        return "PER-2";   case ACC_Per3:        return "PER-3";   case ACC_Per4:        return "PER-4";
+        case ACC_Per5:        return "PER-5";
     } return "Group-2";
 }
 
 void AddAccessCardToInventory(int index) {
-    AccessCardType card;
+    AccCardType card;
     switch(index) {
-        case  34: card = AccessCardType_Admin;       break; case  81: card = AccessCardType_Standard;    break; case  83: card = AccessCardType_Group1;      break;
-        case  84: card = AccessCardType_Science;     break; case  85: card = AccessCardType_Engineering; break; case  86: card = AccessCardType_GroupB;      break;
-        case  87: card = AccessCardType_Security;    break; case  88: card = AccessCardType_Per5;        break; case  89: card = AccessCardType_Medical;     break;
-        case  90: card = AccessCardType_Group3;      break; case  91: card = AccessCardType_Group4;      break; case 110: card = AccessCardType_Per1;        break;
-        default: CenterStatusPrint("BUG: Unmarked access card, defaulting to STD."); card = AccessCardType_Standard; break;
+        case  34: card = ACC_Admin;       break; case  81: card = ACC_Std;    break; case  83: card = ACC_Grp1;      break;
+        case  84: card = ACC_Sci;     break; case  85: card = ACC_Eng; break; case  86: card = ACC_GrpB;      break;
+        case  87: card = ACC_Security;    break; case  88: card = ACC_Per5;        break; case  89: card = ACC_Med;     break;
+        case  90: card = ACC_Grp3;      break; case  91: card = ACC_Grp4;      break; case 110: card = ACC_Per1;        break;
+        default: CenterStatusPrint("BUG: Unmarked access card, defaulting to STD."); card = ACC_Std; break;
     }
     if (index == 87) { // Command card = STO + SEC + MTN
-        if (InventoryHasAccessCard(AccessCardType_Storage) && InventoryHasAccessCard(AccessCardType_Security) && InventoryHasAccessCard(AccessCardType_Maintenance)) { CenterStatusPrint("%s%s",Sys_Text.stringTable[44],AccessCardCodeForType(card)); return; }
-        World.invP1.accessCardOwned |= (1u<<AccessCardType_Storage)|(1u<<AccessCardType_Security)|(1u<<AccessCardType_Maintenance);
-        CenterStatusPrint("%s%s, %s, %s",Sys_Text.stringTable[45],AccessCardCodeForType(AccessCardType_Storage),AccessCardCodeForType(AccessCardType_Security),AccessCardCodeForType(AccessCardType_Maintenance));
+        if (InventoryHasAccessCard(ACC_Stor) && InventoryHasAccessCard(ACC_Security) && InventoryHasAccessCard(ACC_Maint)) { CenterStatusPrint("%s%s",Sys_Text.stringTable[44],AccessCardCodeForType(card)); return; }
+        World.invP1.accessCardOwned |= (1u<<ACC_Stor)|(1u<<ACC_Security)|(1u<<ACC_Maint);
+        CenterStatusPrint("%s%s, %s, %s",Sys_Text.stringTable[45],AccessCardCodeForType(ACC_Stor),AccessCardCodeForType(ACC_Security),AccessCardCodeForType(ACC_Maint));
         return;
     }
     if (InventoryHasAccessCard(card)) { CenterStatusPrint("%s%s",Sys_Text.stringTable[44],AccessCardCodeForType(card)); return; }
@@ -141,11 +144,11 @@ void AddGrenadeToInventory(int index, int useableIndex) {
 void RemoveGrenade(int index) { if(World.invP1.grenAmmo[index] > 0){World.invP1.grenAmmo[index]--;} if(!World.invP1.grenAmmo[index]){GrenadeCycleDown();} }
 void CheckForUnreadLogs() {
     int em = 0, lg = 0;
-    for (int i = T_LOGS_COUNT-1; i >= 0; i--) { if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) { if (Sys_Text.audioLogType[i] == AudioLogType_Email) {em++;} else {lg++;} } }
+    for (int i = LOGCNT-1; i >= 0; i--) { if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) { if (Sys_Text.audioLogType[i] == AudioLogType_Email) {em++;} else {lg++;} } }
     if (!em) {World.invP1.hasNewEmail = false;} if (!lg) {World.invP1.hasNewLogs  = false;}
 }
 
-static int FindNextUnreadLog() { for (int i = T_LOGS_COUNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
+static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
 static void PlayLog(int logIndex) {
     if (logIndex < 0 || !(World.invP1.hasHardware & HW_ERD)) return;
 //     if (World.invP1.logSndInited) { SndStop(&World.invP1.logSound); SndUninit(&World.invP1.logSound); World.invP1.logSndInited = false; }
@@ -465,23 +468,23 @@ void FuncWallInitAfterLoad(u16 self) {
     V3 tempVec = V3_AsubB(World.position[self],e->targetPosition);
     float distTotal = V3_Dist(e->startPosition,e->targetPosition);
     tempVec = V3_ScaleByF(V3_Normalize(tempVec),-1.0f);
-    if (e->funcState == FuncStates_AjarMovingTarget) tempVec = V3_ScaleByF(tempVec,distTotal * e->percentAjar);
-    else if (e->funcState == FuncStates_AjarMovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentAjar));
-    else if (e->funcState == FuncStates_MovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentMoved));
+    if (e->funcState == FStat_AjarMovingTarget) tempVec = V3_ScaleByF(tempVec,distTotal * e->percentAjar);
+    else if (e->funcState == FStat_AjarMovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentAjar));
+    else if (e->funcState == FStat_MovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentMoved));
     else tempVec = V3_ScaleByF(tempVec,distTotal * e->percentMoved);
     SetPosition(self,V3_AplusB(World.position[self],tempVec),true); // Force it like a teleport
 }
 
-void FuncWallMoveStart(u16 self) { World.instances[self].funcState = FuncStates_MovingStart; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; }
-void FuncWallMoveTarget(u16 self) { World.instances[self].funcState = FuncStates_MovingTarget; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; }
-void FuncWallTargetted(u16 self) { Entity* e = &World.instances[self]; if (e->funcState == FuncStates_Start || e->funcState == FuncStates_MovingStart || e->funcState == FuncStates_AjarMovingTarget){FuncWallMoveTarget(self);} else{FuncWallMoveStart(self);} play_wav(sounds[76],1.0f,World.position[self],true); }
+void FuncWallMoveStart(u16 self) { World.instances[self].funcState = FStat_MovingStart; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; }
+void FuncWallMoveTarget(u16 self) { World.instances[self].funcState = FStat_MovingTarget; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; }
+void FuncWallTargetted(u16 self) { Entity* e = &World.instances[self]; if (e->funcState == FStat_Start || e->funcState == FStat_MovingStart || e->funcState == FStat_AjarMovingTarget){FuncWallMoveTarget(self);} else{FuncWallMoveStart(self);} play_wav(sounds[76],1.0f,World.position[self],true); }
 void FuncWallUpdate(u16 self) {
     Entity* e = &World.instances[self];
-    V3 goal = e->funcState == FuncStates_MovingStart ? e->startPosition : e->targetPosition;
-    FuncStates doneState = e->funcState == FuncStates_MovingStart ? FuncStates_Start : FuncStates_Target;
-    if (e->funcState == FuncStates_Start) { SetPosition(self,e->startPosition,true); World.velocity[self] = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 0.0f; return; }
-    if (e->funcState == FuncStates_Target) { SetPosition(self,e->targetPosition,true); World.velocity[self] = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 1.0f; return; }
-    if (e->funcState != FuncStates_MovingStart && e->funcState != FuncStates_MovingTarget) return;
+    V3 goal = e->funcState == FStat_MovingStart ? e->startPosition : e->targetPosition;
+    FuncStates doneState = e->funcState == FStat_MovingStart ? FStat_Start : FStat_Target;
+    if (e->funcState == FStat_Start) { SetPosition(self,e->startPosition,true); World.velocity[self] = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 0.0f; return; }
+    if (e->funcState == FStat_Target) { SetPosition(self,e->targetPosition,true); World.velocity[self] = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 1.0f; return; }
+    if (e->funcState != FStat_MovingStart && e->funcState != FStat_MovingTarget) return;
     V3 delta = V3_AsubB(goal,World.position[self]);
     float distanceLeft = V3_Mag(delta);
     float total = V3_Dist(e->startPosition,e->targetPosition);
@@ -489,7 +492,7 @@ void FuncWallUpdate(u16 self) {
     if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) {
         SetPosition(self,goal,true);
         e->funcState = doneState;
-        e->percentMoved = doneState == FuncStates_Target ? 1.0f : 0.0f;
+        e->percentMoved = doneState == FStat_Target ? 1.0f : 0.0f;
         World.velocity[self] = (V3){0.0f,0.0f,0.0f};
         return;
     }
@@ -710,7 +713,7 @@ void ElevatorButtonClick(u16 self) {
     Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor];
     bool doorClosed = door->doorOpen == DoorState_Closed;
     float dist = V3_Dist(World.Sys_UI.objectInUsePos,World.position[PLAYER1]);
-    if (dist > ELEVATOR_PAD_TETHER_DIST && !doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; }
+    if (dist > 2.0f/*tether dist*/ && !doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; }
     if (!doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[7]); /*Door not closed.*/ return; }
     if (!(e->entflags & EF_ACTIVE)) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); /*Floor not accessible.*/ return; }
     V3 spawnPos = (e->targetDestinationID != U16_MAX && e->targetDestinationID < World.instCount) ? World.position[e->targetDestinationID] : (V3){0.0f,0.0f,0.0f};
@@ -728,7 +731,7 @@ void EmailTargetted(u16 self, u16 activator) {
 #define OVERLOAD_CLICK_DEBOUNCE 0.4
 #define OVERLOAD_HEAT_THRESHOLD 25.0f
 static double overloadClickFinished = 0.0;
-void OverloadButtonAction(void) {
+void OverloadButtonAction() {
     if (overloadClickFinished >= World.pauseRelativeTime) return;
     overloadClickFinished = World.pauseRelativeTime + OVERLOAD_CLICK_DEBOUNCE;
     if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponIndex] > OVERLOAD_HEAT_THRESHOLD) {
@@ -746,16 +749,16 @@ void OverloadButtonAction(void) {
     }
 }
 
-void OverloadEnergyClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; OverloadButtonAction(); }
-void OverloadFired(void) { World.invP1.overloadEnabled = false; }
+void OverloadEnergyClick() { World.Sys_UI.mouseClickHeldOverGUI = true; OverloadButtonAction(); }
+void OverloadFired() { World.invP1.overloadEnabled = false; }
 // Called from weapon pane render — returns visual state for renderer to act on 0 = normal+clickable, 1 = overloaded, 2 = disabled (post-fire/too hot)
-u8 OverloadButtonVisualState(void) { if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponIndex] > OVERLOAD_HEAT_THRESHOLD) {return 2;} if (World.invP1.overloadEnabled) {return 1;} return 0; }
+u8 OverloadButtonVisualState() { if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponIndex] > OVERLOAD_HEAT_THRESHOLD) {return 2;} if (World.invP1.overloadEnabled) {return 1;} return 0; }
 // TargetID
 #define TARGETID_LINK_DIST       10.0f
 #define TARGETID_DAMAGE_TIME_HIT  2.5f
 #define TARGETID_DAMAGE_TIME_MISS 1.0f
 float TargetIDGetSensingRange(bool manual) { u8 ver = World.invP1.hardwareVersion[HW_TID_IDX]; if (manual) {return (ver >= 4) ? 18.0f : 13.0f;} return (ver <= 2) ? 0.0f : ((ver == 3) ? 13.0f : 20.0f); }
-float TargetIDGetTetherRange(void) { return (World.invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
+float TargetIDGetTetherRange() { return (World.invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
 static void TargetIDDeactivate(u16 self) { Entity* e=&World.instances[self]; if(e->enemy != WORLD){Entity* npc=&World.instances[e->enemy]; flag_set(&npc->entflags,EF_TARGID_ATTACHED,false); e->enemy=WORLD;} e->textIndex=-1; flag_set(&e->entflags,EF_ACTIVE,false); }
 void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
     Entity* e = &World.instances[self]; if (e->enemy == WORLD) return;
@@ -792,7 +795,7 @@ void TargetIDUpdate(u16 self) {
 static const float  hwDrain[12][4] = {[3]={0.01535f,0.03413f,0.02559f,0.0f},[5]={0.04096f,0.10239f,0.17919f,0.05119f},[6]={0.001706f,0.0f,0.0f,0.0f},[7]={0.02559f,0.04266f,0.05119f,0.0f},[9]={0.0f,0.02f,0.015f,0.0f},[11]={0.08533f,0.0f,0.0f,0.0f},};
 static const u16 hwDrainJPM[12][4] = {[3]={9,20,15,0},[5]={24,60,105,30},[6]={1,0,0,0},[7]={15,25,30,0},[9]={0,16,12,0},[11]={50,0,0,0},};
 void CreateTargetIDInstance(float damage, u16 hitIdx, float tranq) { if (hitIdx == WORLD || hitIdx >= World.instCount) return; Entity* npc = &World.instances[hitIdx]; if (!(npc->entflags & EF_ACTIVE) || (npc->entflags & EF_TARGID_ATTACHED)) return; if (V3_Dist(World.position[hitIdx], World.position[PLAYER1]) > TargetIDGetTetherRange()) return; u16 tidIdx = SpawnDynamicObject(736, false); if (tidIdx == WORLD || tidIdx == U16_MAX) return; Entity* tid = &World.instances[tidIdx]; tid->enemy = hitIdx; tid->tickFinished = World.pauseRelativeTime + 4.0; tid->textIndex = (tranq >= 0.0f) ? 536 : -1; tid->animSwapFinished = World.pauseRelativeTime + (tranq >= 0.0f ? 2.5 : 0.0); World.position[tidIdx] = World.position[hitIdx]; flag_set(&tid->entflags, EF_ACTIVE, true); flag_set(&npc->entflags, EF_TARGID_ATTACHED, true); if (damage > 0.0f) TargetIDSendDamageReceive(tidIdx, damage, Att_None); }
-static void TargetIdentifierSenseTargets(void) {
+void TargetIdentifierSenseTargets() {
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
         Entity* e = &World.instances[i];
         if (!(e->entflags & EF_ACTIVE))       continue;
@@ -804,8 +807,8 @@ static void TargetIdentifierSenseTargets(void) {
     }
 }
 
-bool ModRequestsGrayscale(void) {return (/*(World.invP1.hasHardware & HW_INF) && */(World.invP1.hardwareIsActive & HW_INF) > 0); }
-static void DeactivateHardwareOnEnergyDepleted(void) {
+bool ModRequestsGrayscale() { return ((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0); }
+static void DeactivateHardwareOnEnergyDepleted() {
     u16* active = &World.invP1.hardwareIsActive;
     flag_set((u32*)active,HW_SNS,false); // TODO: SensaroundOff() — hardware button manager effects
     flag_set((u32*)active,HW_BIO,false); // TODO: BioOff()
@@ -823,8 +826,8 @@ void GiveEnergy(float give,EnergyType type) {
     if (type == EnergyType_ChargeStation) play_wav(sounds[100],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false); // chargingstation
 }
 
-void PlayerEnergyInit(void) { World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + random_range(0.0f,1.0f); World.invP1.drainJPM = 0; }
-void PlayerEnergyUpdate(void) {
+void PlayerEnergyInit() { World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + random_range(0.0f,1.0f); World.invP1.drainJPM = 0; }
+void PlayerEnergyUpdate() {
     if (World.invP1.hasHardware & HW_TID) TargetIdentifierSenseTargets();
     if (World.invP1.energyDrainTickFinished > World.pauseRelativeTime) return;
     World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1;
@@ -1209,8 +1212,9 @@ void HealthManagerInitAfterLoad(u16 self) {
     }
 }
 
-void mat4_lookat_from(float*,Quaternion*,V3); INLINE void mul_mat4(float*,const float*,const float*); void ExtractFrustumPlanes(float*,FrustumPlane*);
-Quaternion cubeQuats[6] = {{0.0f,ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*+X:Right*/,{0.0f,-ONE_OVER_SQRT2,0.0f,ONE_OVER_SQRT2}/*-X:Left*/,{-ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*+Y:Up*/,{ONE_OVER_SQRT2,0.0f,0.0f,ONE_OVER_SQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
+void mat4_lookat_from(float*,Quaternion*,V3); void mul_mat4(float*,const float*,const float*); void ExtractFrustumPlanes(float*,FrustumPlane*);
+#define INVSQRT2 0.70710678118f
+Quaternion cubeQuats[6] = {{0.0f,INVSQRT2,0.0f,INVSQRT2}/*+X:Right*/,{0.0f,-INVSQRT2,0.0f,INVSQRT2}/*-X:Left*/,{-INVSQRT2,0.0f,0.0f,INVSQRT2}/*+Y:Up*/,{INVSQRT2,0.0f,0.0f,INVSQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
 void UpdateLights() {
     for (u16 lightIdx=0;lightIdx<World.loadedLights;++lightIdx) {
         V3 lightPos = World.lightsNewPosition[lightIdx];
@@ -1284,6 +1288,10 @@ void HardwareJumpJetsOn(void)  { World.invP1.hardwareIsActive |=  HW_JET; }
 void HardwareJumpJetsOff(void) { World.invP1.hardwareIsActive &= ~HW_JET; }
 void HardwareJumpJetsAction() { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); JumpJetsToggle(); if (JumpJetsActive()) HardwareJumpJetsOn(); else HardwareJumpJetsOff(); }
 void HardwareJumpJetsClick() { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareJumpJetsAction(); }
+#define INFRARED_RANGE 50.35f
+#define LANTERN_RANGE 11.52f
+static Color3 lantCol = (Color3){1.0f,1.0f,1.0f};
+static float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};
 void HardwareUpdate() {
     bool infraredOn = (World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0;
     bool lanternOn = (World.invP1.hasHardware & HW_LAN) && (World.invP1.hardwareIsActive & HW_LAN) > 0;
@@ -1336,7 +1344,7 @@ void PatchDisableAll(void) {
             else { if (World.curLev >= 0 || World.curLev < 13) World.instances[PLAYER1].position = ressurectionLocation[World.curLev]; }
             // Activate death screen and readouts for "BRAIN ACTIVITY SATISFACTORY..." ya debatable right etc. etc.
 //              PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true); // TODO
-            PlayTrack(TrackType_Revive,MusicType_Override);
+            PlayTrack(TT_Revive,MT_Override);
             World.instances[PLAYER1].ressurectingFinished = World.pauseRelativeTime + 3f;
             return true;
         }
@@ -1557,11 +1565,11 @@ void PatchDisableAll(void) {
 //     if (IsolinearChipsetInstalled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.IsolinearChipsetInstalled, testIfTrue, ud, tio, target, targetIfFalse);
 // }
 // Doors
-static bool DoorInventoryHasAccessCard(AccessCardType card) { return card == AccessCardType_None || (World.invP1.accessCardOwned & (1u << card)); }
+static bool DoorInventoryHasAccessCard(AccCardType card) { return card == ACC_None || (World.invP1.accessCardOwned & (1u << card)); }
 static float DoorGetProgress(const Entity* e, u8 clip) { AnimationClip c = DoorGetClip(e,clip); if(c.frameEnd <= c.frameStart){return 1.0f;} return DoorClamp01((float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart)); } 
 static void DoorOpen(u16 self) { Entity* e = &World.instances[self]; DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorGetClip(e,DOOR_CLIP_OPENING).frameStart); e->doorOpen = e->doorState = DoorState_Opening; e->waitBeforeClose = World.pauseRelativeTime + e->delay; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true); }
 static void DoorClose(u16 self) { Entity* e = &World.instances[self]; DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorGetClip(e,DOOR_CLIP_CLOSING).frameStart); e->doorOpen = e->doorState = DoorState_Closing; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true); } 
-void DoorForceOpen(u16 self) { World.instances[self].requiredAccessCard = AccessCardType_None; EntitySetLocked(&World.instances[self],false); DoorOpen(self); }
+void DoorForceOpen(u16 self) { World.instances[self].requiredAccessCard = ACC_None; EntitySetLocked(&World.instances[self],false); DoorOpen(self); }
 void DoorForceClose(u16 self) { if (World.instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
     Entity* e = &World.instances[self];
@@ -1590,13 +1598,13 @@ void DoorUse(u16 self, u16 activator) {
     if (activator == WORLD) return;
     Entity* e = &World.instances[self];
     if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(World.position[self]); return; }
-    if (Cheats.superoverride || World.diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = AccessCardType_None; }
-    if (World.diffMis <= 1) { e->requiredAccessCard = AccessCardType_None; }
+    if (Cheats.superoverride || World.diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = ACC_None; }
+    if (World.diffMis <= 1) { e->requiredAccessCard = ACC_None; }
     if (e->useFinished >= World.pauseRelativeTime) return;
     e->useFinished = World.pauseRelativeTime + e->useTimeDelay;
-    if (e->requiredAccessCard != AccessCardType_None) {
+    if (e->requiredAccessCard != ACC_None) {
         if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) { CenterStatusPrint("%s",Sys_Text.stringTable[2]);/*TODO Access-card-specific status text.*/ if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) {play_wav(sounds[e->SFXLockedIndex],0.7f,World.position[self],true);} return; }
-        else e->requiredAccessCard = AccessCardType_None; // TODO Access-card granted status text.
+        else e->requiredAccessCard = ACC_None; // TODO Access-card granted status text.
     }
     if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) {play_wav(sounds[e->SFXLockedIndex],0.55f,World.position[self],true);} return; }
     if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(activator,e->target); }
@@ -1627,9 +1635,10 @@ u16 SpawnDynamicObject(int val, bool cheat) {
     return entityIndexInInstanceTable;
 }
 // Vmail
-void DeactivateVMail(void) { World.Sys_UI.vmailActive = false; if (World.invP1.lastAddedIndex >= 0) { World.invP1.readLog[World.invP1.lastAddedIndex] = true; CheckForUnreadLogs(); } play_wav(sounds[82], SfxVol(), (V3){0.0f,0.0f,0.0f}, false); }
+void DeactivateVMail() { World.Sys_UI.vmailActive = false; if (World.invP1.lastAddedIndex >= 0) { World.invP1.readLog[World.invP1.lastAddedIndex] = true; CheckForUnreadLogs(); } play_wav(sounds[82], SfxVol(), (V3){0.0f,0.0f,0.0f}, false); }
 // TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.
 void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
+void GravityLiftToggle(u16 self);
 void Targetted(u16 activator, u16 self) {
     Entity* e = &World.instances[self]; u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
     DualLog("Targetted a->ioflags:%u e:%u doorcond:%u\n", aioflags, e->index, ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)));
@@ -1641,7 +1650,7 @@ void Targetted(u16 activator, u16 self) {
     if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true);
     if (IdxIsButtonSwitch(e->index)) ButtonSwitchTargetted(self, activator);
     if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)) { DoorForceOpen(self); } 
-    else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && (e->entflags & EF_LOCKED) == 0 && (e->requiredAccessCard == AccessCardType_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) { DoorForceOpen(self); }
+    else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && (e->entflags & EF_LOCKED) == 0 && (e->requiredAccessCard == ACC_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) { DoorForceOpen(self); }
     else if ((aioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) { DoorForceClose(self); }
     else if (IdxIsDoor(e->index)) { DoorTargetted(self, activator); }
     if (aioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self, false);
@@ -1706,8 +1715,8 @@ static void Frob(V3 pos, V3 forward, V3 right) {
     UseEntity(tempHit.hitInstanceIndex);
 }
 // Update
-void WeaponsUpdate(void);
-void ModUpdate(void) {
+void WeaponsUpdate(); void TextureSequenceUpdate(u16 self);
+void ModUpdate() {
     if (World.paused || World.menuActive) return;
     WeaponsUpdate();
     PatchUpdate();
@@ -1732,8 +1741,8 @@ void ModUpdate(void) {
     }
 }
 
-u16 GetCrosshairTexture(void) { switch(World.invP1.weaponIndex) { case 36:case 38:case 43:case 45:case 48:return 1121;/*red*/case 37:case 40:case 50:return 1253;/*blue*/case 41:case 42:return 1166;/*orange*/case 44:case 47:return 1122;/*yellow*/ case 46:case 51:return 1161;/*teal*/default:return 1260;/*green*/ } }
-u16 GetCursorTexture(void){
+u16 GetCrosshairTexture() { switch(World.invP1.weaponIndex) { case 36:case 38:case 43:case 45:case 48:return 1121;/*red*/case 37:case 40:case 50:return 1253;/*blue*/case 41:case 42:return 1166;/*orange*/case 44:case 47:return 1122;/*yellow*/ case 46:case 51:return 1161;/*teal*/default:return 1260;/*green*/ } }
+u16 GetCursorTexture() {
     if(World.paused||World.menuActive)return 1261;/*Red standard cursor*/if(!World.invP1.holdingObject)return GetCrosshairTexture();
     switch(World.invP1.heldObjectIndex){
         case 312: case 313: return 605;/*item_arm, item_audiolog*/

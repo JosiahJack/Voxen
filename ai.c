@@ -1,4 +1,6 @@
 // ai.c - AI logic control for NPC's enemies in the game.
+#include "common.h"
+#include "lib.h"
 #define MIN_WALK_SPEED_SQ    (0.32f * 0.32f)
 #define ANIM_WALK_SWAP_DELAY 0.5
 #define AI_TICK_TIME         0.2
@@ -101,6 +103,7 @@ void InitializeAIAfterLoad(u16 i) {
     if (World.instances[i].entflags & EF_ASLEEP) { World.instances[i].currentState = AIState_Idle; /*flag_set(&World.instances[e->sleepingCables].entflags, EF_ACTIVE, true); *//*TODO*/ }
     World.instances[i].attackFinished = World.pauseRelativeTime + 1.0;
     World.instances[i].idealTransformForward = World.instances[i].forward;
+    #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
     //scpy_to_a_from_b(World.instances[i].targetID,npcTable[npcID].name,TARGET_ID_LENGTH);
     //sFormat(World.instances[i].targetID,TARGET_ID_LENGTH * sizeof(char),"%s %05u",npcTable[npcID].name,npcCountInWorldPerType[npcID]++); // TODO
     u8 c;
@@ -136,10 +139,10 @@ bool HasHealth(u16 i) {
     return (World.instances[i].health > 0.0f);
 }
 
-static inline bool     ai_is_cyber(Entity* e)  { return npcTable[e->index - 419].type == NPCType_Cyber; }
-static inline bool     ai_has_health(Entity* e){ return ai_is_cyber(e) ? e->cyberHealth > 0.0f : e->health > 0.0f; }
-static inline V3  ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3_AplusB(World.position[idx],(V3){0.0f,0.0f,0.0f}/* e->sightPointOffset*/); } // TODO table of sight point offsets
-static inline V3 ai_gun_pos(Entity* e, int n) {
+INLINE bool ai_is_cyber(Entity* e)  { return npcTable[e->index - 419].type == NPCType_Cyber; }
+INLINE bool ai_has_health(Entity* e){ return ai_is_cyber(e) ? e->cyberHealth > 0.0f : e->health > 0.0f; }
+INLINE V3 ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3_AplusB(World.position[idx],(V3){0.0f,0.0f,0.0f}/* e->sightPointOffset*/); } // TODO table of sight point offsets
+INLINE V3 ai_gun_pos(Entity* e, int n) {
     V3 off = (V3){0.0f,0.0f,0.0f};//(n == 3) ? e->gunPointOffset2 : e->gunPointOffset; // TODO table of offsets
     if (n == 2 && off.x == 0.0f && off.y == 0.0f && off.z == 0.0f) off = (V3){0.0f,0.0f,0.0f};//e->gunPointOffset2; TODO
     u16 idx=(u16)(e - World.instances);
@@ -270,7 +273,7 @@ static bool AICheckIfEnemyInSight(u16 idx) {
             u16 hi = hit.hitInstanceIndex;
             if (hi && V3_SqDist(hit.point, spos) < 4.0f && IdxIsDoor(World.instances[hi].index)) {
                 Entity* dr = &World.instances[hi];
-                if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && World.diffCbt > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= dr->securityThreshold && (dr->requiredAccessCard == AccessCardType_None)) DoorActuate(hi);
+                if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && World.diffCbt > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= dr->securityThreshold && (dr->requiredAccessCard == ACC_None)) DoorActuate(hi);
             }
         }
     }

@@ -672,7 +672,7 @@ const char* sounds[SOUNDS_COUNT] = {
     "./Audio/physics/footsteps/Wood/woodcrate_jump3.wav",
 };
 
-const char* audioLogs[T_LOGS_COUNT] = {
+const char* audioLogs[LOGCNT] = {
     "./Audio/logs/ghiran-2.wav",
     "./Audio/logs/steinberg-1.wav",
     "./Audio/logs/raines-1.wav",
@@ -810,58 +810,58 @@ const char* audioLogs[T_LOGS_COUNT] = {
 };
 
 FootStepType GetFootstepTypeForPrefab(int pid) {
-    if (pid == 0 || (pid >= 21 && pid <= 22)) return FootStepType_None;
-    if ((pid >= 2 && pid <= 10) || (pid >= 98 && pid <= 100) || pid == 110) return FootStepType_Squish;
-    if ((pid >= 13 && pid <= 18) || (pid >= 82 && pid <= 88)) return FootStepType_Metal2;
-    if ((pid >= 23 && pid <= 40) || pid == 48 || pid == 49 || pid == 53) return FootStepType_Plastic2;
-    if ((pid >= 41 && pid <= 47) || (pid >= 149 && pid <= 159)) return FootStepType_Plastic;
-    if (pid >= 64 && pid <= 66) return FootStepType_Sand;
-    if (pid >= 94 && pid <= 96) return FootStepType_Grass;
-    if ((pid >= 101 && pid <= 109) || pid == 111) return FootStepType_GrittyCrete;
-    if (pid >= 144 && pid <= 148) return FootStepType_Vent;
-    if (pid >= 131 && pid <= 134) return FootStepType_Metal;
-    if (pid == 1 || pid == 19 || pid == 77 || pid == 93 || pid == 122 || pid == 126 || pid == 128 || pid == 187 || pid == 221 || (pid >= 235 && pid <= 237) || (pid >= 260 && pid <= 261) || (pid >= 270 && pid <= 271) || pid == 279) return FootStepType_Glass;
-    if (pid == 11 || (pid >= 51 && pid <= 52) || (pid >= 56 && pid <= 57) || pid == 71 || (pid >= 116 && pid <= 117) || (pid >= 120 && pid <= 121) || (pid >= 135 && pid <= 136) || (pid >= 139 && pid <= 140) || (pid >= 204 && pid <= 207) || (pid >= 458 && pid <= 460) || (pid >= 477 && pid <= 479)) return FootStepType_Metpanel;
-    if (pid == 12 || pid == 61 || (pid >= 72 && pid <= 73) || pid == 76 || (pid >= 280 && pid <= 287)) return FootStepType_Marble;
-    if (pid == 20 || pid == 464 || (pid >= 472 && pid <= 476)) return FootStepType_Wood2;
-    if (pid == 50 || pid == 70 || pid == 75) return FootStepType_Carpet;
-    if (pid >= 54 && pid <= 55) return FootStepType_Gravel;
-    if ((pid >= 62 && pid <= 63) || pid == 78 || pid == 89 || pid == 112 || pid == 127 || pid == 129 || (pid >= 137 && pid <= 138) || (pid >= 141 && pid <= 143) || pid == 189 || pid == 196 || (pid >= 208 && pid <= 220) || (pid >= 222 && pid <= 230) || (pid >= 238 && pid <= 240) || (pid >= 292 && pid <= 301) || pid == 305 || pid == 461 || pid == 463 || pid == 500 || pid == 516 || (pid >= 525 && pid <= 526)) return FootStepType_Metal;
-    if (pid == 74 || pid == 306) return FootStepType_Plaster;
-    if (pid == 79 || pid == 130 || pid == 231 || (pid >= 262 && pid <= 265) || (pid >= 527 && pid <= 529)) return FootStepType_Grate;
-    if ((pid >= 80 && pid <= 81) || (pid >= 124 && pid <= 125) || (pid >= 302 && pid <= 304)) return FootStepType_Rubber;
-    if (pid == 97) return FootStepType_Water;
-    if ((pid >= 113 && pid <= 115) || (pid >= 118 && pid <= 119) || pid == 123 || (pid >= 160 && pid <= 161) || (pid >= 169 && pid <= 177) || (pid >= 253 && pid <= 255) || pid == 515) return FootStepType_Panel;
-    return FootStepType_Plastic; // default
+    if (pid == 0 || (pid >= 21 && pid <= 22)) return FSTP_None;
+    if ((pid >= 2 && pid <= 10) || (pid >= 98 && pid <= 100) || pid == 110) return FSTP_Squish;
+    if ((pid >= 13 && pid <= 18) || (pid >= 82 && pid <= 88)) return FSTP_Metal2;
+    if ((pid >= 23 && pid <= 40) || pid == 48 || pid == 49 || pid == 53) return FSTP_Plastic2;
+    if ((pid >= 41 && pid <= 47) || (pid >= 149 && pid <= 159)) return FSTP_Plastic;
+    if (pid >= 64 && pid <= 66) return FSTP_Sand;
+    if (pid >= 94 && pid <= 96) return FSTP_Grass;
+    if ((pid >= 101 && pid <= 109) || pid == 111) return FSTP_GrittyCrete;
+    if (pid >= 144 && pid <= 148) return FSTP_Vent;
+    if (pid >= 131 && pid <= 134) return FSTP_Metal;
+    if (pid == 1 || pid == 19 || pid == 77 || pid == 93 || pid == 122 || pid == 126 || pid == 128 || pid == 187 || pid == 221 || (pid >= 235 && pid <= 237) || (pid >= 260 && pid <= 261) || (pid >= 270 && pid <= 271) || pid == 279) return FSTP_Glass;
+    if (pid == 11 || (pid >= 51 && pid <= 52) || (pid >= 56 && pid <= 57) || pid == 71 || (pid >= 116 && pid <= 117) || (pid >= 120 && pid <= 121) || (pid >= 135 && pid <= 136) || (pid >= 139 && pid <= 140) || (pid >= 204 && pid <= 207) || (pid >= 458 && pid <= 460) || (pid >= 477 && pid <= 479)) return FSTP_Metpanel;
+    if (pid == 12 || pid == 61 || (pid >= 72 && pid <= 73) || pid == 76 || (pid >= 280 && pid <= 287)) return FSTP_Marble;
+    if (pid == 20 || pid == 464 || (pid >= 472 && pid <= 476)) return FSTP_Wood2;
+    if (pid == 50 || pid == 70 || pid == 75) return FSTP_Carpet;
+    if (pid >= 54 && pid <= 55) return FSTP_Gravel;
+    if ((pid >= 62 && pid <= 63) || pid == 78 || pid == 89 || pid == 112 || pid == 127 || pid == 129 || (pid >= 137 && pid <= 138) || (pid >= 141 && pid <= 143) || pid == 189 || pid == 196 || (pid >= 208 && pid <= 220) || (pid >= 222 && pid <= 230) || (pid >= 238 && pid <= 240) || (pid >= 292 && pid <= 301) || pid == 305 || pid == 461 || pid == 463 || pid == 500 || pid == 516 || (pid >= 525 && pid <= 526)) return FSTP_Metal;
+    if (pid == 74 || pid == 306) return FSTP_Plaster;
+    if (pid == 79 || pid == 130 || pid == 231 || (pid >= 262 && pid <= 265) || (pid >= 527 && pid <= 529)) return FSTP_Grate;
+    if ((pid >= 80 && pid <= 81) || (pid >= 124 && pid <= 125) || (pid >= 302 && pid <= 304)) return FSTP_Rubber;
+    if (pid == 97) return FSTP_Water;
+    if ((pid >= 113 && pid <= 115) || (pid >= 118 && pid <= 119) || pid == 123 || (pid >= 160 && pid <= 161) || (pid >= 169 && pid <= 177) || (pid >= 253 && pid <= 255) || pid == 515) return FSTP_Panel;
+    return FSTP_Plastic; // default
 }
 
 const char* JumpSound(FootStepType fstep) {
     switch(fstep) {
-        case FootStepType_None: return sounds[0];
+        case FSTP_None: return sounds[0];
         // + 1 because its exclusive, :eyeroll:
-        case FootStepType_Carpet:      return sounds[random_range_u32(540,542 + 1)];
-        case FootStepType_Concrete:    return sounds[random_range_u32(546,548 + 1)];
-        case FootStepType_GrittyCrete: return sounds[random_range_u32(552,554 + 1)];
-        case FootStepType_Grass:       return sounds[random_range_u32(558,560 + 1)];
-        case FootStepType_Gravel:      return sounds[random_range_u32(564,566 + 1)];
-        case FootStepType_Rock:        return sounds[random_range_u32(570,572 + 1)];
-        case FootStepType_Glass:       return sounds[random_range_u32(576,578 + 1)];
-        case FootStepType_Marble:      return sounds[random_range_u32(582,584 + 1)];
-        case FootStepType_Metal:       return sounds[random_range_u32(588,590 + 1)];
-        case FootStepType_Grate:       return sounds[random_range_u32(594,596 + 1)];
-        case FootStepType_Metal2:      return sounds[random_range_u32(600,602 + 1)];
-        case FootStepType_Metpanel:    return sounds[random_range_u32(606,608 + 1)];
-        case FootStepType_Panel:       return sounds[random_range_u32(612,614 + 1)];
-        case FootStepType_Plaster:     return sounds[random_range_u32(618,620 + 1)];
-        case FootStepType_Plastic:     return sounds[random_range_u32(624,626 + 1)];
-        case FootStepType_Plastic2:    return sounds[random_range_u32(630,632 + 1)];
-        case FootStepType_Rubber:      return sounds[random_range_u32(636,638 + 1)];
-        case FootStepType_Sand:        return sounds[random_range_u32(642,644 + 1)];
-        case FootStepType_Squish:      return sounds[random_range_u32(648,650 + 1)];
-        case FootStepType_Vent:        return sounds[random_range_u32(429,430 + 1)];
-        case FootStepType_Water:       return sounds[random_range_u32(651,654 + 1)];
-        case FootStepType_Wood:        return sounds[random_range_u32(661,663 + 1)];
-        case FootStepType_Wood2:       return sounds[random_range_u32(667,669 + 1)];
+        case FSTP_Carpet:      return sounds[random_range_u32(540,542 + 1)];
+        case FSTP_Concrete:    return sounds[random_range_u32(546,548 + 1)];
+        case FSTP_GrittyCrete: return sounds[random_range_u32(552,554 + 1)];
+        case FSTP_Grass:       return sounds[random_range_u32(558,560 + 1)];
+        case FSTP_Gravel:      return sounds[random_range_u32(564,566 + 1)];
+        case FSTP_Rock:        return sounds[random_range_u32(570,572 + 1)];
+        case FSTP_Glass:       return sounds[random_range_u32(576,578 + 1)];
+        case FSTP_Marble:      return sounds[random_range_u32(582,584 + 1)];
+        case FSTP_Metal:       return sounds[random_range_u32(588,590 + 1)];
+        case FSTP_Grate:       return sounds[random_range_u32(594,596 + 1)];
+        case FSTP_Metal2:      return sounds[random_range_u32(600,602 + 1)];
+        case FSTP_Metpanel:    return sounds[random_range_u32(606,608 + 1)];
+        case FSTP_Panel:       return sounds[random_range_u32(612,614 + 1)];
+        case FSTP_Plaster:     return sounds[random_range_u32(618,620 + 1)];
+        case FSTP_Plastic:     return sounds[random_range_u32(624,626 + 1)];
+        case FSTP_Plastic2:    return sounds[random_range_u32(630,632 + 1)];
+        case FSTP_Rubber:      return sounds[random_range_u32(636,638 + 1)];
+        case FSTP_Sand:        return sounds[random_range_u32(642,644 + 1)];
+        case FSTP_Squish:      return sounds[random_range_u32(648,650 + 1)];
+        case FSTP_Vent:        return sounds[random_range_u32(429,430 + 1)];
+        case FSTP_Water:       return sounds[random_range_u32(651,654 + 1)];
+        case FSTP_Wood:        return sounds[random_range_u32(661,663 + 1)];
+        case FSTP_Wood2:       return sounds[random_range_u32(667,669 + 1)];
     }
     
     return sounds[0]; // null wav fallback
@@ -869,31 +869,31 @@ const char* JumpSound(FootStepType fstep) {
 	
 const char* JumpLandSound(FootStepType fstep) {
     switch(fstep) {
-        case FootStepType_None: return sounds[0];
+        case FSTP_None: return sounds[0];
         // + 1 because its exclusive, :eyeroll:
-        case FootStepType_Carpet:      return sounds[random_range_u32(537,539 + 1)];
-        case FootStepType_Concrete:    return sounds[random_range_u32(543,545 + 1)];
-        case FootStepType_GrittyCrete: return sounds[random_range_u32(549,551 + 1)];
-        case FootStepType_Grass:       return sounds[random_range_u32(555,557 + 1)];
-        case FootStepType_Gravel:      return sounds[random_range_u32(561,563 + 1)];
-        case FootStepType_Rock:        return sounds[random_range_u32(567,569 + 1)];
-        case FootStepType_Glass:       return sounds[random_range_u32(573,575 + 1)];
-        case FootStepType_Marble:      return sounds[random_range_u32(579,581 + 1)];
-        case FootStepType_Metal:       return sounds[random_range_u32(585,587 + 1)];
-        case FootStepType_Grate:       return sounds[random_range_u32(591,593 + 1)];
-        case FootStepType_Metal2:      return sounds[random_range_u32(597,599 + 1)];
-        case FootStepType_Metpanel:    return sounds[random_range_u32(603,605 + 1)];
-        case FootStepType_Panel:       return sounds[random_range_u32(609,611 + 1)];
-        case FootStepType_Plaster:     return sounds[random_range_u32(615,617 + 1)];
-        case FootStepType_Plastic:     return sounds[random_range_u32(621,623 + 1)];
-        case FootStepType_Plastic2:    return sounds[random_range_u32(627,629 + 1)];
-        case FootStepType_Rubber:      return sounds[random_range_u32(633,635 + 1)];
-        case FootStepType_Sand:        return sounds[random_range_u32(639,641 + 1)];
-        case FootStepType_Squish:      return sounds[random_range_u32(645,647 + 1)];
-        case FootStepType_Vent:        return sounds[random_range_u32(428,437 + 1)];
-        case FootStepType_Water:       return sounds[random_range_u32(655,657 + 1)];
-        case FootStepType_Wood:        return sounds[random_range_u32(658,660 + 1)];
-        case FootStepType_Wood2:       return sounds[random_range_u32(664,666 + 1)];
+        case FSTP_Carpet:      return sounds[random_range_u32(537,539 + 1)];
+        case FSTP_Concrete:    return sounds[random_range_u32(543,545 + 1)];
+        case FSTP_GrittyCrete: return sounds[random_range_u32(549,551 + 1)];
+        case FSTP_Grass:       return sounds[random_range_u32(555,557 + 1)];
+        case FSTP_Gravel:      return sounds[random_range_u32(561,563 + 1)];
+        case FSTP_Rock:        return sounds[random_range_u32(567,569 + 1)];
+        case FSTP_Glass:       return sounds[random_range_u32(573,575 + 1)];
+        case FSTP_Marble:      return sounds[random_range_u32(579,581 + 1)];
+        case FSTP_Metal:       return sounds[random_range_u32(585,587 + 1)];
+        case FSTP_Grate:       return sounds[random_range_u32(591,593 + 1)];
+        case FSTP_Metal2:      return sounds[random_range_u32(597,599 + 1)];
+        case FSTP_Metpanel:    return sounds[random_range_u32(603,605 + 1)];
+        case FSTP_Panel:       return sounds[random_range_u32(609,611 + 1)];
+        case FSTP_Plaster:     return sounds[random_range_u32(615,617 + 1)];
+        case FSTP_Plastic:     return sounds[random_range_u32(621,623 + 1)];
+        case FSTP_Plastic2:    return sounds[random_range_u32(627,629 + 1)];
+        case FSTP_Rubber:      return sounds[random_range_u32(633,635 + 1)];
+        case FSTP_Sand:        return sounds[random_range_u32(639,641 + 1)];
+        case FSTP_Squish:      return sounds[random_range_u32(645,647 + 1)];
+        case FSTP_Vent:        return sounds[random_range_u32(428,437 + 1)];
+        case FSTP_Water:       return sounds[random_range_u32(655,657 + 1)];
+        case FSTP_Wood:        return sounds[random_range_u32(658,660 + 1)];
+        case FSTP_Wood2:       return sounds[random_range_u32(664,666 + 1)];
     }
     
     return sounds[0]; // null wav fallback
@@ -901,31 +901,31 @@ const char* JumpLandSound(FootStepType fstep) {
 
 const char* FootStepSound(FootStepType fstep) {
     switch(fstep) {
-        case FootStepType_None: return sounds[0];
+        case FSTP_None: return sounds[0];
         // + 1 because its exclusive, :eyeroll:
-        case FootStepType_Carpet:      return sounds[random_range_u32(268,275 + 1)];
-        case FootStepType_Concrete:    return sounds[random_range_u32(276,283 + 1)];
-        case FootStepType_GrittyCrete: return sounds[random_range_u32(284,291 + 1)];
-        case FootStepType_Grass:       return sounds[random_range_u32(292,299 + 1)];
-        case FootStepType_Gravel:      return sounds[random_range_u32(300,307 + 1)];
-        case FootStepType_Rock:        return sounds[random_range_u32(308,315 + 1)];
-        case FootStepType_Glass:       return sounds[random_range_u32(316,323 + 1)];
-        case FootStepType_Marble:      return sounds[random_range_u32(324,331 + 1)];
-        case FootStepType_Metal:       return sounds[random_range_u32(332,339 + 1)];
-        case FootStepType_Grate:       return sounds[random_range_u32(340,347 + 1)];
-        case FootStepType_Metal2:      return sounds[random_range_u32(348,355 + 1)];
-        case FootStepType_Metpanel:    return sounds[random_range_u32(356,363 + 1)];
-        case FootStepType_Panel:       return sounds[random_range_u32(364,371 + 1)];
-        case FootStepType_Plaster:     return sounds[random_range_u32(372,379 + 1)];
-        case FootStepType_Plastic:     return sounds[random_range_u32(380,387 + 1)];
-        case FootStepType_Plastic2:    return sounds[random_range_u32(388,395 + 1)];
-        case FootStepType_Rubber:      return sounds[random_range_u32(396,403 + 1)];
-        case FootStepType_Sand:        return sounds[random_range_u32(404,411 + 1)];
-        case FootStepType_Squish:      return sounds[random_range_u32(412,427 + 1)];
-        case FootStepType_Vent:        return sounds[random_range_u32(428,437 + 1)];
-        case FootStepType_Water:       return sounds[random_range_u32(438,442 + 1)];
-        case FootStepType_Wood:        return sounds[random_range_u32(443,450 + 1)];
-        case FootStepType_Wood2:       return sounds[random_range_u32(451,458 + 1)];
+        case FSTP_Carpet:      return sounds[random_range_u32(268,275 + 1)];
+        case FSTP_Concrete:    return sounds[random_range_u32(276,283 + 1)];
+        case FSTP_GrittyCrete: return sounds[random_range_u32(284,291 + 1)];
+        case FSTP_Grass:       return sounds[random_range_u32(292,299 + 1)];
+        case FSTP_Gravel:      return sounds[random_range_u32(300,307 + 1)];
+        case FSTP_Rock:        return sounds[random_range_u32(308,315 + 1)];
+        case FSTP_Glass:       return sounds[random_range_u32(316,323 + 1)];
+        case FSTP_Marble:      return sounds[random_range_u32(324,331 + 1)];
+        case FSTP_Metal:       return sounds[random_range_u32(332,339 + 1)];
+        case FSTP_Grate:       return sounds[random_range_u32(340,347 + 1)];
+        case FSTP_Metal2:      return sounds[random_range_u32(348,355 + 1)];
+        case FSTP_Metpanel:    return sounds[random_range_u32(356,363 + 1)];
+        case FSTP_Panel:       return sounds[random_range_u32(364,371 + 1)];
+        case FSTP_Plaster:     return sounds[random_range_u32(372,379 + 1)];
+        case FSTP_Plastic:     return sounds[random_range_u32(380,387 + 1)];
+        case FSTP_Plastic2:    return sounds[random_range_u32(388,395 + 1)];
+        case FSTP_Rubber:      return sounds[random_range_u32(396,403 + 1)];
+        case FSTP_Sand:        return sounds[random_range_u32(404,411 + 1)];
+        case FSTP_Squish:      return sounds[random_range_u32(412,427 + 1)];
+        case FSTP_Vent:        return sounds[random_range_u32(428,437 + 1)];
+        case FSTP_Water:       return sounds[random_range_u32(438,442 + 1)];
+        case FSTP_Wood:        return sounds[random_range_u32(443,450 + 1)];
+        case FSTP_Wood2:       return sounds[random_range_u32(451,458 + 1)];
     }
 
     return sounds[0]; // null wav

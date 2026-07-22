@@ -30,7 +30,7 @@ bool AddSoftwareItem(u16 index, int vers) {
             World.invP1.softVersions[SW_DECOY]++; World.invP1.hasSoft |= (1u << SW_DECOY); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[448]); return true;
         case 455/*item_cyber_recall*/: if (World.invP1.cyberItemIndex < 0){World.invP1.cyberItemIndex = 2;} World.invP1.softVersions[SW_RECALL]++; World.invP1.hasSoft |= (1u << SW_RECALL); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[449]); return true;
         case 451/* ;) item_cyber_game*/: { if (vers < 0 || vers >= 7){return false;} World.invP1.hasNewData  = true; World.invP1.hasMinigame |= (u8)(1u << vers); static const u16 gameMsg[7] = {450,451,452,453,454,455,456}; play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[gameMsg[vers]]); return true; }
-        case 448/*item_cyber_data*/: World.invP1.hasNewData = true; if (vers >= 0 && vers < T_LOGS_COUNT) {World.invP1.hasLog[vers] = true;} play_wav(sounds[87],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[457]); return true; 
+        case 448/*item_cyber_data*/: World.invP1.hasNewData = true; if (vers >= 0 && vers < LOGCNT) {World.invP1.hasLog[vers] = true;} play_wav(sounds[87],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[457]); return true; 
         case 452/*item_cyber_integrity*/: if (player->cyberHealth >= 255.0f) {return false;} play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); player->cyberHealth += 77.0f; if (player->cyberHealth > 255.0f) {player->cyberHealth = 255.0f;} CenterStatusPrint("%s",Sys_Text.stringTable[459]); return true;
         case 453/*item_cyber_keycard*/: World.invP1.hasNewData = true; if (vers < 0 || vers > 110) vers = 81; AddAccessCardToInventory(vers); return true;
         default: break;
@@ -79,13 +79,6 @@ void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[sel
 void TriggerOnTriggerEnter(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
 void TriggerOnTriggerStay(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
 // GravityLift
-void GravityLiftInitAfterLoad(u16 self) {
-    World.instances[self].strength =                  UsableOrDef(World.instances[self].strength, 12.0f);
-    World.instances[self].offStrengthFactor =         UsableOrDef(World.instances[self].offStrengthFactor, 0.3f);
-    World.instances[self].distancePaddingToTopPoint = UsableOrDef(World.instances[self].distancePaddingToTopPoint, 0.32f);
-    World.instances[self].topPoint = (V3){ 0.0f, World.position[self].y + (World.colliderSize[self].y * 0.5f), 0.0f };
-}
-
 void GravityLiftOnForce(u16 self, u16 other, bool initial) {
     float topY = World.position[self].y + (World.colliderSize[self].y * 0.5f);
     float dist = topY - World.position[other].y + 0.48f;

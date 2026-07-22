@@ -1,10 +1,11 @@
 // particles.c - Particle System, supports subemitters (up to 8 children), soft particles, billboard projectiles, texture index++ animation, all timed against World.pauseRelativeTime.
-    // // 6. Trigger effects (e.g. in GetImpactType):
-    // u16 impactType = GetImpactType(instanceIdx);
-    // PSys_PlayOneshot(impactType==729?0 : impactType==724?3 : impactType==723?8 : impactType==722?7 : impactType==730?9 : impactType==756?12 : impactType==757?13 : 14, hitPoint);
-    // 
-    // // 7. For a billboard projectile:
-    // u16 proj = PSys_PlayBurstAt(6/*Projectile*/, muzzlePos, aimDir, 40.f);
+// Trigger effects (e.g. in GetImpactType):
+// u16 impactType = GetImpactType(instanceIdx);
+// PSys_PlayOneshot(impactType==729?0 : impactType==724?3 : impactType==723?8 : impactType==722?7 : impactType==730?9 : impactType==756?12 : impactType==757?13 : 14, hitPoint);
+// For a billboard projectile:
+// u16 proj = PSys_PlayBurstAt(6/*Projectile*/, muzzlePos, aimDir, 40.f);
+#include "common.h"
+#include "lib.h"
 #define MAX_PSYS_DEFS 64
 #define MAX_PSYS_PARTICLES 16384
 #define MAX_PSYS_EMITTERS 256
@@ -44,7 +45,6 @@ static const PsDef psysDefs[MAX_PSYS_DEFS] = {
 };
 
 static DepthSort* psysSortBuf = NULL;
-#define PSys_PlayOneshot(defIdx,pos) PSys_Play(defIdx,pos,QUAT_IDENTITY,0)
 PsParticle psysParts[MAX_PSYS_PARTICLES];
 PsEmitter psysEmitters[MAX_PSYS_EMITTERS];
 u32 psysPartFree=0,psysEmitterFree=0,psysAliveCount=0;
@@ -53,14 +53,12 @@ static double psysLastTime;
 static float* psysVertBuf=NULL; // Flat-VBO vertex: 8 floats per corner (x,y,z, u,v, r,g,b,a packed?, texIdx float), Actually: xyz(3)+uv(2)+rgba(4)+texIdx(1) = 10 floats per vertex, 60 per quad
 #define PSYS_VTX_STRIDE 10
 #define PSYS_QUAD_FLOATS (6*PSYS_VTX_STRIDE) // 60 floats per particle quad
-static inline u32 psysAllocPart(void) { u32 i=psysPartFree; if(i>=MAX_PSYS_PARTICLES)return MAX_PSYS_PARTICLES; psysPartFree=*(u32*)&psysParts[i].pos.x; return i; }
-static inline void psysFreePart(u32 i) { *(u32*)&psysParts[i].pos.x=psysPartFree; psysPartFree=i; }
-static inline u32 psysAllocEmitter(void) { u32 i=psysEmitterFree; if(i>=MAX_PSYS_EMITTERS)return MAX_PSYS_EMITTERS; psysEmitterFree=*(u32*)&psysEmitters[i].defIdx; return i; }
-static inline void psysFreeEmitter(u32 i) { *(u32*)&psysEmitters[i].defIdx=psysEmitterFree; psysEmitterFree=i; }
-
+INLINE u32 psysAllocPart(void) { u32 i=psysPartFree; if(i>=MAX_PSYS_PARTICLES)return MAX_PSYS_PARTICLES; psysPartFree=*(u32*)&psysParts[i].pos.x; return i; }
+INLINE void psysFreePart(u32 i) { *(u32*)&psysParts[i].pos.x=psysPartFree; psysPartFree=i; }
+INLINE u32 psysAllocEmitter(void) { u32 i=psysEmitterFree; if(i>=MAX_PSYS_EMITTERS)return MAX_PSYS_EMITTERS; psysEmitterFree=*(u32*)&psysEmitters[i].defIdx; return i; }
+INLINE void psysFreeEmitter(u32 i) { *(u32*)&psysEmitters[i].defIdx=psysEmitterFree; psysEmitterFree=i; }
 INLINE float psysRand(float mn, float mx) { return mn + (mx - mn) * (float)random_range(0u, 100000u) * 0.00001f; }
-
-static inline u32 lerpColor(u32 a, u32 b, float t) {
+INLINE u32 lerpColor(u32 a, u32 b, float t) {
     float ti = 1.f - t;
     u32 ar = (a) & 0xFF, ag = (a >> 8) & 0xFF, ab = (a >> 16) & 0xFF, aa = (a >> 24) & 0xFF;
     u32 br = (b) & 0xFF, bg = (b >> 8) & 0xFF, bb = (b >> 16) & 0xFF, ba = (b >> 24) & 0xFF;

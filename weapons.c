@@ -1,4 +1,7 @@
 // weapons.c - Weapon System
+#include "common.h"
+#include "lib.h"
+FootStepType GetFootstepTypeForPrefab(int pid); bool ChangeAmmoType();
 float delayBetweenShotsForWeapon[16]={1.0f,0.6f,0.5f,0.1f,0.8f,1.6f,0.65f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,1.1f,0.75f};
 float delayBetweenShotsForWeapon2[16]={1.0f,4.5f,0.5f,0.15f,4.0f,1.6f,0.75f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,5.0f,0.75f};
 float damagePerHitForWeapon[16]={75.0f,12.0f,15.0f,10.0f,18.0f,150.0f,15.0f,60.0f,45.0f,22.0f,50.0f,185.0f,6.0f,35.0f,6.0f,2.0f};
@@ -224,7 +227,7 @@ void HitScanFire(int wep16) {
     if (isBeam) CreateBeamEffects(wep16);
 }
 
-static void BiomonitorEnergyPulse(float take);
+void BiomonitorEnergyPulse(float take);
 void MeleeHitUpdate(void) {
     if (wfx.pendingMeleeFinished <= 0.0 || World.pauseRelativeTime < wfx.pendingMeleeFinished) return;
     wfx.pendingMeleeFinished = 0.0;

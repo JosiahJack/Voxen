@@ -1,4 +1,6 @@
 // textures.c - 2D Texture Loading System
+#include "common.h"
+#include "lib.h"
 u32 totalPixels,totalPaletteColors;
 typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData;          typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser;
 typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } PngContext; typedef struct { u8* indices; u32* palette,palSize; i32 w, h; } TexResult;
@@ -72,7 +74,7 @@ u8* PngDecode(const u8* buffer, i32 len, i32 initial_size, i32* outlen, PngArena
 }
 
 static u8 first_row_filter[5] = {PNGFmt_none, PNGFmt_sub, PNGFmt_none, PNGFmt_avg_first, PNGFmt_paeth_first};
-inline static i32 PngPaeth(i32 a, i32 b, i32 c) { i32 p = a+b-c, pa = vabs(p-a), pb = vabs(p-b), pc = vabs(p-c); return (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
+INLINE i32 PngPaeth(i32 a, i32 b, i32 c) { i32 p = a+b-c, pa = vabs(p-a), pb = vabs(p-b), pc = vabs(p-c); return (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
 static i32 CreatePngImageArena(PngArena* arena, PngData* a, u8* raw, u32 raw_len, i32 out_n, u32 x, u32 y, i32 img_n) {
     u32 i, j, stride = x * out_n, w_bytes = (img_n * x * 8 + 7) >> 3; i32 k, f;
     if (raw_len < (w_bytes + 1) * y) return 0;
@@ -226,9 +228,8 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     OS_Free(data, sz); return true;
 }
 
-typedef struct { int width,height; u8* pixels; } WinSysIcon;
 void VSetWindowIcon(WinSysIcon*);
-static __attribute__((noinline)) void LoadTextures() {
+void LoadTextures() {
     double start_time = get_time();
     texCnt = totalPixels = totalPaletteColors = 0u;
     TextureDataParser texture_parser; 
@@ -418,6 +419,7 @@ void TextureSequenceInit(u16 self, char* trimmed_value) {
     e->textureAnimating = false; // Couldn't find match, just don't animate.
 }
 
+void TurnLightOff(u16 litIdx);
 void TextureSequenceUpdate(u16 self) {
     Entity* e = &World.instances[self];
     if (!e->textureAnimating) return;

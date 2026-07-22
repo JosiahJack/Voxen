@@ -1,4 +1,6 @@
 // entity.c - Entity Definitions and Save Load System for levels and savegames
+#include "common.h"
+#include "lib.h" // LibC Replacements and Helpers
 #define LINE_LEN_MAX 81920
 Entity EDefs[MAX_ENTITIES];
 V3 EDefscolliderCenter[MAX_ENTITIES]; // Offset relative to .position's global worldspace xyz location
@@ -12,7 +14,31 @@ float EDefsbounciness[MAX_ENTITIES];
 float EDefsangularDrag[MAX_ENTITIES];
 float EDefsgravity[MAX_ENTITIES];
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
-void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No sense inflating the table data in entity.c
+INLINE i32 parse_numberi32(const char* str, const char* line, u32 lineNum) { if(str == 0 || *str == '\0'){DualLogError("Invalid from line[%d]: %s\n",lineNum+1,line); return 0;} while(cEmpty((char)*str)){str++;} bool negative=false; if(*str == '+'){str++;}else if(*str == '-'){negative=true; str++;} i64 result=0; while(*str >= '0' && *str <= '9'){result=result*10L + (*str-'0'); str++;} return (i32)(negative ? -result : result); }
+INLINE i16 parse_numberi16(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -32768 || retval > 32767) { DualLogError("Value %d out of range for i16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i16)retval; }
+INLINE i8 parse_numberi8(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -128 || retval > 127) { DualLogError("Value %d out of range for i8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i8)retval; }
+float parse_float(const char* str, const char* line, u32 lineNum) {
+    if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
+    while (cEmpty(*str)) str++;
+    bool negative = false;
+    if (*str == '-') { negative = true; str++; }
+    else if (*str == '+') { str++; }
+    double value = 0.0;
+    bool has_digit = false;
+    while (*str >= '0' && *str <= '9') { value = value * 10.0 + (*str - '0'); str++; has_digit = true; } // Integer part
+    if (*str == '.') { // Decimal part
+        str++;
+        double frac = 0.0;
+        double place = 0.1;
+        while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; }
+        value += frac;
+    }
+    if (!has_digit) return 0.0f;
+    if (negative) value = -value;
+    return (float)value;
+}
+
+void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense inflating the table data in entity.c
     mset(EDefs,0,sizeof(Entity)); 
     for (int i=0;i<768;++i) { EDefs[i].index = i; EDefs[i].modelIndex = MAX_MDLS; EDefs[i].lodIndex = MAX_MDLS; }
     
@@ -460,8 +486,8 @@ void ModEDefsInitAfterLoad(void) { // Global conditions for all entities.  No se
     /*415 unused*/
     /*416 unused*/
     /*417 item_access_card_perdarcy*/  EDefs[417].modelIndex=0; EDefs[417].texIndex=8; EDefs[417].glowIndex=341; EDefscollider[417]=COLTYPE_CVX; EDefs[417].colMeshIndex=672; EDefsmass[417]=0.2f; EDefsangularDrag[417]=0.05f; EDefs[417].kinematic=false; EDefsdynamicFriction[417]=EDefsstaticFriction[417]=0.6f;
-    for (int i=419;i<=447;++i) { EDefscollider[i]=COLTYPE_CAP; EDefscolliderSize[i].z=COLLIDER_CAPSULE_DIRECTION_Y_F; EDefsstaticFriction[i]=1.0f; EDefsdynamicFriction[i]=0.15f; EDefs[i].kinematic=true; EDefsmass[i]=1.0f; EDefsangularDrag[i]=2.2f; } // NPCs
-    /*419 npc_autobomb*/            EDefs[419].modelIndex=299; EDefs[419].texIndex=542; EDefscolliderCenter[419].y=0.42f; EDefscolliderCenter[419].z=0.01848752f;                   EDefscolliderSize[419]=(V3){0.42f,1.48f,COLLIDER_CAPSULE_DIRECTION_Z_F};          EDefsangularDrag[419]=1.0f; EDefs[419].glowIndex=541;
+    for (int i=419;i<=447;++i) { EDefscollider[i]=COLTYPE_CAP; EDefscolliderSize[i].z=COLCAP_DIR_Y_F; EDefsstaticFriction[i]=1.0f; EDefsdynamicFriction[i]=0.15f; EDefs[i].kinematic=true; EDefsmass[i]=1.0f; EDefsangularDrag[i]=2.2f; } // NPCs
+    /*419 npc_autobomb*/            EDefs[419].modelIndex=299; EDefs[419].texIndex=542; EDefscolliderCenter[419].y=0.42f; EDefscolliderCenter[419].z=0.01848752f;                   EDefscolliderSize[419]=(V3){0.42f,1.48f,COLCAP_DIR_Z_F};          EDefsangularDrag[419]=1.0f; EDefs[419].glowIndex=541;
     /*420 npc_cyborg_assassin*/     EDefs[420].modelIndex=306; EDefs[420].texIndex=545; EDefs[420].numclips= 8; EDefs[420].animationNum=24;                                           EDefscolliderSize[419].x=0.48f; EDefscolliderSize[419].y=2.0f;  EDefsmass[420]=1.5f; EDefsangularDrag[420]=1.5f; EDefs[420].glowIndex=544;
     /*421 npc_avian_mutant*/        EDefs[421].modelIndex=328; EDefs[421].texIndex=568; EDefs[421].numclips= 5; EDefs[421].animationNum=35; EDefscolliderCenter[421].y= 0.0200f;     EDefscolliderSize[421].x=0.40f; EDefscolliderSize[421].y=1.60f; EDefsmass[421]=2.0f; EDefsangularDrag[421]=1.0f;
     /*422 npc_exec_bot*/            EDefs[422].modelIndex=316; EDefs[422].texIndex=555; EDefs[422].numclips= 5; EDefs[422].animationNum=29; EDefscolliderCenter[422].y= 0.0125f;     EDefscolliderSize[422].x=0.48f; EDefscolliderSize[422].y=2.025f;EDefsmass[422]=2.2f; EDefsangularDrag[422]=1.5f;
@@ -856,12 +882,8 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
     else if (sEqual(k,"lerpOn")) flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));
 }
 
-#define INFRARED_RANGE 50.35f
-#define LANTERN_RANGE 11.52f
-Color3 lantCol = (Color3){1.0f,1.0f,1.0f};
 u16 headmountedLanternLight;
 V3 lanternPos;
-float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};
 #define CHGD(a,b) (vabs((a) - (b)) > 0.0001f)
 void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
     bool changed = ((!!(World.lights[i].lflags & SHADON) - shad) || (!!(World.lights[i].lflags & LIGHTON) -  on) || CHGD(World.lights[i].range,range) || CHGD(World.lights[i].pos.x,pos.x) || CHGD(World.lights[i].pos.y,pos.y) || CHGD(World.lights[i].pos.z,pos.z));
@@ -906,15 +928,9 @@ u16 AddInstance(u16 entIdx, V3 pos) {
     return i;
 }
 
-static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0.07f},/*0*/  {0.34509805f,0.38431373f,0.49019608f,0.055f},/*1*/  {0.47058824f,0.3882353f, 0.3928334f,0.05f},/*2*/  {0.32941177f,0.29411766f,0.2509804f,0.065f},/*3*/ {0.3882353f,0.452415f, 0.47058824f,0.075f},/*4*/
-                                          {0.3882353f, 0.4117647f, 0.47058824f,0.03f},/*5*/  {0.3f,       0.24f,      0.33f,      0.070f},/*6*/  {0.38679248f,0.3471719f, 0.3302332f,0.07f},/*7*/  {0.44708973f,0.45681614f,0.4811321f,0.040f},/*8*/ {0.4056604f,0.3992963f,0.36930403f,0.050f},/*9*/
-                                          {0.48235294f,0.58431375f,0.5176471f, 0.04f},/*10*/ {0.52872473f,0.58431375f,0.48235294f,0.040f},/*11*/ {0.48235294f,0.58431375f,0.5176471f,0.05f},/*12*/ {0.0f,       0.0f,       0.0f,      0.005f},/*13*/ };
-static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/
-                                     {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {-64.000f,-60.120f}/*13*/};
-static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 71.68f/*13*/};
 extern u16 headmountedLanternLight;
 Entity entsFromFile[INSTANCE_COUNT]; V3 positionFromFile[INSTANCE_COUNT]; V3 scaleFromFile[INSTANCE_COUNT]; Quaternion rotationFromFile[INSTANCE_COUNT]; Light lightsFromFile[LIGHT_COUNT]; LightAnimation lanimsFromFile[LIGHT_COUNT];
-static void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt);
+void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt);
 void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/ GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++; }
 static const char* mm_ptr; static const char* mm_end;
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
@@ -932,7 +948,66 @@ static char* MmapGetLine(char* buf, int sz) {
     return buf;
 }
 
+void SetLevelPointers(u8 lev) {
+    if (lev >= MAX_LEVELS) return;
+    World.currentLevel = lev;
+    World.instances        = World.levelInstances[lev];
+    World.position         = World.levelPosition[lev];
+    World.scale            = World.levelScale[lev];
+    World.velocity         = World.levelVelocity[lev];
+    World.angularVelocity  = World.levelAngularVelocity[lev];
+    World.colliderCenter   = World.levelColliderCenter[lev];
+    World.colliderSize     = World.levelColliderSize[lev];
+    World.collider         = World.levelCollider[lev];
+    World.rotation         = World.levelRotation[lev];
+    World.layer            = World.levelLayer[lev];
+    World.mass             = World.levelMass[lev];
+    World.radius           = World.levelRadius[lev];
+    World.gravity          = World.levelGravity[lev];
+    World.inertiaTensor    = World.levelInertiaTensor[lev];
+    World.invInertiaTensor = World.levelInvInertiaTensor[lev];
+    World.angularDrag      = World.levelAngularDrag[lev];
+    World.dynamicFriction  = World.levelDynamicFriction[lev];
+    World.staticFriction   = World.levelStaticFriction[lev];
+    World.bounciness       = World.levelBounciness[lev];
+    World.invTnsrValid     = World.levelInvTnsrValid[lev];
+    World.colliding        = World.levelColliding[lev];
+    World.instCount        = World.levelInstCount[lev];
+    World.lights            = World.levelLights[lev];
+    World.lanims            = World.levelLAnims[lev];
+    World.lightsNewPosition = World.levelLightsNewPosition[lev];
+    World.loadedLights      = World.levelLoadedLights[lev];
+}
+
+void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
+    if (srcLevel >= MAX_LEVELS || dstLevel >= MAX_LEVELS || srcLevel == dstLevel) return;
+    u16 s = PLAYER1;
+    World.levelInstances[dstLevel][s]            = World.levelInstances[srcLevel][s];
+    World.levelPosition[dstLevel][s]             = World.levelPosition[srcLevel][s];
+    World.levelScale[dstLevel][s]                = World.levelScale[srcLevel][s];
+    World.levelVelocity[dstLevel][s]             = World.levelVelocity[srcLevel][s];
+    World.levelAngularVelocity[dstLevel][s]      = World.levelAngularVelocity[srcLevel][s];
+    World.levelColliderCenter[dstLevel][s]       = World.levelColliderCenter[srcLevel][s];
+    World.levelColliderSize[dstLevel][s]         = World.levelColliderSize[srcLevel][s];
+    World.levelCollider[dstLevel][s]             = World.levelCollider[srcLevel][s];
+    World.levelRotation[dstLevel][s]             = World.levelRotation[srcLevel][s];
+    World.levelLayer[dstLevel][s]                = World.levelLayer[srcLevel][s];
+    World.levelMass[dstLevel][s]                 = World.levelMass[srcLevel][s];
+    World.levelRadius[dstLevel][s]               = World.levelRadius[srcLevel][s];
+    World.levelGravity[dstLevel][s]              = World.levelGravity[srcLevel][s];
+    mcpy(World.levelInertiaTensor[dstLevel][s],    World.levelInertiaTensor[srcLevel][s],    6 * sizeof(float));
+    mcpy(World.levelInvInertiaTensor[dstLevel][s], World.levelInvInertiaTensor[srcLevel][s], 6 * sizeof(float));
+    World.levelAngularDrag[dstLevel][s]          = World.levelAngularDrag[srcLevel][s];
+    World.levelDynamicFriction[dstLevel][s]      = World.levelDynamicFriction[srcLevel][s];
+    World.levelStaticFriction[dstLevel][s]       = World.levelStaticFriction[srcLevel][s];
+    World.levelBounciness[dstLevel][s]           = World.levelBounciness[srcLevel][s];
+    World.levelInvTnsrValid[dstLevel][s]         = World.levelInvTnsrValid[srcLevel][s];
+    World.levelColliding[dstLevel][s]            = World.levelColliding[srcLevel][s];
+}
+
 char lineSpace[LINE_LEN_MAX];
+void AddDoorPortal(u16 entIdx, u16 parent);
+void TextureSequenceInit(u16 self, char* trimmed_value);
 void LoadLevelMod(u8 lev) {
     u8 curlevel = vclamp(lev, 0, 13);
     World.curLev = curlevel;
@@ -1164,10 +1239,20 @@ void LoadLevelMod(u8 lev) {
 }
 #undef KEY_EQ
 void func_forcebridge(u16 self); void CyberWallInitAfterLoad(u16 self); void FuncWallInitAfterLoad(u16); void LogicTimerInitBeforeLoad(u16); void ButtonSwitchInitAfterLoad(u16);
-static float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
-static AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips[e->animationNum][clip]; }
-static void DoorSetClipFrame(u16 self, u8 clip, u16 frame) { ChangeAnim(&World.instances[self],clip); (void)frame; }
-static u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span)); }
+float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
+AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips[e->animationNum][clip]; }
+void ChangeAnim(Entity* e, u8 clip);
+void DoorSetClipFrame(u16 self, u8 clip, u16 frame) { ChangeAnim(&World.instances[self],clip); (void)frame; }
+u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span)); }
+void TeleportTouchInitAfterLoad(u16 self); void CyberItemInitBeforeLoad(u16 self);
+void GravityLiftInitAfterLoad(u16 self) {
+    World.instances[self].strength =                  UsableOrDef(World.instances[self].strength, 12.0f);
+    World.instances[self].offStrengthFactor =         UsableOrDef(World.instances[self].offStrengthFactor, 0.3f);
+    World.instances[self].distancePaddingToTopPoint = UsableOrDef(World.instances[self].distancePaddingToTopPoint, 0.32f);
+    World.instances[self].topPoint = (V3){ 0.0f, World.position[self].y + (World.colliderSize[self].y * 0.5f), 0.0f };
+}
+
+void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
 void LoadLevelData(u8 curlevel) {
     World.curLev = curlevel;
     SetLevelPointers(curlevel); // Ensures writing to correct current level
@@ -1246,7 +1331,7 @@ void LoadLevelData(u8 curlevel) {
 }
 
 void RenderLoading(i32 offset, const char * restrict text);
-__attribute__((cold)) void LoadAllLevels(void) {
+void LoadAllLevels() {
     double start_time = get_time();
     DebugRAM("start of LoadAllLevels");
     RenderLoading(100,"Loading level data...");
@@ -1259,6 +1344,7 @@ __attribute__((cold)) void LoadAllLevels(void) {
     DebugRAM("end of LoadAllLevels");
 }
 
+void ResetLevelAudio(); void ResetLevelMusic(); void CullInit();
 void LoadLevel(u8 curlevel, V3 pos) {
     DebugRAM("start of LoadLevel");
     World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false;
@@ -1306,7 +1392,7 @@ size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) 
     return d; // Return final compressed size
 }
 
-size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Put the bubbles of zero back.
+static size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Put the bubbles of zero back.
     size_t s = 0, d = 0;
     while (s < srcSize && d < dstCapacity) {
         u8 cmd = src[s++];
@@ -1367,4 +1453,4 @@ void LoadGame(u8 slot) {
     for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }
 
-u8 GetCurrentLevelSecurity(void) { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
+u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
