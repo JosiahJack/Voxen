@@ -38,13 +38,13 @@ public class ItemTabManager : MonoBehaviour {
 		textManager.GetComponent<Text>().text = Text->stringTable[349]; // MULTIMEDIA DATA READER
 	}
 
-	public void SendItemDataToItemTab(int constIndex, int customIndex) {
+	public void SendItemDataToItemTab(int constIndex, int custIdx) {
 		Reset();
 		if (constIndex < 0) return;
 
 		if (constIndex == 92 || constIndex == 93 || constIndex == 94) { // Head
 			int ind = 37; // Generic indeterminate head.
-			switch(customIndex) {
+			switch(custIdx) {
 				case 1: ind = 11; break; // Abe Ghiran
 				case 2: ind = 32; break; // Mira Stackhouse
 				case 3: ind =  1; break; // Baerga

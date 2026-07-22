@@ -36,7 +36,7 @@ typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 f
 typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 typedef struct { bool hit; V3 point,normal; float pen; } Overlap;    typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
-enum{INSTANCE_COUNT=9000,LIGHT_COUNT=2200,U16_MAX=65535,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,MAX_ENTITIES=768,MAX_LEVELS=14,MAX_MDLS=6000,MAX_TXRS=2048,MAX_TOTAL_PIXELS=29900000u,MAX_UNIQUE_COLORS=1048576u,WORLDX=64,WORLDZ=64,WORLDY=18,MAX_ANIMS=64,
+enum{INSTANCE_COUNT=9000,LIGHT_COUNT=2200,U16_MAX=65535,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,MAX_ENTITIES=768,MAX_LEVELS=14,MAX_MDLS=6000,MAX_TXRS=2048,MAX_TOTAL_PIXELS=38000780u,MAX_UNIQUE_COLORS=120040u,WORLDX=64,WORLDZ=64,WORLDY=18,MAX_ANIMS=64,
      MAX_ANIMCLIPS=32,MAX_WIRELINE_VRTS=512000,MAX_PORTALS=56/*Max 49 on lev 7*/,MAX_KEYS=512,MAX_MOUSE_BUTTONS=8,MAX_CHANNELS=48,MAX_GLYPHS=4096,VRT_ATT_SZ=16,CPU_VRT_SZ=32,LEVEL_CYBERSPACE=13,SHADOW_MAP_SIZE=128,MAX_SHADOWMAPS=80,FONT_ATLAS_SIZE=4672,
      BVH_MAX_DEPTH=3,BVH_LEAF_MAX_TRIS=8,BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585 worst case, +safety*/,BVH_MAX_TRIS_PER_MDL=6986,WELD_HASH_SIZE=32768,MAX_UNIQUE_CVX_MESHES=5989,MAX_VERT_ELEMENT_SIZE=6964,MAX_OUTPUT_VERTS=20960,LIGHTON=1,SHADON=2,
      LIGHT_AND_SHADOW_ON=3,LSPOT=4,LDIR=8,LDIRTY=16,LERPON=32,VOXELS_PER_CELL=8,ARRSIZE=(WORLDX * WORLDZ),VOXELS_X=(WORLDX * VOXELS_PER_CELL),VOXELS_Z=(WORLDZ * VOXELS_PER_CELL),VOXEL_COUNT=(VOXELS_X * VOXELS_Z)/*64 * 64 * 8 * 8*/,TARGET_STRING_LENGTH=38,
@@ -102,29 +102,34 @@ extern SettingsSystem Sys_Settings;
 typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,editMode; u8 dizzyLevel; } CheatsSystem;
 extern CheatsSystem Cheats;
 typedef struct {
-        double logFinished,blinkFinished,beepFinished,tickFinished,centerTabsTickFinished; i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count;
-        u16 linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8]; u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
+        double vmailFrameFinished,logFinished,blinkFinished,beepFinished,tickFinished,centerTabsTickFinished; i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count;
+        u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8]; u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
         bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],
-             highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8],vmailActive;
+             highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
+        u8 vmailActive;
         AudioLogType logType; V3 objectInUsePos;
 } SystemUI;
 typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
 extern TextSystem Sys_Text;
-enum{PATCH_BERSERK=1,PATCH_DETOX=2,PATCH_GENIUS=4,PATCH_MEDI=8,PATCH_REFLEX=16,PATCH_SIGHT=32,PATCH_STAMINUP=64};
-enum{HW_COUNT=14,HW_SYS=1/*System Analyzer*/,HW_NAV=2/*Navigation Unit*/,HW_ERD=4/*Datareader/EReader*/,HW_SNS=8/*Sensaround*/,HW_TID=16/*Target Identifier*/,HW_SHD=32/*Energy Shield*/,HW_BIO=64/*Biomonitor*/,HW_LAN=128/*Head Mounted Lantern*/,HW_ENV=256/*Envirosuit*/,HW_BST=512/*Turbo Motion Booster*/,HW_JET=1024/*Jump Jet Boots*/,HW_INF=2048/*Infrared Night Sight Enhancement*/};
-enum{HW_SYS_IDX=0/*System Analyzer*/,HW_NAV_IDX=1/*Navigation Unit*/,HW_ERD_IDX=2/*Datareader/EReader*/,HW_SNS_IDX=3/*Sensaround*/,HW_TID_IDX=4/*Target Identifier*/,HW_SHD_IDX=5/*Energy Shield*/,HW_BIO_IDX=6/*Biomonitor*/,HW_LAN_IDX=7/*Head Mounted Lantern*/,HW_ENV_IDX=8/*Envirosuit*/,HW_BST_IDX=9/*Turbo Motion Booster*/,HW_JET_IDX=10/*Jump Jet Boots*/,HW_INF_IDX=11/*Infrared Night Sight Enhancement*/};
-enum{SW_DRILL=0,SW_PULSER=1,SW_SHIELD=2,SW_TURBO=3,SW_DECOY=4,SW_RECALL=5,SW_GAMES=6};
-enum{MINIGAME_PING=1,MINIGAME_15=2,MINIGAME_WING0=4,MINIGAME_BOTBOUNCE=8,MINIGAME_EEL_ZAPPER=16,MINIGAME_ROAD=32,MINIGAME_TRIOPTOE=64};
-// Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
-typedef struct {
-    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinishedTime,berserkIncrementFinishedTime,detoxFinishedTime,geniusFinishedTime,mediFinishedTime,reflexFinishedTime,sightFinishedTime,leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished;
-    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,maxEnergy,radAdjust,initialRadiation,weaponDipLerp,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity,leanVelocity;
+enum{PATCH_BERSERK=1,PATCH_DETOX=2,PATCH_GENIUS=4,PATCH_MEDI=8,PATCH_REFLEX=16,PATCH_SIGHT=32,PATCH_STAMINUP=64,HW_COUNT=14,HW_SYS=1/*System Analyzer*/,HW_NAV=2/*Navigation Unit*/,HW_ERD=4/*Datareader/EReader*/,HW_SNS=8/*Sensaround*/,
+     HW_TID=16/*Target Identifier*/,HW_SHD=32/*Energy Shield*/,HW_BIO=64/*Biomonitor*/,HW_LAN=128/*Head Mounted Lantern*/,HW_ENV=256/*Envirosuit*/,HW_BST=512/*Turbo Motion Booster*/,HW_JET=1024/*Jump Jet Boots*/,HW_INF=2048/*Infrared Night Sight Enhancement*/,
+     HW_SYS_IDX=0/*System Analyzer*/,HW_NAV_IDX=1/*Navigation Unit*/,HW_ERD_IDX=2/*Datareader/EReader*/,HW_SNS_IDX=3/*Sensaround*/,HW_TID_IDX=4/*Target Identifier*/,HW_SHD_IDX=5/*Energy Shield*/,HW_BIO_IDX=6/*Biomonitor*/,HW_LAN_IDX=7/*Head Mounted Lantern*/,
+     HW_ENV_IDX=8/*Envirosuit*/,HW_BST_IDX=9/*Turbo Motion Booster*/,HW_JET_IDX=10/*Jump Jet Boots*/,HW_INF_IDX=11/*Infrared Night Sight Enhancement*/,SW_DRILL=0,SW_PULSER=1,SW_SHIELD=2,SW_TURBO=3,SW_DECOY=4,SW_RECALL=5,SW_GAMES=6,
+     MINIGAME_PING=1,MINIGAME_15=2,MINIGAME_WING0=4,MINIGAME_BOTBOUNCE=8,MINIGAME_EEL_ZAPPER=16,MINIGAME_ROAD=32,MINIGAME_TRIOPTOE=64};
+typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
+    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,
+           leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished;
+    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,maxEnergy,
+          radAdjust,initialRadiation,weaponDipLerp,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity,leanVelocity;
     u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
-    i32 lastAddedIndex,emailCurrent,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent,/*Current slot in the general inventory (14 slots).*/hardwareInvIndex,/*Current index to the item look-up table.*/generalInventoryIndexRef[14],berserkIncrement;
+    i32 lastAddedIndex,emailCurrent,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent/*Current slot in the general inventory (14 slots).*/,hardwareInvIndex/*Current index to the item look-up table.*/,
+        generalInventoryIndexRef[14],berserkIncrement;
     i16 ladderState,weaponCurrentPending,weaponIndexPending,weaponCurrent;
-    u16 numLogsFromLevel[10],hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustomIndex,heldObjectAmmo,heldObjectAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustomIndex[14],patchActive,drainJPM;
-    u8 lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenadeCurrent,generalInvCurrent,patchCurrent,patchCounts[7],cyberItemIndex;
-    bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData,radiationArea,leanResetting;
+    u16 hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustIdx,heldObjectAmmo,heldObjectAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustIdx[14],patchActive,drainJPM;
+    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hardwareVersion[HW_COUNT],hardwareVersionSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenCur,generalInvCurrent,patchCur,
+       patchCounts[7],cyberItemIndex;
+    bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,currentCyberItem,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,
+         hasNewLogs,hasNewData,radiationArea,leanResetting;
 } InventorySystem;
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData; // For use with LiveSplit or other future speedrunner utilities for doing speedruns
@@ -156,7 +161,7 @@ typedef /*FAT*/ struct  {
           randomItemDropChance[4];
     V3 accumulatedForce,currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;    
     u16 enemy,altTexIndex,altGlowIndex,messageIndex,teleportID,targetDestinationID,recentMostActivator,countToTrigger,counter,activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex,animationNum,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,
-        lookUpIndex,contents[4],customIndex[4],useableItemIndex,usableCustomIndex,randomItem[4],randomItemCustomIndex[4],mainSwitchMaterial,deathBurst,adjacencyIdx;
+        lookUpIndex,contents[4],custIdx[4],useableItemIndex,usableCustIdx,randomItem[4],randomItemCustIdx[4],mainSwitchMaterial,deathBurst,adjacencyIdx;
     i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2;
     bool cardchunk,searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,
          despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive,alternateOn,lerping,onlyTargetOnce,autoPlayEmail,
@@ -209,12 +214,16 @@ extern float modelMatrices[INSTANCE_COUNT*16]; extern u16** modelTriangles; exte
 extern float **physPos; extern u16** physTris; extern u32* physVertCounts; extern u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; extern u32 uniqueCvxMeshCount;
 extern u32** cvxAdjOffsets; extern u16** cvxAdjLists; extern u16 cvxAdjStart[MAX_UNIQUE_CVX_MESHES]; extern BvhNode** modelBVHNodes; extern u16** modelBVHTriOrder; extern u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
 extern u16 playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; extern const AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; extern i32 threadCnt;
-extern u32 vbos[MAX_MDLS],tbos[MAX_MDLS]; extern FHandle console_log_file; extern u32 drawCalls,vertsRendered,voxelUpdateSP,lightsID,psysSp,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID; extern u32 shadowmapIndirectionList[LIGHT_COUNT];
+extern u32 vbos[MAX_MDLS],tbos[MAX_MDLS]; extern FHandle console_log_file; extern u32 drawCalls,vertsRendered,voxelUpdateSP,lightsID,psysSp,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID;
+extern u32 shadowmapIndirectionList[LIGHT_COUNT];
 extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern double last_mouse_x,last_mouse_y; extern Entity EDefs[MAX_ENTITIES];
-extern V3 EDefscolliderCenter[MAX_ENTITIES]/*Offset relative to .position's global worldspace xyz location*/, EDefscolliderSize[MAX_ENTITIES];/*x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)*/
+extern V3 EDefscolliderCenter[MAX_ENTITIES]/*Offset relative to .position's global worldspace xyz location*/;
+extern V3 EDefscolliderSize[MAX_ENTITIES]/*x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)*/;
 extern ColliderType/*u8*/ EDefscollider[MAX_ENTITIES];
+extern const char* audioLogs[LOGCNT];
 extern u32 EDefslayer[MAX_ENTITIES],gridCellStates[ARRSIZE];
-extern float EDefsmass[MAX_ENTITIES],EDefsdynamicFriction[MAX_ENTITIES],EDefsstaticFriction[MAX_ENTITIES],EDefsbounciness[MAX_ENTITIES],EDefsangularDrag[MAX_ENTITIES],EDefsgravity[MAX_ENTITIES],berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
+extern float EDefsmass[MAX_ENTITIES],EDefsdynamicFriction[MAX_ENTITIES],EDefsstaticFriction[MAX_ENTITIES],EDefsbounciness[MAX_ENTITIES],EDefsangularDrag[MAX_ENTITIES],EDefsgravity[MAX_ENTITIES],berserkSeedTime,rasterPerspectiveProjection[16],
+             shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 typedef struct { V3 normal; float d; } FrustumPlane;
 extern FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 typedef struct PngArena { u8*base,*cursor,*end; } PngArena;
@@ -228,11 +237,11 @@ void *OS_AllocateRAM(size_t,i32,i32,FHandle),*OS_AllocateFileBackedRAMReadonly(s
 i64 OS_Read(long,void*,size_t),OS_RawWrite(FHandle fd, const void* buf, size_t cnt),OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/),OS_Tell(FHandle);
 i32 OS_FileSize(FHandle f);
 __attribute__((noreturn)) void OS_Exit(i64); void DualLogError(const char*, ...),DualLogWarn(const char*, ...),DualLog(const char*, ...);
-void play_wav(const char*,float,V3,bool);
+void play_wav(const char*,float,V3,bool),play_message(const char *);
 u32 GetCollisionMask(u32);
 float TakeDamage(u16,DamageData);
 double get_time();
-void UseTargets(u16,const char*),SetPosition(u16,V3,bool),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),* OS_Alloc(size_t),OS_Free(void*,size_t),*OS_OpenAndAllocateFileBufferReadonly(const char*,FHandle*,int*),DebugRAM(const char*);
+void UseTargets(u16,const char*),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),* OS_Alloc(size_t),OS_Free(void*,size_t),*OS_OpenAndAllocateFileBufferReadonly(const char*,FHandle*,int*),DebugRAM(const char*);
 typedef int (*cmpfun)(const void*,const void*); typedef int (*cmpfun_r)(const void*,const void*,void*);
 int OS_ThreadCreate(OS_Thread*,void*(*fn)(void*),void*);
 char* StringFindFirstCharWithin(const char *s, char c);
@@ -243,7 +252,8 @@ float DoorClamp01(float),Tranquilize(u16,float,bool);
 bool Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Sprint(),TurnLeft(),TurnRight(),LookUp(),LookDown(),RecentLog(),Biomonitor(),Sensaround(),Lantern(),
      Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),
      Console(),ScrshotPressed(),PositionVisibleFromPlayerCell(float,float),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();
-void MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),OverloadFired(),SetVSync(),ResetInput(),InputProcessing(),LoadAllLevels(),AddWireLine(V3 start, V3 end, Color col),ForceInventoryMode(),ForceShootMode(),DoorSetClipFrame(u16,u8,u16),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool);
+void MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),OverloadFired(),SetVSync(),ResetInput(),InputProcessing(),LoadAllLevels(),AddWireLine(V3 start, V3 end, Color col),ForceInventoryMode(),ForceShootMode(),DoorSetClipFrame(u16,u8,u16);
+void UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool);
 void UpdateLights(),ModUpdate(),PSys_Update(),PSys_Init(),InitFontAtlasses(),LoadLogTextForLanguage(u8),LoadTextForLanguage(u8),RenderFormattedText(i16,i16,u32,u8,float,const char* restrict,...),CullCore(),PngArenaInit(PngArena*);
 RaycastHit Raycast(V3,V3,float,u32);
 V3 ScreenPointToRay(V3,V3);
@@ -274,11 +284,11 @@ INLINE float vfloor(float x) { return __builtin_floorf(x); }
 INLINE float vceil(float x) { return __builtin_ceilf(x); }
 INLINE float vsinf(float x) { x -= TAU * vfloor(x * INV_TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
 INLINE float vcosf(float x) { return vsinf(x + 1.57079632f); }
-INLINE float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x = vabs(x); float ret = (-0.0187293f * x + 0.0742610f) * x - 0.2121144f; ret = (ret * x + 1.5707288f) * vsqrtf(1.0f - x); ret = ret - 2.0f * negate * ret; return negate * PI + (1.0f - 2.0f * negate) * ret; }
+INLINE float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x=vabs(x); float ret=(-0.0187293f*x + 0.0742610f)*x - 0.2121144f; ret=(ret*x + 1.5707288f)*vsqrtf(1.0f - x); ret=ret - 2.0f*negate*ret; return negate*PI + (1.0f - 2.0f*negate) * ret; }
 INLINE float vtan(float x) { return vsinf(x) / vcosf(x); }
 INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
 INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
-INLINE float vexp2f(float x) { float ip = vfloor(x); float fp = x - ip; float p = 1.0f + fp * (0.69314718f + fp * (0.24022651f + fp * 0.05550411f)); /*poly approximation for 2^fp on [0,1]*/ int ei = (int)ip + 127; u32 bits = (u32)(ei << 23); union { u32 i; float f; } u = { bits }; return u.f * p; }
+INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f + fp*(0.69314718f + fp*(0.24022651f + fp*0.05550411f)); /*poly approx 2^fp on [0,1]*/ int ei=(int)ip + 127; u32 bits=(u32)(ei << 23); union{u32 i; float f;}u={bits}; return u.f*p;}
 INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 INLINE i32 clamp(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
 INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
@@ -294,8 +304,11 @@ INLINE float V3_SqDist(V3 a, V3 b) { V3 d = V3_AsubB(a,b); return V3_dot(d,d); }
 INLINE float V3_Dist(V3 a, V3 b) { return V3_Mag(V3_AsubB(a,b)); }
 INLINE V3 V3_Cross(V3 a, V3 b) { return (V3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
 INLINE V3 V3_Normalize(V3 v) { float len_sq = V3_dot(v,v); if (len_sq < 0.000001f){return v;} float inv_len = vinvsqtf(len_sq); return (V3){v.x * inv_len, v.y * inv_len, v.z * inv_len}; }
-INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2) { float aw=q1.w, ax=q1.x, ay=q1.y, az= q1.z, bw=q2.w, bx=q2.x, by=q2.y, bz= q2.z; return (Quaternion){aw*bx + ax*bw + ay*bz - az*by,aw*by - ax*bz + ay*bw + az*bx,aw*bz + ax*by - ay*bx + az*bw,aw*bw - ax*bx - ay*by - az*bz}; }
-INLINE V3 quat_rot_v3(Quaternion q, V3 v) { float x=q.x, y=q.y, z=q.z, w=q.w; float vx=v.x, vy=v.y, vz=v.z; float tx=2.0f * (y*vz - z*vy); float ty=2.0f * (z*vx - x*vz); float tz=2.0f * (x*vy - y*vx); return (V3){vx + w*tx + (y*tz - z*ty),vy + w*ty + (z*tx - x*tz),vz + w*tz + (x*ty - y*tx)}; }
+INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2){float aw=q1.w,ax=q1.x,ay=q1.y,az=q1.z,bw=q2.w,bx=q2.x,by=q2.y,bz=q2.z; return (Quaternion){aw*bx+ax*bw+ay*bz-az*by,aw*by-ax*bz+ay*bw+az*bx,aw*bz+ax*by-ay*bx+az*bw,aw*bw-ax*bx-ay*by-az*bz};}
+INLINE V3 quat_rot_v3(Quaternion q, V3 v) {
+    float x=q.x, y=q.y, z=q.z, w=q.w; float vx=v.x, vy=v.y, vz=v.z; float tx=2.0f * (y*vz - z*vy); float ty=2.0f * (z*vx - x*vz); float tz=2.0f * (x*vy - y*vx); return (V3){vx + w*tx + (y*tz - z*ty),vy + w*ty + (z*tx - x*tz),vz + w*tz + (x*ty - y*tx)};
+}
+
 INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
 INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 760); }
@@ -312,12 +325,26 @@ INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 
 INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
 INLINE bool IdxIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417); }
 INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
-INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603) || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
-INLINE bool IdxIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
+INLINE bool IdxIsStaticObjectSaveable(int c) {
+    return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603)  || (c >= 604 && c < 616)
+            || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746));
+}
+
+INLINE bool IdxIsStaticObjectImmutable(int c) {
+    return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698
+            || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755));
+}
+
 INLINE float UsableOrDef(float cur, float def) { u32 c = *(u32*)&cur, d = *(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
-INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 36 && i <= 51) ? (i - 36)/*36:Mark3 AR*//*37:ER-90 Blaster*//*38:SV-23 Dartgun*//*39:AM-27 Flechette*//*40:RW-45 Ion Beam*//*41:TS-04 Laser Rapier*//*42:Lead Pipe*//*43:Magnum 2100*//*44:SB-20 Magpulse*//*45:ML-41 Pistol*//*46:LG-XX Plasma*//*47:MM-76 Railgun*//*48:DC-05 Riotgun*//*49:RF-07 Skorpion*//*50:Sparq Beam*//*51:DH-07 Stungun*/ : -1; }
+INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 36 && i <= 51) ? (i - 36) : -1; }
 INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==37 || i==40 || i==46 || i==50 || i==51; }
-INLINE u16 GetImpactType(u16 instanceIdx){switch(World.instances[instanceIdx].bloodType){case BloodType_None:return 729;/*SparksSmall*/case BloodType_Red:return 724;/*BloodSpurtSmall*/case BloodType_Yellow:return 723;/*BloodSpurtSmallYellow*/case BloodType_Green:return 722;/*BloodSpurtSmallGreen*/case BloodType_Robot:return 730;/*SparksSmallBlue*/case BloodType_Leaf:return 756;/*LeafBurst*/case BloodType_Mutation:return 757;/*MutationBurst*/case BloodType_GrayMutation:return 758;/*GraytationBurst*/}return 729;/*SparksSmall*/}
+INLINE u16 GetImpactType(u16 instanceIdx){
+    switch(World.instances[instanceIdx].bloodType){
+        case BloodType_None:return 729; case BloodType_Red:return 724; case BloodType_Yellow:return 723; case BloodType_Green:return 722; case BloodType_Robot:return 730; case BloodType_Leaf:return 756; case BloodType_Mutation:return 757;
+        case BloodType_GrayMutation:return 758;
+    } return 729;
+}
+
 INLINE  int  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
 INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
 INLINE void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
@@ -341,8 +368,9 @@ INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
 INLINE float SfxVol() { return (float)Sys_Settings.VolumeEffects / 100.0f; }
-enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,
-      GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8};
+enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,
+      GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,
+      GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8};
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
 typedef void(*FGL_C)(u32), (*FGL_FL)(),   (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
 typedef void(*FGL_CS)(u32),(*FGL_RB)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32),  (*FGL_CTSI2D)(u32,i32,i32,i32,i32,i32,i32,i32);
@@ -355,11 +383,12 @@ extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; 
 extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable;
 typedef enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)} JoyHatId;
 typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,
-             KEY_SEMICOLON=59/* ; */,KEY_EQUAL=61/* = */,KEY_A=65,KEY_B=66,KEY_C=67,KEY_D=68,KEY_E=69,KEY_F=70,KEY_G=71,KEY_H=72,KEY_I=73,KEY_J=74,KEY_K=75,KEY_L=76,KEY_M=77,KEY_N=78,KEY_O=79,KEY_P=80,KEY_Q=81,KEY_R=82,KEY_S=83,KEY_T=84,KEY_U=85,KEY_V=86,KEY_W=87,KEY_X=88,KEY_Y=89,KEY_Z=90,
-             KEY_LEFT_BRACKET=91/* [ */,KEY_BACKSLASH=92/* \ */,KEY_RIGHT_BRACKET=93/* ] */,KEY_GRAVE_ACCENT=96/* ` */,KEY_ESCAPE=256,KEY_ENTER=257,KEY_TAB=258,KEY_BACKSPACE=259,KEY_INSERT=260,KEY_DELETE=261,KEY_RIGHT=262,KEY_LEFT=263,KEY_DOWN=264,KEY_UP=265,KEY_PAGE_UP=266,KEY_PAGE_DOWN=267,
-             KEY_HOME=268,KEY_END=269,KEY_CAPS_LOCK=280,KEY_SCROLL_LOCK=281,KEY_NUM_LOCK=282,KEY_PRINT_SCREEN=283,KEY_PAUSE=284,KEY_F1=290,KEY_F2=291,KEY_F3=292,KEY_F4=293,KEY_F5=294,KEY_F6=295,KEY_F7=296,KEY_F8=297,KEY_F9=298,KEY_F10=299,KEY_F11=300,KEY_F12=301,KEY_KP_0=320,
-             KEY_KP_1=321,KEY_KP_2=322,KEY_KP_3=323,KEY_KP_4=324,KEY_KP_5=325,KEY_KP_6=326,KEY_KP_7=327,KEY_KP_8=328,KEY_KP_9=329,KEY_KP_DECIMAL=330,KEY_KP_DIVIDE=331,KEY_KP_MULTIPLY=332,KEY_KP_SUBTRACT=333,KEY_KP_ADD=334,KEY_KP_ENTER=335,KEY_KP_EQUAL=336,KEY_LEFT_SHIFT=340,
-             KEY_LEFT_CONTROL=341,KEY_LEFT_ALT=342,KEY_LEFT_SUPER=343,KEY_RIGHT_SHIFT=344,KEY_RIGHT_CONTROL=345,KEY_RIGHT_ALT=346,KEY_RIGHT_SUPER=347,KEY_MENU=348} KeyId;
+             KEY_SEMICOLON=59/* ; */,KEY_EQUAL=61/* = */,KEY_A=65,KEY_B=66,KEY_C=67,KEY_D=68,KEY_E=69,KEY_F=70,KEY_G=71,KEY_H=72,KEY_I=73,KEY_J=74,KEY_K=75,KEY_L=76,KEY_M=77,KEY_N=78,KEY_O=79,KEY_P=80,KEY_Q=81,KEY_R=82,KEY_S=83,KEY_T=84,KEY_U=85,KEY_V=86,
+             KEY_W=87,KEY_X=88,KEY_Y=89,KEY_Z=90,KEY_LEFT_BRACKET=91/* [ */,KEY_BACKSLASH=92/* \ */,KEY_RIGHT_BRACKET=93/* ] */,KEY_GRAVE_ACCENT=96/* ` */,KEY_ESCAPE=256,KEY_ENTER=257,KEY_TAB=258,KEY_BACKSPACE=259,KEY_INSERT=260,KEY_DELETE=261,
+             KEY_RIGHT=262,KEY_LEFT=263,KEY_DOWN=264,KEY_UP=265,KEY_PAGE_UP=266,KEY_PAGE_DOWN=267,KEY_HOME=268,KEY_END=269,KEY_CAPS_LOCK=280,KEY_SCROLL_LOCK=281,KEY_NUM_LOCK=282,KEY_PRINT_SCREEN=283,KEY_PAUSE=284,KEY_F1=290,KEY_F2=291,KEY_F3=292,KEY_F4=293,
+             KEY_F5=294,KEY_F6=295,KEY_F7=296,KEY_F8=297,KEY_F9=298,KEY_F10=299,KEY_F11=300,KEY_F12=301,KEY_KP_0=320,KEY_KP_1=321,KEY_KP_2=322,KEY_KP_3=323,KEY_KP_4=324,KEY_KP_5=325,KEY_KP_6=326,KEY_KP_7=327,KEY_KP_8=328,KEY_KP_9=329,KEY_KP_DECIMAL=330,
+             KEY_KP_DIVIDE=331,KEY_KP_MULTIPLY=332,KEY_KP_SUBTRACT=333,KEY_KP_ADD=334,KEY_KP_ENTER=335,KEY_KP_EQUAL=336,KEY_LEFT_SHIFT=340,KEY_LEFT_CONTROL=341,KEY_LEFT_ALT=342,KEY_LEFT_SUPER=343,KEY_RIGHT_SHIFT=344,KEY_RIGHT_CONTROL=345,KEY_RIGHT_ALT=346,
+             KEY_RIGHT_SUPER=347,KEY_MENU=348} KeyId;
 typedef enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2} MouseButtonId;
 typedef enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15} JoystickId;
 typedef struct { bool down,pressed,released; } KeyState; typedef struct { const char* name; int value; } InputElement;

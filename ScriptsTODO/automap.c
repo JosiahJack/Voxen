@@ -175,13 +175,11 @@ static const float camMaxAmount = 0.2548032f;
 // 	public void UpdateAutomap(V3 playerPosition) {
 // 		if (PlayerMovement.a.inCyberSpace) return;
 // 		if (!initialized) Start();
-// 
 // 		if (inSideView) {
 // 			Utils.AssignImageOverride(automapSideLHImage,automapsSideImages[LevelManager.a.currentLevel]);
 // 			Utils.AssignImageOverride(automapSideRHImage,automapsSideImages[LevelManager.a.currentLevel]);
 // 			return;
 // 		} 
-// 		
 // 		if (AutoMapDisplayActive()) {
 // 			Utils.Activate(automapCamera.gameObject);
 // 			Utils.EnableCamera(automapCamera);
@@ -189,14 +187,9 @@ static const float camMaxAmount = 0.2548032f;
 // 			Utils.Deactivate(automapCamera.gameObject);
 // 			Utils.DisableCamera(automapCamera);
 // 		}
-// 
-// 		if (World.invP1.NavUnitVersion() < 2) {
-// 			Utils.Deactivate(poolContainerAutomapBotOverlays);
-// 		} else {
-// 			Utils.Activate(poolContainerAutomapBotOverlays);
-// 		}
-// 
-// 		if (World.invP1.NavUnitVersion() < 3) {
+// 		if (World.invP1.hardwareVersion[HW_NAV_IDX] < 2) { Utils.Deactivate(poolContainerAutomapBotOverlays); }
+// 		else { Utils.Activate(poolContainerAutomapBotOverlays); }
+// 		if (World.invP1.hardwareVersion[HW_NAV_IDX] < 3) {
 // 			Utils.Deactivate(poolContainerAutomapCyborgOverlays);
 // 			Utils.Deactivate(poolContainerAutomapMutantOverlays);
 // 		} else {

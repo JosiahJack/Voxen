@@ -94,12 +94,12 @@
 		}
 	}
 
-	public void LogAdded(int logCustomIndex) {
+	public void LogAdded(int logCustIdx) {
 		if (World.diffMis == 0) return;
 		// Not checking for eReader present here...best to assume so we don't
 		// have to do all this later and remember it and save it in save file.
 
-		switch (logCustomIndex) {
+		switch (logCustIdx) {
 			case 6: // #2-4601-06.MAY.72, just rewards
 				notes[6].SetActive(true); // Make sure this was on.
 				World.invP1.hasNewNotes = true;

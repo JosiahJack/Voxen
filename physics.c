@@ -16,11 +16,7 @@ typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 float posBudget[INSTANCE_COUNT]; // Remaining |Δpos| entity i may receive this substep; reset every substep in Physics().
 u16 dynamicEntities[512],dynamicEntityCount;
-void SetPosition(u16 i, V3 newpos, bool teleport) {
-    float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} if(teleport){World.position[i]=newpos; return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;}
-    V3 dir=V3_Normalize(V3_AsubB(newpos,World.position[i])); World.position[i]=V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed)); posBudget[i] -= allowed;
-}
-
+INLINE void SetPosition(u16 i, V3 newpos) { float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;} V3 dir=V3_Normalize(V3_AsubB(newpos,World.position[i])); World.position[i]=V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed)); posBudget[i] -= allowed; }
 INLINE Manifold OverlapToManifold(Overlap r) { Manifold m={0}; if (r.hit && r.pen > PHY_EPSILON) { m.normal = r.normal; m.n = 1; m.p[0] = (ManifoldPt){r.point, r.pen}; m.maxPen = r.pen; } return m; }
 INLINE Overlap SphSph(V3 a, float ar, V3 b, float br) { V3 dt=V3_AsubB(a,b); float d2=V3_dot(dt,dt),rs=ar+br; float h=(d2<rs*rs); float d=vsqrtf(vmax(d2,0.0f)); float m=(d<PHY_EPSILON); V3 n=V3_AplusB(V3_ScaleByF(dt,(1.0f/vmax(d,PHY_EPSILON))*(1.0f-m)),V3_ScaleByF((V3){0,1,0},m)); V3 point=V3_AplusB(b,V3_ScaleByF(n,br)); return (Overlap){(bool)h,point,n,(rs-d)*h}; }
 Overlap SphCap(ShapeSphere s, ShapeCapsule c) { V3 seg=V3_AsubB(c.tip,c.base); float l=V3_dot(seg,seg); float m=(l < PHY_EPSILON); V3 b=V3_AplusB(c.base, V3_ScaleByF(seg,vclamp(V3_dot(V3_AsubB(s.ctr, c.base),seg) / vmax(l, PHY_EPSILON), 0.0f, 1.0f) * (1.0f - m))); b = V3_AplusB(V3_ScaleByF(b,1.0f - m),V3_ScaleByF(c.base,m)); return SphSph(s.ctr,s.rad,b,c.rad); }
@@ -541,8 +537,8 @@ void ApplyManifoldResponse(u16 a, u16 b, const Manifold *m) {
     for (int it=0;it<iters;++it) { for (int i=0;i<m->n;++i) ResolveContactVelocity(a,b,m->normal,rA[i],rB[i],targetVn[i],&accumN[i],&accumT[i],bStatic,invMassA,invMassB,invSumN[i],canRotateA,canRotateB,Ra,Rb); }
     float avgPen=0.0f; for (int i=0;i<m->n;++i) {avgPen += m->p[i].pen;} avgPen /= (float)m->n; float c = vmax(avgPen - 0.005f,0.0f) * 0.9f;
     float massDiv = invMassA + invMassB + PHY_EPSILON;
-    SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(m->normal,c * invMassA / massDiv)),false); 
-    if (!bStatic) SetPosition(b,V3_AsubB(World.position[b],V3_ScaleByF(m->normal,c * invMassB / massDiv)),false);
+    SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(m->normal,c * invMassA / massDiv))); 
+    if (!bStatic) SetPosition(b,V3_AsubB(World.position[b],V3_ScaleByF(m->normal,c * invMassB / massDiv)));
 }
 
 void EntityColliderMatrixNow(u16 i, float M[16]) { // Convex meshes need to keep their matrix4x4 up to date.
@@ -580,7 +576,7 @@ void Physics(float dt) {
             else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
             float linDrag = vexp(-0.1f * dtsub); 
             V3 vel = World.velocity[a]; vel.x *= linDrag; vel.z *= linDrag; World.velocity[a] = vel; // Y axis is unaffected, so gravity accumulates infinitely until MAX_SPEED
-            SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)),false);
+            SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
             if (World.collider[a] != COLTYPE_CAP) {
                 if (unlikely(!V3_IsSane(World.angularVelocity[a]))) { World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f}; }
                 else {

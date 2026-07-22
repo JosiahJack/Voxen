@@ -350,11 +350,11 @@
 		itemTabRH.Reset();
 	}
 
-	public void SendInfoToItemTab(int index, int customIndex) {
+	public void SendInfoToItemTab(int index, int custIdx) {
 		if (index < 0 || index > 110) { ResetItemTab(); return; }
 
-		itemTabLH.SendItemDataToItemTab(index,customIndex);
-		itemTabRH.SendItemDataToItemTab(index,customIndex);
+		itemTabLH.SendItemDataToItemTab(index,custIdx);
+		itemTabRH.SendItemDataToItemTab(index,custIdx);
 	}
 
 	public void SendInfoToItemTab(int index) {
@@ -389,14 +389,14 @@
 		} else {
 			// Patches
 			// ----------------------------------------------------------------
-			World.invP1.patchButtonScripts[World.invP1.patchCurrent].DoubleClick();
+			World.invP1.patchButtonScripts[World.invP1.patchCur].DoubleClick();
 
 			// Set item tab to next patch.
 			SendInfoToItemTab(World.invP1.patchIndex);
 		}
 	}
 
-	public void Search(bool isRH, string head, int numberFoundContents, int[] contents, int[] customIndex) {
+	public void Search(bool isRH, string head, int numberFoundContents, int[] contents, int[] custIdx) {
 		if (isRH) {
 			headerTextRH.SetActive(true);
 			headerText_textRH.enabled = true;
@@ -413,7 +413,7 @@
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = null;
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contWorld.instances[i]);
 					searchContainerRH.contWorld.instances[i] = contWorld.instances[i];
-					searchContainerRH.customIndex[i] = customIndex[i];
+					searchContainerRH.custIdx[i] = custIdx[i];
 				}
 			}
 			searchCloseButtonRH.SetActive(true);
@@ -433,7 +433,7 @@
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = null;
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(contWorld.instances[i]);
 					searchContainerLH.contWorld.instances[i] = contWorld.instances[i];
-					searchContainerLH.customIndex[i] = customIndex[i];
+					searchContainerLH.custIdx[i] = custIdx[i];
 				}
 			}
 			searchCloseButtonLH.SetActive(true);
@@ -769,7 +769,7 @@
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = null;
 					searchItemImagesRH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(101);
 					searchContainerRH.contWorld.instances[i] = -1;
-					searchContainerRH.customIndex[i] = -1;
+					searchContainerRH.custIdx[i] = -1;
 				}
 			}
 
@@ -785,7 +785,7 @@
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = null;
 					searchItemImagesLH[i].GetComponent<Image>().overrideSprite = Const.a.GetSpriteFromTexture(101);
 					searchContainerLH.contWorld.instances[i] = -1;
-					searchContainerLH.customIndex[i] = -1;
+					searchContainerLH.custIdx[i] = -1;
 				}
 			}
 

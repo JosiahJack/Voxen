@@ -222,7 +222,7 @@ void BioMonitorUpdate() {
 
     // Chi Brain Waves
     float brainFactor = 0.15f;
-    if (World.invP1.geniusFinishedTime > World.pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f);
+    if (World.invP1.geniusFinished > World.pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f);
     if (Cheats.showFPS) bioMonitor.chiValue = (((float)World.thisFrameTime/16.0f) * 0.5f) - 2.0f;
     else                     bioMonitor.chiValue = (float)(vsinf(World.pauseRelativeTime * 10.0 * (double)brainFactor));
 

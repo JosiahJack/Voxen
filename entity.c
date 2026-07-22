@@ -901,7 +901,7 @@ u16 AddInstance(u16 entIdx, V3 pos) {
     u16 i = World.instCount;
     InitializeEntity(&World.instances[i]);
     World.instances[i].index = entIdx;
-    SetPosition(i,pos,true); // Marks dirty internally, using true to force as if twere teleported.
+    World.position[i] = pos;
     if (IdxIsNPC(entIdx)) InitializeAIAfterLoad(i);
     World.instances[i].cardchunk = EDefs[entIdx].cardchunk;
     World.instances[i].modelIndex = EDefs[entIdx].modelIndex;
@@ -1366,7 +1366,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
     World.levelCurrentlyLoading = false;
-    SetPosition(PLAYER1,pos,true);
+    World.position[PLAYER1]=pos;
     DebugRAM("end of LoadLevel");
 }
 // Save Game System

@@ -3,6 +3,7 @@
 #include "lib.h" // LibC Replacements and Helpers
 #include "credits.h"
 #include "Shaders/shaders.h"
+#define THRSTACKSZ (8 * 1024 * 1024)
 #if defined(_WIN32)
     #define WINDOWS
     #define MOD_EXTENSION ".dll" // e.g. Citadel.dll
@@ -32,7 +33,6 @@
     INLINE int OS_GetNumThreads() { SYSTEM_INFO si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
     void OS_Free(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x00008000)) DualLogError("VirtualFree failed\n"); }
     i64 OS_RawWrite(FHandle fd, const void* buf, size_t count) { u32 w; return WriteFile((void*)fd,(void*)buf,(u32)count,&w,NULL) ? (i64)w : -1; }
-    #define THRSTACKSZ (8 * 1024 * 1024)
     void* __stdcall GetProcessHeap(); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); void __stdcall Sleep(u32 dwMilliseconds); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
     typedef u32 (__stdcall *LPTHREAD_START_ROUTINE)(void* lpParameter);
     void* __stdcall CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, u32 dwCreationFlags, u32* lpThreadId);
@@ -67,7 +67,6 @@
     #define SYSCALL2(n, a, b) syscall6(n,(long)(a),(long)(b),0,0,0,0)
     #define SYSCALL3(n, a, b, c) syscall6(n,(long)(a),(long)(b),(long)(c),0,0,0)
     #define SYSCALL4(n, a, b, c, d) syscall6(n,(long)(a),(long)(b),(long)(c),(long)(d),0,0)
-    #define THRSTACKSZ (8 * 1024 * 1024)
     INLINE long syscall6(long n, long a, long b, long c, long d, long e, long f) { register long r=n; register long r10 __asm__("r10") = d; register long r8  __asm__("r8")  = e; register long r9  __asm__("r9")  = f; __asm__ __volatile__("syscall":"+a"(r):"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return r; }
     __attribute__((naked)) static long OS_CloneSyscall(struct OS_ThreadHead* stack) { __asm__ volatile ("mov %%rdi, %%rsi\nmov $0x50f00, %%edi\nmov $56, %%eax\nsyscall\nmov  %%rsp, %%rdi\nret\n":::"rax","rcx","rsi","rdi","r11","memory"); }
     __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) { head->fn(head->arg); __atomic_store_n(&head->join_futex,1,__ATOMIC_SEQ_CST); SYSCALL3(202,&head->join_futex,1,0x7fffffff);/*futex wake*/  SYSCALL1(60,0); __builtin_unreachable(); }
@@ -748,6 +747,8 @@ void RenderPausedUI() {
     RenderFormattedText(572,690,overQuit ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,/*"QUIT GAME"*/Sys_Text.stringTable[729]);
 }
 
+static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931};
+static const u16   vmailEndFrames[6]={1644,1712,1783,1863,1930,1988};
 u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0;
 #define AVG_CPU_TAPS 2048
 double avgCPUt[AVG_CPU_TAPS]={0};
@@ -765,7 +766,7 @@ static double RenderUI() {
     if ((World.menuActive || World.paused)) {
         if (Sys_Input.keyStates[KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
         else if (Sys_Input.keyStates[KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
-    } else { /* Normal UI */
+    } else if (!World.Sys_UI.vmailActive) { /* Normal UI */
 //         if (World.Sys_UI.showTeleportFX) { /*TeleportFX*/ }
 //         if (World.Sys_UI.showRadiationFX) { /*RadiationFX*/ }
 //         if (World.Sys_UI.showHealingFX) { /*HealingFX*/ }
@@ -826,10 +827,16 @@ static double RenderUI() {
 //         if (World.Sys_UI.showSightDimming) { /*SightDimming*/ }
 //         if (World.Sys_UI.showDeathFX) { /*DeathFXContainer*/ }
     }
+    if (World.Sys_UI.vmailActive) {
+        if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[World.Sys_UI.vmailActive]) {
+            if (World.Sys_UI.vmailFrame == (vmailStartFrames[World.Sys_UI.vmailActive]+11)) play_wav(sounds[99],1.0f,(V3){0,0,0},false);
+            World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[World.Sys_UI.vmailActive]) World.Sys_UI.vmailFrame = vmailEndFrames[World.Sys_UI.vmailActive];
+        }
+        RenderUIImage(283,184,800,400,World.Sys_UI.vmailFrame); // Vmail viewer
+    }
     i16 debugTextStartY = 48; /* Diagnostics / Debugging */
     if (Cheats.showLocation && !World.menuActive) RenderFormattedText(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
     i16 lineSpacing = 18;
-    
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, CPU ms::Shad: %.3f(wrst:%.3f), Phys: %.3f, Rendr: %.3f, Pre phys: %.3f, Logic: %.3f",playerCellIdx,shadowTime * 1000,worstShadTime * 1000,physTime * 1000,renderTime * 1000,prePhys * 1000,gameTime * 1000);
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",World.velocity[PLAYER1].x,World.velocity[PLAYER1].y,World.velocity[PLAYER1].z,World.instances[PLAYER1].entflags & EF_GROUNDED);
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Time Elapsed: %.3f",World.pauseRelativeTime - game_start_time);
@@ -1114,8 +1121,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight); // Restore normal output size for final composite blit
     glUseProgram(imageBlitSP); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,inputImageID); glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,inputUIID); glUniform1i(31,1); glUniform1i(32,3); glUniformMatrix4fv(33,1,0,invViewProj);
-    double berserkTimeRemainingNormalized = World.invP1.berserkFinishedTime > 0.0001 ? (World.invP1.berserkFinishedTime - World.pauseRelativeTime) / BERSERK_TIME : 0.0;
-    if (World.invP1.berserkFinishedTime < World.pauseRelativeTime && World.invP1.berserkFinishedTime > 0.0001) World.invP1.berserkFinishedTime = berserkTimeRemainingNormalized = 0.0;
+    double berserkTimeRemainingNormalized = World.invP1.berserkFinished > 0.0001 ? (World.invP1.berserkFinished - World.pauseRelativeTime) / BERSERK_TIME : 0.0;
+    if (World.invP1.berserkFinished < World.pauseRelativeTime && World.invP1.berserkFinished > 0.0001) World.invP1.berserkFinished = berserkTimeRemainingNormalized = 0.0;
     glUniform1ui(5,refOn); glUniform1ui(6,Sys_Settings.FXAA); glUniform1f(14,Sys_Settings.FOV); glUniform1f(16,aspect3D); glUniform1ui(22,Sys_Settings.Shadows); glUniform1f(9,(float)berserkTimeRemainingNormalized); glUniform1f(10,berserkSeedTime); glUniform1ui(11,Sys_Settings.Brightness);
     glUniform3f(12,deg2rad(World.cam_yaw),deg2rad(World.cam_pitch),deg2rad(World.cam_roll)); glUniform3f(13,px,py,pz); glUniform1f(15,(float)World.pauseRelativeTime * 0.1f); glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
     glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); glUniform1ui(19,((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
@@ -1202,7 +1209,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.invP1.sparqSetting = 50.0f; World.invP1.ionSetting = 100.0f; World.invP1.blasterSetting = 15.0f; World.invP1.plasmaSetting = 40.0f; World.invP1.stungunSetting = 20.0f; World.invP1.justFired = (World.pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
     World.invP1.resetAfterDeathTime = 0.5; World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.radFXFinished = World.pauseRelativeTime; World.Sys_UI.lastMultiMediaTabOpened = MM_EMAIL_TABLE;
     World.Sys_UI.logFinished = World.pauseRelativeTime; World.Sys_UI.tickFinished = World.Sys_UI.centerTabsTickFinished = World.current_time + 0.1 + (double)random_range(0.0f,1.0f); World.Sys_UI.blinkFinished = 1.0 + World.pauseRelativeTime; World.Sys_UI.beepFinished = 3.0 + World.pauseRelativeTime;
-    World.invP1.mediFinishedTime = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = -1.0; World.invP1.berserkIncrement = World.invP1.patchActive = 0; World.invP1.staminupActive = World.geniusActive = false; World.timeScale = DEFAULT_TIME_SCALE; 
+    World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = -1.0; World.invP1.berserkIncrement = World.invP1.patchActive = 0; World.invP1.staminupActive = World.geniusActive = false; World.timeScale = DEFAULT_TIME_SCALE; 
     World.cam_yaw = 90.0f; World.cam_pitch = 0.0f; World.cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode;
     World.gameFinished = World.creditsActive = World.decoyActive = false; World.damageDealt = World.damageReceived = 0.0f;
     World.ressurections = World.deaths = World.kills = World.cyberkills = 0u; World.shotsFired = World.grenadesThrown = World.savesScummed = 0U; World.creditsPageIndex = 0u;
@@ -1219,6 +1226,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
 }
+
+void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
 
 // Init
 void GoIntoGame() { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", World.playerName); }

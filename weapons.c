@@ -378,8 +378,11 @@ void FireWeapon(int wep16, bool isSilent) {
 
 static bool pendingAttackWep16Valid = false; static int  pendingAttackWep16 = -1;
 void StartNormalAttack(int wep16) { if ((wep16 < 0 || wep16 > 15) || (World.invP1.waitTilNextFire >= World.pauseRelativeTime) || (World.invP1.reloadFinished >= World.pauseRelativeTime)) return; pendingAttackWep16=wep16; pendingAttackWep16Valid=true; }
+void DeactivateVMail();
 void CheckAttackInput(void) {
-    if (World.invP1.holdingObject && !World.mouseClickHeldOverGUI) { if (!World.uiIsBlocking) { /* DropHeldItem(); */ return; } /*AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustomIndex); ResetHeldItem(); TODO*/ return; }
+    if (!Attack()) return;
+    if (World.Sys_UI.vmailActive) { DeactivateVMail(); return; }
+    if (World.invP1.holdingObject && !World.mouseClickHeldOverGUI) { if (!World.uiIsBlocking) { /* DropHeldItem(); */ return; } /*AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); TODO*/ return; }
     int wepdex = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
     if (wepdex == -1 || World.invP1.holdingObject || World.mouseClickHeldOverGUI) return; // No weapon.
     StartNormalAttack(wepdex);

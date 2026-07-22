@@ -4,47 +4,37 @@
 #include "lib.h"
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
-    float ndcX =  ((World.inventoryMode ? World.cursorPosition_x : 683.0f) - 683.0f) / 384.0f; // Normalize both axes by half-height 384 so aspect handled naturally
-    float ndcY = -((World.inventoryMode ? World.cursorPosition_y : 384.0f) - 384.0f) / 384.0f;
-    float tanFov = vtan((float)Sys_Settings.FOV * 0.5f * PI / 180.0f);
-    V3 view = V3_Normalize((V3){ndcX * tanFov,ndcY * tanFov,-1.0f}); V3 flipForward = (V3){-fwd.x,-fwd.y,-fwd.z}; V3 up = V3_Normalize(V3_Cross(rt,flipForward));
+    float tanFov = vtan((float)Sys_Settings.FOV * 0.5f * PI / 180.0f), ndcX = ((World.inventoryMode ? World.cursorPosition_x : 683.0f) - 683.0f) / 384.0f, ndcY = -((World.inventoryMode ? World.cursorPosition_y : 384.0f) - 384.0f) / 384.0f;
+    V3 view = V3_Normalize((V3){ndcX * tanFov,ndcY * tanFov,-1.0f}), flipForward = (V3){-fwd.x,-fwd.y,-fwd.z}; V3 up = V3_Normalize(V3_Cross(rt,flipForward));
     return (V3){view.x*rt.x + view.y*up.x + view.z*flipForward.x,view.x*rt.y + view.y*up.y + view.z*flipForward.y,view.x*rt.z + view.y*up.z + view.z*flipForward.z};
 }
 
-void ResetHeldItem() { World.invP1.heldObjectIndex=World.invP1.heldObjectCustomIndex=U16_MAX; World.invP1.heldObjectAmmo=World.invP1.heldObjectAmmo2=0; World.invP1.heldObjectLoadedAlternate=World.invP1.holdingObject=World.invP1.grenActive=false; }
+void ResetHeldItem() { World.invP1.heldObjectIndex=World.invP1.heldObjectCustIdx=U16_MAX; World.invP1.heldObjectAmmo=World.invP1.heldObjectAmmo2=0; World.invP1.heldObjectLoadedAlternate=World.invP1.holdingObject=World.invP1.grenActive=false; }
 void DropHeldItem() {
-    if (World.invP1.heldObjectIndex >= World.instCount) { ResetHeldItem(); return; }
-    if (World.invP1.dropFinished > World.pauseRelativeTime) return;
-    World.invP1.dropFinished = World.pauseRelativeTime + 0.2; // Prevent immediate regrab at high fps
-    u16 newent = AddInstance(World.invP1.heldObjectIndex,World.position[PLAYER1]);
-    Entity* tossObject = &World.instances[newent];
-    tossObject->usableCustomIndex = World.invP1.heldObjectCustomIndex;
-    tossObject->ammo = World.invP1.heldObjectAmmo;
-    tossObject->ammo2 = World.invP1.heldObjectAmmo2;
-    tossObject->heldObjectLoadedAlternate = World.invP1.heldObjectLoadedAlternate;
-    World.position[newent] = World.position[PLAYER1];
-    flag_set(&tossObject->entflags,EF_RIGIDBODY,true);
-    V3 tossDir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right);
-    World.position[newent] = V3_AplusB(World.position[PLAYER1],V3_ScaleByF(tossDir,0.48f));
-    World.velocity[newent] = V3_ScaleByF(tossDir,10.0f);
+    if (World.invP1.heldObjectIndex >= World.instCount) { ResetHeldItem(); return; }    if (World.invP1.dropFinished > World.pauseRelativeTime) {return;}
+    World.invP1.dropFinished = World.pauseRelativeTime + 0.2; // Prevent immediate re-grab at high fps
+    u16 n = AddInstance(World.invP1.heldObjectIndex,World.position[PLAYER1]);
+    Entity* e = &World.instances[n]; e->usableCustIdx = World.invP1.heldObjectCustIdx; e->ammo = World.invP1.heldObjectAmmo; e->ammo2 = World.invP1.heldObjectAmmo2; e->heldObjectLoadedAlternate = World.invP1.heldObjectLoadedAlternate;
+    flag_set(&e->entflags,EF_RIGIDBODY,true); 
+    V3 tossDir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right); World.position[n] = V3_AplusB(World.position[PLAYER1],V3_ScaleByF(tossDir,0.48f)); World.velocity[n] = V3_ScaleByF(tossDir,10.0f);
     ResetHeldItem();
 }
 
 static const u16 patchMsg[7] = {325,326,327,328,329,330,331};
-//static const double patchTime[7] = {BERSERK_TIME,DETOX_TIME,GENIUS_TIME,MEDI_TIME,REFLEX_TIME,SIGHT_TIME,STAMINUP_TIME}; TODO
-void PatchUse(int patchSlot) { (void)patchSlot; if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } World.invP1.patchCounts[patchSlot]--;
+void PatchUse(int patchSlot) {
+    if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } World.invP1.patchCounts[patchSlot]--;
     World.invP1.patchActive |= (u16)(1u << patchSlot);
     switch (patchSlot) {
-        case 0: if (World.invP1.berserkFinishedTime > World.pauseRelativeTime) World.invP1.berserkFinishedTime += BERSERK_TIME; else World.invP1.berserkFinishedTime = World.pauseRelativeTime + BERSERK_TIME; World.invP1.berserkIncrementFinishedTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0); World.invP1.berserkIncrement = 0; break;
-        case 1: World.invP1.detoxFinishedTime = World.pauseRelativeTime + DETOX_TIME; World.invP1.radiated = 0.0f; break;
-        case 2: World.invP1.geniusFinishedTime = World.pauseRelativeTime + GENIUS_TIME; World.geniusActive = true; break;
-        case 3: World.invP1.mediFinishedTime = World.pauseRelativeTime + MEDI_TIME; break;
-        case 4: World.invP1.reflexFinishedTime = World.absoluteTime + REFLEX_TIME; World.timeScale = REFLEX_TIME_SCALE; break;
-        case 5: World.invP1.sightFinishedTime = World.pauseRelativeTime + SIGHT_TIME; World.invP1.sightSideEffectFinishedTime = -1.0; break;
+        case 0: if(World.invP1.berserkFinished > World.pauseRelativeTime){World.invP1.berserkFinished += BERSERK_TIME;}
+                else{World.invP1.berserkFinished = World.pauseRelativeTime + BERSERK_TIME; World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0); World.invP1.berserkIncrement = 0;} break;
+        case 1: World.invP1.detoxFinished        = World.pauseRelativeTime + DETOX_TIME; World.invP1.radiated = 0.0f; break;
+        case 2: World.invP1.geniusFinished       = World.pauseRelativeTime + GENIUS_TIME; World.geniusActive = true; break;
+        case 3: World.invP1.mediFinished         = World.pauseRelativeTime + MEDI_TIME; break;
+        case 4: World.invP1.reflexFinishedTime   = World.absoluteTime + REFLEX_TIME; World.timeScale = REFLEX_TIME_SCALE; break; // TODO Handle restoring offset from absolute time at loading savegame
+        case 5: World.invP1.sightFinishedTime    = World.pauseRelativeTime + SIGHT_TIME; World.invP1.sightSideEffectFinishedTime = -1.0; break;
         case 6: World.invP1.staminupFinishedTime = World.pauseRelativeTime + STAMINUP_TIME; World.invP1.staminupActive = true; World.invP1.fatigue = 0.0f; break;
     }
-    CenterStatusPrint("%s",Sys_Text.stringTable[patchMsg[patchSlot]]);
-    if (World.invP1.patchCounts[World.invP1.patchCurrent] <= 0) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCurrent = (i8)i; break; } } }
+    CenterStatusPrint("%s",Sys_Text.stringTable[patchMsg[patchSlot]]); if (World.invP1.patchCounts[World.invP1.patchCur] <= 0) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } }
     play_wav(sounds[88],SfxVol(),(V3){0.0f,0.0f,0.0f},false);
 }
 
@@ -54,29 +44,22 @@ bool InventoryHasAccessCard(AccCardType card) { return (World.invP1.accessCardOw
 bool InventoryHasAnyAccessCards() { return World.invP1.accessCardOwned != 0; }
 const char* AccessCardCodeForType(AccCardType a) { // Called by ItemTabManager
     switch(a) {
-        case ACC_Std:    return "STD";     case ACC_Med:     return "MED";     case ACC_Sci:     return "SCI";
-        case ACC_Admin:       return "ADM";     case ACC_Grp1:      return "Group-1"; case ACC_Grp2:      return "Group-2";
-        case ACC_Grp3:      return "Group-3"; case ACC_Grp4:      return "Group-4"; case ACC_GrpA:      return "Group-A";
-        case ACC_GrpB:      return "Group-B"; case ACC_Stor:     return "STO";     case ACC_Eng: return "ENG";
-        case ACC_Maint: return "MTN";     case ACC_Security:    return "SEC";     case ACC_Per1:        return "PER-1";
-        case ACC_Per2:        return "PER-2";   case ACC_Per3:        return "PER-3";   case ACC_Per4:        return "PER-4";
-        case ACC_Per5:        return "PER-5";
+        case ACC_Std: return "STD";     case ACC_Med: return "MED";     case ACC_Sci: return "SCI"; case ACC_Admin:return "ADM"; case ACC_Grp1: return "Group-1"; case ACC_Grp2:return "Group-2"; case ACC_Grp3:return "Group-3"; case ACC_Grp4:return "Group-4";
+        case ACC_GrpA:return "Group-A"; case ACC_GrpB:return "Group-B"; case ACC_Stor:return "STO"; case ACC_Eng:  return "ENG"; case ACC_Maint:return "MTN";     case ACC_Security:return "SEC"; case ACC_Per1:return "PER-1";   case ACC_Per2:return "PER-2";
+        case ACC_Per3:return "PER-3";   case ACC_Per4:return "PER-4";   case ACC_Per5:return "PER-5";
     } return "Group-2";
 }
 
 void AddAccessCardToInventory(int index) {
     AccCardType card;
     switch(index) {
-        case  34: card = ACC_Admin;       break; case  81: card = ACC_Std;    break; case  83: card = ACC_Grp1;      break;
-        case  84: card = ACC_Sci;     break; case  85: card = ACC_Eng; break; case  86: card = ACC_GrpB;      break;
-        case  87: card = ACC_Security;    break; case  88: card = ACC_Per5;        break; case  89: card = ACC_Med;     break;
-        case  90: card = ACC_Grp3;      break; case  91: card = ACC_Grp4;      break; case 110: card = ACC_Per1;        break;
+        case 34:card=ACC_Admin; break; case 81:card=ACC_Std;  break; case 83:card=ACC_Grp1; break; case  84:card=ACC_Sci;  break; case 85:card=ACC_Eng; break; case 86:card=ACC_GrpB; break; case 87:card=ACC_Security; break; case 88:card=ACC_Per5; break; 
+        case 89:card=ACC_Med;   break; case 90:card=ACC_Grp3; break; case 91:card=ACC_Grp4; break; case 110:card=ACC_Per1; break;
         default: CenterStatusPrint("BUG: Unmarked access card, defaulting to STD."); card = ACC_Std; break;
     }
     if (index == 87) { // Command card = STO + SEC + MTN
         if (InventoryHasAccessCard(ACC_Stor) && InventoryHasAccessCard(ACC_Security) && InventoryHasAccessCard(ACC_Maint)) { CenterStatusPrint("%s%s",Sys_Text.stringTable[44],AccessCardCodeForType(card)); return; }
-        World.invP1.accessCardOwned |= (1u<<ACC_Stor)|(1u<<ACC_Security)|(1u<<ACC_Maint);
-        CenterStatusPrint("%s%s, %s, %s",Sys_Text.stringTable[45],AccessCardCodeForType(ACC_Stor),AccessCardCodeForType(ACC_Security),AccessCardCodeForType(ACC_Maint));
+        World.invP1.accessCardOwned |= (1u<<ACC_Stor)|(1u<<ACC_Security)|(1u<<ACC_Maint); CenterStatusPrint("%s%s, %s, %s",Sys_Text.stringTable[45],AccessCardCodeForType(ACC_Stor),AccessCardCodeForType(ACC_Security),AccessCardCodeForType(ACC_Maint));
         return;
     }
     if (InventoryHasAccessCard(card)) { CenterStatusPrint("%s%s",Sys_Text.stringTable[44],AccessCardCodeForType(card)); return; }
@@ -84,88 +67,34 @@ void AddAccessCardToInventory(int index) {
 }
 
 void AddHardwareToInventory(int index,int hwversion,bool overt) {
-    if (index < 0) return;
-    if (hwversion < 0) { CenterStatusPrint("BUG: Hardware added with version < 0, using 0."); hwversion = 0; }
     if (hwversion > 0 && hwversion <= (int)World.invP1.hardwareVersion[index]) { if(overt){CenterStatusPrint("%s",Sys_Text.stringTable[46]);/*THAT WARE IS OBSOLETE. DISCARDED.*/} return; }
     static const u8 textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32};
-    World.invP1.hardwareInvIndex = index; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hardwareVersion[index] = (u8)hwversion; World.invP1.hardwareVersionSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0; // TODO: engine enables HUD hardware buttons from hasHardware bitmask on render, TODO: nav unit (index 1): compass/automap HUD visibility from hasHardware & HW_NAV + version
+    World.invP1.hardwareInvIndex = index; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hardwareVersion[index] = (u8)hwversion; World.invP1.hardwareVersionSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0;
     if (overt) CenterStatusPrint("%s v%d",Sys_Text.stringTable[textIdx[index] + 326],hwversion);
 }
 
-int  NavUnitVersion()     { return World.invP1.hardwareVersion[HW_NAV_IDX]; }
-int  BioMonitorVersion()  { return World.invP1.hardwareVersion[HW_BIO_IDX]; }
-bool BioMonitorActive()   { return (World.invP1.hasHardware & HW_BIO) && (World.invP1.hardwareIsActive & HW_BIO); }
-bool LanternActive()      { return (World.invP1.hasHardware & HW_LAN) && (World.invP1.hardwareIsActive & HW_LAN); }
-int  EnvirosuitVersion()  { return World.invP1.hardwareVersion[HW_ENV_IDX]; }
-bool BoosterSetToSkates() { return World.invP1.hardwareVersionSetting[HW_BST_IDX] == 0; }
-bool BoosterSetToBoost()  { return World.invP1.hardwareVersionSetting[HW_BST_IDX] >= 1; }
-bool BoosterActive()      { return (World.invP1.hasHardware & HW_BST) && (World.invP1.hardwareIsActive & HW_BST); }
-void JumpJetsToggle()     { World.invP1.hardwareIsActive ^= HW_JET; }
-int  JumpJetsVersion()    { return World.invP1.hardwareVersion[HW_JET_IDX]; }
-bool JumpJetsActive()     { return (World.invP1.hasHardware & HW_JET) && (World.invP1.hardwareIsActive & HW_JET); }
-// HideBioMonitor / UnHideBioMonitor: engine reads InventoryBioMonitorActive() for HUD visibility, no gamecode needed
-bool AddGeneralObjectToInventory(int index,int customIndex) {
-    if (index < 0) return false;
-    for (int i=1;i<14;++i) {
-        if (World.invP1.generalInventoryIndexRef[i] != -1) continue;
-        if (!InventoryHasAnyAccessCards() && World.invP1.generalInvCurrent == 0) World.invP1.generalInvCurrent = (i8)i;
-        World.invP1.generalInventoryIndexRef[i] = index;
-        World.invP1.generalInvCustomIndex[i] = (i16)customIndex;
-        CenterStatusPrint("%s%s",Sys_Text.stringTable[index + 326],Sys_Text.stringTable[31]);
-        return true;
-    }
-    return false;
+bool AddGeneralObjectToInventory(int index,int custIdx) {
+    for (i8 i=1;i<14;++i) {
+        if (World.invP1.generalInventoryIndexRef[i] == -1) { 
+            if(!InventoryHasAnyAccessCards() && World.invP1.generalInvCurrent == 0){World.invP1.generalInvCurrent=i;} World.invP1.generalInventoryIndexRef[i]=index; 
+            World.invP1.generalInvCustIdx[i]=(i16)custIdx; CenterStatusPrint("%s%s",Sys_Text.stringTable[index + 326],Sys_Text.stringTable[31]);
+            return true;
+        }
+    } return false;
 }
 
-void GrenadeCycleDown() {
-    int last = World.invP1.grenadeCurrent, next = last - 1; if (next < 0) next=6;
-    for (int c = 0; c <= 13; c++) { if (World.invP1.grenAmmo[next] > 0){break;} if (c == 13){return;} if (--next < 0){next = 6;} }
-    if (last == next) return;
-    World.invP1.grenadeCurrent = (i8)next; static const u16 msg[7] = {579,580,581,582,583,584,585}; CenterStatusPrint("%s",Sys_Text.stringTable[msg[next]]);
-}
-
-void GrenadeCycleUp() {
-    int last = World.invP1.grenadeCurrent, next = last + 1; if (next > 6) next = 0;
-    for (int c = 0; c <= 13; c++) { if (World.invP1.grenAmmo[next] > 0) {break;} if (c == 13) {return;} if (++next > 6) {next=0;} }
-    if (last == next) return;
-    World.invP1.grenadeCurrent = (i8)next; static const u16 msg[7] = {579,580,581,582,583,584,585}; CenterStatusPrint("%s",Sys_Text.stringTable[msg[next]]);
-}
-
-void AddGrenadeToInventory(int index, int useableIndex) {
-    if (index < 0) return;
-    bool anyGren = false;
-    for (int i = 0; i < 7; i++) if (World.invP1.grenAmmo[i]) { anyGren = true; break; }
-    if (!anyGren) World.invP1.grenadeCurrent = (i8)index;
-    World.invP1.grenAmmo[index]++;
-    World.invP1.grenConstIndex[index] = (i16)useableIndex;
-    CenterStatusPrint("%s%s",Sys_Text.stringTable[useableIndex + 326],Sys_Text.stringTable[34]);
-}
-
-void RemoveGrenade(int index) { if(World.invP1.grenAmmo[index] > 0){World.invP1.grenAmmo[index]--;} if(!World.invP1.grenAmmo[index]){GrenadeCycleDown();} }
-void CheckForUnreadLogs() {
-    int em = 0, lg = 0;
-    for (int i = LOGCNT-1; i >= 0; i--) { if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) { if (Sys_Text.audioLogType[i] == AudioLogType_Email) {em++;} else {lg++;} } }
-    if (!em) {World.invP1.hasNewEmail = false;} if (!lg) {World.invP1.hasNewLogs  = false;}
-}
-
+void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
 static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
 static void PlayLog(int logIndex) {
-    if (logIndex < 0 || !(World.invP1.hasHardware & HW_ERD)) return;
-//     if (World.invP1.logSndInited) { SndStop(&World.invP1.logSound); SndUninit(&World.invP1.logSound); World.invP1.logSndInited = false; }
-//     if (!SndInit(sounds[Sys_Text.audioLogSoundIndex[logIndex]],0,NULL,NULL,&World.invP1.logSound)) { SndSetVolume(&World.invP1.logSound,(float)Sys_Settings.VolumeMessage / 100.0f); SndStart(&World.invP1.logSound); World.invP1.logSndInited = true; }
-//     World.invP1.readLog[logIndex] = true;
-//     if (Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail) {
-//         World.Sys_UI.vmailActive        = true;
-//         World.invP1.vmailLogIndex = (i16)logIndex; // engine reads to select which .webm to play
+    if (logIndex < 0 || !(World.invP1.hasHardware & HW_ERD)) {return;} play_message(audioLogs[logIndex]); World.invP1.readLog[logIndex] = true;
+    if (Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail) {
+        World.Sys_UI.vmailActive        = true;
+//         World.invP1.vmailLogIndex = (i16)logIndex;
 //         switch (logIndex) { // TODO
-//             case 119: vmailbetajet.SetActive(true); fileName = "betajet.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmailbetajetVideo.url = urlPath; vmailbetajetVideo.Play(); break;
-//             case 116: vmailbridgesep.SetActive(true); fileName = "bridgesep.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmailbridgesepVideo.url = urlPath; vmailbridgesepVideo.Play(); break;
-//             case 117: vmailcitadestruct.SetActive(true); fileName = "citadestruct.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmailcitadestructVideo.url = urlPath; vmailcitadestructVideo.Play(); break;
-//             case 110: vmailgenstatus.SetActive(true); fileName = "genstatus.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmailgenstatusVideo.url = urlPath; vmailgenstatusVideo.Play(); break;
-//             case 114: vmaillaserdest.SetActive(true); fileName = "laserdest.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmaillaserdestVideo.url = urlPath; vmaillaserdestVideo.Play(); break;
-//             case 120: vmailshieldsup.SetActive(true); fileName = "shieldsup.webm"; Utils.ConfirmExistsMakeIfNot(basePath,fileName); urlPath = Utils.SafePathCombine(basePath,fileName); vmailshieldsupVideo.url = urlPath; vmailshieldsupVideo.Play(); break;
+//             case 119: vmailbetajet.SetActive(true); fileName = "betajet.webm"; break;     case 116: vmailbridgesep.SetActive(true); fileName = "bridgesep.webm"; break; case 117: vmailcitadestruct.SetActive(true); fileName = "citadestruct.webm"; break;
+//             case 110: vmailgenstatus.SetActive(true); fileName = "genstatus.webm"; break; case 114: vmaillaserdest.SetActive(true); fileName = "laserdest.webm"; break; case 120: vmailshieldsup.SetActive(true); fileName = "shieldsup.webm"; break;
 //         }
-//    }
+    }
     CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); // "Playing <name>" // TODO: SendAudioLogToDataTab(logIndex) — engine-side data tab notification
 }
 
@@ -178,35 +107,21 @@ void AddAudioLogToInventory(int index) {
     World.invP1.numLogsFromLevel[Sys_Text.audioLogLevelFound[index]]++;
     if      (Sys_Text.audioLogType[index] == AudioLogType_Email)  World.invP1.hasNewEmail = true;
     else if (Sys_Text.audioLogType[index] == AudioLogType_Normal) World.invP1.hasNewLogs  = true;
-    if (World.invP1.hasHardware & HW_ERD) {
-        // "Audio log <name> picked up. Press <key> to play." — TODO: key binding name interp
-        CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[38]);
-    } else {
-        CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[310]);
-    }
+    if (World.invP1.hasHardware & HW_ERD) { CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[38]); } // "Audio log <name> picked up. Press <key> to play." — TODO: key binding name interp
+    else { CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[310]); }
 }
 
-void PatchCycleDown() {
-    int next = World.invP1.patchCurrent - 1; if (next < 0) {next = 6;}
-    World.invP1.patchCurrent = (i8)next;
-    for (int c=0;c<=13;++c) { if (World.invP1.patchCounts[next] > 0) {break;} if (c == 13) {return;} if (--next < 0) {next=6;} }
-    World.invP1.patchCurrent = (i8)next;
-}
-
-void PatchCycleUp() {
-    int next = World.invP1.patchCurrent + 1; if (next > 6) next = 0;
-    World.invP1.patchCurrent = (i8)next;
-    for (int c=0;c<=13;++c) { if (World.invP1.patchCounts[next] > 0) {break;} if (c == 13) {return;} if (++next > 6) {next=0;} }
-    World.invP1.patchCurrent = (i8)next;
-}
-
-void AddPatchToInventory(int index,int constIndex) { if (index < 0) {return;} World.invP1.patchCounts[index]++; if (!World.invP1.patchCounts[World.invP1.patchCurrent]) {World.invP1.patchCurrent = (i8)index;} CenterStatusPrint("%s%s",Sys_Text.stringTable[constIndex + 326],Sys_Text.stringTable[35]); }
+static inline void ItemAdd(u8 *cur, u8 *counts, int idx, int uIdx, int sysIdx) { if (!counts[*cur]) {*cur=(i8)idx;} counts[idx]++; CenterStatusPrint("%s%s", Sys_Text.stringTable[uIdx + 326], Sys_Text.stringTable[sysIdx]); }
+void AddGrenadeToInventory(int i, int u) { World.invP1.grenConstIndex[i]=(i16)u; ItemAdd(&World.invP1.grenCur,World.invP1.grenAmmo,i,u,34); } // TODO, grenConstIndex needed??
+void   AddPatchToInventory(int i, int u) { if (i >= 0) ItemAdd(&World.invP1.patchCur, World.invP1.patchCounts, i, u, 35); }
+static inline void GrenadeCycle(int step){int cur= World.invP1.grenCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(   World.invP1.grenAmmo[next]>0){World.invP1.grenCur =(i8)next; CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
+static inline void   PatchCycle(int step){int cur=World.invP1.patchCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(World.invP1.patchCounts[next]>0){World.invP1.patchCur=(i8)next; CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
+void RemoveGrenade(int i) { if(World.invP1.grenAmmo[i] > 0){World.invP1.grenAmmo[i]--;} if(!World.invP1.grenAmmo[i]){GrenadeCycle(-1);} }
 static i8 GetExistingCyberItemIndex() { if (World.invP1.softVersions[SW_TURBO]  > 0) {return 0;} if (World.invP1.softVersions[SW_DECOY]  > 0) {return 1;} if (World.invP1.softVersions[SW_RECALL] > 0) {return 2;} return -1; }
 static void UseTurbo() {
     if (World.invP1.softVersions[SW_TURBO] <= 0) { World.invP1.hasSoft &= (u8)~(1u << SW_TURBO); return; }
     if (--World.invP1.softVersions[SW_TURBO] == 0) World.invP1.hasSoft &= (u8)~(1u << SW_TURBO);
-    if (World.invP1.turboFinished > World.pauseRelativeTime) World.invP1.turboFinished += World.invP1.turboCyberTime;
-    else                                                     World.invP1.turboFinished  = World.invP1.turboCyberTime + World.pauseRelativeTime;
+    if(World.invP1.turboFinished > World.pauseRelativeTime){World.invP1.turboFinished+=World.invP1.turboCyberTime;}else{World.invP1.turboFinished=World.invP1.turboCyberTime + World.pauseRelativeTime;}
 }
 
 static void UseDecoy() {
@@ -233,46 +148,20 @@ void RemoveWeapon(int slot) { World.invP1.weaponInventoryIndices[slot] = World.i
 static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index == 4) ? 5.0f : (wep16Index == 10) ? 13.0f : (wep16Index == 14) ? 2.0f : 3.0f; }
 void UpdateAmmoCount() { World.invP1.numweapons=0; for (int i=0;i<7;i++) { if(World.invP1.weaponInventoryIndices[i] >= 0){World.invP1.numweapons++;} } }
 void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
-    buf[0] = '\0';
-    int wepIdx = World.invP1.weaponInventoryIndices[slot];
-    bool alt = World.invP1.wepLoadedWithAlternate[slot];
+    buf[0] = '\0'; int wepIdx = World.invP1.weaponInventoryIndices[slot]; bool alt = World.invP1.wepLoadedWithAlternate[slot]; float heat = World.invP1.currentEnergyWeaponHeat[slot];
     u8 mag = alt ? World.invP1.currentMagazineAmount2[slot] : World.invP1.currentMagazineAmount[slot];
-    float heat = World.invP1.currentEnergyWeaponHeat[slot];
     switch(wepIdx) {
-        case 36: // MK3 Assault Rifle
-            if (alt) sFormat(buf,bufSize,"%upn | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);
-            else     sFormat(buf,bufSize,"%umg | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);
-            break;
-        case 37: case 40: case 46: case 50: case 51: // Energy weapons
-            scpy_to_a_from_b(buf,heat > 80.0f ? Sys_Text.stringTable[14] : Sys_Text.stringTable[15],bufSize);
-            break;
-        case 38: // SV-23 Dartgun
-            if (alt) sFormat(buf,bufSize,"%utq | %und, %utq",mag,World.invP1.wepAmmo[2],World.invP1.wepAmmoSecondary[2]);
-            else     sFormat(buf,bufSize,"%und | %und, %utq",mag,World.invP1.wepAmmo[2],World.invP1.wepAmmoSecondary[2]);
-            break;
-        case 39: // AM-27 Flechette
-            if (alt) sFormat(buf,bufSize,"%usp | %uhn, %usp",mag,World.invP1.wepAmmo[3],World.invP1.wepAmmoSecondary[3]);
-            else     sFormat(buf,bufSize,"%uhn | %uhn, %usp",mag,World.invP1.wepAmmo[3],World.invP1.wepAmmoSecondary[3]);
-            break;
+        case 36: if (alt){sFormat(buf,bufSize,"%upn | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);}else{sFormat(buf,bufSize,"%umg | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);} break; // MK3 Assault Rifle
+        case 37: case 40: case 46: case 50: case 51: scpy_to_a_from_b(buf,heat > 80.0f ? Sys_Text.stringTable[14] : Sys_Text.stringTable[15],bufSize); break; // Energy weapons
+        case 38: if (alt){sFormat(buf,bufSize,"%utq | %und, %utq",mag,World.invP1.wepAmmo[2],World.invP1.wepAmmoSecondary[2]);}else{sFormat(buf,bufSize,"%und | %und, %utq",mag,World.invP1.wepAmmo[2],World.invP1.wepAmmoSecondary[2]);} break; // SV-23 Dartgun
+        case 39: if (alt){sFormat(buf,bufSize,"%usp | %uhn, %usp",mag,World.invP1.wepAmmo[3],World.invP1.wepAmmoSecondary[3]);}else{sFormat(buf,bufSize,"%uhn | %uhn, %usp",mag,World.invP1.wepAmmo[3],World.invP1.wepAmmoSecondary[3]);} break; // AM-27 Flechette
         case 41: case 42: break; // Laser Rapier / Lead Pipe: no ammo
-        case 43: // Magnum 2100
-            if (alt) sFormat(buf,bufSize,"%usg | %uhw, %usg",mag,World.invP1.wepAmmo[7],World.invP1.wepAmmoSecondary[7]);
-            else     sFormat(buf,bufSize,"%uhw | %uhw, %usg",mag,World.invP1.wepAmmo[7],World.invP1.wepAmmoSecondary[7]);
-            break;
-        case 44: // SB-20 Magpulse
-            if (alt) sFormat(buf,bufSize,"%usu | %ucr, %usu",mag,World.invP1.wepAmmo[8],World.invP1.wepAmmoSecondary[8]);
-            else     sFormat(buf,bufSize,"%ucr | %ucr, %usu",mag,World.invP1.wepAmmo[8],World.invP1.wepAmmoSecondary[8]);
-            break;
-        case 45: // ML-41 Pistol
-            if (alt) sFormat(buf,bufSize,"%utf | %ust, %utf",mag,World.invP1.wepAmmo[9],World.invP1.wepAmmoSecondary[9]);
-            else     sFormat(buf,bufSize,"%ust | %ust, %utf",mag,World.invP1.wepAmmo[9],World.invP1.wepAmmoSecondary[9]);
-            break;
+        case 43: if (alt){sFormat(buf,bufSize,"%usg | %uhw, %usg",mag,World.invP1.wepAmmo[7],World.invP1.wepAmmoSecondary[7]);}else{sFormat(buf,bufSize,"%uhw | %uhw, %usg",mag,World.invP1.wepAmmo[7],World.invP1.wepAmmoSecondary[7]);} break; // Magnum 2100
+        case 44: if (alt){sFormat(buf,bufSize,"%usu | %ucr, %usu",mag,World.invP1.wepAmmo[8],World.invP1.wepAmmoSecondary[8]);}else{sFormat(buf,bufSize,"%ucr | %ucr, %usu",mag,World.invP1.wepAmmo[8],World.invP1.wepAmmoSecondary[8]);} break; // SB-20 Magpulse
+        case 45: if (alt){sFormat(buf,bufSize,"%utf | %ust, %utf",mag,World.invP1.wepAmmo[9],World.invP1.wepAmmoSecondary[9]);}else{sFormat(buf,bufSize,"%ust | %ust, %utf",mag,World.invP1.wepAmmo[9],World.invP1.wepAmmoSecondary[9]);} break; // ML-41 Pistol
         case 47: sFormat(buf,bufSize,"%url | %url",World.invP1.currentMagazineAmount[slot],World.invP1.wepAmmo[11]); break; // MM-76 Railgun
         case 48: sFormat(buf,bufSize,"%urb | %urb",World.invP1.currentMagazineAmount[slot],World.invP1.wepAmmo[12]); break; // DC-05 Riotgun
-        case 49: // RF-07 Skorpion
-            if (alt) sFormat(buf,bufSize,"%ulg | %usm, %ulg",mag,World.invP1.wepAmmo[13],World.invP1.wepAmmoSecondary[13]);
-            else     sFormat(buf,bufSize,"%usm | %usm, %ulg",mag,World.invP1.wepAmmo[13],World.invP1.wepAmmoSecondary[13]);
-            break;
+        case 49: if (alt){sFormat(buf,bufSize,"%ulg | %usm, %ulg",mag,World.invP1.wepAmmo[13],World.invP1.wepAmmoSecondary[13]);}else{sFormat(buf,bufSize,"%usm | %usm, %ulg",mag,World.invP1.wepAmmo[13],World.invP1.wepAmmoSecondary[13]);} break; // RF-07 Skorpion
         default: break;
     }
 }
@@ -325,18 +214,18 @@ void UseGrenade(int index) {
         case 13: World.invP1.heldObjectIndex = 404; RemoveGrenade(2); break; // Gas
         default: return;
     }
-    World.invP1.heldObjectCustomIndex = U16_MAX; World.invP1.heldObjectAmmo = 0; World.invP1.heldObjectAmmo2 = 0; World.invP1.heldObjectLoadedAlternate = false; World.invP1.holdingObject = true;
+    World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldObjectAmmo = 0; World.invP1.heldObjectAmmo2 = 0; World.invP1.heldObjectLoadedAlternate = false; World.invP1.holdingObject = true;
 }
 
 void InventoryUpdate() {
     if (Grenade()) {
         if (World.curLev == LEVEL_CYBERSPACE) UseCyberspaceItem();
-        else if (World.invP1.grenadeCurrent >= 0 && World.invP1.grenadeCurrent < 7 && World.invP1.grenAmmo[World.invP1.grenadeCurrent] > 0) UseGrenade(World.invP1.grenConstIndex[World.invP1.grenadeCurrent]);
+        else if (World.invP1.grenCur >= 0 && World.invP1.grenCur < 7 && World.invP1.grenAmmo[World.invP1.grenCur] > 0) UseGrenade(World.invP1.grenConstIndex[World.invP1.grenCur]);
         else CenterStatusPrint("%s",Sys_Text.stringTable[322]); // Out of grenades.
     }
     
-    if (GrenadeCycUp())  { if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemUp(); else GrenadeCycleUp(); }
-    if (GrenadeCycDown()){ if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemDn(); else GrenadeCycleDown(); }
+    if (GrenadeCycUp())  { if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemUp(); else GrenadeCycle( 1); }
+    if (GrenadeCycDown()){ if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemDn(); else GrenadeCycle(-1); }
     if (RecentLog() && (World.invP1.hasHardware & HW_ERD)) {
         bool playing = false; //SndPlaying(&World.invP1.logSound); TODO
         if (World.invP1.lastAddedIndex >= 0 && !playing) {
@@ -356,12 +245,12 @@ void InventoryUpdate() {
     }
 
     if (Patch()) {
-        if (World.invP1.patchCurrent >= 0 && World.invP1.patchCurrent < 7 && World.invP1.patchCounts[World.invP1.patchCurrent] > 0)
-            PatchUse(World.invP1.patchCurrent);
+        if (World.invP1.patchCur >= 0 && World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0)
+            PatchUse(World.invP1.patchCur);
         else {CenterStatusPrint("%s",Sys_Text.stringTable[324]); /*Out of patches.*/}
     }
-    if (PatchCycUp()) PatchCycleUp();
-    if (PatchCycDown()) PatchCycleDown();
+         if (  PatchCycUp()) PatchCycle( 1);
+    else if (PatchCycDown()) PatchCycle(-1);
 }
 
 extern u8 magazinePitchCountForWeapon[16];
@@ -370,12 +259,12 @@ static bool firstTimePickup = true;
 static bool firstTimeSearch = true;
 // Expects usableItem index
 void AddItemFail(int index) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[318]);/*Inventory full.*/ }
-void AddItemToInventory(int index, int customIndex) {
+void AddItemToInventory(int index, int custIdx) {
     World.Sys_UI.mouseClickHeldOverGUI = true; // Prevent gun shooting.
     if (index < 0) index = 0; // Good check on paper.
     if (index > 110) index = 94; // Way to get a head.
-    if ((index >= 0 && index <= 5) || index == 33 || index == 35 || (index >= 52 && index < 59) || (index >= 61 && index <= 64) || (index >= 92 && index <= 101)) { if (!AddGeneralObjectToInventory(index,customIndex)) { AddItemFail(index); } }
-    else if (index == 6) { AddAudioLogToInventory(World.invP1.heldObjectCustomIndex); }
+    if ((index >= 0 && index <= 5) || index == 33 || index == 35 || (index >= 52 && index < 59) || (index >= 61 && index <= 64) || (index >= 92 && index <= 101)) { if (!AddGeneralObjectToInventory(index,custIdx)) { AddItemFail(index); } }
+    else if (index == 6) { AddAudioLogToInventory(World.invP1.heldObjectCustIdx); }
     else if (index >= 36 && index <= 51) { if (!AddWeaponToInventory(index,World.invP1.heldObjectAmmo,World.invP1.heldObjectAmmo2,World.invP1.heldObjectLoadedAlternate)) { AddItemFail(index); } }
     else if (index == 34 || index == 81 || (index >= 83 && index <= 91) || index == 110) AddAccessCardToInventory(index);
     else {
@@ -394,18 +283,18 @@ void AddItemToInventory(int index, int customIndex) {
             case 18: AddPatchToInventory(4,index); break;
             case 19: AddPatchToInventory(1,index); break;
             case 20: AddPatchToInventory(0,index); break;
-            case 21: AddHardwareToInventory(0,customIndex,true); break;
-            case 22: AddHardwareToInventory(1,customIndex,true); break;
-            case 23: AddHardwareToInventory(2,customIndex,true); break;
-            case 24: AddHardwareToInventory(3,customIndex,true); break;
-            case 25: AddHardwareToInventory(4,customIndex,true); break;
-            case 26: AddHardwareToInventory(5,customIndex,true); break;
-            case 27: AddHardwareToInventory(6,customIndex,true); break;
-            case 28: AddHardwareToInventory(7,customIndex,true); break;
-            case 29: AddHardwareToInventory(8,customIndex,true); break;
-            case 30: AddHardwareToInventory(9,customIndex,true); break;
-            case 31: AddHardwareToInventory(10,customIndex,true); break;
-            case 32: AddHardwareToInventory(11,customIndex,true); break;
+            case 21: AddHardwareToInventory(0,custIdx,true); break;
+            case 22: AddHardwareToInventory(1,custIdx,true); break;
+            case 23: AddHardwareToInventory(2,custIdx,true); break;
+            case 24: AddHardwareToInventory(3,custIdx,true); break;
+            case 25: AddHardwareToInventory(4,custIdx,true); break;
+            case 26: AddHardwareToInventory(5,custIdx,true); break;
+            case 27: AddHardwareToInventory(6,custIdx,true); break;
+            case 28: AddHardwareToInventory(7,custIdx,true); break;
+            case 29: AddHardwareToInventory(8,custIdx,true); break;
+            case 30: AddHardwareToInventory(9,custIdx,true); break;
+            case 31: AddHardwareToInventory(10,custIdx,true); break;
+            case 32: AddHardwareToInventory(11,custIdx,true); break;
             case 60: AddAmmoToInventory(12,index,magazinePitchCountForWeapon[12],false); break; // rubber slugs
             case 65: AddAmmoToInventory(8,index,magazinePitchCountForWeapon2[8],true); break; // magpulse cartridge super
             case 66: AddAmmoToInventory(2,index,magazinePitchCountForWeapon[2],false); break; // needle darts
@@ -468,11 +357,11 @@ void FuncWallInitAfterLoad(u16 self) {
     V3 tempVec = V3_AsubB(World.position[self],e->targetPosition);
     float distTotal = V3_Dist(e->startPosition,e->targetPosition);
     tempVec = V3_ScaleByF(V3_Normalize(tempVec),-1.0f);
-    if (e->funcState == FStat_AjarMovingTarget) tempVec = V3_ScaleByF(tempVec,distTotal * e->percentAjar);
-    else if (e->funcState == FStat_AjarMovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentAjar));
-    else if (e->funcState == FStat_MovingStart) tempVec = V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentMoved));
-    else tempVec = V3_ScaleByF(tempVec,distTotal * e->percentMoved);
-    SetPosition(self,V3_AplusB(World.position[self],tempVec),true); // Force it like a teleport
+    if (e->funcState == FStat_AjarMovingTarget) tempVec=V3_ScaleByF(tempVec,distTotal * e->percentAjar);
+    else if (e->funcState == FStat_AjarMovingStart) tempVec=V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentAjar));
+    else if (e->funcState == FStat_MovingStart) tempVec=V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentMoved));
+    else tempVec=V3_ScaleByF(tempVec,distTotal * e->percentMoved);
+    World.position[self]=V3_AplusB(World.position[self],tempVec);
 }
 
 void FuncWallMoveStart(u16 self) { World.instances[self].funcState = FStat_MovingStart; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; }
@@ -482,21 +371,15 @@ void FuncWallUpdate(u16 self) {
     Entity* e = &World.instances[self];
     V3 goal = e->funcState == FStat_MovingStart ? e->startPosition : e->targetPosition;
     FuncStates doneState = e->funcState == FStat_MovingStart ? FStat_Start : FStat_Target;
-    if (e->funcState == FStat_Start) { SetPosition(self,e->startPosition,true); World.velocity[self] = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 0.0f; return; }
-    if (e->funcState == FStat_Target) { SetPosition(self,e->targetPosition,true); World.velocity[self] = (V3){0.0f,0.0f,0.0f}; e->percentMoved = 1.0f; return; }
+    if (e->funcState == FStat_Start) { World.position[self]=e->startPosition; e->percentMoved = 0.0f; return; }
+    if (e->funcState == FStat_Target) { World.position[self]=e->targetPosition; e->percentMoved = 1.0f; return; }
     if (e->funcState != FStat_MovingStart && e->funcState != FStat_MovingTarget) return;
     V3 delta = V3_AsubB(goal,World.position[self]);
     float distanceLeft = V3_Mag(delta);
     float total = V3_Dist(e->startPosition,e->targetPosition);
     float dist = e->speed * (float)World.deltaTime;
-    if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) {
-        SetPosition(self,goal,true);
-        e->funcState = doneState;
-        e->percentMoved = doneState == FStat_Target ? 1.0f : 0.0f;
-        World.velocity[self] = (V3){0.0f,0.0f,0.0f};
-        return;
-    }
-    if (distanceLeft > 0.0001f) SetPosition(self,V3_AplusB(World.position[self],V3_ScaleByF(V3_Normalize(delta),dist)),true);
+    if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) { World.position[self]=goal; e->funcState=doneState; e->percentMoved=doneState == FStat_Target ? 1.0f : 0.0f; return; }
+    if (distanceLeft > 0.0001f) World.position[self]=V3_AplusB(World.position[self],V3_ScaleByF(V3_Normalize(delta),dist));
     if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,World.position[self]) / total;
 }
 // ForceBridge
@@ -776,19 +659,18 @@ void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
 }
 
 void TargetIDUpdate(u16 self) {
-    Entity* e = &World.instances[self];
-    if (!(e->entflags & EF_ACTIVE)) return;
-    if (e->enemy == WORLD) { TargetIDDeactivate(self); return; }
-    Entity* npc = &World.instances[e->enemy];
+    if (!(World.instances[self].entflags & EF_ACTIVE)) return;
+    if (World.instances[self].enemy == WORLD) { TargetIDDeactivate(self); return; }
+    Entity* npc = &World.instances[World.instances[self].enemy];
     if (npc->health <= 0.0f) { TargetIDDeactivate(self); return; }
     if (V3_Dist(World.position[self],World.position[PLAYER1]) > TARGETID_LINK_DIST) { TargetIDDeactivate(self); return; }
-    if (e->tickFinished < World.pauseRelativeTime) { TargetIDDeactivate(self); return; }
-    SetPosition(self,World.position[e->enemy],true); // Track parent NPC position
+    if (World.instances[self].tickFinished < World.pauseRelativeTime) { TargetIDDeactivate(self); return; }
+    World.position[self]=World.position[World.instances[self].enemy]; // Track parent NPC position
     bool stunned = npc->tranquilizeFinished > World.pauseRelativeTime;
-    flag_set(&e->entflags,EF_ASLEEP,stunned);
-    if (e->textIndex >= 0) {
-        if (stunned && e->animSwapFinished < World.pauseRelativeTime) e->textIndex = 536; // STUNNED
-        else if (e->animSwapFinished < World.pauseRelativeTime) { e->textIndex = -1; if (!(World.invP1.hasHardware & HW_TID)) { TargetIDDeactivate(self); return; } }
+    flag_set(&World.instances[self].entflags,EF_ASLEEP,stunned);
+    if (World.instances[self].textIndex >= 0) {
+        if (stunned && World.instances[self].animSwapFinished < World.pauseRelativeTime) World.instances[self].textIndex = 536; // STUNNED
+        else if (World.instances[self].animSwapFinished < World.pauseRelativeTime) { World.instances[self].textIndex = -1; if (!(World.invP1.hasHardware & HW_TID)) { TargetIDDeactivate(self); return; } }
     }
 }
 // PlayerEnergy
@@ -868,7 +750,7 @@ void GeneralInvApply(int buttonIdx,int customIdx) {
     }
 }
 void GeneralInvDoubleClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvApply(buttonIdx,customIdx); }
-void GeneralInventoryActivate() { int cur=World.invP1.generalInvCurrent; if(cur < 0 || cur >= 14){DualLog("BUG: generalInvCurrent out of range at %d",cur); return;} GeneralInvApply(cur,World.invP1.generalInvCustomIndex[cur]); if(cur != 0)World.invP1.generalInventoryIndexRef[cur]=-1; }
+void GeneralInventoryActivate() { int cur=World.invP1.generalInvCurrent; if(cur < 0 || cur >= 14){DualLog("BUG: generalInvCurrent out of range at %d",cur); return;} GeneralInvApply(cur,World.invP1.generalInvCustIdx[cur]); if(cur != 0)World.invP1.generalInventoryIndexRef[cur]=-1; }
 // GrenadeActivate
 static bool GrenadeIsNPCMine(u16 self) { return World.layer[self] != L_PlayerBullets; }
 void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
@@ -1029,9 +911,9 @@ static void DropSearchables(u16 self) {
         u16 spawned = SpawnDynamicObject(World.instances[self].contents[i] + 307,true);
         if (spawned != U16_MAX) {
             World.position[spawned] = World.position[self];
-            World.instances[spawned].customIndex[0] = World.instances[self].customIndex[i];
+            World.instances[spawned].custIdx[0] = World.instances[self].custIdx[i];
         } else CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");
-        World.instances[self].contents[i] = World.instances[self].customIndex[i] = U16_MAX;
+        World.instances[self].contents[i] = World.instances[self].custIdx[i] = U16_MAX;
     }
 }
 
@@ -1257,9 +1139,9 @@ void UpdateLights() {
     glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
 }
 // Hardware
-void HardwareBioOff(void) { World.invP1.hardwareIsActive &= ~HW_BIO; if (Cheats.showFPS) {return;}/*TODO (after this return): BiomonitorClearGraphs() — engine-side graph reset // TODO: deactivate bioMonitorContainer — engine reads BioMonitorActive()*/ }
-void HardwareBioOn(void) { World.invP1.hardwareIsActive |= HW_BIO; } // TODO: activate bioMonitorContainer — engine reads BioMonitorActive()
-void HardwareBioAction(void) { if (World.invP1.hardwareVersionSetting[HW_BIO_IDX] == 0 && World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (BioMonitorActive()) HardwareBioOff(); else HardwareBioOn(); }
+void HardwareBioOff(void) { World.invP1.hardwareIsActive &= ~HW_BIO; if (Cheats.showFPS) {return;}/*TODO (after this return): BiomonitorClearGraphs() — engine-side graph reset*/ }
+void HardwareBioOn(void) { World.invP1.hardwareIsActive |= HW_BIO; }
+void HardwareBioAction(void) { if (World.invP1.hardwareVersionSetting[HW_BIO_IDX] == 0 && World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if ((World.invP1.hasHardware & HW_BIO) && (World.invP1.hardwareIsActive & HW_BIO)) HardwareBioOff(); else HardwareBioOn(); }
 void HardwareBioClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareBioAction(); }
 void HardwareSensaroundOn(void) { World.invP1.hardwareIsActive |= HW_SNS; } // TODO: activate sensaround cameras/overlays — engine reads hardwareIsActive & HW_SNS + version
 void HardwareSensaroundOff(void) { World.invP1.hardwareIsActive &= ~HW_SNS; } // TODO: deactivate sensaround cameras, restore tabs — engine reads hardwareIsActive & HW_SNS
@@ -1282,11 +1164,11 @@ void HardwareEReaderAction(void) { play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0
 void HardwareEReaderClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareEReaderAction(); }
 void HardwareBoosterOn(void)  { World.invP1.hardwareIsActive |=  HW_BST; }
 void HardwareBoosterOff(void) { World.invP1.hardwareIsActive &= ~HW_BST; }
-void HardwareBoosterAction(void) { if (BoosterSetToBoost() && World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (World.invP1.hardwareIsActive & HW_BST) HardwareBoosterOff(); else HardwareBoosterOn(); } 
+void HardwareBoosterAction(void) { if (World.invP1.hardwareVersionSetting[HW_BST_IDX] >= 1/*Set to boost not skates*/ && World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (World.invP1.hardwareIsActive & HW_BST) HardwareBoosterOff(); else HardwareBoosterOn(); } 
 void HardwareBoosterClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareBoosterAction(); }
 void HardwareJumpJetsOn(void)  { World.invP1.hardwareIsActive |=  HW_JET; }
 void HardwareJumpJetsOff(void) { World.invP1.hardwareIsActive &= ~HW_JET; }
-void HardwareJumpJetsAction() { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); JumpJetsToggle(); if (JumpJetsActive()) HardwareJumpJetsOn(); else HardwareJumpJetsOff(); }
+void HardwareJumpJetsAction() { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= HW_JET; if ((World.invP1.hasHardware & HW_JET) && (World.invP1.hardwareIsActive & HW_JET)) HardwareJumpJetsOn(); else HardwareJumpJetsOff(); }
 void HardwareJumpJetsClick() { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareJumpJetsAction(); }
 #define INFRARED_RANGE 50.35f
 #define LANTERN_RANGE 11.52f
@@ -1303,25 +1185,25 @@ void HardwareUpdate() {
 }
 // Dermal Patches
 void PatchUpdate() {
-    if (World.invP1.patchActive & PATCH_DETOX) { if (World.invP1.detoxFinishedTime < World.pauseRelativeTime) World.invP1.patchActive -= PATCH_DETOX; } // Detox
-    if (World.invP1.patchActive & PATCH_MEDI) { if (World.invP1.mediFinishedTime < World.pauseRelativeTime && World.invP1.mediFinishedTime != -1.0) { World.invP1.patchActive -= PATCH_MEDI; World.invP1.mediFinishedTime = -1.0; } } // Medi
+    if (World.invP1.patchActive & PATCH_DETOX) { if (World.invP1.detoxFinished < World.pauseRelativeTime) World.invP1.patchActive -= PATCH_DETOX; } // Detox
+    if (World.invP1.patchActive & PATCH_MEDI) { if (World.invP1.mediFinished < World.pauseRelativeTime && World.invP1.mediFinished != -1.0) { World.invP1.patchActive -= PATCH_MEDI; World.invP1.mediFinished = -1.0; } } // Medi
     if (World.invP1.patchActive & PATCH_REFLEX) { if (World.invP1.reflexFinishedTime < World.absoluteTime && World.invP1.reflexFinishedTime != -1.0){ World.invP1.patchActive-=PATCH_REFLEX; World.invP1.reflexFinishedTime=-1.0; World.timeScale=DEFAULT_TIME_SCALE;}else{World.timeScale=REFLEX_TIME_SCALE;}}else{if(World.timeScale != DEFAULT_TIME_SCALE){World.timeScale=DEFAULT_TIME_SCALE;}}//Reflex
     if (World.invP1.patchActive & PATCH_BERSERK) { // Berserk
-        if (World.invP1.berserkFinishedTime < World.pauseRelativeTime) {
+        if (World.invP1.berserkFinished < World.pauseRelativeTime) {
             World.invP1.berserkIncrement = 0;
             World.invP1.patchActive -= PATCH_BERSERK;
             // TODO: BerserkFX disable + reset — engine reads patchActive & PATCH_BERSERK
         } else {
             // TODO: BerserkFX enable — engine reads patchActive & PATCH_BERSERK
-            if (World.invP1.berserkIncrementFinishedTime < World.pauseRelativeTime) {
+            if (World.invP1.berserkIncTime < World.pauseRelativeTime) {
                 World.invP1.berserkIncrement++;
                 if (World.invP1.berserkIncrement > 6) World.invP1.berserkIncrement = 6;
-                World.invP1.berserkIncrementFinishedTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0f);
+                World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0f);
                 // TODO: engine reads berserkIncrement for texture swap + strength increment
             }
         }
     }
-    if (World.invP1.patchActive & PATCH_GENIUS) { if(World.invP1.geniusFinishedTime < World.pauseRelativeTime){World.invP1.patchActive -= PATCH_GENIUS; World.geniusActive=false;}else{World.geniusActive=true;} } // Genius
+    if (World.invP1.patchActive & PATCH_GENIUS) { if(World.invP1.geniusFinished < World.pauseRelativeTime){World.invP1.patchActive -= PATCH_GENIUS; World.geniusActive=false;}else{World.geniusActive=true;} } // Genius
     if (World.invP1.patchActive & PATCH_SIGHT) { // Sight
         if (World.invP1.sightFinishedTime < World.pauseRelativeTime && World.invP1.sightFinishedTime != -1.0) { World.invP1.sightFinishedTime=-1.0; World.invP1.sightSideEffectFinishedTime = World.pauseRelativeTime + SIGHT_SIDE_EFFECT_TIME; } // TODO: sightLight disable, sightDimming enable — engine reads sightFinishedTime == -1 + side effect active
         if (World.invP1.sightSideEffectFinishedTime < World.pauseRelativeTime && World.invP1.sightSideEffectFinishedTime != -1.0) { World.invP1.sightSideEffectFinishedTime=World.invP1.sightFinishedTime=-1.0; World.invP1.patchActive -= PATCH_SIGHT; } // TODO: sightDimming disable, sightLight disable — engine reads patchActive & PATCH_SIGHT
@@ -1330,7 +1212,7 @@ void PatchUpdate() {
 }
 
 void PatchDisableAll(void) {
-    World.invP1.berserkFinishedTime = World.invP1.berserkIncrementFinishedTime = World.invP1.detoxFinishedTime = World.invP1.geniusFinishedTime = World.invP1.mediFinishedTime = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = World.invP1.sightSideEffectFinishedTime = World.invP1.staminupFinishedTime = -1.0;
+    World.invP1.berserkFinished = World.invP1.berserkIncTime = World.invP1.detoxFinished = World.invP1.geniusFinished = World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = World.invP1.sightSideEffectFinishedTime = World.invP1.staminupFinishedTime = -1.0;
     World.invP1.staminupActive=false; World.invP1.fatigue =0.0f; World.invP1.berserkIncrement = World.invP1.patchActive = 0; World.timeScale  = DEFAULT_TIME_SCALE; World.geniusActive = false;
     // TODO: sightLight/sightDimming disable — engine reads patchActive == 0
     // TODO: BerserkFX disable + reset — engine reads patchActive & PATCH_BERSERK
@@ -1635,7 +1517,7 @@ u16 SpawnDynamicObject(int val, bool cheat) {
     return entityIndexInInstanceTable;
 }
 // Vmail
-void DeactivateVMail() { World.Sys_UI.vmailActive = false; if (World.invP1.lastAddedIndex >= 0) { World.invP1.readLog[World.invP1.lastAddedIndex] = true; CheckForUnreadLogs(); } play_wav(sounds[82], SfxVol(), (V3){0.0f,0.0f,0.0f}, false); }
+void DeactivateVMail() { World.Sys_UI.vmailActive=0; }
 // TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.
 void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
 void GravityLiftToggle(u16 self);
@@ -1687,11 +1569,11 @@ void UseEntity(u16 i) {
     else if (IdxIsUsableObject(ent->index)) {
         World.invP1.holdingObject = true;
         World.invP1.heldObjectIndex = ent->index;
-        World.invP1.heldObjectCustomIndex = ent->usableCustomIndex;
+        World.invP1.heldObjectCustIdx = ent->usableCustIdx;
         World.invP1.heldObjectAmmo = ent->ammo;
         World.invP1.heldObjectAmmo2 = ent->ammo2;
         World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
-        if (Sys_Settings.QuickItemPickup) { AddItemToInventory(ent->index,ent->usableCustomIndex); ResetHeldItem(); }
+        if (Sys_Settings.QuickItemPickup) { AddItemToInventory(ent->index,ent->usableCustIdx); ResetHeldItem(); }
         else { CenterStatusPrint("%s%s",Sys_Text.stringTable[World.invP1.heldObjectIndex - 307 + 326],Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); } // Inventory mode is turned on when picking something up
         DeleteInstance(i);
     } else CenterStatusPrint("%s%s",Sys_Text.stringTable[29],"name");
@@ -1700,7 +1582,7 @@ void UseEntity(u16 i) {
 #define FROB_DISTANCE 4.9f
 static void Frob(V3 pos, V3 forward, V3 right) {
     if (World.curLev == LEVEL_CYBERSPACE) return;
-    if (World.Sys_UI.vmailActive) { DeactivateVMail(); World.Sys_UI.vmailActive = false; return; }
+    if (World.Sys_UI.vmailActive) { DeactivateVMail(); return; }
     if (World.uiIsBlocking) return;
     if (World.invP1.holdingObject) { DropHeldItem(); return; }
     V3 dir = ScreenPointToRay(forward,right);
