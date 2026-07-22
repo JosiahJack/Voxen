@@ -1,4 +1,4 @@
-// composite.glsl - Full screen quad blit with compositing pass to combine rendered view with UI overlay.  Includes custom AA, VHS blur (subtle, magic!), SSR application with tapped blur, procedural skybox with stars and saturn and sun and station shield (if on!) that rotate to represent station rotation, berserk hallucinatory effect, screen rolling EMP effect, fog, grayscale for infrared hardware effect.
+// composite.glsl - Composite rendered view + UI overlay, custom AA, VHS blur (subtle, magic!), SSR with tapped blur, Procedural skybox w/ stars + saturn + sun + station shield (if on!) that rotate, berserk color hallucinations, EMP screen rolling, fog, infrared grayscale.
 in vec2 TexCoord;
 out vec4 FragColor;
 layout(location =  2) uniform uint screenWidth;
@@ -70,10 +70,7 @@ float snoise(vec2 v) {
     return 130.0 * dot(m, g);
 }
 
-float dither(vec2 uv, float scale, float fac, float finalMultiplier) {
-    return fract(snoise(uv * vec2(screenWidth, screenHeight) * 0.5) * 0.025) * finalMultiplier;
-}
-
+float dither(vec2 uv, float scale, float fac, float finalMultiplier) { return fract(snoise(uv * vec2(screenWidth, screenHeight) * 0.5) * 0.025) * finalMultiplier; }
 vec3 reconstructWorldPos(vec2 uv) {
     float depth = texture(inputDepthID, uv).r;
     if (depth >= 0.9999) return vec3(0.0); // invalid
@@ -84,76 +81,31 @@ vec3 reconstructWorldPos(vec2 uv) {
 
 // Cellular noise for star field with density and size variation
 vec3 cellularStar(vec2 uv, float scale, float brightness, float time, float densityMod) {
-    vec2 p = uv * scale;
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    float minDist = 1.0;
-    vec2 starPos;
-    vec3 starColor = vec3(1.0);
-    float sizeMod = 0.1;
-    for (int x = -1; x <= 1; x++) {
-        vec2 neighbor = vec2(float(x), float(-1));
-        vec2 point = vec2(
-            snoise(i + neighbor + vec2(0.0, 0.0)),
-            snoise(i + neighbor + vec2(1.0, 1.0))
-        ) * 0.5 + 0.5;
-        vec2 diff = neighbor + point - f;
-        float dist = length(diff);
-        if (dist < minDist) {
-            minDist = dist;
-            starPos = point;
-            float colorNoise = snoise(i + neighbor + vec2(2.0, 2.0)) * 0.5 + 0.5;
-            starColor = mix(vec3(0.8, 0.8, 1.0), vec3(1.0, 0.9, 0.7), colorNoise);
-            sizeMod = mix(0.02, 0.15, snoise(i + neighbor + vec2(3.0, 3.0)) * 0.5 + 0.5);
-        }
-    }
-
-    for (int x = -1; x <= 1; x++) {
+    vec2 p = uv * scale; vec2 i = floor(p); vec2 f = fract(p); float minDist = 1.0; vec2 starPos; vec3 starColor = vec3(1.0); float sizeMod = 0.1;
+    for (int x = -1; x <= 1; x++) { // Stars
         vec2 neighbor = vec2(float(x), float(0));
-        vec2 point = vec2(
-            snoise(i + neighbor + vec2(0.0, 0.0)),
-            snoise(i + neighbor + vec2(1.0, 1.0))
-        ) * 0.5 + 0.5;
+        vec2 point = vec2(snoise(i + neighbor + vec2(0.0, 0.0)),snoise(i + neighbor + vec2(1.0, 1.0))) * 0.5 + 0.5;
         vec2 diff = neighbor + point - f;
         float dist = length(diff);
-        if (dist < minDist) {
-            minDist = dist;
-            starPos = point;
-            float colorNoise = snoise(i + neighbor + vec2(2.0, 2.0)) * 0.5 + 0.5;
-            starColor = mix(vec3(0.8, 0.8, 1.0), vec3(1.0, 0.9, 0.7), colorNoise);
-            sizeMod = mix(0.02, 0.15, snoise(i + neighbor + vec2(3.0, 3.0)) * 0.5 + 0.5);
-        }
+        if (dist < minDist){minDist=dist; starPos=point; float colorNoise=snoise(i + neighbor + vec2(2.0,2.0))*0.5 + 0.5; starColor=mix(vec3(0.8,0.8,1.0),vec3(1.0,0.9,0.7),colorNoise); sizeMod=mix(0.02,0.15,snoise(i + neighbor + vec2(3.0,3.0))*0.5 + 0.5);}
     }
 
-    for (int x = -1; x <= 1; x++) {
+    for (int x = -1; x <= 1; x++) { // Microwave background (Eigengrau) variation
         vec2 neighbor = vec2(float(x), float(1));
-        vec2 point = vec2(
-            snoise(i + neighbor + vec2(0.0, 0.0)),
-            snoise(i + neighbor + vec2(1.0, 1.0))
-        ) * 0.5 + 0.5;
+        vec2 point = vec2(snoise(i + neighbor + vec2(0.0, 0.0)),snoise(i + neighbor + vec2(1.0, 1.0))) * 0.5 + 0.5;
         vec2 diff = neighbor + point - f;
         float dist = length(diff);
-        if (dist < minDist) {
-            minDist = dist;
-            starPos = point;
-            float colorNoise = snoise(i + neighbor + vec2(2.0, 2.0)) * 0.5 + 0.5;
-            starColor = mix(vec3(0.8, 0.8, 1.0), vec3(1.0, 0.9, 0.7), colorNoise);
-            sizeMod = mix(0.02, 0.15, snoise(i + neighbor + vec2(3.0, 3.0)) * 0.5 + 0.5);
-        }
+        if (dist < minDist){minDist=dist; starPos=point; float colorNoise=snoise(i + neighbor + vec2(2.0,2.0))*0.5 + 0.5; starColor=mix(vec3(0.8,0.8,1.0),vec3(1.0,0.9,0.7),colorNoise); sizeMod=mix(0.02,0.15,snoise(i + neighbor + vec2(3.0,3.0))*0.5 + 0.5);}
     }
     float star = smoothstep(sizeMod, 0.0, minDist) * brightness * densityMod;
     return starColor * star;
 }
 
-// Star field generation with density variation in polar coordinates
-vec3 starField(vec3 dir, float density, float brightness) {
-    // Convert direction to polar coordinates
-    float theta = atan(dir.z, dir.x); // Azimuth [0, 2PI]
+vec3 starField(vec3 dir, float density, float brightness) { // Star field generation with density variation in polar coordinates
+    float theta = atan(dir.z, dir.x); // Azimuth [0, 2PI] Convert direction to polar coordinates
     float phi = acos(dir.y); // Elevation [0, PI]
     vec2 noiseUV = vec2(theta, phi); // Use raw polar coords for noise
-    // Layered Simplex noise for density variation
-    float densityMod = snoise(noiseUV * 0.5) * 0.5 + 0.5; // Primary layer
-    densityMod = mix(0.0, 2.5, densityMod); // Stronger variation
+    float densityMod = snoise(noiseUV * 0.5) * 0.5 + 0.5; densityMod = mix(0.0, 2.5, densityMod); // Layered Simplex noise for density variation
     float densityMod2 = snoise(noiseUV * 10.5 + vec2(10.0)) * 0.5 + 0.5; // Higher frequency, phase-shifted
     densityMod = mix(densityMod, 0.0, densityMod2 * 3.2); // Stronger dark patches
     return cellularStar(noiseUV, 40.0, brightness, timeVal * 0.1, densityMod) * density;
@@ -174,8 +126,8 @@ vec3 milkyWay(vec3 dir) {
     intensity *= (snoise(noiseUV * 0.6) * 0.2 + 0.8); // 2D noise, softer scale
     intensity *= poleFade * (1.0 - seamBlend * 0.5); // Apply seam and pole fade
     float tintNoise = clamp(snoise(noiseUV * 0.3 + vec2(5.0)) * 0.5 + 0.5, 0.0, 1.0);
-    vec3 tint = mix(vec3(0.7, 0.85, 0.7), vec3(1.0, 0.95, 0.99), tintNoise);
-    float ditherVal = dither(noiseUV, 0.2, 0.015, 0.01);
+    vec3 tint = mix(vec3(0.7,0.85,0.7),vec3(1.0,0.95,0.99),tintNoise);
+    float ditherVal = dither(noiseUV, 0.2,0.015,0.01);
     return vec3(intensity) * tint * 0.06 + vec3(ditherVal);
 }
 
@@ -207,12 +159,7 @@ vec3 rgb2hsv(vec3 c) {
     return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
 }
 
-vec3 hsv2rgb(vec3 c) {
-    vec3 rgb = abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0;
-    rgb = clamp(rgb, 0.0, 1.0);
-    return c.z * mix(vec3(1.0), rgb, c.y);
-}
-
+vec3 hsv2rgb(vec3 c) { vec3 rgb = abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0; rgb = clamp(rgb, 0.0, 1.0); return c.z * mix(vec3(1.0), rgb, c.y); }
 vec3 applyBerserk(vec3 worldPos, vec3 base) {
     float prog = clamp(1.0 - berserkTimeRemaining, 0.0, 1.0);
     float seed = fract(sin(berserkSeedTimestamp * 91.7) * 43758.5453);
@@ -228,31 +175,24 @@ vec3 applyBerserk(vec3 worldPos, vec3 base) {
     float fadeIn = smoothstep(0.0, 0.05, prog);
     float fadeOut = smoothstep(0.0, 0.025, berserkTimeRemaining);
     vec3 berserkColor = mix(base, hsv2rgb(hsv), coverageMask * fadeIn * fadeOut);
-
-    // Inversion fade in final throes
-    float invertFade = smoothstep(0.25, 0.22, berserkTimeRemaining) * fadeOut;
+    float invertFade = smoothstep(0.25, 0.22, berserkTimeRemaining) * fadeOut; // Inversion fade in final throes
     vec3 inverted = vec3(1.0) - berserkColor;
     inverted *= inverted * 1.5;
     return mix(berserkColor, inverted * berserkColor * 1.5, invertFade);
 }
 
 vec3 Grayscale(vec3 currentColor) {
-        float lum = max(max(currentColor.r, currentColor.g), currentColor.b);
-        lum = pow(lum, 0.7);
-        lum = 1.0 - exp(-lum); lum = lum * 1.1;
-        float low = 0.2, high = 0.85;
-        lum = clamp((lum - low) / (high - low), 0.0, 1.0);
-        float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453);
-        lum += (n - 0.5) * 0.01;
-        return vec3(lum);
+    float lum = max(max(currentColor.r, currentColor.g), currentColor.b);
+    lum = pow(lum, 0.7);
+    lum = 1.0 - exp(-lum); lum = lum * 1.1;
+    float low = 0.2, high = 0.85;
+    lum = clamp((lum - low) / (high - low), 0.0, 1.0);
+    float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453);
+    lum += (n - 0.5) * 0.01;
+    return vec3(lum);
 }
 
-const float ssr_weights[9] = float[](
-    0.0625, 0.125, 0.0625,
-    0.125,  0.25,  0.125,
-    0.0625, 0.125, 0.0625
-);
-
+const float ssr_weights[9] = float[](0.0625,0.125,0.0625,0.125,0.25,0.125,0.0625,0.125,0.0625);
 void main() {
     vec2 texCoordUsed = TexCoord;
     if (empEffectActive > 0u) texCoordUsed.y += timeVal * 15.0;
@@ -309,14 +249,8 @@ void main() {
                 skyColor += milkyWay(skyDir);
 
                 // Procedural Saturn
-                vec3 saturnPole = vec3(0.0, 1.0, 0.0);
-                float planetRadius = 0.451;
-                float cosPlanet = cos(planetRadius);
-                float dd = dot(skyDir, saturnCenter);
-                vec3 mainColor1 = vec3(0.85, 0.78, 0.6);
-                vec3 mainColor2 = vec3(0.82, 0.74, 0.62);
-                vec3 darkColor = vec3(0.81, 0.73, 0.55);
-                vec3 ringColor = darkColor;
+                vec3 saturnPole = vec3(0.0, 1.0, 0.0); float planetRadius = 0.451; float cosPlanet = cos(planetRadius); float dd = dot(skyDir, saturnCenter);
+                vec3 mainColor1 = vec3(0.85, 0.78, 0.6); vec3 mainColor2 = vec3(0.82, 0.74, 0.62); vec3 darkColor = vec3(0.81, 0.73, 0.55); vec3 ringColor = darkColor;
                 vec3 tiltedPole = normalize(vec3(saturnPole.x, saturnPole.y - saturnPole.z * 0.5, saturnPole.y * 0.5 + saturnPole.z));
                 vec3 rayDir = normalize(skyDir);
                 bool pixelLiesOnPlanet = (dd > cosPlanet);
@@ -398,131 +332,60 @@ void main() {
             FragColor = vec4((color.rgb * max(0.1,color.a)) + skyColor, 1.0); // Add window alpha weighted color tint
         }
     }
-
-    vec4 fog = vec4(0.0,0.0,0.0,0.0);
-    if (!isSky) color.rgb = mix(color.rgb, fog.rgb, fog.a);
     vec2 ssRatio = vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
     ivec2 pixel = ivec2(texCoordUsed * ssRatio);
     if (reflectionsEnabled > 0) {
-        vec2 sampleUV = (vec2(pixel)) / ssRatio;
         vec2 lowResSize = ssRatio;
         vec2 pixelLow = floor(vec2(pixel)) + 0.5;  // Center of the current low-res pixel
         vec2 sampleUVBase = pixelLow / lowResSize;
         vec4 reflectionColor = vec4(0.0);
-        reflectionColor.rgb += texture(outputImage, sampleUV).rgb;
-        float weightSum = 1.0;
         int wi = 0;
         for (int x = -1; x <= 1; ++x) {
             for (int y = -1; y <= 1; ++y) {
-                vec2 offset = vec2(float(x), float(y));
-                vec2 sampleUV = (pixelLow + offset) / lowResSize;
+                vec2 sampleUV = (pixelLow + vec2(float(x), float(y))) / lowResSize;
                 vec3 samp = texture(outputImage,sampleUV).rgb;
                 float w = ssr_weights[wi++];
                 reflectionColor.rgb += samp * w;
-                weightSum += 1.0;
             }
         }
-
-        reflectionColor.rgb /= weightSum;
+        reflectionColor.rgb /= 4.51;
         if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
-
         color.rgb += (reflectionColor.rgb * 2.2);
     }
-
     vec3 aaColor = color.rgb;
+    vec2 texelSize = 1.0 / vec2(screenWidth,screenHeight);
     if (aaEnabled > 0.0) {
-        vec2 pixelSize = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
-        vec3 centerColor = texture(tex, texCoordUsed).rgb;
-        float lumaCenter = dot(centerColor, vec3(0.299, 0.587, 0.114));
-        vec3 cLeft  = texture(tex, texCoordUsed + vec2(-pixelSize.x,  0.0)).rgb;
-        vec3 cRight = texture(tex, texCoordUsed + vec2( pixelSize.x,  0.0)).rgb;
-        vec3 cUp    = texture(tex, texCoordUsed + vec2( 0.0, -pixelSize.y)).rgb;
-        vec3 cDown  = texture(tex, texCoordUsed + vec2( 0.0,  pixelSize.y)).rgb;
-        float lumaLeft  = dot(cLeft,  vec3(0.299, 0.587, 0.114));
-        float lumaRight = dot(cRight, vec3(0.299, 0.587, 0.114));
-        float lumaUp    = dot(cUp,    vec3(0.299, 0.587, 0.114));
-        float lumaDown  = dot(cDown,  vec3(0.299, 0.587, 0.114));
-        float lumaDx = abs(lumaRight - lumaLeft);
-        float lumaDy = abs(lumaDown  - lumaUp);
+        vec3 centerColor = texture(tex,texCoordUsed).rgb;
+        float lumaCenter = dot(centerColor,vec3(0.299,0.587,0.114));
+        vec3 cLeft  = texture(tex,texCoordUsed + vec2(-texelSize.x, 0.0)).rgb;
+        vec3 cRight = texture(tex,texCoordUsed + vec2( texelSize.x, 0.0)).rgb;
+        vec3 cUp    = texture(tex,texCoordUsed + vec2(0.0, -texelSize.y)).rgb;
+        vec3 cDown  = texture(tex,texCoordUsed + vec2(0.0,  texelSize.y)).rgb;
+        float lumaLeft  = dot(cLeft,vec3(0.299,0.587,0.114)); float lumaRight = dot(cRight,vec3(0.299,0.587,0.114));
+        float lumaUp    = dot(cUp,  vec3(0.299,0.587,0.114)); float lumaDown  = dot(cDown, vec3(0.299,0.587,0.114));
+        float lumaDx = abs(lumaRight - lumaLeft); float lumaDy = abs(lumaDown  - lumaUp);
         float gradientMag = max(lumaDx, lumaDy);
         if (gradientMag > 0.08) {
-            const int   nSamples = 2;
-            const float radiusPx = 3.5;
-            float xStrength = 0.25;
-            float yStrength = 0.25;
-            if (lumaDx > lumaDy) xStrength = 1.0;
-            else yStrength = 1.0;
-
-            // dx Blur
+            const int nSamples = 2; const float radiusPx = 3.5;
+            float xStrength = 0.25; float yStrength = 0.25; if(lumaDx > lumaDy){xStrength = 1.0;}else{yStrength = 1.0;}
             vec3 accum = vec3(0.0);
-            float wSum = 0.0;
-            for (int i = -nSamples; i <= nSamples; ++i) {
-                if (i == 0) continue;
-
-                float fi = float(i);
-                float dist = fi * (radiusPx * xStrength / float(nSamples));
-                vec2 offset = vec2(0.0, 1.0) * dist * pixelSize;
-                vec3 col    = texture(tex, texCoordUsed + offset).rgb;
-                accum += col;
-                wSum  += 1.0;
-            }
-
-            if (wSum > 0.0001) {
-                vec3 blurred = accum / wSum;
-                float strength = lumaDx * 128.0;  // stronger on pure axis
-                float blend = clamp(strength, 0.0, 0.88);
-                aaColor = mix(aaColor, blurred, blend);
-            }
-
-            // dy Blurr
+            for (int i = -nSamples; i <= nSamples; ++i) { if (i == 0){continue;} float dist = float(i) * (radiusPx * xStrength / float(nSamples)); accum += texture(tex,texCoordUsed + (vec2(0.0,1.0) * dist * texelSize)).rgb; }
+            aaColor = mix(aaColor,accum * 0.25,clamp(lumaDx * 128.0, 0.0, 0.88)); // dx Blur
             accum = vec3(0.0);
-            wSum = 0.0;
-            for (int i = -nSamples; i <= nSamples; ++i) {
-                if (i == 0) continue;
-
-                float fi = float(i);
-                float dist = fi * (radiusPx * yStrength / float(nSamples));
-                vec2 offset = vec2(1.0, 0.0) * dist * pixelSize;
-                vec3 col    = texture(tex, texCoordUsed + offset).rgb;
-                accum += col;
-                wSum  += 1.0;
-            }
-
-            if (wSum > 0.0001) {
-                vec3 blurred = accum / wSum;
-                float strength = lumaDy * 128.0;  // stronger on pure axis
-                float blend = clamp(strength, 0.0, 0.88);
-                aaColor = mix(aaColor, blurred, blend);
-            }
+            for (int i = -nSamples; i <= nSamples; ++i) { if (i == 0){continue;} float dist = float(i) * (radiusPx * yStrength / float(nSamples)); accum += texture(tex,texCoordUsed + (vec2(1.0,0.0) * dist * texelSize)).rgb; }
+            aaColor = mix(aaColor,accum * 0.25,clamp(lumaDy * 128.0, 0.0, 0.88)); // dy Blurr
         }
     }
-
-    // VHS Blur
-    const float r = vhsRadiusMax * vhsBlurAmount;
-    vec2 px = 1.0 / vec2(screenWidth, screenHeight);
-    vec3 acc = vec3(0.0);
-    float wsum = 0.0;
-    const float w[7] = float[](0.05,0.12,0.20,0.26,0.20,0.12,0.05);
-    for (int i=0;i<7;i++) {
-        float o = (i-3) * (r/3.0);
-        vec3 s = texture(tex, texCoordUsed + vec2(o*px.x,0.0)).rgb;
-        acc += s * w[i];
-        wsum += w[i];
-    }
-
-    acc /= wsum;
-    acc += texture(tex, texCoordUsed + vec2(0.0,-px.y)).rgb * 0.25;
-    acc += texture(tex, texCoordUsed + vec2(0.0, px.y)).rgb * 0.25;
-    vec3 vhsBlur = acc * (1.0/1.5); // renormalize
-    aaColor = mix(aaColor, vhsBlur, clamp(vhsBlurAmount, 0.0, 1.0));
-    if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed); // Banded Static (pain, emp effects, etc.)
+    const float r = vhsRadiusMax * vhsBlurAmount; vec3 acc = vec3(0.0); const float w[7] = float[](0.05,0.12,0.20,0.26,0.20,0.12,0.05);
+    for (int i=0;i<7;i++) { float o = (i-3) * (r/3.0); vec3 s = texture(tex, texCoordUsed + vec2(o*texelSize.x,0.0)).rgb; acc += s * w[i]; }
+    acc += texture(tex,texCoordUsed + vec2(0.0,-texelSize.y)).rgb * 0.25;
+    acc += texture(tex,texCoordUsed + vec2(0.0, texelSize.y)).rgb * 0.25;
+    vec3 vhsBlur = acc * 0.666666667; // renormalize
+    aaColor = mix(aaColor, vhsBlur, clamp(vhsBlurAmount, 0.0, 1.0)); // VHS Blur
+    if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed); // Banded Static (red for pain, blue shield/emp effects, etc.)
     aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting + 50) / 100.0))); // Brightness Adjustment Setting
-    if (berserkTimeRemaining > 0.0) {
-        vec3 worldPos = reconstructWorldPos(texCoordUsed);
-        if (worldPos != vec3(0.0)) aaColor = applyBerserk(worldPos,aaColor); // Berserk last as it's a brain effect not an eye effect
-    }
+    if (berserkTimeRemaining > 0.0) { vec3 worldPos = reconstructWorldPos(texCoordUsed); if (worldPos != vec3(0.0)) aaColor = applyBerserk(worldPos,aaColor);/*Berserk last as it's a brain effect not an eye effect*/ }
     if (grayscaleEnabled > 0) aaColor = Grayscale(aaColor);
-
     vec4 uiSample = texture(uiImage,texCoordUsed);
     FragColor = vec4(mix(aaColor,uiSample.rgb,uiSample.a),1.0);
 }
