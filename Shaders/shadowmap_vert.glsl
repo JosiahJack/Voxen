@@ -7,9 +7,4 @@ layout(location=0) uniform uint instanceIndex;
 layout(location=1) uniform mat4 viewProjMatrix;
 out vec3 FragPos;
 out vec2 TexCoord;
-void main() {
-    vec4 matmul = modelMatrices[instanceIndex] * vec4(position, 1.0);
-    FragPos = matmul.xyz; // World-space position
-    gl_Position = viewProjMatrix * matmul;
-    TexCoord = aTexCoord;
-}
+void main() { vec4 matmul=modelMatrices[instanceIndex] * vec4(position,1.0); FragPos=matmul.xyz;/*World-space position*/ gl_Position=viewProjMatrix*matmul; TexCoord=aTexCoord; }

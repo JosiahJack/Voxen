@@ -14,6 +14,7 @@ layout(location=3) uniform vec2 worldMin;
 layout(location=4) uniform uint shadowMapSize;
 layout(location=5) uniform vec3 camPos;
 layout(location=6) uniform uint maxLightsPerVoxel;
+layout(location=7) uniform uint shadSizeSqd;
 const int WORLD_X_VOXELCOUNT = 512;
 const float VOXEL_SIZE = 0.32;
 const uint SHADON = 2u;
@@ -41,11 +42,8 @@ void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out
     vec2 uvx = mix(vec2( dir.z, dir.y), vec2(-dir.z, dir.y), sxyz.x);
     vec2 uvy = mix(vec2( dir.x, dir.z), vec2( dir.x,-dir.z), sxyz.y);
     vec2 uvz = mix(vec2(-dir.x, dir.y), vec2( dir.x, dir.y), sxyz.z);
-    float fmx = step(a.y,a.x)*step(a.z,a.x);
-    float fmy = step(a.x,a.y)*step(a.z,a.y);
-    vec2 uv = fmx * uvx + fmy * uvy + (1.0 - fmx - fmy) * uvz;
+    vec2 uv = mx * uvx + my * uvy + (1.0 - mx - my) * uvz;
     uv = uv * 0.5 + 0.5;
-    uint shadSizeSqd = shadowMapSize * shadowMapSize;
     faceOff = (shadowIndex * shadSizeSqd * 6u) + (face * shadSizeSqd);
     tc = uv * float(shadowMapSize);
 }

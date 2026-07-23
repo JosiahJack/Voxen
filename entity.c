@@ -1005,63 +1005,34 @@ void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
     World.levelColliding[dstLevel][s]            = World.levelColliding[srcLevel][s];
 }
 
-char lineSpace[LINE_LEN_MAX];
-void AddDoorPortal(u16 entIdx, u16 parent);
-void TextureSequenceInit(u16 self, char* trimmed_value);
+char lineSpace[LINE_LEN_MAX]; void AddDoorPortal(u16 entIdx, u16 parent); void TextureSequenceInit(u16 self, char* trimmed_value);
 void LoadLevelMod(u8 lev) {
-    u8 curlevel = vclamp(lev, 0, 13);
-    World.curLev = curlevel;
-    World.levelCurrentlyLoading = true;
-    World.instCount = 3;
+    u8 curlevel = vclamp(lev, 0, 13); World.curLev = curlevel; World.levelCurrentlyLoading = true; World.instCount = 3;
     if (curlevel == 1) {
         AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);
         AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);
     } // TODO other level camviews
-    mset(lineSpace,0,LINE_LEN_MAX * sizeof(char));
-    u32 lineNum = 0; i32 entCount = -1, lightsIdx = -1;
-    char* line;
+    mset(lineSpace,0,LINE_LEN_MAX * sizeof(char)); u32 lineNum = 0; i32 entCount = -1, lightsIdx = -1; char* line;
     while (MmapGetLine(lineSpace, LINE_LEN_MAX)) {
-        lineNum++;
-        line = lineSpace;
-        char* firstColon = StringFindFirstCharWithin(line, ':');
-        int firstKeyLen = firstColon ? (int)(firstColon - line) : 0;
+        lineNum++; line = lineSpace; char* firstColon = StringFindFirstCharWithin(line, ':'); int firstKeyLen = firstColon ? (int)(firstColon - line) : 0;
         bool isLight = !(firstKeyLen == 10 && sCompUpToLen(line, "constIndex", 10) == 0);
-        Entity* inst = NULL;
-        Light*   lit  = NULL;
-        LightAnimation* lanim = NULL;
+        Entity* inst=NULL; Light* lit=NULL; LightAnimation* lanim=NULL;
         if (isLight) {
-            lightsIdx++;
-            if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n", lightsIdx, curlevel); continue; }
-            lit   = &lightsFromFile[lightsIdx];
-            lanim = &lanimsFromFile[lightsIdx];
-            // Zero this slot only (replaces the full-array mset + full-array lflags init)
-            mset(lit, 0, sizeof(Light));
-            mset(lanim, 0, sizeof(LightAnimation));
+            lightsIdx++; if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n", lightsIdx, curlevel); continue; }
+            lit=&lightsFromFile[lightsIdx]; lanim=&lanimsFromFile[lightsIdx]; mset(lit,0,sizeof(Light)); mset(lanim,0,sizeof(LightAnimation)); // Zero this slot only (replaces the full-array mset + full-array lflags init)
             lit->lflags = LIGHT_AND_SHADOW_ON; // default per-light
         } else {
             entCount++;
             if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; }
-            inst = &entsFromFile[entCount];
-            // Zero this entity slot only
-            mset(inst, 0, sizeof(Entity));
-            mset(&positionFromFile[entCount], 0, sizeof(V3));
-            mset(&scaleFromFile[entCount],    0, sizeof(V3));
-            mset(&rotationFromFile[entCount], 0, sizeof(Quaternion));
+            inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&positionFromFile[entCount],0,sizeof(V3)); mset(&scaleFromFile[entCount],0,sizeof(V3)); mset(&rotationFromFile[entCount],0,sizeof(Quaternion)); // Zero this entity slot only
         }
-
         bool activeStateRead = false;
         while (line[0] != '\0') {
-            char* pipe = StringFindFirstCharWithin(line, '|');
-            char* kvString = line;
-            if (pipe) { *pipe = '\0'; line = pipe + 1; }
-            else       { line += slen(line); }
+            char* pipe = StringFindFirstCharWithin(line, '|'); char* kvString = line;
+            if (pipe) { *pipe = '\0'; line = pipe + 1; } else { line += slen(line); }
             if (kvString[0] == '\0') continue;
-            char* colon = StringFindFirstCharWithin(kvString, ':');
-            if (!colon || colon[1] == '\0') continue;
-            *colon = '\0';
-            char* key = kvString;
-            char* value = colon + 1;
-            int keyLen = (int)(colon - key); // length is free, no slen()
+            char* colon = StringFindFirstCharWithin(kvString, ':'); if (!colon || colon[1] == '\0') continue;
+            *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);
             } else {
                 // Use KEY_EQ for length-aware compares against literals (no slen on key).
@@ -1254,8 +1225,7 @@ void GravityLiftInitAfterLoad(u16 self) {
 
 void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
 void LoadLevelData(u8 curlevel) {
-    World.curLev = curlevel;
-    SetLevelPointers(curlevel); // Ensures writing to correct current level
+    World.curLev = curlevel; SetLevelPointers(curlevel); // Ensures writing to correct current level
     mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Clear previous level slots. Claimed slots are fully initialized by AddInstance().
     World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
@@ -1263,16 +1233,13 @@ void LoadLevelData(u8 curlevel) {
     char filename[20]; // Minimum size for 0 through 13.
     sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); }
-    mm_ptr = (const char*)fbuf;
-    mm_end = mm_ptr + fsize;
-    LoadLevelMod(curlevel);
-    OS_Free(fbuf, (size_t)fsize);
+    mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; LoadLevelMod(curlevel); OS_Free(fbuf, (size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
     for (int i = PLAYER1; i < World.instCount; ++i) {
         i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
         World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
         World.radius[i] = modelBounds[World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x, World.scale[i].y), World.scale[i].z);
-        World.instances[i].shadRadius = World.radius[i] * 1.70f;
+        World.instances[i].shadRadius = World.radius[i] * 1.82f;
         ComputeConvexMeshInertiaTensor(i);
         if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
     }
@@ -1330,7 +1297,8 @@ void LoadLevelData(u8 curlevel) {
     World.levelLoadedLights[curlevel] = World.loadedLights; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
 }
 
-void RenderLoading(i32 offset, const char * restrict text);
+u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
+void RenderLoading(i32 offset, const char * restrict text); void ResetLevelAudio(); void ResetLevelMusic(); void CullInit();
 void LoadAllLevels() {
     double start_time = get_time();
     DebugRAM("start of LoadAllLevels");
@@ -1344,7 +1312,6 @@ void LoadAllLevels() {
     DebugRAM("end of LoadAllLevels");
 }
 
-void ResetLevelAudio(); void ResetLevelMusic(); void CullInit();
 void LoadLevel(u8 curlevel, V3 pos) {
     DebugRAM("start of LoadLevel");
     World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false;
@@ -1361,7 +1328,8 @@ void LoadLevel(u8 curlevel, V3 pos) {
     DualLog("Switched to Level %d\n",curlevel);
     ResetLevelAudio(); ResetLevelMusic();
     RenderLoading(110,"Loading cull system..."); CullInit(); // Must be after level!
-    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]);
+    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights);
+                                 glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(7,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
     RenderLoading(120,"Loading voxel lighting data...");
     for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
@@ -1376,17 +1344,9 @@ size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) 
     while (s < srcSize) { // 1. Hunt for Zeros
         size_t zeroCount = 0;
         while (s + zeroCount < srcSize && src[s + zeroCount] == 0) { zeroCount++; }
-        if (zeroCount > 0) {
-            if (zeroCount < 128) { if (d >= dstCapacity){return 0;} dst[d++] = (u8)(0x80 + (zeroCount - 1)); }
-            else { if (d + 5 > dstCapacity) {return 0;} dst[d++] = 0xFF; u32 zCount32=(u32)zeroCount; mcpy(&dst[d],&zCount32,sizeof(u32)); d += 4; }
-            s += zeroCount; continue; // Go back to hunting zeros
-        }
-        
+        if(zeroCount > 0){if(zeroCount < 128){if (d >= dstCapacity){return 0;} dst[d++]=(u8)(0x80 + (zeroCount-1));}else{if(d + 5 > dstCapacity){return 0;} dst[d++] = 0xFF; u32 zCount32=(u32)zeroCount; mcpy(&dst[d],&zCount32,sizeof(u32)); d+=4;} s+=zeroCount; continue; }
         size_t litCount = 0; // 2. Process Literal Data (Non-Zeros). It costs 2 bytes of overhead to break a literal run to compress 1 or 2 zeros. Only break a literal run if 3 or more zeros ahead.
-        while (s + litCount < srcSize && litCount < 128) {
-            if (src[s + litCount] == 0) { size_t remain = srcSize - (s + litCount); if (remain >= 3 && src[s + litCount + 1] == 0 && src[s + litCount + 2] == 0) { break; } /*Found a juicy patch of zeros, break the literal run!*/ }
-            litCount++;
-        }
+        while (s + litCount < srcSize && litCount < 128) { if (src[s + litCount] == 0) { size_t remain = srcSize - (s + litCount); if (remain >= 3 && src[s + litCount + 1] == 0 && src[s + litCount + 2] == 0) { break; } } litCount++; }
         if (litCount > 0) { if (d + 1 + litCount > dstCapacity) {return 0;} dst[d++] = (u8)(litCount - 1); mcpy(&dst[d], &src[s], litCount); s += litCount; d += litCount; }
     }
     return d; // Return final compressed size
@@ -1396,22 +1356,9 @@ static size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t d
     size_t s = 0, d = 0;
     while (s < srcSize && d < dstCapacity) {
         u8 cmd = src[s++];
-        if (cmd < 128) { // Literal Run
-            size_t litCount = cmd + 1;
-            if (s + litCount > srcSize || d + litCount > dstCapacity) return 0; 
-            mcpy(&dst[d], &src[s], litCount); s += litCount; d += litCount;
-        } else if (cmd < 0xFF) { // Short Zero Run
-            size_t zeroCount = cmd - 128 + 1;
-            if (d + zeroCount > dstCapacity) return 0;
-            mset(&dst[d], 0, zeroCount); d += zeroCount;
-        } else { // Long Zero Run
-            if (s + 4 > srcSize) return 0;
-            u32 zeroCount;
-            mcpy(&zeroCount, &src[s], sizeof(u32));
-            s += 4;
-            if (d + zeroCount > dstCapacity) return 0;
-            mset(&dst[d], 0, zeroCount); d += zeroCount;
-        }
+             if (cmd <  128) { size_t litCount = cmd + 1; if(s + litCount > srcSize || d + litCount > dstCapacity){return 0;} mcpy(&dst[d], &src[s], litCount); s += litCount; d += litCount; } // Literal Run
+        else if (cmd < 0xFF) { size_t zeroCount=cmd - 128 + 1; if(d + zeroCount > dstCapacity){return 0;} mset(&dst[d], 0, zeroCount); d += zeroCount; } // Short Zero Run
+        else                 { if(s + 4 > srcSize){return 0;} u32 zeroCount; mcpy(&zeroCount, &src[s], sizeof(u32)); s += 4; if(d + zeroCount > dstCapacity){return 0;} mset(&dst[d], 0, zeroCount); d += zeroCount; } // Long Zero Run
     }
     return d;
 }
@@ -1420,37 +1367,23 @@ static size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t d
 typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compressedSize; char savename[48]; } SaveHeader;
 #pragma pack(pop)
 void SaveGame(u8 slot, const char* savename) {
-    if (slot > 7) return;
-    char path[] = "./Data/sav0.bin"; path[10] = '0' + slot;
-    FHandle fd = OS_OpenWriteonly(path); if (fd == (FHandle)-1) return;
-    // Allocate memory for the compression buffer
-    size_t uncompressedSize = sizeof(GlobalContext);
-    size_t maxCompSize = GetMaxCompressedSize(uncompressedSize);
-    u8* compBuffer = (u8*)OS_Alloc(maxCompSize);
-    size_t finalCompSize = VoidSquasher((const u8*)&World,uncompressedSize,compBuffer,maxCompSize);
+    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenWriteonly(path); if(fd == (FHandle)-1){return;}
+    size_t sz=sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b=(u8*)OS_Alloc(maxCompSize); size_t finalCompSize=VoidSquasher((const u8*)&World,sz,b,maxCompSize);
     if (finalCompSize > 0) {
-        SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=2, .uncompressedSize=(u32)uncompressedSize, .compressedSize=(u32)finalCompSize};
+        SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=2, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize};
         if (savename) { int i=0;   while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;}   header.savename[i]='\0'; }
-        World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,compBuffer,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot);
+        World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot);
     } else { DualLogError("Compression failed during SaveGame!\n"); }
-    OS_Free(compBuffer,maxCompSize); OS_Close(fd);
+    OS_Free(b,maxCompSize); OS_Close(fd);
 }
 
 void LoadGame(u8 slot) {
-    if (slot > 7) return;
-    char path[] = "./Data/sav0.bin"; path[10] = '0' + slot;
-    FHandle fd = OS_OpenReadonly(path); if (fd == (FHandle)-1) return;
-    SaveHeader header;
-    if (OS_Read(fd, &header, sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
-    // Allocate memory to read the compressed file
-    u8* compBuffer = (u8*)OS_Alloc(header.compressedSize);
-    if (OS_Read(fd,compBuffer,header.compressedSize) == (long)header.compressedSize) {
-        size_t result = BlowBubblesOfVoid(compBuffer, header.compressedSize, (u8*)&World, header.uncompressedSize); // Decompress straight into the World struct
-        if (result == header.uncompressedSize) { SetLevelPointers(World.currentLevel); CenterStatusPrint("Loaded Game: %s", header.savename); }
-        else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
+    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;}
+    SaveHeader header; if (OS_Read(fd, &header, sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; } 
+    u8* b = (u8*)OS_Alloc(header.compressedSize);
+    if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
+        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize); // Decompress straight into the World struct
+        if (result == header.uncompressedSize) { SetLevelPointers(World.currentLevel); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
     }
-    OS_Free(compBuffer,header.compressedSize); OS_Close(fd);
-    for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
+    OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }
-
-u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }

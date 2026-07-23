@@ -36,11 +36,11 @@ typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 f
 typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 typedef struct { bool hit; V3 point,normal; float pen; } Overlap;    typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
-enum{INSTANCE_COUNT=9000,LIGHT_COUNT=2200,U16_MAX=65535,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,MAX_ENTITIES=768,MAX_LEVELS=14,MAX_MDLS=6000,MAX_TXRS=2048,MAX_TOTAL_PIXELS=38000780u,MAX_UNIQUE_COLORS=120040u,WORLDX=64,WORLDZ=64,WORLDY=18,MAX_ANIMS=64,
+enum{INSTANCE_COUNT=9000,LIGHT_COUNT=2200,MAX_LIGHTS_PER_VOXEL=32,U16_MAX=65535,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,MAX_ENTITIES=768,MAX_LEVELS=14,MAX_MDLS=6000,MAX_TXRS=2048,MAX_TOTAL_PIXELS=38000780u,MAX_UNIQUE_COLORS=120040u,WORLDX=64,WORLDZ=64,WORLDY=18,
      MAX_ANIMCLIPS=32,MAX_WIRELINE_VRTS=512000,MAX_PORTALS=56/*Max 49 on lev 7*/,MAX_KEYS=512,MAX_MOUSE_BUTTONS=8,MAX_CHANNELS=48,MAX_GLYPHS=4096,VRT_ATT_SZ=16,CPU_VRT_SZ=32,LEVEL_CYBERSPACE=13,SHADOW_MAP_SIZE=128,MAX_SHADOWMAPS=80,FONT_ATLAS_SIZE=4672,
      BVH_MAX_DEPTH=3,BVH_LEAF_MAX_TRIS=8,BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585 worst case, +safety*/,BVH_MAX_TRIS_PER_MDL=6986,WELD_HASH_SIZE=32768,MAX_UNIQUE_CVX_MESHES=5989,MAX_VERT_ELEMENT_SIZE=6964,MAX_OUTPUT_VERTS=20960,LIGHTON=1,SHADON=2,
      LIGHT_AND_SHADOW_ON=3,LSPOT=4,LDIR=8,LDIRTY=16,LERPON=32,VOXELS_PER_CELL=8,ARRSIZE=(WORLDX * WORLDZ),VOXELS_X=(WORLDX * VOXELS_PER_CELL),VOXELS_Z=(WORLDZ * VOXELS_PER_CELL),VOXEL_COUNT=(VOXELS_X * VOXELS_Z)/*64 * 64 * 8 * 8*/,TARGET_STRING_LENGTH=38,
-     SOUNDS_COUNT=670,T_LOGSTR_CNT=1100,T_LOGSTR_MAX=1280,LOGCNT=134,T_BUFFER_SIZE=1024,NUM_AI_TYPES=29,INPUT_RELEASE=0,INPUT_PRESS=1,INPUT_REPEAT=2,CREDITS_PAGES=22,FONT_NORMAL=0,FONT_STOPD=1,MM_EMAIL_TABLE=0,MM_LOG_TABLE=1,
+     MAX_ANIMS=64,SOUNDS_COUNT=670,T_LOGSTR_CNT=1100,T_LOGSTR_MAX=1280,LOGCNT=134,T_BUFFER_SIZE=1024,NUM_AI_TYPES=29,INPUT_RELEASE=0,INPUT_PRESS=1,INPUT_REPEAT=2,CREDITS_PAGES=22,FONT_NORMAL=0,FONT_STOPD=1,MM_EMAIL_TABLE=0,MM_LOG_TABLE=1,AVG_CPU_TAPS=2048,
      MM_DATA_TABLE=2,MM_NOTES=3,COLTYPE_NONE=0,COLTYPE_BOX=1,COLTYPE_SPH=2,COLTYPE_CAP=3,COLTYPE_CVX=4,COLTYPE_MSH=5,T_WHITE=0,T_YELLOW=1,T_DARK_YELLOW=2,T_GREEN=3,T_RED=4,T_ORANGE=5,T_STOPD_RED=6,T_STOPD_RED_HIGHLIGHT=7,T_STOPD_RED_PAUSETITLE=8,
      T_GREEN_MENU=9,T_GREEN_MENU_SHADOW=10,T_GREEN_MENU_GLOW=11,T_RED_MENU=12,ANIM_LOOP_ALL=0,ANIM_IDLE_CLOSED=0,ANIM_IDLE=0,ANIM_INACTIVE=0,ANIM_ATTACK_MISS=1,ANIM_OPENING=1,ANIM_WALK=1,ANIM_ACTIVATE=1,ANIM_ATTACK_HIT=2,ANIM_ACTIVATED=2,ANIM_IDLE_OPEN=2,
      ANIM_RUN=2,ANIM_CLOSING=3,ANIM_DEACTIVATE=3,ANIM_ATTACK1=3,ANIM_ATTACK2=4,ANIM_INSTALL=4,ANIM_ATTACK3=5,ANIM_INSTALLED=5,ANIM_PAIN=6,ANIM_PAIN2=7,ANIM_PAIN3=8,ANIM_DYING=9,CELL_VISIBLE=1,CELL_OPEN=2,
@@ -316,7 +316,7 @@ INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c !
 INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }
 INLINE bool IdxIsLightStaticSaveable(int c) { return c == 748; }
 INLINE bool IdxIsGenericTransform(int c) { return c == 749; }
-INLINE bool IdxIsNPC(int c) { return (c >= 419 && c < 448); }
+INLINE bool IdxIsNPC(int c) { return (c >= 419 && c <= 447); }
 INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
 INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }
 INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); }
@@ -324,7 +324,7 @@ INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 69
 INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
 INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
 INLINE bool IdxIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417); }
-INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) ||  c == 417 || (c >= 419 && c <= 428) || (c >= 430 && c <= 437) || (c >= 440 && c <= 442) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
+INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) || c == 417 || (c >= 419 && c <= 447) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
 INLINE bool IdxIsStaticObjectSaveable(int c) {
     return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603)  || (c >= 604 && c < 616)
             || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746));

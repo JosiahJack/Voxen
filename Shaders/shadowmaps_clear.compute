@@ -2,9 +2,5 @@
 layout(local_size_x=32, local_size_y=1, local_size_z=1) in;
 layout(location=0) uniform uint shadowMapSize;
 layout(std430,binding=5) buffer ShadowMaps { uint depthData[]; };
-void main() {
-    uint pixel = gl_GlobalInvocationID.x; uint faceSize = shadowMapSize * shadowMapSize; if (pixel >= faceSize) return;
-    uint lightIdx = gl_GlobalInvocationID.z; uint faceIdx = gl_WorkGroupID.y; // 0 to 5 for cube faces
-    depthData[(lightIdx * faceSize * 6) + (faceIdx * faceSize) + pixel] = 0xFFFFFFFFu;
-}
+void main() { uint faceSize=shadowMapSize*shadowMapSize; if(gl_GlobalInvocationID.x >= faceSize){return;} depthData[(gl_GlobalInvocationID.z/*light idx*/*faceSize*6) + (gl_WorkGroupID.y/*face idx*/*faceSize) + gl_GlobalInvocationID.x/*pixel*/]=0xFFFFFFFFu; }
 

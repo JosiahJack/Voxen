@@ -17,17 +17,14 @@ void main() {
     if (isTransparent > 0u) {
         vec2 uv = vec2(TexCoord.x,1.0 - TexCoord.y);
         ivec2 texSize = textureSizes[texIndex];
-        ivec2 texUV = ivec2(uv * vec2(texSize)) & (texSize - ivec2(1));
+        ivec2 texUV = ivec2(fract(uv) * vec2(texSize)) & (texSize - ivec2(1));
         uint pixelOffset = textureOffsets[texIndex] + uint(texUV.y) * texSize.x + uint(texUV.x);
-        uint slotIndex = pixelOffset >> 2u;
-        uint packedIdx = colors[slotIndex];
-        uint localOffset = pixelOffset & 3u;
-        uint paletteIndex = (packedIdx >> (localOffset * 8u)) & 0xFFu;
+        uint packedIdx = colors[pixelOffset >> 2u];
+        uint paletteIndex = (packedIdx >> ((pixelOffset & 3u) * 8u)) & 0xFFu;
         uint texPaletteOffset = texturePaletteOffsets[texIndex];
         uint color = texturePalettes[texPaletteOffset + paletteIndex];
         if ((color >> 24) < 252u) discard;
     }
-
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
     uint ssbo_index = offsetIntoSSBO + texelCoord.y * shadowMapSize + texelCoord.x;
     vec3 toLight = lightPos - FragPos;

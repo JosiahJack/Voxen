@@ -1085,7 +1085,7 @@ float TakeDamage(u16 self,DamageData dd) {
 }
 
 void HealthManagerInitAfterLoad(u16 self) {
-    if (self == PLAYER1) { World.instances[self].health      = 211.0f; World.instances[self].cyberHealth = 255.0f; World.instances[self].noiseFinished = World.pauseRelativeTime - 31.0;/*guarantee no combat music on start*/ return; }
+    if (self == PLAYER1) { World.instances[self].health=211.0f; World.instances[self].cyberHealth=255.0f; World.instances[self].noiseFinished = World.pauseRelativeTime - 31.0;/*guarantee no combat music on start*/ return; }
     if (IdxIsNPC(World.instances[self].index)) {
         if (IsCyberEntity(self)) { if (World.instances[self].cyberHealth < 0.0f) World.instances[self].cyberHealth = npcTable[World.instances[self].index - 419].healthForCyberNPC; }
         else { if (World.instances[self].health < 0.0f) World.instances[self].health = npcTable[World.instances[self].index - 419].health; }
@@ -1218,19 +1218,13 @@ void PatchDisableAll(void) {
     // TODO: BerserkFX disable + reset — engine reads patchActive & PATCH_BERSERK
 }
 // TODO hopper death needs to tint red halfway through its death animation, then fade back to normal.
-/* TODO
-        int[] levelSecurity; int[] levelCameraCount; int[] levelLargeNodeCount; int[] levelSmallNodeCount; int[] levelCameraDestroyedCount; int[] levelSmallNodeDestroyedCount; int[] levelLargeNodeDestroyedCount; V3[] ressurectionLocation; bool[] ressurectionActive; u16[] ressurectionBayDoor; V3[] elevatorTargetDestinations;
-        bool RessurectPlayer() {
-            if (!ressurectionActive[World.curLev]) return false;
-            if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { LoadLevel(6,ressurectionLocation[currentLevel].position); ressurectionBayDoor[6].ForceClose(); }
-            else { if (World.curLev >= 0 || World.curLev < 13) World.instances[PLAYER1].position = ressurectionLocation[World.curLev]; }
-            // Activate death screen and readouts for "BRAIN ACTIVITY SATISFACTORY..." ya debatable right etc. etc.
-//              PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true); // TODO
-            PlayTrack(TT_Revive,MT_Override);
-            World.instances[PLAYER1].ressurectingFinished = World.pauseRelativeTime + 3f;
-            return true;
-        }
-}*/
+// bool RessurectPlayer() {
+//     if (!ressurectionActive[World.curLev]) return false;
+//     if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { LoadLevel(6,ressurectionLocation[currentLevel].position); ressurectionBayDoor[6].ForceClose(); } else { if (World.curLev >= 0 || World.curLev < 13) World.instances[PLAYER1].position = ressurectionLocation[World.curLev]; }
+// //              PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true); // TODO  // Activate death screen and readouts for "BRAIN ACTIVITY SATISFACTORY..." ya debatable right etc. etc.
+//     PlayTrack(TT_Revive,MT_Override); World.instances[PLAYER1].ressurectingFinished = World.pauseRelativeTime + 3f;
+//     return true;
+// }
 // Quest Bits / Mission I/O TODO
 // void TargetOnGatePassed(bool bitToCheck, bool passIfTrue, UseData ud, string targ, string targOnFalse) { if (passIfTrue) { if (!bitToCheck) { UseTargets(ud,tio,targ); return; } } else { if (bitToCheck) { UseTargets(ud,tio,targOnFalse); return; } } UseTargets(targ); }
 // void EnableBits(u16 i) {
@@ -1285,44 +1279,14 @@ void PatchDisableAll(void) {
 //     if (World.instances[i].ioflags & Q_ANTENNA_WEST_DESTROYED) { DualLog("Q_ANTENNA_WEST_DESTROYED: 1"); QuestLogNotesManager.a.notes[13].SetActive(true); }
 //     if (World.instances[i].ioflags & Q_SELF_DESTRUCT_ACTIVATED) {
 //         DualLog("Q_SELF_DESTRUCT_ACTIVATED: 1");
-//         QuestLogNotesManager.a.notes[0].SetActive(true);
-//         QuestLogNotesManager.a.notes[1].SetActive(true);
-//         QuestLogNotesManager.a.notes[2].SetActive(true);
-//         QuestLogNotesManager.a.notes[3].SetActive(true);
-//         QuestLogNotesManager.a.notes[4].SetActive(true);
-//         QuestLogNotesManager.a.notes[5].SetActive(true);
-//         QuestLogNotesManager.a.notes[6].SetActive(true);
-//         QuestLogNotesManager.a.notes[7].SetActive(true);
-//         QuestLogNotesManager.a.notes[8].SetActive(true);
-//         QuestLogNotesManager.a.notes[9].SetActive(true);
-//         QuestLogNotesManager.a.notes[10].SetActive(true);
-//         QuestLogNotesManager.a.notes[11].SetActive(true);
-//         QuestLogNotesManager.a.notes[12].SetActive(true);
-//         QuestLogNotesManager.a.notes[13].SetActive(true);
-//         QuestLogNotesManager.a.notes[14].SetActive(true); // Self destruct
-//         QuestLogNotesManager.a.notes[15].SetActive(true); // Escape pod
-//         QuestLogNotesManager.a.notes[16].SetActive(true); // Access the bridge
+//         for (int i=0;i<17;++i) QuestLogNotesManager.a.notes[i].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[14].isOn = Const.a.questData.SelfDestructActivated;
 //         QuestLogNotesManager.a.labels[14].text = Sys_Text.stringTable[567]; // Set:Engage reactor self-destruct.
 //         QuestLogNotesManager.a.labels[15].text = Sys_Text.stringTable[568]; // Set:Escape on escape pod.
 //     }
 //     if (World.instances[i].ioflags & Q_BRIDGE_SEPARATED) {
 //         DualLog("Q_BRIDGE_SEPARATED: 1");
-//         QuestLogNotesManager.a.notes[0].SetActive(true);
-//         QuestLogNotesManager.a.notes[1].SetActive(true);
-//         QuestLogNotesManager.a.notes[2].SetActive(true);
-//         QuestLogNotesManager.a.notes[3].SetActive(true);
-//         QuestLogNotesManager.a.notes[4].SetActive(true);
-//         QuestLogNotesManager.a.notes[5].SetActive(true);
-//         QuestLogNotesManager.a.notes[6].SetActive(true);
-//         QuestLogNotesManager.a.notes[7].SetActive(true);
-//         QuestLogNotesManager.a.notes[8].SetActive(true);
-//         QuestLogNotesManager.a.notes[9].SetActive(true);
-//         QuestLogNotesManager.a.notes[10].SetActive(true);
-//         QuestLogNotesManager.a.notes[11].SetActive(true);
-//         QuestLogNotesManager.a.notes[12].SetActive(true);
-//         QuestLogNotesManager.a.notes[13].SetActive(true);
-//         QuestLogNotesManager.a.notes[14].SetActive(true); // Self destruct
+//         for (int i=0;i<15;++i) QuestLogNotesManager.a.notes[i].SetActive(true);
 //         QuestLogNotesManager.a.checkBoxes[14].isOn = Const.a.questData.SelfDestructActivated;
 //         QuestLogNotesManager.a.labels[14].text = Sys_Text.stringTable[567]; // Set:Engage reactor self-destruct.
 //         QuestLogNotesManager.a.notes[16].SetActive(true);
@@ -1454,24 +1418,14 @@ static void DoorClose(u16 self) { Entity* e = &World.instances[self]; DoorSetCli
 void DoorForceOpen(u16 self) { World.instances[self].requiredAccessCard = ACC_None; EntitySetLocked(&World.instances[self],false); DoorOpen(self); }
 void DoorForceClose(u16 self) { if (World.instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
-    Entity* e = &World.instances[self];
-    if (e->doorOpen == DoorState_Open) { DoorClose(self); return; }
-    if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; }
-    if (e->doorOpen == DoorState_Opening) {
-        float t = DoorGetProgress(e,DOOR_CLIP_OPENING);
-        AnimationClip c = DoorGetClip(e,DOOR_CLIP_CLOSING);
-        DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorFrameFromProgress(c,1.0f - t));
-        e->doorOpen = e->doorState = DoorState_Closing;
-        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true);
-        return;
-    }
-    if (e->doorOpen == DoorState_Closing) {
-        float t = DoorGetProgress(e,DOOR_CLIP_CLOSING);
-        AnimationClip c = DoorGetClip(e,DOOR_CLIP_OPENING);
-        DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorFrameFromProgress(c,1.0f - t));
-        e->doorOpen = e->doorState = DoorState_Opening;
-        e->waitBeforeClose = World.pauseRelativeTime + e->delay;
-        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true);
+    Entity* e = &World.instances[self]; if (e->doorOpen == DoorState_Open) { DoorClose(self); return; } if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; }
+    bool op = e->doorOpen == DoorState_Opening;
+    if (op || e->doorOpen == DoorState_Closing) {
+        int src = op ? DOOR_CLIP_OPENING : DOOR_CLIP_CLOSING, dst = op ? DOOR_CLIP_CLOSING : DOOR_CLIP_OPENING;
+        DoorSetClipFrame(self, dst, DoorFrameFromProgress(DoorGetClip(e, dst), 1.0f - DoorGetProgress(e, src)));
+        e->doorOpen = e->doorState = op ? DoorState_Closing : DoorState_Opening;
+        if (!op) e->waitBeforeClose = World.pauseRelativeTime + e->delay;
+        if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], 1.0f, World.position[self], true);
     }
 }
 
@@ -1505,9 +1459,8 @@ void DoorUpdate(u16 self) {
     else if (e->doorOpen == DoorState_Closing && e->clip == DOOR_CLIP_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; DoorSetClipFrame(self,DOOR_CLIP_IDLE_CLOSED,DoorGetClip(e,DOOR_CLIP_IDLE_CLOSED).frameStart); }
     if (World.pauseRelativeTime > e->waitBeforeClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
 }
-// Automap
+
 void CloseFullmap() {} // TODO
-// Misc
 u16 SpawnDynamicObject(int val, bool cheat) {
     if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return WORLD; }
     if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, World.curLev, cheat);
@@ -1516,8 +1469,6 @@ u16 SpawnDynamicObject(int val, bool cheat) {
     u16 entityIndexInInstanceTable = AddInstance((u16)val, (V3){0.0f,0.0f,0.0f});
     return entityIndexInInstanceTable;
 }
-// Vmail
-void DeactivateVMail() { World.Sys_UI.vmailActive=0; }
 // TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.
 void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
 void GravityLiftToggle(u16 self);
@@ -1548,8 +1499,7 @@ void Targetted(u16 activator, u16 self) {
 }
 
 void UseTargets(u16 activator, const char* targetname) {
-    if (sEmpty(targetname)) return;
-    bool wasActive=World.targetIOActive, succeeded=false; u8 entryLevel = World.currentLevel;
+    if(sEmpty(targetname)){return;} bool wasActive=World.targetIOActive, succeeded=false; u8 entryLevel = World.currentLevel;
     if (!wasActive) { World.targetIOActive = true; World.targetIOEntryLevel = entryLevel; World.targetIOActivatorIdx = activator; World.targetIOActivatorEntity = World.instances[activator]; World.targetIOActivatorIoflags = World.instances[activator].ioflags; }
     for (u8 lev = 0; lev < World.numLevels; ++lev) {
         if (World.currentLevel != lev) SetLevelPointers(lev);
@@ -1581,34 +1531,23 @@ void UseEntity(u16 i) {
 
 #define FROB_DISTANCE 4.9f
 static void Frob(V3 pos, V3 forward, V3 right) {
-    if (World.curLev == LEVEL_CYBERSPACE) return;
-    if (World.Sys_UI.vmailActive) { DeactivateVMail(); return; }
-    if (World.uiIsBlocking) return;
-    if (World.invP1.holdingObject) { DropHeldItem(); return; }
-    V3 dir = ScreenPointToRay(forward,right);
-    RaycastHit tempHit = Raycast(pos,dir,FROB_DISTANCE,LMASK_PLAYER_FROB);
-    if (Cheats.showPhys) {
-        World.debugLine_start = pos;
-        World.debugLine_end = tempHit.hit ? tempHit.point : (V3){dir.x * FROB_DISTANCE + pos.x,dir.y * FROB_DISTANCE + pos.y,dir.z * FROB_DISTANCE + pos.z};
-        World.debugLineFinished = World.pauseRelativeTime + 3.0;
-    }
-    if (!tempHit.hit) { CenterStatusPrint("%s",Sys_Text.stringTable[30]); return; }
-    if (PSys_PlayOneshot(0,tempHit.point) == U16_MAX) DualLog("Failed to play particle system 0\n");
-    UseEntity(tempHit.hitInstanceIndex);
+    if (World.curLev == LEVEL_CYBERSPACE || World.uiIsBlocking) {return;} if (World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive = 0; return; } if (World.invP1.holdingObject) { DropHeldItem(); return; }
+    V3 dir = ScreenPointToRay(forward, right); RaycastHit h = Raycast(pos,dir,FROB_DISTANCE,LMASK_PLAYER_FROB);
+    if (Cheats.showPhys) { World.debugLine_start = pos; World.debugLineFinished = World.pauseRelativeTime + 3.0; World.debugLine_end = h.hit ? h.point : (V3){dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z}; }
+    if (!h.hit) { CenterStatusPrint("%s", Sys_Text.stringTable[30]); return; }
+    if (PSys_PlayOneshot(0, h.point) == U16_MAX){DualLog("Failed to play particle system 0\n");} // TESTING
+    UseEntity(h.hitInstanceIndex);
 }
 // Update
 void WeaponsUpdate(); void TextureSequenceUpdate(u16 self);
 void ModUpdate() {
     if (World.paused || World.menuActive) return;
-    WeaponsUpdate();
-    PatchUpdate();
-    HardwareUpdate();
+    WeaponsUpdate(); PatchUpdate(); HardwareUpdate();
     if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right);
     if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) AddWireLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
-        Entity* e = &World.instances[i];
+        Entity* e = &World.instances[i]; u16 constdex = e->index;
         TextureSequenceUpdate(i);
-        u16 constdex = e->index;
         if (constdex == 718) ExplosionLifeUpdate(i);
         if (IdxIsButtonSwitch(constdex)) ButtonSwitchUpdate(i);
         if (IdxIsDoor(constdex)) DoorUpdate(i);
