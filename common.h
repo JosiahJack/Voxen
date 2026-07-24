@@ -36,11 +36,11 @@ typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 f
 typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 typedef struct { bool hit; V3 point,normal; float pen; } Overlap;    typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
-enum{INSTANCE_COUNT=9000,LIGHT_COUNT=2200,MAX_LIGHTS_PER_VOXEL=32,U16_MAX=65535,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,MAX_ENTITIES=768,MAX_LEVELS=14,MAX_MDLS=6000,MAX_TXRS=2048,MAX_TOTAL_PIXELS=38000780u,MAX_UNIQUE_COLORS=120040u,WORLDX=64,WORLDZ=64,WORLDY=18,
-     MAX_ANIMCLIPS=32,MAX_WIRELINE_VRTS=512000,MAX_PORTALS=56/*Max 49 on lev 7*/,MAX_KEYS=512,MAX_MOUSE_BUTTONS=8,MAX_CHANNELS=48,MAX_GLYPHS=4096,VRT_ATT_SZ=16,CPU_VRT_SZ=32,LEVEL_CYBERSPACE=13,SHADOW_MAP_SIZE=128,MAX_SHADOWMAPS=80,FONT_ATLAS_SIZE=4672,
+enum{INSTANCE_COUNT=9000,LIGHT_COUNT=2200,MAX_LIGHTS_PER_VOXEL=128,U16_MAX=65535,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,MAX_ENTITIES=768,MAX_LEVELS=14,MAX_MDLS=6000,MAX_TXRS=2048,MAX_TOTAL_PIXELS=38000780u,MAX_UNIQUE_COLORS=120040u,WORLDX=64,WORLDZ=64,WORLDY=18,
+     MAX_ANIMCLIPS=10,MAX_WIRELINE_VRTS=512000,MAX_PORTALS=56/*Max 49 on lev 7*/,MAX_KEYS=512,MAX_MOUSE_BUTTONS=8,MAX_CHANNELS=48,MAX_GLYPHS=4096,VRT_ATT_SZ=16,CPU_VRT_SZ=32,LEVEL_CYBERSPACE=13,SHADOW_MAP_SIZE=128,MAX_SHADOWMAPS=128,FONT_ATLAS_SIZE=4672,
      BVH_MAX_DEPTH=3,BVH_LEAF_MAX_TRIS=8,BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585 worst case, +safety*/,BVH_MAX_TRIS_PER_MDL=6986,WELD_HASH_SIZE=32768,MAX_UNIQUE_CVX_MESHES=5989,MAX_VERT_ELEMENT_SIZE=6964,MAX_OUTPUT_VERTS=20960,LIGHTON=1,SHADON=2,
      LIGHT_AND_SHADOW_ON=3,LSPOT=4,LDIR=8,LDIRTY=16,LERPON=32,VOXELS_PER_CELL=8,ARRSIZE=(WORLDX * WORLDZ),VOXELS_X=(WORLDX * VOXELS_PER_CELL),VOXELS_Z=(WORLDZ * VOXELS_PER_CELL),VOXEL_COUNT=(VOXELS_X * VOXELS_Z)/*64 * 64 * 8 * 8*/,TARGET_STRING_LENGTH=38,
-     MAX_ANIMS=64,SOUNDS_COUNT=670,T_LOGSTR_CNT=1100,T_LOGSTR_MAX=1280,LOGCNT=134,T_BUFFER_SIZE=1024,NUM_AI_TYPES=29,INPUT_RELEASE=0,INPUT_PRESS=1,INPUT_REPEAT=2,CREDITS_PAGES=22,FONT_NORMAL=0,FONT_STOPD=1,MM_EMAIL_TABLE=0,MM_LOG_TABLE=1,AVG_CPU_TAPS=2048,
+     MAX_ANIMS=52,SOUNDS_COUNT=670,T_LOGSTR_CNT=1100,T_LOGSTR_MAX=1280,LOGCNT=134,T_BUFFER_SIZE=1024,NUM_AI_TYPES=29,INPUT_RELEASE=0,INPUT_PRESS=1,INPUT_REPEAT=2,CREDITS_PAGES=22,FONT_NORMAL=0,FONT_STOPD=1,MM_EMAIL_TABLE=0,MM_LOG_TABLE=1,AVG_CPU_TAPS=2048,
      MM_DATA_TABLE=2,MM_NOTES=3,COLTYPE_NONE=0,COLTYPE_BOX=1,COLTYPE_SPH=2,COLTYPE_CAP=3,COLTYPE_CVX=4,COLTYPE_MSH=5,T_WHITE=0,T_YELLOW=1,T_DARK_YELLOW=2,T_GREEN=3,T_RED=4,T_ORANGE=5,T_STOPD_RED=6,T_STOPD_RED_HIGHLIGHT=7,T_STOPD_RED_PAUSETITLE=8,
      T_GREEN_MENU=9,T_GREEN_MENU_SHADOW=10,T_GREEN_MENU_GLOW=11,T_RED_MENU=12,ANIM_LOOP_ALL=0,ANIM_IDLE_CLOSED=0,ANIM_IDLE=0,ANIM_INACTIVE=0,ANIM_ATTACK_MISS=1,ANIM_OPENING=1,ANIM_WALK=1,ANIM_ACTIVATE=1,ANIM_ATTACK_HIT=2,ANIM_ACTIVATED=2,ANIM_IDLE_OPEN=2,
      ANIM_RUN=2,ANIM_CLOSING=3,ANIM_DEACTIVATE=3,ANIM_ATTACK1=3,ANIM_ATTACK2=4,ANIM_INSTALL=4,ANIM_ATTACK3=5,ANIM_INSTALLED=5,ANIM_PAIN=6,ANIM_PAIN2=7,ANIM_PAIN3=8,ANIM_DYING=9,CELL_VISIBLE=1,CELL_OPEN=2,
@@ -152,7 +152,7 @@ typedef /*FAT*/ struct  {
     V3 forward,right,lastPosition/*used for NPC logic, not physics*/,topPoint,targetPosition,startPosition,activatedScale,direction;
     u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
     i32 cellIndex; i16 cellX,cellZ;
-    u8 portalIndex,clip,numclips,texAnimClip,camView,securityThreshold,lerpUp,maxRandomItems/*[0 4] TODO*/;
+    u8 portalIndex,clip,numclips,texAnimClip,camView,securityThreshold,lerpUp,maxRandomItems/*[0 4] TODO*/,lastDmgType;
     FuncStates/*u8*/ funcState; BodyState/*u8*/ bodyState;
     float shadRadius,health,cyberHealth,targetPositionY,radiation,speed,percentAjar,percentMoved,volume,timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,
           timeTillDeadFinished,timeTillPainFinished,huntFinished,randomWaitForNextAttack1Finished,randomWaitForNextAttack2Finished,randomWaitForNextAttack3Finished,attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,
@@ -252,7 +252,7 @@ float DoorClamp01(float),Tranquilize(u16,float,bool);
 bool Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Sprint(),TurnLeft(),TurnRight(),LookUp(),LookDown(),RecentLog(),Biomonitor(),Sensaround(),Lantern(),
      Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),
      Console(),ScrshotPressed(),PositionVisibleFromPlayerCell(float,float),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();
-void MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),OverloadFired(),SetVSync(),ResetInput(),InputProcessing(),LoadAllLevels(),AddWireLine(V3 start, V3 end, Color col),ForceInventoryMode(),ForceShootMode(),DoorSetClipFrame(u16,u8,u16);
+void MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),SetVSync(),ResetInput(),InputProcessing(),LoadAllLevels(),AddWireLine(V3 start, V3 end, Color col),ForceInventoryMode(),ForceShootMode(),DoorSetClipFrame(u16,u8,u16);
 void UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool);
 void UpdateLights(),ModUpdate(),PSys_Update(),PSys_Init(),InitFontAtlasses(),LoadLogTextForLanguage(u8),LoadTextForLanguage(u8),RenderFormattedText(i16,i16,u32,u8,float,const char* restrict,...),CullCore(),PngArenaInit(PngArena*);
 RaycastHit Raycast(V3,V3,float,u32);

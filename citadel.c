@@ -255,12 +255,9 @@ void InventoryUpdate() {
 
 extern u8 magazinePitchCountForWeapon[16];
 extern u8 magazinePitchCountForWeapon2[16];
-static bool firstTimePickup = true;
-static bool firstTimeSearch = true;
 // Expects usableItem index
 void AddItemFail(int index) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[318]);/*Inventory full.*/ }
 void AddItemToInventory(int index, int custIdx) {
-    World.Sys_UI.mouseClickHeldOverGUI = true; // Prevent gun shooting.
     if (index < 0) index = 0; // Good check on paper.
     if (index > 110) index = 94; // Way to get a head.
     if ((index >= 0 && index <= 5) || index == 33 || index == 35 || (index >= 52 && index < 59) || (index >= 61 && index <= 64) || (index >= 92 && index <= 101)) { if (!AddGeneralObjectToInventory(index,custIdx)) { AddItemFail(index); } }
@@ -314,16 +311,21 @@ void AddItemToInventory(int index, int custIdx) {
             case 80: AddAmmoToInventory(8,index,magazinePitchCountForWeapon2[8],false); break; // small magpulse cartridges
         }
     }
-//     Utils.PlayUIOneShotSavable(87); // frob_item    
-    firstTimePickup = false;
+    play_wav(sounds[87],1.0f,(V3){0.0f,0.0f,0.0f},false);
 }
-// Cyber Elements
+
 void CyberDecoyEnable() { World.decoyActive = true; }
 void CyberDecoyDisable() { World.decoyActive = false; }
 void CyberDoorOnCollisionEnter(u16 self, u16 other) { if(other != PLAYER1){return;} CenterStatusPrint("%s  %s",Sys_Text.stringTable[World.instances[self].messageIndex],Sys_Text.stringTable[601]); }
 void CyberTimerInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; e->cyberTimer = 600.0f; e->timerFinished = World.pauseRelativeTime + 1.0; }
 void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; switch (diff) { case 0: e->cyberTimer = 600.0f; break; case 1: e->cyberTimer = 300.0f; break; case 2: e->cyberTimer = 240.0f; break; case 3: e->cyberTimer = 180.0f; break; } }
-void CyberTimerUpdate(u16 self) { Entity* e=&World.instances[self]; if(e->cyberTimer <= 0.0f){UIExitCyberspace(); return;} if(e->timerFinished >= World.pauseRelativeTime){return;} e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds = e->cyberTimer - (e->minutes * 60.0f); e->timerFinished = World.pauseRelativeTime + 1.0; }
+void CyberTimerUpdate(u16 self) {
+    if(World.curLev != LEVEL_CYBERSPACE){return;}
+    Entity* e=&World.instances[self]; if(e->cyberTimer <= 0.0f){UIExitCyberspace(); return;}
+    if(e->timerFinished >= World.pauseRelativeTime){return;}
+    e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds = e->cyberTimer - (e->minutes * 60.0f); e->timerFinished = World.pauseRelativeTime + 1.0;
+}
+
 void CyberWallInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->volume=0.02f; e->tickFinished=World.pauseRelativeTime + 2.0; e->animSwapFinished=0.0; } // TODO: push e->volume to chunk_frag.glsl as _CenterAlpha uniform or per-instance draw param for this geometry instance's material slot
 void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (World.pauseRelativeTime < e->tickFinished) {return;} if (e->volume > 0.02f) { e->volume -= 0.05f; if (e->volume < 0.02f) {e->volume=0.02f;} }  e->tickFinished = World.pauseRelativeTime + 0.05; }
 void CyberWallHit(u16 self) { Entity* e = &World.instances[self]; e->volume = 1.0f; } // Called by projectile hit, collision, or ConwaySignal propagation from adjacent wall TODO: push e->volume to renderer as _CenterAlpha for this instance
@@ -333,25 +335,21 @@ void CyberWallConwaySignal(u16 self) { Entity* e = &World.instances[self]; e->an
     if (becomes) CyberWallHit(self); else e->volume = 0.02f;
     for (int i=0; i<nc; i++) { if (nb[i]==U16_MAX) continue; Entity* n = &World.instances[nb[i]]; if (n->animSwapFinished < World.pauseRelativeTime + 0.4) { n->animSwapFinished = World.pauseRelativeTime + 0.5; n->tickFinished = World.pauseRelativeTime + 0.5; } }
 } // Conway's game of life propagation on world x,z plane
-// SearchFX
+
 void SearchFXResetEnable(u16 self) { Entity* e = &World.instances[self]; if (e->itemLifeTime <= 0.0f) {e->itemLifeTime = 3.0f;} e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
-// ExplosionLife
 void ExplosionLifeInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if(e->tickTime <= 0.0f){e->tickTime = 0.05f;} if(e->delay <= 0.0f){e->delay = 0.8f;} e->delayFinished = World.pauseRelativeTime + e->delay; }
 void ExplosionLifeUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE) || e->delayFinished >= World.pauseRelativeTime) {return;} if (e->dontReset){flag_set(&e->entflags,EF_ACTIVE,false);} else{DeleteInstance(self);} }
-// DelayedSpawn
 void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
 void DelayedSpawnUpdate(u16 self) {
-    Entity* e = &World.instances[self];
-    if (!e->active || e->timerFinished >= World.pauseRelativeTime) return;
-    e->active = false;
-    if (!e->doSelfAfterList) return;
+    Entity* e = &World.instances[self]; if (!e->active || e->timerFinished >= World.pauseRelativeTime) return;
+    e->active = false; if (!e->doSelfAfterList) return;
     if (e->despawnInstead) {
         if (e->destroyAfterListInsteadOfDeactivate) DeleteInstance(self);
         else flag_set(&e->entflags,EF_ACTIVE,false);
     } else flag_set(&e->entflags,EF_ACTIVE,true);
 }
-// FuncWall
+
 void FuncWallInitAfterLoad(u16 self) {
     Entity* e = &World.instances[self];
     V3 tempVec = V3_AsubB(World.position[self],e->targetPosition);
@@ -520,7 +518,6 @@ void ButtonSwitchTargetted(u16 self, u16 activator) { ButtonSwitchUse(self,activ
 void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= (u8)e->minSecurityLevel) { if(!e->broken){HealthManagerHealingBed(PLAYER1,e->amount,true); CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav(sounds[103],1.0f,World.position[self],false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
 // VaporizeButton
 void VaporizeClick(void) {
-    World.Sys_UI.mouseClickHeldOverGUI = true;
     if (World.invP1.generalInvCurrent == 0) return; // Access Cards index.
     int cur = World.invP1.generalInvCurrent;
     World.invP1.generalInventoryIndexRef[cur] = -1; // Remove item
@@ -591,7 +588,6 @@ void CyborgConversionToggleTargetted(void) {
 // static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
 void ElevatorButtonClick(u16 self) {
     Entity* e = &World.instances[self];
-    World.Sys_UI.mouseClickHeldOverGUI = true;
     if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; }
     Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor];
     bool doorClosed = door->doorOpen == DoorState_Closed;
@@ -621,20 +617,14 @@ void OverloadButtonAction() {
         CenterStatusPrint("%s",Sys_Text.stringTable[12]); // Weapon too hot
         return;
     }
-    if (World.invP1.overloadEnabled) {
-        CenterStatusPrint("%s",Sys_Text.stringTable[13]); // Overload disabled
+    if (World.invP1.overloadEnabled) { CenterStatusPrint("%s",Sys_Text.stringTable[13]);/*Overload disabled*/
         World.invP1.overloadEnabled = false;
-        // Render-time: normalButtonSprite, textClickableColor, stringTable[16]
     } else {
-        CenterStatusPrint("%s",Sys_Text.stringTable[17]); // Overload enabled
+        CenterStatusPrint("%s",Sys_Text.stringTable[17]);/*Overload enabled*/
         World.invP1.overloadEnabled = true;
-        // Render-time: overloadButtonSprite, textOverloadColor, stringTable[18]
     }
 }
 
-void OverloadEnergyClick() { World.Sys_UI.mouseClickHeldOverGUI = true; OverloadButtonAction(); }
-void OverloadFired() { World.invP1.overloadEnabled = false; }
-// Called from weapon pane render — returns visual state for renderer to act on 0 = normal+clickable, 1 = overloaded, 2 = disabled (post-fire/too hot)
 u8 OverloadButtonVisualState() { if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponIndex] > OVERLOAD_HEAT_THRESHOLD) {return 2;} if (World.invP1.overloadEnabled) {return 1;} return 0; }
 // TargetID
 #define TARGETID_LINK_DIST       10.0f
@@ -1508,10 +1498,14 @@ void UseTargets(u16 activator, const char* targetname) {
     if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (!wasActive) {World.targetIOActive=false;}
 }
 // Frob/Use
-void SearchObject(int searchable, bool first) { if (first) { firstTimeSearch = false; } World.Sys_UI.highlightStatus[MM_NOTES] = true; World.Sys_UI.highlightTickCount[MM_NOTES] = 3; World.Sys_UI.tickFinished = World.pauseRelativeTime; if (World.instances[searchable].searchableInUse) { for (int i=0;i<4;i++) { if (World.instances[searchable].contents[i] >= 0) break; } } else play_wav(sounds[91],0.75f,(V3){0.0f,0.0f,0.0f},false); }
+void SearchObject(int searchable) {
+    World.Sys_UI.highlightStatus[MM_NOTES] = true; World.Sys_UI.highlightTickCount[MM_NOTES] = 3; World.Sys_UI.tickFinished = World.pauseRelativeTime;
+    if (World.instances[searchable].searchableInUse) { for (int i=0;i<4;i++) { if (World.instances[searchable].contents[i] >= 0) break; } } else play_wav(sounds[91],0.75f,(V3){0.0f,0.0f,0.0f},false);
+}
+
 void UseEntity(u16 i) {
     Entity* ent = &World.instances[i];
-    if (IdxIsSearchable(ent->index)) { World.invP1.currentSearchItem = i; SearchObject(i,firstTimeSearch); DualLog("Search\n"); }
+    if (IdxIsSearchable(ent->index)) { World.invP1.currentSearchItem = i; SearchObject(i); DualLog("Search\n"); }
     else if (IdxIsDoor(ent->index)) DoorUse(i,PLAYER1);
     else if (IdxIsNPC(ent->index)) DualLog("Can't use NPC\n");
     else if (IdxIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
@@ -1547,18 +1541,10 @@ void ModUpdate() {
     if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) AddWireLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
         Entity* e = &World.instances[i]; u16 constdex = e->index;
-        TextureSequenceUpdate(i);
-        if (constdex == 718) ExplosionLifeUpdate(i);
-        if (IdxIsButtonSwitch(constdex)) ButtonSwitchUpdate(i);
-        if (IdxIsDoor(constdex)) DoorUpdate(i);
-        if (constdex == 701) LogicTimerUpdate(i);
-        if (e->doSelfAfterList || e->despawnInstead || e->destroyAfterListInsteadOfDeactivate) DelayedSpawnUpdate(i);
-        if (e->itemLifeTime > 0.0f) SearchFXResetUpdate(i);
-        if (World.curLev == LEVEL_CYBERSPACE && e->cyberTimer > 0.0f) CyberTimerUpdate(i);
-        if (constdex == 515) ForceBridgeUpdate(i);
-        if (constdex == 517) FuncWallUpdate(i);
-        if (constdex == 21 || constdex == 22) CyberWallUpdate(i);
-        if (constdex == 736) TargetIDUpdate(i);
+        DelayedSpawnUpdate(i);    TextureSequenceUpdate(i);
+        if(constdex == 718){ExplosionLifeUpdate(i);}    if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);}    if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);}    if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
+        if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}  if(constdex == 515){ForceBridgeUpdate(i);}                 if(constdex == 517){FuncWallUpdate(i);}    if(constdex == 21 || constdex == 22){CyberWallUpdate(i);}
+        //TargetIDUpdate(i); TODO
     }
 }
 
@@ -1566,32 +1552,26 @@ u16 GetCrosshairTexture() { switch(World.invP1.weaponIndex) { case 36:case 38:ca
 u16 GetCursorTexture() {
     if(World.paused||World.menuActive)return 1261;/*Red standard cursor*/if(!World.invP1.holdingObject)return GetCrosshairTexture();
     switch(World.invP1.heldObjectIndex){
-        case 312: case 313: return 605;/*item_arm, item_audiolog*/
-        case 364: return 969;/*item_chipset_interfacedemod*/
-        case 308: return 838;/*item_paper_wad*/              case 309: return 764;/*item_beaker*/              case 310: return 767;/*item_beverage*/              case 311: return 981;/*item_skull*/
-        case 314: return 853;/*weapon_grenadefrag*/          case 315: return 849;/*weapon_grenadeconc*/       case 316: return 851;/*weapon_grenadeemp*/          case 317: return 850;/*weapon_grenadeearth*/
-        case 318: return 860;/*weapon_grenademine*/          case 319: return 861;/*weapon_grenadenitro*/      case 320: return 859;/*weapon_grenadegas*/          case 321: return 974;/*item_patch_berserk*/
-        case 322: return 975;/*item_patch_detox*/            case 323: return 976;/*item_patch_genius*/        case 324: return 977;/*item_patch_medi*/            case 325: return 978;/*tem_patch_reflex*/
-        case 326: return 979;/*item_patch_sight*/            case 327: return 980;/*item_patch_staminup*/      case 328: return 882;/*item_hw_system*/             case 329: return 907;/*item_hw_navunit*/
-        case 330: return 902;/*item_hw_ereader*/             case 331: return 909;/*item_hw_sensaround*/       case 332: return 935;/*item_hw_targetid*/           case 333: return 911;/*item_hw_shield*/
-        case 334: return 900;/*item_hw_bio*/                 case 335: return 906;/*item_hw_lantern*/          case 336: return 903;/*item_hw_envirosuit*/         case 337: return 901;/*item_hw_booster*/
-        case 338: return 905;/*item_hw_jumpjets*/            case 339: return 904;/*item_hw_infrared*/         case 340: return 966;/*item_fireextinguisher*/      case 341: return 626;/*item_access_card_admin*/
-        case 342: return 845;/*item_workerhelmet*/           case 343: return 988;/*weapon_mk3*/               case 344: return 982;/*weapon_blaster*/             case 345: return 983;/*weapon_dartgun*/
-        case 346: return 984;/*weapon_flechette*/            case 347: return 985;/*weapon_ionrifle*/          case 348: return 1034;/*weapon_rapier*/             case 349: return 990;/*weapon_pipe*/
-        case 350: return 986;/*weapon_magnum*/               case 351: return 987;/*weapon_magpulse*/          case 352: return 1010;/*weapon_pistol*/             case 353: return 1019;/*weapon_plasma*/
-        case 354: return 1027;/*weapon_railgun*/             case 355: return 1035;/*weapon_riotgun*/          case 356: return 1036;/*weapon_skorpion*/           case 357: return 1052;/*weapon_sparqbeam*/
-        case 358: return 1065;/*weapon_stungun*/             case 359: return 965;/*item_battery*/             case 360: return 968;/*item_battery_icad*/          case 361: return 972;/*item_logic_probe*/
-        case 362: return 967;/*item_healthkit*/              case 363: return 973;/*item_plastique*/           case 365: return 766;/*item_flask*/                 case 366: return 969;/*item_chipset_bitflag*/
-        case 367: return 549;/*item_ammo_rubber*/            case 368: return 971;/*item_isotopex22*/          case 369: return 765;/*item_testtube*/              case 370: return 853;/*weapon_grenadefrag_live*/
-        case 371: return 970;/*item_chipset_isolinear*/      case 372: return 849;/*weapon_grenadeconc_live*/  case 373: return 420;/*item_ammo_needle*/           case 374: return 602;/*item_ammo_tranq*/
-        case 375: return 593;/*item_ammo_standard*/          case 376: return 597;/*item_ammo_teflon*/         case 377: return 411;/*item_ammo_hollow*/           case 378: return 561;/*item_ammo_slug*/
-        case 379: return 419;/*item_ammo_magnesium*/         case 380: return 421;/*item_ammo_penetrator*/     case 381: return 417;/*item_ammo_hornet*/           case 382: return 577;/*item_ammo_splinter*/
-        case 383: return 422;/*item_ammo_rail*/              case 384: return 551;/*item_ammo_slag*/           case 385: return 552;/*item_ammo_slaglarge*/        case 386: return 418;/*item_ammo_magcart*/
-        case 387: return 851;/*weapon_grenadeemp_live*/      case 388: return 762;/*item_access_card_std*/     case 389: return 850;/*weapon_grenadeearth_live*/   case 390: return 610;/*item_access_card_group1*/
-        case 391: return 621;/*item_access_card_science*/    case 392: return 609;/*item_access_card_eng*/     case 393: return 610;/*item_access_card_groupB*/    case 394: return 635;/*item_access_card_security*/
-        case 395: return 761;/*item_access_card_per5diego*/  case 396: return 632;/*item_access_card_medi*/    case 397: return 610;/*item_access_card_group3*/    case 398: return 624;/*item_access_card_purple*/
-        case 399: return 872;/*item_head_male*/              case 400: return 862;/*item_head_female*/         case 401: return 872;/*item_severedhead*/           case 402: return 860;/*weapon_grenademine_live*/
-        case 403: return 861;/*weapon_grenadenitro_live*/    case 404: return 859;/*weapon_grenadegas_live*/   case 417: return 760;/*item_access_card_perdarcy*/
+        case 312: return 605;/*item_arm*/                 case 313: return 606;/*item_audiolog*/            case 364: return 969;/*item_chipset_interfacedemod*/ case 308: return 838;/*item_paper_wad*/            case 309: return 764;/*item_beaker*/ 
+        case 310: return 767;/*item_beverage*/            case 311: return 981;/*item_skull*/               case 314: return 853;/*weapon_grenadefrag*/          case 315: return 849;/*weapon_grenadeconc*/        case 316: return 851;/*weapon_grenadeemp*/ 
+        case 317: return 850;/*weapon_grenadeearth*/      case 318: return 860;/*weapon_grenademine*/       case 319: return 861;/*weapon_grenadenitro*/         case 320: return 859;/*weapon_grenadegas*/         case 321: return 974;/*item_patch_berserk*/
+        case 322: return 975;/*item_patch_detox*/         case 323: return 976;/*item_patch_genius*/        case 324: return 977;/*item_patch_medi*/             case 325: return 978;/*tem_patch_reflex*/          case 326: return 979;/*item_patch_sight*/ 
+        case 327: return 980;/*item_patch_staminup*/      case 328: return 882;/*item_hw_system*/           case 329: return 907;/*item_hw_navunit*/             case 330: return 902;/*item_hw_ereader*/           case 331: return 909;/*item_hw_sensaround*/ 
+        case 332: return 935;/*item_hw_targetid*/         case 333: return 911;/*item_hw_shield*/           case 334: return 900;/*item_hw_bio*/                 case 335: return 906;/*item_hw_lantern*/           case 336: return 903;/*item_hw_envirosuit*/
+        case 337: return 901;/*item_hw_booster*/          case 338: return 905;/*item_hw_jumpjets*/         case 339: return 904;/*item_hw_infrared*/            case 340: return 966;/*item_fireextinguisher*/     case 341: return 626;/*item_access_card_admin*/
+        case 342: return 845;/*item_workerhelmet*/        case 343: return 988;/*weapon_mk3*/               case 344: return 982;/*weapon_blaster*/              case 345: return 983;/*weapon_dartgun*/            case 346: return 984;/*weapon_flechette*/
+        case 347: return 985;/*weapon_ionrifle*/          case 348: return 1034;/*weapon_rapier*/           case 349: return 990;/*weapon_pipe*/                 case 350: return 986;/*weapon_magnum*/             case 351: return 987;/*weapon_magpulse*/
+        case 352: return 1010;/*weapon_pistol*/           case 353: return 1019;/*weapon_plasma*/           case 354: return 1027;/*weapon_railgun*/             case 355: return 1035;/*weapon_riotgun*/           case 356: return 1036;/*weapon_skorpion*/
+        case 357: return 1052;/*weapon_sparqbeam*/        case 358: return 1065;/*weapon_stungun*/          case 359: return 965;/*item_battery*/                case 360: return 968;/*item_battery_icad*/         case 361: return 972;/*item_logic_probe*/
+        case 362: return 967;/*item_healthkit*/           case 363: return 973;/*item_plastique*/           case 365: return 766;/*item_flask*/                  case 366: return 969;/*item_chipset_bitflag*/      case 367: return 549;/*item_ammo_rubber*/
+        case 368: return 971;/*item_isotopex22*/          case 369: return 765;/*item_testtube*/            case 370: return 853;/*weapon_grenadefrag_live*/     case 371: return 970;/*item_chipset_isolinear*/    case 372: return 849;/*weapon_grenadeconc_live*/
+        case 373: return 420;/*item_ammo_needle*/         case 374: return 602;/*item_ammo_tranq*/          case 375: return 593;/*item_ammo_standard*/          case 376: return 597;/*item_ammo_teflon*/          case 377: return 411;/*item_ammo_hollow*/
+        case 378: return 561;/*item_ammo_slug*/           case 379: return 419;/*item_ammo_magnesium*/      case 380: return 421;/*item_ammo_penetrator*/        case 381: return 417;/*item_ammo_hornet*/          case 382: return 577;/*item_ammo_splinter*/
+        case 383: return 422;/*item_ammo_rail*/           case 384: return 551;/*item_ammo_slag*/           case 385: return 552;/*item_ammo_slaglarge*/         case 386: return 418;/*item_ammo_magcart*/         case 387: return 851;/*weapon_grenadeemp_live*/
+        case 388: return 762;/*item_access_card_std*/     case 389: return 850;/*weapon_grenadeearth_live*/ case 390: return 610;/*item_access_card_group1*/     case 391: return 621;/*item_access_card_science*/  case 392: return 609;/*item_access_card_eng*/
+        case 393: return 610;/*item_access_card_groupB*/  case 394: return 635;/*item_access_card_security*/case 395: return 761;/*item_access_card_per5diego*/  case 396: return 632;/*item_access_card_medi*/     case 397: return 610;/*item_access_card_group3*/
+        case 398: return 624;/*item_access_card_purple*/  case 399: return 872;/*item_head_male*/           case 400: return 862;/*item_head_female*/            case 401: return 872;/*item_severedhead*/          case 402: return 860;/*weapon_grenademine_live*/
+        case 403: return 861;/*weapon_grenadenitro_live*/ case 404: return 859;/*weapon_grenadegas_live*/   case 417: return 760;/*item_access_card_perdarcy*/
     }
     return 1250;/*paper wad fallback*/
 }

@@ -250,7 +250,7 @@ void FireWeapon(int wep16, bool isSilent) {
     }
     if (wepClass[wep16] != WC_MELEE) { // Take ammo/energy. Melee weapons consume neither and don't count towards shotsFired.
         if (wepClass[wep16] == WC_ENERGY) {
-            if (World.invP1.overloadEnabled) { OverloadFired(); if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(energyDrainOverloadForWeapon[wep16]); BiomonitorEnergyPulse(energyDrainOverloadForWeapon[wep16]); } }
+            if (World.invP1.overloadEnabled) { World.invP1.overloadEnabled = false; if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(energyDrainOverloadForWeapon[wep16]); BiomonitorEnergyPulse(energyDrainOverloadForWeapon[wep16]); } }
             else { float takeEnerg = (World.invP1.weaponEnergySetting[wc]/100.0f) * (energyDrainHiForWeapon[wep16]-energyDrainLowForWeapon[wep16]); if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(takeEnerg); BiomonitorEnergyPulse(takeEnerg); } }
         } else { if (World.invP1.wepLoadedWithAlternate[wc]) { if (!Cheats.bottomless) World.invP1.currentMagazineAmount2[wc]--; } else { if (!Cheats.bottomless) World.invP1.currentMagazineAmount[wc]--; } }
         World.shotsFired++;

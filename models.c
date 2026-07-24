@@ -6,11 +6,11 @@ typedef struct { const char* data; const char* name; int size; } RawOBJ; typedef
 typedef struct { u32 start,end; int tid; } PhysGeomTask;
 BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
 typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
-BvhBuildCtx thrd_bvh_ctx[32];
+static BvhBuildCtx thrd_bvh_ctx[32];
 u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0;
 u32** cvxAdjOffsets = NULL; u16** cvxAdjLists = NULL; // CSR format adjacency data: cvxAdjOffsets[m] has vCount + 1 entries pointing into cvxAdjLists[m]
 u16  cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
-u16  lastCvxSupport[MAX_UNIQUE_CVX_MESHES] = {0}; // Persistent hill-climbing state per mesh
+static u16 lastCvxSupport[MAX_UNIQUE_CVX_MESHES]={0}; // Persistent hill-climbing state per mesh
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
 INLINE float fast_atof(const char** p) { const char* c=*p; while (*c == ' ' || *c == '\t') {c++;} float s=1.0f; if(*c == '-'){s=-1.0f; c++;} float v=0.0f; while (*c >= '0' && *c <= '9') { v=v * 10.0f + (*c - '0'); c++; } if (*c == '.') { c++; float sub=0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub*=0.1f; c++; } } *p=c; return s * v; }
 INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *c == '\t') {c++;} i32 s=1; if(*c == '-'){s=-1; c++;} i32 v = 0; while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; } *p = c; return v * s; }
@@ -24,13 +24,12 @@ void OptimizeVertexCache(u16* idx, u32 ic, u32 vc, u8* scratch) {
     u16* n = (u16*)(scratch + (tc * sizeof(TriSort) * 2));
     for (u32 i = 0; i < tc; ++i) { u16* p = idx + i * 3; u32 m = p[0] < p[1] ? p[0] : p[1]; m = m < p[2] ? m : p[2]; t[i].idx = i; t[i].key = (u16)m; }
     if (tc >= 2) {
-        //RadixSortTriangles(t,t_tmp,tc);
         u32 b0[256]={0}, b1[256]={0};
-        for (u32 i = 0; i < tc; ++i) {u16 key = t[i].key; b0[key & 0xFF]++; b1[(key >> 8) & 0xFF]++;}
+        for (u32 i=0;i<tc;++i) {u16 key = t[i].key; b0[key & 0xFF]++; b1[(key >> 8) & 0xFF]++;}
         u32 sum0=0, sum1=0;
-        for (u32 i = 0; i < 256; ++i) { u32 t0 = b0[i]; u32 t1 = b1[i]; b0[i] = sum0; b1[i] = sum1; sum0 += t0; sum1 += t1; }
-        for (u32 i = 0; i < tc; ++i) {u32 radix0 = t[i].key & 0xFF; u32 dest = b0[radix0]++; t_tmp[dest] = t[i];}
-        for (u32 i = 0; i < tc; ++i) { u32 radix1 = (t_tmp[i].key >> 8) & 0xFF; u32 dest = b1[radix1]++; t[dest] = t_tmp[i]; }
+        for (u32 i=0;i<256;++i) { u32 t0 = b0[i]; u32 t1 = b1[i]; b0[i] = sum0; b1[i] = sum1; sum0 += t0; sum1 += t1; }
+        for (u32 i=0;i<tc;++i) {u32 radix0 = t[i].key & 0xFF; u32 dest = b0[radix0]++; t_tmp[dest] = t[i];}
+        for (u32 i=0;i<tc;++i) { u32 radix1 = (t_tmp[i].key >> 8) & 0xFF; u32 dest = b1[radix1]++; t[dest] = t_tmp[i]; }
     }
     for (u32 i = 0; i < tc; ++i) { u16* s = idx + t[i].idx * 3; u16* d = n + i * 3; d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; }
     mcpy(idx, n, ic * sizeof(u16));

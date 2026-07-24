@@ -17,7 +17,6 @@ layout(location=6) uniform uint maxLightsPerVoxel;
 layout(location=7) uniform uint shadSizeSqd;
 const int WORLD_X_VOXELCOUNT = 512;
 const float VOXEL_SIZE = 0.32;
-const uint SHADON = 2u;
 const float vhalf = 0.16;
 bool CellVisible(float x, float z){ ivec2 p=ivec2(clamp((vec2(x,z) - worldMin + 1.28)/2.56,0.0,63.0)); return (gridCellStates[p.y*64+p.x]&1)>0; }
 bool VoxelOrNeighborVisible(float x, float z) {

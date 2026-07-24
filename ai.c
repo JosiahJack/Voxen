@@ -15,10 +15,6 @@
 #define AI_TARGET_OFFSET_Y   0.24f
 #define MIN_WALK_SPEED_SQ    (0.32f * 0.32f)
 #define ANIM_WALK_SWAP_DELAY 0.5
-const float stopDistance = 1.28f; // Constant
-const float positionCheckDelay = 2.0f;
-const float searchTime = 5.0f;
-V3 targetOffset = (V3){0.0f, 0.24f, 0.0f};
 u16 npcCountInWorldPerType[NUM_AI_TYPES];
 // Name,AtkTyp1,2,3,Dmg1,2,3,Range1,2,3,Health,CybHealth,Percp,Disrp,Armr,Def,Movtyp,Yawspd,FOV,FOVAtk,FOVStartMov,DistToSeeBehind,SightRange,WalkSpd,RunSpd,AtkSpd1,2,3,AtkForce3,AtkRad3,TtPain,TbwPain,TtDead,TtActualAtk1,2,3,TbwAtk1,2,3,TEnemChg,TIdleSFXMin,TIdleSFXMax,TAtk1WaitMin,TAtk1WaitMax,TAtk1WaitChnc,TAtk2WaitMin,TAtk2WaitMax,TAtk2WaitChnc,TAtk3WaitMin,TAtk3WaitMax,TAtk3WaitChnc,ProjType1,2,3,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,PreActMeleCols,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType,AtkProj1,2,3
 NPCTable npcTable[NUM_AI_TYPES] = {

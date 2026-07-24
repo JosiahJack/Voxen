@@ -2,23 +2,29 @@
 #include "common.h"
 #include "lib.h" // LibC Replacements and Helpers
 #define LINE_LEN_MAX 81920
-Entity EDefs[MAX_ENTITIES];
-V3 EDefscolliderCenter[MAX_ENTITIES]; // Offset relative to .position's global worldspace xyz location
-V3 EDefscolliderSize[MAX_ENTITIES]; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
-ColliderType/*u8*/ EDefscollider[MAX_ENTITIES];
-u32 EDefslayer[MAX_ENTITIES];
-float EDefsmass[MAX_ENTITIES];
-float EDefsdynamicFriction[MAX_ENTITIES];
-float EDefsstaticFriction[MAX_ENTITIES];
-float EDefsbounciness[MAX_ENTITIES];
-float EDefsangularDrag[MAX_ENTITIES];
-float EDefsgravity[MAX_ENTITIES];
+extern Entity EDefs[MAX_ENTITIES];
+extern V3 EDefscolliderCenter[MAX_ENTITIES]; // Offset relative to .position's global worldspace xyz location
+extern V3 EDefscolliderSize[MAX_ENTITIES]; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
+extern ColliderType/*u8*/ EDefscollider[MAX_ENTITIES];
+extern u32 EDefslayer[MAX_ENTITIES];
+extern float EDefsmass[MAX_ENTITIES];
+extern float EDefsdynamicFriction[MAX_ENTITIES];
+extern float EDefsstaticFriction[MAX_ENTITIES];
+extern float EDefsbounciness[MAX_ENTITIES];
+extern float EDefsangularDrag[MAX_ENTITIES];
+extern float EDefsgravity[MAX_ENTITIES];
+extern u16 headmountedLanternLight;
+static Entity entsFromFile[INSTANCE_COUNT]; static V3 posFromFile[INSTANCE_COUNT],scaleFromFile[INSTANCE_COUNT]; static Quaternion rotationFromFile[INSTANCE_COUNT]; static Light lightsFromFile[LIGHT_COUNT]; static LightAnimation lanimsFromFile[LIGHT_COUNT];
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
-INLINE i32 parse_numberi32(const char* str, const char* line, u32 lineNum) { if(str == 0 || *str == '\0'){DualLogError("Invalid from line[%d]: %s\n",lineNum+1,line); return 0;} while(cEmpty((char)*str)){str++;} bool negative=false; if(*str == '+'){str++;}else if(*str == '-'){negative=true; str++;} i64 result=0; while(*str >= '0' && *str <= '9'){result=result*10L + (*str-'0'); str++;} return (i32)(negative ? -result : result); }
-INLINE i16 parse_numberi16(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -32768 || retval > 32767) { DualLogError("Value %d out of range for i16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i16)retval; }
-INLINE i8 parse_numberi8(const char* str, const char* line, u32 lineNum) { i32 retval = parse_numberi32(str, line, lineNum); if (retval < -128 || retval > 127) { DualLogError("Value %d out of range for i8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (i8)retval; }
-float parse_float(const char* str, const char* line, u32 lineNum) {
-    if (str == 0 || *str == '\0') { DualLogError("Invalid blank string from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
+__attribute__((noinline)) i32 parse_numberi32(const char* str, const char* line, u32 lineNum) {
+    if(str == 0 || *str == '\0'){DualLogError("Invalid on line %d:%s\n",lineNum+1,line); return 0;}
+    while(cEmpty((char)*str)){str++;} bool negative=false; if(*str == '+'){str++;}else if(*str == '-'){negative=true; str++;} i64 result=0; while(*str >= '0' && *str <= '9'){result=result*10L + (*str-'0'); str++;} return (i32)(negative ? -result : result);
+}
+
+__attribute__((noinline)) i16 parse_numberi16(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -32768 || v > 32767){DualLogError("%d outrange i16 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i16)v;}
+__attribute__((noinline)) i8 parse_numberi8(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -128 || v > 127){DualLogError("%d out range i8 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i8)v;}
+__attribute__((noinline)) float parse_float(const char* str, const char* line, u32 lineNum) {
+    if (str == 0 || *str == '\0') { DualLogError("Blank on line %d:%s\n", lineNum+1, line); return 0.0f; }
     while (cEmpty(*str)) str++;
     bool negative = false;
     if (*str == '-') { negative = true; str++; }
@@ -26,13 +32,7 @@ float parse_float(const char* str, const char* line, u32 lineNum) {
     double value = 0.0;
     bool has_digit = false;
     while (*str >= '0' && *str <= '9') { value = value * 10.0 + (*str - '0'); str++; has_digit = true; } // Integer part
-    if (*str == '.') { // Decimal part
-        str++;
-        double frac = 0.0;
-        double place = 0.1;
-        while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; }
-        value += frac;
-    }
+    if (*str == '.') { str++; double frac = 0.0; double place = 0.1; while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; } value += frac; } // Decimal part
     if (!has_digit) return 0.0f;
     if (negative) value = -value;
     return (float)value;
@@ -41,8 +41,6 @@ float parse_float(const char* str, const char* line, u32 lineNum) {
 void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense inflating the table data in entity.c
     mset(EDefs,0,sizeof(Entity)); 
     for (int i=0;i<768;++i) { EDefs[i].index = i; EDefs[i].modelIndex = MAX_MDLS; EDefs[i].lodIndex = MAX_MDLS; }
-    
-    // Modular Wall, Ceiling, Floor Chunks
     for (int i=0;i<=306;++i) EDefs[i].cardchunk = true; // Mark these all to have box colliders added... except for slices below:
     EDefs[  6].cardchunk = EDefs[  9].cardchunk = EDefs[ 10].cardchunk = EDefs[ 20].cardchunk = EDefs[ 22].cardchunk = EDefs[ 31].cardchunk = EDefs[ 32].cardchunk = EDefs[ 42].cardchunk = false;
     EDefs[ 43].cardchunk = EDefs[ 44].cardchunk = EDefs[ 52].cardchunk = EDefs[ 63].cardchunk = EDefs[ 78].cardchunk = EDefs[ 83].cardchunk = EDefs[ 87].cardchunk = EDefs[ 91].cardchunk = false;
@@ -56,13 +54,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
         if (!EDefslayer[i]) EDefslayer[i] = L_Default;
         flag_set(&EDefs[i].entflags,EF_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
         flag_set(&EDefs[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(EDefs[i].index));
-        if (EDefs[i].cardchunk) {
-            EDefs[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX;
-            EDefscollider[i] = COLTYPE_BOX;
-            EDefscolliderCenter[i].y = 1.32f;
-            EDefscolliderSize[i] = (V3){2.56f,0.08f,2.56f};
-        }
-        
+        if (EDefs[i].cardchunk) { EDefs[i].lodIndex=178;/*LOD card index*/ EDefscollider[i]=COLTYPE_BOX; EDefscolliderCenter[i].y=1.32f; EDefscolliderSize[i]=(V3){2.56f,0.08f,2.56f}; }
         EDefs[i].currentFrameFinished = World.pauseRelativeTime + 0.1;
         if (IdxIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; EDefs[i].tickTime = 1.5; } // ButtonSwitch
     } // Handle generics up front such that all below can override it.
@@ -760,17 +752,18 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*685 decal_scorch4*/        EDefs[685].modelIndex=77;  EDefs[685].texIndex=230;
     /*686 decal_scorchtiny*/     EDefs[686].modelIndex=77;  EDefs[686].texIndex=232;
     /*687 decal_blood_splat*/    EDefs[687].modelIndex=77;  EDefs[687].texIndex=234;
-    /*688 func_switch1*/         EDefs[688].modelIndex=609;  EDefs[688].texIndex=837;  EDefscollider[688]=COLTYPE_BOX;  EDefscolliderCenter[688]=(V3){0.0f,0.0f,0.0f};  EDefscolliderSize[688]=(V3){0.32f,0.04f,0.32f}; EDefs[688].colMeshIndex=U16_MAX; 
-    /*689 func_switch2*/         EDefs[689].modelIndex=610;  EDefs[689].texIndex=839;  EDefs[689].mainSwitchMaterial=839;  EDefs[689].altTexIndex=841;  EDefs[689].glowIndex=0;  EDefs[689].altGlowIndex=840;  EDefs[689].changeTexOnActive=true; EDefs[689].blinkTexOnActive=true;  EDefscollider[689]=COLTYPE_BOX;  EDefscolliderCenter[689]=(V3){-0.0243553f,0.0f,0.000004883f};  EDefscolliderSize[689]=(V3){0.0476318f,0.64f,0.64f};  EDefs[689].colMeshIndex=U16_MAX; 
-    /*690 func_switch3*/         EDefs[690].modelIndex=611;  EDefs[690].texIndex=842;  EDefs[690].altTexIndex=844;  EDefs[690].glowIndex=0;  EDefs[690].altGlowIndex=843;  EDefs[690].changeTexOnActive=true;  EDefscollider[690]=COLTYPE_BOX;  EDefscolliderCenter[690]=(V3){-0.02285008f,0.000053061f,-0.000056993f};  EDefscolliderSize[690]=(V3){0.02f,0.32f,0.32f};  EDefs[690].colMeshIndex=U16_MAX; 
-    /*691 func_switch4*/         EDefs[691].modelIndex=612;  EDefs[691].texIndex=846;  EDefscollider[691]=COLTYPE_BOX;  EDefscolliderCenter[691]=(V3){0.06f,0.0f,0.0f};  EDefscolliderSize[691]=(V3){0.2f,0.64f,0.64f};  EDefs[691].colMeshIndex=U16_MAX; 
-    /*692 func_switch5*/         EDefs[692].modelIndex=614;  EDefs[692].texIndex=848;  EDefscollider[692]=COLTYPE_BOX;  EDefscolliderCenter[692]=(V3){0.0f,0.0f,0.0f};  EDefscolliderSize[692]=(V3){0.64f,0.64f,0.08f};  EDefs[692].colMeshIndex=U16_MAX; 
-    /*693 func_switch5broken*/   EDefs[693].modelIndex=613;  EDefs[693].texIndex=847;  EDefscollider[693]=COLTYPE_BOX;  EDefscolliderCenter[693]=(V3){0.0f,0.0f,0.0f};  EDefscolliderSize[693]=(V3){0.64f,0.64f,0.08f};  EDefs[693].colMeshIndex=U16_MAX; 
-    /*694 func_switch7*/         EDefs[694].modelIndex=612;  EDefs[694].texIndex=854;  EDefscollider[694]=COLTYPE_BOX;  EDefscolliderCenter[694]=(V3){1.523325f,0.0f,0.0f};  EDefscolliderSize[694]=(V3){0.2008026f,0.64f,0.64f};  EDefs[694].colMeshIndex=U16_MAX; 
-    /*695 func_switch8*/         EDefs[695].modelIndex=616;  EDefs[695].texIndex=856;  EDefs[695].altTexIndex=858;  EDefs[695].glowIndex=855;  EDefs[695].altGlowIndex=857;  EDefs[695].changeTexOnActive=true;  EDefscollider[695]=COLTYPE_BOX;  EDefscolliderCenter[695]=(V3){-0.04f,0.0f,0.0001220703f};  EDefscolliderSize[695]=(V3){0.08f,0.64f,0.64f};  EDefs[695].colMeshIndex=U16_MAX; 
-    /*696 func_switchbroken1*/   EDefs[696].modelIndex=617;  EDefs[696].texIndex=618; 
-    /*697 clip_npc*/             EDefscollider[697]=COLTYPE_BOX;  EDefscolliderCenter[697]=(V3){1.005016f,0.0f,0.0f};  EDefscolliderSize[697]=(V3){2.010033f,16.0f,16.0f};  EDefs[697].colMeshIndex=U16_MAX;
-    /*698 clip_objects*/         EDefscollider[698]=COLTYPE_BOX;  EDefscolliderCenter[698]=(V3){0.0f,0.0f,0.0f};  EDefscolliderSize[698]=(V3){2.56f,2.56f,2.56f};  EDefs[698].colMeshIndex=U16_MAX;
+    for (int i=688;i<=698;++i) EDefscollider[i]=COLTYPE_BOX;
+    /*688 func_switch1*/         EDefs[688].modelIndex=609; EDefs[688].texIndex=837; EDefscolliderSize[688]=(V3){0.32f,0.04f,0.32f};
+    /*689 func_switch2*/         EDefs[689].modelIndex=610; EDefs[689].texIndex=839; EDefs[689].mainSwitchMaterial=839; EDefs[689].altTexIndex=841; EDefs[689].altGlowIndex=840;  EDefs[689].changeTexOnActive=true; EDefs[689].blinkTexOnActive=true; EDefscolliderCenter[689]=(V3){-0.0243553f,0.0f,0.000004883f}; EDefscolliderSize[689]=(V3){0.0476318f,0.64f,0.64f};
+    /*690 func_switch3*/         EDefs[690].modelIndex=611; EDefs[690].texIndex=842; EDefs[690].altTexIndex=844; EDefs[690].altGlowIndex=843; EDefs[690].changeTexOnActive=true;  EDefscolliderCenter[690]=(V3){-0.02285008f,0.000053061f,-0.000056993f};  EDefscolliderSize[690]=(V3){0.02f,0.32f,0.32f}; 
+    /*691 func_switch4*/         EDefs[691].modelIndex=612; EDefs[691].texIndex=846; EDefscolliderCenter[691].x=0.06f; EDefscolliderSize[691]=(V3){0.2f,0.64f,0.64f}; 
+    /*692 func_switch5*/         EDefs[692].modelIndex=614; EDefs[692].texIndex=848; EDefscolliderSize[692]=(V3){0.64f,0.64f,0.08f};
+    /*693 func_switch5broken*/   EDefs[693].modelIndex=613; EDefs[693].texIndex=847; EDefscolliderSize[693]=(V3){0.64f,0.64f,0.08f}; 
+    /*694 func_switch7*/         EDefs[694].modelIndex=612; EDefs[694].texIndex=854; EDefscolliderCenter[694].x=1.523325f;  EDefscolliderSize[694]=(V3){0.2008026f,0.64f,0.64f};
+    /*695 func_switch8*/         EDefs[695].modelIndex=616; EDefs[695].texIndex=856; EDefs[695].altTexIndex=858;  EDefs[695].glowIndex=855;  EDefs[695].altGlowIndex=857;  EDefs[695].changeTexOnActive=true; EDefscolliderCenter[695]=(V3){-0.04f,0.0f,0.0001220703f};  EDefscolliderSize[695]=(V3){0.08f,0.64f,0.64f};
+    /*696 func_switchbroken1*/   EDefs[696].modelIndex=617; EDefs[696].texIndex=618; 
+    /*697 clip_npc*/             EDefscolliderCenter[697].x=1.005016f; EDefscolliderSize[697]=(V3){2.010033f,16.0f,16.0f};
+    /*698 clip_objects*/         EDefscolliderSize[698]=(V3){2.56f,2.56f,2.56f};
     /*699 logic_relay*/
     /*700 logic_branch*/
     /*701 logic_timer*/
@@ -842,14 +835,13 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*767 player*/
 }
 // Lights
-i32 AddLight(Light* lit, LightAnimation* lanim) {
-    i32 i = World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++;
-    if (World.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,World.curLev); OS_Exit(1); }
-    mcpy(&World.lights[i],lit,sizeof(Light)); mcpy(&World.lanims[i],lanim,sizeof(LightAnimation));
-    World.lightsNewPosition[i] = lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true);
-    return i;
+__attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* lanim) {
+    i32 i = World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++; if (World.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,World.curLev); OS_Exit(1); }
+    mcpy(&World.lights[i],lit,sizeof(Light)); mcpy(&World.lanims[i],lanim,sizeof(LightAnimation)); World.lightsNewPosition[i] = lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true); return i;
 }
 
+__attribute__((noinline)) u16 AddLightSimple(V3 pos, Color3 c, float r, float in, u16 lf){Light l={.pos=pos,.col=c,.range=r,.intensity=in,.maxIntensity=in,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=lf}; LightAnimation a={0}; return AddLight(&l,&a);}
+__attribute__((noinline)) u16 AddOffsetLight(Entity* par, V3 offset, Color3 col, float range, float intensity) { return AddLightSimple(GetLocalTransformedPos(par,offset),col,range,intensity,LIGHT_AND_SHADOW_ON); }
 bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
 void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAnimation* lam, u16 lIdx) {
     char* br = StringFindFirstCharWithin(k,'[');
@@ -895,7 +887,7 @@ void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float 
 void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; World.layer[idx]=L_Default; e->camView=255; e->tickTime = 0.35f; World.angularDrag[idx] = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=World.mass[idx]=e->volume=World.rotation[idx].w=1.0f; World.dynamicFriction[idx] = World.staticFriction[idx] = 0.6f; }
 void InitializeAIAfterLoad(u16 i);
 void DeleteInstance(u16 i) { if (i <= PLAYER1 || i >= World.instCount) return; flag_set(&World.instances[i].entflags,EF_ACTIVE,false); } // Don't delete null ent, player 1, nor player 2 or already empty slots.
-u16 AddInstance(u16 entIdx, V3 pos) {
+__attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return 0; }
     if (World.instCount >= INSTANCE_COUNT) { DualLogError("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return 0; }
     u16 i = World.instCount;
@@ -928,10 +920,8 @@ u16 AddInstance(u16 entIdx, V3 pos) {
     return i;
 }
 
-extern u16 headmountedLanternLight;
-Entity entsFromFile[INSTANCE_COUNT]; V3 positionFromFile[INSTANCE_COUNT]; V3 scaleFromFile[INSTANCE_COUNT]; Quaternion rotationFromFile[INSTANCE_COUNT]; Light lightsFromFile[LIGHT_COUNT]; LightAnimation lanimsFromFile[LIGHT_COUNT];
 void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt);
-void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/ GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++; }
+__attribute__((noinline)) void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/ GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++; }
 static const char* mm_ptr; static const char* mm_end;
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
 static char* MmapGetLine(char* buf, int sz) {
@@ -1024,7 +1014,7 @@ void LoadLevelMod(u8 lev) {
         } else {
             entCount++;
             if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; }
-            inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&positionFromFile[entCount],0,sizeof(V3)); mset(&scaleFromFile[entCount],0,sizeof(V3)); mset(&rotationFromFile[entCount],0,sizeof(Quaternion)); // Zero this entity slot only
+            inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); mset(&scaleFromFile[entCount],0,sizeof(V3)); mset(&rotationFromFile[entCount],0,sizeof(Quaternion)); // Zero this entity slot only
         }
         bool activeStateRead = false;
         while (line[0] != '\0') {
@@ -1038,9 +1028,9 @@ void LoadLevelMod(u8 lev) {
                 // Use KEY_EQ for length-aware compares against literals (no slen on key).
                 // key/value are used directly instead of trimmed_key/trimmed_value.
                 if (KEY_EQ("constIndex"))           inst->index = parse_numberu16(value, lineSpace, lineNum);
-                else if (KEY_EQ("localPosition.x")) positionFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localPosition.y")) positionFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localPosition.z")) positionFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localPosition.x")) posFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localPosition.y")) posFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("localPosition.z")) posFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("localRotation.x")) rotationFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("localRotation.y")) rotationFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("localRotation.z")) rotationFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
@@ -1125,9 +1115,9 @@ void LoadLevelMod(u8 lev) {
     for (i32 e=0;e<totalEnts;++e) {
         Entity* src = &entsFromFile[e];
         u16 entIdx = src->index;
-        u16 parent = AddInstance(entIdx,positionFromFile[e]);
+        u16 parent = AddInstance(entIdx,posFromFile[e]);
         Entity* par = &World.instances[parent];
-        par->lastPosition          = positionFromFile[e];
+        par->lastPosition          = posFromFile[e];
         World.rotation[parent]    = rotationFromFile[e];
         World.scale[parent]       = scaleFromFile[e];
         par->entflags             |= src->entflags; // bitor `|` since AddInstance already set flags from entity definitions.
@@ -1166,32 +1156,19 @@ void LoadLevelMod(u8 lev) {
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARGET_STRING_LENGTH);
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent); // Only at load, not in AddInstance
         if (entIdx == 525) { // prop_console01
-            V3 ofs1 = GetLocalTransformedPos(par,(V3){5.81f,2.29f,38.05f-38.3552f});
-            V3 ofs2 = GetLocalTransformedPos(par,(V3){-10.1f,0.9f,18.21f-38.3552f});
-            Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.3531f,0.4837f,0.6509f},.range=1.85f,.intensity=0.7f,.maxIntensity=0.7f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-            Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.3561f,0.3561f,0.8970f},.range=2.0f,.intensity=1.12f,.maxIntensity=1.12f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-            LightAnimation lam={0};
-            par->texAnimLight  = AddLight(&lit1,&lam);
-            par->texAnimLight2 = AddLight(&lit2,&lam);
+            par->texAnimLight  = AddOffsetLight(par, (V3){5.81f, 2.29f, 38.05f-38.3552f}, (Color3){0.3531f, 0.4837f, 0.6509f}, 1.85f, 0.7f);
+            par->texAnimLight2 = AddOffsetLight(par, (V3){-10.1f, 0.9f, 18.21f-38.3552f}, (Color3){0.3561f, 0.3561f, 0.8970f}, 2.0f, 1.12f);
+        } else if (entIdx == 279) { par->texAnimLight = AddOffsetLight(par, (V3){0.0f, -0.08f, 0.0f}, (Color3){0.909803922f, 0.929411765f, 1.0f}, 3.2f, 1.575f); } // chunk_screen
+        else if (par->index == 574) { // prop_healingbed
+            Color3 green = {0.0f, 0.925490196f, 0.082352941f};
+            par->texAnimLight  = AddOffsetLight(par, (V3){0.5292511f, 0.065f, 0.915f}, green, 3.0f, 0.72f);
+            par->texAnimLight2 = AddOffsetLight(par, (V3){-0.5317497f, 0.065f, 1.039f}, green, 3.0f, 0.72f);
+            par->textureAnimating = true; par->texAnimClip = 12; par->texFrame = 0;
+            scpy_to_a_from_b(par->texAnimResourceFolder, "MedicalBed", TARGET_STRING_LENGTH);
         } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) { World.position[parent].y += 0.12f; } // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 310) { World.position[parent].y += 0.0975f; } // item_beverage: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx >= 472 && entIdx <= 476) { World.position[parent].y += 0.342f; } // se_crate1, se_crate2, se_crate3, se_crate4, se_crate5: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 279) { // chunk_screen
-            V3 ofs1 = GetLocalTransformedPos(par,(V3){0.0f,-0.08f,0.0f});
-            Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.909803922f,0.929411765f,1.0f},.range=3.2f,.intensity=1.575f,.maxIntensity=1.575f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-            LightAnimation lam={0};
-            par->texAnimLight = AddLight(&lit1,&lam);
-        } else if (par->index == 574) { // prop_healingbed
-            V3 ofs1 = GetLocalTransformedPos(par,(V3){0.5292511f,0.065f,0.915f});
-            V3 ofs2 = GetLocalTransformedPos(par,(V3){-0.5317497f,0.065f,1.039f});
-            Light lit1 = (Light){.pos=ofs1,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-            Light lit2 = (Light){.pos=ofs2,.col=(Color3){0.0f,0.925490196f,0.082352941f},.range=3.0f,.intensity=0.72f,.maxIntensity=0.72f,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=LIGHT_AND_SHADOW_ON};
-            LightAnimation lam={0};
-            par->texAnimLight  = AddLight(&lit1,&lam);
-            par->texAnimLight2 = AddLight(&lit2,&lam);
-            par->textureAnimating = true; par->texAnimClip = 12; par->texFrame = 0;
-            scpy_to_a_from_b(par->texAnimResourceFolder,"MedicalBed",TARGET_STRING_LENGTH);
-        } else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
+        else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
         else if (entIdx == 720) { /*u16 mist=*/AddInstance(648,World.position[parent]); }// ambient_mist
         else if (entIdx == 733) { /*u16 pipewater=*/AddInstance(649,World.position[parent]);/*ambient_pipewater_loop*/ /*u16 rain=*/AddInstance(653,(V3){World.position[parent].x,World.position[parent].y - 1.26f,World.position[parent].z});/*ambient_rain*/ }
         if (par->texAnimResourceFolder[0] != '\0' && par->tickTime <= 0.01f) par->tickTime = 0.35f;
@@ -1199,14 +1176,10 @@ void LoadLevelMod(u8 lev) {
     }
     for (int i=0;i<=lightsIdx;++i) { if (!(lightsFromFile[i].lflags & LSPOT)) {lightsFromFile[i].spotAng = 0.0f;} AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators
-        World.shd1 = AddInstance(754, (V3){-51.30664f,  -47.42f,  56.42651f}); World.rotation[World.shd1] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        World.shd2 = AddInstance(754, (V3){ 71.5f,      -47.42f, -66.6f    }); World.rotation[World.shd2] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        World.shd3 = AddInstance(754, (V3){-51.306650f, -47.42f, -66.66652f}); World.rotation[World.shd3] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
-        World.shd4 = AddInstance(754, (V3){ 71.78664f,  -47.42f,  56.42651f}); World.rotation[World.shd4] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+        World.shd1=AddInstance(754,(V3){-51.30664f,-47.42f,56.42651f}); World.shd2=AddInstance(754,(V3){71.5f,-47.42f,-66.6f}); World.shd3=AddInstance(754,(V3){-51.306650f,-47.42f,-66.66652f}); World.shd4=AddInstance(754,(V3){71.78664f,-47.42f,56.42651f}); 
+        World.rotation[World.shd1] = World.rotation[World.shd2] = World.rotation[World.shd3] = World.rotation[World.shd4] = QUAT_IDENTITY;
     } else World.shd1=World.shd2=World.shd3=World.shd4=U16_MAX;
-    Light hl = (Light){.pos=World.position[PLAYER1],.col=(Color3){1.0f,1.0f,1.0f},.range=11.52f,.lflags=LIGHTON,.intensity=0.0f,.minIntensity=0.0f,.maxIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY};
-    LightAnimation lam = {0};
-    headmountedLanternLight = AddLight(&hl, &lam);
+    headmountedLanternLight = AddLightSimple(World.position[PLAYER1],(Color3){1.0f,1.0f,1.0f},11.52f,0.0f,LIGHTON);
 }
 #undef KEY_EQ
 void func_forcebridge(u16 self); void CyberWallInitAfterLoad(u16 self); void FuncWallInitAfterLoad(u16); void LogicTimerInitBeforeLoad(u16); void ButtonSwitchInitAfterLoad(u16);
@@ -1239,7 +1212,7 @@ void LoadLevelData(u8 curlevel) {
         i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
         World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
         World.radius[i] = modelBounds[World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x, World.scale[i].y), World.scale[i].z);
-        World.instances[i].shadRadius = World.radius[i] * 1.82f;
+        World.instances[i].shadRadius = World.radius[i] * 2.00f;
         ComputeConvexMeshInertiaTensor(i);
         if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
     }

@@ -107,7 +107,9 @@ FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 u16 editModeSelection,editModeTestEntityDefinition=0; double game_start_time,shadowTime,worstShadTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u32 drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
-extern Entity EDefs[MAX_ENTITIES]; GlobalContext World = {0};
+Entity EDefs[MAX_ENTITIES]; V3 EDefscolliderCenter[MAX_ENTITIES],EDefscolliderSize[MAX_ENTITIES]; ColliderType/*u8*/ EDefscollider[MAX_ENTITIES]; u32 EDefslayer[MAX_ENTITIES];
+float EDefsmass[MAX_ENTITIES],EDefsdynamicFriction[MAX_ENTITIES],EDefsstaticFriction[MAX_ENTITIES],EDefsbounciness[MAX_ENTITIES],EDefsangularDrag[MAX_ENTITIES],EDefsgravity[MAX_ENTITIES];
+GlobalContext World = {0};
 void TurnLightOff(u16 litIdx) { if (litIdx < World.loadedLights) {flag_set(&World.lights[litIdx].lflags,LIGHTON,false);} }
 Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
                       {1.0f,0.498039216f,0.0f,1.0f}, /* 5 Orange T_ORANGE*/ {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red T_STOPD_RED*/ {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
@@ -515,7 +517,7 @@ void UpdateScreenSize(i32 width, i32 height) {
     glBindFramebuffer(GL_FRAMEBUFFER,0); ignore_next_mouse_delta = true;
 }
 
-bool MenuEnter() { return (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
+bool MenuEnter() { return !Cheats.consoleActive && (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
 INLINE bool CursorIsOverBounds(float startX, float endX, float startY, float endY) { return World.cursorPosition_x >= startX && World.cursorPosition_x <= endX  /* 0 == left */ && World.cursorPosition_y >= startY && World.cursorPosition_y <= endY; /* 0 ==  top */ }
 u8 UI_Interactable(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
     bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y);
@@ -830,7 +832,7 @@ static double RenderUI() {
     return time_now;
 }
 
-#define SHADOW_NEARMESH_MAX 1024
+#define SHADOW_NEARMESH_MAX 2048
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
 INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex > texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MAX_MDLS || e->texIndex >= MAX_TXRS || otherCondition; }
 INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) {

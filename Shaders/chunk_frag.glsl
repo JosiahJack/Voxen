@@ -48,20 +48,7 @@ layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; }; // S
 layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430,binding=8) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430,binding=9) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
-
-const uint blueNoise[64] = uint[](
-    0x23F1A408u, 0x8C4BDE72u, 0x159D3F66u, 0xB1549A2Du, 0x47C20E89u, 0xD67B1F58u, 0x32A96C17u, 0xE4832B94u,
-    0x915F36C8u, 0x1A7D42B9u, 0xE1842C9Au, 0x3F6E15B2u, 0x8D4C0F73u, 0x54A61EBDu, 0x27D39F0Cu, 0xC17A58E6u,
-    0x4E921B6Fu, 0xB843D157u, 0x2A8C09F4u, 0x7E3596C2u, 0x1F5D8B41u, 0xAC6E24D9u, 0x38B712A3u, 0xF682490Du,
-    0x147C5A3Eu, 0xD92E81F3u, 0x4B62079Cu, 0xA25F31D7u, 0x8B4E1676u, 0x2D935C1Bu, 0xF17A4802u, 0x39C46D15u,
-    0x6D1A4F82u, 0xB42C9E35u, 0x1F8D5473u, 0xD60B7A42u, 0x39E1842Cu, 0x9A58C71Fu, 0x4B7D12B1u, 0xE62409F3u,
-    0x2D8C4F1Au, 0x73B9541Eu, 0xC26E0B8Du, 0x159A3F47u, 0x842C6D1Bu, 0x3F7A4E92u, 0xB158D60Cu, 0x1A842D93u,
-    0x547B1E8Cu, 0x9D3F6215u, 0x42B91A7Du, 0x0E842C9Au, 0xF31D7B4Eu, 0x24D60B8Cu, 0x81F34B62u, 0x39C17A48u,
-    0xA25F147Cu, 0x8B4E2D93u, 0x1F7A4802u, 0xD62E81F3u, 0x4B62147Cu, 0xA25F31D7u, 0x8B4E1676u, 0x2D935C1Bu
-);
-
-float getBlueNoise(ivec2 p) { int idx = ((p.y & 15) << 4) | (p.x & 15); return float((blueNoise[idx >> 2] >> ((idx & 3) << 3)) & 0xFFu) * 0.00392156862;/*Pre-multiplied 1.0/255.0*/ }
-
+float getBlueNoise(ivec2 p) {uint n = (uint(p.x) * 73856093u) ^ (uint(p.y) * 19349663u); n=(n^(n >> 13u))*1274126177u; return float(n & 0xFFu) * 0.00392156862; }// 0.00392156862 == 1.0 / 255.0
 const float VOXEL_SIZE = 0.32;
 const uint SHADON = 2u;
 uint GetVoxelIndex(vec3 worldPos) {
@@ -173,7 +160,7 @@ void main() {
         float lambertian = clamp(NdotL,0.0,1.0);
         float distOverRange = dist * invRange;
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
-        if (attenuation < 0.015) continue;
+        if (attenuation < 0.03) continue;
         float spotAng = lights[lightIdx].spotAng;
         float spotFalloff = 1.0;
         if (spotAng > 0.0) { // Extremely rare, only ~15 spot lights in entire game out of several thousand lights.

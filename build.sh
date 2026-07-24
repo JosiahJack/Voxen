@@ -131,9 +131,9 @@ if ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
 #         windows)  wine ./voxen.exe ;;
-        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
-#         *)        ./voxen ;;   # linux
+        *)        ./voxen ;;   # linux
     esac
     rm -f ./Shaders/*.h "$TEMP_DIR"/*.o ./voxen.upx #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi
