@@ -5,10 +5,10 @@ typedef struct WinSyswindow WinSyswindow;
 WinSyswindow* window;
 typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } vidmode;
 typedef void (*WinSysproc)(void); typedef struct WinSyscontext WinSyscontext; typedef struct WinSyswindow WinSyswindow; typedef struct WinSyslibrary WinSyslibrary; typedef struct WinSysmonitor WinSysmonitor;
-typedef struct WinSysfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits; uintptr_t handle; } WinSysfbconfig;
+typedef struct { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits; uintptr_t handle; } FBC;
 extern WinSyslibrary WinSys;
 WinSysproc PlatformGetModuleSymbol(void* module, const char* name); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(); void InputWindowFocus(i32); void InputKey(char*,int,int); void InputMouseClick(char*,int,int); void InputCursorPos(double*,double*,double,double);
-void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(const WinSysfbconfig* alternatives, u32); WinSysmonitor* AllocMonitor(const char*,int,int);
+void InputMonitor(WinSysmonitor*,int,int); const FBC* ChooseFBConfig(const FBC* alternatives, u32); WinSysmonitor* AllocMonitor(const char*,int,int);
 #if defined(_WIN32)
     #define LOWORD(l) ((u16)(((u64) (l)) & 0xffff))
     #define HIWORD(l) ((u16)((((u64) (l)) >> 16) & 0xffff))
@@ -27,7 +27,7 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
     typedef struct WinSyslibraryWGL { HINSTANCE instance; } WinSyslibraryWGL; typedef struct WinSyswindowWin32 { void* handle; i32 frameAction; int width,height,lastCurX,lastCurY; } WinSyswindowWin32;
     typedef struct WinSyslibraryWin32 { HINSTANCE instance; void* helperWindowHandle; u16 helperWindowClass,mainWindowClass; short int keycodes[512],scancodes[349]; double restoreCurPosX,restoreCurPosY; WinSyswindow *disabledCursorWindow, *capturedCursorWindow; struct {HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush;} dwmapi; struct {HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo;} ntdll;} WinSyslibraryWin32;
     typedef struct WinSysmonitorWin32 { void* handle; u16 adapterName[32],displayName[32]; } WinSysmonitorWin32; typedef struct _DISPLAY_DEVICEW { u32 cb; u16 DeviceName[32],DeviceString[128]; u32 StateFlags; u8 _p[256]; } DISPLAY_DEVICEW,*PDISPLAY_DEVICEW,*LPDISPLAY_DEVICEW;
-    typedef struct { u16 nSize,nVersion; u32 dwFlags; u8 _p[32]; } PIXELFORMATDESCRIPTOR,*PPIXELFORMATDESCRIPTOR,*LPPIXELFORMATDESCRIPTOR; typedef struct { u8 rgbBlue,rgbGreen,rgbRed,rgbReserved; } RGBQUAD; typedef struct { u8 a[36]; RGBQUAD bmiColors[1]; } BITMAPINFO;
+    typedef struct { u16 nSize,nVersion; u32 dwFlags; u8 _p[32]; } PIXELFORMATDESCRIPTOR; typedef struct { u8 rgbBlue,rgbGreen,rgbRed,rgbReserved; } RGBQUAD; typedef struct { u8 a[36]; RGBQUAD bmiColors[1]; } BITMAPINFO;
     typedef struct { u32 bV5Size; i32 bV5Width,bV5Height; u16 bV5Planes,bV5BitCount; u32 bV5Compression; u8 _p[20]; u32 bV5RedMask,bV5GreenMask,bV5BlueMask,bV5AlphaMask; u8 _p2[52]; } BITMAPV5HEADER;
     DLL_IMP void* WINAPI CreateIconIndirect(ICONINFO*); DLL_IMP void* WINAPI GetDC(void*); DLL_IMP i32 WINAPI GetModuleHandleExW(u32,const u16*,HINSTANCE*); DLL_IMP int WINAPI ReleaseDC(void*,void*); DLL_IMP i32 WINAPI SetCursorPos(int,int); DLL_IMP int WINAPI WideCharToMultiByte(u32,u32,u16*,int,char*,int,const char*,i32*); DLL_IMP void* WINAPI SetCursor(void*); DLL_IMP i32 WINAPI GetCursorPos(POINT*);
     DLL_IMP int WINAPI MultiByteToWideChar(u32,u32,const char*,int,u16*,int); DLL_IMP i32 WINAPI ClipCursor(const RECT*); DLL_IMP i32 WINAPI ClientToScreen(void*,POINT*); DLL_IMP void* WINAPI CreateDCW(const u16*,const u16*,const u16*,const DEVMODEW*); DLL_IMP void* WINAPI GetPropW(void*,u16*); DLL_IMP i32 WINAPI GetMessageTime(); DLL_IMP i32 WINAPI GetClientRect(void*,RECT*);
@@ -36,7 +36,7 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
     DLL_IMP i32 WINAPI TranslateMessage(const MSG*); DLL_IMP i16 WINAPI GetKeyState(int); DLL_IMP i64 WINAPI DispatchMessageW(const MSG*); DLL_IMP i32 WINAPI ShowWindow(void*,int); DLL_IMP i32 WINAPI BringWindowToTop(void*); DLL_IMP i32 WINAPI SetWindowPlacement(void*,const WINDOWPLACEMENT*); DLL_IMP void* WINAPI SetFocus(void*); DLL_IMP i32 WINAPI SetForegroundWindow(void*); 
     DLL_IMP i32 WINAPI GetWindowPlacement(void*,WINDOWPLACEMENT*); DLL_IMP i32 WINAPI SetPropW(void*,u16*,void*); DLL_IMP i32 WINAPI OffsetRect(RECT*,int,int); DLL_IMP void* WINAPI CreateWindowExW(u32,u16*,u16*,u32,int,int,int,int,void*,void*,HINSTANCE,void*); DLL_IMP u64 WINAPI VerSetConditionMask(u64,u32,u8); DLL_IMP u16 WINAPI RegisterClassExW(const WNDCLASSEXW *); DLL_IMP i32 WINAPI DeleteObject(void*); 
     DLL_IMP i32 WINAPI DeleteDC(void*); DLL_IMP i32 WINAPI SwapBuffers(void*); DLL_IMP i32 WINAPI EnumDisplayMonitors(void*,const RECT*,MONITORENUMPROC,i64); DLL_IMP i32 WINAPI EnumDisplaySettingsW(u16*,u32,LPDEVMODEW); DLL_IMP i32 WINAPI EnumDisplayDevicesW(u16*,u32,PDISPLAY_DEVICEW,u32);
-    DLL_IMP i32 WINAPI EnumDisplaySettingsExW(u16*,u32,LPDEVMODEW,u32); DLL_IMP i32 WINAPI SetPixelFormat(void*,i32,const PIXELFORMATDESCRIPTOR *); DLL_IMP i32 WINAPI ChoosePixelFormat(void* hdc,const PIXELFORMATDESCRIPTOR *ppfd); DLL_IMP i32 WINAPI DescribePixelFormat(void*,i32,u32,LPPIXELFORMATDESCRIPTOR); DLL_IMP void* WINAPI CreateBitmap(i32,i32,u32,u32,const void *); 
+    DLL_IMP i32 WINAPI EnumDisplaySettingsExW(u16*,u32,LPDEVMODEW,u32); DLL_IMP i32 WINAPI SetPixelFormat(void*,i32,const PIXELFORMATDESCRIPTOR *); DLL_IMP i32 WINAPI ChoosePixelFormat(void* hdc,const PIXELFORMATDESCRIPTOR *ppfd); DLL_IMP i32 WINAPI DescribePixelFormat(void*,i32,u32,PIXELFORMATDESCRIPTOR*); DLL_IMP void* WINAPI CreateBitmap(i32,i32,u32,u32,const void *); 
     DLL_IMP void* WINAPI CreateDIBSection(void*,const BITMAPINFO*,u32,void**,void*,u32); DLL_IMP i32 WINAPI GetDeviceCaps(void*,i32);
     u16* CreateWideStringFromUTF8Win32(const char* source); i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp); void WinSysPollMonitorsWin32();
     struct WinSyslibrary { WinSysmonitor** monitors; int monitorCount; WinSyslibraryWin32 win32; WinSyslibraryWGL wgl; };
@@ -202,13 +202,13 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
         static const int attribs[]={0x2010,0x2001,0x2013,0x2003,0x2011,0x2015,0x2017,0x2019,0x201b,0x2022,0x2023};
         int values[sizeof(attribs)/sizeof(int)],i,pixelFormat,nativeCount,usableCount=0;
         const int query = 0x2000; wglGetPixelFormatAttribivARB(win->context.wgl.dc,1,0,1,&query,&nativeCount);
-        WinSysfbconfig* usableConfigs = OS_Calloc(nativeCount,sizeof(WinSysfbconfig));
+        FBC* usableConfigs = OS_Calloc(nativeCount,sizeof(FBC));
         for (i = 0; i < nativeCount; i++) {
-            WinSysfbconfig* u = usableConfigs + usableCount; pixelFormat = i + 1; wglGetPixelFormatAttribivARB(win->context.wgl.dc,pixelFormat,0,sizeof(attribs)/sizeof(int),attribs,values); if (values[0] == 0 || values[1] == 0 || values[2] != 0x202b || values[3] == 0x2025 || values[4] !=  1) continue;
+            FBC* u = usableConfigs + usableCount; pixelFormat = i + 1; wglGetPixelFormatAttribivARB(win->context.wgl.dc,pixelFormat,0,sizeof(attribs)/sizeof(int),attribs,values); if (values[0] == 0 || values[1] == 0 || values[2] != 0x202b || values[3] == 0x2025 || values[4] !=  1) continue;
             u->redBits=values[5]; u->greenBits=values[6]; u->blueBits=values[7]; u->alphaBits=values[8]; u->depthBits=values[9]; u->stencilBits=values[10]; u->handle=pixelFormat; usableCount++;
         }
-        const WinSysfbconfig* closest = ChooseFBConfig(usableConfigs,usableCount);
-        pixelFormat = (int)closest->handle; OS_Free(usableConfigs,nativeCount * sizeof(WinSysfbconfig));
+        const FBC* closest = ChooseFBConfig(usableConfigs,usableCount);
+        pixelFormat = (int)closest->handle; OS_Free(usableConfigs,nativeCount * sizeof(FBC));
         return pixelFormat;
     }
 
@@ -486,12 +486,12 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
         WinSys.glx.SwapIntervalEXT = (GLX_SIEP)getProcAddressGLX("glXSwapIntervalEXT");
         WinSys.glx.CreateContextAttribsARB = (GLX_CCAA)getProcAddressGLX("glXCreateContextAttribsARB");
         GLXFBConfig native; XVisualInfo* result;
-        GLXFBConfig* nativeConfigs; WinSysfbconfig* usableConfigs; const WinSysfbconfig* closest; int nativeCount,usableCount;
+        GLXFBConfig* nativeConfigs; FBC* usableConfigs; const FBC* closest; int nativeCount,usableCount;
         nativeConfigs = WinSys.glx.GetFBConfigs(WinSys.x11.display,WinSys.x11.screen,&nativeCount);        
-        usableConfigs = OS_Calloc(nativeCount,sizeof(WinSysfbconfig)); usableCount = 0;
+        usableConfigs = OS_Calloc(nativeCount,sizeof(FBC)); usableCount = 0;
         for (int i = 0;  i < nativeCount;  i++) {
             const GLXFBConfig n = nativeConfigs[i];
-            WinSysfbconfig* u = usableConfigs + usableCount;
+            FBC* u = usableConfigs + usableCount;
             if(!(getGLXFBConfigAttrib(n,0x8011/*render type*/) & 0x00000001/*rgba bit*/)){continue;}
             if(!(getGLXFBConfigAttrib(n,0x8010/*drawable type*/) & 0x00000001/*window bit*/)){continue;}
             if(getGLXFBConfigAttrib(n,5) != 1){continue;}
@@ -500,7 +500,7 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
             usableCount++;
         }
         closest = ChooseFBConfig(usableConfigs,usableCount); native = (GLXFBConfig)closest->handle;
-        WinSys.x11.xlib.Free(nativeConfigs); if (usableConfigs) OS_Free(usableConfigs,nativeCount*sizeof(WinSysfbconfig));
+        WinSys.x11.xlib.Free(nativeConfigs); if (usableConfigs) OS_Free(usableConfigs,nativeCount*sizeof(FBC));
         result = WinSys.glx.GetVisualFromFBConfig(WinSys.x11.display,native);
         Visual* visual=result->visual; int depth = result->depth; WinSys.x11.xlib.Free(result); int xpos=0,ypos=0;
         win->x11.colormap=WinSys.x11.xlib.CreateColormap(WinSys.x11.display,WinSys.x11.root,visual,0);
@@ -580,19 +580,7 @@ int WindowInit() {
     return  1;
 }
 
-const WinSysfbconfig* ChooseFBConfig(const WinSysfbconfig* alts, u32 count) {
-    u32 missing, leastMissing = 2147483647, colorDiff, leastColorDiff = 2147483647, extraDiff, leastExtraDiff = 2147483647;
-    const WinSysfbconfig* closest = NULL;
-    for (u32 i = 0; i < count; i++) {
-        const WinSysfbconfig* c = alts + i; missing = (c->alphaBits==0)+(c->depthBits==0)+(c->stencilBits==0);
-        colorDiff = 0; colorDiff+=(8-c->redBits)  *(8-c->redBits);   colorDiff+=(8-c->greenBits)*(8-c->greenBits); colorDiff+=(8-c->blueBits)   *(8-c->blueBits);
-        extraDiff = 0; extraDiff+=(8-c->alphaBits)*(8-c->alphaBits); extraDiff+=(8-c->depthBits)*(8-c->depthBits); extraDiff+=(8-c->stencilBits)*(8-c->stencilBits);
-        if (missing < leastMissing || (missing == leastMissing && (colorDiff < leastColorDiff || (colorDiff == leastColorDiff && extraDiff < leastExtraDiff)))) closest = c;
-        if (c == closest) { leastMissing=missing; leastColorDiff=colorDiff; leastExtraDiff=extraDiff; }
-    }
-    return closest;
-}
-
+const FBC* ChooseFBConfig(const FBC* alts, u32 count) { u32 l=-1; const FBC* f=0; for (u32 i = 0; i < count; i++) { const FBC* c=alts+i; u32 s=(((c->alphaBits==0)+(c->depthBits==0)+(c->stencilBits==0))*65536) + (((8-c->redBits)*(8-c->redBits) + (8-c->greenBits)*(8-c->greenBits) + (8-c->blueBits)*(8-c->blueBits))*256) + ((8-c->alphaBits)*(8-c->alphaBits) + (8-c->depthBits)*(8-c->depthBits) + (8-c->stencilBits)*(8-c->stencilBits)); if(s < l){l=s; f=c;} } return f; }
 void SetGLContext_GetFunctionPointers() {
     WinSyswindow* handle=(WinSyswindow*)window; handle->context.makeCurrent(handle);
     #define X(n,t) n=(t)handle->context.getProcAddress(#n);
