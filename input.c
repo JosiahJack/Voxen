@@ -1,4 +1,4 @@
-// input.c - Input and Configuration System for Config.ini and keyboard, mouse, and gamepad support.
+// input.c - Input and Configuration System for Config.ini, keyboard and mouse support.
 #include "common.h"
 #include "lib.h"
 double last_mouse_x,last_mouse_y;
@@ -15,8 +15,6 @@ KeyState* GetCodeMapping(int settingIndex) {
     i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
     if (i == 148 || i >= MAX_KEYS) return &Sys_Input.keyStates[MAX_KEYS - 1]; // UNUSED NULL (e.g. setting unbound)
     if (i >= 53 && i <= 61) return &Sys_Input.mouseButtons[inputElements[i].value];
-    if (i >= 62 && i <= 77) return &Sys_Input.joystickButtons[JOYSTICK_1][inputElements[i].value];
-    if ((i >= 78 && i <= 79) || (i >= 132 && i <= 133)) return &Sys_Input.joystickHats[inputElements[i].value];
     return &Sys_Input.keyStates[inputElements[i].value];
 }
 
@@ -74,12 +72,10 @@ void ForceShootMode() { if (Sys_Settings.NoShootMode){return;} World.Sys_UI.mous
 void ForceInventoryMode() { World.inventoryMode = true; World.cursorPosition_x = 663; World.cursorPosition_y = 371; ignore_next_mouse_delta = true; } // Centered on UI baseline resolution 1366x768
 void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
 void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
-void MenuGoBack(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot); void ApplyPlayerMovements(float dt);
+void MenuGoBack(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot); void ApplyPlayerMovements(float dt); void PollEvents();
 void play_synth_laser(float volume,float freq,float sweep,float fmrate,float decay); void play_synth_door(float volume,float pitch); void play_synth_impact(float volume,float ring_freq,float decay,float noise_amt,float ring_amt);
-void PollEvents(); void JoysticksPoll(); bool JoystickPresent(int jid);
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
-    JoysticksPoll();
     if (window_has_focus) {
         float v = 0.1f;
         if (Sys_Input.keyStates[KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(V3){0.0f,0.0f,0.0f},false);
@@ -99,7 +95,7 @@ void InputProcessing() {
         if (Lantern()) World.invP1.hardwareIsActive ^= HW_LAN;
         if (Infrared()) World.invP1.hardwareIsActive ^= HW_INF;
         ApplyPlayerMovements(World.dt);
-        if (!World.paused && !World.menuActive && !World.inventoryMode) { // Apply mouselook/keyboardlook/joysticklook/lean
+        if (!World.paused && !World.menuActive && !World.inventoryMode) { // Apply mouselook/keyboardlook/lean
             float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
             World.cam_yaw += (float)World.currentMouse_dx * s; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if (World.cam_yaw < 0.0f)     {World.cam_yaw  += 360.0f;}
             World.cam_pitch+=(float)World.currentMouse_dy * s; if (World.cam_pitch > 89.0f) {World.cam_pitch = 89.0f;} if (World.cam_pitch < -89.0f) {World.cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg

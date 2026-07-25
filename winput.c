@@ -1,47 +1,41 @@
 // winput.c - Windowing and Input System interfacing with the OS.
 #include "common.h"
-typedef void (*WinSysglproc)(void); typedef struct WinSyswindow WinSyswindow; WinSyswindow* window; typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } vidmode; typedef struct { u8 buttons[15]; float axes[6]; } WinSysgamepadstate;
-typedef void (*WinSysproc)(void); typedef struct WinSysfbconfig WinSysfbconfig; typedef struct WinSyscontext WinSyscontext; typedef struct WinSyswindow WinSyswindow; typedef struct WinSyslibrary WinSyslibrary; typedef struct WinSysmonitor WinSysmonitor; typedef struct WinSysjoystick WinSysjoystick;
+typedef void (*WinSysglproc)(void);
+typedef struct WinSyswindow WinSyswindow;
+WinSyswindow* window;
+typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } vidmode;
+typedef void (*WinSysproc)(void); typedef struct WinSysfbconfig WinSysfbconfig; typedef struct WinSyscontext WinSyscontext; typedef struct WinSyswindow WinSyswindow; typedef struct WinSyslibrary WinSyslibrary; typedef struct WinSysmonitor WinSysmonitor;
 struct WinSysfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; i32 samples,stereo,sRGB,doublebuffer; uintptr_t handle; }; extern WinSyslibrary WinSys;
-WinSysproc PlatformGetModuleSymbol(void* module, const char* name); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(); void InputWindowFocus(i32); void InputKey(char*,int,int); void InputMouseClick(char*,int,int); void InputCursorPos(double*,double*,double,double); void JoystickConnection(WinSysjoystick*,int); void InputJoystickAxis(WinSysjoystick*,int,float);
-void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSysjoystick*,int,char); void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(const WinSysfbconfig* alternatives, u32); WinSysmonitor* AllocMonitor(const char*,int,int); WinSysjoystick* WinSysAllocJoystick(const char*,const char*,int,int,int); void FreeJoystick(WinSysjoystick*);
+WinSysproc PlatformGetModuleSymbol(void* module, const char* name); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(); void InputWindowFocus(i32); void InputKey(char*,int,int); void InputMouseClick(char*,int,int); void InputCursorPos(double*,double*,double,double);
+void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(const WinSysfbconfig* alternatives, u32); WinSysmonitor* AllocMonitor(const char*,int,int);
 #if defined(_WIN32)
-    #define MAKEWORD(a,b) ((u16) (((u8) (((u64) (a)) & 0xff)) | ((u16) ((u8) (((u64) (b)) & 0xff))) << 8))
-    #define MAKELONG(a, b) ((i32) (((u16) (((u64) (a)) & 0xffff)) | ((u32) ((u16) (((u64) (b)) & 0xffff))) << 16))
     #define LOWORD(l) ((u16)(((u64) (l)) & 0xffff))
     #define HIWORD(l) ((u16)((((u64) (l)) >> 16) & 0xffff))
     #define LOBYTE(w) ((u8)(((u64) (w)) & 0xff))
     #define HIBYTE(w) ((u8)((((u64) (w)) >> 8) & 0xff))
     typedef void *HWND, *HBITMAP, *HBRUSH, *HDC, *HGLRC, *HICON, *HMENU, *HMONITOR;
     typedef struct tagPOINT { i32 x,y; } POINT,*PPOINT,*NPPOINT,*LPPOINT; typedef struct _POINTL { i32 x,y; } POINTL,*PPOINTL; typedef struct tagRECT { i32 left,top,right,bottom; } RECT,*PRECT,*NPRECT,*LPRECT; typedef struct tagSIZE { i32 cx,cy; } SIZE,*PSIZE,*LPSIZE;
-    typedef struct _OSVERSIONINFOEXW { u32 dwOSVersionInfoSize,dwMajorVersion,dwMinorVersion,dwBuildNumber,dwPlatformId; u16 szCSDVersion[128]; u16 wServicePackMajor,wServicePackMinor,wSuiteMask; u8 wProductType,wReserved; } OSVERSIONINFOEXW;
+    typedef struct { u32 dwOSVersionInfoSize,dwMajorVersion,dwMinorVersion; u8 _p[264]; u16 wServicePackMajor; u8 _p2[6]; } OSVERSIONINFOEXW;
     int __cdecl wcscmp(const u16 *_Str1,const u16 *_Str2); u16* wcscpy(u16* restrict destination, const u16* restrict source);
-    #define MAKEINTATOM(i) (u16*)((u64)((u16)(i)))
-    typedef struct _devicemodeW {u16 dmDeviceName[32]; u16 dmSpecVersion,dmDriverVersion,dmSize,dmDriverExtra; u32 dmFields; union { struct { i16 dmOrientation,dmPaperSize,dmPaperLength,dmPaperWidth,dmScale,dmCopies,dmDefaultSource,dmPrintQuality; }; struct { POINTL dmPosition; u32 dmDisplayOrientation,dmDisplayFixedOutput; }; };
-                                 i16 dmColor,dmDuplex,dmYResolution,dmTTOption,dmCollate; u16 dmFormName[32],dmLogPixels; u32 dmBitsPerPel,dmPelsWidth,dmPelsHeight; union { u32 dmDisplayFlags,dmNup; }; u32 dmDisplayFrequency,dmICMMethod,dmICMIntent,dmMediaType,dmDitherType,dmReserved1,dmReserved2,dmPanningWidth,dmPanningHeight; } DEVMODEW,*LPDEVMODEW;
+    typedef struct _devicemodeW {u16 a[34]; u16 dmSize,b; u32 c; POINTL dmPosition; u8 d[18]; u16 e[33]; u32 f,dmPelsWidth,dmPelsHeight,g,dmDisplayFrequency; u8 h[32]; } DEVMODEW,*LPDEVMODEW;
     typedef i64 (__stdcall *WNDPROC)(HWND,u32,u64,i64); typedef i32 (__stdcall *MONITORENUMPROC)(HMONITOR,HDC,LPRECT,i64);
     typedef struct _ICONINFO { i32 fIcon; u32 xHotspot,yHotspot; HBITMAP hbmMask,hbmColor; } ICONINFO; typedef ICONINFO *PICONINFO; typedef struct tagMSG { HWND hwnd; u32 message; u64 wParam; i64 lParam; u32 time; POINT pt; } MSG,*PMSG,*NPMSG,*LPMSG;
-    typedef struct tagMONITORINFO { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; } MONITORINFO,*LPMONITORINFO;             typedef struct tagMONITORINFOEXW { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; u16 szDevice[32]; } MONITORINFOEXW;
-    typedef struct tagWINDOWPLACEMENT { u32 length; u32 flags; u32 showCmd; POINT ptMinPosition; POINT ptMaxPosition; RECT rcNormalPosition; } WINDOWPLACEMENT;
-    typedef struct tagWNDCLASSEXW { u32 cbSize,style; WNDPROC lpfnWndProc; i32 cbClsExtra,cbWndExtra; HINSTANCE hInstance; HICON hIcon,hCursor; HBRUSH hbrBackground; u16 *lpszMenuName,*lpszClassName; HICON hIconSm; } WNDCLASSEXW;
-    typedef struct {u16 wButtons; u8 bLeftTrigger,bRightTrigger; i16 sThumbLX,sThumbLY,sThumbRX,sThumbRY; } XINPUT_GAMEPAD; /*typedef struct {u16 wLeftMotorSpeed, wRightMotorSpeed;} XINPUT_VIBRATION;*/
-    typedef struct {u8 Type,SubType; u16 Flags; XINPUT_GAMEPAD Gamepad; u32* Vibration/*XINPUT_VIBRATION Vibration*/;} XINPUT_CAPABILITIES;   typedef struct {u32 dwPacketNumber; XINPUT_GAMEPAD Gamepad;} XINPUT_STATE;
-    typedef u32 (WINAPI * PFN_XInputGetCapabilities)(u32,u32,XINPUT_CAPABILITIES*);                                         typedef u32 (WINAPI * PFN_XInputGetState)(u32,XINPUT_STATE*);
-    typedef struct { u32 dbch_size,dbch_devicetype,dbch_reserved; } DEV_BROADCAST_HDR;                                      typedef struct { u32 dbcc_size,dbcc_devicetype,dbcc_reserved; GUID dbcc_classguid; u16 dbcc_name[1]; } DEV_BROADCAST_DEVICEINTERFACE_W;
-    typedef i32 (WINAPI * PFN_DwmIsCompositionEnabled)(i32*);            typedef i32 (WINAPI * PFN_DwmFlush)();                  typedef i32 (WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,u32,u64); typedef i32 (WINAPI * PFN_SWE)(int);
-    typedef i32 (WINAPI * PFN_GPFAIVA)(HDC,int,int,u32,const int*,int*); typedef HGLRC (WINAPI * FP_CCAA)(HDC,HGLRC,const int*); typedef HGLRC (WINAPI * PFN_CC)(HDC);                                       typedef PROC (WINAPI * PFN_wglGetProcAddress)(const char*);
-    typedef HDC (WINAPI * PFN_wglGetCurrentDC)();                        typedef HGLRC (WINAPI * PFN_wglGetCurrentContext)();    typedef i32 (WINAPI * PFN_wglMakeCurrent)(HDC,HGLRC);
+    typedef struct { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; } MONITORINFO,*LPMONITORINFO; typedef struct { u32 cbSize; RECT rcMonitor; RECT rcWork; u8 _p[4]; u16 szDevice[32]; } MONITORINFOEXW;
+    typedef struct { u32 length; u32 flags; u32 showCmd; POINT ptMinPosition; POINT ptMaxPosition; RECT rcNormalPosition; } WINDOWPLACEMENT;
+    typedef struct { u32 cbSize,style; WNDPROC lpfnWndProc; i32 cbClsExtra,cbWndExtra; HINSTANCE hInstance; HICON hIcon,hCursor; HBRUSH hbrBackground; u16 *lpszMenuName,*lpszClassName; HICON hIconSm; } WNDCLASSEXW;
+    typedef struct { u32 dbch_size,dbch_devicetype,dbch_reserved; } DEV_BROADCAST_HDR; typedef struct { u32 dbcc_size,dbcc_devicetype,dbcc_reserved; GUID dbcc_classguid; u16 dbcc_name[1]; } DEV_BROADCAST_DEVICEINTERFACE_W;
+    typedef i32 (WINAPI * PFN_DwmIsCompositionEnabled)(i32*); typedef i32 (WINAPI * PFN_DwmFlush)(); typedef i32 (WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,u32,u64); typedef i32 (WINAPI * PFN_SWE)(int);
+    typedef i32 (WINAPI * PFN_GPFAIVA)(HDC,int,int,u32,const int*,int*); typedef HGLRC (WINAPI * FP_CCAA)(HDC,HGLRC,const int*); typedef HGLRC (WINAPI * PFN_CC)(HDC); typedef PROC (WINAPI * PFN_wglGetProcAddress)(const char*);
+    typedef HDC (WINAPI * PFN_wglGetCurrentDC)(); typedef HGLRC (WINAPI * PFN_wglGetCurrentContext)(); typedef i32 (WINAPI * PFN_wglMakeCurrent)(HDC,HGLRC);
     typedef struct WGLContext { HDC dc; HGLRC handle; int interval; } WGLContext;
     PFN_wglGetCurrentDC wglGetCurrentDC; PFN_CC wglCreateContext; FP_CCAA wglCreateContextAttribsARB; PFN_wglGetCurrentContext wglGetCurrentContext; PFN_wglMakeCurrent wglMakeCurrent; PFN_wglGetProcAddress wglGetProcAddress; PFN_GPFAIVA wglGetPixelFormatAttribivARB; PFN_SWE wglSwapIntervalEXT;
     typedef struct WinSyslibraryWGL { HINSTANCE instance; } WinSyslibraryWGL;
     typedef struct WinSyswindowWin32 { HWND handle; i32 cursorTracked,frameAction,keymenu; int width,height,lastCurX,lastCurY; } WinSyswindowWin32;
-    typedef struct WinSyslibraryWin32 { HINSTANCE instance; HWND helperWindowHandle; u16 helperWindowClass,mainWindowClass; void* deviceNotificationHandle; short int keycodes[512],scancodes[349]; double restoreCurPosX,restoreCurPosY; WinSyswindow *disabledCursorWindow, *capturedCursorWindow; HICON blankCursor; struct {HINSTANCE instance; PFN_XInputGetCapabilities GetCapabilities; PFN_XInputGetState GetState;} xinput; struct {HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush;} dwmapi; struct {HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo;} ntdll;} WinSyslibraryWin32;
-    typedef struct WinSysmonitorWin32 { HMONITOR handle; u16 adapterName[32],displayName[32]; char publicAdapterName[32],publicDisplayName[32]; i32 modesPruned,modeChanged; } WinSysmonitorWin32;
-    typedef struct WinSysjoystickWin32{ int objectCount; u32 index; GUID guid; } WinSysjoystickWin32;
-    typedef long FXPT2DOT30; typedef struct tagCIEXYZ { FXPT2DOT30 x,y,z; } CIEXYZ; typedef struct tagICEXYZTRIPLE {CIEXYZ r,g,b;} CIEXYZTRIPLE;
-    typedef struct _DISPLAY_DEVICEW { u32 cb; u16 DeviceName[32],DeviceString[128]; u32 StateFlags; u16 DeviceID[128],DeviceKey[128]; } DISPLAY_DEVICEW,*PDISPLAY_DEVICEW,*LPDISPLAY_DEVICEW;
-    typedef struct tagPIXELFORMATDESCRIPTOR { u16 nSize,nVersion; u32 dwFlags; u8 iPixelType,cColorBits,cRedBits,cRedShift,cGreenBits,cGreenShift,cBlueBits,cBlueShift,cAlphaBits,cAlphaShift,cAccumBits,cAccumRedBits,cAccumGreenBits,cAccumBlueBits,cAccumAlphaBits,cDepthBits,cStencilBits,cAuxBuffers,iLayerType,bReserved; u32 dwLayerMask,dwVisibleMask,dwDamageMask; } PIXELFORMATDESCRIPTOR,*PPIXELFORMATDESCRIPTOR,*LPPIXELFORMATDESCRIPTOR;
-    typedef struct { u32 bV5Size; i32 bV5Width,bV5Height; u16 bV5Planes,bV5BitCount; u32 bV5Compression,bV5SizeImage; i32 bV5XPelsPerMeter; i32 bV5YPelsPerMeter; u32 bV5ClrUsed,bV5ClrImportant,bV5RedMask,bV5GreenMask,bV5BlueMask,bV5AlphaMask,bV5CSType; CIEXYZTRIPLE bV5Endpoints; u32 bV5GammaRed,bV5GammaGreen,bV5GammaBlue,bV5Intent,bV5ProfileData,bV5ProfileSize,bV5Reserved; } BITMAPV5HEADER,*LPBITMAPV5HEADER,*PBITMAPV5HEADER;
+    typedef struct WinSyslibraryWin32 { HINSTANCE instance; HWND helperWindowHandle; u16 helperWindowClass,mainWindowClass; void* deviceNotificationHandle; short int keycodes[512],scancodes[349]; double restoreCurPosX,restoreCurPosY; WinSyswindow *disabledCursorWindow, *capturedCursorWindow; HICON blankCursor; struct {HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush;} dwmapi; struct {HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo;} ntdll;} WinSyslibraryWin32;
+    typedef struct WinSysmonitorWin32 { HMONITOR handle; u16 adapterName[32],displayName[32]; } WinSysmonitorWin32;
+    typedef struct _DISPLAY_DEVICEW { u32 cb; u16 DeviceName[32],DeviceString[128]; u32 StateFlags; u8 _p[256]; } DISPLAY_DEVICEW,*PDISPLAY_DEVICEW,*LPDISPLAY_DEVICEW;
+    typedef struct tagPIXELFORMATDESCRIPTOR { u16 nSize,nVersion; u32 dwFlags; u8 _p[32]; } PIXELFORMATDESCRIPTOR,*PPIXELFORMATDESCRIPTOR,*LPPIXELFORMATDESCRIPTOR;
+    typedef struct { u32 bV5Size; i32 bV5Width,bV5Height; u16 bV5Planes,bV5BitCount; u32 bV5Compression; u8 _p[20]; u32 bV5RedMask,bV5GreenMask,bV5BlueMask,bV5AlphaMask,bV5CSType; u8 bV5Endpoints[36]; u8 _p2[28]; } BITMAPV5HEADER,*LPBITMAPV5HEADER,*PBITMAPV5HEADER;
     typedef struct tagRGBQUAD { u8 rgbBlue,rgbGreen,rgbRed,rgbReserved; } RGBQUAD;
     typedef struct tagBITMAPINFOHEADER { u32 biSize; i32 biWidth,biHeight; u16 biPlanes,biBitCount; u32 biCompression; u32 biSizeImage; i32 biXPelsPerMeter; i32 biYPelsPerMeter; u32 biClrUsed; u32 biClrImportant; } BITMAPINFOHEADER,*LPBITMAPINFOHEADER,*PBITMAPINFOHEADER;
     typedef struct tagBITMAPINFO { BITMAPINFOHEADER bmiHeader; RGBQUAD bmiColors[1]; } BITMAPINFO,*LPBITMAPINFO,*PBITMAPINFO;
@@ -55,8 +49,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
     DLL_IMP i32 WINAPI EnumDisplaySettingsExW(u16*,u32,LPDEVMODEW,u32); DLL_IMP i32 WINAPI SetPixelFormat(HDC,i32,const PIXELFORMATDESCRIPTOR *); DLL_IMP i32 WINAPI ChoosePixelFormat(HDC hdc,const PIXELFORMATDESCRIPTOR *ppfd); DLL_IMP i32 WINAPI DescribePixelFormat(HDC,i32,u32,LPPIXELFORMATDESCRIPTOR); DLL_IMP HBITMAP WINAPI CreateBitmap(i32,i32,u32,u32,const void *); 
     DLL_IMP HBITMAP WINAPI CreateDIBSection(HDC,const BITMAPINFO*,u32,void**,void*,u32); DLL_IMP i32 WINAPI GetDeviceCaps(HDC,i32);
     u16* CreateWideStringFromUTF8Win32(const char* source); i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp); void WinSysPollMonitorsWin32();
-    struct WinSysjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; u8* buttons; int buttonCount; u8* hats; int hatCount; char name[128],guid[33]; WinSysjoystickWin32 win32; };
-    struct WinSyslibrary { WinSysmonitor** monitors; int monitorCount; i32 joysInited; WinSysjoystick joysticks[JOYSTICK_LAST + 1]; WinSyslibraryWin32 win32; WinSyslibraryWGL wgl; };
+    struct WinSyslibrary { WinSysmonitor** monitors; int monitorCount; WinSyslibraryWin32 win32; WinSyslibraryWGL wgl; };
     struct WinSyscontext { int client,source,major,minor; void (*makeCurrent)(WinSyswindow*); void (*swapBuffers)(WinSyswindow*); void (*swapInterval)(int); WinSysglproc (*getProcAddress)(const char*); WGLContext wgl; };
     struct WinSyswindow { i32 decorated,doublebuffer; vidmode videoMode; int cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; WinSyscontext context; WinSyswindowWin32 win32; };
     struct WinSysmonitor { char name[128]; int widthMM,heightMM; vidmode currentMode; WinSysmonitorWin32 win32; };
@@ -168,37 +161,6 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
     u16* CreateWideStringFromUTF8Win32(const char* src) { u16* target; int count = MultiByteToWideChar(65001,0,(char*)src,-1,NULL,0); target = OS_Calloc(count,sizeof(u16)); MultiByteToWideChar(65001,0,(char*)src,-1,target,count); return target; }
     char* CreateUTF8FromWideStringWin32(const u16* src, int* size) { *size = WideCharToMultiByte(65001,0,(u16*)src,-1,NULL,0,NULL,NULL); char* target = OS_Calloc(*size,1); WideCharToMultiByte(65001,0,(u16*)src,-1,target,*size,NULL,NULL); return target; }
     i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp) { OSVERSIONINFOEXW osvi={0}; osvi.dwOSVersionInfoSize=sizeof(osvi), osvi.dwMajorVersion=major, osvi.dwMinorVersion=minor, osvi.wServicePackMajor=sp; u32 mask=0x0000002|0x0000001|0x0000020; u64 cond=VerSetConditionMask(VerSetConditionMask(VerSetConditionMask(0,0x0000002,3),0x0000001,3),0x0000020,3); return WinSys.win32.ntdll.RtlVerifyVersionInfo(&osvi,mask,cond)==0; }
-    static void closeJoystick(WinSysjoystick* js) { JoystickConnection(js,0x00040002/*disconnected*/); FreeJoystick(js); }
-    void WinSysDetectJoystickConnectionWin32() {
-        if (WinSys.win32.xinput.instance) {
-            for (u32 index=0;index<4;index++) {
-                int jid; XINPUT_CAPABILITIES xic; WinSysjoystick* js;
-                for (jid = 0;  jid <= JOYSTICK_LAST;  jid++) { if (WinSys.joysticks[jid].connected && WinSys.joysticks[jid].win32.index == index) {break;} }
-                if (jid <= JOYSTICK_LAST || WinSys.win32.xinput.GetCapabilities(index,0,&xic) != 0) continue;
-                char guid[33]; sFormat(guid,sizeof(guid),"78696e707574%02x000000000000000000",xic.SubType & 0xff); js = WinSysAllocJoystick("Gamepad",guid,6,10,1); if (!js) continue;
-                js->win32.index = index; JoystickConnection(js,0x00040001/*connected*/);
-            }
-        }
-    }
-
-    i32 InitJoysticks() { WinSysDetectJoystickConnectionWin32(); return 1; }
-    i32 PollJoystick(WinSysjoystick* js) {
-        u32 result; XINPUT_STATE xis;
-        const u16 buttons[14] = {0x0001/*XINPUT_GAMEPAD_DPAD_UP*/,0x0002/*XINPUT_GAMEPAD_DPAD_DOWN*/,0x0008/*XINPUT_GAMEPAD_DPAD_RIGHT*/,0x0004/*XINPUT_GAMEPAD_DPAD_LEFT*/,0x1000/*XINPUT_GAMEPAD_A*/,0x2000/*XINPUT_GAMEPAD_B*/,0x4000/*XINPUT_GAMEPAD_X*/,0x8000/*XINPUT_GAMEPAD_Y*/,0x0100/*XINPUT_GAMEPAD_LEFT_SHOULDER*/,0x0200/*XINPUT_GAMEPAD_RIGHT_SHOULDER*/,0x0020/*XINPUT_GAMEPAD_BACK*/,0x0010/*XINPUT_GAMEPAD_START*/,0x0040/*XINPUT_GAMEPAD_LEFT_THUMB*/,0x0080/*XINPUT_GAMEPAD_RIGHT_THUMB*/};
-        result = WinSys.win32.xinput.GetState(js->win32.index, &xis);
-        if (result != 0) { if (result == 1167/*not connected*/) {closeJoystick(js);} return 0; }
-        const i16 axis_vals[] = {xis.Gamepad.sThumbLX,-xis.Gamepad.sThumbLY,xis.Gamepad.sThumbRX,-xis.Gamepad.sThumbRY};
-        for (int i=0;i<4;++i) InputJoystickAxis(js,i,(axis_vals[i] + 0.5f) / 32767.5f);
-        InputJoystickAxis(js,4,xis.Gamepad.bLeftTrigger / 127.5f - 1.f); InputJoystickAxis(js,5,xis.Gamepad.bRightTrigger / 127.5f - 1.f);
-        for (int i=0;i<10;++i) { const char value = (xis.Gamepad.wButtons & buttons[i]) ? 1 : 0; InputJoystickButton(js,i,value); }
-        int dpad = ((const int[]){0,1,2,3,4,0,0,0,8,0,0,0,0,0,0,0})[xis.Gamepad.wButtons & 0xF];
-        if ((dpad & JOYHAT_RIGHT) && (dpad & JOYHAT_LEFT)) dpad &= ~(JOYHAT_RIGHT | JOYHAT_LEFT);
-        if ((dpad & JOYHAT_UP) && (dpad & JOYHAT_DOWN)) dpad &= ~(JOYHAT_UP | JOYHAT_DOWN);
-        InputJoystickHat(js,0,dpad);
-        return  1;
-    }
-    
-    void WinSysDetectJoystickDisconnectionWin32() { for(int jid=0;jid<=JOYSTICK_LAST;jid++){WinSysjoystick* js = WinSys.joysticks + jid; if(js->connected){PollJoystick(js);}} }
     static i32 __stdcall monitorCallback(HMONITOR h, HDC c, RECT* r, i64 d) { MONITORINFOEXW mi; (void)c; (void)r; mset(&mi,0,sizeof(mi)); mi.cbSize = sizeof(mi); if (GetMonitorInfoW(h,(MONITORINFO*)&mi)) { WinSysmonitor* monitor = (WinSysmonitor*)d; if (wcscmp(mi.szDevice, monitor->win32.adapterName) == 0) {monitor->win32.handle = h;} } return 1; }
     static WinSysmonitor* createMonitor(DISPLAY_DEVICEW* adapter, DISPLAY_DEVICEW* display) {
         WinSysmonitor* monitor; int widthMM,heightMM,nameSize=0; HDC dc; RECT rect;
@@ -209,67 +171,51 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
         if (IsWindowsVersionOrGreaterWin32(HIBYTE(0x0603),LOBYTE(0x0603),0)) { widthMM  = GetDeviceCaps(dc,4); heightMM = GetDeviceCaps(dc,6); } // Is Windows 8.10 or greater
         else { widthMM  = (int) (dm.dmPelsWidth * 25.4f / GetDeviceCaps(dc,88)); heightMM = (int)(dm.dmPelsHeight * 25.4f / GetDeviceCaps(dc,90)); }
         DeleteDC(dc); monitor = AllocMonitor(name,widthMM,heightMM); OS_Free(name,nameSize);
-        if (adapter->StateFlags & 0x08000000/*DISPLAY_DEVICE_MODESPRUNED*/) monitor->win32.modesPruned =  1;
         wcscpy(monitor->win32.adapterName, adapter->DeviceName);
         if (display) wcscpy(monitor->win32.displayName,display->DeviceName);
         rect.left=dm.dmPosition.x; rect.top=dm.dmPosition.y; rect.right=dm.dmPosition.x + dm.dmPelsWidth; rect.bottom=dm.dmPosition.y + dm.dmPelsHeight;
         EnumDisplayMonitors(NULL,&rect,monitorCallback,(i64)monitor);
         return monitor;
     }
-
+    
     void WinSysPollMonitorsWin32() {
         int i, disconnectedCount = WinSys.monitorCount; WinSysmonitor** disconnected = NULL; u32 adapterIndex,displayIndex; DISPLAY_DEVICEW adapter, display; WinSysmonitor* monitor;
         if (disconnectedCount) { disconnected = OS_Calloc(WinSys.monitorCount,sizeof(WinSysmonitor*)); mcpy(disconnected,WinSys.monitors,WinSys.monitorCount * sizeof(WinSysmonitor*)); }
         for (adapterIndex = 0;;adapterIndex++) {
-            int type = 1; mset(&adapter,0,sizeof(adapter)); adapter.cb = sizeof(adapter); if (!EnumDisplayDevicesW(NULL,adapterIndex,&adapter,0)) break;
+            mset(&adapter,0,sizeof(adapter)); adapter.cb = sizeof(adapter); if (!EnumDisplayDevicesW(NULL,adapterIndex,&adapter,0)) break;
             if (!(adapter.StateFlags&1)) continue;
-            if (adapter.StateFlags & 0x00000004/*DISPLAY_DEVICE_PRIMARY_DEVICE*/) type = 0;
             for (displayIndex=0;;++displayIndex) {
                 mset(&display,0,sizeof(display)); display.cb = sizeof(display); if (!EnumDisplayDevicesW(adapter.DeviceName,displayIndex,&display,0)) break;
                 if (!(display.StateFlags&1)) continue;
+                int displayType = (display.StateFlags & 0x00000004/*DISPLAY_DEVICE_PRIMARY_DEVICE*/) ? 1 : 0;
                 for (i=0;i<disconnectedCount;++i) { if(disconnected[i] && wcscmp(disconnected[i]->win32.displayName,display.DeviceName) == 0){disconnected[i] = NULL; EnumDisplayMonitors(NULL,NULL,monitorCallback,(i64)WinSys.monitors[i]); break;} }
                 if (i < disconnectedCount) continue;
                 monitor = createMonitor(&adapter,&display); if (!monitor) { OS_Free(disconnected,WinSys.monitorCount*sizeof(WinSysmonitor*)); return; }
-                InputMonitor(monitor,0x00040001/*connected*/,type); type = 1;
+                InputMonitor(monitor,0x00040001/*connected*/,displayType);
             }
             if (displayIndex == 0) {
+                int adapterType = (adapter.StateFlags & 0x00000004) ? 0 : 1;
                 for (i=0;i<disconnectedCount;++i) { if (disconnected[i] && wcscmp(disconnected[i]->win32.adapterName,adapter.DeviceName) == 0) {disconnected[i]=NULL; break;} }
                 if (i < disconnectedCount) continue;
                 monitor = createMonitor(&adapter,NULL); if (!monitor) { OS_Free(disconnected,WinSys.monitorCount*sizeof(WinSysmonitor*)); return; }
-                InputMonitor(monitor,0x00040001/*connected*/,type);
+                InputMonitor(monitor,0x00040001/*connected*/,adapterType);
             }
         }
         for (i=0;i<disconnectedCount;++i) { if (disconnected[i]) {InputMonitor(disconnected[i],0x00040002/*disconnected*/,0);} }
         if (disconnected) OS_Free(disconnected,WinSys.monitorCount*sizeof(WinSysmonitor*));
     }
     
-    static i64 __stdcall helperWindowProc(HWND hWnd, u32 uMsg, u64 wParam, i64 lParam) {
-        switch (uMsg) {
-            case 0x007E/*WM_DISPLAYCHANGE*/: WinSysPollMonitorsWin32(); break;
-            case 0x0219/*WM_DEVICECHANGE*/: if (!WinSys.joysInited) break;
-                if (wParam == 0x8000/*DBT_DEVICEARRIVAL*/ || wParam == 0x8004/*DBT_DEVICEREMOVECOMPLETE*/) {
-                    DEV_BROADCAST_HDR* dbh = (DEV_BROADCAST_HDR*) lParam;
-                    if (dbh && dbh->dbch_devicetype == 0x0005/*DBT_DEVTYP_DEVICEINTERFACE*/ && wParam == 0x8000/*DBT_DEVICEARRIVAL*/)           WinSysDetectJoystickConnectionWin32();
-                    if (dbh && dbh->dbch_devicetype == 0x0005/*DBT_DEVTYP_DEVICEINTERFACE*/ && wParam == 0x8004/*DBT_DEVICEREMOVECOMPLETE*/) WinSysDetectJoystickDisconnectionWin32();
-                }
-                break;
-        }
-        return DefWindowProcW(hWnd,uMsg,wParam,lParam);
-    }
-
+    static i64 __stdcall helperWindowProc(HWND hWnd, u32 uMsg, u64 wParam, i64 lParam) { switch (uMsg) { case 0x007E/*WM_DISPLAYCHANGE*/: WinSysPollMonitorsWin32(); break; } return DefWindowProcW(hWnd,uMsg,wParam,lParam); }
     void GetMonitorPos(WinSysmonitor* monitor, int* x, int* y) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsExW(monitor->win32.adapterName,0xFFFFFFFFU,&dm,0x00000004); *x = dm.dmPosition.x; *y = dm.dmPosition.y; }
     void GetMonitorWorkarea(WinSysmonitor* monitor, int* x, int* y, int* width, int* height) { MONITORINFO mi = {0}; mi.cbSize = sizeof(mi); GetMonitorInfoW(monitor->win32.handle, &mi); *x = mi.rcWork.left; *y = mi.rcWork.top; *width = mi.rcWork.right - mi.rcWork.left; *height = mi.rcWork.bottom - mi.rcWork.top; }
     void GetVideoMode(WinSysmonitor* monitor, vidmode* mode) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsW(monitor->win32.adapterName,0xFFFFFFFFU,&dm); mode->width=dm.dmPelsWidth; mode->height=dm.dmPelsHeight; mode->refreshRate=dm.dmDisplayFrequency; }
     static int choosePixelFormatWGL(WinSyswindow* win) {
-        int attribs[24],values[24],attribCount=0,i,pixelFormat,nativeCount,usableCount=0;
-        const int query = 0x2000/*num pixel formats*/; wglGetPixelFormatAttribivARB(win->context.wgl.dc,1,0,1,&query,&nativeCount);
-        attribs[attribCount++] = 0x2010/*support opengl*/; attribs[attribCount++] = 0x2001/*draw to window*/; attribs[attribCount++] = 0x2013/*pixel type*/; attribs[attribCount++] = 0x2003/*accelaration*/;
-        attribs[attribCount++] = 0x2011/*double buffer*/; attribs[attribCount++] = 0x2015/*r bits*/; attribs[attribCount++] = 0x2017/*g bits*/;
-        attribs[attribCount++] = 0x2019/*b bits*/; attribs[attribCount++] = 0x201b/*a bits*/; attribs[attribCount++] = 0x2022/*depth bits*/; attribs[attribCount++] = 0x2023/*stencil bits*/;
+        static const int attribs[]={0x2010,0x2001,0x2013,0x2003,0x2011,0x2015,0x2017,0x2019,0x201b,0x2022,0x2023};
+        int values[sizeof(attribs)/sizeof(int)],i,pixelFormat,nativeCount,usableCount=0;
+        const int query = 0x2000; wglGetPixelFormatAttribivARB(win->context.wgl.dc,1,0,1,&query,&nativeCount);
         WinSysfbconfig* usableConfigs = OS_Calloc(nativeCount,sizeof(WinSysfbconfig));
         for (i = 0; i < nativeCount; i++) {
-            WinSysfbconfig* u = usableConfigs + usableCount; pixelFormat = i + 1; wglGetPixelFormatAttribivARB(win->context.wgl.dc,pixelFormat,0,attribCount,attribs,values);
-            if (values[0] == 0 || values[1] == 0/* support OpenGL + draw to window */ || values[2] != 0x202b/*type rgba*/ || values[3] == 0x2025/*no accel*/ || values[4] !=  1) continue;
+            WinSysfbconfig* u = usableConfigs + usableCount; pixelFormat = i + 1; wglGetPixelFormatAttribivARB(win->context.wgl.dc,pixelFormat,0,sizeof(attribs)/sizeof(int),attribs,values); if (values[0] == 0 || values[1] == 0 || values[2] != 0x202b || values[3] == 0x2025 || values[4] !=  1) continue;
             u->redBits=values[5]; u->greenBits=values[6]; u->blueBits=values[7]; u->alphaBits=values[8]; u->depthBits=values[9]; u->stencilBits=values[10]; u->handle=pixelFormat; usableCount++;
         }
         const WinSysfbconfig* closest = ChooseFBConfig(usableConfigs,usableCount);
@@ -291,7 +237,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
         int frameX,frameY; frameX=frameY=0x80000000;
         int frameWidth=rect.right-rect.left, frameHeight=rect.bottom-rect.top;
         u16* wideTitle=CreateWideStringFromUTF8Win32(GAME_TITLE);
-        win->win32.handle=CreateWindowExW(0,(u16*)MAKEINTATOM(WinSys.win32.mainWindowClass),wideTitle,style,frameX,frameY,frameWidth,frameHeight,NULL,NULL,WinSys.win32.instance,(void*)NULL);
+        win->win32.handle=CreateWindowExW(0,(u16*)(u16*)((u64)((u16)(WinSys.win32.mainWindowClass))),wideTitle,style,frameX,frameY,frameWidth,frameHeight,NULL,NULL,WinSys.win32.instance,(void*)NULL);
         SetPropW(win->win32.handle,L"WinSys",win);
         win->win32.keymenu=0; WINDOWPLACEMENT wp={0}; wp.length=sizeof(wp); AdjustWindowRectEx(&rect,style,0,0);
         GetWindowPlacement(win->win32.handle,&wp);
@@ -328,23 +274,30 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
     typedef struct { i64 flags; int x,y, width,height,min_width,min_height,max_width,max_height,width_inc,height_inc; struct {int x; int y;} min_aspect,max_aspect; int base_width, base_height; int win_gravity; } XSizeHints;
     typedef XID Window,Drawable,Font,Pixmap,Cursor,Colormap; typedef struct _XExtData { int number; struct _XExtData *next; int (*free_private)(struct _XExtData*); XPointer private_data; } XExtData;
     typedef struct { int extension, major_opcode, first_event, first_error; } XExtCodes; typedef struct { int depth, bits_per_pixel, scanline_pad; } XPixmapFormatValues;
-    typedef struct _XGC *GC; typedef struct { XExtData *ext_data; VisualID visualid; int class; u64 red_mask, green_mask, blue_mask; int bits_per_rgb; int map_entries;} Visual; 
+    typedef struct _XGC *GC;
+    typedef struct { XExtData *ext_data; VisualID visualid; int class; u64 red_mask, green_mask, blue_mask; int bits_per_rgb; int map_entries;} Visual; 
     typedef struct { int depth,nvisuals; Visual *visuals; } Depth;
     typedef struct { XExtData *ext_data; struct _XDisplay *display; Window root; int width,height,mwidth,mheight,ndepths; Depth *depths; int root_depth; Visual *root_visual; GC default_gc; Colormap cmap; u64 white_pixel, black_pixel; int max_maps, min_maps, backing_store; int save_unders; i64 root_input_mask; } Screen;
     typedef struct { XExtData *ext_data; int depth, bits_per_pixel, scanline_pad; } ScreenFormat;
     typedef struct { Pixmap background_pixmap; u64 background_pixel; Pixmap border_pixmap; u64 border_pixel; int bit_gravity, win_gravity, backing_store; u64 backing_planes, backing_pixel; int save_under; i64 event_mask, do_not_propagate_mask; int override_redirect; Colormap colormap; Cursor cursor; } XSetWindowAttributes;
     typedef struct { int x,y,width,height,border_width,depth; Visual *visual; Window root; int class,bit_gravity,win_gravity,backing_store; u64 backing_planes,backing_pixel; int save_under; Colormap colormap; int map_installed,map_state; i64 all_event_masks,your_event_mask,do_not_propagate_mask; i32 override_redirect; Screen *screen; } XWindowAttributes;
-    typedef struct _XDisplay Display; typedef struct { XExtData *ext_data; struct _XPrivate *private1; int fd, private2, proto_major_version, proto_minor_version; char *vendor; XID private3, private4, private5; int private6; XID (*resource_alloc)(struct _XDisplay*); int byte_order, bitmap_unit, bitmap_pad, bitmap_bit_order, nformats; ScreenFormat *pixmap_format; int private8; struct _XPrivate *private9, *private10; int qlen; u64 last_request_read,request; XPointer private11,private12,private13,private14; unsigned max_request_size; struct _XrmHashBucketRec *db; int (*private15)(struct _XDisplay*); char *display_name; i32 default_screen, nscreens; Screen *screens; u64 motion_buffer, private16; i32 min_keycode,max_keycode; XPointer private17,private18; i32 private19; char *xdefaults; } *_XPrivDisplay;
+    typedef struct _XDisplay Display;
+    typedef struct { XExtData *ext_data; struct _XPrivate *private1; int fd, private2, proto_major_version, proto_minor_version; char *vendor; XID private3, private4, private5; int private6; XID (*resource_alloc)(struct _XDisplay*); int byte_order, bitmap_unit, bitmap_pad, bitmap_bit_order, nformats; ScreenFormat *pixmap_format; int private8; struct _XPrivate *private9, *private10; int qlen; u64 last_request_read,request; XPointer private11,private12,private13,private14; unsigned max_request_size; struct _XrmHashBucketRec *db; int (*private15)(struct _XDisplay*); char *display_name; i32 default_screen, nscreens; Screen *screens; u64 motion_buffer, private16; i32 min_keycode,max_keycode; XPointer private17,private18; i32 private19; char *xdefaults; } *_XPrivDisplay;
     typedef struct { int a; u64 b; int c; void *d; u64 e,f,g,h; int i,j,k,l; u32 m,keycode; int n; } XKeyEvent; // Don't care the names of the unused fields here, so just stuff alphabet in there
-    typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int i,j,k,l; u32 m,button; int n; } XButtonEvent;  typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int x,y,i,j; u32 k; char l; int m; } XMotionEvent;
-    typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int x,y,i,j,k,l; int m,n; u32 o; } XCrossingEvent; typedef struct { int a; u64 b; i32 c; Display *d; Window e; int mode,f; } XFocusChangeEvent;
-    typedef struct { int a; u64 b; i32 c; Display *d; Window e,f,parent; int g,h,i; } XReparentEvent;                          typedef struct { int a; u64 b; i32 c; Display *d; Window e,f; int x,y,width,height,g; Window h; int i; } XConfigureEvent;
+    typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int i,j,k,l; u32 m,button; int n; } XButtonEvent;
+    typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int x,y,i,j; u32 k; char l; int m; } XMotionEvent;
+    typedef struct { int a; u64 b; int c; Display *d; Window e,f,g; Time h; int x,y,i,j,k,l; int m,n; u32 o; } XCrossingEvent;
+    typedef struct { int a; u64 b; i32 c; Display *d; Window e; int mode,f; } XFocusChangeEvent;
+    typedef struct { int a; u64 b; i32 c; Display *d; Window e,f,parent; int g,h,i; } XReparentEvent;
+    typedef struct { int a; u64 b; i32 c; Display *d; Window e,f; int x,y,width,height,g; Window h; int i; } XConfigureEvent;
     typedef struct { int a; u64 b; int c; Display *d; Window window; Atom message_type; int format; union { char b[20]; short s[10]; long l[5]; } data; } XClientMessageEvent;
     typedef struct { int a; u64 b; int send_event; Display *c; Window window; } XAnyEvent;
     typedef struct { int type; u64 serial; int send_event; Display *display; int extension, evtype; u32 cookie; void *data; } XGenericEventCookie;
     typedef union _XEvent { int type; XAnyEvent xany; XKeyEvent xkey; XButtonEvent xbutton; XMotionEvent xmotion; XCrossingEvent xcrossing; XFocusChangeEvent xfocus; u8 p0[528]; XReparentEvent xreparent; XConfigureEvent xcfg; u8 p1[648]; XClientMessageEvent xclient; u8 p2[224]; } XEvent;
-    typedef struct _XIC *XIC; typedef struct { Visual *visual; VisualID visualid; int screen,depth; int class; u64 red_mask,green_mask,blue_mask; int colormap_size,bits_per_rgb; } XVisualInfo;
-    typedef int XContext; typedef XID RROutput,RRCrtc,RRMode; typedef u64 XRRModeFlags;
+    typedef struct _XIC *XIC;
+    typedef struct { Visual *visual; VisualID visualid; int screen,depth; int class; u64 red_mask,green_mask,blue_mask; int colormap_size,bits_per_rgb; } XVisualInfo;
+    typedef int XContext;
+    typedef XID RROutput,RRCrtc,RRMode; typedef u64 XRRModeFlags;
     typedef struct { RRMode id; u32 width,height; u64 dotClock; u32 hSyncStart,hSyncEnd,hTotal,hSkew,vSyncStart,vSyncEnd,vTotal; char *name; u32 nameLength; XRRModeFlags modeFlags; } XRRModeInfo;
     typedef struct { Time timestamp; Time configTimestamp; int ncrtc; RRCrtc *crtcs; int noutput; RROutput *outputs; int nmode; XRRModeInfo *modes; } XRRScreenResources;
     typedef struct { Time timestamp; RRCrtc crtc; char *name; int nameLen; u64 mm_width,mm_height; Connection connection; SubpixelOrder subpixel_order; i32 ncrtc; RRCrtc *crtcs; i32 nclone; RROutput *clones; i32 nmode,npreferred; RRMode *modes; } XRROutputInfo;
@@ -372,10 +325,11 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
                                      PFN_XTranslateCoordinates TranslateCoordinates; PFN_XUndefineCursor UndefineCursor; PFN_XUngrabPointer UngrabPointer; PFN_XUnsetICFocus UnsetICFocus; PFN_XWarpPointer WarpPointer; } xlib;
                                      struct {void* handle; int eventBase,errorBase,major,minor; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary; PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration;}randr; } WinSyslibraryX11;
     struct input_absinfo {i32 value,minimum,maximum,fuzz,flat,resolution;};
-    PFN_XNextEvent XNextEvent; typedef struct WinSysmonitorX11 { RROutput output; RRCrtc crtc; int index; } WinSysmonitorX11; typedef struct WinSysjoystickLinux { FHandle fd; char path[260]; int keyMap[0x300/*KEY_CNT*/ - 0x100/*BTN_MISC*/],absMap[0x40/*ABS_CNT*/]; struct input_absinfo absInfo[0x40/*ABS_CNT*/]; int hats[4][2]; } WinSysjoystickLinux; typedef struct WinSyslibraryLinux { int inotify,watch; i32 dropped; } WinSyslibraryLinux;
+    PFN_XNextEvent XNextEvent;
+    typedef struct WinSysmonitorX11 { RROutput output; RRCrtc crtc; int index; } WinSysmonitorX11;
+    typedef struct WinSyslibraryLinux { int inotify,watch; i32 dropped; } WinSyslibraryLinux;
     void GetCursorPosV(WinSyswindow*,double*,double*); void SetCurV(WinSyswindow*,double,double);
-    struct WinSysjoystick { i32 allocated,connected; size_t axesSize,buttonsSize,hatsSize; float*  axes; int axisCount; u8* buttons; int buttonCount; u8* hats; int hatCount; char name[128],guid[33]; WinSysjoystickLinux linjs; };
-    struct WinSyslibrary { WinSysmonitor** monitors; int monitorCount; i32 joysInited; WinSysjoystick joysticks[JOYSTICK_LAST + 1]; WinSyslibraryX11 x11; WinSyslibraryGLX glx; WinSyslibraryLinux linjs; };
+    struct WinSyslibrary { WinSysmonitor** monitors; int monitorCount; WinSyslibraryX11 x11; WinSyslibraryGLX glx; WinSyslibraryLinux linjs; };
     struct WinSyscontext { int client,source,major,minor; FGL_GIV GetIntegerv; void (*makeCurrent)(WinSyswindow*); void (*swapBuffers)(WinSyswindow*); void (*swapInterval)(int); WinSysglproc (*getProcAddress)(const char*); WinSyscontextGLX glx; };
     struct WinSyswindow { i32 decorated,doublebuffer; vidmode videoMode; int minwidth,minheight,maxwidth,maxheight,cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; WinSyscontext context; WinSyswindowX11 x11; };
     struct WinSysmonitor { char name[128]; int widthMM,heightMM; vidmode currentMode; WinSysmonitorX11 x11; };
@@ -404,8 +358,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
         updateNormalHints(win,width,height);
         if (WinSys.x11.NWM_STATE && WinSys.x11.NWM_STATE_FULLSCREEN) sendEventToWM(win,WinSys.x11.NWM_STATE,0/*remove*/,WinSys.x11.NWM_STATE_FULLSCREEN,0,1,0);
         else { XSetWindowAttributes attributes; attributes.override_redirect=0; WinSys.x11.xlib.ChangeWindowAttributes(WinSys.x11.display,win->x11.handle,(1L<<9)/*override redirect*/,&attributes); win->x11.overrideRedirect=0; }
-        WinSys.x11.xlib.DeleteProperty(WinSys.x11.display,win->x11.handle,WinSys.x11.NWM_BYPASS_COMPOSITOR);
-        WinSys.x11.xlib.MoveResizeWindow(WinSys.x11.display,win->x11.handle,x,y,width,height);
+        WinSys.x11.xlib.DeleteProperty(WinSys.x11.display,win->x11.handle,WinSys.x11.NWM_BYPASS_COMPOSITOR); WinSys.x11.xlib.MoveResizeWindow(WinSys.x11.display,win->x11.handle,x,y,width,height);
     }
     
     i32 WindowFocused() { Window focused; int state; WinSys.x11.xlib.GetInputFocus(WinSys.x11.display,&focused,&state); return ((WinSyswindow*)window)->x11.handle==focused; }
@@ -556,116 +509,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
     }
 
     static Atom getAtomIfSupported(Atom* atoms, unsigned long count, const char* name) { const Atom atom=WinSys.x11.xlib.InternAtom(WinSys.x11.display,name,0); for (unsigned long i=0;i<count;i++) {if (atoms[i] == atom) {return atom;}} return 0L; }
-    static void handleKeyEvent(WinSysjoystick* js, int code, int value) { InputJoystickButton(js,js->linjs.keyMap[code - 0x100/*BTN_MISC*/],value ? INPUT_PRESS : INPUT_RELEASE); }
-    static void handleAbsEvent(WinSysjoystick* js, int code, int value) {
-        const int index = js->linjs.absMap[code];
-        if (code >= 0x10/*ABS_HAT0X*/ && code <= 0x17/*ABS_HAT3Y*/) {
-            static const char stateMap[3][3] = {{JOYHAT_CENTERED,JOYHAT_UP,JOYHAT_DOWN},{JOYHAT_LEFT,JOYHAT_LEFT_UP,JOYHAT_LEFT_DOWN},{JOYHAT_RIGHT,JOYHAT_RIGHT_UP,JOYHAT_RIGHT_DOWN},};
-            const int hat = (code - 0x10/*ABS_HAT0X*/) / 2, axis = (code - 0x10/*ABS_HAT0X*/) % 2;
-            int* state = js->linjs.hats[hat];
-            state[axis] = (value == 0) ? 0 : value < 0 ? 1 : value > 0 ? 2 : state[axis];
-            InputJoystickHat(js, index, stateMap[state[0]][state[1]]);
-        } else {
-            const struct input_absinfo* info = &js->linjs.absInfo[code];
-            float normalized = value;
-            const int range = info->maximum - info->minimum;
-            if (range) { normalized = (normalized - info->minimum) / range; normalized = normalized * 2.0f - 1.0f; }
-            InputJoystickAxis(js, index, normalized);
-        }
-    }
-
-    static void pollAbsState(WinSysjoystick* js) { for (int code=0;code<0x40/*ABS_CNT*/;code++) { if (js->linjs.absMap[code] < 0) {continue;} struct input_absinfo* info = &js->linjs.absInfo[code]; if (OS_IOControl(js->linjs.fd,(0x80184540 + (code)),info) < 0) {continue;} handleAbsEvent(js,code,info->value); } }
-    #define isBitSet(bit, arr) (arr[(bit) / 8] & (1 << ((bit) % 8)))
-    #define EVIOCGBIT(ev, len) (0x80004520 + (ev) + ((len) << 16))
-    static i32 openJoystickDevice(const char* path) {
-        for (int jid = 0;  jid <= JOYSTICK_LAST;  jid++) { if(!WinSys.joysticks[jid].connected){continue;} if(sEqual(WinSys.joysticks[jid].linjs.path,path)){return 0;} }
-        WinSysjoystickLinux linjs = {0}; linjs.fd = OS_Open(path,00004000|02000000,0); if (linjs.fd == -1) return 0;
-        char evBits[(0x20/*EV_CNT*/ + 7) / 8] = {0},keyBits[(0x300/*KEY_CNT*/ + 7) / 8] = {0},absBits[(0x40/*ABS_CNT*/ + 7) / 8] = {0};
-        struct input_id id; if (OS_IOControl(linjs.fd,EVIOCGBIT(0,sizeof(evBits)),evBits) < 0 || OS_IOControl(linjs.fd,EVIOCGBIT(0x01/*EV_KEY*/,sizeof(keyBits)),keyBits) < 0 || OS_IOControl(linjs.fd,EVIOCGBIT(0x03/*EV_ABS*/,sizeof(absBits)),absBits) < 0 || OS_IOControl(linjs.fd,0x80084501/*EVIOCGID*/,&id) < 0) { OS_Close(linjs.fd); return 0; }
-        if (!isBitSet(0x03/*EV_ABS*/,evBits)) { OS_Close(linjs.fd); return 0; }
-        char name[256] = "",guid[33] = "";
-        if (OS_IOControl(linjs.fd,(0x80004506 | (((sizeof(name)) & 0x1fff) << 16)),name) < 0) scpy_to_a_from_b(name,"Unknown",sizeof(name));
-        if (id.vendor && id.product && id.version) sFormat(guid,sizeof(guid),"%02x%02x0000%02x%02x0000%02x%02x0000%02x%02x0000",id.bustype & 0xff, id.bustype >> 8,id.vendor & 0xff,  id.vendor >> 8,id.product & 0xff, id.product >> 8,id.version & 0xff, id.version >> 8);
-        else sFormat(guid,sizeof(guid),"%02x%02x0000%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x00",id.bustype & 0xff, id.bustype >> 8,name[0], name[1], name[2], name[3],name[4], name[5], name[6], name[7],name[8], name[9], name[10]);
-        int axisCount = 0, buttonCount = 0, hatCount = 0;
-        for (int code=0x100/*BTN_MISC*/;code<0x300/*KEY_CNT*/;code++) { if(!isBitSet(code,keyBits)){continue;} linjs.keyMap[code - 0x100/*BTN_MISC*/]=buttonCount++; }
-        for (int code=0;code<0x40/*ABS_CNT*/;code++) {
-            linjs.absMap[code] = -1; if (!isBitSet(code,absBits)) continue;
-            if (code >= 0x10/*ABS_HAT0X*/ && code <= 0x17/*ABS_HAT3Y*/) { linjs.absMap[code] = hatCount; hatCount++; code++; } // Skip the Y axis
-            else { if(OS_IOControl(linjs.fd,(0x80184540 + (code)),&linjs.absInfo[code]) < 0){continue;} linjs.absMap[code]=axisCount++; }
-        }
-        WinSysjoystick* js = WinSysAllocJoystick(name,guid,axisCount,buttonCount,hatCount); if (!js) { OS_Close(linjs.fd); return 0; }
-        scpy_to_a_from_b(linjs.path,path,sizeof(linjs.path)); mcpy(&js->linjs,&linjs,sizeof(linjs)); pollAbsState(js); JoystickConnection(js,0x00040001/*connected*/);
-        return  1;
-    }
-    
-    struct linux_dirent64 { u64 d_ino; i64 d_off; u16 d_reclen; u8 d_type; char d_name[]; };
-    struct inotify_event { i32 wd; u32 mask,cookie,len; char name[]; };
-    static void closeJoystick(WinSysjoystick* js) { JoystickConnection(js,0x00040002/*disconnected*/); if (js->linjs.fd > 0) { OS_Close(js->linjs.fd); js->linjs.fd = -1; } FreeJoystick(js); }
-    static i32 isEventDevice(const char* name) { if (!name || !sCompUpToLen(name, "event", 5) || name[5] == '\0') {return 0;} for (const char* p=name+5;*p;++p) if (*p < '0' || *p > '9') {return 0;} return 1; }
-    static void iterateInputDevices(void (*callback)(const char* fullpath)) {
-        const char* dirname = "/dev/input"; FHandle fd = OS_Open(dirname,00200000|02000000,0); if (fd < 0) return;
-        char buf[8192];
-        for (;;) {
-            register long rax __asm__("rax") = 217/*__NR_getdents64*/, rdi __asm__("rdi") = fd; register char* rsi __asm__("rsi") = buf; register size_t rdx __asm__("rdx") = sizeof(buf);
-            __asm__ __volatile__("syscall":"+r"(rax):"r"(rdi),"r"(rsi),"r"(rdx):"rcx","r11","memory"); if (rax <= 0) break;
-            long offset = 0;
-            while (offset < rax) {
-                struct linux_dirent64* d = (struct linux_dirent64*)(buf + offset);
-                if (d->d_name[0] != '.' && isEventDevice(d->d_name)) { char path[260]; sFormat(path,sizeof(path),"%s/%s",dirname,d->d_name); callback(path); }
-                offset += d->d_reclen;
-            }
-        }
-        OS_Close(fd);
-    }
-    
-    static void openJoystickCallback(const char* path) { openJoystickDevice(path); }
-    static char joyConbuffer[16384],joyPath[260];
-    void DetectJoyCnx() {
-        if (WinSys.linjs.inotify <= 0) return;
-        long size = OS_Read(WinSys.linjs.inotify,joyConbuffer,sizeof(joyConbuffer)); if (size <= 0) return;
-        i32 offset = 0;
-        while (size >= offset + (i32)sizeof(struct inotify_event)) {
-            const struct inotify_event* e = (struct inotify_event*)(joyConbuffer + offset);
-            offset += (i32)sizeof(struct inotify_event) + e->len;
-            if (e->len == 0 || !isEventDevice(e->name)) continue;
-            sFormat(joyPath,sizeof(joyPath), "/dev/input/%s", e->name);
-            if (e->mask & (0x00000100/*IN_CREATE*/|0x00000004/*IN_ATTRIB*/)) openJoystickDevice(joyPath);
-            else if (e->mask & 0x00000200/*IN_DELETE*/) {
-                for (int jid=0;jid<=JOYSTICK_LAST;++jid) { if(sEqual(WinSys.joysticks[jid].linjs.path,joyPath)){closeJoystick(WinSys.joysticks + jid); break;} }
-            }
-        }
-    }
-
-    i32 InitJoysticks() {
-        const char* dirname = "/dev/input";
-        {register long rax __asm__("rax") = 294/*__NR_inotify_init1*/; register u32 rdi __asm__("rdi") = 0x800/*IN_NONBLOCK*/|0x80000/*IN_CLOEXEC*/;
-        __asm__ __volatile__("syscall" : "+r"(rax) : "r"(rdi) : "rcx", "r11", "memory");
-        WinSys.linjs.inotify = (int)rax; }
-        if (WinSys.linjs.inotify >= 0) {
-            register long rax __asm__("rax") = 295/*__NR_inotify_add_watch*/; register int rdi __asm__("rdi") = WinSys.linjs.inotify; register const char* rsi __asm__("rsi") = dirname;
-            register u32 rdx __asm__("rdx") = 0x00000100/*IN_CREATE*/|0x00000004/*IN_ATTRIB*/|0x00000200/*IN_DELETE*/;
-            __asm__ __volatile__("syscall":"+r"(rax):"r"(rdi),"r"(rsi),"r"(rdx):"rcx","r11","memory");
-            WinSys.linjs.watch = (int)rax;
-        }
-        iterateInputDevices(openJoystickCallback);
-        return 1;
-    }
-
-    i32 PollJoystick(WinSysjoystick* js) {
-        if (js->linjs.fd <= 0) return 0;
-        for (;;) {
-            struct input_event e; long n = OS_Read(js->linjs.fd,&e,sizeof(e));
-            if (n < 0) { closeJoystick(js); break; } if (n == 0) { break; } if (n < (long)sizeof(e)) { closeJoystick(js); break; }
-            if (e.type == 0x00/*EV_SYN*/) { if(e.code == 3/*SYN_DROPPED*/){WinSys.linjs.dropped=1;}else if(e.code == 0/*SYN_REPORT*/){WinSys.linjs.dropped=0; pollAbsState(js);} }
-            if (WinSys.linjs.dropped) continue;
-                 if (e.type == 0x01/*EV_KEY*/) handleKeyEvent(js,e.code,e.value);
-            else if (e.type == 0x03/*EV_ABS*/) handleAbsEvent(js,e.code,e.value);
-        }
-        return js->connected;
-    }
-    
-    void PollEvents() { if (WinSys.joysInited) {DetectJoyCnx();} WinSys.x11.xlib.Pending(WinSys.x11.display); while (((_XPrivDisplay)(WinSys.x11.display))->qlen) { XEvent e; XNextEvent(WinSys.x11.display,&e); processEvent(&e); } WinSyswindow* win = WinSys.x11.disabledCursorWindow; if(win){ int w,h; GetWindowSize(win,&w,&h); if(win->x11.lastCurX!=w/2 || win->x11.lastCurY!=h/2){SetCurV(win,w/2,h/2);} } }
+    void PollEvents() { WinSys.x11.xlib.Pending(WinSys.x11.display); while (((_XPrivDisplay)(WinSys.x11.display))->qlen) { XEvent e; XNextEvent(WinSys.x11.display,&e); processEvent(&e); } WinSyswindow* win = WinSys.x11.disabledCursorWindow; if(win){ int w,h; GetWindowSize(win,&w,&h); if(win->x11.lastCurX!=w/2 || win->x11.lastCurY!=h/2){SetCurV(win,w/2,h/2);} } }
     static int getGLXFBConfigAttrib(GLXFBConfig fbconfig, int attrib) { int value; WinSys.glx.GetFBConfigAttrib(WinSys.x11.display, fbconfig, attrib, &value); return value; }
     static void makeContextCurrentGLX(WinSyswindow* win) { WinSys.glx.MakeCurrent(WinSys.x11.display,win->context.glx.window,win->context.glx.handle); }
     static void swapBuffersGLX(WinSyswindow* win) { WinSys.glx.SwapBuffers(WinSys.x11.display, win->context.glx.window); }
@@ -738,11 +582,6 @@ int WindowInit() {
     mset(&WinSys,0,sizeof(WinSys));
     #if defined(_WIN32)
         GetModuleHandleExW(0x4|0x2,(const u16*)&WinSys,(HMODULE*)&WinSys.win32.instance);
-        const char* names[] = {"xinput1_4.dll","xinput1_3.dll","xinput9_1_0.dll","xinput1_2.dll","xinput1_1.dll",NULL};
-        for (int i=0;names[i];++i) {
-            WinSys.win32.xinput.instance = LoadLibraryA(names[i]);
-            if (WinSys.win32.xinput.instance) { WinSys.win32.xinput.GetCapabilities = (PFN_XInputGetCapabilities)PlatformGetModuleSymbol(WinSys.win32.xinput.instance, "XInputGetCapabilities"); WinSys.win32.xinput.GetState = (PFN_XInputGetState)PlatformGetModuleSymbol(WinSys.win32.xinput.instance, "XInputGetState"); break; }
-        }
         WinSys.win32.dwmapi.instance = LoadLibraryA("dwmapi.dll");
         if (WinSys.win32.dwmapi.instance) { WinSys.win32.dwmapi.IsCompositionEnabled = (PFN_DwmIsCompositionEnabled)PlatformGetModuleSymbol(WinSys.win32.dwmapi.instance, "DwmIsCompositionEnabled"); WinSys.win32.dwmapi.Flush = (PFN_DwmFlush)PlatformGetModuleSymbol(WinSys.win32.dwmapi.instance, "DwmFlush"); }
         WinSys.win32.ntdll.instance = LoadLibraryA("ntdll.dll");
@@ -751,7 +590,7 @@ int WindowInit() {
         MSG msg; WNDCLASSEXW wc={0}; wc.cbSize=sizeof(wc); // Start making of a helper window
         wc.style = 0x0020/*CS_OWNDC*/; wc.lpfnWndProc = (WNDPROC)helperWindowProc; wc.hInstance = WinSys.win32.instance; wc.lpszClassName = L"WinSys3 Helper";
         WinSys.win32.helperWindowClass = RegisterClassExW(&wc);
-        WinSys.win32.helperWindowHandle = CreateWindowExW(0x00000100/*WS_EX_WINDOWEDGE*/ | 0x00000200/*WS_EX_CLIENTEDGE*/,(u16*)MAKEINTATOM(WinSys.win32.helperWindowClass),L"WinSys message window",0x04000000/*WS_CLIPSIBLINGS*/|0x02000000/*WS_CLIPCHILDREN*/,0,0,1,1,NULL,NULL,WinSys.win32.instance,NULL);
+        WinSys.win32.helperWindowHandle = CreateWindowExW(0x00000100/*WS_EX_WINDOWEDGE*/ | 0x00000200/*WS_EX_CLIENTEDGE*/,(u16*)(u16*)((u64)((u16)(WinSys.win32.helperWindowClass))),L"WinSys message window",0x04000000/*WS_CLIPSIBLINGS*/|0x02000000/*WS_CLIPCHILDREN*/,0,0,1,1,NULL,NULL,WinSys.win32.instance,NULL);
         ShowWindow(WinSys.win32.helperWindowHandle,0);
         DEV_BROADCAST_DEVICEINTERFACE_W dbi={0}; dbi.dbcc_size = sizeof(dbi); dbi.dbcc_devicetype = 0x0005/*DBT_DEVTYP_DEVICEINTERFACE*/; dbi.dbcc_classguid = (GUID){0x4d1e55b2,0xf16f,0x11cf,{0x88,0xcb,0x00,0x11,0x11,0x00,0x00,0x30}};
         WinSys.win32.deviceNotificationHandle = RegisterDeviceNotificationW(WinSys.win32.helperWindowHandle,(DEV_BROADCAST_HDR*)&dbi,0);
@@ -769,8 +608,7 @@ int WindowInit() {
         XNextEvent = (PFN_XNextEvent)PlatformGetModuleSymbol(WinSys.x11.xlib.handle,"XNextEvent");
         WinSys.x11.screen = ((_XPrivDisplay)(WinSys.x11.display))->default_screen;
         WinSys.x11.root = (&((_XPrivDisplay)(WinSys.x11.display))->screens[WinSys.x11.screen])->root;
-        static XContext lastContext = 0;
-        WinSys.x11.context = ++lastContext;
+        WinSys.x11.context = 1;
         WinSys.x11.randr.handle = WinSysPlatformLoadModule("libXrandr.so.2");
         #define X(n) WinSys.x11.randr.n = (PFN_XRR##n)PlatformGetModuleSymbol(WinSys.x11.randr.handle,"XRR"#n);
             X(FreeCrtcInfo) X(FreeOutputInfo) X(FreeScreenResources) X(GetCrtcInfo) X(GetOutputInfo) X(GetOutputPrimary) X(GetScreenResourcesCurrent) X(SelectInput) X(UpdateConfiguration)
@@ -913,31 +751,3 @@ void CycleToNextMonitor() {
 }
 
 void SetVSync() { ((WinSyswindow*)window)->context.swapInterval((i32)Sys_Settings.Vsync); }
-void JoystickConnection(WinSysjoystick* js, int e) { js->connected=(e == 0x00040001/*connected*/) ? 1 : (e == 0x00040002/*disconnected*/) ? 0 : js->connected; int jid=(int)(js - WinSys.joysticks); if(jid > JOYSTICK_LAST){return;} Sys_Input.joystickPresent[jid]=(e == 0x00040001/*connected*/); if(!Sys_Input.joystickPresent[jid]){mset(Sys_Input.joystickButtons,0,sizeof(Sys_Input.joystickButtons)); mset(Sys_Input.joystickHats,0,sizeof(Sys_Input.joystickHats));} /*Clear*/ }
-void InputJoystickAxis(WinSysjoystick* js,int axis, float value) { js->axes[axis] = value; }
-void InputJoystickButton(WinSysjoystick* js,int button, char value) { js->buttons[button] = value; }
-void InputJoystickHat(WinSysjoystick* js, int hat, char value) { int base=js->buttonCount + hat * 4; js->buttons[base+0]=(value & 0x01) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+1]=(value & 0x02) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+2]=(value & 0x04) ? INPUT_PRESS : INPUT_RELEASE; js->buttons[base+3]=(value & 0x08) ? INPUT_PRESS : INPUT_RELEASE; js->hats[hat]=value; }
-WinSysjoystick* WinSysAllocJoystick(const char* name,const char* guid,int axisCount,int buttonCount,int hatCount) {
-    int jid; WinSysjoystick* js;
-    for (jid = 0; jid <= JOYSTICK_LAST; jid++) { if (!WinSys.joysticks[jid].allocated) break; }
-    if (jid > JOYSTICK_LAST) return NULL;
-    js = WinSys.joysticks + jid;
-    js->allocated = 1; js->axisCount = axisCount; js->buttonCount = buttonCount; js->hatCount = hatCount;
-    js->axesSize = axisCount*sizeof(float); js->axes = OS_Calloc(axisCount,sizeof(float)); js->buttonsSize = (buttonCount + (size_t)hatCount * 4);
-    js->buttons = OS_Calloc(buttonCount + (size_t)hatCount * 4,1); js->hatsSize = hatCount; js->hats = OS_Calloc(hatCount,1);
-    scpy_to_a_from_b(js->name,name,sizeof(js->name)); scpy_to_a_from_b(js->guid,guid,sizeof(js->guid));
-    return js;
-}
-
-bool JoystickPresent(int jid) { if (jid < 0 || jid > JOYSTICK_LAST || (!WinSys.joysInited && !InitJoysticks())) {return false;} WinSys.joysInited = 1; WinSysjoystick* js = WinSys.joysticks + jid; return js->connected ? PollJoystick(js) : false; }
-void FreeJoystick(WinSysjoystick* js) { OS_Free(js->axes,js->axesSize); OS_Free(js->buttons,js->buttonsSize); OS_Free(js->hats,js->hatsSize); mset(js,0,sizeof(WinSysjoystick)); }
-void JoysticksPoll() {
-    for (int jid = JOYSTICK_1; jid <= JOYSTICK_LAST; ++jid) { // Input Poll
-        if (!JoystickPresent(jid)) continue;
-        WinSysjoystick* js = WinSys.joysticks + jid; if (!js->connected) continue;
-        PollJoystick(js); int totalButtons = js->buttonCount + js->hatCount * 4;
-        for (int i = 0; i < totalButtons && i < 16; ++i) { KeyState* k = &Sys_Input.joystickButtons[jid - JOYSTICK_1][i]; bool down = js->buttons[i] == INPUT_PRESS; k->pressed = down && !k->down; k->released = !down && k->down; k->down = down; }
-        for (int i = 0; i < js->hatCount && i < 5; ++i) { Sys_Input.joystickHats[i].down = js->hats[i]; }
-//         for (int i = 0; i < js->axisCount && i < MAX_JOYSTICK_AXES; ++i) { Sys_Input.joystickAxes[jid - JOYSTICK_1][i] = js->axes[i]; } TODO??
-    }
-}
