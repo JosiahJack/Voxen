@@ -74,7 +74,7 @@ char* sUpToEndLine(char* buf, int sz, FHandle fd) {
 FHandle console_log_file=0;
 static void DualLogMain(const char *prefix, const char *fmt, va_list args) {
     char buf[4096]; va_list c; __builtin_va_copy(c,args); sFormatV(buf,sizeof(buf),fmt,c); __builtin_va_end(c); bool color = (prefix && prefix[0] == '\033');
-    #ifdef WINDOWS
+    #if defined(_WIN32)
         FHandle out = GetStdHandle(color ? (u32)-12 : (u32)-11);
     #else
         FHandle out = color ? 2 : 1;

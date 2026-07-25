@@ -5,7 +5,7 @@ typedef void (*WinSysproc)(void); typedef struct WinSysfbconfig WinSysfbconfig; 
 struct WinSysfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; i32 samples,stereo,sRGB,doublebuffer; uintptr_t handle; }; extern WinSyslibrary WinSys;
 WinSysproc PlatformGetModuleSymbol(void* module, const char* name); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(); void InputWindowFocus(i32); void InputKey(char*,int,int); void InputMouseClick(char*,int,int); void InputCursorPos(double*,double*,double,double); void JoystickConnection(WinSysjoystick*,int); void InputJoystickAxis(WinSysjoystick*,int,float);
 void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSysjoystick*,int,char); void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(const WinSysfbconfig* alternatives, u32); WinSysmonitor* AllocMonitor(const char*,int,int); WinSysjoystick* WinSysAllocJoystick(const char*,const char*,int,int,int); void FreeJoystick(WinSysjoystick*);
-#if defined(WINDOWS)
+#if defined(_WIN32)
     #define MAKEWORD(a,b) ((u16) (((u8) (((u64) (a)) & 0xff)) | ((u16) ((u8) (((u64) (b)) & 0xff))) << 8))
     #define MAKELONG(a, b) ((i32) (((u16) (((u64) (a)) & 0xffff)) | ((u32) ((u16) (((u64) (b)) & 0xffff))) << 16))
     #define LOWORD(l) ((u16)(((u64) (l)) & 0xffff))
@@ -24,8 +24,8 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
     typedef struct tagMONITORINFO { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; } MONITORINFO,*LPMONITORINFO;             typedef struct tagMONITORINFOEXW { u32 cbSize; RECT rcMonitor; RECT rcWork; u32 dwFlags; u16 szDevice[32]; } MONITORINFOEXW;
     typedef struct tagWINDOWPLACEMENT { u32 length; u32 flags; u32 showCmd; POINT ptMinPosition; POINT ptMaxPosition; RECT rcNormalPosition; } WINDOWPLACEMENT;
     typedef struct tagWNDCLASSEXW { u32 cbSize,style; WNDPROC lpfnWndProc; i32 cbClsExtra,cbWndExtra; HINSTANCE hInstance; HICON hIcon,hCursor; HBRUSH hbrBackground; u16 *lpszMenuName,*lpszClassName; HICON hIconSm; } WNDCLASSEXW;
-    typedef struct {u16 wButtons; u8 bLeftTrigger,bRightTrigger; i16 sThumbLX,sThumbLY,sThumbRX,sThumbRY; } XINPUT_GAMEPAD; typedef struct {u16 wLeftMotorSpeed, wRightMotorSpeed;} XINPUT_VIBRATION;
-    typedef struct {u8 Type,SubType; u16 Flags; XINPUT_GAMEPAD Gamepad; XINPUT_VIBRATION Vibration;} XINPUT_CAPABILITIES;   typedef struct {u32 dwPacketNumber; XINPUT_GAMEPAD Gamepad;} XINPUT_STATE;
+    typedef struct {u16 wButtons; u8 bLeftTrigger,bRightTrigger; i16 sThumbLX,sThumbLY,sThumbRX,sThumbRY; } XINPUT_GAMEPAD; /*typedef struct {u16 wLeftMotorSpeed, wRightMotorSpeed;} XINPUT_VIBRATION;*/
+    typedef struct {u8 Type,SubType; u16 Flags; XINPUT_GAMEPAD Gamepad; u32* Vibration/*XINPUT_VIBRATION Vibration*/;} XINPUT_CAPABILITIES;   typedef struct {u32 dwPacketNumber; XINPUT_GAMEPAD Gamepad;} XINPUT_STATE;
     typedef u32 (WINAPI * PFN_XInputGetCapabilities)(u32,u32,XINPUT_CAPABILITIES*);                                         typedef u32 (WINAPI * PFN_XInputGetState)(u32,XINPUT_STATE*);
     typedef struct { u32 dbch_size,dbch_devicetype,dbch_reserved; } DEV_BROADCAST_HDR;                                      typedef struct { u32 dbcc_size,dbcc_devicetype,dbcc_reserved; GUID dbcc_classguid; u16 dbcc_name[1]; } DEV_BROADCAST_DEVICEINTERFACE_W;
     typedef i32 (WINAPI * PFN_DwmIsCompositionEnabled)(i32*);            typedef i32 (WINAPI * PFN_DwmFlush)();                  typedef i32 (WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,u32,u64); typedef i32 (WINAPI * PFN_SWE)(int);
@@ -623,7 +623,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
     static char joyConbuffer[16384],joyPath[260];
     void DetectJoyCnx() {
         if (WinSys.linjs.inotify <= 0) return;
-        i32 size = OS_Read(WinSys.linjs.inotify,joyConbuffer,sizeof(joyConbuffer)); if (size <= 0) return;
+        long size = OS_Read(WinSys.linjs.inotify,joyConbuffer,sizeof(joyConbuffer)); if (size <= 0) return;
         i32 offset = 0;
         while (size >= offset + (i32)sizeof(struct inotify_event)) {
             const struct inotify_event* e = (struct inotify_event*)(joyConbuffer + offset);
@@ -632,9 +632,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
             sFormat(joyPath,sizeof(joyPath), "/dev/input/%s", e->name);
             if (e->mask & (0x00000100/*IN_CREATE*/|0x00000004/*IN_ATTRIB*/)) openJoystickDevice(joyPath);
             else if (e->mask & 0x00000200/*IN_DELETE*/) {
-                for (int jid = 0; jid <= JOYSTICK_LAST; jid++) {
-                    if (sEqual(WinSys.joysticks[jid].linjs.path,joyPath)) { closeJoystick(WinSys.joysticks + jid); break; }
-                }
+                for (int jid=0;jid<=JOYSTICK_LAST;++jid) { if(sEqual(WinSys.joysticks[jid].linjs.path,joyPath)){closeJoystick(WinSys.joysticks + jid); break;} }
             }
         }
     }
@@ -738,7 +736,7 @@ void InputJoystickButton(WinSysjoystick*,int,char); void InputJoystickHat(WinSys
 WinSyslibrary WinSys={0};
 int WindowInit() {
     mset(&WinSys,0,sizeof(WinSys));
-    #if defined(WINDOWS)
+    #if defined(_WIN32)
         GetModuleHandleExW(0x4|0x2,(const u16*)&WinSys,(HMODULE*)&WinSys.win32.instance);
         const char* names[] = {"xinput1_4.dll","xinput1_3.dll","xinput9_1_0.dll","xinput1_2.dll","xinput1_1.dll",NULL};
         for (int i=0;names[i];++i) {

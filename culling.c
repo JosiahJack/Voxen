@@ -22,7 +22,7 @@ static u8* LoadCullPNG(const char* name, int level) {
     FHandle fp=OS_OpenReadonly(path);
     OS_Seek(fp,0,2); size_t size = OS_Tell(fp); if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n",path); OS_Exit(1); }
     u8* cullingFileBuffer=OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8));
-    OS_Seek(fp,0,0); size_t read_size = OS_Read(fp,cullingFileBuffer,size); OS_Close(fp); if (read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); }
+    OS_Seek(fp,0,0); long read_size = OS_Read(fp,cullingFileBuffer,size); OS_Close(fp); if ((size_t)read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); }
     i32 w,h; u8* pixels=PngLoad(cullingFileBuffer,size,&w,&h,&png_arena_main); if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); }
     OS_Free(cullingFileBuffer,MAX_CULL_FILESIZE * sizeof(u8));
     return pixels;

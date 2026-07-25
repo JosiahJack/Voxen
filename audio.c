@@ -3,7 +3,7 @@
 #include "lib.h"
 #include "tables_audio.h"
 enum{AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS)};
-#ifdef WINDOWS
+#if defined(_WIN32)
     #define FAILED(hr)    ((i32)(hr) <  0)
     #define PCM_NONBLOCK (1<<1)
     #define PCM_FORMAT_S16_LE 2
@@ -472,7 +472,7 @@ static u16 WavU16LE(const u8 *d) { return (u16)(d[0]|(d[1]<<8)); }
 static u32 WavU32LE(const u8 *d) { return (u32)(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24)); }
 static bool WavInit(WaveFile *w, const char *path) {
     u8 buf[36]; mset(w,0,sizeof(*w)); w->fp = OS_OpenReadonly(path); if (w->fp == INVALID_FHANDLE) return false;
-    if (OS_Read(w->fp, buf, 12) != 12) goto fail;
+    if (OS_Read(w->fp,buf,12) != 12) goto fail;
     if (mcmp(buf,"RIFF",4) != 0) goto fail;
     if (mcmp(buf+8,"WAVE",4) != 0) goto fail;
     bool got_fmt=false,got_data=false;
@@ -513,7 +513,7 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
     while (framesToRead > 0) {
         u64 batchFrames=framesToRead; u64 batchBytes=batchFrames * bpf;
         if (batchBytes > sizeof(tmp)) { batchFrames = sizeof(tmp) / bpf; batchBytes  = batchFrames * bpf; }
-        size_t got=OS_Read(w->fp,tmp,(size_t)batchBytes);
+        long got=OS_Read(w->fp,tmp,(size_t)batchBytes);
         u64 gotFrames=got / bpf; u64 samples=gotFrames * w->channels;
         if (bps == 8) { for (u64 i = 0; i < samples; i++) {*out++ = (tmp[i] / 255.0f) * 2.0f - 1.0f;} }
         else { for (u64 i = 0; i < samples; i++) {i16 s; mcpy(&s,tmp + i*2,2); *out++ = s * (1.0f / 32768.0f);} } // 16bit LE
@@ -626,7 +626,7 @@ void MP3Resume() { mp3_paused = false; }
 float GetMP3RemainingTime() { mp3_channel_t *m = &mp3_ch[mp3_slot]; return (!m->open || m->frames_decoded >= m->total_frames) ? 0.0f : (!m->total_frames ? 1.0f : (float)(m->total_frames - m->frames_decoded) / (m->src_rate ? m->src_rate : AUDIO_RATE)); }
 static FHandle pcm_fds[8]; static i32 pcm_fd_count = 0;
 pthread_t audThreadID; void* AudThread(void* arg); 
-#ifdef WINDOWS
+#if defined(_WIN32)
     void AudioUpdate() {
         if (pcm_fd_count==0) {return;} 
         i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; pcm_sync_t sync; if (pcm_sync(pcm_fds[0],&sync) < 0) {return;}

@@ -3,8 +3,11 @@
 #define GAME_TITLE "Citadel"
 #define WIN_ICON "./Textures/UI/menudot1.png"
 #define INLINE static inline __attribute__((always_inline))
-typedef __INT8_TYPE__   i8; typedef  __UINT8_TYPE__  u8; /*8bit types*/    typedef __INT16_TYPE__ i16; typedef __UINT16_TYPE__ u16; typedef u16 half;/*16bit types*/    typedef __INT32_TYPE__ i32; typedef __UINT32_TYPE__ u32; /*32bit types*/
-typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ size_t;/*64bit types*/    typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
+typedef __INT8_TYPE__   i8; typedef  __UINT8_TYPE__  u8;                               /*8bit types*/
+typedef __INT16_TYPE__ i16; typedef __UINT16_TYPE__ u16; typedef u16 half;            /*16bit types*/
+typedef __INT32_TYPE__ i32; typedef __UINT32_TYPE__ u32;                              /*32bit types*/
+typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ size_t;/*64bit types*/
+typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define bool u8
 #define true 1
 #define false 0
@@ -13,21 +16,21 @@ typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ s
 #define NULL ((void *)0)
 #define assert(cond) do { if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; } } while(0) // Force a crash for debug
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
-#ifdef WINDOWS
+#if defined(_WIN32)
+    #define DLL_IMP __declspec (dllimport)
+    #define WINAPI __stdcall
     #define INVALID_FHANDLE ((void*) (i64)-1)
     typedef void* FHandle; typedef struct { void* handle; } OS_Thread;
     struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; }; typedef uintptr_t pthread_t; typedef intptr_t pthread_mutex_t,pthread_cond_t; typedef int pthread_condattr_t; typedef u32 pthread_mutexattr_t;
-    typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t;
-    int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**);
+    typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t; typedef struct { unsigned long Data1; u16 Data2,Data3; u8 Data4[8]; } GUID;
+    int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**); DLL_IMP void* WINAPI GetStdHandle(u32);
 #else
     #define INVALID_FHANDLE -1
     typedef int FHandle; typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
     typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
     struct timespec {i64 tv_sec,tv_nsec;}; typedef u64 pthread_t; typedef u32 pthread_mutexattr_t; typedef struct {u8 _[40];} pthread_mutex_t; typedef struct {u8 _[48];} pthread_cond_t; typedef int pthread_condattr_t;
     typedef struct {u32 flags; void* stack;} pthread_attr_t;
-    int pthread_create(pthread_t* restrict,const pthread_attr_t* restrict,void*(*start_routine)(void*),void* restrict); int pthread_join(pthread_t,void**);
-    void *dlopen(const char*,int); void *dlsym(void*,const char *);
-    long OS_Open(const char* path, i32 flags, i32 mode);
+    int pthread_create(pthread_t* restrict,const pthread_attr_t* restrict,void*(*start_routine)(void*),void* restrict); int pthread_join(pthread_t,void**); void *dlopen(const char*,int); void *dlsym(void*,const char*); long OS_Open(const char*,i32,i32);
 #endif
 typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color;    typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion;    typedef u8 ColliderType; typedef u16 Text;
 static const Quaternion QUAT_IDENTITY=(Quaternion){0.0f,0.0f,0.0f,1.0f};
@@ -234,7 +237,7 @@ extern i8 currentMenuItem;
 typedef struct { int width,height; u8* pixels; } WinSysIcon;
 FHandle OS_OpenReadonly(const char*),OS_OpenWriteonly(const char*);
 void *OS_AllocateRAM(size_t,i32,i32,FHandle),*OS_AllocateFileBackedRAMReadonly(size_t,FHandle,char*),*OS_Realloc(void*,size_t,size_t),OS_Close(FHandle),OS_Write(FHandle,const void*,size_t,const char*),OS_ThreadJoin(OS_Thread* t),OS_USleep(u32 usec);
-i64 OS_Read(long,void*,size_t),OS_RawWrite(FHandle fd, const void* buf, size_t cnt),OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/),OS_Tell(FHandle);
+long OS_Read(FHandle,void*,size_t),OS_RawWrite(FHandle fd, const void* buf, size_t cnt),OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/),OS_Tell(FHandle);
 i32 OS_FileSize(FHandle f);
 __attribute__((noreturn)) void OS_Exit(i64); void DualLogError(const char*, ...),DualLogWarn(const char*, ...),DualLog(const char*, ...);
 void play_wav(const char*,float,V3,bool),play_message(const char *);
