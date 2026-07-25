@@ -1,5 +1,5 @@
-// citadel.c - Gamelogic.  Most functionality is trivial so put it here.
-// TODO: Add camera view entities for other levels than just medical, Particle system, Voxel GI?, Directional lights for cyberspace, Directional light for sunlight, Directional light shadowmapping just for sunlight, TARGET ID: Type-LevelNum(0#)EnemyNum(###),Example: Mutant-06003, EXCEPTIONS: Cyborg-00001 is Edward Diego
+// citadel.c - Game logic.
+// TODO: Voxel GI?, Directional lights for cyberspace, Directional light for sunlight, Directional light shadowmapping just for sunlight
 #include "common.h"
 #include "lib.h"
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns

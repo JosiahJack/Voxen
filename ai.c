@@ -101,6 +101,7 @@ void InitializeAIAfterLoad(u16 i) {
     World.instances[i].idealTransformForward = World.instances[i].forward;
     #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
     //scpy_to_a_from_b(World.instances[i].targetID,npcTable[npcID].name,TARGET_ID_LENGTH);
+    //TODO TARGET ID: Type-LevelNum(0#)EnemyNum(###),Example: Mutant-06003, EXCEPTIONS: Cyborg-00001 is Edward Diego
     //sFormat(World.instances[i].targetID,TARGET_ID_LENGTH * sizeof(char),"%s %05u",npcTable[npcID].name,npcCountInWorldPerType[npcID]++); // TODO
     u8 c;
     switch (World.instances[i].currentState) {
