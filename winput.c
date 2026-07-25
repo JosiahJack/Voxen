@@ -5,7 +5,7 @@ typedef struct WinSyswindow WinSyswindow;
 WinSyswindow* window;
 typedef struct { int width,height,redBits,greenBits,blueBits,refreshRate; } vidmode;
 typedef void (*WinSysproc)(void); typedef struct WinSyscontext WinSyscontext; typedef struct WinSyswindow WinSyswindow; typedef struct WinSyslibrary WinSyslibrary; typedef struct WinSysmonitor WinSysmonitor;
-typedef struct WinSysfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits,accumRedBits,accumGreenBits,accumBlueBits,accumAlphaBits; i32 samples,stereo,sRGB,doublebuffer; uintptr_t handle; } WinSysfbconfig;
+typedef struct WinSysfbconfig { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits; uintptr_t handle; } WinSysfbconfig;
 extern WinSyslibrary WinSys;
 WinSysproc PlatformGetModuleSymbol(void* module, const char* name); void UpdateScreenSize(i32 width, i32 height); void SaveConfig(); void InputWindowFocus(i32); void InputKey(char*,int,int); void InputMouseClick(char*,int,int); void InputCursorPos(double*,double*,double,double);
 void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(const WinSysfbconfig* alternatives, u32); WinSysmonitor* AllocMonitor(const char*,int,int);
@@ -20,7 +20,6 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
     typedef i64 (__stdcall *WNDPROC)(void*,u32,u64,i64); typedef i32 (__stdcall *MONITORENUMPROC)(void*,void*,RECT*,i64); typedef struct _ICONINFO { i32 fIcon; u32 xHotspot,yHotspot; void *hbmMask,*hbmColor; } ICONINFO;
     typedef struct { u8 a[8]; u32 message; u8 b[4]; u64 wParam; i64 lParam; u32 time; u8 c[12]; } MSG,*PMSG,*NPMSG,*LPMSG; typedef struct { u32 cbSize; u8 a[16]; RECT rcWork; u8 b[4]; } MONITORINFO,*LPMONITORINFO; typedef struct { u32 cbSize; u8 a[36]; u16 szDevice[32]; } MONITORINFOEXW;
     typedef struct { u32 length; u8 a[4]; u32 showCmd; u8 b[16]; RECT rcNormalPosition; } WINDOWPLACEMENT; typedef struct { u32 cbSize,style; WNDPROC lpfnWndProc; i32 a,b; HINSTANCE hInstance; void *c,*d,*e; u16 *f,*n; void *g; } WNDCLASSEXW;
-    typedef struct { u32 dbch_size,dbch_devicetype,dbch_reserved; } DEV_BROADCAST_HDR; typedef struct { u32 dbcc_size,dbcc_devicetype,dbcc_reserved; GUID dbcc_classguid; u16 dbcc_name[1]; } DEV_BROADCAST_DEVICEINTERFACE_W;
     typedef i32 (WINAPI * PFN_DwmIsCompositionEnabled)(i32*); typedef i32 (WINAPI * PFN_DwmFlush)(); typedef i32 (WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,u32,u64); typedef i32 (WINAPI * PFN_SWE)(int);
     typedef i32 (WINAPI * PFN_GPFAIVA)(void*,int,int,u32,const int*,int*); typedef void* (WINAPI * FP_CCAA)(void*,void*,const int*); typedef void* (WINAPI * PFN_CC)(void*); typedef PROC (WINAPI * PFN_wglGetProcAddress)(const char*);
     typedef void* (WINAPI * PFN_wglGetCurrentDC)(); typedef void* (WINAPI * PFN_wglGetCurrentContext)(); typedef i32 (WINAPI * PFN_wglMakeCurrent)(void*,void*); typedef struct WGLContext { void* dc; void* handle; int interval; } WGLContext;
@@ -28,10 +27,8 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
     typedef struct WinSyslibraryWGL { HINSTANCE instance; } WinSyslibraryWGL; typedef struct WinSyswindowWin32 { void* handle; i32 frameAction; int width,height,lastCurX,lastCurY; } WinSyswindowWin32;
     typedef struct WinSyslibraryWin32 { HINSTANCE instance; void* helperWindowHandle; u16 helperWindowClass,mainWindowClass; short int keycodes[512],scancodes[349]; double restoreCurPosX,restoreCurPosY; WinSyswindow *disabledCursorWindow, *capturedCursorWindow; struct {HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush;} dwmapi; struct {HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo;} ntdll;} WinSyslibraryWin32;
     typedef struct WinSysmonitorWin32 { void* handle; u16 adapterName[32],displayName[32]; } WinSysmonitorWin32; typedef struct _DISPLAY_DEVICEW { u32 cb; u16 DeviceName[32],DeviceString[128]; u32 StateFlags; u8 _p[256]; } DISPLAY_DEVICEW,*PDISPLAY_DEVICEW,*LPDISPLAY_DEVICEW;
-    typedef struct { u16 nSize,nVersion; u32 dwFlags; u8 _p[32]; } PIXELFORMATDESCRIPTOR,*PPIXELFORMATDESCRIPTOR,*LPPIXELFORMATDESCRIPTOR;
-    typedef struct { u32 bV5Size; i32 bV5Width,bV5Height; u16 bV5Planes,bV5BitCount; u32 bV5Compression; u8 _p[20]; u32 bV5RedMask,bV5GreenMask,bV5BlueMask,bV5AlphaMask; u8 _p2[68]; } BITMAPV5HEADER,*LPBITMAPV5HEADER,*PBITMAPV5HEADER;
-    typedef struct { u8 rgbBlue,rgbGreen,rgbRed,rgbReserved; } RGBQUAD;
-    typedef struct { u32 biSize; i32 biWidth,biHeight; u16 biPlanes,biBitCount; u32 biCompression; u32 biSizeImage; i32 biXPelsPerMeter; i32 biYPelsPerMeter; u32 biClrUsed; u32 biClrImportant; } BITMAPINFOHEADER; typedef struct { BITMAPINFOHEADER bmiHeader; RGBQUAD bmiColors[1]; } BITMAPINFO;
+    typedef struct { u16 nSize,nVersion; u32 dwFlags; u8 _p[32]; } PIXELFORMATDESCRIPTOR,*PPIXELFORMATDESCRIPTOR,*LPPIXELFORMATDESCRIPTOR; typedef struct { u8 rgbBlue,rgbGreen,rgbRed,rgbReserved; } RGBQUAD; typedef struct { u8 a[36]; RGBQUAD bmiColors[1]; } BITMAPINFO;
+    typedef struct { u32 bV5Size; i32 bV5Width,bV5Height; u16 bV5Planes,bV5BitCount; u32 bV5Compression; u8 _p[20]; u32 bV5RedMask,bV5GreenMask,bV5BlueMask,bV5AlphaMask; u8 _p2[52]; } BITMAPV5HEADER;
     DLL_IMP void* WINAPI CreateIconIndirect(ICONINFO*); DLL_IMP void* WINAPI GetDC(void*); DLL_IMP i32 WINAPI GetModuleHandleExW(u32,const u16*,HINSTANCE*); DLL_IMP int WINAPI ReleaseDC(void*,void*); DLL_IMP i32 WINAPI SetCursorPos(int,int); DLL_IMP int WINAPI WideCharToMultiByte(u32,u32,u16*,int,char*,int,const char*,i32*); DLL_IMP void* WINAPI SetCursor(void*); DLL_IMP i32 WINAPI GetCursorPos(POINT*);
     DLL_IMP int WINAPI MultiByteToWideChar(u32,u32,const char*,int,u16*,int); DLL_IMP i32 WINAPI ClipCursor(const RECT*); DLL_IMP i32 WINAPI ClientToScreen(void*,POINT*); DLL_IMP void* WINAPI CreateDCW(const u16*,const u16*,const u16*,const DEVMODEW*); DLL_IMP void* WINAPI GetPropW(void*,u16*); DLL_IMP i32 WINAPI GetMessageTime(); DLL_IMP i32 WINAPI GetClientRect(void*,RECT*);
     DLL_IMP void* WINAPI LoadCursorW(HINSTANCE,u16*); DLL_IMP u32 WINAPI MapVirtualKeyW(u32,u32); DLL_IMP i32 WINAPI SetWindowPos(void*,void*,int,int,int,int,u32); DLL_IMP void* WINAPI SetCapture(void* hWnd); DLL_IMP i32 WINAPI ReleaseCapture(); DLL_IMP i32 WINAPI PeekMessageW(LPMSG,void*,u32,u32,u32); DLL_IMP i32 WINAPI AdjustWindowRect(RECT*,u32,i32);DLL_IMP i32 WINAPI GetWindowLongW(void*,int);
@@ -43,8 +40,8 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
     DLL_IMP void* WINAPI CreateDIBSection(void*,const BITMAPINFO*,u32,void**,void*,u32); DLL_IMP i32 WINAPI GetDeviceCaps(void*,i32);
     u16* CreateWideStringFromUTF8Win32(const char* source); i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp); void WinSysPollMonitorsWin32();
     struct WinSyslibrary { WinSysmonitor** monitors; int monitorCount; WinSyslibraryWin32 win32; WinSyslibraryWGL wgl; };
-    struct WinSyscontext { int client,source,major,minor; void (*makeCurrent)(WinSyswindow*); void (*swapBuffers)(WinSyswindow*); void (*swapInterval)(int); WinSysglproc (*getProcAddress)(const char*); WGLContext wgl; };
-    struct WinSyswindow { i32 decorated,doublebuffer; vidmode videoMode; int cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; WinSyscontext context; WinSyswindowWin32 win32; };
+    struct WinSyscontext { void (*makeCurrent)(WinSyswindow*); void (*swapBuffers)(WinSyswindow*); void (*swapInterval)(int); WinSysglproc (*getProcAddress)(const char*); WGLContext wgl; };
+    struct WinSyswindow { i32 decorated; /*vidmode videoMode;*/ int cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; WinSyscontext context; WinSyswindowWin32 win32; };
     struct WinSysmonitor { char name[128]; int widthMM,heightMM; vidmode currentMode; WinSysmonitorWin32 win32; };
     static u32 getWindowStyle(const WinSyswindow* w) { return 0x060A0000 | (w->decorated ? 0x00C00000 : 0x80000000); } // clipping,sysmenu,minimize,title,border,and borderless raw
     static void* createIcon(const WinSysIcon* image,int xhot,int yhot,i32 icon) {
@@ -221,8 +218,7 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
     static WinSysglproc getProcAddressWGL(const char* procname) { const WinSysglproc proc = (WinSysglproc)wglGetProcAddress(procname); if (proc) {return proc;} return (WinSysglproc)PlatformGetModuleSymbol(WinSys.wgl.instance,procname); }
     void SetWindowPosition(WinSyswindow* handle, int x, int y) { WinSyswindow* win = (WinSyswindow*)handle; RECT rect = {x,y,x,y}; AdjustWindowRectEx(&rect,getWindowStyle(win),0,0x00040000/*WS_EX_APPWINDOW*/); SetWindowPos(win->win32.handle,NULL,rect.left,rect.top,0,0,0x0010|0x0200|0x0001|0x0004); }
     WinSyswindow* VCreateWindow(int width, int height) {
-        WinSyswindow* win = OS_Calloc(1,sizeof(WinSyswindow)); win->videoMode = (vidmode){width,height,8,8,8,-1}; win->decorated = win->doublebuffer = 1; win->cursorMode = 0x00034003/*disabled*/;
-        u32 style = getWindowStyle(win);
+        WinSyswindow* win = OS_Calloc(1,sizeof(WinSyswindow)); win->decorated = 1; win->cursorMode = 0x00034003/*disabled*/; u32 style = getWindowStyle(win);
         WNDCLASSEXW wc= (WNDCLASSEXW){sizeof(wc),0x23/*Redraws + Owns Device Context*/,windowProc,0,0,WinSys.win32.instance,NULL,NULL,NULL,NULL,L"Voxen",NULL};
         WinSys.win32.mainWindowClass=RegisterClassExW(&wc);
         RECT rect={0,0,width,height}; //AdjustWindowRectEx(&rect,style,0,0);
@@ -247,18 +243,18 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
 #else // LINUX
     typedef u8 KeyCode; typedef u16 Rotation,SubpixelOrder,Connection; typedef i32 Bool; typedef int Status; typedef u64 XID,Mask,Atom,VisualID,Time,KeySym; typedef char *XPointer; typedef u32 XcursorUInt;
     typedef struct _XcursorImage { u8 a[16]; XcursorUInt xhot,yhot; u8 b[8]; XcursorUInt *pixels; } XcursorImage; typedef struct { i64 flags; int x,y; u8 a[8]; int min_width,min_height,max_width,max_height; u8 b[32]; int win_gravity; } XSizeHints;
-    typedef struct _XExtData { u8 a[32]; } XExtData; typedef struct { u8 a[56]; } Visual; typedef struct { u8 a[16]; } Depth; typedef struct { u8 a[16]; XID root; u8 b[40]; Visual *root_visual; u8 c[56]; } Screen; typedef struct { u8 a[24]; } ScreenFormat;
+    typedef struct { u8 a[56]; } Visual; typedef struct { u8 a[16]; XID root; u8 b[40]; Visual *root_visual; u8 c[56]; } Screen;
     typedef struct { u8 a[72]; i64 event_mask; u8 b[16]; XID colormap; u8 c[8]; } XSetWindowAttributes; typedef struct { u8 a[8]; int width,height; u8 b[84]; int map_state; u8 c[40]; } XWindowAttributes; typedef struct _XDisplay Display;
     typedef struct { u8 a[136]; int qlen; u8 b[84]; i32 default_screen, nscreens; Screen *screens; u8 c[56]; } *_XPrivDisplay; typedef struct { int a; u64 b; int c; void *d; u64 e,f,g,h; int i,j,k,l; u32 m,keycode; int n; } XKeyEvent; // Don't care the names of the unused fields here, so just stuff alphabet in there
     typedef struct { int a; u64 b; int c; Display *d; XID e,f,g; Time h; int i,j,k,l; u32 m,button; int n; } XButtonEvent; typedef struct { int a; u64 b; int c; Display *d; XID e,f,g; Time h; int x,y,i,j; u32 k; char l; int m; } XMotionEvent;
-    typedef struct { int a; u64 b; int c; Display *d; XID e,f,g; Time h; int x,y,i,j,k,l; int m,n; u32 o; } XCrossingEvent; typedef struct { int a; u64 b; i32 c; Display *d; XID e; int mode,f; } XFocusChangeEvent;
+    typedef struct { int a; u64 b; int c; Display *d; XID e,f,g; Time h; int x,y; u8 i[32]; } XCrossingEvent; typedef struct { int a; u64 b; i32 c; Display *d; XID e; int mode,f; } XFocusChangeEvent;
     typedef struct { int a; u64 b; i32 c; Display *d; XID e,f,parent; int g,h,i; } XReparentEvent; typedef struct { int a; u64 b; i32 c; Display *d; XID e,f; int x,y,width,height,g; XID h; int i; } XConfigureEvent;
     typedef struct { int a; u64 b; int c; Display *d; XID window; Atom message_type; int format; union { char b[20]; short s[10]; long l[5]; } data; } XClientMessageEvent; typedef struct { int a; u64 b; int send_event; Display *c; XID window; } XAnyEvent;
     typedef struct { int type; u64 serial; int send_event; Display *display; int extension, evtype; u32 cookie; void *data; } XGenericEventCookie;
     typedef union _XEvent { int type; XAnyEvent xany; XKeyEvent xkey; XButtonEvent xbutton; XMotionEvent xmotion; XCrossingEvent xcrossing; XFocusChangeEvent xfocus; u8 p0[528]; XReparentEvent xreparent; XConfigureEvent xcfg; u8 p1[648]; XClientMessageEvent xclient; u8 p2[224]; } XEvent;
     typedef struct _XIC *XIC; typedef struct { Visual *visual; u8 a[12]; int depth; u8 b[40]; } XVisualInfo; typedef int XContext; typedef XID RROutput,RRCrtc,RRMode; typedef u64 XRRModeFlags;
     typedef struct { RRMode id; u32 width,height; u64 dotClock; u8 b[8]; u32 hTotal; u8 c[12]; u32 vTotal; u8 d[28]; } XRRModeInfo; typedef struct { u8 a[32]; int noutput; u8 b[4]; RROutput *outputs; int nmode; u8 c[4]; XRRModeInfo *modes; } XRRScreenResources;
-    typedef struct { u8 a[8]; RRCrtc crtc; char *name; u8 b[8]; u64 mm_width,mm_height; Connection connection; u8 c[52]; } XRROutputInfo; typedef struct { u8 a[8]; i32 x,y; u32 width,height; RRMode mode; Rotation rotation; u8 b[28]; } XRRCrtcInfo;
+    typedef struct { u8 a[8]; RRCrtc crtc; char *name; u8 b[8]; u64 mm_width,mm_height; Connection connection; u8 c[52]; } XRROutputInfo; typedef struct { u8 a[8]; i32 x,y; u32 width,height; RRMode mode; Rotation rotation; u8 b[36]; } XRRCrtcInfo;
     typedef XID GLXWindow,GLXDrawable; typedef struct __GLXFBConfig* GLXFBConfig; typedef struct __GLXcontext* GLXContext;
     typedef void(*__GLXextproc)();                            typedef XSizeHints*(*PFN_XAllocSizeHints)();                       typedef int(*PFN_XChangeProperty)(Display*,XID,Atom,Atom,int,int,const u8*,int);   typedef void(*PFN_XCID)(XcursorImage*);                         typedef void(*PFN_XRRFreeOutputInfo)(XRROutputInfo*);                    typedef XID(*PFN_XCreateColormap)(Display*,XID,Visual*,int);
     typedef int(*PFN_XDefineCursor)(Display*,XID,XID);        typedef int(*PFN_XDeleteProperty)(Display*,XID,Atom);              typedef int(*PFN_XDisplayKeycodes)(Display*,int*,int*);                            typedef Bool(*PFN_XFilterEvent)(XEvent*,XID);                   typedef int(*PFN_XFindContext)(Display*,XID,XContext,XPointer*);         typedef XID(*PFN_XCreateWindow)(Display*,XID,int,int,u32,u32,u32,int,u32,Visual*,u64,XSetWindowAttributes*);
@@ -285,7 +281,7 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
     PFN_XNextEvent XNextEvent; typedef struct WinSysmonitorX11 { RROutput output; RRCrtc crtc; int index; } WinSysmonitorX11; typedef struct WinSyslibraryLinux { int inotify,watch; i32 dropped; } WinSyslibraryLinux;
     void GetCursorPosV(WinSyswindow*,double*,double*); void SetCurV(WinSyswindow*,double,double); struct WinSyslibrary { WinSysmonitor** monitors; int monitorCount; WinSyslibraryX11 x11; WinSyslibraryGLX glx; WinSyslibraryLinux linjs; };
     struct WinSyscontext { int client,source,major,minor; FGL_GIV GetIntegerv; void (*makeCurrent)(WinSyswindow*); void (*swapBuffers)(WinSyswindow*); void (*swapInterval)(int); WinSysglproc (*getProcAddress)(const char*); WinSyscontextGLX glx; };
-    struct WinSyswindow { i32 decorated,doublebuffer; vidmode videoMode; int minwidth,minheight,maxwidth,maxheight,cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; WinSyscontext context; WinSyswindowX11 x11; };
+    struct WinSyswindow { i32 decorated,cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; WinSyscontext context; WinSyswindowX11 x11; };
     struct WinSysmonitor { char name[128]; int widthMM,heightMM; vidmode currentMode; WinSysmonitorX11 x11; };
     void* WinSysPlatformLoadModule(const char* path) { return dlopen(path,2); }
     WinSysproc PlatformGetModuleSymbol(void* module, const char* name) { return dlsym(module,name); }
@@ -471,7 +467,7 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
     static WinSysglproc getProcAddressGLX(const char* procname) { return WinSys.glx.GetProcAddress((const u8*) procname); }
     void SetWindowPosition(WinSyswindow* handle, int xpos, int ypos) { WinSyswindow* win = (WinSyswindow*)handle; SetWindowPos(win,xpos,ypos); }
     WinSyswindow* VCreateWindow(int width, int height) {
-        WinSyswindow* win = OS_Calloc(1,sizeof(WinSyswindow)); win->videoMode = (vidmode){width,height,8,8,8,-1}; win->decorated = win->doublebuffer = 1; win->cursorMode = 0x00034003/*disabled*/;
+        WinSyswindow* win = OS_Calloc(1,sizeof(WinSyswindow)); win->decorated = 1; win->cursorMode = 0x00034003/*disabled*/;
         const char* names[] = {"libGLX.so.0","libGL.so.1","libGL.so",NULL};
         for (int i=0;names[i] && !WinSys.glx.handle;i++) WinSys.glx.handle = WinSysPlatformLoadModule(names[i]);
         WinSys.glx.GetFBConfigs = (GLX_GFBCP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXGetFBConfigs");
@@ -496,12 +492,10 @@ void InputMonitor(WinSysmonitor*,int,int); const WinSysfbconfig* ChooseFBConfig(
         for (int i = 0;  i < nativeCount;  i++) {
             const GLXFBConfig n = nativeConfigs[i];
             WinSysfbconfig* u = usableConfigs + usableCount;
-            if (!(getGLXFBConfigAttrib(n,0x8011/*render type*/) & 0x00000001/*rgba bit*/)) continue;
-            if (!(getGLXFBConfigAttrib(n,0x8010/*drawable type*/) & 0x00000001/*window bit*/)) continue;
-            if (getGLXFBConfigAttrib(n,5) !=  1) continue;
-            u->redBits = getGLXFBConfigAttrib(n,8); u->greenBits = getGLXFBConfigAttrib(n,9); u->blueBits = getGLXFBConfigAttrib(n,10); u->alphaBits = getGLXFBConfigAttrib(n,11); u->depthBits = getGLXFBConfigAttrib(n,12); u->stencilBits = getGLXFBConfigAttrib(n,13);
-            u->accumRedBits = getGLXFBConfigAttrib(n,14); u->accumGreenBits = getGLXFBConfigAttrib(n,15); u->accumBlueBits = getGLXFBConfigAttrib(n,16); u->accumAlphaBits = getGLXFBConfigAttrib(n,17);
-            if (getGLXFBConfigAttrib(n,6)) u->stereo =  1;
+            if(!(getGLXFBConfigAttrib(n,0x8011/*render type*/) & 0x00000001/*rgba bit*/)){continue;}
+            if(!(getGLXFBConfigAttrib(n,0x8010/*drawable type*/) & 0x00000001/*window bit*/)){continue;}
+            if(getGLXFBConfigAttrib(n,5) != 1){continue;}
+            //if(getGLXFBConfigAttrib(n,6)) u->stereo =  1;
             u->handle = (uintptr_t) n;
             usableCount++;
         }
@@ -638,8 +632,8 @@ void WinSysGetMonitorWorkarea(WinSysmonitor* handle, int* xpos, int* ypos, int* 
 const vidmode* WinSysGetVideoMode(WinSysmonitor* handle) { WinSysmonitor* monitor=(WinSysmonitor*)handle; GetVideoMode(monitor,&monitor->currentMode); return &monitor->currentMode; }
 void InputWindowFocus(i32 f) { window_has_focus = f != 0; ignore_next_mouse_delta = true; WinSyswindow* win = (WinSyswindow*)window; if (!f) { for (int k=0;k<=348;++k) { if (win->keys[k] == INPUT_PRESS) {InputKey(win->keys,k,INPUT_RELEASE);} } for (int b=0;b<=  7;++b) { if (win->mouseButtons[b] == INPUT_PRESS) {InputMouseClick(win->mouseButtons,b,INPUT_RELEASE);} } } }
 void VSetWindowIcon(WinSysIcon* images) { SetWindowIcon(images); }
-void VSetWindowSize(int w, int h) { WinSyswindow* win = (WinSyswindow*)window; win->videoMode.width=w; win->videoMode.height=h; SetWindowSize(win,w,h); }
-void WinSysSetWindowMonitor(int xpos, int ypos, int width, int height) { WinSyswindow* win = (WinSyswindow*)window; win->videoMode.width=width; win->videoMode.height=height; SetWindowMonitor(win,xpos,ypos,width,height); }
+void VSetWindowSize(int w, int h) { WinSyswindow* win = (WinSyswindow*)window; SetWindowSize(win,w,h); }
+void WinSysSetWindowMonitor(int xpos, int ypos, int width, int height) { WinSyswindow* win = (WinSyswindow*)window; SetWindowMonitor(win,xpos,ypos,width,height); }
 void CenterWindowOnMonitor() {
     int c; WinSysmonitor** monitors=WinSysGetMonitors(&c); if (Sys_Settings.CurrentMonitor > (c - 1)) { Sys_Settings.CurrentMonitor=0; SaveConfig(); } WinSysmonitor* next=monitors[Sys_Settings.CurrentMonitor]; int mx,my; WinSysGetMonitorPos(next,&mx,&my);
     const vidmode* mode=WinSysGetVideoMode(next); int xpos=mx + (mode->width - Sys_Settings.ScreenWidth)/2, ypos=my + (mode->height - Sys_Settings.ScreenHeight)/2; SetWindowPosition(window,xpos,ypos); ignore_next_mouse_delta=true;
