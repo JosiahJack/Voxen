@@ -669,6 +669,7 @@ static void ScreenDeath(u16 self) {
 }
 
 static void VaporizeCorpse(u16 self,bool energyVaporized) { Entity* e=&World.instances[self]; flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true); DropSearchables(self); e->modelIndex=MAX_MDLS; if (IdxIsNPC(e->index) || IdxIsSearchable(e->index)) DeleteInstance(self); CreateDeathEffects(self,energyVaporized ? 2 : ((e->deathBurst == 0) ? 1/*Corpse hit fallback*/ : e->deathBurst)); }
+static inline bool IsGrenade(u16 i) { return ((i >= 314 && i <= 320) || i == 370 || i == 372 || i == 387 || i == 389 || (i >= 402 && i <= 404)); }
 static void Death(u16 self,bool energyVaporized) {
     Entity* e = &World.instances[self];
     if (e->entflags & EF_DEAD_CHECKS_DONE) return;
@@ -677,8 +678,8 @@ static void Death(u16 self,bool energyVaporized) {
     bool isObj = IdxIsDynamicObject(e->index);
     if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->entflags |= EF_DEAD_CHECKS_DONE; return; }
 //     bool gib        = (e->entflags & EF_DEATH_BURST_DONE) != 0;
-    bool vaporize=(IdxIsNPC(e->index) && e->health <= 0.0f) || IdxIsCorpse(e->index); // vaporizeCorpse maps to VISIBLE being set
-    bool isGrenade=(e->entflags & EF_ISGRENADE) != 0, doTeleport=(e->entflags & EF_TELEPORT_ON_DEATH) != 0; // REQUIRE_RESET reused as teleportOnDeath
+    bool vaporize=(IdxIsNPC(e->index) && e->health <= 0.0f) || IdxIsCorpse(e->index);
+    bool isGrenade=IsGrenade(e->index), doTeleport=(e->entflags & EF_TELEPORT_ON_DEATH) != 0;
     if (e->iceActive) World.collider[self] = COLTYPE_NONE;
     if (vaporize && e->index != 477/*sec_camera*/ && !isGrenade) VaporizeCorpse(self,energyVaporized);
     else if (isObj) ObjectDeath(self);
@@ -692,48 +693,31 @@ static void Death(u16 self,bool energyVaporized) {
 float TakeDamage(u16 self,DamageData dd) {
     if (Cheats.god && self == PLAYER1) return 0.0f;
     bool isCyber = IsCyberEntity(self); float* hp = isCyber ? &World.instances[self].cyberHealth : &World.instances[self].health;
-    bool isNPC = IdxIsNPC(World.instances[self].index), isPlayer = (self == PLAYER1);
-//     bool isObj = IdxIsDynamicObject(World.instances[self].index); // TODO
-    bool isGrenade = (World.instances[self].entflags & EF_ISGRENADE) != 0;
-//     bool isScreen  = (World.instances[self].index == 279); // TODO
-    bool isCam = (World.instances[self].index == 477);
-    if (isCyber) {
-        if (dd.attackType == Att_Drill && isNPC) return 0.0f;
-        if (dd.attackType != Att_Drill && World.instances[self].iceActive) return 0.0f;
-    }
-    // Dead exceptions — still allow damage to gibs, ice, player, grenades, screens, cameras, teleporters
+    u16 selfIdx = World.instances[self].index;
+    bool isNPC = IdxIsNPC(selfIdx), isPlayer = (self == PLAYER1);
+//     bool isObj = IdxIsDynamicObject(selfIdx); // TODO
+    bool isGrenade = IsGrenade(selfIdx);
+//     bool isScreen  = (selfIdx == 279); // TODO
+    if (isCyber) { if (dd.attackType == Att_Drill && isNPC){return 0.0f;} if (dd.attackType != Att_Drill && World.instances[self].iceActive){return 0.0f;} }
+   
     if (*hp <= 0.0f) {
-        bool allowPost = (isNPC || World.instances[self].iceActive || isPlayer || isGrenade || World.instances[self].index == 279 || isCam);
+        bool allowPost = (isNPC || World.instances[self].iceActive || isPlayer || isGrenade || selfIdx == 279/*chunk_screen*/ || selfIdx == 477/*sec_camera*/);
         if (!allowPost) return 0.0f;
     }
     float take = dd.damage;
     if (isPlayer) {
         float absorb = 0.0f;
-        if (isCyber) {
-            // Cyber C-Shield software absorption
-            if (World.invP1.hasSoft & (1 << SW_SHIELD)) {
-                u8 sv = World.invP1.softVersions[SW_SHIELD];
-                absorb = (sv <= 9) ? sv * 0.05f : 0.0f;
-                take *= (1.0f - absorb);
-                if (take <= 0.0f) return 0.0f;
-            }
-        } else {
+        if (isCyber) { if (World.invP1.hasSoft & (1 << SW_SHIELD)) { u8 sv = World.invP1.softVersions[SW_SHIELD]; absorb = (sv <= 9) ? sv * 0.05f : 0.0f; take *= (1.0f - absorb); if (take <= 0.0f){return 0.0f;} } }// Cyber C-Shield software absorption
+        else {
             if (dd.attackType == Att_Magn) { take = 0.0f; TakeEnergy(11.0f); } // TODO: empstatic.Flash(2), BiomonitorEnergyPulse(11f) — FX systems
             if ((World.invP1.hardwareIsActive & HW_SHD) && (World.invP1.hasHardware & HW_SHD)) {
                 float thresh = 0.0f;
-                switch (World.invP1.hardwareVersion[HW_SHD_IDX]) {
-                    case 0: absorb = 0.20f; thresh =  0.0f; break;
-                    case 1: absorb = 0.40f; thresh = 10.0f; break;
-                    case 2: absorb = 0.75f; thresh = 15.0f; break;
-                    case 3: absorb = 0.75f; thresh = 30.0f; break;
-                }
+                switch (World.invP1.hardwareVersion[HW_SHD_IDX]) { case 0:absorb=0.20f; thresh=0.0f; break; case 1:absorb=0.40f; thresh=10.0f; break; case 2:absorb=0.75f; thresh=15.0f; break; case 3:absorb=0.75f; thresh=30.0f; break; }
                 if (take < thresh) absorb = 1.0f;
                 if (absorb > 0.0f) {
                     if (absorb < 1.0f) absorb = vclamp(absorb + random_range(-0.08f,0.08f),0.0f,1.0f);
-                    take *= (1.0f - absorb);
-                    play_wav(sounds[94],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false); // shield absorb
-                    int abs = (int)(absorb * 100.0f);
-                    CenterStatusPrint("%s%d%s",Sys_Text.stringTable[208],abs,Sys_Text.stringTable[209]);
+                    take *= (1.0f - absorb); play_wav(sounds[94],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false); // shield absorb
+                    int abs = (int)(absorb * 100.0f); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[208],abs,Sys_Text.stringTable[209]);
                     // TODO: shield screen flash effect
                 }
             }
@@ -747,12 +731,12 @@ float TakeDamage(u16 self,DamageData dd) {
         if (isPlayer) { World.damageReceived += take; if (World.instances[self].cyberHealth <= 0.0f) { ExitCyberspace(); return 0.0f; } }
         if (dd.owner == PLAYER1){World.damageDealt += take;}
     } else {
-        if (World.instances[self].index == 477/*Camera constIndex 477 gets one-shot by tranq*/ && dd.attackType == Att_Trnq) take = World.instances[self].health + 1.0f;
+        if (selfIdx == 477/*Camera constIndex 477 gets one-shot by tranq*/ && dd.attackType == Att_Trnq) take = World.instances[self].health + 1.0f;
         take = ApplyAttTypeAdjustments(self,take,dd.attackType); World.instances[self].health -= take; if (isPlayer) { World.damageReceived += take; World.Sys_Music.inCombat = true; }
         if (dd.owner == PLAYER1){World.damageDealt += take;}
     }
     if (isNPC && (World.instances[self].health > 0.0f || (isCyber && World.instances[self].cyberHealth > 0.0f))) {
-        if (npcTable[World.instances[self].index - 419].timeBetweenPain > 0.0f) flag_set(&World.instances[self].entflags,EF_GO_INTO_PAIN,true);
+        if (npcTable[selfIdx - 419].timeBetweenPain > 0.0f) flag_set(&World.instances[self].entflags,EF_GO_INTO_PAIN,true);
         World.instances[self].recentMostActivator = dd.owner; // Pass attacker to NPC
         TargetIDSendDamageReceive(self,take,dd.attackType);
         AICheckPain(self); // setup enemy with NPC
@@ -1100,15 +1084,13 @@ void DoorActuate(u16 self) {
     bool op = e->doorOpen == DoorState_Opening;
     if (op || e->doorOpen == DoorState_Closing) {
         int src = op ? DOOR_CLIP_OPENING : DOOR_CLIP_CLOSING, dst = op ? DOOR_CLIP_CLOSING : DOOR_CLIP_OPENING;
-        DoorSetClipFrame(self, dst, DoorFrameFromProgress(DoorGetClip(e, dst), 1.0f - DoorGetProgress(e, src)));
-        e->doorOpen = e->doorState = op ? DoorState_Closing : DoorState_Opening;
+        DoorSetClipFrame(self,dst,DoorFrameFromProgress(DoorGetClip(e,dst),1.0f - DoorGetProgress(e,src))); e->doorOpen = e->doorState = op ? DoorState_Closing : DoorState_Opening;
         if (!op) e->waitBeforeClose = World.pauseRelativeTime + e->delay;
         if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], 1.0f, World.position[self], true);
     }
 }
 
 void DoorUse(u16 self, u16 activator) {
-    DualLog("Door use called by activator %u\n",activator);
     if (activator == WORLD) return;
     Entity* e = &World.instances[self];
     if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(World.position[self]); return; }
@@ -1129,8 +1111,7 @@ void DoorUse(u16 self, u16 activator) {
 void DoorTargetted(u16 self, u16 activator) { if ((World.instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&World.instances[self],false); if (!World.instances[self].targettingOnlyUnlocks) DoorUse(self,activator); }
 void DoorUpdate(u16 self) {
     Entity* e = &World.instances[self];
-    if (e->blocked) return; // TODO frame-pause blocked doors instead of fully skipping.
-    if (e->ajar) return;
+    if (e->blocked || e->ajar) return; // TODO frame-pause blocked doors instead of fully skipping.
     AnimationClip opening = DoorGetClip(e,DOOR_CLIP_OPENING);
     AnimationClip closing = DoorGetClip(e,DOOR_CLIP_CLOSING);
     if (e->doorOpen == DoorState_Opening && e->clip == DOOR_CLIP_OPENING && e->frame >= opening.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; DoorSetClipFrame(self,DOOR_CLIP_IDLE_OPEN,DoorGetClip(e,DOOR_CLIP_IDLE_OPEN).frameStart); }
@@ -1141,9 +1122,9 @@ void DoorUpdate(u16 self) {
 void CloseFullmap() {} // TODO
 u16 SpawnDynamicObject(int val, bool cheat) {
     if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return WORLD; }
-    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, World.curLev, cheat);
-    if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return WORLD; }
-    if (World.instCount >= INSTANCE_COUNT) { DualLogError("Failed to spawn constIndex %u: instance table full (%u/%u)", val, World.instCount, INSTANCE_COUNT); return WORLD; }
+    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ",val,World.curLev,cheat);
+    if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return WORLD; }
+    if (World.instCount >= INSTANCE_COUNT) { DualLogError("Failed to spawn constIndex %u: instance table full (%u/%u)",val,World.instCount,INSTANCE_COUNT); return WORLD; }
     u16 entityIndexInInstanceTable = AddInstance((u16)val, (V3){0.0f,0.0f,0.0f});
     return entityIndexInInstanceTable;
 }
@@ -1199,12 +1180,7 @@ void UseEntity(u16 i) {
     else if (IdxIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
     else if (IdxIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
     else if (IdxIsUsableObject(ent->index)) {
-        World.invP1.holdingObject = true;
-        World.invP1.heldObjectIndex = ent->index;
-        World.invP1.heldObjectCustIdx = ent->usableCustIdx;
-        World.invP1.heldObjectAmmo = ent->ammo;
-        World.invP1.heldObjectAmmo2 = ent->ammo2;
-        World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
+        World.invP1.holdingObject = true; World.invP1.heldObjectIndex = ent->index; World.invP1.heldObjectCustIdx = ent->usableCustIdx; World.invP1.heldObjectAmmo = ent->ammo; World.invP1.heldObjectAmmo2 = ent->ammo2; World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
         if (Sys_Settings.QuickItemPickup) { AddItemToInventory(ent->index,ent->usableCustIdx); ResetHeldItem(); }
         else { CenterStatusPrint("%s%s",Sys_Text.stringTable[World.invP1.heldObjectIndex - 307 + 326],Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); } // Inventory mode is turned on when picking something up
         DeleteInstance(i);
