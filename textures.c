@@ -228,7 +228,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     OS_Free(data, sz); return true;
 }
 
-void VSetWindowIcon(WinSysIcon*);
+void SetWindowIcon(WinSysIcon*);
 void LoadTextures() {
     double start_time = get_time();
     texCnt = totalPixels = totalPaletteColors = 0u;
@@ -298,7 +298,7 @@ void LoadTextures() {
     u8* pixels = PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main);
     if (!pixels) { DualLogError("Failed to load icon: %s\n",WIN_ICON); OS_Exit(1); }
     WinSysIcon image = (WinSysIcon){w,h,pixels}; 
-    VSetWindowIcon(&image);
+    SetWindowIcon(&image);
     OS_Free(file_buffer, windowIconFileSize); 
     OS_Free(png_arena_main.base, 16777216); 
     png_arena_main.base = NULL;

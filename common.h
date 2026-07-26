@@ -238,31 +238,21 @@ typedef struct { int width,height; u8* pixels; } WinSysIcon;
 FHandle OS_OpenReadonly(const char*),OS_OpenWriteonly(const char*);
 void *OS_AllocateRAM(size_t,i32,i32,FHandle),*OS_AllocateFileBackedRAMReadonly(size_t,FHandle,char*),*OS_Realloc(void*,size_t,size_t),OS_Close(FHandle),OS_Write(FHandle,const void*,size_t,const char*),OS_ThreadJoin(OS_Thread* t),OS_USleep(u32 usec);
 long OS_Read(FHandle,void*,size_t),OS_RawWrite(FHandle fd, const void* buf, size_t cnt),OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/),OS_Tell(FHandle);
-i32 OS_FileSize(FHandle f);
-__attribute__((noreturn)) void OS_Exit(i64); void DualLogError(const char*, ...),DualLogWarn(const char*, ...),DualLog(const char*, ...);
-void play_wav(const char*,float,V3,bool),play_message(const char *);
-u32 GetCollisionMask(u32);
-float TakeDamage(u16,DamageData);
-double get_time();
-void UseTargets(u16,const char*),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),* OS_Alloc(size_t),OS_Free(void*,size_t),*OS_OpenAndAllocateFileBufferReadonly(const char*,FHandle*,int*),DebugRAM(const char*);
+__attribute__((noreturn)) void OS_Exit(i64);
+i32 OS_FileSize(FHandle f),OS_ThreadCreate(OS_Thread*,void*(*fn)(void*),void*);
+u32 GetCollisionMask(u32); RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
+u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
+double get_time(); float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData);
+void UseTargets(u16,const char*),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),* OS_Alloc(size_t),OS_Free(void*,size_t),*OS_OpenAndAllocateFileBufferReadonly(const char*,FHandle*,int*),DebugRAM(const char*),
+     play_wav(const char*,float,V3,bool),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),ResetInput(),InputProcessing(),LoadAllLevels(),
+     AddWireLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),DoorSetClipFrame(u16,u8,u16),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
+     LoadTextForLanguage(u8),RenderFormattedText(i16,i16,u32,u8,float,const char* restrict,...),CullCore(),PngArenaInit(PngArena*),DualLogError(const char*, ...),DualLogWarn(const char*, ...),DualLog(const char*, ...);
 typedef int (*cmpfun)(const void*,const void*); typedef int (*cmpfun_r)(const void*,const void*,void*);
-int OS_ThreadCreate(OS_Thread*,void*(*fn)(void*),void*);
 char* StringFindFirstCharWithin(const char *s, char c);
-void LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16);
-u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),PSys_Play(u8,V3,Quaternion,u16),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
 AnimationClip DoorGetClip(const Entity*,u8);
-float DoorClamp01(float),Tranquilize(u16,float,bool);
 bool Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Sprint(),TurnLeft(),TurnRight(),LookUp(),LookDown(),RecentLog(),Biomonitor(),Sensaround(),Lantern(),
      Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),
      Console(),ScrshotPressed(),PositionVisibleFromPlayerCell(float,float),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();
-void MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),SetVSync(),ResetInput(),InputProcessing(),LoadAllLevels(),AddWireLine(V3 start, V3 end, Color col),ForceInventoryMode(),ForceShootMode(),DoorSetClipFrame(u16,u8,u16);
-void UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool);
-void UpdateLights(),ModUpdate(),PSys_Update(),PSys_Init(),InitFontAtlasses(),LoadLogTextForLanguage(u8),LoadTextForLanguage(u8),RenderFormattedText(i16,i16,u32,u8,float,const char* restrict,...),CullCore(),PngArenaInit(PngArena*);
-RaycastHit Raycast(V3,V3,float,u32);
-V3 ScreenPointToRay(V3,V3);
-u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
-#define PSys_PlayOneshot(defIdx,pos) PSys_Play(defIdx,pos,QUAT_IDENTITY,0)
-void PSys_Render(float* viewProj, V3 camPos, V3 camUp, V3 camRight, float nearPlane, float farPlane, u32 depthTex);
 typedef float __v8sf __attribute__((__vector_size__(32))); typedef float __m256 __attribute__((__vector_size__(32))); typedef long long __m128i __attribute__((__vector_size__(16))); typedef __m128i __m128i_u __attribute__((__may_alias__, __aligned__(1))); typedef __m256 __m256_u __attribute__((__may_alias__, __aligned__(1)));
 typedef float __v4sf __attribute__((__vector_size__(16))); typedef int __v4si __attribute__((__vector_size__(16)));   typedef float __m128 __attribute__((__vector_size__(16)));      typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1)));
 #define _mm_storeu_si128(P, V) (*(__m128i_u *)(P) = (V))

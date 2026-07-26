@@ -153,36 +153,78 @@ float copysignf(float magnitude, float sign) { float result; __asm__ ("andps %[s
 INLINE V3 BoxSupport(ShapeBox b, V3 d) { V3 x=quat_rot_v3(b.rot,(V3){1,0,0}), y=quat_rot_v3(b.rot,(V3){0,1,0}), z=quat_rot_v3(b.rot,(V3){0,0,1}); float kx = copysignf(1.0f, V3_dot(d, x)); float ky = copysignf(1.0f, V3_dot(d, y)); float kz = copysignf(1.0f, V3_dot(d, z)); return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr, V3_ScaleByF(x, kx * b.hExt.x)), V3_ScaleByF(y, ky * b.hExt.y)), V3_ScaleByF(z, kz * b.hExt.z)); }
 INLINE V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db=V3_dot(cap.base,d), dt=V3_dot(cap.tip,d); float mask=(dt > db); V3 best=V3_AplusB(V3_ScaleByF(cap.tip,mask),V3_ScaleByF(cap.base,1.0f - mask)); float L = V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); V3 dir=V3_ScaleByF(d,cap.rad / vsqrtf(safeL)); float lmask=(L >= PHY_EPSILON); return V3_AplusB(best,V3_ScaleByF(dir,lmask)); }
 typedef union { __m128 f; __m128i i; } m128_bits;
-INLINE __m128  _mm_set_ps(float e3, float e2, float e1, float e0) { return (__m128){e0,e1,e2,e3}; }
-INLINE __m128i _mm_setzero_si128(void) { return (__m128i)(__v4si){0, 0, 0, 0}; }
-INLINE __m128i _mm_set1_epi32(int x) { return (__m128i)(__v4si){x, x, x, x}; }
-INLINE __m128i _mm_set_epi32(int e3, int e2, int e1, int e0) { return (__m128i)(__v4si){e0, e1, e2, e3}; }
-INLINE __m128i _mm_add_epi32(__m128i a, __m128i b) { return a + b; }
-INLINE __m128i _mm_and_si128(__m128i a, __m128i b) { return a & b; }
-INLINE __m128i _mm_or_si128(__m128i a, __m128i b)  { return a | b; }
-INLINE __m128i _mm_andnot_si128(__m128i a, __m128i b) { return (~a) & b; }
-INLINE __m128i _mm_castps_si128(__m128 a) { m128_bits u; u.f = a; return u.i; }
-INLINE __m128  _mm_cmpgt_ps(__m128 a, __m128 b) { m128_bits u; u.i = (a > b); return u.f; }
+// INLINE __m128  _mm_set_ps(float e3, float e2, float e1, float e0) { return (__m128){e0,e1,e2,e3}; }
+// INLINE __m128i _mm_setzero_si128(void) { return (__m128i)(__v4si){0, 0, 0, 0}; }
+// INLINE __m128i _mm_set1_epi32(int x) { return (__m128i)(__v4si){x, x, x, x}; }
+// INLINE __m128i _mm_set_epi32(int e3, int e2, int e1, int e0) { return (__m128i)(__v4si){e0, e1, e2, e3}; }
+// INLINE __m128i _mm_add_epi32(__m128i a, __m128i b) { return a + b; }
+// INLINE __m128i _mm_and_si128(__m128i a, __m128i b) { return a & b; }
+// INLINE __m128i _mm_or_si128(__m128i a, __m128i b)  { return a | b; }
+// INLINE __m128i _mm_andnot_si128(__m128i a, __m128i b) { return (~a) & b; }
+// INLINE __m128i _mm_castps_si128(__m128 a) { m128_bits u; u.f = a; return u.i; }
+// INLINE __m128  _mm_cmpgt_ps(__m128 a, __m128 b) { m128_bits u; u.i = (a > b); return u.f; }
+// INLINE V3 exhaustiveBest_simd(const float* p, u32 n, V3 d) {
+//     __m128 vx=_mm_set1_ps(d.x), vy=_mm_set1_ps(d.y), vz=_mm_set1_ps(d.z);
+//     __m128 bestVal=_mm_set1_ps(-3.402823466e38F);
+//     __m128i bestIdx=_mm_setzero_si128(), idx0123=_mm_set_epi32(3,2,1,0);
+//     u32 i=0;
+//     for (; i+4<=n; i+=4) {
+//         __m128 X=_mm_set_ps(p[(i+3)*3],p[(i+2)*3],p[(i+1)*3],p[i*3]);
+//         __m128 Y=_mm_set_ps(p[(i+3)*3+1],p[(i+2)*3+1],p[(i+1)*3+1],p[i*3+1]);
+//         __m128 Z=_mm_set_ps(p[(i+3)*3+2],p[(i+2)*3+2],p[(i+1)*3+2],p[i*3+2]);
+//         __m128 dd=_mm_add_ps(_mm_add_ps(_mm_mul_ps(X,vx),_mm_mul_ps(Y,vy)),_mm_mul_ps(Z,vz));
+//         __m128 gt=_mm_cmpgt_ps(dd,bestVal);
+//         bestVal=(__m128)__builtin_ia32_maxps((__v4sf)(dd),(__v4sf)(bestVal));
+//         __m128i curIdx=_mm_add_epi32(_mm_set1_epi32((int)i),idx0123);
+//         bestIdx=_mm_or_si128(_mm_and_si128(_mm_castps_si128(gt),curIdx),_mm_andnot_si128(_mm_castps_si128(gt),bestIdx));
+//     }
+//     float v[4]; int ix[4]; _mm_storeu_ps(v,bestVal); _mm_storeu_si128((__m128i*)ix,bestIdx);
+//     float top=v[0]; int bi=ix[0];
+//     for (int k=1;k<4;k++) if (v[k]>top){top=v[k];bi=ix[k];}
+//     for (; i<n; ++i){ float dd=p[i*3]*d.x+p[i*3+1]*d.y+p[i*3+2]*d.z; if(dd>top){top=dd;bi=(int)i;} }
+//     return (V3){p[bi*3],p[bi*3+1],p[bi*3+2]};
+// }
+typedef int          __v8si  __attribute__((__vector_size__(32)));
+typedef long long    __m256i __attribute__((__vector_size__(32)));
+typedef __m256i      __m256i_u __attribute__((__may_alias__, __aligned__(1)));
+#define _mm256_storeu_si256(P, V)  (*(__m256i_u *)(P) = (V))
+#define _mm256_loadu_ps(P)         (*(__m256_u const *)(P))
+#define _mm256_set1_ps(A)          ((__m256){ (A),(A),(A),(A),(A),(A),(A),(A) })
+#define _mm256_setr_ps(e0,e1,e2,e3,e4,e5,e6,e7) ((__m256){ (e0),(e1),(e2),(e3),(e4),(e5),(e6),(e7) })
+#define _mm256_storeu_ps(P, A)     (*(__m256_u *)(P) = (A))
+#define _mm256_add_ps(A, B)        ((__m256)((__v8sf)(A) + (__v8sf)(B)))
+#define _mm256_sub_ps(A, B)        ((__m256)((__v8sf)(A) - (__v8sf)(B)))
+#define _mm256_mul_ps(A, B)        ((__m256)((__v8sf)(A) * (__v8sf)(B)))
+typedef union { __m256 f; __m256i i; } m256_bits;
+INLINE __m256  _mm256_set_ps(float e7,float e6,float e5,float e4, float e3,float e2,float e1,float e0) { return (__m256){e0,e1,e2,e3,e4,e5,e6,e7}; }
+INLINE __m256i _mm256_setzero_si256(void)       { return (__m256i)(__v8si){0,0,0,0,0,0,0,0}; }
+INLINE __m256i _mm256_set1_epi32(int x)         { return (__m256i)(__v8si){x,x,x,x,x,x,x,x}; }
+INLINE __m256i _mm256_set_epi32(int e7,int e6,int e5,int e4, int e3,int e2,int e1,int e0) { return (__m256i)(__v8si){e0,e1,e2,e3,e4,e5,e6,e7}; }
+INLINE __m256i _mm256_add_epi32(__m256i a, __m256i b)    { return a + b; }
+INLINE __m256i _mm256_and_si256(__m256i a, __m256i b)    { return a & b; }
+INLINE __m256i _mm256_or_si256(__m256i a, __m256i b)     { return a | b; }
+INLINE __m256i _mm256_andnot_si256(__m256i a, __m256i b) { return (~a) & b; }
+INLINE __m256i _mm256_castps_si256(__m256 a)             { m256_bits u; u.f = a; return u.i; }
+INLINE __m256  _mm256_cmpgt_ps(__m256 a, __m256 b)       { m256_bits u; u.i = (a > b); return u.f; }
 INLINE V3 exhaustiveBest_simd(const float* p, u32 n, V3 d) {
-    __m128 vx=_mm_set1_ps(d.x), vy=_mm_set1_ps(d.y), vz=_mm_set1_ps(d.z);
-    __m128 bestVal=_mm_set1_ps(-3.402823466e38F);
-    __m128i bestIdx=_mm_setzero_si128(), idx0123=_mm_set_epi32(3,2,1,0);
-    u32 i=0;
-    for (; i+4<=n; i+=4) {
-        __m128 X=_mm_set_ps(p[(i+3)*3],p[(i+2)*3],p[(i+1)*3],p[i*3]);
-        __m128 Y=_mm_set_ps(p[(i+3)*3+1],p[(i+2)*3+1],p[(i+1)*3+1],p[i*3+1]);
-        __m128 Z=_mm_set_ps(p[(i+3)*3+2],p[(i+2)*3+2],p[(i+1)*3+2],p[i*3+2]);
-        __m128 dd=_mm_add_ps(_mm_add_ps(_mm_mul_ps(X,vx),_mm_mul_ps(Y,vy)),_mm_mul_ps(Z,vz));
-        __m128 gt=_mm_cmpgt_ps(dd,bestVal);
-        bestVal=(__m128)__builtin_ia32_maxps((__v4sf)(dd),(__v4sf)(bestVal));
-        __m128i curIdx=_mm_add_epi32(_mm_set1_epi32((int)i),idx0123);
-        bestIdx=_mm_or_si128(_mm_and_si128(_mm_castps_si128(gt),curIdx),_mm_andnot_si128(_mm_castps_si128(gt),bestIdx));
+    __m256  vx = _mm256_set1_ps(d.x),vy = _mm256_set1_ps(d.y),vz = _mm256_set1_ps(d.z);
+    __m256  bestVal = _mm256_set1_ps(-3.402823466e38F);
+    __m256i bestIdx = _mm256_setzero_si256(),idx01234567 = _mm256_set_epi32(7,6,5,4,3,2,1,0);
+    u32 i = 0;
+    for (; i + 8 <= n; i += 8) {
+        __m256 X = _mm256_set_ps(p[(i+7)*3],  p[(i+6)*3],  p[(i+5)*3],  p[(i+4)*3],p[(i+3)*3],  p[(i+2)*3],  p[(i+1)*3],  p[ i   *3]);
+        __m256 Y = _mm256_set_ps(p[(i+7)*3+1],p[(i+6)*3+1],p[(i+5)*3+1],p[(i+4)*3+1],p[(i+3)*3+1],p[(i+2)*3+1],p[(i+1)*3+1],p[ i   *3+1]);
+        __m256 Z = _mm256_set_ps(p[(i+7)*3+2],p[(i+6)*3+2],p[(i+5)*3+2],p[(i+4)*3+2],p[(i+3)*3+2],p[(i+2)*3+2],p[(i+1)*3+2],p[ i   *3+2]);
+        __m256 dd = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(X,vx),_mm256_mul_ps(Y,vy)),_mm256_mul_ps(Z,vz));
+        __m256 gt = _mm256_cmpgt_ps(dd, bestVal);
+        bestVal = (__m256)__builtin_ia32_maxps256((__v8sf)dd, (__v8sf)bestVal);
+        __m256i curIdx = _mm256_add_epi32(_mm256_set1_epi32((int)i), idx01234567);
+        bestIdx = _mm256_or_si256(_mm256_and_si256(_mm256_castps_si256(gt), curIdx),_mm256_andnot_si256(_mm256_castps_si256(gt), bestIdx));
     }
-    float v[4]; int ix[4]; _mm_storeu_ps(v,bestVal); _mm_storeu_si128((__m128i*)ix,bestIdx);
-    float top=v[0]; int bi=ix[0];
-    for (int k=1;k<4;k++) if (v[k]>top){top=v[k];bi=ix[k];}
-    for (; i<n; ++i){ float dd=p[i*3]*d.x+p[i*3+1]*d.y+p[i*3+2]*d.z; if(dd>top){top=dd;bi=(int)i;} }
-    return (V3){p[bi*3],p[bi*3+1],p[bi*3+2]};
+    float v[8]; int ix[8]; _mm256_storeu_ps(v, bestVal); _mm256_storeu_si256((__m256i*)ix, bestIdx);
+    float top = v[0]; int bi = ix[0]; for (int k = 1; k < 8; k++) if (v[k] > top) { top = v[k]; bi = ix[k]; }
+    for (; i < n; ++i) { float dd = p[i*3]*d.x + p[i*3+1]*d.y + p[i*3+2]*d.z; if (dd > top) { top = dd; bi = (int)i; } }
+    return (V3){p[bi*3], p[bi*3+1], p[bi*3+2]};
 }
 
 V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld) {
@@ -339,20 +381,7 @@ Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx, u16 adjIdx) {
     return m;
 }
 
-typedef struct {V3 mn,mx;} AABB3;
-// typedef struct { u16 hullMesh; const float* hullMx; const V3* boxV; u32 boxN; AABB3 hb; float spreadEps,thicknessTolerance; Manifold best; u16 adjHull; } CvxMshCtx;
-typedef struct { 
-    u16 hullMesh; 
-    const float* hullMx; 
-    const V3* boxV; 
-    u32 boxN; 
-    AABB3 hb; 
-    V3 hullCenter; 
-    float hullRadius; 
-    float spreadEps,thicknessTolerance; 
-    Manifold best; 
-    u16 adjHull; 
-} CvxMshCtx;
+typedef struct {V3 mn,mx;} AABB3; typedef struct { u16 hullMesh; const float* hullMx; const V3* boxV; u32 boxN; AABB3 hb; V3 hullCenter; float hullRadius,spreadEps,thicknessTolerance; Manifold best; u16 adjHull; } CvxMshCtx;
 void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     u16 hullMesh=ctx->hullMesh; Manifold* best=&ctx->best; float spreadEps=ctx->spreadEps, thicknessTolerance=ctx->thicknessTolerance;
     if (vmin(ta.x,vmin(tb.x,tc.x))>ctx->hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<ctx->hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>ctx->hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<ctx->hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>ctx->hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<ctx->hb.mn.z) return;

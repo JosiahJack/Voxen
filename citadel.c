@@ -1529,7 +1529,6 @@ static void Frob(V3 pos, V3 forward, V3 right) {
     V3 dir = ScreenPointToRay(forward, right); RaycastHit h = Raycast(pos,dir,FROB_DISTANCE,LMASK_PLAYER_FROB);
     if (Cheats.showPhys) { World.debugLine_start = pos; World.debugLineFinished = World.pauseRelativeTime + 3.0; World.debugLine_end = h.hit ? h.point : (V3){dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z}; }
     if (!h.hit) { CenterStatusPrint("%s", Sys_Text.stringTable[30]); return; }
-    if (PSys_PlayOneshot(0, h.point) == U16_MAX){DualLog("Failed to play particle system 0\n");} // TESTING
     UseEntity(h.hitInstanceIndex);
 }
 // Update
