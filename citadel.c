@@ -218,45 +218,19 @@ void UseGrenade(int index) {
 }
 
 void InventoryUpdate() {
-    if (Grenade()) {
-        if (World.curLev == LEVEL_CYBERSPACE) UseCyberspaceItem();
-        else if (World.invP1.grenCur >= 0 && World.invP1.grenCur < 7 && World.invP1.grenAmmo[World.invP1.grenCur] > 0) UseGrenade(World.invP1.grenConstIndex[World.invP1.grenCur]);
-        else CenterStatusPrint("%s",Sys_Text.stringTable[322]); // Out of grenades.
-    }
-    
+    if (Grenade()) { if (World.curLev == LEVEL_CYBERSPACE){UseCyberspaceItem();} else if (World.invP1.grenCur >= 0 && World.invP1.grenCur < 7 && World.invP1.grenAmmo[World.invP1.grenCur] > 0){UseGrenade(World.invP1.grenConstIndex[World.invP1.grenCur]);} else {CenterStatusPrint("%s",Sys_Text.stringTable[322]);/*Out of grenades.*/} }
     if (GrenadeCycUp())  { if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemUp(); else GrenadeCycle( 1); }
     if (GrenadeCycDown()){ if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemDn(); else GrenadeCycle(-1); }
     if (RecentLog() && (World.invP1.hasHardware & HW_ERD)) {
-        bool playing = false; //SndPlaying(&World.invP1.logSound); TODO
-        if (World.invP1.lastAddedIndex >= 0 && !playing) {
-            int temp = World.invP1.lastAddedIndex;
-            PlayLog(temp);
-            World.invP1.lastAddedIndex = FindNextUnreadLog();
-            if (World.invP1.lastAddedIndex == temp) World.invP1.lastAddedIndex = -1;
-            CheckForUnreadLogs();
-        } else {
-            //SndStop(&World.invP1.logSound); TODO
-            int temp = World.invP1.lastAddedIndex;
-            World.invP1.lastAddedIndex = FindNextUnreadLog();
-            if (World.invP1.lastAddedIndex == temp) {World.invP1.lastAddedIndex = -1;}
-            CheckForUnreadLogs();
-            CenterStatusPrint("%s",Sys_Text.stringTable[1019]); /*Log playback stopped.*/
-        }
+        if (World.invP1.lastAddedIndex >= 0) { int temp = World.invP1.lastAddedIndex; PlayLog(temp); World.invP1.lastAddedIndex = FindNextUnreadLog(); if (World.invP1.lastAddedIndex == temp) World.invP1.lastAddedIndex = -1; CheckForUnreadLogs(); }
+        else { int temp = World.invP1.lastAddedIndex; World.invP1.lastAddedIndex = FindNextUnreadLog(); if (World.invP1.lastAddedIndex == temp) {World.invP1.lastAddedIndex = -1;} CheckForUnreadLogs(); CenterStatusPrint("%s",Sys_Text.stringTable[1019]); /*Log playback stopped.*/ }
     }
-
-    if (Patch()) {
-        if (World.invP1.patchCur >= 0 && World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0)
-            PatchUse(World.invP1.patchCur);
-        else {CenterStatusPrint("%s",Sys_Text.stringTable[324]); /*Out of patches.*/}
-    }
-         if (  PatchCycUp()) PatchCycle( 1);
-    else if (PatchCycDown()) PatchCycle(-1);
+    if (Patch()) { if (World.invP1.patchCur >= 0 && World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0){PatchUse(World.invP1.patchCur);} else {CenterStatusPrint("%s",Sys_Text.stringTable[324]); /*Out of patches.*/} }
+    if (PatchCycUp()){PatchCycle( 1);} else if (PatchCycDown()){PatchCycle(-1);}
 }
 
-extern u8 magazinePitchCountForWeapon[16];
-extern u8 magazinePitchCountForWeapon2[16];
-// Expects usableItem index
-void AddItemFail(int index) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[318]);/*Inventory full.*/ }
+void AddItemFail(int index/*Expects usableItem index*/) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[318]);/*Inventory full.*/ }
+extern u8 magazinePitchCountForWeapon[16],magazinePitchCountForWeapon2[16];
 void AddItemToInventory(int index, int custIdx) {
     if (index < 0) index = 0; // Good check on paper.
     if (index > 110) index = 94; // Way to get a head.
@@ -266,52 +240,25 @@ void AddItemToInventory(int index, int custIdx) {
     else if (index == 34 || index == 81 || (index >= 83 && index <= 91) || index == 110) AddAccessCardToInventory(index);
     else {
         switch (index) {
-            case 7:  AddGrenadeToInventory(0,index); break; // Frag
-            case 8:  AddGrenadeToInventory(3,index); break; // Concussion
-            case 9:  AddGrenadeToInventory(1,index); break; // EMP
-            case 10: AddGrenadeToInventory(6,index); break; // Earth Shaker
-            case 11: AddGrenadeToInventory(4,index); break; // Land Mine
-            case 12: AddGrenadeToInventory(5,index); break; // Nitropak
-            case 13: AddGrenadeToInventory(2,index); break; // Gas
-            case 14: AddPatchToInventory(2,index); break;
-            case 15: AddPatchToInventory(6,index); break;
-            case 16: AddPatchToInventory(5,index); break;
-            case 17: AddPatchToInventory(3,index); break;
-            case 18: AddPatchToInventory(4,index); break;
-            case 19: AddPatchToInventory(1,index); break;
-            case 20: AddPatchToInventory(0,index); break;
-            case 21: AddHardwareToInventory(0,custIdx,true); break;
-            case 22: AddHardwareToInventory(1,custIdx,true); break;
-            case 23: AddHardwareToInventory(2,custIdx,true); break;
-            case 24: AddHardwareToInventory(3,custIdx,true); break;
-            case 25: AddHardwareToInventory(4,custIdx,true); break;
-            case 26: AddHardwareToInventory(5,custIdx,true); break;
-            case 27: AddHardwareToInventory(6,custIdx,true); break;
-            case 28: AddHardwareToInventory(7,custIdx,true); break;
-            case 29: AddHardwareToInventory(8,custIdx,true); break;
-            case 30: AddHardwareToInventory(9,custIdx,true); break;
-            case 31: AddHardwareToInventory(10,custIdx,true); break;
-            case 32: AddHardwareToInventory(11,custIdx,true); break;
-            case 60: AddAmmoToInventory(12,index,magazinePitchCountForWeapon[12],false); break; // rubber slugs
-            case 65: AddAmmoToInventory(8,index,magazinePitchCountForWeapon2[8],true); break; // magpulse cartridge super
-            case 66: AddAmmoToInventory(2,index,magazinePitchCountForWeapon[2],false); break; // needle darts
-            case 67: AddAmmoToInventory(2,index,magazinePitchCountForWeapon2[2],true); break; // tranquilizer darts
-            case 68: AddAmmoToInventory(9,index,magazinePitchCountForWeapon[9],false); break; // standard bullets
-            case 69: AddAmmoToInventory(9,index,magazinePitchCountForWeapon2[9],true); break; // teflon bullets
-            case 70: AddAmmoToInventory(7,index,magazinePitchCountForWeapon[7],false); break; // hollow point rounds
-            case 71: AddAmmoToInventory(7,index,magazinePitchCountForWeapon2[7],true); break; // slug rounds
-            case 72: AddAmmoToInventory(0,index,magazinePitchCountForWeapon[0],false); break; // magnesium tipped slugs
-            case 73: AddAmmoToInventory(0,index,magazinePitchCountForWeapon2[0],true); break; // penetrator slugs
-            case 74: AddAmmoToInventory(3,index,magazinePitchCountForWeapon[3],false); break; // hornet clip
-            case 75: AddAmmoToInventory(3,index,magazinePitchCountForWeapon2[3],true); break; // splinter clip
-            case 76: AddAmmoToInventory(11,index,magazinePitchCountForWeapon[11],false); break; // rail rounds
-            case 77: AddAmmoToInventory(13,index,magazinePitchCountForWeapon[13],false); break; // slag magazine
-            case 78: AddAmmoToInventory(13,index,magazinePitchCountForWeapon2[13],true); break; // large slag magazine
-            case 79: AddAmmoToInventory(8,index,magazinePitchCountForWeapon[8],false); break; // magpulse cartridges
-            case 80: AddAmmoToInventory(8,index,magazinePitchCountForWeapon2[8],false); break; // small magpulse cartridges
+            case 7:  AddGrenadeToInventory(0,index); break; /*Frag*/      case 8:  AddGrenadeToInventory(3,index); break; /*Concussion*/ case 9:  AddGrenadeToInventory(1,index); break; /*EMP*/ case 10: AddGrenadeToInventory(6,index); break; /*Earth Shaker*/
+            case 11: AddGrenadeToInventory(4,index); break; /*Land Mine*/ case 12: AddGrenadeToInventory(5,index); break; /*Nitropak*/   case 13: AddGrenadeToInventory(2,index); break; /*Gas*/
+            case 14: AddPatchToInventory(2,index); break; case 15: AddPatchToInventory(6,index); break; case 16: AddPatchToInventory(5,index); break; case 17: AddPatchToInventory(3,index); break;
+            case 18: AddPatchToInventory(4,index); break; case 19: AddPatchToInventory(1,index); break; case 20: AddPatchToInventory(0,index); break;
+            case 21: AddHardwareToInventory(0,custIdx,true); break; case 22: AddHardwareToInventory(1,custIdx,true); break; case 23: AddHardwareToInventory(2,custIdx,true); break; case 24: AddHardwareToInventory(3,custIdx,true); break;
+            case 25: AddHardwareToInventory(4,custIdx,true); break; case 26: AddHardwareToInventory(5,custIdx,true); break; case 27: AddHardwareToInventory(6,custIdx,true); break; case 28: AddHardwareToInventory(7,custIdx,true); break;
+            case 29: AddHardwareToInventory(8,custIdx,true); break; case 30: AddHardwareToInventory(9,custIdx,true); break; case 31: AddHardwareToInventory(10,custIdx,true);break; case 32: AddHardwareToInventory(11,custIdx,true); break;
+            case 60: AddAmmoToInventory(12,index,magazinePitchCountForWeapon[12],false); break; /*rubber slugs*/         case 65: AddAmmoToInventory(8,index,magazinePitchCountForWeapon2[8],true); break; /*magpulse cartridge super*/
+            case 66: AddAmmoToInventory(2,index,magazinePitchCountForWeapon[2],false); break; /*needle darts*/           case 67: AddAmmoToInventory(2,index,magazinePitchCountForWeapon2[2],true); break; /*tranquilizer darts*/
+            case 68: AddAmmoToInventory(9,index,magazinePitchCountForWeapon[9],false); break; /*standard bullets*/       case 69: AddAmmoToInventory(9,index,magazinePitchCountForWeapon2[9],true); break; /*teflon bullets*/
+            case 70: AddAmmoToInventory(7,index,magazinePitchCountForWeapon[7],false); break; /*hollow point rounds*/    case 71: AddAmmoToInventory(7,index,magazinePitchCountForWeapon2[7],true); break; /*slug rounds*/
+            case 72: AddAmmoToInventory(0,index,magazinePitchCountForWeapon[0],false); break; /*magnesium tipped slugs*/ case 73: AddAmmoToInventory(0,index,magazinePitchCountForWeapon2[0],true); break; /*penetrator slugs*/
+            case 74: AddAmmoToInventory(3,index,magazinePitchCountForWeapon[3],false); break; /*hornet clip*/            case 75: AddAmmoToInventory(3,index,magazinePitchCountForWeapon2[3],true); break; /*splinter clip*/
+            case 76: AddAmmoToInventory(11,index,magazinePitchCountForWeapon[11],false); break; /*rail rounds*/          case 77: AddAmmoToInventory(13,index,magazinePitchCountForWeapon[13],false); break; /*slag magazine*/
+            case 78: AddAmmoToInventory(13,index,magazinePitchCountForWeapon2[13],true); break; /*large slag magazine*/  case 79: AddAmmoToInventory(8,index,magazinePitchCountForWeapon[8],false); break; /*magpulse cartridges*/
+            case 80: AddAmmoToInventory(8,index,magazinePitchCountForWeapon2[8],false); break; /*small magpulse cartridges*/
         }
     }
-    play_wav(sounds[87],1.0f,(V3){0.0f,0.0f,0.0f},false);
+    play_wav(sounds[87],1.0f,(V3){0},false);
 }
 
 void CyberDecoyEnable() { World.decoyActive = true; }
@@ -320,9 +267,7 @@ void CyberDoorOnCollisionEnter(u16 self, u16 other) { if(other != PLAYER1){retur
 void CyberTimerInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; e->cyberTimer = 600.0f; e->timerFinished = World.pauseRelativeTime + 1.0; }
 void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; switch (diff) { case 0: e->cyberTimer = 600.0f; break; case 1: e->cyberTimer = 300.0f; break; case 2: e->cyberTimer = 240.0f; break; case 3: e->cyberTimer = 180.0f; break; } }
 void CyberTimerUpdate(u16 self) {
-    if(World.curLev != LEVEL_CYBERSPACE){return;}
-    Entity* e=&World.instances[self]; if(e->cyberTimer <= 0.0f){UIExitCyberspace(); return;}
-    if(e->timerFinished >= World.pauseRelativeTime){return;}
+    if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e=&World.instances[self]; if(e->cyberTimer <= 0.0f){UIExitCyberspace(); return;} if(e->timerFinished >= World.pauseRelativeTime){return;}
     e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds = e->cyberTimer - (e->minutes * 60.0f); e->timerFinished = World.pauseRelativeTime + 1.0;
 }
 
@@ -342,19 +287,13 @@ void ExplosionLifeInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; 
 void ExplosionLifeUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE) || e->delayFinished >= World.pauseRelativeTime) {return;} if (e->dontReset){flag_set(&e->entflags,EF_ACTIVE,false);} else{DeleteInstance(self);} }
 void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
 void DelayedSpawnUpdate(u16 self) {
-    Entity* e = &World.instances[self]; if (!e->active || e->timerFinished >= World.pauseRelativeTime) return;
-    e->active = false; if (!e->doSelfAfterList) return;
-    if (e->despawnInstead) {
-        if (e->destroyAfterListInsteadOfDeactivate) DeleteInstance(self);
-        else flag_set(&e->entflags,EF_ACTIVE,false);
-    } else flag_set(&e->entflags,EF_ACTIVE,true);
+    Entity* e = &World.instances[self]; if(!e->active || e->timerFinished >= World.pauseRelativeTime){return;} e->active = false; if(!e->doSelfAfterList){return;}
+    if (e->despawnInstead) { if(e->destroyAfterListInsteadOfDeactivate){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }     else flag_set(&e->entflags,EF_ACTIVE,true);
 }
 
 void FuncWallInitAfterLoad(u16 self) {
     Entity* e = &World.instances[self];
-    V3 tempVec = V3_AsubB(World.position[self],e->targetPosition);
-    float distTotal = V3_Dist(e->startPosition,e->targetPosition);
-    tempVec = V3_ScaleByF(V3_Normalize(tempVec),-1.0f);
+    float distTotal = V3_Dist(e->startPosition,e->targetPosition); V3 tempVec = V3_ScaleByF(V3_Normalize(V3_AsubB(World.position[self],e->targetPosition)),-1.0f);
     if (e->funcState == FStat_AjarMovingTarget) tempVec=V3_ScaleByF(tempVec,distTotal * e->percentAjar);
     else if (e->funcState == FStat_AjarMovingStart) tempVec=V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentAjar));
     else if (e->funcState == FStat_MovingStart) tempVec=V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentMoved));
@@ -373,9 +312,7 @@ void FuncWallUpdate(u16 self) {
     if (e->funcState == FStat_Target) { World.position[self]=e->targetPosition; e->percentMoved = 1.0f; return; }
     if (e->funcState != FStat_MovingStart && e->funcState != FStat_MovingTarget) return;
     V3 delta = V3_AsubB(goal,World.position[self]);
-    float distanceLeft = V3_Mag(delta);
-    float total = V3_Dist(e->startPosition,e->targetPosition);
-    float dist = e->speed * (float)World.deltaTime;
+    float distanceLeft = V3_Mag(delta), total = V3_Dist(e->startPosition,e->targetPosition), dist = e->speed * (float)World.deltaTime;
     if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) { World.position[self]=goal; e->funcState=doneState; e->percentMoved=doneState == FStat_Target ? 1.0f : 0.0f; return; }
     if (distanceLeft > 0.0001f) World.position[self]=V3_AplusB(World.position[self],V3_ScaleByF(V3_Normalize(delta),dist));
     if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,World.position[self]) / total;
@@ -383,65 +320,43 @@ void FuncWallUpdate(u16 self) {
 // ForceBridge
 void func_forcebridge(u16 self) {
     Entity* e = &World.instances[self];
-    e->tickTime = 0.05f;
-    e->tickFinished = World.pauseRelativeTime + e->tickTime + (double)random_range(0.0f,1.0f);
-    e->lerping = true;
-    if (e->activatedScale.x <= 0.02f) e->activatedScale.x = 2.56f;
-    if (e->activatedScale.y <= 0.02f) e->activatedScale.y = 0.08f;
-    if (e->activatedScale.z <= 0.02f) e->activatedScale.z = 2.56f;
-    if (!e->active) { e->modelIndex = MAX_MDLS; World.collider[self] = COLTYPE_NONE; }
+    e->tickTime = 0.05f; e->tickFinished = World.pauseRelativeTime + e->tickTime + (double)random_range(0.0f,1.0f); e->lerping = true;
+    if(e->activatedScale.x <= 0.02f){e->activatedScale.x = 2.56f;} if(e->activatedScale.y <= 0.02f){e->activatedScale.y = 0.08f;} if(e->activatedScale.z <= 0.02f){e->activatedScale.z = 2.56f;}
+    if(!e->active){ e->modelIndex=MAX_MDLS; World.collider[self]=COLTYPE_NONE;}
     switch (e->fieldColor) {
-        case ForceFieldColor_Red:      e->texIndex = 38; break;
-        case ForceFieldColor_Green:    e->texIndex = 40; break;
-        case ForceFieldColor_Blue:     e->texIndex = 39; break;
-        case ForceFieldColor_Purple:   e->texIndex = 41; break;
-        case ForceFieldColor_RedFaint: e->texIndex = 198; break;
+        case ForceFieldColor_Red:e->texIndex=38; break; case ForceFieldColor_Green:e->texIndex=40; break; case ForceFieldColor_Blue:e->texIndex=39; break; case ForceFieldColor_Purple:e->texIndex=41; break; case ForceFieldColor_RedFaint:e->texIndex=198; break;
     }
 }
 
 void ForceBridgeActivate(u16 self, bool isSilent) {
     Entity* e = &World.instances[self]; if (e->active) {return;}
-    if (!isSilent) play_wav(sounds[102],1.0f,World.position[self],true);
-    e->modelIndex = 78; World.collider[self] = COLTYPE_BOX; e->active = e->lerping = true; World.scale[self] = (V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x, e->forceFieldDirectionY ? 0.1f : e->activatedScale.y, e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
+    if(!isSilent){play_wav(sounds[102],1.0f,World.position[self],true);}
+    e->modelIndex=78; World.collider[self]=COLTYPE_BOX; e->active=e->lerping=true; World.scale[self]=(V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x,e->forceFieldDirectionY ? 0.1f : e->activatedScale.y,e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
 }
 
-void ForceBridgeDeactivate(u16 self, bool isSilent) {
-    Entity* e = &World.instances[self]; if (!e->active) {return;}
-    if (!isSilent) {play_wav(sounds[102],1.0f,World.position[self],true);}
-    e->active = false; e->lerping = true; e->modelIndex = MAX_MDLS; World.collider[self] = COLTYPE_NONE;
-}
-
+void ForceBridgeDeactivate(u16 self, bool isSilent) { Entity* e = &World.instances[self]; if (!e->active) {return;} if (!isSilent) {play_wav(sounds[102],1.0f,World.position[self],true);} e->active = false; e->lerping = true; e->modelIndex = MAX_MDLS; World.collider[self] = COLTYPE_NONE; }
 void ForceBridgeToggle(u16 self) { if (World.instances[self].active) {ForceBridgeDeactivate(self,false); } else {ForceBridgeActivate(self,false);} }
 void ForceBridgeUpdate(u16 self) {
-    Entity* e = &World.instances[self];
-    if (e->tickFinished >= World.pauseRelativeTime) return;
+    Entity* e = &World.instances[self]; if (e->tickFinished >= World.pauseRelativeTime) return;
     e->tickFinished = World.pauseRelativeTime + e->tickTime;
     if (e->active) {
         if (!e->lerping) return;
-        float sx = e->forceFieldDirectionX ? lerp(World.scale[self].x,e->activatedScale.x,e->tickTime * 2.0f) : World.scale[self].x;
-        float sy = e->forceFieldDirectionY ? lerp(World.scale[self].y,e->activatedScale.y,e->tickTime * 2.0f) : World.scale[self].y;
-        float sz = e->forceFieldDirectionZ ? lerp(World.scale[self].z,e->activatedScale.z,e->tickTime * 2.0f) : World.scale[self].z;
-        World.scale[self] = (V3){sx,sy,sz};
-        if (vabs(e->activatedScale.x - sx) < 0.08f && vabs(e->activatedScale.y - sy) < 0.08f && vabs(e->activatedScale.z - sz) < 0.08f) { World.scale[self] = e->activatedScale; e->lerping = false; }
+        float sx = e->forceFieldDirectionX ? lerp(World.scale[self].x,e->activatedScale.x,e->tickTime*2.0f) : World.scale[self].x;
+        float sy = e->forceFieldDirectionY ? lerp(World.scale[self].y,e->activatedScale.y,e->tickTime*2.0f) : World.scale[self].y;
+        float sz = e->forceFieldDirectionZ ? lerp(World.scale[self].z,e->activatedScale.z,e->tickTime*2.0f) : World.scale[self].z;
+        World.scale[self] = (V3){sx,sy,sz}; if (vabs(e->activatedScale.x - sx) < 0.08f && vabs(e->activatedScale.y - sy) < 0.08f && vabs(e->activatedScale.z - sz) < 0.08f) { World.scale[self] = e->activatedScale; e->lerping = false; }
     } else if (e->lerping) {
         float sx = e->forceFieldDirectionX ? lerp(World.scale[self].x,0.0f,e->tickTime * 2.0f) : World.scale[self].x;
         float sy = e->forceFieldDirectionY ? lerp(World.scale[self].y,0.0f,e->tickTime * 2.0f) : World.scale[self].y;
         float sz = e->forceFieldDirectionZ ? lerp(World.scale[self].z,0.0f,e->tickTime * 2.0f) : World.scale[self].z;
-        World.scale[self] = (V3){sx,sy,sz};
-        if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); World.collider[self] = COLTYPE_NONE; e->lerping = false; }
+        World.scale[self] = (V3){sx,sy,sz}; if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); World.collider[self] = COLTYPE_NONE; e->lerping = false; }
     }
 }
 
 // TriggerCounter
 void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,World.instances[self].target); }
-void TriggerCounterDelayedTarget(u16 self, u16 activator) { World.instances[self].delayFinished = World.pauseRelativeTime + World.instances[self].delay; TriggerCounterTarget(self,activator); }
-void TriggerCounterTargetted(u16 self, u16 activator) {
-    Entity* e = &World.instances[self];
-    e->counter++;
-    if (e->counter != e->countToTrigger) {return;}
-    if (e->delay <= 0.0f) TriggerCounterTarget(self,activator); else TriggerCounterDelayedTarget(self,activator);
-    if (!e->dontReset) e->counter = 0;
-}
+void TriggerCounterDelayedTarget(u16 self, u16 act) { World.instances[self].delayFinished = World.pauseRelativeTime + World.instances[self].delay; TriggerCounterTarget(self,act); }
+void TriggerCounterTargetted(u16 self, u16 act) { Entity* e=&World.instances[self]; e->counter++; if (e->counter != e->countToTrigger) {return;} if (e->delay <= 0.0f){TriggerCounterTarget(self,act);}else{TriggerCounterDelayedTarget(self,act);} if (!e->dontReset){e->counter=0;} }
 // TextureChanger
 void TextureChangerInitAfterLoad(u16 self) { if (!World.instances[self].currentTexture) {return;} World.instances[self].texIndex = World.instances[self].altTexIndex; if (World.instances[self].altGlowIndex < MAX_TXRS) {World.instances[self].glowIndex = World.instances[self].altGlowIndex;} }
 void TextureChangerToggle(u16 self) {
@@ -450,68 +365,24 @@ void TextureChangerToggle(u16 self) {
     World.instances[self].currentTexture = !World.instances[self].currentTexture;
 }
 // LogicTimer
-void LogicTimerInitBeforeLoad(u16 self) {
-    Entity* e = &World.instances[self];
-    if (e->timeInterval <= 0.0f) e->timeInterval = 0.35f;
-    if (e->randomMin <= 0.0f) e->randomMin = 5.0f;
-    if (e->randomMax <= 0.0f) e->randomMax = 10.0f;
-    e->intervalFinished = World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
-}
-
+void LogicTimerInitBeforeLoad(u16 self) { Entity* e=&World.instances[self]; if(e->timeInterval <= 0.0f){e->timeInterval=0.35f;} if(e->randomMin <= 0.0f){e->randomMin=5.0f;} if(e->randomMax <= 0.0f){e->randomMax=10.0f;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); }
 void LogicTimerUseTargets(u16 self) { UseTargets(self,World.instances[self].target); }
-void LogicTimerUpdate(u16 self) {
-    return; // TODO for testing!  Was getting annoyed by target i/o troubleshooting messages from lev1 broken door firing constantly.
-    Entity* e = &World.instances[self];
-    if (!e->active || e->intervalFinished >= World.pauseRelativeTime) return;
-    e->intervalFinished = World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval);
-    LogicTimerUseTargets(self);
-}
-
+void LogicTimerUpdate(u16 self) { return; /* TODO for testing!  Was getting annoyed by target i/o troubleshooting messages from lev1 broken door firing constantly.*/ Entity* e=&World.instances[self]; if(!e->active || e->intervalFinished >= World.pauseRelativeTime){return;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); LogicTimerUseTargets(self); }
 void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; World.instances[self].active = !World.instances[self].active; }
-//=============================================================================
 // ButtonSwitch
-void ButtonSwitchInitAfterLoad(u16 self) {
-    Entity* e = &World.instances[self];
-    e->delayFinished = 0.0f;
-    if (e->active) e->tickFinished = World.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);
-}
-
-void ButtonSwitchUseTargets(u16 self, u16 activator) {
-    Entity* e = &World.instances[self];
-    DualLog("ButtonSwitchUseTargets, targeting:%s,ioflags:%u\n",e->target,e->ioflags);
-    UseTargets(activator,e->target);
-    e->active = !e->active;
-    e->alternateOn = e->active;
-    if (e->changeTexOnActive) {
-        e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial;
-        if (e->blinkTexOnActive && e->active) e->tickFinished = World.pauseRelativeTime + 1.5f;
-    }
-}
-
+void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->delayFinished=0.0f; if(e->active){e->tickFinished=World.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);} }
+void ButtonSwitchUseTargets(u16 self, u16 activator) { Entity* e=&World.instances[self]; UseTargets(activator,e->target); e->active=!e->active; e->alternateOn=e->active; if(e->changeTexOnActive){ e->texIndex=e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial; if(e->blinkTexOnActive && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} } }
 void ButtonSwitchUse(u16 self, u16 activator) {
-    Entity* e = &World.instances[self];
-    if (Cheats.superoverride || World.diffMis == 0) EntitySetLocked(e,false);
-    else if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(World.position[self]); return; }
-    if ((e->entflags & EF_LOCKED) != 0) {
-        CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]);
-        if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],1.0f,World.position[self],true);
-        return;
-    }
-    
+    Entity* e = &World.instances[self]; if(Cheats.superoverride || World.diffMis == 0){EntitySetLocked(e,false);} else if(GetCurrentLevelSecurity() > e->securityThreshold){UIBlockedBySecurity(World.position[self]); return;}
+    if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],1.0f,World.position[self],true); return; }
     if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true);
     CenterStatusPrint("%s",Sys_Text.stringTable[e->messageIndex]);
-    if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World.pauseRelativeTime + e->delay; }
-    else ButtonSwitchUseTargets(self,activator);
+    if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World.pauseRelativeTime + e->delay; } else ButtonSwitchUseTargets(self,activator);
 }
 
 void ButtonSwitchUpdate(u16 self) {
-    Entity* e = &World.instances[self];
-    if (e->delayFinished > 0.0 && e->delayFinished < World.pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator); }
-    if (e->blinkTexOnActive && e->active && e->tickFinished < World.pauseRelativeTime) {
-        e->alternateOn = !e->alternateOn;
-        e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial;
-        e->tickFinished = World.pauseRelativeTime + e->tickTime;
-    }
+    Entity* e = &World.instances[self]; if (e->delayFinished > 0.0 && e->delayFinished < World.pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator); }
+    if (e->blinkTexOnActive && e->active && e->tickFinished < World.pauseRelativeTime) { e->alternateOn = !e->alternateOn; e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial; e->tickFinished = World.pauseRelativeTime + e->tickTime; }
 }
 
 void ButtonSwitchTargetted(u16 self, u16 activator) { ButtonSwitchUse(self,activator); }
@@ -527,33 +398,13 @@ void VaporizeClick(void) {
     if (World.invP1.generalInventoryIndexRef[cur] < 0) { for (int i=13; i >= 0; i--) { if (World.invP1.generalInventoryIndexRef[i] >= 0) { World.invP1.generalInvCurrent = (i8)i; break; } } }
     play_wav(sounds[89], SfxVol(), (V3){0.0f,0.0f,0.0f}, false); // vaporize sfx
 }
-// AmmoIconManager
-#define AMMO_ICON_NONE    -1
-#define AMMO_ICON_ENERGY  -2
-typedef struct { i8 norm,alt; } AmmoIconEntry;
-static const AmmoIconEntry ammoIconTable[51] = {
-    [36-36] = { 7,  8  }, // MK3 Magnesium / Penetrator
-    [37-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
-    [38-36] = { 0,  1  }, // Dartgun Needle / Tranq
-    [39-36] = { 9,  10 }, // Flechetter Hornette / Splinter
-    [40-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
-    [41-36] = {AMMO_ICON_NONE, AMMO_ICON_NONE},  // Rapier, no ammo
-    [42-36] = {AMMO_ICON_NONE, AMMO_ICON_NONE},  // Pipe, no ammo
-    [43-36] = { 5,  6  }, // Magnum Hollow / Slug
-    [44-36] = { 11, AMMO_ICON_NONE }, // Magpulse Magcart
-    [45-36] = { 2,  3  }, // Pistol Standard / Teflon
-    [46-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
-    [47-36] = { 14, AMMO_ICON_NONE }, // Railgun Rail Round
-    [48-36] = { 4,  AMMO_ICON_NONE }, // Riotgun Rubber
-    [49-36] = { 12, 13 }, // Skorpion Slag / Large Slag
-    [50-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
-    [51-36] = {AMMO_ICON_ENERGY, AMMO_ICON_ENERGY},
-};
 
-i8 AmmoIconGet(int index,bool alt) { if (index < 36 || index > 51) {return AMMO_ICON_NONE;} const AmmoIconEntry* e = &ammoIconTable[index - 36]; return alt ? e->alt : e->norm; } // TODO: trigger immediate-mode UI redraw of weapon pane border, icon visibility, energySlider, energyHeatTicks, energyOverloadButton based on return value (engine-side UI rendering concern).
-// CreditsScroll, video text phases: 0=text1 visible, 1=text2 visible, 2=text3 visible, 3=all hidden
-static double creditsVidStartTime = 0.0; static double creditsVidFinished  = 0.0; static u8 creditsVidPhase    = 0;
-// TODO: start outro.webm video playback via engine video player // TODO: render Sys_Text.stringTable[610] as endVideoText1 (phase 0) // TODO: render Sys_Text.stringTable[611] as endVideoText2 (phase 1) // TODO: render Sys_Text.stringTable[612] as endVideoText3 (phase 2)
+typedef struct { i8 norm,alt; } AmmoIconEntry;
+static const AmmoIconEntry ammoIconTable[51]={[36-36]={7,8}/*MK3 Magnesium/Penetrator*/,[37-36]={-2,-2}/*Energy*/,[38-36]={0,1}/*Dartgun Needle/Tranq*/,[39-36]={9,10}/*Flechette Hornette/Splinter*/,[40-36]={-2,-2}/*Energy*/,[41-36]={-1,-1}/*Rapier, no ammo*/,
+                                              [42-36]={-1,-1}/*Pipe, no ammo*/,[43-36]={5,6}/*Magnum Hollow/Slug*/,[44-36]={11,-1}/*Magpulse Magcart*/,[45-36]={2,3 }/*Pistol Standard/Teflon*/,[46-36]={-2,-2}/*Energy*/,[47-36]={14,-1}/*Railgun Rail Rounds*/,
+                                              [48-36]={4,-1}/*Riotgun Rubber Slugs*/,[49-36]={12,13}/*Skorpion Slag/Large Slag*/,[50-36]={-2,-2}/*Energy*/,[51-36]={-2,-2}/*Energy*/};
+i8 AmmoIconGet(int index,bool alt) { if (index < 36 || index > 51) {return -1;} const AmmoIconEntry* e = &ammoIconTable[index - 36]; return alt ? e->alt : e->norm; } // TODO: trigger immediate-mode UI redraw of weapon pane border, icon visibility, energySlider, energyHeatTicks, energyOverloadButton based on return value (engine-side UI rendering concern).
+static double creditsVidStartTime,creditsVidFinished; static u8 creditsVidPhase; // CreditsScroll, TODO video text phases: 0=text1 visible, 1=text2 visible, 2=text3 visible, 3=all hidden
 void CreditsOnEnable(void) { World.creditsActive=true; World.creditsPageIndex=0; creditsVidStartTime=World.absoluteTime; creditsVidFinished=World.absoluteTime + 37.2; creditsVidPhase=0; }
 void CreditsUpdate(void) {
     if (!World.creditsActive) return;
@@ -568,8 +419,7 @@ void CreditsUpdate(void) {
     if (creditsVidFinished > 0.0) return; // absorb all click input while video playing
     if (Attack()) { // left click — advance
         if (!(World.creditsPageIndex >= CREDITS_PAGES)) {
-            ++World.creditsPageIndex;
-            if (!World.gameFinished && World.creditsPageIndex == 1) ++World.creditsPageIndex; // skip stats page when not finishing game
+            ++World.creditsPageIndex; if (!World.gameFinished && World.creditsPageIndex == 1) ++World.creditsPageIndex; // skip stats page when not finishing game
             if (World.creditsPageIndex >= CREDITS_PAGES) World.creditsPageIndex = CREDITS_PAGES; // bottom
         } else { World.creditsActive = false; MenuGoBack(); }
         return;
@@ -578,54 +428,29 @@ void CreditsUpdate(void) {
 }
 // CyborgConversionToggle
 void CyborgConversionToggleTargetted(void) {
-    bool active = (World.ressurectionActiveLevels >> World.curLev) & 1u;
-    flag_setu16(&World.ressurectionActiveLevels,(1u << World.curLev),!active);
-    if (World.curLev == 6) flag_setu16(&World.ressurectionActiveLevels, (1u<<10|1u<<11|1u<<12),!active); // Set groves 10,11,12 when 6 gets toggled as they don't have their own switch
-    play_wav(sounds[active ? 183 : 184],Sys_Settings.VolumeMessage,(V3){0.0f,0.0f,0.0f},false); // "vox_cybconvcancelled" : "vox_cybconvenabled"
-    CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);
+    bool active = (World.ressurectionActiveLevels >> World.curLev) & 1u; flag_setu16(&World.ressurectionActiveLevels,(1u << World.curLev),!active); if (World.curLev == 6) flag_setu16(&World.ressurectionActiveLevels, (1u<<10|1u<<11|1u<<12),!active); // Set groves 10,11,12 when 6 gets toggled as they don't have their own switch
+    play_wav(sounds[active ? 183 : 184],Sys_Settings.VolumeMessage,(V3){0.0f,0.0f,0.0f},false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);
 }
 // ElevatorButton
-// static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
+// static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"}; TODO
+extern V3 queuedLevelPos; extern u8 queuedLevelToLoad;
 void ElevatorButtonClick(u16 self) {
-    Entity* e = &World.instances[self];
-    if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; }
-    Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor];
-    bool doorClosed = door->doorOpen == DoorState_Closed;
-    float dist = V3_Dist(World.Sys_UI.objectInUsePos,World.position[PLAYER1]);
+    Entity* e = &World.instances[self]; if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; }
+    Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor]; bool doorClosed = door->doorOpen == DoorState_Closed; float dist = V3_Dist(World.Sys_UI.objectInUsePos,World.position[PLAYER1]);
     if (dist > 2.0f/*tether dist*/ && !doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; }
     if (!doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[7]); /*Door not closed.*/ return; }
     if (!(e->entflags & EF_ACTIVE)) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); /*Floor not accessible.*/ return; }
-    V3 spawnPos = (e->targetDestinationID != U16_MAX && e->targetDestinationID < World.instCount) ? World.position[e->targetDestinationID] : (V3){0.0f,0.0f,0.0f};
-    LoadLevel((u8)e->teleportID,spawnPos);
-}
-// Email
-void EmailTargetted(u16 self, u16 activator) {
-    (void)activator; Entity* e = &World.instances[self]; u16 idx = e->emailIndex;
-    if (World.invP1.hasLog[idx]) return;
-    World.invP1.hasLog[idx] = World.invP1.hasNewEmail = true; World.invP1.lastAddedIndex = idx;
-    if (Sys_Text.audioLogType[idx] == AudioLogType_Email) World.invP1.beepDone = true;
-    if (e->autoPlayEmail) PlayLastAddedLog(idx);
-}
-// EnergyOverloadButton
-#define OVERLOAD_CLICK_DEBOUNCE 0.4
-#define OVERLOAD_HEAT_THRESHOLD 25.0f
-static double overloadClickFinished = 0.0;
-void OverloadButtonAction() {
-    if (overloadClickFinished >= World.pauseRelativeTime) return;
-    overloadClickFinished = World.pauseRelativeTime + OVERLOAD_CLICK_DEBOUNCE;
-    if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponIndex] > OVERLOAD_HEAT_THRESHOLD) {
-        CenterStatusPrint("%s",Sys_Text.stringTable[12]); // Weapon too hot
-        return;
-    }
-    if (World.invP1.overloadEnabled) { CenterStatusPrint("%s",Sys_Text.stringTable[13]);/*Overload disabled*/
-        World.invP1.overloadEnabled = false;
-    } else {
-        CenterStatusPrint("%s",Sys_Text.stringTable[17]);/*Overload enabled*/
-        World.invP1.overloadEnabled = true;
-    }
+    queuedLevelPos=(e->targetDestinationID != U16_MAX && e->targetDestinationID < World.instCount) ? World.position[e->targetDestinationID] : (V3){0.0f,0.0f,0.0f}; queuedLevelToLoad=(u8)e->teleportID;
 }
 
-u8 OverloadButtonVisualState() { if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponIndex] > OVERLOAD_HEAT_THRESHOLD) {return 2;} if (World.invP1.overloadEnabled) {return 1;} return 0; }
+void EmailTargetted(u16 self) { Entity* e=&World.instances[self]; u16 idx=e->emailIndex; if(World.invP1.hasLog[idx]){return;} World.invP1.hasLog[idx]=World.invP1.hasNewEmail=true; World.invP1.lastAddedIndex=idx; if(Sys_Text.audioLogType[idx] == AudioLogType_Email){World.invP1.beepDone=true;} if(e->autoPlayEmail){PlayLastAddedLog(idx);} }
+void OverloadButtonAction() {
+    static double overloadClickFinished = 0.0; if (overloadClickFinished >= World.pauseRelativeTime){return;} overloadClickFinished = World.pauseRelativeTime + 0.4; 
+    if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponIndex] > 25.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[12]);/*Weapon too hot*/ return; }
+    if (World.invP1.overloadEnabled) { CenterStatusPrint("%s",Sys_Text.stringTable[13]);/*Overload disabled*/ World.invP1.overloadEnabled = false; } else { CenterStatusPrint("%s",Sys_Text.stringTable[17]);/*Overload enabled*/ World.invP1.overloadEnabled = true; }
+}
+
+u8 OverloadButtonVisualState() { if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponIndex] > 25.0f) {return 2;} if (World.invP1.overloadEnabled) {return 1;} return 0; }
 // TargetID
 #define TARGETID_LINK_DIST       10.0f
 #define TARGETID_DAMAGE_TIME_HIT  2.5f
@@ -634,8 +459,7 @@ float TargetIDGetSensingRange(bool manual) { u8 ver = World.invP1.hardwareVersio
 float TargetIDGetTetherRange() { return (World.invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
 static void TargetIDDeactivate(u16 self) { Entity* e=&World.instances[self]; if(e->enemy != WORLD){Entity* npc=&World.instances[e->enemy]; flag_set(&npc->entflags,EF_TARGID_ATTACHED,false); e->enemy=WORLD;} e->textIndex=-1; flag_set(&e->entflags,EF_ACTIVE,false); }
 void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
-    Entity* e = &World.instances[self]; if (e->enemy == WORLD) return;
-    Entity* npc = &World.instances[e->enemy];
+    Entity* e=&World.instances[self]; if(e->enemy == WORLD){return;} Entity* npc=&World.instances[e->enemy];
     if (attackType == Att_Trnq) { e->textIndex=536;/*STUNNED*/ e->animSwapFinished=World.pauseRelativeTime - 1.0;/*expire damage text*/ }
     else {
         float mh = npcTable[npc->index - 419].health;
@@ -667,51 +491,22 @@ void TargetIDUpdate(u16 self) {
 static const float  hwDrain[12][4] = {[3]={0.01535f,0.03413f,0.02559f,0.0f},[5]={0.04096f,0.10239f,0.17919f,0.05119f},[6]={0.001706f,0.0f,0.0f,0.0f},[7]={0.02559f,0.04266f,0.05119f,0.0f},[9]={0.0f,0.02f,0.015f,0.0f},[11]={0.08533f,0.0f,0.0f,0.0f},};
 static const u16 hwDrainJPM[12][4] = {[3]={9,20,15,0},[5]={24,60,105,30},[6]={1,0,0,0},[7]={15,25,30,0},[9]={0,16,12,0},[11]={50,0,0,0},};
 void CreateTargetIDInstance(float damage, u16 hitIdx, float tranq) { if (hitIdx == WORLD || hitIdx >= World.instCount) return; Entity* npc = &World.instances[hitIdx]; if (!(npc->entflags & EF_ACTIVE) || (npc->entflags & EF_TARGID_ATTACHED)) return; if (V3_Dist(World.position[hitIdx], World.position[PLAYER1]) > TargetIDGetTetherRange()) return; u16 tidIdx = SpawnDynamicObject(736, false); if (tidIdx == WORLD || tidIdx == U16_MAX) return; Entity* tid = &World.instances[tidIdx]; tid->enemy = hitIdx; tid->tickFinished = World.pauseRelativeTime + 4.0; tid->textIndex = (tranq >= 0.0f) ? 536 : -1; tid->animSwapFinished = World.pauseRelativeTime + (tranq >= 0.0f ? 2.5 : 0.0); World.position[tidIdx] = World.position[hitIdx]; flag_set(&tid->entflags, EF_ACTIVE, true); flag_set(&npc->entflags, EF_TARGID_ATTACHED, true); if (damage > 0.0f) TargetIDSendDamageReceive(tidIdx, damage, Att_None); }
-void TargetIdentifierSenseTargets() {
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
-        Entity* e = &World.instances[i];
-        if (!(e->entflags & EF_ACTIVE))       continue;
-        if (!IdxIsNPC(e->index))              continue;
-        if (e->entflags & EF_DEAD)            continue;
-        if (e->entflags & EF_TARGID_ATTACHED) continue;
-        if (V3_Dist(World.position[i],World.position[PLAYER1]) > TargetIDGetSensingRange(false)) continue;
-        CreateTargetIDInstance(0.0f, i, -1.0f);
-    }
-}
-
+void TargetIdentifierSenseTargets() { for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) { Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || !IdxIsNPC(e->index) || (e->entflags & EF_DEAD) || (e->entflags & EF_TARGID_ATTACHED) || V3_Dist(World.position[i],World.position[PLAYER1]) > TargetIDGetSensingRange(false)){continue;} CreateTargetIDInstance(0.0f,i,-1.0f); } }
 bool ModRequestsGrayscale() { return ((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0); }
-static void DeactivateHardwareOnEnergyDepleted() {
-    u16* active = &World.invP1.hardwareIsActive;
-    flag_set((u32*)active,HW_SNS,false); // TODO: SensaroundOff() — hardware button manager effects
-    flag_set((u32*)active,HW_BIO,false); // TODO: BioOff()
-    flag_set((u32*)active,HW_SHD,false); // TODO: ShieldOffWithEffects()
-    flag_set((u32*)active,HW_LAN,false); // TODO: LanternOff()
-    flag_set((u32*)active,HW_BST,false); // TODO: BoosterOff()
-    flag_set((u32*)active,HW_INF,false); // TODO: InfraredOff()
-}
-
+static void DeactivateHardwareOnEnergyDepleted() { World.invP1.hardwareIsActive = 0; }
 void TakeEnergy(float take) { if (World.invP1.energy <= 0.0f || Cheats.redbull) {return;} World.invP1.energy -= take; if (World.invP1.energy <= 0.0f) { World.invP1.energy = 0.0f; play_wav(sounds[84],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false);/*energy_gone*/ CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ DeactivateHardwareOnEnergyDepleted(); } }
 void GiveEnergy(float give,EnergyType type) {
-    World.invP1.energy += give;
-    if (World.invP1.energy > 255.0f) World.invP1.energy = 255.0f;
-    if (type == EnergyType_Battery)       play_wav(sounds[79], Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false); // batteryuse
-    if (type == EnergyType_ChargeStation) play_wav(sounds[100],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false); // chargingstation
+    World.invP1.energy += give; if (World.invP1.energy > 255.0f) {World.invP1.energy = 255.0f;}
+    if (type == EnergyType_Battery){play_wav(sounds[79],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false);/*batteryuse*/} else if (type == EnergyType_ChargeStation){play_wav(sounds[100],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false);/*chargingstation*/}
 }
 
 void PlayerEnergyInit() { World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + random_range(0.0f,1.0f); World.invP1.drainJPM = 0; }
 void PlayerEnergyUpdate() {
-    if (World.invP1.hasHardware & HW_TID) TargetIdentifierSenseTargets();
-    if (World.invP1.energyDrainTickFinished > World.pauseRelativeTime) return;
-    World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1;
-    bool anyDrain = false; u8 ver; World.invP1.drainJPM = 0;
-    for (int hw = 3; hw <= 11; hw++) {
-        u16 bit = (u16)(1u << hw);
-        if (!(World.invP1.hardwareIsActive & bit)) continue;
-        if (hw == 4 || hw == 8 || hw == 10) continue; // No energy usage
-        ver = World.invP1.hardwareVersionSetting[hw];
-        float drain = hwDrain[hw][ver];
-        World.invP1.drainJPM += hwDrainJPM[hw][ver];
-        if (drain > 0.0f) { TakeEnergy(drain); anyDrain = true; }
+    if (World.invP1.hasHardware & HW_TID) TargetIdentifierSenseTargets(); if (World.invP1.energyDrainTickFinished > World.pauseRelativeTime) return;
+    World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1; bool anyDrain = false; u8 ver; World.invP1.drainJPM = 0;
+    for (int hw=3;hw<=11;++hw) {
+        u16 bit=(u16)(1u << hw); if (!(World.invP1.hardwareIsActive & bit) || hw == 4 || hw == 8 || hw == 10) continue; // No energy usage
+        ver=World.invP1.hardwareVersionSetting[hw]; float drain=hwDrain[hw][ver];  World.invP1.drainJPM += hwDrainJPM[hw][ver]; if (drain > 0.0f) { TakeEnergy(drain); anyDrain = true; }
     }
     if (anyDrain && World.invP1.energy <= 0.0f) { DeactivateHardwareOnEnergyDepleted(); World.invP1.drainJPM = 0; } // Depleted
 }
@@ -720,35 +515,22 @@ static void ApplyBattery(void) { if (World.invP1.energy >= 255.0f) { CenterStatu
 static void ApplyIcadBattery(void) { if (World.invP1.energy >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; }/*Energy full*/ GiveEnergy(255.0f,EnergyType_Battery); World.invP1.generalInventoryIndexRef[World.invP1.hardwareInvCurrent] = -1; }
 static void ApplyHealthkit(void) { if (World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; }/*Energy full*/ World.instances[PLAYER1].health = 255.0f; World.invP1.generalInventoryIndexRef[World.invP1.hardwareInvCurrent] = -1; }
 void GeneralInvUse(int buttonIdx,int customIdx) {
-    World.invP1.hardwareInvCurrent = buttonIdx;
-    int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx];
-    if (buttonIdx == 0) {return;} // TODO: World.Sys_UI.SendInfoToItemTab(81) — access cards display, MFDManager // TODO: SetCurrentAsLast for active side panel, MFDManager
-    // TODO: World.Sys_UI.SendInfoToItemTab(itemIdx,customIdx) — MFDManager// TODO: SetCurrentAsLast for active side panel, MFDManager
-    (void)customIdx; (void)itemIdx;
+    World.invP1.hardwareInvCurrent = buttonIdx; int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx]; if (buttonIdx == 0) {return;} // TODO: World.Sys_UI.SendInfoToItemTab(81) — access cards display, MFDManager // TODO: SetCurrentAsLast for active side panel, MFDManager
+    (void)customIdx; (void)itemIdx; // TODO: World.Sys_UI.SendInfoToItemTab(itemIdx,customIdx) — MFDManager// TODO: SetCurrentAsLast for active side panel, MFDManager
 }
 
 void GeneralInvClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvUse(buttonIdx,customIdx); }
 void GeneralInvApply(int buttonIdx,int customIdx) {
     if (buttonIdx == 0) { return; } // TODO: World.Sys_UI.SendInfoToItemTab(81), OpenTab access cards — MFDManager
-    World.invP1.hardwareInvCurrent = buttonIdx;
-    int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx];
-    switch (itemIdx) {
-        case 52: ApplyBattery();     break;
-        case 53: ApplyIcadBattery(); break;
-        case 55: ApplyHealthkit();   break;
-        default: World.invP1.hardwareInvCurrent = buttonIdx; (void)customIdx; break; // TODO: World.Sys_UI.SendInfoToItemTab(itemIdx,customIdx), OpenTab — MFDManager
-    }
+    World.invP1.hardwareInvCurrent = buttonIdx; int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx];
+    switch (itemIdx) { case 52:ApplyBattery();break;  case 53:ApplyIcadBattery();break;  case 55:ApplyHealthkit();break;  default:World.invP1.hardwareInvCurrent=buttonIdx;(void)customIdx;break; /*TODO: World.Sys_UI.SendInfoToItemTab(itemIdx,customIdx), OpenTab — MFDManager*/}
 }
 void GeneralInvDoubleClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvApply(buttonIdx,customIdx); }
 void GeneralInventoryActivate() { int cur=World.invP1.generalInvCurrent; if(cur < 0 || cur >= 14){DualLog("BUG: generalInvCurrent out of range at %d",cur); return;} GeneralInvApply(cur,World.invP1.generalInvCustIdx[cur]); if(cur != 0)World.invP1.generalInventoryIndexRef[cur]=-1; }
-// GrenadeActivate
 static bool GrenadeIsNPCMine(u16 self) { return World.layer[self] != L_PlayerBullets; }
 void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
-    if (target == WORLD || target >= World.instCount || vel <= 0.0f) return;
-    Entity* e = &World.instances[target]; if (e->entflags & EF_DEAD) return;
-    if (!(e->entflags & EF_RIGIDBODY) && target != PLAYER1) return;
-    V3 n = V3_Normalize(normal); if (V3_Mag(n) < 0.0001f) {n = (V3){0.0f,1.0f,0.0f};/*At least make it pop off the floor*/} AddForce(target,V3_ScaleByF(n,vel),true);
-    (void)pt; // TODO, have torque applied relative to point lever arm.
+    if (target == WORLD || target >= World.instCount || vel <= 0.0f){return;} Entity* e = &World.instances[target]; if((e->entflags & EF_DEAD) || (!(e->entflags & EF_RIGIDBODY) && target != PLAYER1)){return;}
+    V3 n = V3_Normalize(normal); if (V3_Mag(n) < 0.0001f) {n = (V3){0.0f,1.0f,0.0f};/*At least make it pop off the floor*/} AddForce(target,V3_ScaleByF(n,vel),true); (void)pt; // TODO, have torque applied relative to point lever arm.
 }
 
 void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseVel) { 
@@ -759,43 +541,30 @@ void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseV
         if (!(e->entflags & EF_RIGIDBODY) && !IdxIsNPC(e->index) && i != PLAYER1) continue;
         float sqd = V3_SqDist(World.position[i], center); if (sqd > r2) continue;
         float dist = vsqrtf(sqd); float falloff = 1.0f - (dist / radius); if (falloff <= 0.0f) continue;
-        V3 normal;
-        if (dist > 0.0001f) normal = V3_ScaleByF(V3_AsubB(World.position[i], center), 1.0f / dist);
-        else normal = (V3){0.0f,1.0f,0.0f}; ApplyImpactForce(i, baseVel * falloff, normal, World.position[i]);
-        if (dd && dd->damage > 0.0f && i != dd->owner) { DamageData splash = *dd; splash.damage = dd->damage * falloff; splash.hitIdx = i; splash.hitpoint = World.position[i]; splash.attacknormal = normal; TakeDamage(i, splash); }
+        V3 normal; if(dist > 0.0001f){normal=V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist);}else{normal = (V3){0.0f,1.0f,0.0f}; ApplyImpactForce(i,baseVel * falloff,normal,World.position[i]);}
+        if (dd && dd->damage > 0.0f && i != dd->owner) { DamageData splash=*dd; splash.damage = dd->damage * falloff; splash.hitIdx = i; splash.hitpoint=World.position[i]; splash.attacknormal=normal; TakeDamage(i,splash); }
     }
 }
 
 void SpawnExplosionEffect(V3 pos, int explosionType) { static const u16 prefabs[6] = {729,730,731,732,733,734}; int idx = (explosionType >= 0 && explosionType < 6) ? explosionType : 2; u16 fx = SpawnDynamicObject(prefabs[idx], false); if (fx == WORLD || fx == U16_MAX) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->delay <= 0.0f) e->delay = 0.8f; e->delayFinished = World.pauseRelativeTime + e->delay; }
 void GrenadeExplode(u16 self) {
     Entity* e = &World.instances[self];
-    DamageData dd = {.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=WORLD,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
+    DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,
+                   .owner=e->recentMostActivator,.hitIdx=WORLD,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
     float radius = (e->strength > 0.0f) ? e->strength : 4.0f;
-    ApplyImpactForceSphere(&dd, World.position[self], radius, e->damage * 1.5f);
-    if (!GrenadeIsNPCMine(self)) { Entity* p = &World.instances[PLAYER1]; p->noiseFinished = World.pauseRelativeTime + 2.0; }
-    i16 idx = (i16)e->index;
-    int soundIndex = 60; int explosionType = 2;
+    ApplyImpactForceSphere(&dd,World.position[self],radius,e->damage * 1.5f); if (!GrenadeIsNPCMine(self)) { Entity* p = &World.instances[PLAYER1]; p->noiseFinished = World.pauseRelativeTime + 2.0; } i16 idx=(i16)e->index; int soundIndex=60,explosionType=2;
     switch (idx) {
-        case 7: case 11: soundIndex = 64; World.fogFac += 5;  explosionType = 1; break; // frag, mine
-        case 8: case 10: soundIndex = 60; World.fogFac += 7;  explosionType = 2; break; // conc, earth
-        case 9:  soundIndex = 67;                           explosionType = 4; break; // emp
-        case 12: soundIndex = 60; World.fogFac += 6;  explosionType = 2; break; // nitro
-        case 13: soundIndex = 63; World.fogFac += 10; explosionType = 3; break; // gas
+        case 7: case 11: soundIndex = 64; World.fogFac += 5; explosionType = 1; break;/*frag, mine*/ case 8: case 10: soundIndex = 60; World.fogFac += 7; explosionType = 2; break;/*conc, earth*/ case 9:  soundIndex = 67; explosionType = 4; break;/*emp*/
+        case 12: soundIndex = 60; World.fogFac += 6;  explosionType = 2; break;/*nitro*/ case 13: soundIndex = 63; World.fogFac += 10; explosionType = 3; break;/*gas*/
     }
-    play_wav(sounds[soundIndex],1.0f,World.position[self],true);
-    SpawnExplosionEffect(World.position[self], explosionType);
-    Shake(-1.0f);
-    DeleteInstance(self);
+    play_wav(sounds[soundIndex],1.0f,World.position[self],true); SpawnExplosionEffect(World.position[self],explosionType); Shake(-1.0f); DeleteInstance(self);
 }
 
 void GrenadeActivate(u16 self) {
-    Entity* e = &World.instances[self];
-    i16 idx = (i16)e->index;
+    Entity* e = &World.instances[self]; i16 idx = (i16)e->index;
     switch (idx) {
-        case 7: case 8: case 9: case 13: e->grenadeExplodeContact = true; break;
-        case 10: e->timerFinished = World.pauseRelativeTime + World.invP1.earthShakerTimeSetting; e->grenadeUseTimer = true; break;
-        case 11: e->grenadeUseProx = true; e->grenadeExplodeContact = false; break;
-        case 12: e->timerFinished = World.pauseRelativeTime + World.invP1.nitroTimeSetting; e->grenadeUseTimer = true; break;
+        case 7: case 8: case 9: case 13: e->grenadeExplodeContact = true; break;    case 10: e->timerFinished = World.pauseRelativeTime + World.invP1.earthShakerTimeSetting; e->grenadeUseTimer = true; break;
+        case 11: e->grenadeUseProx = true; e->grenadeExplodeContact = false; break; case 12: e->timerFinished = World.pauseRelativeTime + World.invP1.nitroTimeSetting; e->grenadeUseTimer = true; break;
         default: return;
     }
 }
@@ -808,9 +577,7 @@ void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactTy
 void ExitCyberspace(void) { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel(World.startLevel < World.numLevels ? World.startLevel : 0, (V3){0.0f,0.0f,0.0f}/*TODO Remember level and location player left to enter cyberspace!*/); }
 void ReduceCurrentLevelSecurity(SecurityType stype) { // Typical level: 4 CPU nodes. 20 cameras, 100% = 4x + 20y.  Assuming that a good camera percentage is 2-3%, CPU % would be about 10-15 each
     u8 lev = World.curLev; if (lev >= 14 || stype == SecurityType_None) return;
-    const float camScore=4.0f, nodeSmallScore=10.0f, nodeLargeScore=27.0f;
-    float total = (World.levelCameraCount[lev]*camScore)+(World.levelSmallNodeCount[lev]*nodeSmallScore)+(World.levelLargeNodeCount[lev]*nodeLargeScore);
-    if (total <= 0.0f) return;
+    const float camScore=4.0f, nodeSmallScore=10.0f, nodeLargeScore=27.0f; float total = (World.levelCameraCount[lev]*camScore)+(World.levelSmallNodeCount[lev]*nodeSmallScore)+(World.levelLargeNodeCount[lev]*nodeLargeScore); if (total <= 0.0f) return;
     float drop = camScore;
     switch (stype) {
         case SecurityType_Camera: drop=(camScore/total)*100.0f; if (World.levelCameraDestroyedCount[lev]<255) World.levelCameraDestroyedCount[lev]++; break;
@@ -818,8 +585,7 @@ void ReduceCurrentLevelSecurity(SecurityType stype) { // Typical level: 4 CPU no
         case SecurityType_NodeLarge: drop=(nodeLargeScore/total)*100.0f; if (World.levelLargeNodeDestroyedCount[lev]<255) World.levelLargeNodeDestroyedCount[lev]++; break;
         default: return;
     }
-    int cur=(int)World.levelSecurity[lev]-(int)drop;
-    if (cur<0) cur=0; World.levelSecurity[lev]=(u8)cur;
+    int cur=(int)World.levelSecurity[lev]-(int)drop; if (cur<0) cur=0; World.levelSecurity[lev]=(u8)cur;
     if (World.levelCameraDestroyedCount[lev]==World.levelCameraCount[lev] && World.levelSmallNodeDestroyedCount[lev]==World.levelSmallNodeCount[lev] && World.levelLargeNodeDestroyedCount[lev]==World.levelLargeNodeCount[lev]) World.levelSecurity[lev]=0;
     CenterStatusPrint("%s%d%s", Sys_Text.stringTable[306], (int)World.levelSecurity[lev], Sys_Text.stringTable[307]);
 }
@@ -830,7 +596,8 @@ float Tranquilize(u16 i, float amount, bool energy);
 static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
     Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return; // hit own host, ignore
     e->counter++;
-    DamageData dd = {.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity= e->damage * 1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
+    DamageData dd = {.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity= e->damage * 1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx,
+                     .isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
     Entity* hit = &World.instances[hitIdx];
     if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; }
     if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; } // Railgun sphere impact
@@ -840,70 +607,36 @@ static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 
         dd.impactVelocity = dd.damage * 1.5f;
         if (e->counter > 0) dd.impactVelocity /= 3.0f;
         if (World.curLev != LEVEL_CYBERSPACE && e->recentMostActivator == PLAYER1) { ApplyImpactForce(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); }
-        float dmgFinal = TakeDamage(hitIdx,dd);
-        float tranq = -1.0f;
-        if (dd.isOtherNPC) {
-            if (!(hit->entflags & EF_ASLEEP)) World.Sys_Music.inCombat = true;
-            if (dd.attackType == Att_Trnq) { float stunAmount = vclamp(3.0f + (World.invP1.stungunSetting / 100.0f) * 7.0f, 3.0f, 10.0f); tranq = Tranquilize(hitIdx, stunAmount, true); }
-        }
-        if (dmgFinal < 0.0f) dmgFinal = 0.0f;
-        CreateTargetIDInstance(dmgFinal,hitIdx,tranq);
-        SpawnImpactEffect(GetImpactType(hitIdx),hitPos);
+        float dmgFinal = TakeDamage(hitIdx,dd); float tranq=-1.0f;
+        if (dd.isOtherNPC) { if(!(hit->entflags & EF_ASLEEP)){World.Sys_Music.inCombat=true;} if(dd.attackType == Att_Trnq){float stunAmount=vclamp(3.0f+(World.invP1.stungunSetting/100.0f)*7.0f,3.0f,10.0f); tranq=Tranquilize(hitIdx,stunAmount,true);} }
+        if (dmgFinal < 0.0f) {dmgFinal = 0.0f;} CreateTargetIDInstance(dmgFinal,hitIdx,tranq); SpawnImpactEffect(GetImpactType(hitIdx),hitPos);
     }
     if (e->counter >= e->countToTrigger) { SpawnImpactEffect(GetImpactType(hitIdx),hitPos); if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
 }
 #pragma GCC diagnostic pop
 
-void ProjectileEffectImpactInitAfterLoad(u16 self) {
-    Entity* e       = &World.instances[self];
-    e->counter      = 0;
-    if (e->countToTrigger < 1) e->countToTrigger = 1;
-}
+void ProjectileEffectImpactInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->counter=0; if(e->countToTrigger < 1){e->countToTrigger=1;} }
 // HealthManager
-// Attack type damage multiplier table [NPCType][AttType], 1.0f = no change, 0.0f = immune, other = multiplier
-static const float attackTypeMult[7][12] = {
-    // None  Melee  MelEn  EnBm   Mag    Proj   Needle ProjEB ProjLn Gas    Tranq  Drill
-    [NPCType_Mutant]      = {1,1,1,1,0,  1,2,1,1,2,1,1},
-    [NPCType_Supermutant] = {1,1,1,1,0,  1,1,1,1,1.5,1,1},
-    [NPCType_Robot]       = {1,1,1,1,4,  1,0,1,1,0,1,1},
-    [NPCType_Cyborg]      = {1,1,1,1,2,  1,1,1,1,1,1,1},
-    [NPCType_Supercyborg] = {1,1,1,1,2,  1,0,1,1,0,1,1},
-    [NPCType_MutantCyborg]= {1,1,1,1,0.5,1,2,1,1,2,1.5,1},
-    [NPCType_Cyber]       = {1,1,1,1,1,  1,1,1,1,1,1,0},
-};
 
+ // None  Melee  MelEn  EnBm   Mag    Proj   Needle ProjEB ProjLn Gas    Tranq  Drill
+static const float attackTypeMult[7][12]={[NPCType_Mutant]={1,1,1,1,0,1,2,1,1,2,1,1},[NPCType_Supermutant]={1,1,1,1,0,1,1,1,1,1.5,1,1},[NPCType_Robot]={1,1,1,1,4,1,0,1,1,0,1,1},[NPCType_Cyborg]={1,1,1,1,2,1,1,1,1,1,1,1},[NPCType_Supercyborg]={1,1,1,1,2,1,0,1,1,0,1,1},
+                                          [NPCType_MutantCyborg]={1,1,1,1,0.5,1,2,1,1,2,1.5,1},[NPCType_Cyber]={1,1,1,1,1,1,1,1,1,1,1,0}}; // Attack type damage multiplier table [NPCType][AttType], 1.0f = no change, 0.0f = immune, other = multiplier
 static const i16 objectDeathSound[] = {[458]=63,[459]=66,[460]=66,[464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,[472]=62,[473]=62,[474]=62,[475]=62,[476]=62,[477]=61,[478]=65,[479]=69,[525]=68,[526]=68,};
-static bool IsCyberEntity(u16 self) {
-    if (World.curLev == LEVEL_CYBERSPACE) return true;
-    Entity* e = &World.instances[self];
-    if (self != PLAYER1 && e->cyberHealth > 0.0f) return true;
-    return (IdxIsNPC(e->index) && (e->index - 419) > 23); // 24-28 are cyber enemies
-}
-
+static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE){return true;} Entity* e=&World.instances[self]; if (self != PLAYER1 && e->cyberHealth > 0.0f){return true;} return (IdxIsNPC(e->index) && (e->index - 419) > 23);/*24-28 are cyber enemies*/}
 static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxIsNPC(World.instances[self].index) || World.instances[self].health <= 0.0f){return take;} NPCType t = npcTable[World.instances[self].index - 419].type; if (at >= 12){return take;} return take * attackTypeMult[t][at]; }
 static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (!sEmpty(World.instances[self].target)) UseTargets(self,World.instances[self].target); }
 static void TeleportAway(u16 self) { 
-    if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;}
-    flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true);
-    World.collider[self] = COLTYPE_NONE;
-    World.gravity[self] = 0.0f;
-    World.velocity[self] = (V3){0,0,0};
-    World.angularVelocity[self] = (V3){0,0,0};
-    World.instances[self].modelIndex = U16_MAX;
-    V3 fxPos = World.position[self]; if (World.collider[self] != COLTYPE_NONE) fxPos = V3_AplusB(fxPos, World.colliderCenter[self]);
-    SpawnImpactEffect(735, fxPos); play_wav(sounds[106], 1.0f, fxPos, false);
+    if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;} flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true);
+    World.collider[self] = COLTYPE_NONE; World.gravity[self] = 0.0f; World.velocity[self] = (V3){0,0,0}; World.angularVelocity[self] = (V3){0,0,0}; World.instances[self].modelIndex = U16_MAX;
+    V3 fxPos = World.position[self]; if(World.collider[self] != COLTYPE_NONE){fxPos=V3_AplusB(fxPos,World.colliderCenter[self]);} SpawnImpactEffect(735,fxPos); play_wav(sounds[106],1.0f,fxPos,false);
 }
 
 static void DropSearchables(u16 self) {
-    // TODO: NotifySearchThatSearchableWasDestroyed();
+    /*TODO: NotifySearchThatSearchableWasDestroyed();*/
     for (int i = 0; i < 4; i++) {
-        if (World.instances[self].contents[i] == U16_MAX) continue;
-        u16 spawned = SpawnDynamicObject(World.instances[self].contents[i] + 307,true);
-        if (spawned != U16_MAX) {
-            World.position[spawned] = World.position[self];
-            World.instances[spawned].custIdx[0] = World.instances[self].custIdx[i];
-        } else CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");
-        World.instances[self].contents[i] = World.instances[self].custIdx[i] = U16_MAX;
+        if (World.instances[self].contents[i] == U16_MAX) {continue;} u16 spawned = SpawnDynamicObject(World.instances[self].contents[i] + 307,true);
+        if(spawned != U16_MAX){World.position[spawned]=World.position[self]; World.instances[spawned].custIdx[0]=World.instances[self].custIdx[i];}else{CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");}
+        World.instances[self].contents[i] = World.instances[self].custIdx[i]=U16_MAX;
     }
 }
 
@@ -911,69 +644,31 @@ static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {
 static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.gravity[self] = 0.0f; }
 static void NPCDeath(u16 self) {
     if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) {return;}
-    flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true);
-    CreateDeathEffects(self,World.instances[self].deathBurst);
-    if (World.instances[self].index == 419) play_wav(sounds[64],1.0f,World.position[self],true); // npc_autobomb: explosion1
+    flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true); CreateDeathEffects(self,World.instances[self].deathBurst); if (World.instances[self].index == 419) play_wav(sounds[64],1.0f,World.position[self],true); // npc_autobomb: explosion1
     if (npcTable[World.instances[self].index - 419].type == NPCType_Cyber) DeleteInstance(self);
     // else: keep collider alive to prevent falling through floor (Unity physics note preserved)
 }
 
 static void ObjectDeath(u16 self) {
-    Entity* e = &World.instances[self];
-    if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) return;
-    if (World.instances[self].entflags & EF_DEATH_BURST_DONE) { // gibOnDeath reuses DEATH_BURST_DONE
-        // Gib path
-        CreateDeathEffects(self,World.instances[self].deathBurst);
-        DropSearchables(self);
-        if (World.instances[self].index != 279) World.collider[self] = COLTYPE_NONE;
-        HideSelf(self);
-    } else {
-        World.collider[self] = COLTYPE_NONE;
-        DropSearchables(self);
-        CreateDeathEffects(self,World.instances[self].deathBurst);
-    }
-    flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true);
-    World.instances[self].automapHidden = true;
+    Entity* e = &World.instances[self]; if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) return;
+    if (World.instances[self].entflags & EF_DEATH_BURST_DONE) { CreateDeathEffects(self,World.instances[self].deathBurst); DropSearchables(self); if (World.instances[self].index != 279){World.collider[self]=COLTYPE_NONE;} HideSelf(self); }
+    else { World.collider[self] = COLTYPE_NONE; DropSearchables(self); CreateDeathEffects(self,World.instances[self].deathBurst); }
+    flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true); World.instances[self].automapHidden = true;
     if (World.instances[self].securityThreshold > 0) {
-        SecurityType stype = SecurityType_None;
-        switch ((SecurityType)World.instances[self].securityThreshold) {
-            case SecurityType_Camera:    stype = SecurityType_Camera; break;
-            case SecurityType_NodeSmall: stype = SecurityType_NodeSmall; break;
-            case SecurityType_NodeLarge: stype = SecurityType_NodeLarge; break;
-            default: break;
-        }
-        if (stype != SecurityType_None) ReduceCurrentLevelSecurity(stype);
+        SecurityType stype = SecurityType_None; if(World.instances[self].index == 477){stype=SecurityType_Camera;}else if(World.instances[self].index == 479){stype=SecurityType_NodeSmall;} else if(World.instances[self].index == 478){stype=SecurityType_NodeLarge;}
+        if(stype != SecurityType_None){ReduceCurrentLevelSecurity(stype);}
     }
-    u16 idx = World.instances[self].index;
-    i16 soundex = 62; // default: crate_break
-    if (idx < 527 && objectDeathSound[idx] != 0) soundex = objectDeathSound[idx];
-    play_wav(sounds[soundex],1.0f,World.position[self],true);
-    if (e->deathBurst != 0) HideSelf(self);
+    u16 idx = World.instances[self].index; play_wav(sounds[((idx < 527 && objectDeathSound[idx] != 0) ? objectDeathSound[idx] : 62/*crate_break*/)],1.0f,World.position[self],true); if(e->deathBurst != 0){HideSelf(self);}
 }
 
 static void ScreenDeath(u16 self) {
-    Entity* e = &World.instances[self];
-    if (e->entflags & EF_DEAD_CHECKS_DONE) return;
-    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
-    play_wav(sounds[69],1.0f,World.position[self],true); // screen_destroy
+    Entity* e = &World.instances[self]; if (e->entflags & EF_DEAD_CHECKS_DONE) return;
+    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true); play_wav(sounds[69],1.0f,World.position[self],true); // screen_destroy
     // TODO: stop ImageSequenceTextureArray animation for this instance
     if (e->entflags & EF_DEATH_BURST_DONE) ObjectDeath(self); // gib path
 }
 
-static void VaporizeCorpse(u16 self,bool energyVaporized) {
-    Entity* e = &World.instances[self];
-    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
-    DropSearchables(self);
-    u16 fx = e->deathBurst;
-    if (fx == 0) fx = 1; // PoolType_CorpseHit fallback
-    if (energyVaporized) fx = 2; // PoolType_Vaporize
-    e->modelIndex = MAX_MDLS;
-    bool isNPC = IdxIsNPC(e->index);
-    bool isSearchable = IdxIsSearchable(e->index);
-    if (isNPC || isSearchable) DeleteInstance(self);
-    CreateDeathEffects(self,fx);
-}
-
+static void VaporizeCorpse(u16 self,bool energyVaporized) { Entity* e=&World.instances[self]; flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true); DropSearchables(self); e->modelIndex=MAX_MDLS; if (IdxIsNPC(e->index) || IdxIsSearchable(e->index)) DeleteInstance(self); CreateDeathEffects(self,energyVaporized ? 2 : ((e->deathBurst == 0) ? 1/*Corpse hit fallback*/ : e->deathBurst)); }
 static void Death(u16 self,bool energyVaporized) {
     Entity* e = &World.instances[self];
     if (e->entflags & EF_DEAD_CHECKS_DONE) return;
@@ -982,28 +677,22 @@ static void Death(u16 self,bool energyVaporized) {
     bool isObj = IdxIsDynamicObject(e->index);
     if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->entflags |= EF_DEAD_CHECKS_DONE; return; }
 //     bool gib        = (e->entflags & EF_DEATH_BURST_DONE) != 0;
-    bool vaporize   = (IdxIsNPC(e->index) && e->health <= 0.0f) || IdxIsCorpse(e->index); // vaporizeCorpse maps to VISIBLE being set
-    bool isScreen   = (e->index == 279);
-    bool isGrenade  = (e->entflags & EF_ISGRENADE) != 0;
-    bool isCam      = (e->index == 477);
-    bool doTeleport = (e->entflags & EF_TELEPORT_ON_DEATH) != 0; // REQUIRE_RESET reused as teleportOnDeath
+    bool vaporize=(IdxIsNPC(e->index) && e->health <= 0.0f) || IdxIsCorpse(e->index); // vaporizeCorpse maps to VISIBLE being set
+    bool isGrenade=(e->entflags & EF_ISGRENADE) != 0, doTeleport=(e->entflags & EF_TELEPORT_ON_DEATH) != 0; // REQUIRE_RESET reused as teleportOnDeath
     if (e->iceActive) World.collider[self] = COLTYPE_NONE;
-    if (vaporize && !isCam && !isGrenade) VaporizeCorpse(self,energyVaporized);
-    else if (isObj)    ObjectDeath(self);
-    else if (isScreen) ScreenDeath(self);
+    if (vaporize && e->index != 477/*sec_camera*/ && !isGrenade) VaporizeCorpse(self,energyVaporized);
+    else if (isObj) ObjectDeath(self);
+    else if (e->index == 279/*screen*/) ScreenDeath(self);
     else if (doTeleport) TeleportAway(self);
     else if (isGrenade) GrenadeExplode(self);
-    if (isNPC && !doTeleport) NPCDeath(self);
-    else if (self == PLAYER1) World.deaths++;
+    if (isNPC && !doTeleport) NPCDeath(self); else if (self == PLAYER1) World.deaths++;
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
 }
 
 float TakeDamage(u16 self,DamageData dd) {
     if (Cheats.god && self == PLAYER1) return 0.0f;
-    bool isCyber = IsCyberEntity(self);
-    float* hp = isCyber ? &World.instances[self].cyberHealth : &World.instances[self].health;
-    bool isNPC = IdxIsNPC(World.instances[self].index);
-    bool isPlayer = (self == PLAYER1);
+    bool isCyber = IsCyberEntity(self); float* hp = isCyber ? &World.instances[self].cyberHealth : &World.instances[self].health;
+    bool isNPC = IdxIsNPC(World.instances[self].index), isPlayer = (self == PLAYER1);
 //     bool isObj = IdxIsDynamicObject(World.instances[self].index); // TODO
     bool isGrenade = (World.instances[self].entflags & EF_ISGRENADE) != 0;
 //     bool isScreen  = (World.instances[self].index == 279); // TODO
@@ -1017,7 +706,6 @@ float TakeDamage(u16 self,DamageData dd) {
         bool allowPost = (isNPC || World.instances[self].iceActive || isPlayer || isGrenade || World.instances[self].index == 279 || isCam);
         if (!allowPost) return 0.0f;
     }
-
     float take = dd.damage;
     if (isPlayer) {
         float absorb = 0.0f;
@@ -1467,7 +1155,7 @@ void Targetted(u16 activator, u16 self) {
     DualLog("Targetted a->ioflags:%u e:%u doorcond:%u\n", aioflags, e->index, ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)));
     if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; } // info_message
     if (e->index == 708) { World.gameFinished = true; return; }
-    if (e->index == 707) { EmailTargetted(self, activator); return; } // info_email
+    if (e->index == 707) { EmailTargetted(self); return; } // info_email
     if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) { if(e->index == 598 || e->index == 600){TriggerTargetted(self,activator);}else if(e->index == 594){TriggerCounterTargetted(self,activator);} }
     if (aioflags & TARG_IOFLAGS_UNLOCK) EntitySetLocked(e, false);
     if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true);
@@ -1563,7 +1251,7 @@ u16 GetCursorTexture() {
         case 352: return 1010;/*weapon_pistol*/           case 353: return 1019;/*weapon_plasma*/           case 354: return 1027;/*weapon_railgun*/             case 355: return 1035;/*weapon_riotgun*/           case 356: return 1036;/*weapon_skorpion*/
         case 357: return 1052;/*weapon_sparqbeam*/        case 358: return 1065;/*weapon_stungun*/          case 359: return 965;/*item_battery*/                case 360: return 968;/*item_battery_icad*/         case 361: return 972;/*item_logic_probe*/
         case 362: return 967;/*item_healthkit*/           case 363: return 973;/*item_plastique*/           case 365: return 766;/*item_flask*/                  case 366: return 969;/*item_chipset_bitflag*/      case 367: return 549;/*item_ammo_rubber*/
-        case 368: return 971;/*item_isotopex22*/          case 369: return 765;/*item_testtube*/            case 370: return 853;/*weapon_grenadefrag_live*/     case 371: return 970;/*item_chipset_isolinear*/    case 372: return 849;/*weapon_grenadeconc_live*/
+        case 368: return 971;/*item_isotopex22*/          case 369: return 765;/*it442em_testtube*/            case 370: return 853;/*weapon_grenadefrag_live*/     case 371: return 970;/*item_chipset_isolinear*/    case 372: return 849;/*weapon_grenadeconc_live*/
         case 373: return 420;/*item_ammo_needle*/         case 374: return 602;/*item_ammo_tranq*/          case 375: return 593;/*item_ammo_standard*/          case 376: return 597;/*item_ammo_teflon*/          case 377: return 411;/*item_ammo_hollow*/
         case 378: return 561;/*item_ammo_slug*/           case 379: return 419;/*item_ammo_magnesium*/      case 380: return 421;/*item_ammo_penetrator*/        case 381: return 417;/*item_ammo_hornet*/          case 382: return 577;/*item_ammo_splinter*/
         case 383: return 422;/*item_ammo_rail*/           case 384: return 551;/*item_ammo_slag*/           case 385: return 552;/*item_ammo_slaglarge*/         case 386: return 418;/*item_ammo_magcart*/         case 387: return 851;/*weapon_grenadeemp_live*/
