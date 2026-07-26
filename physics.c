@@ -187,7 +187,6 @@ typedef union { __m128 f; __m128i i; } m128_bits;
 typedef int          __v8si  __attribute__((__vector_size__(32)));
 typedef long long    __m256i __attribute__((__vector_size__(32)));
 typedef __m256i      __m256i_u __attribute__((__may_alias__, __aligned__(1)));
-#define _mm256_storeu_si256(P, V)  (*(__m256i_u *)(P) = (V))
 #define _mm256_loadu_ps(P)         (*(__m256_u const *)(P))
 #define _mm256_set1_ps(A)          ((__m256){ (A),(A),(A),(A),(A),(A),(A),(A) })
 #define _mm256_setr_ps(e0,e1,e2,e3,e4,e5,e6,e7) ((__m256){ (e0),(e1),(e2),(e3),(e4),(e5),(e6),(e7) })

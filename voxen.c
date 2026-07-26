@@ -901,7 +901,7 @@ void InitalizeEnvironment() {
 
 void Physics(float dt); void UpdateAnims(void); void UpdateAudio(); bool ScrshotPressed();
 i32 main() {
-    InitalizeEnvironment(); 
+    InitalizeEnvironment();
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
         double curtime = get_time(); World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time,0.0); World.absoluteTime+=World.deltaTime; World.current_time=curtime;

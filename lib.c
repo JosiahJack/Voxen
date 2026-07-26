@@ -1,7 +1,45 @@
 // lib.c - LibC replacement functions and other misc helpers.
 #include "common.h"
-void* mcpy(void *dst, const void *src, size_t n) { u8 *d=(u8 *)dst; const u8 *s=(const u8 *)src; while (n--) {*d++=*s++;} return dst; } // memcpy replacement
-void* mset(void *dst, int c, size_t n) { u8 *p=(u8 *)dst; u8 v=(u8)c; while (n--) {*p++=v;} return dst; } // memset replacement
+typedef long long __m256i_t __attribute__((__vector_size__(32), __may_alias__, __aligned__(1)));
+#define __m256i __m256i_t
+#define _mm256_loadu_si256(P) (*(__m256i*)(P))
+#define _mm_loadu_si128(P) (*(__m128i_u*)(P))
+static inline __m256i _mm256_set1_epi8_fast(char c) { __m256i v; char *p = (char*)&v; for (int i = 0; i < 32; ++i) p[i] = c; return v; }
+static inline __m128i _mm_set1_epi8_fast(char c) { __m128i v; char *p = (char*)&v; for (int i = 0; i < 16; ++i) p[i] = c; return v; }
+void* mcpy(void *dst, const void *src, size_t n) {
+    u8 *d = (u8*)dst; const u8 *s = (const u8*)src; size_t i = 0;
+    for (; i + 128 <= n; i += 128) {
+        _mm256_storeu_si256((__m256i*)(d+i),    _mm256_loadu_si256((const __m256i*)(s+i)));
+        _mm256_storeu_si256((__m256i*)(d+i+32), _mm256_loadu_si256((const __m256i*)(s+i+32)));
+        _mm256_storeu_si256((__m256i*)(d+i+64), _mm256_loadu_si256((const __m256i*)(s+i+64)));
+        _mm256_storeu_si256((__m256i*)(d+i+96), _mm256_loadu_si256((const __m256i*)(s+i+96)));
+    }
+    for (; i + 32 <= n; i += 32) { _mm256_storeu_si256((__m256i*)(d+i), _mm256_loadu_si256((const __m256i*)(s+i))); }
+    size_t rem = n - i; u8* rd = d + i; const u8* rs = s + i;
+    if (rem >= 16) { _mm_storeu_si128((__m128i*)rd, _mm_loadu_si128((const __m128i*)rs)); _mm_storeu_si128((__m128i*)(d+n-16), _mm_loadu_si128((const __m128i*)(s+n-16)));
+    } else if (rem >= 8) { *(u64*)rd = *(const u64*)rs; *(u64*)(d+n-8) = *(const u64*)(s+n-8);
+    } else if (rem >= 4) { *(u32*)rd = *(const u32*)rs; *(u32*)(d+n-4) = *(const u32*)(s+n-4);
+    } else if (rem >= 2) { *(u16*)rd = *(const u16*)rs; *(u16*)(d+n-2) = *(const u16*)(s+n-2);
+    } else if (rem == 1) { *rd = *rs; }
+    return dst;
+}
+
+void* mset(void *dst, int c, size_t n) {
+    u8 *p = (u8*)dst; size_t i = 0;
+    if (n >= 32) {
+        __m256i v256 = _mm256_set1_epi8_fast((char)c);
+        for (; i + 128 <= n; i += 128) { _mm256_storeu_si256((__m256i*)(p+i),v256); _mm256_storeu_si256((__m256i*)(p+i+32),v256); _mm256_storeu_si256((__m256i*)(p+i+64),v256); _mm256_storeu_si256((__m256i*)(p+i+96),v256); }
+        for (; i + 32 <= n; i += 32) { _mm256_storeu_si256((__m256i*)(p+i), v256); }
+    }
+    size_t rem = n - i; u8* rp = p + i;
+    if (rem >= 16) { __m128i v128 = _mm_set1_epi8_fast((char)c); _mm_storeu_si128((__m128i*)rp, v128); _mm_storeu_si128((__m128i*)(p+n-16), v128);
+    } else if (rem >= 8) { u64 v64 = (u64)0x0101010101010101ULL * (u8)c; *(u64*)rp = v64; *(u64*)(p+n-8) = v64;
+    } else if (rem >= 4) { u32 v32 = 0x01010101U * (u8)c; *(u32*)rp = v32; *(u32*)(p+n-4) = v32;
+    } else if (rem >= 2) { u16 v16 = (u16)(0x0101U * (u8)c); *(u16*)rp = v16; *(u16*)(p+n-2) = v16;
+    } else if (rem == 1) { *rp = (u8)c; }
+    return dst;
+}
+
 size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
 char* data_parser_trim(char* s) { while(cEmpty((u8)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((u8)*e)){e--;} e[1]=0; return s; }
 i32 s2i32(const char *str) { // atoi replacement, needed separately from fast_atoi for user console input
@@ -108,24 +146,20 @@ void BmpWrite(char const *filename, int x, int y, const void *data) {
 
 void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
     (void)context;
-    //static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
-    //long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;
-    //size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0;
-    //long fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
-
-    //char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1); if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0'; OS_Close(fd); char* p = buf;
-    //while (*p) {
-        //if (mcmp(p,"Private_",8) == 0) {
-            //p += 8; size_t val = 0; if (mcmp(p,"Clean",5) !=0 && mcmp(p,"Dirty",5) != 0) { p++; continue; }
-            //while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
-            
-            //p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
-        //}
-        
-        //p++;
-    //}
-
-    //DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
+//     static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
+//     long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;
+//     size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0;
+//     long fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
+//     char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1); if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0'; OS_Close(fd); char* p = buf;
+//     while (*p) {
+//         if (mcmp(p,"Private_",8) == 0) {
+//             p += 8; size_t val = 0; if (mcmp(p,"Clean",5) !=0 && mcmp(p,"Dirty",5) != 0) { p++; continue; }
+//             while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
+//             p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
+//         }
+//         p++;
+//     }
+//     DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
 }
 
 int OS_MakeFolder(const char* path);

@@ -262,6 +262,7 @@ typedef float __v4sf __attribute__((__vector_size__(16))); typedef int __v4si __
 #define _mm_storeu_ps(P, A) (*(__m128_u *)(P) = (A))
 #define _mm_add_ps(A, B) ((__m128)((__v4sf)(A) + (__v4sf)(B)))
 #define _mm_mul_ps(A, B) ((__m128)((__v4sf)(A) * (__v4sf)(B)))
+#define _mm256_storeu_si256(P, V) (*(__m256i*)(P) = (V))
 #define PI 3.14159265f
 #define TAU 6.2831853f
 #define INV_TAU (1.0f / TAU) // Precomputed for fast multiplication
@@ -298,10 +299,7 @@ INLINE float V3_Dist(V3 a, V3 b) { return V3_Mag(V3_AsubB(a,b)); }
 INLINE V3 V3_Cross(V3 a, V3 b) { return (V3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
 INLINE V3 V3_Normalize(V3 v) { float len_sq = V3_dot(v,v); if (len_sq < 0.000001f){return v;} float inv_len = vinvsqtf(len_sq); return (V3){v.x * inv_len, v.y * inv_len, v.z * inv_len}; }
 INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2){float aw=q1.w,ax=q1.x,ay=q1.y,az=q1.z,bw=q2.w,bx=q2.x,by=q2.y,bz=q2.z; return (Quaternion){aw*bx+ax*bw+ay*bz-az*by,aw*by-ax*bz+ay*bw+az*bx,aw*bz+ax*by-ay*bx+az*bw,aw*bw-ax*bx-ay*by-az*bz};}
-INLINE V3 quat_rot_v3(Quaternion q, V3 v) {
-    float x=q.x, y=q.y, z=q.z, w=q.w; float vx=v.x, vy=v.y, vz=v.z; float tx=2.0f * (y*vz - z*vy); float ty=2.0f * (z*vx - x*vz); float tz=2.0f * (x*vy - y*vx); return (V3){vx + w*tx + (y*tz - z*ty),vy + w*ty + (z*tx - x*tz),vz + w*tz + (x*ty - y*tx)};
-}
-
+INLINE V3 quat_rot_v3(Quaternion q, V3 v) {float x=q.x,y=q.y,z=q.z,w=q.w; float vx=v.x,vy=v.y,vz=v.z; float tx=2.0f*(y*vz-z*vy); float ty=2.0f*(z*vx-x*vz); float tz=2.0f*(x*vy-y*vx); return (V3){vx+w*tx+(y*tz-z*ty),vy+w*ty+(z*tx-x*tz),vz+w*tz+(x*ty-y*tx)};}
 INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
 INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 760); }
@@ -318,16 +316,8 @@ INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 
 INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
 INLINE bool IdxIsAccessCard(u16 c) { return ((c >= 388 && c <= 398) || c == 417); }
 INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 404) || c == 417 || (c >= 419 && c <= 447) || (c >= 458 && c <= 463) || (c >= 465 && c <= 476); }
-INLINE bool IdxIsStaticObjectSaveable(int c) {
-    return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603)  || (c >= 604 && c < 616)
-            || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746));
-}
-
-INLINE bool IdxIsStaticObjectImmutable(int c) {
-    return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698
-            || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755));
-}
-
+INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603)  || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
+INLINE bool IdxIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
 INLINE float UsableOrDef(float cur, float def) { u32 c = *(u32*)&cur, d = *(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
 INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 36 && i <= 51) ? (i - 36) : -1; }
 INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==37 || i==40 || i==46 || i==50 || i==51; }
@@ -373,7 +363,7 @@ typedef u32(*FGL_CFBS)(u32), (*FGL_CP)(), (*FGL_GERR)(), (*FGL_CBFV)(u32,i32,con
 extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferData; extern FGL_UB glUnmapBuffer; extern FGL_MBR glMapBufferRange; extern FGL_U2F glUniform2f; extern FGL_U1F glUniform1f; extern FGL_U1UI glUniform1ui; extern FGL_UP glUseProgram;
 extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays; extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i;
 extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding; extern FGL_EVAA glEnableVertexAttribArray;
-extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable;
+extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_FL glFlush; extern FGL_F glFinish;
 typedef enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)} JoyHatId;
 typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,
              KEY_SEMICOLON=59/* ; */,KEY_EQUAL=61/* = */,KEY_A=65,KEY_B=66,KEY_C=67,KEY_D=68,KEY_E=69,KEY_F=70,KEY_G=71,KEY_H=72,KEY_I=73,KEY_J=74,KEY_K=75,KEY_L=76,KEY_M=77,KEY_N=78,KEY_O=79,KEY_P=80,KEY_Q=81,KEY_R=82,KEY_S=83,KEY_T=84,KEY_U=85,KEY_V=86,

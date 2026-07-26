@@ -263,149 +263,376 @@ MIT-0
 Log ouput from standard run:
 
 ```
-Compiling voxen, total iterations today 85 (2026-03-29)...
-Built engine successfully.
-Built mod gamecode successfully.
-Built engine and mod in 954 ms
+Compiling voxen, total iterations today 228 (2026-07-25)...
+Built engine as game in 127 ms
 Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed
-WinSys init took 0.010394029 secs
-Load Config.ini, create window and GL context took 0.081719108 secs
-GL function loading took 0.000441692 secs
-Set monitor, Set WinSys callbacks, Compile shaders took 0.004927384 secs
-GL buffer definitions took 0.000161770 secs
-Loading game definition... Citadel:: num levels: 14, start level: 1... took 0.000048480 secs
-Reloading mod code...dlopen-ing...done!
-Loading    5 fonts...took 0.023699606 secs
-GL SSBOs and Settings Apply... took 0.011501173 secs
-Loading models (5989) ... total vertices: 11670811, total tris: 65659044, took 0.699694164 secs
-Loading textures (1579) ... total palette colors: 100535, total pixels: 29804440... took 0.126002 secs
-InitializeEnvironment completed
-Game Initialized in 1.263755100 secs
+Entity size: 900
+Loading    5 fonts... took 0.123607973 s
+Loading textures (1989) ... total palette colors: 120019, total pixels: 38000755... took 0.162262 secs
+Loading   models (5989) ... vertices: 11975224, tris: 11351562, 0.643557074 secs
 Loading new game...
-Rendered screen saying "Loading new game..."
-Cam view added.  Count at 1
-Cam view added.  Count at 2
-Loaded 17791 entities, 1058 static lights for Level 1... took 0.101106322 secs
-Entity instances initialized after load
-Culling...found 1170 open cells, closed edges N: 368, S: 364, E: 337, W: 341... took 0.080589886 secs
+Entity counts::0:3831|1:5937|2:5076|3:3274|4:3389|5:4270|6:5773|7:6081|8:4756|9:4469|10:1721|11:1608|12:1314|13:8416
+ Light counts::0:1289|1:1059|2:1138|3:490|4:870|5:1149|6:1225|7:2016|8:903|9:1526|10:719|11:525|12:487|13:3
+Load all levels... took 0.189141671 secs
+Switched to Level 1
+Culling found 1178 open cells... took 0.090702681 secs
+Generating edge adjacency lists for 28 convex meshes...took 0.002452750 secs
+Game Initialized in 1.631655835 secs
+Loading new game...
+Entity counts::0:3831|1:5937|2:5076|3:3274|4:3389|5:4270|6:5773|7:6081|8:4756|9:4469|10:1721|11:1608|12:1314|13:8416
+ Light counts::0:1289|1:1059|2:1138|3:490|4:870|5:1149|6:1225|7:2016|8:903|9:1526|10:719|11:525|12:487|13:3
+Load all levels... took 0.156872861 secs
+Switched to Level 1
+Culling found 1178 open cells... took 0.089528178 secs
+Generating edge adjacency lists for 28 convex meshes...took 0.002449103 secs
 Player named "" started the game!
 ```
 
-Log output from one run with DEBUG_RAM_OUTPUT declared in voxen.h:
+Log output from one run with lib.c DebugRAM() internals uncommented:
 
 ```
-Compiling voxen, total iterations today 87 (2026-03-29)...
-Built engine successfully.
-Built mod gamecode successfully.
-Built engine and mod in 395 ms
-Memory at program start: Heap 0 bytes (0 KB | 0.00 MB), USS 35565568 bytes (34732 KB | 33.92 MB)
-Memory at InitializeEnvironment start: Heap 0 bytes (0 KB | 0.00 MB), USS 35565568 bytes (34732 KB | 33.92 MB)
+Compiling voxen, total iterations today 229 (2026-07-25)...
+Built engine as game in 363 ms
+Mem at program start: Heap 0b(0KB|0.00MB), USS 487424b(476KB|0.46MB)
 Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed
-WinSys init took 0.011530377 secs
-Load Config.ini, create window and GL context took 0.073844631 secs
-GL function loading took 0.000458672 secs
-Set monitor, Set WinSys callbacks, Compile shaders took 0.004821350 secs
-GL buffer definitions took 0.000160161 secs
-Loading game definition... Citadel:: num levels: 14, start level: 1... took 0.000090910 secs
-Reloading mod code...dlopen-ing...done!
-Memory at after loading mod: Heap 9699328 bytes (9472 KB | 9.25 MB), USS 53764096 bytes (52504 KB | 51.27 MB)
-Loading    5 fonts...took 0.023276584 secs
-Memory at after freeing window bar icon: Heap 9699328 bytes (9472 KB | 9.25 MB), USS 116690944 bytes (113956 KB | 111.29 MB)
-GL SSBOs and Settings Apply... took 0.013768522 secs
-Loading models (5989) ...Memory at after model load loop: Heap 12599296 bytes (12304 KB | 12.02 MB), USS 399085568 bytes (389732 KB | 380.60 MB)
-Memory at after to model to gpu transfer: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 459104256 bytes (448344 KB | 437.84 MB)
- total vertices: 11670811, total tris: 65659044, took 0.701599961 secs
-Memory at After Load Models: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 452018176 bytes (441424 KB | 431.08 MB)
-Memory at start of LoadTextures: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 452018176 bytes (441424 KB | 431.08 MB)
-Loading textures (1579) ... Memory at After loop for load textures: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 509079552 bytes (497148 KB | 485.50 MB)
-total palette colors: 100535, total pixels: 29804440... took 0.130844 secs
-Memory at After LoadTextures and after deallocation: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 482234368 bytes (470932 KB | 459.89 MB)
-Memory at InitializeEnvironment end: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 483131392 bytes (471808 KB | 460.75 MB)
-InitializeEnvironment completed
-Memory at prior to game loop: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 483131392 bytes (471808 KB | 460.75 MB)
-Game Initialized in 1.301660107 secs
-Memory at after 4 frames: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 492355584 bytes (480816 KB | 469.55 MB)
-Memory at after 100 frames: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 460451840 bytes (449660 KB | 439.12 MB)
-Memory at after 200 frames: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 460451840 bytes (449660 KB | 439.12 MB)
-Memory at after 500 frames: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 460451840 bytes (449660 KB | 439.12 MB)
-Memory at after 1000 frames: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 460455936 bytes (449664 KB | 439.13 MB)
+Entity size: 900
+Mem at start font load: Heap 8282112b(8088KB|7.90MB), USS 16257024b(15876KB|15.50MB)
+Loading    5 fonts...Mem at after font load: Heap 8282112b(8088KB|7.90MB), USS 95985664b(93736KB|91.54MB)
+ took 0.147640197 s
+Loading textures (1989) ... total palette colors: 120019, total pixels: 38000755... took 0.127588 secs
+Mem at After LoadTextures and after deallocation: Heap 10797056b(10544KB|10.30MB), USS 140636160b(137340KB|134.12MB)
+Loading   models (5989) ... vertices: 11975224, tris: 11351562, 0.665408164 secs
+Mem at After LoadModels: Heap 281055232b(274468KB|268.04MB), USS 496721920b(485080KB|473.71MB)
 Loading new game...
-Rendered screen saying "Loading new game..."
-Memory at start of LoadLevel: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 460468224 bytes (449676 KB | 439.14 MB)
-Cam view added.  Count at 1
-Cam view added.  Count at 2
-Loaded 17791 entities, 1058 static lights for Level 1... took 0.096384954 secs
-Memory at end of LoadLevel instances: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 462393344 bytes (451556 KB | 440.97 MB)
-Entity instances initialized after load
-Culling...Memory at start of Cull_Init: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 462397440 bytes (451560 KB | 440.98 MB)
-found 1170 open cells, closed edges N: 368, S: 364, E: 337, W: 341...Memory at end of dynamic culling DetermineClosedEdges: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 462417920 bytes (451580 KB | 440.00 MB)
- took 0.088219065 secs
-Memory at end of Cull_Init: Heap 221216768 bytes (216032 KB | 210.97 MB), USS 464531456 bytes (453644 KB | 443.01 MB)
+Mem at start of LoadAllLevels: Heap 281055232b(274468KB|268.04MB), USS 497909760b(486240KB|474.84MB)
+Entity counts::0:3831|1:5937|2:5076|3:3274|4:3389|5:4270|6:5773|7:6081|8:4756|9:4469|10:1721|11:1608|12:1314|13:8416
+ Light counts::0:1289|1:1059|2:1138|3:490|4:870|5:1149|6:1225|7:2016|8:903|9:1526|10:719|11:525|12:487|13:3
+Load all levels... took 0.196210112 secs
+Mem at end of LoadAllLevels: Heap 281600000b(275000KB|268.55MB), USS 634777600b(619900KB|605.37MB)
+Mem at start of LoadLevel: Heap 281600000b(275000KB|268.55MB), USS 634777600b(619900KB|605.37MB)
+Switched to Level 1
+Culling found 1178 open cells... took 0.091125611 secs
+Mem at end of LoadLevel: Heap 281600000b(275000KB|268.55MB), USS 637509632b(622568KB|607.98MB)
+Generating edge adjacency lists for 28 convex meshes...took 0.002214804 secs
+Mem at InitializeEnvironment end: Heap 281600000b(275000KB|268.55MB), USS 637845504b(622896KB|608.30MB)
+Game Initialized in 1.726753756 secs
+Mem at frame 4: Heap 282288128b(275672KB|269.21MB), USS 643543040b(628460KB|613.73MB)
+Mem at frame 100: Heap 282288128b(275672KB|269.21MB), USS 639348736b(624364KB|609.73MB)
+Mem at frame 200: Heap 282288128b(275672KB|269.21MB), USS 639348736b(624364KB|609.73MB)
+Mem at frame 500: Heap 282288128b(275672KB|269.21MB), USS 639352832b(624368KB|609.73MB)
+Mem at frame 1000: Heap 282288128b(275672KB|269.21MB), USS 639356928b(624372KB|609.74MB)
+Loading new game...
+Mem at start of LoadAllLevels: Heap 282288128b(275672KB|269.21MB), USS 639361024b(624376KB|609.74MB)
+Entity counts::0:3831|1:5937|2:5076|3:3274|4:3389|5:4270|6:5773|7:6081|8:4756|9:4469|10:1721|11:1608|12:1314|13:8416
+ Light counts::0:1289|1:1059|2:1138|3:490|4:870|5:1149|6:1225|7:2016|8:903|9:1526|10:719|11:525|12:487|13:3
+Load all levels... took 0.167074728 secs
+Mem at end of LoadAllLevels: Heap 282288128b(275672KB|269.21MB), USS 639361024b(624376KB|609.74MB)
+Mem at start of LoadLevel: Heap 282288128b(275672KB|269.21MB), USS 639361024b(624376KB|609.74MB)
+Switched to Level 1
+Culling found 1178 open cells... took 0.089577006 secs
+Mem at end of LoadLevel: Heap 282288128b(275672KB|269.21MB), USS 639295488b(624312KB|609.68MB)
+Generating edge adjacency lists for 28 convex meshes...took 0.002515498 secs
 Player named "" started the game!
 ```
 
 ```
-❯ grep -rIn  "OS_Alloc"
-voxen.c:30:    INLINE void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); return CloseHandle(m),r;}    
-voxen.c:36:    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
-voxen.c:67:    INLINE void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd){ long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return (void*)r; }
-voxen.c:71:    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
-voxen.c:87:    INLINE int OS_ThreadCreate(OS_Thread* out, void* (*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
-voxen.c:92:INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); } 
-voxen.c:93:INLINE void* OS_Calloc(size_t amount, size_t count) { return OS_Alloc(amount * count); }
-voxen.c:95:INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s){void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
-voxen.c:96:INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
-particles.c:124:    psysVertBuf = (float*)OS_Alloc(MAX_PSYS_PARTICLES * PSYS_QUAD_FLOATS * sizeof(float));
-particles.c:125:    psysSortBuf = (PsDepthSort*)OS_Alloc(MAX_PSYS_PARTICLES * sizeof(PsDepthSort));
-lib.c:127:    u8* pixels = OS_Alloc(w * h * 4 * sizeof(char));
-entity.c:1342:    u8* compBuffer = (u8*)OS_Alloc(maxCompSize);
-entity.c:1359:    u8* compBuffer = (u8*)OS_Alloc(header.compressedSize);
-textures.c:9:void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
-textures.c:139:        u32 nP = (u32)w * h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256 * sizeof(u32)); u32 pSz = 0; 
-textures.c:195:    p->entries = OS_Alloc((p->count = p->capacity = m_idx + 1) * sizeof(TextureData));
-textures.c:239:    i32* parsIdx = OS_Alloc(texCnt * sizeof(i32));
-textures.c:243:    thread_png_arenas = (PngArena*)OS_Alloc((size_t)threadCnt * sizeof(PngArena));
-textures.c:245:    TexResult* texResults = OS_Alloc(texCnt * sizeof(TexResult)); // Unified result struct allocation
-textures.c:255:    void* arena = OS_AllocateRAM(arena_size, 0x1|0x2, 0x20|0x02|0x08000, INVALID_FHANDLE);
-textures.c:258:    i32* textureSizes = OS_Alloc(texCnt * 2 * sizeof(i32));
-textures.c:259:    u32* texturePaletteOffsets = OS_Alloc(texCnt * sizeof(u32));
-textures.c:294:    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,WIN_ICON);   
-text.c:27:    ttAllocs = OS_Alloc(4674 * sizeof(TAlloc));
-text.c:36:    u8*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
-culling.c:41:    u8* cullingFileBuffer = OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8));
-winput.c:825:        WinSys.monitors = WinSys.monitors ? OS_Realloc(WinSys.monitors,monitorAllocationSize,sizeof(WinSysmonitor*) * WinSys.monitorCount) : OS_Alloc(WinSys.monitorCount * sizeof(WinSysmonitor*));
-audio.c:534:    u32 sf = *frames, df = (u32)((u64)sf*AUDIO_RATE/src_rate); float *dst = (float*)OS_Alloc(df*2*sizeof(float)); *sz = df*2*sizeof(float); float ratio = (float)sf/(float)df;
-audio.c:542:    u64 frames = wav.totalPCMFrameCount; float *buf = (float*)OS_Alloc(frames*AUDIO_CHANNELS*sizeof(float)); size_t bufSize = frames*AUDIO_CHANNELS*sizeof(float); u64 got = WavReadPCMFrames(&wav,frames,buf);
-models.c:107:    u16* final_t = OS_Alloc(ec * sizeof(u16)); // Allocate final_t early so we can use it instead of ft_scratch
-models.c:119:    float* final_verts = (float*)OS_Alloc((size_t)ucnt * CPU_VRT_SZ);
-models.c:192:    modelBVHNodes[m] = (BvhNode*)OS_Alloc(ctx->nodeCount * sizeof(BvhNode));
-models.c:196:        modelBVHTriOrder[m] = (u16*)OS_Alloc(ctx->triCount * sizeof(u16));
-models.c:222:    ModelData* ents = OS_Alloc(cnt * sizeof(ModelData));
-models.c:309:    float* weldedPos = (float*)OS_Alloc((size_t)vc * 3 * sizeof(float)); // worst case: no duplicates at all
-models.c:328:    u16* weldedTris = (u16*)OS_Alloc((size_t)tc * 3 * sizeof(u16));
-models.c:342:    vPos = OS_Alloc(mdlsCnt * sizeof(float*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
-models.c:343:    modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
-models.c:346:    void* arena_base = OS_Alloc(arena); char* p = arena_base;
-models.c:383:    physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
-models.c:384:    physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
-models.c:385:    physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
-models.c:493:    cvxAdjOffsets=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u32*)); cvxAdjLists=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u16*));
-models.c:512:        u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
-models.c:521:        u32* degree=OS_Alloc(vCount * sizeof(u32)); 
-models.c:523:        u32* offsets=OS_Alloc((vCount + 1) * sizeof(u32)); offsets[0]=0; for(u32 i=0;i<vCount;++i){offsets[i+1]=offsets[i] + degree[i];}
-models.c:524:        u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));
-models.c:525:        u32* writePos = OS_Alloc(vCount * sizeof(u32));
+❯ grep -rIn "Alloc"
+voxen.c:11:    typedef struct { union { u32 dwOemId; struct { u16 wProcessorArchitecture,wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; u32 dwPageSize; void* lpMinimumApplicationAddress,*lpMaximumApplicationAddress; u64 dwActiveProcessorMask; u32 dwNumberOfProcessors,dwProcessorType,dwAllocationGranularity; u16 wProcessorLevel,wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
+voxen.c:12:    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*); DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);         DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,LPOVERLAPPED);    DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);          DLL_IMP i32 WINAPI UnmapViewOfFile(void*); DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
+voxen.c:17:    void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); return CloseHandle(m),r;}    
+voxen.c:24:    void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
+voxen.c:30:    void* __stdcall GetProcessHeap(); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); void __stdcall Sleep(u32 dwMilliseconds); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
+voxen.c:34:    int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
+voxen.c:45:    void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd) { long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return (void*)r; }
+voxen.c:49:    void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
+voxen.c:62:    int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
+voxen.c:67:void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); } 
+voxen.c:68:INLINE void* OS_Calloc(size_t amount, size_t count) { return OS_Alloc(amount * count); }
+voxen.c:70:void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
+voxen.c:71:void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
+lib.c:135:    u8* pixels = OS_Alloc(w * h * 4 * sizeof(char));
+entity.c:1208:    FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); }
+entity.c:1344:    size_t sz=sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b=(u8*)OS_Alloc(maxCompSize); size_t finalCompSize=VoidSquasher((const u8*)&World,sz,b,maxCompSize);
+entity.c:1356:    u8* b = (u8*)OS_Alloc(header.compressedSize);
+textures.c:11:void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
+textures.c:12:void* PngArenaAlloc(PngArena* a, size_t s) { if(!a->base||a->cursor+s>a->end)return NULL; void* p=a->cursor; a->cursor+=s; return p; }
+textures.c:62:    pngzbuf a = {0}; u8* p = (u8*)PngArenaAlloc(arena, initial_size), d_len[288]; i32 f, t;
+textures.c:81:    a->out = (u8*)PngArenaAlloc(arena, (size_t)x * y * out_n);
+textures.c:121:            case 0x49444154: if (!z.idata) { z.idata = (u8*)PngArenaAlloc(arena, len + 16); ioff = 0; } mcpy(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
+textures.c:138:        FHandle dummy_fd; int sz=0; const char* d =(const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path,&dummy_fd,&sz);
+textures.c:141:        u32 nP = (u32)w * h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256 * sizeof(u32)); u32 pSz = 0; 
+textures.c:181:    FHandle fd; int sz; char *data = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz), *cur = data, *end = data + sz;
+textures.c:197:    p->entries = OS_Alloc((p->count = p->capacity = m_idx + 1) * sizeof(TextureData));
+textures.c:240:    i32* parsIdx = OS_Alloc(texCnt * sizeof(i32));
+textures.c:244:    thread_png_arenas = (PngArena*)OS_Alloc((size_t)threadCnt * sizeof(PngArena));
+textures.c:246:    TexResult* texResults = OS_Alloc(texCnt * sizeof(TexResult)); // Unified result struct allocation
+textures.c:256:    void* arena = OS_AllocateRAM(arena_size, 0x1|0x2, 0x20|0x02|0x08000, INVALID_FHANDLE);
+textures.c:259:    i32* textureSizes = OS_Alloc(texCnt * 2 * sizeof(i32));
+textures.c:260:    u32* texturePaletteOffsets = OS_Alloc(texCnt * sizeof(u32));
+textures.c:295:    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,WIN_ICON);    
+text.c:19:    FHandle fd;int fsz;fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
+text.c:29:    ttAllocs = OS_Alloc(4674 * sizeof(TAlloc));
+text.c:31:    fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
+text.c:32:    fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
+text.c:38:    u8*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
+text.c:64:    OS_Free(ttAllocs,4674 * sizeof(TAlloc));
+text.c:85:    Sys_Text.file_data=(u8*)OS_OpenAndAllocateFileBufferReadonly(tf,&dfd,&asz);if(!Sys_Text.file_data||asz<=0){DualLogError("Failed to load text file: %s\n",tf);return;}
+text.c:109:    Sys_Text.filelog_data=(u8*)OS_OpenAndAllocateFileBufferReadonly(tf,&dfd,&asz);if(!Sys_Text.filelog_data||asz<=0){DualLogError("Failed to load log text file: %s\n",tf);return;}
+culling.c:24:    u8* cullingFileBuffer=OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8));
+winput.c:11:void InputMonitor(WinSysmonitor*,int,int); const FBC* ChooseFBConfig(const FBC*, u32); WinSysmonitor* AllocMonitor(const char*,int,int);
+winput.c:138:        DeleteDC(dc); m = AllocMonitor(name,wMM,hMM); OS_Free(name,nameSize);
+winput.c:231:    typedef void(*__GLXextproc)();                            typedef XSizeHints*(*PFN_XAllocSizeHints)();                       typedef int(*PFN_XChangeProperty)(Display*,XID,Atom,Atom,int,int,const u8*,int);   typedef void(*PFN_XCID)(XcursorImage*);                         typedef void(*PFN_XRRFreeOutputInfo)(XRROutputInfo*);                    typedef XID(*PFN_XCreateColormap)(Display*,XID,Visual*,int);
+winput.c:247:                                     struct { void* handle; PFN_XAllocSizeHints AllocSizeHints; PFN_XChangeProperty ChangeProperty; PFN_XChangeWindowAttributes ChangeWindowAttributes; PFN_XCheckTypedWindowEvent CheckTypedWindowEvent; PFN_XCreateColormap CreateColormap; PFN_XCreateWindow CreateWindow; PFN_XDefineCursor DefineCursor;
+winput.c:262:    static void updateNormalHints(WinSyswindow* w, int w_, int h) { XSizeHints* hs=WinSys.x11.xlib.AllocSizeHints(); i64 s; WinSys.x11.xlib.GetWMNormalHints(WinSys.x11.display,w->x11.handle,hs,&s); hs->flags &= ~((1L<<4)|(1L<<5)|(1L<<7)); hs->flags|=((1L<<4)|(1L<<5)); hs->min_width=hs->max_width=w_; hs->min_height=hs->max_height=h; WinSys.x11.xlib.SetWMNormalHints(WinSys.x11.display,w->x11.handle,hs); WinSys.x11.xlib.Free(hs); }
+winput.c:303:            WinSysmonitor* m = AllocMonitor(oi->name, wMM, hMM);
+winput.c:415:        if (!WindowVisible()) { i64 s; XSizeHints* h=WinSys.x11.xlib.AllocSizeHints(); if (WinSys.x11.xlib.GetWMNormalHints(WinSys.x11.display,w->x11.handle,h,&s)) {h->flags|=(1L<<2); h->x=h->y=0; WinSys.x11.xlib.SetWMNormalHints(WinSys.x11.display,w->x11.handle,h);} WinSys.x11.xlib.Free(h); } 
+winput.c:450:        XSizeHints* sz=WinSys.x11.xlib.AllocSizeHints();
+winput.c:486:            X(AllocSizeHints) X(ChangeProperty) X(CheckTypedWindowEvent) X(CreateColormap) X(CreateWindow) X(ChangeWindowAttributes) X(DefineCursor) X(DeleteProperty) X(DisplayKeycodes) X(FilterEvent) X(FindContext) X(Free) X(UngrabPointer) X(FreeEventData) X(GetInputFocus) X(GetKeyboardMapping) X(GetWMNormalHints) X(GetWindowAttributes) X(GetWindowProperty)
+winput.c:535:size_t monitorAllocationSize = 0;
+winput.c:539:        WinSys.monitors = WinSys.monitors ? OS_Realloc(WinSys.monitors,monitorAllocationSize,sizeof(WinSysmonitor*) * WinSys.monitorCount) : OS_Alloc(WinSys.monitorCount * sizeof(WinSysmonitor*));
+winput.c:540:        monitorAllocationSize = WinSys.monitorCount * sizeof(WinSysmonitor*);
+winput.c:550:WinSysmonitor* AllocMonitor(const char* n, int w, int h) { WinSysmonitor* m = OS_Calloc(1, sizeof(WinSysmonitor)); m->widthMM = w; m->heightMM = h; scpy_to_a_from_b(m->name,n,sizeof(m->name)); return m; }
+audio.c:655:    u32 sf = *frames, df = (u32)((u64)sf*AUDIO_RATE/src_rate); float *dst = (float*)OS_Alloc(df*2*sizeof(float)); *sz = df*2*sizeof(float); float ratio = (float)sf/(float)df;
+audio.c:663:    u64 frames = wav.totalPCMFrameCount; float *buf = (float*)OS_Alloc(frames*AUDIO_CHANNELS*sizeof(float)); size_t bufSize = frames*AUDIO_CHANNELS*sizeof(float); u64 got = WavReadPCMFrames(&wav,frames,buf);
+models.c:88:    u16* final_t = OS_Alloc(ec * sizeof(u16)); // Allocate final_t early so we can use it instead of ft_scratch
+models.c:100:    float* final_verts = (float*)OS_Alloc((size_t)ucnt * CPU_VRT_SZ);
+models.c:173:    modelBVHNodes[m] = (BvhNode*)OS_Alloc(ctx->nodeCount * sizeof(BvhNode));
+models.c:177:        modelBVHTriOrder[m] = (u16*)OS_Alloc(ctx->triCount * sizeof(u16));
+models.c:193:    FHandle fd; int sz; char* buf = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz);
+models.c:203:    ModelData* ents = OS_Alloc(cnt * sizeof(ModelData));
+models.c:274:    float* weldedPos = (float*)OS_Alloc((size_t)vc * 3 * sizeof(float)); // worst case: no duplicates at all
+models.c:293:    u16* weldedTris = (u16*)OS_Alloc((size_t)tc * 3 * sizeof(u16));
+models.c:307:    vPos = OS_Alloc(mdlsCnt * sizeof(float*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
+models.c:308:    modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+models.c:311:    void* arena_base = OS_Alloc(arena); char* p = arena_base;
+models.c:316:    for (u32 i=0; i<mdlsCnt; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz; raw[i].name=mp.entries[pi].path;} }
+models.c:348:    physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
+models.c:349:    physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+models.c:350:    physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
+models.c:458:    cvxAdjOffsets=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u32*)); cvxAdjLists=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u16*));
+models.c:477:        u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
+models.c:486:        u32* degree=OS_Alloc(vCount * sizeof(u32)); 
+models.c:488:        u32* offsets=OS_Alloc((vCount + 1) * sizeof(u32)); offsets[0]=0; for(u32 i=0;i<vCount;++i){offsets[i+1]=offsets[i] + degree[i];}
+models.c:489:        u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));
+models.c:490:        u32* writePos = OS_Alloc(vCount * sizeof(u32));
+common.h:239:void *OS_AllocateRAM(size_t,i32,i32,FHandle),*OS_AllocateFileBackedRAMReadonly(size_t,FHandle,char*),*OS_Realloc(void*,size_t,size_t),OS_Close(FHandle),OS_Write(FHandle,const void*,size_t,const char*),OS_ThreadJoin(OS_Thread* t),OS_USleep(u32 usec);
+common.h:246:void UseTargets(u16,const char*),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),* OS_Alloc(size_t),OS_Free(void*,size_t),*OS_OpenAndAllocateFileBufferReadonly(const char*,FHandle*,int*),DebugRAM(const char*),
+stbtt.h:4:typedef struct { void* ptr; size_t sz; } TAlloc;
+stbtt.h:5:static TAlloc* ttAllocs = NULL;
 stbtt.h:7:static void* ttalloc(size_t n) { if (tallocCount>=4674) {DualLogError("ttalloc too many!\n"); return NULL;} void*p=OS_Alloc(n); ttAllocs[tallocCount++]=(TAlloc){p,n}; return p; }
-
+stbtt.h:8:static void  ttfree (void* p) { if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_Free(p,ttAllocs[tallocCount-1].sz);tallocCount--; }
+synth.c:5:static SynthVoice* SynAlloc(void) { for (u32 i=0;i<MAX_SYNTH_VOICES;i++) if (!syn_ch[i].active) return &syn_ch[i]; return NULL; }
+synth.c:6:static SynthVoice* SynTrigger(SynthFn fn,float seconds,float vol) { SynthVoice* v=SynAlloc(); if(!v) return NULL; *v=(SynthVoice){.fn=fn,.frames=(u32)(AUDIO_RATE*seconds),.vol=vol,.active=true}; return v; }
 ```
 
 Binary size eval:
 
 ```
 ❯ size ./voxen
-   text     data       bss       dec      hex filename
- 458838    40072 310849280 311348190 128ecbde  ./voxen
+   text  data       bss       dec     hex filename
+ 506018 33428 192529865 193069311 b8200ff ./voxen
+❯ nm -S --size-sort -t d ./voxen | grep -i ' [tw] ' | tail -n 200
 
+0000000017193600 0000000000000321 t TextureSequenceInit
+0000000016903312 0000000000000324 t GenImpact
+0000000017286480 0000000000000329 t LoadSecondaryAmmoType
+0000000017232032 0000000000000330 t UI_MenuButton
+0000000016940976 0000000000000331 t DropHeldItem
+0000000017258192 0000000000000332 t RenderCameraViews
+0000000017031680 0000000000000335 t InputCursorPos
+0000000017286128 0000000000000337 t LoadPrimaryAmmoType
+0000000016953088 0000000000000339 t SpawnImpactEffect
+0000000016956800 0000000000000341 t HardwareUpdate
+0000000016953440 0000000000000343 t ReduceCurrentLevelSecurity
+0000000016941312 0000000000000347 t AddAccessCardToInventory
+0000000017285776 0000000000000347 t CheckUIStateAndAttack
+0000000017046256 0000000000000347 t DualLogMain
+0000000017141504 0000000000000354 t _cid_subrs
+0000000017278752 0000000000000357 t cmd_git
+0000000017055312 0000000000000361 t BvhRayAABBHit
+0000000017029424 0000000000000362 t SaveGame
+0000000017140032 0000000000000364 t _csv
+0000000017029056 0000000000000366 t VoidSquasher
+0000000017073408 0000000000000368 t trigger_gravitylift_touch
+0000000017090144 0000000000000375 t EPAContactPoint
+0000000017146384 0000000000000376 t stbtt_GetGlyphBox
+0000000017171744 0000000000000378 t _cff_idx
+0000000017232368 0000000000000378 t UI_Checkbox
+0000000017230416 0000000000000379 t RenderUIImage
+0000000017171360 0000000000000380 t _dict_ints
+0000000017047008 0000000000000383 t BmpWrite
+0000000017039088 0000000000000383 t mcpy
+0000000016948304 0000000000000386 t ButtonSwitchUpdate
+0000000016943184 0000000000000389 t AddItemFail
+0000000017040272 0000000000000389 t scpy_to_a_from_b
+0000000016998128 0000000000000389 t UpdateLight
+0000000016969440 0000000000000392 t CastRayCellCheck
+0000000017217728 0000000000000393 t InputWindowFocus
+0000000016938320 0000000000000395 t mp3_read_pcm_frames_f32
+0000000017287520 0000000000000400 t WeaponsUpdate
+0000000017222544 0000000000000407 t ConsoleEmulator
+0000000016902144 0000000000000408 t GenLaser
+0000000017218128 0000000000000414 t CenterWindowOnMonitor
+0000000017031248 0000000000000420 t quat_from_yaw_pitch_roll
+0000000016901712 0000000000000428 t SynTrigger
+0000000017205472 0000000000000436 t SetWindowMonitor
+0000000016946800 0000000000000447 t UseTargets
+0000000017038144 0000000000000451 t LoadConfig
+0000000017151872 0000000000000460 t _eqs
+0000000016955040 0000000000000462 t TeleportAway
+0000000017221184 0000000000000464 t ParseLevelArg
+0000000017152336 0000000000000491 t _tess_c
+0000000017141008 0000000000000492 t _cff_idx_get
+0000000017152832 0000000000000498 t _tess_cb
+0000000016999776 0000000000000506 t SetLevelPointers
+0000000016973424 0000000000000515 t PortalCulling
+0000000017270096 0000000000000524 t UpdateInstanceMatrix4x4s
+0000000017219888 0000000000000525 t ChangeFullScreenWindowed
+0000000016914096 0000000000000526 t UpdateMusic
+0000000016903648 0000000000000527 t play_wav
+0000000016970400 0000000000000531 t CastStraightX
+0000000016945296 0000000000000534 t FuncWallUpdate
+0000000017141872 0000000000000543 t _get_subrs
+0000000017193936 0000000000000545 t TextureSequenceUpdate
+0000000017030608 0000000000000546 t InputKey
+0000000016940368 0000000000000550 t ScreenPointToRay
+0000000016969840 0000000000000551 t CastStraightZ
+0000000016957152 0000000000000564 t PatchUpdate
+0000000016902624 0000000000000568 t GenDoor
+0000000016962224 0000000000000572 t UseEntity
+0000000016900064 0000000000000582 t AICheckPain
+0000000016968736 0000000000000587 t AddDoorPortal
+0000000016942592 0000000000000588 t AddWeaponToInventory
+0000000017092848 0000000000000588 t RunGJK
+0000000016975056 0000000000000598 t CullInit
+0000000017068880 0000000000000609 t UpdateAnims
+0000000017196304 0000000000000613 t DrawVelocityVector
+0000000016958912 0000000000000622 t DoorUse
+0000000017231408 0000000000000624 t UI_Slider
+0000000017098640 0000000000000631 t _supA_box
+0000000016947664 0000000000000640 t ButtonSwitchUse
+0000000017093440 0000000000000643 t SeedEPA
+0000000017078096 0000000000000646 t Entity_GetCap
+0000000017204816 0000000000000650 t SetWindowIcon
+0000000017000288 0000000000000656 t CopyPlayerState
+0000000017208000 0000000000000656 t GetMonitorWorkarea
+0000000017027600 0000000000000674 t LoadAllLevels
+0000000017257504 0000000000000680 t GetProjections
+0000000016913104 0000000000000683 t GetCorrespondingLevelClip
+0000000017029792 0000000000000684 t LoadGame
+0000000016946112 0000000000000687 t ForceBridgeUpdate
+0000000017227504 0000000000000688 t CompileAnyShader
+0000000017281600 0000000000000689 t MeleeHitUpdate
+0000000017110112 0000000000000690 t ApplyInvTensor
+0000000016899360 0000000000000704 t InitializeAIAfterLoad
+0000000016958192 0000000000000713 t DoorActuate
+0000000016900656 0000000000000720 t GetFootstepTypeForPrefab
+0000000016952336 0000000000000746 t GrenadeExplode
+0000000017229648 0000000000000760 t mul_mat4
+0000000017135232 0000000000000767 t stbtt_FindGlyphIndex
+0000000017028288 0000000000000768 t LoadLevel
+0000000017074624 0000000000000787 t SphBox
+0000000017073824 0000000000000791 t CapCap
+0000000017095392 0000000000000806 t BvhWalkSphMsh
+0000000017228816 0000000000000829 t ExtractFrustumPlanes
+0000000017179392 0000000000000831 t PngHuf
+0000000017041264 0000000000000849 t double2str
+0000000016949152 0000000000000876 t ApplyImpactForceSphere
+0000000017048368 0000000000000890 t qsort_new
+0000000017221648 0000000000000892 t ProcessConsoleCommand
+0000000017282304 0000000000000894 t FireMelee
+0000000017198608 0000000000000898 t DrawSphereWireframe
+0000000017096208 0000000000000901 t CapMsh
+0000000016964656 0000000000000939 t ObjectDeath
+0000000017280640 0000000000000946 t CreateStandardImpactMarks
+0000000017199568 0000000000000958 t DrawMeshCollider
+0000000016937088 0000000000000965 t mp3L3_imdct36
+0000000016998576 0000000000000969 t AddInstance
+0000000017207024 0000000000000970 t InputMonitor
+0000000017192592 0000000000001003 t TextureParsingWorker
+0000000017284544 0000000000001020 t FireWeapon
+0000000016911808 0000000000001035 t MixAmbs
+0000000016973952 0000000000001092 t CullCore
+0000000017103696 0000000000001094 t BvhWalkAABB_CvxTri
+0000000017205920 0000000000001095 t PollMonitors
+0000000017254720 0000000000001131 t DrawEntity
+0000000017276928 0000000000001175 t main
+0000000016970944 0000000000001181 t CircleFanRays
+0000000017131280 0000000000001202 t CantStand
+0000000016939136 0000000000001223 t Push
+0000000016906400 0000000000001234 t play_mp3
+0000000016953792 0000000000001245 t Death
+0000000017209232 0000000000001249 t processEvent
+0000000017049264 0000000000001268 t sift
+0000000017094096 0000000000001284 t ExpandEPA
+0000000017203520 0000000000001288 t DrawAngularVelocity
+0000000016972128 0000000000001292 t DetermineVisibleCells
+0000000016955504 0000000000001292 t UpdateLights
+0000000017216400 0000000000001319 t SetGLContext_GetFunctionPointers
+0000000017097120 0000000000001321 t PrimitiveCvx
+0000000017218544 0000000000001336 t UpdateScreenSize
+0000000017086400 0000000000001399 t HullSupport
+0000000016943584 0000000000001410 t AddItemToInventory
+0000000017108608 0000000000001490 t BoxMsh
+0000000017150368 0000000000001500 t _rse
+0000000017169808 0000000000001539 t RenderFormattedText
+0000000017165744 0000000000001550 t LoadTextForLanguage
+0000000017069568 0000000000001643 t GenerateConvexAdjacencyLists
+0000000017270620 0000000000001644 t NewGame
+0000000017255856 0000000000001645 t mat4_inverse
+0000000017071216 0000000000001667 t BvhBuildOctree
+0000000017196928 0000000000001676 t DrawBoxColliderColored
+0000000016962800 0000000000001729 t ModUpdate
+0000000016909968 0000000000001797 t InitAudio
+0000000017050544 0000000000001847 t trinkle
+0000000017106688 0000000000001888 t CvxCvx
+0000000017104800 0000000000001888 t CvxMsh
+0000000016996128 0000000000001995 t LoadFieldIntoLight
+0000000017245728 0000000000002018 t RenderPausedUI
+0000000017035936 0000000000002034 t InputProcessing
+0000000016904176 0000000000002045 t load_wav
+0000000017210496 0000000000002073 t VCreateWindow
+0000000016907840 0000000000002121 t AudioUpdate
+0000000017090704 0000000000002134 t SphTriTest
+0000000017025344 0000000000002198 t LoadLevelData
+0000000016950032 0000000000002289 t TakeDamage
+0000000017087808 0000000000002327 t GJKNextSimplex
+0000000016959872 0000000000002350 t Targetted
+0000000017110816 0000000000002422 t ResolveContactVelocity
+0000000017167296 0000000000002501 t LoadLogTextForLanguage
+0000000017066336 0000000000002531 t PhysGeomWorker
+0000000017132496 0000000000002541 t ApplyPlayerMovements
+0000000017163184 0000000000002553 t InitFontAtlasses
+0000000016965904 0000000000002556 t DetermineClosedEdges
+0000000017075424 0000000000002666 t CapBox
+0000000017160224 0000000000002687 t stbtt_InitFont_internal
+0000000017052416 0000000000002896 t ParseModelData
+0000000017153344 0000000000002918 t stbtt_MakeGlyphBitmapSubpixel
+0000000017200528 0000000000002985 t DrawCapsuleCollider
+0000000017079280 0000000000003029 t ComputeConvexMeshInertiaTensor
+0000000017042128 0000000000003052 t sFormatV
+0000000017055680 0000000000003337 t LoadModels
+0000000017142416 0000000000003422 t _run_cs
+0000000017113248 0000000000003596 t ApplyManifoldResponse
+0000000017146768 0000000000003599 t _fae
+0000000017212704 0000000000003696 t WindowInit
+0000000017099616 0000000000003894 t CvxTriTest
+0000000017156272 0000000000003948 t stbtt_PackFontRanges
+0000000017082320 0000000000003999 t BoxBox
+0000000017136000 0000000000004032 t _GetGlyphShapeTT
+0000000017222960 0000000000004529 t Raycast
+0000000017272320 0000000000004598 t InitalizeEnvironment
+0000000017187120 0000000000005469 t LoadTextures
+0000000017180224 0000000000006891 t PngLoad
+0000000017247760 0000000000006892 t RenderShadowmaps
+0000000017172176 0000000000007201 t PngDecode
+0000000017059024 0000000000007311 t ModelParsingWorker
+0000000017258528 0000000000011563 t Render
+0000000017232848 0000000000012865 t RenderMenu
+0000000017116848 0000000000014421 t Physics
+0000000016976256 0000000000019365 t ModEDefsInitAfterLoad
+0000000016914752 0000000000022335 t mp3_decode_next_frame_ex
+0000000017000944 0000000000023981 t LoadLevelMod
 ```
 
 Helper bash commands to generate frame sequences in models.txt:

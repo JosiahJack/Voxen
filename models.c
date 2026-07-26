@@ -266,6 +266,43 @@ float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { // Ray-vs-
     return tmin;
 }
 
+//float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { an idea
+    //__m128 origin_v = _mm_setr_ps(origin.x, origin.y, origin.z, 0.0f);
+    //__m128 dir_v = _mm_setr_ps(dir.x, dir.y, dir.z, 0.0f);
+    //__m128 mn_v = _mm_setr_ps(mn.x, mn.y, mn.z, 0.0f);
+    //__m128 mx_v = _mm_setr_ps(mx.x, mx.y, mx.z, 0.0f);
+
+    //// Prevent division by zero (which creates NaNs that ruin the min/max logic)
+    //__m128 zero = _mm_setzero_ps();
+    //__m128 tiny = _mm_set1_ps(1e-8f);
+    //__m128 safe_dir = _mm_blendv_ps(dir_v, tiny, _mm_cmpeq_ps(dir_v, zero));
+    //__m128 inv_dir = _mm_div_ps(_mm_set1_ps(1.0f), safe_dir);
+
+    //// Compute intersection slabs
+    //__m128 t1 = _mm_mul_ps(_mm_sub_ps(mn_v, origin_v), inv_dir);
+    //__m128 t2 = _mm_mul_ps(_mm_sub_ps(mx_v, origin_v), inv_dir);
+
+    //__m128 tmin_v = _mm_min_ps(t1, t2);
+    //__m128 tmax_v = _mm_max_ps(t1, t2);
+
+    //// Horizontal max of tmin_v
+    //__m128 shuf = _mm_shuffle_ps(tmin_v, tmin_v, _MM_SHUFFLE(2, 1, 0, 3));
+    //__m128 max1 = _mm_max_ps(tmin_v, shuf);
+    //shuf = _mm_movehdup_ps(max1);
+    //__m128 max2 = _mm_max_ps(max1, shuf);
+    //float tmin = _mm_cvtss_f32(max2);
+
+    //// Horizontal min of tmax_v
+    //shuf = _mm_shuffle_ps(tmax_v, tmax_v, _MM_SHUFFLE(2, 1, 0, 3));
+    //__m128 min1 = _mm_min_ps(tmax_v, shuf);
+    //shuf = _mm_movehdup_ps(min1);
+    //__m128 min2 = _mm_min_ps(min1, shuf);
+    //float tmax = _mm_cvtss_f32(min2);
+
+    //if (tmax < 0.0f || tmin > tmax || tmin > maxDist) return -1.0f;
+    //return tmin < 0.0f ? 0.0f : tmin;
+//}
+
 INLINE u32 WeldHash(i32 x, i32 y, i32 z) { u32 h = ((u32)x * 0x8DA6B343u) ^ ((u32)y * 0xD8163841u) ^ ((u32)z * 0xCB1AB31Fu); return h & (WELD_HASH_SIZE - 1); }
 static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap) {
     u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m];
@@ -290,10 +327,13 @@ static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap) 
         remap[i] = (u16)found;
     }
     for (u32 i = 0; i < usedSlots; ++i) weldHt[weldHtUsed[i]] = 0xFFFFFFFFU; // reset shared scratch for the next model on this thread
+    float* exactPos = (float*)OS_Alloc((size_t)weldedCount * 3 * sizeof(float));
+    mcpy(exactPos,weldedPos, (size_t)weldedCount * 3 * sizeof(float));
+    OS_Free(weldedPos,(size_t)vc * 3 * sizeof(float));
     u16* weldedTris = (u16*)OS_Alloc((size_t)tc * 3 * sizeof(u16));
     const u16* srcTris = modelTriangles[m];
     for (u32 i = 0; i < tc * 3; ++i) weldedTris[i] = remap[srcTris[i]];
-    physPos[m] = weldedPos; physTris[m] = weldedTris; physVertCounts[m] = weldedCount;
+    physPos[m] = exactPos; physTris[m] = weldedTris; physVertCounts[m] = weldedCount;
 }
 
 static void* PhysGeomWorker(void* a) { PhysGeomTask* t=a; BvhBuildCtx* bvhCtx=&thrd_bvh_ctx[t->tid]; u32* ht = thrd_ht[t->tid]; u32* u=thrd_ht_used[t->tid]; u16* sc=(u16*)thrd_remap_scratch[t->tid]; for (u32 m = t->start; m < t->end; ++m) { if(m >= mdlsCnt || !modelVertexCounts[m] || !modelTriangleCounts[m]){physPos[m]=NULL; physTris[m]=NULL; physVertCounts[m]=0; continue;}  WeldModelPositions((u16)m,ht,u,sc); BuildModelBVH(bvhCtx,(u16)m); }  return NULL; }
@@ -353,7 +393,8 @@ void LoadModels() {
     if (threadCnt > 1) {     for (int i=0;i<threadCnt;++i) OS_ThreadCreate(&pth[i],PhysGeomWorker,&ptasks[i]); } // Sneak the physics deduplication passes underneath the GPU upload ;)
     glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
     for (int i=0; i<mdlsCnt; ++i) {
-        if (!modelVertexCounts[i]) continue;
+        if (raw[i].data) OS_Free((void*)raw[i].data,raw[i].size);
+        if (!modelVertexCounts[i]) {continue;/*Skip unused index slots*/}
         tv += modelVertexCounts[i]; tt += modelTriangleCounts[i]; size_t vcz = (size_t)modelVertexCounts[i] * VRT_ATT_SZ, tcz = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
         glBindBuffer(GL_ARRAY_BUFFER,vbos[i]); glBufferData(GL_ARRAY_BUFFER,vcz,NULL,GL_STATIC_DRAW);
         half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER,0,vcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
@@ -361,16 +402,13 @@ void LoadModels() {
         for (u32 k = 0; k < vc; ++k) { __m256 v_in=(*(__m256_u const *)(&verts[k*8])); __m128i v_half=_mm256_cvtps_ph(v_in,0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/); _mm_storeu_si128((__m128i*)&mpv[k*8],v_half); }
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-        if (raw[i].data) OS_Free((void*)raw[i].data,raw[i].size);
     }
     glBindBuffer(GL_ARRAY_BUFFER,0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
     if (threadCnt > 1) { for(int i=0;i<threadCnt;++i){OS_ThreadJoin(&pth[i]);}    } else { for(int t=0;t<threadCnt;++t){PhysGeomWorker(&ptasks[t]);} /*Single threaded fallback*/} // Regroup the physics deduplication passes after GPU upload, this does save about 0.18secs!
     for (u32 m = 0; m < mdlsCnt; ++m) {
         if (vPos[m]) { OS_Free(vPos[m],(size_t)modelVertexCounts[m] * CPU_VRT_SZ); OS_Free(modelTriangles[m],(size_t)modelTriangleCounts[m] * 3 * sizeof(u16)); vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; }
     }
-    OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData));
-    DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
-    DebugRAM("After LoadModels");
+    OS_Free(vPos,mdlsCnt * sizeof(float*)); OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData)); DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime); DebugRAM("After LoadModels");
 }
 
 const AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
