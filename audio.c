@@ -717,8 +717,8 @@ void play_wav(const char *path,float volume,V3 pos,bool positional) {
     i32 slot = GetFreeWavSlot();
     if (slot==-1 && wav_count<MAX_CHANNELS) slot=wav_count++;
     if (slot==-1) { DualLog("WARNING: Max WAV channels (%d) reached\n",MAX_CHANNELS); return; }
-    u32 frames; size_t sz=0; float *buf = load_wav(path,&frames,&sz);
-    if (!buf) { DualLog("ERROR: Failed to load WAV %s\n",path); return; }
+    u32 frames; size_t sz=0; float *buf = load_wav(p,&frames,&sz);
+    if (!buf) { DualLog("ERROR: Failed to load WAV %s\n",p); return; }
     wav_ch[slot] = (wav_channel_t){ .samples = buf, .allocSize = sz, .frame_count = frames, .frame_pos = 0, .volume = volume, .looping = false, .positional = positional, .pos=pos, .playing = true };
 }
 

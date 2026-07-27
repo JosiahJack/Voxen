@@ -48,7 +48,7 @@ void InputCursorPos(double* x, double* y, double xpos, double ypos) { // static 
     if (*x == xpos && *y == ypos) { last_mouse_x=xpos; last_mouse_y=ypos; return;}
     *x=xpos; *y=ypos; if (!window_has_focus){return;}
     if (ignore_next_mouse_delta) { World.currentMouse_dx = World.currentMouse_dy = 0; ignore_next_mouse_delta = mouseMovementThisFrame = false; return; }
-    World.currentMouse_dx = (i32)(xpos - last_mouse_x); World.currentMouse_dy = (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos;
+    World.currentMouse_dx += (i32)(xpos - last_mouse_x); World.currentMouse_dy += (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos;
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { // Uses UI baseline resolution 1366x768
         i32 newX = clamp(World.cursorPosition_x + World.currentMouse_dx,0,1366); if (newX != World.cursorPosition_x) {mouseMovementThisFrame = true;} World.cursorPosition_x = newX;
         i32 newY = clamp(World.cursorPosition_y + World.currentMouse_dy,0, 768); if (newY != World.cursorPosition_y) {mouseMovementThisFrame = true;} World.cursorPosition_y = newY;
@@ -64,7 +64,7 @@ bool TurnRight() { return GetKey(11); }             bool LookUp() { return GetKe
 bool Lantern() { return GetKeyPressed(17); }        bool Shield() { return GetKeyPressed(18); }         bool Infrared() { return GetKeyPressed(19); }     bool Email() { return GetKeyPressed(20); }          bool Booster() { return GetKeyPressed(21); }        bool Jumpjets() { return GetKeyPressed(22); }
 bool Attack() { return GetKeyPressed(23); }         bool Use() { return GetKeyPressed(24); }            bool Menu() { return GetKeyPressed(25); }         bool ToggleMode() { return GetKeyPressed(26); }     bool Reload() { return GetKeyPressed(27); }         bool WeaponCycUp() { return GetKeyPressed(28); }
 bool WeaponCycDown() { return GetKeyPressed(29); }  bool Grenade() { return GetKeyPressed(30); }        bool GrenadeCycUp() { return GetKeyPressed(31); } bool GrenadeCycDown() { return GetKeyPressed(32); } bool ChangeAmmoType() { return GetKeyPressed(33); } bool Patch() { return GetKeyPressed(34); }
-bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }   bool Map() { return GetKeyPressed(37); }          bool SwimUp() {return Cheats.noclip && GetKey(38);} bool SwimDn() {return Cheats.noclip && GetKey(39);} bool Console() { return GetKeyPressed(-1); }     bool ScrshotPressed() { return GetKeyPressed(41); } 
+bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }   bool Map() { return GetKeyPressed(37); }          bool SwimUp() {return /*Cheats.noclip && TODO */GetKey(38);} bool SwimDn() {return /*Cheats.noclip && */GetKey(39);} bool Console() { return GetKeyPressed(-1); }     bool ScrshotPressed() { return GetKeyPressed(41); }
 bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){return false;} if (World.pauseRelativeTime < World.invP1.leanLeftTapFinished) { World.invP1.leanLeftTapFinished = 0.0; return true; } World.invP1.leanLeftTapFinished = World.pauseRelativeTime + 0.5; return false; }
 bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.pauseRelativeTime < World.invP1.leanRightTapFinished) { World.invP1.leanRightTapFinished = 0.0; return true; } World.invP1.leanRightTapFinished = World.pauseRelativeTime + 0.5; return false; } 
 void CloseFullmap();

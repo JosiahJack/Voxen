@@ -531,7 +531,7 @@ __attribute__((hot)) void RenderShadowmaps() {
     if (numShadowsCouldRender > 0U) { // Added since there is now work between here and the for loop so this is beneficial to check.
         glUseProgram(shadowmapsClearSP); glDispatchCompute(groupX_shadClear,6,numShadowsCouldRender); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
         shadDrawCalls=0U; glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP); u32 shadowmapOffsetHead=0U; mset(shadowCasterIndices,0,SC_MAX*sizeof(u16)); u32 numShadowCasters=0U;
-        for (int i=INSTS_1ST_IDX;i<INSTANCE_COUNT;++i) { if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsDynamicObject(World.instances[i].index)) {continue;} shadowCasterIndices[numShadowCasters]=i; numShadowCasters++; if(numShadowCasters >= (SC_MAX)){break;} }
+        for (int i=INSTS_1ST_IDX;i<INSTANCE_COUNT;++i) { if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS))/*TODO || IdxIsDynamicObject(World.instances[i].index)*/) {continue;} shadowCasterIndices[numShadowCasters]=i; numShadowCasters++; if(numShadowCasters >= (SC_MAX)){break;} }
         u16 shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0,useDetail=Sys_Settings.ModelDetail;
         for (u32 c = 0; c < numShadowsCouldRender; ++c, ++shadowMapIdx) { // Render top MAX_SHADOWMAPS candidates
             u16 lightIdx = candidates[c];

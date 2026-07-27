@@ -4,13 +4,7 @@
 #include "trigger.c" // Trigger Volumes System
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
 const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=16.666666f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.08f / 16.666666f),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.005f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
-const float WALK_SPEED=3.6f,SPRINT_SPEED=8.8f,PLAYER_MAX_CYBER_SPEED=5.0f,SPRINT_SPEED_FATIGUED=5.5f;
-#define CROUCH_SPEED 1.25f
-#define PLAYER_MAX_PRONE_SPEED 0.5f
-#define PLAYER_BOOSTER_SPEED_BOOST 1.2f
-#define PLAYER_CROUCH_RATIO 0.6f
-#define PLAYER_PRONE_RATIO 0.01f
-#define PLAYER_TRANSITION_TO_PRONE_ADD 0.10f
+const float WALK_SPEED=3.6f,SPRINT_SPEED=8.8f,PLAYER_MAX_CYBER_SPEED=5.0f,SPRINT_SPEED_FATIGUED=5.5f,CROUCH_SPEED=1.25f,PLAYER_MAX_PRONE_SPEED=0.5f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.6f,PLAYER_PRONE_RATIO=0.01f;
 enum {MANIFOLD_MAX=4,CVXMSH_HULL_CACHE=1024,EPA_MAX_FACES=64,EPA_MAX_VERTS=128,EPA_MAX_EDGES=EPA_MAX_FACES * 3,GJK_ITER=16,EPA_ITER=16};
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
@@ -92,30 +86,30 @@ INLINE V3 MeshVert(u16 m, u32 i) { const float* p = physPos[m] + i * 3; return (
 void ComputeConvexMeshInertiaTensor(u16 i) {
     u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i]=false; if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) {return;}
     float acc[6]={0}; float cm[3]={0}; float volAcc=0.0f; u32 triCount = modelTriangleCounts[mi];
-    for (u32 ti=0;ti<triCount;++ti) {
+    for (u32 ti=0;ti<triCount;++ti) { // Accumulates without dividing by 6 for each saving that for the end for performance.
         u32 i0 = modelTriangles[mi][ti*3+0], i1 = modelTriangles[mi][ti*3+1], i2 = modelTriangles[mi][ti*3+2];
         V3 v0=MeshVert(mi,i0), v1=MeshVert(mi,i1), v2=MeshVert(mi,i2);
-        float det = V3_dot(v0,V3_Cross(v1,v2)); volAcc += det;
+        float det = V3_dot(v0,V3_Cross(v1,v2)); volAcc += det; // Signed 6x tetrahedron volume via scalar triple product
         cm[0] += det*(v0.x + v1.x + v2.x); cm[1] += det*(v0.y + v1.y + v2.y); cm[2] += det*(v0.z + v1.z + v2.z);
-        acc[0] += det*(v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x);
-        acc[1] += det*(v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y);
+        acc[0] += det*(v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x); // Analytic polynomial integration over volume
+        acc[1] += det*(v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y); // (Mirtich / Eberly polyhedron mass properties technique)
         acc[2] += det*(v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z);
-        acc[3] += det*(2.0f*(v0.x*v0.y + v1.x*v1.y + v2.x*v2.y) + v0.x*v1.y + v1.x*v0.y + v0.x*v2.y + v2.x*v0.y + v1.x*v2.y + v2.x*v1.y);
-        acc[4] += det*(2.0f*(v0.x*v0.z + v1.x*v1.z + v2.x*v2.z) + v0.x*v1.z + v1.x*v0.z + v0.x*v2.z + v2.x*v0.z + v1.x*v2.z + v2.x*v1.z);
-        acc[5] += det*(2.0f*(v0.y*v0.z + v1.y*v1.z + v2.y*v2.z) + v0.y*v1.z + v1.y*v0.z + v0.y*v2.z + v2.y*v0.z + v1.y*v2.z + v2.y*v1.z);
+        acc[3] += det*(2.0f*(v0.x*v0.y + v1.x*v1.y + v2.x*v2.y) + v0.x*v1.y + v1.x*v0.y + v0.x*v2.y + v2.x*v0.y + v1.x*v2.y + v2.x*v1.y); // Multiplier 2.0f handles
+        acc[4] += det*(2.0f*(v0.x*v0.z + v1.x*v1.z + v2.x*v2.z) + v0.x*v1.z + v1.x*v0.z + v0.x*v2.z + v2.x*v0.z + v1.x*v2.z + v2.x*v1.z); // the algebraic cross-term
+        acc[5] += det*(2.0f*(v0.y*v0.z + v1.y*v1.z + v2.y*v2.z) + v0.y*v1.z + v1.y*v0.z + v0.y*v2.z + v2.y*v0.z + v1.y*v2.z + v2.y*v1.z); // polynomial expansion
     }
     if (vabs(volAcc) < PHY_EPSILON) return;
-    float sx = World.scale[i].x, sy = World.scale[i].y, sz = World.scale[i].z; float sd = World.mass[i] / (volAcc * 10.0f), so = World.mass[i] / (volAcc * 20.0f);
-    float cx = cm[0] / (4.0f * volAcc), cy = cm[1] / (4.0f * volAcc), cz = cm[2] / (4.0f * volAcc); float scx = cx * sx, scy = cy * sy, scz = cz * sz, m=World.mass[i];
+    float sx = World.scale[i].x, sy = World.scale[i].y, sz = World.scale[i].z; float sd = World.mass[i] / (volAcc * 10.0f/*6/60*/), so = World.mass[i] / (volAcc * 20.0f/*6/120*/); // Diagonals=6/60, off-diagonals=6/120, since those have the 2.0f multiplied above from the x^2 expansion resulting in 2xy terms.
+    float cx = cm[0] / (4.0f * volAcc), cy = cm[1] / (4.0f * volAcc), cz = cm[2] / (4.0f * volAcc); float scx = cx * sx, scy = cy * sy, scz = cz * sz, m=World.mass[i]; // Center of mass denominator 24 reduced by 6/24 = 1/4
     float Ixx = sd*(acc[1]*sy*sy + acc[2]*sz*sz) - m*(scy*scy + scz*scz); float Iyy = sd*(acc[0]*sx*sx + acc[2]*sz*sz) - m*(scx*scx + scz*scz); float Izz = sd*(acc[0]*sx*sx + acc[1]*sy*sy) - m*(scx*scx + scy*scy);
-    float Ixy = -(so*acc[3]*sx*sy - m*scx*scy); float Ixz = -(so*acc[4]*sx*sz - m*scx*scz); float Iyz = -(so*acc[5]*sy*sz - m*scy*scz);
+    float Ixy = -(so*acc[3]*sx*sy - m*scx*scy); float Ixz = -(so*acc[4]*sx*sz - m*scx*scz); float Iyz = -(so*acc[5]*sy*sz - m*scy*scz); // Parallel Axis Theorem: shifts rotation center from origin (0,0,0) to center of mass
     float r = modelBounds[mi] * vmax(vmax(sx,sy),sz); float mn = 0.04f * m * r * r;
-    Ixx = vmax(Ixx,mn); Iyy = vmax(Iyy,mn); Izz = vmax(Izz,mn);
+    Ixx = vmax(Ixx,mn); Iyy = vmax(Iyy,mn); Izz = vmax(Izz,mn); // Clamp diagonal inertia to a minimum floor of 10% of the I=2/5ths*mr^2=0.4mr^2 hence 0.04 of spherical inertia to avoid NaN's.
     float *IT=World.inertiaTensor[i]; IT[0]=Ixx; IT[1]=Iyy; IT[2]=Izz; IT[3]=Ixy; IT[4]=Ixz; IT[5]=Iyz;
     float det = Ixx*(Iyy*Izz - Iyz*Iyz) - Ixy*(Ixy*Izz - Ixz*Iyz) + Ixz*(Ixy*Iyz - Iyy*Ixz); if (vabs(det) < PHY_EPSILON) return;
-    float invDet = 1.0f / det, *iI=World.invInertiaTensor[i];
-    iI[0]=(Iyy*Izz - Iyz*Iyz)*invDet; iI[1]=(Ixx*Izz - Ixz*Ixz)*invDet; iI[2]=(Ixx*Iyy - Ixy*Ixy)*invDet;
-    iI[3]=(Ixz*Iyz - Ixy*Izz)*invDet; iI[4]=(Ixy*Iyz - Iyy*Ixz)*invDet; iI[5]=(Ixy*Ixz - Ixx*Iyz)*invDet;
+    float invDet = 1.0f / det, *iI=World.invInertiaTensor[i]; // Applies Cramer's Rule to invert for actual use.  [ 0  3  4 ]  (0=Ixx, 1=Iyy, 2=Izz) (3=Ixy, 4=Ixz, 5=Iyz)
+    iI[0]=(Iyy*Izz - Iyz*Iyz)*invDet; iI[1]=(Ixx*Izz - Ixz*Ixz)*invDet; iI[2]=(Ixx*Iyy - Ixy*Ixy)*invDet;      // [ 3  1  5 ]  Tensor is symmetric only 6 unique elements needed
+    iI[3]=(Ixz*Iyz - Ixy*Izz)*invDet; iI[4]=(Ixy*Iyz - Iyy*Ixz)*invDet; iI[5]=(Ixy*Ixz - Ixx*Iyz)*invDet;      // [ 4  5  2 ]
     World.invTnsrValid[i]=true;
 }
 
@@ -149,81 +143,45 @@ Overlap BoxBox(ShapeBox a, ShapeBox b) {
 V3 MvVert(const float* M, V3 v) { return (V3){ M[0]*v.x + M[4]*v.y + M[8]*v.z  + M[12], M[1]*v.x + M[5]*v.y + M[9]*v.z  + M[13], M[2]*v.x + M[6]*v.y + M[10]*v.z + M[14] }; }
 INLINE void MeshTri(u16 m, u32 ti, const float* mx, V3* a, V3* b, V3* c) { u32 i0=modelTriangles[m][ti*3+0],i1=modelTriangles[m][ti*3+1],i2=modelTriangles[m][ti*3+2]; *a=MvVert(mx,MeshVert(m,i0)); *b=MvVert(mx,MeshVert(m,i1)); *c=MvVert(mx,MeshVert(m,i2)); }
 INLINE V3 SphSupport(ShapeSphere b, V3 d) { float L=V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); float scale=b.rad / vsqrtf(safeL); V3 dir=V3_ScaleByF(d,scale); float mask=(L > PHY_EPSILON); return V3_AplusB(V3_ScaleByF(dir,mask),V3_ScaleByF((V3){0,b.rad,0},1.0f - mask)); }
-float copysignf(float magnitude, float sign) { float result; __asm__ ("andps %[sign_mask], %[sign]\n\tandnps %[mag], %[sign_mask]\n\torps %[sign_mask], %[mag]\n\t":[mag] "+x" (magnitude), [sign] "+x" (sign), [sign_mask] "=x" (result): "2" (-0.0f)); return magnitude; } // Loads the sign bit mask (0x80000000) into sign_mask
+float copysignf(float magnitude, float sign) {
+    union { float f; u32 i; } m, s;
+    m.f = magnitude; s.f = sign;
+    m.i = (m.i & 0x7FFFFFFFu) | (s.i & 0x80000000u);
+    return m.f;
+}
 INLINE V3 BoxSupport(ShapeBox b, V3 d) { V3 x=quat_rot_v3(b.rot,(V3){1,0,0}), y=quat_rot_v3(b.rot,(V3){0,1,0}), z=quat_rot_v3(b.rot,(V3){0,0,1}); float kx = copysignf(1.0f, V3_dot(d, x)); float ky = copysignf(1.0f, V3_dot(d, y)); float kz = copysignf(1.0f, V3_dot(d, z)); return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr, V3_ScaleByF(x, kx * b.hExt.x)), V3_ScaleByF(y, ky * b.hExt.y)), V3_ScaleByF(z, kz * b.hExt.z)); }
 INLINE V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db=V3_dot(cap.base,d), dt=V3_dot(cap.tip,d); float mask=(dt > db); V3 best=V3_AplusB(V3_ScaleByF(cap.tip,mask),V3_ScaleByF(cap.base,1.0f - mask)); float L = V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); V3 dir=V3_ScaleByF(d,cap.rad / vsqrtf(safeL)); float lmask=(L >= PHY_EPSILON); return V3_AplusB(best,V3_ScaleByF(dir,lmask)); }
 typedef union { __m128 f; __m128i i; } m128_bits;
-// INLINE __m128  _mm_set_ps(float e3, float e2, float e1, float e0) { return (__m128){e0,e1,e2,e3}; }
-// INLINE __m128i _mm_setzero_si128(void) { return (__m128i)(__v4si){0, 0, 0, 0}; }
-// INLINE __m128i _mm_set1_epi32(int x) { return (__m128i)(__v4si){x, x, x, x}; }
-// INLINE __m128i _mm_set_epi32(int e3, int e2, int e1, int e0) { return (__m128i)(__v4si){e0, e1, e2, e3}; }
-// INLINE __m128i _mm_add_epi32(__m128i a, __m128i b) { return a + b; }
-// INLINE __m128i _mm_and_si128(__m128i a, __m128i b) { return a & b; }
-// INLINE __m128i _mm_or_si128(__m128i a, __m128i b)  { return a | b; }
-// INLINE __m128i _mm_andnot_si128(__m128i a, __m128i b) { return (~a) & b; }
-// INLINE __m128i _mm_castps_si128(__m128 a) { m128_bits u; u.f = a; return u.i; }
-// INLINE __m128  _mm_cmpgt_ps(__m128 a, __m128 b) { m128_bits u; u.i = (a > b); return u.f; }
-// INLINE V3 exhaustiveBest_simd(const float* p, u32 n, V3 d) {
-//     __m128 vx=_mm_set1_ps(d.x), vy=_mm_set1_ps(d.y), vz=_mm_set1_ps(d.z);
-//     __m128 bestVal=_mm_set1_ps(-3.402823466e38F);
-//     __m128i bestIdx=_mm_setzero_si128(), idx0123=_mm_set_epi32(3,2,1,0);
-//     u32 i=0;
-//     for (; i+4<=n; i+=4) {
-//         __m128 X=_mm_set_ps(p[(i+3)*3],p[(i+2)*3],p[(i+1)*3],p[i*3]);
-//         __m128 Y=_mm_set_ps(p[(i+3)*3+1],p[(i+2)*3+1],p[(i+1)*3+1],p[i*3+1]);
-//         __m128 Z=_mm_set_ps(p[(i+3)*3+2],p[(i+2)*3+2],p[(i+1)*3+2],p[i*3+2]);
-//         __m128 dd=_mm_add_ps(_mm_add_ps(_mm_mul_ps(X,vx),_mm_mul_ps(Y,vy)),_mm_mul_ps(Z,vz));
-//         __m128 gt=_mm_cmpgt_ps(dd,bestVal);
-//         bestVal=(__m128)__builtin_ia32_maxps((__v4sf)(dd),(__v4sf)(bestVal));
-//         __m128i curIdx=_mm_add_epi32(_mm_set1_epi32((int)i),idx0123);
-//         bestIdx=_mm_or_si128(_mm_and_si128(_mm_castps_si128(gt),curIdx),_mm_andnot_si128(_mm_castps_si128(gt),bestIdx));
-//     }
-//     float v[4]; int ix[4]; _mm_storeu_ps(v,bestVal); _mm_storeu_si128((__m128i*)ix,bestIdx);
-//     float top=v[0]; int bi=ix[0];
-//     for (int k=1;k<4;k++) if (v[k]>top){top=v[k];bi=ix[k];}
-//     for (; i<n; ++i){ float dd=p[i*3]*d.x+p[i*3+1]*d.y+p[i*3+2]*d.z; if(dd>top){top=dd;bi=(int)i;} }
-//     return (V3){p[bi*3],p[bi*3+1],p[bi*3+2]};
-// }
-typedef int          __v8si  __attribute__((__vector_size__(32)));
-typedef long long    __m256i __attribute__((__vector_size__(32)));
-typedef __m256i      __m256i_u __attribute__((__may_alias__, __aligned__(1)));
-#define _mm256_loadu_ps(P)         (*(__m256_u const *)(P))
-#define _mm256_set1_ps(A)          ((__m256){ (A),(A),(A),(A),(A),(A),(A),(A) })
-#define _mm256_setr_ps(e0,e1,e2,e3,e4,e5,e6,e7) ((__m256){ (e0),(e1),(e2),(e3),(e4),(e5),(e6),(e7) })
-#define _mm256_storeu_ps(P, A)     (*(__m256_u *)(P) = (A))
-#define _mm256_add_ps(A, B)        ((__m256)((__v8sf)(A) + (__v8sf)(B)))
-#define _mm256_sub_ps(A, B)        ((__m256)((__v8sf)(A) - (__v8sf)(B)))
-#define _mm256_mul_ps(A, B)        ((__m256)((__v8sf)(A) * (__v8sf)(B)))
-typedef union { __m256 f; __m256i i; } m256_bits;
-INLINE __m256  _mm256_set_ps(float e7,float e6,float e5,float e4, float e3,float e2,float e1,float e0) { return (__m256){e0,e1,e2,e3,e4,e5,e6,e7}; }
-INLINE __m256i _mm256_setzero_si256(void)       { return (__m256i)(__v8si){0,0,0,0,0,0,0,0}; }
-INLINE __m256i _mm256_set1_epi32(int x)         { return (__m256i)(__v8si){x,x,x,x,x,x,x,x}; }
-INLINE __m256i _mm256_set_epi32(int e7,int e6,int e5,int e4, int e3,int e2,int e1,int e0) { return (__m256i)(__v8si){e0,e1,e2,e3,e4,e5,e6,e7}; }
-INLINE __m256i _mm256_add_epi32(__m256i a, __m256i b)    { return a + b; }
-INLINE __m256i _mm256_and_si256(__m256i a, __m256i b)    { return a & b; }
-INLINE __m256i _mm256_or_si256(__m256i a, __m256i b)     { return a | b; }
-INLINE __m256i _mm256_andnot_si256(__m256i a, __m256i b) { return (~a) & b; }
-INLINE __m256i _mm256_castps_si256(__m256 a)             { m256_bits u; u.f = a; return u.i; }
-INLINE __m256  _mm256_cmpgt_ps(__m256 a, __m256 b)       { m256_bits u; u.i = (a > b); return u.f; }
-INLINE V3 exhaustiveBest_simd(const float* p, u32 n, V3 d) {
-    __m256  vx = _mm256_set1_ps(d.x),vy = _mm256_set1_ps(d.y),vz = _mm256_set1_ps(d.z);
-    __m256  bestVal = _mm256_set1_ps(-3.402823466e38F);
-    __m256i bestIdx = _mm256_setzero_si256(),idx01234567 = _mm256_set_epi32(7,6,5,4,3,2,1,0);
-    u32 i = 0;
-    for (; i + 8 <= n; i += 8) {
-        __m256 X = _mm256_set_ps(p[(i+7)*3],  p[(i+6)*3],  p[(i+5)*3],  p[(i+4)*3],p[(i+3)*3],  p[(i+2)*3],  p[(i+1)*3],  p[ i   *3]);
-        __m256 Y = _mm256_set_ps(p[(i+7)*3+1],p[(i+6)*3+1],p[(i+5)*3+1],p[(i+4)*3+1],p[(i+3)*3+1],p[(i+2)*3+1],p[(i+1)*3+1],p[ i   *3+1]);
-        __m256 Z = _mm256_set_ps(p[(i+7)*3+2],p[(i+6)*3+2],p[(i+5)*3+2],p[(i+4)*3+2],p[(i+3)*3+2],p[(i+2)*3+2],p[(i+1)*3+2],p[ i   *3+2]);
-        __m256 dd = _mm256_add_ps(_mm256_add_ps(_mm256_mul_ps(X,vx),_mm256_mul_ps(Y,vy)),_mm256_mul_ps(Z,vz));
-        __m256 gt = _mm256_cmpgt_ps(dd, bestVal);
-        bestVal = (__m256)__builtin_ia32_maxps256((__v8sf)dd, (__v8sf)bestVal);
-        __m256i curIdx = _mm256_add_epi32(_mm256_set1_epi32((int)i), idx01234567);
-        bestIdx = _mm256_or_si256(_mm256_and_si256(_mm256_castps_si256(gt), curIdx),_mm256_andnot_si256(_mm256_castps_si256(gt), bestIdx));
+INLINE __m128  _mm_set_ps(float e3, float e2, float e1, float e0) { return (__m128){e0,e1,e2,e3}; }
+INLINE __m128i _mm_setzero_si128(void) { return (__m128i)(__v4si){0, 0, 0, 0}; }
+INLINE __m128i _mm_set1_epi32(int x) { return (__m128i)(__v4si){x, x, x, x}; }
+INLINE __m128i _mm_set_epi32(int e3, int e2, int e1, int e0) { return (__m128i)(__v4si){e0, e1, e2, e3}; }
+INLINE __m128i _mm_add_epi32(__m128i a, __m128i b) { return a + b; }
+INLINE __m128i _mm_and_si128(__m128i a, __m128i b) { return a & b; }
+INLINE __m128i _mm_or_si128(__m128i a, __m128i b)  { return a | b; }
+INLINE __m128i _mm_andnot_si128(__m128i a, __m128i b) { return (~a) & b; }
+INLINE __m128i _mm_castps_si128(__m128 a) { m128_bits u; u.f = a; return u.i; }
+INLINE __m128  _mm_cmpgt_ps(__m128 a, __m128 b) { m128_bits u; u.i = (a > b); return u.f; }
+INLINE V3 exhaustiveBest_simd(const float* p, u32 n, V3 d) { // 128bit version faster on actual Haswell era hardware (guessing because 256bit has to do 2 128bit passes)
+    __m128 vx=_mm_set1_ps(d.x), vy=_mm_set1_ps(d.y), vz=_mm_set1_ps(d.z);
+    __m128 bestVal=_mm_set1_ps(-3.402823466e38F);
+    __m128i bestIdx=_mm_setzero_si128(), idx0123=_mm_set_epi32(3,2,1,0);
+    u32 i=0;
+    for (; i+4<=n; i+=4) {
+        __m128 X=_mm_set_ps(p[(i+3)*3],p[(i+2)*3],p[(i+1)*3],p[i*3]);
+        __m128 Y=_mm_set_ps(p[(i+3)*3+1],p[(i+2)*3+1],p[(i+1)*3+1],p[i*3+1]);
+        __m128 Z=_mm_set_ps(p[(i+3)*3+2],p[(i+2)*3+2],p[(i+1)*3+2],p[i*3+2]);
+        __m128 dd=_mm_add_ps(_mm_add_ps(_mm_mul_ps(X,vx),_mm_mul_ps(Y,vy)),_mm_mul_ps(Z,vz));
+        __m128 gt=_mm_cmpgt_ps(dd,bestVal);
+        bestVal=(__m128)__builtin_ia32_maxps((__v4sf)(dd),(__v4sf)(bestVal));
+        __m128i curIdx=_mm_add_epi32(_mm_set1_epi32((int)i),idx0123);
+        bestIdx=_mm_or_si128(_mm_and_si128(_mm_castps_si128(gt),curIdx),_mm_andnot_si128(_mm_castps_si128(gt),bestIdx));
     }
-    float v[8]; int ix[8]; _mm256_storeu_ps(v, bestVal); _mm256_storeu_si256((__m256i*)ix, bestIdx);
-    float top = v[0]; int bi = ix[0]; for (int k = 1; k < 8; k++) if (v[k] > top) { top = v[k]; bi = ix[k]; }
-    for (; i < n; ++i) { float dd = p[i*3]*d.x + p[i*3+1]*d.y + p[i*3+2]*d.z; if (dd > top) { top = dd; bi = (int)i; } }
-    return (V3){p[bi*3], p[bi*3+1], p[bi*3+2]};
+    float v[4]; int ix[4]; _mm_storeu_ps(v,bestVal); _mm_storeu_si128((__m128i*)ix,bestIdx);
+    float top=v[0]; int bi=ix[0];
+    for (int k=1;k<4;k++) if (v[k]>top){top=v[k];bi=ix[k];}
+    for (; i<n; ++i){ float dd=p[i*3]*d.x+p[i*3+1]*d.y+p[i*3+2]*d.z; if(dd>top){top=dd;bi=(int)i;} }
+    return (V3){p[bi*3],p[bi*3+1],p[bi*3+2]};
 }
 
 V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld) {
@@ -246,7 +204,7 @@ bool GJKNextSimplex(Simplex3D *s, V3 *dir) {
     V3 A = s->v[s->n - 1], AO = {-A.x,-A.y,-A.z}; V3 wAA = s->wA[s->n - 1], wBA = s->wB[s->n - 1];
     if (s->n == 2) {
         V3 AB = V3_AsubB(s->v[0], A);
-        if (AB.x + AB.y + AB.z < PHY_EPSILON) AB = V3_AplusB(AB, V3_ScaleByF(*dir, 0.001f));
+        if (V3_dot(AB,AB) < PHY_EPSILON) AB=V3_AplusB(AB,V3_ScaleByF(*dir,0.001f));
         if (V3_dot(AB,AO) > 0.f){*dir = V3_Cross(V3_Cross(AB,AO),AB);} else { s->n = 1; GJKSet(s,0,A,wAA,wBA); *dir = AO; }
         if (V3_dot(*dir,*dir) < PHY_EPSILON) { V3 px = (vabs(AB.x) > 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; *dir = V3_Cross(AB,px); }
         return true;
@@ -292,10 +250,11 @@ void SphTriTest(V3 sc, float sr, u16 mesh, u32 ti, const float* mx, Overlap* r) 
 
 INLINE V3 TriSupport(V3 ta, V3 tb, V3 tc, V3 d) { float d1=V3_dot(ta,d),d2=V3_dot(tb,d),d3=V3_dot(tc,d); return d1>d2 ? (d1>d3 ? ta : tc) : (d2>d3 ? tb : tc); }
 typedef enum { SUP_HULL_HULL, SUP_PRIM_HULL, SUP_HULL_TRI } SupportType;
-typedef struct SupportCtx { V3 (*supA)(const struct SupportCtx *ctx, V3 dir); V3 (*supB)(const struct SupportCtx *ctx, V3 negDir); u16 prim,meshA,meshB; const float *matA,*matB; V3 ta,tb,tc; u16 adjA,adjB; } SupportCtx;
+typedef struct SupportCtx { V3 (*supA)(const struct SupportCtx *ctx, V3 dir); V3 (*supB)(const struct SupportCtx *ctx, V3 negDir); u16 prim,meshA,meshB; const float *matA,*matB; V3 ta,tb,tc; u16 adjA,adjB; ShapeBox boxShape; } SupportCtx;
 INLINE V3 _supA_hull(const SupportCtx *ctx, V3 d) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, d); }
 INLINE V3 _supA_sph(const SupportCtx *ctx, V3 d)  { return SphSupport(Entity_GetSph(ctx->prim), d); }
 INLINE V3 _supA_box(const SupportCtx *ctx, V3 d)  { return BoxSupport(Entity_GetBox(ctx->prim), d); }
+INLINE V3 _supA_boxShape(const SupportCtx *ctx, V3 d) { return BoxSupport(ctx->boxShape, d); }
 INLINE V3 _supA_cap(const SupportCtx *ctx, V3 d)  { return CapsuleSupport(Entity_GetCap(ctx->prim), d); }
 INLINE V3 _supB_hull(const SupportCtx *ctx, V3 nd)  { return HullSupport(ctx->meshB, ctx->matB, ctx->adjB, nd); }
 INLINE V3 _supB_hullA(const SupportCtx *ctx, V3 nd) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, nd); }
@@ -355,10 +314,10 @@ INLINE void BvhNodeWorldAABB(const BvhNode* node, const float* mx, V3* wMn, V3* 
 }
 
 void BvhWalkSphMsh(V3 sc, float sr, u16 m, const float* mx, Overlap* r) {
-    const BvhNode* nodes=modelBVHNodes[m]; const u16* triOrder = modelBVHTriOrder[m]; const BvhNode* stack[64]; int sp = 0; stack[sp++] = &nodes[0];
+    const BvhNode* nodes=modelBVHNodes[m]; const u16* triOrder = modelBVHTriOrder[m]; const BvhNode* stack[8*8*8]; int sp = 0; stack[sp++] = &nodes[0];
     while (sp > 0) {
         const BvhNode* node = stack[--sp]; V3 wMn,wMx; BvhNodeWorldAABB(node,mx,&wMn,&wMx); if (!BvhSphereAABBOverlap(sc,sr,wMn,wMx)) continue;
-        if (node->triCount > 0) { for (u32 i = 0; i < node->triCount; i++) SphTriTest(sc, sr, m, triOrder[node->triStart + i], mx, r); } else { for (int o = 0; o < 8; o++) if (node->children[o] >= 0) stack[sp++] = &nodes[node->children[o]]; }
+        if (node->triCount > 0) { for (u32 i = 0; i < node->triCount; i++) SphTriTest(sc, sr, m, triOrder[node->triStart + i], mx, r); } else { for (int o=0;o<8;++o) if (node->children[o] >= 0) stack[sp++] = &nodes[node->children[o]]; }
     }
 }
 
@@ -380,14 +339,15 @@ Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx, u16 adjIdx) {
     return m;
 }
 
-typedef struct {V3 mn,mx;} AABB3; typedef struct { u16 hullMesh; const float* hullMx; const V3* boxV; u32 boxN; AABB3 hb; V3 hullCenter; float hullRadius,spreadEps,thicknessTolerance; Manifold best; u16 adjHull; } CvxMshCtx;
+typedef struct {V3 mn,mx;} AABB3; typedef struct { u16 hullMesh; const float* hullMx; const V3* boxV; u32 boxN; AABB3 hb; V3 hullCenter; float hullRadius,spreadEps,thicknessTolerance; Manifold best; u16 adjHull; ShapeBox boxShape; } CvxMshCtx;
 void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     u16 hullMesh=ctx->hullMesh; Manifold* best=&ctx->best; float spreadEps=ctx->spreadEps, thicknessTolerance=ctx->thicknessTolerance;
     if (vmin(ta.x,vmin(tb.x,tc.x))>ctx->hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<ctx->hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>ctx->hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<ctx->hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>ctx->hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<ctx->hb.mn.z) return;
     V3 triEdge1=V3_AsubB(tb,ta), triEdge2=V3_AsubB(tc,ta); V3 triN=V3_Cross(triEdge1,triEdge2); float triLenSq=V3_dot(triN,triN); if (triLenSq < PHY_EPSILON) return;
     triN = V3_ScaleByF(triN, 1.0f / vsqrtf(triLenSq));
     if (best->n >= MANIFOLD_MAX && (ctx->hullRadius - vabs(V3_dot(triN,V3_AsubB(ctx->hullCenter, ta)))) <= best->maxPen + MANIFOLD_TIE_MARGIN) return; // Fast early-out: If the manifold is full, only process triangles that can be deeper
-    SupportCtx supCtx = (SupportCtx){_supA_hull, _supB_tri, .meshA=hullMesh, .matA=ctx->hullMx, .adjA=ctx->adjHull, .adjB=ctx->adjHull, .ta=ta, .tb=tb, .tc=tc};
+//     SupportCtx supCtx = (SupportCtx){_supA_hull, _supB_tri, .meshA=hullMesh, .matA=ctx->hullMx, .adjA=ctx->adjHull, .adjB=ctx->adjHull, .ta=ta, .tb=tb, .tc=tc};
+    SupportCtx supCtx = (SupportCtx){ctx->boxV ? _supA_boxShape : _supA_hull, _supB_tri, .meshA=hullMesh, .matA=ctx->hullMx, .adjA=ctx->adjHull, .adjB=ctx->adjHull, .ta=ta, .tb=tb, .tc=tc, .boxShape=ctx->boxShape};
     GJKResult gjk = RunGJK(&supCtx,GJK_ITER); if(!gjk.hit)return;
     Simplex3D *s = &gjk.s;
     while (s->n<4) {
@@ -494,14 +454,26 @@ Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 
     return m;
 }
 
-Manifold BoxMsh(ShapeBox b,u16 m,const float* mx){
-    CvxMshCtx c={0}; c.adjHull=U16_MAX; if(m>=MAX_MDLS||!modelTriangleCounts[m])return c.best; V3 bv[8]; c.hullMesh=m; c.hullMx=mx; c.boxV=bv; c.boxN=8; V3 a[3]; float h[3]={b.hExt.x,b.hExt.y,b.hExt.z}; a[0]=quat_rot_v3(b.rot,(V3){1,0,0}); a[1]=quat_rot_v3(b.rot,(V3){0,1,0}); a[2]=quat_rot_v3(b.rot,(V3){0,0,1}); AABB3 q={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}};
-    for(int i=0;i<8;i++){V3 p=b.ctr;for(int k=0;k<3;k++)p=V3_AplusB(p,V3_ScaleByF(a[k],((i>>k)&1?1.f:-1.f)*h[k])); bv[i]=p; q.mn.x=vmin(q.mn.x,p.x); q.mn.y=vmin(q.mn.y,p.y); q.mn.z=vmin(q.mn.z,p.z); q.mx.x=vmax(q.mx.x,p.x); q.mx.y=vmax(q.mx.y,p.y); q.mx.z=vmax(q.mx.z,p.z);}
-    V3 e=V3_AsubB(q.mx,q.mn),skin={.01f,.01f,.01f}; c.spreadEps=vmax(.02f,vmax(e.x,vmax(e.y,e.z))*.15f); c.thicknessTolerance=vclamp(V3_Mag(b.hExt)*.06f,.003f,.02f); c.hb=(AABB3){V3_AsubB(q.mn,skin),V3_AplusB(q.mx,skin)};
-    c.hullCenter = b.ctr;
-    c.hullRadius = V3_Mag(b.hExt);
-    if (BvhHasBVH(m)) { BvhWalkAABB_CvxTri(m, mx, c.hb, &c); c.best.normal=V3_ScaleByF(c.best.normal,-1.f); return c.best; }
-    for(u32 ti=0;ti<modelTriangleCounts[m];ti++){V3 x,y,z;MeshTri(m,ti,mx,&x,&y,&z);CvxTriTest(&c,x,y,z);} c.best.normal=V3_ScaleByF(c.best.normal,-1.f); return c.best;
+void obb_axes(Quaternion q, V3 *ax, V3 *ay, V3 *az) { *ax=quat_rot_v3(q,(V3){1,0,0}); *ay=quat_rot_v3(q,(V3){0,1,0}); *az=quat_rot_v3(q,(V3){0,0,1}); }
+AABB3 BoxWorldAABB(ShapeBox b) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); V3 hx=V3_ScaleByF(x,b.hExt.x), hy=V3_ScaleByF(y,b.hExt.y), hz=V3_ScaleByF(z,b.hExt.z); V3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.ctr,e),V3_AplusB(b.ctr,e)}; }
+static Manifold BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
+    Manifold z={0}; if(triMesh>=MAX_MDLS||!modelTriangleCounts[triMesh]) return z;
+    CvxMshCtx ctx={0}; ctx.boxShape=box; ctx.adjHull=U16_MAX;
+    AABB3 hb=BoxWorldAABB(box); float skin=0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin; ctx.hb=hb;
+    ctx.hullCenter=box.ctr; ctx.hullRadius=V3_Mag(box.hExt);
+    V3 ext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(ext.x,vmax(ext.y,ext.z))*0.15f);
+    ctx.thicknessTolerance=vclamp(V3_Mag(box.hExt)*0.06f,0.003f,0.02f);
+    V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
+    V3 hx=V3_ScaleByF(ax,box.hExt.x),hy=V3_ScaleByF(ay,box.hExt.y),hz=V3_ScaleByF(az,box.hExt.z);
+    V3 bv[8]={V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),
+              V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz),
+              V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),
+              V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz),  V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
+    ctx.boxV=bv; ctx.boxN=8;
+    if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh,triMx,ctx.hb,&ctx); }
+    else { u32 triCount=modelTriangleCounts[triMesh]; for(u32 ti=0;ti<triCount;++ti){V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc);} }
+    if(ctx.best.n) ctx.best.normal=V3_ScaleByF(ctx.best.normal,-1.f);
+    return ctx.best;
 }
 
 INLINE void quat_to_mat3(Quaternion q, float R[3][3]) { float x=q.x,y=q.y,z=q.z,w=q.w, xx=x*x,yy=y*y,zz=z*z, xy=x*y,xz=x*z,yz=y*z, wx=w*x,wy=w*y,wz=w*z; R[0][0]=1.0f-2.0f*(yy+zz); R[0][1]=2.0f*(xy-wz); R[0][2]=2.0f*(xz+wy); R[1][0]=2.0f*(xy+wz); R[1][1]=1.0f-2.0f*(xx+zz); R[1][2]=2.0f*(yz-wx); R[2][0]=2.0f*(xz-wy); R[2][1]=2.0f*(yz+wx); R[2][2]=1.0f-2.0f*(xx+yy); }
@@ -584,7 +556,7 @@ void Physics(float dt) {
         else if (likely(World.collider[i] == COLTYPE_BOX)) { World.radius[i] = vmax(World.colliderSize[i].x * 0.5f * World.scale[i].x,vmax(World.colliderSize[i].y * 0.5f * World.scale[i].y,World.colliderSize[i].z * 0.5f * World.scale[i].z)); }
         else if (World.collider[i] == COLTYPE_SPH || World.collider[i] == COLTYPE_CAP) { World.radius[i] = vmax(World.colliderSize[i].x,World.colliderSize[i].y) * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z)); }
         else World.radius[i] = World.colliderSize[i].x * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));
-        if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && World.collider[i] != COLTYPE_NONE && (vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z)) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}
+        if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && World.collider[i] != COLTYPE_NONE && vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}
     }
     for (u8 s=0;s<substeps;++s) {
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
@@ -698,12 +670,8 @@ INLINE float smooth_damp(float cur, float targ, float* vel, float tm, float dt) 
 Overlap CapMsh(ShapeCapsule,u16,const float*);
 bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
     float oldHeight = World.colliderSize[playerIdx].y; V3 oldPos = World.position[playerIdx];
-    World.colliderSize[playerIdx].y = targetHeight; // Temporarily morph player into the standing capsule
-    World.position[playerIdx].y += (targetHeight - oldHeight); 
-    bool blocked = false;
-    i32 cx = PosGetCellCoordX(World.position[playerIdx].x);
-    i32 cz = PosGetCellCoordZ(World.position[playerIdx].z);
-    u32 mask = GetCollisionMask(World.layer[playerIdx]);
+    World.colliderSize[playerIdx].y = targetHeight; World.position[playerIdx].y += (targetHeight - oldHeight); // Temporarily morph player into the standing capsule
+    bool blocked = false; i32 cx=PosGetCellCoordX(World.position[playerIdx].x), cz=PosGetCellCoordZ(World.position[playerIdx].z); u32 mask=GetCollisionMask(World.layer[playerIdx]);
     for (i32 dx = -1; dx <= 1 && !blocked; ++dx) {
         for (i32 dz = -1; dz <= 1 && !blocked; ++dz) {
             u32 cell = PosGetCellCoordsP(cx + dx, cz + dz);
@@ -713,9 +681,7 @@ bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
             }
         }
     }
-    World.colliderSize[playerIdx].y = oldHeight;
-    World.position[playerIdx] = oldPos;
-    return blocked;
+    World.colliderSize[playerIdx].y = oldHeight; World.position[playerIdx] = oldPos; return blocked;
 }
 
 KeyState* GetCodeMapping(int settingIndex);
@@ -743,8 +709,8 @@ void ApplyPlayerMovements(float dt) {
         else { p->bodyState = BodyState_ProningUp; } // Between prone and crouch, or prone → up to crouch
     }
     switch (p->bodyState) {
-        case BodyState_CrouchingDown:targetRatio=-0.01f; break;                       case BodyState_StandingUp:targetRatio=1.01f;  break;      case BodyState_ProningDown:targetRatio=-0.01f; break; 
-        case BodyState_ProningUp:    targetRatio=1.01f; transitionSec+=0.1f; break; case BodyState_Crouch:    targetRatio=PLAYER_CROUCH_RATIO; break; case BodyState_Prone:      targetRatio=PLAYER_PRONE_RATIO; break; default: targetRatio=1.0f; break;
+        case BodyState_CrouchingDown:targetRatio=-0.01f; break; case BodyState_StandingUp:targetRatio=1.01f; break; case BodyState_ProningDown:targetRatio=-0.01f; break;
+        case BodyState_ProningUp:targetRatio=1.01f; transitionSec+=0.1f; break; case BodyState_Crouch:targetRatio=PLAYER_CROUCH_RATIO; break; case BodyState_Prone:targetRatio=PLAYER_PRONE_RATIO; break; default:targetRatio=1.0f; break;
     }
     float lastRatio = World.invP1.currentCrouchRatio;
     World.invP1.currentCrouchRatio = smooth_damp(lastRatio,targetRatio,&World.invP1.crouchingVelocity,transitionSec,dt);
@@ -759,11 +725,8 @@ void ApplyPlayerMovements(float dt) {
     V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; 
     float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0};
     bool isRunning = (inputLenSq > 0.01f); float speed = GetBasePlayerSpeed(PLAYER1,isRunning) * 1.75f, accel=World.boosterActive ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
-    if (World.invP1.ladderState > 0) {
-        float climbSpeed = (Sprint() && isRunning) ? 1.2f : 0.4f;
-        targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed * 25.0f, p->right.z * s * speed * 0.3f};
-        accel = 5.0f;
-    } else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
+    if (World.invP1.ladderState > 0) { float climbSpeed = (Sprint() && isRunning) ? 1.2f : 0.4f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed * 25.0f, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
+    else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
     V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); 
     dv = (V3){ vclamp(dv.x, -10.0f, 10.0f), vclamp(dv.y, -10.0f, 10.0f), vclamp(dv.z, -10.0f, 10.0f) };
     World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1], V3_ScaleByF(dv, accel * vclamp(dt, 0.0005f, 0.1f)));

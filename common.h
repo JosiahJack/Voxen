@@ -240,7 +240,7 @@ void *OS_AllocateRAM(size_t,i32,i32,FHandle),*OS_AllocateFileBackedRAMReadonly(s
 long OS_Read(FHandle,void*,size_t),OS_RawWrite(FHandle fd, const void* buf, size_t cnt),OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/),OS_Tell(FHandle);
 __attribute__((noreturn)) void OS_Exit(i64);
 i32 OS_FileSize(FHandle f),OS_ThreadCreate(OS_Thread*,void*(*fn)(void*),void*);
-u32 GetCollisionMask(u32); RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
+RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
 u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
 double get_time(); float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData);
 void UseTargets(u16,const char*),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),* OS_Alloc(size_t),OS_Free(void*,size_t),*OS_OpenAndAllocateFileBufferReadonly(const char*,FHandle*,int*),DebugRAM(const char*),
