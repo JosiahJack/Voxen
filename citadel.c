@@ -760,10 +760,12 @@ void mat4_lookat_from(float*,Quaternion*,V3); void mul_mat4(float*,const float*,
 #define INVSQRT2 0.70710678118f
 Quaternion cubeQuats[6] = {{0.0f,INVSQRT2,0.0f,INVSQRT2}/*+X:Right*/,{0.0f,-INVSQRT2,0.0f,INVSQRT2}/*-X:Left*/,{-INVSQRT2,0.0f,0.0f,INVSQRT2}/*+Y:Up*/,{INVSQRT2,0.0f,0.0f,INVSQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
 void UpdateLights() {
+    bool lightDirty = false;
     for (u16 lightIdx=0;lightIdx<World.loadedLights;++lightIdx) {
         V3 lightPos = World.lightsNewPosition[lightIdx];
         World.lights[lightIdx].pos = lightPos;
         if (World.lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
+            lightDirty = true;
             flag_set(&World.lights[lightIdx].lflags,LDIRTY,false);
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) { // Update to new position
@@ -796,9 +798,12 @@ void UpdateLights() {
             }
         }
     }
-    glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,World.loadedLights * sizeof(Light),World.lights,GL_DYNAMIC_DRAW);
-    glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
-    glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
+
+    if (lightDirty) {
+        glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,World.loadedLights * sizeof(Light),World.lights,GL_DYNAMIC_DRAW);
+        glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
+        glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
+    }
 }
 // Hardware
 void HardwareBioOff(void) { World.invP1.hardwareIsActive &= ~HW_BIO; if (Cheats.showFPS) {return;}/*TODO (after this return): BiomonitorClearGraphs() — engine-side graph reset*/ }

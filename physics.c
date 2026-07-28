@@ -3,9 +3,9 @@
 #include "lib.h"
 #include "trigger.c" // Trigger Volumes System
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
-const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=16.666666f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.08f / 16.666666f),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.005f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
+const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=16.666666f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.08f / 16.666666f),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
 const float WALK_SPEED=3.6f,SPRINT_SPEED=8.8f,PLAYER_MAX_CYBER_SPEED=5.0f,SPRINT_SPEED_FATIGUED=5.5f,CROUCH_SPEED=1.25f,PLAYER_MAX_PRONE_SPEED=0.5f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.6f,PLAYER_PRONE_RATIO=0.01f;
-enum {MANIFOLD_MAX=4,CVXMSH_HULL_CACHE=1024,EPA_MAX_FACES=64,EPA_MAX_VERTS=128,EPA_MAX_EDGES=EPA_MAX_FACES * 3,GJK_ITER=16,EPA_ITER=16};
+enum {MANIFOLD_MAX=4,CVXMSH_HULL_CACHE=1024,EPA_MAX_FACES=64,EPA_MAX_VERTS=128,EPA_MAX_EDGES=EPA_MAX_FACES * 3,GJK_ITER=16,EPA_ITER=16,SOLVER_ITER=16,SOLVER_ITER_MIN=16};
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 float posBudget[INSTANCE_COUNT]; // Remaining |Δpos| entity i may receive this substep; reset every substep in Physics().
@@ -16,10 +16,19 @@ INLINE Overlap SphSph(V3 a, float ar, V3 b, float br) { V3 dt=V3_AsubB(a,b); flo
 Overlap SphCap(ShapeSphere s, ShapeCapsule c) { V3 seg=V3_AsubB(c.tip,c.base); float l=V3_dot(seg,seg); float m=(l < PHY_EPSILON); V3 b=V3_AplusB(c.base, V3_ScaleByF(seg,vclamp(V3_dot(V3_AsubB(s.ctr, c.base),seg) / vmax(l, PHY_EPSILON), 0.0f, 1.0f) * (1.0f - m))); b = V3_AplusB(V3_ScaleByF(b,1.0f - m),V3_ScaleByF(c.base,m)); return SphSph(s.ctr,s.rad,b,c.rad); }
 Overlap CapCap(ShapeCapsule a, ShapeCapsule b) {
     Overlap r={0}; float sc,tc,distSq, radSum=a.rad + b.rad; V3 d1 = V3_AsubB(a.tip,a.base), d2=V3_AsubB(b.tip,b.base), vr=V3_AsubB(a.base,b.base);
-    float qa=V3_dot(d1,d1), e=V3_dot(d2,d2), f=V3_dot(d2,vr); if(qa < PHY_EPSILON && e < PHY_EPSILON){sc=tc=0.0f; distSq=V3_dot(vr,vr);}else if(qa < PHY_EPSILON){sc=0.0f; tc=vclamp(f/e,0.0f,1.0f);}
-    else { float c=V3_dot(d1,vr); if (e < PHY_EPSILON) { tc=0.0f; sc=vclamp(-c/qa,0.0f,1.0f); } else { float qb=V3_dot(d1,d2), denom=qa*e - qb*qb; sc=(denom > PHY_EPSILON) ? vclamp((qb*f - c*e)/denom,0.0f,1.0f) : 0.0f; tc=(qb*sc + f)/e; if(tc < 0.0f){tc=0.0f; sc=vclamp(-c/qa,0.0f,1.0f);}else if(tc > 1.0f){tc=1.0f; sc=vclamp((qb-c)/qa,0.0f,1.0f);} } }
-    V3 ptA = V3_AplusB(a.base,V3_ScaleByF(d1,sc)), ptB = V3_AplusB(b.base,V3_ScaleByF(d2,tc)), diff = V3_AsubB(ptA,ptB); distSq = V3_dot(diff,diff); if(distSq >= radSum * radSum) return r;
-    float dist = vsqrtf(vmax(distSq,0.0f)); r.pen = radSum - dist; r.hit = true; r.normal = (dist < PHY_EPSILON) ? (V3){0,1,0} : V3_ScaleByF(diff,1.0f/dist); r.point = V3_AplusB(ptB,V3_ScaleByF(r.normal,b.rad)); return r;
+    float qa=V3_dot(d1,d1), e=V3_dot(d2,d2), f=V3_dot(d2,vr);
+    if(qa < PHY_EPSILON && e < PHY_EPSILON){sc=tc=0.0f;}
+    else if(qa < PHY_EPSILON){sc=0.0f; tc=vclamp(f/e,0.0f,1.0f);}
+    else {
+        float c=V3_dot(d1,vr);
+        if(e < PHY_EPSILON){tc=0.0f; sc=vclamp(-c/qa,0.0f,1.0f);}
+        else {
+            float qb=V3_dot(d1,d2),denom=qa*e - qb*qb; sc=(denom > PHY_EPSILON) ? vclamp((qb*f - c*e)/denom,0.0f,1.0f) : 0.0f; tc=(qb*sc + f)/e;
+            if(tc < 0.0f){tc=0.0f; sc=vclamp(-c/qa,0.0f,1.0f);}else if(tc > 1.0f){tc=1.0f; sc=vclamp((qb-c)/qa,0.0f,1.0f);}
+        }
+    }
+    V3 ptA=V3_AplusB(a.base,V3_ScaleByF(d1,sc)), ptB=V3_AplusB(b.base,V3_ScaleByF(d2,tc)), diff=V3_AsubB(ptA,ptB); distSq=V3_dot(diff,diff); if(distSq >= radSum * radSum) return r;
+    float dist=vsqrtf(vmax(distSq,0.0f)); r.pen=radSum - dist; r.hit=true; r.normal=(dist < PHY_EPSILON) ? (V3){0,1,0} : V3_ScaleByF(diff,1.0f/dist); r.point = V3_AplusB(ptB,V3_ScaleByF(r.normal,b.rad)); return r;
 }
 
 INLINE Overlap SphBoxAxes(V3 ctr, float rad, V3 boxCtr, V3 ax, V3 ay, V3 az, V3 hExt) {
@@ -84,6 +93,7 @@ Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5
 Quaternion quat_normalize(Quaternion q) { float l = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; float m = (l < PHY_EPSILON); float inv=vinvsqtf(vmax(l,PHY_EPSILON)); q.x*=inv; q.y*=inv; q.z*=inv; q.w*=inv; q.x=q.x*(1.0f - m); q.y=q.y*(1.0f - m); q.z=q.z*(1.0f - m); q.w=q.w*(1.0f - m) + 1.0f*m; return q; }
 INLINE V3 MeshVert(u16 m, u32 i) { const float* p = physPos[m] + i * 3; return (V3){p[0],p[1],p[2]}; }
 void ComputeConvexMeshInertiaTensor(u16 i) {
+    World.mass[i] *= 10.0f;
     u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i]=false; if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) {return;}
     float acc[6]={0}; float cm[3]={0}; float volAcc=0.0f; u32 triCount = modelTriangleCounts[mi];
     for (u32 ti=0;ti<triCount;++ti) { // Accumulates without dividing by 6 for each saving that for the end for performance.
@@ -113,31 +123,79 @@ void ComputeConvexMeshInertiaTensor(u16 i) {
     World.invTnsrValid[i]=true;
 }
 
-bool PointInOBB(V3 pt, ShapeBox box) { V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx = V3_dot(d,ax), ly = V3_dot(d,ay), lz = V3_dot(d,az); return (vabs(lx) <= box.hExt.x) && (vabs(ly) <= box.hExt.y) && (vabs(lz) <= box.hExt.z); }
-Overlap BoxBox(ShapeBox a, ShapeBox b) {
-    Overlap r = {0}; V3 aAxes[3],bAxes[3];
-    aAxes[0]=quat_rot_v3(a.rot,(V3){1,0,0}); aAxes[1]=quat_rot_v3(a.rot,(V3){0,1,0}); aAxes[2]=quat_rot_v3(a.rot,(V3){0,0,1});
-    bAxes[0]=quat_rot_v3(b.rot,(V3){1,0,0}); bAxes[1]=quat_rot_v3(b.rot,(V3){0,1,0}); bAxes[2]=quat_rot_v3(b.rot,(V3){0,0,1}); 
-    V3 T = V3_AsubB(b.ctr,a.ctr); float R[3][3],AbsR[3][3];
+bool PointInOBB(V3 pt, ShapeBox box) {
+    V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx = V3_dot(d,ax), ly = V3_dot(d,ay), lz = V3_dot(d,az);
+    return (vabs(lx) <= box.hExt.x + 0.001f) && (vabs(ly) <= box.hExt.y + 0.001f) && (vabs(lz) <= box.hExt.z + 0.001f);
+}
+
+Manifold BoxBox(ShapeBox a, ShapeBox b) {
+    Manifold m={0}; V3 aAxes[3], bAxes[3]; aAxes[0]=quat_rot_v3(a.rot,(V3){1,0,0}); aAxes[1]=quat_rot_v3(a.rot,(V3){0,1,0}); aAxes[2]=quat_rot_v3(a.rot,(V3){0,0,1});
+    bAxes[0]=quat_rot_v3(b.rot,(V3){1,0,0}); bAxes[1]=quat_rot_v3(b.rot,(V3){0,1,0}); bAxes[2]=quat_rot_v3(b.rot,(V3){0,0,1});
+    float aExt[3] = { a.hExt.x, a.hExt.y, a.hExt.z }; float bExt[3] = { b.hExt.x, b.hExt.y, b.hExt.z }; V3 T = V3_AsubB(b.ctr,a.ctr); float R[3][3],AbsR[3][3];
     for (int i=0;i<3;i++) for (int j=0;j<3;j++) { R[i][j]=V3_dot(aAxes[i],bAxes[j]); AbsR[i][j]=vabs(R[i][j])+1e-6f; }
-    float minOverlap=1e9f; int bestAxis=-1; bool flipNormal=false; V3 bestEdgeAxis={0,1,0};
-    for (int i=0;i<3;i++) { float ra=((float*)&a.hExt)[i], rb=b.hExt.x*AbsR[i][0]+b.hExt.y*AbsR[i][1]+b.hExt.z*AbsR[i][2]; float t=vabs(V3_dot(T,aAxes[i])); if(t>ra+rb){return r;} float ov=(ra+rb)-t; if(ov<minOverlap){minOverlap=ov; bestAxis=  i; flipNormal=(V3_dot(T,aAxes[i])<0.f);} }
-    for (int i=0;i<3;i++) { float ra=a.hExt.x*AbsR[0][i]+a.hExt.y*AbsR[1][i]+a.hExt.z*AbsR[2][i], rb=((float*)&b.hExt)[i]; float t=vabs(V3_dot(T,bAxes[i])); if(t>ra+rb){return r;} float ov=(ra+rb)-t; if(ov<minOverlap){minOverlap=ov; bestAxis=3+i; flipNormal=(V3_dot(T,bAxes[i])<0.f);} }
-    for (int i=0;i<3;i++) for (int j=0;j<3;j++) {
-        int i1=(i+1)%3, i2=(i+2)%3, j1=(j+1)%3, j2=(j+2)%3; float t=vabs(V3_dot(T,aAxes[i2])*R[i1][j] - V3_dot(T,aAxes[i1])*R[i2][j]); float ra=((float*)&a.hExt)[i1]*AbsR[i2][j]+((float*)&a.hExt)[i2]*AbsR[i1][j]; float rb=((float*)&b.hExt)[j1]*AbsR[i][j2]+((float*)&b.hExt)[j2]*AbsR[i][j1];
-        if(t>ra+rb){return r;} float axLenSq=1.f-(R[i][j]*R[i][j]); if (axLenSq>1e-4f) { float ov=((ra+rb)-t)/vsqrtf(axLenSq); if (ov<minOverlap) { V3 ea=V3_Cross(aAxes[i],bAxes[j]); minOverlap=ov; bestAxis=6+i*3+j; bestEdgeAxis=ea; flipNormal=(V3_dot(T,ea)<0.f); } }
+    float minOverlap=1e9f; int bestAxis=-1; bool flipNormal=false;
+    for (int i=0;i<3;i++) {
+        float ra=aExt[i], rb=bExt[0]*AbsR[i][0]+bExt[1]*AbsR[i][1]+bExt[2]*AbsR[i][2];
+        float t=vabs(V3_dot(T,aAxes[i]));
+        if(t>ra+rb) return m;
+        float ov=(ra+rb)-t;
+        if(ov<minOverlap-MANIFOLD_TIE_MARGIN){minOverlap=ov; bestAxis=i; flipNormal=(V3_dot(T,aAxes[i])<0.f);}
     }
-    if (bestAxis<0) return r;
-    r.hit=true; r.pen=minOverlap;
-    if      (bestAxis<3) r.normal=flipNormal ? aAxes[bestAxis]            : V3_ScaleByF(aAxes[bestAxis],-1.f);
-    else if (bestAxis<6) r.normal=flipNormal ? bAxes[bestAxis-3]          : V3_ScaleByF(bAxes[bestAxis-3],-1.f);
-    else                 r.normal=flipNormal ? V3_Normalize(bestEdgeAxis) : V3_ScaleByF(V3_Normalize(bestEdgeAxis),-1.f);
-    V3 sA=a.ctr;
-    sA=V3_AplusB(sA,V3_ScaleByF(aAxes[0],(V3_dot(aAxes[0],r.normal)<0.f?1.f:-1.f)*a.hExt.x));
-    sA=V3_AplusB(sA,V3_ScaleByF(aAxes[1],(V3_dot(aAxes[1],r.normal)<0.f?1.f:-1.f)*a.hExt.y));
-    sA=V3_AplusB(sA,V3_ScaleByF(aAxes[2],(V3_dot(aAxes[2],r.normal)<0.f?1.f:-1.f)*a.hExt.z));
-    r.point=V3_AplusB(sA,V3_ScaleByF(r.normal,minOverlap*0.5f));
-    return r;
+    for (int i=0;i<3;i++) {
+        float ra=aExt[0]*AbsR[0][i]+aExt[1]*AbsR[1][i]+aExt[2]*AbsR[2][i], rb=bExt[i];
+        float t=vabs(V3_dot(T,bAxes[i]));
+        if(t>ra+rb) return m;
+        float ov=(ra+rb)-t;
+        if(ov<minOverlap-MANIFOLD_TIE_MARGIN){minOverlap=ov; bestAxis=3+i; flipNormal=(V3_dot(T,bAxes[i])<0.f);}
+    }
+    for (int i=0;i<3;i++) for (int j=0;j<3;j++) {
+        int i1=(i+1)%3, i2=(i+2)%3, j1=(j+1)%3, j2=(j+2)%3;
+        float t=vabs(V3_dot(T,aAxes[i2])*R[i1][j] - V3_dot(T,aAxes[i1])*R[i2][j]);
+        float ra=aExt[i1]*AbsR[i2][j]+aExt[i2]*AbsR[i1][j];
+        float rb=bExt[j1]*AbsR[i][j2]+bExt[j2]*AbsR[i][j1];
+        if(t>ra+rb) return m;
+        float axLenSq=1.f-(R[i][j]*R[i][j]);
+        if (axLenSq>1e-4f) { float ov=((ra+rb)-t)/vsqrtf(axLenSq); if (ov < minOverlap-MANIFOLD_TIE_MARGIN) { V3 ea=V3_Cross(aAxes[i],bAxes[j]); minOverlap=ov; bestAxis=6+i*3+j; flipNormal=(V3_dot(T,ea)<0.f); } }
+    }
+    if (bestAxis < 0) return m;
+    m.maxPen=minOverlap; V3 normal;
+    if (bestAxis >= 6) { // Fallback for edge-edge collisions
+        int i=(bestAxis - 6) / 3, j=(bestAxis - 6) % 3; V3 ea=V3_Cross(aAxes[i],bAxes[j]);
+        normal = flipNormal ? V3_Normalize(ea) : V3_ScaleByF(V3_Normalize(ea),-1.f); m.normal = normal; m.n = 1; V3 sA=a.ctr;
+        sA=V3_AplusB(sA,V3_ScaleByF(aAxes[0],(V3_dot(aAxes[0],normal)<0.f?1.f:-1.f)*a.hExt.x));
+        sA=V3_AplusB(sA,V3_ScaleByF(aAxes[1],(V3_dot(aAxes[1],normal)<0.f?1.f:-1.f)*a.hExt.y));
+        sA=V3_AplusB(sA,V3_ScaleByF(aAxes[2],(V3_dot(aAxes[2],normal)<0.f?1.f:-1.f)*a.hExt.z));
+        m.p[0].point = V3_AplusB(sA,V3_ScaleByF(normal,minOverlap*0.5f)); m.p[0].pen = minOverlap; m.maxPen = minOverlap; return m;
+    }
+    int refAxis; float *refExt,*incExt; V3 *refAxes,*incAxes,refCenter,refNormal;
+    if (bestAxis < 3) { refAxis = bestAxis; normal = flipNormal ? aAxes[refAxis] : V3_ScaleByF(aAxes[refAxis], -1.f); refAxes = aAxes; refExt = aExt; incAxes = bAxes; incExt = bExt; refCenter = a.ctr; refNormal = V3_ScaleByF(normal, -1.0f); } // Points outward from A towards B
+    else { refAxis = bestAxis - 3; normal = flipNormal ? bAxes[refAxis] : V3_ScaleByF(bAxes[refAxis], -1.f); refAxes = bAxes; refExt = bExt; incAxes = aAxes; incExt = aExt; refCenter = b.ctr; refNormal = normal; } // Points outward from B towards A
+    m.normal = normal; refCenter = V3_AplusB(refCenter, V3_ScaleByF(refNormal, refExt[refAxis])); float minDot=1e9f, incSign=1.0f; int incAxis = 0; // Push refCenter exactly to the touching face
+    for (int i=0; i<3; ++i) { float dot = V3_dot(incAxes[i], refNormal); if (dot < minDot) { minDot = dot; incAxis = i; incSign = 1.0f; } if (-dot < minDot) { minDot = -dot; incAxis = i; incSign = -1.0f; } } // Find incident face (most anti-parallel to reference normal)
+    V3 incBoxCtr = (bestAxis < 3) ? b.ctr : a.ctr; V3 incCenter = V3_AplusB(incBoxCtr, V3_ScaleByF(incAxes[incAxis], incSign * incExt[incAxis]));
+    int i1 = (incAxis+1)%3, i2 = (incAxis+2)%3; V3 ext1 = V3_ScaleByF(incAxes[i1], incExt[i1]); V3 ext2 = V3_ScaleByF(incAxes[i2], incExt[i2]);
+    V3 clipped[8]; int clipCount = 4;
+    clipped[0] = V3_AplusB(incCenter, V3_AplusB(ext1, ext2)); clipped[1] = V3_AsubB(incCenter, V3_AsubB(ext1, ext2)); clipped[2] = V3_AsubB(incCenter, V3_AplusB(ext1, ext2)); clipped[3] = V3_AplusB(incCenter, V3_AsubB(ext1, ext2));
+    int r1 = (refAxis+1)%3, r2 = (refAxis+2)%3;
+    #define CLIP_PLANE(n_axis, sign) { V3 n = V3_ScaleByF(refAxes[n_axis], sign); float dist = V3_dot(n, refCenter) + refExt[n_axis]; V3 out[8]; int outCount = 0; \
+        for (int i=0; i<clipCount; ++i) { \
+            V3 v1 = clipped[i]; V3 v2 = clipped[(i+1)%clipCount]; float d1 = V3_dot(n, v1) - dist; float d2 = V3_dot(n, v2) - dist; if (d1 <= 0.0f) out[outCount++] = v1; \
+            if ((d1 > 0.0f && d2 <= 0.0f) || (d1 <= 0.0f && d2 > 0.0f)) { float t = d1 / (d1 - d2); out[outCount++] = V3_AplusB(v1, V3_ScaleByF(V3_AsubB(v2, v1), t)); } \
+        } \
+        clipCount = outCount; for(int i=0; i<clipCount; ++i) clipped[i] = out[i]; \
+    } // Sutherland-Hodgman clipping against the 4 side planes of the reference face
+    CLIP_PLANE(r1, 1.0f) CLIP_PLANE(r1, -1.0f) CLIP_PLANE(r2, 1.0f) CLIP_PLANE(r2, -1.0f)
+    float refPlaneDist = V3_dot(refNormal, refCenter); // Keep points that are behind the reference face
+    for (int i=0; i<clipCount; ++i) {
+        float dist = V3_dot(refNormal, clipped[i]) - refPlaneDist;
+        if (dist <= 0.001f) { // Small skin tolerance
+            bool isDup = false;
+            for(int k=0; k<m.n; ++k) { V3 diff = V3_AsubB(clipped[i], m.p[k].point); if (V3_dot(diff, diff) < 0.00001f) { isDup = true; break; } }
+            if (!isDup && m.n < MANIFOLD_MAX) { m.p[m.n].point=clipped[i]; float pen=-dist; if(pen < 0){pen=0;} m.p[m.n].pen=pen; if (pen > m.maxPen){m.maxPen=pen;} m.n++; }
+        }
+    }
+    if (m.n == 0) { m.n = 1; m.p[0].point = V3_AplusB(refCenter, V3_ScaleByF(refNormal, 0.01f)); m.p[0].pen = minOverlap; m.maxPen = minOverlap; }
+    return m;
 }
 
 V3 MvVert(const float* M, V3 v) { return (V3){ M[0]*v.x + M[4]*v.y + M[8]*v.z  + M[12], M[1]*v.x + M[5]*v.y + M[9]*v.z  + M[13], M[2]*v.x + M[6]*v.y + M[10]*v.z + M[14] }; }
@@ -249,7 +307,6 @@ void SphTriTest(V3 sc, float sr, u16 mesh, u32 ti, const float* mx, Overlap* r) 
 }
 
 INLINE V3 TriSupport(V3 ta, V3 tb, V3 tc, V3 d) { float d1=V3_dot(ta,d),d2=V3_dot(tb,d),d3=V3_dot(tc,d); return d1>d2 ? (d1>d3 ? ta : tc) : (d2>d3 ? tb : tc); }
-typedef enum { SUP_HULL_HULL, SUP_PRIM_HULL, SUP_HULL_TRI } SupportType;
 typedef struct SupportCtx { V3 (*supA)(const struct SupportCtx *ctx, V3 dir); V3 (*supB)(const struct SupportCtx *ctx, V3 negDir); u16 prim,meshA,meshB; const float *matA,*matB; V3 ta,tb,tc; u16 adjA,adjB; ShapeBox boxShape; } SupportCtx;
 INLINE V3 _supA_hull(const SupportCtx *ctx, V3 d) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, d); }
 INLINE V3 _supA_sph(const SupportCtx *ctx, V3 d)  { return SphSupport(Entity_GetSph(ctx->prim), d); }
@@ -346,7 +403,6 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     V3 triEdge1=V3_AsubB(tb,ta), triEdge2=V3_AsubB(tc,ta); V3 triN=V3_Cross(triEdge1,triEdge2); float triLenSq=V3_dot(triN,triN); if (triLenSq < PHY_EPSILON) return;
     triN = V3_ScaleByF(triN, 1.0f / vsqrtf(triLenSq));
     if (best->n >= MANIFOLD_MAX && (ctx->hullRadius - vabs(V3_dot(triN,V3_AsubB(ctx->hullCenter, ta)))) <= best->maxPen + MANIFOLD_TIE_MARGIN) return; // Fast early-out: If the manifold is full, only process triangles that can be deeper
-//     SupportCtx supCtx = (SupportCtx){_supA_hull, _supB_tri, .meshA=hullMesh, .matA=ctx->hullMx, .adjA=ctx->adjHull, .adjB=ctx->adjHull, .ta=ta, .tb=tb, .tc=tc};
     SupportCtx supCtx = (SupportCtx){ctx->boxV ? _supA_boxShape : _supA_hull, _supB_tri, .meshA=hullMesh, .matA=ctx->hullMx, .adjA=ctx->adjHull, .adjB=ctx->adjHull, .ta=ta, .tb=tb, .tc=tc, .boxShape=ctx->boxShape};
     GJKResult gjk = RunGJK(&supCtx,GJK_ITER); if(!gjk.hit)return;
     Simplex3D *s = &gjk.s;
@@ -360,16 +416,14 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
         for (int k=0;k<s->n;k++){V3 dv=V3_AsubB(sup,s->v[k]); dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
         if (!dup){s->wA[s->n]=wA; s->wB[s->n]=wB; s->v[s->n++]=sup;} else {fallbackDir=(V3){-fallbackDir.x,-fallbackDir.y,-fallbackDir.z}; GetSupportPair(&supCtx, fallbackDir, &wA, &wB); s->wA[s->n]=wA; s->wB[s->n]=wB; s->v[s->n++]=V3_AsubB(wA,wB);}
     }
-    EPAState epa; SeedEPA(&epa, s); if (epa.nf<4) return;
-    bool tHit=false; V3 tN={0}; float tD=0; V3 tP={0};
+    EPAState epa; SeedEPA(&epa, s); if (epa.nf<4){return;} bool tHit=false; V3 tN={0}; float tD=0; V3 tP={0};
     for (int it=0;it<EPA_ITER;++it){
         int bf=-1; float bd=1e9f; for (int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break;
         V3 bn=epa.ef[bf].n; V3 wA, wB; GetSupportPair(&supCtx, bn, &wA, &wB); V3 sup=V3_AsubB(wA,wB);
         if(V3_dot(bn,sup)-bd<PHY_EPSILON){ if(V3_dot(bn,triN) < 0.0f){bn=triN;} tHit=true; tN=bn; tD=bd; tP=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); break; }
         if (!ExpandEPA(&epa,sup,wA,wB)) break;
     }
-    if (!tHit) return;
-    V3 deepPoint=tP;
+    if (!tHit){return;} V3 deepPoint=tP;
     if (!best->n) { best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD}; }
     else {
         float align=V3_dot(tN,best->normal);
@@ -382,9 +436,7 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     if (best->n < MANIFOLD_MAX) {
         u32 hn = ctx->boxV ? ctx->boxN : modelVertexCounts[hullMesh];
         if (hn && best->n>0 && V3_dot(tN,best->normal)>MANIFOLD_ALIGN_THRESHOLD) {
-            float planeDist=V3_dot(tN,deepPoint); 
-            // Reuse triEdge1 and triEdge2
-            float d00=V3_dot(triEdge1,triEdge1), d01=V3_dot(triEdge1,triEdge2), d11=V3_dot(triEdge2,triEdge2), denom=d00*d11-d01*d01; 
+            float planeDist=V3_dot(tN,deepPoint); float d00=V3_dot(triEdge1,triEdge1), d01=V3_dot(triEdge1,triEdge2), d11=V3_dot(triEdge2,triEdge2), denom=d00*d11-d01*d01; // Reuse triEdge1 and triEdge2
             bool validTri=vabs(denom)>PHY_EPSILON;
             for (u32 i=0;i<hn;++i) {
                 V3 pt=ctx->boxV ? ctx->boxV[i] : MvVert(ctx->hullMx,MeshVert(hullMesh,i)); float distToPlane=V3_dot(tN,pt)-planeDist;
@@ -430,9 +482,7 @@ Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 
     EPAState epa; SeedEPA(&epa, &gjk.s);
     for(int it=0;it<EPA_ITER;++it) {
         int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break;
-        V3 bn=epa.ef[bf].n; 
-        V3 wA, wB; GetSupportPair(&ctx, bn, &wA, &wB);
-        V3 sup=V3_AsubB(wA,wB);
+        V3 bn=epa.ef[bf].n; V3 wA, wB; GetSupportPair(&ctx, bn, &wA, &wB); V3 sup=V3_AsubB(wA,wB);
         if (V3_dot(bn,sup)-bd<PHY_EPSILON) {
             m.normal=bn; m.maxPen=bd; m.n=1; V3 deepPoint=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); m.p[0]=(ManifoldPt){deepPoint,bd};
             u32 nVertsB = modelVertexCounts[meshB];
@@ -506,7 +556,7 @@ void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float target
         float angTermAT = canRotateA ? V3_dot(rAxT,ApplyInvTensor(a,rAxT,Ra)) : 0.0f, angTermBT = canRotateB ? V3_dot(rBxT,ApplyInvTensor(b,rBxT,Rb)) : 0.0f, invSumT = invMassA + invMassB + angTermAT + angTermBT;
         if (invSumT > PHY_EPSILON) {
             float jt = -V3_dot(relVel2,tangent) / invSumT, friction; bool aIsSpecial = (World.collider[a] == COLTYPE_CAP && (a == PLAYER1 || IdxIsNPC(World.instances[a].index)));
-            if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.05f) / 0.10f, 0.0f, 1.0f); friction = 0.05f + mix * (1.0f - 0.05f); }
+            if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.05f) / 0.10f, 0.0f, 1.0f); friction = 0.8f + mix * (0.6f - 0.8f); }
             float maxT = friction * (*accumN), newAccumT = vclamp(*accumT + jt, -maxT, maxT); jt = newAccumT - *accumT; *accumT = newAccumT;
             V3 fImpulse = V3_ScaleByF(tangent,jt); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(fImpulse,invMassA));
             if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b],V3_ScaleByF(fImpulse,invMassB));
@@ -517,7 +567,7 @@ void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float target
 }
 
 void DrawSphereContact(V3 pos, float rad);
-void ApplyManifoldResponse(u16 a, u16 b, const Manifold *m) {
+void ApplyManifoldResponse(u16 a, u16 b, const Manifold *m, float dt) {
     if (!m->n || (World.collider[b] == COLTYPE_MSH && World.collider[a] == COLTYPE_MSH)) return;
     bool bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.collider[b] == COLTYPE_NONE || World.collider[b] == COLTYPE_MSH);
     for (int i=0;i<m->n;++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} }
@@ -530,15 +580,17 @@ void ApplyManifoldResponse(u16 a, u16 b, const Manifold *m) {
         rA[i] = V3_AsubB(m->p[i].point,World.position[a]); rB[i] = bStatic ? (V3){0,0,0} : V3_AsubB(m->p[i].point,World.position[b]);
         V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],rA[i])), vAtB = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],rB[i]));
         float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal), e_r = (vn0 < -0.5f) ? vmax(World.bounciness[a],bStatic ? 0.0f : World.bounciness[b]) : 0.0f;
-        targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f; V3 rAxN = V3_Cross(rA[i],m->normal), rBxN = V3_Cross(rB[i],m->normal);
+        targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f;
+        targetVn[i] += 0.2f * vmax(m->p[i].pen - 0.005f, 0.0f) / dt; // per-point Baumgarte bias, replaces the averaged SetPosition hack
+        V3 rAxN = V3_Cross(rA[i],m->normal), rBxN = V3_Cross(rB[i],m->normal);
         invSumN[i] = invMassA + invMassB + (canRotateA ? V3_dot(rAxN,ApplyInvTensor(a,rAxN,Ra)) : 0.0f) + (canRotateB ? V3_dot(rBxN,ApplyInvTensor(b,rBxN,Rb)) : 0.0f);
     }
-    int iters = (m->n > 1) ? 8 : 1;
+    int iters = (m->n > 1) ? SOLVER_ITER : SOLVER_ITER_MIN;
     for (int it=0;it<iters;++it) { for (int i=0;i<m->n;++i) ResolveContactVelocity(a,b,m->normal,rA[i],rB[i],targetVn[i],&accumN[i],&accumT[i],bStatic,invMassA,invMassB,invSumN[i],canRotateA,canRotateB,Ra,Rb); }
-    float avgPen=0.0f; for (int i=0;i<m->n;++i) {avgPen += m->p[i].pen;} avgPen /= (float)m->n; float c = vmax(avgPen - 0.005f,0.0f) * 0.9f;
+    float avgPen=0.0f; for (int i=0;i<m->n;++i) {avgPen += m->p[i].pen;} avgPen /= (float)m->n; float c = vmax(avgPen - 0.005f,0.0f) * 0.9f; // Baumgarte correction.
     float massDiv = invMassA + invMassB + PHY_EPSILON;
-    SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(m->normal,c * invMassA / massDiv))); 
-    if (!bStatic) SetPosition(b,V3_AsubB(World.position[b],V3_ScaleByF(m->normal,c * invMassB / massDiv)));
+//     SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(m->normal,c * invMassA / massDiv)));
+//     if (!bStatic) SetPosition(b,V3_AsubB(World.position[b],V3_ScaleByF(m->normal,c * invMassB / massDiv)));
 }
 
 void EntityColliderMatrixNow(u16 i, float M[16]) { // Convex meshes need to keep their matrix4x4 up to date.
@@ -607,7 +659,7 @@ void Physics(float dt) {
                         else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_SPH) { Overlap r=SphCap(Entity_GetSph(b),Entity_GetCap(a)); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.f); mf=OverlapToManifold(r); }
                         else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_CAP) { mf=OverlapToManifold(SphCap(Entity_GetSph(a),Entity_GetCap(b))); }
                         else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_CAP) { Overlap r = CapBox(Entity_GetCap(b),Entity_GetBox(a)); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
-                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_BOX) { mf = OverlapToManifold(BoxBox(Entity_GetBox(a),Entity_GetBox(b))); }
+                        else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_BOX) { mf = BoxBox(Entity_GetBox(a),Entity_GetBox(b)); }
                         else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_BOX) { ShapeSphere sa = Entity_GetSph(a); mf = OverlapToManifold(SphBox(sa.ctr,sa.rad,Entity_GetBox(b))); }
                         else if (World.collider[a] == COLTYPE_BOX && World.collider[b] == COLTYPE_SPH) { ShapeSphere sa = Entity_GetSph(b); Overlap r = SphBox(sa.ctr,sa.rad,Entity_GetBox(a)); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
                         else if (World.collider[a] == COLTYPE_SPH && World.collider[b] == COLTYPE_SPH) { ShapeSphere sa = Entity_GetSph(a), sb = Entity_GetSph(b); mf = OverlapToManifold(SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad)); }
@@ -628,7 +680,7 @@ void Physics(float dt) {
                 }
             }
             World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false);
-            for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; World.colliding[a]=World.colliding[contactsOther[c]]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f}) >= 0.574f) {World.instances[a].entflags |= EF_GROUNDED;} ApplyManifoldResponse(a,contactsOther[c],mfp); } // 3. Restitution
+            for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; World.colliding[a]=World.colliding[contactsOther[c]]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f}) >= 0.574f) {World.instances[a].entflags |= EF_GROUNDED;} ApplyManifoldResponse(a,contactsOther[c],mfp,dt); } // 3. Restitution
             World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
         }
         for (u16 i=0;i<numTriggers;++i) {

@@ -305,9 +305,10 @@ static double RenderUI() {
     if (Cheats.showFPS) {
         World.thisFrameTime = (time_now - World.last_time) * 1000.0; World.last_time = time_now; World.cpuFrameTime = World.cpuTime * 1000.0; u8 timingColor = (World.thisFrameTime > 6.944444) ? T_RED : T_WHITE; drawCalls += 3; double avgCPU = 0.0;
         avgCPUt[avgCPUt_idx] = World.cpuFrameTime; avgCPUt_idx++; if (avgCPUt_idx >= AVG_CPU_TAPS) avgCPUt_idx = 0;
-        for (int i=0;i<AVG_CPU_TAPS;++i) avgCPU += avgCPUt[i];
-        avgCPU /= (double)AVG_CPU_TAPS;
-        RenderFormattedText(16 + 100, debugTextStartY - lineSpacing,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avgCPU);
+        u32 avgmax = globalframe > AVG_CPU_TAPS ? AVG_CPU_TAPS : globalframe;
+        for (u32 i=0;i<avgmax;++i) avgCPU += avgCPUt[i];
+        avgCPU /= (double)avgmax;
+        RenderFormattedText(16 + 100, debugTextStartY - lineSpacing,timingColor,FONT_NORMAL,1.0f,"CPU avg %.2f",avgCPU); avgCPU = 0;
         RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime);
         RenderFormattedText(16 + 250, debugTextStartY - lineSpacing,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
     }
