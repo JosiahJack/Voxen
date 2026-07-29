@@ -303,7 +303,9 @@ static double RenderUI() {
     if (World.statusTextDecayFinished > World.current_time) RenderFormattedText(460,114,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     double time_now = get_time();
     if (Cheats.showFPS) {
-        World.thisFrameTime = (time_now - World.last_time) * 1000.0; World.last_time = time_now; World.cpuFrameTime = World.cpuTime * 1000.0; u8 timingColor = (World.thisFrameTime > 6.944444) ? T_RED : T_WHITE; drawCalls += 3; double avgCPU = 0.0;
+        World.thisFrameTime = (time_now - World.last_time) * 1000.0; World.last_time = time_now; World.cpuFrameTime = World.cpuTime * 1000.0;
+        u8 timingColor = (get_time() - World.current_time) > (World.thisFrameTime - 0.2) ? T_RED : T_WHITE;
+        double avgCPU = 0.0;
         avgCPUt[avgCPUt_idx] = World.cpuFrameTime; avgCPUt_idx++; if (avgCPUt_idx >= AVG_CPU_TAPS) avgCPUt_idx = 0;
         u32 avgmax = globalframe > AVG_CPU_TAPS ? AVG_CPU_TAPS : globalframe;
         for (u32 i=0;i<avgmax;++i) avgCPU += avgCPUt[i];

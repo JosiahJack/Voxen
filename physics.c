@@ -5,7 +5,7 @@
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
 const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=16.666666f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.08f / 16.666666f),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
 const float WALK_SPEED=3.6f,SPRINT_SPEED=8.8f,PLAYER_MAX_CYBER_SPEED=5.0f,SPRINT_SPEED_FATIGUED=5.5f,CROUCH_SPEED=1.25f,PLAYER_MAX_PRONE_SPEED=0.5f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.6f,PLAYER_PRONE_RATIO=0.01f;
-enum {MANIFOLD_MAX=4,CVXMSH_HULL_CACHE=1024,EPA_MAX_FACES=64,EPA_MAX_VERTS=128,EPA_MAX_EDGES=EPA_MAX_FACES*3,GJK_ITER=16,EPA_ITER=16,SOLVER_ITER_GLOBAL=48,MAX_GLOBAL_CONTACTS=8192};
+enum {MANIFOLD_MAX=4,CVXMSH_HULL_CACHE=1024,EPA_MAX_FACES=64,EPA_MAX_VERTS=128,EPA_MAX_EDGES=EPA_MAX_FACES*3,GJK_ITER=16,EPA_ITER=16,SOLVER_ITER_GLOBAL=8,MAX_GLOBAL_CONTACTS=8192};
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
@@ -404,7 +404,7 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     if (vmin(ta.x,vmin(tb.x,tc.x))>ctx->hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<ctx->hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>ctx->hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<ctx->hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>ctx->hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<ctx->hb.mn.z) return;
     V3 triEdge1=V3_AsubB(tb,ta), triEdge2=V3_AsubB(tc,ta); V3 triN=V3_Cross(triEdge1,triEdge2); float triLenSq=V3_dot(triN,triN); if (triLenSq < PHY_EPSILON) return;
     triN = V3_ScaleByF(triN, 1.0f / vsqrtf(triLenSq));
-    if (best->n >= MANIFOLD_MAX && (ctx->hullRadius - vabs(V3_dot(triN,V3_AsubB(ctx->hullCenter, ta)))) <= best->maxPen + MANIFOLD_TIE_MARGIN) return; // Fast early-out: If the manifold is full, only process triangles that can be deeper
+    if ((ctx->hullRadius - vabs(V3_dot(triN,V3_AsubB(ctx->hullCenter, ta)))) <= best->maxPen + MANIFOLD_TIE_MARGIN) return; // Fast early-out: If the manifold is full, only process triangles that can be deeper
     SupportCtx supCtx = (SupportCtx){ctx->boxV ? _supA_boxShape : _supA_hull, _supB_tri, .meshA=hullMesh, .matA=ctx->hullMx, .adjA=ctx->adjHull, .adjB=ctx->adjHull, .ta=ta, .tb=tb, .tc=tc, .boxShape=ctx->boxShape};
     GJKResult gjk = RunGJK(&supCtx,GJK_ITER); if(!gjk.hit)return;
     Simplex3D *s = &gjk.s;
@@ -517,10 +517,8 @@ static Manifold BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
     ctx.thicknessTolerance=vclamp(V3_Mag(box.hExt)*0.06f,0.003f,0.02f);
     V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
     V3 hx=V3_ScaleByF(ax,box.hExt.x),hy=V3_ScaleByF(ay,box.hExt.y),hz=V3_ScaleByF(az,box.hExt.z);
-    V3 bv[8]={V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),
-              V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz),
-              V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),
-              V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz),  V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
+    V3 bv[8]={V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz),
+              V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz),  V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
     ctx.boxV=bv; ctx.boxN=8;
     if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh,triMx,ctx.hb,&ctx); }
     else { u32 triCount=modelTriangleCounts[triMesh]; for(u32 ti=0;ti<triCount;++ti){V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc);} }
@@ -648,6 +646,8 @@ void Physics(float dt) {
             u16 a = dynamicEntities[i]; if (unlikely(World.collider[a] == COLTYPE_MSH || (Cheats.noclip && a == PLAYER1))) continue;
             i32 cx = PosGetCellCoordX(World.position[a].x), cz = PosGetCellCoordZ(World.position[a].z); u32 mask = GetCollisionMask(World.layer[a]);
             float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub; i32 radCells = vmax((i32)(searchRad / CELLSZ),1);
+            float matA[16]; const float *mxA = &modelMatrices[a*16];
+            if (World.collider[a] == COLTYPE_CVX) { EntityColliderMatrixNow(a,matA); mxA = matA; } // Not MSH as only CVX is dynamically moving during physics substeps.
             Manifold contactsMani[32]; u16 contactsOther[32]; int contactCount = 0;
             for (i32 dx = -radCells; dx <= radCells; ++dx) {
                 for (i32 dz = -radCells; dz <= radCells; ++dz) { // 2. Collisions
@@ -658,8 +658,7 @@ void Physics(float dt) {
                         if (!(mask & World.layer[b]) || World.collider[b] == COLTYPE_NONE) continue;
                         if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && b > a)) continue; // Prevent doubled restitutions causing ghosting.
                         V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
-                        Manifold mf = {0}; float matA[16], matB[16]; const float *mxA = &modelMatrices[a*16], *mxB = &modelMatrices[b*16];
-                        if (World.collider[a] == COLTYPE_CVX) { EntityColliderMatrixNow(a,matA); mxA = matA; } // Not MSH as only CVX is dynamically moving during physics substeps.
+                        Manifold mf = {0}; float matB[16]; const float *mxB = &modelMatrices[b*16];
                         if (World.collider[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
                         if      (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_CAP) { mf = OverlapToManifold(CapCap(Entity_GetCap(a),Entity_GetCap(b))); }
                         else if (World.collider[a] == COLTYPE_CAP && World.collider[b] == COLTYPE_BOX) { mf = OverlapToManifold(CapBox(Entity_GetCap(a),Entity_GetBox(b))); }
