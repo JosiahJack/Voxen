@@ -5,12 +5,12 @@
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
 const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=16.666666f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.08f / 16.666666f),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
 const float WALK_SPEED=3.6f,SPRINT_SPEED=8.8f,PLAYER_MAX_CYBER_SPEED=5.0f,SPRINT_SPEED_FATIGUED=5.5f,CROUCH_SPEED=1.25f,PLAYER_MAX_PRONE_SPEED=0.5f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.6f,PLAYER_PRONE_RATIO=0.01f;
-enum {MANIFOLD_MAX=4,CVXMSH_HULL_CACHE=1024,EPA_MAX_FACES=64,EPA_MAX_VERTS=128,EPA_MAX_EDGES=EPA_MAX_FACES*3,GJK_ITER=16,EPA_ITER=16,SOLVER_ITER_GLOBAL=8,MAX_GLOBAL_CONTACTS=8192};
+enum {MANIFOLD_MAX=4,CVXMSH_HULL_CACHE=1024,EPA_MAX_FACES=64,EPA_MAX_VERTS=128,EPA_MAX_EDGES=EPA_MAX_FACES*3,GJK_ITER=16,EPA_ITER=16,SOLVER_ITER_GLOBAL=32,MAX_GLOBAL_CONTACTS=8192};
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
 SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount;
-float posBudget[INSTANCE_COUNT]; // Remaining |Δpos| entity i may receive this substep; reset every substep in Physics().
+float posBudget[INSTANCE_COUNT]; // Remaining |Δpos| entity may receive this substep; resets every substep in Physics().
 u16 dynamicEntities[512],dynamicEntityCount;
 INLINE void SetPosition(u16 i, V3 newpos) { float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;} V3 dir=V3_Normalize(V3_AsubB(newpos,World.position[i])); World.position[i]=V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed)); posBudget[i] -= allowed; }
 INLINE Manifold OverlapToManifold(Overlap r) { Manifold m={0}; if (r.hit && r.pen > PHY_EPSILON) { m.normal = r.normal; m.n = 1; m.p[0] = (ManifoldPt){r.point, r.pen}; m.maxPen = r.pen; } return m; }
@@ -398,13 +398,17 @@ Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx, u16 adjIdx) {
     return m;
 }
 
-typedef struct {V3 mn,mx;} AABB3; typedef struct { u16 hullMesh; const float* hullMx; const V3* boxV; u32 boxN; AABB3 hb; V3 hullCenter; float hullRadius,spreadEps,thicknessTolerance; Manifold best; u16 adjHull; ShapeBox boxShape; } CvxMshCtx;
+typedef struct {V3 mn,mx;} AABB3;
+typedef struct {u16 hullMesh; const float* hullMx; const V3* boxV; u32 boxN; AABB3 hb; V3 hullCenter; float hullRadius,spreadEps,thicknessTolerance; Manifold best; u16 adjHull; ShapeBox boxShape; V3 bestTa,bestTb,bestTc,bestTriN,bestDeepPoint; float bestTriD; bool haveBestTri;} CvxMshCtx;
 void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
-    u16 hullMesh=ctx->hullMesh; Manifold* best=&ctx->best; float spreadEps=ctx->spreadEps, thicknessTolerance=ctx->thicknessTolerance;
+    u16 hullMesh=ctx->hullMesh; Manifold* best=&ctx->best;
     if (vmin(ta.x,vmin(tb.x,tc.x))>ctx->hb.mx.x || vmax(ta.x,vmax(tb.x,tc.x))<ctx->hb.mn.x || vmin(ta.y,vmin(tb.y,tc.y))>ctx->hb.mx.y || vmax(ta.y,vmax(tb.y,tc.y))<ctx->hb.mn.y || vmin(ta.z,vmin(tb.z,tc.z))>ctx->hb.mx.z || vmax(ta.z,vmax(tb.z,tc.z))<ctx->hb.mn.z) return;
     V3 triEdge1=V3_AsubB(tb,ta), triEdge2=V3_AsubB(tc,ta); V3 triN=V3_Cross(triEdge1,triEdge2); float triLenSq=V3_dot(triN,triN); if (triLenSq < PHY_EPSILON) return;
     triN = V3_ScaleByF(triN, 1.0f / vsqrtf(triLenSq));
-    if ((ctx->hullRadius - vabs(V3_dot(triN,V3_AsubB(ctx->hullCenter, ta)))) <= best->maxPen + MANIFOLD_TIE_MARGIN) return; // Fast early-out: If the manifold is full, only process triangles that can be deeper
+    // Fix #1: sphere(hull)-vs-plane(tri) separating bound now applies unconditionally.
+    // best->maxPen==0 when best->n==0, so this degenerates to a plain "farther than hullRadius" reject pre-fill,
+    // instead of only kicking in once the manifold already has 4 points.
+    if ((ctx->hullRadius - vabs(V3_dot(triN,V3_AsubB(ctx->hullCenter, ta)))) <= (best->n ? best->maxPen + MANIFOLD_TIE_MARGIN : 0.0f)) return;
     SupportCtx supCtx = (SupportCtx){ctx->boxV ? _supA_boxShape : _supA_hull, _supB_tri, .meshA=hullMesh, .matA=ctx->hullMx, .adjA=ctx->adjHull, .adjB=ctx->adjHull, .ta=ta, .tb=tb, .tc=tc, .boxShape=ctx->boxShape};
     GJKResult gjk = RunGJK(&supCtx,GJK_ITER); if(!gjk.hit)return;
     Simplex3D *s = &gjk.s;
@@ -426,26 +430,52 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
         if (!ExpandEPA(&epa,sup,wA,wB)) break;
     }
     if (!tHit){return;} V3 deepPoint=tP;
-    if (!best->n) { best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD}; }
-    else {
+    if (!best->n) {
+        best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD};
+        ctx->bestTa=ta; ctx->bestTb=tb; ctx->bestTc=tc; ctx->bestTriN=tN; ctx->bestTriD=tD; ctx->bestDeepPoint=deepPoint; ctx->haveBestTri=true;
+    } else {
         float align=V3_dot(tN,best->normal);
         if (align>MANIFOLD_ALIGN_THRESHOLD) {
-            bool better=(tD>best->maxPen+MANIFOLD_TIE_MARGIN) || (vabs(tD-best->maxPen)<=MANIFOLD_TIE_MARGIN && V3_dot(tN,(V3){0,1,0})>V3_dot(best->normal,(V3){0,1,0})); if (better){best->normal=tN; best->maxPen=tD;} bool spread=true;
-            for (int k=0;k<best->n;++k){V3 dv=V3_AsubB(deepPoint,best->p[k].point); if(V3_dot(dv,dv)<spreadEps*spreadEps){spread=false; if(tD>best->p[k].pen)best->p[k].pen=tD; break;}}
+            bool better=(tD>best->maxPen+MANIFOLD_TIE_MARGIN) || (vabs(tD-best->maxPen)<=MANIFOLD_TIE_MARGIN && V3_dot(tN,(V3){0,1,0})>V3_dot(best->normal,(V3){0,1,0}));
+            if (better){
+                best->normal=tN; best->maxPen=tD;
+                ctx->bestTa=ta; ctx->bestTb=tb; ctx->bestTc=tc; ctx->bestTriN=tN; ctx->bestTriD=tD; ctx->bestDeepPoint=deepPoint; ctx->haveBestTri=true;
+            }
+            bool spread=true;
+            for (int k=0;k<best->n;++k){V3 dv=V3_AsubB(deepPoint,best->p[k].point); if(V3_dot(dv,dv)<ctx->spreadEps*ctx->spreadEps){spread=false; if(tD>best->p[k].pen)best->p[k].pen=tD; break;}}
             if (spread&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){deepPoint,tD};
-        } else if (tD>best->maxPen+MANIFOLD_TIE_MARGIN){best->n=0; best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD};}
+        } else if (tD>best->maxPen+MANIFOLD_TIE_MARGIN){
+            best->n=0; best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD};
+            ctx->bestTa=ta; ctx->bestTb=tb; ctx->bestTc=tc; ctx->bestTriN=tN; ctx->bestTriD=tD; ctx->bestDeepPoint=deepPoint; ctx->haveBestTri=true;
+        }
     }
-    if (best->n < MANIFOLD_MAX) {
-        u32 hn = ctx->boxV ? ctx->boxN : modelVertexCounts[hullMesh];
-        if (hn && best->n>0 && V3_dot(tN,best->normal)>MANIFOLD_ALIGN_THRESHOLD) {
-            float planeDist=V3_dot(tN,deepPoint); float d00=V3_dot(triEdge1,triEdge1), d01=V3_dot(triEdge1,triEdge2), d11=V3_dot(triEdge2,triEdge2), denom=d00*d11-d01*d01; // Reuse triEdge1 and triEdge2
-            bool validTri=vabs(denom)>PHY_EPSILON;
-            for (u32 i=0;i<hn;++i) {
-                V3 pt=ctx->boxV ? ctx->boxV[i] : MvVert(ctx->hullMx,MeshVert(hullMesh,i)); float distToPlane=V3_dot(tN,pt)-planeDist;
-                if (vabs(distToPlane)<thicknessTolerance) {
-                    bool insideTri=false;
-                    if (validTri){V3 projPt=V3_AsubB(pt,V3_ScaleByF(tN,distToPlane)), v2=V3_AsubB(projPt,ta); float d20=V3_dot(v2,triEdge1), d21=V3_dot(v2,triEdge2), v=(d11*d20-d01*d21)/denom, w=(d00*d21-d01*d20)/denom, u=1.0f-v-w; if(u>=-0.02f&&v>=-0.02f&&w>=-0.02f)insideTri=true;}
-                    if (insideTri){float ptPen=tD-distToPlane; if(ptPen>0.0f){bool isDup=false; for(int k=0;k<best->n;++k){V3 diff=V3_AsubB(pt,best->p[k].point); if(V3_dot(diff,diff)<spreadEps*spreadEps){isDup=true;break;}} if(!isDup&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){pt,ptPen}; if(best->n>=MANIFOLD_MAX)break;}}
+}
+
+// Fix #2: the hull-vertex-vs-plane scan for extra manifold points, run ONCE against the
+// single winning triangle after the whole BVH/triangle traversal finishes, instead of once
+// per qualifying (aligned) triangle inline in CvxTriTest.
+void CvxMshFillExtraPoints(CvxMshCtx* ctx) {
+    Manifold* best = &ctx->best;
+    if (!ctx->haveBestTri || best->n == 0 || best->n >= MANIFOLD_MAX) return;
+    u32 hn = ctx->boxV ? ctx->boxN : modelVertexCounts[ctx->hullMesh];
+    if (!hn) return;
+    V3 ta=ctx->bestTa, tN=ctx->bestTriN;
+    V3 triEdge1=V3_AsubB(ctx->bestTb,ta), triEdge2=V3_AsubB(ctx->bestTc,ta);
+    float planeDist=V3_dot(tN,ctx->bestDeepPoint), tD=ctx->bestTriD;
+    float d00=V3_dot(triEdge1,triEdge1), d01=V3_dot(triEdge1,triEdge2), d11=V3_dot(triEdge2,triEdge2), denom=d00*d11-d01*d01;
+    bool validTri=vabs(denom)>PHY_EPSILON;
+    for (u32 i=0;i<hn && best->n<MANIFOLD_MAX;++i) {
+        V3 pt=ctx->boxV ? ctx->boxV[i] : MvVert(ctx->hullMx,MeshVert(ctx->hullMesh,i));
+        float distToPlane=V3_dot(tN,pt)-planeDist;
+        if (vabs(distToPlane)<ctx->thicknessTolerance) {
+            bool insideTri=false;
+            if (validTri){V3 projPt=V3_AsubB(pt,V3_ScaleByF(tN,distToPlane)), v2=V3_AsubB(projPt,ta); float d20=V3_dot(v2,triEdge1), d21=V3_dot(v2,triEdge2), v=(d11*d20-d01*d21)/denom, w=(d00*d21-d01*d20)/denom, u=1.0f-v-w; if(u>=-0.02f&&v>=-0.02f&&w>=-0.02f)insideTri=true;}
+            if (insideTri){
+                float ptPen=tD-distToPlane;
+                if(ptPen>0.0f){
+                    bool isDup=false;
+                    for(int k=0;k<best->n;++k){V3 diff=V3_AsubB(pt,best->p[k].point); if(V3_dot(diff,diff)<ctx->spreadEps*ctx->spreadEps){isDup=true;break;}}
+                    if(!isDup&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){pt,ptPen};
                 }
             }
         }
@@ -471,8 +501,9 @@ Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* tri
     V3 hext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(hext.x,vmax(hext.y,hext.z))*0.15f);
     float wscaleH=V3_Mag((V3){hullMx[0],hullMx[1],hullMx[2]}); ctx.thicknessTolerance=vclamp(modelBounds[hullMesh]*wscaleH*0.06f,0.003f,0.02f);
     u32 triCount=modelTriangleCounts[triMesh]; if(!triCount)return ctx.best;
-    if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh, triMx, hb, &ctx); return ctx.best; }
-    for (u32 ti=0;ti<triCount;++ti) { V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc); }
+    if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh, triMx, hb, &ctx); }
+    else { for (u32 ti=0;ti<triCount;++ti) { V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc); } }
+    CvxMshFillExtraPoints(&ctx);
     return ctx.best;
 }
 
@@ -522,6 +553,7 @@ static Manifold BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
     ctx.boxV=bv; ctx.boxN=8;
     if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh,triMx,ctx.hb,&ctx); }
     else { u32 triCount=modelTriangleCounts[triMesh]; for(u32 ti=0;ti<triCount;++ti){V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc);} }
+    CvxMshFillExtraPoints(&ctx);
     if(ctx.best.n) ctx.best.normal=V3_ScaleByF(ctx.best.normal,-1.f);
     return ctx.best;
 }

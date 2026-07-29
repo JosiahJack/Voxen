@@ -78,7 +78,7 @@ void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     if (window_has_focus) {
         float v = 0.1f;
-        if (Sys_Input.keyStates[KEY_E].pressed) play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f,(V3){0.0f,0.0f,0.0f},false);
+        if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);
         if (Sys_Input.keyStates[KEY_W].pressed) play_synth_door(v,50); // thud slide
         if (Sys_Input.keyStates[KEY_T].pressed) play_synth_impact(v,4500,18,0.3f,0.6f); // Glass ting
         if (Sys_Input.keyStates[KEY_R].pressed) play_synth_impact(v,1800,30,0.5f,0.3f); // cartridge drop
