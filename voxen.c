@@ -498,11 +498,9 @@ INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) {
 }
 
 #define SC_MAX (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)
-DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; u16 shadowCasterIndices[SC_MAX],candidates[MAX_SHADOWMAPS];
-static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
+DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; u16 shadowCasterIndices[SC_MAX],candidates[MAX_SHADOWMAPS]; static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
 INLINE u8 GetCubemapFaceMask(V3 d, float r) { u8 m=0; float absX=vabs(d.x),absY=vabs(d.y),absZ=vabs(d.z); if (d.x+r>absY && d.x+r>absZ) {m|=(1<<0);} if (d.x-r<-absY && d.x-r<-absZ) {m|=(1<<1);} if (d.y+r>absX && d.y+r>absZ) {m|=(1<<2);} if (d.y-r<-absX && d.y-r<-absZ) {m|=(1<<3);} if (d.z+r>absX && d.z+r>absY) {m|=(1<<4);} if (d.z-r<-absX && d.z-r<-absY) {m|=(1<<5);} return m; }
-static const i8 faceAxis[6] = {0,0,1,1,2,2};
-static const float  faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
+static const i8 faceAxis[6] = {0,0,1,1,2,2}; static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
 INLINE bool FaceMaybeVisibleToPlayer(V3 toLight, V3 pf, float radius, float dotThresh, u8 face) {
     float c[3] = { toLight.x, toLight.y, toLight.z }; const float f[3] = { pf.x, pf.y, pf.z }; int axis = faceAxis[face]; c[axis] += faceSign[face] * radius;
     if (0 != axis) {c[0] += (f[0] >= 0.0f ? radius : -radius);} if (1 != axis) {c[1] += (f[1] >= 0.0f ? radius : -radius);} if (2 != axis) {c[2] += (f[2] >= 0.0f ? radius : -radius);}
@@ -520,7 +518,7 @@ __attribute__((hot)) void RenderShadowmaps() {
         float intensity = World.lights[i].maxIntensity; /*Much more stable than actual intensity (from fade/flickers).  Since gated by on above, this is fine now.*/ if (unlikely(intensity < 0.1f)) continue;
         float range =  World.lights[i].range; float luminosity = (intensity / (range * range)); if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
         u16 cellX = PosGetCellCoordX(lightPos.x), cellZ = PosGetCellCoordZ(lightPos.z);
-        int lightCellIdx = (cellZ * WORLDX) + cellX; u8 r = vceil(range * (1.0f / CELLSZ));
+        int lightCellIdx = (cellZ * WORLDX) + cellX; u8 r = vmax(vceil(range * (1.0f / CELLSZ)),2);
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r); if (!inPVS) continue;
         float dx = lightPos.x - playerPos.x, dy = lightPos.y - playerPos.y, dz = lightPos.z - playerPos.z;
@@ -533,7 +531,7 @@ __attribute__((hot)) void RenderShadowmaps() {
         shadDrawCalls=0U; glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP); u32 shadowmapOffsetHead=0U; mset(shadowCasterIndices,0,SC_MAX*sizeof(u16)); u32 numShadowCasters=0U;
         for (int i=INSTS_1ST_IDX;i<INSTANCE_COUNT;++i) { if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS))/*TODO || IdxIsDynamicObject(World.instances[i].index)*/) {continue;} shadowCasterIndices[numShadowCasters]=i; numShadowCasters++; if(numShadowCasters >= (SC_MAX)){break;} }
         u16 shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0,useDetail=Sys_Settings.ModelDetail;
-        for (u32 c = 0; c < numShadowsCouldRender; ++c, ++shadowMapIdx) { // Render top MAX_SHADOWMAPS candidates
+        for (u32 c = 0; c < numShadowsCouldRender; ++c) { // Render top MAX_SHADOWMAPS candidates
             u16 lightIdx = candidates[c];
             float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f); u16 nearbyMeshCount = 0; 
             V3 lpos = World.lights[lightIdx].pos;
@@ -544,12 +542,12 @@ __attribute__((hot)) void RenderShadowmaps() {
                 float radSum = (effectiveRadius + World.radius[j]);
                 if (distToLightSqrd >= radSum * radSum) continue;
                 u8 faceMask = GetCubemapFaceMask(d,World.instances[j].shadRadius); if (faceMask == 0) continue;
-                shadows_nearMeshes[nearbyMeshCount].index = j; shadows_nearMeshes[nearbyMeshCount].fmask = faceMask; 
+                shadows_nearMeshes[nearbyMeshCount].index = j;
                 nearbyMeshCount++; if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
             }
             if (unlikely(nearbyMeshCount < 1)) continue;
             glUniform3f(3,lpos.x,lpos.y,lpos.z);
-            shadowmapIndirectionList[lightIdx] = shadowMapIdx;
+            shadowmapIndirectionList[lightIdx] = shadowMapIdx; ++shadowMapIdx;
             V3 toLight = V3_AsubB(lpos, playerPos);
             #pragma GCC unroll 6
             for (u8 face = 0; face < 6; face++) {
@@ -559,7 +557,6 @@ __attribute__((hot)) void RenderShadowmaps() {
                 glUniform1ui(7,shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
                 u8 currentFaceBit = (1 << face);
                 for (u16 j = 0; j < nearbyMeshCount; ++j) {
-                    if (!(shadows_nearMeshes[j].fmask & currentFaceBit)) continue;
                     int i = shadows_nearMeshes[j].index;
                     Entity* e = &World.instances[i];
                     glUniform1ui(0,i);

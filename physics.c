@@ -5,9 +5,11 @@
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
 const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=16.666666f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.08f / 16.666666f),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
 const float WALK_SPEED=3.6f,SPRINT_SPEED=8.8f,PLAYER_MAX_CYBER_SPEED=5.0f,SPRINT_SPEED_FATIGUED=5.5f,CROUCH_SPEED=1.25f,PLAYER_MAX_PRONE_SPEED=0.5f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.6f,PLAYER_PRONE_RATIO=0.01f;
-enum {MANIFOLD_MAX=4,CVXMSH_HULL_CACHE=1024,EPA_MAX_FACES=64,EPA_MAX_VERTS=128,EPA_MAX_EDGES=EPA_MAX_FACES * 3,GJK_ITER=16,EPA_ITER=16,SOLVER_ITER=16,SOLVER_ITER_MIN=16};
+enum {MANIFOLD_MAX=4,CVXMSH_HULL_CACHE=1024,EPA_MAX_FACES=64,EPA_MAX_VERTS=128,EPA_MAX_EDGES=EPA_MAX_FACES*3,GJK_ITER=16,EPA_ITER=16,SOLVER_ITER_GLOBAL=48,MAX_GLOBAL_CONTACTS=8192};
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
+typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
+SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount;
 float posBudget[INSTANCE_COUNT]; // Remaining |Δpos| entity i may receive this substep; reset every substep in Physics().
 u16 dynamicEntities[512],dynamicEntityCount;
 INLINE void SetPosition(u16 i, V3 newpos) { float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;} V3 dir=V3_Normalize(V3_AsubB(newpos,World.position[i])); World.position[i]=V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed)); posBudget[i] -= allowed; }
@@ -556,7 +558,7 @@ void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float target
         float angTermAT = canRotateA ? V3_dot(rAxT,ApplyInvTensor(a,rAxT,Ra)) : 0.0f, angTermBT = canRotateB ? V3_dot(rBxT,ApplyInvTensor(b,rBxT,Rb)) : 0.0f, invSumT = invMassA + invMassB + angTermAT + angTermBT;
         if (invSumT > PHY_EPSILON) {
             float jt = -V3_dot(relVel2,tangent) / invSumT, friction; bool aIsSpecial = (World.collider[a] == COLTYPE_CAP && (a == PLAYER1 || IdxIsNPC(World.instances[a].index)));
-            if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.05f) / 0.10f, 0.0f, 1.0f); friction = 0.8f + mix * (0.6f - 0.8f); }
+            if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.005f) / 0.10f, 0.0f, 1.0f); friction = 0.8f + mix * (0.6f - 0.8f); }
             float maxT = friction * (*accumN), newAccumT = vclamp(*accumT + jt, -maxT, maxT); jt = newAccumT - *accumT; *accumT = newAccumT;
             V3 fImpulse = V3_ScaleByF(tangent,jt); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(fImpulse,invMassA));
             if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b],V3_ScaleByF(fImpulse,invMassB));
@@ -567,30 +569,34 @@ void ResolveContactVelocity(u16 a, u16 b, V3 n, V3 rAarm, V3 rBarm, float target
 }
 
 void DrawSphereContact(V3 pos, float rad);
-void ApplyManifoldResponse(u16 a, u16 b, const Manifold *m, float dt) {
+void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
     if (!m->n || (World.collider[b] == COLTYPE_MSH && World.collider[a] == COLTYPE_MSH)) return;
-    bool bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.collider[b] == COLTYPE_NONE || World.collider[b] == COLTYPE_MSH);
+    if (gContactCount >= MAX_GLOBAL_CONTACTS) { DualLogWarn("Ran out of global contact slots!\n"); return; }
+    SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m;
+    sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.collider[b] == COLTYPE_NONE || World.collider[b] == COLTYPE_MSH);
     for (int i=0;i<m->n;++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} }
-    float Ra[3][3], Rb[3][3]; quat_to_mat3(World.rotation[a],Ra);
-    if (!bStatic) quat_to_mat3(World.rotation[b],Rb);
-    V3 rA[MANIFOLD_MAX], rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX], accumN[MANIFOLD_MAX]={0}, accumT[MANIFOLD_MAX]={0}, invSumN[MANIFOLD_MAX];
-    float invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a], invMassB = (bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
-    bool canRotateA = (World.collider[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index)), canRotateB = (!bStatic && World.collider[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index));
+    quat_to_mat3(World.rotation[a],sc->Ra); if (!sc->bStatic) quat_to_mat3(World.rotation[b],sc->Rb);
+    sc->invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a]; sc->invMassB = (sc->bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
+    sc->canRotateA = (World.collider[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index)); sc->canRotateB = (!sc->bStatic && World.collider[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index));
     for (int i=0;i<m->n;++i) {
-        rA[i] = V3_AsubB(m->p[i].point,World.position[a]); rB[i] = bStatic ? (V3){0,0,0} : V3_AsubB(m->p[i].point,World.position[b]);
-        V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],rA[i])), vAtB = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],rB[i]));
-        float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal), e_r = (vn0 < -0.5f) ? vmax(World.bounciness[a],bStatic ? 0.0f : World.bounciness[b]) : 0.0f;
-        targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f;
-        targetVn[i] += 0.2f * vmax(m->p[i].pen - 0.005f, 0.0f) / dt; // per-point Baumgarte bias, replaces the averaged SetPosition hack
-        V3 rAxN = V3_Cross(rA[i],m->normal), rBxN = V3_Cross(rB[i],m->normal);
-        invSumN[i] = invMassA + invMassB + (canRotateA ? V3_dot(rAxN,ApplyInvTensor(a,rAxN,Ra)) : 0.0f) + (canRotateB ? V3_dot(rBxN,ApplyInvTensor(b,rBxN,Rb)) : 0.0f);
+        sc->rA[i] = V3_AsubB(m->p[i].point,World.position[a]); sc->rB[i] = sc->bStatic ? (V3){0,0,0} : V3_AsubB(m->p[i].point,World.position[b]);
+        V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],sc->rA[i])), vAtB = sc->bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],sc->rB[i]));
+        float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal), e_r = (vn0 < -0.5f) ? vmax(World.bounciness[a],sc->bStatic ? 0.0f : World.bounciness[b]) : 0.0f;
+        sc->targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f;
+        sc->targetVn[i] += 0.22f * vmax(m->p[i].pen - 0.06f, 0.0f) / dt; // per-point Baumgarte bias, frozen at gather time
+        V3 rAxN = V3_Cross(sc->rA[i],m->normal), rBxN = V3_Cross(sc->rB[i],m->normal);
+        sc->invSumN[i] = sc->invMassA + sc->invMassB + (sc->canRotateA ? V3_dot(rAxN,ApplyInvTensor(a,rAxN,sc->Ra)) : 0.0f) + (sc->canRotateB ? V3_dot(rBxN,ApplyInvTensor(b,rBxN,sc->Rb)) : 0.0f);
+        sc->accumN[i] = 0.0f; sc->accumT[i] = 0.0f; // no warm-starting across substeps
     }
-    int iters = (m->n > 1) ? SOLVER_ITER : SOLVER_ITER_MIN;
-    for (int it=0;it<iters;++it) { for (int i=0;i<m->n;++i) ResolveContactVelocity(a,b,m->normal,rA[i],rB[i],targetVn[i],&accumN[i],&accumT[i],bStatic,invMassA,invMassB,invSumN[i],canRotateA,canRotateB,Ra,Rb); }
-    float avgPen=0.0f; for (int i=0;i<m->n;++i) {avgPen += m->p[i].pen;} avgPen /= (float)m->n; float c = vmax(avgPen - 0.005f,0.0f) * 0.9f; // Baumgarte correction.
-    float massDiv = invMassA + invMassB + PHY_EPSILON;
-//     SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(m->normal,c * invMassA / massDiv)));
-//     if (!bStatic) SetPosition(b,V3_AsubB(World.position[b],V3_ScaleByF(m->normal,c * invMassB / massDiv)));
+}
+
+void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this substep.
+    for (int it=0;it<SOLVER_ITER_GLOBAL;++it) {
+        for (u32 c=0;c<gContactCount;++c) {
+            SolverContact *sc=&gContacts[c];
+            for (int p=0;p<sc->m.n;++p) ResolveContactVelocity(sc->a,sc->b,sc->m.normal,sc->rA[p],sc->rB[p],sc->targetVn[p],&sc->accumN[p],&sc->accumT[p],sc->bStatic,sc->invMassA,sc->invMassB,sc->invSumN[p],sc->canRotateA,sc->canRotateB,sc->Ra,sc->Rb);
+        }
+    }
 }
 
 void EntityColliderMatrixNow(u16 i, float M[16]) { // Convex meshes need to keep their matrix4x4 up to date.
@@ -602,7 +608,7 @@ INLINE int V3_IsSane(V3 v) { union { float f; unsigned int i; } ux,uy,uz; ux.f =
 u16 triggerVolumes[128]; u16 numTriggers;
 void DrawBoxColliderColored(u16 i, Color col);
 void Physics(float dt) {
-    u8 substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)substeps; dynamicEntityCount = 0;
+    World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
     for (u16 i=0;i<World.instCount && dynamicEntityCount < 512;++i) {
         if (World.collider[i] == COLTYPE_MSH || World.collider[i] == COLTYPE_CVX) { World.radius[i] = modelBounds[World.collider[i] == COLTYPE_CVX ? World.instances[i].colMeshIndex : World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); }
         else if (likely(World.collider[i] == COLTYPE_BOX)) { World.radius[i] = vmax(World.colliderSize[i].x * 0.5f * World.scale[i].x,vmax(World.colliderSize[i].y * 0.5f * World.scale[i].y,World.colliderSize[i].z * 0.5f * World.scale[i].z)); }
@@ -610,7 +616,7 @@ void Physics(float dt) {
         else World.radius[i] = World.colliderSize[i].x * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));
         if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && World.collider[i] != COLTYPE_NONE && vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}
     }
-    for (u8 s=0;s<substeps;++s) {
+    for (u8 s=0;s<World.substeps;++s) {
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
         for (u16 t=0;t<128;++t) triggerVolumes[t]=0xFFFF;
         for (u16 i=0;i<World.instCount;++i) { // 0. Broadphase cell lists
@@ -621,13 +627,14 @@ void Physics(float dt) {
             if (unlikely(((idx >= 595 && idx <= 601) || idx == 746) && (World.instances[i].entflags & EF_ACTIVE) && numTriggers < 128)) triggerVolumes[numTriggers++] = i;
         }
         if (numTriggers >= 127) DualLogWarn("Ran out of triggers!\n");
+        gContactCount = 0;
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
             u16 a=dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f;
             acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; }
             else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
-            float linDrag = vexp(-0.1f * dtsub); 
-            V3 vel = World.velocity[a]; vel.x *= linDrag; vel.z *= linDrag; World.velocity[a] = vel; // Y axis is unaffected, so gravity accumulates infinitely until MAX_SPEED
+            float linDrag = vexp(-0.1f * dtsub); World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag;
+            float angDrag = vexp(-0.1f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag);
             SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
             if (World.collider[a] != COLTYPE_CAP) {
                 if (unlikely(!V3_IsSane(World.angularVelocity[a]))) { World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f}; }
@@ -680,8 +687,21 @@ void Physics(float dt) {
                 }
             }
             World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false);
-            for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; World.colliding[a]=World.colliding[contactsOther[c]]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f}) >= 0.574f) {World.instances[a].entflags |= EF_GROUNDED;} ApplyManifoldResponse(a,contactsOther[c],mfp,dt); } // 3. Restitution
+            for (int c = 0; c < contactCount; ++c) {
+                Manifold *mfp=&contactsMani[c]; World.colliding[a]=World.colliding[contactsOther[c]]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f})>=0.574f) {World.instances[a].entflags |= EF_GROUNDED;} PrepareSolverContact(a,contactsOther[c],mfp,dt);
+            }
             World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
+        }
+        SolveGlobalContacts(); // 3. Restitution
+        for (u32 c=0; c<gContactCount; ++c) { // 3.5 Positional Correction (Projection)
+            SolverContact *sc = &gContacts[c];
+            float avgPen = 0.0f;
+            for (int p=0; p<sc->m.n; ++p) avgPen += sc->m.p[p].pen;
+            if (sc->m.n > 0) avgPen /= (float)sc->m.n;
+            float correction = vmax(avgPen - 0.005f, 0.0f) * 0.4f;
+            float massDiv = sc->invMassA + sc->invMassB + PHY_EPSILON;
+            SetPosition(sc->a, V3_AplusB(World.position[sc->a], V3_ScaleByF(sc->m.normal, correction * sc->invMassA / massDiv)));
+            if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
         for (u16 i=0;i<numTriggers;++i) {
             u16 self = triggerVolumes[i];
