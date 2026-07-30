@@ -555,12 +555,10 @@ __attribute__((hot)) void RenderShadowmaps() {
                 glUniform1ui(2,face);
                 glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
                 glUniform1ui(7,shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
-                u8 currentFaceBit = (1 << face);
                 for (u16 j = 0; j < nearbyMeshCount; ++j) {
                     int i = shadows_nearMeshes[j].index;
-                    Entity* e = &World.instances[i];
+                    Entity* e=&World.instances[i]; u16 modelType=(instanceIsLODArray[i] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex;
                     glUniform1ui(0,i);
-                    u16 modelType = (instanceIsLODArray[i] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex;
                     if (currentModelType != modelType || currentModelType == 0) { currentModelType = modelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); }
                     if (currentTexIndex != e->texIndex) { currentTexIndex = e->texIndex; glUniform1ui(6,e->texIndex); }
                     bool texIsTransparent = transparentTexture[e->texIndex];
@@ -873,7 +871,7 @@ void InitalizeEnvironment() {
     RenderLoading(40,"Loading...");
     float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - NEAR_PLANE);
     m[0]=1.0f; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=1.0f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]=-(lightRangeMax + NEAR_PLANE) / viewRange; m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=0.0f;
-    InitAudio();
+    InitAudio(); synth_set_room(0.66f,0.8f);
     ModEDefsInitAfterLoad(); // Set the values for all 768 entity definitions, a doozy of a function.
     glGenFramebuffers(1,&gBufferFBO);
     ChangeFullScreenWindowed(); SetSkyRotateSpeed(); SetVSync(); LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language);

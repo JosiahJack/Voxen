@@ -253,6 +253,13 @@ AnimationClip DoorGetClip(const Entity*,u8);
 bool Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Sprint(),TurnLeft(),TurnRight(),LookUp(),LookDown(),RecentLog(),Biomonitor(),Sensaround(),Lantern(),
      Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),
      Console(),ScrshotPressed(),PositionVisibleFromPlayerCell(float,float),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();
+typedef enum {SND_LASER_PISTOL=0,SND_LASER_RIFLE,SND_DOOR,SND_IMPACT_GLASS,SND_IMPACT_METAL,SND_EXPLOSION,SND_HISS,SND_PIPE,SND_SHIELD_HIT,SND_FOOTSTEP,SND_SAND_FOOTSTEP,SND_TAP_CASE,SND_PLASTIC_TAP,SND_SPARK_SMALL,SND_CRACKLE,SND_SINE,SND_CLINK,
+              SND_BEAKER_CLINK,SND_BEAKER_THUD,SND_COUNT} SoundID;
+typedef struct SynthVoice SynthVoice;
+typedef float (*SynthFn)(SynthVoice*);
+typedef struct SynthVoice { SynthFn fn; u32 frame,frames; float vol,pitch; V3 pos; bool positional,active; float p[4]/*preset params*/,s[8]/*generator state (extra slots vs original for richer sounds)*/; } SynthVoice;
+void synth_set_room(float size, float wet);
+void play_synth(SoundID id, float vol, float pitch);
 typedef float __v8sf __attribute__((__vector_size__(32))); typedef float __m256 __attribute__((__vector_size__(32))); typedef long long __m128i __attribute__((__vector_size__(16))); typedef __m128i __m128i_u __attribute__((__may_alias__, __aligned__(1))); typedef __m256 __m256_u __attribute__((__may_alias__, __aligned__(1)));
 typedef float __v4sf __attribute__((__vector_size__(16))); typedef int __v4si __attribute__((__vector_size__(16)));   typedef float __m128 __attribute__((__vector_size__(16)));      typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1)));
 #define _mm_storeu_si128(P, V) (*(__m128i_u *)(P) = (V))

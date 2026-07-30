@@ -73,17 +73,29 @@ void ForceInventoryMode() { World.inventoryMode = true; World.cursorPosition_x =
 void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
 void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void MenuGoBack(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot); void ApplyPlayerMovements(float dt); void PollEvents();
-void play_synth_laser(float volume,float freq,float sweep,float fmrate,float decay); void play_synth_door(float volume,float pitch); void play_synth_impact(float volume,float ring_freq,float decay,float noise_amt,float ring_amt);
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     if (window_has_focus) {
         float v = 0.1f;
         if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);
-        if (Sys_Input.keyStates[KEY_W].pressed) play_synth_door(v,50); // thud slide
-        if (Sys_Input.keyStates[KEY_T].pressed) play_synth_impact(v,4500,18,0.3f,0.6f); // Glass ting
-        if (Sys_Input.keyStates[KEY_R].pressed) play_synth_impact(v,1800,30,0.5f,0.3f); // cartridge drop
-        if (Sys_Input.keyStates[KEY_Y].pressed) play_synth_laser(v,800,-2.0f,40,12);
-        if (Sys_Input.keyStates[KEY_U].pressed) play_synth_laser(v,800,2.0f,40,12);
+        if (Sys_Input.keyStates[KEY_W].pressed) play_synth(SND_DOOR,0.2f,1.0f);
+
+        if (Sys_Input.keyStates[KEY_T].pressed) play_synth(SND_IMPACT_GLASS,0.2f,1.0f);
+        if (Sys_Input.keyStates[KEY_R].pressed) play_synth(SND_BEAKER_THUD,0.1f,1.0f);
+        if (Sys_Input.keyStates[KEY_Y].pressed) play_synth(SND_BEAKER_CLINK,0.2f,1.0f);
+
+        if (Sys_Input.keyStates[KEY_U].pressed) play_synth(SND_LASER_RIFLE,0.2f,1.0f);
+        if (Sys_Input.keyStates[KEY_G].pressed) play_synth(SND_EXPLOSION,0.2f,1.0f);
+        if (Sys_Input.keyStates[KEY_H].pressed) play_synth(SND_HISS,0.2f,1.0f);
+        if (Sys_Input.keyStates[KEY_J].pressed) play_synth(SND_PIPE,0.2f,1.0f);
+        if (Sys_Input.keyStates[KEY_K].pressed) play_synth(SND_SHIELD_HIT,0.2f,1.0f);
+        if (Sys_Input.keyStates[KEY_L].pressed) play_synth(SND_FOOTSTEP,0.2f,1.0f);
+        if (Sys_Input.keyStates[KEY_Z].pressed) play_synth(SND_SAND_FOOTSTEP,0.2f,1.0f);
+        if (Sys_Input.keyStates[KEY_B].pressed) play_synth(SND_TAP_CASE,0.2f,1.0f);
+        if (Sys_Input.keyStates[KEY_N].pressed) play_synth(SND_PLASTIC_TAP,0.2f,1.0f);
+        if (Sys_Input.keyStates[KEY_M].pressed) play_synth(SND_CRACKLE,0.2f,1.0f);
+
+
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
         if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; SaveGame(7,"quicksave"); return; }
         if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }

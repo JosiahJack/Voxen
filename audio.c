@@ -675,9 +675,10 @@ static void wave_mix(wav_channel_t* w, float* mix) {
 
 static void audio_mix_period(i16 *out) {
     float mix[AUDIO_FRAMES*AUDIO_CHANNELS]; mset(mix,0,sizeof(mix));
-    for (u32 c=0;c<wav_count;c++) { if ( wav_ch[c].playing &&  wav_ch[c].samples) {wave_mix(&wav_ch[c],mix);} } // General wav file playback
-    for (u32 c=0;c<ext_count;c++) { if (ext_ch[c]->playing && ext_ch[c]->samples) {wave_mix(ext_ch[c], mix);} } // Looped Ambients
-    for (u32 c=0;c<MAX_SYNTH_VOICES;c++) if (syn_ch[c].active) synth_mix(&syn_ch[c],mix); // Synthesized audio (oh yes!)
+    for (u32 c=0;c<wav_count;c++) { if ( wav_ch[c].playing &&  wav_ch[c].samples) {wave_mix(&wav_ch[c],mix);} }
+    for (u32 c=0;c<ext_count;c++) { if (ext_ch[c]->playing && ext_ch[c]->samples) {wave_mix(ext_ch[c], mix);} }
+    for (u32 c=0;c<MAX_SYNTH_VOICES;c++) if (syn_ch[c].active) synth_mix(&syn_ch[c],mix);
+    synth_reverb_apply(mix, AUDIO_FRAMES); // room acoustics: wavs + synth get the room, logs + music bypass it
     if (log_playing && log_samples) {
         float vol = (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMessage/100.0f);
         for (i32 f = 0; f < AUDIO_FRAMES; f++) {
