@@ -1,53 +1,26 @@
 // common.h - Shared items between engine and gamecode (e.g. enums)
 #pragma once
+#include "types.h"
 #define GAME_TITLE "Citadel"
 #define WIN_ICON "./Textures/UI/menudot1.png"
-#define INLINE static inline __attribute__((always_inline))
-typedef __INT8_TYPE__   i8; typedef  __UINT8_TYPE__  u8;                               /*8bit types*/
-typedef __INT16_TYPE__ i16; typedef __UINT16_TYPE__ u16; typedef u16 half;            /*16bit types*/
-typedef __INT32_TYPE__ i32; typedef __UINT32_TYPE__ u32;                              /*32bit types*/
-typedef __INT64_TYPE__ i64; typedef __UINT64_TYPE__ u64; typedef __SIZE_TYPE__ size_t;/*64bit types*/
-typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
-#define bool u8
-#define true 1
-#define false 0
-#define likely(x)   __builtin_expect(!!(x),1)
-#define unlikely(x) __builtin_expect(!!(x),0)
-#define NULL ((void *)0)
 #define assert(cond) do { if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; } } while(0) // Force a crash for debug
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
-#if defined(_WIN32)
-    #define DLL_IMP __declspec (dllimport)
-    #define WINAPI __stdcall
-    #define INVALID_FHANDLE ((void*) (i64)-1)
-    typedef void* FHandle; typedef struct { void* handle; } OS_Thread;
-    struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; }; typedef uintptr_t pthread_t; typedef intptr_t pthread_mutex_t,pthread_cond_t; typedef int pthread_condattr_t; typedef u32 pthread_mutexattr_t;
-    typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t; typedef struct { unsigned long Data1; u16 Data2,Data3; u8 Data4[8]; } GUID;
-    int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**); DLL_IMP void* WINAPI GetStdHandle(u32);
-#else
-    #define INVALID_FHANDLE -1
-    typedef int FHandle; typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
-    typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
-    struct timespec {i64 tv_sec,tv_nsec;}; typedef u64 pthread_t; typedef u32 pthread_mutexattr_t; typedef struct {u8 _[40];} pthread_mutex_t; typedef struct {u8 _[48];} pthread_cond_t; typedef int pthread_condattr_t;
-    typedef struct {u32 flags; void* stack;} pthread_attr_t;
-    int pthread_create(pthread_t* restrict,const pthread_attr_t* restrict,void*(*start_routine)(void*),void* restrict); int pthread_join(pthread_t,void**); void *dlopen(const char*,int); void *dlsym(void*,const char*); long OS_Open(const char*,i32,i32);
-#endif
-typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color;    typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion;    typedef u8 ColliderType; typedef u16 Text;
+void DualLogError(const char* s, ...);
+#include "os.h"
 static const Quaternion QUAT_IDENTITY=(Quaternion){0.0f,0.0f,0.0f,1.0f};
 typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
 typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;
 typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
-typedef struct { bool hit; V3 point,normal; float pen; } Overlap;    typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
-enum{INSTANCE_COUNT=9000,LIGHT_COUNT=2200,MAX_LIGHTS_PER_VOXEL=128,U16_MAX=65535,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,MAX_ENTITIES=768,MAX_LEVELS=14,MAX_MDLS=6000,MAX_TXRS=2048,MAX_TOTAL_PIXELS=38000780u,MAX_UNIQUE_COLORS=120040u,WORLDX=64,WORLDZ=64,WORLDY=18,
-     MAX_ANIMCLIPS=10,MAX_WIRELINE_VRTS=2024000,MAX_PORTALS=56/*Max 49 on lev 7*/,MAX_KEYS=512,MAX_MOUSE_BUTTONS=8,MAX_CHANNELS=48,MAX_GLYPHS=4096,VRT_ATT_SZ=16,CPU_VRT_SZ=32,LEVEL_CYBERSPACE=13,SHADOW_MAP_SIZE=128,MAX_SHADOWMAPS=128,FONT_ATLAS_SIZE=4672,
-     BVH_MAX_DEPTH=3,BVH_LEAF_MAX_TRIS=8,BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585 worst case, +safety*/,BVH_MAX_TRIS_PER_MDL=6986,WELD_HASH_SIZE=32768,MAX_UNIQUE_CVX_MESHES=5989,MAX_VERT_ELEMENT_SIZE=6964,MAX_OUTPUT_VERTS=20960,LIGHTON=1,SHADON=2,
+enum{INSTANCE_COUNT=9000,LIGHT_COUNT=2200,MAX_LIGHTS_PER_VOXEL=128,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,MAX_ENTITIES=768,MAX_LEVELS=14,MAX_TXRS=2048,MAX_TOTAL_PIXELS=38000780u,MAX_UNIQUE_COLORS=120040u,WORLDX=64,WORLDZ=64,WORLDY=18,
+     MAX_ANIMCLIPS=10,MAX_WIRELINE_VRTS=2024000,MAX_PORTALS=56/*Max 49 on lev 7*/,MAX_KEYS=512,MAX_MOUSE_BUTTONS=8,MAX_CHANNELS=48,LEVEL_CYBERSPACE=13,SHADOW_MAP_SIZE=128,MAX_SHADOWMAPS=128,MAX_UNIQUE_CVX_MESHES=5989,LIGHTON=1,SHADON=2,
      LIGHT_AND_SHADOW_ON=3,LSPOT=4,LDIR=8,LDIRTY=16,LERPON=32,VOXELS_PER_CELL=8,ARRSIZE=(WORLDX * WORLDZ),VOXELS_X=(WORLDX * VOXELS_PER_CELL),VOXELS_Z=(WORLDZ * VOXELS_PER_CELL),VOXEL_COUNT=(VOXELS_X * VOXELS_Z)/*64 * 64 * 8 * 8*/,TARGET_STRING_LENGTH=38,
-     MAX_ANIMS=52,SOUNDS_COUNT=670,T_LOGSTR_CNT=1100,T_LOGSTR_MAX=1280,LOGCNT=134,T_BUFFER_SIZE=1024,NUM_AI_TYPES=29,INPUT_RELEASE=0,INPUT_PRESS=1,INPUT_REPEAT=2,CREDITS_PAGES=22,FONT_NORMAL=0,FONT_STOPD=1,MM_EMAIL_TABLE=0,MM_LOG_TABLE=1,AVG_CPU_TAPS=2048,
+     MAX_ANIMS=52,SOUNDS_COUNT=670,T_LOGSTR_CNT=1100,T_LOGSTR_MAX=1280,LOGCNT=134,NUM_AI_TYPES=29,INPUT_RELEASE=0,INPUT_PRESS=1,INPUT_REPEAT=2,CREDITS_PAGES=22,MM_EMAIL_TABLE=0,MM_LOG_TABLE=1,AVG_CPU_TAPS=2048,
      MM_DATA_TABLE=2,MM_NOTES=3,COLTYPE_NONE=0,COLTYPE_BOX=1,COLTYPE_SPH=2,COLTYPE_CAP=3,COLTYPE_CVX=4,COLTYPE_MSH=5,T_WHITE=0,T_YELLOW=1,T_DARK_YELLOW=2,T_GREEN=3,T_RED=4,T_ORANGE=5,T_STOPD_RED=6,T_STOPD_RED_HIGHLIGHT=7,T_STOPD_RED_PAUSETITLE=8,
      T_GREEN_MENU=9,T_GREEN_MENU_SHADOW=10,T_GREEN_MENU_GLOW=11,T_RED_MENU=12,ANIM_LOOP_ALL=0,ANIM_IDLE_CLOSED=0,ANIM_IDLE=0,ANIM_INACTIVE=0,ANIM_ATTACK_MISS=1,ANIM_OPENING=1,ANIM_WALK=1,ANIM_ACTIVATE=1,ANIM_ATTACK_HIT=2,ANIM_ACTIVATED=2,ANIM_IDLE_OPEN=2,
      ANIM_RUN=2,ANIM_CLOSING=3,ANIM_DEACTIVATE=3,ANIM_ATTACK1=3,ANIM_ATTACK2=4,ANIM_INSTALL=4,ANIM_ATTACK3=5,ANIM_INSTALLED=5,ANIM_PAIN=6,ANIM_PAIN2=7,ANIM_PAIN3=8,ANIM_DYING=9,CELL_VISIBLE=1,CELL_OPEN=2,
      CELL_CLOSEDNORTH=4,CELL_CLOSEDEAST=8,CELL_CLOSEDSOUTH=16,CELL_CLOSEDWEST=32,CELL_SEES_SUN=64,CELL_SEES_SKYBOX=128,DOOR_CLIP_IDLE_CLOSED=0,DOOR_CLIP_OPENING=1,DOOR_CLIP_IDLE_OPEN=2,DOOR_CLIP_CLOSING=3};
+#include "parse.h"
 static const float PLAYER_RADIUS=0.48f,PLAYER_HEIGHT=2.00f,PLAYER_CAM_OFFSET_Y=0.84f,CELLSZ=2.56f,CELLXHALF=(CELLSZ * 0.5f),VOXEL_SIZE=(CELLSZ/(float)VOXELS_PER_CELL),VOXEL_HALF=(VOXEL_SIZE * 0.5f),COLCAP_DIR_X_F=0.0f,COLCAP_DIR_Y_F=1.0f,COLCAP_DIR_Z_F=2.0f,
                    REFLEX_TIME_SCALE=0.25,DEFAULT_TIME_SCALE=1.0,BERSERK_DAMAGE_MULTIPLIER=4.0f/*Quad Damage!*/;
 static const double BERSERK_TIME=20.0,DETOX_TIME=60.0,GENIUS_TIME=180.0,MEDI_TIME=35.0,REFLEX_TIME=155.0,SIGHT_TIME=40.0,STAMINUP_TIME=60.0,SIGHT_SIDE_EFFECT_TIME=17.0,NITRO_MIN_TIME=1.0,NITRO_MAX_TIME=60.0,NITRO_DEFAULT_TIME=7.0,EARTH_SHAKER_MIN_TIME=4.0,
@@ -173,7 +146,6 @@ typedef /*FAT*/ struct  {
     char targetname[TARGET_STRING_LENGTH],target[TARGET_STRING_LENGTH],target2[TARGET_STRING_LENGTH],currenttarget[TARGET_STRING_LENGTH],targetIfFalse[TARGET_STRING_LENGTH],texAnimResourceFolder[TARGET_STRING_LENGTH];
 } Entity; // phew what a porker of a struct, it's been a eatin!
 typedef struct { Entity* entries; u32 count; u32 capacity; } DataParser;
-typedef __builtin_va_list va_list;
 typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; V3 pos; size_t allocSize; } wav_channel_t;
 typedef struct {float depth; u16 index; } DepthSort;
 typedef struct {
@@ -235,24 +207,19 @@ extern bool instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAX_TXRS],tran
 extern u8 currentPlayerNameLength;
 extern i8 currentMenuItem;
 typedef struct { int width,height; u8* pixels; } WinSysIcon;
-FHandle OS_OpenReadonly(const char*),OS_OpenWriteonly(const char*);
-void *OS_AllocateRAM(size_t,i32,i32,FHandle),*OS_AllocateFileBackedRAMReadonly(size_t,FHandle,char*),*OS_Realloc(void*,size_t,size_t),OS_Close(FHandle),OS_Write(FHandle,const void*,size_t,const char*),OS_ThreadJoin(OS_Thread* t),OS_USleep(u32 usec);
-long OS_Read(FHandle,void*,size_t),OS_RawWrite(FHandle fd, const void* buf, size_t cnt),OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/),OS_Tell(FHandle);
-__attribute__((noreturn)) void OS_Exit(i64);
-i32 OS_FileSize(FHandle f),OS_ThreadCreate(OS_Thread*,void*(*fn)(void*),void*);
 RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
 u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
 double get_time(); float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData);
-void UseTargets(u16,const char*),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),* OS_Alloc(size_t),OS_Free(void*,size_t),*OS_OpenAndAllocateFileBufferReadonly(const char*,FHandle*,int*),DebugRAM(const char*),
+void UseTargets(u16,const char*),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),DebugRAM(const char*),
      play_wav(const char*,float,V3,bool),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),ResetInput(),InputProcessing(),LoadAllLevels(),
      AddWireLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),DoorSetClipFrame(u16,u8,u16),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
      LoadTextForLanguage(u8),RenderFormattedText(i16,i16,u32,u8,float,const char* restrict,...),CullCore(),PngArenaInit(PngArena*),DualLogError(const char*, ...),DualLogWarn(const char*, ...),DualLog(const char*, ...);
-typedef int (*cmpfun)(const void*,const void*); typedef int (*cmpfun_r)(const void*,const void*,void*);
 char* StringFindFirstCharWithin(const char *s, char c);
 AnimationClip DoorGetClip(const Entity*,u8);
 bool Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Sprint(),TurnLeft(),TurnRight(),LookUp(),LookDown(),RecentLog(),Biomonitor(),Sensaround(),Lantern(),
      Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),
      Console(),ScrshotPressed(),PositionVisibleFromPlayerCell(float,float),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();
+// Synthesized Audio
 typedef enum {SND_LASER_PISTOL=0,SND_LASER_RIFLE,SND_DOOR,SND_IMPACT_GLASS,SND_IMPACT_METAL,SND_EXPLOSION,SND_HISS,SND_PIPE,SND_SHIELD_HIT,SND_FOOTSTEP,SND_SAND_FOOTSTEP,SND_TAP_CASE,SND_PLASTIC_TAP,SND_SPARK_SMALL,SND_CRACKLE,SND_SINE,SND_CLINK,
               SND_BEAKER_CLINK,SND_BEAKER_THUD,SND_COUNT} SoundID;
 typedef struct SynthVoice SynthVoice;
@@ -260,54 +227,9 @@ typedef float (*SynthFn)(SynthVoice*);
 typedef struct SynthVoice { SynthFn fn; u32 frame,frames; float vol,pitch; V3 pos; bool positional,active; float p[4]/*preset params*/,s[8]/*generator state (extra slots vs original for richer sounds)*/; } SynthVoice;
 void synth_set_room(float size, float wet);
 void play_synth(SoundID id, float vol, float pitch);
-typedef float __v8sf __attribute__((__vector_size__(32))); typedef float __m256 __attribute__((__vector_size__(32))); typedef long long __m128i __attribute__((__vector_size__(16))); typedef __m128i __m128i_u __attribute__((__may_alias__, __aligned__(1))); typedef __m256 __m256_u __attribute__((__may_alias__, __aligned__(1)));
-typedef float __v4sf __attribute__((__vector_size__(16))); typedef int __v4si __attribute__((__vector_size__(16)));   typedef float __m128 __attribute__((__vector_size__(16)));      typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1)));
-#define _mm_storeu_si128(P, V) (*(__m128i_u *)(P) = (V))
-#define _mm_loadu_ps(P) (*(__m128_u const *)(P))
-#define _mm_set1_ps(A) ((__m128){ (A), (A), (A), (A) })
-#define _mm_setr_ps(e0,e1,e2,e3) ((__m128){ (e0), (e1), (e2), (e3) })
-#define _mm_storeu_ps(P, A) (*(__m128_u *)(P) = (A))
-#define _mm_add_ps(A, B) ((__m128)((__v4sf)(A) + (__v4sf)(B)))
-#define _mm_mul_ps(A, B) ((__m128)((__v4sf)(A) * (__v4sf)(B)))
-#define _mm256_storeu_si256(P, V) (*(__m256i*)(P) = (V))
-#define PI 3.14159265f
-#define TAU 6.2831853f
-#define INV_TAU (1.0f / TAU) // Precomputed for fast multiplication
-#define INV_PI  (1.0f / PI)
-#define vabs(x) ((x) < 0 ? -(x) : (x))
-#define vmin(a,b) ((a) < (b) ? (a) : (b))
-#define vmax(a,b) ((a) > (b) ? (a) : (b))
-#define vclamp(x,a,b) vmin(vmax(x,a),b)
-#define vsqrtf(x) __builtin_sqrtf(x)
-#define NEAR_PLANE (0.02f)
-INLINE float vinvsqtf(float v) { __m128 x = (__m128){v,0.0f,0.0f,0.0f}; __m128 r=__builtin_ia32_rsqrtss(x); float y = r[0]; float x2 = v * 0.5f; return y * (1.5f - x2 * y * y); }
-INLINE float vfloor(float x) { return __builtin_floorf(x); }
-INLINE float vceil(float x) { return __builtin_ceilf(x); }
-INLINE float vsinf(float x) { x -= TAU * vfloor(x * INV_TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
-INLINE float vcosf(float x) { return vsinf(x + 1.57079632f); }
-INLINE float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x=vabs(x); float ret=(-0.0187293f*x + 0.0742610f)*x - 0.2121144f; ret=(ret*x + 1.5707288f)*vsqrtf(1.0f - x); ret=ret - 2.0f*negate*ret; return negate*PI + (1.0f - 2.0f*negate) * ret; }
-INLINE float vtan(float x) { return vsinf(x) / vcosf(x); }
-INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
-INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
-INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f + fp*(0.69314718f + fp*(0.24022651f + fp*0.05550411f)); /*poly approx 2^fp on [0,1]*/ int ei=(int)ip + 127; u32 bits=(u32)(ei << 23); union{u32 i; float f;}u={bits}; return u.f*p;}
-INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
-INLINE i32 clamp(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
-INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
-INLINE V3 V3_AplusB(V3 a, V3 b) { return (V3){a.x + b.x, a.y + b.y, a.z + b.z}; }
-INLINE V3 V3_AsubB(V3 a, V3 b) { return (V3){a.x - b.x, a.y - b.y, a.z - b.z}; }
-INLINE V3 V3_ScaleByF(V3 v, float s) { return (V3){v.x * s, v.y * s, v.z * s}; }
-INLINE V3 mul_v3_v3_elementwise(V3 v, V3 w) { return (V3){v.x * w.x, v.y * w.y, v.z * w.z}; }
-INLINE float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
-INLINE float V3_dot(V3 a, V3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
-INLINE float quat_dot(Quaternion a, Quaternion b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
-INLINE float V3_Mag(const V3 v) { return vsqrtf(V3_dot(v,v)); }
-INLINE float V3_SqDist(V3 a, V3 b) { V3 d = V3_AsubB(a,b); return V3_dot(d,d); }
-INLINE float V3_Dist(V3 a, V3 b) { return V3_Mag(V3_AsubB(a,b)); }
-INLINE V3 V3_Cross(V3 a, V3 b) { return (V3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
-INLINE V3 V3_Normalize(V3 v) { float len_sq = V3_dot(v,v); if (len_sq < 0.000001f){return v;} float inv_len = vinvsqtf(len_sq); return (V3){v.x * inv_len, v.y * inv_len, v.z * inv_len}; }
-INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2){float aw=q1.w,ax=q1.x,ay=q1.y,az=q1.z,bw=q2.w,bx=q2.x,by=q2.y,bz=q2.z; return (Quaternion){aw*bx+ax*bw+ay*bz-az*by,aw*by-ax*bz+ay*bw+az*bx,aw*bz+ax*by-ay*bx+az*bw,aw*bw-ax*bx-ay*by-az*bz};}
-INLINE V3 quat_rot_v3(Quaternion q, V3 v) {float x=q.x,y=q.y,z=q.z,w=q.w; float vx=v.x,vy=v.y,vz=v.z; float tx=2.0f*(y*vz-z*vy); float ty=2.0f*(z*vx-x*vz); float tz=2.0f*(x*vy-y*vx); return (V3){vx+w*tx+(y*tz-z*ty),vy+w*ty+(z*tx-x*tz),vz+w*tz+(x*ty-y*tx)};}
-INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
+#include "parse.h"
+#include "matvecquat.h"
+// Game Typechecks
 INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 760); }
 INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
@@ -334,23 +256,13 @@ INLINE u16 GetImpactType(u16 instanceIdx){
         case BloodType_GrayMutation:return 758;
     } return 729;
 }
-
-INLINE  int  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
-INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
+// Lib.c replacements and other inline helpers
 INLINE void flag_setu16(u16 *flags, u16 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 INLINE void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 INLINE bool BvhHasBVH(u16 m) { return (m < MAX_MDLS && modelBVHNodeCounts[m] && modelBVHNodes[m] != NULL); }
-bool cEmpty(const char c);
-INLINE u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
-    if(str == 0 || *str == '\0'){DualLogError("Invalid from line[%d]: %s\n",lineNum+1,line); return 0;}
-    while(cEmpty((char)*str)){str++;} while(cEmpty(*str)){str++;} if(*str == '+'){str++;} 
-    if(*str == '-'){DualLogError("Invalid negative u32(%s) from line[%d]: %s\n",str,lineNum+1,line); return 0;}
-    u64 result=0; while (*str >= '0' && *str <= '9') { i32 digit=*str-'0'; result=result*10 + (u64)digit; str++; } return (u32)result;
-}
+// bool cEmpty(const char c);
 
-INLINE u16 parse_numberu16(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U16_MAX) { DualLogError("Value %u out of range for u16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u16)retval; }
-INLINE u8 parse_numberu8(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > 255) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u8)retval; }
-INLINE bool parse_bool(const char* str, const char* line, u32 lineNum) { u32 parseval = parse_numberu32(str, line, lineNum); if (parseval > 1) {DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);} return parseval > 0 ? true : false; }
+// Game logic inlines
 INLINE void EntitySetLocked(Entity* e, bool locked) { DualLog("Unlocking entity with index %u\n",(u16)(e - World.instances)); flag_set(&e->entflags,EF_LOCKED,locked); }
 INLINE void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; CenterStatusPrint("%s",Sys_Text.stringTable[25]); }
 INLINE void UICyberSprint(u16 textIndex) { CenterStatusPrint("%s",Sys_Text.stringTable[textIndex]); }
@@ -358,6 +270,7 @@ INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
 INLINE float SfxVol() { return (float)Sys_Settings.VolumeEffects / 100.0f; }
+// GL
 enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,
       GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,
       GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8};
@@ -371,6 +284,7 @@ extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferDa
 extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays; extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i;
 extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding; extern FGL_EVAA glEnableVertexAttribArray;
 extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_FL glFlush; extern FGL_F glFinish;
+// Input
 typedef enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)} JoyHatId;
 typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,
              KEY_SEMICOLON=59/* ; */,KEY_EQUAL=61/* = */,KEY_A=65,KEY_B=66,KEY_C=67,KEY_D=68,KEY_E=69,KEY_F=70,KEY_G=71,KEY_H=72,KEY_I=73,KEY_J=74,KEY_K=75,KEY_L=76,KEY_M=77,KEY_N=78,KEY_O=79,KEY_P=80,KEY_Q=81,KEY_R=82,KEY_S=83,KEY_T=84,KEY_U=85,KEY_V=86,

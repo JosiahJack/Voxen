@@ -21,6 +21,7 @@ __attribute__((noinline)) i32 parse_numberi32(const char* str, const char* line,
     while(cEmpty((char)*str)){str++;} bool negative=false; if(*str == '+'){str++;}else if(*str == '-'){negative=true; str++;} i64 result=0; while(*str >= '0' && *str <= '9'){result=result*10L + (*str-'0'); str++;} return (i32)(negative ? -result : result);
 }
 
+__attribute__((noinline)) V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator) { u16 idx=(u16)(originator - World.instances); V3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,World.scale[idx]); V3 rotatedOfs = quat_rot_v3(World.rotation[idx],scaledOfs); V3 result = V3_AplusB(World.position[idx],rotatedOfs); return result; }
 __attribute__((noinline)) i16 parse_numberi16(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -32768 || v > 32767){DualLogError("%d outrange i16 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i16)v;}
 __attribute__((noinline)) i8 parse_numberi8(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -128 || v > 127){DualLogError("%d out range i8 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i8)v;}
 __attribute__((noinline)) float parse_float(const char* str, const char* line, u32 lineNum) {
@@ -1311,31 +1312,6 @@ void LoadLevel(u8 curlevel, V3 pos) {
     DebugRAM("end of LoadLevel");
 }
 // Save Game System
-INLINE size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
-size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Find and pop the zeroes bubbles.  Turns an otherwise 232mb save file into ~23mb.
-    size_t s = 0, d = 0;
-    while (s < srcSize) { // 1. Hunt for Zeros
-        size_t zeroCount = 0;
-        while (s + zeroCount < srcSize && src[s + zeroCount] == 0) { zeroCount++; }
-        if(zeroCount > 0){if(zeroCount < 128){if (d >= dstCapacity){return 0;} dst[d++]=(u8)(0x80 + (zeroCount-1));}else{if(d + 5 > dstCapacity){return 0;} dst[d++] = 0xFF; u32 zCount32=(u32)zeroCount; mcpy(&dst[d],&zCount32,sizeof(u32)); d+=4;} s+=zeroCount; continue; }
-        size_t litCount = 0; // 2. Process Literal Data (Non-Zeros). It costs 2 bytes of overhead to break a literal run to compress 1 or 2 zeros. Only break a literal run if 3 or more zeros ahead.
-        while (s + litCount < srcSize && litCount < 128) { if (src[s + litCount] == 0) { size_t remain = srcSize - (s + litCount); if (remain >= 3 && src[s + litCount + 1] == 0 && src[s + litCount + 2] == 0) { break; } } litCount++; }
-        if (litCount > 0) { if (d + 1 + litCount > dstCapacity) {return 0;} dst[d++] = (u8)(litCount - 1); mcpy(&dst[d], &src[s], litCount); s += litCount; d += litCount; }
-    }
-    return d; // Return final compressed size
-}
-
-static size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Put the bubbles of zero back.
-    size_t s = 0, d = 0;
-    while (s < srcSize && d < dstCapacity) {
-        u8 cmd = src[s++];
-             if (cmd <  128) { size_t litCount = cmd + 1; if(s + litCount > srcSize || d + litCount > dstCapacity){return 0;} mcpy(&dst[d], &src[s], litCount); s += litCount; d += litCount; } // Literal Run
-        else if (cmd < 0xFF) { size_t zeroCount=cmd - 128 + 1; if(d + zeroCount > dstCapacity){return 0;} mset(&dst[d], 0, zeroCount); d += zeroCount; } // Short Zero Run
-        else                 { if(s + 4 > srcSize){return 0;} u32 zeroCount; mcpy(&zeroCount, &src[s], sizeof(u32)); s += 4; if(d + zeroCount > dstCapacity){return 0;} mset(&dst[d], 0, zeroCount); d += zeroCount; } // Long Zero Run
-    }
-    return d;
-}
-
 #pragma pack(push, 1)
 typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compressedSize; char savename[48]; } SaveHeader;
 #pragma pack(pop)

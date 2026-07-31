@@ -25,6 +25,7 @@ void double2str(char* dest, double value, int decs, size_t bufsz);
 int sFormatV(char* buf, size_t bufsz, const char* f, va_list args);
 int sFormat(char* buffer, size_t bufsz, const char* format, ...);
 char* sUpToEndLine(char* buf, int sz, FHandle fd);
+void PrintLog(const char* s, ...);
 void DualLog(const char* s, ...);
 void DualLogWarn(const char* s, ...);
 void DualLogError(const char* s, ...);
@@ -42,5 +43,10 @@ u32 rand();
 float lerp(float min, float max, float val);
 float inverse_lerp(float min, float max, float val);
 char* sLevelFileUpToEndLine(char* buf, int size);
-V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator);
 void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp);
+size_t GetMaxCompressedSize(size_t srcSize);
+size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity);
+size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity);
+INLINE  int  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
+INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
+

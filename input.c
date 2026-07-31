@@ -76,7 +76,6 @@ void MenuGoBack(); void SaveGame(u8 slot, const char* savename); void LoadGame(u
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     if (window_has_focus) {
-        float v = 0.1f;
         if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);
         if (Sys_Input.keyStates[KEY_W].pressed) play_synth(SND_DOOR,0.2f,1.0f);
 

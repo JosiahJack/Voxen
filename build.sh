@@ -112,7 +112,7 @@ else
 fi
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c audio.c textures.c models.c biomonitor.c input.c culling.c" #synth.c is in audio.c
+SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c audio.c textures.c models.c biomonitor.c input.c culling.c misc.c" #synth.c is in audio.c
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -o $BINARY_NAME

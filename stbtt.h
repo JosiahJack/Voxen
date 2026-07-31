@@ -307,17 +307,8 @@ void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo*info,u8*out,int ow,int o
 typedef int stbrp_coord; typedef struct{int width,height,x,y,bottom_y;}stbrp_context;
 typedef struct{u8 x;}stbrp_node; typedef struct{stbrp_coord x,y;int id,w,h,was_packed;}stbrp_rect;
 void stbrp_pack_rects(stbrp_context*con,stbrp_rect*rects,int n){int i;for(i=0;i<n;++i){if(con->x+rects[i].w>con->width){con->x=0;con->y=con->bottom_y;}if(con->y+rects[i].h>con->height)break;rects[i].x=con->x;rects[i].y=con->y;rects[i].was_packed=1;con->x+=rects[i].w;if(con->y+rects[i].h>con->bottom_y)con->bottom_y=con->y+rects[i].h;}for(;i<n;++i)rects[i].was_packed=0;}
-typedef struct{u16 x0,y0,x1,y1;float xoff,yoff,xadvance,xoff2,yoff2;}stbtt_packedchar;
-typedef struct{float x0,y0,s0,t0,x1,y1,s1,t1;} aligned_quad;
 typedef struct{void*uac;void*pack_info;int width,height,stride_in_bytes,padding,skip_missing;u32 h_oversample,v_oversample;u8*pixels;}stbtt_pack_context;
 typedef struct{float font_size;int first_unicode_codepoint_in_range;int*array_of_unicode_codepoints;int num_chars;stbtt_packedchar*chardata_for_range;u8 h_oversample,v_oversample;}FPackRange;
-void stbtt_GetPackedQuad(const stbtt_packedchar*cd, int pw, int ph, int ci, float*xpos, float*ypos, aligned_quad*q, int ai){
-    float ipw=1.0f/pw,iph=1.0f/ph;const stbtt_packedchar*b=cd+ci;
-    if(ai){float x=vfloor((*xpos+b->xoff)+0.5f),y=vfloor((*ypos+b->yoff)+0.5f);q->x0=x;q->y0=y;q->x1=x+b->xoff2-b->xoff;q->y1=y+b->yoff2-b->yoff;}
-    else{q->x0=*xpos+b->xoff;q->y0=*ypos+b->yoff;q->x1=*xpos+b->xoff2;q->y1=*ypos+b->yoff2;}
-    q->s0=b->x0*ipw;q->t0=b->y0*iph;q->s1=b->x1*ipw;q->t1=b->y1*iph;*xpos+=b->xadvance;
-}
-
 int stbtt_PackBegin(stbtt_pack_context*spc,u8* px, int pw, int ph, int str, int pad, void* a){ stbrp_context*ctx=(stbrp_context*)ttalloc(sizeof(*ctx)); *ctx=(stbrp_context){pw-pad,ph-pad,0,0,0}; if(px){mset(px,0,(size_t)(pw*ph));} return *spc=(stbtt_pack_context){a,ctx,pw,ph,str ? str : pw,pad,0,1,1,px},1; }
 void _hpre(u8*p,int w,int h,int str,u32 kw){for(int j=0;j<h;++j,p+=str){u8 buf[8]={0};int tot=0;for(int i=0;i<w;++i){if(i<=w-(int)kw){tot+=p[i]-buf[i&7];buf[(i+kw)&7]=p[i];}else tot-=buf[i&7];p[i]=(u8)(tot/kw);}}}
 void _vpre(u8*p,int w,int h,int str,u32 kw){for(int j=0;j<w;++j,++p){u8 buf[8]={0};int tot=0;for(int i=0;i<h;++i){if(i<=h-(int)kw){tot+=p[i*str]-buf[i&7];buf[(i+kw)&7]=p[i*str];}else tot-=buf[i&7];p[i*str]=(u8)(tot/kw);}}}

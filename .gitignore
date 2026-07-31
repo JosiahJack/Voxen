@@ -4,6 +4,7 @@
 *.pdb
 *.dll.lib
 *.lib
+*.bin
 perf.data
 temp_build/*
 temp_build_gc/*
