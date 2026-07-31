@@ -26,7 +26,7 @@ if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe -Wl,-Bstatic -lmingw32 -lmingwex"
-    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lole32 -static-libgcc"
+    LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lole32"
     BINARY_NAME="vparser.exe"
 else
     CC=$LINUX_CC
@@ -47,8 +47,10 @@ total_build_time=$((build_end - build_start))
 echo "Built offline vparser in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-        windows)  wine ./vparser.exe -all ;;
-        *)        ./vparser -all ;;   # linux
+        windows)  strip --strip-all ./vparser.exe; upx -qqq --best --lzma ./vparser.exe; wine ./vparser.exe -all ;;
+#         windows)  wine ./vparser.exe -all ;;
+        *)        strip --strip-all --strip-unneeded ./vparser; upx -qqq --best --lzma ./vparser; ./vparser -all ;;   # linux
+#         *)        ./vparser -all ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./vparser.upx ./vparser.pdb # Cleanup
 fi
