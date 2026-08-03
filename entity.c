@@ -5,7 +5,7 @@
 extern Entity EDefs[MAX_ENTITIES];
 extern V3 EDefscolliderCenter[MAX_ENTITIES]; // Offset relative to .position's global worldspace xyz location
 extern V3 EDefscolliderSize[MAX_ENTITIES]; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
-extern ColliderType/*u8*/ EDefscollider[MAX_ENTITIES];
+extern ColliderType/*u8*/ EDefscol[MAX_ENTITIES];
 extern u32 EDefslayer[MAX_ENTITIES];
 extern float EDefsmass[MAX_ENTITIES];
 extern float EDefsdynamicFriction[MAX_ENTITIES];
@@ -55,7 +55,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
         if (!EDefslayer[i]) EDefslayer[i] = L_Default;
         flag_set(&EDefs[i].entflags,EF_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
         flag_set(&EDefs[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(EDefs[i].index));
-        if (EDefs[i].cardchunk) { EDefs[i].lodIndex=178;/*LOD card index*/ EDefscollider[i]=COLTYPE_BOX; EDefscolliderCenter[i].y=1.32f; EDefscolliderSize[i]=(V3){2.56f,0.08f,2.56f}; }
+        if (EDefs[i].cardchunk) { EDefs[i].lodIndex=178;/*LOD card index*/ EDefscol[i]=COLTYPE_BOX; EDefscolliderCenter[i].y=1.32f; EDefscolliderSize[i]=(V3){2.56f,0.08f,2.56f}; }
         EDefs[i].currentFrameFinished = World.pauseRelativeTime + 0.1;
         if (IdxIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; EDefs[i].tickTime = 1.5; } // ButtonSwitch
     } // Handle generics up front such that all below can override it.
@@ -183,7 +183,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*120 chunk_maint1_5*/             EDefs[120].modelIndex=225; EDefs[120].texIndex=443; EDefs[120].glowIndex=442;
     /*121 chunk_maint1_6*/             EDefs[121].modelIndex=226; EDefs[121].texIndex=96;
     /*122 chunk_maint1_7*/             EDefs[122].modelIndex=227; EDefs[122].texIndex=447; EDefs[122].glowIndex=446;
-    /*123 chunk_blockerflightbay*/     EDefs[123].modelIndex=178; EDefs[123].normIndex=160; EDefs[123].texIndex=1230; EDefs[123].specIndex=1242; EDefscollider[123]=COLTYPE_BOX; EDefscolliderCenter[123].y=1.44f; EDefscolliderSize[123]=(V3){2.56f,0.32f,2.56f}; EDefs[123].colMeshIndex=U16_MAX;
+    /*123 chunk_blockerflightbay*/     EDefs[123].modelIndex=178; EDefs[123].normIndex=160; EDefs[123].texIndex=1230; EDefs[123].specIndex=1242; EDefscol[123]=COLTYPE_BOX; EDefscolliderCenter[123].y=1.44f; EDefscolliderSize[123]=(V3){2.56f,0.32f,2.56f}; EDefs[123].colMeshIndex=U16_MAX;
     /*124 chunk_maint1_9*/             EDefs[124].modelIndex=606; EDefs[124].texIndex=450;
     /*125 chunk_maint1_9d*/            EDefs[125].modelIndex=620; EDefs[125].texIndex=449; EDefs[125].glowIndex=448;
     /*126 chunk_maint2_1*/             EDefs[126].modelIndex=230; EDefs[126].texIndex=455;
@@ -209,12 +209,12 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*146 chunk_maint3_1_slice32_rh*/  EDefs[146].modelIndex=245; EDefs[146].texIndex=483;
     /*147 chunk_maint3_1_slice45*/     EDefs[147].modelIndex=247; EDefs[147].texIndex=483;
     /*148 chunk_maint3_1d*/            EDefs[148].modelIndex=243; EDefs[148].texIndex=482; EDefs[148].glowIndex=481;
-    /*149 chunk_med1_1*/               EDefs[149].modelIndex=249; EDefs[149].texIndex=486; EDefs[149].specIndex=1256; EDefs[149].normIndex=1255; EDefscollider[149]=COLTYPE_MSH;
-    /*150 chunk_med1_1_half_top*/      EDefs[150].modelIndex=250; EDefs[150].texIndex=486; EDefs[150].specIndex=1256; EDefs[150].normIndex=1255; EDefscollider[150]=COLTYPE_MSH;
-    /*151 chunk_med1_1_slice128high*/  EDefs[151].modelIndex=251; EDefs[151].texIndex=486; EDefs[151].specIndex=1256; EDefs[151].normIndex=1255; EDefscollider[151]=COLTYPE_MSH;
-    /*152 chunk_med1_1_slice192RH*/    EDefs[152].modelIndex=252; EDefs[152].texIndex=486; EDefs[152].specIndex=1256; EDefs[152].normIndex=1255; EDefscollider[152]=COLTYPE_MSH;
-    /*153 chunk_med1_1_slice256*/      EDefs[153].modelIndex=253; EDefs[153].texIndex=486; EDefs[153].specIndex=1256; EDefs[153].normIndex=1255; EDefscollider[153]=COLTYPE_MSH;
-    /*154 chunk_med1_1d*/              EDefs[154].modelIndex=248; EDefs[154].texIndex=485; EDefs[154].glowIndex=484; EDefs[154].specIndex=1236; EDefs[154].normIndex=1255; EDefscollider[154]=COLTYPE_MSH;
+    /*149 chunk_med1_1*/               EDefs[149].modelIndex=249; EDefs[149].texIndex=486; EDefs[149].specIndex=1256; EDefs[149].normIndex=1255; EDefscol[149]=COLTYPE_MSH;
+    /*150 chunk_med1_1_half_top*/      EDefs[150].modelIndex=250; EDefs[150].texIndex=486; EDefs[150].specIndex=1256; EDefs[150].normIndex=1255; EDefscol[150]=COLTYPE_MSH;
+    /*151 chunk_med1_1_slice128high*/  EDefs[151].modelIndex=251; EDefs[151].texIndex=486; EDefs[151].specIndex=1256; EDefs[151].normIndex=1255; EDefscol[151]=COLTYPE_MSH;
+    /*152 chunk_med1_1_slice192RH*/    EDefs[152].modelIndex=252; EDefs[152].texIndex=486; EDefs[152].specIndex=1256; EDefs[152].normIndex=1255; EDefscol[152]=COLTYPE_MSH;
+    /*153 chunk_med1_1_slice256*/      EDefs[153].modelIndex=253; EDefs[153].texIndex=486; EDefs[153].specIndex=1256; EDefs[153].normIndex=1255; EDefscol[153]=COLTYPE_MSH;
+    /*154 chunk_med1_1d*/              EDefs[154].modelIndex=248; EDefs[154].texIndex=485; EDefs[154].glowIndex=484; EDefs[154].specIndex=1236; EDefs[154].normIndex=1255; EDefscol[154]=COLTYPE_MSH;
     /*155 chunk_med1_2*/               EDefs[155].modelIndex=255; EDefs[155].texIndex=489; EDefs[155].glowIndex=488; EDefs[155].specIndex=1256;
     /*156 chunk_med1_2d*/              EDefs[156].modelIndex=254; EDefs[156].texIndex=487; EDefs[156].specIndex=1256;
     /*157 chunk_med1_3*/               EDefs[157].modelIndex=257; EDefs[157].texIndex=493; EDefs[157].glowIndex=492; EDefs[157].specIndex=1256;
@@ -222,22 +222,22 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*159 chunk_med1_4*/               EDefs[159].modelIndex=258; EDefs[159].texIndex=494; EDefs[159].specIndex=1256;
     /*160 chunk_med1_5*/               EDefs[160].modelIndex=669; EDefs[160].texIndex=495; EDefs[160].specIndex=1256;
     /*161 chunk_med1_6*/               EDefs[161].modelIndex=259; EDefs[161].texIndex=496; EDefs[161].normIndex=509; EDefs[161].specIndex=1256;
-    /*162 chunk_med1_7*/               EDefs[162].modelIndex=262; EDefs[162].texIndex=499; EDefs[162].specIndex=1268; EDefs[162].normIndex=498; EDefscollider[162]=COLTYPE_MSH;
-    /*163 chunk_med1_7_slice14_64*/    EDefs[163].modelIndex=263; EDefs[163].texIndex=499; EDefs[163].specIndex=1268; EDefs[163].normIndex=1254; EDefscollider[163]=COLTYPE_MSH;
-    /*164 chunk_med1_7_slice45_320lh*/ EDefs[164].modelIndex=264; EDefs[164].texIndex=499; EDefs[164].specIndex=1268; EDefs[164].normIndex=1254; EDefscollider[164]=COLTYPE_MSH;
-    /*165 chunk_med1_7_slice45_320rh*/ EDefs[165].modelIndex=265; EDefs[165].texIndex=499; EDefs[165].specIndex=1268; EDefs[165].normIndex=1254; EDefscollider[165]=COLTYPE_MSH;
-    /*166 chunk_med1_7_slice96high*/   EDefs[166].modelIndex=266; EDefs[166].texIndex=499; EDefs[166].specIndex=1268; EDefs[166].normIndex=1254; EDefscollider[166]=COLTYPE_MSH;
-    /*167 chunk_med1_7d*/              EDefs[167].modelIndex=260; EDefs[167].texIndex=497; EDefs[167].specIndex=1269; EDefs[167].normIndex=1270; EDefscollider[167]=COLTYPE_MSH;
-    /*168 chunk_med1_7d_slice128*/     EDefs[168].modelIndex=261; EDefs[168].texIndex=497; EDefs[168].specIndex=1269; EDefs[168].normIndex=1270; EDefscollider[168]=COLTYPE_MSH;
-    /*169 chunk_med1_8*/               EDefs[169].modelIndex=268; EDefs[169].texIndex=503; EDefs[169].normIndex=502; EDefs[169].specIndex=1242; EDefscollider[169]=COLTYPE_MSH;
-    /*170 chunk_med1_8d*/              EDefs[170].modelIndex=267; EDefs[170].texIndex=501; EDefs[170].normIndex=163; EDefs[170].specIndex=1242; EDefscollider[170]=COLTYPE_MSH;
-    /*171 chunk_med1_9*/               EDefs[171].modelIndex=278; EDefs[171].texIndex=507; EDefs[171].normIndex=506; EDefs[171].specIndex=1267; EDefscollider[171]=COLTYPE_MSH;
+    /*162 chunk_med1_7*/               EDefs[162].modelIndex=262; EDefs[162].texIndex=499; EDefs[162].specIndex=1268; EDefs[162].normIndex=498; EDefscol[162]=COLTYPE_MSH;
+    /*163 chunk_med1_7_slice14_64*/    EDefs[163].modelIndex=263; EDefs[163].texIndex=499; EDefs[163].specIndex=1268; EDefs[163].normIndex=1254; EDefscol[163]=COLTYPE_MSH;
+    /*164 chunk_med1_7_slice45_320lh*/ EDefs[164].modelIndex=264; EDefs[164].texIndex=499; EDefs[164].specIndex=1268; EDefs[164].normIndex=1254; EDefscol[164]=COLTYPE_MSH;
+    /*165 chunk_med1_7_slice45_320rh*/ EDefs[165].modelIndex=265; EDefs[165].texIndex=499; EDefs[165].specIndex=1268; EDefs[165].normIndex=1254; EDefscol[165]=COLTYPE_MSH;
+    /*166 chunk_med1_7_slice96high*/   EDefs[166].modelIndex=266; EDefs[166].texIndex=499; EDefs[166].specIndex=1268; EDefs[166].normIndex=1254; EDefscol[166]=COLTYPE_MSH;
+    /*167 chunk_med1_7d*/              EDefs[167].modelIndex=260; EDefs[167].texIndex=497; EDefs[167].specIndex=1269; EDefs[167].normIndex=1270; EDefscol[167]=COLTYPE_MSH;
+    /*168 chunk_med1_7d_slice128*/     EDefs[168].modelIndex=261; EDefs[168].texIndex=497; EDefs[168].specIndex=1269; EDefs[168].normIndex=1270; EDefscol[168]=COLTYPE_MSH;
+    /*169 chunk_med1_8*/               EDefs[169].modelIndex=268; EDefs[169].texIndex=503; EDefs[169].normIndex=502; EDefs[169].specIndex=1242; EDefscol[169]=COLTYPE_MSH;
+    /*170 chunk_med1_8d*/              EDefs[170].modelIndex=267; EDefs[170].texIndex=501; EDefs[170].normIndex=163; EDefs[170].specIndex=1242; EDefscol[170]=COLTYPE_MSH;
+    /*171 chunk_med1_9*/               EDefs[171].modelIndex=278; EDefs[171].texIndex=507; EDefs[171].normIndex=506; EDefs[171].specIndex=1267; EDefscol[171]=COLTYPE_MSH;
     /*172 unused*/
     /*173 unused*/
-    /*174 chunk_med1_9d*/              EDefs[174].modelIndex=269; EDefs[174].texIndex=505; EDefs[174].normIndex=504; EDefs[174].specIndex=1267; EDefscollider[174]=COLTYPE_MSH;
+    /*174 chunk_med1_9d*/              EDefs[174].modelIndex=269; EDefs[174].texIndex=505; EDefs[174].normIndex=504; EDefs[174].specIndex=1267; EDefscol[174]=COLTYPE_MSH;
     /*175 unused*/
-    /*176 chunk_med1_9d_ofs112_90*/    EDefs[176].modelIndex=270; EDefs[176].texIndex=505; EDefs[176].normIndex=504; EDefs[176].specIndex=1267; EDefscollider[176]=COLTYPE_MSH;
-    /*177 chunk_med1_9d_ofs144_90*/    EDefs[177].modelIndex=272; EDefs[177].texIndex=505; EDefs[177].normIndex=504; EDefs[177].specIndex=1267; EDefscollider[177]=COLTYPE_MSH;
+    /*176 chunk_med1_9d_ofs112_90*/    EDefs[176].modelIndex=270; EDefs[176].texIndex=505; EDefs[176].normIndex=504; EDefs[176].specIndex=1267; EDefscol[176]=COLTYPE_MSH;
+    /*177 chunk_med1_9d_ofs144_90*/    EDefs[177].modelIndex=272; EDefs[177].texIndex=505; EDefs[177].normIndex=504; EDefs[177].specIndex=1267; EDefscol[177]=COLTYPE_MSH;
     /*178 chunk_med2_1*/               EDefs[178].modelIndex=280; EDefs[178].texIndex=513; EDefs[178].specIndex=1254; EDefs[178].glowIndex=511; EDefs[178].normIndex=512;
     /*179 chunk_med2_1_slice32RH*/     EDefs[179].modelIndex=281; EDefs[179].texIndex=513; EDefs[179].normIndex=512; EDefs[179].specIndex=1254;
     /*180 chunk_med2_1d*/              EDefs[180].modelIndex=279; EDefs[180].glowIndex=508; EDefs[180].texIndex=510; EDefs[180].specIndex=1254;
@@ -247,8 +247,8 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*184 chunk_med2_3*/               EDefs[184].modelIndex=286; EDefs[184].texIndex=521; EDefs[184].glowIndex=520; EDefs[184].specIndex=1242;
     /*185 chunk_med2_3d*/              EDefs[185].modelIndex=285; EDefs[185].texIndex=519; EDefs[185].glowIndex=518; EDefs[185].specIndex=1242;
     /*186 chunk_med2_4*/               EDefs[186].modelIndex=287; EDefs[186].texIndex=523; EDefs[186].glowIndex=522; EDefs[186].specIndex=1242;
-    /*187 chunk_med2_5*/               EDefs[187].modelIndex=288; EDefs[187].texIndex=527; EDefs[187].glowIndex=526; EDefs[187].specIndex=539; EDefscollider[187]=COLTYPE_BOX; EDefscolliderCenter[187].y=1.44f; EDefscolliderSize[187]=(V3){2.56f,0.32f,2.56f}; EDefs[187].colMeshIndex=U16_MAX;
-    /*188 chunk_med2_6*/               EDefs[188].modelIndex=289; EDefs[188].texIndex=528; EDefs[188].specIndex=1271;                          EDefscollider[188]=COLTYPE_MSH; EDefs[188].colMeshIndex=289;
+    /*187 chunk_med2_5*/               EDefs[187].modelIndex=288; EDefs[187].texIndex=527; EDefs[187].glowIndex=526; EDefs[187].specIndex=539; EDefscol[187]=COLTYPE_BOX; EDefscolliderCenter[187].y=1.44f; EDefscolliderSize[187]=(V3){2.56f,0.32f,2.56f}; EDefs[187].colMeshIndex=U16_MAX;
+    /*188 chunk_med2_6*/               EDefs[188].modelIndex=289; EDefs[188].texIndex=528; EDefs[188].specIndex=1271;                          EDefscol[188]=COLTYPE_MSH; EDefs[188].colMeshIndex=289;
     /*189 chunk_med2_7*/               EDefs[189].modelIndex=290; EDefs[189].texIndex=530; EDefs[189].glowIndex=529; EDefs[189].specIndex=1245;
     /*190 chunk_med2_8*/               EDefs[190].modelIndex=291; EDefs[190].texIndex=531; EDefs[190].specIndex=1242;
     /*191 chunk_med2_8_half_top*/      EDefs[191].modelIndex=292; EDefs[191].texIndex=531; EDefs[191].specIndex=1242;
@@ -368,13 +368,13 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*305 chunk_teleporter*/           EDefs[305].modelIndex=178; EDefs[305].texIndex=1166; 
     /*306 chunk_white*/                EDefs[306].modelIndex=178; EDefs[306].texIndex=881;
     for (int i=307;i<=404;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=1.0f; } // Item
-    /*307 item_paper_wad*/             EDefs[307].modelIndex=487; EDefs[307].texIndex=1250; EDefscollider[307]= COLTYPE_SPH; EDefscolliderCenter[307]=(V3){-0.001254f,-0.001190498f,0.006335999f}; EDefscolliderSize[307].x=0.0451f; EDefsmass[307]=0.06f;
+    /*307 item_paper_wad*/             EDefs[307].modelIndex=487; EDefs[307].texIndex=1250; EDefscol[307]= COLTYPE_SPH; EDefscolliderCenter[307]=(V3){-0.001254f,-0.001190498f,0.006335999f}; EDefscolliderSize[307].x=0.0451f; EDefsmass[307]=0.06f;
     /*308 item_warecasing*/            EDefs[308].modelIndex=637; EDefs[308].texIndex=1251; EDefsmass[308]=0.8f;
-    /*309 item_beaker*/                EDefs[309].modelIndex=14;  EDefscollider[309]=COLTYPE_CVX; EDefs[309].colMeshIndex=682; EDefs[309].texIndex=36; EDefs[309].specIndex=1242;  EDefsmass[309]=0.28f; EDefsdynamicFriction[309]=0.1f; EDefsstaticFriction[309]=0.2f;
-    /*310 item_beverage*/              EDefs[310].modelIndex=18;  EDefscollider[310]=COLTYPE_CVX; EDefs[310].colMeshIndex=683; EDefs[310].texIndex=37; EDefsmass[310]=0.12f;
+    /*309 item_beaker*/                EDefs[309].modelIndex=14;  EDefscol[309]=COLTYPE_CVX; EDefs[309].colMeshIndex=682; EDefs[309].texIndex=36; EDefs[309].specIndex=1242;  EDefsmass[309]=0.28f; EDefsdynamicFriction[309]=0.1f; EDefsstaticFriction[309]=0.2f;
+    /*310 item_beverage*/              EDefs[310].modelIndex=18;  EDefscol[310]=COLTYPE_CVX; EDefs[310].colMeshIndex=683; EDefs[310].texIndex=37; EDefsmass[310]=0.12f;
     /*311 item_skull*/                 EDefs[311].modelIndex=593; EDefsmass[311]=0.451f;
-    /*312 item_arm*/                   EDefs[312].modelIndex=7;   EDefs[312].texIndex=28; EDefscollider[312]=COLTYPE_CVX; EDefs[312].colMeshIndex=678;
-    /*313 item_audiolog*/              EDefs[313].modelIndex=11;  EDefscollider[313]=COLTYPE_CVX; EDefs[313].colMeshIndex=679; EDefs[313].texIndex=52; EDefs[313].glowIndex=80;  EDefsmass[313]=0.2f;
+    /*312 item_arm*/                   EDefs[312].modelIndex=7;   EDefs[312].texIndex=28; EDefscol[312]=COLTYPE_CVX; EDefs[312].colMeshIndex=678;
+    /*313 item_audiolog*/              EDefs[313].modelIndex=11;  EDefscol[313]=COLTYPE_CVX; EDefs[313].colMeshIndex=679; EDefs[313].texIndex=52; EDefs[313].glowIndex=80;  EDefsmass[313]=0.2f;
     /*314 weapon_grenadefrag*/         EDefs[314].modelIndex=182;
     /*315 weapon_grenadeconc*/         EDefs[315].modelIndex=165;
     /*316 weapon_grenadeemp*/          EDefs[316].modelIndex=168;
@@ -382,27 +382,27 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*318 weapon_grenademine*/         EDefs[318].modelIndex=184;
     /*319 weapon_grenadenitro*/        EDefs[319].modelIndex=185;
     /*320 weapon_grenadegas*/          EDefs[320].modelIndex=183;
-    /*321 item_patch_berserk*/         EDefs[321].modelIndex=488; EDefs[321].texIndex=590; EDefscollider[321]=COLTYPE_CVX; EDefs[321].colMeshIndex=491; EDefsmass[321]=0.12f;
-    /*322 item_patch_detox*/           EDefs[322].modelIndex=488; EDefs[322].texIndex=591; EDefscollider[322]=COLTYPE_CVX; EDefs[322].colMeshIndex=491; EDefsmass[322]=0.12f;
-    /*323 item_patch_genius*/          EDefs[323].modelIndex=488; EDefs[323].texIndex=592; EDefscollider[323]=COLTYPE_CVX; EDefs[323].colMeshIndex=491; EDefsmass[323]=0.12f;
-    /*324 item_patch_medi*/            EDefs[324].modelIndex=488; EDefs[324].texIndex=600; EDefscollider[324]=COLTYPE_CVX; EDefs[324].colMeshIndex=491; EDefsmass[324]=0.12f;
-    /*325 item_patch_reflex*/          EDefs[325].modelIndex=488; EDefs[325].texIndex=641; EDefscollider[325]=COLTYPE_CVX; EDefs[325].colMeshIndex=491; EDefsmass[325]=0.12f;
-    /*326 item_patch_sight*/           EDefs[326].modelIndex=488; EDefs[326].texIndex=646; EDefscollider[326]=COLTYPE_CVX; EDefs[326].colMeshIndex=491; EDefsmass[326]=0.12f;
-    /*327 item_patch_staminup*/        EDefs[327].modelIndex=488; EDefs[327].texIndex=647; EDefscollider[327]=COLTYPE_CVX; EDefs[327].colMeshIndex=491; EDefsmass[327]=0.12f;
+    /*321 item_patch_berserk*/         EDefs[321].modelIndex=488; EDefs[321].texIndex=590; EDefscol[321]=COLTYPE_CVX; EDefs[321].colMeshIndex=491; EDefsmass[321]=0.12f;
+    /*322 item_patch_detox*/           EDefs[322].modelIndex=488; EDefs[322].texIndex=591; EDefscol[322]=COLTYPE_CVX; EDefs[322].colMeshIndex=491; EDefsmass[322]=0.12f;
+    /*323 item_patch_genius*/          EDefs[323].modelIndex=488; EDefs[323].texIndex=592; EDefscol[323]=COLTYPE_CVX; EDefs[323].colMeshIndex=491; EDefsmass[323]=0.12f;
+    /*324 item_patch_medi*/            EDefs[324].modelIndex=488; EDefs[324].texIndex=600; EDefscol[324]=COLTYPE_CVX; EDefs[324].colMeshIndex=491; EDefsmass[324]=0.12f;
+    /*325 item_patch_reflex*/          EDefs[325].modelIndex=488; EDefs[325].texIndex=641; EDefscol[325]=COLTYPE_CVX; EDefs[325].colMeshIndex=491; EDefsmass[325]=0.12f;
+    /*326 item_patch_sight*/           EDefs[326].modelIndex=488; EDefs[326].texIndex=646; EDefscol[326]=COLTYPE_CVX; EDefs[326].colMeshIndex=491; EDefsmass[326]=0.12f;
+    /*327 item_patch_staminup*/        EDefs[327].modelIndex=488; EDefs[327].texIndex=647; EDefscol[327]=COLTYPE_CVX; EDefs[327].colMeshIndex=491; EDefsmass[327]=0.12f;
     /*328 item_hw_system*/             EDefs[328].modelIndex=207; EDefs[328].texIndex=405; EDefs[328].glowIndex=404; EDefsmass[328]=0.17f;
-    /*329 item_hw_navunit*/            EDefs[329].modelIndex=204; EDefs[329].texIndex=1258;EDefs[329].glowIndex=1259; EDefscollider[329]=COLTYPE_CVX; EDefs[329].colMeshIndex=696; EDefsmass[329]=0.1f;
-    /*330 item_hw_ereader*/            EDefs[330].modelIndex=200; EDefscollider[330]=COLTYPE_CVX; EDefs[330].colMeshIndex=692; EDefsmass[330]=0.12f;
-    /*331 item_hw_sensaround*/         EDefs[331].modelIndex=205; EDefscollider[331]=COLTYPE_CVX; EDefs[331].colMeshIndex=697; EDefsmass[331]=0.12f;
+    /*329 item_hw_navunit*/            EDefs[329].modelIndex=204; EDefs[329].texIndex=1258;EDefs[329].glowIndex=1259; EDefscol[329]=COLTYPE_CVX; EDefs[329].colMeshIndex=696; EDefsmass[329]=0.1f;
+    /*330 item_hw_ereader*/            EDefs[330].modelIndex=200; EDefscol[330]=COLTYPE_CVX; EDefs[330].colMeshIndex=692; EDefsmass[330]=0.12f;
+    /*331 item_hw_sensaround*/         EDefs[331].modelIndex=205; EDefscol[331]=COLTYPE_CVX; EDefs[331].colMeshIndex=697; EDefsmass[331]=0.12f;
     /*332 item_hw_targetid*/           EDefs[332].modelIndex=208; EDefsmass[332]=0.08f;
     /*333 item_hw_shield*/             EDefs[333].modelIndex=206; EDefsmass[333]=0.14f;
-    /*334 item_hw_bio*/                EDefs[334].modelIndex=197; EDefscollider[334]=COLTYPE_CVX; EDefs[334].colMeshIndex=689; EDefsmass[334]=0.1f;
-    /*335 item_hw_lantern*/            EDefs[335].modelIndex=203; EDefscollider[335]=COLTYPE_CVX; EDefs[335].colMeshIndex=695; EDefsmass[335]=0.11f;
-    /*336 item_hw_envirosuit*/         EDefs[336].modelIndex=199; EDefscollider[336]=COLTYPE_CVX; EDefs[336].colMeshIndex=691; EDefsmass[336]=0.451f;
-    /*337 item_hw_booster*/            EDefs[337].modelIndex=198; EDefscollider[337]=COLTYPE_CVX; EDefs[337].colMeshIndex=690; EDefsmass[337]=0.16f;
-    /*338 item_hw_jumpjets*/           EDefs[338].modelIndex=202; EDefscollider[338]=COLTYPE_CVX; EDefs[338].colMeshIndex=694; EDefsmass[338]=0.32f;
-    /*339 item_hw_infrared*/           EDefs[339].modelIndex=201; EDefscollider[339]=COLTYPE_CVX; EDefs[339].colMeshIndex=693; EDefsmass[339]=0.1f;
-    /*340 item_fireextinguisher*/      EDefs[340].modelIndex=144; EDefscollider[340]=COLTYPE_CVX; EDefs[340].colMeshIndex=684; EDefsmass[340]=1.3f;
-    /*341 item_access_card_admin*/     EDefs[341].modelIndex=0;   EDefs[341].texIndex=9; EDefs[341].glowIndex=82; EDefscollider[341]=COLTYPE_CVX; EDefs[341].colMeshIndex=672; EDefsmass[341]=0.2f;
+    /*334 item_hw_bio*/                EDefs[334].modelIndex=197; EDefscol[334]=COLTYPE_CVX; EDefs[334].colMeshIndex=689; EDefsmass[334]=0.1f;
+    /*335 item_hw_lantern*/            EDefs[335].modelIndex=203; EDefscol[335]=COLTYPE_CVX; EDefs[335].colMeshIndex=695; EDefsmass[335]=0.11f;
+    /*336 item_hw_envirosuit*/         EDefs[336].modelIndex=199; EDefscol[336]=COLTYPE_CVX; EDefs[336].colMeshIndex=691; EDefsmass[336]=0.451f;
+    /*337 item_hw_booster*/            EDefs[337].modelIndex=198; EDefscol[337]=COLTYPE_CVX; EDefs[337].colMeshIndex=690; EDefsmass[337]=0.16f;
+    /*338 item_hw_jumpjets*/           EDefs[338].modelIndex=202; EDefscol[338]=COLTYPE_CVX; EDefs[338].colMeshIndex=694; EDefsmass[338]=0.32f;
+    /*339 item_hw_infrared*/           EDefs[339].modelIndex=201; EDefscol[339]=COLTYPE_CVX; EDefs[339].colMeshIndex=693; EDefsmass[339]=0.1f;
+    /*340 item_fireextinguisher*/      EDefs[340].modelIndex=144; EDefscol[340]=COLTYPE_CVX; EDefs[340].colMeshIndex=684; EDefsmass[340]=1.3f;
+    /*341 item_access_card_admin*/     EDefs[341].modelIndex=0;   EDefs[341].texIndex=9; EDefs[341].glowIndex=82; EDefscol[341]=COLTYPE_CVX; EDefs[341].colMeshIndex=672; EDefsmass[341]=0.2f;
     /*342 item_workerhelmet*/          EDefs[342].modelIndex=648; EDefsmass[342]=1.2f;
     /*343 weapon_mk3*/                 EDefs[343].modelIndex=646; EDefsmass[343]=0.75f;
     /*344 weapon_blaster*/             EDefs[344].modelIndex=638; EDefsmass[344]=0.5f;
@@ -420,48 +420,48 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*356 weapon_skorpion*/            EDefs[356].modelIndex=655; EDefsmass[356]=1.3f;
     /*357 weapon_sparqbeam*/           EDefs[357].modelIndex=656; EDefsmass[357]=0.3f;
     /*358 weapon_stungun*/             EDefs[358].modelIndex=657; EDefsmass[358]=0.3f;
-    /*359 item_battery*/               EDefs[359].modelIndex=13;  EDefscollider[359]=COLTYPE_CVX;  EDefs[359].colMeshIndex=680;  EDefsmass[359]=0.3f;
-    /*360 item_battery_icad*/          EDefs[360].modelIndex=13;  EDefscollider[360]=COLTYPE_CVX;  EDefs[360].colMeshIndex=680;  EDefsmass[360]=0.35f;
+    /*359 item_battery*/               EDefs[359].modelIndex=13;  EDefscol[359]=COLTYPE_CVX;  EDefs[359].colMeshIndex=680;  EDefsmass[359]=0.3f;
+    /*360 item_battery_icad*/          EDefs[360].modelIndex=13;  EDefscol[360]=COLTYPE_CVX;  EDefs[360].colMeshIndex=680;  EDefsmass[360]=0.35f;
     /*361 item_logic_probe*/           EDefs[361].modelIndex=217; EDefs[361].texIndex=427;  EDefsmass[361]=0.15f;
-    /*362 item_healthkit*/             EDefs[362].modelIndex=196; EDefscollider[362]=COLTYPE_CVX;  EDefs[362].colMeshIndex=688;  EDefsmass[362]=0.25f;
+    /*362 item_healthkit*/             EDefs[362].modelIndex=196; EDefscol[362]=COLTYPE_CVX;  EDefs[362].colMeshIndex=688;  EDefsmass[362]=0.25f;
     /*363 item_plastique*/             EDefs[363].modelIndex=492; EDefsmass[363]=1.4f;
-    /*364 item_chipset_interfacedemod*/EDefs[364].modelIndex=45;  EDefscollider[364]=COLTYPE_BOX;  EDefscolliderCenter[364]=(V3){0.003744498f,0.0001704991f,0.03192701f};  EDefscolliderSize[364]=(V3){0.459303f,0.3412231f,0.06385402f};  EDefs[364].colMeshIndex=U16_MAX;  EDefsmass[364]=0.3f;
-    /*365 item_flask*/                 EDefs[365].modelIndex=145; EDefscollider[365]=COLTYPE_CVX;  EDefs[365].colMeshIndex=685;  EDefs[365].texIndex=36;  EDefs[365].specIndex=1242;  EDefsmass[365]=0.22f;
-    /*366 item_chipset_bitflag*/       EDefs[366].modelIndex=45;  EDefscollider[366]=COLTYPE_BOX;  EDefscolliderCenter[366]=(V3){0.003744498f,0.0001704991f,0.03192701f};  EDefscolliderSize[366]=(V3){0.459303f,0.3412231f,0.06385402f};  EDefs[366].colMeshIndex=U16_MAX;  EDefsmass[366]=0.3f;
-    /*367 item_ammo_rubber*/           EDefs[367].modelIndex=8;   EDefscollider[367]=COLTYPE_CVX;  EDefs[367].colMeshIndex=676;  EDefsmass[367]=0.25f;
+    /*364 item_chipset_interfacedemod*/EDefs[364].modelIndex=45;  EDefscol[364]=COLTYPE_BOX;  EDefscolliderCenter[364]=(V3){0.003744498f,0.0001704991f,0.03192701f};  EDefscolliderSize[364]=(V3){0.459303f,0.3412231f,0.06385402f};  EDefs[364].colMeshIndex=U16_MAX;  EDefsmass[364]=0.3f;
+    /*365 item_flask*/                 EDefs[365].modelIndex=145; EDefscol[365]=COLTYPE_CVX;  EDefs[365].colMeshIndex=685;  EDefs[365].texIndex=36;  EDefs[365].specIndex=1242;  EDefsmass[365]=0.22f;
+    /*366 item_chipset_bitflag*/       EDefs[366].modelIndex=45;  EDefscol[366]=COLTYPE_BOX;  EDefscolliderCenter[366]=(V3){0.003744498f,0.0001704991f,0.03192701f};  EDefscolliderSize[366]=(V3){0.459303f,0.3412231f,0.06385402f};  EDefs[366].colMeshIndex=U16_MAX;  EDefsmass[366]=0.3f;
+    /*367 item_ammo_rubber*/           EDefs[367].modelIndex=8;   EDefscol[367]=COLTYPE_CVX;  EDefs[367].colMeshIndex=676;  EDefsmass[367]=0.25f;
     /*368 item_isotopex22*/            EDefs[368].modelIndex=209; EDefsmass[368]=1.2f;
-    /*369 item_testtube*/              EDefs[369].modelIndex=622; EDefs[369].texIndex=36; EDefs[369].specIndex=1242; EDefscollider[369]=COLTYPE_CVX; EDefs[369].colMeshIndex=612; EDefsmass[369]=0.21f;
+    /*369 item_testtube*/              EDefs[369].modelIndex=622; EDefs[369].texIndex=36; EDefs[369].specIndex=1242; EDefscol[369]=COLTYPE_CVX; EDefs[369].colMeshIndex=612; EDefsmass[369]=0.21f;
     /*370 weapon_grenadefrag_live*/    EDefs[370].modelIndex=182;
-    /*371 item_chipset_isolinear*/     EDefs[371].modelIndex=46;  EDefscollider[371]=COLTYPE_BOX;  EDefscolliderCenter[371]=(V3){-0.0009825006f,-0.0129465f,0.0148115f};  EDefscolliderSize[371]=(V3){0.223635f,0.4175691f,0.02912301f};  EDefs[371].colMeshIndex=U16_MAX;  EDefsmass[371]=0.26f;
+    /*371 item_chipset_isolinear*/     EDefs[371].modelIndex=46;  EDefscol[371]=COLTYPE_BOX;  EDefscolliderCenter[371]=(V3){-0.0009825006f,-0.0129465f,0.0148115f};  EDefscolliderSize[371]=(V3){0.223635f,0.4175691f,0.02912301f};  EDefs[371].colMeshIndex=U16_MAX;  EDefsmass[371]=0.26f;
     /*372 weapon_grenadeconc_live*/    EDefs[372].modelIndex=165;
-    /*373 item_ammo_needle*/           EDefs[373].modelIndex=4;   EDefs[373].texIndex=15; EDefscollider[373]=COLTYPE_BOX; EDefscolliderCenter[373]=(V3){-0.0004654949f,0.0004549972f,0.0244365f}; EDefscolliderSize[373]=(V3){0.131339f,0.1442801f,0.04838703f}; EDefs[373].colMeshIndex=U16_MAX; EDefsmass[373]=0.15f;
-    /*374 item_ammo_tranq*/            EDefs[374].modelIndex=4;   EDefs[374].texIndex=27; EDefscollider[374]=COLTYPE_BOX; EDefscolliderCenter[374]=(V3){-0.0004654949f,0.0004549972f,0.0244365f}; EDefscolliderSize[374]=(V3){0.131339f,0.1442801f,0.04838703f}; EDefs[374].colMeshIndex=U16_MAX; EDefsmass[374]=0.15f;
-    /*375 item_ammo_standard*/         EDefs[375].modelIndex=5;   EDefscollider[375]=COLTYPE_BOX; EDefscolliderCenter[375]=(V3){0.0001984993f,0.0f,0.02172501f};  EDefscolliderSize[375]=(V3){0.1209471f,0.2176701f,0.04345007f};  EDefs[375].colMeshIndex=U16_MAX;  EDefsmass[375]=0.2f;
-    /*376 item_ammo_teflon*/           EDefs[376].modelIndex=5;   EDefscollider[376]=COLTYPE_BOX; EDefscolliderCenter[376]=(V3){0.0001984993f,0.0f,0.02172501f};  EDefscolliderSize[376]=(V3){0.1209471f,0.2176701f,0.04345007f};  EDefs[376].colMeshIndex=U16_MAX;  EDefsmass[376]=0.2f;
-    /*377 item_ammo_hollow*/           EDefs[377].modelIndex=5;   EDefscollider[377]=COLTYPE_BOX; EDefscolliderCenter[377]=(V3){0.0002185023f,0.0f,0.02122951f};  EDefscolliderSize[377]=(V3){0.1423431f,0.2127061f,0.04245907f};  EDefs[377].colMeshIndex=U16_MAX;  EDefsmass[377]=0.2f;
-    /*378 item_ammo_slug*/             EDefs[378].modelIndex=3;   EDefscollider[378]=COLTYPE_BOX; EDefscolliderCenter[378]=(V3){0.0002185023f,0.0f,0.02122951f};  EDefscolliderSize[378]=(V3){0.1423431f,0.2127061f,0.04245907f};  EDefs[378].colMeshIndex=U16_MAX;  EDefs[378].glowIndex=22;  EDefsmass[378]=0.2f;
-    /*379 item_ammo_magnesium*/        EDefs[379].modelIndex=3;   EDefscollider[379]=COLTYPE_CVX; EDefs[379].colMeshIndex=673; EDefsmass[379]=0.35f;
-    /*380 item_ammo_penetrator*/       EDefs[380].modelIndex=3;   EDefscollider[380]=COLTYPE_CVX; EDefs[380].colMeshIndex=673; EDefsmass[380]=0.35f;
-    /*381 item_ammo_hornet*/           EDefs[381].modelIndex=1;   EDefscollider[381]=COLTYPE_CVX; EDefs[381].colMeshIndex=673; EDefsmass[381]=0.35f;
-    /*382 item_ammo_splinter*/         EDefs[382].modelIndex=630; EDefscollider[382]=COLTYPE_CVX; EDefs[382].colMeshIndex=673; EDefsmass[382]=0.35f;
-    /*383 item_ammo_rail*/             EDefs[383].modelIndex=6;   EDefscollider[383]=COLTYPE_CVX; EDefs[383].colMeshIndex=675; EDefsmass[383]=0.40f;
-    /*384 item_ammo_slag*/             EDefs[384].modelIndex=9;   EDefscollider[384]=COLTYPE_CVX; EDefs[384].colMeshIndex=673; EDefsmass[384]=0.35f;
-    /*385 item_ammo_slaglarge*/        EDefs[385].modelIndex=10;  EDefscollider[385]=COLTYPE_CVX; EDefs[385].colMeshIndex=677; EDefsmass[385]=0.40f;
-    /*386 item_ammo_magcart*/          EDefs[386].modelIndex=2;   EDefscollider[386]=COLTYPE_CVX; EDefs[386].colMeshIndex=674; EDefsmass[386]=0.35f;
+    /*373 item_ammo_needle*/           EDefs[373].modelIndex=4;   EDefs[373].texIndex=15; EDefscol[373]=COLTYPE_BOX; EDefscolliderCenter[373]=(V3){-0.0004654949f,0.0004549972f,0.0244365f}; EDefscolliderSize[373]=(V3){0.131339f,0.1442801f,0.04838703f}; EDefs[373].colMeshIndex=U16_MAX; EDefsmass[373]=0.15f;
+    /*374 item_ammo_tranq*/            EDefs[374].modelIndex=4;   EDefs[374].texIndex=27; EDefscol[374]=COLTYPE_BOX; EDefscolliderCenter[374]=(V3){-0.0004654949f,0.0004549972f,0.0244365f}; EDefscolliderSize[374]=(V3){0.131339f,0.1442801f,0.04838703f}; EDefs[374].colMeshIndex=U16_MAX; EDefsmass[374]=0.15f;
+    /*375 item_ammo_standard*/         EDefs[375].modelIndex=5;   EDefscol[375]=COLTYPE_BOX; EDefscolliderCenter[375]=(V3){0.0001984993f,0.0f,0.02172501f};  EDefscolliderSize[375]=(V3){0.1209471f,0.2176701f,0.04345007f};  EDefs[375].colMeshIndex=U16_MAX;  EDefsmass[375]=0.2f;
+    /*376 item_ammo_teflon*/           EDefs[376].modelIndex=5;   EDefscol[376]=COLTYPE_BOX; EDefscolliderCenter[376]=(V3){0.0001984993f,0.0f,0.02172501f};  EDefscolliderSize[376]=(V3){0.1209471f,0.2176701f,0.04345007f};  EDefs[376].colMeshIndex=U16_MAX;  EDefsmass[376]=0.2f;
+    /*377 item_ammo_hollow*/           EDefs[377].modelIndex=5;   EDefscol[377]=COLTYPE_BOX; EDefscolliderCenter[377]=(V3){0.0002185023f,0.0f,0.02122951f};  EDefscolliderSize[377]=(V3){0.1423431f,0.2127061f,0.04245907f};  EDefs[377].colMeshIndex=U16_MAX;  EDefsmass[377]=0.2f;
+    /*378 item_ammo_slug*/             EDefs[378].modelIndex=3;   EDefscol[378]=COLTYPE_BOX; EDefscolliderCenter[378]=(V3){0.0002185023f,0.0f,0.02122951f};  EDefscolliderSize[378]=(V3){0.1423431f,0.2127061f,0.04245907f};  EDefs[378].colMeshIndex=U16_MAX;  EDefs[378].glowIndex=22;  EDefsmass[378]=0.2f;
+    /*379 item_ammo_magnesium*/        EDefs[379].modelIndex=3;   EDefscol[379]=COLTYPE_CVX; EDefs[379].colMeshIndex=673; EDefsmass[379]=0.35f;
+    /*380 item_ammo_penetrator*/       EDefs[380].modelIndex=3;   EDefscol[380]=COLTYPE_CVX; EDefs[380].colMeshIndex=673; EDefsmass[380]=0.35f;
+    /*381 item_ammo_hornet*/           EDefs[381].modelIndex=1;   EDefscol[381]=COLTYPE_CVX; EDefs[381].colMeshIndex=673; EDefsmass[381]=0.35f;
+    /*382 item_ammo_splinter*/         EDefs[382].modelIndex=630; EDefscol[382]=COLTYPE_CVX; EDefs[382].colMeshIndex=673; EDefsmass[382]=0.35f;
+    /*383 item_ammo_rail*/             EDefs[383].modelIndex=6;   EDefscol[383]=COLTYPE_CVX; EDefs[383].colMeshIndex=675; EDefsmass[383]=0.40f;
+    /*384 item_ammo_slag*/             EDefs[384].modelIndex=9;   EDefscol[384]=COLTYPE_CVX; EDefs[384].colMeshIndex=673; EDefsmass[384]=0.35f;
+    /*385 item_ammo_slaglarge*/        EDefs[385].modelIndex=10;  EDefscol[385]=COLTYPE_CVX; EDefs[385].colMeshIndex=677; EDefsmass[385]=0.40f;
+    /*386 item_ammo_magcart*/          EDefs[386].modelIndex=2;   EDefscol[386]=COLTYPE_CVX; EDefs[386].colMeshIndex=674; EDefsmass[386]=0.35f;
     /*387 weapon_grenadeemp_live*/     EDefs[387].modelIndex=168;
-    /*388 item_access_card_std*/       EDefs[388].modelIndex=0;   EDefs[388].texIndex=79;  EDefs[388].glowIndex=867;  EDefscollider[388]=COLTYPE_CVX;  EDefs[388].colMeshIndex=672;  EDefsmass[388]=0.2f;
+    /*388 item_access_card_std*/       EDefs[388].modelIndex=0;   EDefs[388].texIndex=79;  EDefs[388].glowIndex=867;  EDefscol[388]=COLTYPE_CVX;  EDefs[388].colMeshIndex=672;  EDefsmass[388]=0.2f;
     /*389 weapon_grenadeearth_live*/   EDefs[389].modelIndex=181;
-    /*390 item_access_card_group1*/    EDefs[390].modelIndex=0;   EDefs[390].texIndex=7;  EDefs[390].glowIndex=159;  EDefscollider[390]=COLTYPE_CVX;  EDefs[390].colMeshIndex=672;  EDefsmass[390]=0.2f;
-    /*391 item_access_card_science*/   EDefs[391].modelIndex=0;   EDefs[391].texIndex=2;  EDefs[391].glowIndex=343;  EDefscollider[391]=COLTYPE_CVX;  EDefs[391].colMeshIndex=672;  EDefsmass[391]=0.2f;
-    /*392 item_access_card_eng*/       EDefs[392].modelIndex=0;   EDefs[392].texIndex=3;  EDefs[392].glowIndex=81;  EDefscollider[392]=COLTYPE_CVX;  EDefs[392].colMeshIndex=672;  EDefsmass[392]=0.2f;
-    /*393 item_access_card_groupB*/    EDefs[393].modelIndex=0;   EDefs[393].texIndex=7;  EDefs[393].glowIndex=159;  EDefscollider[393]=COLTYPE_CVX;  EDefs[393].colMeshIndex=672;  EDefsmass[393]=0.2f;
-    /*394 item_access_card_security*/  EDefs[394].modelIndex=0;   EDefs[394].texIndex=10;  EDefs[394].glowIndex=344;  EDefscollider[394]=COLTYPE_CVX;  EDefs[394].colMeshIndex=672;  EDefsmass[394]=0.2f;
-    /*395 item_access_card_per5diego*/ EDefs[395].modelIndex=0;   EDefs[395].texIndex=8;  EDefs[395].glowIndex=341;  EDefscollider[395]=COLTYPE_CVX;  EDefs[395].colMeshIndex=672;  EDefsmass[395]=0.2f;
-    /*396 item_access_card_medi*/      EDefs[396].modelIndex=0;   EDefs[396].texIndex=1;  EDefs[396].glowIndex=161;  EDefscollider[396]=COLTYPE_CVX;  EDefs[396].colMeshIndex=672;  EDefsmass[396]=0.2f;
-    /*397 item_access_card_group3*/    EDefs[397].modelIndex=0;   EDefs[397].texIndex=7;  EDefs[397].glowIndex=159;  EDefscollider[397]=COLTYPE_CVX;  EDefs[397].colMeshIndex=672;  EDefsmass[397]=0.2f;
-    /*398 item_access_card_purple*/    EDefs[398].modelIndex=0;   EDefs[398].texIndex=5;  EDefs[398].glowIndex=342;  EDefscollider[398]=COLTYPE_CVX;  EDefs[398].colMeshIndex=672;  EDefsmass[398]=0.2f;
-    /*399 item_head_male*/             EDefs[399].modelIndex=194; EDefscollider[399]=COLTYPE_CVX; EDefs[399].colMeshIndex=687; EDefsmass[399]=1.29f;
-    /*400 item_head_female*/           EDefs[400].modelIndex=193; EDefscollider[400]=COLTYPE_CVX; EDefs[400].colMeshIndex=686; EDefsmass[400]=1.30f;
+    /*390 item_access_card_group1*/    EDefs[390].modelIndex=0;   EDefs[390].texIndex=7;  EDefs[390].glowIndex=159;  EDefscol[390]=COLTYPE_CVX;  EDefs[390].colMeshIndex=672;  EDefsmass[390]=0.2f;
+    /*391 item_access_card_science*/   EDefs[391].modelIndex=0;   EDefs[391].texIndex=2;  EDefs[391].glowIndex=343;  EDefscol[391]=COLTYPE_CVX;  EDefs[391].colMeshIndex=672;  EDefsmass[391]=0.2f;
+    /*392 item_access_card_eng*/       EDefs[392].modelIndex=0;   EDefs[392].texIndex=3;  EDefs[392].glowIndex=81;  EDefscol[392]=COLTYPE_CVX;  EDefs[392].colMeshIndex=672;  EDefsmass[392]=0.2f;
+    /*393 item_access_card_groupB*/    EDefs[393].modelIndex=0;   EDefs[393].texIndex=7;  EDefs[393].glowIndex=159;  EDefscol[393]=COLTYPE_CVX;  EDefs[393].colMeshIndex=672;  EDefsmass[393]=0.2f;
+    /*394 item_access_card_security*/  EDefs[394].modelIndex=0;   EDefs[394].texIndex=10;  EDefs[394].glowIndex=344;  EDefscol[394]=COLTYPE_CVX;  EDefs[394].colMeshIndex=672;  EDefsmass[394]=0.2f;
+    /*395 item_access_card_per5diego*/ EDefs[395].modelIndex=0;   EDefs[395].texIndex=8;  EDefs[395].glowIndex=341;  EDefscol[395]=COLTYPE_CVX;  EDefs[395].colMeshIndex=672;  EDefsmass[395]=0.2f;
+    /*396 item_access_card_medi*/      EDefs[396].modelIndex=0;   EDefs[396].texIndex=1;  EDefs[396].glowIndex=161;  EDefscol[396]=COLTYPE_CVX;  EDefs[396].colMeshIndex=672;  EDefsmass[396]=0.2f;
+    /*397 item_access_card_group3*/    EDefs[397].modelIndex=0;   EDefs[397].texIndex=7;  EDefs[397].glowIndex=159;  EDefscol[397]=COLTYPE_CVX;  EDefs[397].colMeshIndex=672;  EDefsmass[397]=0.2f;
+    /*398 item_access_card_purple*/    EDefs[398].modelIndex=0;   EDefs[398].texIndex=5;  EDefs[398].glowIndex=342;  EDefscol[398]=COLTYPE_CVX;  EDefs[398].colMeshIndex=672;  EDefsmass[398]=0.2f;
+    /*399 item_head_male*/             EDefs[399].modelIndex=194; EDefscol[399]=COLTYPE_CVX; EDefs[399].colMeshIndex=687; EDefsmass[399]=1.29f;
+    /*400 item_head_female*/           EDefs[400].modelIndex=193; EDefscol[400]=COLTYPE_CVX; EDefs[400].colMeshIndex=686; EDefsmass[400]=1.30f;
     /*401 item_severedhead*/           EDefs[401].modelIndex=590; EDefsmass[401]=1.28f;
     /*402 weapon_grenademine_live*/    EDefs[402].modelIndex=184;
     /*403 weapon_grenadenitro_live*/   EDefs[403].modelIndex=185;
@@ -478,27 +478,27 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*414 unused*/
     /*415 unused*/
     /*416 unused*/
-    /*417 item_access_card_perdarcy*/  EDefs[417].modelIndex=0; EDefs[417].texIndex=8; EDefs[417].glowIndex=341; EDefscollider[417]=COLTYPE_CVX; EDefs[417].colMeshIndex=672; EDefsmass[417]=0.2f; EDefsangularDrag[417]=0.05f; EDefs[417].kinematic=false; EDefsdynamicFriction[417]=EDefsstaticFriction[417]=0.6f;
-    for (int i=419;i<=447;++i) { EDefscollider[i]=COLTYPE_CAP; EDefscolliderSize[i].z=COLCAP_DIR_Y_F; EDefsstaticFriction[i]=1.0f; EDefsdynamicFriction[i]=0.15f; EDefs[i].kinematic=true; EDefsmass[i]=1.0f; EDefsangularDrag[i]=2.2f; } // NPCs
+    /*417 item_access_card_perdarcy*/  EDefs[417].modelIndex=0; EDefs[417].texIndex=8; EDefs[417].glowIndex=341; EDefscol[417]=COLTYPE_CVX; EDefs[417].colMeshIndex=672; EDefsmass[417]=0.2f; EDefsangularDrag[417]=0.05f; EDefs[417].kinematic=false; EDefsdynamicFriction[417]=EDefsstaticFriction[417]=0.6f;
+    for (int i=419;i<=447;++i) { EDefscol[i]=COLTYPE_CAP; EDefscolliderSize[i].z=COLCAP_DIR_Y_F; EDefsstaticFriction[i]=1.0f; EDefsdynamicFriction[i]=0.15f; EDefs[i].kinematic=true; EDefsmass[i]=1.0f; EDefsangularDrag[i]=2.2f; } // NPCs
     /*419 npc_autobomb*/            EDefs[419].modelIndex=299; EDefs[419].texIndex=542; EDefscolliderCenter[419].y=0.42f; EDefscolliderCenter[419].z=0.01848752f;                   EDefscolliderSize[419]=(V3){0.42f,1.48f,COLCAP_DIR_Z_F};          EDefsangularDrag[419]=1.0f; EDefs[419].glowIndex=541;
     /*420 npc_cyborg_assassin*/     EDefs[420].modelIndex=306; EDefs[420].texIndex=545; EDefs[420].numclips= 8; EDefs[420].animationNum=24;                                           EDefscolliderSize[419].x=0.48f; EDefscolliderSize[419].y=2.0f;  EDefsmass[420]=1.5f; EDefsangularDrag[420]=1.5f; EDefs[420].glowIndex=544;
     /*421 npc_avian_mutant*/        EDefs[421].modelIndex=328; EDefs[421].texIndex=568; EDefs[421].numclips= 5; EDefs[421].animationNum=35; EDefscolliderCenter[421].y= 0.0200f;     EDefscolliderSize[421].x=0.40f; EDefscolliderSize[421].y=1.60f; EDefsmass[421]=2.0f; EDefsangularDrag[421]=1.0f;
     /*422 npc_exec_bot*/            EDefs[422].modelIndex=316; EDefs[422].texIndex=555; EDefs[422].numclips= 5; EDefs[422].animationNum=29; EDefscolliderCenter[422].y= 0.0125f;     EDefscolliderSize[422].x=0.48f; EDefscolliderSize[422].y=2.025f;EDefsmass[422]=2.2f; EDefsangularDrag[422]=1.5f;
     /*423 npc_cyborg_drone*/        EDefs[423].modelIndex=312; EDefs[423].texIndex=547; EDefs[423].numclips= 7; EDefs[423].animationNum=3;                                            EDefscolliderSize[423].x=0.36f; EDefscolliderSize[423].y=2.00f; EDefsmass[423]=1.5f; EDefsangularDrag[423]=2.0f;
-    /*424 npc_cortex_reaver*/       EDefs[424].modelIndex=300; EDefs[424].texIndex=543; EDefs[424].numclips=6;  EDefs[424].animationNum=23; EDefscolliderCenter[424].y=-0.02263292f; EDefscolliderSize[424].x=0.451f;                                EDefsmass[424]=5.0f; EDefsangularDrag[424]=3.0f; EDefscollider[424]=COLTYPE_SPH;
+    /*424 npc_cortex_reaver*/       EDefs[424].modelIndex=300; EDefs[424].texIndex=543; EDefs[424].numclips=6;  EDefs[424].animationNum=23; EDefscolliderCenter[424].y=-0.02263292f; EDefscolliderSize[424].x=0.451f;                                EDefsmass[424]=5.0f; EDefsangularDrag[424]=3.0f; EDefscol[424]=COLTYPE_SPH;
     /*425 npc_cyborg_warrior*/      EDefs[425].modelIndex=315; EDefs[425].texIndex=554; EDefs[425].numclips=7;  EDefs[425].animationNum=28;                                           EDefscolliderSize[425].x=0.48f; EDefscolliderSize[425].y=2.00f; EDefsmass[425]=1.5f; EDefsangularDrag[425]=2.0f;
     /*426 npc_cyborg_enforcer*/     EDefs[426].modelIndex=314; EDefs[426].texIndex=550; EDefs[426].numclips=8;  EDefs[426].animationNum=27; EDefscolliderCenter[426].y=0.05f;        EDefscolliderSize[426].x=0.40f; EDefscolliderSize[426].y=2.08f; EDefsmass[426]=1.5f;
     /*427 npc_cyborg_elite*/        EDefs[427].modelIndex=313; EDefs[427].texIndex=548; EDefs[427].numclips=10; EDefs[427].animationNum=26; EDefscolliderCenter[427].y=0.10f;        EDefscolliderSize[427].x=0.44f; EDefscolliderSize[427].y=2.20f; EDefsmass[427]=3.5f;
     /*428 npc_cyborg_diego*/        EDefs[428].modelIndex=309; EDefs[428].texIndex=546; EDefs[428].numclips=6;  EDefs[428].animationNum=25;                                           EDefscolliderSize[428].x=0.48f; EDefscolliderSize[428].y=2.12f; EDefsmass[428]=2.0f;
-    /*429 npc_sec1_bot*/            EDefs[429].modelIndex=333; EDefs[429].texIndex=573; EDefs[429].numclips=2;  EDefs[429].animationNum=38; EDefscolliderCenter[429].y=0.05f;        EDefscolliderSize[429].x=0.64f;                                 EDefsmass[429]=1.5f; EDefsangularDrag[429]=0.8f; EDefscollider[429]=COLTYPE_SPH;
+    /*429 npc_sec1_bot*/            EDefs[429].modelIndex=333; EDefs[429].texIndex=573; EDefs[429].numclips=2;  EDefs[429].animationNum=38; EDefscolliderCenter[429].y=0.05f;        EDefscolliderSize[429].x=0.64f;                                 EDefsmass[429]=1.5f; EDefsangularDrag[429]=0.8f; EDefscol[429]=COLTYPE_SPH;
     /*430 npc_sec2_bot*/            EDefs[430].modelIndex=335; EDefs[430].texIndex=574; EDefs[430].numclips=6;  EDefs[430].animationNum=39; EDefscolliderCenter[430].y=0.2f;         EDefscolliderSize[430].x=0.80f; EDefscolliderSize[430].y=2.40f; EDefsmass[430]=4.51f;
-    /*431 npc_maint_bot*/           EDefs[431].modelIndex=325; EDefs[431].texIndex=567; EDefs[431].numclips=4;  EDefs[431].animationNum=34; EDefscolliderCenter[431].y=-0.3f;        EDefscolliderSize[431].x=0.48f;                                 EDefsmass[431]=1.5f; EDefsangularDrag[431]=1.5f; EDefscollider[431]=COLTYPE_SPH;
+    /*431 npc_maint_bot*/           EDefs[431].modelIndex=325; EDefs[431].texIndex=567; EDefs[431].numclips=4;  EDefs[431].animationNum=34; EDefscolliderCenter[431].y=-0.3f;        EDefscolliderSize[431].x=0.48f;                                 EDefsmass[431]=1.5f; EDefsangularDrag[431]=1.5f; EDefscol[431]=COLTYPE_SPH;
     /*432 npc_mutant_cyborg*/       EDefs[432].modelIndex=329; EDefs[432].texIndex=569; EDefs[432].numclips=7;  EDefs[432].animationNum=51; EDefscolliderCenter[432].y=0.12f;        EDefscolliderSize[432].x=0.65f; EDefscolliderSize[432].y=2.30f; EDefsmass[432]=3.0f; // Josiah's assumption is that the Mutant Cyborg is the "toaster oven" to inspire the first ever ECS that LGS made on Thief as they experimented more with their entity management, per Mahk interview with Casey Muratori: https://www.youtube.com/watch?v=73Do0OScoOU
     /*433 npc_hopper*/              EDefs[433].modelIndex=322; EDefs[433].texIndex=562; EDefs[433].numclips=8;  EDefs[433].animationNum=32; EDefscolliderCenter[433].z=1.0f;         EDefscolliderSize[433].x=0.64f; EDefscolliderSize[433].y=2.00f; EDefsangularDrag[433]=1000.0f; EDefsdynamicFriction[433]=0.005f; EDefsstaticFriction[433]=0.1f;
     /*434 npc_humanoid_mutant*/     EDefs[434].modelIndex=323; EDefs[434].texIndex=563; EDefs[434].numclips=6;  EDefs[434].animationNum=2;                                            EDefscolliderSize[434].x=0.38f; EDefscolliderSize[434].y=2.00f; EDefsmass[434]=1.4f; EDefsangularDrag[434]=2.0f;
-    /*435 npc_invisomut*/           EDefs[435].modelIndex=324; EDefs[435].texIndex=565; EDefs[435].numclips=5;  EDefs[435].animationNum=33; EDefscolliderCenter[435].y=-0.28938290f; EDefscolliderSize[435]=(V3){1.5f,1.078766f,0.8f};           EDefsmass[435]=1.3f; EDefsangularDrag[435]=0.8f; EDefscollider[435]=COLTYPE_BOX;
+    /*435 npc_invisomut*/           EDefs[435].modelIndex=324; EDefs[435].texIndex=565; EDefs[435].numclips=5;  EDefs[435].animationNum=33; EDefscolliderCenter[435].y=-0.28938290f; EDefscolliderSize[435]=(V3){1.5f,1.078766f,0.8f};           EDefsmass[435]=1.3f; EDefsangularDrag[435]=0.8f; EDefscol[435]=COLTYPE_BOX;
     /*436 npc_virus_mutant*/        EDefs[436].modelIndex=330; EDefs[436].texIndex=576; EDefs[436].numclips=6;  EDefs[436].animationNum=41; EDefscolliderCenter[436].y=-0.05f;       EDefscolliderSize[436].x=0.40f; EDefscolliderSize[436].y=1.90f; EDefsmass[436]=1.4f; EDefsangularDrag[436]=2.0f;
-    /*437 npc_servbot*/             EDefs[437].modelIndex=5153;EDefs[437].texIndex=575; EDefs[437].numclips=5;  EDefs[437].animationNum=40; EDefs[437].colMeshIndex=54; EDefsmass[437]=2.50f; EDefsangularDrag[437]=1.0f; EDefscollider[437]=COLTYPE_CVX;
+    /*437 npc_servbot*/             EDefs[437].modelIndex=5153;EDefs[437].texIndex=575; EDefs[437].numclips=5;  EDefs[437].animationNum=40; EDefs[437].colMeshIndex=54; EDefsmass[437]=2.50f; EDefsangularDrag[437]=1.0f; EDefscol[437]=COLTYPE_CVX;
     /*438 npc_flier_bot*/           EDefs[438].modelIndex=318; EDefs[438].texIndex=558; EDefs[438].numclips=5;  EDefs[438].animationNum=30; EDefsmass[438]=1.75f; EDefsangularDrag[438]=0.8f;
     /*439 npc_zerog_mutant*/        EDefs[439].modelIndex=395; EDefs[439].texIndex=1170;EDefs[439].numclips=3;  EDefs[439].animationNum=42; EDefsmass[439]=1.30f; EDefsangularDrag[439]=1.0f;
     /*440 npc_gorilla_tiger_mutant*/EDefs[440].modelIndex=320; EDefs[440].texIndex=560; EDefs[440].numclips=7;  EDefs[440].animationNum=31; EDefsmass[440]=2.00f;
@@ -509,7 +509,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*445 npc_cyberram*/            EDefs[445].modelIndex=304; EDefsmass[445]=2.00f; EDefsangularDrag[445]=3.0f;
     /*446 npc_cyber_reaver*/        EDefs[446].modelIndex=305; EDefsmass[446]=2.20f; EDefsangularDrag[446]=3.0f;
     /*447 npc_cybershodan*/         EDefsmass[447]=4.51f; EDefsangularDrag[447]=3.0f; EDefsdynamicFriction[447]=0.6f; EDefsstaticFriction[447]=0.6f;
-    for (int i=448;i<=457;++i) { EDefscollider[i]=COLTYPE_SPH; EDefscolliderSize[i]=(V3){1.5f,1.5f,1.5f}; } // Cyber Item Definitions
+    for (int i=448;i<=457;++i) { EDefscol[i]=COLTYPE_SPH; EDefscolliderSize[i]=(V3){1.5f,1.5f,1.5f}; } // Cyber Item Definitions
     /*448 item_cyber_data*/     EDefs[448].modelIndex=65;
     /*449 item_cyber_decoy*/    EDefs[449].modelIndex=72;
     /*450 item_cyber_drill*/    EDefs[450].modelIndex=68;
@@ -535,14 +535,14 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*469 se_corpse_security*/  EDefs[469].texIndex=136;  EDefs[469].specIndex=137;  EDefs[469].modelIndex=56; 
     /*470 se_corpse_tan*/       EDefs[470].texIndex=138;  EDefs[470].modelIndex=57; 
     /*471 se_corpse_torso*/     EDefs[471].texIndex=126;  EDefs[471].specIndex=127;  EDefs[471].modelIndex=58; 
-    /*472 se_crate1*/           EDefs[472].texIndex=145;  EDefs[472].modelIndex=60;  EDefscollider[472]=COLTYPE_BOX; EDefscolliderSize[472]=(V3){0.684186f,0.6841861f,0.6841861f};  EDefs[472].colMeshIndex=U16_MAX;  EDefsmass[472]=0.75f; EDefsgravity[472]=1.0f; EDefsdynamicFriction[472]=0.6f; EDefsstaticFriction[472]=0.6f;
-    /*473 se_crate2*/           EDefs[473].texIndex=143;  EDefs[473].modelIndex=60;  EDefscollider[473]=COLTYPE_BOX; EDefscolliderSize[473]=(V3){0.684186f,0.6841861f,0.6841861f};  EDefs[473].colMeshIndex=U16_MAX;  EDefsmass[473]=0.75f; EDefsgravity[473]=1.0f; EDefsdynamicFriction[473]=0.6f; EDefsstaticFriction[473]=0.6f;
-    /*474 se_crate3*/           EDefs[474].texIndex=144;  EDefs[474].modelIndex=60;  EDefscollider[474]=COLTYPE_BOX; EDefscolliderSize[474]=(V3){0.684186f,0.6841861f,0.6841861f};  EDefs[474].colMeshIndex=U16_MAX;  EDefsmass[474]=0.75f; EDefsgravity[474]=1.0f; EDefsdynamicFriction[474]=0.6f; EDefsstaticFriction[474]=0.6f;
-    /*475 se_crate4*/           EDefs[475].texIndex=146;  EDefs[475].modelIndex=60;  EDefscollider[475]=COLTYPE_BOX; EDefscolliderSize[475]=(V3){0.684186f,0.6841861f,0.6841861f};  EDefs[475].colMeshIndex=U16_MAX;  EDefsmass[475]=2.25f; EDefsgravity[475]=1.0f; EDefsdynamicFriction[475]=0.6f; EDefsstaticFriction[475]=0.6f;
-    /*476 se_crate5*/           EDefs[476].modelIndex=60;  EDefscollider[476]=COLTYPE_BOX; EDefscolliderSize[476]=(V3){0.684186f,0.6841861f,0.6841861f};  EDefs[476].colMeshIndex=U16_MAX;  EDefsmass[476]=2.25f; EDefsdynamicFriction[476]=0.6f; EDefsstaticFriction[476]=0.6f;
-    /*477 sec_camera*/       EDefs[477].modelIndex=589;  EDefs[477].texIndex=73;  EDefs[477].glowIndex=72; EDefscollider[477]=COLTYPE_MSH;
-    /*478 sec_cpunode*/      EDefs[478].modelIndex=587;  EDefs[478].texIndex=242;  EDefs[478].glowIndex=248; EDefscollider[478]=COLTYPE_MSH;
-    /*479 sec_cpunode_small*/EDefs[479].modelIndex=588;  EDefs[479].texIndex=107; EDefscollider[479]=COLTYPE_MSH;
+    /*472 se_crate1*/           EDefs[472].texIndex=145;  EDefs[472].modelIndex=60;  EDefscol[472]=COLTYPE_BOX; EDefscolliderSize[472]=(V3){0.684186f,0.6841861f,0.6841861f};  EDefs[472].colMeshIndex=U16_MAX;  EDefsmass[472]=0.75f; EDefsgravity[472]=1.0f; EDefsdynamicFriction[472]=0.6f; EDefsstaticFriction[472]=0.6f;
+    /*473 se_crate2*/           EDefs[473].texIndex=143;  EDefs[473].modelIndex=60;  EDefscol[473]=COLTYPE_BOX; EDefscolliderSize[473]=(V3){0.684186f,0.6841861f,0.6841861f};  EDefs[473].colMeshIndex=U16_MAX;  EDefsmass[473]=0.75f; EDefsgravity[473]=1.0f; EDefsdynamicFriction[473]=0.6f; EDefsstaticFriction[473]=0.6f;
+    /*474 se_crate3*/           EDefs[474].texIndex=144;  EDefs[474].modelIndex=60;  EDefscol[474]=COLTYPE_BOX; EDefscolliderSize[474]=(V3){0.684186f,0.6841861f,0.6841861f};  EDefs[474].colMeshIndex=U16_MAX;  EDefsmass[474]=0.75f; EDefsgravity[474]=1.0f; EDefsdynamicFriction[474]=0.6f; EDefsstaticFriction[474]=0.6f;
+    /*475 se_crate4*/           EDefs[475].texIndex=146;  EDefs[475].modelIndex=60;  EDefscol[475]=COLTYPE_BOX; EDefscolliderSize[475]=(V3){0.684186f,0.6841861f,0.6841861f};  EDefs[475].colMeshIndex=U16_MAX;  EDefsmass[475]=2.25f; EDefsgravity[475]=1.0f; EDefsdynamicFriction[475]=0.6f; EDefsstaticFriction[475]=0.6f;
+    /*476 se_crate5*/           EDefs[476].modelIndex=60;  EDefscol[476]=COLTYPE_BOX; EDefscolliderSize[476]=(V3){0.684186f,0.6841861f,0.6841861f};  EDefs[476].colMeshIndex=U16_MAX;  EDefsmass[476]=2.25f; EDefsdynamicFriction[476]=0.6f; EDefsstaticFriction[476]=0.6f;
+    /*477 sec_camera*/       EDefs[477].modelIndex=589;  EDefs[477].texIndex=73;  EDefs[477].glowIndex=72; EDefscol[477]=COLTYPE_MSH;
+    /*478 sec_cpunode*/      EDefs[478].modelIndex=587;  EDefs[478].texIndex=242;  EDefs[478].glowIndex=248; EDefscol[478]=COLTYPE_MSH;
+    /*479 sec_cpunode_small*/EDefs[479].modelIndex=588;  EDefs[479].texIndex=107; EDefscol[479]=COLTYPE_MSH;
     /*480 weapon_cyber_mine*/ EDefs[480].modelIndex=71;  EDefs[480].texIndex=1224;
     for (int i=481;i<=895;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=0.3f; } // Physical Generic Objects
     /*481 proj_enemshot2*/       EDefs[481].modelIndex=MAX_MDLS;
@@ -560,7 +560,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*493 proj_cyberdog_shot*/   EDefs[493].modelIndex=63;
     /*494 proj_cyberreaver_shot*/EDefs[494].modelIndex=64;
     /*495 proj_cyberice_shot*/   EDefs[495].modelIndex=68;
-    for (int i=496;i<515;++i) { EDefs[i].SFXIndex = 75; EDefscollider[i]=COLTYPE_MSH;  } // Doors
+    for (int i=496;i<515;++i) { EDefs[i].SFXIndex = 75; EDefscol[i]=COLTYPE_MSH;  } // Doors
     /*496 doorA*/         EDefs[496].modelIndex=719; EDefs[496].texIndex=185; EDefs[496].numclips=4;    EDefs[496].animationNum=1;                           
     /*497 doorB*/         EDefs[497].modelIndex=0;  EDefs[497].texIndex=189;  EDefs[497].glowIndex=188; EDefs[497].numclips=4;    EDefs[497].animationNum=0;
     /*498 doorC*/         EDefs[498].modelIndex=0;  EDefs[498].texIndex=184;  EDefs[498].numclips=4;    EDefs[498].animationNum=5;
@@ -580,8 +580,8 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*512 door_secret1*/  EDefs[512].modelIndex=0;  EDefs[512].numclips=4;  EDefs[512].animationNum=19;  EDefs[512].texIndex=210;
     /*513 door_secret2*/  EDefs[513].modelIndex=0;  EDefs[513].numclips=4;  EDefs[513].animationNum=18;  EDefs[513].texIndex=209;
     /*514 door_secret3*/  EDefs[514].modelIndex=94;  EDefs[514].numclips=4;  EDefs[514].animationNum=20;  EDefs[514].texIndex=211;
-    /*515 func_forcebridge*/ EDefs[515].modelIndex=78;  EDefs[515].texIndex=38; EDefscollider[515]=COLTYPE_BOX;
-    /*516 prop_lift2*/       EDefs[516].modelIndex=215;  EDefs[516].texIndex=155;  EDefs[516].glowIndex=154;  EDefscollider[516]=COLTYPE_BOX;  EDefscolliderCenter[516]=(V3){0.0f,0.0f,0.0f};  EDefscolliderSize[516]=(V3){1.0f,1.0f,1.0f};  EDefs[516].colMeshIndex=U16_MAX; 
+    /*515 func_forcebridge*/ EDefs[515].modelIndex=78;  EDefs[515].texIndex=38; EDefscol[515]=COLTYPE_BOX;
+    /*516 prop_lift2*/       EDefs[516].modelIndex=215;  EDefs[516].texIndex=155;  EDefs[516].glowIndex=154;  EDefscol[516]=COLTYPE_BOX;  EDefscolliderCenter[516]=(V3){0.0f,0.0f,0.0f};  EDefscolliderSize[516]=(V3){1.0f,1.0f,1.0f};  EDefs[516].colMeshIndex=U16_MAX; 
     /*517 func_wall*/        EDefsmass[517]=10.0f;  EDefsangularDrag[517]=0.05f;  EDefsgravity[517]=0.0f;  EDefs[517].kinematic=true;  EDefsdynamicFriction[517]=0.6f;  EDefsstaticFriction[517]=0.6f;
     /*518 BulletHoleLarge*/
     /*519 BulletHoleScorchLarge*/
@@ -589,41 +589,41 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*521 BulletHoleSmall*/
     /*522 BulletHoleTiny*/
     /*523 BulletHoleTinySpread*/
-    /*524 func_door_cyber*/      EDefs[524].modelIndex=178; EDefs[524].texIndex=1224; EDefscollider[524]=COLTYPE_BOX; EDefscolliderCenter[524]=(V3){0.0f,1.31f,0.0f}; EDefscolliderSize[524]=(V3){2.56f,0.06f,2.56f}; EDefs[524].colMeshIndex=U16_MAX; 
-    /*525 prop_console01*/       EDefs[525].texIndex=100; EDefs[525].modelIndex=49; EDefscollider[525]=COLTYPE_MSH;
-    /*526 prop_console02*/       EDefs[526].texIndex=100; EDefs[526].modelIndex=50; EDefscollider[526]=COLTYPE_MSH;
-    /*527 prop_grate1_1*/        EDefs[527].modelIndex=186; EDefs[527].texIndex=359; EDefscollider[527]=COLTYPE_MSH;
-    /*528 prop_grate1_2*/        EDefs[528].modelIndex=187; EDefs[528].texIndex=360; EDefscollider[528]=COLTYPE_MSH;
-    /*529 prop_grate1_3*/        EDefs[529].modelIndex=188; EDefs[529].texIndex=361; EDefscollider[529]=COLTYPE_MSH;
-    /*530 se_cabinet*/           EDefs[530].modelIndex=39; EDefs[530].texIndex=70; EDefscollider[530]=COLTYPE_MSH;
-    /*531 se_thermos*/           EDefs[531].texIndex=863; EDefs[531].modelIndex=623; EDefscollider[531]=COLTYPE_MSH;
-    /*532 prop_beaker_holder*/   EDefs[532].modelIndex=15; EDefs[532].texIndex=36; EDefscollider[532]=COLTYPE_MSH;
-    /*533 prop_bed*/             EDefs[533].modelIndex=16; EDefs[533].texIndex=246; EDefscollider[533]=COLTYPE_MSH;
-    /*534 prop_bed_hospital*/    EDefs[534].modelIndex=608; EDefs[534].texIndex=759; EDefscollider[534]=COLTYPE_MSH;
-    /*535 prop_bed_neurosurgery*/EDefs[535].texIndex=18; EDefs[535].normIndex=29; EDefs[535].specIndex=1238; EDefs[535].modelIndex=17; EDefscollider[535]=COLTYPE_MSH;
-    /*536 prop_bonepile1*/       EDefs[536].modelIndex=19; EDefs[536].texIndex=815; EDefscollider[536]=COLTYPE_MSH;
+    /*524 func_door_cyber*/      EDefs[524].modelIndex=178; EDefs[524].texIndex=1224; EDefscol[524]=COLTYPE_BOX; EDefscolliderCenter[524]=(V3){0.0f,1.31f,0.0f}; EDefscolliderSize[524]=(V3){2.56f,0.06f,2.56f}; EDefs[524].colMeshIndex=U16_MAX; 
+    /*525 prop_console01*/       EDefs[525].texIndex=100; EDefs[525].modelIndex=49; EDefscol[525]=COLTYPE_MSH;
+    /*526 prop_console02*/       EDefs[526].texIndex=100; EDefs[526].modelIndex=50; EDefscol[526]=COLTYPE_MSH;
+    /*527 prop_grate1_1*/        EDefs[527].modelIndex=186; EDefs[527].texIndex=359; EDefscol[527]=COLTYPE_MSH;
+    /*528 prop_grate1_2*/        EDefs[528].modelIndex=187; EDefs[528].texIndex=360; EDefscol[528]=COLTYPE_MSH;
+    /*529 prop_grate1_3*/        EDefs[529].modelIndex=188; EDefs[529].texIndex=361; EDefscol[529]=COLTYPE_MSH;
+    /*530 se_cabinet*/           EDefs[530].modelIndex=39; EDefs[530].texIndex=70; EDefscol[530]=COLTYPE_MSH;
+    /*531 se_thermos*/           EDefs[531].texIndex=863; EDefs[531].modelIndex=623; EDefscol[531]=COLTYPE_MSH;
+    /*532 prop_beaker_holder*/   EDefs[532].modelIndex=15; EDefs[532].texIndex=36; EDefscol[532]=COLTYPE_MSH;
+    /*533 prop_bed*/             EDefs[533].modelIndex=16; EDefs[533].texIndex=246; EDefscol[533]=COLTYPE_MSH;
+    /*534 prop_bed_hospital*/    EDefs[534].modelIndex=608; EDefs[534].texIndex=759; EDefscol[534]=COLTYPE_MSH;
+    /*535 prop_bed_neurosurgery*/EDefs[535].texIndex=18; EDefs[535].normIndex=29; EDefs[535].specIndex=1238; EDefs[535].modelIndex=17; EDefscol[535]=COLTYPE_MSH;
+    /*536 prop_bonepile1*/       EDefs[536].modelIndex=19; EDefs[536].texIndex=815; EDefscol[536]=COLTYPE_MSH;
     /*537 prop_bridgewall1*/     EDefs[537].modelIndex=33; 
     /*538 prop_broken_clock*/    EDefs[538].modelIndex=38; EDefs[538].texIndex=1117; EDefs[538].altTexIndex=1118; EDefs[538].glowIndex=1115; EDefs[538].altGlowIndex=1116; 
     /*539 prop_brokengun*/       EDefs[539].modelIndex=639; EDefs[539].texIndex=878; 
-    /*540 prop_chair01*/         EDefs[540].modelIndex=41; EDefs[540].texIndex=195; EDefscollider[540]=COLTYPE_MSH;
-    /*541 prop_chair02*/         EDefs[541].modelIndex=42; EDefs[541].texIndex=195; EDefscollider[541]=COLTYPE_MSH;
-    /*542 prop_chair03*/         EDefs[542].modelIndex=43; EDefs[542].texIndex=195; EDefscollider[542]=COLTYPE_MSH;
-    /*543 prop_chair04*/         EDefs[543].modelIndex=41; EDefs[543].texIndex=195; EDefscollider[543]=COLTYPE_MSH;
-    /*544 prop_chair05*/         EDefs[544].modelIndex=42; EDefs[544].texIndex=195; EDefscollider[544]=COLTYPE_MSH;
+    /*540 prop_chair01*/         EDefs[540].modelIndex=41; EDefs[540].texIndex=195; EDefscol[540]=COLTYPE_MSH;
+    /*541 prop_chair02*/         EDefs[541].modelIndex=42; EDefs[541].texIndex=195; EDefscol[541]=COLTYPE_MSH;
+    /*542 prop_chair03*/         EDefs[542].modelIndex=43; EDefs[542].texIndex=195; EDefscol[542]=COLTYPE_MSH;
+    /*543 prop_chair04*/         EDefs[543].modelIndex=41; EDefs[543].texIndex=195; EDefscol[543]=COLTYPE_MSH;
+    /*544 prop_chair05*/         EDefs[544].modelIndex=42; EDefs[544].texIndex=195; EDefscol[544]=COLTYPE_MSH;
     /*545 prop_chandelier*/      EDefs[545].modelIndex=496; EDefs[545].texIndex=644;
-    /*546 prop_charge_station*/  EDefs[546].modelIndex=44; EDefs[546].texIndex=77; EDefs[546].glowIndex=76; EDefscollider[546]=COLTYPE_MSH;
-    /*547 prop_clothes*/         EDefs[547].modelIndex=47; EDefs[547].texIndex=97; EDefscollider[547]=COLTYPE_MSH;
-    /*548 prop_computer*/        EDefs[548].modelIndex=48; EDefs[548].texIndex=195; EDefscollider[548]=COLTYPE_MSH;
-    /*549 prop_couch*/           EDefs[549].modelIndex=59; EDefs[549].texIndex=195; EDefscollider[549]=COLTYPE_MSH;
-    /*550 prop_couch2*/          EDefs[550].modelIndex=59; EDefs[550].texIndex=195; EDefscollider[550]=COLTYPE_MSH;
-    /*551 prop_cpuscreen*/       EDefs[551].modelIndex=178; EDefs[551].texIndex=768; EDefscollider[551]=COLTYPE_MSH;
+    /*546 prop_charge_station*/  EDefs[546].modelIndex=44; EDefs[546].texIndex=77; EDefs[546].glowIndex=76; EDefscol[546]=COLTYPE_MSH;
+    /*547 prop_clothes*/         EDefs[547].modelIndex=47; EDefs[547].texIndex=97; EDefscol[547]=COLTYPE_MSH;
+    /*548 prop_computer*/        EDefs[548].modelIndex=48; EDefs[548].texIndex=195; EDefscol[548]=COLTYPE_MSH;
+    /*549 prop_couch*/           EDefs[549].modelIndex=59; EDefs[549].texIndex=195; EDefscol[549]=COLTYPE_MSH;
+    /*550 prop_couch2*/          EDefs[550].modelIndex=59; EDefs[550].texIndex=195; EDefscol[550]=COLTYPE_MSH;
+    /*551 prop_cpuscreen*/       EDefs[551].modelIndex=178; EDefs[551].texIndex=768; EDefscol[551]=COLTYPE_MSH;
     /*552 prop_cyber_datafrag*/  EDefs[552].modelIndex=78; 
     /*553 prop_cyber_decoy*/     EDefs[553].modelIndex=78; 
     /*554 prop_cyber_exit*/      EDefs[554].modelIndex=78; 
     /*555 prop_cyber_switch*/    EDefs[555].modelIndex=0; 
-    /*556 prop_cyberport*/       EDefs[556].modelIndex=62; EDefs[556].texIndex=117; EDefs[556].glowIndex=116; EDefscollider[556]=COLTYPE_MSH;
-    /*557 prop_desk01*/          EDefs[557].modelIndex=74; EDefs[557].texIndex=125; EDefscollider[557]=COLTYPE_MSH;
-    /*558 prop_desk02*/          EDefs[558].modelIndex=75; EDefs[558].texIndex=124; EDefscollider[558]=COLTYPE_MSH;
+    /*556 prop_cyberport*/       EDefs[556].modelIndex=62; EDefs[556].texIndex=117; EDefs[556].glowIndex=116; EDefscol[556]=COLTYPE_MSH;
+    /*557 prop_desk01*/          EDefs[557].modelIndex=74; EDefs[557].texIndex=125; EDefscol[557]=COLTYPE_MSH;
+    /*558 prop_desk02*/          EDefs[558].modelIndex=75; EDefs[558].texIndex=124; EDefscol[558]=COLTYPE_MSH;
     /*559 prop_dexmissile*/            EDefs[559].modelIndex=76; EDefs[559].texIndex=164; EDefs[559].glowIndex=162; 
     /*560 prop_foliage_fernpoison*/    EDefs[560].modelIndex=160; EDefs[560].texIndex=331;
     /*561 prop_foliage_bush*/          EDefs[561].modelIndex=495; EDefs[561].texIndex=643; EDefs[561].glowIndex=642; 
@@ -631,32 +631,32 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*563 prop_foliage_fernblueflower*/EDefs[563].modelIndex=159; EDefs[563].texIndex=333; EDefs[563].glowIndex=330; 
     /*564 prop_foliage_pinetreem*/     EDefs[564].modelIndex=489; EDefs[564].texIndex=594;
     /*565 prop_foliage_poisonbush1*/   EDefs[565].modelIndex=493; EDefs[565].texIndex=638;
-    /*566 prop_gear_large*/            EDefs[566].modelIndex=166; EDefs[566].texIndex=335; EDefscollider[566]=COLTYPE_MSH;
-    /*567 prop_gear_small*/            EDefs[567].modelIndex=167; EDefs[567].texIndex=336; EDefscollider[567]=COLTYPE_MSH;
+    /*566 prop_gear_large*/            EDefs[566].modelIndex=166; EDefs[566].texIndex=335; EDefscol[566]=COLTYPE_MSH;
+    /*567 prop_gear_small*/            EDefs[567].modelIndex=167; EDefs[567].texIndex=336; EDefscol[567]=COLTYPE_MSH;
     /*568 prop_grass1*/                EDefs[568].texIndex=329;
     /*569 prop_grass2*/                EDefs[569].texIndex=329;
     /*570 prop_grass3*/                EDefs[570].texIndex=329;
     /*571 prop_grass4*/                EDefs[571].texIndex=329;
     /*572 prop_grass5*/                EDefs[572].texIndex=329;
-    /*573 prop_grate4*/                EDefs[573].modelIndex=161; EDefs[573].texIndex=329; EDefscollider[573]=COLTYPE_MSH;
-    /*574 prop_healingbed*/ EDefs[574].modelIndex=195; EDefs[574].texIndex=1139; EDefscollider[574]=COLTYPE_MSH;
-    /*575 prop_lamp*/ EDefs[575].modelIndex=212; EDefs[575].texIndex=423; EDefscollider[575]=COLTYPE_MSH;
-    /*576 prop_light_emergsignal*/ EDefs[576].modelIndex=216; EDefs[576].texIndex=426; EDefs[576].altTexIndex=424; EDefs[576].glowIndex=0; EDefs[576].altGlowIndex=424; EDefscollider[576]=COLTYPE_MSH;
-    /*577 prop_microscope*/ EDefs[577].modelIndex=298; EDefs[577].texIndex=645; EDefs[577].specIndex=1241; EDefscollider[577]=COLTYPE_MSH;
-    /*578 prop_pipe*/ EDefs[578].modelIndex=490; EDefs[578].texIndex=595; EDefscollider[578]=COLTYPE_MSH;
+    /*573 prop_grate4*/                EDefs[573].modelIndex=161; EDefs[573].texIndex=329; EDefscol[573]=COLTYPE_MSH;
+    /*574 prop_healingbed*/ EDefs[574].modelIndex=195; EDefs[574].texIndex=1139; EDefscol[574]=COLTYPE_MSH;
+    /*575 prop_lamp*/ EDefs[575].modelIndex=212; EDefs[575].texIndex=423; EDefscol[575]=COLTYPE_MSH;
+    /*576 prop_light_emergsignal*/ EDefs[576].modelIndex=216; EDefs[576].texIndex=426; EDefs[576].altTexIndex=424; EDefs[576].glowIndex=0; EDefs[576].altGlowIndex=424; EDefscol[576]=COLTYPE_MSH;
+    /*577 prop_microscope*/ EDefs[577].modelIndex=298; EDefs[577].texIndex=645; EDefs[577].specIndex=1241; EDefscol[577]=COLTYPE_MSH;
+    /*578 prop_pipe*/ EDefs[578].modelIndex=490; EDefs[578].texIndex=595; EDefscol[578]=COLTYPE_MSH;
     /*579 prop_puddle*/ EDefs[579].modelIndex=157; EDefs[579].texIndex=648;
     /*580 prop_puddle_grease*/ EDefs[580].modelIndex=157; EDefs[580].texIndex=650;
     /*581 prop_puddle_oil*/ EDefs[581].modelIndex=157; EDefs[581].texIndex=652;
-    /*582 prop_shelves*/ EDefs[582].modelIndex=591; EDefs[582].texIndex=94; EDefscollider[582]=COLTYPE_MSH;
-    /*583 prop_skeleton*/ EDefs[583].modelIndex=592; EDefs[583].texIndex=815; EDefscollider[583]=COLTYPE_MSH;
+    /*582 prop_shelves*/ EDefs[582].modelIndex=591; EDefs[582].texIndex=94; EDefscol[582]=COLTYPE_MSH;
+    /*583 prop_skeleton*/ EDefs[583].modelIndex=592; EDefs[583].texIndex=815; EDefscol[583]=COLTYPE_MSH;
     /*584 prop_sleeping_cables*/ EDefs[584].modelIndex=595; EDefs[584].texIndex=71;
     /*585 prop_sparkingwire*/ EDefs[585].modelIndex=0; EDefs[585].numclips=1; EDefs[585].animationNum=46; EDefs[585].texIndex=71;
-    /*586 prop_table*/ EDefs[586].modelIndex=619; EDefs[586].texIndex=92; EDefscollider[586]=COLTYPE_MSH;
-    /*587 prop_tv_on_a_post*/ EDefs[587].modelIndex=625; EDefs[587].texIndex=1228; EDefscollider[587]=COLTYPE_MSH;
-    /*588 prop_vendingmachines1*/ EDefs[588].modelIndex=627; EDefs[588].texIndex=870; EDefscollider[588]=COLTYPE_MSH;
-    /*589 prop_vendingmachines2*/ EDefs[589].modelIndex=614; EDefs[589].texIndex=871; EDefscollider[589]=COLTYPE_MSH;
-    /*590 prop_weapon_rack*/ EDefs[590].modelIndex=641; EDefs[590].texIndex=113; EDefscollider[590]=COLTYPE_MSH;
-    /*591 prop_xray*/ EDefs[591].modelIndex=660; EDefs[591].texIndex=153; EDefscollider[591]=COLTYPE_MSH;
+    /*586 prop_table*/ EDefs[586].modelIndex=619; EDefs[586].texIndex=92; EDefscol[586]=COLTYPE_MSH;
+    /*587 prop_tv_on_a_post*/ EDefs[587].modelIndex=625; EDefs[587].texIndex=1228; EDefscol[587]=COLTYPE_MSH;
+    /*588 prop_vendingmachines1*/ EDefs[588].modelIndex=627; EDefs[588].texIndex=870; EDefscol[588]=COLTYPE_MSH;
+    /*589 prop_vendingmachines2*/ EDefs[589].modelIndex=614; EDefs[589].texIndex=871; EDefscol[589]=COLTYPE_MSH;
+    /*590 prop_weapon_rack*/ EDefs[590].modelIndex=641; EDefs[590].texIndex=113; EDefscol[590]=COLTYPE_MSH;
+    /*591 prop_xray*/ EDefs[591].modelIndex=660; EDefs[591].texIndex=153; EDefscol[591]=COLTYPE_MSH;
     /*592 text_decal*/ EDefs[592].modelIndex=77;
     /*593 text_decalStopDSS1*/ EDefs[593].modelIndex=77; 
     /*594 trigger_counter*/
@@ -753,7 +753,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*685 decal_scorch4*/        EDefs[685].modelIndex=77;  EDefs[685].texIndex=230;
     /*686 decal_scorchtiny*/     EDefs[686].modelIndex=77;  EDefs[686].texIndex=232;
     /*687 decal_blood_splat*/    EDefs[687].modelIndex=77;  EDefs[687].texIndex=234;
-    for (int i=688;i<=698;++i) EDefscollider[i]=COLTYPE_BOX;
+    for (int i=688;i<=698;++i) EDefscol[i]=COLTYPE_BOX;
     /*688 func_switch1*/         EDefs[688].modelIndex=609; EDefs[688].texIndex=837; EDefscolliderSize[688]=(V3){0.32f,0.04f,0.32f};
     /*689 func_switch2*/         EDefs[689].modelIndex=610; EDefs[689].texIndex=839; EDefs[689].mainSwitchMaterial=839; EDefs[689].altTexIndex=841; EDefs[689].altGlowIndex=840;  EDefs[689].changeTexOnActive=true; EDefs[689].blinkTexOnActive=true; EDefscolliderCenter[689]=(V3){-0.0243553f,0.0f,0.000004883f}; EDefscolliderSize[689]=(V3){0.0476318f,0.64f,0.64f};
     /*690 func_switch3*/         EDefs[690].modelIndex=611; EDefs[690].texIndex=842; EDefs[690].altTexIndex=844; EDefs[690].altGlowIndex=843; EDefs[690].changeTexOnActive=true;  EDefscolliderCenter[690]=(V3){-0.02285008f,0.000053061f,-0.000056993f};  EDefscolliderSize[690]=(V3){0.02f,0.32f,0.32f}; 
@@ -783,7 +783,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*714 info_screenshake*/
     /*715 info_spawnpoint*/
     /*716 fx_reverbzone*/
-    /*717 ef_cyber_ice*/ EDefscollider[717]=COLTYPE_SPH;  EDefscolliderCenter[717]=(V3){0.0f,0.004354001f,-0.014725f};  EDefscolliderSize[717]=(V3){1.0f,0.0f,0.0f};  EDefs[717].colMeshIndex=U16_MAX; 
+    /*717 ef_cyber_ice*/ EDefscol[717]=COLTYPE_SPH;  EDefscolliderCenter[717]=(V3){0.0f,0.004354001f,-0.014725f};  EDefscolliderSize[717]=(V3){1.0f,0.0f,0.0f};  EDefs[717].colMeshIndex=U16_MAX; 
     /*718 ef_fragexplosion*/
     /*719 ef_line_sparqbeam*/
     /*720 ef_mist*/
@@ -909,7 +909,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     World.instances[i].kinematic = EDefs[entIdx].kinematic;
     flag_set(&World.instances[i].entflags,EF_RIGIDBODY,EDefs[entIdx].entflags & EF_RIGIDBODY);
     flag_set(&World.instances[i].entflags,EF_NO_SHADOWS,EDefs[entIdx].entflags & EF_NO_SHADOWS);
-    World.collider[i] = EDefscollider[entIdx];
+    World.col[i] = EDefscol[entIdx];
     World.colliderCenter[i] = EDefscolliderCenter[entIdx];
     World.colliderSize[i] = EDefscolliderSize[entIdx];
     World.mass[i] = EDefsmass[entIdx] > 0.0f ? EDefsmass[entIdx] : 1.0f;
@@ -949,7 +949,7 @@ void SetLevelPointers(u8 lev) {
     World.angularVelocity  = World.levelAngularVelocity[lev];
     World.colliderCenter   = World.levelColliderCenter[lev];
     World.colliderSize     = World.levelColliderSize[lev];
-    World.collider         = World.levelCollider[lev];
+    World.col              = World.levelCollider[lev];
     World.rotation         = World.levelRotation[lev];
     World.layer            = World.levelLayer[lev];
     World.mass             = World.levelMass[lev];
@@ -1215,7 +1215,7 @@ void LoadLevelData(u8 curlevel) {
         World.radius[i] = modelBounds[World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x, World.scale[i].y), World.scale[i].z);
         World.instances[i].shadRadius = World.radius[i] * 2.00f;
         ComputeConvexMeshInertiaTensor(i);
-        if (World.mass[i] < 0.001f && World.collider[i] != COLTYPE_NONE && World.collider[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
+        if (World.mass[i] < 0.001f && World.col[i] != COLTYPE_NONE && World.col[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
     }
     for (int i=PLAYER1;i<World.instCount;++i) {
         u16 constIndex = World.instances[i].index;
@@ -1235,16 +1235,16 @@ void LoadLevelData(u8 curlevel) {
             if (World.instances[i].doorOpen > DoorState_Opening) World.instances[i].doorOpen = World.instances[i].startOpen ? DoorState_Open : DoorState_Closed;
             World.instances[i].doorState = World.instances[i].doorOpen;
             if (World.instances[i].ajar) {
-                AnimationClip c = DoorGetClip(&World.instances[i],DOOR_CLIP_OPENING);
-                DoorSetClipFrame(i,DOOR_CLIP_OPENING,DoorFrameFromProgress(c,World.instances[i].ajarPercentage));
+                AnimationClip c = DoorGetClip(&World.instances[i],ANIM_OPENING);
+                DoorSetClipFrame(i,ANIM_OPENING,DoorFrameFromProgress(c,World.instances[i].ajarPercentage));
                 World.instances[i].doorOpen = World.instances[i].doorState = DoorState_Opening;
                 return;
             }
             switch (World.instances[i].doorOpen) {
-                case DoorState_Open:    DoorSetClipFrame(i,DOOR_CLIP_IDLE_OPEN,DoorGetClip(&World.instances[i],DOOR_CLIP_IDLE_OPEN).frameStart); break;
-                case DoorState_Opening: DoorSetClipFrame(i,DOOR_CLIP_OPENING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],DOOR_CLIP_OPENING),0.0f/*TODO percent of anim*/)); break;
-                case DoorState_Closing: DoorSetClipFrame(i,DOOR_CLIP_CLOSING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],DOOR_CLIP_CLOSING),0.0f/*TODO percent of anim*/)); break;
-                default:                DoorSetClipFrame(i,DOOR_CLIP_IDLE_CLOSED,DoorGetClip(&World.instances[i],DOOR_CLIP_IDLE_CLOSED).frameStart); break;
+                case DoorState_Open:    DoorSetClipFrame(i,ANIM_IDLE_OPEN,DoorGetClip(&World.instances[i],ANIM_IDLE_OPEN).frameStart); break;
+                case DoorState_Opening: DoorSetClipFrame(i,ANIM_OPENING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],ANIM_OPENING),0.0f/*TODO percent of anim*/)); break;
+                case DoorState_Closing: DoorSetClipFrame(i,ANIM_CLOSING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],ANIM_CLOSING),0.0f/*TODO percent of anim*/)); break;
+                default:                DoorSetClipFrame(i,ANIM_IDLE_CLOSED,DoorGetClip(&World.instances[i],ANIM_IDLE_CLOSED).frameStart); break;
             }
         } else if (IdxIsNPC(constIndex)) { World.layer[i] = L_NPC; /* TODO AIInit funcion */ }
         else if (IdxIsSearchable(constIndex)) {

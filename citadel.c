@@ -322,7 +322,7 @@ void func_forcebridge(u16 self) {
     Entity* e = &World.instances[self];
     e->tickTime = 0.05f; e->tickFinished = World.pauseRelativeTime + e->tickTime + (double)random_range(0.0f,1.0f); e->lerping = true;
     if(e->activatedScale.x <= 0.02f){e->activatedScale.x = 2.56f;} if(e->activatedScale.y <= 0.02f){e->activatedScale.y = 0.08f;} if(e->activatedScale.z <= 0.02f){e->activatedScale.z = 2.56f;}
-    if(!e->active){ e->modelIndex=MAX_MDLS; World.collider[self]=COLTYPE_NONE;}
+    if(!e->active){ e->modelIndex=MAX_MDLS; World.col[self]=COLTYPE_NONE;}
     switch (e->fieldColor) {
         case ForceFieldColor_Red:e->texIndex=38; break; case ForceFieldColor_Green:e->texIndex=40; break; case ForceFieldColor_Blue:e->texIndex=39; break; case ForceFieldColor_Purple:e->texIndex=41; break; case ForceFieldColor_RedFaint:e->texIndex=198; break;
     }
@@ -331,10 +331,10 @@ void func_forcebridge(u16 self) {
 void ForceBridgeActivate(u16 self, bool isSilent) {
     Entity* e = &World.instances[self]; if (e->active) {return;}
     if(!isSilent){play_wav(sounds[102],1.0f,World.position[self],true);}
-    e->modelIndex=78; World.collider[self]=COLTYPE_BOX; e->active=e->lerping=true; World.scale[self]=(V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x,e->forceFieldDirectionY ? 0.1f : e->activatedScale.y,e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
+    e->modelIndex=78; World.col[self]=COLTYPE_BOX; e->active=e->lerping=true; World.scale[self]=(V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x,e->forceFieldDirectionY ? 0.1f : e->activatedScale.y,e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
 }
 
-void ForceBridgeDeactivate(u16 self, bool isSilent) { Entity* e = &World.instances[self]; if (!e->active) {return;} if (!isSilent) {play_wav(sounds[102],1.0f,World.position[self],true);} e->active = false; e->lerping = true; e->modelIndex = MAX_MDLS; World.collider[self] = COLTYPE_NONE; }
+void ForceBridgeDeactivate(u16 self, bool isSilent) { Entity* e = &World.instances[self]; if (!e->active) {return;} if (!isSilent) {play_wav(sounds[102],1.0f,World.position[self],true);} e->active = false; e->lerping = true; e->modelIndex = MAX_MDLS; World.col[self] = COLTYPE_NONE; }
 void ForceBridgeToggle(u16 self) { if (World.instances[self].active) {ForceBridgeDeactivate(self,false); } else {ForceBridgeActivate(self,false);} }
 void ForceBridgeUpdate(u16 self) {
     Entity* e = &World.instances[self]; if (e->tickFinished >= World.pauseRelativeTime) return;
@@ -349,7 +349,7 @@ void ForceBridgeUpdate(u16 self) {
         float sx = e->forceFieldDirectionX ? lerp(World.scale[self].x,0.0f,e->tickTime * 2.0f) : World.scale[self].x;
         float sy = e->forceFieldDirectionY ? lerp(World.scale[self].y,0.0f,e->tickTime * 2.0f) : World.scale[self].y;
         float sz = e->forceFieldDirectionZ ? lerp(World.scale[self].z,0.0f,e->tickTime * 2.0f) : World.scale[self].z;
-        World.scale[self] = (V3){sx,sy,sz}; if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); World.collider[self] = COLTYPE_NONE; e->lerping = false; }
+        World.scale[self] = (V3){sx,sy,sz}; if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); World.col[self] = COLTYPE_NONE; e->lerping = false; }
     }
 }
 
@@ -627,8 +627,8 @@ static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxI
 static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (!sEmpty(World.instances[self].target)) UseTargets(self,World.instances[self].target); }
 static void TeleportAway(u16 self) { 
     if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;} flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true);
-    World.collider[self] = COLTYPE_NONE; World.gravity[self] = 0.0f; World.velocity[self] = (V3){0,0,0}; World.angularVelocity[self] = (V3){0,0,0}; World.instances[self].modelIndex = U16_MAX;
-    V3 fxPos = World.position[self]; if(World.collider[self] != COLTYPE_NONE){fxPos=V3_AplusB(fxPos,World.colliderCenter[self]);} SpawnImpactEffect(735,fxPos); play_wav(sounds[106],1.0f,fxPos,false);
+    World.col[self] = COLTYPE_NONE; World.gravity[self] = 0.0f; World.velocity[self] = (V3){0,0,0}; World.angularVelocity[self] = (V3){0,0,0}; World.instances[self].modelIndex = U16_MAX;
+    V3 fxPos = World.position[self]; if(World.col[self] != COLTYPE_NONE){fxPos=V3_AplusB(fxPos,World.colliderCenter[self]);} SpawnImpactEffect(735,fxPos); play_wav(sounds[106],1.0f,fxPos,false);
 }
 
 static void DropSearchables(u16 self) {
@@ -640,7 +640,7 @@ static void DropSearchables(u16 self) {
     }
 }
 
-static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} V3 pos = World.position[self]; if (World.collider[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
+static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} V3 pos = World.position[self]; if (World.col[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
 static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.gravity[self] = 0.0f; }
 static void NPCDeath(u16 self) {
     if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) {return;}
@@ -651,8 +651,8 @@ static void NPCDeath(u16 self) {
 
 static void ObjectDeath(u16 self) {
     Entity* e = &World.instances[self]; if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) return;
-    if (World.instances[self].entflags & EF_DEATH_BURST_DONE) { CreateDeathEffects(self,World.instances[self].deathBurst); DropSearchables(self); if (World.instances[self].index != 279){World.collider[self]=COLTYPE_NONE;} HideSelf(self); }
-    else { World.collider[self] = COLTYPE_NONE; DropSearchables(self); CreateDeathEffects(self,World.instances[self].deathBurst); }
+    if (World.instances[self].entflags & EF_DEATH_BURST_DONE) { CreateDeathEffects(self,World.instances[self].deathBurst); DropSearchables(self); if (World.instances[self].index != 279){World.col[self]=COLTYPE_NONE;} HideSelf(self); }
+    else { World.col[self] = COLTYPE_NONE; DropSearchables(self); CreateDeathEffects(self,World.instances[self].deathBurst); }
     flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true); World.instances[self].automapHidden = true;
     if (World.instances[self].securityThreshold > 0) {
         SecurityType stype = SecurityType_None; if(World.instances[self].index == 477){stype=SecurityType_Camera;}else if(World.instances[self].index == 479){stype=SecurityType_NodeSmall;} else if(World.instances[self].index == 478){stype=SecurityType_NodeLarge;}
@@ -680,7 +680,7 @@ static void Death(u16 self,bool energyVaporized) {
 //     bool gib        = (e->entflags & EF_DEATH_BURST_DONE) != 0;
     bool vaporize=(IdxIsNPC(e->index) && e->health <= 0.0f) || IdxIsCorpse(e->index);
     bool isGrenade=IsGrenade(e->index), doTeleport=(e->entflags & EF_TELEPORT_ON_DEATH) != 0;
-    if (e->iceActive) World.collider[self] = COLTYPE_NONE;
+    if (e->iceActive) World.col[self] = COLTYPE_NONE;
     if (vaporize && e->index != 477/*sec_camera*/ && !isGrenade) VaporizeCorpse(self,energyVaporized);
     else if (isObj) ObjectDeath(self);
     else if (e->index == 279/*screen*/) ScreenDeath(self);
@@ -1080,15 +1080,15 @@ void PatchDisableAll(void) {
 // Doors
 static bool DoorInventoryHasAccessCard(AccCardType card) { return card == ACC_None || (World.invP1.accessCardOwned & (1u << card)); }
 static float DoorGetProgress(const Entity* e, u8 clip) { AnimationClip c = DoorGetClip(e,clip); if(c.frameEnd <= c.frameStart){return 1.0f;} return DoorClamp01((float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart)); } 
-static void DoorOpen(u16 self) { Entity* e = &World.instances[self]; DoorSetClipFrame(self,DOOR_CLIP_OPENING,DoorGetClip(e,DOOR_CLIP_OPENING).frameStart); e->doorOpen = e->doorState = DoorState_Opening; e->waitBeforeClose = World.pauseRelativeTime + e->delay; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true); }
-static void DoorClose(u16 self) { Entity* e = &World.instances[self]; DoorSetClipFrame(self,DOOR_CLIP_CLOSING,DoorGetClip(e,DOOR_CLIP_CLOSING).frameStart); e->doorOpen = e->doorState = DoorState_Closing; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true); } 
+static void DoorOpen(u16 self) { Entity* e = &World.instances[self]; DoorSetClipFrame(self,ANIM_OPENING,DoorGetClip(e,ANIM_OPENING).frameStart); e->doorOpen = e->doorState = DoorState_Opening; e->waitBeforeClose = World.pauseRelativeTime + e->delay; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true); }
+static void DoorClose(u16 self) { Entity* e = &World.instances[self]; DoorSetClipFrame(self,ANIM_CLOSING,DoorGetClip(e,ANIM_CLOSING).frameStart); e->doorOpen = e->doorState = DoorState_Closing; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true); } 
 void DoorForceOpen(u16 self) { World.instances[self].requiredAccessCard = ACC_None; EntitySetLocked(&World.instances[self],false); DoorOpen(self); }
 void DoorForceClose(u16 self) { if (World.instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
     Entity* e = &World.instances[self]; if (e->doorOpen == DoorState_Open) { DoorClose(self); return; } if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; }
     bool op = e->doorOpen == DoorState_Opening;
     if (op || e->doorOpen == DoorState_Closing) {
-        int src = op ? DOOR_CLIP_OPENING : DOOR_CLIP_CLOSING, dst = op ? DOOR_CLIP_CLOSING : DOOR_CLIP_OPENING;
+        int src = op ? ANIM_OPENING : ANIM_CLOSING, dst = op ? ANIM_CLOSING : ANIM_OPENING;
         DoorSetClipFrame(self,dst,DoorFrameFromProgress(DoorGetClip(e,dst),1.0f - DoorGetProgress(e,src))); e->doorOpen = e->doorState = op ? DoorState_Closing : DoorState_Opening;
         if (!op) e->waitBeforeClose = World.pauseRelativeTime + e->delay;
         if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], 1.0f, World.position[self], true);
@@ -1117,10 +1117,10 @@ void DoorTargetted(u16 self, u16 activator) { if ((World.instances[self].entflag
 void DoorUpdate(u16 self) {
     Entity* e = &World.instances[self];
     if (e->blocked || e->ajar) return; // TODO frame-pause blocked doors instead of fully skipping.
-    AnimationClip opening = DoorGetClip(e,DOOR_CLIP_OPENING);
-    AnimationClip closing = DoorGetClip(e,DOOR_CLIP_CLOSING);
-    if (e->doorOpen == DoorState_Opening && e->clip == DOOR_CLIP_OPENING && e->frame >= opening.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; DoorSetClipFrame(self,DOOR_CLIP_IDLE_OPEN,DoorGetClip(e,DOOR_CLIP_IDLE_OPEN).frameStart); }
-    else if (e->doorOpen == DoorState_Closing && e->clip == DOOR_CLIP_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; DoorSetClipFrame(self,DOOR_CLIP_IDLE_CLOSED,DoorGetClip(e,DOOR_CLIP_IDLE_CLOSED).frameStart); }
+    AnimationClip opening = DoorGetClip(e,ANIM_OPENING);
+    AnimationClip closing = DoorGetClip(e,ANIM_CLOSING);
+    if (e->doorOpen == DoorState_Opening && e->clip == ANIM_OPENING && e->frame >= opening.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; DoorSetClipFrame(self,ANIM_IDLE_OPEN,DoorGetClip(e,ANIM_IDLE_OPEN).frameStart); }
+    else if (e->doorOpen == DoorState_Closing && e->clip == ANIM_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; DoorSetClipFrame(self,ANIM_IDLE_CLOSED,DoorGetClip(e,ANIM_IDLE_CLOSED).frameStart); }
     if (World.pauseRelativeTime > e->waitBeforeClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
 }
 
