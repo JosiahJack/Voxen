@@ -88,7 +88,7 @@ void GenerateTextBin() {
 
 u16 mdlsCnt;
 static float **vPos; u16** modelTriangles; u32 modelVertexCounts[MAX_MDLS]; u16 modelTriangleCounts[MAX_MDLS]; float modelBounds[MAX_MDLS];
-float** physPos; u16** physTris; u32* physVertCounts;
+float** physPos; u16** physTris; u32* physVertCounts; u32** cvxAdjOffsets; u16** cvxAdjLists; u32 cvxAdjOffsetCounts[MAX_MDLS],cvxAdjListCounts[MAX_MDLS];
 BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS], modelBVHTriOrderCounts[MAX_MDLS];
 static float **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; static u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; static u8** thrd_cache_scratch;
 typedef struct { const char* data; const char* name; int size; } RawOBJ;
@@ -352,14 +352,49 @@ static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap) 
     physPos[m] = exactPos; physTris[m] = weldedTris; physVertCounts[m] = weldedCount;
 }
 
-static void* PhysGeomWorker(void* a) { PhysGeomTask* t=a; BvhBuildCtx* bvhCtx=&thrd_bvh_ctx[t->tid]; u32* ht = thrd_ht[t->tid]; u32* u=thrd_ht_used[t->tid]; u16* sc=(u16*)thrd_remap_scratch[t->tid]; for (u32 m = t->start; m < t->end; ++m) { if(m >= mdlsCnt || !modelVertexCounts[m] || !modelTriangleCounts[m]){physPos[m]=NULL; physTris[m]=NULL; physVertCounts[m]=0; continue;}  WeldModelPositions((u16)m,ht,u,sc); BuildModelBVH(bvhCtx,(u16)m); }  return NULL; }
+int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
+static void GenerateModelAdjacency(u16 m) {
+    cvxAdjOffsets[m] = NULL; cvxAdjLists[m] = NULL; cvxAdjOffsetCounts[m] = 0; cvxAdjListCounts[m] = 0;
+    u32 vCount = physVertCounts[m], tCount = modelTriangleCounts[m]; if (!vCount || !tCount || !physPos[m] || !physTris[m]) return;
+    u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
+    for (u32 t = 0; t < tCount; ++t) {
+        u16 i0 = physTris[m][t*3+0], i1 = physTris[m][t*3+1], i2 = physTris[m][t*3+2];
+        tempEdges[edgeCount++] = ((u32)vmin(i0,i1) << 16) | vmax(i0,i1);
+        tempEdges[edgeCount++] = ((u32)vmin(i1,i2) << 16) | vmax(i1,i2);
+        tempEdges[edgeCount++] = ((u32)vmin(i2,i0) << 16) | vmax(i2,i0);
+    }
+    qsort_new(tempEdges, edgeCount, sizeof(u32), EdgeCompare);
+    u32 uniqueEdgeCount = 0;
+    u32* degree = OS_Alloc(vCount * sizeof(u32));
+    mset(degree, 0, vCount * sizeof(u32));
+    for (u32 i = 0; i < edgeCount; ++i) {
+        if (i == 0 || tempEdges[i] != tempEdges[i-1]) { tempEdges[uniqueEdgeCount++] = tempEdges[i]; u16 a = (u16)(tempEdges[i] >> 16); u16 b = (u16)(tempEdges[i] & 0xFFFF); degree[a]++; degree[b]++; }
+    }
+    u32* offsets = OS_Alloc((vCount + 1) * sizeof(u32)); offsets[0] = 0;
+    for (u32 i = 0; i < vCount; ++i) offsets[i+1] = offsets[i] + degree[i];
+    u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));
+    u32* writePos = OS_Alloc(vCount * sizeof(u32));
+    mcpy(writePos, offsets, vCount * sizeof(u32));
+    for (u32 i = 0; i < uniqueEdgeCount; ++i) { u16 a = (u16)(tempEdges[i] >> 16); u16 b = (u16)(tempEdges[i] & 0xFFFF); adjList[writePos[a]++] = b; adjList[writePos[b]++] = a; }
+    cvxAdjOffsets[m] = offsets;  cvxAdjLists[m] = adjList;
+    cvxAdjOffsetCounts[m] = vCount + 1;
+    cvxAdjListCounts[m]  = uniqueEdgeCount * 2;
+    OS_Free(tempEdges, tCount * 3 * sizeof(u32));
+    OS_Free(degree, vCount * sizeof(u32));
+    OS_Free(writePos, vCount * sizeof(u32));
+}
+
+static void* PhysGeomWorker(void* a) {
+    PhysGeomTask* t=a; BvhBuildCtx* bvhCtx=&thrd_bvh_ctx[t->tid]; u32* ht = thrd_ht[t->tid]; u32* u=thrd_ht_used[t->tid]; u16* sc=(u16*)thrd_remap_scratch[t->tid];
+    for (u32 m = t->start; m < t->end; ++m) {
+        if(m >= mdlsCnt || !modelVertexCounts[m] || !modelTriangleCounts[m]){physPos[m]=NULL; physTris[m]=NULL; physVertCounts[m]=0; continue;}
+        WeldModelPositions((u16)m,ht,u,sc); BuildModelBVH(bvhCtx,(u16)m); GenerateModelAdjacency((u16)m);
+    }  return NULL;
+}
+
 static half* ConvertVertsToHalf(const float* verts, u32 vc) {
     half* out = (half*)OS_Alloc((size_t)vc * VRT_ATT_SZ);
-    for (u32 k = 0; k < vc; ++k) {
-        __m256 v_in = (*(__m256_u const *)(&verts[k*8]));
-        __m128i v_half = _mm256_cvtps_ph(v_in,0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/);
-        _mm_storeu_si128((__m128i*)&out[k*8],v_half);
-    }
+    for (u32 k = 0; k < vc; ++k) { __m256 v_in = (*(__m256_u const *)(&verts[k*8])); __m128i v_half = _mm256_cvtps_ph(v_in,0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/); _mm_storeu_si128((__m128i*)&out[k*8],v_half); }
     return out;
 }
 
@@ -374,6 +409,8 @@ static void WriteModelsBin(const char* outPath) {
         payloadSize += AlignUp4(modelTriangleCounts[m] * 3 * sizeof(u16));      // welded phys tris - weld doesn't change tri count, only re-indexes
         payloadSize += AlignUp4(modelBVHNodeCounts[m] * sizeof(BvhNode));
         payloadSize += AlignUp4(modelBVHTriOrderCounts[m] * sizeof(u16));
+        payloadSize += AlignUp4(cvxAdjOffsetCounts[m] * sizeof(u32));
+        payloadSize += AlignUp4(cvxAdjListCounts[m]  * sizeof(u16));
     }
     size_t dirSize = (size_t)mdlsCnt * sizeof(ModelDirEntry);
     size_t totalSize = dirSize + payloadSize;
@@ -386,42 +423,24 @@ static void WriteModelsBin(const char* outPath) {
         e->bound = modelBounds[m];
         if (!modelVertexCounts[m] || !modelTriangleCounts[m]) continue;
         half* halfVerts = ConvertVertsToHalf(vPos[m], modelVertexCounts[m]);
-        size_t vRawSz = (size_t)modelVertexCounts[m] * VRT_ATT_SZ, vSz = AlignUp4((u32)vRawSz);
-        e->vertOff = cursor; e->vertCount = modelVertexCounts[m];
-        mcpy(blob + cursor, halfVerts, vRawSz); cursor += (u32)vSz;
+        size_t vRawSz = (size_t)modelVertexCounts[m] * VRT_ATT_SZ, vSz = AlignUp4((u32)vRawSz); e->vertOff = cursor; e->vertCount = modelVertexCounts[m]; mcpy(blob + cursor, halfVerts, vRawSz); cursor += (u32)vSz; 
         OS_Free(halfVerts, vRawSz);
-        size_t tRawSz = (size_t)modelTriangleCounts[m] * 3 * sizeof(u16), tSz = AlignUp4((u32)tRawSz);
-        e->triOff = cursor; e->triCount = modelTriangleCounts[m];
-        mcpy(blob + cursor, modelTriangles[m], tRawSz); cursor += (u32)tSz;
-        size_t pRawSz = (size_t)physVertCounts[m] * 3 * sizeof(float), pSz = AlignUp4((u32)pRawSz);
-        e->physPosOff = cursor; e->physVertCount = physVertCounts[m];
-        mcpy(blob + cursor, physPos[m], pRawSz); cursor += (u32)pSz;
-        size_t ptRawSz = (size_t)modelTriangleCounts[m] * 3 * sizeof(u16), ptSz = AlignUp4((u32)ptRawSz);
-        e->physTriOff = cursor; e->physTriCount = modelTriangleCounts[m];
-        mcpy(blob + cursor, physTris[m], ptRawSz); cursor += (u32)ptSz;
-        if (modelBVHNodeCounts[m]) {
-            size_t bnRawSz = (size_t)modelBVHNodeCounts[m] * sizeof(BvhNode), bnSz = AlignUp4((u32)bnRawSz);
-            e->bvhNodeOff = cursor; e->bvhNodeCount = modelBVHNodeCounts[m];
-            mcpy(blob + cursor, modelBVHNodes[m], bnRawSz); cursor += (u32)bnSz;
-        }
-        if (modelBVHTriOrderCounts[m]) {
-            size_t btRawSz = (size_t)modelBVHTriOrderCounts[m] * sizeof(u16), btSz = AlignUp4((u32)btRawSz);
-            e->bvhTriOrderOff = cursor; e->bvhTriOrderCount = modelBVHTriOrderCounts[m];
-            mcpy(blob + cursor, modelBVHTriOrder[m], btRawSz); cursor += (u32)btSz;
-        }
+        size_t tRawSz = (size_t)modelTriangleCounts[m] * 3 * sizeof(u16), tSz = AlignUp4((u32)tRawSz); e->triOff = cursor; e->triCount = modelTriangleCounts[m]; mcpy(blob + cursor, modelTriangles[m], tRawSz); cursor += (u32)tSz;
+        size_t pRawSz = (size_t)physVertCounts[m] * 3 * sizeof(float), pSz = AlignUp4((u32)pRawSz); e->physPosOff = cursor; e->physVertCount = physVertCounts[m]; mcpy(blob + cursor, physPos[m], pRawSz); cursor += (u32)pSz;
+        size_t ptRawSz = (size_t)modelTriangleCounts[m] * 3 * sizeof(u16), ptSz = AlignUp4((u32)ptRawSz); e->physTriOff = cursor; e->physTriCount = modelTriangleCounts[m]; mcpy(blob + cursor, physTris[m], ptRawSz); cursor += (u32)ptSz;
+        if (modelBVHNodeCounts[m]) { size_t bnRawSz = (size_t)modelBVHNodeCounts[m] * sizeof(BvhNode), bnSz = AlignUp4((u32)bnRawSz); e->bvhNodeOff = cursor; e->bvhNodeCount = modelBVHNodeCounts[m]; mcpy(blob + cursor, modelBVHNodes[m], bnRawSz); cursor += (u32)bnSz; }
+        if (modelBVHTriOrderCounts[m]) { size_t btRawSz = (size_t)modelBVHTriOrderCounts[m] * sizeof(u16), btSz = AlignUp4((u32)btRawSz); e->bvhTriOrderOff = cursor; e->bvhTriOrderCount = modelBVHTriOrderCounts[m]; mcpy(blob + cursor, modelBVHTriOrder[m], btRawSz); cursor += (u32)btSz; }
+        if (cvxAdjOffsetCounts[m]) { size_t aoRawSz = (size_t)cvxAdjOffsetCounts[m] * sizeof(u32), aoSz = AlignUp4((u32)aoRawSz); e->cvxAdjOffOff = cursor; e->cvxAdjOffCount = cvxAdjOffsetCounts[m]; mcpy(blob + cursor, cvxAdjOffsets[m], aoRawSz); cursor += (u32)aoSz; }
+        if (cvxAdjListCounts[m]) { size_t alRawSz = (size_t)cvxAdjListCounts[m] * sizeof(u16), alSz = AlignUp4((u32)alRawSz); e->cvxAdjListOff = cursor; e->cvxAdjListCount = cvxAdjListCounts[m]; mcpy(blob + cursor, cvxAdjLists[m], alRawSz); cursor += (u32)alSz; }
     }
-    size_t maxComp = GetMaxCompressedSize(totalSize);
-    u8* comp = (u8*)OS_Alloc(maxComp);
-    size_t compSize = VoidSquasher(blob, totalSize, comp, maxComp);
-    if (!compSize) { PrintLog("models.bin compression failed!\n"); OS_Exit(1); }
-    ModelsBinHeader header = { .magicNumber=MODELS_BIN_MAGIC, .version=MODELS_BIN_VERSION, .mdlsCnt=mdlsCnt, .uncompressedSize=(u32)totalSize, .compressedSize=(u32)compSize };
+    ModelsBinHeader header = { .magicNumber=MODELS_BIN_MAGIC, .version=MODELS_BIN_VERSION, .mdlsCnt=mdlsCnt, .size=(u32)totalSize, };
     FHandle fd = OS_OpenWriteonly(outPath);
     if (fd == (FHandle)-1) { PrintLog("Could not open %s for writing\n", outPath); OS_Exit(1); }
     OS_Write(fd, &header, sizeof(ModelsBinHeader), outPath);
-    OS_Write(fd, comp, compSize, outPath);
+    OS_Write(fd, blob, totalSize, outPath);
     OS_Close(fd);
-    PrintLog("Wrote %s: %u models, %u bytes raw -> %u bytes compressed\n", outPath, mdlsCnt, (u32)totalSize, (u32)compSize);
-    OS_Free(blob, totalSize); OS_Free(comp, maxComp);
+    PrintLog("Wrote %s: %u models, %u bytes\n", outPath, mdlsCnt, (u32)totalSize);
+    OS_Free(blob, totalSize);
 }
 
 void GenerateModelsBin() {
@@ -479,12 +498,15 @@ void GenerateModelsBin() {
     physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
     physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
     physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
+    cvxAdjOffsets = (u32**)OS_Alloc(mdlsCnt * sizeof(u32*));
+    cvxAdjLists   = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
     PhysGeomTask ptasks[32]; OS_Thread pth[32];
     for (int i=0;i<threadCnt;++i) ptasks[i] = (PhysGeomTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,i};
     if (threadCnt > 1) { for (int i=0;i<threadCnt;++i) OS_ThreadCreate(&pth[i],PhysGeomWorker,&ptasks[i]); for(int i=0;i<threadCnt;++i){OS_ThreadJoin(&pth[i]);} }
     else { for(int t=0;t<threadCnt;++t){PhysGeomWorker(&ptasks[t]);} }
     WriteModelsBin(outPath);
-    OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData));
+    for (u32 i = 0; i < mdlsCnt; ++i) { if(cvxAdjOffsets[i]){OS_Free(cvxAdjOffsets[i],cvxAdjOffsetCounts[i] * sizeof(u32));} if(cvxAdjLists[i]){OS_Free(cvxAdjLists[i],cvxAdjListCounts[i] * sizeof(u16));} }
+    OS_Free(cvxAdjOffsets,mdlsCnt * sizeof(u32*)); OS_Free(cvxAdjLists,mdlsCnt * sizeof(u16*)); OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData));
     PrintLog(" finished in %f secs\n", get_time() - startModelTime);
 }
 

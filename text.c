@@ -108,13 +108,6 @@ void LoadLogTextForLanguage(u8 lang) {
         nxt:continue;}
 }
 
-void stbtt_GetPackedQuad(const stbtt_packedchar*cd, int pw, int ph, int ci, float*xpos, float*ypos, aligned_quad*q, int ai){
-    float ipw=1.0f/pw,iph=1.0f/ph;const stbtt_packedchar*b=cd+ci;
-    if(ai){float x=vfloor((*xpos+b->xoff)+0.5f),y=vfloor((*ypos+b->yoff)+0.5f);q->x0=x;q->y0=y;q->x1=x+b->xoff2-b->xoff;q->y1=y+b->yoff2-b->yoff;}
-    else{q->x0=*xpos+b->xoff;q->y0=*ypos+b->yoff;q->x1=*xpos+b->xoff2;q->y1=*ypos+b->yoff2;}
-    q->s0=b->x0*ipw;q->t0=b->y0*iph;q->s1=b->x1*ipw;q->t1=b->y1*iph;*xpos+=b->xadvance;
-}
-
 static float textVertexData[8192]; extern Color textColors[];
 void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char* restrict format,...) {
     va_list args; __builtin_va_start(args,format); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,args); __builtin_va_end(args);
@@ -122,23 +115,27 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char*
     glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex);
     float invatsz = 1.0f/(float)FONT_ATLAS_SIZE;
     glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID); glBindVertexArray(textVAO);
-    size_t vc=0; const char*p=uiTextBuffer; float xpos=x,ypos=y+(16*scale),ls=22*scale; aligned_quad q; int cc=0; float puv = 10.0f * invatsz, bw=2.0f;
+    size_t vc=0; const char*p=uiTextBuffer; float xpos=x,ypos=y+(16*scale),ls=22*scale; int cc=0; float puv = 10.0f * invatsz, bw=2.0f;
     while(*p) {
         const u8*s=(const u8*)p; u32 cp=0;
         if (*s<0x80) { cp=*s++; }
         else if ((*s&0xE0)==0xC0) { cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }
-        else if ((*s&0xF0)==0xE0) { cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6;  cp|=(s[2]&0x3F); s+=3; }
+        else if ((*s&0xF0)==0xE0) { cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }
         else if ((*s&0xF8)==0xF0) { cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
         else s++;
-
         p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=x; ypos+=ls; cc=0; continue; }
-
         int idx=CodepointToPackedIndex(cp,fontID);
-        stbtt_GetPackedQuad((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,idx,&xpos,&ypos,&q,1);
-        float vx0=q.x0*scale-bw,vy0=q.y0*scale-bw,vx1=q.x1*scale+bw,vy1=q.y1*scale+bw; float s0=q.s0-puv,t0=q.t0-puv,s1=q.s1+puv,t1=q.t1+puv,z=0.0f; float tv[30] = { vx0,vy0,z,s0,t0,vx1,vy1,z,s1,t1,vx1,vy0,z,s1,t0,vx0,vy0,z,s0,t0,vx0,vy1,z,s0,t1,vx1,vy1,z,s1,t1 };
-        mcpy(textVertexData+vc*30,tv,sizeof(tv)); vc++;
-        if (cp>='0' && cp<='9') { if(fontID == FONT_STOPD){xpos=q.x0 + ((fontID == FONT_STOPD) ? fixedNumberAdvanceWidthStopD : fixedNumberAdvanceWidth);} }
+        const stbtt_packedchar*b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx;
+        float qx = vfloor((xpos + b->xoff) + 0.5f), qy = vfloor((ypos + b->yoff) + 0.5f);
+        float qx0 = qx, qy0 = qy, qx1 = qx + b->xoff2 - b->xoff, qy1 = qy + b->yoff2 - b->yoff;
+        float qs0 = b->x0 * invatsz, qt0 = b->y0 * invatsz, qs1 = b->x1 * invatsz, qt1 = b->y1 * invatsz;
+        xpos += b->xadvance;
+        float vx0 = qx0 * scale - bw, vy0 = qy0 * scale - bw, vx1 = qx1 * scale + bw, vy1 = qy1 * scale + bw;
+        float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f;
+        float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 };
+        mcpy(textVertexData + vc * 30, tv, sizeof(tv)); vc++;
+        if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD)
+            xpos = qx0 + fixedNumberAdvanceWidthStopD;
     }
-    
-    if(vc){ glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
+    if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }

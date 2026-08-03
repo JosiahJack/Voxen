@@ -12,32 +12,11 @@ int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { // Ray-vs-AABB slab test. Returns entry t (>=0) if the ray hits the AABB within [0, maxDist], or -1.0f if no hit. Handles axis-aligned rays (zero direction component) correctly.
     float tmin = 0.0f, tmax = maxDist;
     if (vabs(dir.x) < 1e-8f) { if (origin.x < mn.x || origin.x > mx.x) return -1.0f; } // X slab
-    else {
-        float inv = 1.0f / dir.x;
-        float t1 = (mn.x - origin.x) * inv, t2 = (mx.x - origin.x) * inv;
-        if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
-        if (t1 > tmin) tmin = t1;
-        if (t2 < tmax) tmax = t2;
-        if (tmin > tmax) return -1.0f;
-    }
+    else { float inv = 1.0f / dir.x; float t1 = (mn.x - origin.x) * inv, t2 = (mx.x - origin.x) * inv; if (t1 > t2) { float t = t1; t1 = t2; t2 = t; } if (t1 > tmin) {tmin = t1;} if (t2 < tmax) {tmax = t2;} if (tmin > tmax) {return -1.0f;} }
     if (vabs(dir.y) < 1e-8f) { if (origin.y < mn.y || origin.y > mx.y) return -1.0f; } // Y slab
-    else {
-        float inv = 1.0f / dir.y;
-        float t1 = (mn.y - origin.y) * inv, t2 = (mx.y - origin.y) * inv;
-        if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
-        if (t1 > tmin) tmin = t1;
-        if (t2 < tmax) tmax = t2;
-        if (tmin > tmax) return -1.0f;
-    }
+    else { float inv = 1.0f / dir.y; float t1 = (mn.y - origin.y) * inv, t2 = (mx.y - origin.y) * inv; if (t1 > t2) { float t = t1; t1 = t2; t2 = t; } if (t1 > tmin) {tmin = t1;} if (t2 < tmax) {tmax = t2;} if (tmin > tmax) {return -1.0f;} }
     if (vabs(dir.z) < 1e-8f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; } // Z slab
-    else {
-        float inv = 1.0f / dir.z;
-        float t1 = (mn.z - origin.z) * inv, t2 = (mx.z - origin.z) * inv;
-        if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
-        if (t1 > tmin) tmin = t1;
-        if (t2 < tmax) tmax = t2;
-        if (tmin > tmax) return -1.0f;
-    }
+    else { float inv = 1.0f / dir.z; float t1 = (mn.z - origin.z) * inv, t2 = (mx.z - origin.z) * inv; if (t1 > t2) { float t = t1; t1 = t2; t2 = t; } if (t1 > tmin) {tmin = t1;} if (t2 < tmax) {tmax = t2;} if (tmin > tmax) {return -1.0f;} }
     return tmin;
 }
 
@@ -46,18 +25,14 @@ void LoadModels() {
     FHandle fd; int fsz = 0;
     char* raw = OS_OpenAndAllocateFileBufferReadonly("./models.bin", &fd, &fsz);
     if (!raw || fsz < (int)sizeof(ModelsBinHeader)) { DualLogError("Missing or truncated models.bin - run vparser first\n"); OS_Exit(1); }
-    ModelsBinHeader header; mcpy(&header, raw, sizeof(ModelsBinHeader));
+    ModelsBinHeader header; mcpy(&header,raw,sizeof(ModelsBinHeader));
     if (header.magicNumber != MODELS_BIN_MAGIC) { DualLogError("models.bin: bad magic\n"); OS_Exit(1); }
     if (header.version != MODELS_BIN_VERSION) { DualLogError("models.bin: version mismatch (got %u, want %u) - rerun vparser\n", header.version, MODELS_BIN_VERSION); OS_Exit(1); }
     if (header.mdlsCnt >= MAX_MDLS) { DualLogError("models.bin: mdlsCnt %u exceeds MAX_MDLS\n", header.mdlsCnt); OS_Exit(1); }
-    if ((size_t)fsz < sizeof(ModelsBinHeader) + header.compressedSize) { DualLogError("models.bin: file truncated relative to header\n"); OS_Exit(1); }
-    u8* blob = (u8*)OS_Alloc(header.uncompressedSize);
-    size_t got = BlowBubblesOfVoid((const u8*)raw + sizeof(ModelsBinHeader), header.compressedSize, blob, header.uncompressedSize);
-    OS_Free(raw, fsz);
-    if (got != header.uncompressedSize) { DualLogError("models.bin: decompression failed, expected %u got %u\n", header.uncompressedSize, (u32)got); OS_Exit(1); }
-    modelsBinBlob = blob;
+    if ((size_t)fsz < sizeof(ModelsBinHeader) + header.size) { DualLogError("models.bin: file truncated relative to header\n"); OS_Exit(1); }
+    modelsBinBlob = raw + sizeof(ModelsBinHeader);
     mdlsCnt = (u16)header.mdlsCnt;
-    const ModelDirEntry* dir = (const ModelDirEntry*)blob;
+    const ModelDirEntry* dir = (const ModelDirEntry*)modelsBinBlob;
     vPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
     modelTriangles = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
     physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
@@ -75,21 +50,13 @@ void LoadModels() {
             continue;
         }
         tv += e->vertCount; tt += e->triCount; modelBounds[m] = e->bound;
-
-        // Vertex data is already half-float and already vertex-cache/fetch optimized - straight upload, no CPU work.
         size_t vcz = (size_t)e->vertCount * VRT_ATT_SZ, tcz = (size_t)e->triCount * 3 * sizeof(u16);
-        glBindBuffer(GL_ARRAY_BUFFER,vbos[m]); glBufferData(GL_ARRAY_BUFFER,vcz,blob + e->vertOff,GL_STATIC_DRAW);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[m]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,blob + e->triOff,GL_STATIC_DRAW);
-
-        // Physics + BVH data: pointers straight into the blob, zero copy.
-        physPos[m] = (float*)(blob + e->physPosOff); physVertCounts[m] = e->physVertCount;
-        physTris[m] = (u16*)(blob + e->physTriOff);
-        modelBVHNodes[m] = e->bvhNodeCount ? (BvhNode*)(blob + e->bvhNodeOff) : NULL; modelBVHNodeCounts[m] = e->bvhNodeCount;
-        modelBVHTriOrder[m] = e->bvhTriOrderCount ? (u16*)(blob + e->bvhTriOrderOff) : NULL; modelBVHTriOrderCounts[m] = e->bvhTriOrderCount;
-
-        // Preserve the existing contract: after LoadModels(), vPos/modelTriangles/modelVertexCounts/
-        // modelTriangleCounts alias the physics (welded, full-float) geometry rather than the render
-        // geometry - physics hot paths read these directly as CPU-space positions.
+        glBindBuffer(GL_ARRAY_BUFFER,vbos[m]); glBufferData(GL_ARRAY_BUFFER,vcz,(u8*)modelsBinBlob + e->vertOff,GL_STATIC_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[m]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,(u8*)modelsBinBlob + e->triOff,GL_STATIC_DRAW);
+        physPos[m] = (float*)((u8*)modelsBinBlob + e->physPosOff); physVertCounts[m] = e->physVertCount;
+        physTris[m] = (u16*)((u8*)modelsBinBlob + e->physTriOff);
+        modelBVHNodes[m] = e->bvhNodeCount ? (BvhNode*)((u8*)modelsBinBlob + e->bvhNodeOff) : NULL; modelBVHNodeCounts[m] = e->bvhNodeCount;
+        modelBVHTriOrder[m] = e->bvhTriOrderCount ? (u16*)((u8*)modelsBinBlob + e->bvhTriOrderOff) : NULL; modelBVHTriOrderCounts[m] = e->bvhTriOrderCount;
         vPos[m] = physPos[m]; modelTriangles[m] = physTris[m];
         modelVertexCounts[m] = physVertCounts[m]; modelTriangleCounts[m] = e->physTriCount;
     }
@@ -150,6 +117,7 @@ const AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, 
     [49]={[ANIM_IDLE]={1.0f,1,1,5728,24},[ANIM_ATTACK_MISS]={1.0f,1,13,5728,24},[ANIM_ATTACK_HIT]={1.0f,18,24,5741,24}}, // v_pipe
     [50]={[ANIM_IDLE]={1.0f,1,1,5748,24},[ANIM_ATTACK_MISS]={0.5f,4,22,5749,24},[ANIM_ATTACK_HIT]={1.0f,4,22,5749,24}}, // v_rapier
     [51]={[ANIM_IDLE]={1.0f,1,65,5768,24},[ANIM_WALK]={1.0f,75,98,5833,24},[ANIM_RUN]={1.0f,75,98,5833,24},[ANIM_ATTACK2]={1.0f,109,126,5857,24},[ANIM_ATTACK1]={1.0f,128,142,5875,24},[ANIM_PAIN]={1.0f,144,159,5890,24},[ANIM_PAIN2]={1.0f,161,174,5906,24},[ANIM_DYING]={1.0f,176,243,5920,24}}, // npc_mutant_cyborg
+    // TODO Add the cyber exit, cyber item anims
 };
 
 void PortalCulling(); bool ToggleDoorPortal(u8,u16,u16);
@@ -179,43 +147,26 @@ void UpdateAnims(void) {
 void ChangeAnim(Entity* e, u8 clip) { e->clip = clip; e->currentFrameFinished = 0.0; AnimationClip* c = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; e->frame = c->frameStart; } // TODO actually use this!}
 void GenerateConvexAdjacencyLists() { // Hill Climb Racer Adjacency List
     double start_time = get_time();
-    cvxAdjOffsets=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u32*)); cvxAdjLists=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u16*));
-    for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
+    cvxAdjOffsets = OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u32*)); cvxAdjLists = OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u16*));
+    const ModelDirEntry* dir = (const ModelDirEntry*)modelsBinBlob;
+    for (u32 lev = 0; lev < MAX_LEVELS; ++lev) {
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
-            if (World.levelCollider[lev][i] == COLTYPE_CVX) { //DualLog("Checking level %u, instance %u with constindex %u for convex mesh uniques, colMeshIndex: %u, current uniqueCvxMeshCount: %u\n",lev,i,World.levelInstances[lev][i].index,World.levelInstances[lev][i].colMeshIndex,uniqueCvxMeshCount);
-                u16 colMeshIdx = World.levelInstances[lev][i].colMeshIndex;// if (colMeshIdx == U16_MAX) continue;
+            if (World.levelCollider[lev][i] == COLTYPE_CVX) {
+                u16 colMeshIdx = World.levelInstances[lev][i].colMeshIndex;
                 if (colMeshIdx > MAX_MDLS) DualLogWarn("Improper convex mesh colMeshIndex on level %u, instance %u with constindex %u for convex mesh uniques, colMeshIndex: %u\n",lev,i,World.levelInstances[lev][i].index,World.levelInstances[lev][i].colMeshIndex);
                 bool isUnique=true; u32 foundIdx=U16_MAX;
                 for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { if (uniqueCvxMeshIndices[u] == colMeshIdx) { isUnique = false; foundIdx = u; break; } }
-                if (isUnique) { //DualLog("Processing convex mesh colMeshIndex %u on object %u[%u]\n",colMeshIdx,lev,i);
+                if (isUnique) {
                     if (uniqueCvxMeshCount >= MAX_UNIQUE_CVX_MESHES) { DualLogWarn("Warning: Exceeded MAX_UNIQUE_CVX_MESHES! Some convex meshes will use slow linear support.\n"); World.levelInstances[lev][i].adjacencyIdx = U16_MAX; continue; }
-                    uniqueCvxMeshIndices[uniqueCvxMeshCount] = colMeshIdx; World.levelInstances[lev][i].adjacencyIdx = (u16)uniqueCvxMeshCount; uniqueCvxMeshCount++; //DualLog("Incremented uniqueCvxMeshCount to %u\n",uniqueCvxMeshCount);
+                    uniqueCvxMeshIndices[uniqueCvxMeshCount] = colMeshIdx; World.levelInstances[lev][i].adjacencyIdx = (u16)uniqueCvxMeshCount;
+                    const ModelDirEntry* e = &dir[colMeshIdx];
+                    cvxAdjOffsets[uniqueCvxMeshCount] = e->cvxAdjOffCount  ? (u32*)((u8*)modelsBinBlob + e->cvxAdjOffOff)  : NULL;
+                    cvxAdjLists[uniqueCvxMeshCount]   = e->cvxAdjListCount ? (u16*)((u8*)modelsBinBlob + e->cvxAdjListOff) : NULL;
+                    lastCvxSupport[uniqueCvxMeshCount] = 0;
+                    uniqueCvxMeshCount++;
                 } else { World.levelInstances[lev][i].adjacencyIdx = (u16)foundIdx; }
             } else { World.levelInstances[lev][i].adjacencyIdx = U16_MAX; }
         }
     }
-    for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { // 2. Generate edge adjacency list for each unique mesh
-        u16 m = uniqueCvxMeshIndices[u]; if (m >= MAX_MDLS) { continue;}
-        u32 vCount = physVertCounts[m], tCount = modelTriangleCounts[m];
-        if (!vCount || !tCount || !physPos[m] || !physTris[m]) continue;
-        u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
-        for (u32 t = 0; t < tCount; ++t) {
-            u16 i0=physTris[m][t*3+0], i1=physTris[m][t*3+1], i2=physTris[m][t*3+2];
-            tempEdges[edgeCount++]=((u32)vmin(i0,i1) << 16) | vmax(i0,i1);
-            tempEdges[edgeCount++]=((u32)vmin(i1,i2) << 16) | vmax(i1,i2);
-            tempEdges[edgeCount++]=((u32)vmin(i2,i0) << 16) | vmax(i2,i0);
-        }
-        qsort_new(tempEdges,edgeCount,sizeof(u32),EdgeCompare);
-        u32 uniqueEdgeCount=0;
-        u32* degree=OS_Alloc(vCount * sizeof(u32));
-        for (u32 i = 0; i < edgeCount; ++i) { if (i == 0 || tempEdges[i] != tempEdges[i-1]) { tempEdges[uniqueEdgeCount++]=tempEdges[i]; u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); degree[a]++; degree[b]++; } }
-        u32* offsets=OS_Alloc((vCount + 1) * sizeof(u32)); offsets[0]=0; for(u32 i=0;i<vCount;++i){offsets[i+1]=offsets[i] + degree[i];}
-        u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));
-        u32* writePos = OS_Alloc(vCount * sizeof(u32));
-        mcpy(writePos, offsets, vCount * sizeof(u32));
-        for (u32 i=0;i<uniqueEdgeCount;++i) { u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); adjList[writePos[a]++]=b; adjList[writePos[b]++]=a; }
-        cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList; lastCvxSupport[u]=0;
-        OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
-    }
-    DualLog("Generating edge adjacency lists for %u convex meshes...took %f secs\n",uniqueCvxMeshCount,get_time() - start_time);
+    DualLog("Loaded pre-baked edge adjacency lists for %u convex meshes...took %f secs\n",uniqueCvxMeshCount, get_time() - start_time);
 }
