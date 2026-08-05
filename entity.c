@@ -1,6 +1,5 @@
 // entity.c - Entity Definitions and Save Load System for levels and savegames
 #include "common.h"
-#include "lib.h" // LibC Replacements and Helpers
 #define LINE_LEN_MAX 81920
 extern Entity EDefs[MAX_ENTITIES];
 extern V3 EDefscolliderCenter[MAX_ENTITIES]; // Offset relative to .position's global worldspace xyz location
@@ -921,8 +920,6 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     return i;
 }
 
-void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt);
-__attribute__((noinline)) void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/ GenBTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); camViewCount++; }
 static const char* mm_ptr; static const char* mm_end;
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
 static char* MmapGetLine(char* buf, int sz) {
@@ -996,7 +993,7 @@ void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
     World.levelColliding[dstLevel][s]            = World.levelColliding[srcLevel][s];
 }
 
-char lineSpace[LINE_LEN_MAX]; void AddDoorPortal(u16 entIdx, u16 parent); void TextureSequenceInit(u16 self, char* trimmed_value);
+char lineSpace[LINE_LEN_MAX]; void AddDoorPortal(u16 entIdx, u16 parent); void TextureSequenceInit(u16 self, char* trimmed_value); void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr);
 void LoadLevelMod(u8 lev) {
     u8 curlevel = vclamp(lev, 0, 13); World.curLev = curlevel; World.levelCurrentlyLoading = true; World.instCount = 3;
     if (curlevel == 1) {

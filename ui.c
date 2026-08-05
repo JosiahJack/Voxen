@@ -1,7 +1,7 @@
 // ui.c - User Interface(UI) aka HUD
+INLINE bool CursorIsOverBounds(float x0, float x1, float y0, float y1) { return World.cursorPos_x >= x0 && World.cursorPos_x <= x1 && World.cursorPos_y >= y0 && World.cursorPos_y <= y1;/*0,0=top left*/ }
 bool MenuEnter() { return !Cheats.consoleActive && (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
-INLINE bool CursorIsOverBounds(float startX, float endX, float startY, float endY) { return World.cursorPosition_x >= startX && World.cursorPosition_x <= endX  /* 0 == left */ && World.cursorPosition_y >= startY && World.cursorPosition_y <= endY; /* 0 ==  top */ }
-u8 UI_Interactable(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
+u8 UI_MenuInteractable(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
     bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y);
     if (cursorIsOver && mouseMovementThisFrame) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} }
     if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) return 1u;
@@ -9,13 +9,13 @@ u8 UI_Interactable(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bo
     return 0u;
 }
 
-u8 UI_Button(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this) { return UI_Interactable(x,y,w,h,cursorOver,this,false); }
+u8 UI_Button(i16 x, i16 y, float w, float h, bool* cursorOver, i8 this) { return UI_MenuInteractable(x,y,w,h,cursorOver,this,false); }
 bool AnyLeftRightMouseDown() { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down); }
 bool UI_Slider(i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8 currentValue, u8* out, bool* sliderActive, u8 min, u8 max, u8 step, u8 mindex, u16 lingdex) {
     bool over=false,changed=false; *out = currentValue;
     RenderUIImage(x,y, w,h, 1079); // Slider background
     RenderUIImage(x + sliderPos,y, h,h,1078); // Slider handle
-    if (UI_Interactable(xPosForLabel,y,xPosForLabel + w,h,&over,mindex,true)) *sliderActive = true;
+    if (UI_MenuInteractable(xPosForLabel,y,xPosForLabel + w,h,&over,mindex,true)) *sliderActive = true;
     if (*sliderActive && World.currentMouse_dx != 0) { i32 new = (i32)currentValue + vmin(vmax(World.currentMouse_dx,-1),1); *out = (u8)vmin(vmax(new,min),max); if (*out != currentValue) {changed = true;} }
     if (!AnyLeftRightMouseDown()) { if (*sliderActive) { *sliderActive = false; SaveConfig(); } }
     if (MenuEnter() && currentMenuItem == mindex) {
@@ -226,12 +226,14 @@ void RenderPausedUI() {
 }
 
 static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16   vmailEndFrames[6]={1644,1712,1783,1863,1930,1988}; u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0; double avgCPUt[AVG_CPU_TAPS]={0}; int avgCPUt_idx = 0;
+void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
 static double RenderUI() {
     drawCallsNormal = drawCalls;
+    World.uiIsBlocking = false;
     if (World.creditsActive) { // Render Credits
         if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed) { ++World.creditsPageIndex; if(World.creditsPageIndex > CREDITS_PAGES){World.creditsActive=false; return get_time();} /*Finished with Erthang!  That's it, go home.*/ }
         if (World.creditsPageIndex == 1) { CreditsStats(); RenderFormattedText(300,10,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); }
-        else                                                    RenderFormattedText(300,10,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]);
+        else                                               RenderFormattedText(300,10,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]);
         return get_time();
     }
     if (World.menuActive) RenderMenu();
@@ -242,9 +244,19 @@ static double RenderUI() {
     } else if (!World.Sys_UI.vmailActive) { /* Normal UI */
 //         if (World.Sys_UI.showTeleportFX) { /*TeleportFX*/ } if (World.Sys_UI.showRadiationFX) { /*RadiationFX*/ } if (World.Sys_UI.showHealingFX) { /*HealingFX*/ } if (World.Sys_UI.showShieldFX) { /*ShieldFX*/ } 
 //         if (World.Sys_UI.showShieldActivation) { /*waveup*/ /*wavedn*/ } if (World.Sys_UI.showShieldDeactivation) { /*waveup*/ /*wavedn*/ } if (World.Sys_UI.showDeathRessurectionFX) { /*spawndelaycontainers...*/ } 
-//         if (World.Sys_UI.showHardware) { /*ShieldButton*/ /*LanternButton*/ /*SensaroundButton*/ /*BioButton*/ /*NightVisionButton*/ /*EReaderButton*/ /*BoosterButton*/ /*JumpJetsButton*/ }
-        if (!Cheats.noHUD) {RenderUIImage(672,0,22,22,1020);} /*ShootModeButton*/
-        if (World.inventoryMode && Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed && CursorIsOverBounds(672,694,22,0)) ForceShootMode();
+        if (World.invP1.hasHardware & HW_BIO && !Cheats.noHUD) RenderUIImage(   0,200,40,40, 989); // Hw Btn: Biomonitor
+        if (World.invP1.hasHardware & HW_SNS && !Cheats.noHUD) RenderUIImage(   0,250,40,40,1009); // Hw Btn: Sensaround
+        if (World.invP1.hasHardware & HW_LAN && !Cheats.noHUD) RenderUIImage(   0,300,40,40,1004); // Hw Btn: Lantern
+        if (World.invP1.hasHardware & HW_SHD && !Cheats.noHUD) RenderUIImage(   0,350,40,40,1014); // Hw Btn: Shield
+        if (World.invP1.hasHardware & HW_INF && !Cheats.noHUD) RenderUIImage(1326,200,40,40, 998); // Hw Btn: Infrared
+        if (World.invP1.hasHardware & HW_ERD && !Cheats.noHUD) RenderUIImage(1326,250,40,40, 996); // Hw Btn: Ereader
+        if (World.invP1.hasHardware & HW_BST && !Cheats.noHUD) RenderUIImage(1326,300,40,40, 993); // Hw Btn: Booster
+        if (World.invP1.hasHardware & HW_JET && !Cheats.noHUD) RenderUIImage(1326,350,40,40,1000); // Hw Btn: Jumpjets
+        if (!Cheats.noHUD) {RenderUIImage(667,0,32,32,1020);} /*ShootModeButton*/
+        if (World.inventoryMode && CursorIsOverBounds(667,699,0,32)) {
+            World.uiIsBlocking = true;
+            if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed) ForceShootMode();
+        }
 //         if (World.Sys_UI.showTextWarnings) { /*WarningTexts...*/ } if (World.Sys_UI.showAutomapFull) { /*AutomapFullRawImage*/ /*PlayerIconFull*/ /*CloseFullmapButton*/ } if (World.Sys_UI.showMissionTimer) { /*MissionTimerT*/ /*MissionTimer*/ }
         if (true/*World.Sys_UI.showLeftMFDPanel*/) {
             if (MFD_LefTab == 0) { /*WeaponTabLH: WepNameTextLH, WepIconLH, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/ }
@@ -253,7 +265,7 @@ static double RenderUI() {
             else if (MFD_LefTab == 3) { /*TargetTabLH*/ }
             else if (MFD_LefTab == 4) { /*DataTabLH: SecurityLH, DataHeaders, ElevatorUIControl, KeycodeUIControl, SearchContents, AudioLogInfo, PuzzleGrid, PuzzleWire, SystemAnalyzer Display*/ }
 //             if (World.Sys_UI.showSensaroundLH) { /*SensaroundLH Plane*/ }
-            if (true/*World.Sys_UI.showTabButtonsPanelLH*/) {
+            if (!Cheats.noHUD) {
                 RenderUIImage(-16,552,32,40,MFD_LefTab == 0 ? 1024 : 1022); RenderUIImage(-16,600,32,40,MFD_LefTab == 1 ? 1024 : 1022); RenderUIImage(-16,648,32,40,MFD_LefTab == 2 ? 1024 : 1022); RenderUIImage(-16,696,32,40,MFD_LefTab == 3 ? 1024 : 1022); /*ButtonWeapon, ButtonItem, ButtonAutomap, ButtonTarget, ButtonData*/
             }
 //             if (World.Sys_UI.showCyberTimer) { /*CyberTimerT*/ /*CyberTimer*/ }
@@ -265,7 +277,7 @@ static double RenderUI() {
             else if (MFD_CenterTab == 3) { /*SoftwareTab: Label, SoftwareInventory, ICEDrill, Pulser, Turbo, Decoy, Recall*/ }
             else if (MFD_CenterTab == 4) { /*MultiMediaDataReader: LogTableofContents, LogsLevelFolder, LogTextReader, EmailTab, DataTab, NotesTab*/ }
 //             if (World.Sys_UI.showSensaroundCenter) { /*SensaroundCenter Plane*/ }
-            if (true/*World.Sys_UI.showCenterTabButtons*/) {
+            if (!Cheats.noHUD) {
                 RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021); RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021); RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021); RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021); /*Main, Hardware, General, Software, AddToInventoryHelper*/
             }
         }
@@ -276,14 +288,31 @@ static double RenderUI() {
             else if (MFD_RightTab == 3) { /*TargetTabRH*/ }
             else if (MFD_RightTab == 4) { /*DataTabRH: SecurityRH, Elevators, Keycodes, AudioLogs, Puzzles, SystemAnalyzer*/ }
 //             if (World.Sys_UI.showSensaroundRH) { /*SensaroundRH Plane*/ }
-            if (true/*World.Sys_UI.showTabButtonsPanelRH*/) {
+            if (!Cheats.noHUD) {
                 RenderUIImage(1350,552,32,40,MFD_RightTab == 0 ? 1024 : 1022); RenderUIImage(1350,600,32,40,MFD_RightTab == 1 ? 1024 : 1022); RenderUIImage(1350,648,32,40,MFD_RightTab == 2 ? 1024 : 1022); RenderUIImage(1350,696,32,40,MFD_RightTab == 3 ? 1024 : 1022); /*ButtonWeapon, ButtonItem, ButtonAutomap, ButtonTarget, ButtonData*/
             }
         }
 //         if (World.Sys_UI.showBioMonitor) { /*Graph*/ /*Biomonitor texts, BPM, Patch, Fatigue*/ } if (World.Sys_UI.showEnergyTickPanel) { /*EnergyTickPanel*/ } if (World.Sys_UI.showHealthTickPanel) { /*HealthTickPanel*/ }
-//         if (World.Sys_UI.showEnergyIndicator) { /*EnergyIndicator*/ /*EnergySurge*/ /*EnergyDrainText*/ /*EnergyJPMText*/ } if (World.Sys_UI.showHealthIndicator) { /*HealthIndicator*/ /*HealthIndicatorCyber*/ } 
-//         if (World.Sys_UI.showVmailPlayer) { /*VmailPlayer GenStatus, BetaJet, etc.*/ } if (World.Sys_UI.showSearchFX) { /*SearchFXLH*/ /*SearchFXRH*/ } if (World.Sys_UI.showTouchables) { /*MainMenuTouch, Console, Left/RightTouchstick, TouchSpace/LMB/Swim*/ }
-//         if (World.Sys_UI.showEMPStatic) { /*EMPStatic*/ } if (World.Sys_UI.showPainStatic) { /*PainStatic*/ } if (World.Sys_UI.showSightDimming) { /*SightDimming*/ } if (World.Sys_UI.showDeathFX) { /*DeathFXContainer*/ }
+//         if (World.Sys_UI.showEnergyIndicator) { /*EnergyIndicator*/ /*EnergySurge*/ /*EnergyDrainText*/ /*EnergyJPMText*/ }
+//         if (World.Sys_UI.showHealthIndicator) { /*HealthIndicator*/ /*HealthIndicatorCyber*/ }
+        if (!Cheats.noHUD) {
+            RenderUIImage(1332, 2,32,32,956); // Health Indicator
+            int p1H = World.instances[PLAYER1].health; if (p1H > 255) p1H = 255;
+            for (int i=7;i>=0;--i) if (p1H > (7 - i) * 11)       RenderUIImage(1050 - (i * 16), 4,32,32,964); // Health Tick Red
+            for (int i=7;i>=0;--i) if (p1H > 88 + (7 - i) * 11)  RenderUIImage(1178 - (i * 16), 4,32,32,963); // Health Tick Orange
+            for (int i=7;i>=0;--i) if (p1H > 176 + (7 - i) * 11) RenderUIImage(1306 - (i * 16), 4,32,32,962); // Health Tick Green
+            RenderUIImage(1333,36,32,32,939); // Energy Indicator
+            int p1E = World.invP1.energy; if (p1E > 255) p1E = 255;
+            for (int i=7;i>=0;--i) if (p1E > (7 - i) * 11)       RenderUIImage(1050 - (i * 16),35,32,32,964); // Energy Tick Red
+            for (int i=7;i>=0;--i) if (p1E > 88 + (7 - i) * 11)  RenderUIImage(1178 - (i * 16),35,32,32,963); // Energy Tick Orange
+            for (int i=7;i>=0;--i) if (p1E > 176 + (7 - i) * 11) RenderUIImage(1306 - (i * 16),35,32,32,962); // Energy Tick Green
+        }
+        if (World.inventoryMode && World.invP1.holdingObject && CursorIsOverBounds(345,1021,460,768)) { // Add to Inventory Helper
+            World.uiIsBlocking = true;
+            RenderUIImage(345,460,676,308,1075);
+            RenderFormattedText(586,460,T_GREEN,FONT_NORMAL,1.0f,"ADD TO INVENTORY");
+            if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) {AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem();}
+        }
     }
     if (World.Sys_UI.vmailActive) {
         if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[World.Sys_UI.vmailActive]) {
@@ -298,7 +327,7 @@ static double RenderUI() {
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"playerCellIdx: %u, CPU ms::Shad: %.3f, Phys: %.3f, subs %u, Rendr: %.3f, Pre phys: %.3f, Logic: %.3f",playerCellIdx,shadowTime * 1000,physTime * 1000,World.substeps,renderTime * 1000,prePhys * 1000,gameTime * 1000);
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"Player velocity: %.2f, %.2f, %.2f, Grounded: %u",World.velocity[PLAYER1].x,World.velocity[PLAYER1].y,World.velocity[PLAYER1].z,World.instances[PLAYER1].entflags & EF_GROUNDED);
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Time Elapsed: %.3f",World.pauseRelativeTime - game_start_time);
-    RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPosition_x,World.cursorPosition_y,World.currentMouse_dx,World.currentMouse_dy);
+    RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderFormattedText(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (World.statusTextDecayFinished > World.current_time) RenderFormattedText(460,114,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     double time_now = get_time();

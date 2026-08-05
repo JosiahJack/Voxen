@@ -1,6 +1,5 @@
 // input.c - Input and Configuration System for Config.ini, keyboard and mouse support.
 #include "common.h"
-#include "lib.h"
 double last_mouse_x,last_mouse_y;
 InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D},{"E",KEY_E},{"F",KEY_F},{"G",KEY_G},{"H",KEY_H},{"I",KEY_I},{"J",KEY_J},{"K",KEY_K},{"L",KEY_L},{"M",KEY_M},{"N",KEY_N},{"O",KEY_O},{"P",KEY_P},{"Q",KEY_Q},{"R",KEY_R},{"S",KEY_S},{"T",KEY_T},{"U",KEY_U},{"V",KEY_V},{"W",KEY_W},{"X",KEY_X},{"Y",KEY_Y},{"Z",KEY_Z},
                                  {"1",KEY_1},{"2",KEY_2},{"3",KEY_3},{"4",KEY_4},{"5",KEY_5},{"6",KEY_6},{"7",KEY_7},{"8",KEY_8},{"9",KEY_9},{"0",KEY_0},{"UPARROW",KEY_UP},{"DNARROW",KEY_DOWN},{"LFARROW",KEY_LEFT},{"RTARROW",KEY_RIGHT},{"NUM1",KEY_KP_1},{"NUM2",KEY_KP_2},{"NUM3",KEY_KP_3},{"NUM+",KEY_KP_ADD},{"ENTER",KEY_ENTER},
@@ -50,8 +49,8 @@ void InputCursorPos(double* x, double* y, double xpos, double ypos) { // static 
     if (ignore_next_mouse_delta) { World.currentMouse_dx = World.currentMouse_dy = 0; ignore_next_mouse_delta = mouseMovementThisFrame = false; return; }
     World.currentMouse_dx += (i32)(xpos - last_mouse_x); World.currentMouse_dy += (i32)(ypos - last_mouse_y); last_mouse_x = xpos; last_mouse_y = ypos;
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { // Uses UI baseline resolution 1366x768
-        i32 newX = clamp(World.cursorPosition_x + World.currentMouse_dx,0,1366); if (newX != World.cursorPosition_x) {mouseMovementThisFrame = true;} World.cursorPosition_x = newX;
-        i32 newY = clamp(World.cursorPosition_y + World.currentMouse_dy,0, 768); if (newY != World.cursorPosition_y) {mouseMovementThisFrame = true;} World.cursorPosition_y = newY;
+        i32 newX = clamp(World.cursorPos_x + World.currentMouse_dx,0,1366); if (newX != World.cursorPos_x) {mouseMovementThisFrame = true;} World.cursorPos_x = newX;
+        i32 newY = clamp(World.cursorPos_y + World.currentMouse_dy,0, 768); if (newY != World.cursorPos_y) {mouseMovementThisFrame = true;} World.cursorPos_y = newY;
     }
 }
 
@@ -68,8 +67,8 @@ bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return
 bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){return false;} if (World.pauseRelativeTime < World.invP1.leanLeftTapFinished) { World.invP1.leanLeftTapFinished = 0.0; return true; } World.invP1.leanLeftTapFinished = World.pauseRelativeTime + 0.5; return false; }
 bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.pauseRelativeTime < World.invP1.leanRightTapFinished) { World.invP1.leanRightTapFinished = 0.0; return true; } World.invP1.leanRightTapFinished = World.pauseRelativeTime + 0.5; return false; } 
 void CloseFullmap();
-void ForceShootMode() { if (Sys_Settings.NoShootMode){return;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); World.cursorPosition_x=663; World.cursorPosition_y=371/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true; if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0; World.Sys_UI.vmailActive=false;} }
-void ForceInventoryMode() { World.inventoryMode = true; World.cursorPosition_x = 663; World.cursorPosition_y = 371; ignore_next_mouse_delta = true; } // Centered on UI baseline resolution 1366x768
+void ForceShootMode() { if (Sys_Settings.NoShootMode){return;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); World.cursorPos_x=663; World.cursorPos_y=371/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true; if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0; World.Sys_UI.vmailActive=false;} }
+void ForceInventoryMode() { World.inventoryMode = true; World.cursorPos_x = 663; World.cursorPos_y = 371; ignore_next_mouse_delta = true; } // Centered on UI baseline resolution 1366x768
 void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
 void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void MenuGoBack(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot); void ApplyPlayerMovements(float dt); void PollEvents();

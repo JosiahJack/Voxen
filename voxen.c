@@ -1,9 +1,7 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
 #include "common.h"
-#include "lib.h" // LibC Replacements and Helpers
 #include "credits.h"
 #include "Shaders/shaders.h"
-#include "os.h"
 FGL_FL glFlush; FGL_AT glActiveTexture; FGL_AS glAttachShader; FGL_CTSI2D glCopyTexSubImage2D;  FGL_BB glBindBuffer;  FGL_BBB glBindBufferBase;    FGL_CPIV glGetProgramiv;FGL_CC glClearColor;    FGL_U4F glUniform4f;        FGL_BFB glBindFramebuffer;FGL_VP glViewport;    FGL_BVA glBindVertexArray; FGL_EVAA glEnableVertexAttribArray; FGL_CFBS glCheckFramebufferStatus;            
 FGL_F glFinish; FGL_UP glUseProgram;    FGL_DM glDepthMask;    FGL_VAB glVertexAttribBinding;   FGL_DF glDepthFunc;   FGL_DC glDispatchCompute;    FGL_DB glDrawBuffers;   FGL_GSIV glGetShaderiv; FGL_BVB glBindVertexBuffer; FGL_LW glLineWidth;       FGL_LP glLinkProgram; FGL_RB glReadBuffer;       FGL_U3F glUniform3f;
 FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram; FGL_CRS glCreateShader; FGL_BFS glBlendFuncSeparate;FGL_CBFV glClearBufferFv; FGL_UB glUnmapBuffer; FGL_BD glBufferData;    
@@ -394,20 +392,36 @@ void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
     glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,6); drawCalls++; uiDrawCalls++; vertsRendered += 6; glBindBuffer(GL_ARRAY_BUFFER,0);
 }
 
-void ClearAll() { glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,0); glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); }
-void RenderLoading(i32 offset, const char * restrict text) { ClearAll(); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); RenderFormattedText(683 - offset,379,T_WHITE,FONT_NORMAL,1.0f,text); ((WinSyswindow*)window)->context.swapBuffers(((WinSyswindow*)window)); }
-void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp) { if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id); glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,bmp); glTexParameteri(GL_TEXTURE_2D,0x2801/*GL_TEXTURE_MIN_FILTER*/,filt); glTexParameteri(GL_TEXTURE_2D,0x2800/*GL_TEXTURE_MAG_FILTER*/,filt); }
-void GenBTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt) { GenerateAndBindTexture(id,internalFormat,width,height,format,type,filt,NULL); }
+void RenderLoading(i32 offset, const char * restrict text) {
+    glBindFramebuffer(GL_FRAMEBUFFER,0); glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
+    RenderFormattedText((Sys_Settings.ScreenWidth/2) - offset,(Sys_Settings.ScreenHeight/2),T_WHITE,FONT_NORMAL,1,text);
+    ((WinSyswindow*)window)->context.swapBuffers(((WinSyswindow*)window));
+}
+
+void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp) {
+    if (*id == 0) {glGenTextures(1,id);}
+    glBindTexture(GL_TEXTURE_2D,*id);
+    glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,bmp);
+    glTexParameteri(GL_TEXTURE_2D,0x2801/*GL_TEXTURE_MIN_FILTER*/,filt);
+    glTexParameteri(GL_TEXTURE_2D,0x2800/*GL_TEXTURE_MAG_FILTER*/,filt);
+}
+
+void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) {
+    camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/
+    GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); camViewCount++;
+}
+
 void UpdateScreenSize(i32 width, i32 height) {
     u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); // Cap at minimum Quake resolution and maximum 8k.
     float wf = (float)w, hf = (float)h; Sys_Settings.ScreenCenterX = wf * 0.5f; Sys_Settings.ScreenCenterY = hf * 0.5f;
     glViewport(0,0,w,h);
     glUseProgram(imageBlitSP); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES); glUseProgram(chunkSP); glUniform1ui(6,w); glUniform1ui(7,h); glUseProgram(ssrSP); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
-    GenBTexture(&inputImageID, GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); // Lit Raster
-    GenBTexture(&inputSpecID,  GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/); // Specular Colors
-    GenBTexture(&inputNormalID,GL_RG16F,w,h, GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/); // Normal XYZ
-    GenBTexture(&inputDepthID,0x81A7/*GL_DEPTH_COMPONENT32*/,w,h,0x1902/*GL_DEPTH_COMPONENT*/,GL_FLOAT,0x2600/*GL_NEAREST*/); // Raster Depth
-    GenBTexture(&outputImageID,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/);
+    GenerateAndBindTexture(&inputImageID, GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); // Lit Raster
+    GenerateAndBindTexture(&inputSpecID,  GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); // Specular Colors
+    GenerateAndBindTexture(&inputNormalID,GL_RG16F,w,h, GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); // Normal XYZ
+    GenerateAndBindTexture(&inputDepthID,0x81A7/*GL_DEPTH_COMPONENT32*/,w,h,0x1902/*GL_DEPTH_COMPONENT*/,GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); // Raster Depth
+    GenerateAndBindTexture(&outputImageID,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL);
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputImageID,0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,inputSpecID,0);
@@ -422,6 +436,7 @@ void UpdateScreenSize(i32 width, i32 height) {
 }
 #include "ui.c"
 #define SHADOW_NEARMESH_MAX 2048
+typedef struct {float depth; u16 index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
 INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex > texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MAX_MDLS || e->texIndex >= MAX_TXRS || otherCondition; }
 INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) {
@@ -432,84 +447,297 @@ INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) {
     return modelType;
 }
 
+/* ==========================================================================
+ * Minimal AVX2/FMA Intrinsics (no-headers mode)
+ * ======================================================================= */
+typedef float __m256 __attribute__((__vector_size__(32), __may_alias__));
+typedef long long __m256i __attribute__((__vector_size__(32), __may_alias__));
+typedef float __v8sf __attribute__((__vector_size__(32), __may_alias__));
+#define _CMP_LT_OQ 0x11
+#define _CMP_GT_OQ 0x1e
+
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_load_ps(float const *__P) { return *(const __m256 *)__P; }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_loadu_ps(float const *__P) { __m256 __W; __builtin_memcpy(&__W, __P, sizeof(__m256)); return __W; }
+extern __inline void __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_store_ps(float *__P, __m256 __W) { *(__m256 *)__P = __W; }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_set1_ps(float __A) { return (__m256){__A, __A, __A, __A, __A, __A, __A, __A}; }
+extern __inline __m256i __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_set1_epi32(int __A) { return (__m256i){ (long long)__A, (long long)__A, (long long)__A, (long long)__A }; }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_castsi256_ps(__m256i __A) { return (__m256)__A; }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_sub_ps(__m256 __A, __m256 __B) { return __A - __B; }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_add_ps(__m256 __A, __m256 __B) { return __A + __B; }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_mul_ps(__m256 __A, __m256 __B) { return __A * __B; }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_fmadd_ps(__m256 __A, __m256 __B, __m256 __C) { return __A * __B + __C; }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_max_ps(__m256 __A, __m256 __B) { return (__m256) __builtin_ia32_maxps256((__v8sf)__A, (__v8sf)__B); }
+
+#define _mm256_cmp_ps(A, B, C) ((__m256) __builtin_ia32_cmpps256 ((__v8sf)(__m256)(A), (__v8sf)(__m256)(B), (int)(C))) 
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_andnot_ps(__m256 __A, __m256 __B) { return (__m256)(~(__m256i)__A & (__m256i)__B); }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_and_ps(__m256 __A, __m256 __B) { return (__m256)((__m256i)__A & (__m256i)__B); }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_or_ps(__m256 __A, __m256 __B) { return (__m256)((__m256i)__A | (__m256i)__B); }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_xor_ps(__m256 __A, __m256 __B) { return (__m256)((__m256i)__A ^ (__m256i)__B); }
+extern __inline int __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_movemask_ps(__m256 __A) { return __builtin_ia32_movmskps256((__v8sf)__A); }
+extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_setzero_ps(void) { return (__m256){ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; }
+
 #define SC_MAX (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)
-DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; u16 shadowCasterIndices[SC_MAX],candidates[MAX_SHADOWMAPS]; static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
-INLINE u8 GetCubemapFaceMask(V3 d, float r) { u8 m=0; float absX=vabs(d.x),absY=vabs(d.y),absZ=vabs(d.z); if (d.x+r>absY && d.x+r>absZ) {m|=(1<<0);} if (d.x-r<-absY && d.x-r<-absZ) {m|=(1<<1);} if (d.y+r>absX && d.y+r>absZ) {m|=(1<<2);} if (d.y-r<-absX && d.y-r<-absZ) {m|=(1<<3);} if (d.z+r>absX && d.z+r>absY) {m|=(1<<4);} if (d.z-r<-absX && d.z-r<-absY) {m|=(1<<5);} return m; }
-static const i8 faceAxis[6] = {0,0,1,1,2,2}; static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
-INLINE bool FaceMaybeVisibleToPlayer(V3 toLight, V3 pf, float radius, float dotThresh, u8 face) {
-    float c[3] = { toLight.x, toLight.y, toLight.z }; const float f[3] = { pf.x, pf.y, pf.z }; int axis = faceAxis[face]; c[axis] += faceSign[face] * radius;
-    if (0 != axis) {c[0] += (f[0] >= 0.0f ? radius : -radius);} if (1 != axis) {c[1] += (f[1] >= 0.0f ? radius : -radius);} if (2 != axis) {c[2] += (f[2] >= 0.0f ? radius : -radius);}
-    return (c[0]*f[0] + c[1]*f[1] + c[2]*f[2]) > dotThresh;
+DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
+u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS];
+
+static __attribute__((aligned(64))) float sc_posX[SC_MAX];
+static __attribute__((aligned(64))) float sc_posY[SC_MAX];
+static __attribute__((aligned(64))) float sc_posZ[SC_MAX];
+static __attribute__((aligned(64))) float sc_radius[SC_MAX];
+static __attribute__((aligned(64))) float sc_shadRadius[SC_MAX];
+static u16 sc_origIdx[SC_MAX];
+
+static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
+static const i8 faceAxis[6] = {0,0,1,1,2,2};
+static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
+
+INLINE u8 GetCubemapFaceMask(V3 d, float r) {
+    u8 m=0; 
+    float absX=vabs(d.x),absY=vabs(d.y),absZ=vabs(d.z);
+    float maxAbsYZ = absY > absZ ? absY : absZ;
+    float maxAbsXZ = absX > absZ ? absX : absZ;
+    float maxAbsXY = absX > absY ? absX : absY;
+    if (d.x+r > maxAbsYZ) m|=(1<<0);
+    if (d.x-r < -maxAbsYZ) m|=(1<<1);
+    if (d.y+r > maxAbsXZ) m|=(1<<2);
+    if (d.y-r < -maxAbsXZ) m|=(1<<3);
+    if (d.z+r > maxAbsXY) m|=(1<<4);
+    if (d.z-r < -maxAbsXY) m|=(1<<5);
+    return m;
 }
 
-__attribute__((hot)) void RenderShadowmaps() {    
+__attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     double shadowStartTime = get_time();
-    mset(candidates,0,MAX_SHADOWMAPS*sizeof(u16));
-    u16 numShadowsCouldRender=0;
-    V3 playerPos = World.position[PLAYER1], pf = World.instances[PLAYER1].forward;
-    for (u16 i = 0; i < World.loadedLights; ++i) { // Collect candidates: only lights that are enabled and in PVS
+    mset(candidates, 0, MAX_SHADOWMAPS * sizeof(u16));
+    V3 playerPos = World.position[PLAYER1];
+    V3 pf = World.instances[PLAYER1].forward;
+    u16 numCandidates = 0;
+    for (u16 i = 0; i < World.loadedLights; ++i) {
         if (unlikely(!(World.lights[i].lflags & SHADON) || !(World.lights[i].lflags & LIGHTON))) continue;
         V3 lightPos = World.lights[i].pos;
-        float intensity = World.lights[i].maxIntensity; /*Much more stable than actual intensity (from fade/flickers).  Since gated by on above, this is fine now.*/ if (unlikely(intensity < 0.1f)) continue;
-        float range =  World.lights[i].range; float luminosity = (intensity / (range * range)); if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
+        float intensity = World.lights[i].maxIntensity;
+        if (unlikely(intensity < 0.1f)) continue;
+        float range = World.lights[i].range;
+        float luminosity = (intensity / (range * range));
+        if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
         u16 cellX = PosGetCellCoordX(lightPos.x), cellZ = PosGetCellCoordZ(lightPos.z);
-        int lightCellIdx = (cellZ * WORLDX) + cellX; u8 r = vmax(vceil(range * (1.0f / CELLSZ)),2);
+        int lightCellIdx = (cellZ * WORLDX) + cellX;
+        u8 r = vmax(vceil(range * (1.0f / CELLSZ)),2);
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
-        if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r); if (!inPVS) continue;
+        if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r);
+        if (!inPVS) continue;
         float dx = lightPos.x - playerPos.x, dy = lightPos.y - playerPos.y, dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
-        float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z); if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
-        candidates[numShadowsCouldRender] = i; numShadowsCouldRender++; if (numShadowsCouldRender >= MAX_SHADOWMAPS) break;
+        float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z);
+        if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
+        candidates[numCandidates++] = i;
+        if (numCandidates >= MAX_SHADOWMAPS) break;
     }
-    if (numShadowsCouldRender > 0U) { // Added since there is now work between here and the for loop so this is beneficial to check.
-        glUseProgram(shadowmapsClearSP); glDispatchCompute(groupX_shadClear,6,numShadowsCouldRender); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
-        shadDrawCalls=0U; glViewport(0,0,SHADOW_MAP_SIZE,SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP); u32 shadowmapOffsetHead=0U; mset(shadowCasterIndices,0,SC_MAX*sizeof(u16)); u32 numShadowCasters=0U;
-        for (int i=INSTS_1ST_IDX;i<INSTANCE_COUNT;++i) { if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS))/*TODO || IdxIsDynamicObject(World.instances[i].index)*/) {continue;} shadowCasterIndices[numShadowCasters]=i; numShadowCasters++; if(numShadowCasters >= (SC_MAX)){break;} }
-        u16 shadowMapIdx=0,currentModelType=0,currentTexIndex=0; bool currentIsTransparent=0,useDetail=Sys_Settings.ModelDetail;
-        for (u32 c = 0; c < numShadowsCouldRender; ++c) { // Render top MAX_SHADOWMAPS candidates
-            u16 lightIdx = candidates[c];
-            float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f); u16 nearbyMeshCount = 0; 
-            V3 lpos = World.lights[lightIdx].pos;
-            for (u16 shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) {
-                u16 j = shadowCasterIndices[shadowCasterInstanceIdx];
-                V3 d = V3_AsubB(World.position[j],lpos);
-                float distToLightSqrd = V3_dot(d,d);
-                float radSum = (effectiveRadius + World.radius[j]);
-                if (distToLightSqrd >= radSum * radSum) continue;
-                u8 faceMask = GetCubemapFaceMask(d,World.instances[j].shadRadius); if (faceMask == 0) continue;
-                shadows_nearMeshes[nearbyMeshCount].index = j;
-                nearbyMeshCount++; if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
-            }
-            if (unlikely(nearbyMeshCount < 1)) continue;
-            glUniform3f(3,lpos.x,lpos.y,lpos.z);
-            shadowmapIndirectionList[lightIdx] = shadowMapIdx; ++shadowMapIdx;
-            V3 toLight = V3_AsubB(lpos, playerPos);
-            #pragma GCC unroll 6
-            for (u8 face = 0; face < 6; face++) {
-                if (!FaceMaybeVisibleToPlayer(toLight, pf, effectiveRadius, 0.0f, face) && !SphereInFrustum(lightFrustumPlanes[lightIdx][face], playerPos, 0.48f)) { continue; } // Skip rendering for cubemap faces that are where player can't see.
-                glUniform1ui(2,face);
-                glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
-                glUniform1ui(7,shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
-                for (u16 j = 0; j < nearbyMeshCount; ++j) {
-                    int i = shadows_nearMeshes[j].index;
-                    Entity* e=&World.instances[i]; u16 modelType=(instanceIsLODArray[i] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex;
-                    glUniform1ui(0,i);
-                    if (currentModelType != modelType || currentModelType == 0) { currentModelType = modelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); }
-                    if (currentTexIndex != e->texIndex) { currentTexIndex = e->texIndex; glUniform1ui(6,e->texIndex); }
-                    bool texIsTransparent = transparentTexture[e->texIndex];
-                    if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8,(u32)currentIsTransparent); }
-                    glDrawElements(0x0004/*GL_TRIANGLES*/,modelTriangleCounts[currentModelType]*3,GL_UNSIGNED_SHORT,0); drawCalls++; shadDrawCalls++; vertsRendered += modelTriangleCounts[currentModelType] * 3;
-                }
-            }
-            shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
+    if (numCandidates == 0) { shadowTime = get_time() - shadowStartTime; return; }
+
+    u32 numCasters = 0;
+    for (int i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
+        if (EntNotVisible(i, (World.instances[i].entflags & EF_NO_SHADOWS)) ||
+            IdxIsDynamicObject(World.instances[i].index)) continue;
+        shadowCasterIndices[numCasters++] = i;
+        if (numCasters >= SC_MAX) break;
+    }
+
+    u32 i = 0;
+    for (; i + 8 <= numCasters; i += 8) {
+        float lx[8], ly[8], lz[8], lr[8], lsr[8];
+        for (int k = 0; k < 8; ++k) {
+            u16 j = shadowCasterIndices[i + k];
+            lx[k]  = World.position[j].x;
+            ly[k]  = World.position[j].y;
+            lz[k]  = World.position[j].z;
+            lr[k]  = World.radius[j];
+            lsr[k] = World.instances[j].shadRadius;
+            sc_origIdx[i + k] = j;
         }
-        glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); glBindBuffer(GL_SSBO,shadowMapsIndirectionID); glBufferData(GL_SSBO,World.loadedLights * sizeof(u32),shadowmapIndirectionList,GL_DYNAMIC_DRAW);
+        _mm256_store_ps(&sc_posX[i],       _mm256_loadu_ps(lx));
+        _mm256_store_ps(&sc_posY[i],       _mm256_loadu_ps(ly));
+        _mm256_store_ps(&sc_posZ[i],       _mm256_loadu_ps(lz));
+        _mm256_store_ps(&sc_radius[i],     _mm256_loadu_ps(lr));
+        _mm256_store_ps(&sc_shadRadius[i], _mm256_loadu_ps(lsr));
     }
+    for (; i < numCasters; ++i) { u16 j = shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
+    const u32 numCastersAligned = numCasters & ~7u;
+
+    /* Issue clear early so GPU executes concurrently with CPU SIMD */
+    glUseProgram(shadowmapsClearSP); glDispatchCompute(groupX_shadClear, 6, numCandidates);
+    shadDrawCalls = 0U;
+    glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP);
+
+    u32 shadowmapOffsetHead = 0U;
+    u16 shadowMapIdx = 0;
+    u32 currentSortKey = 0xFFFFFFFF;
+    u16 currentModelType = 0xFFFF;
+    u16 currentTexIndex = 0xFFFF;
+    u32 currentTriCount = 0;
+    bool currentIsTransparent = false;
+    bool useDetail = Sys_Settings.ModelDetail;
+    typedef struct { u32 sortKey; u16 instanceIdx; } SortedMesh;
+    SortedMesh localMeshes[SHADOW_NEARMESH_MAX];
+
+    for (u16 c = 0; c < numCandidates; ++c) {
+        u16 lightIdx = candidates[c];
+        V3 lpos = World.lights[lightIdx].pos;
+        float effectiveRadius = vmin(World.lights[lightIdx].range, 15.36f);
+        V3 toLight = V3_AsubB(lpos, playerPos);
+        const float addX = (pf.x >= 0.0f) ? effectiveRadius : -effectiveRadius;
+        const float addY = (pf.y >= 0.0f) ? effectiveRadius : -effectiveRadius;
+        const float addZ = (pf.z >= 0.0f) ? effectiveRadius : -effectiveRadius;
+        __attribute__((aligned(32))) float cX[8], cY[8], cZ[8];
+        for (int f = 0; f < 6; ++f) {
+            const int axis = faceAxis[f];
+            const float sign = faceSign[f];
+            float x = toLight.x + addX;
+            float y = toLight.y + addY;
+            float z = toLight.z + addZ;
+            if      (axis == 0) x = toLight.x + sign * effectiveRadius;
+            else if (axis == 1) y = toLight.y + sign * effectiveRadius;
+            else                z = toLight.z + sign * effectiveRadius;
+            cX[f] = x; cY[f] = y; cZ[f] = z;
+        }
+        cX[6] = cY[6] = cZ[6] = 0.0f;
+        cX[7] = cY[7] = cZ[7] = 0.0f;
+        const __m256 cx = _mm256_load_ps(cX);
+        const __m256 cy = _mm256_load_ps(cY);
+        const __m256 cz = _mm256_load_ps(cZ);
+        const __m256 fx = _mm256_set1_ps(pf.x);
+        const __m256 fy = _mm256_set1_ps(pf.y);
+        const __m256 fz = _mm256_set1_ps(pf.z);
+        const __m256 dot = _mm256_fmadd_ps(cx, fx, _mm256_fmadd_ps(cy, fy, _mm256_mul_ps(cz, fz)));
+        const __m256 visible = _mm256_cmp_ps(dot, _mm256_setzero_ps(), _CMP_GT_OQ);
+        u8 faceMask = (u8)(_mm256_movemask_ps(visible) & 0x3F);
+        for (u8 face = 0; face < 6; ++face) { if (!(faceMask & (1u << face))) { if (SphereInFrustum(lightFrustumPlanes[lightIdx][face], playerPos, 0.48f)) {faceMask |= (u8)(1u << face);} } }
+        if (faceMask == 0) continue;
+
+        const __m256 lposX = _mm256_set1_ps(lpos.x);
+        const __m256 lposY = _mm256_set1_ps(lpos.y);
+        const __m256 lposZ = _mm256_set1_ps(lpos.z);
+        const __m256 effR  = _mm256_set1_ps(effectiveRadius);
+        const __m256 signMask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
+        u16 nearbyMeshCount = 0;
+        u32 k = 0;
+        for (; k < numCastersAligned; k += 8) {
+            const __m256 px = _mm256_load_ps(&sc_posX[k]);
+            const __m256 py = _mm256_load_ps(&sc_posY[k]);
+            const __m256 pz = _mm256_load_ps(&sc_posZ[k]);
+            const __m256 r  = _mm256_load_ps(&sc_radius[k]);
+            const __m256 sr = _mm256_load_ps(&sc_shadRadius[k]);
+            const __m256 dx = _mm256_sub_ps(px, lposX);
+            const __m256 dy = _mm256_sub_ps(py, lposY);
+            const __m256 dz = _mm256_sub_ps(pz, lposZ);
+            const __m256 distSq   = _mm256_fmadd_ps(dx, dx, _mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dz, dz)));
+            const __m256 radSum   = _mm256_add_ps(effR, r);
+            const __m256 radSumSq = _mm256_mul_ps(radSum, radSum);
+            const __m256 inRange  = _mm256_cmp_ps(distSq, radSumSq, _CMP_LT_OQ);
+
+            const __m256 absX = _mm256_andnot_ps(signMask, dx);
+            const __m256 absY = _mm256_andnot_ps(signMask, dy);
+            const __m256 absZ = _mm256_andnot_ps(signMask, dz);
+
+            /* Optimized Face Math: A > |B| && A > |C| <==> A > max(|B|, |C|) */
+            const __m256 maxAbsYZ = _mm256_max_ps(absY, absZ);
+            const __m256 maxAbsXZ = _mm256_max_ps(absX, absZ);
+            const __m256 maxAbsXY = _mm256_max_ps(absX, absY);
+
+            const __m256 negMaxAbsYZ = _mm256_or_ps(maxAbsYZ, signMask);
+            const __m256 negMaxAbsXZ = _mm256_or_ps(maxAbsXZ, signMask);
+            const __m256 negMaxAbsXY = _mm256_or_ps(maxAbsXY, signMask);
+
+            const __m256 dxp = _mm256_add_ps(dx, sr);
+            const __m256 posXface = _mm256_cmp_ps(dxp, maxAbsYZ, _CMP_GT_OQ);
+            const __m256 dxm = _mm256_sub_ps(dx, sr);
+            const __m256 negXface = _mm256_cmp_ps(dxm, negMaxAbsYZ, _CMP_LT_OQ);
+
+            const __m256 dyp = _mm256_add_ps(dy, sr);
+            const __m256 posYface = _mm256_cmp_ps(dyp, maxAbsXZ, _CMP_GT_OQ);
+            const __m256 dym = _mm256_sub_ps(dy, sr);
+            const __m256 negYface = _mm256_cmp_ps(dym, negMaxAbsXZ, _CMP_LT_OQ);
+
+            const __m256 dzp = _mm256_add_ps(dz, sr);
+            const __m256 posZface = _mm256_cmp_ps(dzp, maxAbsXY, _CMP_GT_OQ);
+            const __m256 dzm = _mm256_sub_ps(dz, sr);
+            const __m256 negZface = _mm256_cmp_ps(dzm, negMaxAbsXY, _CMP_LT_OQ);
+
+            const __m256 anyFace = _mm256_or_ps(_mm256_or_ps(posXface, negXface),_mm256_or_ps(_mm256_or_ps(posYface, negYface), _mm256_or_ps(posZface, negZface)));
+            const __m256 valid = _mm256_and_ps(inRange, anyFace);
+            unsigned mask = (unsigned)_mm256_movemask_ps(valid);
+            while (mask) {
+                int bit = __builtin_ctz(mask); mask &= mask - 1;
+                if (unlikely(nearbyMeshCount >= SHADOW_NEARMESH_MAX)) {
+                    DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx);
+                    k = numCastersAligned; break;
+                }
+                u16 instIdx = sc_origIdx[k + bit];
+                Entity* e = &World.instances[instIdx];
+                u16 modelType = (instanceIsLODArray[instIdx] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex;
+                localMeshes[nearbyMeshCount].instanceIdx = instIdx;
+                localMeshes[nearbyMeshCount].sortKey = ((u32)modelType << 16) | e->texIndex;
+                nearbyMeshCount++;
+            }
+            if (k == numCastersAligned && nearbyMeshCount >= SHADOW_NEARMESH_MAX) break;
+        }
+        
+        if (nearbyMeshCount < SHADOW_NEARMESH_MAX) {
+            for (; k < numCasters; ++k) {
+                V3 d = V3_AsubB(World.position[sc_origIdx[k]], lpos);
+                float distToLightSqrd = V3_dot(d,d);
+                float radSum = (effectiveRadius + World.radius[sc_origIdx[k]]);
+                if (distToLightSqrd >= radSum * radSum) continue;
+                u8 faceMaskScalar = GetCubemapFaceMask(d, World.instances[sc_origIdx[k]].shadRadius);
+                if (faceMaskScalar == 0) continue;
+                u16 instIdx = sc_origIdx[k];
+                Entity* e = &World.instances[instIdx];
+                u16 modelType = (instanceIsLODArray[instIdx] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex;
+                localMeshes[nearbyMeshCount].instanceIdx = instIdx;
+                localMeshes[nearbyMeshCount].sortKey = ((u32)modelType << 16) | e->texIndex;
+                nearbyMeshCount++;
+                if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
+            }
+        }
+        if (nearbyMeshCount == 0) continue;
+
+        for (u16 j = 1; j < nearbyMeshCount; ++j) { SortedMesh key = localMeshes[j]; int sk = (int)j - 1; while(sk >= 0 && localMeshes[sk].sortKey > key.sortKey){localMeshes[sk + 1]=localMeshes[sk]; --sk;} localMeshes[sk + 1] = key; }
+
+        glUniform3f(3, lpos.x, lpos.y, lpos.z);
+        shadowmapIndirectionList[lightIdx] = shadowMapIdx; ++shadowMapIdx;
+        #pragma GCC unroll 6
+        for (u8 face = 0; face < 6; ++face) {
+            if (!(faceMask & (1u << face))) continue;
+            glUniform1ui(2, face);
+            glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
+            glUniform1ui(7, shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
+            for (u16 j = 0; j < nearbyMeshCount; ++j) {
+                u16 instIdx = localMeshes[j].instanceIdx;
+                u32 sortKey = localMeshes[j].sortKey;
+                glUniform1ui(0, instIdx);
+                if (currentSortKey != sortKey) {
+                    currentSortKey = sortKey;
+                    u16 modelType = (u16)(sortKey >> 16);
+                    u16 texIndex = (u16)(sortKey & 0xFFFF);
+                    if (currentModelType != modelType) { currentModelType = modelType; glBindVertexBuffer(0, vbos[modelType], 0, VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]); currentTriCount = modelTriangleCounts[currentModelType] * 3; }
+                    if (currentTexIndex != texIndex) {
+                        currentTexIndex = texIndex; glUniform1ui(6, texIndex); bool texIsTransparent = transparentTexture[texIndex];
+                        if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8, (u32)currentIsTransparent); }
+                    }
+                }
+                glDrawElements(0x0004, currentTriCount, GL_UNSIGNED_SHORT, 0); drawCalls++; shadDrawCalls++; vertsRendered += currentTriCount;
+            }
+        }
+        shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
+    }
+    glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+    glBindBuffer(GL_SSBO, shadowMapsIndirectionID);
+    glBufferData(GL_SSBO, World.loadedLights * sizeof(u32), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
     shadowTime = get_time() - shadowStartTime;
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
-float GetPainStatic() { return 0.0f; } // TODO: Hook into pain/health management and shield impact effect
+__attribute__((const)) float GetPainStatic() { return 0.0f; } // TODO: Hook into pain/health management and shield impact effect
 Color GetPainStaticColor() { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
@@ -565,7 +793,7 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight; float sfov, snear, sfar;
     if (camView) { CamView* cv=&camViews[camViewIdx]; swidth=cv->width; sheight=cv->height; sfov=(float)cv->fov; snear=cv->near; sfar=cv->far; }
-    else { swidth=Sys_Settings.ScreenWidth; sheight=Sys_Settings.ScreenHeight; sfov=(float)Sys_Settings.FOV; snear=NEAR_PLANE; sfar=World.farPlane[World.curLev]; }
+    else { swidth=Sys_Settings.ScreenWidth; sheight=Sys_Settings.ScreenHeight; sfov=(float)Sys_Settings.FOV; snear=0.02f; sfar=World.farPlane[World.curLev]; }
     V3 playerPos = World.position[PLAYER1]; float px=playerPos.x, py=playerPos.y, pz=playerPos.z, aspect3D=(float)swidth / (float)sheight;
     float view[16],viewProj[16],invViewRot[9],invViewProj[16];
     GetProjections(view,viewProj,invViewRot,invViewProj,sfov,aspect3D,snear,sfar);
@@ -575,10 +803,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps();
     double rendStart = get_time();
     UpdateLights(); // This is where the voxels get updated!
-    for (int i=0;i<LIGHT_COUNT;++i) flag_set(&World.lights[i].lflags,LDIRTY,false);
     glViewport(0,0,swidth,sheight);
-    ClearAll();
-    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClearColor(0,0,0,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
     u16 visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0, opaqueCount = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
@@ -666,9 +892,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glUseProgram(ssrSP); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3); glUniformMatrix4fv(6,1,0,invViewProj); glUniformMatrix4fv(4,1,GL_FALSE,viewProj); u32 groupX_ssr=((Sys_Settings.ScreenWidth/Sys_Settings.SSR_RES)+31)/32, groupY_ssr=((Sys_Settings.ScreenHeight/Sys_Settings.SSR_RES)+31)/32;
         glDispatchCompute(groupX_ssr,groupY_ssr,1);
     }
-    glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glViewport(0,0,1366,768); glDisable(GL_CULL_FACE); renderTime = get_time() - rendStart;
+    glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT);
+    glViewport(0,0,1366,768); glDisable(GL_CULL_FACE); renderTime = get_time() - rendStart;
     RenderUI();
-    if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) RenderUIImage((i16)(World.cursorPosition_x) - 20,(i16)(World.cursorPosition_y) - 20,40,40,GetCursorTexture());
+    if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) RenderUIImage((i16)(World.cursorPos_x) - 20,(i16)(World.cursorPos_y) - 20,40,40,GetCursorTexture());
     else if (!Cheats.noHUD) RenderUIImage(663,364,40,40,GetCursorTexture()); // Centered on UI fixed resolution 1366x768 FBO
     glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight); // Restore normal output size for final composite blit
     glUseProgram(imageBlitSP); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,inputImageID); glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
@@ -720,7 +947,6 @@ static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0
                                      {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {-64.000f,-60.120f}/*13*/};
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 71.68f/*13*/};
 // Init && Main
-void GenerateConvexAdjacencyLists();
 __attribute__((cold)) void NewGame() { // Reset World States
     DualLog("Loading new game...\n");
     RenderLoading(100,"Loading new game...");
@@ -738,8 +964,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.col[PLAYER1] = COLTYPE_CAP; World.colliderCenter[PLAYER1].y = -PLAYER_CAM_OFFSET_Y; World.colliderSize[PLAYER1] = (V3){PLAYER_RADIUS,PLAYER_HEIGHT,COLCAP_DIR_Y_F}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     World.mass[PLAYER1] = 1.0f; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
     World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = World.invP1.leanTarget = World.invP1.leanShift = 0.0f; World.gravity[PLAYER1] = 1.0f; World.dynamicFriction[PLAYER1] = 0.6f; World.staticFriction[PLAYER1] = 0.8f; 
-    World.instances[PLAYER1].health = 200.0f; World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime;
-    World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);  World.invP1.maxEnergy = 255.0f;
+    World.instances[PLAYER1].health = 211.0f; World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime;
+    World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f,1.0f);
     World.invP1.hardwareInvReferenceIndex[0]  = 21; World.invP1.hardwareInvReferenceIndex[1]  = 22; World.invP1.hardwareInvReferenceIndex[2]  = 23; World.invP1.hardwareInvReferenceIndex[3]  = 24; World.invP1.hardwareInvReferenceIndex[4]  = 25; World.invP1.hardwareInvReferenceIndex[5]  = 26;
     World.invP1.hardwareInvReferenceIndex[6]  = 27; World.invP1.hardwareInvReferenceIndex[7]  = 28; World.invP1.hardwareInvReferenceIndex[8]  = 29; World.invP1.hardwareInvReferenceIndex[9]  = 30; World.invP1.hardwareInvReferenceIndex[10] = 31; World.invP1.hardwareInvReferenceIndex[11] = 32;
     World.invP1.hardwareInvReferenceIndex[12] =  0; World.invP1.hardwareInvReferenceIndex[13] =  0; World.invP1.generalInventoryIndexRef[0] = 81; // Hardcoded lookup indices into the Const main table.
@@ -747,7 +973,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     for (int i=0;i<HW_COUNT;++i) World.invP1.hardwareVersion[i] = World.invP1.hardwareVersionSetting[i] = 0;
     World.invP1.nitroTimeSetting = NITRO_DEFAULT_TIME;
     World.invP1.earthShakerTimeSetting = EARTH_SHAKER_DEFAULT_TIME;
-    World.invP1.lastAddedIndex = World.invP1.currentCyberItem = World.invP1.globalLookupIndex = -1;
+    World.invP1.lastAddedIndex = World.invP1.globalLookupIndex = -1;
     World.invP1.hasNewEmail = World.invP1.hasNewNotes = true;
     World.invP1.isPulserNotDrill = true;
     for (int i=0;i<7;++i) World.invP1.weaponInventoryIndices[i] = World.invP1.weaponInventoryAmmoIndices[i] = -1;
@@ -775,7 +1001,7 @@ void LoadModels(); void LoadTextures(); void ModEDefsInitAfterLoad(); void InitA
 void InitalizeEnvironment() {
     game_start_time = get_time(); random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/ console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     DebugRAM("program start"); DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\nEntity size: %u\n",sizeof(Entity));
-    SetLevelPointers(0); WindowInit(); threadCnt = clamp(OS_GetNumThreads(),1,32); globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.cursorPosition_x=680,World.cursorPosition_y=384;
+    SetLevelPointers(0); WindowInit(); threadCnt = clamp(OS_GetNumThreads(),1,32); globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.cursorPos_x=680,World.cursorPos_y=384;
     World.numLevels=MAX_LEVELS; World.startLevel=1/*medical*/; LoadConfig();/*Get settings before setting window size.*/ window = VCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); CenterWindowOnMonitor(); SetGLContext_GetFunctionPointers();
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); ((WinSyswindow*)window)->context.swapBuffers(((WinSyswindow*)window)); // Black out the window as early as possible for better presentation.
     i32 major=0,minor=0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor); if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
@@ -804,8 +1030,8 @@ void InitalizeEnvironment() {
     glGenFramebuffers(1,&uiFBO); glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,inputUIID); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputUIID,0);
     u32 drawBuffersUI[] = {GL_COLOR_ATTACHMENT0}; glDrawBuffers(1,drawBuffersUI); glCheckFramebufferStatus(GL_FRAMEBUFFER); glBindImageTexture(0,inputUIID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/* UI Rendered Color*/ glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputUIID,0);
     RenderLoading(40,"Loading...");
-    float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - NEAR_PLANE);
-    m[0]=1.0f; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=1.0f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]=-(lightRangeMax + NEAR_PLANE) / viewRange; m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f * lightRangeMax * NEAR_PLANE / viewRange; m[15]=0.0f;
+    float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - 0.02f);
+    m[0]=1.0f; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=1.0f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]=-(lightRangeMax + 0.02f) / viewRange; m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f * lightRangeMax * 0.02f / viewRange; m[15]=0.0f;
     InitAudio(); synth_set_room(0.66f,0.8f);
     ModEDefsInitAfterLoad(); // Set the values for all 768 entity definitions, a doozy of a function.
     glGenFramebuffers(1,&gBufferFBO);
@@ -840,7 +1066,14 @@ i32 main() {
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
         prePhys = get_time() - input_start;
-        if (!World.paused && !World.menuActive) { double ps=get_time(); float dt=vclamp((float)(World.pauseRelativeTime - World.last_physics_time),0.0005f,0.1f); World.last_physics_time=World.pauseRelativeTime; World.dt=dt; Physics(dt); physTime=get_time() - ps; } else physTime=0.0;
+        if (!World.paused && !World.menuActive) {
+            double ps=get_time();
+            float dt=(float)vclamp((World.pauseRelativeTime - World.last_physics_time),0.0005,0.1);
+            World.last_physics_time=World.pauseRelativeTime;
+            World.dt=dt;
+            Physics(dt);
+            physTime=get_time() - ps;
+        } else physTime=0.0;
         double gameT_start = get_time();
         ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
         UpdateAudio();

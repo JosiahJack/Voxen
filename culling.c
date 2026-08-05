@@ -1,6 +1,5 @@
 // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
 #include "common.h"
-#include "lib.h"
 typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead;} Portal;
 u32 gridCellStates[ARRSIZE],precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
 u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u8 numActivePortals = 0;

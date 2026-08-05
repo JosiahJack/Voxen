@@ -1,6 +1,5 @@
 // textures.c - 2D Texture Loading System
 #include "common.h"
-#include "lib.h"
 u32 totalPixels,totalPaletteColors;
 typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData;          typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser;
 typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } PngContext; typedef struct { u8* indices; u32* palette,palSize; i32 w, h; } TexResult;

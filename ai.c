@@ -1,6 +1,5 @@
 // ai.c - AI logic control for NPC's enemies in the game.
 #include "common.h"
-#include "lib.h"
 static const float AI_STOP_DIST=1.28f, AI_STOP_DIST_SQ=(AI_STOP_DIST * AI_STOP_DIST), AI_POS_CHECK_DELAY=2.0f, AI_WANDER_RANGE=79.0f, AI_TARGET_OFFSET_Y=0.24f;
 u16 npcCountInWorldPerType[NUM_AI_TYPES];
 // Name,AtkTyp1,2,3,Dmg1,2,3,Range1,2,3,Health,CybHealth,Percp,Disrp,Armr,Def,Movtyp,Yawspd,FOV,FOVAtk,FOVStartMov,DistToSeeBehind,SightRange,WalkSpd,RunSpd,AtkSpd1,2,3,AtkForce3,AtkRad3,TtPain,TbwPain,TtDead,TtActualAtk1,2,3,TbwAtk1,2,3,TEnemChg,TIdleSFXMin,TIdleSFXMax,TAtk1WaitMin,TAtk1WaitMax,TAtk1WaitChnc,TAtk2WaitMin,TAtk2WaitMax,TAtk2WaitChnc,TAtk3WaitMin,TAtk3WaitMax,TAtk3WaitChnc,ProjType1,2,3,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,PreActMeleCols,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType,AtkProj1,2,3
@@ -63,9 +62,9 @@ void InitializeAIAfterLoad(u16 i) {
     World.instances[i].timeTillDeadFinished = World.pauseRelativeTime;
     World.instances[i].meleeDamageFinished = World.pauseRelativeTime;
     World.instances[i].gracePeriodFinished = World.pauseRelativeTime;
-    World.instances[i].randomWaitForNextAttack1Finished = World.pauseRelativeTime;
-    World.instances[i].randomWaitForNextAttack2Finished = World.pauseRelativeTime;
-    World.instances[i].randomWaitForNextAttack3Finished = World.pauseRelativeTime;
+    World.instances[i].randWaitAtt1Finished = World.pauseRelativeTime;
+    World.instances[i].randWaitAtt2Finished = World.pauseRelativeTime;
+    World.instances[i].randWaitAtt3Finished = World.pauseRelativeTime;
     World.instances[i].tranquilizeFinished = World.pauseRelativeTime;
     World.instances[i].deathBurstFinished = World.pauseRelativeTime;
     World.instances[i].wanderFinished = World.pauseRelativeTime;
@@ -515,7 +514,7 @@ static bool AICanAttack(u16 selfIdx, float dsq, u8 type, float* rangeToEnemy) {
     if (ai_is_cyber(self)) return true; // Cyber enemies are dumb but aggressive.
     if (!(self->entflags & EF_ENEM_IN_FRONT)) return false;
     if (type >= 2 && !(self->entflags & EF_ENEM_IN_FOV)) return false;
-    float wait = type == 3 ? self->randomWaitForNextAttack3Finished : (type == 2 ? self->randomWaitForNextAttack2Finished : self->randomWaitForNextAttack1Finished);
+    float wait = type == 3 ? self->randWaitAtt3Finished : (type == 2 ? self->randWaitAtt2Finished : self->randWaitAtt1Finished);
     return wait < World.pauseRelativeTime;
 }
 
@@ -678,9 +677,9 @@ static void AITransitionAttackToRun(Entity* self, int n) {
     float chance, wmin, wmax;
     float* wait;
     switch (n) {
-        case 1:  chance=npc->timeAttack1WaitChance; wmin=npc->timeAttack1WaitMin; wmax=npc->timeAttack1WaitMax; wait=&self->randomWaitForNextAttack1Finished; break;
-        case 2:  chance=npc->timeAttack2WaitChance; wmin=npc->timeAttack2WaitMin; wmax=npc->timeAttack2WaitMax; wait=&self->randomWaitForNextAttack2Finished; break;
-        default: chance=npc->timeAttack3WaitChance; wmin=npc->timeAttack3WaitMin; wmax=npc->timeAttack3WaitMax; wait=&self->randomWaitForNextAttack3Finished; break;
+        case 1:  chance=npc->timeAttack1WaitChance; wmin=npc->timeAttack1WaitMin; wmax=npc->timeAttack1WaitMax; wait=&self->randWaitAtt1Finished; break;
+        case 2:  chance=npc->timeAttack2WaitChance; wmin=npc->timeAttack2WaitMin; wmax=npc->timeAttack2WaitMax; wait=&self->randWaitAtt2Finished; break;
+        default: chance=npc->timeAttack3WaitChance; wmin=npc->timeAttack3WaitMin; wmax=npc->timeAttack3WaitMax; wait=&self->randWaitAtt3Finished; break;
     }
     *wait = (random_range(0.0f, 1.0f) < chance) ? World.pauseRelativeTime + random_range(wmin, wmax) : World.pauseRelativeTime;
 }

@@ -1,44 +1,71 @@
 // text.c - Text and Font Rendering/Loading System
 #include "common.h"
-#include "lib.h"
-extern u32 textVAO,textVBO,textSP; u32 fontAtlasTex, fontAtlasTexStopD; extern Color textColors[];
-u8* textBinData = NULL; stbtt_packedchar* fontPackedChar = NULL; stbtt_packedchar* fontPackedCharStopD = NULL;
-int numPackedGlyphs = 0, numPackedGlyphsStopD = 0; float fixedNumberAdvanceWidth = 0.0f, fixedNumberAdvanceWidthStopD = 0.0f;
-static char uiTextBuffer[T_BUFFER_SIZE]; static float textVertexData[8192];
+#include "stbtt.h"
+int numPackedGlyphs=0,numPackedGlyphsStopD=0; extern u32 textVAO,textVBO,textSP;
+u32 fontAtlasTex,fontAtlasTexStopD;
+stbtt_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
+float fixedNumberAdvanceWidth=0.0f,fixedNumberAdvanceWidthStopD=0.0f;
+static const char* fallbackFontPaths[]={"./Fonts/FreeSerifBold.ttf","./Fonts/cambriab.ttf","./Fonts/NotoSansCJK-Bold.ttc"}, *fontPaths[]={"./Fonts/SystemShockText.ttf","./Fonts/StopD.ttf"};
+static stbtt_fontinfo fontInfo[5]; static u8 *fontData[5]; static char uiTextBuffer[T_BUFFER_SIZE];
+typedef struct{char*path;u8*data;size_t size;stbtt_fontinfo info;}LoadedFont;
+LoadedFont fallbackFonts[3];
+typedef struct{i32 first,count,startIndex;}GlyphRange;
 GlyphRange fontRanges[]     ={{0x0020,0x7E - 0x20 + 1,0},{0x00A0,0xFF - 0xA0 + 1,95},{0x0400,0x04FF - 0x0400 + 1,95+96},{0x3040,0x30FF - 0x3040 + 1,95+96+256}};
 GlyphRange fontRangesStopD[]={{0x0020,0x7E - 0x20 + 1,0},{0x00A0,0xFF - 0xA0 + 1,95},{0x0400,0x04FF - 0x0400 + 1,95+96},{0x3040,0x30FF - 0x3040 + 1,95+96+256}};
 i32 numFontRanges=sizeof(fontRanges)/sizeof(fontRanges[0]);
+i32 CodepointToPackedIndex(i32 cp,int fontID){ if(cp<32){cp=32;} if(cp>=447){cp=446;} const GlyphRange*ranges=(fontID==FONT_STOPD)?fontRangesStopD:fontRanges; i32 total=(fontID==FONT_STOPD)?numPackedGlyphsStopD:numPackedGlyphs; for(i32 i=0;i<numFontRanges;i++){if(cp>=ranges[i].first&&cp<ranges[i].first+ranges[i].count){i32 idx=ranges[i].startIndex+vmax((cp-ranges[i].first),0);if(idx<total){return idx;}}} return 0; }
+LoadedFont LoadFallbackFont(const char*path,int fii,int ci){
+    FHandle fd;int fsz;fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
+    int off=stbtt_GetFontOffsetForIndex(fontData[fii],ci);if(off<0){DualLogError("Invalid collection index %d for font %s\n",ci,path);OS_Exit(1);}
+    if(!stbtt_InitFont_internal(&fontInfo[fii],fontData[fii],off)){DualLogError("Failed to init font at index %d in %s\n",ci,path);OS_Exit(1);}
+    return (LoadedFont){(char*)path,fontData[fii],fsz,fontInfo[fii]};
+}
+int GetGlyphAndFont(u32 cp,stbtt_fontinfo**outFont,u8 fontID){ int g=stbtt_FindGlyphIndex(fontID==FONT_STOPD?&fontInfo[1]:&fontInfo[0],cp);if(g){*outFont=fontID==FONT_STOPD?&fontInfo[1]:&fontInfo[0];return g;} for(int i=0;i<3;i++){g=stbtt_FindGlyphIndex(&fallbackFonts[i].info,cp);if(g){*outFont=&fallbackFonts[i].info;return g;}} return 0; }
 void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp);
 void InitFontAtlasses() {
     DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    5 fonts...");
-    FHandle fd;
-    int fileSize;
-    textBinData = (u8*)OS_OpenAndAllocateFileBufferReadonly("text.bin",&fd,&fileSize);
-    if (!textBinData || (size_t)fileSize < sizeof(TextBinHeader)) { DualLogError("Failed to load text.bin\n"); OS_Exit(1); }
-    TextBinHeader* header = (TextBinHeader*)textBinData;
-    if (header->magic != TEXT_BIN_MAGIC) { DualLogError("Invalid text.bin magic number\n"); OS_Exit(1); }
-    numPackedGlyphs = header->numPackedGlyphs;
-    numPackedGlyphsStopD = header->numPackedGlyphsStopD;
-    fixedNumberAdvanceWidth = header->fixedNumberAdvanceWidth;
-    fixedNumberAdvanceWidthStopD = header->fixedNumberAdvanceWidthStopD;
-    u8* currentOffset = textBinData + sizeof(TextBinHeader);
-    fontPackedChar = (stbtt_packedchar*)currentOffset;
-    currentOffset += header->packedCharBytes;
-    fontPackedCharStopD = (stbtt_packedchar*)currentOffset;
-    currentOffset += header->packedCharStopDBytes;
-    u8* primaryAtlasBmp = currentOffset;
-    currentOffset += header->atlasBytes;
-    u8* stopDAtlasBmp = currentOffset;
-    GenerateAndBindTexture(&fontAtlasTex,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,primaryAtlasBmp);
-    GenerateAndBindTexture(&fontAtlasTexStopD,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,stopDAtlasBmp);
+    ttAllocs = OS_Alloc(4674 * sizeof(TAlloc));
+    FHandle fd1,fd2;int sz1,sz2;
+    fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
+    fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
+    if(!stbtt_InitFont_internal(&fontInfo[0],fontData[0],0)){DualLogError("%s font init failed\n",fontPaths[0]);OS_Exit(1);}
+    if(!stbtt_InitFont_internal(&fontInfo[1],fontData[1],0)){DualLogError("%s font init failed\n",fontPaths[1]);OS_Exit(1);}
+    fallbackFonts[0]=LoadFallbackFont(fallbackFontPaths[0],2,0);
+    fallbackFonts[1]=LoadFallbackFont(fallbackFontPaths[1],3,0);
+    fallbackFonts[2]=LoadFallbackFont(fallbackFontPaths[2],4,2);
+    u8*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
+    stbtt_pack_context pc;stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc.h_oversample=3;pc.v_oversample=3;pc.skip_missing=1;numPackedGlyphs=0;
+    for(int r=0;r<numFontRanges;++r){fontRanges[r].startIndex=numPackedGlyphs;
+        for(int i=0;i<fontRanges[r].count;++i){if(numPackedGlyphs>=MAX_GLYPHS)break;u32 cp=fontRanges[r].first+i;stbtt_fontinfo*font=&fontInfo[0];u8*data=fontData[0];
+            int g=stbtt_FindGlyphIndex(font,cp);if(!g){g=GetGlyphAndFont(cp,&font,FONT_NORMAL);if(!g)continue;data=(font==&fontInfo[0])?fontData[0]:((LoadedFont*)((char*)font-__builtin_offsetof(LoadedFont,info)))->data;}
+            float h=20.0f;if(font!=&fontInfo[0])h*=1.2f;FPackRange range={h,cp,NULL,1,&fontPackedChar[numPackedGlyphs],0,0};stbtt_PackFontRanges(&pc,data,0,&range,1);
+            int idx=numPackedGlyphs++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidth=vmax(fixedNumberAdvanceWidth,fontPackedChar[idx].xadvance);
+        }
+    }
+    ttfree(pc.pack_info);GenerateAndBindTexture(&fontAtlasTex,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
+    mset(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
+    stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=3;pc2.v_oversample=3;pc2.skip_missing=1;numPackedGlyphsStopD=0;
+    for(int r=0;r<numFontRanges;++r){fontRangesStopD[r].startIndex=numPackedGlyphsStopD;
+        for(int i=0;i<fontRangesStopD[r].count;++i){if(numPackedGlyphsStopD>=MAX_GLYPHS)break;u32 cp=fontRangesStopD[r].first+i;stbtt_fontinfo*font=&fontInfo[1];u8*data=fontData[1];
+            int g=stbtt_FindGlyphIndex(font,cp);if(!g){g=GetGlyphAndFont(cp,&font,FONT_STOPD);if(!g)continue;data=(font==&fontInfo[0])?fontData[0]:((LoadedFont*)((char*)font-__builtin_offsetof(LoadedFont,info)))->data;}
+            float h=54.0f;if(font!=&fontInfo[1])h*=1.2f;FPackRange range={h,cp,NULL,1,&fontPackedCharStopD[numPackedGlyphsStopD],0,0};stbtt_PackFontRanges(&pc2,data,0,&range,1);
+            int idx=numPackedGlyphsStopD++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidthStopD=vmax(fixedNumberAdvanceWidthStopD,fontPackedCharStopD[idx].xadvance);
+        }
+    }
+    ttfree(pc2.pack_info);GenerateAndBindTexture(&fontAtlasTexStopD,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
+    OS_Free(bmp,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
+    OS_Free(fontData[0],sz1);
+    OS_Free(fontData[1],sz2);
+    OS_Free(fontData[2],fallbackFonts[0].size);
+    OS_Free(fontData[3],fallbackFonts[1].size);
+    OS_Free(fontData[4],fallbackFonts[2].size);
+    OS_Free(ttAllocs,4674 * sizeof(TAlloc));
     DebugRAM("after font load");
-    glUseProgram(textSP);
-    glUniform1i(1,2);
+    glUseProgram(textSP); glUniform1i(1,2);
     DualLog(" took %f s\n",get_time()-t0);
 }
 
-i32 CodepointToPackedIndex(i32 cp,int fontID){ if(cp<32){cp=32;} if(cp>=447){cp=446;} const GlyphRange*ranges=(fontID==FONT_STOPD)?fontRangesStopD:fontRanges; i32 total=(fontID==FONT_STOPD)?numPackedGlyphsStopD:numPackedGlyphs; for(i32 i=0;i<numFontRanges;i++){if(cp>=ranges[i].first&&cp<ranges[i].first+ranges[i].count){i32 idx=ranges[i].startIndex+vmax((cp-ranges[i].first),0);if(idx<total){return idx;}}} return 0; }
 size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
     size_t dp=0,sp=0;
     while(sp<slen&&dp<dlen-4){if(sp+1>=slen)break;u32 c=(u32)src[sp+1]<<8|src[sp];sp+=2;

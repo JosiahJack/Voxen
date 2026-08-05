@@ -1,10 +1,9 @@
 // citadel.c - Game logic.
 // TODO: Voxel GI?, Directional lights for cyberspace, Directional light for sunlight, Directional light shadowmapping just for sunlight
 #include "common.h"
-#include "lib.h"
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
-    float tanFov = vtan((float)Sys_Settings.FOV * 0.5f * PI / 180.0f), ndcX = ((World.inventoryMode ? World.cursorPosition_x : 683.0f) - 683.0f) / 384.0f, ndcY = -((World.inventoryMode ? World.cursorPosition_y : 384.0f) - 384.0f) / 384.0f;
+    float tanFov = vtan((float)Sys_Settings.FOV * 0.5f * PI / 180.0f), ndcX = ((World.inventoryMode ? World.cursorPos_x : 683.0f) - 683.0f) / 384.0f, ndcY = -((World.inventoryMode ? World.cursorPos_y : 384.0f) - 384.0f) / 384.0f;
     V3 view = V3_Normalize((V3){ndcX * tanFov,ndcY * tanFov,-1.0f}), flipForward = (V3){-fwd.x,-fwd.y,-fwd.z}; V3 up = V3_Normalize(V3_Cross(rt,flipForward));
     return (V3){view.x*rt.x + view.y*up.x + view.z*flipForward.x,view.x*rt.y + view.y*up.y + view.z*flipForward.y,view.x*rt.z + view.y*up.z + view.z*flipForward.z};
 }
@@ -73,7 +72,7 @@ void AddHardwareToInventory(int index,int hwversion,bool overt) {
     if (overt) CenterStatusPrint("%s v%d",Sys_Text.stringTable[textIdx[index] + 326],hwversion);
 }
 
-bool AddGeneralObjectToInventory(int index,int custIdx) {
+bool AddGeneralObjectToInventory(int index, int custIdx) {
     for (i8 i=1;i<14;++i) {
         if (World.invP1.generalInventoryIndexRef[i] == -1) { 
             if(!InventoryHasAnyAccessCards() && World.invP1.generalInvCurrent == 0){World.invP1.generalInvCurrent=i;} World.invP1.generalInventoryIndexRef[i]=index; 
@@ -112,8 +111,8 @@ void AddAudioLogToInventory(int index) {
 }
 
 static inline void ItemAdd(u8 *cur, u8 *counts, int idx, int uIdx, int sysIdx) { if (!counts[*cur]) {*cur=(i8)idx;} counts[idx]++; CenterStatusPrint("%s%s", Sys_Text.stringTable[uIdx + 326], Sys_Text.stringTable[sysIdx]); }
-void AddGrenadeToInventory(int i, int u) { World.invP1.grenConstIndex[i]=(i16)u; ItemAdd(&World.invP1.grenCur,World.invP1.grenAmmo,i,u,34); } // TODO, grenConstIndex needed??
-void   AddPatchToInventory(int i, int u) { if (i >= 0) ItemAdd(&World.invP1.patchCur, World.invP1.patchCounts, i, u, 35); }
+void AddGrenadeToInventory(int i, int u) { World.invP1.grenConstIndex[i]=(i16)u; ItemAdd(&World.invP1.grenCur,World.invP1.grenAmmo,i,u,34); }
+void   AddPatchToInventory(int i, int u) { if (i >= 0) ItemAdd(&World.invP1.patchCur,World.invP1.patchCounts,i,u,35); }
 static inline void GrenadeCycle(int step){int cur= World.invP1.grenCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(   World.invP1.grenAmmo[next]>0){World.invP1.grenCur =(i8)next; CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
 static inline void   PatchCycle(int step){int cur=World.invP1.patchCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(World.invP1.patchCounts[next]>0){World.invP1.patchCur=(i8)next; CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
 void RemoveGrenade(int i) { if(World.invP1.grenAmmo[i] > 0){World.invP1.grenAmmo[i]--;} if(!World.invP1.grenAmmo[i]){GrenadeCycle(-1);} }
@@ -232,16 +231,19 @@ void InventoryUpdate() {
 void AddItemFail(int index/*Expects usableItem index*/) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[318]);/*Inventory full.*/ }
 extern u8 magazinePitchCountForWeapon[16],magazinePitchCountForWeapon2[16];
 void AddItemToInventory(int index, int custIdx) {
-    if (index < 0) index = 0; // Good check on paper.
-    if (index > 110) index = 94; // Way to get a head.
-    if ((index >= 0 && index <= 5) || index == 33 || index == 35 || (index >= 52 && index < 59) || (index >= 61 && index <= 64) || (index >= 92 && index <= 101)) { if (!AddGeneralObjectToInventory(index,custIdx)) { AddItemFail(index); } }
-    else if (index == 6) { AddAudioLogToInventory(World.invP1.heldObjectCustIdx); }
-    else if (index >= 36 && index <= 51) { if (!AddWeaponToInventory(index,World.invP1.heldObjectAmmo,World.invP1.heldObjectAmmo2,World.invP1.heldObjectLoadedAlternate)) { AddItemFail(index); } }
-    else if (index == 34 || index == 81 || (index >= 83 && index <= 91) || index == 110) AddAccessCardToInventory(index);
+    if (IdxIsGenericItem(index)) { if(!AddGeneralObjectToInventory(index,custIdx)){AddItemFail(index);} }
+    else if (IdxIsAudioLog(index)) { AddAudioLogToInventory(World.invP1.heldObjectCustIdx); }
+    else if (IdxIsWeapon(index)) { if (!AddWeaponToInventory(index,World.invP1.heldObjectAmmo,World.invP1.heldObjectAmmo2,World.invP1.heldObjectLoadedAlternate)) { AddItemFail(index); } }
+    else if (IdxIsAccessCard(index)) AddAccessCardToInventory(index);
     else {
         switch (index) {
-            case 7:  AddGrenadeToInventory(0,index); break; /*Frag*/      case 8:  AddGrenadeToInventory(3,index); break; /*Concussion*/ case 9:  AddGrenadeToInventory(1,index); break; /*EMP*/ case 10: AddGrenadeToInventory(6,index); break; /*Earth Shaker*/
-            case 11: AddGrenadeToInventory(4,index); break; /*Land Mine*/ case 12: AddGrenadeToInventory(5,index); break; /*Nitropak*/   case 13: AddGrenadeToInventory(2,index); break; /*Gas*/
+            case 314: AddGrenadeToInventory(0,index); break; /*Frag*/
+            case 315: AddGrenadeToInventory(3,index); break; /*Concussion*/
+            case 316: AddGrenadeToInventory(1,index); break; /*EMP*/
+            case 317: AddGrenadeToInventory(6,index); break; /*Earth Shaker*/
+            case 318: AddGrenadeToInventory(4,index); break; /*Land Mine*/
+            case 319: AddGrenadeToInventory(5,index); break; /*Nitropak*/
+            case 320: AddGrenadeToInventory(2,index); break; /*Gas*/
             case 14: AddPatchToInventory(2,index); break; case 15: AddPatchToInventory(6,index); break; case 16: AddPatchToInventory(5,index); break; case 17: AddPatchToInventory(3,index); break;
             case 18: AddPatchToInventory(4,index); break; case 19: AddPatchToInventory(1,index); break; case 20: AddPatchToInventory(0,index); break;
             case 21: AddHardwareToInventory(0,custIdx,true); break; case 22: AddHardwareToInventory(1,custIdx,true); break; case 23: AddHardwareToInventory(2,custIdx,true); break; case 24: AddHardwareToInventory(3,custIdx,true); break;
@@ -256,6 +258,7 @@ void AddItemToInventory(int index, int custIdx) {
             case 76: AddAmmoToInventory(11,index,magazinePitchCountForWeapon[11],false); break; /*rail rounds*/          case 77: AddAmmoToInventory(13,index,magazinePitchCountForWeapon[13],false); break; /*slag magazine*/
             case 78: AddAmmoToInventory(13,index,magazinePitchCountForWeapon2[13],true); break; /*large slag magazine*/  case 79: AddAmmoToInventory(8,index,magazinePitchCountForWeapon[8],false); break; /*magpulse cartridges*/
             case 80: AddAmmoToInventory(8,index,magazinePitchCountForWeapon2[8],false); break; /*small magpulse cartridges*/
+            default: return;
         }
     }
     play_wav(sounds[87],1.0f,(V3){0},false);
@@ -799,8 +802,8 @@ void UpdateLights() {
         }
     }
 
+    glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,World.loadedLights * sizeof(Light),World.lights,GL_DYNAMIC_DRAW); // Always update the light intensity for flickers and such.
     if (lightDirty) {
-        glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,World.loadedLights * sizeof(Light),World.lights,GL_DYNAMIC_DRAW);
         glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
         glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
     }
@@ -1194,7 +1197,10 @@ void UseEntity(u16 i) {
 
 #define FROB_DISTANCE 4.9f
 static void Frob(V3 pos, V3 forward, V3 right) {
-    if (World.curLev == LEVEL_CYBERSPACE || World.uiIsBlocking) {return;} if (World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive = 0; return; } if (World.invP1.holdingObject) { DropHeldItem(); return; }
+    if (World.uiIsBlocking) {return;}
+    if (World.curLev == LEVEL_CYBERSPACE) {return;}
+    if (World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive = 0; return; }
+    if (World.invP1.holdingObject) { DropHeldItem(); return; }
     V3 dir = ScreenPointToRay(forward, right); RaycastHit h = Raycast(pos,dir,FROB_DISTANCE,LMASK_PLAYER_FROB);
     if (Cheats.showPhys) { World.debugLine_start = pos; World.debugLineFinished = World.pauseRelativeTime + 3.0; World.debugLine_end = h.hit ? h.point : (V3){dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z}; }
     if (!h.hit) { CenterStatusPrint("%s", Sys_Text.stringTable[30]); return; }
@@ -1232,7 +1238,7 @@ u16 GetCursorTexture() {
         case 352: return 1010;/*weapon_pistol*/           case 353: return 1019;/*weapon_plasma*/           case 354: return 1027;/*weapon_railgun*/             case 355: return 1035;/*weapon_riotgun*/           case 356: return 1036;/*weapon_skorpion*/
         case 357: return 1052;/*weapon_sparqbeam*/        case 358: return 1065;/*weapon_stungun*/          case 359: return 965;/*item_battery*/                case 360: return 968;/*item_battery_icad*/         case 361: return 972;/*item_logic_probe*/
         case 362: return 967;/*item_healthkit*/           case 363: return 973;/*item_plastique*/           case 365: return 766;/*item_flask*/                  case 366: return 969;/*item_chipset_bitflag*/      case 367: return 549;/*item_ammo_rubber*/
-        case 368: return 971;/*item_isotopex22*/          case 369: return 765;/*it442em_testtube*/            case 370: return 853;/*weapon_grenadefrag_live*/     case 371: return 970;/*item_chipset_isolinear*/    case 372: return 849;/*weapon_grenadeconc_live*/
+        case 368: return 971;/*item_isotopex22*/          case 369: return 765;/*it442em_testtube*/         case 370: return 853;/*weapon_grenadefrag_live*/     case 371: return 970;/*item_chipset_isolinear*/    case 372: return 849;/*weapon_grenadeconc_live*/
         case 373: return 420;/*item_ammo_needle*/         case 374: return 602;/*item_ammo_tranq*/          case 375: return 593;/*item_ammo_standard*/          case 376: return 597;/*item_ammo_teflon*/          case 377: return 411;/*item_ammo_hollow*/
         case 378: return 561;/*item_ammo_slug*/           case 379: return 419;/*item_ammo_magnesium*/      case 380: return 421;/*item_ammo_penetrator*/        case 381: return 417;/*item_ammo_hornet*/          case 382: return 577;/*item_ammo_splinter*/
         case 383: return 422;/*item_ammo_rail*/           case 384: return 551;/*item_ammo_slag*/           case 385: return 552;/*item_ammo_slaglarge*/         case 386: return 418;/*item_ammo_magcart*/         case 387: return 851;/*weapon_grenadeemp_live*/

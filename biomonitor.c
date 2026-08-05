@@ -1,6 +1,5 @@
 // biomonotor.c - Biomonitor Graph and Text displays.
 #include "common.h"
-#include "lib.h"
 #define BIOM_ERG 0
 #define BIOM_CHI 1
 #define BIOM_ECG 2

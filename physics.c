@@ -1,6 +1,5 @@
 // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
 #include "common.h"
-#include "lib.h"
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
 const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=16.666666f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.08f / 16.666666f),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
 const float WALK_SPEED=3.6f,SPRINT_SPEED=8.8f,PLAYER_MAX_CYBER_SPEED=5.0f,SPRINT_SPEED_FATIGUED=5.5f,CROUCH_SPEED=1.25f,PLAYER_MAX_PRONE_SPEED=0.5f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.6f,PLAYER_PRONE_RATIO=0.01f;

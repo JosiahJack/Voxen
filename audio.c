@@ -1,6 +1,5 @@
 // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
 #include "common.h"
-#include "lib.h"
 enum{AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS)};
 const char* sounds[SOUNDS_COUNT] = {
     "null"/*0*/, "ambient/ambient_frogs"/*1*/, "ambient/clicker"/*2*/, "ambient/compressor"/*3*/, "ambient/dishwasher"/*4*/, "ambient/drip_amb"/*5*/, "ambient/fan1"/*6*/, "ambient/generator_gas"/*7*/,
@@ -648,6 +647,7 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
 }
 
 typedef struct { mp3 dec; bool open; float fade_vol,fade_target,fade_step; u32 src_rate; u64 frames_decoded,total_frames; } mp3_channel_t;
+typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; V3 pos; size_t allocSize; } wav_channel_t;
 static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static u32 wav_count,ext_count,mp3_slot,log_frame_count,log_frame_pos; 
 static mp3_channel_t mp3_ch[2]; static float *log_samples; static size_t log_allocSize=0; static bool log_playing,mp3_paused = false;
 static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_rate, size_t* sz) {

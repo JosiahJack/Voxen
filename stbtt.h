@@ -308,6 +308,7 @@ typedef int stbrp_coord; typedef struct{int width,height,x,y,bottom_y;}stbrp_con
 typedef struct{u8 x;}stbrp_node; typedef struct{stbrp_coord x,y;int id,w,h,was_packed;}stbrp_rect;
 void stbrp_pack_rects(stbrp_context*con,stbrp_rect*rects,int n){int i;for(i=0;i<n;++i){if(con->x+rects[i].w>con->width){con->x=0;con->y=con->bottom_y;}if(con->y+rects[i].h>con->height)break;rects[i].x=con->x;rects[i].y=con->y;rects[i].was_packed=1;con->x+=rects[i].w;if(con->y+rects[i].h>con->bottom_y)con->bottom_y=con->y+rects[i].h;}for(;i<n;++i)rects[i].was_packed=0;}
 typedef struct{void*uac;void*pack_info;int width,height,stride_in_bytes,padding,skip_missing;u32 h_oversample,v_oversample;u8*pixels;}stbtt_pack_context;
+typedef struct{u16 x0,y0,x1,y1;float xoff,yoff,xadvance,xoff2,yoff2;}stbtt_packedchar;
 typedef struct{float font_size;int first_unicode_codepoint_in_range;int*array_of_unicode_codepoints;int num_chars;stbtt_packedchar*chardata_for_range;u8 h_oversample,v_oversample;}FPackRange;
 int stbtt_PackBegin(stbtt_pack_context*spc,u8* px, int pw, int ph, int str, int pad, void* a){ stbrp_context*ctx=(stbrp_context*)ttalloc(sizeof(*ctx)); *ctx=(stbrp_context){pw-pad,ph-pad,0,0,0}; if(px){mset(px,0,(size_t)(pw*ph));} return *spc=(stbtt_pack_context){a,ctx,pw,ph,str ? str : pw,pad,0,1,1,px},1; }
 void _hpre(u8*p,int w,int h,int str,u32 kw){for(int j=0;j<h;++j,p+=str){u8 buf[8]={0};int tot=0;for(int i=0;i<w;++i){if(i<=w-(int)kw){tot+=p[i]-buf[i&7];buf[(i+kw)&7]=p[i];}else tot-=buf[i&7];p[i]=(u8)(tot/kw);}}}
