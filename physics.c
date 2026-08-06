@@ -555,11 +555,12 @@ void CvxMshFillExtraPoints(CvxMshCtx* ctx) {
     }
 }
 
-INLINE bool BvhAABBOverlap(V3 aMn, V3 aMx, V3 bMn, V3 bMx) { return (aMx.x >= bMn.x && aMn.x <= bMx.x && aMx.y >= bMn.y && aMn.y <= bMx.y && aMx.z >= bMn.z && aMn.z <= bMx.z); }
 void BvhWalkAABB_CvxTri(u16 triMesh, const float* triMx, AABB3 hb, CvxMshCtx* ctx) {
     const BvhNode* nodes = modelBVHNodes[triMesh]; const u16* triOrder = modelBVHTriOrder[triMesh]; const BvhNode* stack[64]; int sp = 0; stack[sp++] = &nodes[0];
     while (sp > 0) {
-        const BvhNode* node = stack[--sp]; V3 wMn, wMx; BvhNodeWorldAABB(node, triMx, &wMn, &wMx); if (!BvhAABBOverlap(wMn, wMx, hb.mn, hb.mx)) continue;
+        const BvhNode* node = stack[--sp]; V3 wMn, wMx; BvhNodeWorldAABB(node, triMx, &wMn, &wMx);
+        bool bvhAABBOverlap = (wMx.x >= hb.mn.x && wMn.x <= hb.mx.x && wMx.y >= hb.mn.y && wMn.y <= hb.mx.y && wMx.z >= hb.mn.z && wMn.z <= hb.mx.z);
+        if (!bvhAABBOverlap) continue;
         if (node->triCount > 0) { for (u32 i = 0; i < node->triCount; i++) { V3 ta, tb, tc; MeshTri(triMesh, triOrder[node->triStart + i], triMx, &ta, &tb, &tc); CvxTriTest(ctx, ta, tb, tc); } }
         else { for (int o = 0; o < 8; o++) if (node->children[o] >= 0) stack[sp++] = &nodes[node->children[o]]; }
     }
@@ -577,6 +578,27 @@ Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* tri
     if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh, triMx, hb, &ctx); }
     else { for (u32 ti=0;ti<triCount;++ti) { V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc); } }
     CvxMshFillExtraPoints(&ctx);
+    return ctx.best;
+}
+
+void obb_axes(Quaternion q, V3 *ax, V3 *ay, V3 *az) { *ax=quat_rot_v3(q,(V3){1,0,0}); *ay=quat_rot_v3(q,(V3){0,1,0}); *az=quat_rot_v3(q,(V3){0,0,1}); }
+AABB3 BoxWorldAABB(ShapeBox b) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); V3 hx=V3_ScaleByF(x,b.hExt.x), hy=V3_ScaleByF(y,b.hExt.y), hz=V3_ScaleByF(z,b.hExt.z); V3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.ctr,e),V3_AplusB(b.ctr,e)}; }
+static Manifold BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
+    Manifold z={0}; if(triMesh>=MAX_MDLS||!modelTriangleCounts[triMesh]) return z;
+    CvxMshCtx ctx={0}; ctx.boxShape=box; ctx.adjHull=U16_MAX;
+    AABB3 hb=BoxWorldAABB(box); float skin=0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin; ctx.hb=hb;
+    ctx.hullCenter=box.ctr; ctx.hullRadius=V3_Mag(box.hExt);
+    V3 ext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(ext.x,vmax(ext.y,ext.z))*0.15f);
+    ctx.thicknessTolerance=vclamp(V3_Mag(box.hExt)*0.06f,0.003f,0.02f);
+    V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
+    V3 hx=V3_ScaleByF(ax,box.hExt.x),hy=V3_ScaleByF(ay,box.hExt.y),hz=V3_ScaleByF(az,box.hExt.z);
+    V3 bv[8]={V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz),
+              V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz),  V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
+    ctx.boxV=bv; ctx.boxN=8;
+    if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh,triMx,ctx.hb,&ctx); }
+    else { u32 triCount=modelTriangleCounts[triMesh]; for(u32 ti=0;ti<triCount;++ti){V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc);} }
+    CvxMshFillExtraPoints(&ctx);
+    if(ctx.best.n) ctx.best.normal=V3_ScaleByF(ctx.best.normal,-1.f);
     return ctx.best;
 }
 
@@ -608,27 +630,6 @@ Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 
         if (!ExpandEPA(&epa,sup,wA,wB)) break;
     }
     return m;
-}
-
-void obb_axes(Quaternion q, V3 *ax, V3 *ay, V3 *az) { *ax=quat_rot_v3(q,(V3){1,0,0}); *ay=quat_rot_v3(q,(V3){0,1,0}); *az=quat_rot_v3(q,(V3){0,0,1}); }
-AABB3 BoxWorldAABB(ShapeBox b) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); V3 hx=V3_ScaleByF(x,b.hExt.x), hy=V3_ScaleByF(y,b.hExt.y), hz=V3_ScaleByF(z,b.hExt.z); V3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.ctr,e),V3_AplusB(b.ctr,e)}; }
-static Manifold BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
-    Manifold z={0}; if(triMesh>=MAX_MDLS||!modelTriangleCounts[triMesh]) return z;
-    CvxMshCtx ctx={0}; ctx.boxShape=box; ctx.adjHull=U16_MAX;
-    AABB3 hb=BoxWorldAABB(box); float skin=0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin; ctx.hb=hb;
-    ctx.hullCenter=box.ctr; ctx.hullRadius=V3_Mag(box.hExt);
-    V3 ext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(ext.x,vmax(ext.y,ext.z))*0.15f);
-    ctx.thicknessTolerance=vclamp(V3_Mag(box.hExt)*0.06f,0.003f,0.02f);
-    V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
-    V3 hx=V3_ScaleByF(ax,box.hExt.x),hy=V3_ScaleByF(ay,box.hExt.y),hz=V3_ScaleByF(az,box.hExt.z);
-    V3 bv[8]={V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz),
-              V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz),  V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
-    ctx.boxV=bv; ctx.boxN=8;
-    if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh,triMx,ctx.hb,&ctx); }
-    else { u32 triCount=modelTriangleCounts[triMesh]; for(u32 ti=0;ti<triCount;++ti){V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc);} }
-    CvxMshFillExtraPoints(&ctx);
-    if(ctx.best.n) ctx.best.normal=V3_ScaleByF(ctx.best.normal,-1.f);
-    return ctx.best;
 }
 
 INLINE void quat_to_mat3(Quaternion q, float R[3][3]) { float x=q.x,y=q.y,z=q.z,w=q.w, xx=x*x,yy=y*y,zz=z*z, xy=x*y,xz=x*z,yz=y*z, wx=w*x,wy=w*y,wz=w*z; R[0][0]=1.0f-2.0f*(yy+zz); R[0][1]=2.0f*(xy-wz); R[0][2]=2.0f*(xz+wy); R[1][0]=2.0f*(xy+wz); R[1][1]=1.0f-2.0f*(xx+zz); R[1][2]=2.0f*(yz-wx); R[2][0]=2.0f*(xz-wy); R[2][1]=2.0f*(yz+wx); R[2][2]=1.0f-2.0f*(xx+yy); }

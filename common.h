@@ -138,7 +138,7 @@ enum {
                 MAX_PORTALS = 56 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,
     /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, CREDITS_PAGES = 22, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 768, INSTANCE_COUNT = 9000, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29,
     /*Lights*/ LIGHT_COUNT = 2200, MAX_LIGHTS_PER_VOXEL = 128, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 128, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, 
-    /*Models*/ MAX_MDLS=6000, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=20960, BVH_MAX_DEPTH=3, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=6986, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
+    /*Models*/ MAX_MDLS=6000, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=20960, BVH_MAX_DEPTH=6, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=6986, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
     /*Textures*/ MAX_TXRS = 2048, MAX_TOTAL_PIXELS = 38400780u, MAX_UNIQUE_COLORS = 120040u, MAX_WIRELINE_VRTS = 2024000, 
     /*Animations*/ MAX_ANIMCLIPS = 10, MAX_ANIMS = 52, ANIM_LOOP_ALL = 0, ANIM_IDLE_CLOSED = 0, ANIM_IDLE = 0, ANIM_INACTIVE = 0, ANIM_ATTACK_MISS = 1, ANIM_OPENING = 1, ANIM_WALK = 1, ANIM_ACTIVATE = 1, ANIM_ATTACK_HIT = 2, ANIM_ACTIVATED = 2,
                    ANIM_IDLE_OPEN = 2, ANIM_RUN = 2, ANIM_CLOSING = 3, ANIM_DEACTIVATE = 3, ANIM_ATTACK1 = 3, ANIM_ATTACK2 = 4, ANIM_INSTALL = 4, ANIM_ATTACK3 = 5, ANIM_INSTALLED = 5, ANIM_PAIN = 6, ANIM_PAIN2 = 7, ANIM_PAIN3 = 8, ANIM_DYING = 9,
@@ -391,10 +391,9 @@ typedef struct SynthVoice { SynthFn fn; u32 frame,frames; float vol,pitch; V3 po
 void synth_set_room(float size, float wet);
 void play_synth(SoundID id, float vol, float pitch);
 // Math, Vectors, Quaternions
+float sinf(float x); float tanf(float x); float cosf(float x);
 #define PI 3.14159265f
 #define TAU 6.2831853f
-#define INV_TAU (1.0f / TAU) // Precomputed for fast multiplication
-#define INV_PI  (1.0f / PI)
 #define vabs(x) ((x) < 0 ? -(x) : (x))
 #define vmin(a,b) ((a) < (b) ? (a) : (b))
 #define vmax(a,b) ((a) > (b) ? (a) : (b))
@@ -403,10 +402,10 @@ void play_synth(SoundID id, float vol, float pitch);
 INLINE float vinvsqtf(float v) { __m128 x = (__m128){v,0.0f,0.0f,0.0f}; __m128 r=__builtin_ia32_rsqrtss(x); float y = r[0]; float x2 = v * 0.5f; return y * (1.5f - x2 * y * y); }
 INLINE float vfloor(float x) { return __builtin_floorf(x); }
 INLINE float vceil(float x) { return __builtin_ceilf(x); }
-INLINE float vsinf(float x) { x -= TAU * vfloor(x * INV_TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
+INLINE float vsinf(float x) { x -= TAU * vfloor(x * (1.0f / TAU)); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
 INLINE float vcosf(float x) { return vsinf(x + 1.57079632f); }
 INLINE float vacosf(float x) { float negate = (x < 0.0f) ? 1.0f : 0.0f; x=vabs(x); float ret=(-0.0187293f*x + 0.0742610f)*x - 0.2121144f; ret=(ret*x + 1.5707288f)*vsqrtf(1.0f - x); ret=ret - 2.0f*negate*ret; return negate*PI + (1.0f - 2.0f*negate) * ret; }
-INLINE float vtan(float x) { return vsinf(x) / vcosf(x); }
+INLINE float vtan(float x) { return tanf(x)/*vsinf(x) / vcosf(x)*/; }
 INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
 INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
 INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f + fp*(0.69314718f + fp*(0.24022651f + fp*0.05550411f)); /*poly approx 2^fp on [0,1]*/ int ei=(int)ip + 127; u32 bits=(u32)(ei << 23); union{u32 i; float f;}u={bits}; return u.f*p;}
@@ -427,8 +426,9 @@ INLINE V3 V3_Cross(V3 a, V3 b) { return (V3){a.y * b.z - a.z * b.y, a.z * b.x - 
 INLINE V3 V3_Normalize(V3 v) { float len_sq = V3_dot(v,v); if (len_sq < 0.000001f){return v;} float inv_len = vinvsqtf(len_sq); return (V3){v.x * inv_len, v.y * inv_len, v.z * inv_len}; }
 INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2){float aw=q1.w,ax=q1.x,ay=q1.y,az=q1.z,bw=q2.w,bx=q2.x,by=q2.y,bz=q2.z; return (Quaternion){aw*bx+ax*bw+ay*bz-az*by,aw*by-ax*bz+ay*bw+az*bx,aw*bz+ax*by-ay*bx+az*bw,aw*bw-ax*bx-ay*by-az*bz};}
 INLINE V3 quat_rot_v3(Quaternion q, V3 v) {float x=q.x,y=q.y,z=q.z,w=q.w; float vx=v.x,vy=v.y,vz=v.z; float tx=2.0f*(y*vz-z*vy); float ty=2.0f*(z*vx-x*vz); float tz=2.0f*(x*vy-y*vx); return (V3){vx+w*tx+(y*tz-z*ty),vy+w*ty+(z*tx-x*tz),vz+w*tz+(x*ty-y*tx)};}
-INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
+INLINE float quat_angle_deg(Quaternion a, Quaternion b) { float d = vclamp(vabs(quat_dot(a, b)), 0.0f, 1.0f); return 2.0f * vacosf(d) * (180.0f / PI); }
 // Game Typechecks
+INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
 INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 760); }
 INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }

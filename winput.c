@@ -574,41 +574,51 @@ WinSysmonitor* GetCurrentMonitor() {
 }
 
 void ChangeResolution() {
-    if (resDropdownCount < 1) return;
-    resSelectedIdx = (resSelectedIdx + 1) % resDropdownCount; Sys_Settings.ScreenWidth = (u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight = (u32)resModes[resSelectedIdx].h;
-    WinSysmonitor* m = GetCurrentMonitor(); if(!m) m=GetPrimaryMonitor();
-    int mx,my; WinSysGetMonitorPos(m,&mx,&my); const vidmode* desktop = WinSysGetVideoMode(m);
-    int x = mx + (desktop->width - (int)Sys_Settings.ScreenWidth) / 2, y = my + (desktop->height - (int)Sys_Settings.ScreenHeight) / 2;
-    SetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight); SetWindowPosition(window,x,y); UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
-    resDropdownOpen = false; SaveConfig();
+    if (resDropdownCount > 1) {
+        resSelectedIdx = (resSelectedIdx + 1) % resDropdownCount; Sys_Settings.ScreenWidth = (u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight = (u32)resModes[resSelectedIdx].h;
+        WinSysmonitor* m = GetCurrentMonitor(); if(!m) m=GetPrimaryMonitor();
+        int mx,my; WinSysGetMonitorPos(m,&mx,&my); const vidmode* desktop = WinSysGetVideoMode(m);
+        int x = mx + (desktop->width - (int)Sys_Settings.ScreenWidth) / 2, y = my + (desktop->height - (int)Sys_Settings.ScreenHeight) / 2;
+        SetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight); SetWindowPosition(window,x,y); UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
+        resDropdownOpen = false; SaveConfig();
+    }
 }
 
 void GatherResolutionModes() {
     resDropdownCount = 0; WinSysmonitor* m = GetCurrentMonitor(); if (!m) m=GetPrimaryMonitor(); const vidmode* d = WinSysGetVideoMode(m); if(!d) return;
+    
     static const struct {int w,h;} cr[] = {{320,200},{640,400},{640,480},{800,600},{1024,768},{1280,720},{1280,800},{1366,768},{1440,900},{1600,900},{1920,1080},{2560,1440}};
     int maxW = d->width, maxH = d->height,j;
     for (int i = 0; i < 12 && resDropdownCount < 8; ++i) {
         if (cr[i].w > maxW || cr[i].h > maxH || cr[i].w < 320 || cr[i].h < 200) continue;
+        
         for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == cr[i].w && resModes[j].h == cr[i].h) break; }
         if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){cr[i].w,cr[i].h};
     }
+    
     if (resDropdownCount < 8) resModes[resDropdownCount++] = (ResMode){d->width,d->height};
     resSelectedIdx = 0;
     for (int i = 0; i < resDropdownCount; ++i) { if(resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight){resSelectedIdx=i; break;} }
 }
 
-void ChangeFullScreenWindowed() {
+void ChangeFullScreenWindowed(bool adjustToFit) {
     int x,y,w,h,mx,my,c; WinSysmonitor** monitors = WinSysGetMonitors(&c); WinSysmonitor* m = monitors[Sys_Settings.CurrentMonitor]; const vidmode* mo = WinSysGetVideoMode(m); WinSysGetMonitorWorkarea(m,&x,&y,&w,&h);
     window->decorated = (i32)(!Sys_Settings.Fullscreen); SetWindowDecorated(window,(i32)(!Sys_Settings.Fullscreen));
     if (Sys_Settings.Fullscreen) {SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth = w; Sys_Settings.ScreenHeight = h;}
-    else { WinSysGetMonitorPos(m,&mx,&my); Sys_Settings.ScreenWidth = vmax(vmin((w*3)/4,1366),320); Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4,768),200); SetWindowMonitor(mx + (mo->width - Sys_Settings.ScreenWidth) / 2,my + (mo->height - Sys_Settings.ScreenHeight) / 2,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); }
+    else { WinSysGetMonitorPos(m,&mx,&my);
+        
+    if (adjustToFit) {Sys_Settings.ScreenWidth = vmax(vmin((w*3)/4,1366),320); Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4,768),200); }
+    SetWindowMonitor(mx + (mo->width - Sys_Settings.ScreenWidth) / 2,my + (mo->height - Sys_Settings.ScreenHeight) / 2,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); }
     UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
 
 void CycleToNextMonitor() {
-    static double monitorSwitchTime; if (get_time() < monitorSwitchTime) return;
-    monitorSwitchTime = get_time() + 0.5; int c; WinSysmonitor** monitors = WinSysGetMonitors(&c); if (Sys_Settings.CurrentMonitor > (c - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); } if (!monitors || c < 2) return;
-    Sys_Settings.CurrentMonitor = (Sys_Settings.CurrentMonitor + 1) % c; SaveConfig(); CenterWindowOnMonitor();
+    static double monitorSwitchTime;
+    if (get_time() >= monitorSwitchTime) {
+        monitorSwitchTime = get_time() + 0.5; int c; WinSysmonitor** monitors = WinSysGetMonitors(&c);
+        if (Sys_Settings.CurrentMonitor > (c - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
+        if (monitors && c >= 2) { Sys_Settings.CurrentMonitor = (Sys_Settings.CurrentMonitor + 1) % c; SaveConfig(); CenterWindowOnMonitor(); }
+    }
 }
 
 void SetVSync() { window->context.swapInterval((i32)Sys_Settings.Vsync); }

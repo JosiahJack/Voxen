@@ -148,8 +148,8 @@ static i32 BvhBuildOctree(BvhBuildCtx* __restrict ctx, u16 m, const float* __res
     for (u32 i = 0; i < triCount; i++) { u8 o = ctx->triOctants[i]; ctx->triScratch[octantStarts[o] + octantFill[o]++] = triIdxArray[i]; }
     for (u32 i = 0; i < triCount; i++) { triIdxArray[i] = ctx->triScratch[i]; }
     for (int o = 0; o < 8; o++) {
-        if (octantCounts[o] == 0) continue;
-        i32 childIdx = BvhBuildOctree(ctx,m,pos,tris,triIdxArray + octantStarts[o],octantCounts[o],depth + 1); // <-- was missing pos,tris
+        if (octantCounts[o] == 0) {continue;}
+        i32 childIdx = BvhBuildOctree(ctx,m,pos,tris,triIdxArray + octantStarts[o],octantCounts[o],depth + 1); // We re curse a little
         if (childIdx >= 0) node->children[o] = (i16)childIdx;
     }
     return nodeIdx;

@@ -147,22 +147,6 @@ static Quaternion quat_look_rotation(V3 fwd, V3 up) {
     return q;
 }
 
-static Quaternion quat_slerp(Quaternion a, Quaternion b, float t) {
-    float d = quat_dot(a, b);
-    if (d < 0.0f) { b.x=-b.x; b.y=-b.y; b.z=-b.z; b.w=-b.w; d=-d; }
-    if (d > 0.9995f) {
-        Quaternion r = { a.x+t*(b.x-a.x), a.y+t*(b.y-a.y), a.z+t*(b.z-a.z), a.w+t*(b.w-a.w) };
-        float il = 1.0f / vsqrtf(r.x*r.x + r.y*r.y + r.z*r.z + r.w*r.w);
-        r.x*=il; r.y*=il; r.z*=il; r.w*=il;
-        return r;
-    }
-    d = vclamp(d, -1.0f, 1.0f);
-    float th0 = vacosf(d), th = th0*t, sth0 = vsinf(th0);
-    float s0 = vsinf(th0 - th) / sth0, s1 = vsinf(th) / sth0;
-    return (Quaternion){ s0*a.x+s1*b.x, s0*a.y+s1*b.y, s0*a.z+s1*b.z, s0*a.w+s1*b.w };
-}
-
-static float quat_angle_deg(Quaternion a, Quaternion b) { float d = vclamp(vabs(quat_dot(a, b)), 0.0f, 1.0f); return 2.0f * vacosf(d) * (180.0f / PI); }
 static void aiac_set_clip(Entity* self, u8 c) {
     if (self->clip == c) return;
     self->clip  = c;
@@ -329,6 +313,22 @@ static void AIEnemyInFrontChecks(Entity* self, u16 eidx) {
     V3 spos=ai_sight_pos(self), epos=World.position[eidx];
     V3 iv = V3_Normalize((V3){epos.x - spos.x,0.0f,epos.z - spos.z}); float d = V3_dot(iv,self->forward);
     flag_set(&self->entflags,EF_ENEM_IN_FOV,d > 0.800f); flag_set(&self->entflags,EF_ENEM_IN_FRONT,d > 0.300f);
+}
+
+static Quaternion quat_slerp(Quaternion a, Quaternion b, float t) {
+    float d = quat_dot(a, b);
+    if (d < 0.0f) { b.x=-b.x; b.y=-b.y; b.z=-b.z; b.w=-b.w; d=-d; }
+    if (d > 0.9995f) {
+        Quaternion r = { a.x+t*(b.x-a.x), a.y+t*(b.y-a.y), a.z+t*(b.z-a.z), a.w+t*(b.w-a.w) };
+        float il = 1.0f / vsqrtf(r.x*r.x + r.y*r.y + r.z*r.z + r.w*r.w);
+        r.x*=il; r.y*=il; r.z*=il; r.w*=il;
+        return r;
+    }
+
+    d = vclamp(d, -1.0f, 1.0f);
+    float th0 = vacosf(d), th = th0*t, sth0 = vsinf(th0);
+    float s0 = vsinf(th0 - th) / sth0, s1 = vsinf(th) / sth0;
+    return (Quaternion){ s0*a.x+s1*b.x, s0*a.y+s1*b.y, s0*a.z+s1*b.z, s0*a.w+s1*b.w };
 }
 
 static void AIFace(Entity* self, V3 goal) {
