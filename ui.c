@@ -242,6 +242,24 @@ static double RenderUI() {
         if (Sys_Input.keyStates[KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
         else if (Sys_Input.keyStates[KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
     } else if (!World.Sys_UI.vmailActive) { /* Normal UI */
+        //         if (World.Sys_UI.showBioMonitor) { /*Graph*/ /*Biomonitor texts, BPM, Patch, Fatigue*/ } if (World.Sys_UI.showEnergyTickPanel) { /*EnergyTickPanel*/ } if (World.Sys_UI.showHealthTickPanel) { /*HealthTickPanel*/ }
+//         if (World.Sys_UI.showEnergyIndicator) { /*EnergyIndicator*/ /*EnergySurge*/ /*EnergyDrainText*/ /*EnergyJPMText*/ }
+//         if (World.Sys_UI.showHealthIndicator) { /*HealthIndicator*/ /*HealthIndicatorCyber*/ }
+        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        // Health and Energy Bars
+        if (!Cheats.noHUD) {
+            RenderUIImage(1332, 2,32,32,956); // Health Indicator
+            int p1H = World.instances[PLAYER1].health; if (p1H > 255) p1H = 255;
+            for (int i=7;i>=0;--i) if (p1H > (7 - i) * 11)       RenderUIImage(1050 - (i * 16), 4,32,32,964); // Health Tick Red
+            for (int i=7;i>=0;--i) if (p1H > 88 + (7 - i) * 11)  RenderUIImage(1178 - (i * 16), 4,32,32,963); // Health Tick Orange
+            for (int i=7;i>=0;--i) if (p1H > 176 + (7 - i) * 11) RenderUIImage(1306 - (i * 16), 4,32,32,962); // Health Tick Green
+            RenderUIImage(1333,36,32,32,939); // Energy Indicator
+            int p1E = World.invP1.energy; if (p1E > 255) p1E = 255;
+            for (int i=7;i>=0;--i) if (p1E > (7 - i) * 11)       RenderUIImage(1050 - (i * 16),35,32,32,964); // Energy Tick Red
+            for (int i=7;i>=0;--i) if (p1E > 88 + (7 - i) * 11)  RenderUIImage(1178 - (i * 16),35,32,32,963); // Energy Tick Orange
+            for (int i=7;i>=0;--i) if (p1E > 176 + (7 - i) * 11) RenderUIImage(1306 - (i * 16),35,32,32,962); // Energy Tick Green
+        }
+        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //         if (World.Sys_UI.showTeleportFX) { /*TeleportFX*/ } if (World.Sys_UI.showRadiationFX) { /*RadiationFX*/ } if (World.Sys_UI.showHealingFX) { /*HealingFX*/ } if (World.Sys_UI.showShieldFX) { /*ShieldFX*/ } 
 //         if (World.Sys_UI.showShieldActivation) { /*waveup*/ /*wavedn*/ } if (World.Sys_UI.showShieldDeactivation) { /*waveup*/ /*wavedn*/ } if (World.Sys_UI.showDeathRessurectionFX) { /*spawndelaycontainers...*/ } 
         if (World.invP1.hasHardware & HW_BIO && !Cheats.noHUD) RenderUIImage(   0,200,40,40, 989); // Hw Btn: Biomonitor
@@ -255,64 +273,59 @@ static double RenderUI() {
         if (!Cheats.noHUD) {RenderUIImage(667,0,32,32,1020);} /*ShootModeButton*/
         if (World.inventoryMode && CursorIsOverBounds(667,699,0,32)) {
             World.uiIsBlocking = true;
-            if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed) ForceShootMode();
+            if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { ForceShootMode(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; }
         }
 //         if (World.Sys_UI.showTextWarnings) { /*WarningTexts...*/ } if (World.Sys_UI.showAutomapFull) { /*AutomapFullRawImage*/ /*PlayerIconFull*/ /*CloseFullmapButton*/ } if (World.Sys_UI.showMissionTimer) { /*MissionTimerT*/ /*MissionTimer*/ }
-        if (true/*World.Sys_UI.showLeftMFDPanel*/) {
-            if (MFD_LefTab == 0) { /*WeaponTabLH: WepNameTextLH, WepIconLH, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/ }
-            else if (MFD_LefTab == 1) { /*ItemTabLH: ItemIcon, ItemText, Vaporize/Apply/Use Buttons, EReaderSections, AccessCardsList, Sliders*/ }
-            else if (MFD_LefTab == 2) { /*AutomapTabLH: AutomapMask, Overlays, PlayerIcon, ZoomIn/Out/Full/Side Buttons*/ }
-            else if (MFD_LefTab == 3) { /*TargetTabLH*/ }
-            else if (MFD_LefTab == 4) { /*DataTabLH: SecurityLH, DataHeaders, ElevatorUIControl, KeycodeUIControl, SearchContents, AudioLogInfo, PuzzleGrid, PuzzleWire, SystemAnalyzer Display*/ }
-//             if (World.Sys_UI.showSensaroundLH) { /*SensaroundLH Plane*/ }
-            if (!Cheats.noHUD) {
-                RenderUIImage(-16,552,32,40,MFD_LefTab == 0 ? 1024 : 1022); RenderUIImage(-16,600,32,40,MFD_LefTab == 1 ? 1024 : 1022); RenderUIImage(-16,648,32,40,MFD_LefTab == 2 ? 1024 : 1022); RenderUIImage(-16,696,32,40,MFD_LefTab == 3 ? 1024 : 1022); /*ButtonWeapon, ButtonItem, ButtonAutomap, ButtonTarget, ButtonData*/
-            }
-//             if (World.Sys_UI.showCyberTimer) { /*CyberTimerT*/ /*CyberTimer*/ }
-        }
-        if (true/*World.Sys_UI.showCenterMFDPanel*/) {
-            if (MFD_CenterTab == 0) { /*MainTab: WeaponInventory, WeaponShotsInventory, GrenadeInventory, PatchInventory*/ }
-            else if (MFD_CenterTab == 1) { /*HardwareTab: Label, HardwareInventory*/ }
-            else if (MFD_CenterTab == 2) { /*GeneralTab: Label, GeneralInventory, AccessCards*/ }
-            else if (MFD_CenterTab == 3) { /*SoftwareTab: Label, SoftwareInventory, ICEDrill, Pulser, Turbo, Decoy, Recall*/ }
-            else if (MFD_CenterTab == 4) { /*MultiMediaDataReader: LogTableofContents, LogsLevelFolder, LogTextReader, EmailTab, DataTab, NotesTab*/ }
-//             if (World.Sys_UI.showSensaroundCenter) { /*SensaroundCenter Plane*/ }
-            if (!Cheats.noHUD) {
-                RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021); RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021); RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021); RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021); /*Main, Hardware, General, Software, AddToInventoryHelper*/
-            }
-        }
-        if (true/*World.Sys_UI.showRightMFDPanel*/) {
-            if (MFD_RightTab == 0) { /*WeaponTabRH: WepName, ClipBox, HeatTicks, Reload/Unload, EnergySlider*/ }
-            else if (MFD_RightTab == 1) { /*ItemTabRH: Icons, Actions, EReaderSections, Sliders*/ }
-            else if (MFD_RightTab == 2) { /*AutomapTabRH: AutomapMask, Zoom controls*/ }
-            else if (MFD_RightTab == 3) { /*TargetTabRH*/ }
-            else if (MFD_RightTab == 4) { /*DataTabRH: SecurityRH, Elevators, Keycodes, AudioLogs, Puzzles, SystemAnalyzer*/ }
-//             if (World.Sys_UI.showSensaroundRH) { /*SensaroundRH Plane*/ }
-            if (!Cheats.noHUD) {
-                RenderUIImage(1350,552,32,40,MFD_RightTab == 0 ? 1024 : 1022); RenderUIImage(1350,600,32,40,MFD_RightTab == 1 ? 1024 : 1022); RenderUIImage(1350,648,32,40,MFD_RightTab == 2 ? 1024 : 1022); RenderUIImage(1350,696,32,40,MFD_RightTab == 3 ? 1024 : 1022); /*ButtonWeapon, ButtonItem, ButtonAutomap, ButtonTarget, ButtonData*/
-            }
-        }
-//         if (World.Sys_UI.showBioMonitor) { /*Graph*/ /*Biomonitor texts, BPM, Patch, Fatigue*/ } if (World.Sys_UI.showEnergyTickPanel) { /*EnergyTickPanel*/ } if (World.Sys_UI.showHealthTickPanel) { /*HealthTickPanel*/ }
-//         if (World.Sys_UI.showEnergyIndicator) { /*EnergyIndicator*/ /*EnergySurge*/ /*EnergyDrainText*/ /*EnergyJPMText*/ }
-//         if (World.Sys_UI.showHealthIndicator) { /*HealthIndicator*/ /*HealthIndicatorCyber*/ }
+//         if (World.Sys_UI.showCyberTimer) { /*CyberTimerT*/ /*CyberTimer*/ }
+        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        // Left MFD
+        if (MFD_LefTab == 0) { /*WeaponTabLH: WepNameTextLH, WepIconLH, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/ }
+        else if (MFD_LefTab == 1) { /*ItemTabLH: ItemIcon, ItemText, Vaporize/Apply/Use Buttons, EReaderSections, AccessCardsList, Sliders*/ }
+        else if (MFD_LefTab == 2) { /*AutomapTabLH: AutomapMask, Overlays, PlayerIcon, ZoomIn/Out/Full/Side Buttons*/ }
+        else if (MFD_LefTab == 3) { /*TargetTabLH*/ }
+        else if (MFD_LefTab == 4) { /*DataTabLH: SecurityLH, DataHeaders, ElevatorUIControl, KeycodeUIControl, SearchContents, AudioLogInfo, PuzzleGrid, PuzzleWire, SystemAnalyzer Display*/ }
+//         if (World.Sys_UI.showSensaroundLH) { /*SensaroundLH Plane*/ }
         if (!Cheats.noHUD) {
-            RenderUIImage(1332, 2,32,32,956); // Health Indicator
-            int p1H = World.instances[PLAYER1].health; if (p1H > 255) p1H = 255;
-            for (int i=7;i>=0;--i) if (p1H > (7 - i) * 11)       RenderUIImage(1050 - (i * 16), 4,32,32,964); // Health Tick Red
-            for (int i=7;i>=0;--i) if (p1H > 88 + (7 - i) * 11)  RenderUIImage(1178 - (i * 16), 4,32,32,963); // Health Tick Orange
-            for (int i=7;i>=0;--i) if (p1H > 176 + (7 - i) * 11) RenderUIImage(1306 - (i * 16), 4,32,32,962); // Health Tick Green
-            RenderUIImage(1333,36,32,32,939); // Energy Indicator
-            int p1E = World.invP1.energy; if (p1E > 255) p1E = 255;
-            for (int i=7;i>=0;--i) if (p1E > (7 - i) * 11)       RenderUIImage(1050 - (i * 16),35,32,32,964); // Energy Tick Red
-            for (int i=7;i>=0;--i) if (p1E > 88 + (7 - i) * 11)  RenderUIImage(1178 - (i * 16),35,32,32,963); // Energy Tick Orange
-            for (int i=7;i>=0;--i) if (p1E > 176 + (7 - i) * 11) RenderUIImage(1306 - (i * 16),35,32,32,962); // Energy Tick Green
+            RenderUIImage(-16,552,32,40,MFD_LefTab == 0 ? 1024 : 1022); // Weapon
+            RenderUIImage(-16,600,32,40,MFD_LefTab == 1 ? 1024 : 1022); // Item
+            RenderUIImage(-16,648,32,40,MFD_LefTab == 2 ? 1024 : 1022); // Automap
+            RenderUIImage(-16,696,32,40,MFD_LefTab == 3 ? 1024 : 1022); // Data
+        }
+        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        // Center MFD
+        if (MFD_CenterTab == 0) { /*MainTab: WeaponInventory, WeaponShotsInventory, GrenadeInventory, PatchInventory*/ }
+        else if (MFD_CenterTab == 1) { /*HardwareTab: Label, HardwareInventory*/ }
+        else if (MFD_CenterTab == 2) { /*GeneralTab: Label, GeneralInventory, AccessCards*/ }
+        else if (MFD_CenterTab == 3) { /*SoftwareTab: Label, SoftwareInventory, ICEDrill, Pulser, Turbo, Decoy, Recall*/ }
+        else if (MFD_CenterTab == 4) { /*MultiMediaDataReader: LogTableofContents, LogsLevelFolder, LogTextReader, EmailTab, DataTab, NotesTab*/ }
+//         if (World.Sys_UI.showSensaroundCenter) { /*SensaroundCenter Plane*/ }
+        if (!Cheats.noHUD) {
+            RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021); // Main
+            RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021); // Hardware
+            RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021); // General
+            RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021); // Software
         }
         if (World.inventoryMode && World.invP1.holdingObject && CursorIsOverBounds(345,1021,460,768)) { // Add to Inventory Helper
             World.uiIsBlocking = true;
             RenderUIImage(345,460,676,308,1075);
             RenderFormattedText(586,460,T_GREEN,FONT_NORMAL,1.0f,"ADD TO INVENTORY");
-            if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) {AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem();}
+            if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; }
         }
+        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        // Right MFD
+        if (MFD_RightTab == 0) { /*WeaponTabRH: WepName, ClipBox, HeatTicks, Reload/Unload, EnergySlider*/ }
+        else if (MFD_RightTab == 1) { /*ItemTabRH: Icons, Actions, EReaderSections, Sliders*/ }
+        else if (MFD_RightTab == 2) { /*AutomapTabRH: AutomapMask, Zoom controls*/ }
+        else if (MFD_RightTab == 3) { /*TargetTabRH*/ }
+        else if (MFD_RightTab == 4) { /*DataTabRH: SecurityRH, Elevators, Keycodes, AudioLogs, Puzzles, SystemAnalyzer*/ }
+//         if (World.Sys_UI.showSensaroundRH) { /*SensaroundRH Plane*/ }
+        if (!Cheats.noHUD) {
+            RenderUIImage(1350,552,32,40,MFD_RightTab == 0 ? 1024 : 1022); // Weapon
+            RenderUIImage(1350,600,32,40,MFD_RightTab == 1 ? 1024 : 1022); // Item
+            RenderUIImage(1350,648,32,40,MFD_RightTab == 2 ? 1024 : 1022); // Automap
+            RenderUIImage(1350,696,32,40,MFD_RightTab == 3 ? 1024 : 1022); // Data
+        }
+        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------        
     }
     if (World.Sys_UI.vmailActive) {
         if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[World.Sys_UI.vmailActive]) {

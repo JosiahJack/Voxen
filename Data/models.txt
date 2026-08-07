@@ -144,7 +144,14 @@ index: 62
 index: 63
 #Models/cyber_bullet.obj
 index: 64
-
+#Models/briefcase_gib1_collider.obj
+index: 65
+#Models/briefcase_gib2_collider.obj
+index: 66
+#Models/briefcase_gib3_collider.obj
+index: 67
+#Models/hw_system_collider.obj
+index: 68
 #Models/cyber_integrity.obj
 index: 69
 
@@ -897,7 +904,8 @@ index: 644
 index: 645
 #Models/w_mk3.obj
 index: 646
-
+#Models/w_pipe_collider.obj
+index: 647
 #Models/workerhelmet.obj
 index: 648
 #Models/w_pipe.obj

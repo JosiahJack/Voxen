@@ -418,6 +418,7 @@ static V3 AIGetAStarPoint(Entity* self) {
     int best = -1; float bestD = 1e9f;
     for (int i = 0; i < 4; ++i) {
         if (!PositionVisibleFromPlayerCell(cands[i].x, cands[i].z)) continue;
+        
         float d = V3_SqDist(ep, cands[i]);
         if (d < bestD) { bestD = d; best = i; }
     }
@@ -647,6 +648,7 @@ static DamageData SetNPCData(Entity* self, int n) {
         case 2: dd.damage = npc->damage2; dd.attackType = npc->attackType2; break;
         default: dd.damage = npc->damage3; dd.attackType = npc->attackType3; break;
     }
+    
     dd.penetration = 0;
     dd.defense = 0;
     return dd;

@@ -2,24 +2,31 @@
 #include "common.h"
 #include "credits.h"
 #include "Shaders/shaders.h"
-FGL_FL glFlush; FGL_AT glActiveTexture; FGL_AS glAttachShader; FGL_CTSI2D glCopyTexSubImage2D;  FGL_BB glBindBuffer;  FGL_BBB glBindBufferBase;    FGL_CPIV glGetProgramiv;FGL_CC glClearColor;    FGL_U4F glUniform4f;        FGL_BFB glBindFramebuffer;FGL_VP glViewport;    FGL_BVA glBindVertexArray; FGL_EVAA glEnableVertexAttribArray; FGL_CFBS glCheckFramebufferStatus;            
-FGL_F glFinish; FGL_UP glUseProgram;    FGL_DM glDepthMask;    FGL_VAB glVertexAttribBinding;   FGL_DF glDepthFunc;   FGL_DC glDispatchCompute;    FGL_DB glDrawBuffers;   FGL_GSIV glGetShaderiv; FGL_BVB glBindVertexBuffer; FGL_LW glLineWidth;       FGL_LP glLinkProgram; FGL_RB glReadBuffer;       FGL_U3F glUniform3f;
-FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram; FGL_CRS glCreateShader; FGL_BFS glBlendFuncSeparate;FGL_CBFV glClearBufferFv; FGL_UB glUnmapBuffer; FGL_BD glBufferData;    
-FGL_C glClear;  FGL_DE glDrawElements;  FGL_U2UI glUniform2ui; FGL_UM4FV glUniformMatrix4fv;    FGL_GIV glGetIntegerv;FGL_GSIL glGetShaderInfoLog; FGL_U2F glUniform2f;    FGL_U1UI glUniform1ui;  FGL_GVA glGenVertexArrays;  FGL_RP glReadPixels;      FGL_SS glShaderSource;FGL_TPI glTexParameteri;   FGL_U1F glUniform1f;
-FGL_E glEnable; FGL_FF glFrontFace;     FGL_GB glGenBuffers;   FGL_FBT2D glFramebufferTexture2D;FGL_GERR glGetError;  FGL_GFS glGenFramebuffers;   FGL_GT glGenTextures;   FGL_BSD glBufferSubData;FGL_MBR glMapBufferRange;   FGL_U1I glUniform1i;      FGL_T2D glTexImage2D; FGL_BIT glBindImageTexture;FGL_BT glBindTexture;
+// Rendering
 u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,
     textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS];
+
 float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
-float modelMatrices[INSTANCE_COUNT*16]; u16** modelTriangles; u32 modelVertexCounts[MAX_MDLS]; u16 modelTriangleCounts[MAX_MDLS]; float modelBounds[MAX_MDLS]; u16 mdlsCnt; float **physPos; u16** physTris; u32* physVertCounts;
+
+// Entity Management
+float modelMatrices[INSTANCE_COUNT*16];
+
+u16** modelTriangles; u32 modelVertexCounts[MAX_MDLS]; u16 modelTriangleCounts[MAX_MDLS]; float modelBounds[MAX_MDLS]; u16 mdlsCnt; float **physPos; u16** physTris; u32* physVertCounts;
+
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; i32 threadCnt=0; u32 globalframe=0,globalframesPerLastSecond;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
-    .InputCodeSettings = {  5,/*Forward=F*/     0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/   23,/*Prone=X*/    16,/*Lean Left=Q*/   4,/*Lean Right=E*/ 45,/*Sprint=LEFT SHIFT*/ 38,/*Turn Left=LF ARROW*/ 39,/*Turn Right=RT ARROW*/ 36,/*Look Up=UP ARROW*/ 37,/*Look Down=DN ARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/
-                           27,/*Sensaround=2*/ 28,/*Lantern=3*/     29,/*Shield=4*/   30,/*Infrared=5*/      31,/*Email=6*/   32,/*Booster=7*/  33,/*Jumpjets=8*/ 56,/*Attack=LMB*/   57,/*Use=RMB*/      99,/*Menu/Back=ESCAPE*/  97,/*Toggle Mode=TAB*/    17,/*Reload=R*/           128,/*Weapon+=MWHEEL+*/ 129,/* Weapon-=MWHEEL-*/    6,/* Grenade=G*/   19,/*Grenade + = T*/
-                          131,/*Grenade-=*/    21,/*Ammo Type=V*/    9,/*Patch Use=J*/ 8,/*Patch+=I*/       132,/*Patch-=,*/  12,/*Full Map=M*/ 21,/*Swim Up= V*/  2,/*Swim Down=C*/ 102,/*Console=`*/   101/*Screenshot=F12*/},
+    .InputCodeSettings = {  5,/*Forward=F*/      0,/*Strafe Left=A*/      18,/*Backpedal=S*/        3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/        2,/*Crouch=C*/     23,/*Prone=X*/      16,/*Lean Left=Q*/       4,/*Lean Right=E*/
+                           45,/*Sprint=LSHIFT*/ 38,/*Turn Left=LARROW*/   39,/*Turn Right=RARROW*/ 36,/*Look Up=UARROW*/  37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/ 27,/*Sensaround=2*/     28,/*Lantern=3*/
+                           29,/*Shield=4*/      30,/*Infrared=5*/         31,/*Email=6*/           32,/*Booster=7*/       33,/*Jumpjets=8*/       56,/*Attack=LMB*/   57,/*Use=RMB*/      99,/*Menu/Back=ESCAPE*/ 97,/*Toggle Mode=TAB*/
+                           17,/*Reload=R*/     128,/*Weapon+=MWHEEL+*/   129,/* Weapon-=MWHEEL-*/   6,/* Grenade=G*/      19,/*Grenade + = T*/   131,/*Grenade-=*/    21,/*Ammo Type=V*/
+                           9,/*Patch Use=J*/     8,/*Patch+=I*/          132,/*Patch-=,*/          12,/*Full Map=M*/      21,/*Swim Up= V*/        2,/*Swim Down=C*/ 102,/*Console=`*/   101/*Screenshot=F12*/},
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
-InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false};
+    
+InputSystem Sys_Input;
+TextSystem Sys_Text;
+CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false};
 static bool shadowBuffersCreated = false;
 CamView camViews[64],levelCamViews[14][64]; u8 camViewCount,levelCamViewCount[14]; u32 camViewTextures[64],levelCamViewTextures[14][64],drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
@@ -141,7 +148,18 @@ typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdF
 int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
 void cmd_noclip() { Cheats.noclip = !Cheats.noclip; if (Cheats.noclip) { World.velocity[PLAYER1] = (V3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
 void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; if (Cheats.showPhys) {CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
-void EnableCheatArsenal(u8 level) { (void)level; } // TODO
+void EnableCheatArsenal(u8 level) {
+    switch(level) {
+        case 1: // pipe, dartgun, pistol, sparqbeam, stungun, ammo tranq, ammo tranq, ammo needle, ammo needle, ammo needle, ammo standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader
+        case 2: // card std, pipe, dartgun, pistol, sparqbeam, tranq, needle, needle, needle, standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader, standard, tefl, standard, grenfrag, grengas
+        case 3: // card std, card eng, card sci, dartgun, pistol, sparqbeam, needle, needle, needle, standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader, standard, teflon, standard, grenfrag, grengas, grenfrag, teflon, standard, grenmine
+        case 4: // flechette, card eng, card sci, card std, rapier, dartgun, pistol, sparqbeam, needle, needle, needle, standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader, standard, teflon, standard, grenfrag, grengas, grenfrag, teflon, standard, grenmine, hornet, splinter, hornet
+        case 6: // flechetter, magnum, card eng, card sci, card std, rapier, pistol, sparqbeam, standard, battery, battery, grenconc, medi, medi, navunit, system, ereader, standard, teflon, standard, grenfrag, grenfrag, teflon, hollow, standard, grenmine, hornet, splinter, hornet, hollow
+        case 7: // flechetter, magnum, magpulse, shield, card eng, card sci, card std, grenemp, rapier, pistol, battery, battery, grenconc, medi, blaster, medi, magcart, navunit, system, ereader, teflon, standard, grenfrag, grenfrag, hollow, hornet, splinter, hornet, hollow, battery, hollow, hornet, grenconc, grenemp
+        case 8: // skorpion, slaglarge, slag, flechette, magnum, mk3, magpulse, shield, card eng, card sci, card std, grenemp, rapier, ionrifle, grenconc, medi, medi, magcart, navunit, system, ereader, grenmine, grenearth, grenfrag, grenfrag, hollow, grennitro, icad, splinter, hollow, magnesium, hollow, hornet, grenconc, grenemp, slag, slug, icad, grenconc, grenmine, grenmine, grenmine, grenmine, grenearth, grennitro, magnesium, magnesium, slug, slug
+        case 9: break; // skorpion, slaglarge, slag, magnum, mk3, magpulse, shield, grenemp, rapier, ionrifle, grenconc, medi, medi, magcart, navunit, ereader, grenmine, grenearth, grenfrag, grenfrag, hollow, grennitro, icad, hollow, magnesium, hollow, healthkit, grenconc, grenemp, slag, icad, grenearth, grennitro, magnesium, magnesium, slug, magcart, plasma, magcart, medi, icad, healthkit
+    }
+} // TODO
 void cmd_kill() { World.instances[PLAYER1].health = World.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
 void cmd_undo() { if (Cheats.editMode) { CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } } // TODO actually track and despawn last
 void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; float shakeForce = (force < 0.48f) ? force : 0.48f; (void)shakeForce; } // TODO actually shake
