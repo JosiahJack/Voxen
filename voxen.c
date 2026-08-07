@@ -1029,7 +1029,7 @@ void InitalizeEnvironment() {
     DebugRAM("program start"); DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\nEntity size: %u\n",sizeof(Entity));
     SetLevelPointers(0); WindowInit(); threadCnt = clamp(OS_GetNumThreads(),1,32); globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.cursorPos_x=680,World.cursorPos_y=384;
     World.numLevels=MAX_LEVELS; World.startLevel=1/*medical*/; LoadConfig();/*Get settings before setting window size.*/ window = VCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); CenterWindowOnMonitor(); SetGLContext_GetFunctionPointers();
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); ((WinSyswindow*)window)->context.swapBuffers(((WinSyswindow*)window)); // Black out the window as early as possible for better presentation.
+    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); // Black out the window as early as possible for better presentation.
     i32 major=0,minor=0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor); if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
     glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/); glClearColor(0,0,0,1);
@@ -1109,7 +1109,7 @@ i32 main() {
         Render(false/*!camview*/,0u);
         if (ScrshotPressed() && World.current_time > World.screenshotTimeout) Screenshot();
         ResetInput(); globalframe++; World.cpuTime = get_time() - World.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.
-        ((WinSyswindow*)window)->context.swapBuffers(((WinSyswindow*)window)); // Present frame (almost always waiting for GPU since GPU bound).
+        ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); // Present frame (almost always waiting for GPU since GPU bound).
         CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
         { static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (globalframe == dbgFrm[d]) {DebugRAM(dbgLbl[d]); break;} }
     }

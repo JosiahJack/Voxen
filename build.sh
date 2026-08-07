@@ -94,19 +94,19 @@ EOF
 LINUX_CC="zig cc"
 WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wframe-larger-than=65536"
 COMMON_CFLAGS="-ferror-limit=500 -fno-stack-protector -fno-unwind-tables -Wno-format-nonliteral -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
-               -Wshadow -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -Wno-switch -fdeclspec -fomit-frame-pointer -g0 -fstrict-aliasing \
-               -Wno-overlength-strings -fno-math-errno -fno-sanitize=all -fno-trapping-math -fmerge-all-constants -m64 -O3 -march=haswell -mf16c -mavx -Wbool-conversion -Wno-empty-body -nostdinc"
+               -Wshadow -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -Wno-switch -fdeclspec -fomit-frame-pointer -g0 \
+               -Wno-overlength-strings -fno-math-errno -fno-sanitize=all -fno-trapping-math -m64 -O3 -march=haswell -mf16c -mavx -Wbool-conversion -Wno-empty-body -nostdinc"
 COMMON_LFLAGS="-Wl,-z,relro,-z,now,--gc-sections,--as-needed,--build-id=none"
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
-    CFLAGS="-D_WIN32 $COMMON_CFLAGS -mno-stack-arg-probe -Wl,-Bstatic -lmingw32 -lmingwex"
+    CFLAGS="-D_WIN32 $COMMON_CFLAGS -fno-strict-aliasing -Wl,-Bstatic -lmingw32 -lmingwex"
     LDFLAGS="$COMMON_LFLAGS -L. -lgdi32 -lole32 -static-libgcc"
     BINARY_NAME="voxen.exe"
 else
     CC=$LINUX_CC
     LINKER=$CC
-    CFLAGS="$COMMON_CFLAGS -fno-plt -fno-semantic-interposition -fno-builtin"
+    CFLAGS="$COMMON_CFLAGS -fstrict-aliasing -fmerge-all-constants -fno-plt -fno-semantic-interposition -fno-builtin"
     LDFLAGS="$COMMON_LFLAGS -target x86_64-linux-gnu.2.7 -ldl"
     BINARY_NAME="voxen"
 fi
@@ -123,9 +123,8 @@ if ! $IS_CI; then
     case "$PLATFORM" in
 #         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
         windows)  wine ./voxen.exe ;;
-        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
-#         *)        strip --strip-all --strip-unneeded ./voxen; ./voxen ;;   # linux Alternate build methods to be able to look at symbols and debugging
-#         *)        ./voxen ;;   # linux
+#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+        *)        ./voxen ;;   # linux
     esac
     rm -f ./Shaders/*.h "$TEMP_DIR"/*.o ./voxen.upx ./voxen.pdb #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi
