@@ -160,7 +160,8 @@ index: 70
 index: 71
 #Models/cyberplayer.obj
 index: 72
-
+#Models/g_frag_collider.obj
+index: 73
 #Models/desk01.obj
 index: 74
 #Models/desk02.obj
@@ -183,7 +184,28 @@ index: 81
 index: 82
 #Models/cyber_switch_000004.obj
 index: 83
-
+#Models/g_conc_collider.obj
+index: 84
+#Models/g_emp_collider.obj
+index: 85
+#Models/g_eshaker_collider.obj
+index: 86
+#Models/g_mine_collider.obj
+index: 87
+#Models/g_nitro_collider.obj
+index: 88
+#Models/g_gas_collider.obj
+index: 89
+#Models/hw_targetid_collider.obj
+index: 90
+#Models/hw_shield_collider.obj
+index: 91
+#Models/workerhelmet_lflap.obj
+index: 92
+#Models/workerhelmet_rflap.obj
+index: 93
+#Models/workerhelmet_collider.obj
+index: 94
 #Models/eng1_1d.obj
 index: 95
 #Models/eng1_1.obj
@@ -238,7 +260,8 @@ index: 119
 index: 120
 #Models/eng2_5_slice45.obj
 index: 121
-
+#Models/workerhelmet_lflap_collider.obj
+index: 122
 #Models/exec1_1d.obj
 index: 123
 #Models/exec1_1.obj
@@ -401,7 +424,8 @@ index: 211
 index: 212
 #Models/lift1.obj
 index: 213
-
+#Models/workerhelmet_rflap_collider.obj
+index: 214
 #Models/lift2.obj
 index: 215
 #Models/light_emergsignal.obj
@@ -572,8 +596,10 @@ index: 297
 index: 298
 #Models/npc_autobomb.obj
 index: 299
-
-
+#Models/g_nitro_inactive.obj
+index: 300
+#Models/g_nitro_inactive_collider.obj
+index: 301
 #Models/npc_cyberdog.obj
 index: 302
 #Models/npc_cyberguard1.obj
@@ -582,12 +608,24 @@ index: 303
 index: 304
 #Models/npc_cyberreaver.obj
 index: 305
-
+#Models/logic_probe_collider.obj
+index: 306
 #Models/npc_cyborgassassin_throwingstar.obj
 index: 307
-
-
-
+#Models/plastique_collider.obj
+index: 308
+#Models/w_mk3_collider.obj
+index: 309
+#Models/w_blaster_collider.obj
+index: 310
+#Models/w_dartgun_collider.obj
+index: 311
+#Models/w_flechette_collider.obj
+index: 312
+#Models/w_ionrifle_collider.obj
+index: 313
+#Models/w_rapier_collider.obj
+index: 314
 
 #Models/reac1_1_slice45.obj
 index: 339

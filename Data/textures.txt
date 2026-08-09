@@ -934,7 +934,6 @@ index: 407
 index: 408
 #Textures/isolinearchipset.png
 index: 409
-
 // 410 used for bugfix at top
 #Textures/UI/frobicons/amm_hollow.png
 index: 411
@@ -1391,17 +1390,22 @@ index: 625
 #Textures/UI/frobicons/card_group5.png
 index: 626
 transparent: 1
-
+#Textures/g_emp01_active_glow.png
+index: 627
+#Textures/g_eshaker_active_glow.png
+index: 628
 #Textures/UI/frobicons/card_group6.png
 index: 629
 transparent: 1
-
+#Textures/g_frag01_active_glow.png
+index: 630
 #Textures/pnl8.png
 index: 631
 #Textures/UI/frobicons/card_medi.png
 index: 632
 transparent: 1
-
+#Textures/chipset_bitflag.png
+index: 633
 #Textures/pnl9.png
 index: 634
 #Textures/UI/frobicons/card_per1.png

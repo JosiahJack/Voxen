@@ -77,6 +77,7 @@ void ForceInventoryMode() { if (!World.inventoryMode) {World.inventoryMode = tru
 void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
 void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void MenuGoBack(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot); void ApplyPlayerMovements(float dt); void PollEvents();
+extern u16 editModeTestEntityDefinition;
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     if (window_has_focus) {
@@ -98,7 +99,21 @@ void InputProcessing() {
         if (Sys_Input.keyStates[KEY_N].pressed) play_synth(SND_PLASTIC_TAP,0.2f,1.0f);
         if (Sys_Input.keyStates[KEY_M].pressed) play_synth(SND_CRACKLE,0.2f,1.0f);
 
-
+        if (Sprint() && Sys_Input.keyStates[KEY_R].pressed) {
+            bool foundValidDynamic = false;
+            while (!foundValidDynamic) {
+                editModeTestEntityDefinition--;
+                if (editModeTestEntityDefinition < 307) editModeTestEntityDefinition = 767;
+                if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true;
+            }
+        } else if (Sys_Input.keyStates[KEY_R].pressed) {
+            bool foundValidDynamic = false;
+            while (!foundValidDynamic) {
+                editModeTestEntityDefinition++;
+                if (editModeTestEntityDefinition > 767) editModeTestEntityDefinition = 307;
+                if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true;
+            }
+        }
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
         if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; SaveGame(7,"quicksave"); return; }
         if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
