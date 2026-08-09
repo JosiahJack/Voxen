@@ -2582,8 +2582,7 @@ index: 1162
 index: 1163
 #Textures/sequences/scr_exp06.png
 index: 1164
-#Textures/sequences/telepad_00_glow.png
-index: 1165
+
 #Textures/sequences/telepad_00.png
 index: 1166
 #Textures/sequences/telepad_01.png
@@ -3240,16 +3239,15 @@ index: 1487
 index: 1488
 #Textures/sequences/shodanstatic_36.png
 index: 1489
-#Textures/sequences/telepad_00.png
-index: 1490
-#Textures/sequences/telepad_01.png
-index: 1491
-#Textures/sequences/telepad_02.png
-index: 1492
-#Textures/sequences/telepad_03.png
-index: 1493
 #Textures/sequences/telepad_00_glow.png
-index: 1494
+index: 1490
+#Textures/sequences/telepad_01_glow.png
+index: 1491
+#Textures/sequences/telepad_02_glow.png
+index: 1492
+#Textures/sequences/telepad_03_glow.png
+index: 1493
+
 #Textures/sequences/medscreen13_00.png
 index: 1495
 #Textures/sequences/medscreen13_01.png

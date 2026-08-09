@@ -450,6 +450,49 @@ void UpdateScreenSize(i32 width, i32 height) {
     glBindFramebuffer(GL_FRAMEBUFFER,0); ignore_next_mouse_delta = true;
 }
 #include "ui.c"
+// Lights
+#define INVSQRT2 0.70710678118f
+Quaternion cubeQuats[6] = {{0.0f,INVSQRT2,0.0f,INVSQRT2}/*+X:Right*/,{0.0f,-INVSQRT2,0.0f,INVSQRT2}/*-X:Left*/,{-INVSQRT2,0.0f,0.0f,INVSQRT2}/*+Y:Up*/,{INVSQRT2,0.0f,0.0f,INVSQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
+void UpdateLights() {
+    bool lightDirty = false;
+    for (u16 lightIdx=0;lightIdx<World.loadedLights;++lightIdx) {
+        V3 lightPos = World.lightsNewPosition[lightIdx];
+        World.lights[lightIdx].pos = lightPos;
+        if (World.lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
+            lightDirty = true;
+            flag_set(&World.lights[lightIdx].lflags,LDIRTY,false);
+            #pragma GCC unroll 6 // Update to new position
+            for (int j=0;j<6;++j) { mat4_lookat_from((float*)lightView[lightIdx][j],&cubeQuats[j],lightPos); mul_mat4((float*)lightViewProj[lightIdx][j],shadowmapsPerspectiveProjection,(float*)lightView[lightIdx][j]); ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j],lightFrustumPlanes[lightIdx][j]); }
+        }
+    }
+    if (!World.paused && !World.menuActive) {
+        for (int i=0;i<World.loadedLights;++i) { // Just lerps/flickers in intensity
+            if (World.lanims[i].numIntervalSteps < 1) continue;
+            if (!(World.lights[i].lflags & LIGHTON)) { World.lights[i].intensity = 0.0f; continue; }
+            if (World.lanims[i].lerpTime < (float)World.pauseRelativeTime) {
+                World.lights[i].intensity = World.lanims[i].lerpUp ? World.lights[i].maxIntensity : World.lights[i].minIntensity; // Pick target to lerp towards
+                World.lanims[i].lerpUp = !World.lanims[i].lerpUp;
+                World.lanims[i].currentStep++; if (World.lanims[i].currentStep >= World.lanims[i].numIntervalSteps) World.lanims[i].currentStep = 0; // Wrap and start over continuous looping
+                World.lanims[i].lerpStepTime = World.lanims[i].intervalSteps[World.lanims[i].currentStep];
+                World.lanims[i].lerpTime = (float)World.pauseRelativeTime + World.lanims[i].lerpStepTime;
+                World.lanims[i].lerpStartTime = (float)World.pauseRelativeTime;
+            } else if (World.lights[i].lflags & LERPON) {
+                if (World.lanims[i].currentStep < World.lanims[i].numLerpSteps) {
+                    if (World.lanims[i].stepIsLerping[World.lanims[i].currentStep]) {
+                        World.lanims[i].lerpValue = ((float)World.pauseRelativeTime - World.lanims[i].lerpStartTime)/(World.lanims[i].lerpTime - World.lanims[i].lerpStartTime); // percent towards goal time
+                        float lerpVal = World.lanims[i].lerpUp ? World.lanims[i].lerpValue : (1.0f - World.lanims[i].lerpValue);
+                        World.lanims[i].lerpValue = World.lights[i].minIntensity + ((World.lights[i].maxIntensity - World.lights[i].minIntensity) * lerpVal);
+                        World.lights[i].intensity = World.lanims[i].lerpValue;
+                    }
+                }
+            }
+        }
+    }
+
+    glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,World.loadedLights * sizeof(Light),World.lights,GL_DYNAMIC_DRAW); // Always update the light intensity for flickers and such.
+    if (lightDirty) { glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z); glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1); }
+}
+// Shadowmapping
 #define SHADOW_NEARMESH_MAX 2048
 typedef struct {float depth; u16 index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
@@ -520,33 +563,25 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     u16 numCandidates = 0;
     for (u16 i = 0; i < World.loadedLights; ++i) {
         if (unlikely(!(World.lights[i].lflags & SHADON) || !(World.lights[i].lflags & LIGHTON))) continue;
-        
         V3 lightPos = World.lights[i].pos;
         float intensity = World.lights[i].maxIntensity;
         if (unlikely(intensity < 0.1f)) continue;
-        
         float range = World.lights[i].range;
         float luminosity = (intensity / (range * range));
         if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
-        
         u16 cellX = PosGetCellCoordX(lightPos.x), cellZ = PosGetCellCoordZ(lightPos.z);
         int lightCellIdx = (cellZ * WORLDX) + cellX;
         u8 r = vmax(vceil(range * (1.0f / CELLSZ)),2);
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r);
         if (!inPVS) continue;
-        
         float dx = lightPos.x - playerPos.x, dy = lightPos.y - playerPos.y, dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
         float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z);
         if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
-        
-        candidates[numCandidates++] = i;
-        if (numCandidates >= MAX_SHADOWMAPS) break;
+        candidates[numCandidates++] = i; if (numCandidates >= MAX_SHADOWMAPS) break;
     }
-    
     if (numCandidates == 0) { shadowTime = get_time() - shadowStartTime; return; }
-
     u32 numCasters = 0;
     for (int i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
         if (EntNotVisible(i, (World.instances[i].entflags & EF_NO_SHADOWS)) ||
@@ -554,7 +589,6 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         shadowCasterIndices[numCasters++] = i;
         if (numCasters >= SC_MAX) break;
     }
-
     u32 i = 0;
     for (; i + 8 <= numCasters; i += 8) {
         float lx[8], ly[8], lz[8], lr[8], lsr[8];
@@ -575,12 +609,9 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     }
     for (; i < numCasters; ++i) { u16 j = shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
     const u32 numCastersAligned = numCasters & ~7u;
-
-    /* Issue clear early so GPU executes concurrently with CPU SIMD */
     glUseProgram(shadowmapsClearSP); glDispatchCompute(groupX_shadClear, 6, numCandidates);
     shadDrawCalls = 0U;
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP);
-
     u32 shadowmapOffsetHead = 0U;
     u16 shadowMapIdx = 0;
     u32 currentSortKey = 0xFFFFFFFF;
@@ -591,7 +622,6 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     bool useDetail = Sys_Settings.ModelDetail;
     typedef struct { u32 sortKey; u16 instanceIdx; } SortedMesh;
     SortedMesh localMeshes[SHADOW_NEARMESH_MAX];
-
     for (u16 c = 0; c < numCandidates; ++c) {
         u16 lightIdx = candidates[c];
         V3 lpos = World.lights[lightIdx].pos;
@@ -625,7 +655,6 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         u8 faceMask = (u8)(_mm256_movemask_ps(visible) & 0x3F);
         for (u8 face = 0; face < 6; ++face) { if (!(faceMask & (1u << face))) { if (SphereInFrustum(lightFrustumPlanes[lightIdx][face], playerPos, 0.48f)) {faceMask |= (u8)(1u << face);} } }
         if (faceMask == 0) continue;
-
         const __m256 lposX = _mm256_set1_ps(lpos.x);
         const __m256 lposY = _mm256_set1_ps(lpos.y);
         const __m256 lposZ = _mm256_set1_ps(lpos.z);
@@ -646,44 +675,33 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
             const __m256 radSum   = _mm256_add_ps(effR, r);
             const __m256 radSumSq = _mm256_mul_ps(radSum, radSum);
             const __m256 inRange  = _mm256_cmp_ps(distSq, radSumSq, _CMP_LT_OQ);
-
             const __m256 absX = _mm256_andnot_ps(signMask, dx);
             const __m256 absY = _mm256_andnot_ps(signMask, dy);
             const __m256 absZ = _mm256_andnot_ps(signMask, dz);
-
-            /* Optimized Face Math: A > |B| && A > |C| <==> A > max(|B|, |C|) */
-            const __m256 maxAbsYZ = _mm256_max_ps(absY, absZ);
+            const __m256 maxAbsYZ = _mm256_max_ps(absY, absZ); // Face Math: A > |B| && A > |C| <==> A > max(|B|, |C|)
             const __m256 maxAbsXZ = _mm256_max_ps(absX, absZ);
             const __m256 maxAbsXY = _mm256_max_ps(absX, absY);
-
             const __m256 negMaxAbsYZ = _mm256_or_ps(maxAbsYZ, signMask);
             const __m256 negMaxAbsXZ = _mm256_or_ps(maxAbsXZ, signMask);
             const __m256 negMaxAbsXY = _mm256_or_ps(maxAbsXY, signMask);
-
             const __m256 dxp = _mm256_add_ps(dx, sr);
             const __m256 posXface = _mm256_cmp_ps(dxp, maxAbsYZ, _CMP_GT_OQ);
             const __m256 dxm = _mm256_sub_ps(dx, sr);
             const __m256 negXface = _mm256_cmp_ps(dxm, negMaxAbsYZ, _CMP_LT_OQ);
-
             const __m256 dyp = _mm256_add_ps(dy, sr);
             const __m256 posYface = _mm256_cmp_ps(dyp, maxAbsXZ, _CMP_GT_OQ);
             const __m256 dym = _mm256_sub_ps(dy, sr);
             const __m256 negYface = _mm256_cmp_ps(dym, negMaxAbsXZ, _CMP_LT_OQ);
-
             const __m256 dzp = _mm256_add_ps(dz, sr);
             const __m256 posZface = _mm256_cmp_ps(dzp, maxAbsXY, _CMP_GT_OQ);
             const __m256 dzm = _mm256_sub_ps(dz, sr);
             const __m256 negZface = _mm256_cmp_ps(dzm, negMaxAbsXY, _CMP_LT_OQ);
-
             const __m256 anyFace = _mm256_or_ps(_mm256_or_ps(posXface, negXface),_mm256_or_ps(_mm256_or_ps(posYface, negYface), _mm256_or_ps(posZface, negZface)));
             const __m256 valid = _mm256_and_ps(inRange, anyFace);
             unsigned mask = (unsigned)_mm256_movemask_ps(valid);
             while (mask) {
                 int bit = __builtin_ctz(mask); mask &= mask - 1;
-                if (unlikely(nearbyMeshCount >= SHADOW_NEARMESH_MAX)) {
-                    DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx);
-                    k = numCastersAligned; break;
-                }
+                if (unlikely(nearbyMeshCount >= SHADOW_NEARMESH_MAX)) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); k = numCastersAligned; break; }
                 u16 instIdx = sc_origIdx[k + bit];
                 Entity* e = &World.instances[instIdx];
                 u16 modelType = (instanceIsLODArray[instIdx] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex;
@@ -693,7 +711,6 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
             }
             if (k == numCastersAligned && nearbyMeshCount >= SHADOW_NEARMESH_MAX) break;
         }
-        
         if (nearbyMeshCount < SHADOW_NEARMESH_MAX) {
             for (; k < numCasters; ++k) {
                 V3 d = V3_AsubB(World.position[sc_origIdx[k]], lpos);
@@ -712,21 +729,18 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
             }
         }
         if (nearbyMeshCount == 0) continue;
-
         for (u16 j = 1; j < nearbyMeshCount; ++j) { SortedMesh key = localMeshes[j]; int sk = (int)j - 1; while(sk >= 0 && localMeshes[sk].sortKey > key.sortKey){localMeshes[sk + 1]=localMeshes[sk]; --sk;} localMeshes[sk + 1] = key; }
-
         glUniform3f(3, lpos.x, lpos.y, lpos.z);
         shadowmapIndirectionList[lightIdx] = shadowMapIdx; ++shadowMapIdx;
         #pragma GCC unroll 6
         for (u8 face = 0; face < 6; ++face) {
             if (!(faceMask & (1u << face))) continue;
-            glUniform1ui(2, face);
-            glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
-            glUniform1ui(7, shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
-            for (u16 j = 0; j < nearbyMeshCount; ++j) {
-                u16 instIdx = localMeshes[j].instanceIdx;
-                u32 sortKey = localMeshes[j].sortKey;
-                glUniform1ui(0, instIdx);
+            glUniform1ui(2,face);
+            glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
+            glUniform1ui(7,shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
+            for (u16 j=0;j<nearbyMeshCount;++j) {
+                u16 instIdx = localMeshes[j].instanceIdx; u32 sortKey = localMeshes[j].sortKey;
+                glUniform1ui(0,instIdx);
                 if (currentSortKey != sortKey) {
                     currentSortKey = sortKey;
                     u16 modelType = (u16)(sortKey >> 16);

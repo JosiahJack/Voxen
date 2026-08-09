@@ -286,8 +286,6 @@ void CyberWallConwaySignal(u16 self) { Entity* e = &World.instances[self]; e->an
 
 void SearchFXResetEnable(u16 self) { Entity* e = &World.instances[self]; if (e->itemLifeTime <= 0.0f) {e->itemLifeTime = 3.0f;} e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
-void ExplosionLifeInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if(e->tickTime <= 0.0f){e->tickTime = 0.05f;} if(e->delay <= 0.0f){e->delay = 0.8f;} e->delayFinished = World.pauseRelativeTime + e->delay; }
-void ExplosionLifeUpdate(u16 self) { Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE) || e->delayFinished >= World.pauseRelativeTime) {return;} if (e->dontReset){flag_set(&e->entflags,EF_ACTIVE,false);} else{DeleteInstance(self);} }
 void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
 void DelayedSpawnUpdate(u16 self) {
     Entity* e = &World.instances[self]; if(!e->active || e->timerFinished >= World.pauseRelativeTime){return;} e->active = false; if(!e->doSelfAfterList){return;}
@@ -323,7 +321,7 @@ void FuncWallUpdate(u16 self) {
 // ForceBridge
 void func_forcebridge(u16 self) {
     Entity* e = &World.instances[self];
-    e->tickTime = 0.05f; e->tickFinished = World.pauseRelativeTime + e->tickTime + (double)random_range(0.0f,1.0f); e->lerping = true;
+    e->tickFinished = World.pauseRelativeTime + 0.05f + (double)random_range(0.0f,1.0f); e->lerping = true;
     if(e->activatedScale.x <= 0.02f){e->activatedScale.x = 2.56f;} if(e->activatedScale.y <= 0.02f){e->activatedScale.y = 0.08f;} if(e->activatedScale.z <= 0.02f){e->activatedScale.z = 2.56f;}
     if(!e->active){ e->modelIndex=MAX_MDLS; World.col[self]=COLTYPE_NONE;}
     switch (e->fieldColor) {
@@ -341,17 +339,17 @@ void ForceBridgeDeactivate(u16 self, bool isSilent) { Entity* e = &World.instanc
 void ForceBridgeToggle(u16 self) { if (World.instances[self].active) {ForceBridgeDeactivate(self,false); } else {ForceBridgeActivate(self,false);} }
 void ForceBridgeUpdate(u16 self) {
     Entity* e = &World.instances[self]; if (e->tickFinished >= World.pauseRelativeTime) return;
-    e->tickFinished = World.pauseRelativeTime + e->tickTime;
+    e->tickFinished = World.pauseRelativeTime + 0.05f;
     if (e->active) {
         if (!e->lerping) return;
-        float sx = e->forceFieldDirectionX ? lerp(World.scale[self].x,e->activatedScale.x,e->tickTime*2.0f) : World.scale[self].x;
-        float sy = e->forceFieldDirectionY ? lerp(World.scale[self].y,e->activatedScale.y,e->tickTime*2.0f) : World.scale[self].y;
-        float sz = e->forceFieldDirectionZ ? lerp(World.scale[self].z,e->activatedScale.z,e->tickTime*2.0f) : World.scale[self].z;
+        float sx = e->forceFieldDirectionX ? lerp(World.scale[self].x,e->activatedScale.x,0.1f) : World.scale[self].x;
+        float sy = e->forceFieldDirectionY ? lerp(World.scale[self].y,e->activatedScale.y,0.1f) : World.scale[self].y;
+        float sz = e->forceFieldDirectionZ ? lerp(World.scale[self].z,e->activatedScale.z,0.1f) : World.scale[self].z;
         World.scale[self] = (V3){sx,sy,sz}; if (vabs(e->activatedScale.x - sx) < 0.08f && vabs(e->activatedScale.y - sy) < 0.08f && vabs(e->activatedScale.z - sz) < 0.08f) { World.scale[self] = e->activatedScale; e->lerping = false; }
     } else if (e->lerping) {
-        float sx = e->forceFieldDirectionX ? lerp(World.scale[self].x,0.0f,e->tickTime * 2.0f) : World.scale[self].x;
-        float sy = e->forceFieldDirectionY ? lerp(World.scale[self].y,0.0f,e->tickTime * 2.0f) : World.scale[self].y;
-        float sz = e->forceFieldDirectionZ ? lerp(World.scale[self].z,0.0f,e->tickTime * 2.0f) : World.scale[self].z;
+        float sx = e->forceFieldDirectionX ? lerp(World.scale[self].x,0.0f,0.1f) : World.scale[self].x;
+        float sy = e->forceFieldDirectionY ? lerp(World.scale[self].y,0.0f,0.1f) : World.scale[self].y;
+        float sz = e->forceFieldDirectionZ ? lerp(World.scale[self].z,0.0f,0.1f) : World.scale[self].z;
         World.scale[self] = (V3){sx,sy,sz}; if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); World.col[self] = COLTYPE_NONE; e->lerping = false; }
     }
 }
@@ -385,7 +383,7 @@ void ButtonSwitchUse(u16 self, u16 activator) {
 
 void ButtonSwitchUpdate(u16 self) {
     Entity* e = &World.instances[self]; if (e->delayFinished > 0.0 && e->delayFinished < World.pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator); }
-    if (e->blinkTexOnActive && e->active && e->tickFinished < World.pauseRelativeTime) { e->alternateOn = !e->alternateOn; e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial; e->tickFinished = World.pauseRelativeTime + e->tickTime; }
+    if (e->blinkTexOnActive && e->active && e->tickFinished < World.pauseRelativeTime) { e->alternateOn = !e->alternateOn; e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial; e->tickFinished = World.pauseRelativeTime + 1.5f; }
 }
 
 void ButtonSwitchTargetted(u16 self, u16 activator) { ButtonSwitchUse(self,activator); }
@@ -756,56 +754,6 @@ void HealthManagerInitAfterLoad(u16 self) {
         else { if (World.instances[self].health < 0.0f) World.instances[self].health = npcTable[World.instances[self].index - 419].health; }
         if (World.diffCbt == 0) { World.instances[self].health = 1.0f; }
         if (World.instances[self].entflags & EF_ACT_AS_CORPSE_ONLY) { World.instances[self].health = 0.0f; World.instances[self].cyberHealth = 0.0f; UseDeathTargets(self); if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH){TeleportAway(self);}else{NPCDeath(self);} }
-    }
-}
-
-void mat4_lookat_from(float*,Quaternion*,V3); void mul_mat4(float*,const float*,const float*); void ExtractFrustumPlanes(float*,FrustumPlane*);
-#define INVSQRT2 0.70710678118f
-Quaternion cubeQuats[6] = {{0.0f,INVSQRT2,0.0f,INVSQRT2}/*+X:Right*/,{0.0f,-INVSQRT2,0.0f,INVSQRT2}/*-X:Left*/,{-INVSQRT2,0.0f,0.0f,INVSQRT2}/*+Y:Up*/,{INVSQRT2,0.0f,0.0f,INVSQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
-void UpdateLights() {
-    bool lightDirty = false;
-    for (u16 lightIdx=0;lightIdx<World.loadedLights;++lightIdx) {
-        V3 lightPos = World.lightsNewPosition[lightIdx];
-        World.lights[lightIdx].pos = lightPos;
-        if (World.lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
-            lightDirty = true;
-            flag_set(&World.lights[lightIdx].lflags,LDIRTY,false);
-            #pragma GCC unroll 6
-            for (int j=0;j<6;++j) { // Update to new position
-                mat4_lookat_from((float*)lightView[lightIdx][j],&cubeQuats[j],lightPos);
-                mul_mat4((float*)lightViewProj[lightIdx][j],shadowmapsPerspectiveProjection,(float*)lightView[lightIdx][j]);
-                ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j],lightFrustumPlanes[lightIdx][j]);
-            }
-        }
-    }
-    if (!World.paused && !World.menuActive) {
-        for (int i=0;i<World.loadedLights;++i) { // Just lerps/flickers in intensity
-            if (World.lanims[i].numIntervalSteps < 1) continue;
-            if (!(World.lights[i].lflags & LIGHTON)) { World.lights[i].intensity = 0.0f; continue; }
-            if (World.lanims[i].lerpTime < (float)World.pauseRelativeTime) {
-                World.lights[i].intensity = World.lanims[i].lerpUp ? World.lights[i].maxIntensity : World.lights[i].minIntensity; // Pick target to lerp towards
-                World.lanims[i].lerpUp = !World.lanims[i].lerpUp;
-                World.lanims[i].currentStep++; if (World.lanims[i].currentStep >= World.lanims[i].numIntervalSteps) World.lanims[i].currentStep = 0; // Wrap and start over continuous looping
-                World.lanims[i].lerpStepTime = World.lanims[i].intervalSteps[World.lanims[i].currentStep];
-                World.lanims[i].lerpTime = (float)World.pauseRelativeTime + World.lanims[i].lerpStepTime;
-                World.lanims[i].lerpStartTime = (float)World.pauseRelativeTime;
-            } else if (World.lights[i].lflags & LERPON) {
-                if (World.lanims[i].currentStep < World.lanims[i].numLerpSteps) {
-                    if (World.lanims[i].stepIsLerping[World.lanims[i].currentStep]) {
-                        World.lanims[i].lerpValue = ((float)World.pauseRelativeTime - World.lanims[i].lerpStartTime)/(World.lanims[i].lerpTime - World.lanims[i].lerpStartTime); // percent towards goal time
-                        float lerpVal = World.lanims[i].lerpUp ? World.lanims[i].lerpValue : (1.0f - World.lanims[i].lerpValue);
-                        World.lanims[i].lerpValue = World.lights[i].minIntensity + ((World.lights[i].maxIntensity - World.lights[i].minIntensity) * lerpVal);
-                        World.lights[i].intensity = World.lanims[i].lerpValue;
-                    }
-                }
-            }
-        }
-    }
-
-    glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,World.loadedLights * sizeof(Light),World.lights,GL_DYNAMIC_DRAW); // Always update the light intensity for flickers and such.
-    if (lightDirty) {
-        glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
-        glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
     }
 }
 // Hardware
@@ -1216,8 +1164,8 @@ void ModUpdate() {
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
         Entity* e = &World.instances[i]; u16 constdex = e->index;
         DelayedSpawnUpdate(i);    TextureSequenceUpdate(i);
-        if(constdex == 718){ExplosionLifeUpdate(i);}    if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);}    if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);}    if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
-        if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}  if(constdex == 515){ForceBridgeUpdate(i);}                 if(constdex == 517){FuncWallUpdate(i);}    if(constdex == 21 || constdex == 22){CyberWallUpdate(i);}
+        if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
+        if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);}
         //TargetIDUpdate(i); TODO
     }
 }

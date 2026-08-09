@@ -103,7 +103,7 @@ bool DidRayHit(int wep16) {
 void CreateStandardImpactMarks(int wep16) {
     if (!wfx.tempHit.hit) return;
     Entity* e = &World.instances[wfx.tempHit.hitInstanceIndex];
-    if ((e->kinematic == false && (e->entflags & EF_RIGIDBODY)) || IdxIsDoor(e->index)) return; // Don't create bullet holes on objects that move, die, animate, or are doors.
+    if ((e->entflags & EF_RIGIDBODY) || IdxIsDoor(e->index)) return; // Don't create bullet holes on objects that move.
     V3 pos = V3_AplusB(wfx.tempHit.point, V3_ScaleByF(wfx.tempHit.normal, 0.16f));
     u16 markInst = SpawnDynamicObject(wepBulletHolePrefab[wep16], -1); if (markInst == 0xFFFF) return;
     World.position[markInst] = pos;

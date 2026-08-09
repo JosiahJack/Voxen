@@ -401,7 +401,6 @@ static void AIIdle(u16 sidx) {
         if (random_range(0.0f, 1.0f) < 0.5f && sidle >= 0 && sidle < (i16)SOUNDS_COUNT) play_wav(sounds[sidle],World.instances[sidx].volume,World.position[sidx],true);
         World.instances[sidx].idleTime = World.pauseRelativeTime + random_range(npc->timeIdleSFXMin, npc->timeIdleSFXMax);
     }
-    if (World.instances[sidx].entflags & EF_ASLEEP) { World.instances[sidx].kinematic=true; World.velocity[sidx] = (V3){0,0,0}; }
     AICheckPain(sidx);
 }
 
@@ -595,11 +594,10 @@ static void AIDying(u16 i) {
             int sded = sfxDeath[World.instances[i].index - 419];
             if (sded >= 0 && sded < (i16)SOUNDS_COUNT) play_wav(sounds[sded],World.instances[i].volume,World.position[sidx],true);
         }
-        if (ai_is_cyber(&World.instances[i])) World.gravity[i] = 0.0f; // Physics for death
-        else { World.gravity[i] = 1.0f; World.instances[i].kinematic=true; }
-        flag_set(&World.instances[i].entflags, EF_ASLEEP, false);
+        World.gravity[i] = ai_is_cyber(&World.instances[i]) ? 0.0f : 1.0f; // Physics for death
+        flag_set(&World.instances[i].entflags,EF_ASLEEP,false);
         World.layer[i] = L_Corpse;
-        flag_set(&World.instances[i].entflags, EF_FIRST_SIGHTING, true);
+        flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
         World.instances[i].timeTillDeadFinished = World.pauseRelativeTime + npc->timeTillDead;
     //     if (npc->switchMaterialOnDeath && World.instances[i].dyingTexture) World.instances[i].texIndex = World.instances[i].dyingTexture; // TODO Handle hopper and zerog texture changes
         if (World.instances[i].index == 428 || World.instances[i].index == 439) World.velocity[sidx] = (V3){0.0f,World.velocity[sidx].z,0.0f}; // Index-specific velocity patch (Exec bot and Zero-G mutant)

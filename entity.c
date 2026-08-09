@@ -1,6 +1,14 @@
 // entity.c - Entity Definitions and Save Load System for levels and savegames
 #include "common.h"
 #define LINE_LEN_MAX 81920
+typedef struct {
+    float volume;
+    u16 index,modelIndex,lodIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,altTexIndex,altGlowIndex,mainSwitchMaterial,lockedMessageLingdex,animationNum;
+    i16 SFXIndex;
+    u8  numclips;
+    bool changeTexOnActive,blinkTexOnActive;
+} EPerms; // 8 + 28 + 5 = 41B -> 44B w/ 3B tail pad (float alignment forces mod-4 size)
+
 extern Entity EDefs[MAX_ENTITIES];
 extern V3 EDefscolliderCenter[MAX_ENTITIES]; // Offset relative to .position's global worldspace xyz location
 extern V3 EDefscolliderSize[MAX_ENTITIES]; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
@@ -39,25 +47,31 @@ __attribute__((noinline)) float parse_float(const char* str, const char* line, u
 }
 
 void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense inflating the table data in entity.c
-    mset(EDefs,0,sizeof(Entity)); 
-    for (int i=0;i<768;++i) { EDefs[i].index = i; EDefs[i].modelIndex = MAX_MDLS; EDefs[i].lodIndex = MAX_MDLS; }
-    for (int i=0;i<=306;++i) EDefs[i].cardchunk = true; // Mark these all to have box colliders added... except for slices below:
-    EDefs[  6].cardchunk = EDefs[  9].cardchunk = EDefs[ 10].cardchunk = EDefs[ 20].cardchunk = EDefs[ 22].cardchunk = EDefs[ 31].cardchunk = EDefs[ 32].cardchunk = EDefs[ 42].cardchunk = false;
-    EDefs[ 43].cardchunk = EDefs[ 44].cardchunk = EDefs[ 52].cardchunk = EDefs[ 63].cardchunk = EDefs[ 78].cardchunk = EDefs[ 83].cardchunk = EDefs[ 87].cardchunk = EDefs[ 91].cardchunk = false;
-    EDefs[ 95].cardchunk = EDefs[142].cardchunk = EDefs[143].cardchunk = EDefs[145].cardchunk = EDefs[146].cardchunk = EDefs[147].cardchunk = EDefs[150].cardchunk = EDefs[151].cardchunk = false;
-    EDefs[152].cardchunk = EDefs[153].cardchunk = EDefs[163].cardchunk = EDefs[164].cardchunk = EDefs[165].cardchunk = EDefs[166].cardchunk = EDefs[168].cardchunk = EDefs[176].cardchunk = false;
-    EDefs[177].cardchunk = EDefs[179].cardchunk = EDefs[182].cardchunk = EDefs[191].cardchunk = EDefs[192].cardchunk = EDefs[193].cardchunk = EDefs[200].cardchunk = EDefs[210].cardchunk = false;
-    EDefs[211].cardchunk = EDefs[212].cardchunk = EDefs[213].cardchunk = EDefs[219].cardchunk = EDefs[233].cardchunk = EDefs[242].cardchunk = EDefs[243].cardchunk = EDefs[246].cardchunk = false;
-    EDefs[247].cardchunk = EDefs[248].cardchunk = EDefs[249].cardchunk = EDefs[255].cardchunk = EDefs[263].cardchunk = EDefs[264].cardchunk = EDefs[283].cardchunk = EDefs[284].cardchunk = false;
-    EDefs[285].cardchunk = EDefs[291].cardchunk = EDefs[298].cardchunk = EDefs[299].cardchunk = EDefs[300].cardchunk = EDefs[301].cardchunk = EDefs[303].cardchunk = EDefs[188].cardchunk = false;
-    for (i32 i = 0; i < MAX_ENTITIES; i++) {        
+    mset(EDefs,0,MAX_ENTITIES * sizeof(Entity)); 
+    // Handle generics up front such that all below per index values can override it.
+    for (int i=0;i<MAX_ENTITIES;++i) { EDefs[i].index = i; EDefs[i].modelIndex = EDefs[i].lodIndex = MAX_MDLS; }
+    bool cardChunk[307];
+    for (int i=0;i<307;++i) { cardChunk[i] = true; }
+    cardChunk[  6] = cardChunk[  9] = cardChunk[ 10] = cardChunk[ 20] = cardChunk[ 22] = cardChunk[ 31] = cardChunk[ 32] = cardChunk[ 42] = cardChunk[ 43] = cardChunk[ 44] = cardChunk[ 52] = cardChunk[ 63] = cardChunk[ 78] = cardChunk[ 83] = cardChunk[ 87] = cardChunk[ 91] = false;
+    cardChunk[ 95] = cardChunk[142] = cardChunk[143] = cardChunk[145] = cardChunk[146] = cardChunk[147] = cardChunk[150] = cardChunk[151] = cardChunk[152] = cardChunk[153] = cardChunk[163] = cardChunk[164] = cardChunk[165] = cardChunk[166] = cardChunk[168] = cardChunk[176] = false;
+    cardChunk[177] = cardChunk[179] = cardChunk[182] = cardChunk[191] = cardChunk[192] = cardChunk[193] = cardChunk[200] = cardChunk[210] = cardChunk[211] = cardChunk[212] = cardChunk[213] = cardChunk[219] = cardChunk[233] = cardChunk[242] = cardChunk[243] = cardChunk[246] = false;
+    cardChunk[247] = cardChunk[248] = cardChunk[249] = cardChunk[255] = cardChunk[263] = cardChunk[264] = cardChunk[283] = cardChunk[284] = cardChunk[285] = cardChunk[291] = cardChunk[298] = cardChunk[299] = cardChunk[300] = cardChunk[301] = cardChunk[303] = cardChunk[188] = false;
+    for (i32 i = 0; i < MAX_ENTITIES; i++) {
         if (!EDefslayer[i]) EDefslayer[i] = L_Default;
         flag_set(&EDefs[i].entflags,EF_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
         flag_set(&EDefs[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(EDefs[i].index));
-        if (EDefs[i].cardchunk) { EDefs[i].lodIndex=178;/*LOD card index*/ EDefscol[i]=COLTYPE_BOX; EDefscolliderCenter[i].y=1.32f; EDefscolliderSize[i]=(V3){2.56f,0.08f,2.56f}; }
+        if (i < 307 && cardChunk[i]) { EDefs[i].lodIndex=178;/*LOD card index*/ EDefscol[i]=COLTYPE_BOX; EDefscolliderCenter[i].y=1.32f; EDefscolliderSize[i]=(V3){2.56f,0.08f,2.56f}; }
         EDefs[i].currentFrameFinished = World.pauseRelativeTime + 0.1;
-        if (IdxIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; EDefs[i].tickTime = 1.5; } // ButtonSwitch
-    } // Handle generics up front such that all below can override it.
+        if (IdxIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; } // ButtonSwitch
+    }
+    for (int i=307;i<=404;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=1.0f; } // Item
+    for (int i=419;i<=447;++i) { EDefscol[i]=COLTYPE_CAP; EDefscolliderSize[i].z=COLCAP_DIR_Y_F; EDefsstaticFriction[i]=1.0f; EDefsdynamicFriction[i]=0.15f; EDefsmass[i]=1.0f; EDefsangularDrag[i]=2.2f; } // NPCs
+    for (int i=448;i<=457;++i) { EDefscol[i]=COLTYPE_SPH; EDefscolliderSize[i]=(V3){1.5f,1.5f,1.5f}; } // Cyber Item Definitions
+    for (int i=458;i<=463;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=1.5f; } // Physical Generic Objects
+    for (int i=481;i<=495;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=0.3f; } // Projectiles
+    for (int i=496;i<515;++i) { EDefs[i].SFXIndex = 75; EDefscol[i]=COLTYPE_MSH;  } // Doors
+    for (int i=688;i<=698;++i) EDefscol[i]=COLTYPE_BOX; // Switches
+    // End generics, now for specifics:
     // Note that designated initializer method, e.g. { .modelIndex = 178, .texIndex = 0 } method will cause compiler to add the = 0 assignment for every field ballooning binary size to 11mb!  So we do this.  Straightforward and simple:
     /*  0 chunk_black*/                EDefs[  0].modelIndex=178; EDefs[  0].texIndex=0; 
     /*  1 chunk_blocker*/              EDefs[  1].modelIndex=178; EDefs[  1].texIndex=1230;EDefs[  1].normIndex=160; EDefs[  1].specIndex=1230;
@@ -231,8 +245,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*169 chunk_med1_8*/               EDefs[169].modelIndex=268; EDefs[169].texIndex=503; EDefs[169].normIndex=502; EDefs[169].specIndex=1242; EDefscol[169]=COLTYPE_MSH;
     /*170 chunk_med1_8d*/              EDefs[170].modelIndex=267; EDefs[170].texIndex=501; EDefs[170].normIndex=163; EDefs[170].specIndex=1242; EDefscol[170]=COLTYPE_MSH;
     /*171 chunk_med1_9*/               EDefs[171].modelIndex=278; EDefs[171].texIndex=507; EDefs[171].normIndex=506; EDefs[171].specIndex=1267; EDefscol[171]=COLTYPE_MSH;
-    /*172 unused*/
-    /*173 unused*/
+    /*172, 173 unused*/
     /*174 chunk_med1_9d*/              EDefs[174].modelIndex=269; EDefs[174].texIndex=505; EDefs[174].normIndex=504; EDefs[174].specIndex=1267; EDefscol[174]=COLTYPE_MSH;
     /*175 unused*/
     /*176 chunk_med1_9d_ofs112_90*/    EDefs[176].modelIndex=270; EDefs[176].texIndex=505; EDefs[176].normIndex=504; EDefs[176].specIndex=1267; EDefscol[176]=COLTYPE_MSH;
@@ -284,7 +297,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*222 chunk_reac2_7*/              EDefs[222].modelIndex=522; EDefs[222].texIndex=691; EDefs[222].glowIndex=690;
     /*223 chunk_reac2_8*/              EDefs[223].modelIndex=523; EDefs[223].texIndex=693; EDefs[223].glowIndex=692;
     /*224 chunk_reac2_9*/              EDefs[224].modelIndex=524; EDefs[224].texIndex=694;
-    /*225 chunk_reac2_1*/              EDefs[225].modelIndex=525; EDefs[225].texIndex=696; EDefs[225].glowIndex=695;
+    /*225 chunk_reac3_1*/              EDefs[225].modelIndex=525; EDefs[225].texIndex=696; EDefs[225].glowIndex=695;
     /*226 chunk_reac3_2*/              EDefs[226].modelIndex=526; EDefs[226].texIndex=697;
     /*227 chunk_reac3_3*/              EDefs[227].modelIndex=527; EDefs[227].texIndex=698;
     /*228 chunk_reac3_4*/              EDefs[228].modelIndex=528; EDefs[228].texIndex=699;
@@ -345,8 +358,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*283 chunk_sec1_1c_slice45*/      EDefs[283].modelIndex=580; EDefs[283].texIndex=786; EDefs[283].specIndex=786; 
     /*284 chunk_sec1_1c_slice64highlh*/EDefs[284].modelIndex=581; EDefs[284].texIndex=786; EDefs[284].specIndex=786; 
     /*285 chunk_sec1_1c_slice64highrh*/EDefs[285].modelIndex=582; EDefs[285].texIndex=786; EDefs[285].specIndex=786; 
-    /*286 unused*/
-    /*287 unused*/
+    /*286, 287 unused*/
     /*288 chunk_sec1_2*/               EDefs[288].modelIndex=584; EDefs[288].texIndex=789; EDefs[288].specIndex=1233; 
     /*289 chunk_sec1_2b*/              EDefs[289].modelIndex=583; EDefs[289].texIndex=788; EDefs[289].specIndex=1233; 
     /*290 chunk_sec1_3*/               EDefs[290].modelIndex=585; EDefs[290].texIndex=790; EDefs[290].specIndex=1233; 
@@ -357,8 +369,8 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*295 chunk_stor1_4*/              EDefs[295].modelIndex=599; EDefs[295].texIndex=827; 
     /*296 chunk_stor1_5*/              EDefs[296].modelIndex=600; EDefs[296].texIndex=828; 
     /*297 chunk_stor1_6*/              EDefs[297].modelIndex=601; EDefs[297].texIndex=829; 
-    /*298chunk_stor1_6_slice128_up_lh*/EDefs[298].modelIndex=602; EDefs[298].texIndex=829; 
-    /*299chunk_stor1_6_slice128_up_rh*/EDefs[299].modelIndex=603; EDefs[299].texIndex=829; 
+    /*298 chunk_stor1_6_slice128_up_lh*/EDefs[298].modelIndex=602; EDefs[298].texIndex=829; 
+    /*299 chunk_stor1_6_slice128_up_rh*/EDefs[299].modelIndex=603; EDefs[299].texIndex=829; 
     /*300 chunk_stor1_6_slice192lh*/   EDefs[300].modelIndex=604; EDefs[300].texIndex=829; 
     /*301 chunk_stor1_6_slice192rh*/   EDefs[301].modelIndex=605; EDefs[301].texIndex=829; 
     /*302 chunk_stor1_7*/              EDefs[302].modelIndex=606; EDefs[302].texIndex=833; EDefs[302].specIndex=834; EDefs[302].normIndex=832; 
@@ -366,13 +378,12 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*304 chunk_stor1_7d*/             EDefs[304].modelIndex=620; EDefs[304].texIndex=831; EDefs[304].glowIndex=830; EDefs[304].normIndex=832; EDefs[304].specIndex=834; 
     /*305 chunk_teleporter*/           EDefs[305].modelIndex=178; EDefs[305].texIndex=1166; 
     /*306 chunk_white*/                EDefs[306].modelIndex=178; EDefs[306].texIndex=881;
-    for (int i=307;i<=404;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=1.0f; } // Item
     /*307 item_paper_wad*/             EDefs[307].modelIndex=487; EDefs[307].texIndex=1250; EDefscol[307]= COLTYPE_SPH; EDefscolliderCenter[307]=(V3){-0.001254f,-0.001190498f,0.006335999f}; EDefscolliderSize[307].x=0.0451f; EDefsmass[307]=0.06f;
     /*308 item_warecasing*/            EDefs[308].modelIndex=637; EDefs[308].texIndex=1251; EDefsmass[308]=0.8f; EDefscol[308]=COLTYPE_BOX; EDefscolliderCenter[308].z=0.09397449f; EDefscolliderSize[308]=(V3){0.540964f,0.405398f,0.187949f};
-    /*309 item_beaker*/                EDefs[309].modelIndex=14;  EDefscol[309]=COLTYPE_CVX; EDefs[309].colMeshIndex=682; EDefs[309].texIndex=36; EDefs[309].specIndex=1242;  EDefsmass[309]=0.28f; EDefsdynamicFriction[309]=0.1f; EDefsstaticFriction[309]=0.2f;
-    /*310 item_beverage*/              EDefs[310].modelIndex=18;  EDefscol[310]=COLTYPE_CVX; EDefs[310].colMeshIndex=683; EDefs[310].texIndex=37; EDefsmass[310]=0.12f;
-    /*311 item_skull*/                 EDefs[311].modelIndex=593; EDefsmass[311]=0.451f;
-    /*312 item_arm*/                   EDefs[312].modelIndex=7;   EDefs[312].texIndex=28; EDefscol[312]=COLTYPE_CVX; EDefs[312].colMeshIndex=678;
+    /*309 item_beaker*/                EDefs[309].modelIndex=14; EDefs[309].texIndex=36; EDefscol[309]=COLTYPE_CVX; EDefs[309].colMeshIndex=682; EDefs[309].specIndex=1242;  EDefsmass[309]=0.28f; EDefsdynamicFriction[309]=0.1f; EDefsstaticFriction[309]=0.2f;
+    /*310 item_beverage*/              EDefs[310].modelIndex=18; EDefs[310].texIndex=37; EDefscol[310]=COLTYPE_CVX; EDefs[310].colMeshIndex=683; EDefsmass[310]=0.12f;
+    /*311 item_skull*/                 EDefs[311].modelIndex=593; EDefs[311].texIndex=816; EDefscol[311]=COLTYPE_CVX; EDefs[311].colMeshIndex=70; EDefsmass[311]=0.451f;
+    /*312 item_arm*/                   EDefs[312].modelIndex=7;  EDefs[312].texIndex=28; EDefscol[312]=COLTYPE_CVX; EDefs[312].colMeshIndex=678;
     /*313 item_audiolog*/              EDefs[313].modelIndex=11;  EDefscol[313]=COLTYPE_CVX; EDefs[313].colMeshIndex=679; EDefs[313].texIndex=52; EDefs[313].glowIndex=80;  EDefsmass[313]=0.2f;
     /*314 weapon_grenadefrag*/         EDefs[314].modelIndex=182;
     /*315 weapon_grenadeconc*/         EDefs[315].modelIndex=165;
@@ -465,22 +476,10 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*402 weapon_grenademine_live*/    EDefs[402].modelIndex=184;
     /*403 weapon_grenadenitro_live*/   EDefs[403].modelIndex=185;
     /*404 weapon_grenadegas_live*/     EDefs[404].modelIndex=183;
-    /*405 unused*/
-    /*406 unused*/
-    /*407 unused*/
-    /*408 unused*/
-    /*409 unused*/
-    /*410 unused*/
-    /*411 unused*/
-    /*412 unused*/
-    /*413 unused*/
-    /*414 unused*/
-    /*415 unused*/
-    /*416 unused*/
-    /*417 item_access_card_perdarcy*/  EDefs[417].modelIndex=0; EDefs[417].texIndex=8; EDefs[417].glowIndex=341; EDefscol[417]=COLTYPE_CVX; EDefs[417].colMeshIndex=672; EDefsmass[417]=0.2f; EDefsangularDrag[417]=0.05f; EDefs[417].kinematic=false; EDefsdynamicFriction[417]=EDefsstaticFriction[417]=0.6f;
-    for (int i=419;i<=447;++i) { EDefscol[i]=COLTYPE_CAP; EDefscolliderSize[i].z=COLCAP_DIR_Y_F; EDefsstaticFriction[i]=1.0f; EDefsdynamicFriction[i]=0.15f; EDefs[i].kinematic=true; EDefsmass[i]=1.0f; EDefsangularDrag[i]=2.2f; } // NPCs
-    /*419 npc_autobomb*/            EDefs[419].modelIndex=299; EDefs[419].texIndex=542; EDefscolliderCenter[419].y=0.42f; EDefscolliderCenter[419].z=0.01848752f;                   EDefscolliderSize[419]=(V3){0.42f,1.48f,COLCAP_DIR_Z_F};          EDefsangularDrag[419]=1.0f; EDefs[419].glowIndex=541;
-    /*420 npc_cyborg_assassin*/     EDefs[420].modelIndex=306; EDefs[420].texIndex=545; EDefs[420].numclips= 8; EDefs[420].animationNum=24;                                           EDefscolliderSize[419].x=0.48f; EDefscolliderSize[419].y=2.0f;  EDefsmass[420]=1.5f; EDefsangularDrag[420]=1.5f; EDefs[420].glowIndex=544;
+    /*405 to 416 unused*/
+    /*417 item_access_card_perdarcy*/  EDefs[417].modelIndex=0; EDefs[417].texIndex=8; EDefs[417].glowIndex=341; EDefscol[417]=COLTYPE_CVX; EDefs[417].colMeshIndex=672; EDefsmass[417]=0.2f; EDefsangularDrag[417]=0.05f; EDefsdynamicFriction[417]=EDefsstaticFriction[417]=0.6f;
+    /*419 npc_autobomb*/            EDefs[419].modelIndex=299; EDefs[419].texIndex=542; EDefscolliderCenter[419].y=0.42f; EDefscolliderCenter[419].z=0.01848752f; EDefscolliderSize[419]=(V3){0.42f,1.48f,COLCAP_DIR_Z_F}; EDefsangularDrag[419]=1.0f; EDefs[419].glowIndex=541;
+    /*420 npc_cyborg_assassin*/     EDefs[420].modelIndex=306; EDefs[420].texIndex=545; EDefs[420].numclips= 8; EDefs[420].animationNum=24; EDefscolliderSize[420].x=0.48f; EDefscolliderSize[420].y=2.0f;  EDefsmass[420]=1.5f; EDefsangularDrag[420]=1.5f; EDefs[420].glowIndex=544;
     /*421 npc_avian_mutant*/        EDefs[421].modelIndex=328; EDefs[421].texIndex=568; EDefs[421].numclips= 5; EDefs[421].animationNum=35; EDefscolliderCenter[421].y= 0.0200f;     EDefscolliderSize[421].x=0.40f; EDefscolliderSize[421].y=1.60f; EDefsmass[421]=2.0f; EDefsangularDrag[421]=1.0f;
     /*422 npc_exec_bot*/            EDefs[422].modelIndex=316; EDefs[422].texIndex=555; EDefs[422].numclips= 5; EDefs[422].animationNum=29; EDefscolliderCenter[422].y= 0.0125f;     EDefscolliderSize[422].x=0.48f; EDefscolliderSize[422].y=2.025f;EDefsmass[422]=2.2f; EDefsangularDrag[422]=1.5f;
     /*423 npc_cyborg_drone*/        EDefs[423].modelIndex=312; EDefs[423].texIndex=547; EDefs[423].numclips= 7; EDefs[423].animationNum=3;                                            EDefscolliderSize[423].x=0.36f; EDefscolliderSize[423].y=2.00f; EDefsmass[423]=1.5f; EDefsangularDrag[423]=2.0f;
@@ -508,7 +507,6 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*445 npc_cyberram*/            EDefs[445].modelIndex=304; EDefsmass[445]=2.00f; EDefsangularDrag[445]=3.0f;
     /*446 npc_cyber_reaver*/        EDefs[446].modelIndex=305; EDefsmass[446]=2.20f; EDefsangularDrag[446]=3.0f;
     /*447 npc_cybershodan*/         EDefsmass[447]=4.51f; EDefsangularDrag[447]=3.0f; EDefsdynamicFriction[447]=0.6f; EDefsstaticFriction[447]=0.6f;
-    for (int i=448;i<=457;++i) { EDefscol[i]=COLTYPE_SPH; EDefscolliderSize[i]=(V3){1.5f,1.5f,1.5f}; } // Cyber Item Definitions
     /*448 item_cyber_data*/     EDefs[448].modelIndex=65;
     /*449 item_cyber_decoy*/    EDefs[449].modelIndex=72;
     /*450 item_cyber_drill*/    EDefs[450].modelIndex=68;
@@ -519,7 +517,6 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*455 item_cyber_recall*/   EDefs[455].modelIndex=65;
     /*456 item_cyber_shield*/   EDefs[456].modelIndex=65;
     /*457 item_cyber_turbo*/    EDefs[457].modelIndex=65;
-    for (int i=458;i<=463;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=1.5f; } // Physical Generic Objects
     /*458 prop_phys_barrel_chemical*/ EDefs[458].modelIndex=12;  EDefs[458].texIndex=30;
     /*459 prop_phys_barrel_radiation*/EDefs[459].modelIndex=12;  EDefs[459].texIndex=31;
     /*460 prop_phys_barrel_toxic*/    EDefs[460].modelIndex=12;  EDefs[460].texIndex=33;
@@ -543,7 +540,6 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*478 sec_cpunode*/      EDefs[478].modelIndex=587;  EDefs[478].texIndex=242;  EDefs[478].glowIndex=248; EDefscol[478]=COLTYPE_MSH;
     /*479 sec_cpunode_small*/EDefs[479].modelIndex=588;  EDefs[479].texIndex=107; EDefscol[479]=COLTYPE_MSH;
     /*480 weapon_cyber_mine*/ EDefs[480].modelIndex=71;  EDefs[480].texIndex=1224;
-    for (int i=481;i<=895;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=0.3f; } // Physical Generic Objects
     /*481 proj_enemshot2*/       EDefs[481].modelIndex=MAX_MDLS;
     /*482 proj_magpulse_shot*/   EDefs[482].modelIndex=MAX_MDLS; EDefs[482].texIndex=807;
     /*483 proj_stungun_shot*/    EDefs[483].modelIndex=MAX_MDLS; EDefs[483].texIndex=835;
@@ -559,7 +555,6 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*493 proj_cyberdog_shot*/   EDefs[493].modelIndex=63;
     /*494 proj_cyberreaver_shot*/EDefs[494].modelIndex=64;
     /*495 proj_cyberice_shot*/   EDefs[495].modelIndex=68;
-    for (int i=496;i<515;++i) { EDefs[i].SFXIndex = 75; EDefscol[i]=COLTYPE_MSH;  } // Doors
     /*496 doorA*/         EDefs[496].modelIndex=719; EDefs[496].texIndex=185; EDefs[496].numclips=4;    EDefs[496].animationNum=1;                           
     /*497 doorB*/         EDefs[497].modelIndex=0;  EDefs[497].texIndex=189;  EDefs[497].glowIndex=188; EDefs[497].numclips=4;    EDefs[497].animationNum=0;
     /*498 doorC*/         EDefs[498].modelIndex=0;  EDefs[498].texIndex=184;  EDefs[498].numclips=4;    EDefs[498].animationNum=5;
@@ -581,7 +576,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*514 door_secret3*/  EDefs[514].modelIndex=94;  EDefs[514].numclips=4;  EDefs[514].animationNum=20;  EDefs[514].texIndex=211;
     /*515 func_forcebridge*/ EDefs[515].modelIndex=78;  EDefs[515].texIndex=38; EDefscol[515]=COLTYPE_BOX;
     /*516 prop_lift2*/       EDefs[516].modelIndex=215;  EDefs[516].texIndex=155;  EDefs[516].glowIndex=154;  EDefscol[516]=COLTYPE_BOX;  EDefscolliderCenter[516]=(V3){0.0f,0.0f,0.0f};  EDefscolliderSize[516]=(V3){1.0f,1.0f,1.0f};  EDefs[516].colMeshIndex=U16_MAX; 
-    /*517 func_wall*/        EDefsmass[517]=10.0f;  EDefsangularDrag[517]=0.05f;  EDefsgravity[517]=0.0f;  EDefs[517].kinematic=true;  EDefsdynamicFriction[517]=0.6f;  EDefsstaticFriction[517]=0.6f;
+    /*517 func_wall*/        EDefsmass[517]=10.0f;  EDefsangularDrag[517]=0.05f;  EDefsgravity[517]=0.0f; EDefsdynamicFriction[517]=0.6f;  EDefsstaticFriction[517]=0.6f;
     /*518 BulletHoleLarge*/
     /*519 BulletHoleScorchLarge*/
     /*520 BulletHoleScorchSmall*/
@@ -752,7 +747,6 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*685 decal_scorch4*/        EDefs[685].modelIndex=77;  EDefs[685].texIndex=230;
     /*686 decal_scorchtiny*/     EDefs[686].modelIndex=77;  EDefs[686].texIndex=232;
     /*687 decal_blood_splat*/    EDefs[687].modelIndex=77;  EDefs[687].texIndex=234;
-    for (int i=688;i<=698;++i) EDefscol[i]=COLTYPE_BOX;
     /*688 func_switch1*/         EDefs[688].modelIndex=609; EDefs[688].texIndex=837; EDefscolliderSize[688]=(V3){0.32f,0.04f,0.32f};
     /*689 func_switch2*/         EDefs[689].modelIndex=610; EDefs[689].texIndex=839; EDefs[689].mainSwitchMaterial=839; EDefs[689].altTexIndex=841; EDefs[689].altGlowIndex=840;  EDefs[689].changeTexOnActive=true; EDefs[689].blinkTexOnActive=true; EDefscolliderCenter[689]=(V3){-0.0243553f,0.0f,0.000004883f}; EDefscolliderSize[689]=(V3){0.0476318f,0.64f,0.64f};
     /*690 func_switch3*/         EDefs[690].modelIndex=611; EDefs[690].texIndex=842; EDefs[690].altTexIndex=844; EDefs[690].altGlowIndex=843; EDefs[690].changeTexOnActive=true;  EDefscolliderCenter[690]=(V3){-0.02285008f,0.000053061f,-0.000056993f};  EDefscolliderSize[690]=(V3){0.02f,0.32f,0.32f}; 
@@ -824,15 +818,8 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*756 ef_particle_leafburst*/
     /*757 ef_particle_mutationburst*/
     /*758 ef_particle_graytationburst*/
-    /*759 unused*/
-    /*760 unused*/
-    /*761 unused*/
-    /*762 unused*/
-    /*763 unused*/
-    /*764 unused*/
-    /*765 unused*/
-    /*766 unused*/
-    /*767 player*/
+    /*759 through 766 unused*/
+    /*767 player (mostly just so any index checks don't accidentally trigger against player by its index)*/
 }
 // Lights
 __attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* lanim) {
@@ -884,7 +871,7 @@ void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float 
 }
 #undef CHGD
 // Level Loading and Entity Management System
-void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; e->kinematic=true; World.layer[idx]=L_Default; e->camView=255; e->tickTime = 0.35f; World.angularDrag[idx] = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=World.mass[idx]=e->volume=World.rotation[idx].w=1.0f; World.dynamicFriction[idx] = World.staticFriction[idx] = 0.6f; }
+void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; World.layer[idx]=L_Default; e->camView=255; World.angularDrag[idx] = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=World.mass[idx]=e->volume=World.rotation[idx].w=1.0f; World.dynamicFriction[idx] = World.staticFriction[idx] = 0.6f; }
 void InitializeAIAfterLoad(u16 i);
 void DeleteInstance(u16 i) { if (i <= PLAYER1 || i >= World.instCount) return; flag_set(&World.instances[i].entflags,EF_ACTIVE,false); } // Don't delete null ent, player 1, nor player 2 or already empty slots.
 __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
@@ -895,7 +882,6 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     World.instances[i].index = entIdx;
     World.position[i] = pos;
     if (IdxIsNPC(entIdx)) InitializeAIAfterLoad(i);
-    World.instances[i].cardchunk = EDefs[entIdx].cardchunk;
     World.instances[i].modelIndex = EDefs[entIdx].modelIndex;
     World.instances[i].colMeshIndex = EDefs[entIdx].colMeshIndex;
     World.instances[i].numclips = EDefs[entIdx].numclips;
@@ -905,7 +891,6 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAX_TXRS ? 0 : EDefs[entIdx].specIndex;
     World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAX_TXRS ? 0 : EDefs[entIdx].normIndex;
     World.instances[i].lodIndex = EDefs[entIdx].lodIndex;
-    World.instances[i].kinematic = EDefs[entIdx].kinematic;
     flag_set(&World.instances[i].entflags,EF_RIGIDBODY,EDefs[entIdx].entflags & EF_RIGIDBODY);
     flag_set(&World.instances[i].entflags,EF_NO_SHADOWS,EDefs[entIdx].entflags & EF_NO_SHADOWS);
     World.col[i] = EDefscol[entIdx];
@@ -1097,7 +1082,6 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(value, lineSpace, lineNum));
                 else if (KEY_EQ("branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(value, lineSpace, lineNum));
                 else if (KEY_EQ("resourceFolder") && *value) scpy_to_a_from_b(inst->texAnimResourceFolder, value, TARGET_STRING_LENGTH);
-                else if (KEY_EQ("frameDelay"))      inst->tickTime = (double)parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("randomFrame"))     inst->texAnimRandom = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("reverseSequence")) inst->texAnimInReverse = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);
@@ -1145,7 +1129,6 @@ void LoadLevelMod(u8 lev) {
         par->changeTexOnActive     = src->changeTexOnActive;
         par->blinkTexOnActive      = src->blinkTexOnActive;
         par->securityThreshold     = src->securityThreshold;
-        par->tickTime              = src->tickTime;
         par->texAnimRandom         = src->texAnimRandom;
         par->texAnimInReverse      = src->texAnimInReverse;
         par->messageLingdex        = src->messageLingdex;
@@ -1154,15 +1137,15 @@ void LoadLevelMod(u8 lev) {
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARGET_STRING_LENGTH);
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent); // Only at load, not in AddInstance
         if (entIdx == 525) { // prop_console01
-            par->texAnimLight  = AddOffsetLight(par, (V3){5.81f, 2.29f, 38.05f-38.3552f}, (Color3){0.3531f, 0.4837f, 0.6509f}, 1.85f, 0.7f);
-            par->texAnimLight2 = AddOffsetLight(par, (V3){-10.1f, 0.9f, 18.21f-38.3552f}, (Color3){0.3561f, 0.3561f, 0.8970f}, 2.0f, 1.12f);
-        } else if (entIdx == 279) { par->texAnimLight = AddOffsetLight(par, (V3){0.0f, -0.08f, 0.0f}, (Color3){0.909803922f, 0.929411765f, 1.0f}, 3.2f, 1.575f); } // chunk_screen
+            par->texAnimLight  = AddOffsetLight(par,(V3){5.81f,2.29f,38.05f-38.3552f},(Color3){0.3531f,0.4837f,0.6509f},1.85f,0.7f);
+            par->texAnimLight2 = AddOffsetLight(par,(V3){-10.1f,0.9f,18.21f-38.3552f},(Color3){0.3561f,0.3561f,0.8970f},2.0f,1.12f);
+        } else if (entIdx == 279) { par->texAnimLight = AddOffsetLight(par,(V3){0.0f,-0.08f,0.0f},(Color3){0.909803922f,0.929411765f,1.0f},3.2f,1.575f); } // chunk_screen
         else if (par->index == 574) { // prop_healingbed
             Color3 green = {0.0f, 0.925490196f, 0.082352941f};
             par->texAnimLight  = AddOffsetLight(par, (V3){0.5292511f, 0.065f, 0.915f}, green, 3.0f, 0.72f);
             par->texAnimLight2 = AddOffsetLight(par, (V3){-0.5317497f, 0.065f, 1.039f}, green, 3.0f, 0.72f);
             par->textureAnimating = true; par->texAnimClip = 12; par->texFrame = 0;
-            scpy_to_a_from_b(par->texAnimResourceFolder, "MedicalBed", TARGET_STRING_LENGTH);
+            scpy_to_a_from_b(par->texAnimResourceFolder,"MedicalBed",TARGET_STRING_LENGTH);
         } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) { World.position[parent].y += 0.12f; } // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 328) { World.position[parent].y += 0.04f; } // item_hw_system: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 310) { World.position[parent].y += 0.0975f; } // item_beverage: Move up to account for CG mod (origin moved vs Unity version)
@@ -1170,8 +1153,8 @@ void LoadLevelMod(u8 lev) {
         else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
         else if (entIdx == 720) { /*u16 mist=*/AddInstance(648,World.position[parent]); }// ambient_mist
         else if (entIdx == 733) { /*u16 pipewater=*/AddInstance(649,World.position[parent]);/*ambient_pipewater_loop*/ /*u16 rain=*/AddInstance(653,(V3){World.position[parent].x,World.position[parent].y - 1.26f,World.position[parent].z});/*ambient_rain*/ }
-        if (par->texAnimResourceFolder[0] != '\0' && par->tickTime <= 0.01f) par->tickTime = 0.35f;
-        TextureSequenceInit(parent, par->texAnimResourceFolder);
+        else if (entIdx == 305) { scpy_to_a_from_b(par->texAnimResourceFolder,"Telepad",TARGET_STRING_LENGTH); } /*chunk_teleporter*/
+        TextureSequenceInit(parent,par->texAnimResourceFolder);
     }
     for (int i=0;i<=lightsIdx;++i) { if (!(lightsFromFile[i].lflags & LSPOT)) {lightsFromFile[i].spotAng = 0.0f;} AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators

@@ -618,6 +618,7 @@ void ChangeFullScreenWindowed(bool adjustToFit) {
     UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
 
+void SetVSync() { window->context.swapInterval((i32)Sys_Settings.Vsync); }
 void CycleToNextMonitor() {
     static double monitorSwitchTime;
     if (get_time() >= monitorSwitchTime) {
@@ -626,5 +627,3 @@ void CycleToNextMonitor() {
         if (monitors && c >= 2) { Sys_Settings.CurrentMonitor = (Sys_Settings.CurrentMonitor + 1) % c; SaveConfig(); CenterWindowOnMonitor(); }
     }
 }
-
-void SetVSync() { window->context.swapInterval((i32)Sys_Settings.Vsync); }

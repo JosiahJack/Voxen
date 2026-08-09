@@ -45,14 +45,12 @@ static int PngComputeHuffmans(pngzbuf* a) {
 }
 
 static int PngParseUncompressedBlock(pngzbuf* a) {
-    u8 header[4]; i32 k = 0; if (a->num_bits & 7) PngZReceive(a, a->num_bits & 7);
-    while (a->num_bits > 0) { header[k] = (u8)(a->code_buffer & 255); a->code_buffer >>= 8; a->num_bits -= 8; ++k; }
-    if (k <= 0) header[0] = *a->zbuffer++;
-    if (k <= 1) header[1] = *a->zbuffer++;
-    if (k <= 2) header[2] = *a->zbuffer++;
-    if (k <= 3) header[3] = *a->zbuffer++;
-    i32 len = header[1] * 256 + header[0];
-    mcpy(a->zout,a->zbuffer,len); a->zbuffer += len; a->zout += len;
+    u8 header[4]; if (a->num_bits & 7) PngZReceive(a, a->num_bits & 7);
+    for (int k=0;k<4;++k) { header[k] = (a->num_bits > 0) ? (a->num_bits -= 8, (u8)(a->code_buffer >> (k * 8))) : *a->zbuffer++; }
+    a->code_buffer >>= (a->num_bits > 0 ? 0 : 0); // Reset or discard state if necessary
+    i32 len = (header[1] << 8) | header[0];
+    mcpy(a->zout, a->zbuffer, len);
+    a->zbuffer += len; a->zout += len;
     return 1;
 }
 
@@ -305,9 +303,8 @@ void LoadTextures() {
     DebugRAM("After LoadTextures and after deallocation");
 }
 
-#define NUM_TEXTURE_CLIPS 48
 typedef struct { const u16 *frames;  u8 length; bool hasGlow; const u16 *glowFrames; u8 glowLength; const char* name; } TextureAnimClip;
-u16 sequenceTextures[302]={
+u16 sequenceTextures[]={
     1159,1160,881,1162,1163,1164, // scr_exp 01 - 06
     1310,1311,1312,1313, // bridg1_1 001 - 004
     1115,1116, // broken_clock01_glow 01 - 02
@@ -339,8 +336,8 @@ u16 sequenceTextures[302]={
     1438,1439,1440,1441,1442, // rad1_1 00 - 04
     1443,1444,1445,1446,1447,1448,1449,1450,1451,1452, // screencode 0 - 9
     1453,1454,1455,1456,1457,1458,1459,1460,1461,1462,1463,1464,1465,1466,1467,1468,1469,1470,1471,1472,1473,1474,1475,1476,1477,1478,1479,1480,1481,1482,1483,1484,1485,1486,1487,1488,1489, // shodanstatic 00 - 36
-    1490,1491,1492,1493, // telepad 00 - 03
-    1494, // telepad_00_glow
+    1166,1167,1168,1169, // telepad 00 - 03
+    1490,1491,1492,1493, // telepad_00_glow
     0, // black // index 212
     0, // black
     0, // black
@@ -354,6 +351,7 @@ u16 sequenceTextures[302]={
     1576,1577,1578 // door_x1 01 - 03 // ends at index 301
 };
 
+#define NUM_TEXTURE_CLIPS 49
 static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
     /*0*/{(u16[]){6,7,8,9,9,8,7,6},8,false,NULL,0,"Bridge11"},
     /*1*/{(u16[]){10,11},2,true,(u16[]){12,13},2,"BrokenClock"},
@@ -373,20 +371,20 @@ static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
     /*15*/{(u16[]){99,98,97,92},4,false,NULL,0,"MedScreen3"},
     /*16*/{(u16[]){29,30,31,36},4,false,NULL,0,"MedScreen4"},
     /*17*/{(u16[]){56,55,54,59,59,54,55,56},8,false,NULL,0,"MedScreen5"},
-    /*18*/{(u16[]){61,61,62,62,61,61,212,213,214,215,216,217},12,false,NULL,0,"MedScreen6"},
+    /*18*/{(u16[]){61,61,62,62,61,61,215,216,217,218,219,220},12,false,NULL,0,"MedScreen6"},
     /*19*/{(u16[]){119,120,121,122},4,false,NULL,0,"MedScreen7"},
     /*20*/{(u16[]){59,54,55,56},4,false,NULL,0,"MedScreen8"},
     /*21*/{(u16[]){37,38,39,40,41,42,43,44},8,false,NULL,0,"MedScreen9"},
     /*22*/{(u16[]){83,84,85,86,83,83,86,85,84,83},10,false,NULL,0,"MedScreen10"},
     /*23*/{(u16[]){67,66,66,67,79,80,80,79},8,false,NULL,0,"MedScreen11"},
-    /*24*/{(u16[]){218,219,220,221,222,223,224,225,226,227,228,229},12,false,NULL,0,"MedScreen13"},
+    /*24*/{(u16[]){221,222,223,224,225,226,227,228,229,230,231,232},12,false,NULL,0,"MedScreen13"},
     /*25*/{(u16[]){79,80,81,82,82,81,80,79},8,false,NULL,0,"MedScreen16"},
     /*26*/{(u16[]){73,74,75,76,77,78},6,false,NULL,0,"MedScreen18"},
     /*27*/{(u16[]){73,74,76,75,77,76,78,73},8,false,NULL,0,"MedScreen22"},
     /*28*/{(u16[]){29,30,31,32},4,false,NULL,0,"MedScreen23"},
-    /*29*/{(u16[]){230,231,232,233,234,235,236,237},8,false,NULL,0,"MedScreen24"},
+    /*29*/{(u16[]){233,234,235,236,237,238,239,240},8,false,NULL,0,"MedScreen24"},
     /*30*/{(u16[]){92,93,94,95},4,false,NULL,0,"MedScreen25"},
-    /*31*/{(u16[]){238,239,240,241,242,243,244,245},8,false,NULL,0,"MedScreen27"},
+    /*31*/{(u16[]){241,242,243,244,245,246,247,248},8,false,NULL,0,"MedScreen27"},
     /*32*/{(u16[]){64,65,66,67,68},5,false,NULL,0,"MedScreen29"},
     /*33*/{(u16[]){155,156,157,158,159},5,false,NULL,0,"Rad1_1"},
     /*34*/{(u16[]){61,61,62,62},4,false,NULL,0,"ReacScreen4"},
@@ -400,9 +398,10 @@ static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
     /*42*/{(u16[]){29,30,31},3,false,NULL,0,"SecScreen4"},
     /*43*/{(u16[]){170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,203,204,205,206,205,203,204,206,205,204,203,206,205,203,204,205,206,203,206,205,203,204,203},60,false,NULL,0,"ShodanStatic"},
     /*44*/{(u16[]){203,204,205,206,203,206,205,203,204,205,206,203,206,205,203,204,203},17,false,NULL,0,"Static"},
-    /*45*/{(u16[]){207,208,209,210},4,true,(u16[]){207,208,209,210},4,"Telepad"},
-    /*46*/{(u16[]){299,300,301},3,false,NULL,0,"XDoor1"},
-    /*47*/{(u16[]){246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298},53,false,NULL,0,"ZeroGMutant"},
+    /*45*/{(u16[]){207,208,209,210},4,true,(u16[]){211,212,213,214},4,"Telepad"},
+    /*46*/{(u16[]){302,303,304},3,false,NULL,0,"XDoor1"},
+    /*47*/{(u16[]){249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301},53,false,NULL,0,"ZeroGMutant"},
+    /*48*/{(u16[]){287,288,289,290,291,292,293,294,295,296,297,298,299,300,301},15,false,NULL,0,"ZeroGMutantDeath"},
 };
 
 void TextureSequenceInit(u16 self, char* trimmed_value) {
@@ -423,7 +422,12 @@ void TextureSequenceUpdate(u16 self) {
     Entity* e = &World.instances[self];
     if (!e->textureAnimating) return;
     if (e->tickFinished >= World.pauseRelativeTime) return;
-    e->tickFinished = World.pauseRelativeTime + e->tickTime;
+    float tickTime = 0.35f;
+    if (e->texAnimClip == 5 || e->texAnimClip == 6) tickTime = 0.5f;    
+    if (e->texAnimClip == 43) tickTime = 0.3f;
+    if (e->texAnimClip == 17 || e->texAnimClip == 44) tickTime = 0.2f;
+    if (e->texAnimClip == 47 || e->texAnimClip == 48) tickTime = 0.04166f;
+    e->tickFinished = World.pauseRelativeTime + tickTime;
     const TextureAnimClip* clip = &textureAnimClips[e->texAnimClip];
     if (e->texAnimRandom && (!e->textureAnimationStopsAtDead || e->health > 0.0f)) {
         e->texFrame = random_range_u32(0, clip->length - 1);

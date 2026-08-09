@@ -154,7 +154,8 @@ index: 67
 index: 68
 #Models/cyber_integrity.obj
 index: 69
-
+#Models/skull_collider.obj
+index: 70
 #Models/cyber_mine.obj
 index: 71
 #Models/cyberplayer.obj
