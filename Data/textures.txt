@@ -1255,6 +1255,7 @@ index: 563
 index: 564
 #Textures/npc_invisomut.png
 index: 565
+transparent: 1
 #Textures/npc_maintbotmuzzburst.png
 index: 566
 #Textures/npc_maintenancebot.png

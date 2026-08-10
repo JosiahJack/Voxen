@@ -32,8 +32,7 @@ index: 6
 index: 7
 #Models/a_rubber.obj
 index: 8
-#Models/a_slag.obj
-index: 9
+
 #Models/a_slaglarge.obj
 index: 10
 #Models/audiolog.obj
@@ -626,6 +625,48 @@ index: 312
 index: 313
 #Models/w_rapier_collider.obj
 index: 314
+#Models/w_magnum_collider.obj
+index: 315
+#Models/w_magpulse_collider.obj
+index: 316
+#Models/w_pistol_collider.obj
+index: 317
+#Models/w_plasma_collider.obj
+index: 318
+#Models/w_railgun_collider.obj
+index: 319
+#Models/w_riotgun_collider.obj
+index: 320
+#Models/w_skorpion_collider.obj
+index: 321
+#Models/w_sparqbeam_collider.obj
+index: 322
+#Models/w_stungun_collider.obj
+index: 323
+#Models/chipset_isolinear_collider.obj
+index: 324
+#Models/chipset_collider.obj
+index: 325
+#Models/isotopex22_collider.obj
+index: 326
+#Models/severedhead_collider.obj
+index: 327
+#Models/npc_autobomb_collider.obj
+index: 328
+#Models/npc_invisomut_collider.obj
+index: 329
+#Models/npc_gortiger_collider.obj
+index: 330
+#Models/npc_repairbot_collider.obj
+index: 331
+#Models/barrel_toxic_collider.obj
+index: 332
+#Models/cart1_collider.obj
+index: 333
+#Models/pot_collider.obj
+index: 334
+#Models/toolcart_collider.obj
+index: 335
 
 #Models/reac1_1_slice45.obj
 index: 339
@@ -1015,8 +1056,7 @@ index: 684
 index: 685
 #Models/head_female_collider.obj
 index: 686
-#Models/head_male_collider.obj
-index: 687
+
 #Models/healthkit_collider.obj
 index: 688
 #Models/hw_bio_collider.obj

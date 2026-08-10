@@ -421,58 +421,58 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*347 weapon_ionrifle*/            EDefs[347].modelIndex=643; EDefs[347].texIndex=883; EDefscol[347]=COLTYPE_CVX; EDefs[347].colMeshIndex=313; EDefsmass[347]=0.8f;
     /*348 weapon_rapier*/              EDefs[348].modelIndex=653; EDefs[348].texIndex=891; EDefscol[348]=COLTYPE_CVX; EDefs[348].colMeshIndex=314; EDefs[348].glowIndex=890; EDefsmass[348]=0.3f;
     /*349 weapon_pipe*/                EDefs[349].modelIndex=649; EDefs[349].texIndex=887; EDefs[349].specIndex=1241; EDefsmass[349]=0.85f; EDefscol[349]=COLTYPE_CVX; EDefs[349].colMeshIndex=647;
-    /*350 weapon_magnum*/              EDefs[350].modelIndex=644; EDefs[350].texIndex=877; EDefs[350].specIndex=1231; EDefsmass[350]=0.6f; EDefscol[350]=COLTYPE_CVX; EDefs[350].colMeshIndex=311;
-    /*351 weapon_magpulse*/            EDefs[351].modelIndex=645; EDefs[351].texIndex=884; EDefs[351].specIndex=1231; EDefsmass[351]=0.65f; EDefscol[351]=COLTYPE_CVX; EDefs[351].colMeshIndex=311;
-    /*352 weapon_pistol*/              EDefs[352].modelIndex=650; EDefs[352].texIndex=878; EDefs[352].specIndex=1231; EDefsmass[352]=0.3f; EDefscol[352]=COLTYPE_CVX; EDefs[352].colMeshIndex=311;
-    /*353 weapon_plasma*/              EDefs[353].modelIndex=651; EDefs[353].texIndex=888; EDefs[353].specIndex=1240; EDefsmass[353]=1.2f; EDefscol[353]=COLTYPE_CVX; EDefs[353].colMeshIndex=311;
-    /*354 weapon_railgun*/             EDefs[354].modelIndex=652; EDefs[354].texIndex=889; EDefs[354].specIndex=1231; EDefscol[354]=COLTYPE_CVX; EDefs[354].colMeshIndex=311; EDefsmass[355]=0.8f;
-    /*355 weapon_riotgun*/             EDefs[355].modelIndex=654; EDefs[355].texIndex=892; EDefs[355].specIndex=1231; EDefscol[355]=COLTYPE_CVX; EDefs[355].colMeshIndex=311; EDefsmass[355]=0.55f;
-    /*356 weapon_skorpion*/            EDefs[356].modelIndex=655; EDefs[356].texIndex=893; EDefs[356].specIndex=1231; EDefscol[356]=COLTYPE_CVX; EDefs[356].colMeshIndex=311; EDefsmass[356]=1.3f;
-    /*357 weapon_sparqbeam*/           EDefs[357].modelIndex=656; EDefs[357].texIndex=895; EDefs[357].specIndex=1231; EDefscol[357]=COLTYPE_CVX; EDefs[357].colMeshIndex=311; EDefs[357].glowIndex=894; EDefsmass[357]=0.3f;
-    /*358 weapon_stungun*/             EDefs[358].modelIndex=657; EDefs[358].texIndex=896; EDefs[358].specIndex=1231; EDefscol[358]=COLTYPE_CVX; EDefs[358].colMeshIndex=311; EDefsmass[358]=0.3f;
+    /*350 weapon_magnum*/              EDefs[350].modelIndex=644; EDefs[350].texIndex=877; EDefs[350].specIndex=1231; EDefsmass[350]=0.6f; EDefscol[350]=COLTYPE_CVX; EDefs[350].colMeshIndex=315;
+    /*351 weapon_magpulse*/            EDefs[351].modelIndex=645; EDefs[351].texIndex=884; EDefs[351].specIndex=1231; EDefsmass[351]=0.65f; EDefscol[351]=COLTYPE_CVX; EDefs[351].colMeshIndex=316;
+    /*352 weapon_pistol*/              EDefs[352].modelIndex=650; EDefs[352].texIndex=878; EDefs[352].specIndex=1231; EDefsmass[352]=0.3f; EDefscol[352]=COLTYPE_CVX; EDefs[352].colMeshIndex=317;
+    /*353 weapon_plasma*/              EDefs[353].modelIndex=651; EDefs[353].texIndex=888; EDefs[353].specIndex=1240; EDefsmass[353]=1.2f; EDefscol[353]=COLTYPE_CVX; EDefs[353].colMeshIndex=318;
+    /*354 weapon_railgun*/             EDefs[354].modelIndex=652; EDefs[354].texIndex=889; EDefs[354].specIndex=1231; EDefscol[354]=COLTYPE_CVX; EDefs[354].colMeshIndex=319; EDefsmass[355]=0.8f;
+    /*355 weapon_riotgun*/             EDefs[355].modelIndex=654; EDefs[355].texIndex=892; EDefs[355].specIndex=1231; EDefscol[355]=COLTYPE_CVX; EDefs[355].colMeshIndex=320; EDefsmass[355]=0.55f;
+    /*356 weapon_skorpion*/            EDefs[356].modelIndex=655; EDefs[356].texIndex=893; EDefs[356].specIndex=1231; EDefscol[356]=COLTYPE_CVX; EDefs[356].colMeshIndex=321; EDefsmass[356]=1.3f;
+    /*357 weapon_sparqbeam*/           EDefs[357].modelIndex=656; EDefs[357].texIndex=895; EDefs[357].specIndex=1231; EDefscol[357]=COLTYPE_CVX; EDefs[357].colMeshIndex=322; EDefs[357].glowIndex=894; EDefsmass[357]=0.3f;
+    /*358 weapon_stungun*/             EDefs[358].modelIndex=657; EDefs[358].texIndex=896; EDefs[358].specIndex=1231; EDefscol[358]=COLTYPE_CVX; EDefs[358].colMeshIndex=323; EDefsmass[358]=0.3f;
     /*359 item_battery*/               EDefs[359].modelIndex=13; EDefs[359].texIndex=35; EDefscol[359]=COLTYPE_CVX; EDefs[359].colMeshIndex=680; EDefsmass[359]=0.3f;
     /*360 item_battery_icad*/          EDefs[360].modelIndex=13; EDefs[360].texIndex=34; EDefscol[360]=COLTYPE_CVX; EDefs[360].colMeshIndex=680; EDefsmass[360]=0.35f;
     /*361 item_logic_probe*/           EDefs[361].modelIndex=217; EDefs[361].texIndex=427; EDefscol[361]=COLTYPE_CVX; EDefs[361].colMeshIndex=306; EDefsmass[361]=0.15f;
     /*362 item_healthkit*/             EDefs[362].modelIndex=196; EDefs[362].texIndex=391; EDefscol[362]=COLTYPE_CVX; EDefs[362].colMeshIndex=688; EDefsmass[362]=0.25f;
     /*363 item_plastique*/             EDefs[363].modelIndex=492; EDefs[363].texIndex=599; EDefscol[363]=COLTYPE_CVX; EDefs[363].colMeshIndex=308; EDefsmass[363]=1.4f;
-    /*364 item_chipset_interfacedemod*/EDefs[364].modelIndex=45; EDefs[364].texIndex=78; EDefscol[364]=COLTYPE_BOX; EDefscolliderCenter[364]=(V3){0.003744498f,0.0001704991f,0.03192701f};  EDefscolliderSize[364]=(V3){0.459303f,0.3412231f,0.06385402f};  EDefs[364].colMeshIndex=U16_MAX;  EDefsmass[364]=0.3f;
+    /*364 item_chipset_interfacedemod*/EDefs[364].modelIndex=45; EDefs[364].texIndex=78; EDefscol[364]=COLTYPE_CVX; EDefs[364].colMeshIndex=325; EDefsmass[364]=0.3f;
     /*365 item_flask*/                 EDefs[365].modelIndex=145; EDefscol[365]=COLTYPE_CVX; EDefs[365].colMeshIndex=685; EDefs[365].texIndex=36;  EDefs[365].specIndex=1242;  EDefsmass[365]=0.22f;
-    /*366 item_chipset_bitflag*/       EDefs[366].modelIndex=45; EDefs[366].texIndex=633; EDefscol[366]=COLTYPE_BOX; EDefscolliderCenter[366]=(V3){0.003744498f,0.0001704991f,0.03192701f};  EDefscolliderSize[366]=(V3){0.459303f,0.3412231f,0.06385402f};  EDefs[366].colMeshIndex=U16_MAX;  EDefsmass[366]=0.3f;
-    /*367 item_ammo_rubber*/           EDefs[367].modelIndex=8; EDefscol[367]=COLTYPE_CVX; EDefs[367].colMeshIndex=676;  EDefsmass[367]=0.25f;
-    /*368 item_isotopex22*/            EDefs[368].modelIndex=209; EDefsmass[368]=1.2f;
+    /*366 item_chipset_bitflag*/       EDefs[366].modelIndex=45; EDefs[366].texIndex=633; EDefscol[366]=COLTYPE_CVX; EDefs[366].colMeshIndex=325; EDefsmass[366]=0.3f;
+    /*367 item_ammo_rubber*/           EDefs[367].modelIndex=8; EDefs[367].texIndex=19; EDefscol[367]=COLTYPE_CVX; EDefs[367].colMeshIndex=676; EDefsmass[367]=0.25f;
+    /*368 item_isotopex22*/            EDefs[368].modelIndex=209; EDefs[368].texIndex=413; EDefs[368].glowIndex=412; EDefscol[368]=COLTYPE_CVX; EDefs[368].colMeshIndex=326; EDefsmass[368]=1.2f;
     /*369 item_testtube*/              EDefs[369].modelIndex=622; EDefs[369].texIndex=36; EDefs[369].specIndex=1242; EDefscol[369]=COLTYPE_CVX; EDefs[369].colMeshIndex=612; EDefsmass[369]=0.21f;
     /*370 weapon_grenadefrag_live*/    EDefs[370].modelIndex=182; EDefs[370].texIndex=347; EDefs[370].glowIndex=630; EDefscol[370]=COLTYPE_CVX; EDefs[370].colMeshIndex=73; EDefsmass[370]=1.0f;
-    /*371 item_chipset_isolinear*/     EDefs[371].modelIndex=46;  EDefscol[371]=COLTYPE_BOX;  EDefscolliderCenter[371]=(V3){-0.0009825006f,-0.0129465f,0.0148115f};  EDefscolliderSize[371]=(V3){0.223635f,0.4175691f,0.02912301f};  EDefs[371].colMeshIndex=U16_MAX;  EDefsmass[371]=0.26f;
-    /*372 weapon_grenadeconc_live*/    EDefs[372].modelIndex=165;
-    /*373 item_ammo_needle*/           EDefs[373].modelIndex=4;   EDefs[373].texIndex=15; EDefscol[373]=COLTYPE_BOX; EDefscolliderCenter[373]=(V3){-0.0004654949f,0.0004549972f,0.0244365f}; EDefscolliderSize[373]=(V3){0.131339f,0.1442801f,0.04838703f}; EDefs[373].colMeshIndex=U16_MAX; EDefsmass[373]=0.15f;
-    /*374 item_ammo_tranq*/            EDefs[374].modelIndex=4;   EDefs[374].texIndex=27; EDefscol[374]=COLTYPE_BOX; EDefscolliderCenter[374]=(V3){-0.0004654949f,0.0004549972f,0.0244365f}; EDefscolliderSize[374]=(V3){0.131339f,0.1442801f,0.04838703f}; EDefs[374].colMeshIndex=U16_MAX; EDefsmass[374]=0.15f;
-    /*375 item_ammo_standard*/         EDefs[375].modelIndex=5;   EDefscol[375]=COLTYPE_BOX; EDefscolliderCenter[375]=(V3){0.0001984993f,0.0f,0.02172501f};  EDefscolliderSize[375]=(V3){0.1209471f,0.2176701f,0.04345007f};  EDefs[375].colMeshIndex=U16_MAX;  EDefsmass[375]=0.2f;
-    /*376 item_ammo_teflon*/           EDefs[376].modelIndex=5;   EDefscol[376]=COLTYPE_BOX; EDefscolliderCenter[376]=(V3){0.0001984993f,0.0f,0.02172501f};  EDefscolliderSize[376]=(V3){0.1209471f,0.2176701f,0.04345007f};  EDefs[376].colMeshIndex=U16_MAX;  EDefsmass[376]=0.2f;
-    /*377 item_ammo_hollow*/           EDefs[377].modelIndex=5;   EDefscol[377]=COLTYPE_BOX; EDefscolliderCenter[377]=(V3){0.0002185023f,0.0f,0.02122951f};  EDefscolliderSize[377]=(V3){0.1423431f,0.2127061f,0.04245907f};  EDefs[377].colMeshIndex=U16_MAX;  EDefsmass[377]=0.2f;
-    /*378 item_ammo_slug*/             EDefs[378].modelIndex=3;   EDefscol[378]=COLTYPE_BOX; EDefscolliderCenter[378]=(V3){0.0002185023f,0.0f,0.02122951f};  EDefscolliderSize[378]=(V3){0.1423431f,0.2127061f,0.04245907f};  EDefs[378].colMeshIndex=U16_MAX;  EDefs[378].glowIndex=22;  EDefsmass[378]=0.2f;
-    /*379 item_ammo_magnesium*/        EDefs[379].modelIndex=3;   EDefscol[379]=COLTYPE_CVX; EDefs[379].colMeshIndex=673; EDefsmass[379]=0.35f;
-    /*380 item_ammo_penetrator*/       EDefs[380].modelIndex=3;   EDefscol[380]=COLTYPE_CVX; EDefs[380].colMeshIndex=673; EDefsmass[380]=0.35f;
-    /*381 item_ammo_hornet*/           EDefs[381].modelIndex=1;   EDefscol[381]=COLTYPE_CVX; EDefs[381].colMeshIndex=673; EDefsmass[381]=0.35f;
-    /*382 item_ammo_splinter*/         EDefs[382].modelIndex=630; EDefscol[382]=COLTYPE_CVX; EDefs[382].colMeshIndex=673; EDefsmass[382]=0.35f;
-    /*383 item_ammo_rail*/             EDefs[383].modelIndex=6;   EDefscol[383]=COLTYPE_CVX; EDefs[383].colMeshIndex=675; EDefsmass[383]=0.40f;
-    /*384 item_ammo_slag*/             EDefs[384].modelIndex=9;   EDefscol[384]=COLTYPE_CVX; EDefs[384].colMeshIndex=673; EDefsmass[384]=0.35f;
-    /*385 item_ammo_slaglarge*/        EDefs[385].modelIndex=10;  EDefscol[385]=COLTYPE_CVX; EDefs[385].colMeshIndex=677; EDefsmass[385]=0.40f;
-    /*386 item_ammo_magcart*/          EDefs[386].modelIndex=2;   EDefscol[386]=COLTYPE_CVX; EDefs[386].colMeshIndex=674; EDefsmass[386]=0.35f;
+    /*371 item_chipset_isolinear*/     EDefs[371].modelIndex=46; EDefs[371].texIndex=409; EDefscol[371]=COLTYPE_CVX; EDefs[371].colMeshIndex=308; EDefsmass[371]=0.26f;
+    /*372 weapon_grenadeconc_live*/    EDefs[372].modelIndex=165; EDefs[372].texIndex=334; EDefscol[372]=COLTYPE_CVX; EDefs[372].colMeshIndex=84; EDefsmass[372]=1.3f;
+    /*373 item_ammo_needle*/           EDefs[373].modelIndex=4; EDefs[373].texIndex=15; EDefscol[373]=COLTYPE_BOX; EDefscolliderCenter[373]=(V3){-0.0004654949f,0.0004549972f,0.0244365f}; EDefscolliderSize[373]=(V3){0.131339f,0.1442801f,0.04838703f}; EDefs[373].colMeshIndex=U16_MAX; EDefsmass[373]=0.15f;
+    /*374 item_ammo_tranq*/            EDefs[374].modelIndex=4; EDefs[374].texIndex=27; EDefscol[374]=COLTYPE_BOX; EDefscolliderCenter[374]=(V3){-0.0004654949f,0.0004549972f,0.0244365f}; EDefscolliderSize[374]=(V3){0.131339f,0.1442801f,0.04838703f}; EDefs[374].colMeshIndex=U16_MAX; EDefsmass[374]=0.15f;
+    /*375 item_ammo_standard*/         EDefs[375].modelIndex=5; EDefs[375].texIndex=25; EDefscol[375]=COLTYPE_BOX; EDefscolliderCenter[375]=(V3){0.0001984993f,0.0f,0.02172501f}; EDefscolliderSize[375]=(V3){0.1209471f,0.2176701f,0.04345007f}; EDefs[375].colMeshIndex=U16_MAX; EDefsmass[375]=0.2f;
+    /*376 item_ammo_teflon*/           EDefs[376].modelIndex=5; EDefs[376].texIndex=26; EDefscol[376]=COLTYPE_BOX; EDefscolliderCenter[376]=(V3){0.0001984993f,0.0f,0.02172501f}; EDefscolliderSize[376]=(V3){0.1209471f,0.2176701f,0.04345007f}; EDefs[376].colMeshIndex=U16_MAX; EDefsmass[376]=0.2f;
+    /*377 item_ammo_hollow*/           EDefs[377].modelIndex=5; EDefs[377].texIndex=11; EDefscol[377]=COLTYPE_BOX; EDefscolliderCenter[377]=(V3){0.0002185023f,0.0f,0.02122951f}; EDefscolliderSize[377]=(V3){0.1423431f,0.2127061f,0.04245907f}; EDefs[377].colMeshIndex=U16_MAX; EDefsmass[377]=0.2f;
+    /*378 item_ammo_slug*/             EDefs[378].modelIndex=3; EDefs[378].texIndex=23; EDefs[378].glowIndex=22; EDefscol[378]=COLTYPE_BOX; EDefscolliderCenter[378]=(V3){0.0002185023f,0.0f,0.02122951f}; EDefscolliderSize[378]=(V3){0.1423431f,0.2127061f,0.04245907f}; EDefs[378].colMeshIndex=U16_MAX; EDefs[378].glowIndex=22;  EDefsmass[378]=0.2f;
+    /*379 item_ammo_magnesium*/        EDefs[379].modelIndex=1; EDefs[379].texIndex=14; EDefscol[379]=COLTYPE_CVX; EDefs[379].colMeshIndex=673; EDefsmass[379]=0.35f;
+    /*380 item_ammo_penetrator*/       EDefs[380].modelIndex=1; EDefs[380].texIndex=16; EDefscol[380]=COLTYPE_CVX; EDefs[380].colMeshIndex=673; EDefsmass[380]=0.35f;
+    /*381 item_ammo_hornet*/           EDefs[381].modelIndex=1; EDefs[381].texIndex=12; EDefscol[381]=COLTYPE_CVX; EDefs[381].colMeshIndex=673; EDefsmass[381]=0.35f;
+    /*382 item_ammo_splinter*/         EDefs[382].modelIndex=1; EDefs[382].texIndex=24; EDefscol[382]=COLTYPE_CVX; EDefs[382].colMeshIndex=673; EDefsmass[382]=0.35f;
+    /*383 item_ammo_rail*/             EDefs[383].modelIndex=6; EDefs[383].texIndex=17; EDefscol[383]=COLTYPE_CVX; EDefs[383].colMeshIndex=675; EDefsmass[383]=0.40f;
+    /*384 item_ammo_slag*/             EDefs[384].modelIndex=1; EDefs[384].texIndex=21; EDefscol[384]=COLTYPE_CVX; EDefs[384].colMeshIndex=673; EDefsmass[384]=0.35f;
+    /*385 item_ammo_slaglarge*/        EDefs[385].modelIndex=10; EDefs[385].texIndex=20; EDefscol[385]=COLTYPE_CVX; EDefs[385].colMeshIndex=677; EDefsmass[385]=0.40f;
+    /*386 item_ammo_magcart*/          EDefs[386].modelIndex=2; EDefs[386].texIndex=13; EDefscol[386]=COLTYPE_CVX; EDefs[386].colMeshIndex=674; EDefsmass[386]=0.35f;
     /*387 weapon_grenadeemp_live*/     EDefs[387].modelIndex=168; EDefs[387].texIndex=337; EDefs[387].glowIndex=627; EDefscol[387]=COLTYPE_CVX; EDefs[387].colMeshIndex=85; EDefsmass[387]=0.8f;
-    /*388 item_access_card_std*/       EDefs[388].modelIndex=0;   EDefs[388].texIndex=79; EDefs[388].glowIndex=867; EDefscol[388]=COLTYPE_CVX; EDefs[388].colMeshIndex=672; EDefsmass[388]=0.2f;
+    /*388 item_access_card_std*/       EDefs[388].modelIndex=0; EDefs[388].texIndex=79; EDefs[388].glowIndex=867; EDefscol[388]=COLTYPE_CVX; EDefs[388].colMeshIndex=672; EDefsmass[388]=0.2f;
     /*389 weapon_grenadeearth_live*/   EDefs[389].modelIndex=181; EDefs[389].texIndex=345; EDefs[389].glowIndex=628; EDefscol[389]=COLTYPE_CVX; EDefs[389].colMeshIndex=86; EDefsmass[389]=1.5f;
-    /*390 item_access_card_group1*/    EDefs[390].modelIndex=0;   EDefs[390].texIndex=7;  EDefs[390].glowIndex=159;  EDefscol[390]=COLTYPE_CVX;  EDefs[390].colMeshIndex=672;  EDefsmass[390]=0.2f;
-    /*391 item_access_card_science*/   EDefs[391].modelIndex=0;   EDefs[391].texIndex=2;  EDefs[391].glowIndex=343;  EDefscol[391]=COLTYPE_CVX;  EDefs[391].colMeshIndex=672;  EDefsmass[391]=0.2f;
-    /*392 item_access_card_eng*/       EDefs[392].modelIndex=0;   EDefs[392].texIndex=3;  EDefs[392].glowIndex=81;  EDefscol[392]=COLTYPE_CVX;  EDefs[392].colMeshIndex=672;  EDefsmass[392]=0.2f;
-    /*393 item_access_card_groupB*/    EDefs[393].modelIndex=0;   EDefs[393].texIndex=7;  EDefs[393].glowIndex=159;  EDefscol[393]=COLTYPE_CVX;  EDefs[393].colMeshIndex=672;  EDefsmass[393]=0.2f;
-    /*394 item_access_card_security*/  EDefs[394].modelIndex=0;   EDefs[394].texIndex=10;  EDefs[394].glowIndex=344;  EDefscol[394]=COLTYPE_CVX;  EDefs[394].colMeshIndex=672;  EDefsmass[394]=0.2f;
-    /*395 item_access_card_per5diego*/ EDefs[395].modelIndex=0;   EDefs[395].texIndex=8;  EDefs[395].glowIndex=341;  EDefscol[395]=COLTYPE_CVX;  EDefs[395].colMeshIndex=672;  EDefsmass[395]=0.2f;
-    /*396 item_access_card_medi*/      EDefs[396].modelIndex=0;   EDefs[396].texIndex=1;  EDefs[396].glowIndex=161;  EDefscol[396]=COLTYPE_CVX;  EDefs[396].colMeshIndex=672;  EDefsmass[396]=0.2f;
-    /*397 item_access_card_group3*/    EDefs[397].modelIndex=0;   EDefs[397].texIndex=7;  EDefs[397].glowIndex=159;  EDefscol[397]=COLTYPE_CVX;  EDefs[397].colMeshIndex=672;  EDefsmass[397]=0.2f;
-    /*398 item_access_card_purple*/    EDefs[398].modelIndex=0;   EDefs[398].texIndex=5;  EDefs[398].glowIndex=342;  EDefscol[398]=COLTYPE_CVX;  EDefs[398].colMeshIndex=672;  EDefsmass[398]=0.2f;
-    /*399 item_head_male*/             EDefs[399].modelIndex=194; EDefscol[399]=COLTYPE_CVX; EDefs[399].colMeshIndex=687; EDefsmass[399]=1.29f;
-    /*400 item_head_female*/           EDefs[400].modelIndex=193; EDefscol[400]=COLTYPE_CVX; EDefs[400].colMeshIndex=686; EDefsmass[400]=1.30f;
-    /*401 item_severedhead*/           EDefs[401].modelIndex=590; EDefsmass[401]=1.28f;
+    /*390 item_access_card_group1*/    EDefs[390].modelIndex=0; EDefs[390].texIndex=7; EDefs[390].glowIndex=159; EDefscol[390]=COLTYPE_CVX; EDefs[390].colMeshIndex=672; EDefsmass[390]=0.2f;
+    /*391 item_access_card_science*/   EDefs[391].modelIndex=0; EDefs[391].texIndex=2; EDefs[391].glowIndex=343; EDefscol[391]=COLTYPE_CVX; EDefs[391].colMeshIndex=672; EDefsmass[391]=0.2f;
+    /*392 item_access_card_eng*/       EDefs[392].modelIndex=0; EDefs[392].texIndex=3; EDefs[392].glowIndex=81; EDefscol[392]=COLTYPE_CVX; EDefs[392].colMeshIndex=672; EDefsmass[392]=0.2f;
+    /*393 item_access_card_groupB*/    EDefs[393].modelIndex=0; EDefs[393].texIndex=7; EDefs[393].glowIndex=159; EDefscol[393]=COLTYPE_CVX; EDefs[393].colMeshIndex=672; EDefsmass[393]=0.2f;
+    /*394 item_access_card_security*/  EDefs[394].modelIndex=0; EDefs[394].texIndex=10; EDefs[394].glowIndex=344; EDefscol[394]=COLTYPE_CVX; EDefs[394].colMeshIndex=672; EDefsmass[394]=0.2f;
+    /*395 item_access_card_per5diego*/ EDefs[395].modelIndex=0; EDefs[395].texIndex=8; EDefs[395].glowIndex=341; EDefscol[395]=COLTYPE_CVX; EDefs[395].colMeshIndex=672; EDefsmass[395]=0.2f;
+    /*396 item_access_card_medi*/      EDefs[396].modelIndex=0; EDefs[396].texIndex=1; EDefs[396].glowIndex=161; EDefscol[396]=COLTYPE_CVX; EDefs[396].colMeshIndex=672; EDefsmass[396]=0.2f;
+    /*397 item_access_card_group3*/    EDefs[397].modelIndex=0; EDefs[397].texIndex=7; EDefs[397].glowIndex=159; EDefscol[397]=COLTYPE_CVX; EDefs[397].colMeshIndex=672; EDefsmass[397]=0.2f;
+    /*398 item_access_card_purple*/    EDefs[398].modelIndex=0; EDefs[398].texIndex=5; EDefs[398].glowIndex=342; EDefscol[398]=COLTYPE_CVX; EDefs[398].colMeshIndex=672; EDefsmass[398]=0.2f;
+    /*399 item_head_male*/             EDefs[399].modelIndex=194; EDefs[399].texIndex=389; EDefscol[399]=COLTYPE_CVX; EDefs[399].colMeshIndex=194; EDefsmass[399]=1.29f;
+    /*400 item_head_female*/           EDefs[400].modelIndex=193; EDefs[400].texIndex=388; EDefscol[400]=COLTYPE_CVX; EDefs[400].colMeshIndex=686; EDefsmass[400]=1.30f;
+    /*401 item_severedhead*/           EDefs[401].modelIndex=590; EDefs[401].texIndex=801; EDefscol[401]=COLTYPE_CVX; EDefs[401].colMeshIndex=327; EDefsmass[401]=1.28f;
     /*402 weapon_grenademine_live*/    EDefs[402].modelIndex=184; EDefs[402].texIndex=351; EDefs[402].glowIndex=352; EDefscol[402]=COLTYPE_CVX; EDefs[402].colMeshIndex=87; EDefsmass[402]=1.2f;
     /*403 weapon_grenadenitro_live*/   EDefs[403].modelIndex=185; EDefs[403].texIndex=354; EDefs[403].glowIndex=355; EDefscol[403]=COLTYPE_CVX; EDefs[403].colMeshIndex=88; EDefsmass[403]=1.2f;
     /*404 weapon_grenadegas_live*/     EDefs[404].modelIndex=183; EDefs[404].texIndex=349; EDefscol[404]=COLTYPE_CVX; EDefs[404].colMeshIndex=89; EDefsmass[404]=0.9f;
@@ -480,51 +480,51 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*406 item_workerhelmet_rflap*/    EDefs[406].modelIndex=93; EDefs[406].texIndex=886; EDefscol[406]=COLTYPE_CVX; EDefs[406].colMeshIndex=214; EDefsmass[406]=0.2f;
     /*407 to 416 unused*/
     /*417 item_access_card_perdarcy*/  EDefs[417].modelIndex=0; EDefs[417].texIndex=8; EDefs[417].glowIndex=341; EDefscol[417]=COLTYPE_CVX; EDefs[417].colMeshIndex=672; EDefsmass[417]=0.2f; EDefsangularDrag[417]=0.05f; EDefsdynamicFriction[417]=EDefsstaticFriction[417]=0.6f;
-    /*419 npc_autobomb*/            EDefs[419].modelIndex=299; EDefs[419].texIndex=542; EDefscolliderCenter[419].y=0.42f; EDefscolliderCenter[419].z=0.01848752f; EDefscolliderSize[419]=(V3){0.42f,1.48f,COLCAP_DIR_Z_F}; EDefsangularDrag[419]=1.0f; EDefs[419].glowIndex=541;
-    /*420 npc_cyborg_assassin*/     EDefs[420].modelIndex=306; EDefs[420].texIndex=545; EDefs[420].numclips= 8; EDefs[420].animationNum=24; EDefscolliderSize[420].x=0.48f; EDefscolliderSize[420].y=2.0f;  EDefsmass[420]=1.5f; EDefsangularDrag[420]=1.5f; EDefs[420].glowIndex=544;
-    /*421 npc_avian_mutant*/        EDefs[421].modelIndex=328; EDefs[421].texIndex=568; EDefs[421].numclips= 5; EDefs[421].animationNum=35; EDefscolliderCenter[421].y= 0.0200f;     EDefscolliderSize[421].x=0.40f; EDefscolliderSize[421].y=1.60f; EDefsmass[421]=2.0f; EDefsangularDrag[421]=1.0f;
-    /*422 npc_exec_bot*/            EDefs[422].modelIndex=316; EDefs[422].texIndex=555; EDefs[422].numclips= 5; EDefs[422].animationNum=29; EDefscolliderCenter[422].y= 0.0125f;     EDefscolliderSize[422].x=0.48f; EDefscolliderSize[422].y=2.025f;EDefsmass[422]=2.2f; EDefsangularDrag[422]=1.5f;
-    /*423 npc_cyborg_drone*/        EDefs[423].modelIndex=312; EDefs[423].texIndex=547; EDefs[423].numclips= 7; EDefs[423].animationNum=3;                                            EDefscolliderSize[423].x=0.36f; EDefscolliderSize[423].y=2.00f; EDefsmass[423]=1.5f; EDefsangularDrag[423]=2.0f;
-    /*424 npc_cortex_reaver*/       EDefs[424].modelIndex=300; EDefs[424].texIndex=543; EDefs[424].numclips=6;  EDefs[424].animationNum=23; EDefscolliderCenter[424].y=-0.02263292f; EDefscolliderSize[424].x=0.451f;                                EDefsmass[424]=5.0f; EDefsangularDrag[424]=3.0f; EDefscol[424]=COLTYPE_SPH;
-    /*425 npc_cyborg_warrior*/      EDefs[425].modelIndex=315; EDefs[425].texIndex=554; EDefs[425].numclips=7;  EDefs[425].animationNum=28;                                           EDefscolliderSize[425].x=0.48f; EDefscolliderSize[425].y=2.00f; EDefsmass[425]=1.5f; EDefsangularDrag[425]=2.0f;
-    /*426 npc_cyborg_enforcer*/     EDefs[426].modelIndex=314; EDefs[426].texIndex=550; EDefs[426].numclips=8;  EDefs[426].animationNum=27; EDefscolliderCenter[426].y=0.05f;        EDefscolliderSize[426].x=0.40f; EDefscolliderSize[426].y=2.08f; EDefsmass[426]=1.5f;
-    /*427 npc_cyborg_elite*/        EDefs[427].modelIndex=313; EDefs[427].texIndex=548; EDefs[427].numclips=10; EDefs[427].animationNum=26; EDefscolliderCenter[427].y=0.10f;        EDefscolliderSize[427].x=0.44f; EDefscolliderSize[427].y=2.20f; EDefsmass[427]=3.5f;
-    /*428 npc_cyborg_diego*/        EDefs[428].modelIndex=309; EDefs[428].texIndex=546; EDefs[428].numclips=6;  EDefs[428].animationNum=25;                                           EDefscolliderSize[428].x=0.48f; EDefscolliderSize[428].y=2.12f; EDefsmass[428]=2.0f;
-    /*429 npc_sec1_bot*/            EDefs[429].modelIndex=333; EDefs[429].texIndex=573; EDefs[429].numclips=2;  EDefs[429].animationNum=38; EDefscolliderCenter[429].y=0.05f;        EDefscolliderSize[429].x=0.64f;                                 EDefsmass[429]=1.5f; EDefsangularDrag[429]=0.8f; EDefscol[429]=COLTYPE_SPH;
-    /*430 npc_sec2_bot*/            EDefs[430].modelIndex=335; EDefs[430].texIndex=574; EDefs[430].numclips=6;  EDefs[430].animationNum=39; EDefscolliderCenter[430].y=0.2f;         EDefscolliderSize[430].x=0.80f; EDefscolliderSize[430].y=2.40f; EDefsmass[430]=4.51f;
-    /*431 npc_maint_bot*/           EDefs[431].modelIndex=325; EDefs[431].texIndex=567; EDefs[431].numclips=4;  EDefs[431].animationNum=34; EDefscolliderCenter[431].y=-0.3f;        EDefscolliderSize[431].x=0.48f;                                 EDefsmass[431]=1.5f; EDefsangularDrag[431]=1.5f; EDefscol[431]=COLTYPE_SPH;
-    /*432 npc_mutant_cyborg*/       EDefs[432].modelIndex=329; EDefs[432].texIndex=569; EDefs[432].numclips=7;  EDefs[432].animationNum=51; EDefscolliderCenter[432].y=0.12f;        EDefscolliderSize[432].x=0.65f; EDefscolliderSize[432].y=2.30f; EDefsmass[432]=3.0f; // Josiah's assumption is that the Mutant Cyborg is the "toaster oven" to inspire the first ever ECS that LGS made on Thief as they experimented more with their entity management, per Mahk interview with Casey Muratori: https://www.youtube.com/watch?v=73Do0OScoOU
-    /*433 npc_hopper*/              EDefs[433].modelIndex=322; EDefs[433].texIndex=562; EDefs[433].numclips=8;  EDefs[433].animationNum=32; EDefscolliderCenter[433].z=1.0f;         EDefscolliderSize[433].x=0.64f; EDefscolliderSize[433].y=2.00f; EDefsangularDrag[433]=1000.0f; EDefsdynamicFriction[433]=0.005f; EDefsstaticFriction[433]=0.1f;
-    /*434 npc_humanoid_mutant*/     EDefs[434].modelIndex=323; EDefs[434].texIndex=563; EDefs[434].numclips=6;  EDefs[434].animationNum=2;                                            EDefscolliderSize[434].x=0.38f; EDefscolliderSize[434].y=2.00f; EDefsmass[434]=1.4f; EDefsangularDrag[434]=2.0f;
-    /*435 npc_invisomut*/           EDefs[435].modelIndex=324; EDefs[435].texIndex=565; EDefs[435].numclips=5;  EDefs[435].animationNum=33; EDefscolliderCenter[435].y=-0.28938290f; EDefscolliderSize[435]=(V3){1.5f,1.078766f,0.8f};           EDefsmass[435]=1.3f; EDefsangularDrag[435]=0.8f; EDefscol[435]=COLTYPE_BOX;
-    /*436 npc_virus_mutant*/        EDefs[436].modelIndex=330; EDefs[436].texIndex=576; EDefs[436].numclips=6;  EDefs[436].animationNum=41; EDefscolliderCenter[436].y=-0.05f;       EDefscolliderSize[436].x=0.40f; EDefscolliderSize[436].y=1.90f; EDefsmass[436]=1.4f; EDefsangularDrag[436]=2.0f;
-    /*437 npc_servbot*/             EDefs[437].modelIndex=5153;EDefs[437].texIndex=575; EDefs[437].numclips=5;  EDefs[437].animationNum=40; EDefs[437].colMeshIndex=54; EDefsmass[437]=2.50f; EDefsangularDrag[437]=1.0f; EDefscol[437]=COLTYPE_CVX;
-    /*438 npc_flier_bot*/           EDefs[438].modelIndex=318; EDefs[438].texIndex=558; EDefs[438].numclips=5;  EDefs[438].animationNum=30; EDefsmass[438]=1.75f; EDefsangularDrag[438]=0.8f;
-    /*439 npc_zerog_mutant*/        EDefs[439].modelIndex=395; EDefs[439].texIndex=1170;EDefs[439].numclips=3;  EDefs[439].animationNum=42; EDefsmass[439]=1.30f; EDefsangularDrag[439]=1.0f;
-    /*440 npc_gorilla_tiger_mutant*/EDefs[440].modelIndex=320; EDefs[440].texIndex=560; EDefs[440].numclips=7;  EDefs[440].animationNum=31; EDefsmass[440]=2.00f;
-    /*441 npc_repairbot*/           EDefs[441].modelIndex=331; EDefs[441].texIndex=572; EDefs[441].numclips=4;  EDefs[441].animationNum=37; EDefsmass[441]=1.50f; EDefsangularDrag[441]=2.0f;
-    /*442 npc_plant_mutant*/        EDefs[442].modelIndex=330; EDefs[442].texIndex=570; EDefs[442].numclips=6;  EDefs[442].animationNum=36; EDefsmass[442]=0.80f; EDefsangularDrag[442]=1.5f;
-    /*443 npc_cyberdog*/            EDefs[443].modelIndex=302; EDefsmass[443]=1.50f; EDefsangularDrag[443]=3.0f;
-    /*444 npc_cyberguard*/          EDefs[444].modelIndex=303; EDefsmass[444]=2.00f; EDefsangularDrag[444]=3.0f;
-    /*445 npc_cyberram*/            EDefs[445].modelIndex=304; EDefsmass[445]=2.00f; EDefsangularDrag[445]=3.0f;
-    /*446 npc_cyber_reaver*/        EDefs[446].modelIndex=305; EDefsmass[446]=2.20f; EDefsangularDrag[446]=3.0f;
-    /*447 npc_cybershodan*/         EDefsmass[447]=4.51f; EDefsangularDrag[447]=3.0f; EDefsdynamicFriction[447]=0.6f; EDefsstaticFriction[447]=0.6f;
-    /*448 item_cyber_data*/     EDefs[448].modelIndex=65;
-    /*449 item_cyber_decoy*/    EDefs[449].modelIndex=72;
-    /*450 item_cyber_drill*/    EDefs[450].modelIndex=68;
-    /*451 item_cyber_game*/     EDefs[451].modelIndex=65;
-    /*452 item_cyber_integrity*/EDefs[452].modelIndex=69;
-    /*453 item_cyber_keycard*/  EDefs[453].modelIndex=70;
-    /*454 item_cyber_pulser*/   EDefs[454].modelIndex=65;
-    /*455 item_cyber_recall*/   EDefs[455].modelIndex=65;
-    /*456 item_cyber_shield*/   EDefs[456].modelIndex=65;
-    /*457 item_cyber_turbo*/    EDefs[457].modelIndex=65;
-    /*458 prop_phys_barrel_chemical*/ EDefs[458].modelIndex=12;  EDefs[458].texIndex=30;
-    /*459 prop_phys_barrel_radiation*/EDefs[459].modelIndex=12;  EDefs[459].texIndex=31;
-    /*460 prop_phys_barrel_toxic*/    EDefs[460].modelIndex=12;  EDefs[460].texIndex=33;
-    /*461 prop_phys_cart*/            EDefs[461].modelIndex=40;  EDefs[461].texIndex=416; EDefsmass[461]=2.5f;
-    /*462 prop_phys_pot*/             EDefs[462].modelIndex=494; EDefsmass[462]=0.3f;
-    /*463 prop_phys_toolcart*/        EDefs[463].modelIndex=624; EDefs[463].texIndex=865; EDefs[463].normIndex=864;  EDefs[463].specIndex=866;  EDefsmass[463]=20.0f; EDefsangularDrag[463]=0.2f;
+    /*419 npc_autobomb*/            EDefs[419].modelIndex=299; EDefs[419].texIndex=542; EDefs[419].glowIndex=541; EDefscol[419]=COLTYPE_CVX; EDefs[419].colMeshIndex=328;
+    /*420 npc_cyborg_assassin*/     EDefs[420].modelIndex=306; EDefs[420].texIndex=545; EDefs[420].numclips= 8; EDefs[420].animationNum=24; EDefscolliderSize[420].x=0.48f; EDefscolliderSize[420].y=2.0f; EDefscolliderCenter[420].y=0.96f; EDefsmass[420]=1.5f; EDefsangularDrag[420]=1.5f; EDefs[420].glowIndex=544;
+    /*421 npc_avian_mutant*/        EDefs[421].modelIndex=328; EDefs[421].texIndex=568; EDefs[421].numclips= 5; EDefs[421].animationNum=35; EDefscolliderSize[421].x=0.64f; EDefscolliderSize[421].y=1.60f; EDefscolliderCenter[421].y=0.64f; EDefsmass[421]=2.0f; EDefsangularDrag[421]=1.0f;
+    /*422 npc_exec_bot*/            EDefs[422].modelIndex=316; EDefs[422].texIndex=555; EDefs[422].numclips= 5; EDefs[422].animationNum=29; EDefscolliderSize[422].x=0.48f; EDefscolliderSize[422].y=2.025f; EDefscolliderCenter[422].y=0.96f; EDefsmass[422]=2.2f; EDefsangularDrag[422]=1.5f;
+    /*423 npc_cyborg_drone*/        EDefs[423].modelIndex=312; EDefs[423].texIndex=547; EDefs[423].numclips= 7; EDefs[423].animationNum=3; EDefscolliderSize[423].x=0.36f; EDefscolliderSize[423].y=2.00f; EDefsmass[423]=1.5f; EDefsangularDrag[423]=2.0f;
+    /*424 npc_cortex_reaver*/       EDefs[424].modelIndex=300; EDefs[424].texIndex=543; EDefs[424].numclips=6; EDefs[424].animationNum=23; EDefscolliderSize[424].x=1.28f; EDefscolliderSize[424].y=2.5f; EDefscolliderCenter[424].y=1.28f; EDefsmass[424]=5.0f; EDefsangularDrag[424]=3.0f;
+    /*425 npc_cyborg_warrior*/      EDefs[425].modelIndex=315; EDefs[425].texIndex=554; EDefs[425].numclips=7; EDefs[425].animationNum=28; EDefscolliderSize[425].x=0.48f; EDefscolliderSize[425].y=2.00f; EDefsmass[425]=1.5f; EDefsangularDrag[425]=2.0f;
+    /*426 npc_cyborg_enforcer*/     EDefs[426].modelIndex=314; EDefs[426].texIndex=550; EDefs[426].numclips=8; EDefs[426].animationNum=27; EDefscolliderSize[426].x=0.40f; EDefscolliderSize[426].y=2.08f; EDefscolliderCenter[426].y=1.03f;  EDefsmass[426]=1.5f;
+    /*427 npc_cyborg_elite*/        EDefs[427].modelIndex=313; EDefs[427].texIndex=548; EDefs[427].numclips=10; EDefs[427].animationNum=26; EDefscolliderSize[427].x=0.44f; EDefscolliderSize[427].y=2.20f; EDefscolliderCenter[427].y=1.09f;  EDefsmass[427]=3.5f;
+    /*428 npc_cyborg_diego*/        EDefs[428].modelIndex=309; EDefs[428].texIndex=546; EDefs[428].numclips=6; EDefs[428].animationNum=25; EDefscolliderSize[428].x=0.48f; EDefscolliderSize[428].y=2.12f; EDefscolliderCenter[428].y=1.04f; EDefsmass[428]=2.0f;
+    /*429 npc_sec1_bot*/            EDefs[429].modelIndex=333; EDefs[429].texIndex=573; EDefs[429].numclips=2; EDefs[429].animationNum=38; EDefscolliderSize[429].x=0.76f; EDefscolliderSize[429].y=1.8f; EDefscolliderCenter[429].y=0.76f; EDefsmass[429]=1.5f; EDefsangularDrag[429]=0.8f;
+    /*430 npc_sec2_bot*/            EDefs[430].modelIndex=335; EDefs[430].texIndex=574; EDefs[430].numclips=6; EDefs[430].animationNum=39; EDefscolliderSize[430].x=1.12f; EDefscolliderSize[430].y=2.40f; EDefscolliderCenter[430].y=1.08f; EDefsmass[430]=4.51f;
+    /*431 npc_maint_bot*/           EDefs[431].modelIndex=325; EDefs[431].texIndex=567; EDefs[431].numclips=4; EDefs[431].animationNum=34; EDefscolliderSize[431].x=2.00f; EDefscolliderCenter[431].y=0.78f; EDefsmass[431]=1.5f; EDefsangularDrag[431]=1.5f; EDefscol[431]=COLTYPE_SPH;
+    /*432 npc_mutant_cyborg*/       EDefs[432].modelIndex=329; EDefs[432].texIndex=569; EDefs[432].numclips=7; EDefs[432].animationNum=51; EDefscolliderCenter[432].y=0.12f; EDefscolliderSize[432].x=0.75f; EDefscolliderSize[432].y=2.30f; EDefsmass[432]=3.0f; // Josiah's assumption is that the Mutant Cyborg is the "toaster oven" to inspire the first ever ECS that LGS made on Thief as they experimented more with their entity management, per Mahk interview with Casey Muratori: https://www.youtube.com/watch?v=73Do0OScoOU
+    /*433 npc_hopper*/              EDefs[433].modelIndex=322; EDefs[433].texIndex=562; EDefs[433].numclips=8; EDefs[433].animationNum=32; EDefscolliderSize[433].x=0.96f; EDefscolliderSize[433].y=2.38f; EDefscolliderCenter[433].y=1.04f; EDefscolliderCenter[433].z=-0.16f;
+    /*434 npc_humanoid_mutant*/     EDefs[434].modelIndex=323; EDefs[434].texIndex=563; EDefs[434].numclips=6; EDefs[434].animationNum=2; EDefscolliderSize[434].x=0.38f; EDefscolliderSize[434].y=2.00f; EDefsmass[434]=1.4f; EDefsangularDrag[434]=2.0f;
+    /*435 npc_invisomut*/           EDefs[435].modelIndex=324; EDefs[435].texIndex=565; EDefs[435].numclips=5; EDefs[435].animationNum=33; EDefscol[435]=COLTYPE_CVX; EDefs[435].colMeshIndex=329; EDefsmass[435]=1.3f; EDefsangularDrag[435]=0.8f; 
+    /*436 npc_virus_mutant*/        EDefs[436].modelIndex=330; EDefs[436].texIndex=576; EDefs[436].numclips=6; EDefs[436].animationNum=41; EDefscolliderSize[436].x=0.72f; EDefscolliderSize[436].y=1.90f; EDefscolliderCenter[436].y=0.95f; EDefscolliderCenter[436].z=0.16f; EDefsmass[436]=1.4f; EDefsangularDrag[436]=2.0f;
+    /*437 npc_servbot*/             EDefs[437].modelIndex=5153;EDefs[437].texIndex=575; EDefs[437].numclips=5; EDefs[437].animationNum=40; EDefs[437].colMeshIndex=54; EDefsmass[437]=2.50f; EDefsangularDrag[437]=1.0f; EDefscol[437]=COLTYPE_CVX;
+    /*438 npc_flier_bot*/           EDefs[438].modelIndex=318; EDefs[438].texIndex=558; EDefs[438].numclips=5; EDefs[438].animationNum=30; EDefsmass[438]=1.75f; EDefsangularDrag[438]=0.8f; EDefscolliderSize[438].x=0.8f; EDefscolliderCenter[438].y=0.16f; EDefscol[438]=COLTYPE_SPH;
+    /*439 npc_zerog_mutant*/        EDefs[439].modelIndex=395; EDefs[439].texIndex=1170;EDefs[439].numclips=3; EDefs[439].animationNum=42; EDefsmass[439]=1.30f; EDefsangularDrag[439]=1.0f; EDefscolliderSize[439].x=1.6f; EDefscol[439]=COLTYPE_SPH;
+    /*440 npc_gorilla_tiger_mutant*/EDefs[440].modelIndex=320; EDefs[440].texIndex=560; EDefs[440].numclips=7; EDefs[440].animationNum=31; EDefsmass[440]=2.00f; EDefscol[440]=COLTYPE_CVX; EDefs[440].colMeshIndex=330;
+    /*441 npc_repairbot*/           EDefs[441].modelIndex=331; EDefs[441].texIndex=572; EDefs[441].numclips=4; EDefs[441].animationNum=37; EDefsmass[441]=1.50f; EDefsangularDrag[441]=2.0f; EDefscol[441]=COLTYPE_CVX; EDefs[441].colMeshIndex=331;
+    /*442 npc_plant_mutant*/        EDefs[442].modelIndex=330; EDefs[442].texIndex=570; EDefs[442].numclips=6; EDefs[442].animationNum=36; EDefsmass[442]=0.80f; EDefsangularDrag[442]=1.5f; EDefscolliderSize[442].x=0.6f; EDefscolliderSize[442].y=1.44f; EDefscolliderCenter[442].y=0.72f;
+    /*443 npc_cyberdog*/            EDefs[443].modelIndex=302; EDefsmass[443]=1.50f; EDefsangularDrag[443]=3.0f; EDefscolliderSize[443].x=0.72f; EDefscol[443]=COLTYPE_SPH;
+    /*444 npc_cyberguard*/          EDefs[444].modelIndex=303; EDefsmass[444]=2.00f; EDefsangularDrag[444]=3.0f; EDefscolliderSize[444].x=1.0f; EDefscol[444]=COLTYPE_SPH;
+    /*445 npc_cyberram*/            EDefs[445].modelIndex=304; EDefsmass[445]=2.00f; EDefsangularDrag[445]=3.0f; EDefscolliderSize[445].x=1.44f; EDefscol[445]=COLTYPE_SPH;
+    /*446 npc_cyber_reaver*/        EDefs[446].modelIndex=305; EDefsmass[446]=2.20f; EDefsangularDrag[446]=3.0f; EDefscolliderSize[446].x=0.72f; EDefscol[446]=COLTYPE_SPH;
+    /*447 npc_cybershodan*/         EDefsmass[447]=4.51f; EDefsangularDrag[447]=3.0f; EDefsdynamicFriction[447]=0.6f; EDefsstaticFriction[447]=0.6f; EDefscolliderSize[447].x=0.28f; EDefscolliderSize[447].y=1.6f; EDefscolliderSize[447].y=2.0f;
+    /*448 item_cyber_data*/     EDefs[448].modelIndex=65; EDefscolliderSize[448].x=1.5f; EDefscol[448]=COLTYPE_SPH;
+    /*449 item_cyber_decoy*/    EDefs[449].modelIndex=72; EDefscolliderSize[449].x=1.5f; EDefscol[449]=COLTYPE_SPH;
+    /*450 item_cyber_drill*/    EDefs[450].modelIndex=68; EDefscolliderSize[450].x=1.5f; EDefscol[450]=COLTYPE_SPH;
+    /*451 item_cyber_game*/     EDefs[451].modelIndex=65; EDefscolliderSize[451].x=1.5f; EDefscol[451]=COLTYPE_SPH;
+    /*452 item_cyber_integrity*/EDefs[452].modelIndex=69; EDefscolliderSize[452].x=1.5f; EDefscol[452]=COLTYPE_SPH;
+    /*453 item_cyber_keycard*/  EDefs[453].modelIndex=70; EDefscolliderSize[453].x=1.5f; EDefscol[453]=COLTYPE_SPH;
+    /*454 item_cyber_pulser*/   EDefs[454].modelIndex=65; EDefscolliderSize[454].x=1.5f; EDefscol[454]=COLTYPE_SPH;
+    /*455 item_cyber_recall*/   EDefs[455].modelIndex=65; EDefscolliderSize[455].x=1.5f; EDefscol[455]=COLTYPE_SPH;
+    /*456 item_cyber_shield*/   EDefs[456].modelIndex=65; EDefscolliderSize[456].x=1.5f; EDefscol[456]=COLTYPE_SPH;
+    /*457 item_cyber_turbo*/    EDefs[457].modelIndex=65; EDefscolliderSize[457].x=1.5f; EDefscol[457]=COLTYPE_SPH;
+    /*458 prop_phys_barrel_chemical*/ EDefs[458].modelIndex=12; EDefs[458].texIndex=30; EDefscol[458]=COLTYPE_CVX; EDefs[458].colMeshIndex=332;
+    /*459 prop_phys_barrel_radiation*/EDefs[459].modelIndex=12; EDefs[459].texIndex=31; EDefscol[459]=COLTYPE_CVX; EDefs[459].colMeshIndex=332;
+    /*460 prop_phys_barrel_toxic*/    EDefs[460].modelIndex=12; EDefs[460].texIndex=33; EDefscol[460]=COLTYPE_CVX; EDefs[460].colMeshIndex=332;
+    /*461 prop_phys_cart*/            EDefs[461].modelIndex=40; EDefs[461].texIndex=416; EDefsmass[461]=2.5f; EDefscol[461]=COLTYPE_CVX; EDefs[461].colMeshIndex=333;
+    /*462 prop_phys_pot*/             EDefs[462].modelIndex=494; EDefsmass[462]=0.3f; EDefscol[462]=COLTYPE_CVX; EDefs[462].colMeshIndex=334;
+    /*463 prop_phys_toolcart*/        EDefs[463].modelIndex=624; EDefs[463].texIndex=865; EDefs[463].normIndex=864; EDefs[463].specIndex=866; EDefsmass[463]=20.0f; EDefsangularDrag[463]=0.2f; EDefscol[463]=COLTYPE_CVX; EDefs[463].colMeshIndex=335;
     /*464 se_briefcase*/        EDefs[464].modelIndex=34; EDefs[464].texIndex=66; EDefs[464].glowIndex=65; EDefscol[464]=COLTYPE_MSH;
     /*465 se_corpse_blueshirt*/ EDefs[465].modelIndex=51; EDefs[465].texIndex=126; EDefs[465].specIndex=127;
     /*466 se_corpse_brownshirt*/EDefs[466].texIndex=128;  EDefs[466].specIndex=129;  EDefs[466].modelIndex=52; 
@@ -883,6 +883,15 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     InitializeEntity(&World.instances[i]);
     World.instances[i].index = entIdx;
     World.position[i] = pos;
+    if (entIdx == 424) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.8f; } // npc_cortex_reaver
+    if (entIdx == 430) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.9f; } // npc_sec2_bot
+    if (entIdx == 431) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.4f; } // npc_maint_bot
+    if (entIdx == 433) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.88f; } // npc_hopper
+    if (entIdx == 439) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.4f; } // npc_zerog_mutant
+    if (entIdx == 441) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.75f; } // npc_repairbot
+    if (entIdx == 444) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.666f; } // npc_cyberguard
+    if (entIdx == 445) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.5f; } // npc_cyberram
+    if (entIdx == 446) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 1.1f; } // npc_cyber_reaver
     if (entIdx == 475 || entIdx == 476) World.scale[i] = (V3){1.75f,1.75f,1.75f};
     if (IdxIsNPC(entIdx)) InitializeAIAfterLoad(i);
     World.instances[i].modelIndex = EDefs[entIdx].modelIndex;
@@ -1164,8 +1173,18 @@ void LoadLevelMod(u8 lev) {
         //else if (entIdx == 343) { World.position[parent].y += 0.16f; } // weapon_blaster: Move up to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value
         //else if (entIdx == 346) { World.position[parent].z += 0.16f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value, also not sure if barrel parallel axis is x or z that I slid this along
         //else if (entIdx == 348) { World.position[parent].z += 0.6f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value, also not sure if blade parallel axis is x or z that I slid this along
+        else if (entIdx == 350) { World.position[parent].y += 0.16f; } // weapon_magnum: Move over to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 352) { World.position[parent].y += 0.16f; } // weapon_pistol: Move over to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 358) { World.position[parent].y += 0.16f; } // weapon_stungun: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 361) { World.position[parent].y += 0.05f; } // item_logic_probe: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 363) { World.position[parent].y += 0.04f; } // item_plastique: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 364 || entIdx == 366) { World.position[parent].y += 0.03f; } // item_chipset_isolinear: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 368) { World.position[parent].y += 0.04f; } // item_isotopex22: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 371) { World.position[parent].y += 0.015f; } // item_chipset_isolinear: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 379 || entIdx == 380 || entIdx == 381 || entIdx == 382 || entIdx == 384) { World.position[parent].y += 0.025f; } // item_ammo_hornet, item_ammo_splinter, item_ammo_magnesium, item_ammo_penetrator: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 399) { World.position[parent].y += 0.01f; } // item_head_male: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 458 || entIdx == 459 || entIdx == 460) { World.position[parent].y += 0.72f; } // prop_phys_barrel_chemical, prop_phys_barrel_radiation, prop_phys_barrel_toxic: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 463) { World.position[parent].y += 0.64f; } // prop_phys_toolcart: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx >= 472 && entIdx <= 476) { World.position[parent].y += 0.342f; } // se_crate1, se_crate2, se_crate3, se_crate4, se_crate5: Move up to account for CG mod (origin moved vs Unity version)
         else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
         else if (entIdx == 720) { /*u16 mist=*/AddInstance(648,World.position[parent]); }// ambient_mist

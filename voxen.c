@@ -10,7 +10,6 @@ float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProje
 
 // Entity Management
 float modelMatrices[INSTANCE_COUNT*16];
-
 u16** modelTriangles; u32 modelVertexCounts[MAX_MDLS]; u16 modelTriangleCounts[MAX_MDLS]; float modelBounds[MAX_MDLS]; u16 mdlsCnt; float **physPos; u16** physTris; u32* physVertCounts;
 
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
@@ -23,14 +22,15 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
                            9,/*Patch Use=J*/     8,/*Patch+=I*/          132,/*Patch-=,*/          12,/*Full Map=M*/      21,/*Swim Up= V*/        2,/*Swim Down=C*/ 102,/*Console=`*/   101/*Screenshot=F12*/},
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
-    
+
 InputSystem Sys_Input;
 TextSystem Sys_Text;
-CheatsSystem Cheats = {.god=false,.noclip=false,.showLocation=true,.showFPS=true,.editMode=false,.showPhys=false};
+CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=true, .showFPS=true, .editMode=false, .showPhys=false};
 static bool shadowBuffersCreated = false;
-CamView camViews[64],levelCamViews[14][64]; u8 camViewCount,levelCamViewCount[14]; u32 camViewTextures[64],levelCamViewTextures[14][64],drawCalls,uiDrawCalls,shadDrawCalls,vertsRendered,drawCallsNormal;
-FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
-u16 editModeSelection,editModeTestEntityDefinition=347; double game_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS];
+CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
+FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
+u16 editModeSelection, editModeTestEntityDefinition=472;
+double game_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS];
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
 Entity EDefs[MAX_ENTITIES]; V3 EDefscolliderCenter[MAX_ENTITIES],EDefscolliderSize[MAX_ENTITIES]; ColliderType/*u8*/ EDefscol[MAX_ENTITIES]; u32 EDefslayer[MAX_ENTITIES];
@@ -99,19 +99,35 @@ void DrawMeshCollider(u16 i) {
 }
 
 void DrawCapsuleCollider(u16 i) {
-    Color col = ColliderColor(i); ShapeCapsule cap = Entity_GetCap(i);
-    V3 axis=V3_Normalize(V3_AsubB(cap.tip,cap.base)); V3 ref=(vabs(axis.y)<0.9f)?(V3){0,1,0}:(V3){1,0,0}; V3 perp0=V3_Normalize(V3_Cross(axis,ref)),perp1=V3_Cross(axis,perp0);
-    float step=6.28318530f/12,r=cap.rad;
-    for (int seg=0;seg<12;seg++) {
-        float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1); V3 r0 = V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(perp1,s0*r)), r1=V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(perp1,s1*r));
-        AddWireLine(V3_AplusB(cap.base,r0),V3_AplusB(cap.base,r1),col); AddWireLine(V3_AplusB(cap.tip,r0),V3_AplusB(cap.tip,r1),col);
+    Color col = ColliderColor(i); 
+    ShapeCapsule cap = Entity_GetCap(i);
+    V3 diff = V3_AsubB(cap.tip, cap.base);
+    V3 axis = (vabs(diff.x) + vabs(diff.y) + vabs(diff.z) > 0.0001f) ? V3_Normalize(diff) : (V3){0.0f, 1.0f, 0.0f};     
+    V3 ref = (vabs(axis.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; 
+    V3 perp0 = V3_Normalize(V3_Cross(axis, ref)); 
+    V3 perp1 = V3_Cross(axis, perp0);
+    float step = 6.28318530f / 12, r = cap.rad;
+    for (int seg = 0; seg < 12; seg++) { // Draw top and bottom rings
+        float a0 = seg * step, a1 = a0 + step;
+        float c0 = vcosf(a0), s0 = vsinf(a0), c1 = vcosf(a1), s1 = vsinf(a1); 
+        V3 r0 = V3_AplusB(V3_ScaleByF(perp0, c0 * r), V3_ScaleByF(perp1, s0 * r));
+        V3 r1 = V3_AplusB(V3_ScaleByF(perp0, c1 * r), V3_ScaleByF(perp1, s1 * r));
+        AddWireLine(V3_AplusB(cap.base, r0), V3_AplusB(cap.base, r1), col); 
+        AddWireLine(V3_AplusB(cap.tip, r0),  V3_AplusB(cap.tip, r1),  col);
     }
-    for (int seg=0;seg<6;seg++) {
-        float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
-        AddWireLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,-s1*r))),col); AddWireLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,-s1*r))),col);
-        AddWireLine(V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis, s0*r))),V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis, s1*r))),col); AddWireLine(V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis, s0*r))),V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis, s1*r))),col);
+    for (int seg = 0; seg < 6; seg++) { // Draw the hemispheres
+        float a0 = seg * step, a1 = a0 + step;
+        float c0 = vcosf(a0), s0 = vsinf(a0), c1 = vcosf(a1), s1 = vsinf(a1);
+        AddWireLine(V3_AplusB(cap.base, V3_AplusB(V3_ScaleByF(perp0, c0 * r), V3_ScaleByF(axis, -s0 * r))), V3_AplusB(cap.base, V3_AplusB(V3_ScaleByF(perp0, c1 * r), V3_ScaleByF(axis, -s1 * r))), col); 
+        AddWireLine(V3_AplusB(cap.base, V3_AplusB(V3_ScaleByF(perp1, c0 * r), V3_ScaleByF(axis, -s0 * r))), V3_AplusB(cap.base, V3_AplusB(V3_ScaleByF(perp1, c1 * r), V3_ScaleByF(axis, -s1 * r))), col);
+        AddWireLine(V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp0, c0 * r), V3_ScaleByF(axis, s0 * r))),  V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp0, c1 * r), V3_ScaleByF(axis, s1 * r))), col); 
+        AddWireLine(V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp1, c0 * r), V3_ScaleByF(axis, s0 * r))),  V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp1, c1 * r), V3_ScaleByF(axis, s1 * r))), col);
     }
-    for (int seg=0;seg<4;seg++) { float a=seg*(6.28318530f/4.f); V3 off=V3_AplusB(V3_ScaleByF(perp0,vcosf(a)*r),V3_ScaleByF(perp1,vsinf(a)*r)); AddWireLine(V3_AplusB(cap.base,off),V3_AplusB(cap.tip,off),col); }
+    for (int seg = 0; seg < 4; seg++) { // Draw the longitudinal lines
+        float a = seg * (6.28318530f / 4.f); 
+        V3 off = V3_AplusB(V3_ScaleByF(perp0, vcosf(a) * r), V3_ScaleByF(perp1, vsinf(a) * r)); 
+        AddWireLine(V3_AplusB(cap.base, off), V3_AplusB(cap.tip, off), col); 
+    }
     DrawVelocityVector(i);
 }
 
