@@ -22,14 +22,13 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
                            9,/*Patch Use=J*/     8,/*Patch+=I*/          132,/*Patch-=,*/          12,/*Full Map=M*/      21,/*Swim Up= V*/        2,/*Swim Down=C*/ 102,/*Console=`*/   101/*Screenshot=F12*/},
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
-
 InputSystem Sys_Input;
 TextSystem Sys_Text;
 CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=true, .showFPS=true, .editMode=false, .showPhys=false};
 static bool shadowBuffersCreated = false;
 CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
-u16 editModeSelection, editModeTestEntityDefinition=379;
+u16 editModeSelection, editModeTestEntityDefinition=433;
 double game_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS];
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
@@ -212,6 +211,7 @@ static void cmd_energy() { Cheats.redbull = !Cheats.redbull; if (Cheats.redbull)
 static void SetSkyRotateSpeed() { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(imageBlitSP); glUniform1f(30,skyRotateSpeeds[Cheats.dizzyLevel]); }
 static void cmd_dizzy() { Cheats.dizzyLevel = (Cheats.dizzyLevel >= 3) ? 0 : Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
 static void cmd_bottomless() { Cheats.bottomless = !Cheats.bottomless; if (Cheats.bottomless) {CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]);/*"Bring it!"*/} else {CenterStatusPrint("%s",Sys_Text.stringTable[1003]);/*"Hose disconnected from interdimensional wormhole. Normal ammo operation restored."*/} }
+static void cmd_animtest() { Cheats.animTest = !Cheats.animTest; if (Cheats.animTest) {CenterStatusPrint("animation test enabled!");} else {CenterStatusPrint("animation test disabled");} }
 static void cmd_nohud() { Cheats.noHUD = !Cheats.noHUD; if (Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
 static void cmd_iamshodan() { Cheats.superoverride = !Cheats.superoverride; if (Cheats.superoverride) {CenterStatusPrint("%s",Sys_Text.stringTable[1010]);/*"Full security override enabled!"*/ } else {CenterStatusPrint("%s",Sys_Text.stringTable[1009]);/*"SHODAN has regained control of security from you"*/} }
 static void cmd_staminup() { Cheats.fatigueCheat = !Cheats.fatigueCheat; if (Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); World.invP1.fatigue=0.0f; } else {CenterStatusPrint("%s",Sys_Text.stringTable[1012]); } }
@@ -236,7 +236,7 @@ static void cmd_iamironman(){ CenterStatusPrint("That's nice dear."); }         
 static void cmd_idkfa()       { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); } static void cmd_ai()          { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
 static void cmd_quit()      { OS_Exit(0); }                                                           static void cmd_aireal()      { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
 static const ConsoleCommand consoleCmds[] = {
-    {"noclip",         {.noArg=cmd_noclip},        CMD_NOARG},{"idclip",          {.noArg=cmd_noclip},CMD_NOARG},         {"no clip",     {.noArg = cmd_noclip},CMD_NOARG},  {"showphys",      {.noArg = cmd_showphys},CMD_NOARG},  { "god",           {.noArg=cmd_god}, CMD_NOARG},       {"overwhelming",            {.noArg=cmd_god}, CMD_NOARG},
+    {"noclip",         {.noArg=cmd_noclip},        CMD_NOARG},{"idclip",          {.noArg=cmd_noclip},CMD_NOARG},         {"no clip",     {.noArg = cmd_noclip},CMD_NOARG},  {"showphys",      {.noArg = cmd_showphys},CMD_NOARG},  { "god",           {.noArg=cmd_god}, CMD_NOARG},       {"overwhelming",            {.noArg=cmd_god}, CMD_NOARG}, 
     {"whosyourdaddy",  {.noArg = cmd_god},         CMD_NOARG},{"iddqd",           {.noArg=cmd_god}, CMD_NOARG},           {"notarget",    {.noArg=cmd_notarget},CMD_NOARG},  {"no target",     {.noArg = cmd_notarget},CMD_NOARG},  {"editmode",       {.noArg=cmd_edit},CMD_NOARG},       {"edit",                    {.noArg=cmd_edit},CMD_NOARG},
     {"edit mode",      {.noArg = cmd_edit},        CMD_NOARG},{"editor",          {.noArg=cmd_edit},CMD_NOARG},           {"undo",        {.noArg=cmd_undo},    CMD_NOARG},  {"showfps",       {.noArg = cmd_showfps}, CMD_NOARG},  {"show fps",       {.noArg=cmd_showfps},CMD_NOARG},    {"showlocation",            {.noArg=cmd_showlocation},CMD_NOARG},
     {"show location",  {.noArg = cmd_showlocation},CMD_NOARG},{"nohud",           {.noArg=cmd_nohud},CMD_NOARG},          {"no hud",      {.noArg=cmd_nohud},   CMD_NOARG},  {"bottomlessclip",{.noArg = cmd_bottomless},CMD_NOARG},{"bottomless clip",{.noArg=cmd_bottomless},CMD_NOARG}, {"load",                    {.withStr=cmd_loadlevel},CMD_STR},
@@ -249,7 +249,7 @@ static const ConsoleCommand consoleCmds[] = {
     {"die",            {.noArg=cmd_kill},          CMD_NOARG},{"justinbailey",    {.noArg = cmd_justinbailey}, CMD_NOARG},{"woodstock",   {.noArg=cmd_woodstock}, CMD_NOARG},{"quarry",        {.noArg=cmd_quarry},      CMD_NOARG},{"zelda",          {.noArg = cmd_zelda},    CMD_NOARG},{"allyourbasearebelongtous",{.noArg=cmd_allyourbase},CMD_NOARG},
     {"all your base",  {.noArg=cmd_allyourbase},   CMD_NOARG},{"i am iron man",   {.noArg = cmd_iamironman},   CMD_NOARG},{"i am amazing",{.noArg=cmd_iamironman},CMD_NOARG},{"i am cool",     {.noArg=cmd_iamironman},  CMD_NOARG},{"i am best",      {.noArg =cmd_iamironman},CMD_NOARG},{"idkfa",                   {.noArg=cmd_idkfa},      CMD_NOARG},
     {"impulse 9",      {.noArg=cmd_idkfa},         CMD_NOARG},{"undo",            {.noArg = cmd_undo},         CMD_NOARG},{"shake",       {.noArg=cmd_shake},     CMD_NOARG},{"tired",         {.noArg=cmd_staminup},    CMD_NOARG},{"staminup",       {.noArg = cmd_staminup}, CMD_NOARG},{"grok",                    {.noArg=cmd_ai},         CMD_NOARG},
-    {"chatgpt",        {.noArg=cmd_ai},            CMD_NOARG},{"claude",          {.noArg = cmd_ai},           CMD_NOARG},{"gemini",      {.noArg=cmd_ai},        CMD_NOARG},{"shodan",        {.noArg=cmd_aireal},      CMD_NOARG},{NULL,{.raw = NULL},CMD_NOARG}/*sizeof helper*/ };
+    {"chatgpt",        {.noArg=cmd_ai},            CMD_NOARG},{"claude",          {.noArg = cmd_ai},           CMD_NOARG},{"gemini",      {.noArg=cmd_ai},        CMD_NOARG},{"shodan",        {.noArg=cmd_aireal},      CMD_NOARG},{"animtest",       {.noArg = cmd_animtest}, CMD_NOARG},{NULL,{.raw = NULL},CMD_NOARG}/*sizeof helper*/ };
 void ToggleConsole();
 void ProcessConsoleCommand(const char* c) {
     if (c == NULL || slen(c) == 0) { ToggleConsole(); return; }
@@ -887,19 +887,20 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUseProgram(depthPrepassSP); // Depth Prepass - Eliminates some overdraw for ~6.1% performance improvement in spite of added draw calls
     glUniformMatrix4fv(2,1,0,viewProj);
     glEnable(GL_DEPTH_TEST); glColorMask(0,0,0,0); glDepthMask(1); glDepthFunc(0x0201/*GL_LESS*/); glDisable(GL_BLEND);
-    //if (opaqueCount > 1) qsort_new(visibleInstances,opaqueCount,sizeof(DepthSort),dsortInv); Doesn't seem to be needed
+    if (opaqueCount > 1) qsort_new(visibleInstances,opaqueCount,sizeof(DepthSort),dsortInv); // Needed for cutout bushes/foliage
     if (tcnt > 1) qsort_new(visibleInstances + opaqueCount,tcnt,sizeof(DepthSort),dsort);
     u8 cullBlendState = 0xFF;
-    for (u16 visibleIndex = 0; visibleIndex < opaqueCount; ++visibleIndex) {
+    for (u16 visibleIndex = 0; visibleIndex < opaqueCount + tcnt; ++visibleIndex) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i]; u16 tex = e->texIndex;
-        if (unlikely(doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f)) { if(cullBlendState != 2){glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState=2;} } // Doublesided
-        else { if(cullBlendState != 0){glEnable(GL_CULL_FACE); glDisable(GL_BLEND); cullBlendState=0;} } // Opaque
+        if (unlikely(transparentTexture[tex])) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
+        else if (unlikely(doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f)) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
+        else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } // Opaque
         currentModelType = GetAndBindModel(i,currentModelType);
+        glUniform1ui(3,(u32)tex);
         u32 vertCount = modelTriangleCounts[currentModelType] * 3;
         glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered += vertCount;
     }
-    
     glUseProgram(chunkSP);/*Main Pass*/ glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u);/*default constIndex*/ cullBlendState = 0xFF;
     bool grayscaleEnabled = ModRequestsGrayscale(); glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = World.fogColor[World.curLev].a + (float)(World.fogFac / 255u); // Alpha is base density for level.
@@ -920,7 +921,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         else { if(cullBlendState != 0){glEnable(GL_CULL_FACE); glDisable(GL_BLEND); cullBlendState=0;} } // Opaque
         DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,grayscaleEnabled);
     }
-    
     glDepthMask(1); currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0; // Transparents Pass
     for (u16 visibleIndex = opaqueCount; visibleIndex < (opaqueCount + tcnt); ++visibleIndex) {
         u16 i = visibleInstances[visibleIndex].index;
@@ -932,20 +932,17 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         else glDepthFunc(0x0203/*GL_LEQUAL*/); // Actual alphas
         DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,grayscaleEnabled);
     }
-    
     if(unlikely(camView)) {
         glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/,gBufferFBO); glReadBuffer(GL_COLOR_ATTACHMENT0); glBindTexture(GL_TEXTURE_2D,camViewTextures[camViewIdx]);
         glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,0,0,0,swidth,sheight); // Store the render result for the camview
         glBindTexture(GL_TEXTURE_2D,0); return; // After copying render result, skip SSR and composite for camviews <<<<<<<<<<<<< CAM VIEW BARRIER
     }
-    
     if(unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID);
     if(likely(Sys_Settings.Reflections>0u)){ // Screen Space Reflections
         glUseProgram(ssrSP); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3); glUniformMatrix4fv(6,1,0,invViewProj); glUniformMatrix4fv(4,1,GL_FALSE,viewProj); u32 groupX_ssr=((Sys_Settings.ScreenWidth/Sys_Settings.SSR_RES)+31)/32, groupY_ssr=((Sys_Settings.ScreenHeight/Sys_Settings.SSR_RES)+31)/32;
         glDispatchCompute(groupX_ssr,groupY_ssr,1);
     }
-    
     glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glClearColor(0,0,0,1);
     glViewport(0,0,1366,768); glDisable(GL_CULL_FACE); renderTime = get_time() - rendStart;
     RenderUI();

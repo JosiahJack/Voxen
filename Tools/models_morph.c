@@ -1,7 +1,7 @@
 // models.c - 3D Models Loading System
 #include "common.h"
-enum{MAX_GLTF_JOINTS=96,MAX_GLTF_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLTF_VERTS=MAX_OUTPUT_VERTS,MAX_GLTF_BLOCKS=64};
-float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
+enum{MAX_GLTF_JOINTS=96,MAX_GLTF_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLTF_VERTS=MAX_OUTPUT_VERTS,MAX_GLTF_BLOCKS=64,MAX_GLTF_MORPH_TARGETS=32};
+float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts, **thrd_morph_pos, **thrd_morph_nrm; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
 typedef struct { const char *data,*name; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count,capacity; } ModelDataParser;
 typedef struct { u32 start,end; int tid; } PhysGeomTask;
 BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
@@ -27,7 +27,8 @@ typedef struct{char*name; cgltf_buffer*buffer; size_t offset,size,stride; cgltf_
 typedef struct{size_t count;cgltf_buffer_view*indices_buffer_view;size_t indices_byte_offset;cgltf_component_type indices_component_type;cgltf_buffer_view*values_buffer_view;size_t values_byte_offset;}cgltf_accessor_sparse;
 typedef struct{char*name;cgltf_component_type component_type;bool normalized;cgltf_type type;size_t offset,count,stride;cgltf_buffer_view*buffer_view;bool has_min,has_max,is_sparse;float min[16],max[16];cgltf_accessor_sparse sparse;} cgltf_accessor;
 typedef struct{char*name;cgltf_attribute_type type;i32 index;cgltf_accessor*data;}cgltf_attribute;
-typedef struct{cgltf_primitive_type type; cgltf_accessor*indices; cgltf_attribute*attributes; size_t attributes_count; }cgltf_primitive;
+typedef struct{cgltf_attribute*attributes;size_t attributes_count;}cgltf_morph_target;
+typedef struct{cgltf_primitive_type type; cgltf_accessor*indices; cgltf_attribute*attributes; size_t attributes_count; cgltf_morph_target*targets; size_t targets_count; }cgltf_primitive;
 typedef struct{char *name; cgltf_primitive *primitives; size_t primitives_count; float*weights; size_t weights_count;} cgltf_mesh;
 typedef struct cgltf_node cgltf_node;
 typedef struct{char*name;cgltf_node**joints;size_t joints_count;cgltf_node*skeleton;cgltf_accessor*inverse_bind_matrices;}cgltf_skin;
@@ -158,13 +159,17 @@ static cgltf_primitive_type cgltf_json_to_primitive_type(jsmntok_t const* t, con
     return ty==0?cgltf_primitive_type_points:ty==1?cgltf_primitive_type_lines:ty==2?cgltf_primitive_type_line_loop:ty==3?cgltf_primitive_type_line_strip:ty==4?cgltf_primitive_type_triangles:ty==5?cgltf_primitive_type_triangle_strip:ty==6?cgltf_primitive_type_triangle_fan:cgltf_primitive_type_invalid;
 }
 
-static int cgltf_parse_json_primitive(jsmntok_t const* t, int i, const u8* j, cgltf_primitive* out){
+static int cgltf_parse_json_primitive(jsmntok_t const* t, int i, const u8* j, cgltf_primitive* out) {
     CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);out->type=cgltf_primitive_type_triangles;int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
         CGLTF_CHECK_KEY(t[i]);
         if(cgltf_json_strcmp(t+i,j,"mode")){++i;out->type=cgltf_json_to_primitive_type(t+i,j);++i;}
         else if(cgltf_json_strcmp(t+i,j,"indices")){++i;out->indices=CGLTF_PTRINDEX(cgltf_accessor,cgltf_json_to_int(t+i,j));++i;}
         else if(cgltf_json_strcmp(t+i,j,"attributes"))i=cgltf_parse_json_attribute_list(t,i+1,j,&out->attributes,&out->attributes_count);
+        else if(cgltf_json_strcmp(t+i,j,"targets")){
+            i=cgltf_parse_json_array(t,i+1,j,sizeof(cgltf_morph_target),(void**)&out->targets,&out->targets_count);if(i<0)return i;
+            for(size_t m=0;m<out->targets_count;++m){i=cgltf_parse_json_attribute_list(t,i,j,&out->targets[m].attributes,&out->targets[m].attributes_count);if(i<0)return i;}
+        }
         else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
     }
@@ -363,7 +368,7 @@ static int cgltf_parse_json_animation_channel(jsmntok_t const* t, int i, const u
             for(int m=0;m<tsz;++m){
                 CGLTF_CHECK_KEY(t[i]);
                 if(cgltf_json_strcmp(t+i,j,"node")){++i;out->target_node=CGLTF_PTRINDEX(cgltf_node,cgltf_json_to_int(t+i,j));++i;}
-                else if(cgltf_json_strcmp(t+i,j,"path")){ ++i; out->target_path = cgltf_json_strcmp(t+i,j,"translation") ? cgltf_animation_path_type_translation : cgltf_json_strcmp(t+i,j,"rotation") ? cgltf_animation_path_type_rotation : cgltf_json_strcmp(t+i,j,"scale") ? cgltf_animation_path_type_scale : cgltf_animation_path_type_invalid; ++i; }
+                else if(cgltf_json_strcmp(t+i,j,"path")){ ++i; out->target_path = cgltf_json_strcmp(t+i,j,"translation") ? cgltf_animation_path_type_translation : cgltf_json_strcmp(t+i,j,"rotation") ? cgltf_animation_path_type_rotation : cgltf_json_strcmp(t+i,j,"scale") ? cgltf_animation_path_type_scale : cgltf_json_strcmp(t+i,j,"weights") ? cgltf_animation_path_type_weights : cgltf_animation_path_type_invalid; ++i; }
                 else i=cgltf_skip_json(t,i+1);
                 if(i<0)return i;
             }
@@ -491,6 +496,7 @@ cgltf_result cgltf_parse(const void* d, size_t sz, cgltf_data** out_data) {
         for(size_t n=0;n<data->meshes[m].primitives_count;++n){
             CGLTF_PTRFIXUP(data->meshes[m].primitives[n].indices,data->accessors,data->accessors_count);
             for(size_t k=0;k<data->meshes[m].primitives[n].attributes_count;++k){CGLTF_PTRFIXUP_REQ(data->meshes[m].primitives[n].attributes[k].data,data->accessors,data->accessors_count);}
+            for(size_t g=0;g<data->meshes[m].primitives[n].targets_count;++g) { for(size_t k=0;k<data->meshes[m].primitives[n].targets[g].attributes_count;++k){ CGLTF_PTRFIXUP_REQ(data->meshes[m].primitives[n].targets[g].attributes[k].data,data->accessors,data->accessors_count);} }
         }
     for(size_t m=0;m<data->accessors_count;++m){
         CGLTF_PTRFIXUP(data->accessors[m].buffer_view,data->buffer_views,data->buffer_views_count);
@@ -603,6 +609,7 @@ cgltf_result cgltf_validate(cgltf_data* data) {
     for(size_t i=0;i<data->animations_count;++i){
         for(size_t j=0;j<data->animations[i].channels_count;++j){
             cgltf_animation_channel* c=&data->animations[i].channels[j];if(!c->target_node)continue;
+            if(c->target_path==cgltf_animation_path_type_weights)continue;
             size_t comp=1,vals=c->sampler->interpolation==cgltf_interpolation_type_cubic_spline?3:1;
             if(c->sampler->input->count*comp*vals!=c->sampler->output->count)return cgltf_result_invalid_gltf;
         }
@@ -665,8 +672,27 @@ __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* __restrict sv, u
 }
 
 typedef struct { u16 j[4]; float w[4]; } VtxSkin;
-typedef struct { float *pos,*nrm,*uv; VtxSkin* skin; u32 vertCount,*indices,triCount; cgltf_node* jointNodes[MAX_GLTF_JOINTS]; float invBind[MAX_GLTF_JOINTS][16]; u32 jointCount; cgltf_animation* anim; cgltf_data* gltf; bool isTransformAnim; cgltf_node** meshNodes; float **subPos,**subNrm,**subUv; u32 *subVertCount,**subIndices,*subTriCount,submeshCount; } GltfMesh;
+typedef struct { float *pos,*nrm,*uv; VtxSkin* skin; u32 vertCount,*indices,triCount; cgltf_node* jointNodes[MAX_GLTF_JOINTS]; float invBind[MAX_GLTF_JOINTS][16]; u32 jointCount; cgltf_animation* anim; cgltf_data* gltf; bool isTransformAnim;
+                cgltf_node** meshNodes; float **subPos,**subNrm,**subUv; u32 *subVertCount,**subIndices,*subTriCount,submeshCount; u32 morphCount; float **morphPos,**morphNrm,*morphBaseW; cgltf_node* morphTargetNode; u32 *subMorphCount; 
+                float ***subMorphPos,***subMorphNrm,**subMorphBaseW;} GltfMesh;
 static GltfMesh gBlockMeshes[MAX_GLTF_BLOCKS]; static u32 gBlockMeshCount = 0;
+static const float* MorphDefaultWeights(const cgltf_node* node, const cgltf_mesh* mesh, size_t* count) { if(node->weights_count){*count=node->weights_count;return node->weights;} *count=mesh->weights_count; return mesh->weights; } // node.weights overrides mesh.weights per spec
+static void LoadPrimMorphTargets(const cgltf_primitive* prim, u32 vc, const float* defW, size_t defWCount, u32* outCount, float*** outPos, float*** outNrm, float** outBaseW) {
+    u32 mc = (u32)prim->targets_count;
+    if (mc > MAX_GLTF_MORPH_TARGETS) { DualLogError("gltf_anim: morph target count %u exceeds max %u\n", mc, (u32)MAX_GLTF_MORPH_TARGETS); OS_Exit(1); }
+    *outCount = mc; if (!mc) { *outPos=NULL; *outNrm=NULL; *outBaseW=NULL; return; }
+    float** mp = (float**)OS_Alloc(mc * sizeof(float*)); float** mn = (float**)OS_Alloc(mc * sizeof(float*)); float* bw = (float*)OS_Alloc(mc * sizeof(float));
+    for (u32 mt = 0; mt < mc; ++mt) {
+        const cgltf_accessor *tp=NULL,*tn=NULL;
+        for (size_t a=0;a<prim->targets[mt].attributes_count;++a) { cgltf_attribute* at=&prim->targets[mt].attributes[a]; if(at->type==cgltf_attribute_type_position)tp=at->data; else if(at->type==cgltf_attribute_type_normal)tn=at->data; }
+        mp[mt]=(float*)OS_Alloc((size_t)vc*3*sizeof(float));
+        if (tp) for(u32 v=0;v<vc;++v) cgltf_accessor_read_float(tp,v,&mp[mt][v*3],3); else mset(mp[mt],0,(size_t)vc*3*sizeof(float));
+        if (tn) { mn[mt]=(float*)OS_Alloc((size_t)vc*3*sizeof(float)); for(u32 v=0;v<vc;++v) cgltf_accessor_read_float(tn,v,&mn[mt][v*3],3); } else mn[mt]=NULL;
+        bw[mt] = (mt<defWCount) ? defW[mt] : 0.0f;
+    }
+    *outPos=mp; *outNrm=mn; *outBaseW=bw;
+}
+
 static void Mat4Identity(float* m) { mset(m, 0, sizeof(float) * 16); m[0] = m[5] = m[10] = m[15] = 1.0f; }
 static void Mat4Mul(const float* __restrict a, const float* __restrict b, float* __restrict out) { for (int c = 0; c < 4; ++c) for (int r = 0; r < 4; ++r) { float s = 0.0f; for (int k = 0; k < 4; ++k) s += a[k*4+r] * b[c*4+k]; out[c*4+r] = s; } }
 static void Mat4TransformPoint(const float* __restrict m, const float* __restrict v, float* __restrict out) { out[0] = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]  + m[12]; out[1] = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]  + m[13]; out[2] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14]; }
@@ -687,6 +713,7 @@ static bool ParseGLTFStatic(u32 mindex, const u8* bytes, size_t size, float* __r
     if (!meshNode) {  for (size_t i = 0; i < data->nodes_count; ++i) { if(data->nodes[i].mesh){meshNode = &data->nodes[i]; break;} }  }
     if (!meshNode) { DualLogError("gltf_static: no mesh node in glb\n"); OS_Exit(1); }
     cgltf_mesh* mesh = meshNode->mesh;
+    size_t defWCount; const float* defW = MorphDefaultWeights(meshNode, mesh, &defWCount);
     if (mesh->primitives_count == 0) { DualLogError("gltf_static: mesh has no primitives\n"); OS_Exit(1); }
     float gm[16]; Mat4Identity(gm); const cgltf_node* parents[32]; int parentCount = 0; const cgltf_node* curr = meshNode;
     while (curr && parentCount < 32) { parents[parentCount++] = curr; curr = curr->parent; }
@@ -701,6 +728,13 @@ static bool ParseGLTFStatic(u32 mindex, const u8* bytes, size_t size, float* __r
         const cgltf_accessor* uvAcc  = cgltf_find_accessor(prim, cgltf_attribute_type_texcoord, 0);
         if (!posAcc) { DualLogError("gltf_static: primitive missing POSITION\n"); OS_Exit(1); }
         u32 vc = (u32)posAcc->count;
+        u32 mc = (u32)prim->targets_count; if (mc > MAX_GLTF_MORPH_TARGETS) { DualLogError("gltf_static: morph target count %u exceeds max %u\n", mc, (u32)MAX_GLTF_MORPH_TARGETS); OS_Exit(1); }
+        const cgltf_accessor *mtp[MAX_GLTF_MORPH_TARGETS], *mtn[MAX_GLTF_MORPH_TARGETS]; float mw[MAX_GLTF_MORPH_TARGETS];
+        for (u32 mt=0; mt<mc; ++mt) {
+            mtp[mt]=NULL; mtn[mt]=NULL;
+            for (size_t a=0;a<prim->targets[mt].attributes_count;++a){cgltf_attribute*at=&prim->targets[mt].attributes[a]; if(at->type==cgltf_attribute_type_position)mtp[mt]=at->data; else if(at->type==cgltf_attribute_type_normal)mtn[mt]=at->data;}
+            mw[mt]=(mt<defWCount)?defW[mt]:0.0f;
+        }
         u32 ic = prim->indices ? (u32)prim->indices->count : vc;
         if (ic == 0 || ec + ic > MAX_OUTPUT_VERTS) { DualLogError("gltf_static: vert count %u out of range or overflow\n", ic); OS_Exit(1); }
         for (u32 k = 0; k < ic; ++k) {
@@ -708,8 +742,13 @@ static bool ParseGLTFStatic(u32 mindex, const u8* bytes, size_t size, float* __r
             if (vi >= vc) continue;
             float pt[3]={0,0,0}, n[3]={0,1,0}, uv[2]={0,0};
             cgltf_accessor_read_float(posAcc, vi, pt, 3);
+            for (u32 mt=0; mt<mc; ++mt) { if(mw[mt]==0.0f||!mtp[mt])continue; float d[3]; cgltf_accessor_read_float(mtp[mt],vi,d,3); pt[0]+=d[0]*mw[mt]; pt[1]+=d[1]*mw[mt]; pt[2]+=d[2]*mw[mt]; }
             Mat4TransformPoint(gm, pt, pt);
-            if (nrmAcc) { cgltf_accessor_read_float(nrmAcc, vi, n, 3); Mat4TransformDir(gm, n, n); }
+            if (nrmAcc) {
+                cgltf_accessor_read_float(nrmAcc, vi, n, 3);
+                for (u32 mt=0; mt<mc; ++mt) { if(mw[mt]==0.0f||!mtn[mt])continue; float d[3]; cgltf_accessor_read_float(mtn[mt],vi,d,3); n[0]+=d[0]*mw[mt]; n[1]+=d[1]*mw[mt]; n[2]+=d[2]*mw[mt]; }
+                Mat4TransformDir(gm, n, n);
+            }
             if (uvAcc) cgltf_accessor_read_float(uvAcc, vi, uv, 2);
             float* dst = sv + (ec<<3);
             dst[0]=pt[0]; dst[1]=pt[2]; dst[2]=pt[1];   dst[3]=n[0]; dst[4]=n[2]; dst[5]=n[1];   dst[6]=uv[0]; dst[7]=1.0f - uv[1];
@@ -798,6 +837,35 @@ static void SampleQuat(const cgltf_animation_sampler* samp, float t, float* outq
 	if (len > 1e-8f) { float inv = 1.0f/len; for (int c = 0; c < 4; ++c) outq[c] *= inv; }
 }
 
+static void ReadSamplerWeights(const cgltf_animation_sampler* samp, u32 keyIdx, u32 tc, float* out) { u32 e = (samp->interpolation==cgltf_interpolation_type_cubic_spline)?(keyIdx*3+1)*tc:keyIdx*tc; for(u32 c=0;c<tc;++c) cgltf_accessor_read_float(samp->output,e+c,&out[c],1); }
+static void SampleWeights(const cgltf_animation_sampler* samp, float t, u32 tc, float* out) {
+	u32 i0; float frac; FindBracket(samp,t,&i0,&frac);
+	ReadSamplerWeights(samp,i0,tc,out);
+	if (frac<=0.0f || samp->interpolation==cgltf_interpolation_type_step) return;
+	float nxt[MAX_GLTF_MORPH_TARGETS]; ReadSamplerWeights(samp,i0+1,tc,nxt);
+	for (u32 c=0;c<tc;++c) out[c]+=(nxt[c]-out[c])*frac;
+}
+
+static void MorphWeightsAtTime(const GltfMesh* gm, cgltf_node* node, float t, u32 tc, const float* baseW, float* outW) {
+	mcpy(outW, baseW, tc*sizeof(float));
+	if (gm->isTransformAnim) {
+		for (size_t a=0;a<gm->gltf->animations_count;++a) { cgltf_animation* anim=&gm->gltf->animations[a];
+			for (size_t c=0;c<anim->channels_count;++c) { const cgltf_animation_channel* ch=&anim->channels[c]; if (ch->target_node==node && ch->target_path==cgltf_animation_path_type_weights) { SampleWeights(ch->sampler,t,tc,outW); return; } }
+		}
+	} else {
+		for (size_t c=0;c<gm->anim->channels_count;++c) { const cgltf_animation_channel* ch=&gm->anim->channels[c]; if (ch->target_node==node && ch->target_path==cgltf_animation_path_type_weights) { SampleWeights(ch->sampler,t,tc,outW); return; } }
+	}
+}
+static void ApplyMorph(u32 tc, const float* w, float** posD, float** nrmD, u32 vc, const float* __restrict basePos, const float* __restrict baseNrm, float* __restrict outPos, float* __restrict outNrm) {
+	mcpy(outPos, basePos, (size_t)vc*3*sizeof(float));
+	mcpy(outNrm, baseNrm, (size_t)vc*3*sizeof(float));
+	for (u32 mt=0; mt<tc; ++mt) {
+		float wt=w[mt]; if (wt==0.0f) continue;
+		const float* pd=posD[mt]; for (u32 v=0; v<vc*3; ++v) outPos[v]+=pd[v]*wt;
+		const float* nd=nrmD[mt]; if (nd) for (u32 v=0;v<vc*3;++v) outNrm[v]+=nd[v]*wt;
+	}
+}
+
 static void NodeLocalMatrixAtTime(const GltfMesh* gm, cgltf_node* node, float t, float* outM) {
     float T[3] = {node->translation[0], node->translation[1], node->translation[2]};
     float R[4] = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]};
@@ -843,6 +911,8 @@ static void GltfMeshFreePartial(GltfMesh* gm) {
             if(gm->subNrm[s])     OS_Free(gm->subNrm[s],     (size_t)gm->subVertCount[s] * 3 * sizeof(float));
             if(gm->subUv[s])      OS_Free(gm->subUv[s],       (size_t)gm->subVertCount[s] * 2 * sizeof(float));
             if(gm->subIndices[s]) OS_Free(gm->subIndices[s],  (size_t)gm->subTriCount[s]  * 3 * sizeof(u32));
+            for(u32 mt=0; mt<gm->subMorphCount[s]; ++mt){ if(gm->subMorphPos[s][mt])OS_Free(gm->subMorphPos[s][mt],(size_t)gm->subVertCount[s]*3*sizeof(float)); if(gm->subMorphNrm[s][mt])OS_Free(gm->subMorphNrm[s][mt],(size_t)gm->subVertCount[s]*3*sizeof(float)); }
+            if(gm->subMorphCount[s]){ OS_Free(gm->subMorphPos[s],gm->subMorphCount[s]*sizeof(float*)); OS_Free(gm->subMorphNrm[s],gm->subMorphCount[s]*sizeof(float*)); OS_Free(gm->subMorphBaseW[s],gm->subMorphCount[s]*sizeof(float)); }
         }
         if(gm->meshNodes)    OS_Free(gm->meshNodes,    gm->submeshCount * sizeof(cgltf_node*));
         if(gm->subPos)       OS_Free(gm->subPos,       gm->submeshCount * sizeof(float*));
@@ -851,7 +921,13 @@ static void GltfMeshFreePartial(GltfMesh* gm) {
         if(gm->subVertCount) OS_Free(gm->subVertCount, gm->submeshCount * sizeof(u32));
         if(gm->subIndices)   OS_Free(gm->subIndices,   gm->submeshCount * sizeof(u32*));
         if(gm->subTriCount)  OS_Free(gm->subTriCount,  gm->submeshCount * sizeof(u32));
+        if(gm->subMorphCount)OS_Free(gm->subMorphCount,gm->submeshCount * sizeof(u32));
+        if(gm->subMorphPos)  OS_Free(gm->subMorphPos,  gm->submeshCount * sizeof(float**));
+        if(gm->subMorphNrm)  OS_Free(gm->subMorphNrm,  gm->submeshCount * sizeof(float**));
+        if(gm->subMorphBaseW)OS_Free(gm->subMorphBaseW,gm->submeshCount * sizeof(float*));
     }
+    for(u32 mt=0; mt<gm->morphCount; ++mt){ if(gm->morphPos[mt])OS_Free(gm->morphPos[mt],(size_t)gm->vertCount*3*sizeof(float)); if(gm->morphNrm[mt])OS_Free(gm->morphNrm[mt],(size_t)gm->vertCount*3*sizeof(float)); }
+    if(gm->morphCount){ OS_Free(gm->morphPos,gm->morphCount*sizeof(float*)); OS_Free(gm->morphNrm,gm->morphCount*sizeof(float*)); OS_Free(gm->morphBaseW,gm->morphCount*sizeof(float)); }
 }
  
 static bool GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
@@ -866,7 +942,6 @@ static bool GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     out->anim = bestAnim;
     out->gltf = data; // kept alive until GltfFreeAllBlocks() -- jointNodes[]/anim/meshNodes alias into it
     if (out->anim->channels_count) { for (size_t c = 0; c < out->anim->channels_count; ++c) { if (out->anim->channels[c].sampler->interpolation == cgltf_interpolation_type_cubic_spline) { DualLogWarn("gltf_anim: CUBICSPLINE channel present -- tangents ignored, degrading to linear-between-keys\n"); break; } } }
-   
     cgltf_node* skinNode = NULL;
     for (size_t i = 0; i < data->nodes_count; ++i) if (data->nodes[i].skin && data->nodes[i].mesh) { skinNode = &data->nodes[i]; break; }
     if (skinNode) { // Skeletal mesh animation (skinned)
@@ -902,6 +977,9 @@ static bool GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
             float wsum = wf[0]+wf[1]+wf[2]+wf[3], winv = (wsum > 1e-6f) ? 1.0f/wsum : 0.0f;
             for (int k = 0; k < 4; ++k) { out->skin[i].j[k] = (u16)jf[k]; out->skin[i].w[k] = wf[k]*winv; }
         }
+        size_t defWCount; const float* defW = MorphDefaultWeights(skinNode, mesh, &defWCount);
+        LoadPrimMorphTargets(prim, vc, defW, defWCount, &out->morphCount, &out->morphPos, &out->morphNrm, &out->morphBaseW);
+        out->morphTargetNode = skinNode;
         u32 tc;
         if (prim->indices) {
             tc = (u32)(prim->indices->count / 3);
@@ -931,6 +1009,10 @@ static bool GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     out->submeshCount = submeshCount;
     out->meshNodes    = (cgltf_node**)OS_Alloc(submeshCount * sizeof(cgltf_node*));
     out->subPos       = (float**)    OS_Alloc(submeshCount * sizeof(float*));
+    out->subMorphCount= (u32*)      OS_Alloc(submeshCount * sizeof(u32));
+    out->subMorphPos  = (float***)  OS_Alloc(submeshCount * sizeof(float**));
+    out->subMorphNrm  = (float***)  OS_Alloc(submeshCount * sizeof(float**));
+    out->subMorphBaseW= (float**)   OS_Alloc(submeshCount * sizeof(float*));
     out->subNrm       = (float**)    OS_Alloc(submeshCount * sizeof(float*));
     out->subUv        = (float**)    OS_Alloc(submeshCount * sizeof(float*));
     out->subVertCount = (u32*)       OS_Alloc(submeshCount * sizeof(u32));
@@ -962,6 +1044,8 @@ static bool GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
                     out->subUv[si][v*2+1] = 1.0f - out->subUv[si][v*2+1]; // Flip V
                 } else { out->subUv[si][v*2]=0.0f; out->subUv[si][v*2+1]=0.0f; }
             }
+            size_t defWCount; const float* defW = MorphDefaultWeights(node, mesh, &defWCount);
+            LoadPrimMorphTargets(prim, vc, defW, defWCount, &out->subMorphCount[si], &out->subMorphPos[si], &out->subMorphNrm[si], &out->subMorphBaseW[si]);
             u32 tc;
             if (prim->indices) {
                 tc = (u32)(prim->indices->count / 3);
@@ -980,7 +1064,9 @@ static bool GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     return true;
 }
  
-static void SkinFrameToScratch(GltfMesh* __restrict gm, float t, float* __restrict posedPos, float* __restrict posedNrm, float* __restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
+static void SkinFrameToScratch(GltfMesh* __restrict gm, float t, float* __restrict morphedPos, float* __restrict morphedNrm, float* __restrict posedPos, float* __restrict posedNrm, float* __restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
+	const float *basePos=gm->pos,*baseNrm=gm->nrm;
+	if (gm->morphCount) { float w[MAX_GLTF_MORPH_TARGETS]; MorphWeightsAtTime(gm,gm->morphTargetNode,t,gm->morphCount,gm->morphBaseW,w); ApplyMorph(gm->morphCount,w,gm->morphPos,gm->morphNrm,gm->vertCount,gm->pos,gm->nrm,morphedPos,morphedNrm); basePos=morphedPos; baseNrm=morphedNrm; }
 	float skinMat[MAX_GLTF_JOINTS][16];
 	for (u32 j = 0; j < gm->jointCount; ++j) {
 		float g[16]; NodeGlobalMatrixAtTime(gm, gm->jointNodes[j], t, g);
@@ -994,8 +1080,8 @@ static void SkinFrameToScratch(GltfMesh* __restrict gm, float t, float* __restri
 			const float* m = skinMat[sk->j[k]];
 			for (int e = 0; e < 16; ++e) blended[e] += m[e] * w;
 		}
-		Mat4TransformPoint(blended, &gm->pos[v*3], &posedPos[v*3]);
-		Mat4TransformDir(blended, &gm->nrm[v*3], &posedNrm[v*3]);
+		Mat4TransformPoint(blended, &basePos[v*3], &posedPos[v*3]);
+		Mat4TransformDir(blended, &baseNrm[v*3], &posedNrm[v*3]);
 	}
 	__m128 mn_v = _mm_set1_ps(1e9f), mx_v = _mm_set1_ps(-1e9f);
 	u32 ec = 0, cornerCount = gm->triCount * 3;
@@ -1012,7 +1098,7 @@ static void SkinFrameToScratch(GltfMesh* __restrict gm, float t, float* __restri
 	*outEc = ec; *outMn = mn_v; *outMx = mx_v;
 }
 
-static void TransformFrameToScratch(GltfMesh* __restrict gm, float t, float* __restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
+static void TransformFrameToScratch(GltfMesh* __restrict gm, float t, float* __restrict morphedPos, float* __restrict morphedNrm, float* __restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
     __m128 mn_v = _mm_set1_ps(1e9f), mx_v = _mm_set1_ps(-1e9f);
     u32 ec = 0;
     for (u32 s = 0; s < gm->submeshCount; ++s) {
@@ -1020,6 +1106,11 @@ static void TransformFrameToScratch(GltfMesh* __restrict gm, float t, float* __r
         NodeGlobalMatrixAtTime(gm, gm->meshNodes[s], t, gm_mat);
         const float* __restrict spos = gm->subPos[s];
         const float* __restrict snrm = gm->subNrm[s];
+        if (gm->subMorphCount[s]) {
+            float w[MAX_GLTF_MORPH_TARGETS]; MorphWeightsAtTime(gm,gm->meshNodes[s],t,gm->subMorphCount[s],gm->subMorphBaseW[s],w);
+            ApplyMorph(gm->subMorphCount[s],w,gm->subMorphPos[s],gm->subMorphNrm[s],gm->subVertCount[s],gm->subPos[s],gm->subNrm[s],morphedPos,morphedNrm);
+            spos=morphedPos; snrm=morphedNrm;
+        }
         const float* __restrict suv  = gm->subUv[s];
         const u32*   __restrict sidx = gm->subIndices[s];
         u32 cornerCount = gm->subTriCount[s] * 3;
@@ -1047,12 +1138,14 @@ static void* GltfBakeWorker(void* arg) {
     GltfBakeTask* bt = (GltfBakeTask*)arg;
     float* posedPos = thrd_pos[bt->tid];
     float* posedNrm = thread_temp_nrm[bt->tid];
+    float* morphedPos = thrd_morph_pos[bt->tid];
+    float* morphedNrm = thrd_morph_nrm[bt->tid];
     float* sv = thrd_verts[bt->tid];
     for (u32 i = bt->start; i < bt->end; ++i) {
         GltfFrameTask* t = &bt->tasks[i];
         u32 ec; __m128 mn_v, mx_v;
-        if (t->mesh->isTransformAnim) TransformFrameToScratch(t->mesh, t->timelineFrame, sv, &ec, &mn_v, &mx_v);
-        else SkinFrameToScratch(t->mesh, t->timelineFrame, posedPos, posedNrm, sv, &ec, &mn_v, &mx_v);
+        if (t->mesh->isTransformAnim) TransformFrameToScratch(t->mesh, t->timelineFrame, morphedPos, morphedNrm, sv, &ec, &mn_v, &mx_v);
+        else SkinFrameToScratch(t->mesh, t->timelineFrame, morphedPos, morphedNrm, posedPos, posedNrm, sv, &ec, &mn_v, &mx_v);
         FinalizeParsedMesh(t->modelIndex, sv, ec, thrd_ht[bt->tid], thrd_ht_used[bt->tid], thrd_remap_scratch[bt->tid], thrd_cache_scratch[bt->tid],&vPos[t->modelIndex], &modelVertexCounts[t->modelIndex], &modelTriangles[t->modelIndex], &modelTriangleCounts[t->modelIndex], mn_v, mx_v);
     }
     return NULL;
@@ -1379,8 +1472,10 @@ void LoadModels() {
     mdlsCnt = (u16)maxid + 1;
     vPos = OS_Alloc(mdlsCnt * sizeof(float*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
     modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
-    size_t remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16)); size_t bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode); size_t bvh_u8_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u8); size_t bvh_u16_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u16);
-    size_t arena = mdlsCnt*sizeof(i32) + mdlsCnt*sizeof(RawOBJ) + 16*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + WELD_HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + remap_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz);
+    size_t remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16)), morph_sz = (size_t)MAX_GLTF_VERTS * 3 * sizeof(float),
+           bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode), bvh_u8_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u8), bvh_u16_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u16);
+    size_t arena = mdlsCnt*sizeof(i32) + mdlsCnt*sizeof(RawOBJ) + 18*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float)
+                   + WELD_HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + remap_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz + 2*morph_sz);
     void* arena_base = OS_Alloc(arena); char* p = arena_base;
     i32* idxmap = (i32*)p; p += mdlsCnt*sizeof(i32);
     mset(idxmap, -1, mdlsCnt*sizeof(i32));
@@ -1398,6 +1493,8 @@ void LoadModels() {
     float **nrm = (float**)p; p += threadCnt*sizeof(float*);
     float **uv = (float**)p; p += threadCnt*sizeof(float*); 
     float **ov = (float**)p; p += threadCnt*sizeof(float*);
+    float **mp_arr = (float**)p; p += threadCnt*sizeof(float*);
+    float **mn_arr = (float**)p; p += threadCnt*sizeof(float*);
     u32 **ht = (u32**)p; p += threadCnt*sizeof(u32*); 
     u32 **ht_used = (u32**)p; p += threadCnt*sizeof(u32*);
     u32 **remap_scr = (u32**)p; p += threadCnt*sizeof(u32*); 
@@ -1410,13 +1507,14 @@ void LoadModels() {
     size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float);
     for (int i=0; i<threadCnt; ++i) { 
         pos[i]=(float*)p; p+=psz; nrm[i] = (float*)p; p += psz; uv[i] = (float*)p; p+=MAX_VERT_ELEMENT_SIZE*2*sizeof(float); 
-        ov[i]=(float*)p; p+=usz; 
+        ov[i]=(float*)p; p+=usz;
+        mp_arr[i]=(float*)p; p+=morph_sz; mn_arr[i]=(float*)p; p+=morph_sz;
         ht[i]=(u32*)p; p+=WELD_HASH_SIZE*sizeof(u32); ht_used[i] = (u32*)p; p+=MAX_OUTPUT_VERTS*sizeof(u32);
         remap_scr[i]=(u32*)p; p+=remap_sz; cache_scr[i]=(u8*)p; p+=cache_sz; bvh_nodes_p[i]=(BvhNode*)p; p += bvh_nodes_sz; bvh_oct_p[i]=(u8*)p; p += bvh_u8_sz; bvh_order_p[i]=(u16*)p; p += bvh_u16_sz; bvh_scr_p[i]=(u16*)p; p += bvh_u16_sz; bvh_init_p[i]=(u16*)p; p += bvh_u16_sz;
         mset(ht[i],0xFF,WELD_HASH_SIZE * sizeof(u32));
         thrd_bvh_ctx[i]=(BvhBuildCtx){.nodes=bvh_nodes_p[i], .triOctants=bvh_oct_p[i], .triOrder=bvh_order_p[i], .triScratch=bvh_scr_p[i], .initialTris=bvh_init_p[i], .nodeCount=0, .triCount=0};
     }
-    thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov;
+    thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_morph_pos = mp_arr; thrd_morph_nrm = mn_arr;
     thrd_ht = ht; thrd_ht_used = ht_used;
     thrd_remap_scratch = remap_scr; thrd_cache_scratch = cache_scr;
     ModelParseTask tasks[32]; u32 chunk = (mdlsCnt + threadCnt - 1) / threadCnt; OS_Thread th[32];
@@ -1557,7 +1655,7 @@ void UpdateAnims(void) {
             if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
             continue; // Skip normal processing entirely
         }
-        if (e->clip >= e->numclips) continue;
+        if (e->numclips == 0 || e->clip >= e->numclips) continue;
         AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip];
         if (clip->framerate <= 0 || clip->speed <= 0) continue;
         e->currentFrameFinished += animDT * clip->speed;

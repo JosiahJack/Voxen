@@ -1113,7 +1113,7 @@ void LoadLevelMod(u8 lev) {
         Entity* par = &World.instances[parent];
         par->lastPosition          = posFromFile[e];
         World.rotation[parent]    = rotationFromFile[e];
-        World.scale[parent]       = scaleFromFile[e];
+        if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
         par->entflags             |= src->entflags; // bitor `|` since AddInstance already set flags from entity definitions.
         par->ioflags               = src->ioflags;
         par->amount                = src->amount;
