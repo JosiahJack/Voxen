@@ -29,7 +29,7 @@ CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=true, .showFPS=t
 static bool shadowBuffersCreated = false;
 CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
-u16 editModeSelection, editModeTestEntityDefinition=472;
+u16 editModeSelection, editModeTestEntityDefinition=379;
 double game_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS];
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
@@ -600,8 +600,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     if (numCandidates == 0) { shadowTime = get_time() - shadowStartTime; return; }
     u32 numCasters = 0;
     for (int i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
-        if (EntNotVisible(i, (World.instances[i].entflags & EF_NO_SHADOWS)) ||
-            IdxIsDynamicObject(World.instances[i].index)) continue;
+        if (EntNotVisible(i, (World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsNPC(World.instances[i].index)) continue;
         shadowCasterIndices[numCasters++] = i;
         if (numCasters >= SC_MAX) break;
     }
@@ -625,7 +624,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     }
     for (; i < numCasters; ++i) { u16 j = shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
     const u32 numCastersAligned = numCasters & ~7u;
-    glUseProgram(shadowmapsClearSP); glDispatchCompute(groupX_shadClear, 6, numCandidates);
+    glUseProgram(shadowmapsClearSP); glDispatchCompute(groupX_shadClear,6,numCandidates);
     shadDrawCalls = 0U;
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP);
     u32 shadowmapOffsetHead = 0U;
@@ -641,12 +640,12 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     for (u16 c = 0; c < numCandidates; ++c) {
         u16 lightIdx = candidates[c];
         V3 lpos = World.lights[lightIdx].pos;
-        float effectiveRadius = vmin(World.lights[lightIdx].range, 15.36f);
+        float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f);
         V3 toLight = V3_AsubB(lpos, playerPos);
         const float addX = (pf.x >= 0.0f) ? effectiveRadius : -effectiveRadius;
         const float addY = (pf.y >= 0.0f) ? effectiveRadius : -effectiveRadius;
         const float addZ = (pf.z >= 0.0f) ? effectiveRadius : -effectiveRadius;
-        __attribute__((aligned(32))) float cX[8], cY[8], cZ[8];
+        __attribute__((aligned(32))) float cX[8],cY[8],cZ[8];
         for (int f = 0; f < 6; ++f) {
             const int axis = faceAxis[f];
             const float sign = faceSign[f];

@@ -621,8 +621,8 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*557 prop_desk01*/          EDefs[557].modelIndex=74; EDefs[557].texIndex=125; EDefscol[557]=COLTYPE_MSH;
     /*558 prop_desk02*/          EDefs[558].modelIndex=75; EDefs[558].texIndex=124; EDefscol[558]=COLTYPE_MSH;
     /*559 prop_dexmissile*/            EDefs[559].modelIndex=76; EDefs[559].texIndex=164; EDefs[559].glowIndex=162; 
-    /*560 prop_foliage_fernpoison*/    EDefs[560].modelIndex=160; EDefs[560].texIndex=331;
-    /*561 prop_foliage_bush*/          EDefs[561].modelIndex=495; EDefs[561].texIndex=643; EDefs[561].glowIndex=642; 
+    /*560 prop_foliage_fernpoison*/    EDefs[560].modelIndex=160; EDefs[560].texIndex=331; EDefscol[560]=COLTYPE_MSH;
+    /*561 prop_foliage_bush*/          EDefs[561].modelIndex=495; EDefs[561].texIndex=643; EDefs[561].glowIndex=642; EDefscol[561]=COLTYPE_MSH;
     /*562 prop_foliage_fern*/          EDefs[562].modelIndex=160; EDefs[562].texIndex=333; EDefs[562].glowIndex=330; 
     /*563 prop_foliage_fernblueflower*/EDefs[563].modelIndex=159; EDefs[563].texIndex=333; EDefs[563].glowIndex=330; 
     /*564 prop_foliage_pinetreem*/     EDefs[564].modelIndex=489; EDefs[564].texIndex=594;
@@ -1173,6 +1173,7 @@ void LoadLevelMod(u8 lev) {
         //else if (entIdx == 343) { World.position[parent].y += 0.16f; } // weapon_blaster: Move up to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value
         //else if (entIdx == 346) { World.position[parent].z += 0.16f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value, also not sure if barrel parallel axis is x or z that I slid this along
         //else if (entIdx == 348) { World.position[parent].z += 0.6f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value, also not sure if blade parallel axis is x or z that I slid this along
+        else if (entIdx == 345) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.00f; } // weapon_dartgun
         else if (entIdx == 350) { World.position[parent].y += 0.16f; } // weapon_magnum: Move over to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 352) { World.position[parent].y += 0.16f; } // weapon_pistol: Move over to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 358) { World.position[parent].y += 0.16f; } // weapon_stungun: Move up to account for CG mod (origin moved vs Unity version)

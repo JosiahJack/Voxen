@@ -852,6 +852,7 @@ const char* levelMusicDeath[MAX_LEVELS] = {"THM0-17_death","THM1-17_death","THM3
 void PlayMenuMusic() { mp3_clear(); play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); }
 void PlayGameMusic() { mp3_clear(); /*play_mp3("./Audio/music/THM1-19_medicalstart.mp3",100);*/ }
 const char* GetCorrespondingLevelClip(TrackType ttype) {
+    DualLog("GetCorrespondingLevelClip ttype: %u, curLev: %u\n",ttype,World.curLev);
     switch(ttype) { // Override types, return from these first before special level handling
         case TT_Revive:   return levelMusicRevive[World.curLev];   case TT_Death:      return levelMusicDeath[World.curLev];
         case TT_Elevator: return levelMusicElevator[World.curLev]; case TT_Distortion: return levelMusicDistortion[World.curLev];
