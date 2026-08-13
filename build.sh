@@ -9,6 +9,7 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 $IS_CI || clear
+mkdir -p ./temp_build
 TEMP_DIR=temp_build
 rm -f ./Shaders/*.h "$TEMP_DIR"/*.o
 export TMPDIR=/dev/shm
@@ -112,7 +113,7 @@ else
 fi
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c audio.c textures.c models.c biomonitor.c input.c culling.c" #synth.c is in audio.c
+SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c audio.c textures.c models.c biomonitor.c culling.c" #synth.c is in audio.c
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "$CC -c {} $CFLAGS -o $TEMP_DIR/\$(basename {}).o"
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -o $BINARY_NAME
@@ -121,10 +122,11 @@ total_build_time=$((build_end - shader_start))
 echo "Built engine as game in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-#         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
-        windows)  wine ./voxen.exe ;;
+        windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
+#         windows)  wine ./voxen.exe ;;
 #         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
         *)        ./voxen ;;   # linux
     esac
-    rm -f ./Shaders/*.h "$TEMP_DIR"/*.o ./voxen.upx ./voxen.pdb #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
+    rm -f ./Shaders/*.h ./voxen.upx ./voxen.pdb #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
+    rm -r ./temp_build
 fi

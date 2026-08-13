@@ -470,12 +470,10 @@ void UpdateScreenSize(i32 width, i32 height) {
 #define INVSQRT2 0.70710678118f
 Quaternion cubeQuats[6] = {{0.0f,INVSQRT2,0.0f,INVSQRT2}/*+X:Right*/,{0.0f,-INVSQRT2,0.0f,INVSQRT2}/*-X:Left*/,{-INVSQRT2,0.0f,0.0f,INVSQRT2}/*+Y:Up*/,{INVSQRT2,0.0f,0.0f,INVSQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
 void UpdateLights() {
-    bool lightDirty = false;
     for (u16 lightIdx=0;lightIdx<World.loadedLights;++lightIdx) {
         V3 lightPos = World.lightsNewPosition[lightIdx];
         World.lights[lightIdx].pos = lightPos;
         if (World.lights[lightIdx].lflags & LDIRTY) { // Marked all as true at level load.
-            lightDirty = true;
             flag_set(&World.lights[lightIdx].lflags,LDIRTY,false);
             #pragma GCC unroll 6 // Update to new position
             for (int j=0;j<6;++j) { mat4_lookat_from((float*)lightView[lightIdx][j],&cubeQuats[j],lightPos); mul_mat4((float*)lightViewProj[lightIdx][j],shadowmapsPerspectiveProjection,(float*)lightView[lightIdx][j]); ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j],lightFrustumPlanes[lightIdx][j]); }
@@ -506,7 +504,7 @@ void UpdateLights() {
     }
 
     glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,World.loadedLights * sizeof(Light),World.lights,GL_DYNAMIC_DRAW); // Always update the light intensity for flickers and such.
-    if (lightDirty) { glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z); glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1); }
+    glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z); glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
 }
 // Shadowmapping
 #define SHADOW_NEARMESH_MAX 2048

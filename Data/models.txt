@@ -1027,7 +1027,7 @@ index: 669
 
 #Models/access_card_collider.obj
 index: 672
-#Models/a_hornet_collider.obj
+#Models/a_hornet_collider.glb
 index: 673
 #Models/a_magcart_collider.obj
 index: 674
@@ -1295,7 +1295,7 @@ frame: 306 327
 frame: 329 351
 frame: 353 377
 frame: 380 402
-frame: 415 438
+frame: 416 438
 
 #Models/npc_cyborgwarrior.glb
 index: 3482

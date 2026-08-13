@@ -2,7 +2,9 @@
 #include "common.h"
 u32 totalPixels,totalPaletteColors;
 typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData;          typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser;
-typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8* img_buffer, *img_buffer_end; } PngContext; typedef struct { u8* indices; u32* palette,palSize; i32 w, h; } TexResult;
+typedef struct { u8 r,g,b; } PngPalEntry;
+typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8 img_depth, img_color_type, img_error; u16 img_palette_count; PngPalEntry img_palette[256]; u8 img_trns[256]; u8* img_buffer, *img_buffer_end; } PngContext;
+typedef struct { u8* indices; u32* palette,palSize; i32 w, h; } TexResult;
 typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; i32* parsIdx; const TextureDataParser* parser; TexResult* results;int tid; } TextureParseTask;
 typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData; typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman; typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length, z_distance; } pngzbuf;
 enum { PNGFmt_none=0, PNGFmt_sub=1, PNGFmt_up=2, PNGFmt_avg=3, PNGFmt_paeth=4, PNGFmt_avg_first, PNGFmt_paeth_first };
@@ -18,7 +20,7 @@ static i32 PngHuf(PngHuffman* z, const u8* sl, i32 num) {
     for(i=0;i<num;++i){ int s=(num==32)?5:sl[i]; if(!s){continue;} int c=nc[s]-z->firstcode[s]+z->firstsymbol[s]; u16 fv=(u16)((s<<9)|i); z->size[c]=(u8)s; z->value[c]=(u16)i; if(s<=9){ int j=BitReverse(nc[s],s); while(j<(1<<9)){z->fast[j]=fv; j+=(1<<s);} } ++nc[s]; }
     return 1;
 }
-
+ 
 #define REFILL(z) if(z->num_bits<16){do{z->code_buffer|=(u32)(*z->zbuffer++)<<z->num_bits;z->num_bits+=8;}while(z->num_bits<=24);}
 static u32 PngZReceive(pngzbuf* z, int n) { REFILL(z); u32 k=z->code_buffer&((1u<<n)-1); z->code_buffer>>=n; z->num_bits-=n; return k; }
 static u32 PngHuffman_decode(pngzbuf* a, PngHuffman* z) { REFILL(a); int b=z->fast[a->code_buffer&511], s; if(b){ s=b>>9; a->code_buffer>>=s; a->num_bits-=s; return b&511; } int k=BitReverse(a->code_buffer,16); for(s=10; k>=z->maxcode[s]; ++s); b=(k>>(16-s))-z->firstcode[s]+z->firstsymbol[s]; a->code_buffer>>=s; a->num_bits-=s; return z->value[b]; }
@@ -27,7 +29,7 @@ static int PngParseHuffmanBlock(pngzbuf* a) {
     static const int lb[]={3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258}, le[]={0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0}, db[]={1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577}, de[]={0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
     for(;;){ int z=PngHuffman_decode(a,&a->z_length); if(z<256){*o++=(u8)z;} else if(z==256){ a->zout=o; return 1; } else { z-=257; int l=lb[z]+(le[z]?PngZReceive(a,le[z]):0); z=PngHuffman_decode(a,&a->z_distance); int d=db[z]+(de[z]?PngZReceive(a,de[z]):0); u8* p=o-d; while(l--){*o++=*p++;} } }
 }
-
+ 
 static int PngComputeHuffmans(pngzbuf* a) {
     static const u8 dz[]={16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15}; u8 lc[286+32+137], cs[19]={0};
     u32 hl=PngZReceive(a,5)+257, hd=PngZReceive(a,5)+1, hc=PngZReceive(a,4)+4, nt=hl+hd, n=0;
@@ -43,7 +45,7 @@ static int PngComputeHuffmans(pngzbuf* a) {
         }
     } return PngHuf(&a->z_length,lc,hl) && PngHuf(&a->z_distance,lc+hl,hd);
 }
-
+ 
 static int PngParseUncompressedBlock(pngzbuf* a) {
     u8 header[4]; if (a->num_bits & 7) PngZReceive(a, a->num_bits & 7);
     for (int k=0;k<4;++k) { header[k] = (a->num_bits > 0) ? (a->num_bits -= 8, (u8)(a->code_buffer >> (k * 8))) : *a->zbuffer++; }
@@ -53,7 +55,7 @@ static int PngParseUncompressedBlock(pngzbuf* a) {
     a->zbuffer += len; a->zout += len;
     return 1;
 }
-
+ 
 static u8 PngZDefLen(int i) { return (i<144)?8:(i<256)?9:(i<280)?7:8; }
 u8* PngDecode(const u8* buffer, i32 len, i32 initial_size, i32* outlen, PngArena* arena) {
     pngzbuf a = {0}; u8* p = (u8*)PngArenaAlloc(arena, initial_size), d_len[288]; i32 f, t;
@@ -69,7 +71,7 @@ u8* PngDecode(const u8* buffer, i32 len, i32 initial_size, i32* outlen, PngArena
     } while (!f);
     if (outlen) *outlen = (i32)(a.zout - a.zout_start); return a.zout_start;
 }
-
+ 
 static u8 first_row_filter[5] = {PNGFmt_none, PNGFmt_sub, PNGFmt_none, PNGFmt_avg_first, PNGFmt_paeth_first};
 INLINE i32 PngPaeth(i32 a, i32 b, i32 c) { i32 p = a+b-c, pa = vabs(p-a), pb = vabs(p-b), pc = vabs(p-c); return (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
 static i32 CreatePngImageArena(PngArena* arena, PngData* a, u8* raw, u32 raw_len, i32 out_n, u32 x, u32 y, i32 img_n) {
@@ -106,24 +108,106 @@ static i32 CreatePngImageArena(PngArena* arena, PngData* a, u8* raw, u32 raw_len
     }
     return 1;
 }
-
+ 
 u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
     if (arena->base) arena->cursor = arena->base;
     PngContext s; s.img_n = s.img_out_n = 0; s.img_buffer = (u8*)buffer; s.img_buffer_end = (u8*)buffer + len;
+    s.img_error = 0; s.img_palette_count = 0; s.img_depth = 8; s.img_color_type = 0; mset(s.img_trns, 255, sizeof(s.img_trns));
     PngData z = {0}; z.s = &s; u32 ioff = 0; z.expanded = z.idata = z.out = NULL; s.img_buffer += 8; s.img_x = s.img_y = 1;
     for (;;) {
         u32 length = PngGet32be(&s), type = PngGet32be(&s);
         switch (type) {
-            case 0x49484452: s.img_x = PngGet32be(&s); s.img_y = PngGet32be(&s); s.img_buffer++; { i32 color = (*s.img_buffer++); s.img_buffer += 3; s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0); } break;
+            case 0x49484452: { // IHDR
+                s.img_x = PngGet32be(&s); s.img_y = PngGet32be(&s);
+                u8 depth = *s.img_buffer++; i32 color = (*s.img_buffer++); s.img_buffer += 3;
+                s.img_depth = depth; s.img_color_type = (u8)color;
+                // color type 3 = palette/indexed: 1 raw byte (index) per pixel, not 3.
+                s.img_n = (color == 3) ? 1 : (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
+                if (depth == 16) s.img_error = 1; // 16-bit samples unsupported (rest of loader assumes 8-bit units)
+            } break;
+            case 0x504C5445: { // PLTE
+                s.img_palette_count = (u16)(length / 3);
+                for (u32 i = 0; i < s.img_palette_count && i < 256; ++i) {
+                    s.img_palette[i].r = s.img_buffer[i*3+0];
+                    s.img_palette[i].g = s.img_buffer[i*3+1];
+                    s.img_palette[i].b = s.img_buffer[i*3+2];
+                }
+                s.img_buffer += length;
+            } break;
+            case 0x74524E53: { // tRNS - per-palette-entry alpha, defaults to 255 (opaque) for entries not listed
+                for (u32 i = 0; i < length && i < 256; ++i) s.img_trns[i] = s.img_buffer[i];
+                s.img_buffer += length;
+            } break;
             case 0x49444154: if (!z.idata) { z.idata = (u8*)PngArenaAlloc(arena, len + 16); ioff = 0; } mcpy(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
-            case 0x49454E44: { u32 rL = s.img_x * s.img_y * s.img_n + s.img_y; z.expanded = (u8*)PngDecode(z.idata, ioff, rL, (i32*)(&rL), arena); s.img_out_n = (s.img_n + 1 == 4) ? 4 : s.img_n; CreatePngImageArena(arena,&z,z.expanded, rL,s.img_out_n,s.img_x,s.img_y,s.img_n); PngGet32be(&s); goto Label_parsesuccess; }
+            case 0x49454E44: { // IEND
+                if (s.img_error) goto Label_parsesuccess;
+                u32 bpp = (u32)s.img_n * s.img_depth;                 // bits per pixel, all channels
+                u32 row_bytes = (s.img_x * bpp + 7) / 8;               // packed bytes per row (== img_n*x when depth==8)
+                u32 rL = row_bytes * s.img_y + s.img_y;                // + 1 filter byte per row
+                z.expanded = (u8*)PngDecode(z.idata, ioff, rL, (i32*)(&rL), arena);
+                i32 ok;
+                if (s.img_depth < 8) {
+                    // Only grayscale(0)/indexed(3) can be sub-8bpp. PNG filtering treats these as
+                    // bpp==1 (byte-distance back == 1 byte, not 1 pixel), so the existing per-column
+                    // img_n-byte filter loop already does the right thing if we feed it row_bytes as
+                    // "x" with img_n=out_n=1 — no change needed to CreatePngImageArena itself.
+                    ok = CreatePngImageArena(arena,&z,z.expanded, rL, 1, row_bytes, s.img_y, 1);
+                    if (ok) {
+                        u32 nP = s.img_x * s.img_y;
+                        u8* samples = (u8*)PngArenaAlloc(arena, nP);
+                        if (!samples) { ok = 0; }
+                        else {
+                            u8 maxv = (u8)((1u << s.img_depth) - 1);
+                            for (u32 row = 0; row < s.img_y; ++row) {
+                                u8* rp = z.out + row * row_bytes;
+                                for (u32 col = 0; col < s.img_x; ++col) {
+                                    u32 bit = col * s.img_depth;
+                                    u8 shift = 8 - s.img_depth - (u8)(bit & 7);
+                                    samples[row * s.img_x + col] = (rp[bit >> 3] >> shift) & maxv;
+                                }
+                            }
+                            z.out = samples;
+                        }
+                    }
+                } else {
+                    s.img_out_n = (s.img_color_type == 3) ? 1 : ((s.img_n + 1 == 4) ? 4 : s.img_n);
+                    ok = CreatePngImageArena(arena,&z,z.expanded, rL,s.img_out_n,s.img_x,s.img_y,s.img_n);
+                }
+                if (ok) {
+                    u32 nP = s.img_x * s.img_y;
+                    u8* rgba = (u8*)PngArenaAlloc(arena, (size_t)nP * 4);
+                    if (rgba) {
+                        if (s.img_color_type == 3) { // indexed -> palette lookup (z.out is 1 index byte/pixel, any depth)
+                            for (u32 p = 0; p < nP; ++p) {
+                                u8 idx = z.out[p]; PngPalEntry* e = &s.img_palette[idx];
+                                rgba[p*4+0] = e->r; rgba[p*4+1] = e->g; rgba[p*4+2] = e->b; rgba[p*4+3] = s.img_trns[idx];
+                            }
+                        } else if (s.img_color_type == 0) { // grayscale -> replicate into RGB, alpha 255 (no tRNS gray-key support)
+                            u8 scale = (s.img_depth < 8) ? (u8)(255 / ((1u << s.img_depth) - 1)) : 1;
+                            for (u32 p = 0; p < nP; ++p) {
+                                u8 g = (s.img_depth < 8) ? (u8)(z.out[p] * scale) : z.out[p];
+                                rgba[p*4+0]=g; rgba[p*4+1]=g; rgba[p*4+2]=g; rgba[p*4+3]=255;
+                            }
+                        } else if (s.img_color_type == 4) { // grayscale+alpha -> replicate into RGB, keep alpha
+                            for (u32 p = 0; p < nP; ++p) {
+                                u8 g = z.out[p*2], a = z.out[p*2+1];
+                                rgba[p*4+0]=g; rgba[p*4+1]=g; rgba[p*4+2]=g; rgba[p*4+3]=a;
+                            }
+                        } else { // color type 2 (RGB, already alpha-promoted by CreatePngImageArena) or 6 (RGBA)
+                            mcpy(rgba, z.out, (size_t)nP * 4);
+                        }
+                        z.out = rgba;
+                    } else z.out = NULL;
+                } else z.out = NULL;
+                PngGet32be(&s); goto Label_parsesuccess;
+            }
             default: s.img_buffer += length; break;
         }
         PngGet32be(&s);
     }
     Label_parsesuccess: *x = z.s->img_x; *y = z.s->img_y; return z.out;
 }
-
+ 
 #define TEXHASH_SZ 256
 static void* TextureParsingWorker(void* arg) {
     TextureParseTask* t = (TextureParseTask*)arg; u32 i;
@@ -144,7 +228,15 @@ static void* TextureParsingWorker(void* arg) {
             u32 h_val = (c * 0x9E3779B9u); // Murmur-style avalanche hash
             h_val ^= h_val >> 16;
             u32 slot = h_val & (TEXHASH_SZ - 1);
-            while (exact_hash[slot] != 0xFFFFFFFF) { if (exact_hash[slot] == c) { idx[p] = exact_idx[slot]; goto found; }  slot = (slot + 1) & (TEXHASH_SZ - 1); }
+            // Bounded probe: once pSz hits 256 the table can be completely full, in which case
+            // there is no empty sentinel left to terminate on for a color that isn't present.
+            // Cap the scan at TEXHASH_SZ so a full table + novel color falls through to the
+            // nearest-neighbor path below instead of spinning forever.
+            for (u32 probe = 0; probe < TEXHASH_SZ; ++probe) {
+                if (exact_hash[slot] == 0xFFFFFFFF) break;
+                if (exact_hash[slot] == c) { idx[p] = exact_idx[slot]; goto found; }
+                slot = (slot + 1) & (TEXHASH_SZ - 1);
+            }
             if (pSz < 256) { 
                 pal[pSz] = c; 
                 idx[p] = (u8)pSz; 
@@ -173,7 +265,7 @@ static void* TextureParsingWorker(void* arg) {
     }
     return NULL;
 }
-
+ 
 static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     FHandle fd; int sz; char *data = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz), *cur = data, *end = data + sz;
     u32 line = 0, m_idx = 0;
@@ -224,7 +316,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     if (e.path[0] && e.index < p->capacity) p->entries[e.index] = e;
     OS_Free(data, sz); return true;
 }
-
+ 
 void SetWindowIcon(WinSysIcon*);
 void LoadTextures() {
     double start_time = get_time();
