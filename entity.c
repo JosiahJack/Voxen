@@ -1009,7 +1009,7 @@ void LoadLevelMod(u8 lev) {
         } else {
             entCount++;
             if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; }
-            inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); mset(&scaleFromFile[entCount],0,sizeof(V3)); mset(&rotationFromFile[entCount],0,sizeof(Quaternion)); // Zero this entity slot only
+            inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; // Zero this entity slot only
         }
         bool activeStateRead = false;
         while (line[0] != '\0') {
