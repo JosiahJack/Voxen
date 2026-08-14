@@ -841,13 +841,12 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
     }
     static const struct { const char* key; u16 offset; u8 type; } map[] = {
         {"currentStep",    __builtin_offsetof(LightAnimation,currentStep),1},{"lerpValue",      __builtin_offsetof(LightAnimation,lerpValue),0},{"intervalSteps.Length",__builtin_offsetof(LightAnimation,numIntervalSteps),1},{"intervalStepisLerping.Length",__builtin_offsetof(LightAnimation, numLerpSteps),1},
-        {"localPosition.x",__builtin_offsetof(Light,pos.x),0},               {"localPosition.y",__builtin_offsetof(Light,pos.y),0},             {"localPosition.z",     __builtin_offsetof(Light,pos.z),0},                    {"localRotation.x",             __builtin_offsetof(Light,spotDir.x),0},
-        {"localRotation.y",__builtin_offsetof(Light,spotDir.y),0},           {"localRotation.z",__builtin_offsetof(Light,spotDir.z),0},         {"localRotation.w",     __builtin_offsetof(Light,spotDir.w),0},                {"range",                       __builtin_offsetof(Light,range),0},
-        {"spotAngle",      __builtin_offsetof(Light,spotAng),0},             {"minIntensity",   __builtin_offsetof(Light,minIntensity),0},      {"maxIntensity",        __builtin_offsetof(Light,maxIntensity),0},             {"color.r",__builtin_offsetof(Light,col.r),0},{"color.g",__builtin_offsetof(Light,col.g),0},{"color.b",__builtin_offsetof(Light,col.b),0}
+        {"lP.x",__builtin_offsetof(Light,pos.x),0},{"lP.y",__builtin_offsetof(Light,pos.y),0},{"lP.z",__builtin_offsetof(Light,pos.z),0},{"lR.x",__builtin_offsetof(Light,spotDir.x),0},{"lR.y",__builtin_offsetof(Light,spotDir.y),0},{"lR.z",__builtin_offsetof(Light,spotDir.z),0},{"lR.w",__builtin_offsetof(Light,spotDir.w),0},
+        {"range",__builtin_offsetof(Light,range),0},{"spotAngle",__builtin_offsetof(Light,spotAng),0},{"minIntensity",__builtin_offsetof(Light,minIntensity),0},{"maxIntensity",__builtin_offsetof(Light,maxIntensity),0},{"color.r",__builtin_offsetof(Light,col.r),0},{"color.g",__builtin_offsetof(Light,col.g),0},{"color.b",__builtin_offsetof(Light,col.b),0}
     };
     for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {
         if (sEqual(k, map[i].key)) { // Types: 0 = float, 1 = u8.  Check key prefix to decide if pointing at 'lit' or 'lam'
-            void* dest = (k[0] == 'l' && k[1] == 'o') ? (void*)lit : (void*)lam;
+            void* dest = (k[0] == 'l' && (k[1] == 'P' || k[1] == 'R')) ? (void*)lit : (void*)lam;
             if (k[0] == 'r' || k[0] == 's' || k[0] == 'm' || k[0] == 'c') {
                 if (k[1] != 'u') dest = (void*)lit; // range, spot, max, color (not currentStep)
             }
@@ -857,10 +856,8 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
             return;
         }
     }
-    if (sEqual(k,"intensity")) lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;
-    else if (sEqual(k,"type")) flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);
-    else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); }
-    else if (sEqual(k,"lerpOn")) flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));
+         if (sEqual(k,"intensity")) {lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;}                                                        else if (sEqual(k,"type"))   {flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);}
+    else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); } else if (sEqual(k,"lerpOn")) {flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));}
 }
 
 u16 headmountedLanternLight;
@@ -1023,13 +1020,13 @@ void LoadLevelMod(u8 lev) {
                 // Use KEY_EQ for length-aware compares against literals (no slen on key).
                 // key/value are used directly instead of trimmed_key/trimmed_value.
                 if (KEY_EQ("constIndex"))           inst->index = parse_numberu16(value, lineSpace, lineNum);
-                else if (KEY_EQ("localPosition.x")) posFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localPosition.y")) posFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localPosition.z")) posFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localRotation.x")) rotationFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localRotation.y")) rotationFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localRotation.z")) rotationFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localRotation.w")) rotationFromFile[entCount].w = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("lP.x")) posFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("lP.y")) posFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("lP.z")) posFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("lR.x")) rotationFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("lR.y")) rotationFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("lR.z")) rotationFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("lR.w")) rotationFromFile[entCount].w = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("localScale.x"))    scaleFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("localScale.y"))    scaleFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("localScale.z"))    scaleFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
