@@ -140,6 +140,20 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
        4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe view of colliders, velocity debug vectors, angular velocity debug vector and arc for orientation, raycast debug vector, and weapon lasers 
 ```
 
+### Install Footprint
+
+```❯ (du -sh */; du -ch *(.N) .*(.N) 2>/dev/null | grep total | sed 's/total/loose files/') | sort -hr
+145M    Audio/
+134M    Textures/
+73M     Models/
+34M     Data/
+21M     Fonts/
+1.6M    loose files
+108K    Shaders/
+4.0K    Screenshots/
+```
+Citadel.7z (LZMA Max Compressed) sitting at 188.5mb
+
 ### Systems:
 
 #### Data Resource Loading
@@ -676,3 +690,6 @@ ls ./Models/*.obj | grep -vFf <(sed -n 's/^#//p' ./Data/models.txt)
 
 Quick command to clean out Blender comments from obj file:
 sed -i '/^#/d' ./Models/*.obj
+
+mp3 crush command:
+❯ find . -type f -name "*.mp3" -exec sh -c 'for f; do ffmpeg -loglevel fatal -y -i "$f" -f mp3 -map_metadata -1 -q:a 8.4 -ar 24000 "${f}.tmp" && mv "${f}.tmp" "$f"; done' _ {} +
