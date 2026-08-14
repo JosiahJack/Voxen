@@ -1017,9 +1017,7 @@ void LoadLevelMod(u8 lev) {
             *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);
             } else {
-                // Use KEY_EQ for length-aware compares against literals (no slen on key).
-                // key/value are used directly instead of trimmed_key/trimmed_value.
-                if (KEY_EQ("constIndex"))           inst->index = parse_numberu16(value, lineSpace, lineNum);
+                     if (KEY_EQ("constIndex"))           inst->index = parse_numberu16(value, lineSpace, lineNum);
                 else if (KEY_EQ("lP.x")) posFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("lP.y")) posFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("lP.z")) posFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
@@ -1027,9 +1025,9 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("lR.y")) rotationFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("lR.z")) rotationFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("lR.w")) rotationFromFile[entCount].w = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localScale.x"))    scaleFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localScale.y"))    scaleFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("localScale.z"))    scaleFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("lS.x"))    scaleFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("lS.y"))    scaleFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("lS.z"))    scaleFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
                 else if (KEY_EQ("amount"))          inst->amount = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("resetTime"))       inst->resetTime = parse_float(value, lineSpace, lineNum);
