@@ -5,7 +5,7 @@ int numPackedGlyphs=0,numPackedGlyphsStopD=0; extern u32 textVAO,textVBO,textSP;
 u32 fontAtlasTex,fontAtlasTexStopD;
 stbtt_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
 float fixedNumberAdvanceWidth=0.0f,fixedNumberAdvanceWidthStopD=0.0f;
-static const char* fallbackFontPaths[]={"./Fonts/FreeSerifBold.ttf","./Fonts/cambriab.ttf","./Fonts/NotoSansCJK-Bold.ttc"}, *fontPaths[]={"./Fonts/SystemShockText.ttf","./Fonts/StopD.ttf"};
+static const char* fallbackFontPaths[]={"./Fonts/FreeSerifBold.ttf","./Fonts/cambriab.ttf","./Fonts/NotoSansCJK-Subset.ttf"}, *fontPaths[]={"./Fonts/SystemShockText.ttf","./Fonts/StopD.ttf"};
 static stbtt_fontinfo fontInfo[5]; static u8 *fontData[5]; static char uiTextBuffer[T_BUFFER_SIZE];
 typedef struct{char*path;u8*data;size_t size;stbtt_fontinfo info;}LoadedFont;
 LoadedFont fallbackFonts[3];
@@ -33,7 +33,7 @@ void InitFontAtlasses() {
     if(!stbtt_InitFont_internal(&fontInfo[1],fontData[1],0)){DualLogError("%s font init failed\n",fontPaths[1]);OS_Exit(1);}
     fallbackFonts[0]=LoadFallbackFont(fallbackFontPaths[0],2,0);
     fallbackFonts[1]=LoadFallbackFont(fallbackFontPaths[1],3,0);
-    fallbackFonts[2]=LoadFallbackFont(fallbackFontPaths[2],4,2);
+    fallbackFonts[2]=LoadFallbackFont(fallbackFontPaths[2],4,0);
     u8*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
     stbtt_pack_context pc;stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc.h_oversample=3;pc.v_oversample=3;pc.skip_missing=1;numPackedGlyphs=0;
     for(int r=0;r<numFontRanges;++r){fontRanges[r].startIndex=numPackedGlyphs;
