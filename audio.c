@@ -837,7 +837,7 @@ void ResetLevelAudio(void) { ambs=0; mset(ambReg,0,ambs * sizeof(u16)); for (u16
 // Music System
 #define BUFFER_MS 50
 #define AUD_BUFFER_T 0.05f
-const char* levelMusicLooped[MAX_LEVELS] = {"looped/track0","looped/track1","looped/track2","looped/track3","looped/track4","looped/track5","looped/track6","looped/track7","looped/track8","looped/track9","looped/track10","looped/track11","looped/track12","looped/track13"};
+const char* levelMusicLooped[MAX_LEVELS] = {"looped/track0","looped/track1","looped/track2","looped/track3","looped/track2","looped/track0","looped/track6","looped/track0","looped/track8","misc/null","looped/track10","looped/track11","looped/track12","looped/track13"};
 const char* reactorMusic[13] = {"THM4-01_reactorcombat1","THM4-02_reactorcombat2","THM4-03_reactorcombat3","THM4-04_reactorcombat4","THM4-05_reactorwalkingatocombat","THM4-06_reactorwalkingbtocombat","THM4-09_reactorwalkinga1","THM4-10_reactorwalkinga2","THM4-11_reactorwalkingb1","THM4-12_reactorwalkingb2","THM4-13_reactorwalkingb3","THM4-14_reactorwalkingc1","THM4-15_reactorwalkingc2"};
 const char* medicalMusic[11] = {"THM1-19_medicalstart","THM1-01_medicalwalking1","THM1-02_medicalwalking2","THM1-03_medicalwalking3","THM1-04_medicalwalking4","THM1-05_medicalcombat1","THM1-06_medicalcombat2","THM1-07_medicalcombat3","THM1-08_medicalcombat4","THM1-09_medicalcombat5","THM1-10_medicalcombat6"};
 const char* scienceMusic[10] = {"THM3-17_sciencestart","THM3-03_science1","THM3-04_science2","THM3-05_science3","THM3-06_science4","THM3-07_science5","THM3-08_science6","THM3-09_science7","THM3-01_scienceaction1","THM3-02_scienceaction2"};
@@ -896,7 +896,7 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
         if (mtype == MT_Override) {
                  if (ttype == TT_Revive){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicRevive[World.curLev]);}else if(ttype == TT_Death){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicDeath[World.curLev]);}
             else if (ttype == TT_Elevator){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicElevator[World.curLev]);}else if(ttype == TT_Distortion){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicDistortion[World.curLev]);}
-        } else sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicLooped[World.curLev]);
+        } else { if(World.curLev != 9){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicLooped[World.curLev]);} }
         play_mp3(p,0);
         return;
     } // Normal Dynamic Music System
