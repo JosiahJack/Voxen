@@ -553,7 +553,7 @@ index: 277
 index: 278
 #Models/med2_1d.obj
 index: 279
-#Models/med2_1.obj
+#Models/med2_1.glb
 index: 280
 #Models/med2_1_slice32RH.obj
 index: 281
@@ -1346,47 +1346,47 @@ frame: 1 47
 frame: 49 107
 frame: 109 125
 frame: 127 157
-#Models/npc_hopper_000160.obj
+#Models/npc_hopper_000160.glb
 index: 4252
-#Models/npc_hopper_000161.obj
+#Models/npc_hopper_000161.glb
 index: 4253
-#Models/npc_hopper_000162.obj
+#Models/npc_hopper_000162.glb
 index: 4254
-#Models/npc_hopper_000163.obj
+#Models/npc_hopper_000163.glb
 index: 4255
-#Models/npc_hopper_000164.obj
+#Models/npc_hopper_000164.glb
 index: 4256
-#Models/npc_hopper_000165.obj
+#Models/npc_hopper_000165.glb
 index: 4257
-#Models/npc_hopper_000166.obj
+#Models/npc_hopper_000166.glb
 index: 4258
-#Models/npc_hopper_000167.obj
+#Models/npc_hopper_000167.glb
 index: 4259
-#Models/npc_hopper_000168.obj
+#Models/npc_hopper_000168.glb
 index: 4260
-#Models/npc_hopper_000169.obj
+#Models/npc_hopper_000169.glb
 index: 4261
-#Models/npc_hopper_000170.obj
+#Models/npc_hopper_000170.glb
 index: 4262
-#Models/npc_hopper_000171.obj
+#Models/npc_hopper_000171.glb
 index: 4263
-#Models/npc_hopper_000172.obj
+#Models/npc_hopper_000172.glb
 index: 4264
-#Models/npc_hopper_000173.obj
+#Models/npc_hopper_000173.glb
 index: 4265
-#Models/npc_hopper_000174.obj
+#Models/npc_hopper_000174.glb
 index: 4266
-#Models/npc_hopper_000175.obj
+#Models/npc_hopper_000175.glb
 index: 4267
-#Models/npc_hopper_000176.obj
+#Models/npc_hopper_000176.glb
 index: 4268
-#Models/npc_hopper_000177.obj
+#Models/npc_hopper_000177.glb
 index: 4269
-#Models/npc_hopper_000178.obj
+#Models/npc_hopper_000178.glb
 index: 4270
-#Models/npc_hopper_000179.obj
+#Models/npc_hopper_000179.glb
 index: 4271
-#Models/npc_hopper_000180.obj
+#Models/npc_hopper_000180.glb
 index: 4272
 #Models/npc_hopper_000181.obj
 index: 4273

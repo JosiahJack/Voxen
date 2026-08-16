@@ -1519,22 +1519,20 @@ void UpdateAnims(void) {
     double animDT = World.pauseRelativeTime - lastPauseTime; lastPauseTime = World.pauseRelativeTime;
     if (animDT > 0.1) animDT = 0.1; if (animDT <= 0.0) return;
     bool portalsNeedUpdated = false;
-    bool animTest = Cheats.animTest;
+    u8 animTest = Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
         Entity* e = &World.instances[i];
         if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS) continue;
         if (e->numclips == 0) continue;
-        if (animTest) {
-            u8 validClips[MAX_ANIMCLIPS]; u8 numValid = 0;
+        if (animTest == 1) {
+            u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0;
             double totalDuration = 0.0;
             for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &modelAnimationClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } }
             if (numValid == 0) continue;
             e->currentFrameFinished += animDT;
             while (e->currentFrameFinished >= totalDuration) { e->currentFrameFinished -= totalDuration; }
             if (e->currentFrameFinished < 0.0) e->currentFrameFinished = 0.0;
-            double t = e->currentFrameFinished;
-            u8 targetClipIdx = 0;
-            double clipStartTime = 0.0;
+            double t = e->currentFrameFinished, clipStartTime=0.0;
             AnimationClip* activeClip = &modelAnimationClips[e->animationNum][validClips[0]];
             for (u8 j = 0; j < numValid; ++j) {
                 activeClip = &modelAnimationClips[e->animationNum][validClips[j]];
@@ -1557,6 +1555,60 @@ void UpdateAnims(void) {
             e->modelIndex = newModel;
             if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
             continue; // Skip normal processing entirely
+        } else if (animTest == 2) {
+            if (Sys_Input.keyStates[KEY_1].pressed || Sys_Input.keyStates[KEY_2].pressed) {
+                u8 validClips[MAX_ANIMCLIPS], numValid=0;
+                for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) {
+                    AnimationClip* test = &modelAnimationClips[e->animationNum][c];
+                    if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; }
+                }
+                if (numValid > 0) {
+                    // Locate the current clip within the valid list (default to first if out of range)
+                    u8 currentValidIdx = 0;
+                    for (u8 j = 0; j < numValid; ++j) {
+                        if (validClips[j] == e->clip) { currentValidIdx = j; break; }
+                    }
+
+                    AnimationClip* activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]];
+                    u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1;
+                    // Clamp current frame offset into this clip's range
+                    u32 currentOffset = (e->frame >= activeClip->frameStart && (e->frame - activeClip->frameStart) < frameCount)
+                                        ? (e->frame - activeClip->frameStart) : 0;
+
+                    if (Sys_Input.keyStates[KEY_1].pressed) {
+                        // Forward: next frame, rolling into next clip, wrap to start clip
+                        currentOffset++;
+                        if (currentOffset >= frameCount) {
+                            currentOffset = 0;
+                            currentValidIdx = (currentValidIdx + 1 >= numValid) ? 0 : (currentValidIdx + 1);
+                            activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]];
+                        }
+                    } else { // KEY_2 pressed: backward
+                        if (currentOffset == 0) {
+                            // Move to previous clip's last frame, wrap to last clip if at start
+                            currentValidIdx = (currentValidIdx == 0) ? (numValid - 1) : (currentValidIdx - 1);
+                            activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]];
+                            frameCount = activeClip->frameEnd - activeClip->frameStart + 1;
+                            currentOffset = frameCount - 1;
+                        } else {
+                            currentOffset--;
+                        }
+                    }
+
+                    u8 targetClip = validClips[currentValidIdx];
+                    u32 newFrame = activeClip->frameStart + currentOffset;
+                    u16 newModel = activeClip->frameStartModelIndex + currentOffset;
+
+                    bool frameUpdated = (e->clip != targetClip || e->frame != newFrame || e->modelIndex != newModel);
+                    e->clip = targetClip;
+                    e->frame = newFrame;
+                    e->modelIndex = newModel;
+                    e->currentFrameFinished = 0.0; // Reset timing state since we drive frames manually
+
+                    if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
+                }
+            }
+            continue; // Always skip normal processing entirely so the frame doesn't auto-advance
         }
         if (e->clip >= e->numclips) continue;
         AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip];
