@@ -1291,8 +1291,7 @@ index: 580
 index: 582
 #Textures/ParticleCloudWhite.png
 index: 583
-#Textures/ParticleCloudWhiteReduced.png
-index: 584
+
 #Textures/ParticleFireballSheet.png
 index: 585
 #Textures/ParticleFirecloud.png
@@ -1783,8 +1782,7 @@ index: 816
 index: 817
 #Textures/sparqbeam.png
 index: 818
-#Textures/SparqSpatter.png
-index: 819
+
 #Textures/Sparqwave.png
 index: 820
 #Textures/SplashesFineParticle.png

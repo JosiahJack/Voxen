@@ -1388,123 +1388,123 @@ index: 4270
 index: 4271
 #Models/npc_hopper_000180.glb
 index: 4272
-#Models/npc_hopper_000181.obj
+#Models/npc_hopper_000181.glb
 index: 4273
-#Models/npc_hopper_000182.obj
+#Models/npc_hopper_000182.glb
 index: 4274
-#Models/npc_hopper_000183.obj
+#Models/npc_hopper_000183.glb
 index: 4275
-#Models/npc_hopper_000184.obj
+#Models/npc_hopper_000184.glb
 index: 4276
-#Models/npc_hopper_000185.obj
+#Models/npc_hopper_000185.glb
 index: 4277
-#Models/npc_hopper_000186.obj
+#Models/npc_hopper_000186.glb
 index: 4278
-#Models/npc_hopper_000187.obj
+#Models/npc_hopper_000187.glb
 index: 4279
-#Models/npc_hopper_000188.obj
+#Models/npc_hopper_000188.glb
 index: 4280
-#Models/npc_hopper_000189.obj
+#Models/npc_hopper_000189.glb
 index: 4281
-#Models/npc_hopper_000190.obj
+#Models/npc_hopper_000190.glb
 index: 4282
-#Models/npc_hopper_000191.obj
+#Models/npc_hopper_000191.glb
 index: 4283
-#Models/npc_hopper_000192.obj
+#Models/npc_hopper_000192.glb
 index: 4284
-#Models/npc_hopper_000193.obj
+#Models/npc_hopper_000193.glb
 index: 4285
-#Models/npc_hopper_000194.obj
+#Models/npc_hopper_000194.glb
 index: 4286
-#Models/npc_hopper_000195.obj
+#Models/npc_hopper_000195.glb
 index: 4287
-#Models/npc_hopper_000196.obj
+#Models/npc_hopper_000196.glb
 index: 4288
-#Models/npc_hopper_000197.obj
+#Models/npc_hopper_000197.glb
 index: 4289
-#Models/npc_hopper_000198.obj
+#Models/npc_hopper_000198.glb
 index: 4290
-#Models/npc_hopper_000199.obj
+#Models/npc_hopper_000199.glb
 index: 4291
-#Models/npc_hopper_000200.obj
+#Models/npc_hopper_000200.glb
 index: 4292
-#Models/npc_hopper_000201.obj
+#Models/npc_hopper_000201.glb
 index: 4293
-#Models/npc_hopper_000202.obj
+#Models/npc_hopper_000202.glb
 index: 4294
-#Models/npc_hopper_000203.obj
+#Models/npc_hopper_000203.glb
 index: 4295
-#Models/npc_hopper_000204.obj
+#Models/npc_hopper_000204.glb
 index: 4296
-#Models/npc_hopper_000205.obj
+#Models/npc_hopper_000205.glb
 index: 4297
-#Models/npc_hopper_000206.obj
+#Models/npc_hopper_000206.glb
 index: 4298
-#Models/npc_hopper_000207.obj
+#Models/npc_hopper_000207.glb
 index: 4299
-#Models/npc_hopper_000208.obj
+#Models/npc_hopper_000208.glb
 index: 4300
-#Models/npc_hopper_000209.obj
+#Models/npc_hopper_000209.glb
 index: 4301
-#Models/npc_hopper_000210.obj
+#Models/npc_hopper_000210.glb
 index: 4302
-#Models/npc_hopper_000211.obj
+#Models/npc_hopper_000211.glb
 index: 4303
-#Models/npc_hopper_000212.obj
+#Models/npc_hopper_000212.glb
 index: 4304
-#Models/npc_hopper_000213.obj
+#Models/npc_hopper_000213.glb
 index: 4305
-#Models/npc_hopper_000214.obj
+#Models/npc_hopper_000214.glb
 index: 4306
-#Models/npc_hopper_000215.obj
+#Models/npc_hopper_000215.glb
 index: 4307
-#Models/npc_hopper_000216.obj
+#Models/npc_hopper_000216.glb
 index: 4308
-#Models/npc_hopper_000217.obj
+#Models/npc_hopper_000217.glb
 index: 4309
-#Models/npc_hopper_000218.obj
+#Models/npc_hopper_000218.glb
 index: 4310
-#Models/npc_hopper_000219.obj
+#Models/npc_hopper_000219.glb
 index: 4311
-#Models/npc_hopper_000220.obj
+#Models/npc_hopper_000220.glb
 index: 4312
-#Models/npc_hopper_000221.obj
+#Models/npc_hopper_000221.glb
 index: 4313
-#Models/npc_hopper_000222.obj
+#Models/npc_hopper_000222.glb
 index: 4314
-#Models/npc_hopper_000223.obj
+#Models/npc_hopper_000223.glb
 index: 4315
-#Models/npc_hopper_000224.obj
+#Models/npc_hopper_000224.glb
 index: 4316
-#Models/npc_hopper_000225.obj
+#Models/npc_hopper_000225.glb
 index: 4317
-#Models/npc_hopper_000226.obj
+#Models/npc_hopper_000226.glb
 index: 4318
-#Models/npc_hopper_000227.obj
+#Models/npc_hopper_000227.glb
 index: 4319
-#Models/npc_hopper_000228.obj
+#Models/npc_hopper_000228.glb
 index: 4320
-#Models/npc_hopper_000229.obj
+#Models/npc_hopper_000229.glb
 index: 4321
-#Models/npc_hopper_000230.obj
+#Models/npc_hopper_000230.glb
 index: 4322
-#Models/npc_hopper_000231.obj
+#Models/npc_hopper_000231.glb
 index: 4323
-#Models/npc_hopper_000232.obj
+#Models/npc_hopper_000232.glb
 index: 4324
-#Models/npc_hopper_000233.obj
+#Models/npc_hopper_000233.glb
 index: 4325
-#Models/npc_hopper_000234.obj
+#Models/npc_hopper_000234.glb
 index: 4326
-#Models/npc_hopper_000235.obj
+#Models/npc_hopper_000235.glb
 index: 4327
-#Models/npc_hopper_000236.obj
+#Models/npc_hopper_000236.glb
 index: 4328
-#Models/npc_hopper_000237.obj
+#Models/npc_hopper_000237.glb
 index: 4329
-#Models/npc_hopper_000238.obj
+#Models/npc_hopper_000238.glb
 index: 4330
-#Models/npc_hopper_000239.obj
+#Models/npc_hopper_000239.glb
 index: 4331
 
 #Models/npc_invisomut.glb
