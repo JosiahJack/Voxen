@@ -59,7 +59,7 @@ const char* sounds[SOUNDS_COUNT] = {
     "footsteps/Vent/vent_step5"/*432*/, "footsteps/Vent/vent_step6"/*433*/, "footsteps/Vent/vent_step7"/*434*/, "footsteps/Vent/vent_step8"/*435*/, "footsteps/Vent/vent_step9"/*436*/, "footsteps/Vent/vent_step10"/*437*/, "footsteps/Water/water_foot_step1"/*438*/, "footsteps/Water/water_foot_step2"/*439*/,
     "footsteps/Water/water_foot_step3"/*440*/, "footsteps/Water/water_foot_step4"/*441*/, "footsteps/Water/water_foot_step5"/*442*/, "footsteps/Wood/wood_step1"/*443*/, "footsteps/Wood/wood_step2"/*444*/, "footsteps/Wood/wood_step3"/*445*/, "footsteps/Wood/wood_step4"/*446*/, "footsteps/Wood/wood_step5"/*447*/,
     "footsteps/Wood/wood_step6"/*448*/, "footsteps/Wood/wood_step7"/*449*/, "footsteps/Wood/wood_step8"/*450*/, "footsteps/Wood/woodcrate_step1"/*451*/, "footsteps/Wood/woodcrate_step2"/*452*/, "footsteps/Wood/woodcrate_step3"/*453*/, "footsteps/Wood/woodcrate_step4"/*454*/, "footsteps/Wood/woodcrate_step5"/*455*/,
-    "footsteps/Wood/woodcrate_step6"/*456*/, "footsteps/Wood/woodcrate_step7"/*457*/, "footsteps/Wood/woodcrate_step8"/*458*/, "footsteps/Clothes/rustle01"/*459*/, "footsteps/Clothes/rustle02"/*460*/, "footsteps/Clothes/rustle03"/*461*/, "footsteps/Clothes/rustle04"/*462*/, "footsteps/Clothes/rustle05"/*463*/,
+    "footsteps/Wood/woodcrate_step6"/*456*/, "footsteps/Wood/woodcrate_step7"/*457*/, "footsteps/Wood/woodcrate_step8"/*458*/, "footsteps/Clothes/rustle01"/*459*/, "footsteps/Clothes/rustle02"/*460*/, "footsteps/Clothes/rustle03"/*461*/, "footsteps/Clothes/rustle01"/*462*/, "footsteps/Clothes/rustle05"/*463*/,
     "footsteps/Clothes/rustle06"/*464*/, "footsteps/Clothes/rustle07"/*465*/, "buttons/keycard_wrong"/*466*/, "buttons/locked_deny"/*467*/, "buttons/blocked_by_security"/*468*/, "shodan/shodan1"/*469*/, "shodan/shodan_beyondcomprehension"/*470*/, "shodan/shodan_ceaseimmediately"/*471*/,
     "shodan/shodan_ceasepestering"/*472*/, "shodan/shodan_ceaseyourmeddling"/*473*/, "shodan/shodan_cyborg65v"/*474*/, "shodan/shodan_cyborg77e"/*475*/, "shodan/shodan_destroyitmychildren"/*476*/, "shodan/shodan_destroymycameras"/*477*/, "shodan/shodan_didyouthinkididntknow"/*478*/, "shodan/shodan_directivetocyborgf71"/*479*/,
     "shodan/shodan_doyouthinkshecanhelp"/*480*/, "shodan/shodan_drunkwithvisioniamgod"/*481*/, "shodan/shodan_energydrainmines"/*482*/, "shodan/shodan_enjoyyourvictory"/*483*/, "shodan/shodan_enterroomgrave"/*484*/, "shodan/shodan_gaurdthrone"/*485*/, "shodan/shodan_grovesteps"/*486*/, "shodan/shodan_imonthebridge"/*487*/,
@@ -547,6 +547,41 @@ static void mp3_skip_id3v2(mp3 *p) {
     } else mp3_on_seek_os(p->pUserData,0,0); // SEEK_SET
 }
 
+static void mp3_parse_lame_header(mp3 *p) {
+    FHandle f = (FHandle)(uintptr_t)p->pUserData; if (f == INVALID_FHANDLE) return;
+    u8 buf[4096]; long bytes_read = OS_Read(f,buf,sizeof(buf)); OS_Seek(f,(i64)p->streamStartOffset,0);
+    if (bytes_read < 200) return;
+    for (long i = 0; i < bytes_read - 100; i++) {
+        if (mp3_hdr_valid(buf + i)) {
+            int is_mpeg1 = !!MP3_HDR_TEST_MPEG1((buf + i));
+            int is_mono  = MP3_HDR_IS_MONO((buf + i));
+            int side_info_size = is_mpeg1 ? (is_mono ? 17 : 32) : (is_mono ? 9 : 17);
+            int xing_offset = i + 4 + side_info_size;
+            if (xing_offset + 8 < bytes_read) {
+                if (mcmp(buf + xing_offset,"Xing",4) == 0 || mcmp(buf + xing_offset,"Info",4) == 0) {
+                    u32 flags = ((u32)buf[xing_offset+4]<<24)|((u32)buf[xing_offset+5]<<16)|((u32)buf[xing_offset+6]<<8)|buf[xing_offset+7];
+                    int lame_offset = xing_offset + 8;
+                    if (flags & 0x1) lame_offset += 4;   // frames
+                    if (flags & 0x2) lame_offset += 4;   // bytes
+                    if (flags & 0x4) lame_offset += 100; // TOC
+                    if (flags & 0x8) lame_offset += 4;   // quality
+                    if (lame_offset + 24 < bytes_read) {
+                        u8 *lame = buf + lame_offset;
+                        if (mcmp(lame,"LAME",4) == 0) {
+                            u32 delay   = (lame[21] << 4) | (lame[22] >> 4);
+                            u32 padding = ((lame[22] & 0x0F) << 8) | lame[23];
+                            p->delayInPCMFrames   = delay + 528 + 1 + 576; // Add one granule's frame pad of 576 to account for the mp3 encoding smearing with silence at the end; this makes it sound more or less seemless.
+                            p->paddingInPCMFrames = (padding > 529) ? padding - 529 : 0 + 576;
+                        }
+                    }
+                    return;
+                }
+            }
+            return;
+        }
+    }
+}
+
 static bool mp3_init_internal(mp3 *p) {
     mp3dec_init(&p->decoder);
     p->streamCursor = p->streamStartOffset=0; p->streamLength = (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF); p->delayInPCMFrames = p->paddingInPCMFrames=0; p->totalPCMFrameCount = (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF);
@@ -555,12 +590,12 @@ static bool mp3_init_internal(mp3 *p) {
         if (slen > 0) { if (slen > 128) { char tag[3]; mp3_on_seek_os(p->pUserData,-128,2); if (mp3_on_read(p, tag, 3) == 3 && tag[0]=='T' && tag[1]=='A' && tag[2]=='G') slen -= 128; } p->streamLength = (u64)slen; }
         mp3_on_seek_os(p->pUserData,0,0); p->streamCursor = 0;
     }
-    mp3_skip_id3v2(p); mp3dec_frame_info firstFrameInfo; u32 firstFramePCMFrameCount = mp3_decode_next_frame_ex(p,(mp3_sample_t*)p->pcmFrames,&firstFrameInfo);
+    mp3_skip_id3v2(p); mp3_parse_lame_header(p); mp3dec_frame_info firstFrameInfo; u32 firstFramePCMFrameCount = mp3_decode_next_frame_ex(p,(mp3_sample_t*)p->pcmFrames,&firstFrameInfo);
     if (firstFramePCMFrameCount == 0) { OS_Free(p->pData,p->dataCapacity); p->pData = NULL; p->dataCapacity = 0; return false; }
     p->channels=p->mp3FChan; p->sampleRate=p->mp3FrameSampleRate; return true;
 }
 
-static bool mp3_init_file(mp3 *pMP3, const char *path) { if(!pMP3 || !path){return false;} mset(pMP3,0,sizeof(mp3)); FHandle f=OS_OpenReadonly(path); if(f == INVALID_FHANDLE){return false;} pMP3->pUserData=(void*)(uintptr_t)f; bool r=mp3_init_internal(pMP3); if(!r){OS_Close(f); return false;} return true; }
+static bool mp3_init_file(mp3 *pMP3, const char *path) { if(!pMP3 || !path){return false;} mset(pMP3,0,sizeof(mp3)); FHandle f=OS_OpenReadonly(path); if(f == INVALID_FHANDLE){return false;} pMP3->pUserData=(void*)(uintptr_t)f; DualLog("Pre mp3_init_internal for %s\n",path); bool r=mp3_init_internal(pMP3); DualLog("mp3_init_internal for %s:%u\n",path,r); if(!r){OS_Close(f); return false;} return true; }
 static void mp3_uninit(mp3 *pMP3) { if (!pMP3) {return;} if (pMP3->pUserData) {OS_Close((FHandle)(uintptr_t)pMP3->pUserData); pMP3->pUserData=NULL;} OS_Free(pMP3->pData, pMP3->dataCapacity); pMP3->pData = NULL; pMP3->dataCapacity = 0; }
 static void mp3_reset(mp3 *p) { p->pcmFConsInMP3F=0; p->pcmFRemInMP3F=0; p->currentPCMFrame=0; p->dataSize=0; p->atEnd=0; mp3dec_init(&p->decoder); }
 static bool mp3_seek_to_start_of_stream(mp3 *p){u64 o=p->streamStartOffset;if(!mp3_on_seek(p,o<=0x7FFFFFFF?(int)o:0x7FFFFFFF,0))return 0;if(o>0x7FFFFFFF){o-=0x7FFFFFFF;while(o>0){int c=(o<=0x7FFFFFFF)?(int)o:0x7FFFFFFF;if(!mp3_on_seek(p,c,1))return 0;o-=c;}}mp3_reset(p);return 1;}
@@ -586,8 +621,8 @@ static u64 mp3_read_pcm_frames_f32(mp3* m, u64 framesToRead, float *pBufferOut){
 static bool mp3_seek_to_pcm_frame(mp3* m, u64 fidx){ if(!m) {return 0;} if(fidx==0){return mp3_seek_to_start_of_stream(m);} if(fidx<m->currentPCMFrame){ if(!mp3_seek_to_start_of_stream(m)) {return 0;} } u64 toSkip=fidx-m->currentPCMFrame; u64 skipped=mp3_read_pcm_frames_f32(m,toSkip,NULL); return skipped==toSkip; }
 static u64 mp3_get_pcm_frame_count(mp3* pMP3){
     u64 total; if(pMP3->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF)){ total=pMP3->totalPCMFrameCount; if(total>=pMP3->delayInPCMFrames){total-=pMP3->delayInPCMFrames;} if(total>=pMP3->paddingInPCMFrames){total-=pMP3->paddingInPCMFrames;} return total; }
-    u64 savedFrame=pMP3->currentPCMFrame; if(!mp3_seek_to_start_of_stream(pMP3)) return 0;
-    total=0; for(;;){ u32 n=mp3_decode_next_frame_ex(pMP3,NULL,NULL); if(!n){break;}total+=n; } mp3_seek_to_start_of_stream(pMP3); mp3_seek_to_pcm_frame(pMP3,savedFrame); return total;
+    u64 savedFrame=pMP3->currentPCMFrame; if(!mp3_seek_to_start_of_stream(pMP3)) return 0; total=0; for(;;){ u32 n=mp3_decode_next_frame_ex(pMP3,NULL,NULL); if(!n){break;}total+=n; }
+    pMP3->totalPCMFrameCount = total; mp3_seek_to_start_of_stream(pMP3); mp3_seek_to_pcm_frame(pMP3,savedFrame); if(total>=pMP3->delayInPCMFrames){total-=pMP3->delayInPCMFrames;} if(total>=pMP3->paddingInPCMFrames){total-=pMP3->paddingInPCMFrames;} return total;
 }
 
 typedef struct { FHandle fp; u16 channels,bitsPerSample,fmtTag; u32 sampleRate; u64 totalPCMFrameCount,dataChunkDataPos,bytesRemaining; } WaveFile;
@@ -665,6 +700,16 @@ static float *load_wav(const char *path,u32 *out_frames, size_t* sz) {
     u32 src_rate = wav.sampleRate; WavUnInit(&wav); *out_frames = (u32)got; return resample_stereo(buf,bufSize,out_frames,src_rate,sz); // Reallocates and returns new buffer, freeing the buf alloc'ed here
 }
 
+static float *load_mp3(const char *path, u32 *out_frames, size_t* sz) {
+    mp3 dec; if (!mp3_init_file(&dec, path)) { return NULL; } u32 src_channels=dec.channels, src_rate=dec.sampleRate; u64 total = mp3_get_pcm_frame_count(&dec); if (total == 0) { mp3_uninit(&dec); return NULL; }
+    size_t bufSize = (size_t)total * AUDIO_CHANNELS * sizeof(float);
+    float *buf = (float*)OS_Alloc(bufSize); mp3_seek_to_pcm_frame(&dec,0); u64 got = mp3_read_pcm_frames_f32(&dec,total,buf); mp3_uninit(&dec); if (got == 0) { OS_Free(buf,bufSize); return NULL; }
+    if (src_channels == 1) { for (i64 i=(i64)got - 1;i>=0;i--){buf[i*2+1]=buf[i]; buf[i*2]=buf[i];} }
+    *out_frames = (u32)got; return resample_stereo(buf, bufSize, out_frames, src_rate, sz); // Reallocates and returns new buffer, freeing the buf alloc'ed here
+}
+
+INLINE float *load_audio(const char *path, u32 *out_frames, size_t* sz) { if (sEndsWith(path,".mp3")) { return load_mp3(path, out_frames, sz); } return load_wav(path, out_frames, sz); }
+
 i32 GetFreeWavSlot() { i32 retval = -1; for (u32 i = 0; i < wav_count; i++) { if (!wav_ch[i].playing && wav_ch[i].samples) {OS_Free(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples = NULL; wav_ch[i].allocSize = 0; retval=i; } } return retval; }
 #include "synth.c" // Audio Synthesis Engine
 static void wave_mix(wav_channel_t* w, float* mix) {
@@ -729,7 +774,7 @@ void play_message(const char *path) {
     log_samples=buf; log_frame_count=frames; log_frame_pos=0; log_playing=true;
 }
 
-i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=load_wav(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=w->positional=w->playing=false; return 0; }
+i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=load_audio(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=w->positional=w->playing=false; return 0; }
 i32 SndStart(wav_channel_t* w) { w->frame_pos = 0; w->playing = true; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) return 0; if (ext_count < MAX_CHANNELS) ext_ch[ext_count++] = w; return 0; }
 void SndStop(wav_channel_t* w) { w->playing=false; }
 void SndUninit(wav_channel_t* w) { if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[--ext_count]; break; } }
@@ -819,7 +864,7 @@ void MixAmbs() {
         if (d < 7.68f && PositionVisibleFromPlayerCell(World.position[ambReg[i]].x,World.position[ambReg[i]].z)) {
             if (!slot->loaded) {
                 SndUninit(&slot->sound);
-                char path[512]; sFormat(path,sizeof(path),"./Audio/ambient/%s.wav",def->filename);
+                char path[512]; sFormat(path,sizeof(path),"./Audio/ambient/%s.mp3",def->filename);
                 if (SndInit(path,&slot->sound) != 0) continue;
                 slot->length_sec = SndLen(&slot->sound); if(slot->length_sec <= 0.0f) {SndUninit(&slot->sound); continue;}
                 SoundSetLooping(&slot->sound,true);
@@ -848,7 +893,7 @@ const char* cyberMusic[13] = {"THM10-02_cyberstart","THM10-01_cyber1","THM10-03_
 const char* levelMusicElevator[13] = {"THM7-01_elevator1","THM7-01_elevator1","THM7-02_elevator2","THM7-03_elevator3","THM7-04_elevator4","THM7-05_elevator5","THM7-06_elevator6","THM7-07_elevator7","THM7-08_elevator8","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1"};
 const char* levelMusicRevive[MAX_LEVELS] = {"THM4-18_reactorrevive","THM1-18_medicalrevive","THM3-19_sciencerevive","THM3-19_sciencerevive","THM3-19_sciencerevive","THM1-18_medicalrevive","THM2-18_executiverevive","THM4-18_reactorrevive","THM6-22_securityrevive","THM1-18_medicalrevive","THM2-18_executiverevive","THM2-18_executiverevive","THM2-18_executiverevive","THM1-18_medicalrevive"};
 const char* levelMusicDistortion[MAX_LEVELS] = {"THM6-49_securitydistorted","THM1-48_medicaldistorted","THM3-49_sciencedistorted","THM3-49_sciencedistorted","THM1-48_medicaldistorted","THM1-48_medicaldistorted","THM2-46_executivedistorted","THM1-48_medicaldistorted","THM6-49_securitydistorted","THM1-48_medicaldistorted","THM1-48_medicaldistorted","THM1-48_medicaldistorted","THM1-48_medicaldistorted","THM10-41_cyberdistorted"};
-const char* levelMusicDeath[MAX_LEVELS] = {"THM0-17_death","THM1-17_death","THM3-18_death","THM0-17_death","THM3-18_death","THM0-17_death","THM2-17_death","THM0-17_death","THM6-21_death","THM0-17_death","THM5-17_death","THM5-17_death","THM5-17_death","THM10-16_death"};
+const char* levelMusicDeath[MAX_LEVELS] = {"THM0-17_death","THM0-17_death","THM3-18_death","THM0-17_death","THM3-18_death","THM0-17_death","THM2-17_death","THM0-17_death","THM6-21_death","THM0-17_death","THM5-17_death","THM5-17_death","THM5-17_death","THM10-16_death"};
 void PlayMenuMusic() { mp3_clear(); play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); }
 void PlayGameMusic() { mp3_clear(); /*play_mp3("./Audio/music/THM1-19_medicalstart.mp3",100);*/ }
 const char* GetCorrespondingLevelClip(TrackType ttype) {
