@@ -22,51 +22,42 @@ static i32 PngHuf(PngHuffman* z, const u8* sl, i32 num) {
 }
  
 #define REFILL(z) if(z->num_bits<16){do{z->code_buffer|=(u32)(*z->zbuffer++)<<z->num_bits;z->num_bits+=8;}while(z->num_bits<=24);}
-static u32 PngZReceive(pngzbuf* z, int n) { REFILL(z); u32 k=z->code_buffer&((1u<<n)-1); z->code_buffer>>=n; z->num_bits-=n; return k; }
-static u32 PngHuffman_decode(pngzbuf* a, PngHuffman* z) { REFILL(a); int b=z->fast[a->code_buffer&511], s; if(b){ s=b>>9; a->code_buffer>>=s; a->num_bits-=s; return b&511; } int k=BitReverse(a->code_buffer,16); for(s=10; k>=z->maxcode[s]; ++s); b=(k>>(16-s))-z->firstcode[s]+z->firstsymbol[s]; a->code_buffer>>=s; a->num_bits-=s; return z->value[b]; }
-static int PngParseHuffmanBlock(pngzbuf* a) {
-    u8* o=a->zout;
-    static const int lb[]={3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258}, le[]={0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0}, db[]={1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577}, de[]={0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
-    for(;;){ int z=PngHuffman_decode(a,&a->z_length); if(z<256){*o++=(u8)z;} else if(z==256){ a->zout=o; return 1; } else { z-=257; int l=lb[z]+(le[z]?PngZReceive(a,le[z]):0); z=PngHuffman_decode(a,&a->z_distance); int d=db[z]+(de[z]?PngZReceive(a,de[z]):0); u8* p=o-d; while(l--){*o++=*p++;} } }
-}
- 
-static int PngComputeHuffmans(pngzbuf* a) {
-    static const u8 dz[]={16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15}; u8 lc[286+32+137], cs[19]={0};
-    u32 hl=PngZReceive(a,5)+257, hd=PngZReceive(a,5)+1, hc=PngZReceive(a,4)+4, nt=hl+hd, n=0;
-    for(u32 i=0;i<hc;++i) cs[dz[i]]=(u8)PngZReceive(a,3); PngHuf(&a->z_length,cs,19);
-    while(n<nt){
-        u32 c=PngHuffman_decode(a,&a->z_length);
-        if(c<16)lc[n++]=(u8)c;
-        else { u8 f=0;
-            if(c==16){c=PngZReceive(a,2)+3; f=lc[n-1];}
-            else if(c==17)c=PngZReceive(a,3)+3;
-            else if(c==18)c=PngZReceive(a,7)+11;
-            else return 0; mset(lc+n,f,c); n+=c;
-        }
-    } return PngHuf(&a->z_length,lc,hl) && PngHuf(&a->z_distance,lc+hl,hd);
-}
- 
-static int PngParseUncompressedBlock(pngzbuf* a) {
-    u8 header[4]; if (a->num_bits & 7) PngZReceive(a, a->num_bits & 7);
-    for (int k=0;k<4;++k) { header[k] = (a->num_bits > 0) ? (a->num_bits -= 8, (u8)(a->code_buffer >> (k * 8))) : *a->zbuffer++; }
-    a->code_buffer >>= (a->num_bits > 0 ? 0 : 0); // Reset or discard state if necessary
-    i32 len = (header[1] << 8) | header[0];
-    mcpy(a->zout, a->zbuffer, len);
-    a->zbuffer += len; a->zout += len;
-    return 1;
-}
- 
+INLINE u32 PngZReceive(pngzbuf* z, int n) { REFILL(z); u32 k=z->code_buffer&((1u<<n)-1); z->code_buffer>>=n; z->num_bits-=n; return k; }
+INLINE u32 PngHuffman_decode(pngzbuf* a, PngHuffman* z) { REFILL(a); int b=z->fast[a->code_buffer&511], s; if(b){ s=b>>9; a->code_buffer>>=s; a->num_bits-=s; return b&511; } int k=BitReverse(a->code_buffer,16); for(s=10; k>=z->maxcode[s]; ++s); b=(k>>(16-s))-z->firstcode[s]+z->firstsymbol[s]; a->code_buffer>>=s; a->num_bits-=s; return z->value[b]; }
 static u8 PngZDefLen(int i) { return (i<144)?8:(i<256)?9:(i<280)?7:8; }
 u8* PngDecode(const u8* buffer, i32 len, i32 initial_size, i32* outlen, PngArena* arena) {
     pngzbuf a = {0}; u8* p = (u8*)PngArenaAlloc(arena, initial_size), d_len[288]; i32 f, t;
     a.zbuffer = (u8*)buffer; a.zbuffer_end = (u8*)buffer+len; a.zout_start = a.zout = p; a.zbuffer += 2;
     do {
         f = PngZReceive(&a, 1); t = PngZReceive(&a, 2);
-        if (t == 0) PngParseUncompressedBlock(&a);
-        else {
+        if (t == 0) { // Uncompressed block
+            u8 header[4]; if (a.num_bits & 7) PngZReceive(&a,a.num_bits & 7);
+            for (int k=0;k<4;++k) { header[k] = (a.num_bits > 0) ? (a.num_bits -= 8, (u8)(a.code_buffer >> (k * 8))) : *a.zbuffer++; }
+            a.code_buffer >>= (a.num_bits > 0 ? 0 : 0); // Reset or discard state if necessary
+            i32 lenh=(header[1] << 8) | header[0]; mcpy(a.zout,a.zbuffer,lenh); a.zbuffer+=lenh; a.zout+=lenh;
+        } else {
             if (t == 1) { for(int i=0; i<288; ++i) d_len[i]=PngZDefLen(i); PngHuf(&a.z_length, d_len, 288); PngHuf(&a.z_distance, NULL, 32); }
-            else PngComputeHuffmans(&a);
-            PngParseHuffmanBlock(&a);
+            else { // Huffman compressed block
+                static const u8 dz[]={16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15}; u8 lc[286+32+137], cs[19]={0};
+                u32 hl=PngZReceive(&a,5)+257, hd=PngZReceive(&a,5)+1, hc=PngZReceive(&a,4)+4, nt=hl+hd, n=0;
+                for(u32 i=0;i<hc;++i) cs[dz[i]]=(u8)PngZReceive(&a,3); PngHuf(&a.z_length,cs,19);
+                bool skip = false;
+                while(n<nt){
+                    u32 c=PngHuffman_decode(&a,&a.z_length);
+                    if(c<16)lc[n++]=(u8)c;
+                    else { u8 fz=0;
+                        if(c==16){c=PngZReceive(&a,2)+3; fz=lc[n-1];}
+                        else if(c==17)c=PngZReceive(&a,3)+3;
+                        else if(c==18)c=PngZReceive(&a,7)+11;
+                        else { skip = true; break; }
+                        mset(lc+n,fz,c); n+=c;
+                    }
+                }
+                if (!skip) PngHuf(&a.z_length,lc,hl) && PngHuf(&a.z_distance,lc+hl,hd);
+            }
+            u8* o=a.zout; // Parse huffman block
+            static const int lb[]={3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258}, le[]={0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0}, db[]={1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577}, de[]={0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
+            for(;;){ int z=PngHuffman_decode(&a,&a.z_length); if(z<256){*o++=(u8)z;} else if(z==256){ a.zout=o; break; } else { z-=257; int l=lb[z]+(le[z]?PngZReceive(&a,le[z]):0); z=PngHuffman_decode(&a,&a.z_distance); int d=db[z]+(de[z]?PngZReceive(&a,de[z]):0); u8* p=o-d; while(l--){*o++=*p++;} } }
         }
     } while (!f);
     if (outlen) *outlen = (i32)(a.zout - a.zout_start); return a.zout_start;

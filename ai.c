@@ -267,10 +267,9 @@ static void AIPlaySightSound(u16 idx) {
     if (!(World.instances[idx].entflags & EF_FIRST_SIGHTING)) return;
     if (!ai_has_health(&World.instances[idx])) return;
     if (World.instances[idx].entflags & EF_ACT_AS_CORPSE_ONLY) return;
-    
     flag_set(&World.instances[idx].entflags, EF_FIRST_SIGHTING,false);
     i16 sfx = sfxSightSound[World.instances[idx].index - 419];
-    if (sfx >= 0 && sfx < (i16)SOUNDS_COUNT) play_wav(sounds[sfx],World.instances[idx].volume,World.position[idx],true);
+    if (sfx >= 39 && sfx < SOUNDS_COUNT) play_wav(sounds[sfx],World.instances[idx].volume,World.position[idx],true);
 }
 
 static bool AICheckIfPlayerInSight(u16 idx) {

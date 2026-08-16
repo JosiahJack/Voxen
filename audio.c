@@ -2,12 +2,8 @@
 #include "common.h"
 enum{AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS)};
 const char* sounds[SOUNDS_COUNT] = {
-    "null"/*0*/, "ambient/ambient_frogs"/*1*/, "ambient/clicker"/*2*/, "ambient/compressor"/*3*/, "ambient/dishwasher"/*4*/, "ambient/drip_amb"/*5*/, "ambient/fan1"/*6*/, "ambient/generator_gas"/*7*/,
-    "ambient/gurgle"/*8*/, "ambient/icemaker"/*9*/, "ambient/ind_lift1"/*10*/, "ambient/ind_lift2"/*11*/, "ambient/intake"/*12*/, "ambient/lathe"/*13*/, "ambient/lava2"/*14*/, "ambient/lev3loop1"/*15*/,
-    "ambient/lev3loop2"/*16*/, "ambient/lev3loop3"/*17*/, "ambient/lev3loop4"/*18*/, "ambient/liquid_bubble"/*19*/, "ambient/machgear_loop"/*20*/, "ambient/machine_ambience"/*21*/, "ambient/machine_go"/*22*/, "ambient/machine_humamb7"/*23*/,
-    "ambient/machine_humlonoise"/*24*/, "ambient/machine_loop1"/*25*/, "ambient/machine_loop2"/*26*/, "ambient/machinea1"/*27*/, "ambient/machinevat_loop"/*28*/, "ambient/pipewater_loop"/*29*/, "ambient/powerloom"/*30*/, "ambient/pump"/*31*/,
-    "ambient/pump2"/*32*/, "ambient/rain"/*33*/, "ambient/sparks1"/*34*/, "ambient/sparks2"/*35*/, "ambient/sparks3"/*36*/, "ambient/steam_loop"/*37*/, "ambient/washing_machine"/*38*/, "buttons/button_beep"/*39*/,
-    "buttons/button_chonk"/*40*/, "buttons/button_chuck"/*41*/, "buttons/button_clickclocktuck"/*42*/, "buttons/button_deny"/*43*/, "buttons/button_lswitch"/*44*/, "buttons/button_swipe"/*45*/, "buttons/keycard_success"/*46*/, "cyborgs/cyborg_die"/*47*/,
+    ""/*0*/, ""/*1*/, ""/*2*/, ""/*3*/, ""/*4*/, ""/*5*/, ""/*6*/, ""/*7*/, ""/*8*/, ""/*9*/, ""/*10*/, ""/*11*/, ""/*12*/, ""/*13*/, ""/*14*/, ""/*15*/, ""/*16*/, ""/*17*/, ""/*18*/, ""/*19*/, ""/*20*/, ""/*21*/, ""/*22*/, ""/*23*/, ""/*24*/, ""/*25*/, ""/*26*/, ""/*27*/, ""/*28*/, ""/*29*/, ""/*30*/, ""/*31*/, ""/*32*/, ""/*33*/, ""/*34*/, ""/*35*/, ""/*36*/, ""/*37*/, ""/*38*/,
+    "buttons/button_beep"/*39*/, "buttons/button_chonk"/*40*/, ""/*41*/, "buttons/button_clickclocktuck"/*42*/, "buttons/button_deny"/*43*/, "buttons/button_lswitch"/*44*/, "buttons/button_swipe"/*45*/, "buttons/keycard_success"/*46*/, "cyborgs/cyborg_die"/*47*/,
     "cyborgs/cyborg_die2"/*48*/, "cyborgs/cyborg_idle2"/*49*/, "cyborgs/cyborg_shoot"/*50*/, "cyborgs/cyborgwarrior_die"/*51*/, "cyborgs/diego_blubber"/*52*/, "cyborgs/ediego_dontkeepmewaiting"/*53*/, "cyborgs/ediego_faceme"/*54*/, "cyborgs/ediego_facexecutioner"/*55*/,
     "cyborgs/ediego_finishexecution"/*56*/, "cyborgs/ediego_wewillmeetagain"/*57*/, "cyborgs/yourlevelsareterrible"/*58*/, "cyborgs/yourweaponsareshoddybadweapons"/*59*/, "destroy/attack1_explode"/*60*/, "destroy/camera_destroy"/*61*/, "destroy/crate_break"/*62*/, "destroy/explode_minor"/*63*/,
     "destroy/explosion1"/*64*/, "destroy/explosion2"/*65*/, "destroy/explosion3"/*66*/, "destroy/hit2"/*67*/, "destroy/hit3"/*68*/, "destroy/screen_destroy"/*69*/, "doors/door_platform"/*70*/, "doors/doorbulkhead_open"/*71*/,
@@ -35,7 +31,7 @@ const char* sounds[SOUNDS_COUNT] = {
     "weapons/wdartgun"/*240*/, "weapons/wdrill"/*241*/, "weapons/wearthshake"/*242*/, "weapons/wflechette"/*243*/, "weapons/wgrenade_arm"/*244*/, "weapons/wion"/*245*/, "weapons/wlaserrapier_hit"/*246*/, "weapons/wlaserrapier_swing"/*247*/,
     "weapons/wlocknload"/*248*/, "weapons/wmagnum"/*249*/, "weapons/wmagpulse"/*250*/, "weapons/wmarksman"/*251*/, "weapons/wpipe_dmg"/*252*/, "weapons/wpipe_hit"/*253*/, "weapons/wpipe_swing"/*254*/, "weapons/wpistol"/*255*/,
     "weapons/wpistolsilenced"/*256*/, "weapons/wplasma"/*257*/, "weapons/wpulser"/*258*/, "weapons/wrailgun"/*259*/, "weapons/wreload"/*260*/, "weapons/wricoshet"/*261*/, "weapons/wriotgun"/*262*/, "weapons/wskorpion"/*263*/,
-    "weapons/wsparq"/*264*/, "weapons/wstungun"/*265*/, "weapons/wwoosh"/*266*/, "ambient/airhiss"/*267*/, "footsteps/Carpet/carpet_step1"/*268*/, "footsteps/Carpet/carpet_step2"/*269*/, "footsteps/Carpet/carpet_step3"/*270*/, "footsteps/Carpet/carpet_step4"/*271*/,
+    "weapons/wsparq"/*264*/, "weapons/wstungun"/*265*/, "weapons/wwoosh"/*266*/, ""/*267*/, "footsteps/Carpet/carpet_step1"/*268*/, "footsteps/Carpet/carpet_step2"/*269*/, "footsteps/Carpet/carpet_step3"/*270*/, "footsteps/Carpet/carpet_step4"/*271*/,
     "footsteps/Carpet/carpet_step5"/*272*/, "footsteps/Carpet/carpet_step6"/*273*/, "footsteps/Carpet/carpet_step7"/*274*/, "footsteps/Carpet/carpet_step8"/*275*/, "footsteps/Concrete/concrete_step1"/*276*/, "footsteps/Concrete/concrete_step2"/*277*/, "footsteps/Concrete/concrete_step3"/*278*/, "footsteps/Concrete/concrete_step4"/*279*/,
     "footsteps/Concrete/concrete_step5"/*280*/, "footsteps/Concrete/concrete_step6"/*281*/, "footsteps/Concrete/concrete_step7"/*282*/, "footsteps/Concrete/concrete_step8"/*283*/, "footsteps/Concrete Gritty/concrete_grit_step1"/*284*/, "footsteps/Concrete Gritty/concrete_grit_step2"/*285*/, "footsteps/Concrete Gritty/concrete_grit_step3"/*286*/, "footsteps/Concrete Gritty/concrete_grit_step4"/*287*/,
     "footsteps/Concrete Gritty/concrete_grit_step5"/*288*/, "footsteps/Concrete Gritty/concrete_grit_step6"/*289*/, "footsteps/Concrete Gritty/concrete_grit_step7"/*290*/, "footsteps/Concrete Gritty/concrete_grit_step8"/*291*/, "footsteps/Earth/earth_step1"/*292*/, "footsteps/Earth/earth_step2"/*293*/, "footsteps/Earth/earth_step3"/*294*/, "footsteps/Earth/earth_step4"/*295*/,
@@ -86,7 +82,7 @@ const char* sounds[SOUNDS_COUNT] = {
     "footsteps/Squish/squish_jump1"/*648*/, "footsteps/Squish/squish_jump2"/*649*/, "footsteps/Squish/squish_jump3"/*650*/, "footsteps/Water/water_wade1"/*651*/, "footsteps/Water/water_wade2"/*652*/, "footsteps/Water/water_wade3"/*653*/, "footsteps/Water/water_wade4"/*654*/, "footsteps/Water/water_step6"/*655*/,
     "footsteps/Water/water_step7"/*656*/, "footsteps/Water/water_step8"/*657*/, "footsteps/Wood/wood_land1"/*658*/, "footsteps/Wood/wood_land2"/*659*/, "footsteps/Wood/wood_land3"/*660*/, "footsteps/Wood/wood_jump1"/*661*/, "footsteps/Wood/wood_jump2"/*662*/, "footsteps/Wood/wood_jump3"/*663*/,
     "footsteps/Wood/woodcrate_land1"/*664*/, "footsteps/Wood/woodcrate_land2"/*665*/, "footsteps/Wood/woodcrate_land3"/*666*/, "footsteps/Wood/woodcrate_jump1"/*667*/, "footsteps/Wood/woodcrate_jump2"/*668*/, "footsteps/Wood/woodcrate_jump3"/*669*/};
-const char* audioLogs[LOGCNT] = {"logs/ghiran-2"/*0*/,"logs/steinberg-1"/*1*/,"logs/raines-1"/*2*/,"logs/sigmund-1"/*3*/,"logs/stevens-1"/*4*/,"shodan/shodan_youmychildren"/*5*/,"null"/*6*/,"logs/oconnel-1"/*7*/,"logs/honig-1"/*8*/,"logs/honig-2"/*9*/,
+const char* audioLogs[LOGCNT] = {"logs/ghiran-2"/*0*/,"logs/steinberg-1"/*1*/,"logs/raines-1"/*2*/,"logs/sigmund-1"/*3*/,"logs/stevens-1"/*4*/,"shodan/shodan_youmychildren"/*5*/,""/*6*/,"logs/oconnel-1"/*7*/,"logs/honig-1"/*8*/,"logs/honig-2"/*9*/,
                                  "logs/stackhouse-1"/*10*/,"shodan/shodan_directivetocyborgf71"/*11*/,"logs/kirby-1"/*12*/,"logs/ozark-1"/*13*/,"logs/ghiran-1"/*14*/,"logs/darcy-1"/*15*/,"logs/blankenship-1"/*16*/,"logs/grossman-1"/*17*/,"logs/grossman-2"/*18*/,
                                  "logs/grossman-3"/*19*/,"shodan/shodan_laserisbeingreadied"/*20*/,"logs/stannek-2"/*21*/,"logs/anderczyk"/*22*/,"logs/endicott-1"/*23*/,"logs/wong-2"/*24*/,"logs/melville-1"/*25*/,"logs/baerga-1"/*26*/,
                                  "shodan/shodan_tocyborg43s"/*27*/,"logs/darcy-3"/*28*/,"logs/darcy-2"/*29*/,"logs/stannek-1"/*30*/,"logs/baerga-2"/*31*/,"shodan/shodan_energydrainmines"/*32*/,"shodan/shodan_drunkwithvisioniamgod"/*33*/,"logs/hayes-1"/*34*/,
@@ -98,9 +94,9 @@ const char* audioLogs[LOGCNT] = {"logs/ghiran-2"/*0*/,"logs/steinberg-1"/*1*/,"l
                                  "shodan/shodan_gaurdthrone"/*81*/,"logs/ghiran-6"/*82*/,"shodan/shodan1"/*83*/,"logs/rebecca-1"/*84*/,"shodan/shodan_whoareyou"/*85*/,"shodan/shodan_insectloose_plansforearth"/*86*/,"logs/parovski-1"/*87*/,"logs/parovski-2"/*88*/,
                                  "shodan/shodan_quietstation"/*89*/,"logs/rebecca-3"/*90*/,"shodan/shodan_iwilldownloadmyself"/*91*/,"shodan/shodan_imonthebridge"/*92*/,"logs/rebecca-4"/*93*/, "shodan/shodan_enjoyyourvictory"/*94*/,
                                  "cyborgs/ediego_dontkeepmewaiting"/*95*/,"shodan/shodan_youdestroyedmystation"/*96*/,"shodan/shodan_nomoretransmissions"/*97*/,"shodan/shodan_doyouthinkshecanhelp"/*98*/,"shodan/shodan_ceasepestering"/*99*/,
-                                 "shodan/shodan_morrisbrocailisadolt"/*100*/,"shodan/shodan_shecanthelp"/*101*/,"null"/*102*/,"null"/*103*/,"null"/*104*/,"null"/*105*/,"null"/*106*/,"null"/*107*/,"null"/*108*/,"hud/vmailalert"/*109*/,"null"/*110*/,"null"/*111*/,
-                                 "shodan/shodan_thankyou"/*112*/,"hud/vmailalert"/*113*/,"null"/*114*/,"hud/vmailalert"/*115*/,"hud/vmailalert"/*116*/,"null"/*117*/,"hud/vmailalert"/*118*/,"hud/vmailalert"/*119*/,"null"/*120*/,"null"/*121*/,"null"/*122*/,
-                                 "null"/*123*/,"null"/*124*/,"null"/*125*/,"null"/*126*/,"null"/*127*/,"null"/*128*/,"null"/*129*/,"null"/*130*/,"null"/*131*/,"null"/*132*/};
+                                 "shodan/shodan_morrisbrocailisadolt"/*100*/,"shodan/shodan_shecanthelp"/*101*/,""/*102*/,""/*103*/,""/*104*/,""/*105*/,""/*106*/,""/*107*/,""/*108*/,"hud/vmailalert"/*109*/,""/*110*/,""/*111*/,
+                                 "shodan/shodan_thankyou"/*112*/,"hud/vmailalert"/*113*/,""/*114*/,"hud/vmailalert"/*115*/,"hud/vmailalert"/*116*/,""/*117*/,"hud/vmailalert"/*118*/,"hud/vmailalert"/*119*/,""/*120*/,""/*121*/,""/*122*/,
+                                 ""/*123*/,""/*124*/,""/*125*/,""/*126*/,""/*127*/,""/*128*/,""/*129*/,""/*130*/,""/*131*/,""/*132*/};
 static const char* GetRandomSound(FootStepType fstep,const int* starts,const int* counts,int size) { int idx=(int)fstep; if (idx<=0 || idx>=size) return sounds[0]; return sounds[random_range_u32(starts[idx],starts[idx]+counts[idx])]; }
 FootStepType GetFootstepTypeForPrefab(int pid) {
     static FootStepType table[530]; static int initialized=0;
@@ -709,7 +705,6 @@ static float *load_mp3(const char *path, u32 *out_frames, size_t* sz) {
 }
 
 INLINE float *load_audio(const char *path, u32 *out_frames, size_t* sz) { if (sEndsWith(path,".mp3")) { return load_mp3(path, out_frames, sz); } return load_wav(path, out_frames, sz); }
-
 i32 GetFreeWavSlot() { i32 retval = -1; for (u32 i = 0; i < wav_count; i++) { if (!wav_ch[i].playing && wav_ch[i].samples) {OS_Free(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples = NULL; wav_ch[i].allocSize = 0; retval=i; } } return retval; }
 #include "synth.c" // Audio Synthesis Engine
 static void wave_mix(wav_channel_t* w, float* mix) {
@@ -776,13 +771,7 @@ void play_message(const char *path) {
 
 i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=load_audio(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=w->positional=w->playing=false; return 0; }
 i32 SndStart(wav_channel_t* w) { w->frame_pos = 0; w->playing = true; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) return 0; if (ext_count < MAX_CHANNELS) ext_ch[ext_count++] = w; return 0; }
-void SndStop(wav_channel_t* w) { w->playing=false; }
 void SndUninit(wav_channel_t* w) { if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[--ext_count]; break; } }
-void SndSetVolume(wav_channel_t* w, float volume) { w->volume=volume; }
-void SoundSetLooping(wav_channel_t* w, bool loop) { w->looping=loop; }
-bool SndPlaying(wav_channel_t* w)  { return w->playing; }
-i32 SndFrmCurpos(wav_channel_t* w,u64 *pCursor) { *pCursor=w->frame_pos; return 0; }
-float SndLen(wav_channel_t* w) {  return (float)w->frame_count / (float)AUDIO_RATE; }
 static void mp3_open_slot(i32 s, const char *path, float fade_from, float fade_to, i32 fade_ms) {
     mp3_channel_t *m = &mp3_ch[s]; if (m->open) { mp3_uninit(&m->dec); m->open=false; } if (!mp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); return; }
     m->src_rate = m->dec.sampleRate; m->total_frames = mp3_get_pcm_frame_count(&m->dec); mp3_seek_to_pcm_frame(&m->dec,0); m->frames_decoded = 0; m->open = true; m->fade_target = fade_to;
@@ -791,9 +780,6 @@ static void mp3_open_slot(i32 s, const char *path, float fade_from, float fade_t
 
 void play_mp3(const char *path, i32 fade_ms) { i32 old = mp3_slot, next = mp3_slot ? 0 : 1; if (mp3_ch[old].open) { mp3_ch[old].fade_target = 0.0f; mp3_ch[old].fade_step = (fade_ms > 0) ? -mp3_ch[old].fade_vol / (AUDIO_RATE * fade_ms / 1000.0f) : -1.0f; } mp3_open_slot(mp3_slot = next,path,0.0f,1.0f,fade_ms); }
 void mp3_clear() { for (i32 i=0;i<2;i++) if (mp3_ch[i].open) { mp3_uninit(&mp3_ch[i].dec); mp3_ch[i].open=false; } mp3_slot=0; }
-void MP3Pause() { mp3_paused = true; }
-void MP3Resume() { mp3_paused = false; }
-float GetMP3RemainingTime() { mp3_channel_t *m = &mp3_ch[mp3_slot]; return (!m->open || m->frames_decoded >= m->total_frames) ? 0.0f : (!m->total_frames ? 1.0f : (float)(m->total_frames - m->frames_decoded) / (m->src_rate ? m->src_rate : AUDIO_RATE)); }
 static FHandle pcm_fds[8]; static i32 pcm_fd_count = 0;
 pthread_t audThreadID; void* AudThread(void* arg); 
 #if defined(_WIN32)
@@ -866,15 +852,14 @@ void MixAmbs() {
                 SndUninit(&slot->sound);
                 char path[512]; sFormat(path,sizeof(path),"./Audio/ambient/%s.mp3",def->filename);
                 if (SndInit(path,&slot->sound) != 0) continue;
-                slot->length_sec = SndLen(&slot->sound); if(slot->length_sec <= 0.0f) {SndUninit(&slot->sound); continue;}
-                SoundSetLooping(&slot->sound,true);
-                slot->loaded = 1;
+                slot->length_sec=((float)slot->sound.frame_count / (float)AUDIO_RATE);
+                if(slot->length_sec <= 0.0f) {SndUninit(&slot->sound); continue;}
+                slot->sound.looping=true; slot->loaded=1;
             }
-            if (!SndPlaying(&slot->sound)) SndStart(&slot->sound);
-            if (slot->length_sec > 0.0f) { u64 cur; SndFrmCurpos(&slot->sound,&cur); } // Time sync
+            if (!slot->sound.playing) SndStart(&slot->sound);
             float final_vol = World.instances[a].volume * ((d <= 1.0f) ? 1.0f : (d >= 7.68f) ? 0.0f : (7.68f - d) / (7.68f - 1.0f));
-            SndSetVolume(&slot->sound,final_vol);
-        } else if (SndPlaying(&slot->sound)) SndStop(&slot->sound);
+            slot->sound.volume=final_vol;
+        } else if (slot->sound.playing) slot->sound.playing=false;
     }
 }
 
@@ -952,9 +937,11 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
 }
 
 void UpdateMusic() {
-    if (World.paused && !World.menuActive) { MP3Pause(); return; }
-    MP3Resume();
-    float remaining = GetMP3RemainingTime(); if(remaining > AUD_BUFFER_T){return;} if(World.menuActive){play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return;}
+    if (World.paused && !World.menuActive) { mp3_paused=true; return; }
+    mp3_paused=false;
+    mp3_channel_t *m = &mp3_ch[mp3_slot];
+    float remaining = (!m->open || m->frames_decoded >= m->total_frames) ? 0.0f : (!m->total_frames ? 1.0f : (float)(m->total_frames - m->frames_decoded) / (m->src_rate ? m->src_rate : AUDIO_RATE));
+    if(remaining > AUD_BUFFER_T){return;} if(World.menuActive){play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return;}
     if(World.Sys_Music.inCombat && !World.Sys_Music.inZone && World.Sys_Music.combatImpulseFinished < World.pauseRelativeTime) {
         World.Sys_Music.inCombat=false; PlayTrack(TT_Combat,MT_Override); World.Sys_Music.combatImpulseFinished=World.pauseRelativeTime + 20.0; return;
     }
