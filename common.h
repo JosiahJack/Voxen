@@ -359,7 +359,7 @@ extern V3 EDefscolliderSize[MAX_ENTITIES]/*x,y,z for Box, x for Sphere radius, e
 extern ColliderType/*u8*/ EDefscol[MAX_ENTITIES];
 extern const char* audioLogs[LOGCNT];
 extern u32 EDefslayer[MAX_ENTITIES],gridCellStates[ARRSIZE];
-extern float EDefsmass[MAX_ENTITIES],EDefsdynamicFriction[MAX_ENTITIES],EDefsstaticFriction[MAX_ENTITIES],EDefsbounciness[MAX_ENTITIES],EDefsangularDrag[MAX_ENTITIES],EDefsgravity[MAX_ENTITIES],berserkSeedTime,rasterPerspectiveProjection[16],
+extern float EDefsmass[MAX_ENTITIES],EDefsdynamicFriction[MAX_ENTITIES],EDefsstaticFriction[MAX_ENTITIES],EDefsbounciness[MAX_ENTITIES],EDefsangularDrag[MAX_ENTITIES],berserkSeedTime,rasterPerspectiveProjection[16],
              shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 typedef struct { V3 normal; float d; } FrustumPlane;
 extern FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];

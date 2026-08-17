@@ -19,7 +19,6 @@ extern float EDefsdynamicFriction[MAX_ENTITIES];
 extern float EDefsstaticFriction[MAX_ENTITIES];
 extern float EDefsbounciness[MAX_ENTITIES];
 extern float EDefsangularDrag[MAX_ENTITIES];
-extern float EDefsgravity[MAX_ENTITIES];
 extern u16 headmountedLanternLight;
 static Entity entsFromFile[INSTANCE_COUNT]; static V3 posFromFile[INSTANCE_COUNT],scaleFromFile[INSTANCE_COUNT]; static Quaternion rotationFromFile[INSTANCE_COUNT]; static Light lightsFromFile[LIGHT_COUNT]; static LightAnimation lanimsFromFile[LIGHT_COUNT];
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
@@ -64,11 +63,11 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
         EDefs[i].currentFrameFinished = World.pauseRelativeTime + 0.1;
         if (IdxIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; } // ButtonSwitch
     }
-    for (int i=307;i<=404;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=1.0f; } // Item
+    for (int i=307;i<=404;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsmass[i]=1.0f; } // Item
     for (int i=419;i<=447;++i) { EDefscol[i]=COLTYPE_CAP; EDefscolliderSize[i].z=COLCAP_DIR_Y_F; EDefsstaticFriction[i]=1.0f; EDefsdynamicFriction[i]=0.15f; EDefsmass[i]=1.0f; EDefsangularDrag[i]=2.2f; } // NPCs
     for (int i=448;i<=457;++i) { EDefscol[i]=COLTYPE_SPH; EDefscolliderSize[i]=(V3){1.5f,1.5f,1.5f}; } // Cyber Item Definitions
-    for (int i=458;i<=463;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=1.5f; } // Physical Generic Objects
-    for (int i=481;i<=495;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsstaticFriction[i]=0.6f; EDefsmass[i]=0.3f; } // Projectiles
+    for (int i=458;i<=463;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsmass[i]=1.5f; } // Physical Generic Objects
+    for (int i=481;i<=495;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsmass[i]=0.3f; } // Projectiles
     for (int i=496;i<515;++i) { EDefs[i].SFXIndex = 75; EDefscol[i]=COLTYPE_MSH;  } // Doors
     for (int i=688;i<=698;++i) EDefscol[i]=COLTYPE_BOX; // Switches
     // End generics, now for specifics:
@@ -477,7 +476,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*403 weapon_grenadenitro_live*/   EDefs[403].modelIndex=185; EDefs[403].texIndex=354; EDefs[403].glowIndex=355; EDefscol[403]=COLTYPE_CVX; EDefs[403].colMeshIndex=88; EDefsmass[403]=1.2f;
     /*404 weapon_grenadegas_live*/     EDefs[404].modelIndex=183; EDefs[404].texIndex=349; EDefscol[404]=COLTYPE_CVX; EDefs[404].colMeshIndex=89; EDefsmass[404]=0.9f;
     /*405 to 416 unused*/
-    /*417 item_access_card_perdarcy*/  EDefs[417].modelIndex=0; EDefs[417].texIndex=8; EDefs[417].glowIndex=341; EDefscol[417]=COLTYPE_CVX; EDefs[417].colMeshIndex=672; EDefsmass[417]=0.2f; EDefsangularDrag[417]=0.05f; EDefsdynamicFriction[417]=EDefsstaticFriction[417]=0.6f;
+    /*417 item_access_card_perdarcy*/  EDefs[417].modelIndex=0; EDefs[417].texIndex=8; EDefs[417].glowIndex=341; EDefscol[417]=COLTYPE_CVX; EDefs[417].colMeshIndex=672; EDefsmass[417]=0.2f; EDefsangularDrag[417]=0.05f;
     /*419 npc_autobomb*/            EDefs[419].modelIndex=299; EDefs[419].texIndex=542; EDefs[419].glowIndex=541; EDefscol[419]=COLTYPE_CVX; EDefs[419].colMeshIndex=328;
     /*420 npc_cyborg_assassin*/     EDefs[420].modelIndex=306; EDefs[420].texIndex=545; EDefs[420].numclips= 8; EDefs[420].animationNum=24; EDefscolliderSize[420].x=0.48f; EDefscolliderSize[420].y=2.0f; EDefscolliderCenter[420].y=0.96f; EDefsmass[420]=1.5f; EDefsangularDrag[420]=1.5f; EDefs[420].glowIndex=544;
     /*421 npc_avian_mutant*/        EDefs[421].modelIndex=328; EDefs[421].texIndex=568; EDefs[421].numclips= 5; EDefs[421].animationNum=35; EDefscolliderSize[421].x=0.64f; EDefscolliderSize[421].y=1.60f; EDefscolliderCenter[421].y=0.64f; EDefsmass[421]=2.0f; EDefsangularDrag[421]=1.0f;
@@ -506,7 +505,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*444 npc_cyberguard*/          EDefs[444].modelIndex=303; EDefsmass[444]=2.00f; EDefsangularDrag[444]=3.0f; EDefscolliderSize[444].x=1.0f; EDefscol[444]=COLTYPE_SPH;
     /*445 npc_cyberram*/            EDefs[445].modelIndex=304; EDefsmass[445]=2.00f; EDefsangularDrag[445]=3.0f; EDefscolliderSize[445].x=1.44f; EDefscol[445]=COLTYPE_SPH;
     /*446 npc_cyber_reaver*/        EDefs[446].modelIndex=305; EDefsmass[446]=2.20f; EDefsangularDrag[446]=3.0f; EDefscolliderSize[446].x=0.72f; EDefscol[446]=COLTYPE_SPH;
-    /*447 npc_cybershodan*/         EDefsmass[447]=4.51f; EDefsangularDrag[447]=3.0f; EDefsdynamicFriction[447]=0.6f; EDefsstaticFriction[447]=0.6f; EDefscolliderSize[447].x=0.28f; EDefscolliderSize[447].y=1.6f; EDefscolliderSize[447].y=2.0f;
+    /*447 npc_cybershodan*/         EDefsmass[447]=4.51f; EDefsangularDrag[447]=3.0f; EDefscolliderSize[447].x=0.28f; EDefscolliderSize[447].y=1.6f; EDefscolliderSize[447].y=2.0f;
     /*448 item_cyber_data*/     EDefs[448].modelIndex=65; EDefscolliderSize[448].x=1.5f; EDefscol[448]=COLTYPE_SPH;
     /*449 item_cyber_decoy*/    EDefs[449].modelIndex=72; EDefscolliderSize[449].x=1.5f; EDefscol[449]=COLTYPE_SPH;
     /*450 item_cyber_drill*/    EDefs[450].modelIndex=68; EDefscolliderSize[450].x=1.5f; EDefscol[450]=COLTYPE_SPH;
@@ -531,11 +530,11 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*469 se_corpse_security*/  EDefs[469].texIndex=136;  EDefs[469].specIndex=137;  EDefs[469].modelIndex=56; 
     /*470 se_corpse_tan*/       EDefs[470].texIndex=138;  EDefs[470].modelIndex=57; 
     /*471 se_corpse_torso*/     EDefs[471].texIndex=126;  EDefs[471].specIndex=127;  EDefs[471].modelIndex=58; 
-    /*472 se_crate1*/           EDefs[472].texIndex=145; EDefs[472].modelIndex=60; EDefscol[472]=COLTYPE_BOX; EDefscolliderSize[472]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[472]=0.75f; EDefsgravity[472]=1.0f; EDefsdynamicFriction[472]=0.6f; EDefsstaticFriction[472]=0.6f;
-    /*473 se_crate2*/           EDefs[473].texIndex=143; EDefs[473].modelIndex=60; EDefscol[473]=COLTYPE_BOX; EDefscolliderSize[473]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[473]=0.75f; EDefsgravity[473]=1.0f; EDefsdynamicFriction[473]=0.6f; EDefsstaticFriction[473]=0.6f;
-    /*474 se_crate3*/           EDefs[474].texIndex=144; EDefs[474].modelIndex=60; EDefscol[474]=COLTYPE_BOX; EDefscolliderSize[474]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[474]=0.75f; EDefsgravity[474]=1.0f; EDefsdynamicFriction[474]=0.6f; EDefsstaticFriction[474]=0.6f;
-    /*475 se_crate4*/           EDefs[475].texIndex=146; EDefs[475].modelIndex=60; EDefscol[475]=COLTYPE_BOX; EDefscolliderSize[475]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[475]=2.25f; EDefsgravity[475]=1.0f; EDefsdynamicFriction[475]=0.6f; EDefsstaticFriction[475]=0.6f;
-    /*476 se_crate5*/           EDefs[476].texIndex=145; EDefs[476].modelIndex=60; EDefscol[476]=COLTYPE_BOX; EDefscolliderSize[476]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[476]=2.25f; EDefsdynamicFriction[476]=0.6f; EDefsstaticFriction[476]=0.6f;
+    /*472 se_crate1*/           EDefs[472].texIndex=145; EDefs[472].modelIndex=60; EDefscol[472]=COLTYPE_BOX; EDefscolliderSize[472]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[472]=0.75f;
+    /*473 se_crate2*/           EDefs[473].texIndex=143; EDefs[473].modelIndex=60; EDefscol[473]=COLTYPE_BOX; EDefscolliderSize[473]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[473]=0.75f;
+    /*474 se_crate3*/           EDefs[474].texIndex=144; EDefs[474].modelIndex=60; EDefscol[474]=COLTYPE_BOX; EDefscolliderSize[474]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[474]=0.75f;
+    /*475 se_crate4*/           EDefs[475].texIndex=146; EDefs[475].modelIndex=60; EDefscol[475]=COLTYPE_BOX; EDefscolliderSize[475]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[475]=2.25f;
+    /*476 se_crate5*/           EDefs[476].texIndex=145; EDefs[476].modelIndex=60; EDefscol[476]=COLTYPE_BOX; EDefscolliderSize[476]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[476]=2.25f;
     /*477 sec_camera*/       EDefs[477].modelIndex=589;  EDefs[477].texIndex=73;  EDefs[477].glowIndex=72; EDefscol[477]=COLTYPE_MSH;
     /*478 sec_cpunode*/      EDefs[478].modelIndex=587;  EDefs[478].texIndex=242;  EDefs[478].glowIndex=248; EDefscol[478]=COLTYPE_MSH;
     /*479 sec_cpunode_small*/EDefs[479].modelIndex=588;  EDefs[479].texIndex=107; EDefscol[479]=COLTYPE_MSH;
@@ -574,9 +573,9 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*512 door_secret1*/  EDefs[512].modelIndex=0;  EDefs[512].numclips=4;  EDefs[512].animationNum=19;  EDefs[512].texIndex=210;
     /*513 door_secret2*/  EDefs[513].modelIndex=0;  EDefs[513].numclips=4;  EDefs[513].animationNum=18;  EDefs[513].texIndex=209;
     /*514 door_secret3*/  EDefs[514].modelIndex=94;  EDefs[514].numclips=4;  EDefs[514].animationNum=20;  EDefs[514].texIndex=211;
-    /*515 func_forcebridge*/ EDefs[515].modelIndex=78;  EDefs[515].texIndex=38; EDefscol[515]=COLTYPE_BOX;
-    /*516 prop_lift2*/       EDefs[516].modelIndex=215;  EDefs[516].texIndex=155;  EDefs[516].glowIndex=154;  EDefscol[516]=COLTYPE_BOX;  EDefscolliderCenter[516]=(V3){0.0f,0.0f,0.0f};  EDefscolliderSize[516]=(V3){1.0f,1.0f,1.0f};  EDefs[516].colMeshIndex=U16_MAX; 
-    /*517 func_wall*/        EDefsmass[517]=10.0f;  EDefsangularDrag[517]=0.05f;  EDefsgravity[517]=0.0f; EDefsdynamicFriction[517]=0.6f;  EDefsstaticFriction[517]=0.6f;
+    /*515 func_forcebridge*/ EDefs[515].modelIndex=78; EDefs[515].texIndex=38; EDefscol[515]=COLTYPE_BOX;
+    /*516 prop_lift2*/       EDefs[516].modelIndex=215; EDefs[516].texIndex=155; EDefs[516].glowIndex=154; EDefscol[516]=COLTYPE_BOX; EDefscolliderCenter[516]=(V3){0.0f,0.0f,0.0f};  EDefscolliderSize[516]=(V3){1.0f,1.0f,1.0f};  EDefs[516].colMeshIndex=U16_MAX; 
+    /*517 func_wall*/        EDefsmass[517]=10.0f; EDefsangularDrag[517]=0.05f; EDefsdynamicFriction[517]=0.6f; EDefsstaticFriction[517]=0.6f;
     /*518 BulletHoleLarge*/
     /*519 BulletHoleScorchLarge*/
     /*520 BulletHoleScorchSmall*/
@@ -868,14 +867,17 @@ void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float 
 }
 #undef CHGD
 // Level Loading and Entity Management System
-void InitializeEntity(Entity* e) { mset(e,0,sizeof(Entity)); u16 idx=(u16)(e - World.instances); e->index=U16_MAX; e->entflags=EF_ACTIVE; World.layer[idx]=L_Default; e->camView=255; World.angularDrag[idx] = 0.05f; e->modelIndex=e->lodIndex=e->colMeshIndex=MAX_MDLS; e->texIndex=e->glowIndex=e->specIndex=e->normIndex = MAX_TXRS; World.scale[idx].x=World.scale[idx].y=World.scale[idx].z=World.mass[idx]=e->volume=World.rotation[idx].w=1.0f; World.dynamicFriction[idx] = World.staticFriction[idx] = 0.6f; }
-void InitializeAIAfterLoad(u16 i);
+void InitNPC(u16 i);
 void DeleteInstance(u16 i) { if (i <= PLAYER1 || i >= World.instCount) return; flag_set(&World.instances[i].entflags,EF_ACTIVE,false); } // Don't delete null ent, player 1, nor player 2 or already empty slots.
 __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return 0; }
     if (World.instCount >= INSTANCE_COUNT) { DualLogError("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return 0; }
     u16 i = World.instCount;
-    InitializeEntity(&World.instances[i]);
+    mset(&World.instances[i],0,sizeof(Entity));
+    World.instances[i].entflags=EF_ACTIVE; World.layer[i]=L_Default;World.instances[i].camView=255; World.angularDrag[i]=0.05f;
+    World.instances[i].modelIndex=World.instances[i].lodIndex=World.instances[i].colMeshIndex=MAX_MDLS;
+    World.instances[i].texIndex=World.instances[i].glowIndex=World.instances[i].specIndex=World.instances[i].normIndex = MAX_TXRS;
+    World.scale[i].x=World.scale[i].y=World.scale[i].z=World.mass[i]=World.instances[i].volume=World.rotation[i].w=1.0f; World.dynamicFriction[i]=0.5f; World.staticFriction[i]=0.6f;
     World.instances[i].index = entIdx;
     World.position[i] = pos;
     if (entIdx == 424) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.8f; } // npc_cortex_reaver
@@ -888,7 +890,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx == 445) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.5f; } // npc_cyberram
     if (entIdx == 446) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 1.1f; } // npc_cyber_reaver
     if (entIdx == 475 || entIdx == 476) World.scale[i] = (V3){1.75f,1.75f,1.75f};
-    if (IdxIsNPC(entIdx)) InitializeAIAfterLoad(i);
+    if (IdxIsNPC(entIdx)) InitNPC(i);
     World.instances[i].modelIndex = EDefs[entIdx].modelIndex;
     World.instances[i].colMeshIndex = EDefs[entIdx].colMeshIndex;
     World.instances[i].numclips = EDefs[entIdx].numclips;
@@ -905,7 +907,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     World.colliderSize[i] = EDefscolliderSize[entIdx];
     World.mass[i] = EDefsmass[entIdx] > 0.0f ? EDefsmass[entIdx] : 1.0f;
     World.angularDrag[i] = EDefsangularDrag[entIdx] > 0.0f ? EDefsangularDrag[entIdx] : 0.05f;
-    World.gravity[i] = EDefsgravity[entIdx] > 0.0f ? EDefsgravity[entIdx] : 1.0f;
+    World.gravity[i] = IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f;
     World.instances[i].lockedMessageLingdex = EDefs[entIdx].lockedMessageLingdex;
     World.instCount++;
     World.levelInstCount[World.currentLevel] = World.instCount;

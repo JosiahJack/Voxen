@@ -33,7 +33,7 @@ double game_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shad
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
 Entity EDefs[MAX_ENTITIES]; V3 EDefscolliderCenter[MAX_ENTITIES],EDefscolliderSize[MAX_ENTITIES]; ColliderType/*u8*/ EDefscol[MAX_ENTITIES]; u32 EDefslayer[MAX_ENTITIES];
-float EDefsmass[MAX_ENTITIES],EDefsdynamicFriction[MAX_ENTITIES],EDefsstaticFriction[MAX_ENTITIES],EDefsbounciness[MAX_ENTITIES],EDefsangularDrag[MAX_ENTITIES],EDefsgravity[MAX_ENTITIES];
+float EDefsmass[MAX_ENTITIES],EDefsdynamicFriction[MAX_ENTITIES],EDefsstaticFriction[MAX_ENTITIES],EDefsbounciness[MAX_ENTITIES],EDefsangularDrag[MAX_ENTITIES];
 GlobalContext World = {0};
 void TurnLightOff(u16 litIdx) { if (litIdx < World.loadedLights) {flag_set(&World.lights[litIdx].lflags,LIGHTON,false);} }
 Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/

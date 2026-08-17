@@ -48,7 +48,7 @@ void SetHuntFinished(u16 i) {
     else { World.instances[i].huntFinished += vmax(npcTable[npcID].huntTime, 60.0); }
 }
 
-void InitializeAIAfterLoad(u16 i) {
+void InitNPC(u16 i) {
     World.layer[i] = L_NPC;
     u16 npcID = World.instances[i].index - 419;
     World.instances[i].idleTime = World.pauseRelativeTime + (double)random_range(npcTable[npcID].timeIdleSFXMin,npcTable[npcID].timeIdleSFXMax);
