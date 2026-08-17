@@ -995,13 +995,14 @@ void LoadLevelMod(u8 lev) {
         AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);
     } // TODO other level camviews
     mset(lineSpace,0,LINE_LEN_MAX * sizeof(char)); u32 lineNum = 0; i32 entCount = -1, lightsIdx = -1; char* line;
+    for (u16 i=0;i<LIGHT_COUNT;++i) { mset(&lightsFromFile[lightsIdx],0,sizeof(Light)); mset(&lanimsFromFile[lightsIdx],0,sizeof(LightAnimation)); lightsFromFile[i].range = 5.5f; lightsFromFile[i].col = (Color3){1.0f,1.0f,1.0f}; lightsFromFile[i].spotAng=0.0f; }
     while (MmapGetLine(lineSpace, LINE_LEN_MAX)) {
         lineNum++; line = lineSpace; char* firstColon = StringFindFirstCharWithin(line, ':'); int firstKeyLen = firstColon ? (int)(firstColon - line) : 0;
         bool isLight = !(firstKeyLen == 10 && sCompUpToLen(line, "constIndex", 10) == 0);
         Entity* inst=NULL; Light* lit=NULL; LightAnimation* lanim=NULL;
         if (isLight) {
             lightsIdx++; if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n", lightsIdx, curlevel); continue; }
-            lit=&lightsFromFile[lightsIdx]; lanim=&lanimsFromFile[lightsIdx]; mset(lit,0,sizeof(Light)); mset(lanim,0,sizeof(LightAnimation)); // Zero this slot only (replaces the full-array mset + full-array lflags init)
+            lit=&lightsFromFile[lightsIdx]; lanim=&lanimsFromFile[lightsIdx];
             lit->lflags = LIGHT_AND_SHADOW_ON; // default per-light
         } else {
             entCount++;
@@ -1188,7 +1189,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 305) { scpy_to_a_from_b(par->texAnimResourceFolder,"Telepad",TARGET_STRING_LENGTH); } /*chunk_teleporter*/
         TextureSequenceInit(parent,par->texAnimResourceFolder);
     }
-    for (int i=0;i<=lightsIdx;++i) { if (!(lightsFromFile[i].lflags & LSPOT)) {lightsFromFile[i].spotAng = 0.0f;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
+    for (int i=0;i<=lightsIdx;++i) { lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators
         World.shd1=AddInstance(754,(V3){-51.30664f,-47.42f,56.42651f}); World.shd2=AddInstance(754,(V3){71.5f,-47.42f,-66.6f}); World.shd3=AddInstance(754,(V3){-51.306650f,-47.42f,-66.66652f}); World.shd4=AddInstance(754,(V3){71.78664f,-47.42f,56.42651f}); 
         World.rotation[World.shd1] = World.rotation[World.shd2] = World.rotation[World.shd3] = World.rotation[World.shd4] = QUAT_IDENTITY;
