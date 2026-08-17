@@ -529,7 +529,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*468 se_corpse_labcoat*/   EDefs[468].texIndex=132;  EDefs[468].specIndex=133;  EDefs[468].modelIndex=55; 
     /*469 se_corpse_security*/  EDefs[469].texIndex=136;  EDefs[469].specIndex=137;  EDefs[469].modelIndex=56; 
     /*470 se_corpse_tan*/       EDefs[470].texIndex=138;  EDefs[470].modelIndex=57; 
-    /*471 se_corpse_torso*/     EDefs[471].texIndex=126;  EDefs[471].specIndex=127;  EDefs[471].modelIndex=58; 
+    /*471 se_corpse_torso*/     EDefs[471].texIndex=126;  EDefs[471].specIndex=127;  EDefs[471].modelIndex=58;
     /*472 se_crate1*/           EDefs[472].texIndex=145; EDefs[472].modelIndex=60; EDefscol[472]=COLTYPE_BOX; EDefscolliderSize[472]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[472]=0.75f;
     /*473 se_crate2*/           EDefs[473].texIndex=143; EDefs[473].modelIndex=60; EDefscol[473]=COLTYPE_BOX; EDefscolliderSize[473]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[473]=0.75f;
     /*474 se_crate3*/           EDefs[474].texIndex=144; EDefs[474].modelIndex=60; EDefscol[474]=COLTYPE_BOX; EDefscolliderSize[474]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[474]=0.75f;
