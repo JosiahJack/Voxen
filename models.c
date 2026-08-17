@@ -8,7 +8,7 @@ BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS
 typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 static BvhBuildCtx thrd_bvh_ctx[32];
 u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0;
-u32** cvxAdjOffsets = NULL; u16** cvxAdjLists = NULL; // CSR format adjacency data: cvxAdjOffsets[m] has vCount + 1 entries pointing into cvxAdjLists[m]
+u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; u16* cvxAdjLists[MAX_UNIQUE_CVX_MESHES]; // CSR format adjacency data: cvxAdjOffsets[m] has vCount + 1 entries pointing into cvxAdjLists[m]
 u16 cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
 static u16 lastCvxSupport[MAX_UNIQUE_CVX_MESHES]={0}; // Persistent hill-climbing state per mesh
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
@@ -120,24 +120,31 @@ static float cgltf_json_to_float(jsmntok_t const* t, const u8* j){
 static bool cgltf_json_to_bool(jsmntok_t const* t, const u8* j){int sz=(int)(t->end-t->start);return sz==4&&sCompUpToLen((const char*)j+t->start,"true",4)==0;}
 static int cgltf_skip_json(jsmntok_t const* t, int i){int e=i+1;while(i<e){switch(t[i].type){case JSMN_OBJECT:e+=t[i].size*2;break;case JSMN_ARRAY:e+=t[i].size;break;case JSMN_PRIMITIVE:case JSMN_STRING:break;default:return -1;}i++;}return i;}
 static int cgltf_parse_json_float_array(jsmntok_t const* t, int i, const u8* j, float* o, int s){CGLTF_CHECK_TOKTYPE(t[i], JSMN_ARRAY);if(t[i].size!=s)return CGLTF_ERROR_JSON;++i;for(int k=0;k<s;++k){CGLTF_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);o[k]=cgltf_json_to_float(t+i,j);++i;}return i;}
-
-static int cgltf_parse_json_string(jsmntok_t const* t, int i, const u8* j, char** out){
-    CGLTF_CHECK_TOKTYPE(t[i], JSMN_STRING);if(*out)return CGLTF_ERROR_JSON;
-    int sz=(int)(t[i].end-t[i].start);char*r=(char*)OS_Alloc(sz+1);sCpy2aSubFromb(r,sz,(const char*)j+t[i].start,sz+1);*out=r;return i+1;
+static int cgltf_parse_json_string(jsmntok_t const* t, int i, const u8* j, char** out){ CGLTF_CHECK_TOKTYPE(t[i], JSMN_STRING);if(*out)return CGLTF_ERROR_JSON; int sz=(int)(t[i].end-t[i].start);char*r=(char*)OS_Alloc(sz+1);sCpy2aSubFromb(r,sz,(const char*)j+t[i].start,sz+1);*out=r;return i+1; }
+static int cgltf_parse_json_array(jsmntok_t const* t, int i, const u8* j, size_t es, void** out, size_t* os){ (void)j;if(t[i].type!=JSMN_ARRAY)return CGLTF_ERROR_JSON;if(*out)return CGLTF_ERROR_JSON;int sz=t[i].size;*out=OS_Alloc(es*sz);*os=sz;return i+1; }
+typedef int (*cgltf_parse_item_func)(jsmntok_t const* t, int i, const u8* j, void* out);
+static int cgltf_parse_json_array_generic(jsmntok_t const* t, int i, const u8* j, size_t elem_size, void** out_array, size_t* out_count, cgltf_parse_item_func parse_item) { i = cgltf_parse_json_array(t, i, j, elem_size, out_array, out_count); if (i < 0) return i; for (size_t k = 0; k < *out_count; ++k) { i = parse_item(t, i, j, (char*)*out_array + k * elem_size); if (i < 0) return i; } return i; }
+static cgltf_component_type cgltf_json_to_component_type(jsmntok_t const* t, const u8* j){ int ty=cgltf_json_to_int(t,j); return ty==5120?cgltf_component_type_r_8:ty==5121?cgltf_component_type_r_8u:ty==5122?cgltf_component_type_r_16:ty==5123?cgltf_component_type_r_16u:ty==5125?cgltf_component_type_r_32u:ty==5126?cgltf_component_type_r_32f:cgltf_component_type_invalid; }
+static int cgltf_parse_json_sparse_part(jsmntok_t const* t, int i, const u8* j, cgltf_buffer_view** out_bv, size_t* out_offset, cgltf_component_type* out_ct) {
+    CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);
+    int sz = t[i].size; ++i;
+    for (int m = 0; m < sz; ++m) {
+        CGLTF_CHECK_KEY(t[i]);
+        if (cgltf_json_strcmp(t+i, j, "bufferView")) { ++i; *out_bv = CGLTF_PTRINDEX(cgltf_buffer_view, cgltf_json_to_int(t+i, j)); ++i; }
+        else if (cgltf_json_strcmp(t+i, j, "byteOffset")) { ++i; *out_offset = cgltf_json_to_size(t+i, j); ++i; }
+        else if (out_ct && cgltf_json_strcmp(t+i, j, "componentType")) { ++i; *out_ct = cgltf_json_to_component_type(t+i, j); ++i; }
+        else i = cgltf_skip_json(t, i+1);
+        if (i < 0) return i;
+    }
+    return i;
 }
 
-static int cgltf_parse_json_array(jsmntok_t const* t, int i, const u8* j, size_t es, void** out, size_t* os){
-    (void)j;if(t[i].type!=JSMN_ARRAY)return CGLTF_ERROR_JSON;if(*out)return CGLTF_ERROR_JSON;int sz=t[i].size;*out=OS_Alloc(es*sz);*os=sz;return i+1;
-}
-
+static int cgltf_parse_json_node_array(jsmntok_t const* t, int i, const u8* j, cgltf_node*** out, size_t* out_count) { i = cgltf_parse_json_array(t, i, j, sizeof(cgltf_node*), (void**)out, out_count); if (i < 0) return i; for (size_t m = 0; m < *out_count; ++m) { (*out)[m] = CGLTF_PTRINDEX(cgltf_node, cgltf_json_to_int(t+i, j)); ++i; } return i; }
+static int cgltf_parse_json_float_array_alloc(jsmntok_t const* t, int i, const u8* j, float** out, size_t* out_count) { i = cgltf_parse_json_array(t, i, j, sizeof(float), (void**)out, out_count); if (i < 0) return i; return cgltf_parse_json_float_array(t, i-1, j, *out, (int)*out_count); }
 static void cgltf_parse_attribute_type(const char* n, cgltf_attribute_type* ot, int* oi){
     if(*n=='_'){*ot=cgltf_attribute_type_custom;return;}
     const char* us=StringFindFirstCharWithin(n,'_');size_t l=us?(size_t)(us-n):slen(n);
-    *ot = l==8&&sCompUpToLen(n,"POSITION",8)==0?cgltf_attribute_type_position:
-          l==6&&sCompUpToLen(n,"NORMAL",6)==0?cgltf_attribute_type_normal:
-          l==8&&sCompUpToLen(n,"TEXCOORD",8)==0?cgltf_attribute_type_texcoord:
-          l==6&&sCompUpToLen(n,"JOINTS",6)==0?cgltf_attribute_type_joints:
-          l==7&&sCompUpToLen(n,"WEIGHTS",7)==0?cgltf_attribute_type_weights:cgltf_attribute_type_invalid;
+    *ot = l==8&&sCompUpToLen(n,"POSITION",8)==0?cgltf_attribute_type_position: l==6&&sCompUpToLen(n,"NORMAL",6)==0?cgltf_attribute_type_normal: l==8&&sCompUpToLen(n,"TEXCOORD",8)==0?cgltf_attribute_type_texcoord: l==6&&sCompUpToLen(n,"JOINTS",6)==0?cgltf_attribute_type_joints: l==7&&sCompUpToLen(n,"WEIGHTS",7)==0?cgltf_attribute_type_weights:cgltf_attribute_type_invalid;
     if(us&&*ot!=cgltf_attribute_type_invalid){*oi=s2i32(us+1);if(*oi<0){*ot=cgltf_attribute_type_invalid;*oi=0;}}
 }
 
@@ -161,69 +168,36 @@ static int cgltf_parse_json_primitive(jsmntok_t const* t, int i, const u8* j, cg
     CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);out->type=cgltf_primitive_type_triangles;int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
         CGLTF_CHECK_KEY(t[i]);
-        if(cgltf_json_strcmp(t+i,j,"mode")){++i;out->type=cgltf_json_to_primitive_type(t+i,j);++i;}
+             if(cgltf_json_strcmp(t+i,j,"mode")){++i;out->type=cgltf_json_to_primitive_type(t+i,j);++i;}
         else if(cgltf_json_strcmp(t+i,j,"indices")){++i;out->indices=CGLTF_PTRINDEX(cgltf_accessor,cgltf_json_to_int(t+i,j));++i;}
         else if(cgltf_json_strcmp(t+i,j,"attributes"))i=cgltf_parse_json_attribute_list(t,i+1,j,&out->attributes,&out->attributes_count);
         else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
-    }
-    return i;
+    } return i;
 }
 
 static int cgltf_parse_json_mesh(jsmntok_t const* t, int i, const u8* j, cgltf_mesh* out){
     CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
         CGLTF_CHECK_KEY(t[i]);
-        if(cgltf_json_strcmp(t+i,j,"name"))i=cgltf_parse_json_string(t,i+1,j,&out->name);
-        else if(cgltf_json_strcmp(t+i,j,"primitives")){
-            i=cgltf_parse_json_array(t,i+1,j,sizeof(cgltf_primitive),(void**)&out->primitives,&out->primitives_count);if(i<0)return i;
-            for(size_t m=0;m<out->primitives_count;++m){i=cgltf_parse_json_primitive(t,i,j,&out->primitives[m]);if(i<0)return i;}
-        }
-        else if(cgltf_json_strcmp(t+i,j,"weights")){i=cgltf_parse_json_array(t,i+1,j,sizeof(float),(void**)&out->weights,&out->weights_count);if(i<0)return i;i=cgltf_parse_json_float_array(t,i-1,j,out->weights,(int)out->weights_count);}
+             if(cgltf_json_strcmp(t+i,j,      "name")){i=cgltf_parse_json_string(t,i+1,j,&out->name);}
+        else if(cgltf_json_strcmp(t+i,j,"primitives")){i=cgltf_parse_json_array_generic(t, i+1, j, sizeof(cgltf_primitive), (void**)&out->primitives, &out->primitives_count, (cgltf_parse_item_func)cgltf_parse_json_primitive);}
+        else if(cgltf_json_strcmp(t+i,j,   "weights")){i=cgltf_parse_json_float_array_alloc(t, i+1, j, &out->weights, &out->weights_count);}
         else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
-    }
-    return i;
-}
-
-static int cgltf_parse_json_meshes(jsmntok_t const* t, int i, const u8* j, cgltf_data* out){
-    i=cgltf_parse_json_array(t,i,j,sizeof(cgltf_mesh),(void**)&out->meshes,&out->meshes_count);if(i<0)return i;
-    for(size_t k=0;k<out->meshes_count;++k){i=cgltf_parse_json_mesh(t,i,j,&out->meshes[k]);if(i<0)return i;}return i;
-}
-
-static cgltf_component_type cgltf_json_to_component_type(jsmntok_t const* t, const u8* j){
-    int ty=cgltf_json_to_int(t,j);
-    return ty==5120?cgltf_component_type_r_8:ty==5121?cgltf_component_type_r_8u:ty==5122?cgltf_component_type_r_16:ty==5123?cgltf_component_type_r_16u:ty==5125?cgltf_component_type_r_32u:ty==5126?cgltf_component_type_r_32f:cgltf_component_type_invalid;
+    } return i;
 }
 
 static int cgltf_parse_json_accessor_sparse(jsmntok_t const* t, int i, const u8* j, cgltf_accessor_sparse* out){
-    CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
-    for(int k=0;k<sz;++k){
+    CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT); int sz = t[i].size; ++i;
+    for (int k = 0; k < sz; ++k) {
         CGLTF_CHECK_KEY(t[i]);
-        if(cgltf_json_strcmp(t+i,j,"count")){++i;out->count=cgltf_json_to_size(t+i,j);++i;}
-        else if(cgltf_json_strcmp(t+i,j,"indices")){
-            ++i;CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int isz=t[i].size;++i;
-            for(int m=0;m<isz;++m){
-                CGLTF_CHECK_KEY(t[i]);
-                if(cgltf_json_strcmp(t+i,j,"bufferView")){++i;out->indices_buffer_view=CGLTF_PTRINDEX(cgltf_buffer_view,cgltf_json_to_int(t+i,j));++i;}
-                else if(cgltf_json_strcmp(t+i,j,"byteOffset")){++i;out->indices_byte_offset=cgltf_json_to_size(t+i,j);++i;}
-                else if(cgltf_json_strcmp(t+i,j,"componentType")){++i;out->indices_component_type=cgltf_json_to_component_type(t+i,j);++i;}
-                else i=cgltf_skip_json(t,i+1);
-                if(i<0)return i;
-            }
-        } else if(cgltf_json_strcmp(t+i,j,"values")){
-            ++i;CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int vsz=t[i].size;++i;
-            for(int m=0;m<vsz;++m){
-                CGLTF_CHECK_KEY(t[i]);
-                if(cgltf_json_strcmp(t+i,j,"bufferView")){++i;out->values_buffer_view=CGLTF_PTRINDEX(cgltf_buffer_view,cgltf_json_to_int(t+i,j));++i;}
-                else if(cgltf_json_strcmp(t+i,j,"byteOffset")){++i;out->values_byte_offset=cgltf_json_to_size(t+i,j);++i;}
-                else i=cgltf_skip_json(t,i+1);
-                if(i<0)return i;
-            }
-        } else i=cgltf_skip_json(t,i+1);
-        if(i<0)return i;
-    }
-    return i;
+        if (cgltf_json_strcmp(t+i, j, "count")) { ++i; out->count = cgltf_json_to_size(t+i, j); ++i; }
+        else if (cgltf_json_strcmp(t+i, j, "indices")) { ++i; i = cgltf_parse_json_sparse_part(t, i, j, &out->indices_buffer_view, &out->indices_byte_offset, &out->indices_component_type); }
+        else if (cgltf_json_strcmp(t+i, j, "values")) { ++i; i = cgltf_parse_json_sparse_part(t, i, j, &out->values_buffer_view, &out->values_byte_offset, NULL); }
+        else i = cgltf_skip_json(t, i+1);
+        if (i < 0) return i;
+    } return i;
 }
 
 static int cgltf_parse_json_accessor(jsmntok_t const* t, int i, const u8* j, cgltf_accessor* out){
@@ -245,13 +219,7 @@ static int cgltf_parse_json_accessor(jsmntok_t const* t, int i, const u8* j, cgl
         else if(cgltf_json_strcmp(t+i,j,"sparse")){out->is_sparse=1;i=cgltf_parse_json_accessor_sparse(t,i+1,j,&out->sparse);}
         else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
-    }
-    return i;
-}
-
-static int cgltf_parse_json_accessors(jsmntok_t const* t, int i, const u8* j, cgltf_data* out){
-    i=cgltf_parse_json_array(t,i,j,sizeof(cgltf_accessor),(void**)&out->accessors,&out->accessors_count);if(i<0)return i;
-    for(size_t k=0;k<out->accessors_count;++k){i=cgltf_parse_json_accessor(t,i,j,&out->accessors[k]);if(i<0)return i;}return i;
+    } return i;
 }
 
 static int cgltf_parse_json_buffer_view(jsmntok_t const* t, int i, const u8* j, cgltf_buffer_view* out){
@@ -266,14 +234,9 @@ static int cgltf_parse_json_buffer_view(jsmntok_t const* t, int i, const u8* j, 
         else if(cgltf_json_strcmp(t+i,j,"target")){++i;int ty=cgltf_json_to_int(t+i,j);out->type=ty==34962?cgltf_buffer_view_type_vertices:ty==34963?cgltf_buffer_view_type_indices:cgltf_buffer_view_type_invalid;++i;}
         else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
-    }
-    return i;
+    } return i;
 }
 
-static int cgltf_parse_json_buffer_views(jsmntok_t const* t, int i, const u8* j, cgltf_data* out){
-    i=cgltf_parse_json_array(t,i,j,sizeof(cgltf_buffer_view),(void**)&out->buffer_views,&out->buffer_views_count);if(i<0)return i;
-    for(size_t k=0;k<out->buffer_views_count;++k){i=cgltf_parse_json_buffer_view(t,i,j,&out->buffer_views[k]);if(i<0)return i;}return i;
-}
 
 static int cgltf_parse_json_buffer(jsmntok_t const* t, int i, const u8* j, cgltf_buffer* out){
     CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
@@ -284,34 +247,20 @@ static int cgltf_parse_json_buffer(jsmntok_t const* t, int i, const u8* j, cgltf
         else if(cgltf_json_strcmp(t+i,j,"uri"))i=cgltf_parse_json_string(t,i+1,j,&out->uri);
         else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
-    }
-    return i;
-}
-
-static int cgltf_parse_json_buffers(jsmntok_t const* t, int i, const u8* j, cgltf_data* out){
-    i=cgltf_parse_json_array(t,i,j,sizeof(cgltf_buffer),(void**)&out->buffers,&out->buffers_count);if(i<0)return i;
-    for(size_t k=0;k<out->buffers_count;++k){i=cgltf_parse_json_buffer(t,i,j,&out->buffers[k]);if(i<0)return i;}return i;
+    } return i;
 }
 
 static int cgltf_parse_json_skin(jsmntok_t const* t, int i, const u8* j, cgltf_skin* out){
     CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
         CGLTF_CHECK_KEY(t[i]);
-        if(cgltf_json_strcmp(t+i,j,"name"))i=cgltf_parse_json_string(t,i+1,j,&out->name);
-        else if(cgltf_json_strcmp(t+i,j,"joints")){
-            i=cgltf_parse_json_array(t,i+1,j,sizeof(cgltf_node*),(void**)&out->joints,&out->joints_count);if(i<0)return i;
-            for(size_t m=0;m<out->joints_count;++m){out->joints[m]=CGLTF_PTRINDEX(cgltf_node,cgltf_json_to_int(t+i,j));++i;}
-        } else if(cgltf_json_strcmp(t+i,j,"skeleton")){++i;CGLTF_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);out->skeleton=CGLTF_PTRINDEX(cgltf_node,cgltf_json_to_int(t+i,j));++i;}
-        else if(cgltf_json_strcmp(t+i,j,"inverseBindMatrices")){++i;CGLTF_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);out->inverse_bind_matrices=CGLTF_PTRINDEX(cgltf_accessor,cgltf_json_to_int(t+i,j));++i;}
+             if (cgltf_json_strcmp(t+i,j,"name")){i=cgltf_parse_json_string(t,i+1,j,&out->name);}
+        else if (cgltf_json_strcmp(t+i,j,"joints")) { ++i; i = cgltf_parse_json_node_array(t,i,j,&out->joints,&out->joints_count); }
+        else if (cgltf_json_strcmp(t+i,j,"skeleton")) {++i;CGLTF_CHECK_TOKTYPE(t[i],JSMN_PRIMITIVE);out->skeleton=CGLTF_PTRINDEX(cgltf_node,cgltf_json_to_int(t+i,j));++i;}
+        else if (cgltf_json_strcmp(t+i,j,"inverseBindMatrices")) {++i;CGLTF_CHECK_TOKTYPE(t[i],JSMN_PRIMITIVE);out->inverse_bind_matrices=CGLTF_PTRINDEX(cgltf_accessor,cgltf_json_to_int(t+i,j));++i;}
         else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
-    }
-    return i;
-}
-
-static int cgltf_parse_json_skins(jsmntok_t const* t, int i, const u8* j, cgltf_data* out){
-    i=cgltf_parse_json_array(t,i,j,sizeof(cgltf_skin),(void**)&out->skins,&out->skins_count);if(i<0)return i;
-    for(size_t k=0;k<out->skins_count;++k){i=cgltf_parse_json_skin(t,i,j,&out->skins[k]);if(i<0)return i;}return i;
+    } return i;
 }
 
 static int cgltf_parse_json_node(jsmntok_t const* t, int i, const u8* j, cgltf_node* out){
@@ -321,23 +270,17 @@ static int cgltf_parse_json_node(jsmntok_t const* t, int i, const u8* j, cgltf_n
     for(int k=0;k<sz;++k){
         CGLTF_CHECK_KEY(t[i]);
         if(cgltf_json_strcmp(t+i,j,"name"))i=cgltf_parse_json_string(t,i+1,j,&out->name);
-        else if(cgltf_json_strcmp(t+i,j,"children")){i=cgltf_parse_json_array(t,i+1,j,sizeof(cgltf_node*),(void**)&out->children,&out->children_count);if(i<0)return i;for(size_t m=0;m<out->children_count;++m){out->children[m]=CGLTF_PTRINDEX(cgltf_node,cgltf_json_to_int(t+i,j));++i;}}
+        else if (cgltf_json_strcmp(t+i,j,"children")) { ++i; i = cgltf_parse_json_node_array(t, i, j, &out->children, &out->children_count); }
         else if(cgltf_json_strcmp(t+i,j,"mesh")){++i;CGLTF_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);out->mesh=CGLTF_PTRINDEX(cgltf_mesh,cgltf_json_to_int(t+i,j));++i;}
         else if(cgltf_json_strcmp(t+i,j,"skin")){++i;CGLTF_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);out->skin=CGLTF_PTRINDEX(cgltf_skin,cgltf_json_to_int(t+i,j));++i;}
         else if(cgltf_json_strcmp(t+i,j,"translation")){out->has_translation=1;i=cgltf_parse_json_float_array(t,i+1,j,out->translation,3);}
         else if(cgltf_json_strcmp(t+i,j,"rotation")){out->has_rotation=1;i=cgltf_parse_json_float_array(t,i+1,j,out->rotation,4);}
         else if(cgltf_json_strcmp(t+i,j,"scale")){out->has_scale=1;i=cgltf_parse_json_float_array(t,i+1,j,out->scale,3);}
         else if(cgltf_json_strcmp(t+i,j,"matrix")){out->has_matrix=1;i=cgltf_parse_json_float_array(t,i+1,j,out->matrix,16);}
-        else if(cgltf_json_strcmp(t+i,j,"weights")){i=cgltf_parse_json_array(t,i+1,j,sizeof(float),(void**)&out->weights,&out->weights_count);if(i<0)return i;i=cgltf_parse_json_float_array(t,i-1,j,out->weights,(int)out->weights_count);}
+        else if (cgltf_json_strcmp(t+i,j,"weights")) {i = cgltf_parse_json_float_array_alloc(t,i+1,j,&out->weights,&out->weights_count);}
         else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
-    }
-    return i;
-}
-
-static int cgltf_parse_json_nodes(jsmntok_t const* t, int i, const u8* j, cgltf_data* out){
-    i=cgltf_parse_json_array(t,i,j,sizeof(cgltf_node),(void**)&out->nodes,&out->nodes_count);if(i<0)return i;
-    for(size_t k=0;k<out->nodes_count;++k){i=cgltf_parse_json_node(t,i,j,&out->nodes[k]);if(i<0)return i;}return i;
+    } return i;
 }
 
 static int cgltf_parse_json_animation_sampler(jsmntok_t const* t, int i, const u8* j, cgltf_animation_sampler* out){
@@ -348,8 +291,7 @@ static int cgltf_parse_json_animation_sampler(jsmntok_t const* t, int i, const u
         else if(cgltf_json_strcmp(t+i,j,"output")){++i;out->output=CGLTF_PTRINDEX(cgltf_accessor,cgltf_json_to_int(t+i,j));++i;}
         else if(cgltf_json_strcmp(t+i,j,"interpolation")){ ++i; out->interpolation = cgltf_json_strcmp(t+i,j,"LINEAR")?cgltf_interpolation_type_linear:cgltf_json_strcmp(t+i,j,"STEP")?cgltf_interpolation_type_step:cgltf_json_strcmp(t+i,j,"CUBICSPLINE")?cgltf_interpolation_type_cubic_spline:cgltf_interpolation_type_linear; ++i; } else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
-    }
-    return i;
+    } return i;
 }
 
 static int cgltf_parse_json_animation_channel(jsmntok_t const* t, int i, const u8* j, cgltf_animation_channel* out){
@@ -368,59 +310,44 @@ static int cgltf_parse_json_animation_channel(jsmntok_t const* t, int i, const u
             }
         } else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
-    }
-    return i;
+    } return i;
 }
 
 static int cgltf_parse_json_animation(jsmntok_t const* t, int i, const u8* j, cgltf_animation* out){
     CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
         CGLTF_CHECK_KEY(t[i]);
-        if(cgltf_json_strcmp(t+i,j,"name"))i=cgltf_parse_json_string(t,i+1,j,&out->name);
-        else if(cgltf_json_strcmp(t+i,j,"samplers")){
-            i=cgltf_parse_json_array(t,i+1,j,sizeof(cgltf_animation_sampler),(void**)&out->samplers,&out->samplers_count);if(i<0)return i;
-            for(size_t m=0;m<out->samplers_count;++m){i=cgltf_parse_json_animation_sampler(t,i,j,&out->samplers[m]);if(i<0)return i;}
-        } else if(cgltf_json_strcmp(t+i,j,"channels")){
-            i=cgltf_parse_json_array(t,i+1,j,sizeof(cgltf_animation_channel),(void**)&out->channels,&out->channels_count);if(i<0)return i;
-            for(size_t m=0;m<out->channels_count;++m){i=cgltf_parse_json_animation_channel(t,i,j,&out->channels[m]);if(i<0)return i;}
-        } else i=cgltf_skip_json(t,i+1);
-        if(i<0)return i;
-    }
-    return i;
-}
-
-static int cgltf_parse_json_animations(jsmntok_t const* t, int i, const u8* j, cgltf_data* out){
-    i=cgltf_parse_json_array(t,i,j,sizeof(cgltf_animation),(void**)&out->animations,&out->animations_count);if(i<0)return i;
-    for(size_t k=0;k<out->animations_count;++k){i=cgltf_parse_json_animation(t,i,j,&out->animations[k]);if(i<0)return i;}return i;
-}
-
-static int cgltf_parse_json_root(jsmntok_t const* t, int i, const u8* j, cgltf_data* out){
-    CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
-    for(int k=0;k<sz;++k){
-        CGLTF_CHECK_KEY(t[i]);
-        if(cgltf_json_strcmp(t+i,j,"meshes"))i=cgltf_parse_json_meshes(t,i+1,j,out);
-        else if(cgltf_json_strcmp(t+i,j,"accessors"))i=cgltf_parse_json_accessors(t,i+1,j,out);
-        else if(cgltf_json_strcmp(t+i,j,"bufferViews"))i=cgltf_parse_json_buffer_views(t,i+1,j,out);
-        else if(cgltf_json_strcmp(t+i,j,"buffers"))i=cgltf_parse_json_buffers(t,i+1,j,out);
-        else if(cgltf_json_strcmp(t+i,j,"skins"))i=cgltf_parse_json_skins(t,i+1,j,out);
-        else if(cgltf_json_strcmp(t+i,j,"nodes"))i=cgltf_parse_json_nodes(t,i+1,j,out);
-        else if(cgltf_json_strcmp(t+i,j,"animations"))i=cgltf_parse_json_animations(t,i+1,j,out);
+             if(cgltf_json_strcmp(t+i,j,"name"))i=cgltf_parse_json_string(t,i+1,j,&out->name);
+        else if(cgltf_json_strcmp(t+i,j,"samplers")){i=cgltf_parse_json_array_generic(t,i+1,j,sizeof(cgltf_animation_sampler),(void**)&out->samplers,&out->samplers_count,(cgltf_parse_item_func)cgltf_parse_json_animation_sampler); } 
+        else if(cgltf_json_strcmp(t+i,j,"channels")){i=cgltf_parse_json_array(t,i+1,j,sizeof(cgltf_animation_channel),(void**)&out->channels,&out->channels_count);if(i<0)return i; for(size_t m=0;m<out->channels_count;++m){i=cgltf_parse_json_animation_channel(t,i,j,&out->channels[m]);if(i<0)return i;} }
         else i=cgltf_skip_json(t,i+1);
         if(i<0)return i;
     }
     return i;
 }
 
+static int cgltf_parse_json_root(jsmntok_t const* t, int i, const u8* j, cgltf_data* out){
+    CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT); int sz = t[i].size; ++i;
+    for (int k = 0; k < sz; ++k) {
+        CGLTF_CHECK_KEY(t[i]);
+        if (cgltf_json_strcmp(t+i, j, "meshes")) i = cgltf_parse_json_array_generic(t, i+1, j, sizeof(cgltf_mesh), (void**)&out->meshes, &out->meshes_count, (cgltf_parse_item_func)cgltf_parse_json_mesh);
+        else if (cgltf_json_strcmp(t+i, j, "accessors")) i = cgltf_parse_json_array_generic(t, i+1, j, sizeof(cgltf_accessor), (void**)&out->accessors, &out->accessors_count, (cgltf_parse_item_func)cgltf_parse_json_accessor);
+        else if (cgltf_json_strcmp(t+i, j, "bufferViews")) i = cgltf_parse_json_array_generic(t, i+1, j, sizeof(cgltf_buffer_view), (void**)&out->buffer_views, &out->buffer_views_count, (cgltf_parse_item_func)cgltf_parse_json_buffer_view);
+        else if (cgltf_json_strcmp(t+i, j, "buffers")) i = cgltf_parse_json_array_generic(t, i+1, j, sizeof(cgltf_buffer), (void**)&out->buffers, &out->buffers_count, (cgltf_parse_item_func)cgltf_parse_json_buffer);
+        else if (cgltf_json_strcmp(t+i, j, "skins")) i = cgltf_parse_json_array_generic(t, i+1, j, sizeof(cgltf_skin), (void**)&out->skins, &out->skins_count, (cgltf_parse_item_func)cgltf_parse_json_skin);
+        else if (cgltf_json_strcmp(t+i, j, "nodes")) i = cgltf_parse_json_array_generic(t, i+1, j, sizeof(cgltf_node), (void**)&out->nodes, &out->nodes_count, (cgltf_parse_item_func)cgltf_parse_json_node);
+        else if (cgltf_json_strcmp(t+i, j, "animations")) i = cgltf_parse_json_array_generic(t, i+1, j, sizeof(cgltf_animation), (void**)&out->animations, &out->animations_count, (cgltf_parse_item_func)cgltf_parse_json_animation);
+        else i = cgltf_skip_json(t, i+1);
+        if (i < 0) return i;
+    } return i;
+}
+
 static void jsmn_init(jsmn_parser* p){p->pos=0;p->toknext=0;p->toksuper=-1;}
 static jsmntok_t* jsmn_alloc_token(jsmn_parser* p, jsmntok_t* t, size_t n){if(p->toknext>=n)return NULL;jsmntok_t* tok=&t[p->toknext++];tok->start=tok->end=-1;tok->size=0;tok->parent=-1;return tok;}
 static void jsmn_fill_token(jsmntok_t* t, jsmntype_t ty, size_t s, size_t e){t->type=ty;t->start=s;t->end=e;t->size=0;}
 static int jsmn_parse_primitive(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n){
-    size_t s=p->pos;
-    for(;p->pos<l&&js[p->pos];p->pos++){switch(js[p->pos]){case ':':case '\t':case '\r':case '\n':case ' ':case ',':case ']':case '}':goto f;}}
-    p->pos=s;return JSMN_ERROR_PART;
-    f:if(!t){p->pos--;return 0;}
-    jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok){p->pos=s;return JSMN_ERROR_NOMEM;}
-    jsmn_fill_token(tok,JSMN_PRIMITIVE,s,p->pos);tok->parent=p->toksuper;p->pos--;return 0;
+    size_t s=p->pos; for(;p->pos<l&&js[p->pos];p->pos++){switch(js[p->pos]){case ':':case '\t':case '\r':case '\n':case ' ':case ',':case ']':case '}':goto f;}}
+    p->pos=s;return JSMN_ERROR_PART; f:if(!t){p->pos--;return 0;} jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok){p->pos=s;return JSMN_ERROR_NOMEM;} jsmn_fill_token(tok,JSMN_PRIMITIVE,s,p->pos);tok->parent=p->toksuper;p->pos--;return 0;
 }
 
 static int jsmn_parse_string(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n){
@@ -487,10 +414,7 @@ cgltf_result cgltf_parse(const void* d, size_t sz, cgltf_data** out_data) {
     int i=cgltf_parse_json_root(t,0,jc,data);
     if(i<0){DualLogError("Error parsing json in glb\n");OS_Exit(1);}
     for(size_t m=0;m<data->meshes_count;++m)
-        for(size_t n=0;n<data->meshes[m].primitives_count;++n){
-            CGLTF_PTRFIXUP(data->meshes[m].primitives[n].indices,data->accessors,data->accessors_count);
-            for(size_t k=0;k<data->meshes[m].primitives[n].attributes_count;++k){CGLTF_PTRFIXUP_REQ(data->meshes[m].primitives[n].attributes[k].data,data->accessors,data->accessors_count);}
-        }
+        for(size_t n=0;n<data->meshes[m].primitives_count;++n){ CGLTF_PTRFIXUP(data->meshes[m].primitives[n].indices,data->accessors,data->accessors_count); for(size_t k=0;k<data->meshes[m].primitives[n].attributes_count;++k){CGLTF_PTRFIXUP_REQ(data->meshes[m].primitives[n].attributes[k].data,data->accessors,data->accessors_count);} }
     for(size_t m=0;m<data->accessors_count;++m){
         CGLTF_PTRFIXUP(data->accessors[m].buffer_view,data->buffer_views,data->buffer_views_count);
         if(data->accessors[m].is_sparse){CGLTF_PTRFIXUP_REQ(data->accessors[m].sparse.indices_buffer_view,data->buffer_views,data->buffer_views_count);CGLTF_PTRFIXUP_REQ(data->accessors[m].sparse.values_buffer_view,data->buffer_views,data->buffer_views_count);}
@@ -501,38 +425,21 @@ cgltf_result cgltf_parse(const void* d, size_t sz, cgltf_data** out_data) {
     for(size_t m=0;m<data->skins_count;++m){for(size_t n=0;n<data->skins[m].joints_count;++n){CGLTF_PTRFIXUP_REQ(data->skins[m].joints[n],data->nodes,data->nodes_count);}CGLTF_PTRFIXUP(data->skins[m].skeleton,data->nodes,data->nodes_count);CGLTF_PTRFIXUP(data->skins[m].inverse_bind_matrices,data->accessors,data->accessors_count);}
     for(size_t m=0;m<data->nodes_count;++m){
         for(size_t n=0;n<data->nodes[m].children_count;++n){CGLTF_PTRFIXUP_REQ(data->nodes[m].children[n],data->nodes,data->nodes_count);if(data->nodes[m].children[n]->parent){DualLogError("JSON error when attempting to fixup pointers\n");OS_Exit(1);}data->nodes[m].children[n]->parent=&data->nodes[m];}
-        CGLTF_PTRFIXUP(data->nodes[m].mesh,data->meshes,data->meshes_count);
-        CGLTF_PTRFIXUP(data->nodes[m].skin,data->skins,data->skins_count);
+        CGLTF_PTRFIXUP(data->nodes[m].mesh,data->meshes,data->meshes_count); CGLTF_PTRFIXUP(data->nodes[m].skin,data->skins,data->skins_count);
     }
     for(size_t m=0;m<data->animations_count;++m){
         for(size_t n=0;n<data->animations[m].samplers_count;++n){CGLTF_PTRFIXUP_REQ(data->animations[m].samplers[n].input,data->accessors,data->accessors_count);CGLTF_PTRFIXUP_REQ(data->animations[m].samplers[n].output,data->accessors,data->accessors_count);}
         for(size_t n=0;n<data->animations[m].channels_count;++n){CGLTF_PTRFIXUP_REQ(data->animations[m].channels[n].sampler,data->animations[m].samplers,data->animations[m].samplers_count);CGLTF_PTRFIXUP(data->animations[m].channels[n].target_node,data->nodes,data->nodes_count);}
     }
-    data->json=(const char*)jc;data->json_size=jl;*out_data=data;
-    (*out_data)->bin=bin;(*out_data)->bin_size=bsz;
-    return cgltf_result_success;
+    data->json=(const char*)jc;data->json_size=jl;*out_data=data; (*out_data)->bin=bin;(*out_data)->bin_size=bsz; return cgltf_result_success;
 }
 
-static void cgltf_combine_paths(char* p, const char* b, const char* u) {
-    const char* s0=StringFindLastChar(b,'/'),*s1=StringFindLastChar(b,'\\'),*sl=s0?(s1&&s1>s0?s1:s0):s1;
-    size_t sz=0;
-    if(sl){sz=sl-b+1;for(size_t i=0;i<sz;++i)p[i]=b[i];}
-    for(size_t i=0;u[i];++i)p[sz+i]=u[i];p[sz+slen(u)]=0;
-}
-
+static void cgltf_combine_paths(char* p, const char* b, const char* u) { const char* s0=StringFindLastChar(b,'/'),*s1=StringFindLastChar(b,'\\'),*sl=s0?(s1&&s1>s0?s1:s0):s1; size_t sz=0; if(sl){sz=sl-b+1;for(size_t i=0;i<sz;++i)p[i]=b[i];} for(size_t i=0;u[i];++i)p[sz+i]=u[i];p[sz+slen(u)]=0; }
 static int cgltf_unhex(char c){return(u8)(c-'0')<10?c-'0':(u8)(c-'A')<6?c-'A'+10:(u8)(c-'a')<6?c-'a'+10:-1;}
 size_t cgltf_decode_uri(char* u){char*w=u,*i=u;while(*i){if(*i=='%'){int h1=cgltf_unhex(i[1]);if(h1>=0){int h2=cgltf_unhex(i[2]);if(h2>=0){*w++=(char)(h1*16+h2);i+=3;continue;}}}*w++=*i++;}*w=0;return w-u;}
-
 cgltf_result cgltf_load_buffer_base64(size_t sz, const char* b64, void** out) {
     u8* d=(u8*)OS_Alloc(sz);u32 buf=0,bb=0;
-    for(size_t i=0;i<sz;++i){
-        while(bb<8){
-            char c=*b64++;int idx=(u8)(c-'A')<26?c-'A':(u8)(c-'a')<26?c-'a'+26:(u8)(c-'0')<10?c-'0'+52:c=='+'?62:c=='/'?63:-1;
-            if(idx<0){OS_Free(d,sz);return cgltf_result_io_error;}
-            buf=(buf<<6)|idx;bb+=6;
-        }
-        d[i]=(u8)(buf>>(bb-8));bb-=8;
-    }
+    for(size_t i=0;i<sz;++i){ while(bb<8){ char c=*b64++;int idx=(u8)(c-'A')<26?c-'A':(u8)(c-'a')<26?c-'a'+26:(u8)(c-'0')<10?c-'0'+52:c=='+'?62:c=='/'?63:-1; if(idx<0){OS_Free(d,sz);return cgltf_result_io_error;} buf=(buf<<6)|idx;bb+=6; } d[i]=(u8)(buf>>(bb-8));bb-=8; }
     *out=d;return cgltf_result_success;
 }
 
@@ -554,8 +461,7 @@ cgltf_result cgltf_load_buffers(cgltf_data* data, const char* gltf_path) {
             u8* fb=OS_AllocateFileBackedRAMReadonly(fsz,fp,path);
             OS_Close(fp);OS_Free(path,psz);data->buffers[i].data=fb;
         } else return cgltf_result_unknown_format;
-    }
-    return cgltf_result_success;
+    } return cgltf_result_success;
 }
 
 static size_t cgltf_calc_index_bound(cgltf_buffer_view* bv, size_t off, cgltf_component_type ct, size_t cnt) {
@@ -580,10 +486,7 @@ cgltf_result cgltf_validate(cgltf_data* data) {
             if(s->indices_buffer_view->buffer->data){size_t ib=cgltf_calc_index_bound(s->indices_buffer_view,s->indices_byte_offset,s->indices_component_type,s->count);if(ib>=a->count)return cgltf_result_data_too_short;}
         }
     }
-    for(size_t i=0;i<data->buffer_views_count;++i){
-        size_t rq=data->buffer_views[i].offset+data->buffer_views[i].size;
-        if(data->buffer_views[i].buffer&&data->buffer_views[i].buffer->size<rq)return cgltf_result_data_too_short;
-    }
+    for(size_t i=0;i<data->buffer_views_count;++i){ size_t rq=data->buffer_views[i].offset+data->buffer_views[i].size; if(data->buffer_views[i].buffer&&data->buffer_views[i].buffer->size<rq)return cgltf_result_data_too_short; }
     for(size_t i=0;i<data->meshes_count;++i){
         for(size_t j=0;j<data->meshes[i].primitives_count;++j){
             if(data->meshes[i].primitives[j].type==cgltf_primitive_type_invalid)return cgltf_result_invalid_gltf;
@@ -600,11 +503,7 @@ cgltf_result cgltf_validate(cgltf_data* data) {
     }
     for(size_t i=0;i<data->nodes_count;++i){cgltf_node* p1=data->nodes[i].parent,*p2=p1?p1->parent:NULL;while(p1&&p2){if(p1==p2)return cgltf_result_invalid_gltf;p1=p1->parent;p2=p2->parent?p2->parent->parent:NULL;}}
     for(size_t i=0;i<data->animations_count;++i){
-        for(size_t j=0;j<data->animations[i].channels_count;++j){
-            cgltf_animation_channel* c=&data->animations[i].channels[j];if(!c->target_node)continue;
-            size_t comp=1,vals=c->sampler->interpolation==cgltf_interpolation_type_cubic_spline?3:1;
-            if(c->sampler->input->count*comp*vals!=c->sampler->output->count)return cgltf_result_invalid_gltf;
-        }
+        for(size_t j=0;j<data->animations[i].channels_count;++j){ cgltf_animation_channel* c=&data->animations[i].channels[j];if(!c->target_node)continue; size_t comp=1,vals=c->sampler->interpolation==cgltf_interpolation_type_cubic_spline?3:1; if(c->sampler->input->count*comp*vals!=c->sampler->output->count)return cgltf_result_invalid_gltf; }
     }
     return cgltf_result_success;
 }
@@ -631,35 +530,24 @@ void OptimizeVertexCache(u16* idx, u32 ic, u32 vc, u8* scratch) {
 }
 
 u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, u32* remap, u8* nv) {
-    u32 oc = *vc; if (!oc || !ic) return v;
-    mset(remap,0xFF,oc * sizeof(u32)); u32 nc = 0;      for(u32 i=0;i<ic;++i) { u32 id = idx[i]; if (id < oc && remap[id] == 0xFFFFFFFFU) { remap[id]=nc; ++nc; } }
+    u32 oc = *vc; if (!oc || !ic) return v; mset(remap,0xFF,oc * sizeof(u32)); u32 nc = 0; for(u32 i=0;i<ic;++i) { u32 id = idx[i]; if (id < oc && remap[id] == 0xFFFFFFFFU) { remap[id]=nc; ++nc; } }
     mset(remap,0xFF,oc * sizeof(u32)); u32 write_ptr=0; for(u32 i=0;i<ic;++i) { u32 id = idx[i]; if (id < oc) { if (remap[id] == 0xFFFFFFFFU) { remap[id]=write_ptr; mcpy(nv + write_ptr * stride, v + id * stride, stride); write_ptr++; } idx[i]=(u16)remap[id]; } }
-    *vc = nc;
-    return nv;
+    *vc = nc; return nv;
 }
 
 #define _mm_min_ps(A, B) ((__m128)__builtin_ia32_minps((__v4sf)(A), (__v4sf)(B)))
 #define _mm_max_ps(A, B) ((__m128)__builtin_ia32_maxps((__v4sf)(A), (__v4sf)(B)))
 __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* __restrict sv, u32 ec, u32* __restrict ht, u32* __restrict ht_used, u32* __restrict remap_scr, u8* __restrict cache_scr, float** __restrict ov_pos, u32* ovc, u16** ot, u16* otc, __m128 mn_v, __m128 mx_v) {
-    if (unlikely(!ec)) return false;
-    u16* final_t = OS_Alloc(ec * sizeof(u16)); // Allocate final_t early so we can use it instead of ft_scratch
-    u32 used_slots_count = 0;
-    u32* rem = (u32*)remap_scr; // Reuse remap_scr for the 'rem' array!
-    u32 ucnt = 0;
+    if (unlikely(!ec)){return false;} u16* final_t = OS_Alloc(ec * sizeof(u16)); /*Allocate final_t early so we can use it instead of ft_scratch*/ u32 used_slots_count = 0; u32* rem = (u32*)remap_scr; /*Reuse remap_scr for the 'rem' array!*/ u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
-        const float* v = sv + (i<<3);
-        const u32* uv = (const u32*)v; u32 h0 = uv[0] ^ uv[1] ^ uv[2] ^ uv[3]; u32 h1 = uv[4] ^ uv[5] ^ uv[6] ^ uv[7]; u32 s = (h0 ^ h1) & (WELD_HASH_SIZE-1);
+        const float* v = sv + (i<<3); const u32* uv = (const u32*)v; u32 h0 = uv[0] ^ uv[1] ^ uv[2] ^ uv[3]; u32 h1 = uv[4] ^ uv[5] ^ uv[6] ^ uv[7]; u32 s = (h0 ^ h1) & (WELD_HASH_SIZE-1);
         while (ht[s] != 0xFFFFFFFFU) { if (mcmp(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (WELD_HASH_SIZE-1); }
         ht[s] = ucnt; rem[i] = ucnt; ht_used[used_slots_count++] = s; mcpy(sv+(ucnt<<3), v, 32); ++ucnt; nxt:;
     }
     for (u32 i=0;i<ec;++i) final_t[i] = (u16)rem[i];
-    OptimizeVertexCache(final_t,ec,ucnt,cache_scr);
-    float* final_verts = (float*)OS_Alloc((size_t)ucnt * CPU_VRT_SZ);
-    OptimizeVertexFetch((u8*)sv,&ucnt,final_t,ec,CPU_VRT_SZ,remap_scr,(u8*)final_verts);
-    *ov_pos = final_verts; *ovc = ucnt; *ot = final_t; *otc = ec/3;
-    float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr,mn_v); _mm_storeu_ps(mx_arr,mx_v);
-    modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2])))));
-    for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]] = 0xFFFFFFFFU;}
+    OptimizeVertexCache(final_t,ec,ucnt,cache_scr); float* final_verts = (float*)OS_Alloc((size_t)ucnt * CPU_VRT_SZ);
+    OptimizeVertexFetch((u8*)sv,&ucnt,final_t,ec,CPU_VRT_SZ,remap_scr,(u8*)final_verts); *ov_pos = final_verts; *ovc = ucnt; *ot = final_t; *otc = ec/3;
+    float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr,mn_v); _mm_storeu_ps(mx_arr,mx_v); modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2]))))); for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]] = 0xFFFFFFFFU;}
     return true;
 }
 
@@ -669,10 +557,7 @@ static GltfMesh gBlockMeshes[MAX_GLTF_BLOCKS]; static u32 gBlockMeshCount = 0;
 static void Mat4Identity(float* m) { mset(m, 0, sizeof(float) * 16); m[0] = m[5] = m[10] = m[15] = 1.0f; }
 static void Mat4Mul(const float* __restrict a, const float* __restrict b, float* __restrict out) { for (int c = 0; c < 4; ++c) for (int r = 0; r < 4; ++r) { float s = 0.0f; for (int k = 0; k < 4; ++k) s += a[k*4+r] * b[c*4+k]; out[c*4+r] = s; } }
 static void Mat4TransformPoint(const float* __restrict m, const float* __restrict v, float* __restrict out) { out[0] = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]  + m[12]; out[1] = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]  + m[13]; out[2] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14]; }
-static void Mat4TransformDir(const float* __restrict m, const float* __restrict v, float* __restrict out) {
-	float x = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]; float y = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]; float z = m[2]*v[0] + m[6]*v[1] + m[10]*v[2]; float len = vsqrtf(x*x + y*y + z*z), inv = (len > 1e-8f) ? 1.0f/len : 0.0f; out[0] = x*inv; out[1] = y*inv; out[2] = z*inv;
-}
-
+static void Mat4TransformDir(const float* __restrict m, const float* __restrict v, float* __restrict out) { float x = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]; float y = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]; float z = m[2]*v[0] + m[6]*v[1] + m[10]*v[2]; float len = vsqrtf(x*x + y*y + z*z), inv = (len > 1e-8f) ? 1.0f/len : 0.0f; out[0] = x*inv; out[1] = y*inv; out[2] = z*inv; }
 static bool ParseGLTFStatic(u32 mindex, const u8* bytes, size_t size, float* __restrict sv, u32* __restrict ht, u32* __restrict ht_used, u32* __restrict remap_scr, u8* __restrict cache_scr, float** __restrict ov_pos, u32* ovc, u16** ot, u16* otc) {
     *ov_pos=NULL; *ot=NULL; *ovc=*otc=0; cgltf_data* data = NULL; cgltf_parse(bytes, size, &data); cgltf_load_buffers(data, NULL); cgltf_validate(data);
     if (data->meshes_count == 0 || data->nodes_count == 0) { DualLogError("gltf_static: no mesh/nodes in glb\n"); OS_Exit(1); }
@@ -1514,106 +1399,45 @@ void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
     u8 animTest = Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
-        Entity* e = &World.instances[i];
-        if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS) continue;
-        if (e->numclips == 0) continue;
+        Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->numclips == 0) continue;
         if (animTest == 1) {
-            u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0;
-            double totalDuration = 0.0;
-            for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &modelAnimationClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } }
-            if (numValid == 0) continue;
+            u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0;
+            for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &modelAnimationClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } } if (numValid == 0){continue;} 
             e->currentFrameFinished += animDT;
-            while (e->currentFrameFinished >= totalDuration) { e->currentFrameFinished -= totalDuration; }
-            if (e->currentFrameFinished < 0.0) e->currentFrameFinished = 0.0;
-            double t = e->currentFrameFinished, clipStartTime=0.0;
-            AnimationClip* activeClip = &modelAnimationClips[e->animationNum][validClips[0]];
+            while (e->currentFrameFinished >= totalDuration) { e->currentFrameFinished -= totalDuration; } if (e->currentFrameFinished < 0.0){e->currentFrameFinished = 0.0;} double t = e->currentFrameFinished, clipStartTime=0.0; AnimationClip* activeClip = &modelAnimationClips[e->animationNum][validClips[0]];
             for (u8 j = 0; j < numValid; ++j) {
-                activeClip = &modelAnimationClips[e->animationNum][validClips[j]];
-                double activeDur = (double)(activeClip->frameEnd - activeClip->frameStart + 1) / ((double)activeClip->framerate * activeClip->speed);
-                if (t < clipStartTime + activeDur) { targetClipIdx = j; break; }
-                clipStartTime += activeDur;
-                if (j == numValid - 1) { targetClipIdx = j; t = clipStartTime; }
+                activeClip = &modelAnimationClips[e->animationNum][validClips[j]]; double activeDur = (double)(activeClip->frameEnd - activeClip->frameStart + 1) / ((double)activeClip->framerate * activeClip->speed);
+                if (t < clipStartTime + activeDur) { targetClipIdx = j; break; } clipStartTime += activeDur; if (j == numValid - 1) { targetClipIdx = j; t = clipStartTime; }
             }
-            u8 targetClip = validClips[targetClipIdx];
-            double timeInClip = t - clipStartTime;
-            double timePerFrame = 1.0 / ((double)activeClip->framerate * activeClip->speed);
-            u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1;
-            u32 frameOffset = (u32)(timeInClip / timePerFrame);
-            if (frameOffset >= frameCount) frameOffset = frameCount - 1;
-            u32 newFrame = activeClip->frameStart + frameOffset;
-            u16 newModel = activeClip->frameStartModelIndex + frameOffset;
-            bool frameUpdated = (e->clip != targetClip || e->frame != newFrame || e->modelIndex != newModel);
-            e->clip = targetClip;
-            e->frame = newFrame;
-            e->modelIndex = newModel;
+            u8 targetClip = validClips[targetClipIdx]; double timeInClip = t - clipStartTime, timePerFrame = 1.0 / ((double)activeClip->framerate * activeClip->speed);
+            u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1, frameOffset = (u32)(timeInClip / timePerFrame); if (frameOffset >= frameCount) frameOffset = frameCount - 1;
+            u32 newFrame = activeClip->frameStart + frameOffset; u16 newModel = activeClip->frameStartModelIndex + frameOffset; bool frameUpdated = (e->clip != targetClip || e->frame != newFrame || e->modelIndex != newModel);
+            e->clip = targetClip; e->frame = newFrame; e->modelIndex = newModel;
             if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
-            continue; // Skip normal processing entirely
         } else if (animTest == 2) {
             if (Sys_Input.keyStates[KEY_1].pressed || Sys_Input.keyStates[KEY_2].pressed) {
                 u8 validClips[MAX_ANIMCLIPS], numValid=0;
-                for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) {
-                    AnimationClip* test = &modelAnimationClips[e->animationNum][c];
-                    if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; }
-                }
-                if (numValid > 0) {
-                    // Locate the current clip within the valid list (default to first if out of range)
+                for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &modelAnimationClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; } }
+                if (numValid > 0) { // Locate the current clip within the valid list (default to first if out of range)
                     u8 currentValidIdx = 0;
-                    for (u8 j = 0; j < numValid; ++j) {
-                        if (validClips[j] == e->clip) { currentValidIdx = j; break; }
-                    }
-
+                    for (u8 j = 0; j < numValid; ++j) { if (validClips[j] == e->clip) { currentValidIdx = j; break; } }
                     AnimationClip* activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]];
                     u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1;
-                    // Clamp current frame offset into this clip's range
-                    u32 currentOffset = (e->frame >= activeClip->frameStart && (e->frame - activeClip->frameStart) < frameCount)
-                                        ? (e->frame - activeClip->frameStart) : 0;
-
-                    if (Sys_Input.keyStates[KEY_1].pressed) {
-                        // Forward: next frame, rolling into next clip, wrap to start clip
-                        currentOffset++;
-                        if (currentOffset >= frameCount) {
-                            currentOffset = 0;
-                            currentValidIdx = (currentValidIdx + 1 >= numValid) ? 0 : (currentValidIdx + 1);
-                            activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]];
-                        }
-                    } else { // KEY_2 pressed: backward
-                        if (currentOffset == 0) {
-                            // Move to previous clip's last frame, wrap to last clip if at start
-                            currentValidIdx = (currentValidIdx == 0) ? (numValid - 1) : (currentValidIdx - 1);
-                            activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]];
-                            frameCount = activeClip->frameEnd - activeClip->frameStart + 1;
-                            currentOffset = frameCount - 1;
-                        } else {
-                            currentOffset--;
-                        }
-                    }
-
-                    u8 targetClip = validClips[currentValidIdx];
-                    u32 newFrame = activeClip->frameStart + currentOffset;
-                    u16 newModel = activeClip->frameStartModelIndex + currentOffset;
-
+                    u32 currentOffset = (e->frame >= activeClip->frameStart && (e->frame - activeClip->frameStart) < frameCount) ? (e->frame - activeClip->frameStart) : 0;
+                    if (Sys_Input.keyStates[KEY_1].pressed) { currentOffset++; if (currentOffset >= frameCount) { currentOffset = 0; currentValidIdx = (currentValidIdx + 1 >= numValid) ? 0 : (currentValidIdx + 1); activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]]; } }
+                    else { if (currentOffset == 0) { currentValidIdx = (currentValidIdx == 0) ? (numValid - 1) : (currentValidIdx - 1); activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]]; frameCount = activeClip->frameEnd - activeClip->frameStart + 1; currentOffset = frameCount - 1; } else { currentOffset--; } }
+                    u8 targetClip = validClips[currentValidIdx]; u32 newFrame = activeClip->frameStart + currentOffset; u16 newModel = activeClip->frameStartModelIndex + currentOffset;
                     bool frameUpdated = (e->clip != targetClip || e->frame != newFrame || e->modelIndex != newModel);
-                    e->clip = targetClip;
-                    e->frame = newFrame;
-                    e->modelIndex = newModel;
-                    e->currentFrameFinished = 0.0; // Reset timing state since we drive frames manually
-
-                    if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
+                    e->clip = targetClip; e->frame = newFrame; e->modelIndex = newModel; e->currentFrameFinished = 0.0; if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
                 }
             }
-            continue; // Always skip normal processing entirely so the frame doesn't auto-advance
         }
-        if (e->clip >= e->numclips) continue;
-        AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip];
-        if (clip->framerate <= 0 || clip->speed <= 0) continue;
-        e->currentFrameFinished += animDT * clip->speed;
-        double timePerFrame = 1.0 / (double)clip->framerate;
+        if (animTest || e->clip >= e->numclips) continue;
+        AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue;
+        e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / (double)clip->framerate;
         if (e->currentFrameFinished >= timePerFrame) {
-            u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame);
-            u32 frameCount = clip->frameEnd - clip->frameStart + 1;
-            e->currentFrameFinished -= (double)framesToAdvance * timePerFrame;
-            e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount);
-            e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
+            u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1;
+            e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
             if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     }
@@ -1623,15 +1447,14 @@ void UpdateAnims(void) {
 void ChangeAnim(Entity* e, u8 clip) { e->clip = clip; e->currentFrameFinished = 0.0; AnimationClip* c = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; e->frame = c->frameStart; } // TODO actually use this!}
 void GenerateConvexAdjacencyLists() { // Hill Climb Racer Adjacency List
     double start_time = get_time();
-    cvxAdjOffsets=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u32*)); cvxAdjLists=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u16*));
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
-            if (World.levelCollider[lev][i] == COLTYPE_CVX) { //DualLog("Checking level %u, instance %u with constindex %u for convex mesh uniques, colMeshIndex: %u, current uniqueCvxMeshCount: %u\n",lev,i,World.levelInstances[lev][i].index,World.levelInstances[lev][i].colMeshIndex,uniqueCvxMeshCount);
+            if (World.levelCollider[lev][i] == COLTYPE_CVX) {
                 u16 colMeshIdx = World.levelInstances[lev][i].colMeshIndex;// if (colMeshIdx == U16_MAX) continue;
                 if (colMeshIdx > MAX_MDLS) DualLogWarn("Improper convex mesh colMeshIndex on level %u, instance %u with constindex %u for convex mesh uniques, colMeshIndex: %u\n",lev,i,World.levelInstances[lev][i].index,World.levelInstances[lev][i].colMeshIndex);
                 bool isUnique=true; u32 foundIdx=U16_MAX;
                 for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { if (uniqueCvxMeshIndices[u] == colMeshIdx) { isUnique = false; foundIdx = u; break; } }
-                if (isUnique) { //DualLog("Processing convex mesh colMeshIndex %u on object %u[%u]\n",colMeshIdx,lev,i);
+                if (isUnique) {
                     if (uniqueCvxMeshCount >= MAX_UNIQUE_CVX_MESHES) { DualLogWarn("Warning: Exceeded MAX_UNIQUE_CVX_MESHES! Some convex meshes will use slow linear support.\n"); World.levelInstances[lev][i].adjacencyIdx = U16_MAX; continue; }
                     uniqueCvxMeshIndices[uniqueCvxMeshCount] = colMeshIdx; World.levelInstances[lev][i].adjacencyIdx = (u16)uniqueCvxMeshCount; uniqueCvxMeshCount++; //DualLog("Incremented uniqueCvxMeshCount to %u\n",uniqueCvxMeshCount);
                 } else { World.levelInstances[lev][i].adjacencyIdx = (u16)foundIdx; }
@@ -1643,19 +1466,11 @@ void GenerateConvexAdjacencyLists() { // Hill Climb Racer Adjacency List
         u32 vCount = physVertCounts[m], tCount = modelTriangleCounts[m];
         if (!vCount || !tCount || !physPos[m] || !physTris[m]) continue;
         u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
-        for (u32 t = 0; t < tCount; ++t) {
-            u16 i0=physTris[m][t*3+0], i1=physTris[m][t*3+1], i2=physTris[m][t*3+2];
-            tempEdges[edgeCount++]=((u32)vmin(i0,i1) << 16) | vmax(i0,i1);
-            tempEdges[edgeCount++]=((u32)vmin(i1,i2) << 16) | vmax(i1,i2);
-            tempEdges[edgeCount++]=((u32)vmin(i2,i0) << 16) | vmax(i2,i0);
-        }
-        qsort_new(tempEdges,edgeCount,sizeof(u32),EdgeCompare);
-        u32 uniqueEdgeCount=0; 
-        u32* degree=OS_Alloc(vCount * sizeof(u32)); 
+        for (u32 t = 0; t < tCount; ++t) { u16 i0=physTris[m][t*3+0], i1=physTris[m][t*3+1], i2=physTris[m][t*3+2]; tempEdges[edgeCount++]=((u32)vmin(i0,i1) << 16) | vmax(i0,i1); tempEdges[edgeCount++]=((u32)vmin(i1,i2) << 16) | vmax(i1,i2); tempEdges[edgeCount++]=((u32)vmin(i2,i0) << 16) | vmax(i2,i0); }
+        qsort_new(tempEdges,edgeCount,sizeof(u32),EdgeCompare); u32 uniqueEdgeCount=0; u32* degree=OS_Alloc(vCount * sizeof(u32)); 
         for (u32 i = 0; i < edgeCount; ++i) { if (i == 0 || tempEdges[i] != tempEdges[i-1]) { tempEdges[uniqueEdgeCount++]=tempEdges[i]; u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); degree[a]++; degree[b]++; } }
         u32* offsets=OS_Alloc((vCount + 1) * sizeof(u32)); offsets[0]=0; for(u32 i=0;i<vCount;++i){offsets[i+1]=offsets[i] + degree[i];}
-        u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));
-        u32* writePos = OS_Alloc(vCount * sizeof(u32));
+        u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16)); u32* writePos = OS_Alloc(vCount * sizeof(u32));
         mcpy(writePos, offsets, vCount * sizeof(u32));
         for (u32 i=0;i<uniqueEdgeCount;++i) { u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); adjList[writePos[a]++]=b; adjList[writePos[b]++]=a; }
         cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList; lastCvxSupport[u]=0;
