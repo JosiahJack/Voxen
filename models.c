@@ -1,4 +1,4 @@
-// models.c - 3D Models Loading System
+// models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
 #include "common.h"
 enum{MAX_GLTF_JOINTS=96,MAX_GLTF_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLTF_VERTS=MAX_OUTPUT_VERTS,MAX_GLTF_BLOCKS=64};
 float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
@@ -861,32 +861,20 @@ static bool GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
  
 static void SkinFrameToScratch(GltfMesh* __restrict gm, float t, float* __restrict posedPos, float* __restrict posedNrm, float* __restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
 	float skinMat[MAX_GLTF_JOINTS][16];
-	for (u32 j = 0; j < gm->jointCount; ++j) {
-		float g[16]; NodeGlobalMatrixAtTime(gm, gm->jointNodes[j], t, g);
-		Mat4Mul(g, gm->invBind[j], skinMat[j]);
-	}
+	for (u32 j = 0; j < gm->jointCount; ++j) { float g[16]; NodeGlobalMatrixAtTime(gm, gm->jointNodes[j], t, g); Mat4Mul(g, gm->invBind[j], skinMat[j]); }
 	for (u32 v = 0; v < gm->vertCount; ++v) {
 		const VtxSkin* sk = &gm->skin[v];
 		float blended[16] = {0};
-		for (int k = 0; k < 4; ++k) {
-			float w = sk->w[k]; if (w <= 0.0f) continue;
-			const float* m = skinMat[sk->j[k]];
-			for (int e = 0; e < 16; ++e) blended[e] += m[e] * w;
-		}
-		Mat4TransformPoint(blended, &gm->pos[v*3], &posedPos[v*3]);
-		Mat4TransformDir(blended, &gm->nrm[v*3], &posedNrm[v*3]);
+		for (int k = 0; k < 4; ++k) { float w = sk->w[k]; if (w <= 0.0f){continue;} const float* m = skinMat[sk->j[k]]; for (int e = 0; e < 16; ++e) blended[e] += m[e] * w; }
+		Mat4TransformPoint(blended, &gm->pos[v*3], &posedPos[v*3]); Mat4TransformDir(blended, &gm->nrm[v*3], &posedNrm[v*3]);
 	}
 	__m128 mn_v = _mm_set1_ps(1e9f), mx_v = _mm_set1_ps(-1e9f);
 	u32 ec = 0, cornerCount = gm->triCount * 3;
 	for (u32 k = 0; k < cornerCount; ++k) {
 		if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("gltf_anim: frame vertex overflow, truncating\n"); break; }
 		u32 vi = gm->indices[k];
-		float* dst = sv + (ec << 3);
-		dst[0] = -posedPos[vi*3+0]; dst[1] = posedPos[vi*3+1]; dst[2] = posedPos[vi*3+2];
-		dst[3] = -posedNrm[vi*3+0]; dst[4] = posedNrm[vi*3+1]; dst[5] = posedNrm[vi*3+2];
-		dst[6] = gm->uv[vi*2+0];    dst[7] = gm->uv[vi*2+1];
-		__m128 pos_v = _mm_loadu_ps(dst); mn_v = _mm_min_ps(mn_v, pos_v); mx_v = _mm_max_ps(mx_v, pos_v);
-		++ec;
+		float* dst = sv + (ec << 3); dst[0] = -posedPos[vi*3+0]; dst[1] = posedPos[vi*3+1]; dst[2] = posedPos[vi*3+2]; dst[3] = -posedNrm[vi*3+0]; dst[4] = posedNrm[vi*3+1]; dst[5] = posedNrm[vi*3+2]; dst[6] = gm->uv[vi*2+0];    dst[7] = gm->uv[vi*2+1];
+		__m128 pos_v = _mm_loadu_ps(dst); mn_v = _mm_min_ps(mn_v, pos_v); mx_v = _mm_max_ps(mx_v, pos_v); ++ec;
 	}
 	*outEc = ec; *outMn = mn_v; *outMx = mx_v;
 }
@@ -895,208 +883,94 @@ static void TransformFrameToScratch(GltfMesh* __restrict gm, float t, float* __r
     __m128 mn_v = _mm_set1_ps(1e9f), mx_v = _mm_set1_ps(-1e9f);
     u32 ec = 0;
     for (u32 s = 0; s < gm->submeshCount; ++s) {
-        float gm_mat[16];
-        NodeGlobalMatrixAtTime(gm, gm->meshNodes[s], t, gm_mat);
-        const float* __restrict spos = gm->subPos[s];
-        const float* __restrict snrm = gm->subNrm[s];
-        const float* __restrict suv  = gm->subUv[s];
-        const u32*   __restrict sidx = gm->subIndices[s];
-        u32 cornerCount = gm->subTriCount[s] * 3;
+        float gm_mat[16]; NodeGlobalMatrixAtTime(gm, gm->meshNodes[s], t, gm_mat);
+        const float* __restrict spos = gm->subPos[s]; const float* __restrict snrm = gm->subNrm[s]; const float* __restrict suv  = gm->subUv[s]; const u32*   __restrict sidx = gm->subIndices[s]; u32 cornerCount = gm->subTriCount[s] * 3;
         for (u32 k = 0; k < cornerCount; ++k) {
             if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("gltf_anim: transform frame vertex overflow, truncating\n"); goto done; }
-            u32 vi = sidx[k];
-            float pt[3], n[3];
-            Mat4TransformPoint(gm_mat, &spos[vi*3], pt);
-            Mat4TransformDir  (gm_mat, &snrm[vi*3], n);
-            float* dst = sv + (ec << 3);
-            dst[0] = -pt[0]; dst[1] = pt[1];  dst[2] = pt[2];
-            dst[3] = -n[0];  dst[4] = n[1];   dst[5] = n[2];
-            dst[6] = suv[vi*2+0]; dst[7] = suv[vi*2+1];
-            __m128 pos_v = _mm_loadu_ps(dst); mn_v = _mm_min_ps(mn_v, pos_v); mx_v = _mm_max_ps(mx_v, pos_v);
-            ++ec;
+            u32 vi = sidx[k]; float pt[3], n[3]; Mat4TransformPoint(gm_mat, &spos[vi*3], pt); Mat4TransformDir  (gm_mat, &snrm[vi*3], n);
+            float* dst = sv + (ec << 3); dst[0] = -pt[0]; dst[1] = pt[1]; dst[2] = pt[2]; dst[3] = -n[0]; dst[4] = n[1]; dst[5] = n[2]; dst[6] = suv[vi*2+0]; dst[7] = suv[vi*2+1];
+            __m128 pos_v = _mm_loadu_ps(dst); mn_v = _mm_min_ps(mn_v, pos_v); mx_v = _mm_max_ps(mx_v, pos_v); ++ec;
         }
     }
-    done:
-    *outEc = ec; *outMn = mn_v; *outMx = mx_v;
+    done: *outEc = ec; *outMn = mn_v; *outMx = mx_v;
 }
  
 typedef struct { GltfMesh* mesh; u32 modelIndex; float timelineFrame; } GltfFrameTask;
 typedef struct { GltfFrameTask* tasks; u32 start, end; int tid; } GltfBakeTask;
 static void* GltfBakeWorker(void* arg) {
-    GltfBakeTask* bt = (GltfBakeTask*)arg;
-    float* posedPos = thrd_pos[bt->tid];
-    float* posedNrm = thread_temp_nrm[bt->tid];
-    float* sv = thrd_verts[bt->tid];
+    GltfBakeTask* bt = (GltfBakeTask*)arg; float* posedPos = thrd_pos[bt->tid]; float* posedNrm = thread_temp_nrm[bt->tid]; float* sv = thrd_verts[bt->tid];
     for (u32 i = bt->start; i < bt->end; ++i) {
-        GltfFrameTask* t = &bt->tasks[i];
-        u32 ec; __m128 mn_v, mx_v;
-        if (t->mesh->isTransformAnim) TransformFrameToScratch(t->mesh, t->timelineFrame, sv, &ec, &mn_v, &mx_v);
-        else SkinFrameToScratch(t->mesh, t->timelineFrame, posedPos, posedNrm, sv, &ec, &mn_v, &mx_v);
+        GltfFrameTask* t = &bt->tasks[i]; u32 ec; __m128 mn_v, mx_v; if (t->mesh->isTransformAnim) TransformFrameToScratch(t->mesh, t->timelineFrame, sv, &ec, &mn_v, &mx_v); else SkinFrameToScratch(t->mesh, t->timelineFrame, posedPos, posedNrm, sv, &ec, &mn_v, &mx_v);
         FinalizeParsedMesh(t->modelIndex, sv, ec, thrd_ht[bt->tid], thrd_ht_used[bt->tid], thrd_remap_scratch[bt->tid], thrd_cache_scratch[bt->tid],&vPos[t->modelIndex], &modelVertexCounts[t->modelIndex], &modelTriangles[t->modelIndex], &modelTriangleCounts[t->modelIndex], mn_v, mx_v);
-    }
-    return NULL;
+    } return NULL;
 }
 
 void LoadGLTFAnimatedBlocks(ModelData* entries, u32 entryCount, RawOBJ* raw) {
-    gBlockMeshCount = 0;
-    u32 maxTasks = 0;
+    gBlockMeshCount = 0; u32 maxTasks = 0; for (u32 i = 0; i < entryCount; ++i) { if(!entries[i].animated || !IsGLTFSourcePath(entries[i].path)){continue;} maxTasks += entries[i].frameCount; }   if(!maxTasks){return;}
+    GltfFrameTask* tasks = (GltfFrameTask*)OS_Alloc((size_t)maxTasks * sizeof(GltfFrameTask)); u32 taskCount = 0;
     for (u32 i = 0; i < entryCount; ++i) {
-        if (!entries[i].animated || !IsGLTFSourcePath(entries[i].path)) continue;
-        maxTasks += entries[i].frameCount;
-    }
-    if (!maxTasks) return;
-    
-    GltfFrameTask* tasks = (GltfFrameTask*)OS_Alloc((size_t)maxTasks * sizeof(GltfFrameTask));
-    u32 taskCount = 0;
-    
-    for (u32 i = 0; i < entryCount; ++i) {
-        if (!entries[i].animated || !IsGLTFSourcePath(entries[i].path)) continue;
+        if (!entries[i].animated || !IsGLTFSourcePath(entries[i].path)) {continue;}
         u32 baseIdx = entries[i].index;
-        if (baseIdx >= MAX_MDLS || !raw[baseIdx].data || raw[baseIdx].size <= 0) { 
-            DualLogError("gltf_anim: '%s' (index %u) has no loaded data\n", entries[i].path, baseIdx); 
-            continue; 
-        }
-        if (gBlockMeshCount >= MAX_GLTF_BLOCKS) { 
-            DualLogError("gltf_anim: exceeded MAX_GLTF_BLOCKS (%u), skipping '%s'\n", (u32)MAX_GLTF_BLOCKS, entries[i].path); 
-            continue; 
-        }
-        
+        if (baseIdx >= MAX_MDLS || !raw[baseIdx].data || raw[baseIdx].size <= 0) { DualLogError("gltf_anim: '%s' (index %u) has no loaded data\n", entries[i].path, baseIdx); continue; }
+        if (gBlockMeshCount >= MAX_GLTF_BLOCKS) { DualLogError("gltf_anim: exceeded MAX_GLTF_BLOCKS (%u), skipping '%s'\n", (u32)MAX_GLTF_BLOCKS, entries[i].path); continue; }
         GltfMesh* gm = &gBlockMeshes[gBlockMeshCount];
-        if (!GltfMeshLoad((const u8*)raw[baseIdx].data, (size_t)raw[baseIdx].size, gm)) { 
-            DualLogError("gltf_anim: failed to load '%s'\n", entries[i].path); 
-            continue; 
-        }
-        ++gBlockMeshCount;
-        
-        u16 a = entries[i].animationNum;
-        
-        // Fetch framerate from the first valid clip for this animation
-        float framerate = 0.0f;
-        if (a < MAX_ANIMS) {
-            for (u32 c = 0; c < MAX_ANIMCLIPS; ++c) {
-                if (modelAnimationClips[a][c].framerate > 0.0f) {
-                    framerate = modelAnimationClips[a][c].framerate;
-                    break;
-                }
-            }
-        }
+        if (!GltfMeshLoad((const u8*)raw[baseIdx].data, (size_t)raw[baseIdx].size, gm)) { DualLogError("gltf_anim: failed to load '%s'\n", entries[i].path); continue; }
+        ++gBlockMeshCount; u16 a = entries[i].animationNum; float framerate = 0.0f;
+        if (a < MAX_ANIMS) {  for(u32 c = 0; c < MAX_ANIMCLIPS; ++c){ if(modelAnimationClips[a][c].framerate > 0.0f){framerate = modelAnimationClips[a][c].framerate; break;} }  }
         if (framerate <= 0.0f) framerate = 30.0f; // Fallback if undefined
-        
         for (u32 fi = 0; fi < entries[i].frameCount; ++fi) {
             u32 frameNum = entries[i].frames[fi];
             u32 modelIdx = baseIdx + fi; // Contiguous index, sparse frame
-            
-            if (modelIdx >= mdlsCnt) { 
-                DualLogWarn("gltf_anim: frame %u -> model index %u exceeds mdlsCnt\n", frameNum, modelIdx); 
-                continue; 
-            }
-            
-            bool dup = false;
-            for (u32 k = 0; k < taskCount; ++k) {
-                if (tasks[k].modelIndex == modelIdx) { dup = true; break; }
-            }
-            if (dup) continue;
-            
-            tasks[taskCount].mesh = gm; 
-            tasks[taskCount].modelIndex = modelIdx; 
-            tasks[taskCount].timelineFrame = (float)frameNum / framerate; 
-            ++taskCount;
+            if (modelIdx >= mdlsCnt) { DualLogWarn("gltf_anim: frame %u -> model index %u exceeds mdlsCnt\n", frameNum, modelIdx); continue; }
+            bool dup = false; for (u32 k = 0; k < taskCount; ++k) { if (tasks[k].modelIndex == modelIdx) { dup = true; break; } }   if(dup){continue;}
+            tasks[taskCount].mesh = gm; tasks[taskCount].modelIndex = modelIdx; tasks[taskCount].timelineFrame = (float)frameNum / framerate; ++taskCount;
         }
     }
-    
-    if (!taskCount) { 
-        OS_Free(tasks, (size_t)maxTasks * sizeof(GltfFrameTask)); 
-        return; 
-    }
-    
+    if (!taskCount) { OS_Free(tasks, (size_t)maxTasks * sizeof(GltfFrameTask)); return; }
     GltfBakeTask btasks[32]; OS_Thread bth[32];
     u32 chunk = (taskCount + threadCnt - 1) / threadCnt;
-    for (int t = 0; t < threadCnt; ++t) { 
-        u32 s = (u32)t * chunk, e = ((u32)t+1) * chunk > taskCount ? taskCount : ((u32)t+1) * chunk; 
-        btasks[t] = (GltfBakeTask){ tasks, s, e, t }; 
-    }
-    
-    if (threadCnt > 1) { 
-        for(int t = 0; t < threadCnt; ++t) OS_ThreadCreate(&bth[t],GltfBakeWorker,&btasks[t]); 
-        for(int t = 0; t < threadCnt; ++t) OS_ThreadJoin(&bth[t]); 
-    } else { 
-        for (int t = 0; t < threadCnt; ++t) GltfBakeWorker(&btasks[t]); 
-    }
-    
+    for (int t = 0; t < threadCnt; ++t) { u32 s = (u32)t * chunk, e = ((u32)t+1) * chunk > taskCount ? taskCount : ((u32)t+1) * chunk; btasks[t] = (GltfBakeTask){ tasks, s, e, t }; }
+    if (threadCnt > 1) { for(int t=0;t<threadCnt;++t){OS_ThreadCreate(&bth[t],GltfBakeWorker,&btasks[t]);}  for(int t=0;t<threadCnt;++t){OS_ThreadJoin(&bth[t]);} } else {  for (int t = 0; t < threadCnt; ++t) GltfBakeWorker(&btasks[t]);  }
     OS_Free(tasks, (size_t)maxTasks * sizeof(GltfFrameTask));
 }
 
-// Recursive centroid-based, each tri goes into exactly one octant containing its centroid, no tri dupes. The node AABB is the union of its tri AABBs (NOT the octant AABB) — guarantees any query that overlaps a tri also overlaps its ancestor nodes, so traversal never misses a tri. triIdxArray is modified in-place: on return it is partitioned by octant so that each child's triangles are contiguous (matches the leaf ranges written to ctx->triOrder).
+// Recursive(ew) centroid-based, each tri goes into exactly one octant containing its centroid, no tri dupes. The node AABB is the union of its tri AABBs (NOT the octant AABB) — guarantees any query that overlaps a tri also overlaps its ancestor nodes, so traversal never misses a tri. triIdxArray is modified in-place: on return it is partitioned by octant so that each child's triangles are contiguous (matches the leaf ranges written to ctx->triOrder).
 static i32 BvhBuildOctree(BvhBuildCtx* __restrict ctx, u16 m, const float* __restrict pos, const u16* __restrict tris, u16* triIdxArray, u32 triCount, u32 depth) {
-    if (triCount == 0) return -1;
-    if (ctx->nodeCount >= BVH_MAX_NODES_PER_MDL) depth = BVH_MAX_DEPTH;
+    if (triCount == 0){return -1;}
+    if (ctx->nodeCount >= BVH_MAX_NODES_PER_MDL){depth = BVH_MAX_DEPTH;}
     i32 nodeIdx = ctx->nodeCount++; BvhNode* node = &ctx->nodes[nodeIdx]; node->triStart = 0; node->triCount = 0;
     for(int i = 0; i < 8; i++){node->children[i]=-1;}
     __m128 mn_v=_mm_set1_ps(1e9f); __m128 mx_v=_mm_set1_ps(-1e9f);
-    for (u32 i = 0; i < triCount; i++) {
-        u32 triIdx = triIdxArray[i]; 
-        u32 i0=tris[triIdx*3+0], i1=tris[triIdx*3+1], i2=tris[triIdx*3+2];
-        __m128 v0 = _mm_loadu_ps(pos + (size_t)i0*3);
-        __m128 v1 = _mm_loadu_ps(pos + (size_t)i1*3);
-        __m128 v2 = _mm_loadu_ps(pos + (size_t)i2*3);
-        mn_v = _mm_min_ps(mn_v, _mm_min_ps(_mm_min_ps(v0, v1), v2));
-        mx_v = _mm_max_ps(mx_v, _mm_max_ps(_mm_max_ps(v0, v1), v2));
-    }
+    for (u32 i = 0; i < triCount; i++){u32 triIdx=triIdxArray[i]; u32 i0=tris[triIdx*3+0],i1=tris[triIdx*3+1],i2=tris[triIdx*3+2]; __m128 v0=_mm_loadu_ps(pos+(size_t)i0*3); __m128 v1=_mm_loadu_ps(pos+(size_t)i1*3); __m128 v2=_mm_loadu_ps(pos+(size_t)i2*3); mn_v=_mm_min_ps(mn_v,_mm_min_ps(_mm_min_ps(v0,v1),v2)); mx_v=_mm_max_ps(mx_v,_mm_max_ps(_mm_max_ps(v0,v1),v2));}
     float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr, mn_v); _mm_storeu_ps(mx_arr, mx_v); node->mn = (V3){mn_arr[0], mn_arr[1], mn_arr[2]}; node->mx = (V3){mx_arr[0], mx_arr[1], mx_arr[2]};
-    if (depth >= 3 || triCount <= BVH_LEAF_MAX_TRIS || ctx->nodeCount + 8 > BVH_MAX_NODES_PER_MDL) {
-        u32 startIdx = ctx->triCount;
-        for (u32 i = 0; i < triCount && ctx->triCount < BVH_MAX_TRIS_PER_MDL; i++) { ctx->triOrder[ctx->triCount++] = triIdxArray[i]; }
-        node->triStart = startIdx; node->triCount = (u16)triCount; return nodeIdx;
-    }
-    V3 center = V3_ScaleByF(V3_AplusB(node->mn, node->mx), 0.5f); __m128 center_v = _mm_setr_ps(center.x, center.y, center.z, 0.0f); __m128 third = _mm_set1_ps(1.0f/3.0f);
-    u32 octantCounts[8] = {0};
+    if (depth >= 3 || triCount <= BVH_LEAF_MAX_TRIS || ctx->nodeCount + 8 > BVH_MAX_NODES_PER_MDL) { u32 startIdx = ctx->triCount; for (u32 i = 0; i < triCount && ctx->triCount < BVH_MAX_TRIS_PER_MDL; i++) { ctx->triOrder[ctx->triCount++] = triIdxArray[i]; } node->triStart = startIdx; node->triCount = (u16)triCount; return nodeIdx; }
+    V3 center = V3_ScaleByF(V3_AplusB(node->mn, node->mx), 0.5f); __m128 center_v = _mm_setr_ps(center.x, center.y, center.z, 0.0f); __m128 third = _mm_set1_ps(1.0f/3.0f); u32 octantCounts[8] = {0};
     for (u32 i=0;i<triCount;++i) {
         u32 triIdx = triIdxArray[i];
         u32 i0 = tris[triIdx*3+0], i1 = tris[triIdx*3+1], i2 = tris[triIdx*3+2];
-        __m128 v0 = _mm_loadu_ps(pos + (size_t)i0*3);
-        __m128 v1 = _mm_loadu_ps(pos + (size_t)i1*3);
-        __m128 v2 = _mm_loadu_ps(pos + (size_t)i2*3);
+        __m128 v0 = _mm_loadu_ps(pos + (size_t)i0*3); __m128 v1 = _mm_loadu_ps(pos + (size_t)i1*3); __m128 v2 = _mm_loadu_ps(pos + (size_t)i2*3);
         __m128 centroid = _mm_mul_ps(_mm_add_ps(_mm_add_ps(v0, v1), v2), third);
         __v4si ge = (__v4si)(centroid >= center_v); // Compare centroid >= center. Returns a vector mask (all 1s if true, all 0s if false)
         u8 oct = (u8)((ge[0] & 1) | ((ge[1] & 1) << 1) | ((ge[2] & 1) << 2)); // Extract bits 0, 1, 2 from the mask
-        ctx->triOctants[i] = oct; 
-        octantCounts[oct]++;
+        ctx->triOctants[i] = oct; octantCounts[oct]++;
     }
-    u32 octantStarts[8];
-    u32 total = 0;
-    for (int o = 0; o < 8; o++) { octantStarts[o] = total; total += octantCounts[o]; }
-    u32 octantFill[8] = {0};
+    u32 octantStarts[8], total=0; for (int o = 0; o < 8; o++) { octantStarts[o] = total; total += octantCounts[o]; } u32 octantFill[8] = {0};
     for (u32 i = 0; i < triCount; i++) { u8 o = ctx->triOctants[i]; ctx->triScratch[octantStarts[o] + octantFill[o]++] = triIdxArray[i]; }
     for (u32 i = 0; i < triCount; i++) { triIdxArray[i] = ctx->triScratch[i]; }
-    for (int o = 0; o < 8; o++) {
-        if (octantCounts[o] == 0) {continue;}
-        i32 childIdx = BvhBuildOctree(ctx,m,pos,tris,triIdxArray + octantStarts[o],octantCounts[o],depth + 1); // We re curse a little
-        if (childIdx >= 0) node->children[o] = (i16)childIdx;
-    }
+    for (int o = 0; o < 8; o++) { if (octantCounts[o] == 0) {continue;} i32 childIdx = BvhBuildOctree(ctx,m,pos,tris,triIdxArray + octantStarts[o],octantCounts[o],depth + 1);/*We re curse a little*/ if (childIdx >= 0) {node->children[o] = (i16)childIdx;} }
     return nodeIdx;
 }
 
 static void BuildModelBVH(BvhBuildCtx* ctx, u16 m) {
     if (m >= mdlsCnt || m >= MAX_MDLS) return;
-    modelBVHNodes[m] = NULL;
-    modelBVHTriOrder[m] = NULL;
-    modelBVHNodeCounts[m] = 0;
-    modelBVHTriOrderCounts[m] = 0;
-    u32 triCount = modelTriangleCounts[m];
+    modelBVHNodes[m] = NULL; modelBVHTriOrder[m] = NULL; modelBVHNodeCounts[m] = modelBVHTriOrderCounts[m] = 0; u32 triCount = modelTriangleCounts[m];
     if (triCount == 0 || triCount > BVH_MAX_TRIS_PER_MDL) { DualLogError("Too many verts on model %u!  Could not build a BVH!\n",m); return;}
     if (!physPos[m] || !physTris[m]) return;
-    ctx->nodeCount = ctx->triCount = 0;
-    u16* initialTris = ctx->initialTris;
+    ctx->nodeCount = ctx->triCount = 0; u16* initialTris = ctx->initialTris;
     for (u32 i = 0; i < triCount; i++) initialTris[i] = (u16)i;
-    i32 rootIdx = BvhBuildOctree(ctx,m,physPos[m],physTris[m],initialTris,triCount,0);
-    if (rootIdx < 0 || ctx->nodeCount == 0) return;
-    modelBVHNodes[m] = (BvhNode*)OS_Alloc(ctx->nodeCount * sizeof(BvhNode));
-    mcpy(modelBVHNodes[m], ctx->nodes, ctx->nodeCount * sizeof(BvhNode));
-    modelBVHNodeCounts[m] = ctx->nodeCount;
-    if (ctx->triCount > 0) {
-        modelBVHTriOrder[m] = (u16*)OS_Alloc(ctx->triCount * sizeof(u16));
-        if (modelBVHTriOrder[m]) { mcpy(modelBVHTriOrder[m],ctx->triOrder,ctx->triCount * sizeof(u16)); modelBVHTriOrderCounts[m] = ctx->triCount; }
-    }
+    i32 rootIdx = BvhBuildOctree(ctx,m,physPos[m],physTris[m],initialTris,triCount,0); if (rootIdx < 0 || ctx->nodeCount == 0) return;
+    modelBVHNodes[m] = (BvhNode*)OS_Alloc(ctx->nodeCount * sizeof(BvhNode)); mcpy(modelBVHNodes[m], ctx->nodes, ctx->nodeCount * sizeof(BvhNode)); modelBVHNodeCounts[m] = ctx->nodeCount;
+    if (ctx->triCount > 0) { modelBVHTriOrder[m] = (u16*)OS_Alloc(ctx->triCount * sizeof(u16)); if (modelBVHTriOrder[m]) { mcpy(modelBVHTriOrder[m],ctx->triOrder,ctx->triCount * sizeof(u16)); modelBVHTriOrderCounts[m] = ctx->triCount; } }
 }
 
 typedef struct { u32 start, end; RawOBJ* raw; const bool* isGLTFAnimSrc; const bool* isGLTFStaticSrc; int tid; } ModelParseTask;
@@ -1125,8 +999,7 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     ModelData* ents = OS_Alloc(cnt * sizeof(ModelData));
     p->entries = ents; p->capacity = p->count = cnt;
     for (u32 i=0; i<cnt; ++i) {ents[i] = (ModelData){U16_MAX,false,255,NULL,0,{0}};}
-    ModelData cur = {U16_MAX,false,255,NULL,0,{0}};
-    c = buf; e = buf+sz; ln = 0;
+    ModelData cur = {U16_MAX,false,255,NULL,0,{0}}; c = buf; e = buf+sz; ln = 0;
     while (c < e) {
         char* s = c; while (c < e && *c != '\n' && *c != '\r') ++c;
         size_t len = c - s; ++ln;
@@ -1142,28 +1015,16 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
         }
         char* col = StringFindFirstCharWithin(s, ':');
         if (col) {
-            char k[256]={0}, v[256]={0};
-            sCpy2aSubFromb(k, col-s, s, 256);
-            sCpy2aSubFromb(v, le-col, col+1, 256);
+            char k[256]={0}, v[256]={0}; sCpy2aSubFromb(k, col-s, s, 256); sCpy2aSubFromb(v, le-col, col+1, 256);
             if (sEqual(k,"index")) cur.index = parse_numberu16(v,s,ln);
             //else if (sEqual(k,"frame")) {u16 f = parse_numberu16(v,s,ln); cur.frames = OS_Realloc(cur.frames,cur.frameCount*sizeof(u16),(cur.frameCount+1) * sizeof(u16)); cur.frames[cur.frameCount++] = f;}
             else if (sEqual(k,"frame")) {
-                const char* vp = v;
-                while (*vp == ' ' || *vp == '\t') ++vp;
-                u16 f0 = parse_numberu16(vp, s, ln);
-                while (*vp && ((*vp >= '0' && *vp <= '9') || *vp == '-' || *vp == '+')) ++vp; // skip first number
+                const char* vp = v; while (*vp == ' ' || *vp == '\t') ++vp; u16 f0 = parse_numberu16(vp, s, ln); while (*vp && ((*vp >= '0' && *vp <= '9') || *vp == '-' || *vp == '+')) ++vp; // skip first number
                 while (*vp == ' ' || *vp == '\t') ++vp;
                 if (*vp >= '0' && *vp <= '9') { // second number present -> range
-                    u16 f1 = parse_numberu16(vp, s, ln);
-                    if (f1 < f0) { u16 t = f0; f0 = f1; f1 = t; } // be forgiving
-                    for (u16 f = f0; f <= f1; ++f) {
-                        cur.frames = OS_Realloc(cur.frames, cur.frameCount*sizeof(u16), (cur.frameCount+1) * sizeof(u16));
-                        cur.frames[cur.frameCount++] = f;
-                    }
-                } else {
-                    cur.frames = OS_Realloc(cur.frames, cur.frameCount*sizeof(u16), (cur.frameCount+1) * sizeof(u16));
-                    cur.frames[cur.frameCount++] = f0;
-                }
+                    u16 f1 = parse_numberu16(vp, s, ln); if (f1 < f0) { u16 t = f0; f0 = f1; f1 = t; } // be forgiving
+                    for (u16 f = f0; f <= f1; ++f) { cur.frames = OS_Realloc(cur.frames, cur.frameCount*sizeof(u16), (cur.frameCount+1) * sizeof(u16)); cur.frames[cur.frameCount++] = f; }
+                } else { cur.frames = OS_Realloc(cur.frames, cur.frameCount*sizeof(u16), (cur.frameCount+1) * sizeof(u16)); cur.frames[cur.frameCount++] = f0; }
             }
             else if (sEqual(k,"animationNum")) cur.animationNum = parse_numberu16(v,s,ln);
             else if (sEqual(k,"animated")) cur.animated = parse_numberu8(v,s,ln);
@@ -1177,33 +1038,9 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
 
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { // Ray-vs-AABB slab test. Returns entry t (>=0) if the ray hits the AABB within [0, maxDist], or -1.0f if no hit. Handles axis-aligned rays (zero direction component) correctly.
     float tmin = 0.0f, tmax = maxDist;
-    if (vabs(dir.x) < 1e-8f) { if (origin.x < mn.x || origin.x > mx.x) return -1.0f; } // X slab
-    else {
-        float inv = 1.0f / dir.x;
-        float t1 = (mn.x - origin.x) * inv, t2 = (mx.x - origin.x) * inv;
-        if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
-        if (t1 > tmin) tmin = t1;
-        if (t2 < tmax) tmax = t2;
-        if (tmin > tmax) return -1.0f;
-    }
-    if (vabs(dir.y) < 1e-8f) { if (origin.y < mn.y || origin.y > mx.y) return -1.0f; } // Y slab
-    else {
-        float inv = 1.0f / dir.y;
-        float t1 = (mn.y - origin.y) * inv, t2 = (mx.y - origin.y) * inv;
-        if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
-        if (t1 > tmin) tmin = t1;
-        if (t2 < tmax) tmax = t2;
-        if (tmin > tmax) return -1.0f;
-    }
-    if (vabs(dir.z) < 1e-8f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; } // Z slab
-    else {
-        float inv = 1.0f / dir.z;
-        float t1 = (mn.z - origin.z) * inv, t2 = (mx.z - origin.z) * inv;
-        if (t1 > t2) { float t = t1; t1 = t2; t2 = t; }
-        if (t1 > tmin) tmin = t1;
-        if (t2 < tmax) tmax = t2;
-        if (tmin > tmax) return -1.0f;
-    }
+    if (vabs(dir.x) < 1e-8f) { if (origin.x < mn.x || origin.x > mx.x) return -1.0f; } else { float inv=1.0f/dir.x; float t1=(mn.x-origin.x) * inv, t2=(mx.x-origin.x) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } // X slab
+    if (vabs(dir.y) < 1e-8f) { if (origin.y < mn.y || origin.y > mx.y) return -1.0f; } else { float inv=1.0f/dir.y; float t1=(mn.y-origin.y) * inv, t2=(mx.y-origin.y) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } // Y slab
+    if (vabs(dir.z) < 1e-8f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; } else { float inv=1.0f/dir.z; float t1=(mn.z-origin.z) * inv, t2=(mx.z-origin.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } // Z slab
     return tmin;
 }
 
@@ -1214,15 +1051,13 @@ static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap) 
     const float* src = vPos[m]; mset(weldHt,0xFF,WELD_HASH_SIZE * sizeof(u32)); u32 usedSlots=0, weldedCount=0;
     float* weldedPos = (float*)OS_Alloc((size_t)vc * 3 * sizeof(float)); // worst case: no duplicates at all
     for (u32 i = 0; i < vc; ++i) {
-        float x = src[i*8+0], y = src[i*8+1], z = src[i*8+2];
-        i32 cx = (i32)vfloor(x * 10000), cy = (i32)vfloor(y * 10000), cz = (i32)vfloor(z * 10000);
-        u32 found = 0xFFFFFFFFU;
+        float x = src[i*8+0], y = src[i*8+1], z = src[i*8+2]; i32 cx = (i32)vfloor(x * 10000), cy = (i32)vfloor(y * 10000), cz = (i32)vfloor(z * 10000); u32 found = 0xFFFFFFFFU;
         for (i32 dz = -1; dz <= 1 && found == 0xFFFFFFFFU; ++dz)
-        for (i32 dy = -1; dy <= 1 && found == 0xFFFFFFFFU; ++dy)
-        for (i32 dx = -1; dx <= 1 && found == 0xFFFFFFFFU; ++dx) {
-            u32 slot = WeldHash(cx+dx, cy+dy, cz+dz);
-            while (weldHt[slot] != 0xFFFFFFFFU) { u32 cand = weldHt[slot]; float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z; if (ddx*ddx + ddy*ddy + ddz*ddz <= 0.0001f * 0.0001f) { found = cand; break; } slot = (slot + 1) & (WELD_HASH_SIZE - 1); }
-        }
+            for (i32 dy = -1; dy <= 1 && found == 0xFFFFFFFFU; ++dy)
+                for (i32 dx = -1; dx <= 1 && found == 0xFFFFFFFFU; ++dx) {
+                    u32 slot = WeldHash(cx+dx, cy+dy, cz+dz);
+                    while (weldHt[slot] != 0xFFFFFFFFU) { u32 cand = weldHt[slot]; float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z; if (ddx*ddx + ddy*ddy + ddz*ddz <= 0.0001f * 0.0001f) { found = cand; break; } slot = (slot + 1) & (WELD_HASH_SIZE - 1); }
+                }
         if (found == 0xFFFFFFFFU) {
             found = weldedCount; weldedPos[weldedCount*3+0]=x; weldedPos[weldedCount*3+1]=y; weldedPos[weldedCount*3+2]=z; ++weldedCount; u32 slot = WeldHash(cx, cy, cz); 
             while (weldHt[slot] != 0xFFFFFFFFU) slot = (slot + 1) & (WELD_HASH_SIZE - 1);
@@ -1250,8 +1085,7 @@ void LoadModels() {
     u32 maxid = 0, totalActual = 0;
     for (u32 i=0; i<mp.count; ++i) {
         if (mp.entries[i].index == U16_MAX) continue;
-        totalActual++;
-        if (mp.entries[i].index > maxid) maxid = mp.entries[i].index;
+        totalActual++; if (mp.entries[i].index > maxid) maxid = mp.entries[i].index;
         if (mp.entries[i].animated && IsGLTFSourcePath(mp.entries[i].path)) { u32 blockMax=mp.entries[i].index + (mp.entries[i].frameCount > 0 ? (mp.entries[i].frameCount - 1) : 0); if(blockMax > maxid){maxid=blockMax;} }
     }
     DualLog("Loading   models (%d) ...",totalActual);
@@ -1268,24 +1102,10 @@ void LoadModels() {
     for (u32 i=0; i<mdlsCnt; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz; raw[i].name=mp.entries[pi].path;} }
     bool* isGLTFAnimSrc = (bool*)OS_Alloc(mdlsCnt * sizeof(bool));
     bool* isGLTFStaticSrc = (bool*)OS_Alloc(mdlsCnt * sizeof(bool));
-    for (u32 i=0; i<mp.count; ++i) {
-        if (mp.entries[i].index == U16_MAX || !IsGLTFSourcePath(mp.entries[i].path)) continue;
-        if (mp.entries[i].animated) isGLTFAnimSrc[mp.entries[i].index] = true;
-        else isGLTFStaticSrc[mp.entries[i].index] = true;
-    }
-    float **pos = (float**)p; p += threadCnt*sizeof(float*); 
-    float **nrm = (float**)p; p += threadCnt*sizeof(float*);
-    float **uv = (float**)p; p += threadCnt*sizeof(float*); 
-    float **ov = (float**)p; p += threadCnt*sizeof(float*);
-    u32 **ht = (u32**)p; p += threadCnt*sizeof(u32*); 
-    u32 **ht_used = (u32**)p; p += threadCnt*sizeof(u32*);
-    u32 **remap_scr = (u32**)p; p += threadCnt*sizeof(u32*); 
-    u8 **cache_scr = (u8**)p; p += threadCnt*sizeof(u8*);
-    BvhNode **bvh_nodes_p = (BvhNode**)p; p += threadCnt*sizeof(BvhNode*);
-    u8 **bvh_oct_p = (u8**)p; p += threadCnt*sizeof(u8*);
-    u16 **bvh_order_p = (u16**)p; p += threadCnt*sizeof(u16*);
-    u16 **bvh_scr_p = (u16**)p; p += threadCnt*sizeof(u16*);
-    u16 **bvh_init_p = (u16**)p; p += threadCnt*sizeof(u16*);
+    for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index == U16_MAX || !IsGLTFSourcePath(mp.entries[i].path)){continue;} if (mp.entries[i].animated) isGLTFAnimSrc[mp.entries[i].index] = true; else isGLTFStaticSrc[mp.entries[i].index] = true; }
+    float **pos = (float**)p; p += threadCnt*sizeof(float*); float **nrm = (float**)p; p += threadCnt*sizeof(float*); float **uv = (float**)p; p += threadCnt*sizeof(float*);  float **ov = (float**)p; p += threadCnt*sizeof(float*);
+    u32 **ht = (u32**)p; p += threadCnt*sizeof(u32*); u32 **ht_used = (u32**)p; p += threadCnt*sizeof(u32*); u32 **remap_scr = (u32**)p; p += threadCnt*sizeof(u32*); u8 **cache_scr = (u8**)p; p += threadCnt*sizeof(u8*);
+    BvhNode **bvh_nodes_p = (BvhNode**)p; p += threadCnt*sizeof(BvhNode*); u8 **bvh_oct_p = (u8**)p; p += threadCnt*sizeof(u8*); u16 **bvh_order_p = (u16**)p; p += threadCnt*sizeof(u16*); u16 **bvh_scr_p = (u16**)p; p += threadCnt*sizeof(u16*); u16 **bvh_init_p = (u16**)p; p += threadCnt*sizeof(u16*);
     size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float);
     for (int i=0; i<threadCnt; ++i) { 
         pos[i]=(float*)p; p+=psz; nrm[i] = (float*)p; p += psz; uv[i] = (float*)p; p+=MAX_VERT_ELEMENT_SIZE*2*sizeof(float); 
