@@ -3,13 +3,15 @@
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
 static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=16.666666f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
 static const float WALK_SPEED=3.6f,SPRINT_SPEED=8.8f,PLAYER_MAX_CYBER_SPEED=5.0f,SPRINT_SPEED_FATIGUED=5.5f,CROUCH_SPEED=1.25f,PLAYER_MAX_PRONE_SPEED=0.5f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.6f,PLAYER_PRONE_RATIO=0.01f;
-enum { MANIFOLD_MAX=4, CVXMSH_HULL_CACHE=1024, EPA_MAX_FACES=64, EPA_MAX_VERTS=128, EPA_MAX_EDGES=EPA_MAX_FACES*3, GJK_ITER=16, EPA_ITER=16, SOLVER_ITER_GLOBAL=32, MAX_GLOBAL_CONTACTS=8192 };
+enum { MANIFOLD_MAX=4, CVXMSH_HULL_CACHE=1024, EPA_MAX_FACES=64, EPA_MAX_VERTS=128, EPA_MAX_EDGES=EPA_MAX_FACES*3, GJK_ITER=32, EPA_ITER=16, SOLVER_ITER_GLOBAL=32, MAX_GLOBAL_CONTACTS=8192 };
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
-typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
+typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3],Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
 SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount;
 float posBudget[INSTANCE_COUNT]; // Remaining |Δpos| entity may receive this substep; resets every substep in Physics().
 u16 dynamicEntities[512],dynamicEntityCount;
+static u8 g_physSleep[INSTANCE_COUNT]; // physics sleep-deactivation flags (separate from AI-owned EF_ASLEEP)
+bool PhysIsAsleep(u16 i) { return g_physSleep[i] != 0; } // exposed for showPhys debug coloring
 // Trigger System
 void AddForce(u16 i, V3 f, bool imp); void AddAccessCardToInventory(int index); void UseTargets(u16 activator, const char* targetname); void DeleteInstance(u16 i); void TakeEnergy(float take);
 void trigger_cyberpush_touch(u16 self, u16 other) { if (World.diffCyb < 1) {return;} AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force * (float)World.deltaTime),false); World.Sys_Music.cyberTube = true; }
@@ -452,7 +454,7 @@ INLINE void BvhNodeWorldAABB(const BvhNode* node, const float* mx, V3* wMn, V3* 
 }
 
 void BvhWalkSphMsh(V3 sc, float sr, u16 m, const float* mx, Overlap* r) {
-    const BvhNode* nodes=modelBVHNodes[m]; const u16* triOrder = modelBVHTriOrder[m]; const BvhNode* stack[8*8*8]; int sp = 0; stack[sp++] = &nodes[0];
+    const BvhNode* nodes=modelBVHNodes[m]; const u16* triOrder = modelBVHTriOrder[m]; const BvhNode* stack[64]; int sp = 0; stack[sp++] = &nodes[0];
     while (sp > 0) {
         const BvhNode* node = stack[--sp]; V3 wMn,wMx; BvhNodeWorldAABB(node,mx,&wMn,&wMx); if (!BvhSphereAABBOverlap(sc,sr,wMn,wMx)) continue;
         if (node->triCount > 0) { for (u32 i = 0; i < node->triCount; i++) SphTriTest(sc, sr, m, triOrder[node->triStart + i], mx, r); } else { for (int o=0;o<8;++o) if (node->children[o] >= 0) stack[sp++] = &nodes[node->children[o]]; }
@@ -486,7 +488,7 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     triN = V3_ScaleByF(triN, 1.0f / vsqrtf(triLenSq));
     if ((ctx->hullRadius - vabs(V3_dot(triN,V3_AsubB(ctx->hullCenter, ta)))) <= (best->n ? best->maxPen + MANIFOLD_TIE_MARGIN : 0.0f)) return;
     SupportCtx supCtx = (SupportCtx){ctx->boxV ? _supA_boxShape : _supA_hull, _supB_tri, .meshA=hullMesh, .matA=ctx->hullMx, .adjA=ctx->adjHull, .adjB=ctx->adjHull, .ta=ta, .tb=tb, .tc=tc, .boxShape=ctx->boxShape};
-    GJKResult gjk = RunGJK(&supCtx,GJK_ITER); if(!gjk.hit)return;
+    GJKResult gjk = RunGJK(&supCtx,GJK_ITER); if(!gjk.hit){return;}
     Simplex3D *s = &gjk.s;
     while (s->n<4) {
         V3 fallbackDir={0.0f,1.0f,0.0f};
@@ -498,7 +500,7 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
         for (int k=0;k<s->n;k++){V3 dv=V3_AsubB(sup,s->v[k]); dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
         if (!dup){s->wA[s->n]=wA; s->wB[s->n]=wB; s->v[s->n++]=sup;} else {fallbackDir=(V3){-fallbackDir.x,-fallbackDir.y,-fallbackDir.z}; GetSupportPair(&supCtx, fallbackDir, &wA, &wB); s->wA[s->n]=wA; s->wB[s->n]=wB; s->v[s->n++]=V3_AsubB(wA,wB);}
     }
-    EPAState epa; SeedEPA(&epa, s); if (epa.nf<4){return;} bool tHit=false; V3 tN={0}; float tD=0; V3 tP={0};
+    EPAState epa; SeedEPA(&epa, s); if (epa.nf<4){ return; } bool tHit=false; V3 tN={0}; float tD=0; V3 tP={0};
     for (int it=0;it<EPA_ITER;++it){
         int bf=-1; float bd=1e9f; for (int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break;
         V3 bn=epa.ef[bf].n; V3 wA, wB; GetSupportPair(&supCtx, bn, &wA, &wB); V3 sup=V3_AsubB(wA,wB);
@@ -563,11 +565,21 @@ void BvhWalkAABB_CvxTri(u16 triMesh, const float* triMx, AABB3 hb, CvxMshCtx* ct
     }
 }
 
+// --- hull local-AABB cache (computed once per hull mesh, reused across queries) ---
+static AABB3 g_hullLocalAABB[MAX_MDLS];
+static u8 g_hullLocalAABBInit[MAX_MDLS] = {0};
 Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx, u16 adjHull) {
     Manifold z={0}; if(hullMesh>=MAX_MDLS||adjHull>=MAX_MDLS||triMesh>=MAX_MDLS)return z;
     u32 hn=modelVertexCounts[hullMesh]; if(!hn)return z;
-    CvxMshCtx ctx={0}; ctx.hullMesh=hullMesh; ctx.hullMx=hullMx; ctx.adjHull=adjHull; AABB3 hb={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}};
-    for (u32 i=0;i<hn;++i) { V3 w=MvVert(hullMx,MeshVert(hullMesh,i)); hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); }
+    CvxMshCtx ctx={0}; ctx.hullMesh=hullMesh; ctx.hullMx=hullMx; ctx.adjHull=adjHull; AABB3 hb;
+    if (!g_hullLocalAABBInit[hullMesh]) {
+        AABB3 la={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}};
+        for (u32 i=0;i<hn;++i){ V3 v=MeshVert(hullMesh,i); la.mn.x=vmin(la.mn.x,v.x); la.mn.y=vmin(la.mn.y,v.y); la.mn.z=vmin(la.mn.z,v.z); la.mx.x=vmax(la.mx.x,v.x); la.mx.y=vmax(la.mx.y,v.y); la.mx.z=vmax(la.mx.z,v.z); }
+        g_hullLocalAABB[hullMesh]=la; g_hullLocalAABBInit[hullMesh]=1;
+    }
+    { const AABB3* la=&g_hullLocalAABB[hullMesh]; V3 c[8]={{la->mn.x,la->mn.y,la->mn.z},{la->mn.x,la->mn.y,la->mx.z},{la->mn.x,la->mx.y,la->mn.z},{la->mn.x,la->mx.y,la->mx.z},{la->mx.x,la->mn.y,la->mn.z},{la->mx.x,la->mn.y,la->mx.z},{la->mx.x,la->mx.y,la->mn.z},{la->mx.x,la->mx.y,la->mx.z}};
+      hb.mn.x=1e9f;hb.mn.y=1e9f;hb.mn.z=1e9f;hb.mx.x=-1e9f;hb.mx.y=-1e9f;hb.mx.z=-1e9f;
+      for (int i=0;i<8;++i){ V3 w=MvVert(hullMx,c[i]); hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); } }
     ctx.hb=hb; ctx.hullCenter = V3_ScaleByF(V3_AplusB(hb.mn, hb.mx), 0.5f); ctx.hullRadius = V3_Mag(V3_AsubB(hb.mx, hb.mn)) * 0.5f;
     V3 hext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(hext.x,vmax(hext.y,hext.z))*0.15f);
     float wscaleH=V3_Mag((V3){hullMx[0],hullMx[1],hullMx[2]}); ctx.thicknessTolerance=vclamp(modelBounds[hullMesh]*wscaleH*0.06f,0.003f,0.02f);
@@ -630,6 +642,8 @@ Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 
 }
 
 INLINE void quat_to_mat3(Quaternion q, float R[3][3]) { float x=q.x,y=q.y,z=q.z,w=q.w, xx=x*x,yy=y*y,zz=z*z, xy=x*y,xz=x*z,yz=y*z, wx=w*x,wy=w*y,wz=w*z; R[0][0]=1.0f-2.0f*(yy+zz); R[0][1]=2.0f*(xy-wz); R[0][2]=2.0f*(xz+wy); R[1][0]=2.0f*(xy+wz); R[1][1]=1.0f-2.0f*(xx+zz); R[1][2]=2.0f*(yz-wx); R[2][0]=2.0f*(xz-wy); R[2][1]=2.0f*(yz+wx); R[2][2]=1.0f-2.0f*(xx+yy); }
+INLINE void BuildInvInertiaMatrix(u16 i, const float R[3][3], float K[3][3]) { /* K = R * I_inv * R^T, precomputed per body for solver hotpath */ float I0,I1,I2,I3,I4,I5; if (World.col[i]==COLTYPE_BOX) { ShapeBox b=Entity_GetBox(i); float m=World.mass[i],hx=b.hExt.x,hy=b.hExt.y,hz=b.hExt.z; I0=1.0f/vmax((1.0f/3.0f)*m*(hy*hy+hz*hz),1e-6f); I1=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hz*hz),1e-6f); I2=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hy*hy),1e-6f); I3=I4=I5=0.0f; } else if (World.col[i]==COLTYPE_CVX && World.invTnsrValid[i]) { float *II=World.invInertiaTensor[i]; I0=II[0]; I1=II[1]; I2=II[2]; I3=II[3]; I4=II[4]; I5=II[5]; } else { float s=1.0f/vmax((2.0f/5.0f)*World.mass[i]*World.radius[i]*World.radius[i],1e-6f); I0=I1=I2=s; I3=I4=I5=0.0f; } for (int r=0;r<3;++r) for (int c=0;c<3;++c) K[r][c]=R[r][0]*(I0*R[c][0]+I3*R[c][1]+I4*R[c][2])+R[r][1]*(I3*R[c][0]+I1*R[c][1]+I5*R[c][2])+R[r][2]*(I4*R[c][0]+I5*R[c][1]+I2*R[c][2]); }
+INLINE V3 M33_v(const float M[3][3], V3 v) { return (V3){M[0][0]*v.x+M[0][1]*v.y+M[0][2]*v.z, M[1][0]*v.x+M[1][1]*v.y+M[1][2]*v.z, M[2][0]*v.x+M[2][1]*v.y+M[2][2]*v.z}; }
 V3 ApplyInvTensor(u16 i, V3 v, const float R[3][3]) {
     if (World.col[i] == COLTYPE_BOX) {
         ShapeBox b = Entity_GetBox(i); float m = World.mass[i], hx = b.hExt.x, hy = b.hExt.y, hz = b.hExt.z;
@@ -659,8 +673,8 @@ void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this su
                 float invMassA = sc->invMassA, invMassB = sc->invMassB;
                 float invSumN = sc->invSumN[p];
                 bool canRotateA = sc->canRotateA, canRotateB = sc->canRotateB;
-                const float (*Ra)[3] = sc->Ra;
-                const float (*Rb)[3] = sc->Rb;
+                const float (*Ka)[3] = sc->Ka;
+                const float (*Kb)[3] = sc->Kb;
                 if (invSumN < PHY_EPSILON) continue;
                 V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],rAarm)), vAtB = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],rBarm));
                 float vn = V3_dot(V3_AsubB(vAtA,vAtB),n), j = (targetVn - vn) / invSumN, newAccumN = vmax(*accumN + j, 0.0f); 
@@ -671,13 +685,13 @@ void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this su
                 if (deltaVn > maxDelta) maxDelta = deltaVn;
                 V3 impulse = V3_ScaleByF(n,j); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(impulse,invMassA));
                 if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b],V3_ScaleByF(impulse,invMassB));
-                if (canRotateA) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a],ApplyInvTensor(a,V3_Cross(rAarm,impulse),Ra));
-                if (canRotateB) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b],ApplyInvTensor(b,V3_Cross(rBarm,impulse),Rb));
+                if (canRotateA) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a],M33_v(Ka,V3_Cross(rAarm,impulse)));
+                if (canRotateB) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b],M33_v(Kb,V3_Cross(rBarm,impulse)));
                 V3 vAtA2 = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],rAarm)), vAtB2 = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],rBarm));
                 V3 relVel2 = V3_AsubB(vAtA2,vAtB2), tangent = V3_AsubB(relVel2,V3_ScaleByF(n,V3_dot(relVel2,n))); float tLen = V3_Mag(tangent);
                 if (tLen > 0.0001f) {
                     tangent = V3_ScaleByF(tangent,1.0f/tLen); V3 rAxT = V3_Cross(rAarm,tangent), rBxT = V3_Cross(rBarm,tangent);
-                    float angTermAT = canRotateA ? V3_dot(rAxT,ApplyInvTensor(a,rAxT,Ra)) : 0.0f, angTermBT = canRotateB ? V3_dot(rBxT,ApplyInvTensor(b,rBxT,Rb)) : 0.0f, invSumT = invMassA + invMassB + angTermAT + angTermBT;
+                    float angTermAT = canRotateA ? V3_dot(rAxT,M33_v(Ka,rAxT)) : 0.0f, angTermBT = canRotateB ? V3_dot(rBxT,M33_v(Kb,rBxT)) : 0.0f, invSumT = invMassA + invMassB + angTermAT + angTermBT;
                     if (invSumT > PHY_EPSILON) {
                         float jt = -V3_dot(relVel2,tangent) / invSumT, friction; bool aIsSpecial = (World.col[a] == COLTYPE_CAP && (a == PLAYER1 || IdxIsNPC(World.instances[a].index)));
                         if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.005f) / 0.10f, 0.0f, 1.0f); friction = 0.8f + mix * (0.6f - 0.8f); }
@@ -689,8 +703,8 @@ void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this su
                         if (deltaVt > maxDelta) maxDelta = deltaVt;
                         V3 fImpulse = V3_ScaleByF(tangent,jt); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(fImpulse,invMassA));
                         if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b],V3_ScaleByF(fImpulse,invMassB));
-                        if (canRotateA) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a],ApplyInvTensor(a,V3_Cross(rAarm,fImpulse),Ra));
-                        if (canRotateB) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b],ApplyInvTensor(b,V3_Cross(rBarm,fImpulse),Rb));
+                        if (canRotateA) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a],M33_v(Ka,V3_Cross(rAarm,fImpulse)));
+                        if (canRotateB) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b],M33_v(Kb,V3_Cross(rBarm,fImpulse)));
                     }
                 }
             }
@@ -704,9 +718,10 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
     if (!m->n || (World.col[b] == COLTYPE_MSH && World.col[a] == COLTYPE_MSH)) return;
     if (gContactCount >= MAX_GLOBAL_CONTACTS) { DualLogWarn("Ran out of global contact slots!\n"); return; }
     SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m;
-    sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == COLTYPE_NONE || World.col[b] == COLTYPE_MSH);
+    sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == COLTYPE_NONE || World.col[b] == COLTYPE_MSH || g_physSleep[b]);
     for (int i=0;i<m->n;++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} }
-    quat_to_mat3(World.rotation[a],sc->Ra); if (!sc->bStatic) quat_to_mat3(World.rotation[b],sc->Rb);
+    quat_to_mat3(World.rotation[a],sc->Ra); BuildInvInertiaMatrix(a,sc->Ra,sc->Ka);
+    if (!sc->bStatic) { quat_to_mat3(World.rotation[b],sc->Rb); BuildInvInertiaMatrix(b,sc->Rb,sc->Kb); }
     sc->invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a]; sc->invMassB = (sc->bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
     sc->canRotateA = (World.col[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index)); sc->canRotateB = (!sc->bStatic && World.col[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index));
     for (int i=0;i<m->n;++i) {
@@ -716,7 +731,7 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
         sc->targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f;
         sc->targetVn[i] += 0.22f * vmax(m->p[i].pen - 0.06f, 0.0f) / dt; // per-point Baumgarte bias, frozen at gather time
         V3 rAxN = V3_Cross(sc->rA[i],m->normal), rBxN = V3_Cross(sc->rB[i],m->normal);
-        sc->invSumN[i] = sc->invMassA + sc->invMassB + (sc->canRotateA ? V3_dot(rAxN,ApplyInvTensor(a,rAxN,sc->Ra)) : 0.0f) + (sc->canRotateB ? V3_dot(rBxN,ApplyInvTensor(b,rBxN,sc->Rb)) : 0.0f);
+        sc->invSumN[i] = sc->invMassA + sc->invMassB + (sc->canRotateA ? V3_dot(rAxN,M33_v(sc->Ka,rAxN)) : 0.0f) + (sc->canRotateB ? V3_dot(rBxN,M33_v(sc->Kb,rBxN)) : 0.0f);
         sc->accumN[i] = 0.0f; sc->accumT[i] = 0.0f; // no warm-starting across substeps
     }
 }
@@ -741,7 +756,7 @@ void Physics(float dt) {
         else if (likely(World.col[i] == COLTYPE_BOX)) { World.radius[i] = vmax(World.colliderSize[i].x * 0.5f * World.scale[i].x,vmax(World.colliderSize[i].y * 0.5f * World.scale[i].y,World.colliderSize[i].z * 0.5f * World.scale[i].z)); }
         else if (World.col[i] == COLTYPE_SPH || World.col[i] == COLTYPE_CAP) { World.radius[i] = vmax(World.colliderSize[i].x,World.colliderSize[i].y) * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z)); }
         else World.radius[i] = World.colliderSize[i].x * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));
-        if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && World.col[i] != COLTYPE_NONE && vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}
+        if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && !(g_physSleep[i]) && World.col[i] != COLTYPE_NONE && vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}
     }
     for (u8 s=0;s<World.substeps;++s) {
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
@@ -773,6 +788,7 @@ void Physics(float dt) {
         }
         for (u16 i=0;i<dynamicEntityCount;++i) {
             u16 a = dynamicEntities[i]; if (unlikely(World.col[a] == COLTYPE_MSH || (Cheats.noclip && a == PLAYER1))) continue;
+            u8 colA = World.col[a]; ShapeBox boxA = colA==COLTYPE_BOX ? Entity_GetBox(a) : (ShapeBox){0}; ShapeCapsule capA = colA==COLTYPE_CAP ? Entity_GetCap(a) : (ShapeCapsule){0}; ShapeSphere sphA = colA==COLTYPE_SPH ? Entity_GetSph(a) : (ShapeSphere){0};
             i32 cx = PosGetCellCoordX(World.position[a].x), cz = PosGetCellCoordZ(World.position[a].z); u32 mask = GetCollisionMask(World.layer[a]);
             float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub; i32 radCells = vmax((i32)(searchRad / CELLSZ),1);
             float matA[16]; const float *mxA = &modelMatrices[a*16];
@@ -783,24 +799,25 @@ void Physics(float dt) {
                     u32 cell = PosGetCellCoordsP(cx + dx,cz + dz);
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
                         u16 b = cellLists[cell][k]; if (b == a || b >= World.instCount) continue;
+                        u8 colB = World.col[b]; ShapeBox boxB = colB==COLTYPE_BOX ? Entity_GetBox(b) : (ShapeBox){0}; ShapeCapsule capB = colB==COLTYPE_CAP ? Entity_GetCap(b) : (ShapeCapsule){0}; ShapeSphere sphB = colB==COLTYPE_SPH ? Entity_GetSph(b) : (ShapeSphere){0};
                         if (unlikely(Cheats.noclip && b == PLAYER1)) continue;
                         if (!(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue;
-                        if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && b > a)) continue; // Prevent doubled restitutions causing ghosting.
+                        if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !g_physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
                         V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
                         Manifold mf = {0}; float matB[16]; const float *mxB = &modelMatrices[b*16];
                         if (World.col[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
-                        if      (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_CAP) { mf = OverlapToManifold(CapCap(Entity_GetCap(a),Entity_GetCap(b))); }
-                        else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_BOX) { mf = OverlapToManifold(CapBox(Entity_GetCap(a),Entity_GetBox(b))); }
-                        else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_SPH) { Overlap r=SphCap(Entity_GetSph(b),Entity_GetCap(a)); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.f); mf=OverlapToManifold(r); }
-                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_CAP) { mf=OverlapToManifold(SphCap(Entity_GetSph(a),Entity_GetCap(b))); }
-                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_CAP) { Overlap r = CapBox(Entity_GetCap(b),Entity_GetBox(a)); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
-                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_BOX) { mf = BoxBox(Entity_GetBox(a),Entity_GetBox(b)); }
-                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_BOX) { ShapeSphere sa = Entity_GetSph(a); mf = OverlapToManifold(SphBox(sa.ctr,sa.rad,Entity_GetBox(b))); }
-                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_SPH) { ShapeSphere sa = Entity_GetSph(b); Overlap r = SphBox(sa.ctr,sa.rad,Entity_GetBox(a)); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
-                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_SPH) { ShapeSphere sa = Entity_GetSph(a), sb = Entity_GetSph(b); mf = OverlapToManifold(SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad)); }
-                        else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_MSH) { mf = OverlapToManifold(CapMsh(Entity_GetCap(a),World.instances[b].modelIndex,mxB)); }
-                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_MSH) { ShapeSphere sa = Entity_GetSph(a); mf = OverlapToManifold(SphMsh(sa.ctr,sa.rad,World.instances[b].modelIndex,mxB)); }
-                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_MSH) { mf = BoxMsh(Entity_GetBox(a),World.instances[b].modelIndex,mxB); }
+                        if      (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_CAP) { mf = OverlapToManifold(CapCap(capA,capB)); }
+                        else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_BOX) { mf = OverlapToManifold(CapBox(capA,boxB)); }
+                        else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_SPH) { Overlap r=SphCap(sphB,capA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.f); mf=OverlapToManifold(r); }
+                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_CAP) { mf=OverlapToManifold(SphCap(sphA,capB)); }
+                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_CAP) { Overlap r = CapBox(capB,boxA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
+                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_BOX) { mf = BoxBox(boxA,boxB); }
+                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_BOX) { ShapeSphere sa = sphA; mf = OverlapToManifold(SphBox(sa.ctr,sa.rad,boxB)); }
+                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_SPH) { ShapeSphere sa = sphB; Overlap r = SphBox(sa.ctr,sa.rad,boxA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
+                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_SPH) { ShapeSphere sa = sphA, sb = sphB; mf = OverlapToManifold(SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad)); }
+                        else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_MSH) { mf = OverlapToManifold(CapMsh(capA,World.instances[b].modelIndex,mxB)); }
+                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_MSH) { ShapeSphere sa = sphA; mf = OverlapToManifold(SphMsh(sa.ctr,sa.rad,World.instances[b].modelIndex,mxB)); }
+                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_MSH) { mf = BoxMsh(boxA,World.instances[b].modelIndex,mxB); }
                         else if (World.col[a] == COLTYPE_CVX && World.col[b] == COLTYPE_MSH) { mf = CvxMsh(World.instances[a].colMeshIndex,mxA,World.instances[b].modelIndex,mxB,World.instances[a].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else if (World.col[a] == COLTYPE_CVX && World.col[b] == COLTYPE_CAP) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
@@ -849,6 +866,49 @@ void Physics(float dt) {
                     case 601/*trigger_radiation*/:            World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation; break; // TODO bleedoff when !radiationArea, amelioration from envirosuit, detox patch negation for 30secs
                     case 746/*weapon_grenadeenergmine_live*/: TakeEnergy(256.0f); break;
                 }
+            }
+        }
+    }
+
+    // --- sleep / wake deactivation ---
+    {
+        const float SLEEP_LIN2 = 0.0025f;   // (0.05 m/s)^2
+        const float SLEEP_ANG2 = 0.0025f;   // (0.05 rad/s)^2
+        const i32 WAKE_CELLS = 2;
+        for (u32 i=0;i<World.instCount;++i) {
+            u32 ef = World.instances[i].entflags;
+            bool canSleep = (i!=PLAYER1) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && (World.col[i]!=COLTYPE_NONE) && (World.mass[i] >= 0.001f);
+            if (!canSleep) { g_physSleep[i]=0; continue; }
+            i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z);
+            bool nearAwake = false;
+            for (i32 dx=-WAKE_CELLS; dx<=WAKE_CELLS && !nearAwake; ++dx)
+              for (i32 dz=-WAKE_CELLS; dz<=WAKE_CELLS && !nearAwake; ++dz) {
+                u32 cl = PosGetCellCoordsP(cx+dx,cz+dz);
+                for (u16 k=0;k<cellCounts[cl];++k) {
+                    u16 j = cellLists[cl][k]; if (j==i) continue;
+                    u32 ej = World.instances[j].entflags;
+                    if (g_physSleep[j] || !(ej & EF_ACTIVE)) continue; // asleep/inactive bodies don't wake others
+                    float sj2 = V3_dot(World.velocity[j], World.velocity[j]);
+                    bool jMoving = sj2 > SLEEP_LIN2;
+                    bool jAnimWaking = false;
+                    if (j != PLAYER1) {
+                        u16 an = World.instances[j].animationNum;
+                        if ((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48)
+                            && an < MAX_ANIMS && World.instances[j].clip < MAX_ANIMCLIPS && World.instances[j].numclips > 0) {
+                            u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate;
+                            if (fr > 0) { double since = World.current_time - World.instances[j].animFinished; jAnimWaking = (since * (double)fr < 1.0); } // anim changed frame within last 1/fr secs (hysteresis)
+                        }
+                    }
+                    if (!(jMoving || jAnimWaking)) continue; // not a waker -> lets i sleep
+                    V3 d = V3_AsubB(World.position[i], World.position[j]);
+                    float rr = World.radius[i] + World.radius[j] + (jMoving ? 2.0f * vsqrtf(sj2) : 0.0f); // mover reach only when actually translating
+                    if (V3_dot(d,d) < rr*rr) { nearAwake=true; break; }
+                }
+            }
+            if (g_physSleep[i]) { if (nearAwake) g_physSleep[i]=0; }
+            else if (!nearAwake && (ef & EF_GROUNDED)) {
+                float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]);
+                if (sp2 < SLEEP_LIN2 && asp2 < SLEEP_ANG2) { g_physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; }
             }
         }
     }

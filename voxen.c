@@ -57,7 +57,8 @@ void AddWireLine(V3 start, V3 end, Color col) {
 }
 
 ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i);
-INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY)) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
+bool PhysIsAsleep(u16 i);
+INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY) || PhysIsAsleep(i)) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
 void DrawVelocityVector(u16 i) {
     if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;}
     V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f)); AddWireLine(World.position[i],tip,textColors[T_ORANGE]); V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}));

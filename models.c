@@ -1257,7 +1257,9 @@ void UpdateAnims(void) {
         e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / (double)clip->framerate;
         if (e->currentFrameFinished >= timePerFrame) {
             u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1;
+            u16 prevFrame = e->frame;
             e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
+            if (e->frame != prevFrame) e->animFinished = World.current_time; // hysteresis: stamp ONLY on an actual frame change (single-frame idle clips don't restamp, so they don't hold neighbors awake)
             if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][ANIM_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     }
