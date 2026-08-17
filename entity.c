@@ -476,9 +476,7 @@ void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense 
     /*402 weapon_grenademine_live*/    EDefs[402].modelIndex=184; EDefs[402].texIndex=351; EDefs[402].glowIndex=352; EDefscol[402]=COLTYPE_CVX; EDefs[402].colMeshIndex=87; EDefsmass[402]=1.2f;
     /*403 weapon_grenadenitro_live*/   EDefs[403].modelIndex=185; EDefs[403].texIndex=354; EDefs[403].glowIndex=355; EDefscol[403]=COLTYPE_CVX; EDefs[403].colMeshIndex=88; EDefsmass[403]=1.2f;
     /*404 weapon_grenadegas_live*/     EDefs[404].modelIndex=183; EDefs[404].texIndex=349; EDefscol[404]=COLTYPE_CVX; EDefs[404].colMeshIndex=89; EDefsmass[404]=0.9f;
-    /*405 item_workerhelmet_lflap*/    EDefs[405].modelIndex=92; EDefs[405].texIndex=886; EDefscol[405]=COLTYPE_CVX; EDefs[405].colMeshIndex=122; EDefsmass[405]=0.2f;
-    /*406 item_workerhelmet_rflap*/    EDefs[406].modelIndex=93; EDefs[406].texIndex=886; EDefscol[406]=COLTYPE_CVX; EDefs[406].colMeshIndex=214; EDefsmass[406]=0.2f;
-    /*407 to 416 unused*/
+    /*405 to 416 unused*/
     /*417 item_access_card_perdarcy*/  EDefs[417].modelIndex=0; EDefs[417].texIndex=8; EDefs[417].glowIndex=341; EDefscol[417]=COLTYPE_CVX; EDefs[417].colMeshIndex=672; EDefsmass[417]=0.2f; EDefsangularDrag[417]=0.05f; EDefsdynamicFriction[417]=EDefsstaticFriction[417]=0.6f;
     /*419 npc_autobomb*/            EDefs[419].modelIndex=299; EDefs[419].texIndex=542; EDefs[419].glowIndex=541; EDefscol[419]=COLTYPE_CVX; EDefs[419].colMeshIndex=328;
     /*420 npc_cyborg_assassin*/     EDefs[420].modelIndex=306; EDefs[420].texIndex=545; EDefs[420].numclips= 8; EDefs[420].animationNum=24; EDefscolliderSize[420].x=0.48f; EDefscolliderSize[420].y=2.0f; EDefscolliderCenter[420].y=0.96f; EDefsmass[420]=1.5f; EDefsangularDrag[420]=1.5f; EDefs[420].glowIndex=544;
@@ -1164,7 +1162,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 319) { World.position[parent].y += 0.09f; } // weapon_grenadegas: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 332) { World.position[parent].y += 0.015f; } // item_hw_targetid: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 333) { World.position[parent].y += 0.028f; } // item_hw_shield: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 342) { World.position[parent].y += 0.12f; } // item_workerhelmet: Move up to account for CG mod (origin moved vs Unity version) TODO spawn 405 and 406 flaps with hinge joint at -0.174835,0,0 and 0.174835,0,0 on z axis with limits [-70 100] TODO hinge joints!?
+        else if (entIdx == 342) { World.position[parent].y += 0.12f; } // item_workerhelmet: Move up to account for CG mod (origin moved vs Unity version)
         //else if (entIdx == 343) { World.position[parent].y += 0.16f; } // weapon_blaster: Move up to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value
         //else if (entIdx == 346) { World.position[parent].z += 0.16f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value, also not sure if barrel parallel axis is x or z that I slid this along
         //else if (entIdx == 348) { World.position[parent].z += 0.6f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value, also not sure if blade parallel axis is x or z that I slid this along
@@ -1188,7 +1186,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 305) { scpy_to_a_from_b(par->texAnimResourceFolder,"Telepad",TARGET_STRING_LENGTH); } /*chunk_teleporter*/
         TextureSequenceInit(parent,par->texAnimResourceFolder);
     }
-    for (int i=0;i<=lightsIdx;++i) { if (!(lightsFromFile[i].lflags & LSPOT)) {lightsFromFile[i].spotAng = 0.0f;} AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
+    for (int i=0;i<=lightsIdx;++i) { if (!(lightsFromFile[i].lflags & LSPOT)) {lightsFromFile[i].spotAng = 0.0f;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators
         World.shd1=AddInstance(754,(V3){-51.30664f,-47.42f,56.42651f}); World.shd2=AddInstance(754,(V3){71.5f,-47.42f,-66.6f}); World.shd3=AddInstance(754,(V3){-51.306650f,-47.42f,-66.66652f}); World.shd4=AddInstance(754,(V3){71.78664f,-47.42f,56.42651f}); 
         World.rotation[World.shd1] = World.rotation[World.shd2] = World.rotation[World.shd3] = World.rotation[World.shd4] = QUAT_IDENTITY;

@@ -591,7 +591,7 @@ static bool mp3_init_internal(mp3 *p) {
     p->channels=p->mp3FChan; p->sampleRate=p->mp3FrameSampleRate; return true;
 }
 
-static bool mp3_init_file(mp3 *pMP3, const char *path) { if(!pMP3 || !path){return false;} mset(pMP3,0,sizeof(mp3)); FHandle f=OS_OpenReadonly(path); if(f == INVALID_FHANDLE){return false;} pMP3->pUserData=(void*)(uintptr_t)f; DualLog("Pre mp3_init_internal for %s\n",path); bool r=mp3_init_internal(pMP3); DualLog("mp3_init_internal for %s:%u\n",path,r); if(!r){OS_Close(f); return false;} return true; }
+static bool mp3_init_file(mp3 *pMP3, const char *path) { if(!pMP3 || !path){return false;} mset(pMP3,0,sizeof(mp3)); FHandle f=OS_OpenReadonly(path); if(f == INVALID_FHANDLE){return false;} pMP3->pUserData=(void*)(uintptr_t)f; bool r=mp3_init_internal(pMP3); if(!r){OS_Close(f); return false;} return true; }
 static void mp3_uninit(mp3 *pMP3) { if (!pMP3) {return;} if (pMP3->pUserData) {OS_Close((FHandle)(uintptr_t)pMP3->pUserData); pMP3->pUserData=NULL;} OS_Free(pMP3->pData, pMP3->dataCapacity); pMP3->pData = NULL; pMP3->dataCapacity = 0; }
 static void mp3_reset(mp3 *p) { p->pcmFConsInMP3F=0; p->pcmFRemInMP3F=0; p->currentPCMFrame=0; p->dataSize=0; p->atEnd=0; mp3dec_init(&p->decoder); }
 static bool mp3_seek_to_start_of_stream(mp3 *p){u64 o=p->streamStartOffset;if(!mp3_on_seek(p,o<=0x7FFFFFFF?(int)o:0x7FFFFFFF,0))return 0;if(o>0x7FFFFFFF){o-=0x7FFFFFFF;while(o>0){int c=(o<=0x7FFFFFFF)?(int)o:0x7FFFFFFF;if(!mp3_on_seek(p,c,1))return 0;o-=c;}}mp3_reset(p);return 1;}
@@ -837,14 +837,13 @@ void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(100
 #define MAXAMB 256
 typedef struct { wav_channel_t sound; u32 loaded; float length_sec; } AmbientSlot; typedef struct { u16 index; const char* filename; } AmbientDef;
 u16 ambReg[MAXAMB]; static AmbientSlot ambientSlots[MAXAMB] = {0}; static u16 ambs=0;
-static const AmbientDef ambientSounds[MAXAMB] = {
-    {621,"airhiss"},        {622,"clicker"},  {623,"compressor"},    {624,"dishwasher"},{625,"drip_amb"},{626,"fan1"},         {627,"generator_gas"},   {628,"gurgle"},    {629,"icemaker"},       {630,"intake"},            {631,"lathe"},        {632,"lev3loop1"},    {633,"lev3loop2"},
-    {634,"lev3loop3"},      {635,"lev3loop4"},{636,"liquid_bubble"}, {637,"lava2"},     {638,"rain"},    {639,"machgear_loop"},{640,"machine_ambience"},{641,"machine_go"},{642,"machine_humamb7"},{643,"machine_humlonoise"},{644,"machine_loop1"},{645,"machine_loop2"},{646,"machinea1"},
-    {647,"machinevat_loop"},{648,"mist"},     {649,"pipewater_loop"},{650,"powerloom"}, {651,"pump"},    {652,"pump2"},        {653,"rain"},            {654,"steam_loop"},{655,"washing_machine"}};
-void MixAmbs() {    
+static const AmbientDef ambientSounds[MAXAMB] = {{621,"airhiss"},        {622,"clicker"},  {623,"compressor"},    {624,"dishwasher"},{625,"drip_amb"},{626,"fan1"},         {627,"generator_gas"},   {628,"gurgle"},    {629,"icemaker"},       {630,"intake"},            {631,"lathe"},        {632,"lev3loop1"},    {633,"lev3loop2"},
+                                                 {634,"lev3loop3"},      {635,"lev3loop4"},{636,"liquid_bubble"}, {637,"lava2"},     {638,"rain"},    {639,"machgear_loop"},{640,"machine_ambience"},{641,"machine_go"},{642,"machine_humamb7"},{643,"machine_humlonoise"},{644,"machine_loop1"},{645,"machine_loop2"},{646,"machinea1"},
+                                                 {647,"machinevat_loop"},{648,"mist"},     {649,"pipewater_loop"},{650,"powerloom"}, {651,"pump"},    {652,"pump2"},        {653,"rain"},            {654,"steam_loop"},{655,"washing_machine"}};
+void MixAmbs() {
     for (u16 i=0;i<ambs;++i) {
         u16 a = ambReg[i];
-        const AmbientDef* def = NULL; for (size_t j=0;j<MAXAMB;++j) { if (ambientSounds[j].index==World.instances[a].index) {def = &ambientSounds[j]; break; } }
+        const AmbientDef* def = NULL; for (size_t j=0;j<MAXAMB;++j) { if(ambientSounds[j].index==World.instances[a].index){def=&ambientSounds[j]; break;} } if (!def) continue;
         float d = V3_Dist(World.position[PLAYER1],World.position[ambReg[i]]);
         AmbientSlot* slot = &ambientSlots[(size_t)(def - ambientSounds)];
         if (d < 7.68f && PositionVisibleFromPlayerCell(World.position[ambReg[i]].x,World.position[ambReg[i]].z)) {
@@ -882,41 +881,14 @@ const char* levelMusicDeath[MAX_LEVELS] = {"THM0-17_death","THM0-17_death","THM3
 void PlayMenuMusic() { mp3_clear(); play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); }
 void PlayGameMusic() { mp3_clear(); /*play_mp3("./Audio/music/THM1-19_medicalstart.mp3",100);*/ }
 const char* GetCorrespondingLevelClip(TrackType ttype) {
-    DualLog("GetCorrespondingLevelClip ttype: %u, curLev: %u\n",ttype,World.curLev);
-    switch(ttype) { // Override types, return from these first before special level handling
-        case TT_Revive:   return levelMusicRevive[World.curLev];   case TT_Death:      return levelMusicDeath[World.curLev];
-        case TT_Elevator: return levelMusicElevator[World.curLev]; case TT_Distortion: return levelMusicDistortion[World.curLev];
-    }
-    if (World.curLev == 0 || World.curLev == 5 || World.curLev == 7) { // 0  REACTOR, 5 FLIGHT, 7 ENGINEERING
-        if (World.Sys_Music.levelEntry) return reactorMusic[6];
-        if (ttype == TT_Combat)  return reactorMusic[random_range_u8(0,6)];
-        return reactorMusic[random_range_u8(6,13)];
-    } else if (World.curLev == 1) { // 1  MEDICAL
-        if (World.Sys_Music.levelEntry) return medicalMusic[0];
-        if (ttype == TT_Combat)  return medicalMusic[random_range_u8(5,11)];
-        return medicalMusic[random_range_u8(1,5)];
-    } else if (World.curLev == 2 || World.curLev == 4) { // 2  SCIENCE, 4 STORAGE
-        if (World.Sys_Music.levelEntry) return scienceMusic[0];
-        if (ttype == TT_Combat)  return scienceMusic[random_range_u8(8,10)];
-        return scienceMusic[random_range_u8(1,8)];
-    } else if (World.curLev == 8) { // 8 SECURITY
-        if (World.Sys_Music.levelEntry) return securityMusic[9];
-        if (ttype == TT_Combat)  return securityMusic[random_range_u8(0,6)];
-        return securityMusic[random_range_u8(6,19)];
-    } else if (World.curLev == 6) { // 6 EXECUTIVE
-        if (World.Sys_Music.levelEntry) return executiveMusic[0];
-        if (ttype == TT_Combat)  return executiveMusic[random_range_u8(9,13)];
-        return executiveMusic[random_range_u8(0,10)];
-    } else if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { // 10, 12 GROVES
-        if (World.Sys_Music.levelEntry) return groveMusic[19];
-        if (ttype == TT_Combat)  return groveMusic[random_range_u8(0,9)];
-        return executiveMusic[random_range_u8(9,24)];
-    } else if (World.curLev == 13) { // 13 CYBERSPACE
-        if (World.Sys_Music.levelEntry)     return cyberMusic[0];
-        if (World.Sys_Music.cyberTube)      return cyberMusic[random_range_u8(4,8)];
-        if (random_range(0.0f,1.0f) < 0.5f) return cyberMusic[random_range_u8(1,5)];
-        else                                return cyberMusic[8];
-    }
+    switch(ttype) { case TT_Revive:return levelMusicRevive[World.curLev]; case TT_Death:return levelMusicDeath[World.curLev]; case TT_Elevator:return levelMusicElevator[World.curLev]; case TT_Distortion:return levelMusicDistortion[World.curLev]; } // Override types
+    if (World.curLev == 0 || World.curLev == 5 || World.curLev == 7) { if (World.Sys_Music.levelEntry) {return reactorMusic[6];} if (ttype == TT_Combat){return reactorMusic[random_range_u8(0,5)];} return reactorMusic[random_range_u8(6,12)]; } // 0  REACTOR, 5 FLIGHT, 7 ENGINEERING
+    else if (World.curLev == 1) { if (World.Sys_Music.levelEntry){return medicalMusic[0];} if (ttype == TT_Combat){return medicalMusic[random_range_u8(5,10)];} return medicalMusic[random_range_u8(1,4)]; } // 1  MEDICAL
+    else if (World.curLev == 2 || World.curLev == 4) { if (World.Sys_Music.levelEntry){return scienceMusic[0];} if (ttype == TT_Combat)  return scienceMusic[random_range_u8(8,9)]; return scienceMusic[random_range_u8(1,7)]; } // 2  SCIENCE, 4 STORAGE
+    else if (World.curLev == 8) { if (World.Sys_Music.levelEntry){return securityMusic[9];} if (ttype == TT_Combat){return securityMusic[random_range_u8(0,5)];} return securityMusic[random_range_u8(6,18)]; } // 8 SECURITY
+    else if (World.curLev == 6) { if (World.Sys_Music.levelEntry){return executiveMusic[0];} if (ttype == TT_Combat){return executiveMusic[random_range_u8(9,12)];} return executiveMusic[random_range_u8(0,9)]; } // 6 EXECUTIVE
+    else if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { if (World.Sys_Music.levelEntry){return groveMusic[19];} if (ttype == TT_Combat){return groveMusic[random_range_u8(0,8)];} return groveMusic[random_range_u8(9,23)]; } // 10, 12 GROVES
+    else if (World.curLev == 13) { if (World.Sys_Music.levelEntry){return cyberMusic[0];} if (World.Sys_Music.cyberTube){return cyberMusic[random_range_u8(4,7)];} if (random_range(0.0f,1.0f) < 0.5f){return cyberMusic[random_range_u8(1,4)];} return cyberMusic[8]; } // 13 CYBERSPACE
     return levelMusicLooped[0];
 }
 
@@ -937,7 +909,7 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
 }
 
 void UpdateMusic() {
-    if (World.paused && !World.menuActive) { mp3_paused=true; return; }
+    if ((World.paused && !World.menuActive) || !Sys_Settings.VolumeMusic) { mp3_paused=true; return; }
     mp3_paused=false;
     mp3_channel_t *m = &mp3_ch[mp3_slot];
     float remaining = (!m->open || m->frames_decoded >= m->total_frames) ? 0.0f : (!m->total_frames ? 1.0f : (float)(m->total_frames - m->frames_decoded) / (m->src_rate ? m->src_rate : AUDIO_RATE));

@@ -571,10 +571,10 @@ INLINE u8 GetCubemapFaceMask(V3 d, float r) {
 
 __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     double shadowStartTime = get_time();
-    mset(candidates, 0, MAX_SHADOWMAPS * sizeof(u16));
+    mset(candidates,U16_MAX,MAX_SHADOWMAPS * sizeof(u16));
     V3 playerPos = World.position[PLAYER1];
     V3 pf = World.instances[PLAYER1].forward;
-    u16 numCandidates = 0;
+    u16 numCandidates=0; i32 numCasters=0;
     for (u16 i = 0; i < World.loadedLights; ++i) {
         if (unlikely(!(World.lights[i].lflags & SHADON) || !(World.lights[i].lflags & LIGHTON))) continue;
         V3 lightPos = World.lights[i].pos;
@@ -596,14 +596,8 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         candidates[numCandidates++] = i; if (numCandidates >= MAX_SHADOWMAPS) break;
     }
     if (numCandidates == 0) { shadowTime = get_time() - shadowStartTime; return; }
-    u32 numCasters = 0;
-    for (int i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
-        if (EntNotVisible(i, (World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsNPC(World.instances[i].index)) continue;
-        shadowCasterIndices[numCasters++] = i;
-        if (numCasters >= SC_MAX) break;
-    }
-    u32 i = 0;
-    for (; i + 8 <= numCasters; i += 8) {
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if (EntNotVisible(i, (World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsNPC(World.instances[i].index)){continue;} shadowCasterIndices[numCasters++]=i; if(numCasters >= SC_MAX){break;} }
+    for (i32 i=0;i+8<=numCasters;i+=8) {
         float lx[8], ly[8], lz[8], lr[8], lsr[8];
         for (int k = 0; k < 8; ++k) {
             u16 j = shadowCasterIndices[i + k];
@@ -620,8 +614,8 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         _mm256_store_ps(&sc_radius[i],     _mm256_loadu_ps(lr));
         _mm256_store_ps(&sc_shadRadius[i], _mm256_loadu_ps(lsr));
     }
-    for (; i < numCasters; ++i) { u16 j = shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
-    const u32 numCastersAligned = numCasters & ~7u;
+    for (i32 i=0;i<numCasters;++i) { u16 j=shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
+    const u16 numCastersAligned = numCasters & ~7u;
     glUseProgram(shadowmapsClearSP); glDispatchCompute(groupX_shadClear,6,numCandidates);
     shadDrawCalls = 0U;
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP);
@@ -636,7 +630,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     typedef struct { u32 sortKey; u16 instanceIdx; } SortedMesh;
     SortedMesh localMeshes[SHADOW_NEARMESH_MAX];
     for (u16 c = 0; c < numCandidates; ++c) {
-        u16 lightIdx = candidates[c];
+        u16 lightIdx = candidates[c]; if (lightIdx == U16_MAX) continue;
         V3 lpos = World.lights[lightIdx].pos;
         float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f);
         V3 toLight = V3_AsubB(lpos, playerPos);
@@ -673,8 +667,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         const __m256 lposZ = _mm256_set1_ps(lpos.z);
         const __m256 effR  = _mm256_set1_ps(effectiveRadius);
         const __m256 signMask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
-        u16 nearbyMeshCount = 0;
-        u32 k = 0;
+        u16 nearbyMeshCount = 0; i32 k = 0;
         for (; k < numCastersAligned; k += 8) {
             const __m256 px = _mm256_load_ps(&sc_posX[k]);
             const __m256 py = _mm256_load_ps(&sc_posY[k]);
@@ -747,7 +740,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         shadowmapIndirectionList[lightIdx] = shadowMapIdx; ++shadowMapIdx;
         #pragma GCC unroll 6
         for (u8 face = 0; face < 6; ++face) {
-            if (!(faceMask & (1u << face))) continue;
+            if (!(faceMask & (1u << face))) {continue;}
             glUniform1ui(2,face);
             glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
             glUniform1ui(7,shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));

@@ -141,16 +141,16 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
 ```
 
 ### Install Footprint
-
+Size key: b = bit, n = nibble, B = byte, k = kilobyte, m = megabyte, g = we don't go there, t = haha
 ```
-❯ (du -sh */; du -ch *(.N) .*(.N) 2>/dev/null | grep total | sed 's/total/loose files/') | sort -hr
-84M     Audio/
-58M     Textures/
-52M     Models/
-17M     Data/
-1.8M    Fonts/
-1.6M    loose files
-4.0K    Screenshots/
+ 85,644k Audio/
+ 51,726k Textures/
+ 52,321k Models/
+ 17,170k Data/
+  1,815k Fonts/
+  1,589k loose files (binaries, autosplitter notes)
+      0k Screenshots/
+210,265k
 ```
 Citadel.7z (LZMA Max Compressed) sitting at 116.8mb
 
