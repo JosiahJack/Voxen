@@ -12,6 +12,13 @@ float posBudget[INSTANCE_COUNT]; // Remaining |Δpos| entity may receive this su
 u16 dynamicEntities[512],dynamicEntityCount;
 static u8 g_physSleep[INSTANCE_COUNT]; // physics sleep-deactivation flags (separate from AI-owned EF_ASLEEP)
 bool PhysIsAsleep(u16 i) { return g_physSleep[i] != 0; } // exposed for showPhys debug coloring
+INLINE bool AnimWaking(u16 j) {
+    if (j == PLAYER1) return false;
+    u16 an = World.instances[j].animationNum;
+    if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAX_ANIMS && World.instances[j].clip < MAX_ANIMCLIPS && World.instances[j].numclips > 0)) return false;
+    u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate;
+    return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0;
+}
 // Trigger System
 void AddForce(u16 i, V3 f, bool imp); void AddAccessCardToInventory(int index); void UseTargets(u16 activator, const char* targetname); void DeleteInstance(u16 i); void TakeEnergy(float take);
 void trigger_cyberpush_touch(u16 self, u16 other) { if (World.diffCyb < 1) {return;} AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force * (float)World.deltaTime),false); World.Sys_Music.cyberTube = true; }
@@ -121,7 +128,7 @@ void trigger_gravitylift_touch(u16 self, u16 other) {
 
 void GravityLiftToggle(u16 self) { World.instances[self].active = !World.instances[self].active; }
 // Physics System
-INLINE void SetPosition(u16 i, V3 newpos) { float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;} V3 dir=V3_Normalize(V3_AsubB(newpos,World.position[i])); World.position[i]=V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed)); posBudget[i] -= allowed; }
+INLINE void SetPosition(u16 i, V3 newpos) { float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;} V3 dir=V3_Normalize(V3_AsubB(newpos,World.position[i])); World.position[i]=V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed)); flag_set(&World.instances[i].entflags,EF_MOVING,true); posBudget[i] -= allowed; }
 INLINE Manifold OverlapToManifold(Overlap r) { Manifold m={0}; if (r.hit && r.pen > PHY_EPSILON) { m.normal = r.normal; m.n = 1; m.p[0] = (ManifoldPt){r.point, r.pen}; m.maxPen = r.pen; } return m; }
 INLINE Overlap SphSph(V3 a, float ar, V3 b, float br) { V3 dt=V3_AsubB(a,b); float d2=V3_dot(dt,dt),rs=ar+br; float h=(d2<rs*rs); float d=vsqrtf(vmax(d2,0.0f)); float m=(d<PHY_EPSILON); V3 n=V3_AplusB(V3_ScaleByF(dt,(1.0f/vmax(d,PHY_EPSILON))*(1.0f-m)),V3_ScaleByF((V3){0,1,0},m)); V3 point=V3_AplusB(b,V3_ScaleByF(n,br)); return (Overlap){(bool)h,point,n,(rs-d)*h}; }
 INLINE Overlap SphCap(ShapeSphere s, ShapeCapsule c) { V3 seg=V3_AsubB(c.tip,c.base); float l=V3_dot(seg,seg); float m=(l < PHY_EPSILON); V3 b=V3_AplusB(c.base, V3_ScaleByF(seg,vclamp(V3_dot(V3_AsubB(s.ctr, c.base),seg) / vmax(l, PHY_EPSILON), 0.0f, 1.0f) * (1.0f - m))); b = V3_AplusB(V3_ScaleByF(b,1.0f - m),V3_ScaleByF(c.base,m)); return SphSph(s.ctr,s.rad,b,c.rad); }
@@ -750,6 +757,7 @@ INLINE int V3_IsSane(V3 v) { union { float f; unsigned int i; } ux,uy,uz; ux.f =
 u16 triggerVolumes[128]; u16 numTriggers;
 void DrawBoxColliderColored(u16 i, Color col);
 void Physics(float dt) {
+    for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false);
     World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
     for (u16 i=0;i<World.instCount && dynamicEntityCount < 512;++i) {
         if (World.col[i] == COLTYPE_MSH || World.col[i] == COLTYPE_CVX) { World.radius[i] = modelBounds[World.col[i] == COLTYPE_CVX ? World.instances[i].colMeshIndex : World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); }
@@ -869,13 +877,12 @@ void Physics(float dt) {
             }
         }
     }
-
-    // --- sleep / wake deactivation ---
     {
         const float SLEEP_LIN2 = 0.0025f;   // (0.05 m/s)^2
         const float SLEEP_ANG2 = 0.0025f;   // (0.05 rad/s)^2
         const i32 WAKE_CELLS = 2;
         for (u32 i=0;i<World.instCount;++i) {
+            if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true);
             u32 ef = World.instances[i].entflags;
             bool canSleep = (i!=PLAYER1) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && (World.col[i]!=COLTYPE_NONE) && (World.mass[i] >= 0.001f);
             if (!canSleep) { g_physSleep[i]=0; continue; }
@@ -890,15 +897,7 @@ void Physics(float dt) {
                     if (g_physSleep[j] || !(ej & EF_ACTIVE)) continue; // asleep/inactive bodies don't wake others
                     float sj2 = V3_dot(World.velocity[j], World.velocity[j]);
                     bool jMoving = sj2 > SLEEP_LIN2;
-                    bool jAnimWaking = false;
-                    if (j != PLAYER1) {
-                        u16 an = World.instances[j].animationNum;
-                        if ((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48)
-                            && an < MAX_ANIMS && World.instances[j].clip < MAX_ANIMCLIPS && World.instances[j].numclips > 0) {
-                            u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate;
-                            if (fr > 0) { double since = World.current_time - World.instances[j].animFinished; jAnimWaking = (since * (double)fr < 1.0); } // anim changed frame within last 1/fr secs (hysteresis)
-                        }
-                    }
+                    bool jAnimWaking = AnimWaking(j);
                     if (!(jMoving || jAnimWaking)) continue; // not a waker -> lets i sleep
                     V3 d = V3_AsubB(World.position[i], World.position[j]);
                     float rr = World.radius[i] + World.radius[j] + (jMoving ? 2.0f * vsqrtf(sj2) : 0.0f); // mover reach only when actually translating

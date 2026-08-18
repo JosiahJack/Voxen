@@ -1189,7 +1189,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 305) { scpy_to_a_from_b(par->texAnimResourceFolder,"Telepad",TARGET_STRING_LENGTH); } /*chunk_teleporter*/
         TextureSequenceInit(parent,par->texAnimResourceFolder);
     }
-    for (int i=0;i<=lightsIdx;++i) { lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
+    for (int i=0;i<=lightsIdx;++i) { if (lightsFromFile[i].intensity < 0.11f && lightsFromFile[i].maxIntensity < 0.11f){continue;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
     if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators
         World.shd1=AddInstance(754,(V3){-51.30664f,-47.42f,56.42651f}); World.shd2=AddInstance(754,(V3){71.5f,-47.42f,-66.6f}); World.shd3=AddInstance(754,(V3){-51.306650f,-47.42f,-66.66652f}); World.shd4=AddInstance(754,(V3){71.78664f,-47.42f,56.42651f}); 
         World.rotation[World.shd1] = World.rotation[World.shd2] = World.rotation[World.shd3] = World.rotation[World.shd4] = QUAT_IDENTITY;

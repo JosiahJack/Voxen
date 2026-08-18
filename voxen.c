@@ -553,7 +553,12 @@ static __attribute__((aligned(64))) float sc_posZ[SC_MAX];
 static __attribute__((aligned(64))) float sc_radius[SC_MAX];
 static __attribute__((aligned(64))) float sc_shadRadius[SC_MAX];
 static u16 sc_origIdx[SC_MAX];
-static const u32 groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
+static u16 shadowSlot[LIGHT_COUNT]; // persistent atlas slot per light, U16_MAX = uncached
+static u8 shadowFaces[LIGHT_COUNT]; // faces rendered into cached slot
+static float shadowPosSum[LIGHT_COUNT]; // nearby mesh position sum at last render
+static u32 shadowIdSum[LIGHT_COUNT]; // nearby mesh instance+model+tex sum at last render
+static u32 shadClearFace[SHADOW_MAP_SIZE*SHADOW_MAP_SIZE]; // 0xFFFFFFFF fill for SSBO clears
+static i8 shadowLevel=-1; u32 shadowNextSlot=0; // cache epoch, slot allocator
 static const i8 faceAxis[6] = {0,0,1,1,2,2};
 static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
 INLINE u8 GetCubemapFaceMask(V3 d, float r) {
@@ -570,6 +575,8 @@ INLINE u8 GetCubemapFaceMask(V3 d, float r) {
     if (d.z-r < -maxAbsXY) m|=(1<<5);
     return m;
 }
+
+INLINE bool ShadowCasterMoved(u16 i) { return i != PLAYER1 && (World.instances[i].entflags & EF_MOVING) && !IdxIsNPC(World.instances[i].index); }
 
 __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     double shadowStartTime = get_time();
@@ -618,11 +625,10 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     }
     for (i32 i=0;i<numCasters;++i) { u16 j=shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
     const u16 numCastersAligned = numCasters & ~7u;
-    glUseProgram(shadowmapsClearSP); glDispatchCompute(groupX_shadClear,6,numCandidates);
+    if (shadowLevel != (i8)World.curLev) { mset(shadowSlot,0xFF,sizeof(shadowSlot)); mset(shadowFaces,0,sizeof(shadowFaces)); mset(shadowPosSum,0,sizeof(shadowPosSum)); mset(shadowIdSum,0,sizeof(shadowIdSum)); mset(shadClearFace,0xFF,sizeof(shadClearFace)); shadowNextSlot=0; shadowLevel=(i8)World.curLev; }
     shadDrawCalls = 0U;
+    glBindBuffer(GL_SSBO, shadowMapSSBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP);
-    u32 shadowmapOffsetHead = 0U;
-    u16 shadowMapIdx = 0;
     u32 currentSortKey = 0xFFFFFFFF;
     u16 currentModelType = 0xFFFF;
     u16 currentTexIndex = 0xFFFF;
@@ -669,7 +675,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         const __m256 lposZ = _mm256_set1_ps(lpos.z);
         const __m256 effR  = _mm256_set1_ps(effectiveRadius);
         const __m256 signMask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
-        u16 nearbyMeshCount = 0; i32 k = 0;
+        u16 nearbyMeshCount = 0; i32 k = 0; bool anyMoved=false; float posSum=0.0f;
         for (; k < numCastersAligned; k += 8) {
             const __m256 px = _mm256_load_ps(&sc_posX[k]);
             const __m256 py = _mm256_load_ps(&sc_posY[k]);
@@ -716,6 +722,8 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 localMeshes[nearbyMeshCount].instanceIdx = instIdx;
                 localMeshes[nearbyMeshCount].sortKey = ((u32)modelType << 16) | e->texIndex;
                 nearbyMeshCount++;
+                posSum += World.position[instIdx].x + World.position[instIdx].y + World.position[instIdx].z;
+                if (ShadowCasterMoved(instIdx)) anyMoved = true;
             }
             if (k == numCastersAligned && nearbyMeshCount >= SHADOW_NEARMESH_MAX) break;
         }
@@ -733,36 +741,46 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 localMeshes[nearbyMeshCount].instanceIdx = instIdx;
                 localMeshes[nearbyMeshCount].sortKey = ((u32)modelType << 16) | e->texIndex;
                 nearbyMeshCount++;
+                posSum += World.position[instIdx].x + World.position[instIdx].y + World.position[instIdx].z;
+                if (ShadowCasterMoved(instIdx)) anyMoved = true;
                 if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
             }
         }
-        if (nearbyMeshCount == 0) continue;
+        if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_COUNT; continue; }
         for (u16 j = 1; j < nearbyMeshCount; ++j) { SortedMesh key = localMeshes[j]; int sk = (int)j - 1; while(sk >= 0 && localMeshes[sk].sortKey > key.sortKey){localMeshes[sk + 1]=localMeshes[sk]; --sk;} localMeshes[sk + 1] = key; }
-        glUniform3f(3, lpos.x, lpos.y, lpos.z);
-        shadowmapIndirectionList[lightIdx] = shadowMapIdx; ++shadowMapIdx;
-        #pragma GCC unroll 6
-        for (u8 face = 0; face < 6; ++face) {
-            if (!(faceMask & (1u << face))) {continue;}
-            glUniform1ui(2,face);
-            glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
-            glUniform1ui(7,shadowmapOffsetHead + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
-            for (u16 j=0;j<nearbyMeshCount;++j) {
-                u16 instIdx = localMeshes[j].instanceIdx; u32 sortKey = localMeshes[j].sortKey;
-                glUniform1ui(0,instIdx);
-                if (currentSortKey != sortKey) {
-                    currentSortKey = sortKey;
-                    u16 modelType = (u16)(sortKey >> 16);
-                    u16 texIndex = (u16)(sortKey & 0xFFFF);
-                    if (currentModelType != modelType) { currentModelType = modelType; glBindVertexBuffer(0, vbos[modelType], 0, VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]); currentTriCount = modelTriangleCounts[currentModelType] * 3; }
-                    if (currentTexIndex != texIndex) {
-                        currentTexIndex = texIndex; glUniform1ui(6, texIndex); bool texIsTransparent = transparentTexture[texIndex];
-                        if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8, (u32)currentIsTransparent); }
+        u32 idSum=0; for (u16 j=0;j<nearbyMeshCount;++j) idSum += localMeshes[j].instanceIdx + localMeshes[j].sortKey;
+        u16 slot = shadowSlot[lightIdx];
+        if (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || (faceMask & ~shadowFaces[lightIdx]) || slot == U16_MAX) {
+            if (slot == U16_MAX) { if (shadowNextSlot >= MAX_SHADOWMAPS) { mset(shadowSlot,0xFF,sizeof(shadowSlot)); mset(shadowFaces,0,sizeof(shadowFaces)); shadowNextSlot=0; } shadowSlot[lightIdx]=(u16)shadowNextSlot++; slot=shadowSlot[lightIdx]; }
+            u32 slotOff=(u32)slot*(SHADOW_MAP_SIZE*SHADOW_MAP_SIZE*6);
+            glUniform3f(3, lpos.x, lpos.y, lpos.z);
+            #pragma GCC unroll 6
+            for (u8 face = 0; face < 6; ++face) {
+                if (!(faceMask & (1u << face))) {continue;}
+                glBufferSubData(GL_SSBO,(slotOff + face*SHADOW_MAP_SIZE*SHADOW_MAP_SIZE)*4,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE*4,shadClearFace);
+                glUniform1ui(2,face);
+                glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
+                glUniform1ui(7,slotOff + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
+                for (u16 j=0;j<nearbyMeshCount;++j) {
+                    u16 instIdx = localMeshes[j].instanceIdx; u32 sortKey = localMeshes[j].sortKey;
+                    glUniform1ui(0,instIdx);
+                    if (currentSortKey != sortKey) {
+                        currentSortKey = sortKey;
+                        u16 modelType = (u16)(sortKey >> 16);
+                        u16 texIndex = (u16)(sortKey & 0xFFFF);
+                        if (currentModelType != modelType) { currentModelType = modelType; glBindVertexBuffer(0, vbos[modelType], 0, VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]); currentTriCount = modelTriangleCounts[currentModelType] * 3; }
+                        if (currentTexIndex != texIndex) {
+                            currentTexIndex = texIndex; glUniform1ui(6, texIndex); bool texIsTransparent = transparentTexture[texIndex];
+                            if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8, (u32)currentIsTransparent); }
+                        }
                     }
+                    glDrawElements(0x0004, currentTriCount, GL_UNSIGNED_SHORT, 0); drawCalls++; shadDrawCalls++; vertsRendered += currentTriCount;
                 }
-                glDrawElements(0x0004, currentTriCount, GL_UNSIGNED_SHORT, 0); drawCalls++; shadDrawCalls++; vertsRendered += currentTriCount;
             }
+            shadowPosSum[lightIdx]=posSum; shadowIdSum[lightIdx]=idSum;
         }
-        shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
+        shadowFaces[lightIdx]=faceMask;
+        shadowmapIndirectionList[lightIdx]=slot;
     }
     glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
     glBindBuffer(GL_SSBO, shadowMapsIndirectionID);
@@ -1129,7 +1147,7 @@ void InitalizeEnvironment() {
     if (World.introNotPlayed) {} // TODO: Play intro
     World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     NewGame();
-    // PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
+    PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
     DebugRAM("InitializeEnvironment end"); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
 }
 
