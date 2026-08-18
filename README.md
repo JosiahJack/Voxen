@@ -37,9 +37,6 @@ Minimizing hierarchical layers and leveraging sensibly named globals to cut out
 fluff and overhead is important.  Minimal dependencies and leveraging tried and
 true systems is important.
 
-The gamecode for mod as game lives in a separately compiled hermetic dll/so file
-that has no libc usage, no external linking, and strict API interop with the engine.
-
 ## Supported Platforms
 
 - **Linux (64-bit)**: Primarily Debian-based distros (e.g., Kubuntu, Xubuntu) with X11. Wayland support is not intentional.  YMMV via XWayland.
@@ -95,49 +92,43 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
 ### Table of Contents (Kind of):
 
 ```
-❯ ls *.* ./Shaders/*.glsl ./Shaders/*.compute | grep -vE 'README.md|builds.csv|voxen.exe|voxen.log|build.sh|Citadel.pdb' | xargs perl -MList::Util=max -lne '$first{$ARGV} //= $_; $count{$ARGV} = $.; if(eof){$total += $.; $. = 0;} END { $max = max map {length} keys %first; printf "99999999 %7d total\n", $total; printf "%8d %-${max}s  %s\n", $count{$_}, $_, $first{$_} for keys %first }' 2>/dev/null | sort -nr | head -n 51 | sed 's/^99999999 //'
-  15503 total
-    2152 citadel.c                           // citadel.c - Gamelogic.  Most functionality is trivial so put it here.
-    1367 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
-    1224 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
-    1143 winput.c                            // winput.c - Windowing and Input System interfacing with the OS.
-     932 tables_audio.h                      // tables_audio.h - Audio filepaths, footstep indirection tables, and synth tables
-     911 ai.c                                // ai.c - AI logic control for NPC's enemies in the game.
-     870 audio.c                             // audio.c - Audio System supporting .mp3 and .wav filetypes only, uses Windows WASAPI and Linux ALSA (uses "default" to work on PulseAudio and PipeWire or just ALSA+dmix systems, with raw ioctl fallback to all ALSA devices if "default" unavailable).  Mixes synthesized sounds as well.
-     794 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
-     588 physics.c                           // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
-     585 automap.c                           // automap.c - Automap System
-     537 weapons.c                           // weapons.c - Weapon System
-     528 ./Shaders/composite_frag.glsl       // composite.glsl - Full screen quad blit with compositing pass to combine rendered view with UI overlay.  Includes custom AA, VHS blur (subtle, magic!), SSR application with tapped blur, procedural skybox with stars and saturn and sun and station shield (if on!) that rotate to represent station rotation, berserk hallucinatory effect, screen rolling EMP effect, fog, grayscale for infrared hardware effect.
-     523 models.c                            // models.c - 3D Models Loading System
-     440 textures.c                          // textures.c - 2D Texture Loading System
+❯ ls *.* ./Shaders/*.glsl ./Shaders/*.compute | grep -vE 'README.md|builds.csv|voxen.exe|voxen.log|build.sh|Citadel.pdb|*.bin' | xargs perl -MList::Util=max -lne '$first{$ARGV} //= $_; $count{$ARGV} = $.; if(eof){$total += $.; $. = 0;} END { $max = max map {length} keys %first; printf "99999999 %7d total\n", $total; printf "%8d %-${max}s  %s\n", $count{$_}, $_, $first{$_} for keys %first }' 2>/dev/null | sort -nr | head -n 51 | sed 's/^99999999 //'
+  13450 total
+    1352 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
+    1300 models.c                            // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
+    1199 citadel.c                           // citadel.c - Game logic.
+    1134 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
+     932 physics.c                           // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
+     925 audio.c                             // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
+     887 ai.c                                // ai.c - AI logic control for NPC's enemies in the game.
+     821 winput.c                            // winput.c - WinSys Windowing System and Input System interfacing with the OS.
+     537 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
+     529 text.c                              // text.c - Text and Font Rendering/Loading System
+     494 textures.c                          // textures.c - 2D Texture Loading System
+     399 synth.c                             // synth.c — Procedural Audio Engine
+     391 ./Shaders/composite_frag.glsl       // composite.glsl - Composite rendered view + UI overlay, custom AA, VHS blur (subtle, magic!), SSR with tapped blur, Procedural skybox w/ stars + saturn + sun + station shield (if on!) that rotate, berserk color hallucinations, EMP screen rolling, fog, infrared grayscale.
      387 credits.h                           // credits.h - Credits for Citadel: The System Shock Fan Remake, salt the fries!
-     380 stbtt.h                             // stb_truetype.h - v1.26 - public domain
-     319 ./Shaders/chunk_frag.glsl           // chunk_frag.glsl: Generic shader for all world objects
-     313 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
-     306 culling.c                           // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
-     183 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
-     163 text.c                              // text.c - Text and Font Rendering/Loading System
-     151 console.c                           // console.c - Console Emulator CHEATS!  Same type of tilde activated command entry as Quake or Half-Life or Source.
-     118 synth.c                             // synth.c - Audio Synthesis Engine, creates synthesized audio on the fly from math using zero RAM.
-      93 ray.c                               // ray.c - Raycast System.  This is an exact polygonal casting system for high accuracty separate from the physics engine entirely except for layers.
-      89 ./Shaders/ssr.compute               // ssr.compute - Compute shader for Screen Space Reflections 
-      86 ./Shaders/voxels.compute            // voxels.compute - Compute shader for determining light lists for voxels and updating voxel tables 
+     372 weapons.c                           // weapons.c - Weapon System
+     361 ui.c                                // ui.c - User Interface(UI) aka HUD
+     307 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
+     288 culling.c                           // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
+     229 ./Shaders/chunk_frag.glsl           // chunk_frag.glsl: Generic shader for all world objects
+     229 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
+      83 ./Shaders/voxels.compute            // voxels.compute - Compute shader for determining light lists for voxels and updating voxel tables 
+      70 ./Shaders/ssr.compute               // ssr.compute - Compute shader for Screen Space Reflections 
       54 ./Shaders/text_frag.glsl            // text_frag.glsl - Text Fragment shader, supports both SystemShock font with black border around every character and StopD font with 3d drop shadow and top edge highlights
-      47 Citadel_Autosplitter.txt            // Citadel_Autosplitter.txt - This game uses the following sequential struct to store data for speedrunners to access using a utility like LiveSplit or other tool.  HAPPY SPEEDRUNNING!!
-      37 ./Shaders/shadowmap_frag.glsl       // shadowmap_frag.glsl - Shadowmap Fragment Shader, uses alpha cutout on textures for {fence style shadows.  Writes into SSBO via atomicMin on typecast float dist with * 100000 scaling.
-      33 ./Shaders/depth_prepass.glsl        // depth_prepass.glsl: Renders all opaque objects prior to main forward+ pass
-      31 Citadel_Autosplitter.asl            // Citadel_AutoSplitter.asl - AutoSplitter C# LiveSplit instruction file
-      30 ./Shaders/ui_frag.glsl              // ui_frag.glsl: Generic shader for unlit textured UI images (mostly cutouts)
+      33 ./Shaders/shadowmap_frag.glsl       // shadowmap_frag.glsl - Shadowmap Fragment Shader, uses alpha cutout on textures for {fence style shadows.  Writes into SSBO via atomicMin on typecast float dist with * 100000 scaling.
+      32 ./Shaders/depth_prepass.glsl        // depth_prepass.glsl: Renders all opaque + cutout objects prior to main forward+ pass
+      29 ./Shaders/ui_frag.glsl              // ui_frag.glsl: Generic shader for unlit textured UI images (mostly cutouts)
       18 ./Shaders/chunk_vert.glsl           // chunk_vert.glsl: Generic shader for unlit textured surfaces (all world geometry, items, enemies, doors, etc., without transparency for first pass prior to lighting.
-      17 ./Shaders/depth_prepass_vert.glsl   // chunk.glsl: Generic shader for unlit textured surfaces (all world geometry, items,
-      15 ./Shaders/shadowmap_vert.glsl       // shadowmap_vert.glsl - Shadowmap Vertex shader
-      12 ./Shaders/shadowmaps_clear.compute  // shadowmaps_clear.compute - Compute shader for clearing the distances for shadowmaps in the SSBO to 0xFFFFFFFF
+      15 ./Shaders/depth_prepass_vert.glsl   // depth_prepass_vert.glsl: vertex shader for depth prepass
+      10 ./Shaders/shadowmap_vert.glsl       // shadowmap_vert.glsl - Shadowmap Vertex shader
        6 ./Shaders/ui_vert.glsl              // ui_vert.glsl: Generic shader for unlit textured surfaces (all world geometry, items, enemies, doors, etc., without transparency for first pass prior to lighting.
        6 ./Shaders/text_vert.glsl            // text_vert.glsl - Text Vertex Shader
+       6 ./Shaders/shadowmaps_clear.compute  // shadowmaps_clear.compute - Compute shader for clearing the distances for shadowmaps in the SSBO to 0xFFFFFFFF
        6 ./Shaders/debugunlit_vert.glsl      // debugunlit_vert.glsl - Wireline Vertex Shader
        5 ./Shaders/composite_vert.glsl       // imageblit.glsl - Full screen quad unlit textured for presenting image buffers such as results from compute shaders, image effects, post-processing, etc..
-       4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe view of colliders, velocity debug vectors, angular velocity debug vector and arc for orientation, raycast debug vector, and weapon lasers 
+       4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe view of colliders, velocity debug vectors, angular velocity debug vector and arc for orientation, raycast debug vector, and weapon lasers  
 ```
 
 ### Install Footprint
@@ -445,208 +436,210 @@ Binary size eval:
 ❯ size ./voxen
    text  data       bss       dec     hex filename
  506018 33428 192529865 193069311 b8200ff ./voxen
-❯ nm -S --size-sort -t d ./voxen | grep -i ' [tw] ' | tail -n 200
+```
 
-0000000017193600 0000000000000321 t TextureSequenceInit
-0000000016903312 0000000000000324 t GenImpact
-0000000017286480 0000000000000329 t LoadSecondaryAmmoType
-0000000017232032 0000000000000330 t UI_MenuButton
-0000000016940976 0000000000000331 t DropHeldItem
-0000000017258192 0000000000000332 t RenderCameraViews
-0000000017031680 0000000000000335 t InputCursorPos
-0000000017286128 0000000000000337 t LoadPrimaryAmmoType
-0000000016953088 0000000000000339 t SpawnImpactEffect
-0000000016956800 0000000000000341 t HardwareUpdate
-0000000016953440 0000000000000343 t ReduceCurrentLevelSecurity
-0000000016941312 0000000000000347 t AddAccessCardToInventory
-0000000017285776 0000000000000347 t CheckUIStateAndAttack
-0000000017046256 0000000000000347 t DualLogMain
-0000000017141504 0000000000000354 t _cid_subrs
-0000000017278752 0000000000000357 t cmd_git
-0000000017055312 0000000000000361 t BvhRayAABBHit
-0000000017029424 0000000000000362 t SaveGame
-0000000017140032 0000000000000364 t _csv
-0000000017029056 0000000000000366 t VoidSquasher
-0000000017073408 0000000000000368 t trigger_gravitylift_touch
-0000000017090144 0000000000000375 t EPAContactPoint
-0000000017146384 0000000000000376 t stbtt_GetGlyphBox
-0000000017171744 0000000000000378 t _cff_idx
-0000000017232368 0000000000000378 t UI_Checkbox
-0000000017230416 0000000000000379 t RenderUIImage
-0000000017171360 0000000000000380 t _dict_ints
-0000000017047008 0000000000000383 t BmpWrite
-0000000017039088 0000000000000383 t mcpy
-0000000016948304 0000000000000386 t ButtonSwitchUpdate
-0000000016943184 0000000000000389 t AddItemFail
-0000000017040272 0000000000000389 t scpy_to_a_from_b
-0000000016998128 0000000000000389 t UpdateLight
-0000000016969440 0000000000000392 t CastRayCellCheck
-0000000017217728 0000000000000393 t InputWindowFocus
-0000000016938320 0000000000000395 t mp3_read_pcm_frames_f32
-0000000017287520 0000000000000400 t WeaponsUpdate
-0000000017222544 0000000000000407 t ConsoleEmulator
-0000000016902144 0000000000000408 t GenLaser
-0000000017218128 0000000000000414 t CenterWindowOnMonitor
-0000000017031248 0000000000000420 t quat_from_yaw_pitch_roll
-0000000016901712 0000000000000428 t SynTrigger
-0000000017205472 0000000000000436 t SetWindowMonitor
-0000000016946800 0000000000000447 t UseTargets
-0000000017038144 0000000000000451 t LoadConfig
-0000000017151872 0000000000000460 t _eqs
-0000000016955040 0000000000000462 t TeleportAway
-0000000017221184 0000000000000464 t ParseLevelArg
-0000000017152336 0000000000000491 t _tess_c
-0000000017141008 0000000000000492 t _cff_idx_get
-0000000017152832 0000000000000498 t _tess_cb
-0000000016999776 0000000000000506 t SetLevelPointers
-0000000016973424 0000000000000515 t PortalCulling
-0000000017270096 0000000000000524 t UpdateInstanceMatrix4x4s
-0000000017219888 0000000000000525 t ChangeFullScreenWindowed
-0000000016914096 0000000000000526 t UpdateMusic
-0000000016903648 0000000000000527 t play_wav
-0000000016970400 0000000000000531 t CastStraightX
-0000000016945296 0000000000000534 t FuncWallUpdate
-0000000017141872 0000000000000543 t _get_subrs
-0000000017193936 0000000000000545 t TextureSequenceUpdate
-0000000017030608 0000000000000546 t InputKey
-0000000016940368 0000000000000550 t ScreenPointToRay
-0000000016969840 0000000000000551 t CastStraightZ
-0000000016957152 0000000000000564 t PatchUpdate
-0000000016902624 0000000000000568 t GenDoor
-0000000016962224 0000000000000572 t UseEntity
-0000000016900064 0000000000000582 t AICheckPain
-0000000016968736 0000000000000587 t AddDoorPortal
-0000000016942592 0000000000000588 t AddWeaponToInventory
-0000000017092848 0000000000000588 t RunGJK
-0000000016975056 0000000000000598 t CullInit
-0000000017068880 0000000000000609 t UpdateAnims
-0000000017196304 0000000000000613 t DrawVelocityVector
-0000000016958912 0000000000000622 t DoorUse
-0000000017231408 0000000000000624 t UI_Slider
-0000000017098640 0000000000000631 t _supA_box
-0000000016947664 0000000000000640 t ButtonSwitchUse
-0000000017093440 0000000000000643 t SeedEPA
-0000000017078096 0000000000000646 t Entity_GetCap
-0000000017204816 0000000000000650 t SetWindowIcon
-0000000017000288 0000000000000656 t CopyPlayerState
-0000000017208000 0000000000000656 t GetMonitorWorkarea
-0000000017027600 0000000000000674 t LoadAllLevels
-0000000017257504 0000000000000680 t GetProjections
-0000000016913104 0000000000000683 t GetCorrespondingLevelClip
-0000000017029792 0000000000000684 t LoadGame
-0000000016946112 0000000000000687 t ForceBridgeUpdate
-0000000017227504 0000000000000688 t CompileAnyShader
-0000000017281600 0000000000000689 t MeleeHitUpdate
-0000000017110112 0000000000000690 t ApplyInvTensor
-0000000016899360 0000000000000704 t InitializeAIAfterLoad
-0000000016958192 0000000000000713 t DoorActuate
-0000000016900656 0000000000000720 t GetFootstepTypeForPrefab
-0000000016952336 0000000000000746 t GrenadeExplode
-0000000017229648 0000000000000760 t mul_mat4
-0000000017135232 0000000000000767 t stbtt_FindGlyphIndex
-0000000017028288 0000000000000768 t LoadLevel
-0000000017074624 0000000000000787 t SphBox
-0000000017073824 0000000000000791 t CapCap
-0000000017095392 0000000000000806 t BvhWalkSphMsh
-0000000017228816 0000000000000829 t ExtractFrustumPlanes
-0000000017179392 0000000000000831 t PngHuf
-0000000017041264 0000000000000849 t double2str
-0000000016949152 0000000000000876 t ApplyImpactForceSphere
-0000000017048368 0000000000000890 t qsort_new
-0000000017221648 0000000000000892 t ProcessConsoleCommand
-0000000017282304 0000000000000894 t FireMelee
-0000000017198608 0000000000000898 t DrawSphereWireframe
-0000000017096208 0000000000000901 t CapMsh
-0000000016964656 0000000000000939 t ObjectDeath
-0000000017280640 0000000000000946 t CreateStandardImpactMarks
-0000000017199568 0000000000000958 t DrawMeshCollider
-0000000016937088 0000000000000965 t mp3L3_imdct36
-0000000016998576 0000000000000969 t AddInstance
-0000000017207024 0000000000000970 t InputMonitor
-0000000017192592 0000000000001003 t TextureParsingWorker
-0000000017284544 0000000000001020 t FireWeapon
-0000000016911808 0000000000001035 t MixAmbs
-0000000016973952 0000000000001092 t CullCore
-0000000017103696 0000000000001094 t BvhWalkAABB_CvxTri
-0000000017205920 0000000000001095 t PollMonitors
-0000000017254720 0000000000001131 t DrawEntity
-0000000017276928 0000000000001175 t main
-0000000016970944 0000000000001181 t CircleFanRays
-0000000017131280 0000000000001202 t CantStand
-0000000016939136 0000000000001223 t Push
-0000000016906400 0000000000001234 t play_mp3
-0000000016953792 0000000000001245 t Death
-0000000017209232 0000000000001249 t processEvent
-0000000017049264 0000000000001268 t sift
-0000000017094096 0000000000001284 t ExpandEPA
-0000000017203520 0000000000001288 t DrawAngularVelocity
-0000000016972128 0000000000001292 t DetermineVisibleCells
-0000000016955504 0000000000001292 t UpdateLights
-0000000017216400 0000000000001319 t SetGLContext_GetFunctionPointers
-0000000017097120 0000000000001321 t PrimitiveCvx
-0000000017218544 0000000000001336 t UpdateScreenSize
-0000000017086400 0000000000001399 t HullSupport
-0000000016943584 0000000000001410 t AddItemToInventory
-0000000017108608 0000000000001490 t BoxMsh
-0000000017150368 0000000000001500 t _rse
-0000000017169808 0000000000001539 t RenderFormattedText
-0000000017165744 0000000000001550 t LoadTextForLanguage
-0000000017069568 0000000000001643 t GenerateConvexAdjacencyLists
-0000000017270620 0000000000001644 t NewGame
-0000000017255856 0000000000001645 t mat4_inverse
-0000000017071216 0000000000001667 t BvhBuildOctree
-0000000017196928 0000000000001676 t DrawBoxColliderColored
-0000000016962800 0000000000001729 t ModUpdate
-0000000016909968 0000000000001797 t InitAudio
-0000000017050544 0000000000001847 t trinkle
-0000000017106688 0000000000001888 t CvxCvx
-0000000017104800 0000000000001888 t CvxMsh
-0000000016996128 0000000000001995 t LoadFieldIntoLight
-0000000017245728 0000000000002018 t RenderPausedUI
-0000000017035936 0000000000002034 t InputProcessing
-0000000016904176 0000000000002045 t load_wav
-0000000017210496 0000000000002073 t VCreateWindow
-0000000016907840 0000000000002121 t AudioUpdate
-0000000017090704 0000000000002134 t SphTriTest
-0000000017025344 0000000000002198 t LoadLevelData
-0000000016950032 0000000000002289 t TakeDamage
-0000000017087808 0000000000002327 t GJKNextSimplex
-0000000016959872 0000000000002350 t Targetted
-0000000017110816 0000000000002422 t ResolveContactVelocity
-0000000017167296 0000000000002501 t LoadLogTextForLanguage
-0000000017066336 0000000000002531 t PhysGeomWorker
-0000000017132496 0000000000002541 t ApplyPlayerMovements
-0000000017163184 0000000000002553 t InitFontAtlasses
-0000000016965904 0000000000002556 t DetermineClosedEdges
-0000000017075424 0000000000002666 t CapBox
-0000000017160224 0000000000002687 t stbtt_InitFont_internal
-0000000017052416 0000000000002896 t ParseModelData
-0000000017153344 0000000000002918 t stbtt_MakeGlyphBitmapSubpixel
-0000000017200528 0000000000002985 t DrawCapsuleCollider
-0000000017079280 0000000000003029 t ComputeConvexMeshInertiaTensor
-0000000017042128 0000000000003052 t sFormatV
-0000000017055680 0000000000003337 t LoadModels
-0000000017142416 0000000000003422 t _run_cs
-0000000017113248 0000000000003596 t ApplyManifoldResponse
-0000000017146768 0000000000003599 t _fae
-0000000017212704 0000000000003696 t WindowInit
-0000000017099616 0000000000003894 t CvxTriTest
-0000000017156272 0000000000003948 t stbtt_PackFontRanges
-0000000017082320 0000000000003999 t BoxBox
-0000000017136000 0000000000004032 t _GetGlyphShapeTT
-0000000017222960 0000000000004529 t Raycast
-0000000017272320 0000000000004598 t InitalizeEnvironment
-0000000017187120 0000000000005469 t LoadTextures
-0000000017180224 0000000000006891 t PngLoad
-0000000017247760 0000000000006892 t RenderShadowmaps
-0000000017172176 0000000000007201 t PngDecode
-0000000017059024 0000000000007311 t ModelParsingWorker
-0000000017258528 0000000000011563 t Render
-0000000017232848 0000000000012865 t RenderMenu
-0000000017116848 0000000000014421 t Physics
-0000000016976256 0000000000019365 t ModEDefsInitAfterLoad
-0000000016914752 0000000000022335 t mp3_decode_next_frame_ex
-0000000017000944 0000000000023981 t LoadLevelMod
+```
+❯ nm -S --size-sort -t d ./voxen | grep -i ' [tw] ' | tail -n 200
+0000000016978736 0000000000000392 t CastRayCellCheck
+0000000017081328 0000000000000392 t OptimizeVertexFetch
+0000000017055312 0000000000000393 t Screenshot
+0000000016924928 0000000000000395 t mp3_read_pcm_frames_f32
+0000000016922144 0000000000000403 t resample_stereo
+0000000017294320 0000000000000407 t ConsoleEmulator
+0000000017290976 0000000000000411 t CenterWindowOnMonitor
+0000000017294736 0000000000000420 t quat_from_yaw_pitch_roll
+0000000016950656 0000000000000443 t ScreenPointToRay
+0000000017074368 0000000000000447 t cgltf_load_buffer_base64
+0000000016977584 0000000000000447 t LoadCullPNG
+0000000016957056 0000000000000447 t UseTargets
+0000000017219904 0000000000000460 t _eqs
+0000000016965408 0000000000000462 t TeleportAway
+0000000017303440 0000000000000464 t ParseLevelArg
+0000000016924448 0000000000000469 t mp3_seek_to_pcm_frame
+0000000016902736 0000000000000476 t play_synth
+0000000017301904 0000000000000478 t LoadConfig
+0000000017231360 0000000000000490 t LoadFallbackFont
+0000000017220368 0000000000000491 t _tess_c
+0000000017208896 0000000000000492 t _cff_idx_get
+0000000017220864 0000000000000498 t _tess_cb
+0000000017377648 0000000000000498 t WeaponsUpdate
+0000000017009872 0000000000000506 t SetLevelPointers
+0000000016982720 0000000000000515 t PortalCulling
+0000000017349600 0000000000000519 t UpdateInstanceMatrix4x4s
+0000000017290448 0000000000000526 t InputKey
+0000000016979696 0000000000000531 t CastStraightX
+0000000016914384 0000000000000533 t UpdateMusic
+0000000016955568 0000000000000534 t FuncWallUpdate
+0000000016923904 0000000000000536 t mp3_get_pcm_frame_count
+0000000016920832 0000000000000537 t GenRing
+0000000017209760 0000000000000543 t _get_subrs
+0000000017041120 0000000000000546 t LoadGame
+0000000016918496 0000000000000549 t GenTapCase
+0000000016979136 0000000000000551 t CastStraightZ
+0000000016966224 0000000000000564 t PatchUpdate
+0000000017148144 0000000000000565 t _supA_box
+0000000016971280 0000000000000572 t UseEntity
+0000000016917536 0000000000000578 t GenFootstep
+0000000017054704 0000000000000579 t BmpWrite
+0000000017048432 0000000000000580 t DualLogMain
+0000000016915728 0000000000000580 t GenDoor
+0000000016900176 0000000000000582 t AICheckPain
+0000000016903216 0000000000000582 t play_wav
+0000000016978032 0000000000000587 t AddDoorPortal
+0000000016953200 0000000000000588 t AddWeaponToInventory
+0000000017142336 0000000000000588 t RunGJK
+0000000017128576 0000000000000595 t SampleQuat
+0000000016967984 0000000000000605 t DoorUse
+0000000017313088 0000000000000612 t UI_Slider
+0000000017270112 0000000000000613 t DrawVelocityVector
+0000000016957920 0000000000000614 t ButtonSwitchUse
+0000000016915104 0000000000000617 t GenLaserSS1
+0000000017269232 0000000000000618 t TextureSequenceUpdate
+0000000017124176 0000000000000629 t cgltf_parse_json_accessor_sparse
+0000000016919456 0000000000000634 t GenSparkSmall
+0000000017142928 0000000000000643 t SeedEPA
+0000000017132128 0000000000000646 t Entity_GetCap
+0000000017278656 0000000000000650 t SetWindowIcon
+0000000016906928 0000000000000654 t play_mp3
+0000000017010384 0000000000000656 t CopyPlayerState
+0000000017051616 0000000000000662 t VoidSquasher
+0000000017040448 0000000000000666 t SaveGame
+0000000016956384 0000000000000671 t ForceBridgeUpdate
+0000000016984352 0000000000000672 t CullInit
+0000000016902048 0000000000000675 t synth_reverb_apply
+0000000017343104 0000000000000680 t GetProjections
+0000000017309488 0000000000000688 t CompileAnyShader
+0000000017371936 0000000000000689 t MeleeHitUpdate
+0000000017158736 0000000000000690 t ApplyInvTensor
+0000000016913360 0000000000000690 t GetCorrespondingLevelClip
+0000000016899472 0000000000000704 t InitNPC
+0000000016967264 0000000000000713 t DoorActuate
+0000000017038960 0000000000000719 t LoadAllLevels
+0000000016900768 0000000000000720 t GetFootstepTypeForPrefab
+0000000016962576 0000000000000746 t GrenadeExplode
+0000000016951152 0000000000000754 t DropHeldItem
+0000000016921376 0000000000000756 t GenBeakerThud
+0000000017311328 0000000000000760 t mul_mat4
+0000000017202912 0000000000000767 t stbtt_FindGlyphIndex
+0000000017039680 0000000000000768 t LoadLevel
+0000000017144880 0000000000000806 t BvhWalkSphMsh
+0000000017310496 0000000000000829 t ExtractFrustumPlanes
+0000000017124816 0000000000000831 t cgltf_parse_json_sparse_part
+0000000017249504 0000000000000831 t PngHuf
+0000000016959328 0000000000000846 t ApplyImpactForceSphere
+0000000017136448 0000000000000847 t HullSupport
+0000000017372640 0000000000000894 t FireMelee
+0000000017272416 0000000000000898 t DrawSphereWireframe
+0000000017145696 0000000000000901 t CapMsh
+0000000017044048 0000000000000901 t double2str
+0000000017050672 0000000000000919 t trinkle
+0000000017152896 0000000000000926 t CvxMshFillExtraPoints
+0000000017370992 0000000000000936 t CreateStandardImpactMarks
+0000000017273376 0000000000000958 t DrawMeshCollider
+0000000016948032 0000000000000965 t mp3L3_imdct36
+0000000016973680 0000000000000966 t ObjectDeath
+0000000017280416 0000000000000970 t InputMonitor
+0000000017374880 0000000000001020 t FireWeapon
+0000000017127312 0000000000001024 t NodeGlobalMatrixAtTime
+0000000017303904 0000000000001036 t ProcessConsoleCommand
+0000000016905872 0000000000001052 t SndInit
+0000000017153824 0000000000001060 t BvhWalkAABB_CvxTri
+0000000016983248 0000000000001092 t CullCore
+0000000017279312 0000000000001095 t PollMonitors
+0000000017340320 0000000000001131 t DrawEntity
+0000000016911952 0000000000001137 t MixAmbs
+0000000017008720 0000000000001144 t AddInstance
+0000000017081728 0000000000001155 t FinalizeParsedMesh
+0000000016980240 0000000000001181 t CircleFanRays
+0000000017080128 0000000000001192 t OptimizeVertexCache
+0000000017198928 0000000000001202 t CantStand
+0000000017292736 0000000000001203 t ChangeFullScreenWindowed
+0000000016949424 0000000000001223 t Push
+0000000017267648 0000000000001234 t TextureParsingWorker
+0000000017074816 0000000000001249 t cgltf_load_buffers
+0000000017143584 0000000000001284 t ExpandEPA
+0000000017277360 0000000000001288 t DrawAngularVelocity
+0000000017049376 0000000000001290 t qsort_new
+0000000016981424 0000000000001292 t DetermineVisibleCells
+0000000017056176 0000000000001312 t scycle
+0000000017288736 0000000000001319 t SetGLContext_GetFunctionPointers
+0000000016964080 0000000000001327 t Death
+0000000017291392 0000000000001336 t UpdateScreenSize
+0000000017146608 0000000000001337 t PrimitiveCvx
+0000000016922560 0000000000001338 t mp3_init_file
+0000000016953792 0000000000001477 t AddItemToInventory
+0000000017356048 0000000000001508 t main
+0000000017240064 0000000000001539 t RenderFormattedText
+0000000017125648 0000000000001548 t GltfMeshFreePartial
+0000000017281680 0000000000001590 t processEvent
+0000000017350119 0000000000001624 t NewGame
+0000000017218272 0000000000001626 t _rse
+0000000017341456 0000000000001645 t mat4_inverse
+0000000017129520 0000000000001667 t BvhBuildOctree
+0000000017270736 0000000000001676 t DrawBoxColliderColored
+0000000016971856 0000000000001707 t ModUpdate
+0000000017235616 0000000000001755 t LoadTextForLanguage
+0000000017052288 0000000000001777 t BlowBubblesOfVoid
+0000000016910080 0000000000001803 t InitAudio
+0000000017072560 0000000000001808 t jsmn_parse
+0000000016903808 0000000000001813 t load_wav
+0000000017156816 0000000000001888 t CvxCvx
+0000000017154896 0000000000001917 t CvxMsh
+0000000017058368 0000000000001985 t cgltf_element_read_float
+0000000017006256 0000000000002011 t LoadFieldIntoLight
+0000000017327376 0000000000002018 t RenderPausedUI
+0000000017283280 0000000000002073 t VCreateWindow
+0000000017140192 0000000000002134 t SphTriTest
+0000000017113504 0000000000002172 t UpdateAnims
+0000000017115744 0000000000002184 t GenerateConvexAdjacencyLists
+0000000016907872 0000000000002207 t AudioUpdate
+0000000017118224 0000000000002305 t cgltf_parse_json_node
+0000000017137296 0000000000002332 t GJKNextSimplex
+0000000016968928 0000000000002350 t Targetted
+0000000017090784 0000000000002365 t GltfBakeWorker
+0000000016960176 0000000000002385 t TakeDamage
+0000000017036512 0000000000002392 t LoadLevelData
+0000000017162384 0000000000002450 t PrepareSolverContact
+0000000017200144 0000000000002566 t ApplyPlayerMovements
+0000000016974960 0000000000002621 t DetermineClosedEdges
+0000000017237376 0000000000002674 t LoadLogTextForLanguage
+0000000017228672 0000000000002687 t stbtt_InitFont_internal
+0000000017110720 0000000000002777 t PhysGeomWorker
+0000000017120544 0000000000002871 t cgltf_parse_json_animation
+0000000017298800 0000000000002930 t InputProcessing
+0000000017159440 0000000000002933 t SolveGlobalContacts
+0000000017274336 0000000000003022 t DrawCapsuleCollider
+0000000017133312 0000000000003045 t ComputeConvexMeshInertiaTensor
+0000000017044960 0000000000003052 t sFormatV
+0000000017329408 0000000000003172 t UpdateLights
+0000000017285488 0000000000003243 t WindowInit
+0000000017149056 0000000000003305 t CvxTriTest
+0000000017221376 0000000000003323 t stbtt_MakeGlyphBitmapSubpixel
+0000000017210304 0000000000003422 t _run_cs
+0000000017214672 0000000000003599 t _fae
+0000000017250336 0000000000003700 t PngLoad
+0000000017231856 0000000000003750 t InitFontAtlasses
+0000000017224704 0000000000003953 t stbtt_PackFontRanges
+0000000017076080 0000000000004048 t cgltf_validate
+0000000017203680 0000000000004225 t _GetGlyphShapeTT
+0000000017351792 0000000000004252 t InitalizeEnvironment
+0000000017093152 0000000000004469 t ParseModelData
+0000000017304944 0000000000004529 t Raycast
+0000000017098000 0000000000005003 t LoadModels
+0000000017344128 0000000000005460 t Render
+0000000017254048 0000000000006331 t CreatePngImageArena
+0000000017242448 0000000000007052 t PngDecode
+0000000017260384 0000000000007249 t LoadTextures
+0000000017332592 0000000000007651 t RenderShadowmaps
+0000000017103008 0000000000007710 t ModelParsingWorker
+0000000017082896 0000000000007878 t LoadGLTFAnimatedBlocks
+0000000017359632 0000000000010741 t RenderUI
+0000000017060368 0000000000012181 t cgltf_parse
+0000000017314528 0000000000012840 t RenderMenu
+0000000016985840 0000000000019907 t ModEDefsInitAfterLoad
+0000000016925328 0000000000022693 t mp3_decode_next_frame_ex
+0000000017011040 0000000000025043 t LoadLevelMod
+0000000017164848 0000000000034074 t Physics
 ```
 
 Helper bash commands to generate frame sequences in models.txt:
