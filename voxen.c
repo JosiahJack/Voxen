@@ -750,13 +750,16 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         for (u16 j = 1; j < nearbyMeshCount; ++j) { SortedMesh key = localMeshes[j]; int sk = (int)j - 1; while(sk >= 0 && localMeshes[sk].sortKey > key.sortKey){localMeshes[sk + 1]=localMeshes[sk]; --sk;} localMeshes[sk + 1] = key; }
         u32 idSum=0; for (u16 j=0;j<nearbyMeshCount;++j) idSum += localMeshes[j].instanceIdx + localMeshes[j].sortKey;
         u16 slot = shadowSlot[lightIdx];
-        if (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || (faceMask & ~shadowFaces[lightIdx]) || slot == U16_MAX) {
+        bool contentDirty = (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
+        u8 needFaces = (u8)(faceMask & ~shadowFaces[lightIdx]);
+        if (contentDirty || needFaces) {
             if (slot == U16_MAX) { if (shadowNextSlot >= MAX_SHADOWMAPS) { mset(shadowSlot,0xFF,sizeof(shadowSlot)); mset(shadowFaces,0,sizeof(shadowFaces)); shadowNextSlot=0; } shadowSlot[lightIdx]=(u16)shadowNextSlot++; slot=shadowSlot[lightIdx]; }
             u32 slotOff=(u32)slot*(SHADOW_MAP_SIZE*SHADOW_MAP_SIZE*6);
             glUniform3f(3, lpos.x, lpos.y, lpos.z);
+            u8 renderFaces = contentDirty ? faceMask : needFaces; // Content change invalidates all faces, but viewpoint change only needs relevant faces.
             #pragma GCC unroll 6
             for (u8 face = 0; face < 6; ++face) {
-                if (!(faceMask & (1u << face))) {continue;}
+                if (!(renderFaces & (1u << face))) {continue;}
                 glBufferSubData(GL_SSBO,(slotOff + face*SHADOW_MAP_SIZE*SHADOW_MAP_SIZE)*4,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE*4,shadClearFace);
                 glUniform1ui(2,face);
                 glUniformMatrix4fv(1,1,GL_FALSE,(float*)lightViewProj[lightIdx][face]);
@@ -778,8 +781,8 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 }
             }
             shadowPosSum[lightIdx]=posSum; shadowIdSum[lightIdx]=idSum;
+            shadowFaces[lightIdx] = contentDirty ? faceMask : (u8)(shadowFaces[lightIdx] | faceMask);
         }
-        shadowFaces[lightIdx]=faceMask;
         shadowmapIndirectionList[lightIdx]=slot;
     }
     glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
@@ -1174,8 +1177,8 @@ i32 main() {
         ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
         UpdateAudio();
         gameTime = get_time() - gameT_start;
+        if (likely(!World.paused && !World.menuActive)) UpdateInstanceMatrix4x4s(); // Before camviews so camview shadows render same as main pass
         drawCalls=uiDrawCalls=shadDrawCalls=vertsRendered=0; RenderCameraViews(); if (likely(!World.paused && !World.menuActive)) CullCore();
-        if (likely(!World.paused && !World.menuActive)) UpdateInstanceMatrix4x4s();
         Render(false/*!camview*/,0u);
         if (ScrshotPressed() && World.current_time > World.screenshotTimeout) Screenshot();
         ResetInput(); globalframe++; World.cpuTime = get_time() - World.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.

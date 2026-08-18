@@ -1226,7 +1226,7 @@ void LoadLevelData(u8 curlevel) {
     for (int i = PLAYER1; i < World.instCount; ++i) {
         i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
         World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
-        World.radius[i] = modelBounds[World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x, World.scale[i].y), World.scale[i].z);
+        u16 mi = World.instances[i].modelIndex; World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
         World.instances[i].shadRadius = World.radius[i] * 2.00f;
         ComputeConvexMeshInertiaTensor(i);
         if (World.mass[i] < 0.001f && World.col[i] != COLTYPE_NONE && World.col[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
