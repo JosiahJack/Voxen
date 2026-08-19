@@ -10,6 +10,7 @@ float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProje
 
 // Entity Management
 float modelMatrices[INSTANCE_COUNT*16];
+float *world_from_mdl = modelMatrices; // Alias for physics collision
 u16** modelTriangles; u32 modelVertexCounts[MAX_MDLS]; u16 modelTriangleCounts[MAX_MDLS]; float modelBounds[MAX_MDLS]; u16 mdlsCnt; float **physPos; u16** physTris; u32* physVertCounts;
 
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
@@ -57,8 +58,6 @@ void AddWireLine(V3 start, V3 end, Color col) {
     World.debugLineVertCount = i;
 }
 
-ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i);
-bool PhysIsAsleep(u16 i);
 INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY) || PhysIsAsleep(i)) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
 void DrawVelocityVector(u16 i) {
     if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;}
@@ -193,7 +192,6 @@ int ParseLevelArg(const char* arg) {
 }
 
 u8 queuedLevelToLoad = 255u; V3 queuedLevelPos;
-void LoadLevel(u8 curlevel, V3 pos);
 static void cmd_loadlevel(const char* arg) {
     if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
     int level = ParseLevelArg(arg); if (level == -2) return; // Already printed g3 message

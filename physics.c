@@ -799,7 +799,7 @@ void Physics(float dt) {
             u8 colA = World.col[a]; ShapeBox boxA = colA==COLTYPE_BOX ? Entity_GetBox(a) : (ShapeBox){0}; ShapeCapsule capA = colA==COLTYPE_CAP ? Entity_GetCap(a) : (ShapeCapsule){0}; ShapeSphere sphA = colA==COLTYPE_SPH ? Entity_GetSph(a) : (ShapeSphere){0};
             i32 cx = PosGetCellCoordX(World.position[a].x), cz = PosGetCellCoordZ(World.position[a].z); u32 mask = GetCollisionMask(World.layer[a]);
             float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub; i32 radCells = vmax((i32)(searchRad / CELLSZ),1);
-            float matA[16]; const float *mxA = &modelMatrices[a*16];
+            float matA[16]; const float *mxA = &world_from_mdl[a*16];
             if (World.col[a] == COLTYPE_CVX) { EntityColliderMatrixNow(a,matA); mxA = matA; } // Not MSH as only CVX is dynamically moving during physics substeps.
             Manifold contactsMani[32]; u16 contactsOther[32]; int contactCount = 0;
             for (i32 dx = -radCells; dx <= radCells; ++dx) {
@@ -812,7 +812,7 @@ void Physics(float dt) {
                         if (!(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue;
                         if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !g_physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
                         V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
-                        Manifold mf = {0}; float matB[16]; const float *mxB = &modelMatrices[b*16];
+                        Manifold mf = {0}; float matB[16]; const float *mxB = &world_from_mdl[b*16];
                         if (World.col[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
                         if      (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_CAP) { mf = OverlapToManifold(CapCap(capA,capB)); }
                         else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_BOX) { mf = OverlapToManifold(CapBox(capA,boxB)); }
@@ -935,7 +935,7 @@ bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
             u32 cell = PosGetCellCoordsP(cx + dx, cz + dz);
             for (u16 k = 0; k < cellCounts[cell]; ++k) {
                 u16 b = cellLists[cell][k]; if (b == playerIdx || !(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue;
-                if (World.col[b] == COLTYPE_MSH) { Overlap r = CapMsh(Entity_GetCap(playerIdx),World.instances[b].modelIndex,&modelMatrices[b*16]); if (r.hit && r.pen > 0.08f) { blocked = true; break; } }
+                if (World.col[b] == COLTYPE_MSH) { Overlap r = CapMsh(Entity_GetCap(playerIdx),World.instances[b].modelIndex,&world_from_mdl[b*16]); if (r.hit && r.pen > 0.08f) { blocked = true; break; } }
             }
         }
     }

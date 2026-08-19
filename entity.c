@@ -1311,7 +1311,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32));
     camViewCount = levelCamViewCount[curlevel];
     mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    mset(modelMatrices,0,INSTANCE_COUNT * 16 * sizeof(float));
+    // world_from_mdl is now an alias for modelMatrices, no need to zero separately
     for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
     DualLog("Switched to Level %d\n",curlevel);
     ResetLevelAudio(); ResetLevelMusic();
