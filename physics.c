@@ -1,8 +1,8 @@
 // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
 #include "common.h"
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
-static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=16.666666f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
-static const float WALK_SPEED=3.6f,SPRINT_SPEED=8.8f,PLAYER_MAX_CYBER_SPEED=5.0f,SPRINT_SPEED_FATIGUED=5.5f,CROUCH_SPEED=1.25f,PLAYER_MAX_PRONE_SPEED=0.5f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.6f,PLAYER_PRONE_RATIO=0.01f;
+static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
+static const float WALK_SPEED=5.7f,SPRINT_SPEED=17.0f,PLAYER_MAX_CYBER_SPEED=10.0f,SPRINT_SPEED_FATIGUED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,PLAYER_PRONE_RATIO=0.32f;
 enum { MANIFOLD_MAX=4, CVXMSH_HULL_CACHE=1024, EPA_MAX_FACES=64, EPA_MAX_VERTS=128, EPA_MAX_EDGES=EPA_MAX_FACES*3, GJK_ITER=32, EPA_ITER=16, SOLVER_ITER_GLOBAL=32, MAX_GLOBAL_CONTACTS=8192 };
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
@@ -914,18 +914,7 @@ void Physics(float dt) {
 }
 
 void AddForce(u16 i, V3 f, bool imp) { if (imp) { World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f / vmax(World.mass[i],0.001f))); } else { World.instances[i].accumulatedForce = V3_AplusB(World.instances[i].accumulatedForce,f); } }
-float GetBasePlayerSpeed(u16 p,bool running){
-    bool sprint=Sprint(); if(Cheats.noclip)return PLAYER_MAX_CYBER_SPEED*(sprint?2.5f:1.5f); if(World.curLev==LEVEL_CYBERSPACE)return PLAYER_MAX_CYBER_SPEED;
-    BodyState b=World.instances[p].bodyState; float v=WALK_SPEED;
-    switch(b){ case BodyState_CrouchingDown: case BodyState_Crouch:v=CROUCH_SPEED; break; case BodyState_Prone: case BodyState_ProningDown: case BodyState_ProningUp:v=PLAYER_MAX_PRONE_SPEED; break; default:break; }
-    if ((sprint||World.boosterActive) && running) { v = World.invP1.fatigue > 80.0f && World.boosterActive ? SPRINT_SPEED_FATIGUED : SPRINT_SPEED;
-    if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown)  v -= (WALK_SPEED-CROUCH_SPEED)*1.5f;
-    else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp)v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;}
-    return v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f);
-}
-
 INLINE float smooth_damp(float cur, float targ, float* vel, float tm, float dt) { float o=2.0f / vmax(tm,0.0001f); float x=o * dt; float exp=1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x); float d=cur - targ; float t=(*vel + o * d) * dt; *vel=(*vel - o * t) * exp; return targ + (d + t) * exp; }
-Overlap CapMsh(ShapeCapsule,u16,const float*);
 bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
     float oldHeight = World.colliderSize[playerIdx].y; V3 oldPos = World.position[playerIdx];
     World.colliderSize[playerIdx].y = targetHeight; World.position[playerIdx].y += (targetHeight - oldHeight); // Temporarily morph player into the standing capsule
@@ -966,10 +955,12 @@ void ApplyPlayerMovements(float dt) {
         else if (p->bodyState == BodyState_Crouch) { p->bodyState = BodyState_ProningDown; } // Crouch → go to prone
         else { p->bodyState = BodyState_ProningUp; } // Between prone and crouch, or prone → up to crouch
     }
+    float fatigueWane = 1.0f; if (Cheats.fatigueCheat) World.invP1.fatigue = 0.0f;
     switch (p->bodyState) {
-        case BodyState_CrouchingDown:targetRatio=-0.01f; break; case BodyState_StandingUp:targetRatio=1.01f; break; case BodyState_ProningDown:targetRatio=-0.01f; break;
-        case BodyState_ProningUp:targetRatio=1.01f; transitionSec+=0.1f; break; case BodyState_Crouch:targetRatio=PLAYER_CROUCH_RATIO; break; case BodyState_Prone:targetRatio=PLAYER_PRONE_RATIO; break; default:targetRatio=1.0f; break;
+        case BodyState_CrouchingDown:targetRatio=-0.01f; fatigueWane = 2.0f; break; case BodyState_StandingUp:targetRatio=1.01f; fatigueWane = 2.0f; break; case BodyState_ProningDown:targetRatio=-0.01f; fatigueWane = 3.5f; break;
+        case BodyState_ProningUp:targetRatio=1.01f; transitionSec+=0.1f; fatigueWane = 3.5f; break; case BodyState_Crouch:targetRatio=PLAYER_CROUCH_RATIO; fatigueWane = 2.0f; break; case BodyState_Prone:targetRatio=PLAYER_PRONE_RATIO; fatigueWane = 3.5f; break;
     }
+    if (JumpDown()) { if (!Cheats.noclip) {World.velocity[PLAYER1].y += 4.51f + 0.2f; World.invP1.fatigue += 6.5f; }}
     float lastRatio = World.invP1.currentCrouchRatio;
     World.invP1.currentCrouchRatio = smooth_damp(lastRatio,targetRatio,&World.invP1.crouchingVelocity,transitionSec,dt);
     if (World.invP1.currentCrouchRatio >= 1.0f) { World.invP1.currentCrouchRatio = 1.0f; if(p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_Standing;} }
@@ -977,15 +968,30 @@ void ApplyPlayerMovements(float dt) {
     else if (p->bodyState == BodyState_ProningUp && World.invP1.currentCrouchRatio >= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; }
     else if (p->bodyState == BodyState_ProningDown && World.invP1.currentCrouchRatio <= PLAYER_PRONE_RATIO) { World.invP1.currentCrouchRatio = PLAYER_PRONE_RATIO; p->bodyState = BodyState_Prone; }
     World.colliderSize[PLAYER1].y = PLAYER_HEIGHT * World.invP1.currentCrouchRatio; World.colliderCenter[PLAYER1].y =  -PLAYER_CAM_OFFSET_Y + (PLAYER_HEIGHT - World.colliderSize[PLAYER1].y) * 0.5f; // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84 which is PLAYER_CAM_OFFSET_Y)
-    float h=(float)Forward() - (float)Backpedal(), s=(float)StrafeRight() - (float)StrafeLeft(), vertInput=(float)SwimUp() - (float)SwimDn();
+    float h=(float)Forward() - (float)Backpedal(), s=(float)StrafeRight() - (float)StrafeLeft(), vertInput = Cheats.noclip ? (float)((SwimUp()) || Jump()) - (float)SwimDn() : 0.0;
+    bool isSprinting=Sprint();
+    if (World.invP1.fatigueMoveFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f)) { World.invP1.fatigue += isSprinting ? 2.85f : 0.8f; World.invP1.fatigueMoveFinished = World.pauseRelativeTime + 0.3f; }
     float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y;
     p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
     V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; 
-    float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0};
-    bool isRunning = (inputLenSq > 0.01f); float speed = GetBasePlayerSpeed(PLAYER1,isRunning) * 1.75f, accel=World.boosterActive ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
-    if (World.invP1.ladderState > 0) { float climbSpeed = (Sprint() && isRunning) ? 1.2f : 0.4f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed * 25.0f, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
+    float inputLenSq = V3_dot(inputDir,inputDir);
+    V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0}; 
+    bool isRunning = (inputLenSq > 0.01f); float speedAdjust = 0.0f; bool setSpeedAdjusted = false;
+    if (Cheats.noclip) { speedAdjust = PLAYER_MAX_CYBER_SPEED*(isSprinting ? 2.5f : 1.5f); setSpeedAdjusted = true; }
+    if (World.curLev==LEVEL_CYBERSPACE) { speedAdjust = PLAYER_MAX_CYBER_SPEED; setSpeedAdjusted = true; }
+    BodyState b=World.instances[PLAYER1].bodyState; float v=WALK_SPEED;
+    switch(b){ case BodyState_CrouchingDown: case BodyState_Crouch:v=CROUCH_SPEED; break; case BodyState_Prone: case BodyState_ProningDown: case BodyState_ProningUp:v=PLAYER_MAX_PRONE_SPEED; break; default:break; }
+    if ((isSprinting||World.boosterActive) && isRunning) {
+        v = World.invP1.fatigue > 80.0f && !World.boosterActive ? SPRINT_SPEED_FATIGUED : SPRINT_SPEED;
+        if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown)  v -= (WALK_SPEED-CROUCH_SPEED)*1.5f;
+        else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp)v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;
+    }
+    float speed = (setSpeedAdjusted ? speedAdjust : v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f))/* * 1.58f*/, accel=World.boosterActive ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
+    if (World.invP1.ladderState > 0) { float climbSpeed = (isSprinting && isRunning) ? 1.2f : 0.4f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed * 25.0f, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
     else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
     V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); 
     dv = (V3){ vclamp(dv.x, -10.0f, 10.0f), vclamp(dv.y, -10.0f, 10.0f), vclamp(dv.z, -10.0f, 10.0f) };
     World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1], V3_ScaleByF(dv, accel * vclamp(dt, 0.0005f, 0.1f)));
+    if (World.invP1.fatigueBleedoffFinished < World.pauseRelativeTime) { World.invP1.fatigue -= fatigueWane; World.invP1.fatigueBleedoffFinished = World.pauseRelativeTime + 0.3f; } // Fatigue bleed off
+    World.invP1.fatigue = vclamp(World.invP1.fatigue,0.0f,100.0f);
 }
