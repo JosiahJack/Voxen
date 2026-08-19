@@ -163,7 +163,7 @@ static const float PLAYER_RADIUS=0.48f,PLAYER_HEIGHT=2.00f,PLAYER_CAM_OFFSET_Y=0
                    REFLEX_TIME_SCALE=0.25,DEFAULT_TIME_SCALE=1.0,BERSERK_DAMAGE_MULTIPLIER=4.0f/*Quad Damage!*/;
 static const double BERSERK_TIME=20.0,DETOX_TIME=60.0,GENIUS_TIME=180.0,MEDI_TIME=35.0,REFLEX_TIME=155.0,SIGHT_TIME=40.0,STAMINUP_TIME=60.0,SIGHT_SIDE_EFFECT_TIME=17.0,NITRO_MIN_TIME=1.0,NITRO_MAX_TIME=60.0,NITRO_DEFAULT_TIME=7.0,EARTH_SHAKER_MIN_TIME=4.0,
                     EARTH_SHAKER_MAX_TIME=60.0,EARTH_SHAKER_DEFAULT_TIME=10.0;
-enum{EF_ACTIVE=(1u<<0),                      EF_GROUNDED=(1u<<2),EF_RIGIDBODY=(1u<<3),EF_NO_SHADOWS=(1u<<4),EF_ASLEEP=(1u<<5),EF_WALK_PATH_ON_START=(1u<<6),EF_TOUCHING_HURTS=(1u<<7),EF_ACT_AS_CORPSE_ONLY=(1u<<8),EF_DYING=(1u<<9),EF_DEATH_BURST_DONE=(1u<<10),
+enum{EF_ACTIVE=(1u<<0),EF_GRAVLIFT=(1u<<1),EF_GROUNDED=(1u<<2),EF_RIGIDBODY=(1u<<3),EF_NO_SHADOWS=(1u<<4),EF_ASLEEP=(1u<<5),EF_WALK_PATH_ON_START=(1u<<6),EF_TOUCHING_HURTS=(1u<<7),EF_ACT_AS_CORPSE_ONLY=(1u<<8),EF_DYING=(1u<<9),EF_DEATH_BURST_DONE=(1u<<10),
      EF_DEAD=(1u<<11),EF_TELEPORT_ON_DEATH=(1u<<12),EF_GO_INTO_PAIN=(1u<<13),EF_WANDERING=(1u<<14),EF_ACT_AS_TURRET=(1u<<15),EF_TARGID_ATTACHED=(1u<<16),EF_ENEM_IN_SIGHT=(1u<<17),EF_ENEM_IN_FRONT=(1u<<18),EF_ENEM_IN_FOV=(1u<<19),EF_ENEM_IN_LOS=(1u<<20),
      EF_FIRST_SIGHTING=(1u<<21),EF_DYING_SETUP=(1u<<22),EF_HAD_ENEMY=(1u<<23),EF_SHOT_FIRED=(1u<<24),EF_DEAD_CHECKS_DONE=(1u<<25),EF_HOP_DONE=(1u<<26),EF_LOCKED=(1u<<27),EF_HAS_CAMERA_VIEW=(1u<<28),EF_DAMAGE_ON_USE=(1u<<29),EF_MOVING=(1u<<30)};
 enum{Q_ROBOT_SPAWN_DEACTIVATED=(1u<<0),Q_ISOTOPE_INSTALLED=(1u<<1),Q_SHIELD_ACTIVATED=(1u<<2),Q_LASER_SAFETY_OVERRIDEN=(1u<<3),Q_LASER_DESTROYED=(1u<<4),Q_BETA_GROVE_CYBER_UNLOCKED=(1u<<5),Q_GROVE_ALPHA_JETTISON_ENABLED=(1u<<6),
@@ -259,7 +259,7 @@ enum{PATCH_BERSERK=1, PATCH_DETOX=2, PATCH_GENIUS=4, PATCH_MEDI=8, PATCH_REFLEX=
      SW_DRILL=0,SW_PULSER=1,SW_SHIELD=2,SW_TURBO=3,SW_DECOY=4,SW_RECALL=5,SW_GAMES=6,
      MINIGAME_PING=1,MINIGAME_15=2,MINIGAME_WING0=4,MINIGAME_BOTBOUNCE=8,MINIGAME_EEL_ZAPPER=16,MINIGAME_ROAD=32,MINIGAME_TRIOPTOE=64};
 typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
-    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,
+    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,jumpJetFinished,
            leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished,fatigueBleedoffFinished,fatigueMoveFinished;
     float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,
           radAdjust,initialRadiation,weaponDipLerp,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity,leanVelocity;

@@ -251,12 +251,12 @@ static double RenderUI() {
         if (!Cheats.noHUD) {
             RenderUIImage(1332, 2,32,32,956); // Health Indicator
             int p1H = World.instances[PLAYER1].health; if (p1H > 255) p1H = 255;
-            for (int i=7;i>=0;--i) if (p1H > (7 - i) * 11)       RenderUIImage(1050 - (i * 16), 4,32,32,964); // Health Tick Red
+            for (int i=7;i>=0;--i) if (i == 7/*Always render at least 1 tick*/ || p1H > (7 - i) * 11)       RenderUIImage(1050 - (i * 16), 4,32,32,964); // Health Tick Red
             for (int i=7;i>=0;--i) if (p1H > 88 + (7 - i) * 11)  RenderUIImage(1178 - (i * 16), 4,32,32,963); // Health Tick Orange
             for (int i=7;i>=0;--i) if (p1H > 176 + (7 - i) * 11) RenderUIImage(1306 - (i * 16), 4,32,32,962); // Health Tick Green
             RenderUIImage(1333,36,32,32,939); // Energy Indicator
             int p1E = World.invP1.energy; if (p1E > 255) p1E = 255;
-            for (int i=7;i>=0;--i) if (p1E > (7 - i) * 11)       RenderUIImage(1050 - (i * 16),35,32,32,964); // Energy Tick Red
+            for (int i=7;i>=0;--i) if (i == 7/*Always render at least 1 tick*/ || p1E > (7 - i) * 11)       RenderUIImage(1050 - (i * 16),35,32,32,964); // Energy Tick Red
             for (int i=7;i>=0;--i) if (p1E > 88 + (7 - i) * 11)  RenderUIImage(1178 - (i * 16),35,32,32,963); // Energy Tick Orange
             for (int i=7;i>=0;--i) if (p1E > 176 + (7 - i) * 11) RenderUIImage(1306 - (i * 16),35,32,32,962); // Energy Tick Green
         }

@@ -955,12 +955,19 @@ void ApplyPlayerMovements(float dt) {
         else if (p->bodyState == BodyState_Crouch) { p->bodyState = BodyState_ProningDown; } // Crouch → go to prone
         else { p->bodyState = BodyState_ProningUp; } // Between prone and crouch, or prone → up to crouch
     }
-    float fatigueWane = 1.0f; if (Cheats.fatigueCheat) World.invP1.fatigue = 0.0f;
+    float fatigueWane = 1.0f; if (Cheats.fatigueCheat || World.invP1.staminupActive) World.invP1.fatigue = 0.0f;
     switch (p->bodyState) {
         case BodyState_CrouchingDown:targetRatio=-0.01f; fatigueWane = 2.0f; break; case BodyState_StandingUp:targetRatio=1.01f; fatigueWane = 2.0f; break; case BodyState_ProningDown:targetRatio=-0.01f; fatigueWane = 3.5f; break;
         case BodyState_ProningUp:targetRatio=1.01f; transitionSec+=0.1f; fatigueWane = 3.5f; break; case BodyState_Crouch:targetRatio=PLAYER_CROUCH_RATIO; fatigueWane = 2.0f; break; case BodyState_Prone:targetRatio=PLAYER_PRONE_RATIO; fatigueWane = 3.5f; break;
     }
-    if (JumpDown()) { if (!Cheats.noclip) {World.velocity[PLAYER1].y += 4.51f + 0.2f; World.invP1.fatigue += 6.5f; }}
+    bool inGravLift = ((p->entflags & EF_GRAVLIFT) > 0);
+    bool grounded = !inGravLift && ((p->entflags & EF_GROUNDED) > 0);
+    bool jumpjettin = ((World.invP1.hasHardware & HW_JET) > 0 && (World.invP1.hardwareIsActive & HW_JET) > 0);
+    if (JumpDown() && grounded && !jumpjettin) { if (!Cheats.noclip) {World.velocity[PLAYER1].y += (World.invP1.fatigue > 80.0f ? 2.0f : 4.51f/*;)*/) + 0.2f; if(!World.boosterActive && !Cheats.noclip){World.invP1.fatigue += 6.5f;} } }
+    if (Jump() && jumpjettin && World.invP1.jumpJetFinished < World.pauseRelativeTime && World.invP1.energy > 0.0f) {
+        if (!Cheats.noclip) {World.velocity[PLAYER1].y += 1.3f;} World.invP1.jumpJetFinished = World.pauseRelativeTime + 0.1f;
+        if (World.invP1.jumpJetSuckFinished < World.pauseRelativeTime) { World.invP1.jumpJetSuckFinished=World.pauseRelativeTime+1.0f; float energysuck = 11.0f; switch (World.invP1.hardwareVersionSetting[10]) { case 0: energysuck=11.0f; break; case 1:energysuck=26.0f; break; case 2:energysuck=22.0f; break; } TakeEnergy(energysuck); }
+    }
     float lastRatio = World.invP1.currentCrouchRatio;
     World.invP1.currentCrouchRatio = smooth_damp(lastRatio,targetRatio,&World.invP1.crouchingVelocity,transitionSec,dt);
     if (World.invP1.currentCrouchRatio >= 1.0f) { World.invP1.currentCrouchRatio = 1.0f; if(p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_Standing;} }
@@ -969,11 +976,11 @@ void ApplyPlayerMovements(float dt) {
     else if (p->bodyState == BodyState_ProningDown && World.invP1.currentCrouchRatio <= PLAYER_PRONE_RATIO) { World.invP1.currentCrouchRatio = PLAYER_PRONE_RATIO; p->bodyState = BodyState_Prone; }
     World.colliderSize[PLAYER1].y = PLAYER_HEIGHT * World.invP1.currentCrouchRatio; World.colliderCenter[PLAYER1].y =  -PLAYER_CAM_OFFSET_Y + (PLAYER_HEIGHT - World.colliderSize[PLAYER1].y) * 0.5f; // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84 which is PLAYER_CAM_OFFSET_Y)
     float h=(float)Forward() - (float)Backpedal(), s=(float)StrafeRight() - (float)StrafeLeft(), vertInput = Cheats.noclip ? (float)((SwimUp()) || Jump()) - (float)SwimDn() : 0.0;
-    bool isSprinting=Sprint();
-    if (World.invP1.fatigueMoveFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f)) { World.invP1.fatigue += isSprinting ? 2.85f : 0.8f; World.invP1.fatigueMoveFinished = World.pauseRelativeTime + 0.3f; }
+    bool isSprinting=Sprint() && (grounded || inGravLift || World.invP1.ladderState > 0 || Cheats.noclip);
+    if (World.invP1.fatigueMoveFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f && !Cheats.noclip) && !World.boosterActive){World.invP1.fatigue += isSprinting ? 2.85f : 1.0f; World.invP1.fatigueMoveFinished=World.pauseRelativeTime + 0.298f;/*Slightly different than bleedoff to keep out of sync*/}
     float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y;
     p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
-    V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; 
+    V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s};
     float inputLenSq = V3_dot(inputDir,inputDir);
     V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0}; 
     bool isRunning = (inputLenSq > 0.01f); float speedAdjust = 0.0f; bool setSpeedAdjusted = false;
@@ -983,15 +990,15 @@ void ApplyPlayerMovements(float dt) {
     switch(b){ case BodyState_CrouchingDown: case BodyState_Crouch:v=CROUCH_SPEED; break; case BodyState_Prone: case BodyState_ProningDown: case BodyState_ProningUp:v=PLAYER_MAX_PRONE_SPEED; break; default:break; }
     if ((isSprinting||World.boosterActive) && isRunning) {
         v = World.invP1.fatigue > 80.0f && !World.boosterActive ? SPRINT_SPEED_FATIGUED : SPRINT_SPEED;
-        if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown)  v -= (WALK_SPEED-CROUCH_SPEED)*1.5f;
-        else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp)v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;
+        if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown) v -= (WALK_SPEED-CROUCH_SPEED)*1.5f; else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp) v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;
     }
-    float speed = (setSpeedAdjusted ? speedAdjust : v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f))/* * 1.58f*/, accel=World.boosterActive ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
-    if (World.invP1.ladderState > 0) { float climbSpeed = (isSprinting && isRunning) ? 1.2f : 0.4f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed * 25.0f, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
+    float speed = (setSpeedAdjusted ? speedAdjust : v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f)) + (World.invP1.staminupActive ? 1.0f : 0.0f), accel=World.boosterActive && World.curLev!=LEVEL_CYBERSPACE ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
+    if (World.invP1.ladderState > 0) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed * 25.0f, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
     else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
     V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); 
-    dv = (V3){ vclamp(dv.x, -10.0f, 10.0f), vclamp(dv.y, -10.0f, 10.0f), vclamp(dv.z, -10.0f, 10.0f) };
-    World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1], V3_ScaleByF(dv, accel * vclamp(dt, 0.0005f, 0.1f)));
-    if (World.invP1.fatigueBleedoffFinished < World.pauseRelativeTime) { World.invP1.fatigue -= fatigueWane; World.invP1.fatigueBleedoffFinished = World.pauseRelativeTime + 0.3f; } // Fatigue bleed off
-    World.invP1.fatigue = vclamp(World.invP1.fatigue,0.0f,100.0f);
+    dv = (V3){ vclamp(dv.x, -10.0f, 10.0f), vclamp(dv.y, -10.0f, 10.0f), vclamp(dv.z,-10.0f,10.0f) };
+    World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1], V3_ScaleByF(dv,accel * vclamp(dt,0.0005f,0.1f)));
+    if (World.invP1.fatigueBleedoffFinished < World.pauseRelativeTime && World.curLev!=LEVEL_CYBERSPACE && !Cheats.noclip) { World.invP1.fatigue -= fatigueWane; World.invP1.fatigueBleedoffFinished = World.pauseRelativeTime + 0.3f; } // Fatigue bleed off
+    World.invP1.fatigue = vclamp(World.invP1.fatigue,0.0f,100.0f); // TODO textwarnings Fatigue high when > 80.0f
+    // TODO booster friction mod, TODO booster double tap JumpDown() burst forward, TODO cyber drift forward based on difficultyCyber (like a plane woo), TODO maxCyberUltimateSpeed clamping
 }
