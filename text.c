@@ -55,7 +55,7 @@ static int stbtt_InitFont_internal(stbtt_fontinfo* info, u8* data, int fs) {
     info->indexToLocFormat=ttUSHORT(data+info->head+50);return 1;
 }
 
-int _font_offset(u8*d,int idx){ if(stbtt_tag4(d,'1',0,0,0)||stbtt_tag(d,"typ1")||stbtt_tag(d,"OTTO")||stbtt_tag4(d,0,1,0,0)||stbtt_tag(d,"true")){return idx==0?0:-1;} if(stbtt_tag(d,"ttcf")&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){u8* p = d+8; i32 n=((i32)p[0]<<24)|((i32)p[1]<<16)|((i32)p[2]<<8)|p[3]; if(idx>=n){return -1;} return ttULONG(d+12+idx*4); } return -1; }
+int _font_offset(u8*d,int idx){ if(stbtt_tag4(d,'1',0,0,0)||stbtt_tag(d,"typ1")||stbtt_tag(d,"OTTO")||stbtt_tag4(d,0,1,0,0)||stbtt_tag(d,"true")){return idx==0?0:-1;} if(stbtt_tag(d,"ttcf")&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=((i32)d[8]<<24)|((i32)d[9]<<16)|((i32)d[10]<<8)|d[11]; if(idx>=n){return -1;} return ttULONG(d+12+idx*4); } return -1; }
 int stbtt_GetFontOffsetForIndex(const u8*d,int i){return _font_offset((u8*)d,i);}
 int stbtt_FindGlyphIndex(const stbtt_fontinfo*info,int cp){
     u8*d=info->data;u32 im=info->index_map;u16 fmt=ttUSHORT(d+im);
@@ -301,8 +301,7 @@ typedef struct{void*uac;void*pack_info;int width,height,stride_in_bytes,padding,
 typedef struct{u16 x0,y0,x1,y1;float xoff,yoff,xadvance,xoff2,yoff2;}stbtt_packedchar;
 typedef struct{float font_size;int first_unicode_codepoint_in_range;int*array_of_unicode_codepoints;int num_chars;stbtt_packedchar*chardata_for_range;u8 h_oversample,v_oversample;}FPackRange;
 int stbtt_PackBegin(stbtt_pack_context*spc,u8* px, int pw, int ph, int str, int pad, void* a){ stbrp_context*ctx=(stbrp_context*)ttalloc(sizeof(*ctx)); *ctx=(stbrp_context){pw-pad,ph-pad,0,0,0}; if(px){mset(px,0,(size_t)(pw*ph));} return *spc=(stbtt_pack_context){a,ctx,pw,ph,str ? str : pw,pad,0,1,1,px},1; }
-void _hpre(u8*p,int w,int h,int str,u32 kw){for(int j=0;j<h;++j,p+=str){u8 buf[8]={0};int tot=0;for(int i=0;i<w;++i){if(i<=w-(int)kw){tot+=p[i]-buf[i&7];buf[(i+kw)&7]=p[i];}else tot-=buf[i&7];p[i]=(u8)(tot/kw);}}}
-void _vpre(u8*p,int w,int h,int str,u32 kw){for(int j=0;j<w;++j,++p){u8 buf[8]={0};int tot=0;for(int i=0;i<h;++i){if(i<=h-(int)kw){tot+=p[i*str]-buf[i&7];buf[(i+kw)&7]=p[i*str];}else tot-=buf[i&7];p[i*str]=(u8)(tot/kw);}}}
+void _pre(u8*p,int w,int h,int str,u32 kw,int vert){ int outer=vert?w:h, inner=vert?h:w, os=vert?1:str, is=vert?str:1; for(int j=0;j<outer;++j,p+=os){u8 buf[8]={0};int tot=0;for(int i=0;i<inner;++i){if(i<=inner-(int)kw){tot+=p[i*is]-buf[i&7];buf[(i+kw)&7]=p[i*is];}else tot-=buf[i&7];p[i*is]=(u8)(tot/kw);}} }
 float _oshift(int os){return os?-(float)(os-1)/(2.0f*(float)os):0.0f;}
 int stbtt_PackFontRanges(stbtt_pack_context*spc,const u8*fontdata,int fi,FPackRange*ranges,int nr){
     stbtt_fontinfo info;int n=0;stbrp_rect*rects;
@@ -344,8 +343,8 @@ int stbtt_PackFontRanges(stbtt_pack_context*spc,const u8*fontdata,int fi,FPackRa
                 GetGlyphBitmapBoxSubpixel(&info,g,sc * spc->h_oversample,sc * spc->v_oversample,0,0,&x0,&y0,&x1,&y1);
                 u8* p_pixels = spc->pixels + r->x + r->y * spc->stride_in_bytes;
                 stbtt_MakeGlyphBitmapSubpixel(&info,p_pixels,r->w - spc->h_oversample + 1,r->h - spc->v_oversample + 1,spc->stride_in_bytes,sc * spc->h_oversample,sc * spc->v_oversample,0,0,g);
-                if (spc->h_oversample > 1) _hpre(p_pixels,r->w,r->h,spc->stride_in_bytes,spc->h_oversample);
-                if (spc->v_oversample > 1) _vpre(p_pixels,r->w,r->h,spc->stride_in_bytes,spc->v_oversample);
+                if (spc->h_oversample > 1) _pre(p_pixels,r->w,r->h,spc->stride_in_bytes,spc->h_oversample,0);
+                if (spc->v_oversample > 1) _pre(p_pixels,r->w,r->h,spc->stride_in_bytes,spc->v_oversample,1);
                 bc->x0 = r->x; bc->y0 = r->y; bc->x1 = r->x + r->w; bc->y1 = r->y + r->h;
                 bc->xadvance = sc * adv;
                 bc->xoff  = x0 * (1.0f / spc->h_oversample) + _oshift(spc->h_oversample);
@@ -382,6 +381,20 @@ LoadedFont LoadFallbackFont(const char*path,int fii,int ci){
 }
 int GetGlyphAndFont(u32 cp,stbtt_fontinfo**outFont,u8 fontID){ int g=stbtt_FindGlyphIndex(fontID==FONT_STOPD?&fontInfo[1]:&fontInfo[0],cp);if(g){*outFont=fontID==FONT_STOPD?&fontInfo[1]:&fontInfo[0];return g;} for(int i=0;i<3;i++){g=stbtt_FindGlyphIndex(&fallbackFonts[i].info,cp);if(g){*outFont=&fallbackFonts[i].info;return g;}} return 0; }
 void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp);
+void BuildAtlas(u32* atlasTex, GlyphRange* ranges, int* numPacked, stbtt_packedchar* packedChars, float* fixedNumAdv, float baseH, int fontIdx, u8 fontID, u8* bmp) {
+    stbtt_pack_context pc; stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL); pc.h_oversample=pc.v_oversample=3; pc.skip_missing=1; *numPacked=0;
+    for(int r=0; r<numFontRanges; ++r) { ranges[r].startIndex = *numPacked;
+        for(int i=0; i<ranges[r].count; ++i) {
+            if(*numPacked >= MAX_GLYPHS) break;
+            u32 cp = ranges[r].first + i; stbtt_fontinfo* font = &fontInfo[fontIdx]; u8* data = fontData[fontIdx]; int g = stbtt_FindGlyphIndex(font, cp);
+            if(!g) { g = GetGlyphAndFont(cp, &font, fontID); if(!g){continue;} data = (font == &fontInfo[fontIdx]) ? fontData[fontIdx] : ((LoadedFont*)((char*)font - __builtin_offsetof(LoadedFont, info)))->data; }
+            float h = baseH; if(font != &fontInfo[fontIdx]) h *= 1.2f;
+            FPackRange range = {h, cp, NULL, 1, &packedChars[*numPacked], 0, 0}; stbtt_PackFontRanges(&pc, data, 0, &range, 1);
+            int idx = (*numPacked)++; if(cp >= '0' && cp <= '9') *fixedNumAdv = vmax(*fixedNumAdv,packedChars[idx].xadvance);
+        }
+    } ttfree(pc.pack_info); GenerateAndBindTexture(atlasTex, 0x8229, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0x1903, GL_UNSIGNED_BYTE, 0x2601, bmp);
+}
+
 void InitFontAtlasses() {
     DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    5 fonts...");
@@ -394,26 +407,10 @@ void InitFontAtlasses() {
     fallbackFonts[0]=LoadFallbackFont(fallbackFontPaths[0],2,0);
     fallbackFonts[1]=LoadFallbackFont(fallbackFontPaths[1],3,0);
     fallbackFonts[2]=LoadFallbackFont(fallbackFontPaths[2],4,0);
-    u8*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
-    stbtt_pack_context pc;stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc.h_oversample=3;pc.v_oversample=3;pc.skip_missing=1;numPackedGlyphs=0;
-    for(int r=0;r<numFontRanges;++r){fontRanges[r].startIndex=numPackedGlyphs;
-        for(int i=0;i<fontRanges[r].count;++i){if(numPackedGlyphs>=MAX_GLYPHS)break;u32 cp=fontRanges[r].first+i;stbtt_fontinfo*font=&fontInfo[0];u8*data=fontData[0];
-            int g=stbtt_FindGlyphIndex(font,cp);if(!g){g=GetGlyphAndFont(cp,&font,FONT_NORMAL);if(!g)continue;data=(font==&fontInfo[0])?fontData[0]:((LoadedFont*)((char*)font-__builtin_offsetof(LoadedFont,info)))->data;}
-            float h=20.0f;if(font!=&fontInfo[0])h*=1.2f;FPackRange range={h,cp,NULL,1,&fontPackedChar[numPackedGlyphs],0,0};stbtt_PackFontRanges(&pc,data,0,&range,1);
-            int idx=numPackedGlyphs++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidth=vmax(fixedNumberAdvanceWidth,fontPackedChar[idx].xadvance);
-        }
-    }
-    ttfree(pc.pack_info);GenerateAndBindTexture(&fontAtlasTex,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
-    mset(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
-    stbtt_pack_context pc2;stbtt_PackBegin(&pc2,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL);pc2.h_oversample=3;pc2.v_oversample=3;pc2.skip_missing=1;numPackedGlyphsStopD=0;
-    for(int r=0;r<numFontRanges;++r){fontRangesStopD[r].startIndex=numPackedGlyphsStopD;
-        for(int i=0;i<fontRangesStopD[r].count;++i){if(numPackedGlyphsStopD>=MAX_GLYPHS)break;u32 cp=fontRangesStopD[r].first+i;stbtt_fontinfo*font=&fontInfo[1];u8*data=fontData[1];
-            int g=stbtt_FindGlyphIndex(font,cp);if(!g){g=GetGlyphAndFont(cp,&font,FONT_STOPD);if(!g)continue;data=(font==&fontInfo[0])?fontData[0]:((LoadedFont*)((char*)font-__builtin_offsetof(LoadedFont,info)))->data;}
-            float h=54.0f;if(font!=&fontInfo[1])h*=1.2f;FPackRange range={h,cp,NULL,1,&fontPackedCharStopD[numPackedGlyphsStopD],0,0};stbtt_PackFontRanges(&pc2,data,0,&range,1);
-            int idx=numPackedGlyphsStopD++;if(cp>='0'&&cp<='9')fixedNumberAdvanceWidthStopD=vmax(fixedNumberAdvanceWidthStopD,fontPackedCharStopD[idx].xadvance);
-        }
-    }
-    ttfree(pc2.pack_info);GenerateAndBindTexture(&fontAtlasTexStopD,0x8229/*GL_R8*/,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903/*GL_RED*/,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,bmp);
+    u8* bmp = OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
+    BuildAtlas(&fontAtlasTex, fontRanges, &numPackedGlyphs, fontPackedChar, &fixedNumberAdvanceWidth, 20.0f, 0, FONT_NORMAL, bmp);
+    mset(bmp, 0, FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
+    BuildAtlas(&fontAtlasTexStopD, fontRangesStopD, &numPackedGlyphsStopD, fontPackedCharStopD, &fixedNumberAdvanceWidthStopD, 54.0f, 1, FONT_STOPD, bmp);
     OS_Free(bmp,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
     OS_Free(fontData[0],sz1);
     OS_Free(fontData[1],sz2);
@@ -425,30 +422,30 @@ void InitFontAtlasses() {
     glUseProgram(textSP); glUniform1i(1,2);
     DualLog(" took %f s\n",get_time()-t0);
 }
-
 // Localization
 size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
     size_t dp=0,sp=0;
-    while(sp<slen&&dp<dlen-4){if(sp+1>=slen)break;u32 c=(u32)src[sp+1]<<8|src[sp];sp+=2;
-        if(c<0x80){dst[dp++]=(char)c;}
-        else if(c<0x800){dst[dp++]=(char)(0xC0|(c>>6));dst[dp++]=(char)(0x80|(c&0x3F));}
-        else if(c<0x10000){dst[dp++]=(char)(0xE0|(c>>12));dst[dp++]=(char)(0x80|((c>>6)&0x3F));dst[dp++]=(char)(0x80|(c&0x3F));}
-        else continue;}
+    while(sp<slen&&dp<dlen-4){
+        if(sp+1>=slen)break;u32 c=(u32)src[sp+1]<<8|src[sp];sp+=2;
+        if(c<0x80){dst[dp++]=(char)c;} else if(c<0x800){dst[dp++]=(char)(0xC0|(c>>6));dst[dp++]=(char)(0x80|(c&0x3F));} else if(c<0x10000){dst[dp++]=(char)(0xE0|(c>>12));dst[dp++]=(char)(0x80|((c>>6)&0x3F));dst[dp++]=(char)(0x80|(c&0x3F));} else continue;
+    }
     dst[dp]='\0';return dp;
 }
 
 static const char* localizations[8]={"./Data/text_english.txt","./Data/text_espanol.txt","./Data/text_deutsch.txt","./Data/text_francais.txt","./Data/text_nihongo.txt","./Data/text_russkiy.txt","./Data/text_italiano.txt","./Data/text_portugues.txt"};
+u8* LoadTextFile(const char* path, size_t* out_size, size_t* out_dp, int* out_utf16) {
+    FHandle dfd = INVALID_FHANDLE; int asz = 0;
+    u8* data = OS_OpenAndAllocateFileBufferReadonly(path, &dfd, &asz); if(!data || asz <= 0) { DualLogError("Failed to load text file: %s\n", path); *out_size = 0; return NULL; }
+    *out_size = (size_t)asz; *out_dp = 0; *out_utf16 = 0;
+    if(asz >= 2 && data[0]==0xFF && data[1]==0xFE) { *out_dp = 2; *out_utf16 = 1; }
+    else if(asz >= 3 && data[0]==0xEF && data[1]==0xBB && data[2]==0xBF) { *out_dp = 3; }
+    else { int nl=0; for(size_t i=1; i<(size_t)asz && i<1024; i+=2) if(data[i]==0) nl++; if(nl*3 > asz) *out_utf16 = 1; }
+    return data;
+}
+
 void LoadTextForLanguage(u8 lang) {
     char tf[256]={0}; sCpy2aSubFromb(tf,255,localizations[lang<8?lang:0],256);
-    FHandle dfd=INVALID_FHANDLE;int asz=0;
-    if(Sys_Text.file_data){OS_Free(Sys_Text.file_data,Sys_Text.file_size);Sys_Text.file_data=NULL;Sys_Text.file_size=0;}
-    Sys_Text.file_data=(u8*)OS_OpenAndAllocateFileBufferReadonly(tf,&dfd,&asz);if(!Sys_Text.file_data||asz<=0){DualLogError("Failed to load text file: %s\n",tf);return;}
-    Sys_Text.file_size=(size_t)asz;
-    size_t dp=0;int utf16=0;
-    if(Sys_Text.file_size>=2&&Sys_Text.file_data[0]==0xFF&&Sys_Text.file_data[1]==0xFE){dp=2;utf16=1;}
-    else if(Sys_Text.file_size>=3&&Sys_Text.file_data[0]==0xEF&&Sys_Text.file_data[1]==0xBB&&Sys_Text.file_data[2]==0xBF){dp=3;}
-    else{size_t nl=0;for(size_t i=1;i<Sys_Text.file_size&&i<1024;i+=2)if(Sys_Text.file_data[i]==0)nl++;if(nl*3>Sys_Text.file_size)utf16=1;}
-    char line[T_LOGSTR_MAX];int ln=0;
+    char line[T_LOGSTR_MAX]; size_t dp=0; int utf16=0,ln=0; Sys_Text.file_data = LoadTextFile(tf,&Sys_Text.file_size,&dp,&utf16);    
     while(dp<Sys_Text.file_size){size_t ls=dp;
         if(utf16){while(dp+1<Sys_Text.file_size){u16 ch=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.file_size){u16 nx=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
         else{while(dp<Sys_Text.file_size){u8 c=Sys_Text.file_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.file_size&&Sys_Text.file_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
@@ -464,15 +461,7 @@ static const char* logLocalizations[8]={"./Data/logs_english.txt","./Data/logs_e
 void LoadLogTextForLanguage(u8 lang) {
     mset(Sys_Text.audioLogImagesRefIndicesLH,0,LOGCNT*sizeof(u16));mset(Sys_Text.audioLogImagesRefIndicesRH,0,LOGCNT*sizeof(u16));mset(Sys_Text.audioLogType,0,LOGCNT*sizeof(u8));mset(Sys_Text.audioLogLevelFound,0,LOGCNT*sizeof(u8));
     char tf[256]={0}; sCpy2aSubFromb(tf,255,logLocalizations[lang<8?lang:0],256);
-    FHandle dfd=INVALID_FHANDLE;int asz=0;
-    if(Sys_Text.filelog_data){OS_Free(Sys_Text.filelog_data,Sys_Text.filelog_size);Sys_Text.filelog_data=NULL;Sys_Text.filelog_size=0;}
-    Sys_Text.filelog_data=(u8*)OS_OpenAndAllocateFileBufferReadonly(tf,&dfd,&asz);if(!Sys_Text.filelog_data||asz<=0){DualLogError("Failed to load log text file: %s\n",tf);return;}
-    Sys_Text.filelog_size=(size_t)asz;
-    size_t dp=0;int utf16=0;
-    if(Sys_Text.filelog_size>=2&&Sys_Text.filelog_data[0]==0xFF&&Sys_Text.filelog_data[1]==0xFE){dp=2;utf16=1;}
-    else if(Sys_Text.filelog_size>=3&&Sys_Text.filelog_data[0]==0xEF&&Sys_Text.filelog_data[1]==0xBB&&Sys_Text.filelog_data[2]==0xBF){dp=3;}
-    else{int nl=0;for(size_t i=1;i<Sys_Text.filelog_size&&i<2048;i+=2)if(Sys_Text.filelog_data[i]==0)nl++;if(nl>(int)(Sys_Text.filelog_size/5))utf16=1;}
-    char line[1024];
+    char line[1024]; size_t dp=0;int utf16=0; Sys_Text.filelog_data = LoadTextFile(tf,&Sys_Text.filelog_size,&dp,&utf16);  
     while(dp<Sys_Text.filelog_size){size_t ls=dp;
         if(utf16){while(dp+1<Sys_Text.filelog_size){u16 ch=Sys_Text.filelog_data[dp]|(Sys_Text.filelog_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.filelog_size){u16 nx=Sys_Text.filelog_data[dp]|(Sys_Text.filelog_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
         else{while(dp<Sys_Text.filelog_size){u8 c=Sys_Text.filelog_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.filelog_size&&Sys_Text.filelog_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
@@ -482,14 +471,9 @@ void LoadLogTextForLanguage(u8 lang) {
         int li=-1,ilh=-1,irh=-1,lt=0,lf=0,fi=0;char*pos=line;
         while(*pos&&fi<32){while(*pos==' ')++pos;char*st=pos;int q=(*pos=='"');if(q)++pos;while(*pos){if(*pos==','&&!q)break;if(*pos=='"'&&q){if(pos[1]==','){pos++;break;}if(pos[1]=='"'){pos+=2;continue;}}++pos;}char*en=pos;if(q&&*en=='"')--en;size_t tl=(size_t)(en-st);if(!tl){if(*pos==',')++pos;fi++;continue;}
             switch(fi){
-                case 0:  li=s2i32Len(st,tl); if (li<0||li>=LOGCNT) goto nxt; break;
-                case 1:  ilh=s2i32Len(st,tl); break;
-                case 2:  irh=s2i32Len(st,tl); break;
-                case 3:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologNames[li],tl,st,sizeof(World.audiologNames[0]));       break;
-                case 4:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologSenders[li],tl,st,sizeof(World.audiologSenders[0]));   break;
-                case 5:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologSubjects[li],tl,st,sizeof(World.audiologSubjects[0])); break;
-                case 6:  lt=s2i32Len(st,tl); break;
-                case 7:  lf=s2i32Len(st,tl); break;
+                case 0:  li=s2i32Len(st,tl); if (li<0||li>=LOGCNT) goto nxt; break;                 case 1:  ilh=s2i32Len(st,tl); break; case 2: irh=s2i32Len(st,tl); break;
+                case 3:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(   World.audiologNames[li],tl,st,sizeof(World.audiologNames[0]));    break; case 4: if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologSenders[li],tl,st,sizeof(World.audiologSenders[0])); break;
+                case 5:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologSubjects[li],tl,st,sizeof(World.audiologSubjects[0])); break; case 6:  lt=s2i32Len(st,tl); break;    case 7:  lf=s2i32Len(st,tl); break;
                 default: if(li>=0&&li<LOGCNT){char*d=World.audioLogSpeech2Text[li]; size_t cur=slen(d); if(cur>0&&cur<T_LOGSTR_MAX*4-2){d[cur++]=',';d[cur]='\0';} size_t left=T_LOGSTR_MAX*4-cur-1; if(left>0){size_t cl=tl>left?left:tl;sCpy2aSubFromb(d+cur,cl,st,left+1);}}break;}
             if (*pos==',')++pos;fi++;}
         if (li>=0&&li<LOGCNT) {Sys_Text.audioLogImagesRefIndicesLH[li]=(u16)ilh;Sys_Text.audioLogImagesRefIndicesRH[li]=(u16)irh;Sys_Text.audioLogType[li]=(u8)lt;Sys_Text.audioLogLevelFound[li]=(u8)lf;}
@@ -513,17 +497,15 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char*
         else s++;
         p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=x; ypos+=ls; cc=0; continue; }
         int idx=CodepointToPackedIndex(cp,fontID);
-        const stbtt_packedchar*b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx;
-        float qx = vfloor((xpos + b->xoff) + 0.5f), qy = vfloor((ypos + b->yoff) + 0.5f);
-        float qx0 = qx, qy0 = qy, qx1 = qx + b->xoff2 - b->xoff, qy1 = qy + b->yoff2 - b->yoff;
+        const stbtt_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx;
+        float qx0 = vfloor((xpos + b->xoff) + 0.5f), qy0 = vfloor((ypos + b->yoff) + 0.5f);
         float qs0 = b->x0 * invatsz, qt0 = b->y0 * invatsz, qs1 = b->x1 * invatsz, qt1 = b->y1 * invatsz;
-        xpos += b->xadvance;
-        float vx0 = qx0 * scale - bw, vy0 = qy0 * scale - bw, vx1 = qx1 * scale + bw, vy1 = qy1 * scale + bw;
+        float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw;
         float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f;
         float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 };
-        mcpy(textVertexData + vc * 30, tv, sizeof(tv)); vc++;
-        if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD)
-            xpos = qx0 + fixedNumberAdvanceWidthStopD;
+        mcpy(textVertexData + vc * 30,tv,sizeof(tv)); vc++;
+        if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD){xpos = qx0 + fixedNumberAdvanceWidthStopD;}
+        else xpos += b->xadvance;
     }
     if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
