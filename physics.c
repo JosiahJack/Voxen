@@ -754,7 +754,7 @@ bool PointInOBB(V3 pt, ShapeBox box) {
 }
 
 INLINE int V3_IsSane(V3 v) { union { float f; unsigned int i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
-u16 triggerVolumes[128]; u16 numTriggers;
+u16 triggerVolumes[128]; u16 numTriggers; extern double game_actual_start_time;
 void DrawBoxColliderColored(u16 i, Color col);
 void Physics(float dt) {
     for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false);
@@ -779,7 +779,7 @@ void Physics(float dt) {
         if (numTriggers >= 127) DualLogWarn("Ran out of triggers!\n");
         gContactCount = 0;
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
-            u16 a=dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f;
+            u16 a=dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0 || (World.pauseRelativeTime - game_actual_start_time < 0.7f))) acc.y = 0.0f;
             acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; }
             else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
