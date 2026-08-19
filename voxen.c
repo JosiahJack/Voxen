@@ -1058,7 +1058,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     ResetInput(); World.currentMouse_dx = World.currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true; // These are global one-time resets, don't belong inside ResetInput() that is for every frame's clear.
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0,lev);
-    LoadAllLevels(); LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f});
+    LoadAllLevels(); LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); World.invP1.currentCrouchRatio = 1.0f;
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
             World.levelInstances[lev][i].adjacencyIdx = U16_MAX;
