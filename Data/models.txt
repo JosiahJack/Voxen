@@ -1311,7 +1311,7 @@ frame: 3
 frame: 15 68
 frame: 82 92
 frame: 94 117
-frame: 119 127
+frame: 119 126
 
 #Models/npc_flierbot.glb
 index: 3776

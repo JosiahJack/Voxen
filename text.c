@@ -477,7 +477,7 @@ void LoadLogTextForLanguage(u8 lang) {
                 case 0:  li=s2i32Len(st,tl); if (li<0||li>=LOGCNT) goto nxt; break;                 case 1:  ilh=s2i32Len(st,tl); break; case 2: irh=s2i32Len(st,tl); break;
                 case 3:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(   World.audiologNames[li],tl,st,sizeof(World.audiologNames[0]));    break; case 4: if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologSenders[li],tl,st,sizeof(World.audiologSenders[0])); break;
                 case 5:  if(li>=0&&li<LOGCNT) sCpy2aSubFromb(World.audiologSubjects[li],tl,st,sizeof(World.audiologSubjects[0])); break; case 6:  lt=s2i32Len(st,tl); break;    case 7:  lf=s2i32Len(st,tl); break;
-                default: if(li>=0&&li<LOGCNT){char*d=World.audioLogSpeech2Text[li]; size_t cur=slen(d); if(cur>0&&cur<T_LOGSTR_MAX-2){d[cur++]=',';d[cur]='\0';} size_t left=T_LOGSTR_MAX*4-cur-1; if(left>0){size_t cl=tl>left?left:tl;sCpy2aSubFromb(d+cur,cl,st,left+1);}}break;}
+                default: if(li>=0&&li<LOGCNT){char*d=World.audioLogSpeech2Text[li]; size_t cur=slen(d); if(cur>0&&cur<T_LOGSTR_MAX-2){d[cur++]=',';d[cur]='\0';} size_t left=T_LOGSTR_MAX-cur-1; if(left>0){size_t cl=tl>left?left:tl;sCpy2aSubFromb(d+cur,cl,st,left+1);}}break;}
             if (*pos==',')++pos;fi++;}
         if (li>=0&&li<LOGCNT) {Sys_Text.audioLogImagesRefIndicesLH[li]=(u16)ilh;Sys_Text.audioLogImagesRefIndicesRH[li]=(u16)irh;Sys_Text.audioLogType[li]=(u8)lt;Sys_Text.audioLogLevelFound[li]=(u8)lf;}
         nxt:continue;}
@@ -494,9 +494,9 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char*
     while(*p) {
         const u8*s=(const u8*)p; u32 cp=0;
         if (*s<0x80) { cp=*s++; }
-        else if ((*s&0xE0)==0xC0) { cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }
-        else if ((*s&0xF0)==0xE0) { cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }
-        else if ((*s&0xF8)==0xF0) { cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
+        else if ((*s&0xE0)==0xC0) { if (!s[1]) break; cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }
+        else if ((*s&0xF0)==0xE0) { if (!s[1] || !s[2]) break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }
+        else if ((*s&0xF8)==0xF0) { if (!s[1] || !s[2] || !s[3]) break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
         else s++;
         p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=x; ypos+=ls; cc=0; continue; }
         int idx=CodepointToPackedIndex(cp,fontID);

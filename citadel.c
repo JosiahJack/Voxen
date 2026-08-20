@@ -85,7 +85,7 @@ bool AddGeneralObjectToInventory(int index, int custIdx) {
 void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
 static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
 static void PlayLog(int logIndex) {
-    if (logIndex < 0 || !(World.invP1.hasHardware & HW_ERD)) {return;} play_message(audioLogs[logIndex]); World.invP1.readLog[logIndex] = true;
+    if(logIndex < 0 || logIndex >= LOGCNT || !(World.invP1.hasHardware & HW_ERD)){return;} play_message(AudioLogPath(logIndex)); World.invP1.readLog[logIndex]=true;
     if (Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail) {
         World.Sys_UI.vmailActive        = true;
 //         World.invP1.vmailLogIndex = (i16)logIndex;
@@ -558,7 +558,7 @@ void GrenadeExplode(u16 self) {
         case 7: case 11: soundIndex = 64; World.fogFac += 5; explosionType = 1; break;/*frag, mine*/ case 8: case 10: soundIndex = 60; World.fogFac += 7; explosionType = 2; break;/*conc, earth*/ case 9:  soundIndex = 67; explosionType = 4; break;/*emp*/
         case 12: soundIndex = 60; World.fogFac += 6;  explosionType = 2; break;/*nitro*/ case 13: soundIndex = 63; World.fogFac += 10; explosionType = 3; break;/*gas*/
     }
-    play_wav(sounds[soundIndex],1.0f,World.position[self],true); SpawnExplosionEffect(World.position[self],explosionType); Shake(-1.0f); DeleteInstance(self);
+    play_wav(SoundPath(soundIndex),1.0f,World.position[self],true); SpawnExplosionEffect(World.position[self],explosionType); Shake(-1.0f); DeleteInstance(self);
 }
 
 void GrenadeActivate(u16 self) {
@@ -659,7 +659,7 @@ static void ObjectDeath(u16 self) {
         SecurityType stype = SecurityType_None; if(World.instances[self].index == 477){stype=SecurityType_Camera;}else if(World.instances[self].index == 479){stype=SecurityType_NodeSmall;} else if(World.instances[self].index == 478){stype=SecurityType_NodeLarge;}
         if(stype != SecurityType_None){ReduceCurrentLevelSecurity(stype);}
     }
-    u16 idx = World.instances[self].index; play_wav(sounds[((idx < 527 && objectDeathSound[idx] != 0) ? objectDeathSound[idx] : 62/*crate_break*/)],1.0f,World.position[self],true); if(e->deathBurst != 0){HideSelf(self);}
+    u16 idx = World.instances[self].index; play_wav(SoundPath((idx < 527 && objectDeathSound[idx] != 0) ? objectDeathSound[idx] : 62/*crate_break*/),1.0f,World.position[self],true); if(e->deathBurst != 0){HideSelf(self);}
 }
 
 static void ScreenDeath(u16 self) {

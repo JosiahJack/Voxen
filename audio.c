@@ -676,10 +676,13 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
     return totalRead;
 }
 
-typedef struct { mp3 dec; bool open; float fade_vol,fade_target,fade_step; u32 src_rate; u64 frames_decoded,total_frames; } mp3_channel_t;
+typedef struct { mp3 dec; bool open; u32 src_rate; u64 frames_decoded,total_frames; } mp3_channel_t;
+typedef struct { _Atomic float vol,target,step; } mp3_fade_t;
+typedef struct { float *samples; size_t allocSize; u32 frame_count,frame_pos; } log_msg_t;
 typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; V3 pos; size_t allocSize; } wav_channel_t;
-static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static u32 wav_count,ext_count,mp3_slot,log_frame_count,log_frame_pos; 
-static mp3_channel_t mp3_ch[2]; static float *log_samples; static size_t log_allocSize=0; static bool log_playing,mp3_paused = false;
+static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static u32 wav_count,ext_count,mp3_slot; 
+static _Atomic(mp3_channel_t*) mp3_ch[2],mp3_ch_retired[2]; static mp3_fade_t mp3_fade[2]; static _Atomic bool mp3_paused=false;
+static _Atomic(log_msg_t*) log_msg; static _Atomic(log_msg_t*) log_msg_retired;
 static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_rate, size_t* sz) {
     if(src_rate == 0){src_rate=AUDIO_RATE;} if (src_rate == AUDIO_RATE){return src;}
     u32 sf=*frames, df=(u32)((u64)sf*AUDIO_RATE/src_rate); float *dst=(float*)OS_Alloc(df*2*sizeof(float)); *sz=df*2*sizeof(float); float ratio=(float)sf/(float)df;
@@ -712,40 +715,51 @@ static void wave_mix(wav_channel_t* w, float* mix) {
     for (i32 f = 0; f < AUDIO_FRAMES; f++) { if (w->frame_pos >= w->frame_count){ if (w->looping){w->frame_pos=0;}else{w->playing=false; break;} } mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol; w->frame_pos++; }
 }
 
+static void mp3_ch_retire(i32 s, mp3_channel_t *old) { if (!old){return;} mp3_channel_t *expected=NULL; while (!__c11_atomic_compare_exchange_weak(&mp3_ch_retired[s],&expected,old,3/*memory_order_release*/,0/*memory_order_relaxed*/)) {expected=NULL; OS_USleep(1000);} }
+static void mp3_ch_finish(i32 s, mp3_channel_t *cur){ mp3_channel_t *expected=cur; if(__c11_atomic_compare_exchange_strong(&mp3_ch[s],&expected,NULL,4/*memory_order_acq_rel*/,0/*memory_order_relaxed*/)){mp3_uninit(&cur->dec); OS_Free(cur,sizeof(*cur));} }
 static void audio_mix_period(i16 *out) {
+    for (i32 s=0;s<2;s++) { mp3_channel_t *r = __c11_atomic_exchange(&mp3_ch_retired[s],NULL,2/*memory_order_acquire*/); if (r) { mp3_uninit(&r->dec); OS_Free(r,sizeof(*r)); } }
+    log_msg_t *lr = __c11_atomic_exchange(&log_msg_retired,NULL,2/*memory_order_acquire*/); if (lr) { OS_Free(lr->samples,lr->allocSize); OS_Free(lr,sizeof(*lr)); }
     float mix[AUDIO_FRAMES*AUDIO_CHANNELS]; mset(mix,0,sizeof(mix));
     for (u32 c=0;c<wav_count;c++) { if ( wav_ch[c].playing &&  wav_ch[c].samples) {wave_mix(&wav_ch[c],mix);} }
     for (u32 c=0;c<ext_count;c++) { if (ext_ch[c]->playing && ext_ch[c]->samples) {wave_mix(ext_ch[c], mix);} }
     for (u32 c=0;c<MAX_SYNTH_VOICES;c++) if (syn_ch[c].active) synth_mix(&syn_ch[c],mix);
-    synth_reverb_apply(mix, AUDIO_FRAMES); // room acoustics: wavs + synth get the room, logs + music bypass it
-    if (log_playing && log_samples) {
+    synth_reverb_apply(mix, AUDIO_FRAMES);
+    {log_msg_t *lm = __c11_atomic_load(&log_msg,2/*memory_order_acquire*/);
+    if (lm) {
         float vol = (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMessage/100.0f);
         for (i32 f = 0; f < AUDIO_FRAMES; f++) {
-            if (log_frame_pos >= log_frame_count) { log_playing=false; break; }
-            mix[f*2+0] += log_samples[log_frame_pos*2+0] * vol; mix[f*2+1] += log_samples[log_frame_pos*2+1] * vol; log_frame_pos++;
+            if (lm->frame_pos >= lm->frame_count) { log_msg_t *expected = lm; if (__c11_atomic_compare_exchange_strong(&log_msg,&expected,NULL,4/*memory_order_acq_rel*/,0/*memory_order_relaxed*/)) { OS_Free(lm->samples,lm->allocSize); OS_Free(lm,sizeof(*lm)); } break; }
+            mix[f*2+0] += lm->samples[lm->frame_pos*2+0] * vol; mix[f*2+1] += lm->samples[lm->frame_pos*2+1] * vol; lm->frame_pos++;
         }
-    }
-    if (!mp3_paused) {
+    } }
+    if (!__c11_atomic_load(&mp3_paused,0/*memory_order_relaxed*/)) {
         for (u32 s = 0; s < 2; s++) {
-            mp3_channel_t *m = &mp3_ch[s];
-            if (!m->open) continue;
-            u32 src_rate = m->src_rate ? m->src_rate : AUDIO_RATE;
+            mp3_channel_t *m = __c11_atomic_load(&mp3_ch[s],2/*memory_order_acquire*/);
+            if (!m || !m->open) continue;
+            u32 src_rate = vclamp(m->src_rate ? m->src_rate : AUDIO_RATE,8000u,96000u);
             u64 frames_to_read = (src_rate == AUDIO_RATE) ? AUDIO_FRAMES : (u64)((u64)AUDIO_FRAMES*src_rate/AUDIO_RATE)+2;
-            float raw[AUDIO_FRAMES*8 + 8]; // 15392 bytes
+            float raw[AUDIO_FRAMES*8 + 8];
             u64 got = mp3_read_pcm_frames_f32(&m->dec,frames_to_read,raw);
-            if (got == 0) { mp3_uninit(&m->dec); m->open=false; continue; }
-            float vol = m->fade_vol * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMusic/100.0f);
-            m->frames_decoded += got; float ratio = (float)got/(float)AUDIO_FRAMES;
+            if (got == 0) { mp3_ch_finish(s,m); continue; }
+            float fade_vol = __c11_atomic_load(&mp3_fade[s].vol,0/*memory_order_relaxed*/);
+            float fade_target = __c11_atomic_load(&mp3_fade[s].target,0/*memory_order_relaxed*/);
+            float fade_step = __c11_atomic_load(&mp3_fade[s].step,0/*memory_order_relaxed*/);
+            float vol = fade_vol * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMusic/100.0f);
+            m->frames_decoded += got; float ratio = (float)got/(float)AUDIO_FRAMES; bool finished=false;
             for (i32 f = 0; f < AUDIO_FRAMES; f++) {
                 float pos = f*ratio; u32 a=(u32)pos, b=(a+1<(u32)got)?a+1:a; float t=pos-(float)a;
                 float l = raw[a*2+0]+t*(raw[b*2+0]-raw[a*2+0]), r = raw[a*2+1]+t*(raw[b*2+1]-raw[a*2+1]);
                 mix[f*2+0] += l*vol; mix[f*2+1] += r*vol;
-                if (m->fade_step != 0.0f) {
-                    m->fade_vol += m->fade_step;
-                    if (m->fade_step>0.0f && m->fade_vol>=m->fade_target) { m->fade_vol=m->fade_target; m->fade_step=0.0f; }
-                    else if (m->fade_step<0.0f && m->fade_vol<=m->fade_target) { m->fade_vol=m->fade_target; m->fade_step=0.0f; if (m->fade_target==0.0f) { mp3_uninit(&m->dec); m->open=false; } }
+                if (fade_step != 0.0f) {
+                    fade_vol += fade_step;
+                    if (fade_step>0.0f && fade_vol>=fade_target) { fade_vol=fade_target; fade_step=0.0f; }
+                    else if (fade_step<0.0f && fade_vol<=fade_target) { fade_vol=fade_target; fade_step=0.0f; if (fade_target==0.0f) finished=true; }
                 }
             }
+            __c11_atomic_store(&mp3_fade[s].vol,fade_vol,0/*memory_order_relaxed*/);
+            __c11_atomic_store(&mp3_fade[s].step,fade_step,0/*memory_order_relaxed*/);
+            if (finished) mp3_ch_finish(s,m);
         }
     }
     for (u32 i = 0; i < AUDIO_FRAMES * AUDIO_CHANNELS; i++) { float s = mix[i]; s = s > 1.0f ? 1.0f : (s < -1.0f ? -1.0f : s); out[i] = (i16)(s * 32767.0f); }
@@ -763,22 +777,40 @@ void play_wav(const char *path,float volume,V3 pos,bool positional) {
 }
 
 void play_message(const char *path) {
-    if (log_playing && log_samples && log_allocSize > 0) { log_playing=false; OS_Free(log_samples,log_allocSize); log_samples=NULL; log_allocSize=0; }
-    u32 frames; float *buf = load_wav(path,&frames,&log_allocSize); if (!buf) { DualLogError("Failed to load %s\n",path); return; }
-    log_samples=buf; log_frame_count=frames; log_frame_pos=0; log_playing=true;
+    log_msg_t *lm = (log_msg_t*)OS_Alloc(sizeof(log_msg_t));
+    lm->samples = load_wav(path,&lm->frame_count,&lm->allocSize);
+    if (!lm->samples) { DualLogError("Failed to load %s\n",path); OS_Free(lm,sizeof(*lm)); return; }
+    lm->frame_pos = 0;
+    log_msg_t *old = __c11_atomic_exchange(&log_msg,lm,3/*memory_order_release*/);
+    if (old) { log_msg_t *expected = NULL; while (!__c11_atomic_compare_exchange_weak(&log_msg_retired,&expected,old,3/*memory_order_release*/,0/*memory_order_relaxed*/)) { expected=NULL; OS_USleep(1000); } }
 }
 
 i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=load_audio(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=w->positional=w->playing=false; return 0; }
 i32 SndStart(wav_channel_t* w) { w->frame_pos = 0; w->playing = true; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) return 0; if (ext_count < MAX_CHANNELS) ext_ch[ext_count++] = w; return 0; }
 void SndUninit(wav_channel_t* w) { if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[--ext_count]; break; } }
 static void mp3_open_slot(i32 s, const char *path, float fade_from, float fade_to, i32 fade_ms) {
-    mp3_channel_t *m = &mp3_ch[s]; if (m->open) { mp3_uninit(&m->dec); m->open=false; } if (!mp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); return; }
-    m->src_rate = m->dec.sampleRate; m->total_frames = mp3_get_pcm_frame_count(&m->dec); mp3_seek_to_pcm_frame(&m->dec,0); m->frames_decoded = 0; m->open = true; m->fade_target = fade_to;
-    m->fade_vol = (m->fade_step = (fade_ms > 0) ? (fade_to - fade_from) / (AUDIO_RATE * fade_ms / 1000.0f) : 0.0f) == 0.0f ? fade_to : fade_from;
+    mp3_channel_t *m = (mp3_channel_t*)OS_Alloc(sizeof(mp3_channel_t)); mset(m,0,sizeof(*m));
+    if (!mp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); OS_Free(m,sizeof(*m)); return; }
+    m->src_rate = m->dec.sampleRate; m->total_frames = mp3_get_pcm_frame_count(&m->dec); mp3_seek_to_pcm_frame(&m->dec,0); m->frames_decoded = 0; m->open = true;
+    float step = (fade_ms > 0) ? (fade_to - fade_from) / (AUDIO_RATE * fade_ms / 1000.0f) : 0.0f;
+    __c11_atomic_store(&mp3_fade[s].vol, step == 0.0f ? fade_to : fade_from, 0/*memory_order_relaxed*/);
+    __c11_atomic_store(&mp3_fade[s].target, fade_to, 0/*memory_order_relaxed*/);
+    __c11_atomic_store(&mp3_fade[s].step, step, 3/*memory_order_release*/);
+    mp3_ch_retire(s, __c11_atomic_exchange(&mp3_ch[s], m, 3/*memory_order_release*/));
 }
 
-void play_mp3(const char *path, i32 fade_ms) { i32 old = mp3_slot, next = mp3_slot ? 0 : 1; if (mp3_ch[old].open) { mp3_ch[old].fade_target = 0.0f; mp3_ch[old].fade_step = (fade_ms > 0) ? -mp3_ch[old].fade_vol / (AUDIO_RATE * fade_ms / 1000.0f) : -1.0f; } mp3_open_slot(mp3_slot = next,path,0.0f,1.0f,fade_ms); }
-void mp3_clear() { for (i32 i=0;i<2;i++) if (mp3_ch[i].open) { mp3_uninit(&mp3_ch[i].dec); mp3_ch[i].open=false; } mp3_slot=0; }
+void play_mp3(const char *path, i32 fade_ms) {
+    i32 old = mp3_slot, next = mp3_slot ? 0 : 1;
+    mp3_channel_t *cur = __c11_atomic_load(&mp3_ch[old],0/*memory_order_relaxed*/);
+    if (cur && cur->open) {
+        float curvol = __c11_atomic_load(&mp3_fade[old].vol,0/*memory_order_relaxed*/);
+        __c11_atomic_store(&mp3_fade[old].step,(fade_ms>0) ? -curvol/(AUDIO_RATE*fade_ms/1000.0f) : -1.0f,0/*memory_order_relaxed*/);
+        __c11_atomic_store(&mp3_fade[old].target,0.0f,3/*memory_order_release*/);
+    }
+    mp3_slot = next; mp3_open_slot(next,path,0.0f,1.0f,fade_ms);
+}
+
+void mp3_clear() { for (i32 i=0;i<2;i++) mp3_ch_retire(i, __c11_atomic_exchange(&mp3_ch[i],NULL,3/*memory_order_release*/)); mp3_slot=0; }
 static FHandle pcm_fds[8]; static i32 pcm_fd_count = 0;
 pthread_t audThreadID; void* AudThread(void* arg); 
 #if defined(_WIN32)
@@ -908,10 +940,10 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
 }
 
 void UpdateMusic() {
-    if ((World.paused && !World.menuActive) || !Sys_Settings.VolumeMusic) { mp3_paused=true; return; }
-    mp3_paused=false;
-    mp3_channel_t *m = &mp3_ch[mp3_slot];
-    float remaining = (!m->open || m->frames_decoded >= m->total_frames) ? 0.0f : (!m->total_frames ? 1.0f : (float)(m->total_frames - m->frames_decoded) / (m->src_rate ? m->src_rate : AUDIO_RATE));
+    if ((World.paused && !World.menuActive) || !Sys_Settings.VolumeMusic) { __c11_atomic_store(&mp3_paused,true,0/*memory_order_relaxed*/); return; }
+    __c11_atomic_store(&mp3_paused,false,0/*memory_order_relaxed*/);
+    mp3_channel_t *m = __c11_atomic_load(&mp3_ch[mp3_slot],0/*memory_order_relaxed*/);
+    float remaining = (!m || !m->open || m->frames_decoded >= m->total_frames) ? 0.0f : (!m->total_frames ? 1.0f : (float)(m->total_frames - m->frames_decoded) / (m->src_rate ? m->src_rate : AUDIO_RATE));
     if(remaining > AUD_BUFFER_T){return;} if(World.menuActive){play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return;}
     if(World.Sys_Music.inCombat && !World.Sys_Music.inZone && World.Sys_Music.combatImpulseFinished < World.pauseRelativeTime) {
         World.Sys_Music.inCombat=false; PlayTrack(TT_Combat,MT_Override); World.Sys_Music.combatImpulseFinished=World.pauseRelativeTime + 20.0; return;

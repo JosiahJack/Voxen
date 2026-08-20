@@ -743,7 +743,6 @@ static bool GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     out->anim = bestAnim;
     out->gltf = data; // kept alive until GltfFreeAllBlocks() -- jointNodes[]/anim/meshNodes alias into it
     if (out->anim->channels_count) { for (size_t c = 0; c < out->anim->channels_count; ++c) { if (out->anim->channels[c].sampler->interpolation == cgltf_interpolation_type_cubic_spline) { DualLogWarn("gltf_anim: CUBICSPLINE channel present -- tangents ignored, degrading to linear-between-keys\n"); break; } } }
-   
     cgltf_node* skinNode = NULL;
     for (size_t i = 0; i < data->nodes_count; ++i) if (data->nodes[i].skin && data->nodes[i].mesh) { skinNode = &data->nodes[i]; break; }
     if (skinNode) { // Skeletal mesh animation (skinned)
@@ -761,23 +760,16 @@ static bool GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
         u32 vc = (u32)posAcc->count;
         if (vc == 0 || vc > MAX_GLTF_VERTS) { DualLogError("gltf_anim: vertex count %u out of range (max %u)\n", vc, (u32)MAX_GLTF_VERTS); OS_Exit(1); }
         out->vertCount = vc;
-        out->pos  = (float*)OS_Alloc((size_t)vc * 3 * sizeof(float));
-        out->nrm  = (float*)OS_Alloc((size_t)vc * 3 * sizeof(float));
-        out->uv   = (float*)OS_Alloc((size_t)vc * 2 * sizeof(float));
-        out->skin = (VtxSkin*)OS_Alloc((size_t)vc * sizeof(VtxSkin));
+        out->pos=(float*)OS_Alloc((size_t)vc * 3 * sizeof(float)); out->nrm=(float*)OS_Alloc((size_t)vc * 3 * sizeof(float)); out->uv=(float*)OS_Alloc((size_t)vc * 2 * sizeof(float)); out->skin=(VtxSkin*)OS_Alloc((size_t)vc * sizeof(VtxSkin));
         for (u32 i = 0; i < vc; ++i) {
             cgltf_accessor_read_float(posAcc, i, &out->pos[i*3], 3);
             if (nrmAcc) cgltf_accessor_read_float(nrmAcc, i, &out->nrm[i*3], 3);
             else { out->nrm[i*3]=0.0f; out->nrm[i*3+1]=1.0f; out->nrm[i*3+2]=0.0f; }
-            if (uvAcc) {
-                cgltf_accessor_read_float(uvAcc, i, &out->uv[i*2], 2);
-                out->uv[i*2+1] = 1.0f - out->uv[i*2+1]; // Flip V: glTF bottom-left, engine top-left
-            } else { out->uv[i*2]=0.0f; out->uv[i*2+1]=0.0f; }
+            if (uvAcc) { cgltf_accessor_read_float(uvAcc, i, &out->uv[i*2], 2); out->uv[i*2+1] = 1.0f - out->uv[i*2+1]; /*Flip V: glTF bottom-left, engine top-left*/ }
+            else { out->uv[i*2]=0.0f; out->uv[i*2+1]=0.0f; }
             float jf[4]={0,0,0,0}, wf[4]={0,0,0,0};
-            cgltf_accessor_read_float(jntAcc, i, jf, 4);
-            cgltf_accessor_read_float(wgtAcc, i, wf, 4);
-            float wsum = wf[0]+wf[1]+wf[2]+wf[3], winv = (wsum > 1e-6f) ? 1.0f/wsum : 0.0f;
-            for (int k = 0; k < 4; ++k) { out->skin[i].j[k] = (u16)jf[k]; out->skin[i].w[k] = wf[k]*winv; }
+            cgltf_accessor_read_float(jntAcc,i,jf,4); cgltf_accessor_read_float(wgtAcc,i,wf,4); float wsum = wf[0]+wf[1]+wf[2]+wf[3], winv = (wsum > 1e-6f) ? 1.0f/wsum : 0.0f;
+            for (int k=0;k<4;++k){i32 jj=(i32)jf[k]; out->skin[i].j[k]=(jj >= 0 && jj < MAX_GLTF_JOINTS) ? (u16)jj : 0; out->skin[i].w[k]=wf[k]*winv;}
         }
         u32 tc;
         if (prim->indices) {
