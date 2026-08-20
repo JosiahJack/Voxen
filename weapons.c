@@ -182,7 +182,7 @@ void MeleeHitUpdate(void) {
             u16 fstepSnd = GetFootstepTypeForPrefab(targ);
             (void)fstepSnd;//if (fstepSnd) { PlayWav(World.position[targ], fstepSnd, 1.0f); PlayWav(World.position[targ], wfx.pendingMeleeHitSnd, 0.65f); } TODO
             //else PlayWav(World.position[targ], wfx.pendingMeleeHitSnd, 1.0f);
-            World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime + 0.5;
+            World.invP1.noiseFinished = World.pauseRelativeTime + 0.5;
         }
         return;
     }
@@ -191,7 +191,7 @@ void MeleeHitUpdate(void) {
     if (dmgFinal < 0.0f) {dmgFinal = 0.0f;}
     (void)dmgFinal; // CreateTargetIDInstance(dmgFinal, targ, -1.0f); TODO
     if (!silent) {
-        World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime + 0.5;
+        World.invP1.noiseFinished = World.pauseRelativeTime + 0.5;
         BloodType bt = World.instances[targ].bloodType; (void)bt;//TODO
 //         if (bt==BloodType_Red || bt==BloodType_Yellow || bt==BloodType_Green) PlayUIOneShotSavable(wfx.pendingMeleeFleshSnd); TODO
 //         else if (isRapier && World.invP1.energy < 4.0f) PlayUIOneShotSavable(67);
@@ -238,7 +238,7 @@ void FirePlasma(int w){FireBeachball(w,plasmaShotForce,485);} void FireRailgun(i
 typedef void (*FireFn)(int); FireFn wepSpecialFire[16]={0,0,0,0,0,FireRapier,FirePipe,0,FireMagpulse,0,FirePlasma,FireRailgun,0,0,0,FireStungun};
 void FireWeapon(int wep16, bool isSilent) {
     if (wep16 < 0 || wep16 > 15) return;
-    World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime + 0.5; (void)isSilent;//if (!isSilent) PlayUIOneShotSavable(wepFireSound[wep16]); TODO
+    World.invP1.noiseFinished = World.pauseRelativeTime + 0.5; (void)isSilent;//if (!isSilent) PlayUIOneShotSavable(wepFireSound[wep16]); TODO
     bool didHit=false; if(wepSpecialFire[wep16]){wepSpecialFire[wep16](wep16);}else{didHit = DidRayHit(wep16);}
     if (wepSmokePrefab[wep16] && didHit) { u16 smk = SpawnDynamicObject(wepSmokePrefab[wep16], -1); if (smk != 0xFFFF) { World.position[smk]=wfx.reloadContainerPos; } } // ActivateInst(wepMuzzleFlashInst[wep16]); // muzzle-flash instance table, per-weapon
     World.fogFac += wepFogInc[wep16]; u16 wc = World.invP1.weaponCurrent;
