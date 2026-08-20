@@ -1,8 +1,8 @@
 // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
 #include "common.h"
-typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead;} Portal;
+typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead; u8 lev;} Portal;
 u32 gridCellStates[ARRSIZE],precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
-u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u8 numActivePortals = 0;
+u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u32 numActivePortals = 0;
 __attribute__((pure)) bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
 bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
@@ -70,7 +70,8 @@ void DetermineClosedEdges() {
 }
 
 void AddDoorPortal(u16 entIdx, u16 parent) {
-    if (entIdx == 499 || entIdx == 509) return; // Don't add bulkheads
+    if (entIdx == 499 || entIdx == 509/*Don't add bulkheads that span 2 cells, would be unnecessary complication*/){return;}
+    if (numActivePortals >= MAX_PORTALS){DualLogWarn("Unable to add more door portals!\n"); return;}
     float nudgeAmount = 0.32f;
     Entity* door = &World.instances[parent]; door->portalIndex = numActivePortals; bool isOpen = (door->doorState != DoorState_Closed); // Allows for any of DoorState_Open, DoorState_Opening, or DoorState_Closing to be considered open as far as portals are concerned so we can draw objects between the door panels.
     float obj_x = World.position[parent].x; float obj_z = World.position[parent].z;
@@ -82,16 +83,16 @@ void AddDoorPortal(u16 entIdx, u16 parent) {
                 //             South pair\/
         PortalCell cellN = (PortalCell){PosGetCellCoordX(obj_x), (cellN_idx != cellCurrent) ? cellIndexUp : PosGetCellCoordZ(obj_z)}; // Ensure that cellA is always the north cell of the pair
         PortalCell cellS = (PortalCell){                cellN.x, (cellS_idx != cellCurrent) ? cellIndexDn : PosGetCellCoordZ(obj_z)};
-        activePortals[numActivePortals] = (Portal){ .cellA=cellN, .cellB=cellS, .portalNS=true, .open=isOpen, .dirty=true };
+        activePortals[numActivePortals] = (Portal){ .cellA=cellN, .cellB=cellS, .portalNS=true, .open=isOpen, .dirty=true, .lev=World.curLev };
     } else { // Portal is an East<>West pair
         PortalCell cellE = (PortalCell){(cellE_idx != cellCurrent) ? cellIndexRight : PosGetCellCoordX(obj_x), PosGetCellCoordZ(obj_z)}; // Ensure that cellA is always the east cell of the pair
         PortalCell cellW = (PortalCell){(cellW_idx != cellCurrent) ?  cellIndexLeft : PosGetCellCoordX(obj_x), cellE.z};
-        activePortals[numActivePortals] = (Portal){ .cellA=cellE, .cellB=cellW, .portalNS=false, .open=isOpen, .dirty=true };
+        activePortals[numActivePortals] = (Portal){ .cellA=cellE, .cellB=cellW, .portalNS=false, .open=isOpen, .dirty=true, .lev=World.curLev };
     }
     numActivePortals++;
 }
 
-bool ToggleDoorPortal(u8 p, u16 dr, u16 closedMdx) { if (p >= MAX_PORTALS) {return false;} Portal* prt = &activePortals[p]; bool currentState=prt->open; u16 mdx=World.instances[dr].modelIndex; if (mdx == closedMdx &&  currentState) { prt->open=false; prt->dirty=true; } else if (mdx != closedMdx && !currentState) { prt->open=true; prt->dirty=true; } return true; }
+bool ToggleDoorPortal(u32 p, u16 dr, u16 closedMdx) { if (p >= MAX_PORTALS) {return false;} Portal* prt = &activePortals[p]; bool currentState=prt->open; u16 mdx=World.instances[dr].modelIndex; if (mdx == closedMdx &&  currentState) { prt->open=false; prt->dirty=true; } else if (mdx != closedMdx && !currentState) { prt->open=true; prt->dirty=true; } return true; }
 i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ) {
     if (lastX != x || lastZ != z) {
         if (XZPairInBounds(lastX, lastZ)) { 
@@ -240,11 +241,11 @@ void DetermineVisibleCells(i32 startX, i32 startZ) {
     }
 }
 
-void PortalCulling() { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
+void PortalCulling() { // Called just once at end of animation loop for the frame after each frame-perfect change to door models becoming either closed or not closed.
     bool previousLightVisible[LIGHT_COUNT]; mset(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
     for (u16 i=0;i<World.loadedLights;++i) { u16 lcell = (World.lights[i].pos.z * WORLDX) + World.lights[i].pos.x; if (gridCellStates[lcell] & CELL_VISIBLE) {previousLightVisible[i]=true;} }
-    for (u8 portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
-        Portal* prt = &activePortals[portalIdx]; if (!prt->dirty) continue;
+    for (u32 portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
+        Portal* prt = &activePortals[portalIdx]; if (!prt->dirty || prt->lev != World.curLev) continue;
         prt->dirty = false;
         u16 cellIdxA = (prt->cellA.z * WORLDX) + prt->cellA.x; u16 cellIdxB = (prt->cellB.z * WORLDX) + prt->cellB.x; // Guaranteed order at level load.  A = N or E, B = S or W
         if (prt->open) { // Open the edges up
@@ -256,7 +257,7 @@ void PortalCulling() { // Called just once at end of animation loop for the fram
         }
     }
     DetermineVisibleCells(PosGetCellCoordX(World.position[PLAYER1].x),PosGetCellCoordZ(World.position[PLAYER1].z)); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
-    for (u16 i=0;i<World.loadedLights;++i) { u16 lcell=(World.lights[i].pos.z * WORLDX) + World.lights[i].pos.x; if (!previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) {flag_set(&World.lights[i].lflags,LDIRTY,true);} }
+    for (u16 i=0;i<World.loadedLights;++i) { i32 lcell=PosGetCellCoords(World.lights[i].pos.x, World.lights[i].pos.z); if (lcell >= 0 && lcell < ARRSIZE && !previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) {flag_set(&World.lights[i].lflags,LDIRTY,true);} }
     glBindBuffer(GL_SSBO,cellVisibleDataID); glBufferData(GL_SSBO,ARRSIZE * sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW);
 }
 

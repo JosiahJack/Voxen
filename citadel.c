@@ -445,13 +445,13 @@ void ElevatorButtonClick(u16 self) {
 }
 
 void EmailTargetted(u16 self) { Entity* e=&World.instances[self]; u16 idx=e->emailIndex; if(World.invP1.hasLog[idx]){return;} World.invP1.hasLog[idx]=World.invP1.hasNewEmail=true; World.invP1.lastAddedIndex=idx; if(Sys_Text.audioLogType[idx] == AudioLogType_Email){World.invP1.beepDone=true;} if(e->autoPlayEmail){PlayLastAddedLog(idx);} }
+u8 OverloadButtonVisualState() { if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] > 25.0f) {return 2;} if (World.invP1.overloadEnabled) {return 1;} return 0; }
 void OverloadButtonAction() {
     static double overloadClickFinished = 0.0; if (overloadClickFinished >= World.pauseRelativeTime){return;} overloadClickFinished = World.pauseRelativeTime + 0.4; 
-    if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponIndex] > 25.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[12]);/*Weapon too hot*/ return; }
+    if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] > 25.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[12]);/*Weapon too hot*/ return; }
     if (World.invP1.overloadEnabled) { CenterStatusPrint("%s",Sys_Text.stringTable[13]);/*Overload disabled*/ World.invP1.overloadEnabled = false; } else { CenterStatusPrint("%s",Sys_Text.stringTable[17]);/*Overload enabled*/ World.invP1.overloadEnabled = true; }
 }
 
-u8 OverloadButtonVisualState() { if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponIndex] > 25.0f) {return 2;} if (World.invP1.overloadEnabled) {return 1;} return 0; }
 // TargetID
 #define TARGETID_LINK_DIST       10.0f
 #define TARGETID_DAMAGE_TIME_HIT  2.5f
@@ -635,9 +635,9 @@ static void TeleportAway(u16 self) {
 static void DropSearchables(u16 self) {
     /*TODO: NotifySearchThatSearchableWasDestroyed();*/
     for (int i = 0; i < 4; i++) {
-        if (World.instances[self].contents[i] == U16_MAX) {continue;} u16 spawned = SpawnDynamicObject(World.instances[self].contents[i] + 307,true);
+        if (World.instances[self].contents[i] <= -1) {continue;} u16 spawned = SpawnDynamicObject(World.instances[self].contents[i] + 307,true);
         if(spawned != U16_MAX){World.position[spawned]=World.position[self]; World.instances[spawned].custIdx[0]=World.instances[self].custIdx[i];}else{CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");}
-        World.instances[self].contents[i] = World.instances[self].custIdx[i]=U16_MAX;
+        World.instances[self].contents[i] = World.instances[self].custIdx[i]=-1;
     }
 }
 
@@ -747,7 +747,7 @@ float TakeDamage(u16 self,DamageData dd) {
     return take;
 }
 
-void HealthManagerInitAfterLoad(u16 self) {
+void HealthManagerInitAfterLoad(u16 self) { // TODO call me!
     if (self == PLAYER1) { World.instances[self].health=211.0f; World.instances[self].cyberHealth=255.0f; World.instances[self].noiseFinished = World.pauseRelativeTime - 31.0;/*guarantee no combat music on start*/ return; }
     if (IdxIsNPC(World.instances[self].index)) {
         if (IsCyberEntity(self)) { if (World.instances[self].cyberHealth < 0.0f) World.instances[self].cyberHealth = npcTable[World.instances[self].index - 419].healthForCyberNPC; }
@@ -797,7 +797,7 @@ void HardwareUpdate() {
     bool lanternOn = (World.invP1.hasHardware & HW_LAN) && (World.invP1.hardwareIsActive & HW_LAN) > 0;
     if (lanternOn || infraredOn) { // Update headmounted lantern/infrared's light (infrared overrides lantern brightness/range)
         V3 ppos = World.position[PLAYER1]; lanternPos = (V3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f};
-        float intensity = infraredOn ? 0.8f : lanternVersionBrightness[World.invP1.hardwareVersionSetting[7]];
+        float intensity = infraredOn ? 0.8f : lanternVersionBrightness[vclamp(World.invP1.hardwareVersionSetting[7],0,2)];
         UpdateLight(headmountedLanternLight,lanternPos,lantCol,infraredOn ? INFRARED_RANGE : LANTERN_RANGE,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
     } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,false);
 }
@@ -1077,10 +1077,10 @@ void DoorUpdate(u16 self) {
 
 void CloseFullmap() {} // TODO
 u16 SpawnDynamicObject(int val, bool cheat) {
-    if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return WORLD; }
+    if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return 0xFFFF; }
     if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ",val,World.curLev,cheat);
-    if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return WORLD; }
-    if (World.instCount >= INSTANCE_COUNT) { DualLogError("Failed to spawn constIndex %u: instance table full (%u/%u)",val,World.instCount,INSTANCE_COUNT); return WORLD; }
+    if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return 0xFFFF; }
+    if (World.instCount >= INSTANCE_COUNT) { DualLogError("Failed to spawn constIndex %u: instance table full (%u/%u)",val,World.instCount,INSTANCE_COUNT); return 0xFFFF; }
     u16 entityIndexInInstanceTable = AddInstance((u16)val, (V3){0.0f,0.0f,0.0f});
     return entityIndexInInstanceTable;
 }

@@ -8,10 +8,9 @@ typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3],Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
 SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount;
-float posBudget[INSTANCE_COUNT]; // Remaining |Δpos| entity may receive this substep; resets every substep in Physics().
+float posBudget[INSTANCE_COUNT]; // Remaining |delta pos| entity may receive this substep; resets every substep in Physics().
 u16 dynamicEntities[512],dynamicEntityCount;
-static u8 g_physSleep[INSTANCE_COUNT]; // physics sleep-deactivation flags (separate from AI-owned EF_ASLEEP)
-bool PhysIsAsleep(u16 i) { return g_physSleep[i] != 0; } // exposed for showPhys debug coloring
+bool PhysIsAsleep(u16 i) { return World.physSleep[i] != 0; } // exposed for showPhys debug coloring
 INLINE bool AnimWaking(u16 j) {
     if (j == PLAYER1) return false;
     u16 an = World.instances[j].animationNum;
@@ -74,21 +73,14 @@ void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances
 void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // TODO Visual subobject parity removed with hierarchy removal.
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} UICyberSprint((u16)e->textIndex); e->active = true; UseTargets(other,e->target); }
 // TeleportTouch
-static u16 TeleportTouch_allTeleportTouches[8];
 static bool TeleportTouch_initialized;
-void TeleportTouchInitAfterLoad(u16 self) {
-    Entity* e = &World.instances[self];
-    if (!TeleportTouch_initialized) { for (u8 i = 0; i < 8; i++) TeleportTouch_allTeleportTouches[i] = U16_MAX; TeleportTouch_initialized = true; }
-    if (e->teleportID >= 8) { DeleteInstance(self); return; }
-    TeleportTouch_allTeleportTouches[e->teleportID] = self;
-}
-
+void TeleportTouchInitAfterLoad(u16 self){Entity* e=&World.instances[self]; if(!TeleportTouch_initialized){for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;} TeleportTouch_initialized=true;} if(e->teleportID >= 8){DeleteInstance(self); return;} World.TeleportTouch_allTeleportTouches[e->teleportID]=self;}
 void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &World.instances[self];
     Entity* player = &World.instances[PLAYER1];
     if (!e->touchEnabled || other != PLAYER1) return;
     if (player->health <= 0.0f || e->justUsed >= World.pauseRelativeTime) return;
-    u16 dest = e->targetDestinationID < 8 ? TeleportTouch_allTeleportTouches[e->targetDestinationID] : U16_MAX;
+    u16 dest = e->targetDestinationID < 8 ? World.TeleportTouch_allTeleportTouches[e->targetDestinationID] : U16_MAX;
     if (dest == U16_MAX) return;
     World.position[PLAYER1] = World.position[dest];
     World.instances[dest].justUsed = World.pauseRelativeTime + 1.0;
@@ -211,7 +203,7 @@ Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5
 Quaternion quat_normalize(Quaternion q) { float l = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; float m = (l < PHY_EPSILON); float inv=vinvsqtf(vmax(l,PHY_EPSILON)); q.x*=inv; q.y*=inv; q.z*=inv; q.w*=inv; q.x=q.x*(1.0f - m); q.y=q.y*(1.0f - m); q.z=q.z*(1.0f - m); q.w=q.w*(1.0f - m) + 1.0f*m; return q; }
 INLINE V3 MeshVert(u16 m, u32 i) { const float* p = physPos[m] + i * 3; return (V3){p[0],p[1],p[2]}; }
 void ComputeConvexMeshInertiaTensor(u16 i) {
-    World.mass[i] *= 10.0f;
+    World.mass[i] *= 10.0f; // Intentional global mass scaling.  Tunes all masses vs Unity engine version of Citadel, gives better responses and robustness to small items.
     u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i]=false; if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) {return;}
     float acc[6]={0}; float cm[3]={0}; float volAcc=0.0f; u32 triCount = modelTriangleCounts[mi];
     for (u32 ti=0;ti<triCount;++ti) { // Accumulates without dividing by 6 for each saving that for the end for performance.
@@ -725,7 +717,7 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
     if (!m->n || (World.col[b] == COLTYPE_MSH && World.col[a] == COLTYPE_MSH)) return;
     if (gContactCount >= MAX_GLOBAL_CONTACTS) { DualLogWarn("Ran out of global contact slots!\n"); return; }
     SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m;
-    sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == COLTYPE_NONE || World.col[b] == COLTYPE_MSH || g_physSleep[b]);
+    sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == COLTYPE_NONE || World.col[b] == COLTYPE_MSH || World.physSleep[b]);
     for (int i=0;i<m->n;++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} }
     quat_to_mat3(World.rotation[a],sc->Ra); BuildInvInertiaMatrix(a,sc->Ra,sc->Ka);
     if (!sc->bStatic) { quat_to_mat3(World.rotation[b],sc->Rb); BuildInvInertiaMatrix(b,sc->Rb,sc->Kb); }
@@ -753,7 +745,7 @@ bool PointInOBB(V3 pt, ShapeBox box) {
     return (vabs(lx) <= box.hExt.x + 0.001f) && (vabs(ly) <= box.hExt.y + 0.001f) && (vabs(lz) <= box.hExt.z + 0.001f);
 }
 
-INLINE int V3_IsSane(V3 v) { union { float f; unsigned int i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
+INLINE int V3_IsSane(V3 v) { union { float f; u32 i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
 u16 triggerVolumes[128]; u16 numTriggers; extern double game_actual_start_time;
 void DrawBoxColliderColored(u16 i, Color col);
 void Physics(float dt) {
@@ -764,7 +756,7 @@ void Physics(float dt) {
         else if (likely(World.col[i] == COLTYPE_BOX)) { World.radius[i] = vmax(World.colliderSize[i].x * 0.5f * World.scale[i].x,vmax(World.colliderSize[i].y * 0.5f * World.scale[i].y,World.colliderSize[i].z * 0.5f * World.scale[i].z)); }
         else if (World.col[i] == COLTYPE_SPH || World.col[i] == COLTYPE_CAP) { World.radius[i] = vmax(World.colliderSize[i].x,World.colliderSize[i].y) * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z)); }
         else World.radius[i] = World.colliderSize[i].x * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));
-        if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && !(g_physSleep[i]) && World.col[i] != COLTYPE_NONE && vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}
+        if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && !(World.physSleep[i]) && World.col[i] != COLTYPE_NONE && vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}
     }
     for (u8 s=0;s<World.substeps;++s) {
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
@@ -810,7 +802,7 @@ void Physics(float dt) {
                         u8 colB = World.col[b]; ShapeBox boxB = colB==COLTYPE_BOX ? Entity_GetBox(b) : (ShapeBox){0}; ShapeCapsule capB = colB==COLTYPE_CAP ? Entity_GetCap(b) : (ShapeCapsule){0}; ShapeSphere sphB = colB==COLTYPE_SPH ? Entity_GetSph(b) : (ShapeSphere){0};
                         if (unlikely(Cheats.noclip && b == PLAYER1)) continue;
                         if (!(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue;
-                        if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !g_physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
+                        if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !World.physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
                         V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
                         Manifold mf = {0}; float matB[16]; const float *mxB = &world_from_mdl[b*16];
                         if (World.col[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
@@ -885,7 +877,7 @@ void Physics(float dt) {
             if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true);
             u32 ef = World.instances[i].entflags;
             bool canSleep = (i!=PLAYER1) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && (World.col[i]!=COLTYPE_NONE) && (World.mass[i] >= 0.001f);
-            if (!canSleep) { g_physSleep[i]=0; continue; }
+            if (!canSleep) { World.physSleep[i]=0; continue; }
             i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z);
             bool nearAwake = false;
             for (i32 dx=-WAKE_CELLS; dx<=WAKE_CELLS && !nearAwake; ++dx)
@@ -894,7 +886,7 @@ void Physics(float dt) {
                 for (u16 k=0;k<cellCounts[cl];++k) {
                     u16 j = cellLists[cl][k]; if (j==i) continue;
                     u32 ej = World.instances[j].entflags;
-                    if (g_physSleep[j] || !(ej & EF_ACTIVE)) continue; // asleep/inactive bodies don't wake others
+                    if (World.physSleep[j] || !(ej & EF_ACTIVE)) continue; // asleep/inactive bodies don't wake others
                     float sj2 = V3_dot(World.velocity[j], World.velocity[j]);
                     bool jMoving = sj2 > SLEEP_LIN2;
                     bool jAnimWaking = AnimWaking(j);
@@ -904,10 +896,10 @@ void Physics(float dt) {
                     if (V3_dot(d,d) < rr*rr) { nearAwake=true; break; }
                 }
             }
-            if (g_physSleep[i]) { if (nearAwake) g_physSleep[i]=0; }
+            if (World.physSleep[i]) { if (nearAwake) World.physSleep[i]=0; }
             else if (!nearAwake && (ef & EF_GROUNDED)) {
                 float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]);
-                if (sp2 < SLEEP_LIN2 && asp2 < SLEEP_ANG2) { g_physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; }
+                if (sp2 < SLEEP_LIN2 && asp2 < SLEEP_ANG2) { World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; }
             }
         }
     }
@@ -993,7 +985,7 @@ void ApplyPlayerMovements(float dt) {
         if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown) v -= (WALK_SPEED-CROUCH_SPEED)*1.5f; else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp) v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;
     }
     float speed = (setSpeedAdjusted ? speedAdjust : v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f)) + (World.invP1.staminupActive ? 1.0f : 0.0f), accel=World.boosterActive && World.curLev!=LEVEL_CYBERSPACE ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
-    if (World.invP1.ladderState > 0) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed * 25.0f, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
+    if (World.invP1.ladderState > 0) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
     else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
     V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); 
     dv = (V3){ vclamp(dv.x, -10.0f, 10.0f), vclamp(dv.y, -10.0f, 10.0f), vclamp(dv.z,-10.0f,10.0f) };

@@ -19,7 +19,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
     .InputCodeSettings = {  5,/*Forward=F*/      0,/*Strafe Left=A*/      18,/*Backpedal=S*/        3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/        2,/*Crouch=C*/     23,/*Prone=X*/      16,/*Lean Left=Q*/       4,/*Lean Right=E*/
                            45,/*Sprint=LSHIFT*/ 38,/*Turn Left=LARROW*/   39,/*Turn Right=RARROW*/ 36,/*Look Up=UARROW*/  37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/ 27,/*Sensaround=2*/     28,/*Lantern=3*/
                            29,/*Shield=4*/      30,/*Infrared=5*/         31,/*Email=6*/           32,/*Booster=7*/       33,/*Jumpjets=8*/       56,/*Attack=LMB*/   57,/*Use=RMB*/      99,/*Menu/Back=ESCAPE*/ 97,/*Toggle Mode=TAB*/
-                           17,/*Reload=R*/     128,/*Weapon+=MWHEEL+*/   129,/* Weapon-=MWHEEL-*/   6,/* Grenade=G*/      19,/*Grenade + = T*/   131,/*Grenade-=*/    21,/*Ammo Type=V*/
+                           17,/*Reload=R*/     127,/*Weapon+=MWHEEL+*/   128,/* Weapon-=MWHEEL-*/   6,/* Grenade=G*/      19,/*Grenade + = T*/   131,/*Grenade-=*/    21,/*Ammo Type=V*/
                            9,/*Patch Use=J*/     8,/*Patch+=I*/          132,/*Patch-=,*/          12,/*Full Map=M*/      21,/*Swim Up= V*/        2,/*Swim Down=C*/ 102,/*Console=`*/   101/*Screenshot=F12*/},
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
@@ -29,7 +29,7 @@ CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=true, .showFPS=t
 static bool shadowBuffersCreated = false;
 CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
-u16 editModeSelection, editModeTestEntityDefinition=433;
+u16 editModeSelection, editModeTestEntityDefinition=472;
 double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS];
 static u32 gpuQ[5][5]; static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
@@ -169,7 +169,7 @@ void EnableCheatArsenal(u8 level) {
         case 1: // pipe, dartgun, pistol, sparqbeam, stungun, ammo tranq, ammo tranq, ammo needle, ammo needle, ammo needle, ammo standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader
         case 2: // card std, pipe, dartgun, pistol, sparqbeam, tranq, needle, needle, needle, standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader, standard, tefl, standard, grenfrag, grengas
         case 3: // card std, card eng, card sci, dartgun, pistol, sparqbeam, needle, needle, needle, standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader, standard, teflon, standard, grenfrag, grengas, grenfrag, teflon, standard, grenmine
-        case 4: // flechette, card eng, card sci, card std, rapier, dartgun, pistol, sparqbeam, needle, needle, needle, standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader, standard, teflon, standard, grenfrag, grengas, grenfrag, teflon, standard, grenmine, hornet, splinter, hornet
+        case 4: case 5: // flechette, card eng, card sci, card std, rapier, dartgun, pistol, sparqbeam, needle, needle, needle, standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader, standard, teflon, standard, grenfrag, grengas, grenfrag, teflon, standard, grenmine, hornet, splinter, hornet
         case 6: // flechetter, magnum, card eng, card sci, card std, rapier, pistol, sparqbeam, standard, battery, battery, grenconc, medi, medi, navunit, system, ereader, standard, teflon, standard, grenfrag, grenfrag, teflon, hollow, standard, grenmine, hornet, splinter, hornet, hollow
         case 7: // flechetter, magnum, magpulse, shield, card eng, card sci, card std, grenemp, rapier, pistol, battery, battery, grenconc, medi, blaster, medi, magcart, navunit, system, ereader, teflon, standard, grenfrag, grenfrag, hollow, hornet, splinter, hornet, hollow, battery, hollow, hornet, grenconc, grenemp
         case 8: // skorpion, slaglarge, slag, flechette, magnum, mk3, magpulse, shield, card eng, card sci, card std, grenemp, rapier, ionrifle, grenconc, medi, medi, magcart, navunit, system, ereader, grenmine, grenearth, grenfrag, grenfrag, hollow, grennitro, icad, splinter, hollow, magnesium, hollow, hornet, grenconc, grenemp, slag, slug, icad, grenconc, grenmine, grenmine, grenmine, grenmine, grenearth, grennitro, magnesium, magnesium, slug, slug
@@ -195,12 +195,12 @@ u8 queuedLevelToLoad = 255u; V3 queuedLevelPos;
 static void cmd_loadlevel(const char* arg) {
     if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
     int level = ParseLevelArg(arg); if (level == -2) return; // Already printed g3 message
-    if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %u",level); return; }
+    if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %d",level); return; }
     CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; queuedLevelPos = ressurectionLocations[level > 9 ? 6 : level]; LoadLevel(level,queuedLevelPos); (void)cyberSpaceEntryLocations; // TODO: Handle level 13 entry based on currentLevel
 }
 
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }
-static void cmd_summon(int itemConstIndex) { if (!IdxInBounds(itemConstIndex)) { SpawnDynamicObject(itemConstIndex, true); CenterStatusPrint("Summoned object ID %d", itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s", itemConstIndex); } }
+static void cmd_summon(int itemConstIndex) { if (IdxInBounds(itemConstIndex)) { SpawnDynamicObject(itemConstIndex,true); CenterStatusPrint("Summoned object ID %d",itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s",itemConstIndex); } }
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; }
 static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
@@ -332,7 +332,7 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                         result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i;
                         bestT = tryTri.distance;  // tighten BVH pruning for remaining nodes
                     }
-                } else { for (int o = 0; o < 8; o++) { if (node->children[o] >= 0) {stack[sp++] = &nodes[node->children[o]];} } }
+                } else { for (int o = 0; o < 8 && sp < 64; o++) { if (node->children[o] >= 0) {stack[sp++] = &nodes[node->children[o]];} } }
             }
             continue;  // next entity
         }
@@ -364,15 +364,15 @@ INLINE float GetScore(float stupid, bool isFinal) {
 INLINE void DecomposeTime(double t, u32* h, u32* m, double* s) { double tb = vfloor(t / 3600.0); *h = (u32)tb; t -= tb * 3600.0; tb = vfloor(t / 60.0); *m = (u32)tb; *s = t - tb * 60.0; }
 INLINE void CreditsStats() {
     size_t off = 0; u32 h,m; double s;
-    off += sFormat(creditStats + off, sizeof(creditStats),"============================================================================\nCITADEL\n============================================================================\nCONGRATULATIONS %s\n",World.playerName);
-    DecomposeTime(World.pauseRelativeTime,&h,&m,&s); off += sFormat(creditStats + off, sizeof(creditStats),"Straight Time: %uh %um %.3fs\n",h,m,s);
-    DecomposeTime(World.absoluteTime,&h,&m,&s);      off += sFormat(creditStats + off,sizeof(creditStats),"Total Time (with reload from deaths): %uh %um %.3fs\n",h,m,s);
+    off += sFormat(creditStats + off, sizeof(creditStats)-off,"============================================================================\nCITADEL\n============================================================================\nCONGRATULATIONS %s\n",World.playerName);
+    DecomposeTime(World.pauseRelativeTime,&h,&m,&s); off += sFormat(creditStats + off, sizeof(creditStats)-off,"Straight Time: %uh %um %.3fs\n",h,m,s);
+    DecomposeTime(World.absoluteTime,&h,&m,&s);      off += sFormat(creditStats + off,sizeof(creditStats)-off,"Total Time (with reload from deaths): %uh %um %.3fs\n",h,m,s);
     float stupid = ((float)(World.diffCbt * World.diffCbt)) + ((float)(World.diffPuz * World.diffPuz)) + ((float)(World.diffMis * World.diffMis)) + ((float)(World.diffCyb * World.diffCyb)); u32 finalSubscore = GetScore(stupid,false), finalScore = (u32)GetScore(stupid,true);
-    off += sFormat(creditStats + off,sizeof(creditStats),"Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n",World.kills,World.cyberkills,(u32)finalSubscore,World.deaths,World.ressurections);
-    off += sFormat(creditStats + off,sizeof(creditStats),"Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n",World.diffCbt,World.diffPuz,World.diffMis,World.diffCyb);
-    off += sFormat(creditStats + off,sizeof(creditStats),"Difficulty Index: %.2f\nFinal Score: %u\n\n",stupid,finalScore);
-    off += sFormat(creditStats + off,sizeof(creditStats),"Shots Fired: %u\nGrenades Thrown: %u\n",World.shotsFired,World.grenadesThrown);
-    off += sFormat(creditStats + off,sizeof(creditStats),"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",World.damageDealt,World.damageReceived,World.savesScummed);
+    off += sFormat(creditStats + off,sizeof(creditStats)-off,"Kills: %u\nKills in Cyberspace: %u\nScoreSubtotal: %u\nDeaths: %u\nRessurections: %u\n",World.kills,World.cyberkills,(u32)finalSubscore,World.deaths,World.ressurections);
+    off += sFormat(creditStats + off,sizeof(creditStats)-off,"Combat: %u | Puzzle: %u | Mission: %u | Cyber: %u\n",World.diffCbt,World.diffPuz,World.diffMis,World.diffCyb);
+    off += sFormat(creditStats + off,sizeof(creditStats)-off,"Difficulty Index: %.2f\nFinal Score: %u\n\n",stupid,finalScore);
+    off += sFormat(creditStats + off,sizeof(creditStats)-off,"Shots Fired: %u\nGrenades Thrown: %u\n",World.shotsFired,World.grenadesThrown);
+    off += sFormat(creditStats + off,sizeof(creditStats)-off,"Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n",World.damageDealt,World.damageReceived,World.savesScummed);
 }
 // Rendering Sys
 INLINE void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfoLog(s,512,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
@@ -439,6 +439,7 @@ void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, 
 }
 
 void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) {
+    if (camViewCount >= 64) { DualLogWarn("Too many cam views, more than 64!  Skipped adding at %f %f %f\n",p.x,p.y,p.z); return; }
     camViews[camViewCount] = (CamView){p,r,fv,w,h,nr,fr,World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f,false};/*Staggered for perf*/
     GenerateAndBindTexture(&camViewTextures[camViewCount],GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); camViewCount++;
 }
@@ -857,8 +858,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][1]);
     double rendStart = get_time();
     UpdateLights(); // This is where the voxels get updated!
-    glViewport(0,0,swidth,sheight);
-    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    glViewport(0,0,swidth,sheight); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); 
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND); // Opaques
     u16 currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0, opaqueCount = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
@@ -875,27 +875,20 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
             if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN)) continue;
             if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f) continue; // 30.72 * 30.72, 12 cells
         }
-        
         if (World.instances[i].camView != 255) camViews[World.instances[i].camView].visible = true;
-        if (transparentTexture[World.instances[i].texIndex]) {
-            if(tcnt>1023){continue;}
-            
-            tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++;
-        } else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
+        if (transparentTexture[World.instances[i].texIndex]) { if(tcnt>1023){continue;} tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; }
+        else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
-    
-    if (World.shd1 < U16_MAX && skyVisible) { // Add shield generators in skybox.
+    if (World.shd1 < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4) && opaqueCount < (INSTANCE_COUNT - 4)) { // Add shield generators in skybox.
         visibleInstances[opaqueCount].index=World.shd1; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
         visibleInstances[opaqueCount].index=World.shd2; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
         visibleInstances[opaqueCount].index=World.shd3; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
         visibleInstances[opaqueCount].index=World.shd4; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
     }
-    
     if (editModeSelection < U16_MAX && Cheats.editMode) {
         if (transparentTexture[World.instances[editModeSelection].texIndex]) { if(tcnt<=1023){ tmpTransparent[tcnt].index = editModeSelection; tmpTransparent[tcnt].depth = 1.28f; tcnt++;} }
         else { visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }
     }
-    
     mcpy(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort));
     glUseProgram(depthPrepassSP);
     glUniformMatrix4fv(2,1,0,viewProj);
@@ -947,6 +940,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,grayscaleEnabled);
     }
     if(unlikely(camView)) {
+        glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
         glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/,gBufferFBO); glReadBuffer(GL_COLOR_ATTACHMENT0); glBindTexture(GL_TEXTURE_2D,camViewTextures[camViewIdx]);
         glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,0,0,0,swidth,sheight); // Store the render result for the camview
         glBindTexture(GL_TEXTURE_2D,0); return; // After copying render result, skip SSR and composite for camviews <<<<<<<<<<<<< CAM VIEW BARRIER

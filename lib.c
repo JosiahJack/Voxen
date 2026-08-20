@@ -50,7 +50,7 @@ bool sEndsWith(const char *str, const char *suffix) { size_t slen=0, suflen=0; w
 int sCompUpToLen(const char* s1, const char* s2, size_t n) { const u8 *p1 = (const u8*)s1, *p2 = (const u8*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
 void scpy_to_a_from_b(char* a, const char* b, size_t bufsz) { size_t szb=slen(b); if (szb>=bufsz) { DualLogError("scpy_to_a_from_b: B bigger than buffer\n"); OS_Exit(1); } for(size_t i=0;i<szb;++i){a[i]=b[i];} a[szb] = '\0'; } // strcpy replacement
 void sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz) { if (subsz >= bufsz) { DualLogError("sCpy2aSubFromb substring overflow!\n"); OS_Exit(1); } bool ended=0; for(size_t i= 0;i<subsz;++i){ if(!ended && b[i] == '\0'){ended=1;} if(ended){a[i]='\0';}else{a[i]=b[i];} } a[subsz]='\0'; } // strncpy replacement (hopefully my mnemonic "a_subfrom_b" will help)
-void sCat(char* a, const char* b, size_t bufsz) { size_t sza=slen(a), szb=slen(b); if (sza + szb >= bufsz) { DualLogError("sCat overflow\n"); } char* dest = a + sza; for(size_t i=0;i<szb;++i){dest[i]=b[i];} dest[szb]='\0'; } // strcat replacement
+void sCat(char* a, const char* b, size_t bufsz) { size_t sza=slen(a),szb=slen(b); if(sza+szb >= bufsz){DualLogError("sCat ovrflw\n"); if(bufsz <= sza+1){return;} szb=bufsz-sza-1;} char* dest = a + sza; for(size_t i=0;i<szb;++i){dest[i]=b[i];} dest[szb]='\0'; } // strcat replacement
 char c2Lower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); } // If uppercase 'A'-'Z' (65-90), +32 into 'a'-'z' (97-122)
 char* sFindSub(const char* s, const char* sub) { if (sub[0] == '\0') {return (char*)s;} for (size_t i = 0; s[i] != '\0'; ++i) { if (s[i] == sub[0]/*Only look if first matches*/) { size_t si=i, subi=0; while (s[si] != '\0' && sub[subi] != '\0' && s[si] == sub[subi]){si++; subi++;} if(sub[subi] == '\0'){return (char*)&s[i];} } } return NULL;/*No match*/ } // strstr replacement
 const char* StringFindLastChar(const char* str, const char c) { const char* lastSeen = NULL; do { if (*str == c) lastSeen = str; } while (*str++); return lastSeen; } // strrchr replacement
@@ -72,8 +72,7 @@ void double2str(char* dest, double value, int decs, size_t bufsz) {
 }
 
 int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
-    if (bufsz == 0) return 0;
-    size_t pos = 0;
+    if(bufsz == 0){return 0;} size_t pos=0;
     while (*f && pos < bufsz - 1) {
         if (*f != '%') { buf[pos++] = *f++; continue; }
         f++; // skip '%'
@@ -84,22 +83,19 @@ int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
             case 'x': { u32 val=__builtin_va_arg(args,u32); char num[32]; int i=0; const char* hexChars="0123456789abcdef"; do {num[i++]=hexChars[val % 16]; val/=16;}while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++] = num[i];} } break;
             case 'u': { u32 val=__builtin_va_arg(args,u32); char num[32]; int i=0; do{num[i++]='0' + (val % 10); val/=10; }while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++]=num[i];} } break;
             case 'c': { char c=(char)__builtin_va_arg(args,int); if(pos < bufsz - 1){buf[pos++]=c;} } break;
-            case 'd': { case 'i': { int val=__builtin_va_arg(args,int); if(val < 0){ if(pos < bufsz - 1){buf[pos++] = '-';} val=-val; } char num[32]; int i=0; do{num[i++]='0' + (val % 10); val/=10;}while(val); while(i < width && pos < bufsz - 1){buf[pos++] = padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++] = num[i];} } } break;
+            case 'd': { case 'i': { int val=__builtin_va_arg(args,int); u32 uval=(u32)val; if(val < 0){if(pos < bufsz - 1){buf[pos++] = '-';} uval=-uval;} char num[32]; int i=0; do{num[i++]='0'+(uval%10); uval/=10;}while(uval); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++]=num[i];} } } break;
             case 's': { const char* s=__builtin_va_arg(args,const char*); size_t len = slen(s); if(pos + len >= bufsz){len = bufsz - pos - 1;}; for(size_t i=0;i<len;++i){buf[pos++] = s[i];} } break;
             case 'f': { double val=__builtin_va_arg(args,double); char num[64]; double2str(num,val,decimals,sizeof(num)); size_t len=slen(num); if(pos + len >= bufsz){len=bufsz - pos - 1;} for (size_t i=0;i<len;++i){buf[pos++]=num[i];} } break;
             case '%': if (pos < bufsz - 1) buf[pos++] = '%'; break;
-        }
-        f++;
-    }
-    buf[pos] = '\0';
-    return (int)pos;
+        } f++;
+    } buf[pos] = '\0'; return (int)pos;
 }
 
 int sFormat(char* buffer, size_t bufsz, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = sFormatV(buffer,bufsz,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
 char* sUpToEndLine(char* buf, int sz, FHandle fd) {
     if (sz <= 1 || buf == NULL) {return NULL;}
     char* p=buf; int rem = sz - 1; static int pos=0, end=0; static char b[4096];
-    while(rem > 0){ if(pos >= end){ long n=OS_Read(fd,b,sizeof(b)); if(n <= 0 && p == buf){return NULL;} pos=0; end=(int)n; } while(rem > 0 && pos < end){ char c=b[pos++]; *p++=c; rem--; if(c == '\n'){goto done;} } }
+    while(rem > 0){ if(pos >= end){ long n=OS_Read(fd,b,sizeof(b)); if(n <= 0){ if (p == buf){return NULL;} goto done;} pos=0; end=(int)n; } while(rem > 0 && pos < end){ char c=b[pos++]; *p++=c; rem--; if(c == '\n'){goto done;} } }
     done:
     *p = '\0'; return buf;
 } // fgets replacement, not thread safe but no multithreading

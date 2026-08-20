@@ -24,7 +24,7 @@ static Entity entsFromFile[INSTANCE_COUNT]; static V3 posFromFile[INSTANCE_COUNT
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
 __attribute__((noinline)) i32 parse_numberi32(const char* str, const char* line, u32 lineNum) {
     if(str == 0 || *str == '\0'){DualLogError("Invalid on line %d:%s\n",lineNum+1,line); return 0;}
-    while(cEmpty((char)*str)){str++;} bool negative=false; if(*str == '+'){str++;}else if(*str == '-'){negative=true; str++;} i64 result=0; while(*str >= '0' && *str <= '9'){result=result*10L + (*str-'0'); str++;} return (i32)(negative ? -result : result);
+    while(cEmpty((char)*str)){str++;} bool negative=false; if(*str == '+'){str++;}else if(*str == '-'){negative=true; str++;} i64 result=0; int n=0; while(*str >= '0' && *str <= '9' && n++ < 18){result=result*10L + (*str-'0'); str++;} while(*str >= '0' && *str <= '9'){str++;} return (i32)(negative ? -result : result);
 }
 
 __attribute__((noinline)) V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator) { u16 idx=(u16)(originator - World.instances); V3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,World.scale[idx]); V3 rotatedOfs = quat_rot_v3(World.rotation[idx],scaledOfs); V3 result = V3_AplusB(World.position[idx],rotatedOfs); return result; }
@@ -833,7 +833,7 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
     char* br = StringFindFirstCharWithin(k,'[');
     if (br) {
         int i = parse_numberu32(br + 1,il,ln);
-        if (i >= 0 && i < 32) { if(k[12] == 's'){lam->intervalSteps[i] = parse_float(v,il,ln);}else{lam->stepIsLerping[i] = parse_float(v,il,ln);} } /*"intervalSteps[" index 12 is 's', "intervalStepisLerping[" index 12 is 'i'*/
+        if (i >= 0 && i < 32) { if (br - k == 13) { lam->intervalSteps[i] = parse_float(v,il,ln); }/*"intervalSteps[" bracket is at index 13*/ else if (br - k == 21) { lam->stepIsLerping[i] = parse_float(v,il,ln); }/*"intervalStepisLerping[" bracket is at index 21*/ }
         return;
     }
     static const struct { const char* key; u16 offset; u8 type; } map[] = {
@@ -857,13 +857,12 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
     else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); } else if (sEqual(k,"lerpOn")) {flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));}
 }
 
-u16 headmountedLanternLight;
-V3 lanternPos;
+u16 headmountedLanternLight; V3 lanternPos;
 #define CHGD(a,b) (vabs((a) - (b)) > 0.0001f)
 void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
     bool changed = ((!!(World.lights[i].lflags & SHADON) - shad) || (!!(World.lights[i].lflags & LIGHTON) -  on) || CHGD(World.lights[i].range,range) || CHGD(World.lights[i].pos.x,pos.x) || CHGD(World.lights[i].pos.y,pos.y) || CHGD(World.lights[i].pos.z,pos.z));
     World.lights[i].intensity=intensity; World.lights[i].minIntensity=min; World.lights[i].maxIntensity=max; World.lights[i].spotAng=spotAng; World.lights[i].spotDir=spotDir; World.lights[i].col=col; World.lights[i].pos=World.lightsNewPosition[i]=pos; World.lights[i].range=range;
-    flag_set(&World.lights[i].lflags,19,(World.lights[i].lflags&LDIRTY)|changed<<4|on|shad<<1);
+    World.lights[i].lflags = (World.lights[i].lflags & ~(LIGHTON | SHADON | LDIRTY)) | ((World.lights[i].lflags & LDIRTY) | (changed << 4) | on | (shad << 1));
 }
 #undef CHGD
 // Level Loading and Entity Management System
@@ -995,7 +994,7 @@ void LoadLevelMod(u8 lev) {
         AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);
     } // TODO other level camviews
     mset(lineSpace,0,LINE_LEN_MAX * sizeof(char)); u32 lineNum = 0; i32 entCount = -1, lightsIdx = -1; char* line;
-    for (u16 i=0;i<LIGHT_COUNT;++i) { mset(&lightsFromFile[lightsIdx],0,sizeof(Light)); mset(&lanimsFromFile[lightsIdx],0,sizeof(LightAnimation)); lightsFromFile[i].range = 5.5f; lightsFromFile[i].col = (Color3){1.0f,1.0f,1.0f}; lightsFromFile[i].spotAng=0.0f; }
+    for (u16 i=0;i<LIGHT_COUNT;++i) { mset(&lightsFromFile[i],0,sizeof(Light)); mset(&lanimsFromFile[i],0,sizeof(LightAnimation)); lightsFromFile[i].range = 5.5f; lightsFromFile[i].col = (Color3){1.0f,1.0f,1.0f}; lightsFromFile[i].spotAng=0.0f; }
     while (MmapGetLine(lineSpace, LINE_LEN_MAX)) {
         lineNum++; line = lineSpace; char* firstColon = StringFindFirstCharWithin(line, ':'); int firstKeyLen = firstColon ? (int)(firstColon - line) : 0;
         bool isLight = !(firstKeyLen == 10 && sCompUpToLen(line, "constIndex", 10) == 0);
@@ -1252,22 +1251,22 @@ void LoadLevelData(u8 curlevel) {
                 AnimationClip c = DoorGetClip(&World.instances[i],ANIM_OPENING);
                 DoorSetClipFrame(i,ANIM_OPENING,DoorFrameFromProgress(c,World.instances[i].ajarPercentage));
                 World.instances[i].doorOpen = World.instances[i].doorState = DoorState_Opening;
-                return;
-            }
-            switch (World.instances[i].doorOpen) {
-                case DoorState_Open:    DoorSetClipFrame(i,ANIM_IDLE_OPEN,DoorGetClip(&World.instances[i],ANIM_IDLE_OPEN).frameStart); break;
-                case DoorState_Opening: DoorSetClipFrame(i,ANIM_OPENING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],ANIM_OPENING),0.0f/*TODO percent of anim*/)); break;
-                case DoorState_Closing: DoorSetClipFrame(i,ANIM_CLOSING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],ANIM_CLOSING),0.0f/*TODO percent of anim*/)); break;
-                default:                DoorSetClipFrame(i,ANIM_IDLE_CLOSED,DoorGetClip(&World.instances[i],ANIM_IDLE_CLOSED).frameStart); break;
+            } else {
+                switch (World.instances[i].doorOpen) {
+                    case DoorState_Open:    DoorSetClipFrame(i,ANIM_IDLE_OPEN,DoorGetClip(&World.instances[i],ANIM_IDLE_OPEN).frameStart); break;
+                    case DoorState_Opening: DoorSetClipFrame(i,ANIM_OPENING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],ANIM_OPENING),0.0f/*TODO percent of anim*/)); break;
+                    case DoorState_Closing: DoorSetClipFrame(i,ANIM_CLOSING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],ANIM_CLOSING),0.0f/*TODO percent of anim*/)); break;
+                    default:                DoorSetClipFrame(i,ANIM_IDLE_CLOSED,DoorGetClip(&World.instances[i],ANIM_IDLE_CLOSED).frameStart); break;
+                }
             }
         } else if (IdxIsNPC(constIndex)) { World.layer[i] = L_NPC; /* TODO AIInit funcion */ }
         else if (IdxIsSearchable(constIndex)) {
             if (World.instances[i].generateContents) {
                 int numRandomGeneratedItems = 0;
                 for(int j=0;j<4;j++) {
-                    if (World.instances[i].randomItemDropChance[j] <= 0.0f) continue;
+                    if(numRandomGeneratedItems >= World.instances[i].maxRandomItems){break;} if(World.instances[i].randomItemDropChance[j] <= 0.0f){continue;}
                     u8 tempInt = random_range_u8(0,100);
-                    if (((float)tempInt / 100.0f) <= World.instances[i].randomItemDropChance[j]) { World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; numRandomGeneratedItems++; if (numRandomGeneratedItems > World.instances[i].maxRandomItems) {break;} }
+                    if(((float)tempInt / 100.0f) <= World.instances[i].randomItemDropChance[j]){World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; numRandomGeneratedItems++;}
                 }
             }
         } else if (constIndex == 515) func_forcebridge(i); // func_forcebridge
@@ -1342,7 +1341,7 @@ void SaveGame(u8 slot, const char* savename) {
 
 void LoadGame(u8 slot) {
     if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;}
-    SaveHeader header; if (OS_Read(fd, &header, sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; } 
+    SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343 || header.version != 2 || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; } 
     u8* b = (u8*)OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
         size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize); // Decompress straight into the World struct

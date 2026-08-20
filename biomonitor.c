@@ -191,7 +191,7 @@ static void Push(int index, float val) {
 }
 
 void BiomonitorEnergyPulse(float take) { Push(0,take); IncrementERG(); Push(0,take); IncrementERG(); }
-void BioMonitorUpdate() {
+void BioMonitorUpdate() { // TODO call me!
     if (!(World.invP1.hasHardware & HW_BIO) || !(World.invP1.hardwareIsActive & HW_BIO)) return;
     bioMonitor.header = 526; bioMonitor.heartRateText = 527; bioMonitor.bpmText = 529; bioMonitor.fatigueDetailText = 531;
                                                                           bioMonitor.fatigue = 534; // Low
@@ -235,7 +235,7 @@ void BioMonitorUpdate() {
     else bioMonitor.ecgValue = 0.0f;
 
         // Inject variation when beating
-    if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range_i32(-beatVariation,beatVariation);
+    if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range(-beatVariation,beatVariation);
     if (bioMonitor.tick0Finished < World.pauseRelativeTime) {
         bioMonitor.tick0Finished = World.pauseRelativeTime + bioMonitor.tick0;
         Push(0,bioMonitor.ergValue); IncrementERG();

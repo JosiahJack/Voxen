@@ -252,7 +252,6 @@ static void AISetHuntFinished(u16 idx) {
 
 static void AISetEnemy(u16 idx, u16 eidx) {
     if (!eidx) return;
-    
     World.instances[idx].enemy = eidx;
     World.instances[idx].posCheckFinished = World.pauseRelativeTime + AI_POS_CHECK_DELAY;
     flag_set(&World.instances[idx].entflags,EF_WANDERING,false);
@@ -285,9 +284,7 @@ static bool AICheckIfPlayerInSight(u16 idx) {
     float dist = V3_Dist(playerPos, spos);
     NPCTable* npc = &npcTable[World.instances[idx].index - 419];
     if (dist > npc->sightRange) return false;
-
     if (ai_is_cyber(&World.instances[idx])) { AISetEnemy(idx,PLAYER1); AIPlaySightSound(idx); return true; }
-
     V3 checkN = V3_Normalize(V3_AsubB(playerPos, spos));
     float cosA = vclamp(V3_dot(checkN,World.instances[idx].forward), -1.0f, 1.0f);
     float angle = vacosf(cosA) * (180.0f / PI);
@@ -317,13 +314,7 @@ static void AIEnemyInFrontChecks(Entity* self, u16 eidx) {
 static Quaternion quat_slerp(Quaternion a, Quaternion b, float t) {
     float d = quat_dot(a, b);
     if (d < 0.0f) { b.x=-b.x; b.y=-b.y; b.z=-b.z; b.w=-b.w; d=-d; }
-    if (d > 0.9995f) {
-        Quaternion r = { a.x+t*(b.x-a.x), a.y+t*(b.y-a.y), a.z+t*(b.z-a.z), a.w+t*(b.w-a.w) };
-        float il = 1.0f / vsqrtf(r.x*r.x + r.y*r.y + r.z*r.z + r.w*r.w);
-        r.x*=il; r.y*=il; r.z*=il; r.w*=il;
-        return r;
-    }
-
+    if (d > 0.9995f) { Quaternion r = { a.x+t*(b.x-a.x), a.y+t*(b.y-a.y), a.z+t*(b.z-a.z), a.w+t*(b.w-a.w) }; float il = 1.0f / vsqrtf(r.x*r.x + r.y*r.y + r.z*r.z + r.w*r.w); r.x*=il; r.y*=il; r.z*=il; r.w*=il; return r; }
     d = vclamp(d, -1.0f, 1.0f);
     float th0 = vacosf(d), th = th0*t, sth0 = vsinf(th0);
     float s0 = vsinf(th0 - th) / sth0, s1 = vsinf(th) / sth0;
@@ -331,21 +322,13 @@ static Quaternion quat_slerp(Quaternion a, Quaternion b, float t) {
 }
 
 static void AIFace(Entity* self, V3 goal) {
-    u16 sidx=(u16)(self - World.instances);
-    if (self->entflags & EF_ASLEEP) return;
+    u16 sidx=(u16)(self - World.instances); if (self->entflags & EF_ASLEEP) return;
     V3 fv = V3_AsubB(goal,World.position[sidx]);
-    if (!ai_is_cyber(self)) fv.y = 0.0f;
-    if (fv.x == 0.0f && fv.y == 0.0f && fv.z == 0.0f) return;
-
+    if (!ai_is_cyber(self)) fv.y = 0.0f; if (fv.x == 0.0f && fv.y == 0.0f && fv.z == 0.0f) return;
     u16 eidx = self->enemy;
     if (ai_is_cyber(self) && eidx) { World.rotation[sidx] = World.rotation[eidx]; return; }
-
-    if (fv.x == 0.0f && fv.z == 0.0f) {
-        if (eidx) fv = V3_AsubB(World.position[eidx],World.position[sidx]);
-        else fv.x += 0.001f;
-    }
-
-    Quaternion lr = quat_look_rotation(fv, (V3){0.0f, 1.0f, 0.0f});
+    if (fv.x == 0.0f && fv.z == 0.0f) { if (eidx){fv=V3_AsubB(World.position[eidx],World.position[sidx]);} else{fv.x += 0.001f;} }
+    Quaternion lr = quat_look_rotation(fv, (V3){0.0f,1.0f,0.0f});
     float t = (float)(0.2f * npcTable[self->index - 419].yawSpeed * World.deltaTime);
     World.rotation[sidx] = quat_slerp(World.rotation[sidx],lr,t);
 }
@@ -599,7 +582,7 @@ static void AIDying(u16 i) {
         flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
         World.instances[i].timeTillDeadFinished = World.pauseRelativeTime + npc->timeTillDead;
     //     if (npc->switchMaterialOnDeath && World.instances[i].dyingTexture) World.instances[i].texIndex = World.instances[i].dyingTexture; // TODO Handle hopper and zerog texture changes
-        if (World.instances[i].index == 428 || World.instances[i].index == 439) World.velocity[sidx] = (V3){0.0f,World.velocity[sidx].z,0.0f}; // Index-specific velocity patch (Exec bot and Zero-G mutant)
+        if (World.instances[i].index == 428 || World.instances[i].index == 439) World.velocity[sidx] = (V3){0.0f,World.velocity[sidx].y,0.0f}; // Prevent gibs on Exec bot or fake melt on Zero-G mutant from having horizontal movement (looks nicer).
         if (World.instances[i].index == 433) World.layer[i] = L_Corpse; // Hopper: enable capsule collider (implicit in layer change)
         flag_set(&World.instances[i].entflags, EF_DYING_SETUP, true);
     }
@@ -860,9 +843,11 @@ static void AIThink(u16 idx) {
     if (self->currentState == AIState_Dead || self->currentState == AIState_Dying) return;
 }
 
-void AIControllerUpdate(u16 idx) {
-    if (!(World.instances[idx].entflags & EF_ACTIVE)) return;
-    if (!ai_is_cyber(&World.instances[idx]) && npcTable[World.instances[idx].index - 419].moveType != AIMoveType_Fly && World.instances[idx].currentState != AIState_Dead && World.instances[idx].currentState != AIState_Dying) World.gravity[idx] = 1.0f;
+void AIControllerUpdate(u16 idx) { // TODO call me!
+    if(!(World.instances[idx].entflags & EF_ACTIVE)){return;}
+    u16 edx=World.instances[idx].index; if(!IdxIsNPC(edx)){return;}
+    u16 ndx=edx-419;
+    if(!ai_is_cyber(&World.instances[idx]) && npcTable[ndx].moveType != AIMoveType_Fly && World.instances[idx].currentState != AIState_Dead && World.instances[idx].currentState != AIState_Dying) World.gravity[idx] = 1.0f;
     flag_set(&World.instances[idx].entflags,EF_ENEM_IN_SIGHT,AICheckIfPlayerInSight(idx));
     u16 eidx = World.instances[idx].enemy;
     if (eidx && ai_has_health(&World.instances[idx])) {
@@ -883,5 +868,5 @@ void AIControllerUpdate(u16 idx) {
         float sqmag = V3_dot(toTarget, toTarget);
         if (sqmag > 1e-6f || ai_is_cyber(&World.instances[idx])) AIFace(&World.instances[idx],World.instances[idx].currentDestination);
     }
-    if (npcTable[World.instances[idx].index - 419].moveType == AIMoveType_Fly && World.instances[idx].tranquilizeFinished < World.pauseRelativeTime) AIFlierMoveToHoverHeight(&World.instances[idx]);
+    if (npcTable[ndx].moveType == AIMoveType_Fly && World.instances[idx].tranquilizeFinished < World.pauseRelativeTime) AIFlierMoveToHoverHeight(&World.instances[idx]);
 }

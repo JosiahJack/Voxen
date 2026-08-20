@@ -185,8 +185,8 @@ const char* JumpLandSound(FootStepType fstep) { static const int starts[]={0,537
     static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, u32 *min, u32 *max) { struct snd_interval *i = get_interval_struct(p,parameter); *min = i->min + i->openmin; *max = i->max - i->openmax; }
     static u32 hw_params_get(struct snd_pcm_hw_params *p, int parameter, u32 value) { u32 r, t; return (parameter >= 0 && parameter <= 2) ? hw_params_get_mask(p,parameter,value) : ((parameter >= 8 && parameter <= 19) ? (hw_params_get_interval(p,parameter,&r,&t),r) : 0); }
     static void hw_params_fill(struct snd_pcm_hw_params *p) { mset(p,0,sizeof(*p)); mset(p->masks,0xff,sizeof(p->masks)); p->rmask = p->info = 0xffffffffU; for (int i=0;i<=11;i++) { p->intervals[i].min = 0; p->intervals[i].max = 0xffffffffU; } }
-    unsigned long pcm_gethw(pcm_params_t *p, pcm_param_t param, u32 val) { return hw_params_get(&p->hw_params,param,val); }
-    unsigned long pcm_getsw(pcm_params_t *p, pcm_param_t param) { pcm_sw_params_t *sw = &p->sw_params; return ((u64*)&sw->avail_min)[param - 22]; }
+    u64 pcm_gethw(pcm_params_t *p, pcm_param_t param, u32 val) { return hw_params_get(&p->hw_params,param,val); }
+    u64 pcm_getsw(pcm_params_t *p, pcm_param_t param) { pcm_sw_params_t *sw = &p->sw_params; return ((u64*)&sw->avail_min)[param - 22]; }
     int pcm_params_setup(int fd, pcm_params_t *p) {
         if (ioctl(fd,_IOWR('A',0x11,struct snd_pcm_hw_params),&p->hw_params) == -1) return -1;
         if (!pcm_getsw(p,22)) ((u64*)&p->sw_params.avail_min)[0] = pcm_gethw(p,13,0);
@@ -633,14 +633,14 @@ static bool WavInit(WaveFile *w, const char *path) {
     for (;;) {
         u8 chunkId[4],szBuf[4]; if ((OS_Read(w->fp,chunkId,4) != 4) || (OS_Read(w->fp,szBuf,4) != 4)) break;
         u32 chunkSize = WavU32LE(szBuf);
-        if (mcmp(chunkId, "fmt ", 4) == 0) {
+        if (mcmp(chunkId,"fmt ",4) == 0) {
             if (chunkSize < 16) goto fail;
             u8 fmt[18]; u32 toRead = chunkSize < 18 ? chunkSize : 18; if (OS_Read(w->fp,fmt,toRead) != (long)toRead) goto fail;
             if (chunkSize > toRead) OS_Seek(w->fp, (i64)(chunkSize - toRead),1);
             w->fmtTag = WavU16LE(fmt+0); w->channels = WavU16LE(fmt+2); w->sampleRate = WavU32LE(fmt+4); w->bitsPerSample = WavU16LE(fmt+14);
             if (w->fmtTag == 0xFFFE && toRead >= 18) { u16 cbSize = WavU16LE(fmt + 16); if (cbSize >= 22) { u8 ext[22]; if(OS_Read(w->fp,ext,22) == 22){w->fmtTag=WavU16LE(ext + 6);} } }
             if (w->fmtTag != 0x1) goto fail; // PCM format
-            if (w->bitsPerSample != 8 && w->bitsPerSample != 16) goto fail;
+            if ((w->bitsPerSample != 8 && w->bitsPerSample != 16) || w->sampleRate == 0) goto fail;
             got_fmt = true;
         } else if (mcmp(chunkId,"data",4) == 0) {
             w->dataChunkDataPos = (u64)OS_Tell(w->fp);
@@ -652,7 +652,6 @@ static bool WavInit(WaveFile *w, const char *path) {
             break; /* data chunk is last thing we need */
         } else OS_Seek(w->fp,(i64)(chunkSize + (chunkSize & 1)),1);
     }
-
     if (got_fmt && got_data) return true;
     fail:
     if (w->fp != INVALID_FHANDLE) { OS_Close(w->fp); w->fp = INVALID_FHANDLE; }
@@ -682,10 +681,10 @@ typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos;
 static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static u32 wav_count,ext_count,mp3_slot,log_frame_count,log_frame_pos; 
 static mp3_channel_t mp3_ch[2]; static float *log_samples; static size_t log_allocSize=0; static bool log_playing,mp3_paused = false;
 static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_rate, size_t* sz) {
-    if (src_rate == AUDIO_RATE) return src;
-    u32 sf = *frames, df = (u32)((u64)sf*AUDIO_RATE/src_rate); float *dst = (float*)OS_Alloc(df*2*sizeof(float)); *sz = df*2*sizeof(float); float ratio = (float)sf/(float)df;
-    for (u32 i = 0; i < df; i++) { float pos = i*ratio; u32 a = (u32)pos, b = a+1<sf?a+1:a; float t = pos-(float)a; dst[i*2+0] = src[a*2+0]+t*(src[b*2+0]-src[a*2+0]); dst[i*2+1] = src[a*2+1]+t*(src[b*2+1]-src[a*2+1]); }
-    OS_Free(src,srcSize); *frames = df; return dst;
+    if(src_rate == 0){src_rate=AUDIO_RATE;} if (src_rate == AUDIO_RATE){return src;}
+    u32 sf=*frames, df=(u32)((u64)sf*AUDIO_RATE/src_rate); float *dst=(float*)OS_Alloc(df*2*sizeof(float)); *sz=df*2*sizeof(float); float ratio=(float)sf/(float)df;
+    for (u32 i=0;i<df;++i) { float pos = i*ratio; u32 a = (u32)pos,b=a+1<sf?a+1:a; float t=pos-(float)a; dst[i*2+0]=src[a*2+0]+t*(src[b*2+0]-src[a*2+0]); dst[i*2+1] = src[a*2+1]+t*(src[b*2+1]-src[a*2+1]); }
+    OS_Free(src,srcSize); *frames=df; return dst;
 }
 
 static void WavUnInit(WaveFile *w) { if (w->fp != INVALID_FHANDLE) { OS_Close(w->fp); w->fp = INVALID_FHANDLE; } }
@@ -732,7 +731,7 @@ static void audio_mix_period(i16 *out) {
             if (!m->open) continue;
             u32 src_rate = m->src_rate ? m->src_rate : AUDIO_RATE;
             u64 frames_to_read = (src_rate == AUDIO_RATE) ? AUDIO_FRAMES : (u64)((u64)AUDIO_FRAMES*src_rate/AUDIO_RATE)+2;
-            float raw[AUDIO_FRAMES*4];
+            float raw[AUDIO_FRAMES*8 + 8]; // 15392 bytes
             u64 got = mp3_read_pcm_frames_f32(&m->dec,frames_to_read,raw);
             if (got == 0) { mp3_uninit(&m->dec); m->open=false; continue; }
             float vol = m->fade_vol * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMusic/100.0f);
@@ -753,7 +752,7 @@ static void audio_mix_period(i16 *out) {
 }
 
 void play_wav(const char *path,float volume,V3 pos,bool positional) {
-    if (sEqual(path,"null")) return;
+    if (!path || slen(path) < 1 || sEqual(path,"null")) return;
     char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path);
     i32 slot = GetFreeWavSlot();
     if (slot==-1 && wav_count<MAX_CHANNELS) slot=wav_count++;
