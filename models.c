@@ -408,7 +408,7 @@ cgltf_result cgltf_parse(const void* d, size_t sz, cgltf_data** out_data) {
     jsmntok_t* t=(jsmntok_t*)OS_Alloc(sizeof(jsmntok_t)*(tc+1));jsmn_init(&p);
     tc=jsmn_parse(&p,(const char*)jc,jl,t,tc);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);}
     t[tc].type=JSMN_UNDEFINED;
-    cgltf_data* data=(cgltf_data*)OS_Alloc(sizeof(cgltf_data));mset(data,0,sizeof(cgltf_data));
+    cgltf_data* data=(cgltf_data*)OS_Alloc(sizeof(cgltf_data));
     int i=cgltf_parse_json_root(t,0,jc,data);
     if(i<0){DualLogError("Error parsing json in glb\n");OS_Exit(1);}
     for(size_t m=0;m<data->meshes_count;++m)
