@@ -1009,12 +1009,12 @@ void ApplyPlayerMovements(float dt) {
     World.invP1.fatigue = vclamp(World.invP1.fatigue,0.0f,100.0f); // TODO textwarnings Fatigue high when > 80.0f
     if (grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
-        if (velChange > 5.0f) {
+        if (velChange > 2.0f) {
             RaycastHit lhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET);
             FootStepType lstp = lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete;
-            float vol = vmax(vmin(1.0f - ((11.72f - velChange) / 11.72f),1.0f),0.5f);
+            float vol = vclamp((velChange - 1.0f) / (11.72f - 1.0f),0.0f,1.0f) * (1.0f - 0.5f) * 0.8f * stepVolMod;
             play_wav(JumpLandSound(lstp),SfxVol() * vol,World.position[PLAYER1],true);
-            World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime + 0.1f;
+            World.invP1.noiseFinished = World.pauseRelativeTime + 0.1f;
         }
         if (velChange >= 11.72f) {
             DamageData dd = {0};
@@ -1022,7 +1022,7 @@ void ApplyPlayerMovements(float dt) {
             if (falltake > World.instances[PLAYER1].health && falltake - World.instances[PLAYER1].health < 5.0f) falltake = World.instances[PLAYER1].health - 1.0f; // some small saving grace
             dd.damage = falltake; // No need for GetDamageTakeAmount since this is strictly internal to Player
             TakeDamage(PLAYER1,dd);
-            World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime + 0.2f;
+            World.invP1.noiseFinished = World.pauseRelativeTime + 0.2f;
         }
     }
     World.invP1.wasGrounded = grounded;
