@@ -323,7 +323,6 @@ void LoadTextures() {
     thread_png_arenas = (PngArena*)OS_Alloc((size_t)threadCnt * sizeof(PngArena));
     for (int t = 0; t < threadCnt; ++t) { thread_png_arenas[t].base = NULL; PngArenaInit(&thread_png_arenas[t]); }
     TexResult* texResults = OS_Alloc(texCnt * sizeof(TexResult)); // Unified result struct allocation
-    mset(texResults, 0, texCnt * sizeof(TexResult));
     TextureParseTask tasks[32]; 
     OS_Thread workers[32];
     _Atomic u32 shared_idx = 0; // The shared thread counter

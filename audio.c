@@ -97,7 +97,7 @@ const char* audioLogs[LOGCNT] = {"logs/ghiran-2"/*0*/,"logs/steinberg-1"/*1*/,"l
                                  "shodan/shodan_morrisbrocailisadolt"/*100*/,"shodan/shodan_shecanthelp"/*101*/,""/*102*/,""/*103*/,""/*104*/,""/*105*/,""/*106*/,""/*107*/,""/*108*/,"hud/vmailalert"/*109*/,""/*110*/,""/*111*/,
                                  "shodan/shodan_thankyou"/*112*/,"hud/vmailalert"/*113*/,""/*114*/,"hud/vmailalert"/*115*/,"hud/vmailalert"/*116*/,""/*117*/,"hud/vmailalert"/*118*/,"hud/vmailalert"/*119*/,""/*120*/,""/*121*/,""/*122*/,
                                  ""/*123*/,""/*124*/,""/*125*/,""/*126*/,""/*127*/,""/*128*/,""/*129*/,""/*130*/,""/*131*/,""/*132*/};
-static const char* GetRandomSound(FootStepType fstep,const int* starts,const int* counts,int size) { int idx=(int)fstep; if (idx<=0 || idx>=size) return sounds[0]; return sounds[random_range_u32(starts[idx],starts[idx]+counts[idx])]; }
+static const char* GetRandomSound(FootStepType fstep,const int* starts,const int* counts,int size) { int idx=(int)fstep; if (idx<=0 || idx>=size) return sounds[0]; return sounds[random_range_u32(starts[idx],starts[idx]+counts[idx]-1)]; }
 FootStepType GetFootstepTypeForPrefab(int pid) {
     static FootStepType table[530]; static int initialized=0;
     if (!initialized) {
@@ -122,6 +122,7 @@ FootStepType GetFootstepTypeForPrefab(int pid) {
 const char* FootStepSound(FootStepType fstep) { static const int starts[]={0,268,276,284,292,300,308,316,324,332,340,348,356,364,372,380,388,396,404,412,428,438,443,451}; static const int counts[]={0,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,16,10,5,8,8}; return GetRandomSound(fstep,starts,counts,(int)(sizeof(starts)/sizeof(starts[0]))); }
 const char* JumpSound(FootStepType fstep) { static const int starts[]={0,540,546,552,558,564,570,576,582,588,594,600,606,612,618,624,630,636,642,648,429,651,661,667}; static const int counts[]={0,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,4,3,3}; return GetRandomSound(fstep,starts,counts,(int)(sizeof(starts)/sizeof(starts[0]))); }
 const char* JumpLandSound(FootStepType fstep) { static const int starts[]={0,537,543,549,555,561,567,573,579,585,591,597,603,609,615,621,627,633,639,645,428,655,658,664}; static const int counts[]={0,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,10,3,3,3}; return GetRandomSound(fstep,starts,counts,(int)(sizeof(starts)/sizeof(starts[0]))); }
+const char* RustleSound() { return sounds[random_range_u32(459,465)]; } // footsteps/Clothes/rustle01..07 (idle clothes scuff)
 #if defined(_WIN32)
     #define FAILED(hr)    ((i32)(hr) <  0)
     #define PCM_NONBLOCK (1<<1)
@@ -678,8 +679,8 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
 
 typedef struct mp3_channel_s { mp3 dec; bool open; u32 src_rate; _Atomic u64 frames_decoded; u64 total_frames; _Atomic float fade_vol,fade_target,fade_step; struct mp3_channel_s *next; } mp3_channel_t;
 typedef struct log_msg_s { float *samples; size_t allocSize; u32 frame_count,frame_pos; struct log_msg_s *next; } log_msg_t;
-typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional,playing; V3 pos; size_t allocSize; } wav_channel_t;
-static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static u32 wav_count,ext_count,mp3_slot; 
+typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional; _Atomic bool playing; V3 pos; size_t allocSize; } wav_channel_t;
+static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static _Atomic u32 wav_count,ext_count; static u32 mp3_slot; 
 static _Atomic(mp3_channel_t*) mp3_ch[2],mp3_ch_retired[2]; static _Atomic bool mp3_paused=false;
 static _Atomic(log_msg_t*) log_msg; static _Atomic(log_msg_t*) log_msg_retired;
 static _Atomic(float) mp3_remaining[2]; static _Atomic(mp3_channel_t*) mp3_fade_out_target[2]; static _Atomic(i32) mp3_fade_out_ms[2];
@@ -707,12 +708,12 @@ static float *load_mp3(const char *path, u32 *out_frames, size_t* sz) {
 }
 
 INLINE float *load_audio(const char *path, u32 *out_frames, size_t* sz) { if (sEndsWith(path,".mp3")) { return load_mp3(path, out_frames, sz); } return load_wav(path, out_frames, sz); }
-i32 GetFreeWavSlot() { i32 retval = -1; for (u32 i = 0; i < wav_count; i++) { if (!wav_ch[i].playing && wav_ch[i].samples) {OS_Free(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples = NULL; wav_ch[i].allocSize = 0; retval=i; } } return retval; }
+i32 GetFreeWavSlot() { i32 retval = -1; u32 n = __c11_atomic_load(&wav_count,2/*acquire*/); for (u32 i = 0; i < n; i++) { if (!__c11_atomic_load(&wav_ch[i].playing,2/*acquire*/)) {if (wav_ch[i].samples) {OS_Free(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples = NULL; wav_ch[i].allocSize = 0;} retval=i; break;} } return retval; }
 #include "synth.c" // Audio Synthesis Engine
 static void wave_mix(wav_channel_t* w, float* mix) {
     float vol = w->volume * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); V3 pos = w->pos; float dist = V3_Dist(pos,World.position[PLAYER1]); float spatial_atten = (dist >= 64.0f) ? 0.0f : ((dist <= 1.0f) ? 1.0f : 1.0f-(dist-1.0f)/63.0f);
     if (w->positional) vol *= spatial_atten;
-    for (i32 f = 0; f < AUDIO_FRAMES; f++) { if (w->frame_pos >= w->frame_count){ if (w->looping){w->frame_pos=0;}else{w->playing=false; break;} } mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol; w->frame_pos++; }
+    for (i32 f = 0; f < AUDIO_FRAMES; f++) { if (w->frame_pos >= w->frame_count){ if (w->looping){w->frame_pos=0;}else{__c11_atomic_store(&w->playing,false,3/*release*/); break;} } mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol; w->frame_pos++; }
 }
 
 static void mp3_ch_retire(i32 s, mp3_channel_t *old) { if (!old){return;} mp3_channel_t *head = __c11_atomic_load(&mp3_ch_retired[s],0/*memory_order_relaxed*/); do { old->next = head; } while (!__c11_atomic_compare_exchange_weak(&mp3_ch_retired[s],&head,old,3/*memory_order_release*/,0/*memory_order_relaxed*/)); }
@@ -721,8 +722,8 @@ static void audio_mix_period(i16 *out) {
     for (i32 s=0;s<2;s++) { mp3_channel_t *r = __c11_atomic_exchange(&mp3_ch_retired[s],NULL,2/*memory_order_acquire*/); while (r) { mp3_channel_t *n = r->next; mp3_uninit(&r->dec); OS_Free(r,sizeof(*r)); r = n; } }
     log_msg_t *lr = __c11_atomic_exchange(&log_msg_retired,NULL,2/*memory_order_acquire*/); while (lr) { log_msg_t *n = lr->next; OS_Free(lr->samples,lr->allocSize); OS_Free(lr,sizeof(*lr)); lr = n; }
     float mix[AUDIO_FRAMES*AUDIO_CHANNELS]; mset(mix,0,sizeof(mix));
-    for (u32 c=0;c<wav_count;c++) { if ( wav_ch[c].playing &&  wav_ch[c].samples) {wave_mix(&wav_ch[c],mix);} }
-    for (u32 c=0;c<ext_count;c++) { if (ext_ch[c]->playing && ext_ch[c]->samples) {wave_mix(ext_ch[c], mix);} }
+    u32 wn = __c11_atomic_load(&wav_count,2/*acquire*/); for (u32 c=0;c<wn;c++) { if ( __c11_atomic_load(&wav_ch[c].playing,2/*acquire*/) &&  wav_ch[c].samples) {wave_mix(&wav_ch[c],mix);} }
+    u32 en = __c11_atomic_load(&ext_count,2/*acquire*/); for (u32 c=0;c<en;c++) { if (__c11_atomic_load(&ext_ch[c]->playing,2/*acquire*/) && ext_ch[c]->samples) {wave_mix(ext_ch[c], mix);} }
     for (u32 c=0;c<MAX_SYNTH_VOICES;c++) if (syn_ch[c].active) synth_mix(&syn_ch[c],mix);
     synth_reverb_apply(mix, AUDIO_FRAMES);
     {log_msg_t *lm = __c11_atomic_load(&log_msg,2/*memory_order_acquire*/);
@@ -779,16 +780,16 @@ void play_wav(const char *path,float volume,V3 pos,bool positional) {
     if (!path || slen(path) < 1 || sEqual(path,"null")) return;
     char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path);
     i32 slot = GetFreeWavSlot();
-    if (slot==-1 && wav_count<MAX_CHANNELS) slot=wav_count++;
+    if (slot==-1) { u32 cur = __c11_atomic_load(&wav_count,2/*acquire*/); if (cur < MAX_CHANNELS) slot = (i32)__c11_atomic_fetch_add(&wav_count,1u,3/*release*/); }
     if (slot==-1) { DualLog("WARNING: Max WAV channels (%d) reached\n",MAX_CHANNELS); return; }
     u32 frames; size_t sz=0; float *buf = load_wav(p,&frames,&sz);
     if (!buf) { DualLog("ERROR: Failed to load WAV %s\n",p); return; }
     wav_ch[slot] = (wav_channel_t){ .samples = buf, .allocSize = sz, .frame_count = frames, .frame_pos = 0, .volume = volume, .looping = false, .positional = positional, .pos=pos, .playing = true };
+    __c11_atomic_thread_fence(3/*release*/);
 }
 
 void play_message(const char *path) {
     log_msg_t *lm = (log_msg_t*)OS_Alloc(sizeof(log_msg_t));
-    mset(lm,0,sizeof(*lm));
     lm->samples = load_wav(path,&lm->frame_count,&lm->allocSize);
     if (!lm->samples) { DualLogError("Failed to load %s\n",path); OS_Free(lm,sizeof(*lm)); return; }
     lm->frame_pos = 0;
@@ -796,11 +797,11 @@ void play_message(const char *path) {
     if (old) { log_msg_t *head = __c11_atomic_load(&log_msg_retired,0/*memory_order_relaxed*/); do { old->next = head; } while (!__c11_atomic_compare_exchange_weak(&log_msg_retired,&head,old,3/*memory_order_release*/,0/*memory_order_relaxed*/)); }
 }
 
-i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=load_audio(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=w->positional=w->playing=false; return 0; }
-i32 SndStart(wav_channel_t* w) { w->frame_pos = 0; w->playing = true; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) return 0; if (ext_count < MAX_CHANNELS) ext_ch[ext_count++] = w; return 0; }
-void SndUninit(wav_channel_t* w) { if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; for (u32 i=0;i<ext_count;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[--ext_count]; break; } }
+i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=load_audio(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=w->positional=false; __c11_atomic_store(&w->playing,false,3/*release*/); return 0; }
+i32 SndStart(wav_channel_t* w) { w->frame_pos = 0; __c11_atomic_store(&w->playing,true,3/*release*/); u32 n = __c11_atomic_load(&ext_count,2/*acquire*/); for (u32 i=0;i<n;++i) if (ext_ch[i] == w) return 0; if (n < MAX_CHANNELS) { ext_ch[n] = w; __c11_atomic_fetch_add(&ext_count,1u,3/*release*/); } return 0; }
+void SndUninit(wav_channel_t* w) { if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } __c11_atomic_store(&w->playing,false,3/*release*/); u32 n = __c11_atomic_load(&ext_count,2/*acquire*/); for (u32 i=0;i<n;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[n-1]; __c11_atomic_fetch_sub(&ext_count,1u,3/*release*/); break; } }
 static void mp3_open_slot(i32 s, const char *path, float fade_from, float fade_to, i32 fade_ms) {
-    mp3_channel_t *m = (mp3_channel_t*)OS_Alloc(sizeof(mp3_channel_t)); mset(m,0,sizeof(*m));
+    mp3_channel_t *m = (mp3_channel_t*)OS_Alloc(sizeof(mp3_channel_t));
     if (!mp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); OS_Free(m,sizeof(*m)); return; }
     m->src_rate = m->dec.sampleRate; m->total_frames = mp3_get_pcm_frame_count(&m->dec); mp3_seek_to_pcm_frame(&m->dec,0); m->frames_decoded = 0; m->open = true;
     float step = (fade_ms > 0) ? (fade_to - fade_from) / (AUDIO_RATE * fade_ms / 1000.0f) : 0.0f;
@@ -870,7 +871,7 @@ pthread_t audThreadID; void* AudThread(void* arg);
         else { DualLogError("Audio: raw device card=%d dev=%d setup failed, closing\n",card,dev); OS_Close(r); }
     }
 
-    void AudioUpdate() { if (!apcm) {return;} i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; audio_mix_period(buf); int r = snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); if (r < 0 && snd_pcm_recover(apcm,r,0) >= 0) { snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); } }
+    void AudioUpdate() { i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; audio_mix_period(buf); if (apcm) { int r = snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); if (r < 0 && snd_pcm_recover(apcm,r,0) >= 0) { snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); } } }
     void InitAudio() { InitSCFTables(); if (!alsa_try_open_default()) { for (i32 card = 0; card < 8; card++) { for (i32 dev = 0; dev < 8; dev++) init_pcm_device(card,dev); } if (pcm_fd_count == 0) {DualLogError("Audio: no output device found\n"); return; } } pthread_create(&audThreadID,NULL,AudThread,NULL); }
 #endif
 

@@ -955,7 +955,10 @@ void ApplyPlayerMovements(float dt) {
     bool inGravLift = ((p->entflags & EF_GRAVLIFT) > 0);
     bool grounded = !inGravLift && ((p->entflags & EF_GROUNDED) > 0);
     bool jumpjettin = ((World.invP1.hasHardware & HW_JET) > 0 && (World.invP1.hardwareIsActive & HW_JET) > 0);
-    if (JumpDown() && grounded && !jumpjettin) { if (!Cheats.noclip) {World.velocity[PLAYER1].y += (World.invP1.fatigue > 80.0f ? 2.0f : 4.51f/*;)*/) + 0.2f; if(!World.boosterActive && !Cheats.noclip){World.invP1.fatigue += 6.5f;} } }
+    if (JumpDown() && grounded && !jumpjettin) {
+        if (!Cheats.noclip) {World.velocity[PLAYER1].y += (World.invP1.fatigue > 80.0f ? 2.0f : 4.51f/*;)*/) + 0.2f; if(!World.boosterActive && !Cheats.noclip){World.invP1.fatigue += 6.5f;} }
+        RaycastHit jhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType jfstp = jhit.hit ? GetFootstepTypeForPrefab(World.instances[jhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpSound(jfstp),SfxVol(),World.position[PLAYER1],true);
+    }
     if (Jump() && jumpjettin && World.invP1.jumpJetFinished < World.pauseRelativeTime && World.invP1.energy > 0.0f) {
         if (!Cheats.noclip) {World.velocity[PLAYER1].y += 1.3f;} World.invP1.jumpJetFinished = World.pauseRelativeTime + 0.1f;
         if (World.invP1.jumpJetSuckFinished < World.pauseRelativeTime) { World.invP1.jumpJetSuckFinished=World.pauseRelativeTime+1.0f; float energysuck = 11.0f; switch (World.invP1.hardwareVersionSetting[10]) { case 0: energysuck=11.0f; break; case 1:energysuck=26.0f; break; case 2:energysuck=22.0f; break; } TakeEnergy(energysuck); }
@@ -970,6 +973,18 @@ void ApplyPlayerMovements(float dt) {
     float h=(float)Forward() - (float)Backpedal(), s=(float)StrafeRight() - (float)StrafeLeft(), vertInput = Cheats.noclip ? (float)((SwimUp()) || Jump()) - (float)SwimDn() : 0.0;
     bool isSprinting=Sprint() && (grounded || inGravLift || World.invP1.ladderState > 0 || Cheats.noclip);
     if (World.invP1.fatigueMoveFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f && !Cheats.noclip) && !World.boosterActive){World.invP1.fatigue += isSprinting ? 2.85f : 1.0f; World.invP1.fatigueMoveFinished=World.pauseRelativeTime + 0.298f;/*Slightly different than bleedoff to keep out of sync*/}
+    float stepVolMod = fatigueWane > 3.4f ? 0.2f : fatigueWane > 1.9f ? 0.4f : 1.0f;
+    float rustleVolMod = fatigueWane > 3.4f ? 0.65f : fatigueWane > 1.9f ? 0.7f : 1.0f;
+    if (World.invP1.footstepFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f && !Cheats.noclip) && !World.boosterActive) {
+        RaycastHit fstep = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET);
+        FootStepType fstp = fstep.hit ? GetFootstepTypeForPrefab(World.instances[fstep.hitInstanceIndex].index) : FSTP_Concrete;
+        play_wav(FootStepSound(fstp),SfxVol() * random_range(0.4f,0.55f) * stepVolMod * 0.5f,World.position[PLAYER1],true);
+        World.invP1.footstepFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
+    }
+    if (World.invP1.rustleFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f && !Cheats.noclip) && !World.boosterActive) {
+        play_wav(RustleSound(),SfxVol() * random_range(0.3f,0.5f) * rustleVolMod * 0.75f,World.position[PLAYER1],true);
+        World.invP1.rustleFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
+    }
     float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y;
     p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
     V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s};
@@ -992,5 +1007,25 @@ void ApplyPlayerMovements(float dt) {
     World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1], V3_ScaleByF(dv,accel * vclamp(dt,0.0005f,0.1f)));
     if (World.invP1.fatigueBleedoffFinished < World.pauseRelativeTime && World.curLev!=LEVEL_CYBERSPACE && !Cheats.noclip) { World.invP1.fatigue -= fatigueWane; World.invP1.fatigueBleedoffFinished = World.pauseRelativeTime + 0.3f; } // Fatigue bleed off
     World.invP1.fatigue = vclamp(World.invP1.fatigue,0.0f,100.0f); // TODO textwarnings Fatigue high when > 80.0f
+    if (grounded && !World.invP1.wasGrounded) {
+        float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
+        if (velChange > 5.0f) {
+            RaycastHit lhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET);
+            FootStepType lstp = lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete;
+            float vol = vmax(vmin(1.0f - ((11.72f - velChange) / 11.72f),1.0f),0.5f);
+            play_wav(JumpLandSound(lstp),SfxVol() * vol,World.position[PLAYER1],true);
+            World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime + 0.1f;
+        }
+        if (velChange >= 11.72f) {
+            DamageData dd = {0};
+            float falltake = 75.0f - random_range(0.0f,68.0f);
+            if (falltake > World.instances[PLAYER1].health && falltake - World.instances[PLAYER1].health < 5.0f) falltake = World.instances[PLAYER1].health - 1.0f; // some small saving grace
+            dd.damage = falltake; // No need for GetDamageTakeAmount since this is strictly internal to Player
+            TakeDamage(PLAYER1,dd);
+            World.instances[PLAYER1].noiseFinished = World.pauseRelativeTime + 0.2f;
+        }
+    }
+    World.invP1.wasGrounded = grounded;
+    World.invP1.lastVelY = World.velocity[PLAYER1].y;
     // TODO booster friction mod, TODO booster double tap JumpDown() burst forward, TODO cyber drift forward based on difficultyCyber (like a plane woo), TODO maxCyberUltimateSpeed clamping
 }
