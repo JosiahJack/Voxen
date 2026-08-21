@@ -1,5 +1,15 @@
 // lib.c - LibC replacement functions and other misc helpers.
 #include "common.h"
+#define SCRATCH_ARENA_SIZE (465ULL * 1024 * 1024)
+u8* scratch_base = NULL;
+u8* scratch_cur  = NULL;
+u8* scratch_end  = NULL;
+size_t initPhaseSize = 0; // accumulates freed-by-phase sizes (OS_FreeInitPhaseInner)
+void OS_ScratchInit(void) { if(scratch_base){return;} scratch_base=(u8*)OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur=scratch_base; scratch_end=scratch_base + SCRATCH_ARENA_SIZE; initPhaseSize=0; }
+void* OS_AllocScratch(size_t amount) { if(!scratch_base){OS_ScratchInit();} size_t aligned=(amount + 15) & ~(size_t)15; if(scratch_cur+aligned > scratch_end){DualLogError("Scratch exhausted!\n"); OS_Exit(1);} void* p=scratch_cur; scratch_cur+=aligned; return p; }
+void OS_FreeInitPhaseInner(size_t amount) { initPhaseSize += amount; }
+void OS_FreeInitPhase(void) { scratch_cur -= initPhaseSize; if (scratch_cur < scratch_base) { DualLogError("OS_FreeInitPhase: cursor underflow! freed %zu bytes\n",initPhaseSize); OS_Exit(1); } mset(scratch_cur,0,initPhaseSize); initPhaseSize=0; }
+void OS_ScratchFree(void) { if (!scratch_base){return;} OS_Free(scratch_base, SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; initPhaseSize = 0; }
 void* mcpy(void *dst, const void *src, size_t n) {
     u8 *d = (u8*)dst; const u8 *s = (const u8*)src; size_t i = 0;
     for (; i + 128 <= n; i += 128) {
@@ -223,3 +233,4 @@ float lerp(float min, float max, float val) { return min + (max - min) * vclamp(
 float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
 FHandle levelFileHandle;
 char* sLevelFileUpToEndLine(char* buf, int size) { return sUpToEndLine(buf,size,levelFileHandle); }
+

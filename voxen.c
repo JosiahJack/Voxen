@@ -43,15 +43,15 @@ Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0
                       {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title T_GREEN_MENU*/ {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/ {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/ {0.392156863f,0.031372549f,0.039215686f,1.0f} /* 12 Red Menu Text Dark T_RED_MENU*/ };
 // Wireline Rendering
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
-DebugLineVertex debugLineVerts[MAX_WIRELINE_VRTS * 2];
+DebugLineVertex* debugLineVerts = NULL;
 INLINE void DrawDebugLines(float* viewProj) {
-    if (World.debugLineVertCount == 0) {return;}
+    if (!debugLineVerts || World.debugLineVertCount == 0) {return;}
     glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO); 
     glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount; glEnable(GL_DEPTH_TEST); World.debugLineVertCount = 0;
 }
 
 void AddWireLine(V3 start, V3 end, Color col) {
-    if (World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2) return;
+    if (!debugLineVerts || World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2) return;
     int i = World.debugLineVertCount;
     debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z; debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
     debugLineVerts[i].x = end.x; debugLineVerts[i].y = end.y; debugLineVerts[i].z = end.z;       debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
@@ -163,7 +163,7 @@ typedef void (*ConsoleCmdFuncNoArg)(); typedef void (*ConsoleCmdFuncInt)(int); t
 typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {CMD_NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
 int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
 void cmd_noclip() { Cheats.noclip = !Cheats.noclip; if (Cheats.noclip) { World.velocity[PLAYER1] = (V3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
-void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; if (Cheats.showPhys) {CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
+void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; if (Cheats.showPhys) { debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); DebugRAM("showPhys ON"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/ } else { OS_Free(debugLineVerts, (size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); debugLineVerts = NULL; DebugRAM("showPhys OFF"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/ } }
 void EnableCheatArsenal(u8 level) {
     switch(level) {
         case 1: // pipe, dartgun, pistol, sparqbeam, stungun, ammo tranq, ammo tranq, ammo needle, ammo needle, ammo needle, ammo standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader
@@ -1052,7 +1052,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     ResetInput(); World.currentMouse_dx = World.currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true; // These are global one-time resets, don't belong inside ResetInput() that is for every frame's clear.
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0,lev);
-    LoadAllLevels(); LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); World.invP1.currentCrouchRatio = 1.0f;
+    DebugRAM("before runtime LoadAllLevels"); LoadAllLevels(); DebugRAM("after runtime LoadAllLevels"); LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); DebugRAM("after runtime LoadLevel"); World.invP1.currentCrouchRatio = 1.0f;
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
             World.levelInstances[lev][i].adjacencyIdx = U16_MAX;
@@ -1065,6 +1065,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
             }
         }
     }
+    DebugRAM("before edge adjacency");
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { // 2. Generate edge adjacency list for each unique mesh
         u16 m = uniqueCvxMeshIndices[u]; if (m >= MAX_MDLS) { continue;}
         u32 vCount = physVertCounts[m], tCount = modelTriangleCounts[m]; if (!vCount || !tCount || !physPos[m] || !physTris[m]) continue;
@@ -1079,6 +1080,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
         cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList;
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
     }
+    DebugRAM("after edge adjacency");
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u); World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u); World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent these all being the same number.
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
 }
@@ -1090,6 +1092,7 @@ void GoIntoGame() { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" sta
 void LoadModels(); void LoadTextures(); void ModEDefsInitAfterLoad(); void InitAudio(); void LoadConfig();
 void InitalizeEnvironment() {
     game_start_time = get_time(); random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/ console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
+    OS_ScratchInit(); // Set up the 465 MB scratch arena for init phases
     DebugRAM("program start"); DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\nEntity size: %u\n",sizeof(Entity));
     SetLevelPointers(0); WindowInit(); threadCnt = clamp(OS_GetNumThreads(),1,32); globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.cursorPos_x=680,World.cursorPos_y=384;
     World.numLevels=MAX_LEVELS; World.startLevel=1/*medical*/; LoadConfig();/*Get settings before setting window size.*/ window = VCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); CenterWindowOnMonitor(); SetGLContext_GetFunctionPointers();
@@ -1138,12 +1141,14 @@ void InitalizeEnvironment() {
                                                                                                                             textureSizesID   = MakeSSBO(&textureSizesID,  15,MAX_TXRS * 2 * sizeof(i32),NULL, GL_STATIC_DRAW);
     glUseProgram(shadowmapsSP); glUniform1ui(9,SHADOW_MAP_SIZE); glUseProgram(shadowmapsClearSP); glUniform1ui(0,SHADOW_MAP_SIZE); glUseProgram(chunkSP); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE); // One time set uniforms
     for (int f=0;f<5;++f) glGenQueries(5,gpuQ[f]);
-    RenderLoading(100,"Loading textures..."); LoadTextures(); RenderLoading(92,"Loading models..."); LoadModels();
+    RenderLoading(100,"Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); RenderLoading(92,"Loading models..."); DebugRAM("before LoadModels"); LoadModels(); DebugRAM("after LoadModels");
     if (World.introNotPlayed) {} // TODO: Play intro
     World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     NewGame();
     PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
     DebugRAM("InitializeEnvironment end"); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
+    OS_ScratchFree();
+    DebugRAM("InitializeEnvironment after scratch free");
 }
 
 void Physics(float dt); void UpdateAnims(void); void UpdateAudio(); bool ScrshotPressed();
@@ -1183,7 +1188,7 @@ i32 main() {
           World.gpuFrameMs=World.gpuShadowMs+World.gpuPreMs+World.gpuMainMs+World.gpuSsrMs+World.gpuCompMs; } gpuQFrame=(gpuQFrame+1)%5;
         ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); // Present frame (almost always waiting for GPU since GPU bound).
         CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
-        { static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (globalframe == dbgFrm[d]) {DebugRAM(dbgLbl[d]); break;} }
+        { static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (globalframe == dbgFrm[d]) {DebugRAM(dbgLbl[d]); if (globalframe == 1000) break;} }
     }
     return 0;
 }

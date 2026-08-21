@@ -118,8 +118,9 @@ static float cgltf_json_to_float(jsmntok_t const* t, const u8* j){
 static bool cgltf_json_to_bool(jsmntok_t const* t, const u8* j){int sz=(int)(t->end-t->start);return sz==4&&sCompUpToLen((const char*)j+t->start,"true",4)==0;}
 static int cgltf_skip_json(jsmntok_t const* t, int i){int e=i+1;while(i<e){switch(t[i].type){case JSMN_OBJECT:e+=t[i].size*2;break;case JSMN_ARRAY:e+=t[i].size;break;case JSMN_PRIMITIVE:case JSMN_STRING:break;default:return -1;}i++;}return i;}
 static int cgltf_parse_json_float_array(jsmntok_t const* t, int i, const u8* j, float* o, int s){CGLTF_CHECK_TOKTYPE(t[i], JSMN_ARRAY);if(t[i].size!=s)return CGLTF_ERROR_JSON;++i;for(int k=0;k<s;++k){CGLTF_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);o[k]=cgltf_json_to_float(t+i,j);++i;}return i;}
-static int cgltf_parse_json_string(jsmntok_t const* t, int i, const u8* j, char** out){ CGLTF_CHECK_TOKTYPE(t[i], JSMN_STRING);if(*out)return CGLTF_ERROR_JSON; int sz=(int)(t[i].end-t[i].start);char*r=(char*)OS_Alloc(sz+1);sCpy2aSubFromb(r,sz,(const char*)j+t[i].start,sz+1);*out=r;return i+1; }
-static int cgltf_parse_json_array(jsmntok_t const* t, int i, const u8* j, size_t es, void** out, size_t* os){ (void)j;if(t[i].type!=JSMN_ARRAY)return CGLTF_ERROR_JSON;if(*out)return CGLTF_ERROR_JSON;int sz=t[i].size;*out=OS_Alloc(es*sz);*os=sz;return i+1; }
+size_t cgltf_total_alloc = 0; // track cgltf parse tree leak
+static int cgltf_parse_json_string(jsmntok_t const* t, int i, const u8* j, char** out){ CGLTF_CHECK_TOKTYPE(t[i], JSMN_STRING);if(*out)return CGLTF_ERROR_JSON; int sz=(int)(t[i].end-t[i].start);char*r=(char*)OS_AllocScratch(sz+1);cgltf_total_alloc+=sz+1;sCpy2aSubFromb(r,sz,(const char*)j+t[i].start,sz+1);*out=r;return i+1; }
+static int cgltf_parse_json_array(jsmntok_t const* t, int i, const u8* j, size_t es, void** out, size_t* os){ (void)j;if(t[i].type!=JSMN_ARRAY)return CGLTF_ERROR_JSON;if(*out)return CGLTF_ERROR_JSON;int sz=t[i].size;*out=OS_AllocScratch(es*sz);cgltf_total_alloc+=es*sz;*os=sz;return i+1; }
 typedef int (*cgltf_parse_item_func)(jsmntok_t const* t, int i, const u8* j, void* out);
 static int cgltf_parse_json_array_generic(jsmntok_t const* t, int i, const u8* j, size_t elem_size, void** out_array, size_t* out_count, cgltf_parse_item_func parse_item) { i = cgltf_parse_json_array(t, i, j, elem_size, out_array, out_count); if (i < 0) return i; for (size_t k = 0; k < *out_count; ++k) { i = parse_item(t, i, j, (char*)*out_array + k * elem_size); if (i < 0) return i; } return i; }
 static cgltf_component_type cgltf_json_to_component_type(jsmntok_t const* t, const u8* j){ int ty=cgltf_json_to_int(t,j); return ty==5120?cgltf_component_type_r_8:ty==5121?cgltf_component_type_r_8u:ty==5122?cgltf_component_type_r_16:ty==5123?cgltf_component_type_r_16u:ty==5125?cgltf_component_type_r_32u:ty==5126?cgltf_component_type_r_32f:cgltf_component_type_invalid; }
@@ -148,7 +149,7 @@ static void cgltf_parse_attribute_type(const char* n, cgltf_attribute_type* ot, 
 
 static int cgltf_parse_json_attribute_list(jsmntok_t const* t, int i, const u8* j, cgltf_attribute** out, size_t* oc){
     CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);if(*out)return CGLTF_ERROR_JSON;
-    *oc=t[i].size;*out=(cgltf_attribute*)OS_Alloc(sizeof(cgltf_attribute)**oc);++i;
+    *oc=t[i].size;*out=(cgltf_attribute*)OS_Alloc(sizeof(cgltf_attribute)**oc);cgltf_total_alloc+=sizeof(cgltf_attribute)**oc;++i;
     for(size_t k=0;k<*oc;++k){
         CGLTF_CHECK_KEY(t[i]);i=cgltf_parse_json_string(t,i,j,&(*out)[k].name);if(i<0)return CGLTF_ERROR_JSON;
         cgltf_parse_attribute_type((*out)[k].name,&(*out)[k].type,&(*out)[k].index);
@@ -405,10 +406,10 @@ cgltf_result cgltf_parse(const void* d, size_t sz, cgltf_data** out_data) {
         bc+=8;bin=bc;bsz=bl;
     }
     jsmn_parser p={0,0,0};int tc=jsmn_parse(&p,(const char*)jc,jl,NULL,0);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);}
-    jsmntok_t* t=(jsmntok_t*)OS_Alloc(sizeof(jsmntok_t)*(tc+1));jsmn_init(&p);
+    jsmntok_t* t=(jsmntok_t*)OS_AllocScratch(sizeof(jsmntok_t)*(tc+1));jsmn_init(&p);
     tc=jsmn_parse(&p,(const char*)jc,jl,t,tc);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);}
     t[tc].type=JSMN_UNDEFINED;
-    cgltf_data* data=(cgltf_data*)OS_Alloc(sizeof(cgltf_data));
+    cgltf_data* data=(cgltf_data*)OS_AllocScratch(sizeof(cgltf_data)); cgltf_total_alloc += sizeof(cgltf_data);
     int i=cgltf_parse_json_root(t,0,jc,data);
     if(i<0){DualLogError("Error parsing json in glb\n");OS_Exit(1);}
     for(size_t m=0;m<data->meshes_count;++m)
@@ -436,8 +437,8 @@ static void cgltf_combine_paths(char* p, const char* b, const char* u) { const c
 static int cgltf_unhex(char c){return(u8)(c-'0')<10?c-'0':(u8)(c-'A')<6?c-'A'+10:(u8)(c-'a')<6?c-'a'+10:-1;}
 size_t cgltf_decode_uri(char* u){char*w=u,*i=u;while(*i){if(*i=='%'){int h1=cgltf_unhex(i[1]);if(h1>=0){int h2=cgltf_unhex(i[2]);if(h2>=0){*w++=(char)(h1*16+h2);i+=3;continue;}}}*w++=*i++;}*w=0;return w-u;}
 cgltf_result cgltf_load_buffer_base64(size_t sz, const char* b64, void** out) {
-    u8* d=(u8*)OS_Alloc(sz);u32 buf=0,bb=0;
-    for(size_t i=0;i<sz;++i){ while(bb<8){ char c=*b64++;int idx=(u8)(c-'A')<26?c-'A':(u8)(c-'a')<26?c-'a'+26:(u8)(c-'0')<10?c-'0'+52:c=='+'?62:c=='/'?63:-1; if(idx<0){OS_Free(d,sz);return cgltf_result_io_error;} buf=(buf<<6)|idx;bb+=6; } d[i]=(u8)(buf>>(bb-8));bb-=8; }
+    u8* d=(u8*)OS_Alloc(sz);cgltf_total_alloc+=sz;u32 buf=0,bb=0;
+    for(size_t i=0;i<sz;++i){ while(bb<8){ char c=*b64++;int idx=(u8)(c-'A')<26?c-'A':(u8)(c-'a')<26?c-'a'+26:(u8)(c-'0')<10?c-'0'+52:c=='+'?62:c=='/'?63:-1; if(idx<0){OS_FreeInitPhaseInner(sz);return cgltf_result_io_error;} buf=(buf<<6)|idx;bb+=6; } d[i]=(u8)(buf>>(bb-8));bb-=8; }
     *out=d;return cgltf_result_success;
 }
 
@@ -451,13 +452,13 @@ cgltf_result cgltf_load_buffers(cgltf_data* data, const char* gltf_path) {
             if(comma&&comma-uri>=7&&sCompUpToLen(comma-7,";base64",7)){cgltf_result r=cgltf_load_buffer_base64(data->buffers[i].size,comma+1,&data->buffers[i].data);if(r!=cgltf_result_success)return r;}
             else return cgltf_result_unknown_format;
         } else if(sFindSub(uri,"://")==NULL&&gltf_path){
-            size_t psz=slen(uri)+slen(gltf_path)+1;char* path=(char*)OS_Alloc(psz);
+            size_t psz=slen(uri)+slen(gltf_path)+1;char* path=(char*)OS_AllocScratch(psz);
             cgltf_combine_paths(path,gltf_path,uri);
             cgltf_decode_uri(path+slen(path)-slen(uri));
             FHandle fp=OS_OpenReadonly(path);
             int fsz=OS_FileSize(fp);
             u8* fb=OS_AllocateFileBackedRAMReadonly(fsz,fp,path);
-            OS_Close(fp);OS_Free(path,psz);data->buffers[i].data=fb;
+            OS_Close(fp);OS_FreeInitPhaseInner(psz);data->buffers[i].data=fb;
         } else return cgltf_result_unknown_format;
     } return cgltf_result_success;
 }
@@ -505,7 +506,6 @@ cgltf_result cgltf_validate(cgltf_data* data) {
     }
     return cgltf_result_success;
 }
-
 typedef struct {u32 idx,key;} TriSort;
 int cmp(const void* a, const void* b) { u32 ka=((const TriSort*)a)->key, kb=((const TriSort*)b)->key; return (ka > kb) - (ka < kb); } // branchless 1 or -1
 void OptimizeVertexCache(u16* idx, u32 ic, u32 vc, u8* scratch) {
@@ -551,7 +551,8 @@ __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* __restrict sv, u
 
 typedef struct { u16 j[4]; float w[4]; } VtxSkin;
 typedef struct { float *pos,*nrm,*uv; VtxSkin* skin; u32 vertCount,*indices,triCount; cgltf_node* jointNodes[MAX_GLTF_JOINTS]; float invBind[MAX_GLTF_JOINTS][16]; u32 jointCount; cgltf_animation* anim; cgltf_data* gltf; bool isTransformAnim; cgltf_node** meshNodes; float **subPos,**subNrm,**subUv; u32 *subVertCount,**subIndices,*subTriCount,submeshCount; } GltfMesh;
-static GltfMesh gBlockMeshes[MAX_GLTF_BLOCKS]; static u32 gBlockMeshCount = 0;
+GltfMesh* gBlockMeshes = NULL; // scratch-allocated in LoadGLTFAnimatedBlocks (init-only, 441 KB)
+static u32 gBlockMeshCount = 0;
 static void Mat4Identity(float* m) { mset(m, 0, sizeof(float) * 16); m[0] = m[5] = m[10] = m[15] = 1.0f; }
 static void Mat4Mul(const float* __restrict a, const float* __restrict b, float* __restrict out) { for (int c = 0; c < 4; ++c) for (int r = 0; r < 4; ++r) { float s = 0.0f; for (int k = 0; k < 4; ++k) s += a[k*4+r] * b[c*4+k]; out[c*4+r] = s; } }
 static void Mat4TransformPoint(const float* __restrict m, const float* __restrict v, float* __restrict out) { out[0] = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]  + m[12]; out[1] = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]  + m[13]; out[2] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14]; }
@@ -594,7 +595,6 @@ static bool ParseGLTFStatic(u32 mindex, const u8* bytes, size_t size, float* __r
             ++ec;
         }
     }
-    
     return FinalizeParsedMesh(mindex, sv, ec, ht, ht_used, remap_scr, cache_scr, ov_pos, ovc, ot, otc, mn_v, mx_v);
 }
 
@@ -897,6 +897,7 @@ static void* GltfBakeWorker(void* arg) {
 
 void LoadGLTFAnimatedBlocks(ModelData* entries, u32 entryCount, RawOBJ* raw) {
     gBlockMeshCount = 0; u32 maxTasks = 0; for (u32 i = 0; i < entryCount; ++i) { if(!entries[i].animated || !IsGLTFSourcePath(entries[i].path)){continue;} maxTasks += entries[i].frameCount; }   if(!maxTasks){return;}
+    gBlockMeshes = (GltfMesh*)OS_AllocScratch((size_t)MAX_GLTF_BLOCKS * sizeof(GltfMesh));
     GltfFrameTask* tasks = (GltfFrameTask*)OS_Alloc((size_t)maxTasks * sizeof(GltfFrameTask)); u32 taskCount = 0;
     for (u32 i = 0; i < entryCount; ++i) {
         if (!entries[i].animated || !IsGLTFSourcePath(entries[i].path)) {continue;}
@@ -916,12 +917,14 @@ void LoadGLTFAnimatedBlocks(ModelData* entries, u32 entryCount, RawOBJ* raw) {
             tasks[taskCount].mesh = gm; tasks[taskCount].modelIndex = modelIdx; tasks[taskCount].timelineFrame = (float)frameNum / framerate; ++taskCount;
         }
     }
-    if (!taskCount) { OS_Free(tasks, (size_t)maxTasks * sizeof(GltfFrameTask)); return; }
+    if (!taskCount) { OS_Free(tasks, (size_t)maxTasks * sizeof(GltfFrameTask)); OS_FreeInitPhaseInner((size_t)MAX_GLTF_BLOCKS * sizeof(GltfMesh)); gBlockMeshes = NULL; return; }
     GltfBakeTask btasks[32]; OS_Thread bth[32];
     u32 chunk = (taskCount + threadCnt - 1) / threadCnt;
     for (int t = 0; t < threadCnt; ++t) { u32 s = (u32)t * chunk, e = ((u32)t+1) * chunk > taskCount ? taskCount : ((u32)t+1) * chunk; btasks[t] = (GltfBakeTask){ tasks, s, e, t }; }
     if (threadCnt > 1) { for(int t=0;t<threadCnt;++t){OS_ThreadCreate(&bth[t],GltfBakeWorker,&btasks[t]);}  for(int t=0;t<threadCnt;++t){OS_ThreadJoin(&bth[t]);} } else {  for (int t = 0; t < threadCnt; ++t) GltfBakeWorker(&btasks[t]);  }
     OS_Free(tasks, (size_t)maxTasks * sizeof(GltfFrameTask));
+    OS_FreeInitPhaseInner((size_t)MAX_GLTF_BLOCKS * sizeof(GltfMesh));
+    gBlockMeshes = NULL;
 }
 
 // Recursive(ew) centroid-based, each tri goes into exactly one octant containing its centroid, no tri dupes. The node AABB is the union of its tri AABBs (NOT the octant AABB) — guarantees any query that overlaps a tri also overlaps its ancestor nodes, so traversal never misses a tri. triIdxArray is modified in-place: on return it is partitioned by octant so that each child's triangles are contiguous (matches the leaf ranges written to ctx->triOrder).
@@ -986,7 +989,7 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     if (!maxidx) { DualLogWarn("No entries in %s\n", fn); OS_Free(buf,sz); return true; }
     if (maxidx >= maxSz) { DualLogWarn("Index too large in %s\n", fn); OS_Free(buf,sz); return true; }
     u32 cnt = maxidx + 1;
-    ModelData* ents = OS_Alloc(cnt * sizeof(ModelData));
+    ModelData* ents = OS_AllocScratch(cnt * sizeof(ModelData));
     p->entries = ents; p->capacity = p->count = cnt;
     for (u32 i=0; i<cnt; ++i) {ents[i] = (ModelData){U16_MAX,false,255,NULL,0,{0}};}
     ModelData cur = {U16_MAX,false,255,NULL,0,{0}}; c = buf; e = buf+sz; ln = 0;
@@ -1075,18 +1078,18 @@ void LoadModels() {
         if (mp.entries[i].animated && IsGLTFSourcePath(mp.entries[i].path)) { u32 blockMax=mp.entries[i].index + (mp.entries[i].frameCount > 0 ? (mp.entries[i].frameCount - 1) : 0); if(blockMax > maxid){maxid=blockMax;} }
     }
     DualLog("Loading   models (%d) ...",totalActual); mdlsCnt = (u16)maxid + 1; if ((u16)maxid > MAX_MDLS){DualLogError("Too many models!  Exceeds %u!\n",MAX_MDLS); OS_Exit(1);}
-    vPos = OS_Alloc(mdlsCnt * sizeof(float*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
+    vPos = OS_AllocScratch(mdlsCnt * sizeof(float*)); modelTriangles = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
     modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
     size_t remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16)); size_t bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode); size_t bvh_u8_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u8); size_t bvh_u16_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u16);
     size_t arena = mdlsCnt*sizeof(i32) + mdlsCnt*sizeof(RawOBJ) + 16*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + WELD_HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + remap_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz);
-    void* arena_base = OS_Alloc(arena); char* p = arena_base;
+    void* arena_base = OS_AllocScratch(arena); char* p = arena_base;
     i32* idxmap = (i32*)p; p += mdlsCnt*sizeof(i32);
     mset(idxmap, -1, mdlsCnt*sizeof(i32));
     for (u32 i=0; i<mp.count; ++i) if (mp.entries[i].index != U16_MAX) idxmap[mp.entries[i].index] = (i32)i;
     RawOBJ* raw = (RawOBJ*)p; p += mdlsCnt*sizeof(RawOBJ);
     for (u32 i=0; i<mdlsCnt; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz; raw[i].name=mp.entries[pi].path;} }
-    bool* isGLTFAnimSrc = (bool*)OS_Alloc(mdlsCnt * sizeof(bool));
-    bool* isGLTFStaticSrc = (bool*)OS_Alloc(mdlsCnt * sizeof(bool));
+    bool* isGLTFAnimSrc = (bool*)OS_AllocScratch(mdlsCnt * sizeof(bool));
+    bool* isGLTFStaticSrc = (bool*)OS_AllocScratch(mdlsCnt * sizeof(bool));
     for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index == U16_MAX || !IsGLTFSourcePath(mp.entries[i].path)){continue;} if (mp.entries[i].animated) isGLTFAnimSrc[mp.entries[i].index] = true; else isGLTFStaticSrc[mp.entries[i].index] = true; }
     float **pos = (float**)p; p += threadCnt*sizeof(float*); float **nrm = (float**)p; p += threadCnt*sizeof(float*); float **uv = (float**)p; p += threadCnt*sizeof(float*);  float **ov = (float**)p; p += threadCnt*sizeof(float*);
     u32 **ht = (u32**)p; p += threadCnt*sizeof(u32*); u32 **ht_used = (u32**)p; p += threadCnt*sizeof(u32*); u32 **remap_scr = (u32**)p; p += threadCnt*sizeof(u32*); u8 **cache_scr = (u8**)p; p += threadCnt*sizeof(u8*);
@@ -1110,8 +1113,8 @@ void LoadModels() {
         for (int i=0;i<threadCnt;++i) OS_ThreadJoin(&th[i]);
     } else { for (int t=0;t<threadCnt;++t) ModelParsingWorker(&tasks[t]); /*Single threaded fallback*/ }
     LoadGLTFAnimatedBlocks(mp.entries,mp.count,raw);
-    OS_Free(isGLTFAnimSrc, mdlsCnt * sizeof(bool));
-    OS_Free(isGLTFStaticSrc, mdlsCnt * sizeof(bool));
+    OS_FreeInitPhaseInner(mdlsCnt * sizeof(bool));
+    OS_FreeInitPhaseInner(mdlsCnt * sizeof(bool));
     physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
     physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
     physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
@@ -1135,7 +1138,9 @@ void LoadModels() {
     for (u32 m = 0; m < mdlsCnt; ++m) {
         if (vPos[m]) { OS_Free(vPos[m],(size_t)modelVertexCounts[m] * CPU_VRT_SZ); OS_Free(modelTriangles[m],(size_t)modelTriangleCounts[m] * 3 * sizeof(u16)); vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; }
     }
-    OS_Free(vPos,mdlsCnt * sizeof(float*)); OS_Free(arena_base,arena); OS_Free(mp.entries,mp.count * sizeof(ModelData)); DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime); DebugRAM("After LoadModels");
+    OS_FreeInitPhaseInner(mdlsCnt * sizeof(float*)); OS_FreeInitPhaseInner(arena); OS_FreeInitPhaseInner(mp.count * sizeof(ModelData));
+    OS_FreeInitPhase();
+    DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
 }
 
 AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate

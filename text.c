@@ -4,8 +4,8 @@
 typedef struct { void* ptr; size_t sz; } TAlloc;
 static TAlloc* ttAllocs = NULL;
 static int tallocCount=0;
-static void* ttalloc(size_t n) { if (tallocCount>=4674) {DualLogError("ttalloc too many!\n"); return NULL;} void*p=OS_Alloc(n); ttAllocs[tallocCount++]=(TAlloc){p,n}; return p; }
-static void  ttfree (void* p) { if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_Free(p,ttAllocs[tallocCount-1].sz);tallocCount--; } // Make sure to pop off in reverse order!
+static void* ttalloc(size_t n) { if (tallocCount>=4674) {DualLogError("ttalloc too many!\n"); return NULL;} void*p=OS_AllocScratch(n); ttAllocs[tallocCount++]=(TAlloc){p,n}; return p; }
+static void  ttfree (void* p) { if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_FreeInitPhaseInner(ttAllocs[tallocCount-1].sz);tallocCount--; } // Make sure to pop off in reverse order!
 static u16 ttUSHORT(u8*p) {return p[0]*256 + p[1];} 
 static i16 ttSHORT (u8*p) {return p[0]*256 + p[1];}
 static u32 ttULONG (u8*p) {return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
@@ -401,7 +401,7 @@ void BuildAtlas(u32* atlasTex, GlyphRange* ranges, int* numPacked, stbtt_packedc
 void InitFontAtlasses() {
     DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    5 fonts...");
-    ttAllocs = OS_Alloc(4674 * sizeof(TAlloc));
+    ttAllocs = OS_AllocScratch(4674 * sizeof(TAlloc));
     FHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
     fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
@@ -410,17 +410,18 @@ void InitFontAtlasses() {
     fallbackFonts[0]=LoadFallbackFont(fallbackFontPaths[0],2,0);
     fallbackFonts[1]=LoadFallbackFont(fallbackFontPaths[1],3,0);
     fallbackFonts[2]=LoadFallbackFont(fallbackFontPaths[2],4,0);
-    u8* bmp = OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
+    u8* bmp = OS_AllocScratch(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
     BuildAtlas(&fontAtlasTex, fontRanges, &numPackedGlyphs, fontPackedChar, &fixedNumberAdvanceWidth, 20.0f, 0, FONT_NORMAL, bmp);
     mset(bmp, 0, FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
     BuildAtlas(&fontAtlasTexStopD, fontRangesStopD, &numPackedGlyphsStopD, fontPackedCharStopD, &fixedNumberAdvanceWidthStopD, 54.0f, 1, FONT_STOPD, bmp);
-    OS_Free(bmp,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
+    OS_FreeInitPhaseInner(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
     OS_Free(fontData[0],sz1);
     OS_Free(fontData[1],sz2);
     OS_Free(fontData[2],fallbackFonts[0].size);
     OS_Free(fontData[3],fallbackFonts[1].size);
     OS_Free(fontData[4],fallbackFonts[2].size);
-    OS_Free(ttAllocs,4674 * sizeof(TAlloc));
+    OS_FreeInitPhaseInner(4674 * sizeof(TAlloc));
+    OS_FreeInitPhase();
     DebugRAM("after font load");
     glUseProgram(textSP); glUniform1i(1,2);
     DualLog(" took %f s\n",get_time()-t0);
