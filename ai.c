@@ -288,7 +288,7 @@ static bool AICheckIfPlayerInSight(u16 idx) {
     V3 checkN = V3_Normalize(V3_AsubB(playerPos, spos));
     float cosA = vclamp(V3_dot(checkN,World.instances[idx].forward), -1.0f, 1.0f);
     float angle = vacosf(cosA) * (180.0f / PI);
-    bool makingNoise = World.instances[PLAYER1].noiseFinished > World.pauseRelativeTime;
+    bool makingNoise = World.invP1.noiseFinished > World.pauseRelativeTime;
     if (angle < npc->fov * 0.5f) {
         RaycastHit hit = Raycast(spos, checkN, dist + 0.1f, LMASK_NPC_SIGHT);
         if (hit.hit && hit.hitInstanceIndex == PLAYER1) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); AISetEnemy(idx,PLAYER1); AIPlaySightSound(idx); return true; }

@@ -741,7 +741,7 @@ static bool GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     size_t maxChannels = 0;
     for (size_t a = 0; a < data->animations_count; ++a) { if (data->animations[a].channels_count > maxChannels) { maxChannels = data->animations[a].channels_count; bestAnim = &data->animations[a]; } }
     out->anim = bestAnim;
-    out->gltf = data; // kept alive until GltfFreeAllBlocks() -- jointNodes[]/anim/meshNodes alias into it
+    out->gltf = data;
     if (out->anim->channels_count) { for (size_t c = 0; c < out->anim->channels_count; ++c) { if (out->anim->channels[c].sampler->interpolation == cgltf_interpolation_type_cubic_spline) { DualLogWarn("gltf_anim: CUBICSPLINE channel present -- tangents ignored, degrading to linear-between-keys\n"); break; } } }
     cgltf_node* skinNode = NULL;
     for (size_t i = 0; i < data->nodes_count; ++i) if (data->nodes[i].skin && data->nodes[i].mesh) { skinNode = &data->nodes[i]; break; }
