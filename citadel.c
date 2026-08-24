@@ -274,16 +274,8 @@ void CyberTimerUpdate(u16 self) {
     e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds = e->cyberTimer - (e->minutes * 60.0f); e->timerFinished = World.pauseRelativeTime + 1.0;
 }
 
-void CyberWallInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->volume=0.02f; e->tickFinished=World.pauseRelativeTime + 2.0; e->animSwapFinished=0.0; } // TODO: push e->volume to chunk_frag.glsl as _CenterAlpha uniform or per-instance draw param for this geometry instance's material slot
-void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (World.pauseRelativeTime < e->tickFinished) {return;} if (e->volume > 0.02f) { e->volume -= 0.05f; if (e->volume < 0.02f) {e->volume=0.02f;} }  e->tickFinished = World.pauseRelativeTime + 0.05; }
-void CyberWallHit(u16 self) { Entity* e = &World.instances[self]; e->volume = 1.0f; } // Called by projectile hit, collision, or ConwaySignal propagation from adjacent wall TODO: push e->volume to renderer as _CenterAlpha for this instance
-void CyberWallConwaySignal(u16 self) { Entity* e = &World.instances[self]; e->animSwapFinished = World.pauseRelativeTime + 0.5; V3 myPos = World.position[self]; int alive = 0; u16 nb[4] = {U16_MAX,U16_MAX,U16_MAX,U16_MAX}; int nc = 0; V3 off[4] = {{CELLSZ,0,0},{-CELLSZ,0,0},{0,0,CELLSZ},{0,0,-CELLSZ}};
-    for (int d=0; d<4; d++) { V3 probe = V3_AplusB(myPos,off[d]); for (u16 i=INSTS_1ST_IDX; i<World.instCount; i++) { Entity* o = &World.instances[i]; if (!(o->entflags&EF_ACTIVE)||i==self) continue; if (o->index!=21 && o->index!=22) continue; if (!sEqual(o->targetname,e->targetname)) continue; if (V3_SqDist(World.position[i],probe) < (VOXEL_SIZE*VOXEL_SIZE)) { nb[nc++]=i; if (o->volume > 0.5f) alive++; break; } } }
-    bool isAlive = (e->volume > 0.5f); bool becomes = isAlive ? (alive==2||alive==3) : (alive==3);
-    if (becomes) CyberWallHit(self); else e->volume = 0.02f;
-    for (int i=0; i<nc; i++) { if (nb[i]==U16_MAX) continue; Entity* n = &World.instances[nb[i]]; if (n->animSwapFinished < World.pauseRelativeTime + 0.4) { n->animSwapFinished = World.pauseRelativeTime + 0.5; n->tickFinished = World.pauseRelativeTime + 0.5; } }
-} // Conway's game of life propagation on world x,z plane
-
+void CyberWallInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->tickFinished=World.pauseRelativeTime + 2.0; e->animSwapFinished=0.0; } // TODO: push e->volume to chunk_frag.glsl as _CenterAlpha uniform or per-instance draw param for this geometry instance's material slot
+void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (World.pauseRelativeTime < e->tickFinished) {return;} e->tickFinished = World.pauseRelativeTime + 0.05; }
 void SearchFXResetEnable(u16 self) { Entity* e = &World.instances[self]; if (e->itemLifeTime <= 0.0f) {e->itemLifeTime = 3.0f;} e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
 void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
@@ -359,10 +351,15 @@ void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,World.
 void TriggerCounterDelayedTarget(u16 self, u16 act) { World.instances[self].delayFinished = World.pauseRelativeTime + World.instances[self].delay; TriggerCounterTarget(self,act); }
 void TriggerCounterTargetted(u16 self, u16 act) { Entity* e=&World.instances[self]; e->counter++; if (e->counter != e->countToTrigger) {return;} if (e->delay <= 0.0f){TriggerCounterTarget(self,act);}else{TriggerCounterDelayedTarget(self,act);} if (!e->dontReset){e->counter=0;} }
 // TextureChanger
-void TextureChangerInitAfterLoad(u16 self) { if (!World.instances[self].currentTexture) {return;} World.instances[self].texIndex = World.instances[self].altTexIndex; if (World.instances[self].altGlowIndex < MAX_TXRS) {World.instances[self].glowIndex = World.instances[self].altGlowIndex;} }
 void TextureChangerToggle(u16 self) {
+    u16 alt = 0, glowAlt = 0;
+         if (World.instances[self].index == 538) { alt = 1118; glowAlt = 1116; }
+    else if (World.instances[self].index == 689) { alt = 841; glowAlt = 840; }
+    else if (World.instances[self].index == 690) { alt = 844; glowAlt = 843; }
+    else if (World.instances[self].index == 695) { alt = 858; glowAlt = 857; }
+    else return;
     if (World.instances[self].currentTexture) { World.instances[self].texIndex = EDefs[World.instances[self].index].texIndex; World.instances[self].glowIndex = EDefs[World.instances[self].index].glowIndex; }
-    else { World.instances[self].texIndex = World.instances[self].altTexIndex; if (World.instances[self].altGlowIndex < MAX_TXRS) {World.instances[self].glowIndex = World.instances[self].altGlowIndex;} }
+    else { World.instances[self].texIndex = alt; World.instances[self].glowIndex = glowAlt; }
     World.instances[self].currentTexture = !World.instances[self].currentTexture;
 }
 // LogicTimer
@@ -372,7 +369,13 @@ void LogicTimerUpdate(u16 self) { return; /* TODO for testing!  Was getting anno
 void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; World.instances[self].active = !World.instances[self].active; }
 // ButtonSwitch
 void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->delayFinished=0.0f; if(e->active){e->tickFinished=World.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);} }
-void ButtonSwitchUseTargets(u16 self, u16 activator) { Entity* e=&World.instances[self]; UseTargets(activator,e->target); e->active=!e->active; e->alternateOn=e->active; if(e->changeTexOnActive){ e->texIndex=e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial; if(e->blinkTexOnActive && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} } }
+void ButtonSwitchUseTargets(u16 self, u16 activator) {
+    Entity* e=&World.instances[self];
+    UseTargets(activator,e->target);
+    e->active=!e->active;
+    if(e->index == 689 || e->index == 690 || e->index == 695) { TextureChangerToggle(self); if(e->index == 689 && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} }
+}
+
 void ButtonSwitchUse(u16 self, u16 activator) {
     Entity* e = &World.instances[self]; if(Cheats.superoverride || World.diffMis == 0){EntitySetLocked(e,false);} else if(GetCurrentLevelSecurity() > e->securityThreshold){UIBlockedBySecurity(World.position[self]); return;}
     if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex],1.0f,World.position[self],true); return; }
@@ -383,7 +386,7 @@ void ButtonSwitchUse(u16 self, u16 activator) {
 
 void ButtonSwitchUpdate(u16 self) {
     Entity* e = &World.instances[self]; if (e->delayFinished > 0.0 && e->delayFinished < World.pauseRelativeTime) { e->delayFinished = 0.0; ButtonSwitchUseTargets(self,e->recentMostActivator); }
-    if (e->blinkTexOnActive && e->active && e->tickFinished < World.pauseRelativeTime) { e->alternateOn = !e->alternateOn; e->texIndex = e->alternateOn ? e->altTexIndex : e->mainSwitchMaterial; e->tickFinished = World.pauseRelativeTime + 1.5f; }
+    if (e->index == 689 && e->active && e->tickFinished < World.pauseRelativeTime) { TextureChangerToggle(self); e->tickFinished = World.pauseRelativeTime + 1.5f; }
 }
 
 void ButtonSwitchTargetted(u16 self, u16 activator) { ButtonSwitchUse(self,activator); }

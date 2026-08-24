@@ -268,7 +268,7 @@ static void AIPlaySightSound(u16 idx) {
     if (World.instances[idx].entflags & EF_ACT_AS_CORPSE_ONLY) return;
     flag_set(&World.instances[idx].entflags, EF_FIRST_SIGHTING,false);
     i16 sfx = sfxSightSound[World.instances[idx].index - 419];
-    if (sfx >= 39 && sfx < SOUNDS_COUNT) play_wav(sounds[sfx],World.instances[idx].volume,World.position[idx],true);
+    if (sfx >= 39 && sfx < SOUNDS_COUNT) play_wav(sounds[sfx],SfxVol(),World.position[idx],true);
 }
 
 static bool AICheckIfPlayerInSight(u16 idx) {
@@ -380,7 +380,7 @@ static void AIIdle(u16 sidx) {
     NPCTable* npc = &npcTable[World.instances[sidx].index - 419];
     if (World.instances[sidx].idleTime < World.pauseRelativeTime) {
         int sidle = sfxIdle[World.instances[sidx].index - 419];
-        if (random_range(0.0f, 1.0f) < 0.5f && sidle >= 0 && sidle < (i16)SOUNDS_COUNT) play_wav(sounds[sidle],World.instances[sidx].volume,World.position[sidx],true);
+        if (random_range(0.0f, 1.0f) < 0.5f && sidle >= 0 && sidle < (i16)SOUNDS_COUNT) play_wav(sounds[sidle],SfxVol(),World.position[sidx],true);
         World.instances[sidx].idleTime = World.pauseRelativeTime + random_range(npc->timeIdleSFXMin, npc->timeIdleSFXMax);
     }
     AICheckPain(sidx);
@@ -574,7 +574,7 @@ static void AIDying(u16 i) {
         u16 sidx = i;
         if (!(World.instances[i].entflags & EF_ACT_AS_CORPSE_ONLY) && !(World.instances[i].entflags & EF_TELEPORT_ON_DEATH)) {
             int sded = sfxDeath[World.instances[i].index - 419];
-            if (sded >= 0 && sded < (i16)SOUNDS_COUNT) play_wav(sounds[sded],World.instances[i].volume,World.position[sidx],true);
+            if (sded >= 0 && sded < (i16)SOUNDS_COUNT) play_wav(sounds[sded],SfxVol(),World.position[sidx],true);
         }
         World.gravity[i] = ai_is_cyber(&World.instances[i]) ? 0.0f : 1.0f; // Physics for death
         flag_set(&World.instances[i].entflags,EF_ASLEEP,false);
@@ -765,7 +765,7 @@ static void AIAttack1(Entity* self) {
     if (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) {
         flag_set(&self->entflags, EF_SHOT_FIRED, true);
         int sat = sfxAttack1[self->index - 419];
-        if (self->attack1SoundTime < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) { play_wav(sounds[sat], self->volume,World.position[sidx],true); self->attack1SoundTime = World.pauseRelativeTime + npc->timeBetweenAttack1; }
+        if (self->attack1SoundTime < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) { play_wav(sounds[sat],SfxVol(),World.position[sidx],true); self->attack1SoundTime = World.pauseRelativeTime + npc->timeBetweenAttack1; }
         AIMakeAttack(self, npc->attackType, 1);
     }
     if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self, 1);
@@ -778,7 +778,7 @@ static void AIAttack2(Entity* self) {
     if (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) {
         flag_set(&self->entflags, EF_SHOT_FIRED, true);
         int sat2 = sfxAttack2[self->index - 419];
-        if (self->attack2SoundTime < World.pauseRelativeTime && sat2 >= 0 && sat2 < (i16)SOUNDS_COUNT) { play_wav(sounds[sat2],self->volume,World.position[sidx],true); self->attack2SoundTime = World.pauseRelativeTime + npc->timeBetweenAttack2; }
+        if (self->attack2SoundTime < World.pauseRelativeTime && sat2 >= 0 && sat2 < (i16)SOUNDS_COUNT) { play_wav(sounds[sat2],SfxVol(),World.position[sidx],true); self->attack2SoundTime = World.pauseRelativeTime + npc->timeBetweenAttack2; }
         AIMakeAttack(self,npc->attackType2,2);
     }
     if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self, 2);
@@ -792,7 +792,7 @@ static void AIAttack3(Entity* self) {
     if (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) {
         flag_set(&self->entflags, EF_SHOT_FIRED, true);
         int sat3 = sfxAttack3[self->index - 419];
-        if (self->attack3SoundTime < World.pauseRelativeTime && sat3 >= 0 && sat3 < (i16)SOUNDS_COUNT) { play_wav(sounds[sat3],self->volume,World.position[sidx],true); self->attack3SoundTime = World.pauseRelativeTime + npc->timeBetweenAttack3; }
+        if (self->attack3SoundTime < World.pauseRelativeTime && sat3 >= 0 && sat3 < (i16)SOUNDS_COUNT) { play_wav(sounds[sat3],SfxVol(),World.position[sidx],true); self->attack3SoundTime = World.pauseRelativeTime + npc->timeBetweenAttack3; }
         AIMakeAttack(self, npc->attackType3, 3);
     }
     if (self->index == 427 && self->enemy) AddWireLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f,0.15f,0.18f,0.85f});

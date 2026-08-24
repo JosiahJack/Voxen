@@ -1143,6 +1143,7 @@ void LoadModels() {
     DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
 }
 
+u8 numClips[MAX_ANIMS] = {/*0*/4,/*1*/4,/*2*/6,/*3*/7,/*4*/4,/*5*/4,/*6*/4,/*7*/4,/*8*/4,/*9*/4,/*10*/4,/*11*/4,/*12*/4,/*13*/4,/*14*/4,/*15*/4,/*16*/4,/*17*/4,/*18*/4,/*19*/4,/*20*/4,/*21*/1,/*22*/1,/*23*/6,/*24*/8,/*25*/6,/*26*/10,/*27*/8,/*28*/7,/*29*/5,/*30*/5,/*31*/7,/*32*/8,/*33*/5,/*34*/4,/*35*/5,/*36*/6,/*37*/4,/*38*/2,/*39*/6,/*40*/5,/*41*/6,/*42*/3,/*43*/3,/*44*/5,/*45*/4,/*46*/1,/*47*/4,/*48*/4,/*49*/3,/*50*/3,/*51*/7,/*52*/1};
 AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
     [0]={[ANIM_IDLE_CLOSED]={1.0f,2,2,699,24},[ANIM_OPENING]={1.0f,2,11,699,24},[ANIM_IDLE_OPEN]={1.0f,11,11,708,24},[ANIM_CLOSING]={1.0f,12,21,709,24}}, // doorB (door2)
     [1]={[ANIM_IDLE_CLOSED]={1.0f,2,2,719,24},[ANIM_OPENING]={1.0f,2,12,719,24},[ANIM_IDLE_OPEN]={1.0f,12,12,729,24},[ANIM_CLOSING]={1.0f,14,24,731,24}}, // doorA (door1)
@@ -1209,7 +1210,7 @@ void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
     u8 animTest = Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
-        Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->numclips == 0) continue;
+        Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS) continue;
         if (animTest == 1) {
             u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0;
             for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &modelAnimationClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } } if (numValid == 0){continue;} 
@@ -1242,7 +1243,7 @@ void UpdateAnims(void) {
                 }
             }
         }
-        if (animTest || e->clip >= e->numclips) continue;
+        if (animTest || e->clip >= numClips[e->animationNum]) continue;
         AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue;
         e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / (double)clip->framerate;
         if (e->currentFrameFinished >= timePerFrame) {

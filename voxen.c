@@ -34,8 +34,6 @@ double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,pre
 static u32 gpuQ[5][5]; static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
-Entity EDefs[MAX_ENTITIES]; V3 EDefscolliderCenter[MAX_ENTITIES],EDefscolliderSize[MAX_ENTITIES]; ColliderType/*u8*/ EDefscol[MAX_ENTITIES]; u32 EDefslayer[MAX_ENTITIES];
-float EDefsmass[MAX_ENTITIES],EDefsdynamicFriction[MAX_ENTITIES],EDefsstaticFriction[MAX_ENTITIES],EDefsbounciness[MAX_ENTITIES],EDefsangularDrag[MAX_ENTITIES];
 GlobalContext World = {0};
 void TurnLightOff(u16 litIdx) { if (litIdx < World.loadedLights) {flag_set(&World.lights[litIdx].lflags,LIGHTON,false);} }
 Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
@@ -798,7 +796,7 @@ __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((
 void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, bool grayscaleEnabled) {
     u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex;
     if (Cheats.showPhys) {if (World.col[i] == COLTYPE_BOX) {DrawBoxCollider(i);} else if (World.col[i] == COLTYPE_SPH) {DrawSphereCollider(i);} else if (World.col[i] == COLTYPE_CVX) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_MSH) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);} DrawAngularVelocity(i);}
-    glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,e->volume); glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
+    glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,0.0f/*TODO cyber wall panel alpha w/ fade*/); glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
     if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); }
     glUniform1ui(30,e->camView < camViewCount ? 1u : 0u);
     if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); glUniform1i(29,6); }
@@ -1089,7 +1087,7 @@ void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmail
 
 // Init
 void GoIntoGame() { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); }
-void LoadModels(); void LoadTextures(); void ModEDefsInitAfterLoad(); void InitAudio(); void LoadConfig();
+void LoadModels(); void LoadTextures(); void InitAudio(); void LoadConfig();
 void InitalizeEnvironment() {
     game_start_time = get_time(); random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/ console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     OS_ScratchInit(); // Set up the 465 MB scratch arena for init phases
@@ -1126,7 +1124,6 @@ void InitalizeEnvironment() {
     float* m = shadowmapsPerspectiveProjection; float lightRangeMax=15.36f; float viewRange=(lightRangeMax - 0.02f);
     m[0]=1.0f; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=1.0f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]=-(lightRangeMax + 0.02f) / viewRange; m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f * lightRangeMax * 0.02f / viewRange; m[15]=0.0f;
     InitAudio(); synth_set_room(0.66f,0.8f);
-    ModEDefsInitAfterLoad(); // Set the values for all 768 entity definitions, a doozy of a function.
     glGenFramebuffers(1,&gBufferFBO);
     ChangeFullScreenWindowed(false); SetSkyRotateSpeed(); SetVSync(); LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language);
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2}; glDrawBuffers(3,drawBuffers);

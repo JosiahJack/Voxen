@@ -295,17 +295,17 @@ typedef /*FAT*/ struct  {
     V3 forward,right,lastPosition/*used for NPC logic, not physics*/,topPoint,targetPosition,startPosition,activatedScale,direction;
     u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
     i32 cellIndex; i16 cellX,cellZ; u32 portalIndex;
-    u8 clip,numclips,texAnimClip,camView,securityThreshold,lerpUp,maxRandomItems/*[0 4] TODO*/,lastDmgType;
+    u8 clip,animationNum,texAnimClip,camView,securityThreshold,lerpUp,maxRandomItems/*[0 4] TODO*/,lastDmgType;
     FuncStates/*u8*/ funcState; BodyState/*u8*/ bodyState; 
-    float shadRadius,health,cyberHealth,targetPositionY,radiation,speed,percentAjar,percentMoved,volume,timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,
+    float shadRadius,health,cyberHealth,targetPositionY,radiation,speed,percentAjar,percentMoved,timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,
           timeTillDeadFinished,timeTillPainFinished,huntFinished,randWaitAtt1Finished,randWaitAtt2Finished,randWaitAtt3Finished,attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,
           posCheckFinished,currentFrameFinished,animFinished,animSwapFinished,delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFireFinished,delayResetFinished,delayFinished,tickFinished,tickTime,useFinished,
           waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,ajarPercentage,useTimeDelay,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[4];
     V3 accumulatedForce,currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;    
-    u16 enemy,altTexIndex,altGlowIndex,messageIndex,teleportID,targetDestinationID,recentMostActivator,countToTrigger,counter,activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex,animationNum,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,useableItemIndex,usableCustIdx,mainSwitchMaterial,deathBurst,adjacencyIdx;
+    u16 enemy,messageIndex,teleportID,targetDestinationID,recentMostActivator,countToTrigger,counter,activateSFX,lockedSFX,messageLingdex,lockedMessageLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,useableItemIndex,usableCustIdx,deathBurst,adjacencyIdx;
     i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[4],randomItemCustIdx[4];
     bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,
-         despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,changeTexOnActive,blinkTexOnActive,alternateOn,lerping,onlyTargetOnce,autoPlayEmail,
+         despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,
          textureAnimating,textureGlowAnimating,textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom,automapHidden,grenadeExplodeContact,grenadeUseTimer,grenadeUseProx,blocked,ajar;
     AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState;
     char targetname[TARGET_STRING_LENGTH],target[TARGET_STRING_LENGTH],target2[TARGET_STRING_LENGTH],currenttarget[TARGET_STRING_LENGTH],targetIfFalse[TARGET_STRING_LENGTH],texAnimResourceFolder[TARGET_STRING_LENGTH];
@@ -325,13 +325,11 @@ typedef struct {
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music;
     Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
     V3 levelPosition[MAX_LEVELS][INSTANCE_COUNT],levelScale[MAX_LEVELS][INSTANCE_COUNT],levelVelocity[MAX_LEVELS][INSTANCE_COUNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT],
-       levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT]/*Offset relative to .position's global worldspace xyz location*/,levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]/*x,y,z for Box, x for Sphere radius, else x,y,z for Capsule rad,height,dir(0=X,1=Y,2=Z)*/,
-       levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
+       levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT]/*Offset relative to .position's global worldspace xyz location*/,levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]/*x,y,z for Box, x for Sphere radius, else x,y,z for Capsule rad,height,dir(0=X,1=Y,2=Z)*/,levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
     ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT];
     Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
     u32 levelLayer[MAX_LEVELS][INSTANCE_COUNT];
-    float levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],
-          levelAngularDrag[MAX_LEVELS][INSTANCE_COUNT],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT],levelBounciness[MAX_LEVELS][INSTANCE_COUNT];
+    float levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
     bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT],levelColliding[MAX_LEVELS][INSTANCE_COUNT];
     u16 levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS];
     Light levelLights[MAX_LEVELS][LIGHT_COUNT];
@@ -341,7 +339,7 @@ typedef struct {
     ColliderType* col;
     Quaternion* rotation;
     u32* layer,targetIOActivatorIoflags;
-    float* mass,dt,*radius,*gravity,(*inertiaTensor)[6],(*invInertiaTensor)[6],*angularDrag,*dynamicFriction,*staticFriction,*bounciness,cam_pitch,cam_yaw,cam_roll;
+    float* mass,dt,*radius,*gravity,(*inertiaTensor)[6],(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
     i32 currentMouse_dx,currentMouse_dy;
     bool *invTnsrValid,*colliding,targetIOActive;
     Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
@@ -354,14 +352,12 @@ extern u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; extern u16* cvxAdjLists[MAX_UN
 extern u16 playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; extern AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; extern i32 threadCnt;
 extern u32 vbos[MAX_MDLS],tbos[MAX_MDLS]; extern FHandle console_log_file; extern u32 drawCalls,vertsRendered,voxelUpdateSP,lightsID,psysSp,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID;
 extern u32 shadowmapIndirectionList[LIGHT_COUNT];
-extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern double last_mouse_x,last_mouse_y; extern Entity EDefs[MAX_ENTITIES]; extern Entity* entsFromFile;
-extern V3 EDefscolliderCenter[MAX_ENTITIES]/*Offset relative to .position's global worldspace xyz location*/;
-extern V3 EDefscolliderSize[MAX_ENTITIES]/*x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)*/;
-extern ColliderType/*u8*/ EDefscol[MAX_ENTITIES];
+extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern double last_mouse_x,last_mouse_y;
+typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms; // 8 + 28 + 5 = 41B -> 44B w/ 3B tail pad (float alignment forces mod-4 size)
+extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile;
 extern const char* audioLogs[LOGCNT];
-extern u32 EDefslayer[MAX_ENTITIES],gridCellStates[ARRSIZE];
-extern float EDefsmass[MAX_ENTITIES],EDefsdynamicFriction[MAX_ENTITIES],EDefsstaticFriction[MAX_ENTITIES],EDefsbounciness[MAX_ENTITIES],EDefsangularDrag[MAX_ENTITIES],berserkSeedTime,rasterPerspectiveProjection[16],
-             shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
+extern u32 gridCellStates[ARRSIZE];
+extern float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 typedef struct { V3 normal; float d; } FrustumPlane;
 extern FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 typedef struct PngArena { u8*base,*cursor,*end; } PngArena;

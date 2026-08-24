@@ -1,28 +1,791 @@
 // entity.c - Entity Definitions and Save Load System for levels and savegames
 #include "common.h"
 #define LINE_LEN_MAX 81920
-typedef struct {
-    float volume;
-    u16 index,modelIndex,lodIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,altTexIndex,altGlowIndex,mainSwitchMaterial,lockedMessageLingdex,animationNum;
-    i16 SFXIndex;
-    u8  numclips;
-    bool changeTexOnActive,blinkTexOnActive;
-} EPerms; // 8 + 28 + 5 = 41B -> 44B w/ 3B tail pad (float alignment forces mod-4 size)
-
-extern Entity EDefs[MAX_ENTITIES];
-extern V3 EDefscolliderCenter[MAX_ENTITIES]; // Offset relative to .position's global worldspace xyz location
-extern V3 EDefscolliderSize[MAX_ENTITIES]; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
-extern ColliderType/*u8*/ EDefscol[MAX_ENTITIES];
-extern u32 EDefslayer[MAX_ENTITIES];
-extern float EDefsmass[MAX_ENTITIES];
-extern float EDefsdynamicFriction[MAX_ENTITIES];
-extern float EDefsstaticFriction[MAX_ENTITIES];
-extern float EDefsbounciness[MAX_ENTITIES];
-extern float EDefsangularDrag[MAX_ENTITIES];
-extern u16 headmountedLanternLight;
-Entity* entsFromFile = NULL; // allocated from scratch arena during LoadAllLevels, 7.72 MB
-V3 *posFromFile = NULL, *scaleFromFile = NULL; Quaternion *rotationFromFile = NULL; Light *lightsFromFile = NULL; LightAnimation *lanimsFromFile = NULL; // all scratch-allocated in LoadAllLevels
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
+Entity* entsFromFile; V3 *posFromFile, *scaleFromFile; Quaternion *rotationFromFile; Light *lightsFromFile; LightAnimation *lanimsFromFile; u16 headmountedLanternLight;
+EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,dynFriction,statFriction,animationNum,col,colCtr,colSz
+/*0 chunk_black*/[0]={.modelIndex=178,.colMeshIndex=0,.texIndex=0,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*1 chunk_blocker*/[1]={.modelIndex=178,.colMeshIndex=0,.texIndex=1230,.glowIndex=MAX_TXRS,.specIndex=1230,.normIndex=160,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*2 chunk_bridg1_1*/[2]={.modelIndex=661,.colMeshIndex=0,.texIndex=44,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=43,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*3 chunk_bridg1_1flipx*/[3]={.modelIndex=667,.colMeshIndex=0,.texIndex=44,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*4 chunk_bridg1_2*/[4]={.modelIndex=662,.colMeshIndex=0,.texIndex=45,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*5 chunk_bridg1_3*/[5]={.modelIndex=20,.colMeshIndex=0,.texIndex=47,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*6 chunk_bridg1_3_slice45*/[6]={.modelIndex=21,.colMeshIndex=0,.texIndex=47,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*7 chunk_bridg1_3flipx*/[7]={.modelIndex=663,.colMeshIndex=0,.texIndex=47,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*8 chunk_bridg1_4*/[8]={.modelIndex=22,.colMeshIndex=0,.texIndex=48,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*9 chunk_bridg1_4_slice32*/[9]={.modelIndex=23,.colMeshIndex=0,.texIndex=48,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*10 chunk_bridg1_4_slice32flipx*/[10]={.modelIndex=24,.colMeshIndex=0,.texIndex=48,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*11 chunk_bridg1_5*/[11]={.modelIndex=25,.colMeshIndex=0,.texIndex=50,.glowIndex=49,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*12 chunk_bridg2_2*/[12]={.modelIndex=26,.colMeshIndex=0,.texIndex=MAX_ANIMS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*13 chunk_bridg2_3*/[13]={.modelIndex=27,.colMeshIndex=0,.texIndex=56,.glowIndex=54,.specIndex=MAX_TXRS,.normIndex=55,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*14 chunk_bridg2_4*/[14]={.modelIndex=28,.colMeshIndex=0,.texIndex=57,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*15 chunk_bridg2_5*/[15]={.modelIndex=29,.colMeshIndex=0,.texIndex=59,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=58,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*16 chunk_bridg2_6*/[16]={.modelIndex=30,.colMeshIndex=0,.texIndex=60,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*17 chunk_bridg2_7*/[17]={.modelIndex=664,.colMeshIndex=0,.texIndex=61,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*18 chunk_bridg2_8*/[18]={.modelIndex=31,.colMeshIndex=0,.texIndex=62,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*19 chunk_bridg2_9*/[19]={.modelIndex=32,.colMeshIndex=0,.texIndex=64,.glowIndex=63,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*20 chunk_crate_impenetrable*/[20]={.modelIndex=61,.colMeshIndex=0,.texIndex=150,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*21 chunk_cyberpanel*/[21]={.modelIndex=178,.colMeshIndex=0,.texIndex=151,.glowIndex=151,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*22 chunk_cyberpanel_slice45*/[22]={.modelIndex=180,.colMeshIndex=0,.texIndex=152,.glowIndex=152,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*23 chunk_eng1_1*/[23]={.modelIndex=96,.colMeshIndex=0,.texIndex=254,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*24 chunk_eng1_1d*/[24]={.modelIndex=95,.colMeshIndex=0,.texIndex=253,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*25 chunk_eng1_2*/[25]={.modelIndex=98,.colMeshIndex=0,.texIndex=256,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*26 chunk_eng1_2d*/[26]={.modelIndex=97,.colMeshIndex=0,.texIndex=255,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*27 chunk_eng1_3*/[27]={.modelIndex=100,.colMeshIndex=0,.texIndex=259,.glowIndex=258,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*28 chunk_eng1_3d*/[28]={.modelIndex=99,.colMeshIndex=0,.texIndex=257,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*29 chunk_eng1_4*/[29]={.modelIndex=101,.colMeshIndex=0,.texIndex=260,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*30 chunk_eng1_5*/[30]={.modelIndex=103,.colMeshIndex=0,.texIndex=262,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*31 chunk_eng1_5_slice45lh*/[31]={.modelIndex=104,.colMeshIndex=0,.texIndex=262,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*32 chunk_eng1_5_slice45rh*/[32]={.modelIndex=105,.colMeshIndex=0,.texIndex=262,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*33 chunk_eng1_5d*/[33]={.modelIndex=102,.colMeshIndex=0,.texIndex=261,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*34 chunk_eng1_6*/[34]={.modelIndex=107,.colMeshIndex=0,.texIndex=266,.glowIndex=265,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*35 chunk_eng1_6d*/[35]={.modelIndex=106,.colMeshIndex=0,.texIndex=264,.glowIndex=263,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*36 chunk_eng1_7*/[36]={.modelIndex=108,.colMeshIndex=0,.texIndex=269,.glowIndex=268,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*37 chunk_eng1_7d*/[37]={.modelIndex=665,.colMeshIndex=0,.texIndex=267,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*38 chunk_eng1_8*/[38]={.modelIndex=109,.colMeshIndex=0,.texIndex=271,.glowIndex=270,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*39 chunk_eng1_9*/[39]={.modelIndex=111,.colMeshIndex=0,.texIndex=273,.glowIndex=251,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*40 chunk_eng1_9d*/[40]={.modelIndex=110,.colMeshIndex=0,.texIndex=272,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*41 chunk_eng2_1*/[41]={.modelIndex=113,.colMeshIndex=0,.texIndex=276,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*42 chunk_eng2_1_slice45*/[42]={.modelIndex=116,.colMeshIndex=0,.texIndex=276,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*43 chunk_eng2_1_slice384high*/[43]={.modelIndex=114,.colMeshIndex=0,.texIndex=276,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*44 chunk_eng2_1_slice384highrh*/[44]={.modelIndex=115,.colMeshIndex=0,.texIndex=276,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*45 chunk_eng2_1d*/[45]={.modelIndex=112,.colMeshIndex=0,.texIndex=275,.glowIndex=274,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*46 chunk_eng2_2*/[46]={.modelIndex=117,.colMeshIndex=0,.texIndex=279,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*47 chunk_eng2_2d*/[47]={.modelIndex=666,.colMeshIndex=0,.texIndex=277,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*48 chunk_eng2_3*/[48]={.modelIndex=119,.colMeshIndex=0,.texIndex=282,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*49 chunk_eng2_3d*/[49]={.modelIndex=118,.colMeshIndex=0,.texIndex=281,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*50 chunk_eng2_4*/[50]={.modelIndex=178,.colMeshIndex=0,.texIndex=283,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*51 chunk_eng2_5*/[51]={.modelIndex=120,.colMeshIndex=0,.texIndex=285,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=284,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*52 chunk_eng2_5_slice45*/[52]={.modelIndex=121,.colMeshIndex=0,.texIndex=285,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=284,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*53 chunk_eng2_6 (wall pump)*/[53]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=141,.glowIndex=142,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=21,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*54 chunk_exec1_1*/[54]={.modelIndex=124,.colMeshIndex=0,.texIndex=287,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*55 chunk_exec1_1d*/[55]={.modelIndex=123,.colMeshIndex=0,.texIndex=286,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*56 chunk_exec1_2*/[56]={.modelIndex=126,.colMeshIndex=0,.texIndex=291,.glowIndex=290,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*57 chunk_exec1_2d*/[57]={.modelIndex=125,.colMeshIndex=0,.texIndex=289,.glowIndex=288,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*58 chunk_exec2_1*/[58]={.modelIndex=127,.colMeshIndex=0,.texIndex=292,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*59 chunk_exec2_2*/[59]={.modelIndex=129,.colMeshIndex=0,.texIndex=295,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*60 chunk_exec2_2d*/[60]={.modelIndex=128,.colMeshIndex=0,.texIndex=294,.glowIndex=293,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*61 chunk_exec2_3*/[61]={.modelIndex=130,.colMeshIndex=0,.texIndex=296,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*62 chunk_exec2_4*/[62]={.modelIndex=131,.colMeshIndex=0,.texIndex=297,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*63 chunk_exec2_4_slice45*/[63]={.modelIndex=132,.colMeshIndex=0,.texIndex=297,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*64 chunk_exec2_5*/[64]={.modelIndex=133,.colMeshIndex=0,.texIndex=298,.glowIndex=MAX_TXRS,.specIndex=1257,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*65 chunk_exec2_6*/[65]={.modelIndex=134,.colMeshIndex=0,.texIndex=299,.glowIndex=MAX_TXRS,.specIndex=1257,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*66 chunk_exec2_7*/[66]={.modelIndex=133,.colMeshIndex=0,.texIndex=300,.glowIndex=MAX_TXRS,.specIndex=1257,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*67 chunk_exec3_1*/[67]={.modelIndex=127,.colMeshIndex=0,.texIndex=303,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*68 chunk_exec3_1d*/[68]={.modelIndex=135,.colMeshIndex=0,.texIndex=302,.glowIndex=301,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*69 chunk_exec3_2*/[69]={.modelIndex=129,.colMeshIndex=0,.texIndex=304,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*70 chunk_exec3_4*/[70]={.modelIndex=178,.colMeshIndex=0,.texIndex=305,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*71 chunk_exec4_1*/[71]={.modelIndex=136,.colMeshIndex=0,.texIndex=307,.glowIndex=306,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*72 chunk_exec4_2*/[72]={.modelIndex=137,.colMeshIndex=0,.texIndex=308,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*73 chunk_exec4_3*/[73]={.modelIndex=138,.colMeshIndex=0,.texIndex=309,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*74 chunk_exec4_4*/[74]={.modelIndex=139,.colMeshIndex=0,.texIndex=311,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*75 chunk_exec4_5*/[75]={.modelIndex=178,.colMeshIndex=0,.texIndex=312,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*76 chunk_exec4_6*/[76]={.modelIndex=141,.colMeshIndex=0,.texIndex=313,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*77 chunk_exec6_1*/[77]={.modelIndex=142,.colMeshIndex=0,.texIndex=315,.glowIndex=314,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*78 chunk_exteriorpanel1*/[78]={.modelIndex=131,.colMeshIndex=0,.texIndex=1228,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*79 chunk_fan1*/[79]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=96,.glowIndex=192,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=22,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*80 chunk_flight1_1*/[80]={.modelIndex=146,.colMeshIndex=0,.texIndex=319,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*81 chunk_flight1_1b*/[81]={.modelIndex=146,.colMeshIndex=0,.texIndex=318,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*82 chunk_flight1_2*/[82]={.modelIndex=147,.colMeshIndex=0,.texIndex=320,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*83 chunk_flight1_2_slice45rh*/[83]={.modelIndex=149,.colMeshIndex=0,.texIndex=320,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*84 unused*/[84]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*85 chunk_flight1_4*/[85]={.modelIndex=151,.colMeshIndex=0,.texIndex=322,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*86 chunk_flight1_5*/[86]={.modelIndex=147,.colMeshIndex=0,.texIndex=323,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*87 chunk_flight1_5_slice45lh*/[87]={.modelIndex=148,.colMeshIndex=0,.texIndex=323,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*88 chunk_flight1_6*/[88]={.modelIndex=152,.colMeshIndex=0,.texIndex=325,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*89 chunk_flight2_1*/[89]={.modelIndex=153,.colMeshIndex=0,.texIndex=326,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*90 chunk_flight2_2*/[90]={.modelIndex=154,.colMeshIndex=0,.texIndex=327,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*91 chunk_flight2_2_slice45*/[91]={.modelIndex=155,.colMeshIndex=0,.texIndex=327,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*92 chunk_flight2_3*/[92]={.modelIndex=156,.colMeshIndex=0,.texIndex=328,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*93 chunk_grove1_1*/[93]={.modelIndex=189,.colMeshIndex=0,.texIndex=362,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*94 chunk_grove1_2*/[94]={.modelIndex=178,.colMeshIndex=0,.texIndex=363,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*95 chunk_grove1_2_slice45*/[95]={.modelIndex=180,.colMeshIndex=0,.texIndex=363,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*96 chunk_grove1_3*/[96]={.modelIndex=178,.colMeshIndex=0,.texIndex=364,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*97 chunk_grove1_4*/[97]={.modelIndex=178,.colMeshIndex=0,.texIndex=365,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*98 chunk_grove1_5*/[98]={.modelIndex=178,.colMeshIndex=0,.texIndex=367,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*99 chunk_grove1_6*/[99]={.modelIndex=178,.colMeshIndex=0,.texIndex=368,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*100 chunk_grove1_7*/[100]={.modelIndex=178,.colMeshIndex=0,.texIndex=369,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*101 chunk_grove2_1*/[101]={.modelIndex=190,.colMeshIndex=0,.texIndex=370,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*102 chunk_grove2_2*/[102]={.modelIndex=190,.colMeshIndex=0,.texIndex=371,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*103 chunk_grove2_3*/[103]={.modelIndex=191,.colMeshIndex=0,.texIndex=372,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*104 chunk_grove2_4*/[104]={.modelIndex=341,.colMeshIndex=0,.texIndex=374,.glowIndex=373,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*105 chunk_grove2_5*/[105]={.modelIndex=192,.colMeshIndex=0,.texIndex=375,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*106 chunk_grove2_6*/[106]={.modelIndex=192,.colMeshIndex=0,.texIndex=376,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*107 chunk_grove2_7*/[107]={.modelIndex=191,.colMeshIndex=0,.texIndex=378,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*108 chunk_grove2_8*/[108]={.modelIndex=191,.colMeshIndex=0,.texIndex=379,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*109 chunk_grove2_9*/[109]={.modelIndex=191,.colMeshIndex=0,.texIndex=385,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*110 chunk_grove2_9b*/[110]={.modelIndex=191,.colMeshIndex=0,.texIndex=381,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*111 chunk_grove2_9c*/[111]={.modelIndex=191,.colMeshIndex=0,.texIndex=383,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*112 chunk_lift1*/[112]={.modelIndex=213,.colMeshIndex=0,.texIndex=1246,.glowIndex=1247,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*113 chunk_maint1_1*/[113]={.modelIndex=218,.colMeshIndex=0,.texIndex=430,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*114 chunk_maint1_2*/[114]={.modelIndex=220,.colMeshIndex=0,.texIndex=432,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*115 chunk_maint1_2d*/[115]={.modelIndex=219,.colMeshIndex=0,.texIndex=431,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*116 chunk_maint1_3*/[116]={.modelIndex=222,.colMeshIndex=0,.texIndex=436,.glowIndex=435,.specIndex=437,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*117 chunk_maint1_3b*/[117]={.modelIndex=221,.colMeshIndex=0,.texIndex=434,.glowIndex=433,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*118 chunk_maint1_4*/[118]={.modelIndex=224,.colMeshIndex=0,.texIndex=441,.glowIndex=440,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*119 chunk_maint1_4b*/[119]={.modelIndex=223,.colMeshIndex=0,.texIndex=439,.glowIndex=438,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*120 chunk_maint1_5*/[120]={.modelIndex=225,.colMeshIndex=0,.texIndex=443,.glowIndex=442,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*121 chunk_maint1_6*/[121]={.modelIndex=226,.colMeshIndex=0,.texIndex=96,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*122 chunk_maint1_7*/[122]={.modelIndex=227,.colMeshIndex=0,.texIndex=447,.glowIndex=446,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*123 chunk_blockerflightbay*/[123]={.modelIndex=178,.colMeshIndex=U16_MAX,.texIndex=1230,.glowIndex=MAX_TXRS,.specIndex=1242,.normIndex=160,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0,1.44f,0},.colSz=(V3){2.56f,0.32f,2.56f}},
+/*124 chunk_maint1_9*/[124]={.modelIndex=606,.colMeshIndex=0,.texIndex=450,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*125 chunk_maint1_9d*/[125]={.modelIndex=620,.colMeshIndex=0,.texIndex=449,.glowIndex=448,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*126 chunk_maint2_1*/[126]={.modelIndex=230,.colMeshIndex=0,.texIndex=455,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*127 chunk_maint2_1b*/[127]={.modelIndex=228,.colMeshIndex=0,.texIndex=451,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*128 chunk_maint2_1d*/[128]={.modelIndex=229,.colMeshIndex=0,.texIndex=453,.glowIndex=452,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*129 chunk_maint2_2*/[129]={.modelIndex=230,.colMeshIndex=0,.texIndex=457,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*130 chunk_maint2_3*/[130]={.modelIndex=232,.colMeshIndex=0,.texIndex=460,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*131 chunk_maint2_3d*/[131]={.modelIndex=231,.colMeshIndex=0,.texIndex=459,.glowIndex=458,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*132 chunk_maint2_4*/[132]={.modelIndex=233,.colMeshIndex=0,.texIndex=464,.glowIndex=463,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*133 chunk_maint2_4d*/[133]={.modelIndex=233,.colMeshIndex=0,.texIndex=462,.glowIndex=461,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*134 chunk_maint2_5*/[134]={.modelIndex=235,.colMeshIndex=0,.texIndex=468,.glowIndex=467,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*135 chunk_maint2_5d*/[135]={.modelIndex=234,.colMeshIndex=0,.texIndex=466,.glowIndex=465,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*136 chunk_maint2_6*/[136]={.modelIndex=236,.colMeshIndex=0,.texIndex=472,.glowIndex=471,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*137 chunk_maint2_6d*/[137]={.modelIndex=238,.colMeshIndex=0,.texIndex=470,.glowIndex=470,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*138 chunk_maint2_7*/[138]={.modelIndex=238,.colMeshIndex=0,.texIndex=476,.glowIndex=475,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*139 chunk_maint2_7d*/[139]={.modelIndex=237,.colMeshIndex=0,.texIndex=474,.glowIndex=473,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*140 chunk_maint2_8*/[140]={.modelIndex=239,.colMeshIndex=0,.texIndex=478,.glowIndex=477,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*141 chunk_maint2_9*/[141]={.modelIndex=240,.colMeshIndex=0,.texIndex=480,.glowIndex=479,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*142 chunk_maint2_9_slice45RH*/[142]={.modelIndex=242,.colMeshIndex=0,.texIndex=480,.glowIndex=479,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*143 chunk_maint2_9_slice128_top*/[143]={.modelIndex=241,.colMeshIndex=0,.texIndex=480,.glowIndex=479,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*144 chunk_maint3_1*/[144]={.modelIndex=244,.colMeshIndex=0,.texIndex=483,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*145 chunk_maint3_1_slice32_lh*/[145]={.modelIndex=246,.colMeshIndex=0,.texIndex=483,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*146 chunk_maint3_1_slice32_rh*/[146]={.modelIndex=245,.colMeshIndex=0,.texIndex=483,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*147 chunk_maint3_1_slice45*/[147]={.modelIndex=247,.colMeshIndex=0,.texIndex=483,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*148 chunk_maint3_1d*/[148]={.modelIndex=243,.colMeshIndex=0,.texIndex=482,.glowIndex=481,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*149 chunk_med1_1*/[149]={.modelIndex=249,.colMeshIndex=0,.texIndex=486,.glowIndex=MAX_TXRS,.specIndex=1256,.normIndex=1255,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*150 chunk_med1_1_half_top*/[150]={.modelIndex=250,.colMeshIndex=0,.texIndex=486,.glowIndex=MAX_TXRS,.specIndex=1256,.normIndex=1255,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*151 chunk_med1_1_slice128high*/[151]={.modelIndex=251,.colMeshIndex=0,.texIndex=486,.glowIndex=MAX_TXRS,.specIndex=1256,.normIndex=1255,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*152 chunk_med1_1_slice192RH*/[152]={.modelIndex=252,.colMeshIndex=0,.texIndex=486,.glowIndex=MAX_TXRS,.specIndex=1256,.normIndex=1255,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*153 chunk_med1_1_slice256*/[153]={.modelIndex=253,.colMeshIndex=0,.texIndex=486,.glowIndex=MAX_TXRS,.specIndex=1256,.normIndex=1255,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*154 chunk_med1_1d*/[154]={.modelIndex=248,.colMeshIndex=0,.texIndex=485,.glowIndex=484,.specIndex=1236,.normIndex=1255,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*155 chunk_med1_2*/[155]={.modelIndex=255,.colMeshIndex=0,.texIndex=489,.glowIndex=488,.specIndex=1256,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*156 chunk_med1_2d*/[156]={.modelIndex=254,.colMeshIndex=0,.texIndex=487,.glowIndex=MAX_TXRS,.specIndex=1256,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*157 chunk_med1_3*/[157]={.modelIndex=257,.colMeshIndex=0,.texIndex=493,.glowIndex=492,.specIndex=1256,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*158 chunk_med1_3d*/[158]={.modelIndex=256,.colMeshIndex=0,.texIndex=491,.glowIndex=490,.specIndex=1256,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*159 chunk_med1_4*/[159]={.modelIndex=258,.colMeshIndex=0,.texIndex=494,.glowIndex=MAX_TXRS,.specIndex=1256,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*160 chunk_med1_5*/[160]={.modelIndex=669,.colMeshIndex=0,.texIndex=495,.glowIndex=MAX_TXRS,.specIndex=1256,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*161 chunk_med1_6*/[161]={.modelIndex=259,.colMeshIndex=0,.texIndex=496,.glowIndex=MAX_TXRS,.specIndex=1256,.normIndex=509,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*162 chunk_med1_7*/[162]={.modelIndex=262,.colMeshIndex=0,.texIndex=499,.glowIndex=MAX_TXRS,.specIndex=1268,.normIndex=498,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*163 chunk_med1_7_slice14_64*/[163]={.modelIndex=263,.colMeshIndex=0,.texIndex=499,.glowIndex=MAX_TXRS,.specIndex=1268,.normIndex=1254,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*164 chunk_med1_7_slice45_320lh*/[164]={.modelIndex=264,.colMeshIndex=0,.texIndex=499,.glowIndex=MAX_TXRS,.specIndex=1268,.normIndex=1254,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*165 chunk_med1_7_slice45_320rh*/[165]={.modelIndex=265,.colMeshIndex=0,.texIndex=499,.glowIndex=MAX_TXRS,.specIndex=1268,.normIndex=1254,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*166 chunk_med1_7_slice96high*/[166]={.modelIndex=266,.colMeshIndex=0,.texIndex=499,.glowIndex=MAX_TXRS,.specIndex=1268,.normIndex=1254,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*167 chunk_med1_7d*/[167]={.modelIndex=260,.colMeshIndex=0,.texIndex=497,.glowIndex=MAX_TXRS,.specIndex=1269,.normIndex=1270,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*168 chunk_med1_7d_slice128*/[168]={.modelIndex=261,.colMeshIndex=0,.texIndex=497,.glowIndex=MAX_TXRS,.specIndex=1269,.normIndex=1270,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*169 chunk_med1_8*/[169]={.modelIndex=268,.colMeshIndex=0,.texIndex=503,.glowIndex=MAX_TXRS,.specIndex=1242,.normIndex=502,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*170 chunk_med1_8d*/[170]={.modelIndex=267,.colMeshIndex=0,.texIndex=501,.glowIndex=MAX_TXRS,.specIndex=1242,.normIndex=163,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*171 chunk_med1_9*/[171]={.modelIndex=278,.colMeshIndex=0,.texIndex=507,.glowIndex=MAX_TXRS,.specIndex=1267,.normIndex=506,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*172*/[172]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*173*/[173]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*174 chunk_med1_9d*/[174]={.modelIndex=269,.colMeshIndex=0,.texIndex=505,.glowIndex=MAX_TXRS,.specIndex=1267,.normIndex=504,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*175 unused*/[175]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*176 chunk_med1_9d_ofs112_90*/[176]={.modelIndex=270,.colMeshIndex=0,.texIndex=505,.glowIndex=MAX_TXRS,.specIndex=1267,.normIndex=504,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*177 chunk_med1_9d_ofs144_90*/[177]={.modelIndex=272,.colMeshIndex=0,.texIndex=505,.glowIndex=MAX_TXRS,.specIndex=1267,.normIndex=504,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*178 chunk_med2_1*/[178]={.modelIndex=280,.colMeshIndex=0,.texIndex=513,.glowIndex=511,.specIndex=1254,.normIndex=512,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*179 chunk_med2_1_slice32RH*/[179]={.modelIndex=281,.colMeshIndex=0,.texIndex=513,.glowIndex=MAX_TXRS,.specIndex=1254,.normIndex=512,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*180 chunk_med2_1d*/[180]={.modelIndex=279,.colMeshIndex=0,.texIndex=510,.glowIndex=508,.specIndex=1254,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*181 chunk_med2_2*/[181]={.modelIndex=283,.colMeshIndex=0,.texIndex=517,.glowIndex=516,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*182 chunk_med2_2_half_bottom*/[182]={.modelIndex=284,.colMeshIndex=0,.texIndex=517,.glowIndex=516,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*183 chunk_med2_2d*/[183]={.modelIndex=282,.colMeshIndex=0,.texIndex=515,.glowIndex=516,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*184 chunk_med2_3*/[184]={.modelIndex=286,.colMeshIndex=0,.texIndex=521,.glowIndex=520,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*185 chunk_med2_3d*/[185]={.modelIndex=285,.colMeshIndex=0,.texIndex=519,.glowIndex=518,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*186 chunk_med2_4*/[186]={.modelIndex=287,.colMeshIndex=0,.texIndex=523,.glowIndex=522,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*187 chunk_med2_5*/[187]={.modelIndex=288,.colMeshIndex=0,.texIndex=527,.glowIndex=526,.specIndex=539,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0,1.44f,0},.colSz=(V3){2.56f,0.32f,2.56f}},
+/*188 chunk_med2_6*/[188]={.modelIndex=289,.colMeshIndex=0,.texIndex=528,.glowIndex=MAX_TXRS,.specIndex=1271,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*189 chunk_med2_7*/[189]={.modelIndex=290,.colMeshIndex=0,.texIndex=530,.glowIndex=529,.specIndex=1245,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*190 chunk_med2_8*/[190]={.modelIndex=291,.colMeshIndex=0,.texIndex=531,.glowIndex=MAX_TXRS,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*191 chunk_med2_8_half_top*/[191]={.modelIndex=292,.colMeshIndex=0,.texIndex=531,.glowIndex=MAX_TXRS,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*192 chunk_med2_8_slice32RH*/[192]={.modelIndex=293,.colMeshIndex=0,.texIndex=531,.glowIndex=MAX_TXRS,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*193 chunk_med2_8_slice45*/[193]={.modelIndex=294,.colMeshIndex=0,.texIndex=531,.glowIndex=MAX_TXRS,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*194 chunk_med2_9*/[194]={.modelIndex=296,.colMeshIndex=0,.texIndex=535,.glowIndex=534,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*195 chunk_med2_9d*/[195]={.modelIndex=295,.colMeshIndex=0,.texIndex=533,.glowIndex=532,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*196 chunk_med3_1*/[196]={.modelIndex=297,.colMeshIndex=0,.texIndex=536,.glowIndex=MAX_TXRS,.specIndex=1236,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*197 chunk_rad1_1*/[197]={.modelIndex=501,.colMeshIndex=0,.texIndex=660,.glowIndex=659,.specIndex=1231,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*198 chunk_rad1_2*/[198]={.modelIndex=501,.colMeshIndex=0,.texIndex=662,.glowIndex=661,.specIndex=1231,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*199 chunk_reac1_1*/[199]={.modelIndex=502,.colMeshIndex=0,.texIndex=664,.glowIndex=MAX_TXRS,.specIndex=1243,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*200 chunk_reac1_1_slice45*/[200]={.modelIndex=339,.colMeshIndex=0,.texIndex=664,.glowIndex=MAX_TXRS,.specIndex=1243,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*201 chunk_reac1_2*/[201]={.modelIndex=503,.colMeshIndex=0,.texIndex=665,.glowIndex=MAX_TXRS,.specIndex=1243,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*202 chunk_reac1_3*/[202]={.modelIndex=504,.colMeshIndex=0,.texIndex=666,.glowIndex=MAX_TXRS,.specIndex=1243,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*203 chunk_reac1_4*/[203]={.modelIndex=505,.colMeshIndex=0,.texIndex=668,.glowIndex=667,.specIndex=669,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*204 chunk_reac1_5*/[204]={.modelIndex=506,.colMeshIndex=0,.texIndex=671,.glowIndex=670,.specIndex=1239,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*205 chunk_reac1_6*/[205]={.modelIndex=507,.colMeshIndex=0,.texIndex=673,.glowIndex=672,.specIndex=1243,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*206 chunk_reac1_7*/[206]={.modelIndex=342,.colMeshIndex=0,.texIndex=676,.glowIndex=675,.specIndex=1243,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*207 chunk_reac1_8*/[207]={.modelIndex=508,.colMeshIndex=0,.texIndex=678,.glowIndex=678,.specIndex=1243,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*208 chunk_reac1_9*/[208]={.modelIndex=509,.colMeshIndex=0,.texIndex=680,.glowIndex=680,.specIndex=1243,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*209 chunk_reac2_1*/[209]={.modelIndex=512,.colMeshIndex=0,.texIndex=682,.glowIndex=MAX_TXRS,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*210 chunk_reac2_1_slice45LH*/[210]={.modelIndex=514,.colMeshIndex=0,.texIndex=682,.glowIndex=MAX_TXRS,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*211 chunk_reac2_1_slice45LH_up*/[211]={.modelIndex=515,.colMeshIndex=0,.texIndex=682,.glowIndex=MAX_TXRS,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*212 chunk_reac2_1_slice45RH*/[212]={.modelIndex=516,.colMeshIndex=0,.texIndex=682,.glowIndex=MAX_TXRS,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*213 chunk_reac2_1_slice45RH_up*/[213]={.modelIndex=517,.colMeshIndex=0,.texIndex=682,.glowIndex=MAX_TXRS,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*214 chunk_reac2_1b*/[214]={.modelIndex=510,.colMeshIndex=0,.texIndex=681,.glowIndex=MAX_TXRS,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*215 chunk_reac2_1bmirror*/[215]={.modelIndex=511,.colMeshIndex=0,.texIndex=681,.glowIndex=MAX_TXRS,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*216 chunk_reac2_1mirror*/[216]={.modelIndex=513,.colMeshIndex=0,.texIndex=682,.glowIndex=MAX_TXRS,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*217 chunk_reac2_2*/[217]={.modelIndex=518,.colMeshIndex=0,.texIndex=684,.glowIndex=683,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*218 chunk_reac2_4*/[218]={.modelIndex=519,.colMeshIndex=0,.texIndex=685,.glowIndex=MAX_TXRS,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*219 chunk_reac2_4_slice128lower*/[219]={.modelIndex=340,.colMeshIndex=0,.texIndex=685,.glowIndex=MAX_TXRS,.specIndex=1235,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*220 chunk_reac2_5*/[220]={.modelIndex=520,.colMeshIndex=0,.texIndex=687,.glowIndex=686,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*221 chunk_reac2_6*/[221]={.modelIndex=521,.colMeshIndex=0,.texIndex=689,.glowIndex=688,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*222 chunk_reac2_7*/[222]={.modelIndex=522,.colMeshIndex=0,.texIndex=691,.glowIndex=690,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*223 chunk_reac2_8*/[223]={.modelIndex=523,.colMeshIndex=0,.texIndex=693,.glowIndex=692,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*224 chunk_reac2_9*/[224]={.modelIndex=524,.colMeshIndex=0,.texIndex=694,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*225 chunk_reac3_1*/[225]={.modelIndex=525,.colMeshIndex=0,.texIndex=696,.glowIndex=695,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*226 chunk_reac3_2*/[226]={.modelIndex=526,.colMeshIndex=0,.texIndex=697,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*227 chunk_reac3_3*/[227]={.modelIndex=527,.colMeshIndex=0,.texIndex=698,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*228 chunk_reac3_4*/[228]={.modelIndex=528,.colMeshIndex=0,.texIndex=699,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*229 chunk_reac3_5*/[229]={.modelIndex=529,.colMeshIndex=0,.texIndex=701,.glowIndex=700,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*230 chunk_reac3_6*/[230]={.modelIndex=530,.colMeshIndex=0,.texIndex=703,.glowIndex=702,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*231 chunk_reac3_7*/[231]={.modelIndex=531,.colMeshIndex=0,.texIndex=704,.glowIndex=MAX_TXRS,.specIndex=705,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*232 chunk_reac4_1*/[232]={.modelIndex=532,.colMeshIndex=0,.texIndex=707,.glowIndex=706,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*233 chunk_reac4_1_slice45lh*/[233]={.modelIndex=533,.colMeshIndex=0,.texIndex=707,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*234 chunk_reac4_2*/[234]={.modelIndex=534,.colMeshIndex=0,.texIndex=709,.glowIndex=708,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*235 chunk_reac5_1*/[235]={.modelIndex=535,.colMeshIndex=0,.texIndex=711,.glowIndex=710,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*236 chunk_reac5_2*/[236]={.modelIndex=536,.colMeshIndex=0,.texIndex=713,.glowIndex=712,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*237 chunk_reac5_3*/[237]={.modelIndex=537,.colMeshIndex=0,.texIndex=715,.glowIndex=714,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*238 chunk_reac6_1*/[238]={.modelIndex=538,.colMeshIndex=0,.texIndex=716,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*239 chunk_reac6_2*/[239]={.modelIndex=539,.colMeshIndex=0,.texIndex=717,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*240 chunk_reac6_3*/[240]={.modelIndex=539,.colMeshIndex=0,.texIndex=719,.glowIndex=718,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*241 chunk_sci1_1*/[241]={.modelIndex=540,.colMeshIndex=0,.texIndex=722,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*242 chunk_sci1_1_slice45_toplh*/[242]={.modelIndex=542,.colMeshIndex=0,.texIndex=722,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*243 chunk_sci1_1_slice45_toprh*/[243]={.modelIndex=543,.colMeshIndex=0,.texIndex=722,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*244 chunk_sci1_1d*/[244]={.modelIndex=541,.colMeshIndex=0,.texIndex=721,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*245 chunk_sci1_2*/[245]={.modelIndex=545,.colMeshIndex=0,.texIndex=724,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*246 chunk_sci1_2_slice45lh*/[246]={.modelIndex=546,.colMeshIndex=0,.texIndex=724,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*247 chunk_sci1_2_slice45lh_up*/[247]={.modelIndex=547,.colMeshIndex=0,.texIndex=724,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*248 chunk_sci1_2_slice45rh*/[248]={.modelIndex=548,.colMeshIndex=0,.texIndex=724,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*249 chunk_sci1_2_slice45rh_up*/[249]={.modelIndex=549,.colMeshIndex=0,.texIndex=724,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*250 chunk_sci1_2d*/[250]={.modelIndex=544,.colMeshIndex=0,.texIndex=723,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*251 chunk_sci1_3*/[251]={.modelIndex=550,.colMeshIndex=0,.texIndex=726,.glowIndex=725,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*252 chunk_sci1_4*/[252]={.modelIndex=498,.colMeshIndex=0,.texIndex=727,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*253 chunk_sci1_5*/[253]={.modelIndex=551,.colMeshIndex=0,.texIndex=728,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*254 chunk_sci1_6*/[254]={.modelIndex=552,.colMeshIndex=0,.texIndex=729,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*255 chunk_sci1_6_slice45*/[255]={.modelIndex=553,.colMeshIndex=0,.texIndex=729,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*256 chunk_sci1_7*/[256]={.modelIndex=555,.colMeshIndex=0,.texIndex=731,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*257 chunk_sci1_7d*/[257]={.modelIndex=554,.colMeshIndex=0,.texIndex=730,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*258 chunk_sci1_8*/[258]={.modelIndex=557,.colMeshIndex=0,.texIndex=734,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*259 chunk_sci1_8d*/[259]={.modelIndex=556,.colMeshIndex=0,.texIndex=733,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*260 chunk_sci1_9*/[260]={.modelIndex=559,.colMeshIndex=0,.texIndex=737,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*261 chunk_sci1_9d*/[261]={.modelIndex=558,.colMeshIndex=0,.texIndex=736,.glowIndex=735,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*262 chunk_sci2_1*/[262]={.modelIndex=561,.colMeshIndex=0,.texIndex=739,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*263 chunk_sci2_1_slice45lh*/[263]={.modelIndex=563,.colMeshIndex=0,.texIndex=739,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*264 chunk_sci2_1_slice45rh*/[264]={.modelIndex=562,.colMeshIndex=0,.texIndex=739,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*265 chunk_sci2_1d*/[265]={.modelIndex=560,.colMeshIndex=0,.texIndex=738,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*266 chunk_sci2_2*/[266]={.modelIndex=565,.colMeshIndex=0,.texIndex=742,.glowIndex=741,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*267 chunk_sci2_2d*/[267]={.modelIndex=564,.colMeshIndex=0,.texIndex=740,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*268 chunk_sci2_3*/[268]={.modelIndex=566,.colMeshIndex=0,.texIndex=744,.glowIndex=743,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*269 chunk_sci2_4*/[269]={.modelIndex=567,.colMeshIndex=0,.texIndex=745,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*270 chunk_sci2_5*/[270]={.modelIndex=569,.colMeshIndex=0,.texIndex=747,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*271 chunk_sci2_5d*/[271]={.modelIndex=568,.colMeshIndex=0,.texIndex=746,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*272 chunk_sci3_1*/[272]={.modelIndex=571,.colMeshIndex=0,.texIndex=749,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*273 chunk_sci3_1d*/[273]={.modelIndex=570,.colMeshIndex=0,.texIndex=748,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*274 chunk_sci3_2*/[274]={.modelIndex=572,.colMeshIndex=0,.texIndex=750,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*275 chunk_sci3_3*/[275]={.modelIndex=573,.colMeshIndex=0,.texIndex=752,.glowIndex=751,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*276 chunk_sci3_4*/[276]={.modelIndex=574,.colMeshIndex=0,.texIndex=754,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*277 chunk_sci3_5*/[277]={.modelIndex=575,.colMeshIndex=0,.texIndex=756,.glowIndex=755,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*278 chunk_sci3_6*/[278]={.modelIndex=576,.colMeshIndex=0,.texIndex=758,.glowIndex=757,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*279 chunk_screen*/[279]={.modelIndex=5988,.colMeshIndex=0,.texIndex=881,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*280 chunk_sec1_1*/[280]={.modelIndex=178,.colMeshIndex=0,.texIndex=787,.glowIndex=MAX_TXRS,.specIndex=787,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*281 chunk_sec1_1b*/[281]={.modelIndex=178,.colMeshIndex=0,.texIndex=785,.glowIndex=MAX_TXRS,.specIndex=785,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*282 chunk_sec1_1c*/[282]={.modelIndex=577,.colMeshIndex=0,.texIndex=786,.glowIndex=MAX_TXRS,.specIndex=786,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*283 chunk_sec1_1c_slice45*/[283]={.modelIndex=580,.colMeshIndex=0,.texIndex=786,.glowIndex=MAX_TXRS,.specIndex=786,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*284 chunk_sec1_1c_slice64highlh*/[284]={.modelIndex=581,.colMeshIndex=0,.texIndex=786,.glowIndex=MAX_TXRS,.specIndex=786,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*285 chunk_sec1_1c_slice64highrh*/[285]={.modelIndex=582,.colMeshIndex=0,.texIndex=786,.glowIndex=MAX_TXRS,.specIndex=786,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*286 unused*/[286]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*287 unused*/[287]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*288 chunk_sec1_2*/[288]={.modelIndex=584,.colMeshIndex=0,.texIndex=789,.glowIndex=MAX_TXRS,.specIndex=1233,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*289 chunk_sec1_2b*/[289]={.modelIndex=583,.colMeshIndex=0,.texIndex=788,.glowIndex=MAX_TXRS,.specIndex=1233,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*290 chunk_sec1_3*/[290]={.modelIndex=585,.colMeshIndex=0,.texIndex=790,.glowIndex=MAX_TXRS,.specIndex=1233,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*291 chunk_sec1_3_slice45*/[291]={.modelIndex=586,.colMeshIndex=0,.texIndex=790,.glowIndex=MAX_TXRS,.specIndex=1233,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*292 chunk_stor1_1*/[292]={.modelIndex=597,.colMeshIndex=0,.texIndex=824,.glowIndex=823,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*293 chunk_stor1_2*/[293]={.modelIndex=598,.colMeshIndex=0,.texIndex=825,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*294 chunk_stor1_3*/[294]={.modelIndex=598,.colMeshIndex=0,.texIndex=826,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*295 chunk_stor1_4*/[295]={.modelIndex=599,.colMeshIndex=0,.texIndex=827,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*296 chunk_stor1_5*/[296]={.modelIndex=600,.colMeshIndex=0,.texIndex=828,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*297 chunk_stor1_6*/[297]={.modelIndex=601,.colMeshIndex=0,.texIndex=829,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*298 chunk_stor1_6_slice128_up_lh*/[298]={.modelIndex=602,.colMeshIndex=0,.texIndex=829,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*299 chunk_stor1_6_slice128_up_rh*/[299]={.modelIndex=603,.colMeshIndex=0,.texIndex=829,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*300 chunk_stor1_6_slice192lh*/[300]={.modelIndex=604,.colMeshIndex=0,.texIndex=829,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*301 chunk_stor1_6_slice192rh*/[301]={.modelIndex=605,.colMeshIndex=0,.texIndex=829,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*302 chunk_stor1_7*/[302]={.modelIndex=606,.colMeshIndex=0,.texIndex=833,.glowIndex=MAX_TXRS,.specIndex=834,.normIndex=832,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*303 chunk_stor1_7_slice45*/[303]={.modelIndex=607,.colMeshIndex=0,.texIndex=833,.glowIndex=MAX_TXRS,.specIndex=834,.normIndex=832,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*304 chunk_stor1_7d*/[304]={.modelIndex=620,.colMeshIndex=0,.texIndex=831,.glowIndex=830,.specIndex=834,.normIndex=832,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*305 chunk_teleporter*/[305]={.modelIndex=178,.colMeshIndex=0,.texIndex=1166,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*306 chunk_white*/[306]={.modelIndex=178,.colMeshIndex=0,.texIndex=881,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*307 item_paper_wad*/[307]={.modelIndex=487,.colMeshIndex=0,.texIndex=1250,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.06f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){-0.001254f,-0.001190498f,0.006335999f},.colSz=(V3){0.0451f,0,0}},
+/*308 item_warecasing*/[308]={.modelIndex=637,.colMeshIndex=0,.texIndex=1251,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.8f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0,0,0.09397449f},.colSz=(V3){0.540964f,0.405398f,0.187949f}},
+/*309 item_beaker*/[309]={.modelIndex=14,.colMeshIndex=682,.texIndex=36,.glowIndex=MAX_TXRS,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0.28f,.dynFriction=0.1f,.statFriction=0.2f,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*310 item_beverage*/[310]={.modelIndex=18,.colMeshIndex=683,.texIndex=37,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.12f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*311 item_skull*/[311]={.modelIndex=593,.colMeshIndex=70,.texIndex=816,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.451f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*312 item_arm*/[312]={.modelIndex=7,.colMeshIndex=678,.texIndex=28,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.0f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*313 item_audiolog*/[313]={.modelIndex=11,.colMeshIndex=679,.texIndex=52,.glowIndex=80,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*314 weapon_grenadefrag*/[314]={.modelIndex=182,.colMeshIndex=73,.texIndex=348,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.0f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*315 weapon_grenadeconc*/[315]={.modelIndex=165,.colMeshIndex=84,.texIndex=334,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*316 weapon_grenadeemp*/[316]={.modelIndex=168,.colMeshIndex=85,.texIndex=338,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.8f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*317 weapon_grenadeearth*/[317]={.modelIndex=181,.colMeshIndex=86,.texIndex=346,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*318 weapon_grenademine*/[318]={.modelIndex=184,.colMeshIndex=87,.texIndex=353,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*319 weapon_grenadenitro*/[319]={.modelIndex=300,.colMeshIndex=301,.texIndex=356,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*320 weapon_grenadegas*/[320]={.modelIndex=183,.colMeshIndex=89,.texIndex=349,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.9f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*321 item_patch_berserk*/[321]={.modelIndex=488,.colMeshIndex=491,.texIndex=590,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.14f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*322 item_patch_detox*/[322]={.modelIndex=488,.colMeshIndex=491,.texIndex=591,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.14f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*323 item_patch_genius*/[323]={.modelIndex=488,.colMeshIndex=491,.texIndex=592,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.14f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*324 item_patch_medi*/[324]={.modelIndex=488,.colMeshIndex=491,.texIndex=600,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.14f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*325 item_patch_reflex*/[325]={.modelIndex=488,.colMeshIndex=491,.texIndex=641,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.14f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*326 item_patch_sight*/[326]={.modelIndex=488,.colMeshIndex=491,.texIndex=646,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.14f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*327 item_patch_staminup*/[327]={.modelIndex=488,.colMeshIndex=491,.texIndex=647,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.14f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*328 item_hw_system*/[328]={.modelIndex=207,.colMeshIndex=68,.texIndex=405,.glowIndex=404,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.17f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*329 item_hw_navunit*/[329]={.modelIndex=204,.colMeshIndex=696,.texIndex=907,.glowIndex=1259,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.1f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*330 item_hw_ereader*/[330]={.modelIndex=200,.colMeshIndex=692,.texIndex=397,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.12f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*331 item_hw_sensaround*/[331]={.modelIndex=205,.colMeshIndex=697,.texIndex=402,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.12f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*332 item_hw_targetid*/[332]={.modelIndex=208,.colMeshIndex=90,.texIndex=408,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.08f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*333 item_hw_shield*/[333]={.modelIndex=206,.colMeshIndex=91,.texIndex=403,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.14f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*334 item_hw_bio*/[334]={.modelIndex=197,.colMeshIndex=689,.texIndex=393,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.1f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*335 item_hw_lantern*/[335]={.modelIndex=203,.colMeshIndex=695,.texIndex=401,.glowIndex=400,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.11f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*336 item_hw_envirosuit*/[336]={.modelIndex=199,.colMeshIndex=691,.texIndex=396,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.451f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*337 item_hw_booster*/[337]={.modelIndex=198,.colMeshIndex=690,.texIndex=395,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.16f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*338 item_hw_jumpjets*/[338]={.modelIndex=202,.colMeshIndex=694,.texIndex=399,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.32f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*339 item_hw_infrared*/[339]={.modelIndex=201,.colMeshIndex=693,.texIndex=398,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.1f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*340 item_fireextinguisher*/[340]={.modelIndex=144,.colMeshIndex=684,.texIndex=317,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*341 item_access_card_admin*/[341]={.modelIndex=0,.colMeshIndex=672,.texIndex=9,.glowIndex=82,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*342 item_workerhelmet*/[342]={.modelIndex=648,.colMeshIndex=94,.texIndex=886,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.8f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*343 weapon_mk3*/[343]={.modelIndex=646,.colMeshIndex=309,.texIndex=885,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.75f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*344 weapon_blaster*/[344]={.modelIndex=638,.colMeshIndex=310,.texIndex=875,.glowIndex=874,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.5f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*345 weapon_dartgun*/[345]={.modelIndex=640,.colMeshIndex=311,.texIndex=876,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*346 weapon_flechette*/[346]={.modelIndex=642,.colMeshIndex=312,.texIndex=880,.glowIndex=879,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.4f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*347 weapon_ionrifle*/[347]={.modelIndex=643,.colMeshIndex=313,.texIndex=883,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.8f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*348 weapon_rapier*/[348]={.modelIndex=653,.colMeshIndex=314,.texIndex=891,.glowIndex=890,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*349 weapon_pipe*/[349]={.modelIndex=649,.colMeshIndex=647,.texIndex=887,.glowIndex=MAX_TXRS,.specIndex=1241,.normIndex=MAX_TXRS,.mass=0.85f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*350 weapon_magnum*/[350]={.modelIndex=644,.colMeshIndex=315,.texIndex=877,.glowIndex=MAX_TXRS,.specIndex=1231,.normIndex=MAX_TXRS,.mass=0.6f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*351 weapon_magpulse*/[351]={.modelIndex=645,.colMeshIndex=316,.texIndex=884,.glowIndex=MAX_TXRS,.specIndex=1231,.normIndex=MAX_TXRS,.mass=0.65f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*352 weapon_pistol*/[352]={.modelIndex=650,.colMeshIndex=317,.texIndex=878,.glowIndex=MAX_TXRS,.specIndex=1231,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*353 weapon_plasma*/[353]={.modelIndex=651,.colMeshIndex=318,.texIndex=888,.glowIndex=MAX_TXRS,.specIndex=1240,.normIndex=MAX_TXRS,.mass=1.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*354 weapon_railgun*/[354]={.modelIndex=652,.colMeshIndex=319,.texIndex=889,.glowIndex=MAX_TXRS,.specIndex=1231,.normIndex=MAX_TXRS,.mass=1.0f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*355 weapon_riotgun*/[355]={.modelIndex=654,.colMeshIndex=320,.texIndex=892,.glowIndex=MAX_TXRS,.specIndex=1231,.normIndex=MAX_TXRS,.mass=0.55f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*356 weapon_skorpion*/[356]={.modelIndex=655,.colMeshIndex=321,.texIndex=893,.glowIndex=MAX_TXRS,.specIndex=1231,.normIndex=MAX_TXRS,.mass=1.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*357 weapon_sparqbeam*/[357]={.modelIndex=656,.colMeshIndex=322,.texIndex=895,.glowIndex=894,.specIndex=1231,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*358 weapon_stungun*/[358]={.modelIndex=657,.colMeshIndex=323,.texIndex=896,.glowIndex=MAX_TXRS,.specIndex=1231,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*359 item_battery*/[359]={.modelIndex=13,.colMeshIndex=680,.texIndex=35,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*360 item_battery_icad*/[360]={.modelIndex=13,.colMeshIndex=680,.texIndex=34,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.35f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*361 item_logic_probe*/[361]={.modelIndex=217,.colMeshIndex=306,.texIndex=427,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.15f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*362 item_healthkit*/[362]={.modelIndex=196,.colMeshIndex=688,.texIndex=391,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.25f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*363 item_plastique*/[363]={.modelIndex=492,.colMeshIndex=308,.texIndex=599,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.4f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*364 item_chipset_interfacedemod*/[364]={.modelIndex=45,.colMeshIndex=325,.texIndex=78,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*365 item_flask*/[365]={.modelIndex=145,.colMeshIndex=685,.texIndex=36,.glowIndex=MAX_TXRS,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0.22f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*366 item_chipset_bitflag*/[366]={.modelIndex=45,.colMeshIndex=325,.texIndex=633,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*367 item_ammo_rubber*/[367]={.modelIndex=8,.colMeshIndex=676,.texIndex=19,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.25f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*368 item_isotopex22*/[368]={.modelIndex=209,.colMeshIndex=326,.texIndex=413,.glowIndex=412,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*369 item_testtube*/[369]={.modelIndex=622,.colMeshIndex=612,.texIndex=36,.glowIndex=MAX_TXRS,.specIndex=1242,.normIndex=MAX_TXRS,.mass=0.21f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*370 weapon_grenadefrag_live*/[370]={.modelIndex=182,.colMeshIndex=73,.texIndex=347,.glowIndex=630,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.0f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*371 item_chipset_isolinear*/[371]={.modelIndex=46,.colMeshIndex=308,.texIndex=409,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.26f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*372 weapon_grenadeconc_live*/[372]={.modelIndex=165,.colMeshIndex=84,.texIndex=334,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*373 item_ammo_needle*/[373]={.modelIndex=4,.colMeshIndex=U16_MAX,.texIndex=15,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.15f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){-0.0004654949f,0.0004549972f,0.0244365f},.colSz=(V3){0.131339f,0.1442801f,0.04838703f}},
+/*374 item_ammo_tranq*/[374]={.modelIndex=4,.colMeshIndex=U16_MAX,.texIndex=27,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.15f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){-0.0004654949f,0.0004549972f,0.0244365f},.colSz=(V3){0.131339f,0.1442801f,0.04838703f}},
+/*375 item_ammo_standard*/[375]={.modelIndex=5,.colMeshIndex=U16_MAX,.texIndex=25,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0.0001984993f,0.0f,0.02172501f},.colSz=(V3){0.1209471f,0.2176701f,0.04345007f}},
+/*376 item_ammo_teflon*/[376]={.modelIndex=5,.colMeshIndex=U16_MAX,.texIndex=26,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0.0001984993f,0.0f,0.02172501f},.colSz=(V3){0.1209471f,0.2176701f,0.04345007f}},
+/*377 item_ammo_hollow*/[377]={.modelIndex=5,.colMeshIndex=U16_MAX,.texIndex=11,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0.0002185023f,0.0f,0.02122951f},.colSz=(V3){0.1423431f,0.2127061f,0.04245907f}},
+/*378 item_ammo_slug*/[378]={.modelIndex=3,.colMeshIndex=U16_MAX,.texIndex=23,.glowIndex=22,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0.0002185023f,0.0f,0.02122951f},.colSz=(V3){0.1423431f,0.2127061f,0.04245907f}},
+/*379 item_ammo_magnesium*/[379]={.modelIndex=1,.colMeshIndex=673,.texIndex=14,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.35f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*380 item_ammo_penetrator*/[380]={.modelIndex=1,.colMeshIndex=673,.texIndex=16,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.35f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*381 item_ammo_hornet*/[381]={.modelIndex=1,.colMeshIndex=673,.texIndex=12,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.35f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*382 item_ammo_splinter*/[382]={.modelIndex=1,.colMeshIndex=673,.texIndex=24,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.35f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*383 item_ammo_rail*/[383]={.modelIndex=6,.colMeshIndex=675,.texIndex=17,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.40f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*384 item_ammo_slag*/[384]={.modelIndex=1,.colMeshIndex=673,.texIndex=21,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.35f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*385 item_ammo_slaglarge*/[385]={.modelIndex=10,.colMeshIndex=677,.texIndex=20,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.40f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*386 item_ammo_magcart*/[386]={.modelIndex=2,.colMeshIndex=674,.texIndex=13,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.35f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*387 weapon_grenadeemp_live*/[387]={.modelIndex=168,.colMeshIndex=85,.texIndex=337,.glowIndex=627,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.8f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*388 item_access_card_std*/[388]={.modelIndex=0,.colMeshIndex=672,.texIndex=79,.glowIndex=867,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*389 weapon_grenadeearth_live*/[389]={.modelIndex=181,.colMeshIndex=86,.texIndex=345,.glowIndex=628,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*390 item_access_card_group1*/[390]={.modelIndex=0,.colMeshIndex=672,.texIndex=7,.glowIndex=159,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*391 item_access_card_science*/[391]={.modelIndex=0,.colMeshIndex=672,.texIndex=2,.glowIndex=343,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*392 item_access_card_eng*/[392]={.modelIndex=0,.colMeshIndex=672,.texIndex=3,.glowIndex=81,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*393 item_access_card_groupB*/[393]={.modelIndex=0,.colMeshIndex=672,.texIndex=7,.glowIndex=159,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*394 item_access_card_security*/[394]={.modelIndex=0,.colMeshIndex=672,.texIndex=10,.glowIndex=344,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*395 item_access_card_per5diego*/[395]={.modelIndex=0,.colMeshIndex=672,.texIndex=8,.glowIndex=341,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*396 item_access_card_medi*/[396]={.modelIndex=0,.colMeshIndex=672,.texIndex=1,.glowIndex=161,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*397 item_access_card_group3*/[397]={.modelIndex=0,.colMeshIndex=672,.texIndex=7,.glowIndex=159,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*398 item_access_card_purple*/[398]={.modelIndex=0,.colMeshIndex=672,.texIndex=5,.glowIndex=342,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*399 item_head_male*/[399]={.modelIndex=194,.colMeshIndex=194,.texIndex=389,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.29f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*400 item_head_female*/[400]={.modelIndex=193,.colMeshIndex=686,.texIndex=388,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.30f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*401 item_severedhead*/[401]={.modelIndex=590,.colMeshIndex=327,.texIndex=801,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.28f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*402 weapon_grenademine_live*/[402]={.modelIndex=184,.colMeshIndex=87,.texIndex=351,.glowIndex=352,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*403 weapon_grenadenitro_live*/[403]={.modelIndex=185,.colMeshIndex=88,.texIndex=354,.glowIndex=355,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*404 weapon_grenadegas_live*/[404]={.modelIndex=183,.colMeshIndex=89,.texIndex=349,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.9f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*405 to 416 unused*/[405]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*406*/[406]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*407*/[407]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*408*/[408]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*409*/[409]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*410*/[410]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*411*/[411]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*412*/[412]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*413*/[413]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*414*/[414]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*415*/[415]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*416*/[416]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*417 item_access_card_perdarcy*/[417]={.modelIndex=0,.colMeshIndex=672,.texIndex=8,.glowIndex=341,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*418 unused*/[418]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*419 npc_autobomb*/[419]={.modelIndex=299,.colMeshIndex=328,.texIndex=542,.glowIndex=541,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.0f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*420 npc_cyborg_assassin*/[420]={.modelIndex=306,.colMeshIndex=0,.texIndex=545,.glowIndex=544,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=24,.col=COLTYPE_CAP,.colCtr=(V3){0,0.96f,0},.colSz=(V3){0.48f,2.0f,0}},
+/*421 npc_avian_mutant*/[421]={.modelIndex=328,.colMeshIndex=0,.texIndex=568,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.0f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=35,.col=COLTYPE_CAP,.colCtr=(V3){0,0.64f,0},.colSz=(V3){0.64f,1.60f,0}},
+/*422 npc_exec_bot*/[422]={.modelIndex=316,.colMeshIndex=0,.texIndex=555,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.2f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=29,.col=COLTYPE_CAP,.colCtr=(V3){0,0.96f,0},.colSz=(V3){0.48f,2.025f,0}},
+/*423 npc_cyborg_drone*/[423]={.modelIndex=312,.colMeshIndex=0,.texIndex=547,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=3,.col=COLTYPE_CAP,.colCtr=(V3){0,0,0},.colSz=(V3){0.36f,2.00f,0}},
+/*424 npc_cortex_reaver*/[424]={.modelIndex=300,.colMeshIndex=0,.texIndex=543,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=5.0f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=23,.col=COLTYPE_CAP,.colCtr=(V3){0,1.28f,0},.colSz=(V3){1.28f,2.5f,0}},
+/*425 npc_cyborg_warrior*/[425]={.modelIndex=315,.colMeshIndex=0,.texIndex=554,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=28,.col=COLTYPE_CAP,.colCtr=(V3){0,0,0},.colSz=(V3){0.48f,2.00f,0}},
+/*426 npc_cyborg_enforcer*/[426]={.modelIndex=314,.colMeshIndex=0,.texIndex=550,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=27,.col=COLTYPE_CAP,.colCtr=(V3){0,1.03f,0},.colSz=(V3){0.40f,2.08f,0}},
+/*427 npc_cyborg_elite*/[427]={.modelIndex=313,.colMeshIndex=0,.texIndex=548,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=3.5f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=26,.col=COLTYPE_CAP,.colCtr=(V3){0,1.09f,0},.colSz=(V3){0.44f,2.20f,0}},
+/*428 npc_cyborg_diego*/[428]={.modelIndex=309,.colMeshIndex=0,.texIndex=546,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.0f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=25,.col=COLTYPE_CAP,.colCtr=(V3){0,1.04f,0},.colSz=(V3){0.48f,2.12f,0}},
+/*429 npc_sec1_bot*/[429]={.modelIndex=333,.colMeshIndex=0,.texIndex=573,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=38,.col=COLTYPE_CAP,.colCtr=(V3){0,0.76f,0},.colSz=(V3){0.76f,1.8f,0}},
+/*430 npc_sec2_bot*/[430]={.modelIndex=335,.colMeshIndex=0,.texIndex=574,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=4.51f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=39,.col=COLTYPE_CAP,.colCtr=(V3){0,1.08f,0},.colSz=(V3){1.12f,2.40f,0}},
+/*431 npc_maint_bot*/[431]={.modelIndex=325,.colMeshIndex=0,.texIndex=567,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=34,.col=COLTYPE_SPH,.colCtr=(V3){0,0.78f,0},.colSz=(V3){2.00f,0,0}},
+/*432 npc_mutant_cyborg*/[432]={.modelIndex=329,.colMeshIndex=0,.texIndex=569,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=3.0f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=51,.col=COLTYPE_CAP,.colCtr=(V3){0,0.12f,0},.colSz=(V3){0.75f,2.30f,0}},
+/*433 npc_hopper*/[433]={.modelIndex=322,.colMeshIndex=0,.texIndex=562,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.0f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=32,.col=COLTYPE_CAP,.colCtr=(V3){0,1.04f,-0.16f},.colSz=(V3){0.96f,2.38f,0}},
+/*434 npc_humanoid_mutant*/[434]={.modelIndex=323,.colMeshIndex=0,.texIndex=563,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.4f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=2,.col=COLTYPE_CAP,.colCtr=(V3){0,0,0},.colSz=(V3){0.38f,2.00f,0}},
+/*435 npc_invisomut*/[435]={.modelIndex=324,.colMeshIndex=329,.texIndex=565,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.3f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=33,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*436 npc_virus_mutant*/[436]={.modelIndex=330,.colMeshIndex=0,.texIndex=576,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.4f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=41,.col=COLTYPE_CAP,.colCtr=(V3){0,0.95f,0.16f},.colSz=(V3){0.72f,1.90f,0}},
+/*437 npc_servbot*/[437]={.modelIndex=5153,.colMeshIndex=54,.texIndex=575,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.50f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=40,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*438 npc_flier_bot*/[438]={.modelIndex=318,.colMeshIndex=0,.texIndex=558,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.75f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=30,.col=COLTYPE_SPH,.colCtr=(V3){0,0.16f,0},.colSz=(V3){0.8f,0,0}},
+/*439 npc_zerog_mutant*/[439]={.modelIndex=395,.colMeshIndex=0,.texIndex=1170,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.30f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=42,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.6f,0,0}},
+/*440 npc_gorilla_tiger_mutant*/[440]={.modelIndex=320,.colMeshIndex=330,.texIndex=560,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.00f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=31,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*441 npc_repairbot*/[441]={.modelIndex=331,.colMeshIndex=331,.texIndex=572,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.50f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=37,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*442 npc_plant_mutant*/[442]={.modelIndex=330,.colMeshIndex=0,.texIndex=570,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.80f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=36,.col=COLTYPE_CAP,.colCtr=(V3){0,0.72f,0},.colSz=(V3){0.6f,1.44f,0}},
+/*443 npc_cyberdog*/[443]={.modelIndex=302,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.50f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){0.72f,0,0}},
+/*444 npc_cyberguard*/[444]={.modelIndex=303,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.00f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.0f,0,0}},
+/*445 npc_cyberram*/[445]={.modelIndex=304,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.00f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.44f,0,0}},
+/*446 npc_cyber_reaver*/[446]={.modelIndex=305,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.20f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){0.72f,0,0}},
+/*447 npc_cybershodan*/[447]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=4.51f,.dynFriction=0.15f,.statFriction=1.0f,.animationNum=MAX_ANIMS,.col=COLTYPE_CAP,.colCtr=(V3){0,0,0},.colSz=(V3){0.28f,2.0f,0}},
+/*448 item_cyber_data*/[448]={.modelIndex=65,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.5f,0,0}},
+/*449 item_cyber_decoy*/[449]={.modelIndex=72,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.5f,0,0}},
+/*450 item_cyber_drill*/[450]={.modelIndex=68,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.5f,0,0}},
+/*451 item_cyber_game*/[451]={.modelIndex=65,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.5f,0,0}},
+/*452 item_cyber_integrity*/[452]={.modelIndex=69,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.5f,0,0}},
+/*453 item_cyber_keycard*/[453]={.modelIndex=70,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.5f,0,0}},
+/*454 item_cyber_pulser*/[454]={.modelIndex=65,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.5f,0,0}},
+/*455 item_cyber_recall*/[455]={.modelIndex=65,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.5f,0,0}},
+/*456 item_cyber_shield*/[456]={.modelIndex=65,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.5f,0,0}},
+/*457 item_cyber_turbo*/[457]={.modelIndex=65,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0,0,0},.colSz=(V3){1.5f,0,0}},
+/*458 prop_phys_barrel_chemical*/[458]={.modelIndex=12,.colMeshIndex=332,.texIndex=30,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*459 prop_phys_barrel_radiation*/[459]={.modelIndex=12,.colMeshIndex=332,.texIndex=31,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*460 prop_phys_barrel_toxic*/[460]={.modelIndex=12,.colMeshIndex=332,.texIndex=33,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=1.5f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*461 prop_phys_cart*/[461]={.modelIndex=40,.colMeshIndex=333,.texIndex=416,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.5f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*462 prop_phys_pot*/[462]={.modelIndex=494,.colMeshIndex=334,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*463 prop_phys_toolcart*/[463]={.modelIndex=624,.colMeshIndex=335,.texIndex=865,.glowIndex=MAX_TXRS,.specIndex=866,.normIndex=864,.mass=20.0f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_CVX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*464 se_briefcase*/[464]={.modelIndex=34,.colMeshIndex=0,.texIndex=66,.glowIndex=65,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*465 se_corpse_blueshirt*/[465]={.modelIndex=51,.colMeshIndex=0,.texIndex=126,.glowIndex=MAX_TXRS,.specIndex=127,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*466 se_corpse_brownshirt*/[466]={.modelIndex=52,.colMeshIndex=0,.texIndex=128,.glowIndex=MAX_TXRS,.specIndex=129,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*467 se_corpse_eaten*/[467]={.modelIndex=MAX_ANIMS,.colMeshIndex=0,.texIndex=130,.glowIndex=MAX_TXRS,.specIndex=131,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*468 se_corpse_labcoat*/[468]={.modelIndex=55,.colMeshIndex=0,.texIndex=132,.glowIndex=MAX_TXRS,.specIndex=133,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*469 se_corpse_security*/[469]={.modelIndex=56,.colMeshIndex=0,.texIndex=136,.glowIndex=MAX_TXRS,.specIndex=137,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*470 se_corpse_tan*/[470]={.modelIndex=57,.colMeshIndex=0,.texIndex=138,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*471 se_corpse_torso*/[471]={.modelIndex=58,.colMeshIndex=0,.texIndex=126,.glowIndex=MAX_TXRS,.specIndex=127,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*472 se_crate1*/[472]={.modelIndex=60,.colMeshIndex=0,.texIndex=145,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.75f,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0,0,0},.colSz=(V3){0.684186f,0.6841861f,0.6841861f}},
+/*473 se_crate2*/[473]={.modelIndex=60,.colMeshIndex=0,.texIndex=143,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.75f,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0,0,0},.colSz=(V3){0.684186f,0.6841861f,0.6841861f}},
+/*474 se_crate3*/[474]={.modelIndex=60,.colMeshIndex=0,.texIndex=144,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.75f,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0,0,0},.colSz=(V3){0.684186f,0.6841861f,0.6841861f}},
+/*475 se_crate4*/[475]={.modelIndex=60,.colMeshIndex=0,.texIndex=146,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.25f,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0,0,0},.colSz=(V3){0.684186f,0.6841861f,0.6841861f}},
+/*476 se_crate5*/[476]={.modelIndex=60,.colMeshIndex=0,.texIndex=145,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=2.25f,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0,0,0},.colSz=(V3){0.684186f,0.6841861f,0.6841861f}},
+/*477 sec_camera*/[477]={.modelIndex=589,.colMeshIndex=0,.texIndex=73,.glowIndex=72,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*478 sec_cpunode*/[478]={.modelIndex=587,.colMeshIndex=0,.texIndex=242,.glowIndex=248,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*479 sec_cpunode_small*/[479]={.modelIndex=588,.colMeshIndex=0,.texIndex=107,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*480 weapon_cyber_mine*/[480]={.modelIndex=71,.colMeshIndex=0,.texIndex=1224,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*481 proj_enemshot2*/[481]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*482 proj_magpulse_shot*/[482]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=807,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*483 proj_stungun_shot*/[483]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=835,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*484 proj_rail_shot*/[484]={.modelIndex=652,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*485 proj_plasmarifle_shot*/[485]={.modelIndex=651,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*486 proj_enemshot6*/[486]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*487 proj_enemshot5*/[487]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.2f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*488 proj_enemshot4*/[488]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*489 proj_throwingstar*/[489]={.modelIndex=307,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*490 proj_magpulsenpc_shot*/[490]={.modelIndex=645,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*491 proj_railnpc_shot*/[491]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*492 proj_cyberplayer_shot*/[492]={.modelIndex=72,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*493 proj_cyberdog_shot*/[493]={.modelIndex=63,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*494 proj_cyberreaver_shot*/[494]={.modelIndex=64,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*495 proj_cyberice_shot*/[495]={.modelIndex=68,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0.3f,.dynFriction=0.5f,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*496 doorA*/[496]={.modelIndex=719,.colMeshIndex=0,.texIndex=185,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=1,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*497 doorB*/[497]={.modelIndex=0,.colMeshIndex=0,.texIndex=189,.glowIndex=188,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=0,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*498 doorC*/[498]={.modelIndex=0,.colMeshIndex=0,.texIndex=184,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=5,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*499 doorD*/[499]={.modelIndex=0,.colMeshIndex=0,.texIndex=196,.glowIndex=197,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=4,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*500 doorE*/[500]={.modelIndex=0,.colMeshIndex=0,.texIndex=208,.glowIndex=207,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=9,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*501 doorF*/[501]={.modelIndex=0,.colMeshIndex=0,.texIndex=187,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=10,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*502 doorG*/[502]={.modelIndex=0,.colMeshIndex=0,.texIndex=193,.glowIndex=194,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=11,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*503 doorH*/[503]={.modelIndex=0,.colMeshIndex=0,.texIndex=190,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=12,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*504 doorI*/[504]={.modelIndex=0,.colMeshIndex=0,.texIndex=200,.glowIndex=199,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=13,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*505 doorJ*/[505]={.modelIndex=0,.colMeshIndex=0,.texIndex=215,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=6,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*506 doorK*/[506]={.modelIndex=0,.colMeshIndex=0,.texIndex=214,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=7,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*507 doorL*/[507]={.modelIndex=0,.colMeshIndex=0,.texIndex=191,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=8,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*508 door_elevator1*/[508]={.modelIndex=0,.colMeshIndex=0,.texIndex=202,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=14,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*509 door_elevator2*/[509]={.modelIndex=0,.colMeshIndex=0,.texIndex=203,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=15,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*510 door_elevator3*/[510]={.modelIndex=0,.colMeshIndex=0,.texIndex=206,.glowIndex=205,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=16,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*511 door_elevator4*/[511]={.modelIndex=0,.colMeshIndex=0,.texIndex=203,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=17,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*512 door_secret1*/[512]={.modelIndex=0,.colMeshIndex=0,.texIndex=210,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=19,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*513 door_secret2*/[513]={.modelIndex=0,.colMeshIndex=0,.texIndex=209,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=18,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*514 door_secret3*/[514]={.modelIndex=94,.colMeshIndex=0,.texIndex=211,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=20,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*515 func_forcebridge*/[515]={.modelIndex=78,.colMeshIndex=0,.texIndex=38,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*516 prop_lift2*/[516]={.modelIndex=215,.colMeshIndex=U16_MAX,.texIndex=155,.glowIndex=154,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0.0f,0.0f,0.0f},.colSz=(V3){1.0f,1.0f,1.0f}},
+/*517 func_wall*/[517]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=10.0f,.dynFriction=0.6f,.statFriction=0.6f,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*518 BulletHoleLarge*/[518]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*519 BulletHoleScorchLarge*/[519]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*520 BulletHoleScorchSmall*/[520]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*521 BulletHoleSmall*/[521]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*522 BulletHoleTiny*/[522]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*523 BulletHoleTinySpread*/[523]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*524 func_door_cyber*/[524]={.modelIndex=178,.colMeshIndex=U16_MAX,.texIndex=1224,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_BOX,.colCtr=(V3){0.0f,1.31f,0.0f},.colSz=(V3){2.56f,0.06f,2.56f}},
+/*525 prop_console01*/[525]={.modelIndex=49,.colMeshIndex=0,.texIndex=100,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*526 prop_console02*/[526]={.modelIndex=50,.colMeshIndex=0,.texIndex=100,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*527 prop_grate1_1*/[527]={.modelIndex=186,.colMeshIndex=0,.texIndex=359,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*528 prop_grate1_2*/[528]={.modelIndex=187,.colMeshIndex=0,.texIndex=360,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*529 prop_grate1_3*/[529]={.modelIndex=188,.colMeshIndex=0,.texIndex=361,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*530 se_cabinet*/[530]={.modelIndex=39,.colMeshIndex=0,.texIndex=70,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*531 se_thermos*/[531]={.modelIndex=623,.colMeshIndex=0,.texIndex=863,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*532 prop_beaker_holder*/[532]={.modelIndex=15,.colMeshIndex=0,.texIndex=36,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*533 prop_bed*/[533]={.modelIndex=16,.colMeshIndex=0,.texIndex=246,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*534 prop_bed_hospital*/[534]={.modelIndex=608,.colMeshIndex=0,.texIndex=759,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*535 prop_bed_neurosurgery*/[535]={.modelIndex=17,.colMeshIndex=0,.texIndex=18,.glowIndex=MAX_TXRS,.specIndex=1238,.normIndex=29,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*536 prop_bonepile1*/[536]={.modelIndex=19,.colMeshIndex=0,.texIndex=815,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*537 prop_bridgewall1*/[537]={.modelIndex=33,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*538 prop_broken_clock*/[538]={.modelIndex=38,.colMeshIndex=0,.texIndex=1117,.glowIndex=1115,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*539 prop_brokengun*/[539]={.modelIndex=639,.colMeshIndex=0,.texIndex=878,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*540 prop_chair01*/[540]={.modelIndex=41,.colMeshIndex=0,.texIndex=195,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*541 prop_chair02*/[541]={.modelIndex=42,.colMeshIndex=0,.texIndex=195,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*542 prop_chair03*/[542]={.modelIndex=43,.colMeshIndex=0,.texIndex=195,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*543 prop_chair04*/[543]={.modelIndex=41,.colMeshIndex=0,.texIndex=195,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*544 prop_chair05*/[544]={.modelIndex=42,.colMeshIndex=0,.texIndex=195,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*545 prop_chandelier*/[545]={.modelIndex=496,.colMeshIndex=0,.texIndex=644,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*546 prop_charge_station*/[546]={.modelIndex=44,.colMeshIndex=0,.texIndex=77,.glowIndex=76,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*547 prop_clothes*/[547]={.modelIndex=47,.colMeshIndex=0,.texIndex=97,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*548 prop_computer*/[548]={.modelIndex=48,.colMeshIndex=0,.texIndex=195,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*549 prop_couch*/[549]={.modelIndex=59,.colMeshIndex=0,.texIndex=195,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*550 prop_couch2*/[550]={.modelIndex=59,.colMeshIndex=0,.texIndex=195,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*551 prop_cpuscreen*/[551]={.modelIndex=178,.colMeshIndex=0,.texIndex=768,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*552 prop_cyber_datafrag*/[552]={.modelIndex=78,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*553 prop_cyber_decoy*/[553]={.modelIndex=78,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*554 prop_cyber_exit*/[554]={.modelIndex=78,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*555 prop_cyber_switch*/[555]={.modelIndex=0,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*556 prop_cyberport*/[556]={.modelIndex=62,.colMeshIndex=0,.texIndex=117,.glowIndex=116,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*557 prop_desk01*/[557]={.modelIndex=74,.colMeshIndex=0,.texIndex=125,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*558 prop_desk02*/[558]={.modelIndex=75,.colMeshIndex=0,.texIndex=124,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*559 prop_dexmissile*/[559]={.modelIndex=76,.colMeshIndex=0,.texIndex=164,.glowIndex=162,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*560 prop_foliage_fernpoison*/[560]={.modelIndex=160,.colMeshIndex=0,.texIndex=331,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*561 prop_foliage_bush*/[561]={.modelIndex=495,.colMeshIndex=0,.texIndex=643,.glowIndex=642,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*562 prop_foliage_fern*/[562]={.modelIndex=160,.colMeshIndex=0,.texIndex=333,.glowIndex=330,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*563 prop_foliage_fernblueflower*/[563]={.modelIndex=159,.colMeshIndex=0,.texIndex=333,.glowIndex=330,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*564 prop_foliage_pinetreem*/[564]={.modelIndex=489,.colMeshIndex=0,.texIndex=594,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*565 prop_foliage_poisonbush1*/[565]={.modelIndex=493,.colMeshIndex=0,.texIndex=638,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*566 prop_gear_large*/[566]={.modelIndex=166,.colMeshIndex=0,.texIndex=335,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*567 prop_gear_small*/[567]={.modelIndex=167,.colMeshIndex=0,.texIndex=336,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*568 prop_grass1*/[568]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=329,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*569 prop_grass2*/[569]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=329,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*570 prop_grass3*/[570]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=329,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*571 prop_grass4*/[571]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=329,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*572 prop_grass5*/[572]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=329,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*573 prop_grate4*/[573]={.modelIndex=161,.colMeshIndex=0,.texIndex=329,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*574 prop_healingbed*/[574]={.modelIndex=195,.colMeshIndex=0,.texIndex=1139,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*575 prop_lamp*/[575]={.modelIndex=212,.colMeshIndex=0,.texIndex=423,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*576 prop_light_emergsignal*/[576]={.modelIndex=216,.colMeshIndex=0,.texIndex=426,.glowIndex=0,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*577 prop_microscope*/[577]={.modelIndex=298,.colMeshIndex=0,.texIndex=645,.glowIndex=MAX_TXRS,.specIndex=1241,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*578 prop_pipe*/[578]={.modelIndex=490,.colMeshIndex=0,.texIndex=595,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*579 prop_puddle*/[579]={.modelIndex=157,.colMeshIndex=0,.texIndex=648,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*580 prop_puddle_grease*/[580]={.modelIndex=157,.colMeshIndex=0,.texIndex=650,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*581 prop_puddle_oil*/[581]={.modelIndex=157,.colMeshIndex=0,.texIndex=652,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*582 prop_shelves*/[582]={.modelIndex=591,.colMeshIndex=0,.texIndex=94,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*583 prop_skeleton*/[583]={.modelIndex=592,.colMeshIndex=0,.texIndex=815,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*584 prop_sleeping_cables*/[584]={.modelIndex=595,.colMeshIndex=0,.texIndex=71,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*585 prop_sparkingwire*/[585]={.modelIndex=0,.colMeshIndex=0,.texIndex=71,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=46,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*586 prop_table*/[586]={.modelIndex=619,.colMeshIndex=0,.texIndex=92,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*587 prop_tv_on_a_post*/[587]={.modelIndex=625,.colMeshIndex=0,.texIndex=1228,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*588 prop_vendingmachines1*/[588]={.modelIndex=627,.colMeshIndex=0,.texIndex=870,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*589 prop_vendingmachines2*/[589]={.modelIndex=614,.colMeshIndex=0,.texIndex=871,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*590 prop_weapon_rack*/[590]={.modelIndex=641,.colMeshIndex=0,.texIndex=113,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*591 prop_xray*/[591]={.modelIndex=660,.colMeshIndex=0,.texIndex=153,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_MSH,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*592 text_decal*/[592]={.modelIndex=77,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*593 text_decalStopDSS1*/[593]={.modelIndex=77,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*594 trigger_counter*/[594]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*595 trigger_cyberpush*/[595]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*596 trigger_gravitylift*/[596]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*597 trigger_ladder*/[597]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*598 trigger_multiple*/[598]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*599 trigger_music*/[599]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*600 trigger_once*/[600]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*601 trigger_radiation*/[601]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*602 us_isotopepanel*/[602]={.modelIndex=0,.colMeshIndex=0,.texIndex=616,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=44,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*603 us_paperlog*/[603]={.modelIndex=486,.colMeshIndex=0,.texIndex=580,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*604 us_puz_elevatorkeypad*/[604]={.modelIndex=615,.colMeshIndex=0,.texIndex=247,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*605 us_puz_elevatorkeypad2*/[605]={.modelIndex=618,.colMeshIndex=0,.texIndex=250,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*606 us_puz_elevatorkeypad3*/[606]={.modelIndex=615,.colMeshIndex=0,.texIndex=247,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*607 us_puz_elevatorkeypad4*/[607]={.modelIndex=210,.colMeshIndex=0,.texIndex=249,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*608 us_puz_keypad*/[608]={.modelIndex=211,.colMeshIndex=0,.texIndex=414,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*609 us_puz_panel_blue_grid*/[609]={.modelIndex=0,.colMeshIndex=0,.texIndex=604,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=43,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*610 us_puz_panel_brown_grid*/[610]={.modelIndex=0,.colMeshIndex=0,.texIndex=604,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=43,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*611 us_puz_panel_gray_grid*/[611]={.modelIndex=0,.colMeshIndex=0,.texIndex=634,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=43,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*612 us_puz_panel_red_grid*/[612]={.modelIndex=0,.colMeshIndex=0,.texIndex=625,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=43,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*613 us_puz_panel_teal_grid*/[613]={.modelIndex=0,.colMeshIndex=0,.texIndex=601,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=43,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*614 us_relaypanel*/[614]={.modelIndex=0,.colMeshIndex=0,.texIndex=617,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=45,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*615 us_retinalscanner*/[615]={.modelIndex=79,.colMeshIndex=0,.texIndex=46,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*616 prop_vending1_1*/[616]={.modelIndex=627,.colMeshIndex=0,.texIndex=870,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*617 prop_vending1_2*/[617]={.modelIndex=628,.colMeshIndex=0,.texIndex=870,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*618 prop_vending1_3*/[618]={.modelIndex=629,.colMeshIndex=0,.texIndex=870,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*619 prop_vending2_1*/[619]={.modelIndex=614,.colMeshIndex=0,.texIndex=871,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*620 prop_vending2_2*/[620]={.modelIndex=621,.colMeshIndex=0,.texIndex=871,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*621 ambient_airhiss*/[621]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*622 ambient_clicker*/[622]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*623 ambient_compressor*/[623]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*624 ambient_dishwasher*/[624]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*625 ambient_drip_amb*/[625]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*626 ambient_fan*/[626]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*627 ambient_generator_gas*/[627]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*628 ambient_gurgle*/[628]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*629 ambient_icemaker*/[629]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*630 ambient_intake*/[630]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*631 ambient_lathe*/[631]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*632 ambient_lev3loop1*/[632]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*633 ambient_lev3loop2*/[633]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*634 ambient_lev3loop3*/[634]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*635 ambient_lev3loop4*/[635]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*636 ambient_liquid_bubble*/[636]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*637 ambient_liquid_lava2*/[637]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*638 ambient_looping*/[638]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*639 ambient_machgear_loop*/[639]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*640 ambient_machine_ambience*/[640]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*641 ambient_machine_go*/[641]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*642 ambient_machine_humamb7*/[642]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*643 ambient_machine_humlonoise*/[643]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*644 ambient_machine_loop1*/[644]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*645 ambient_machine_loop2*/[645]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*646 ambient_machinea1*/[646]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*647 ambient_machinevat_loop*/[647]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*648 ambient_mist*/[648]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*649 ambient_pipewater_loop*/[649]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*650 ambient_powerloom*/[650]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*651 ambient_pump*/[651]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*652 ambient_pump2*/[652]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*653 ambient_rain*/[653]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*654 ambient_steam_loop*/[654]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*655 ambient_washing_machine*/[655]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*656 decal_blood_die*/[656]={.modelIndex=77,.colMeshIndex=0,.texIndex=237,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*657 decal_blood_resist*/[657]={.modelIndex=77,.colMeshIndex=0,.texIndex=240,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*658 decal_blood_stayaway*/[658]={.modelIndex=77,.colMeshIndex=0,.texIndex=235,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*659 decal_blood_words2*/[659]={.modelIndex=77,.colMeshIndex=0,.texIndex=236,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*660 decal_bloodfonta*/[660]={.modelIndex=178,.colMeshIndex=0,.texIndex=118,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*661 decal_bloodfonte*/[661]={.modelIndex=178,.colMeshIndex=0,.texIndex=121,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*662 decal_bloodfontg*/[662]={.modelIndex=178,.colMeshIndex=0,.texIndex=122,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*663 decal_bloodfonth*/[663]={.modelIndex=178,.colMeshIndex=0,.texIndex=89,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*664 decal_bloodfontr*/[664]={.modelIndex=178,.colMeshIndex=0,.texIndex=139,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*665 decal_bloodfonty*/[665]={.modelIndex=178,.colMeshIndex=0,.texIndex=140,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*666 decal_bloodsplat2*/[666]={.modelIndex=157,.colMeshIndex=0,.texIndex=130,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*667 decal_logo_antenna*/[667]={.modelIndex=77,.colMeshIndex=0,.texIndex=182,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*668 decal_logo_armory*/[668]={.modelIndex=77,.colMeshIndex=0,.texIndex=178,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*669 decal_logo_biohazard*/[669]={.modelIndex=77,.colMeshIndex=0,.texIndex=180,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*670 decal_logo_bridge*/[670]={.modelIndex=77,.colMeshIndex=0,.texIndex=181,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*671 decal_logo_cyborg*/[671]={.modelIndex=77,.colMeshIndex=0,.texIndex=176,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*672 decal_logo_gears*/[672]={.modelIndex=77,.colMeshIndex=0,.texIndex=174,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*673 decal_logo_medical*/[673]={.modelIndex=77,.colMeshIndex=0,.texIndex=165,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*674 decal_logo_radhazard*/[674]={.modelIndex=77,.colMeshIndex=0,.texIndex=177,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*675 decal_logo_research*/[675]={.modelIndex=77,.colMeshIndex=0,.texIndex=175,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*676 decal_logo_security*/[676]={.modelIndex=77,.colMeshIndex=0,.texIndex=167,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*677 decal_painting1*/[677]={.modelIndex=77,.colMeshIndex=0,.texIndex=218,.glowIndex=216,.specIndex=MAX_TXRS,.normIndex=217,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*678 decal_painting2*/[678]={.modelIndex=77,.colMeshIndex=0,.texIndex=220,.glowIndex=219,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*679 decal_painting3*/[679]={.modelIndex=77,.colMeshIndex=0,.texIndex=222,.glowIndex=221,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*680 decal_posterbetterfuture*/[680]={.modelIndex=77,.colMeshIndex=0,.texIndex=226,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=225,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*681 decal_postergenetics*/[681]={.modelIndex=77,.colMeshIndex=0,.texIndex=224,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=223,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*682 decal_scorch1*/[682]={.modelIndex=77,.colMeshIndex=0,.texIndex=227,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*683 decal_scorch2*/[683]={.modelIndex=77,.colMeshIndex=0,.texIndex=228,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*684 decal_scorch3*/[684]={.modelIndex=77,.colMeshIndex=0,.texIndex=229,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*685 decal_scorch4*/[685]={.modelIndex=77,.colMeshIndex=0,.texIndex=230,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*686 decal_scorchtiny*/[686]={.modelIndex=77,.colMeshIndex=0,.texIndex=232,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*687 decal_blood_splat*/[687]={.modelIndex=77,.colMeshIndex=0,.texIndex=234,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*688 func_switch1*/[688]={.modelIndex=609,.colMeshIndex=0,.texIndex=837,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0.32f,0.04f,0.32f}},
+/*689 func_switch2*/[689]={.modelIndex=610,.colMeshIndex=0,.texIndex=839,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){-0.0243553f,0.0f,0.000004883f},.colSz=(V3){0.0476318f,0.64f,0.64f}},
+/*690 func_switch3*/[690]={.modelIndex=611,.colMeshIndex=0,.texIndex=842,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){-0.02285008f,0.000053061f,-0.000056993f},.colSz=(V3){0.02f,0.32f,0.32f}},
+/*691 func_switch4*/[691]={.modelIndex=612,.colMeshIndex=0,.texIndex=846,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0.06f,0,0},.colSz=(V3){0.2f,0.64f,0.64f}},
+/*692 func_switch5*/[692]={.modelIndex=614,.colMeshIndex=0,.texIndex=848,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0.64f,0.64f,0.08f}},
+/*693 func_switch5broken*/[693]={.modelIndex=613,.colMeshIndex=0,.texIndex=847,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0.64f,0.64f,0.08f}},
+/*694 func_switch7*/[694]={.modelIndex=612,.colMeshIndex=0,.texIndex=854,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){1.523325f,0,0},.colSz=(V3){0.2008026f,0.64f,0.64f}},
+/*695 func_switch8*/[695]={.modelIndex=616,.colMeshIndex=0,.texIndex=856,.glowIndex=855,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){-0.04f,0.0f,0.0001220703f},.colSz=(V3){0.08f,0.64f,0.64f}},
+/*696 func_switchbroken1*/[696]={.modelIndex=617,.colMeshIndex=0,.texIndex=618,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*697 clip_npc*/[697]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){1.005016f,0,0},.colSz=(V3){2.010033f,16.0f,16.0f}},
+/*698 clip_objects*/[698]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){2.56f,2.56f,2.56f}},
+/*699 logic_relay*/[699]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*700 logic_branch*/[700]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*701 logic_timer*/[701]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*702 logic_spawner*/[702]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*703 info_teleport_destination*/[703]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*704 prop_debris_panel*/[704]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*705 info_cyborgconversion*/[705]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*706 info_elev_destination*/[706]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*707 info_email*/[707]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*708 info_gameend*/[708]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*709 info_message*/[709]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*710 info_mission*/[710]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*711 info_note*/[711]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*712 info_playsound*/[712]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*713 info_ressurection_point*/[713]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*714 info_screenshake*/[714]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*715 info_spawnpoint*/[715]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*716 fx_reverbzone*/[716]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*717 ef_cyber_ice*/[717]={.modelIndex=MAX_MDLS,.colMeshIndex=U16_MAX,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=COLTYPE_SPH,.colCtr=(V3){0.0f,0.004354001f,-0.014725f},.colSz=(V3){1.0f,0.0f,0.0f}},
+/*718 ef_fragexplosion*/[718]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*719 ef_line_sparqbeam*/[719]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*720 ef_mist*/[720]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*721 ef_particle_bloodspurtsmall*/[721]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*722 ef_particle_bloodspurtsmallgreen*/[722]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*723 ef_particle_bloodspurtsmallyellow*/[723]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*724 ef_particle_bloodspurttiny*/[724]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*725 ef_particle_camerahit*/[725]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*726 ef_particle_darthit*/[726]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*727 ef_particle_sec2muzburst*/[727]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*728 ef_particle_sec2rotmuzburst*/[728]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*729 ef_particle_sparksmall*/[729]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*730 ef_particle_sparksmallblue*/[730]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*731 ef_particle_sparqhit*/[731]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*732 ef_sparkspits*/[732]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*733 ef_spraydrips*/[733]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*734 ef_steam*/[734]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*735 env_sparksmall*/[735]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*736 TargetIDInstance*/[736]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*737 prop_papers01*/[737]={.modelIndex=484,.colMeshIndex=0,.texIndex=580,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*738 prop_papers02*/[738]={.modelIndex=485,.colMeshIndex=0,.texIndex=580,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*739 ef_particle_blasterhit*/[739]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*740 ef_particle_ionhit*/[740]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*741 us_puz_panel_blue_wire*/[741]={.modelIndex=0,.colMeshIndex=0,.texIndex=604,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=43,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*742 us_puz_panel_brown_wire*/[742]={.modelIndex=0,.colMeshIndex=0,.texIndex=631,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=43,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*743 us_puz_panel_gray_wire*/[743]={.modelIndex=0,.colMeshIndex=0,.texIndex=634,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=43,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*744 us_puz_panel_red_wire*/[744]={.modelIndex=0,.colMeshIndex=0,.texIndex=625,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=43,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*745 us_puz_panel_teal_wire*/[745]={.modelIndex=0,.colMeshIndex=0,.texIndex=601,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=43,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*746 weapon_grenadeenergmine_live*/[746]={.modelIndex=169,.colMeshIndex=0,.texIndex=852,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*747 decal_logo_storage*/[747]={.modelIndex=77,.colMeshIndex=0,.texIndex=169,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*748 light_animated*/[748]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*749 generic_transform*/[749]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*750 chunk_crate_impenetrable2*/[750]={.modelIndex=61,.colMeshIndex=0,.texIndex=147,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*751 chunk_crate_impenetrable3*/[751]={.modelIndex=61,.colMeshIndex=0,.texIndex=148,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*752 chunk_crate_impenetrable4*/[752]={.modelIndex=61,.colMeshIndex=0,.texIndex=149,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*753 npc_sec3_bot*/[753]={.modelIndex=681,.colMeshIndex=0,.texIndex=553,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*754 prop_shieldgenerator*/[754]={.modelIndex=143,.colMeshIndex=0,.texIndex=316,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*755 unused*/[755]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*756 ef_particle_leafburst*/[756]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*757 ef_particle_mutationburst*/[757]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*758 ef_particle_graytationburst*/[758]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*759 through 766 unused*/[759]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*760*/[760]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*761*/[761]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*762*/[762]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*763*/[763]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*764*/[764]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*765*/[765]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*766*/[766]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+/*767 player (mostly just so any index checks don't accidentally trigger against player by its index)*/[767]={.modelIndex=MAX_MDLS,.colMeshIndex=0,.texIndex=MAX_TXRS,.glowIndex=MAX_TXRS,.specIndex=MAX_TXRS,.normIndex=MAX_TXRS,.mass=0,.dynFriction=0,.statFriction=0,.animationNum=MAX_ANIMS,.col=0,.colCtr=(V3){0,0,0},.colSz=(V3){0,0,0}},
+};
+
+static bool cardChunk[307]={/*0*/1,/*1*/1,/*2*/1,/*3*/1,/*4*/1,/*5*/1,/*6*/0,/*7*/1,/*8*/1,/*9*/0,/*10*/0,/*11*/1,/*12*/1,/*13*/1,/*14*/1,/*15*/1,/*16*/1,/*17*/1,/*18*/1,/*19*/1,/*20*/0,/*21*/1,/*22*/0,/*23*/1,/*24*/1,/*25*/1,/*26*/1,/*27*/1,/*28*/1,/*29*/1,                                                                                                                                                                       
+ /*30*/1,/*31*/0,/*32*/0,/*33*/1,/*34*/1,/*35*/1,/*36*/1,/*37*/1,/*38*/1,/*39*/1,/*40*/1,/*41*/1,/*42*/0,/*43*/0,/*44*/0,/*45*/1,/*46*/1,/*47*/1,/*48*/1,/*49*/1,/*50*/1,/*51*/1,/*52*/0,/*53*/1,/*54*/1,/*55*/1,/*56*/1,/*57*/1,/*58*/1,/*59*/1,/*60*/1,/*61*/1,                                                                                                                                                             
+ /*62*/1,/*63*/0,/*64*/1,/*65*/1,/*66*/1,/*67*/1,/*68*/1,/*69*/1,/*70*/1,/*71*/1,/*72*/1,/*73*/1,/*74*/1,/*75*/1,/*76*/1,/*77*/1,/*78*/0,/*79*/1,/*80*/1,/*81*/1,/*82*/1,/*83*/0,/*84*/1,/*85*/1,/*86*/1,/*87*/0,/*88*/1,/*89*/1,/*90*/1,/*91*/0,/*92*/1,/*93*/1,                                                                                                                                                             
+ /*94*/1,/*95*/0,/*96*/1,/*97*/1,/*98*/1,/*99*/1,/*100*/1,/*101*/1,/*102*/1,/*103*/1,/*104*/1,/*105*/1,/*106*/1,/*107*/1,/*108*/1,/*109*/1,/*110*/1,/*111*/1,/*112*/1,/*113*/1,/*114*/1,/*115*/1,/*116*/1,/*117*/1,/*118*/1,/*119*/1,/*120*/1,/*121*/1,/*122*/1,/*123*/1,                                                                                                                                                     
+ /*124*/1,/*125*/1,/*126*/1,/*127*/1,/*128*/1,/*129*/1,/*130*/1,/*131*/1,/*132*/1,/*133*/1,/*134*/1,/*135*/1,/*136*/1,/*137*/1,/*138*/1,/*139*/1,/*140*/1,/*141*/1,/*142*/0,/*143*/0,/*144*/1,/*145*/0,/*146*/0,/*147*/0,/*148*/1,/*149*/1,/*150*/0,/*151*/0,/*152*/0,                                                                                                                                                        
+ /*153*/0,/*154*/1,/*155*/1,/*156*/1,/*157*/1,/*158*/1,/*159*/1,/*160*/1,/*161*/1,/*162*/1,/*163*/0,/*164*/0,/*165*/0,/*166*/0,/*167*/1,/*168*/0,/*169*/1,/*170*/1,/*171*/1,/*172*/1,/*173*/1,/*174*/1,/*175*/1,/*176*/0,/*177*/0,/*178*/1,/*179*/0,/*180*/1,/*181*/1,                                                                                                                                                        
+ /*182*/0,/*183*/1,/*184*/1,/*185*/1,/*186*/1,/*187*/1,/*188*/0,/*189*/1,/*190*/1,/*191*/0,/*192*/0,/*193*/0,/*194*/1,/*195*/1,/*196*/1,/*197*/1,/*198*/1,/*199*/1,/*200*/0,/*201*/1,/*202*/1,/*203*/1,/*204*/1,/*205*/1,/*206*/1,/*207*/1,/*208*/1,/*209*/1,/*210*/0,                                                                                                                                                        
+ /*211*/0,/*212*/0,/*213*/0,/*214*/1,/*215*/1,/*216*/1,/*217*/1,/*218*/1,/*219*/0,/*220*/1,/*221*/1,/*222*/1,/*223*/1,/*224*/1,/*225*/1,/*226*/1,/*227*/1,/*228*/1,/*229*/1,/*230*/1,/*231*/1,/*232*/1,/*233*/0,/*234*/1,/*235*/1,/*236*/1,/*237*/1,/*238*/1,/*239*/1,                                                                                                                                                        
+ /*240*/1,/*241*/1,/*242*/0,/*243*/0,/*244*/1,/*245*/1,/*246*/0,/*247*/0,/*248*/0,/*249*/0,/*250*/1,/*251*/1,/*252*/1,/*253*/1,/*254*/1,/*255*/0,/*256*/1,/*257*/1,/*258*/1,/*259*/1,/*260*/1,/*261*/1,/*262*/1,/*263*/0,/*264*/0,/*265*/1,/*266*/1,/*267*/1,/*268*/1,                                                                                                                                                        
+ /*269*/1,/*270*/1,/*271*/1,/*272*/1,/*273*/1,/*274*/1,/*275*/1,/*276*/1,/*277*/1,/*278*/1,/*279*/1,/*280*/1,/*281*/1,/*282*/1,/*283*/0,/*284*/0,/*285*/0,/*286*/1,/*287*/1,/*288*/1,/*289*/1,/*290*/1,/*291*/0,/*292*/1,/*293*/1,/*294*/1,/*295*/1,/*296*/1,/*297*/1,                                                                                                                                                        
+ /*298*/0,/*299*/0,/*300*/0,/*301*/0,/*302*/1,/*303*/0,/*304*/1,/*305*/1,/*306*/1};
+
 __attribute__((noinline)) i32 parse_numberi32(const char* str, const char* line, u32 lineNum) {
     if(str == 0 || *str == '\0'){DualLogError("Invalid on line %d:%s\n",lineNum+1,line); return 0;}
     while(cEmpty((char)*str)){str++;} bool negative=false; if(*str == '+'){str++;}else if(*str == '-'){negative=true; str++;} i64 result=0; int n=0; while(*str >= '0' && *str <= '9' && n++ < 18){result=result*10L + (*str-'0'); str++;} while(*str >= '0' && *str <= '9'){str++;} return (i32)(negative ? -result : result);
@@ -34,11 +797,8 @@ __attribute__((noinline)) i8 parse_numberi8(const char* str, const char* line, u
 __attribute__((noinline)) float parse_float(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Blank on line %d:%s\n", lineNum+1, line); return 0.0f; }
     while (cEmpty(*str)) str++;
-    bool negative = false;
-    if (*str == '-') { negative = true; str++; }
-    else if (*str == '+') { str++; }
-    double value = 0.0;
-    bool has_digit = false;
+    bool negative = false; if (*str == '-') { negative = true; str++; } else if (*str == '+') { str++; }
+    double value = 0.0; bool has_digit = false;
     while (*str >= '0' && *str <= '9') { value = value * 10.0 + (*str - '0'); str++; has_digit = true; } // Integer part
     if (*str == '.') { str++; double frac = 0.0; double place = 0.1; while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; } value += frac; } // Decimal part
     if (!has_digit) return 0.0f;
@@ -46,781 +806,6 @@ __attribute__((noinline)) float parse_float(const char* str, const char* line, u
     return (float)value;
 }
 
-void ModEDefsInitAfterLoad() { // Global conditions for all entities.  No sense inflating the table data in entity.c
-    mset(EDefs,0,MAX_ENTITIES * sizeof(Entity)); 
-    // Handle generics up front such that all below per index values can override it.
-    for (int i=0;i<MAX_ENTITIES;++i) { EDefs[i].index = i; EDefs[i].modelIndex = EDefs[i].lodIndex = MAX_MDLS; }
-    bool cardChunk[307];
-    for (int i=0;i<307;++i) { cardChunk[i] = true; }
-    cardChunk[  6] = cardChunk[  9] = cardChunk[ 10] = cardChunk[ 20] = cardChunk[ 22] = cardChunk[ 31] = cardChunk[ 32] = cardChunk[ 42] = cardChunk[ 43] = cardChunk[ 44] = cardChunk[ 52] = cardChunk[ 63] = cardChunk[ 78] = cardChunk[ 83] = cardChunk[ 87] = cardChunk[ 91] = false;
-    cardChunk[ 95] = cardChunk[142] = cardChunk[143] = cardChunk[145] = cardChunk[146] = cardChunk[147] = cardChunk[150] = cardChunk[151] = cardChunk[152] = cardChunk[153] = cardChunk[163] = cardChunk[164] = cardChunk[165] = cardChunk[166] = cardChunk[168] = cardChunk[176] = false;
-    cardChunk[177] = cardChunk[179] = cardChunk[182] = cardChunk[191] = cardChunk[192] = cardChunk[193] = cardChunk[200] = cardChunk[210] = cardChunk[211] = cardChunk[212] = cardChunk[213] = cardChunk[219] = cardChunk[233] = cardChunk[242] = cardChunk[243] = cardChunk[246] = false;
-    cardChunk[247] = cardChunk[248] = cardChunk[249] = cardChunk[255] = cardChunk[263] = cardChunk[264] = cardChunk[283] = cardChunk[284] = cardChunk[285] = cardChunk[291] = cardChunk[298] = cardChunk[299] = cardChunk[300] = cardChunk[301] = cardChunk[303] = cardChunk[188] = false;
-    for (i32 i = 0; i < MAX_ENTITIES; i++) {
-        if (!EDefslayer[i]) EDefslayer[i] = L_Default;
-        flag_set(&EDefs[i].entflags,EF_ACTIVE,true); // Individual value setting to allow mods to set custom starting flags themselves. (or here too if they want, tis your oyster).
-        flag_set(&EDefs[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(EDefs[i].index));
-        if (i < 307 && cardChunk[i]) { EDefs[i].lodIndex=178;/*LOD card index*/ EDefscol[i]=COLTYPE_BOX; EDefscolliderCenter[i].y=1.32f; EDefscolliderSize[i]=(V3){2.56f,0.08f,2.56f}; }
-        EDefs[i].currentFrameFinished = World.pauseRelativeTime + 0.1;
-        if (IdxIsButtonSwitch(EDefs[i].index)) { EDefs[i].lockedMessageLingdex = 193; } // ButtonSwitch
-    }
-    for (int i=307;i<=404;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsmass[i]=1.0f; } // Item
-    for (int i=419;i<=447;++i) { EDefscol[i]=COLTYPE_CAP; EDefscolliderSize[i].z=COLCAP_DIR_Y_F; EDefsstaticFriction[i]=1.0f; EDefsdynamicFriction[i]=0.15f; EDefsmass[i]=1.0f; EDefsangularDrag[i]=2.2f; } // NPCs
-    for (int i=448;i<=457;++i) { EDefscol[i]=COLTYPE_SPH; EDefscolliderSize[i]=(V3){1.5f,1.5f,1.5f}; } // Cyber Item Definitions
-    for (int i=458;i<=463;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsmass[i]=1.5f; } // Physical Generic Objects
-    for (int i=481;i<=495;++i) { EDefsangularDrag[i]=0.05f; EDefsdynamicFriction[i]=0.5f; EDefsmass[i]=0.3f; } // Projectiles
-    for (int i=496;i<515;++i) { EDefs[i].SFXIndex = 75; EDefscol[i]=COLTYPE_MSH;  } // Doors
-    for (int i=688;i<=698;++i) EDefscol[i]=COLTYPE_BOX; // Switches
-    // End generics, now for specifics:
-    // Note that designated initializer method, e.g. { .modelIndex = 178, .texIndex = 0 } method will cause compiler to add the = 0 assignment for every field ballooning binary size to 11mb!  So we do this.  Straightforward and simple:
-    /*  0 chunk_black*/                EDefs[  0].modelIndex=178; EDefs[  0].texIndex=0; 
-    /*  1 chunk_blocker*/              EDefs[  1].modelIndex=178; EDefs[  1].texIndex=1230;EDefs[  1].normIndex=160; EDefs[  1].specIndex=1230;
-    /*  2 chunk_bridg1_1*/             EDefs[  2].modelIndex=661; EDefs[  2].texIndex=44;  EDefs[  2].normIndex=43;
-    /*  3 chunk_bridg1_1flipx*/        EDefs[  3].modelIndex=667; EDefs[  3].texIndex=44;
-    /*  4 chunk_bridg1_2*/             EDefs[  4].modelIndex=662; EDefs[  4].texIndex=45;
-    /*  5 chunk_bridg1_3*/             EDefs[  5].modelIndex=20;  EDefs[  5].texIndex=47;
-    /*  6 chunk_bridg1_3_slice45*/     EDefs[  6].modelIndex=21;  EDefs[  6].texIndex=47;
-    /*  7 chunk_bridg1_3flipx*/        EDefs[  7].modelIndex=663; EDefs[  7].texIndex=47;
-    /*  8 chunk_bridg1_4*/             EDefs[  8].modelIndex=22;  EDefs[  8].texIndex=48;
-    /*  9 chunk_bridg1_4_slice32*/     EDefs[  9].modelIndex=23;  EDefs[  9].texIndex=48;
-    /* 10 chunk_bridg1_4_slice32flipx*/EDefs[ 10].modelIndex=24;  EDefs[ 10].texIndex=48;
-    /* 11 chunk_bridg1_5*/             EDefs[ 11].modelIndex=25;  EDefs[ 11].texIndex=50;  EDefs[ 11].glowIndex=49;
-    /* 12 chunk_bridg2_2*/             EDefs[ 12].modelIndex=26;  EDefs[ 12].texIndex=53;
-    /* 13 chunk_bridg2_3*/             EDefs[ 13].modelIndex=27;  EDefs[ 13].texIndex=56;  EDefs[ 13].glowIndex=54;  EDefs[ 13].normIndex=55;
-    /* 14 chunk_bridg2_4*/             EDefs[ 14].modelIndex=28;  EDefs[ 14].texIndex=57;
-    /* 15 chunk_bridg2_5*/             EDefs[ 15].modelIndex=29;  EDefs[ 15].texIndex=59;  EDefs[ 15].normIndex=58;
-    /* 16 chunk_bridg2_6*/             EDefs[ 16].modelIndex=30;  EDefs[ 16].texIndex=60;
-    /* 17 chunk_bridg2_7*/             EDefs[ 17].modelIndex=664; EDefs[ 17].texIndex=61;
-    /* 18 chunk_bridg2_8*/             EDefs[ 18].modelIndex=31;  EDefs[ 18].texIndex=62;
-    /* 19 chunk_bridg2_9*/             EDefs[ 19].modelIndex=32;  EDefs[ 19].texIndex=64;  EDefs[ 19].glowIndex=63;
-    /* 20 chunk_crate_impenetrable*/   EDefs[ 20].modelIndex=61;  EDefs[ 20].texIndex=150;
-    /* 21 chunk_cyberpanel*/           EDefs[ 21].modelIndex=178; EDefs[ 21].texIndex=151; EDefs[ 21].glowIndex=151;
-    /* 22 chunk_cyberpanel_slice45*/   EDefs[ 22].modelIndex=180; EDefs[ 22].texIndex=152; EDefs[ 22].glowIndex=152;
-    /* 23 chunk_eng1_1*/               EDefs[ 23].modelIndex=96;  EDefs[ 23].texIndex=254;
-    /* 24 chunk_eng1_1d*/              EDefs[ 24].modelIndex=95;  EDefs[ 24].texIndex=253;
-    /* 25 chunk_eng1_2*/               EDefs[ 25].modelIndex=98;  EDefs[ 25].texIndex=256;
-    /* 26 chunk_eng1_2d*/              EDefs[ 26].modelIndex=97;  EDefs[ 26].texIndex=255;
-    /* 27 chunk_eng1_3*/               EDefs[ 27].modelIndex=100; EDefs[ 27].texIndex=259; EDefs[ 27].glowIndex=258;
-    /* 28 chunk_eng1_3d*/              EDefs[ 28].modelIndex=99;  EDefs[ 28].texIndex=257;
-    /* 29 chunk_eng1_4*/               EDefs[ 29].modelIndex=101; EDefs[ 29].texIndex=260;
-    /* 30 chunk_eng1_5*/               EDefs[ 30].modelIndex=103; EDefs[ 30].texIndex=262;
-    /* 31 chunk_eng1_5_slice45lh*/     EDefs[ 31].modelIndex=104; EDefs[ 31].texIndex=262;
-    /* 32 chunk_eng1_5_slice45rh*/     EDefs[ 32].modelIndex=105; EDefs[ 32].texIndex=262;
-    /* 33 chunk_eng1_5d*/              EDefs[ 33].modelIndex=102; EDefs[ 33].texIndex=261;
-    /* 34 chunk_eng1_6*/               EDefs[ 34].modelIndex=107; EDefs[ 34].texIndex=266; EDefs[ 34].glowIndex=265;
-    /* 35 chunk_eng1_6d*/              EDefs[ 35].modelIndex=106; EDefs[ 35].texIndex=264; EDefs[ 35].glowIndex=263;
-    /* 36 chunk_eng1_7*/               EDefs[ 36].modelIndex=108; EDefs[ 36].texIndex=269; EDefs[ 36].glowIndex=268;
-    /* 37 chunk_eng1_7d*/              EDefs[ 37].modelIndex=665; EDefs[ 37].texIndex=267;
-    /* 38 chunk_eng1_8*/               EDefs[ 38].modelIndex=109; EDefs[ 38].texIndex=271; EDefs[ 38].glowIndex=270;
-    /* 39 chunk_eng1_9*/               EDefs[ 39].modelIndex=111; EDefs[ 39].texIndex=273; EDefs[ 39].glowIndex=251;
-    /* 40 chunk_eng1_9d*/              EDefs[ 40].modelIndex=110; EDefs[ 40].texIndex=272;
-    /* 41 chunk_eng2_1*/               EDefs[ 41].modelIndex=113; EDefs[ 41].texIndex=276;
-    /* 42 chunk_eng2_1_slice45*/       EDefs[ 42].modelIndex=116; EDefs[ 42].texIndex=276;
-    /* 43 chunk_eng2_1_slice384high*/  EDefs[ 43].modelIndex=114; EDefs[ 43].texIndex=276;
-    /* 44 chunk_eng2_1_slice384highrh*/EDefs[ 44].modelIndex=115; EDefs[ 44].texIndex=276;
-    /* 45 chunk_eng2_1d*/              EDefs[ 45].modelIndex=112; EDefs[ 45].texIndex=275; EDefs[ 45].glowIndex=274;
-    /* 46 chunk_eng2_2*/               EDefs[ 46].modelIndex=117; EDefs[ 46].texIndex=279;
-    /* 47 chunk_eng2_2d*/              EDefs[ 47].modelIndex=666; EDefs[ 47].texIndex=277;
-    /* 48 chunk_eng2_3*/               EDefs[ 48].modelIndex=119; EDefs[ 48].texIndex=282;
-    /* 49 chunk_eng2_3d*/              EDefs[ 49].modelIndex=118; EDefs[ 49].texIndex=281;
-    /* 50 chunk_eng2_4*/               EDefs[ 50].modelIndex=178; EDefs[ 50].texIndex=283;
-    /* 51 chunk_eng2_5*/               EDefs[ 51].modelIndex=120; EDefs[ 51].texIndex=285; EDefs[ 51].normIndex=284;
-    /* 52 chunk_eng2_5_slice45*/       EDefs[ 52].modelIndex=121; EDefs[ 52].texIndex=285; EDefs[ 52].normIndex=284;
-    /* 53 chunk_eng2_6 (wall pump)*/                              EDefs[ 53].texIndex=141; EDefs[ 53].glowIndex=142; EDefs[ 53].numclips=1; EDefs[ 53].animationNum=21;
-    /* 54 chunk_exec1_1*/              EDefs[ 54].modelIndex=124; EDefs[ 54].texIndex=287;
-    /* 55 chunk_exec1_1d*/             EDefs[ 55].modelIndex=123; EDefs[ 55].texIndex=286;
-    /* 56 chunk_exec1_2*/              EDefs[ 56].modelIndex=126; EDefs[ 56].texIndex=291; EDefs[ 56].glowIndex=290;
-    /* 57 chunk_exec1_2d*/             EDefs[ 57].modelIndex=125; EDefs[ 57].texIndex=289; EDefs[ 57].glowIndex=288;
-    /* 58 chunk_exec2_1*/              EDefs[ 58].modelIndex=127; EDefs[ 58].texIndex=292;
-    /* 59 chunk_exec2_2*/              EDefs[ 59].modelIndex=129; EDefs[ 59].texIndex=295;
-    /* 60 chunk_exec2_2d*/             EDefs[ 60].modelIndex=128; EDefs[ 60].texIndex=294; EDefs[ 60].glowIndex=293;
-    /* 61 chunk_exec2_3*/              EDefs[ 61].modelIndex=130; EDefs[ 61].texIndex=296;
-    /* 62 chunk_exec2_4*/              EDefs[ 62].modelIndex=131; EDefs[ 62].texIndex=297;
-    /* 63 chunk_exec2_4_slice45*/      EDefs[ 63].modelIndex=132; EDefs[ 63].texIndex=297;
-    /* 64 chunk_exec2_5*/              EDefs[ 64].modelIndex=133; EDefs[ 64].texIndex=298; EDefs[ 64].specIndex=1257;
-    /* 65 chunk_exec2_6*/              EDefs[ 65].modelIndex=134; EDefs[ 65].texIndex=299; EDefs[ 65].specIndex=1257;
-    /* 66 chunk_exec2_7*/              EDefs[ 66].modelIndex=133; EDefs[ 66].texIndex=300; EDefs[ 66].specIndex=1257;
-    /* 67 chunk_exec3_1*/              EDefs[ 67].modelIndex=127; EDefs[ 67].texIndex=303;
-    /* 68 chunk_exec3_1d*/             EDefs[ 68].modelIndex=135; EDefs[ 68].texIndex=302; EDefs[68].glowIndex=301;
-    /* 69 chunk_exec3_2*/              EDefs[ 69].modelIndex=129; EDefs[ 69].texIndex=304;
-    /* 70 chunk_exec3_4*/              EDefs[ 70].modelIndex=178; EDefs[ 70].texIndex=305;
-    /* 71 chunk_exec4_1*/              EDefs[ 71].modelIndex=136; EDefs[ 71].texIndex=307; EDefs[ 71].glowIndex=306;
-    /* 72 chunk_exec4_2*/              EDefs[ 72].modelIndex=137; EDefs[ 72].texIndex=308;
-    /* 73 chunk_exec4_3*/              EDefs[ 73].modelIndex=138; EDefs[ 73].texIndex=309;
-    /* 74 chunk_exec4_4*/              EDefs[ 74].modelIndex=139; EDefs[ 74].texIndex=311;
-    /* 75 chunk_exec4_5*/              EDefs[ 75].modelIndex=178; EDefs[ 75].texIndex=312;
-    /* 76 chunk_exec4_6*/              EDefs[ 76].modelIndex=141; EDefs[ 76].texIndex=313;
-    /* 77 chunk_exec6_1*/              EDefs[ 77].modelIndex=142; EDefs[ 77].texIndex=315; EDefs[ 77].glowIndex=314;
-    /* 78 chunk_exteriorpanel1*/       EDefs[ 78].modelIndex=131; EDefs[ 78].texIndex=1228;
-    /* 79 chunk_fan1*/                                            EDefs[ 79].texIndex=96;  EDefs[ 79].glowIndex=192; EDefs[ 79].numclips=1; EDefs[ 79].animationNum=22;  
-    /* 80 chunk_flight1_1*/            EDefs[ 80].modelIndex=146; EDefs[ 80].texIndex=319;
-    /* 81 chunk_flight1_1b*/           EDefs[ 81].modelIndex=146; EDefs[ 81].texIndex=318;
-    /* 82 chunk_flight1_2*/            EDefs[ 82].modelIndex=147; EDefs[ 82].texIndex=320;
-    /* 83 chunk_flight1_2_slice45rh*/  EDefs[ 83].modelIndex=149; EDefs[ 83].texIndex=320;
-    /* 84 unused */
-    /* 85 chunk_flight1_4*/            EDefs[ 85].modelIndex=151; EDefs[ 85].texIndex=322;
-    /* 86 chunk_flight1_5*/            EDefs[ 86].modelIndex=147; EDefs[ 86].texIndex=323;
-    /* 87 chunk_flight1_5_slice45lh*/  EDefs[ 87].modelIndex=148; EDefs[ 87].texIndex=323;
-    /* 88 chunk_flight1_6*/            EDefs[ 88].modelIndex=152; EDefs[ 88].texIndex=325;
-    /* 89 chunk_flight2_1*/            EDefs[ 89].modelIndex=153; EDefs[ 89].texIndex=326;
-    /* 90 chunk_flight2_2*/            EDefs[ 90].modelIndex=154; EDefs[ 90].texIndex=327;
-    /* 91 chunk_flight2_2_slice45*/    EDefs[ 91].modelIndex=155; EDefs[ 91].texIndex=327;
-    /* 92 chunk_flight2_3*/            EDefs[ 92].modelIndex=156; EDefs[ 92].texIndex=328;
-    /* 93 chunk_grove1_1*/             EDefs[ 93].modelIndex=189; EDefs[ 93].texIndex=362;
-    /* 94 chunk_grove1_2*/             EDefs[ 94].modelIndex=178; EDefs[ 94].texIndex=363;
-    /* 95 chunk_grove1_2_slice45*/     EDefs[ 95].modelIndex=180; EDefs[ 95].texIndex=363;
-    /* 96 chunk_grove1_3*/             EDefs[ 96].modelIndex=178; EDefs[ 96].texIndex=364;
-    /* 97 chunk_grove1_4*/             EDefs[ 97].modelIndex=178; EDefs[ 97].texIndex=365;
-    /* 98 chunk_grove1_5*/             EDefs[ 98].modelIndex=178; EDefs[ 98].texIndex=367;
-    /* 99 chunk_grove1_6*/             EDefs[ 99].modelIndex=178; EDefs[ 99].texIndex=368;
-    /*100 chunk_grove1_7*/             EDefs[100].modelIndex=178; EDefs[100].texIndex=369;
-    /*101 chunk_grove2_1*/             EDefs[101].modelIndex=190; EDefs[101].texIndex=370;
-    /*102 chunk_grove2_2*/             EDefs[102].modelIndex=190; EDefs[102].texIndex=371;
-    /*103 chunk_grove2_3*/             EDefs[103].modelIndex=191; EDefs[103].texIndex=372;
-    /*104 chunk_grove2_4*/             EDefs[104].modelIndex=341; EDefs[104].texIndex=374; EDefs[104].glowIndex=373;
-    /*105 chunk_grove2_5*/             EDefs[105].modelIndex=192; EDefs[105].texIndex=375;
-    /*106 chunk_grove2_6*/             EDefs[106].modelIndex=192; EDefs[106].texIndex=376;
-    /*107 chunk_grove2_7*/             EDefs[107].modelIndex=191; EDefs[107].texIndex=378;
-    /*108 chunk_grove2_8*/             EDefs[108].modelIndex=191; EDefs[108].texIndex=379;
-    /*109 chunk_grove2_9*/             EDefs[109].modelIndex=191; EDefs[109].texIndex=385;
-    /*110 chunk_grove2_9b*/            EDefs[110].modelIndex=191; EDefs[110].texIndex=381;
-    /*111 chunk_grove2_9c*/            EDefs[111].modelIndex=191; EDefs[111].texIndex=383;
-    /*112 chunk_lift1*/                EDefs[112].modelIndex=213; EDefs[112].texIndex=1246; EDefs[112].glowIndex=1247;
-    /*113 chunk_maint1_1*/             EDefs[113].modelIndex=218; EDefs[113].texIndex=430;
-    /*114 chunk_maint1_2*/             EDefs[114].modelIndex=220; EDefs[114].texIndex=432;
-    /*115 chunk_maint1_2d*/            EDefs[115].modelIndex=219; EDefs[115].texIndex=431;
-    /*116 chunk_maint1_3*/             EDefs[116].modelIndex=222; EDefs[116].texIndex=436; EDefs[116].glowIndex=435; EDefs[116].specIndex=437;
-    /*117 chunk_maint1_3b*/            EDefs[117].modelIndex=221; EDefs[117].texIndex=434; EDefs[117].glowIndex=433;
-    /*118 chunk_maint1_4*/             EDefs[118].modelIndex=224; EDefs[118].texIndex=441; EDefs[118].glowIndex=440;
-    /*119 chunk_maint1_4b*/            EDefs[119].modelIndex=223; EDefs[119].texIndex=439; EDefs[119].glowIndex=438;
-    /*120 chunk_maint1_5*/             EDefs[120].modelIndex=225; EDefs[120].texIndex=443; EDefs[120].glowIndex=442;
-    /*121 chunk_maint1_6*/             EDefs[121].modelIndex=226; EDefs[121].texIndex=96;
-    /*122 chunk_maint1_7*/             EDefs[122].modelIndex=227; EDefs[122].texIndex=447; EDefs[122].glowIndex=446;
-    /*123 chunk_blockerflightbay*/     EDefs[123].modelIndex=178; EDefs[123].normIndex=160; EDefs[123].texIndex=1230; EDefs[123].specIndex=1242; EDefscol[123]=COLTYPE_BOX; EDefscolliderCenter[123].y=1.44f; EDefscolliderSize[123]=(V3){2.56f,0.32f,2.56f}; EDefs[123].colMeshIndex=U16_MAX;
-    /*124 chunk_maint1_9*/             EDefs[124].modelIndex=606; EDefs[124].texIndex=450;
-    /*125 chunk_maint1_9d*/            EDefs[125].modelIndex=620; EDefs[125].texIndex=449; EDefs[125].glowIndex=448;
-    /*126 chunk_maint2_1*/             EDefs[126].modelIndex=230; EDefs[126].texIndex=455;
-    /*127 chunk_maint2_1b*/            EDefs[127].modelIndex=228; EDefs[127].texIndex=451;
-    /*128 chunk_maint2_1d*/            EDefs[128].modelIndex=229; EDefs[128].texIndex=453; EDefs[128].glowIndex=452;
-    /*129 chunk_maint2_2*/             EDefs[129].modelIndex=230; EDefs[129].texIndex=457;
-    /*130 chunk_maint2_3*/             EDefs[130].modelIndex=232; EDefs[130].texIndex=460;
-    /*131 chunk_maint2_3d*/            EDefs[131].modelIndex=231; EDefs[131].texIndex=459; EDefs[131].glowIndex=458;
-    /*132 chunk_maint2_4*/             EDefs[132].modelIndex=233; EDefs[132].texIndex=464; EDefs[132].glowIndex=463;
-    /*133 chunk_maint2_4d*/            EDefs[133].modelIndex=233; EDefs[133].texIndex=462; EDefs[133].glowIndex=461;
-    /*134 chunk_maint2_5*/             EDefs[134].modelIndex=235; EDefs[134].texIndex=468; EDefs[134].glowIndex=467;
-    /*135 chunk_maint2_5d*/            EDefs[135].modelIndex=234; EDefs[135].texIndex=466; EDefs[135].glowIndex=465;
-    /*136 chunk_maint2_6*/             EDefs[136].modelIndex=236; EDefs[136].texIndex=472; EDefs[136].glowIndex=471;
-    /*137 chunk_maint2_6d*/            EDefs[137].modelIndex=238; EDefs[137].texIndex=470; EDefs[137].glowIndex=470;
-    /*138 chunk_maint2_7*/             EDefs[138].modelIndex=238; EDefs[138].texIndex=476; EDefs[138].glowIndex=475;
-    /*139 chunk_maint2_7d*/            EDefs[139].modelIndex=237; EDefs[139].texIndex=474; EDefs[139].glowIndex=473;
-    /*140 chunk_maint2_8*/             EDefs[140].modelIndex=239; EDefs[140].texIndex=478; EDefs[140].glowIndex=477;
-    /*141 chunk_maint2_9*/             EDefs[141].modelIndex=240; EDefs[141].texIndex=480; EDefs[141].glowIndex=479;
-    /*142 chunk_maint2_9_slice45RH*/   EDefs[142].modelIndex=242; EDefs[142].texIndex=480; EDefs[142].glowIndex=479;
-    /*143 chunk_maint2_9_slice128_top*/EDefs[143].modelIndex=241; EDefs[143].texIndex=480; EDefs[143].glowIndex=479;
-    /*144 chunk_maint3_1*/             EDefs[144].modelIndex=244; EDefs[144].texIndex=483;
-    /*145 chunk_maint3_1_slice32_lh*/  EDefs[145].modelIndex=246; EDefs[145].texIndex=483;
-    /*146 chunk_maint3_1_slice32_rh*/  EDefs[146].modelIndex=245; EDefs[146].texIndex=483;
-    /*147 chunk_maint3_1_slice45*/     EDefs[147].modelIndex=247; EDefs[147].texIndex=483;
-    /*148 chunk_maint3_1d*/            EDefs[148].modelIndex=243; EDefs[148].texIndex=482; EDefs[148].glowIndex=481;
-    /*149 chunk_med1_1*/               EDefs[149].modelIndex=249; EDefs[149].texIndex=486; EDefs[149].specIndex=1256; EDefs[149].normIndex=1255; EDefscol[149]=COLTYPE_MSH;
-    /*150 chunk_med1_1_half_top*/      EDefs[150].modelIndex=250; EDefs[150].texIndex=486; EDefs[150].specIndex=1256; EDefs[150].normIndex=1255; EDefscol[150]=COLTYPE_MSH;
-    /*151 chunk_med1_1_slice128high*/  EDefs[151].modelIndex=251; EDefs[151].texIndex=486; EDefs[151].specIndex=1256; EDefs[151].normIndex=1255; EDefscol[151]=COLTYPE_MSH;
-    /*152 chunk_med1_1_slice192RH*/    EDefs[152].modelIndex=252; EDefs[152].texIndex=486; EDefs[152].specIndex=1256; EDefs[152].normIndex=1255; EDefscol[152]=COLTYPE_MSH;
-    /*153 chunk_med1_1_slice256*/      EDefs[153].modelIndex=253; EDefs[153].texIndex=486; EDefs[153].specIndex=1256; EDefs[153].normIndex=1255; EDefscol[153]=COLTYPE_MSH;
-    /*154 chunk_med1_1d*/              EDefs[154].modelIndex=248; EDefs[154].texIndex=485; EDefs[154].glowIndex=484; EDefs[154].specIndex=1236; EDefs[154].normIndex=1255; EDefscol[154]=COLTYPE_MSH;
-    /*155 chunk_med1_2*/               EDefs[155].modelIndex=255; EDefs[155].texIndex=489; EDefs[155].glowIndex=488; EDefs[155].specIndex=1256;
-    /*156 chunk_med1_2d*/              EDefs[156].modelIndex=254; EDefs[156].texIndex=487; EDefs[156].specIndex=1256;
-    /*157 chunk_med1_3*/               EDefs[157].modelIndex=257; EDefs[157].texIndex=493; EDefs[157].glowIndex=492; EDefs[157].specIndex=1256;
-    /*158 chunk_med1_3d*/              EDefs[158].modelIndex=256; EDefs[158].texIndex=491; EDefs[158].glowIndex=490; EDefs[158].specIndex=1256;
-    /*159 chunk_med1_4*/               EDefs[159].modelIndex=258; EDefs[159].texIndex=494; EDefs[159].specIndex=1256;
-    /*160 chunk_med1_5*/               EDefs[160].modelIndex=669; EDefs[160].texIndex=495; EDefs[160].specIndex=1256;
-    /*161 chunk_med1_6*/               EDefs[161].modelIndex=259; EDefs[161].texIndex=496; EDefs[161].normIndex=509; EDefs[161].specIndex=1256;
-    /*162 chunk_med1_7*/               EDefs[162].modelIndex=262; EDefs[162].texIndex=499; EDefs[162].specIndex=1268; EDefs[162].normIndex=498; EDefscol[162]=COLTYPE_MSH;
-    /*163 chunk_med1_7_slice14_64*/    EDefs[163].modelIndex=263; EDefs[163].texIndex=499; EDefs[163].specIndex=1268; EDefs[163].normIndex=1254; EDefscol[163]=COLTYPE_MSH;
-    /*164 chunk_med1_7_slice45_320lh*/ EDefs[164].modelIndex=264; EDefs[164].texIndex=499; EDefs[164].specIndex=1268; EDefs[164].normIndex=1254; EDefscol[164]=COLTYPE_MSH;
-    /*165 chunk_med1_7_slice45_320rh*/ EDefs[165].modelIndex=265; EDefs[165].texIndex=499; EDefs[165].specIndex=1268; EDefs[165].normIndex=1254; EDefscol[165]=COLTYPE_MSH;
-    /*166 chunk_med1_7_slice96high*/   EDefs[166].modelIndex=266; EDefs[166].texIndex=499; EDefs[166].specIndex=1268; EDefs[166].normIndex=1254; EDefscol[166]=COLTYPE_MSH;
-    /*167 chunk_med1_7d*/              EDefs[167].modelIndex=260; EDefs[167].texIndex=497; EDefs[167].specIndex=1269; EDefs[167].normIndex=1270; EDefscol[167]=COLTYPE_MSH;
-    /*168 chunk_med1_7d_slice128*/     EDefs[168].modelIndex=261; EDefs[168].texIndex=497; EDefs[168].specIndex=1269; EDefs[168].normIndex=1270; EDefscol[168]=COLTYPE_MSH;
-    /*169 chunk_med1_8*/               EDefs[169].modelIndex=268; EDefs[169].texIndex=503; EDefs[169].normIndex=502; EDefs[169].specIndex=1242; EDefscol[169]=COLTYPE_MSH;
-    /*170 chunk_med1_8d*/              EDefs[170].modelIndex=267; EDefs[170].texIndex=501; EDefs[170].normIndex=163; EDefs[170].specIndex=1242; EDefscol[170]=COLTYPE_MSH;
-    /*171 chunk_med1_9*/               EDefs[171].modelIndex=278; EDefs[171].texIndex=507; EDefs[171].normIndex=506; EDefs[171].specIndex=1267; EDefscol[171]=COLTYPE_MSH;
-    /*172, 173 unused*/
-    /*174 chunk_med1_9d*/              EDefs[174].modelIndex=269; EDefs[174].texIndex=505; EDefs[174].normIndex=504; EDefs[174].specIndex=1267; EDefscol[174]=COLTYPE_MSH;
-    /*175 unused*/
-    /*176 chunk_med1_9d_ofs112_90*/    EDefs[176].modelIndex=270; EDefs[176].texIndex=505; EDefs[176].normIndex=504; EDefs[176].specIndex=1267; EDefscol[176]=COLTYPE_MSH;
-    /*177 chunk_med1_9d_ofs144_90*/    EDefs[177].modelIndex=272; EDefs[177].texIndex=505; EDefs[177].normIndex=504; EDefs[177].specIndex=1267; EDefscol[177]=COLTYPE_MSH;
-    /*178 chunk_med2_1*/               EDefs[178].modelIndex=280; EDefs[178].texIndex=513; EDefs[178].specIndex=1254; EDefs[178].glowIndex=511; EDefs[178].normIndex=512;
-    /*179 chunk_med2_1_slice32RH*/     EDefs[179].modelIndex=281; EDefs[179].texIndex=513; EDefs[179].normIndex=512; EDefs[179].specIndex=1254;
-    /*180 chunk_med2_1d*/              EDefs[180].modelIndex=279; EDefs[180].glowIndex=508; EDefs[180].texIndex=510; EDefs[180].specIndex=1254;
-    /*181 chunk_med2_2*/               EDefs[181].modelIndex=283; EDefs[181].texIndex=517; EDefs[181].glowIndex=516; EDefs[181].specIndex=1242;
-    /*182 chunk_med2_2_half_bottom*/   EDefs[182].modelIndex=284; EDefs[182].texIndex=517; EDefs[182].glowIndex=516; EDefs[182].specIndex=1242;
-    /*183 chunk_med2_2d*/              EDefs[183].modelIndex=282; EDefs[183].texIndex=515; EDefs[183].glowIndex=516; EDefs[183].specIndex=1242;
-    /*184 chunk_med2_3*/               EDefs[184].modelIndex=286; EDefs[184].texIndex=521; EDefs[184].glowIndex=520; EDefs[184].specIndex=1242;
-    /*185 chunk_med2_3d*/              EDefs[185].modelIndex=285; EDefs[185].texIndex=519; EDefs[185].glowIndex=518; EDefs[185].specIndex=1242;
-    /*186 chunk_med2_4*/               EDefs[186].modelIndex=287; EDefs[186].texIndex=523; EDefs[186].glowIndex=522; EDefs[186].specIndex=1242;
-    /*187 chunk_med2_5*/               EDefs[187].modelIndex=288; EDefs[187].texIndex=527; EDefs[187].glowIndex=526; EDefs[187].specIndex=539; EDefscol[187]=COLTYPE_BOX; EDefscolliderCenter[187].y=1.44f; EDefscolliderSize[187]=(V3){2.56f,0.32f,2.56f};
-    /*188 chunk_med2_6*/               EDefs[188].modelIndex=289; EDefs[188].texIndex=528; EDefs[188].specIndex=1271;                          EDefscol[188]=COLTYPE_MSH;
-    /*189 chunk_med2_7*/               EDefs[189].modelIndex=290; EDefs[189].texIndex=530; EDefs[189].glowIndex=529; EDefs[189].specIndex=1245;
-    /*190 chunk_med2_8*/               EDefs[190].modelIndex=291; EDefs[190].texIndex=531; EDefs[190].specIndex=1242;
-    /*191 chunk_med2_8_half_top*/      EDefs[191].modelIndex=292; EDefs[191].texIndex=531; EDefs[191].specIndex=1242;
-    /*192 chunk_med2_8_slice32RH*/     EDefs[192].modelIndex=293; EDefs[192].texIndex=531; EDefs[192].specIndex=1242;
-    /*193 chunk_med2_8_slice45*/       EDefs[193].modelIndex=294; EDefs[193].texIndex=531; EDefs[193].specIndex=1242;
-    /*194 chunk_med2_9*/               EDefs[194].modelIndex=296; EDefs[194].texIndex=535; EDefs[194].glowIndex=534; EDefs[194].specIndex=1242;
-    /*195 chunk_med2_9d*/              EDefs[195].modelIndex=295; EDefs[195].texIndex=533; EDefs[195].glowIndex=532; EDefs[195].specIndex=1242;
-    /*196 chunk_med3_1*/               EDefs[196].modelIndex=297; EDefs[196].texIndex=536; EDefs[196].specIndex=1236;
-    /*197 chunk_rad1_1*/               EDefs[197].modelIndex=501; EDefs[197].texIndex=660; EDefs[197].glowIndex=659; EDefs[197].specIndex=1231;
-    /*198 chunk_rad1_2*/               EDefs[198].modelIndex=501; EDefs[198].texIndex=662; EDefs[198].glowIndex=661; EDefs[198].specIndex=1231;
-    /*199 chunk_reac1_1*/              EDefs[199].modelIndex=502; EDefs[199].texIndex=664; EDefs[199].specIndex=1243;
-    /*200 chunk_reac1_1_slice45*/      EDefs[200].modelIndex=339; EDefs[200].texIndex=664; EDefs[200].specIndex=1243;
-    /*201 chunk_reac1_2*/              EDefs[201].modelIndex=503; EDefs[201].texIndex=665; EDefs[201].specIndex=1243;
-    /*202 chunk_reac1_3*/              EDefs[202].modelIndex=504; EDefs[202].texIndex=666; EDefs[202].specIndex=1243;
-    /*203 chunk_reac1_4*/              EDefs[203].modelIndex=505; EDefs[203].texIndex=668; EDefs[203].glowIndex=667; EDefs[203].specIndex=669;
-    /*204 chunk_reac1_5*/              EDefs[204].modelIndex=506; EDefs[204].texIndex=671; EDefs[204].glowIndex=670; EDefs[204].specIndex=1239;
-    /*205 chunk_reac1_6*/              EDefs[205].modelIndex=507; EDefs[205].texIndex=673; EDefs[205].glowIndex=672; EDefs[205].specIndex=1243;
-    /*206 chunk_reac1_7*/              EDefs[206].modelIndex=342; EDefs[206].texIndex=676; EDefs[206].glowIndex=675; EDefs[206].specIndex=1243;
-    /*207 chunk_reac1_8*/              EDefs[207].modelIndex=508; EDefs[207].texIndex=678; EDefs[207].glowIndex=678; EDefs[207].specIndex=1243;
-    /*208 chunk_reac1_9*/              EDefs[208].modelIndex=509; EDefs[208].texIndex=680; EDefs[208].glowIndex=680; EDefs[208].specIndex=1243;
-    /*209 chunk_reac2_1*/              EDefs[209].modelIndex=512; EDefs[209].texIndex=682; EDefs[209].specIndex=1235;
-    /*210 chunk_reac2_1_slice45LH*/    EDefs[210].modelIndex=514; EDefs[210].texIndex=682; EDefs[210].specIndex=1235;
-    /*211 chunk_reac2_1_slice45LH_up*/ EDefs[211].modelIndex=515; EDefs[211].texIndex=682; EDefs[211].specIndex=1235;
-    /*212 chunk_reac2_1_slice45RH*/    EDefs[212].modelIndex=516; EDefs[212].texIndex=682; EDefs[212].specIndex=1235;
-    /*213 chunk_reac2_1_slice45RH_up*/ EDefs[213].modelIndex=517; EDefs[213].texIndex=682; EDefs[213].specIndex=1235;
-    /*214 chunk_reac2_1b*/             EDefs[214].modelIndex=510; EDefs[214].texIndex=681; EDefs[214].specIndex=1235;
-    /*215 chunk_reac2_1bmirror*/       EDefs[215].modelIndex=511; EDefs[215].texIndex=681; EDefs[215].specIndex=1235;
-    /*216 chunk_reac2_1mirror*/        EDefs[216].modelIndex=513; EDefs[216].texIndex=682; EDefs[216].specIndex=1235;
-    /*217 chunk_reac2_2*/              EDefs[217].modelIndex=518; EDefs[217].texIndex=684; EDefs[217].glowIndex=683; EDefs[217].specIndex=1235;
-    /*218 chunk_reac2_4*/              EDefs[218].modelIndex=519; EDefs[218].texIndex=685; EDefs[218].specIndex=1235;
-    /*219 chunk_reac2_4_slice128lower*/EDefs[219].modelIndex=340; EDefs[219].texIndex=685; EDefs[219].specIndex=1235;
-    /*220 chunk_reac2_5*/              EDefs[220].modelIndex=520; EDefs[220].texIndex=687; EDefs[220].glowIndex=686;
-    /*221 chunk_reac2_6*/              EDefs[221].modelIndex=521; EDefs[221].texIndex=689; EDefs[221].glowIndex=688;
-    /*222 chunk_reac2_7*/              EDefs[222].modelIndex=522; EDefs[222].texIndex=691; EDefs[222].glowIndex=690;
-    /*223 chunk_reac2_8*/              EDefs[223].modelIndex=523; EDefs[223].texIndex=693; EDefs[223].glowIndex=692;
-    /*224 chunk_reac2_9*/              EDefs[224].modelIndex=524; EDefs[224].texIndex=694;
-    /*225 chunk_reac3_1*/              EDefs[225].modelIndex=525; EDefs[225].texIndex=696; EDefs[225].glowIndex=695;
-    /*226 chunk_reac3_2*/              EDefs[226].modelIndex=526; EDefs[226].texIndex=697;
-    /*227 chunk_reac3_3*/              EDefs[227].modelIndex=527; EDefs[227].texIndex=698;
-    /*228 chunk_reac3_4*/              EDefs[228].modelIndex=528; EDefs[228].texIndex=699;
-    /*229 chunk_reac3_5*/              EDefs[229].modelIndex=529; EDefs[229].texIndex=701; EDefs[229].glowIndex=700;
-    /*230 chunk_reac3_6*/              EDefs[230].modelIndex=530; EDefs[230].texIndex=703; EDefs[230].glowIndex=702;
-    /*231 chunk_reac3_7*/              EDefs[231].modelIndex=531; EDefs[231].texIndex=704; EDefs[231].specIndex=705;
-    /*232 chunk_reac4_1*/              EDefs[232].modelIndex=532; EDefs[232].texIndex=707; EDefs[232].glowIndex=706;
-    /*233 chunk_reac4_1_slice45lh*/    EDefs[233].modelIndex=533; EDefs[233].texIndex=707;
-    /*234 chunk_reac4_2*/              EDefs[234].modelIndex=534; EDefs[234].texIndex=709; EDefs[234].glowIndex=708;
-    /*235 chunk_reac5_1*/              EDefs[235].modelIndex=535; EDefs[235].texIndex=711; EDefs[235].glowIndex=710;
-    /*236 chunk_reac5_2*/              EDefs[236].modelIndex=536; EDefs[236].texIndex=713; EDefs[236].glowIndex=712;
-    /*237 chunk_reac5_3*/              EDefs[237].modelIndex=537; EDefs[237].texIndex=715; EDefs[237].glowIndex=714;
-    /*238 chunk_reac6_1*/              EDefs[238].modelIndex=538; EDefs[238].texIndex=716;
-    /*239 chunk_reac6_2*/              EDefs[239].modelIndex=539; EDefs[239].texIndex=717;
-    /*240 chunk_reac6_3*/              EDefs[240].modelIndex=539; EDefs[240].texIndex=719; EDefs[240].glowIndex=718;
-    /*241 chunk_sci1_1*/               EDefs[241].modelIndex=540; EDefs[241].texIndex=722; 
-    /*242 chunk_sci1_1_slice45_toplh*/ EDefs[242].modelIndex=542; EDefs[242].texIndex=722; 
-    /*243 chunk_sci1_1_slice45_toprh*/ EDefs[243].modelIndex=543; EDefs[243].texIndex=722; 
-    /*244 chunk_sci1_1d*/              EDefs[244].modelIndex=541; EDefs[244].texIndex=721; 
-    /*245 chunk_sci1_2*/               EDefs[245].modelIndex=545; EDefs[245].texIndex=724; 
-    /*246 chunk_sci1_2_slice45lh*/     EDefs[246].modelIndex=546; EDefs[246].texIndex=724; 
-    /*247 chunk_sci1_2_slice45lh_up*/  EDefs[247].modelIndex=547; EDefs[247].texIndex=724; 
-    /*248 chunk_sci1_2_slice45rh*/     EDefs[248].modelIndex=548; EDefs[248].texIndex=724; 
-    /*249 chunk_sci1_2_slice45rh_up*/  EDefs[249].modelIndex=549; EDefs[249].texIndex=724; 
-    /*250 chunk_sci1_2d*/              EDefs[250].modelIndex=544; EDefs[250].texIndex=723; 
-    /*251 chunk_sci1_3*/               EDefs[251].modelIndex=550; EDefs[251].texIndex=726; EDefs[251].glowIndex=725; 
-    /*252 chunk_sci1_4*/               EDefs[252].modelIndex=498; EDefs[252].texIndex=727; 
-    /*253 chunk_sci1_5*/               EDefs[253].modelIndex=551; EDefs[253].texIndex=728; 
-    /*254 chunk_sci1_6*/               EDefs[254].modelIndex=552; EDefs[254].texIndex=729; 
-    /*255 chunk_sci1_6_slice45*/       EDefs[255].modelIndex=553; EDefs[255].texIndex=729; 
-    /*256 chunk_sci1_7*/               EDefs[256].modelIndex=555; EDefs[256].texIndex=731; 
-    /*257 chunk_sci1_7d*/              EDefs[257].modelIndex=554; EDefs[257].texIndex=730; 
-    /*258 chunk_sci1_8*/               EDefs[258].modelIndex=557; EDefs[258].texIndex=734; 
-    /*259 chunk_sci1_8d*/              EDefs[259].modelIndex=556; EDefs[259].texIndex=733; 
-    /*260 chunk_sci1_9*/               EDefs[260].modelIndex=559; EDefs[260].texIndex=737; 
-    /*261 chunk_sci1_9d*/              EDefs[261].modelIndex=558; EDefs[261].texIndex=736; EDefs[261].glowIndex=735; 
-    /*262 chunk_sci2_1*/               EDefs[262].modelIndex=561; EDefs[262].texIndex=739; 
-    /*263 chunk_sci2_1_slice45lh*/     EDefs[263].modelIndex=563; EDefs[263].texIndex=739; 
-    /*264 chunk_sci2_1_slice45rh*/     EDefs[264].modelIndex=562; EDefs[264].texIndex=739; 
-    /*265 chunk_sci2_1d*/              EDefs[265].modelIndex=560; EDefs[265].texIndex=738; 
-    /*266 chunk_sci2_2*/               EDefs[266].modelIndex=565; EDefs[266].texIndex=742; EDefs[266].glowIndex=741; 
-    /*267 chunk_sci2_2d*/              EDefs[267].modelIndex=564; EDefs[267].texIndex=740; 
-    /*268 chunk_sci2_3*/               EDefs[268].modelIndex=566; EDefs[268].texIndex=744; EDefs[268].glowIndex=743; 
-    /*269 chunk_sci2_4*/               EDefs[269].modelIndex=567; EDefs[269].texIndex=745; 
-    /*270 chunk_sci2_5*/               EDefs[270].modelIndex=569; EDefs[270].texIndex=747; 
-    /*271 chunk_sci2_5d*/              EDefs[271].modelIndex=568; EDefs[271].texIndex=746; 
-    /*272 chunk_sci3_1*/               EDefs[272].modelIndex=571; EDefs[272].texIndex=749; 
-    /*273 chunk_sci3_1d*/              EDefs[273].modelIndex=570; EDefs[273].texIndex=748; 
-    /*274 chunk_sci3_2*/               EDefs[274].modelIndex=572; EDefs[274].texIndex=750; 
-    /*275 chunk_sci3_3*/               EDefs[275].modelIndex=573; EDefs[275].texIndex=752; EDefs[275].glowIndex=751; 
-    /*276 chunk_sci3_4*/               EDefs[276].modelIndex=574; EDefs[276].texIndex=754; 
-    /*277 chunk_sci3_5*/               EDefs[277].modelIndex=575; EDefs[277].texIndex=756; EDefs[277].glowIndex=755; 
-    /*278 chunk_sci3_6*/               EDefs[278].modelIndex=576; EDefs[278].texIndex=758; EDefs[278].glowIndex=757; 
-    /*279 chunk_screen*/               EDefs[279].modelIndex=5988;EDefs[279].texIndex=881; 
-    /*280 chunk_sec1_1*/               EDefs[280].modelIndex=178; EDefs[280].texIndex=787; EDefs[280].specIndex=787; 
-    /*281 chunk_sec1_1b*/              EDefs[281].modelIndex=178; EDefs[281].texIndex=785; EDefs[281].specIndex=785; 
-    /*282 chunk_sec1_1c*/              EDefs[282].modelIndex=577; EDefs[282].texIndex=786; EDefs[282].specIndex=786; 
-    /*283 chunk_sec1_1c_slice45*/      EDefs[283].modelIndex=580; EDefs[283].texIndex=786; EDefs[283].specIndex=786; 
-    /*284 chunk_sec1_1c_slice64highlh*/EDefs[284].modelIndex=581; EDefs[284].texIndex=786; EDefs[284].specIndex=786; 
-    /*285 chunk_sec1_1c_slice64highrh*/EDefs[285].modelIndex=582; EDefs[285].texIndex=786; EDefs[285].specIndex=786; 
-    /*286, 287 unused*/
-    /*288 chunk_sec1_2*/               EDefs[288].modelIndex=584; EDefs[288].texIndex=789; EDefs[288].specIndex=1233; 
-    /*289 chunk_sec1_2b*/              EDefs[289].modelIndex=583; EDefs[289].texIndex=788; EDefs[289].specIndex=1233; 
-    /*290 chunk_sec1_3*/               EDefs[290].modelIndex=585; EDefs[290].texIndex=790; EDefs[290].specIndex=1233; 
-    /*291 chunk_sec1_3_slice45*/       EDefs[291].modelIndex=586; EDefs[291].texIndex=790; EDefs[291].specIndex=1233; 
-    /*292 chunk_stor1_1*/              EDefs[292].modelIndex=597; EDefs[292].texIndex=824; EDefs[292].glowIndex=823; 
-    /*293 chunk_stor1_2*/              EDefs[293].modelIndex=598; EDefs[293].texIndex=825; 
-    /*294 chunk_stor1_3*/              EDefs[294].modelIndex=598; EDefs[294].texIndex=826; 
-    /*295 chunk_stor1_4*/              EDefs[295].modelIndex=599; EDefs[295].texIndex=827; 
-    /*296 chunk_stor1_5*/              EDefs[296].modelIndex=600; EDefs[296].texIndex=828; 
-    /*297 chunk_stor1_6*/              EDefs[297].modelIndex=601; EDefs[297].texIndex=829; 
-    /*298 chunk_stor1_6_slice128_up_lh*/EDefs[298].modelIndex=602; EDefs[298].texIndex=829; 
-    /*299 chunk_stor1_6_slice128_up_rh*/EDefs[299].modelIndex=603; EDefs[299].texIndex=829; 
-    /*300 chunk_stor1_6_slice192lh*/   EDefs[300].modelIndex=604; EDefs[300].texIndex=829; 
-    /*301 chunk_stor1_6_slice192rh*/   EDefs[301].modelIndex=605; EDefs[301].texIndex=829; 
-    /*302 chunk_stor1_7*/              EDefs[302].modelIndex=606; EDefs[302].texIndex=833; EDefs[302].specIndex=834; EDefs[302].normIndex=832; 
-    /*303 chunk_stor1_7_slice45*/      EDefs[303].modelIndex=607; EDefs[303].texIndex=833; EDefs[303].specIndex=834; EDefs[303].normIndex=832; 
-    /*304 chunk_stor1_7d*/             EDefs[304].modelIndex=620; EDefs[304].texIndex=831; EDefs[304].glowIndex=830; EDefs[304].normIndex=832; EDefs[304].specIndex=834; 
-    /*305 chunk_teleporter*/           EDefs[305].modelIndex=178; EDefs[305].texIndex=1166; 
-    /*306 chunk_white*/                EDefs[306].modelIndex=178; EDefs[306].texIndex=881;
-    /*307 item_paper_wad*/             EDefs[307].modelIndex=487; EDefs[307].texIndex=1250; EDefscol[307]= COLTYPE_SPH; EDefscolliderCenter[307]=(V3){-0.001254f,-0.001190498f,0.006335999f}; EDefscolliderSize[307].x=0.0451f; EDefsmass[307]=0.06f;
-    /*308 item_warecasing*/            EDefs[308].modelIndex=637; EDefs[308].texIndex=1251; EDefsmass[308]=0.8f; EDefscol[308]=COLTYPE_BOX; EDefscolliderCenter[308].z=0.09397449f; EDefscolliderSize[308]=(V3){0.540964f,0.405398f,0.187949f};
-    /*309 item_beaker*/                EDefs[309].modelIndex=14; EDefs[309].texIndex=36; EDefscol[309]=COLTYPE_CVX; EDefs[309].colMeshIndex=682; EDefs[309].specIndex=1242;  EDefsmass[309]=0.28f; EDefsdynamicFriction[309]=0.1f; EDefsstaticFriction[309]=0.2f;
-    /*310 item_beverage*/              EDefs[310].modelIndex=18; EDefs[310].texIndex=37; EDefscol[310]=COLTYPE_CVX; EDefs[310].colMeshIndex=683; EDefsmass[310]=0.12f;
-    /*311 item_skull*/                 EDefs[311].modelIndex=593; EDefs[311].texIndex=816; EDefscol[311]=COLTYPE_CVX; EDefs[311].colMeshIndex=70; EDefsmass[311]=0.451f;
-    /*312 item_arm*/                   EDefs[312].modelIndex=7; EDefs[312].texIndex=28; EDefscol[312]=COLTYPE_CVX; EDefs[312].colMeshIndex=678;
-    /*313 item_audiolog*/              EDefs[313].modelIndex=11; EDefs[313].texIndex=52; EDefs[313].glowIndex=80; EDefscol[313]=COLTYPE_CVX; EDefs[313].colMeshIndex=679; EDefsmass[313]=0.2f;
-    /*314 weapon_grenadefrag*/         EDefs[314].modelIndex=182; EDefs[314].texIndex=348; EDefscol[314]=COLTYPE_CVX; EDefs[314].colMeshIndex=73; EDefsmass[314]=1.0f;
-    /*315 weapon_grenadeconc*/         EDefs[315].modelIndex=165; EDefs[315].texIndex=334; EDefscol[315]=COLTYPE_CVX; EDefs[315].colMeshIndex=84; EDefsmass[315]=1.3f;
-    /*316 weapon_grenadeemp*/          EDefs[316].modelIndex=168; EDefs[316].texIndex=338; EDefscol[316]=COLTYPE_CVX; EDefs[316].colMeshIndex=85; EDefsmass[316]=0.8f;
-    /*317 weapon_grenadeearth*/        EDefs[317].modelIndex=181; EDefs[317].texIndex=346; EDefscol[317]=COLTYPE_CVX; EDefs[317].colMeshIndex=86; EDefsmass[317]=1.5f;
-    /*318 weapon_grenademine*/         EDefs[318].modelIndex=184; EDefs[318].texIndex=353; EDefscol[318]=COLTYPE_CVX; EDefs[318].colMeshIndex=87; EDefsmass[318]=1.2f;
-    /*319 weapon_grenadenitro*/        EDefs[319].modelIndex=300; EDefs[319].texIndex=356; EDefscol[319]=COLTYPE_CVX; EDefs[319].colMeshIndex=301; EDefsmass[319]=1.2f;
-    /*320 weapon_grenadegas*/          EDefs[320].modelIndex=183; EDefs[320].texIndex=349; EDefscol[320]=COLTYPE_CVX; EDefs[320].colMeshIndex=89; EDefsmass[320]=0.9f;
-    /*321 item_patch_berserk*/         EDefs[321].modelIndex=488; EDefs[321].texIndex=590; EDefscol[321]=COLTYPE_CVX; EDefs[321].colMeshIndex=491; EDefsmass[321]=0.14f;
-    /*322 item_patch_detox*/           EDefs[322].modelIndex=488; EDefs[322].texIndex=591; EDefscol[322]=COLTYPE_CVX; EDefs[322].colMeshIndex=491; EDefsmass[322]=0.14f;
-    /*323 item_patch_genius*/          EDefs[323].modelIndex=488; EDefs[323].texIndex=592; EDefscol[323]=COLTYPE_CVX; EDefs[323].colMeshIndex=491; EDefsmass[323]=0.14f;
-    /*324 item_patch_medi*/            EDefs[324].modelIndex=488; EDefs[324].texIndex=600; EDefscol[324]=COLTYPE_CVX; EDefs[324].colMeshIndex=491; EDefsmass[324]=0.14f;
-    /*325 item_patch_reflex*/          EDefs[325].modelIndex=488; EDefs[325].texIndex=641; EDefscol[325]=COLTYPE_CVX; EDefs[325].colMeshIndex=491; EDefsmass[325]=0.14f;
-    /*326 item_patch_sight*/           EDefs[326].modelIndex=488; EDefs[326].texIndex=646; EDefscol[326]=COLTYPE_CVX; EDefs[326].colMeshIndex=491; EDefsmass[326]=0.14f;
-    /*327 item_patch_staminup*/        EDefs[327].modelIndex=488; EDefs[327].texIndex=647; EDefscol[327]=COLTYPE_CVX; EDefs[327].colMeshIndex=491; EDefsmass[327]=0.14f;
-    /*328 item_hw_system*/             EDefs[328].modelIndex=207; EDefs[328].texIndex=405; EDefs[328].glowIndex=404; EDefsmass[328]=0.17f; EDefscol[328]=COLTYPE_CVX; EDefs[328].colMeshIndex=68;
-    /*329 item_hw_navunit*/            EDefs[329].modelIndex=204; EDefs[329].texIndex=907; EDefs[329].glowIndex=1259; EDefscol[329]=COLTYPE_CVX; EDefs[329].colMeshIndex=696; EDefsmass[329]=0.1f;
-    /*330 item_hw_ereader*/            EDefs[330].modelIndex=200; EDefs[330].texIndex=397; EDefscol[330]=COLTYPE_CVX; EDefs[330].colMeshIndex=692; EDefsmass[330]=0.12f;
-    /*331 item_hw_sensaround*/         EDefs[331].modelIndex=205; EDefs[331].texIndex=402; EDefscol[331]=COLTYPE_CVX; EDefs[331].colMeshIndex=697; EDefsmass[331]=0.12f;
-    /*332 item_hw_targetid*/           EDefs[332].modelIndex=208; EDefs[332].texIndex=408; EDefscol[332]=COLTYPE_CVX; EDefs[332].colMeshIndex=90; EDefsmass[332]=0.08f;
-    /*333 item_hw_shield*/             EDefs[333].modelIndex=206; EDefs[333].texIndex=403; EDefscol[333]=COLTYPE_CVX; EDefs[333].colMeshIndex=91; EDefsmass[333]=0.14f;
-    /*334 item_hw_bio*/                EDefs[334].modelIndex=197; EDefs[334].texIndex=393; EDefscol[334]=COLTYPE_CVX; EDefs[334].colMeshIndex=689; EDefsmass[334]=0.1f;
-    /*335 item_hw_lantern*/            EDefs[335].modelIndex=203; EDefs[335].texIndex=401; EDefs[335].glowIndex=400; EDefscol[335]=COLTYPE_CVX; EDefs[335].colMeshIndex=695; EDefsmass[335]=0.11f;
-    /*336 item_hw_envirosuit*/         EDefs[336].modelIndex=199; EDefs[336].texIndex=396; EDefscol[336]=COLTYPE_CVX; EDefs[336].colMeshIndex=691; EDefsmass[336]=0.451f;
-    /*337 item_hw_booster*/            EDefs[337].modelIndex=198; EDefs[337].texIndex=395; EDefscol[337]=COLTYPE_CVX; EDefs[337].colMeshIndex=690; EDefsmass[337]=0.16f;
-    /*338 item_hw_jumpjets*/           EDefs[338].modelIndex=202; EDefs[338].texIndex=399; EDefscol[338]=COLTYPE_CVX; EDefs[338].colMeshIndex=694; EDefsmass[338]=0.32f;
-    /*339 item_hw_infrared*/           EDefs[339].modelIndex=201; EDefs[339].texIndex=398; EDefscol[339]=COLTYPE_CVX; EDefs[339].colMeshIndex=693; EDefsmass[339]=0.1f;
-    /*340 item_fireextinguisher*/      EDefs[340].modelIndex=144; EDefs[340].texIndex=317; EDefscol[340]=COLTYPE_CVX; EDefs[340].colMeshIndex=684; EDefsmass[340]=1.3f;
-    /*341 item_access_card_admin*/     EDefs[341].modelIndex=0;   EDefs[341].texIndex=9; EDefs[341].glowIndex=82; EDefscol[341]=COLTYPE_CVX; EDefs[341].colMeshIndex=672; EDefsmass[341]=0.2f;
-    /*342 item_workerhelmet*/          EDefs[342].modelIndex=648; EDefs[342].texIndex=886; EDefscol[342]=COLTYPE_CVX; EDefs[342].colMeshIndex=94; EDefsmass[342]=0.8f;
-    /*343 weapon_mk3*/                 EDefs[343].modelIndex=646; EDefs[343].texIndex=885; EDefscol[343]=COLTYPE_CVX; EDefs[343].colMeshIndex=309; EDefsmass[343]=0.75f;
-    /*344 weapon_blaster*/             EDefs[344].modelIndex=638; EDefs[344].texIndex=875; EDefscol[344]=COLTYPE_CVX; EDefs[344].colMeshIndex=310; EDefs[344].glowIndex=874; EDefsmass[344]=0.5f;
-    /*345 weapon_dartgun*/             EDefs[345].modelIndex=640; EDefs[345].texIndex=876; EDefscol[345]=COLTYPE_CVX; EDefs[345].colMeshIndex=311; EDefsmass[345]=0.3f;
-    /*346 weapon_flechette*/           EDefs[346].modelIndex=642; EDefs[346].texIndex=880; EDefscol[346]=COLTYPE_CVX; EDefs[346].colMeshIndex=312; EDefs[346].glowIndex=879; EDefsmass[346]=0.4f;
-    /*347 weapon_ionrifle*/            EDefs[347].modelIndex=643; EDefs[347].texIndex=883; EDefscol[347]=COLTYPE_CVX; EDefs[347].colMeshIndex=313; EDefsmass[347]=0.8f;
-    /*348 weapon_rapier*/              EDefs[348].modelIndex=653; EDefs[348].texIndex=891; EDefscol[348]=COLTYPE_CVX; EDefs[348].colMeshIndex=314; EDefs[348].glowIndex=890; EDefsmass[348]=0.3f;
-    /*349 weapon_pipe*/                EDefs[349].modelIndex=649; EDefs[349].texIndex=887; EDefs[349].specIndex=1241; EDefsmass[349]=0.85f; EDefscol[349]=COLTYPE_CVX; EDefs[349].colMeshIndex=647;
-    /*350 weapon_magnum*/              EDefs[350].modelIndex=644; EDefs[350].texIndex=877; EDefs[350].specIndex=1231; EDefsmass[350]=0.6f; EDefscol[350]=COLTYPE_CVX; EDefs[350].colMeshIndex=315;
-    /*351 weapon_magpulse*/            EDefs[351].modelIndex=645; EDefs[351].texIndex=884; EDefs[351].specIndex=1231; EDefsmass[351]=0.65f; EDefscol[351]=COLTYPE_CVX; EDefs[351].colMeshIndex=316;
-    /*352 weapon_pistol*/              EDefs[352].modelIndex=650; EDefs[352].texIndex=878; EDefs[352].specIndex=1231; EDefsmass[352]=0.3f; EDefscol[352]=COLTYPE_CVX; EDefs[352].colMeshIndex=317;
-    /*353 weapon_plasma*/              EDefs[353].modelIndex=651; EDefs[353].texIndex=888; EDefs[353].specIndex=1240; EDefsmass[353]=1.2f; EDefscol[353]=COLTYPE_CVX; EDefs[353].colMeshIndex=318;
-    /*354 weapon_railgun*/             EDefs[354].modelIndex=652; EDefs[354].texIndex=889; EDefs[354].specIndex=1231; EDefscol[354]=COLTYPE_CVX; EDefs[354].colMeshIndex=319; EDefsmass[355]=0.8f;
-    /*355 weapon_riotgun*/             EDefs[355].modelIndex=654; EDefs[355].texIndex=892; EDefs[355].specIndex=1231; EDefscol[355]=COLTYPE_CVX; EDefs[355].colMeshIndex=320; EDefsmass[355]=0.55f;
-    /*356 weapon_skorpion*/            EDefs[356].modelIndex=655; EDefs[356].texIndex=893; EDefs[356].specIndex=1231; EDefscol[356]=COLTYPE_CVX; EDefs[356].colMeshIndex=321; EDefsmass[356]=1.3f;
-    /*357 weapon_sparqbeam*/           EDefs[357].modelIndex=656; EDefs[357].texIndex=895; EDefs[357].specIndex=1231; EDefscol[357]=COLTYPE_CVX; EDefs[357].colMeshIndex=322; EDefs[357].glowIndex=894; EDefsmass[357]=0.3f;
-    /*358 weapon_stungun*/             EDefs[358].modelIndex=657; EDefs[358].texIndex=896; EDefs[358].specIndex=1231; EDefscol[358]=COLTYPE_CVX; EDefs[358].colMeshIndex=323; EDefsmass[358]=0.3f;
-    /*359 item_battery*/               EDefs[359].modelIndex=13; EDefs[359].texIndex=35; EDefscol[359]=COLTYPE_CVX; EDefs[359].colMeshIndex=680; EDefsmass[359]=0.3f;
-    /*360 item_battery_icad*/          EDefs[360].modelIndex=13; EDefs[360].texIndex=34; EDefscol[360]=COLTYPE_CVX; EDefs[360].colMeshIndex=680; EDefsmass[360]=0.35f;
-    /*361 item_logic_probe*/           EDefs[361].modelIndex=217; EDefs[361].texIndex=427; EDefscol[361]=COLTYPE_CVX; EDefs[361].colMeshIndex=306; EDefsmass[361]=0.15f;
-    /*362 item_healthkit*/             EDefs[362].modelIndex=196; EDefs[362].texIndex=391; EDefscol[362]=COLTYPE_CVX; EDefs[362].colMeshIndex=688; EDefsmass[362]=0.25f;
-    /*363 item_plastique*/             EDefs[363].modelIndex=492; EDefs[363].texIndex=599; EDefscol[363]=COLTYPE_CVX; EDefs[363].colMeshIndex=308; EDefsmass[363]=1.4f;
-    /*364 item_chipset_interfacedemod*/EDefs[364].modelIndex=45; EDefs[364].texIndex=78; EDefscol[364]=COLTYPE_CVX; EDefs[364].colMeshIndex=325; EDefsmass[364]=0.3f;
-    /*365 item_flask*/                 EDefs[365].modelIndex=145; EDefscol[365]=COLTYPE_CVX; EDefs[365].colMeshIndex=685; EDefs[365].texIndex=36;  EDefs[365].specIndex=1242;  EDefsmass[365]=0.22f;
-    /*366 item_chipset_bitflag*/       EDefs[366].modelIndex=45; EDefs[366].texIndex=633; EDefscol[366]=COLTYPE_CVX; EDefs[366].colMeshIndex=325; EDefsmass[366]=0.3f;
-    /*367 item_ammo_rubber*/           EDefs[367].modelIndex=8; EDefs[367].texIndex=19; EDefscol[367]=COLTYPE_CVX; EDefs[367].colMeshIndex=676; EDefsmass[367]=0.25f;
-    /*368 item_isotopex22*/            EDefs[368].modelIndex=209; EDefs[368].texIndex=413; EDefs[368].glowIndex=412; EDefscol[368]=COLTYPE_CVX; EDefs[368].colMeshIndex=326; EDefsmass[368]=1.2f;
-    /*369 item_testtube*/              EDefs[369].modelIndex=622; EDefs[369].texIndex=36; EDefs[369].specIndex=1242; EDefscol[369]=COLTYPE_CVX; EDefs[369].colMeshIndex=612; EDefsmass[369]=0.21f;
-    /*370 weapon_grenadefrag_live*/    EDefs[370].modelIndex=182; EDefs[370].texIndex=347; EDefs[370].glowIndex=630; EDefscol[370]=COLTYPE_CVX; EDefs[370].colMeshIndex=73; EDefsmass[370]=1.0f;
-    /*371 item_chipset_isolinear*/     EDefs[371].modelIndex=46; EDefs[371].texIndex=409; EDefscol[371]=COLTYPE_CVX; EDefs[371].colMeshIndex=308; EDefsmass[371]=0.26f;
-    /*372 weapon_grenadeconc_live*/    EDefs[372].modelIndex=165; EDefs[372].texIndex=334; EDefscol[372]=COLTYPE_CVX; EDefs[372].colMeshIndex=84; EDefsmass[372]=1.3f;
-    /*373 item_ammo_needle*/           EDefs[373].modelIndex=4; EDefs[373].texIndex=15; EDefscol[373]=COLTYPE_BOX; EDefscolliderCenter[373]=(V3){-0.0004654949f,0.0004549972f,0.0244365f}; EDefscolliderSize[373]=(V3){0.131339f,0.1442801f,0.04838703f}; EDefs[373].colMeshIndex=U16_MAX; EDefsmass[373]=0.15f;
-    /*374 item_ammo_tranq*/            EDefs[374].modelIndex=4; EDefs[374].texIndex=27; EDefscol[374]=COLTYPE_BOX; EDefscolliderCenter[374]=(V3){-0.0004654949f,0.0004549972f,0.0244365f}; EDefscolliderSize[374]=(V3){0.131339f,0.1442801f,0.04838703f}; EDefs[374].colMeshIndex=U16_MAX; EDefsmass[374]=0.15f;
-    /*375 item_ammo_standard*/         EDefs[375].modelIndex=5; EDefs[375].texIndex=25; EDefscol[375]=COLTYPE_BOX; EDefscolliderCenter[375]=(V3){0.0001984993f,0.0f,0.02172501f}; EDefscolliderSize[375]=(V3){0.1209471f,0.2176701f,0.04345007f}; EDefs[375].colMeshIndex=U16_MAX; EDefsmass[375]=0.2f;
-    /*376 item_ammo_teflon*/           EDefs[376].modelIndex=5; EDefs[376].texIndex=26; EDefscol[376]=COLTYPE_BOX; EDefscolliderCenter[376]=(V3){0.0001984993f,0.0f,0.02172501f}; EDefscolliderSize[376]=(V3){0.1209471f,0.2176701f,0.04345007f}; EDefs[376].colMeshIndex=U16_MAX; EDefsmass[376]=0.2f;
-    /*377 item_ammo_hollow*/           EDefs[377].modelIndex=5; EDefs[377].texIndex=11; EDefscol[377]=COLTYPE_BOX; EDefscolliderCenter[377]=(V3){0.0002185023f,0.0f,0.02122951f}; EDefscolliderSize[377]=(V3){0.1423431f,0.2127061f,0.04245907f}; EDefs[377].colMeshIndex=U16_MAX; EDefsmass[377]=0.2f;
-    /*378 item_ammo_slug*/             EDefs[378].modelIndex=3; EDefs[378].texIndex=23; EDefs[378].glowIndex=22; EDefscol[378]=COLTYPE_BOX; EDefscolliderCenter[378]=(V3){0.0002185023f,0.0f,0.02122951f}; EDefscolliderSize[378]=(V3){0.1423431f,0.2127061f,0.04245907f}; EDefs[378].colMeshIndex=U16_MAX; EDefs[378].glowIndex=22;  EDefsmass[378]=0.2f;
-    /*379 item_ammo_magnesium*/        EDefs[379].modelIndex=1; EDefs[379].texIndex=14; EDefscol[379]=COLTYPE_CVX; EDefs[379].colMeshIndex=673; EDefsmass[379]=0.35f;
-    /*380 item_ammo_penetrator*/       EDefs[380].modelIndex=1; EDefs[380].texIndex=16; EDefscol[380]=COLTYPE_CVX; EDefs[380].colMeshIndex=673; EDefsmass[380]=0.35f;
-    /*381 item_ammo_hornet*/           EDefs[381].modelIndex=1; EDefs[381].texIndex=12; EDefscol[381]=COLTYPE_CVX; EDefs[381].colMeshIndex=673; EDefsmass[381]=0.35f;
-    /*382 item_ammo_splinter*/         EDefs[382].modelIndex=1; EDefs[382].texIndex=24; EDefscol[382]=COLTYPE_CVX; EDefs[382].colMeshIndex=673; EDefsmass[382]=0.35f;
-    /*383 item_ammo_rail*/             EDefs[383].modelIndex=6; EDefs[383].texIndex=17; EDefscol[383]=COLTYPE_CVX; EDefs[383].colMeshIndex=675; EDefsmass[383]=0.40f;
-    /*384 item_ammo_slag*/             EDefs[384].modelIndex=1; EDefs[384].texIndex=21; EDefscol[384]=COLTYPE_CVX; EDefs[384].colMeshIndex=673; EDefsmass[384]=0.35f;
-    /*385 item_ammo_slaglarge*/        EDefs[385].modelIndex=10; EDefs[385].texIndex=20; EDefscol[385]=COLTYPE_CVX; EDefs[385].colMeshIndex=677; EDefsmass[385]=0.40f;
-    /*386 item_ammo_magcart*/          EDefs[386].modelIndex=2; EDefs[386].texIndex=13; EDefscol[386]=COLTYPE_CVX; EDefs[386].colMeshIndex=674; EDefsmass[386]=0.35f;
-    /*387 weapon_grenadeemp_live*/     EDefs[387].modelIndex=168; EDefs[387].texIndex=337; EDefs[387].glowIndex=627; EDefscol[387]=COLTYPE_CVX; EDefs[387].colMeshIndex=85; EDefsmass[387]=0.8f;
-    /*388 item_access_card_std*/       EDefs[388].modelIndex=0; EDefs[388].texIndex=79; EDefs[388].glowIndex=867; EDefscol[388]=COLTYPE_CVX; EDefs[388].colMeshIndex=672; EDefsmass[388]=0.2f;
-    /*389 weapon_grenadeearth_live*/   EDefs[389].modelIndex=181; EDefs[389].texIndex=345; EDefs[389].glowIndex=628; EDefscol[389]=COLTYPE_CVX; EDefs[389].colMeshIndex=86; EDefsmass[389]=1.5f;
-    /*390 item_access_card_group1*/    EDefs[390].modelIndex=0; EDefs[390].texIndex=7; EDefs[390].glowIndex=159; EDefscol[390]=COLTYPE_CVX; EDefs[390].colMeshIndex=672; EDefsmass[390]=0.2f;
-    /*391 item_access_card_science*/   EDefs[391].modelIndex=0; EDefs[391].texIndex=2; EDefs[391].glowIndex=343; EDefscol[391]=COLTYPE_CVX; EDefs[391].colMeshIndex=672; EDefsmass[391]=0.2f;
-    /*392 item_access_card_eng*/       EDefs[392].modelIndex=0; EDefs[392].texIndex=3; EDefs[392].glowIndex=81; EDefscol[392]=COLTYPE_CVX; EDefs[392].colMeshIndex=672; EDefsmass[392]=0.2f;
-    /*393 item_access_card_groupB*/    EDefs[393].modelIndex=0; EDefs[393].texIndex=7; EDefs[393].glowIndex=159; EDefscol[393]=COLTYPE_CVX; EDefs[393].colMeshIndex=672; EDefsmass[393]=0.2f;
-    /*394 item_access_card_security*/  EDefs[394].modelIndex=0; EDefs[394].texIndex=10; EDefs[394].glowIndex=344; EDefscol[394]=COLTYPE_CVX; EDefs[394].colMeshIndex=672; EDefsmass[394]=0.2f;
-    /*395 item_access_card_per5diego*/ EDefs[395].modelIndex=0; EDefs[395].texIndex=8; EDefs[395].glowIndex=341; EDefscol[395]=COLTYPE_CVX; EDefs[395].colMeshIndex=672; EDefsmass[395]=0.2f;
-    /*396 item_access_card_medi*/      EDefs[396].modelIndex=0; EDefs[396].texIndex=1; EDefs[396].glowIndex=161; EDefscol[396]=COLTYPE_CVX; EDefs[396].colMeshIndex=672; EDefsmass[396]=0.2f;
-    /*397 item_access_card_group3*/    EDefs[397].modelIndex=0; EDefs[397].texIndex=7; EDefs[397].glowIndex=159; EDefscol[397]=COLTYPE_CVX; EDefs[397].colMeshIndex=672; EDefsmass[397]=0.2f;
-    /*398 item_access_card_purple*/    EDefs[398].modelIndex=0; EDefs[398].texIndex=5; EDefs[398].glowIndex=342; EDefscol[398]=COLTYPE_CVX; EDefs[398].colMeshIndex=672; EDefsmass[398]=0.2f;
-    /*399 item_head_male*/             EDefs[399].modelIndex=194; EDefs[399].texIndex=389; EDefscol[399]=COLTYPE_CVX; EDefs[399].colMeshIndex=194; EDefsmass[399]=1.29f;
-    /*400 item_head_female*/           EDefs[400].modelIndex=193; EDefs[400].texIndex=388; EDefscol[400]=COLTYPE_CVX; EDefs[400].colMeshIndex=686; EDefsmass[400]=1.30f;
-    /*401 item_severedhead*/           EDefs[401].modelIndex=590; EDefs[401].texIndex=801; EDefscol[401]=COLTYPE_CVX; EDefs[401].colMeshIndex=327; EDefsmass[401]=1.28f;
-    /*402 weapon_grenademine_live*/    EDefs[402].modelIndex=184; EDefs[402].texIndex=351; EDefs[402].glowIndex=352; EDefscol[402]=COLTYPE_CVX; EDefs[402].colMeshIndex=87; EDefsmass[402]=1.2f;
-    /*403 weapon_grenadenitro_live*/   EDefs[403].modelIndex=185; EDefs[403].texIndex=354; EDefs[403].glowIndex=355; EDefscol[403]=COLTYPE_CVX; EDefs[403].colMeshIndex=88; EDefsmass[403]=1.2f;
-    /*404 weapon_grenadegas_live*/     EDefs[404].modelIndex=183; EDefs[404].texIndex=349; EDefscol[404]=COLTYPE_CVX; EDefs[404].colMeshIndex=89; EDefsmass[404]=0.9f;
-    /*405 to 416 unused*/
-    /*417 item_access_card_perdarcy*/  EDefs[417].modelIndex=0; EDefs[417].texIndex=8; EDefs[417].glowIndex=341; EDefscol[417]=COLTYPE_CVX; EDefs[417].colMeshIndex=672; EDefsmass[417]=0.2f; EDefsangularDrag[417]=0.05f;
-    /*419 npc_autobomb*/            EDefs[419].modelIndex=299; EDefs[419].texIndex=542; EDefs[419].glowIndex=541; EDefscol[419]=COLTYPE_CVX; EDefs[419].colMeshIndex=328;
-    /*420 npc_cyborg_assassin*/     EDefs[420].modelIndex=306; EDefs[420].texIndex=545; EDefs[420].numclips= 8; EDefs[420].animationNum=24; EDefscolliderSize[420].x=0.48f; EDefscolliderSize[420].y=2.0f; EDefscolliderCenter[420].y=0.96f; EDefsmass[420]=1.5f; EDefsangularDrag[420]=1.5f; EDefs[420].glowIndex=544;
-    /*421 npc_avian_mutant*/        EDefs[421].modelIndex=328; EDefs[421].texIndex=568; EDefs[421].numclips= 5; EDefs[421].animationNum=35; EDefscolliderSize[421].x=0.64f; EDefscolliderSize[421].y=1.60f; EDefscolliderCenter[421].y=0.64f; EDefsmass[421]=2.0f; EDefsangularDrag[421]=1.0f;
-    /*422 npc_exec_bot*/            EDefs[422].modelIndex=316; EDefs[422].texIndex=555; EDefs[422].numclips= 5; EDefs[422].animationNum=29; EDefscolliderSize[422].x=0.48f; EDefscolliderSize[422].y=2.025f; EDefscolliderCenter[422].y=0.96f; EDefsmass[422]=2.2f; EDefsangularDrag[422]=1.5f;
-    /*423 npc_cyborg_drone*/        EDefs[423].modelIndex=312; EDefs[423].texIndex=547; EDefs[423].numclips= 7; EDefs[423].animationNum=3; EDefscolliderSize[423].x=0.36f; EDefscolliderSize[423].y=2.00f; EDefsmass[423]=1.5f; EDefsangularDrag[423]=2.0f;
-    /*424 npc_cortex_reaver*/       EDefs[424].modelIndex=300; EDefs[424].texIndex=543; EDefs[424].numclips=6; EDefs[424].animationNum=23; EDefscolliderSize[424].x=1.28f; EDefscolliderSize[424].y=2.5f; EDefscolliderCenter[424].y=1.28f; EDefsmass[424]=5.0f; EDefsangularDrag[424]=3.0f;
-    /*425 npc_cyborg_warrior*/      EDefs[425].modelIndex=315; EDefs[425].texIndex=554; EDefs[425].numclips=7; EDefs[425].animationNum=28; EDefscolliderSize[425].x=0.48f; EDefscolliderSize[425].y=2.00f; EDefsmass[425]=1.5f; EDefsangularDrag[425]=2.0f;
-    /*426 npc_cyborg_enforcer*/     EDefs[426].modelIndex=314; EDefs[426].texIndex=550; EDefs[426].numclips=8; EDefs[426].animationNum=27; EDefscolliderSize[426].x=0.40f; EDefscolliderSize[426].y=2.08f; EDefscolliderCenter[426].y=1.03f;  EDefsmass[426]=1.5f;
-    /*427 npc_cyborg_elite*/        EDefs[427].modelIndex=313; EDefs[427].texIndex=548; EDefs[427].numclips=10; EDefs[427].animationNum=26; EDefscolliderSize[427].x=0.44f; EDefscolliderSize[427].y=2.20f; EDefscolliderCenter[427].y=1.09f;  EDefsmass[427]=3.5f;
-    /*428 npc_cyborg_diego*/        EDefs[428].modelIndex=309; EDefs[428].texIndex=546; EDefs[428].numclips=6; EDefs[428].animationNum=25; EDefscolliderSize[428].x=0.48f; EDefscolliderSize[428].y=2.12f; EDefscolliderCenter[428].y=1.04f; EDefsmass[428]=2.0f;
-    /*429 npc_sec1_bot*/            EDefs[429].modelIndex=333; EDefs[429].texIndex=573; EDefs[429].numclips=2; EDefs[429].animationNum=38; EDefscolliderSize[429].x=0.76f; EDefscolliderSize[429].y=1.8f; EDefscolliderCenter[429].y=0.76f; EDefsmass[429]=1.5f; EDefsangularDrag[429]=0.8f;
-    /*430 npc_sec2_bot*/            EDefs[430].modelIndex=335; EDefs[430].texIndex=574; EDefs[430].numclips=6; EDefs[430].animationNum=39; EDefscolliderSize[430].x=1.12f; EDefscolliderSize[430].y=2.40f; EDefscolliderCenter[430].y=1.08f; EDefsmass[430]=4.51f;
-    /*431 npc_maint_bot*/           EDefs[431].modelIndex=325; EDefs[431].texIndex=567; EDefs[431].numclips=4; EDefs[431].animationNum=34; EDefscolliderSize[431].x=2.00f; EDefscolliderCenter[431].y=0.78f; EDefsmass[431]=1.5f; EDefsangularDrag[431]=1.5f; EDefscol[431]=COLTYPE_SPH;
-    /*432 npc_mutant_cyborg*/       EDefs[432].modelIndex=329; EDefs[432].texIndex=569; EDefs[432].numclips=7; EDefs[432].animationNum=51; EDefscolliderCenter[432].y=0.12f; EDefscolliderSize[432].x=0.75f; EDefscolliderSize[432].y=2.30f; EDefsmass[432]=3.0f; // Josiah's assumption is that the Mutant Cyborg is the "toaster oven" to inspire the first ever ECS that LGS made on Thief as they experimented more with their entity management, per Mahk interview with Casey Muratori: https://www.youtube.com/watch?v=73Do0OScoOU
-    /*433 npc_hopper*/              EDefs[433].modelIndex=322; EDefs[433].texIndex=562; EDefs[433].numclips=8; EDefs[433].animationNum=32; EDefscolliderSize[433].x=0.96f; EDefscolliderSize[433].y=2.38f; EDefscolliderCenter[433].y=1.04f; EDefscolliderCenter[433].z=-0.16f;
-    /*434 npc_humanoid_mutant*/     EDefs[434].modelIndex=323; EDefs[434].texIndex=563; EDefs[434].numclips=6; EDefs[434].animationNum=2; EDefscolliderSize[434].x=0.38f; EDefscolliderSize[434].y=2.00f; EDefsmass[434]=1.4f; EDefsangularDrag[434]=2.0f;
-    /*435 npc_invisomut*/           EDefs[435].modelIndex=324; EDefs[435].texIndex=565; EDefs[435].numclips=5; EDefs[435].animationNum=33; EDefscol[435]=COLTYPE_CVX; EDefs[435].colMeshIndex=329; EDefsmass[435]=1.3f; EDefsangularDrag[435]=0.8f; 
-    /*436 npc_virus_mutant*/        EDefs[436].modelIndex=330; EDefs[436].texIndex=576; EDefs[436].numclips=6; EDefs[436].animationNum=41; EDefscolliderSize[436].x=0.72f; EDefscolliderSize[436].y=1.90f; EDefscolliderCenter[436].y=0.95f; EDefscolliderCenter[436].z=0.16f; EDefsmass[436]=1.4f; EDefsangularDrag[436]=2.0f;
-    /*437 npc_servbot*/             EDefs[437].modelIndex=5153;EDefs[437].texIndex=575; EDefs[437].numclips=5; EDefs[437].animationNum=40; EDefs[437].colMeshIndex=54; EDefsmass[437]=2.50f; EDefsangularDrag[437]=1.0f; EDefscol[437]=COLTYPE_CVX;
-    /*438 npc_flier_bot*/           EDefs[438].modelIndex=318; EDefs[438].texIndex=558; EDefs[438].numclips=5; EDefs[438].animationNum=30; EDefsmass[438]=1.75f; EDefsangularDrag[438]=0.8f; EDefscolliderSize[438].x=0.8f; EDefscolliderCenter[438].y=0.16f; EDefscol[438]=COLTYPE_SPH;
-    /*439 npc_zerog_mutant*/        EDefs[439].modelIndex=395; EDefs[439].texIndex=1170;EDefs[439].numclips=3; EDefs[439].animationNum=42; EDefsmass[439]=1.30f; EDefsangularDrag[439]=1.0f; EDefscolliderSize[439].x=1.6f; EDefscol[439]=COLTYPE_SPH;
-    /*440 npc_gorilla_tiger_mutant*/EDefs[440].modelIndex=320; EDefs[440].texIndex=560; EDefs[440].numclips=7; EDefs[440].animationNum=31; EDefsmass[440]=2.00f; EDefscol[440]=COLTYPE_CVX; EDefs[440].colMeshIndex=330;
-    /*441 npc_repairbot*/           EDefs[441].modelIndex=331; EDefs[441].texIndex=572; EDefs[441].numclips=4; EDefs[441].animationNum=37; EDefsmass[441]=1.50f; EDefsangularDrag[441]=2.0f; EDefscol[441]=COLTYPE_CVX; EDefs[441].colMeshIndex=331;
-    /*442 npc_plant_mutant*/        EDefs[442].modelIndex=330; EDefs[442].texIndex=570; EDefs[442].numclips=6; EDefs[442].animationNum=36; EDefsmass[442]=0.80f; EDefsangularDrag[442]=1.5f; EDefscolliderSize[442].x=0.6f; EDefscolliderSize[442].y=1.44f; EDefscolliderCenter[442].y=0.72f;
-    /*443 npc_cyberdog*/            EDefs[443].modelIndex=302; EDefsmass[443]=1.50f; EDefsangularDrag[443]=3.0f; EDefscolliderSize[443].x=0.72f; EDefscol[443]=COLTYPE_SPH;
-    /*444 npc_cyberguard*/          EDefs[444].modelIndex=303; EDefsmass[444]=2.00f; EDefsangularDrag[444]=3.0f; EDefscolliderSize[444].x=1.0f; EDefscol[444]=COLTYPE_SPH;
-    /*445 npc_cyberram*/            EDefs[445].modelIndex=304; EDefsmass[445]=2.00f; EDefsangularDrag[445]=3.0f; EDefscolliderSize[445].x=1.44f; EDefscol[445]=COLTYPE_SPH;
-    /*446 npc_cyber_reaver*/        EDefs[446].modelIndex=305; EDefsmass[446]=2.20f; EDefsangularDrag[446]=3.0f; EDefscolliderSize[446].x=0.72f; EDefscol[446]=COLTYPE_SPH;
-    /*447 npc_cybershodan*/         EDefsmass[447]=4.51f; EDefsangularDrag[447]=3.0f; EDefscolliderSize[447].x=0.28f; EDefscolliderSize[447].y=1.6f; EDefscolliderSize[447].y=2.0f;
-    /*448 item_cyber_data*/     EDefs[448].modelIndex=65; EDefscolliderSize[448].x=1.5f; EDefscol[448]=COLTYPE_SPH;
-    /*449 item_cyber_decoy*/    EDefs[449].modelIndex=72; EDefscolliderSize[449].x=1.5f; EDefscol[449]=COLTYPE_SPH;
-    /*450 item_cyber_drill*/    EDefs[450].modelIndex=68; EDefscolliderSize[450].x=1.5f; EDefscol[450]=COLTYPE_SPH;
-    /*451 item_cyber_game*/     EDefs[451].modelIndex=65; EDefscolliderSize[451].x=1.5f; EDefscol[451]=COLTYPE_SPH;
-    /*452 item_cyber_integrity*/EDefs[452].modelIndex=69; EDefscolliderSize[452].x=1.5f; EDefscol[452]=COLTYPE_SPH;
-    /*453 item_cyber_keycard*/  EDefs[453].modelIndex=70; EDefscolliderSize[453].x=1.5f; EDefscol[453]=COLTYPE_SPH;
-    /*454 item_cyber_pulser*/   EDefs[454].modelIndex=65; EDefscolliderSize[454].x=1.5f; EDefscol[454]=COLTYPE_SPH;
-    /*455 item_cyber_recall*/   EDefs[455].modelIndex=65; EDefscolliderSize[455].x=1.5f; EDefscol[455]=COLTYPE_SPH;
-    /*456 item_cyber_shield*/   EDefs[456].modelIndex=65; EDefscolliderSize[456].x=1.5f; EDefscol[456]=COLTYPE_SPH;
-    /*457 item_cyber_turbo*/    EDefs[457].modelIndex=65; EDefscolliderSize[457].x=1.5f; EDefscol[457]=COLTYPE_SPH;
-    /*458 prop_phys_barrel_chemical*/ EDefs[458].modelIndex=12; EDefs[458].texIndex=30; EDefscol[458]=COLTYPE_CVX; EDefs[458].colMeshIndex=332;
-    /*459 prop_phys_barrel_radiation*/EDefs[459].modelIndex=12; EDefs[459].texIndex=31; EDefscol[459]=COLTYPE_CVX; EDefs[459].colMeshIndex=332;
-    /*460 prop_phys_barrel_toxic*/    EDefs[460].modelIndex=12; EDefs[460].texIndex=33; EDefscol[460]=COLTYPE_CVX; EDefs[460].colMeshIndex=332;
-    /*461 prop_phys_cart*/            EDefs[461].modelIndex=40; EDefs[461].texIndex=416; EDefsmass[461]=2.5f; EDefscol[461]=COLTYPE_CVX; EDefs[461].colMeshIndex=333;
-    /*462 prop_phys_pot*/             EDefs[462].modelIndex=494; EDefsmass[462]=0.3f; EDefscol[462]=COLTYPE_CVX; EDefs[462].colMeshIndex=334;
-    /*463 prop_phys_toolcart*/        EDefs[463].modelIndex=624; EDefs[463].texIndex=865; EDefs[463].normIndex=864; EDefs[463].specIndex=866; EDefsmass[463]=20.0f; EDefsangularDrag[463]=0.2f; EDefscol[463]=COLTYPE_CVX; EDefs[463].colMeshIndex=335;
-    /*464 se_briefcase*/        EDefs[464].modelIndex=34; EDefs[464].texIndex=66; EDefs[464].glowIndex=65; EDefscol[464]=COLTYPE_MSH;
-    /*465 se_corpse_blueshirt*/ EDefs[465].modelIndex=51; EDefs[465].texIndex=126; EDefs[465].specIndex=127;
-    /*466 se_corpse_brownshirt*/EDefs[466].texIndex=128;  EDefs[466].specIndex=129;  EDefs[466].modelIndex=52; 
-    /*467 se_corpse_eaten*/     EDefs[467].texIndex=130;  EDefs[467].specIndex=131;  EDefs[467].modelIndex=53; 
-    /*468 se_corpse_labcoat*/   EDefs[468].texIndex=132;  EDefs[468].specIndex=133;  EDefs[468].modelIndex=55; 
-    /*469 se_corpse_security*/  EDefs[469].texIndex=136;  EDefs[469].specIndex=137;  EDefs[469].modelIndex=56; 
-    /*470 se_corpse_tan*/       EDefs[470].texIndex=138;  EDefs[470].modelIndex=57; 
-    /*471 se_corpse_torso*/     EDefs[471].texIndex=126;  EDefs[471].specIndex=127;  EDefs[471].modelIndex=58;
-    /*472 se_crate1*/           EDefs[472].texIndex=145; EDefs[472].modelIndex=60; EDefscol[472]=COLTYPE_BOX; EDefscolliderSize[472]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[472]=0.75f;
-    /*473 se_crate2*/           EDefs[473].texIndex=143; EDefs[473].modelIndex=60; EDefscol[473]=COLTYPE_BOX; EDefscolliderSize[473]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[473]=0.75f;
-    /*474 se_crate3*/           EDefs[474].texIndex=144; EDefs[474].modelIndex=60; EDefscol[474]=COLTYPE_BOX; EDefscolliderSize[474]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[474]=0.75f;
-    /*475 se_crate4*/           EDefs[475].texIndex=146; EDefs[475].modelIndex=60; EDefscol[475]=COLTYPE_BOX; EDefscolliderSize[475]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[475]=2.25f;
-    /*476 se_crate5*/           EDefs[476].texIndex=145; EDefs[476].modelIndex=60; EDefscol[476]=COLTYPE_BOX; EDefscolliderSize[476]=(V3){0.684186f,0.6841861f,0.6841861f}; EDefsmass[476]=2.25f;
-    /*477 sec_camera*/       EDefs[477].modelIndex=589;  EDefs[477].texIndex=73;  EDefs[477].glowIndex=72; EDefscol[477]=COLTYPE_MSH;
-    /*478 sec_cpunode*/      EDefs[478].modelIndex=587;  EDefs[478].texIndex=242;  EDefs[478].glowIndex=248; EDefscol[478]=COLTYPE_MSH;
-    /*479 sec_cpunode_small*/EDefs[479].modelIndex=588;  EDefs[479].texIndex=107; EDefscol[479]=COLTYPE_MSH;
-    /*480 weapon_cyber_mine*/ EDefs[480].modelIndex=71;  EDefs[480].texIndex=1224;
-    /*481 proj_enemshot2*/       EDefs[481].modelIndex=MAX_MDLS;
-    /*482 proj_magpulse_shot*/   EDefs[482].modelIndex=MAX_MDLS; EDefs[482].texIndex=807;
-    /*483 proj_stungun_shot*/    EDefs[483].modelIndex=MAX_MDLS; EDefs[483].texIndex=835;
-    /*484 proj_rail_shot*/       EDefs[484].modelIndex=652; 
-    /*485 proj_plasmarifle_shot*/EDefs[485].modelIndex=651; EDefsbounciness[485]=0.9f;
-    /*486 proj_enemshot6*/       EDefs[486].modelIndex=MAX_MDLS;
-    /*487 proj_enemshot5*/       EDefs[487].modelIndex=MAX_MDLS; EDefsmass[487]=0.2f;
-    /*488 proj_enemshot4*/       EDefs[488].modelIndex=MAX_MDLS;
-    /*489 proj_throwingstar*/    EDefs[489].modelIndex=307;
-    /*490 proj_magpulsenpc_shot*/EDefs[490].modelIndex=645;
-    /*491 proj_railnpc_shot*/    EDefs[491].modelIndex=MAX_MDLS;
-    /*492 proj_cyberplayer_shot*/EDefs[492].modelIndex=72;
-    /*493 proj_cyberdog_shot*/   EDefs[493].modelIndex=63;
-    /*494 proj_cyberreaver_shot*/EDefs[494].modelIndex=64;
-    /*495 proj_cyberice_shot*/   EDefs[495].modelIndex=68;
-    /*496 doorA*/         EDefs[496].modelIndex=719; EDefs[496].texIndex=185; EDefs[496].numclips=4;    EDefs[496].animationNum=1;                           
-    /*497 doorB*/         EDefs[497].modelIndex=0;  EDefs[497].texIndex=189;  EDefs[497].glowIndex=188; EDefs[497].numclips=4;    EDefs[497].animationNum=0;
-    /*498 doorC*/         EDefs[498].modelIndex=0;  EDefs[498].texIndex=184;  EDefs[498].numclips=4;    EDefs[498].animationNum=5;
-    /*499 doorD*/         EDefs[499].modelIndex=0;  EDefs[499].numclips=4;  EDefs[499].animationNum=4;  EDefs[499].texIndex=196;  EDefs[499].glowIndex=197;
-    /*500 doorE*/         EDefs[500].modelIndex=0;  EDefs[500].numclips=4;  EDefs[500].animationNum=9;  EDefs[500].texIndex=208;  EDefs[500].glowIndex=207;
-    /*501 doorF*/         EDefs[501].modelIndex=0;  EDefs[501].numclips=4;  EDefs[501].animationNum=10; EDefs[501].texIndex=187;
-    /*502 doorG*/         EDefs[502].modelIndex=0;  EDefs[502].numclips=4;  EDefs[502].animationNum=11; EDefs[502].texIndex=193;  EDefs[502].glowIndex=194;
-    /*503 doorH*/         EDefs[503].modelIndex=0;  EDefs[503].numclips=4;  EDefs[503].animationNum=12; EDefs[503].texIndex=190;
-    /*504 doorI*/         EDefs[504].modelIndex=0;  EDefs[504].numclips=4;  EDefs[504].animationNum=13; EDefs[504].texIndex=200;  EDefs[504].glowIndex=199;
-    /*505 doorJ*/         EDefs[505].modelIndex=0;  EDefs[505].numclips=4;  EDefs[505].animationNum=6;  EDefs[505].texIndex=215;
-    /*506 doorK*/         EDefs[506].modelIndex=0;  EDefs[506].numclips=4;  EDefs[506].animationNum=7;  EDefs[506].texIndex=214;
-    /*507 doorL*/         EDefs[507].modelIndex=0;  EDefs[507].numclips=4;  EDefs[507].animationNum=8;  EDefs[507].texIndex=191;
-    /*508 door_elevator1*/EDefs[508].modelIndex=0;  EDefs[508].numclips=4;  EDefs[508].animationNum=14;  EDefs[508].texIndex=202;
-    /*509 door_elevator2*/EDefs[509].modelIndex=0;  EDefs[509].numclips=4;  EDefs[509].animationNum=15;  EDefs[509].texIndex=203;
-    /*510 door_elevator3*/EDefs[510].modelIndex=0;  EDefs[510].numclips=4;  EDefs[510].animationNum=16;  EDefs[510].texIndex=206;  EDefs[510].glowIndex=205;
-    /*511 door_elevator4*/EDefs[511].modelIndex=0;  EDefs[511].numclips=4;  EDefs[511].animationNum=17;  EDefs[511].texIndex=203;
-    /*512 door_secret1*/  EDefs[512].modelIndex=0;  EDefs[512].numclips=4;  EDefs[512].animationNum=19;  EDefs[512].texIndex=210;
-    /*513 door_secret2*/  EDefs[513].modelIndex=0;  EDefs[513].numclips=4;  EDefs[513].animationNum=18;  EDefs[513].texIndex=209;
-    /*514 door_secret3*/  EDefs[514].modelIndex=94;  EDefs[514].numclips=4;  EDefs[514].animationNum=20;  EDefs[514].texIndex=211;
-    /*515 func_forcebridge*/ EDefs[515].modelIndex=78; EDefs[515].texIndex=38; EDefscol[515]=COLTYPE_BOX;
-    /*516 prop_lift2*/       EDefs[516].modelIndex=215; EDefs[516].texIndex=155; EDefs[516].glowIndex=154; EDefscol[516]=COLTYPE_BOX; EDefscolliderCenter[516]=(V3){0.0f,0.0f,0.0f};  EDefscolliderSize[516]=(V3){1.0f,1.0f,1.0f};  EDefs[516].colMeshIndex=U16_MAX; 
-    /*517 func_wall*/        EDefsmass[517]=10.0f; EDefsangularDrag[517]=0.05f; EDefsdynamicFriction[517]=0.6f; EDefsstaticFriction[517]=0.6f;
-    /*518 BulletHoleLarge*/
-    /*519 BulletHoleScorchLarge*/
-    /*520 BulletHoleScorchSmall*/
-    /*521 BulletHoleSmall*/
-    /*522 BulletHoleTiny*/
-    /*523 BulletHoleTinySpread*/
-    /*524 func_door_cyber*/      EDefs[524].modelIndex=178; EDefs[524].texIndex=1224; EDefscol[524]=COLTYPE_BOX; EDefscolliderCenter[524]=(V3){0.0f,1.31f,0.0f}; EDefscolliderSize[524]=(V3){2.56f,0.06f,2.56f}; EDefs[524].colMeshIndex=U16_MAX; 
-    /*525 prop_console01*/       EDefs[525].texIndex=100; EDefs[525].modelIndex=49; EDefscol[525]=COLTYPE_MSH;
-    /*526 prop_console02*/       EDefs[526].texIndex=100; EDefs[526].modelIndex=50; EDefscol[526]=COLTYPE_MSH;
-    /*527 prop_grate1_1*/        EDefs[527].modelIndex=186; EDefs[527].texIndex=359; EDefscol[527]=COLTYPE_MSH;
-    /*528 prop_grate1_2*/        EDefs[528].modelIndex=187; EDefs[528].texIndex=360; EDefscol[528]=COLTYPE_MSH;
-    /*529 prop_grate1_3*/        EDefs[529].modelIndex=188; EDefs[529].texIndex=361; EDefscol[529]=COLTYPE_MSH;
-    /*530 se_cabinet*/           EDefs[530].modelIndex=39; EDefs[530].texIndex=70; EDefscol[530]=COLTYPE_MSH;
-    /*531 se_thermos*/           EDefs[531].texIndex=863; EDefs[531].modelIndex=623; EDefscol[531]=COLTYPE_MSH;
-    /*532 prop_beaker_holder*/   EDefs[532].modelIndex=15; EDefs[532].texIndex=36; EDefscol[532]=COLTYPE_MSH;
-    /*533 prop_bed*/             EDefs[533].modelIndex=16; EDefs[533].texIndex=246; EDefscol[533]=COLTYPE_MSH;
-    /*534 prop_bed_hospital*/    EDefs[534].modelIndex=608; EDefs[534].texIndex=759; EDefscol[534]=COLTYPE_MSH;
-    /*535 prop_bed_neurosurgery*/EDefs[535].texIndex=18; EDefs[535].normIndex=29; EDefs[535].specIndex=1238; EDefs[535].modelIndex=17; EDefscol[535]=COLTYPE_MSH;
-    /*536 prop_bonepile1*/       EDefs[536].modelIndex=19; EDefs[536].texIndex=815; EDefscol[536]=COLTYPE_MSH;
-    /*537 prop_bridgewall1*/     EDefs[537].modelIndex=33; 
-    /*538 prop_broken_clock*/    EDefs[538].modelIndex=38; EDefs[538].texIndex=1117; EDefs[538].altTexIndex=1118; EDefs[538].glowIndex=1115; EDefs[538].altGlowIndex=1116; 
-    /*539 prop_brokengun*/       EDefs[539].modelIndex=639; EDefs[539].texIndex=878; 
-    /*540 prop_chair01*/         EDefs[540].modelIndex=41; EDefs[540].texIndex=195; EDefscol[540]=COLTYPE_MSH;
-    /*541 prop_chair02*/         EDefs[541].modelIndex=42; EDefs[541].texIndex=195; EDefscol[541]=COLTYPE_MSH;
-    /*542 prop_chair03*/         EDefs[542].modelIndex=43; EDefs[542].texIndex=195; EDefscol[542]=COLTYPE_MSH;
-    /*543 prop_chair04*/         EDefs[543].modelIndex=41; EDefs[543].texIndex=195; EDefscol[543]=COLTYPE_MSH;
-    /*544 prop_chair05*/         EDefs[544].modelIndex=42; EDefs[544].texIndex=195; EDefscol[544]=COLTYPE_MSH;
-    /*545 prop_chandelier*/      EDefs[545].modelIndex=496; EDefs[545].texIndex=644;
-    /*546 prop_charge_station*/  EDefs[546].modelIndex=44; EDefs[546].texIndex=77; EDefs[546].glowIndex=76; EDefscol[546]=COLTYPE_MSH;
-    /*547 prop_clothes*/         EDefs[547].modelIndex=47; EDefs[547].texIndex=97; EDefscol[547]=COLTYPE_MSH;
-    /*548 prop_computer*/        EDefs[548].modelIndex=48; EDefs[548].texIndex=195; EDefscol[548]=COLTYPE_MSH;
-    /*549 prop_couch*/           EDefs[549].modelIndex=59; EDefs[549].texIndex=195; EDefscol[549]=COLTYPE_MSH;
-    /*550 prop_couch2*/          EDefs[550].modelIndex=59; EDefs[550].texIndex=195; EDefscol[550]=COLTYPE_MSH;
-    /*551 prop_cpuscreen*/       EDefs[551].modelIndex=178; EDefs[551].texIndex=768; EDefscol[551]=COLTYPE_MSH;
-    /*552 prop_cyber_datafrag*/  EDefs[552].modelIndex=78; 
-    /*553 prop_cyber_decoy*/     EDefs[553].modelIndex=78; 
-    /*554 prop_cyber_exit*/      EDefs[554].modelIndex=78; 
-    /*555 prop_cyber_switch*/    EDefs[555].modelIndex=0; 
-    /*556 prop_cyberport*/       EDefs[556].modelIndex=62; EDefs[556].texIndex=117; EDefs[556].glowIndex=116; EDefscol[556]=COLTYPE_MSH;
-    /*557 prop_desk01*/          EDefs[557].modelIndex=74; EDefs[557].texIndex=125; EDefscol[557]=COLTYPE_MSH;
-    /*558 prop_desk02*/          EDefs[558].modelIndex=75; EDefs[558].texIndex=124; EDefscol[558]=COLTYPE_MSH;
-    /*559 prop_dexmissile*/            EDefs[559].modelIndex=76; EDefs[559].texIndex=164; EDefs[559].glowIndex=162; 
-    /*560 prop_foliage_fernpoison*/    EDefs[560].modelIndex=160; EDefs[560].texIndex=331; EDefscol[560]=COLTYPE_MSH;
-    /*561 prop_foliage_bush*/          EDefs[561].modelIndex=495; EDefs[561].texIndex=643; EDefs[561].glowIndex=642; EDefscol[561]=COLTYPE_MSH;
-    /*562 prop_foliage_fern*/          EDefs[562].modelIndex=160; EDefs[562].texIndex=333; EDefs[562].glowIndex=330; 
-    /*563 prop_foliage_fernblueflower*/EDefs[563].modelIndex=159; EDefs[563].texIndex=333; EDefs[563].glowIndex=330; 
-    /*564 prop_foliage_pinetreem*/     EDefs[564].modelIndex=489; EDefs[564].texIndex=594;
-    /*565 prop_foliage_poisonbush1*/   EDefs[565].modelIndex=493; EDefs[565].texIndex=638;
-    /*566 prop_gear_large*/            EDefs[566].modelIndex=166; EDefs[566].texIndex=335; EDefscol[566]=COLTYPE_MSH;
-    /*567 prop_gear_small*/            EDefs[567].modelIndex=167; EDefs[567].texIndex=336; EDefscol[567]=COLTYPE_MSH;
-    /*568 prop_grass1*/                EDefs[568].texIndex=329;
-    /*569 prop_grass2*/                EDefs[569].texIndex=329;
-    /*570 prop_grass3*/                EDefs[570].texIndex=329;
-    /*571 prop_grass4*/                EDefs[571].texIndex=329;
-    /*572 prop_grass5*/                EDefs[572].texIndex=329;
-    /*573 prop_grate4*/                EDefs[573].modelIndex=161; EDefs[573].texIndex=329; EDefscol[573]=COLTYPE_MSH;
-    /*574 prop_healingbed*/ EDefs[574].modelIndex=195; EDefs[574].texIndex=1139; EDefscol[574]=COLTYPE_MSH;
-    /*575 prop_lamp*/ EDefs[575].modelIndex=212; EDefs[575].texIndex=423; EDefscol[575]=COLTYPE_MSH;
-    /*576 prop_light_emergsignal*/ EDefs[576].modelIndex=216; EDefs[576].texIndex=426; EDefs[576].altTexIndex=424; EDefs[576].glowIndex=0; EDefs[576].altGlowIndex=424; EDefscol[576]=COLTYPE_MSH;
-    /*577 prop_microscope*/ EDefs[577].modelIndex=298; EDefs[577].texIndex=645; EDefs[577].specIndex=1241; EDefscol[577]=COLTYPE_MSH;
-    /*578 prop_pipe*/ EDefs[578].modelIndex=490; EDefs[578].texIndex=595; EDefscol[578]=COLTYPE_MSH;
-    /*579 prop_puddle*/ EDefs[579].modelIndex=157; EDefs[579].texIndex=648;
-    /*580 prop_puddle_grease*/ EDefs[580].modelIndex=157; EDefs[580].texIndex=650;
-    /*581 prop_puddle_oil*/ EDefs[581].modelIndex=157; EDefs[581].texIndex=652;
-    /*582 prop_shelves*/ EDefs[582].modelIndex=591; EDefs[582].texIndex=94; EDefscol[582]=COLTYPE_MSH;
-    /*583 prop_skeleton*/ EDefs[583].modelIndex=592; EDefs[583].texIndex=815; EDefscol[583]=COLTYPE_MSH;
-    /*584 prop_sleeping_cables*/ EDefs[584].modelIndex=595; EDefs[584].texIndex=71;
-    /*585 prop_sparkingwire*/ EDefs[585].modelIndex=0; EDefs[585].numclips=1; EDefs[585].animationNum=46; EDefs[585].texIndex=71;
-    /*586 prop_table*/ EDefs[586].modelIndex=619; EDefs[586].texIndex=92; EDefscol[586]=COLTYPE_MSH;
-    /*587 prop_tv_on_a_post*/ EDefs[587].modelIndex=625; EDefs[587].texIndex=1228; EDefscol[587]=COLTYPE_MSH;
-    /*588 prop_vendingmachines1*/ EDefs[588].modelIndex=627; EDefs[588].texIndex=870; EDefscol[588]=COLTYPE_MSH;
-    /*589 prop_vendingmachines2*/ EDefs[589].modelIndex=614; EDefs[589].texIndex=871; EDefscol[589]=COLTYPE_MSH;
-    /*590 prop_weapon_rack*/ EDefs[590].modelIndex=641; EDefs[590].texIndex=113; EDefscol[590]=COLTYPE_MSH;
-    /*591 prop_xray*/ EDefs[591].modelIndex=660; EDefs[591].texIndex=153; EDefscol[591]=COLTYPE_MSH;
-    /*592 text_decal*/ EDefs[592].modelIndex=77;
-    /*593 text_decalStopDSS1*/ EDefs[593].modelIndex=77; 
-    /*594 trigger_counter*/
-    /*595 trigger_cyberpush*/
-    /*596 trigger_gravitylift*/
-    /*597 trigger_ladder*/
-    /*598 trigger_multiple*/
-    /*599 trigger_music*/
-    /*600 trigger_once*/
-    /*601 trigger_radiation*/
-    /*602 us_isotopepanel*/ EDefs[602].modelIndex=0;  EDefs[602].texIndex=616;  EDefs[602].numclips=5;  EDefs[602].animationNum=44; 
-    /*603 us_paperlog*/ EDefs[603].modelIndex=486;  EDefs[603].texIndex=580; 
-    /*604 us_puz_elevatorkeypad*/ EDefs[604].modelIndex=615;  EDefs[604].texIndex=247; 
-    /*605 us_puz_elevatorkeypad2*/ EDefs[605].modelIndex=618;  EDefs[605].texIndex=250; 
-    /*606 us_puz_elevatorkeypad3*/ EDefs[606].modelIndex=615;  EDefs[606].texIndex=247; 
-    /*607 us_puz_elevatorkeypad4*/ EDefs[607].modelIndex=210;  EDefs[607].texIndex=249; 
-    /*608 us_puz_keypad*/ EDefs[608].modelIndex=211;  EDefs[608].texIndex=414; 
-    /*609 us_puz_panel_blue_grid*/ EDefs[609].modelIndex=0;  EDefs[609].texIndex=604;  EDefs[609].numclips=3;  EDefs[609].animationNum=43; 
-    /*610 us_puz_panel_brown_grid*/ EDefs[610].modelIndex=0;  EDefs[610].texIndex=604;  EDefs[610].numclips=3;  EDefs[610].animationNum=43; 
-    /*611 us_puz_panel_gray_grid*/ EDefs[611].modelIndex=0;  EDefs[611].texIndex=634;  EDefs[611].numclips=3;  EDefs[611].animationNum=43; 
-    /*612 us_puz_panel_red_grid*/ EDefs[612].modelIndex=0;  EDefs[612].texIndex=625;  EDefs[612].numclips=3;  EDefs[612].animationNum=43; 
-    /*613 us_puz_panel_teal_grid*/ EDefs[613].modelIndex=0;  EDefs[613].texIndex=601;  EDefs[613].numclips=3;  EDefs[613].animationNum=43; 
-    /*614 us_relaypanel*/ EDefs[614].modelIndex=0;  EDefs[614].texIndex=617;  EDefs[614].numclips=4;  EDefs[614].animationNum=45; 
-    /*615 us_retinalscanner*/ EDefs[615].modelIndex=79;  EDefs[615].texIndex=46; 
-    /*616 prop_vending1_1*/ EDefs[616].modelIndex=627;  EDefs[616].texIndex=870; 
-    /*617 prop_vending1_2*/ EDefs[617].modelIndex=628;  EDefs[617].texIndex=870; 
-    /*618 prop_vending1_3*/ EDefs[618].modelIndex=629;  EDefs[618].texIndex=870; 
-    /*619 prop_vending2_1*/ EDefs[619].modelIndex=614;  EDefs[619].texIndex=871; 
-    /*620 prop_vending2_2*/ EDefs[620].modelIndex=621;  EDefs[620].texIndex=871; 
-    /*621 ambient_airhiss*/ EDefs[621].volume=0.05f;
-    /*622 ambient_clicker*/ EDefs[622].volume=0.20f;
-    /*623 ambient_compressor*/ EDefs[623].volume=0.4f;
-    /*624 ambient_dishwasher*/ EDefs[624].volume=0.2f;
-    /*625 ambient_drip_amb*/   EDefs[625].volume=0.5f;
-    /*626 ambient_fan*/        EDefs[626].volume=0.3f;
-    /*627 ambient_generator_gas*/ EDefs[627].volume=0.3f;
-    /*628 ambient_gurgle*/    EDefs[628].volume=0.3f;
-    /*629 ambient_icemaker*/  EDefs[629].volume=0.6f;
-    /*630 ambient_intake*/    EDefs[630].volume=0.2f;
-    /*631 ambient_lathe*/     EDefs[631].volume=0.4f;
-    /*632 ambient_lev3loop1*/ EDefs[632].volume=0.1f;
-    /*633 ambient_lev3loop2*/ EDefs[633].volume=0.1f;
-    /*634 ambient_lev3loop3*/ EDefs[634].volume=0.1f;
-    /*635 ambient_lev3loop4*/ EDefs[635].volume=0.1f;
-    /*636 ambient_liquid_bubble*/     EDefs[636].volume=1.0f;
-    /*637 ambient_liquid_lava2*/      EDefs[637].volume=0.4f;
-    /*638 ambient_looping*/           EDefs[638].volume=0.4f;
-    /*639 ambient_machgear_loop*/     EDefs[639].volume=0.4f;
-    /*640 ambient_machine_ambience*/  EDefs[640].volume=0.8f;
-    /*641 ambient_machine_go*/        EDefs[641].volume=0.6f;
-    /*642 ambient_machine_humamb7*/   EDefs[642].volume=1.0f;
-    /*643 ambient_machine_humlonoise*/EDefs[643].volume=0.4f;
-    /*644 ambient_machine_loop1*/     EDefs[644].volume=0.4f;
-    /*645 ambient_machine_loop2*/     EDefs[645].volume=0.4f;
-    /*646 ambient_machinea1*/         EDefs[646].volume=0.4f;
-    /*647 ambient_machinevat_loop*/   EDefs[647].volume=0.8f;
-    /*648 ambient_mist*/              EDefs[648].volume=0.02f;
-    /*649 ambient_pipewater_loop*/    EDefs[649].volume=0.65f;
-    /*650 ambient_powerloom*/         EDefs[650].volume=0.3f;
-    /*651 ambient_pump*/              EDefs[651].volume=0.2f;
-    /*652 ambient_pump2*/             EDefs[652].volume=0.05f;
-    /*653 ambient_rain*/              EDefs[653].volume=0.55f;
-    /*654 ambient_steam_loop*/        EDefs[654].volume=0.1f;
-    /*655 ambient_washing_machine*/   EDefs[655].volume=0.5f;
-    /*656 decal_blood_die*/ EDefs[656].modelIndex=77;  EDefs[656].texIndex=237;
-    /*657 decal_blood_resist*/ EDefs[657].modelIndex=77;  EDefs[657].texIndex=240;
-    /*658 decal_blood_stayaway*/ EDefs[658].modelIndex=77;  EDefs[658].texIndex=235;
-    /*659 decal_blood_words2*/ EDefs[659].modelIndex=77;  EDefs[659].texIndex=236;
-    /*660 decal_bloodfonta*/ EDefs[660].modelIndex=178;  EDefs[660].texIndex=118;
-    /*661 decal_bloodfonte*/ EDefs[661].modelIndex=178;  EDefs[661].texIndex=121;
-    /*662 decal_bloodfontg*/ EDefs[662].modelIndex=178;  EDefs[662].texIndex=122;
-    /*663 decal_bloodfonth*/ EDefs[663].modelIndex=178;  EDefs[663].texIndex=89;
-    /*664 decal_bloodfontr*/ EDefs[664].modelIndex=178;  EDefs[664].texIndex=139;
-    /*665 decal_bloodfonty*/ EDefs[665].modelIndex=178;  EDefs[665].texIndex=140;
-    /*666 decal_bloodsplat2*/ EDefs[666].modelIndex=157;  EDefs[666].texIndex=130;
-    /*667 decal_logo_antenna*/ EDefs[667].modelIndex=77;  EDefs[667].texIndex=182;
-    /*668 decal_logo_armory*/ EDefs[668].modelIndex=77;  EDefs[668].texIndex=178;
-    /*669 decal_logo_biohazard*/ EDefs[669].modelIndex=77;  EDefs[669].texIndex=180;
-    /*670 decal_logo_bridge*/ EDefs[670].modelIndex=77;  EDefs[670].texIndex=181;
-    /*671 decal_logo_cyborg*/ EDefs[671].modelIndex=77;  EDefs[671].texIndex=176;
-    /*672 decal_logo_gears*/ EDefs[672].modelIndex=77;  EDefs[672].texIndex=174;
-    /*673 decal_logo_medical*/ EDefs[673].modelIndex=77;  EDefs[673].texIndex=165;
-    /*674 decal_logo_radhazard*/ EDefs[674].modelIndex=77;  EDefs[674].texIndex=177;
-    /*675 decal_logo_research*/ EDefs[675].modelIndex=77;  EDefs[675].texIndex=175;
-    /*676 decal_logo_security*/ EDefs[676].modelIndex=77;  EDefs[676].texIndex=167;
-    /*677 decal_painting1*/ EDefs[677].modelIndex=77;  EDefs[677].texIndex=218;  EDefs[677].glowIndex=216;  EDefs[677].normIndex=217;
-    /*678 decal_painting2*/ EDefs[678].modelIndex=77;  EDefs[678].texIndex=220;  EDefs[678].glowIndex=219;
-    /*679 decal_painting3*/ EDefs[679].modelIndex=77;  EDefs[679].texIndex=222;  EDefs[679].glowIndex=221;
-    /*680 decal_posterbetterfuture*/ EDefs[680].modelIndex=77;  EDefs[680].texIndex=226;  EDefs[680].normIndex=225;
-    /*681 decal_postergenetics*/ EDefs[681].modelIndex=77;  EDefs[681].texIndex=224;  EDefs[681].normIndex=223;
-    /*682 decal_scorch1*/        EDefs[682].modelIndex=77;  EDefs[682].texIndex=227;
-    /*683 decal_scorch2*/        EDefs[683].modelIndex=77;  EDefs[683].texIndex=228;
-    /*684 decal_scorch3*/        EDefs[684].modelIndex=77;  EDefs[684].texIndex=229;
-    /*685 decal_scorch4*/        EDefs[685].modelIndex=77;  EDefs[685].texIndex=230;
-    /*686 decal_scorchtiny*/     EDefs[686].modelIndex=77;  EDefs[686].texIndex=232;
-    /*687 decal_blood_splat*/    EDefs[687].modelIndex=77;  EDefs[687].texIndex=234;
-    /*688 func_switch1*/         EDefs[688].modelIndex=609; EDefs[688].texIndex=837; EDefscolliderSize[688]=(V3){0.32f,0.04f,0.32f};
-    /*689 func_switch2*/         EDefs[689].modelIndex=610; EDefs[689].texIndex=839; EDefs[689].mainSwitchMaterial=839; EDefs[689].altTexIndex=841; EDefs[689].altGlowIndex=840;  EDefs[689].changeTexOnActive=true; EDefs[689].blinkTexOnActive=true; EDefscolliderCenter[689]=(V3){-0.0243553f,0.0f,0.000004883f}; EDefscolliderSize[689]=(V3){0.0476318f,0.64f,0.64f};
-    /*690 func_switch3*/         EDefs[690].modelIndex=611; EDefs[690].texIndex=842; EDefs[690].altTexIndex=844; EDefs[690].altGlowIndex=843; EDefs[690].changeTexOnActive=true;  EDefscolliderCenter[690]=(V3){-0.02285008f,0.000053061f,-0.000056993f};  EDefscolliderSize[690]=(V3){0.02f,0.32f,0.32f}; 
-    /*691 func_switch4*/         EDefs[691].modelIndex=612; EDefs[691].texIndex=846; EDefscolliderCenter[691].x=0.06f; EDefscolliderSize[691]=(V3){0.2f,0.64f,0.64f}; 
-    /*692 func_switch5*/         EDefs[692].modelIndex=614; EDefs[692].texIndex=848; EDefscolliderSize[692]=(V3){0.64f,0.64f,0.08f};
-    /*693 func_switch5broken*/   EDefs[693].modelIndex=613; EDefs[693].texIndex=847; EDefscolliderSize[693]=(V3){0.64f,0.64f,0.08f}; 
-    /*694 func_switch7*/         EDefs[694].modelIndex=612; EDefs[694].texIndex=854; EDefscolliderCenter[694].x=1.523325f;  EDefscolliderSize[694]=(V3){0.2008026f,0.64f,0.64f};
-    /*695 func_switch8*/         EDefs[695].modelIndex=616; EDefs[695].texIndex=856; EDefs[695].altTexIndex=858;  EDefs[695].glowIndex=855;  EDefs[695].altGlowIndex=857;  EDefs[695].changeTexOnActive=true; EDefscolliderCenter[695]=(V3){-0.04f,0.0f,0.0001220703f};  EDefscolliderSize[695]=(V3){0.08f,0.64f,0.64f};
-    /*696 func_switchbroken1*/   EDefs[696].modelIndex=617; EDefs[696].texIndex=618; 
-    /*697 clip_npc*/             EDefscolliderCenter[697].x=1.005016f; EDefscolliderSize[697]=(V3){2.010033f,16.0f,16.0f};
-    /*698 clip_objects*/         EDefscolliderSize[698]=(V3){2.56f,2.56f,2.56f};
-    /*699 logic_relay*/
-    /*700 logic_branch*/
-    /*701 logic_timer*/
-    /*702 logic_spawner*/
-    /*703 info_teleport_destination*/
-    /*704 prop_debris_panel*/
-    /*705 info_cyborgconversion*/
-    /*706 info_elev_destination*/
-    /*707 info_email*/
-    /*708 info_gameend*/
-    /*709 info_message*/
-    /*710 info_mission*/
-    /*711 info_note*/
-    /*712 info_playsound*/
-    /*713 info_ressurection_point*/
-    /*714 info_screenshake*/
-    /*715 info_spawnpoint*/
-    /*716 fx_reverbzone*/
-    /*717 ef_cyber_ice*/ EDefscol[717]=COLTYPE_SPH;  EDefscolliderCenter[717]=(V3){0.0f,0.004354001f,-0.014725f};  EDefscolliderSize[717]=(V3){1.0f,0.0f,0.0f};  EDefs[717].colMeshIndex=U16_MAX; 
-    /*718 ef_fragexplosion*/
-    /*719 ef_line_sparqbeam*/
-    /*720 ef_mist*/
-    /*721 ef_particle_bloodspurtsmall*/
-    /*722 ef_particle_bloodspurtsmallgreen*/
-    /*723 ef_particle_bloodspurtsmallyellow*/
-    /*724 ef_particle_bloodspurttiny*/
-    /*725 ef_particle_camerahit*/
-    /*726 ef_particle_darthit*/
-    /*727 ef_particle_sec2muzburst*/
-    /*728 ef_particle_sec2rotmuzburst*/
-    /*729 ef_particle_sparksmall*/
-    /*730 ef_particle_sparksmallblue*/
-    /*731 ef_particle_sparqhit*/
-    /*732 ef_sparkspits*/
-    /*733 ef_spraydrips*/
-    /*734 ef_steam*/
-    /*735 env_sparksmall*/
-    /*736 TargetIDInstance*/
-    /*737 prop_papers01*/ EDefs[737].modelIndex=484;  EDefs[737].texIndex=580; 
-    /*738 prop_papers02*/ EDefs[738].modelIndex=485;  EDefs[738].texIndex=580; 
-    /*739 ef_particle_blasterhit*/
-    /*740 ef_particle_ionhit*/
-    /*741 us_puz_panel_blue_wire*/       EDefs[741].modelIndex=0;  EDefs[741].texIndex=604;  EDefs[741].numclips=3;  EDefs[741].animationNum=43; 
-    /*742 us_puz_panel_brown_wire*/      EDefs[742].modelIndex=0;  EDefs[742].texIndex=631;  EDefs[742].numclips=3;  EDefs[742].animationNum=43; 
-    /*743 us_puz_panel_gray_wire*/       EDefs[743].modelIndex=0;  EDefs[743].texIndex=634;  EDefs[743].numclips=3;  EDefs[743].animationNum=43; 
-    /*744 us_puz_panel_red_wire*/        EDefs[744].modelIndex=0;  EDefs[744].texIndex=625;  EDefs[744].numclips=3;  EDefs[744].animationNum=43; 
-    /*745 us_puz_panel_teal_wire*/       EDefs[745].modelIndex=0;  EDefs[745].texIndex=601;  EDefs[745].numclips=3;  EDefs[745].animationNum=43; 
-    /*746 weapon_grenadeenergmine_live*/ EDefs[746].modelIndex=169;  EDefs[746].texIndex=852; 
-    /*747 decal_logo_storage*/           EDefs[747].modelIndex=77;  EDefs[747].texIndex=169;
-    /*748 light_animated*/
-    /*749 generic_transform*/
-    /*750 chunk_crate_impenetrable2*/    EDefs[750].modelIndex=61;  EDefs[750].texIndex=147; 
-    /*751 chunk_crate_impenetrable3*/    EDefs[751].modelIndex=61;  EDefs[751].texIndex=148; 
-    /*752 chunk_crate_impenetrable4*/    EDefs[752].modelIndex=61;  EDefs[752].texIndex=149; 
-    /*753 npc_sec3_bot*/                 EDefs[753].modelIndex=681;  EDefs[753].texIndex=553; 
-    /*754 prop_shieldgenerator*/         EDefs[754].modelIndex=143;  EDefs[754].texIndex=316; 
-    /*755 unused*/
-    /*756 ef_particle_leafburst*/
-    /*757 ef_particle_mutationburst*/
-    /*758 ef_particle_graytationburst*/
-    /*759 through 766 unused*/
-    /*767 player (mostly just so any index checks don't accidentally trigger against player by its index)*/
-}
 // Lights
 __attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* lanim) {
     i32 i = World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++; if (World.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,World.curLev); OS_Exit(1); }
@@ -874,12 +859,11 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (World.instCount >= INSTANCE_COUNT) { DualLogError("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return 0; }
     u16 i = World.instCount;
     mset(&World.instances[i],0,sizeof(Entity));
-    World.instances[i].entflags=EF_ACTIVE; World.layer[i]=L_Default;World.instances[i].camView=255; World.angularDrag[i]=0.05f;
+    World.instances[i].entflags=EF_ACTIVE; World.layer[i]=L_Default;World.instances[i].camView=255;
     World.instances[i].modelIndex=World.instances[i].lodIndex=World.instances[i].colMeshIndex=MAX_MDLS;
     World.instances[i].texIndex=World.instances[i].glowIndex=World.instances[i].specIndex=World.instances[i].normIndex = MAX_TXRS;
-    World.scale[i].x=World.scale[i].y=World.scale[i].z=World.mass[i]=World.instances[i].volume=World.rotation[i].w=1.0f; World.dynamicFriction[i]=0.5f; World.staticFriction[i]=0.6f;
-    World.instances[i].index = entIdx;
-    World.position[i] = pos;
+    World.scale[i].x=World.scale[i].y=World.scale[i].z=World.mass[i]=World.rotation[i].w=1.0f; World.dynamicFriction[i]=0.5f; World.staticFriction[i]=0.6f;
+    World.instances[i].index = entIdx;    World.position[i] = pos;
     if (entIdx == 424) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.8f; } // npc_cortex_reaver
     if (entIdx == 430) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.9f; } // npc_sec2_bot
     if (entIdx == 431) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.4f; } // npc_maint_bot
@@ -891,26 +875,23 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx == 446) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 1.1f; } // npc_cyber_reaver
     if (entIdx == 475 || entIdx == 476) World.scale[i] = (V3){1.75f,1.75f,1.75f};
     if (IdxIsNPC(entIdx)) InitNPC(i);
+    if (IdxIsDoor(entIdx)) { World.instances[i].SFXIndex = 75; }
     World.instances[i].modelIndex = EDefs[entIdx].modelIndex;
     World.instances[i].colMeshIndex = EDefs[entIdx].colMeshIndex;
-    World.instances[i].numclips = EDefs[entIdx].numclips;
     World.instances[i].animationNum = EDefs[entIdx].animationNum;
     World.instances[i].texIndex = EDefs[entIdx].texIndex;
     World.instances[i].glowIndex = EDefs[entIdx].glowIndex >= MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
     World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAX_TXRS ? 0 : EDefs[entIdx].specIndex;
     World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAX_TXRS ? 0 : EDefs[entIdx].normIndex;
-    World.instances[i].lodIndex = EDefs[entIdx].lodIndex;
-    flag_set(&World.instances[i].entflags,EF_RIGIDBODY,EDefs[entIdx].entflags & EF_RIGIDBODY);
-    flag_set(&World.instances[i].entflags,EF_NO_SHADOWS,EDefs[entIdx].entflags & EF_NO_SHADOWS);
-    World.col[i] = EDefscol[entIdx];
-    World.colliderCenter[i] = EDefscolliderCenter[entIdx];
-    World.colliderSize[i] = EDefscolliderSize[entIdx];
-    World.mass[i] = EDefsmass[entIdx] > 0.0f ? EDefsmass[entIdx] : 1.0f;
-    World.angularDrag[i] = EDefsangularDrag[entIdx] > 0.0f ? EDefsangularDrag[entIdx] : 0.05f;
+    flag_set(&World.instances[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(entIdx));
+    World.col[i] = EDefs[entIdx].col;
+    World.colliderCenter[i] = EDefs[entIdx].colCtr;
+    World.colliderSize[i] = EDefs[entIdx].colSz;
+    World.mass[i] = EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f;
     World.gravity[i] = IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f;
-    World.instances[i].lockedMessageLingdex = EDefs[entIdx].lockedMessageLingdex;
-    World.instCount++;
-    World.levelInstCount[World.currentLevel] = World.instCount;
+    if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; } // ButtonSwitch
+    if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=COLTYPE_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; }
+    World.instCount++; World.levelInstCount[World.currentLevel]=World.instCount;
     return i;
 }
 
@@ -948,10 +929,8 @@ void SetLevelPointers(u8 lev) {
     World.gravity          = World.levelGravity[lev];
     World.inertiaTensor    = World.levelInertiaTensor[lev];
     World.invInertiaTensor = World.levelInvInertiaTensor[lev];
-    World.angularDrag      = World.levelAngularDrag[lev];
     World.dynamicFriction  = World.levelDynamicFriction[lev];
     World.staticFriction   = World.levelStaticFriction[lev];
-    World.bounciness       = World.levelBounciness[lev];
     World.invTnsrValid     = World.levelInvTnsrValid[lev];
     World.colliding        = World.levelColliding[lev];
     World.instCount        = World.levelInstCount[lev];
@@ -979,10 +958,8 @@ void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
     World.levelGravity[dstLevel][s]              = World.levelGravity[srcLevel][s];
     mcpy(World.levelInertiaTensor[dstLevel][s],    World.levelInertiaTensor[srcLevel][s],    6 * sizeof(float));
     mcpy(World.levelInvInertiaTensor[dstLevel][s], World.levelInvInertiaTensor[srcLevel][s], 6 * sizeof(float));
-    World.levelAngularDrag[dstLevel][s]          = World.levelAngularDrag[srcLevel][s];
     World.levelDynamicFriction[dstLevel][s]      = World.levelDynamicFriction[srcLevel][s];
     World.levelStaticFriction[dstLevel][s]       = World.levelStaticFriction[srcLevel][s];
-    World.levelBounciness[dstLevel][s]           = World.levelBounciness[srcLevel][s];
     World.levelInvTnsrValid[dstLevel][s]         = World.levelInvTnsrValid[srcLevel][s];
     World.levelColliding[dstLevel][s]            = World.levelColliding[srcLevel][s];
 }
@@ -1041,7 +1018,6 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("delay"))           inst->delay = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("locked"))          flag_set(&inst->entflags, EF_LOCKED, parse_bool(value, lineSpace, lineNum));
                 else if (KEY_EQ("active"))          inst->active = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("alternateOn"))     inst->alternateOn = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("onlyTargetOnce"))  inst->onlyOnce = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("targetAlreadyDone")) inst->targetAlreadyDone = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("stayOpen"))        inst->stayOpen = parse_bool(value, lineSpace, lineNum);
@@ -1057,8 +1033,6 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("useFinished"))     inst->useFinished = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
                 else if (KEY_EQ("waitBeforeClose")) inst->waitBeforeClose = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
                 else if (KEY_EQ("lasersFinished"))  inst->lasersFinished = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
-                else if (KEY_EQ("changeMatOnActive")) inst->changeTexOnActive = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("blinkWhenActive")) inst->blinkTexOnActive = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("doorOpen"))        flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPEN, parse_bool(value, lineSpace, lineNum));
                 else if (KEY_EQ("doorOpenIfUnlocked") || KEY_EQ("doorToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPENIFUNLOCKED, parse_bool(value, lineSpace, lineNum));
                 else if (KEY_EQ("doorClose"))       flag_set(&inst->ioflags, TARG_IOFLAGS_DOORCLOSE, parse_bool(value, lineSpace, lineNum));
@@ -1118,7 +1092,6 @@ void LoadLevelMod(u8 lev) {
         par->damage                = src->damage;
         par->delay                 = src->delay;
         par->active                = src->active;
-        par->alternateOn           = src->alternateOn;
         par->onlyOnce              = src->onlyOnce;
         par->targetAlreadyDone     = src->targetAlreadyDone;
         par->stayOpen              = src->stayOpen;
@@ -1134,8 +1107,6 @@ void LoadLevelMod(u8 lev) {
         par->useFinished           = src->useFinished;
         par->waitBeforeClose       = src->waitBeforeClose;
         par->lasersFinished        = src->lasersFinished;
-        par->changeTexOnActive     = src->changeTexOnActive;
-        par->blinkTexOnActive      = src->blinkTexOnActive;
         par->securityThreshold     = src->securityThreshold;
         par->texAnimRandom         = src->texAnimRandom;
         par->texAnimInReverse      = src->texAnimInReverse;

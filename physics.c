@@ -14,7 +14,7 @@ bool PhysIsAsleep(u16 i) { return World.physSleep[i] != 0; } // exposed for show
 INLINE bool AnimWaking(u16 j) {
     if (j == PLAYER1) return false;
     u16 an = World.instances[j].animationNum;
-    if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAX_ANIMS && World.instances[j].clip < MAX_ANIMCLIPS && World.instances[j].numclips > 0)) return false;
+    if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAX_ANIMS && World.instances[j].clip < MAX_ANIMCLIPS)) return false;
     u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate;
     return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0;
 }
@@ -723,10 +723,13 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
     if (!sc->bStatic) { quat_to_mat3(World.rotation[b],sc->Rb); BuildInvInertiaMatrix(b,sc->Rb,sc->Kb); }
     sc->invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a]; sc->invMassB = (sc->bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
     sc->canRotateA = (World.col[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index)); sc->canRotateB = (!sc->bStatic && World.col[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index));
+    float bouncinessA = (World.instances[a].index == 485/*proj_plasmarifle_shot*/ ? 0.9f : 0.3f);
+    float bouncinessB = (World.instances[b].index == 485/*proj_plasmarifle_shot*/ ? 0.9f : 0.3f); if (sc->bStatic) bouncinessB = 0.0f;
+    if (a == PLAYER1 || b == PLAYER1 || IdxIsNPC(a) || IdxIsNPC(b)) bouncinessA = bouncinessB = 0.0f;
     for (int i=0;i<m->n;++i) {
         sc->rA[i] = V3_AsubB(m->p[i].point,World.position[a]); sc->rB[i] = sc->bStatic ? (V3){0,0,0} : V3_AsubB(m->p[i].point,World.position[b]);
         V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],sc->rA[i])), vAtB = sc->bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],sc->rB[i]));
-        float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal), e_r = (vn0 < -0.5f) ? vmax(World.bounciness[a],sc->bStatic ? 0.0f : World.bounciness[b]) : 0.0f;
+        float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal), e_r = (vn0 < -0.5f) ? vmax(bouncinessA,bouncinessB) : 0.0f;
         sc->targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f;
         sc->targetVn[i] += 0.22f * vmax(m->p[i].pen - 0.06f, 0.0f) / dt; // per-point Baumgarte bias, frozen at gather time
         V3 rAxN = V3_Cross(sc->rA[i],m->normal), rBxN = V3_Cross(sc->rB[i],m->normal);

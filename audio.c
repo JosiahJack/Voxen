@@ -777,14 +777,12 @@ static void audio_mix_period(i16 *out) {
 }
 
 void play_wav(const char *path,float volume,V3 pos,bool positional) {
-    if (!path || slen(path) < 1 || sEqual(path,"null")) return;
-    char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path);
-    i32 slot = GetFreeWavSlot();
-    if (slot==-1) { u32 cur = __c11_atomic_load(&wav_count,2/*acquire*/); if (cur < MAX_CHANNELS) slot = (i32)__c11_atomic_fetch_add(&wav_count,1u,3/*release*/); }
-    if (slot==-1) { DualLog("WARNING: Max WAV channels (%d) reached\n",MAX_CHANNELS); return; }
+    if(!path || slen(path) < 1 || sEqual(path,"null")){return;}
+    char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path); i32 slot=GetFreeWavSlot();
+    if(slot==-1){u32 cur=__c11_atomic_load(&wav_count,2/*acquire*/); if(cur < MAX_CHANNELS){slot=(i32)__c11_atomic_fetch_add(&wav_count,1u,3/*release*/);}} if(slot==-1){DualLogWarn("Max WAV channels (%d) reached\n",MAX_CHANNELS); return;}
     u32 frames; size_t sz=0; float *buf = load_wav(p,&frames,&sz);
-    if (!buf) { DualLog("ERROR: Failed to load WAV %s\n",p); return; }
-    wav_ch[slot] = (wav_channel_t){ .samples = buf, .allocSize = sz, .frame_count = frames, .frame_pos = 0, .volume = volume, .looping = false, .positional = positional, .pos=pos, .playing = true };
+    if(!buf){DualLogError("Failed to load%s\n",p); return;}
+    wav_ch[slot] = (wav_channel_t){.samples=buf, .allocSize=sz, .frame_count=frames, .frame_pos=0, .volume=volume, .looping=false, .positional=positional, .pos=pos, .playing=true};
     __c11_atomic_thread_fence(3/*release*/);
 }
 
@@ -878,11 +876,9 @@ pthread_t audThreadID; void* AudThread(void* arg);
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(1000); } return NULL; }
 // Looping Ambients SFX System
 #define MAXAMB 256
-typedef struct { wav_channel_t sound; u32 loaded; float length_sec; } AmbientSlot; typedef struct { u16 index; const char* filename; } AmbientDef;
-u16 ambReg[MAXAMB]; static AmbientSlot ambientSlots[MAXAMB] = {0}; static u16 ambs=0;
-static const AmbientDef ambientSounds[MAXAMB] = {{621,"airhiss"},        {622,"clicker"},  {623,"compressor"},    {624,"dishwasher"},{625,"drip_amb"},{626,"fan1"},         {627,"generator_gas"},   {628,"gurgle"},    {629,"icemaker"},       {630,"intake"},            {631,"lathe"},        {632,"lev3loop1"},    {633,"lev3loop2"},
-                                                 {634,"lev3loop3"},      {635,"lev3loop4"},{636,"liquid_bubble"}, {637,"lava2"},     {638,"rain"},    {639,"machgear_loop"},{640,"machine_ambience"},{641,"machine_go"},{642,"machine_humamb7"},{643,"machine_humlonoise"},{644,"machine_loop1"},{645,"machine_loop2"},{646,"machinea1"},
-                                                 {647,"machinevat_loop"},{648,"mist"},     {649,"pipewater_loop"},{650,"powerloom"}, {651,"pump"},    {652,"pump2"},        {653,"rain"},            {654,"steam_loop"},{655,"washing_machine"}};
+typedef struct { wav_channel_t sound; u32 loaded; float length_sec; } AmbientSlot; typedef struct { u16 index; float vol; const char* filename; } AmbientDef; u16 ambReg[MAXAMB]; static AmbientSlot ambientSlots[MAXAMB] = {0}; static u16 ambs=0;
+static const AmbientDef ambientSounds[MAXAMB] = {{621,0.05f,"airhiss"},{622,0.20f,"clicker"},{623,0.4f,"compressor"},{624,0.2f,"dishwasher"},{625,0.5f,"drip_amb"},{626,0.3f,"fan1"},{627,0.3f,"generator_gas"},{628,0.3f,"gurgle"},{629,0.6f,"icemaker"},{630,0.2f,"intake"},{631,0.4f,"lathe"},{632,0.1f,"lev3loop1"},{633,0.1f,"lev3loop2"},{634,0.1f,"lev3loop3"},{635,0.1f,"lev3loop4"},{636,1.0f,"liquid_bubble"},{637,0.4f,"lava2"},{638,0.55f,"rain"/*looping*/},
+                                                 {639,0.4f,"machgear_loop"},{640,0.8f,"machine_ambience"},{641,0.6f,"machine_go"},{642,1.0f,"machine_humamb7"},{643,0.4f,"machine_humlonoise"},{644,0.4f,"machine_loop1"},{645,0.4f,"machine_loop2"},{646,0.4f,"machinea1"},{647,0.8f,"machinevat_loop"},{648,0.02f,"mist"},{649,0.65f,"pipewater_loop"},{650,0.3f,"powerloom"},{651,0.2f,"pump"},{652,0.05f,"pump2"},{653,0.55f,"rain"},{654,0.1f,"steam_loop"},{655,0.5f,"washing_machine"}};
 void MixAmbs() {
     for (u16 i=0;i<ambs;++i) {
         u16 a = ambReg[i];
@@ -899,13 +895,12 @@ void MixAmbs() {
                 slot->sound.looping=true; slot->loaded=1;
             }
             if (!slot->sound.playing) SndStart(&slot->sound);
-            float final_vol = World.instances[a].volume * ((d <= 1.0f) ? 1.0f : (d >= 7.68f) ? 0.0f : (7.68f - d) / (7.68f - 1.0f));
-            slot->sound.volume=final_vol;
+            slot->sound.volume=(def->vol * ((d <= 1.0f) ? 1.0f : (d >= 7.68f) ? 0.0f : (7.68f - d) / (7.68f - 1.0f)));
         } else if (slot->sound.playing) slot->sound.playing=false;
     }
 }
 
-void ResetLevelAudio(void) { ambs=0; mset(ambReg,0,ambs * sizeof(u16)); for (u16 i = INSTS_1ST_IDX; i<World.instCount;++i) { if(IdxIsAmbient(World.instances[i].index)){ambReg[ambs]=i; ambs++; if(ambs >= MAXAMB){DualLogError("Ambient noises %u > %u!\n",ambs,MAXAMB); break;} World.instances[i].volume=EDefs[World.instances[i].index].volume * 0.5f;} } }
+void ResetLevelAudio(void){ambs=0; mset(ambReg,0,ambs*sizeof(u16)); for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){if(IdxIsAmbient(World.instances[i].index)){ambReg[ambs]=i; ambs++; if(ambs>=MAXAMB){DualLogError("Ambients %u > %u!\n",ambs,MAXAMB); break;}}}}
 // Music System
 #define BUFFER_MS 50
 #define AUD_BUFFER_T 0.05f
@@ -942,13 +937,9 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
                  if (ttype == TT_Revive){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicRevive[World.curLev]);}else if(ttype == TT_Death){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicDeath[World.curLev]);}
             else if (ttype == TT_Elevator){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicElevator[World.curLev]);}else if(ttype == TT_Distortion){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicDistortion[World.curLev]);}
         } else { if(World.curLev != 9){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicLooped[World.curLev]);} }
-        play_mp3(p,0);
-        return;
+        play_mp3(p,0); return;
     } // Normal Dynamic Music System
-    if (mtype == MT_Override) mp3_clear();
-    sFormat(p,sizeof(p),"./Audio/music/%s.mp3",GetCorrespondingLevelClip(ttype));
-    play_mp3(p,BUFFER_MS);
-    if (!World.Sys_Music.elevator){World.Sys_Music.levelEntry=false;}
+    if(mtype == MT_Override){mp3_clear();} sFormat(p,sizeof(p),"./Audio/music/%s.mp3",GetCorrespondingLevelClip(ttype)); play_mp3(p,BUFFER_MS); if (!World.Sys_Music.elevator){World.Sys_Music.levelEntry=false;}
 }
 
 void UpdateMusic() {
