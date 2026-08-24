@@ -756,7 +756,7 @@ void Physics(float dt) {
     World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
     for (u16 i=0;i<World.instCount && dynamicEntityCount < 512;++i) {
         if (World.col[i] == COLTYPE_MSH || World.col[i] == COLTYPE_CVX) { World.radius[i] = modelBounds[World.col[i] == COLTYPE_CVX ? World.instances[i].colMeshIndex : World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); }
-        else if (likely(World.col[i] == COLTYPE_BOX)) { World.radius[i] = vmax(World.colliderSize[i].x * 0.5f * World.scale[i].x,vmax(World.colliderSize[i].y * 0.5f * World.scale[i].y,World.colliderSize[i].z * 0.5f * World.scale[i].z)); }
+        else if (likely(World.col[i] == COLTYPE_BOX)) { float hx = World.colliderSize[i].x * 0.5f * World.scale[i].x, hy = World.colliderSize[i].y * 0.5f * World.scale[i].y, hz = World.colliderSize[i].z * 0.5f * World.scale[i].z; World.radius[i] = vsqrtf(hx * hx + hy * hy + hz * hz); }
         else if (World.col[i] == COLTYPE_SPH || World.col[i] == COLTYPE_CAP) { World.radius[i] = vmax(World.colliderSize[i].x,World.colliderSize[i].y) * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z)); }
         else World.radius[i] = World.colliderSize[i].x * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));
         if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && !(World.physSleep[i]) && World.col[i] != COLTYPE_NONE && vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}

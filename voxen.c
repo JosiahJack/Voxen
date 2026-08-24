@@ -506,7 +506,7 @@ void UpdateLights() {
     glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z); glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
 }
 // Shadowmapping
-#define SHADOW_NEARMESH_MAX 2048
+#define SHADOW_NEARMESH_MAX 512
 typedef struct {float depth; u16 index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
 INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex > texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MAX_MDLS || e->texIndex >= MAX_TXRS || otherCondition; }
