@@ -711,8 +711,16 @@ bool PointInOBB(V3 pt, ShapeBox box) {
     return (vabs(lx) <= box.hExt.x + 0.001f) && (vabs(ly) <= box.hExt.y + 0.001f) && (vabs(lz) <= box.hExt.z + 0.001f);
 }
 
+
+bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {
+    V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx = V3_dot(d,ax), ly = V3_dot(d,ay), lz = V3_dot(d,az);
+    float cx = vclamp(lx,-box.hExt.x,box.hExt.x), cy = vclamp(ly,-box.hExt.y,box.hExt.y), cz = vclamp(lz,-box.hExt.z,box.hExt.z);
+    float dx = lx-cx, dy = ly-cy, dz = lz-cz; return (dx*dx + dy*dy + dz*dz) <= radius*radius;
+}
+
 INLINE int V3_IsSane(V3 v) { union { float f; u32 i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
 u16 triggerVolumes[128]; u16 numTriggers; extern double game_actual_start_time;
+static bool ladderWalkOff = false; static float ladderTopY = 0.0f;
 void DrawBoxColliderColored(u16 i, Color col);
 void Physics(float dt) {
     for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false);
@@ -814,19 +822,27 @@ void Physics(float dt) {
             SetPosition(sc->a, V3_AplusB(World.position[sc->a], V3_ScaleByF(sc->m.normal, correction * sc->invMassA / massDiv)));
             if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
+        bool ladderTouched = false;
         for (u16 i=0;i<numTriggers;++i) {
             u16 self = triggerVolumes[i];
             u16 trigdx=World.instances[self].index;
             if (Cheats.showPhys) DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f});
+            ShapeBox trigBox = Entity_GetBox(self);
             for (u16 o=0;o<dynamicEntityCount;++o) { // 4. Triggers
                 u16 other = dynamicEntities[o]; if (World.col[other] == COLTYPE_NONE || !(World.instances[other].entflags & EF_ACTIVE)) continue;
-                if (!PointInOBB(World.position[other],Entity_GetBox(self))) continue;
+                float otherRadius = World.colliderSize[other].x * vmax(vmax(World.scale[other].x,World.scale[other].y),World.scale[other].z); if (otherRadius <= 0.0f) otherRadius = 0.32f;
+                bool touches;
+                if (World.col[other] == COLTYPE_CAP) {
+                    ShapeCapsule oc = Entity_GetCap(other); V3 capMid = V3_ScaleByF(V3_AplusB(oc.tip,oc.base),0.5f);
+                    touches = CapsuleTouchesOBB(oc.base,otherRadius,trigBox) || CapsuleTouchesOBB(capMid,otherRadius,trigBox) || CapsuleTouchesOBB(oc.tip,otherRadius,trigBox);
+                } else touches = CapsuleTouchesOBB(World.position[other],otherRadius,trigBox);
+                if (!touches) continue;
                 if (other != PLAYER1 && trigdx == 596) { trigger_gravitylift_touch(self,other); continue; }
-                World.Sys_Music.cyberTube = false; World.gravity[PLAYER1] = 1.0f; World.invP1.ladderState=0; World.Sys_Music.inZone = World.Sys_Music.elevator = World.Sys_Music.distortion = false; // Reset trigger sustained flags
+                World.Sys_Music.cyberTube = false; World.gravity[PLAYER1] = 1.0f; World.Sys_Music.inZone = World.Sys_Music.elevator = World.Sys_Music.distortion = false;
                 switch(trigdx) {
                     case 595/*trigger_cyberpush*/:   trigger_cyberpush_touch(self,other); break;
                     case 596/*trigger_gravitylift*/: trigger_gravitylift_touch(self,other); break;
-                    case 597/*trigger_ladder*/:      World.invP1.ladderState=1; break;
+                    case 597/*trigger_ladder*/:      World.invP1.ladderState=1; ladderTouched = true; ladderTopY = trigBox.ctr.y + trigBox.hExt.y; break;
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;
                     case 599/*trigger_music*/: { TrackType tt=World.instances[self].trackType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elevator); World.Sys_Music.distortion=(tt == TT_Distortion); break; }
                     case 601/*trigger_radiation*/:            World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation; break; // TODO bleedoff when !radiationArea, amelioration from envirosuit, detox patch negation for 30secs
@@ -834,6 +850,8 @@ void Physics(float dt) {
                 }
             }
         }
+        ladderWalkOff = ladderTouched && (World.position[PLAYER1].y > ladderTopY + 0.48f);
+        if (!ladderTouched) World.invP1.ladderState=0;
     }
     {
         const float SLEEP_LIN2 = 0.0025f;   // (0.05 m/s)^2
@@ -921,9 +939,17 @@ void ApplyPlayerMovements(float dt) {
     bool inGravLift = ((p->entflags & EF_GRAVLIFT) > 0);
     bool grounded = !inGravLift && ((p->entflags & EF_GROUNDED) > 0);
     bool jumpjettin = ((World.invP1.hasHardware & HW_JET) > 0 && (World.invP1.hardwareIsActive & HW_JET) > 0);
-    if (JumpDown() && grounded && !jumpjettin) {
-        if (!Cheats.noclip) {World.velocity[PLAYER1].y += (World.invP1.fatigue > 80.0f ? 2.0f : 4.51f/*;)*/) + 0.2f; if(!World.boosterActive && !Cheats.noclip){World.invP1.fatigue += 6.5f;} }
-        RaycastHit jhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType jfstp = jhit.hit ? GetFootstepTypeForPrefab(World.instances[jhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpSound(jfstp),SfxVol(),World.position[PLAYER1],true);
+    bool onLadder = World.invP1.ladderState > 0;
+    if (JumpDown() && (grounded || onLadder) && !jumpjettin) {
+        if (onLadder) {
+            World.invP1.ladderState = 0; onLadder = false;
+            float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y;
+            V3 fwd = V3_Normalize((V3){2.0f*(xz+wy), 2.0f*(r.y*r.z - r.w*r.x), 1.0f - 2.0f*(r.x*r.x+y2)});
+            World.velocity[PLAYER1] = V3_ScaleByF(fwd, 6.0f);
+        } else {
+            if (!Cheats.noclip) {World.velocity[PLAYER1].y += (World.invP1.fatigue > 80.0f ? 2.0f : 4.51f) + 0.2f; if(!World.boosterActive && !Cheats.noclip){World.invP1.fatigue += 6.5f;} }
+            RaycastHit jhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType jfstp = jhit.hit ? GetFootstepTypeForPrefab(World.instances[jhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpSound(jfstp),SfxVol(),World.position[PLAYER1],true);
+        }
     }
     if (Jump() && jumpjettin && World.invP1.jumpJetFinished < World.pauseRelativeTime && World.invP1.energy > 0.0f) {
         if (!Cheats.noclip) {World.velocity[PLAYER1].y += 1.3f;} World.invP1.jumpJetFinished = World.pauseRelativeTime + 0.1f;
@@ -966,7 +992,7 @@ void ApplyPlayerMovements(float dt) {
         if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown) v -= (WALK_SPEED-CROUCH_SPEED)*1.5f; else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp) v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;
     }
     float speed = (setSpeedAdjusted ? speedAdjust : v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f)) + (World.invP1.staminupActive ? 1.0f : 0.0f), accel=World.boosterActive && World.curLev!=LEVEL_CYBERSPACE ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
-    if (World.invP1.ladderState > 0) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
+    if (onLadder && !ladderWalkOff) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
     else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
     V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); 
     dv = (V3){ vclamp(dv.x, -10.0f, 10.0f), vclamp(dv.y, -10.0f, 10.0f), vclamp(dv.z,-10.0f,10.0f) };

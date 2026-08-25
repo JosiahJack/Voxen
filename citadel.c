@@ -280,7 +280,8 @@ void SearchFXResetEnable(u16 self) { Entity* e = &World.instances[self]; if (e->
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
 void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
 void DelayedSpawnUpdate(u16 self) {
-    Entity* e = &World.instances[self]; if(!e->active || e->timerFinished >= World.pauseRelativeTime){return;} e->active = false; if(!e->doSelfAfterList){return;}
+    Entity* e = &World.instances[self]; if(!e->active || e->timerFinished <= 0.0 || e->timerFinished > World.pauseRelativeTime){return;}
+    e->active = false; if(!e->doSelfAfterList){return;}
     if (e->despawnInstead) { if(e->destroyAfterListInsteadOfDeactivate){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }     else flag_set(&e->entflags,EF_ACTIVE,true);
 }
 
@@ -324,10 +325,11 @@ void func_forcebridge(u16 self) {
 void ForceBridgeActivate(u16 self, bool isSilent) {
     Entity* e = &World.instances[self]; if (e->active) {return;}
     if(!isSilent){play_wav(sounds[102],1.0f,World.position[self],true);}
+    flag_set(&e->entflags,EF_ACTIVE,true);
     e->modelIndex=78; World.col[self]=COLTYPE_BOX; e->active=e->lerping=true; World.scale[self]=(V3){ e->forceFieldDirectionX ? 0.1f : e->activatedScale.x,e->forceFieldDirectionY ? 0.1f : e->activatedScale.y,e->forceFieldDirectionZ ? 0.1f : e->activatedScale.z };
 }
 
-void ForceBridgeDeactivate(u16 self, bool isSilent) { Entity* e = &World.instances[self]; if (!e->active) {return;} if (!isSilent) {play_wav(sounds[102],1.0f,World.position[self],true);} e->active = false; e->lerping = true; e->modelIndex = MAX_MDLS; World.col[self] = COLTYPE_NONE; }
+void ForceBridgeDeactivate(u16 self, bool isSilent) { Entity* e = &World.instances[self]; if (!e->active) {return;} if (!isSilent) {play_wav(sounds[102],1.0f,World.position[self],true);} e->active = false; e->lerping = true; }
 void ForceBridgeToggle(u16 self) { if (World.instances[self].active) {ForceBridgeDeactivate(self,false); } else {ForceBridgeActivate(self,false);} }
 void ForceBridgeUpdate(u16 self) {
     Entity* e = &World.instances[self]; if (e->tickFinished >= World.pauseRelativeTime) return;
@@ -342,7 +344,7 @@ void ForceBridgeUpdate(u16 self) {
         float sx = e->forceFieldDirectionX ? lerp(World.scale[self].x,0.0f,0.1f) : World.scale[self].x;
         float sy = e->forceFieldDirectionY ? lerp(World.scale[self].y,0.0f,0.1f) : World.scale[self].y;
         float sz = e->forceFieldDirectionZ ? lerp(World.scale[self].z,0.0f,0.1f) : World.scale[self].z;
-        World.scale[self] = (V3){sx,sy,sz}; if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { flag_set(&e->entflags,EF_ACTIVE,false); World.col[self] = COLTYPE_NONE; e->lerping = false; }
+        World.scale[self] = (V3){sx,sy,sz}; if (sx < 0.08f || sy < 0.08f || sz < 0.08f) { e->modelIndex = MAX_MDLS; World.col[self] = COLTYPE_NONE; e->lerping = false; }
     }
 }
 
@@ -1081,19 +1083,45 @@ u16 SpawnDynamicObject(int val, bool cheat) {
 }
 // TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.
 void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
+bool QuestBitIsSet(u8 qb) { return (qb < QB_COUNT) && ((World.missionBits >> qb) & 1u); }
+void QuestBitSet(u8 qb)    { if (qb < QB_COUNT) World.missionBits |=  (1u << qb); }
+void QuestBitClear(u8 qb)  { if (qb < QB_COUNT) World.missionBits &= ~(1u << qb); }
+void QuestBitToggle(u8 qb) { if (qb < QB_COUNT) World.missionBits ^=  (1u << qb); }
+
 void Targetted(u16 activator, u16 self) {
     Entity* e = &World.instances[self]; u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
-    if (e->index == 699) { UseTargets(activator,e->targetIdx); return; } // logic_relay: plain passthrough
+    if (e->index == 699) {
+        if (!e->relayEnabled) return;
+        if (e->relayOnceEver) { if (e->relayAlreadyDone) return; e->relayAlreadyDone = true; }
+        u32 savedFlags = World.targetIOActivatorIoflags; World.targetIOActivatorIoflags = e->ioflags;
+        UseTargets(activator,e->targetIdx);
+        World.targetIOActivatorIoflags = savedFlags;
+        return;
+    }
+    if (e->index == 700) {
+        if (!(aioflags & TARG_IOFLAGS_BRANCH_FLIPONLY)) {
+            if (e->relayEnabled && e->currentTargetIdx != IO_NONE) {
+                u32 savedFlags = World.targetIOActivatorIoflags; World.targetIOActivatorIoflags = e->ioflags;
+                UseTargets(activator,e->currentTargetIdx);
+                World.targetIOActivatorIoflags = savedFlags;
+                e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx;
+            }
+        }
+        if (aioflags & (TARG_IOFLAGS_BRANCH_FLIP | TARG_IOFLAGS_BRANCH_FLIPONLY)) {
+            e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx;
+        }
+        return;
+    }
     if (e->index == 710) { // info_mission: quest bit set/clear/toggle, or test-and-branch via target/targetIfFalse.  Mode comes from the activating targetIO bits, falling back to the info_mission's own line.
         if (e->questBitID == QB_None) return;
-        u32 qb = 1u << e->questBitID; u32 modeFlags = aioflags ? aioflags : e->ioflags;
-        if (modeFlags & TARG_IOFLAGS_MISSION_BIT_TOGGLE) { World.missionBits ^= qb; DualLog("info_mission toggled bit %u -> %u\n",e->questBitID,(unsigned)((World.missionBits >> e->questBitID) & 1u)); return; }
-        if (modeFlags & TARG_IOFLAGS_MISSION_BIT_OFF)    { World.missionBits &= ~qb; return; }
-        if (modeFlags & TARG_IOFLAGS_MISSION_BIT_ON)     { World.missionBits |= qb; return; }
+        u32 modeFlags = aioflags ? aioflags : e->ioflags;
+        if (modeFlags & TARG_IOFLAGS_MISSION_BIT_TOGGLE) { QuestBitToggle(e->questBitID); DualLog("info_mission toggled bit %u -> %u\n",e->questBitID,(unsigned)QuestBitIsSet(e->questBitID)); return; }
+        if (modeFlags & TARG_IOFLAGS_MISSION_BIT_OFF)    { QuestBitClear(e->questBitID); return; }
+        if (modeFlags & TARG_IOFLAGS_MISSION_BIT_ON)     { QuestBitSet(e->questBitID); return; }
         u8 tm = e->questTestMode;
         if (!tm && activator != WORLD && activator < World.instCount) tm = World.instances[activator].questTestMode;
         if (tm) {
-            bool bitOn = ((World.missionBits >> e->questBitID) & 1u) != 0u;
+            bool bitOn = QuestBitIsSet(e->questBitID);
             bool pass = (tm == 1) ? bitOn : !bitOn; // 1==testQuestBitIsOn, 2==testQuestBitIsOff
             UseTargets(activator, pass ? e->targetIdx : e->targetIfFalseIdx);
         }

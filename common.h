@@ -301,6 +301,7 @@ typedef /*FAT*/ struct  {
     AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState;
     u16 targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx; // Indices into the interned IO name table (IO_NONE==empty, see entity.c).  texAnimResourceFolder stays a string.
     u8 questBitID/*QB_*/,questTestMode/*0 none,1 fire target if bit ON,2 fire target if bit OFF*/;
+    u8 branchOnSecond,relayEnabled,relayOnceEver,relayAlreadyDone;
     char texAnimResourceFolder[TARGET_STRING_LENGTH];
 } Entity; // phew what a porker of a struct, it's been a eatin!
 typedef struct {
@@ -374,6 +375,7 @@ AnimationClip DoorGetClip(const Entity*,u8);
 enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
 void ChangeAnim(Entity*,u8); void ForceDoorPortalOpen(u16); // ForceDoorPortalOpen: bounds-checked against registered portals (culling.c)
 enum{IO_NONE=0}; u16 IOInternName(const char*); const char* IOName(u16);
+bool QuestBitIsSet(u8 qb); void QuestBitSet(u8 qb),QuestBitClear(u8 qb),QuestBitToggle(u8 qb);
 bool Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Sprint(),TurnLeft(),TurnRight(),LookUp(),LookDown(),RecentLog(),Biomonitor(),Sensaround(),Lantern(),
      Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),
      Console(),ScrshotPressed(),PositionVisibleFromPlayerCell(float,float),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();

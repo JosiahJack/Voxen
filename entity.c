@@ -2,7 +2,7 @@
 #include "common.h"
 #define LINE_LEN_MAX 81920
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178
-Entity* entsFromFile; V3 *posFromFile, *scaleFromFile; Quaternion *rotationFromFile; Light *lightsFromFile; LightAnimation *lanimsFromFile; u16 headmountedLanternLight;
+Entity* entsFromFile; V3 *posFromFile, *scaleFromFile; Quaternion *rotationFromFile; Light *lightsFromFile; LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL; u16 headmountedLanternLight;
 EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,dynFriction,statFriction,animationNum,col,colCtr,colSz
 /*0 chunk_black*/[0]={178,0,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*1 chunk_blocker*/[1]={178,0,1230,MAX_TXRS,1230,160,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*2 chunk_bridg1_1*/[2]={661,0,44,MAX_TXRS,MAX_TXRS,43,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*3 chunk_bridg1_1flipx*/[3]={667,0,44,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*4 chunk_bridg1_2*/[4]={662,0,45,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*5 chunk_bridg1_3*/[5]={20,0,47,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -541,7 +541,7 @@ void LoadLevelMod(u8 lev) {
         } else {
             entCount++;
             if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; }
-            inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; // Zero this entity slot only
+            inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
         }
         bool activeStateRead = false;
         while (line[0] != '\0') {
@@ -570,8 +570,8 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("damageOnUse"))     inst->damage = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("target"))          inst->targetIdx = IOInternName(value);
                 else if (KEY_EQ("targetname"))      inst->targetnameIdx = IOInternName(value);
-                else if (KEY_EQ("target2"))         inst->target2Idx = IOInternName(value); // logic_branch secondary target
-                else if (KEY_EQ("targetIfFalse"))   inst->targetIfFalseIdx = IOInternName(value); // logic_branch conditional target
+                else if (KEY_EQ("target2"))         inst->target2Idx = IOInternName(value);
+                else if (KEY_EQ("targetIfFalse"))   inst->targetIfFalseIdx = IOInternName(value);
                 else if (KEY_EQ("delayResetFinished")) inst->delayResetFinished = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime; // trigger_multiple/trigger_once
                 else if (KEY_EQ("randomItemCustomIndex[0]")) inst->randomItemCustIdx[0] = parse_numberi16(value,lineSpace,lineNum);
                 else if (KEY_EQ("randomItemCustomIndex[1]")) inst->randomItemCustIdx[1] = parse_numberi16(value,lineSpace,lineNum);
@@ -584,6 +584,7 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("locked"))          flag_set(&inst->entflags, EF_LOCKED, parse_bool(value, lineSpace, lineNum));
                 else if (KEY_EQ("active"))          inst->active = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("onlyTargetOnce"))  inst->onlyOnce = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("onlyOnce"))        inst->onlyOnce = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("targetAlreadyDone")) inst->targetAlreadyDone = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("stayOpen"))        inst->stayOpen = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("startOpen"))       inst->startOpen = parse_bool(value, lineSpace, lineNum);
@@ -631,9 +632,27 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);
                 else if (KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
                 else if (KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
+                else if (KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("onSecond"))        inst->branchOnSecond = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("onceEver"))        inst->relayOnceEver = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(value, lineSpace, lineNum);
                 else if (KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
                 else if (KEY_EQ("testQuestBitIsOff"))   inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 2 : inst->questTestMode;
+                else if (KEY_EQ("ForceBridge.activated")) inst->active = parse_bool(value,lineSpace,lineNum);
+                else if (KEY_EQ("x"))                   inst->forceFieldDirectionX = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("y"))                   inst->forceFieldDirectionY = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("z"))                   inst->forceFieldDirectionZ = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("activatedScaleX"))     inst->activatedScale.x = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("activatedScaleY"))     inst->activatedScale.y = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("activatedScaleZ"))     inst->activatedScale.z = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("fieldColor"))          inst->fieldColor = (ForceFieldColor)parse_numberu8(value, lineSpace, lineNum);
+                else if (KEY_EQ("tickFinished"))        inst->tickFinished = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;
+                else if (KEY_EQ("center.x"))            colCtrFromFile[entCount].x = parse_float(value,lineSpace,lineNum);
+                else if (KEY_EQ("center.y"))            colCtrFromFile[entCount].y = parse_float(value,lineSpace,lineNum);
+                else if (KEY_EQ("center.z"))            colCtrFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
+                else if (KEY_EQ("size.x"))              colSzFromFile[entCount].x = parse_float(value,lineSpace,lineNum);
+                else if (KEY_EQ("size.y"))              colSzFromFile[entCount].y = parse_float(value,lineSpace,lineNum);
+                else if (KEY_EQ("size.z"))              colSzFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
                 else if (KEY_EQ("RobotSpawnDeactivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_RobotSpawnDeactivated; }
                 else if (KEY_EQ("IsotopeInstalled"))            { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsotopeInstalled; }
                 else if (KEY_EQ("ShieldActivated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_ShieldActivated; }
@@ -676,6 +695,12 @@ void LoadLevelMod(u8 lev) {
         par->damage                = src->damage;
         par->delay                 = src->delay;
         par->active                = src->active;
+        par->activatedScale        = src->activatedScale;
+        par->forceFieldDirectionX  = src->forceFieldDirectionX;
+        par->forceFieldDirectionY  = src->forceFieldDirectionY;
+        par->forceFieldDirectionZ  = src->forceFieldDirectionZ;
+        par->fieldColor            = src->fieldColor;
+        par->tickFinished          = src->tickFinished;
         par->onlyOnce              = src->onlyOnce;
         par->targetAlreadyDone     = src->targetAlreadyDone;
         par->stayOpen              = src->stayOpen;
@@ -698,8 +723,21 @@ void LoadLevelMod(u8 lev) {
         par->targetIfFalseIdx      = src->targetIfFalseIdx;
         par->questBitID            = src->questBitID;
         par->questTestMode         = src->questTestMode;
+        par->branchOnSecond        = src->branchOnSecond;
+        par->relayEnabled         = src->relayEnabled;
+        par->relayOnceEver        = src->relayOnceEver;
+        par->relayAlreadyDone     = src->relayAlreadyDone;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARGET_STRING_LENGTH);
-        if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent); // Only at load, not in AddInstance
+        if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
+        if (entIdx >= 595 && entIdx <= 601) {
+            if (colSzFromFile[e].x >= 0.0f || colSzFromFile[e].y >= 0.0f || colSzFromFile[e].z >= 0.0f) {
+                World.colliderCenter[parent] = colCtrFromFile[e];
+                World.colliderSize[parent]   = (V3){ colSzFromFile[e].x < 0.0f ? 1.0f : colSzFromFile[e].x, colSzFromFile[e].y < 0.0f ? 1.0f : colSzFromFile[e].y, colSzFromFile[e].z < 0.0f ? 1.0f : colSzFromFile[e].z };
+            } else { World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f}; }
+        } else if (entIdx == 515 && EDefs[entIdx].col == COLTYPE_BOX && EDefs[entIdx].colSz.x == 0.0f && EDefs[entIdx].colSz.y == 0.0f && EDefs[entIdx].colSz.z == 0.0f) {
+            World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f};
+        }
+        if (entIdx == 700) par->currentTargetIdx = par->branchOnSecond ? par->target2Idx : par->targetIdx;
         if (entIdx == 525) { // prop_console01
             par->texAnimLight  = AddOffsetLight(par,(V3){5.81f,2.29f,38.05f-38.3552f},(Color3){0.3531f,0.4837f,0.6509f},1.85f,0.7f);
             par->texAnimLight2 = AddOffsetLight(par,(V3){-10.1f,0.9f,18.21f-38.3552f},(Color3){0.3561f,0.3561f,0.8970f},2.0f,1.12f);
@@ -844,12 +882,15 @@ void LoadAllLevels() {
     posFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
     scaleFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
     rotationFromFile = (Quaternion*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(Quaternion));
+    colCtrFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
+    colSzFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
     IONamesReset(); // Intern table is derived data; rebuild before parsing levels so indices match entity targetIdx fields.
     lightsFromFile = (Light*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(Light));
     lanimsFromFile = (LightAnimation*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(LightAnimation));
     for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;}
     for (u8 lev = 0; lev < World.numLevels; ++lev) LoadLevelData(lev);
     OS_Free(entsFromFile, (size_t)INSTANCE_COUNT * sizeof(Entity));
+    OS_Free(colCtrFromFile, (size_t)INSTANCE_COUNT * sizeof(V3)); OS_Free(colSzFromFile, (size_t)INSTANCE_COUNT * sizeof(V3)); colCtrFromFile = NULL; colSzFromFile = NULL;
     OS_Free(posFromFile, (size_t)INSTANCE_COUNT * sizeof(V3));
     OS_Free(scaleFromFile, (size_t)INSTANCE_COUNT * sizeof(V3));
     OS_Free(rotationFromFile, (size_t)INSTANCE_COUNT * sizeof(Quaternion));
