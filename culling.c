@@ -66,7 +66,7 @@ void DetermineClosedEdges() {
             else { gridCellStates[cellIdx] &= ~CELL_SEES_SKYBOX; gridCellStates[cellIdx] |= CELL_SEES_SUN; } // All white and black cells marked as 0.  Only sees Sun.
         }
     }
-    OS_Free(png_arena_main.base, 16777216); png_arena_main.base = NULL; DualLog(" freed culling PNG arena (16MB), found %d open cells...",totalOpenCells);
+    OS_Free(png_arena_main.base, 16777216); png_arena_main.base = NULL; DualLog("found %d open cells...",totalOpenCells);
 }
 
 void AddDoorPortal(u16 entIdx, u16 parent) {
