@@ -1090,7 +1090,6 @@ u16 SpawnDynamicObject(int val, bool cheat) {
 }
 // TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.
 void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
-void GravityLiftToggle(u16 self);
 void Targetted(u16 activator, u16 self) {
     Entity* e = &World.instances[self]; u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
     DualLog("Targetted a->ioflags:%u e:%u doorcond:%u\n", aioflags, e->index, ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)));
@@ -1108,7 +1107,7 @@ void Targetted(u16 activator, u16 self) {
     if (aioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self, false);
     else if (aioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self, false);
     else if (aioflags & TARG_IOFLAGS_FBRIDGE_TOGGLE) ForceBridgeToggle(self);
-    if (aioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) GravityLiftToggle(self);
+    if (aioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) World.instances[self].active=!World.instances[self].active;
     if (aioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
     if (aioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self);
     if (aioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e, (e->entflags & EF_LOCKED) == 0);
@@ -1165,9 +1164,10 @@ void ModUpdate() {
     WeaponsUpdate(); PatchUpdate(); HardwareUpdate();
     if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right);
     if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) AddWireLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e = &World.instances[i]; u16 constdex = e->index;
-        DelayedSpawnUpdate(i);    TextureSequenceUpdate(i);
+        DelayedSpawnUpdate(i);
+        if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i);
         if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);}
         //TargetIDUpdate(i); TODO

@@ -23,42 +23,23 @@ void AddForce(u16 i, V3 f, bool imp); void AddAccessCardToInventory(int index); 
 void trigger_cyberpush_touch(u16 self, u16 other) { if (World.diffCyb < 1) {return;} AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force * (float)World.deltaTime),false); World.Sys_Music.cyberTube = true; }
 void prop_cyber_exit(u16 other) { if (other != PLAYER1) {return;} UIExitCyberspace(); }
 void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); }
-void CyberItemInitBeforeLoad(u16 self) { Entity* e = &World.instances[self]; if (World.diffMis == 0 && e->index == 448) {flag_set(&e->entflags,EF_ACTIVE,false); /*item_cyber_data*/} }
-bool AddSoftwareItem(u16 index, int vers) {
-    Entity* player = &World.instances[PLAYER1];
-    float sfxVol = (float)Sys_Settings.VolumeEffects / 100.0f;
-    switch(index) {
-        case 450/*item_cyber_drill*/:
-            if (World.invP1.isPulserNotDrill && !(World.invP1.hasSoft & (1u << SW_PULSER))) World.invP1.isPulserNotDrill = false;
-            if (vers > World.invP1.softVersions[SW_DRILL]) World.invP1.softVersions[SW_DRILL] = (u8)vers;
-            else CenterStatusPrint("%s",Sys_Text.stringTable[46]);
-            World.invP1.hasSoft |= (1u << SW_DRILL); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[444],World.invP1.softVersions[SW_DRILL],Sys_Text.stringTable[458]); return true;
-        case 454/*item_cyber_pulser*/:
-            if (!World.invP1.isPulserNotDrill && !(World.invP1.hasSoft & (1u << SW_PULSER))) World.invP1.isPulserNotDrill = true;
-            if (vers > World.invP1.softVersions[SW_PULSER]) World.invP1.softVersions[SW_PULSER] = (u8)vers;
-            else CenterStatusPrint("%s",Sys_Text.stringTable[46]);
-            World.invP1.hasSoft |= (1u << SW_PULSER); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[445],World.invP1.softVersions[SW_PULSER],Sys_Text.stringTable[458]); return true;
-        case 456/*item_cyber_shield*/:
-            if (vers > World.invP1.softVersions[SW_SHIELD]) World.invP1.softVersions[SW_SHIELD] = (u8)vers;
-            else CenterStatusPrint("%s",Sys_Text.stringTable[46]);
-            World.invP1.hasSoft |= (1u << SW_SHIELD); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[446],World.invP1.softVersions[SW_SHIELD],Sys_Text.stringTable[458]); return true;
-        case 457/*item_cyber_turbo*/:
-            if (World.invP1.cyberItemIndex < 0) World.invP1.cyberItemIndex = 0;
-            World.invP1.softVersions[SW_TURBO]++; World.invP1.hasSoft |= (1u << SW_TURBO); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[447]); return true;
-        case 449/*item_cyber_decoy*/:
-            if (World.invP1.cyberItemIndex < 0) World.invP1.cyberItemIndex = 1;
-            World.invP1.softVersions[SW_DECOY]++; World.invP1.hasSoft |= (1u << SW_DECOY); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[448]); return true;
-        case 455/*item_cyber_recall*/: if (World.invP1.cyberItemIndex < 0){World.invP1.cyberItemIndex = 2;} World.invP1.softVersions[SW_RECALL]++; World.invP1.hasSoft |= (1u << SW_RECALL); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[449]); return true;
-        case 451/* ;) item_cyber_game*/: { if (vers < 0 || vers >= 7){return false;} World.invP1.hasNewData  = true; World.invP1.hasMinigame |= (u8)(1u << vers); static const u16 gameMsg[7] = {450,451,452,453,454,455,456}; play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[gameMsg[vers]]); return true; }
-        case 448/*item_cyber_data*/: World.invP1.hasNewData = true; if (vers >= 0 && vers < LOGCNT) {World.invP1.hasLog[vers] = true;} play_wav(sounds[87],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[457]); return true; 
-        case 452/*item_cyber_integrity*/: if (player->cyberHealth >= 255.0f) {return false;} play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); player->cyberHealth += 77.0f; if (player->cyberHealth > 255.0f) {player->cyberHealth = 255.0f;} CenterStatusPrint("%s",Sys_Text.stringTable[459]); return true;
-        case 453/*item_cyber_keycard*/: World.invP1.hasNewData = true; if (vers < 0 || vers > 110) vers = 81; AddAccessCardToInventory(vers); return true;
+void CyberItemOnTriggerEnter(u16 self, u16 other) {
+    if(other!=PLAYER1){return;} float sfxVol=(float)Sys_Settings.VolumeEffects/100.0f; bool success=false;
+    switch(World.instances[self].index) {
+        case 450/*item_cyber_drill*/: if(World.invP1.isPulserNotDrill&&!(World.invP1.hasSoft&(1u<<SW_PULSER))){World.invP1.isPulserNotDrill=false;} if(World.instances[self].version>World.invP1.softVersions[SW_DRILL]){World.invP1.softVersions[SW_DRILL]=(u8)World.instances[self].version;}else{CenterStatusPrint("%s",Sys_Text.stringTable[46]);} World.invP1.hasSoft|=(1u<<SW_DRILL); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[444],World.invP1.softVersions[SW_DRILL],Sys_Text.stringTable[458]); success=true; break;
+        case 454/*item_cyber_pulser*/: if(!World.invP1.isPulserNotDrill&&!(World.invP1.hasSoft&(1u<<SW_PULSER))){World.invP1.isPulserNotDrill=true;} if(World.instances[self].version>World.invP1.softVersions[SW_PULSER]){World.invP1.softVersions[SW_PULSER]=(u8)World.instances[self].version;}else{CenterStatusPrint("%s",Sys_Text.stringTable[46]);} World.invP1.hasSoft|=(1u<<SW_PULSER); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[445],World.invP1.softVersions[SW_PULSER],Sys_Text.stringTable[458]); success=true; break;
+        case 456/*item_cyber_shield*/: if(World.instances[self].version>World.invP1.softVersions[SW_SHIELD]){World.invP1.softVersions[SW_SHIELD]=(u8)World.instances[self].version;}else{CenterStatusPrint("%s",Sys_Text.stringTable[46]);} World.invP1.hasSoft|=(1u<<SW_SHIELD); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[446],World.invP1.softVersions[SW_SHIELD],Sys_Text.stringTable[458]); success=true; break;
+        case 457/*item_cyber_turbo*/: if(World.invP1.cyberItemIndex<0){World.invP1.cyberItemIndex=0;} World.invP1.softVersions[SW_TURBO]++; World.invP1.hasSoft|=(1u<<SW_TURBO); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[447]); success=true; break;
+        case 449/*item_cyber_decoy*/: if(World.invP1.cyberItemIndex<0){World.invP1.cyberItemIndex=1;} World.invP1.softVersions[SW_DECOY]++; World.invP1.hasSoft|=(1u<<SW_DECOY); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[448]); success=true; break;
+        case 455/*item_cyber_recall*/: if(World.invP1.cyberItemIndex<0){World.invP1.cyberItemIndex=2;} World.invP1.softVersions[SW_RECALL]++; World.invP1.hasSoft|=(1u<<SW_RECALL); play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[449]); success=true; break;
+        case 451/* ;) item_cyber_game*/: { int vers=World.instances[self].version; if(vers<0||vers>=7){break;} World.invP1.hasNewData=true; World.invP1.hasMinigame|=(u8)(1u<<vers); static const u16 gameMsg[7]={450,451,452,453,454,455,456}; play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[gameMsg[vers]]); success=true; break; }
+        case 448/*item_cyber_data*/: { int vers=World.instances[self].version; World.invP1.hasNewData=true; if(vers>=0&&vers<LOGCNT){World.invP1.hasLog[vers]=true;} play_wav(sounds[87],sfxVol,(V3){0.0f,0.0f,0.0f},false); CenterStatusPrint("%s",Sys_Text.stringTable[457]); success=true; break; }
+        case 452/*item_cyber_integrity*/: { Entity* player=&World.instances[PLAYER1]; if(player->cyberHealth>=255.0f){break;} play_wav(sounds[86],sfxVol,(V3){0.0f,0.0f,0.0f},false); player->cyberHealth+=77.0f; if(player->cyberHealth>255.0f){player->cyberHealth=255.0f;} CenterStatusPrint("%s",Sys_Text.stringTable[459]); success=true; break; }
+        case 453/*item_cyber_keycard*/: { int vers=World.instances[self].version; World.invP1.hasNewData=true; if(vers<0||vers>110){vers=81;} AddAccessCardToInventory(vers); success=true; break; }
         default: break;
     }
-    return false;
+    if(success){DeleteInstance(self);}
 }
-
-void CyberItemOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} if (!AddSoftwareItem(e->index,e->version)) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
 void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World.instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; World.layer[other] = 24; World.velocity[other] = V3_ScaleByF(World.velocity[other],-1.0f); }
 void CyberMineInitBeforeLoad(u16 self) {
     Entity* e = &World.instances[self];
@@ -104,21 +85,8 @@ void GravityLiftOnForce(u16 self, u16 other, bool initial) {
     }
 }
 
-void GravityLiftOffForce(u16 self, u16 other, bool initial) {
-    if (World.velocity[other].y < World.instances[self].offStrengthFactor) {
-        float yForce = World.instances[self].offStrengthFactor - World.velocity[other].y;
-        if (initial || World.instances[self].initialBurstFinished > World.pauseRelativeTime) yForce *= 2.0f;
-        AddForce(other,(V3){0.0f,yForce,0.0f},false);
-    }
-}
-
-void trigger_gravitylift_touch(u16 self, u16 other) {
-    if (vabs(World.gravity[other] - 1.0f) < 0.00001f) World.instances[self].initialBurstFinished = World.pauseRelativeTime + 1.0f;
-    if (World.instances[self].active) GravityLiftOnForce(self,other,true);
-    else GravityLiftOffForce(self,other,true);
-}
-
-void GravityLiftToggle(u16 self) { World.instances[self].active = !World.instances[self].active; }
+void GravityLiftOffForce(u16 self, u16 other, bool initial) { if (World.velocity[other].y < World.instances[self].offStrengthFactor){float y=World.instances[self].offStrengthFactor - World.velocity[other].y; if (initial || World.instances[self].initialBurstFinished > World.pauseRelativeTime){y *= 2.0f;} AddForce(other,(V3){0.0f,y,0.0f},false);} }
+void trigger_gravitylift_touch(u16 self, u16 other) { if (vabs(World.gravity[other]-1.0f)<0.00001f){World.instances[self].initialBurstFinished=World.pauseRelativeTime+1.0f;} if (World.instances[self].active){GravityLiftOnForce(self,other,true);} else{GravityLiftOffForce(self,other,true);} }
 // Physics System
 INLINE void SetPosition(u16 i, V3 newpos) { float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;} V3 dir=V3_Normalize(V3_AsubB(newpos,World.position[i])); World.position[i]=V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed)); flag_set(&World.instances[i].entflags,EF_MOVING,true); posBudget[i] -= allowed; }
 INLINE Manifold OverlapToManifold(Overlap r) { Manifold m={0}; if (r.hit && r.pen > PHY_EPSILON) { m.normal = r.normal; m.n = 1; m.p[0] = (ManifoldPt){r.point, r.pen}; m.maxPen = r.pen; } return m; }
@@ -225,15 +193,12 @@ void ComputeConvexMeshInertiaTensor(u16 i) {
     float Ixy = -(so*acc[3]*sx*sy - m*scx*scy); float Ixz = -(so*acc[4]*sx*sz - m*scx*scz); float Iyz = -(so*acc[5]*sy*sz - m*scy*scz); // Parallel Axis Theorem: shifts rotation center from origin (0,0,0) to center of mass
     float r = modelBounds[mi] * vmax(vmax(sx,sy),sz); float mn = 0.04f * m * r * r;
     Ixx = vmax(Ixx,mn); Iyy = vmax(Iyy,mn); Izz = vmax(Izz,mn); // Clamp diagonal inertia to a minimum floor of 10% of the I=2/5ths*mr^2=0.4mr^2 hence 0.04 of spherical inertia to avoid NaN's.
-    float *IT=World.inertiaTensor[i]; IT[0]=Ixx; IT[1]=Iyy; IT[2]=Izz; IT[3]=Ixy; IT[4]=Ixz; IT[5]=Iyz;
     float det = Ixx*(Iyy*Izz - Iyz*Iyz) - Ixy*(Ixy*Izz - Ixz*Iyz) + Ixz*(Ixy*Iyz - Iyy*Ixz); if (vabs(det) < PHY_EPSILON) return;
     float invDet = 1.0f / det, *iI=World.invInertiaTensor[i]; // Applies Cramer's Rule to invert for actual use.  [ 0  3  4 ]  (0=Ixx, 1=Iyy, 2=Izz) (3=Ixy, 4=Ixz, 5=Iyz)
     iI[0]=(Iyy*Izz - Iyz*Iyz)*invDet; iI[1]=(Ixx*Izz - Ixz*Ixz)*invDet; iI[2]=(Ixx*Iyy - Ixy*Ixy)*invDet;      // [ 3  1  5 ]  Tensor is symmetric only 6 unique elements needed
     iI[3]=(Ixz*Iyz - Ixy*Izz)*invDet; iI[4]=(Ixy*Iyz - Iyy*Ixz)*invDet; iI[5]=(Ixy*Ixz - Ixx*Iyz)*invDet;      // [ 4  5  2 ]
     World.invTnsrValid[i]=true;
 }
-
-
 
 INLINE Manifold BoxBox(ShapeBox a, ShapeBox b) {
     Manifold m={0}; V3 aAxes[3], bAxes[3]; aAxes[0]=quat_rot_v3(a.rot,(V3){1,0,0}); aAxes[1]=quat_rot_v3(a.rot,(V3){0,1,0}); aAxes[2]=quat_rot_v3(a.rot,(V3){0,0,1});

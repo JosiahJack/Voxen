@@ -137,7 +137,7 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 enum {
     /*Culling*/ WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                 MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,
-    /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, CREDITS_PAGES = 22, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 768, INSTANCE_COUNT = 9000, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29,
+    /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, CREDITS_PAGES = 22, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 768, INSTANCE_COUNT = 8500, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29,
     /*Lights*/ LIGHT_COUNT = 2200, MAX_LIGHTS_PER_VOXEL = 128, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, 
     /*Models*/ MAX_MDLS=6400, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
     /*Textures*/ MAX_TXRS = 2048, MAX_TOTAL_PIXELS = 38400780u, MAX_UNIQUE_COLORS = 120040u,
@@ -329,7 +329,7 @@ typedef struct {
     ColliderType* col;
     Quaternion* rotation;
     u32* layer,targetIOActivatorIoflags;
-    float* mass,dt,*radius,*gravity,(*inertiaTensor)[6],(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
+    float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
     i32 currentMouse_dx,currentMouse_dy;
     bool *invTnsrValid,*colliding,targetIOActive;
     Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
@@ -343,7 +343,7 @@ extern u16 playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*
 extern u32 vbos[MAX_MDLS],tbos[MAX_MDLS]; extern FHandle console_log_file; extern u32 drawCalls,vertsRendered,voxelUpdateSP,lightsID,psysSp,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID;
 extern u32 shadowmapIndirectionList[LIGHT_COUNT];
 extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern double last_mouse_x,last_mouse_y;
-typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms; // 8 + 28 + 5 = 41B -> 44B w/ 3B tail pad (float alignment forces mod-4 size)
+typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
 extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile;
 extern const char* audioLogs[LOGCNT];
 extern u32 gridCellStates[ARRSIZE];

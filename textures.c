@@ -460,34 +460,25 @@ void TextureSequenceInit(u16 self, char* trimmed_value) {
     if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EDefs[e->index].modelIndex; return; }
     e->textureAnimating = true; e->textureGlowAnimating = false; e->texAnimLight = U16_MAX; e->texAnimLight2 = U16_MAX;
     e->texFrame = e->texGlowFrame = 0;
-    if (sEqual(trimmed_value,"ScreenDestroyed")) { e->texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
+    if (sEqual(trimmed_value,"ScreenDestroyed")) { World.instances[self].texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
     if (sEqual(trimmed_value,"MedCamView1")) { e->textureAnimating = false; e->camView = 0; return; } // Sensaround occupies slots 0,1,2 for center, left, right respectively.
     if (sEqual(trimmed_value,"MedCamView2")) { e->textureAnimating = false; e->camView = 1; return; }
-    for (int i=0;i<NUM_TEXTURE_CLIPS;++i) { if(sEqual(trimmed_value,textureAnimClips[i].name)){e->texAnimClip=i; e->textureGlowAnimating=textureAnimClips[i].hasGlow; return;} }
+    for (int i=0;i<NUM_TEXTURE_CLIPS;++i) { if(sEqual(trimmed_value,textureAnimClips[i].name)){World.instances[self].texAnimClip=i; e->textureGlowAnimating=textureAnimClips[i].hasGlow; return;} }
     e->textureAnimating = false; // Couldn't find match, just don't animate.
 }
 
-void TurnLightOff(u16 litIdx);
 void TextureSequenceUpdate(u16 self) {
-    Entity* e = &World.instances[self]; if (!e->textureAnimating || e->tickFinished >= World.pauseRelativeTime) return;
-    float tickTime = 0.35f;
-    if (e->texAnimClip == 5 || e->texAnimClip == 6) tickTime = 0.5f;    
-    if (e->texAnimClip == 43) tickTime = 0.3f;
-    if (e->texAnimClip == 17 || e->texAnimClip == 44) tickTime = 0.2f;
-    if (e->texAnimClip == 47 || e->texAnimClip == 48) tickTime = 0.04166f;
-    e->tickFinished = World.pauseRelativeTime + tickTime;
-    const TextureAnimClip* clip = &textureAnimClips[e->texAnimClip];
-    if (e->texAnimRandom && (!e->textureAnimationStopsAtDead || e->health > 0.0f)) {
-        e->texFrame = random_range_u32(0, clip->length - 1);
-        if (clip->hasGlow) e->texGlowFrame = random_range_u32(0, clip->glowLength - 1);
-    } else {
-        if (e->texAnimInReverse) {
-            if (e->texFrame == 0) { e->texFrame = clip->length - 1;} else { e->texFrame = (e->texFrame - 1 + clip->length) % clip->length; }
-            if (clip->hasGlow) { if(e->texGlowFrame == 0){e->texGlowFrame = clip->glowLength - 1;} else {e->texGlowFrame--;} }
-        } else { e->texFrame = (e->texFrame + 1) % clip->length; if(clip->hasGlow){e->texGlowFrame=(e->texGlowFrame + 1) % clip->glowLength;} }
+    Entity* e = &World.instances[self]; u16 tClip = e->texAnimClip; const TextureAnimClip* clip = &textureAnimClips[tClip];
+    e->tickFinished = World.pauseRelativeTime + ((tClip == 5 || tClip == 6) ? 0.5f : (tClip == 43) ? 0.3f : (tClip == 17 || tClip == 44) ? 0.2f : (tClip == 47 || tClip == 48) ? 0.04166f : 0.35f);
+    if (e->texAnimRandom && (!e->textureAnimationStopsAtDead || e->health > 0.0f)) { e->texFrame = random_range_u32(0,clip->length-1); if(clip->hasGlow){e->texGlowFrame=random_range_u32(0,clip->glowLength - 1);} 
+    } else if (e->texAnimInReverse) { e->texFrame = (e->texFrame == 0) ? clip->length - 1 : e->texFrame - 1; if(clip->hasGlow){e->texGlowFrame=(e->texGlowFrame == 0) ? clip->glowLength - 1 : e->texGlowFrame - 1;}
+    } else { e->texFrame = (e->texFrame + 1) % clip->length; if(clip->hasGlow){e->texGlowFrame=(e->texGlowFrame+1)%clip->glowLength;} }
+    if (e->textureAnimationStopsAtDead && e->health <= 0.0f && e->texFrame >= clip->length - 1) {
+        e->textureAnimating=false;
+        if(e->texAnimLight < World.loadedLights){flag_set(&World.lights[e->texAnimLight].lflags,LIGHTON,false);}
+        if(e->texAnimLight2 < World.loadedLights){flag_set(&World.lights[e->texAnimLight2].lflags,LIGHTON,false);}
     }
-    if (e->textureAnimationStopsAtDead && e->health <= 0.0f && e->texFrame >= clip->length - 1) { e->textureAnimating = false; TurnLightOff(e->texAnimLight); TurnLightOff(e->texAnimLight2); }
-    e->texIndex = sequenceTextures[ clip->frames[e->texFrame] ];
-    if (clip->hasGlow && clip->glowFrames) e->glowIndex = sequenceTextures[ clip->glowFrames[e->texGlowFrame] ];
-    if (e->index == 279 && !clip->hasGlow) e->glowIndex = e->texIndex;
+    e->texIndex = sequenceTextures[clip->frames[e->texFrame]];
+    if (clip->hasGlow && clip->glowFrames) { e->glowIndex = sequenceTextures[clip->glowFrames[e->texGlowFrame]]; }
+    if (e->index == 279 && !clip->hasGlow) { e->glowIndex = e->texIndex; }
 }
