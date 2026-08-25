@@ -287,8 +287,8 @@ void DelayedSpawnUpdate(u16 self) {
 void FuncWallInitAfterLoad(u16 self) {
     Entity* e = &World.instances[self];
     float distTotal = V3_Dist(e->startPosition,e->targetPosition); V3 tempVec = V3_ScaleByF(V3_Normalize(V3_AsubB(World.position[self],e->targetPosition)),-1.0f);
-    if (e->funcState == FStat_AjarMovingTarget) tempVec=V3_ScaleByF(tempVec,distTotal * e->percentAjar);
-    else if (e->funcState == FStat_AjarMovingStart) tempVec=V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentAjar));
+    if (e->funcState == FStat_AjarMovingTarget) tempVec=V3_ScaleByF(tempVec,distTotal * e->ajarPercentage);
+    else if (e->funcState == FStat_AjarMovingStart) tempVec=V3_ScaleByF(tempVec,distTotal * (1.0f - e->ajarPercentage));
     else if (e->funcState == FStat_MovingStart) tempVec=V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentMoved));
     else tempVec=V3_ScaleByF(tempVec,distTotal * e->percentMoved);
     World.position[self]=V3_AplusB(World.position[self],tempVec);
@@ -347,7 +347,7 @@ void ForceBridgeUpdate(u16 self) {
 }
 
 // TriggerCounter
-void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,World.instances[self].target); }
+void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,World.instances[self].targetIdx); }
 void TriggerCounterDelayedTarget(u16 self, u16 act) { World.instances[self].delayFinished = World.pauseRelativeTime + World.instances[self].delay; TriggerCounterTarget(self,act); }
 void TriggerCounterTargetted(u16 self, u16 act) { Entity* e=&World.instances[self]; e->counter++; if (e->counter != e->countToTrigger) {return;} if (e->delay <= 0.0f){TriggerCounterTarget(self,act);}else{TriggerCounterDelayedTarget(self,act);} if (!e->dontReset){e->counter=0;} }
 // TextureChanger
@@ -364,14 +364,14 @@ void TextureChangerToggle(u16 self) {
 }
 // LogicTimer
 void LogicTimerInitBeforeLoad(u16 self) { Entity* e=&World.instances[self]; if(e->timeInterval <= 0.0f){e->timeInterval=0.35f;} if(e->randomMin <= 0.0f){e->randomMin=5.0f;} if(e->randomMax <= 0.0f){e->randomMax=10.0f;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); }
-void LogicTimerUseTargets(u16 self) { UseTargets(self,World.instances[self].target); }
+void LogicTimerUseTargets(u16 self) { UseTargets(self,World.instances[self].targetIdx); }
 void LogicTimerUpdate(u16 self) { return; /* TODO for testing!  Was getting annoyed by target i/o troubleshooting messages from lev1 broken door firing constantly.*/ Entity* e=&World.instances[self]; if(!e->active || e->intervalFinished >= World.pauseRelativeTime){return;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); LogicTimerUseTargets(self); }
 void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; World.instances[self].active = !World.instances[self].active; }
 // ButtonSwitch
 void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->delayFinished=0.0f; if(e->active){e->tickFinished=World.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);} }
 void ButtonSwitchUseTargets(u16 self, u16 activator) {
     Entity* e=&World.instances[self];
-    UseTargets(activator,e->target);
+    UseTargets(activator,e->targetIdx);
     e->active=!e->active;
     if(e->index == 689 || e->index == 690 || e->index == 695) { TextureChangerToggle(self); if(e->index == 689 && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} }
 }
@@ -566,17 +566,9 @@ void GrenadeExplode(u16 self) {
     play_wav(SoundPath(soundIndex),1.0f,World.position[self],true); SpawnExplosionEffect(World.position[self],explosionType); Shake(-1.0f); DeleteInstance(self);
 }
 
-void GrenadeActivate(u16 self) {
-    Entity* e = &World.instances[self]; i16 idx = (i16)e->index;
-    switch (idx) {
-        case 7: case 8: case 9: case 13: e->grenadeExplodeContact = true; break;    case 10: e->timerFinished = World.pauseRelativeTime + World.invP1.earthShakerTimeSetting; e->grenadeUseTimer = true; break;
-        case 11: e->grenadeUseProx = true; e->grenadeExplodeContact = false; break; case 12: e->timerFinished = World.pauseRelativeTime + World.invP1.nitroTimeSetting; e->grenadeUseTimer = true; break;
-        default: return;
-    }
-}
-
-void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; if ((i16)e->index == 14) { GrenadeExplode(self); return; } /*Plastique*/ if (e->grenadeUseTimer && e->timerFinished < World.pauseRelativeTime) { GrenadeExplode(self); return; } if (e->grenadeUseProx) { V3 origin = World.position[self]; float pr = (e->strength > 0.0f) ? e->strength : 1.5f; for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (i != PLAYER1 && !IdxIsNPC(o->index)) continue; if (V3_SqDist(World.position[i], origin) < (pr * pr)) { GrenadeExplode(self); return; } } } }
-void GrenadeOnCollision(u16 self) { if (World.instances[self].grenadeExplodeContact) GrenadeExplode(self); }
+void GrenadeActivate(u16 self) { u16 idx=World.instances[self].index; if (idx == 10){World.instances[self].timerFinished=World.pauseRelativeTime + World.invP1.earthShakerTimeSetting;} if (idx == 12){World.instances[self].timerFinished=World.pauseRelativeTime + World.invP1.nitroTimeSetting;} }
+void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; u16 idx=World.instances[self].index; if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished < World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr = (e->strength > 0.0f) ? e->strength : 1.5f; for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (i != PLAYER1 && !IdxIsNPC(o->index)) continue; if (V3_SqDist(World.position[i], origin) < (pr * pr)) { GrenadeExplode(self); return; } } } }
+void GrenadeOnCollision(u16 self) { u16 idx=World.instances[self].index; if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
 // ProjectileEffectImpact
 float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= BERSERK_DAMAGE_MULTIPLIER; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (fx == WORLD || fx == U16_MAX) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
@@ -630,7 +622,7 @@ static const float attackTypeMult[7][12]={[NPCType_Mutant]={1,1,1,1,0,1,2,1,1,2,
 static const i16 objectDeathSound[] = {[458]=63,[459]=66,[460]=66,[464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,[472]=62,[473]=62,[474]=62,[475]=62,[476]=62,[477]=61,[478]=65,[479]=69,[525]=68,[526]=68,};
 static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE){return true;} Entity* e=&World.instances[self]; if (self != PLAYER1 && e->cyberHealth > 0.0f){return true;} return (IdxIsNPC(e->index) && (e->index - 419) > 23);/*24-28 are cyber enemies*/}
 static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxIsNPC(World.instances[self].index) || World.instances[self].health <= 0.0f){return take;} NPCType t = npcTable[World.instances[self].index - 419].type; if (at >= 12){return take;} return take * attackTypeMult[t][at]; }
-static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (!sEmpty(World.instances[self].target)) UseTargets(self,World.instances[self].target); }
+static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (World.instances[self].targetIdx != IO_NONE) UseTargets(self,World.instances[self].targetIdx); }
 static void TeleportAway(u16 self) { 
     if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;} flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true);
     World.col[self] = COLTYPE_NONE; World.gravity[self] = 0.0f; World.velocity[self] = (V3){0,0,0}; World.angularVelocity[self] = (V3){0,0,0}; World.instances[self].modelIndex = U16_MAX;
@@ -1035,8 +1027,8 @@ void PatchDisableAll(void) {
 // Doors
 static bool DoorInventoryHasAccessCard(AccCardType card) { return card == ACC_None || (World.invP1.accessCardOwned & (1u << card)); }
 static float DoorGetProgress(const Entity* e, u8 clip) { AnimationClip c = DoorGetClip(e,clip); if(c.frameEnd <= c.frameStart){return 1.0f;} return DoorClamp01((float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart)); } 
-static void DoorOpen(u16 self) { Entity* e = &World.instances[self]; DoorSetClipFrame(self,ANIM_OPENING,DoorGetClip(e,ANIM_OPENING).frameStart); e->doorOpen = e->doorState = DoorState_Opening; e->waitBeforeClose = World.pauseRelativeTime + e->delay; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true); }
-static void DoorClose(u16 self) { Entity* e = &World.instances[self]; DoorSetClipFrame(self,ANIM_CLOSING,DoorGetClip(e,ANIM_CLOSING).frameStart); e->doorOpen = e->doorState = DoorState_Closing; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true); } 
+static void DoorOpen(u16 self) { Entity* e = &World.instances[self]; ChangeAnim(e,ANIM_OPENING); e->doorOpen = e->doorState = DoorState_Opening; e->waitBeforeClose = World.pauseRelativeTime + e->delay; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true); }
+static void DoorClose(u16 self) { Entity* e = &World.instances[self]; ChangeAnim(e,ANIM_CLOSING); e->doorOpen = e->doorState = DoorState_Closing; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex],1.0f,World.position[self],true); }
 void DoorForceOpen(u16 self) { World.instances[self].requiredAccessCard = ACC_None; EntitySetLocked(&World.instances[self],false); DoorOpen(self); }
 void DoorForceClose(u16 self) { if (World.instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
@@ -1044,7 +1036,8 @@ void DoorActuate(u16 self) {
     bool op = e->doorOpen == DoorState_Opening;
     if (op || e->doorOpen == DoorState_Closing) {
         int src = op ? ANIM_OPENING : ANIM_CLOSING, dst = op ? ANIM_CLOSING : ANIM_OPENING;
-        DoorSetClipFrame(self,dst,DoorFrameFromProgress(DoorGetClip(e,dst),1.0f - DoorGetProgress(e,src))); e->doorOpen = e->doorState = op ? DoorState_Closing : DoorState_Opening;
+        AnimationClip dstClip = DoorGetClip(e,dst); u16 newFrm = DoorFrameFromProgress(dstClip,1.0f - DoorGetProgress(e,src)); // Direct frame assignment (mid-anim reversal): clip + frame + matching model.
+        e->clip = dst; e->frame = newFrm; e->currentFrameFinished = 0.0; e->modelIndex = dstClip.frameStartModelIndex + (u16)(newFrm - dstClip.frameStart); e->doorOpen = e->doorState = op ? DoorState_Closing : DoorState_Opening;
         if (!op) e->waitBeforeClose = World.pauseRelativeTime + e->delay;
         if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], 1.0f, World.position[self], true);
     }
@@ -1057,25 +1050,23 @@ void DoorUse(u16 self, u16 activator) {
     if (Cheats.superoverride || World.diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = ACC_None; }
     if (World.diffMis <= 1) { e->requiredAccessCard = ACC_None; }
     if (e->useFinished >= World.pauseRelativeTime) return;
-    e->useFinished = World.pauseRelativeTime + e->useTimeDelay;
+    e->useFinished = World.pauseRelativeTime + 0.15f;
     if (e->requiredAccessCard != ACC_None) {
         if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) { CenterStatusPrint("%s",Sys_Text.stringTable[2]);/*TODO Access-card-specific status text.*/ if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) {play_wav(sounds[e->SFXLockedIndex],0.7f,World.position[self],true);} return; }
         else e->requiredAccessCard = ACC_None; // TODO Access-card granted status text.
     }
     if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) {play_wav(sounds[e->SFXLockedIndex],0.55f,World.position[self],true);} return; }
-    if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(activator,e->target); }
+    if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(activator,e->targetIdx); }
     if (e->ajar) e->ajar = false;
     DoorActuate(self);
 }
 
 void DoorTargetted(u16 self, u16 activator) { if ((World.instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&World.instances[self],false); if (!World.instances[self].targettingOnlyUnlocks) DoorUse(self,activator); }
 void DoorUpdate(u16 self) {
-    Entity* e = &World.instances[self];
-    if (e->blocked || e->ajar) return; // TODO frame-pause blocked doors instead of fully skipping.
-    AnimationClip opening = DoorGetClip(e,ANIM_OPENING);
-    AnimationClip closing = DoorGetClip(e,ANIM_CLOSING);
-    if (e->doorOpen == DoorState_Opening && e->clip == ANIM_OPENING && e->frame >= opening.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; DoorSetClipFrame(self,ANIM_IDLE_OPEN,DoorGetClip(e,ANIM_IDLE_OPEN).frameStart); }
-    else if (e->doorOpen == DoorState_Closing && e->clip == ANIM_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; DoorSetClipFrame(self,ANIM_IDLE_CLOSED,DoorGetClip(e,ANIM_IDLE_CLOSED).frameStart); }
+    Entity* e = &World.instances[self]; if(e->ajar){return;}
+    AnimationClip opening=DoorGetClip(e,ANIM_OPENING), closing=DoorGetClip(e,ANIM_CLOSING);
+    if (e->doorOpen == DoorState_Opening && e->clip == ANIM_OPENING && e->frame >= opening.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,ANIM_IDLE_OPEN); }
+    else if (e->doorOpen == DoorState_Closing && e->clip == ANIM_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,ANIM_IDLE_CLOSED); }
     if (World.pauseRelativeTime > e->waitBeforeClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
 }
 
@@ -1092,6 +1083,22 @@ u16 SpawnDynamicObject(int val, bool cheat) {
 void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
 void Targetted(u16 activator, u16 self) {
     Entity* e = &World.instances[self]; u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
+    if (e->index == 699) { UseTargets(activator,e->targetIdx); return; } // logic_relay: plain passthrough
+    if (e->index == 710) { // info_mission: quest bit set/clear/toggle, or test-and-branch via target/targetIfFalse.  Mode comes from the activating targetIO bits, falling back to the info_mission's own line.
+        if (e->questBitID == QB_None) return;
+        u32 qb = 1u << e->questBitID; u32 modeFlags = aioflags ? aioflags : e->ioflags;
+        if (modeFlags & TARG_IOFLAGS_MISSION_BIT_TOGGLE) { World.missionBits ^= qb; DualLog("info_mission toggled bit %u -> %u\n",e->questBitID,(unsigned)((World.missionBits >> e->questBitID) & 1u)); return; }
+        if (modeFlags & TARG_IOFLAGS_MISSION_BIT_OFF)    { World.missionBits &= ~qb; return; }
+        if (modeFlags & TARG_IOFLAGS_MISSION_BIT_ON)     { World.missionBits |= qb; return; }
+        u8 tm = e->questTestMode;
+        if (!tm && activator != WORLD && activator < World.instCount) tm = World.instances[activator].questTestMode;
+        if (tm) {
+            bool bitOn = ((World.missionBits >> e->questBitID) & 1u) != 0u;
+            bool pass = (tm == 1) ? bitOn : !bitOn; // 1==testQuestBitIsOn, 2==testQuestBitIsOff
+            UseTargets(activator, pass ? e->targetIdx : e->targetIfFalseIdx);
+        }
+        return;
+    }
     DualLog("Targetted a->ioflags:%u e:%u doorcond:%u\n", aioflags, e->index, ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)));
     if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; } // info_message
     if (e->index == 708) { World.gameFinished = true; return; }
@@ -1116,12 +1123,13 @@ void Targetted(u16 activator, u16 self) {
     else if (aioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags, EF_ACTIVE, !(e->entflags & EF_ACTIVE));
 }
 
-void UseTargets(u16 activator, const char* targetname) {
-    if(sEmpty(targetname)){return;} bool wasActive=World.targetIOActive, succeeded=false; u8 entryLevel = World.currentLevel;
+void UseTargets(u16 activator, u16 targetIdx) {
+    if(targetIdx == IO_NONE){return;} bool wasActive=World.targetIOActive, succeeded=false; u8 entryLevel = World.currentLevel;
     if (!wasActive) { World.targetIOActive = true; World.targetIOEntryLevel = entryLevel; World.targetIOActivatorIdx = activator; World.targetIOActivatorEntity = World.instances[activator]; World.targetIOActivatorIoflags = World.instances[activator].ioflags; }
+    const char* targetname = IOName(targetIdx); // For logging only; matching is u16 compare against the interned table.
     for (u8 lev = 0; lev < World.numLevels; ++lev) {
         if (World.currentLevel != lev) SetLevelPointers(lev);
-        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (!sEqual(World.instances[i].targetname,targetname)) {continue;} DualLog("Target hit: %s on %u (lev %u)\n",targetname,i,lev); Targetted(activator,i); succeeded=true; }
+        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} DualLog("Target hit: %s on %u (lev %u)\n",targetname,i,lev); Targetted(activator,i); succeeded=true; }
     }
     if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (!wasActive) {World.targetIOActive=false;}
 }

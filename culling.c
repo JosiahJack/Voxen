@@ -1,6 +1,5 @@
 // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
 #include "common.h"
-typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead; u8 lev;} Portal;
 u32 gridCellStates[ARRSIZE],precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
 u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u32 numActivePortals = 0;
 __attribute__((pure)) bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
@@ -92,7 +91,8 @@ void AddDoorPortal(u16 entIdx, u16 parent) {
     numActivePortals++;
 }
 
-bool ToggleDoorPortal(u32 p, u16 dr, u16 closedMdx) { if (p >= MAX_PORTALS) {return false;} Portal* prt = &activePortals[p]; bool currentState=prt->open; u16 mdx=World.instances[dr].modelIndex; if (mdx == closedMdx &&  currentState) { prt->open=false; prt->dirty=true; } else if (mdx != closedMdx && !currentState) { prt->open=true; prt->dirty=true; } return true; }
+bool ToggleDoorPortal(u32 p, u16 dr, u16 closedMdx) { if (p >= MAX_PORTALS) {return false;} Portal* prt = &activePortals[p]; bool currentState=prt->open; u16 mdx=World.instances[dr].modelIndex; if (mdx == closedMdx && currentState) { prt->open=false; prt->dirty=true; } else if (mdx != closedMdx && !currentState) { prt->open=true; prt->dirty=true; } return true; }
+void ForceDoorPortalOpen(u16 p) { if (p >= numActivePortals) {return;} activePortals[p].open = true; activePortals[p].dirty = true; } // Used at load for doors that start open/ajar. Bounds-checked so non-portal doors (portalIndex==0 default) can't corrupt portal 0.
 i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ) {
     if (lastX != x || lastZ != z) {
         if (XZPairInBounds(lastX, lastZ)) { 
@@ -269,10 +269,21 @@ void CullCore() {
     PortalCulling(); // Update based on portal states.
 }
 
+static void ApplyOpenPortalEdges(void) { // Clears closed-edge bits for lev-matched portals currently marked open. Called from CullInit after DetermineClosedEdges() so the precomputed visibility table (and every later PVS recompute) treats open/ajar door portals as passable from the start.
+    for (u32 portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
+        Portal* prt = &activePortals[portalIdx];
+        if (!prt->open || prt->lev != World.curLev) continue;
+        u16 cellIdxA = (prt->cellA.z * WORLDX) + prt->cellA.x; u16 cellIdxB = (prt->cellB.z * WORLDX) + prt->cellB.x;
+        if (prt->portalNS) { gridCellStates[cellIdxA] &= ~(CELL_CLOSEDSOUTH); gridCellStates[cellIdxB] &= ~(CELL_CLOSEDNORTH); }
+        else               { gridCellStates[cellIdxA] &= ~(CELL_CLOSEDWEST);  gridCellStates[cellIdxB] &= ~(CELL_CLOSEDEAST); }
+    }
+}
+
 void CullInit() {
     if (World.curLev == LEVEL_CYBERSPACE) return;
     double start_time = get_time(); DualLog("Culling ");
     DetermineClosedEdges(); // For each cell, get visibility as though player were there and put into gridCellStates.  Then store the visibility of gridCellStates into the table of all visible cells for that cell at the appropriate offset for looking up later when actually re-assigning gridCellStates from this precalculated visibility state for the particular cell.
+    ApplyOpenPortalEdges(); // DetermineClosedEdges() just reset every edge to its static closed state; reopen doors that start open/ajar BEFORE baking the precomputed visibility table below.
     for (i32 z=0;z<WORLDZ;z++) {
         for (i32 x=0;x<WORLDX;x++) {
             DetermineVisibleCells(x,z);

@@ -19,7 +19,7 @@ INLINE bool AnimWaking(u16 j) {
     return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0;
 }
 // Trigger System
-void AddForce(u16 i, V3 f, bool imp); void AddAccessCardToInventory(int index); void UseTargets(u16 activator, const char* targetname); void DeleteInstance(u16 i); void TakeEnergy(float take);
+void AddForce(u16 i, V3 f, bool imp); void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 targetIdx); void DeleteInstance(u16 i); void TakeEnergy(float take);
 void trigger_cyberpush_touch(u16 self, u16 other) { if (World.diffCyb < 1) {return;} AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force * (float)World.deltaTime),false); World.Sys_Music.cyberTube = true; }
 void prop_cyber_exit(u16 other) { if (other != PLAYER1) {return;} UIExitCyberspace(); }
 void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); }
@@ -52,10 +52,8 @@ void CyberMineInitBeforeLoad(u16 self) {
 float TakeDamage(u16 self,DamageData dd);
 void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) return; PlayerTakeDamage(PLAYER1,e->damage); play_wav(sounds[67],1.0f,World.position[self],false); flag_set(&e->entflags,EF_ACTIVE,false); }
 void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // TODO Visual subobject parity removed with hierarchy removal.
-void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(other,e->target); }
+void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(other,e->targetIdx); }
 // TeleportTouch
-static bool TeleportTouch_initialized;
-void TeleportTouchInitAfterLoad(u16 self){Entity* e=&World.instances[self]; if(!TeleportTouch_initialized){for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;} TeleportTouch_initialized=true;} if(e->teleportID >= 8){DeleteInstance(self); return;} World.TeleportTouch_allTeleportTouches[e->teleportID]=self;}
 void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &World.instances[self];
     Entity* player = &World.instances[PLAYER1];
@@ -68,8 +66,8 @@ void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
     play_wav(sounds[106],1.0f,World.position[dest],false);
 }
 // Trigger for Events (trigger_multiple/trigger_once same as Quake 1)
-void TriggerDelayedTarget(u16 self, u16 activator) { World.instances[self].delayFireFinished = World.pauseRelativeTime + World.instances[self].delay; UseTargets(activator,World.instances[self].target); }
-void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (e->recentMostActivator && e->ignoreSecondaryTriggers)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(other,World.instances[self].target);}else{TriggerDelayedTarget(self,other);} }
+void TriggerDelayedTarget(u16 self, u16 activator) { World.instances[self].delayFireFinished = World.pauseRelativeTime + World.instances[self].delay; UseTargets(activator,World.instances[self].targetIdx); }
+void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (e->recentMostActivator && e->ignoreSecondaryTriggers)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(other,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self,other);} }
 void TriggerOnTriggerEnter(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
 void TriggerOnTriggerStay(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
 // GravityLift

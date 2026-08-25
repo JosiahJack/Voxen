@@ -190,42 +190,6 @@
 		CenterTabButtonClickSilent(curCenterTab,false);
 	}
 
-	public void DrawTicks(bool health) {
-		tempSpriteIndex = -1;
-		float checkVal = 0;
-		if (health) {
-			if (MouseLookScript.a.inCyberSpace) {
-				checkVal = World.instances[PLAYER1].cyberHealth;
-			} else {
-				checkVal = World.instances[PLAYER1].health;
-			}
-		} else {
-			checkVal = PlayerEnergy.a.energy;
-		}
-
-		// Always display ticks properly no matter what crazy value  we've been
-		// hacked to have.
-		if (checkVal > 255f) checkVal = 255f; 
-		for (int i=1;i<24;i++) {
-			if (checkVal < (11f * i)) tempSpriteIndex++;
-		}
-
-		tempSpriteIndex++;
-		if (tempSpriteIndex >= 0 && tempSpriteIndex < 25) {
-			if (health) {
-				tickImageHealth.overrideSprite = tickImages[tempSpriteIndex];
-			} else {
-				tickImageEnergy.overrideSprite = tickImages[tempSpriteIndex];
-			}
-		} else {
-			if (health) {
-				tickImageHealth.overrideSprite = tickImages[24];
-			} else {
-				tickImageEnergy.overrideSprite = tickImages[24];
-			}
-		}
-	}
-
 	void WeaponButtonsManagerUpdate() {
 		for (int i=0; i<7; i++) {
 			WeaponButton wepbut = wepbutMan.wepButtonsScripts[i];

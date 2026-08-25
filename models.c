@@ -1210,7 +1210,7 @@ void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
     u8 animTest = Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
-        Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS) continue;
+        Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->ajar) continue;
         if (animTest == 1) {
             u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0;
             for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &modelAnimationClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } } if (numValid == 0){continue;} 

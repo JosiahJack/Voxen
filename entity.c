@@ -509,6 +509,19 @@ void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
 }
 
 char lineSpace[LINE_LEN_MAX]; void AddDoorPortal(u16 entIdx, u16 parent); void TextureSequenceInit(u16 self, char* trimmed_value); void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr);
+// Interned target/targetname strings for the IO registration system.  Built once during LoadAllLevels() in level-parse order (deterministic), so indices are stable across sessions and usable cross-level.
+// Index 0 (IO_NONE) is reserved for "no name".  Entity.targetIdx/.target2Idx/.targetIfFalseIdx/.targetnameIdx/.currentTargetIdx all index into this table.
+#define MAX_IO_NAMES 1024
+static char ioNames[MAX_IO_NAMES][TARGET_STRING_LENGTH]; static u16 ioNameCount = 0;
+static void IONamesReset(void) { ioNameCount = 1; ioNames[0][0] = '\0'; } // Reserve slot 0 as IO_NONE
+u16 IOInternName(const char* name) {
+    if (!name || !*name) return IO_NONE;
+    for (u16 i = 1; i < ioNameCount; ++i) { if (sEqual(ioNames[i],name)) return i; }
+    if (ioNameCount >= MAX_IO_NAMES) { DualLogError("IO name table full (%u unique names)! Targeting will be dropped for new names.\n",MAX_IO_NAMES); return IO_NONE; }
+    scpy_to_a_from_b(ioNames[ioNameCount],name,TARGET_STRING_LENGTH);
+    return ioNameCount++;
+}
+const char* IOName(u16 idx) { return (idx < ioNameCount) ? ioNames[idx] : ""; }
 void LoadLevelMod(u8 lev) {
     u8 curlevel = vclamp(lev, 0, 13); World.curLev = curlevel; World.levelCurrentlyLoading = true; World.instCount = 3;
     if (curlevel == 1) {
@@ -555,8 +568,16 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("resetTime"))       inst->resetTime = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("minSecurityLevel"))inst->minSecurityLevel = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("damageOnUse"))     inst->damage = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("target"))          scpy_to_a_from_b(inst->target, value, TARGET_STRING_LENGTH);
-                else if (KEY_EQ("targetname"))      scpy_to_a_from_b(inst->targetname, value, TARGET_STRING_LENGTH);
+                else if (KEY_EQ("target"))          inst->targetIdx = IOInternName(value);
+                else if (KEY_EQ("targetname"))      inst->targetnameIdx = IOInternName(value);
+                else if (KEY_EQ("target2"))         inst->target2Idx = IOInternName(value); // logic_branch secondary target
+                else if (KEY_EQ("targetIfFalse"))   inst->targetIfFalseIdx = IOInternName(value); // logic_branch conditional target
+                else if (KEY_EQ("delayResetFinished")) inst->delayResetFinished = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime; // trigger_multiple/trigger_once
+                else if (KEY_EQ("randomItemCustomIndex[0]")) inst->randomItemCustIdx[0] = parse_numberi16(value,lineSpace,lineNum);
+                else if (KEY_EQ("randomItemCustomIndex[1]")) inst->randomItemCustIdx[1] = parse_numberi16(value,lineSpace,lineNum);
+                else if (KEY_EQ("randomItemCustomIndex[2]")) inst->randomItemCustIdx[2] = parse_numberi16(value,lineSpace,lineNum);
+                else if (KEY_EQ("randomItemCustomIndex[3]")) inst->randomItemCustIdx[3] = parse_numberi16(value,lineSpace,lineNum);
+                else if (KEY_EQ("musicType"))       inst->musicType = (MusicType)parse_numberu8(value,lineSpace,lineNum); // trigger_music
                 else if (KEY_EQ("securityThreshhold") || KEY_EQ("securityThreshold")) inst->securityThreshold = parse_numberu8(value, lineSpace, lineNum);
                 else if (KEY_EQ("messageIndex"))    inst->messageIndex = parse_numberi16(value, lineSpace, lineNum);
                 else if (KEY_EQ("delay"))           inst->delay = parse_float(value, lineSpace, lineNum);
@@ -568,13 +589,10 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("startOpen"))       inst->startOpen = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("ajar"))            inst->ajar = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("ajarPercentage"))  inst->ajarPercentage = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("useTimeDelay"))    inst->useTimeDelay = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("blocked"))         inst->blocked = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("toggleLasers"))    inst->toggleLasers = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("targettingOnlyUnlocks")) inst->targettingOnlyUnlocks = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("changeLayerOnOpenClose")) inst->changeLayerOnOpenClose = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("useFinished"))     inst->useFinished = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
                 else if (KEY_EQ("waitBeforeClose")) inst->waitBeforeClose = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
                 else if (KEY_EQ("lasersFinished"))  inst->lasersFinished = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
                 else if (KEY_EQ("doorOpen"))        flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPEN, parse_bool(value, lineSpace, lineNum));
@@ -614,6 +632,28 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
                 else if (KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
                 else if (KEY_EQ("requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(value, lineSpace, lineNum);
+                else if (KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
+                else if (KEY_EQ("testQuestBitIsOff"))   inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 2 : inst->questTestMode;
+                else if (KEY_EQ("RobotSpawnDeactivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_RobotSpawnDeactivated; }
+                else if (KEY_EQ("IsotopeInstalled"))            { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsotopeInstalled; }
+                else if (KEY_EQ("ShieldActivated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_ShieldActivated; }
+                else if (KEY_EQ("LaserSafetyOverriden"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserSafetyOverriden; }
+                else if (KEY_EQ("LaserDestroyed"))              { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserDestroyed; }
+                else if (KEY_EQ("BetaGroveCyberUnlocked"))      { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BetaGroveCyberUnlocked; }
+                else if (KEY_EQ("GroveAlphaJettisonEnabled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveAlphaJettisonEnabled; }
+                else if (KEY_EQ("GroveBetaJettisonEnabled"))    { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveBetaJettisonEnabled; }
+                else if (KEY_EQ("GroveDeltaJettisonEnabled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveDeltaJettisonEnabled; }
+                else if (KEY_EQ("MasterJettisonBroken"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_MasterJettisonBroken; }
+                else if (KEY_EQ("Relay428Fixed"))               { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_Relay428Fixed; }
+                else if (KEY_EQ("MasterJettisonEnabled"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_MasterJettisonEnabled; }
+                else if (KEY_EQ("BetaGroveJettisoned"))         { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BetaGroveJettisoned; }
+                else if (KEY_EQ("AntennaNorthDestroyed"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaNorthDestroyed; }
+                else if (KEY_EQ("AntennaSouthDestroyed"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaSouthDestroyed; }
+                else if (KEY_EQ("AntennaEastDestroyed"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaEastDestroyed; }
+                else if (KEY_EQ("AntennaWestDestroyed"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaWestDestroyed; }
+                else if (KEY_EQ("SelfDestructActivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_SelfDestructActivated; }
+                else if (KEY_EQ("BridgeSeparated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BridgeSeparated; }
+                else if (KEY_EQ("IsolinearChipsetInstalled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsolinearChipsetInstalled; }
                 else if (KEY_EQ("doorOpenState"))   inst->doorOpen = parse_numberu8(value, lineSpace, lineNum);
             }
         }
@@ -642,21 +682,22 @@ void LoadLevelMod(u8 lev) {
         par->startOpen             = src->startOpen;
         par->ajar                  = src->ajar;
         par->ajarPercentage        = src->ajarPercentage;
-        par->useTimeDelay          = src->useTimeDelay;
-        par->blocked               = src->blocked;
         par->timeBeforeLasersOn    = src->timeBeforeLasersOn;
         par->toggleLasers          = src->toggleLasers;
         par->targettingOnlyUnlocks = src->targettingOnlyUnlocks;
         par->changeLayerOnOpenClose= src->changeLayerOnOpenClose;
-        par->useFinished           = src->useFinished;
         par->waitBeforeClose       = src->waitBeforeClose;
         par->lasersFinished        = src->lasersFinished;
         par->securityThreshold     = src->securityThreshold;
         par->texAnimRandom         = src->texAnimRandom;
         par->texAnimInReverse      = src->texAnimInReverse;
         par->messageLingdex        = src->messageLingdex;
-        scpy_to_a_from_b(par->target, src->target, TARGET_STRING_LENGTH);
-        scpy_to_a_from_b(par->targetname, src->targetname, TARGET_STRING_LENGTH);
+        par->targetIdx             = src->targetIdx;
+        par->targetnameIdx         = src->targetnameIdx;
+        par->target2Idx            = src->target2Idx;
+        par->targetIfFalseIdx      = src->targetIfFalseIdx;
+        par->questBitID            = src->questBitID;
+        par->questTestMode         = src->questTestMode;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARGET_STRING_LENGTH);
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent); // Only at load, not in AddInstance
         if (entIdx == 525) { // prop_console01
@@ -716,16 +757,7 @@ void func_forcebridge(u16 self); void CyberWallInitAfterLoad(u16 self); void Fun
 float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
 AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips[e->animationNum][clip]; }
 void ChangeAnim(Entity* e, u8 clip);
-void DoorSetClipFrame(u16 self, u8 clip, u16 frame) { ChangeAnim(&World.instances[self],clip); (void)frame; }
 u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span)); }
-void TeleportTouchInitAfterLoad(u16 self);
-void GravityLiftInitAfterLoad(u16 self) {
-    World.instances[self].strength =                  UsableOrDef(World.instances[self].strength, 12.0f);
-    World.instances[self].offStrengthFactor =         UsableOrDef(World.instances[self].offStrengthFactor, 0.3f);
-    World.instances[self].distancePaddingToTopPoint = UsableOrDef(World.instances[self].distancePaddingToTopPoint, 0.32f);
-    World.instances[self].topPoint = (V3){ 0.0f, World.position[self].y + (World.colliderSize[self].y * 0.5f), 0.0f };
-}
-
 void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
 void LoadLevelData(u8 curlevel) {
     World.curLev = curlevel; SetLevelPointers(curlevel); // Ensures writing to correct current level
@@ -751,30 +783,31 @@ void LoadLevelData(u8 curlevel) {
         if (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443/*not cyber*/)) World.gravity[i] = 1.0f;
         else World.gravity[i] = 0.0f;
         if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
-        else if (IdxIsDoor(constIndex)) World.layer[i] = L_Door;
         else if (IdxIsUsableObject(constIndex)) {
             if (World.diffPuz == 3 && World.instances[i].index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
             if (World.diffMis <= 1 && IdxIsAccessCard(World.instances[i].index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
             if (World.diffMis == 0 && World.instances[i].index == 313) DeleteInstance(i); // Remove audiologs on Mission difficulty 0
         } else if (IdxIsDoor(World.instances[i].index)) {
+            World.layer[i] = L_Door;
             if (World.instances[i].startOpen) World.instances[i].stayOpen = true;
-            if (World.instances[i].useTimeDelay <= 0.0f) World.instances[i].useTimeDelay = 0.15f;
             if (World.instances[i].lockedMessageLingdex <= 0) World.instances[i].lockedMessageLingdex = 3;
             if (World.instances[i].SFXIndex < 0) World.instances[i].SFXIndex = 75;
             if (World.instances[i].doorOpen > DoorState_Opening) World.instances[i].doorOpen = World.instances[i].startOpen ? DoorState_Open : DoorState_Closed;
             World.instances[i].doorState = World.instances[i].doorOpen;
             if (World.instances[i].ajar) {
                 AnimationClip c = DoorGetClip(&World.instances[i],ANIM_OPENING);
-                DoorSetClipFrame(i,ANIM_OPENING,DoorFrameFromProgress(c,World.instances[i].ajarPercentage));
+                u16 f = DoorFrameFromProgress(c,World.instances[i].ajarPercentage);
+                World.instances[i].clip = ANIM_OPENING; World.instances[i].frame = f; World.instances[i].modelIndex = c.frameStartModelIndex + (u16)(f - c.frameStart); World.instances[i].currentFrameFinished = 0.0; // Parked partway; UpdateAnims() holds ajar doors so it stays put.
                 World.instances[i].doorOpen = World.instances[i].doorState = DoorState_Opening;
             } else {
                 switch (World.instances[i].doorOpen) {
-                    case DoorState_Open:    DoorSetClipFrame(i,ANIM_IDLE_OPEN,DoorGetClip(&World.instances[i],ANIM_IDLE_OPEN).frameStart); break;
-                    case DoorState_Opening: DoorSetClipFrame(i,ANIM_OPENING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],ANIM_OPENING),0.0f/*TODO percent of anim*/)); break;
-                    case DoorState_Closing: DoorSetClipFrame(i,ANIM_CLOSING,DoorFrameFromProgress(DoorGetClip(&World.instances[i],ANIM_CLOSING),0.0f/*TODO percent of anim*/)); break;
-                    default:                DoorSetClipFrame(i,ANIM_IDLE_CLOSED,DoorGetClip(&World.instances[i],ANIM_IDLE_CLOSED).frameStart); break;
+                    case DoorState_Open:    ChangeAnim(&World.instances[i],ANIM_IDLE_OPEN); break;
+                    case DoorState_Opening: ChangeAnim(&World.instances[i],ANIM_OPENING); break;
+                    case DoorState_Closing: ChangeAnim(&World.instances[i],ANIM_CLOSING); break;
+                    default:                ChangeAnim(&World.instances[i],ANIM_IDLE_CLOSED); break;
                 }
             }
+            if (IdxIsPortalBlockingDoor(World.instances[i].index) && World.instances[i].doorState != DoorState_Closed) ForceDoorPortalOpen(World.instances[i].portalIndex); // Open/ajar doors start with their portal open. Bounds-checked in culling.c; guard keeps non-portal doors from touching portal 0.
         } else if (IdxIsNPC(constIndex)) { World.layer[i] = L_NPC; /* TODO AIInit funcion */ }
         else if (IdxIsSearchable(constIndex)) {
             if (World.instances[i].generateContents) {
@@ -787,15 +820,15 @@ void LoadLevelData(u8 curlevel) {
             }
         } else if (constIndex == 515) func_forcebridge(i); // func_forcebridge
         else if (constIndex == 517) FuncWallInitAfterLoad(i);
-        else if (constIndex == 596) GravityLiftInitAfterLoad(i);
+        else if (constIndex == 596) { World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,0.3f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); World.instances[i].topPoint=(V3){0.0f,World.position[i].y + (World.colliderSize[i].y * 0.5f),0.0f}; } /*trigger_gravitylift*/
         else if (constIndex == 701) LogicTimerInitBeforeLoad(i);
-        else if (constIndex == 556) TeleportTouchInitAfterLoad(i); // prop_cyberport
+        else if (constIndex == 703) { if(World.instances[i].teleportID < 8){World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} }/*info_teleport_destination*/
         else if (constIndex == 555) { } // prop_cyber_switch CyberSwitchInitAfterLoad(i);
         else if (constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
         else if (IdxIsButtonSwitch(World.instances[i].index)) ButtonSwitchInitAfterLoad(i);
         else if (constIndex >= 448 && constIndex <= 457) { if(World.diffMis == 0 && World.instances[i].index == 448/*item_cyber_data*/){DeleteInstance(i);} }
         else if (constIndex == 480) CyberMineInitBeforeLoad(i);
-        if (!sEmpty(World.instances[i].targetname) && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
+        if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
     }
     World.levelLoadedLights[curlevel] = World.loadedLights; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
 }
@@ -811,8 +844,10 @@ void LoadAllLevels() {
     posFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
     scaleFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
     rotationFromFile = (Quaternion*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(Quaternion));
+    IONamesReset(); // Intern table is derived data; rebuild before parsing levels so indices match entity targetIdx fields.
     lightsFromFile = (Light*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(Light));
     lanimsFromFile = (LightAnimation*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(LightAnimation));
+    for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;}
     for (u8 lev = 0; lev < World.numLevels; ++lev) LoadLevelData(lev);
     OS_Free(entsFromFile, (size_t)INSTANCE_COUNT * sizeof(Entity));
     OS_Free(posFromFile, (size_t)INSTANCE_COUNT * sizeof(V3));
@@ -861,7 +896,7 @@ void SaveGame(u8 slot, const char* savename) {
     if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenWriteonly(path); if(fd == (FHandle)-1){return;}
     size_t sz=sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b=(u8*)OS_Alloc(maxCompSize); size_t finalCompSize=VoidSquasher((const u8*)&World,sz,b,maxCompSize);
     if (finalCompSize > 0) {
-        SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=2, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize};
+        SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=4, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize};
         if (savename) { int i=0;   while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;}   header.savename[i]='\0'; }
         World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot);
     } else { DualLogError("Compression failed during SaveGame!\n"); }
@@ -870,7 +905,7 @@ void SaveGame(u8 slot, const char* savename) {
 
 void LoadGame(u8 slot) {
     if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;}
-    SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343 || header.version != 2 || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; } 
+    SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343 || header.version != 4 || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; } 
     u8* b = (u8*)OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
         size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize); // Decompress straight into the World struct
