@@ -76,7 +76,7 @@ bool AddGeneralObjectToInventory(int index, int custIdx) {
     for (i8 i=1;i<14;++i) {
         if (World.invP1.generalInventoryIndexRef[i] == -1) { 
             if(!InventoryHasAnyAccessCards() && World.invP1.generalInvCurrent == 0){World.invP1.generalInvCurrent=i;} World.invP1.generalInventoryIndexRef[i]=index; 
-            World.invP1.generalInvCustIdx[i]=(i16)custIdx; CenterStatusPrint("%s%s",Sys_Text.stringTable[index + 326],Sys_Text.stringTable[31]);
+            World.invP1.generalInvCustIdx[i]=(i16)custIdx; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]);
             return true;
         }
     } return false;
@@ -110,7 +110,7 @@ void AddAudioLogToInventory(int index) {
     else { CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[310]); }
 }
 
-static inline void ItemAdd(u8 *cur, u8 *counts, int idx, int uIdx, int sysIdx) { if (!counts[*cur]) {*cur=(i8)idx;} counts[idx]++; CenterStatusPrint("%s%s", Sys_Text.stringTable[uIdx + 326], Sys_Text.stringTable[sysIdx]); }
+static inline void ItemAdd(u8 *cur, u8 *counts, int idx, int uIdx, int sysIdx) { if (!counts[*cur]) {*cur=(i8)idx;} counts[idx]++; CenterStatusPrint("%s%s", Sys_Text.stringTable[ItemStringIdx(uIdx)], Sys_Text.stringTable[sysIdx]); }
 void AddGrenadeToInventory(int i, int u) { World.invP1.grenConstIndex[i]=(i16)u; ItemAdd(&World.invP1.grenCur,World.invP1.grenAmmo,i,u,34); }
 void   AddPatchToInventory(int i, int u) { if (i >= 0) ItemAdd(&World.invP1.patchCur,World.invP1.patchCounts,i,u,35); }
 static inline void GrenadeCycle(int step){int cur= World.invP1.grenCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(   World.invP1.grenAmmo[next]>0){World.invP1.grenCur =(i8)next; CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
@@ -141,8 +141,8 @@ void UseCyberspaceItem() {
     }
 }
 
-void CycleCyberSpaceItemUp() { int next = World.invP1.cyberItemIndex + 1; if (next > 2){next=0;} for (int c = 0; c <= 7; c++) { if (!(World.invP1.hasSoft & (1u << next))) { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (++next > 2) {next = 0;} } }
-void CycleCyberSpaceItemDn() { int next = World.invP1.cyberItemIndex - 1; if (next < 0){next=2;} for (int c = 0; c <= 7; c++) { if (  World.invP1.hasSoft & (1u << next))  { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (--next < 0) {next = 2;} } }
+void CycleCyberSpaceItemUp() { int next = World.invP1.cyberItemIndex + 1; if (next > 2){next=0;} for (int c = 0; c <= 7; c++) { if (World.invP1.hasSoft & (1u << (SW_TURBO+next))) { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (++next > 2) {next = 0;} } }
+void CycleCyberSpaceItemDn() { int next = World.invP1.cyberItemIndex - 1; if (next < 0){next=2;} for (int c = 0; c <= 7; c++) { if (World.invP1.hasSoft & (1u << (SW_TURBO+next))) { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (--next < 0) {next = 2;} } }
 void RemoveWeapon(int slot) { World.invP1.weaponInventoryIndices[slot] = World.invP1.weaponInventoryAmmoIndices[slot] = -1; }
 static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index == 4) ? 5.0f : (wep16Index == 10) ? 13.0f : (wep16Index == 14) ? 2.0f : 3.0f; }
 void UpdateAmmoCount() { World.invP1.numweapons=0; for (int i=0;i<7;i++) { if(World.invP1.weaponInventoryIndices[i] >= 0){World.invP1.numweapons++;} } }
@@ -150,22 +150,22 @@ void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
     buf[0] = '\0'; int wepIdx = World.invP1.weaponInventoryIndices[slot]; bool alt = World.invP1.wepLoadedWithAlternate[slot]; float heat = World.invP1.currentEnergyWeaponHeat[slot];
     u8 mag = alt ? World.invP1.currentMagazineAmount2[slot] : World.invP1.currentMagazineAmount[slot];
     switch(wepIdx) {
-        case 36: if (alt){sFormat(buf,bufSize,"%upn | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);}else{sFormat(buf,bufSize,"%umg | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);} break; // MK3 Assault Rifle
-        case 37: case 40: case 46: case 50: case 51: scpy_to_a_from_b(buf,heat > 80.0f ? Sys_Text.stringTable[14] : Sys_Text.stringTable[15],bufSize); break; // Energy weapons
-        case 38: if (alt){sFormat(buf,bufSize,"%utq | %und, %utq",mag,World.invP1.wepAmmo[2],World.invP1.wepAmmoSecondary[2]);}else{sFormat(buf,bufSize,"%und | %und, %utq",mag,World.invP1.wepAmmo[2],World.invP1.wepAmmoSecondary[2]);} break; // SV-23 Dartgun
-        case 39: if (alt){sFormat(buf,bufSize,"%usp | %uhn, %usp",mag,World.invP1.wepAmmo[3],World.invP1.wepAmmoSecondary[3]);}else{sFormat(buf,bufSize,"%uhn | %uhn, %usp",mag,World.invP1.wepAmmo[3],World.invP1.wepAmmoSecondary[3]);} break; // AM-27 Flechette
-        case 41: case 42: break; // Laser Rapier / Lead Pipe: no ammo
-        case 43: if (alt){sFormat(buf,bufSize,"%usg | %uhw, %usg",mag,World.invP1.wepAmmo[7],World.invP1.wepAmmoSecondary[7]);}else{sFormat(buf,bufSize,"%uhw | %uhw, %usg",mag,World.invP1.wepAmmo[7],World.invP1.wepAmmoSecondary[7]);} break; // Magnum 2100
-        case 44: if (alt){sFormat(buf,bufSize,"%usu | %ucr, %usu",mag,World.invP1.wepAmmo[8],World.invP1.wepAmmoSecondary[8]);}else{sFormat(buf,bufSize,"%ucr | %ucr, %usu",mag,World.invP1.wepAmmo[8],World.invP1.wepAmmoSecondary[8]);} break; // SB-20 Magpulse
-        case 45: if (alt){sFormat(buf,bufSize,"%utf | %ust, %utf",mag,World.invP1.wepAmmo[9],World.invP1.wepAmmoSecondary[9]);}else{sFormat(buf,bufSize,"%ust | %ust, %utf",mag,World.invP1.wepAmmo[9],World.invP1.wepAmmoSecondary[9]);} break; // ML-41 Pistol
-        case 47: sFormat(buf,bufSize,"%url | %url",World.invP1.currentMagazineAmount[slot],World.invP1.wepAmmo[11]); break; // MM-76 Railgun
-        case 48: sFormat(buf,bufSize,"%urb | %urb",World.invP1.currentMagazineAmount[slot],World.invP1.wepAmmo[12]); break; // DC-05 Riotgun
-        case 49: if (alt){sFormat(buf,bufSize,"%ulg | %usm, %ulg",mag,World.invP1.wepAmmo[13],World.invP1.wepAmmoSecondary[13]);}else{sFormat(buf,bufSize,"%usm | %usm, %ulg",mag,World.invP1.wepAmmo[13],World.invP1.wepAmmoSecondary[13]);} break; // RF-07 Skorpion
+        case 343: if (alt){sFormat(buf,bufSize,"%upn | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);}else{sFormat(buf,bufSize,"%umg | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);} break; // MK3 Assault Rifle
+        case 344: case 347: case 353: case 357: case 358: scpy_to_a_from_b(buf,heat > 80.0f ? Sys_Text.stringTable[14] : Sys_Text.stringTable[15],bufSize); break; // Energy weapons
+        case 345: if (alt){sFormat(buf,bufSize,"%utq | %und, %utq",mag,World.invP1.wepAmmo[2],World.invP1.wepAmmoSecondary[2]);}else{sFormat(buf,bufSize,"%und | %und, %utq",mag,World.invP1.wepAmmo[2],World.invP1.wepAmmoSecondary[2]);} break; // SV-23 Dartgun
+        case 346: if (alt){sFormat(buf,bufSize,"%usp | %uhn, %usp",mag,World.invP1.wepAmmo[3],World.invP1.wepAmmoSecondary[3]);}else{sFormat(buf,bufSize,"%uhn | %uhn, %usp",mag,World.invP1.wepAmmo[3],World.invP1.wepAmmoSecondary[3]);} break; // AM-27 Flechette
+        case 348: case 349: break; // Laser Rapier / Lead Pipe: no ammo
+        case 350: if (alt){sFormat(buf,bufSize,"%usg | %uhw, %usg",mag,World.invP1.wepAmmo[7],World.invP1.wepAmmoSecondary[7]);}else{sFormat(buf,bufSize,"%uhw | %uhw, %usg",mag,World.invP1.wepAmmo[7],World.invP1.wepAmmoSecondary[7]);} break; // Magnum 2100
+        case 351: if (alt){sFormat(buf,bufSize,"%usu | %ucr, %usu",mag,World.invP1.wepAmmo[8],World.invP1.wepAmmoSecondary[8]);}else{sFormat(buf,bufSize,"%ucr | %ucr, %usu",mag,World.invP1.wepAmmo[8],World.invP1.wepAmmoSecondary[8]);} break; // SB-20 Magpulse
+        case 352: if (alt){sFormat(buf,bufSize,"%utf | %ust, %utf",mag,World.invP1.wepAmmo[9],World.invP1.wepAmmoSecondary[9]);}else{sFormat(buf,bufSize,"%ust | %ust, %utf",mag,World.invP1.wepAmmo[9],World.invP1.wepAmmoSecondary[9]);} break; // ML-41 Pistol
+        case 354: sFormat(buf,bufSize,"%url | %url",World.invP1.currentMagazineAmount[slot],World.invP1.wepAmmo[11]); break; // MM-76 Railgun
+        case 355: sFormat(buf,bufSize,"%urb | %urb",World.invP1.currentMagazineAmount[slot],World.invP1.wepAmmo[12]); break; // DC-05 Riotgun
+        case 356: if (alt){sFormat(buf,bufSize,"%ulg | %usm, %ulg",mag,World.invP1.wepAmmo[13],World.invP1.wepAmmoSecondary[13]);}else{sFormat(buf,bufSize,"%usm | %usm, %ulg",mag,World.invP1.wepAmmo[13],World.invP1.wepAmmoSecondary[13]);} break; // RF-07 Skorpion
         default: break;
     }
 }
 
-__attribute__((noinline)) void AddAmmoToInventory(int index,int constIndex,int amount,bool isSecondary) { if(index < 0){return;} if(isSecondary){World.invP1.wepAmmoSecondary[index]+=(u16)amount;} else {World.invP1.wepAmmo[index]+=(u16)amount;} CenterStatusPrint("%s%s",Sys_Text.stringTable[constIndex + 326],Sys_Text.stringTable[630]); }
+__attribute__((noinline)) void AddAmmoToInventory(int index,int constIndex,int amount,bool isSecondary) { if(index < 0){return;} if(isSecondary){World.invP1.wepAmmoSecondary[index]+=(u16)amount;} else {World.invP1.wepAmmo[index]+=(u16)amount;} CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(constIndex)],Sys_Text.stringTable[630]); }
 bool AddWeaponToInventory(int index,int ammo1,int ammo2,bool loadedAlt) {
     if (index < 0) return false;
     for (int i = 0; i < 7; i++) {
@@ -189,7 +189,7 @@ bool AddWeaponToInventory(int index,int ammo1,int ammo2,bool loadedAlt) {
             if (ammo2 > 0) World.invP1.wepAmmoSecondary[index16] += (u16)ammo2;
             World.invP1.wepLoadedWithAlternate[i] = false;
         }
-        CenterStatusPrint("%s%s",Sys_Text.stringTable[index + 326],Sys_Text.stringTable[33]);
+        CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[33]);
         UpdateAmmoCount();
         return true;
     }
@@ -202,15 +202,15 @@ void UseGrenade(int index) {
     ForceInventoryMode();  // Inventory mode is turned on when picking something up.
     ResetHeldItem();
     World.invP1.grenActive = true;
-    CenterStatusPrint("%s%s",Sys_Text.stringTable[index + 326],Sys_Text.stringTable[320]); // activated, grenade is LIVE!
+    CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[320]); // activated, grenade is LIVE!
     switch(index) {
-        case 7:  World.invP1.heldObjectIndex = 370; RemoveGrenade(0); break; // Frag
-        case 8:  World.invP1.heldObjectIndex = 372; RemoveGrenade(3); break; // Concussion
-        case 9:  World.invP1.heldObjectIndex = 387; RemoveGrenade(1); break; // EMP
-        case 10: World.invP1.heldObjectIndex = 389; RemoveGrenade(6); break; // Earth Shaker
-        case 11: World.invP1.heldObjectIndex = 402; RemoveGrenade(4); break; // Land Mine
-        case 12: World.invP1.heldObjectIndex = 403; RemoveGrenade(5); break; // Nitropak
-        case 13: World.invP1.heldObjectIndex = 404; RemoveGrenade(2); break; // Gas
+        case 314: World.invP1.heldObjectIndex = 370; RemoveGrenade(0); break; // Frag
+        case 315: World.invP1.heldObjectIndex = 372; RemoveGrenade(3); break; // Concussion
+        case 316: World.invP1.heldObjectIndex = 387; RemoveGrenade(1); break; // EMP
+        case 317: World.invP1.heldObjectIndex = 389; RemoveGrenade(6); break; // Earth Shaker
+        case 318: World.invP1.heldObjectIndex = 402; RemoveGrenade(4); break; // Land Mine
+        case 319: World.invP1.heldObjectIndex = 403; RemoveGrenade(5); break; // Nitropak
+        case 320: World.invP1.heldObjectIndex = 404; RemoveGrenade(2); break; // Gas
         default: return;
     }
     World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldObjectAmmo = 0; World.invP1.heldObjectAmmo2 = 0; World.invP1.heldObjectLoadedAlternate = false; World.invP1.holdingObject = true;
@@ -228,7 +228,7 @@ void InventoryUpdate() {
     if (PatchCycUp()){PatchCycle( 1);} else if (PatchCycDown()){PatchCycle(-1);}
 }
 
-void AddItemFail(int index/*Expects usableItem index*/) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[index + 326],Sys_Text.stringTable[318]);/*Inventory full.*/ }
+void AddItemFail(int index/*Expects usableItem index*/) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[318]);/*Inventory full.*/ }
 extern u8 magazinePitchCountForWeapon[16],magazinePitchCountForWeapon2[16];
 void AddItemToInventory(int index, int custIdx) {
     if (IdxIsGenericItem(index)) { if(!AddGeneralObjectToInventory(index,custIdx)){AddItemFail(index);} }
@@ -423,7 +423,7 @@ typedef struct { i8 norm,alt; } AmmoIconEntry;
 static const AmmoIconEntry ammoIconTable[51]={[36-36]={7,8}/*MK3 Magnesium/Penetrator*/,[37-36]={-2,-2}/*Energy*/,[38-36]={0,1}/*Dartgun Needle/Tranq*/,[39-36]={9,10}/*Flechette Hornette/Splinter*/,[40-36]={-2,-2}/*Energy*/,[41-36]={-1,-1}/*Rapier, no ammo*/,
                                               [42-36]={-1,-1}/*Pipe, no ammo*/,[43-36]={5,6}/*Magnum Hollow/Slug*/,[44-36]={11,-1}/*Magpulse Magcart*/,[45-36]={2,3 }/*Pistol Standard/Teflon*/,[46-36]={-2,-2}/*Energy*/,[47-36]={14,-1}/*Railgun Rail Rounds*/,
                                               [48-36]={4,-1}/*Riotgun Rubber Slugs*/,[49-36]={12,13}/*Skorpion Slag/Large Slag*/,[50-36]={-2,-2}/*Energy*/,[51-36]={-2,-2}/*Energy*/};
-i8 AmmoIconGet(int index,bool alt) { if (index < 36 || index > 51) {return -1;} const AmmoIconEntry* e = &ammoIconTable[index - 36]; return alt ? e->alt : e->norm; }
+i8 AmmoIconGet(int index,bool alt) { if (index < 343 || index > 358) {return -1;} const AmmoIconEntry* e = &ammoIconTable[index - 343]; return alt ? e->alt : e->norm; }
 static double creditsVidStartTime,creditsVidFinished; static u8 creditsVidPhase; // CreditsScroll, TODO video text phases: 0=text1 visible, 1=text2 visible, 2=text3 visible, 3=all hidden
 void CreditsOnEnable(void) { World.creditsActive=true; World.creditsPageIndex=0; creditsVidStartTime=World.absoluteTime; creditsVidFinished=World.absoluteTime + 37.2; creditsVidPhase=0; }
 void CreditsUpdate(void) {
@@ -531,19 +531,19 @@ void PlayerEnergyUpdate() {
     if (anyDrain && World.invP1.energy <= 0.0f) { DeactivateHardwareOnEnergyDepleted(); World.invP1.drainJPM = 0; } // Depleted
 }
 // GeneralInventory
-static void ApplyBattery(void) { if (World.invP1.energy >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; }/*Energy full*/ GiveEnergy(83.0f,EnergyType_Battery); World.invP1.generalInventoryIndexRef[World.invP1.hardwareInvCurrent] = -1; }
-static void ApplyIcadBattery(void) { if (World.invP1.energy >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; }/*Energy full*/ GiveEnergy(255.0f,EnergyType_Battery); World.invP1.generalInventoryIndexRef[World.invP1.hardwareInvCurrent] = -1; }
-static void ApplyHealthkit(void) { if (World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; }/*Energy full*/ World.instances[PLAYER1].health = 255.0f; World.invP1.generalInventoryIndexRef[World.invP1.hardwareInvCurrent] = -1; }
+static void ApplyBattery(int btn) { if (World.invP1.energy >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; } GiveEnergy(83.0f,EnergyType_Battery); World.invP1.generalInventoryIndexRef[btn] = -1; }
+static void ApplyIcadBattery(int btn) { if (World.invP1.energy >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; } GiveEnergy(255.0f,EnergyType_Battery); World.invP1.generalInventoryIndexRef[btn] = -1; }
+static void ApplyHealthkit(int btn) { if (World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; } World.instances[PLAYER1].health = 255.0f; World.invP1.generalInventoryIndexRef[btn] = -1; }
 void GeneralInvUse(int buttonIdx,int customIdx) {
-    World.invP1.hardwareInvCurrent = buttonIdx; int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx]; if (buttonIdx == 0) {return;}
+    int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx]; if (buttonIdx == 0) {return;}
     (void)customIdx; (void)itemIdx;
 }
 
 void GeneralInvClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvUse(buttonIdx,customIdx); }
 void GeneralInvApply(int buttonIdx,int customIdx) {
     if (buttonIdx == 0) { return; }
-    World.invP1.hardwareInvCurrent = buttonIdx; int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx];
-    switch (itemIdx) { case 52:ApplyBattery();break;  case 53:ApplyIcadBattery();break;  case 55:ApplyHealthkit();break;  default:World.invP1.hardwareInvCurrent=buttonIdx;(void)customIdx;break;}
+    int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx];
+    switch (itemIdx) { case 52:ApplyBattery(buttonIdx);break;  case 53:ApplyIcadBattery(buttonIdx);break;  case 55:ApplyHealthkit(buttonIdx);break;  default:(void)customIdx;break;}
 }
 void GeneralInvDoubleClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvApply(buttonIdx,customIdx); }
 void GeneralInventoryActivate() { int cur=World.invP1.generalInvCurrent; if(cur < 0 || cur >= 14){DualLog("BUG: generalInvCurrent out of range at %d",cur); return;} GeneralInvApply(cur,World.invP1.generalInvCustIdx[cur]); if(cur != 0)World.invP1.generalInventoryIndexRef[cur]=-1; }
@@ -1075,7 +1075,7 @@ void ModUpdate() {
     }
 }
 
-u16 GetCrosshairTexture() { switch(World.invP1.weaponIndex) { case 36:case 38:case 43:case 45:case 48:return 1121;/*red*/case 37:case 40:case 50:return 1253;/*blue*/case 41:case 42:return 1166;/*orange*/case 44:case 47:return 1122;/*yellow*/ case 46:case 51:return 1161;/*teal*/default:return 1260;/*green*/ } }
+u16 GetCrosshairTexture() { switch(World.invP1.weaponIndex) { case 343:case 345:case 350:case 352:case 355:return 1121;/*red*/case 344:case 347:case 357:return 1253;/*blue*/case 348:case 349:return 1166;/*orange*/case 351:case 354:return 1122;/*yellow*/ case 353:case 358:return 1161;/*teal*/default:return 1260;/*green*/ } }
 u16 GetCursorTexture() {
     if(World.paused||World.menuActive)return 1261;/*Red standard cursor*/if(!World.invP1.holdingObject)return GetCrosshairTexture();
     switch(World.invP1.heldObjectIndex){

@@ -449,7 +449,9 @@ INLINE bool IdxIsWeapon(int c) { return (c >= 343 && c <= 358); }
 INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 343 && i <= 358) ? (i - 343) : -1; }
 INLINE bool IdxIsAudioLog(int c) { return c == 313; }
 INLINE float UsableOrDef(float cur, float def) { u32 c = *(u32*)&cur, d = *(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
-INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==37 || i==40 || i==46 || i==50 || i==51; }
+INLINE int UseableFromConst(int c){return c>=307?c-307:c;}
+INLINE int ItemStringIdx(int c){return UseableFromConst(c)+326;}
+INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
 INLINE u16 GetImpactType(u16 instanceIdx){
     switch(World.instances[instanceIdx].bloodType){
         case BloodType_None:return 729; case BloodType_Red:return 724; case BloodType_Yellow:return 723; case BloodType_Green:return 722; case BloodType_Robot:return 730; case BloodType_Leaf:return 756; case BloodType_Mutation:return 757;
