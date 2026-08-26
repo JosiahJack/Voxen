@@ -900,7 +900,7 @@ void MixAmbs() {
     }
 }
 
-void ResetLevelAudio(void){ambs=0; mset(ambReg,0,ambs*sizeof(u16)); for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){if(IdxIsAmbient(World.instances[i].index)){ambReg[ambs]=i; ambs++; if(ambs>=MAXAMB){DualLogError("Ambients %u > %u!\n",ambs,MAXAMB); break;}}}}
+void ResetLevelAudio(void){ambs=0; mset(ambReg,0,MAXAMB*sizeof(u16)); for(u32 s=0;s<MAXAMB;++s){if(ambientSlots[s].loaded){ambientSlots[s].sound.playing=false;}} for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){if(IdxIsAmbient(World.instances[i].index)){ambReg[ambs]=i; ambs++; if(ambs>=MAXAMB){DualLogError("Ambients %u > %u!\n",ambs,MAXAMB); break;}}}}
 // Music System
 #define BUFFER_MS 50
 #define AUD_BUFFER_T 0.05f

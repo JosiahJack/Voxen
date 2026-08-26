@@ -1,7 +1,7 @@
 // citadel.c - Game logic.
-// TODO: Voxel GI?, Directional lights for cyberspace, Directional light for sunlight, Directional light shadowmapping just for sunlight
 #include "common.h"
-__attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
+extern void PainStaticFlash(float intensity); extern void EmpStaticFlash(float intensity); extern void BiomonitorEnergyPulse(float take); extern void BioMonitorClearGraphs(void);
+__attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0};
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
     float tanFov = vtan((float)Sys_Settings.FOV * 0.5f * PI / 180.0f), ndcX = ((World.inventoryMode ? World.cursorPos_x : 683.0f) - 683.0f) / 384.0f, ndcY = -((World.inventoryMode ? World.cursorPos_y : 384.0f) - 384.0f) / 384.0f;
     V3 view = V3_Normalize((V3){ndcX * tanFov,ndcY * tanFov,-1.0f}), flipForward = (V3){-fwd.x,-fwd.y,-fwd.z}; V3 up = V3_Normalize(V3_Cross(rt,flipForward));
@@ -94,7 +94,7 @@ static void PlayLog(int logIndex) {
 //             case 110: vmailgenstatus.SetActive(true); fileName = "genstatus.webm"; break; case 114: vmaillaserdest.SetActive(true); fileName = "laserdest.webm"; break; case 120: vmailshieldsup.SetActive(true); fileName = "shieldsup.webm"; break;
 //         }
     }
-    CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); // "Playing <name>" // TODO: SendAudioLogToDataTab(logIndex) — engine-side data tab notification
+    CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]);
 }
 
 void PlayLastAddedLog(int logIndex) { if(logIndex < 0){return;} PlayLog(logIndex); World.invP1.lastAddedIndex = -1; }
@@ -379,7 +379,7 @@ void TextureChangerToggle(u16 self) {
 // LogicTimer
 void LogicTimerInitBeforeLoad(u16 self) { Entity* e=&World.instances[self]; if(e->timeInterval <= 0.0f){e->timeInterval=0.35f;} if(e->randomMin <= 0.0f){e->randomMin=5.0f;} if(e->randomMax <= 0.0f){e->randomMax=10.0f;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); }
 void LogicTimerUseTargets(u16 self) { UseTargets(self,World.instances[self].targetIdx); }
-void LogicTimerUpdate(u16 self) { return; /* TODO for testing!  Was getting annoyed by target i/o troubleshooting messages from lev1 broken door firing constantly.*/ Entity* e=&World.instances[self]; if(!e->active || e->intervalFinished >= World.pauseRelativeTime){return;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); LogicTimerUseTargets(self); }
+void LogicTimerUpdate(u16 self) { Entity* e=&World.instances[self]; if(!e->active || e->intervalFinished >= World.pauseRelativeTime){return;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); LogicTimerUseTargets(self); }
 void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; World.instances[self].active = !World.instances[self].active; }
 // ButtonSwitch
 void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->delayFinished=0.0f; if(e->active){e->tickFinished=World.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);} }
@@ -423,7 +423,7 @@ typedef struct { i8 norm,alt; } AmmoIconEntry;
 static const AmmoIconEntry ammoIconTable[51]={[36-36]={7,8}/*MK3 Magnesium/Penetrator*/,[37-36]={-2,-2}/*Energy*/,[38-36]={0,1}/*Dartgun Needle/Tranq*/,[39-36]={9,10}/*Flechette Hornette/Splinter*/,[40-36]={-2,-2}/*Energy*/,[41-36]={-1,-1}/*Rapier, no ammo*/,
                                               [42-36]={-1,-1}/*Pipe, no ammo*/,[43-36]={5,6}/*Magnum Hollow/Slug*/,[44-36]={11,-1}/*Magpulse Magcart*/,[45-36]={2,3 }/*Pistol Standard/Teflon*/,[46-36]={-2,-2}/*Energy*/,[47-36]={14,-1}/*Railgun Rail Rounds*/,
                                               [48-36]={4,-1}/*Riotgun Rubber Slugs*/,[49-36]={12,13}/*Skorpion Slag/Large Slag*/,[50-36]={-2,-2}/*Energy*/,[51-36]={-2,-2}/*Energy*/};
-i8 AmmoIconGet(int index,bool alt) { if (index < 36 || index > 51) {return -1;} const AmmoIconEntry* e = &ammoIconTable[index - 36]; return alt ? e->alt : e->norm; } // TODO: trigger immediate-mode UI redraw of weapon pane border, icon visibility, energySlider, energyHeatTicks, energyOverloadButton based on return value (engine-side UI rendering concern).
+i8 AmmoIconGet(int index,bool alt) { if (index < 36 || index > 51) {return -1;} const AmmoIconEntry* e = &ammoIconTable[index - 36]; return alt ? e->alt : e->norm; }
 static double creditsVidStartTime,creditsVidFinished; static u8 creditsVidPhase; // CreditsScroll, TODO video text phases: 0=text1 visible, 1=text2 visible, 2=text3 visible, 3=all hidden
 void CreditsOnEnable(void) { World.creditsActive=true; World.creditsPageIndex=0; creditsVidStartTime=World.absoluteTime; creditsVidFinished=World.absoluteTime + 37.2; creditsVidPhase=0; }
 void CreditsUpdate(void) {
@@ -535,15 +535,15 @@ static void ApplyBattery(void) { if (World.invP1.energy >= 255.0f) { CenterStatu
 static void ApplyIcadBattery(void) { if (World.invP1.energy >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; }/*Energy full*/ GiveEnergy(255.0f,EnergyType_Battery); World.invP1.generalInventoryIndexRef[World.invP1.hardwareInvCurrent] = -1; }
 static void ApplyHealthkit(void) { if (World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; }/*Energy full*/ World.instances[PLAYER1].health = 255.0f; World.invP1.generalInventoryIndexRef[World.invP1.hardwareInvCurrent] = -1; }
 void GeneralInvUse(int buttonIdx,int customIdx) {
-    World.invP1.hardwareInvCurrent = buttonIdx; int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx]; if (buttonIdx == 0) {return;} // TODO: World.Sys_UI.SendInfoToItemTab(81) — access cards display, MFDManager // TODO: SetCurrentAsLast for active side panel, MFDManager
-    (void)customIdx; (void)itemIdx; // TODO: World.Sys_UI.SendInfoToItemTab(itemIdx,customIdx) — MFDManager// TODO: SetCurrentAsLast for active side panel, MFDManager
+    World.invP1.hardwareInvCurrent = buttonIdx; int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx]; if (buttonIdx == 0) {return;}
+    (void)customIdx; (void)itemIdx;
 }
 
 void GeneralInvClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvUse(buttonIdx,customIdx); }
 void GeneralInvApply(int buttonIdx,int customIdx) {
-    if (buttonIdx == 0) { return; } // TODO: World.Sys_UI.SendInfoToItemTab(81), OpenTab access cards — MFDManager
+    if (buttonIdx == 0) { return; }
     World.invP1.hardwareInvCurrent = buttonIdx; int itemIdx = World.invP1.generalInventoryIndexRef[buttonIdx];
-    switch (itemIdx) { case 52:ApplyBattery();break;  case 53:ApplyIcadBattery();break;  case 55:ApplyHealthkit();break;  default:World.invP1.hardwareInvCurrent=buttonIdx;(void)customIdx;break; /*TODO: World.Sys_UI.SendInfoToItemTab(itemIdx,customIdx), OpenTab — MFDManager*/}
+    switch (itemIdx) { case 52:ApplyBattery();break;  case 53:ApplyIcadBattery();break;  case 55:ApplyHealthkit();break;  default:World.invP1.hardwareInvCurrent=buttonIdx;(void)customIdx;break;}
 }
 void GeneralInvDoubleClick(int buttonIdx,int customIdx) { World.Sys_UI.mouseClickHeldOverGUI = true; GeneralInvApply(buttonIdx,customIdx); }
 void GeneralInventoryActivate() { int cur=World.invP1.generalInvCurrent; if(cur < 0 || cur >= 14){DualLog("BUG: generalInvCurrent out of range at %d",cur); return;} GeneralInvApply(cur,World.invP1.generalInvCustIdx[cur]); if(cur != 0)World.invP1.generalInventoryIndexRef[cur]=-1; }
@@ -586,7 +586,7 @@ void GrenadeOnCollision(u16 self) { u16 idx=World.instances[self].index; if ((id
 // ProjectileEffectImpact
 float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= BERSERK_DAMAGE_MULTIPLIER; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (fx == WORLD || fx == U16_MAX) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
-void ExitCyberspace(void) { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel(World.startLevel < World.numLevels ? World.startLevel : 0, (V3){0.0f,0.0f,0.0f}/*TODO Remember level and location player left to enter cyberspace!*/); }
+void ExitCyberspace(void) { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel(World.startLevel < World.numLevels ? World.startLevel : 0, (V3){0.0f,0.0f,0.0f}); }
 void ReduceCurrentLevelSecurity(SecurityType stype) { // Typical level: 4 CPU nodes. 20 cameras, 100% = 4x + 20y.  Assuming that a good camera percentage is 2-3%, CPU % would be about 10-15 each
     u8 lev = World.curLev; if (lev >= 14 || stype == SecurityType_None) return;
     const float camScore=4.0f, nodeSmallScore=10.0f, nodeLargeScore=27.0f; float total = (World.levelCameraCount[lev]*camScore)+(World.levelSmallNodeCount[lev]*nodeSmallScore)+(World.levelLargeNodeCount[lev]*nodeLargeScore); if (total <= 0.0f) return;
@@ -644,7 +644,7 @@ static void TeleportAway(u16 self) {
 }
 
 static void DropSearchables(u16 self) {
-    /*TODO: NotifySearchThatSearchableWasDestroyed();*/
+
     for (int i = 0; i < 4; i++) {
         if (World.instances[self].contents[i] <= -1) {continue;} u16 spawned = SpawnDynamicObject(World.instances[self].contents[i] + 307,true);
         if(spawned != U16_MAX){World.position[spawned]=World.position[self]; World.instances[spawned].custIdx[0]=World.instances[self].custIdx[i];}else{CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");}
@@ -658,7 +658,7 @@ static void NPCDeath(u16 self) {
     if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) {return;}
     flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true); CreateDeathEffects(self,World.instances[self].deathBurst); if (World.instances[self].index == 419) play_wav(sounds[64],1.0f,World.position[self],true); // npc_autobomb: explosion1
     if (npcTable[World.instances[self].index - 419].type == NPCType_Cyber) DeleteInstance(self);
-    // else: keep collider alive to prevent falling through floor (Unity physics note preserved)
+
 }
 
 static void ObjectDeath(u16 self) {
@@ -676,7 +676,7 @@ static void ObjectDeath(u16 self) {
 static void ScreenDeath(u16 self) {
     Entity* e = &World.instances[self]; if (e->entflags & EF_DEAD_CHECKS_DONE) return;
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true); play_wav(sounds[69],1.0f,World.position[self],true); // screen_destroy
-    // TODO: stop ImageSequenceTextureArray animation for this instance
+
     if (e->entflags & EF_DEATH_BURST_DONE) ObjectDeath(self); // gib path
 }
 
@@ -698,7 +698,7 @@ static void Death(u16 self,bool energyVaporized) {
     else if (e->index == 279/*screen*/) ScreenDeath(self);
     else if (doTeleport) TeleportAway(self);
     else if (isGrenade) GrenadeExplode(self);
-    if (isNPC && !doTeleport) NPCDeath(self); else if (self == PLAYER1) World.deaths++;
+    if (isNPC && !doTeleport) NPCDeath(self); else if (self == PLAYER1) { if (!RessurectPlayer()) World.deaths++; }
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
 }
 
@@ -707,9 +707,9 @@ float TakeDamage(u16 self,DamageData dd) {
     bool isCyber = IsCyberEntity(self); float* hp = isCyber ? &World.instances[self].cyberHealth : &World.instances[self].health;
     u16 selfIdx = World.instances[self].index;
     bool isNPC = IdxIsNPC(selfIdx), isPlayer = (self == PLAYER1);
-//     bool isObj = IdxIsDynamicObject(selfIdx); // TODO
+
     bool isGrenade = IsGrenade(selfIdx);
-//     bool isScreen  = (selfIdx == 279); // TODO
+
     if (isCyber) { if (dd.attackType == Att_Drill && isNPC){return 0.0f;} if (dd.attackType != Att_Drill && World.instances[self].iceActive){return 0.0f;} }
    
     if (*hp <= 0.0f) {
@@ -721,7 +721,7 @@ float TakeDamage(u16 self,DamageData dd) {
         float absorb = 0.0f;
         if (isCyber) { if (World.invP1.hasSoft & (1 << SW_SHIELD)) { u8 sv = World.invP1.softVersions[SW_SHIELD]; absorb = (sv <= 9) ? sv * 0.05f : 0.0f; take *= (1.0f - absorb); if (take <= 0.0f){return 0.0f;} } }// Cyber C-Shield software absorption
         else {
-            if (dd.attackType == Att_Magn) { take = 0.0f; TakeEnergy(11.0f); } // TODO: empstatic.Flash(2), BiomonitorEnergyPulse(11f) — FX systems
+            if (dd.attackType == Att_Magn) { take = 0.0f; TakeEnergy(11.0f); EmpStaticFlash(2.0f); BiomonitorEnergyPulse(11.0f); }
             if ((World.invP1.hardwareIsActive & HW_SHD) && (World.invP1.hasHardware & HW_SHD)) {
                 float thresh = 0.0f;
                 switch (World.invP1.hardwareVersion[HW_SHD_IDX]) { case 0:absorb=0.20f; thresh=0.0f; break; case 1:absorb=0.40f; thresh=10.0f; break; case 2:absorb=0.75f; thresh=15.0f; break; case 3:absorb=0.75f; thresh=30.0f; break; }
@@ -730,10 +730,10 @@ float TakeDamage(u16 self,DamageData dd) {
                     if (absorb < 1.0f) absorb = vclamp(absorb + random_range(-0.08f,0.08f),0.0f,1.0f);
                     take *= (1.0f - absorb); play_wav(sounds[94],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false); // shield absorb
                     int abs = (int)(absorb * 100.0f); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[208],abs,Sys_Text.stringTable[209]);
-                    // TODO: shield screen flash effect
+
                 }
             }
-            if (take > 0.0f && (absorb < 0.4f || random_range(0.0f,1.0f) < 0.5f)) { play_wav(sounds[140],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false);/*player pain*/ } // TODO: pstatic.Flash(take>15?2:take>10?1:0) — pain flash FX
+            if (take > 0.0f && (absorb < 0.4f || random_range(0.0f,1.0f) < 0.5f)) { play_wav(sounds[140],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false); PainStaticFlash(take > 15.0f ? 2.0f : take > 10.0f ? 1.0f : 0.5f); }
         }
     }
 
@@ -757,7 +757,7 @@ float TakeDamage(u16 self,DamageData dd) {
     return take;
 }
 
-void HealthManagerInitAfterLoad(u16 self) { // TODO call me!
+void HealthManagerInitAfterLoad(u16 self) {
     if (self == PLAYER1) { World.instances[self].health=211.0f; World.instances[self].cyberHealth=255.0f; World.invP1.noiseFinished = World.pauseRelativeTime - 31.0;/*guarantee no combat music on start*/ return; }
     if (IdxIsNPC(World.instances[self].index)) {
         if (IsCyberEntity(self)) { if (World.instances[self].cyberHealth < 0.0f) World.instances[self].cyberHealth = npcTable[World.instances[self].index - 419].healthForCyberNPC; }
@@ -767,28 +767,28 @@ void HealthManagerInitAfterLoad(u16 self) { // TODO call me!
     }
 }
 // Hardware
-void HardwareBioOff(void) { World.invP1.hardwareIsActive &= ~HW_BIO; if (Cheats.showFPS) {return;}/*TODO (after this return): BiomonitorClearGraphs() — engine-side graph reset*/ }
+void HardwareBioOff(void) { World.invP1.hardwareIsActive &= ~HW_BIO; if (Cheats.showFPS) {return;} BioMonitorClearGraphs(); }
 void HardwareBioOn(void) { World.invP1.hardwareIsActive |= HW_BIO; }
 void HardwareBioAction(void) { if (World.invP1.hardwareVersionSetting[HW_BIO_IDX] == 0 && World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if ((World.invP1.hasHardware & HW_BIO) && (World.invP1.hardwareIsActive & HW_BIO)) HardwareBioOff(); else HardwareBioOn(); }
 void HardwareBioClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareBioAction(); }
-void HardwareSensaroundOn(void) { World.invP1.hardwareIsActive |= HW_SNS; } // TODO: activate sensaround cameras/overlays — engine reads hardwareIsActive & HW_SNS + version
-void HardwareSensaroundOff(void) { World.invP1.hardwareIsActive &= ~HW_SNS; } // TODO: deactivate sensaround cameras, restore tabs — engine reads hardwareIsActive & HW_SNS
+void HardwareSensaroundOn(void) { World.invP1.hardwareIsActive |= HW_SNS; }
+void HardwareSensaroundOff(void) { World.invP1.hardwareIsActive &= ~HW_SNS; }
 void HardwareSensaroundAction(void) { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } if (World.invP1.hardwareIsActive & HW_SNS) { play_wav(sounds[82],SfxVol(),(V3){0.0f,0.0f,0.0f},false); HardwareSensaroundOff(); } else { play_wav(sounds[93],SfxVol(),(V3){0.0f,0.0f,0.0f},false); HardwareSensaroundOn(); } }
 void HardwareSensaroundClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareSensaroundAction(); }
-void HardwareShieldOn(void) { World.invP1.hardwareIsActive |= HW_SHD; } // TODO: ShieldActivateFX — engine reads hardwareIsActive & HW_SHD
+void HardwareShieldOn(void) { World.invP1.hardwareIsActive |= HW_SHD; }
 void HardwareShieldOff(void) { World.invP1.hardwareIsActive &= ~HW_SHD; }
-void HardwareShieldOffWithEffects(void) { HardwareShieldOff(); } // TODO: ShieldDeactivateFX — engine reads hardwareIsActive & HW_SHD
+void HardwareShieldOffWithEffects(void) { HardwareShieldOff(); }
 void HardwareShieldAction(void) { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } if (World.invP1.hardwareIsActive & HW_SHD) { play_wav(sounds[95],SfxVol(),(V3){0.0f,0.0f,0.0f},false); HardwareShieldOffWithEffects(); } else { play_wav(sounds[96],SfxVol(),(V3){0.0f,0.0f,0.0f},false); HardwareShieldOn(); } }
 void HardwareShieldClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareShieldAction(); }
-void HardwareLanternOn(void) { World.invP1.hardwareIsActive |= HW_LAN; } // TODO: enable headlight at lanternBrightness[hardwareVersionSetting[HW_LAN_IDX]] — engine reads bitmask + version
-void HardwareLanternOff(void) { World.invP1.hardwareIsActive &= ~HW_LAN; } // TODO: disable headlight — engine reads hardwareIsActive & HW_LAN
+void HardwareLanternOn(void) { World.invP1.hardwareIsActive |= HW_LAN; }
+void HardwareLanternOff(void) { World.invP1.hardwareIsActive &= ~HW_LAN; }
 void HardwareLanternAction(void) { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (World.invP1.hardwareIsActive & HW_LAN) HardwareLanternOff(); else HardwareLanternOn(); }
 void HardwareLanternClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareLanternAction(); }
-void HardwareInfraredOn(void) { World.invP1.hardwareIsActive |= HW_INF; } // TODO: enable infrared light + grayscale on player/sensaround cameras — engine reads bitmask
-void HardwareInfraredOff(void) { World.invP1.hardwareIsActive &= ~HW_INF; } // TODO: disable infrared light + grayscale — engine reads bitmask
+void HardwareInfraredOn(void) { World.invP1.hardwareIsActive |= HW_INF; }
+void HardwareInfraredOff(void) { World.invP1.hardwareIsActive &= ~HW_INF; }
 void HardwareInfraredAction(void) { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } bool wasOn = (World.invP1.hardwareIsActive & HW_INF) != 0; play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (wasOn) HardwareInfraredOff(); else HardwareInfraredOn(); }
 void HardwareInfraredClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareInfraredAction(); }
-void HardwareEReaderAction(void) { play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive |= HW_ERD; } // TODO: OpenEReaderInItemsTab() — engine-side tab open
+void HardwareEReaderAction(void) { play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive |= HW_ERD; }
 void HardwareEReaderClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareEReaderAction(); }
 void HardwareBoosterOn(void)  { World.invP1.hardwareIsActive |=  HW_BST; }
 void HardwareBoosterOff(void) { World.invP1.hardwareIsActive &= ~HW_BST; }
@@ -820,21 +820,21 @@ void PatchUpdate() {
         if (World.invP1.berserkFinished < World.pauseRelativeTime) {
             World.invP1.berserkIncrement = 0;
             World.invP1.patchActive -= PATCH_BERSERK;
-            // TODO: BerserkFX disable + reset — engine reads patchActive & PATCH_BERSERK
+
         } else {
-            // TODO: BerserkFX enable — engine reads patchActive & PATCH_BERSERK
+
             if (World.invP1.berserkIncTime < World.pauseRelativeTime) {
                 World.invP1.berserkIncrement++;
                 if (World.invP1.berserkIncrement > 6) World.invP1.berserkIncrement = 6;
                 World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0f);
-                // TODO: engine reads berserkIncrement for texture swap + strength increment
+
             }
         }
     }
     if (World.invP1.patchActive & PATCH_GENIUS) { if(World.invP1.geniusFinished < World.pauseRelativeTime){World.invP1.patchActive -= PATCH_GENIUS; World.geniusActive=false;}else{World.geniusActive=true;} } // Genius
     if (World.invP1.patchActive & PATCH_SIGHT) { // Sight
-        if (World.invP1.sightFinishedTime < World.pauseRelativeTime && World.invP1.sightFinishedTime != -1.0) { World.invP1.sightFinishedTime=-1.0; World.invP1.sightSideEffectFinishedTime = World.pauseRelativeTime + SIGHT_SIDE_EFFECT_TIME; } // TODO: sightLight disable, sightDimming enable — engine reads sightFinishedTime == -1 + side effect active
-        if (World.invP1.sightSideEffectFinishedTime < World.pauseRelativeTime && World.invP1.sightSideEffectFinishedTime != -1.0) { World.invP1.sightSideEffectFinishedTime=World.invP1.sightFinishedTime=-1.0; World.invP1.patchActive -= PATCH_SIGHT; } // TODO: sightDimming disable, sightLight disable — engine reads patchActive & PATCH_SIGHT
+        if (World.invP1.sightFinishedTime < World.pauseRelativeTime && World.invP1.sightFinishedTime != -1.0) { World.invP1.sightFinishedTime=-1.0; World.invP1.sightSideEffectFinishedTime = World.pauseRelativeTime + SIGHT_SIDE_EFFECT_TIME; }
+        if (World.invP1.sightSideEffectFinishedTime < World.pauseRelativeTime && World.invP1.sightSideEffectFinishedTime != -1.0) { World.invP1.sightSideEffectFinishedTime=World.invP1.sightFinishedTime=-1.0; World.invP1.patchActive -= PATCH_SIGHT; }
     }
     if (World.invP1.patchActive & PATCH_STAMINUP) { if (World.invP1.staminupFinishedTime < World.pauseRelativeTime) { World.invP1.staminupActive=false; World.invP1.fatigue=100.0f; World.invP1.patchActive -= PATCH_STAMINUP; } else { World.invP1.fatigue = 0.0f; World.invP1.staminupActive = true; } } // Staminup
 }
@@ -842,202 +842,55 @@ void PatchUpdate() {
 void PatchDisableAll(void) {
     World.invP1.berserkFinished = World.invP1.berserkIncTime = World.invP1.detoxFinished = World.invP1.geniusFinished = World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = World.invP1.sightSideEffectFinishedTime = World.invP1.staminupFinishedTime = -1.0;
     World.invP1.staminupActive=false; World.invP1.fatigue =0.0f; World.invP1.berserkIncrement = World.invP1.patchActive = 0; World.timeScale  = DEFAULT_TIME_SCALE; World.geniusActive = false;
-    // TODO: sightLight/sightDimming disable — engine reads patchActive == 0
-    // TODO: BerserkFX disable + reset — engine reads patchActive & PATCH_BERSERK
+
+
 }
-// TODO hopper death needs to tint red halfway through its death animation, then fade back to normal.
-// bool RessurectPlayer() {
-//     if (!ressurectionActive[World.curLev]) return false;
-//     if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { LoadLevel(6,ressurectionLocation[currentLevel].position); ressurectionBayDoor[6].ForceClose(); } else { if (World.curLev >= 0 || World.curLev < 13) World.instances[PLAYER1].position = ressurectionLocation[World.curLev]; }
-// //              PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true); // TODO  // Activate death screen and readouts for "BRAIN ACTIVITY SATISFACTORY..." ya debatable right etc. etc.
-//     PlayTrack(TT_Revive,MT_Override); World.instances[PLAYER1].ressurectingFinished = World.pauseRelativeTime + 3f;
-//     return true;
-// }
-// Quest Bits / Mission I/O TODO
-// void TargetOnGatePassed(bool bitToCheck, bool passIfTrue, UseData ud, string targ, string targOnFalse) { if (passIfTrue) { if (!bitToCheck) { UseTargets(ud,tio,targ); return; } } else { if (bitToCheck) { UseTargets(ud,tio,targOnFalse); return; } } UseTargets(targ); }
-// void EnableBits(u16 i) {
-//     World.instances[WORLD].ioflags |= World.instances[i].ioflags;
-//     if (World.instances[i].ioflags & Q_ROBOT_SPAWN_DEACTIVATED) DualLog("Q_ROBOT_SPAWN_DEACTIVATED: 1");
-//     if (World.instances[i].ioflags & Q_ISOTOPE_INSTALLED) DualLog("Q_ISOTOPE_INSTALLED: 1");
-//     if (World.instances[i].ioflags & Q_SHIELD_ACTIVATED) { DualLog("Q_SHIELD_ACTIVATED: 1"); QuestLogNotesManager.a.notes[8].SetActive(true); QuestLogNotesManager.a.checkBoxes[8].isOn = Const.a.questData.ShieldActivated; QuestLogNotesManager.a.labels[8].text = Sys_Text.stringTable[560]; }
-//     if (World.instances[i].ioflags & Q_LASER_SAFETY_OVERRIDEN) { DualLog("Q_LASER_SAFETY_OVERRIDEN: 1"); QuestLogNotesManager.a.notes[7].SetActive(true); QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden; QuestLogNotesManager.a.labels[7].text = Sys_Text.stringTable[559]; }
-//     if (World.instances[i].ioflags & Q_LASER_DESTROYED) {
-//         DualLog("Q_LASER_DESTROYED: 1");
-//         if (AutoSplitterData.missionSplitID == 1) AutoSplitterData.missionSplitID++;
-//         QuestLogNotesManager.a.notes[9].SetActive(true);
-//         QuestLogNotesManager.a.checkBoxes[9].isOn = Const.a.questData.LaserDestroyed;
-//         QuestLogNotesManager.a.labels[9].text = Sys_Text.stringTable[561];
-//     }
-//     if (World.instances[i].ioflags & Q_BETA_GROVE_CYBER_UNLOCKED) { DualLog("Q_BETA_GROVE_CYBER_UNLOCKED: 1"); QuestLogNotesManager.a.notes[12].SetActive(true); }
-//     if (World.instances[i].ioflags & Q_GROVE_ALPHA_JETTISON_ENABLED) { DualLog("Q_GROVE_ALPHA_JETTISON_ENABLED: 1"); QuestLogNotesManager.a.notes[12].SetActive(true); }  
-//     if (World.instances[i].ioflags & Q_GROVE_BETA_JETTISON_ENABLED) { DualLog("Q_GROVE_BETA_JETTISON_ENABLED: 1"); QuestLogNotesManager.a.notes[12].SetActive(true); }
-//     if (World.instances[i].ioflags & Q_GROVE_DELTA_JETTISON_ENABLED) { DualLog("Q_GROVE_DELTA_JETTISON_ENABLED: 1"); QuestLogNotesManager.a.notes[12].SetActive(true); }
-//     if (World.instances[i].ioflags & Q_MASTER_JETTISON_BROKEN) {
-//         DualLog("Q_MASTER_JETTISON_BROKEN: 1");
-//         if (AutoSplitterData.missionSplitID == 2) AutoSplitterData.missionSplitID++;
-//         QuestLogNotesManager.a.notes[12].SetActive(true);
-//         QuestLogNotesManager.a.notes[11].SetActive(true);
-//         QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563]; // Set:Diagnose and repair broken relay
-//     }
-//     if (World.instances[i].ioflags & Q_RELAY_428_FIXED) { DualLog("Q_RELAY_428_FIXED: 1"); 
-//         QuestLogNotesManager.a.notes[11].SetActive(true);
-//         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
-//         QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563]; // Set:Diagnose and repair broken relay
-//         QuestLogNotesManager.a.labels[11].text += Sys_Text.stringTable[564]; // Add:: 428.
-//     }
-//     if (World.instances[i].ioflags & Q_MASTER_JETTISON_ENABLED) {
-//         DualLog("Q_MASTER_JETTISON_ENABLED: 1");
-//         if (AutoSplitterData.missionSplitID == 3) AutoSplitterData.missionSplitID++;
-//         QuestLogNotesManager.a.notes[10].SetActive(true);
-//         QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled;
-//         QuestLogNotesManager.a.labels[10].text = Sys_Text.stringTable[562];
-//     }
-//     if (World.instances[i].ioflags & Q_BETA_GROVE_JETTISONED) {
-//         DualLog("Q_BETA_GROVE_JETTISONED: 1");
-//         if (AutoSplitterData.missionSplitID == 4) AutoSplitterData.missionSplitID++;
-//         QuestLogNotesManager.a.notes[12].SetActive(true);
-//         QuestLogNotesManager.a.checkBoxes[12].isOn = Const.a.questData.BetaGroveJettisoned;
-//         QuestLogNotesManager.a.labels[12].text = Sys_Text.stringTable[565];
-//         QuestLogNotesManager.a.notes[13].SetActive(true);
-//         QuestLogNotesManager.a.labels[13].text = Sys_Text.stringTable[566];
-//     }
-//     if (World.instances[i].ioflags & Q_ANTENNA_NORTH_DESTROYED) { DualLog("Q_ANTENNA_NORTH_DESTROYED: 1"); QuestLogNotesManager.a.notes[13].SetActive(true); }
-//     if (World.instances[i].ioflags & Q_ANTENNA_SOUTH_DESTROYED) { DualLog("Q_ANTENNA_SOUTH_DESTROYED: 1"); QuestLogNotesManager.a.notes[13].SetActive(true); }
-//     if (World.instances[i].ioflags & Q_ANTENNA_EAST_DESTROYED) { DualLog("Q_ANTENNA_EAST_DESTROYED: 1"); QuestLogNotesManager.a.notes[13].SetActive(true); }
-//     if (World.instances[i].ioflags & Q_ANTENNA_WEST_DESTROYED) { DualLog("Q_ANTENNA_WEST_DESTROYED: 1"); QuestLogNotesManager.a.notes[13].SetActive(true); }
-//     if (World.instances[i].ioflags & Q_SELF_DESTRUCT_ACTIVATED) {
-//         DualLog("Q_SELF_DESTRUCT_ACTIVATED: 1");
-//         for (int i=0;i<17;++i) QuestLogNotesManager.a.notes[i].SetActive(true);
-//         QuestLogNotesManager.a.checkBoxes[14].isOn = Const.a.questData.SelfDestructActivated;
-//         QuestLogNotesManager.a.labels[14].text = Sys_Text.stringTable[567]; // Set:Engage reactor self-destruct.
-//         QuestLogNotesManager.a.labels[15].text = Sys_Text.stringTable[568]; // Set:Escape on escape pod.
-//     }
-//     if (World.instances[i].ioflags & Q_BRIDGE_SEPARATED) {
-//         DualLog("Q_BRIDGE_SEPARATED: 1");
-//         for (int i=0;i<15;++i) QuestLogNotesManager.a.notes[i].SetActive(true);
-//         QuestLogNotesManager.a.checkBoxes[14].isOn = Const.a.questData.SelfDestructActivated;
-//         QuestLogNotesManager.a.labels[14].text = Sys_Text.stringTable[567]; // Set:Engage reactor self-destruct.
-//         QuestLogNotesManager.a.notes[16].SetActive(true);
-//         QuestLogNotesManager.a.notes[17].SetActive(true);
-//         QuestLogNotesManager.a.checkBoxes[16].isOn = true;
-//         QuestLogNotesManager.a.labels[16].text = Sys_Text.stringTable[569]; // Set:Access the bridge.
-//         QuestLogNotesManager.a.labels[17].text = Sys_Text.stringTable[570]; // Set:Destroy SHODAN.
-//     }
-//     if (World.instances[i].ioflags & Q_ISOLINEAR_CHIPSET_INSTALLED) DualLog("Q_ISOLINEAR_CHIPSET_INSTALLED: 1");
-// }
-// 
-// void DisableBits() {
-//     if (RobotSpawnDeactivated) { Const.a.questData.RobotSpawnDeactivated = false; }
-//     if (IsotopeInstalled) Const.a.questData.IsotopeInstalled = false;
-//     if (ShieldActivated) { Const.a.questData.ShieldActivated = false; DualLog("Bit unset ShieldActivated: " + Const.a.questData.ShieldActivated.ToString()); QuestLogNotesManager.a.checkBoxes[8].isOn = Const.a.questData.ShieldActivated; }
-//     if (LaserSafetyOverriden) { Const.a.questData.LaserSafetyOverriden = false; QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden; }
-//     if (LaserDestroyed) { Const.a.questData.LaserDestroyed = false; QuestLogNotesManager.a.checkBoxes[9].isOn = Const.a.questData.LaserDestroyed; }
-//     if (BetaGroveCyberUnlocked) Const.a.questData.BetaGroveCyberUnlocked = false;
-//     if (GroveAlphaJettisonEnabled) Const.a.questData.GroveAlphaJettisonEnabled = false;
-//     if (GroveBetaJettisonEnabled) Const.a.questData.GroveBetaJettisonEnabled = false;
-//     if (GroveDeltaJettisonEnabled) Const.a.questData.GroveDeltaJettisonEnabled = false;
-//     if (MasterJettisonBroken) Const.a.questData.MasterJettisonBroken = false;
-//     if (Relay428Fixed) { Const.a.questData.Relay428Fixed = false; QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed; }
-//     if (MasterJettisonEnabled) { Const.a.questData.MasterJettisonEnabled = false; QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled; }
-//     if (BetaGroveJettisoned) { Const.a.questData.BetaGroveJettisoned = false; QuestLogNotesManager.a.checkBoxes[12].isOn = Const.a.questData.BetaGroveJettisoned; }
-//     if (AntennaNorthDestroyed) Const.a.questData.AntennaNorthDestroyed = false;
-//     if (AntennaSouthDestroyed) Const.a.questData.AntennaSouthDestroyed = false;
-//     if (AntennaEastDestroyed) Const.a.questData.AntennaEastDestroyed = false;
-//     if (AntennaWestDestroyed) Const.a.questData.AntennaWestDestroyed = false;
-//     if (SelfDestructActivated) { Const.a.questData.SelfDestructActivated = false; QuestLogNotesManager.a.checkBoxes[14].isOn = Const.a.questData.SelfDestructActivated; }
-//     if (BridgeSeparated) Const.a.questData.BridgeSeparated = false;
-//     if (IsolinearChipsetInstalled) Const.a.questData.IsolinearChipsetInstalled = false;
-// }
-// 
-// void ToggleBits() {
-//     if (RobotSpawnDeactivated) Const.a.questData.RobotSpawnDeactivated = !Const.a.questData.RobotSpawnDeactivated;
-//     if (IsotopeInstalled) Const.a.questData.IsotopeInstalled = !Const.a.questData.IsotopeInstalled;
-//     if (ShieldActivated) {
-//         Const.a.questData.ShieldActivated = !Const.a.questData.ShieldActivated;
-//         QuestLogNotesManager.a.checkBoxes[8].isOn = Const.a.questData.ShieldActivated;
-//         if (Const.a.questData.ShieldActivated) { QuestLogNotesManager.a.notes[8].SetActive(true); QuestLogNotesManager.a.labels[8].text = Sys_Text.stringTable[560]; }
-//     }
-//     if (LaserSafetyOverriden) {
-//         Const.a.questData.LaserSafetyOverriden = !Const.a.questData.LaserSafetyOverriden;
-//         QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden;
-//         if (Const.a.questData.LaserSafetyOverriden) { QuestLogNotesManager.a.notes[7].SetActive(true); QuestLogNotesManager.a.labels[7].text = Sys_Text.stringTable[559]; }
-//     }
-//     if (LaserDestroyed) {
-//         Const.a.questData.LaserDestroyed = !Const.a.questData.LaserDestroyed;
-//         if (AutoSplitterData.missionSplitID == 1) { AutoSplitterData.missionSplitID++; }
-//         QuestLogNotesManager.a.checkBoxes[9].isOn = Const.a.questData.LaserDestroyed;
-//         if (Const.a.questData.LaserDestroyed) { QuestLogNotesManager.a.notes[9].SetActive(true); QuestLogNotesManager.a.labels[9].text = Sys_Text.stringTable[561]; }
-//     }
-//     if (BetaGroveCyberUnlocked) Const.a.questData.BetaGroveCyberUnlocked = !Const.a.questData.BetaGroveCyberUnlocked;
-//     if (GroveAlphaJettisonEnabled) Const.a.questData.GroveAlphaJettisonEnabled = !Const.a.questData.GroveAlphaJettisonEnabled;
-//     if (GroveBetaJettisonEnabled) Const.a.questData.GroveBetaJettisonEnabled = !Const.a.questData.GroveBetaJettisonEnabled;
-//     if (GroveDeltaJettisonEnabled) Const.a.questData.GroveDeltaJettisonEnabled = !Const.a.questData.GroveDeltaJettisonEnabled;
-//     if (MasterJettisonBroken) {
-//         Const.a.questData.MasterJettisonBroken = !Const.a.questData.MasterJettisonBroken;
-//         if (Const.a.questData.MasterJettisonBroken) {
-//             QuestLogNotesManager.a.notes[11].SetActive(true); // Diagnose and repair broken relay
-//             QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563];// Set:Diagnose and repair broken relay
-//         }
-//     }
-//     if (Relay428Fixed) {
-//         Const.a.questData.Relay428Fixed = !Const.a.questData.Relay428Fixed;
-//         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
-//         if (Const.a.questData.Relay428Fixed) { QuestLogNotesManager.a.notes[11].SetActive(true); QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563];/*Set:Diagnose and repair broken relay*/ QuestLogNotesManager.a.labels[11].text += Sys_Text.stringTable[564];/*Add:: 428.*/ }
-//     }
-//     if (MasterJettisonEnabled) { Const.a.questData.MasterJettisonEnabled = !Const.a.questData.MasterJettisonEnabled; QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled; if (Const.a.questData.MasterJettisonEnabled) { QuestLogNotesManager.a.notes[10].SetActive(true); QuestLogNotesManager.a.labels[10].text = Sys_Text.stringTable[562]; } }
-//     if (BetaGroveJettisoned) {
-//         Const.a.questData.BetaGroveJettisoned = !Const.a.questData.BetaGroveJettisoned;
-//         QuestLogNotesManager.a.checkBoxes[12].isOn = Const.a.questData.BetaGroveJettisoned;
-//         if (Const.a.questData.BetaGroveJettisoned ) { QuestLogNotesManager.a.notes[12].SetActive(true); QuestLogNotesManager.a.labels[12].text = Sys_Text.stringTable[565]; QuestLogNotesManager.a.notes[13].SetActive(true); QuestLogNotesManager.a.labels[13].text = Sys_Text.stringTable[566]; }
-//     }
-//     if (AntennaNorthDestroyed) Const.a.questData.AntennaNorthDestroyed = !Const.a.questData.AntennaNorthDestroyed;
-//     if (AntennaSouthDestroyed) Const.a.questData.AntennaSouthDestroyed = !Const.a.questData.AntennaSouthDestroyed;
-//     if (AntennaEastDestroyed) Const.a.questData.AntennaEastDestroyed = !Const.a.questData.AntennaEastDestroyed;
-//     if (AntennaWestDestroyed) Const.a.questData.AntennaWestDestroyed = !Const.a.questData.AntennaWestDestroyed;
-//     if (SelfDestructActivated) {
-//         Const.a.questData.SelfDestructActivated = !Const.a.questData.SelfDestructActivated;
-//         if (Const.a.questData.SelfDestructActivated) {
-//             QuestLogNotesManager.a.notes[14].SetActive(true);
-//             QuestLogNotesManager.a.notes[15].SetActive(true); // Escape pod
-//             QuestLogNotesManager.a.labels[14].text = Sys_Text.stringTable[567];// Set:Engage reactor self-destruct.
-//             QuestLogNotesManager.a.labels[15].text = Sys_Text.stringTable[568];// Set:Escape on escape pod.
-//         }
-//     }
-//     if (BridgeSeparated) {
-//         Const.a.questData.BridgeSeparated = !Const.a.questData.BridgeSeparated;
-//         if (Const.a.questData.BridgeSeparated) {
-//             QuestLogNotesManager.a.notes[16].SetActive(true);
-//             QuestLogNotesManager.a.notes[17].SetActive(true);
-//             QuestLogNotesManager.a.checkBoxes[16].isOn = true;
-//             QuestLogNotesManager.a.labels[16].text = Sys_Text.stringTable[569]; // Set:Access the bridge.
-//             QuestLogNotesManager.a.labels[17].text = Sys_Text.stringTable[570]; // Set:Destroy SHODAN.
-//         }
-//     }
-//     if (IsolinearChipsetInstalled) Const.a.questData.IsolinearChipsetInstalled = !Const.a.questData.IsolinearChipsetInstalled;
-// }
-// 
-// void TestBits(bool testIfTrue, UseData ud, TargetIO tio) {
-//     if (RobotSpawnDeactivated && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.RobotSpawnDeactivated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (IsotopeInstalled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.IsotopeInstalled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (ShieldActivated && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.ShieldActivated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (LaserSafetyOverriden && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.LaserSafetyOverriden, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (LaserDestroyed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.LaserDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (BetaGroveCyberUnlocked && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BetaGroveCyberUnlocked, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (GroveAlphaJettisonEnabled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveAlphaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (GroveBetaJettisonEnabled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveBetaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (GroveDeltaJettisonEnabled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.GroveDeltaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (MasterJettisonBroken && (!sEmpty(target) || !sEmpty(targetIfFalse)))TargetOnGatePassed(Const.a.questData.MasterJettisonBroken, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (Relay428Fixed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.Relay428Fixed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (MasterJettisonEnabled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.MasterJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (BetaGroveJettisoned && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BetaGroveJettisoned, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaNorthDestroyed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaNorthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaSouthDestroyed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaSouthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaEastDestroyed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaEastDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (AntennaWestDestroyed && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.AntennaWestDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (SelfDestructActivated && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.SelfDestructActivated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (BridgeSeparated && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.BridgeSeparated, testIfTrue, ud, tio, target, targetIfFalse);
-//     if (IsolinearChipsetInstalled && (!sEmpty(target) || !sEmpty(targetIfFalse))) TargetOnGatePassed(Const.a.questData.IsolinearChipsetInstalled, testIfTrue, ud, tio, target, targetIfFalse);
-// }
+// Quest Bits / Mission I/O — side effects on quest notes checklist when bits change
+static void QuestBitNoteSideEffects(u8 qb, bool isOn) {
+    if (isOn) {
+        switch (qb) {
+            case QB_ShieldActivated:       World.questNotesActive[8] = true;  World.questNotesChecked[8] = true;  break;
+            case QB_LaserSafetyOverriden:   World.questNotesActive[7] = true;  World.questNotesChecked[7] = true;  break;
+            case QB_LaserDestroyed:         World.questNotesActive[9] = true;  World.questNotesChecked[9] = true;  if (autoSplitter.missionSplitID == 1) autoSplitter.missionSplitID++; break;
+            case QB_BetaGroveCyberUnlocked: World.questNotesActive[12] = true; break;
+            case QB_GroveAlphaJettisonEnabled: World.questNotesActive[12] = true; break;
+            case QB_GroveBetaJettisonEnabled:  World.questNotesActive[12] = true; break;
+            case QB_GroveDeltaJettisonEnabled: World.questNotesActive[12] = true; break;
+            case QB_MasterJettisonBroken:   World.questNotesActive[12] = true; World.questNotesActive[11] = true; if (autoSplitter.missionSplitID == 2) autoSplitter.missionSplitID++; break;
+            case QB_Relay428Fixed:          World.questNotesActive[11] = true; World.questNotesChecked[11] = true; break;
+            case QB_MasterJettisonEnabled:  World.questNotesActive[10] = true; World.questNotesChecked[10] = true; if (autoSplitter.missionSplitID == 3) autoSplitter.missionSplitID++; break;
+            case QB_BetaGroveJettisoned:    World.questNotesActive[12] = true; World.questNotesChecked[12] = true; World.questNotesActive[13] = true; if (autoSplitter.missionSplitID == 4) autoSplitter.missionSplitID++; break;
+            case QB_AntennaNorthDestroyed:
+            case QB_AntennaSouthDestroyed:
+            case QB_AntennaEastDestroyed:
+            case QB_AntennaWestDestroyed:   World.questNotesActive[13] = true; break;
+            case QB_SelfDestructActivated:  for (int i=0;i<17;++i) World.questNotesActive[i] = true; World.questNotesChecked[14] = true; break;
+            case QB_BridgeSeparated:        for (int i=0;i<17;++i) World.questNotesActive[i] = true; World.questNotesActive[17] = true; World.questNotesChecked[16] = true; break;
+            default: break;
+        }
+    } else {
+        switch (qb) {
+            case QB_ShieldActivated:       World.questNotesChecked[8] = false; break;
+            case QB_LaserSafetyOverriden:   World.questNotesChecked[7] = false; break;
+            case QB_LaserDestroyed:         World.questNotesChecked[9] = false; break;
+            case QB_Relay428Fixed:          World.questNotesChecked[11] = false; break;
+            case QB_MasterJettisonEnabled:  World.questNotesChecked[10] = false; break;
+            case QB_BetaGroveJettisoned:    World.questNotesChecked[12] = false; break;
+            case QB_SelfDestructActivated:  World.questNotesChecked[14] = false; break;
+            case QB_BridgeSeparated:        World.questNotesChecked[16] = false; break;
+            default: break;
+        }
+    }
+}
+// Ressurection: when player dies on a level with resurrection active, teleport back to the ressurection point instead of counting a death.
+bool RessurectPlayer(void) {
+    if (!((World.ressurectionActiveLevels >> World.curLev) & 1u)) return false;
+    if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) LoadLevel(6, ressurectionLocations[6]);
+    else if (World.curLev < 13) World.position[PLAYER1] = ressurectionLocations[World.curLev];
+    PlayTrack(TT_Revive, MT_Override); World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0;
+    CenterStatusPrint("BRAIN ACTIVITY SATISFACTORY...");
+    return true;
+}
 // Doors
 static bool DoorInventoryHasAccessCard(AccCardType card) { return card == ACC_None || (World.invP1.accessCardOwned & (1u << card)); }
 static float DoorGetProgress(const Entity* e, u8 clip) { AnimationClip c = DoorGetClip(e,clip); if(c.frameEnd <= c.frameStart){return 1.0f;} return DoorClamp01((float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart)); } 
@@ -1066,8 +919,8 @@ void DoorUse(u16 self, u16 activator) {
     if (e->useFinished >= World.pauseRelativeTime) return;
     e->useFinished = World.pauseRelativeTime + 0.15f;
     if (e->requiredAccessCard != ACC_None) {
-        if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) { CenterStatusPrint("%s",Sys_Text.stringTable[2]);/*TODO Access-card-specific status text.*/ if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) {play_wav(sounds[e->SFXLockedIndex],0.7f,World.position[self],true);} return; }
-        else e->requiredAccessCard = ACC_None; // TODO Access-card granted status text.
+        if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) { CenterStatusPrint("%s",Sys_Text.stringTable[2]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) {play_wav(sounds[e->SFXLockedIndex],0.7f,World.position[self],true);} return; }
+        else e->requiredAccessCard = ACC_None;
     }
     if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) {play_wav(sounds[e->SFXLockedIndex],0.55f,World.position[self],true);} return; }
     if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(self,e->targetIdx); }
@@ -1084,7 +937,7 @@ void DoorUpdate(u16 self) {
     if (World.pauseRelativeTime > e->waitBeforeClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
 }
 
-void CloseFullmap() {} // TODO
+void CloseFullmap() {}
 u16 SpawnDynamicObject(int val, bool cheat) {
     if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return 0xFFFF; }
     if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ",val,World.curLev,cheat);
@@ -1096,9 +949,9 @@ u16 SpawnDynamicObject(int val, bool cheat) {
 // TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.
 void TriggerTargetted(u16 self, u16 activator) { if (World.instances[self].ignoreSecondaryTriggers) World.instances[self].recentMostActivator = activator; }
 bool QuestBitIsSet(u8 qb) { return (qb < QB_COUNT) && ((World.missionBits >> qb) & 1u); }
-void QuestBitSet(u8 qb)    { if (qb < QB_COUNT) World.missionBits |=  (1u << qb); }
-void QuestBitClear(u8 qb)  { if (qb < QB_COUNT) World.missionBits &= ~(1u << qb); }
-void QuestBitToggle(u8 qb) { if (qb < QB_COUNT) World.missionBits ^=  (1u << qb); }
+void QuestBitSet(u8 qb)    { if (qb < QB_COUNT && !QuestBitIsSet(qb)) { World.missionBits |=  (1u << qb); QuestBitNoteSideEffects(qb, true); } }
+void QuestBitClear(u8 qb)  { if (qb < QB_COUNT &&  QuestBitIsSet(qb)) { World.missionBits &= ~(1u << qb); QuestBitNoteSideEffects(qb, false); } }
+void QuestBitToggle(u8 qb) { if (qb < QB_COUNT) { World.missionBits ^=  (1u << qb); QuestBitNoteSideEffects(qb, QuestBitIsSet(qb)); } }
 
 void Targetted(u16 activator, u16 self) {
     Entity* e = &World.instances[self]; u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
@@ -1169,7 +1022,7 @@ void UseTargets(u16 activator, u16 targetIdx) {
     const char* targetname = IOName(targetIdx); // For logging only; matching is u16 compare against the interned table.
     for (u8 lev = 0; lev < World.numLevels; ++lev) {
         if (World.currentLevel != lev) SetLevelPointers(lev);
-        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} DualLog("Target hit: %s on %u (lev %u)\n",targetname,i,lev); Targetted(activator,i); succeeded=true; }
+        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} DualLog("Target hit: %s on %u (lev %u), timestamp: %f\n",targetname,i,lev,World.pauseRelativeTime); Targetted(activator,i); succeeded=true; }
     }
     if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (!wasActive) {World.targetIOActive=false;}
 }
@@ -1218,7 +1071,7 @@ void ModUpdate() {
         if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i);
         if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);}
-        //TargetIDUpdate(i); TODO
+
     }
 }
 

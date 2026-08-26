@@ -624,6 +624,10 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("delay"))           inst->delay = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("locked"))          flag_set(&inst->entflags, EF_LOCKED, parse_bool(value, lineSpace, lineNum));
                 else if (KEY_EQ("active"))          inst->active = parse_bool(value, lineSpace, lineNum);
+                else if (KEY_EQ("timeInterval"))   inst->timeInterval = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("randomMin"))      inst->randomMin = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("randomMax"))      inst->randomMax = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("useRandomTimes")) inst->useRandomTimes = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("onlyTargetOnce"))  inst->onlyOnce = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("onlyOnce"))        inst->onlyOnce = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("targetAlreadyDone")) inst->targetAlreadyDone = parse_bool(value, lineSpace, lineNum);
@@ -1015,7 +1019,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
     World.levelCurrentlyLoading = false;
-    World.position[PLAYER1]=pos;
+    World.position[PLAYER1]=pos; World.velocity[PLAYER1]=(V3){0,0,0}; World.invP1.lastVelY=0.0f; World.invP1.wasGrounded=true;
     DebugRAM("end of LoadLevel");
 }
 // Save Game System

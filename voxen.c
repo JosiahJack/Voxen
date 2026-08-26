@@ -141,8 +141,8 @@ void DrawAngularVelocity(u16 i) {
 #include "winput.c"
 // Console System - CHEATS!
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
-static V3 ressurectionLocations[10] = {{-27.386f,-55.488f,26.5941f}/*0/R*/, {40.903f,-42.372f,-30.78f}/*1*/, {30.67407f,-25.832f,10.21412f}/*2*/, {38.26813f,-15.498f,20.37825f}/*3*/, {-19.48f,-7.928f,22.954f}/*4*/, {-24.358f,12.5956f,31.8497f}/*5*/,
-                                       {-22.3568f,33.7845f,-30.728f}/*6*/,  {2.228084f,50.95243f,7.532025f}/*7*/, {10.068f,58.897f,13.973f}/*8*/, {2.303f,106.77f,-38.554f}/*9*/};
+V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,
+                                       {-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
 static V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,
                                          {126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
 static void AddToHistory(const char* entry) {
@@ -212,6 +212,10 @@ static void cmd_animtest() { Cheats.animTest++; if (Cheats.animTest > 2) {Cheats
 static void cmd_nohud() { Cheats.noHUD = !Cheats.noHUD; if (Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
 static void cmd_iamshodan() { Cheats.superoverride = !Cheats.superoverride; if (Cheats.superoverride) {CenterStatusPrint("%s",Sys_Text.stringTable[1010]);/*"Full security override enabled!"*/ } else {CenterStatusPrint("%s",Sys_Text.stringTable[1009]);/*"SHODAN has regained control of security from you"*/} }
 static void cmd_staminup() { Cheats.fatigueCheat = !Cheats.fatigueCheat; if (Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); World.invP1.fatigue=0.0f; } else {CenterStatusPrint("%s",Sys_Text.stringTable[1012]); } }
+static void cmd_qb_set(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_set <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitSet((u8)qb); CenterStatusPrint("Quest bit %d SET -> %u",qb,(unsigned)QuestBitIsSet((u8)qb)); }
+static void cmd_qb_clear(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_clear <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitClear((u8)qb); CenterStatusPrint("Quest bit %d CLEARED -> %u",qb,(unsigned)QuestBitIsSet((u8)qb)); }
+static void cmd_qb_toggle(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_toggle <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitToggle((u8)qb); CenterStatusPrint("Quest bit %d TOGGLED -> %u",qb,(unsigned)QuestBitIsSet((u8)qb)); }
+static void cmd_qb_list() { CenterStatusPrint("missionBits: 0x%08X",(unsigned)World.missionBits); for(int i=0;i<QB_COUNT;++i){CenterStatusPrint("  [%2d] %s = %u  note:%s  chk:%s",i,QuestBitIsSet((u8)i)?"ON ":"OFF",(unsigned)QuestBitIsSet((u8)i),World.questNotesActive[i]?"yes":"no ",World.questNotesChecked[i]?"yes":"no");} }
 static void cmd_mrbean()  { CenterStatusPrint("Nice try, there are no go carts to slow down here"); } static void cmd_simonfoster()   { CenterStatusPrint("Nice try, nothing to paint here"); } static void cmd_richardbranson() { CenterStatusPrint("Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"); } static void cmd_johnwardley()       { CenterStatusPrint("WOW!"); }
 static void cmd_johnmace(){ CenterStatusPrint("Nice try, there's nothing to pay double for here"); }  static void cmd_melaniewarn()   { CenterStatusPrint("I feel happy!!!"); }                 static void cmd_damonhill()      { CenterStatusPrint("Nice try, there are no go carts to speed up here"); }                                       static void cmd_michaelschumacher() { CenterStatusPrint("Nice try, there are no go carts to give ludicrous speed here"); }
 static void cmd_tonyday() { CenterStatusPrint("Ok, now I want a hamburger"); }                        static void cmd_katiebrayshaw() { CenterStatusPrint("Hi there! Hello! Hey! Howdy!"); }
@@ -245,7 +249,7 @@ static const ConsoleCommand consoleCmds[] = {
     {"die",            {.noArg=cmd_kill},          NOARG},{"justinbailey",    {.noArg = cmd_justinbailey}, NOARG},{"woodstock",   {.noArg=cmd_woodstock}, NOARG},{"quarry",        {.noArg=cmd_quarry},      NOARG},{"zelda",          {.noArg = cmd_zelda},    NOARG},{"allyourbasearebelongtous",{.noArg=cmd_allyourbase},NOARG},
     {"all your base",  {.noArg=cmd_allyourbase},   NOARG},{"i am iron man",   {.noArg = cmd_iamironman},   NOARG},{"i am amazing",{.noArg=cmd_iamironman},NOARG},{"i am cool",     {.noArg=cmd_iamironman},  NOARG},{"i am best",      {.noArg =cmd_iamironman},NOARG},{"idkfa",                   {.noArg=cmd_idkfa},      NOARG},
     {"impulse 9",      {.noArg=cmd_idkfa},         NOARG},{"undo",            {.noArg = cmd_undo},         NOARG},{"shake",       {.noArg=cmd_shake},     NOARG},{"tired",         {.noArg=cmd_staminup},    NOARG},{"staminup",       {.noArg = cmd_staminup}, NOARG},{"grok",                    {.noArg=cmd_ai},         NOARG},
-    {"chatgpt",        {.noArg=cmd_ai},            NOARG},{"claude",          {.noArg = cmd_ai},           NOARG},{"gemini",      {.noArg=cmd_ai},        NOARG},{"shodan",        {.noArg=cmd_aireal},      NOARG},{"animtest",       {.noArg = cmd_animtest}, NOARG},{NULL,{.raw = NULL},NOARG}/*sizeof helper*/ };
+    {"chatgpt",        {.noArg=cmd_ai},            NOARG},{"claude",          {.noArg = cmd_ai},           NOARG},{"gemini",      {.noArg=cmd_ai},        NOARG},{"shodan",        {.noArg=cmd_aireal},      NOARG},{"animtest",       {.noArg = cmd_animtest}, NOARG},{"qb_set",            {.withStr=cmd_qb_set},   CMD_STR},{"qb_clear",           {.withStr=cmd_qb_clear},  CMD_STR},{"qb_toggle",         {.withStr=cmd_qb_toggle}, CMD_STR},{"qb_list",            {.noArg=cmd_qb_list},    NOARG},{NULL,{.raw = NULL},NOARG}/*sizeof helper*/ };
 void ToggleConsole();
 void ProcessConsoleCommand(const char* c) {
     if (c == NULL || slen(c) == 0) { ToggleConsole(); return; }
@@ -787,8 +791,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
-__attribute__((const)) float GetPainStatic() { return 0.0f; } // TODO: Hook into pain/health management and shield impact effect
-Color GetPainStaticColor() { return (Color){1.0f,0.0f,0.0f,1.0f}; } // TODO: Hook staticColor up to red or blue for pain or shield impact.
+float GetPainStatic() { return vclamp(World.painStaticAlpha + World.empStaticAlpha,0.0f,1.0f); } void PainStaticFlash(float intensity) { World.painStaticAlpha = vclamp(intensity,0.0f,2.0f); } void EmpStaticFlash(float intensity) { World.empStaticAlpha = vclamp(intensity,0.0f,2.0f); }
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
 void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, bool grayscaleEnabled) {
@@ -964,8 +967,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform3f(12,deg2rad(World.cam_yaw),deg2rad(World.cam_pitch),deg2rad(World.cam_roll)); glUniform3f(13,px,py,pz); glUniform1f(15,(float)World.pauseRelativeTime * 0.1f); glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
     glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); glUniform1ui(19,((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     u32 shieldOnType = 0u/*No shield green tint*/; if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) {shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/;} glUniform1ui(20,shieldOnType); // Green Shield
-    Color painStaticColor = GetPainStaticColor(); glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b);
-    glUniformMatrix4fv(24,1,0,viewProj);          glUniformMatrix3fv(25,1,0,invViewRot);        glUniform1i(27,0); // Texture 0 for the rendered geometry color buffer
+    Color3 painStaticColor = (Color3){1.0f,0.0f,0.0f}/*GetPainStaticColor()*/; glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b);
+    glUniformMatrix4fv(24,1,0,viewProj);          glUniformMatrix3fv(25,1,0,invViewRot);        glUniform1i(27,0);
     glUniform1f(28,GetPainStatic());              glUniform1ui(29,(u32)ModRequestsGrayscale()); glBindVertexArray(quadVAO); glDisable(GL_DEPTH_TEST);
     glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/,0,4); drawCalls++; vertsRendered += 4;
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
@@ -1151,7 +1154,7 @@ i32 main() {
     InitalizeEnvironment();
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
-        double curtime = get_time(); World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time,0.0); World.absoluteTime+=World.deltaTime; World.current_time=curtime;
+        double curtime = get_time(); World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time,0.0); World.absoluteTime+=World.deltaTime; World.current_time=curtime; World.painStaticAlpha = vmax(0.0f,World.painStaticAlpha - (float)World.deltaTime * 2.0f); World.empStaticAlpha = vmax(0.0f,World.empStaticAlpha - (float)World.deltaTime * 4.0f);
         if (!World.paused && !World.menuActive) { if (World.pauseRelativeTime < 0.001f) {World.pauseRelativeTime = World.last_physics_time = curtime;} World.pauseRelativeTime += World.deltaTime; }
         double input_start = get_time();
         InputProcessing(); // Before anims and physics to allow them to respond immediately.

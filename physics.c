@@ -67,9 +67,9 @@ void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
 }
 // Trigger for Events (trigger_multiple/trigger_once same as Quake 1)
 void TriggerDelayedTarget(u16 self) { World.instances[self].delayFireFinished = World.pauseRelativeTime + World.instances[self].delay; UseTargets(self,World.instances[self].targetIdx); }
-void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (e->recentMostActivator && e->ignoreSecondaryTriggers)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self);} }
-void TriggerOnTriggerEnter(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
-void TriggerOnTriggerStay(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
+void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (e->recentMostActivator && e->ignoreSecondaryTriggers) || (World.instances[self].allDone && World.instances[self].onlyOnce)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self);} }
+void TriggerOnTriggerEnter(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
+void TriggerOnTriggerStay(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
 // GravityLift
 void GravityLiftOnForce(u16 self, u16 other, bool initial) {
     float topY = World.position[self].y + (World.colliderSize[self].y * 0.5f);
@@ -1001,14 +1001,15 @@ void ApplyPlayerMovements(float dt) {
     World.invP1.fatigue = vclamp(World.invP1.fatigue,0.0f,100.0f); // TODO textwarnings Fatigue high when > 80.0f
     if (grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
-        if (velChange > 2.0f) {
+        if (velChange > 2.0f && World.invP1.noiseFinished < World.pauseRelativeTime) {
             RaycastHit lhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET);
             FootStepType lstp = lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete;
             float vol = vclamp((velChange - 1.0f) / (11.72f - 1.0f),0.0f,1.0f) * (1.0f - 0.5f) * 0.8f * stepVolMod;
             play_wav(JumpLandSound(lstp),SfxVol() * vol,World.position[PLAYER1],true);
-            World.invP1.noiseFinished = World.pauseRelativeTime + 0.1f;
+            World.invP1.noiseFinished = World.pauseRelativeTime + 0.2f;
         }
-        if (velChange >= 11.72f) {
+        if (velChange >= 11.72f && World.invP1.fallPainFinished < World.pauseRelativeTime) {
+            World.invP1.fallPainFinished = World.pauseRelativeTime + 0.5f;
             DamageData dd = {0};
             float falltake = 75.0f - random_range(0.0f,68.0f);
             if (falltake > World.instances[PLAYER1].health && falltake - World.instances[PLAYER1].health < 5.0f) falltake = World.instances[PLAYER1].health - 1.0f; // some small saving grace
