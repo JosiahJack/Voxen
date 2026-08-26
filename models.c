@@ -1,5 +1,6 @@
 // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
 #include "common.h"
+#define ARENA_ALIGN(p) ((char*)(((uintptr_t)(p) + 15) & ~(uintptr_t)15)) // 16-byte align sub-arena cursors
 enum{MAX_GLTF_JOINTS=96,MAX_GLTF_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLTF_VERTS=MAX_OUTPUT_VERTS,MAX_GLTF_BLOCKS=64};
 float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
 typedef struct { const char *data,*name; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count,capacity; } ModelDataParser;
@@ -1082,24 +1083,24 @@ void LoadModels() {
     modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
     size_t remap_sz = (size_t)MAX_OUTPUT_VERTS * sizeof(u32), cache_sz = ((MAX_OUTPUT_VERTS/3) * sizeof(TriSort)) * 2 + (MAX_OUTPUT_VERTS * sizeof(u16)); size_t bvh_nodes_sz = (size_t)BVH_MAX_NODES_PER_MDL * sizeof(BvhNode); size_t bvh_u8_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u8); size_t bvh_u16_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u16);
     size_t arena = mdlsCnt*sizeof(i32) + mdlsCnt*sizeof(RawOBJ) + 16*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + WELD_HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + remap_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz);
-    void* arena_base = OS_AllocScratch(arena); char* p = arena_base;
-    i32* idxmap = (i32*)p; p += mdlsCnt*sizeof(i32);
+    void* arena_base = OS_AllocScratch(arena + 4096); char* p = arena_base; // Fudge covers alignment padding between sections
+    i32* idxmap = (i32*)p; p = ARENA_ALIGN(p + mdlsCnt*sizeof(i32));
     mset(idxmap, -1, mdlsCnt*sizeof(i32));
     for (u32 i=0; i<mp.count; ++i) if (mp.entries[i].index != U16_MAX) idxmap[mp.entries[i].index] = (i32)i;
-    RawOBJ* raw = (RawOBJ*)p; p += mdlsCnt*sizeof(RawOBJ);
+    RawOBJ* raw = (RawOBJ*)p; p = ARENA_ALIGN(p + mdlsCnt*sizeof(RawOBJ));
     for (u32 i=0; i<mdlsCnt; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz; raw[i].name=mp.entries[pi].path;} }
     bool* isGLTFAnimSrc = (bool*)OS_AllocScratch(mdlsCnt * sizeof(bool));
     bool* isGLTFStaticSrc = (bool*)OS_AllocScratch(mdlsCnt * sizeof(bool));
     for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index == U16_MAX || !IsGLTFSourcePath(mp.entries[i].path)){continue;} if (mp.entries[i].animated) isGLTFAnimSrc[mp.entries[i].index] = true; else isGLTFStaticSrc[mp.entries[i].index] = true; }
-    float **pos = (float**)p; p += threadCnt*sizeof(float*); float **nrm = (float**)p; p += threadCnt*sizeof(float*); float **uv = (float**)p; p += threadCnt*sizeof(float*);  float **ov = (float**)p; p += threadCnt*sizeof(float*);
-    u32 **ht = (u32**)p; p += threadCnt*sizeof(u32*); u32 **ht_used = (u32**)p; p += threadCnt*sizeof(u32*); u32 **remap_scr = (u32**)p; p += threadCnt*sizeof(u32*); u8 **cache_scr = (u8**)p; p += threadCnt*sizeof(u8*);
-    BvhNode **bvh_nodes_p = (BvhNode**)p; p += threadCnt*sizeof(BvhNode*); u8 **bvh_oct_p = (u8**)p; p += threadCnt*sizeof(u8*); u16 **bvh_order_p = (u16**)p; p += threadCnt*sizeof(u16*); u16 **bvh_scr_p = (u16**)p; p += threadCnt*sizeof(u16*); u16 **bvh_init_p = (u16**)p; p += threadCnt*sizeof(u16*);
+    float **pos = (float**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(float*)); float **nrm = (float**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(float*)); float **uv = (float**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(float*));  float **ov = (float**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(float*));
+    u32 **ht = (u32**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(u32*)); u32 **ht_used = (u32**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(u32*)); u32 **remap_scr = (u32**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(u32*)); u8 **cache_scr = (u8**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(u8*));
+    BvhNode **bvh_nodes_p = (BvhNode**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(BvhNode*)); u8 **bvh_oct_p = (u8**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(u8*)); u16 **bvh_order_p = (u16**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(u16*)); u16 **bvh_scr_p = (u16**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(u16*)); u16 **bvh_init_p = (u16**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
     size_t psz = MAX_VERT_ELEMENT_SIZE*3*sizeof(float), usz = MAX_OUTPUT_VERTS*8*sizeof(float);
     for (int i=0; i<threadCnt; ++i) { 
-        pos[i]=(float*)p; p+=psz; nrm[i] = (float*)p; p += psz; uv[i] = (float*)p; p+=MAX_VERT_ELEMENT_SIZE*2*sizeof(float); 
-        ov[i]=(float*)p; p+=usz; 
-        ht[i]=(u32*)p; p+=WELD_HASH_SIZE*sizeof(u32); ht_used[i] = (u32*)p; p+=MAX_OUTPUT_VERTS*sizeof(u32);
-        remap_scr[i]=(u32*)p; p+=remap_sz; cache_scr[i]=(u8*)p; p+=cache_sz; bvh_nodes_p[i]=(BvhNode*)p; p += bvh_nodes_sz; bvh_oct_p[i]=(u8*)p; p += bvh_u8_sz; bvh_order_p[i]=(u16*)p; p += bvh_u16_sz; bvh_scr_p[i]=(u16*)p; p += bvh_u16_sz; bvh_init_p[i]=(u16*)p; p += bvh_u16_sz;
+        pos[i]=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + psz); nrm[i] = (float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + psz); uv[i] = (float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + MAX_VERT_ELEMENT_SIZE*2*sizeof(float)); 
+        ov[i]=(float*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + usz); 
+        ht[i]=(u32*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + WELD_HASH_SIZE*sizeof(u32)); ht_used[i] = (u32*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + MAX_OUTPUT_VERTS*sizeof(u32));
+        remap_scr[i]=(u32*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + remap_sz); cache_scr[i]=(u8*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + cache_sz); bvh_nodes_p[i]=(BvhNode*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_nodes_sz); bvh_oct_p[i]=(u8*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u8_sz); bvh_order_p[i]=(u16*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u16_sz); bvh_scr_p[i]=(u16*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u16_sz); bvh_init_p[i]=(u16*)ARENA_ALIGN(p); p = ARENA_ALIGN(p + bvh_u16_sz);
         mset(ht[i],0xFF,WELD_HASH_SIZE * sizeof(u32));
         thrd_bvh_ctx[i]=(BvhBuildCtx){.nodes=bvh_nodes_p[i], .triOctants=bvh_oct_p[i], .triOrder=bvh_order_p[i], .triScratch=bvh_scr_p[i], .initialTris=bvh_init_p[i], .nodeCount=0, .triCount=0};
     }

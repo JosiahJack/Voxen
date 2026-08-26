@@ -243,7 +243,7 @@ void DetermineVisibleCells(i32 startX, i32 startZ) {
 
 void PortalCulling() { // Called just once at end of animation loop for the frame after each frame-perfect change to door models becoming either closed or not closed.
     bool previousLightVisible[LIGHT_COUNT]; mset(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
-    for (u16 i=0;i<World.loadedLights;++i) { u16 lcell = (World.lights[i].pos.z * WORLDX) + World.lights[i].pos.x; if (gridCellStates[lcell] & CELL_VISIBLE) {previousLightVisible[i]=true;} }
+    for (u16 i=0;i<World.loadedLights;++i) { i32 lcell = PosGetCellCoords(World.lights[i].pos.x, World.lights[i].pos.z); if (lcell >= 0 && lcell < ARRSIZE && (gridCellStates[lcell] & CELL_VISIBLE)) {previousLightVisible[i]=true;} }
     for (u32 portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
         Portal* prt = &activePortals[portalIdx]; if (!prt->dirty || prt->lev != World.curLev) continue;
         prt->dirty = false;

@@ -66,8 +66,8 @@ void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
     play_wav(sounds[106],1.0f,World.position[dest],false);
 }
 // Trigger for Events (trigger_multiple/trigger_once same as Quake 1)
-void TriggerDelayedTarget(u16 self, u16 activator) { World.instances[self].delayFireFinished = World.pauseRelativeTime + World.instances[self].delay; UseTargets(self,World.instances[self].targetIdx); }
-void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (e->recentMostActivator && e->ignoreSecondaryTriggers)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self,other);} }
+void TriggerDelayedTarget(u16 self) { World.instances[self].delayFireFinished = World.pauseRelativeTime + World.instances[self].delay; UseTargets(self,World.instances[self].targetIdx); }
+void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (e->recentMostActivator && e->ignoreSecondaryTriggers)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self);} }
 void TriggerOnTriggerEnter(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
 void TriggerOnTriggerStay(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
 // GravityLift

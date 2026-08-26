@@ -388,9 +388,9 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, V3 eye) { // Kept aroun
     V3 right   = { 1.0f - 2.0f * (y2 + z2),        2.0f * (xy + wz),        2.0f * (xz - wy) };  // X+ (right)
     V3 up      = {        2.0f * (xy - wz), 1.0f - 2.0f * (x2 + z2),        2.0f * (yz + wx) };  // Y+ (up)
     V3 forward = {        2.0f * (xz + wy),        2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) };  // Z+ (forward)
-    m[0]  = right.x;   m[1]  = up.x;   m[2]  = -forward.x;// m[3]  = 0.0f;
-    m[4]  = right.y;   m[5]  = up.y;   m[6]  = -forward.y;// m[7]  = 0.0f;
-    m[8]  = right.z;   m[9]  = up.z;   m[10] = -forward.z;// m[11] = 0.0f;
+    m[0]  = right.x;   m[1]  = up.x;   m[2]  = -forward.x; m[3]  = 0.0f;
+    m[4]  = right.y;   m[5]  = up.y;   m[6]  = -forward.y; m[7]  = 0.0f;
+    m[8]  = right.z;   m[9]  = up.z;   m[10] = -forward.z; m[11] = 0.0f;
     m[12] = -V3_dot(right, eye); m[13] = -V3_dot(up, eye); m[14] = V3_dot(forward, eye); m[15] = 1.0f;
 }
 

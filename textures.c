@@ -10,8 +10,8 @@ typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData; typedef s
 enum { PNGFmt_none=0, PNGFmt_sub=1, PNGFmt_up=2, PNGFmt_avg=3, PNGFmt_paeth=4, PNGFmt_avg_first, PNGFmt_paeth_first };
 PngArena png_arena_main; static PngArena* thread_png_arenas = NULL;
 void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
-void* PngArenaAlloc(PngArena* a, size_t s) { if(!a->base||a->cursor+s>a->end){DualLogError("PngArena overflow: need %zu bytes, %zu remaining - raise arena size in PngArenaInit and rebuild\n",s,(size_t)(a->end - a->cursor)); OS_Exit(1);} void* p=a->cursor; a->cursor+=s; return p; }
-static u32 PngGet32be(PngContext* s) { if(s->img_buffer + 4 > s->img_buffer_end){s->img_error=1; return 0;} const u8* p = s->img_buffer; s->img_buffer += 4; return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]; }
+void* PngArenaAlloc(PngArena* a, size_t s) { s = (s + 15) & ~(size_t)15; /*Keep every allocation 16-byte aligned*/ if(!a->base||a->cursor+s>a->end){DualLogError("PngArena overflow: need %zu bytes, %zu remaining - raise arena size in PngArenaInit and rebuild\n",s,(size_t)(a->end - a->cursor)); OS_Exit(1);} void* p=a->cursor; a->cursor+=s; return p; }
+static u32 PngGet32be(PngContext* s) { if(s->img_buffer + 4 > s->img_buffer_end){s->img_error=1; return 0;} const u8* p = s->img_buffer; s->img_buffer += 4; return ((u32)p[0] << 24) | ((u32)p[1] << 16) | ((u32)p[2] << 8) | p[3]; }
 static i32 BitReverse(i32 n, i32 b) { n=((n&0xAAAA)>>1)|((n&0x5555)<<1); n=((n&0xCCCC)>>2)|((n&0x3333)<<2); n=((n&0xF0F0)>>4)|((n&0x0F0F)<<4); n=((n&0xFF00)>>8)|((n&0x00FF)<<8); return n>>(16-b); }
 static i32 PngHuf(PngHuffman* z, const u8* sl, i32 num) {
     i32 i,k=0,code=0,nc[16],sz[17]={0}; mset(z->fast,0,sizeof(z->fast)); if(num != 32) { for(i=0;i<num;++i)++sz[sl[i]]; } sz[0]=0;

@@ -4,27 +4,23 @@
 u8* scratch_base = NULL;
 u8* scratch_cur  = NULL;
 u8* scratch_end  = NULL;
-size_t initPhaseSize = 0; // accumulates freed-by-phase sizes (OS_FreeInitPhaseInner)
+size_t initPhaseSize = 0;
 void OS_ScratchInit(void) { if(scratch_base){return;} scratch_base=(u8*)OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur=scratch_base; scratch_end=scratch_base + SCRATCH_ARENA_SIZE; initPhaseSize=0; }
 void* OS_AllocScratch(size_t amount) { if(!scratch_base){OS_ScratchInit();} size_t aligned=(amount + 15) & ~(size_t)15; if(scratch_cur+aligned > scratch_end){DualLogError("Scratch exhausted!\n"); OS_Exit(1);} void* p=scratch_cur; scratch_cur+=aligned; return p; }
-void OS_FreeInitPhaseInner(size_t amount) { initPhaseSize += amount; }
-void OS_FreeInitPhase(void) { scratch_cur -= initPhaseSize; if (scratch_cur < scratch_base) { DualLogError("OS_FreeInitPhase: cursor underflow! freed %zu bytes\n",initPhaseSize); OS_Exit(1); } mset(scratch_cur,0,initPhaseSize); initPhaseSize=0; }
+void OS_FreeInitPhaseInner(size_t amount) { initPhaseSize += (amount + 15) & ~(size_t)15; }
+void OS_FreeInitPhase(void) { scratch_cur -= initPhaseSize; if (scratch_cur < scratch_base) { DualLogError("OS_FreeInitPhase: cursor underflow! freed %zu bytes\n",initPhaseSize); OS_Exit(1); } mset(scratch_cur,0,initPhaseSize); scratch_cur = (u8*)(((uintptr_t)scratch_cur + 15) & ~(uintptr_t)15); initPhaseSize=0; }
 void OS_ScratchFree(void) { if (!scratch_base){return;} OS_Free(scratch_base, SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; initPhaseSize = 0; }
+typedef u16 u16_u __attribute__((__aligned__(1), __may_alias__)); typedef u32 u32_u __attribute__((__aligned__(1), __may_alias__)); typedef u64 u64_u __attribute__((__aligned__(1), __may_alias__));
 void* mcpy(void *dst, const void *src, size_t n) {
     u8 *d = (u8*)dst; const u8 *s = (const u8*)src; size_t i = 0;
-    for (; i + 128 <= n; i += 128) {
-        _mm256_storeu_si256((__m256i*)(d+i),    _mm256_loadu_si256((const __m256i*)(s+i)));
-        _mm256_storeu_si256((__m256i*)(d+i+32), _mm256_loadu_si256((const __m256i*)(s+i+32)));
-        _mm256_storeu_si256((__m256i*)(d+i+64), _mm256_loadu_si256((const __m256i*)(s+i+64)));
-        _mm256_storeu_si256((__m256i*)(d+i+96), _mm256_loadu_si256((const __m256i*)(s+i+96)));
-    }
-    for (; i + 32 <= n; i += 32) { _mm256_storeu_si256((__m256i*)(d+i), _mm256_loadu_si256((const __m256i*)(s+i))); }
+    for (;i+128<=n;i+=128){ _mm256_storeu_si256((__m256i*)(d+i), _mm256_loadu_si256((const __m256i*)(s+i))); _mm256_storeu_si256((__m256i*)(d+i+32), _mm256_loadu_si256((const __m256i*)(s+i+32))); _mm256_storeu_si256((__m256i*)(d+i+64), _mm256_loadu_si256((const __m256i*)(s+i+64))); _mm256_storeu_si256((__m256i*)(d+i+96), _mm256_loadu_si256((const __m256i*)(s+i+96))); }
+    for (;i+32<=n;i+=32)  { _mm256_storeu_si256((__m256i*)(d+i), _mm256_loadu_si256((const __m256i*)(s+i))); }
     size_t rem = n - i; u8* rd = d + i; const u8* rs = s + i;
-    if (rem >= 16) { _mm_storeu_si128((__m128i*)rd, _mm_loadu_si128((const __m128i*)rs)); _mm_storeu_si128((__m128i*)(d+n-16), _mm_loadu_si128((const __m128i*)(s+n-16)));
-    } else if (rem >= 8) { *(u64*)rd = *(const u64*)rs; *(u64*)(d+n-8) = *(const u64*)(s+n-8);
-    } else if (rem >= 4) { *(u32*)rd = *(const u32*)rs; *(u32*)(d+n-4) = *(const u32*)(s+n-4);
-    } else if (rem >= 2) { *(u16*)rd = *(const u16*)rs; *(u16*)(d+n-2) = *(const u16*)(s+n-2);
-    } else if (rem == 1) { *rd = *rs; }
+    if (rem >= 16) { _mm_storeu_si128((__m128i*)rd, _mm_loadu_si128((const __m128i*)rs)); _mm_storeu_si128((__m128i*)(d+n-16), _mm_loadu_si128((const __m128i*)(s+n-16))); }
+    else if (rem >= 8) { *(u64_u*)rd = *(const u64_u*)rs; *(u64_u*)(d+n-8) = *(const u64_u*)(s+n-8); }
+    else if (rem >= 4) { *(u32_u*)rd = *(const u32_u*)rs; *(u32_u*)(d+n-4) = *(const u32_u*)(s+n-4); }
+    else if (rem >= 2) { *(u16_u*)rd = *(const u16_u*)rs; *(u16_u*)(d+n-2) = *(const u16_u*)(s+n-2); }
+    else if (rem == 1) { *rd = *rs; }
     return dst;
 }
 
@@ -37,9 +33,9 @@ void* mset(void *dst, int c, size_t n) {
     }
     size_t rem = n - i; u8* rp = p + i;
     if (rem >= 16) { __m128i v128 = _mm_set1_epi8_fast((char)c); _mm_storeu_si128((__m128i*)rp, v128); _mm_storeu_si128((__m128i*)(p+n-16), v128);
-    } else if (rem >= 8) { u64 v64 = (u64)0x0101010101010101ULL * (u8)c; *(u64*)rp = v64; *(u64*)(p+n-8) = v64;
-    } else if (rem >= 4) { u32 v32 = 0x01010101U * (u8)c; *(u32*)rp = v32; *(u32*)(p+n-4) = v32;
-    } else if (rem >= 2) { u16 v16 = (u16)(0x0101U * (u8)c); *(u16*)rp = v16; *(u16*)(p+n-2) = v16;
+    } else if (rem >= 8) { u64 v64 = (u64)0x0101010101010101ULL * (u8)c; *(u64_u*)rp = v64; *(u64_u*)(p+n-8) = v64;
+    } else if (rem >= 4) { u32 v32 = 0x01010101U * (u8)c; *(u32_u*)rp = v32; *(u32_u*)(p+n-4) = v32;
+    } else if (rem >= 2) { u16 v16 = (u16)(0x0101U * (u8)c); *(u16_u*)rp = v16; *(u16_u*)(p+n-2) = v16;
     } else if (rem == 1) { *rp = (u8)c; }
     return dst;
 }
@@ -75,6 +71,9 @@ char* sFindSub(const char* s, const char* sub) { if (sub[0] == '\0') {return (ch
 const char* StringFindLastChar(const char* str, const char c) { const char* lastSeen = NULL; do { if (*str == c) lastSeen = str; } while (*str++); return lastSeen; } // strrchr replacement
 char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (char*)s; while (*stringwalker != c) { if (!*stringwalker) {return NULL;} stringwalker++; } return stringwalker; } // strchr replacement
 void double2str(char* dest, double value, int decs, size_t bufsz) {
+    union { double d; u64 u; } bits; bits.d = value; // Bit-test for nan/inf since -ffast-math elides __builtin_isnan
+    if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL) && ((bits.u & 0x000FFFFFFFFFFFFFULL) != 0 || (bits.u >> 63))) { dest[0]='n';dest[1]='a';dest[2]='n';dest[3]='\0'; return; }
+    if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL)) { dest[0]='i';dest[1]='n';dest[2]='f';dest[3]='\0'; return; }
     if (decs < 0 || decs > 9) { DualLogError("double2str: too many decimals\n"); OS_Exit(1); }
     if (value < 0.0) { if (bufsz < 2) {DualLogError("double2str: buffer too small A\n"); OS_Exit(1);} *dest++ = '-'; bufsz--; value = -value; }
     u64 whole = (u64)value; char temp[32]; size_t len = 0;
