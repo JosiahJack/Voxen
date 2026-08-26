@@ -52,7 +52,7 @@ void CyberMineInitBeforeLoad(u16 self) {
 float TakeDamage(u16 self,DamageData dd);
 void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) return; PlayerTakeDamage(PLAYER1,e->damage); play_wav(sounds[67],1.0f,World.position[self],false); flag_set(&e->entflags,EF_ACTIVE,false); }
 void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // TODO Visual subobject parity removed with hierarchy removal.
-void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(other,e->targetIdx); }
+void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(self,e->targetIdx); }
 // TeleportTouch
 void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
     Entity* e = &World.instances[self];
@@ -66,8 +66,8 @@ void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
     play_wav(sounds[106],1.0f,World.position[dest],false);
 }
 // Trigger for Events (trigger_multiple/trigger_once same as Quake 1)
-void TriggerDelayedTarget(u16 self, u16 activator) { World.instances[self].delayFireFinished = World.pauseRelativeTime + World.instances[self].delay; UseTargets(activator,World.instances[self].targetIdx); }
-void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (e->recentMostActivator && e->ignoreSecondaryTriggers)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(other,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self,other);} }
+void TriggerDelayedTarget(u16 self, u16 activator) { World.instances[self].delayFireFinished = World.pauseRelativeTime + World.instances[self].delay; UseTargets(self,World.instances[self].targetIdx); }
+void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (e->recentMostActivator && e->ignoreSecondaryTriggers)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self,other);} }
 void TriggerOnTriggerEnter(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
 void TriggerOnTriggerStay(u16 self, u16 other) { if (!World.instances[self].allDone) TriggerTriggerTripped(self,other); }
 // GravityLift

@@ -285,31 +285,43 @@ void DelayedSpawnUpdate(u16 self) {
     if (e->despawnInstead) { if(e->destroyAfterListInsteadOfDeactivate){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }     else flag_set(&e->entflags,EF_ACTIVE,true);
 }
 
+void FuncWallShiftChildren(u16 self, V3 delta) {
+    if (vabs(delta.x)+vabs(delta.y)+vabs(delta.z) < 0.00001f) {return;}
+    for (u16 i=PLAYER1;i<World.instCount;++i) { if (fwParentOf[i]==self) { World.position[i]=V3_AplusB(World.position[i],delta); } }
+}
 void FuncWallInitAfterLoad(u16 self) {
-    Entity* e = &World.instances[self];
-    float distTotal = V3_Dist(e->startPosition,e->targetPosition); V3 tempVec = V3_ScaleByF(V3_Normalize(V3_AsubB(World.position[self],e->targetPosition)),-1.0f);
-    if (e->funcState == FStat_AjarMovingTarget) tempVec=V3_ScaleByF(tempVec,distTotal * e->ajarPercentage);
-    else if (e->funcState == FStat_AjarMovingStart) tempVec=V3_ScaleByF(tempVec,distTotal * (1.0f - e->ajarPercentage));
-    else if (e->funcState == FStat_MovingStart) tempVec=V3_ScaleByF(tempVec,distTotal * (1.0f - e->percentMoved));
-    else tempVec=V3_ScaleByF(tempVec,distTotal * e->percentMoved);
-    World.position[self]=V3_AplusB(World.position[self],tempVec);
+    Entity* e = &World.instances[self]; V3 prev = World.position[self];
+    float distTotal = V3_Dist(e->startPosition,e->targetPosition); float f = 0.0f;
+    if ((u8)e->funcState > FStat_AjarMovingTarget) f = e->ajarPercentage; // legacy out-of-range states: park at the ajar fractional point
+    else if (e->funcState == FStat_AjarMovingTarget) f = e->ajarPercentage;
+    else if (e->funcState == FStat_AjarMovingStart) f = 1.0f - e->ajarPercentage;
+    if (f < 0.0f) f = 0.0f; if (f > 1.0f) f = 1.0f;
+    V3 np = (distTotal > 0.0001f) ? V3_AplusB(e->startPosition,V3_ScaleByF(V3_Normalize(V3_AsubB(e->targetPosition,e->startPosition)),distTotal*f)) : e->startPosition;
+    World.position[self]=np;
+    if ((u8)e->funcState <= FStat_MovingTarget) { e->funcState = FStat_Start; e->percentMoved = 0.0f; } // rendered closed, so first frob must open
+    FuncWallShiftChildren(self,V3_AsubB(np,prev));
 }
 
 void FuncWallMoveStart(u16 self) { World.instances[self].funcState = FStat_MovingStart; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; }
 void FuncWallMoveTarget(u16 self) { World.instances[self].funcState = FStat_MovingTarget; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; }
-void FuncWallTargetted(u16 self) { Entity* e = &World.instances[self]; if (e->funcState == FStat_Start || e->funcState == FStat_MovingStart || e->funcState == FStat_AjarMovingTarget){FuncWallMoveTarget(self);} else{FuncWallMoveStart(self);} play_wav(sounds[76],1.0f,World.position[self],true); }
-void FuncWallUpdate(u16 self) {
+void FuncWallTargetted(u16 self) { Entity* e = &World.instances[self]; u8 st = (u8)e->funcState;
+    bool toTarget = st == FStat_Start || st == FStat_MovingStart || st == FStat_AjarMovingTarget || (st > FStat_AjarMovingTarget && e->ajarPercentage > 0.0f);
+    if (toTarget){FuncWallMoveTarget(self);} else{FuncWallMoveStart(self);} play_wav(sounds[76],1.0f,World.position[self],true); }
+void FuncWallUpdateInner(u16 self) {
     Entity* e = &World.instances[self];
+    if (e->funcState != FStat_MovingStart && e->funcState != FStat_MovingTarget) return;
     V3 goal = e->funcState == FStat_MovingStart ? e->startPosition : e->targetPosition;
     FuncStates doneState = e->funcState == FStat_MovingStart ? FStat_Start : FStat_Target;
-    if (e->funcState == FStat_Start) { World.position[self]=e->startPosition; e->percentMoved = 0.0f; return; }
-    if (e->funcState == FStat_Target) { World.position[self]=e->targetPosition; e->percentMoved = 1.0f; return; }
-    if (e->funcState != FStat_MovingStart && e->funcState != FStat_MovingTarget) return;
     V3 delta = V3_AsubB(goal,World.position[self]);
     float distanceLeft = V3_Mag(delta), total = V3_Dist(e->startPosition,e->targetPosition), dist = e->speed * (float)World.deltaTime;
     if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) { World.position[self]=goal; e->funcState=doneState; e->percentMoved=doneState == FStat_Target ? 1.0f : 0.0f; return; }
     if (distanceLeft > 0.0001f) World.position[self]=V3_AplusB(World.position[self],V3_ScaleByF(V3_Normalize(delta),dist));
     if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,World.position[self]) / total;
+}
+void FuncWallUpdate(u16 self) {
+    V3 prev = World.position[self];
+    FuncWallUpdateInner(self);
+    FuncWallShiftChildren(self,V3_AsubB(World.position[self],prev));
 }
 // ForceBridge
 void func_forcebridge(u16 self) {
@@ -372,8 +384,8 @@ void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; World.insta
 // ButtonSwitch
 void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->delayFinished=0.0f; if(e->active){e->tickFinished=World.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);} }
 void ButtonSwitchUseTargets(u16 self, u16 activator) {
-    Entity* e=&World.instances[self];
-    UseTargets(activator,e->targetIdx);
+    Entity* e=&World.instances[self]; (void)activator;
+    UseTargets(self,e->targetIdx); // Citadel semantics: the originator's own ioflags become the UseData carried to targets.
     e->active=!e->active;
     if(e->index == 689 || e->index == 690 || e->index == 695) { TextureChangerToggle(self); if(e->index == 689 && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} }
 }
@@ -1058,7 +1070,7 @@ void DoorUse(u16 self, u16 activator) {
         else e->requiredAccessCard = ACC_None; // TODO Access-card granted status text.
     }
     if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) {play_wav(sounds[e->SFXLockedIndex],0.55f,World.position[self],true);} return; }
-    if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(activator,e->targetIdx); }
+    if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(self,e->targetIdx); }
     if (e->ajar) e->ajar = false;
     DoorActuate(self);
 }

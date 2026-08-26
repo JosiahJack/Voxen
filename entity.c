@@ -522,6 +522,45 @@ u16 IOInternName(const char* name) {
     return ioNameCount++;
 }
 const char* IOName(u16 idx) { return (idx < ioNameCount) ? ioNames[idx] : ""; }
+// FuncWall
+#define FW_MAX_CHILDREN 48 /*largest seen: 41 chunks (level 9)*/
+#define FW_POOL_MAX 512
+u16 fwParentOf[INSTANCE_COUNT]; // instance -> owning func_wall mover_target, 0 == none
+static u16 fwSlotStart[INSTANCE_COUNT],fwSlotCount[INSTANCE_COUNT];
+static V3 fwBasePos[INSTANCE_COUNT],fwInfoLocal[INSTANCE_COUNT],fwBaseScale[INSTANCE_COUNT];
+static Quaternion fwBaseRot[INSTANCE_COUNT];
+static u16 fwPoolPrefab[FW_POOL_MAX]; static V3 fwPoolPos[FW_POOL_MAX]; static Quaternion fwPoolRot[FW_POOL_MAX]; static V3 fwPoolScale[FW_POOL_MAX]; static u16 fwPoolUsed;
+static bool fwLine; // current entity line is a func_wall container
+static int fwStage; // transform block counter: 0 own, 1 func_wall container, 2 info_target, >=3 chunk children
+static bool fwCollecting,fwPendingChild;
+static u16 fwCurChild,fwLastChunkSlot,lwPrefab[FW_MAX_CHILDREN];
+static V3 lwPos[FW_MAX_CHILDREN],lwScale[FW_MAX_CHILDREN],fwInfoLocalTmp,fwContainerPos,fwContainerScale,fwInfoScaleDummy;
+static Quaternion lwRot[FW_MAX_CHILDREN],fwContainerRot,fwInfoRotDummy;
+static V3 *fwCurP; static Quaternion *fwCurR; static V3 *fwCurS;
+INLINE V3 QuatRotateVec(Quaternion q, V3 v) { // rotate v by q
+    V3 qv={q.x,q.y,q.z}, t=V3_ScaleByF(V3_Cross(qv,v),2.0f);
+    return V3_AplusB(V3_AplusB(v,V3_ScaleByF(t,q.w)),V3_Cross(qv,t));
+}
+INLINE Quaternion QuatMul(Quaternion a, Quaternion b) { // a * b
+    return (Quaternion){
+        a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
+        a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
+        a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w,
+        a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z};
+}
+static void FWBeginBlock(i32 entCount) { // select destinations for next transform block's components
+    V3 *p; Quaternion *r; V3 *s;
+    if (fwCollecting && fwLastChunkSlot < FW_MAX_CHILDREN) {
+        p=&lwPos[fwLastChunkSlot]; r=&lwRot[fwLastChunkSlot]; s=&lwScale[fwLastChunkSlot];
+    } else {
+        switch (fwStage++) {
+            case 1:  p=&fwContainerPos;   r=&fwContainerRot;   s=&fwContainerScale; break;
+            case 2:  p=&fwInfoLocalTmp;   r=&fwInfoRotDummy;   s=&fwInfoScaleDummy; break; /*info_target rot/scale unused, dumped into temps*/
+            default: p=&posFromFile[entCount]; r=&rotationFromFile[entCount]; s=&scaleFromFile[entCount]; break;
+        }
+    }
+    fwCurP=p; fwCurR=r; fwCurS=s;
+}
 void LoadLevelMod(u8 lev) {
     u8 curlevel = vclamp(lev, 0, 13); World.curLev = curlevel; World.levelCurrentlyLoading = true; World.instCount = 3;
     if (curlevel == 1) {
@@ -542,6 +581,8 @@ void LoadLevelMod(u8 lev) {
             entCount++;
             if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; }
             inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
+            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL;
+            fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f};
         }
         bool activeStateRead = false;
         while (line[0] != '\0') {
@@ -552,17 +593,17 @@ void LoadLevelMod(u8 lev) {
             *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);
             } else {
-                     if (KEY_EQ("constIndex"))           inst->index = parse_numberu16(value, lineSpace, lineNum);
-                else if (KEY_EQ("lP.x")) posFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("lP.y")) posFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("lP.z")) posFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("lR.x")) rotationFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("lR.y")) rotationFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("lR.z")) rotationFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("lR.w")) rotationFromFile[entCount].w = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("lS.x"))    scaleFromFile[entCount].x = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("lS.y"))    scaleFromFile[entCount].y = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("lS.z"))    scaleFromFile[entCount].z = parse_float(value, lineSpace, lineNum);
+                     if (KEY_EQ("constIndex"))          { inst->index = parse_numberu16(value, lineSpace, lineNum); fwLine = inst->index == 517; }
+                else if (KEY_EQ("lP.x") || KEY_EQ("localPosition.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].x=v;} else {FWBeginBlock(entCount); if(fwCurP){fwCurP->x=v;}} }
+                else if (KEY_EQ("lP.y") || KEY_EQ("localPosition.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].y=v;} else if(fwCurP){fwCurP->y=v;} }
+                else if (KEY_EQ("lP.z") || KEY_EQ("localPosition.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].z=v;} else if(fwCurP){fwCurP->z=v;} }
+                else if (KEY_EQ("lR.x") || KEY_EQ("localRotation.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].x=v;} else if(fwCurR){fwCurR->x=v;} }
+                else if (KEY_EQ("lR.y") || KEY_EQ("localRotation.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].y=v;} else if(fwCurR){fwCurR->y=v;} }
+                else if (KEY_EQ("lR.z") || KEY_EQ("localRotation.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].z=v;} else if(fwCurR){fwCurR->z=v;} }
+                else if (KEY_EQ("lR.w") || KEY_EQ("localRotation.w")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].w=v;} else if(fwCurR){fwCurR->w=v;} }
+                else if (KEY_EQ("lS.x") || KEY_EQ("localScale.x"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].x=v;} else if(fwCurS){fwCurS->x=v;} }
+                else if (KEY_EQ("lS.y") || KEY_EQ("localScale.y"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].y=v;} else if(fwCurS){fwCurS->y=v;} }
+                else if (KEY_EQ("lS.z") || KEY_EQ("localScale.z"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].z=v;} else if(fwCurS){fwCurS->z=v;} }
                 else if (KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
                 else if (KEY_EQ("amount"))          inst->amount = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("resetTime"))       inst->resetTime = parse_float(value, lineSpace, lineNum);
@@ -674,9 +715,32 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("BridgeSeparated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BridgeSeparated; }
                 else if (KEY_EQ("IsolinearChipsetInstalled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsolinearChipsetInstalled; }
                 else if (KEY_EQ("doorOpenState"))   inst->doorOpen = parse_numberu8(value, lineSpace, lineNum);
+                else if (KEY_EQ("FuncWall.currentState")) inst->funcState = (FuncStates)parse_numberu8(value, lineSpace, lineNum); // raw; out-of-range legacy values handled by FuncWallInitAfterLoad
+                else if (KEY_EQ("startState"))      {} // recorded in save only; currentState drives placement
+                else if (KEY_EQ("startPosition.x")) inst->startPosition.x = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("startPosition.y")) inst->startPosition.y = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("startPosition.z")) inst->startPosition.z = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("speed"))           inst->speed = parse_float(value, lineSpace, lineNum); // func_wall move speed
+                else if (KEY_EQ("percentAjar"))     inst->ajarPercentage = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("percentMoved"))    inst->percentMoved = parse_float(value, lineSpace, lineNum);
+                else if (KEY_EQ("chunkIDs.Length")) { fwCollecting=true; fwPendingChild=false; fwCurChild=0; fwLastChunkSlot=0; }
+                else if (keyLen > 9 && sCompUpToLen(key,"chunkIDs[",9) == 0) {
+                    u16 idx=parse_numberu16(value,lineSpace,lineNum);
+                    if(fwCurChild<FW_MAX_CHILDREN){lwPrefab[fwCurChild]=idx; fwLastChunkSlot=fwCurChild; fwPendingChild=true; fwCurChild++;}
+                }
             }
         }
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true); // Default active if not specified
+        if (!isLight && entsFromFile[entCount].index == 517) { // func_wall: stash base transform + chunk children for spawn below
+            fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp;
+            u16 n = fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN;
+            u16 start = fwPoolUsed;
+            for (u16 k=0;k<n;++k) {
+                if (fwPoolUsed >= FW_POOL_MAX) { DualLogError("FuncWall chunk pool exhausted on line %u!\n",lineNum); break; }
+                fwPoolPrefab[fwPoolUsed]=lwPrefab[k]; fwPoolPos[fwPoolUsed]=lwPos[k]; fwPoolRot[fwPoolUsed]=lwRot[k]; fwPoolScale[fwPoolUsed]=lwScale[k]; fwPoolUsed++;
+            }
+            fwSlotStart[entCount]=start; fwSlotCount[entCount]=(u16)(fwPoolUsed-start);
+        }
     }
     i32 totalEnts = entCount + 1;
     for (i32 e=0;e<totalEnts;++e) {
@@ -727,7 +791,31 @@ void LoadLevelMod(u8 lev) {
         par->relayEnabled         = src->relayEnabled;
         par->relayOnceEver        = src->relayOnceEver;
         par->relayAlreadyDone     = src->relayAlreadyDone;
+        par->startPosition        = src->startPosition;
+        par->targetPosition       = src->targetPosition;
+        par->funcState            = src->funcState;
+        par->speed                = src->speed;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARGET_STRING_LENGTH);
+        if (entIdx == 517) { // func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative
+            V3 sp = par->startPosition;
+            if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3_AplusB(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } // fallback for entries lacking startPosition
+            World.position[parent]  = sp;
+            par->lastPosition       = sp;
+            World.rotation[parent]  = quat_multiply(fwBaseRot[e],rotationFromFile[e]);
+            World.scale[parent]     = (V3){fwBaseScale[e].x*scaleFromFile[e].x,fwBaseScale[e].y*scaleFromFile[e].y,fwBaseScale[e].z*scaleFromFile[e].z};
+            par->targetPosition     = V3_AplusB(sp,fwInfoLocal[e]); // info_target offset denotes full travel
+            if (par->speed <= 0.0f) par->speed = 0.64f;
+            for (u16 k=0;k<fwSlotCount[e];++k) {
+                u16 pi = fwPoolPrefab[fwSlotStart[e]+k];
+                if (pi >= 307) continue; // chunk family guard
+                u16 c = AddInstance(pi,V3_AplusB(sp,QuatRotateVec(fwBaseRot[e],fwPoolPos[fwSlotStart[e]+k])));
+                if (c == 0) continue;
+                World.rotation[c] = QuatMul(fwBaseRot[e], fwPoolRot[fwSlotStart[e]+k]);
+                V3 cs = fwPoolScale[fwSlotStart[e]+k];
+                World.scale[c] = (V3){World.scale[parent].x*cs.x,World.scale[parent].y*cs.y,World.scale[parent].z*cs.z};
+                fwParentOf[c] = parent;
+            }
+        }
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
         if (entIdx >= 595 && entIdx <= 601) {
             if (colSzFromFile[e].x >= 0.0f || colSzFromFile[e].y >= 0.0f || colSzFromFile[e].z >= 0.0f) {
@@ -888,6 +976,7 @@ void LoadAllLevels() {
     lightsFromFile = (Light*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(Light));
     lanimsFromFile = (LightAnimation*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(LightAnimation));
     for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;}
+    mset(fwParentOf,0,sizeof(fwParentOf)); fwPoolUsed = 0;
     for (u8 lev = 0; lev < World.numLevels; ++lev) LoadLevelData(lev);
     OS_Free(entsFromFile, (size_t)INSTANCE_COUNT * sizeof(Entity));
     OS_Free(colCtrFromFile, (size_t)INSTANCE_COUNT * sizeof(V3)); OS_Free(colSzFromFile, (size_t)INSTANCE_COUNT * sizeof(V3)); colCtrFromFile = NULL; colSzFromFile = NULL;

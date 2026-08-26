@@ -350,6 +350,7 @@ extern u32 shadowmapIndirectionList[LIGHT_COUNT];
 extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
 extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile;
+extern u16 fwParentOf[INSTANCE_COUNT]; // instance -> owning func_wall mover_target, 0 == none
 extern const char* audioLogs[LOGCNT];
 extern u32 gridCellStates[ARRSIZE];
 extern float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
