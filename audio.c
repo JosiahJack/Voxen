@@ -711,8 +711,11 @@ INLINE float *load_audio(const char *path, u32 *out_frames, size_t* sz) { if (sE
 i32 GetFreeWavSlot() { i32 retval = -1; u32 n = __c11_atomic_load(&wav_count,2/*acquire*/); for (u32 i = 0; i < n; i++) { if (!__c11_atomic_load(&wav_ch[i].playing,2/*acquire*/)) {if (wav_ch[i].samples) {OS_Free(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples = NULL; wav_ch[i].allocSize = 0;} retval=i; break;} } return retval; }
 #include "synth.c" // Audio Synthesis Engine
 static void wave_mix(wav_channel_t* w, float* mix) {
-    float vol = w->volume * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); V3 pos = w->pos; float dist = V3_Dist(pos,World.position[PLAYER1]); float spatial_atten = (dist >= 64.0f) ? 0.0f : ((dist <= 1.0f) ? 1.0f : 1.0f-(dist-1.0f)/63.0f);
-    if (w->positional) vol *= spatial_atten;
+    float vol = w->volume * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); V3 pos = w->pos; float dist = V3_Dist(pos,World.position[PLAYER1]); float spatial_atten = vclamp(1.0f - dist / 20.0f, 0.0f, 1.0f);
+    if (w->positional) {
+        if (!PositionVisibleFromPlayerCell(pos.x, pos.z)) vol = 0.0f; // Skip audio if source cell not in player PVS
+        else vol *= spatial_atten;
+    }
     for (i32 f = 0; f < AUDIO_FRAMES; f++) { if (w->frame_pos >= w->frame_count){ if (w->looping){w->frame_pos=0;}else{__c11_atomic_store(&w->playing,false,3/*release*/); break;} } mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol; w->frame_pos++; }
 }
 
