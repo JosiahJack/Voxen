@@ -89,7 +89,7 @@ void DrawMeshCollider(u16 i) {
     float M[16]; mcpy(M, &modelMatrices[i*16], 64); float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
     const float* pos = physPos[mi]; const u16* tris = modelTriangles[mi];
     for (u32 j=0; j<triCount; j++) {
-        V3 w[3]; for (int k=0;k<3;++k) { u32 vi=tris[j*3 + k]; float x=pos[vi*3 + 0]; float y=pos[vi*3 + 1]; float z=pos[vi*3 + 2]; w[k]=(V3){m00*x + m01*y + m02*z + tx, m10*x + m11*y + m12*z + ty, m20*x + m21*y + m22*z + tz}; }
+        V3 w[3]; u32 b=j*3; for (int k=0;k<3;++k) { u32 vi=tris[b + k]; float x=pos[vi*3 + 0]; float y=pos[vi*3 + 1]; float z=pos[vi*3 + 2]; w[k]=(V3){m00*x + m01*y + m02*z + tx, m10*x + m11*y + m12*z + ty, m20*x + m21*y + m22*z + tz}; }
         AddWireLine(w[0],w[1],col); AddWireLine(w[1],w[2],col); AddWireLine(w[2],w[0],col);
     }
     DrawVelocityVector(i);
@@ -161,6 +161,7 @@ typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdF
 int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
 void cmd_noclip() { Cheats.noclip = !Cheats.noclip; if (Cheats.noclip) { World.velocity[PLAYER1] = (V3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
 void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; if (Cheats.showPhys) { debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); DebugRAM("showPhys ON"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/ } else { OS_Free(debugLineVerts, (size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); debugLineVerts = NULL; DebugRAM("showPhys OFF"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/ } }
+void cmd_shownpc() { Cheats.showNPC = !Cheats.showNPC; if (Cheats.showPhys || Cheats.showNPC) { if (!debugLineVerts) { debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); DebugRAM("showNPC ON"); } } else { if (debugLineVerts) { OS_Free(debugLineVerts, (size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); debugLineVerts = NULL; DebugRAM("showNPC OFF"); } } CenterStatusPrint("shownpc: %s", Cheats.showNPC ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 void EnableCheatArsenal(u8 level) {
     switch(level) {
         case 1: // pipe, dartgun, pistol, sparqbeam, stungun, ammo tranq, ammo tranq, ammo needle, ammo needle, ammo needle, ammo standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader
@@ -212,10 +213,10 @@ static void cmd_animtest() { Cheats.animTest++; if (Cheats.animTest > 2) {Cheats
 static void cmd_nohud() { Cheats.noHUD = !Cheats.noHUD; if (Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
 static void cmd_iamshodan() { Cheats.superoverride = !Cheats.superoverride; if (Cheats.superoverride) {CenterStatusPrint("%s",Sys_Text.stringTable[1010]);/*"Full security override enabled!"*/ } else {CenterStatusPrint("%s",Sys_Text.stringTable[1009]);/*"SHODAN has regained control of security from you"*/} }
 static void cmd_staminup() { Cheats.fatigueCheat = !Cheats.fatigueCheat; if (Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); World.invP1.fatigue=0.0f; } else {CenterStatusPrint("%s",Sys_Text.stringTable[1012]); } }
-static void cmd_qb_set(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_set <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitSet((u8)qb); CenterStatusPrint("Quest bit %d SET -> %u",qb,(unsigned)QuestBitIsSet((u8)qb)); }
-static void cmd_qb_clear(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_clear <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitClear((u8)qb); CenterStatusPrint("Quest bit %d CLEARED -> %u",qb,(unsigned)QuestBitIsSet((u8)qb)); }
-static void cmd_qb_toggle(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_toggle <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitToggle((u8)qb); CenterStatusPrint("Quest bit %d TOGGLED -> %u",qb,(unsigned)QuestBitIsSet((u8)qb)); }
-static void cmd_qb_list() { CenterStatusPrint("missionBits: 0x%08X",(unsigned)World.missionBits); for(int i=0;i<QB_COUNT;++i){CenterStatusPrint("  [%2d] %s = %u  note:%s  chk:%s",i,QuestBitIsSet((u8)i)?"ON ":"OFF",(unsigned)QuestBitIsSet((u8)i),World.questNotesActive[i]?"yes":"no ",World.questNotesChecked[i]?"yes":"no");} }
+static void cmd_qb_set(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_set <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitSet((u8)qb); CenterStatusPrint("Quest bit %d SET -> %u",qb,QuestBitIsSet((u8)qb)); }
+static void cmd_qb_clear(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_clear <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitClear((u8)qb); CenterStatusPrint("Quest bit %d CLEARED -> %u",qb,QuestBitIsSet((u8)qb)); }
+static void cmd_qb_toggle(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_toggle <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitToggle((u8)qb); CenterStatusPrint("Quest bit %d TOGGLED -> %u",qb,QuestBitIsSet((u8)qb)); }
+static void cmd_qb_list() { CenterStatusPrint("missionBits: 0x%08X",(unsigned)World.missionBits); for(int i=0;i<QB_COUNT;++i){bool q=QuestBitIsSet((u8)i); CenterStatusPrint("  [%2d] %s = %u  note:%s  chk:%s",i,q?"ON ":"OFF",q,World.questNotesActive[i]?"yes":"no ",World.questNotesChecked[i]?"yes":"no");} }
 static void cmd_mrbean()  { CenterStatusPrint("Nice try, there are no go carts to slow down here"); } static void cmd_simonfoster()   { CenterStatusPrint("Nice try, nothing to paint here"); } static void cmd_richardbranson() { CenterStatusPrint("Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"); } static void cmd_johnwardley()       { CenterStatusPrint("WOW!"); }
 static void cmd_johnmace(){ CenterStatusPrint("Nice try, there's nothing to pay double for here"); }  static void cmd_melaniewarn()   { CenterStatusPrint("I feel happy!!!"); }                 static void cmd_damonhill()      { CenterStatusPrint("Nice try, there are no go carts to speed up here"); }                                       static void cmd_michaelschumacher() { CenterStatusPrint("Nice try, there are no go carts to give ludicrous speed here"); }
 static void cmd_tonyday() { CenterStatusPrint("Ok, now I want a hamburger"); }                        static void cmd_katiebrayshaw() { CenterStatusPrint("Hi there! Hello! Hey! Howdy!"); }
@@ -249,7 +250,8 @@ static const ConsoleCommand consoleCmds[] = {
     {"die",            {.noArg=cmd_kill},          NOARG},{"justinbailey",    {.noArg = cmd_justinbailey}, NOARG},{"woodstock",   {.noArg=cmd_woodstock}, NOARG},{"quarry",        {.noArg=cmd_quarry},      NOARG},{"zelda",          {.noArg = cmd_zelda},    NOARG},{"allyourbasearebelongtous",{.noArg=cmd_allyourbase},NOARG},
     {"all your base",  {.noArg=cmd_allyourbase},   NOARG},{"i am iron man",   {.noArg = cmd_iamironman},   NOARG},{"i am amazing",{.noArg=cmd_iamironman},NOARG},{"i am cool",     {.noArg=cmd_iamironman},  NOARG},{"i am best",      {.noArg =cmd_iamironman},NOARG},{"idkfa",                   {.noArg=cmd_idkfa},      NOARG},
     {"impulse 9",      {.noArg=cmd_idkfa},         NOARG},{"undo",            {.noArg = cmd_undo},         NOARG},{"shake",       {.noArg=cmd_shake},     NOARG},{"tired",         {.noArg=cmd_staminup},    NOARG},{"staminup",       {.noArg = cmd_staminup}, NOARG},{"grok",                    {.noArg=cmd_ai},         NOARG},
-    {"chatgpt",        {.noArg=cmd_ai},            NOARG},{"claude",          {.noArg = cmd_ai},           NOARG},{"gemini",      {.noArg=cmd_ai},        NOARG},{"shodan",        {.noArg=cmd_aireal},      NOARG},{"animtest",       {.noArg = cmd_animtest}, NOARG},{"qb_set",            {.withStr=cmd_qb_set},   CMD_STR},{"qb_clear",           {.withStr=cmd_qb_clear},  CMD_STR},{"qb_toggle",         {.withStr=cmd_qb_toggle}, CMD_STR},{"qb_list",            {.noArg=cmd_qb_list},    NOARG},{NULL,{.raw = NULL},NOARG}/*sizeof helper*/ };
+    {"chatgpt",        {.noArg=cmd_ai},            NOARG},{"claude",          {.noArg = cmd_ai},           NOARG},{"gemini",      {.noArg=cmd_ai},        NOARG},{"shodan",        {.noArg=cmd_aireal},      NOARG},{"animtest",       {.noArg = cmd_animtest}, NOARG},{"qb_set",                  {.withStr=cmd_qb_set},   CMD_STR},
+    {"qb_clear",       {.withStr=cmd_qb_clear},  CMD_STR},{"qb_toggle",       {.withStr=cmd_qb_toggle},  CMD_STR},{"qb_list",     {.noArg=cmd_qb_list},   NOARG},{"shownpc",       {.noArg=cmd_shownpc},     NOARG},{NULL,{.raw = NULL},NOARG}/*sizeof helper*/ };
 void ToggleConsole();
 void ProcessConsoleCommand(const char* c) {
     if (c == NULL || slen(c) == 0) { ToggleConsole(); return; }
@@ -288,12 +290,101 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC) {
     return (RaycastHit){.point=V3_AplusB(origin,V3_ScaleByF(dir,d)), .normal=V3_Normalize(n), .distance=d, .hitInstanceIndex=INSTANCE_COUNT, .hit=vabs(det) >= 0.00000001f && d >= 0 && u >= 0 && v >= 0 && w >= 0};
 }
 
+INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
+    RaycastHit h = {.hit=false,.distance=maxDist,.point={0,0,0},.normal={0,0,0},.hitInstanceIndex=INSTANCE_COUNT};
+    float r = sph.rad;
+    if (r < 0.0001f) return h;
+    V3 oc = V3_AsubB(origin, sph.ctr);
+    float b = V3_dot(oc, dir);
+    float c = V3_dot(oc, oc) - r * r;
+    float disc = b * b - c;
+    if (disc < 0.0f) return h;
+    float s = vsqrtf(disc);
+    float t = -b - s;
+    if (t < 0.0f) t = -b + s;
+    if (t < 0.0f || t > maxDist) return h;
+    V3 p = V3_AplusB(origin, V3_ScaleByF(dir, t));
+    V3 n = V3_Normalize(V3_ScaleByF(V3_AsubB(p, sph.ctr), 1.0f / r));
+    h.hit = true;
+    h.distance = t;
+    h.point = p;
+    h.normal = n;
+    return h;
+}
+INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist) {
+    RaycastHit h={.hit=false,.distance=maxDist,.point={0,0,0},.normal={0,0,0},.hitInstanceIndex=INSTANCE_COUNT};
+    float r = cap.rad; if (r < 0.0001f) return h;
+    V3 ba = V3_AsubB(cap.tip,cap.base), oa = V3_AsubB(origin,cap.base), nBest = {0,0,0};
+    float baba = V3_dot(ba,ba);
+    if (baba < 0.00001f) return RaySphere(origin, dir, (ShapeSphere){cap.base, r}, maxDist);
+    float bard = V3_dot(ba,dir), baoa = V3_dot(ba,oa), tBest=-1.0f;
+    float a = baba - bard * bard, b = baba * V3_dot(dir,oa) - baoa * bard, c = baba * V3_dot(oa,oa) - baoa * baoa - r * r * baba;
+    float disc = b * b - a * c;
+    if (vabs(a) >= 0.00001f && disc >= 0.0f) {
+        float sh = vsqrtf(disc); float t0 = (-b - sh) / a; float y0 = baoa + t0 * bard;
+        if (t0 >= 0.0f && t0 <= maxDist && y0 > 0.0f && y0 < baba) { tBest = t0; V3 p = V3_AplusB(origin,V3_ScaleByF(dir,t0)); V3 q = V3_AplusB(cap.base,V3_ScaleByF(ba,y0/baba)); nBest = V3_Normalize(V3_AsubB(p, q)); }
+        else {
+            float t1 = (-b + sh) / a; float y1 = baoa + t1 * bard;
+            if(t1 >= 0.0f && t1 <= maxDist && y1 > 0.0f && y1 < baba && tBest < 0.0f){tBest=t1; V3 p=V3_AplusB(origin,V3_ScaleByF(dir,t1)); V3 q=V3_AplusB(cap.base,V3_ScaleByF(ba,y1/baba)); nBest=V3_Normalize(V3_AsubB(p,q));}
+        }
+    }
+    for (int k = 0; k < 2; k++) {
+        V3 ctr = k == 0 ? cap.base : cap.tip;
+        V3 oc = V3_AsubB(origin, ctr);
+        float bs = V3_dot(oc, dir);
+        float cs = V3_dot(oc, oc) - r * r;
+        float ds = bs * bs - cs;
+        if (ds < 0.0f) continue;
+        float shs = vsqrtf(ds);
+        float ts = -bs - shs;
+        if (ts < 0.0f) ts = -bs + shs;
+        if (ts < 0.0f || ts > maxDist) continue;
+        if (tBest >= 0.0f && ts >= tBest) continue;
+        V3 ps = V3_AplusB(origin, V3_ScaleByF(dir, ts));
+        float y = V3_dot(V3_AsubB(ps, cap.base), ba);
+        if ((k == 0 && y > 0.0f) || (k == 1 && y < baba)) continue;
+        tBest = ts;
+        nBest = V3_Normalize(V3_ScaleByF(V3_AsubB(ps, ctr), 1.0f / r));
+    }
+    if (tBest >= 0.0f) { h.hit = true; h.distance = tBest; h.point = V3_AplusB(origin, V3_ScaleByF(dir, tBest)); h.normal = nBest; }
+    return h;
+}
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist);
 RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
     RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
+    dir = V3_Normalize(dir);
+    for (u16 i = 0; i < World.instCount; ++i) {
         if (!(layerMask & World.layer[i])){continue;} if (!(World.instances[i].entflags & EF_ACTIVE)){continue;}
-        u16 mindex = World.instances[i].modelIndex; if (mindex >= mdlsCnt) continue;
+        u16 mindex = World.instances[i].modelIndex;
+        if (mindex >= MAX_MDLS) {
+            ColliderType ct = World.col[i];
+            if (ct != COLTYPE_CAP && ct != COLTYPE_SPH) continue;
+            V3 objPos = World.position[i];
+            float scaleMax = vmax(World.scale[i].x, vmax(World.scale[i].y, World.scale[i].z));
+            float boundRad = 0.0f;
+            if (ct == COLTYPE_CAP) {
+                float rad = World.colliderSize[i].x * scaleMax;
+                float hi = vmax(0.0f, World.colliderSize[i].y * 0.5f * scaleMax - rad);
+                boundRad = hi + rad;
+            } else {
+                boundRad = World.colliderSize[i].x * scaleMax;
+            }
+            boundRad = vmax(boundRad, 0.1f);
+            u16 instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
+            if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
+            V3 delta = V3_AsubB(objPos, origin);
+            float distSqrd = V3_dot(delta, delta);
+            float maxDistToObj = vmax(maxDist - boundRad, maxDist);
+            if (distSqrd >= maxDistToObj * maxDistToObj) continue;
+            RaycastHit ch = {0};
+            if (ct == COLTYPE_CAP) ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance);
+            else ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance);
+            if (!ch.hit || ch.distance >= result.distance) continue;
+            ch.hitInstanceIndex = i;
+            result = ch;
+            continue;
+        }
+        if (mindex >= mdlsCnt) continue;
         V3 objPos = World.position[i]; u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); V3 delta = V3_AsubB(objPos,origin); float distSqrd = V3_dot(delta,delta), radBounds = vmax(modelBounds[mindex],1.81f);
         float maxDistToObj = vmax(maxDist - radBounds,maxDist); if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
         if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
@@ -308,41 +399,29 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
         const float* posPtr = physPos[mindex]; const u16* tris = physTris[mindex];
         if (BvhHasBVH(mindex)) {
             const BvhNode* nodes = modelBVHNodes[mindex]; const u16* triOrder = modelBVHTriOrder[mindex];
-            float minScale = vmin(sclx, vmin(scly, sclz)); if (minScale < 0.0001f) minScale = 0.0001f;
-            float localMax = maxDist / minScale;  // conservative local-space upper bound for the ray
-            float bestT = localMax; const BvhNode* stack[64]; int sp = 0; stack[sp++] = &nodes[0];
+            float minScale = vmin(sclx, vmin(scly,sclz)); if(minScale < 0.0001f){minScale=0.0001f;} float localMax=maxDist/minScale; float bestT=localMax; const BvhNode* stack[64]; int sp = 0; stack[sp++] = &nodes[0];
             while (sp > 0) {
                 const BvhNode* node = stack[--sp];
                 float tEntry = BvhRayAABBHit(localOrigin, localDir, node->mn, node->mx, bestT);
-                if (tEntry < 0.0f) continue;  // ray misses node AABB or enters beyond bestT
+                if (tEntry < 0.0f) continue;
                 if (node->triCount > 0) {
-                    for (u32 k = 0; k < node->triCount; k++) {
-                        u32 j = triOrder[node->triStart + k];
-                        u32 iA = tris[j*3 + 0];
-                        u32 iB = tris[j*3 + 1];
-                        u32 iC = tris[j*3 + 2];
-                        V3 posA = { posPtr[iA*3], posPtr[iA*3+1], posPtr[iA*3+2] };
-                        V3 posB = { posPtr[iB*3], posPtr[iB*3+1], posPtr[iB*3+2] };
-                        V3 posC = { posPtr[iC*3], posPtr[iC*3+1], posPtr[iC*3+2] };
+                    for (u32 k=0;k<node->triCount;k++) {
+                        u32 base = triOrder[node->triStart + k] * 3;
+                        u32 iA=tris[base + 0], iB=tris[base + 1], iC=tris[base + 2];
+                        V3 posA = {posPtr[iA*3],posPtr[iA*3+1],posPtr[iA*3+2]}, posB={posPtr[iB*3],posPtr[iB*3+1],posPtr[iB*3+2]}, posC={posPtr[iC*3],posPtr[iC*3+1],posPtr[iC*3+2]};
                         RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC); if (!tryTri.hit) continue;
                         V3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz };
                         float worldDist = V3_Dist(worldPoint,origin); if (worldDist >= result.distance) continue;
-                        V3 worldNormal = { (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z, (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z, (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z };
-                        worldNormal = V3_Normalize(worldNormal);
-                        result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i;
-                        bestT = tryTri.distance;  // tighten BVH pruning for remaining nodes
+                        V3 worldNormal={(m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z,(m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z,(m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z };
+                        worldNormal = V3_Normalize(worldNormal); result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i; bestT = tryTri.distance;
                     }
-                } else { for (int o = 0; o < 8 && sp < 64; o++) { if (node->children[o] >= 0) {stack[sp++] = &nodes[node->children[o]];} } }
+                } else {  for(int o=0;o<8&&sp<64;++o) { if(node->children[o] >= 0){stack[sp++]=&nodes[node->children[o]];} }  }
             }
-            continue;  // next entity
+            continue;
         }
-        for (u32 j=0;j<triCount;++j) { // Linear fallback (no BVH)
-            u32 iA = tris[j*3 + 0];
-            u32 iB = tris[j*3 + 1];
-            u32 iC = tris[j*3 + 2];
-            V3 posA = { posPtr[iA*3], posPtr[iA*3+1], posPtr[iA*3+2] };
-            V3 posB = { posPtr[iB*3], posPtr[iB*3+1], posPtr[iB*3+2] };
-            V3 posC = { posPtr[iC*3], posPtr[iC*3+1], posPtr[iC*3+2] };
+        DualLogError("Missing bvh for %u!!\n",mindex);
+        for (u32 j=0;j<triCount;++j) {
+            u32 iA = tris[j*3 + 0], iB = tris[j*3 + 1], iC = tris[j*3 + 2]; V3 posA = { posPtr[iA*3], posPtr[iA*3+1], posPtr[iA*3+2] }, posB = { posPtr[iB*3], posPtr[iB*3+1], posPtr[iB*3+2] }, posC = { posPtr[iC*3], posPtr[iC*3+1], posPtr[iC*3+2] };
             RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC); if (!tryTri.hit) continue;
             V3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz };
             float worldDist = V3_Dist(worldPoint,origin); if (worldDist >= result.distance) continue;
@@ -1024,6 +1103,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.scale[PLAYER1] = (V3){1.0f,1.0f,1.0f};
     World.rotation[PLAYER1] = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     World.instances[PLAYER1].entflags = EF_ACTIVE|EF_RIGIDBODY;
+    World.instances[PLAYER1].modelIndex = MAX_MDLS;
     World.col[PLAYER1] = COLTYPE_CAP; World.colliderCenter[PLAYER1].y = -PLAYER_CAM_OFFSET_Y; World.colliderSize[PLAYER1] = (V3){PLAYER_RADIUS,PLAYER_HEIGHT,COLCAP_DIR_Y_F}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     World.mass[PLAYER1] = 1.0f; World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
     World.cam_yaw = 90.0f; World.cam_pitch = World.cam_roll = World.invP1.leanTarget = World.invP1.leanShift = 0.0f; World.gravity[PLAYER1] = 1.0f; World.dynamicFriction[PLAYER1] = 0.6f; World.staticFriction[PLAYER1] = 0.8f; 
