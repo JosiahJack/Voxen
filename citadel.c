@@ -1032,34 +1032,90 @@ void SearchObject(int searchable) {
     if (World.instances[searchable].searchableInUse) { for (int i=0;i<4;i++) { if (World.instances[searchable].contents[i] >= 0) break; } } else play_wav(sounds[91],0.75f,(V3){0.0f,0.0f,0.0f},false);
 }
 
+static int UseNameTableIndex(int index) {
+    switch (index) {
+        case 0:return 925; case 1:return 926; case 2:return 54; case 3:return 54; case 4: return 54; case 5: return 54; case 6: return 54; case 7: return 54; case 8: return 54; case 9: return 54; case 10: return 54; case 11: return 55; case 12: return 57;
+        case 13: return 58; case 14: return 59; case 15: return 928; case 16: return 61; case 17: return 929; case 18: return 62; case 19: return 63; case 20: return 927; case 23: return 82; case 24: return 930; case 25: return 84; case 26: return 931;
+        case 27: return 85; case 28: return 932; case 29: return 86; case 30: return 85; case 31: return 85; case 32: return 85; case 33: return 932; case 34: return 88; case 35: return 933; case 36: return 90; case 37: return 934; case 38: return 91;
+        case 39: return 92; case 40: return 935; case 41: return 94; case 42: return 94; case 43: return 94; case 44: return 94; case 45: return 936; case 46: return 95; case 47: return 937; case 48: return 97; case 49: return 938; case 50: return 98;
+        case 51: return 99; case 52: return 99; case 53: return 939; case 54: return 100; case 55: return 940; case 56: return 102; case 57: return 941; case 58: return 103; case 59: return 103; case 60: return 942; case 61: return 104; case 62: return 105;
+        case 63: return 105; case 64: return 943; case 65: return 944; case 66: return 943; case 67: return 103; case 68: return 942; case 69: return 103; case 70: return 108; case 71: return 593; case 72: return 110; case 73: return 110; case 74: return 945;
+        case 75: return 108; case 76: return 112; case 77: return 113; case 78: return 946; case 79: return 947; case 80: return 114; case 81: return 114; case 82: return 115; case 83: return 115; case 84: return 948; case 85: return 115; case 86: return 115;
+        case 87: return 115; case 88: return 82; case 89: return 949; case 90: return 114; case 91: return 114; case 92: return 114; case 93: return 117; case 94: return 118; case 95: return 118; case 96: return 118; case 97: return 119; case 98: return 120;
+        case 99: return 120; case 100: return 120; case 101: return 950; case 102: return 951; case 103: return 950; case 104: return 952; case 105: return 953; case 106: return 952; case 107: return 953; case 108: return 951; case 109: return 120;
+        case 110: return 120; case 111: return 120; case 112: return 954; case 113: return 955; case 114: return 956; case 115: return 957; case 116: return 958; case 117: return 959; case 118: return 130; case 119: return 960; case 120: return 130;
+        case 121: return 131; case 122: return 130; case 124: return 126; case 125: return 961; case 126: return 132; case 127: return 86; case 128: return 962; case 129: return 963; case 130: return 116; case 131: return 964; case 132: return 134;
+        case 133: return 964; case 134: return 134; case 135: return 965; case 136: return 931; case 137: return 964; case 138: return 134; case 139: return 967; case 140: return 966; case 141: return 135; case 142: return 135; case 143: return 135;
+        case 144: return 136; case 145: return 136; case 146: return 136; case 147: return 136; case 148: return 968; case 149: return 969; case 150: return 969; case 151: return 969; case 152: return 969; case 153: return 969; case 154: return 970;
+        case 155: return 138; case 156: return 971; case 157: return 972; case 158: return 973; case 159: return 969; case 160: return 140; case 161: return 140; case 162: return 141; case 163: return 141; case 164: return 141; case 165: return 141;
+        case 166: return 141; case 167: return 974; case 168: return 974; case 169: return 140; case 170: return 975; case 171: return 976; case 172: return 976; case 173: return 976; case 174: return 976; case 175: return 976; case 176: return 976;
+        case 177: return 976; case 178: return 144; case 179: return 144; case 180: return 977; case 181: return 144; case 182: return 142; case 183: return 977; case 184: return 142; case 185: return 978; case 186: return 979; case 187: return 980;
+        case 188: return 956; case 189: return 146; case 190: return 142; case 191: return 142; case 192: return 142; case 193: return 142; case 194: return 981; case 195: return 982; case 196: return 147; case 197: return 148; case 198: return 148;
+        case 199: return 106; case 200: return 106; case 201: return 149; case 202: return 594; case 203: return 151; case 204: return 152; case 205: return 153; case 206: return 154; case 207: return 595; case 208: return 631; case 209: return 157;
+        case 210: return 157; case 211: return 157; case 212: return 157; case 213: return 157; case 214: return 157; case 215: return 157; case 216: return 157; case 217: return 157; case 218: return 157; case 219: return 157; case 220: return 158;
+        case 221: return 983; case 222: return 159; case 223: return 160; case 224: return 984; case 225: return 106; case 226: return 106; case 227: return 985; case 228: return 111; case 229: return 106; case 230: return 106; case 231: return 165;
+        case 232: return 164; case 233: return 164; case 234: return 594; case 235: return 166; case 236: return 166; case 237: return 166; case 238: return 986; case 239: return 132; case 240: return 987; case 241: return 167; case 242: return 167;
+        case 243: return 167; case 244: return 167; case 245: return 167; case 246: return 167; case 247: return 167; case 248: return 167; case 249: return 167; case 250: return 988; case 251: return 169; case 252: return 169; case 253: return 167;
+        case 254: return 167; case 255: return 167; case 256: return 82; case 257: return 930; case 258: return 170; case 259: return 989; case 260: return 990; case 261: return 991; case 262: return 992; case 263: return 992; case 264: return 992;
+        case 265: return 993; case 266: return 82; case 267: return 930; case 268: return 167; case 269: return 167; case 270: return 173; case 271: return 994; case 272: return 176; case 273: return 995; case 274: return 176; case 275: return 174;
+        case 276: return 996; case 277: return 178; case 278: return 177; case 279: return 47; case 280: return 180; case 281: return 180; case 282: return 180; case 283: return 180; case 284: return 180; case 285: return 180; case 286: return 180;
+        case 287: return 180; case 288: return 181; case 289: return 181; case 290: return 107; case 291: return 107; case 292: return 182; case 293: return 997; case 294: return 182; case 295: return 182; case 296: return 182; case 297: return 183;
+        case 298: return 183; case 299: return 183; case 300: return 183; case 301: return 183; case 302: return 126; case 303: return 126; case 304: return 961; case 477: return 1027; case 478: return 1029; case 479: return 1028; case 656: return 1030;
+        case 519: return 1044; case 520: return 1044; case 521: return 1044; case 522: return 1044; case 523: return 1044; case 657: return 1030; case 658: return 1030; case 659: return 1030; case 660: return 1030; case 661: return 1030; case 662: return 1030;
+        case 663: return 1030; case 664: return 1030; case 665: return 1030; case 666: return 1030; case 667: return 1034; case 668: return 1035; case 669: return 1036; case 670: return 1037; case 671: return 1038; case 672: return 1039; case 673: return 1040;
+        case 674: return 1041; case 675: return 1042; case 676: return 1043; case 677: return 1033; case 678: return 1033; case 679: return 1033; case 680: return 1032; case 681: return 1032; case 682: return 1031; case 683: return 1031; case 684: return 1031;
+        case 685: return 1031; case 686: return 1031; case 687: return 1030; default: return -1; // No name available; caller will print just the prefix
+    }
+}
+
 void UseEntity(u16 i) {
     Entity* ent = &World.instances[i];
-    if (IdxIsSearchable(ent->index)) { World.invP1.currentSearchItem = i; SearchObject(i); DualLog("Search\n"); }
+    if (IdxIsSearchable(ent->index)) { World.invP1.currentSearchItem = i; SearchObject(i); CenterStatusPrint("Search\n"); }
     else if (IdxIsDoor(ent->index)) DoorUse(i,PLAYER1);
-    else if (IdxIsNPC(ent->index)) DualLog("Can't use NPC\n");
+    else if (IdxIsNPC(ent->index)) CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[World.instances[i].index - 419].name);
     else if (IdxIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
-    else if (IdxIsGeometry(ent->index)) DualLog("Can't use modular geometry\n");
+    else if (IdxIsGeometry(ent->index)) { int t = UseNameTableIndex(ent->index); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t >= 0 ? Sys_Text.stringTable[t] : ""); }
     else if (IdxIsUsableObject(ent->index)) {
         World.invP1.holdingObject = true; World.invP1.heldObjectIndex = ent->index; World.invP1.heldObjectCustIdx = ent->usableCustIdx; World.invP1.heldObjectAmmo = ent->ammo; World.invP1.heldObjectAmmo2 = ent->ammo2; World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
         if (Sys_Settings.QuickItemPickup) { AddItemToInventory(ent->index,ent->usableCustIdx); ResetHeldItem(); }
         else { CenterStatusPrint("%s%s",Sys_Text.stringTable[World.invP1.heldObjectIndex - 307 + 326],Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); } // Inventory mode is turned on when picking something up
         DeleteInstance(i);
-    } else CenterStatusPrint("%s%s",Sys_Text.stringTable[29],"name");
+    } else { int t = UseNameTableIndex(ent->index); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t >= 0 ? Sys_Text.stringTable[t] : ""); }
 }
 
 #define FROB_DISTANCE 4.9f
 static void Frob(V3 pos, V3 forward, V3 right) {
-    if (World.uiIsBlocking) {return;}
-    if (World.curLev == LEVEL_CYBERSPACE) {return;}
-    if (World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive = 0; return; }
-    if (World.invP1.holdingObject) { DropHeldItem(); return; }
+    if (World.uiIsBlocking || World.curLev == LEVEL_CYBERSPACE){return;}    if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0; return;}    if(World.invP1.holdingObject){DropHeldItem(); return;}
     V3 dir = ScreenPointToRay(forward, right); RaycastHit h = Raycast(pos,dir,FROB_DISTANCE,LMASK_PLAYER_FROB);
     if (Cheats.showPhys) { World.debugLine_start = pos; World.debugLineFinished = World.pauseRelativeTime + 3.0; World.debugLine_end = h.hit ? h.point : (V3){dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z}; }
-    if (!h.hit) { CenterStatusPrint("%s", Sys_Text.stringTable[30]); return; }
-    UseEntity(h.hitInstanceIndex);
+    if (!h.hit) { CenterStatusPrint("%s", Sys_Text.stringTable[30]); } else { UseEntity(h.hitInstanceIndex); }
 }
 // Update
-void WeaponsUpdate(); void TextureSequenceUpdate(u16 self);
+void WeaponsUpdate(); void TextureSequenceUpdate(u16 self); void AIAnimationControllerUpdate(u16 selfIdx); void AIControllerUpdate(u16 selfIdx); void DrawSphereWireframe(Color col, ShapeSphere s);
+void DrawAIDebug(u16 i) {
+    if (!IdxIsNPC(World.instances[i].index)) return;
+    if (!Cheats.showNPC) return;
+    World.layer[i] = L_NPC; World.layer[PLAYER1] = L_Player;
+    Quaternion r = World.rotation[i]; float x=r.x,y=r.y,z=r.z,w=r.w;
+    V3 fwd = V3_Normalize((V3){2.0f*(x*z + w*y), 0.0f, 1.0f - 2.0f*(x*x + y*y)});
+    V3 sightPt = V3_AplusB(World.position[i],(V3){0.0f,0.96f,0.0f});
+    AddWireLine(sightPt,V3_AplusB(sightPt,V3_ScaleByF(fwd,0.6f)),(Color){1.0f,1.0f,0.0f,1.0f});
+    V3 enemPt = World.position[PLAYER1]; enemPt.y -= 0.24f;
+    RaycastHit hit = Raycast(sightPt,V3_AsubB(enemPt,sightPt),20.0f,LMASK_NPC_SIGHT);
+    if (hit.hit && hit.hitInstanceIndex == PLAYER1) { AddWireLine(sightPt,hit.point,(Color){1.0f,0.0f,0.0f,1.0f}); } else {AddWireLine(sightPt,enemPt,(Color){0.0f,1.0f,1.0f,1.0f});}
+    Entity* e = &World.instances[i];
+    Color dbgCol;
+    if (e->currentState == AIState_Idle) dbgCol = (Color){0.0f,1.0f,0.0f,1.0f};
+    else if (e->currentState == AIState_Walk || e->currentState == AIState_Run) {
+        if (e->entflags & EF_ENEM_IN_SIGHT) dbgCol = (Color){1.0f,0.0f,0.0f,1.0f};
+        else dbgCol = (Color){1.0f,1.0f,0.0f,1.0f};
+    } else if (e->currentState == AIState_Attack1 || e->currentState == AIState_Attack2 || e->currentState == AIState_Attack3) dbgCol = (Color){1.0f,0.0f,1.0f,1.0f};
+    else if (e->currentState == AIState_Pain) dbgCol = (Color){1.0f,0.0f,1.0f,1.0f};
+    else if (e->currentState == AIState_Dead) dbgCol = (Color){0.5f,0.5f,0.5f,1.0f};
+    else { dbgCol = (Color){1.0f,0.9f,0.8f,1.0f}; }
+    DrawSphereWireframe(dbgCol, (ShapeSphere){sightPt, 0.32f});
+}
+
 void ModUpdate() {
     if (World.paused || World.menuActive) return;
     WeaponsUpdate(); PatchUpdate(); HardwareUpdate();
@@ -1071,7 +1127,8 @@ void ModUpdate() {
         if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i);
         if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);}
-
+        //if(IdxIsNPC(constdex)) { AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
+        if(IdxIsNPC(constdex)) { DrawAIDebug(i); }
     }
 }
 

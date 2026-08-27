@@ -843,7 +843,7 @@ static void AIThink(u16 idx) {
     if (self->currentState == AIState_Dead || self->currentState == AIState_Dying) return;
 }
 
-void AIControllerUpdate(u16 idx) { // TODO call me!
+void AIControllerUpdate(u16 idx) {
     if(!(World.instances[idx].entflags & EF_ACTIVE)){return;}
     u16 edx=World.instances[idx].index; if(!IdxIsNPC(edx)){return;}
     u16 ndx=edx-419;
