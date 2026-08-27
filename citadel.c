@@ -1092,13 +1092,15 @@ static void Frob(V3 pos, V3 forward, V3 right) {
 }
 // Update
 void WeaponsUpdate(); void TextureSequenceUpdate(u16 self); void AIAnimationControllerUpdate(u16 selfIdx); void AIControllerUpdate(u16 selfIdx); void DrawSphereWireframe(Color col, ShapeSphere s);
+extern float sightPointHeights[NUM_AI_TYPES];
 void DrawAIDebug(u16 i) {
     if (!IdxIsNPC(World.instances[i].index)) return;
     if (!Cheats.showNPC) return;
     World.layer[i] = L_NPC; World.layer[PLAYER1] = L_Player;
     Quaternion r = World.rotation[i]; float x=r.x,y=r.y,z=r.z,w=r.w;
     V3 fwd = V3_Normalize((V3){2.0f*(x*z + w*y), 0.0f, 1.0f - 2.0f*(x*x + y*y)});
-    V3 sightPt = V3_AplusB(World.position[i],(V3){0.0f,0.96f,0.0f});
+    u16 npcIdx = World.instances[i].index - 419;
+    V3 sightPt = V3_AplusB(World.position[i],(V3){0.0f,sightPointHeights[npcIdx],0.0f});
     AddWireLine(sightPt,V3_AplusB(sightPt,V3_ScaleByF(fwd,0.6f)),(Color){1.0f,1.0f,0.0f,1.0f});
     V3 enemPt = World.position[PLAYER1]; enemPt.y -= 0.24f;
     RaycastHit hit = Raycast(sightPt,V3_AsubB(enemPt,sightPt),20.0f,LMASK_NPC_SIGHT);
