@@ -29,7 +29,9 @@ CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=true, .showFPS=t
 static bool shadowBuffersCreated = false;
 CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
-u16 editModeSelection, editModeTestEntityDefinition=472;
+u16 editModeSelection, editModeTestEntityDefinition=343; u16 lastSpawned=U16_MAX;
+Quaternion weaponRotationOffset = {0.0f,0.0f,0.0f,1.0f}; // debug: manual per-model rotation correction for view weapon (identity = no change, dartgun correct by default)
+V3 weaponRotationOffsetEuler; // degrees, tuned with T/Y,U/I,O/P; rebuilds weaponRotationOffset as a normalized quaternion
 double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS];
 static u32 gpuQ[5][5]; static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
@@ -47,6 +49,7 @@ INLINE void DrawDebugLines(float* viewProj) {
     glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount; glEnable(GL_DEPTH_TEST); World.debugLineVertCount = 0;
 }
 
+void BioMonitorUpdate(void);
 void AddWireLine(V3 start, V3 end, Color col) {
     if (!debugLineVerts || World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2) return;
     int i = World.debugLineVertCount;
@@ -175,7 +178,7 @@ void EnableCheatArsenal(u8 level) {
     }
 } // TODO
 void cmd_kill() { World.instances[PLAYER1].health = World.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
-void cmd_undo() { if (Cheats.editMode) { CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } } // TODO actually track and despawn last
+void cmd_undo() { if (Cheats.editMode) { if (lastSpawned < U16_MAX && lastSpawned >= INSTS_1ST_IDX) { DeleteInstance(lastSpawned); lastSpawned = U16_MAX; CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Nothing to undo"); } } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } }
 void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; float shakeForce = (force < 0.48f) ? force : 0.48f; (void)shakeForce; } // TODO actually shake
 void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
 void cmd_shake() { Shake(-1.0f); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
@@ -194,11 +197,11 @@ static void cmd_loadlevel(const char* arg) {
     if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
     int level = ParseLevelArg(arg); if (level == -2) return; // Already printed g3 message
     if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %d",level); return; }
-    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; queuedLevelPos = ressurectionLocations[level > 9 ? 6 : level]; LoadLevel(level,queuedLevelPos); (void)cyberSpaceEntryLocations; // TODO: Handle level 13 entry based on currentLevel
+    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; queuedLevelPos = (level == 13) ? cyberSpaceEntryLocations[World.currentLevel < 8 ? (u8)World.currentLevel : 0] : ressurectionLocations[level > 9 ? 6 : level]; LoadLevel(level,queuedLevelPos);
 }
 
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }
-static void cmd_summon(int itemConstIndex) { if (IdxInBounds(itemConstIndex)) { SpawnDynamicObject(itemConstIndex,true); CenterStatusPrint("Summoned object ID %d",itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s",itemConstIndex); } }
+static void cmd_summon(int itemConstIndex) { if (IdxInBounds(itemConstIndex)) { u16 spawned = SpawnDynamicObject(itemConstIndex,true); if (spawned < U16_MAX) { lastSpawned = spawned; } CenterStatusPrint("Summoned object ID %d",itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s",itemConstIndex); } }
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; }
 static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
@@ -876,7 +879,7 @@ __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((
 void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, bool grayscaleEnabled) {
     u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex;
     if (Cheats.showPhys) {if (World.col[i] == COLTYPE_BOX) {DrawBoxCollider(i);} else if (World.col[i] == COLTYPE_SPH) {DrawSphereCollider(i);} else if (World.col[i] == COLTYPE_CVX) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_MSH) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);} DrawAngularVelocity(i);}
-    glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,0.0f/*TODO cyber wall panel alpha w/ fade*/); glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
+    glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,(float)(1.0f - (vclamp((float)(World.pauseRelativeTime - 0.0f) / 2.0f, 0.0f, 1.0f)))); /* cyber wall panel alpha with fade */ glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
     if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); }
     glUniform1ui(30,e->camView < camViewCount ? 1u : 0u);
     if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); glUniform1i(29,6); }
@@ -1017,6 +1020,40 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         else glDepthFunc(0x0203/*GL_LEQUAL*/); // Actual alphas
         DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,grayscaleEnabled);
     }
+    // View weapon model rendered after transparents, before SSR (current weapon only, gl depth off, centered out in front)
+    u16 wvi = World.weaponVModelIndex; // dedicated view-model instance
+    if (wvi > 0 && wvi < INSTANCE_COUNT) {
+        /* normal usage: u16 vm = World.instances[wvi].modelIndex; (set by CompleteWeaponChange from wepModelIndices[])
+         * test override: render using EDefs[editModeTestEntityDefinition] appearance without permanently modifying the instance */
+        u16 savedModel = World.instances[wvi].modelIndex;
+        u16 savedTex   = World.instances[wvi].texIndex;
+        u16 savedNorm  = World.instances[wvi].normIndex;
+        u16 savedGlow  = World.instances[wvi].glowIndex;
+        u16 savedSpec  = World.instances[wvi].specIndex;
+        u16 testIdx = editModeTestEntityDefinition; if (testIdx >= MAX_ENTITIES) testIdx = 343;
+        u16 testVm = EDefs[testIdx].modelIndex;
+        if (testVm < MAX_MDLS) {
+            //glDepthFunc(0x0201/*GL_ALWAYS*/); glDepthMask(0); // Render with depth off
+            V3 weaponPos = V3_AplusB(World.position[PLAYER1], V3_ScaleByF(V3_Normalize(World.instances[PLAYER1].forward), 0.4f));
+            weaponPos = V3_AplusB(weaponPos, World.weaponViewOffset);
+            World.position[wvi] = weaponPos;
+            World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1], weaponRotationOffset); // follow player's view orientation (yaw+pitch+roll) + manual per-model correction
+            World.instances[wvi].modelIndex = testVm;
+            World.instances[wvi].texIndex  = EDefs[testIdx].texIndex >= MAX_TXRS ? 0u : EDefs[testIdx].texIndex;
+            World.instances[wvi].normIndex = EDefs[testIdx].normIndex >= MAX_TXRS ? 0u : EDefs[testIdx].normIndex;
+            World.instances[wvi].glowIndex = EDefs[testIdx].glowIndex >= MAX_TXRS ? 0u : EDefs[testIdx].glowIndex;
+            World.instances[wvi].specIndex = EDefs[testIdx].specIndex >= MAX_TXRS ? 0u : EDefs[testIdx].specIndex;
+            World.instances[wvi].animationNum = EDefs[testIdx].animationNum;
+            World.col[wvi] = COLTYPE_MSH; // test: allow wireframe debug view of view weapon
+            CHECK_GL_ERROR();
+            u16 curN=0, curT=0, curG=0, curS=0, curM=0;
+            DrawEntity(&World.instances[wvi],wvi,World.instances[wvi].index,World.instances[wvi].texIndex,&curN,&curT,&curG,&curS,&curM,false);
+            World.instances[wvi].modelIndex = savedModel;
+            World.instances[wvi].texIndex  = savedTex;  World.instances[wvi].normIndex = savedNorm;
+            World.instances[wvi].glowIndex = savedGlow; World.instances[wvi].specIndex = savedSpec;
+            //glDepthFunc(0x0203/*GL_LEQUAL*/); glDepthMask(1); // Restore depth
+        }
+    }
     if(unlikely(camView)) {
         glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
         glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/,gBufferFBO); glReadBuffer(GL_COLOR_ATTACHMENT0); glBindTexture(GL_TEXTURE_2D,camViewTextures[camViewIdx]);
@@ -1043,7 +1080,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     double berserkTimeRemainingNormalized = World.invP1.berserkFinished > 0.0001 ? (World.invP1.berserkFinished - World.pauseRelativeTime) / BERSERK_TIME : 0.0;
     if (World.invP1.berserkFinished < World.pauseRelativeTime && World.invP1.berserkFinished > 0.0001) World.invP1.berserkFinished = berserkTimeRemainingNormalized = 0.0;
     glUniform1ui(5,Sys_Settings.Reflections); glUniform1ui(6,Sys_Settings.FXAA); glUniform1f(14,Sys_Settings.FOV); glUniform1f(16,aspect3D); glUniform1ui(22,Sys_Settings.Shadows); glUniform1f(9,(float)berserkTimeRemainingNormalized); glUniform1f(10,berserkSeedTime); glUniform1ui(11,Sys_Settings.Brightness);
-    glUniform3f(12,deg2rad(World.cam_yaw),deg2rad(World.cam_pitch),deg2rad(World.cam_roll)); glUniform3f(13,px,py,pz); glUniform1f(15,(float)World.pauseRelativeTime * 0.1f); glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
+    float shakeOffset = (World.shakeFinished > World.pauseRelativeTime) ? (0.15f * vcosf((float)(World.pauseRelativeTime * 20.0f))) * (World.shakeFinished - World.pauseRelativeTime) : 0.0f; glUniform3f(12,deg2rad(World.cam_yaw + shakeOffset),deg2rad(World.cam_pitch + shakeOffset * 0.5f),deg2rad(World.cam_roll)); glUniform3f(13,px,py,pz); glUniform1f(15,(float)World.pauseRelativeTime * 0.1f); glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
     glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); glUniform1ui(19,((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     u32 shieldOnType = 0u/*No shield green tint*/; if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) {shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/;} glUniform1ui(20,shieldOnType); // Green Shield
     Color3 painStaticColor = (Color3){1.0f,0.0f,0.0f}/*GetPainStaticColor()*/; glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b);
@@ -1132,6 +1169,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0,lev);
     DebugRAM("before runtime LoadAllLevels"); LoadAllLevels(); DebugRAM("after runtime LoadAllLevels"); LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); DebugRAM("after runtime LoadLevel"); World.invP1.currentCrouchRatio = 1.0f;
+    World.weaponViewOffset = (V3){0.0f,-0.24f,0.0};
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
             World.levelInstances[lev][i].adjacencyIdx = U16_MAX;
@@ -1220,7 +1258,7 @@ void InitalizeEnvironment() {
     glUseProgram(shadowmapsSP); glUniform1ui(9,SHADOW_MAP_SIZE); glUseProgram(shadowmapsClearSP); glUniform1ui(0,SHADOW_MAP_SIZE); glUseProgram(chunkSP); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE); // One time set uniforms
     for (int f=0;f<5;++f) glGenQueries(5,gpuQ[f]);
     RenderLoading(100,"Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); RenderLoading(92,"Loading models..."); DebugRAM("before LoadModels"); LoadModels(); DebugRAM("after LoadModels");
-    if (World.introNotPlayed) {} // TODO: Play intro
+    if (World.introNotPlayed) { currentMenuPage = Mpg_IntroVideo; PlayMenuMusic(); World.menuActive = true; World.introNotPlayed = false; }
     World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     NewGame();
     PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
@@ -1250,6 +1288,7 @@ i32 main() {
         } else physTime=0.0;
         double gameT_start = get_time();
         ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
+        if (World.invP1.hasHardware & HW_BIO) BioMonitorUpdate();
         UpdateAudio();
         gameTime = get_time() - gameT_start;
         if (likely(!World.paused && !World.menuActive)) UpdateInstanceMatrix4x4s(); // Before camviews so camview shadows render same as main pass

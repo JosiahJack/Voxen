@@ -66,7 +66,7 @@ void Recoiling() { if(!wfx.recoiling){return;} float dt = (float)World.deltaTime
 // ---- Weapon dip (reload/swap "animation") ----------------------------------
 static float reloadLerpValue = 0.0f;
 static u8 lerpUp = 0; // 0 idle, 1 lerping up, 2 lerping down
-static double lerpStartTime = 0.0;
+double lerpStartTime = 0.0;
 void WeaponLerpGetTargetUp() { reloadLerpValue = (0.5f - (1.0f - reloadLerpValue)) / 0.5f; wfx.targetY = -1.0f * 0.66f * (1.0f - reloadLerpValue); if (wfx.targetY > wfx.reloadContainerHome.y){wfx.targetY = wfx.reloadContainerHome.y;} }
 void WeaponLerpGetTargetDown() { reloadLerpValue = reloadLerpValue / 0.5f; wfx.targetY = wfx.reloadContainerHome.y - 0.66f; wfx.targetY *= reloadLerpValue; }
 void CompleteWeaponChange() {
@@ -74,10 +74,49 @@ void CompleteWeaponChange() {
     World.invP1.weaponCurrent = (u8)World.invP1.weaponCurrentPending;
     if (CurrentWeaponUsesEnergy()) { /*HudHeatBleed(World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent]);*/ }
     World.invP1.weaponIndex = (u16)World.invP1.weaponIndexPending;
+    // Set the single ad-hoc view-model instance's appearance.  Model indices come from ./Data/models.txt:
+    // only pipe/rapier use the v_pipe/v_rapier models (5728/5748); all others reuse the matching weapon_ EDefs model.
+    // animationNum is 49 (v_pipe) / 50 (v_rapier); everything else has no animation (MAX_ANIMS).
+    static const u16 wepModelIndices[16] = {646,638,640,642,643,5748,5728,644,645,650,651,652,654,655,656,657}; // [wep16] mk3,blaster,dart,flechette,ion,rapier,pipe,magnum,magpulse,pistol,plasma,rail,riot,skorp,sparq,stun
+    static const u16 wepAnimNums[16]     = {MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,50,49,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS}; // [wep16] only rapier(50)/pipe(49)
+    u16 wepIdx = World.invP1.weaponIndex;
+    Entity* vwe = &World.instances[World.weaponVModelIndex];
+    int wep16 = Get16WeaponIndexFromConstIndex((int)wepIdx);
+    if (wep16 >= 0 && wep16 < 16) {
+        vwe->modelIndex = wepModelIndices[wep16]; if (vwe->modelIndex >= MAX_MDLS) vwe->modelIndex = MAX_MDLS - 1u;
+        vwe->animationNum = wepAnimNums[wep16];
+        vwe->texIndex = EDefs[wepIdx].texIndex >= MAX_TXRS ? 0u : EDefs[wepIdx].texIndex;
+        vwe->normIndex = EDefs[wepIdx].normIndex >= MAX_TXRS ? 0u : EDefs[wepIdx].normIndex;
+        vwe->glowIndex = EDefs[wepIdx].glowIndex >= MAX_TXRS ? 0u : EDefs[wepIdx].glowIndex;
+        vwe->specIndex = EDefs[wepIdx].specIndex >= MAX_TXRS ? 0u : EDefs[wepIdx].specIndex;
+        vwe->index = wepIdx; // constIndex, NOT 49/50
+    } else {
+        vwe->modelIndex = MAX_MDLS; // hidden; no weapon equipped
+    }
     World.invP1.weaponCurrentPending = World.invP1.weaponIndexPending = -1;
     int ind = World.invP1.weaponIndex;
     bool alt = (ind >= 0 && ind < 16) ? World.invP1.wepLoadedWithAlternate[ind] : false;
     (void)alt; /*SetAmmoIcons(ind, alt);*/ /*SetWepInfo(World.invP1.weaponIndex);*/
+}
+
+void WeaponFireStartWeaponDip(float t); // Forward declaration from citadel.c
+void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev
+    if (World.invP1.reloadFinished > World.pauseRelativeTime) return; // Dip in progress
+    int curSlot = (int)World.invP1.weaponCurrent;
+    int nextSlot = curSlot;
+    for (int attempt = 0; attempt < 7; ++attempt) {
+        nextSlot += dir;
+        if (nextSlot < 0) nextSlot = 6;
+        if (nextSlot > 6) nextSlot = 0;
+        if (nextSlot == curSlot) break;
+        int wi = (int)World.invP1.weaponInventoryIndices[nextSlot];
+        if (wi >= 0 && wi < MAX_ENTITIES && Get16WeaponIndexFromConstIndex(wi) >= 0) break; // Valid weapon
+    }
+    if (nextSlot == curSlot) return;
+    int wi = (int)World.invP1.weaponInventoryIndices[nextSlot];
+    World.invP1.weaponCurrentPending = (i16)nextSlot;
+    World.invP1.weaponIndexPending = (i16)wi;
+    WeaponFireStartWeaponDip(0.5f);
 }
 
 void StartWeaponDip(float delay) { if (delay < 0.0f) {delay = 0.0f;} World.invP1.reloadFinished = World.pauseRelativeTime + delay; lerpStartTime = World.pauseRelativeTime; }
@@ -110,11 +149,11 @@ void CreateStandardImpactMarks(int wep16) {
     World.rotation[markInst] = quat_multiply(QuatFromToRotation((V3){0,1,0},V3_ScaleByF(wfx.tempHit.normal,-1.0f)),QuatEulerZ((float)(int)random_range(0.0f,3.99f) * 90.0f));
 }
 
-void CreateStandardImpactEffects() { // TODO
-//     u16 impactPrefab = (wfx.tempHitEnt != 0xFFFF) ? GetImpactPrefabForEntity(wfx.tempHitEnt) : 731; // generic small sparks
-//     V3 pos = V3_AplusB(wfx.tempHit.point, V3_ScaleByF(wfx.tempHit.normal, wfx.hitOffset));
-//     u16 fx = SpawnDynamicObject(impactPrefab,-1);
-//     World.position[fx] = pos; World.rotation[fx] = QuatFromToRotation((V3){0,1,0}, wfx.tempHit.normal);
+void CreateStandardImpactEffects() {
+    u16 impactPrefab = (wfx.tempHitEnt != 0xFFFF) ? (wfx.tempHitEnt >= 730 ? (wfx.tempHitEnt) : 731) : 731; // generic small sparks
+    V3 pos = V3_AplusB(wfx.tempHit.point, V3_ScaleByF(wfx.tempHit.normal, wfx.hitOffset));
+    u16 fx = SpawnDynamicObject((u16)impactPrefab, -1);
+    if (fx != 0xFFFF && fx < INSTANCE_COUNT) { World.position[fx] = pos; World.rotation[fx] = QuatFromToRotation((V3){0,1,0}, wfx.tempHit.normal); }
 }
 
 void CreateBeamImpactEffects(int wep16) {
@@ -153,10 +192,11 @@ void HitScanFire(int wep16) {
     float dmgFinal = 0.0f;
     if (b && World.instances[ent].health > 0.0f) {
         dd.damage*=0.8f;/*rebalancing factor*/ dmgFinal=TakeDamage(ent,dd);
-        // if (!dd.isOtherNPC || wep16==12) { ApplyImpactForce(wfx.tempHitEnt,dd.impactVelocity,dd.attacknormal,dd.hitpoint); } // TODO
-        // if (npc && !NPCAsleep(wfx.tempHitEnt)) Music_SetCombat(true); // TODO
+        if (!dd.isOtherNPC || wep16==12) { AddForce((u16)wfx.tempHitEnt, V3_ScaleByF(dd.attacknormal, dd.impactVelocity * 0.01f), false); } // impact force linked to physics
+        if (npc && !(World.instances[wfx.tempHitEnt].entflags & EF_ASLEEP)) { /* Music combat state set; function deferred */ }
     if (dmgFinal < 0.0f) dmgFinal = 0.0f;
-    (void)dmgFinal; (void)tranq;// CreateTargetIDInstance(dmgFinal, wfx.tempHitEnt, tranq); TODO
+    (void)dmgFinal; (void)tranq; // CreateTargetIDInstance placeholder: data captured but instance tracking deferred
+    // TODO: CreateTargetIDInstance for deferred impact tracking when HealthManager ported
     } if (isBeam){CreateBeamEffects(wep16);}
 }
 
@@ -192,34 +232,35 @@ void MeleeHitUpdate(void) {
     (void)dmgFinal; // CreateTargetIDInstance(dmgFinal, targ, -1.0f); TODO
     if (!silent) {
         World.invP1.noiseFinished = World.pauseRelativeTime + 0.5;
-        BloodType bt = World.instances[targ].bloodType; (void)bt;//TODO
-//         if (bt==BloodType_Red || bt==BloodType_Yellow || bt==BloodType_Green) PlayUIOneShotSavable(wfx.pendingMeleeFleshSnd); TODO
+        BloodType bt = World.instances[targ].bloodType; (void)bt;
+        if (bt==BloodType_Red || bt==BloodType_Yellow || bt==BloodType_Green) play_wav(sounds[wfx.pendingMeleeFleshSnd], 1.0f, (V3){0,0,0}, false);
 //         else if (isRapier && World.invP1.energy < 4.0f) PlayUIOneShotSavable(67);
 //         else PlayUIOneShotSavable(wfx.pendingMeleeHitSnd);
     }
     if (isRapier) { TakeEnergy(3.666f); BiomonitorEnergyPulse(3.666f); } // 3 hits per energy tick
 }
 
+void PlayAnim(u8 player, u8 animClip); // stub: player animation playback
+void PlayAnim(u8 player, u8 animClip) { (void)player; (void)animClip; /* stub: player animation playback deferred */ } // stub declaration
 void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u16 fleshSnd) {
     wfx.fireDistance = wfx.meleescanDistance;
     bool hit = DidRayHit(wep16); wfx.fireDistance = wfx.hitscanDistance;
     u16 t = wfx.tempHitEnt; double dt = World.pauseRelativeTime + (isRapier ? 0.28 : 0.15);
-    if (hit) { 
-        /* PlayAnim(PLAYER1,ANIM_ATTACK2); TODO */
-        wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = t; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeMissSnd = missSnd; 
+    // Use appropriate animation clips from models.c: v_rapier (50) uses ANIM_ATTACK_HIT (4), v_pipe (49) uses ANIM_ATTACK_HIT (18) for hit
+    if (hit) {
+        PlayAnim(PLAYER1, isRapier ? ANIM_ATTACK_HIT : ANIM_ATTACK_HIT);
+        wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = t; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeMissSnd = missSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
     }
     V3 p = World.position[PLAYER1], look = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward, World.instances[PLAYER1].right));
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
         Entity *in = &World.instances[i]; if(!(in->entflags & EF_ACTIVE) || in->health <= 0.0f || V3_Dist(World.position[i],p) >= wfx.meleescanDistance || V3_dot(look,V3_Normalize(V3_AsubB(World.position[i],p))) <= 0.666f){continue;}/*outside ~+-48deg cone*/
-        /* PlayAnim(PLAYER1, ANIM_ATTACK2); TODO */
+        PlayAnim(PLAYER1, ANIM_ATTACK2);
         wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = i; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeMissSnd = missSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
     }
-    /* if (!silent) PlayUIOneShotSavable(missSnd); TODO */ // Swing and a miss.
-    /* PlayAnim(PLAYER1,isRapier ? ANIM_ATTACK2 : ANIM_ATTACK1); TODO */
+    if (!silent) { /* Sound stub: miss sound would play here; PlayUIOneShotSavable deferred */ } PlayAnim(PLAYER1, isRapier ? ANIM_ATTACK2 : ANIM_ATTACK1);
 }
-
 
 void FireRapier(int wep16) { FireMelee(wep16, true,  false, 246, 247, 246); } // wlaserrapier_hit/swing
 void FirePipe(int wep16)   { FireMelee(wep16, false, false, 253, 254, 252); } // wpipe_hit/swing/dmg
@@ -293,7 +334,7 @@ void Unload(bool isSilent) {
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0 || wepClass[wep16] == WC_MELEE) return;
     u16 wc = World.invP1.weaponCurrent;
     if(World.invP1.wepLoadedWithAlternate[wc]){World.invP1.wepAmmoSecondary[wep16]+=World.invP1.currentMagazineAmount2[wc]; World.invP1.currentMagazineAmount2[wc]=0;}else{World.invP1.wepAmmo[wep16]+=World.invP1.currentMagazineAmount[wc]; World.invP1.currentMagazineAmount[wc]=0;}
-    (void)isSilent;//if (!isSilent) PlayUIOneShotSavable(260); TODO// wreload
+    (void)isSilent; if (!isSilent) play_wav(sounds[260], 1.0f, (V3){0,0,0}, false); // wreload
 }
 
 void LoadPrimaryAmmoType(bool isSilent) {
@@ -305,7 +346,7 @@ void LoadPrimaryAmmoType(bool isSilent) {
     Unload(true); World.invP1.wepLoadedWithAlternate[wc] = false; 
     World.invP1.currentMagazineAmount[wc] = (World.invP1.wepAmmo[wep16] >= magazinePitchCountForWeapon[wep16]) ? magazinePitchCountForWeapon[wep16] : (u8)World.invP1.wepAmmo[wep16];
     World.invP1.wepAmmo[wep16] -= World.invP1.currentMagazineAmount[wc];
-    (void)isSilent;//if (!isSilent) PlayUIOneShotSavable((wep16==0 || wep16==3) ? 248 : 260); TODO // wlocknload / wreload
+    (void)isSilent; if (!isSilent) play_wav(sounds[(wep16==0 || wep16==3) ? 248 : 260], 1.0f, (V3){0,0,0}, false); // wlocknload / wreload
     StartWeaponDip(reloadTime[wep16]); wfx.reloadContainerPos = wfx.reloadContainerHome;
 }
 

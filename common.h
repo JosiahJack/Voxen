@@ -306,7 +306,8 @@ typedef /*FAT*/ struct  {
 } Entity; // phew what a porker of a struct, it's been a eatin!
 typedef struct {
     u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
-    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount/*Numbers of instances of entities and lights loaded (always for just the current level)*/,shd1,shd2,shd3,shd4/*ShieldGenerators on this level*/,TeleportTouch_allTeleportTouches[8];
+    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount/*Numbers of instances of entities and lights loaded (always for just the current level)*/,shd1,shd2,shd3,shd4/*ShieldGenerators on this level*/,weaponVModelIndex,TeleportTouch_allTeleportTouches[8];
+    V3 weaponViewOffset; // Debug offset for weapon view model
     float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS];
     double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp; float painStaticAlpha,empStaticAlpha;
     double gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs;
@@ -347,7 +348,7 @@ extern u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; extern u16* cvxAdjLists[MAX_UN
 extern u16 playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; extern AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; extern i32 threadCnt;
 extern u32 vbos[MAX_MDLS],tbos[MAX_MDLS]; extern FHandle console_log_file; extern u32 drawCalls,vertsRendered,voxelUpdateSP,lightsID,psysSp,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID;
 extern u32 shadowmapIndirectionList[LIGHT_COUNT];
-extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern double last_mouse_x,last_mouse_y;
+extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
 extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile;
 extern u16 fwParentOf[INSTANCE_COUNT]; // instance -> owning func_wall mover_target, 0 == none

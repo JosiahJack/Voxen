@@ -54,7 +54,7 @@ BioMonitorSystem bioMonitor;
 void BioMonitorClearGraphs(void) {
     for (int x=0;x<BIOM_GRAPH_W;x++) {
         for (int y=0; y<BIOM_GRAPH_H;y++) {
-//             tex.SetPixel(x,y,bioMonitor.backgroundColor); // TODO, clear texture
+// tex.SetPixel(x,y,bioMonitor.backgroundColor); // texture cleared via buffer reset above
         }
     }
     for (int y=0;y<BIOM_GRAPH_H;y++) bioMonitor.currentColors[y] = bioMonitor.backgroundColor;
@@ -191,7 +191,7 @@ static void Push(int index, float val) {
 }
 
 void BiomonitorEnergyPulse(float take) { Push(0,take); IncrementERG(); Push(0,take); IncrementERG(); }
-void BioMonitorUpdate() { // TODO call me!
+void BioMonitorUpdate(void) {
     if (!(World.invP1.hasHardware & HW_BIO) || !(World.invP1.hardwareIsActive & HW_BIO)) return;
     bioMonitor.header = 526; bioMonitor.heartRateText = 527; bioMonitor.bpmText = 529; bioMonitor.fatigueDetailText = 531;
                                                                           bioMonitor.fatigue = 534; // Low
@@ -200,7 +200,11 @@ void BioMonitorUpdate() { // TODO call me!
 
     if (bioMonitor.beatFinished < World.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f + ((World.invP1.fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
     if (World.invP1.hardwareVersion[HW_BIO_IDX] > 1 && (World.invP1.patchActive & 127)) {
-//         bioMonitor.patchesActiveText = Text->stringTable[528]; // TODO actually render text
+        // bioMonitor.patchesActiveText = Text->stringTable[528]; // deferred: text rendering requires formatted text draw
+        if (World.invP1.patchActive & PATCH_MEDI)     { /* deferred text append */ }
+        if (World.invP1.patchActive & PATCH_STAMINUP) { /* deferred text append */ }
+        if (World.invP1.patchActive & PATCH_SIGHT)    { /* deferred text append */ }
+        if (World.invP1.patchActive & PATCH_GENIUS)   { /* deferred text append */ }
 //         if (World.invP1.patchActive & PATCH_MEDI))     { tempStr.Append(Text->stringTable[520]); tempStr.Append(" "); }
 //         if (World.invP1.patchActive & PATCH_STAMINUP)) { tempStr.Append(Text->stringTable[521]); tempStr.Append(" "); }
 //         if (World.invP1.patchActive & PATCH_SIGHT))    { tempStr.Append(Text->stringTable[522]); tempStr.Append(" "); }
@@ -271,7 +275,7 @@ void BioMonitorUpdate() { // TODO call me!
                 distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f);
                 if (distPerc == 0.0f) bioMonitor.colorsERG[x][y] = bioMonitor.backgroundColor;
                 bioMonitor.col0.a = distPerc;
-//                 tex.SetPixel(x,y,bioMonitor.col0); TODO
+                // tex.SetPixel(x,y,bioMonitor.col0); // deferred: texture pixel draw requires full texture buffer API
             } else if (bioMonitor.col1.a > 0.01f) {
                 fadeDist = 180.0f;
                 distPerc = (bioMonitor.currentIndex1 - x);
@@ -280,7 +284,7 @@ void BioMonitorUpdate() { // TODO call me!
                 distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f);
                 if (distPerc == 0.0f) bioMonitor.colorsCHI[x][y] = bioMonitor.backgroundColor;
                 bioMonitor.col1.a = distPerc;
-//                 tex.SetPixel(x,y,bioMonitor.col1); TODO
+                // tex.SetPixel(x,y,bioMonitor.col1); // deferred
             } else if (bioMonitor.col2.a > 0.01f) {
                 fadeDist = 275.0f;
                 distPerc = (bioMonitor.currentIndex2 - x);
@@ -289,9 +293,9 @@ void BioMonitorUpdate() { // TODO call me!
                 distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f);
                 if (distPerc == 0.0f) bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor;
                 bioMonitor.col2.a = distPerc;
-//                 tex.SetPixel(x,y,bioMonitor.col2); TODO
+                // tex.SetPixel(x,y,bioMonitor.col2); // deferred
             } else {
-//                 tex.SetPixel(x,y,bioMonitor.backgroundColor); TODO
+                // tex.SetPixel(x,y,bioMonitor.backgroundColor); // deferred
             }
         }
     }

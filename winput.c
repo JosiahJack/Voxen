@@ -1,5 +1,6 @@
 // winput.c - WinSys Windowing System and Input System interfacing with the OS.
 #include "common.h"
+void CycleWeaponSlot(int dir); extern V3 weaponViewOffset; extern double lerpStartTime;
 typedef struct WSWin WSWin; WSWin* window;                 typedef struct WSCtx WSCtx;  typedef struct WSLib WSLib;  typedef struct WSMon WSMon;     extern WSLib WinSys;
 typedef struct { int width,height,refreshRate; } vidmode;  typedef struct { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits; uintptr_t handle; } FBC;
 typedef void (*WSP)(void); WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); void SaveConfig(); void InputWindowFocus(i32); void InputKey(char*,int,int); void InputMouseClick(char*,int,int);
@@ -709,9 +710,33 @@ void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {
 void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void MenuGoBack(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot); void ApplyPlayerMovements(float dt); void PollEvents();
 extern u16 editModeTestEntityDefinition;
+extern Quaternion weaponRotationOffset;
+extern V3 weaponRotationOffsetEuler;
+// Diagnostics: print all rendering-relevant fields of the weapon view model instance + the EDefs test source
+static void DbgPrintWeaponViewModel(const char* trig) {
+    u16 wvi = World.weaponVModelIndex;
+    if (wvi == 0 || wvi >= INSTANCE_COUNT) { DualLog("vmodel[%s] wvi=%u INVALID\n",trig,wvi); return; }
+    Entity* v = &World.instances[wvi];
+    u16 testIdx = editModeTestEntityDefinition; if (testIdx >= MAX_ENTITIES) testIdx = 343;
+    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
+    DualLog("vmodel[%s] wvi=%u idx=%u model=%u/%u tex=%u/%u nrm=%u glo=%u spc=%u anim=%u clip=%u flags=%u layer=%u col=%u colMsh=%u lod=%u\n",
+        trig,wvi,v->index,v->modelIndex,mdlsCnt,v->texIndex,texCnt,v->normIndex,v->glowIndex,v->specIndex,v->animationNum,v->clip,v->entflags,World.layer[wvi],World.col[wvi],v->colMeshIndex,v->lodIndex);
+    DualLog("vmodel[%s] pos=(%.2f,%.2f,%.2f) scl=(%.2f,%.2f,%.2f) sbo=(%.2f,%.2f,%.2f) off=(%.2f,%.2f,%.2f) tris=%u\n",
+        trig,World.position[wvi].x,World.position[wvi].y,World.position[wvi].z,World.scale[wvi].x,World.scale[wvi].y,World.scale[wvi].z,
+        modelMatrices[wvi*16+12],modelMatrices[wvi*16+13],modelMatrices[wvi*16+14],World.weaponViewOffset.x,World.weaponViewOffset.y,World.weaponViewOffset.z,
+        v->modelIndex < mdlsCnt ? modelTriangleCounts[v->modelIndex] : 0);
+    DualLog("vmodel[%s] EDefs[%u]={m=%u,t=%u,n=%u,g=%u,s=%u,a=%u,c=%u} weap cur=%d idx=%u pend=%d/%d wep16=%d transT=%u dblS=%u pauset=%.1f\n",
+        trig,testIdx,EDefs[testIdx].modelIndex,EDefs[testIdx].texIndex,EDefs[testIdx].normIndex,EDefs[testIdx].glowIndex,EDefs[testIdx].specIndex,EDefs[testIdx].animationNum,EDefs[testIdx].colMeshIndex,
+        World.invP1.weaponCurrent,World.invP1.weaponIndex,World.invP1.weaponCurrentPending,World.invP1.weaponIndexPending,wep16,
+        v->texIndex < MAX_TXRS ? transparentTexture[v->texIndex] : 0, v->texIndex < MAX_TXRS ? doubleSidedTexture[v->texIndex] : 0, World.pauseRelativeTime);
+    DualLog("vmodel[%s] playerPos=(%.2f,%.2f,%.2f) fwd=(%.2f,%.2f,%.2f) lvlMin=(%.2f,%.2f) voxel=(%u,%u) inGrid=%u\n",trig,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.instances[PLAYER1].forward.x,World.instances[PLAYER1].forward.y,World.instances[PLAYER1].forward.z,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev],(u32)vmax(0.0f,(World.position[wvi].x - World.worldMin_x[World.curLev]) / VOXEL_SIZE),(u32)vmax(0.0f,(World.position[wvi].z - World.worldMin_z[World.curLev]) / VOXEL_SIZE),((World.position[wvi].x >= World.worldMin_x[World.curLev]) && (World.position[wvi].x < World.worldMin_x[World.curLev] + VOXELS_X * VOXEL_SIZE) && (World.position[wvi].z >= World.worldMin_z[World.curLev]) && (World.position[wvi].z < World.worldMin_z[World.curLev] + VOXELS_Z * VOXEL_SIZE)) ? 1u : 0u);
+    DualLog("vmodel[%s] rotDeg=(%.1f,%.1f,%.1f) rotQuat=(%.3f,%.3f,%.3f,%.3f)\n",trig,weaponRotationOffsetEuler.x,weaponRotationOffsetEuler.y,weaponRotationOffsetEuler.z,weaponRotationOffset.x,weaponRotationOffset.y,weaponRotationOffset.z,weaponRotationOffset.w);
+    DualLog("vmodel[%s] rotOff=(%.2f,%.2f,%.2f,%.2f)\n",trig,weaponRotationOffset.x,weaponRotationOffset.y,weaponRotationOffset.z,weaponRotationOffset.w);
+}
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     if (window_has_focus) {
+        /* synth-testing block (commented out so T/Y/U/I/O/P/K/L are free for weaponRotationOffset tuning)
         if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);
         if (Sys_Input.keyStates[KEY_W].pressed) play_synth(SND_DOOR,0.2f,1.0f);
 
@@ -729,6 +754,7 @@ void InputProcessing() {
         if (Sys_Input.keyStates[KEY_B].pressed) play_synth(SND_TAP_CASE,0.2f,1.0f);
         if (Sys_Input.keyStates[KEY_N].pressed) play_synth(SND_PLASTIC_TAP,0.2f,1.0f);
         if (Sys_Input.keyStates[KEY_M].pressed) play_synth(SND_CRACKLE,0.2f,1.0f);
+        */
 
         if (Sprint() && Sys_Input.keyStates[KEY_R].pressed) {
             bool foundValidDynamic = false;
@@ -745,6 +771,7 @@ void InputProcessing() {
                 if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true;
             }
         }
+        if (Sys_Input.keyStates[KEY_R].pressed) DbgPrintWeaponViewModel("R");
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
         if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; SaveGame(7,"quicksave"); return; }
         if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
@@ -755,6 +782,24 @@ void InputProcessing() {
         if (ToggleMode()) ToggleInventoryMode();
         if (Lantern()) World.invP1.hardwareIsActive ^= HW_LAN;
         if (Infrared()) World.invP1.hardwareIsActive ^= HW_INF;
+        if (WeaponCycUp() || (GetKeyRiseEdgeOrHeld(127,true) && Sys_Input.scrollDelta > 0)) { CycleWeaponSlot(+1); Sys_Input.scrollDelta = 0; }
+        if (WeaponCycDown() || (GetKeyRiseEdgeOrHeld(128,true) && Sys_Input.scrollDelta < 0)) { CycleWeaponSlot(-1); Sys_Input.scrollDelta = 0; }
+        if (Sys_Input.keyStates[KEY_1].pressed) World.weaponViewOffset.x += 0.08f; // key 1 = x+
+        if (Sys_Input.keyStates[KEY_2].pressed) World.weaponViewOffset.x -= 0.08f; // key 2 = x-
+        if (Sys_Input.keyStates[KEY_3].pressed) World.weaponViewOffset.y += 0.08f; // key 3 = y+
+        if (Sys_Input.keyStates[KEY_4].pressed) World.weaponViewOffset.y -= 0.08f; // key 4 = y-
+        if (Sys_Input.keyStates[KEY_5].pressed) World.weaponViewOffset.z += 0.08f; // key 5 = z+
+        if (Sys_Input.keyStates[KEY_T].pressed || Sys_Input.keyStates[KEY_Y].pressed || Sys_Input.keyStates[KEY_U].pressed || Sys_Input.keyStates[KEY_I].pressed || Sys_Input.keyStates[KEY_O].pressed || Sys_Input.keyStates[KEY_P].pressed) { // Euler-deg rotation offset tuning (1deg/press, 5deg if Shift held), rebuilds normalized quaternion
+            float rs = (Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? 5.0f : 1.0f;
+            if (Sys_Input.keyStates[KEY_T].pressed) weaponRotationOffsetEuler.x += rs; // T = yaw+
+            if (Sys_Input.keyStates[KEY_Y].pressed) weaponRotationOffsetEuler.x -= rs; // Y = yaw-
+            if (Sys_Input.keyStates[KEY_U].pressed) weaponRotationOffsetEuler.y += rs; // U = pitch+
+            if (Sys_Input.keyStates[KEY_I].pressed) weaponRotationOffsetEuler.y -= rs; // I = pitch-
+            if (Sys_Input.keyStates[KEY_O].pressed) weaponRotationOffsetEuler.z += rs; // O = roll+
+            if (Sys_Input.keyStates[KEY_P].pressed) weaponRotationOffsetEuler.z -= rs; // P = roll-
+            quat_from_yaw_pitch_roll(&weaponRotationOffset, weaponRotationOffsetEuler.x,weaponRotationOffsetEuler.y,weaponRotationOffsetEuler.z);
+        }
+        if (Sys_Input.keyStates[KEY_1].pressed || Sys_Input.keyStates[KEY_2].pressed || Sys_Input.keyStates[KEY_3].pressed || Sys_Input.keyStates[KEY_4].pressed || Sys_Input.keyStates[KEY_5].pressed || Sys_Input.keyStates[KEY_6].pressed || Sys_Input.keyStates[KEY_T].pressed || Sys_Input.keyStates[KEY_Y].pressed || Sys_Input.keyStates[KEY_U].pressed || Sys_Input.keyStates[KEY_I].pressed || Sys_Input.keyStates[KEY_O].pressed || Sys_Input.keyStates[KEY_P].pressed) DbgPrintWeaponViewModel("1-6/rot");
         ApplyPlayerMovements(World.dt);
         if (!World.paused && !World.menuActive && !World.inventoryMode) { // Apply mouselook/keyboardlook/lean
             float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;

@@ -478,6 +478,7 @@ void SetLevelPointers(u8 lev) {
     World.invTnsrValid     = World.levelInvTnsrValid[lev];
     World.colliding        = World.levelColliding[lev];
     World.instCount        = World.levelInstCount[lev];
+    World.weaponVModelIndex = World.instCount > 3 ? (u16)(World.instCount - 1) : 0; // ad-hoc weapon view model is the last slot of each level (added by LoadLevelMod) so remap the global index per level
     World.lights            = World.levelLights[lev];
     World.lanims            = World.levelLAnims[lev];
     World.lightsNewPosition = World.levelLightsNewPosition[lev];
@@ -564,9 +565,49 @@ static void FWBeginBlock(i32 entCount) { // select destinations for next transfo
 void LoadLevelMod(u8 lev) {
     u8 curlevel = vclamp(lev, 0, 13); World.curLev = curlevel; World.levelCurrentlyLoading = true; World.instCount = 3;
     if (curlevel == 1) {
-        AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);
-        AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);
-    } // TODO other level camviews
+        AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f); // MedScreen14_Camera (verified original)
+        AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f); // MedScreen15_Camera (verified original)
+    }
+    if (curlevel == 2) {
+        // Level 2 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+        AddCamView((V3){36.73389f,-24.66895f,9.47060f},(Quaternion){0.11769f,-0.23125f,0.02819f,0.96534f},75u,256u,256u,0.695f,13.73f); // SciScreen6_Camera
+    }
+    if (curlevel == 3) {
+        // Level 3 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+        AddCamView((V3){-15.35001f,13.99000f,44.87000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},71u,256u,256u,0.5f,16.582f); // BridgeScreen1_Camera
+        AddCamView((V3){-12.01620f,-28.52930f,33.53500f},(Quaternion){0.54295f,0.45300f,0.54295f,-0.45300f},68u,256u,256u,0.868f,14.145f); // MaintScreen_Camera
+    }
+    if (curlevel == 4) {
+        // Level 4 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+        AddCamView((V3){-10.82900f,6.95400f,-50.29300f},(Quaternion){0.00000f,0.70711f,0.70711f,0.00000f},68u,256u,256u,1.3f,9.4f); // GroveScreen1_Camera
+        AddCamView((V3){-23.29000f,104.60000f,62.98000f},(Quaternion){0.00000f,-0.89126f,0.00000f,-0.45349f},68u,256u,256u,4.0f,13.6f); // GroveScreen2_Camera
+        AddCamView((V3){8.92170f,47.42900f,-45.97000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,0.7f,4.32f); // GroveScreen3_Camera
+        AddCamView((V3){-16.67800f,-52.22300f,-23.32000f},(Quaternion){0.00000f,-0.70711f,0.00000f,0.70711f},68u,256u,256u,1.5f,8.04f); // GroveScreen4_Camera
+        AddCamView((V3){-26.93000f,46.56557f,-31.18625f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,0.82f,17.56f); // StorageScreen_Camera
+    }
+    if (curlevel == 5) {
+        // Level 5 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+        AddCamView((V3){-30.72000f,8.96000f,-53.76000f},(Quaternion){0.00000f,0.70711f,0.70711f,0.00000f},68u,256u,256u,2.7f,24.8f); // FlightScreen1_Camera
+    }
+    if (curlevel == 6) {
+        // Level 6 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+        AddCamView((V3){9.08000f,48.71000f,-47.32400f},(Quaternion){0.00000f,0.99054f,0.00000f,-0.13719f},90u,256u,256u,1.2f,11.52f); // ExecScreen5_Camera
+        AddCamView((V3){-3.90720f,13.90800f,2.47230f},(Quaternion){-0.50000f,0.50000f,0.50000f,0.50000f},90u,256u,256u,0.06f,11.87f); // ExecScreen6_Camera
+    }
+    if (curlevel == 7) {
+        // Level 7 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+        AddCamView((V3){106.87113f,-14.55570f,24.65725f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,1.295f,26.01f); // EngScreen3_Camera
+        AddCamView((V3){-57.06100f,34.70000f,1.19200f},(Quaternion){0.00000f,-0.65094f,0.00000f,0.75913f},68u,256u,256u,1.83f,19.9f); // EngScreen4_Camera
+        AddCamView((V3){29.51000f,3.29000f,-9.93000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},80u,256u,256u,0.77f,9.79f); // EngScreen5_Camera
+    }
+    if (curlevel == 8) {
+        // Level 8 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+        AddCamView((V3){69.76093f,30.97230f,-0.84785f},(Quaternion){0.48739f,0.51230f,0.51230f,-0.48739f},85u,256u,256u,0.33f,10.05f); // SecScreen1_Camera
+    }
+    if (curlevel == 9) {
+        // Level 9 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+        AddCamView((V3){-15.24800f,44.55600f,6.42560f},(Quaternion){0.00000f,1.00000f,0.00000f,0.00000f},85u,256u,256u,0.84f,16.223f); // ReacScreen1_Camera
+    }
     mset(lineSpace,0,LINE_LEN_MAX * sizeof(char)); u32 lineNum = 0; i32 entCount = -1, lightsIdx = -1; char* line;
     for (u16 i=0;i<LIGHT_COUNT;++i) { mset(&lightsFromFile[i],0,sizeof(Light)); mset(&lanimsFromFile[i],0,sizeof(LightAnimation)); lightsFromFile[i].range = 5.5f; lightsFromFile[i].col = (Color3){1.0f,1.0f,1.0f}; lightsFromFile[i].spotAng=0.0f; }
     while (MmapGetLine(lineSpace, LINE_LEN_MAX)) {
@@ -879,9 +920,9 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 332) { World.position[parent].y += 0.015f; } // item_hw_targetid: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 333) { World.position[parent].y += 0.028f; } // item_hw_shield: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 342) { World.position[parent].y += 0.12f; } // item_workerhelmet: Move up to account for CG mod (origin moved vs Unity version)
-        //else if (entIdx == 343) { World.position[parent].y += 0.16f; } // weapon_blaster: Move up to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value
-        //else if (entIdx == 346) { World.position[parent].z += 0.16f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value, also not sure if barrel parallel axis is x or z that I slid this along
-        //else if (entIdx == 348) { World.position[parent].z += 0.6f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version) TODO Check if this is needed to be done on prerotated value, also not sure if blade parallel axis is x or z that I slid this along
+        else if (entIdx == 343) { World.position[parent].y += 0.16f; } // weapon_blaster: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 346) { World.position[parent].z += 0.16f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 348) { World.position[parent].z += 0.6f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 345) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.00f; } // weapon_dartgun
         else if (entIdx == 350) { World.position[parent].y += 0.16f; } // weapon_magnum: Move over to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 352) { World.position[parent].y += 0.16f; } // weapon_pistol: Move over to account for CG mod (origin moved vs Unity version)
@@ -908,6 +949,19 @@ void LoadLevelMod(u8 lev) {
         World.rotation[World.shd1] = World.rotation[World.shd2] = World.rotation[World.shd3] = World.rotation[World.shd4] = QUAT_IDENTITY;
     } else World.shd1=World.shd2=World.shd3=World.shd4=U16_MAX;
     headmountedLanternLight = AddLightSimple(World.position[PLAYER1],(Color3){1.0f,1.0f,1.0f},11.52f,0.0f,LIGHTON);
+    // Create single ad-hoc weapon view model instance (no entity definition, no physics collider; like shield generators)
+    if (World.instCount < INSTANCE_COUNT) {
+        u16 wvi = World.instCount;
+        mset(&World.instances[wvi],0,sizeof(Entity));
+        World.instances[wvi].entflags=EF_ACTIVE; World.layer[wvi]=L_Default; World.instances[wvi].camView=255;
+        World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
+        World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAX_TXRS;
+        World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.mass[wvi]=World.rotation[wvi].w=1.0f; World.dynamicFriction[wvi]=0.5f; World.staticFriction[wvi]=0.6f;
+        World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY;
+        World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; // hidden until weapon equipped
+        World.weaponVModelIndex=wvi; World.instCount++;
+    }
+    World.weaponViewOffset = (V3){0,0,0}; // reset debug offset each level
 }
 #undef KEY_EQ
 void func_forcebridge(u16 self); void CyberWallInitAfterLoad(u16 self); void FuncWallInitAfterLoad(u16); void LogicTimerInitBeforeLoad(u16); void ButtonSwitchInitAfterLoad(u16);
@@ -965,7 +1019,7 @@ void LoadLevelData(u8 curlevel) {
                 }
             }
             if (IdxIsPortalBlockingDoor(World.instances[i].index) && World.instances[i].doorState != DoorState_Closed) ForceDoorPortalOpen(World.instances[i].portalIndex); // Open/ajar doors start with their portal open. Bounds-checked in culling.c; guard keeps non-portal doors from touching portal 0.
-        } else if (IdxIsNPC(constIndex)) { World.layer[i] = L_NPC; /* TODO AIInit funcion */ }
+        } else if (IdxIsNPC(constIndex)) { World.layer[i] = L_NPC; InitNPC(i); }
         else if (IdxIsSearchable(constIndex)) {
             if (World.instances[i].generateContents) {
                 int numRandomGeneratedItems = 0;
@@ -1034,6 +1088,8 @@ void LoadLevel(u8 curlevel, V3 pos) {
     mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView));
     mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32));
     camViewCount = levelCamViewCount[curlevel];
+    // Initialize missing level camview entries from file data
+    for (int i = 0; i < camViewCount; ++i) { if (levelCamViews[curlevel][i].visible == false && camViews[i].visible == true) { mcpy(&levelCamViews[curlevel][i], &camViews[i], sizeof(CamView)); levelCamViewTextures[curlevel][i] = camViewTextures[i]; } }
     mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     // world_from_mdl is now an alias for modelMatrices, no need to zero separately
     for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;

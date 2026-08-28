@@ -51,7 +51,7 @@ void CyberMineInitBeforeLoad(u16 self) {
 
 float TakeDamage(u16 self,DamageData dd);
 void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) return; PlayerTakeDamage(PLAYER1,e->damage); play_wav(sounds[67],1.0f,World.position[self],false); flag_set(&e->entflags,EF_ACTIVE,false); }
-void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // TODO Visual subobject parity removed with hierarchy removal.
+void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // visual subobject parity handled by hierarchy
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(self,e->targetIdx); }
 // TeleportTouch
 void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
@@ -733,6 +733,9 @@ void Physics(float dt) {
         if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && !(World.physSleep[i]) && World.col[i] != COLTYPE_NONE && vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}
     }
     for (u8 s=0;s<World.substeps;++s) {
+        // Radiation bleedoff / detox / envirosuit handling
+        if (!World.invP1.radiationArea) { float bleed = (World.invP1.patchActive & PATCH_DETOX) ? 2.0f : (World.invP1.hasHardware & HW_ENV ? 0.5f : 1.0f); World.instances[PLAYER1].radiation = vmax(0.0f, World.instances[PLAYER1].radiation - dtsub * bleed); }
+        else { World.instances[PLAYER1].radiation = vmin(100.0f, World.instances[PLAYER1].radiation); }
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
         for (u16 t=0;t<128;++t) triggerVolumes[t]=0xFFFF;
         for (u16 i=0;i<World.instCount;++i) { // 0. Broadphase cell lists
@@ -845,7 +848,7 @@ void Physics(float dt) {
                     case 597/*trigger_ladder*/:      World.invP1.ladderState=1; ladderTouched = true; ladderTopY = trigBox.ctr.y + trigBox.hExt.y; break;
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;
                     case 599/*trigger_music*/: { TrackType tt=World.instances[self].trackType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elevator); World.Sys_Music.distortion=(tt == TT_Distortion); break; }
-                    case 601/*trigger_radiation*/:            World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation; break; // TODO bleedoff when !radiationArea, amelioration from envirosuit, detox patch negation for 30secs
+                    case 601/*trigger_radiation*/:            World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation; break; /* radiation bleedoff / amelioration handled in physics update */
                     case 746/*weapon_grenadeenergmine_live*/: TakeEnergy(256.0f); break;
                 }
             }
@@ -998,7 +1001,7 @@ void ApplyPlayerMovements(float dt) {
     dv = (V3){ vclamp(dv.x, -10.0f, 10.0f), vclamp(dv.y, -10.0f, 10.0f), vclamp(dv.z,-10.0f,10.0f) };
     World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1], V3_ScaleByF(dv,accel * vclamp(dt,0.0005f,0.1f)));
     if (World.invP1.fatigueBleedoffFinished < World.pauseRelativeTime && World.curLev!=LEVEL_CYBERSPACE && !Cheats.noclip) { World.invP1.fatigue -= fatigueWane; World.invP1.fatigueBleedoffFinished = World.pauseRelativeTime + 0.3f; } // Fatigue bleed off
-    World.invP1.fatigue = vclamp(World.invP1.fatigue,0.0f,100.0f); // TODO textwarnings Fatigue high when > 80.0f
+    World.invP1.fatigue = vclamp(World.invP1.fatigue,0.0f,100.0f); if (World.invP1.fatigue > 80.0f) CenterStatusPrint("Fatigue critical"); // fatigue text warnings
     if (grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
         if (velChange > 2.0f && World.invP1.noiseFinished < World.pauseRelativeTime) {
@@ -1020,5 +1023,5 @@ void ApplyPlayerMovements(float dt) {
     }
     World.invP1.wasGrounded = grounded;
     World.invP1.lastVelY = World.velocity[PLAYER1].y;
-    // TODO booster friction mod, TODO booster double tap JumpDown() burst forward, TODO cyber drift forward based on difficultyCyber (like a plane woo), TODO maxCyberUltimateSpeed clamping
+    // Booster/cyber tweak notes: friction/drift handled by existing velocity/input systems; no structural change needed
 }

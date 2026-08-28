@@ -294,8 +294,17 @@ static double RenderUI() {
         }
         //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
         // Center MFD
-        if (MFD_CenterTab == 0) { /*MainTab: WeaponInventory, WeaponShotsInventory, GrenadeInventory, PatchInventory*/ }
-        else if (MFD_CenterTab == 1) { /*HardwareTab: Label, HardwareInventory*/ }
+        if (MFD_CenterTab == 0) { /*MainTab: WeaponInventory, WeaponShotsInventory, GrenadeInventory, PatchInventory*/
+            RenderFormattedText(400,580,T_RED,FONT_NORMAL,1.0f,"WEAPONS"); /*WEAPONS*/
+            for (int _wsi = 0; _wsi < 7; ++_wsi) {
+                int _wi = (int)World.invP1.weaponInventoryIndices[_wsi];
+                if (_wi >= 0 && _wi < MAX_ENTITIES) RenderFormattedText(400,610 + _wsi*20,(_wsi == (int)World.invP1.weaponCurrent) ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"%d %s",_wsi,Sys_Text.stringTable[ItemStringIdx(_wi)]);
+                else RenderFormattedText(400,610 + _wsi*20,T_GREEN,FONT_NORMAL,1.0f,"%d -",_wsi);
+            }
+            RenderFormattedText(676,580,T_RED,FONT_NORMAL,1.0f,"SHOTS"); /*SHOTS*/
+            RenderFormattedText(740,580,T_RED,FONT_NORMAL,1.0f,"GRENADES"); /*GRENADES*/
+            RenderFormattedText(920,580,T_RED,FONT_NORMAL,1.0f,"PATCHES"); /*PATCHES*/
+        } else if (MFD_CenterTab == 1) { /*HardwareTab: Label, HardwareInventory*/ }
         else if (MFD_CenterTab == 2) { /*GeneralTab: Label, GeneralInventory, AccessCards*/ }
         else if (MFD_CenterTab == 3) { /*SoftwareTab: Label, SoftwareInventory, ICEDrill, Pulser, Turbo, Decoy, Recall*/ }
         else if (MFD_CenterTab == 4) { /*MultiMediaDataReader: LogTableofContents, LogsLevelFolder, LogTextReader, EmailTab, DataTab, NotesTab*/ }
@@ -308,8 +317,8 @@ static double RenderUI() {
         }
         if (World.inventoryMode && World.invP1.holdingObject && CursorIsOverBounds(345,1021,460,768)) { // Add to Inventory Helper
             World.uiIsBlocking = true;
-            RenderUIImage(345,460,676,308,1075);
-            RenderFormattedText(586,460,T_GREEN,FONT_NORMAL,1.0f,"ADD TO INVENTORY");
+            RenderUIImage(345,528,676,240,1075);
+            RenderFormattedText(586,528,T_GREEN,FONT_NORMAL,1.0f,"ADD TO INVENTORY");
             if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; }
         }
         //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -340,8 +349,8 @@ static double RenderUI() {
     i16 lineSpacing = 18;
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);
     if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"CPU ms::Shad:%.3f, Phys:%.3f, Subs:%u, Rend:%.3f, Pre Phys:%.3f, Logic:%.3f",shadowTime * 1000,physTime * 1000,World.substeps,renderTime * 1000,prePhys * 1000,gameTime * 1000);
-    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Grounded: %u",(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0);
-    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,Sprint());
+    if (!World.menuActive && !Cheats.noHUD && !World.paused) RenderFormattedText(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Grounded: %u  weaponCurrent: %d  weaponIndex: %d  pendingIdx: %d  wep16: %d  viewModel: %u  reloadDone: %.2f",(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0,(int)World.invP1.weaponCurrent,(int)World.invP1.weaponIndex,(int)World.invP1.weaponIndexPending,Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex),((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==5||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==6)?49u:((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==0||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==1)?50u:0u)),World.invP1.reloadFinished);
+    if (!World.menuActive && !Cheats.noHUD) RenderFormattedText(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u, wep x:%.2f y:%.2f z:%.2f",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,Sprint(),World.weaponViewOffset.x,World.weaponViewOffset.y,World.weaponViewOffset.z);
     RenderFormattedText(16,debugTextStartY + (lineSpacing * 5),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderFormattedText(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (World.statusTextDecayFinished > World.current_time) RenderFormattedText(460,114,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);

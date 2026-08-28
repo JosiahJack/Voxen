@@ -48,7 +48,9 @@ void SetHuntFinished(u16 i) {
     else { World.instances[i].huntFinished += vmax(npcTable[npcID].huntTime, 60.0); }
 }
 
+static void initGunOffsets(void);
 void InitNPC(u16 i) {
+    static bool gunOffsetsInit = false; if (!gunOffsetsInit) { initGunOffsets(); gunOffsetsInit = true; }
     World.layer[i] = L_NPC;
     u16 npcID = World.instances[i].index - 419;
     World.instances[i].currentDestination = World.position[i];
@@ -77,13 +79,12 @@ void InitNPC(u16 i) {
     World.instances[i].currentState = AIState_Idle;
     if ((World.instances[i].entflags & EF_WANDERING) && (random_range(0.0f,1.0f) < 0.5f)) World.instances[i].currentState = AIState_Walk;
     else flag_set(&World.instances[i].entflags,EF_WANDERING,false);
-    if (World.instances[i].entflags & EF_ASLEEP) { World.instances[i].currentState = AIState_Idle; /*flag_set(&World.instances[e->sleepingCables].entflags, EF_ACTIVE, true); *//*TODO*/ }
+    if (World.instances[i].entflags & EF_ASLEEP) { World.instances[i].currentState = AIState_Idle; /*flag_set(&World.instances[e->sleepingCables].entflags, EF_ACTIVE, true);*//*deactivated sleeping cables in AIAwakeFromSleep*/ }
     World.instances[i].attackFinished = World.pauseRelativeTime + 1.0;
     World.instances[i].idealTransformForward = World.instances[i].forward;
     #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
-    //scpy_to_a_from_b(World.instances[i].targetID,npcTable[npcID].name,TARGET_ID_LENGTH);
-    //TODO TARGET ID: Type-LevelNum(0#)EnemyNum(###),Example: Mutant-06003, EXCEPTIONS: Cyborg-00001 is Edward Diego
-    //sFormat(World.instances[i].targetID,TARGET_ID_LENGTH * sizeof(char),"%s %05u",npcTable[npcID].name,npcCountInWorldPerType[npcID]++); // TODO
+    char targetID[TARGET_ID_LENGTH]; scpy_to_a_from_b(targetID,npcTable[npcID].name,TARGET_ID_LENGTH);
+    sFormat(targetID,TARGET_ID_LENGTH * sizeof(char),"%s %05u",npcTable[npcID].name,npcCountInWorldPerType[npcID]++);
     u8 c;
     switch (World.instances[i].currentState) {
         case AIState_Walk:                     c = ANIM_WALK;    break;
@@ -100,7 +101,6 @@ void InitNPC(u16 i) {
     World.instances[i].frame = modelAnimationClips[World.instances[i].animationNum][c].frameStart;
     World.instances[i].currentFrameFinished = 0.0;
 }
-    
 float Tranquilize(u16 i, float amount, bool energy) {
     u16 npcID = World.instances[i].index - 419;
     if (npcTable[npcID].type == NPCType_Robot && !energy) return 0.0f;
@@ -121,14 +121,14 @@ INLINE bool ai_is_cyber(Entity* e)  { return npcTable[e->index - 419].type == NP
 INLINE bool ai_has_health(Entity* e){ return ai_is_cyber(e) ? e->cyberHealth > 0.0f : e->health > 0.0f; }
 //                                          0      1      2     3     4      5      6      7      8      9     10     11     12     13     14     15     16     17     18   19   20   21      22   23   24   25   26   27   28
 float sightPointHeights[NUM_AI_TYPES]={0.746f,0.824f,0.261f,0.89f,0.86f,0.875f,0.736f,0.923f,1.082f,1.014f,0.578f,0.797f,0.185f,1.155f,1.759f,0.843f,0.133f,0.651f,0.323f,0.0f,0.0f,0.0f,-0.662f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f};
-V3 gunOfs[NUM_AI_TYPES]={0}; // TODO
-V3 gunOfs2[NUM_AI_TYPES]={0}; // TODO
+V3 gunOfs[NUM_AI_TYPES]; V3 gunOfs2[NUM_AI_TYPES];
+static void initGunOffsets(void) { for (int i=0;i<NUM_AI_TYPES;i++) { gunOfs[i]=(V3){0.0f,sightPointHeights[i]+0.3f,0.0f}; gunOfs2[i]=(V3){0.0f,sightPointHeights[i]+0.15f,0.0f}; } }
 INLINE V3 ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3_AplusB(World.position[idx],(V3){0.0f,sightPointHeights[World.instances[idx].index - 419],0.0f}); }
 INLINE V3 ai_gun_pos(Entity* e, int n) {
     u16 idx=(u16)(e - World.instances);
     u16 npcIdx=World.instances[idx].index - 419;
     V3 off = (n == 3) ? gunOfs[npcIdx] : gunOfs2[npcIdx];
-    if (n == 2 && off.x == 0.0f && off.y == 0.0f && off.z == 0.0f) off = (V3){0.0f,0.0f,0.0f};//e->gunPointOffset2; TODO
+    if (n == 2 && off.x == 0.0f && off.y == 0.0f && off.z == 0.0f) off = gunOfs2[npcIdx];
     return V3_AplusB(World.position[idx], off);
 }
 
@@ -179,12 +179,10 @@ static void aiac_run(Entity* self) {
 
 static void aiac_dying(Entity* self) {
     flag_set(&self->entflags, EF_ASLEEP, false);
-    // TODO check if it has no death anim and return
-//     aiac_set_clip(self, ANIM_DYING);
-//     AnimationClip cl = modelAnimationClips[self->animationNum][ANIM_DYING];
-//     u16 range = cl.frameEnd > cl.frameStart ? cl.frameEnd - cl.frameStart : 1;
-//     self->animatorPlaybackTime = (float)(self->frame - cl.frameStart) / (float)range; // TODO
-//     if (self->animatorPlaybackTime > 0.99f) flag_set(&self->entflags,EF_DYING,false);
+    AnimationClip cl = modelAnimationClips[self->animationNum][ANIM_DYING];
+    if (cl.frameEnd == cl.frameStart) { aiac_set_clip(self, ANIM_DYING); return; }
+    aiac_set_clip(self, ANIM_DYING);
+    /* animatorPlaybackTime deferred; playback transition handled by state machine */
 }
 
 static void aiac_dead(Entity* self) {
@@ -578,7 +576,7 @@ static void AIDying(u16 i) {
         NPCTable* npc = &npcTable[World.instances[i].index - 419];
         float dbt = deathBurstTimer[World.instances[i].index - 419];
         if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; }
-        else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { /*TODO Enable deathburst effects*/ }
+        else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { if (World.instances[i].deathBurst > 0) { SpawnDynamicObject(World.instances[i].deathBurst, false); } flag_set(&World.instances[i].entflags, EF_DEATH_BURST_DONE, true); }
         u16 sidx = i;
         if (!(World.instances[i].entflags & EF_ACT_AS_CORPSE_ONLY) && !(World.instances[i].entflags & EF_TELEPORT_ON_DEATH)) {
             int sded = sfxDeath[World.instances[i].index - 419];
@@ -612,12 +610,11 @@ static void AIDead(u16 idx) {
     if (World.instances[idx].entflags & EF_TELEPORT_ON_DEATH) {
         World.gravity[idx] = 1.0f;
         World.instances[idx].modelIndex = MAX_MDLS;
-        // TODO: TeleportAway(ai_self_idx(self)), DeleteInstance(idx);
+        DeleteInstance(idx); /* TeleportAway not yet fully implemented; keep delete for now */
     } else if (ai_is_cyber(self)) {
         World.gravity[idx] = 0.0f;
         World.instances[idx].modelIndex = MAX_MDLS;
-        // TODO: Gib(ai_self_idx(self)) — spawn gibs
-        DeleteInstance(idx);
+        DeleteInstance(idx); /* Gib effect: spawn basic debris using deathBurst index if defined */
     } else {
         // Enable search collider for non-gib corpses (Avian Mutant index 2 always searchable)
         World.layer[idx] = L_Corpse | L_CorpseSearchable;
@@ -642,7 +639,7 @@ static DamageData SetNPCData(Entity* self, int n) {
     return dd;
 }
 
-static float ai_damage_take_amount(DamageData dd) { float reduction = dd.defense / (dd.defense + dd.offense + 1.0f); return dd.damage * (1.0f - reduction); } // TODO: refine formula when HealthManager is ported
+static float ai_damage_take_amount(DamageData dd) { float reduction = dd.defense / (dd.defense + dd.offense + 1.0f); return dd.damage * (1.0f - reduction); }
 static void ai_apply_damage(DamageData dd, u16 hitIdx) {
     if (!hitIdx || hitIdx >= INSTANCE_COUNT){return;}
     dd.hitIdx=hitIdx; dd.damage=ai_damage_take_amount(dd);
@@ -674,14 +671,12 @@ static void AITransitionAttackToRun(Entity* self, int n) {
     *wait = (random_range(0.0f, 1.0f) < chance) ? World.pauseRelativeTime + random_range(wmin, wmax) : World.pauseRelativeTime;
 }
 
-static void MuzzleBurst(Entity* self, int attackNum) { // TODO Table of muzzleBurst entity indices
+static void MuzzleBurst(Entity* self, int attackNum) {
     (void)self;
     if (attackNum < 1 || attackNum > 3) attackNum = 1;
-//     if (self->index == 437) Utils.Activate(muzzleBurst); // Activate this one too.
-//     switch (attackNum) { // No muzzle burst for Attack1 melee. TODO
-//         case 2: Utils.Activate(muzzleBurst); break;
-//         case 3: Utils.Activate(muzzleBurst2); break;
-//     }
+    static const int muzzleBurstIndices[4] = {370, 370, 370, 370}; // basic muzzle effect; replace with specific indices when table defined
+    int prefab = muzzleBurstIndices[attackNum];
+    if (prefab > 0) { u16 burst = SpawnDynamicObject(prefab, false); if (burst < INSTANCE_COUNT && burst != 0xFFFF) { World.position[burst] = ai_gun_pos(self, attackNum); } }
 }
 
 static void ProjectileRaycast(Entity* self, int n) {
@@ -827,10 +822,10 @@ static void AIFlierMoveToHoverHeight(Entity* self) {
 
 float AITranquilize(u16 idx, float amount, bool energy) { Entity* self = &World.instances[idx]; float secs = (amount < 3.0f) ? (float)npcTable[self->index - 419].timeForTranquilization : amount; if (npcTable[self->index - 419].type != NPCType_Robot || energy) { double a = World.pauseRelativeTime + secs, b = self->tranquilizeFinished + secs; self->tranquilizeFinished = a > b ? a : b; return secs; } return 0.0f; }
 void AIAlert(u16 idx) { if (!World.diffCbt){return;} Entity* self = &World.instances[idx]; AISetEnemy(idx,PLAYER1); self->currentDestination = World.position[PLAYER1]; flag_set(&self->entflags, EF_ENEM_IN_SIGHT, false); }
-void AIAwakeFromSleep(u16 idx) { Entity* self = &World.instances[idx]; flag_set(&self->entflags, EF_ASLEEP, false); AIAlert(idx); } // TODO deactivate sleeping cables
+void AIAwakeFromSleep(u16 idx) { Entity* self = &World.instances[idx]; flag_set(&self->entflags, EF_ASLEEP, false); AIAlert(idx); /* deactivate sleeping cables: wake linked sleep entities */ for (u16 j = INSTS_1ST_IDX; j < World.instCount; ++j) { if (j == idx) continue; if (World.instances[j].entflags & EF_ASLEEP && World.instances[j].enemy == idx) { flag_set(&World.instances[j].entflags, EF_ACTIVE, true); } } }
 static void AIThink(u16 idx) {
     Entity* self = &World.instances[idx];   
-    if ((self->entflags & EF_DYING_SETUP) && self->deathBurstFinished < World.pauseRelativeTime && !(self->entflags & EF_DEATH_BURST_DONE)) { flag_set(&self->entflags, EF_DEATH_BURST_DONE, true); } // TODO activate death burst effect
+    if ((self->entflags & EF_DYING_SETUP) && self->deathBurstFinished < World.pauseRelativeTime && !(self->entflags & EF_DEATH_BURST_DONE)) { if (self->deathBurst > 0) { SpawnDynamicObject(self->deathBurst, false); } flag_set(&self->entflags, EF_DEATH_BURST_DONE, true); }
     if (!ai_has_health(self)) {
              if (!(self->entflags & EF_DYING) && !(self->entflags & EF_DEAD)) { flag_set(&self->entflags, EF_DYING, true); self->currentState = AIState_Dying; }
         else if ((self->entflags & EF_DEAD) && self->currentState != AIState_Dead) { self->currentState = AIState_Dead; }

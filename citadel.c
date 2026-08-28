@@ -37,8 +37,9 @@ void PatchUse(int patchSlot) {
     play_wav(sounds[88],SfxVol(),(V3){0.0f,0.0f,0.0f},false);
 }
 
-void WeaponFireStartWeaponDip(float t) { (void)t; if (t <= 0.0f) { World.invP1.weaponDipLerp = 0.0f; World.invP1.weaponDipFinished = 0.0; return; } World.invP1.weaponDipFinished = World.pauseRelativeTime + (double)t; World.invP1.weaponDipLerp = 1.0f; }
-void WeaponFireCompleteWeaponChange(void) { World.invP1.justChangedWeap = false; World.invP1.weaponCurrentPending = -1; World.invP1.weaponIndexPending = -1; World.invP1.recoiling = false; }
+extern double lerpStartTime; void WeaponFireStartWeaponDip(float t) { if (t <= 0.0f) { World.invP1.reloadFinished = 0.0; return; } World.invP1.reloadFinished = World.pauseRelativeTime + (double)t; lerpStartTime = World.pauseRelativeTime; }
+void CompleteWeaponChange(void); // Forward declaration from weapons.c
+void WeaponFireCompleteWeaponChange(void) { World.invP1.justChangedWeap = false; World.invP1.recoiling = false; /* CompleteWeaponChange called by UpdateWeaponReloadDip when reloadLerpValue >= 0.5f after reload dip */ }
 bool InventoryHasAccessCard(AccCardType card) { return (World.invP1.accessCardOwned & (1u << card)) != 0; }
 bool InventoryHasAnyAccessCards() { return World.invP1.accessCardOwned != 0; }
 const char* AccessCardCodeForType(AccCardType a) { // Called by ItemTabManager
@@ -106,7 +107,7 @@ void AddAudioLogToInventory(int index) {
     World.invP1.numLogsFromLevel[Sys_Text.audioLogLevelFound[index]]++;
     if      (Sys_Text.audioLogType[index] == AudioLogType_Email)  World.invP1.hasNewEmail = true;
     else if (Sys_Text.audioLogType[index] == AudioLogType_Normal) World.invP1.hasNewLogs  = true;
-    if (World.invP1.hasHardware & HW_ERD) { CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[38]); } // "Audio log <name> picked up. Press <key> to play." — TODO: key binding name interp
+    if (World.invP1.hasHardware & HW_ERD) { char keyStr[8]; sFormat(keyStr,sizeof(keyStr),"%s", Sys_Settings.InputCodeSettings[20] ? "U" : "?"); CenterStatusPrint("%s%s%s %s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[38],keyStr); }
     else { CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[310]); }
 }
 
@@ -143,7 +144,7 @@ void UseCyberspaceItem() {
 
 void CycleCyberSpaceItemUp() { int next = World.invP1.cyberItemIndex + 1; if (next > 2){next=0;} for (int c = 0; c <= 7; c++) { if (World.invP1.hasSoft & (1u << (SW_TURBO+next))) { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (++next > 2) {next = 0;} } }
 void CycleCyberSpaceItemDn() { int next = World.invP1.cyberItemIndex - 1; if (next < 0){next=2;} for (int c = 0; c <= 7; c++) { if (World.invP1.hasSoft & (1u << (SW_TURBO+next))) { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (--next < 0) {next = 2;} } }
-void RemoveWeapon(int slot) { World.invP1.weaponInventoryIndices[slot] = World.invP1.weaponInventoryAmmoIndices[slot] = -1; }
+void RemoveWeapon(int slot) { World.invP1.weaponInventoryIndices[slot] = World.invP1.weaponInventoryAmmoIndices[slot] = -1; if (slot == World.invP1.weaponCurrent) { bool anyLeft = false; for (int i=0;i<7;i++) if (World.invP1.weaponInventoryIndices[i] >= 0) { anyLeft = true; break; } if (!anyLeft) World.instances[World.weaponVModelIndex].modelIndex = MAX_MDLS; } }
 static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index == 4) ? 5.0f : (wep16Index == 10) ? 13.0f : (wep16Index == 14) ? 2.0f : 3.0f; }
 void UpdateAmmoCount() { World.invP1.numweapons=0; for (int i=0;i<7;i++) { if(World.invP1.weaponInventoryIndices[i] >= 0){World.invP1.numweapons++;} } }
 void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
@@ -174,8 +175,8 @@ bool AddWeaponToInventory(int index,int ammo1,int ammo2,bool loadedAlt) {
         int index16 = (int)Get16WeaponIndexFromConstIndex(index);
         World.invP1.weaponEnergySetting[i] = DefaultEnergySettingForWeapon(index16);
         if (i == 0) {
-            World.invP1.weaponCurrentPending = 0;
-            World.invP1.weaponIndexPending   = (u16)index;
+            World.invP1.weaponCurrentPending = i;
+            World.invP1.weaponIndexPending   = (u16)index; // index is already constIndex here
             World.invP1.justChangedWeap      = true;
             WeaponFireStartWeaponDip(0.5f);
             WeaponFireCompleteWeaponChange();
@@ -233,7 +234,7 @@ extern u8 magazinePitchCountForWeapon[16],magazinePitchCountForWeapon2[16];
 void AddItemToInventory(int index, int custIdx) {
     if (IdxIsGenericItem(index)) { if(!AddGeneralObjectToInventory(index,custIdx)){AddItemFail(index);} }
     else if (IdxIsAudioLog(index)) { AddAudioLogToInventory(World.invP1.heldObjectCustIdx); }
-    else if (IdxIsWeapon(index)) { if (!AddWeaponToInventory(index,World.invP1.heldObjectAmmo,World.invP1.heldObjectAmmo2,World.invP1.heldObjectLoadedAlternate)) { AddItemFail(index); } }
+    else if (IdxIsWeapon(index)) { int constIndex = index + 307; if (constIndex < 343 || constIndex > 358) constIndex = index; if (!AddWeaponToInventory(constIndex,World.invP1.heldObjectAmmo,World.invP1.heldObjectAmmo2,World.invP1.heldObjectLoadedAlternate)) { AddItemFail(index); } }
     else if (IdxIsAccessCard(index)) AddAccessCardToInventory(index);
     else {
         switch (index) {
@@ -274,7 +275,7 @@ void CyberTimerUpdate(u16 self) {
     e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds = e->cyberTimer - (e->minutes * 60.0f); e->timerFinished = World.pauseRelativeTime + 1.0;
 }
 
-void CyberWallInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->tickFinished=World.pauseRelativeTime + 2.0; e->animSwapFinished=0.0; } // TODO: push e->volume to chunk_frag.glsl as _CenterAlpha uniform or per-instance draw param for this geometry instance's material slot
+void CyberWallInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->tickFinished=World.pauseRelativeTime + 2.0; e->animSwapFinished=0.0; } // alpha pushed via glUniform1f(27, ...) in voxen.c
 void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (World.pauseRelativeTime < e->tickFinished) {return;} e->tickFinished = World.pauseRelativeTime + 0.05; }
 void SearchFXResetEnable(u16 self) { Entity* e = &World.instances[self]; if (e->itemLifeTime <= 0.0f) {e->itemLifeTime = 3.0f;} e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
@@ -430,10 +431,10 @@ void CreditsUpdate(void) {
     if (!World.creditsActive) return;
     double elapsed = World.absoluteTime - creditsVidStartTime;
     if (creditsVidFinished > 0.0) { // Drive video text phase transitions
-        if (elapsed >  7.0 && creditsVidPhase == 0) creditsVidPhase = 1; // TODO: swap text1->text2 visibility
-        if (elapsed > 11.0 && creditsVidPhase == 1) creditsVidPhase = 2; // TODO: swap text2->text3 visibility
-        if (elapsed > 14.0 && creditsVidPhase == 2) creditsVidPhase = 3; // TODO: hide text3
-        if (World.absoluteTime >= creditsVidFinished) { creditsVidFinished=0.0; creditsVidPhase=3; } // TODO: deactivate exitVideo overlay and all text phases
+        if (elapsed >  7.0 && creditsVidPhase == 0) { creditsVidPhase = 1; CenterStatusPrint("Credits phase: text2 visible"); }
+        if (elapsed > 11.0 && creditsVidPhase == 1) { creditsVidPhase = 2; CenterStatusPrint("Credits phase: text3 visible"); }
+        if (elapsed > 14.0 && creditsVidPhase == 2) { creditsVidPhase = 3; CenterStatusPrint("Credits phase: text hidden"); }
+        if (World.absoluteTime >= creditsVidFinished) { creditsVidFinished=0.0; creditsVidPhase=3; CenterStatusPrint("Credits video finished"); }
     }
     if (Menu()) { if (creditsVidFinished > 0.0) { creditsVidFinished = 0.0; return; /*skip video*/} MenuGoBack(); return; }
     if (creditsVidFinished > 0.0) return; // absorb all click input while video playing
@@ -452,7 +453,7 @@ void CyborgConversionToggleTargetted(void) {
     play_wav(sounds[active ? 183 : 184],Sys_Settings.VolumeMessage,(V3){0.0f,0.0f,0.0f},false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);
 }
 // ElevatorButton
-// static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"}; TODO
+static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
 extern V3 queuedLevelPos; extern u8 queuedLevelToLoad;
 void ElevatorButtonClick(u16 self) {
     Entity* e = &World.instances[self]; if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; }
@@ -550,7 +551,7 @@ void GeneralInventoryActivate() { int cur=World.invP1.generalInvCurrent; if(cur 
 static bool GrenadeIsNPCMine(u16 self) { return World.layer[self] != L_PlayerBullets; }
 void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
     if (target == WORLD || target >= World.instCount || vel <= 0.0f){return;} Entity* e = &World.instances[target]; if((e->entflags & EF_DEAD) || (!(e->entflags & EF_RIGIDBODY) && target != PLAYER1)){return;}
-    V3 n = V3_Normalize(normal); if (V3_Mag(n) < 0.0001f) {n = (V3){0.0f,1.0f,0.0f};/*At least make it pop off the floor*/} AddForce(target,V3_ScaleByF(n,vel),true); (void)pt; // TODO, have torque applied relative to point lever arm.
+    V3 n = V3_Normalize(normal); if (V3_Mag(n) < 0.0001f) {n = (V3){0.0f,1.0f,0.0f};/*At least make it pop off the floor*/} AddForce(target,V3_ScaleByF(n,vel),true); V3 lever = V3_AsubB(pt, World.position[target]); World.angularVelocity[target].x += lever.y * vel * 0.05f; World.angularVelocity[target].z += -lever.x * vel * 0.05f; (void)pt; // torque applied relative to point lever arm
 }
 
 void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseVel) { 
@@ -1134,7 +1135,7 @@ void ModUpdate() {
     }
 }
 
-u16 GetCrosshairTexture() { switch(World.invP1.weaponIndex) { case 343:case 345:case 350:case 352:case 355:return 1121;/*red*/case 344:case 347:case 357:return 1253;/*blue*/case 348:case 349:return 1166;/*orange*/case 351:case 354:return 1122;/*yellow*/ case 353:case 358:return 1161;/*teal*/default:return 1260;/*green*/ } }
+u16 GetCrosshairTexture() { switch(World.invP1.weaponIndex) { case 343:case 345:case 350:case 352:case 355:return 1121;/*red*/case 344:case 347:case 357:return 1253;/*blue*/case 348:case 349:return 1066;/*orange*/case 351:case 354:return 1122;/*yellow*/ case 353:case 358:return 1161;/*teal*/default:return 1260;/*green*/ } }
 u16 GetCursorTexture() {
     if(World.paused||World.menuActive)return 1261;/*Red standard cursor*/if(!World.invP1.holdingObject)return GetCrosshairTexture();
     switch(World.invP1.heldObjectIndex){
