@@ -30,8 +30,6 @@ static bool shadowBuffersCreated = false;
 CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
 u16 editModeSelection, editModeTestEntityDefinition=343; u16 lastSpawned=U16_MAX;
-Quaternion weaponRotationOffset = {0.0f,0.0f,0.0f,1.0f}; // debug: manual per-model rotation correction for view weapon (identity = no change, dartgun correct by default)
-V3 weaponRotationOffsetEuler; // degrees, tuned with T/Y,U/I,O/P; rebuilds weaponRotationOffset as a normalized quaternion
 double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS];
 static u32 gpuQ[5][5]; static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
@@ -925,6 +923,11 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
     mat4_inverse(viewProj,invViewProj);
 }
 
+//                        0 mk3 assault rifle              1 blaster             2 dartgun               3 flech                 4 ion  5 rapier    6 pipe               7 magnum            8 magpulse               9 pistol               10 plasma                 11 rail                              12 riot              13 skorp              14 sparq               15 stun
+Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},{0,0,0,1},{0,0,0,1},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
+        V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},  {0,0,0},  {0,0,0},        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
+extern const u16 wepModelIndices[16];
+extern float WeaponDipOffsetY(void); // reload/swap dip Y (weapons.c)
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight; float sfov, snear, sfar;
     if (camView) { CamView* cv=&camViews[camViewIdx]; swidth=cv->width; sheight=cv->height; sfov=(float)cv->fov; snear=cv->near; sfar=cv->far; }
@@ -1023,35 +1026,16 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     // View weapon model rendered after transparents, before SSR (current weapon only, gl depth off, centered out in front)
     u16 wvi = World.weaponVModelIndex; // dedicated view-model instance
     if (wvi > 0 && wvi < INSTANCE_COUNT) {
-        /* normal usage: u16 vm = World.instances[wvi].modelIndex; (set by CompleteWeaponChange from wepModelIndices[])
-         * test override: render using EDefs[editModeTestEntityDefinition] appearance without permanently modifying the instance */
-        u16 savedModel = World.instances[wvi].modelIndex;
-        u16 savedTex   = World.instances[wvi].texIndex;
-        u16 savedNorm  = World.instances[wvi].normIndex;
-        u16 savedGlow  = World.instances[wvi].glowIndex;
-        u16 savedSpec  = World.instances[wvi].specIndex;
-        u16 testIdx = editModeTestEntityDefinition; if (testIdx >= MAX_ENTITIES) testIdx = 343;
-        u16 testVm = EDefs[testIdx].modelIndex;
-        if (testVm < MAX_MDLS) {
-            //glDepthFunc(0x0201/*GL_ALWAYS*/); glDepthMask(0); // Render with depth off
-            V3 weaponPos = V3_AplusB(World.position[PLAYER1], V3_ScaleByF(V3_Normalize(World.instances[PLAYER1].forward), 0.4f));
-            weaponPos = V3_AplusB(weaponPos, World.weaponViewOffset);
+        int wep16 = Get16WeaponIndexFromConstIndex(World.instances[wvi].index);
+        if (wep16 >= 0 && wep16 < 16 && World.instances[wvi].modelIndex < MAX_MDLS) { // appearance set by CompleteWeaponChange
+            // Offset in player-local space (right,down,forward), rotated into world by the player view; reload/swap dip added on Y.  Pivot = player position, weapon stays locked to view.
+            World.weaponViewOffset = vWepOfs[wep16];
+            World.weaponViewOffset.y += WeaponDipOffsetY();
+            V3 weaponPos = V3_AplusB(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1], World.weaponViewOffset));
             World.position[wvi] = weaponPos;
-            World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1], weaponRotationOffset); // follow player's view orientation (yaw+pitch+roll) + manual per-model correction
-            World.instances[wvi].modelIndex = testVm;
-            World.instances[wvi].texIndex  = EDefs[testIdx].texIndex >= MAX_TXRS ? 0u : EDefs[testIdx].texIndex;
-            World.instances[wvi].normIndex = EDefs[testIdx].normIndex >= MAX_TXRS ? 0u : EDefs[testIdx].normIndex;
-            World.instances[wvi].glowIndex = EDefs[testIdx].glowIndex >= MAX_TXRS ? 0u : EDefs[testIdx].glowIndex;
-            World.instances[wvi].specIndex = EDefs[testIdx].specIndex >= MAX_TXRS ? 0u : EDefs[testIdx].specIndex;
-            World.instances[wvi].animationNum = EDefs[testIdx].animationNum;
-            World.col[wvi] = COLTYPE_MSH; // test: allow wireframe debug view of view weapon
-            CHECK_GL_ERROR();
+            World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1],vWepRot[wep16]); // view orientation + per-model correction
             u16 curN=0, curT=0, curG=0, curS=0, curM=0;
             DrawEntity(&World.instances[wvi],wvi,World.instances[wvi].index,World.instances[wvi].texIndex,&curN,&curT,&curG,&curS,&curM,false);
-            World.instances[wvi].modelIndex = savedModel;
-            World.instances[wvi].texIndex  = savedTex;  World.instances[wvi].normIndex = savedNorm;
-            World.instances[wvi].glowIndex = savedGlow; World.instances[wvi].specIndex = savedSpec;
-            //glDepthFunc(0x0203/*GL_LEQUAL*/); glDepthMask(1); // Restore depth
         }
     }
     if(unlikely(camView)) {
@@ -1169,7 +1153,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0,lev);
     DebugRAM("before runtime LoadAllLevels"); LoadAllLevels(); DebugRAM("after runtime LoadAllLevels"); LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); DebugRAM("after runtime LoadLevel"); World.invP1.currentCrouchRatio = 1.0f;
-    World.weaponViewOffset = (V3){0.0f,-0.24f,0.0};
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
             World.levelInstances[lev][i].adjacencyIdx = U16_MAX;

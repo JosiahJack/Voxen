@@ -17,6 +17,8 @@ u16 wepFireSound[16]={251,239,240,243,245,246,254,249,250,255,257,259,262,263,26
 u16 wepBulletHolePrefab[16]={518,520,522,521,519,520,522,518,519,521,519,519,523,518,520,520};
 i8  wepFogInc[16]={2,0,0,1,0,0,0,3,0,1,0,2,4,2,0,0};
 u16 wepSmokePrefab[16]={506,0,0,509,0,0,0,507,0,510,0,511,512,513,0,0}; // 0 = no smoke for this weapon
+u16 wepModelIndices[16]={646,638,640,642,643,5748,5728,644,645,650,651,652,654,655,656,657}; // [wep16] mk3,blaster,dart,flechette,ion,rapier,pipe,magnum,magpulse,pistol,plasma,rail,riot,skorp,sparq,stun
+u16 wepAnimNums[16]={MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,50,49,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS}; // [wep16] only rapier(50)/pipe(49)
 typedef enum { WC_STD=0, WC_MELEE=1, WC_ENERGY=2 } WepClass;
 WepClass wepClass[16]={WC_STD,WC_ENERGY,WC_STD,WC_STD,WC_ENERGY,WC_MELEE,WC_MELEE,WC_STD,WC_STD,WC_STD,WC_ENERGY,WC_STD,WC_STD,WC_STD,WC_ENERGY,WC_ENERGY};
 float magpulseShotForce=2.2f, stungunShotForce=2.2f, railgunShotForce=5.0f, plasmaShotForce=1.5f;
@@ -77,8 +79,6 @@ void CompleteWeaponChange() {
     // Set the single ad-hoc view-model instance's appearance.  Model indices come from ./Data/models.txt:
     // only pipe/rapier use the v_pipe/v_rapier models (5728/5748); all others reuse the matching weapon_ EDefs model.
     // animationNum is 49 (v_pipe) / 50 (v_rapier); everything else has no animation (MAX_ANIMS).
-    static const u16 wepModelIndices[16] = {646,638,640,642,643,5748,5728,644,645,650,651,652,654,655,656,657}; // [wep16] mk3,blaster,dart,flechette,ion,rapier,pipe,magnum,magpulse,pistol,plasma,rail,riot,skorp,sparq,stun
-    static const u16 wepAnimNums[16]     = {MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,50,49,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS}; // [wep16] only rapier(50)/pipe(49)
     u16 wepIdx = World.invP1.weaponIndex;
     Entity* vwe = &World.instances[World.weaponVModelIndex];
     int wep16 = Get16WeaponIndexFromConstIndex((int)wepIdx);
@@ -132,6 +132,8 @@ void UpdateWeaponReloadDip() {
         wfx.reloadContainerPos = (V3){wfx.reloadContainerPos.x, wfx.targetY, wfx.reloadContainerPos.z};
     } else { lerpUp = 0; wfx.reloadContainerPos = (V3){wfx.reloadContainerPos.x, wfx.reloadContainerHome.y, wfx.reloadContainerPos.z}; }
 }
+
+float WeaponDipOffsetY(void) { return wfx.reloadContainerPos.y; } // 0 when idle, negative during reload/swap dip (view weapon Y uses this)
 
 void RotateViewWeapon() { if(!World.inventoryMode) {wfx.reloadContainerRot=QUAT_IDENTITY; return;} float h = (float)Sys_Settings.ScreenWidth * 0.5f; wfx.reloadContainerRot = QuatEulerY(wfx.wepYRot = ((wfx.tempVec.x - h) / h) * 48.0f); }
 bool DidRayHit(int wep16) {
