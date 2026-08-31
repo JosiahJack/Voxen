@@ -635,17 +635,21 @@ void LoadLevelMod(u8 lev) {
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);
             } else {
                      if (KEY_EQ("constIndex"))          { inst->index = parse_numberu16(value, lineSpace, lineNum); fwLine = inst->index == 517; }
-                else if (KEY_EQ("lP.x") || KEY_EQ("localPosition.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].x=v;} else {FWBeginBlock(entCount); if(fwCurP){fwCurP->x=v;}} }
-                else if (KEY_EQ("lP.y") || KEY_EQ("localPosition.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].y=v;} else if(fwCurP){fwCurP->y=v;} }
-                else if (KEY_EQ("lP.z") || KEY_EQ("localPosition.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].z=v;} else if(fwCurP){fwCurP->z=v;} }
-                else if (KEY_EQ("lR.x") || KEY_EQ("localRotation.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].x=v;} else if(fwCurR){fwCurR->x=v;} }
-                else if (KEY_EQ("lR.y") || KEY_EQ("localRotation.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].y=v;} else if(fwCurR){fwCurR->y=v;} }
-                else if (KEY_EQ("lR.z") || KEY_EQ("localRotation.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].z=v;} else if(fwCurR){fwCurR->z=v;} }
-                else if (KEY_EQ("lR.w") || KEY_EQ("localRotation.w")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].w=v;} else if(fwCurR){fwCurR->w=v;} }
-                else if (KEY_EQ("lS.x") || KEY_EQ("localScale.x"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].x=v;} else if(fwCurS){fwCurS->x=v;} }
-                else if (KEY_EQ("lS.y") || KEY_EQ("localScale.y"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].y=v;} else if(fwCurS){fwCurS->y=v;} }
-                else if (KEY_EQ("lS.z") || KEY_EQ("localScale.z"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].z=v;} else if(fwCurS){fwCurS->z=v;} }
+                else if (KEY_EQ("lP.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].x=v;} else {FWBeginBlock(entCount); if(fwCurP){fwCurP->x=v;}} }
+                else if (KEY_EQ("lP.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].y=v;} else if(fwCurP){fwCurP->y=v;} }
+                else if (KEY_EQ("lP.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].z=v;} else if(fwCurP){fwCurP->z=v;} }
+                else if (KEY_EQ("lR.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].x=v;} else if(fwCurR){fwCurR->x=v;} }
+                else if (KEY_EQ("lR.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].y=v;} else if(fwCurR){fwCurR->y=v;} }
+                else if (KEY_EQ("lR.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].z=v;} else if(fwCurR){fwCurR->z=v;} }
+                else if (KEY_EQ("lR.w")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].w=v;} else if(fwCurR){fwCurR->w=v;} }
+                else if (KEY_EQ("lS.x"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].x=v;} else if(fwCurS){fwCurS->x=v;} }
+                else if (KEY_EQ("lS.y"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].y=v;} else if(fwCurS){fwCurS->y=v;} }
+                else if (KEY_EQ("lS.z"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].z=v;} else if(fwCurS){fwCurS->z=v;} }
                 else if (KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
+                else if(KEY_EQ("ammo"))inst->ammo=parse_numberi16(value,lineSpace,lineNum);
+                else if(KEY_EQ("ammo2"))inst->ammo2=parse_numberi16(value,lineSpace,lineNum);
+                else if(KEY_EQ("useableItemIndex"))inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
+                else if(KEY_EQ("customIndex"))inst->usableCustIdx=(u16)parse_numberi16(value,lineSpace,lineNum);
                 else if (KEY_EQ("amount"))          inst->amount = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("resetTime"))       inst->resetTime = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("minSecurityLevel"))inst->minSecurityLevel = parse_float(value, lineSpace, lineNum);
@@ -669,16 +673,13 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("randomMin"))      inst->randomMin = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("randomMax"))      inst->randomMax = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("useRandomTimes")) inst->useRandomTimes = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("onlyTargetOnce"))  inst->onlyOnce = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("onlyOnce"))        inst->onlyOnce = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("targetAlreadyDone")) inst->targetAlreadyDone = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("stayOpen"))        inst->stayOpen = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("startOpen"))       inst->startOpen = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("ajar"))            inst->ajar = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("ajarPercentage"))  inst->ajarPercentage = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(value, lineSpace, lineNum);
                 else if (KEY_EQ("toggleLasers"))    inst->toggleLasers = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("targettingOnlyUnlocks")) inst->targettingOnlyUnlocks = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("changeLayerOnOpenClose")) inst->changeLayerOnOpenClose = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("waitBeforeClose")) inst->waitBeforeClose = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
                 else if (KEY_EQ("lasersFinished"))  inst->lasersFinished = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
@@ -713,8 +714,6 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(value, lineSpace, lineNum));
                 else if (KEY_EQ("branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(value, lineSpace, lineNum));
                 else if (KEY_EQ("resourceFolder") && *value) scpy_to_a_from_b(inst->texAnimResourceFolder, value, TARGET_STRING_LENGTH);
-                else if (KEY_EQ("randomFrame"))     inst->texAnimRandom = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("reverseSequence")) inst->texAnimInReverse = parse_bool(value, lineSpace, lineNum);
                 else if (KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);
                 else if (KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
                 else if (KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
@@ -798,6 +797,10 @@ void LoadLevelMod(u8 lev) {
         if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
         par->entflags             |= src->entflags; // bitor `|` since AddInstance already set flags from entity definitions.
         par->ioflags               = src->ioflags;
+        par->ammo                  = src->ammo;
+        par->ammo2                 = src->ammo2;
+        par->lookUpIndex           = src->lookUpIndex;
+        par->usableCustIdx         = src->usableCustIdx;
         par->amount                = src->amount;
         par->resetTime             = src->resetTime;
         par->minSecurityLevel      = src->minSecurityLevel;
@@ -840,18 +843,14 @@ void LoadLevelMod(u8 lev) {
         par->waitBeforeClose       = src->waitBeforeClose;
         par->lasersFinished        = src->lasersFinished;
         par->onlyOnce              = src->onlyOnce;
-        par->targetAlreadyDone     = src->targetAlreadyDone;
         par->stayOpen              = src->stayOpen;
         par->startOpen             = src->startOpen;
         par->ajar                  = src->ajar;
         par->ajarPercentage        = src->ajarPercentage;
         par->timeBeforeLasersOn    = src->timeBeforeLasersOn;
         par->toggleLasers          = src->toggleLasers;
-        par->targettingOnlyUnlocks = src->targettingOnlyUnlocks;
         par->changeLayerOnOpenClose= src->changeLayerOnOpenClose;
         par->securityThreshold     = src->securityThreshold;
-        par->texAnimRandom         = src->texAnimRandom;
-        par->texAnimInReverse      = src->texAnimInReverse;
         par->messageLingdex        = src->messageLingdex;
         par->targetIdx             = src->targetIdx;
         par->targetnameIdx         = src->targetnameIdx;
@@ -1045,11 +1044,11 @@ void LoadLevelData(u8 curlevel) {
 }
 
 u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
-void RenderLoading(i32 offset, const char * restrict text); void ResetLevelAudio(); void ResetLevelMusic(); void CullInit();
+void RenderLoading(const char* restrict); void ResetLevelAudio(); void ResetLevelMusic(); void CullInit();
 void LoadAllLevels() {
     double start_time = get_time();
     DebugRAM("start of LoadAllLevels");
-    RenderLoading(100,"Loading level data...");
+    RenderLoading("Loading level data...");
     World.levelCurrentlyLoading = true;
     entsFromFile = (Entity*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(Entity));
     posFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
@@ -1081,7 +1080,7 @@ void LoadAllLevels() {
 void LoadLevel(u8 curlevel, V3 pos) {
     DebugRAM("start of LoadLevel");
     World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false;
-    RenderLoading(100,"Loading level...");
+    RenderLoading("Loading level...");
     if (World.currentLevel != curlevel) CopyPlayerState(World.currentLevel,curlevel);
     World.curLev = curlevel;
     SetLevelPointers(curlevel);
@@ -1095,10 +1094,10 @@ void LoadLevel(u8 curlevel, V3 pos) {
     for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
     DualLog("Switched to Level %d\n",curlevel);
     ResetLevelAudio(); ResetLevelMusic();
-    RenderLoading(110,"Loading cull system..."); CullInit(); // Must be after level!
+    RenderLoading("Loading cull system..."); CullInit(); // Must be after level!
     glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights);
                                  glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(7,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
-    RenderLoading(120,"Loading voxel lighting data...");
+    RenderLoading("Loading voxel lighting data...");
     for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
     World.levelCurrentlyLoading = false;

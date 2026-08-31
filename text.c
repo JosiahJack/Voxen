@@ -236,7 +236,7 @@ void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
             if(e->y0!=e->y1){
                 stbtt__active_edge* z=(stbtt__active_edge*)_hha(&hh,sizeof(*z));
                 if(z) { float dxdy = (e->x1-e->x0)/(e->y1-e->y0); z->fdx = dxdy; z->fdy = dxdy ? 1.0f/dxdy : 0; z->fx = e->x0 + dxdy * (syt - e->y0) - (float)ox; z->direction = e->invert ? 1.0f : -1.0f; z->sy = e->y0; z->ey = e->y1; z->next = 0; if(j == 0 && oy != 0 && z->ey < syt){z->ey=syt;} z->next = active; active = z; }
-            }++e;
+            } ++e;
         }
         if(active)_fae(sl,sl2+1,res->w,active,syt);
         {float sum=0;for(i=0;i<res->w;++i){float k;int m;sum+=sl2[i];k=(float)vabs(sl[i]+sum)*255.0f+0.5f;m=(int)k;if(m>255)m=255;res->pixels[j*res->stride+i]=(u8)m;}}
@@ -246,16 +246,9 @@ void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
 
 #define _CMP(a,b) ((a)->y0<(b)->y0)
 #define _SWP(a,b) {stbtt__edge t_=(a);(a)=(b);(b)=t_;}
-void _eis(stbtt__edge*p,int n){for(int i=1;i<n;++i){stbtt__edge t=p[i];int j=i;while(j>0&&_CMP(&t,&p[j-1])){p[j]=p[j-1];--j;}p[j]=t;}}
 void _eqs(stbtt__edge*p,int n){while(n>12){int m=n>>1,c01=_CMP(&p[0],&p[m]),c12=_CMP(&p[m],&p[n-1]);if(c01!=c12){int z=(_CMP(&p[0],&p[n-1])==c12)?0:n-1;_SWP(p[z],p[m]);}_SWP(p[0],p[m]);int i=1,j=n-1;for(;;){while(_CMP(&p[i],&p[0]))++i;while(_CMP(&p[0],&p[j]))--j;if(i>=j)break;_SWP(p[i],p[j]);++i;--j;}if(j<n-i){_eqs(p,j);p+=i;n-=i;}else{_eqs(p+i,n-i);n=j;}}}
-void _esort(stbtt__edge*p,int n){_eqs(p,n);_eis(p,n);}
 void _add_pt(V2*p,int n,float x,float y){if(p){p[n].x=x;p[n].y=y;}}
-int _tess_c(V2*pts,int*np,float x0,float y0,float x1,float y1,float x2,float y2,float fsq,int n) {
-    float mx=(x0+2*x1+x2)/4,my=(y0+2*y1+y2)/4,dx=(x0+x2)/2-mx,dy=(y0+y2)/2-my;
-    if(n>16||dx*dx+dy*dy<=fsq){_add_pt(pts,(*np)++,x2,y2);return 1;}
-    _tess_c(pts,np,x0,y0,(x0+x1)/2,(y0+y1)/2,mx,my,fsq,n+1);_tess_c(pts,np,mx,my,(x1+x2)/2,(y1+y2)/2,x2,y2,fsq,n+1);return 1;
-}
-
+int _tess_c(V2*pts,int*np,float x0,float y0,float x1,float y1,float x2,float y2,float fsq,int n) { float mx=(x0+2*x1+x2)/4,my=(y0+2*y1+y2)/4,dx=(x0+x2)/2-mx,dy=(y0+y2)/2-my; if(n>16||dx*dx+dy*dy<=fsq){_add_pt(pts,(*np)++,x2,y2);return 1;} _tess_c(pts,np,x0,y0,(x0+x1)/2,(y0+y1)/2,mx,my,fsq,n+1);_tess_c(pts,np,mx,my,(x1+x2)/2,(y1+y2)/2,x2,y2,fsq,n+1);return 1; }
 void _tess_cb(V2*pts,int*np,float x0,float y0,float x1,float y1,float x2,float y2,float x3,float y3,float fsq,int n) {
     float d0=vsqrtf((x1-x0)*(x1-x0)+(y1-y0)*(y1-y0)),d1=vsqrtf((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)),d2=vsqrtf((x3-x2)*(x3-x2)+(y3-y2)*(y3-y2)),ds=vsqrtf((x3-x0)*(x3-x0)+(y3-y0)*(y3-y0)),ll=d0+d1+d2;
     if(n>16||ll*ll-ds*ds<=fsq){_add_pt(pts,(*np)++,x3,y3);return;}
@@ -284,10 +277,10 @@ static V2* _flatten(stbtt_vertex*v,int nv,float flat,int**cl,int*nc) {
 }
 
 static void _rasterize(stbtt__bitmap*res,V2*pts,int*wc,int nw,float sx,float sy,float shx,float shy,int ox,int oy,int inv){
-    float ysi=inv?-sy:sy;stbtt__edge*e;int n=0,i,j,k;for(i=0;i<nw;++i)n+=wc[i];
-    e=(stbtt__edge*)ttalloc(sizeof(*e)*((size_t)n+1));if(!e)return;n=0;int m=0;
-    for(i=0;i<nw;++i){V2*p=pts+m;m+=wc[i];j=wc[i]-1;for(k=0;k<wc[i];j=k++){int a=k,b=j;if(p[j].y==p[k].y)continue;e[n].invert=0;if(inv?p[j].y>p[k].y:p[j].y<p[k].y){e[n].invert=1;a=j;b=k;}e[n].x0=p[a].x*sx+shx;e[n].y0=p[a].y*ysi+shy;e[n].x1=p[b].x*sx+shx;e[n].y1=p[b].y*ysi+shy;++n;}}
-    _esort(e,n);_rse(res,e,n,ox,oy);ttfree(e);
+    float ysi=inv?-sy:sy; stbtt__edge*e; int n=0; for(int i=0;i<nw;++i){n+=wc[i];}
+    e=(stbtt__edge*)ttalloc(sizeof(*e)*((size_t)n+1)); if(!e){return;} n=0; int m=0;
+    for(int i=0;i<nw;++i){V2*p=pts+m;m+=wc[i]; int j=wc[i]-1;for(int k=0;k<wc[i];j=k++){int a=k,b=j;if(p[j].y==p[k].y)continue;e[n].invert=0;if(inv?p[j].y>p[k].y:p[j].y<p[k].y){e[n].invert=1;a=j;b=k;}e[n].x0=p[a].x*sx+shx;e[n].y0=p[a].y*ysi+shy;e[n].x1=p[b].x*sx+shx;e[n].y1=p[b].y*ysi+shy;++n;}}
+    _eqs(e,n); for(int i=1;i<n;++i){stbtt__edge t=e[i];int j=i;while(j>0&&_CMP(&t,&e[j-1])){e[j]=e[j-1];--j;}e[j]=t;} _rse(res,e,n,ox,oy); ttfree(e);
 }
 
 void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo*info,u8*out,int ow,int oh,int ostr,float sx,float sy,float shx,float shy,int g){
@@ -484,14 +477,63 @@ void LoadLogTextForLanguage(u8 lang) {
         nxt:continue;}
 }
 
-static float textVertexData[8192]; extern Color textColors[];
-void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char* restrict format,...) {
-    va_list args; __builtin_va_start(args,format); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,args); __builtin_va_end(args);
+static float textVertexData[8192]; extern Color textColors[]; enum {TALIGN_LEFT=0,TALIGN_CENTER=1,TALIGN_RIGHT=2};
+//void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 align, const char* restrict format, va_list args) {
+    //va_list c; __builtin_va_copy(c,args); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,c); __builtin_va_end(c);
+    //glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
+    //glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex);
+    //float invatsz = 1.0f/(float)FONT_ATLAS_SIZE;
+    //glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID); glBindVertexArray(textVAO);
+    //float xUsed=x, yUsed=y; if (scale < 1.0f) { xUsed *= (1/scale); yUsed *= (1/scale); }
+    //size_t vc=0; const char*p=uiTextBuffer; float xpos=xUsed,ypos=yUsed+(16*scale),ls=22*scale; int cc=0; float puv = 10.0f * invatsz, bw=2.0f;
+    //while(*p) {
+        //const u8*s=(const u8*)p; u32 cp=0;
+        //if (*s<0x80) { cp=*s++; }
+        //else if ((*s&0xE0)==0xC0) { if (!s[1]) break; cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }
+        //else if ((*s&0xF0)==0xE0) { if (!s[1] || !s[2]) break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }
+        //else if ((*s&0xF8)==0xF0) { if (!s[1] || !s[2] || !s[3]) break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
+        //else s++;
+        //p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=xUsed; ypos+=ls; cc=0; continue; }
+        //int idx=CodepointToPackedIndex(cp,fontID);
+        //const stbtt_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx;
+        //float qx0 = vfloor((xpos + b->xoff) + 0.5f), qy0 = vfloor((ypos + b->yoff) + 0.5f);
+        //float qs0 = b->x0 * invatsz, qt0 = b->y0 * invatsz, qs1 = b->x1 * invatsz, qt1 = b->y1 * invatsz;
+        //float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw;
+        //float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f;
+        //float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 };
+        //if (vc >= 8192/30) break;
+        //mcpy(textVertexData + vc * 30,tv,sizeof(tv)); vc++;
+        //if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD){xpos = qx0 + fixedNumberAdvanceWidthStopD;}
+        //else xpos += b->xadvance;
+    //}
+    //if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
+//}
+static float MeasureLineAdvance(const char* p, u8 fontID) {
+    float w=0; int cc=0;
+    while (*p) {
+        const u8*s=(const u8*)p; u32 cp=0;
+        if (*s<0x80) { cp=*s++; }
+        else if ((*s&0xE0)==0xC0) { if (!s[1]) break; cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }
+        else if ((*s&0xF0)==0xE0) { if (!s[1] || !s[2]) break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }
+        else if ((*s&0xF8)==0xF0) { if (!s[1] || !s[2] || !s[3]) break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
+        else s++;
+        p=(const char*)s; cc++; if (cp=='\n'||cc>120) break;
+        const stbtt_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + CodepointToPackedIndex(cp,fontID);
+        if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD) w = vfloor((w + b->xoff) + 0.5f) + fixedNumberAdvanceWidthStopD; // same pen step the render loop uses for digits
+        else w += b->xadvance;
+    }
+    return w;
+}
+
+void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 align, const char* restrict format, va_list args) {
+    va_list c; __builtin_va_copy(c,args); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,c); __builtin_va_end(c);
     glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
     glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex);
     float invatsz = 1.0f/(float)FONT_ATLAS_SIZE;
     glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID); glBindVertexArray(textVAO);
-    size_t vc=0; const char*p=uiTextBuffer; float xpos=x,ypos=y+(16*scale),ls=22*scale; int cc=0; float puv = 10.0f * invatsz, bw=2.0f;
+    float xUsed=x, yUsed=y; if (scale < 1.0f) { xUsed *= (1/scale); yUsed *= (1/scale); }
+    float alignMul = (align==TALIGN_CENTER) ? 0.5f : (align==TALIGN_RIGHT) ? 1.0f : 0.0f; // pen starts this far (as a fraction of line width) left of xUsed
+    size_t vc=0; const char*p=uiTextBuffer; float xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed), ypos=yUsed+(16*scale),ls=22*scale; int cc=0; float puv = 10.0f * invatsz, bw=2.0f;
     while(*p) {
         const u8*s=(const u8*)p; u32 cp=0;
         if (*s<0x80) { cp=*s++; }
@@ -499,7 +541,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char*
         else if ((*s&0xF0)==0xE0) { if (!s[1] || !s[2]) break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }
         else if ((*s&0xF8)==0xF0) { if (!s[1] || !s[2] || !s[3]) break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
         else s++;
-        p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=x; ypos+=ls; cc=0; continue; }
+        p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed); ypos+=ls; cc=0; continue; }
         int idx=CodepointToPackedIndex(cp,fontID);
         const stbtt_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx;
         float qx0 = vfloor((xpos + b->xoff) + 0.5f), qy0 = vfloor((ypos + b->yoff) + 0.5f);
@@ -514,3 +556,7 @@ void RenderFormattedText(i16 x,i16 y,u32 color,u8 fontID,float scale,const char*
     }
     if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
+
+void RenderTextL(i16 x, i16 y, u32 color, u8 fontID, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,fontID,scale,TALIGN_LEFT,s,a); __builtin_va_end(a); }                                                                                                                                                                                                            
+void RenderTextC(i16 x, i16 y, u32 color, u8 fontID, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,fontID,scale,TALIGN_CENTER,s,a); __builtin_va_end(a); }                                                                                                                                                                                                            
+void RenderTextR(i16 x, i16 y, u32 color, u8 fontID, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,fontID,scale,TALIGN_RIGHT,s,a); __builtin_va_end(a); } 

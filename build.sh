@@ -117,7 +117,7 @@ SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c audio.
 SIZEOPT="models.c text.c textures.c lib.c audio.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "F=\$(echo '$SIZEOPT' | tr ' ' '\\n' | grep -qx \$(basename {}) && echo -Oz || echo ''); $CC -c {} $CFLAGS \$F -o $TEMP_DIR/\$(basename {}).o"
-$LINKER "$TEMP_DIR"/*.o $LDFLAGS -o $BINARY_NAME
+$LINKER "$TEMP_DIR"/*.o $LDFLAGS -Wl,--print-gc-sections -o $BINARY_NAME
 build_end=$(now_ms)
 total_build_time=$((build_end - shader_start))
 echo "Built engine as game in ${total_build_time} ms"
