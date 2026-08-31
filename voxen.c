@@ -45,7 +45,7 @@ INLINE void DrawDebugLines(float* viewProj) {
 }
 
 void BioMonitorUpdate(void);
-void AddWireLine(V3 start, V3 end, Color col) {
+void DrawLine(V3 start, V3 end, Color col) {
     if (!debugLineVerts || World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2) return;
     int i = World.debugLineVertCount;
     debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z; debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
@@ -56,26 +56,22 @@ void AddWireLine(V3 start, V3 end, Color col) {
 INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY) || PhysIsAsleep(i)) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
 void DrawVelocityVector(u16 i) {
     if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;}
-    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f)); AddWireLine(World.position[i],tip,textColors[T_ORANGE]); V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}));
-    AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
+    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f)); DrawLine(World.position[i],tip,textColors[T_ORANGE]); V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}));
+    DrawLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
 }
 
 void DrawBoxColliderColored(u16 i, Color col) {
     ShapeBox b = Entity_GetBox(i); V3 c[8],px,py,pz, ax=quat_rot_v3(b.rot,(V3){1,0,0}), ay=quat_rot_v3(b.rot,(V3){0,1,0}), az=quat_rot_v3(b.rot,(V3){0,0,1}); px=V3_ScaleByF(ax,b.hExt.x); py=V3_ScaleByF(ay,b.hExt.y); pz=V3_ScaleByF(az,b.hExt.z);
     for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3_AplusB(b.ctr,V3_AplusB(V3_AplusB(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
-    AddWireLine(c[0],c[1],col); AddWireLine(c[2],c[3],col); AddWireLine(c[4],c[5],col); AddWireLine(c[6],c[7],col); AddWireLine(c[0],c[2],col); AddWireLine(c[1],c[3],col);
-    AddWireLine(c[4],c[6],col); AddWireLine(c[5],c[7],col); AddWireLine(c[0],c[4],col); AddWireLine(c[1],c[5],col); AddWireLine(c[2],c[6],col); AddWireLine(c[3],c[7],col);
-    DrawVelocityVector(i);
+    DrawLine(c[0],c[1],col); DrawLine(c[2],c[3],col); DrawLine(c[4],c[5],col); DrawLine(c[6],c[7],col); DrawLine(c[0],c[2],col); DrawLine(c[1],c[3],col); DrawLine(c[4],c[6],col); DrawLine(c[5],c[7],col); DrawLine(c[0],c[4],col); DrawLine(c[1],c[5],col); DrawLine(c[2],c[6],col); DrawLine(c[3],c[7],col); DrawVelocityVector(i);
 }
 
-void DrawBoxCollider(u16 i) { DrawBoxColliderColored(i,ColliderColor(i)); }
+static void DrawBoxCollider(u16 i) { DrawBoxColliderColored(i,ColliderColor(i)); }
 void DrawSphereWireframe(Color col, ShapeSphere s) {
     float step=6.28318530f/12;
     for (int seg=0;seg<12;seg++) {
         float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1);
-        AddWireLine(V3_AplusB(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3_AplusB(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col);
-        AddWireLine(V3_AplusB(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3_AplusB(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col);
-        AddWireLine(V3_AplusB(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3_AplusB(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col);
+        DrawLine(V3_AplusB(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3_AplusB(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col); DrawLine(V3_AplusB(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3_AplusB(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col); DrawLine(V3_AplusB(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3_AplusB(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col);
     }
 }
 
@@ -83,72 +79,45 @@ void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = E
 void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
 void DrawMeshCollider(u16 i) {
     Color col = ColliderColor(i); u16 mi = (World.col[i] == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
-    u32 triCount = modelTriangleCounts[mi]; if (!triCount) return;
-    float M[16]; mcpy(M, &modelMatrices[i*16], 64); float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
-    const float* pos = physPos[mi]; const u16* tris = modelTriangles[mi];
-    for (u32 j=0; j<triCount; j++) {
-        V3 w[3]; u32 b=j*3; for (int k=0;k<3;++k) { u32 vi=tris[b + k]; float x=pos[vi*3 + 0]; float y=pos[vi*3 + 1]; float z=pos[vi*3 + 2]; w[k]=(V3){m00*x + m01*y + m02*z + tx, m10*x + m11*y + m12*z + ty, m20*x + m21*y + m22*z + tz}; }
-        AddWireLine(w[0],w[1],col); AddWireLine(w[1],w[2],col); AddWireLine(w[2],w[0],col);
-    }
+    u32 triCount = modelTriangleCounts[mi]; if(!triCount){return;} float M[16]; mcpy(M, &modelMatrices[i*16], 64); float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14]; const float* pos = physPos[mi]; const u16* tris = modelTriangles[mi];
+    for (u32 j=0; j<triCount; j++) { V3 w[3]; u32 b=j*3; for (int k=0;k<3;++k) { u32 vi=tris[b + k]; float x=pos[vi*3 + 0]; float y=pos[vi*3 + 1]; float z=pos[vi*3 + 2]; w[k]=(V3){m00*x + m01*y + m02*z + tx, m10*x + m11*y + m12*z + ty, m20*x + m21*y + m22*z + tz}; } DrawLine(w[0],w[1],col); DrawLine(w[1],w[2],col); DrawLine(w[2],w[0],col); }
     DrawVelocityVector(i);
 }
 
 void DrawCapsuleCollider(u16 i) {
-    Color col = ColliderColor(i); 
-    ShapeCapsule cap = Entity_GetCap(i);
-    V3 diff = V3_AsubB(cap.tip, cap.base);
-    V3 axis = (vabs(diff.x) + vabs(diff.y) + vabs(diff.z) > 0.0001f) ? V3_Normalize(diff) : (V3){0.0f, 1.0f, 0.0f};     
-    V3 ref = (vabs(axis.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; 
-    V3 perp0 = V3_Normalize(V3_Cross(axis, ref)); 
-    V3 perp1 = V3_Cross(axis, perp0);
-    float step = 6.28318530f / 12, r = cap.rad;
-    for (int seg = 0; seg < 12; seg++) { // Draw top and bottom rings
-        float a0 = seg * step, a1 = a0 + step;
-        float c0 = vcosf(a0), s0 = vsinf(a0), c1 = vcosf(a1), s1 = vsinf(a1); 
-        V3 r0 = V3_AplusB(V3_ScaleByF(perp0, c0 * r), V3_ScaleByF(perp1, s0 * r));
-        V3 r1 = V3_AplusB(V3_ScaleByF(perp0, c1 * r), V3_ScaleByF(perp1, s1 * r));
-        AddWireLine(V3_AplusB(cap.base, r0), V3_AplusB(cap.base, r1), col); 
-        AddWireLine(V3_AplusB(cap.tip, r0),  V3_AplusB(cap.tip, r1),  col);
+    Color col = ColliderColor(i); ShapeCapsule cap = Entity_GetCap(i); V3 diff = V3_AsubB(cap.tip, cap.base); V3 axis = (vabs(diff.x) + vabs(diff.y) + vabs(diff.z) > 0.0001f) ? V3_Normalize(diff) : (V3){0.0f, 1.0f, 0.0f};     
+    V3 ref = (vabs(axis.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; V3 perp0 = V3_Normalize(V3_Cross(axis, ref)); V3 perp1 = V3_Cross(axis, perp0); float step = 6.28318530f / 12, r = cap.rad;
+    for (int seg=0;seg<12;++seg) { // Draw top and bottom rings
+        float a0=seg * step, a1=a0 + step; float c0=vcosf(a0), s0=vsinf(a0), c1=vcosf(a1), s1=vsinf(a1); V3 r0=V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(perp1,s0*r)); V3 r1=V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(perp1,s1*r));
+        DrawLine(V3_AplusB(cap.base,r0),V3_AplusB(cap.base,r1),col); DrawLine(V3_AplusB(cap.tip,r0),V3_AplusB(cap.tip,r1),col);
     }
-    for (int seg = 0; seg < 6; seg++) { // Draw the hemispheres
-        float a0 = seg * step, a1 = a0 + step;
-        float c0 = vcosf(a0), s0 = vsinf(a0), c1 = vcosf(a1), s1 = vsinf(a1);
-        AddWireLine(V3_AplusB(cap.base, V3_AplusB(V3_ScaleByF(perp0, c0 * r), V3_ScaleByF(axis, -s0 * r))), V3_AplusB(cap.base, V3_AplusB(V3_ScaleByF(perp0, c1 * r), V3_ScaleByF(axis, -s1 * r))), col); 
-        AddWireLine(V3_AplusB(cap.base, V3_AplusB(V3_ScaleByF(perp1, c0 * r), V3_ScaleByF(axis, -s0 * r))), V3_AplusB(cap.base, V3_AplusB(V3_ScaleByF(perp1, c1 * r), V3_ScaleByF(axis, -s1 * r))), col);
-        AddWireLine(V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp0, c0 * r), V3_ScaleByF(axis, s0 * r))),  V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp0, c1 * r), V3_ScaleByF(axis, s1 * r))), col); 
-        AddWireLine(V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp1, c0 * r), V3_ScaleByF(axis, s0 * r))),  V3_AplusB(cap.tip, V3_AplusB(V3_ScaleByF(perp1, c1 * r), V3_ScaleByF(axis, s1 * r))), col);
+    for (int seg=0;seg<6;++seg) { // Draw the hemispheres
+        float a0=seg*step, a1=a0+step; float c0=vcosf(a0), s0=vsinf(a0), c1=vcosf(a1), s1=vsinf(a1);
+        DrawLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,-s1*r))),col); 
+        DrawLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,-s1*r))),col);
+        DrawLine(V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,s0*r))),V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,s1*r))),col); 
+        DrawLine(V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,s0*r))),V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,s1*r))),col);
     }
-    for (int seg = 0; seg < 4; seg++) { // Draw the longitudinal lines
-        float a = seg * (6.28318530f / 4.f); 
-        V3 off = V3_AplusB(V3_ScaleByF(perp0, vcosf(a) * r), V3_ScaleByF(perp1, vsinf(a) * r)); 
-        AddWireLine(V3_AplusB(cap.base, off), V3_AplusB(cap.tip, off), col); 
-    }
+    for(int seg=0;seg<4;++seg){float a=seg*(6.28318530f / 4.f); V3 off=V3_AplusB(V3_ScaleByF(perp0,vcosf(a)*r),V3_ScaleByF(perp1,vsinf(a)*r)); DrawLine(V3_AplusB(cap.base,off),V3_AplusB(cap.tip,off),col); } // Draw the longitudinal lines
     DrawVelocityVector(i);
 }
 
 void DrawAngularVelocity(u16 i) {
     if (!(World.instances[i].entflags & EF_RIGIDBODY) || V3_Mag(World.angularVelocity[i]) < 0.0001f) return; // skip near-zero
-    Color purple = (Color){0.5f,0.0f,1.0f,1.0f}; V3 dir=V3_Normalize(World.angularVelocity[i]); V3 tip=V3_AplusB(World.position[i],V3_ScaleByF(World.angularVelocity[i],0.35f)); AddWireLine(World.position[i],tip,purple); // Arrow (line vector)
+    Color purple = (Color){0.5f,0.0f,1.0f,1.0f}; V3 dir=V3_Normalize(World.angularVelocity[i]); V3 tip=V3_AplusB(World.position[i],V3_ScaleByF(World.angularVelocity[i],0.35f)); DrawLine(World.position[i],tip,purple); // Arrow (line vector)
     V3 ref=(vabs(dir.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; V3 perp=V3_Normalize(V3_Cross(dir,ref)); V3 perp2 = V3_Cross(dir,perp);
-    AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp, 0.05f)),V3_AplusB(tip,V3_ScaleByF(perp, -0.05f)), purple); // Small cross at tip so zero-length vectors are still visible
-    AddWireLine(V3_AplusB(tip,V3_ScaleByF(perp2,0.05f)),V3_AplusB(tip,V3_ScaleByF(perp2,-0.05f)), purple);
+    DrawLine(V3_AplusB(tip,V3_ScaleByF(perp, 0.05f)),V3_AplusB(tip,V3_ScaleByF(perp, -0.05f)), purple); // Small cross at tip so zero-length vectors are still visible
+    DrawLine(V3_AplusB(tip,V3_ScaleByF(perp2,0.05f)),V3_AplusB(tip,V3_ScaleByF(perp2,-0.05f)), purple);
     float rad=0.6f; /*Quarter circle arc (visualizes rotation plane + sense)*/ float step = 1.57079632679f / 8.0f; /*quarter circle divided into 8 segments*/
     V3 axis=dir; V3 p1=V3_Normalize(V3_Cross(axis,ref)); V3 p2=V3_Cross(axis,p1); V3 prev = V3_AplusB(World.position[i], V3_ScaleByF(p1,rad)); // Find two vectors perpendicular to angular axis
-    for (int j=1;j<=8;++j) { float a = j * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(World.position[i],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); AddWireLine(prev,cur,purple); prev = cur; }
+    for (int j=1;j<=8;++j) { float a = j * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(World.position[i],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); DrawLine(prev,cur,purple); prev = cur; }
 }
 #include "winput.c"
 // Console System - CHEATS!
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
-V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,
-                                       {-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
-static V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,
-                                         {126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
-static void AddToHistory(const char* entry) {
-    if (slen(entry) == 0 || (numHistory > 0 && sEqual(entry,history[numHistory - 1]))) return;
-    if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],entry,T_BUFFER_SIZE); numHistory++; }
-    else { for (int i = 0; i < 7 - 1; i++) {scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE);/*Shift list toward 0*/} scpy_to_a_from_b(history[7 - 1],entry,T_BUFFER_SIZE); }
-}
-
+V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,{-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
+static V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,{126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
+static void AddToHistory(const char* entry) { if (slen(entry) == 0 || (numHistory > 0 && sEqual(entry,history[numHistory - 1]))){return;} if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],entry,T_BUFFER_SIZE); numHistory++; } else { for (int i = 0; i < 7 - 1; i++) {scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE);/*Shift list toward 0*/} scpy_to_a_from_b(history[7 - 1],entry,T_BUFFER_SIZE); } }
 void RecallHistory(int direction) { // direction 1 up (older), -1 down (newer)
     if (direction == 1) { if (historyPos > 0) { historyPos--; scpy_to_a_from_b(consoleEntryText,history[historyPos],T_BUFFER_SIZE); currentEntryLength = slen(consoleEntryText); } } // up
     else if (direction == -1) { if (historyPos < numHistory) { historyPos++; if (historyPos == numHistory) { consoleEntryText[0] = currentEntryLength = 0; } else { scpy_to_a_from_b(consoleEntryText,history[historyPos],T_BUFFER_SIZE); currentEntryLength = slen(consoleEntryText); } } } // down
@@ -190,18 +159,15 @@ int ParseLevelArg(const char* arg) {
 u8 queuedLevelToLoad = 255u; V3 queuedLevelPos;
 static void cmd_loadlevel(const char* arg) {
     if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
-    int level = ParseLevelArg(arg); if (level == -2) return; // Already printed g3 message
-    if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %d",level); return; }
-    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad = level; queuedLevelPos = (level == 13) ? cyberSpaceEntryLocations[World.currentLevel < 8 ? (u8)World.currentLevel : 0] : ressurectionLocations[level > 9 ? 6 : level]; LoadLevel(level,queuedLevelPos);
+    int level=ParseLevelArg(arg); if(level == -2){return;/*Already printed g3 message*/} if(level < 0 || level > 12){CenterStatusPrint("cmd_loadlevel invalid level argument %d",level); return;}
+    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad=level; queuedLevelPos=(level == 13) ? cyberSpaceEntryLocations[World.currentLevel < 8 ? (u8)World.currentLevel : 0] : ressurectionLocations[level > 9 ? 6 : level]; LoadLevel(level,queuedLevelPos);
 }
 
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }
 static void cmd_summon(int itemConstIndex) { if (IdxInBounds(itemConstIndex)) { u16 spawned = SpawnDynamicObject(itemConstIndex,true); if (spawned < U16_MAX) { lastSpawned = spawned; } CenterStatusPrint("Summoned object ID %d",itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s",itemConstIndex); } }
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
-static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; }
-static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
-static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacker!"); }
-static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
+static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; }                         static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
+static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacker!"); } static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
 static void cmd_god() { Cheats.god = !Cheats.god; CenterStatusPrint("god mode: %s", Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_energy() { Cheats.redbull = !Cheats.redbull; if (Cheats.redbull) {CenterStatusPrint("%s", Sys_Text.stringTable[1006]);/*"I feel the power! 0 energy consumption!"*/} else {CenterStatusPrint("%s", Sys_Text.stringTable[1005]);/*Energy usage normal*/} }
 static void SetSkyRotateSpeed() { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(imageBlitSP); glUniform1f(30,skyRotateSpeeds[Cheats.dizzyLevel]); }
@@ -266,22 +232,16 @@ void ProcessConsoleCommand(const char* c) {
 }
 
 void ConsoleEmulator(i32 keycode) {
-    if (keycode == KEY_UP || keycode == KEY_DOWN) { RecallHistory(keycode == KEY_UP ? 1 : -1); return; }
-    if (keycode == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]='\0'; currentEntryLength=0; return; } // Clear the input
-    if (keycode >= KEY_A && keycode <= KEY_Z) { // Handle alphabet keys
-        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { char c = 'a' + (keycode - KEY_A); /*lowercase*/ consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++; }
-    } else if (keycode >= KEY_1 && keycode <= KEY_9) { // Handle number keys 1-9
-        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { char c = '1' + (keycode - KEY_1); /*Map to '1'-'9'*/ consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++; }
-    } else if (keycode == KEY_0) { // Handle '0'
-        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]='0'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
-    } else if (keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) {
-        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=(Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? '_' : '-'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
-    } else if (keycode == KEY_BACKSPACE && currentEntryLength > 0) { currentEntryLength--; consoleEntryText[currentEntryLength]='\0'; } // Handle backspace
-    else if (keycode == KEY_SPACE) { // Handle space
-        if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; }
-    } else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
+    if (keycode == KEY_UP || keycode == KEY_DOWN) { RecallHistory(keycode == KEY_UP ? 1 : -1); return;/*get history*/} if (keycode == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]='\0'; currentEntryLength=0; return; } // Clear the input
+         if (keycode >= KEY_A && keycode <= KEY_Z) { /*Handle alphabet keys*/ if (currentEntryLength < (T_BUFFER_SIZE - 1)) { char c = 'a' + (keycode - KEY_A); /*lowercase*/ consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++; } }
+    else if (keycode >= KEY_1 && keycode <= KEY_9) { /*Handle number keys 1-9*/ if (currentEntryLength < (T_BUFFER_SIZE - 1)) { char c = '1' + (keycode - KEY_1); /*Map to '1'-'9'*/ consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++; } }
+    else if (keycode == KEY_0) { /*Handle '0'*/ if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]='0'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; } }
+    else if (keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) { if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=(Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? '_' : '-'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; } }
+    else if (keycode == KEY_BACKSPACE && currentEntryLength > 0) { currentEntryLength--; consoleEntryText[currentEntryLength]='\0'; } // Handle backspace
+    else if (keycode == KEY_SPACE) { /*Handle space*/ if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; } }
+    else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
 }
-// Raycast System.  This is an exact polygonal casting system for high accuracy separate from the physics engine entirely except for layers and shared vertex positions.
+// Raycast System
 RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC) {
     V3 AB=V3_AsubB(posB,posA), AC=V3_AsubB(posC,posA); V3 n=V3_Cross(AB,AC); V3 ao=V3_AsubB(origin,posA); V3 dao=V3_Cross(ao,dir);
     float det=(-V3_dot(dir,n)); float invDet=1.0f / det; float d=V3_dot(ao,n) * invDet; float u=V3_dot(AC,dao) * invDet, v=(-V3_dot(AB,dao)) * invDet; float w=1.0f - u - v;
@@ -290,63 +250,34 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 posA, V3 posB, V3 posC) {
 
 INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
     RaycastHit h = {.hit=false,.distance=maxDist,.point={0,0,0},.normal={0,0,0},.hitInstanceIndex=INSTANCE_COUNT};
-    float r = sph.rad;
-    if (r < 0.0001f) return h;
-    V3 oc = V3_AsubB(origin, sph.ctr);
-    float b = V3_dot(oc, dir);
-    float c = V3_dot(oc, oc) - r * r;
-    float disc = b * b - c;
-    if (disc < 0.0f) return h;
-    float s = vsqrtf(disc);
-    float t = -b - s;
-    if (t < 0.0f) t = -b + s;
-    if (t < 0.0f || t > maxDist) return h;
-    V3 p = V3_AplusB(origin, V3_ScaleByF(dir, t));
-    V3 n = V3_Normalize(V3_ScaleByF(V3_AsubB(p, sph.ctr), 1.0f / r));
-    h.hit = true;
-    h.distance = t;
-    h.point = p;
-    h.normal = n;
-    return h;
+    float r = sph.rad; if (r < 0.0001f) return h;
+    V3 oc = V3_AsubB(origin, sph.ctr); float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r; float disc=b*b - c; if (disc < 0.0f) return h;
+    float s = vsqrtf(disc); float t = -b - s; if (t < 0.0f) t = -b + s; if (t < 0.0f || t > maxDist) return h;
+    V3 p = V3_AplusB(origin, V3_ScaleByF(dir, t)); V3 n = V3_Normalize(V3_ScaleByF(V3_AsubB(p, sph.ctr), 1.0f / r));
+    h.hit = true; h.distance = t; h.point = p; h.normal = n; return h;
 }
+
 INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist) {
     RaycastHit h={.hit=false,.distance=maxDist,.point={0,0,0},.normal={0,0,0},.hitInstanceIndex=INSTANCE_COUNT};
     float r = cap.rad; if (r < 0.0001f) return h;
-    V3 ba = V3_AsubB(cap.tip,cap.base), oa = V3_AsubB(origin,cap.base), nBest = {0,0,0};
-    float baba = V3_dot(ba,ba);
-    if (baba < 0.00001f) return RaySphere(origin, dir, (ShapeSphere){cap.base, r}, maxDist);
-    float bard = V3_dot(ba,dir), baoa = V3_dot(ba,oa), tBest=-1.0f;
-    float a = baba - bard * bard, b = baba * V3_dot(dir,oa) - baoa * bard, c = baba * V3_dot(oa,oa) - baoa * baoa - r * r * baba;
-    float disc = b * b - a * c;
+    V3 ba = V3_AsubB(cap.tip,cap.base), oa = V3_AsubB(origin,cap.base), nBest = {0,0,0}; float baba = V3_dot(ba,ba); if (baba < 0.00001f) return RaySphere(origin, dir, (ShapeSphere){cap.base, r}, maxDist);
+    float bard = V3_dot(ba,dir), baoa = V3_dot(ba,oa), tBest=-1.0f; float a = baba - bard * bard, b = baba * V3_dot(dir,oa) - baoa * bard, c = baba * V3_dot(oa,oa) - baoa * baoa - r * r * baba; float disc = b * b - a * c;
     if (vabs(a) >= 0.00001f && disc >= 0.0f) {
         float sh = vsqrtf(disc); float t0 = (-b - sh) / a; float y0 = baoa + t0 * bard;
         if (t0 >= 0.0f && t0 <= maxDist && y0 > 0.0f && y0 < baba) { tBest = t0; V3 p = V3_AplusB(origin,V3_ScaleByF(dir,t0)); V3 q = V3_AplusB(cap.base,V3_ScaleByF(ba,y0/baba)); nBest = V3_Normalize(V3_AsubB(p, q)); }
-        else {
-            float t1 = (-b + sh) / a; float y1 = baoa + t1 * bard;
-            if(t1 >= 0.0f && t1 <= maxDist && y1 > 0.0f && y1 < baba && tBest < 0.0f){tBest=t1; V3 p=V3_AplusB(origin,V3_ScaleByF(dir,t1)); V3 q=V3_AplusB(cap.base,V3_ScaleByF(ba,y1/baba)); nBest=V3_Normalize(V3_AsubB(p,q));}
-        }
+        else { float t1 = (-b + sh) / a; float y1 = baoa + t1 * bard; if(t1 >= 0.0f && t1 <= maxDist && y1 > 0.0f && y1 < baba && tBest < 0.0f){tBest=t1; V3 p=V3_AplusB(origin,V3_ScaleByF(dir,t1)); V3 q=V3_AplusB(cap.base,V3_ScaleByF(ba,y1/baba)); nBest=V3_Normalize(V3_AsubB(p,q));} }
     }
     for (int k = 0; k < 2; k++) {
         V3 ctr = k == 0 ? cap.base : cap.tip;
         V3 oc = V3_AsubB(origin, ctr);
-        float bs = V3_dot(oc, dir);
-        float cs = V3_dot(oc, oc) - r * r;
-        float ds = bs * bs - cs;
-        if (ds < 0.0f) continue;
-        float shs = vsqrtf(ds);
-        float ts = -bs - shs;
-        if (ts < 0.0f) ts = -bs + shs;
-        if (ts < 0.0f || ts > maxDist) continue;
-        if (tBest >= 0.0f && ts >= tBest) continue;
-        V3 ps = V3_AplusB(origin, V3_ScaleByF(dir, ts));
-        float y = V3_dot(V3_AsubB(ps, cap.base), ba);
-        if ((k == 0 && y > 0.0f) || (k == 1 && y < baba)) continue;
-        tBest = ts;
-        nBest = V3_Normalize(V3_ScaleByF(V3_AsubB(ps, ctr), 1.0f / r));
+        float bs = V3_dot(oc, dir); float cs = V3_dot(oc, oc) - r * r; float ds = bs * bs - cs; if (ds < 0.0f) continue;
+        float shs = vsqrtf(ds); float ts = -bs - shs; if (ts < 0.0f) ts = -bs + shs; if (ts < 0.0f || ts > maxDist) continue; if (tBest >= 0.0f && ts >= tBest) continue;
+        V3 ps = V3_AplusB(origin, V3_ScaleByF(dir, ts)); float y = V3_dot(V3_AsubB(ps, cap.base), ba); if ((k == 0 && y > 0.0f) || (k == 1 && y < baba)) continue;
+        tBest = ts; nBest = V3_Normalize(V3_ScaleByF(V3_AsubB(ps, ctr), 1.0f / r));
     }
-    if (tBest >= 0.0f) { h.hit = true; h.distance = tBest; h.point = V3_AplusB(origin, V3_ScaleByF(dir, tBest)); h.normal = nBest; }
-    return h;
+    if (tBest >= 0.0f) { h.hit = true; h.distance = tBest; h.point = V3_AplusB(origin, V3_ScaleByF(dir, tBest)); h.normal = nBest; } return h;
 }
+
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist);
 RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
     RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT };
@@ -355,46 +286,31 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
         if (!(layerMask & World.layer[i])){continue;} if (!(World.instances[i].entflags & EF_ACTIVE)){continue;}
         u16 mindex = World.instances[i].modelIndex;
         if (mindex >= MAX_MDLS) {
-            ColliderType ct = World.col[i];
-            if (ct != COLTYPE_CAP && ct != COLTYPE_SPH) continue;
-            V3 objPos = World.position[i];
-            float scaleMax = vmax(World.scale[i].x, vmax(World.scale[i].y, World.scale[i].z));
-            float boundRad = 0.0f;
-            if (ct == COLTYPE_CAP) {
-                float rad = World.colliderSize[i].x * scaleMax;
-                float hi = vmax(0.0f, World.colliderSize[i].y * 0.5f * scaleMax - rad);
-                boundRad = hi + rad;
-            } else {
-                boundRad = World.colliderSize[i].x * scaleMax;
-            }
+            ColliderType ct = World.col[i]; if (ct != COLTYPE_CAP && ct != COLTYPE_SPH) continue;
+            V3 objPos = World.position[i]; float scaleMax = vmax(World.scale[i].x, vmax(World.scale[i].y, World.scale[i].z)); float boundRad = 0.0f;
+            if (ct == COLTYPE_CAP) { float rad = World.colliderSize[i].x * scaleMax; float hi = vmax(0.0f, World.colliderSize[i].y * 0.5f * scaleMax - rad); boundRad = hi + rad; } else { boundRad = World.colliderSize[i].x * scaleMax; }
             boundRad = vmax(boundRad, 0.1f);
             u16 instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
             if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
             V3 delta = V3_AsubB(objPos, origin);
             float distSqrd = V3_dot(delta, delta);
-            float maxDistToObj = vmax(maxDist - boundRad, maxDist);
-            if (distSqrd >= maxDistToObj * maxDistToObj) continue;
+            float maxDistToObj = vmax(maxDist - boundRad, maxDist); if (distSqrd >= maxDistToObj * maxDistToObj) continue;
             RaycastHit ch = {0};
-            if (ct == COLTYPE_CAP) ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance);
-            else ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance);
+            if (ct == COLTYPE_CAP) ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance); else ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance);
             if (!ch.hit || ch.distance >= result.distance) continue;
-            ch.hitInstanceIndex = i;
-            result = ch;
-            continue;
+            ch.hitInstanceIndex = i; result = ch; continue;
         }
         if (mindex >= mdlsCnt) continue;
         V3 objPos = World.position[i]; u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); V3 delta = V3_AsubB(objPos,origin); float distSqrd = V3_dot(delta,delta), radBounds = vmax(modelBounds[mindex],1.81f);
         float maxDistToObj = vmax(maxDist - radBounds,maxDist); if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
         if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
         u32 triCount = modelTriangleCounts[mindex]; if (triCount < 1) continue;
-        float M[16]; mcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
-        float m00=M[0], m10=M[1], m20=M[2], m01=M[4], m11=M[5], m21=M[6], m02=M[8], m12=M[9], m22=M[10], tx=M[12], ty=M[13], tz=M[14];
+        float M[16]; mcpy(M,&modelMatrices[i * 16],16 * sizeof(float)); float m00=M[0], m10=M[1], m20=M[2], m01=M[4], m11=M[5], m21=M[6], m02=M[8], m12=M[9], m22=M[10], tx=M[12], ty=M[13], tz=M[14];
         float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20); float sclx2 = sclx * sclx; float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21); float scly2 = scly * scly; float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22); float sclz2 = sclz * sclz;
         V3 rel = {origin.x - tx, origin.y - ty, origin.z - tz};
         V3 localOrigin = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2, (rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2, (rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2};
         V3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
-        localDir = V3_Normalize(localDir);
-        const float* posPtr = physPos[mindex]; const u16* tris = physTris[mindex];
+        localDir = V3_Normalize(localDir); const float* posPtr = physPos[mindex]; const u16* tris = physTris[mindex];
         if (BvhHasBVH(mindex)) {
             const BvhNode* nodes = modelBVHNodes[mindex]; const u16* triOrder = modelBVHTriOrder[mindex];
             float minScale = vmin(sclx, vmin(scly,sclz)); if(minScale < 0.0001f){minScale=0.0001f;} float localMax=maxDist/minScale; float bestT=localMax; const BvhNode* stack[64]; int sp = 0; stack[sp++] = &nodes[0];
@@ -414,30 +330,13 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                         worldNormal = V3_Normalize(worldNormal); result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i; bestT = tryTri.distance;
                     }
                 } else {  for(int o=0;o<8&&sp<64;++o) { if(node->children[o] >= 0){stack[sp++]=&nodes[node->children[o]];} }  }
-            }
-            continue;
-        }
-        DualLogError("Missing bvh for %u!!\n",mindex);
-        for (u32 j=0;j<triCount;++j) {
-            u32 iA = tris[j*3 + 0], iB = tris[j*3 + 1], iC = tris[j*3 + 2]; V3 posA = { posPtr[iA*3], posPtr[iA*3+1], posPtr[iA*3+2] }, posB = { posPtr[iB*3], posPtr[iB*3+1], posPtr[iB*3+2] }, posC = { posPtr[iC*3], posPtr[iC*3+1], posPtr[iC*3+2] };
-            RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC); if (!tryTri.hit) continue;
-            V3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz };
-            float worldDist = V3_Dist(worldPoint,origin); if (worldDist >= result.distance) continue;
-            V3 worldNormal = { (m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z, (m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z, (m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z };
-            worldNormal = V3_Normalize(worldNormal);
-            result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i;
-        }
-    }
-    return result;
+            } continue;
+        } DualLogError("Missing bvh for %u!!\n",mindex); OS_Exit(1);
+    } return result;
 }
 // Credits Sys
 char creditStats[4096];
-INLINE float GetScore(float stupid, bool isFinal) {
-    float victories = (float)(World.kills + World.cyberkills); if (isFinal) {victories -= vmin(World.ressurections * 10.0f, victories * 0.666f);}
-    float secs  = vfloor((float)World.pauseRelativeTime / 3600.0f), score = victories * 10000.0f;
-    score -= vmin(score * 0.666f, secs * 100.0f); score *= (stupid + 1.0f) / 37.0f; if (stupid > 35.0f) {score += 2222222.0f;} return vfloor(score);
-}
-
+INLINE float GetScore(float stupid, bool isFinal) { float v=(float)(World.kills + World.cyberkills); if (isFinal) {v -= vmin(World.ressurections*10.0f,v*0.666f);} float s=vfloor((float)World.pauseRelativeTime / 3600.0f), score=v*10000.0f; score -= vmin(score*0.666f,s*100.0f); score *= (stupid + 1.0f) / 37.0f; if (stupid > 35.0f) {score += 2222222.0f;} return vfloor(score); }
 INLINE void DecomposeTime(double t, u32* h, u32* m, double* s) { double tb = vfloor(t / 3600.0); *h = (u32)tb; t -= tb * 3600.0; tb = vfloor(t / 60.0); *m = (u32)tb; *s = t - tb * 60.0; }
 INLINE void CreditsStats() {
     size_t off = 0; u32 h,m; double s;
@@ -462,20 +361,15 @@ void CompileShaders() {
     voxelUpdateSP=CompileAnyShader(NULL,voxUpdCSSrc,"Vox"); shadowmapsClearSP=CompileAnyShader(NULL,shadClearCSSrc,"ShadCl");
 }
 
-u32 MakeSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
-void mat4_lookat_from(float* m, Quaternion* camRotation, V3 eye) { // Kept around for light views for shadowmap cubemap faces.
-    float x = camRotation->x, y = camRotation->y, z = camRotation->z, w = camRotation->w;
-    float x2 = x * x, y2 = y * y, z2 = z * z; float xy = x * y, xz = x * z, yz = y * z; float wx = w * x, wy = w * y, wz = w * z;
-    V3 right   = { 1.0f - 2.0f * (y2 + z2),        2.0f * (xy + wz),        2.0f * (xz - wy) };  // X+ (right)
-    V3 up      = {        2.0f * (xy - wz), 1.0f - 2.0f * (x2 + z2),        2.0f * (yz + wx) };  // Y+ (up)
-    V3 forward = {        2.0f * (xz + wy),        2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) };  // Z+ (forward)
-    m[0]  = right.x;   m[1]  = up.x;   m[2]  = -forward.x; m[3]  = 0.0f;
-    m[4]  = right.y;   m[5]  = up.y;   m[6]  = -forward.y; m[7]  = 0.0f;
-    m[8]  = right.z;   m[9]  = up.z;   m[10] = -forward.z; m[11] = 0.0f;
-    m[12] = -V3_dot(right, eye); m[13] = -V3_dot(up, eye); m[14] = V3_dot(forward, eye); m[15] = 1.0f;
+INLINE u32 MakeSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
+static void mat4_lookat_from(float* m, Quaternion* camRotation, V3 eye) { // Kept around for light views for shadowmap cubemap faces.
+    float x=camRotation->x, y=camRotation->y, z=camRotation->z, w=camRotation->w;
+    float x2=x*x, y2=y*y, z2=z*z; float xy=x*y, xz=x*z, yz=y*z; float wx=w*x, wy=w*y, wz=w*z;
+    V3 right={1.0f - 2.0f*(y2 + z2),2.0f*(xy + wz),2.0f*(xz - wy)};/*X+(right)*/ V3 up={2.0f*(xy - wz),1.0f - 2.0f*(x2 + z2),2.0f*(yz + wx)};/*Y+(up)*/ V3 forward={2.0f*(xz + wy),2.0f*(yz - wx), 1.0f - 2.0f*(x2 + y2)};/*Z+(forward)*/
+    m[0]=right.x; m[1]=up.x; m[2]=-forward.x; m[3]=0.0f; m[4]=right.y; m[5]=up.y; m[6]=-forward.y; m[7]=0.0f; m[8]=right.z; m[9]=up.z; m[10]=-forward.z; m[11]=0.0f; m[12]=-V3_dot(right,eye); m[13]=-V3_dot(up,eye); m[14]=V3_dot(forward,eye); m[15]=1.0f;
 }
 
-__attribute__((pure,always_inline)) bool SphereInFrustum(FrustumPlane* ps, V3 c, float radius) { for (int i=0;i<6;++i) { if ((V3_dot(ps[i].normal,c) + ps[i].d) < -radius) return false; } return true; }
+INLINE bool SphereInFrustum(FrustumPlane* ps, V3 c, float radius) { for (int i=0;i<6;++i) { if ((V3_dot(ps[i].normal,c) + ps[i].d) < -radius) return false; } return true; }
 void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     ps[0].normal.x = m[3] + m[0]; ps[0].normal.y = m[7] + m[4]; ps[0].normal.z = m[11] + m[8];  ps[0].d = m[15] + m[12]; // Left
     ps[1].normal.x = m[3] - m[0]; ps[1].normal.y = m[7] - m[4]; ps[1].normal.z = m[11] - m[8];  ps[1].d = m[15] - m[12]; // Right
@@ -517,9 +411,7 @@ void UpdateScreenSize(i32 width, i32 height) {
     GenerateAndBindTexture(&inputDepthID,0x81A7/*GL_DEPTH_COMPONENT32*/,w,h,0x1902/*GL_DEPTH_COMPONENT*/,GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); // Raster Depth
     GenerateAndBindTexture(&outputImageID,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL);
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputImageID,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,inputSpecID,0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,inputNormalID,0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputImageID,0); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,inputSpecID,0); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,inputNormalID,0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,0x8D00/*GL_DEPTH_ATTACHMENT*/,GL_TEXTURE_2D,inputDepthID,0);
     glBindImageTexture(0,inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);      // Main Rendered Color
     glBindImageTexture(2,inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);       // Specular
@@ -565,7 +457,6 @@ void UpdateLights() {
             }
         }
     }
-
     glBindBuffer(GL_SSBO,lightsID); glBufferData(GL_SSBO,World.loadedLights * sizeof(Light),World.lights,GL_DYNAMIC_DRAW); // Always update the light intensity for flickers and such.
     glUseProgram(voxelUpdateSP); glUniform3f(5,World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z); glDispatchCompute((VOXELS_X+15)/16,(VOXELS_Z+15)/16,1);
 }
@@ -575,11 +466,8 @@ typedef struct {float depth; u16 index; } DepthSort;
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
 INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex > texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || e->modelIndex >= MAX_MDLS || e->texIndex >= MAX_TXRS || otherCondition; }
 INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) {
-    glUniform1ui(0,i);
-    u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex;
-    if (currentModelType == modelType && currentModelType != 0) return currentModelType;
-    glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]);
-    return modelType;
+    glUniform1ui(0,i); u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex; if (currentModelType == modelType && currentModelType != 0) return currentModelType;
+    glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); return modelType;
 }
 
 typedef float __m256 __attribute__((__vector_size__(32), __may_alias__));
@@ -606,83 +494,35 @@ extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artif
 extern __inline int __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_movemask_ps(__m256 __A) { return __builtin_ia32_movmskps256((__v8sf)__A); }
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_setzero_ps(void) { return (__m256){ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; }
 #define SC_MAX (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)
-DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
-u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS];
-static __attribute__((aligned(64))) float sc_posX[SC_MAX];
-static __attribute__((aligned(64))) float sc_posY[SC_MAX];
-static __attribute__((aligned(64))) float sc_posZ[SC_MAX];
-static __attribute__((aligned(64))) float sc_radius[SC_MAX];
-static __attribute__((aligned(64))) float sc_shadRadius[SC_MAX];
-static u16 sc_origIdx[SC_MAX];
-static u16 shadowSlot[LIGHT_COUNT]; // persistent atlas slot per light, U16_MAX = uncached
-static u8 shadowFaces[LIGHT_COUNT]; // faces rendered into cached slot
-static float shadowPosSum[LIGHT_COUNT]; // nearby mesh position sum at last render
-static u32 shadowIdSum[LIGHT_COUNT]; // nearby mesh instance+model+tex sum at last render
-static u32 shadClearFace[SHADOW_MAP_SIZE*SHADOW_MAP_SIZE]; // 0xFFFFFFFF fill for SSBO clears
-static i8 shadowLevel=-1; u32 shadowNextSlot=0; // cache epoch, slot allocator
-static const i8 faceAxis[6] = {0,0,1,1,2,2};
-static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
+DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS]; static __attribute__((aligned(64))) float sc_posX[SC_MAX], sc_posY[SC_MAX], sc_posZ[SC_MAX], sc_radius[SC_MAX], sc_shadRadius[SC_MAX];
+static u16 sc_origIdx[SC_MAX], shadowSlot[LIGHT_COUNT];
+static u8 shadowFaces[LIGHT_COUNT];
+static float shadowPosSum[LIGHT_COUNT];
+static u32 shadowIdSum[LIGHT_COUNT], shadClearFace[SHADOW_MAP_SIZE*SHADOW_MAP_SIZE];
+static i8 shadowLevel=-1; u32 shadowNextSlot=0; static const i8 faceAxis[6] = {0,0,1,1,2,2}; static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
 INLINE u8 GetCubemapFaceMask(V3 d, float r) {
-    u8 m=0; 
-    float absX=vabs(d.x),absY=vabs(d.y),absZ=vabs(d.z);
-    float maxAbsYZ = absY > absZ ? absY : absZ;
-    float maxAbsXZ = absX > absZ ? absX : absZ;
-    float maxAbsXY = absX > absY ? absX : absY;
-    if (d.x+r > maxAbsYZ) m|=(1<<0);
-    if (d.x-r < -maxAbsYZ) m|=(1<<1);
-    if (d.y+r > maxAbsXZ) m|=(1<<2);
-    if (d.y-r < -maxAbsXZ) m|=(1<<3);
-    if (d.z+r > maxAbsXY) m|=(1<<4);
-    if (d.z-r < -maxAbsXY) m|=(1<<5);
-    return m;
+    u8 m=0; float absX=vabs(d.x),absY=vabs(d.y),absZ=vabs(d.z); float maxAbsYZ = absY > absZ ? absY : absZ; float maxAbsXZ = absX > absZ ? absX : absZ; float maxAbsXY = absX > absY ? absX : absY;
+    if (d.x+r > maxAbsYZ) m|=(1<<0); if (d.x-r < -maxAbsYZ) m|=(1<<1); if (d.y+r > maxAbsXZ) m|=(1<<2); if (d.y-r < -maxAbsXZ) m|=(1<<3); if (d.z+r > maxAbsXY) m|=(1<<4); if (d.z-r < -maxAbsXY) m|=(1<<5); return m;
 }
 
 INLINE bool ShadowCasterMoved(u16 i) { return i != PLAYER1 && (World.instances[i].entflags & EF_MOVING) && !IdxIsNPC(World.instances[i].index); }
-
 __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
-    double shadowStartTime = get_time();
-    mset(candidates,U16_MAX,MAX_SHADOWMAPS * sizeof(u16));
-    V3 playerPos = World.position[PLAYER1];
-    V3 pf = World.instances[PLAYER1].forward;
-    u16 numCandidates=0; i32 numCasters=0;
+    double shadowStartTime = get_time(); mset(candidates,U16_MAX,MAX_SHADOWMAPS * sizeof(u16)); V3 playerPos=World.position[PLAYER1], pf=World.instances[PLAYER1].forward; u16 numCandidates=0; i32 numCasters=0;
     for (u16 i = 0; i < World.loadedLights; ++i) {
         if (unlikely(!(World.lights[i].lflags & SHADON) || !(World.lights[i].lflags & LIGHTON))) continue;
-        V3 lightPos = World.lights[i].pos;
-        float intensity = World.lights[i].maxIntensity;
-        if (unlikely(intensity < 0.1f)) continue;
-        float range = World.lights[i].range;
-        float luminosity = (intensity / (range * range));
-        if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
-        u16 cellX = PosGetCellCoordX(lightPos.x), cellZ = PosGetCellCoordZ(lightPos.z);
-        int lightCellIdx = (cellZ * WORLDX) + cellX;
-        u8 r = vmax(vceil(range * (1.0f / CELLSZ)),2);
-        bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
-        if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r);
-        if (!inPVS) continue;
-        float dx = lightPos.x - playerPos.x, dy = lightPos.y - playerPos.y, dz = lightPos.z - playerPos.z;
-        float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
-        float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z);
-        if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
+        V3 lightPos = World.lights[i].pos; float intensity = World.lights[i].maxIntensity; if (unlikely(intensity < 0.1f)) continue;
+        float range = World.lights[i].range; float luminosity = (intensity / (range * range)); if (luminosity < 0.008f && (range < 8.0f || intensity < 0.5f)) continue;
+        u16 cellX=PosGetCellCoordX(lightPos.x), cellZ=PosGetCellCoordZ(lightPos.z); int lightCellIdx = (cellZ * WORLDX) + cellX; u8 r = vmax(vceil(range * (1.0f / CELLSZ)),2); 
+        bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE); if (likely(!inPVS)) inPVS = NeighborhoodInPVS(cellX,cellZ,r); if (!inPVS) continue;
+        float dx = lightPos.x - playerPos.x, dy = lightPos.y - playerPos.y, dz = lightPos.z - playerPos.z; float distSqrdToPlayer = dx*dx + dy*dy + dz*dz; float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z); if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
         candidates[numCandidates++] = i; if (numCandidates >= MAX_SHADOWMAPS) break;
     }
     if (numCandidates == 0) { shadowTime = get_time() - shadowStartTime; return; }
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if (EntNotVisible(i, (World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsNPC(World.instances[i].index)){continue;} shadowCasterIndices[numCasters++]=i; if(numCasters >= SC_MAX){break;} }
     for (i32 i=0;i+8<=numCasters;i+=8) {
         float lx[8], ly[8], lz[8], lr[8], lsr[8];
-        for (int k = 0; k < 8; ++k) {
-            u16 j = shadowCasterIndices[i + k];
-            lx[k]  = World.position[j].x;
-            ly[k]  = World.position[j].y;
-            lz[k]  = World.position[j].z;
-            lr[k]  = World.radius[j];
-            lsr[k] = World.instances[j].shadRadius;
-            sc_origIdx[i + k] = j;
-        }
-        _mm256_store_ps(&sc_posX[i],       _mm256_loadu_ps(lx));
-        _mm256_store_ps(&sc_posY[i],       _mm256_loadu_ps(ly));
-        _mm256_store_ps(&sc_posZ[i],       _mm256_loadu_ps(lz));
-        _mm256_store_ps(&sc_radius[i],     _mm256_loadu_ps(lr));
-        _mm256_store_ps(&sc_shadRadius[i], _mm256_loadu_ps(lsr));
+        for (int k=0;k<8;++k){u16 j=shadowCasterIndices[i + k]; lx[k]=World.position[j].x; ly[k]=World.position[j].y; lz[k]=World.position[j].z; lr[k]=World.radius[j]; lsr[k]=World.instances[j].shadRadius; sc_origIdx[i + k]=j;}
+        _mm256_store_ps(&sc_posX[i],_mm256_loadu_ps(lx)); _mm256_store_ps(&sc_posY[i],_mm256_loadu_ps(ly)); _mm256_store_ps(&sc_posZ[i],_mm256_loadu_ps(lz)); _mm256_store_ps(&sc_radius[i],_mm256_loadu_ps(lr)); _mm256_store_ps(&sc_shadRadius[i],_mm256_loadu_ps(lsr));
     }
     for (i32 i=0;i<numCasters;++i) { u16 j=shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
     const u16 numCastersAligned = numCasters & ~7u;
@@ -690,29 +530,16 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     shadDrawCalls = 0U;
     glBindBuffer(GL_SSBO, shadowMapSSBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE); glUseProgram(shadowmapsSP);
-    u32 currentSortKey = 0xFFFFFFFF;
-    u16 currentModelType = 0xFFFF;
-    u16 currentTexIndex = 0xFFFF;
-    u32 currentTriCount = 0;
-    bool currentIsTransparent = false;
-    bool useDetail = Sys_Settings.ModelDetail;
+    u32 currentSortKey = 0xFFFFFFFF, currentTriCount = 0; u16 currentModelType = 0xFFFF, currentTexIndex = 0xFFFF; bool currentIsTransparent = false, useDetail = Sys_Settings.ModelDetail;
     typedef struct { u32 sortKey; u16 instanceIdx; } SortedMesh;
     SortedMesh localMeshes[SHADOW_NEARMESH_MAX];
     for (u16 c = 0; c < numCandidates; ++c) {
         u16 lightIdx = candidates[c]; if (lightIdx == U16_MAX) continue;
-        V3 lpos = World.lights[lightIdx].pos;
-        float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f);
-        V3 toLight = V3_AsubB(lpos, playerPos);
-        const float addX = (pf.x >= 0.0f) ? effectiveRadius : -effectiveRadius;
-        const float addY = (pf.y >= 0.0f) ? effectiveRadius : -effectiveRadius;
-        const float addZ = (pf.z >= 0.0f) ? effectiveRadius : -effectiveRadius;
+        V3 lpos = World.lights[lightIdx].pos; float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f); V3 toLight = V3_AsubB(lpos, playerPos);
+        const float addX = (pf.x >= 0.0f) ? effectiveRadius : -effectiveRadius; const float addY = (pf.y >= 0.0f) ? effectiveRadius : -effectiveRadius; const float addZ = (pf.z >= 0.0f) ? effectiveRadius : -effectiveRadius;
         __attribute__((aligned(32))) float cX[8],cY[8],cZ[8];
         for (int f = 0; f < 6; ++f) {
-            const int axis = faceAxis[f];
-            const float sign = faceSign[f];
-            float x = toLight.x + addX;
-            float y = toLight.y + addY;
-            float z = toLight.z + addZ;
+            const int axis = faceAxis[f]; const float sign = faceSign[f]; float x = toLight.x + addX, y = toLight.y + addY, z = toLight.z + addZ;
             if      (axis == 0) x = toLight.x + sign * effectiveRadius;
             else if (axis == 1) y = toLight.y + sign * effectiveRadius;
             else                z = toLight.z + sign * effectiveRadius;
@@ -720,59 +547,34 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         }
         cX[6] = cY[6] = cZ[6] = 0.0f;
         cX[7] = cY[7] = cZ[7] = 0.0f;
-        const __m256 cx = _mm256_load_ps(cX);
-        const __m256 cy = _mm256_load_ps(cY);
-        const __m256 cz = _mm256_load_ps(cZ);
-        const __m256 fx = _mm256_set1_ps(pf.x);
-        const __m256 fy = _mm256_set1_ps(pf.y);
-        const __m256 fz = _mm256_set1_ps(pf.z);
+        const __m256 cx = _mm256_load_ps(cX); const __m256 cy = _mm256_load_ps(cY); const __m256 cz = _mm256_load_ps(cZ);
+        const __m256 fx = _mm256_set1_ps(pf.x); const __m256 fy = _mm256_set1_ps(pf.y); const __m256 fz = _mm256_set1_ps(pf.z);
         const __m256 dot = _mm256_fmadd_ps(cx, fx, _mm256_fmadd_ps(cy, fy, _mm256_mul_ps(cz, fz)));
         const __m256 visible = _mm256_cmp_ps(dot, _mm256_setzero_ps(), _CMP_GT_OQ);
         u8 faceMask = (u8)(_mm256_movemask_ps(visible) & 0x3F);
         for (u8 face = 0; face < 6; ++face) { if (!(faceMask & (1u << face))) { if (SphereInFrustum(lightFrustumPlanes[lightIdx][face], playerPos, 0.48f)) {faceMask |= (u8)(1u << face);} } }
         if (faceMask == 0) continue;
-        const __m256 lposX = _mm256_set1_ps(lpos.x);
-        const __m256 lposY = _mm256_set1_ps(lpos.y);
-        const __m256 lposZ = _mm256_set1_ps(lpos.z);
+        const __m256 lposX = _mm256_set1_ps(lpos.x); const __m256 lposY = _mm256_set1_ps(lpos.y); const __m256 lposZ = _mm256_set1_ps(lpos.z);
         const __m256 effR  = _mm256_set1_ps(effectiveRadius);
         const __m256 signMask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
         u16 nearbyMeshCount = 0; i32 k = 0; bool anyMoved=false; float posSum=0.0f;
         for (; k < numCastersAligned; k += 8) {
-            const __m256 px = _mm256_load_ps(&sc_posX[k]);
-            const __m256 py = _mm256_load_ps(&sc_posY[k]);
-            const __m256 pz = _mm256_load_ps(&sc_posZ[k]);
-            const __m256 r  = _mm256_load_ps(&sc_radius[k]);
-            const __m256 sr = _mm256_load_ps(&sc_shadRadius[k]);
-            const __m256 dx = _mm256_sub_ps(px, lposX);
-            const __m256 dy = _mm256_sub_ps(py, lposY);
-            const __m256 dz = _mm256_sub_ps(pz, lposZ);
+            const __m256 px = _mm256_load_ps(&sc_posX[k]); const __m256 py = _mm256_load_ps(&sc_posY[k]); const __m256 pz = _mm256_load_ps(&sc_posZ[k]); const __m256 r  = _mm256_load_ps(&sc_radius[k]); const __m256 sr = _mm256_load_ps(&sc_shadRadius[k]);
+            const __m256 dx = _mm256_sub_ps(px, lposX); const __m256 dy = _mm256_sub_ps(py, lposY); const __m256 dz = _mm256_sub_ps(pz, lposZ);
             const __m256 distSq   = _mm256_fmadd_ps(dx, dx, _mm256_fmadd_ps(dy, dy, _mm256_mul_ps(dz, dz)));
             const __m256 radSum   = _mm256_add_ps(effR, r);
             const __m256 radSumSq = _mm256_mul_ps(radSum, radSum);
             const __m256 inRange  = _mm256_cmp_ps(distSq, radSumSq, _CMP_LT_OQ);
-            const __m256 absX = _mm256_andnot_ps(signMask, dx);
-            const __m256 absY = _mm256_andnot_ps(signMask, dy);
-            const __m256 absZ = _mm256_andnot_ps(signMask, dz);
-            const __m256 maxAbsYZ = _mm256_max_ps(absY, absZ); // Face Math: A > |B| && A > |C| <==> A > max(|B|, |C|)
-            const __m256 maxAbsXZ = _mm256_max_ps(absX, absZ);
-            const __m256 maxAbsXY = _mm256_max_ps(absX, absY);
-            const __m256 negMaxAbsYZ = _mm256_or_ps(maxAbsYZ, signMask);
-            const __m256 negMaxAbsXZ = _mm256_or_ps(maxAbsXZ, signMask);
-            const __m256 negMaxAbsXY = _mm256_or_ps(maxAbsXY, signMask);
-            const __m256 dxp = _mm256_add_ps(dx, sr);
-            const __m256 posXface = _mm256_cmp_ps(dxp, maxAbsYZ, _CMP_GT_OQ);
-            const __m256 dxm = _mm256_sub_ps(dx, sr);
-            const __m256 negXface = _mm256_cmp_ps(dxm, negMaxAbsYZ, _CMP_LT_OQ);
-            const __m256 dyp = _mm256_add_ps(dy, sr);
-            const __m256 posYface = _mm256_cmp_ps(dyp, maxAbsXZ, _CMP_GT_OQ);
-            const __m256 dym = _mm256_sub_ps(dy, sr);
-            const __m256 negYface = _mm256_cmp_ps(dym, negMaxAbsXZ, _CMP_LT_OQ);
-            const __m256 dzp = _mm256_add_ps(dz, sr);
-            const __m256 posZface = _mm256_cmp_ps(dzp, maxAbsXY, _CMP_GT_OQ);
-            const __m256 dzm = _mm256_sub_ps(dz, sr);
-            const __m256 negZface = _mm256_cmp_ps(dzm, negMaxAbsXY, _CMP_LT_OQ);
-            const __m256 anyFace = _mm256_or_ps(_mm256_or_ps(posXface, negXface),_mm256_or_ps(_mm256_or_ps(posYface, negYface), _mm256_or_ps(posZface, negZface)));
-            const __m256 valid = _mm256_and_ps(inRange, anyFace);
+            const __m256 absX = _mm256_andnot_ps(signMask, dx); const __m256 absY = _mm256_andnot_ps(signMask, dy); const __m256 absZ = _mm256_andnot_ps(signMask, dz);
+            const __m256 maxAbsYZ = _mm256_max_ps(absY,absZ); const __m256 maxAbsXZ = _mm256_max_ps(absX,absZ); const __m256 maxAbsXY = _mm256_max_ps(absX,absY); // Face Math: A > |B| && A > |C| <==> A > max(|B|, |C|)
+            const __m256 negMaxAbsYZ = _mm256_or_ps(maxAbsYZ,signMask); const __m256 negMaxAbsXZ = _mm256_or_ps(maxAbsXZ,signMask); const __m256 negMaxAbsXY = _mm256_or_ps(maxAbsXY,signMask);
+            const __m256 dxp = _mm256_add_ps(dx, sr); const __m256 posXface = _mm256_cmp_ps(dxp, maxAbsYZ, _CMP_GT_OQ);
+            const __m256 dxm = _mm256_sub_ps(dx, sr); const __m256 negXface = _mm256_cmp_ps(dxm, negMaxAbsYZ, _CMP_LT_OQ);
+            const __m256 dyp = _mm256_add_ps(dy, sr); const __m256 posYface = _mm256_cmp_ps(dyp, maxAbsXZ, _CMP_GT_OQ);
+            const __m256 dym = _mm256_sub_ps(dy, sr); const __m256 negYface = _mm256_cmp_ps(dym, negMaxAbsXZ, _CMP_LT_OQ);
+            const __m256 dzp = _mm256_add_ps(dz, sr); const __m256 posZface = _mm256_cmp_ps(dzp, maxAbsXY, _CMP_GT_OQ);
+            const __m256 dzm = _mm256_sub_ps(dz, sr); const __m256 negZface = _mm256_cmp_ps(dzm, negMaxAbsXY, _CMP_LT_OQ);
+            const __m256 anyFace = _mm256_or_ps(_mm256_or_ps(posXface, negXface),_mm256_or_ps(_mm256_or_ps(posYface, negYface), _mm256_or_ps(posZface, negZface))); const __m256 valid = _mm256_and_ps(inRange, anyFace);
             unsigned mask = (unsigned)_mm256_movemask_ps(valid);
             while (mask) {
                 int bit = __builtin_ctz(mask); mask &= mask - 1;
@@ -837,19 +639,11 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                             currentTexIndex = texIndex; glUniform1ui(6, texIndex); bool texIsTransparent = transparentTexture[texIndex];
                             if (currentIsTransparent != texIsTransparent) { currentIsTransparent = texIsTransparent; glUniform1ui(8, (u32)currentIsTransparent); }
                         }
-                    }
-                    glDrawElements(0x0004, currentTriCount, GL_UNSIGNED_SHORT, 0); drawCalls++; shadDrawCalls++; vertsRendered += currentTriCount;
+                    } glDrawElements(0x0004, currentTriCount, GL_UNSIGNED_SHORT, 0); drawCalls++; shadDrawCalls++; vertsRendered += currentTriCount;
                 }
-            }
-            shadowPosSum[lightIdx]=posSum; shadowIdSum[lightIdx]=idSum;
-            shadowFaces[lightIdx] = contentDirty ? faceMask : (u8)(shadowFaces[lightIdx] | faceMask);
-        }
-        shadowmapIndirectionList[lightIdx]=slot;
-    }
-    glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-    glBindBuffer(GL_SSBO, shadowMapsIndirectionID);
-    glBufferData(GL_SSBO, World.loadedLights * sizeof(u32), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
-    shadowTime = get_time() - shadowStartTime;
+            } shadowPosSum[lightIdx]=posSum; shadowIdSum[lightIdx]=idSum; shadowFaces[lightIdx] = contentDirty ? faceMask : (u8)(shadowFaces[lightIdx] | faceMask);
+        } shadowmapIndirectionList[lightIdx]=slot;
+    } glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); glBindBuffer(GL_SSBO, shadowMapsIndirectionID); glBufferData(GL_SSBO, World.loadedLights * sizeof(u32), shadowmapIndirectionList, GL_DYNAMIC_DRAW); shadowTime = get_time() - shadowStartTime;
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
@@ -863,53 +657,36 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
     if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); }
     glUniform1ui(30,e->camView < camViewCount ? 1u : 0u);
     if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); glUniform1i(29,6); }
-    if((*curN) != (norm) || norm==0) { *curN=norm; glUniform1ui( 1,(u32)norm); }
-    if((*curT) != ( tex) ||  tex==0) { *curT= tex; glUniform1ui(18,(u32)tex ); }
-    if((*curG) != (glow) || glow==0) { *curG=glow; glUniform1ui(19,(u32)glow); }
-    if((*curS) != (spec) || spec==0) { *curS=spec; glUniform1ui(20,(u32)spec); }
+    if((*curN) != (norm) || norm==0) { *curN=norm; glUniform1ui( 1,(u32)norm); } if((*curT) != ( tex) ||  tex==0) { *curT= tex; glUniform1ui(18,(u32)tex ); } 
+    if((*curG) != (glow) || glow==0) { *curG=glow; glUniform1ui(19,(u32)glow); } if((*curS) != (spec) || spec==0) { *curS=spec; glUniform1ui(20,(u32)spec); }
     *curM=GetAndBindModel(i,*curM); u32 vc=modelTriangleCounts[*curM]*3; glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered+=vc;
 }
 
 bool mat4_inverse(const float* m, float* out) {
     float inv[16],det;
-    inv[0] =  m[5]*m[10]*m[15] - m[5]*m[14]*m[11] - m[9]*m[6]*m[15] + m[9]*m[14]*m[7] + m[13]*m[6]*m[11] - m[13]*m[10]*m[7];
-    inv[4] = -m[4]*m[10]*m[15] + m[4]*m[14]*m[11] + m[8]*m[6]*m[15] - m[8]*m[14]*m[7] - m[12]*m[6]*m[11] + m[12]*m[10]*m[7];
-    inv[8] =  m[4]*m[9]*m[15]  - m[4]*m[13]*m[11] - m[8]*m[5]*m[15] + m[8]*m[13]*m[7]  + m[12]*m[5]*m[11] - m[12]*m[9]*m[7];
-    inv[12]= -m[4]*m[9]*m[14]  + m[4]*m[13]*m[10] + m[8]*m[5]*m[14] - m[8]*m[13]*m[6]  - m[12]*m[5]*m[10] + m[12]*m[9]*m[6];
-    inv[1] = -m[1]*m[10]*m[15] + m[1]*m[14]*m[11] + m[9]*m[2]*m[15] - m[9]*m[14]*m[3] - m[13]*m[2]*m[11] + m[13]*m[10]*m[3];
-    inv[5] =  m[0]*m[10]*m[15] - m[0]*m[14]*m[11] - m[8]*m[2]*m[15] + m[8]*m[14]*m[3]  + m[12]*m[2]*m[11] - m[12]*m[10]*m[3];
-    inv[9] = -m[0]*m[9]*m[15]  + m[0]*m[13]*m[11] + m[8]*m[1]*m[15] - m[8]*m[13]*m[3]  - m[12]*m[1]*m[11] + m[12]*m[9]*m[3];
-    inv[13]=  m[0]*m[9]*m[14]  - m[0]*m[13]*m[10] - m[8]*m[1]*m[14] + m[8]*m[13]*m[2]  + m[12]*m[1]*m[10] - m[12]*m[9]*m[2];
-    inv[2] =  m[1]*m[6]*m[15] - m[1]*m[14]*m[7] - m[5]*m[2]*m[15] + m[5]*m[14]*m[3] + m[13]*m[2]*m[7] - m[13]*m[6]*m[3];
-    inv[6] = -m[0]*m[6]*m[15] + m[0]*m[14]*m[7] + m[4]*m[2]*m[15] - m[4]*m[14]*m[3] - m[12]*m[2]*m[7] + m[12]*m[6]*m[3];
-    inv[10]=  m[0]*m[5]*m[15] - m[0]*m[13]*m[7] - m[4]*m[1]*m[15] + m[4]*m[13]*m[3] + m[12]*m[1]*m[7] - m[12]*m[5]*m[3];
-    inv[14]= -m[0]*m[5]*m[14] + m[0]*m[13]*m[6] + m[4]*m[1]*m[14] - m[4]*m[13]*m[2] - m[12]*m[1]*m[6] + m[12]*m[5]*m[2];
-    inv[3] = -m[1]*m[6]*m[11] + m[1]*m[10]*m[7] + m[5]*m[2]*m[11] - m[5]*m[10]*m[3] - m[9]*m[2]*m[7]  + m[9]*m[6]*m[3];
-    inv[7] =  m[0]*m[6]*m[11] - m[0]*m[10]*m[7] - m[4]*m[2]*m[11] + m[4]*m[10]*m[3] + m[8]*m[2]*m[7]  - m[8]*m[6]*m[3];
-    inv[11]= -m[0]*m[5]*m[11] + m[0]*m[9]*m[7]  + m[4]*m[1]*m[11] - m[4]*m[9]*m[3]  - m[8]*m[1]*m[7]  + m[8]*m[5]*m[3];
-    inv[15]=  m[0]*m[5]*m[10] - m[0]*m[9]*m[6]  - m[4]*m[1]*m[10] + m[4]*m[9]*m[2]  + m[8]*m[1]*m[6]  - m[8]*m[5]*m[2];
-    det = m[0]*inv[0] + m[1]*inv[4] + m[2]*inv[8] + m[3]*inv[12];
-    if (det == 0.0f) { for(int i=0;i<16;++i) {out[i] = (i%5==0) ? 1.0f : 0.0f;} return false; }
+    inv[0] =  m[5]*m[10]*m[15] - m[5]*m[14]*m[11] - m[9]*m[6]*m[15] + m[9]*m[14]*m[7] + m[13]*m[6]*m[11] - m[13]*m[10]*m[7]; inv[4] = -m[4]*m[10]*m[15] + m[4]*m[14]*m[11] + m[8]*m[6]*m[15] - m[8]*m[14]*m[7] - m[12]*m[6]*m[11] + m[12]*m[10]*m[7];
+    inv[8] =  m[4]*m[9]*m[15]  - m[4]*m[13]*m[11] - m[8]*m[5]*m[15] + m[8]*m[13]*m[7]  + m[12]*m[5]*m[11] - m[12]*m[9]*m[7]; inv[12]= -m[4]*m[9]*m[14]  + m[4]*m[13]*m[10] + m[8]*m[5]*m[14] - m[8]*m[13]*m[6]  - m[12]*m[5]*m[10] + m[12]*m[9]*m[6];
+    inv[1] = -m[1]*m[10]*m[15] + m[1]*m[14]*m[11] + m[9]*m[2]*m[15] - m[9]*m[14]*m[3] - m[13]*m[2]*m[11] + m[13]*m[10]*m[3]; inv[5] =  m[0]*m[10]*m[15] - m[0]*m[14]*m[11] - m[8]*m[2]*m[15] + m[8]*m[14]*m[3]  + m[12]*m[2]*m[11] - m[12]*m[10]*m[3];
+    inv[9] = -m[0]*m[9]*m[15]  + m[0]*m[13]*m[11] + m[8]*m[1]*m[15] - m[8]*m[13]*m[3]  - m[12]*m[1]*m[11] + m[12]*m[9]*m[3]; inv[13]=  m[0]*m[9]*m[14]  - m[0]*m[13]*m[10] - m[8]*m[1]*m[14] + m[8]*m[13]*m[2]  + m[12]*m[1]*m[10] - m[12]*m[9]*m[2];
+    inv[2] =  m[1]*m[6]*m[15] - m[1]*m[14]*m[7] - m[5]*m[2]*m[15] + m[5]*m[14]*m[3] + m[13]*m[2]*m[7] - m[13]*m[6]*m[3]; inv[6] = -m[0]*m[6]*m[15] + m[0]*m[14]*m[7] + m[4]*m[2]*m[15] - m[4]*m[14]*m[3] - m[12]*m[2]*m[7] + m[12]*m[6]*m[3];
+    inv[10]=  m[0]*m[5]*m[15] - m[0]*m[13]*m[7] - m[4]*m[1]*m[15] + m[4]*m[13]*m[3] + m[12]*m[1]*m[7] - m[12]*m[5]*m[3]; inv[14]= -m[0]*m[5]*m[14] + m[0]*m[13]*m[6] + m[4]*m[1]*m[14] - m[4]*m[13]*m[2] - m[12]*m[1]*m[6] + m[12]*m[5]*m[2];
+    inv[3] = -m[1]*m[6]*m[11] + m[1]*m[10]*m[7] + m[5]*m[2]*m[11] - m[5]*m[10]*m[3] - m[9]*m[2]*m[7]  + m[9]*m[6]*m[3]; inv[7] =  m[0]*m[6]*m[11] - m[0]*m[10]*m[7] - m[4]*m[2]*m[11] + m[4]*m[10]*m[3] + m[8]*m[2]*m[7]  - m[8]*m[6]*m[3];
+    inv[11]= -m[0]*m[5]*m[11] + m[0]*m[9]*m[7]  + m[4]*m[1]*m[11] - m[4]*m[9]*m[3]  - m[8]*m[1]*m[7]  + m[8]*m[5]*m[3]; inv[15]=  m[0]*m[5]*m[10] - m[0]*m[9]*m[6]  - m[4]*m[1]*m[10] + m[4]*m[9]*m[2]  + m[8]*m[1]*m[6]  - m[8]*m[5]*m[2];
+    det = m[0]*inv[0] + m[1]*inv[4] + m[2]*inv[8] + m[3]*inv[12]; if (det == 0.0f) { for(int i=0;i<16;++i) {out[i] = (i%5==0) ? 1.0f : 0.0f;} return false; }
     det = 1.0f / det; for (int i=0;i<16;++i) out[i] = inv[i] * det;
     return true;
 }
 
 void GetProjections(float* view, float* viewProj, float* invViewRot, float* invViewProj, float sfov, float aspect3D, float snear, float sfar) {
     float f = vcot(sfov * PI / 360.0f); float* m = rasterPerspectiveProjection;
-    m[0] = f / aspect3D; m[1] = 0.0f; m[2] = 0.0f; m[3] = 0.0f; m[4] = 0.0f; m[5] = f; m[6] = 0.0f; m[7] = 0.0f;
-    m[8] = 0.0f; m[9] = 0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]= -1.0f;
-    m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * sfar * snear / (sfar - snear); m[15]= 0.0f;
-    mat4_lookat_from(view,&World.rotation[PLAYER1],World.position[PLAYER1]);
-    mul_mat4(viewProj,rasterPerspectiveProjection,view);
-    invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8]; invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9]; invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10];
-    mat4_inverse(viewProj,invViewProj);
+    m[0]=f / aspect3D; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f*sfar*snear / (sfar - snear); m[15]=0.0f;
+    mat4_lookat_from(view,&World.rotation[PLAYER1],World.position[PLAYER1]); mul_mat4(viewProj,rasterPerspectiveProjection,view); 
+    invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8]; invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9]; invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10]; mat4_inverse(viewProj,invViewProj);
 }
-
 //                        0 mk3 assault rifle              1 blaster             2 dartgun               3 flech                 4 ion  5 rapier    6 pipe               7 magnum            8 magpulse               9 pistol               10 plasma                 11 rail                              12 riot              13 skorp              14 sparq               15 stun
 Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},{0,0,0,1},{0,0,0,1},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
         V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},  {0,0,0},  {0,0,0},        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
-extern const u16 wepModelIndices[16];
-extern float WeaponDipOffsetY(void); // reload/swap dip Y (weapons.c)
+extern const u16 wepModelIndices[16]; extern WeaponFireCtx wfx;
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight; float sfov, snear, sfar;
     if (camView) { CamView* cv=&camViews[camViewIdx]; swidth=cv->width; sheight=cv->height; sfov=(float)cv->fov; snear=cv->near; sfar=cv->far; }
@@ -920,8 +697,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
     glBindVertexArray(chunkVAO); // Common vao for RenderDynamicShadowmaps and Rasterized Geometry
     glEnable(GL_DEPTH_TEST);
-    glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][0]); if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps(); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
-    glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][1]);
+    glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][0]); if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps(); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][1]);
     double rendStart = get_time();
     UpdateLights(); // This is where the voxels get updated!
     glViewport(0,0,swidth,sheight); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); 
@@ -946,10 +722,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
     if (World.shd1 < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4) && opaqueCount < (INSTANCE_COUNT - 4)) { // Add shield generators in skybox.
-        visibleInstances[opaqueCount].index=World.shd1; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
-        visibleInstances[opaqueCount].index=World.shd2; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
-        visibleInstances[opaqueCount].index=World.shd3; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
-        visibleInstances[opaqueCount].index=World.shd4; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+        visibleInstances[opaqueCount].index=World.shd1; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++; visibleInstances[opaqueCount].index=World.shd2; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+        visibleInstances[opaqueCount].index=World.shd3; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++; visibleInstances[opaqueCount].index=World.shd4; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
     }
     if (editModeSelection < U16_MAX && Cheats.editMode) {
         if (transparentTexture[World.instances[editModeSelection].texIndex]) { if(tcnt<=1023){ tmpTransparent[tcnt].index = editModeSelection; tmpTransparent[tcnt].depth = 1.28f; tcnt++;} }
@@ -1012,7 +786,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (wep16 >= 0 && wep16 < 16 && World.instances[wvi].modelIndex < MAX_MDLS) { // appearance set by CompleteWeaponChange
             // Offset in player-local space (right,down,forward), rotated into world by the player view; reload/swap dip added on Y.  Pivot = player position, weapon stays locked to view.
             World.weaponViewOffset = vWepOfs[wep16];
-            World.weaponViewOffset.y += WeaponDipOffsetY();
+            World.weaponViewOffset.y += wfx.reloadContainerPos.y;
             V3 weaponPos = V3_AplusB(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1], World.weaponViewOffset));
             World.position[wvi] = weaponPos;
             World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1],vWepRot[wep16]); // view orientation + per-model correction

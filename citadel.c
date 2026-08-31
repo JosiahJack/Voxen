@@ -420,7 +420,6 @@ void CyborgConversionToggleTargetted(void) {
     play_wav(sounds[active ? 183 : 184],Sys_Settings.VolumeMessage,(V3){0.0f,0.0f,0.0f},false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);
 }
 // ElevatorButton
-static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
 extern V3 queuedLevelPos; extern u8 queuedLevelToLoad;
 void ElevatorButtonClick(u16 self) {
     Entity* e = &World.instances[self]; if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; }
@@ -1066,10 +1065,10 @@ void DrawAIDebug(u16 i) {
     V3 fwd = V3_Normalize((V3){2.0f*(x*z + w*y), 0.0f, 1.0f - 2.0f*(x*x + y*y)});
     u16 npcIdx = World.instances[i].index - 419;
     V3 sightPt = V3_AplusB(World.position[i],(V3){0.0f,sightPointHeights[npcIdx],0.0f});
-    AddWireLine(sightPt,V3_AplusB(sightPt,V3_ScaleByF(fwd,0.6f)),(Color){1.0f,1.0f,0.0f,1.0f});
+    DrawLine(sightPt,V3_AplusB(sightPt,V3_ScaleByF(fwd,0.6f)),(Color){1.0f,1.0f,0.0f,1.0f});
     V3 enemPt = World.position[PLAYER1]; enemPt.y -= 0.24f;
     RaycastHit hit = Raycast(sightPt,V3_AsubB(enemPt,sightPt),20.0f,LMASK_NPC_SIGHT);
-    if (hit.hit && hit.hitInstanceIndex == PLAYER1) { AddWireLine(sightPt,hit.point,(Color){1.0f,0.0f,0.0f,1.0f}); } else {AddWireLine(sightPt,enemPt,(Color){0.0f,1.0f,1.0f,1.0f});}
+    if (hit.hit && hit.hitInstanceIndex == PLAYER1) { DrawLine(sightPt,hit.point,(Color){1.0f,0.0f,0.0f,1.0f}); } else {DrawLine(sightPt,enemPt,(Color){0.0f,1.0f,1.0f,1.0f});}
     Entity* e = &World.instances[i];
     Color dbgCol;
     if (e->currentState == AIState_Idle) dbgCol = (Color){0.0f,1.0f,0.0f,1.0f};
@@ -1087,15 +1086,14 @@ void ModUpdate() {
     if (World.paused || World.menuActive) return;
     WeaponsUpdate(); PatchUpdate(); HardwareUpdate();
     if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right);
-    if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) AddWireLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
+    if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e = &World.instances[i]; u16 constdex = e->index;
         DelayedSpawnUpdate(i);
         if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i);
         if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);}
-        //if(IdxIsNPC(constdex)) { AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
-        if(IdxIsNPC(constdex)) { DrawAIDebug(i); }
+        if(IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
     }
 }
 

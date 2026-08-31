@@ -20,8 +20,6 @@ INLINE bool AnimWaking(u16 j) {
 }
 // Trigger System
 void AddForce(u16 i, V3 f, bool imp); void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 targetIdx); void DeleteInstance(u16 i); void TakeEnergy(float take);
-void trigger_cyberpush_touch(u16 self, u16 other) { if (World.diffCyb < 1) {return;} AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force * (float)World.deltaTime),false); World.Sys_Music.cyberTube = true; }
-void prop_cyber_exit(u16 other) { if (other != PLAYER1) {return;} UIExitCyberspace(); }
 void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); }
 void CyberItemOnTriggerEnter(u16 self, u16 other) {
     if(other!=PLAYER1){return;} float sfxVol=(float)Sys_Settings.VolumeEffects/100.0f; bool success=false;
@@ -70,21 +68,17 @@ void TriggerDelayedTarget(u16 self) { World.instances[self].delayFireFinished = 
 void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (e->recentMostActivator && e->ignoreSecondaryTriggers) || (World.instances[self].allDone && World.instances[self].onlyOnce)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self);} }
 void TriggerOnTriggerEnter(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
 void TriggerOnTriggerStay(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
-// GravityLift
-void GravityLiftOnForce(u16 self, u16 other, bool initial) {
-    float topY = World.position[self].y + (World.colliderSize[self].y * 0.5f);
-    float dist = topY - World.position[other].y + 0.48f;
-    float velY = World.velocity[other].y < 0.0f ? 0.0f : World.velocity[other].y;
-    if (dist < World.instances[self].distancePaddingToTopPoint) AddForce(other,(V3){0.0f,9.81f - velY,0.0f},false); // TODO accel-vs-force parity
-    else if (World.velocity[other].y < (World.instances[self].strength * World.mass[other])) {
-        float yForce = (World.instances[self].strength * World.mass[other]) - World.velocity[other].y;
-        if (initial || World.instances[self].initialBurstFinished > World.pauseRelativeTime) yForce *= 2.0f;
-        AddForce(other,(V3){0.0f,yForce,0.0f},false);
-    }
+void trigger_gravitylift_touch(u16 self, u16 other) {
+    if (vabs(World.gravity[other]-1.0f)<0.00001f){World.instances[self].initialBurstFinished=World.pauseRelativeTime+1.0f;}
+    float y=0.0f;
+    if (World.instances[self].active){ // Gravity lift on
+        float velY = World.velocity[other].y < 0.0f ? 0.0f : World.velocity[other].y;
+                 if (((World.position[self].y + (World.colliderSize[self].y*0.5f)/*topY*/) - World.position[other].y + 0.48f)/*dist*/ < World.instances[self].distancePaddingToTopPoint) AddForce(other,(V3){0.0f,9.81f-velY,0.0f},false);
+            else if (World.velocity[other].y < (World.instances[self].strength * World.mass[other])){ y=(World.instances[self].strength * World.mass[other]) - World.velocity[other].y;}
+    }/*off*/else if (World.velocity[other].y <  World.instances[self].offStrengthFactor){             y= World.instances[self].offStrengthFactor             - World.velocity[other].y;} // Gravity lift off (still applies force, but weakly to let objects/player gently drift down
+    if(World.instances[self].initialBurstFinished == 0.0 || World.instances[self].initialBurstFinished > World.pauseRelativeTime){y*=2.0f;}
+    AddForce(other,(V3){0.0f,y,0.0f},false);
 }
-
-void GravityLiftOffForce(u16 self, u16 other, bool initial) { if (World.velocity[other].y < World.instances[self].offStrengthFactor){float y=World.instances[self].offStrengthFactor - World.velocity[other].y; if (initial || World.instances[self].initialBurstFinished > World.pauseRelativeTime){y *= 2.0f;} AddForce(other,(V3){0.0f,y,0.0f},false);} }
-void trigger_gravitylift_touch(u16 self, u16 other) { if (vabs(World.gravity[other]-1.0f)<0.00001f){World.instances[self].initialBurstFinished=World.pauseRelativeTime+1.0f;} if (World.instances[self].active){GravityLiftOnForce(self,other,true);} else{GravityLiftOffForce(self,other,true);} }
 // Physics System
 INLINE void SetPosition(u16 i, V3 newpos) { float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;} V3 dir=V3_Normalize(V3_AsubB(newpos,World.position[i])); World.position[i]=V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed)); flag_set(&World.instances[i].entflags,EF_MOVING,true); posBudget[i] -= allowed; }
 INLINE Manifold OverlapToManifold(Overlap r) { Manifold m={0}; if (r.hit && r.pen > PHY_EPSILON) { m.normal = r.normal; m.n = 1; m.p[0] = (ManifoldPt){r.point, r.pen}; m.maxPen = r.pen; } return m; }
@@ -423,8 +417,8 @@ void BvhWalkSphMsh(V3 sc, float sr, u16 m, const float* mx, Overlap* r) {
     }
 }
 
-Overlap SphMsh(V3 sc, float sr, u16 m, const float* mx) { Overlap r={0}; if(m>=MAX_MDLS)return r; u32 tc=modelTriangleCounts[m]; if(!tc){return r;} if (BvhHasBVH(m)) { BvhWalkSphMsh(sc,sr,m,mx,&r); return r; } for(u32 ti=0;ti<tc;++ti){SphTriTest(sc,sr,m,ti,mx,&r);} return r; }
-Overlap CapMsh(ShapeCapsule c, u16 m, const float* mx) { Overlap best=SphMsh(c.base,c.rad,m,mx), rt=SphMsh(c.tip,c.rad,m,mx); if(rt.pen>best.pen)best=rt; V3 d=V3_AsubB(c.tip,c.base); if(V3_Mag(d)>PHY_EPSILON){/*Hey I was doing a snowman of just the end spheres, don't hate the simplicity, I only use capsules for npcs and player*/for(int k=1;k<6;++k){float t=(float)k/5.0f; Overlap rm=SphMsh(V3_AplusB(c.base,V3_ScaleByF(d,t)),c.rad,m,mx); if(rm.pen>best.pen)best=rm;}} return best; }
+static Overlap SphMsh(V3 sc, float sr, u16 m, const float* mx) { Overlap r={0}; if(m>=MAX_MDLS)return r; u32 tc=modelTriangleCounts[m]; if(!tc){return r;} if (BvhHasBVH(m)) { BvhWalkSphMsh(sc,sr,m,mx,&r); return r; } for(u32 ti=0;ti<tc;++ti){SphTriTest(sc,sr,m,ti,mx,&r);} return r; }
+static Overlap CapMsh(ShapeCapsule c, u16 m, const float* mx) { Overlap best=SphMsh(c.base,c.rad,m,mx), rt=SphMsh(c.tip,c.rad,m,mx); if(rt.pen>best.pen)best=rt; V3 d=V3_AsubB(c.tip,c.base); if(V3_Mag(d)>PHY_EPSILON){/*Hey I was doing a snowman of just the end spheres, don't hate the simplicity, I only use capsules for npcs and player*/for(int k=1;k<6;++k){float t=(float)k/5.0f; Overlap rm=SphMsh(V3_AplusB(c.base,V3_ScaleByF(d,t)),c.rad,m,mx); if(rm.pen>best.pen)best=rm;}} return best; }
 Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx, u16 adjIdx) {
     Manifold m={0}; if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return m;
     u8 col = World.col[prim]; V3 (*supA)(const SupportCtx*, V3) = (col == COLTYPE_SPH) ? _supA_sph : (col == COLTYPE_BOX) ? _supA_box : _supA_cap;
@@ -606,20 +600,6 @@ Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 
 INLINE void quat_to_mat3(Quaternion q, float R[3][3]) { float x=q.x,y=q.y,z=q.z,w=q.w, xx=x*x,yy=y*y,zz=z*z, xy=x*y,xz=x*z,yz=y*z, wx=w*x,wy=w*y,wz=w*z; R[0][0]=1.0f-2.0f*(yy+zz); R[0][1]=2.0f*(xy-wz); R[0][2]=2.0f*(xz+wy); R[1][0]=2.0f*(xy+wz); R[1][1]=1.0f-2.0f*(xx+zz); R[1][2]=2.0f*(yz-wx); R[2][0]=2.0f*(xz-wy); R[2][1]=2.0f*(yz+wx); R[2][2]=1.0f-2.0f*(xx+yy); }
 INLINE void BuildInvInertiaMatrix(u16 i, const float R[3][3], float K[3][3]) { /* K = R * I_inv * R^T, precomputed per body for solver hotpath */ float I0,I1,I2,I3,I4,I5; if (World.col[i]==COLTYPE_BOX) { ShapeBox b=Entity_GetBox(i); float m=World.mass[i],hx=b.hExt.x,hy=b.hExt.y,hz=b.hExt.z; I0=1.0f/vmax((1.0f/3.0f)*m*(hy*hy+hz*hz),1e-6f); I1=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hz*hz),1e-6f); I2=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hy*hy),1e-6f); I3=I4=I5=0.0f; } else if (World.col[i]==COLTYPE_CVX && World.invTnsrValid[i]) { float *II=World.invInertiaTensor[i]; I0=II[0]; I1=II[1]; I2=II[2]; I3=II[3]; I4=II[4]; I5=II[5]; } else { float s=1.0f/vmax((2.0f/5.0f)*World.mass[i]*World.radius[i]*World.radius[i],1e-6f); I0=I1=I2=s; I3=I4=I5=0.0f; } for (int r=0;r<3;++r) for (int c=0;c<3;++c) K[r][c]=R[r][0]*(I0*R[c][0]+I3*R[c][1]+I4*R[c][2])+R[r][1]*(I3*R[c][0]+I1*R[c][1]+I5*R[c][2])+R[r][2]*(I4*R[c][0]+I5*R[c][1]+I2*R[c][2]); }
 INLINE V3 M33_v(const float M[3][3], V3 v) { return (V3){M[0][0]*v.x+M[0][1]*v.y+M[0][2]*v.z, M[1][0]*v.x+M[1][1]*v.y+M[1][2]*v.z, M[2][0]*v.x+M[2][1]*v.y+M[2][2]*v.z}; }
-V3 ApplyInvTensor(u16 i, V3 v, const float R[3][3]) {
-    if (World.col[i] == COLTYPE_BOX) {
-        ShapeBox b = Entity_GetBox(i); float m = World.mass[i], hx = b.hExt.x, hy = b.hExt.y, hz = b.hExt.z;
-        float Ixx=(1.0f/3.0f)*m*(hy*hy+hz*hz), Iyy=(1.0f/3.0f)*m*(hx*hx+hz*hz), Izz=(1.0f/3.0f)*m*(hx*hx+hy*hy), invIxx=1.0f/vmax(Ixx,1e-6f), invIyy=1.0f/vmax(Iyy,1e-6f), invIzz=1.0f/vmax(Izz,1e-6f);
-        float bx=R[0][0]*v.x+R[1][0]*v.y+R[2][0]*v.z, by=R[0][1]*v.x+R[1][1]*v.y+R[2][1]*v.z, bz=R[0][2]*v.x+R[1][2]*v.y+R[2][2]*v.z; float wx=invIxx*bx, wy=invIyy*by, wz=invIzz*bz; 
-        return (V3){R[0][0]*wx+R[0][1]*wy+R[0][2]*wz, R[1][0]*wx+R[1][1]*wy+R[1][2]*wz, R[2][0]*wx+R[2][1]*wy+R[2][2]*wz};
-    }
-    if (World.col[i] != COLTYPE_CVX || !World.invTnsrValid[i]) { float r=World.radius[i]; return V3_ScaleByF(v,1.0f/vmax((2.0f/5.0f)*World.mass[i]*r*r,0.0f)); }
-    float *I=World.invInertiaTensor[i];
-    float bx=R[0][0]*v.x+R[1][0]*v.y+R[2][0]*v.z, by=R[0][1]*v.x+R[1][1]*v.y+R[2][1]*v.z, bz=R[0][2]*v.x+R[1][2]*v.y+R[2][2]*v.z;
-    float wx=I[0]*bx+I[3]*by+I[4]*bz, wy=I[3]*bx+I[1]*by+I[5]*bz, wz=I[4]*bx+I[5]*by+I[2]*bz; 
-    return (V3){R[0][0]*wx+R[0][1]*wy+R[0][2]*wz, R[1][0]*wx+R[1][1]*wy+R[1][2]*wz, R[2][0]*wx+R[2][1]*wy+R[2][2]*wz};
-}
-
 void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this substep.
     for (int it=0;it<SOLVER_ITER_GLOBAL;++it) {
         float maxDelta = 0.0f;
@@ -701,18 +681,12 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
     }
 }
 
-void EntityColliderMatrixNow(u16 i, float M[16]) { // Convex meshes need to keep their matrix4x4 up to date.
+static void EntityColliderMatrixNow(u16 i, float M[16]) { // Convex meshes need to keep their matrix4x4 up to date.
     Quaternion q = World.rotation[i]; V3 sx = V3_ScaleByF(quat_rot_v3(q,(V3){1,0,0}),World.scale[i].x); V3 sy = V3_ScaleByF(quat_rot_v3(q,(V3){0,1,0}),World.scale[i].y); V3 sz = V3_ScaleByF(quat_rot_v3(q,(V3){0,0,1}),World.scale[i].z); V3 p = World.position[i];
     M[0]=sx.x; M[1]=sx.y; M[2]=sx.z; M[3]=0.0f; M[4]=sy.x; M[5]=sy.y; M[6]=sy.z; M[7]=0.0f; M[8]=sz.x; M[9]=sz.y; M[10]=sz.z; M[11]=0.0f; M[12]=p.x; M[13]=p.y; M[14]=p.z; M[15]=1.0f;
 }
 
-bool PointInOBB(V3 pt, ShapeBox box) {
-    V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx = V3_dot(d,ax), ly = V3_dot(d,ay), lz = V3_dot(d,az);
-    return (vabs(lx) <= box.hExt.x + 0.001f) && (vabs(ly) <= box.hExt.y + 0.001f) && (vabs(lz) <= box.hExt.z + 0.001f);
-}
-
-
-bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {
+static bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {
     V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx = V3_dot(d,ax), ly = V3_dot(d,ay), lz = V3_dot(d,az);
     float cx = vclamp(lx,-box.hExt.x,box.hExt.x), cy = vclamp(ly,-box.hExt.y,box.hExt.y), cz = vclamp(lz,-box.hExt.z,box.hExt.z);
     float dx = lx-cx, dy = ly-cy, dz = lz-cz; return (dx*dx + dy*dy + dz*dz) <= radius*radius;
@@ -843,7 +817,8 @@ void Physics(float dt) {
                 if (other != PLAYER1 && trigdx == 596) { trigger_gravitylift_touch(self,other); continue; }
                 World.Sys_Music.cyberTube = false; World.gravity[PLAYER1] = 1.0f; World.Sys_Music.inZone = World.Sys_Music.elevator = World.Sys_Music.distortion = false;
                 switch(trigdx) {
-                    case 595/*trigger_cyberpush*/:   trigger_cyberpush_touch(self,other); break;
+                    case 554/*prop_cyber_exit*/: if(other == PLAYER1){UIExitCyberspace();} break;
+                    case 595/*trigger_cyberpush*/: if(World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force*(float)World.deltaTime),false); World.Sys_Music.cyberTube=true;} break;
                     case 596/*trigger_gravitylift*/: trigger_gravitylift_touch(self,other); break;
                     case 597/*trigger_ladder*/:      World.invP1.ladderState=1; ladderTouched = true; ladderTopY = trigBox.ctr.y + trigBox.hExt.y; break;
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;

@@ -1291,7 +1291,8 @@ index: 580
 index: 582
 #Textures/ParticleCloudWhite.png
 index: 583
-
+#Textures/UI/wepicons/ss1_wp_assaultrifle.png
+index: 584
 #Textures/ParticleFireballSheet.png
 index: 585
 #Textures/ParticleFirecloud.png
@@ -1411,7 +1412,8 @@ index: 634
 #Textures/UI/frobicons/card_per1.png
 index: 635
 transparent: 1
-
+#Textures/UI/wepicons/ss1_wp_blaster.png
+index: 636
 #Textures/pnl_ded.png
 index: 637
 #Textures/poisonbushtrunk.png
@@ -1773,7 +1775,7 @@ index: 811
 #Textures/sheet_stunhit.png
 index: 812
 #Textures/sheet_vaporize.png
-index: 813s
+index: 813
 #Textures/skeleton.png
 index: 815
 #Textures/skull.png
@@ -1782,7 +1784,8 @@ index: 816
 index: 817
 #Textures/sparqbeam.png
 index: 818
-
+#Textures/UI/wepicons/ss1_wp_dart_pistol.png
+index: 819
 #Textures/Sparqwave.png
 index: 820
 #Textures/SplashesFineParticle.png
@@ -2398,7 +2401,20 @@ transparent: 1
 #Textures/UI/cursors/orangecrosshair.png
 index: 1066
 transparent: 1
-
+#Textures/UI/wepicons/ss1_wp_flechette.png
+index: 1067
+#Textures/UI/wepicons/ss1_wp_ionrifle.png
+index: 1068
+#Textures/UI/wepicons/ss1_wp_magnum.png
+index: 1069
+#Textures/UI/wepicons/ss1_wp_magpulse.png
+index: 1070
+#Textures/UI/wepicons/ss1_wp_minipistol.png
+index: 1071
+#Textures/UI/wepicons/ss1_wp_pipe.png
+index: 1072
+#Textures/UI/wepicons/ss1_wp_plasma.png
+index: 1073
 #Textures/UI/searchfx.png
 index: 1074
 transparent: 1
@@ -2585,7 +2601,8 @@ index: 1162
 index: 1163
 #Textures/sequences/scr_exp06.png
 index: 1164
-
+#Textures/UI/wepicons/ss1_wp_railgun.png
+index: 1165
 #Textures/sequences/telepad_00.png
 index: 1166
 #Textures/sequences/telepad_01.png
@@ -3250,7 +3267,8 @@ index: 1491
 index: 1492
 #Textures/sequences/telepad_03_glow.png
 index: 1493
-
+#Textures/UI/wepicons/ss1_wp_rapier.png
+index: 1494
 #Textures/sequences/medscreen13_00.png
 index: 1495
 #Textures/sequences/medscreen13_01.png
@@ -4239,3 +4257,11 @@ index: 1986
 index: 1987
 #Textures/VMailShieldsUp/a40_0023.png
 index: 1988
+#Textures/UI/wepicons/ss1_wp_riotgun.png
+index: 1989
+#Textures/UI/wepicons/ss1_wp_skorpion.png
+index: 1990
+#Textures/UI/wepicons/ss1_wp_sparq.png
+index: 1991
+#Textures/UI/wepicons/ss1_wp_stungun.png
+index: 1992

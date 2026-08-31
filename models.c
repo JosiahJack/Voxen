@@ -1,16 +1,12 @@
 // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
 #include "common.h"
 #define ARENA_ALIGN(p) ((char*)(((uintptr_t)(p) + 15) & ~(uintptr_t)15)) // 16-byte align sub-arena cursors
-enum{MAX_GLTF_JOINTS=96,MAX_GLTF_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLTF_VERTS=MAX_OUTPUT_VERTS,MAX_GLTF_BLOCKS=64};
-float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
+enum{MAX_GLTF_JOINTS=96,MAX_GLTF_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLTF_VERTS=MAX_OUTPUT_VERTS,MAX_GLTF_BLOCKS=64}; float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
 typedef struct { const char *data,*name; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count,capacity; } ModelDataParser;
 typedef struct { u32 start,end; int tid; } PhysGeomTask;
 BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
 typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
-static BvhBuildCtx thrd_bvh_ctx[32];
-u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0;
-u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; u16* cvxAdjLists[MAX_UNIQUE_CVX_MESHES]; // CSR format adjacency data: cvxAdjOffsets[m] has vCount + 1 entries pointing into cvxAdjLists[m]
-u16 cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
+static BvhBuildCtx thrd_bvh_ctx[32]; u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0; u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; u16* cvxAdjLists[MAX_UNIQUE_CVX_MESHES]; u16 cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
 INLINE float fast_atof(const char** p) { const char* c=*p; while (*c == ' ' || *c == '\t') {c++;} float s=1.0f; if(*c == '-'){s=-1.0f; c++;} float v=0.0f; while (*c >= '0' && *c <= '9') { v=v * 10.0f + (*c - '0'); c++; } if (*c == '.') { c++; float sub=0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub*=0.1f; c++; } } *p=c; return s * v; }
 INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *c == '\t') {c++;} i32 s=1; if(*c == '-'){s=-1; c++;} i32 v = 0; while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; } *p = c; return v * s; }
 typedef enum{cgltf_result_success,cgltf_result_data_too_short,cgltf_result_unknown_format,cgltf_result_invalid_json,cgltf_result_invalid_gltf,cgltf_result_file_not_found,cgltf_result_io_error,cgltf_result_legacy_gltf}cgltf_result;
@@ -21,24 +17,16 @@ typedef enum{cgltf_type_invalid,cgltf_type_scalar,cgltf_type_vec2,cgltf_type_vec
 typedef enum{cgltf_primitive_type_invalid,cgltf_primitive_type_points,cgltf_primitive_type_lines,cgltf_primitive_type_line_loop,cgltf_primitive_type_line_strip,cgltf_primitive_type_triangles,cgltf_primitive_type_triangle_strip,cgltf_primitive_type_triangle_fan,cgltf_primitive_type_max_enum}cgltf_primitive_type;
 typedef enum{cgltf_animation_path_type_invalid,cgltf_animation_path_type_translation,cgltf_animation_path_type_rotation,cgltf_animation_path_type_scale,cgltf_animation_path_type_weights,cgltf_animation_path_type_max_enum}cgltf_animation_path_type;
 typedef enum{cgltf_interpolation_type_linear,cgltf_interpolation_type_step,cgltf_interpolation_type_cubic_spline,cgltf_interpolation_type_max_enum}cgltf_interpolation_type;
-typedef struct{ char*name; size_t size; char*uri; void*data; } cgltf_buffer; 
-typedef struct{char*name; cgltf_buffer*buffer; size_t offset,size,stride; cgltf_buffer_view_type type; void*data; }cgltf_buffer_view;
+typedef struct{ char*name; size_t size; char*uri; void*data; } cgltf_buffer; typedef struct{char*name; cgltf_buffer*buffer; size_t offset,size,stride; cgltf_buffer_view_type type; void*data; }cgltf_buffer_view;
 typedef struct{size_t count;cgltf_buffer_view*indices_buffer_view;size_t indices_byte_offset;cgltf_component_type indices_component_type;cgltf_buffer_view*values_buffer_view;size_t values_byte_offset;}cgltf_accessor_sparse;
 typedef struct{char*name;cgltf_component_type component_type;bool normalized;cgltf_type type;size_t offset,count,stride;cgltf_buffer_view*buffer_view;bool has_min,has_max,is_sparse;float min[16],max[16];cgltf_accessor_sparse sparse;} cgltf_accessor;
-typedef struct{char*name;cgltf_attribute_type type;i32 index;cgltf_accessor*data;}cgltf_attribute;
-typedef struct{cgltf_primitive_type type; cgltf_accessor*indices; cgltf_attribute*attributes; size_t attributes_count; }cgltf_primitive;
-typedef struct{char *name; cgltf_primitive *primitives; size_t primitives_count; float*weights; size_t weights_count;} cgltf_mesh;
-typedef struct cgltf_node cgltf_node;
-typedef struct{char*name;cgltf_node**joints;size_t joints_count;cgltf_node*skeleton;cgltf_accessor*inverse_bind_matrices;}cgltf_skin;
-struct cgltf_node{char*name;cgltf_node*parent,**children;size_t children_count;cgltf_skin*skin;cgltf_mesh*mesh;float*weights;size_t weights_count;bool has_translation,has_rotation,has_scale,has_matrix;float translation[3],rotation[4],scale[3],matrix[16];};
-typedef struct{cgltf_accessor*input,*output;cgltf_interpolation_type interpolation;}cgltf_animation_sampler;
-typedef struct{cgltf_animation_sampler*sampler;cgltf_node*target_node;cgltf_animation_path_type target_path;}cgltf_animation_channel;
+typedef struct{char*name;cgltf_attribute_type type;i32 index;cgltf_accessor*data;}cgltf_attribute; typedef struct{cgltf_primitive_type type; cgltf_accessor*indices; cgltf_attribute*attributes; size_t attributes_count; }cgltf_primitive; typedef struct{char *name; cgltf_primitive *primitives; size_t primitives_count; float*weights; size_t weights_count;} cgltf_mesh;
+typedef struct cgltf_node cgltf_node; typedef struct{char*name;cgltf_node**joints;size_t joints_count;cgltf_node*skeleton;cgltf_accessor*inverse_bind_matrices;}cgltf_skin; struct cgltf_node{char*name;cgltf_node*parent,**children;size_t children_count;cgltf_skin*skin;cgltf_mesh*mesh;float*weights;size_t weights_count;bool has_translation,has_rotation,has_scale,has_matrix;float translation[3],rotation[4],scale[3],matrix[16];};
+typedef struct{cgltf_accessor*input,*output;cgltf_interpolation_type interpolation;}cgltf_animation_sampler; typedef struct{cgltf_animation_sampler*sampler;cgltf_node*target_node;cgltf_animation_path_type target_path;}cgltf_animation_channel;
 typedef struct{char*name;cgltf_animation_sampler*samplers;size_t samplers_count;cgltf_animation_channel*channels;size_t channels_count;}cgltf_animation;
 typedef struct{void*file_data;size_t file_size;cgltf_mesh*meshes;size_t meshes_count;cgltf_accessor*accessors;size_t accessors_count;cgltf_buffer_view*buffer_views;size_t buffer_views_count;cgltf_buffer*buffers;size_t buffers_count;cgltf_skin*skins;size_t skins_count;cgltf_node*nodes;size_t nodes_count;cgltf_animation*animations;size_t animations_count;const char*json;size_t json_size;const void*bin;size_t bin_size;}cgltf_data;
-typedef enum{JSMN_UNDEFINED=0,JSMN_OBJECT=1,JSMN_ARRAY=2,JSMN_STRING=3,JSMN_PRIMITIVE=4}jsmntype_t;
-enum{JSMN_ERROR_NOMEM=-1,JSMN_ERROR_INVAL=-2,JSMN_ERROR_PART=-3};
-typedef struct{jsmntype_t type;i64 start,end;i32 size,parent;}jsmntok_t;
-typedef struct{size_t pos;u32 toknext;i32 toksuper;}jsmn_parser;
+typedef enum{JSMN_UNDEFINED=0,JSMN_OBJECT=1,JSMN_ARRAY=2,JSMN_STRING=3,JSMN_PRIMITIVE=4}jsmntype_t; enum{JSMN_ERROR_NOMEM=-1,JSMN_ERROR_INVAL=-2,JSMN_ERROR_PART=-3};
+typedef struct{jsmntype_t type;i64 start,end;i32 size,parent;}jsmntok_t; typedef struct{size_t pos;u32 toknext;i32 toksuper;}jsmn_parser;
 static void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm) {
 	float tx=T[0],ty=T[1],tz=T[2],qx=R[0],qy=R[1],qz=R[2],qw=R[3],sx=S[0],sy=S[1],sz=S[2];
 	lm[0]=(1-2*qy*qy-2*qz*qz)*sx; lm[1]=(2*qx*qy+2*qz*qw)*sx; lm[2]=(2*qx*qz-2*qy*qw)*sx; lm[3]=lm[7]=lm[11]=0.0f; lm[4]=(2*qx*qy-2*qz*qw)*sy; lm[5]=(1-2*qx*qx-2*qz*qz)*sy; lm[6]=(2*qy*qz+2*qx*qw)*sy; lm[8]=(2*qx*qz+2*qy*qw)*sz; lm[9]=(2*qy*qz-2*qx*qw)*sz; lm[10]=(1-2*qx*qx-2*qy*qy)*sz; lm[12]=tx; lm[13]=ty; lm[14]=tz; lm[15]=1.0f;
@@ -66,7 +54,7 @@ static bool cgltf_element_read_float(const u8* e, cgltf_type ty, cgltf_component
 }
 
 const u8* cgltf_buffer_view_data(const cgltf_buffer_view* v){if(v->data)return(const u8*)v->data;if(!v->buffer->data)return NULL;return(const u8*)v->buffer->data+v->offset;}
-const cgltf_accessor* cgltf_find_accessor(const cgltf_primitive* p, cgltf_attribute_type t, i32 idx){for(size_t i=0;i<p->attributes_count;++i){const cgltf_attribute*a=&p->attributes[i];if(a->type==t&&a->index==idx)return a->data;}return NULL;}
+static const cgltf_accessor* cgltf_find_accessor(const cgltf_primitive* p, cgltf_attribute_type t, i32 idx){for(size_t i=0;i<p->attributes_count;++i){const cgltf_attribute*a=&p->attributes[i];if(a->type==t&&a->index==idx)return a->data;}return NULL;}
 static const u8* cgltf_find_sparse_index(const cgltf_accessor* a, size_t n){
     const cgltf_accessor_sparse*s=&a->sparse;const u8*id=cgltf_buffer_view_data(s->indices_buffer_view),*vd=cgltf_buffer_view_data(s->values_buffer_view);
     if(!id||!vd)return NULL;
@@ -93,41 +81,30 @@ size_t cgltf_accessor_read_index(const cgltf_accessor* a, size_t i){
     return cgltf_component_read_index(e,a->component_type);
 }
 
-#define CGLTF_ERROR_JSON -1
-#define CGLTF_ERROR_LEGACY -3
-#define CGLTF_CHECK_TOKTYPE(t, ty) if((t).type!=(ty))return CGLTF_ERROR_JSON;
-#define CGLTF_CHECK_TOKTYPE_RET(t, ty, r) if((t).type!=(ty))return r;
-#define CGLTF_CHECK_KEY(t) if((t).type!=JSMN_STRING||(t).size==0)return CGLTF_ERROR_JSON;
+#define CGLTF_CHECK_TOKTYPE(t, ty) if((t).type!=(ty))return -1;
+#define CGLTF_CHECK_KEY(t) if((t).type!=JSMN_STRING||(t).size==0)return -1;
 #define CGLTF_PTRINDEX(ty, idx) (ty*)((size_t)idx+1)
-#define CGLTF_PTRFIXUP(v, d, s) if(v){if((size_t)v>s)return CGLTF_ERROR_JSON;v=&d[(size_t)v-1];}
-#define CGLTF_PTRFIXUP_REQ(v, d, s) if(!v||(size_t)v>s)return CGLTF_ERROR_JSON;v=&d[(size_t)v-1];
+#define CGLTF_PTRFIXUP(v, d, s) if(v){if((size_t)v>s)return -1;v=&d[(size_t)v-1];}
+#define CGLTF_PTRFIXUP_REQ(v, d, s) if(!v||(size_t)v>s)return -1;v=&d[(size_t)v-1];
 static int cgltf_json_strcmp(jsmntok_t const* t, const u8* j, const char* s){CGLTF_CHECK_TOKTYPE(*t, JSMN_STRING); size_t sl=slen(s),nl=(size_t)(t->end-t->start); return sl==nl?sCompUpToLen((const char*)j+t->start,s,sl)==0:0; }
-static int cgltf_json_to_int(jsmntok_t const* t, const u8* j){
-    CGLTF_CHECK_TOKTYPE(*t, JSMN_PRIMITIVE);i32 r=0;const char*p=(const char*)j+t->start,*e=(const char*)j+t->end;bool n=0;
-    if(*p=='-'){n=1;p++;}while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;}return n?-r:r;
-}
-static size_t cgltf_json_to_size(jsmntok_t const* t, const u8* j){
-    CGLTF_CHECK_TOKTYPE_RET(*t, JSMN_PRIMITIVE, 0);size_t r=0;const char*p=(const char*)j+t->start,*e=(const char*)j+t->end;
-    while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;}return r;
-}
+static int cgltf_json_to_int(jsmntok_t const* t, const u8* j){ CGLTF_CHECK_TOKTYPE(*t, JSMN_PRIMITIVE);i32 r=0;const char*p=(const char*)j+t->start,*e=(const char*)j+t->end;bool n=0; if(*p=='-'){n=1;p++;}while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;}return n?-r:r; }
+static size_t cgltf_json_to_size(jsmntok_t const* t, const u8* j){ if(t->type != JSMN_PRIMITIVE){return 0;} size_t r=0;const char*p=(const char*)j+t->start,*e=(const char*)j+t->end; while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;}return r; }
 static float cgltf_json_to_float(jsmntok_t const* t, const u8* j){
     CGLTF_CHECK_TOKTYPE(*t, JSMN_PRIMITIVE);float r=0,f=0;int s=1;const char*p=(const char*)j+t->start,*e=(const char*)j+t->end;
-    if(*p=='-'){s=-1;p++;}while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;}
-    if(p<e&&*p=='.'){p++;float d=0.1f;while(p<e&&*p>='0'&&*p<='9'){f+=(*p-'0')*d;d*=0.1f;p++;}}
+    if(*p=='-'){s=-1;p++;}while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;} if(p<e&&*p=='.'){p++;float d=0.1f;while(p<e&&*p>='0'&&*p<='9'){f+=(*p-'0')*d;d*=0.1f;p++;}}
     return s*(r+f);
 }
 static bool cgltf_json_to_bool(jsmntok_t const* t, const u8* j){int sz=(int)(t->end-t->start);return sz==4&&sCompUpToLen((const char*)j+t->start,"true",4)==0;}
 static int cgltf_skip_json(jsmntok_t const* t, int i){int e=i+1;while(i<e){switch(t[i].type){case JSMN_OBJECT:e+=t[i].size*2;break;case JSMN_ARRAY:e+=t[i].size;break;case JSMN_PRIMITIVE:case JSMN_STRING:break;default:return -1;}i++;}return i;}
-static int cgltf_parse_json_float_array(jsmntok_t const* t, int i, const u8* j, float* o, int s){CGLTF_CHECK_TOKTYPE(t[i], JSMN_ARRAY);if(t[i].size!=s)return CGLTF_ERROR_JSON;++i;for(int k=0;k<s;++k){CGLTF_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);o[k]=cgltf_json_to_float(t+i,j);++i;}return i;}
+static int cgltf_parse_json_float_array(jsmntok_t const* t, int i, const u8* j, float* o, int s){CGLTF_CHECK_TOKTYPE(t[i], JSMN_ARRAY);if(t[i].size!=s)return -1;++i;for(int k=0;k<s;++k){CGLTF_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);o[k]=cgltf_json_to_float(t+i,j);++i;}return i;}
 size_t cgltf_total_alloc = 0; // track cgltf parse tree leak
-static int cgltf_parse_json_string(jsmntok_t const* t, int i, const u8* j, char** out){ CGLTF_CHECK_TOKTYPE(t[i], JSMN_STRING);if(*out)return CGLTF_ERROR_JSON; int sz=(int)(t[i].end-t[i].start);char*r=(char*)OS_AllocScratch(sz+1);cgltf_total_alloc+=sz+1;sCpy2aSubFromb(r,sz,(const char*)j+t[i].start,sz+1);*out=r;return i+1; }
-static int cgltf_parse_json_array(jsmntok_t const* t, int i, const u8* j, size_t es, void** out, size_t* os){ (void)j;if(t[i].type!=JSMN_ARRAY)return CGLTF_ERROR_JSON;if(*out)return CGLTF_ERROR_JSON;int sz=t[i].size;*out=OS_AllocScratch(es*sz);cgltf_total_alloc+=es*sz;*os=sz;return i+1; }
+static int cgltf_parse_json_string(jsmntok_t const* t, int i, const u8* j, char** out){ CGLTF_CHECK_TOKTYPE(t[i], JSMN_STRING);if(*out)return -1; int sz=(int)(t[i].end-t[i].start);char*r=(char*)OS_AllocScratch(sz+1);cgltf_total_alloc+=sz+1;sCpy2aSubFromb(r,sz,(const char*)j+t[i].start,sz+1);*out=r;return i+1; }
+static int cgltf_parse_json_array(jsmntok_t const* t, int i, const u8* j, size_t es, void** out, size_t* os){ (void)j;if(t[i].type!=JSMN_ARRAY)return -1;if(*out)return -1;int sz=t[i].size;*out=OS_AllocScratch(es*sz);cgltf_total_alloc+=es*sz;*os=sz;return i+1; }
 typedef int (*cgltf_parse_item_func)(jsmntok_t const* t, int i, const u8* j, void* out);
 static int cgltf_parse_json_array_generic(jsmntok_t const* t, int i, const u8* j, size_t elem_size, void** out_array, size_t* out_count, cgltf_parse_item_func parse_item) { i = cgltf_parse_json_array(t, i, j, elem_size, out_array, out_count); if (i < 0) return i; for (size_t k = 0; k < *out_count; ++k) { i = parse_item(t, i, j, (char*)*out_array + k * elem_size); if (i < 0) return i; } return i; }
 static cgltf_component_type cgltf_json_to_component_type(jsmntok_t const* t, const u8* j){ int ty=cgltf_json_to_int(t,j); return ty==5120?cgltf_component_type_r_8:ty==5121?cgltf_component_type_r_8u:ty==5122?cgltf_component_type_r_16:ty==5123?cgltf_component_type_r_16u:ty==5125?cgltf_component_type_r_32u:ty==5126?cgltf_component_type_r_32f:cgltf_component_type_invalid; }
 static int cgltf_parse_json_sparse_part(jsmntok_t const* t, int i, const u8* j, cgltf_buffer_view** out_bv, size_t* out_offset, cgltf_component_type* out_ct) {
-    CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);
-    int sz = t[i].size; ++i;
+    CGLTF_CHECK_TOKTYPE(t[i],JSMN_OBJECT); int sz=t[i].size; ++i;
     for (int m = 0; m < sz; ++m) {
         CGLTF_CHECK_KEY(t[i]);
         if (cgltf_json_strcmp(t+i, j, "bufferView")) { ++i; *out_bv = CGLTF_PTRINDEX(cgltf_buffer_view, cgltf_json_to_int(t+i, j)); ++i; }
@@ -149,21 +126,12 @@ static void cgltf_parse_attribute_type(const char* n, cgltf_attribute_type* ot, 
 }
 
 static int cgltf_parse_json_attribute_list(jsmntok_t const* t, int i, const u8* j, cgltf_attribute** out, size_t* oc){
-    CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);if(*out)return CGLTF_ERROR_JSON;
-    *oc=t[i].size;*out=(cgltf_attribute*)OS_Alloc(sizeof(cgltf_attribute)**oc);cgltf_total_alloc+=sizeof(cgltf_attribute)**oc;++i;
-    for(size_t k=0;k<*oc;++k){
-        CGLTF_CHECK_KEY(t[i]);i=cgltf_parse_json_string(t,i,j,&(*out)[k].name);if(i<0)return CGLTF_ERROR_JSON;
-        cgltf_parse_attribute_type((*out)[k].name,&(*out)[k].type,&(*out)[k].index);
-        (*out)[k].data=CGLTF_PTRINDEX(cgltf_accessor,cgltf_json_to_int(t+i,j));++i;
-    }
+    CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);if(*out)return -1; *oc=t[i].size;*out=(cgltf_attribute*)OS_Alloc(sizeof(cgltf_attribute)**oc);cgltf_total_alloc+=sizeof(cgltf_attribute)**oc;++i;
+    for(size_t k=0;k<*oc;++k){ CGLTF_CHECK_KEY(t[i]);i=cgltf_parse_json_string(t,i,j,&(*out)[k].name);if(i<0)return -1; cgltf_parse_attribute_type((*out)[k].name,&(*out)[k].type,&(*out)[k].index); (*out)[k].data=CGLTF_PTRINDEX(cgltf_accessor,cgltf_json_to_int(t+i,j));++i; }
     return i;
 }
 
-static cgltf_primitive_type cgltf_json_to_primitive_type(jsmntok_t const* t, const u8* j){
-    int ty=cgltf_json_to_int(t,j);
-    return ty==0?cgltf_primitive_type_points:ty==1?cgltf_primitive_type_lines:ty==2?cgltf_primitive_type_line_loop:ty==3?cgltf_primitive_type_line_strip:ty==4?cgltf_primitive_type_triangles:ty==5?cgltf_primitive_type_triangle_strip:ty==6?cgltf_primitive_type_triangle_fan:cgltf_primitive_type_invalid;
-}
-
+static cgltf_primitive_type cgltf_json_to_primitive_type(jsmntok_t const* t, const u8* j){ int ty=cgltf_json_to_int(t,j); return ty==0?cgltf_primitive_type_points:ty==1?cgltf_primitive_type_lines:ty==2?cgltf_primitive_type_line_loop:ty==3?cgltf_primitive_type_line_strip:ty==4?cgltf_primitive_type_triangles:ty==5?cgltf_primitive_type_triangle_strip:ty==6?cgltf_primitive_type_triangle_fan:cgltf_primitive_type_invalid; }
 static int cgltf_parse_json_primitive(jsmntok_t const* t, int i, const u8* j, cgltf_primitive* out){
     CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);out->type=cgltf_primitive_type_triangles;int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
@@ -356,8 +324,7 @@ static int jsmn_parse_string(jsmn_parser* p, const char* js, size_t l, jsmntok_t
         char c=js[p->pos];
         if(c=='\"'){if(!t)return 0;jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok){p->pos=s;return JSMN_ERROR_NOMEM;}jsmn_fill_token(tok,JSMN_STRING,s+1,p->pos);tok->parent=p->toksuper;return 0;}
         if(c=='\\'&&p->pos+1<l){p->pos++;switch(js[p->pos]){case '\"':case '/':case '\\':case 'b':case 'f':case 'r':case 'n':case 't':break;case 'u':p->pos++;for(int i=0;i<4&&p->pos<l&&js[p->pos];i++){if(!((js[p->pos]>=48&&js[p->pos]<=57)||(js[p->pos]>=65&&js[p->pos]<=70)||(js[p->pos]>=97&&js[p->pos]<=102))){p->pos=s;return JSMN_ERROR_INVAL;}p->pos++;}p->pos--;break;default:p->pos=s;return JSMN_ERROR_INVAL;}}
-    }
-    p->pos=s;return JSMN_ERROR_PART;
+    } p->pos=s;return JSMN_ERROR_PART;
 }
 
 static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n){
@@ -365,26 +332,14 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
     for(;p->pos<l&&js[p->pos];p->pos++){
         char c=js[p->pos];jsmntype_t ty;
         switch(c){
-        case '{':case '[':
-            cnt++;if(!t)break;jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok)return JSMN_ERROR_NOMEM;
-            if(p->toksuper!=-1){t[p->toksuper].size++;tok->parent=p->toksuper;}
-            tok->type=(c=='{'?JSMN_OBJECT:JSMN_ARRAY);tok->start=p->pos;p->toksuper=p->toknext-1;break;
-        case '}':case ']':
-            if(!t)break;ty=(c=='}'?JSMN_OBJECT:JSMN_ARRAY);if(p->toknext<1)return JSMN_ERROR_INVAL;
-            tok=&t[p->toknext-1];
-            for(;;){if(tok->start!=-1&&tok->end==-1){if(tok->type!=ty)return JSMN_ERROR_INVAL;tok->end=p->pos+1;p->toksuper=tok->parent;break;}if(tok->parent==-1){if(tok->type!=ty||p->toksuper==-1)return JSMN_ERROR_INVAL;break;}tok=&t[tok->parent];}
-            break;
-        case '\"':
-            r=jsmn_parse_string(p,js,l,t,n);if(r<0)return r;cnt++;if(p->toksuper!=-1&&t)t[p->toksuper].size++;break;
-        case '\t':case '\r':case '\n':case ' ':break;
-        case ':':p->toksuper=p->toknext-1;break;
-        case ',':
-            if(t&&p->toksuper!=-1&&t[p->toksuper].type!=JSMN_ARRAY&&t[p->toksuper].type!=JSMN_OBJECT){p->toksuper=t[p->toksuper].parent;for(i=p->toknext-1;i>=0;i--){if(t[i].type==JSMN_ARRAY||t[i].type==JSMN_OBJECT){if(t[i].start!=-1&&t[i].end==-1){p->toksuper=i;break;}}}}
-            break;
-        case '-':case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':case 't':case 'f':case 'n':
-            if(t&&p->toksuper!=-1){jsmntok_t* ot=&t[p->toksuper];if(ot->type==JSMN_OBJECT||(ot->type==JSMN_STRING&&ot->size!=0))return JSMN_ERROR_INVAL;}
-            r=jsmn_parse_primitive(p,js,l,t,n);if(r<0)return r;cnt++;if(p->toksuper!=-1&&t)t[p->toksuper].size++;break;
-        default:return JSMN_ERROR_INVAL;
+            case '{':case '[': cnt++;if(!t)break;jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok)return JSMN_ERROR_NOMEM; if(p->toksuper!=-1){t[p->toksuper].size++;tok->parent=p->toksuper;} tok->type=(c=='{'?JSMN_OBJECT:JSMN_ARRAY);tok->start=p->pos;p->toksuper=p->toknext-1;break;
+            case '}':case ']': if(!t)break;ty=(c=='}'?JSMN_OBJECT:JSMN_ARRAY);if(p->toknext<1)return JSMN_ERROR_INVAL; tok=&t[p->toknext-1]; for(;;){if(tok->start!=-1&&tok->end==-1){if(tok->type!=ty)return JSMN_ERROR_INVAL;tok->end=p->pos+1;p->toksuper=tok->parent;break;}if(tok->parent==-1){if(tok->type!=ty||p->toksuper==-1)return JSMN_ERROR_INVAL;break;}tok=&t[tok->parent];} break;
+            case '\"': r=jsmn_parse_string(p,js,l,t,n);if(r<0)return r;cnt++;if(p->toksuper!=-1&&t)t[p->toksuper].size++;break;
+            case '\t':case '\r':case '\n':case ' ':break;
+            case ':':p->toksuper=p->toknext-1;break;
+            case ',': if(t&&p->toksuper!=-1&&t[p->toksuper].type!=JSMN_ARRAY&&t[p->toksuper].type!=JSMN_OBJECT){p->toksuper=t[p->toksuper].parent;for(i=p->toknext-1;i>=0;i--){if(t[i].type==JSMN_ARRAY||t[i].type==JSMN_OBJECT){if(t[i].start!=-1&&t[i].end==-1){p->toksuper=i;break;}}}} break;
+            case '-':case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':case 't':case 'f':case 'n': if(t&&p->toksuper!=-1){jsmntok_t* ot=&t[p->toksuper];if(ot->type==JSMN_OBJECT||(ot->type==JSMN_STRING&&ot->size!=0))return JSMN_ERROR_INVAL;} r=jsmn_parse_primitive(p,js,l,t,n);if(r<0)return r;cnt++;if(p->toksuper!=-1&&t)t[p->toksuper].size++;break;
+            default:return JSMN_ERROR_INVAL;
         }
     }
     if(t){for(i=p->toknext-1;i>=0;i--){if(t[i].start!=-1&&t[i].end==-1)return JSMN_ERROR_PART;}}
@@ -400,12 +355,7 @@ cgltf_result cgltf_parse(const void* d, size_t sz, cgltf_data** out_data) {
     u32 jl;mcpy(&jl,jc,4);if(jl>sz-20){DualLogError("Data too short for glb\n");OS_Exit(1);}
     mcpy(&tmp,jc+4,4);if(tmp!=0x4E4F534A){DualLogError("Unknown format for glb\n");OS_Exit(1);}
     jc+=8;const void* bin=NULL;size_t bsz=0;
-    if(8<=sz-20-jl){
-        const u8* bc=jc+jl;u32 bl;mcpy(&bl,bc,4);
-        if(bl>sz-20-jl-8){DualLogError("Data too short for glb\n");OS_Exit(1);}
-        mcpy(&tmp,bc+4,4);if(tmp!=0x004E4942){DualLogError("Unknown format for glb\n");OS_Exit(1);}
-        bc+=8;bin=bc;bsz=bl;
-    }
+    if(8<=sz-20-jl){ const u8* bc=jc+jl;u32 bl;mcpy(&bl,bc,4); if(bl>sz-20-jl-8){DualLogError("Data too short for glb\n");OS_Exit(1);} mcpy(&tmp,bc+4,4);if(tmp!=0x004E4942){DualLogError("Unknown format for glb\n");OS_Exit(1);} bc+=8;bin=bc;bsz=bl; }
     jsmn_parser p={0,0,0};int tc=jsmn_parse(&p,(const char*)jc,jl,NULL,0);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);}
     jsmntok_t* t=(jsmntok_t*)OS_AllocScratch(sizeof(jsmntok_t)*(tc+1));jsmn_init(&p);
     tc=jsmn_parse(&p,(const char*)jc,jl,t,tc);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);}
@@ -446,16 +396,14 @@ cgltf_result cgltf_load_buffer_base64(size_t sz, const char* b64, void** out) {
 cgltf_result cgltf_load_buffers(cgltf_data* data, const char* gltf_path) {
     if(data->buffers_count&&data->buffers[0].data==NULL&&data->buffers[0].uri==NULL&&data->bin){if(data->bin_size<data->buffers[0].size)return cgltf_result_data_too_short;data->buffers[0].data=(void*)data->bin;}
     for(size_t i=0;i<data->buffers_count;++i){
-        if(data->buffers[i].data)continue;
-        const char* uri=data->buffers[i].uri;if(!uri)continue;
+        if(data->buffers[i].data)continue; const char* uri=data->buffers[i].uri;if(!uri)continue;
         if(sCompUpToLen(uri,"data:",5)){
             const char* comma=StringFindFirstCharWithin(uri,',');
             if(comma&&comma-uri>=7&&sCompUpToLen(comma-7,";base64",7)){cgltf_result r=cgltf_load_buffer_base64(data->buffers[i].size,comma+1,&data->buffers[i].data);if(r!=cgltf_result_success)return r;}
             else return cgltf_result_unknown_format;
         } else if(sFindSub(uri,"://")==NULL&&gltf_path){
             size_t psz=slen(uri)+slen(gltf_path)+1;char* path=(char*)OS_AllocScratch(psz);
-            cgltf_combine_paths(path,gltf_path,uri);
-            cgltf_decode_uri(path+slen(path)-slen(uri));
+            cgltf_combine_paths(path,gltf_path,uri); cgltf_decode_uri(path+slen(path)-slen(uri));
             FHandle fp=OS_OpenReadonly(path);
             int fsz=OS_FileSize(fp);
             u8* fb=OS_AllocateFileBackedRAMReadonly(fsz,fp,path);
@@ -1066,7 +1014,6 @@ static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap) 
 }
 
 static void* PhysGeomWorker(void* a) { PhysGeomTask* t=a; BvhBuildCtx* bvhCtx=&thrd_bvh_ctx[t->tid]; u32* ht = thrd_ht[t->tid]; u32* u=thrd_ht_used[t->tid]; u16* sc=(u16*)thrd_remap_scratch[t->tid]; for (u32 m = t->start; m < t->end; ++m) { if(m >= mdlsCnt || !modelVertexCounts[m] || !modelTriangleCounts[m]){physPos[m]=NULL; physTris[m]=NULL; physVertCounts[m]=0; continue;}  WeldModelPositions((u16)m,ht,u,sc); BuildModelBVH(bvhCtx,(u16)m); }  return NULL; }
-
 #define _mm256_cvtps_ph(A, imm) ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)(A), (int)(imm)))
 void LoadModels() {
     double startModelTime = get_time();
@@ -1206,10 +1153,8 @@ void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
 void UpdateAnims(void) {
     if (World.paused || World.menuActive) return;
     static double lastPauseTime = 0.0; if (lastPauseTime == 0.0) lastPauseTime = World.pauseRelativeTime;
-    double animDT = World.pauseRelativeTime - lastPauseTime; lastPauseTime = World.pauseRelativeTime;
-    if (animDT > 0.1) animDT = 0.1; if (animDT <= 0.0) return;
-    bool portalsNeedUpdated = false;
-    u8 animTest = Cheats.animTest;
+    double animDT = World.pauseRelativeTime - lastPauseTime; lastPauseTime = World.pauseRelativeTime; if (animDT > 0.1) animDT = 0.1; if (animDT <= 0.0) return;
+    bool portalsNeedUpdated = false; u8 animTest = Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
         Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->ajar) continue;
         if (animTest == 1) {

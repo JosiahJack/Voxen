@@ -4,7 +4,7 @@ void CycleWeaponSlot(int dir); extern double lerpStartTime;
 typedef struct WSWin WSWin; WSWin* window;                 typedef struct WSCtx WSCtx;  typedef struct WSLib WSLib;  typedef struct WSMon WSMon;     extern WSLib WinSys;
 typedef struct { int width,height,refreshRate; } vidmode;  typedef struct { int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits; uintptr_t handle; } FBC;
 typedef void (*WSP)(void); WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); void SaveConfig(); void InputWindowFocus(i32); void InputKey(char*,int,int); void InputMouseClick(char*,int,int);
-void InputCursorPos(double*,double*,double,double); void InputMonitor(WSMon*,int,int); const FBC* ChooseFBConfig(const FBC*, u32); WSMon* AllocMonitor(const char*,int,int);
+void InputCursorPos(double*,double*,double,double); void InputMonitor(WSMon*,int,int); const FBC* ChooseFBConfig(const FBC*, u32); static WSMon* AllocMonitor(const char*,int,int);
 #if defined(_WIN32)
     int __cdecl wcscmp(const u16*,const u16*); u16* wcscpy(u16*,const u16*);
     typedef struct { i32 x,y; } POINT; typedef struct { i32 l,t,r,b; } RECT; typedef struct { u32 s,maj,min; u8 _p[264]; u16 sp; u8 _p2[6]; } OSVERSIONINFOEXW;
@@ -102,12 +102,12 @@ void InputCursorPos(double*,double*,double,double); void InputMonitor(WSMon*,int
         return DefWindowProcW(h,m,w,l);
     }
     
-    void GetWindowPos(WSWin* w, int* x, int* y) { POINT p={0,0}; ClientToScreen(w->win32.handle,&p); *x=p.x; *y=p.y; }
-    void GetWindowSize(WSWin* w, int* w_, int* h) { RECT a; GetClientRect(w->win32.handle,&a); *w_=a.r; *h=a.b; }
-    void SetWindowSize(int w_, int h) { RECT r={0,0,w_,h}; AdjustWindowRectEx(&r,0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000),0,0); SetWindowPos(window->win32.handle,NULL,0,0,r.r-r.l,r.b-r.t,0x0216); }
-    void SetWindowMonitor(int x, int y, int wd, int h) { RECT r = {x,y,x+wd,y+h}; u32 s=GetWindowLongW(window->win32.handle,-16),f=0x0110; if (window->decorated) {s&=~0x80000000,s|=(0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000)),SetWindowLongW(window->win32.handle,-16,s),f|=0x0020;} AdjustWindowRectEx(&r,0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000),0,0); SetWindowPos(window->win32.handle,(void*)-2,r.l,r.t,r.r-r.l,r.b-r.t,f); }
-    void SetWindowDecorated(WSWin* w,i32 e) { (void)e; RECT r; u32 s=GetWindowLongW(w->win32.handle,-16); s &= ~(0x00C00000 | 0x00080000 | 0x00040000 | 0x00020000 | 0x00010000 | 0x80000000); s |= (0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000)); GetClientRect(w->win32.handle,&r); AdjustWindowRectEx(&r,s,0,0); ClientToScreen(w->win32.handle,(POINT*)&r.l); ClientToScreen(w->win32.handle,(POINT*)&r.r); SetWindowLongW(w->win32.handle,-16,s); SetWindowPos(w->win32.handle,NULL,r.l,r.t,r.r-r.l,r.b-r.t,0x0034); }
-    void PollEvents() {
+    static void GetWindowPos(WSWin* w, int* x, int* y) { POINT p={0,0}; ClientToScreen(w->win32.handle,&p); *x=p.x; *y=p.y; }
+    static void GetWindowSize(WSWin* w, int* w_, int* h) { RECT a; GetClientRect(w->win32.handle,&a); *w_=a.r; *h=a.b; }
+    static void SetWindowSize(int w_, int h) { RECT r={0,0,w_,h}; AdjustWindowRectEx(&r,0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000),0,0); SetWindowPos(window->win32.handle,NULL,0,0,r.r-r.l,r.b-r.t,0x0216); }
+    static void SetWindowMonitor(int x, int y, int wd, int h) { RECT r = {x,y,x+wd,y+h}; u32 s=GetWindowLongW(window->win32.handle,-16),f=0x0110; if (window->decorated) {s&=~0x80000000,s|=(0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000)),SetWindowLongW(window->win32.handle,-16,s),f|=0x0020;} AdjustWindowRectEx(&r,0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000),0,0); SetWindowPos(window->win32.handle,(void*)-2,r.l,r.t,r.r-r.l,r.b-r.t,f); }
+    static void SetWindowDecorated(WSWin* w,i32 e) { (void)e; RECT r; u32 s=GetWindowLongW(w->win32.handle,-16); s &= ~(0x00C00000 | 0x00080000 | 0x00040000 | 0x00020000 | 0x00010000 | 0x80000000); s |= (0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000)); GetClientRect(w->win32.handle,&r); AdjustWindowRectEx(&r,s,0,0); ClientToScreen(w->win32.handle,(POINT*)&r.l); ClientToScreen(w->win32.handle,(POINT*)&r.r); SetWindowLongW(w->win32.handle,-16,s); SetWindowPos(w->win32.handle,NULL,r.l,r.t,r.r-r.l,r.b-r.t,0x0034); }
+    static void PollEvents() {
         MSG m; while (PeekMessageW(&m,NULL,0,0,0x0001)) { if (m.message==0x0012) OS_Exit(0); else { TranslateMessage(&m); DispatchMessageW(&m); } }
         const int k[4][2]={{0xA0,KEY_LEFT_SHIFT},{0xA1,KEY_RIGHT_SHIFT},{0x5B,KEY_LEFT_SUPER},{0x5C,KEY_RIGHT_SUPER}};
         for (int i=0;i<4;i++) { if ((GetKeyState(k[i][0])&0x8000)||window->keys[k[i][1]]!=INPUT_PRESS) continue; InputKey(window->keys,k[i][1],INPUT_RELEASE); }
@@ -174,14 +174,14 @@ void InputCursorPos(double*,double*,double,double); void InputMonitor(WSMon*,int
     }
     
     static i64 __stdcall helperWindowProc(void* h, u32 m, u64 w, i64 l) { if (m == 0x007E) WinSysPollMonitorsWin32(); return DefWindowProcW(h,m,w,l); }
-    void GetMonitorPos(WSMon* m, int* x, int* y) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsExW(m->win32.adapterName,0xFFFFFFFFU,&dm,0x00000004); *x = dm.dmPosition.x; *y = dm.dmPosition.y; }
-    void GetMonitorFullarea(WSMon* m, int* x, int* y, int* w, int* h) { MONITORINFO mi={0}; mi.cbSize=sizeof(mi); GetMonitorInfoW(m->win32.handle,&mi); *x=mi.rcMonitor.l; *y=mi.rcMonitor.t; *w=mi.rcMonitor.r - mi.rcMonitor.l; *h=mi.rcMonitor.b - mi.rcMonitor.t; }
-    void GetVideoMode(WSMon* m, vidmode* mode) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsW(m->win32.adapterName,0xFFFFFFFFU,&dm); mode->width=dm.dmPelsWidth; mode->height=dm.dmPelsHeight; mode->refreshRate=dm.dmDisplayFrequency; }
+    static void GetMonitorPos(WSMon* m, int* x, int* y) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsExW(m->win32.adapterName,0xFFFFFFFFU,&dm,0x00000004); *x = dm.dmPosition.x; *y = dm.dmPosition.y; }
+    static void GetMonitorFullarea(WSMon* m, int* x, int* y, int* w, int* h) { MONITORINFO mi={0}; mi.cbSize=sizeof(mi); GetMonitorInfoW(m->win32.handle,&mi); *x=mi.rcMonitor.l; *y=mi.rcMonitor.t; *w=mi.rcMonitor.r - mi.rcMonitor.l; *h=mi.rcMonitor.b - mi.rcMonitor.t; }
+    static void GetVideoMode(WSMon* m, vidmode* mode) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsW(m->win32.adapterName,0xFFFFFFFFU,&dm); mode->width=dm.dmPelsWidth; mode->height=dm.dmPelsHeight; mode->refreshRate=dm.dmDisplayFrequency; }
     static void makeContextCurrentWGL(WSWin* w) { wglMakeCurrent(w->context.wgl.dc,w->context.wgl.handle); }
     static void swapBuffersWGL(WSWin* w) { if (!IsWindowsVersionOrGreaterWin32(((u8)((((u64)(0x0602))>>8)&0xff)),((u8)(((u64)(0x0602))&0xff)),0)) { i32 e = 0; if ((i32)(WinSys.win32.dwmapi.IsCompositionEnabled(&e) >= 0) && e) { int c = vabs(w->context.wgl.interval); while (c--) WinSys.win32.dwmapi.Flush(); } } SwapBuffers(w->context.wgl.dc); }
     static void swapIntervalWGL(int i) { window->context.wgl.interval = i; if (!IsWindowsVersionOrGreaterWin32(((u8)((((u64)(0x0602))>>8)&0xff)),((u8)(((u64)(0x0602))&0xff)),0)) { i32 e = 0; if ((i32)(WinSys.win32.dwmapi.IsCompositionEnabled(&e) >= 0) && e) i = 0; } wglSwapIntervalEXT(i); }
     static WSP getProcAddressWGL(const char* p) { const WSP proc = (WSP)wglGetProcAddress(p); if (proc) return proc; return (WSP)PlatformGetModuleSymbol(WinSys.instance,p); }
-    void SetWindowPosition(WSWin* w, int x, int y) { RECT r = {x,y,x,y}; AdjustWindowRectEx(&r,0x060A0000 | (w->decorated ? 0x00C00000 : 0x80000000),0,0x00040000); SetWindowPos(w->win32.handle,NULL,r.l,r.t,0,0,0x0215); }
+    static void SetWindowPosition(WSWin* w, int x, int y) { RECT r = {x,y,x,y}; AdjustWindowRectEx(&r,0x060A0000 | (w->decorated ? 0x00C00000 : 0x80000000),0,0x00040000); SetWindowPos(w->win32.handle,NULL,r.l,r.t,0,0,0x0215); }
     WSWin* VCreateWindow(int width, int height) {
         WSWin* w = OS_Alloc(sizeof(WSWin)); w->decorated = 1; w->cursorMode = 0x00034003; u32 style = 0x060A0000 | (w->decorated ? 0x00C00000 : 0x80000000);
         WNDCLASSEXW wc= (WNDCLASSEXW){sizeof(wc),0x23,windowProc,0,0,WinSys.win32.instance,NULL,NULL,NULL,NULL,L"Voxen",NULL};
@@ -258,8 +258,8 @@ void InputCursorPos(double*,double*,double,double); void InputMonitor(WSMon*,int
                                     } WSLibX11;
     PFN_XNextEvent XNextEvent;
     typedef struct WSMonX11 { RROutput output; RRCrtc crtc; } WSMonX11;
-    void GetCursorPosV(WSWin*,double*,double*);
-    void SetCurV(WSWin*,double,double);
+    static void GetCursorPosV(WSWin*,double*,double*);
+    static void SetCurV(WSWin*,double,double);
     struct WSLib { WSMon** monitors; int monitorCount; WSLibX11 x11; WSLibGLX glx; };
     struct WSCtx { void (*makeCurrent)(WSWin*); void (*swapBuffers)(WSWin*); void (*swapInterval)(int); WSP (*getProcAddress)(const char*); WSCtxGLX glx; };
     struct WSWin { i32 decorated,cursorMode; char mouseButtons[8],keys[349]; double virtualCursorPosX,virtualCursorPosY; WSCtx context; WSWinX11 x11; };
@@ -274,23 +274,23 @@ void InputCursorPos(double*,double*,double,double); void InputMonitor(WSMon*,int
     static void releaseCursor() { WinSys.x11.xlib.UngrabPointer(WinSys.x11.display,0L); }
     static void disableCursor(WSWin* w) { WinSys.x11.disabledCursorWindow=w; GetCursorPosV(w,&WinSys.x11.restoreCurPosX,&WinSys.x11.restoreCurPosY); updateCursorImage(w); captureCursor(w); }
     static void enableCursor(WSWin* w) { WinSys.x11.disabledCursorWindow = NULL; releaseCursor(); SetCurV(w,WinSys.x11.restoreCurPosX,WinSys.x11.restoreCurPosY); updateCursorImage(w); }
-    void GetMonitorPos(WSMon* m, int* x, int* y) { XRRScreenResources* sr=WinSys.x11.randr.GetScreenResourcesCurrent(WinSys.x11.display,WinSys.x11.root); XRRCrtcInfo* ci=WinSys.x11.randr.GetCrtcInfo(WinSys.x11.display,sr,m->x11.crtc); if(ci){*x=ci->x; *y=ci->y; WinSys.x11.randr.FreeCrtcInfo(ci);} WinSys.x11.randr.FreeScreenResources(sr); }
+    static void GetMonitorPos(WSMon* m, int* x, int* y) { XRRScreenResources* sr=WinSys.x11.randr.GetScreenResourcesCurrent(WinSys.x11.display,WinSys.x11.root); XRRCrtcInfo* ci=WinSys.x11.randr.GetCrtcInfo(WinSys.x11.display,sr,m->x11.crtc); if(ci){*x=ci->x; *y=ci->y; WinSys.x11.randr.FreeCrtcInfo(ci);} WinSys.x11.randr.FreeScreenResources(sr); }
     void SetWindowIcon(const WinSysIcon* image) {
         int lC=2+image[0].width*image[0].height; u64* icon=OS_Alloc(lC*sizeof(u64)), *t=icon; *t++=image[0].width; *t++=image[0].height;
         for (int j=0;j<image[0].width*image[0].height;++j) *t++=(((u64)image[0].pixels[j*4+0])<<16)|(((u64)image[0].pixels[j*4+1])<<8)|(((u64)image[0].pixels[j*4+2]))|(((u64)image[0].pixels[j*4+3])<<24);
         WinSys.x11.xlib.ChangeProperty(WinSys.x11.display,window->x11.handle,WinSys.x11.NWM_ICON,6,32,0,(u8*)icon,lC); OS_Free(icon,lC*sizeof(u64));
     }
     
-    void GetWindowSize(WSWin* w, int* w_, int* h) { XWindowAttributes a; WinSys.x11.xlib.GetWindowAttributes(WinSys.x11.display,w->x11.handle,&a); *w_=a.width; *h=a.height; }
-    void SetWindowSize(int w_, int h) { w_=vmax(1,w_); h=vmax(1,h); updateNormalHints(window,w_,h); WinSys.x11.xlib.ResizeWindow(WinSys.x11.display,window->x11.handle,w_,h); }
-    void SetWindowMonitor(int x,int y,int w_,int h) { updateNormalHints(window,w_,h); sendEventToWM(window,WinSys.x11.NWM_STATE,Sys_Settings.Fullscreen,WinSys.x11.NWM_STATE_FULLSCREEN,0,1,0); WinSys.x11.xlib.MoveResizeWindow(WinSys.x11.display,window->x11.handle,x,y,w_,h); }
+    static void GetWindowSize(WSWin* w, int* w_, int* h) { XWindowAttributes a; WinSys.x11.xlib.GetWindowAttributes(WinSys.x11.display,w->x11.handle,&a); *w_=a.width; *h=a.height; }
+    static void SetWindowSize(int w_, int h) { w_=vmax(1,w_); h=vmax(1,h); updateNormalHints(window,w_,h); WinSys.x11.xlib.ResizeWindow(WinSys.x11.display,window->x11.handle,w_,h); }
+    static void SetWindowMonitor(int x,int y,int w_,int h) { updateNormalHints(window,w_,h); sendEventToWM(window,WinSys.x11.NWM_STATE,Sys_Settings.Fullscreen,WinSys.x11.NWM_STATE_FULLSCREEN,0,1,0); WinSys.x11.xlib.MoveResizeWindow(WinSys.x11.display,window->x11.handle,x,y,w_,h); }
     i32 WindowFocused() { XID f; int s; WinSys.x11.xlib.GetInputFocus(WinSys.x11.display,&f,&s); return window->x11.handle==f; }
     i32 WindowVisible() { XWindowAttributes w; WinSys.x11.xlib.GetWindowAttributes(WinSys.x11.display,window->x11.handle,&w); return w.map_state==2; }
-    void GetWindowPos(WSWin* w, int* x, int* y) { XID d; WinSys.x11.xlib.TranslateCoordinates(WinSys.x11.display,w->x11.handle,WinSys.x11.root,0,0,x,y,&d); }
-    void SetWindowDecorated(WSWin* w,i32 e) { struct {u64 f,fun,dec; i64 im; u64 st;} h={0}; h.f=2; h.dec=e?1:0; WinSys.x11.xlib.ChangeProperty(WinSys.x11.display,w->x11.handle,WinSys.x11.MOTIF_WM_HINTS,WinSys.x11.MOTIF_WM_HINTS,32,0,(u8*)&h,sizeof(h)/sizeof(i64)); }
-    void GetCursorPosV(WSWin* w, double* x, double* y) { XID r,c; int rx,ry,cx,cy; u32 m; WinSys.x11.xlib.QueryPointer(WinSys.x11.display,w->x11.handle,&r,&c,&rx,&ry,&cx,&cy,&m); *x=cx; *y=cy; }
-    void SetCurV(WSWin* w, double x, double y) { w->x11.warpCursorPosX=(int)x; w->x11.warpCursorPosY=(int)y; WinSys.x11.xlib.WarpPointer(WinSys.x11.display,0L,w->x11.handle,0,0,0,0,(int)x,(int)y); }    
-    void PollMonitors() {
+    static void GetWindowPos(WSWin* w, int* x, int* y) { XID d; WinSys.x11.xlib.TranslateCoordinates(WinSys.x11.display,w->x11.handle,WinSys.x11.root,0,0,x,y,&d); }
+    static void SetWindowDecorated(WSWin* w,i32 e) { struct {u64 f,fun,dec; i64 im; u64 st;} h={0}; h.f=2; h.dec=e?1:0; WinSys.x11.xlib.ChangeProperty(WinSys.x11.display,w->x11.handle,WinSys.x11.MOTIF_WM_HINTS,WinSys.x11.MOTIF_WM_HINTS,32,0,(u8*)&h,sizeof(h)/sizeof(i64)); }
+    static void GetCursorPosV(WSWin* w, double* x, double* y) { XID r,c; int rx,ry,cx,cy; u32 m; WinSys.x11.xlib.QueryPointer(WinSys.x11.display,w->x11.handle,&r,&c,&rx,&ry,&cx,&cy,&m); *x=cx; *y=cy; }
+    static void SetCurV(WSWin* w, double x, double y) { w->x11.warpCursorPosX=(int)x; w->x11.warpCursorPosY=(int)y; WinSys.x11.xlib.WarpPointer(WinSys.x11.display,0L,w->x11.handle,0,0,0,0,(int)x,(int)y); }    
+    static void PollMonitors() {
         XRRScreenResources* sr = WinSys.x11.randr.GetScreenResourcesCurrent(WinSys.x11.display,WinSys.x11.root); RROutput p = WinSys.x11.randr.GetOutputPrimary(WinSys.x11.display,WinSys.x11.root);
         int dC = WinSys.monitorCount; WSMon** d = NULL; if (dC) { d = OS_Alloc(WinSys.monitorCount*sizeof(WSMon*)); mcpy(d,WinSys.monitors,WinSys.monitorCount * sizeof(WSMon*)); }
         for (int i = 0;  i < sr->noutput;  i++) {
@@ -566,14 +566,13 @@ void InputMonitor(WSMon* m, int a, int p) {
     }
 }
 
-WSMon* AllocMonitor(const char* n, int w, int h) { WSMon* m = OS_Alloc(sizeof(WSMon)); m->widthMM = w; m->heightMM = h; scpy_to_a_from_b(m->name,n,sizeof(m->name)); return m; }
-WSMon** WinSysGetMonitors(int* c) { *c = WinSys.monitorCount; return WinSys.monitors; }
+static WSMon* AllocMonitor(const char* n, int w, int h) { WSMon* m = OS_Alloc(sizeof(WSMon)); m->widthMM = w; m->heightMM = h; scpy_to_a_from_b(m->name,n,sizeof(m->name)); return m; }
 WSMon* GetPrimaryMonitor(void) { if (!WinSys.monitorCount) return NULL; return WinSys.monitors[0]; }
 void WinSysGetMonitorPos(WSMon* m, int* x, int* y) { *x = 0; *y = 0; GetMonitorPos(m,x,y); }
 const vidmode* WinSysGetVideoMode(WSMon* m) { GetVideoMode(m,&m->currentMode); return &m->currentMode; }
 void InputWindowFocus(i32 f) { window_has_focus = f != 0; ignore_next_mouse_delta = true; WSWin* w = window; if (!f) { for (int k=0;k<=348;++k) if (w->keys[k] == INPUT_PRESS) InputKey(w->keys,k,INPUT_RELEASE); for (int b=0;b<=7;++b) if (w->mouseButtons[b] == INPUT_PRESS) InputMouseClick(w->mouseButtons,b,INPUT_RELEASE); } }
 void CenterWindowOnMonitor() {
-    int c; WSMon** monitors=WinSysGetMonitors(&c); if (Sys_Settings.CurrentMonitor > (c - 1)) { Sys_Settings.CurrentMonitor=0; SaveConfig(); } WSMon* next=monitors[Sys_Settings.CurrentMonitor]; int mx,my; WinSysGetMonitorPos(next,&mx,&my);
+    if (Sys_Settings.CurrentMonitor > (WinSys.monitorCount - 1)) { Sys_Settings.CurrentMonitor=0; SaveConfig(); } WSMon* next=WinSys.monitors[Sys_Settings.CurrentMonitor]; int mx,my; WinSysGetMonitorPos(next,&mx,&my);
     const vidmode* mode=WinSysGetVideoMode(next); int xpos=mx + (mode->width - Sys_Settings.ScreenWidth)/2, ypos=my + (mode->height - Sys_Settings.ScreenHeight)/2; SetWindowPosition(window,xpos,ypos); ignore_next_mouse_delta=true;
     #if defined(_WIN32)
         void* h = window->win32.handle; ShowWindow(h,5); BringWindowToTop(h); SetForegroundWindow(h); SetFocus(h);
@@ -581,8 +580,8 @@ void CenterWindowOnMonitor() {
 }
 
 WSMon* GetCurrentMonitor() {
-    int wx=0,wy=0,ww=0,wh=0,bA=0,c; GetWindowPos(window,&wx,&wy); GetWindowSize(window,&ww,&wh); WSMon *bM=GetPrimaryMonitor(), **monitors=WinSysGetMonitors(&c);
-    for (int i=0;i<c;++i) { int mx,my; WinSysGetMonitorPos(monitors[i],&mx,&my); const vidmode* mode = WinSysGetVideoMode(monitors[i]); int l=vmax(wx,mx), r=vmin(wx + ww,mx + mode->width), t=vmax(wy,my), b=vmin(wy + wh,my + mode->height); int area = (r > l && b > t) ? (r - l) * (b - t) : 0; if (area > bA) { bA = area; bM = monitors[i]; } }
+    int wx=0,wy=0,ww=0,wh=0,bA=0; GetWindowPos(window,&wx,&wy); GetWindowSize(window,&ww,&wh); WSMon *bM=GetPrimaryMonitor();
+    for (int i=0;i<WinSys.monitorCount;++i) { int mx,my; WinSysGetMonitorPos(WinSys.monitors[i],&mx,&my); const vidmode* mode = WinSysGetVideoMode(WinSys.monitors[i]); int l=vmax(wx,mx), r=vmin(wx + ww,mx + mode->width), t=vmax(wy,my), b=vmin(wy + wh,my + mode->height); int area = (r > l && b > t) ? (r - l) * (b - t) : 0; if (area > bA) { bA = area; bM = WinSys.monitors[i]; } }
     return bM;
 }
 
@@ -599,24 +598,19 @@ void ChangeResolution() {
 
 void GatherResolutionModes() {
     resDropdownCount = 0; WSMon* m = GetCurrentMonitor(); if (!m) m=GetPrimaryMonitor(); const vidmode* d = WinSysGetVideoMode(m); if(!d) return;
-    
     static const struct {int w,h;} cr[] = {{320,200},{640,400},{640,480},{800,600},{1024,768},{1280,720},{1280,800},{1366,768},{1440,900},{1600,900},{1920,1080},{2560,1440}};
     int maxW = d->width, maxH = d->height,j;
     for (int i = 0; i < 12 && resDropdownCount < 8; ++i) {
         if (cr[i].w > maxW || cr[i].h > maxH || cr[i].w < 320 || cr[i].h < 200) continue;
-        
         for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == cr[i].w && resModes[j].h == cr[i].h) break; }
         if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){cr[i].w,cr[i].h};
     }
-    
-    if (resDropdownCount < 8) resModes[resDropdownCount++] = (ResMode){d->width,d->height};
-    resSelectedIdx = 0;
-    for (int i = 0; i < resDropdownCount; ++i) { if(resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight){resSelectedIdx=i; break;} }
+    if (resDropdownCount < 8){resModes[resDropdownCount++]=(ResMode){d->width,d->height};} resSelectedIdx=0;
+    for (int i=0;i<resDropdownCount;++i) { if(resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight){resSelectedIdx=i; break;} }
 }
 
 void ChangeFullScreenWindowed(bool adjustToFit) {
-    int x,y,w,h,mx,my,c; WSMon** monitors = WinSysGetMonitors(&c); WSMon* m = monitors[Sys_Settings.CurrentMonitor]; const vidmode* mo = WinSysGetVideoMode(m); GetMonitorFullarea(m,&x,&y,&w,&h);
-    window->decorated = (i32)(!Sys_Settings.Fullscreen); SetWindowDecorated(window, (i32)(!Sys_Settings.Fullscreen));
+    int x,y,w,h,mx,my; WSMon* m = WinSys.monitors[Sys_Settings.CurrentMonitor]; const vidmode* mo = WinSysGetVideoMode(m); GetMonitorFullarea(m,&x,&y,&w,&h); window->decorated = (i32)(!Sys_Settings.Fullscreen); SetWindowDecorated(window, (i32)(!Sys_Settings.Fullscreen));
     if (Sys_Settings.Fullscreen) { SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth = w; Sys_Settings.ScreenHeight = h; }
     else { WinSysGetMonitorPos(m,&mx,&my); if (adjustToFit) { Sys_Settings.ScreenWidth = vmax(vmin((w*3)/4,1366),320); Sys_Settings.ScreenHeight = vmax(vmin((h*3)/4,768),200); } SetWindowMonitor(mx + (mo->width - Sys_Settings.ScreenWidth)/2,my + (mo->height - Sys_Settings.ScreenHeight)/2,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); }
     UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
@@ -624,11 +618,10 @@ void ChangeFullScreenWindowed(bool adjustToFit) {
 
 void SetVSync() { window->context.swapInterval((i32)Sys_Settings.Vsync); }
 void CycleToNextMonitor() {
-    static double monitorSwitchTime;
+    static double monitorSwitchTime = 0.0;
     if (get_time() >= monitorSwitchTime) {
-        monitorSwitchTime = get_time() + 0.5; int c; WSMon** monitors = WinSysGetMonitors(&c);
-        if (Sys_Settings.CurrentMonitor > (c - 1)) { Sys_Settings.CurrentMonitor = 0; SaveConfig(); }
-        if (monitors && c >= 2) { Sys_Settings.CurrentMonitor = (Sys_Settings.CurrentMonitor + 1) % c; SaveConfig(); CenterWindowOnMonitor(); }
+        monitorSwitchTime = get_time() + 0.5;
+        if(Sys_Settings.CurrentMonitor>(WinSys.monitorCount-1)){Sys_Settings.CurrentMonitor=0; SaveConfig();} if(WinSys.monitorCount>=2){Sys_Settings.CurrentMonitor=(Sys_Settings.CurrentMonitor+1)%WinSys.monitorCount; SaveConfig(); CenterWindowOnMonitor();}
     }
 }
 // Input and Configuration System for Config.ini, keyboard and mouse support.
@@ -715,11 +708,9 @@ void InputProcessing() {
     if (window_has_focus) {
         if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);
         if (Sys_Input.keyStates[KEY_W].pressed) play_synth(SND_DOOR,0.2f,1.0f);
-
         if (Sys_Input.keyStates[KEY_T].pressed) play_synth(SND_IMPACT_GLASS,0.2f,1.0f);
         if (Sys_Input.keyStates[KEY_R].pressed) play_synth(SND_BEAKER_THUD,0.1f,1.0f);
         if (Sys_Input.keyStates[KEY_Y].pressed) play_synth(SND_BEAKER_CLINK,0.2f,1.0f);
-
         if (Sys_Input.keyStates[KEY_U].pressed) play_synth(SND_LASER_RIFLE,0.2f,1.0f);
         if (Sys_Input.keyStates[KEY_G].pressed) play_synth(SND_EXPLOSION,0.2f,1.0f);
         if (Sys_Input.keyStates[KEY_H].pressed) play_synth(SND_HISS,0.2f,1.0f);
@@ -730,7 +721,6 @@ void InputProcessing() {
         if (Sys_Input.keyStates[KEY_B].pressed) play_synth(SND_TAP_CASE,0.2f,1.0f);
         if (Sys_Input.keyStates[KEY_N].pressed) play_synth(SND_PLASTIC_TAP,0.2f,1.0f);
         if (Sys_Input.keyStates[KEY_M].pressed) play_synth(SND_CRACKLE,0.2f,1.0f);
-
         if (Sprint() && Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode) {
             bool foundValidDynamic = false;
             while (!foundValidDynamic) {

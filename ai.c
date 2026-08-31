@@ -695,7 +695,7 @@ static void ProjectileRaycast(Entity* self, int n) {
     RaycastHit hit = Raycast(spos, dir, range, LMASK_NPC_ATTACK);
     if (!hit.hit) return;
     u16 hi = hit.hitInstanceIndex;
-    if (n == 3 && self->index == 427 && eidx) AddWireLine(ai_sight_pos(self), World.position[eidx],(Color){1.0f,0.15f,0.18f,0.85f}); // Targeting laser (Cyborg Elite, attack3)
+    if (n == 3 && self->index == 427 && eidx) DrawLine(ai_sight_pos(self), World.position[eidx],(Color){1.0f,0.15f,0.18f,0.85f}); // Targeting laser (Cyborg Elite, attack3)
     DamageData dd = SetNPCData(self, n);
     dd.hitpoint     = hit.point; dd.attacknormal = dir; dd.impactVelocity = dd.damage;
     bool hitPlayer = (hi == PLAYER1);
@@ -798,8 +798,8 @@ static void AIAttack3(Entity* self) {
         if (self->attack3SoundTime < World.pauseRelativeTime && sat3 >= 0 && sat3 < (i16)SOUNDS_COUNT) { play_wav(sounds[sat3],SfxVol(),World.position[sidx],true); self->attack3SoundTime = World.pauseRelativeTime + npc->timeBetweenAttack3; }
         AIMakeAttack(self, npc->attackType3, 3);
     }
-    if (self->index == 427 && self->enemy) AddWireLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f,0.15f,0.18f,0.85f});
-    if (self->index == 433 && self->enemy) AddWireLine(ai_sight_pos(self),World.position[self->enemy],(Color){0.96f,1.0f,0.0f,0.88f});
+    if (self->index == 427 && self->enemy) DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f,0.15f,0.18f,0.85f});
+    if (self->index == 433 && self->enemy) DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){0.96f,1.0f,0.0f,0.88f});
     if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self, 3);
 }
 

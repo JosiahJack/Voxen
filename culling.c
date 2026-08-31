@@ -208,7 +208,7 @@ void CastRay(i32 x0, i32 z0, i32 x1, i32 z1) {
 }
 
 void CircleFanRays(i32 x0, i32 z0) { if (!XZPairInBounds(x0,z0)) {return;} if (!(gridCellStates[(z0 * WORLDX) + x0] & CELL_VISIBLE)) {return;} i32 x,z,max=WORLDX,min=0; for (x=min;x<max;x++) {CastRay(x0,z0,x,min);} for (x=min;x<max;x++) {CastRay(x0,z0,x,max);} for (z=min;z<max;z++) {CastRay(x0,z0,min,z);} for (z=min;z<max;z++) {CastRay(x0,z0,max,z);} } // Cast fan out to every cell around map perimeter.
-void MarchAxis(i32 st, i32 end, i32 step, i32 ox, i32 oz, i32 sign, bool isX) { for (i32 m = st; step > 0 ? m < end : m >= end; m += step) { i32 x = isX ? m : ox, z = isX ? oz : m; if (XZPairInBounds(x,z) && (gridCellStates[(z * WORLDX) + x] & CELL_VISIBLE)) m = isX ? CastStraightX(m,oz,sign) : CastStraightZ(ox,m,sign); } }
+static void MarchAxis(i32 st, i32 end, i32 step, i32 ox, i32 oz, i32 sign, bool isX) { for (i32 m = st; step > 0 ? m < end : m >= end; m += step) { i32 x = isX ? m : ox, z = isX ? oz : m; if (XZPairInBounds(x,z) && (gridCellStates[(z * WORLDX) + x] & CELL_VISIBLE)) m = isX ? CastStraightX(m,oz,sign) : CastStraightZ(ox,m,sign); } }
 void DetermineVisibleCells(i32 startX, i32 startZ) {
     if (!XZPairInBounds(startX,startZ)) return;
     for (i32 x=0;x<WORLDX;x++) { for (i32 z=0;z<WORLDZ;z++) { i32 subCellIdx = (z * WORLDX) + x; gridCellStates[subCellIdx] &= ~CELL_VISIBLE; } /*Clear all to not visible.*/ }

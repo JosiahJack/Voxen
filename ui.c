@@ -1,5 +1,9 @@
 // ui.c - User Interface(UI) aka HUD
 extern float reloadTime[16];
+//                         mk3,bls,drt,flch, ion,rpir,pipe,magn,magp,pstl,plsm,rail,riot,skrp,sprq,stun
+u16 wepIconTexIndices[16]={584,636,819,1067,1068,1494,1072,1069,1070,1071,1073,1165,1989,1990,1991,1992};
+const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
+u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0;
 void WeaponFireStartWeaponDip(float t);
 void WeaponSelectSlot(int slot){
     int wi=(int)World.invP1.weaponInventoryIndices[slot]; if(wi<0||wi>=MAX_ENTITIES)return;
@@ -64,7 +68,7 @@ __attribute__((noinline)) void MenuGoBack() {
     else if (currentMenuPage == Mpg_Load || currentMenuPage == Mpg_NewGame || currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) currentMenuPage = Mpg_Singleplayer;
 }
 
-void CreateShadowBuffers() { shadowMapSSBO=MakeSSBO(&shadowMapSSBO,5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32),NULL,GL_STATIC_DRAW); shadowMapsIndirectionID=MakeSSBO(&shadowMapsIndirectionID,6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW); shadowBuffersCreated=true; }
+static void CreateShadowBuffers() { shadowMapSSBO=MakeSSBO(&shadowMapSSBO,5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32),NULL,GL_STATIC_DRAW); shadowMapsIndirectionID=MakeSSBO(&shadowMapsIndirectionID,6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW); shadowBuffersCreated=true; }
 __attribute__((noinline)) void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
 void RenderMenu() {    
     if (currentMenuPage != Mpg_IntroVideo && currentMenuPage != Mpg_CreditsVideo && currentMenuPage != Mpg_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
@@ -256,8 +260,74 @@ void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
     }
 }
 
-static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16   vmailEndFrames[6]={1644,1712,1783,1863,1930,1988}; u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0; double avgCPUt[AVG_CPU_TAPS]={0}; int avgCPUt_idx = 0;
-void AddItemToInventory(int index, int custIdx); void ResetHeldItem(); extern double game_actual_start_time;
+void TickBar(bool isEnergy) {
+    RenderUIImage(isEnergy ? 1333 : 1332,isEnergy ? 36 : 2,32,32,isEnergy ? 939 : 956); // Indicator
+    int p1H = isEnergy ? World.invP1.energy : World.instances[PLAYER1].health; if (p1H > 255){p1H = 255;} i16 tY = isEnergy ? 35 : 4;
+    for (int i=7;i>=0;--i) if (i == 7/*Always render at least 1 tick*/ || p1H > (7 - i) * 11){RenderUIImage(1050 - (i * 16),tY,32,32,964);/*Tick Red*/}
+    for (int i=7;i>=0;--i) if (p1H > 88 + (7 - i) * 11){RenderUIImage(1178 - (i * 16),tY,32,32,963);/*Tick Orange*/}
+    for (int i=7;i>=0;--i) if (p1H > 176 + (7 - i) * 11){RenderUIImage(1306 - (i * 16),tY,32,32,962);/*Tick Green*/}
+}
+
+void HardwareButtons() {
+    if (World.invP1.hasHardware & HW_BIO && !Cheats.noHUD) RenderUIImage(   0,200,40,40, 989); // Hw Btn: Biomonitor
+    if (World.invP1.hasHardware & HW_SNS && !Cheats.noHUD) RenderUIImage(   0,250,40,40,1009); // Hw Btn: Sensaround
+    if (World.invP1.hasHardware & HW_LAN && !Cheats.noHUD) RenderUIImage(   0,300,40,40,1004); // Hw Btn: Lantern
+    if (World.invP1.hasHardware & HW_SHD && !Cheats.noHUD) RenderUIImage(   0,350,40,40,1014); // Hw Btn: Shield
+    if (World.invP1.hasHardware & HW_INF && !Cheats.noHUD) RenderUIImage(1326,200,40,40, 998); // Hw Btn: Infrared
+    if (World.invP1.hasHardware & HW_ERD && !Cheats.noHUD) RenderUIImage(1326,250,40,40, 996); // Hw Btn: Ereader
+    if (World.invP1.hasHardware & HW_BST && !Cheats.noHUD) RenderUIImage(1326,300,40,40, 993); // Hw Btn: Booster
+    if (World.invP1.hasHardware & HW_JET && !Cheats.noHUD) RenderUIImage(1326,350,40,40,1000); // Hw Btn: Jumpjets
+}
+
+void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
+void CenterMFD() {
+    if(MFD_CenterTab==0 && !Cheats.noHUD){ /*MainTab: WeaponInventory,WeaponShotsInventory,GrenadeInventory,PatchInventory*/
+        RenderTextL(372,560,T_RED,FONT_NORMAL,0.8f,"WEAPONS"); RenderTextL(574,560,T_RED,FONT_NORMAL,0.8f,"SHOTS"); RenderTextL(768,560,T_RED,FONT_NORMAL,0.8f,"GRENADES"); RenderTextL(920,560,T_RED,FONT_NORMAL,0.8f,"PATCHES"); // Column headers
+        for(int slot=0;slot<7;++slot){
+            int widx=World.invP1.weaponInventoryIndices[slot]; if(widx<0)continue;
+            int y=582+slot*22;
+            bool hov = CursorIsOverBounds(372,712,(float)y-5,(float)y+16); // Slight shift of 6 feels better than just doing y and y + 22 as one would expect, then lopped 1 off one end to prevent double highlighting
+            u32 col = (hov&&World.inventoryMode && World.invP1.weaponCurrent!=slot) ? T_GREEN_MENU : (World.invP1.weaponCurrent==slot?T_YELLOW:(World.invP1.weaponCurrentPending==slot?T_DARK_YELLOW:T_GREEN));
+            RenderTextL(372,y,col,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[ItemStringIdx((i32)widx)]); // Weapon text
+            char b[64]; GetWeaponAmmoText(slot,b,sizeof(b)); RenderTextL(574,y,col,FONT_NORMAL,0.8f,"%s",b); // Ammo text
+            if(hov&&World.inventoryMode&&Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed){WeaponSelectSlot(slot);Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=false; World.uiIsBlocking=true;}
+        }
+    } else if (MFD_CenterTab == 1) { /*HardwareTab: Label, HardwareInventory*/ }
+    else if (MFD_CenterTab == 2) { /*GeneralTab: Label, GeneralInventory, AccessCards*/ }
+    else if (MFD_CenterTab == 3) { /*SoftwareTab: Label, SoftwareInventory, ICEDrill, Pulser, Turbo, Decoy, Recall*/ }
+    else if (MFD_CenterTab == 4) { /*MultiMediaDataReader: LogTableofContents, LogsLevelFolder, LogTextReader, EmailTab, DataTab, NotesTab*/ }
+//         if (World.Sys_UI.showSensaroundCenter) { /*SensaroundCenter Plane*/ }
+    RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021); // Main center tab button
+    RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021); // Hardware center tab button
+    RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021); // General center tab button
+    RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021); // Software center tab button
+    if (World.inventoryMode && World.invP1.holdingObject && CursorIsOverBounds(345,1021,460,768)) { // Add to Inventory Helper
+        World.uiIsBlocking = true;
+        RenderUIImage(345,528,676,240,1075);
+        RenderTextL(586,528,T_GREEN,FONT_NORMAL,1.0f,"ADD TO INVENTORY");
+        if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; }
+    }
+}
+
+void SideMFD(bool isRH) {
+    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
+    RenderUIImage(isRH ? 1022 : 24,520,320,240,1025); // Test BG for ensuring fit into 320x240 to match 1:1 scale that Doom's 320x200 would map to after 4:3 scaling applied (since the CRT's had non-square pixels that stretched 320x200 into 320x240 space, ish) TODO gate by search active
+    if (MFD_LefTab == 0) { /*WeaponTabLH: WepNameTextLH, WepIconLH, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/
+        int widx=World.invP1.weaponInventoryIndices[World.invP1.weaponCurrent];
+        if (widx >= 0) { RenderTextL(isRH ? 1342 : 24,520,T_RED,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16){RenderUIImage(isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIconLH*/} }
+    } else if (MFD_LefTab == 1) { /*ItemTab: ItemIcon, ItemText, Vaporize/Apply/Use Buttons, EReaderSections, AccessCardsList*/ }
+    else if (MFD_LefTab == 2) { /*AutomapTab: AutomapMask, Overlays, PlayerIcon, ZoomIn/Out/Full/Side Buttons*/ }
+    else if (MFD_LefTab == 3) { /*TargetTab*/ }
+    else if (MFD_LefTab == 4) { /*DataTab: Security, DataHeaders, ElevatorUIControl, KeycodeUIControl, SearchContents, AudioLogInfo, PuzzleGrid, PuzzleWire, SystemAnalyzer Display*/ }
+    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hardwareVersion[HW_SNS_IDX] > 1) { /*Sensaround Plane*/ }
+    RenderUIImage(isRH ? 1350 : -16,520,32,40,MFD_LefTab == 0 ? 1024 : 1022); // Weapon side tab button
+    RenderUIImage(isRH ? 1350 : -16,576,32,40,MFD_LefTab == 1 ? 1024 : 1022); // Item side tab button
+    RenderUIImage(isRH ? 1350 : -16,632,32,40,MFD_LefTab == 2 ? 1024 : 1022); // Automap side tab button
+    RenderUIImage(isRH ? 1350 : -16,688,32,40,MFD_LefTab == 3 ? 1024 : 1022); // Data side tab button
+}
+
+static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988}; double avgCPUt[AVG_CPU_TAPS]={0}; int avgCPUt_idx = 0;
+extern double game_actual_start_time;
 extern u16 editModeTestEntityDefinition;
 static double RenderUI() {
     drawCallsNormal = drawCalls;
@@ -277,103 +347,17 @@ static double RenderUI() {
         //         if (World.Sys_UI.showBioMonitor) { /*Graph*/ /*Biomonitor texts, BPM, Patch, Fatigue*/ } if (World.Sys_UI.showEnergyTickPanel) { /*EnergyTickPanel*/ } if (World.Sys_UI.showHealthTickPanel) { /*HealthTickPanel*/ }
 //         if (World.Sys_UI.showEnergyIndicator) { /*EnergyIndicator*/ /*EnergySurge*/ /*EnergyDrainText*/ /*EnergyJPMText*/ }
 //         if (World.Sys_UI.showHealthIndicator) { /*HealthIndicator*/ /*HealthIndicatorCyber*/ }
-        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        // Health and Energy Bars
-        if (!Cheats.noHUD) {
-            RenderUIImage(1332, 2,32,32,956); // Health Indicator
-            int p1H = World.instances[PLAYER1].health; if (p1H > 255) p1H = 255;
-            for (int i=7;i>=0;--i) if (i == 7/*Always render at least 1 tick*/ || p1H > (7 - i) * 11)       RenderUIImage(1050 - (i * 16), 4,32,32,964); // Health Tick Red
-            for (int i=7;i>=0;--i) if (p1H > 88 + (7 - i) * 11)  RenderUIImage(1178 - (i * 16), 4,32,32,963); // Health Tick Orange
-            for (int i=7;i>=0;--i) if (p1H > 176 + (7 - i) * 11) RenderUIImage(1306 - (i * 16), 4,32,32,962); // Health Tick Green
-            RenderUIImage(1333,36,32,32,939); // Energy Indicator
-            int p1E = World.invP1.energy; if (p1E > 255) p1E = 255;
-            for (int i=7;i>=0;--i) if (i == 7/*Always render at least 1 tick*/ || p1E > (7 - i) * 11)       RenderUIImage(1050 - (i * 16),35,32,32,964); // Energy Tick Red
-            for (int i=7;i>=0;--i) if (p1E > 88 + (7 - i) * 11)  RenderUIImage(1178 - (i * 16),35,32,32,963); // Energy Tick Orange
-            for (int i=7;i>=0;--i) if (p1E > 176 + (7 - i) * 11) RenderUIImage(1306 - (i * 16),35,32,32,962); // Energy Tick Green
-        }
-        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        if (!Cheats.noHUD) {TickBar(false/*health*/); TickBar(true/*energy*/);}// Health and Energy Bars
 //         if (World.Sys_UI.showTeleportFX) { /*TeleportFX*/ } if (World.Sys_UI.showRadiationFX) { /*RadiationFX*/ } if (World.Sys_UI.showHealingFX) { /*HealingFX*/ } if (World.Sys_UI.showShieldFX) { /*ShieldFX*/ } 
-//         if (World.Sys_UI.showShieldActivation) { /*waveup*/ /*wavedn*/ } if (World.Sys_UI.showShieldDeactivation) { /*waveup*/ /*wavedn*/ } if (World.Sys_UI.showDeathRessurectionFX) { /*spawndelaycontainers...*/ } 
-        if (World.invP1.hasHardware & HW_BIO && !Cheats.noHUD) RenderUIImage(   0,200,40,40, 989); // Hw Btn: Biomonitor
-        if (World.invP1.hasHardware & HW_SNS && !Cheats.noHUD) RenderUIImage(   0,250,40,40,1009); // Hw Btn: Sensaround
-        if (World.invP1.hasHardware & HW_LAN && !Cheats.noHUD) RenderUIImage(   0,300,40,40,1004); // Hw Btn: Lantern
-        if (World.invP1.hasHardware & HW_SHD && !Cheats.noHUD) RenderUIImage(   0,350,40,40,1014); // Hw Btn: Shield
-        if (World.invP1.hasHardware & HW_INF && !Cheats.noHUD) RenderUIImage(1326,200,40,40, 998); // Hw Btn: Infrared
-        if (World.invP1.hasHardware & HW_ERD && !Cheats.noHUD) RenderUIImage(1326,250,40,40, 996); // Hw Btn: Ereader
-        if (World.invP1.hasHardware & HW_BST && !Cheats.noHUD) RenderUIImage(1326,300,40,40, 993); // Hw Btn: Booster
-        if (World.invP1.hasHardware & HW_JET && !Cheats.noHUD) RenderUIImage(1326,350,40,40,1000); // Hw Btn: Jumpjets
-        if (!Cheats.noHUD) {RenderUIImage(667,0,32,32,1020);} /*ShootModeButton*/
+//         if (World.Sys_UI.showShieldActivation) { /*waveup*/ /*wavedn*/ } if (World.Sys_UI.showShieldDeactivation) { /*waveup*/ /*wavedn*/ } if (World.Sys_UI.showDeathRessurectionFX) { /*spawndelaycontainers...*/ }
+        if (!Cheats.noHUD) {HardwareButtons(); RenderUIImage(667,0,32,32,1020);} /*ShootModeButton*/
         if (World.inventoryMode && CursorIsOverBounds(667,699,0,32)) {
             World.uiIsBlocking = true;
             if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { ForceShootMode(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; }
         }
 //         if (World.Sys_UI.showTextWarnings) { /*WarningTexts...*/ } if (World.Sys_UI.showAutomapFull) { /*AutomapFullRawImage*/ /*PlayerIconFull*/ /*CloseFullmapButton*/ } if (World.Sys_UI.showMissionTimer) { /*MissionTimerT*/ /*MissionTimer*/ }
 //         if (World.Sys_UI.showCyberTimer) { /*CyberTimerT*/ /*CyberTimer*/ }
-        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        // Left MFD
-        RenderUIImage(24,520,320,240,1025); // Test BG for ensuring fit into 320x240 to match 1:1 scale that Doom's 320x200 would map to after 4:3 scaling applied (since the CRT's had non-square pixels that stretched 320x200 into 320x240 space, ish) TODO gate by search active
-        if (MFD_LefTab == 0) { /*WeaponTabLH: WepNameTextLH, WepIconLH, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/
-            int widx=World.invP1.weaponInventoryIndices[World.invP1.weaponCurrent];
-            if (widx >= 0) RenderTextL(24,520,T_RED,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[ItemStringIdx((i32)widx)]); /*Weapon Name*/
-        } else if (MFD_LefTab == 1) { /*ItemTabLH: ItemIcon, ItemText, Vaporize/Apply/Use Buttons, EReaderSections, AccessCardsList, Sliders*/ }
-        else if (MFD_LefTab == 2) { /*AutomapTabLH: AutomapMask, Overlays, PlayerIcon, ZoomIn/Out/Full/Side Buttons*/ }
-        else if (MFD_LefTab == 3) { /*TargetTabLH*/ }
-        else if (MFD_LefTab == 4) { /*DataTabLH: SecurityLH, DataHeaders, ElevatorUIControl, KeycodeUIControl, SearchContents, AudioLogInfo, PuzzleGrid, PuzzleWire, SystemAnalyzer Display*/ }
-//         if (World.Sys_UI.showSensaroundLH) { /*SensaroundLH Plane*/ }
-        if (!Cheats.noHUD) {
-            RenderUIImage(-16,520,32,40,MFD_LefTab == 0 ? 1024 : 1022); // Weapon
-            RenderUIImage(-16,576,32,40,MFD_LefTab == 1 ? 1024 : 1022); // Item
-            RenderUIImage(-16,632,32,40,MFD_LefTab == 2 ? 1024 : 1022); // Automap
-            RenderUIImage(-16,688,32,40,MFD_LefTab == 3 ? 1024 : 1022); // Data
-        }
-        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        // Center MFD
-        if(MFD_CenterTab==0 && !Cheats.noHUD){ /*MainTab: WeaponInventory,WeaponShotsInventory,GrenadeInventory,PatchInventory*/
-            RenderTextL(372,560,T_RED,FONT_NORMAL,0.8f,"WEAPONS"); RenderTextL(574,560,T_RED,FONT_NORMAL,0.8f,"SHOTS"); RenderTextL(768,560,T_RED,FONT_NORMAL,0.8f,"GRENADES"); RenderTextL(920,560,T_RED,FONT_NORMAL,0.8f,"PATCHES"); // Column headers
-            for(int slot=0;slot<7;++slot){
-                int widx=World.invP1.weaponInventoryIndices[slot]; if(widx<0)continue;
-                int y=582+slot*22;
-                bool hov = CursorIsOverBounds(372,712,(float)y-5,(float)y+16); // Slight shift of 6 feels better than just doing y and y + 22 as one would expect, then lopped 1 off one end to prevent double highlighting
-                u32 col = (hov&&World.inventoryMode && World.invP1.weaponCurrent!=slot) ? T_GREEN_MENU : (World.invP1.weaponCurrent==slot?T_YELLOW:(World.invP1.weaponCurrentPending==slot?T_DARK_YELLOW:T_GREEN));
-                RenderTextL(372,y,col,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[ItemStringIdx((i32)widx)]); // Weapon text
-                char b[64]; GetWeaponAmmoText(slot,b,sizeof(b)); RenderTextL(574,y,col,FONT_NORMAL,0.8f,"%s",b); // Ammo text
-                if(hov&&World.inventoryMode&&Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed){WeaponSelectSlot(slot);Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=false; World.uiIsBlocking=true;}
-            }
-        } else if (MFD_CenterTab == 1) { /*HardwareTab: Label, HardwareInventory*/ }
-        else if (MFD_CenterTab == 2) { /*GeneralTab: Label, GeneralInventory, AccessCards*/ }
-        else if (MFD_CenterTab == 3) { /*SoftwareTab: Label, SoftwareInventory, ICEDrill, Pulser, Turbo, Decoy, Recall*/ }
-        else if (MFD_CenterTab == 4) { /*MultiMediaDataReader: LogTableofContents, LogsLevelFolder, LogTextReader, EmailTab, DataTab, NotesTab*/ }
-//         if (World.Sys_UI.showSensaroundCenter) { /*SensaroundCenter Plane*/ }
-        if (!Cheats.noHUD) { // Center tab buttons
-            RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021); // Main
-            RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021); // Hardware
-            RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021); // General
-            RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021); // Software
-        }
-        if (World.inventoryMode && World.invP1.holdingObject && CursorIsOverBounds(345,1021,460,768)) { // Add to Inventory Helper
-            World.uiIsBlocking = true;
-            RenderUIImage(345,528,676,240,1075);
-            RenderTextL(586,528,T_GREEN,FONT_NORMAL,1.0f,"ADD TO INVENTORY");
-            if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; }
-        }
-        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        // Right MFD
-        RenderUIImage(1022,520,320,240,1025); // Test BG for ensuring fit into 320x240 to match 1:1 scale that Doom's 320x200 would map to after 4:3 scaling applied (since the CRT's had non-square pixels that stretched 320x200 into 320x240 space, ish) TODO gate by search active
-        if (MFD_RightTab == 0) { /*WeaponTabRH: WepName, ClipBox, HeatTicks, Reload/Unload, EnergySlider*/
-            int widx=World.invP1.weaponInventoryIndices[World.invP1.weaponCurrent]; 
-            if (widx >= 0) RenderTextR(1342,520,T_RED,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[ItemStringIdx((i32)widx)]); /*Weapon Name*/
-        } else if (MFD_RightTab == 1) { /*ItemTabRH: Icons, Actions, EReaderSections, Sliders*/
-        } else if (MFD_RightTab == 2) { /*AutomapTabRH: AutomapMask, Zoom controls*/ }
-        else if (MFD_RightTab == 3) { /*TargetTabRH*/ }
-        else if (MFD_RightTab == 4) { /*DataTabRH: SecurityRH, Elevators, Keycodes, AudioLogs, Puzzles, SystemAnalyzer*/ }
-//         if (World.Sys_UI.showSensaroundRH) { /*SensaroundRH Plane*/ }
-        if (!Cheats.noHUD) {
-            RenderUIImage(1350,520,32,40,MFD_RightTab == 0 ? 1024 : 1022); // Weapon
-            RenderUIImage(1350,576,32,40,MFD_RightTab == 1 ? 1024 : 1022); // Item
-            RenderUIImage(1350,632,32,40,MFD_RightTab == 2 ? 1024 : 1022); // Automap
-            RenderUIImage(1350,688,32,40,MFD_RightTab == 3 ? 1024 : 1022); // Data
-        }
-        //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------        
+        if(!Cheats.noHUD){SideMFD(false/*Left*/); CenterMFD(); SideMFD(true/*Right*/);} // MFD
     }
     if (World.Sys_UI.vmailActive) {
         if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[World.Sys_UI.vmailActive]) {

@@ -150,7 +150,7 @@ const char* RustleSound() { return sounds[random_range_u32(459,465)]; } // foots
     }
     
     static const GUID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}}; static const GUID IID_IMMDeviceEnumerator_ = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
-    FHandle pcm_open_all(int rate,int channels,int period_frames,int periods) {
+    static FHandle pcm_open_all(int rate,int channels,int period_frames,int periods) {
         CoInitializeEx(NULL,0); IMMDeviceEnumerator *en = NULL; if (FAILED(CoCreateInstance(&CLSID_MMDeviceEnumerator_,NULL,23,&IID_IMMDeviceEnumerator_,(void**)&en))) { DualLogError("CoCreateInstance fail\n"); return INVALID_FHANDLE; }
         IMMDevice *dev = NULL; i32 hr = en->lpVtbl->GetDefaultAudioEndpoint(en,0,0,&dev); en->lpVtbl->Release(en); if (FAILED(hr)||!dev) return INVALID_FHANDLE;
         int idx = wasapi_init_device(dev,rate,channels,period_frames,periods); dev->lpVtbl->Release(dev); if (idx<0) return INVALID_FHANDLE;
@@ -186,9 +186,9 @@ const char* RustleSound() { return sounds[random_range_u32(459,465)]; } // foots
     static void hw_params_get_interval(struct snd_pcm_hw_params *p, int parameter, u32 *min, u32 *max) { struct snd_interval *i = get_interval_struct(p,parameter); *min = i->min + i->openmin; *max = i->max - i->openmax; }
     static u32 hw_params_get(struct snd_pcm_hw_params *p, int parameter, u32 value) { u32 r, t; return (parameter >= 0 && parameter <= 2) ? hw_params_get_mask(p,parameter,value) : ((parameter >= 8 && parameter <= 19) ? (hw_params_get_interval(p,parameter,&r,&t),r) : 0); }
     static void hw_params_fill(struct snd_pcm_hw_params *p) { mset(p,0,sizeof(*p)); mset(p->masks,0xff,sizeof(p->masks)); p->rmask = p->info = 0xffffffffU; for (int i=0;i<=11;i++) { p->intervals[i].min = 0; p->intervals[i].max = 0xffffffffU; } }
-    u64 pcm_gethw(pcm_params_t *p, pcm_param_t param, u32 val) { return hw_params_get(&p->hw_params,param,val); }
-    u64 pcm_getsw(pcm_params_t *p, pcm_param_t param) { pcm_sw_params_t *sw = &p->sw_params; return ((u64*)&sw->avail_min)[param - 22]; }
-    int pcm_params_setup(int fd, pcm_params_t *p) {
+    static u64 pcm_gethw(pcm_params_t *p, pcm_param_t param, u32 val) { return hw_params_get(&p->hw_params,param,val); }
+    static u64 pcm_getsw(pcm_params_t *p, pcm_param_t param) { pcm_sw_params_t *sw = &p->sw_params; return ((u64*)&sw->avail_min)[param - 22]; }
+    static int pcm_params_setup(int fd, pcm_params_t *p) {
         if (ioctl(fd,_IOWR('A',0x11,struct snd_pcm_hw_params),&p->hw_params) == -1) return -1;
         if (!pcm_getsw(p,22)) ((u64*)&p->sw_params.avail_min)[0] = pcm_gethw(p,13,0);
         if (!pcm_getsw(p,24)) ((u64*)&p->sw_params.avail_min)[2] = pcm_gethw(p,17,0);
@@ -197,7 +197,7 @@ const char* RustleSound() { return sounds[random_range_u32(459,465)]; } // foots
         return ioctl(fd,_IO('A',0x40));
     }
 
-    int pcm_open(int card, int device, int flags) { char path[4096]; sFormat(path,sizeof(path),"/dev/snd/pcmC%uD%u%c",card,device,(flags & 1) == 0 ? 'c' : 'p'); return OS_Open(path,00000002 | (flags & (1 << 1) ? 00004000 : 0),0); }
+    static int pcm_open(int card, int device, int flags) { char path[4096]; sFormat(path,sizeof(path),"/dev/snd/pcmC%uD%u%c",card,device,(flags & 1) == 0 ? 'c' : 'p'); return OS_Open(path,00000002 | (flags & (1 << 1) ? 00004000 : 0),0); }
 #endif
 #define MP3_HDR_IS_MONO(h)             (((h[3]) & 0xC0) == 0xC0)
 #define MP3_HDR_IS_MS_STEREO(h)        (((h[3]) & 0xE0) == 0x60)

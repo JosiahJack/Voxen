@@ -140,7 +140,7 @@ enum {
     /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, CREDITS_PAGES = 22, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 768, INSTANCE_COUNT = 8500, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29,
     /*Lights*/ LIGHT_COUNT = 2200, MAX_LIGHTS_PER_VOXEL = 128, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, 
     /*Models*/ MAX_MDLS=6400, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
-    /*Textures*/ MAX_TXRS = 2048, MAX_TOTAL_PIXELS = 38400780u, MAX_UNIQUE_COLORS = 120040u,
+    /*Textures*/ MAX_TXRS = 2048, MAX_TOTAL_PIXELS = 44200000u, MAX_UNIQUE_COLORS = 120040u,
     /*Animations*/ MAX_ANIMCLIPS = 10, MAX_ANIMS = 53, ANIM_LOOP_ALL = 0, ANIM_IDLE_CLOSED = 0, ANIM_IDLE = 0, ANIM_INACTIVE = 0, ANIM_ATTACK_MISS = 1, ANIM_OPENING = 1, ANIM_WALK = 1, ANIM_ACTIVATE = 1, ANIM_ATTACK_HIT = 2, ANIM_ACTIVATED = 2,
                    ANIM_IDLE_OPEN = 2, ANIM_RUN = 2, ANIM_CLOSING = 3, ANIM_DEACTIVATE = 3, ANIM_ATTACK1 = 3, ANIM_ATTACK2 = 4, ANIM_INSTALL = 4, ANIM_ATTACK3 = 5, ANIM_INSTALLED = 5, ANIM_PAIN = 6, ANIM_PAIN2 = 7, ANIM_PAIN3 = 8, ANIM_DYING = 9,
     /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH=6, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=8000, MAX_WIRELINE_VRTS = 2024000,
@@ -222,34 +222,10 @@ typedef struct {
 } SystemUI;
 typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
 extern TextSystem Sys_Text;
-enum{PATCH_BERSERK=1, PATCH_DETOX=2, PATCH_GENIUS=4, PATCH_MEDI=8, PATCH_REFLEX=16, PATCH_SIGHT=32, PATCH_STAMINUP=64,
-     HW_SYS=1/*System Analyzer*/,
-     HW_NAV=2/*Navigation Unit*/,
-     HW_ERD=4/*Datareader/EReader*/,
-     HW_SNS=8/*Sensaround*/,
-     HW_TID=16/*Target Identifier*/,
-     HW_SHD=32/*Energy Shield*/,
-     HW_BIO=64/*Biomonitor*/,
-     HW_LAN=128/*Head Mounted Lantern*/,
-     HW_ENV=256/*Envirosuit*/,
-     HW_BST=512/*Turbo Motion Booster*/,
-     HW_JET=1024/*Jump Jet Boots*/,
-     HW_INF=2048/*Infrared Night Sight Enhancement*/,
-     HW_COUNT=14,
-     HW_SYS_IDX=0/*System Analyzer*/,
-     HW_NAV_IDX=1/*Navigation Unit*/,
-     HW_ERD_IDX=2/*Datareader/EReader*/,
-     HW_SNS_IDX=3/*Sensaround*/,
-     HW_TID_IDX=4/*Target Identifier*/,
-     HW_SHD_IDX=5/*Energy Shield*/,
-     HW_BIO_IDX=6/*Biomonitor*/,
-     HW_LAN_IDX=7/*Head Mounted Lantern*/,
-     HW_ENV_IDX=8/*Envirosuit*/,
-     HW_BST_IDX=9/*Turbo Motion Booster*/,
-     HW_JET_IDX=10/*Jump Jet Boots*/,
-     HW_INF_IDX=11/*Infrared Night Sight Enhancement*/,
-     SW_DRILL=0,SW_PULSER=1,SW_SHIELD=2,SW_TURBO=3,SW_DECOY=4,SW_RECALL=5,SW_GAMES=6,
-     MINIGAME_PING=1,MINIGAME_15=2,MINIGAME_WING0=4,MINIGAME_BOTBOUNCE=8,MINIGAME_EEL_ZAPPER=16,MINIGAME_ROAD=32,MINIGAME_TRIOPTOE=64};
+typedef struct { float hitOffset,verticalOffset,fireDistance,overheatedPercent,wepYRot,targetY; V3 reloadContainerHome,reloadContainerPos,tempVec; Quaternion reloadContainerRot; bool recoiling,pendingMeleeIsRapier,pendingMeleeSilent; RaycastHit tempHit; double pendingMeleeFinished; i32 pendingMeleeWep16; u16 tempHitEnt,pendingMeleeTarget,pendingMeleeHitSnd,pendingMeleeMissSnd,pendingMeleeFleshSnd;} WeaponFireCtx;
+enum{PATCH_BERSERK=1, PATCH_DETOX=2, PATCH_GENIUS=4, PATCH_MEDI=8, PATCH_REFLEX=16, PATCH_SIGHT=32, PATCH_STAMINUP=64,SW_DRILL=0,SW_PULSER=1,SW_SHIELD=2,SW_TURBO=3,SW_DECOY=4,SW_RECALL=5,SW_GAMES=6,  MINIGAME_PING=1,MINIGAME_15=2,MINIGAME_WING0=4,MINIGAME_BOTBOUNCE=8,MINIGAME_EEL_ZAPPER=16,MINIGAME_ROAD=32,MINIGAME_TRIOPTOE=64,HW_COUNT=14,
+         HW_SYS=1/*System Analyzer*/,    HW_NAV=2/*Navigation Unit*/,    HW_ERD=4/*Datareader/EReader*/,    HW_SNS=8/*Sensaround*/,   HW_TID=16/*Target Identifier*/,   HW_SHD=32/*Energy Shield*/,   HW_BIO=64/*Biomonitor*/,  HW_LAN=128/*Head Mounted Lantern*/,  HW_ENV=256/*Envirosuit*/,  HW_BST=512/*Turbo Motion Booster*/,  HW_JET=1024/*Jump Jet Boots*/,  HW_INF=2048/*Infrared Night Sight Enhancement*/,
+     HW_SYS_IDX=0/*System Analyzer*/,HW_NAV_IDX=1/*Navigation Unit*/,HW_ERD_IDX=2/*Datareader/EReader*/,HW_SNS_IDX=3/*Sensaround*/,HW_TID_IDX=4/*Target Identifier*/,HW_SHD_IDX=5/*Energy Shield*/,HW_BIO_IDX=6/*Biomonitor*/,HW_LAN_IDX=7/*Head Mounted Lantern*/,HW_ENV_IDX=8/*Envirosuit*/,HW_BST_IDX=9/*Turbo Motion Booster*/,HW_JET_IDX=10/*Jump Jet Boots*/,HW_INF_IDX=11/*Infrared Night Sight Enhancement*/};
 typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
     double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,jumpJetFinished,noiseFinished,
            leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished,fatigueBleedoffFinished,fatigueMoveFinished,footstepFinished,rustleFinished,fallPainFinished,ressurectingFinished;
@@ -368,7 +344,7 @@ u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFram
 double get_time(); float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData);
 void UseTargets(u16,u16),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),DebugRAM(const char*), DebugRAMPeak(void), DebugRAMBreakdown(void),
      play_wav(const char*,float,V3,bool),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),InputProcessing(),LoadAllLevels(),
-     AddWireLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
+     DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
      LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderTextR(i16,i16,u32,u8,float,const char* restrict,...),CullCore(),PngArenaInit(PngArena*);
 const char* FootStepSound(FootStepType),*JumpSound(FootStepType),*JumpLandSound(FootStepType),*RustleSound(); FootStepType GetFootstepTypeForPrefab(int);
 char* StringFindFirstCharWithin(const char *s, char c);
