@@ -831,38 +831,26 @@ void Physics(float dt) {
         ladderWalkOff = ladderTouched && (World.position[PLAYER1].y > ladderTopY + 0.48f);
         if (!ladderTouched) World.invP1.ladderState=0;
     }
-    {
-        const float SLEEP_LIN2 = 0.0025f;   // (0.05 m/s)^2
-        const float SLEEP_ANG2 = 0.0025f;   // (0.05 rad/s)^2
-        const i32 WAKE_CELLS = 2;
+    {   const i32 WAKE_CELLS = 2;
         for (u32 i=0;i<World.instCount;++i) {
             if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true);
-            u32 ef = World.instances[i].entflags;
-            bool canSleep = (i!=PLAYER1) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && (World.col[i]!=COLTYPE_NONE) && (World.mass[i] >= 0.001f);
-            if (!canSleep) { World.physSleep[i]=0; continue; }
-            i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z);
-            bool nearAwake = false;
+            u32 ef = World.instances[i].entflags; bool canSleep = (i!=PLAYER1) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && (World.col[i]!=COLTYPE_NONE) && (World.mass[i] >= 0.001f); if (!canSleep) { World.physSleep[i]=0; continue; }
+            i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z); bool nearAwake = false;
             for (i32 dx=-WAKE_CELLS; dx<=WAKE_CELLS && !nearAwake; ++dx)
               for (i32 dz=-WAKE_CELLS; dz<=WAKE_CELLS && !nearAwake; ++dz) {
                 u32 cl = PosGetCellCoordsP(cx+dx,cz+dz);
                 for (u16 k=0;k<cellCounts[cl];++k) {
                     u16 j = cellLists[cl][k]; if (j==i) continue;
-                    u32 ej = World.instances[j].entflags;
-                    if (World.physSleep[j] || !(ej & EF_ACTIVE)) continue; // asleep/inactive bodies don't wake others
+                    u32 ej = World.instances[j].entflags; if (World.physSleep[j] || !(ej & EF_ACTIVE)) continue; // asleep/inactive bodies don't wake others
                     float sj2 = V3_dot(World.velocity[j], World.velocity[j]);
-                    bool jMoving = sj2 > SLEEP_LIN2;
-                    bool jAnimWaking = AnimWaking(j);
-                    if (!(jMoving || jAnimWaking)) continue; // not a waker -> lets i sleep
+                    bool jMoving = sj2 > 0.0025f; bool jAnimWaking = AnimWaking(j); if (!(jMoving || jAnimWaking)) continue; // not a waker -> lets i sleep
                     V3 d = V3_AsubB(World.position[i], World.position[j]);
                     float rr = World.radius[i] + World.radius[j] + (jMoving ? 2.0f * vsqrtf(sj2) : 0.0f); // mover reach only when actually translating
                     if (V3_dot(d,d) < rr*rr) { nearAwake=true; break; }
                 }
             }
             if (World.physSleep[i]) { if (nearAwake) World.physSleep[i]=0; }
-            else if (!nearAwake && (ef & EF_GROUNDED)) {
-                float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]);
-                if (sp2 < SLEEP_LIN2 && asp2 < SLEEP_ANG2) { World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; }
-            }
+            else if (!nearAwake && (ef & EF_GROUNDED)) { float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]); if (sp2 < 0.0025f && asp2 < 0.0025f) { World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; } }
         }
     }
 }
@@ -876,10 +864,7 @@ bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
     for (i32 dx = -1; dx <= 1 && !blocked; ++dx) {
         for (i32 dz = -1; dz <= 1 && !blocked; ++dz) {
             u32 cell = PosGetCellCoordsP(cx + dx, cz + dz);
-            for (u16 k = 0; k < cellCounts[cell]; ++k) {
-                u16 b = cellLists[cell][k]; if (b == playerIdx || !(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue;
-                if (World.col[b] == COLTYPE_MSH) { Overlap r = CapMsh(Entity_GetCap(playerIdx),World.instances[b].modelIndex,&world_from_mdl[b*16]); if (r.hit && r.pen > 0.08f) { blocked = true; break; } }
-            }
+            for (u16 k = 0; k < cellCounts[cell]; ++k) { u16 b = cellLists[cell][k]; if (b == playerIdx || !(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue; if (World.col[b] == COLTYPE_MSH) { Overlap r = CapMsh(Entity_GetCap(playerIdx),World.instances[b].modelIndex,&world_from_mdl[b*16]); if (r.hit && r.pen > 0.08f) { blocked = true; break; } } }
         }
     }
     World.colliderSize[playerIdx].y = oldHeight; World.position[playerIdx] = oldPos; return blocked;
@@ -897,8 +882,7 @@ void ApplyPlayerMovements(float dt) {
         if (leanLeft || leanRight) { if(leanLeft){World.invP1.leanRightTapFinished =0;} if(leanRight){World.invP1.leanLeftTapFinished=0;} World.invP1.leanTarget=vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt),-leanMaxAngle,leanMaxAngle); }
         else if (movingForward) { if (vabs(World.invP1.leanTarget) < 0.5f) { World.invP1.leanTarget = 0.0f; } else { World.invP1.leanTarget -= (World.invP1.leanTarget > 0.0f ? 1.0f : -1.0f) * leanSpeed * dt; } }
     }
-    World.cam_roll = World.invP1.leanTarget;
-    float targetRatio=1.0f, transitionSec=0.2f; float currentRatio=World.invP1.currentCrouchRatio;
+    World.cam_roll = World.invP1.leanTarget; float targetRatio=1.0f, transitionSec=0.2f; float currentRatio=World.invP1.currentCrouchRatio;
     if (Crouch()) { // Crouch key always targets crouch ratio from any state
         if (p->bodyState == BodyState_Crouch) { if (!CantStand(PLAYER1,PLAYER_HEIGHT)){p->bodyState = BodyState_StandingUp;}} // Already at crouch → toggle up to standing
         else if (currentRatio > PLAYER_CROUCH_RATIO) { p->bodyState = BodyState_CrouchingDown;} // Above crouch → go down to crouch (handles "if standing up will go back to crouched")
@@ -919,12 +903,8 @@ void ApplyPlayerMovements(float dt) {
     bool jumpjettin = ((World.invP1.hasHardware & HW_JET) > 0 && (World.invP1.hardwareIsActive & HW_JET) > 0);
     bool onLadder = World.invP1.ladderState > 0;
     if (JumpDown() && (grounded || onLadder) && !jumpjettin) {
-        if (onLadder) {
-            World.invP1.ladderState = 0; onLadder = false;
-            float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y;
-            V3 fwd = V3_Normalize((V3){2.0f*(xz+wy), 2.0f*(r.y*r.z - r.w*r.x), 1.0f - 2.0f*(r.x*r.x+y2)});
-            World.velocity[PLAYER1] = V3_ScaleByF(fwd, 6.0f);
-        } else {
+        if (onLadder) { World.invP1.ladderState = 0; onLadder = false; float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y; V3 fwd = V3_Normalize((V3){2.0f*(xz+wy), 2.0f*(r.y*r.z - r.w*r.x), 1.0f - 2.0f*(r.x*r.x+y2)}); World.velocity[PLAYER1] = V3_ScaleByF(fwd, 6.0f); }
+        else {
             if (!Cheats.noclip) {World.velocity[PLAYER1].y += (World.invP1.fatigue > 80.0f ? 2.0f : 4.51f) + 0.2f; if(!World.boosterActive && !Cheats.noclip){World.invP1.fatigue += 6.5f;} }
             RaycastHit jhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType jfstp = jhit.hit ? GetFootstepTypeForPrefab(World.instances[jhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpSound(jfstp),SfxVol(),World.position[PLAYER1],true);
         }
@@ -952,22 +932,17 @@ void ApplyPlayerMovements(float dt) {
         World.invP1.footstepFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
     }
     if (World.invP1.rustleFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f && !Cheats.noclip) && !World.boosterActive) {
-        play_wav(RustleSound(),SfxVol() * random_range(0.3f,0.5f) * rustleVolMod * 0.75f,World.position[PLAYER1],true);
-        World.invP1.rustleFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
+        play_wav(RustleSound(),SfxVol() * random_range(0.3f,0.5f) * rustleVolMod * 0.75f,World.position[PLAYER1],true); World.invP1.rustleFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
     }
-    float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y;
-    p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
-    V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s};
-    float inputLenSq = V3_dot(inputDir,inputDir);
-    V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0}; 
+    float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y; p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
+    V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0}; 
     bool isRunning = (inputLenSq > 0.01f); float speedAdjust = 0.0f; bool setSpeedAdjusted = false;
     if (Cheats.noclip) { speedAdjust = PLAYER_MAX_CYBER_SPEED*(isSprinting ? 2.5f : 1.5f); setSpeedAdjusted = true; }
     if (World.curLev==LEVEL_CYBERSPACE) { speedAdjust = PLAYER_MAX_CYBER_SPEED; setSpeedAdjusted = true; }
     BodyState b=World.instances[PLAYER1].bodyState; float v=WALK_SPEED;
     switch(b){ case BodyState_CrouchingDown: case BodyState_Crouch:v=CROUCH_SPEED; break; case BodyState_Prone: case BodyState_ProningDown: case BodyState_ProningUp:v=PLAYER_MAX_PRONE_SPEED; break; default:break; }
     if ((isSprinting||World.boosterActive) && isRunning) {
-        v = World.invP1.fatigue > 80.0f && !World.boosterActive ? SPRINT_SPEED_FATIGUED : SPRINT_SPEED;
-        if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown) v -= (WALK_SPEED-CROUCH_SPEED)*1.5f; else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp) v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;
+        v = World.invP1.fatigue > 80.0f && !World.boosterActive ? SPRINT_SPEED_FATIGUED : SPRINT_SPEED; if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown) v -= (WALK_SPEED-CROUCH_SPEED)*1.5f; else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp) v -= (WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;
     }
     float speed = (setSpeedAdjusted ? speedAdjust : v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f)) + (World.invP1.staminupActive ? 1.0f : 0.0f), accel=World.boosterActive && World.curLev!=LEVEL_CYBERSPACE ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
     if (onLadder && !ladderWalkOff) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
@@ -980,23 +955,13 @@ void ApplyPlayerMovements(float dt) {
     if (grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
         if (velChange > 2.0f && World.invP1.noiseFinished < World.pauseRelativeTime) {
-            RaycastHit lhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET);
-            FootStepType lstp = lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete;
-            float vol = vclamp((velChange - 1.0f) / (11.72f - 1.0f),0.0f,1.0f) * (1.0f - 0.5f) * 0.8f * stepVolMod;
-            play_wav(JumpLandSound(lstp),SfxVol() * vol,World.position[PLAYER1],true);
-            World.invP1.noiseFinished = World.pauseRelativeTime + 0.2f;
+            RaycastHit lhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp = lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete;
+            play_wav(JumpLandSound(lstp),SfxVol() * (vclamp((velChange - 1.0f) / (11.72f - 1.0f),0.0f,1.0f) * (1.0f - 0.5f) * 0.8f * stepVolMod),World.position[PLAYER1],true); World.invP1.noiseFinished = World.pauseRelativeTime + 0.2f;
         }
         if (velChange >= 11.72f && World.invP1.fallPainFinished < World.pauseRelativeTime) {
-            World.invP1.fallPainFinished = World.pauseRelativeTime + 0.5f;
-            DamageData dd = {0};
-            float falltake = 75.0f - random_range(0.0f,68.0f);
-            if (falltake > World.instances[PLAYER1].health && falltake - World.instances[PLAYER1].health < 5.0f) falltake = World.instances[PLAYER1].health - 1.0f; // some small saving grace
-            dd.damage = falltake; // No need for GetDamageTakeAmount since this is strictly internal to Player
-            TakeDamage(PLAYER1,dd);
-            World.invP1.noiseFinished = World.pauseRelativeTime + 0.2f;
+            World.invP1.fallPainFinished = World.pauseRelativeTime + 0.5f; DamageData dd = {0}; float falltake = 75.0f - random_range(0.0f,68.0f);
+            if (falltake > World.instances[PLAYER1].health && falltake - World.instances[PLAYER1].health < 5.0f) falltake=World.instances[PLAYER1].health - 1.0f; dd.damage = falltake; TakeDamage(PLAYER1,dd); World.invP1.noiseFinished = World.pauseRelativeTime + 0.2f;
         }
     }
-    World.invP1.wasGrounded = grounded;
-    World.invP1.lastVelY = World.velocity[PLAYER1].y;
-    // Booster/cyber tweak notes: friction/drift handled by existing velocity/input systems; no structural change needed
+    World.invP1.wasGrounded = grounded; World.invP1.lastVelY = World.velocity[PLAYER1].y;
 }

@@ -693,34 +693,19 @@ bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){return false;} if (World.p
 bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.pauseRelativeTime < World.invP1.leanRightTapFinished) { World.invP1.leanRightTapFinished = 0.0; return true; } World.invP1.leanRightTapFinished = World.pauseRelativeTime + 0.5; return false; } 
 void CloseFullmap();
 void ForceShootMode() {
-    if (Sys_Settings.NoShootMode){return;}
-    if (World.inventoryMode) {World.cursorPos_x=663; World.cursorPos_y=371/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true;}
+    if (Sys_Settings.NoShootMode){return;} if (World.inventoryMode) {World.cursorPos_x=663; World.cursorPos_y=371/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true;}
     World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0; World.Sys_UI.vmailActive=false;}
 }
 
 void ForceInventoryMode() { if (!World.inventoryMode) {World.inventoryMode = true; World.cursorPos_x = 663; World.cursorPos_y = 371; ignore_next_mouse_delta = true;} } // Centered on UI baseline resolution 1366x768
 void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
 void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
-void MenuGoBack(); void SaveGame(u8 slot, const char* savename); void LoadGame(u8 slot); void ApplyPlayerMovements(float dt); void PollEvents();
+void MenuGoBack(),SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float),PollEvents(),play_synth(SoundID,float,float);
 extern u16 editModeTestEntityDefinition;
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     if (window_has_focus) {
         if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);
-        if (Sys_Input.keyStates[KEY_W].pressed) play_synth(SND_DOOR,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_T].pressed) play_synth(SND_IMPACT_GLASS,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_R].pressed) play_synth(SND_BEAKER_THUD,0.1f,1.0f);
-        if (Sys_Input.keyStates[KEY_Y].pressed) play_synth(SND_BEAKER_CLINK,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_U].pressed) play_synth(SND_LASER_RIFLE,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_G].pressed) play_synth(SND_EXPLOSION,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_H].pressed) play_synth(SND_HISS,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_J].pressed) play_synth(SND_PIPE,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_K].pressed) play_synth(SND_SHIELD_HIT,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_L].pressed) play_synth(SND_FOOTSTEP,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_Z].pressed) play_synth(SND_SAND_FOOTSTEP,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_B].pressed) play_synth(SND_TAP_CASE,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_N].pressed) play_synth(SND_PLASTIC_TAP,0.2f,1.0f);
-        if (Sys_Input.keyStates[KEY_M].pressed) play_synth(SND_CRACKLE,0.2f,1.0f);
         if (Sprint() && Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode) {
             bool foundValidDynamic = false;
             while (!foundValidDynamic) {
@@ -757,7 +742,6 @@ void InputProcessing() {
         }
     }
 }
-
 // Configuration Options Settings Sys
 typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType; typedef struct { const char* name; void* ptr; SettingType type; } Setting;
 #define S_U8(n, v)  { n, &Sys_Settings.v, SETTING_U8 }
@@ -782,8 +766,7 @@ const Setting configTable[] = {
 const int configTableSize = sizeof(configTable) / sizeof(Setting);
 INLINE i32 GetWinSysIndirectionIndexForAnInput(const char* val) { for (int i=0;i<134;++i) {if (sEqual(val,inputElements[i].name)) return i;} return 148; }
 void LoadConfig() {
-    FHandle f = OS_OpenReadonly("./Data/Config.ini");
-    char line[512];
+    FHandle f = OS_OpenReadonly("./Data/Config.ini"); char line[512];
     while (sUpToEndLine(line,sizeof(line),f)) {
         char* s = data_parser_trim(line); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
         char* eq = StringFindFirstCharWithin(s, '='); if (!eq) continue;
@@ -797,19 +780,16 @@ void LoadConfig() {
             }
         }
     }
-    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320); Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200);
-    OS_Close(f);
+    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320); Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200); OS_Close(f);
 }
 
 void FilePrintString(FHandle f, const char* fmt, ...) { va_list a; __builtin_va_start(a,fmt); char b[128]; va_list c; __builtin_va_copy(c,a); sFormatV(b,sizeof(b),fmt,c); __builtin_va_end(c); OS_RawWrite(f,b,slen(b)); __builtin_va_end(a); }
 void SaveConfig() {
-    DualLog("Saving config\n");
-    FHandle f = OS_OpenWriteonly("./Data/Config.ini");
+    DualLog("Saving config\n"); FHandle f = OS_OpenWriteonly("./Data/Config.ini");
     for (int i=0;i<configTableSize;++i) {
-        if (configTable[i].type == SETTING_U8)         FilePrintString(f,"%s = %u\n",configTable[i].name,*(u8*)configTable[i].ptr);
+        if (configTable[i].type == SETTING_U8)         FilePrintString(f,"%s = %u\n",configTable[i].name,*(u8*)configTable[i].ptr); 
         else if (configTable[i].type == SETTING_U16)   FilePrintString(f,"%s = %u\n",configTable[i].name,*(u16*)configTable[i].ptr);
         else if (configTable[i].type == SETTING_INPUT) FilePrintString(f,"%s = %s\n",configTable[i].name,inputElements[*(u16*)configTable[i].ptr].name);
     }
-    OS_Close(f);
-    DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",globalframe);
+    OS_Close(f); DualLog("Saved settings to ./Data/Config.ini! framenum %u\n",globalframe);
 }

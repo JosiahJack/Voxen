@@ -145,19 +145,19 @@ void CreateStandardImpactMarks(int wep16) {
 }
 
 void CreateStandardImpactEffects(){if(wfx.tempHitEnt==0xFFFF)return;u16 ent=wfx.tempHitEnt;if(ent>=World.instCount)return;u16 prefab=GetImpactType(ent);if(prefab==0||prefab>=MAX_ENTITIES)prefab=731;V3 pos=wfx.tempHit.hit?V3_AplusB(wfx.tempHit.point,V3_ScaleByF(wfx.tempHit.normal,wfx.hitOffset)):World.position[ent];V3 n=wfx.tempHit.hit?wfx.tempHit.normal:(V3){0,1,0};u16 fx=SpawnDynamicObject(prefab,-1);if(fx!=0xFFFF&&fx<INSTANCE_COUNT){World.position[fx]=pos;World.rotation[fx]=QuatFromToRotation((V3){0,1,0},n);}}
-void CreateBeamImpactEffects(int wep16) {
+static void CreateBeamImpactEffects(int wep16) {
     int impactConstdex=731;/*Cyan sparq*/ if(wep16 == 1){impactConstdex=739;/*Red laser (blaster)*/}else if(wep16 == 4){impactConstdex=740;/*Yellow laser (ion)*/}
     u16 fx = SpawnDynamicObject((u16)impactConstdex, -1); if(fx == 0xFFFF){return;}
     World.position[fx] = wfx.tempHit.point; World.rotation[fx] = QuatFromToRotation((V3){0,1,0},wfx.tempHit.normal);
 }
 
-void CreateBeamEffects(int wep16) {
+static void CreateBeamEffects(int wep16) {
     u16 laserPrefab=405;/*sparq*/ if(wep16 == 1){laserPrefab=406;/*blaster*/} else if(wep16 == 4){laserPrefab=407;/*ion*/}
     u16 beam = SpawnDynamicObject(laserPrefab, -1); if (beam == 0xFFFF) return;
     World.position[beam] = wfx.reloadContainerPos; // muzzle-relative start point, LaserDrawing.startPoint/endPoint equivalent handled by the beam entity's own update, using its position and a linked end-point field (not modeled here).
 }
 
-float DamageForPower(int w) { // Slope-of-slopes curve: interpolates damage/energy ratio across the energy setting, then scales by the interpolated energy drain itself. See design spreadsheet.
+static float DamageForPower(int w) { // Slope-of-slopes curve: interpolates damage/energy ratio across the energy setting, then scales by the interpolated energy drain itself. See design spreadsheet.
     if(World.invP1.overloadEnabled){return damageOverloadForWeapon[w];}
     float d=dmgForWep[w],D=dmgForWep2[w],e=energyDrainLowForWeapon[w],E=energyDrainHiForWeapon[w]; float pct=World.invP1.weaponEnergySetting[World.invP1.weaponCurrent]*0.01f; return (pct*(D/E - d/e) + 3.0f)*(pct*(E - e) + e);
 }
@@ -213,20 +213,20 @@ void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u
     wfx.fireDistance = 3.2f;
     bool hit = DidRayHit(wep16); wfx.fireDistance = 200.0f;
     u16 t = wfx.tempHitEnt; double dt = World.pauseRelativeTime + (isRapier ? 0.28 : 0.15);
-    // Use appropriate animation clips from models.c: v_rapier (50) uses ANIM_ATTACK_HIT (4), v_pipe (49) uses ANIM_ATTACK_HIT (18) for hit
+    // Use appropriate animation clips from models.c: v_rapier (50) uses A_ATTACK_HIT (4), v_pipe (49) uses A_ATTACK_HIT (18) for hit
     if (hit) {
-        PlayAnim(PLAYER1, isRapier ? ANIM_ATTACK_HIT : ANIM_ATTACK_HIT);
+        PlayAnim(PLAYER1, isRapier ? A_ATTACK_HIT : A_ATTACK_HIT);
         wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = t; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeMissSnd = missSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
     }
     V3 p = World.position[PLAYER1], look = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward, World.instances[PLAYER1].right));
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
         Entity *in = &World.instances[i]; if(!(in->entflags & EF_ACTIVE) || in->health <= 0.0f || V3_Dist(World.position[i],p) >= 3.2f || V3_dot(look,V3_Normalize(V3_AsubB(World.position[i],p))) <= 0.666f){continue;}/*outside ~+-48deg cone*/
-        PlayAnim(PLAYER1, ANIM_ATTACK2);
+        PlayAnim(PLAYER1, A_ATTACK2);
         wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = i; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeMissSnd = missSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
     }
-    if(!silent)play_wav(sounds[missSnd],1.0f,World.position[PLAYER1],false);PlayAnim(PLAYER1,isRapier?ANIM_ATTACK2:ANIM_ATTACK1);
+    if(!silent)play_wav(sounds[missSnd],1.0f,World.position[PLAYER1],false);PlayAnim(PLAYER1,isRapier?A_ATTACK2:A_ATTACK1);
 }
 
 void FireRapier(int wep16) { FireMelee(wep16, true,  false, 246, 247, 246); } // wlaserrapier_hit/swing

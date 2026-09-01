@@ -133,12 +133,9 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*366 item_chipset_bitflag*/[366]={45,325,633,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*367 item_ammo_rubber*/[367]={8,676,19,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.25f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*368 item_isotopex22*/[368]={209,326,413,412,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*369 item_testtube*/[369]={622,612,36,MAX_TXRS,1242,MAX_TXRS,0.21f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*370 weapon_grenadefrag_live*/[370]={182,73,347,630,MAX_TXRS,MAX_TXRS,1.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*371 item_chipset_isolinear*/[371]={46,308,409,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.26f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*372 weapon_grenadeconc_live*/[372]={165,84,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*373 item_ammo_needle*/[373]={4,U16_MAX,15,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.15f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},
-/*374 item_ammo_tranq*/[374]={4,U16_MAX,27,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.15f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},
-/*375 item_ammo_standard*/[375]={5,U16_MAX,25,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0001984993f,0.0f,0.02172501f},{0.1209471f,0.2176701f,0.04345007f}},
-/*376 item_ammo_teflon*/[376]={5,U16_MAX,26,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0001984993f,0.0f,0.02172501f},{0.1209471f,0.2176701f,0.04345007f}},
-/*377 item_ammo_hollow*/[377]={5,U16_MAX,11,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0002185023f,0.0f,0.02122951f},{0.1423431f,0.2127061f,0.04245907f}},
+/*372 weapon_grenadeconc_live*/[372]={165,84,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*373 item_ammo_needle*/[373]={4,U16_MAX,15,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.15f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},
+/*374 item_ammo_tranq*/[374]={4,U16_MAX,27,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.15f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},/*375 item_ammo_standard*/[375]={5,U16_MAX,25,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0001984993f,0.0f,0.02172501f},{0.1209471f,0.2176701f,0.04345007f}},
+/*376 item_ammo_teflon*/[376]={5,U16_MAX,26,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0001984993f,0.0f,0.02172501f},{0.1209471f,0.2176701f,0.04345007f}},/*377 item_ammo_hollow*/[377]={5,U16_MAX,11,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0002185023f,0.0f,0.02122951f},{0.1423431f,0.2127061f,0.04245907f}},
 /*378 item_ammo_slug*/[378]={3,U16_MAX,23,22,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0002185023f,0.0f,0.02122951f},{0.1423431f,0.2127061f,0.04245907f}},
 /*379 item_ammo_magnesium*/[379]={1,673,14,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*380 item_ammo_penetrator*/[380]={1,673,16,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*381 item_ammo_hornet*/[381]={1,673,12,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*382 item_ammo_splinter*/[382]={1,673,24,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
@@ -153,10 +150,8 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*399 item_head_male*/[399]={194,194,389,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.29f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*400 item_head_female*/[400]={193,686,388,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.30f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*401 item_severedhead*/[401]={590,327,801,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.28f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*402 weapon_grenademine_live*/[402]={184,87,351,352,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*403 weapon_grenadenitro_live*/[403]={185,88,354,355,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*404 weapon_grenadegas_live*/[404]={183,89,349,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.9f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*405 to 416 unused*/[405]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*406*/[406]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*407*/[407]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*408*/[408]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*409*/[409]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*410*/[410]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*411*/[411]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*412*/[412]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*413*/[413]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*414*/[414]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*407*/[407]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*408*/[408]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*409*/[409]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*410*/[410]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*411*/[411]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*412*/[412]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*413*/[413]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*414*/[414]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*415*/[415]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*416*/[416]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*417 item_access_card_perdarcy*/[417]={0,672,8,341,MAX_TXRS,MAX_TXRS,0.2f,0,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*418 unused*/[418]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*419 npc_autobomb*/[419]={299,328,542,541,MAX_TXRS,MAX_TXRS,1.0f,0.15f,1.0f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*420 npc_cyborg_assassin*/[420]={306,0,545,544,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,24,COLTYPE_CAP,{0,0.96f,0},{0.48f,2.0f,0}},
@@ -182,10 +177,8 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*458 prop_phys_barrel_chemical*/[458]={12,332,30,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*459 prop_phys_barrel_radiation*/[459]={12,332,31,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*460 prop_phys_barrel_toxic*/[460]={12,332,33,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*461 prop_phys_cart*/[461]={40,333,416,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*462 prop_phys_pot*/[462]={494,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*463 prop_phys_toolcart*/[463]={624,335,865,866,864,MAX_TXRS,20.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*464 se_briefcase*/[464]={34,0,66,65,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*465 se_corpse_blueshirt*/[465]={51,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*466 se_corpse_brownshirt*/[466]={52,0,128,MAX_TXRS,129,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*467 se_corpse_eaten*/[467]={MAX_ANIMS,0,130,MAX_TXRS,131,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*468 se_corpse_labcoat*/[468]={55,0,132,MAX_TXRS,133,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*469 se_corpse_security*/[469]={56,0,136,MAX_TXRS,137,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*470 se_corpse_tan*/[470]={57,0,138,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*471 se_corpse_torso*/[471]={58,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*464 se_briefcase*/[464]={34,0,66,65,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*465 se_corpse_blueshirt*/[465]={51,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*466 se_corpse_brownshirt*/[466]={52,0,128,MAX_TXRS,129,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*467 se_corpse_eaten*/[467]={MAX_ANIMS,0,130,MAX_TXRS,131,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*468 se_corpse_labcoat*/[468]={55,0,132,MAX_TXRS,133,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*469 se_corpse_security*/[469]={56,0,136,MAX_TXRS,137,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*470 se_corpse_tan*/[470]={57,0,138,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*471 se_corpse_torso*/[471]={58,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*472 se_crate1*/[472]={60,0,145,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},/*473 se_crate2*/[473]={60,0,143,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
 /*474 se_crate3*/[474]={60,0,144,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},/*475 se_crate4*/[475]={60,0,146,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.25f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
 /*476 se_crate5*/[476]={60,0,145,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.25f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},/*477 sec_camera*/[477]={589,0,73,72,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
@@ -204,8 +197,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*505 doorJ*/[505]={0,0,215,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,6,COLTYPE_MSH,{0,0,0},{0,0,0}},/*506 doorK*/[506]={0,0,214,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,7,COLTYPE_MSH,{0,0,0},{0,0,0}},/*507 doorL*/[507]={0,0,191,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,8,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*508 door_elevator1*/[508]={0,0,202,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,14,COLTYPE_MSH,{0,0,0},{0,0,0}},/*509 door_elevator2*/[509]={0,0,203,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,15,COLTYPE_MSH,{0,0,0},{0,0,0}},/*510 door_elevator3*/[510]={0,0,206,205,MAX_TXRS,MAX_TXRS,0,0,0,16,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*511 door_elevator4*/[511]={0,0,203,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,17,COLTYPE_MSH,{0,0,0},{0,0,0}},/*512 door_secret1*/[512]={0,0,210,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,19,COLTYPE_MSH,{0,0,0},{0,0,0}},/*513 door_secret2*/[513]={0,0,209,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,18,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*514 door_secret3*/[514]={94,0,211,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,20,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*515 func_forcebridge*/[515]={78,0,38,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0,0,0}},/*516 prop_lift2*/[516]={215,U16_MAX,155,154,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0.0f,0.0f,0.0f},{1.0f,1.0f,1.0f}},
+/*514 door_secret3*/[514]={94,0,211,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,20,COLTYPE_MSH,{0,0,0},{0,0,0}},/*515 func_forcebridge*/[515]={78,0,38,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0,0,0}},/*516 prop_lift2*/[516]={215,U16_MAX,155,154,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0.0f,0.0f,0.0f},{1.0f,1.0f,1.0f}},
 /*517 func_wall*/[517]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,10.0f,0.6f,0.6f,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*518 BulletHoleLarge*/[518]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*519 BulletHoleScorchLarge*/[519]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*520 BulletHoleScorchSmall*/[520]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*521 BulletHoleSmall*/[521]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*522 BulletHoleTiny*/[522]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -254,10 +246,8 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*607 us_puz_elevatorkeypad4*/[607]={210,0,249,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*608 us_puz_keypad*/[608]={211,0,414,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*609 us_puz_panel_blue_grid*/[609]={0,0,604,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*610 us_puz_panel_brown_grid*/[610]={0,0,604,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
 /*611 us_puz_panel_gray_grid*/[611]={0,0,634,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*612 us_puz_panel_red_grid*/[612]={0,0,625,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
-/*613 us_puz_panel_teal_grid*/[613]={0,0,601,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*614 us_relaypanel*/[614]={0,0,617,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,45,0,{0,0,0},{0,0,0}},
-/*615 us_retinalscanner*/[615]={79,0,46,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*616 prop_vending1_1*/[616]={627,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*617 prop_vending1_2*/[617]={628,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*618 prop_vending1_3*/[618]={629,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*619 prop_vending2_1*/[619]={614,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*620 prop_vending2_2*/[620]={621,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*613 us_puz_panel_teal_grid*/[613]={0,0,601,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*614 us_relaypanel*/[614]={0,0,617,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,45,0,{0,0,0},{0,0,0}},/*615 us_retinalscanner*/[615]={79,0,46,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*616 prop_vending1_1*/[616]={627,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*617 prop_vending1_2*/[617]={628,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*618 prop_vending1_3*/[618]={629,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*619 prop_vending2_1*/[619]={614,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*620 prop_vending2_2*/[620]={621,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*621 ambient_airhiss*/[621]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*622 ambient_clicker*/[622]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*623 ambient_compressor*/[623]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*624 ambient_dishwasher*/[624]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*625 ambient_drip_amb*/[625]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*626 ambient_fan*/[626]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*627 ambient_generator_gas*/[627]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*628 ambient_gurgle*/[628]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*629 ambient_icemaker*/[629]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -270,22 +260,14 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*648 ambient_mist*/[648]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*649 ambient_pipewater_loop*/[649]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*650 ambient_powerloom*/[650]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*651 ambient_pump*/[651]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*652 ambient_pump2*/[652]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*653 ambient_rain*/[653]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*654 ambient_steam_loop*/[654]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*655 ambient_washing_machine*/[655]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*656 decal_blood_die*/[656]={77,0,237,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*657 decal_blood_resist*/[657]={77,0,240,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*658 decal_blood_stayaway*/[658]={77,0,235,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*659 decal_blood_words2*/[659]={77,0,236,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*660 decal_bloodfonta*/[660]={178,0,118,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*661 decal_bloodfonte*/[661]={178,0,121,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*662 decal_bloodfontg*/[662]={178,0,122,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*663 decal_bloodfonth*/[663]={178,0,89,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*664 decal_bloodfontr*/[664]={178,0,139,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*665 decal_bloodfonty*/[665]={178,0,140,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*666 decal_bloodsplat2*/[666]={157,0,130,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*667 decal_logo_antenna*/[667]={77,0,182,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*668 decal_logo_armory*/[668]={77,0,178,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*669 decal_logo_biohazard*/[669]={77,0,180,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*670 decal_logo_bridge*/[670]={77,0,181,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*671 decal_logo_cyborg*/[671]={77,0,176,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*672 decal_logo_gears*/[672]={77,0,174,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*673 decal_logo_medical*/[673]={77,0,165,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*674 decal_logo_radhazard*/[674]={77,0,177,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*675 decal_logo_research*/[675]={77,0,175,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*676 decal_logo_security*/[676]={77,0,167,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*677 decal_painting1*/[677]={77,0,218,216,MAX_TXRS,217,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*678 decal_painting2*/[678]={77,0,220,219,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*679 decal_painting3*/[679]={77,0,222,221,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*680 decal_posterbetterfuture*/[680]={77,0,226,MAX_TXRS,MAX_TXRS,225,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*681 decal_postergenetics*/[681]={77,0,224,MAX_TXRS,MAX_TXRS,223,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*682 decal_scorch1*/[682]={77,0,227,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*683 decal_scorch2*/[683]={77,0,228,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*684 decal_scorch3*/[684]={77,0,229,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*685 decal_scorch4*/[685]={77,0,230,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*686 decal_scorchtiny*/[686]={77,0,232,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*687 decal_blood_splat*/[687]={77,0,234,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*656 decal_blood_die*/[656]={77,0,237,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*657 decal_blood_resist*/[657]={77,0,240,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*658 decal_blood_stayaway*/[658]={77,0,235,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*659 decal_blood_words2*/[659]={77,0,236,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*660 decal_bloodfonta*/[660]={178,0,118,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*661 decal_bloodfonte*/[661]={178,0,121,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*662 decal_bloodfontg*/[662]={178,0,122,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*663 decal_bloodfonth*/[663]={178,0,89,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*664 decal_bloodfontr*/[664]={178,0,139,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*665 decal_bloodfonty*/[665]={178,0,140,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*666 decal_bloodsplat2*/[666]={157,0,130,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*667 decal_logo_antenna*/[667]={77,0,182,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*668 decal_logo_armory*/[668]={77,0,178,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*669 decal_logo_biohazard*/[669]={77,0,180,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*670 decal_logo_bridge*/[670]={77,0,181,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*671 decal_logo_cyborg*/[671]={77,0,176,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*672 decal_logo_gears*/[672]={77,0,174,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*673 decal_logo_medical*/[673]={77,0,165,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*674 decal_logo_radhazard*/[674]={77,0,177,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*675 decal_logo_research*/[675]={77,0,175,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*676 decal_logo_security*/[676]={77,0,167,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*677 decal_painting1*/[677]={77,0,218,216,MAX_TXRS,217,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*678 decal_painting2*/[678]={77,0,220,219,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*679 decal_painting3*/[679]={77,0,222,221,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*680 decal_posterbetterfuture*/[680]={77,0,226,MAX_TXRS,MAX_TXRS,225,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*681 decal_postergenetics*/[681]={77,0,224,MAX_TXRS,MAX_TXRS,223,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*682 decal_scorch1*/[682]={77,0,227,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*683 decal_scorch2*/[683]={77,0,228,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*684 decal_scorch3*/[684]={77,0,229,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*685 decal_scorch4*/[685]={77,0,230,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*686 decal_scorchtiny*/[686]={77,0,232,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*687 decal_blood_splat*/[687]={77,0,234,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*688 func_switch1*/[688]={609,0,837,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.32f,0.04f,0.32f}},/*689 func_switch2*/[689]={610,0,839,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.0243553f,0.0f,0.000004883f},{0.0476318f,0.64f,0.64f}},
 /*690 func_switch3*/[690]={611,0,842,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.02285008f,0.000053061f,-0.000056993f},{0.02f,0.32f,0.32f}},/*691 func_switch4*/[691]={612,0,846,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0.06f,0,0},{0.2f,0.64f,0.64f}},
 /*692 func_switch5*/[692]={614,0,848,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.64f,0.64f,0.08f}},/*693 func_switch5broken*/[693]={613,0,847,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.64f,0.64f,0.08f}},
@@ -785,62 +767,37 @@ void LoadLevelMod(u8 lev) {
     }
     i32 totalEnts = entCount + 1;
     for (i32 e=0;e<totalEnts;++e) {
-        Entity* src = &entsFromFile[e];
-        u16 entIdx = src->index;
-        u16 parent = AddInstance(entIdx,posFromFile[e]);
-        Entity* par = &World.instances[parent];
-        par->lastPosition          = posFromFile[e];
-        World.rotation[parent]    = rotationFromFile[e];
-        if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
+        Entity* src = &entsFromFile[e]; u16 entIdx = src->index; u16 parent = AddInstance(entIdx,posFromFile[e]); Entity* par = &World.instances[parent]; par->lastPosition = posFromFile[e]; World.rotation[parent] = rotationFromFile[e]; if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
         par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/ par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->usableCustIdx=src->usableCustIdx;
         par->amount=src->amount; par->resetTime=src->resetTime; par->minSecurityLevel=src->minSecurityLevel; par->damage=src->damage; par->delay=src->delay; par->active=src->active; par->activatedScale=src->activatedScale;
         par->forceFieldDirectionX=src->forceFieldDirectionX; par->forceFieldDirectionY=src->forceFieldDirectionY; par->forceFieldDirectionZ=src->forceFieldDirectionZ; par->fieldColor=src->fieldColor; par->timeInterval=src->timeInterval;
         par->randomMin=src->randomMin; par->randomMax=src->randomMax; par->useRandomTimes=src->useRandomTimes; par->health=src->health; par->cyberHealth=src->cyberHealth; par->radiation=src->radiation; par->idleTime=src->idleTime;
-        par->attack1SoundTime=src->attack1SoundTime; par->attack2SoundTime=src->attack2SoundTime; par->attack3SoundTime=src->attack3SoundTime; par->timeSinceMovedEnough=src->timeSinceMovedEnough; par->tickTime=src->tickTime;
-        par->waitBeforeClose=src->waitBeforeClose; par->onlyOnce=src->onlyOnce; par->stayOpen=src->stayOpen; par->startOpen=src->startOpen; par->ajar=src->ajar; par->ajarPercentage=src->ajarPercentage; par->timeBeforeLasersOn=src->timeBeforeLasersOn;
+        par->timeSinceMovedEnough=src->timeSinceMovedEnough; par->tickTime=src->tickTime; par->waitBeforeClose=src->waitBeforeClose; par->onlyOnce=src->onlyOnce; par->stayOpen=src->stayOpen; par->startOpen=src->startOpen; par->ajar=src->ajar; par->ajarPercentage=src->ajarPercentage; par->timeBeforeLasersOn=src->timeBeforeLasersOn;
         par->toggleLasers=src->toggleLasers; par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->target2Idx=src->target2Idx; 
         par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARGET_STRING_LENGTH);
         if (entIdx == 517) { // func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative
-            V3 sp = par->startPosition;
-            if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3_AplusB(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } // fallback for entries lacking startPosition
-            World.position[parent]  = sp;
-            par->lastPosition       = sp;
-            World.rotation[parent]  = quat_multiply(fwBaseRot[e],rotationFromFile[e]);
-            World.scale[parent]     = (V3){fwBaseScale[e].x*scaleFromFile[e].x,fwBaseScale[e].y*scaleFromFile[e].y,fwBaseScale[e].z*scaleFromFile[e].z};
-            par->targetPosition     = V3_AplusB(sp,fwInfoLocal[e]); // info_target offset denotes full travel
+            V3 sp = par->startPosition; if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3_AplusB(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } // fallback for entries lacking startPosition
+            World.position[parent] = par->lastPosition = sp; World.rotation[parent] = quat_multiply(fwBaseRot[e],rotationFromFile[e]); World.scale[parent] = (V3){fwBaseScale[e].x*scaleFromFile[e].x,fwBaseScale[e].y*scaleFromFile[e].y,fwBaseScale[e].z*scaleFromFile[e].z}; par->targetPosition = V3_AplusB(sp,fwInfoLocal[e]); // info_target offset denotes full travel
             if (par->speed <= 0.0f) par->speed = 0.64f;
             for (u16 k=0;k<fwSlotCount[e];++k) {
-                u16 pi = fwPoolPrefab[fwSlotStart[e]+k];
-                if (pi >= 307) continue; // chunk family guard
-                u16 c = AddInstance(pi,V3_AplusB(sp,QuatRotateVec(fwBaseRot[e],fwPoolPos[fwSlotStart[e]+k])));
-                if (c == 0) continue;
-                World.rotation[c] = QuatMul(fwBaseRot[e], fwPoolRot[fwSlotStart[e]+k]);
-                V3 cs = fwPoolScale[fwSlotStart[e]+k];
-                World.scale[c] = (V3){World.scale[parent].x*cs.x,World.scale[parent].y*cs.y,World.scale[parent].z*cs.z};
-                fwParentOf[c] = parent;
+                u16 pi = fwPoolPrefab[fwSlotStart[e]+k]; if (pi >= 307) continue; // chunk family guard
+                u16 c = AddInstance(pi,V3_AplusB(sp,QuatRotateVec(fwBaseRot[e],fwPoolPos[fwSlotStart[e]+k]))); if (c == 0) continue;
+                World.rotation[c] = QuatMul(fwBaseRot[e], fwPoolRot[fwSlotStart[e]+k]); V3 cs = fwPoolScale[fwSlotStart[e]+k]; World.scale[c] = (V3){World.scale[parent].x*cs.x,World.scale[parent].y*cs.y,World.scale[parent].z*cs.z}; fwParentOf[c] = parent;
             }
         }
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
         if (entIdx >= 595 && entIdx <= 601) {
-            if (colSzFromFile[e].x >= 0.0f || colSzFromFile[e].y >= 0.0f || colSzFromFile[e].z >= 0.0f) {
-                World.colliderCenter[parent] = colCtrFromFile[e];
-                World.colliderSize[parent]   = (V3){ colSzFromFile[e].x < 0.0f ? 1.0f : colSzFromFile[e].x, colSzFromFile[e].y < 0.0f ? 1.0f : colSzFromFile[e].y, colSzFromFile[e].z < 0.0f ? 1.0f : colSzFromFile[e].z };
+            if (colSzFromFile[e].x >= 0.0f || colSzFromFile[e].y >= 0.0f || colSzFromFile[e].z >= 0.0f) { 
+                World.colliderCenter[parent] = colCtrFromFile[e]; World.colliderSize[parent]   = (V3){ colSzFromFile[e].x < 0.0f ? 1.0f : colSzFromFile[e].x, colSzFromFile[e].y < 0.0f ? 1.0f : colSzFromFile[e].y, colSzFromFile[e].z < 0.0f ? 1.0f : colSzFromFile[e].z };
             } else { World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f}; }
-        } else if (entIdx == 515 && EDefs[entIdx].col == COLTYPE_BOX && EDefs[entIdx].colSz.x == 0.0f && EDefs[entIdx].colSz.y == 0.0f && EDefs[entIdx].colSz.z == 0.0f) {
-            World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f};
-        }
+        } else if (entIdx == 515 && EDefs[entIdx].col == COLTYPE_BOX && EDefs[entIdx].colSz.x == 0.0f && EDefs[entIdx].colSz.y == 0.0f && EDefs[entIdx].colSz.z == 0.0f) { World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f}; }
         if (entIdx == 700) par->currentTargetIdx = par->branchOnSecond ? par->target2Idx : par->targetIdx;
-        if (entIdx == 525) { // prop_console01
-            par->texAnimLight  = AddOffsetLight(par,(V3){5.81f,2.29f,38.05f-38.3552f},(Color3){0.3531f,0.4837f,0.6509f},1.85f,0.7f);
-            par->texAnimLight2 = AddOffsetLight(par,(V3){-10.1f,0.9f,18.21f-38.3552f},(Color3){0.3561f,0.3561f,0.8970f},2.0f,1.12f);
-        } else if (entIdx == 279) { par->texAnimLight = AddOffsetLight(par,(V3){0.0f,-0.08f,0.0f},(Color3){0.909803922f,0.929411765f,1.0f},3.2f,1.575f); } // chunk_screen
+        if (entIdx == 525) { par->texAnimLight=AddOffsetLight(par,(V3){5.81f,2.29f,38.05f-38.3552f},(Color3){0.3531f,0.4837f,0.6509f},1.85f,0.7f); par->texAnimLight2=AddOffsetLight(par,(V3){-10.1f,0.9f,18.21f-38.3552f},(Color3){0.3561f,0.3561f,0.8970f},2.0f,1.12f); } // prop_console01
+        else if (entIdx == 279) { par->texAnimLight = AddOffsetLight(par,(V3){0.0f,-0.08f,0.0f},(Color3){0.909803922f,0.929411765f,1.0f},3.2f,1.575f); } // chunk_screen
         else if (par->index == 574) { // prop_healingbed
-            Color3 green = {0.0f, 0.925490196f, 0.082352941f};
-            par->texAnimLight  = AddOffsetLight(par, (V3){0.5292511f, 0.065f, 0.915f}, green, 3.0f, 0.72f);
-            par->texAnimLight2 = AddOffsetLight(par, (V3){-0.5317497f, 0.065f, 1.039f}, green, 3.0f, 0.72f);
-            par->textureAnimating = true; par->texAnimClip = 12; par->texFrame = 0;
+            Color3 green = {0.0f, 0.925490196f, 0.082352941f}; par->texAnimLight=AddOffsetLight(par,(V3){0.5292511f,0.065f,0.915f},green,3.0f,0.72f); par->texAnimLight2=AddOffsetLight(par,(V3){-0.5317497f,0.065f,1.039f},green,3.0f,0.72f); par->textureAnimating=true; par->texAnimClip=12; par->texFrame=0;
             scpy_to_a_from_b(par->texAnimResourceFolder,"MedicalBed",TARGET_STRING_LENGTH);
         } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) { World.position[parent].y += 0.12f; } // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 328) { World.position[parent].y += 0.04f; } // item_hw_system: Move up to account for CG mod (origin moved vs Unity version)
@@ -885,14 +842,10 @@ void LoadLevelMod(u8 lev) {
     headmountedLanternLight = AddLightSimple(World.position[PLAYER1],(Color3){1.0f,1.0f,1.0f},11.52f,0.0f,LIGHTON);
     // Create single ad-hoc weapon view model instance (no entity definition, no physics collider; like shield generators)
     if (World.instCount < INSTANCE_COUNT) {
-        u16 wvi = World.instCount;
-        mset(&World.instances[wvi],0,sizeof(Entity));
-        World.instances[wvi].entflags=EF_ACTIVE; World.layer[wvi]=L_Default; World.instances[wvi].camView=255;
-        World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
-        World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAX_TXRS;
-        World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.mass[wvi]=World.rotation[wvi].w=1.0f; World.dynamicFriction[wvi]=0.5f; World.staticFriction[wvi]=0.6f;
-        World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY;
-        World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; // hidden until weapon equipped
+        u16 wvi = World.instCount; mset(&World.instances[wvi],0,sizeof(Entity));
+        World.instances[wvi].entflags=EF_ACTIVE; World.layer[wvi]=L_Default; World.instances[wvi].camView=255; World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
+        World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAX_TXRS; World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.mass[wvi]=World.rotation[wvi].w=1.0f; World.dynamicFriction[wvi]=0.5f; World.staticFriction[wvi]=0.6f;
+        World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; // hidden until weapon equipped
         World.weaponVModelIndex=wvi; World.instCount++;
     }
     World.weaponViewOffset = (V3){0,0,0}; // reset debug offset each level
@@ -925,8 +878,7 @@ void LoadLevelData(u8 curlevel) {
     }
     for (int i=PLAYER1;i<World.instCount;++i) {
         u16 constIndex = World.instances[i].index;
-        if (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443/*not cyber*/)) World.gravity[i] = 1.0f;
-        else World.gravity[i] = 0.0f;
+        if (i == PLAYER1 || IdxIsDynamicObject(constIndex) || (IdxIsNPC(constIndex) && constIndex < 443/*not cyber*/)){World.gravity[i] = 1.0f;}else{World.gravity[i] = 0.0f;}
         if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
         else if (IdxIsUsableObject(constIndex)) {
             if (World.diffPuz == 3 && World.instances[i].index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
@@ -940,27 +892,17 @@ void LoadLevelData(u8 curlevel) {
             if (World.instances[i].doorOpen > DoorState_Opening) World.instances[i].doorOpen = World.instances[i].startOpen ? DoorState_Open : DoorState_Closed;
             World.instances[i].doorState = World.instances[i].doorOpen;
             if (World.instances[i].ajar) {
-                AnimationClip c = DoorGetClip(&World.instances[i],ANIM_OPENING);
-                u16 f = DoorFrameFromProgress(c,World.instances[i].ajarPercentage);
-                World.instances[i].clip = ANIM_OPENING; World.instances[i].frame = f; World.instances[i].modelIndex = c.frameStartModelIndex + (u16)(f - c.frameStart); World.instances[i].currentFrameFinished = 0.0; // Parked partway; UpdateAnims() holds ajar doors so it stays put.
+                AnimationClip c = DoorGetClip(&World.instances[i],A_OPENING); u16 f = DoorFrameFromProgress(c,World.instances[i].ajarPercentage);
+                World.instances[i].clip = A_OPENING; World.instances[i].frame = f; World.instances[i].modelIndex = c.frameStartModelIndex + (u16)(f - c.frameStart); World.instances[i].currentFrameFinished = 0.0; // Parked partway; UpdateAnims() holds ajar doors so it stays put.
                 World.instances[i].doorOpen = World.instances[i].doorState = DoorState_Opening;
-            } else {
-                switch (World.instances[i].doorOpen) {
-                    case DoorState_Open:    ChangeAnim(&World.instances[i],ANIM_IDLE_OPEN); break;
-                    case DoorState_Opening: ChangeAnim(&World.instances[i],ANIM_OPENING); break;
-                    case DoorState_Closing: ChangeAnim(&World.instances[i],ANIM_CLOSING); break;
-                    default:                ChangeAnim(&World.instances[i],ANIM_IDLE_CLOSED); break;
-                }
-            }
+            } else { switch(World.instances[i].doorOpen){case DoorState_Open:ChangeAnim(&World.instances[i],A_IDLE_OPEN); break; case DoorState_Opening:ChangeAnim(&World.instances[i],A_OPENING); break; case DoorState_Closing:ChangeAnim(&World.instances[i],A_CLOSING); break; default:ChangeAnim(&World.instances[i],A_IDLE_CLOSED); break;} }
             if (IdxIsPortalBlockingDoor(World.instances[i].index) && World.instances[i].doorState != DoorState_Closed) ForceDoorPortalOpen(World.instances[i].portalIndex); // Open/ajar doors start with their portal open. Bounds-checked in culling.c; guard keeps non-portal doors from touching portal 0.
-        } else if (IdxIsNPC(constIndex)) { World.layer[i] = L_NPC; InitNPC(i); }
-        else if (IdxIsSearchable(constIndex)) {
+        } else if (IdxIsSearchable(constIndex)) {
             if (World.instances[i].generateContents) {
                 int numRandomGeneratedItems = 0;
                 for(int j=0;j<4;j++) {
                     if(numRandomGeneratedItems >= World.instances[i].maxRandomItems){break;} if(World.instances[i].randomItemDropChance[j] <= 0.0f){continue;}
-                    u8 tempInt = random_range_u8(0,100);
-                    if(((float)tempInt / 100.0f) <= World.instances[i].randomItemDropChance[j]){World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; numRandomGeneratedItems++;}
+                    u8 tempInt = random_range_u8(0,100); if(((float)tempInt / 100.0f) <= World.instances[i].randomItemDropChance[j]){World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; numRandomGeneratedItems++;}
                 }
             }
         } else if (constIndex == 515) func_forcebridge(i); // func_forcebridge
@@ -982,9 +924,7 @@ u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void ResetLevelMusic(); void CullInit();
 void LoadAllLevels() {
     double start_time = get_time();
-    DebugRAM("start of LoadAllLevels");
-    RenderLoading("Loading level data...");
-    World.levelCurrentlyLoading = true;
+    DebugRAM("start of LoadAllLevels"); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true;
     entsFromFile = (Entity*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(Entity));
     posFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
     scaleFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
@@ -1013,31 +953,17 @@ void LoadAllLevels() {
 }
 
 void LoadLevel(u8 curlevel, V3 pos) {
-    DebugRAM("start of LoadLevel");
-    World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false;
-    RenderLoading("Loading level...");
-    if (World.currentLevel != curlevel) CopyPlayerState(World.currentLevel,curlevel);
-    World.curLev = curlevel;
-    SetLevelPointers(curlevel);
-    mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView));
-    mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32));
-    camViewCount = levelCamViewCount[curlevel];
-    // Initialize missing level camview entries from file data
-    for (int i = 0; i < camViewCount; ++i) { if (levelCamViews[curlevel][i].visible == false && camViews[i].visible == true) { mcpy(&levelCamViews[curlevel][i], &camViews[i], sizeof(CamView)); levelCamViewTextures[curlevel][i] = camViewTextures[i]; } }
+    DebugRAM("start of LoadLevel"); World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false; RenderLoading("Loading level..."); if (World.currentLevel != curlevel) CopyPlayerState(World.currentLevel,curlevel);
+    World.curLev = curlevel; SetLevelPointers(curlevel); mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView)); mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32)); camViewCount = levelCamViewCount[curlevel];
+    for (int i = 0; i < camViewCount; ++i) { if (levelCamViews[curlevel][i].visible == false && camViews[i].visible == true) { mcpy(&levelCamViews[curlevel][i], &camViews[i], sizeof(CamView)); levelCamViewTextures[curlevel][i] = camViewTextures[i]; } } // Initialize missing level camview entries from file data
     mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    // world_from_mdl is now an alias for modelMatrices, no need to zero separately
     for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
-    DualLog("Switched to Level %d\n",curlevel);
-    ResetLevelAudio(); ResetLevelMusic();
-    RenderLoading("Loading cull system..."); CullInit(); // Must be after level!
+    DualLog("Switched to Level %d\n",curlevel); ResetLevelAudio(); ResetLevelMusic(); RenderLoading("Loading cull system..."); CullInit(); // Must be after level!
     glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights);
                                  glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(7,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
-    RenderLoading("Loading voxel lighting data...");
-    for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
+    RenderLoading("Loading voxel lighting data..."); for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
-    World.levelCurrentlyLoading = false;
-    World.position[PLAYER1]=pos; World.velocity[PLAYER1]=(V3){0,0,0}; World.invP1.lastVelY=0.0f; World.invP1.wasGrounded=true;
-    DebugRAM("end of LoadLevel");
+    World.levelCurrentlyLoading = false; World.position[PLAYER1]=pos; World.velocity[PLAYER1]=(V3){0,0,0}; World.invP1.lastVelY=0.0f; World.invP1.wasGrounded=true; DebugRAM("end of LoadLevel");
 }
 // Save Game System
 #pragma pack(push, 1)

@@ -1,6 +1,6 @@
 // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
 #include "common.h"
-enum{AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS)};
+enum{AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS)}; bool PositionVisibleFromPlayerCell(float,float);
 const char* sounds[SOUNDS_COUNT] = {
     ""/*0*/, ""/*1*/, ""/*2*/, ""/*3*/, ""/*4*/, ""/*5*/, ""/*6*/, ""/*7*/, ""/*8*/, ""/*9*/, ""/*10*/, ""/*11*/, ""/*12*/, ""/*13*/, ""/*14*/, ""/*15*/, ""/*16*/, ""/*17*/, ""/*18*/, ""/*19*/, ""/*20*/, ""/*21*/, ""/*22*/, ""/*23*/, ""/*24*/, ""/*25*/, ""/*26*/, ""/*27*/, ""/*28*/, ""/*29*/, ""/*30*/, ""/*31*/, ""/*32*/, ""/*33*/, ""/*34*/, ""/*35*/, ""/*36*/, ""/*37*/, ""/*38*/,
     "buttons/button_beep"/*39*/, "buttons/button_chonk"/*40*/, ""/*41*/, "buttons/button_clickclocktuck"/*42*/, "buttons/button_deny"/*43*/, "buttons/button_lswitch"/*44*/, "buttons/button_swipe"/*45*/, "buttons/keycard_success"/*46*/, "cyborgs/cyborg_die"/*47*/,
@@ -325,9 +325,8 @@ static __attribute__((noinline)) void mp3L3_huffman(float *dst, mp3_bs *bs, cons
                     while (leaf<0){MP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[(bs_cache>>(32-w))-(leaf>>3)];}
                     MP3_FLUSH_BITS(leaf>>8);
                     for (j=0;j<2;j++,dst++,leaf>>=4){
-                        int lsb=leaf&0x0F;
-                        if (lsb==15) { lsb += (bs_cache>>(32-(linbits))); MP3_FLUSH_BITS(linbits); while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;}; *dst= one * mp3L3_pow_43(lsb) * ((i32)bs_cache < 0 ? -1 : 1); }
-                        else *dst=g_mp3_pow43[16+lsb-16*(bs_cache>>31)]*one;
+                        int lsb=leaf&0x0F; 
+                        if (lsb==15) { lsb += (bs_cache>>(32-(linbits))); MP3_FLUSH_BITS(linbits); while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;}; *dst= one * mp3L3_pow_43(lsb) * ((i32)bs_cache < 0 ? -1 : 1); } else *dst=g_mp3_pow43[16+lsb-16*(bs_cache>>31)]*one;
                         MP3_FLUSH_BITS(lsb?1:0);
                     }
                     while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;};
@@ -337,11 +336,8 @@ static __attribute__((noinline)) void mp3L3_huffman(float *dst, mp3_bs *bs, cons
             do {
                 np=*sfb++/2; pairs_to_decode=vmin(big_val_cnt,np); one=*scf++;
                 do {
-                    int j,w=5,leaf=codebook[(bs_cache>>(32-w))];
-                    while (leaf<0){MP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[(bs_cache>>(32-w))-(leaf>>3)];}
-                    MP3_FLUSH_BITS(leaf>>8);
-                    for (j=0;j<2;j++,dst++,leaf>>=4) { int lsb=leaf&0x0F; *dst=g_mp3_pow43[16+lsb-16*(bs_cache>>31)]*one; MP3_FLUSH_BITS(lsb?1:0); }
-                    while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;};
+                    int j,w=5,leaf=codebook[(bs_cache>>(32-w))]; while (leaf<0){MP3_FLUSH_BITS(w);w=leaf&7;leaf=codebook[(bs_cache>>(32-w))-(leaf>>3)];} MP3_FLUSH_BITS(leaf>>8);
+                    for (j=0;j<2;j++,dst++,leaf>>=4) { int lsb=leaf&0x0F; *dst=g_mp3_pow43[16+lsb-16*(bs_cache>>31)]*one; MP3_FLUSH_BITS(lsb?1:0); } while(bs_sh>=0){bs_cache|=(u32)*bs_next_ptr++<<bs_sh;bs_sh-=8;};
                 } while(--pairs_to_decode);
             } while((big_val_cnt-=np)>0&&--sfb_cnt>=0);
         }
@@ -367,11 +363,7 @@ static __attribute__((noinline)) void mp3L3_stereo_process(float *left, const u8
     unsigned i,max_pos=MP3_HDR_TEST_MPEG1(hdr)?7:64;
     for (i=0;sfb[i];i++){
         unsigned ipos=ist_pos[i];
-        if ((int)i>max_band[i%3]&&ipos<max_pos){
-            float kl,kr,s=MP3_HDR_TEST_MS_STEREO(hdr)?1.41421356f:1;
-            if(MP3_HDR_TEST_MPEG1(hdr)){kl=g_pan[2*ipos];kr=g_pan[2*ipos+1];} else {kl=1;kr=mp3L3_ldexp_q2(1,(ipos+1)>>1<<mpeg2_sh);if(ipos&1){kl=kr;kr=1;}}
-            mp3L3_intensity_stereo_band(left,sfb[i],kl*s,kr*s);
-        } else if (MP3_HDR_TEST_MS_STEREO(hdr)) mp3L3_midside_stereo(left,sfb[i]);
+        if ((int)i>max_band[i%3]&&ipos<max_pos){ float kl,kr,s=MP3_HDR_TEST_MS_STEREO(hdr)?1.41421356f:1; if(MP3_HDR_TEST_MPEG1(hdr)){kl=g_pan[2*ipos];kr=g_pan[2*ipos+1];} else {kl=1;kr=mp3L3_ldexp_q2(1,(ipos+1)>>1<<mpeg2_sh);if(ipos&1){kl=kr;kr=1;}} mp3L3_intensity_stereo_band(left,sfb[i],kl*s,kr*s); } else if (MP3_HDR_TEST_MS_STEREO(hdr)) mp3L3_midside_stereo(left,sfb[i]);
         left+=sfb[i];
     }
 }
@@ -394,21 +386,15 @@ static __attribute__((noinline)) void mp3L3_imdct36(float *grbuf, float *overlap
     int i,j;
     static const float g_twid9[18]={0.73727734f,0.79335334f,0.84339145f,0.88701083f,0.92387953f,0.95371695f,0.97629601f,0.99144486f,0.99904822f,0.67559021f,0.60876143f,0.53729961f,0.46174861f,0.38268343f,0.30070580f,0.21643961f,0.13052619f,0.04361938f};
     for (j=0;j<nbands;j++,grbuf+=18,overlap+=9){
-        float co[9],si[9];
-        co[0]=-grbuf[0]; si[0]=grbuf[17];
-        for(i=0;i<4;i++){si[8-2*i]=grbuf[4*i+1]-grbuf[4*i+2];co[1+2*i]=grbuf[4*i+1]+grbuf[4*i+2];si[7-2*i]=grbuf[4*i+4]-grbuf[4*i+3];co[2+2*i]=-(grbuf[4*i+3]+grbuf[4*i+4]);}
-        mp3L3_dct3_9(co); mp3L3_dct3_9(si);
-        si[1]=-si[1];si[3]=-si[3];si[5]=-si[5];si[7]=-si[7];
-        i=0;
+        float co[9],si[9]; co[0]=-grbuf[0]; si[0]=grbuf[17]; for(i=0;i<4;i++){si[8-2*i]=grbuf[4*i+1]-grbuf[4*i+2];co[1+2*i]=grbuf[4*i+1]+grbuf[4*i+2];si[7-2*i]=grbuf[4*i+4]-grbuf[4*i+3];co[2+2*i]=-(grbuf[4*i+3]+grbuf[4*i+4]);}
+        mp3L3_dct3_9(co); mp3L3_dct3_9(si); si[1]=-si[1];si[3]=-si[3];si[5]=-si[5];si[7]=-si[7]; i=0;
         for(;i<9;i++){float ovl=overlap[i],sum=co[i]*g_twid9[9+i]+si[i]*g_twid9[i];overlap[i]=co[i]*g_twid9[i]-si[i]*g_twid9[9+i];grbuf[i]=ovl*win[i]-sum*win[9+i];grbuf[17-i]=ovl*win[9+i]+sum*win[i];}
     }
 }
 
 static __attribute__((noinline)) void mp3L3_idct3(float x0,float x1,float x2,float *dst){float m1=x1*0.86602540f,a1=x0-x2*0.5f;dst[1]=x0+x2;dst[0]=a1+m1;dst[2]=a1-m1;}
 static __attribute__((noinline)) void imdct12(float *x,float *dst,float *overlap){
-    static const float g_twid3[6]={0.79335334f,0.92387953f,0.99144486f,0.60876143f,0.38268343f,0.13052619f};
-    float co[3],si[3]; int i; mp3L3_idct3(-x[0],x[6]+x[3],x[12]+x[9],co); mp3L3_idct3(x[15],x[12]-x[9],x[6]-x[3],si);
-    si[1]=-si[1];
+    static const float g_twid3[6]={0.79335334f,0.92387953f,0.99144486f,0.60876143f,0.38268343f,0.13052619f}; float co[3],si[3]; int i; mp3L3_idct3(-x[0],x[6]+x[3],x[12]+x[9],co); mp3L3_idct3(x[15],x[12]-x[9],x[6]-x[3],si); si[1]=-si[1];
     for(i=0;i<3;i++){float ovl=overlap[i],sum=co[i]*g_twid3[3+i]+si[i]*g_twid3[i];overlap[i]=co[i]*g_twid3[i]-si[i]*g_twid3[3+i];dst[i]=ovl*g_twid3[2-i]-sum*g_twid3[5-i];dst[5-i]=ovl*g_twid3[5-i]+sum*g_twid3[2-i];}
 }
 
@@ -423,8 +409,7 @@ static __attribute__((noinline)) void mp3L3_decode(mp3dec *h, mp3dec_scratch *s,
     if (MP3_HDR_TEST_I_STEREO(h->header)) mp3L3_intensity_stereo(s->grbuf[0],s->ist_pos[1],gr_info,h->header);
     else if (MP3_HDR_IS_MS_STEREO(h->header)) mp3L3_midside_stereo(s->grbuf[0],576);
     for(ch=0;ch<nch;ch++,gr_info++){
-        int aa_bands=31,n_long_bands=(gr_info->mixed_block_flag?2:0)<<(int)(MP3_HDR_GET_SAMPLE_RATEHDR(h->header)==2);
-        if (gr_info->n_short_sfb){aa_bands=n_long_bands-1;mp3L3_reorder(s->grbuf[ch]+n_long_bands*18,s->syn[0],gr_info->sfbtab+gr_info->n_long_sfb);}
+        int aa_bands=31,n_long_bands=(gr_info->mixed_block_flag?2:0)<<(int)(MP3_HDR_GET_SAMPLE_RATEHDR(h->header)==2); if (gr_info->n_short_sfb){aa_bands=n_long_bands-1;mp3L3_reorder(s->grbuf[ch]+n_long_bands*18,s->syn[0],gr_info->sfbtab+gr_info->n_long_sfb);}
         mp3L3_antialias(s->grbuf[ch],aa_bands); mp3L3_imdct_gr(s->grbuf[ch],h->mdct_overlap[ch],gr_info->block_type,n_long_bands); mp3L3_change_sign(s->grbuf[ch]);
     }
 }
@@ -468,21 +453,11 @@ static __attribute__((noinline)) void mp3d_synth(float *xl, mp3_sample_t *dstl, 
     }
 }
 
-static __attribute__((noinline)) void mp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, mp3_sample_t *pcm, float *lins){ for(int i=0;i<nch;i++) {mp3d_DCT_II(grbuf+576*i,nbands);} mcpy(lins,qmf_state,sizeof(float)*15*64); for(int i=0;i<nbands;i+=2) {mp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);} mcpy(qmf_state,lins+nbands*64,sizeof(float)*15*64); }
-static __attribute__((noinline)) int mp3d_match_frame(const u8 *hdr, int mp3_bytes){ for(int i=0,nmatch=0;nmatch<10;nmatch++){ i+=mp3_hdr_frame_bytes(hdr+i)+mp3_hdr_padding(hdr+i); if (i + 4 > mp3_bytes) {return nmatch>0;} if (!mp3_hdr_compare(hdr,hdr+i)) {return 0;} } return 1; }
-static __attribute__((noinline)) int mp3d_find_frame(const u8 *mp3, int mp3_bytes, int *ptr_frame_bytes){
-    int i;
-    for(i=0;i<mp3_bytes-4;i++,mp3++){
-        if (mp3_hdr_valid(mp3)){
-            int frame_bytes=mp3_hdr_frame_bytes(mp3); int fp=frame_bytes+mp3_hdr_padding(mp3);
-            if((frame_bytes&&i+fp<=mp3_bytes&&mp3d_match_frame(mp3,mp3_bytes-i))||(!i&&fp==mp3_bytes)){*ptr_frame_bytes=fp;return i;}
-        }
-    }
-    *ptr_frame_bytes=0; return mp3_bytes;
-}
-
-static __attribute__((noinline)) void mp3dec_init(mp3dec *dec) { dec->header[0]=0; }
-static __attribute__((noinline)) int mp3dec_decode_frame(mp3dec *dec, const u8 *mp3, int mp3_bytes, void *pcm, mp3dec_frame_info *info){
+void mp3d_synth_granule(float *qmf_state, float *grbuf, int nbands, int nch, mp3_sample_t *pcm, float *lins){ for(int i=0;i<nch;i++) {mp3d_DCT_II(grbuf+576*i,nbands);} mcpy(lins,qmf_state,sizeof(float)*15*64); for(int i=0;i<nbands;i+=2) {mp3d_synth(grbuf+i,pcm+32*nch*i,nch,lins+i*64);} mcpy(qmf_state,lins+nbands*64,sizeof(float)*15*64); }
+int mp3d_match_frame(const u8 *hdr, int mp3_bytes){ for(int i=0,nmatch=0;nmatch<10;nmatch++){ i+=mp3_hdr_frame_bytes(hdr+i)+mp3_hdr_padding(hdr+i); if (i + 4 > mp3_bytes) {return nmatch>0;} if (!mp3_hdr_compare(hdr,hdr+i)) {return 0;} } return 1; }
+int mp3d_find_frame(const u8 *mp3, int mp3_bytes, int *ptr_frame_bytes){ for(int i=0;i<mp3_bytes-4;i++,mp3++){ if (mp3_hdr_valid(mp3)){ int frame_bytes=mp3_hdr_frame_bytes(mp3); int fp=frame_bytes+mp3_hdr_padding(mp3); if((frame_bytes&&i+fp<=mp3_bytes&&mp3d_match_frame(mp3,mp3_bytes-i))||(!i&&fp==mp3_bytes)){*ptr_frame_bytes=fp;return i;} } } *ptr_frame_bytes=0; return mp3_bytes; }
+void mp3dec_init(mp3dec *dec) { dec->header[0]=0; }
+int mp3dec_decode_frame(mp3dec *dec, const u8 *mp3, int mp3_bytes, void *pcm, mp3dec_frame_info *info){
     int i=0,igr,frame_size=0,success=1;
     const u8 *hdr; mp3_bs bs_frame[1];
     if (mp3_bytes>4&&dec->header[0]==0xff&&mp3_hdr_compare(dec->header,mp3)){ frame_size=mp3_hdr_frame_bytes(mp3)+mp3_hdr_padding(mp3); if(frame_size!=mp3_bytes&&(frame_size+4>mp3_bytes||!mp3_hdr_compare(mp3,mp3+frame_size))){frame_size=0;} }
@@ -583,8 +558,7 @@ static bool mp3_init_internal(mp3 *p) {
     mp3dec_init(&p->decoder);
     p->streamCursor = p->streamStartOffset=0; p->streamLength = (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF); p->delayInPCMFrames = p->paddingInPCMFrames=0; p->totalPCMFrameCount = (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF);
     if (mp3_on_seek_os(p->pUserData, 0, 2)) { // SEEK_END
-        i64 slen = OS_Tell((FHandle)(uintptr_t)p->pUserData);
-        if (slen > 0) { if (slen > 128) { char tag[3]; mp3_on_seek_os(p->pUserData,-128,2); if (mp3_on_read(p, tag, 3) == 3 && tag[0]=='T' && tag[1]=='A' && tag[2]=='G') slen -= 128; } p->streamLength = (u64)slen; }
+        i64 slen = OS_Tell((FHandle)(uintptr_t)p->pUserData); if (slen > 0) { if (slen > 128) { char tag[3]; mp3_on_seek_os(p->pUserData,-128,2); if (mp3_on_read(p, tag, 3) == 3 && tag[0]=='T' && tag[1]=='A' && tag[2]=='G') slen -= 128; } p->streamLength = (u64)slen; }
         mp3_on_seek_os(p->pUserData,0,0); p->streamCursor = 0;
     }
     mp3_skip_id3v2(p); mp3_parse_lame_header(p); mp3dec_frame_info firstFrameInfo; u32 firstFramePCMFrameCount = mp3_decode_next_frame_ex(p,(mp3_sample_t*)p->pcmFrames,&firstFrameInfo);
@@ -610,8 +584,7 @@ static u64 mp3_read_pcm_frames_raw(mp3 *p, u64 framesToRead, void *pBufferOut){
         if(framesToRead==0) break;
         if(p->totalPCMFrameCount != (((u64)0xFFFFFFFF << 32) | (u64)0xFFFFFFFF) && p->totalPCMFrameCount > p->paddingInPCMFrames && p->currentPCMFrame >= (p->totalPCMFrameCount - p->paddingInPCMFrames)) break;
         if(mp3_decode_next_frame(p)==0) break;
-    }
-    return totalFramesRead;
+    } return totalFramesRead;
 }
 
 static u64 mp3_read_pcm_frames_f32(mp3* m, u64 framesToRead, float *pBufferOut){ if(!m) {return 0;} return mp3_read_pcm_frames_raw(m,framesToRead,pBufferOut); }
@@ -627,9 +600,7 @@ static u16 WavU16LE(const u8 *d) { return (u16)(d[0]|(d[1]<<8)); }
 static u32 WavU32LE(const u8 *d) { return (u32)(d[0]|(d[1]<<8)|(d[2]<<16)|(d[3]<<24)); }
 static bool WavInit(WaveFile *w, const char *path) {
     u8 buf[36]; mset(w,0,sizeof(*w)); w->fp = OS_OpenReadonly(path); if (w->fp == INVALID_FHANDLE) return false;
-    if (OS_Read(w->fp,buf,12) != 12) goto fail;
-    if (mcmp(buf,"RIFF",4) != 0) goto fail;
-    if (mcmp(buf+8,"WAVE",4) != 0) goto fail;
+    if (OS_Read(w->fp,buf,12) != 12) goto fail; if (mcmp(buf,"RIFF",4) != 0) goto fail; if (mcmp(buf+8,"WAVE",4) != 0) goto fail;
     bool got_fmt=false,got_data=false;
     for (;;) {
         u8 chunkId[4],szBuf[4]; if ((OS_Read(w->fp,chunkId,4) != 4) || (OS_Read(w->fp,szBuf,4) != 4)) break;
@@ -654,9 +625,7 @@ static bool WavInit(WaveFile *w, const char *path) {
         } else OS_Seek(w->fp,(i64)(chunkSize + (chunkSize & 1)),1);
     }
     if (got_fmt && got_data) return true;
-    fail:
-    if (w->fp != INVALID_FHANDLE) { OS_Close(w->fp); w->fp = INVALID_FHANDLE; }
-    return false;
+    fail: if (w->fp != INVALID_FHANDLE) { OS_Close(w->fp); w->fp = INVALID_FHANDLE; } return false;
 }
 
 static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
@@ -671,7 +640,6 @@ static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
         u64 gotFrames=got / bpf; u64 samples=gotFrames * w->channels;
         if (bps == 8) { for (u64 i = 0; i < samples; i++) {*out++ = (tmp[i] / 255.0f) * 2.0f - 1.0f;} }
         else { for (u64 i = 0; i < samples; i++) {i16 s; mcpy(&s,tmp + i*2,2); *out++ = s * (1.0f / 32768.0f);} } // 16bit LE
-
         w->bytesRemaining -= gotFrames * bpf; framesToRead -= gotFrames; totalRead += gotFrames; if (gotFrames < batchFrames) break;
     }
     return totalRead;
@@ -701,21 +669,118 @@ static float *load_wav(const char *path,u32 *out_frames, size_t* sz) {
 
 static float *load_mp3(const char *path, u32 *out_frames, size_t* sz) {
     mp3 dec; if (!mp3_init_file(&dec, path)) { return NULL; } u32 src_channels=dec.channels, src_rate=dec.sampleRate; u64 total = mp3_get_pcm_frame_count(&dec); if (total == 0) { mp3_uninit(&dec); return NULL; }
-    size_t bufSize = (size_t)total * AUDIO_CHANNELS * sizeof(float);
-    float *buf = (float*)OS_Alloc(bufSize); mp3_seek_to_pcm_frame(&dec,0); u64 got = mp3_read_pcm_frames_f32(&dec,total,buf); mp3_uninit(&dec); if (got == 0) { OS_Free(buf,bufSize); return NULL; }
+    size_t bufSize = (size_t)total * AUDIO_CHANNELS * sizeof(float); float *buf = (float*)OS_Alloc(bufSize); mp3_seek_to_pcm_frame(&dec,0); u64 got = mp3_read_pcm_frames_f32(&dec,total,buf); mp3_uninit(&dec); if (got == 0) { OS_Free(buf,bufSize); return NULL; }
     if (src_channels == 1) { for (i64 i=(i64)got - 1;i>=0;i--){buf[i*2+1]=buf[i]; buf[i*2]=buf[i];} }
     *out_frames = (u32)got; return resample_stereo(buf, bufSize, out_frames, src_rate, sz); // Reallocates and returns new buffer, freeing the buf alloc'ed here
 }
 
 INLINE float *load_audio(const char *path, u32 *out_frames, size_t* sz) { if (sEndsWith(path,".mp3")) { return load_mp3(path, out_frames, sz); } return load_wav(path, out_frames, sz); }
 i32 GetFreeWavSlot() { i32 retval = -1; u32 n = __c11_atomic_load(&wav_count,2/*acquire*/); for (u32 i = 0; i < n; i++) { if (!__c11_atomic_load(&wav_ch[i].playing,2/*acquire*/)) {if (wav_ch[i].samples) {OS_Free(wav_ch[i].samples,wav_ch[i].allocSize); wav_ch[i].samples = NULL; wav_ch[i].allocSize = 0;} retval=i; break;} } return retval; }
-#include "synth.c" // Audio Synthesis Engine
+// Audio Synthesis Engine
+#define REV_BUF_LEN 110251  // ~2.5s @ 44100; prime
+static float rev_buf[4][REV_BUF_LEN]/*4 comb delay lines, ~1.7MB static*/, ap_buf[2][3533];/*2 allpass lines, prime lengths*/
+static u32   rev_idx[4], ap_idx[2], rev_len[4];/*per-comb delay length in samples*/
+static float rev_fb[4]/*per-comb feedback gain (set by synth_set_room)*/, rev_lp[4]/*per-comb LP filter state (damps high freqs in tail)*/, rev_wet=0.20f, rev_dry=1.00f;
+static const u32 REV_BASE[4] = { 1373, 1607, 1931, 2269 }; // Base delay lengths (small room). Scaled up for larger spaces. Chosen as mutually prime to prevent periodicity artifacts.
+static const u32 AP_LEN[2]   = { 379, 547 }; // Allpass delay lengths — fixed, short for diffusion not coloration.
+void synth_set_room(float size, float wet) { //   synth_set_room(0.0f,  0.00f);  // anechoic (outdoor, dead room)   synth_set_room(0.25f, 0.20f);  // small corridor / panel room   synth_set_room(0.45f, 0.30f);  // medium room / storage bay   synth_set_room(0.70f, 0.45f);  // large open area / hangar   synth_set_room(0.88f, 0.55f);  // cave / underground
+    float scale = 1.0f + size * 4.0f; float fb = 0.3f + size * 0.62f;  // 0.3 (dead) .. 0.92 (cave), size 0..1 scales delay lengths from base (small) up to ~5x (cave).
+    for (u32 i = 0; i < 4; i++) { u32 len = (u32)(REV_BASE[i] * scale); if (len >= REV_BUF_LEN) len = REV_BUF_LEN - 1; rev_len[i] = len; rev_fb[i]  = fb * (0.97f + i * 0.007f);/*slight spread across combs*/ rev_lp[i]  = 0.0f; rev_idx[i] = 0; } ap_idx[0] = ap_idx[1] = 0; rev_wet = wet; rev_dry = 1.0f;
+}
+
+static float reverb_tick(float in) { // Process one sample through the reverb network. Call after all voices mixed.
+    float comb_sum = 0.0f; for (u32 i = 0; i < 4; i++) { float delayed = rev_buf[i][rev_idx[i]]; rev_lp[i] += 0.5f * (delayed - rev_lp[i]); rev_buf[i][rev_idx[i]] = in + rev_lp[i] * rev_fb[i]; rev_idx[i] = (rev_idx[i] + 1 >= rev_len[i]) ? 0 : rev_idx[i] + 1; comb_sum += delayed; } // 4 parallel comb filters.  LP inside feedback loop — damps highs each reflection, like real walls
+    comb_sum *= 0.25f; for (u32 i = 0; i < 2; i++) { float delayed = ap_buf[i][ap_idx[i]]; float w = comb_sum + delayed * 0.5f; ap_buf[i][ap_idx[i]] = w; ap_idx[i] = (ap_idx[i] + 1 >= AP_LEN[i]) ? 0 : ap_idx[i] + 1; comb_sum = delayed - 0.5f * w; } /*2 serial allpass diffusers — smear the echo pattern into smooth tail*/ return comb_sum;
+}
+
+#define MAX_SYNTH_VOICES 16
+static SynthVoice syn_ch[MAX_SYNTH_VOICES];
+static SynthVoice* SynAlloc(void) { for (u32 i = 0; i < MAX_SYNTH_VOICES; i++){ if (!syn_ch[i].active){return &syn_ch[i];} } return NULL; }
+static float SynRandBi(void) { return (float)rand()/(float)RAND_MAX*2.0f-1.0f; }
+static void synth_mix(SynthVoice* v, float* mix) {
+    float vol = v->vol * (Sys_Settings.VolumeMaster/100.0f) * (Sys_Settings.VolumeEffects/100.0f);
+    if(v->positional){float dist=V3_Dist(v->pos,World.position[PLAYER1]); vol*=(dist >= 64.0f) ? 0.0f : (dist <= 1.0f) ? 1.0f : 1.0f-(dist-1.0f)/63.0f;} for(i32 f=0;f<AUDIO_FRAMES;f++){if(v->frame >= v->frames){v->active=false; return;} float s=v->fn(v)*vol; mix[f*2+0]+=s; mix[f*2+1]+=s; v->frame++;}
+}
+
+void synth_reverb_apply(float* mix, i32 frames){ if (rev_wet < 0.001f) return; for (i32 f = 0; f < frames; f++) { float mono = (mix[f*2+0] + mix[f*2+1]) * 0.5f; float wet  = reverb_tick(mono); mix[f*2+0] = mix[f*2+0] * rev_dry + wet * rev_wet; mix[f*2+1] = mix[f*2+1] * rev_dry + wet * rev_wet; } }
+static float LP(float *s, float in, float rc){ *s += rc*(in-*s); return *s; }
+static float HP(float *s, float in, float rc){ return in - LP(s,in,rc); }
+static float BP(float *s1,float *s2,float in,float rc){ float a=LP(s1,in,rc); return a-LP(s2,a,rc); }
+static float Phasor(float *ph, float freq){ *ph += freq/AUDIO_RATE; if(*ph>=1.0f) *ph-=1.0f; return *ph; }
+static float Osc(float *ph, float freq){ return vsinf(6.28318f*Phasor(ph,freq)); }
+static float FMOsc(float *c,float *m,float fc,float fm,float idx) { return vsinf(6.28318f*(Phasor(c,fc)+Osc(m,fm)*idx)); }
+static float GenLaserSS1(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[3]*t); float fc=v->p[0]*v->pitch*(1.0f + v->p[1]*t); float idx=4.0f*vexp(-35.0f*t); float tone=FMOsc(&v->s[0],&v->s[1],fc,v->p[2]*fc, idx); float click = (t < 0.012f) ? LP(&v->s[2], SynRandBi(), 0.4f)*(1.0f - t/0.012f)*0.4f : 0.0f; return (tone + click) * env; } // p[0]=base_freq  p[1]=sweep_rate  p[2]=fm_rate_ratio  p[3]=decay
+static float GenDoor(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float dur = (float)v->frames / AUDIO_RATE; float thud=vsinf(6.28318f * v->p[0]*v->pitch * t) * vexp(-8.0f*t) * 1.5f; float rc   = 0.08f + 0.05f*vsinf(6.28318f*3.0f*t); float hiss = BP(&v->s[0], &v->s[1], SynRandBi(), rc) * 0.6f; return thud + hiss * vsinf(3.14159265f*(t/dur)); } // p[0]=pitch
+static float GenImpact(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[1]*t); if (v->frame%4==0) v->s[2] = SynRandBi(); float noise = LP(&v->s[0], v->s[2], 0.3f); float ring  = vsinf(6.28318f * v->p[0]*v->pitch * t) * env; return noise*env*v->p[2] + ring*v->p[3]; } // p[0]=ring_freq  p[1]=decay  p[2]=noise_amt  p[3]=ring_amt
+static float GenBoom(SynthVoice* v){float env=vexp(-v->p[1]*(float)v->frame/AUDIO_RATE); return Osc(&v->s[0], v->p[0]*v->pitch)*env*0.7f + LP(&v->s[1],SynRandBi(),0.15f)*env*0.8f; } // p[0]=rumble_freq  p[1]=decay
+static float GenHiss(SynthVoice* v){return HP(&v->s[0], SynRandBi(), v->p[0]); }
+static float GenPipe(SynthVoice* v){return BP(&v->s[0], &v->s[1], SynRandBi(), v->p[0]) * 2.0f; }
+static float GenShieldHit(SynthVoice* v) { float t      = (float)v->frame / AUDIO_RATE; float wobble = vsinf(6.28318f*12.0f*t)*60.0f; return Osc(&v->s[0], v->p[0]*v->pitch + wobble) * vexp(-v->p[1]*t); } // p[0]=freq  p[1]=decay
+static float GenFootstep(SynthVoice* v) {
+    float t=(float)v->frame / AUDIO_RATE, dur=(float)v->frames / AUDIO_RATE, raw = SynRandBi();
+    v->s[0] += 0.12f*(raw*raw*raw*0.35f - v->s[0]); v->s[1] += 0.12f*(v->s[0] - v->s[1]);
+    if (v->s[5] <= 0.0f) { if ((rand()%100)<35) { v->s[5]=AUDIO_RATE*random_range(0.006f,0.018f); v->s[6]=random_range(0.4f,1.2f); } else {v->s[6] = 0.0f;} } else {v->s[5] -= 1.0f;}
+    float rc = (0.22f - 0.08f*(t/dur)) * v->pitch; v->s[2] += rc*(raw*v->s[6] - v->s[2]); v->s[3] += rc*(v->s[2] - v->s[3]); float thump = (t < 0.07f) ? raw*vsinf(3.14159265f*(t/0.07f))*0.8f : 0.0f; v->s[4] += 0.025f*(thump - v->s[4]);
+    return v->s[1] + (v->s[2]-v->s[3])*1.5f + v->s[4];
+}
+
+static float GenSandFootstep(SynthVoice* v) {
+    float t=(float)v->frame / AUDIO_RATE; float env=vexp(-25.0f*t); float noise = 0.0f;
+    if (v->frame%12==0) { float raw = SynRandBi(); noise = (raw>0.0f?1.0f:-1.0f)*(raw*raw); if (t<0.05f && (rand()%100)>85) noise += SynRandBi()*0.75f; }
+    v->s[0] += 0.25f*(noise - v->s[0]); v->s[1] += 0.25f*(v->s[0] - v->s[1]); return (v->s[0]-v->s[1])*env*2.0f;
+}
+
+static float GenTapCase(SynthVoice* v) {
+    float t=(float)v->frame / AUDIO_RATE; float dur=(float)v->frames / AUDIO_RATE;
+    if (v->frame%12==0) { float raw = SynRandBi(); v->s[3] = (raw>0.0f?1.0f:-1.0f)*(raw*raw); if (t<0.06f && (rand()%100)>75) v->s[3] += SynRandBi()*0.75f; } if (v->frame%4==0) v->s[4] = SynRandBi();
+    float rc=(0.35f-0.15f*(t/dur)) * v->pitch; v->s[0] += rc*(v->s[3]-v->s[0]); v->s[1] += rc*(v->s[0]-v->s[1]); v->s[2] += 0.04f*(v->s[4]-v->s[2]); return (v->s[0]-v->s[1])*vexp(-22.0f*t) + v->s[2]*vexp(-14.0f*t)*1.8f;
+}
+
+static float GenPlasticTap(SynthVoice* v) { float t=(float)v->frame / AUDIO_RATE; float tr = SynRandBi() * vexp(-600.0f*t) * 0.5f; float f1 = 800.0f*v->pitch, f2 = 1100.0f*v->pitch; float bd = (vsinf(6.28318f*f1*t)*0.6f + vsinf(6.28318f*f2*t)*0.4f)*vexp(-45.0f*t)*0.4f; return tr + bd; }
+static float GenSparkSmall(SynthVoice* v) {
+    float t=(float)v->frame / AUDIO_RATE; float dur=(float)v->frames / AUDIO_RATE; float env = vexp(-14.0f*t);
+    if (v->s[3]<=0.0f) { if ((rand()%100)<22) { v->s[3]=AUDIO_RATE*random_range(0.004f,0.012f); v->s[4]=1.0f; v->s[5]=0.93f-0.15f*(t/dur); } else v->s[4] = 0.0f; } else { v->s[3]-=1.0f; v->s[4]*=v->s[5]; }
+    float active = (v->s[4]>0.01f) ? SynRandBi()*v->s[4] : 0.0f; v->s[1] += 0.28f*(active-v->s[1]); v->s[2] += 0.28f*(v->s[1]-v->s[2]); float thump = (t<0.08f) ? SynRandBi()*vsinf(3.14159265f*(t/0.08f)) : 0.0f; v->s[0] += 0.02f*(thump-v->s[0]); return ((v->s[1]-v->s[2])*3.5f + v->s[0]*1.2f)*env;
+}
+
+static float GenCrackle(SynthVoice* v) {
+    float env = vexp(-v->p[1]*(float)v->frame/AUDIO_RATE);
+    if (v->s[3]<=0.0f) { if ((i32)(rand()%100)<(i32)v->p[2]) { v->s[3]=AUDIO_RATE*random_range(0.004f,0.012f); v->s[4]=1.0f; v->s[5]=0.93f; } else v->s[4] = 0.0f; } else { v->s[3]-=1.0f; v->s[4]*=v->s[5]; }
+    float active = (v->s[4]>0.01f) ? SynRandBi()*v->s[4] : 0.0f; v->s[1] += v->p[0]*(active-v->s[1]); v->s[2] += v->p[0]*(v->s[1]-v->s[2]); return (v->s[1]-v->s[2])*3.5f*env;
+} // p[0]=rc  p[1]=decay  p[2]=burst_chance
+
+static float GenSine(SynthVoice* v) { return vsinf(6.28318f * v->p[0]*v->pitch * (float)v->frame/AUDIO_RATE); }
+static float GenClink(SynthVoice* v) { float t = (float)v->frame / AUDIO_RATE; return vsinf(6.28318f * v->p[0]*v->pitch * t) * vexp(-v->p[1]*t); } // p[0]=freq  p[1]=decay
+// Multi-partial ring for struck glass/metal objects.  Models the inharmonic overtone series of a real resonant body.  Each partial has its own amplitude weight and decay rate — high partials die fast (shimmer), fundamental sustains (body).
+static float GenRing(SynthVoice* v) { // p[0]=fundamental_freq  p[1]=base_decay  p[2]=partial_spread  p[3]=noise_attack.  Partial ratios below approximate a cylindrical glass vessel.  s[0..3] = phasor state for 4 partials (no extra filter state needed)
+    float t=(float)v->frame / AUDIO_RATE; float f0=v->p[0] * v->pitch; float dec=v->p[1]; float sprd=v->p[2]; // how much faster upper partials decay vs fundamental
+    static const float ratios[4]={1.0f,2.76f,5.41f,8.93f}, amps[4]={1.0f,0.35f,0.15f,0.06f}; // Inharmonic partial ratios for glass (not integer multiples — real glass isn't harmonic).  Ratios approximate a cylindrical glass vessel from spectral analysis.
+    float out = 0.0f;
+    for (u32 i = 0; i < 4; i++) { float decay_i=dec*(1.0f + i*sprd);/*upper partials decay faster*/ float env_i=vexp(-decay_i*t); out+=Osc(&v->s[i],f0*ratios[i])*amps[i]*env_i; } // s[0..3] hold phasor state for each partial; s[4] is LP filter for click
+    return out + ((t < v->p[3]) ? LP(&v->s[4], SynRandBi(), 0.35f) * (1.0f - t/v->p[3]) * 0.3f : 0.0f);
+}
+
+// Glass-on-plastic floor thud.  Contact transient (noise burst through BP for the floor body) + damped glass ring (GenRing logic inline, shortened decay from contact damping).  p[0]=glass_freq  p[1]=ring_decay  p[2]=floor_resonance_rc  p[3]=noise_attack
+static float GenBeakerThud(SynthVoice* v) {
+    float t=(float)v->frame / AUDIO_RATE; float f0=v->p[0]*v->pitch;
+    static const float ratios[4]={1.0f,2.76f,5.41f,8.93f}, amps[4]={0.7f,0.25f,0.08f,0.03f}; // Glass partials — same inharmonic ratios, but faster decay (contact damped)
+    float glass = 0.0f; for (u32 i = 0; i < 4; i++) { float decay_i = v->p[1] * (1.0f + i * 1.8f); glass += Osc((float*)&v->s[i], f0 * ratios[i]) * amps[i] * vexp(-decay_i * t); }
+    if (v->frame%4==0){v->s[4] = SynRandBi();}
+    float floor_body = BP(&v->s[5], &v->s[6], v->s[4], v->p[2]) * vexp(-30.0f*t) * 1.4f; /*Floor body: noise burst filtered through BP at plastic panel resonance.  The floor resonates at ~200-400Hz for thin plastic panels.*/
+    return glass + floor_body + ((t < v->p[3]) ? LP(&v->s[7], SynRandBi(), 0.4f)*(1.0f - t/v->p[3])*0.5f : 0.0f);
+}
+
+typedef struct { SynthFn fn; float dur, vol; float p[4]; } SynthPreset;
+static const SynthPreset SynthPresets[SND_COUNT] = {[SND_LASER_PISTOL]={GenLaserSS1,0.30f,0.55f,{900.0f,-1.8f,0.5f,10.0f}},[SND_LASER_RIFLE]={GenLaserSS1,0.40f,0.70f,{600.0f,-0.8f,0.4f,7.0f}},[SND_DOOR]={GenDoor,1.20f,0.65f,{50.0f,0,0,0}},[SND_IMPACT_GLASS]={GenImpact,0.50f,0.60f,{4500.0f,18.0f,0.3f,0.6f}},
+                                                    [SND_IMPACT_METAL]={GenImpact,0.50f,0.65f,{1800.0f,30.0f,0.5f,0.3f}},[SND_EXPLOSION]={GenBoom,1.00f,0.80f,{55.0f,3.5f,0,0}},[SND_HISS]={GenHiss,1.50f,0.35f,{0.12f,0,0,0}},[SND_PIPE]={GenPipe,1.50f,0.40f,{0.07f,0,0,0}},[SND_SHIELD_HIT]={GenShieldHit,0.35f,0.50f,{180.0f,8.0f,0,0}},
+                                                    [SND_FOOTSTEP]={GenFootstep,0.26f,0.70f,{0}},[SND_SAND_FOOTSTEP]={GenSandFootstep,0.30f,0.65f,{0}},[SND_TAP_CASE]={GenTapCase,0.25f,0.55f,{0}},[SND_PLASTIC_TAP]={GenPlasticTap,0.09f,0.50f,{0}},[SND_SPARK_SMALL]={GenSparkSmall,0.24f,0.50f,{0}},
+                                                    [SND_CRACKLE]={GenCrackle,2.00f,0.45f,{0.28f,2.5f,20.0f,0}},[SND_SINE]={GenSine,1.00f,0.50f,{440.0f,0,0,0}},[SND_CLINK]={GenClink,0.40f,0.50f,{1200.0f,12.0f,0,0}},[SND_BEAKER_CLINK]={GenRing,1.20f,0.50f,{2400.0f,4.0f,1.4f,0.008f}},[SND_BEAKER_THUD]={GenBeakerThud,0.60f,0.55f,{2200.0f,18.0f,0.06f,0.012f}}};
+void play_synth(SoundID id, float vol, float pitch){if((u32)id >= SND_COUNT){return;} const SynthPreset* pr=&SynthPresets[id]; SynthVoice* v=SynAlloc(); if(!v){return;} *v=(SynthVoice){.fn=pr->fn,.frames=(u32)(AUDIO_RATE*pr->dur),.vol=pr->vol*vol,.pitch=pitch,.active=true}; v->p[0]=pr->p[0]; v->p[1]=pr->p[1]; v->p[2]=pr->p[2]; v->p[3]=pr->p[3];}
+void play_synth_at(SoundID id, float vol, float pitch, V3 pos){if ((u32)id >= SND_COUNT){return;} const SynthPreset* pr = &SynthPresets[id]; SynthVoice* v = SynAlloc(); if(!v){return;} *v = (SynthVoice){.fn=pr->fn,.frames=(u32)(AUDIO_RATE*pr->dur),.vol=pr->vol*vol,.pitch=pitch,.positional=true,.pos=pos,.active=true}; v->p[0]=pr->p[0]; v->p[1]=pr->p[1]; v->p[2]=pr->p[2]; v->p[3]=pr->p[3]; }
+// Audio Mixing
 static void wave_mix(wav_channel_t* w, float* mix) {
     float vol = w->volume * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); V3 pos = w->pos; float dist = V3_Dist(pos,World.position[PLAYER1]); float spatial_atten = vclamp(1.0f - dist / 20.0f, 0.0f, 1.0f);
-    if (w->positional) {
-        if (!PositionVisibleFromPlayerCell(pos.x, pos.z)) vol = 0.0f; // Skip audio if source cell not in player PVS
-        else vol *= spatial_atten;
-    }
+    if (w->positional) { if (!PositionVisibleFromPlayerCell(pos.x, pos.z)){vol=0.0f;/*Skip audio if source cell not in player PVS*/}else{vol *= spatial_atten;} }
     for (i32 f = 0; f < AUDIO_FRAMES; f++) { if (w->frame_pos >= w->frame_count){ if (w->looping){w->frame_pos=0;}else{__c11_atomic_store(&w->playing,false,3/*release*/); break;} } mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol; w->frame_pos++; }
 }
 
@@ -741,36 +806,20 @@ static void audio_mix_period(i16 *out) {
         for (u32 s = 0; s < 2; s++) {
             mp3_channel_t *m = __c11_atomic_load(&mp3_ch[s],2/*memory_order_acquire*/);
             if (!m || !m->open) { __c11_atomic_store(&mp3_remaining[s],0.0f,0/*memory_order_relaxed*/); continue; }
-            if (__c11_atomic_exchange(&mp3_fade_out_target[s],NULL,2/*memory_order_acquire*/) == m) {
-                i32 fms = __c11_atomic_load(&mp3_fade_out_ms[s],0/*memory_order_relaxed*/);
-                float curvol = __c11_atomic_load(&m->fade_vol,0/*memory_order_relaxed*/);
-                __c11_atomic_store(&m->fade_step,(fms>0) ? -curvol/(AUDIO_RATE*fms/1000.0f) : -1.0f,0/*memory_order_relaxed*/);
-                __c11_atomic_store(&m->fade_target,0.0f,0/*memory_order_relaxed*/);
-            }
+            if (__c11_atomic_exchange(&mp3_fade_out_target[s],NULL,2/*memory_order_acquire*/) == m) { i32 fms = __c11_atomic_load(&mp3_fade_out_ms[s],0/*memory_order_relaxed*/); float curvol = __c11_atomic_load(&m->fade_vol,0/*memory_order_relaxed*/); __c11_atomic_store(&m->fade_step,(fms>0) ? -curvol/(AUDIO_RATE*fms/1000.0f) : -1.0f,0/*memory_order_relaxed*/); __c11_atomic_store(&m->fade_target,0.0f,0/*memory_order_relaxed*/); }
             u32 src_rate = vclamp(m->src_rate ? m->src_rate : AUDIO_RATE,8000u,96000u);
             u64 frames_to_read = (src_rate == AUDIO_RATE) ? AUDIO_FRAMES : (u64)((u64)AUDIO_FRAMES*src_rate/AUDIO_RATE)+2;
             float raw[AUDIO_FRAMES*8 + 8];
             u64 got = mp3_read_pcm_frames_f32(&m->dec,frames_to_read,raw);
             if (got == 0) { __c11_atomic_store(&mp3_remaining[s],0.0f,0/*memory_order_relaxed*/); mp3_ch_finish(s,m); continue; }
-            float fade_vol = __c11_atomic_load(&m->fade_vol,0/*memory_order_relaxed*/);
-            float fade_target = __c11_atomic_load(&m->fade_target,0/*memory_order_relaxed*/);
-            float fade_step = __c11_atomic_load(&m->fade_step,0/*memory_order_relaxed*/);
-            float vol = fade_vol * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMusic/100.0f);
-            u64 decoded = __c11_atomic_load(&m->frames_decoded,0/*memory_order_relaxed*/) + got;
-            __c11_atomic_store(&m->frames_decoded,decoded,0/*memory_order_relaxed*/);
+            float fade_vol = __c11_atomic_load(&m->fade_vol,0/*memory_order_relaxed*/); float fade_target = __c11_atomic_load(&m->fade_target,0/*memory_order_relaxed*/); float fade_step = __c11_atomic_load(&m->fade_step,0/*memory_order_relaxed*/); 
+            float vol = fade_vol * (Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeMusic/100.0f); u64 decoded = __c11_atomic_load(&m->frames_decoded,0/*memory_order_relaxed*/) + got; __c11_atomic_store(&m->frames_decoded,decoded,0/*memory_order_relaxed*/);
             float ratio = (float)got/(float)AUDIO_FRAMES; bool finished=false;
             for (i32 f = 0; f < AUDIO_FRAMES; f++) {
-                float pos = f*ratio; u32 a=(u32)pos, b=(a+1<(u32)got)?a+1:a; float t=pos-(float)a;
-                float l = raw[a*2+0]+t*(raw[b*2+0]-raw[a*2+0]), r = raw[a*2+1]+t*(raw[b*2+1]-raw[a*2+1]);
-                mix[f*2+0] += l*vol; mix[f*2+1] += r*vol;
-                if (fade_step != 0.0f) {
-                    fade_vol += fade_step;
-                    if (fade_step>0.0f && fade_vol>=fade_target) { fade_vol=fade_target; fade_step=0.0f; }
-                    else if (fade_step<0.0f && fade_vol<=fade_target) { fade_vol=fade_target; fade_step=0.0f; if (fade_target==0.0f) finished=true; }
-                }
+                float pos = f*ratio; u32 a=(u32)pos, b=(a+1<(u32)got)?a+1:a; float t=pos-(float)a; float l = raw[a*2+0]+t*(raw[b*2+0]-raw[a*2+0]), r = raw[a*2+1]+t*(raw[b*2+1]-raw[a*2+1]); mix[f*2+0] += l*vol; mix[f*2+1] += r*vol;
+                if (fade_step != 0.0f) { fade_vol += fade_step; if (fade_step>0.0f && fade_vol>=fade_target) { fade_vol=fade_target; fade_step=0.0f; } else if (fade_step<0.0f && fade_vol<=fade_target) { fade_vol=fade_target; fade_step=0.0f; if (fade_target==0.0f) finished=true; } }
             }
-            __c11_atomic_store(&m->fade_vol,fade_vol,0/*memory_order_relaxed*/);
-            __c11_atomic_store(&m->fade_step,fade_step,0/*memory_order_relaxed*/);
+            __c11_atomic_store(&m->fade_vol,fade_vol,0/*memory_order_relaxed*/); __c11_atomic_store(&m->fade_step,fade_step,0/*memory_order_relaxed*/);
             float rem = (!m->total_frames || decoded >= m->total_frames) ? 0.0f : (float)(m->total_frames - decoded) / (float)(m->src_rate ? m->src_rate : AUDIO_RATE);
             __c11_atomic_store(&mp3_remaining[s], rem, 0/*memory_order_relaxed*/);
             if (finished) { __c11_atomic_store(&mp3_remaining[s],0.0f,0/*memory_order_relaxed*/); mp3_ch_finish(s,m); }
@@ -781,21 +830,14 @@ static void audio_mix_period(i16 *out) {
 
 void play_wav(const char *path,float volume,V3 pos,bool positional) {
     if(!path || slen(path) < 1 || sEqual(path,"null")){return;}
-    char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path); i32 slot=GetFreeWavSlot();
-    if(slot==-1){u32 cur=__c11_atomic_load(&wav_count,2/*acquire*/); if(cur < MAX_CHANNELS){slot=(i32)__c11_atomic_fetch_add(&wav_count,1u,3/*release*/);}} if(slot==-1){DualLogWarn("Max WAV channels (%d) reached\n",MAX_CHANNELS); return;}
-    u32 frames; size_t sz=0; float *buf = load_wav(p,&frames,&sz);
-    if(!buf){DualLogError("Failed to load%s\n",p); return;}
-    wav_ch[slot] = (wav_channel_t){.samples=buf, .allocSize=sz, .frame_count=frames, .frame_pos=0, .volume=volume, .looping=false, .positional=positional, .pos=pos, .playing=true};
+    char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path); i32 slot=GetFreeWavSlot(); if(slot==-1){u32 cur=__c11_atomic_load(&wav_count,2/*acquire*/); if(cur < MAX_CHANNELS){slot=(i32)__c11_atomic_fetch_add(&wav_count,1u,3/*release*/);}} if(slot==-1){DualLogWarn("Max WAV channels (%d) reached\n",MAX_CHANNELS); return;}
+    u32 frames; size_t sz=0; float *buf = load_wav(p,&frames,&sz); if(!buf){DualLogError("Failed to load%s\n",p); return;} wav_ch[slot] = (wav_channel_t){.samples=buf, .allocSize=sz, .frame_count=frames, .frame_pos=0, .volume=volume, .looping=false, .positional=positional, .pos=pos, .playing=true};
     __c11_atomic_thread_fence(3/*release*/);
 }
 
 void play_message(const char *path) {
-    log_msg_t *lm = (log_msg_t*)OS_Alloc(sizeof(log_msg_t));
-    lm->samples = load_wav(path,&lm->frame_count,&lm->allocSize);
-    if (!lm->samples) { DualLogError("Failed to load %s\n",path); OS_Free(lm,sizeof(*lm)); return; }
-    lm->frame_pos = 0;
-    log_msg_t *old = __c11_atomic_exchange(&log_msg,lm,3/*memory_order_release*/);
-    if (old) { log_msg_t *head = __c11_atomic_load(&log_msg_retired,0/*memory_order_relaxed*/); do { old->next = head; } while (!__c11_atomic_compare_exchange_weak(&log_msg_retired,&head,old,3/*memory_order_release*/,0/*memory_order_relaxed*/)); }
+    log_msg_t *lm = (log_msg_t*)OS_Alloc(sizeof(log_msg_t)); lm->samples = load_wav(path,&lm->frame_count,&lm->allocSize); if (!lm->samples) { DualLogError("Failed to load %s\n",path); OS_Free(lm,sizeof(*lm)); return; }
+    lm->frame_pos = 0; log_msg_t *old = __c11_atomic_exchange(&log_msg,lm,3/*memory_order_release*/); if (old) { log_msg_t *head = __c11_atomic_load(&log_msg_retired,0/*memory_order_relaxed*/); do { old->next = head; } while (!__c11_atomic_compare_exchange_weak(&log_msg_retired,&head,old,3/*memory_order_release*/,0/*memory_order_relaxed*/)); }
 }
 
 i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=load_audio(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=w->positional=false; __c11_atomic_store(&w->playing,false,3/*release*/); return 0; }
@@ -813,19 +855,9 @@ static void mp3_open_slot(i32 s, const char *path, float fade_from, float fade_t
     mp3_ch_retire(s, __c11_atomic_exchange(&mp3_ch[s], m, 3/*memory_order_release*/));
 }
 
-void play_mp3(const char *path, i32 fade_ms) {
-    i32 old = mp3_slot, next = mp3_slot ? 0 : 1;
-    mp3_channel_t *cur = __c11_atomic_load(&mp3_ch[old],0/*memory_order_relaxed*/);
-    if (cur) {
-        __c11_atomic_store(&mp3_fade_out_ms[old], fade_ms, 0/*memory_order_relaxed*/);
-        __c11_atomic_store(&mp3_fade_out_target[old], cur, 3/*memory_order_release*/);
-    }
-    mp3_slot = next; mp3_open_slot(next,path,0.0f,1.0f,fade_ms);
-}
-
+void play_mp3(const char *path, i32 fade_ms) { i32 old = mp3_slot, next = mp3_slot ? 0 : 1; mp3_channel_t *cur = __c11_atomic_load(&mp3_ch[old],0/*memory_order_relaxed*/); if (cur) { __c11_atomic_store(&mp3_fade_out_ms[old], fade_ms, 0/*memory_order_relaxed*/); __c11_atomic_store(&mp3_fade_out_target[old], cur, 3/*memory_order_release*/); } mp3_slot = next; mp3_open_slot(next,path,0.0f,1.0f,fade_ms); }
 void mp3_clear() { for (i32 i=0;i<2;i++) mp3_ch_retire(i, __c11_atomic_exchange(&mp3_ch[i],NULL,3/*memory_order_release*/)); mp3_slot=0; }
-static FHandle pcm_fds[8]; static i32 pcm_fd_count = 0;
-pthread_t audThreadID; void* AudThread(void* arg); 
+static FHandle pcm_fds[8]; static i32 pcm_fd_count = 0; pthread_t audThreadID; void* AudThread(void* arg); 
 #if defined(_WIN32)
     void AudioUpdate() {
         if (pcm_fd_count==0) {return;} 
@@ -844,11 +876,9 @@ pthread_t audThreadID; void* AudThread(void* arg);
     typedef int (*pfnsphpspsn)(snd_pcm_t*,void*,u64*,int*); typedef int (*pfnsphpspn)(snd_pcm_t*,void*,u32*,int*); static snd_pcm_t *apcm; static pfnspw snd_pcm_writei; static pfnspr snd_pcm_recover;
     static bool alsa_try_open_default() {
         void *so = dlopen("libasound.so.2",2); if (!so) {so = dlopen("libasound.so",2);} if (!so) { DualLog("Audio: libasound not found\n"); return false; }
-        pfnspo spo = dlsym(so,"snd_pcm_open");                              pfnsphpa sphpa = dlsym(so,"snd_pcm_hw_params_any");            pfnsphps sphps = dlsym(so,"snd_pcm_hw_params_sizeof");            pfnsphpsa sphpsa = dlsym(so,"snd_pcm_hw_params_set_access");
-        pfnsphpsf sphpsf = dlsym(so,"snd_pcm_hw_params_set_format");        pfnsphpsc sphpsc = dlsym(so,"snd_pcm_hw_params_set_channels"); pfnsphpsrn sphpsrn = dlsym(so,"snd_pcm_hw_params_set_rate_near"); pfnsphpspsn sphpspsn = dlsym(so,"snd_pcm_hw_params_set_period_size_near");
-        pfnsphpspn sphpspn= dlsym(so,"snd_pcm_hw_params_set_periods_near"); pfnsphp snd_pcm_hw_params = dlsym(so,"snd_pcm_hw_params");     snd_pcm_writei  = dlsym(so,"snd_pcm_writei");                     snd_pcm_recover = dlsym(so,"snd_pcm_recover"); 
-        pfnspp spp = dlsym(so,"snd_pcm_prepare");
-        if (!spo || !sphps || !sphpa || !sphpsa || !sphpsf || !sphpsc || !sphpsrn || !sphpspsn || !sphpspn || !snd_pcm_hw_params || !snd_pcm_writei || !snd_pcm_recover || !spp) { DualLogError("Audio: libasound missing required symbols\n"); return false; }
+        pfnspo spo = dlsym(so,"snd_pcm_open"); pfnsphpa sphpa = dlsym(so,"snd_pcm_hw_params_any"); pfnsphps sphps = dlsym(so,"snd_pcm_hw_params_sizeof"); pfnsphpsa sphpsa = dlsym(so,"snd_pcm_hw_params_set_access"); pfnsphpsf sphpsf = dlsym(so,"snd_pcm_hw_params_set_format"); pfnsphpsc sphpsc = dlsym(so,"snd_pcm_hw_params_set_channels");
+        pfnsphpsrn sphpsrn = dlsym(so,"snd_pcm_hw_params_set_rate_near"); pfnsphpspsn sphpspsn = dlsym(so,"snd_pcm_hw_params_set_period_size_near"); pfnsphpspn sphpspn= dlsym(so,"snd_pcm_hw_params_set_periods_near"); pfnsphp snd_pcm_hw_params = dlsym(so,"snd_pcm_hw_params"); snd_pcm_writei  = dlsym(so,"snd_pcm_writei"); snd_pcm_recover = dlsym(so,"snd_pcm_recover"); 
+        pfnspp spp = dlsym(so,"snd_pcm_prepare"); if (!spo || !sphps || !sphpa || !sphpsa || !sphpsf || !sphpsc || !sphpsrn || !sphpspsn || !sphpspn || !snd_pcm_hw_params || !snd_pcm_writei || !snd_pcm_recover || !spp) { DualLogError("Audio: libasound missing required symbols\n"); return false; }
         int r = spo(&apcm,"default",0,0);  if (r < 0 ||                            !apcm) { DualLogError("snd_pcm_open('default') failed: %d\n",r); return false; }
         int sz = sphps(); u8 hwp_buf[640]; if (sz > (int)sizeof(hwp_buf)                ) { DualLogError("hw_params_t too large (%d)\n",sz); return false; }
         void *hwp = hwp_buf;               if ((r = sphpa(apcm,hwp))                 < 0) { DualLogError("hw_params_any failed\n"); return false; }
@@ -866,16 +896,13 @@ pthread_t audThreadID; void* AudThread(void* arg);
     static void init_pcm_device(i32 card, i32 dev) {
         FHandle r = pcm_open(card,dev,1|(1<<1)); if (r == INVALID_FHANDLE) return;
         pcm_params_t p; hw_params_fill(&p.hw_params); pcm_sw_params_t *sw = &p.sw_params; mset(sw,0,sizeof(*sw)); sw->start_threshold = 1; sw->period_step = 1;
-        hw_params_set(&p.hw_params,0/*PCM_FORMAT*/,3);                  hw_params_set(&p.hw_params,11/*PCM_RATE*/,AUDIO_RATE); hw_params_set(&p.hw_params,10/*PCM_CHANNELS*/,AUDIO_CHANNELS);
-        hw_params_set(&p.hw_params,13/*PCM_PERIOD_SIZE*/,AUDIO_FRAMES); hw_params_set(&p.hw_params,15,AUDIO_PERIODS);
-        if (pcm_params_setup(r,&p) >= 0 && pcm_fd_count < 8) pcm_fds[pcm_fd_count++] = r;
-        else { DualLogError("Audio: raw device card=%d dev=%d setup failed, closing\n",card,dev); OS_Close(r); }
+        hw_params_set(&p.hw_params,0/*PCM_FORMAT*/,3); hw_params_set(&p.hw_params,11/*PCM_RATE*/,AUDIO_RATE); hw_params_set(&p.hw_params,10/*PCM_CHANNELS*/,AUDIO_CHANNELS); hw_params_set(&p.hw_params,13/*PCM_PERIOD_SIZE*/,AUDIO_FRAMES); hw_params_set(&p.hw_params,15,AUDIO_PERIODS);
+        if (pcm_params_setup(r,&p) >= 0 && pcm_fd_count < 8) pcm_fds[pcm_fd_count++] = r; else { DualLogError("Audio: raw device card=%d dev=%d setup failed, closing\n",card,dev); OS_Close(r); }
     }
 
     void AudioUpdate() { i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; audio_mix_period(buf); if (apcm) { int r = snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); if (r < 0 && snd_pcm_recover(apcm,r,0) >= 0) { snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); } } }
     void InitAudio() { InitSCFTables(); if (!alsa_try_open_default()) { for (i32 card = 0; card < 8; card++) { for (i32 dev = 0; dev < 8; dev++) init_pcm_device(card,dev); } if (pcm_fd_count == 0) {DualLogError("Audio: no output device found\n"); return; } } pthread_create(&audThreadID,NULL,AudThread,NULL); }
 #endif
-
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(1000); } return NULL; }
 // Looping Ambients SFX System
 #define MAXAMB 256
@@ -890,11 +917,8 @@ void MixAmbs() {
         AmbientSlot* slot = &ambientSlots[(size_t)(def - ambientSounds)];
         if (d < 7.68f && PositionVisibleFromPlayerCell(World.position[ambReg[i]].x,World.position[ambReg[i]].z)) {
             if (!slot->loaded) {
-                SndUninit(&slot->sound);
-                char path[512]; sFormat(path,sizeof(path),"./Audio/ambient/%s.mp3",def->filename);
-                if (SndInit(path,&slot->sound) != 0) continue;
-                slot->length_sec=((float)slot->sound.frame_count / (float)AUDIO_RATE);
-                if(slot->length_sec <= 0.0f) {SndUninit(&slot->sound); continue;}
+                SndUninit(&slot->sound); char path[512]; sFormat(path,sizeof(path),"./Audio/ambient/%s.mp3",def->filename); if (SndInit(path,&slot->sound) != 0) continue;
+                slot->length_sec=((float)slot->sound.frame_count / (float)AUDIO_RATE); if(slot->length_sec <= 0.0f) {SndUninit(&slot->sound); continue;}
                 slot->sound.looping=true; slot->loaded=1;
             }
             if (!slot->sound.playing) SndStart(&slot->sound);
@@ -950,9 +974,7 @@ void UpdateMusic() {
     __c11_atomic_store(&mp3_paused,false,0/*memory_order_relaxed*/);
     float remaining = __c11_atomic_load(&mp3_remaining[mp3_slot],2/*memory_order_acquire*/);
     if(remaining > AUD_BUFFER_T){return;} if(World.menuActive){play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return;}
-    if(World.Sys_Music.inCombat && !World.Sys_Music.inZone && World.Sys_Music.combatImpulseFinished < World.pauseRelativeTime) {
-        World.Sys_Music.inCombat=false; PlayTrack(TT_Combat,MT_Override); World.Sys_Music.combatImpulseFinished=World.pauseRelativeTime + 20.0; return;
-    }
+    if(World.Sys_Music.inCombat && !World.Sys_Music.inZone && World.Sys_Music.combatImpulseFinished < World.pauseRelativeTime) { World.Sys_Music.inCombat=false; PlayTrack(TT_Combat,MT_Override); World.Sys_Music.combatImpulseFinished=World.pauseRelativeTime + 20.0; return; }
     if(World.Sys_Music.inZone){ if(World.Sys_Music.distortion){PlayTrack(TT_Distortion,MT_Override); return;} if(World.Sys_Music.elevator){PlayTrack(TT_Elevator,MT_Override); return;} }
     if(Sys_Settings.DynamicMusic || remaining <= AUD_BUFFER_T){PlayTrack(TT_Walking,MT_Walking);}
 }
