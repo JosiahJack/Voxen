@@ -261,22 +261,19 @@ void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
 }
 
 void TickBar(bool isEnergy) {
-    RenderUIImage(isEnergy ? 1333 : 1332,isEnergy ? 36 : 2,32,32,isEnergy ? 939 : 956); // Indicator
-    int p1H = isEnergy ? World.invP1.energy : World.instances[PLAYER1].health; if (p1H > 255){p1H = 255;} i16 tY = isEnergy ? 35 : 4;
-    for (int i=7;i>=0;--i) if (i == 7/*Always render at least 1 tick*/ || p1H > (7 - i) * 11){RenderUIImage(1050 - (i * 16),tY,32,32,964);/*Tick Red*/}
-    for (int i=7;i>=0;--i) if (p1H > 88 + (7 - i) * 11){RenderUIImage(1178 - (i * 16),tY,32,32,963);/*Tick Orange*/}
-    for (int i=7;i>=0;--i) if (p1H > 176 + (7 - i) * 11){RenderUIImage(1306 - (i * 16),tY,32,32,962);/*Tick Green*/}
+    RenderUIImage(isEnergy ? 1333 : 1332,isEnergy ? 36 : 2,32,32,isEnergy ? 939 : 956);/*Indicator*/ int p1H = isEnergy ? World.invP1.energy : World.instances[PLAYER1].health; if (p1H > 255){p1H = 255;} i16 tY = isEnergy ? 35 : 4;
+    for (int i=7;i>=0;--i) if (i == 7/*Always render at least 1 tick*/ || p1H > (7 - i) * 11){RenderUIImage(1050 - (i * 16),tY,32,32,964);/*Tick Red*/} for (int i=7;i>=0;--i) if (p1H > 88 + (7 - i) * 11){RenderUIImage(1178 - (i * 16),tY,32,32,963);/*Tick Orange*/} for (int i=7;i>=0;--i) if (p1H > 176 + (7 - i) * 11){RenderUIImage(1306 - (i * 16),tY,32,32,962);/*Tick Green*/}
 }
 
 void HardwareButtons() {
-    if (World.invP1.hasHardware & HW_BIO && !Cheats.noHUD) RenderUIImage(   0,200,40,40, 989); // Hw Btn: Biomonitor
-    if (World.invP1.hasHardware & HW_SNS && !Cheats.noHUD) RenderUIImage(   0,250,40,40,1009); // Hw Btn: Sensaround
+    if (World.invP1.hasHardware & HW_BIO && !Cheats.noHUD) RenderUIImage(   0,180,40,40, 989); // Hw Btn: Biomonitor
+    if (World.invP1.hasHardware & HW_SNS && !Cheats.noHUD) RenderUIImage(   0,240,40,40,1009); // Hw Btn: Sensaround
     if (World.invP1.hasHardware & HW_LAN && !Cheats.noHUD) RenderUIImage(   0,300,40,40,1004); // Hw Btn: Lantern
-    if (World.invP1.hasHardware & HW_SHD && !Cheats.noHUD) RenderUIImage(   0,350,40,40,1014); // Hw Btn: Shield
-    if (World.invP1.hasHardware & HW_INF && !Cheats.noHUD) RenderUIImage(1326,200,40,40, 998); // Hw Btn: Infrared
-    if (World.invP1.hasHardware & HW_ERD && !Cheats.noHUD) RenderUIImage(1326,250,40,40, 996); // Hw Btn: Ereader
+    if (World.invP1.hasHardware & HW_SHD && !Cheats.noHUD) RenderUIImage(   0,360,40,40,1014); // Hw Btn: Shield
+    if (World.invP1.hasHardware & HW_INF && !Cheats.noHUD) RenderUIImage(1326,180,40,40, 998); // Hw Btn: Infrared
+    if (World.invP1.hasHardware & HW_ERD && !Cheats.noHUD) RenderUIImage(1326,240,40,40, 996); // Hw Btn: Ereader
     if (World.invP1.hasHardware & HW_BST && !Cheats.noHUD) RenderUIImage(1326,300,40,40, 993); // Hw Btn: Booster
-    if (World.invP1.hasHardware & HW_JET && !Cheats.noHUD) RenderUIImage(1326,350,40,40,1000); // Hw Btn: Jumpjets
+    if (World.invP1.hasHardware & HW_JET && !Cheats.noHUD) RenderUIImage(1326,360,40,40,1000); // Hw Btn: Jumpjets
 }
 
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
@@ -327,8 +324,9 @@ void SideMFD(bool isRH) {
 }
 
 static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988}; double avgCPUt[AVG_CPU_TAPS]={0}; int avgCPUt_idx = 0;
-extern double game_actual_start_time;
-extern u16 editModeTestEntityDefinition;
+i32 tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10]; double tWrnFinished[10];
+void AppendTextWarning(i32 sidx, i32 sidx2, i32 sidx3, i32 col, i32 id) { tWrnTextIdx[id]=sidx; tWrnTextIdx2[id]=sidx2; tWrnTextIdx3[id]=sidx3; tWrnFinished[id]=tWrnFinished[id] < World.pauseRelativeTime ? World.pauseRelativeTime + 0.1f : tWrnFinished[id] + 0.1f; tWrnColorIdx[id] = col; }
+extern double game_actual_start_time; extern u16 editModeTestEntityDefinition;
 static double RenderUI() {
     drawCallsNormal = drawCalls;
     World.uiIsBlocking = false;
@@ -344,18 +342,20 @@ static double RenderUI() {
         if (Sys_Input.keyStates[KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
         else if (Sys_Input.keyStates[KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
     } else if (!World.Sys_UI.vmailActive) { /* Normal UI */
-        //         if (World.Sys_UI.showBioMonitor) { /*Graph*/ /*Biomonitor texts, BPM, Patch, Fatigue*/ } if (World.Sys_UI.showEnergyTickPanel) { /*EnergyTickPanel*/ } if (World.Sys_UI.showHealthTickPanel) { /*HealthTickPanel*/ }
+//         if (World.Sys_UI.showBioMonitor) { /*Graph*/ /*Biomonitor texts, BPM, Patch, Fatigue*/ } if (World.Sys_UI.showEnergyTickPanel) { /*EnergyTickPanel*/ } if (World.Sys_UI.showHealthTickPanel) { /*HealthTickPanel*/ }
 //         if (World.Sys_UI.showEnergyIndicator) { /*EnergyIndicator*/ /*EnergySurge*/ /*EnergyDrainText*/ /*EnergyJPMText*/ }
 //         if (World.Sys_UI.showHealthIndicator) { /*HealthIndicator*/ /*HealthIndicatorCyber*/ }
-        if (!Cheats.noHUD) {TickBar(false/*health*/); TickBar(true/*energy*/);}// Health and Energy Bars
+        if (!Cheats.noHUD) {
+            TickBar(false/*health*/); TickBar(true/*energy*/);/*Health and Energy Bars*/ HardwareButtons();
+            RenderUIImage(667,0,32,32,1020);/*ShootModeButton*/
+            if (World.inventoryMode && CursorIsOverBounds(667,699,0,32)) { /*ShootModeButton*/ World.uiIsBlocking = true; if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { ForceShootMode(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; } }
+            for (int i=0;i<10;++i){ if (tWrnFinished[i] > World.pauseRelativeTime){
+                char flt[6]; if(tWrnTextIdx[i] == 185){sFormat(flt,6,"%.1f",(double)World.instances[PLAYER1].radiation);} RenderTextL(340,72+(i*18),tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[tWrnTextIdx[i]],tWrnTextIdx[i] == 185 ? flt : tWrnTextIdx2[i] >= 0 ? Sys_Text.stringTable[tWrnTextIdx2[i]] : "",tWrnTextIdx3[i] >= 0 ? Sys_Text.stringTable[tWrnTextIdx3[i]] : "");
+            } /*Text Warnings System (e.g. radiation hazard + biohazard), stacks with timeout*/}
+        }
 //         if (World.Sys_UI.showTeleportFX) { /*TeleportFX*/ } if (World.Sys_UI.showRadiationFX) { /*RadiationFX*/ } if (World.Sys_UI.showHealingFX) { /*HealingFX*/ } if (World.Sys_UI.showShieldFX) { /*ShieldFX*/ } 
 //         if (World.Sys_UI.showShieldActivation) { /*waveup*/ /*wavedn*/ } if (World.Sys_UI.showShieldDeactivation) { /*waveup*/ /*wavedn*/ } if (World.Sys_UI.showDeathRessurectionFX) { /*spawndelaycontainers...*/ }
-        if (!Cheats.noHUD) {HardwareButtons(); RenderUIImage(667,0,32,32,1020);} /*ShootModeButton*/
-        if (World.inventoryMode && CursorIsOverBounds(667,699,0,32)) {
-            World.uiIsBlocking = true;
-            if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { ForceShootMode(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; }
-        }
-//         if (World.Sys_UI.showTextWarnings) { /*WarningTexts...*/ } if (World.Sys_UI.showAutomapFull) { /*AutomapFullRawImage*/ /*PlayerIconFull*/ /*CloseFullmapButton*/ } if (World.Sys_UI.showMissionTimer) { /*MissionTimerT*/ /*MissionTimer*/ }
+//         if (World.Sys_UI.showAutomapFull) { /*AutomapFullRawImage*/ /*PlayerIconFull*/ /*CloseFullmapButton*/ } if (World.Sys_UI.showMissionTimer) { /*MissionTimerT*/ /*MissionTimer*/ }
 //         if (World.Sys_UI.showCyberTimer) { /*CyberTimerT*/ /*CyberTimer*/ }
         if(!Cheats.noHUD){SideMFD(false/*Left*/); CenterMFD(); SideMFD(true/*Right*/);} // MFD
     }
@@ -369,11 +369,11 @@ static double RenderUI() {
     i16 debugTextStartY = 48; /* Diagnostics / Debugging */
     if (Cheats.showLocation && !World.menuActive) RenderTextL(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
     i16 lineSpacing = 18;
-    if (!World.menuActive && !Cheats.noHUD) RenderTextL(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);
-    if (!World.menuActive && !Cheats.noHUD) RenderTextL(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"CPU ms::Shad:%.3f, Phys:%.3f, Subs:%u, Rend:%.3f, Pre Phys:%.3f, Logic:%.3f",shadowTime * 1000,physTime * 1000,World.substeps,renderTime * 1000,prePhys * 1000,gameTime * 1000);
-    if (!World.menuActive && !Cheats.noHUD && !World.paused) RenderTextL(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Grounded: %u  weaponCurrent: %d  weaponIndex: %d  pendingIdx: %d  wep16: %d  viewModel: %u  reloadDone: %.2f",(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0,(int)World.invP1.weaponCurrent,(int)World.invP1.weaponIndex,(int)World.invP1.weaponIndexPending,Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex),((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==5||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==6)?49u:((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==0||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==1)?50u:0u)),World.invP1.reloadFinished);
-    if (!World.menuActive && !Cheats.noHUD) RenderTextL(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,Sprint());
-    RenderTextL(16,debugTextStartY + (lineSpacing * 5),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
+    if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);
+    if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"CPU ms::Shad:%.3f, Phys:%.3f, Subs:%u, Rend:%.3f, Pre Phys:%.3f, Logic:%.3f",shadowTime * 1000,physTime * 1000,World.substeps,renderTime * 1000,prePhys * 1000,gameTime * 1000);
+    if (!World.menuActive && !Cheats.noHUD && !World.paused && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Grounded: %u  weaponCurrent: %d  weaponIndex: %d  pendingIdx: %d  wep16: %d  viewModel: %u  reloadDone: %.2f",(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0,(int)World.invP1.weaponCurrent,(int)World.invP1.weaponIndex,(int)World.invP1.weaponIndexPending,Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex),((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==5||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==6)?49u:((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==0||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==1)?50u:0u)),World.invP1.reloadFinished);
+    if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,Sprint());
+    if (!Cheats.noHUD && Cheats.showLocation) RenderTextL(16,debugTextStartY + (lineSpacing * 5),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderTextL(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (World.statusTextDecayFinished > World.current_time) RenderTextC(683,164,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     double time_now = get_time();

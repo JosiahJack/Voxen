@@ -7,8 +7,6 @@ typedef struct { u32 start,end; int tid; } PhysGeomTask;
 BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
 typedef struct { BvhNode* nodes; u8* triOctants; u16 *triOrder, *triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 static BvhBuildCtx thrd_bvh_ctx[32]; u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; u16* cvxAdjLists[MAX_UNIQUE_CVX_MESHES]; u16 cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
-INLINE float fast_atof(const char** p) { const char* c=*p; while (*c == ' ' || *c == '\t') {c++;} float s=1.0f; if(*c == '-'){s=-1.0f; c++;} float v=0.0f; while (*c >= '0' && *c <= '9') { v=v * 10.0f + (*c - '0'); c++; } if (*c == '.') { c++; float sub=0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub*=0.1f; c++; } } *p=c; return s * v; }
-INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *c == '\t') {c++;} i32 s=1; if(*c == '-'){s=-1; c++;} i32 v = 0; while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; } *p = c; return v * s; }
 typedef enum{cgltf_attribute_type_invalid,cgltf_attribute_type_position,cgltf_attribute_type_normal,cgltf_attribute_type_texcoord,cgltf_attribute_type_joints,cgltf_attribute_type_weights}cgltf_attribute_type;
 typedef enum{cgltf_component_type_invalid,cgltf_component_type_r_8,cgltf_component_type_r_8u,cgltf_component_type_r_16,cgltf_component_type_r_16u,cgltf_component_type_r_32u,cgltf_component_type_r_32f}cgltf_component_type;
 typedef enum{cgltf_type_invalid,cgltf_type_scalar,cgltf_type_vec2,cgltf_type_vec3,cgltf_type_vec4,cgltf_type_mat2,cgltf_type_mat3,cgltf_type_mat4}cgltf_type;

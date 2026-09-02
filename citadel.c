@@ -40,9 +40,8 @@ bool InventoryHasAccessCard(AccCardType card) { return (World.invP1.accessCardOw
 bool InventoryHasAnyAccessCards() { return World.invP1.accessCardOwned != 0; }
 const char* AccessCardCodeForType(AccCardType a) { // Called by ItemTabManager
     switch(a) {
-        case ACC_Std: return "STD";     case ACC_Med: return "MED";     case ACC_Sci: return "SCI"; case ACC_Admin:return "ADM"; case ACC_Grp1: return "Group-1"; case ACC_Grp2:return "Group-2"; case ACC_Grp3:return "Group-3"; case ACC_Grp4:return "Group-4";
-        case ACC_GrpA:return "Group-A"; case ACC_GrpB:return "Group-B"; case ACC_Stor:return "STO"; case ACC_Eng:  return "ENG"; case ACC_Maint:return "MTN";     case ACC_Security:return "SEC"; case ACC_Per1:return "PER-1";   case ACC_Per2:return "PER-2";
-        case ACC_Per3:return "PER-3";   case ACC_Per4:return "PER-4";   case ACC_Per5:return "PER-5";
+        case ACC_Std: return "STD"; case ACC_Med: return "MED"; case ACC_Sci: return "SCI";  case ACC_Admin:return "ADM"; case ACC_Grp1: return "Group-1"; case ACC_Grp2:return "Group-2"; case ACC_Grp3:return "Group-3"; case ACC_Grp4:return "Group-4"; case ACC_GrpA:return "Group-A"; case ACC_GrpB:return "Group-B";
+        case ACC_Stor:return "STO"; case ACC_Eng: return "ENG"; case ACC_Maint:return "MTN"; case ACC_Security:return "SEC"; case ACC_Per1:return "PER-1"; case ACC_Per2:return "PER-2";   case ACC_Per3:return "PER-3";   case ACC_Per4:return "PER-4";   case ACC_Per5:return "PER-5";
     } return "Group-2";
 }
 
@@ -62,19 +61,17 @@ void AddAccessCardToInventory(int index) {
     World.invP1.accessCardOwned |= (1u << card); CenterStatusPrint("%s%s",Sys_Text.stringTable[45],AccessCardCodeForType(card));
 }
 
-void AddHardwareToInventory(int index,int hwversion,bool overt) {
-    if (hwversion > 0 && hwversion <= (int)World.invP1.hardwareVersion[index]) { if(overt){CenterStatusPrint("%s",Sys_Text.stringTable[46]);/*THAT WARE IS OBSOLETE. DISCARDED.*/} return; }
+void AddHardwareToInventory(int index,int hwversion) {
+    if (hwversion > 0 && hwversion <= (int)World.invP1.hardwareVersion[index]) { CenterStatusPrint("%s",Sys_Text.stringTable[46]);/*THAT WARE IS OBSOLETE. DISCARDED.*/ return; }
     static const u8 textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32};
     World.invP1.hardwareInvIndex = index; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hardwareVersion[index] = (u8)hwversion; World.invP1.hardwareVersionSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0;
-    if (overt) CenterStatusPrint("%s v%d",Sys_Text.stringTable[textIdx[index] + 326],hwversion);
+    CenterStatusPrint("%s v%d",Sys_Text.stringTable[textIdx[index] + 326],hwversion);
 }
 
 bool AddGeneralObjectToInventory(int index, int custIdx) {
     for (i8 i=1;i<14;++i) {
         if (World.invP1.generalInventoryIndexRef[i] == -1) { 
-            if(!InventoryHasAnyAccessCards() && World.invP1.generalInvCurrent == 0){World.invP1.generalInvCurrent=i;} World.invP1.generalInventoryIndexRef[i]=index; 
-            World.invP1.generalInvCustIdx[i]=(i16)custIdx; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]);
-            return true;
+            if(!InventoryHasAnyAccessCards() && World.invP1.generalInvCurrent == 0){World.invP1.generalInvCurrent=i;} World.invP1.generalInventoryIndexRef[i]=index; World.invP1.generalInvCustIdx[i]=(i16)custIdx; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]); return true;
         }
     } return false;
 }
@@ -195,9 +192,9 @@ void AddItemToInventory(int index, int custIdx) {
             case 318: AddGrenadeToInventory(4,index); break; /*Land Mine*/ case 319: AddGrenadeToInventory(5,index); break; /*Nitropak*/ case 320: AddGrenadeToInventory(2,index); break; /*Gas*/
             case 14: AddPatchToInventory(2,index); break; case 15: AddPatchToInventory(6,index); break; case 16: AddPatchToInventory(5,index); break; case 17: AddPatchToInventory(3,index); break;
             case 18: AddPatchToInventory(4,index); break; case 19: AddPatchToInventory(1,index); break; case 20: AddPatchToInventory(0,index); break;
-            case 21: AddHardwareToInventory(0,custIdx,true); break; case 22: AddHardwareToInventory(1,custIdx,true); break; case 23: AddHardwareToInventory(2,custIdx,true); break; case 24: AddHardwareToInventory(3,custIdx,true); break;
-            case 25: AddHardwareToInventory(4,custIdx,true); break; case 26: AddHardwareToInventory(5,custIdx,true); break; case 27: AddHardwareToInventory(6,custIdx,true); break; case 28: AddHardwareToInventory(7,custIdx,true); break;
-            case 29: AddHardwareToInventory(8,custIdx,true); break; case 30: AddHardwareToInventory(9,custIdx,true); break; case 31: AddHardwareToInventory(10,custIdx,true);break; case 32: AddHardwareToInventory(11,custIdx,true); break;
+            case 21: AddHardwareToInventory(0,custIdx); break; case 22: AddHardwareToInventory(1,custIdx); break; case 23: AddHardwareToInventory(2,custIdx); break; case 24: AddHardwareToInventory(3,custIdx); break;
+            case 25: AddHardwareToInventory(4,custIdx); break; case 26: AddHardwareToInventory(5,custIdx); break; case 27: AddHardwareToInventory(6,custIdx); break; case 28: AddHardwareToInventory(7,custIdx); break;
+            case 29: AddHardwareToInventory(8,custIdx); break; case 30: AddHardwareToInventory(9,custIdx); break; case 31: AddHardwareToInventory(10,custIdx);break; case 32: AddHardwareToInventory(11,custIdx); break;
             case 60: AddAmmoToInventory(12,index,magazinePitchCountForWeapon[12],false); break; /*rubber slugs*/         case 65: AddAmmoToInventory(8,index,magazinePitchCountForWeapon2[8],true); break; /*magpulse cartridge super*/
             case 66: AddAmmoToInventory(2,index,magazinePitchCountForWeapon[2],false); break; /*needle darts*/           case 67: AddAmmoToInventory(2,index,magazinePitchCountForWeapon2[2],true); break; /*tranquilizer darts*/
             case 68: AddAmmoToInventory(9,index,magazinePitchCountForWeapon[9],false); break; /*standard bullets*/       case 69: AddAmmoToInventory(9,index,magazinePitchCountForWeapon2[9],true); break; /*teflon bullets*/
@@ -938,6 +935,10 @@ void ModUpdate() {
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);}
         if(IdxIsNPC(constdex)) { DrawAIDebug(i); /*AIControllerUpdate(i); AIAnimationControllerUpdate(i);*/ }
     }
+
+    if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) { World.invP1.painSoundFinished = World.pauseRelativeTime + (double)random_range(2.5f,4.0f); play_wav(sounds[140]/*player/playerpain1*/,SfxVol() * 0.2f,(V3){0,0,0},false); }
+    if (World.invP1.radBleedFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { World.invP1.radBleedFinished = World.pauseRelativeTime + 1.8; float take=World.instances[PLAYER1].radiation*0.2f; World.instances[PLAYER1].health-=take; World.painStaticAlpha = take > 15.0f ? 1.0f : take > 10.0f ? 0.8f : 0.3f; }
+    if (World.invP1.radSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { double minT = World.instances[PLAYER1].radiation > 50.0f ? 0.5 : 1.0; World.invP1.radSoundFinished = World.pauseRelativeTime + minT + (double)random_range(0.0f,2.0f); play_wav(sounds[90]/*hud/radiation*/,SfxVol() * 0.18f,(V3){0,0,0},false); }
 }
 
 u16 GetCrosshairTexture() { switch(World.invP1.weaponIndex) { case 343:case 345:case 350:case 352:case 355:return 1121;/*red*/case 344:case 347:case 357:return 1253;/*blue*/case 348:case 349:return 1066;/*orange*/case 351:case 354:return 1122;/*yellow*/ case 353:case 358:return 1161;/*teal*/default:return 1260;/*green*/ } }

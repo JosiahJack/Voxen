@@ -707,8 +707,7 @@ void Physics(float dt) {
         if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && !(World.physSleep[i]) && World.col[i] != COLTYPE_NONE && vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}
     }
     for (u8 s=0;s<World.substeps;++s) {
-        // Radiation bleedoff / detox / envirosuit handling
-        if (!World.invP1.radiationArea) { float bleed = (World.invP1.patchActive & PATCH_DETOX) ? 2.0f : (World.invP1.hasHardware & HW_ENV ? 0.5f : 1.0f); World.instances[PLAYER1].radiation = vmax(0.0f, World.instances[PLAYER1].radiation - dtsub * bleed); }
+        if (!World.invP1.radiationArea) { float bleed = (World.invP1.patchActive & PATCH_DETOX) ? 2.0f : (World.invP1.hasHardware & HW_ENV ? 0.5f : 1.0f); World.instances[PLAYER1].radiation = vmax(0.0f, World.instances[PLAYER1].radiation - dtsub * bleed); } // Radiation bleedoff / detox / envirosuit handling
         else { World.instances[PLAYER1].radiation = vmin(100.0f, World.instances[PLAYER1].radiation); }
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
         for (u16 t=0;t<128;++t) triggerVolumes[t]=0xFFFF;
@@ -799,7 +798,7 @@ void Physics(float dt) {
             SetPosition(sc->a, V3_AplusB(World.position[sc->a], V3_ScaleByF(sc->m.normal, correction * sc->invMassA / massDiv)));
             if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
-        bool ladderTouched = false;
+        bool ladderTouched = false; World.invP1.radiationArea=World.Sys_Music.inZone=World.Sys_Music.elevator=World.Sys_Music.cyberTube=World.Sys_Music.distortion=false; World.gravity[PLAYER1] = 1.0f;
         for (u16 i=0;i<numTriggers;++i) {
             u16 self = triggerVolumes[i];
             u16 trigdx=World.instances[self].index;
@@ -808,23 +807,20 @@ void Physics(float dt) {
             for (u16 o=0;o<dynamicEntityCount;++o) { // 4. Triggers
                 u16 other = dynamicEntities[o]; if (World.col[other] == COLTYPE_NONE || !(World.instances[other].entflags & EF_ACTIVE)) continue;
                 float otherRadius = World.colliderSize[other].x * vmax(vmax(World.scale[other].x,World.scale[other].y),World.scale[other].z); if (otherRadius <= 0.0f) otherRadius = 0.32f;
-                bool touches;
-                if (World.col[other] == COLTYPE_CAP) {
-                    ShapeCapsule oc = Entity_GetCap(other); V3 capMid = V3_ScaleByF(V3_AplusB(oc.tip,oc.base),0.5f);
-                    touches = CapsuleTouchesOBB(oc.base,otherRadius,trigBox) || CapsuleTouchesOBB(capMid,otherRadius,trigBox) || CapsuleTouchesOBB(oc.tip,otherRadius,trigBox);
-                } else touches = CapsuleTouchesOBB(World.position[other],otherRadius,trigBox);
+                bool touches = false;
+                if(World.col[other] == COLTYPE_CAP){ShapeCapsule oc=Entity_GetCap(other); V3 capMid=V3_ScaleByF(V3_AplusB(oc.tip,oc.base),0.5f); touches=CapsuleTouchesOBB(oc.base,otherRadius,trigBox) || CapsuleTouchesOBB(capMid,otherRadius,trigBox) || CapsuleTouchesOBB(oc.tip,otherRadius,trigBox);}
+                else touches=CapsuleTouchesOBB(World.position[other],otherRadius,trigBox);
                 if (!touches) continue;
                 if (other != PLAYER1 && trigdx == 596) { trigger_gravitylift_touch(self,other); continue; }
-                World.Sys_Music.cyberTube = false; World.gravity[PLAYER1] = 1.0f; World.Sys_Music.inZone = World.Sys_Music.elevator = World.Sys_Music.distortion = false;
                 switch(trigdx) {
-                    case 554/*prop_cyber_exit*/: if(other == PLAYER1){UIExitCyberspace();} break;
-                    case 595/*trigger_cyberpush*/: if(World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force*(float)World.deltaTime),false); World.Sys_Music.cyberTube=true;} break;
-                    case 596/*trigger_gravitylift*/: trigger_gravitylift_touch(self,other); break;
-                    case 597/*trigger_ladder*/:      World.invP1.ladderState=1; ladderTouched = true; ladderTopY = trigBox.ctr.y + trigBox.hExt.y; break;
+                    case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;
+                    case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force*(float)World.deltaTime),false); World.Sys_Music.cyberTube=true;} break;
+                    case 596/*trigger_gravitylift*/:trigger_gravitylift_touch(self,other); break;
+                    case 597/*trigger_ladder*/:if(other == PLAYER1){World.invP1.ladderState=1; ladderTouched=true; ladderTopY=trigBox.ctr.y + trigBox.hExt.y;} break;
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;
-                    case 599/*trigger_music*/: { TrackType tt=World.instances[self].trackType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elevator); World.Sys_Music.distortion=(tt == TT_Distortion); break; }
-                    case 601/*trigger_radiation*/:            World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation; break; /* radiation bleedoff / amelioration handled in physics update */
-                    case 746/*weapon_grenadeenergmine_live*/: TakeEnergy(256.0f); break;
+                    case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elevator); World.Sys_Music.distortion=(tt == TT_Distortion);} break;
+                    case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */
+                    case 746/*weapon_grenadeenergmine_live*/:if(other == PLAYER1){TakeEnergy(256.0f);} break;
                 }
             }
         }
@@ -853,6 +849,8 @@ void Physics(float dt) {
             else if (!nearAwake && (ef & EF_GROUNDED)) { float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]); if (sp2 < 0.0025f && asp2 < 0.0025f) { World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; } }
         }
     }
+    if (World.invP1.radiationArea && World.instances[PLAYER1].radiation > 0.0f){AppendTextWarning(184,-1,-1,-T_WHITE,1);/*Radation Area*/} else {World.invP1.radiationArea = false; tWrnFinished[1]=0.0;}
+    if (World.instances[PLAYER1].radiation > 0.1f){AppendTextWarning(185,-1,186,T_RED,2);/*Radiation poisoning ##LBP*/} else {World.instances[PLAYER1].radiation = 0.0f; tWrnFinished[2]=0.0;}
 }
 
 void AddForce(u16 i, V3 f, bool imp) { if (imp) { World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f / vmax(World.mass[i],0.001f))); } else { World.instances[i].accumulatedForce = V3_AplusB(World.instances[i].accumulatedForce,f); } }
@@ -951,7 +949,7 @@ void ApplyPlayerMovements(float dt) {
     dv = (V3){ vclamp(dv.x, -10.0f, 10.0f), vclamp(dv.y, -10.0f, 10.0f), vclamp(dv.z,-10.0f,10.0f) };
     World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1], V3_ScaleByF(dv,accel * vclamp(dt,0.0005f,0.1f)));
     if (World.invP1.fatigueBleedoffFinished < World.pauseRelativeTime && World.curLev!=LEVEL_CYBERSPACE && !Cheats.noclip) { World.invP1.fatigue -= fatigueWane; World.invP1.fatigueBleedoffFinished = World.pauseRelativeTime + 0.3f; } // Fatigue bleed off
-    World.invP1.fatigue = vclamp(World.invP1.fatigue,0.0f,100.0f); if (World.invP1.fatigue > 80.0f) CenterStatusPrint("Fatigue critical"); // fatigue text warnings
+    World.invP1.fatigue = vclamp(World.invP1.fatigue,0.0f,100.0f); if (World.invP1.fatigue > 80.0f){AppendTextWarning(868,-1,-1,T_WHITE,0);/*Fatigue high*/}
     if (grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
         if (velChange > 2.0f && World.invP1.noiseFinished < World.pauseRelativeTime) {

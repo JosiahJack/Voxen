@@ -628,6 +628,9 @@ void LoadLevelMod(u8 lev) {
                 else if (KEY_EQ("lS.y"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].y=v;} else if(fwCurS){fwCurS->y=v;} }
                 else if (KEY_EQ("lS.z"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].z=v;} else if(fwCurS){fwCurS->z=v;} }
                 else if (KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
+                else if (KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);
+                else if (KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);
+                else if (KEY_EQ("radiationAmount")) inst->radiation=parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("ammo"))inst->ammo=parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("ammo2"))inst->ammo2=parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("useableItemIndex"))inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
@@ -755,13 +758,8 @@ void LoadLevelMod(u8 lev) {
         }
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true); // Default active if not specified
         if (!isLight && entsFromFile[entCount].index == 517) { // func_wall: stash base transform + chunk children for spawn below
-            fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp;
-            u16 n = fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN;
-            u16 start = fwPoolUsed;
-            for (u16 k=0;k<n;++k) {
-                if (fwPoolUsed >= FW_POOL_MAX) { DualLogError("FuncWall chunk pool exhausted on line %u!\n",lineNum); break; }
-                fwPoolPrefab[fwPoolUsed]=lwPrefab[k]; fwPoolPos[fwPoolUsed]=lwPos[k]; fwPoolRot[fwPoolUsed]=lwRot[k]; fwPoolScale[fwPoolUsed]=lwScale[k]; fwPoolUsed++;
-            }
+            fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp; u16 n=fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN, start=fwPoolUsed;
+            for (u16 k=0;k<n;++k) { if (fwPoolUsed >= FW_POOL_MAX) { DualLogError("FuncWall chunk pool exhausted on line %u!\n",lineNum); break; } fwPoolPrefab[fwPoolUsed]=lwPrefab[k]; fwPoolPos[fwPoolUsed]=lwPos[k]; fwPoolRot[fwPoolUsed]=lwRot[k]; fwPoolScale[fwPoolUsed]=lwScale[k]; fwPoolUsed++; }
             fwSlotStart[entCount]=start; fwSlotCount[entCount]=(u16)(fwPoolUsed-start);
         }
     }
