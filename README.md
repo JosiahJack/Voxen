@@ -11,7 +11,7 @@ Please take this and make it your own for your own projects.
 The "Voxel Lit" portion of Voxen is in the representation of lighting 
 information using a voxel format that is an invisible layer of data
 overlayed with the normal full 3D polygonal mesh world such that lighting
-calculations for bounce lighting (GI), reflections, and other effects leverage 
+calculations for bounce lighting (GI) TODO! lol, reflections, and other effects leverage 
 the spacial voxel data to optimize lighting calculations for high fidelity at
 high speed with low RAM usage.  The voxel volume is limited to a space that is
 a world cell region 64x64x18 with each cell sized to 2.56x2.56x2.56. Voxels are
@@ -93,27 +93,26 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
 
 ```
 ❯ ls *.* ./Shaders/*.glsl ./Shaders/*.compute | grep -vE 'README.md|builds.csv|voxen.exe|voxen.log|build.sh|Citadel.pdb|*.bin' | xargs perl -MList::Util=max -lne '$first{$ARGV} //= $_; $count{$ARGV} = $.; if(eof){$total += $.; $. = 0;} END { $max = max map {length} keys %first; printf "99999999 %7d total\n", $total; printf "%8d %-${max}s  %s\n", $count{$_}, $_, $first{$_} for keys %first }' 2>/dev/null | sort -nr | head -n 51 | sed 's/^99999999 //'
-  13450 total
-    1352 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
-    1300 models.c                            // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
-    1199 citadel.c                           // citadel.c - Game logic.
-    1134 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
-     932 physics.c                           // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
-     925 audio.c                             // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
-     887 ai.c                                // ai.c - AI logic control for NPC's enemies in the game.
-     821 winput.c                            // winput.c - WinSys Windowing System and Input System interfacing with the OS.
-     537 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
-     529 text.c                              // text.c - Text and Font Rendering/Loading System
-     494 textures.c                          // textures.c - 2D Texture Loading System
-     399 synth.c                             // synth.c — Procedural Audio Engine
+  11658 total
+    1003 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
+     990 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
+     988 models.c                            // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
+     983 audio.c                             // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
+     970 citadel.c                           // citadel.c - Game logic.
+     965 physics.c                           // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
+     795 winput.c                            // winput.c - WinSys Windowing System and Input System interfacing with the OS.
+     562 text.c                              // text.c - Text and Font Rendering/Loading System
+     491 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
+     484 textures.c                          // textures.c - 2D Texture Loading System
+     414 ai.c                                // ai.c - AI logic control for NPC's enemies in the game.
+     393 ui.c                                // ui.c - User Interface(UI) aka HUD
      391 ./Shaders/composite_frag.glsl       // composite.glsl - Composite rendered view + UI overlay, custom AA, VHS blur (subtle, magic!), SSR with tapped blur, Procedural skybox w/ stars + saturn + sun + station shield (if on!) that rotate, berserk color hallucinations, EMP screen rolling, fog, infrared grayscale.
      387 credits.h                           // credits.h - Credits for Citadel: The System Shock Fan Remake, salt the fries!
-     372 weapons.c                           // weapons.c - Weapon System
-     361 ui.c                                // ui.c - User Interface(UI) aka HUD
-     307 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
-     288 culling.c                           // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
+     381 weapons.c                           // weapons.c - Weapon System
+     311 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
+     300 culling.c                           // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
+     244 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
      229 ./Shaders/chunk_frag.glsl           // chunk_frag.glsl: Generic shader for all world objects
-     229 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
       83 ./Shaders/voxels.compute            // voxels.compute - Compute shader for determining light lists for voxels and updating voxel tables 
       70 ./Shaders/ssr.compute               // ssr.compute - Compute shader for Screen Space Reflections 
       54 ./Shaders/text_frag.glsl            // text_frag.glsl - Text Fragment shader, supports both SystemShock font with black border around every character and StopD font with 3d drop shadow and top edge highlights
@@ -137,11 +136,11 @@ Size key: b = bit, n = nibble, B = byte, k = kilobyte, m = megabyte, g = we don'
  85,644k Audio/
  51,726k Textures/
  52,321k Models/
- 17,170k Data/
+ 11,264k Data/
   1,815k Fonts/
   1,589k loose files (binaries, autosplitter notes)
       0k Screenshots/
-210,265k
+204,359k
 ```
 Citadel.7z (LZMA Max Compressed) sitting at 116.8mb
 
@@ -213,12 +212,10 @@ applying lighting/shadows. TODO
 
 #### Screen Space Reflections
 
-All specular surfaces get reflections.  There are
-no specular highlight fakeries to be found here.
-As this is "screenspace" it can only reflect what
-the player can see elsewhere in their screen. This
-may be augmented with the, albeit softer and
-blurrier, voxel results.  Also called SSR.
+All specular surfaces get reflections both from specular highlights
+and from Screen Space Reflections. As this is "screenspace" it can
+only reflect what the player can see elsewhere in their screen. This
+may be augmented with the, albeit softer and blurrier, voxel results TODO!.
 
 #### Rendering System
 
@@ -256,6 +253,8 @@ buffer of texture palette indices offsets.
 
 Models are loaded into one unified flat vertex buffer with
 minimal data, just position, normal, and uv.  Meshes are indexed triangles.
+Uses separate deduplicated position only mesh representation for physics;
+leverages edge adjacency for faster GJK algorithm.
 
 ---
 
