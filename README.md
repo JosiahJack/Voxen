@@ -93,26 +93,26 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
 
 ```
 ❯ ls *.* ./Shaders/*.glsl ./Shaders/*.compute | grep -vE 'README.md|builds.csv|voxen.exe|voxen.log|build.sh|Citadel.pdb|*.bin' | xargs perl -MList::Util=max -lne '$first{$ARGV} //= $_; $count{$ARGV} = $.; if(eof){$total += $.; $. = 0;} END { $max = max map {length} keys %first; printf "99999999 %7d total\n", $total; printf "%8d %-${max}s  %s\n", $count{$_}, $_, $first{$_} for keys %first }' 2>/dev/null | sort -nr | head -n 51 | sed 's/^99999999 //'
-  11658 total
-    1003 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
-     990 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
-     988 models.c                            // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
+  10809 total
      983 audio.c                             // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
-     970 citadel.c                           // citadel.c - Game logic.
-     965 physics.c                           // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
+     982 models.c                            // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
+     970 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
+     924 citadel.c                           // citadel.c - Game logic.
+     835 physics.c                           // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
      795 winput.c                            // winput.c - WinSys Windowing System and Input System interfacing with the OS.
-     562 text.c                              // text.c - Text and Font Rendering/Loading System
-     491 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
-     484 textures.c                          // textures.c - 2D Texture Loading System
+     768 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
+     532 text.c                              // text.c - Text and Font Rendering/Loading System
+     486 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
      414 ai.c                                // ai.c - AI logic control for NPC's enemies in the game.
-     393 ui.c                                // ui.c - User Interface(UI) aka HUD
+     398 ui.c                                // ui.c - User Interface(UI) aka HUD
+     397 textures.c                          // textures.c - 2D Texture Loading System
      391 ./Shaders/composite_frag.glsl       // composite.glsl - Composite rendered view + UI overlay, custom AA, VHS blur (subtle, magic!), SSR with tapped blur, Procedural skybox w/ stars + saturn + sun + station shield (if on!) that rotate, berserk color hallucinations, EMP screen rolling, fog, infrared grayscale.
      387 credits.h                           // credits.h - Credits for Citadel: The System Shock Fan Remake, salt the fries!
      381 weapons.c                           // weapons.c - Weapon System
-     311 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
-     300 culling.c                           // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
-     244 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
+     252 culling.c                           // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
      229 ./Shaders/chunk_frag.glsl           // chunk_frag.glsl: Generic shader for all world objects
+     215 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
+      93 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
       83 ./Shaders/voxels.compute            // voxels.compute - Compute shader for determining light lists for voxels and updating voxel tables 
       70 ./Shaders/ssr.compute               // ssr.compute - Compute shader for Screen Space Reflections 
       54 ./Shaders/text_frag.glsl            // text_frag.glsl - Text Fragment shader, supports both SystemShock font with black border around every character and StopD font with 3d drop shadow and top edge highlights
@@ -127,7 +127,7 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
        6 ./Shaders/shadowmaps_clear.compute  // shadowmaps_clear.compute - Compute shader for clearing the distances for shadowmaps in the SSBO to 0xFFFFFFFF
        6 ./Shaders/debugunlit_vert.glsl      // debugunlit_vert.glsl - Wireline Vertex Shader
        5 ./Shaders/composite_vert.glsl       // imageblit.glsl - Full screen quad unlit textured for presenting image buffers such as results from compute shaders, image effects, post-processing, etc..
-       4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe view of colliders, velocity debug vectors, angular velocity debug vector and arc for orientation, raycast debug vector, and weapon lasers  
+       4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe view of colliders, velocity debug vectors, angular velocity debug vector and arc for orientation, raycast debug vector, and weapon lasers   
 ```
 
 ### Install Footprint

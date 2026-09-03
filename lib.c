@@ -10,34 +10,23 @@ void* OS_AllocScratch(size_t amount) { if(!scratch_base){OS_ScratchInit();} size
 void OS_FreeInitPhaseInner(size_t amount) { initPhaseSize += (amount + 15) & ~(size_t)15; }
 void OS_FreeInitPhase(void) { scratch_cur -= initPhaseSize; if (scratch_cur < scratch_base) { DualLogError("OS_FreeInitPhase: cursor underflow! freed %zu bytes\n",initPhaseSize); OS_Exit(1); } mset(scratch_cur,0,initPhaseSize); scratch_cur = (u8*)(((uintptr_t)scratch_cur + 15) & ~(uintptr_t)15); initPhaseSize=0; }
 void OS_ScratchFree(void) { if (!scratch_base){return;} OS_Free(scratch_base, SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; initPhaseSize = 0; }
-typedef u16 u16_u __attribute__((__aligned__(1), __may_alias__)); typedef u32 u32_u __attribute__((__aligned__(1), __may_alias__)); typedef u64 u64_u __attribute__((__aligned__(1), __may_alias__));
-void* mcpy(void *dst, const void *src, size_t n) {
-    u8 *d = (u8*)dst; const u8 *s = (const u8*)src; size_t i = 0;
-    for (;i+128<=n;i+=128){ _mm256_storeu_si256((__m256i*)(d+i), _mm256_loadu_si256((const __m256i*)(s+i))); _mm256_storeu_si256((__m256i*)(d+i+32), _mm256_loadu_si256((const __m256i*)(s+i+32))); _mm256_storeu_si256((__m256i*)(d+i+64), _mm256_loadu_si256((const __m256i*)(s+i+64))); _mm256_storeu_si256((__m256i*)(d+i+96), _mm256_loadu_si256((const __m256i*)(s+i+96))); }
-    for (;i+32<=n;i+=32)  { _mm256_storeu_si256((__m256i*)(d+i), _mm256_loadu_si256((const __m256i*)(s+i))); }
-    size_t rem = n - i; u8* rd = d + i; const u8* rs = s + i;
-    if (rem >= 16) { _mm_storeu_si128((__m128i*)rd, _mm_loadu_si128((const __m128i*)rs)); _mm_storeu_si128((__m128i*)(d+n-16), _mm_loadu_si128((const __m128i*)(s+n-16))); }
-    else if (rem >= 8) { *(u64_u*)rd = *(const u64_u*)rs; *(u64_u*)(d+n-8) = *(const u64_u*)(s+n-8); }
-    else if (rem >= 4) { *(u32_u*)rd = *(const u32_u*)rs; *(u32_u*)(d+n-4) = *(const u32_u*)(s+n-4); }
-    else if (rem >= 2) { *(u16_u*)rd = *(const u16_u*)rs; *(u16_u*)(d+n-2) = *(const u16_u*)(s+n-2); }
-    else if (rem == 1) { *rd = *rs; }
+typedef u16 u16_u __attribute__((__aligned__(1),__may_alias__));typedef u32 u32_u __attribute__((__aligned__(1),__may_alias__));typedef u64 u64_u __attribute__((__aligned__(1),__may_alias__));
+void* mcpy(void *dst,const void *src,size_t n){
+    u8 *d=(u8*)dst; u8 *s=(u8*)src; size_t i=0;
+    for(;i+128<=n;i+=128){*(__m256i*)(d+i)=*(__m256i*)(s+i);*(__m256i*)(d+i+32)=*(__m256i*)(s+i+32);*(__m256i*)(d+i+64)=*(__m256i*)(s+i+64);*(__m256i*)(d+i+96)=*(__m256i*)(s+i+96);}for(;i+32<=n;i+=32){*(__m256i*)(d+i)=*(__m256i*)(s+i);}
+    size_t rem=n-i; u8* rd=d+i; u8* rs=s+i;
+    if(rem>=16){_mm_storeu_si128((__m128i*)rd,*(__m128i_u*)rs);_mm_storeu_si128((__m128i*)(d+n-16),*(__m128i_u*)(s+n-16));}
+    else if(rem>=8){*(u64_u*)rd=*(u64_u*)rs;*(u64_u*)(d+n-8)=*(u64_u*)(s+n-8);}else if(rem>=4){*(u32_u*)rd=*(u32_u*)rs;*(u32_u*)(d+n-4)=*(u32_u*)(s+n-4);}else if(rem>=2){*(u16_u*)rd=*(u16_u*)rs;*(u16_u*)(d+n-2)=*(u16_u*)(s+n-2);}else if(rem==1){*rd=*rs;}
     return dst;
 }
 
-void* mset(void *dst, int c, size_t n) {
-    u8 *p = (u8*)dst; size_t i = 0;
-    if (n >= 32) {
-        __m256i v256 = _mm256_set1_epi8_fast((char)c);
-        for (; i + 128 <= n; i += 128) { _mm256_storeu_si256((__m256i*)(p+i),v256); _mm256_storeu_si256((__m256i*)(p+i+32),v256); _mm256_storeu_si256((__m256i*)(p+i+64),v256); _mm256_storeu_si256((__m256i*)(p+i+96),v256); }
-        for (; i + 32 <= n; i += 32) { _mm256_storeu_si256((__m256i*)(p+i), v256); }
-    }
-    size_t rem = n - i; u8* rp = p + i;
-    if (rem >= 16) { __m128i v128 = _mm_set1_epi8_fast((char)c); _mm_storeu_si128((__m128i*)rp, v128); _mm_storeu_si128((__m128i*)(p+n-16), v128);
-    } else if (rem >= 8) { u64 v64 = (u64)0x0101010101010101ULL * (u8)c; *(u64_u*)rp = v64; *(u64_u*)(p+n-8) = v64;
-    } else if (rem >= 4) { u32 v32 = 0x01010101U * (u8)c; *(u32_u*)rp = v32; *(u32_u*)(p+n-4) = v32;
-    } else if (rem >= 2) { u16 v16 = (u16)(0x0101U * (u8)c); *(u16_u*)rp = v16; *(u16_u*)(p+n-2) = v16;
-    } else if (rem == 1) { *rp = (u8)c; }
-    return dst;
+void* mset(void *dst,int c,size_t n){
+    u8 *p=(u8*)dst;size_t i=0;
+    if(n>=32){ __m256i v256=_mm256_set1_epi8_fast((char)c); for(;i+128<=n;i+=128){*(__m256i*)(p+i)=v256;*(__m256i*)(p+i+32)=v256;*(__m256i*)(p+i+64)=v256;*(__m256i*)(p+i+96)=v256;}for(;i+32<=n;i+=32){*(__m256i*)(p+i)=v256;} }
+    size_t rem=n-i;u8* rp=p+i;
+    if(rem>=16){__m128i v128=_mm_set1_epi8_fast((char)c);_mm_storeu_si128((__m128i*)rp,v128);_mm_storeu_si128((__m128i*)(p+n-16),v128);}
+    else if(rem>=8){u64 v64=0x0101010101010101ULL*(u8)c;*(u64_u*)rp=v64;*(u64_u*)(p+n-8)=v64; }else if(rem>=4){u32 v32=0x01010101U*(u8)c;*(u32_u*)rp=v32;*(u32_u*)(p+n-4)=v32;}
+    else if(rem>=2){u16 v16=0x0101U*(u8)c;*(u16_u*)rp=v16;*(u16_u*)(p+n-2)=v16;}else if(rem==1){*rp=(u8)c;}    return dst;
 }
 
 size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (*(p++)); return (size_t)(p - s - 1); } // strlen replacement
@@ -114,8 +103,7 @@ char* sUpToEndLine(char* buf, int sz, FHandle fd) {
     if (sz <= 1 || buf == NULL) {return NULL;}
     char* p=buf; int rem = sz - 1; static int pos=0, end=0; static char b[4096];
     while(rem > 0){ if(pos >= end){ long n=OS_Read(fd,b,sizeof(b)); if(n <= 0){ if (p == buf){return NULL;} goto done;} pos=0; end=(int)n; } while(rem > 0 && pos < end){ char c=b[pos++]; *p++=c; rem--; if(c == '\n'){goto done;} } }
-    done:
-    *p = '\0'; return buf;
+    done: *p = '\0'; return buf;
 } // fgets replacement, not thread safe but no multithreading
 // Misc Helpers
 FHandle console_log_file=0;
@@ -166,8 +154,7 @@ size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) 
         size_t litCount = 0; // 2. Process Literal Data (Non-Zeros). It costs 2 bytes of overhead to break a literal run to compress 1 or 2 zeros. Only break a literal run if 3 or more zeros ahead.
         while (s + litCount < srcSize && litCount < 128) { if (src[s + litCount] == 0) { size_t remain = srcSize - (s + litCount); if (remain >= 3 && src[s + litCount + 1] == 0 && src[s + litCount + 2] == 0) { break; } } litCount++; }
         if (litCount > 0) { if (d + 1 + litCount > dstCapacity) {return 0;} dst[d++] = (u8)(litCount - 1); mcpy(&dst[d], &src[s], litCount); s += litCount; d += litCount; }
-    }
-    return d; // Return final compressed size
+    } return d; // Return final compressed size
 }
 
 size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Put the bubbles of zero back.
@@ -177,8 +164,7 @@ size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapac
              if (cmd <  128) { size_t litCount = cmd + 1; if(s + litCount > srcSize || d + litCount > dstCapacity){return 0;} mcpy(&dst[d], &src[s], litCount); s += litCount; d += litCount; } // Literal Run
         else if (cmd < 0xFF) { size_t zeroCount=cmd - 128 + 1; if(d + zeroCount > dstCapacity){return 0;} mset(&dst[d], 0, zeroCount); d += zeroCount; } // Short Zero Run
         else                 { if(s + 4 > srcSize){return 0;} u32 zeroCount; mcpy(&zeroCount, &src[s], sizeof(u32)); s += 4; if(d + zeroCount > dstCapacity){return 0;} mset(&dst[d], 0, zeroCount); d += zeroCount; } // Long Zero Run
-    }
-    return d;
+    } return d;
 }
 
 i32 PosGetCellCoordX(float x) { return (u16)clamp((i32)vfloor((x - World.worldMin_x[World.curLev] + CELLXHALF) / CELLSZ),0,(WORLDX - 1)); }
@@ -188,46 +174,33 @@ u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx=clamp(cx,0,(WORLDX - 1)); cz=clamp(cz
 char statusText[T_BUFFER_SIZE];
 void CenterStatusPrint(const char * restrict fmt, ...) { va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
 void BmpWrite(char const *filename, int x, int y, const void *data) {
-    FHandle f = OS_OpenWriteonly(filename);
-    if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
-    u32 fileSize = 14 + 108 + (u32)x * y * 4; // BMP file header (14 bytes)
-    u8 fileHeader[14] = {'B','M',fileSize & 0xFF,(fileSize >> 8) & 0xFF,(fileSize >> 16) & 0xFF,(fileSize >> 24) & 0xFF,0,0,0,0,14 + 108,0,0,0};
-    u8 infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/
+    FHandle f = OS_OpenWriteonly(filename); if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
+    u32 fileSize = 14 + 108 + (u32)x * y * 4;/*BMP file header (14 bytes)*/ u8 fileHeader[14] = {'B','M',fileSize & 0xFF,(fileSize >> 8) & 0xFF,(fileSize >> 16) & 0xFF,(fileSize >> 24) & 0xFF,0,0,0,0,14 + 108,0,0,0}; u8 infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/
     *(u32*)(infoHeader+4)=(u32)x;/*w*/ *(u32*)(infoHeader+8)=(u32)-y;/*h*/ *(u16*)(infoHeader+12)=1;/*planes*/ *(u16*)(infoHeader+14)=32;/*bit count*/ *(u32*)(infoHeader+16)=3;/*bit fields*/
     *(u32*)(infoHeader+40)=0x000000FF;/*Red*/ *(u32*)(infoHeader + 44) = 0x0000FF00;/*Green*/ *(u32*)(infoHeader + 48) = 0x00FF0000;/*Blue*/ *(u32*)(infoHeader + 52) = 0x00000000;/*Alpha*/
     OS_Write(f,fileHeader,14,filename); OS_Write(f,infoHeader,108,filename);
-    const u8 *pixels = (const u8 *)data;
-    for (int j=y-1;j>=0;--j) OS_Write(f,(void*)(pixels + j*x*4),(size_t)x*4,filename);
-    OS_Close(f);
+    const u8 *pixels = (const u8 *)data; for (int j=y-1;j>=0;--j) OS_Write(f,(void*)(pixels + j*x*4),(size_t)x*4,filename); OS_Close(f);
 }
 
 void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
     (void)context;
 //     static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
 //     long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;
-//     size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0;
-//     long fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
+//     size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0; long fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
 //     char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1); if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0'; OS_Close(fd); char* p = buf;
 //     while (*p) {
 //         if (mcmp(p,"Private_",8) == 0) {
-//             p += 8; size_t val = 0; if (mcmp(p,"Clean",5) !=0 && mcmp(p,"Dirty",5) != 0) { p++; continue; }
-//             while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
+//             p += 8; size_t val = 0; if (mcmp(p,"Clean",5) !=0 && mcmp(p,"Dirty",5) != 0) { p++; continue; }    while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
 //             p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
-//         }
-//         p++;
-//     }
-//     DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
+//         } p++;
+//     } DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
 }
 
-int OS_MakeFolder(const char* path);
 void Screenshot() {
-    World.screenshotTimeout = World.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
-    OS_MakeFolder("Screenshots"); u16 w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
-    u8* pixels = OS_Alloc(w * h * 4 * sizeof(char));
-    glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels);
+    World.screenshotTimeout = World.current_time + 1.0;/*Prevent saving more than 1 per second for sanity purposes.*/ OS_MakeFolder("Screenshots"); u16 w=Sys_Settings.ScreenWidth, h=Sys_Settings.ScreenHeight;
+    u8* pixels = OS_Alloc(w * h * 4 * sizeof(char)); glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels); 
     char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
-    BmpWrite(filename,w,h,pixels); DualLog("Saved screenshot %s\n",filename);
-    OS_Free(pixels,w * h * 4 * sizeof(char));
+    BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
 }
 
 u32 random_range_rng = 0x12345678u;
@@ -239,6 +212,4 @@ float random_range(float a, float b) { float factor = ((float)(xs32() >> 8)) * (
 u32 rand() { return xs32() & 0xFFFFu; }
 float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
 float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
-FHandle levelFileHandle;
-char* sLevelFileUpToEndLine(char* buf, int size) { return sUpToEndLine(buf,size,levelFileHandle); }
-
+char* sLevelFileUpToEndLine(char* buf, int size) { static FHandle levelFileHandle; return sUpToEndLine(buf,size,levelFileHandle); }

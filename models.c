@@ -336,6 +336,7 @@ u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, u32* re
 
 #define _mm_min_ps(A, B) ((__m128)__builtin_ia32_minps((__v4sf)(A), (__v4sf)(B)))
 #define _mm_max_ps(A, B) ((__m128)__builtin_ia32_maxps((__v4sf)(A), (__v4sf)(B)))
+#define _mm_storeu_ps(P, A) (*(__m128_u *)(P) = (A))
 __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* __restrict sv, u32 ec, u32* __restrict ht, u32* __restrict ht_used, u32* __restrict remap_scr, u8* __restrict cache_scr, float** __restrict ov_pos, u32* ovc, u16** ot, u16* otc, __m128 mn_v, __m128 mx_v) {
     if (unlikely(!ec)){return false;} u16* final_t = OS_Alloc(ec * sizeof(u16)); /*Allocate final_t early so we can use it instead of ft_scratch*/ u32 used_slots_count = 0; u32* rem = (u32*)remap_scr; /*Reuse remap_scr for the 'rem' array!*/ u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
@@ -855,18 +856,11 @@ void LoadModels() {
         mset(ht[i],0xFF,WELD_HASH_SIZE * sizeof(u32));
         thrd_bvh_ctx[i]=(BvhBuildCtx){.nodes=bvh_nodes_p[i], .triOctants=bvh_oct_p[i], .triOrder=bvh_order_p[i], .triScratch=bvh_scr_p[i], .initialTris=bvh_init_p[i], .nodeCount=0, .triCount=0};
     }
-    thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov;
-    thrd_ht = ht; thrd_ht_used = ht_used;
-    thrd_remap_scratch = remap_scr; thrd_cache_scratch = cache_scr;
+    thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_ht = ht; thrd_ht_used = ht_used; thrd_remap_scratch = remap_scr; thrd_cache_scratch = cache_scr;
     ModelParseTask tasks[32]; u32 chunk = (mdlsCnt + threadCnt - 1) / threadCnt; OS_Thread th[32];
     for (int i=0;i<threadCnt;++i) tasks[i] = (ModelParseTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,raw,isGLTFAnimSrc,isGLTFStaticSrc,i};
-    if (threadCnt > 1) { // Each worker now parses its model range AND builds each model's BVH right after that model is parsed, all within the same thread -- overlapping BVH build cost with other threads' OBJ parsing instead of a separate serial post-pass.
-        for (int i=0;i<threadCnt;++i) OS_ThreadCreate(&th[i],ModelParsingWorker,&tasks[i]);
-        for (int i=0;i<threadCnt;++i) OS_ThreadJoin(&th[i]);
-    } else { for (int t=0;t<threadCnt;++t) ModelParsingWorker(&tasks[t]); /*Single threaded fallback*/ }
-    LoadGLTFAnimatedBlocks(mp.entries,mp.count,raw);
-    OS_FreeInitPhaseInner(mdlsCnt * sizeof(bool)); 
-    OS_FreeInitPhaseInner(mdlsCnt * sizeof(bool));
+    if (threadCnt > 1) { for (int i=0;i<threadCnt;++i) OS_ThreadCreate(&th[i],ModelParsingWorker,&tasks[i]); for (int i=0;i<threadCnt;++i) OS_ThreadJoin(&th[i]); } else { for (int t=0;t<threadCnt;++t) ModelParsingWorker(&tasks[t]); /*Single threaded fallback*/ }
+    LoadGLTFAnimatedBlocks(mp.entries,mp.count,raw); OS_FreeInitPhaseInner(mdlsCnt * sizeof(bool));  OS_FreeInitPhaseInner(mdlsCnt * sizeof(bool));
     physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*)); physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*)); physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
     PhysGeomTask ptasks[32]; OS_Thread pth[32];
     for (int i=0;i<threadCnt;++i) ptasks[i] = (PhysGeomTask){i*chunk,(i+1)*chunk > mdlsCnt ? mdlsCnt : (i+1)*chunk,i};

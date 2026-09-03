@@ -1,7 +1,6 @@
 // entity.c - Entity Definitions and Save Load System for levels and savegames
 #include "common.h"
-#define LINE_LEN_MAX 81920
-#define GEOMETRY_LOD_CARD_MODEL_IDX 178
+void AddDoorPortal(u16,u16); void TextureSequenceInit(u16,char*); void AddCamView(V3,Quaternion,u8,u16,u16,float,float);
 Entity* entsFromFile; V3 *posFromFile, *scaleFromFile; Quaternion *rotationFromFile; Light *lightsFromFile; LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL; u16 headmountedLanternLight;
 EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,dynFriction,statFriction,animationNum,col,colCtr,colSz
 /*0 chunk_black*/[0]={178,0,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*1 chunk_blocker*/[1]={178,0,1230,MAX_TXRS,1230,160,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*2 chunk_bridg1_1*/[2]={661,0,44,MAX_TXRS,MAX_TXRS,43,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -323,19 +322,15 @@ __attribute__((noinline)) i16 parse_numberi16(const char* str, const char* line,
 __attribute__((noinline)) i8 parse_numberi8(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -128 || v > 127){DualLogError("%d out range i8 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i8)v;}
 __attribute__((noinline)) float parse_float(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Blank on line %d:%s\n", lineNum+1, line); return 0.0f; }
-    while (cEmpty(*str)) str++;
-    bool negative = false; if (*str == '-') { negative = true; str++; } else if (*str == '+') { str++; }
-    double value = 0.0; bool has_digit = false;
+    while (cEmpty(*str)){str++;} bool negative = false; if (*str == '-') { negative = true; str++; } else if (*str == '+') { str++; } double value = 0.0; bool has_digit = false;
     while (*str >= '0' && *str <= '9') { value = value * 10.0 + (*str - '0'); str++; has_digit = true; } // Integer part
     if (*str == '.') { str++; double frac = 0.0; double place = 0.1; while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; } value += frac; } // Decimal part
-    if (!has_digit) return 0.0f;
-    if (negative) value = -value;
-    return (float)value;
+    if(!has_digit){return 0.0f;} if(negative){value = -value;} return (float)value;
 }
 
 // Lights
 __attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* lanim) {
-    i32 i = World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++; if (World.loadedLights >= LIGHT_COUNT) { DualLogError("Too many lights %u added in level %d!\n",i,World.curLev); OS_Exit(1); }
+    i32 i = World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++; if(World.loadedLights >= LIGHT_COUNT){DualLogError("Too many lights,lev%d!\n",World.curLev); OS_Exit(1);}
     mcpy(&World.lights[i],lit,sizeof(Light)); mcpy(&World.lanims[i],lanim,sizeof(LightAnimation)); World.lightsNewPosition[i] = lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true); return i;
 }
 
@@ -357,12 +352,9 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
     for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {
         if (sEqual(k, map[i].key)) { // Types: 0 = float, 1 = u8.  Check key prefix to decide if pointing at 'lit' or 'lam'
             void* dest = (k[0] == 'l' && (k[1] == 'P' || k[1] == 'R')) ? (void*)lit : (void*)lam;
-            if (k[0] == 'r' || k[0] == 's' || k[0] == 'm' || k[0] == 'c') {
-                if (k[1] != 'u') dest = (void*)lit; // range, spot, max, color (not currentStep)
-            }
+            if (k[0] == 'r' || k[0] == 's' || k[0] == 'm' || k[0] == 'c') { if (k[1] != 'u') dest = (void*)lit;/*range, spot, max, color (not currentStep)*/ }
             char* ptr = (char*)dest + map[i].offset;
-            if (map[i].type == 0) *(float*)ptr = parse_float(v,il,ln);
-            else                  *(u8*)ptr = parse_numberu8(v,il,ln);
+            if(map[i].type == 0){*(float*)ptr = parse_float(v,il,ln);}else{*(u8*)ptr = parse_numberu8(v,il,ln);}
             return;
         }
     }
@@ -388,160 +380,56 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     mset(&World.instances[i],0,sizeof(Entity));
     World.instances[i].entflags=EF_ACTIVE; World.layer[i]=L_Default;World.instances[i].camView=255;
     World.instances[i].modelIndex=World.instances[i].lodIndex=World.instances[i].colMeshIndex=MAX_MDLS;
-    World.instances[i].texIndex=World.instances[i].glowIndex=World.instances[i].specIndex=World.instances[i].normIndex = MAX_TXRS;
     World.scale[i].x=World.scale[i].y=World.scale[i].z=World.mass[i]=World.rotation[i].w=1.0f; World.dynamicFriction[i]=0.5f; World.staticFriction[i]=0.6f;
     World.instances[i].index = entIdx;    World.position[i] = pos;
-    if (entIdx == 424) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.8f; } // npc_cortex_reaver
-    if (entIdx == 430) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.9f; } // npc_sec2_bot
-    if (entIdx == 431) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.4f; } // npc_maint_bot
-    if (entIdx == 433) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.88f; } // npc_hopper
-    if (entIdx == 439) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.4f; } // npc_zerog_mutant
-    if (entIdx == 441) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.75f; } // npc_repairbot
-    if (entIdx == 444) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.666f; } // npc_cyberguard
-    if (entIdx == 445) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 0.5f; } // npc_cyberram
-    if (entIdx == 446) { World.scale[i].x = World.scale[i].y = World.scale[i].z = 1.1f; } // npc_cyber_reaver
-    if (entIdx == 475 || entIdx == 476) World.scale[i] = (V3){1.75f,1.75f,1.75f};
-    if (IdxIsNPC(entIdx)) InitNPC(i);
-    if (IdxIsDoor(entIdx)) { World.instances[i].SFXIndex = 75; }
-    World.instances[i].modelIndex = EDefs[entIdx].modelIndex;
-    World.instances[i].colMeshIndex = EDefs[entIdx].colMeshIndex;
-    World.instances[i].animationNum = EDefs[entIdx].animationNum;
-    World.instances[i].texIndex = EDefs[entIdx].texIndex;
-    World.instances[i].glowIndex = EDefs[entIdx].glowIndex >= MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
-    World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAX_TXRS ? 0 : EDefs[entIdx].specIndex;
-    World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAX_TXRS ? 0 : EDefs[entIdx].normIndex;
+    if (entIdx == 424) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.8f; }/*npc_cortex_reaver*/ if (entIdx == 430) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.9f; }/*npc_sec2_bot*/
+    if (entIdx == 431) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.4f; }/*npc_maint_bot*/     if (entIdx == 433) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.88f; }/*npc_hopper*/
+    if (entIdx == 439) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.4f; }/*npc_zerog_mutant*/  if (entIdx == 441) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.75f; }/*npc_repairbot*/
+    if (entIdx == 444) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.666f; }/*npc_cyberguard*/  if (entIdx == 445) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.5f; }/*npc_cyberram*/
+    if (entIdx == 446) { World.scale[i].x=World.scale[i].y=World.scale[i].z=1.1f; }/*npc_cyber_reaver*/  if (entIdx == 475 || entIdx == 476){World.scale[i]=(V3){1.75f,1.75f,1.75f};}/*se_crate4,se_crate5*/
+    if (IdxIsNPC(entIdx)){InitNPC(i);}                                                                   if (IdxIsDoor(entIdx)) { World.instances[i].SFXIndex = 75; }
+    World.instances[i].modelIndex=EDefs[entIdx].modelIndex;  World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex;  World.instances[i].animationNum=EDefs[entIdx].animationNum;
+    World.instances[i].texIndex = EDefs[entIdx].texIndex >= MAX_TXRS ? 0 : EDefs[entIdx].texIndex;    World.instances[i].glowIndex = EDefs[entIdx].glowIndex >= MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
+    World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAX_TXRS ? 0 : EDefs[entIdx].specIndex; World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAX_TXRS ? 0 : EDefs[entIdx].normIndex;
     flag_set(&World.instances[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(entIdx));
-    World.col[i] = EDefs[entIdx].col;
-    World.colliderCenter[i] = EDefs[entIdx].colCtr;
-    World.colliderSize[i] = EDefs[entIdx].colSz;
-    World.mass[i] = EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f;
-    World.gravity[i] = IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f;
-    if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; } // ButtonSwitch
+    World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f;
+    if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; }/*ButtonSwitch*/
     if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=COLTYPE_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; }
-    World.instCount++; World.levelInstCount[World.currentLevel]=World.instCount;
-    return i;
+    World.instCount++; World.levelInstCount[World.currentLevel]=World.instCount; return i;
 }
 
 static const char* mm_ptr; static const char* mm_end;
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
 static char* MmapGetLine(char* buf, int sz) {
-    if (mm_ptr >= mm_end) return NULL;
-    const char* start=mm_ptr; const char* p=start;
-    while (p < mm_end && *p != '\n') { ++p; }
-    int lineLen = (int)(p - start);
-    if (p < mm_end && *p == '\n') { mm_ptr=p + 1; }
-    else { mm_ptr=mm_end; }
-    if (lineLen >= sz) { lineLen = sz - 1; }
-    mcpy(buf,(void*)start,lineLen);
-    while (lineLen > 0 && (buf[lineLen - 1] == '\r' || buf[lineLen - 1] == '\n')) { --lineLen; }
-    buf[lineLen] = '\0';
-    return buf;
+    if (mm_ptr >= mm_end){return NULL;} const char* start=mm_ptr; const char* p=start; while (p < mm_end && *p != '\n') { ++p; } int lineLen = (int)(p - start); if (p < mm_end && *p == '\n') { mm_ptr=p + 1; } else { mm_ptr=mm_end; } 
+    if (lineLen >= sz) { lineLen = sz - 1; } mcpy(buf,(void*)start,lineLen); while (lineLen > 0 && (buf[lineLen - 1] == '\r' || buf[lineLen - 1] == '\n')) { --lineLen; } buf[lineLen] = '\0'; return buf;
 }
 
 void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
-    World.currentLevel = lev;
-    World.instances        = World.levelInstances[lev];
-    World.position         = World.levelPosition[lev];
-    World.scale            = World.levelScale[lev];
-    World.velocity         = World.levelVelocity[lev];
-    World.angularVelocity  = World.levelAngularVelocity[lev];
-    World.colliderCenter   = World.levelColliderCenter[lev];
-    World.colliderSize     = World.levelColliderSize[lev];
-    World.col              = World.levelCollider[lev];
-    World.rotation         = World.levelRotation[lev];
-    World.layer            = World.levelLayer[lev];
-    World.mass             = World.levelMass[lev];
-    World.radius           = World.levelRadius[lev];
-    World.gravity          = World.levelGravity[lev];
-    World.invInertiaTensor = World.levelInvInertiaTensor[lev];
-    World.dynamicFriction  = World.levelDynamicFriction[lev];
-    World.staticFriction   = World.levelStaticFriction[lev];
-    World.invTnsrValid     = World.levelInvTnsrValid[lev];
-    World.colliding        = World.levelColliding[lev];
-    World.instCount        = World.levelInstCount[lev];
-    World.weaponVModelIndex = World.instCount > 3 ? (u16)(World.instCount - 1) : 0; // ad-hoc weapon view model is the last slot of each level (added by LoadLevelMod) so remap the global index per level
-    World.lights            = World.levelLights[lev];
-    World.lanims            = World.levelLAnims[lev];
-    World.lightsNewPosition = World.levelLightsNewPosition[lev];
-    World.loadedLights      = World.levelLoadedLights[lev];
+    World.currentLevel=lev;                                World.instances=World.levelInstances[lev];           World.position=World.levelPosition[lev];         World.scale=World.levelScale[lev];         World.velocity=World.levelVelocity[lev];
+    World.angularVelocity=World.levelAngularVelocity[lev]; World.colliderCenter=World.levelColliderCenter[lev]; World.colliderSize=World.levelColliderSize[lev]; World.col=World.levelCollider[lev];        World.rotation=World.levelRotation[lev];
+    World.layer=World.levelLayer[lev];                     World.mass=World.levelMass[lev];                     World.radius=World.levelRadius[lev];             World.gravity=World.levelGravity[lev];     World.invInertiaTensor=World.levelInvInertiaTensor[lev];
+    World.dynamicFriction=World.levelDynamicFriction[lev]; World.staticFriction=World.levelStaticFriction[lev]; World.invTnsrValid=World.levelInvTnsrValid[lev]; World.colliding=World.levelColliding[lev]; World.instCount=World.levelInstCount[lev];
+    World.lights=World.levelLights[lev];                   World.lanims=World.levelLAnims[lev];                 World.lightsNewPosition=World.levelLightsNewPosition[lev]; World.loadedLights=World.levelLoadedLights[lev]; World.weaponVModelIndex=(u16)(World.instCount - 1);
 }
 
 void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
-    if (srcLevel >= MAX_LEVELS || dstLevel >= MAX_LEVELS || srcLevel == dstLevel) return;
-    u16 s = PLAYER1;
-    World.levelInstances[dstLevel][s]            = World.levelInstances[srcLevel][s];
-    World.levelPosition[dstLevel][s]             = World.levelPosition[srcLevel][s];
-    World.levelScale[dstLevel][s]                = World.levelScale[srcLevel][s];
-    World.levelVelocity[dstLevel][s]             = World.levelVelocity[srcLevel][s];
-    World.levelAngularVelocity[dstLevel][s]      = World.levelAngularVelocity[srcLevel][s];
-    World.levelColliderCenter[dstLevel][s]       = World.levelColliderCenter[srcLevel][s];
-    World.levelColliderSize[dstLevel][s]         = World.levelColliderSize[srcLevel][s];
-    World.levelCollider[dstLevel][s]             = World.levelCollider[srcLevel][s];
-    World.levelRotation[dstLevel][s]             = World.levelRotation[srcLevel][s];
-    World.levelLayer[dstLevel][s]                = World.levelLayer[srcLevel][s];
-    World.levelMass[dstLevel][s]                 = World.levelMass[srcLevel][s];
-    World.levelRadius[dstLevel][s]               = World.levelRadius[srcLevel][s];
-    World.levelGravity[dstLevel][s]              = World.levelGravity[srcLevel][s];
-    mcpy(World.levelInertiaTensor[dstLevel][s],    World.levelInertiaTensor[srcLevel][s],    6 * sizeof(float));
-    mcpy(World.levelInvInertiaTensor[dstLevel][s], World.levelInvInertiaTensor[srcLevel][s], 6 * sizeof(float));
-    World.levelDynamicFriction[dstLevel][s]      = World.levelDynamicFriction[srcLevel][s];
-    World.levelStaticFriction[dstLevel][s]       = World.levelStaticFriction[srcLevel][s];
-    World.levelInvTnsrValid[dstLevel][s]         = World.levelInvTnsrValid[srcLevel][s];
-    World.levelColliding[dstLevel][s]            = World.levelColliding[srcLevel][s];
+    if(srcLevel >= MAX_LEVELS || dstLevel >= MAX_LEVELS || srcLevel == dstLevel){return;} u16 s=PLAYER1; World.levelInstances[dstLevel][s]=World.levelInstances[srcLevel][s]; World.levelPosition[dstLevel][s]=World.levelPosition[srcLevel][s]; World.levelScale[dstLevel][s]=World.levelScale[srcLevel][s];
+    World.levelVelocity[dstLevel][s]=World.levelVelocity[srcLevel][s]; World.levelAngularVelocity[dstLevel][s]=World.levelAngularVelocity[srcLevel][s]; World.levelColliderCenter[dstLevel][s]=World.levelColliderCenter[srcLevel][s]; World.levelColliderSize[dstLevel][s]=World.levelColliderSize[srcLevel][s];
+    World.levelCollider[dstLevel][s]=World.levelCollider[srcLevel][s]; World.levelRotation[dstLevel][s]=World.levelRotation[srcLevel][s]; World.levelLayer[dstLevel][s]=World.levelLayer[srcLevel][s]; World.levelMass[dstLevel][s]=World.levelMass[srcLevel][s]; World.levelRadius[dstLevel][s]=World.levelRadius[srcLevel][s];
+    World.levelGravity[dstLevel][s]=World.levelGravity[srcLevel][s]; mcpy(World.levelInertiaTensor[dstLevel][s],World.levelInertiaTensor[srcLevel][s],6 * sizeof(float)); mcpy(World.levelInvInertiaTensor[dstLevel][s],World.levelInvInertiaTensor[srcLevel][s],6 * sizeof(float));
+    World.levelDynamicFriction[dstLevel][s]=World.levelDynamicFriction[srcLevel][s]; World.levelStaticFriction[dstLevel][s]=World.levelStaticFriction[srcLevel][s]; World.levelInvTnsrValid[dstLevel][s]=World.levelInvTnsrValid[srcLevel][s]; World.levelColliding[dstLevel][s]=World.levelColliding[srcLevel][s];
 }
 
-char lineSpace[LINE_LEN_MAX]; void AddDoorPortal(u16 entIdx, u16 parent); void TextureSequenceInit(u16 self, char* trimmed_value); void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr);
-// Interned target/targetname strings for the IO registration system.  Built once during LoadAllLevels() in level-parse order (deterministic), so indices are stable across sessions and usable cross-level.
-// Index 0 (IO_NONE) is reserved for "no name".  Entity.targetIdx/.target2Idx/.targetIfFalseIdx/.targetnameIdx/.currentTargetIdx all index into this table.
-#define MAX_IO_NAMES 1024
-static char ioNames[MAX_IO_NAMES][TARGET_STRING_LENGTH]; static u16 ioNameCount = 0;
-static void IONamesReset(void) { ioNameCount = 1; ioNames[0][0] = '\0'; } // Reserve slot 0 as IO_NONE
-u16 IOInternName(const char* name) {
-    if (!name || !*name) return IO_NONE;
-    for (u16 i = 1; i < ioNameCount; ++i) { if (sEqual(ioNames[i],name)) return i; }
-    if (ioNameCount >= MAX_IO_NAMES) { DualLogError("IO name table full (%u unique names)! Targeting will be dropped for new names.\n",MAX_IO_NAMES); return IO_NONE; }
-    scpy_to_a_from_b(ioNames[ioNameCount],name,TARGET_STRING_LENGTH);
-    return ioNameCount++;
-}
-const char* IOName(u16 idx) { return (idx < ioNameCount) ? ioNames[idx] : ""; }
-// FuncWall
-#define FW_MAX_CHILDREN 48 /*largest seen: 41 chunks (level 9)*/
-#define FW_POOL_MAX 512
-u16 fwParentOf[INSTANCE_COUNT]; // instance -> owning func_wall mover_target, 0 == none
-static u16 fwSlotStart[INSTANCE_COUNT],fwSlotCount[INSTANCE_COUNT];
-static V3 fwBasePos[INSTANCE_COUNT],fwInfoLocal[INSTANCE_COUNT],fwBaseScale[INSTANCE_COUNT];
-static Quaternion fwBaseRot[INSTANCE_COUNT];
-static u16 fwPoolPrefab[FW_POOL_MAX]; static V3 fwPoolPos[FW_POOL_MAX]; static Quaternion fwPoolRot[FW_POOL_MAX]; static V3 fwPoolScale[FW_POOL_MAX]; static u16 fwPoolUsed;
-static bool fwLine; // current entity line is a func_wall container
-static int fwStage; // transform block counter: 0 own, 1 func_wall container, 2 info_target, >=3 chunk children
-static bool fwCollecting,fwPendingChild;
-static u16 fwCurChild,fwLastChunkSlot,lwPrefab[FW_MAX_CHILDREN];
-static V3 lwPos[FW_MAX_CHILDREN],lwScale[FW_MAX_CHILDREN],fwInfoLocalTmp,fwContainerPos,fwContainerScale,fwInfoScaleDummy;
-static Quaternion lwRot[FW_MAX_CHILDREN],fwContainerRot,fwInfoRotDummy;
-static V3 *fwCurP; static Quaternion *fwCurR; static V3 *fwCurS;
-INLINE V3 QuatRotateVec(Quaternion q, V3 v) { // rotate v by q
-    V3 qv={q.x,q.y,q.z}, t=V3_ScaleByF(V3_Cross(qv,v),2.0f);
-    return V3_AplusB(V3_AplusB(v,V3_ScaleByF(t,q.w)),V3_Cross(qv,t));
-}
-INLINE Quaternion QuatMul(Quaternion a, Quaternion b) { // a * b
-    return (Quaternion){
-        a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
-        a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
-        a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w,
-        a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z};
-}
+char lineSpace[LINE_LEN_MAX]; char ioNames[MAX_IO_NAMES][TARG_STRLEN]; u16 ioNameCount,fwParentOf[INSTANCE_COUNT]; static u16 fwSlotStart[INSTANCE_COUNT],fwSlotCount[INSTANCE_COUNT],fwPoolUsed,fwPoolPrefab[FW_POOL_MAX],fwCurChild,fwLastChunkSlot,lwPrefab[FW_MAX_CHILDREN];
+static V3 fwBasePos[INSTANCE_COUNT],fwInfoLocal[INSTANCE_COUNT],fwBaseScale[INSTANCE_COUNT],fwPoolPos[FW_POOL_MAX],fwPoolScale[FW_POOL_MAX],lwPos[FW_MAX_CHILDREN],lwScale[FW_MAX_CHILDREN],fwInfoLocalTmp,fwContainerPos,fwContainerScale,fwInfoScaleDummy,*fwCurP,*fwCurS;
+static Quaternion fwBaseRot[INSTANCE_COUNT],fwPoolRot[FW_POOL_MAX],lwRot[FW_MAX_CHILDREN],fwContainerRot,fwInfoRotDummy,*fwCurR; static bool fwLine,fwCollecting,fwPendingChild; static i32 fwStage; // transform block counter: 0 own, 1 func_wall container, 2 info_target, >=3 chunk children
+u16 IOInternName(const char* name){if(!name || !*name){return IO_NONE;} for(u16 i=1;i<ioNameCount;++i){if(sEqual(ioNames[i],name)){return i;}} if(ioNameCount >= MAX_IO_NAMES){DualLogError("IO name full!\n"); return IO_NONE;} scpy_to_a_from_b(ioNames[ioNameCount],name,TARG_STRLEN); return ioNameCount++;}
 static void FWBeginBlock(i32 entCount) { // select destinations for next transform block's components
-    V3 *p; Quaternion *r; V3 *s;
-    if (fwCollecting && fwLastChunkSlot < FW_MAX_CHILDREN) {
-        p=&lwPos[fwLastChunkSlot]; r=&lwRot[fwLastChunkSlot]; s=&lwScale[fwLastChunkSlot];
-    } else {
-        switch (fwStage++) {
-            case 1:  p=&fwContainerPos;   r=&fwContainerRot;   s=&fwContainerScale; break;
-            case 2:  p=&fwInfoLocalTmp;   r=&fwInfoRotDummy;   s=&fwInfoScaleDummy; break; /*info_target rot/scale unused, dumped into temps*/
-            default: p=&posFromFile[entCount]; r=&rotationFromFile[entCount]; s=&scaleFromFile[entCount]; break;
-        }
-    }
+    V3 *p,*s; Quaternion *r;
+    if (fwCollecting && fwLastChunkSlot < FW_MAX_CHILDREN) { p=&lwPos[fwLastChunkSlot]; r=&lwRot[fwLastChunkSlot]; s=&lwScale[fwLastChunkSlot]; }
+    else { switch(fwStage++){case 1:p=&fwContainerPos; r=&fwContainerRot; s=&fwContainerScale; break; case 2:p=&fwInfoLocalTmp; r=&fwInfoRotDummy; s=&fwInfoScaleDummy; break; default:p=&posFromFile[entCount]; r=&rotationFromFile[entCount]; s=&scaleFromFile[entCount]; break;} } 
     fwCurP=p; fwCurR=r; fwCurS=s;
 }
 void LoadLevelMod(u8 lev) {
@@ -549,63 +437,35 @@ void LoadLevelMod(u8 lev) {
     if (curlevel == 1) {
         AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f); // MedScreen14_Camera (verified original)
         AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f); // MedScreen15_Camera (verified original)
-    }
-    if (curlevel == 2) {
-        // Level 2 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
-        AddCamView((V3){36.73389f,-24.66895f,9.47060f},(Quaternion){0.11769f,-0.23125f,0.02819f,0.96534f},75u,256u,256u,0.695f,13.73f); // SciScreen6_Camera
-    }
-    if (curlevel == 3) {
-        // Level 3 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+    } else if (curlevel == 2) { AddCamView((V3){36.73389f,-24.66895f,9.47060f},(Quaternion){0.11769f,-0.23125f,0.02819f,0.96534f},75u,256u,256u,0.695f,13.73f); /*SciScreen6_Camera*/}
+    else if (curlevel == 3) {
         AddCamView((V3){-15.35001f,13.99000f,44.87000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},71u,256u,256u,0.5f,16.582f); // BridgeScreen1_Camera
         AddCamView((V3){-12.01620f,-28.52930f,33.53500f},(Quaternion){0.54295f,0.45300f,0.54295f,-0.45300f},68u,256u,256u,0.868f,14.145f); // MaintScreen_Camera
-    }
-    if (curlevel == 4) {
-        // Level 4 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+    } else if (curlevel == 4) {
         AddCamView((V3){-10.82900f,6.95400f,-50.29300f},(Quaternion){0.00000f,0.70711f,0.70711f,0.00000f},68u,256u,256u,1.3f,9.4f); // GroveScreen1_Camera
         AddCamView((V3){-23.29000f,104.60000f,62.98000f},(Quaternion){0.00000f,-0.89126f,0.00000f,-0.45349f},68u,256u,256u,4.0f,13.6f); // GroveScreen2_Camera
         AddCamView((V3){8.92170f,47.42900f,-45.97000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,0.7f,4.32f); // GroveScreen3_Camera
         AddCamView((V3){-16.67800f,-52.22300f,-23.32000f},(Quaternion){0.00000f,-0.70711f,0.00000f,0.70711f},68u,256u,256u,1.5f,8.04f); // GroveScreen4_Camera
         AddCamView((V3){-26.93000f,46.56557f,-31.18625f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,0.82f,17.56f); // StorageScreen_Camera
-    }
-    if (curlevel == 5) {
-        // Level 5 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
-        AddCamView((V3){-30.72000f,8.96000f,-53.76000f},(Quaternion){0.00000f,0.70711f,0.70711f,0.00000f},68u,256u,256u,2.7f,24.8f); // FlightScreen1_Camera
-    }
-    if (curlevel == 6) {
-        // Level 6 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+    } else if (curlevel == 5) { AddCamView((V3){-30.72000f,8.96000f,-53.76000f},(Quaternion){0.00000f,0.70711f,0.70711f,0.00000f},68u,256u,256u,2.7f,24.8f);/*FlightScreen1_Camera*/}
+    else if (curlevel == 6) {
         AddCamView((V3){9.08000f,48.71000f,-47.32400f},(Quaternion){0.00000f,0.99054f,0.00000f,-0.13719f},90u,256u,256u,1.2f,11.52f); // ExecScreen5_Camera
         AddCamView((V3){-3.90720f,13.90800f,2.47230f},(Quaternion){-0.50000f,0.50000f,0.50000f,0.50000f},90u,256u,256u,0.06f,11.87f); // ExecScreen6_Camera
-    }
-    if (curlevel == 7) {
-        // Level 7 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
+    } else if (curlevel == 7) {
         AddCamView((V3){106.87113f,-14.55570f,24.65725f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,1.295f,26.01f); // EngScreen3_Camera
         AddCamView((V3){-57.06100f,34.70000f,1.19200f},(Quaternion){0.00000f,-0.65094f,0.00000f,0.75913f},68u,256u,256u,1.83f,19.9f); // EngScreen4_Camera
         AddCamView((V3){29.51000f,3.29000f,-9.93000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},80u,256u,256u,0.77f,9.79f); // EngScreen5_Camera
-    }
-    if (curlevel == 8) {
-        // Level 8 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
-        AddCamView((V3){69.76093f,30.97230f,-0.84785f},(Quaternion){0.48739f,0.51230f,0.51230f,-0.48739f},85u,256u,256u,0.33f,10.05f); // SecScreen1_Camera
-    }
-    if (curlevel == 9) {
-        // Level 9 cameras (CitadelScene.unity — FOV/Near/Far from Camera component)
-        AddCamView((V3){-15.24800f,44.55600f,6.42560f},(Quaternion){0.00000f,1.00000f,0.00000f,0.00000f},85u,256u,256u,0.84f,16.223f); // ReacScreen1_Camera
-    }
+    } else if (curlevel == 8) { AddCamView((V3){69.76093f,30.97230f,-0.84785f},(Quaternion){0.48739f,0.51230f,0.51230f,-0.48739f},85u,256u,256u,0.33f,10.05f);/*SecScreen1_Camera*/}
+    else if(curlevel == 9) { AddCamView((V3){-15.24800f,44.55600f,6.42560f},(Quaternion){0.00000f,1.00000f,0.00000f,0.00000f},85u,256u,256u,0.84f,16.223f);/*ReacScreen1_Camera*/}
     mset(lineSpace,0,LINE_LEN_MAX * sizeof(char)); u32 lineNum = 0; i32 entCount = -1, lightsIdx = -1; char* line;
     for (u16 i=0;i<LIGHT_COUNT;++i) { mset(&lightsFromFile[i],0,sizeof(Light)); mset(&lanimsFromFile[i],0,sizeof(LightAnimation)); lightsFromFile[i].range = 5.5f; lightsFromFile[i].col = (Color3){1.0f,1.0f,1.0f}; lightsFromFile[i].spotAng=0.0f; }
     while (MmapGetLine(lineSpace, LINE_LEN_MAX)) {
-        lineNum++; line = lineSpace; char* firstColon = StringFindFirstCharWithin(line, ':'); int firstKeyLen = firstColon ? (int)(firstColon - line) : 0;
-        bool isLight = !(firstKeyLen == 10 && sCompUpToLen(line, "constIndex", 10) == 0);
-        Entity* inst=NULL; Light* lit=NULL; LightAnimation* lanim=NULL;
-        if (isLight) {
-            lightsIdx++; if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n", lightsIdx, curlevel); continue; }
-            lit=&lightsFromFile[lightsIdx]; lanim=&lanimsFromFile[lightsIdx];
-            lit->lflags = LIGHT_AND_SHADOW_ON; // default per-light
-        } else {
-            entCount++;
-            if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; }
+        lineNum++; line=lineSpace; char* firstColon=StringFindFirstCharWithin(line,':'); int firstKeyLen=firstColon ? (int)(firstColon - line) : 0; bool isLight=!(firstKeyLen == 10 && sCompUpToLen(line,"constIndex",10) == 0); Entity* inst=NULL; Light* lit=NULL; LightAnimation* lanim=NULL;
+        if (isLight) { lightsIdx++; if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n", lightsIdx, curlevel); continue; } lit=&lightsFromFile[lightsIdx]; lanim=&lanimsFromFile[lightsIdx]; lit->lflags = LIGHT_AND_SHADOW_ON; }
+        else {
+            entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; }
             inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
-            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL;
-            fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f};
+            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f};
         }
         bool activeStateRead = false;
         while (line[0] != '\0') {
@@ -616,144 +476,74 @@ void LoadLevelMod(u8 lev) {
             *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);
             } else {
-                     if (KEY_EQ("constIndex"))          { inst->index = parse_numberu16(value, lineSpace, lineNum); fwLine = inst->index == 517; }
-                else if (KEY_EQ("lP.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].x=v;} else {FWBeginBlock(entCount); if(fwCurP){fwCurP->x=v;}} }
-                else if (KEY_EQ("lP.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].y=v;} else if(fwCurP){fwCurP->y=v;} }
-                else if (KEY_EQ("lP.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].z=v;} else if(fwCurP){fwCurP->z=v;} }
-                else if (KEY_EQ("lR.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].x=v;} else if(fwCurR){fwCurR->x=v;} }
-                else if (KEY_EQ("lR.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].y=v;} else if(fwCurR){fwCurR->y=v;} }
-                else if (KEY_EQ("lR.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].z=v;} else if(fwCurR){fwCurR->z=v;} }
-                else if (KEY_EQ("lR.w")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].w=v;} else if(fwCurR){fwCurR->w=v;} }
-                else if (KEY_EQ("lS.x"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].x=v;} else if(fwCurS){fwCurS->x=v;} }
-                else if (KEY_EQ("lS.y"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].y=v;} else if(fwCurS){fwCurS->y=v;} }
-                else if (KEY_EQ("lS.z"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].z=v;} else if(fwCurS){fwCurS->z=v;} }
-                else if (KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
-                else if (KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);
-                else if (KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);
-                else if (KEY_EQ("radiationAmount")) inst->radiation=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("ammo"))inst->ammo=parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("ammo2"))inst->ammo2=parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("useableItemIndex"))inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("customIndex"))inst->usableCustIdx=(u16)parse_numberi16(value,lineSpace,lineNum);
-                else if (KEY_EQ("amount"))          inst->amount = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("resetTime"))       inst->resetTime = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("minSecurityLevel"))inst->minSecurityLevel = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("damageOnUse"))     inst->damage = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("target"))          inst->targetIdx = IOInternName(value);
-                else if (KEY_EQ("targetname"))      inst->targetnameIdx = IOInternName(value);
-                else if (KEY_EQ("target2"))         inst->target2Idx = IOInternName(value);
-                else if (KEY_EQ("targetIfFalse"))   inst->targetIfFalseIdx = IOInternName(value);
-                else if (KEY_EQ("randomItemCustomIndex[0]")) inst->randomItemCustIdx[0] = parse_numberi16(value,lineSpace,lineNum);
-                else if (KEY_EQ("randomItemCustomIndex[1]")) inst->randomItemCustIdx[1] = parse_numberi16(value,lineSpace,lineNum);
-                else if (KEY_EQ("randomItemCustomIndex[2]")) inst->randomItemCustIdx[2] = parse_numberi16(value,lineSpace,lineNum);
-                else if (KEY_EQ("randomItemCustomIndex[3]")) inst->randomItemCustIdx[3] = parse_numberi16(value,lineSpace,lineNum);
-                else if (KEY_EQ("musicType"))       inst->musicType = (MusicType)parse_numberu8(value,lineSpace,lineNum); // trigger_music
-                else if (KEY_EQ("securityThreshhold") || KEY_EQ("securityThreshold")) inst->securityThreshold = parse_numberu8(value, lineSpace, lineNum);
-                else if (KEY_EQ("messageIndex"))    inst->messageIndex = parse_numberi16(value, lineSpace, lineNum);
-                else if (KEY_EQ("delay"))           inst->delay = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("locked"))          flag_set(&inst->entflags, EF_LOCKED, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("active"))          inst->active = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("timeInterval"))   inst->timeInterval = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("randomMin"))      inst->randomMin = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("randomMax"))      inst->randomMax = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("useRandomTimes")) inst->useRandomTimes = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("onlyOnce"))        inst->onlyOnce = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("stayOpen"))        inst->stayOpen = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("startOpen"))       inst->startOpen = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("ajar"))            inst->ajar = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("ajarPercentage"))  inst->ajarPercentage = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("toggleLasers"))    inst->toggleLasers = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("changeLayerOnOpenClose")) inst->changeLayerOnOpenClose = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("waitBeforeClose")) inst->waitBeforeClose = parse_float(value, lineSpace, lineNum) + World.pauseRelativeTime;
-                else if (KEY_EQ("doorOpen"))        flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPEN, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("doorOpenIfUnlocked") || KEY_EQ("doorToggle")) flag_set(&inst->ioflags, TARG_IOFLAGS_DOOROPENIFUNLOCKED, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("doorClose"))       flag_set(&inst->ioflags, TARG_IOFLAGS_DOORCLOSE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("doorLock") || KEY_EQ("lockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_LOCK, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("doorUnlock") || KEY_EQ("unlockSwitch") || KEY_EQ("unlockElevatorPad") || KEY_EQ("unlockKeycodePad") || KEY_EQ("unlockPuzzlePad")) flag_set(&inst->ioflags, TARG_IOFLAGS_UNLOCK, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("switchTrigger"))   flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCHTRIGGER, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("tripTrigger"))     flag_set(&inst->ioflags, TARG_IOFLAGS_TRIPTRIGGER, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("forceBridgeActivate"))   flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_ACTIVATE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("forceBridgeDeactivate")) flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_DEACTIVATE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("forceBridgeToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_TOGGLE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("gravityLiftToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_GRAVLIFT_TOGGLE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("textureChangeToggle"))   flag_set(&inst->ioflags, TARG_IOFLAGS_TEXTURE_CHG_TOGGLE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("lightOn"))         flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_ON, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("lightOff"))        flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_OFF, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("lightToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_TOGGLE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("funcwallMove"))    flag_set(&inst->ioflags, TARG_IOFLAGS_FUNCWALL_MOVE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("missionBitOn"))    flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_ON, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("missionBitOff"))   flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_OFF, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("missionBitToggle"))flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_TOGGLE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("switchLockToggle"))flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCH_LOCK_TOGGLE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("GOSetActive"))     flag_set(&inst->ioflags, TARG_IOFLAGS_INST_ACTIVATE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("GOSetDeactive"))   flag_set(&inst->ioflags, TARG_IOFLAGS_INST_DEACTIVATE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("GOToggleActive"))  flag_set(&inst->ioflags, TARG_IOFLAGS_INST_TOGGLE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("disableThisGOOnAwake")) flag_set(&inst->ioflags, TARG_IOFLAGS_DISABLE_ON_AWAKE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("playSoundOnce"))   flag_set(&inst->ioflags, TARG_IOFLAGS_PLAY_SOUND_ONCE, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("stopSound"))       flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_SOUND, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("startFlashingMaterials")) flag_set(&inst->ioflags, TARG_IOFLAGS_START_FLASHING_TEX, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("stopFlashingMaterials"))  flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(value, lineSpace, lineNum));
-                else if (KEY_EQ("resourceFolder") && *value) scpy_to_a_from_b(inst->texAnimResourceFolder, value, TARGET_STRING_LENGTH);
-                else if (KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);
-                else if (KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
-                else if (KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
-                else if (KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("onSecond"))        inst->branchOnSecond = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("onceEver"))        inst->relayOnceEver = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(value, lineSpace, lineNum);
-                else if (KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
-                else if (KEY_EQ("testQuestBitIsOff"))   inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 2 : inst->questTestMode;
-                else if (KEY_EQ("ForceBridge.activated")) inst->active = parse_bool(value,lineSpace,lineNum);
-                else if (KEY_EQ("x"))                   inst->forceFieldDirectionX = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("y"))                   inst->forceFieldDirectionY = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("z"))                   inst->forceFieldDirectionZ = parse_bool(value, lineSpace, lineNum);
-                else if (KEY_EQ("activatedScaleX"))     inst->activatedScale.x = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("activatedScaleY"))     inst->activatedScale.y = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("activatedScaleZ"))     inst->activatedScale.z = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("fieldColor"))          inst->fieldColor = (ForceFieldColor)parse_numberu8(value, lineSpace, lineNum);
-                else if (KEY_EQ("center.x"))            colCtrFromFile[entCount].x = parse_float(value,lineSpace,lineNum);
-                else if (KEY_EQ("center.y"))            colCtrFromFile[entCount].y = parse_float(value,lineSpace,lineNum);
-                else if (KEY_EQ("center.z"))            colCtrFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
-                else if (KEY_EQ("size.x"))              colSzFromFile[entCount].x = parse_float(value,lineSpace,lineNum);
-                else if (KEY_EQ("size.y"))              colSzFromFile[entCount].y = parse_float(value,lineSpace,lineNum);
-                else if (KEY_EQ("size.z"))              colSzFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
-                else if (KEY_EQ("RobotSpawnDeactivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_RobotSpawnDeactivated; }
-                else if (KEY_EQ("IsotopeInstalled"))            { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsotopeInstalled; }
-                else if (KEY_EQ("ShieldActivated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_ShieldActivated; }
-                else if (KEY_EQ("LaserSafetyOverriden"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserSafetyOverriden; }
-                else if (KEY_EQ("LaserDestroyed"))              { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserDestroyed; }
-                else if (KEY_EQ("BetaGroveCyberUnlocked"))      { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BetaGroveCyberUnlocked; }
-                else if (KEY_EQ("GroveAlphaJettisonEnabled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveAlphaJettisonEnabled; }
-                else if (KEY_EQ("GroveBetaJettisonEnabled"))    { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveBetaJettisonEnabled; }
-                else if (KEY_EQ("GroveDeltaJettisonEnabled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveDeltaJettisonEnabled; }
-                else if (KEY_EQ("MasterJettisonBroken"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_MasterJettisonBroken; }
-                else if (KEY_EQ("Relay428Fixed"))               { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_Relay428Fixed; }
-                else if (KEY_EQ("MasterJettisonEnabled"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_MasterJettisonEnabled; }
-                else if (KEY_EQ("BetaGroveJettisoned"))         { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BetaGroveJettisoned; }
-                else if (KEY_EQ("AntennaNorthDestroyed"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaNorthDestroyed; }
-                else if (KEY_EQ("AntennaSouthDestroyed"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaSouthDestroyed; }
-                else if (KEY_EQ("AntennaEastDestroyed"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaEastDestroyed; }
-                else if (KEY_EQ("AntennaWestDestroyed"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaWestDestroyed; }
-                else if (KEY_EQ("SelfDestructActivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_SelfDestructActivated; }
-                else if (KEY_EQ("BridgeSeparated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BridgeSeparated; }
-                else if (KEY_EQ("IsolinearChipsetInstalled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsolinearChipsetInstalled; }
-                else if (KEY_EQ("doorOpenState"))   inst->doorOpen = parse_numberu8(value, lineSpace, lineNum);
-                else if (KEY_EQ("FuncWall.currentState")) inst->funcState = (FuncStates)parse_numberu8(value, lineSpace, lineNum); // raw; out-of-range legacy values handled by FuncWallInitAfterLoad
-                else if (KEY_EQ("startState"))      {} // recorded in save only; currentState drives placement
-                else if (KEY_EQ("startPosition.x")) inst->startPosition.x = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("startPosition.y")) inst->startPosition.y = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("startPosition.z")) inst->startPosition.z = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("speed"))           inst->speed = parse_float(value, lineSpace, lineNum); // func_wall move speed
-                else if (KEY_EQ("percentAjar"))     inst->ajarPercentage = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("percentMoved"))    inst->percentMoved = parse_float(value, lineSpace, lineNum);
-                else if (KEY_EQ("chunkIDs.Length")) { fwCollecting=true; fwPendingChild=false; fwCurChild=0; fwLastChunkSlot=0; }
-                else if (keyLen > 9 && sCompUpToLen(key,"chunkIDs[",9) == 0) {
-                    u16 idx=parse_numberu16(value,lineSpace,lineNum);
-                    if(fwCurChild<FW_MAX_CHILDREN){lwPrefab[fwCurChild]=idx; fwLastChunkSlot=fwCurChild; fwPendingChild=true; fwCurChild++;}
-                }
+                     if(KEY_EQ("constIndex")){inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517);}
+                else if(KEY_EQ("lP.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].x=v;} else {FWBeginBlock(entCount); if(fwCurP){fwCurP->x=v;}} } else if(KEY_EQ("lP.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].y=v;} else if(fwCurP){fwCurP->y=v;} }
+                else if(KEY_EQ("lP.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].z=v;} else if(fwCurP){fwCurP->z=v;} }                           else if(KEY_EQ("lR.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].x=v;} else if(fwCurR){fwCurR->x=v;} }
+                else if(KEY_EQ("lR.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].y=v;} else if(fwCurR){fwCurR->y=v;} }                      else if(KEY_EQ("lR.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].z=v;} else if(fwCurR){fwCurR->z=v;} }
+                else if(KEY_EQ("lR.w")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].w=v;} else if(fwCurR){fwCurR->w=v;} }                      else if(KEY_EQ("lS.x"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].x=v;} else if(fwCurS){fwCurS->x=v;} }
+                else if(KEY_EQ("lS.y"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].y=v;} else if(fwCurS){fwCurS->y=v;} }                      else if(KEY_EQ("lS.z"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].z=v;} else if(fwCurS){fwCurS->z=v;} }
+                else if(KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
+                else if(KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("radiationAmount")) inst->radiation=parse_float(value,lineSpace,lineNum);                           else if(KEY_EQ("ammo"))inst->ammo=parse_numberi16(value,lineSpace,lineNum);
+                else if(KEY_EQ("ammo2"))inst->ammo2=parse_numberi16(value,lineSpace,lineNum);                                      else if(KEY_EQ("useableItemIndex"))inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
+                else if(KEY_EQ("customIndex"))inst->usableCustIdx=(u16)parse_numberi16(value,lineSpace,lineNum);                   else if(KEY_EQ("amount"))          inst->amount = parse_float(value, lineSpace, lineNum);
+                else if(KEY_EQ("resetTime"))       inst->resetTime = parse_float(value, lineSpace, lineNum);                       else if(KEY_EQ("minSecurityLevel"))inst->minSecurityLevel = parse_float(value, lineSpace, lineNum);
+                else if(KEY_EQ("damageOnUse"))     inst->damage = parse_float(value, lineSpace, lineNum);                          else if(KEY_EQ("target"))          inst->targetIdx = IOInternName(value);
+                else if(KEY_EQ("targetname"))      inst->targetnameIdx = IOInternName(value);                                      else if(KEY_EQ("target2"))         inst->target2Idx = IOInternName(value);
+                else if(KEY_EQ("targetIfFalse"))   inst->targetIfFalseIdx = IOInternName(value);                                   else if(KEY_EQ("randomItemCustomIndex[0]")) inst->randomItemCustIdx[0] = parse_numberi16(value,lineSpace,lineNum);
+                else if(KEY_EQ("randomItemCustomIndex[1]")) inst->randomItemCustIdx[1] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItemCustomIndex[2]")) inst->randomItemCustIdx[2] = parse_numberi16(value,lineSpace,lineNum);
+                else if(KEY_EQ("randomItemCustomIndex[3]")) inst->randomItemCustIdx[3] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("musicType"))       inst->musicType = (MusicType)parse_numberu8(value,lineSpace,lineNum); // trigger_music
+                else if(KEY_EQ("securityThreshhold") || KEY_EQ("securityThreshold")) inst->securityThreshold=parse_numberu8(value,lineSpace,lineNum);
+                else if(KEY_EQ("messageIndex"))    inst->messageIndex = parse_numberi16(value,lineSpace,lineNum);                  else if(KEY_EQ("delay"))           inst->delay = parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("locked"))          flag_set(&inst->entflags,EF_LOCKED,parse_bool(value,lineSpace,lineNum));        else if(KEY_EQ("active"))          inst->active = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("timeInterval"))   inst->timeInterval = parse_float(value, lineSpace, lineNum);                     else if(KEY_EQ("randomMin"))      inst->randomMin = parse_float(value, lineSpace, lineNum);
+                else if(KEY_EQ("randomMax"))      inst->randomMax = parse_float(value, lineSpace, lineNum);                        else if(KEY_EQ("useRandomTimes")) inst->useRandomTimes = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("onlyOnce"))        inst->onlyOnce = parse_bool(value, lineSpace, lineNum);                         else if(KEY_EQ("stayOpen"))        inst->stayOpen = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("startOpen"))       inst->startOpen = parse_bool(value, lineSpace, lineNum);                        else if(KEY_EQ("ajar"))            inst->ajar = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("ajarPercentage"))  inst->ajarPercentage = parse_float(value, lineSpace, lineNum);                  else if(KEY_EQ("timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(value, lineSpace, lineNum);
+                else if(KEY_EQ("toggleLasers"))    inst->toggleLasers = parse_bool(value, lineSpace, lineNum);                                                              else if(KEY_EQ("changeLayerOnOpenClose")) inst->changeLayerOnOpenClose=parse_bool(value,lineSpace,lineNum);
+                else if(KEY_EQ("waitBeforeClose")) inst->waitBeforeClose=parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;                                    else if(KEY_EQ("doorOpen")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPEN,parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("doorOpenIfUnlocked") || KEY_EQ("doorToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPENIFUNLOCKED,parse_bool(value,lineSpace,lineNum)); else if(KEY_EQ("doorClose")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOORCLOSE,parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("doorLock") || KEY_EQ("lockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_LOCK, parse_bool(value, lineSpace, lineNum));
+                else if(KEY_EQ("doorUnlock") || KEY_EQ("unlockSwitch") || KEY_EQ("unlockElevatorPad") || KEY_EQ("unlockKeycodePad") || KEY_EQ("unlockPuzzlePad")) flag_set(&inst->ioflags,TARG_IOFLAGS_UNLOCK,parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("switchTrigger"))   flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCHTRIGGER, parse_bool(value, lineSpace, lineNum));            else if(KEY_EQ("tripTrigger")) flag_set(&inst->ioflags, TARG_IOFLAGS_TRIPTRIGGER, parse_bool(value, lineSpace, lineNum));
+                else if(KEY_EQ("forceBridgeActivate"))   flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_ACTIVATE, parse_bool(value, lineSpace, lineNum));   else if(KEY_EQ("forceBridgeDeactivate")) flag_set(&inst->ioflags,TARG_IOFLAGS_FBRIDGE_DEACTIVATE,parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("forceBridgeToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_TOGGLE, parse_bool(value, lineSpace, lineNum));     else if(KEY_EQ("gravityLiftToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_GRAVLIFT_TOGGLE,parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("textureChangeToggle"))   flag_set(&inst->ioflags, TARG_IOFLAGS_TEXTURE_CHG_TOGGLE, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("lightOn")) flag_set(&inst->ioflags,TARG_IOFLAGS_LIGHT_ON,parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("lightOff"))        flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_OFF, parse_bool(value, lineSpace, lineNum));                else if(KEY_EQ("lightToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_TOGGLE, parse_bool(value, lineSpace, lineNum));
+                else if(KEY_EQ("funcwallMove"))    flag_set(&inst->ioflags, TARG_IOFLAGS_FUNCWALL_MOVE, parse_bool(value, lineSpace, lineNum));            else if(KEY_EQ("missionBitOn"))    flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_ON, parse_bool(value, lineSpace, lineNum));
+                else if(KEY_EQ("missionBitOff"))   flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_OFF, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("missionBitToggle"))flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_TOGGLE, parse_bool(value, lineSpace, lineNum));
+                else if(KEY_EQ("switchLockToggle"))flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCH_LOCK_TOGGLE, parse_bool(value, lineSpace, lineNum));       else if(KEY_EQ("GOSetActive"))     flag_set(&inst->ioflags, TARG_IOFLAGS_INST_ACTIVATE, parse_bool(value, lineSpace, lineNum));
+                else if(KEY_EQ("GOSetDeactive"))   flag_set(&inst->ioflags, TARG_IOFLAGS_INST_DEACTIVATE, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("GOToggleActive"))  flag_set(&inst->ioflags, TARG_IOFLAGS_INST_TOGGLE, parse_bool(value, lineSpace, lineNum));
+                else if(KEY_EQ("disableThisGOOnAwake")) flag_set(&inst->ioflags, TARG_IOFLAGS_DISABLE_ON_AWAKE, parse_bool(value, lineSpace, lineNum));    else if(KEY_EQ("playSoundOnce"))   flag_set(&inst->ioflags, TARG_IOFLAGS_PLAY_SOUND_ONCE, parse_bool(value, lineSpace, lineNum));
+                else if(KEY_EQ("stopSound"))       flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_SOUND, parse_bool(value, lineSpace, lineNum));               else if(KEY_EQ("startFlashingMaterials")) flag_set(&inst->ioflags, TARG_IOFLAGS_START_FLASHING_TEX, parse_bool(value, lineSpace, lineNum));
+                else if(KEY_EQ("stopFlashingMaterials"))  flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(value, lineSpace, lineNum));
+                else if(KEY_EQ("branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("resourceFolder") && *value) scpy_to_a_from_b(inst->texAnimResourceFolder, value, TARG_STRLEN);
+                else if(KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);                                      else if(KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
+                else if(KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);                                       else if(KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("onSecond"))        inst->branchOnSecond = parse_bool(value, lineSpace, lineNum);                                           else if(KEY_EQ("onceEver"))        inst->relayOnceEver = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(value, lineSpace, lineNum);                                else if(KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
+                else if(KEY_EQ("testQuestBitIsOff"))   inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 2 : inst->questTestMode;                else if(KEY_EQ("ForceBridge.activated")) inst->active = parse_bool(value,lineSpace,lineNum);
+                else if(KEY_EQ("x")) inst->forceFieldDirectionX = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("y")) inst->forceFieldDirectionY = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("z")) inst->forceFieldDirectionZ = parse_bool(value, lineSpace, lineNum); 
+                else if(KEY_EQ("activatedScaleX")) inst->activatedScale.x = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("activatedScaleY")) inst->activatedScale.y = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("activatedScaleZ")) inst->activatedScale.z = parse_float(value, lineSpace, lineNum);
+                else if(KEY_EQ("fieldColor"))          inst->fieldColor = (ForceFieldColor)parse_numberu8(value, lineSpace, lineNum);
+                else if(KEY_EQ("center.x")) colCtrFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.y")) colCtrFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.z")) colCtrFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("size.x")) colSzFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.y")) colSzFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.z")) colSzFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("RobotSpawnDeactivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_RobotSpawnDeactivated; }   else if(KEY_EQ("IsotopeInstalled"))            { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsotopeInstalled; }
+                else if(KEY_EQ("ShieldActivated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_ShieldActivated; }         else if(KEY_EQ("LaserSafetyOverriden"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserSafetyOverriden; }
+                else if(KEY_EQ("LaserDestroyed"))              { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserDestroyed; }          else if(KEY_EQ("BetaGroveCyberUnlocked"))      { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BetaGroveCyberUnlocked; }
+                else if(KEY_EQ("GroveAlphaJettisonEnabled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveAlphaJettisonEnabled;}else if(KEY_EQ("GroveBetaJettisonEnabled"))    { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveBetaJettisonEnabled; }
+                else if(KEY_EQ("GroveDeltaJettisonEnabled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveDeltaJettisonEnabled;}else if(KEY_EQ("MasterJettisonBroken"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_MasterJettisonBroken; }
+                else if(KEY_EQ("Relay428Fixed"))               { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_Relay428Fixed; }           else if(KEY_EQ("MasterJettisonEnabled"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_MasterJettisonEnabled; }
+                else if(KEY_EQ("BetaGroveJettisoned"))         { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BetaGroveJettisoned; }     else if(KEY_EQ("AntennaNorthDestroyed"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaNorthDestroyed; }
+                else if(KEY_EQ("AntennaSouthDestroyed"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaSouthDestroyed; }   else if(KEY_EQ("AntennaEastDestroyed"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaEastDestroyed; }
+                else if(KEY_EQ("AntennaWestDestroyed"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaWestDestroyed; }    else if(KEY_EQ("SelfDestructActivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_SelfDestructActivated; }
+                else if(KEY_EQ("BridgeSeparated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BridgeSeparated; }         else if(KEY_EQ("IsolinearChipsetInstalled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsolinearChipsetInstalled; }
+                else if(KEY_EQ("doorOpenState"))   inst->doorOpen = parse_numberu8(value, lineSpace, lineNum);     else if(KEY_EQ("FuncWall.currentState")) inst->funcState = (FuncStates)parse_numberu8(value, lineSpace, lineNum);
+                else if(KEY_EQ("startPosition.x")) inst->startPosition.x = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("startPosition.y")) inst->startPosition.y = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("startPosition.z")) inst->startPosition.z = parse_float(value, lineSpace, lineNum);
+                else if(KEY_EQ("speed"))           inst->speed = parse_float(value, lineSpace, lineNum);           else if(KEY_EQ("percentAjar"))     inst->ajarPercentage = parse_float(value, lineSpace, lineNum);
+                else if(KEY_EQ("percentMoved"))    inst->percentMoved = parse_float(value, lineSpace, lineNum);    else if(KEY_EQ("chunkIDs.Length")) { fwCollecting=true; fwPendingChild=false; fwCurChild=0; fwLastChunkSlot=0; }
+                else if(keyLen > 9 && sCompUpToLen(key,"chunkIDs[",9) == 0) { u16 idx=parse_numberu16(value,lineSpace,lineNum); if(fwCurChild<FW_MAX_CHILDREN){lwPrefab[fwCurChild]=idx; fwLastChunkSlot=fwCurChild; fwPendingChild=true; fwCurChild++;} }
             }
         }
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true); // Default active if not specified
@@ -774,15 +564,15 @@ void LoadLevelMod(u8 lev) {
         par->toggleLasers=src->toggleLasers; par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->target2Idx=src->target2Idx; 
         par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed;
-        scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARGET_STRING_LENGTH);
+        scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARG_STRLEN);
         if (entIdx == 517) { // func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative
             V3 sp = par->startPosition; if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3_AplusB(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } // fallback for entries lacking startPosition
             World.position[parent] = par->lastPosition = sp; World.rotation[parent] = quat_multiply(fwBaseRot[e],rotationFromFile[e]); World.scale[parent] = (V3){fwBaseScale[e].x*scaleFromFile[e].x,fwBaseScale[e].y*scaleFromFile[e].y,fwBaseScale[e].z*scaleFromFile[e].z}; par->targetPosition = V3_AplusB(sp,fwInfoLocal[e]); // info_target offset denotes full travel
             if (par->speed <= 0.0f) par->speed = 0.64f;
             for (u16 k=0;k<fwSlotCount[e];++k) {
                 u16 pi = fwPoolPrefab[fwSlotStart[e]+k]; if (pi >= 307) continue; // chunk family guard
-                u16 c = AddInstance(pi,V3_AplusB(sp,QuatRotateVec(fwBaseRot[e],fwPoolPos[fwSlotStart[e]+k]))); if (c == 0) continue;
-                World.rotation[c] = QuatMul(fwBaseRot[e], fwPoolRot[fwSlotStart[e]+k]); V3 cs = fwPoolScale[fwSlotStart[e]+k]; World.scale[c] = (V3){World.scale[parent].x*cs.x,World.scale[parent].y*cs.y,World.scale[parent].z*cs.z}; fwParentOf[c] = parent;
+                u16 c = AddInstance(pi,V3_AplusB(sp,quat_rot_v3(fwBaseRot[e],fwPoolPos[fwSlotStart[e]+k]))); if (c == 0) continue;
+                World.rotation[c]=quat_multiply(fwBaseRot[e],fwPoolRot[fwSlotStart[e]+k]); V3 cs=fwPoolScale[fwSlotStart[e]+k]; World.scale[c]=(V3){World.scale[parent].x*cs.x,World.scale[parent].y*cs.y,World.scale[parent].z*cs.z}; fwParentOf[c]=parent;
             }
         }
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
@@ -796,7 +586,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 279) { par->texAnimLight = AddOffsetLight(par,(V3){0.0f,-0.08f,0.0f},(Color3){0.909803922f,0.929411765f,1.0f},3.2f,1.575f); } // chunk_screen
         else if (par->index == 574) { // prop_healingbed
             Color3 green = {0.0f, 0.925490196f, 0.082352941f}; par->texAnimLight=AddOffsetLight(par,(V3){0.5292511f,0.065f,0.915f},green,3.0f,0.72f); par->texAnimLight2=AddOffsetLight(par,(V3){-0.5317497f,0.065f,1.039f},green,3.0f,0.72f); par->textureAnimating=true; par->texAnimClip=12; par->texFrame=0;
-            scpy_to_a_from_b(par->texAnimResourceFolder,"MedicalBed",TARGET_STRING_LENGTH);
+            scpy_to_a_from_b(par->texAnimResourceFolder,"MedicalBed",TARG_STRLEN);
         } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) { World.position[parent].y += 0.12f; } // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 328) { World.position[parent].y += 0.04f; } // item_hw_system: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 310) { World.position[parent].y += 0.0975f; } // item_beverage: Move up to account for CG mod (origin moved vs Unity version)
@@ -829,7 +619,7 @@ void LoadLevelMod(u8 lev) {
         else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
         else if (entIdx == 720) { /*u16 mist=*/AddInstance(648,World.position[parent]); }// ambient_mist
         else if (entIdx == 733) { /*u16 pipewater=*/AddInstance(649,World.position[parent]);/*ambient_pipewater_loop*/ /*u16 rain=*/AddInstance(653,(V3){World.position[parent].x,World.position[parent].y - 1.26f,World.position[parent].z});/*ambient_rain*/ }
-        else if (entIdx == 305) { scpy_to_a_from_b(par->texAnimResourceFolder,"Telepad",TARGET_STRING_LENGTH); } /*chunk_teleporter*/
+        else if (entIdx == 305) { scpy_to_a_from_b(par->texAnimResourceFolder,"Telepad",TARG_STRLEN); } /*chunk_teleporter*/
         TextureSequenceInit(parent,par->texAnimResourceFolder);
     }
     for (int i=0;i<=lightsIdx;++i) { if (lightsFromFile[i].intensity < 0.11f && lightsFromFile[i].maxIntensity < 0.11f){continue;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
@@ -923,30 +713,19 @@ void RenderLoading(const char* restrict); void ResetLevelAudio(); void ResetLeve
 void LoadAllLevels() {
     double start_time = get_time();
     DebugRAM("start of LoadAllLevels"); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true;
-    entsFromFile = (Entity*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(Entity));
-    posFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
-    scaleFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
-    rotationFromFile = (Quaternion*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(Quaternion));
-    colCtrFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
-    colSzFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
-    IONamesReset(); // Intern table is derived data; rebuild before parsing levels so indices match entity targetIdx fields.
-    lightsFromFile = (Light*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(Light));
-    lanimsFromFile = (LightAnimation*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(LightAnimation));
-    for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;}
-    mset(fwParentOf,0,sizeof(fwParentOf)); fwPoolUsed = 0;
-    for (u8 lev = 0; lev < World.numLevels; ++lev) LoadLevelData(lev);
-    OS_Free(entsFromFile, (size_t)INSTANCE_COUNT * sizeof(Entity));
-    OS_Free(colCtrFromFile, (size_t)INSTANCE_COUNT * sizeof(V3)); OS_Free(colSzFromFile, (size_t)INSTANCE_COUNT * sizeof(V3)); colCtrFromFile = NULL; colSzFromFile = NULL;
-    OS_Free(posFromFile, (size_t)INSTANCE_COUNT * sizeof(V3));
-    OS_Free(scaleFromFile, (size_t)INSTANCE_COUNT * sizeof(V3));
-    OS_Free(rotationFromFile, (size_t)INSTANCE_COUNT * sizeof(Quaternion));
-    OS_Free(lightsFromFile, (size_t)LIGHT_COUNT * sizeof(Light));
-    OS_Free(lanimsFromFile, (size_t)LIGHT_COUNT * sizeof(LightAnimation));
+    entsFromFile = (Entity*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(Entity)); posFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
+    scaleFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));        rotationFromFile = (Quaternion*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(Quaternion));
+    colCtrFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));       colSzFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
+    ioNameCount = 1; ioNames[0][0] = '\0'; lightsFromFile = (Light*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(Light)); 
+    lanimsFromFile = (LightAnimation*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(LightAnimation)); for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;}
+    mset(fwParentOf,0,sizeof(fwParentOf)); fwPoolUsed = 0;                                    for(u8 lev=0;lev<World.numLevels;++lev) LoadLevelData(lev);
+    OS_Free(entsFromFile, (size_t)INSTANCE_COUNT * sizeof(Entity)); OS_Free(colCtrFromFile, (size_t)INSTANCE_COUNT * sizeof(V3)); OS_Free(colSzFromFile, (size_t)INSTANCE_COUNT * sizeof(V3)); colCtrFromFile = NULL; colSzFromFile = NULL;
+    OS_Free(posFromFile, (size_t)INSTANCE_COUNT * sizeof(V3));      OS_Free(scaleFromFile, (size_t)INSTANCE_COUNT * sizeof(V3));  OS_Free(rotationFromFile, (size_t)INSTANCE_COUNT * sizeof(Quaternion));
+    OS_Free(lightsFromFile, (size_t)LIGHT_COUNT * sizeof(Light));   OS_Free(lanimsFromFile, (size_t)LIGHT_COUNT * sizeof(LightAnimation));
     entsFromFile = NULL; posFromFile = NULL; scaleFromFile = NULL; rotationFromFile = NULL; lightsFromFile = NULL; lanimsFromFile = NULL;
     DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\nLoad all levels... took %f secs\n",
             World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],
-            World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13],
-            get_time() - start_time);
+            World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13],get_time() - start_time);
     DebugRAM("end of LoadAllLevels");
 }
 
@@ -954,8 +733,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     DebugRAM("start of LoadLevel"); World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false; RenderLoading("Loading level..."); if (World.currentLevel != curlevel) CopyPlayerState(World.currentLevel,curlevel);
     World.curLev = curlevel; SetLevelPointers(curlevel); mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView)); mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32)); camViewCount = levelCamViewCount[curlevel];
     for (int i = 0; i < camViewCount; ++i) { if (levelCamViews[curlevel][i].visible == false && camViews[i].visible == true) { mcpy(&levelCamViews[curlevel][i], &camViews[i], sizeof(CamView)); levelCamViewTextures[curlevel][i] = camViewTextures[i]; } } // Initialize missing level camview entries from file data
-    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
+    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce)); for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
     DualLog("Switched to Level %d\n",curlevel); ResetLevelAudio(); ResetLevelMusic(); RenderLoading("Loading cull system..."); CullInit(); // Must be after level!
     glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights);
                                  glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(7,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);

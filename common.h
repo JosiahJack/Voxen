@@ -16,8 +16,8 @@ typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define NULL ((void *)0)
 enum{U16_MAX=65535};
 typedef __builtin_va_list va_list;
-typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color;    typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion;    typedef u8 ColliderType; typedef u16 Text;
-typedef struct { bool hit; V3 point,normal; float pen; } Overlap;    typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
+typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color; typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion; typedef u8 ColliderType;
+typedef struct { bool hit; V3 point,normal; float pen; } Overlap; typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
 #if defined(_WIN32)
     typedef void* FHandle;
 #else
@@ -30,19 +30,14 @@ typedef float __v4sf __attribute__((__vector_size__(16))); typedef int __v4si __
 #define _mm_loadu_ps(P) (*(__m128_u const *)(P))
 #define _mm_set1_ps(A) ((__m128){ (A), (A), (A), (A) })
 #define _mm_setr_ps(e0,e1,e2,e3) ((__m128){ (e0), (e1), (e2), (e3) })
-#define _mm_storeu_ps(P, A) (*(__m128_u *)(P) = (A))
 #define _mm_add_ps(A, B) ((__m128)((__v4sf)(A) + (__v4sf)(B)))
 #define _mm_mul_ps(A, B) ((__m128)((__v4sf)(A) * (__v4sf)(B)))
 #define __m256i __m256i_t
-#define _mm256_storeu_si256(P, V) (*(__m256i*)(P) = (V))
-#define _mm256_loadu_si256(P) (*(__m256i*)(P))
-#define _mm_loadu_si128(P) (*(__m128i_u*)(P))
 typedef long long __m256i_t __attribute__((__vector_size__(32), __may_alias__, __aligned__(1)));
 static inline __m256i _mm256_set1_epi8_fast(char c) { __m256i v; char *p = (char*)&v; for (int i = 0; i < 32; ++i) p[i] = c; return v; }
 static inline __m128i _mm_set1_epi8_fast(char c) { __m128i v; char *p = (char*)&v; for (int i = 0; i < 16; ++i) p[i] = c; return v; }
 typedef int (*cmpfun)(const void*,const void*);
 typedef int (*cmpfun_r)(const void*,const void*,void*);
-#define assert(cond) do { if (!(cond)) { DualLogError("[%s:%d]:%s(): Assert fail:%s\n",__FILE__,__LINE__,__func__,#cond); *(volatile int*)0 = 0; } } while(0) // Force a crash for debug
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 void DualLogError(const char* s, ...); void DualLog(const char* s, ...); void DualLogWarn(const char* s, ...);
 #define THRSTACKSZ (8 * 1024 * 1024)
@@ -52,7 +47,7 @@ void DualLogError(const char* s, ...); void DualLog(const char* s, ...); void Du
     #define INVALID_FHANDLE ((void*) (i64)-1)
     typedef struct { void* handle; } OS_Thread;
     struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; }; typedef uintptr_t pthread_t; typedef intptr_t pthread_mutex_t,pthread_cond_t; typedef int pthread_condattr_t; typedef u32 pthread_mutexattr_t;
-    typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t; typedef struct { unsigned long Data1; u16 Data2,Data3; u8 Data4[8]; } GUID;
+    typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t;
     int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**); DLL_IMP void* WINAPI GetStdHandle(u32);
 #else
     #define INVALID_FHANDLE -1
@@ -137,7 +132,7 @@ typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSte
 enum {
     /*Culling*/ WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                 MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,
-    /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, CREDITS_PAGES = 22, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 768, INSTANCE_COUNT = 8500, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29,
+    /*Entity Management*/ MAX_LEVELS=14,LEVEL_CYBERSPACE=13,CREDITS_PAGES=22,AVG_CPU_TAPS=2048,MAX_ENTITIES=768,INSTANCE_COUNT=8500,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,
     /*Lights*/ LIGHT_COUNT = 2200, MAX_LIGHTS_PER_VOXEL = 128, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, 
     /*Models*/ MAX_MDLS=6400, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
     /*Textures*/ MAX_TXRS = 2048, MAX_TOTAL_PIXELS = 44200000u, MAX_UNIQUE_COLORS = 120040u,
@@ -146,9 +141,9 @@ enum {
     /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH=6, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=8000, MAX_WIRELINE_VRTS = 2024000,
     /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
     /*Audio*/ MAX_CHANNELS = 128, SOUNDS_COUNT = 670,
-    /*Text*/ TARGET_STRING_LENGTH = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
-             T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_BUFFER_SIZE=1024, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=4672, FONT_NORMAL=0, FONT_STOPD=1,
-    /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3
+    /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
+             T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_BUFFER_SIZE=1024, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=4672, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
+    /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36
 };
 u32 parse_numberu32(const char*, const char*,u32); u16 parse_numberu16(const char*, const char*,u32); u8 parse_numberu8(const char*, const char*,u32); bool parse_bool(const char*, const char*,u32);
 static const float PLAYER_RADIUS=0.48f,PLAYER_HEIGHT=2.00f,PLAYER_CAM_OFFSET_Y=0.84f,CELLSZ=2.56f,CELLXHALF=(CELLSZ * 0.5f),VOXEL_SIZE=(CELLSZ/(float)VOXELS_PER_CELL),VOXEL_HALF=(VOXEL_SIZE * 0.5f),/*COLCAP_DIR_X_F=0.0f,*/COLCAP_DIR_Y_F=1.0f,//,COLCAP_DIR_Z_F=2.0f,
@@ -268,7 +263,7 @@ typedef /*FAT*/ struct  {
     i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[4],randomItemCustIdx[4];
     bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,
          forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,textureGlowAnimating,textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom,automapHidden,blocked,ajar;
-    AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; char texAnimResourceFolder[TARGET_STRING_LENGTH];
+    AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; char texAnimResourceFolder[TARG_STRLEN];
 } Entity; // phew what a porker of a struct, it's been a eatin!
 typedef struct {
     u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
@@ -333,7 +328,7 @@ AnimationClip DoorGetClip(const Entity*,u8);
 // Quest bits (info_mission constIndex 710).  Only ever set/toggled/checked by info_mission entities.
 enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
 void ChangeAnim(Entity*,u8); void ForceDoorPortalOpen(u16); // ForceDoorPortalOpen: bounds-checked against registered portals (culling.c)
-enum{IO_NONE=0}; u16 IOInternName(const char*); const char* IOName(u16);
+enum{IO_NONE=0}; u16 IOInternName(const char*);
 bool QuestBitIsSet(u8 qb); void QuestBitSet(u8 qb),QuestBitClear(u8 qb),QuestBitToggle(u8 qb); bool RessurectPlayer(void);
  bool Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),Console(),ScrshotPressed(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();
 // Synthesized Audio

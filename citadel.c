@@ -797,10 +797,11 @@ void Targetted(u16 activator, u16 self) {
     else if (aioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags, EF_ACTIVE, !(e->entflags & EF_ACTIVE));
 }
 
+extern char ioNames[MAX_IO_NAMES][TARG_STRLEN]; extern u16 ioNameCount;
 void UseTargets(u16 activator, u16 targetIdx) {
     if(targetIdx == IO_NONE){return;} bool wasActive=World.targetIOActive, succeeded=false; u8 entryLevel = World.currentLevel;
     if (!wasActive) { World.targetIOActive = true; World.targetIOEntryLevel = entryLevel; World.targetIOActivatorIdx = activator; World.targetIOActivatorEntity = World.instances[activator]; World.targetIOActivatorIoflags = World.instances[activator].ioflags; }
-    const char* targetname = IOName(targetIdx); // For logging only; matching is u16 compare against the interned table.
+    const char* targetname = (targetIdx < ioNameCount) ? ioNames[targetIdx] : ""; // For logging only; matching is u16 compare against the interned table.
     for (u8 lev = 0; lev < World.numLevels; ++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} DualLog("Target hit: %s on %u (lev %u), timestamp: %f\n",targetname,i,lev,World.pauseRelativeTime); Targetted(activator,i); succeeded=true; } }
     if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (!wasActive) {World.targetIOActive=false;}
 }

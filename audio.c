@@ -128,7 +128,7 @@ const char* RustleSound() { return sounds[random_range_u32(459,465)]; } // foots
     #define PCM_NONBLOCK (1<<1)
     #define PCM_FORMAT_S16_LE 2
     #define REFIID const GUID *const
-    typedef struct IMMDevice IMMDevice; typedef struct IMMDeviceEnumerator IMMDeviceEnumerator;
+    typedef struct IMMDevice IMMDevice; typedef struct IMMDeviceEnumerator IMMDeviceEnumerator;  typedef struct { unsigned long Data1; u16 Data2,Data3; u8 Data4[8]; } GUID;
     typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall* Activate)(void*,const void*,u32,void*,void**);} IMMDeviceVtbl; struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
     typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall*e)(void*,int,u32,void**); i32(__stdcall*GetDefaultAudioEndpoint)(void*,int,int,IMMDevice**);}IMMDeviceEnumeratorVtbl;struct IMMDeviceEnumerator{IMMDeviceEnumeratorVtbl*lpVtbl;};
     typedef struct IAudioClient IAudioClient; typedef struct IAudioRenderClient IAudioRenderClient; typedef struct { u16 t,n; u32 s, a; u16 b,w,c; } WAVEFORMATEX;
