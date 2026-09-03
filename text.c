@@ -478,36 +478,6 @@ void LoadLogTextForLanguage(u8 lang) {
 }
 
 static float textVertexData[8192]; extern Color textColors[]; enum {TALIGN_LEFT=0,TALIGN_CENTER=1,TALIGN_RIGHT=2};
-//void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 align, const char* restrict format, va_list args) {
-    //va_list c; __builtin_va_copy(c,args); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,c); __builtin_va_end(c);
-    //glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
-    //glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex);
-    //float invatsz = 1.0f/(float)FONT_ATLAS_SIZE;
-    //glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID); glBindVertexArray(textVAO);
-    //float xUsed=x, yUsed=y; if (scale < 1.0f) { xUsed *= (1/scale); yUsed *= (1/scale); }
-    //size_t vc=0; const char*p=uiTextBuffer; float xpos=xUsed,ypos=yUsed+(16*scale),ls=22*scale; int cc=0; float puv = 10.0f * invatsz, bw=2.0f;
-    //while(*p) {
-        //const u8*s=(const u8*)p; u32 cp=0;
-        //if (*s<0x80) { cp=*s++; }
-        //else if ((*s&0xE0)==0xC0) { if (!s[1]) break; cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }
-        //else if ((*s&0xF0)==0xE0) { if (!s[1] || !s[2]) break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }
-        //else if ((*s&0xF8)==0xF0) { if (!s[1] || !s[2] || !s[3]) break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
-        //else s++;
-        //p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=xUsed; ypos+=ls; cc=0; continue; }
-        //int idx=CodepointToPackedIndex(cp,fontID);
-        //const stbtt_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx;
-        //float qx0 = vfloor((xpos + b->xoff) + 0.5f), qy0 = vfloor((ypos + b->yoff) + 0.5f);
-        //float qs0 = b->x0 * invatsz, qt0 = b->y0 * invatsz, qs1 = b->x1 * invatsz, qt1 = b->y1 * invatsz;
-        //float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw;
-        //float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f;
-        //float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 };
-        //if (vc >= 8192/30) break;
-        //mcpy(textVertexData + vc * 30,tv,sizeof(tv)); vc++;
-        //if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD){xpos = qx0 + fixedNumberAdvanceWidthStopD;}
-        //else xpos += b->xadvance;
-    //}
-    //if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
-//}
 static float MeasureLineAdvance(const char* p, u8 fontID) {
     float w=0; int cc=0;
     while (*p) {

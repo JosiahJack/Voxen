@@ -794,24 +794,18 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
 }
 
 void RenderCameraViews() { // Render in-world camera views.  Pops player position to elsewhere, renders to tiny fbo, pops player back.
-    if (unlikely(World.paused || World.menuActive || camViewCount == 0 || World.curLev >= LEVEL_CYBERSPACE)) return;
+    if (unlikely(World.paused || World.menuActive || camViewCount == 0 || World.curLev >= LEVEL_CYBERSPACE)){return;}
     V3 tempPlayerPos = World.position[PLAYER1]; Quaternion tempPlayerRot = World.rotation[PLAYER1];
-    for (int cm=0;cm<camViewCount;++cm) {
-        if (camViews[cm].finished < World.pauseRelativeTime && camViews[cm].visible) { camViews[cm].finished = World.pauseRelativeTime + 0.5f; World.position[PLAYER1] = camViews[cm].position; World.rotation[PLAYER1] = camViews[cm].rotation; CullCore(); Render(true/*camview*/,cm); }
-    }
+    for (int cm=0;cm<camViewCount;++cm) { if (camViews[cm].finished < World.pauseRelativeTime && camViews[cm].visible) { camViews[cm].finished = World.pauseRelativeTime + 0.5f; World.position[PLAYER1] = camViews[cm].position; World.rotation[PLAYER1] = camViews[cm].rotation; CullCore(); Render(true/*camview*/,cm); } }
     World.position[PLAYER1] = tempPlayerPos; World.rotation[PLAYER1] = tempPlayerRot; // Restore player for normal render.
 }
 
 void UpdateInstanceMatrix4x4s() {
     i32 dirtyMin = -1, dirtyMax = -1;
     for (u32 i = INSTS_1ST_IDX; i < World.instCount; i++) {        
-        float x=World.rotation[i].x, y=World.rotation[i].y, z=World.rotation[i].z, w=World.rotation[i].w;
-        float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z;
-        float sclx=World.scale[i].x, scly=World.scale[i].y, sclz=World.scale[i].z; u32 m = i*16;
-        modelMatrices[m+0]=(1.0f-2.0f*(y2+z2))*sclx; modelMatrices[m+1]=(2.0f*(xy+wz))*sclx;      modelMatrices[m+2]=(2.0f*(xz-wy))*sclx; // 3,7,11 == 0.0f, no need to set all the time.
-        modelMatrices[m+4]=(2.0f*(xy-wz))*scly;      modelMatrices[m+5]=(1.0f-2.0f*(x2+z2))*scly; modelMatrices[m+6]=(2.0f*(yz+wx))*scly;
-        modelMatrices[m+8]=(2.0f*(xz+wy))*sclz;      modelMatrices[m+9]=(2.0f*(yz-wx))*sclz;      modelMatrices[m+10]=(1.0f-2.0f*(x2+y2))*sclz;
-        modelMatrices[m+12]=World.position[i].x;     modelMatrices[m+13]=World.position[i].y;     modelMatrices[m+14]=World.position[i].z;      modelMatrices[m+15]=1.0f;
+        float x=World.rotation[i].x, y=World.rotation[i].y, z=World.rotation[i].z, w=World.rotation[i].w; float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z; float sclx=World.scale[i].x, scly=World.scale[i].y, sclz=World.scale[i].z; u32 m = i*16;
+        modelMatrices[m+0]=(1.0f-2.0f*(y2+z2))*sclx; modelMatrices[m+1]=(2.0f*(xy+wz))*sclx; modelMatrices[m+2]=(2.0f*(xz-wy))*sclx; modelMatrices[m+3]=modelMatrices[m+7]=modelMatrices[m+11]=0.0f; modelMatrices[m+4]=(2.0f*(xy-wz))*scly; modelMatrices[m+5]=(1.0f-2.0f*(x2+z2))*scly; modelMatrices[m+6]=(2.0f*(yz+wx))*scly;
+        modelMatrices[m+8]=(2.0f*(xz+wy))*sclz; modelMatrices[m+9]=(2.0f*(yz-wx))*sclz; modelMatrices[m+10]=(1.0f-2.0f*(x2+y2))*sclz; modelMatrices[m+12]=World.position[i].x; modelMatrices[m+13]=World.position[i].y; modelMatrices[m+14]=World.position[i].z; modelMatrices[m+15]=1.0f;
         if (dirtyMin < 0) {dirtyMin = (i32)i;} dirtyMax = (i32)i;
     }
     if (dirtyMin >= 0) { glBindBuffer(GL_SSBO,matricesBufferID); u32 offsetFloats=(u32)dirtyMin * 16; u32 countFloats=((u32)dirtyMax - (u32)dirtyMin + 1) * 16; glBufferSubData(GL_SSBO,offsetFloats * 4,countFloats * 4,modelMatrices + offsetFloats); }
@@ -868,8 +862,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
                 if (isUnique) { if (uniqueCvxMeshCount >= MAX_UNIQUE_CVX_MESHES) { DualLogWarn("Exceeded MAX_UNIQUE_CVX_MESHES!\n"); World.levelInstances[lev][i].adjacencyIdx=U16_MAX; continue; } uniqueCvxMeshIndices[uniqueCvxMeshCount]=colMeshIdx; World.levelInstances[lev][i].adjacencyIdx=(u16)uniqueCvxMeshCount; uniqueCvxMeshCount++; }
             }
         }
-    }
-    DebugRAM("before edge adjacency");
+    } DebugRAM("before edge adjacency");
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) { // 2. Generate edge adjacency list for each unique mesh
         u16 m = uniqueCvxMeshIndices[u]; if (m >= MAX_MDLS) { continue;}
         u32 vCount = physVertCounts[m], tCount = modelTriangleCounts[m]; if (!vCount || !tCount || !physPos[m] || !physTris[m]) continue;
@@ -883,22 +876,10 @@ __attribute__((cold)) void NewGame() { // Reset World States
         for (u32 i=0;i<uniqueEdgeCount;++i) { u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); adjList[writePos[a]++]=b; adjList[writePos[b]++]=a; }
         cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList;
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
-    }
-    DebugRAM("after edge adjacency");
+    } DebugRAM("after edge adjacency");
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u); World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u); World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
-    AddHardwareToInventory(0,4);
-    AddHardwareToInventory(1,4);
-    AddHardwareToInventory(2,4);
-    AddHardwareToInventory(3,4);
-    AddHardwareToInventory(4,4);
-    AddHardwareToInventory(5,4);
-    AddHardwareToInventory(6,4);
-    AddHardwareToInventory(7,4);
-    AddHardwareToInventory(8,4);
-    AddHardwareToInventory(9,4);
-    AddHardwareToInventory(10,4);
-    AddHardwareToInventory(11,4);
+    //TESTING TODO REMOVE! AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
 }
 
 void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
@@ -953,13 +934,10 @@ void InitalizeEnvironment() {
     glUseProgram(shadowmapsSP); glUniform1ui(9,SHADOW_MAP_SIZE); glUseProgram(shadowmapsClearSP); glUniform1ui(0,SHADOW_MAP_SIZE); glUseProgram(chunkSP); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE); // One time set uniforms
     for (int f=0;f<5;++f) glGenQueries(5,gpuQ[f]);
     RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); RenderLoading("Loading models..."); DebugRAM("before LoadModels"); LoadModels(); DebugRAM("after LoadModels");
-    if (World.introNotPlayed) { currentMenuPage = Mpg_IntroVideo; PlayMenuMusic(); World.menuActive = true; World.introNotPlayed = false; }
-    World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
+    if (World.introNotPlayed) { currentMenuPage = Mpg_IntroVideo; PlayMenuMusic(); World.menuActive = true; World.introNotPlayed = false; } World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     NewGame();
     PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
-    DebugRAM("InitializeEnvironment end"); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
-    OS_ScratchFree();
-    DebugRAM("InitializeEnvironment after scratch free");
+    OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free");
 }
 
 void Physics(float dt); void UpdateAnims(void); void UpdateAudio(); bool ScrshotPressed();

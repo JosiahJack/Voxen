@@ -612,36 +612,6 @@ void HealthManagerInitAfterLoad(u16 self) {
     }
 }
 // Hardware
-void HardwareBioOff(void) { World.invP1.hardwareIsActive &= ~HW_BIO; if (Cheats.showFPS) {return;} BioMonitorClearGraphs(); }
-void HardwareBioOn(void) { World.invP1.hardwareIsActive |= HW_BIO; }
-void HardwareBioAction(void) { if (World.invP1.hardwareVersionSetting[HW_BIO_IDX] == 0 && World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if ((World.invP1.hasHardware & HW_BIO) && (World.invP1.hardwareIsActive & HW_BIO)) HardwareBioOff(); else HardwareBioOn(); }
-void HardwareBioClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareBioAction(); }
-void HardwareSensaroundOn(void) { World.invP1.hardwareIsActive |= HW_SNS; }
-void HardwareSensaroundOff(void) { World.invP1.hardwareIsActive &= ~HW_SNS; }
-void HardwareSensaroundAction(void) { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } if (World.invP1.hardwareIsActive & HW_SNS) { play_wav(sounds[82],SfxVol(),(V3){0.0f,0.0f,0.0f},false); HardwareSensaroundOff(); } else { play_wav(sounds[93],SfxVol(),(V3){0.0f,0.0f,0.0f},false); HardwareSensaroundOn(); } }
-void HardwareSensaroundClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareSensaroundAction(); }
-void HardwareShieldOn(void) { World.invP1.hardwareIsActive |= HW_SHD; }
-void HardwareShieldOff(void) { World.invP1.hardwareIsActive &= ~HW_SHD; }
-void HardwareShieldAction(void) { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } if (World.invP1.hardwareIsActive & HW_SHD) { play_wav(sounds[95],SfxVol(),(V3){0.0f,0.0f,0.0f},false); HardwareShieldOff(); } else { play_wav(sounds[96],SfxVol(),(V3){0.0f,0.0f,0.0f},false); HardwareShieldOn(); } }
-void HardwareShieldClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareShieldAction(); }
-void HardwareLanternOn(void) { World.invP1.hardwareIsActive |= HW_LAN; }
-void HardwareLanternOff(void) { World.invP1.hardwareIsActive &= ~HW_LAN; }
-void HardwareLanternAction(void) { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (World.invP1.hardwareIsActive & HW_LAN) HardwareLanternOff(); else HardwareLanternOn(); }
-void HardwareLanternClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareLanternAction(); }
-void HardwareInfraredOn(void) { World.invP1.hardwareIsActive |= HW_INF; }
-void HardwareInfraredOff(void) { World.invP1.hardwareIsActive &= ~HW_INF; }
-void HardwareInfraredAction(void) { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } bool wasOn = (World.invP1.hardwareIsActive & HW_INF) != 0; play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (wasOn) HardwareInfraredOff(); else HardwareInfraredOn(); }
-void HardwareInfraredClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareInfraredAction(); }
-void HardwareEReaderAction(void) { play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive |= HW_ERD; }
-void HardwareEReaderClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareEReaderAction(); }
-void HardwareBoosterOn(void)  { World.invP1.hardwareIsActive |=  HW_BST; }
-void HardwareBoosterOff(void) { World.invP1.hardwareIsActive &= ~HW_BST; }
-void HardwareBoosterAction(void) { if (World.invP1.hardwareVersionSetting[HW_BST_IDX] >= 1/*Set to boost not skates*/ && World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (World.invP1.hardwareIsActive & HW_BST) HardwareBoosterOff(); else HardwareBoosterOn(); } 
-void HardwareBoosterClick(void) { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareBoosterAction(); }
-void HardwareJumpJetsOn(void)  { World.invP1.hardwareIsActive |=  HW_JET; }
-void HardwareJumpJetsOff(void) { World.invP1.hardwareIsActive &= ~HW_JET; }
-void HardwareJumpJetsAction() { if (World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; } play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= HW_JET; if ((World.invP1.hasHardware & HW_JET) && (World.invP1.hardwareIsActive & HW_JET)) HardwareJumpJetsOn(); else HardwareJumpJetsOff(); }
-void HardwareJumpJetsClick() { World.Sys_UI.mouseClickHeldOverGUI = true; HardwareJumpJetsAction(); }
 #define INFRARED_RANGE 50.35f
 #define LANTERN_RANGE 11.52f
 static Color3 lantCol = (Color3){1.0f,1.0f,1.0f};
@@ -656,24 +626,14 @@ void HardwareUpdate() {
     } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,false);
 }
 // Dermal Patches
+void PatchDisableAll(void){World.invP1.berserkFinished=World.invP1.berserkIncTime=World.invP1.detoxFinished=World.invP1.geniusFinished=World.invP1.mediFinished=World.invP1.reflexFinishedTime=World.invP1.sightFinishedTime=World.invP1.sightSideEffectFinishedTime=World.invP1.staminupFinishedTime=-1.0; World.invP1.staminupActive=World.geniusActive=false; World.invP1.fatigue=0.0f; World.invP1.berserkIncrement=World.invP1.patchActive=0; World.timeScale=DEFAULT_TIME_SCALE;}
 void PatchUpdate() {
     if (World.invP1.patchActive & PATCH_DETOX) { if (World.invP1.detoxFinished < World.pauseRelativeTime) World.invP1.patchActive -= PATCH_DETOX; } // Detox
     if (World.invP1.patchActive & PATCH_MEDI) { if (World.invP1.mediFinished < World.pauseRelativeTime && World.invP1.mediFinished != -1.0) { World.invP1.patchActive -= PATCH_MEDI; World.invP1.mediFinished = -1.0; } } // Medi
     if (World.invP1.patchActive & PATCH_REFLEX) { if (World.invP1.reflexFinishedTime < World.absoluteTime && World.invP1.reflexFinishedTime != -1.0){ World.invP1.patchActive-=PATCH_REFLEX; World.invP1.reflexFinishedTime=-1.0; World.timeScale=DEFAULT_TIME_SCALE;}else{World.timeScale=REFLEX_TIME_SCALE;}}else{if(World.timeScale != DEFAULT_TIME_SCALE){World.timeScale=DEFAULT_TIME_SCALE;}}//Reflex
     if (World.invP1.patchActive & PATCH_BERSERK) { // Berserk
-        if (World.invP1.berserkFinished < World.pauseRelativeTime) {
-            World.invP1.berserkIncrement = 0;
-            World.invP1.patchActive -= PATCH_BERSERK;
-
-        } else {
-
-            if (World.invP1.berserkIncTime < World.pauseRelativeTime) {
-                World.invP1.berserkIncrement++;
-                if (World.invP1.berserkIncrement > 6) World.invP1.berserkIncrement = 6;
-                World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0f);
-
-            }
-        }
+        if (World.invP1.berserkFinished < World.pauseRelativeTime) { World.invP1.berserkIncrement = 0; World.invP1.patchActive -= PATCH_BERSERK; }
+        else if (World.invP1.berserkIncTime < World.pauseRelativeTime) { World.invP1.berserkIncrement++; if (World.invP1.berserkIncrement > 6) World.invP1.berserkIncrement = 6; World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0f); }
     }
     if (World.invP1.patchActive & PATCH_GENIUS) { if(World.invP1.geniusFinished < World.pauseRelativeTime){World.invP1.patchActive -= PATCH_GENIUS; World.geniusActive=false;}else{World.geniusActive=true;} } // Genius
     if (World.invP1.patchActive & PATCH_SIGHT) { // Sight
@@ -681,13 +641,6 @@ void PatchUpdate() {
         if (World.invP1.sightSideEffectFinishedTime < World.pauseRelativeTime && World.invP1.sightSideEffectFinishedTime != -1.0) { World.invP1.sightSideEffectFinishedTime=World.invP1.sightFinishedTime=-1.0; World.invP1.patchActive -= PATCH_SIGHT; }
     }
     if (World.invP1.patchActive & PATCH_STAMINUP) { if (World.invP1.staminupFinishedTime < World.pauseRelativeTime) { World.invP1.staminupActive=false; World.invP1.fatigue=100.0f; World.invP1.patchActive -= PATCH_STAMINUP; } else { World.invP1.fatigue = 0.0f; World.invP1.staminupActive = true; } } // Staminup
-}
-
-void PatchDisableAll(void) {
-    World.invP1.berserkFinished = World.invP1.berserkIncTime = World.invP1.detoxFinished = World.invP1.geniusFinished = World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = World.invP1.sightSideEffectFinishedTime = World.invP1.staminupFinishedTime = -1.0;
-    World.invP1.staminupActive=false; World.invP1.fatigue =0.0f; World.invP1.berserkIncrement = World.invP1.patchActive = 0; World.timeScale  = DEFAULT_TIME_SCALE; World.geniusActive = false;
-
-
 }
 // Quest Bits / Mission I/O — side effects on quest notes checklist when bits change
 static void QuestBitNoteSideEffects(u8 qb, bool isOn) {

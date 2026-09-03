@@ -99,77 +99,38 @@ static i32 CreatePngImageArena(PngArena* arena, PngData* a, u8* raw, u32 raw_len
 }
 
 u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
-    if (!buffer || len < 8) return NULL;
-    if (arena->base) arena->cursor = arena->base;
-    PngContext s={0}; s.img_n = s.img_out_n = 0; s.img_buffer = (u8*)buffer; s.img_buffer_end = (u8*)buffer + len;
-    s.img_error = 0; s.img_palette_count = 0; s.img_depth = 8; s.img_color_type = 0; mset(s.img_trns, 255, sizeof(s.img_trns)); mset(s.img_palette, 0, sizeof(s.img_palette));
-    PngData z = {0}; z.s = &s; u32 ioff = 0; z.expanded = z.idata = z.out = NULL; s.img_buffer += 8; s.img_x = s.img_y = 1;
+    if (!buffer || len < 8){return NULL;} if (arena->base){arena->cursor=arena->base;}
+    PngContext s={0}; s.img_n=s.img_out_n=0; s.img_buffer=(u8*)buffer; s.img_buffer_end=(u8*)buffer+len; s.img_error=0; s.img_palette_count=0; s.img_depth=8; s.img_color_type=0; mset(s.img_trns,255,sizeof(s.img_trns)); mset(s.img_palette,0,sizeof(s.img_palette)); PngData z={0}; z.s=&s; u32 ioff=0; z.expanded=z.idata=z.out=NULL; s.img_buffer+=8; s.img_x=s.img_y=1;
     for (;;) {
         u32 length = PngGet32be(&s), type = PngGet32be(&s);
         if (s.img_error || (u32)(s.img_buffer_end - s.img_buffer) < length) { s.img_error = 1; break; }
         switch (type) {
             case 0x49484452: { // IHDR
                 if (length != 13 || s.img_buffer + 13 > s.img_buffer_end) { s.img_error = 1; break; }
-                s.img_x = PngGet32be(&s); s.img_y = PngGet32be(&s);
-                if (s.img_x > 16384 || s.img_y > 16384) { s.img_error = 1; break; }
-                u8 depth = *s.img_buffer++; i32 color = (*s.img_buffer++); s.img_buffer += 3;
-                s.img_depth = depth; s.img_color_type = (u8)color;
-                // color type 3 = palette/indexed: 1 raw byte (index) per pixel, not 3.
-                s.img_n = (color == 3) ? 1 : (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
-                if (depth == 0 || depth == 16) s.img_error = 1; // 16-bit samples unsupported (rest of loader assumes 8-bit units)
+                s.img_x = PngGet32be(&s); s.img_y = PngGet32be(&s); if (s.img_x > 16384 || s.img_y > 16384) { s.img_error = 1; break; }
+                u8 depth = *s.img_buffer++; i32 color = (*s.img_buffer++); s.img_buffer += 3; s.img_depth = depth; s.img_color_type = (u8)color;
+                s.img_n = (color == 3) ? 1 : (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0); if (depth == 0 || depth == 16) s.img_error = 1;
             } break;
-            case 0x504C5445: { // PLTE
-                s.img_palette_count = (u16)(length / 3);
-                for (u32 i = 0; i < s.img_palette_count && i < 256; ++i) {
-                    s.img_palette[i].r = s.img_buffer[i*3+0];
-                    s.img_palette[i].g = s.img_buffer[i*3+1];
-                    s.img_palette[i].b = s.img_buffer[i*3+2];
-                }
-                s.img_buffer += length;
-            } break;
-            case 0x74524E53: { // tRNS - per-palette-entry alpha, defaults to 255 (opaque) for entries not listed
-                for (u32 i = 0; i < length && i < 256; ++i) s.img_trns[i] = s.img_buffer[i];
-                s.img_buffer += length;
-            } break;
+            case 0x504C5445: { s.img_palette_count = (u16)(length / 3); for (u32 i = 0; i < s.img_palette_count && i < 256; ++i) { s.img_palette[i].r = s.img_buffer[i*3+0]; s.img_palette[i].g = s.img_buffer[i*3+1]; s.img_palette[i].b = s.img_buffer[i*3+2]; } s.img_buffer += length; } break; // PLTE 
+            case 0x74524E53: { for (u32 i = 0; i < length && i < 256; ++i) s.img_trns[i] = s.img_buffer[i]; s.img_buffer += length; } break;  // tRNS - per-palette-entry alpha, defaults to 255 (opaque) for entries not listed
             case 0x49444154: if (!z.idata) { z.idata = (u8*)PngArenaAlloc(arena, len + 16); ioff = 0; } mcpy(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
             case 0x49454E44: { // IEND
                 if (s.img_error) goto Label_parsesuccess;
-                u32 bpp = (u32)s.img_n * s.img_depth;                 // bits per pixel, all channels
-                u32 row_bytes = (s.img_x * bpp + 7) / 8;               // packed bytes per row (== img_n*x when depth==8)
-                u32 rL = row_bytes * s.img_y + s.img_y;                // + 1 filter byte per row
-                z.expanded = (u8*)PngDecode(z.idata, ioff, rL, (i32*)(&rL), arena);
-                if (!z.expanded){z.out=NULL; PngGet32be(&s); goto Label_parsesuccess;}
-                i32 ok;
+                u32 bpp = (u32)s.img_n * s.img_depth; u32 row_bytes = (s.img_x * bpp + 7) / 8; u32 rL = row_bytes * s.img_y + s.img_y; z.expanded = (u8*)PngDecode(z.idata,ioff,rL,(i32*)(&rL),arena); if (!z.expanded){z.out=NULL; PngGet32be(&s); goto Label_parsesuccess;} i32 ok;
                 if (s.img_depth < 8) {
-                    // Only grayscale(0)/indexed(3) can be sub-8bpp. PNG filtering treats these as
-                    // bpp==1 (byte-distance back == 1 byte, not 1 pixel), so the existing per-column
-                    // img_n-byte filter loop already does the right thing if we feed it row_bytes as
-                    // "x" with img_n=out_n=1 — no change needed to CreatePngImageArena itself.
                     ok = CreatePngImageArena(arena,&z,z.expanded,rL,1,row_bytes,s.img_y, 1);
                     if (ok) {
-                        u32 nP = s.img_x * s.img_y;
-                        u8* samples = (u8*)PngArenaAlloc(arena, nP);
+                        u32 nP=s.img_x*s.img_y; u8* samples=(u8*)PngArenaAlloc(arena,nP);
                         if (!samples) { ok = 0; }
                         else {
                             u8 maxv = (u8)((1u << s.img_depth) - 1);
-                            for (u32 row = 0; row < s.img_y; ++row) {
-                                u8* rp = z.out + row * row_bytes;
-                                for (u32 col = 0; col < s.img_x; ++col) {
-                                    u32 bit = col * s.img_depth;
-                                    u8 shift = 8 - s.img_depth - (u8)(bit & 7);
-                                    samples[row * s.img_x + col] = (rp[bit >> 3] >> shift) & maxv;
-                                }
-                            }
+                            for (u32 row = 0; row < s.img_y; ++row) { u8* rp = z.out + row * row_bytes; for (u32 col = 0; col < s.img_x; ++col) { u32 bit = col * s.img_depth; u8 shift = 8 - s.img_depth - (u8)(bit & 7); samples[row * s.img_x + col] = (rp[bit >> 3] >> shift) & maxv; } }
                             z.out = samples;
                         }
                     }
-                } else {
-                    s.img_out_n = (s.img_color_type == 3) ? 1 : ((s.img_n + 1 == 4) ? 4 : s.img_n);
-                    ok = CreatePngImageArena(arena,&z,z.expanded, rL,s.img_out_n,s.img_x,s.img_y,s.img_n);
-                }
+                } else { s.img_out_n = (s.img_color_type == 3) ? 1 : ((s.img_n + 1 == 4) ? 4 : s.img_n); ok = CreatePngImageArena(arena,&z,z.expanded, rL,s.img_out_n,s.img_x,s.img_y,s.img_n); }
                 if (ok) {
-                    u32 nP = s.img_x * s.img_y;
-                    u8* rgba = (u8*)PngArenaAlloc(arena, (size_t)nP * 4);
+                    u32 nP = s.img_x * s.img_y; u8* rgba = (u8*)PngArenaAlloc(arena, (size_t)nP * 4);
                     if (rgba) {
                         if (s.img_color_type == 3) { for (u32 p = 0; p < nP; ++p) {u8 idx=z.out[p]; if (idx>=s.img_palette_count){idx=0;} PngPalEntry* e=&s.img_palette[idx]; rgba[p*4+0]=e->r; rgba[p*4+1]=e->g; rgba[p*4+2]=e->b; rgba[p*4+3]=s.img_trns[idx];} }  // indexed -> palette lookup (z.out is 1 index byte/pixel, any depth)
                         else if (s.img_color_type == 0) { // grayscale -> replicate into RGB, alpha 255 (no tRNS gray-key support)
@@ -183,19 +144,14 @@ u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
                                 u8 g = z.out[p*2], a = z.out[p*2+1];
                                 rgba[p*4+0]=g; rgba[p*4+1]=g; rgba[p*4+2]=g; rgba[p*4+3]=a;
                             }
-                        } else { // color type 2 (RGB, already alpha-promoted by CreatePngImageArena) or 6 (RGBA)
-                            mcpy(rgba, z.out, (size_t)nP * 4);
-                        }
+                        } else { mcpy(rgba, z.out, (size_t)nP * 4); } // color type 2 (RGB, already alpha-promoted by CreatePngImageArena) or 6 (RGBA)
                         z.out = rgba;
                     } else z.out = NULL;
                 } else z.out = NULL;
                 PngGet32be(&s); goto Label_parsesuccess;
-            }
-            default: s.img_buffer += length; break;
-        }
-        PngGet32be(&s);
-    }
-    Label_parsesuccess: *x = z.s->img_x; *y = z.s->img_y; return z.out;
+            } default: s.img_buffer += length; break;
+        } PngGet32be(&s);
+    } Label_parsesuccess: *x = z.s->img_x; *y = z.s->img_y; return z.out;
 }
  
 #define TEXHASH_SZ 256
@@ -218,10 +174,6 @@ static void* TextureParsingWorker(void* arg) {
             u32 h_val = (c * 0x9E3779B9u); // Murmur-style avalanche hash
             h_val ^= h_val >> 16;
             u32 slot = h_val & (TEXHASH_SZ - 1);
-            // Bounded probe: once pSz hits 256 the table can be completely full, in which case
-            // there is no empty sentinel left to terminate on for a color that isn't present.
-            // Cap the scan at TEXHASH_SZ so a full table + novel color falls through to the
-            // nearest-neighbor path below instead of spinning forever.
             for (u32 probe = 0; probe < TEXHASH_SZ; ++probe) {
                 if (exact_hash[slot] == 0xFFFFFFFF) break;
                 if (exact_hash[slot] == c) { idx[p] = exact_idx[slot]; goto found; }
@@ -386,53 +338,14 @@ void LoadTextures() {
 }
 
 typedef struct { const u16 *frames;  u8 length; bool hasGlow; const u16 *glowFrames; u8 glowLength; const char* name; } TextureAnimClip;
-u16 sequenceTextures[]={
-    1159,1160,881,1162,1163,1164, // scr_exp 01 - 06
-    1310,1311,1312,1313, // bridg1_1 001 - 004
-    1115,1116, // broken_clock01_glow 01 - 02
-    1117,1118, // broken_clock 01 - 02
-    1124,1125,1126,1127,1128,1129,1130, // g_energmine 00 - 06
-    1131,1132,1133,1134,1135,1136,1137,1138, // g_energmine_glow 00 - 07 (yes different count, supported!)
-    1314,1315,1316,1317, // scr_cita2_ 0 - 3
-    1318,1319,1320,1321, // scr_cita3_ 0 - 3
-    1322,1323,1324,1325,1326,1327,1328,1329, // scr_cita_ 0 - 7
-    1330, // engscreen1_04 // index 45
-    0,1331,1332,1333,1334,1335,1336,1337, // scr_static2 0 - 6, then scr_static2_a
-    1338,1339,1340,1341,1342,1343, // scr_static 0 - 5
-    1344,1345,1346,1347, // screen1 0 - 3
-    1348,1349,1350,1351,1352, // screen2 0 - 4
-    1353,1354,1355,1356, // screen3 0 - 3
-    1357,1358,1359,1360,1361,1362, // screen4 0 - 5
-    1363,1364,1365,1366, // screen5 0 - 3
-    1367,1368,1369,1370, // triop1 0 - 3
-    1371,1372,1373,1374,1375,1376,1377,1378,1379,1380, // triop2 0 - 9
-    1381,1382,1383,1384,1385,1386,1387,1388, // triop3 0 - 7
-    1389, // triop4_8 // index 105
-    1381, // triop3_0 // index 106
-    1390,1391,1392,1393,1394,1395,1396,1397, // dna 0 - 7
-    1398,1399,1400,1401, // edcolor 0 - 3
-    1402,1403,1404,1405, // edgray 0 - 3
-    1406,1407,1408,1409,1410,1411,1412,1413,1414,1415,1416, // ammo_magcart 00 - 10
-    1417,1418,1419,1420,1421,1422,1423,1424,1425,1426,1427, // ammo_magcart_glow 00 - 10
-    1428,1429,1430,1431,1432,1433,1434,1435,1436,1437, // medicalbed 00 - 9
-    1438,1439,1440,1441,1442, // rad1_1 00 - 04
-    1443,1444,1445,1446,1447,1448,1449,1450,1451,1452, // screencode 0 - 9
-    1453,1454,1455,1456,1457,1458,1459,1460,1461,1462,1463,1464,1465,1466,1467,1468,1469,1470,1471,1472,1473,1474,1475,1476,1477,1478,1479,1480,1481,1482,1483,1484,1485,1486,1487,1488,1489, // shodanstatic 00 - 36
-    1166,1167,1168,1169, // telepad 00 - 03
-    1490,1491,1492,1493, // telepad_00_glow
-    0, // black // index 212
-    0, // black
-    0, // black
-    0, // black
-    0, // black
-    0, // black // index 217
-    1495,1496,1497,1498,1499,1500,1501,1502,1503,1504,1505,1506, // medscreen13 00 - 11
-    1507,1508,1509,1510,1511,1512,1513,1514, // medscreen24 00 - 07
-    1515,1516,1517,1518,1519,1520,1521,1522, // medscreen16 00 - 07
-    1523,1524,1525,1526,1527,1528,1529,1530,1531,1532,1533,1534,1535,1536,1537,1538,1539,1540,1541,1542,1543,1544,1545,1546,1547,1548,1549,1550,1551,1552,1553,1554,1555,1556,1557,1558,1559,1560,1561,1562,1563,1564,1565,1566,1567,1568,1569,1570,1571,1572,1573,1574, // zerog 00 - 52
-    1576,1577,1578 // door_x1 01 - 03 // ends at index 301
-};
-
+u16 sequenceTextures[]={1159,1160,881,1162,1163,1164,/*scr_exp 01 - 06*/ 1310,1311,1312,1313,/*bridg1_1 001 - 004*/ 1115,1116,/*broken_clock01_glow 01 - 02*/ 1117,1118,/*broken_clock 01 - 02*/ 1124,1125,1126,1127,1128,1129,1130,/*g_energmine 00 - 06*/ 1131,1132,1133,1134,1135,1136,1137,1138,/*g_energmine_glow 00 - 07 (yes different count, supported!)*/
+                        1314,1315,1316,1317,/*scr_cita2_ 0 - 3*/ 1318,1319,1320,1321,/*scr_cita3_ 0 - 3*/ 1322,1323,1324,1325,1326,1327,1328,1329,/*scr_cita_ 0 - 7*/ 1330,/*engscreen1_04 index 45*/ 0,1331,1332,1333,1334,1335,1336,1337,/*scr_static2 0 - 6, then scr_static2_a*/ 1338,1339,1340,1341,1342,1343,/*scr_static 0 - 5*/
+                        1344,1345,1346,1347,/*screen1 0 - 3*/ 1348,1349,1350,1351,1352,/*screen2 0 - 4*/ 1353,1354,1355,1356,/*screen3 0 - 3*/ 1357,1358,1359,1360,1361,1362,/*screen4 0 - 5*/ 1363,1364,1365,1366,/*screen5 0 - 3*/ 1367,1368,1369,1370,/*triop1 0 - 3*/ 1371,1372,1373,1374,1375,1376,1377,1378,1379,1380,/*triop2 0 - 9*/
+                        1381,1382,1383,1384,1385,1386,1387,1388,/*triop3 0 - 7*/ 1389,/*triop4_8 index 105*/ 1381,/*triop3_0 index 106*/ 1390,1391,1392,1393,1394,1395,1396,1397,/*dna 0 - 7*/ 1398,1399,1400,1401,/*edcolor 0 - 3*/ 1402,1403,1404,1405,/*edgray 0 - 3*/ 1406,1407,1408,1409,1410,1411,1412,1413,1414,1415,1416,/*ammo_magcart 00 - 10*/
+                        1417,1418,1419,1420,1421,1422,1423,1424,1425,1426,1427,/*ammo_magcart_glow 00 - 10*/ 1428,1429,1430,1431,1432,1433,1434,1435,1436,1437,/*medicalbed 00 - 9*/ 1438,1439,1440,1441,1442,/*rad1_1 00 - 04*/ 1443,1444,1445,1446,1447,1448,1449,1450,1451,1452,/*screencode 0 - 9*/
+                        1453,1454,1455,1456,1457,1458,1459,1460,1461,1462,1463,1464,1465,1466,1467,1468,1469,1470,1471,1472,1473,1474,1475,1476,1477,1478,1479,1480,1481,1482,1483,1484,1485,1486,1487,1488,1489,/*shodanstatic 00 - 36*/ 1166,1167,1168,1169,/*telepad 00 - 03*/ 1490,1491,1492,1493,/*telepad_00_glow*/ 0,/*black index 212*/ 0,/*black*/ 0,/*black*/
+                        0,/*black*/ 0,/*black*/ 0,/*black index 217*/ 1495,1496,1497,1498,1499,1500,1501,1502,1503,1504,1505,1506,/*medscreen13 00 - 11*/ 1507,1508,1509,1510,1511,1512,1513,1514,/*medscreen24 00 - 07*/ 1515,1516,1517,1518,1519,1520,1521,1522,/*medscreen16 00 - 07*/
+                        1523,1524,1525,1526,1527,1528,1529,1530,1531,1532,1533,1534,1535,1536,1537,1538,1539,1540,1541,1542,1543,1544,1545,1546,1547,1548,1549,1550,1551,1552,1553,1554,1555,1556,1557,1558,1559,1560,1561,1562,1563,1564,1565,1566,1567,1568,1569,1570,1571,1572,1573,1574,/*zerog 00 - 52*/ 1576,1577,1578/*door_x1 01 - 03 ends at index 301*/};
 #define NUM_TEXTURE_CLIPS 49
 static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
     /*0*/{(u16[]){6,7,8,9,9,8,7,6},8,false,NULL,0,"Bridge11"}, /*1*/{(u16[]){10,11},2,true,(u16[]){12,13},2,"BrokenClock"}, /*2*/{(u16[]){14,15,16,17,18,19,20},7,true,(u16[]){21,22,23,24,25,26,27,28},8,"EnergMine"},
