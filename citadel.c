@@ -62,9 +62,9 @@ void AddAccessCardToInventory(int index) {
 }
 
 void AddHardwareToInventory(int index,int hwversion) {
-    if (hwversion > 0 && hwversion <= (int)World.invP1.hardwareVersion[index]) { CenterStatusPrint("%s",Sys_Text.stringTable[46]);/*THAT WARE IS OBSOLETE. DISCARDED.*/ return; }
+    if (hwversion > 0 && hwversion <= (int)World.invP1.hwVers[index]) { CenterStatusPrint("%s",Sys_Text.stringTable[46]);/*THAT WARE IS OBSOLETE. DISCARDED.*/ return; }
     static const u8 textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32};
-    World.invP1.hardwareInvIndex = index; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hardwareVersion[index] = (u8)hwversion; World.invP1.hardwareVersionSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0;
+    World.invP1.hardwareInvIndex = index; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hwVers[index] = (u8)hwversion; World.invP1.hwVersSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0;
     CenterStatusPrint("%s v%d",Sys_Text.stringTable[textIdx[index] + 326],hwversion);
 }
 
@@ -375,8 +375,8 @@ void OverloadButtonAction() {
 #define TARGETID_LINK_DIST       10.0f
 #define TARGETID_DAMAGE_TIME_HIT  2.5f
 #define TARGETID_DAMAGE_TIME_MISS 1.0f
-float TargetIDGetSensingRange(bool manual) { u8 ver = World.invP1.hardwareVersion[HW_TID_IDX]; if (manual) {return (ver >= 4) ? 18.0f : 13.0f;} return (ver <= 2) ? 0.0f : ((ver == 3) ? 13.0f : 20.0f); }
-float TargetIDGetTetherRange() { return (World.invP1.hardwareVersion[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
+float TargetIDGetSensingRange(bool manual) { u8 ver = World.invP1.hwVers[HW_TID_IDX]; if (manual) {return (ver >= 4) ? 18.0f : 13.0f;} return (ver <= 2) ? 0.0f : ((ver == 3) ? 13.0f : 20.0f); }
+float TargetIDGetTetherRange() { return (World.invP1.hwVers[HW_TID_IDX] >= 4) ? 22.0f : 15.0f; }
 static void TargetIDDeactivate(u16 self) { Entity* e=&World.instances[self]; if(e->enemy != WORLD){Entity* npc=&World.instances[e->enemy]; flag_set(&npc->entflags,EF_TARGID_ATTACHED,false); e->enemy=WORLD;} e->textIndex=-1; flag_set(&e->entflags,EF_ACTIVE,false); }
 void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
     Entity* e=&World.instances[self]; if(e->enemy == WORLD){return;} Entity* npc=&World.instances[e->enemy];
@@ -426,7 +426,7 @@ void PlayerEnergyUpdate() {
     World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1; bool anyDrain = false; u8 ver; World.invP1.drainJPM = 0;
     for (int hw=3;hw<=11;++hw) {
         u16 bit=(u16)(1u << hw); if (!(World.invP1.hardwareIsActive & bit) || hw == 4 || hw == 8 || hw == 10) continue; // No energy usage
-        ver=World.invP1.hardwareVersionSetting[hw]; float drain=hwDrain[hw][ver];  World.invP1.drainJPM += hwDrainJPM[hw][ver]; if (drain > 0.0f) { TakeEnergy(drain); anyDrain = true; }
+        ver=World.invP1.hwVersSetting[hw]; float drain=hwDrain[hw][ver];  World.invP1.drainJPM += hwDrainJPM[hw][ver]; if (drain > 0.0f) { TakeEnergy(drain); anyDrain = true; }
     }
     if (anyDrain && World.invP1.energy <= 0.0f) { DeactivateHardwareOnEnergyDepleted(); World.invP1.drainJPM = 0; } // Depleted
 }
@@ -585,7 +585,7 @@ float TakeDamage(u16 self,DamageData dd) {
             if (dd.attackType == Att_Magn) {take = 0.0f; TakeEnergy(11.0f); World.empStaticAlpha=2.0f; BiomonitorEnergyPulse(11.0f);}
             if ((World.invP1.hardwareIsActive & HW_SHD) && (World.invP1.hasHardware & HW_SHD)) {
                 float thresh = 0.0f;
-                switch (World.invP1.hardwareVersion[HW_SHD_IDX]) { case 0:absorb=0.20f; thresh=0.0f; break; case 1:absorb=0.40f; thresh=10.0f; break; case 2:absorb=0.75f; thresh=15.0f; break; case 3:absorb=0.75f; thresh=30.0f; break; }
+                switch (World.invP1.hwVers[HW_SHD_IDX]) { case 0:absorb=0.20f; thresh=0.0f; break; case 1:absorb=0.40f; thresh=10.0f; break; case 2:absorb=0.75f; thresh=15.0f; break; case 3:absorb=0.75f; thresh=30.0f; break; }
                 if (take < thresh) absorb = 1.0f;
                 if (absorb > 0.0f) {
                     if (absorb < 1.0f) absorb = vclamp(absorb + random_range(-0.08f,0.08f),0.0f,1.0f); take *= (1.0f - absorb); play_wav(sounds[94],Sys_Settings.VolumeEffects,(V3){0.0f,0.0f,0.0f},false); // shield absorb 
@@ -621,7 +621,7 @@ void HardwareUpdate() {
     bool lanternOn = (World.invP1.hasHardware & HW_LAN) && (World.invP1.hardwareIsActive & HW_LAN) > 0;
     if (lanternOn || infraredOn) { // Update headmounted lantern/infrared's light (infrared overrides lantern brightness/range)
         V3 ppos = World.position[PLAYER1]; lanternPos = (V3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f};
-        float intensity = infraredOn ? 0.8f : lanternVersionBrightness[vclamp(World.invP1.hardwareVersionSetting[7],0,2)];
+        float intensity = infraredOn ? 0.8f : lanternVersionBrightness[vclamp(World.invP1.hwVersSetting[7],0,2)];
         UpdateLight(headmountedLanternLight,lanternPos,lantCol,infraredOn ? INFRARED_RANGE : LANTERN_RANGE,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
     } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,false);
 }

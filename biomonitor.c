@@ -199,7 +199,7 @@ void BioMonitorUpdate(void) {
     else if (World.invP1.fatigue <  80.0f && World.invP1.fatigue > 30.0f) bioMonitor.fatigue = 533; // Moderate
 
     if (bioMonitor.beatFinished < World.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f + ((World.invP1.fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
-    if (World.invP1.hardwareVersion[HW_BIO_IDX] > 1 && (World.invP1.patchActive & 127)) {
+    if (World.invP1.hwVers[HW_BIO_IDX] > 1 && (World.invP1.patchActive & 127)) {
         // bioMonitor.patchesActiveText = Text->stringTable[528]; // deferred: text rendering requires formatted text draw
         if (World.invP1.patchActive & PATCH_MEDI)     { /* deferred text append */ }
         if (World.invP1.patchActive & PATCH_STAMINUP) { /* deferred text append */ }

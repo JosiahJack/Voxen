@@ -187,9 +187,9 @@ static const float camMaxAmount = 0.2548032f;
 // 			Utils.Deactivate(automapCamera.gameObject);
 // 			Utils.DisableCamera(automapCamera);
 // 		}
-// 		if (World.invP1.hardwareVersion[HW_NAV_IDX] < 2) { Utils.Deactivate(poolContainerAutomapBotOverlays); }
+// 		if (World.invP1.hwVers[HW_NAV_IDX] < 2) { Utils.Deactivate(poolContainerAutomapBotOverlays); }
 // 		else { Utils.Activate(poolContainerAutomapBotOverlays); }
-// 		if (World.invP1.hardwareVersion[HW_NAV_IDX] < 3) {
+// 		if (World.invP1.hwVers[HW_NAV_IDX] < 3) {
 // 			Utils.Deactivate(poolContainerAutomapCyborgOverlays);
 // 			Utils.Deactivate(poolContainerAutomapMutantOverlays);
 // 		} else {

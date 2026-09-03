@@ -273,75 +273,22 @@ INLINE bool HwBtnClick(float x0, float x1, float y0, float y1) {
 
 INLINE int HwActiveTexIndex(int active, int version, int off, int v1, int v2, int v3, int v4) { if (!active) return off; if (v4 >= 0 && version >= 4) return v4; if (version >= 3) return v3; if (version == 2) return v2; return v1; }
 void HardwareButtons() {
-    if (World.invP1.hasHardware & HW_BIO && !Cheats.noHUD) {
-        RenderUIImage(0,180,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_BIO,World.invP1.hardwareVersion[HW_BIO_IDX],989,991,992,992,992));
-        if (HwBtnClick(0,40,180,220)) {
-            if (World.invP1.hardwareVersionSetting[HW_BIO_IDX] == 0 && World.invP1.energy <= 0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if ((World.invP1.hasHardware & HW_BIO) && (World.invP1.hardwareIsActive & HW_BIO)) { World.invP1.hardwareIsActive &= ~HW_BIO; if(!Cheats.showFPS){BioMonitorClearGraphs();} } else World.invP1.hardwareIsActive |= HW_BIO; }
-        }
-    }
-    if (World.invP1.hasHardware & HW_SNS && !Cheats.noHUD) {
-        RenderUIImage(0,240,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_SNS,World.invP1.hardwareVersion[HW_SNS_IDX],1009,1011,1012,1013,1013));
-        if (HwBtnClick(0,40,240,280)) {
-            if (World.invP1.energy <= 0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else if (World.invP1.hardwareIsActive & HW_SNS) { play_wav(sounds[82],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive &= ~HW_SNS; }
-            else { play_wav(sounds[93],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive |= HW_SNS; }
-        }
-    }
-    if (World.invP1.hasHardware & HW_LAN && !Cheats.noHUD) {
-        RenderUIImage(0,300,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_LAN,World.invP1.hardwareVersion[HW_LAN_IDX],1004,1006,1007,1008,1008));
-        if (HwBtnClick(0,40,300,340)) {
-            if (World.invP1.energy <= 0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (World.invP1.hardwareIsActive & HW_LAN) World.invP1.hardwareIsActive &= ~HW_LAN; else World.invP1.hardwareIsActive |= HW_LAN; }
-        }
-    }
-    if (World.invP1.hasHardware & HW_SHD && !Cheats.noHUD) {
-        RenderUIImage(0,360,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_SHD,World.invP1.hardwareVersion[HW_SHD_IDX],1014,1015,1016,1017,1018));
-        if (HwBtnClick(0,40,360,400)) {
-            if (World.invP1.energy <= 0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else if (World.invP1.hardwareIsActive & HW_SHD) { play_wav(sounds[95],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive &= ~HW_SHD; }
-            else { play_wav(sounds[96],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive |= HW_SHD; }
-        }
-    }
-    if (World.invP1.hasHardware & HW_INF && !Cheats.noHUD) {
-        RenderUIImage(1326,180,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_INF,World.invP1.hardwareVersion[HW_INF_IDX],998,999,999,999,999));
-        if (HwBtnClick(1326,1366,180,220)) {
-            if (World.invP1.energy <= 0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else { bool wasOn = (World.invP1.hardwareIsActive & HW_INF) != 0; play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (wasOn) World.invP1.hardwareIsActive &= ~HW_INF; else World.invP1.hardwareIsActive |= HW_INF; }
-        }
-    }
-    if (World.invP1.hasHardware & HW_ERD && !Cheats.noHUD) {
-        bool held = World.inventoryMode && CursorIsOverBounds(1326,1366,240,280) && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down);
-        int tex = ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1)) ? 997 : 996;
-        RenderUIImage(1326,240,40,40,held ? 997 : tex); // Hw Btn: Ereader
-        if (HwBtnClick(1326,1366,240,280)) { play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false); MFD_CenterTab = 4; MFD_LefTab = 1; }
-    }
-    if (World.invP1.hasHardware & HW_BST && !Cheats.noHUD) {
-        RenderUIImage(1326,300,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_BST,World.invP1.hardwareVersion[HW_BST_IDX],993,994,995,995,995));
-        if (HwBtnClick(1326,1366,300,340)) {
-            if (World.invP1.hardwareVersionSetting[HW_BST_IDX] >= 1 && World.invP1.energy <= 0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (World.invP1.hardwareIsActive & HW_BST) World.invP1.hardwareIsActive &= ~HW_BST; else World.invP1.hardwareIsActive |= HW_BST; }
-        }
-    }
-    if (World.invP1.hasHardware & HW_JET && !Cheats.noHUD) {
-        RenderUIImage(1326,360,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_JET,World.invP1.hardwareVersion[HW_JET_IDX],1000,1001,1002,1003,1003)); // Hw Btn: Jumpjets
-        if (HwBtnClick(1326,1366,360,400)) {
-            if (World.invP1.energy <= 0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= HW_JET; }
-        }
-    }
+    if(Cheats.noHUD){return;} bool noEng=World.invP1.energy<=0.0f, hasBio=World.invP1.hasHardware & HW_BIO, bioOn=World.invP1.hardwareIsActive & HW_BIO, snsOn=World.invP1.hardwareIsActive & HW_SNS, lanOn=World.invP1.hardwareIsActive & HW_LAN, shdOn=World.invP1.hardwareIsActive & HW_SHD, infOn=World.invP1.hardwareIsActive & HW_INF;
+    if (hasBio) { RenderUIImage(0,180,40,40,HwActiveTexIndex(bioOn,World.invP1.hwVers[HW_BIO_IDX],989,991,992,992,992)); if (HwBtnClick(0,40,180,220)) { if (World.invP1.hwVersSetting[HW_BIO_IDX] == 0 && noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (hasBio && bioOn) { World.invP1.hardwareIsActive &= ~HW_BIO; if (!Cheats.showFPS) BioMonitorClearGraphs(); } else World.invP1.hardwareIsActive |= HW_BIO; } } }
+    if (World.invP1.hasHardware & HW_SNS) { RenderUIImage(0,240,40,40,HwActiveTexIndex(snsOn,World.invP1.hwVers[HW_SNS_IDX],1009,1011,1012,1013,1013)); if (HwBtnClick(0,40,240,280)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else if (snsOn) { play_wav(sounds[82],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive &= ~HW_SNS; } else { play_wav(sounds[93],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive |= HW_SNS; } } }
+    if (World.invP1.hasHardware & HW_LAN) { RenderUIImage(0,300,40,40,HwActiveTexIndex(lanOn,World.invP1.hwVers[HW_LAN_IDX],1004,1006,1007,1008,1008)); if (HwBtnClick(0,40,300,340)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (lanOn) World.invP1.hardwareIsActive &= ~HW_LAN; else World.invP1.hardwareIsActive |= HW_LAN; } } }
+    if (World.invP1.hasHardware & HW_SHD) { RenderUIImage(0,360,40,40,HwActiveTexIndex(shdOn,World.invP1.hwVers[HW_SHD_IDX],1014,1015,1016,1017,1018)); if (HwBtnClick(0,40,360,400)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else if (shdOn) { play_wav(sounds[95],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive &= ~HW_SHD; } else { play_wav(sounds[96],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive |= HW_SHD; } } }
+    if (World.invP1.hasHardware & HW_INF) { RenderUIImage(1326,180,40,40,HwActiveTexIndex(infOn,World.invP1.hwVers[HW_INF_IDX],998,999,999,999,999)); if (HwBtnClick(1326,1366,180,220)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { bool wasOn=(infOn) != 0; play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (wasOn) World.invP1.hardwareIsActive &= ~HW_INF; else World.invP1.hardwareIsActive |= HW_INF; } } }
+    if (World.invP1.hasHardware & HW_ERD) { RenderUIImage(1326,240,40,40,World.inventoryMode && CursorIsOverBounds(1326,1366,240,280) && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) ? 997 : ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1)) ? 997 : 996); if (HwBtnClick(1326,1366,240,280)) { play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false); MFD_CenterTab = 4; MFD_LefTab = 1; } }
+    if (World.invP1.hasHardware & HW_BST) { RenderUIImage(1326,300,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_BST,World.invP1.hwVers[HW_BST_IDX],993,994,995,995,995)); if (HwBtnClick(1326,1366,300,340)) { if (World.invP1.hwVersSetting[HW_BST_IDX] >= 1 && noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (World.invP1.hardwareIsActive & HW_BST) World.invP1.hardwareIsActive &= ~HW_BST; else World.invP1.hardwareIsActive |= HW_BST; } } }
+    if (World.invP1.hasHardware & HW_JET) { RenderUIImage(1326,360,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_JET,World.invP1.hwVers[HW_JET_IDX],1000,1001,1002,1003,1003)); if (HwBtnClick(1326,1366,360,400)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= HW_JET; } } }
 }
 
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
 void CenterMFD() {
-    RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021); // Main center tab button
-    RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021); // Hardware center tab button
-    RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021); // General center tab button
-    RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021); // Software center tab button
+    RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021);/*Main center tab button*/ RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021);/*Hardware center tab button*/ RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021);/*General center tab button*/ RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021);/*Software center tab button*/
     if (World.inventoryMode && World.invP1.holdingObject && CursorIsOverBounds(345,1021,460,768)) { // Add to Inventory Helper
-        World.uiIsBlocking = true;
-        RenderUIImage(345,528,676,240,1075);
-        RenderTextL(586,528,T_GREEN,FONT_NORMAL,1.0f,"ADD TO INVENTORY");
+        World.uiIsBlocking = true; RenderUIImage(345,528,676,240,1075); RenderTextL(586,528,T_GREEN,FONT_NORMAL,1.0f,"ADD TO INVENTORY");
         if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; }
     }
     //if (World.Sys_UI.showSensaroundCenter) { /*SensaroundCenter Plane*/ } TODO
@@ -369,7 +316,7 @@ void SideMFD(bool isRH) {
     RenderUIImage(isRH ? 1350 : -16,576,32,40,tab == 1 ? 1024 : 1022); // Item side tab button
     RenderUIImage(isRH ? 1350 : -16,632,32,40,tab == 2 ? 1024 : 1022); // Automap side tab button
     RenderUIImage(isRH ? 1350 : -16,688,32,40,tab == 3 ? 1024 : 1022); // Data side tab button
-    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hardwareVersion[HW_SNS_IDX] > 1) { /*TODO Sensaround Plane*/ }
+    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1) { /*TODO Sensaround Plane*/ }
      if (tab == 0){return;} 
     //RenderUIImage(isRH ? 1022 : 24,520,320,240,1025); // TODO REMOVE Test BG for ensuring fit into 320x240 to match 1:1 scale that Doom's 320x200 would map to after 4:3 scaling applied (since the CRT's had non-square pixels that stretched 320x200 into 320x240 space, ish) TODO gate by search active
     if (tab == 1) { /*WeaponTabLH: WepNameTextLH, WepIconLH, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/

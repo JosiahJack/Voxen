@@ -39,29 +39,16 @@ void CyberItemOnTriggerEnter(u16 self, u16 other) {
     if(success){DeleteInstance(self);}
 }
 void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World.instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; World.layer[other] = 24; World.velocity[other] = V3_ScaleByF(World.velocity[other],-1.0f); }
-void CyberMineInitBeforeLoad(u16 self) {
-    Entity* e = &World.instances[self];
-    e->damage = 55.0f;
-    if (World.diffCyb < 3) { if (random_range(0.0f,1.0f) < 0.2f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 33.0f; }
-    if (World.diffCyb < 2) { if (random_range(0.0f,1.0f) < 0.33f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 22.0f; }
-    if (World.diffCyb < 1) { if (random_range(0.0f,1.0f) < 0.50f) flag_set(&e->entflags,EF_ACTIVE,false); e->damage = 11.0f; }
-}
-
+void CyberMineInitBeforeLoad(u16 self) { Entity* e=&World.instances[self]; e->damage=55.0f; if(World.diffCyb<3){if(random_range(0.0f,1.0f)<0.2f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=33.0f;} if(World.diffCyb<2){if(random_range(0.0f,1.0f)<0.33f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=22.0f;} if(World.diffCyb<1){if(random_range(0.0f,1.0f)<0.50f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=11.0f;} }
 float TakeDamage(u16 self,DamageData dd);
 void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) return; PlayerTakeDamage(PLAYER1,e->damage); play_wav(sounds[67],1.0f,World.position[self],false); flag_set(&e->entflags,EF_ACTIVE,false); }
 void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // visual subobject parity handled by hierarchy
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(self,e->targetIdx); }
 // TeleportTouch
 void TeleportTouchOnTriggerEnter(u16 self, u16 other) {
-    Entity* e = &World.instances[self];
-    Entity* player = &World.instances[PLAYER1];
-    if (!e->touchEnabled || other != PLAYER1) return;
-    if (player->health <= 0.0f || e->justUsed >= World.pauseRelativeTime) return;
-    u16 dest = e->targetDestinationID < 8 ? World.TeleportTouch_allTeleportTouches[e->targetDestinationID] : U16_MAX;
-    if (dest == U16_MAX) return;
-    World.position[PLAYER1] = World.position[dest];
-    World.instances[dest].justUsed = World.pauseRelativeTime + 1.0;
-    play_wav(sounds[106],1.0f,World.position[dest],false);
+    Entity* e = &World.instances[self]; Entity* player = &World.instances[PLAYER1]; if (!e->touchEnabled || other != PLAYER1) return; if (player->health <= 0.0f || e->justUsed >= World.pauseRelativeTime) return;
+    u16 dest = e->targetDestinationID < 8 ? World.TeleportTouch_allTeleportTouches[e->targetDestinationID] : U16_MAX; if (dest == U16_MAX) return;
+    World.position[PLAYER1] = World.position[dest]; World.instances[dest].justUsed = World.pauseRelativeTime + 1.0; play_wav(sounds[106],1.0f,World.position[dest],false);
 }
 // Trigger for Events (trigger_multiple/trigger_once same as Quake 1)
 void TriggerDelayedTarget(u16 self) { World.instances[self].delayFireFinished = World.pauseRelativeTime + World.instances[self].delay; UseTargets(self,World.instances[self].targetIdx); }
@@ -718,8 +705,7 @@ void Physics(float dt) {
             u16 idx=World.instances[i].index;
             if (unlikely(((idx >= 595 && idx <= 601) || idx == 746) && (World.instances[i].entflags & EF_ACTIVE) && numTriggers < 128)) triggerVolumes[numTriggers++] = i;
         }
-        if (numTriggers >= 127) DualLogWarn("Ran out of triggers!\n");
-        gContactCount = 0;
+        if (numTriggers >= 127){DualLogWarn("Ran out of triggers!\n");} gContactCount=0;
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
             u16 a=dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f;
             acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
@@ -864,8 +850,7 @@ bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
             u32 cell = PosGetCellCoordsP(cx + dx, cz + dz);
             for (u16 k = 0; k < cellCounts[cell]; ++k) { u16 b = cellLists[cell][k]; if (b == playerIdx || !(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue; if (World.col[b] == COLTYPE_MSH) { Overlap r = CapMsh(Entity_GetCap(playerIdx),World.instances[b].modelIndex,&world_from_mdl[b*16]); if (r.hit && r.pen > 0.08f) { blocked = true; break; } } }
         }
-    }
-    World.colliderSize[playerIdx].y = oldHeight; World.position[playerIdx] = oldPos; return blocked;
+    } World.colliderSize[playerIdx].y = oldHeight; World.position[playerIdx] = oldPos; return blocked;
 }
 
 KeyState* GetCodeMapping(int settingIndex);
@@ -909,7 +894,7 @@ void ApplyPlayerMovements(float dt) {
     }
     if (Jump() && jumpjettin && World.invP1.jumpJetFinished < World.pauseRelativeTime && World.invP1.energy > 0.0f) {
         if (!Cheats.noclip) {World.velocity[PLAYER1].y += 1.3f;} World.invP1.jumpJetFinished = World.pauseRelativeTime + 0.1f;
-        if (World.invP1.jumpJetSuckFinished < World.pauseRelativeTime) { World.invP1.jumpJetSuckFinished=World.pauseRelativeTime+1.0f; float energysuck = 11.0f; switch (World.invP1.hardwareVersionSetting[10]) { case 0: energysuck=11.0f; break; case 1:energysuck=26.0f; break; case 2:energysuck=22.0f; break; } TakeEnergy(energysuck); }
+        if (World.invP1.jumpJetSuckFinished < World.pauseRelativeTime) { World.invP1.jumpJetSuckFinished=World.pauseRelativeTime+1.0f; float energysuck = 11.0f; switch (World.invP1.hwVersSetting[10]) { case 0: energysuck=11.0f; break; case 1:energysuck=26.0f; break; case 2:energysuck=22.0f; break; } TakeEnergy(energysuck); }
     }
     float lastRatio = World.invP1.currentCrouchRatio;
     World.invP1.currentCrouchRatio = smooth_damp(lastRatio,targetRatio,&World.invP1.crouchingVelocity,transitionSec,dt);
