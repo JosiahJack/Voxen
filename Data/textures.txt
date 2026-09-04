@@ -4441,8 +4441,7 @@ index: 2076
 index: 2077
 #Textures/Sprites/grenbighit/546_1273.png
 index: 2078
-#Textures/Sprites/grenbighit/546_1274.png
-index: 2079
+
 #Textures/Sprites/gunhit/546_1214_alpha.png
 index: 2080
 #Textures/Sprites/gunhit/546_1215_alpha.png

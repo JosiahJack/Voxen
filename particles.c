@@ -2,19 +2,12 @@
 #include "common.h"
 typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex; u16 flags,textureIndex,animFrame; u32 seed; } Particle;
 typedef struct Emitter { bool active; float transform[16]; V3 position; float emitAccumulator,emitRate,age,duration; u16 aliveCount,maxAlive; u8 blendMode,materialMode,lightingMode,physicsMode; float lifetimeMin,lifetimeMax,sizeMin,sizeMax,speedMin,speedMax,rotationMin,rotationMax,angularVelocityMin,angularVelocityMax,bounce,particleRadius,gravity; 
-                         u32 textureBaseIndex,textureFrameCount; float animSpeed,softness,nearCameraFade,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; u32 colorRamp[64]; u64 rngState; } Emitter;
+                         u32 textureBaseIndex,textureFrameCount; float animSpeed,animWindow,softness,nearCameraFade,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; u32 colorRamp[64]; u64 rngState; } Emitter;
 typedef struct GpuParticleInstance { float x,y,z,size; u32 color,data0,data1,pad; } GpuParticleInstance;
 typedef struct TrailSegmentInstance { float p0x,p0y,p0z,width0,p1x,p1y,p1z,width1; u32 color0,color1,uvData,pad; } TrailSegmentInstance;
 typedef struct { u32 sortKey; u16 index; } SortEntry;
 typedef struct { Particle particles[MAX_PARTICLES]; Emitter emitters[MAX_EMITTERS]; GpuParticleInstance gpuInstances[MAX_PARTICLES]; TrailSegmentInstance trailSegments[MAX_TRAIL_SEGMENTS]; SortEntry sortKeys[MAX_PARTICLES]; u32 aliveCount,trailCount,instanceBuffer,trailBuffer,quadVAO,quadVBO,particleSP,trailSP; bool initialized; } ParticleSystem;
 ParticleSystem psys = {0};
-#define PARTICLE_FLAG_ADDITIVE      (1u << 0)
-#define PARTICLE_FLAG_SOFT          (1u << 1)
-#define PARTICLE_FLAG_LIT           (1u << 2)
-#define PARTICLE_FLAG_MULTIPLY      (1u << 3)
-#define PARTICLE_FLAG_SOFT_OCCLUDE  (1u << 4)
-#define PARTICLE_FLAG_PHYSICS       (1u << 5)
-#define PARTICLE_FLAG_TRAIL         (1u << 6)
 INLINE u32 xs32(u64* state) { u64 x = *state; x ^= x << 13; x ^= x >> 7; x ^= x << 17; *state = x; return (u32)(x ^ (x >> 32)); }
 INLINE float randf(u64* state) { return (float)(xs32(state) & 0xFFFFFF) * (1.0f / 16777216.0f); }
 INLINE float randf_range(u64* state, float a, float b) { return a + (b - a) * randf(state); }
@@ -60,7 +53,7 @@ u16 ParticleSystem_AddEmitter(V3 position, u32 textureIndex, float emitRate, flo
             Emitter* em = &psys.emitters[i]; em->active = true; mset(em->transform, 0, 16 * sizeof(float)); em->transform[0] = em->transform[5] = em->transform[10] = em->transform[15] = 1.0f; em->position = position;
             em->emitAccumulator = 0.0f; em->emitRate = emitRate; em->age = 0.0f; em->duration = lifetime; em->aliveCount = 0; em->maxAlive = 2000; em->blendMode = blendMode; em->materialMode = 0; em->lightingMode = 0; em->physicsMode = 0; em->lifetimeMin = 0.5f; em->lifetimeMax = 2.0f;
             em->sizeMin = sizeMin; em->sizeMax = sizeMax; em->speedMin = speedMin; em->speedMax = speedMax; em->rotationMin = 0.0f; em->rotationMax = 6.2831853f; em->angularVelocityMin = -1.0f; em->angularVelocityMax = 1.0f; em->bounce = 0.3f; em->particleRadius = 0.1f; em->gravity = 1.0f; em->textureBaseIndex = textureIndex;
-            em->textureFrameCount = 1; em->animSpeed = 10.0f; em->softness = 1.0f; em->nearCameraFade = 1.0f; for (int c = 0; c < 32; c++) { em->scaleCurve[c] = 1.0f; em->velocityCurve[c] = 1.0f; em->rotationCurve[c] = 0.0f; em->emissionCurve[c] = 1.0f; }
+            em->textureFrameCount = 1; em->animSpeed = 10.0f; em->animWindow = 1.0f; em->softness = 1.0f; em->nearCameraFade = 1.0f; for (int c = 0; c < 32; c++) { em->scaleCurve[c] = 1.0f; em->velocityCurve[c] = 1.0f; em->rotationCurve[c] = 0.0f; em->emissionCurve[c] = 1.0f; }
             Color colors[2] = {colorStart, colorEnd}; float times[2] = {0.0f, 1.0f}; build_color_ramp(em, colors, times, 2); em->rngState = globalframe * 1234567 + i * 98765 + 1; return i;
         }
     } return U16_MAX;
@@ -88,6 +81,30 @@ void ParticleSystem_SetEmitterVelocityCurve(u16 index, const float* keys, const 
     if (index >= MAX_EMITTERS) return;
     Emitter* em = &psys.emitters[index]; if (!em->active) return;
     build_curve(em->velocityCurve, keys, times, numKeys);
+}
+
+void ParticleSystem_SetEmitterAnimation(u16 index, u16 frameCount) {
+    if (index >= MAX_EMITTERS) return;
+    Emitter* em = &psys.emitters[index]; if (!em->active) return;
+    if (frameCount > 0) em->textureFrameCount = frameCount;
+}
+
+void ParticleSystem_SetEmitterAnimationWindow(u16 index, float window) {
+    if (index >= MAX_EMITTERS) return;
+    Emitter* em = &psys.emitters[index]; if (!em->active) return;
+    if (window > 0.0f) em->animWindow = window;
+}
+
+void ParticleSystem_SetEmitterRotation(u16 index, float angularVelocity) {
+    if (index >= MAX_EMITTERS) return;
+    Emitter* em = &psys.emitters[index]; if (!em->active) return;
+    em->angularVelocityMin = angularVelocity; em->angularVelocityMax = angularVelocity;
+}
+
+void ParticleSystem_SetEmitterLifetime(u16 index, float lifetimeMin, float lifetimeMax) {
+    if (index >= MAX_EMITTERS) return;
+    Emitter* em = &psys.emitters[index]; if (!em->active) return;
+    em->lifetimeMin = lifetimeMin; em->lifetimeMax = lifetimeMax;
 }
 
 void ParticleSystem_UpdateEmitters(float dt) {
@@ -126,7 +143,7 @@ void ParticleSystem_Simulate(float dt) {
         if (em->physicsMode) { p->vel.y -= 1.0f * dt; }
         u32 rampColor = sample_color_ramp(em, t);
         p->color = rampColor;
-        if (em->textureFrameCount > 1) { p->animFrame = (u16)(t * em->animSpeed * em->textureFrameCount) % em->textureFrameCount; }
+        if (em->textureFrameCount > 1) { float it = t / (em->animWindow > 0.0f ? em->animWindow : 1.0f); p->animFrame = (u16)(it * em->textureFrameCount) % em->textureFrameCount; }
         GpuParticleInstance* gpu = &psys.gpuInstances[i];
         gpu->x = p->pos.x; gpu->y = p->pos.y; gpu->z = p->pos.z;
         gpu->size = p->baseSize * scale; gpu->color = p->color;
