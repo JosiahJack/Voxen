@@ -17,6 +17,9 @@
 // To automate generation of this file, run the following command after cd ./Textures
 // ls *.png | sort | awk '{print "#Textures/"$0"\nindex: "NR-1}'
 //
+// Or this when I added a new subdirectory for sprites and wanted to continue after index 1992:
+// find Textures/Sprites -type f -name "*.png" | sort | awk '{print "#"$0"\nindex: "(NR-1)+1993}'
+//
 // Unneeded fields do not need to be specified.
 // Index 0 is reserved for black, alpha 1.0 (fully opaque)!
 #Textures/UI/ss1_original_palette_FULL.png
@@ -4265,3 +4268,281 @@ index: 1990
 index: 1991
 #Textures/UI/wepicons/ss1_wp_stungun.png
 index: 1992
+#Textures/Sprites/burst1/546_1237.png
+index: 1993
+#Textures/Sprites/burst1/546_1238.png
+index: 1994
+#Textures/Sprites/burst1/546_1239.png
+index: 1995
+#Textures/Sprites/burst1/546_1240.png
+index: 1996
+#Textures/Sprites/burst1/546_1241.png
+index: 1997
+#Textures/Sprites/burst1/546_1242.png
+index: 1998
+#Textures/Sprites/burst2/546_1244.png
+index: 1999
+#Textures/Sprites/burst2/546_1245.png
+index: 2000
+#Textures/Sprites/burst2/546_1246.png
+index: 2001
+#Textures/Sprites/burst2/546_1247.png
+index: 2002
+#Textures/Sprites/burst3/546_1231.png
+index: 2003
+#Textures/Sprites/burst3/546_1232.png
+index: 2004
+#Textures/Sprites/burst3/546_1233.png
+index: 2005
+#Textures/Sprites/burst3/546_1234.png
+index: 2006
+#Textures/Sprites/burst4/546_1194.png
+index: 2007
+#Textures/Sprites/burst4/546_1195.png
+index: 2008
+#Textures/Sprites/burst4/546_1196.png
+index: 2009
+#Textures/Sprites/burst4/546_1197.png
+index: 2010
+#Textures/Sprites/burst4/546_1198.png
+index: 2011
+#Textures/Sprites/burst4/546_1199.png
+index: 2012
+#Textures/Sprites/burst5/546_1209.png
+index: 2013
+#Textures/Sprites/burst5/546_1210.png
+index: 2014
+#Textures/Sprites/burst5/546_1211.png
+index: 2015
+#Textures/Sprites/burst6/546_1314.png
+index: 2016
+#Textures/Sprites/burst6/546_1315.png
+index: 2017
+#Textures/Sprites/camerahit/546_1187.png
+index: 2018
+#Textures/Sprites/camerahit/546_1188.png
+index: 2019
+#Textures/Sprites/camerahit/546_1189.png
+index: 2020
+#Textures/Sprites/camerahit/546_1190.png
+index: 2021
+#Textures/Sprites/camerahit/546_1191.png
+index: 2022
+#Textures/Sprites/corpsehit/546_1329.png
+index: 2023
+#Textures/Sprites/corpsehit/546_1330.png
+index: 2024
+#Textures/Sprites/corpsehit/546_1331.png
+index: 2025
+#Textures/Sprites/corpsehit/546_1332.png
+index: 2026
+#Textures/Sprites/cratehit/546_1300.png
+index: 2027
+#Textures/Sprites/cratehit/546_1301.png
+index: 2028
+#Textures/Sprites/cratehit/546_1302.png
+index: 2029
+#Textures/Sprites/emphit/546_1322.png
+index: 2030
+#Textures/Sprites/emphit/546_1323.png
+index: 2031
+#Textures/Sprites/emphit/546_1324.png
+index: 2032
+#Textures/Sprites/emphit/546_1325.png
+index: 2033
+#Textures/Sprites/emphit/546_1326.png
+index: 2034
+#Textures/Sprites/emphit/546_1327.png
+index: 2035
+#Textures/Sprites/enemshot1/546_0113.png
+index: 2036
+#Textures/Sprites/enemshot2/546_0116.png
+index: 2037
+#Textures/Sprites/enemshot2/546_0117.png
+index: 2038
+#Textures/Sprites/enemshot3/546_0124.png
+index: 2039
+#Textures/Sprites/enemshot3/546_0125.png
+index: 2040
+#Textures/Sprites/enemshot4/546_0128.png
+index: 2041
+#Textures/Sprites/enemshot4/546_0129.png
+index: 2042
+#Textures/Sprites/enemshot5/546_0164.png
+index: 2043
+#Textures/Sprites/enemshot6/546_0167.png
+index: 2044
+#Textures/Sprites/enemshot6/546_0168.png
+index: 2045
+#Textures/Sprites/explosion1/546_1335.png
+index: 2046
+#Textures/Sprites/explosion1/546_1336.png
+index: 2047
+#Textures/Sprites/explosion1/546_1337.png
+index: 2048
+#Textures/Sprites/explosion1/546_1338.png
+index: 2049
+#Textures/Sprites/explosion1/explosion1_firespit.png
+index: 2050
+#Textures/Sprites/explosion2/546_1304.png
+index: 2051
+#Textures/Sprites/explosion2/546_1305.png
+index: 2052
+#Textures/Sprites/explosion2/546_1306.png
+index: 2053
+#Textures/Sprites/explosion2/546_1307.png
+index: 2054
+#Textures/Sprites/explosion2/546_1309.png
+index: 2055
+#Textures/Sprites/explosion2/546_1310.png
+index: 2056
+#Textures/Sprites/explosion2/546_1311.png
+index: 2057
+#Textures/Sprites/explosion3/546_1256.png
+index: 2058
+#Textures/Sprites/explosion3/546_1262.png
+index: 2059
+#Textures/Sprites/explosion3/546_1263.png
+index: 2060
+#Textures/Sprites/explosion3/546_1264.png
+index: 2061
+#Textures/Sprites/explosion3/546_1265.png
+index: 2062
+#Textures/Sprites/explosion4/546_1316.png
+index: 2063
+#Textures/Sprites/explosion4/546_1317.png
+index: 2064
+#Textures/Sprites/explosion4/546_1318.png
+index: 2065
+#Textures/Sprites/explosion4/546_1319.png
+index: 2066
+#Textures/Sprites/explosion4/546_1320.png
+index: 2067
+#Textures/Sprites/explosion5/5d3_0001.png
+index: 2068
+#Textures/Sprites/explosion5/5d3_0002 - Copy.png
+index: 2069
+#Textures/Sprites/explosion5/5d3_0002.png
+index: 2070
+#Textures/Sprites/explosion5/5d3_0003 - Copy.png
+index: 2071
+#Textures/Sprites/explosion5/5d3_0003.png
+index: 2072
+#Textures/Sprites/grenbighit/546_1268.png
+index: 2073
+#Textures/Sprites/grenbighit/546_1269.png
+index: 2074
+#Textures/Sprites/grenbighit/546_1270.png
+index: 2075
+#Textures/Sprites/grenbighit/546_1271.png
+index: 2076
+#Textures/Sprites/grenbighit/546_1272.png
+index: 2077
+#Textures/Sprites/grenbighit/546_1273.png
+index: 2078
+#Textures/Sprites/grenbighit/546_1274.png
+index: 2079
+#Textures/Sprites/gunhit/546_1214_alpha.png
+index: 2080
+#Textures/Sprites/gunhit/546_1215_alpha.png
+index: 2081
+#Textures/Sprites/gunhit/546_1216_alpha.png
+index: 2082
+#Textures/Sprites/gunhit/546_1217_alpha.png
+index: 2083
+#Textures/Sprites/maghit/546_1276.png
+index: 2084
+#Textures/Sprites/maghit/546_1277.png
+index: 2085
+#Textures/Sprites/maghit/546_1278.png
+index: 2086
+#Textures/Sprites/maghit/546_1279.png
+index: 2087
+#Textures/Sprites/maghit/546_1280.png
+index: 2088
+#Textures/Sprites/magshot/546_0132.png
+index: 2089
+#Textures/Sprites/magshot/546_0133.png
+index: 2090
+#Textures/Sprites/meleehit/546_1226.png
+index: 2091
+#Textures/Sprites/meleehit/546_1227.png
+index: 2092
+#Textures/Sprites/meleehit/546_1228.png
+index: 2093
+#Textures/Sprites/nitrorailhit/546_1250.png
+index: 2094
+#Textures/Sprites/nitrorailhit/546_1251.png
+index: 2095
+#Textures/Sprites/nitrorailhit/546_1252.png
+index: 2096
+#Textures/Sprites/nitrorailhit/546_1253.png
+index: 2097
+#Textures/Sprites/nitrorailhit/546_1254.png
+index: 2098
+#Textures/Sprites/plasmahit/546_1287.png
+index: 2099
+#Textures/Sprites/plasmahit/546_1288.png
+index: 2100
+#Textures/Sprites/plasmahit/546_1289.png
+index: 2101
+#Textures/Sprites/plasmashot/546_0143.png
+index: 2102
+#Textures/Sprites/plasmashot/546_0144.png
+index: 2103
+#Textures/Sprites/plasmashot/546_0145.png
+index: 2104
+#Textures/Sprites/plasmashot/546_0146.png
+index: 2105
+#Textures/Sprites/railshot/546_0136.png
+index: 2106
+#Textures/Sprites/shakerhit/546_1257.png
+index: 2107
+#Textures/Sprites/shakerhit/546_1258.png
+index: 2108
+#Textures/Sprites/shakerhit/546_1259.png
+index: 2109
+#Textures/Sprites/shakerhit/546_1260.png
+index: 2110
+#Textures/Sprites/smokepuff1/546_1202.png
+index: 2111
+#Textures/Sprites/smokepuff1/546_1203.png
+index: 2112
+#Textures/Sprites/smokepuff1/546_1204.png
+index: 2113
+#Textures/Sprites/smokepuff1/546_1205.png
+index: 2114
+#Textures/Sprites/smokepuff1/546_1206.png
+index: 2115
+#Textures/Sprites/sparqhit/546_1220.png
+index: 2116
+#Textures/Sprites/sparqhit/546_1221.png
+index: 2117
+#Textures/Sprites/sparqhit/546_1222.png
+index: 2118
+#Textures/Sprites/sparqhit/546_1223.png
+index: 2119
+#Textures/Sprites/starshot/546_0120.png
+index: 2120
+#Textures/Sprites/starshot/546_0121.png
+index: 2121
+#Textures/Sprites/stunhit/546_1283.png
+index: 2122
+#Textures/Sprites/stunhit/546_1284.png
+index: 2123
+#Textures/Sprites/stunshot/546_0139.png
+index: 2124
+#Textures/Sprites/stunshot/stunshot.png
+index: 2125
+#Textures/Sprites/vaporize/546_1292.png
+index: 2126
+#Textures/Sprites/vaporize/546_1293.png
+index: 2127
+#Textures/Sprites/vaporize/546_1294.png
+index: 2128
+#Textures/Sprites/vaporize/546_1295.png
+index: 2129
+#Textures/Sprites/vaporize/546_1296.png
+index: 2130
+#Textures/Sprites/vaporize/546_1297.png
+index: 2131

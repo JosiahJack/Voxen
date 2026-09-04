@@ -1,0 +1,122 @@
+Effect Prefabs Particle Counts, MAX_PARTICLES_PER_EMITTER=2000, MAX_PARTICLES=20094, 11 cyber dogs + 1 shodan + 6 reavers
+chunk_grove1_1::90=ef_mist_gentle(3x) = 30 * 3
+chunk_screen::126=centerBurst(1x) = 1, glassbursteffect(1x) = 125
+ef_fragexplosion::112=CentralFireball(1x) = 12, FireSpits(1x) = 100
+ef_mist::52
+ef_particle_blasterhit::12=(1x) = 1, BlueSparksSmall(1x) = 8, Shockwave(1x) = 1, CenterSpatter2(1x) = 1, CenterSpatter(1x) = 1
+ef_particle_bloodspurtsmall::35
+ef_particle_bloodspurtsmallgreen::32,(1x) = 24, ef_particle_bloodspurttiny(1x) = 8
+ef_particle_bloodspurtsmallyellow::24
+ef_particle_bloodspurttiny::8
+ef_particle_camerahit::16(1x) = 1, DarkBurst(1x) = 1, CenterSpatter(1x) = 1, CenterSpatter2(1x) = 1, Bits(1x) = 12
+ef_particle_darthit::8
+ef_particle_ionhit::
+ef_particle_sec2muzburst::
+ef_particle_sparkssmall::
+ef_particle_sparkssmallblue::
+ef_particle_sparqhit::
+ef_sparkspits::50
+ef_spraydrips::45
+ef_steam::120
+env_sparkssmall::
+npc_autobomb::
+npc_cortex_reaver::
+npc_cyber_reaver::2000...
+npc_cyberdog::554...
+npc_cybershodan::2000...
+npc_cyborg_assassin::1 (muzzle flash)
+npc_cyborg_diego::
+npc_cyborg_drone::
+npc_cyborg_elite::
+npc_cyborg_enforcer::
+npc_cyborg_warrior::
+npc_exec_bot::
+npc_flier_bot::
+npc_hopper::
+npc_humanoid_mutant::
+npc_maint_bot::
+npc_mutant_cyborg::
+npc_plant_mutant::
+npc_repairbot::
+npc_sec1_bot::
+npc_sec2_bot::
+npc_servbot::
+npc_virus_mutant::
+proj_enemshot2::
+proj_enemshot4::
+proj_enemshot5::
+proj_enemshot6::
+proj_magpulse_shot,proj_magpulse_npc_shot::
+proj_plasmarifle_shot::
+proj_railshot,proj_railnpc_shot::
+proj_stungun_shot::
+proj_sparkingwire::
+
+//================================================
+Individual Effect Presets (subprefabs essentially)
+chunk_grove1_1(looping)
+    ef_mist_gentle: ef_particlewaterspray_reduced, texIndex=583;  Every 120secs, emit at rate of 3/sec for 24secs.  Particles have lifetime random between 3.5 and 20secs.  Has shape, vel over lifteime, col over lifetime, size over lifetime
+chunk_screen(on death)
+    centerBurst: ef_screendestroysheet texIndex=glowIndex=811;
+        glassbursteffect: ef_camerabits, color 1,1,1 texIndex=glowIndex=69;
+ef_fragexplosion(on start, play once)
+    CentralFireball: ef_fireball, texIndex=glowIndex={2046,2047,2048,2049,2046,2047,2048,2049};
+    FireSpits: ef_firespit, texIndex=glowIndex=2050;
+ef_mist(looping): ef_particlewaterspray, texIndex=583;
+ef_particle_blasterhit(on start, play once): ef_particleafterburner, texIndex=glowIndex=67
+    BlueSparksSmall: ef_particleglow, texIndex=glowIndex=67;, + trail:ef_particlespark, texIndex=glowIndex=817;/*for trail*/
+    Shockwave: ef_sparqshockwave, texIndex=glowIndex=820;
+    CenterSpatter2: ef_sparqspatter, texIndex=glowIndex=74
+    CenterSpatter: ef_sparqspatter, texIndex=glowIndex=74
+ef_particle_bloodspurtsmall: ef_particlesteam, texIndex=583; + trail:ef_particlespray, texIndex=583
+ef_particle_bloodspurtsmallgreen: ef_particlesteam, texIndex=583; + trail:ef_particlespray, texIndex=583
+    ef_particle_bloodspurttiny: ef_particlesteam, texIndex=583; + trail:ef_particlespray, texIndex=583
+ef_particle_bloodspurtsmallyellow: ef_particlesteam, texIndex=583; + trail:ef_particlespray, texIndex=583
+ef_particle_bloodspurttiny: ef_particlesteam, texIndex=583; + trail:ef_particlespray, texIndex=583
+ef_particle_camerahit: ef_cameraburst, texIndex=glowIndex=67;
+    DarkBurst: ef_cameraburst, texIndex=glowIndex=67;
+    CenterSpatter: ef_cameraspatter, texIndex=glowIndex=74;
+    CenterSpatter2: ef_cameraspatter, texIndex=glowIndex=74;
+    Bits: ef_camerabits, texIndex=glowIndex=69;
+ef_particle_darthit: ef_darthit, texIndex=158;
+ef_particle_ionhit:
+ef_particle_sec2muzburst:
+ef_particle_sparkssmall:
+ef_particle_sparkssmallblue:
+ef_particle_sparqhit:
+ef_sparkspits:
+ef_spraydrips:
+ef_steam:
+env_sparkssmall:
+npc_autobomb:
+npc_cortex_reaver:
+npc_cyber_reaver:
+npc_cyberdog:
+npc_cybershodan:
+npc_cyborg_assassin:
+npc_cyborg_diego:
+npc_cyborg_drone:
+npc_cyborg_elite:
+npc_cyborg_enforcer:
+npc_cyborg_warrior:
+npc_exec_bot:
+npc_flier_bot:
+npc_hopper:
+npc_humanoid_mutant:
+npc_maint_bot:
+npc_mutant_cyborg:
+npc_plant_mutant:
+npc_repairbot:
+npc_sec1_bot:
+npc_sec2_bot:
+npc_servbot:
+npc_virus_mutant:
+proj_enemshot2:
+proj_enemshot4:
+proj_enemshot5:
+proj_enemshot6:
+proj_magpulse_shot,proj_magpulse_npc_shot:
+proj_plasmarifle_shot:
+proj_railshot,proj_railnpc_shot:
+proj_stungun_shot:
+proj_sparkingwire:
