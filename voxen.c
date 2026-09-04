@@ -354,16 +354,7 @@ INLINE void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfo
 INLINE u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) ShaderError(s,name); return s; }
 INLINE u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
-void ParticleSystem_Init(void);
-void ParticleSystem_Shutdown(void);
-void ParticleSystem_Update(float dt);
-void ParticleSystem_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForward, u32 depthTex);
-void ParticleSystem_RenderTrails(float* viewProj, V3 camPos, V3 camRight, V3 camUp);
-u16 ParticleSystem_AddEmitter(const float* position, u32 textureIndex, float emitRate, float lifetime,
-                                    float sizeMin, float sizeMax, float speedMin, float speedMax,
-                                    u32 colorStart, u32 colorEnd, u8 blendMode);
-void ParticleSystem_SetPrograms(u32 particleSP, u32 trailSP);
-
+void ParticleSystem_Init(),ParticleSystem_Update(float),ParticleSystem_Render(float*,V3,V3,V3,V3,u32),ParticleSystem_RenderTrails(float*,V3,V3,V3),ParticleSystem_SetPrograms(u32,u32); u16 ParticleSystem_AddEmitter(const float*,u32,float,float,float,float,float,float,u32,u32,u8);
 void CompileShaders() {
     depthPrepassSP=CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); chunkSP=CompileAnyShader(vertSrc,fragSrc,"Main"); uiSP=CompileAnyShader(vertUISrc,fragUISrc,"UI"); debugUnlitSP=CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");
     shadowmapsSP=CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad"); textSP=CompileAnyShader(textVertSrc,textFragSrc,"Txt"); imageBlitSP=CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); ssrSP=CompileAnyShader(NULL,ssrCSSrc,"SSR");

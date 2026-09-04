@@ -517,12 +517,9 @@ int WindowInit() {
 }
 
 const FBC* ChooseFBConfig(const FBC* a, u32 c) {
-    u32 l=-1;
-    const FBC* f=0;
-    for (u32 i = 0; i < c; i++) {
-        const FBC* x=a+i;
-        u32 s=(((x->alphaBits==0)+(x->depthBits==0)+(x->stencilBits==0))*65536) + (((8-x->redBits)*(8-x->redBits) + (8-x->greenBits)*(8-x->greenBits) + (8-x->blueBits)*(8-x->blueBits))*256) + ((8-x->alphaBits)*(8-x->alphaBits) + (8-x->depthBits)*(8-x->depthBits) + (8-x->stencilBits)*(8-x->stencilBits));
-        if(s < l){l=s; f=x;}
+    u32 l=-1; const FBC* f=0;
+    for (u32 i = 0; i < c; i++) { 
+        const FBC* x=a+i; u32 s=(((x->alphaBits==0)+(x->depthBits==0)+(x->stencilBits==0))*65536) + (((8-x->redBits)*(8-x->redBits) + (8-x->greenBits)*(8-x->greenBits) + (8-x->blueBits)*(8-x->blueBits))*256) + ((8-x->alphaBits)*(8-x->alphaBits) + (8-x->depthBits)*(8-x->depthBits) + (8-x->stencilBits)*(8-x->stencilBits)); if(s < l){l=s; f=x;}
     }
     return f;
 }
@@ -536,36 +533,21 @@ FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL
 void SetGLContext_GetFunctionPointers() {
     WSWin* h=window; h->context.makeCurrent(h);
     #define X(n,t) n=(t)h->context.getProcAddress(#n);
-    X(glClear,FGL_C)              X(glClearColor,FGL_CC)      X(glColorMask,FGL_CM)        X(glDepthFunc,FGL_DF)           X(glDepthMask,FGL_DM)               X(glDisable,FGL_D)             X(glEnableVertexAttribArray,FGL_EVAA)
-    X(glEnable,FGL_E)             X(glFrontFace,FGL_FF)           X(glGetError,FGL_GERR)              X(glGetIntegerv,FGL_GIV)       X(glCheckFramebufferStatus,FGL_CFBS) 
-    X(glLineWidth,FGL_LW)         X(glReadBuffer,FGL_RB)      X(glReadPixels,FGL_RP)       X(glTexImage2D,FGL_T2D)         X(glViewport,FGL_VP)                X(glBindTexture,FGL_BT)        X(glCopyTexSubImage2D,FGL_CTSI2D)
-    X(glDrawArrays,FGL_DA)        X(glDrawElements,FGL_DE)    X(glGenTextures,FGL_GT)      X(glActiveTexture,FGL_AT)       X(glBlendFuncSeparate,FGL_BFS)      X(glBindVertexArray,FGL_BVA)   X(glVertexAttribBinding,FGL_VAB)
-    X(glBindBuffer,FGL_BB)        X(glBufferData,FGL_BD)      X(glGenBuffers,FGL_GB)       X(glUnmapBuffer,FGL_UB)         X(glAttachShader,FGL_AS)            X(glCompileShader,FGL_CS)
-    X(glCreateProgram,FGL_CP)     X(glCreateShader,FGL_CRS)   X(glDrawBuffers,FGL_DB)      X(glGetProgramiv,FGL_CPIV)      X(glGetShaderInfoLog,FGL_GSIL)      X(glGetShaderiv,FGL_GSIV)
-    X(glLinkProgram,FGL_LP)       X(glShaderSource,FGL_SS)    X(glUniform1f,FGL_U1F)       X(glUniform1i,FGL_U1I)          X(glUniform2f,FGL_U2F)              X(glUniform3f,FGL_U3F)
-    X(glUniform4f,FGL_U4F)        X(glTexParameteri,FGL_TPI)  X(glUniform1ui,FGL_U1UI)     X(glUniform2ui,FGL_U2UI)        X(glUniformMatrix3fv,FGL_UM3FV)     X(glUniformMatrix4fv,FGL_UM4FV)
-    X(glUseProgram,FGL_UP)        X(glBindBufferBase,FGL_BBB) X(glBindFramebuffer,FGL_BFB) X(glGenFramebuffers,FGL_GFS)    X(glMapBufferRange,FGL_MBR)         X(glBindImageTexture,FGL_BIT)
-    X(glBindVertexBuffer,FGL_BVB) X(glDispatchCompute,FGL_DC) X(glGenVertexArrays,FGL_GVA) X(glVertexAttribFormat,FGL_VAF) X(glFramebufferTexture2D,FGL_FBT2D) X(glBufferSubData,FGL_BSD)
-    X(glGenQueries,FGL_GIQ) X(glGetQueryObjectui64v,FGL_GQOU64)
-    X(glBeginQuery,FGL_BQ) X(glEndQuery,FGL_D)
-    X(glDrawArraysInstanced,FGL_DAI)
-    X(glBlendFunc,FGL_BB) X(glDeleteBuffers,FGL_DQ) X(glDeleteVertexArrays,FGL_DQ)
+    X(glClear,FGL_C)              X(glClearColor,FGL_CC)      X(glColorMask,FGL_CM)        X(glDepthFunc,FGL_DF)           X(glDepthMask,FGL_DM)               X(glDisable,FGL_D)             X(glEnableVertexAttribArray,FGL_EVAA) X(glEnable,FGL_E)             X(glFrontFace,FGL_FF)       X(glGetError,FGL_GERR)        X(glGetIntegerv,FGL_GIV)       X(glCheckFramebufferStatus,FGL_CFBS) 
+    X(glLineWidth,FGL_LW)         X(glReadBuffer,FGL_RB)      X(glReadPixels,FGL_RP)       X(glTexImage2D,FGL_T2D)         X(glViewport,FGL_VP)                X(glBindTexture,FGL_BT)        X(glCopyTexSubImage2D,FGL_CTSI2D)     X(glDrawArrays,FGL_DA)        X(glDrawElements,FGL_DE)    X(glGenTextures,FGL_GT)      X(glActiveTexture,FGL_AT)       X(glBlendFuncSeparate,FGL_BFS)      X(glBindVertexArray,FGL_BVA)   X(glVertexAttribBinding,FGL_VAB)
+    X(glBindBuffer,FGL_BB)        X(glBufferData,FGL_BD)      X(glGenBuffers,FGL_GB)       X(glUnmapBuffer,FGL_UB)         X(glAttachShader,FGL_AS)            X(glCompileShader,FGL_CS)      X(glCreateProgram,FGL_CP)     X(glCreateShader,FGL_CRS)   X(glDrawBuffers,FGL_DB)      X(glGetProgramiv,FGL_CPIV)      X(glGetShaderInfoLog,FGL_GSIL)      X(glGetShaderiv,FGL_GSIV)
+    X(glLinkProgram,FGL_LP)       X(glShaderSource,FGL_SS)    X(glUniform1f,FGL_U1F)       X(glUniform1i,FGL_U1I)          X(glUniform2f,FGL_U2F)              X(glUniform3f,FGL_U3F)         X(glUniform4f,FGL_U4F)        X(glTexParameteri,FGL_TPI)  X(glUniform1ui,FGL_U1UI)     X(glUniform2ui,FGL_U2UI)        X(glUniformMatrix3fv,FGL_UM3FV)     X(glUniformMatrix4fv,FGL_UM4FV)
+    X(glUseProgram,FGL_UP)        X(glBindBufferBase,FGL_BBB) X(glBindFramebuffer,FGL_BFB) X(glGenFramebuffers,FGL_GFS)    X(glMapBufferRange,FGL_MBR)         X(glBindImageTexture,FGL_BIT)  X(glBindVertexBuffer,FGL_BVB) X(glDispatchCompute,FGL_DC) X(glGenVertexArrays,FGL_GVA) X(glVertexAttribFormat,FGL_VAF) X(glFramebufferTexture2D,FGL_FBT2D) X(glBufferSubData,FGL_BSD)
+    X(glGenQueries,FGL_GIQ) X(glGetQueryObjectui64v,FGL_GQOU64) X(glBeginQuery,FGL_BQ) X(glEndQuery,FGL_D) X(glDrawArraysInstanced,FGL_DAI) X(glBlendFunc,FGL_BB) X(glDeleteBuffers,FGL_DQ) X(glDeleteVertexArrays,FGL_DQ)
     #undef X
 }
 
 size_t monitorAllocationSize = 0;
 void InputMonitor(WSMon* m, int a, int p) {
     if (a == 0x00040001) {
-        WinSys.monitorCount++;
-        WinSys.monitors = WinSys.monitors ? OS_Realloc(WinSys.monitors,monitorAllocationSize,sizeof(WSMon*) * WinSys.monitorCount) : OS_Alloc(WinSys.monitorCount * sizeof(WSMon*));
-        monitorAllocationSize = WinSys.monitorCount * sizeof(WSMon*);
-        if (p == 0) { mmov(WinSys.monitors + 1,WinSys.monitors,((size_t) WinSys.monitorCount - 1) * sizeof(WSMon*)); WinSys.monitors[0] = m; }
-        else WinSys.monitors[WinSys.monitorCount - 1] = m;
-    } else if (a == 0x00040002) {
-        for (int i=0;i<WinSys.monitorCount;++i) {
-            if (WinSys.monitors[i] == m) { WinSys.monitorCount--; mmov(WinSys.monitors + i, WinSys.monitors + i + 1,((size_t) WinSys.monitorCount - i) * sizeof(WSMon*)); break; }
-        }
-    }
+        WinSys.monitorCount++; WinSys.monitors = WinSys.monitors ? OS_Realloc(WinSys.monitors,monitorAllocationSize,sizeof(WSMon*) * WinSys.monitorCount) : OS_Alloc(WinSys.monitorCount * sizeof(WSMon*)); monitorAllocationSize = WinSys.monitorCount * sizeof(WSMon*);
+        if (p == 0) { mmov(WinSys.monitors + 1,WinSys.monitors,((size_t) WinSys.monitorCount - 1) * sizeof(WSMon*)); WinSys.monitors[0] = m; } else WinSys.monitors[WinSys.monitorCount - 1] = m;
+    } else if (a == 0x00040002) { for (int i=0;i<WinSys.monitorCount;++i) { if (WinSys.monitors[i] == m) { WinSys.monitorCount--; mmov(WinSys.monitors + i, WinSys.monitors + i + 1,((size_t) WinSys.monitorCount - i) * sizeof(WSMon*)); break; } } }
 }
 
 static WSMon* AllocMonitor(const char* n, int w, int h) { WSMon* m = OS_Alloc(sizeof(WSMon)); m->widthMM = w; m->heightMM = h; scpy_to_a_from_b(m->name,n,sizeof(m->name)); return m; }
@@ -590,11 +572,8 @@ WSMon* GetCurrentMonitor() {
 void ChangeResolution() {
     if (resDropdownCount > 1) {
         resSelectedIdx = (resSelectedIdx + 1) % resDropdownCount; Sys_Settings.ScreenWidth = (u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight = (u32)resModes[resSelectedIdx].h;
-        WSMon* m = GetCurrentMonitor(); if(!m) m=GetPrimaryMonitor();
-        int mx,my; WinSysGetMonitorPos(m,&mx,&my); const vidmode* desktop = WinSysGetVideoMode(m);
-        int x = mx + (desktop->width - (int)Sys_Settings.ScreenWidth) / 2, y = my + (desktop->height - (int)Sys_Settings.ScreenHeight) / 2;
-        SetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight); SetWindowPosition(window,x,y); UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
-        resDropdownOpen = false; SaveConfig();
+        WSMon* m = GetCurrentMonitor(); if(!m) m=GetPrimaryMonitor(); int mx,my; WinSysGetMonitorPos(m,&mx,&my); const vidmode* desktop = WinSysGetVideoMode(m); int x = mx + (desktop->width - (int)Sys_Settings.ScreenWidth) / 2, y = my + (desktop->height - (int)Sys_Settings.ScreenHeight) / 2;
+        SetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight); SetWindowPosition(window,x,y); UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight); resDropdownOpen = false; SaveConfig();
     }
 }
 
@@ -602,11 +581,7 @@ void GatherResolutionModes() {
     resDropdownCount = 0; WSMon* m = GetCurrentMonitor(); if (!m) m=GetPrimaryMonitor(); const vidmode* d = WinSysGetVideoMode(m); if(!d) return;
     static const struct {int w,h;} cr[] = {{320,200},{640,400},{640,480},{800,600},{1024,768},{1280,720},{1280,800},{1366,768},{1440,900},{1600,900},{1920,1080},{2560,1440}};
     int maxW = d->width, maxH = d->height,j;
-    for (int i = 0; i < 12 && resDropdownCount < 8; ++i) {
-        if (cr[i].w > maxW || cr[i].h > maxH || cr[i].w < 320 || cr[i].h < 200) continue;
-        for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == cr[i].w && resModes[j].h == cr[i].h) break; }
-        if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){cr[i].w,cr[i].h};
-    }
+    for (int i = 0; i < 12 && resDropdownCount < 8; ++i) { if (cr[i].w > maxW || cr[i].h > maxH || cr[i].w < 320 || cr[i].h < 200) continue; for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == cr[i].w && resModes[j].h == cr[i].h) break; } if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){cr[i].w,cr[i].h}; }
     if (resDropdownCount < 8){resModes[resDropdownCount++]=(ResMode){d->width,d->height};} resSelectedIdx=0;
     for (int i=0;i<resDropdownCount;++i) { if(resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight){resSelectedIdx=i; break;} }
 }
@@ -621,10 +596,7 @@ void ChangeFullScreenWindowed(bool adjustToFit) {
 void SetVSync() { window->context.swapInterval((i32)Sys_Settings.Vsync); }
 void CycleToNextMonitor() {
     static double monitorSwitchTime = 0.0;
-    if (get_time() >= monitorSwitchTime) {
-        monitorSwitchTime = get_time() + 0.5;
-        if(Sys_Settings.CurrentMonitor>(WinSys.monitorCount-1)){Sys_Settings.CurrentMonitor=0; SaveConfig();} if(WinSys.monitorCount>=2){Sys_Settings.CurrentMonitor=(Sys_Settings.CurrentMonitor+1)%WinSys.monitorCount; SaveConfig(); CenterWindowOnMonitor();}
-    }
+    if (get_time() >= monitorSwitchTime) { monitorSwitchTime = get_time() + 0.5; if(Sys_Settings.CurrentMonitor>(WinSys.monitorCount-1)){Sys_Settings.CurrentMonitor=0; SaveConfig();} if(WinSys.monitorCount>=2){Sys_Settings.CurrentMonitor=(Sys_Settings.CurrentMonitor+1)%WinSys.monitorCount; SaveConfig(); CenterWindowOnMonitor();} }
 }
 // Input and Configuration System for Config.ini, keyboard and mouse support.
 double last_mouse_x,last_mouse_y;
@@ -639,9 +611,7 @@ InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D}
                                  {"PAUSE",KEY_PAUSE},{"NUMLOCK",KEY_NUM_LOCK},{"MWHEEL+",127},{"MWHEEL-",128},/*Handled special case for mousewheel +/-respectively*/{"PRINT",KEY_PRINT_SCREEN},{"JOY18",JOYHAT_DOWN},{"JOY19",JOYHAT_LEFT},{"UNUSED",0}};
 KeyState* GetCodeMapping(int settingIndex) {
     i32 i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
-    if (i < 0 || i >= (i32)(sizeof(inputElements)/sizeof(inputElements[0]))) return &Sys_Input.keyStates[MAX_KEYS - 1]; // UNUSED NULL (e.g. setting unbound)
-    if (i >= 53 && i <= 60) return &Sys_Input.mouseButtons[inputElements[i].value];
-    return &Sys_Input.keyStates[inputElements[i].value];
+    if (i < 0 || i >= (i32)(sizeof(inputElements)/sizeof(inputElements[0]))) return &Sys_Input.keyStates[MAX_KEYS - 1];/*UNUSED NULL (e.g. setting unbound)*/ if (i >= 53 && i <= 60) return &Sys_Input.mouseButtons[inputElements[i].value]; return &Sys_Input.keyStates[inputElements[i].value];
 }
 
 void TextEntry(i32 k) {
@@ -708,21 +678,8 @@ void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     if (window_has_focus) {
         if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);
-        if (Sprint() && Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode) {
-            bool foundValidDynamic = false;
-            while (!foundValidDynamic) {
-                editModeTestEntityDefinition--;
-                if (editModeTestEntityDefinition < 307) editModeTestEntityDefinition = 767;
-                if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true;
-            }
-        } else if (Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode) {
-            bool foundValidDynamic = false;
-            while (!foundValidDynamic) {
-                editModeTestEntityDefinition++;
-                if (editModeTestEntityDefinition > 767) editModeTestEntityDefinition = 307;
-                if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true;
-            }
-        }
+        if (Sprint() && Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition--; if (editModeTestEntityDefinition < 307) editModeTestEntityDefinition = 767; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
+        else if (Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition++; if (editModeTestEntityDefinition > 767) editModeTestEntityDefinition = 307; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
         if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; SaveGame(7,"quicksave"); return; }
         if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }

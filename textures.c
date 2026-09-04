@@ -215,14 +215,10 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     while (cur < end) {
         char *s = cur; while (cur < end && *cur != '\n' && *cur != '\r') cur++;
         size_t len = cur - s; line++; if (len <= 0) { cur++; continue; }
-        while (cEmpty(*s)) s++; char *le = s + (cur - s) - 1;
-        while (le > s && cEmpty(*le)) le--;
+        while (cEmpty(*s)) s++; char *le = s + (cur - s) - 1; while (le > s && cEmpty(*le)) le--;
         if (*s == '\0' || (s[0] == '/' && s[1] == '/') || s[0] == '#') { if (cur < end && (*cur == '\r' || *cur == '\n')) cur++; continue; }
         char *col = StringFindFirstCharWithin(s, ':');
-        if (col && sCompUpToLen(s, "index", col - s) == 0) {
-            char *v = col + 1; while (cEmpty(*v)) v++;
-            u32 idx = parse_numberu32(v, s, line); if (idx > m_idx) m_idx = idx;
-        }
+        if (col && sCompUpToLen(s, "index", col - s) == 0) { char *v = col + 1; while (cEmpty(*v)) v++; u32 idx = parse_numberu32(v, s, line); if (idx > m_idx) m_idx = idx; } 
         if (cur < end && (*cur == '\r' || *cur == '\n')) cur++;
     }
     if (!m_idx || m_idx >= maxS) { if (!m_idx) DualLogWarn("No entries in %s\n", fn); else DualLogWarn("Index %u too large in %s\n",m_idx,fn); OS_Free(data,sz); return false; }
@@ -245,20 +241,12 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
                 while (cEmpty(*k) && k < col) k++; while (cEmpty(*v) && v <= le) v++;
                 size_t kL = col - k, vL = (le >= v) ? (le - v + 1) : 0;
                 if (kL && vL) {
-                    sCpy2aSubFromb(tk, kL, k, 256); sCpy2aSubFromb(tv,vL,v,256);
-                    char *ke = tk + slen(tk) - 1, *ve = tv + slen(tv) - 1;
-                    while (ke > tk && cEmpty(*ke)) *ke-- = 0; while (ve > tv && cEmpty(*ve)) *ve-- = 0;
-                         if (sEqual(tk,      "index")) e.index       = parse_numberu16(tv,s,line);
-                    else if (sEqual(tk,"transparent")) e.transparent = parse_bool(tv,s,line);
-                    else if (sEqual(tk,"doublesided")) e.doublesided = parse_bool(tv,s,line);
-                    else if (sEqual(tk,"blend"))       e.blend       = parse_numberu8(tv,s,line);
+                    sCpy2aSubFromb(tk, kL, k, 256); sCpy2aSubFromb(tv,vL,v,256); char *ke = tk + slen(tk) - 1, *ve = tv + slen(tv) - 1; while (ke > tk && cEmpty(*ke)) *ke-- = 0; while (ve > tv && cEmpty(*ve)) *ve-- = 0;
+                    if (sEqual(tk,"index")) e.index=parse_numberu16(tv,s,line); else if (sEqual(tk,"transparent")) e.transparent=parse_bool(tv,s,line); else if (sEqual(tk,"doublesided")) e.doublesided=parse_bool(tv,s,line); else if (sEqual(tk,"blend")) e.blend=parse_numberu8(tv,s,line); 
                 }
             }
-        }
-        if (cur < end && (*cur == '\r' || *cur == '\n')) cur++;
-    }
-    if (e.path[0] && e.index < p->capacity) p->entries[e.index] = e;
-    OS_Free(data, sz); return true;
+        } if (cur < end && (*cur == '\r' || *cur == '\n')) cur++;
+    } if (e.path[0] && e.index < p->capacity) p->entries[e.index] = e; OS_Free(data, sz); return true;
 }
  
 void SetWindowIcon(WinSysIcon*);

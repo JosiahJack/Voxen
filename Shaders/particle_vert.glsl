@@ -1,7 +1,6 @@
 // particle_vert.glsl - Instanced particle billboard vertex shader
 layout(location = 0) in vec2 inCorner;
 layout(location = 1) in vec2 inUV;
-
 layout(location = 0) uniform mat4 uViewProj;
 layout(location = 1) uniform vec3 uCamPos;
 layout(location = 2) uniform vec3 uCamRight;
@@ -9,61 +8,11 @@ layout(location = 3) uniform vec3 uCamUp;
 layout(location = 4) uniform vec3 uCamForward;
 layout(location = 5) uniform int uInstanceOffset;
 layout(location = 6) uniform int uMode;
-
-layout(std430, binding = 10) readonly buffer ParticleInstanceBlock {
-    vec4 posSize[20480];
-    uvec4 data[20480];
-};
-
-out vec2 vUV;
-out vec4 vColor;
-out float vViewDist;
-flat out uint vFlags;
-
-vec4 unpackColorRGBA8(uint packedColor) {
-    return vec4(
-        float((packedColor >>  0) & 0xFFu) / 255.0,
-        float((packedColor >>  8) & 0xFFu) / 255.0,
-        float((packedColor >> 16) & 0xFFu) / 255.0,
-        float((packedColor >> 24) & 0xFFu) / 255.0
-    );
-}
-
+layout(std430, binding = 10) readonly buffer ParticleInstanceBlock { vec4 posSize[20480]; uvec4 data[20480]; };
+out vec2 vUV; out vec4 vColor; out float vViewDist; flat out uint vFlags;
+vec4 unpackColorRGBA8(uint packedColor) {return vec4( float((packedColor >>  0) & 0xFFu) / 255.0,float((packedColor >>  8) & 0xFFu) / 255.0,float((packedColor >> 16) & 0xFFu) / 255.0,float((packedColor >> 24) & 0xFFu) / 255.0); }
 void main() {
-    int idx = gl_InstanceID + uInstanceOffset;
-
-    vec4 pSize = posSize[idx];
-    float size = pSize.w;
-    if (size <= 0.0) {
-        gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
-        return;
-    }
-
-    uvec4 d = data[idx];
-    uint rotBits = d.y & 0xFFu;
-    uint texBits = (d.y >> 8) & 0xFFFFu;
-    uint flags   = (d.y >> 24) & 0xFFu;
-
-    float angle = float(rotBits) * (6.28318530718 / 255.0);
-    float c = cos(angle);
-    float s = sin(angle);
-
-    vec2 corner = inCorner;
-    vec2 rotated = vec2(
-        corner.x * c - corner.y * s,
-        corner.x * s + corner.y * c
-    );
-
-    vec3 worldPos =
-        pSize.xyz +
-        uCamRight * (rotated.x * size) +
-        uCamUp * (rotated.y * size);
-
-    gl_Position = uViewProj * vec4(worldPos, 1.0);
-
-    vUV = inUV;
-    vColor = unpackColorRGBA8(d.x);
-    vFlags = flags;
-
-    vViewDist = dot(worldPos - uCamPos, uCamForward);
+    int idx = gl_InstanceID + uInstanceOffset; vec4 pSize = posSize[idx]; float size = pSize.w; if (size <= 0.0) { gl_Position = vec4(0.0, 0.0, 0.0, 0.0); return; }
+    uvec4 d = data[idx]; float angle = float(d.y&0xFFu) * (6.28318530718 / 255.0); float c=cos(angle), s=sin(angle); vec2 corner = inCorner; vec2 rotated = vec2(corner.x * c - corner.y * s,corner.x * s + corner.y * c);
+    vec3 worldPos = pSize.xyz + uCamRight * (rotated.x * size) + uCamUp * (rotated.y * size); gl_Position = uViewProj * vec4(worldPos, 1.0); vUV = inUV; vColor = unpackColorRGBA8(d.x); vFlags = ((d.y >> 24) & 0xFFu); vViewDist = dot(worldPos - uCamPos, uCamForward);
 }
