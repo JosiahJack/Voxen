@@ -354,7 +354,7 @@ INLINE void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfo
 INLINE u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) ShaderError(s,name); return s; }
 INLINE u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
-void ParticleSystem_Init(),ParticleSystem_Update(float),ParticleSystem_Render(float*,V3,V3,V3,V3,u32),ParticleSystem_RenderTrails(float*,V3,V3,V3),ParticleSystem_SetPrograms(u32,u32); u16 ParticleSystem_AddEmitter(const float*,u32,float,float,float,float,float,float,u32,u32,u8);
+void ParticleSystem_Init(),ParticleSystem_Update(float),ParticleSystem_Render(float*,V3,V3,V3,V3,u32,float,float,float,float),ParticleSystem_RenderTrails(float*,V3,V3,V3),ParticleSystem_SetPrograms(u32,u32),ParticleSystem_SetEmitterPhysics(u16,float,float),ParticleSystem_SetEmitterColorRamp(u16,const Color*,const float*,int),ParticleSystem_SetEmitterScaleCurve(u16,const float*,const float*,int),ParticleSystem_SetEmitterVelocityCurve(u16,const float*,const float*,int); u16 ParticleSystem_AddEmitter(V3,u32,float,float,float,float,float,float,Color,Color,u8);
 void CompileShaders() {
     depthPrepassSP=CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); chunkSP=CompileAnyShader(vertSrc,fragSrc,"Main"); uiSP=CompileAnyShader(vertUISrc,fragUISrc,"UI"); debugUnlitSP=CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");
     shadowmapsSP=CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad"); textSP=CompileAnyShader(textVertSrc,textFragSrc,"Txt"); imageBlitSP=CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); ssrSP=CompileAnyShader(NULL,ssrCSSrc,"SSR");
@@ -762,7 +762,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,0,0,0,swidth,sheight); // Store the render result for the camview
         glBindTexture(GL_TEXTURE_2D,0); return; // After copying render result, skip SSR and composite for camviews <<<<<<<<<<<<< CAM VIEW BARRIER
     }
-    { V3 camR={invViewRot[0],invViewRot[1],invViewRot[2]}, camU={invViewRot[3],invViewRot[4],invViewRot[5]}, camF={-invViewRot[6],-invViewRot[7],-invViewRot[8]}; ParticleSystem_Render(viewProj,playerPos,camR,camU,camF,inputDepthID); ParticleSystem_RenderTrails(viewProj,playerPos,camR,camU); }
+    { V3 camR={invViewRot[0],invViewRot[1],invViewRot[2]}, camU={invViewRot[3],invViewRot[4],invViewRot[5]}, camF={-invViewRot[6],-invViewRot[7],-invViewRot[8]}; ParticleSystem_Render(viewProj,playerPos,camR,camU,camF,inputDepthID,snear,sfar,(float)swidth,(float)sheight); ParticleSystem_RenderTrails(viewProj,playerPos,camR,camU); }
     if(unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID);
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][3]);
@@ -876,7 +876,14 @@ __attribute__((cold)) void NewGame() { // Reset World States
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
     } DebugRAM("after edge adjacency");
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u); World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u); World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
-    { V3 pe = World.position[PLAYER1]; ParticleSystem_AddEmitter(&pe.x,67,40.0f,1.0e9f,0.1f,0.35f,0.5f,1.5f,0xFF8844FF,0xFF8844FF,0); }
+    { V3 pe = World.position[PLAYER1]; pe.x += 2.56f; Color cRed={1,0,0,1}, cGreen={0,1,0,1}, cBlue={0,0,1,1}; Color cols[3]={cRed,cGreen,cBlue}; float times[3]={0.0f,0.5f,1.0f};
+      float scaleKeys[3]={0.2f,0.2f,2.0f}; float sTimes[3]={0.0f,0.5f,1.0f};
+      float velKeys[4]={1.0f,1.0f,0.0f,0.0f}; float velTimes[4]={0.0f,0.49f,0.5f,1.0f};
+      u16 peIdx = ParticleSystem_AddEmitter(pe,67,40.0f,1000000000.0f,0.08f,0.08f,0.5f,1.5f,cRed,cGreen,0);
+      ParticleSystem_SetEmitterColorRamp(peIdx, cols, times, 3);
+      ParticleSystem_SetEmitterScaleCurve(peIdx, scaleKeys, sTimes, 3);
+      ParticleSystem_SetEmitterVelocityCurve(peIdx, velKeys, velTimes, 4);
+      ParticleSystem_SetEmitterPhysics(peIdx, 0.3f, 1.0f); }
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
     //TESTING TODO REMOVE! AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
 }
