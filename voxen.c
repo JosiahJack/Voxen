@@ -27,7 +27,7 @@ static bool shadowBuffersCreated = false;
 CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
 u16 editModeSelection, editModeTestEntityDefinition=343; u16 lastSpawned=U16_MAX;
-double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS];
+double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u8 particleBlendTexture[MAX_TXRS];
 static u32 gpuQ[5][5]; static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
 typedef struct {int w,h;} ResMode; ResMode resModes[8];
@@ -354,10 +354,21 @@ INLINE void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfo
 INLINE u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) ShaderError(s,name); return s; }
 INLINE u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
+void ParticleSystem_Init(void);
+void ParticleSystem_Shutdown(void);
+void ParticleSystem_Update(float dt);
+void ParticleSystem_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForward, u32 depthTex);
+void ParticleSystem_RenderTrails(float* viewProj, V3 camPos, V3 camRight, V3 camUp);
+u16 ParticleSystem_AddEmitter(const float* position, u32 textureIndex, float emitRate, float lifetime,
+                                    float sizeMin, float sizeMax, float speedMin, float speedMax,
+                                    u32 colorStart, u32 colorEnd, u8 blendMode);
+void ParticleSystem_SetPrograms(u32 particleSP, u32 trailSP);
+
 void CompileShaders() {
     depthPrepassSP=CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); chunkSP=CompileAnyShader(vertSrc,fragSrc,"Main"); uiSP=CompileAnyShader(vertUISrc,fragUISrc,"UI"); debugUnlitSP=CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");
     shadowmapsSP=CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad"); textSP=CompileAnyShader(textVertSrc,textFragSrc,"Txt"); imageBlitSP=CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); ssrSP=CompileAnyShader(NULL,ssrCSSrc,"SSR");
     voxelUpdateSP=CompileAnyShader(NULL,voxUpdCSSrc,"Vox"); shadowmapsClearSP=CompileAnyShader(NULL,shadClearCSSrc,"ShadCl");
+    ParticleSystem_SetPrograms(CompileAnyShader(particleVertSrc,particleFragSrc,"Part"), CompileAnyShader(trailVertSrc,trailFragSrc,"Trail"));
 }
 
 INLINE u32 MakeSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
@@ -760,6 +771,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,0,0,0,swidth,sheight); // Store the render result for the camview
         glBindTexture(GL_TEXTURE_2D,0); return; // After copying render result, skip SSR and composite for camviews <<<<<<<<<<<<< CAM VIEW BARRIER
     }
+    { V3 camR={invViewRot[0],invViewRot[1],invViewRot[2]}, camU={invViewRot[3],invViewRot[4],invViewRot[5]}, camF={-invViewRot[6],-invViewRot[7],-invViewRot[8]}; ParticleSystem_Render(viewProj,playerPos,camR,camU,camF,inputDepthID); ParticleSystem_RenderTrails(viewProj,playerPos,camR,camU); }
     if(unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID);
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][3]);
@@ -873,6 +885,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
     } DebugRAM("after edge adjacency");
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u); World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u); World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
+    { V3 pe = World.position[PLAYER1]; ParticleSystem_AddEmitter(&pe.x,67,40.0f,1.0e9f,0.1f,0.35f,0.5f,1.5f,0xFF8844FF,0xFF8844FF,0); }
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
     //TESTING TODO REMOVE! AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
 }
@@ -891,6 +904,7 @@ void InitalizeEnvironment() {
     glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/); glClearColor(0,0,0,1);
     CompileShaders();
+    ParticleSystem_Init();
     u32 tvaos[4],tvbos[4]; glGenVertexArrays(4,tvaos); glGenBuffers(4,tvbos); quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; chunkVBO=tvbos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; 
     float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
     glBindVertexArray(quadVAO); glBindBuffer(GL_ARRAY_BUFFER,quadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
@@ -931,7 +945,7 @@ void InitalizeEnvironment() {
     RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); RenderLoading("Loading models..."); DebugRAM("before LoadModels"); LoadModels(); DebugRAM("after LoadModels");
     if (World.introNotPlayed) { currentMenuPage = Mpg_IntroVideo; PlayMenuMusic(); World.menuActive = true; World.introNotPlayed = false; } World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     NewGame();
-    PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
+    //PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
     OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free");
 }
 
@@ -949,6 +963,7 @@ i32 main() {
         if (!World.paused && !World.menuActive) { double ps=get_time(); float dt=(float)vclamp((World.pauseRelativeTime - World.last_physics_time),0.0005,0.1); World.last_physics_time=World.pauseRelativeTime; World.dt=dt; Physics(dt); physTime=get_time() - ps; } else physTime=0.0;
         double gameT_start = get_time();
         ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
+        if (!World.paused && !World.menuActive) ParticleSystem_Update(World.dt);
         if (World.invP1.hasHardware & HW_BIO) BioMonitorUpdate();
         UpdateAudio(); gameTime = get_time() - gameT_start;
         if (likely(!World.paused && !World.menuActive)) UpdateInstanceMatrix4x4s(); // Before camviews so camview shadows render same as main pass

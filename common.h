@@ -298,7 +298,7 @@ extern float modelMatrices[INSTANCE_COUNT*16]; extern float *world_from_mdl; ext
 extern float **physPos; extern u16** physTris; extern u32* physVertCounts; extern u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; extern u32 uniqueCvxMeshCount;
 extern u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; extern u16* cvxAdjLists[MAX_UNIQUE_CVX_MESHES]; extern u16 cvxAdjStart[MAX_UNIQUE_CVX_MESHES]; extern BvhNode** modelBVHNodes; extern u16** modelBVHTriOrder; extern u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS]; extern size_t cgltf_total_alloc;
 extern u16 playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; extern AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; extern i32 threadCnt;
-extern u32 vbos[MAX_MDLS],tbos[MAX_MDLS]; extern FHandle console_log_file; extern u32 drawCalls,vertsRendered,voxelUpdateSP,lightsID,psysSp,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID;
+extern u32 vbos[MAX_MDLS],tbos[MAX_MDLS]; extern FHandle console_log_file; extern u32 drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID;
 extern u32 shadowmapIndirectionList[LIGHT_COUNT];
 extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
@@ -311,7 +311,7 @@ typedef struct { V3 normal; float d; } FrustumPlane;
 extern FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 typedef struct PngArena { u8*base,*cursor,*end; } PngArena;
 extern PngArena png_arena_main;
-extern bool instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS],window_has_focus,ignore_next_mouse_delta,returnToPause,mouseMovementThisFrame,firstFrameMouselook;
+extern bool instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS],window_has_focus,ignore_next_mouse_delta,returnToPause,mouseMovementThisFrame,firstFrameMouselook; extern u8 particleBlendTexture[MAX_TXRS];
 extern u8 currentPlayerNameLength;
 extern i8 currentMenuItem;
 typedef struct { int width,height; u8* pixels; } WinSysIcon;
@@ -415,7 +415,11 @@ INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ?
 // GL
 enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,
       GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,
-      GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8};
+      GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8,
+      GL_TRIANGLE_STRIP=0x0005,GL_LESS=0x0201,GL_LEQUAL=0x0203,GL_SHADER_STORAGE_BUFFER=0x90D2,
+      GL_ONE=1,GL_SRC_ALPHA=0x0302,GL_ONE_MINUS_SRC_ALPHA=0x0303,GL_DST_COLOR=0x0306,GL_ZERO=0,GL_TRUE=1};
+// Particles
+enum {MAX_PARTICLES=20480,MAX_EMITTERS=18,MAX_TRAIL_SEGMENTS=4096,PARTICLE_SSBO_BINDING=10,TRAIL_SSBO_BINDING=11};
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
 typedef void(*FGL_C)(u32), (*FGL_FL)(),   (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
 typedef void(*FGL_CS)(u32),(*FGL_RB)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32),  (*FGL_CTSI2D)(u32,i32,i32,i32,i32,i32,i32,i32);
@@ -423,12 +427,18 @@ typedef void(*FGL_E)(u32), (*FGL_DF)(u32),(*FGL_LP)(u32),  (*FGL_GB)(i32,u32*), 
 typedef void(*FGL_UP)(u32),(*FGL_D)(u32), (*FGL_DM)(bool), (*FGL_LW)(float),    (*FGL_GIV)(u32,i32*),(*FGL_U1UI)(i32,u32),  (*FGL_GSIV)(u32,u32,i32*),  (*FGL_VAF)(u32,i32,u32,bool,u32),  (*FGL_UM3FV)(i32,i32,bool,const float*), (*FGL_U3F)(i32,float,float,float),              (*FGL_U2F)(i32,float,float);
 typedef u32(*FGL_CFBS)(u32), (*FGL_CP)(), (*FGL_GERR)(), (*FGL_CBFV)(u32,i32,const float*), (*FGL_CRS)(u32); typedef bool(*FGL_UB)(u32);
 typedef void(*FGL_GIQ)(i32,u32*),(*FGL_DQ)(i32,const u32*),(*FGL_QC)(u32,u32),(*FGL_GQOU64)(u32,u32,u64*),(*FGL_GI64V)(u32,i64*);
+typedef void(*FGL_DAI)(u32,i32,i32,i32);
 extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferData; extern FGL_UB glUnmapBuffer; extern FGL_MBR glMapBufferRange; extern FGL_U2F glUniform2f; extern FGL_U1F glUniform1f; extern FGL_U1UI glUniform1ui; extern FGL_UP glUseProgram;
 extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays; extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i;
 extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding; extern FGL_EVAA glEnableVertexAttribArray;
 extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_LW glLineWidth;
 extern FGL_GIQ glGenQueries; extern FGL_GQOU64 glGetQueryObjectui64v;
 typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery;
+extern FGL_DAI glDrawArraysInstanced;
+extern FGL_BBB glBindBufferBase;
+extern FGL_BB glBlendFunc;
+extern FGL_DQ glDeleteBuffers;
+extern FGL_DQ glDeleteVertexArrays;
 // Input
 typedef enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)} JoyHatId;
 typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,

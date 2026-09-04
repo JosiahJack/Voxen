@@ -72,6 +72,10 @@ gh ./Shaders/composite_vert.glsl      quadVertSrc
 gh ./Shaders/composite_frag.glsl      quadFragSrc
 gh ./Shaders/shadowmap_vert.glsl      shadowmapVertSrc
 gh ./Shaders/shadowmap_frag.glsl      shadowmapFragSrc
+gh ./Shaders/particle_vert.glsl       particleVertSrc
+gh ./Shaders/particle_frag.glsl       particleFragSrc
+gh ./Shaders/trail_vert.glsl          trailVertSrc
+gh ./Shaders/trail_frag.glsl          trailFragSrc
 cat > Shaders/shaders.h <<'EOF'
 #pragma once
 #include "text_vert.glsl.h"
@@ -88,6 +92,10 @@ cat > Shaders/shaders.h <<'EOF'
 #include "shadowmap_frag.glsl.h"
 #include "composite_vert.glsl.h"
 #include "composite_frag.glsl.h"
+#include "particle_vert.glsl.h"
+#include "particle_frag.glsl.h"
+#include "trail_vert.glsl.h"
+#include "trail_frag.glsl.h"
 #include "ssr.compute.h"
 #include "voxels.compute.h"
 #include "shadowmaps_clear.compute.h"
@@ -113,7 +121,7 @@ else
 fi
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c audio.c textures.c models.c biomonitor.c culling.c" #synth.c is in audio.c
+SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c audio.c textures.c models.c biomonitor.c culling.c particles.c" #synth.c is in audio.c
 SIZEOPT="models.c text.c textures.c lib.c audio.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} sh -c "F=\$(echo '$SIZEOPT' | tr ' ' '\\n' | grep -qx \$(basename {}) && echo -Oz || echo ''); $CC -c {} $CFLAGS \$F -o $TEMP_DIR/\$(basename {}).o"

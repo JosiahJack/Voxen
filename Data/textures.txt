@@ -167,12 +167,15 @@ index: 66
 #Textures/Burst.png
 index: 67
 transparent: 1
+blend: 1
 #Textures/BurstSmooth.png
 index: 68
 transparent: 1
+blend: 1
 #Textures/BurstTiny.png
 index: 69
 transparent: 1
+blend: 1
 #Textures/cabinet.png
 index: 70
 #Textures/cable.png
@@ -4420,12 +4423,10 @@ index: 2066
 index: 2067
 #Textures/Sprites/explosion5/5d3_0001.png
 index: 2068
-#Textures/Sprites/explosion5/5d3_0002 - Copy.png
-index: 2069
+
 #Textures/Sprites/explosion5/5d3_0002.png
 index: 2070
-#Textures/Sprites/explosion5/5d3_0003 - Copy.png
-index: 2071
+
 #Textures/Sprites/explosion5/5d3_0003.png
 index: 2072
 #Textures/Sprites/grenbighit/546_1268.png

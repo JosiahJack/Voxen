@@ -1,7 +1,7 @@
 // textures.c - 2D Texture Loading System
 #include "common.h"
 u32 totalPixels,totalPaletteColors;
-typedef struct { u16 index; bool transparent; bool doublesided; char path[128]; } TextureData;          typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser;
+typedef struct { u16 index; bool transparent; bool doublesided; u8 blend; char path[128]; } TextureData;          typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser;
 typedef struct { u8 r,g,b; } PngPalEntry;
 typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8 img_depth, img_color_type, img_error; u16 img_palette_count; PngPalEntry img_palette[256]; u8 img_trns[256]; u8* img_buffer, *img_buffer_end; } PngContext;
 typedef struct { u8* indices; u32* palette,palSize; i32 w, h; } TexResult;
@@ -162,6 +162,7 @@ static void* TextureParsingWorker(void* arg) {
         if (unlikely(pIdx < 0 || pIdx >= (i32)t->parser->count)) continue;
         doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided; 
         transparentTexture[i] = t->parser->entries[pIdx].transparent;
+        particleBlendTexture[i] = t->parser->entries[pIdx].blend;
         FHandle dummy_fd; int sz=0; const char* d =(const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path,&dummy_fd,&sz);
         if (unlikely(!d || sz <= 0)) continue;
         int w=0, h=0; u8 *pix = PngLoad((const u8*)d,sz,&w,&h,&thread_png_arenas[t->tid]); if (!pix || w < 1 || h < 1) { OS_Free((void*)d,(size_t)sz); continue; }
@@ -250,6 +251,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
                          if (sEqual(tk,      "index")) e.index       = parse_numberu16(tv,s,line);
                     else if (sEqual(tk,"transparent")) e.transparent = parse_bool(tv,s,line);
                     else if (sEqual(tk,"doublesided")) e.doublesided = parse_bool(tv,s,line);
+                    else if (sEqual(tk,"blend"))       e.blend       = parse_numberu8(tv,s,line);
                 }
             }
         }
