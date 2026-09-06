@@ -354,7 +354,7 @@ INLINE void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfo
 INLINE u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) ShaderError(s,name); return s; }
 INLINE u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
-void ParticleSystem_Init(),ParticleSystem_Update(float),ParticleSystem_Render(float*,V3,V3,V3,V3,u32,float,float,float,float),ParticleSystem_RenderTrails(float*,V3,V3,V3),ParticleSystem_SetPrograms(u32,u32),ParticleSystem_SetEmitterPhysics(u16,float,float),ParticleSystem_SetEmitterColorRamp(u16,const Color*,const float*,int),ParticleSystem_SetEmitterScaleCurve(u16,const float*,const float*,int),ParticleSystem_SetEmitterVelocityCurve(u16,const float*,const float*,int),ParticleSystem_SetEmitterAnimation(u16,u16),ParticleSystem_SetEmitterAnimationWindow(u16,float),ParticleSystem_SetEmitterRotation(u16,float),ParticleSystem_SetEmitterLifetime(u16,float,float); u16 ParticleSystem_AddEmitter(V3,u32,float,float,float,float,float,float,Color,Color,u8);
+void ParticleSystem_Init(),ParticleSystem_Update(float),ParticleSystem_Render(float*,V3,V3,V3,V3,u32,float,float,float,float),ParticleSystem_RenderTrails(float*,V3,V3,V3),ParticleSystem_SetPrograms(u32,u32),ParticleSystem_SetEmitterPhysics(u16,float,float),ParticleSystem_SetEmitterTrail(u16,u8,u32),ParticleSystem_SetEmitterTrailLifetime(u16,float),ParticleSystem_SetEmitterTrailColor(u16,Color,Color),ParticleSystem_SetEmitterTrailWidth(u16,float,float),ParticleSystem_SetEmitterColorRamp(u16,const Color*,const float*,int),ParticleSystem_SetEmitterScaleCurve(u16,const float*,const float*,int),ParticleSystem_SetEmitterVelocityCurve(u16,const float*,const float*,int),ParticleSystem_SetEmitterAnimation(u16,u16),ParticleSystem_SetEmitterAnimationWindow(u16,float),ParticleSystem_SetEmitterRotation(u16,float),ParticleSystem_SetEmitterLifetime(u16,float,float); u16 ParticleSystem_AddEmitter(V3,u32,float,float,float,float,float,float,Color,Color,u8);
 void CompileShaders() {
     depthPrepassSP=CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); chunkSP=CompileAnyShader(vertSrc,fragSrc,"Main"); uiSP=CompileAnyShader(vertUISrc,fragUISrc,"UI"); debugUnlitSP=CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");
     shadowmapsSP=CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad"); textSP=CompileAnyShader(textVertSrc,textFragSrc,"Txt"); imageBlitSP=CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); ssrSP=CompileAnyShader(NULL,ssrCSSrc,"SSR");
@@ -882,16 +882,20 @@ __attribute__((cold)) void NewGame() { // Reset World States
       u16 peIdx = ParticleSystem_AddEmitter(pe,67,40.0f,1000000000.0f,0.08f,0.08f,0.5f,1.5f,cRed,cGreen,0);
       ParticleSystem_SetEmitterColorRamp(peIdx, cols, times, 3);
       ParticleSystem_SetEmitterRotation(peIdx,0.0f);
-      ParticleSystem_SetEmitterScaleCurve(peIdx, scaleKeys, sTimes, 3);
-      ParticleSystem_SetEmitterVelocityCurve(peIdx, velKeys, velTimes, 4);
-      ParticleSystem_SetEmitterPhysics(peIdx, 0.3f, 1.0f); }
+      ParticleSystem_SetEmitterScaleCurve(peIdx,scaleKeys,sTimes,3);
+      ParticleSystem_SetEmitterVelocityCurve(peIdx,velKeys,velTimes,4);
+      ParticleSystem_SetEmitterPhysics(peIdx,0.3f,1.0f);
+      ParticleSystem_SetEmitterTrail(peIdx,1,212);
+      ParticleSystem_SetEmitterTrailLifetime(peIdx,0.5f);
+      Color trailStart={1.0f,1.0f,1.0f,1.0f}, trailEnd={1.0f,1.0f,1.0f,0.0f}; ParticleSystem_SetEmitterTrailColor(peIdx,trailStart,trailEnd);
+      ParticleSystem_SetEmitterTrailWidth(peIdx,0.06f,0.02f); }
     { V3 pe = World.position[PLAYER1]; pe.x += 2.56f; Color cWhite={1,1,1,1}, cClear={1,1,1,0}; Color acols[4]={cWhite,cWhite,cClear,cClear}; float atimes[4]={0.0f,0.5f,0.5f,1.0f};
       u16 aIdx = ParticleSystem_AddEmitter(pe,2073,1.0f,1000000000.0f,0.25f,0.25f,0.0f,0.0f,cWhite,cWhite,0);
       ParticleSystem_SetEmitterAnimation(aIdx,6);
       ParticleSystem_SetEmitterAnimationWindow(aIdx,0.6f);
       ParticleSystem_SetEmitterRotation(aIdx,0.0f);
       ParticleSystem_SetEmitterLifetime(aIdx,0.5f,2.0f);
-      ParticleSystem_SetEmitterColorRamp(aIdx, acols, atimes, 4); }
+      ParticleSystem_SetEmitterColorRamp(aIdx,acols,atimes,4); }
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
     //TESTING TODO REMOVE! AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
 }
