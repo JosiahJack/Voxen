@@ -21,7 +21,7 @@ float linearizeSceneDepth(vec2 screenUV) { float rawDepth = texture(uSceneDepth,
 void main() {
     ivec2 texSize = textureSizes[vTexIndex]; vec2 uv = vec2(vUV.x, 1.0 - vUV.y); vec4 texColor = getParticleTextureColor(ivec2(clamp(fract(uv), 0.0, 0.99999) * vec2(texSize)), texSize.x);
     float fade = 1.0; if ((vFlags & 2u) != 0u) { float sceneDist = linearizeSceneDepth(gl_FragCoord.xy / uViewportSize); fade = clamp((sceneDist - vViewDist) / max(vSoftness, 0.0001f), 0.0, 1.0); }
-    if (uBlendMode == 1) { outColor = vec4(texColor.rgb * texColor.a * vColor.rgb * vColor.a * fade, 0.0); return; } // Additive (brightness-as-alpha, adds to scene)
+    if (uBlendMode == 1) { outColor = vec4(texColor.rgb * vColor.rgb * vColor.a * fade, 0.0); return; } // Additive (brightness-as-alpha, adds to scene)
     if (uBlendMode == 2) { outColor = vec4(mix(texColor.rgb * vColor.rgb, vec3(1.0), 1.0 - fade), 1.0); return; } // Multiply (soft-fades toward no darkening)
     outColor = texColor * vColor * fade;
 }

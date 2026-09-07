@@ -3,8 +3,8 @@
 #include "credits.h"
 #include "Shaders/shaders.h"
 // Rendering
-u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,
-    textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS];
+u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,
+    colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS],psysInstancesID,psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP;
 float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 // Entity Management
 float modelMatrices[INSTANCE_COUNT*16];
@@ -20,11 +20,8 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
                            9,/*Patch Use=J*/     8,/*Patch+=I*/          132,/*Patch-=,*/          12,/*Full Map=M*/      21,/*Swim Up= V*/        2,/*Swim Down=C*/ 102,/*Console=`*/   101/*Screenshot=F12*/},
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u,
     .InvertCyberspaceLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
-InputSystem Sys_Input;
-TextSystem Sys_Text;
-CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=false, .showFPS=false, .editMode=false, .showPhys=false};
-static bool shadowBuffersCreated = false;
-CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
+InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=false, .showFPS=false, .editMode=false, .showPhys=false};
+static bool shadowBuffersCreated = false; CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
 u16 editModeSelection, editModeTestEntityDefinition=343; u16 lastSpawned=U16_MAX;
 double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u8 particleBlendTexture[MAX_TXRS];
@@ -39,24 +36,21 @@ Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex* debugLineVerts = NULL;
 INLINE void DrawDebugLines(float* viewProj) {
-    if (!debugLineVerts || World.debugLineVertCount == 0) {return;}
-    glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO); 
+    if (!debugLineVerts || World.debugLineVertCount == 0) {return;} glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO); 
     glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount; glEnable(GL_DEPTH_TEST); World.debugLineVertCount = 0;
 }
 
 void BioMonitorUpdate(void);
 void DrawLine(V3 start, V3 end, Color col) {
-    if (!debugLineVerts || World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2) return;
-    int i = World.debugLineVertCount;
-    debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z; debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
-    debugLineVerts[i].x = end.x; debugLineVerts[i].y = end.y; debugLineVerts[i].z = end.z;       debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
-    World.debugLineVertCount = i;
+    if (!debugLineVerts || World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2){return;} int i=World.debugLineVertCount; 
+    debugLineVerts[i].x=start.x; debugLineVerts[i].y=start.y; debugLineVerts[i].z=start.z; debugLineVerts[i].r=col.r; debugLineVerts[i].g=col.g; debugLineVerts[i].b=col.b; debugLineVerts[i].a=col.a; i++; debugLineVerts[i].x=end.x; debugLineVerts[i].y=end.y; debugLineVerts[i].z=end.z;
+    debugLineVerts[i].r=col.r; debugLineVerts[i].g=col.g; debugLineVerts[i].b=col.b; debugLineVerts[i].a=col.a; i++; World.debugLineVertCount = i; // ORDER IS IMPORTANT!
 }
 
 INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY) || PhysIsAsleep(i)) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
 void DrawVelocityVector(u16 i) {
     if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;}
-    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f)); DrawLine(World.position[i],tip,textColors[T_ORANGE]); V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}));
+    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f)); DrawLine(World.position[i],tip,textColors[T_ORANGE]); V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0})); 
     DrawLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
 }
 
@@ -354,12 +348,10 @@ INLINE void ShaderError(u32 s, const char* name) { char er[512]; glGetShaderInfo
 INLINE u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) ShaderError(s,name); return s; }
 INLINE u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ShaderError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
-void ParticleSystem_Init(),ParticleSystem_Update(float),ParticleSystem_Render(float*,V3,V3,V3,V3,u32,float,float,float,float),ParticleSystem_RenderTrails(float*,V3,V3,V3),ParticleSystem_SetPrograms(u32,u32),ParticleSystem_SetEmitterPhysics(u16,float,float),ParticleSystem_SetEmitterTrail(u16,u8,u32),ParticleSystem_SetEmitterTrailLifetime(u16,float),ParticleSystem_SetEmitterTrailColor(u16,Color,Color),ParticleSystem_SetEmitterTrailWidth(u16,float,float),ParticleSystem_SetEmitterColorRamp(u16,const Color*,const float*,int),ParticleSystem_SetEmitterScaleCurve(u16,const float*,const float*,int),ParticleSystem_SetEmitterVelocityCurve(u16,const float*,const float*,int),ParticleSystem_SetEmitterAnimation(u16,u16),ParticleSystem_SetEmitterAnimationWindow(u16,float),ParticleSystem_SetEmitterRotation(u16,float),ParticleSystem_SetEmitterLifetime(u16,float,float); u16 ParticleSystem_AddEmitter(V3,u32,float,float,float,float,float,float,Color,Color,u8);
 void CompileShaders() {
     depthPrepassSP=CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); chunkSP=CompileAnyShader(vertSrc,fragSrc,"Main"); uiSP=CompileAnyShader(vertUISrc,fragUISrc,"UI"); debugUnlitSP=CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln");
     shadowmapsSP=CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad"); textSP=CompileAnyShader(textVertSrc,textFragSrc,"Txt"); imageBlitSP=CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); ssrSP=CompileAnyShader(NULL,ssrCSSrc,"SSR");
-    voxelUpdateSP=CompileAnyShader(NULL,voxUpdCSSrc,"Vox"); shadowmapsClearSP=CompileAnyShader(NULL,shadClearCSSrc,"ShadCl");
-    ParticleSystem_SetPrograms(CompileAnyShader(particleVertSrc,particleFragSrc,"Part"), CompileAnyShader(trailVertSrc,trailFragSrc,"Trail"));
+    voxelUpdateSP=CompileAnyShader(NULL,voxUpdCSSrc,"Vox"); shadowmapsClearSP=CompileAnyShader(NULL,shadClearCSSrc,"ShadCl"); particleSP=CompileAnyShader(particleVertSrc,particleFragSrc,"Part"); trailSP=CompileAnyShader(trailVertSrc,trailFragSrc,"Trail");
 }
 
 INLINE u32 MakeSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
@@ -648,7 +640,7 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
 //                        0 mk3 assault rifle              1 blaster             2 dartgun               3 flech                 4 ion  5 rapier    6 pipe               7 magnum            8 magpulse               9 pistol               10 plasma                 11 rail                              12 riot              13 skorp              14 sparq               15 stun
 Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},{0,0,0,1},{0,0,0,1},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
         V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},  {0,0,0},  {0,0,0},        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
-extern const u16 wepModelIndices[16]; extern WeaponFireCtx wfx;
+extern const u16 wepModelIndices[16]; extern WeaponFireCtx wfx; void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight; float sfov, snear, sfar;
     if (camView) { CamView* cv=&camViews[camViewIdx]; swidth=cv->width; sheight=cv->height; sfov=(float)cv->fov; snear=cv->near; sfar=cv->far; }
@@ -762,7 +754,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glCopyTexSubImage2D(GL_TEXTURE_2D,0,0,0,0,0,swidth,sheight); // Store the render result for the camview
         glBindTexture(GL_TEXTURE_2D,0); return; // After copying render result, skip SSR and composite for camviews <<<<<<<<<<<<< CAM VIEW BARRIER
     }
-    { V3 camR={invViewRot[0],invViewRot[1],invViewRot[2]}, camU={invViewRot[3],invViewRot[4],invViewRot[5]}, camF={-invViewRot[6],-invViewRot[7],-invViewRot[8]}; ParticleSystem_Render(viewProj,playerPos,camR,camU,camF,inputDepthID,snear,sfar,(float)swidth,(float)sheight); ParticleSystem_RenderTrails(viewProj,playerPos,camR,camU); }
+    PSys_Render(viewProj,playerPos,(V3){invViewRot[0],invViewRot[1],invViewRot[2]},(V3){invViewRot[3],invViewRot[4],invViewRot[5]},(V3){-invViewRot[6],-invViewRot[7],-invViewRot[8]},inputDepthID,snear,sfar,(float)swidth,(float)sheight);
     if(unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID);
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][3]);
@@ -876,33 +868,15 @@ __attribute__((cold)) void NewGame() { // Reset World States
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
     } DebugRAM("after edge adjacency");
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u); World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u); World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
-    { V3 pe = World.position[PLAYER1]; pe.x += 2.56f; Color cRed={1,0,0,1}, cGreen={0,1,0,1}, cBlue={0,0,1,1}; Color cols[3]={cRed,cGreen,cBlue}; float times[3]={0.0f,0.5f,1.0f};
-      float scaleKeys[3]={0.2f,0.2f,2.0f}; float sTimes[3]={0.0f,0.5f,1.0f};
-      float velKeys[4]={1.0f,1.0f,0.0f,0.0f}; float velTimes[4]={0.0f,0.49f,0.5f,1.0f};
-      u16 peIdx = ParticleSystem_AddEmitter(pe,67,40.0f,1000000000.0f,0.08f,0.08f,0.5f,1.5f,cRed,cGreen,0);
-      ParticleSystem_SetEmitterColorRamp(peIdx, cols, times, 3);
-      ParticleSystem_SetEmitterRotation(peIdx,0.0f);
-      ParticleSystem_SetEmitterScaleCurve(peIdx,scaleKeys,sTimes,3);
-      ParticleSystem_SetEmitterVelocityCurve(peIdx,velKeys,velTimes,4);
-      ParticleSystem_SetEmitterPhysics(peIdx,0.3f,1.0f);
-      ParticleSystem_SetEmitterTrail(peIdx,1,212);
-      ParticleSystem_SetEmitterTrailLifetime(peIdx,0.5f);
-      Color trailStart={1.0f,1.0f,1.0f,1.0f}, trailEnd={1.0f,1.0f,1.0f,0.0f}; ParticleSystem_SetEmitterTrailColor(peIdx,trailStart,trailEnd);
-      ParticleSystem_SetEmitterTrailWidth(peIdx,0.06f,0.02f); }
-    { V3 pe = World.position[PLAYER1]; pe.x += 2.56f; Color cWhite={1,1,1,1}, cClear={1,1,1,0}; Color acols[4]={cWhite,cWhite,cClear,cClear}; float atimes[4]={0.0f,0.5f,0.5f,1.0f};
-      u16 aIdx = ParticleSystem_AddEmitter(pe,2073,1.0f,1000000000.0f,0.25f,0.25f,0.0f,0.0f,cWhite,cWhite,0);
-      ParticleSystem_SetEmitterAnimation(aIdx,6);
-      ParticleSystem_SetEmitterAnimationWindow(aIdx,0.6f);
-      ParticleSystem_SetEmitterRotation(aIdx,0.0f);
-      ParticleSystem_SetEmitterLifetime(aIdx,0.5f,2.0f);
-      ParticleSystem_SetEmitterColorRamp(aIdx,acols,atimes,4); }
+    { PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAX_TXRS},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colorStart=(Color){1,0,0,1},.colorEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
+    { PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAX_TXRS},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colorStart=(Color){1,1,1,1},.colorEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
     //TESTING TODO REMOVE! AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
 }
 
 void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
 void GoIntoGame() { NewGame(); PlayGameMusic(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); }
-void LoadModels(),LoadTextures(),InitAudio(),LoadConfig(),synth_set_room(float,float);
+void LoadModels(),LoadTextures(),InitAudio(),LoadConfig(),synth_set_room(float,float); extern u32 random_range_rng;
 void InitalizeEnvironment() {
     game_start_time = get_time(); random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/ console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     OS_ScratchInit(); // Set up the 465 MB scratch arena for init phases
@@ -914,7 +888,6 @@ void InitalizeEnvironment() {
     glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/); glClearColor(0,0,0,1);
     CompileShaders();
-    ParticleSystem_Init();
     u32 tvaos[4],tvbos[4]; glGenVertexArrays(4,tvaos); glGenBuffers(4,tvbos); quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; chunkVBO=tvbos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; 
     float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
     glBindVertexArray(quadVAO); glBindBuffer(GL_ARRAY_BUFFER,quadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
@@ -928,11 +901,14 @@ void InitalizeEnvironment() {
     glBindVertexArray(textVAO);
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
-    glBindVertexBuffer(0, textVBO,0,5 * sizeof(float));
+    glBindVertexBuffer(0,textVBO,0,5*sizeof(float));
     glBindVertexArray(debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW);
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
     glBindVertexBuffer(0,debugLinesVBO,0,sizeof(DebugLineVertex));
+    glGenVertexArrays(1,&psysquadVAO); glGenBuffers(1,&psysquadVBO); static const float quadVerts[16]={-1.0f,-1.0f,0.0f,0.0f,1.0f,-1.0f,1.0f,0.0f,-1.0f,1.0f,0.0f,1.0f,1.0f,1.0f,1.0f,1.0f,}; 
+    glBindVertexArray(psysquadVAO); glBindBuffer(GL_ARRAY_BUFFER,psysquadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadVerts),quadVerts,GL_STATIC_DRAW); glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
+    glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2*sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); glBindVertexBuffer(0,psysquadVBO,0,4 * sizeof(float));
     InitFontAtlasses(); GenerateAndBindTexture(&inputUIID,GL_RGBA8,1366,768,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL);/*UI Fixed Size Raster*/
     glGenFramebuffers(1,&uiFBO); glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,inputUIID); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputUIID,0);
     u32 drawBuffersUI[] = {GL_COLOR_ATTACHMENT0}; glDrawBuffers(1,drawBuffersUI); glCheckFramebufferStatus(GL_FRAMEBUFFER); glBindImageTexture(0,inputUIID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/* UI Rendered Color*/ glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputUIID,0);
@@ -942,24 +918,21 @@ void InitalizeEnvironment() {
     InitAudio(); synth_set_room(0.66f,0.8f);
     glGenFramebuffers(1,&gBufferFBO); ChangeFullScreenWindowed(false); SetSkyRotateSpeed(); SetVSync(); LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language);
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2}; glDrawBuffers(3,drawBuffers);
-    u32 status = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (status != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Framebuffer incomplete: Error code %d\n",status);
-    float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    mcpy(&modelMatrices[0],mat,16 * sizeof(float)); // Null instance matrix used for UI
-    matricesBufferID = MakeSSBO(&matricesBufferID, 1,INSTANCE_COUNT * 16 * sizeof(float),modelMatrices,GL_STATIC_DRAW);     cellVisibleDataID= MakeSSBO(&cellVisibleDataID,7,ARRSIZE * sizeof(u32),NULL,GL_STATIC_DRAW); 
-    voxListCntsID    = MakeSSBO(&voxListCntsID,    2,VOXEL_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW);                        texPalID         = MakeSSBO(&texPalID,         8,MAX_UNIQUE_COLORS * sizeof(u32),NULL,GL_STATIC_DRAW);
-    voxelLightListsID= MakeSSBO(&voxelLightListsID,3,VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(u32),NULL,GL_STATIC_DRAW); texPalOfsID      = MakeSSBO(&texPalOfsID,      9,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
-    lightsID         = MakeSSBO(&lightsID,         4,LIGHT_COUNT * sizeof(Light),NULL,GL_STATIC_DRAW);                      colorBufferID    = MakeSSBO(&colorBufferID,   12,MAX_TOTAL_PIXELS * sizeof(u8),NULL,GL_STATIC_DRAW);
-    if (Sys_Settings.Shadows) CreateShadowBuffers();/*5,6*/                                                                 textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);          textureSizesID = MakeSSBO(&textureSizesID,15,MAX_TXRS * 2 * sizeof(i32),NULL,GL_STATIC_DRAW);
+    u32 status = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (status != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Framebuffer incomplete: Error code %d\n",status); float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}; mcpy(&modelMatrices[0],mat,16 * sizeof(float));
+    matricesBufferID=MakeSSBO(&matricesBufferID,1,INSTANCE_COUNT*16*sizeof(float),modelMatrices,GL_STATIC_DRAW); voxListCntsID=MakeSSBO(&voxListCntsID,2,VOXEL_COUNT*sizeof(u32),NULL,GL_STATIC_DRAW); voxelLightListsID=MakeSSBO(&voxelLightListsID,3,VOXEL_COUNT*MAX_LIGHTS_PER_VOXEL*sizeof(u32),NULL,GL_STATIC_DRAW);
+    lightsID=MakeSSBO(&lightsID,4,LIGHT_COUNT*sizeof(Light),NULL,GL_STATIC_DRAW); if (Sys_Settings.Shadows){CreateShadowBuffers();/*5,6*/} cellVisibleDataID=MakeSSBO(&cellVisibleDataID,7,ARRSIZE*sizeof(u32),NULL,GL_STATIC_DRAW); texPalID= MakeSSBO(&texPalID,8,MAX_UNIQUE_COLORS*sizeof(u32),NULL,GL_STATIC_DRAW);
+    texPalOfsID= MakeSSBO(&texPalOfsID,9,MAX_TXRS*sizeof(u32),NULL,GL_STATIC_DRAW); psysInstancesID = MakeSSBO(&psysInstancesID,10,MAX_PARTICLES*sizeof(GpuPartInst),NULL,GL_DYNAMIC_DRAW); MakeSSBO(&psysTrailsID,11,MAX_TRAIL_SEGS*sizeof(TrlSegInst),NULL,GL_DYNAMIC_DRAW); colorBufferID= MakeSSBO(&colorBufferID,12,MAX_TOTAL_PIXELS*sizeof(u8),NULL,GL_STATIC_DRAW);
+    textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW); textureSizesID = MakeSSBO(&textureSizesID,15,MAX_TXRS*2*sizeof(i32),NULL,GL_STATIC_DRAW);
     glUseProgram(shadowmapsSP); glUniform1ui(9,SHADOW_MAP_SIZE); glUseProgram(shadowmapsClearSP); glUniform1ui(0,SHADOW_MAP_SIZE); glUseProgram(chunkSP); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE); // One time set uniforms
     for (int f=0;f<5;++f) glGenQueries(5,gpuQ[f]);
     RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); RenderLoading("Loading models..."); DebugRAM("before LoadModels"); LoadModels(); DebugRAM("after LoadModels");
     if (World.introNotPlayed) { currentMenuPage = Mpg_IntroVideo; PlayMenuMusic(); World.menuActive = true; World.introNotPlayed = false; } World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     NewGame();
-    //PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
+    PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
     OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free");
 }
 
-void Physics(float dt); void UpdateAnims(void); void UpdateAudio(); bool ScrshotPressed();
+void Physics(float dt); void UpdateAnims(void); void UpdateAudio(); bool ScrshotPressed(); void PSys_Update(float);
 i32 main() {
     InitalizeEnvironment();
     while(1) {
@@ -973,7 +946,7 @@ i32 main() {
         if (!World.paused && !World.menuActive) { double ps=get_time(); float dt=(float)vclamp((World.pauseRelativeTime - World.last_physics_time),0.0005,0.1); World.last_physics_time=World.pauseRelativeTime; World.dt=dt; Physics(dt); physTime=get_time() - ps; } else physTime=0.0;
         double gameT_start = get_time();
         ModUpdate(); // After physics so mod/gamecode can modify velocities before next frame.
-        if (!World.paused && !World.menuActive) ParticleSystem_Update(World.dt);
+        if (!World.paused && !World.menuActive) PSys_Update(World.dt);
         if (World.invP1.hasHardware & HW_BIO) BioMonitorUpdate();
         UpdateAudio(); gameTime = get_time() - gameT_start;
         if (likely(!World.paused && !World.menuActive)) UpdateInstanceMatrix4x4s(); // Before camviews so camview shadows render same as main pass

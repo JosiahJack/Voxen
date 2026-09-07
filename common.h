@@ -117,7 +117,7 @@ void* mcpy(void *dst, const void *src, size_t n);
     INLINE void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THRSTACKSZ); t->head = NULL; t->stack_base = NULL; }
     INLINE void OS_USleep(u32 usec) { long ts[2] = {usec / 1000000,(usec % 1000000) * 1000L}; SYSCALL2(35,ts,ts); }
     INLINE double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
-#endif
+#endif 
 INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
 extern u8* scratch_base; extern u8* scratch_cur; extern u8* scratch_end; extern size_t initPhaseSize;
 void OS_ScratchInit(void),OS_ScratchFree(void),*OS_AllocScratch(size_t amount),OS_FreeInitPhaseInner(size_t amount),OS_FreeInitPhase(void);
@@ -144,7 +144,7 @@ enum {
     /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
              T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_BUFFER_SIZE=1024, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=4672, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
     /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
-    /*Rendering*/ BLEND_OPAQUE=0,BLEND_CUTOUT=1,BLEND_PREMULT=2,BLEND_MULTIPLY=3,PARTICLE_FLAG_ADDITIVE=(1u<<0),PARTICLE_FLAG_SOFT=(1u<<1),PARTICLE_FLAG_LIT=(1u<<2),PARTICLE_FLAG_MULTIPLY=(1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE=(1u<<4),PARTICLE_FLAG_PHYSICS=(1u<<5),PARTICLE_FLAG_TRAIL=(1u<<6)
+    /*Rendering*/ BLEND_OPAQUE=0,BLEND_CUTOUT=1,BLEND_PREMULT=2,BLEND_MULTIPLY=3,PARTICLE_FLAG_ADDITIVE=(1u<<0),PARTICLE_FLAG_SOFT=(1u<<1),PARTICLE_FLAG_LIT=(1u<<2),PARTICLE_FLAG_MULTIPLY=(1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE=(1u<<4),PARTICLE_FLAG_PHYSICS=(1u<<5),PARTICLE_FLAG_TRAIL=(1u<<6),MAX_PARTICLES=20480,MAX_EMITTERS=18,MAX_TRAIL_SEGS=4096,PARTICLE_SSBO_BINDING=10,TRAIL_SSBO_BINDING=11
 };
 u32 parse_numberu32(const char*, const char*,u32); u16 parse_numberu16(const char*, const char*,u32); u8 parse_numberu8(const char*, const char*,u32); bool parse_bool(const char*, const char*,u32);
 static const float PLAYER_RADIUS=0.48f,PLAYER_HEIGHT=2.00f,PLAYER_CAM_OFFSET_Y=0.84f,CELLSZ=2.56f,CELLXHALF=(CELLSZ * 0.5f),VOXEL_SIZE=(CELLSZ/(float)VOXELS_PER_CELL),VOXEL_HALF=(VOXEL_SIZE * 0.5f),/*COLCAP_DIR_X_F=0.0f,*/COLCAP_DIR_Y_F=1.0f,//,COLCAP_DIR_Z_F=2.0f,
@@ -251,6 +251,11 @@ typedef struct { // MUST PRESERVE ORDER TO MATCH TABLE!!
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
 typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead; u8 lev;} Portal;
+typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex; u16 flags,textureIndex,animFrame; u8 blendMode; u32 seed; V3 trailSample; float trailBirth; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
+typedef struct Emitter { bool active; V3 position; float emitAccumulator,emitRate,age,duration; u16 aliveCount,maxAlive; u8 physicsMode,trail; u16 trailTexture; float lifetimeMin,lifetimeMax,sizeMin,sizeMax,speedMin,speedMax,rotMin,rotMax,aVelMin,aVelMax,gravity,trailLifetime,trailWidthStart,trailWidthEnd; u32 trailColorStart,trailColorEnd;
+                         u32 texBaseIdx,textureFrameCount; float animSpeed,animWindow,softness,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; u32 colorRamp[64]; u64 rngState; } Emitter;
+typedef struct GpuPartInst { float x,y,z,size; u32 color,data0,data1,pad; } GpuPartInst; typedef struct TrlSegInst { float p0x,p0y,p0z,padA,p1x,p1y,p1z,padB; float c00x,c00y,c00z,c00w,c01x,c01y,c01z,c01w,c10x,c10y,c10z,c10w,c11x,c11y,c11z,c11w; u32 color0,color1,uvData; float deathTime; float birth0,birth1,pad0,pad1; } TrlSegInst;
+typedef struct { Particle particles[MAX_PARTICLES]; Emitter emitters[MAX_EMITTERS]; GpuPartInst gpuInstances[MAX_PARTICLES]; TrlSegInst trailSegments[MAX_TRAIL_SEGS]; PartSortEntry sortKeys[MAX_PARTICLES]; u32 aliveCount,trailCount; } PSys; extern PSys psys;
 typedef struct { double clipFinished,combatImpulseFinished; bool inCombat,inZone,twoPlaying,distortion,cyberTube,elevator,levelEntry; } MusicSystem;
 typedef /*FAT*/ struct  {
     u32 entflags,ioflags; u16 modelIndex,index/*constIndex for entity type, used for indexing into arrays for resource types when loading resources*/,portalIndex; V3 forward,right,lastPosition/*used for NPC logic, not physics*/,topPoint,targetPosition,startPosition,activatedScale,direction; u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
@@ -262,7 +267,7 @@ typedef /*FAT*/ struct  {
     V3 accumulatedForce,currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;    
     u16 enemy,messageIndex,teleportID,targetDestinationID,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,usableCustIdx,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx;
     i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[4],randomItemCustIdx[4];
-    bool searchableInUse,generateContents,dontReset,onlyOnce,ignoreSecondaryTriggers,allDone,currentTexture,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,
+    bool searchableInUse,dontReset,onlyOnce,allDone,currentTexture,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,
          forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,textureGlowAnimating,textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom,automapHidden,blocked,ajar;
     AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; char texAnimResourceFolder[TARG_STRLEN];
 } Entity; // phew what a porker of a struct, it's been a eatin!
@@ -322,16 +327,12 @@ double get_time(); float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDama
 void UseTargets(u16,u16),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),DebugRAM(const char*), DebugRAMPeak(void), DebugRAMBreakdown(void),
      play_wav(const char*,float,V3,bool),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
-     LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderTextR(i16,i16,u32,u8,float,const char* restrict,...),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32);
-const char* FootStepSound(FootStepType),*JumpSound(FootStepType),*JumpLandSound(FootStepType),*RustleSound(); FootStepType GetFootstepTypeForPrefab(int);
-char* StringFindFirstCharWithin(const char *s, char c);
-AnimationClip DoorGetClip(const Entity*,u8);
+     LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderTextR(i16,i16,u32,u8,float,const char* restrict,...),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
+const char* FootStepSound(FootStepType),*JumpSound(FootStepType),*JumpLandSound(FootStepType),*RustleSound(); FootStepType GetFootstepTypeForPrefab(int); char* StringFindFirstCharWithin(const char*,char); AnimationClip DoorGetClip(const Entity*,u8);
 // Quest bits (info_mission constIndex 710).  Only ever set/toggled/checked by info_mission entities.
 enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
-void ChangeAnim(Entity*,u8); void ForceDoorPortalOpen(u16); // ForceDoorPortalOpen: bounds-checked against registered portals (culling.c)
 enum{IO_NONE=0}; u16 IOInternName(const char*);
-bool QuestBitIsSet(u8 qb); void QuestBitSet(u8 qb),QuestBitClear(u8 qb),QuestBitToggle(u8 qb); bool RessurectPlayer(void);
- bool Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),Console(),ScrshotPressed(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();
+bool QuestBitIsSet(u8),RessurectPlayer(),Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),Console(),ScrshotPressed(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();
 // Synthesized Audio
 typedef enum {SND_LASER_PISTOL=0,SND_LASER_RIFLE,SND_DOOR,SND_IMPACT_GLASS,SND_IMPACT_METAL,SND_EXPLOSION,SND_HISS,SND_PIPE,SND_SHIELD_HIT,SND_FOOTSTEP,SND_SAND_FOOTSTEP,SND_TAP_CASE,SND_PLASTIC_TAP,SND_SPARK_SMALL,SND_CRACKLE,SND_SINE,SND_CLINK,SND_BEAKER_CLINK,SND_BEAKER_THUD,SND_COUNT} SoundID;
 typedef struct SynthVoice SynthVoice; typedef float (*SynthFn)(SynthVoice*); typedef struct SynthVoice { SynthFn fn; u32 frame,frames; float vol,pitch; V3 pos; bool positional,active; float p[4]/*preset params*/,s[8]/*generator state (extra slots vs original for richer sounds)*/; } SynthVoice;
@@ -399,12 +400,7 @@ INLINE float UsableOrDef(float cur, float def) { u32 c = *(u32*)&cur, d = *(u32*
 INLINE int UseableFromConst(int c){return c>=307?c-307:c;}
 INLINE int ItemStringIdx(int c){return UseableFromConst(c)+326;}
 INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
-INLINE u16 GetImpactType(u16 instanceIdx){
-    switch(World.instances[instanceIdx].bloodType){
-        case BloodType_None:return 729; case BloodType_Red:return 724; case BloodType_Yellow:return 723; case BloodType_Green:return 722; case BloodType_Robot:return 730; case BloodType_Leaf:return 756; case BloodType_Mutation:return 757;
-        case BloodType_GrayMutation:return 758;
-    } return 729;
-}
+INLINE u16 GetImpactType(u16 instanceIdx){switch(World.instances[instanceIdx].bloodType){ case BloodType_None:return 729; case BloodType_Red:return 724; case BloodType_Yellow:return 723; case BloodType_Green:return 722; case BloodType_Robot:return 730; case BloodType_Leaf:return 756; case BloodType_Mutation:return 757; case BloodType_GrayMutation:return 758; } return 729;}
 // Game logic inline helpers
 INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601]); }
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
@@ -414,32 +410,23 @@ INLINE float SfxVol() { return (float)Sys_Settings.VolumeEffects / 100.0f; }
 INLINE const char* SoundPath(i32 id) { return (id >= 0 && id < (i32)SOUNDS_COUNT) ? sounds[id] : ""; }
 INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ? audioLogs[id] : ""; }
 // GL
-enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,
-      GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,
-      GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8,
-      GL_TRIANGLE_STRIP=0x0005,GL_LESS=0x0201,GL_LEQUAL=0x0203,GL_SHADER_STORAGE_BUFFER=0x90D2,
-      GL_ONE=1,GL_SRC_ALPHA=0x0302,GL_ONE_MINUS_SRC_ALPHA=0x0303,GL_DST_COLOR=0x0306,GL_ZERO=0,GL_TRUE=1};
+enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,
+      GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,
+      GL_DYNAMIC_DRAW=0x88E8,GL_TRIANGLE_STRIP=0x0005,GL_LESS=0x0201,GL_LEQUAL=0x0203,GL_ONE=1,GL_SRC_ALPHA=0x0302,GL_ONE_MINUS_SRC_ALPHA=0x0303,GL_DST_COLOR=0x0306,GL_ZERO=0,GL_TRUE=1};
 // Particles
-enum {MAX_PARTICLES=20480,MAX_EMITTERS=18,MAX_TRAIL_SEGMENTS=4096,PARTICLE_SSBO_BINDING=10,TRAIL_SSBO_BINDING=11};
+typedef struct PSysDef { V3 pos; u32 textures[16]; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness; Color colorStart,colorEnd; Color rampColors[16]; float rampTimes[16]; u8 rampCount; float scaleKeys[16],scaleTimes[16]; u8 scaleCount; float velKeys[16],velTimes[16]; u8 velCount; float rotKeys[16],rotTimes[16];
+                         u8 rotCount; float emissKeys[16],emissTimes[16]; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd; } PSysDef;
+u16 PSysAdd(const PSysDef*);
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
 typedef void(*FGL_C)(u32), (*FGL_FL)(),   (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
 typedef void(*FGL_CS)(u32),(*FGL_RB)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32),  (*FGL_CTSI2D)(u32,i32,i32,i32,i32,i32,i32,i32);
 typedef void(*FGL_E)(u32), (*FGL_DF)(u32),(*FGL_LP)(u32),  (*FGL_GB)(i32,u32*), (*FGL_BFB)(u32,u32), (*FGL_GFS)(i32,u32*),  (*FGL_TPI)(u32,u32,i32),    (*FGL_FBT2D)(u32,u32,u32,u32,i32), (*FGL_GSIL)(u32,i32,i32*,char*),         (*FGL_BIT)(u32,u32,i32,bool,i32,u32,u32),       (*FGL_VP)(i32,i32,i32,i32),(*FGL_T2D)(u32,i32,i32,i32,i32,i32,u32,u32,const void*);
 typedef void(*FGL_UP)(u32),(*FGL_D)(u32), (*FGL_DM)(bool), (*FGL_LW)(float),    (*FGL_GIV)(u32,i32*),(*FGL_U1UI)(i32,u32),  (*FGL_GSIV)(u32,u32,i32*),  (*FGL_VAF)(u32,i32,u32,bool,u32),  (*FGL_UM3FV)(i32,i32,bool,const float*), (*FGL_U3F)(i32,float,float,float),              (*FGL_U2F)(i32,float,float);
-typedef u32(*FGL_CFBS)(u32), (*FGL_CP)(), (*FGL_GERR)(), (*FGL_CBFV)(u32,i32,const float*), (*FGL_CRS)(u32); typedef bool(*FGL_UB)(u32);
-typedef void(*FGL_GIQ)(i32,u32*),(*FGL_DQ)(i32,const u32*),(*FGL_QC)(u32,u32),(*FGL_GQOU64)(u32,u32,u64*),(*FGL_GI64V)(u32,i64*);
-typedef void(*FGL_DAI)(u32,i32,i32,i32);
-extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferData; extern FGL_UB glUnmapBuffer; extern FGL_MBR glMapBufferRange; extern FGL_U2F glUniform2f; extern FGL_U1F glUniform1f; extern FGL_U1UI glUniform1ui; extern FGL_UP glUseProgram;
-extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays; extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i;
-extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding; extern FGL_EVAA glEnableVertexAttribArray;
-extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_LW glLineWidth;
-extern FGL_GIQ glGenQueries; extern FGL_GQOU64 glGetQueryObjectui64v;
-typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery;
-extern FGL_DAI glDrawArraysInstanced;
-extern FGL_BBB glBindBufferBase;
-extern FGL_BB glBlendFunc;
-extern FGL_DQ glDeleteBuffers;
-extern FGL_DQ glDeleteVertexArrays;
+typedef u32(*FGL_CFBS)(u32), (*FGL_CP)(), (*FGL_GERR)(), (*FGL_CBFV)(u32,i32,const float*), (*FGL_CRS)(u32); typedef bool(*FGL_UB)(u32); typedef void(*FGL_GIQ)(i32,u32*),(*FGL_DQ)(i32,const u32*),(*FGL_QC)(u32,u32),(*FGL_GQOU64)(u32,u32,u64*),(*FGL_GI64V)(u32,i64*); typedef void(*FGL_DAI)(u32,i32,i32,i32);
+extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferData; extern FGL_UB glUnmapBuffer; extern FGL_MBR glMapBufferRange; extern FGL_U2F glUniform2f; extern FGL_U1F glUniform1f; extern FGL_U1UI glUniform1ui; extern FGL_UP glUseProgram; extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays;
+extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i; extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding;
+extern FGL_EVAA glEnableVertexAttribArray; extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_LW glLineWidth; extern FGL_GIQ glGenQueries; extern FGL_GQOU64 glGetQueryObjectui64v; extern FGL_DAI glDrawArraysInstanced;
+extern FGL_BBB glBindBufferBase; extern FGL_BB glBlendFunc; extern FGL_DQ glDeleteBuffers; extern FGL_DQ glDeleteVertexArrays; typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery;
 // Input
 typedef enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)} JoyHatId;
 typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,
@@ -451,8 +438,7 @@ typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/
              KEY_RIGHT_SUPER=347,KEY_MENU=348} KeyId;
 typedef enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2} MouseButtonId;
 typedef enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15} JoystickId;
-typedef struct { bool down,pressed,released; } KeyState; typedef struct { const char* name; int value; } InputElement;
-typedef struct { double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS]; bool lastUse,isCapsLockOn; } InputSystem;
+typedef struct {bool down,pressed,released;} KeyState;    typedef struct {const char* name; int value;} InputElement;    typedef struct {double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS]; bool lastUse,isCapsLockOn;} InputSystem;
 extern InputSystem Sys_Input;
 // LibC Replacement
 #define RAND_MAX 65535
@@ -469,25 +455,14 @@ char* data_parser_trim(char* s);
 i32 s2i32(const char *str);
 bool cEmpty(const char c), sEmpty(const char* a), sEqual(const char* a, const char* b), sEndsWith(const char *str, const char *suffix);
 int sCompUpToLen(const char* s1, const char* s2, size_t n);
-void scpy_to_a_from_b(char* a, const char* b, size_t bufsz);
-void sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz);
-void sCat(char* a, const char* b, size_t bufsz);
-char c2Lower(const char c), *sFindSub(const char* s, const char* sub);
+void scpy_to_a_from_b(char* a, const char* b, size_t bufsz),sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz),sCat(char* a, const char* b, size_t bufsz);
+char c2Lower(const char c), *sFindSub(const char* s, const char* sub),*StringFindFirstCharWithin(const char *s, char c);
 const char* StringFindLastChar(const char* str, const char c);
-char* StringFindFirstCharWithin(const char *s, char c);
 void double2str(char* dest, double value, int decs, size_t bufsz);
 int sFormatV(char* buf, size_t bufsz, const char* f, va_list args), sFormat(char* buffer, size_t bufsz, const char* format, ...);
 char* sUpToEndLine(char* buf, int sz, FHandle fd);
-void PrintLog(const char* s, ...), DualLog(const char* s, ...), DualLogWarn(const char* s, ...), DualLogError(const char* s, ...), CenterStatusPrint(const char * restrict fmt, ...), BmpWrite(char const *filename, int x, int y, const void *data), DebugRAM(const char *context), Screenshot();
-extern char statusText[T_BUFFER_SIZE];
-extern u32 random_range_rng;
-u8 random_range_u8(u8 a, u8 b);
-u32 random_range_u32(u32 a, u32 b);
-i32 random_range_i32(i32 a, i32 b);
-float random_range(float a, float b);
-u32 rand();
-float lerp(float min, float max, float val);
-float inverse_lerp(float min, float max, float val);
+void PrintLog(const char*, ...),DualLog(const char*, ...),DualLogWarn(const char*, ...),DualLogError(const char*, ...),CenterStatusPrint(const char* restrict, ...),BmpWrite(char const*,int,int,const void*),DebugRAM(const char*), Screenshot();
+extern char statusText[T_BUFFER_SIZE]; u8 random_range_u8(u8,u8); u32 random_range_u32(u32,u32); i32 random_range_i32(i32,i32); float random_range(float,float); u32 rand(); float lerp(float,float,float),inverse_lerp(float,float,float);
 char* sLevelFileUpToEndLine(char* buf, int size);
 void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp);
 size_t GetMaxCompressedSize(size_t srcSize);

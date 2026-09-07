@@ -435,26 +435,20 @@ static void FWBeginBlock(i32 entCount) { // select destinations for next transfo
 void LoadLevelMod(u8 lev) {
     u8 curlevel = vclamp(lev, 0, 13); World.curLev = curlevel; World.levelCurrentlyLoading = true; World.instCount = 3;
     if (curlevel == 1) {
-        AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f); // MedScreen14_Camera (verified original)
-        AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f); // MedScreen15_Camera (verified original)
-    } else if (curlevel == 2) { AddCamView((V3){36.73389f,-24.66895f,9.47060f},(Quaternion){0.11769f,-0.23125f,0.02819f,0.96534f},75u,256u,256u,0.695f,13.73f); /*SciScreen6_Camera*/}
+        AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);/*MedScreen14_Camera*/ AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);/*MedScreen15_Camera*/
+    } else if (curlevel == 2) { AddCamView((V3){36.73389f,-24.66895f,9.47060f},(Quaternion){0.11769f,-0.23125f,0.02819f,0.96534f},75u,256u,256u,0.695f,13.73f);/*SciScreen6_Camera*/}
     else if (curlevel == 3) {
-        AddCamView((V3){-15.35001f,13.99000f,44.87000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},71u,256u,256u,0.5f,16.582f); // BridgeScreen1_Camera
-        AddCamView((V3){-12.01620f,-28.52930f,33.53500f},(Quaternion){0.54295f,0.45300f,0.54295f,-0.45300f},68u,256u,256u,0.868f,14.145f); // MaintScreen_Camera
+        AddCamView((V3){-15.35001f,13.99000f,44.87000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},71u,256u,256u,0.5f,16.582f);/*BridgeScreen1_Camera*/ AddCamView((V3){-12.01620f,-28.52930f,33.53500f},(Quaternion){0.54295f,0.45300f,0.54295f,-0.45300f},68u,256u,256u,0.868f,14.145f);/*MaintScreen_Camera*/
     } else if (curlevel == 4) {
-        AddCamView((V3){-10.82900f,6.95400f,-50.29300f},(Quaternion){0.00000f,0.70711f,0.70711f,0.00000f},68u,256u,256u,1.3f,9.4f); // GroveScreen1_Camera
-        AddCamView((V3){-23.29000f,104.60000f,62.98000f},(Quaternion){0.00000f,-0.89126f,0.00000f,-0.45349f},68u,256u,256u,4.0f,13.6f); // GroveScreen2_Camera
-        AddCamView((V3){8.92170f,47.42900f,-45.97000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,0.7f,4.32f); // GroveScreen3_Camera
-        AddCamView((V3){-16.67800f,-52.22300f,-23.32000f},(Quaternion){0.00000f,-0.70711f,0.00000f,0.70711f},68u,256u,256u,1.5f,8.04f); // GroveScreen4_Camera
-        AddCamView((V3){-26.93000f,46.56557f,-31.18625f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,0.82f,17.56f); // StorageScreen_Camera
+        AddCamView((V3){-10.82900f,6.95400f,-50.29300f},(Quaternion){0.00000f,0.70711f,0.70711f,0.00000f},68u,256u,256u,1.3f,9.4f);/*GroveScreen1_Camera*/ AddCamView((V3){-23.29000f,104.60000f,62.98000f},(Quaternion){0.00000f,-0.89126f,0.00000f,-0.45349f},68u,256u,256u,4.0f,13.6f);/*GroveScreen2_Camera*/
+        AddCamView((V3){8.92170f,47.42900f,-45.97000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,0.7f,4.32f);/*GroveScreen3_Camera*/ AddCamView((V3){-16.67800f,-52.22300f,-23.32000f},(Quaternion){0.00000f,-0.70711f,0.00000f,0.70711f},68u,256u,256u,1.5f,8.04f);/*GroveScreen4_Camera*/
+        AddCamView((V3){-26.93000f,46.56557f,-31.18625f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,0.82f,17.56f);/*StorageScreen_Camera*/
     } else if (curlevel == 5) { AddCamView((V3){-30.72000f,8.96000f,-53.76000f},(Quaternion){0.00000f,0.70711f,0.70711f,0.00000f},68u,256u,256u,2.7f,24.8f);/*FlightScreen1_Camera*/}
     else if (curlevel == 6) {
-        AddCamView((V3){9.08000f,48.71000f,-47.32400f},(Quaternion){0.00000f,0.99054f,0.00000f,-0.13719f},90u,256u,256u,1.2f,11.52f); // ExecScreen5_Camera
-        AddCamView((V3){-3.90720f,13.90800f,2.47230f},(Quaternion){-0.50000f,0.50000f,0.50000f,0.50000f},90u,256u,256u,0.06f,11.87f); // ExecScreen6_Camera
+        AddCamView((V3){9.08000f,48.71000f,-47.32400f},(Quaternion){0.00000f,0.99054f,0.00000f,-0.13719f},90u,256u,256u,1.2f,11.52f);/*ExecScreen5_Camera*/ AddCamView((V3){-3.90720f,13.90800f,2.47230f},(Quaternion){-0.50000f,0.50000f,0.50000f,0.50000f},90u,256u,256u,0.06f,11.87f);/*ExecScreen6_Camera*/
     } else if (curlevel == 7) {
-        AddCamView((V3){106.87113f,-14.55570f,24.65725f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,1.295f,26.01f); // EngScreen3_Camera
-        AddCamView((V3){-57.06100f,34.70000f,1.19200f},(Quaternion){0.00000f,-0.65094f,0.00000f,0.75913f},68u,256u,256u,1.83f,19.9f); // EngScreen4_Camera
-        AddCamView((V3){29.51000f,3.29000f,-9.93000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},80u,256u,256u,0.77f,9.79f); // EngScreen5_Camera
+        AddCamView((V3){106.87113f,-14.55570f,24.65725f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,1.295f,26.01f);/*EngScreen3_Camera*/ AddCamView((V3){-57.06100f,34.70000f,1.19200f},(Quaternion){0.00000f,-0.65094f,0.00000f,0.75913f},68u,256u,256u,1.83f,19.9f);/*EngScreen4_Camera*/
+        AddCamView((V3){29.51000f,3.29000f,-9.93000f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},80u,256u,256u,0.77f,9.79f);/*EngScreen5_Camera*/
     } else if (curlevel == 8) { AddCamView((V3){69.76093f,30.97230f,-0.84785f},(Quaternion){0.48739f,0.51230f,0.51230f,-0.48739f},85u,256u,256u,0.33f,10.05f);/*SecScreen1_Camera*/}
     else if(curlevel == 9) { AddCamView((V3){-15.24800f,44.55600f,6.42560f},(Quaternion){0.00000f,1.00000f,0.00000f,0.00000f},85u,256u,256u,0.84f,16.223f);/*ReacScreen1_Camera*/}
     mset(lineSpace,0,LINE_LEN_MAX * sizeof(char)); u32 lineNum = 0; i32 entCount = -1, lightsIdx = -1; char* line;
@@ -465,7 +459,7 @@ void LoadLevelMod(u8 lev) {
         else {
             entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; }
             inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
-            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f};
+            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f}; inst->relayEnabled = true;
         }
         bool activeStateRead = false;
         while (line[0] != '\0') {
@@ -526,7 +520,7 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("testQuestBitIsOff"))   inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 2 : inst->questTestMode;                else if(KEY_EQ("ForceBridge.activated")) inst->active = parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("x")) inst->forceFieldDirectionX = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("y")) inst->forceFieldDirectionY = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("z")) inst->forceFieldDirectionZ = parse_bool(value, lineSpace, lineNum); 
                 else if(KEY_EQ("activatedScaleX")) inst->activatedScale.x = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("activatedScaleY")) inst->activatedScale.y = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("activatedScaleZ")) inst->activatedScale.z = parse_float(value, lineSpace, lineNum);
-                else if(KEY_EQ("fieldColor"))          inst->fieldColor = (ForceFieldColor)parse_numberu8(value, lineSpace, lineNum);
+                else if(KEY_EQ("fieldColor"))          inst->fieldColor = (ForceFieldColor)parse_numberu8(value, lineSpace, lineNum);                      else if(KEY_EQ("touchEnabled")) inst->touchEnabled = parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("center.x")) colCtrFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.y")) colCtrFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.z")) colCtrFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("size.x")) colSzFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.y")) colSzFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.z")) colSzFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("RobotSpawnDeactivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_RobotSpawnDeactivated; }   else if(KEY_EQ("IsotopeInstalled"))            { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsotopeInstalled; }
@@ -686,13 +680,13 @@ void LoadLevelData(u8 curlevel) {
             } else { switch(World.instances[i].doorOpen){case DoorState_Open:ChangeAnim(&World.instances[i],A_IDLE_OPEN); break; case DoorState_Opening:ChangeAnim(&World.instances[i],A_OPENING); break; case DoorState_Closing:ChangeAnim(&World.instances[i],A_CLOSING); break; default:ChangeAnim(&World.instances[i],A_IDLE_CLOSED); break;} }
             if (IdxIsPortalBlockingDoor(World.instances[i].index) && World.instances[i].doorState != DoorState_Closed) ForceDoorPortalOpen(World.instances[i].portalIndex); // Open/ajar doors start with their portal open. Bounds-checked in culling.c; guard keeps non-portal doors from touching portal 0.
         } else if (IdxIsSearchable(constIndex)) {
-            if (World.instances[i].generateContents) {
-                int numRandomGeneratedItems = 0;
-                for(int j=0;j<4;j++) {
-                    if(numRandomGeneratedItems >= World.instances[i].maxRandomItems){break;} if(World.instances[i].randomItemDropChance[j] <= 0.0f){continue;}
-                    u8 tempInt = random_range_u8(0,100); if(((float)tempInt / 100.0f) <= World.instances[i].randomItemDropChance[j]){World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; numRandomGeneratedItems++;}
-                }
-            }
+//             if (World.instances[i].generateContents) { // TODO in LoadLevelMod directly, saves not storing generateContents on Entity as it's ONLY for init
+//                 int numRandomGeneratedItems = 0;
+//                 for(int j=0;j<4;j++) {
+//                     if(numRandomGeneratedItems >= World.instances[i].maxRandomItems){break;} if(World.instances[i].randomItemDropChance[j] <= 0.0f){continue;}
+//                     u8 tempInt = random_range_u8(0,100); if(((float)tempInt / 100.0f) <= World.instances[i].randomItemDropChance[j]){World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; numRandomGeneratedItems++;}
+//                 }
+//             }
         } else if (constIndex == 515) func_forcebridge(i); // func_forcebridge
         else if (constIndex == 517) FuncWallInitAfterLoad(i);
         else if (constIndex == 596) { World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,0.3f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); World.instances[i].topPoint=(V3){0.0f,World.position[i].y + (World.colliderSize[i].y * 0.5f),0.0f}; } /*trigger_gravitylift*/

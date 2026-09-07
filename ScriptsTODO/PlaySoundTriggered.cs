@@ -14,7 +14,7 @@ public class PlaySoundTriggered : MonoBehaviour {
 	int burstemittcnt1 = 15;
 	int burstemittcnt2 = 30;
 	private bool justPaused;
-	private ParticleSystem psys;
+	private PSys psys;
 
     void Start() {
 		if (SFXClip > 0) SFX.clip = sounds[SFXClip];
@@ -32,8 +32,8 @@ public class PlaySoundTriggered : MonoBehaviour {
 		}
 
 		if (playSoundOnParticleEmit) {
-			psys = GetComponent<ParticleSystem>();
-			if (psys == null) DualLog("ERROR: missing ParticleSystem for PlaySoundTriggered");
+			psys = GetComponent<PSys>();
+			if (psys == null) DualLog("ERROR: missing PSys for PlaySoundTriggered");
 			loopingAmbient = false; //only play when triggered by the psys emission
 			numparticles = 0;
 		}

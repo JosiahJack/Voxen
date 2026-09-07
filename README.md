@@ -93,41 +93,46 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
 
 ```
 ❯ ls *.* ./Shaders/*.glsl ./Shaders/*.compute | grep -vE 'README.md|builds.csv|voxen.exe|voxen.log|build.sh|Citadel.pdb|*.bin' | xargs perl -MList::Util=max -lne '$first{$ARGV} //= $_; $count{$ARGV} = $.; if(eof){$total += $.; $. = 0;} END { $max = max map {length} keys %first; printf "99999999 %7d total\n", $total; printf "%8d %-${max}s  %s\n", $count{$_}, $_, $first{$_} for keys %first }' 2>/dev/null | sort -nr | head -n 51 | sed 's/^99999999 //'
-  10809 total
-     983 audio.c                             // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
+  10811 total
      982 models.c                            // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
-     970 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
+     968 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
      924 citadel.c                           // citadel.c - Game logic.
+     905 audio.c                             // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
      835 physics.c                           // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
-     795 winput.c                            // winput.c - WinSys Windowing System and Input System interfacing with the OS.
-     768 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
+     762 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
+     754 winput.c                            // winput.c - WinSys Windowing System and Input System interfacing with the OS.
      532 text.c                              // text.c - Text and Font Rendering/Loading System
-     486 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
+     472 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
      414 ai.c                                // ai.c - AI logic control for NPC's enemies in the game.
      398 ui.c                                // ui.c - User Interface(UI) aka HUD
-     397 textures.c                          // textures.c - 2D Texture Loading System
      391 ./Shaders/composite_frag.glsl       // composite.glsl - Composite rendered view + UI overlay, custom AA, VHS blur (subtle, magic!), SSR with tapped blur, Procedural skybox w/ stars + saturn + sun + station shield (if on!) that rotate, berserk color hallucinations, EMP screen rolling, fog, infrared grayscale.
+     387 textures.c                          // textures.c - 2D Texture Loading System
      387 credits.h                           // credits.h - Credits for Citadel: The System Shock Fan Remake, salt the fries!
      381 weapons.c                           // weapons.c - Weapon System
      252 culling.c                           // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
      229 ./Shaders/chunk_frag.glsl           // chunk_frag.glsl: Generic shader for all world objects
      215 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
+     111 particles.c                         // particles.c - CPU-simulated, GPU-instanced particle system for Voxen
       93 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
       83 ./Shaders/voxels.compute            // voxels.compute - Compute shader for determining light lists for voxels and updating voxel tables 
       70 ./Shaders/ssr.compute               // ssr.compute - Compute shader for Screen Space Reflections 
-      54 ./Shaders/text_frag.glsl            // text_frag.glsl - Text Fragment shader, supports both SystemShock font with black border around every character and StopD font with 3d drop shadow and top edge highlights
       33 ./Shaders/shadowmap_frag.glsl       // shadowmap_frag.glsl - Shadowmap Fragment Shader, uses alpha cutout on textures for {fence style shadows.  Writes into SSBO via atomicMin on typecast float dist with * 100000 scaling.
       32 ./Shaders/depth_prepass.glsl        // depth_prepass.glsl: Renders all opaque + cutout objects prior to main forward+ pass
       29 ./Shaders/ui_frag.glsl              // ui_frag.glsl: Generic shader for unlit textured UI images (mostly cutouts)
+      27 ./Shaders/particle_frag.glsl        // particle_frag.glsl - Particle fragment shader
+      22 ./Shaders/text_frag.glsl            // text_frag.glsl - Text Fragment shader, supports both SystemShock font with black border around every character and StopD font with 3d drop shadow and top edge highlights
+      18 ./Shaders/particle_vert.glsl        // particle_vert.glsl - Instanced particle billboard vertex shader
       18 ./Shaders/chunk_vert.glsl           // chunk_vert.glsl: Generic shader for unlit textured surfaces (all world geometry, items, enemies, doors, etc., without transparency for first pass prior to lighting.
+      15 ./Shaders/trail_frag.glsl           // trail_frag.glsl - Trail fragment shader (SSBO palette texture lookup)
       15 ./Shaders/depth_prepass_vert.glsl   // depth_prepass_vert.glsl: vertex shader for depth prepass
+      14 ./Shaders/trail_vert.glsl           // trail_vert.glsl - Camera-facing ribbon trail vertex shader (welded shared edges)
       10 ./Shaders/shadowmap_vert.glsl       // shadowmap_vert.glsl - Shadowmap Vertex shader
        6 ./Shaders/ui_vert.glsl              // ui_vert.glsl: Generic shader for unlit textured surfaces (all world geometry, items, enemies, doors, etc., without transparency for first pass prior to lighting.
        6 ./Shaders/text_vert.glsl            // text_vert.glsl - Text Vertex Shader
        6 ./Shaders/shadowmaps_clear.compute  // shadowmaps_clear.compute - Compute shader for clearing the distances for shadowmaps in the SSBO to 0xFFFFFFFF
        6 ./Shaders/debugunlit_vert.glsl      // debugunlit_vert.glsl - Wireline Vertex Shader
        5 ./Shaders/composite_vert.glsl       // imageblit.glsl - Full screen quad unlit textured for presenting image buffers such as results from compute shaders, image effects, post-processing, etc..
-       4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe view of colliders, velocity debug vectors, angular velocity debug vector and arc for orientation, raycast debug vector, and weapon lasers   
+       4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe view of colliders, velocity debug vectors, angular velocity debug vector and arc for orientation, raycast debug vector, and weapon lasers    
 ```
 
 ### Install Footprint
@@ -267,166 +272,169 @@ MIT-0
 Log ouput from standard run:
 
 ```
-Compiling voxen, total iterations today 228 (2026-07-25)...
-Built engine as game in 127 ms
+Compiling voxen, total iterations today 44 (2026-09-06)...
+Built engine as game in 1122 ms
 Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed
-Entity size: 900
-Loading    5 fonts... took 0.123607973 s
-Loading textures (1989) ... total palette colors: 120019, total pixels: 38000755... took 0.162262 secs
-Loading   models (5989) ... vertices: 11975224, tris: 11351562, 0.643557074 secs
+Entity size: 692
+Loading    5 fonts... took 0.131186370 s
+Loading textures (2132) ... total palette colors: 48492, total pixels: 44325445... took 0.120746 secs
+Loading   models (807) ... vertices: 13123482, tris: 11706371, 0.893375852 secs
 Loading new game...
-Entity counts::0:3831|1:5937|2:5076|3:3274|4:3389|5:4270|6:5773|7:6081|8:4756|9:4469|10:1721|11:1608|12:1314|13:8416
- Light counts::0:1289|1:1059|2:1138|3:490|4:870|5:1149|6:1225|7:2016|8:903|9:1526|10:719|11:525|12:487|13:3
-Load all levels... took 0.189141671 secs
+Entity counts::0:3835|1:5982|2:5121|3:3285|4:3390|5:4302|6:5780|7:6118|8:4761|9:4571|10:1726|11:1609|12:1315|13:8417
+ Light counts::0:1229|1:1016|2:1107|3:457|4:867|5:1046|6:1130|7:1827|8:887|9:1408|10:699|11:502|12:464|13:3
+Load all levels... took 0.127147783 secs
 Switched to Level 1
-Culling found 1178 open cells... took 0.090702681 secs
-Generating edge adjacency lists for 28 convex meshes...took 0.002452750 secs
-Game Initialized in 1.631655835 secs
+Culling found 1178 open cells... took 0.109769619 secs
+Game Initialized in 1.594466530 secs
 Loading new game...
-Entity counts::0:3831|1:5937|2:5076|3:3274|4:3389|5:4270|6:5773|7:6081|8:4756|9:4469|10:1721|11:1608|12:1314|13:8416
- Light counts::0:1289|1:1059|2:1138|3:490|4:870|5:1149|6:1225|7:2016|8:903|9:1526|10:719|11:525|12:487|13:3
-Load all levels... took 0.156872861 secs
+Entity counts::0:3835|1:5982|2:5121|3:3285|4:3390|5:4302|6:5780|7:6118|8:4761|9:4571|10:1726|11:1609|12:1315|13:8417
+ Light counts::0:1229|1:1016|2:1107|3:457|4:867|5:1046|6:1130|7:1827|8:887|9:1408|10:699|11:502|12:464|13:3
+Load all levels... took 0.101591044 secs
 Switched to Level 1
-Culling found 1178 open cells... took 0.089528178 secs
-Generating edge adjacency lists for 28 convex meshes...took 0.002449103 secs
+Culling found 1178 open cells... took 0.107607252 secs
 Player named "" started the game!
 ```
 
 Log output from one run with lib.c DebugRAM() internals uncommented:
 
 ```
-Compiling voxen, total iterations today 229 (2026-07-25)...
-Built engine as game in 363 ms
-Mem at program start: Heap 0b(0KB|0.00MB), USS 487424b(476KB|0.46MB)
+Compiling voxen, total iterations today 43 (2026-09-06)...
+Built engine as game in 355 ms
+Mem at program start: Heap 0b(0KB|0.00MB), USS 405504b(396KB|0.39MB)
 Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed
-Entity size: 900
-Mem at start font load: Heap 8282112b(8088KB|7.90MB), USS 16257024b(15876KB|15.50MB)
-Loading    5 fonts...Mem at after font load: Heap 8282112b(8088KB|7.90MB), USS 95985664b(93736KB|91.54MB)
- took 0.147640197 s
-Loading textures (1989) ... total palette colors: 120019, total pixels: 38000755... took 0.127588 secs
-Mem at After LoadTextures and after deallocation: Heap 10797056b(10544KB|10.30MB), USS 140636160b(137340KB|134.12MB)
-Loading   models (5989) ... vertices: 11975224, tris: 11351562, 0.665408164 secs
-Mem at After LoadModels: Heap 281055232b(274468KB|268.04MB), USS 496721920b(485080KB|473.71MB)
+Entity size: 692
+Mem at start font load: Heap 8298496b(8104KB|7.91MB), USS 16326656b(15944KB|15.57MB)
+Loading    5 fonts...Mem at after font load: Heap 8298496b(8104KB|7.91MB), USS 136011776b(132824KB|129.71MB)
+ took 0.136365196 s
+Mem at before LoadTextures: Heap 11677696b(11404KB|11.14MB), USS 139513856b(136244KB|133.05MB)
+Mem at start LoadTextures: Heap 11677696b(11404KB|11.14MB), USS 139513856b(136244KB|133.05MB)
+Loading textures (2132) ... total palette colors: 48492, total pixels: 44325445... took 0.148467 secs
+Mem at after LoadTextures: Heap 11677696b(11404KB|11.14MB), USS 186159104b(181796KB|177.54MB)
+Mem at before LoadModels: Heap 11677696b(11404KB|11.14MB), USS 186159104b(181796KB|177.54MB)
+Loading   models (807) ... vertices: 13123482, tris: 11706371, 0.886417532 secs
+Mem at after LoadModels: Heap 302555136b(295464KB|288.54MB), USS 531226624b(518776KB|506.62MB)
 Loading new game...
-Mem at start of LoadAllLevels: Heap 281055232b(274468KB|268.04MB), USS 497909760b(486240KB|474.84MB)
-Entity counts::0:3831|1:5937|2:5076|3:3274|4:3389|5:4270|6:5773|7:6081|8:4756|9:4469|10:1721|11:1608|12:1314|13:8416
- Light counts::0:1289|1:1059|2:1138|3:490|4:870|5:1149|6:1225|7:2016|8:903|9:1526|10:719|11:525|12:487|13:3
-Load all levels... took 0.196210112 secs
-Mem at end of LoadAllLevels: Heap 281600000b(275000KB|268.55MB), USS 634777600b(619900KB|605.37MB)
-Mem at start of LoadLevel: Heap 281600000b(275000KB|268.55MB), USS 634777600b(619900KB|605.37MB)
+Mem at before runtime LoadAllLevels: Heap 302555136b(295464KB|288.54MB), USS 532287488b(519812KB|507.63MB)
+Mem at start of LoadAllLevels: Heap 302555136b(295464KB|288.54MB), USS 532287488b(519812KB|507.63MB)
+Entity counts::0:3835|1:5982|2:5121|3:3285|4:3390|5:4302|6:5780|7:6118|8:4761|9:4571|10:1726|11:1609|12:1315|13:8417
+ Light counts::0:1229|1:1016|2:1107|3:457|4:867|5:1046|6:1130|7:1827|8:887|9:1408|10:699|11:502|12:464|13:3
+Load all levels... took 0.137906698 secs
+Mem at end of LoadAllLevels: Heap 304005120b(296880KB|289.92MB), USS 628744192b(614008KB|599.62MB)
+Mem at after runtime LoadAllLevels: Heap 304005120b(296880KB|289.92MB), USS 628744192b(614008KB|599.62MB)
+Mem at start of LoadLevel: Heap 304005120b(296880KB|289.92MB), USS 628744192b(614008KB|599.62MB)
 Switched to Level 1
-Culling found 1178 open cells... took 0.091125611 secs
-Mem at end of LoadLevel: Heap 281600000b(275000KB|268.55MB), USS 637509632b(622568KB|607.98MB)
-Generating edge adjacency lists for 28 convex meshes...took 0.002214804 secs
-Mem at InitializeEnvironment end: Heap 281600000b(275000KB|268.55MB), USS 637845504b(622896KB|608.30MB)
-Game Initialized in 1.726753756 secs
-Mem at frame 4: Heap 282288128b(275672KB|269.21MB), USS 643543040b(628460KB|613.73MB)
-Mem at frame 100: Heap 282288128b(275672KB|269.21MB), USS 639348736b(624364KB|609.73MB)
-Mem at frame 200: Heap 282288128b(275672KB|269.21MB), USS 639348736b(624364KB|609.73MB)
-Mem at frame 500: Heap 282288128b(275672KB|269.21MB), USS 639352832b(624368KB|609.73MB)
-Mem at frame 1000: Heap 282288128b(275672KB|269.21MB), USS 639356928b(624372KB|609.74MB)
-Loading new game...
-Mem at start of LoadAllLevels: Heap 282288128b(275672KB|269.21MB), USS 639361024b(624376KB|609.74MB)
-Entity counts::0:3831|1:5937|2:5076|3:3274|4:3389|5:4270|6:5773|7:6081|8:4756|9:4469|10:1721|11:1608|12:1314|13:8416
- Light counts::0:1289|1:1059|2:1138|3:490|4:870|5:1149|6:1225|7:2016|8:903|9:1526|10:719|11:525|12:487|13:3
-Load all levels... took 0.167074728 secs
-Mem at end of LoadAllLevels: Heap 282288128b(275672KB|269.21MB), USS 639361024b(624376KB|609.74MB)
-Mem at start of LoadLevel: Heap 282288128b(275672KB|269.21MB), USS 639361024b(624376KB|609.74MB)
-Switched to Level 1
-Culling found 1178 open cells... took 0.089577006 secs
-Mem at end of LoadLevel: Heap 282288128b(275672KB|269.21MB), USS 639295488b(624312KB|609.68MB)
-Generating edge adjacency lists for 28 convex meshes...took 0.002515498 secs
-Player named "" started the game!
+Culling found 1178 open cells... took 0.110187051 secs
+Mem at end of LoadLevel: Heap 304005120b(296880KB|289.92MB), USS 630902784b(616116KB|601.68MB)
+Mem at after runtime LoadLevel: Heap 304005120b(296880KB|289.92MB), USS 630902784b(616116KB|601.68MB)
+Mem at before edge adjacency: Heap 304005120b(296880KB|289.92MB), USS 630902784b(616116KB|601.68MB)
+Mem at after edge adjacency: Heap 304005120b(296880KB|289.92MB), USS 631468032b(616668KB|602.21MB)
+Game Initialized in 1.745898166 secs
+Mem at InitializeEnvironment after scratch free: Heap 304005120b(296880KB|289.92MB), USS 573231104b(559796KB|546.68MB)
+Target hit: lev1creepydoor on 5692 (lev 1), timestamp: 39793.573906016
+Targetted a->ioflags:2 e:496 doorcond:1
+Unlocking entity with index 5692
+Mem at frame 4: Heap 304680960b(297540KB|290.57MB), USS 584269824b(570576KB|557.20MB)
+Mem at frame 100: Heap 304680960b(297540KB|290.57MB), USS 544296960b(531540KB|519.08MB)
+Mem at frame 200: Heap 304680960b(297540KB|290.57MB), USS 540237824b(527576KB|515.21MB)
+Mem at frame 500: Heap 304680960b(297540KB|290.57MB), USS 540725248b(528052KB|515.68MB)
+Mem at frame 1000: Heap 304680960b(297540KB|290.57MB), USS 542461952b(529748KB|517.33MB)
 ```
 
 ```
 ❯ grep -rIn "Alloc"
-voxen.c:11:    typedef struct { union { u32 dwOemId; struct { u16 wProcessorArchitecture,wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; u32 dwPageSize; void* lpMinimumApplicationAddress,*lpMaximumApplicationAddress; u64 dwActiveProcessorMask; u32 dwNumberOfProcessors,dwProcessorType,dwAllocationGranularity; u16 wProcessorLevel,wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
-voxen.c:12:    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*); DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);         DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,LPOVERLAPPED);    DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);          DLL_IMP i32 WINAPI UnmapViewOfFile(void*); DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
-voxen.c:17:    void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); return CloseHandle(m),r;}    
-voxen.c:24:    void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
-voxen.c:30:    void* __stdcall GetProcessHeap(); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); void __stdcall Sleep(u32 dwMilliseconds); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
-voxen.c:34:    int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
-voxen.c:45:    void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd) { long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return (void*)r; }
-voxen.c:49:    void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
-voxen.c:62:    int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
-voxen.c:67:void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); } 
-voxen.c:68:INLINE void* OS_Calloc(size_t amount, size_t count) { return OS_Alloc(amount * count); }
-voxen.c:70:void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
-voxen.c:71:void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
-lib.c:135:    u8* pixels = OS_Alloc(w * h * 4 * sizeof(char));
-entity.c:1208:    FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); }
-entity.c:1344:    size_t sz=sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b=(u8*)OS_Alloc(maxCompSize); size_t finalCompSize=VoidSquasher((const u8*)&World,sz,b,maxCompSize);
-entity.c:1356:    u8* b = (u8*)OS_Alloc(header.compressedSize);
-textures.c:11:void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
-textures.c:12:void* PngArenaAlloc(PngArena* a, size_t s) { if(!a->base||a->cursor+s>a->end)return NULL; void* p=a->cursor; a->cursor+=s; return p; }
-textures.c:62:    pngzbuf a = {0}; u8* p = (u8*)PngArenaAlloc(arena, initial_size), d_len[288]; i32 f, t;
-textures.c:81:    a->out = (u8*)PngArenaAlloc(arena, (size_t)x * y * out_n);
-textures.c:121:            case 0x49444154: if (!z.idata) { z.idata = (u8*)PngArenaAlloc(arena, len + 16); ioff = 0; } mcpy(z.idata + ioff, s.img_buffer, length); s.img_buffer += length; ioff += length; break;
-textures.c:138:        FHandle dummy_fd; int sz=0; const char* d =(const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path,&dummy_fd,&sz);
-textures.c:141:        u32 nP = (u32)w * h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256 * sizeof(u32)); u32 pSz = 0; 
-textures.c:181:    FHandle fd; int sz; char *data = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz), *cur = data, *end = data + sz;
-textures.c:197:    p->entries = OS_Alloc((p->count = p->capacity = m_idx + 1) * sizeof(TextureData));
-textures.c:240:    i32* parsIdx = OS_Alloc(texCnt * sizeof(i32));
-textures.c:244:    thread_png_arenas = (PngArena*)OS_Alloc((size_t)threadCnt * sizeof(PngArena));
-textures.c:246:    TexResult* texResults = OS_Alloc(texCnt * sizeof(TexResult)); // Unified result struct allocation
-textures.c:256:    void* arena = OS_AllocateRAM(arena_size, 0x1|0x2, 0x20|0x02|0x08000, INVALID_FHANDLE);
-textures.c:259:    i32* textureSizes = OS_Alloc(texCnt * 2 * sizeof(i32));
-textures.c:260:    u32* texturePaletteOffsets = OS_Alloc(texCnt * sizeof(u32));
-textures.c:295:    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,WIN_ICON);    
-text.c:19:    FHandle fd;int fsz;fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
-text.c:29:    ttAllocs = OS_Alloc(4674 * sizeof(TAlloc));
-text.c:31:    fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
-text.c:32:    fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
-text.c:38:    u8*bmp=OS_Alloc(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
-text.c:64:    OS_Free(ttAllocs,4674 * sizeof(TAlloc));
-text.c:85:    Sys_Text.file_data=(u8*)OS_OpenAndAllocateFileBufferReadonly(tf,&dfd,&asz);if(!Sys_Text.file_data||asz<=0){DualLogError("Failed to load text file: %s\n",tf);return;}
-text.c:109:    Sys_Text.filelog_data=(u8*)OS_OpenAndAllocateFileBufferReadonly(tf,&dfd,&asz);if(!Sys_Text.filelog_data||asz<=0){DualLogError("Failed to load log text file: %s\n",tf);return;}
-culling.c:24:    u8* cullingFileBuffer=OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8));
-winput.c:11:void InputMonitor(WinSysmonitor*,int,int); const FBC* ChooseFBConfig(const FBC*, u32); WinSysmonitor* AllocMonitor(const char*,int,int);
-winput.c:138:        DeleteDC(dc); m = AllocMonitor(name,wMM,hMM); OS_Free(name,nameSize);
-winput.c:231:    typedef void(*__GLXextproc)();                            typedef XSizeHints*(*PFN_XAllocSizeHints)();                       typedef int(*PFN_XChangeProperty)(Display*,XID,Atom,Atom,int,int,const u8*,int);   typedef void(*PFN_XCID)(XcursorImage*);                         typedef void(*PFN_XRRFreeOutputInfo)(XRROutputInfo*);                    typedef XID(*PFN_XCreateColormap)(Display*,XID,Visual*,int);
-winput.c:247:                                     struct { void* handle; PFN_XAllocSizeHints AllocSizeHints; PFN_XChangeProperty ChangeProperty; PFN_XChangeWindowAttributes ChangeWindowAttributes; PFN_XCheckTypedWindowEvent CheckTypedWindowEvent; PFN_XCreateColormap CreateColormap; PFN_XCreateWindow CreateWindow; PFN_XDefineCursor DefineCursor;
-winput.c:262:    static void updateNormalHints(WinSyswindow* w, int w_, int h) { XSizeHints* hs=WinSys.x11.xlib.AllocSizeHints(); i64 s; WinSys.x11.xlib.GetWMNormalHints(WinSys.x11.display,w->x11.handle,hs,&s); hs->flags &= ~((1L<<4)|(1L<<5)|(1L<<7)); hs->flags|=((1L<<4)|(1L<<5)); hs->min_width=hs->max_width=w_; hs->min_height=hs->max_height=h; WinSys.x11.xlib.SetWMNormalHints(WinSys.x11.display,w->x11.handle,hs); WinSys.x11.xlib.Free(hs); }
-winput.c:303:            WinSysmonitor* m = AllocMonitor(oi->name, wMM, hMM);
-winput.c:415:        if (!WindowVisible()) { i64 s; XSizeHints* h=WinSys.x11.xlib.AllocSizeHints(); if (WinSys.x11.xlib.GetWMNormalHints(WinSys.x11.display,w->x11.handle,h,&s)) {h->flags|=(1L<<2); h->x=h->y=0; WinSys.x11.xlib.SetWMNormalHints(WinSys.x11.display,w->x11.handle,h);} WinSys.x11.xlib.Free(h); } 
-winput.c:450:        XSizeHints* sz=WinSys.x11.xlib.AllocSizeHints();
-winput.c:486:            X(AllocSizeHints) X(ChangeProperty) X(CheckTypedWindowEvent) X(CreateColormap) X(CreateWindow) X(ChangeWindowAttributes) X(DefineCursor) X(DeleteProperty) X(DisplayKeycodes) X(FilterEvent) X(FindContext) X(Free) X(UngrabPointer) X(FreeEventData) X(GetInputFocus) X(GetKeyboardMapping) X(GetWMNormalHints) X(GetWindowAttributes) X(GetWindowProperty)
-winput.c:535:size_t monitorAllocationSize = 0;
-winput.c:539:        WinSys.monitors = WinSys.monitors ? OS_Realloc(WinSys.monitors,monitorAllocationSize,sizeof(WinSysmonitor*) * WinSys.monitorCount) : OS_Alloc(WinSys.monitorCount * sizeof(WinSysmonitor*));
-winput.c:540:        monitorAllocationSize = WinSys.monitorCount * sizeof(WinSysmonitor*);
-winput.c:550:WinSysmonitor* AllocMonitor(const char* n, int w, int h) { WinSysmonitor* m = OS_Calloc(1, sizeof(WinSysmonitor)); m->widthMM = w; m->heightMM = h; scpy_to_a_from_b(m->name,n,sizeof(m->name)); return m; }
-audio.c:655:    u32 sf = *frames, df = (u32)((u64)sf*AUDIO_RATE/src_rate); float *dst = (float*)OS_Alloc(df*2*sizeof(float)); *sz = df*2*sizeof(float); float ratio = (float)sf/(float)df;
-audio.c:663:    u64 frames = wav.totalPCMFrameCount; float *buf = (float*)OS_Alloc(frames*AUDIO_CHANNELS*sizeof(float)); size_t bufSize = frames*AUDIO_CHANNELS*sizeof(float); u64 got = WavReadPCMFrames(&wav,frames,buf);
-models.c:88:    u16* final_t = OS_Alloc(ec * sizeof(u16)); // Allocate final_t early so we can use it instead of ft_scratch
-models.c:100:    float* final_verts = (float*)OS_Alloc((size_t)ucnt * CPU_VRT_SZ);
-models.c:173:    modelBVHNodes[m] = (BvhNode*)OS_Alloc(ctx->nodeCount * sizeof(BvhNode));
-models.c:177:        modelBVHTriOrder[m] = (u16*)OS_Alloc(ctx->triCount * sizeof(u16));
-models.c:193:    FHandle fd; int sz; char* buf = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz);
-models.c:203:    ModelData* ents = OS_Alloc(cnt * sizeof(ModelData));
-models.c:274:    float* weldedPos = (float*)OS_Alloc((size_t)vc * 3 * sizeof(float)); // worst case: no duplicates at all
-models.c:293:    u16* weldedTris = (u16*)OS_Alloc((size_t)tc * 3 * sizeof(u16));
-models.c:307:    vPos = OS_Alloc(mdlsCnt * sizeof(float*)); modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
-models.c:308:    modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
-models.c:311:    void* arena_base = OS_Alloc(arena); char* p = arena_base;
-models.c:316:    for (u32 i=0; i<mdlsCnt; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz; raw[i].name=mp.entries[pi].path;} }
-models.c:348:    physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*));
-models.c:349:    physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
-models.c:350:    physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
-models.c:458:    cvxAdjOffsets=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u32*)); cvxAdjLists=OS_Alloc(MAX_UNIQUE_CVX_MESHES * sizeof(u16*));
-models.c:477:        u32 edgeCount = 0; u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
-models.c:486:        u32* degree=OS_Alloc(vCount * sizeof(u32)); 
-models.c:488:        u32* offsets=OS_Alloc((vCount + 1) * sizeof(u32)); offsets[0]=0; for(u32 i=0;i<vCount;++i){offsets[i+1]=offsets[i] + degree[i];}
-models.c:489:        u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));
-models.c:490:        u32* writePos = OS_Alloc(vCount * sizeof(u32));
-common.h:239:void *OS_AllocateRAM(size_t,i32,i32,FHandle),*OS_AllocateFileBackedRAMReadonly(size_t,FHandle,char*),*OS_Realloc(void*,size_t,size_t),OS_Close(FHandle),OS_Write(FHandle,const void*,size_t,const char*),OS_ThreadJoin(OS_Thread* t),OS_USleep(u32 usec);
-common.h:246:void UseTargets(u16,const char*),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),* OS_Alloc(size_t),OS_Free(void*,size_t),*OS_OpenAndAllocateFileBufferReadonly(const char*,FHandle*,int*),DebugRAM(const char*),
-stbtt.h:4:typedef struct { void* ptr; size_t sz; } TAlloc;
-stbtt.h:5:static TAlloc* ttAllocs = NULL;
-stbtt.h:7:static void* ttalloc(size_t n) { if (tallocCount>=4674) {DualLogError("ttalloc too many!\n"); return NULL;} void*p=OS_Alloc(n); ttAllocs[tallocCount++]=(TAlloc){p,n}; return p; }
-stbtt.h:8:static void  ttfree (void* p) { if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_Free(p,ttAllocs[tallocCount-1].sz);tallocCount--; }
-synth.c:5:static SynthVoice* SynAlloc(void) { for (u32 i=0;i<MAX_SYNTH_VOICES;i++) if (!syn_ch[i].active) return &syn_ch[i]; return NULL; }
-synth.c:6:static SynthVoice* SynTrigger(SynthFn fn,float seconds,float vol) { SynthVoice* v=SynAlloc(); if(!v) return NULL; *v=(SynthVoice){.fn=fn,.frames=(u32)(AUDIO_RATE*seconds),.vol=vol,.active=true}; return v; }
+text.c:4:typedef struct { void* ptr; size_t sz; } TAlloc;
+text.c:5:static TAlloc* ttAllocs = NULL;
+text.c:7:static void* ttalloc(size_t n) { if (tallocCount>=4674) {DualLogError("ttalloc too many!\n"); return NULL;} void*p=OS_AllocScratch(n); ttAllocs[tallocCount++]=(TAlloc){p,n}; return p; }
+text.c:8:static void  ttfree (void* p) { if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_FreeInitPhaseInner(ttAllocs[tallocCount-1].sz);tallocCount--; } // Make sure to pop off in reverse order!
+text.c:373:    FHandle fd;int fsz;fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
+text.c:397:    ttAllocs = OS_AllocScratch(4674 * sizeof(TAlloc));
+text.c:399:    fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
+text.c:400:    fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
+text.c:406:    u8* bmp = OS_AllocScratch(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
+text.c:416:    OS_FreeInitPhaseInner(4674 * sizeof(TAlloc));
+text.c:435:    u8* data = OS_OpenAndAllocateFileBufferReadonly(path, &dfd, &asz); if(!data || asz <= 0) { DualLogError("Failed to load text file: %s\n", path); *out_size = 0; return NULL; }
+culling.c:20:    u8* cullingFileBuffer=OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8)); OS_Seek(fp,0,0); long read_size = OS_Read(fp,cullingFileBuffer,size); OS_Close(fp); if ((size_t)read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); }
+winput.c:7:void InputCursorPos(double*,double*,double,double); void InputMonitor(WSMon*,int,int); const FBC* ChooseFBConfig(const FBC*, u32); static WSMon* AllocMonitor(const char*,int,int);
+winput.c:129:    u16* CreateWideStringFromUTF8Win32(const char* s) { u16* t; int c = MultiByteToWideChar(65001,0,(char*)s,-1,NULL,0); t = OS_Alloc(c*sizeof(u16)); MultiByteToWideChar(65001,0,(char*)s,-1,t,c); return t; }
+winput.c:130:    char* CreateUTF8FromWideStringWin32(const u16* s, int* sz) { *sz = WideCharToMultiByte(65001,0,(u16*)s,-1,NULL,0,NULL,NULL); char* t = OS_Alloc(*sz); WideCharToMultiByte(65001,0,(u16*)s,-1,t,*sz,NULL,NULL); return t; }
+winput.c:141:        DeleteDC(dc); m = AllocMonitor(name,wMM,hMM); OS_Free(name,nameSize);
+winput.c:151:        if (dC) { d = OS_Alloc(WinSys.monitorCount*sizeof(WSMon*)); mcpy(d,WinSys.monitors,WinSys.monitorCount * sizeof(WSMon*)); }
+winput.c:186:        WSWin* w = OS_Alloc(sizeof(WSWin)); w->decorated = 1; w->cursorMode = 0x00034003; u32 style = 0x060A0000 | (w->decorated ? 0x00C00000 : 0x80000000);
+winput.c:206:        FBC* usableConfigs = OS_Alloc(nativeCount*sizeof(FBC));
+winput.c:234:    typedef void(*__GLXextproc)();                            typedef XSizeHints*(*PFN_XAllocSizeHints)();                       typedef int(*PFN_XChangeProperty)(Display*,XID,Atom,Atom,int,int,const u8*,int);   typedef void(*PFN_XCID)(XcursorImage*);                         typedef void(*PFN_XRRFreeOutputInfo)(XRROutputInfo*);                    typedef XID(*PFN_XCreateColormap)(Display*,XID,Visual*,int);
+winput.c:251:                                     struct { void* handle; PFN_XAllocSizeHints AllocSizeHints; PFN_XChangeProperty ChangeProperty; PFN_XChangeWindowAttributes ChangeWindowAttributes; PFN_XCheckTypedWindowEvent CheckTypedWindowEvent; PFN_XCreateColormap CreateColormap; PFN_XCreateWindow CreateWindow; PFN_XDefineCursor DefineCursor;
+winput.c:271:    static void updateNormalHints(WSWin* w, int w_, int h) { XSizeHints* hs=WinSys.x11.xlib.AllocSizeHints(); i64 s; WinSys.x11.xlib.GetWMNormalHints(WinSys.x11.display,w->x11.handle,hs,&s); hs->flags &= ~((1L<<4)|(1L<<5)|(1L<<7)); hs->flags|=((1L<<4)|(1L<<5)); hs->min_width=hs->max_width=w_; hs->min_height=hs->max_height=h; WinSys.x11.xlib.SetWMNormalHints(WinSys.x11.display,w->x11.handle,hs); WinSys.x11.xlib.Free(hs); }
+winput.c:279:        int lC=2+image[0].width*image[0].height; u64* icon=OS_Alloc(lC*sizeof(u64)), *t=icon; *t++=image[0].width; *t++=image[0].height;
+winput.c:295:        int dC = WinSys.monitorCount; WSMon** d = NULL; if (dC) { d = OS_Alloc(WinSys.monitorCount*sizeof(WSMon*)); mcpy(d,WinSys.monitors,WinSys.monitorCount * sizeof(WSMon*)); }
+winput.c:306:            WSMon* m = AllocMonitor(oi->name, wMM, hMM);
+winput.c:417:        if (!WindowVisible()) { i64 s; XSizeHints* h=WinSys.x11.xlib.AllocSizeHints(); if (WinSys.x11.xlib.GetWMNormalHints(WinSys.x11.display,w->x11.handle,h,&s)) {h->flags|=(1L<<2); h->x=h->y=0; WinSys.x11.xlib.SetWMNormalHints(WinSys.x11.display,w->x11.handle,h);} WinSys.x11.xlib.Free(h); } 
+winput.c:422:        WSWin* w = OS_Alloc(sizeof(WSWin)); w->decorated = 1; w->cursorMode = 0x00034003;
+winput.c:433:        GLXFBConfig* nativeConfigs; FBC* usableConfigs; const FBC* closest; int nativeCount,usableCount; nativeConfigs=WinSys.glx.GetFBConfigs(WinSys.x11.display,WinSys.x11.screen,&nativeCount); usableConfigs=OS_Alloc(nativeCount*sizeof(FBC)); usableCount=0;
+winput.c:452:        XSizeHints* sz=WinSys.x11.xlib.AllocSizeHints();
+winput.c:488:            X(AllocSizeHints) X(ChangeProperty) X(CheckTypedWindowEvent) X(CreateColormap) X(CreateWindow) X(ChangeWindowAttributes) X(DefineCursor) X(DeleteProperty) X(DisplayKeycodes) X(FilterEvent) X(FindContext) X(Free) X(UngrabPointer) X(FreeEventData) X(GetInputFocus) X(GetKeyboardMapping) X(GetWMNormalHints) X(GetWindowAttributes) X(GetWindowProperty)
+winput.c:545:size_t monitorAllocationSize = 0;
+winput.c:548:        WinSys.monitorCount++; WinSys.monitors = WinSys.monitors ? OS_Realloc(WinSys.monitors,monitorAllocationSize,sizeof(WSMon*) * WinSys.monitorCount) : OS_Alloc(WinSys.monitorCount * sizeof(WSMon*)); monitorAllocationSize = WinSys.monitorCount * sizeof(WSMon*);
+winput.c:553:static WSMon* AllocMonitor(const char* n, int w, int h) { WSMon* m = OS_Alloc(sizeof(WSMon)); m->widthMM = w; m->heightMM = h; scpy_to_a_from_b(m->name,n,sizeof(m->name)); return m; }
+audio.c:620:    u32 sf=*frames, df=(u32)((u64)sf*AUDIO_RATE/src_rate); float *dst=(float*)OS_Alloc(df*2*sizeof(float)); *sz=df*2*sizeof(float); float ratio=(float)sf/(float)df;
+audio.c:628:    u64 frames = wav.totalPCMFrameCount; float *buf = (float*)OS_Alloc(frames*AUDIO_CHANNELS*sizeof(float)); size_t bufSize = frames*AUDIO_CHANNELS*sizeof(float); u64 got = WavReadPCMFrames(&wav,frames,buf);
+audio.c:635:    size_t bufSize = (size_t)total * AUDIO_CHANNELS * sizeof(float); float *buf = (float*)OS_Alloc(bufSize); mp3_seek_to_pcm_frame(&dec,0); u64 got = mp3_read_pcm_frames_f32(&dec,total,buf); mp3_uninit(&dec); if (got == 0) { OS_Free(buf,bufSize); return NULL; }
+audio.c:660:static SynthVoice* SynAlloc(void) { for (u32 i = 0; i < MAX_SYNTH_VOICES; i++){ if (!syn_ch[i].active){return &syn_ch[i];} } return NULL; }
+audio.c:727:void play_synth(SoundID id, float vol, float pitch){if((u32)id >= SND_COUNT){return;} const SynthPreset* pr=&SynthPresets[id]; SynthVoice* v=SynAlloc(); if(!v){return;} *v=(SynthVoice){.fn=pr->fn,.frames=(u32)(AUDIO_RATE*pr->dur),.vol=pr->vol*vol,.pitch=pitch,.active=true}; v->p[0]=pr->p[0]; v->p[1]=pr->p[1]; v->p[2]=pr->p[2]; v->p[3]=pr->p[3];}
+audio.c:728:void play_synth_at(SoundID id, float vol, float pitch, V3 pos){if ((u32)id >= SND_COUNT){return;} const SynthPreset* pr = &SynthPresets[id]; SynthVoice* v = SynAlloc(); if(!v){return;} *v = (SynthVoice){.fn=pr->fn,.frames=(u32)(AUDIO_RATE*pr->dur),.vol=pr->vol*vol,.pitch=pitch,.positional=true,.pos=pos,.active=true}; v->p[0]=pr->p[0]; v->p[1]=pr->p[1]; v->p[2]=pr->p[2]; v->p[3]=pr->p[3]; }
+audio.c:776:    log_msg_t *lm = (log_msg_t*)OS_Alloc(sizeof(log_msg_t)); lm->samples = load_wav(path,&lm->frame_count,&lm->allocSize); if (!lm->samples) { DualLogError("Failed to load %s\n",path); OS_Free(lm,sizeof(*lm)); return; }
+audio.c:784:    mp3_channel_t *m = (mp3_channel_t*)OS_Alloc(sizeof(mp3_channel_t));
+models.c:51:static int cgltf_parse_json_string(jsmntok_t const* t, int i, const u8* j, char** out){ CGLTF_CHECK_TOKTYPE(t[i], JSMN_STRING);if(*out)return -1; int sz=(int)(t[i].end-t[i].start);char*r=(char*)OS_AllocScratch(sz+1);cgltf_total_alloc+=sz+1;sCpy2aSubFromb(r,sz,(const char*)j+t[i].start,sz+1);*out=r;return i+1; }
+models.c:52:static int cgltf_parse_json_array(jsmntok_t const* t, int i, const u8* j, size_t es, void** out, size_t* os){ (void)j;if(t[i].type!=JSMN_ARRAY)return -1;if(*out)return -1;int sz=t[i].size;*out=OS_AllocScratch(es*sz);cgltf_total_alloc+=es*sz;*os=sz;return i+1; }
+models.c:65:    CGLTF_CHECK_TOKTYPE(t[i], JSMN_OBJECT);if(*out)return -1; *oc=t[i].size;*out=(cgltf_attribute*)OS_Alloc(sizeof(cgltf_attribute)**oc);cgltf_total_alloc+=sizeof(cgltf_attribute)**oc;++i;
+models.c:256:    jsmntok_t* t=(jsmntok_t*)OS_AllocScratch(sizeof(jsmntok_t)*(tc+1));jsmn_init(&p);
+models.c:259:    cgltf_data* data=(cgltf_data*)OS_AllocScratch(sizeof(cgltf_data)); cgltf_total_alloc += sizeof(cgltf_data);
+models.c:286:    u8* d=(u8*)OS_Alloc(sz);cgltf_total_alloc+=sz;u32 buf=0,bb=0;
+models.c:300:            size_t psz=slen(uri)+slen(gltf_path)+1;char* path=(char*)OS_AllocScratch(psz);
+models.c:304:            u8* fb=OS_AllocateFileBackedRAMReadonly(fsz,fp,path);
+models.c:341:    if (unlikely(!ec)){return false;} u16* final_t = OS_Alloc(ec * sizeof(u16)); /*Allocate final_t early so we can use it instead of ft_scratch*/ u32 used_slots_count = 0; u32* rem = (u32*)remap_scr; /*Reuse remap_scr for the 'rem' array!*/ u32 ucnt = 0;
+models.c:348:    OptimizeVertexCache(final_t,ec,ucnt,cache_scr); float* final_verts = (float*)OS_Alloc((size_t)ucnt * CPU_VRT_SZ);
+models.c:528:        out->pos=(float*)OS_AllocScratch((size_t)vc * 3 * sizeof(float)); out->nrm=(float*)OS_AllocScratch((size_t)vc * 3 * sizeof(float)); out->uv=(float*)OS_AllocScratch((size_t)vc * 2 * sizeof(float)); out->skin=(VtxSkin*)OS_AllocScratch((size_t)vc * sizeof(VtxSkin)); gltfScratch += (size_t)vc * (3+3+2) * sizeof(float) + (size_t)vc * sizeof(VtxSkin);
+models.c:543:            out->indices = (u32*)OS_AllocScratch((size_t)tc * 3 * sizeof(u32)); gltfScratch += (size_t)tc * 3 * sizeof(u32);
+models.c:548:            out->indices = (u32*)OS_AllocScratch((size_t)tc * 3 * sizeof(u32)); gltfScratch += (size_t)tc * 3 * sizeof(u32);
+models.c:567:    out->meshNodes    = (cgltf_node**)OS_AllocScratch(submeshCount * sizeof(cgltf_node*)); gltfScratch += submeshCount * sizeof(cgltf_node*);
+models.c:568:    out->subPos       = (float**)    OS_AllocScratch(submeshCount * sizeof(float*)); gltfScratch += submeshCount * sizeof(float*);
+models.c:569:    out->subNrm       = (float**)    OS_AllocScratch(submeshCount * sizeof(float*)); gltfScratch += submeshCount * sizeof(float*);
+models.c:570:    out->subUv        = (float**)    OS_AllocScratch(submeshCount * sizeof(float*)); gltfScratch += submeshCount * sizeof(float*);
+models.c:571:    out->subVertCount = (u32*)       OS_AllocScratch(submeshCount * sizeof(u32)); gltfScratch += submeshCount * sizeof(u32);
+models.c:572:    out->subIndices   = (u32**)      OS_AllocScratch(submeshCount * sizeof(u32*)); gltfScratch += submeshCount * sizeof(u32*);
+models.c:573:    out->subTriCount  = (u32*)       OS_AllocScratch(submeshCount * sizeof(u32)); gltfScratch += submeshCount * sizeof(u32);
+models.c:590:            out->subPos[si] = (float*)OS_AllocScratch((size_t)vc * 3 * sizeof(float)); out->subNrm[si] = (float*)OS_AllocScratch((size_t)vc * 3 * sizeof(float)); out->subUv[si]  = (float*)OS_AllocScratch((size_t)vc * 2 * sizeof(float)); gltfScratch += (size_t)vc * (3+3+2) * sizeof(float);
+models.c:604:                out->subIndices[si] = (u32*)OS_AllocScratch((size_t)tc * 3 * sizeof(u32)); gltfScratch += (size_t)tc * 3 * sizeof(u32);
+models.c:608:                out->subIndices[si] = (u32*)OS_AllocScratch((size_t)tc * 3 * sizeof(u32)); gltfScratch += (size_t)tc * 3 * sizeof(u32);
+models.c:666:    gBlockMeshes = (GltfMesh*)OS_AllocScratch((size_t)MAX_GLTF_BLOCKS * sizeof(GltfMesh));
+models.c:667:    GltfFrameTask* tasks = (GltfFrameTask*)OS_Alloc((size_t)maxTasks * sizeof(GltfFrameTask)); u32 taskCount = 0;
+models.c:731:    modelBVHNodes[m] = (BvhNode*)OS_Alloc(ctx->nodeCount * sizeof(BvhNode)); mcpy(modelBVHNodes[m], ctx->nodes, ctx->nodeCount * sizeof(BvhNode)); modelBVHNodeCounts[m] = ctx->nodeCount;
+models.c:732:    if (ctx->triCount > 0) { modelBVHTriOrder[m] = (u16*)OS_Alloc(ctx->triCount * sizeof(u16)); if (modelBVHTriOrder[m]) { mcpy(modelBVHTriOrder[m],ctx->triOrder,ctx->triCount * sizeof(u16)); modelBVHTriOrderCounts[m] = ctx->triCount; } }
+models.c:748:    FHandle fd; int sz; char* buf = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz);
+models.c:757:    u32 cnt = maxidx + 1; ModelData* ents = OS_AllocScratch(cnt * sizeof(ModelData)); p->entries = ents; p->count = cnt; for (u32 i=0; i<cnt; ++i) {ents[i] = (ModelData){U16_MAX,false,255,NULL,0,{0}};} ModelData cur = {U16_MAX,false,255,NULL,0,{0}}; c = buf; e = buf+sz; ln = 0;
+models.c:806:    float* weldedPos = (float*)OS_Alloc((size_t)vc * 3 * sizeof(float)); // worst case: no duplicates at all
+models.c:819:    float* exactPos = (float*)OS_Alloc((size_t)weldedCount * 3 * sizeof(float));
+models.c:822:    u16* weldedTris = (u16*)OS_Alloc((size_t)tc * 3 * sizeof(u16));
+models.c:834:    vPos = OS_AllocScratch(mdlsCnt * sizeof(float*)); modelTriangles = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+models.c:835:    modelBVHNodes = (BvhNode**)OS_Alloc(mdlsCnt * sizeof(BvhNode*)); modelBVHTriOrder = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*));
+models.c:838:    void* arena_base = OS_AllocScratch(arena + 4096); char* p = arena_base; // Fudge covers alignment padding between sections
+models.c:843:    for (u32 i=0; i<mdlsCnt; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz;} }
+models.c:844:    bool* isGLTFAnimSrc = (bool*)OS_AllocScratch(mdlsCnt * sizeof(bool));
+models.c:845:    bool* isGLTFStaticSrc = (bool*)OS_AllocScratch(mdlsCnt * sizeof(bool));
+models.c:864:    physPos = (float**)OS_Alloc(mdlsCnt * sizeof(float*)); physTris = (u16**)OS_Alloc(mdlsCnt * sizeof(u16*)); physVertCounts = (u32*)OS_Alloc(mdlsCnt * sizeof(u32));
+common.h:65:    typedef struct { union { u32 dwOemId; struct { u16 wProcessorArchitecture,wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; u32 dwPageSize; void* lpMinimumApplicationAddress,*lpMaximumApplicationAddress; u64 dwActiveProcessorMask; u32 dwNumberOfProcessors,dwProcessorType,dwAllocationGranularity; u16 wProcessorLevel,wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
+common.h:66:    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*); DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);         DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,LPOVERLAPPED);    DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);          DLL_IMP i32 WINAPI UnmapViewOfFile(void*); DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
+common.h:71:    INLINE void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); return CloseHandle(m),r;}
+common.h:78:    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
+common.h:84:    void* __stdcall GetProcessHeap(); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); void __stdcall Sleep(u32 dwMilliseconds); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
+common.h:88:    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
+common.h:99:    INLINE void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd) { long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return (void*)r; }
+common.h:103:    INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
+common.h:116:    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
+common.h:121:INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
+common.h:123:void OS_ScratchInit(void),OS_ScratchFree(void),*OS_AllocScratch(size_t amount),OS_FreeInitPhaseInner(size_t amount),OS_FreeInitPhase(void);
+common.h:125:INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
+common.h:126:INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
 ```
 
 Binary size eval:
@@ -434,211 +442,211 @@ Binary size eval:
 ```
 ❯ size ./voxen
    text  data       bss       dec     hex filename
- 506018 33428 192529865 193069311 b8200ff ./voxen
+ 475561 81236 153749769 154306566 9328806 ./voxen
 ```
 
 ```
 ❯ nm -S --size-sort -t d ./voxen | grep -i ' [tw] ' | tail -n 200
-0000000016978736 0000000000000392 t CastRayCellCheck
-0000000017081328 0000000000000392 t OptimizeVertexFetch
-0000000017055312 0000000000000393 t Screenshot
-0000000016924928 0000000000000395 t mp3_read_pcm_frames_f32
-0000000016922144 0000000000000403 t resample_stereo
-0000000017294320 0000000000000407 t ConsoleEmulator
-0000000017290976 0000000000000411 t CenterWindowOnMonitor
-0000000017294736 0000000000000420 t quat_from_yaw_pitch_roll
-0000000016950656 0000000000000443 t ScreenPointToRay
-0000000017074368 0000000000000447 t cgltf_load_buffer_base64
-0000000016977584 0000000000000447 t LoadCullPNG
-0000000016957056 0000000000000447 t UseTargets
-0000000017219904 0000000000000460 t _eqs
-0000000016965408 0000000000000462 t TeleportAway
-0000000017303440 0000000000000464 t ParseLevelArg
-0000000016924448 0000000000000469 t mp3_seek_to_pcm_frame
-0000000016902736 0000000000000476 t play_synth
-0000000017301904 0000000000000478 t LoadConfig
-0000000017231360 0000000000000490 t LoadFallbackFont
-0000000017220368 0000000000000491 t _tess_c
-0000000017208896 0000000000000492 t _cff_idx_get
-0000000017220864 0000000000000498 t _tess_cb
-0000000017377648 0000000000000498 t WeaponsUpdate
-0000000017009872 0000000000000506 t SetLevelPointers
-0000000016982720 0000000000000515 t PortalCulling
-0000000017349600 0000000000000519 t UpdateInstanceMatrix4x4s
-0000000017290448 0000000000000526 t InputKey
-0000000016979696 0000000000000531 t CastStraightX
-0000000016914384 0000000000000533 t UpdateMusic
-0000000016955568 0000000000000534 t FuncWallUpdate
-0000000016923904 0000000000000536 t mp3_get_pcm_frame_count
-0000000016920832 0000000000000537 t GenRing
-0000000017209760 0000000000000543 t _get_subrs
-0000000017041120 0000000000000546 t LoadGame
-0000000016918496 0000000000000549 t GenTapCase
-0000000016979136 0000000000000551 t CastStraightZ
-0000000016966224 0000000000000564 t PatchUpdate
-0000000017148144 0000000000000565 t _supA_box
-0000000016971280 0000000000000572 t UseEntity
-0000000016917536 0000000000000578 t GenFootstep
-0000000017054704 0000000000000579 t BmpWrite
-0000000017048432 0000000000000580 t DualLogMain
-0000000016915728 0000000000000580 t GenDoor
-0000000016900176 0000000000000582 t AICheckPain
-0000000016903216 0000000000000582 t play_wav
-0000000016978032 0000000000000587 t AddDoorPortal
-0000000016953200 0000000000000588 t AddWeaponToInventory
-0000000017142336 0000000000000588 t RunGJK
-0000000017128576 0000000000000595 t SampleQuat
-0000000016967984 0000000000000605 t DoorUse
-0000000017313088 0000000000000612 t UI_Slider
-0000000017270112 0000000000000613 t DrawVelocityVector
-0000000016957920 0000000000000614 t ButtonSwitchUse
-0000000016915104 0000000000000617 t GenLaserSS1
-0000000017269232 0000000000000618 t TextureSequenceUpdate
-0000000017124176 0000000000000629 t cgltf_parse_json_accessor_sparse
-0000000016919456 0000000000000634 t GenSparkSmall
-0000000017142928 0000000000000643 t SeedEPA
-0000000017132128 0000000000000646 t Entity_GetCap
-0000000017278656 0000000000000650 t SetWindowIcon
-0000000016906928 0000000000000654 t play_mp3
-0000000017010384 0000000000000656 t CopyPlayerState
-0000000017051616 0000000000000662 t VoidSquasher
-0000000017040448 0000000000000666 t SaveGame
-0000000016956384 0000000000000671 t ForceBridgeUpdate
-0000000016984352 0000000000000672 t CullInit
-0000000016902048 0000000000000675 t synth_reverb_apply
-0000000017343104 0000000000000680 t GetProjections
-0000000017309488 0000000000000688 t CompileAnyShader
-0000000017371936 0000000000000689 t MeleeHitUpdate
-0000000017158736 0000000000000690 t ApplyInvTensor
-0000000016913360 0000000000000690 t GetCorrespondingLevelClip
-0000000016899472 0000000000000704 t InitNPC
-0000000016967264 0000000000000713 t DoorActuate
-0000000017038960 0000000000000719 t LoadAllLevels
-0000000016900768 0000000000000720 t GetFootstepTypeForPrefab
-0000000016962576 0000000000000746 t GrenadeExplode
-0000000016951152 0000000000000754 t DropHeldItem
-0000000016921376 0000000000000756 t GenBeakerThud
-0000000017311328 0000000000000760 t mul_mat4
-0000000017202912 0000000000000767 t stbtt_FindGlyphIndex
-0000000017039680 0000000000000768 t LoadLevel
-0000000017144880 0000000000000806 t BvhWalkSphMsh
-0000000017310496 0000000000000829 t ExtractFrustumPlanes
-0000000017124816 0000000000000831 t cgltf_parse_json_sparse_part
-0000000017249504 0000000000000831 t PngHuf
-0000000016959328 0000000000000846 t ApplyImpactForceSphere
-0000000017136448 0000000000000847 t HullSupport
-0000000017372640 0000000000000894 t FireMelee
-0000000017272416 0000000000000898 t DrawSphereWireframe
-0000000017145696 0000000000000901 t CapMsh
-0000000017044048 0000000000000901 t double2str
-0000000017050672 0000000000000919 t trinkle
-0000000017152896 0000000000000926 t CvxMshFillExtraPoints
-0000000017370992 0000000000000936 t CreateStandardImpactMarks
-0000000017273376 0000000000000958 t DrawMeshCollider
-0000000016948032 0000000000000965 t mp3L3_imdct36
-0000000016973680 0000000000000966 t ObjectDeath
-0000000017280416 0000000000000970 t InputMonitor
-0000000017374880 0000000000001020 t FireWeapon
-0000000017127312 0000000000001024 t NodeGlobalMatrixAtTime
-0000000017303904 0000000000001036 t ProcessConsoleCommand
-0000000016905872 0000000000001052 t SndInit
-0000000017153824 0000000000001060 t BvhWalkAABB_CvxTri
-0000000016983248 0000000000001092 t CullCore
-0000000017279312 0000000000001095 t PollMonitors
-0000000017340320 0000000000001131 t DrawEntity
-0000000016911952 0000000000001137 t MixAmbs
-0000000017008720 0000000000001144 t AddInstance
-0000000017081728 0000000000001155 t FinalizeParsedMesh
-0000000016980240 0000000000001181 t CircleFanRays
-0000000017080128 0000000000001192 t OptimizeVertexCache
-0000000017198928 0000000000001202 t CantStand
-0000000017292736 0000000000001203 t ChangeFullScreenWindowed
-0000000016949424 0000000000001223 t Push
-0000000017267648 0000000000001234 t TextureParsingWorker
-0000000017074816 0000000000001249 t cgltf_load_buffers
-0000000017143584 0000000000001284 t ExpandEPA
-0000000017277360 0000000000001288 t DrawAngularVelocity
-0000000017049376 0000000000001290 t qsort_new
-0000000016981424 0000000000001292 t DetermineVisibleCells
-0000000017056176 0000000000001312 t scycle
-0000000017288736 0000000000001319 t SetGLContext_GetFunctionPointers
-0000000016964080 0000000000001327 t Death
-0000000017291392 0000000000001336 t UpdateScreenSize
-0000000017146608 0000000000001337 t PrimitiveCvx
-0000000016922560 0000000000001338 t mp3_init_file
-0000000016953792 0000000000001477 t AddItemToInventory
-0000000017356048 0000000000001508 t main
-0000000017240064 0000000000001539 t RenderFormattedText
-0000000017125648 0000000000001548 t GltfMeshFreePartial
-0000000017281680 0000000000001590 t processEvent
-0000000017350119 0000000000001624 t NewGame
-0000000017218272 0000000000001626 t _rse
-0000000017341456 0000000000001645 t mat4_inverse
-0000000017129520 0000000000001667 t BvhBuildOctree
-0000000017270736 0000000000001676 t DrawBoxColliderColored
-0000000016971856 0000000000001707 t ModUpdate
-0000000017235616 0000000000001755 t LoadTextForLanguage
-0000000017052288 0000000000001777 t BlowBubblesOfVoid
-0000000016910080 0000000000001803 t InitAudio
-0000000017072560 0000000000001808 t jsmn_parse
-0000000016903808 0000000000001813 t load_wav
-0000000017156816 0000000000001888 t CvxCvx
-0000000017154896 0000000000001917 t CvxMsh
-0000000017058368 0000000000001985 t cgltf_element_read_float
-0000000017006256 0000000000002011 t LoadFieldIntoLight
-0000000017327376 0000000000002018 t RenderPausedUI
-0000000017283280 0000000000002073 t VCreateWindow
-0000000017140192 0000000000002134 t SphTriTest
-0000000017113504 0000000000002172 t UpdateAnims
-0000000017115744 0000000000002184 t GenerateConvexAdjacencyLists
-0000000016907872 0000000000002207 t AudioUpdate
-0000000017118224 0000000000002305 t cgltf_parse_json_node
-0000000017137296 0000000000002332 t GJKNextSimplex
-0000000016968928 0000000000002350 t Targetted
-0000000017090784 0000000000002365 t GltfBakeWorker
-0000000016960176 0000000000002385 t TakeDamage
-0000000017036512 0000000000002392 t LoadLevelData
-0000000017162384 0000000000002450 t PrepareSolverContact
-0000000017200144 0000000000002566 t ApplyPlayerMovements
-0000000016974960 0000000000002621 t DetermineClosedEdges
-0000000017237376 0000000000002674 t LoadLogTextForLanguage
-0000000017228672 0000000000002687 t stbtt_InitFont_internal
-0000000017110720 0000000000002777 t PhysGeomWorker
-0000000017120544 0000000000002871 t cgltf_parse_json_animation
-0000000017298800 0000000000002930 t InputProcessing
-0000000017159440 0000000000002933 t SolveGlobalContacts
-0000000017274336 0000000000003022 t DrawCapsuleCollider
-0000000017133312 0000000000003045 t ComputeConvexMeshInertiaTensor
-0000000017044960 0000000000003052 t sFormatV
-0000000017329408 0000000000003172 t UpdateLights
-0000000017285488 0000000000003243 t WindowInit
-0000000017149056 0000000000003305 t CvxTriTest
-0000000017221376 0000000000003323 t stbtt_MakeGlyphBitmapSubpixel
-0000000017210304 0000000000003422 t _run_cs
-0000000017214672 0000000000003599 t _fae
-0000000017250336 0000000000003700 t PngLoad
-0000000017231856 0000000000003750 t InitFontAtlasses
-0000000017224704 0000000000003953 t stbtt_PackFontRanges
-0000000017076080 0000000000004048 t cgltf_validate
-0000000017203680 0000000000004225 t _GetGlyphShapeTT
-0000000017351792 0000000000004252 t InitalizeEnvironment
-0000000017093152 0000000000004469 t ParseModelData
-0000000017304944 0000000000004529 t Raycast
-0000000017098000 0000000000005003 t LoadModels
-0000000017344128 0000000000005460 t Render
-0000000017254048 0000000000006331 t CreatePngImageArena
-0000000017242448 0000000000007052 t PngDecode
-0000000017260384 0000000000007249 t LoadTextures
-0000000017332592 0000000000007651 t RenderShadowmaps
-0000000017103008 0000000000007710 t ModelParsingWorker
-0000000017082896 0000000000007878 t LoadGLTFAnimatedBlocks
-0000000017359632 0000000000010741 t RenderUI
-0000000017060368 0000000000012181 t cgltf_parse
-0000000017314528 0000000000012840 t RenderMenu
-0000000016985840 0000000000019907 t ModEDefsInitAfterLoad
-0000000016925328 0000000000022693 t mp3_decode_next_frame_ex
-0000000017011040 0000000000025043 t LoadLevelMod
-0000000017164848 0000000000034074 t Physics
+0000000016920285 0000000000000363 t mp3d_synth_pair
+0000000017025035 0000000000000364 t BvhRayAABBHit
+0000000017064711 0000000000000369 t EPAContactPoint
+0000000016935190 0000000000000371 t AddAudioLogToInventory
+0000000017196152 0000000000000372 t CompileShaders
+0000000016968160 0000000000000374 t UpdateLight
+0000000017058577 0000000000000377 t trigger_gravitylift_touch
+0000000016909791 0000000000000379 t synth_reverb_apply
+0000000017147410 0000000000000383 t _dict_ints
+0000000016925783 0000000000000383 t resample_stereo
+0000000017070342 0000000000000384 t _supA_box
+0000000017224271 0000000000000385 t GetProjections
+0000000017045021 0000000000000393 t cgltf_parse_json_animation_sampler
+0000000016961877 0000000000000395 t CastRayCellCheck
+0000000017183011 0000000000000398 t ConsoleEmulator
+0000000016941652 0000000000000405 t ButtonSwitchUse
+0000000017212140 0000000000000418 t SideMFD
+0000000017183409 0000000000000420 t quat_from_yaw_pitch_roll
+0000000017006638 0000000000000420 t Screenshot
+0000000016935875 0000000000000423 t AddWeaponToInventory
+0000000017188211 0000000000000423 t ParseLevelArg
+0000000016919343 0000000000000423 t PlayTrack
+0000000016938370 0000000000000428 t FuncWallUpdateInner
+0000000017007930 0000000000000431 t cgltf_accessor_read_float
+0000000017142443 0000000000000435 t LoadTextFile
+0000000017146674 0000000000000437 t MeasureLineAdvance
+0000000016958849 0000000000000440 t ObjectDeath
+0000000016933529 0000000000000443 t ScreenPointToRay
+0000000017181829 0000000000000448 t ChangeFullScreenWindowed
+0000000016910170 0000000000000448 t play_wav
+0000000017196524 0000000000000452 t ExtractFrustumPlanes
+0000000017179737 0000000000000455 t InputMonitor
+0000000017189239 0000000000000457 t RayTriangle
+0000000017162671 0000000000000459 t DrawVelocityVector
+0000000016940213 0000000000000460 t UseTargets
+0000000016950135 0000000000000463 t DoorActuate
+0000000016969745 0000000000000464 t SetLevelPointers
+0000000017257113 0000000000000467 t WeaponsUpdate
+0000000017132758 0000000000000468 t _eqs
+0000000017186135 0000000000000470 t LoadConfig
+0000000016962798 0000000000000478 t CastStraightX
+0000000017066946 0000000000000480 t SeedEPA
+0000000017139303 0000000000000481 t LoadFallbackFont
+0000000017133540 0000000000000481 t _tess_cb
+0000000016997066 0000000000000496 t LoadGame
+0000000017013921 0000000000000497 t OptimizeVertexCache
+0000000017207845 0000000000000502 t GetWeaponAmmoText
+0000000016924478 0000000000000509 t mp3L3_imdct36
+0000000017151687 0000000000000509 t PngHuf
+0000000017040388 0000000000000510 t cgltf_parse_json_buffer_view
+0000000016913043 0000000000000512 t play_mp3
+0000000016960556 0000000000000518 t LoadCullPNG
+0000000016920657 0000000000000521 t mp3L3_decode_scalefactors
+0000000016951605 0000000000000521 t QuestBitNoteSideEffects
+0000000016946145 0000000000000522 t GrenadeExplode
+0000000016962272 0000000000000526 t CastStraightZ
+0000000016912262 0000000000000527 t SndInit
+0000000017004344 0000000000000538 t trinkle
+0000000016908809 0000000000000539 t mp3L3_decode
+0000000016950598 0000000000000544 t DoorUse
+0000000017198923 0000000000000545 t UI_Slider
+0000000016953643 0000000000000549 t UseEntity
+0000000016949001 0000000000000552 t PatchUpdate
+0000000017234682 0000000000000553 t UpdateInstanceMatrix4x4s
+0000000016902010 0000000000000560 t AICheckPain
+0000000017002520 0000000000000561 t DualLogMain
+0000000017006074 0000000000000563 t BmpWrite
+0000000017164302 0000000000000563 t DrawSphereWireframe
+0000000016964748 0000000000000571 t PortalCulling
+0000000017161903 0000000000000579 t TextureSequenceUpdate
+0000000017066363 0000000000000583 t RunGJK
+0000000017046780 0000000000000584 t SampleQuat
+0000000017121588 0000000000000598 t stbtt_FindGlyphIndex
+0000000016917727 0000000000000599 t MixAmbs
+0000000017188634 0000000000000605 t ProcessConsoleCommand
+0000000017061800 0000000000000611 t HullSupport
+0000000017142878 0000000000000624 t LoadTextForLanguage
+0000000016970209 0000000000000626 t CopyPlayerState
+0000000017068382 0000000000000638 t BvhWalkSphMsh
+0000000017059099 0000000000000646 t Entity_GetCap
+0000000016961074 0000000000000649 t AddDoorPortal
+0000000016996417 0000000000000649 t SaveGame
+0000000016918684 0000000000000659 t GetCorrespondingLevelClip
+0000000016939544 0000000000000669 t ForceBridgeUpdate
+0000000016967483 0000000000000677 t LoadFieldIntoLight
+0000000016943493 0000000000000678 t ApplyImpactForceSphere
+0000000017249503 0000000000000680 t CreateStandardImpactEffects
+0000000017041513 0000000000000684 t cgltf_parse_json_node
+0000000017114963 0000000000000685 t CantStand
+0000000017000118 0000000000000693 t double2str
+0000000017139895 0000000000000698 t BuildAtlas
+0000000017014694 0000000000000701 t FinalizeParsedMesh
+0000000016959847 0000000000000709 t DetermineClosedEdges
+0000000016965557 0000000000000725 t CullInit
+0000000017045507 0000000000000725 t NodeGlobalMatrixAtTime
+0000000017252631 0000000000000738 t FireMelee
+0000000016954218 0000000000000751 t DrawAIDebug
+0000000017244970 0000000000000754 t PollMonitors
+0000000017196976 0000000000000760 t mul_mat4
+0000000017013152 0000000000000769 t cgltf_load_buffers
+0000000016947389 0000000000000769 t Death
+0000000017047711 0000000000000779 t BvhBuildOctree
+0000000017165102 0000000000000810 t DrawMeshCollider
+0000000017195336 0000000000000816 t CompileAnyShader
+0000000017075515 0000000000000832 t BvhWalkAABB_CvxTri
+0000000016995582 0000000000000835 t LoadLevel
+0000000017003246 0000000000000844 t qsort_new
+0000000016963731 0000000000000859 t DetermineVisibleCells
+0000000017039526 0000000000000862 t cgltf_parse_json_accessor
+0000000016907722 0000000000000882 t mp3L3_read_side_info
+0000000017180939 0000000000000890 t UpdateScreenSize
+0000000016906722 0000000000000892 t mp3dec_decode_frame
+0000000016900972 0000000000000893 t InitNPC
+0000000017042197 0000000000000901 t cgltf_parse_json_animation
+0000000017251730 0000000000000901 t MeleeHitUpdate
+0000000017254075 0000000000000914 t FireWeapon
+0000000017248583 0000000000000920 t CreateStandardImpactMarks
+0000000017067426 0000000000000956 t ExpandEPA
+0000000017074549 0000000000000966 t CvxMshFillExtraPoints
+0000000017211154 0000000000000986 t CenterMFD
+0000000017138174 0000000000001002 t stbtt_InitFont_internal
+0000000017043260 0000000000001024 t cgltf_parse_json_primitive
+0000000016936376 0000000000001025 t AddItemToInventory
+0000000017221758 0000000000001026 t DrawEntity
+0000000017131727 0000000000001031 t _rse
+0000000016928132 0000000000001087 t mp3_decode_next_frame_ex
+0000000017206739 0000000000001106 t RenderPausedUI
+0000000017065242 0000000000001121 t SphTriTest
+0000000017069020 0000000000001153 t PrimitiveCvx
+0000000017212636 0000000000001164 t UpdateLights
+0000000017153930 0000000000001168 t CreatePngImageArena
+0000000016968575 0000000000001170 t AddInstance
+0000000017163130 0000000000001172 t DrawBoxColliderColored
+0000000016930221 0000000000001184 t Push
+0000000016926166 0000000000001185 t mp3_init_file
+0000000017184758 0000000000001235 t InputProcessing
+0000000017060476 0000000000001248 t ComputeConvexMeshInertiaTensor
+0000000017168513 0000000000001282 t DrawAngularVelocity
+0000000016952233 0000000000001307 t Targetted
+0000000017130419 0000000000001308 t _fae
+0000000017052638 0000000000001319 t PSys_Simulate
+0000000017000811 0000000000001322 t sFormatV
+0000000016904737 0000000000001326 t mp3d_synth
+0000000016921178 0000000000001330 t mp3L3_huffman
+0000000017051293 0000000000001345 t PSys_UpdateEmitters
+0000000017250183 0000000000001389 t HitScanFire
+0000000017011256 0000000000001406 t jsmn_parse
+0000000017160164 0000000000001409 t TextureParsingWorker
+0000000016903319 0000000000001418 t mp3d_DCT_II
+0000000017178318 0000000000001419 t SetGLContext_GetFunctionPointers
+0000000016910618 0000000000001426 t load_wav
+0000000017076347 0000000000001435 t CvxMsh
+0000000017222784 0000000000001487 t mat4_inverse
+0000000017134021 0000000000001520 t stbtt_MakeGlyphBitmapSubpixel
+0000000017143502 0000000000001553 t LoadLogTextForLanguage
+0000000017145055 0000000000001619 t RenderFormattedText
+0000000017078198 0000000000001644 t CvxCvx
+0000000017140593 0000000000001660 t InitFontAtlasses
+0000000017170634 0000000000001673 t processEvent
+0000000016993897 0000000000001685 t LoadAllLevels
+0000000017242781 0000000000001721 t main
+0000000017035411 0000000000001726 t PhysGeomWorker
+0000000017152196 0000000000001734 t PngLoad
+0000000016944171 0000000000001788 t TakeDamage
+0000000016915820 0000000000001851 t InitAudio
+0000000017020516 0000000000001909 t GltfBakeWorker
+0000000017172541 0000000000001923 t VCreateWindow
+0000000017037205 0000000000001936 t UpdateAnims
+0000000017136089 0000000000002085 t stbtt_PackFontRanges
+0000000016931405 0000000000002124 t BioMonitorUpdate
+0000000017122492 0000000000002127 t _GetGlyphShapeTT
+0000000016913555 0000000000002265 t AudioUpdate
+0000000017062411 0000000000002300 t GJKNextSimplex
+0000000017208665 0000000000002489 t HardwareButtons
+0000000017165912 0000000000002601 t DrawCapsuleCollider
+0000000017126228 0000000000002605 t _run_cs
+0000000017022425 0000000000002610 t ParseModelData
+0000000017008585 0000000000002671 t cgltf_parse
+0000000017079861 0000000000002681 t SolveGlobalContacts
+0000000016991085 0000000000002766 t LoadLevelData
+0000000017048490 0000000000002803 t PSysAdd
+0000000017071024 0000000000003042 t CvxTriTest
+0000000017148266 0000000000003421 t PngDecode
+0000000017054480 0000000000003497 t PSys_Render
+0000000017082542 0000000000003504 t PrepareSolverContact
+0000000017235248 0000000000003521 t NewGame
+0000000017174746 0000000000003572 t WindowInit
+0000000016954969 0000000000003763 t ModUpdate
+0000000017238882 0000000000003899 t InitalizeEnvironment
+0000000017025399 0000000000004149 t LoadModels
+0000000017015450 0000000000005066 t LoadGLTFAnimatedBlocks
+0000000017155098 0000000000005066 t LoadTextures
+0000000017189696 0000000000005640 t Raycast
+0000000017115648 0000000000005749 t ApplyPlayerMovements
+0000000017029548 0000000000005863 t ModelParsingWorker
+0000000017200173 0000000000006566 t RenderMenu
+0000000017214105 0000000000007619 t RenderShadowmaps
+0000000017224970 0000000000009712 t Render
+0000000016971023 0000000000019958 t LoadLevelMod
+0000000017086046 0000000000027695 t Physics
 ```
 
 Helper bash commands to generate frame sequences in models.txt:
@@ -664,15 +672,15 @@ VoxenSettings voxen_Settings = {
     .Vsync = false
 };
 
-FPS: 289
-ms: 3.43
-RAM: 751mb (mostly the animation system duplicating models for every frame, stupid but works great!)
-VRAM: 434mb
-Build 8.4secs
-Init 1.449secs
+FPS: 478
+ms: 1.94
+RAM: 587mb (mostly the animation system duplicating models for every frame, stupid but works great!)
+VRAM: 1253mb (enough for all lights on largest level, prevents issues)
+Build 1.355secs
+Init 1.547secs
 
-CPU: 3.43ms bottlneck
-GPU: 3.29ms
+CPU: 1.36ms
+GPU: 1.94ms bottlneck
 
 PMD copy-paste-detector usage
 /home/qmaster/Downloads/pmd/bin/pmd cpd --minimum-tokens 100 --language cpp /home/qmaster/Github/Voxen
