@@ -3,11 +3,8 @@
 extern u32 psysquadVAO,psysquadVBO,psysInstancesID,particleSP,psysTrailsID,trailSP;
 PSys psys = {0};
 void PSys_SpawnTrail(V3 p0, V3 p1, u32 texIndex, u32 emitterIndex, float lifetime, float birth0);
-INLINE u32 xs32(u64* state) { u64 x = *state; x ^= x << 13; x ^= x >> 7; x ^= x << 17; *state = x; return (u32)(x ^ (x >> 32)); }
-INLINE float randf(u64* state) { return (float)(xs32(state) & 0xFFFFFF) * (1.0f / 16777216.0f); }
-INLINE float randf_range(u64* state, float a, float b) { return a + (b - a) * randf(state); }
-INLINE u32 pack_rgba8(float r, float g, float b, float a) { u32 ri = (u32)(vclamp(r, 0.0f, 1.0f) * 255.0f + 0.5f); u32 gi = (u32)(vclamp(g, 0.0f, 1.0f) * 255.0f + 0.5f); u32 bi = (u32)(vclamp(b, 0.0f, 1.0f) * 255.0f + 0.5f); u32 ai = (u32)(vclamp(a, 0.0f, 1.0f) * 255.0f + 0.5f); return (ai << 24) | (bi << 16) | (gi << 8) | ri; }
-INLINE void unpack_rgba8(u32 packed, float* r, float* g, float* b, float* a) { *r = (float)((packed >> 0) & 0xFF) / 255.0f; *g = (float)((packed >> 8) & 0xFF) / 255.0f; *b = (float)((packed >> 16) & 0xFF) / 255.0f; *a = (float)((packed >> 24) & 0xFF) / 255.0f; }
+INLINE u32 pack_rgba8(float r, float g, float b, float a) { return (((u32)(vclamp(a,0,1.f)*255.0f + .5f)) << 24) | (((u32)(vclamp(b,0,1.f)*255.0f + .5f)) << 16) | (((u32)(vclamp(g,0,1.f)*255.0f + .5f)) << 8) | ((u32)(vclamp(r,0,1.f)*255.0f + .5f)); }
+INLINE void unpack_rgba8(u32 p, float* r, float* g, float* b, float* a) { *r = (float)((p >> 0) & 0xFF)/255.0f; *g = (float)((p >> 8) & 0xFF)/255.0f; *b = (float)((p >> 16) & 0xFF)/255.0f; *a = (float)((p >> 24) & 0xFF)/255.0f; }
 INLINE u32 ColorToU32(Color c) { return pack_rgba8(c.r, c.g, c.b, c.a); }
 INLINE void build_color_ramp(Emitter* e, const Color* c, const float* d, int n) {for(int i=0;i<64;++i){float t=(float)i/63.0f; int k=0; while(k<n-1&&d[k+1]<=t){k++;} if (k>=n-1){e->colorRamp[i]=ColorToU32(c[n-1]);}else{float a=(t-d[k])/(d[k+1]-d[k]); Color c0=c[k],c1=c[k+1]; e->colorRamp[i]=pack_rgba8(c0.r+(c1.r-c0.r)*a,c0.g+(c1.g-c0.g)*a,c0.b+(c1.b-c0.b)*a,c0.a+(c1.a-c0.a)*a);}}}
 INLINE void build_curve(float* curve, const float* keys, const float* times, int numKeys) { for (int i=0;i<32;++i){float t=(float)i/31.0f; int k=0; while(k<numKeys-1 && times[k+1]<=t){k++;} if(k>=numKeys-1){curve[i]=keys[numKeys-1];}else{float localT=(t-times[k])/(times[k+1]-times[k]); curve[i]=keys[k]+(keys[k+1]-keys[k])*localT;}} }
@@ -15,13 +12,13 @@ INLINE u32 sample_color_ramp(Emitter* em, float t) { int idx = (int)(t * 63.0f);
 INLINE float sample_curve(const float* curve, float t) { int idx = (int)(t * 31.0f); if (idx < 0) idx = 0; if (idx >= 31) return curve[31]; float localT = t * 31.0f - idx; return curve[idx] + (curve[idx + 1] - curve[idx]) * localT; }
 u16 PSysAdd(const PSysDef* pd) {
     for (u16 i = 0; i < MAX_EMITTERS; i++) {
-        if (psys.emitters[i].active || psys.emitters[i].aliveCount){continue;} Emitter* em = &psys.emitters[i]; u16 fc = 0; while (fc < 16 && pd->textures[fc] != MAX_TXRS) fc++; if (fc == 0) fc = 1; em->active = true; em->position = pd->pos; em->emitAccumulator=em->age=0; em->emitRate = pd->emitRate; em->duration = pd->duration; em->aliveCount = 0;
-        em->maxAlive = 2000; em->physicsMode = (pd->gravity != 0.0f) ? 1 : 0; em->trail = pd->trail; em->trailTexture = (u16)(pd->trailTexture & 0xFFFFu); em->lifetimeMin=pd->lifetimeMin>0.0f ? pd->lifetimeMin : 0.5f; em->lifetimeMax=pd->lifetimeMax>0 ? pd->lifetimeMax : 2.0f; if(em->lifetimeMax <= em->lifetimeMin){em->lifetimeMax=em->lifetimeMin + 0.01f;}
-        em->sizeMin=pd->sizeMin; em->sizeMax = pd->sizeMax; em->speedMin = pd->speedMin; em->speedMax = pd->speedMax; em->rotMin = 0.0f; em->rotMax = 6.2831853f; em->aVelMin=pd->rotCount >= 1 ? pd->rotKeys[0] : -1.0f; em->aVelMax=em->aVelMin; em->gravity=pd->gravity; em->trailLifetime=pd->trailLifetime>0.0f ? pd->trailLifetime : 1.0f; 
-        em->trailColorStart=ColorToU32(pd->trailColorStart); em->trailColorEnd=ColorToU32(pd->trailColorEnd); em->trailWidthStart=pd->trailWidthStart>0.0f ? pd->trailWidthStart : 0.05f; em->trailWidthEnd=(pd->trailWidthEnd>0) ? pd->trailWidthEnd : em->trailWidthStart; em->texBaseIdx=pd->textures[0]; em->textureFrameCount = fc; em->animSpeed = 10.0f;
-        em->animWindow=pd->animWindow>0.0f ? pd->animWindow : 1.0f; em->softness=pd->softness>0.0f ? pd->softness : 1.0f; for(int c=0;c<32;++c){em->scaleCurve[c]=1.0f; em->velocityCurve[c]=1.0f; em->rotationCurve[c]=0; em->emissionCurve[c] = 1.0f; }
+        if (psys.emitters[i].active || psys.emitters[i].aliveCount){continue;} Emitter* em=&psys.emitters[i]; u16 fc=0; while(fc<16 && pd->textures[fc]!=MAX_TXRS){fc++;} if(fc == 0){fc=1;} em->active=true; em->position = pd->pos; em->emitAccumulator=em->age=0; em->emitRate = pd->emitRate; em->duration = pd->duration; em->aliveCount = 0;
+        em->maxAlive=2000; em->physicsMode=(pd->gravity != 0) ? 1 : 0; em->trail=pd->trail; em->trailTexture = (u16)(pd->trailTexture & 0xFFFFu); em->lifetimeMin=pd->lifetimeMin>0.0f ? pd->lifetimeMin : 0.5f; em->lifetimeMax=pd->lifetimeMax>0 ? pd->lifetimeMax : 2.0f; if(em->lifetimeMax <= em->lifetimeMin){em->lifetimeMax=em->lifetimeMin + 0.01f;}
+        em->sizeMin=pd->sizeMin; em->sizeMax=pd->sizeMax; em->speedMin = pd->speedMin; em->speedMax = pd->speedMax; em->rotMin=0; em->rotMax = 6.2831853f; em->aVelMin=pd->rotCount >= 1 ? pd->rotKeys[0] : -1.0f; em->aVelMax=em->aVelMin; em->gravity=pd->gravity; em->trailLifetime=pd->trailLifetime>0.0f ? pd->trailLifetime : 1.0f; 
+        em->trailColorStart=ColorToU32(pd->trailColorStart); em->trailColorEnd=ColorToU32(pd->trailColorEnd); em->trailWidthStart=pd->trailWidthStart>0 ? pd->trailWidthStart : 0.05f; em->trailWidthEnd=(pd->trailWidthEnd>0) ? pd->trailWidthEnd : em->trailWidthStart; em->texBaseIdx=pd->textures[0]; em->textureFrameCount = fc; em->animSpeed = 10.0f;
+        em->animWindow=pd->animWindow>0 ? pd->animWindow : 1.0f; em->softness=pd->softness>0 ? pd->softness : 1.0f; for(int c=0;c<32;++c){em->scaleCurve[c]=1.0f; em->velocityCurve[c]=1.0f; em->rotationCurve[c]=0; em->emissionCurve[c] = 1.0f; }
         if(pd->rampCount >= 2){build_color_ramp(em,pd->rampColors,pd->rampTimes,pd->rampCount);}else{Color cc[2]={pd->colorStart,pd->colorEnd}; float tt[2]={0,1.0f}; build_color_ramp(em,cc,tt,2);} if(pd->scaleCount >= 2){build_curve(em->scaleCurve,pd->scaleKeys,pd->scaleTimes,pd->scaleCount);}
-        if(pd->velCount >= 2){build_curve(em->velocityCurve,pd->velKeys,pd->velTimes,pd->velCount);} if(pd->rotCount >= 2){build_curve(em->rotationCurve,pd->rotKeys,pd->rotTimes,pd->rotCount);} if(pd->emissCount >= 2){build_curve(em->emissionCurve,pd->emissKeys,pd->emissTimes,pd->emissCount);} em->rngState=globalframe*1234567 + i*98765 + 1; return i;
+        if(pd->velCount >= 2){build_curve(em->velocityCurve,pd->velKeys,pd->velTimes,pd->velCount);} if(pd->rotCount >= 2){build_curve(em->rotationCurve,pd->rotKeys,pd->rotTimes,pd->rotCount);} if(pd->emissCount >= 2){build_curve(em->emissionCurve,pd->emissKeys,pd->emissTimes,pd->emissCount);} return i;
     } return U16_MAX;
 }
 
@@ -30,12 +27,10 @@ void PSys_UpdateEmitters(float dt) {
         Emitter* em = &psys.emitters[i]; if(!em->active){continue;} em->age+=dt; if(em->duration > 0.0f&& em->age>=em->duration){em->active=false; continue;}
         float rate = em->emitRate; if (em->duration > 0.0f && em->duration < 1e6f){rate*=sample_curve(em->emissionCurve,em->age/em->duration);} em->emitAccumulator+=rate*dt; int count=(int)em->emitAccumulator; em->emitAccumulator-=(float)count; 
         for (int p = 0; p < count; p++) {
-            if ((psys.aliveCount >= MAX_PARTICLES) || (em->aliveCount >= em->maxAlive)){break;} Particle* part = &psys.particles[psys.aliveCount]; float angle = randf_range(&em->rngState,0.0f,6.2831853f), speed = randf_range(&em->rngState,em->speedMin,em->speedMax);
-            part->pos = em->position; part->vel.x=vcosf(angle)*speed; part->vel.y=randf_range(&em->rngState,-0.5f,0.5f)*speed; part->vel.z=vsinf(angle)*speed; part->age=0.0f; part->invLifetime=1.0f/randf_range(&em->rngState,em->lifetimeMin,em->lifetimeMax); part->baseSize=randf_range(&em->rngState,em->sizeMin,em->sizeMax); part->rotation=randf_range(&em->rngState,em->rotMin,em->rotMax);
-            part->angularVelocity = randf_range(&em->rngState, em->aVelMin, em->aVelMax); part->color = sample_color_ramp(em,0.0f); part->emitterIndex = i; part->flags=0; part->blendMode=particleBlendTexture[em->texBaseIdx];
-            if (part->blendMode == 1) { part->flags |= PARTICLE_FLAG_ADDITIVE; } else if (part->blendMode == 2) { part->flags |= PARTICLE_FLAG_MULTIPLY; }
-            if (em->softness > 0.0f) { part->flags |= PARTICLE_FLAG_SOFT; }
-            part->textureIndex = em->texBaseIdx; part->animFrame = 0; part->seed = xs32(&em->rngState); part->trailSample = em->position; part->trailBirth = (float)World.pauseRelativeTime; psys.aliveCount++; em->aliveCount++;
+            if ((psys.aliveCount >= MAX_PARTICLES) || (em->aliveCount >= em->maxAlive)){break;} Particle* part = &psys.particles[psys.aliveCount]; float angle = random_range(0.0f,6.2831853f), speed = random_range(em->speedMin,em->speedMax);
+            part->pos=em->position; part->vel.x=vcosf(angle)*speed; part->vel.y=random_range(-0.5f,0.5f)*speed; part->vel.z=vsinf(angle)*speed; part->age=0.0f; part->invLifetime=1.0f/random_range(em->lifetimeMin,em->lifetimeMax); part->baseSize=random_range(em->sizeMin,em->sizeMax); part->rotation=random_range(em->rotMin,em->rotMax);
+            part->angularVelocity = random_range(em->aVelMin,em->aVelMax); part->color = sample_color_ramp(em,0.0f); part->emitterIndex = i; part->flags=0; part->blendMode=particleBlendTexture[em->texBaseIdx]; if (part->blendMode == 1) { part->flags |= PARTICLE_FLAG_ADDITIVE; } else if (part->blendMode == 2) { part->flags |= PARTICLE_FLAG_MULTIPLY; } 
+            if (em->softness > 0.0f) { part->flags |= PARTICLE_FLAG_SOFT; } part->textureIndex=em->texBaseIdx; part->animFrame=0; part->trailSample=em->position; part->trailBirth=(float)World.pauseRelativeTime; psys.aliveCount++; em->aliveCount++;
         }
     }
 }

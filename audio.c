@@ -658,7 +658,6 @@ static float reverb_tick(float in) { // Process one sample through the reverb ne
 #define MAX_SYNTH_VOICES 16
 static SynthVoice syn_ch[MAX_SYNTH_VOICES];
 static SynthVoice* SynAlloc(void) { for (u32 i = 0; i < MAX_SYNTH_VOICES; i++){ if (!syn_ch[i].active){return &syn_ch[i];} } return NULL; }
-static float SynRandBi(void) { return (float)rand()/(float)RAND_MAX*2.0f-1.0f; }
 static void synth_mix(SynthVoice* v, float* mix) {
     float vol=v->vol*(Sys_Settings.VolumeMaster/100.0f)*(Sys_Settings.VolumeEffects/100.0f); if(v->positional){float d=V3_Dist(v->pos,World.position[PLAYER1]); vol*=(d >= 64.0f) ? 0.0f : (d <= 1.0f) ? 1.0f : 1.0f-(d-1.0f)/63.0f;} for(i32 f=0;f<AUDIO_FRAMES;f++){if(v->frame >= v->frames){v->active=false; return;} float s=v->fn(v)*vol; mix[f*2+0]+=s; mix[f*2+1]+=s; v->frame++;}
 }
@@ -670,15 +669,15 @@ static float BP(float *s1,float *s2,float in,float rc){ float a=LP(s1,in,rc); re
 static float Phasor(float *ph, float freq){ *ph += freq/AUDIO_RATE; if(*ph>=1.0f) *ph-=1.0f; return *ph; }
 static float Osc(float *ph, float freq){ return vsinf(6.28318f*Phasor(ph,freq)); }
 static float FMOsc(float *c,float *m,float fc,float fm,float idx) { return vsinf(6.28318f*(Phasor(c,fc)+Osc(m,fm)*idx)); }
-static float GenLaserSS1(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[3]*t); float fc=v->p[0]*v->pitch*(1.0f + v->p[1]*t); float idx=4.0f*vexp(-35.0f*t); float tone=FMOsc(&v->s[0],&v->s[1],fc,v->p[2]*fc, idx); float click = (t < 0.012f) ? LP(&v->s[2], SynRandBi(), 0.4f)*(1.0f - t/0.012f)*0.4f : 0.0f; return (tone + click) * env; } // p[0]=base_freq  p[1]=sweep_rate  p[2]=fm_rate_ratio  p[3]=decay
-static float GenDoor(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float dur = (float)v->frames / AUDIO_RATE; float thud=vsinf(6.28318f * v->p[0]*v->pitch * t) * vexp(-8.0f*t) * 1.5f; float rc   = 0.08f + 0.05f*vsinf(6.28318f*3.0f*t); float hiss = BP(&v->s[0], &v->s[1], SynRandBi(), rc) * 0.6f; return thud + hiss * vsinf(3.14159265f*(t/dur)); } // p[0]=pitch
-static float GenImpact(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[1]*t); if (v->frame%4==0) v->s[2] = SynRandBi(); float noise = LP(&v->s[0], v->s[2], 0.3f); float ring  = vsinf(6.28318f * v->p[0]*v->pitch * t) * env; return noise*env*v->p[2] + ring*v->p[3]; } // p[0]=ring_freq  p[1]=decay  p[2]=noise_amt  p[3]=ring_amt
-static float GenBoom(SynthVoice* v){float env=vexp(-v->p[1]*(float)v->frame/AUDIO_RATE); return Osc(&v->s[0], v->p[0]*v->pitch)*env*0.7f + LP(&v->s[1],SynRandBi(),0.15f)*env*0.8f; } // p[0]=rumble_freq  p[1]=decay
-static float GenHiss(SynthVoice* v){return HP(&v->s[0], SynRandBi(), v->p[0]); }
-static float GenPipe(SynthVoice* v){return BP(&v->s[0], &v->s[1], SynRandBi(), v->p[0]) * 2.0f; }
+static float GenLaserSS1(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[3]*t); float fc=v->p[0]*v->pitch*(1.0f + v->p[1]*t); float idx=4.0f*vexp(-35.0f*t); float tone=FMOsc(&v->s[0],&v->s[1],fc,v->p[2]*fc, idx); float click = (t < 0.012f) ? LP(&v->s[2], random_range(-1.0f,1.0f), 0.4f)*(1.0f - t/0.012f)*0.4f : 0.0f; return (tone + click) * env; } // p[0]=base_freq  p[1]=sweep_rate  p[2]=fm_rate_ratio  p[3]=decay
+static float GenDoor(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float dur = (float)v->frames / AUDIO_RATE; float thud=vsinf(6.28318f * v->p[0]*v->pitch * t) * vexp(-8.0f*t) * 1.5f; float rc   = 0.08f + 0.05f*vsinf(6.28318f*3.0f*t); float hiss = BP(&v->s[0], &v->s[1], random_range(-1.0f,1.0f), rc) * 0.6f; return thud + hiss * vsinf(3.14159265f*(t/dur)); } // p[0]=pitch
+static float GenImpact(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[1]*t); if (v->frame%4==0) v->s[2] = random_range(-1.0f,1.0f); float noise = LP(&v->s[0], v->s[2], 0.3f); float ring  = vsinf(6.28318f * v->p[0]*v->pitch * t) * env; return noise*env*v->p[2] + ring*v->p[3]; } // p[0]=ring_freq  p[1]=decay  p[2]=noise_amt  p[3]=ring_amt
+static float GenBoom(SynthVoice* v){float env=vexp(-v->p[1]*(float)v->frame/AUDIO_RATE); return Osc(&v->s[0], v->p[0]*v->pitch)*env*0.7f + LP(&v->s[1],random_range(-1.0f,1.0f),0.15f)*env*0.8f; } // p[0]=rumble_freq  p[1]=decay
+static float GenHiss(SynthVoice* v){return HP(&v->s[0], random_range(-1.0f,1.0f), v->p[0]); }
+static float GenPipe(SynthVoice* v){return BP(&v->s[0], &v->s[1], random_range(-1.0f,1.0f), v->p[0]) * 2.0f; }
 static float GenShieldHit(SynthVoice* v) { float t      = (float)v->frame / AUDIO_RATE; float wobble = vsinf(6.28318f*12.0f*t)*60.0f; return Osc(&v->s[0], v->p[0]*v->pitch + wobble) * vexp(-v->p[1]*t); } // p[0]=freq  p[1]=decay
 static float GenFootstep(SynthVoice* v) {
-    float t=(float)v->frame / AUDIO_RATE, dur=(float)v->frames / AUDIO_RATE, raw = SynRandBi();
+    float t=(float)v->frame / AUDIO_RATE, dur=(float)v->frames / AUDIO_RATE, raw = random_range(-1.0f,1.0f);
     v->s[0] += 0.12f*(raw*raw*raw*0.35f - v->s[0]); v->s[1] += 0.12f*(v->s[0] - v->s[1]);
     if (v->s[5] <= 0.0f) { if ((rand()%100)<35) { v->s[5]=AUDIO_RATE*random_range(0.006f,0.018f); v->s[6]=random_range(0.4f,1.2f); } else {v->s[6] = 0.0f;} } else {v->s[5] -= 1.0f;}
     float rc = (0.22f - 0.08f*(t/dur)) * v->pitch; v->s[2] += rc*(raw*v->s[6] - v->s[2]); v->s[3] += rc*(v->s[2] - v->s[3]); float thump = (t < 0.07f) ? raw*vsinf(3.14159265f*(t/0.07f))*0.8f : 0.0f; v->s[4] += 0.025f*(thump - v->s[4]);
@@ -686,23 +685,23 @@ static float GenFootstep(SynthVoice* v) {
 }
 
 static float GenSandFootstep(SynthVoice* v) {
-    float t=(float)v->frame / AUDIO_RATE; float env=vexp(-25.0f*t); float noise = 0.0f; if (v->frame%12==0) { float raw = SynRandBi(); noise = (raw>0.0f?1.0f:-1.0f)*(raw*raw); if (t<0.05f && (rand()%100)>85) noise += SynRandBi()*0.75f; } v->s[0] += 0.25f*(noise - v->s[0]); v->s[1] += 0.25f*(v->s[0] - v->s[1]); return (v->s[0]-v->s[1])*env*2.0f; 
+    float t=(float)v->frame / AUDIO_RATE; float env=vexp(-25.0f*t); float noise = 0.0f; if (v->frame%12==0) { float raw = random_range(-1.0f,1.0f); noise = (raw>0.0f?1.0f:-1.0f)*(raw*raw); if (t<0.05f && (rand()%100)>85) noise += random_range(-1.0f,1.0f)*0.75f; } v->s[0] += 0.25f*(noise - v->s[0]); v->s[1] += 0.25f*(v->s[0] - v->s[1]); return (v->s[0]-v->s[1])*env*2.0f; 
 }
 
 static float GenTapCase(SynthVoice* v) {
-    float t=(float)v->frame / AUDIO_RATE; float dur=(float)v->frames / AUDIO_RATE; if (v->frame%12==0) { float raw = SynRandBi(); v->s[3] = (raw>0.0f?1.0f:-1.0f)*(raw*raw); if (t<0.06f && (rand()%100)>75) v->s[3] += SynRandBi()*0.75f; } if (v->frame%4==0) v->s[4] = SynRandBi();
+    float t=(float)v->frame / AUDIO_RATE; float dur=(float)v->frames / AUDIO_RATE; if (v->frame%12==0) { float raw = random_range(-1.0f,1.0f); v->s[3] = (raw>0.0f?1.0f:-1.0f)*(raw*raw); if (t<0.06f && (rand()%100)>75) v->s[3] += random_range(-1.0f,1.0f)*0.75f; } if (v->frame%4==0) v->s[4] = random_range(-1.0f,1.0f);
     float rc=(0.35f-0.15f*(t/dur)) * v->pitch; v->s[0] += rc*(v->s[3]-v->s[0]); v->s[1] += rc*(v->s[0]-v->s[1]); v->s[2] += 0.04f*(v->s[4]-v->s[2]); return (v->s[0]-v->s[1])*vexp(-22.0f*t) + v->s[2]*vexp(-14.0f*t)*1.8f;
 }
 
-static float GenPlasticTap(SynthVoice* v) { float t=(float)v->frame / AUDIO_RATE; float tr = SynRandBi() * vexp(-600.0f*t) * 0.5f; float f1 = 800.0f*v->pitch, f2 = 1100.0f*v->pitch; float bd = (vsinf(6.28318f*f1*t)*0.6f + vsinf(6.28318f*f2*t)*0.4f)*vexp(-45.0f*t)*0.4f; return tr + bd; }
+static float GenPlasticTap(SynthVoice* v) { float t=(float)v->frame / AUDIO_RATE; float tr = random_range(-1.0f,1.0f) * vexp(-600.0f*t) * 0.5f; float f1 = 800.0f*v->pitch, f2 = 1100.0f*v->pitch; float bd = (vsinf(6.28318f*f1*t)*0.6f + vsinf(6.28318f*f2*t)*0.4f)*vexp(-45.0f*t)*0.4f; return tr + bd; }
 static float GenSparkSmall(SynthVoice* v) {
     float t=(float)v->frame / AUDIO_RATE; float dur=(float)v->frames / AUDIO_RATE; float env = vexp(-14.0f*t); if (v->s[3]<=0.0f) { if ((rand()%100)<22) { v->s[3]=AUDIO_RATE*random_range(0.004f,0.012f); v->s[4]=1.0f; v->s[5]=0.93f-0.15f*(t/dur); } else v->s[4] = 0.0f; } else { v->s[3]-=1.0f; v->s[4]*=v->s[5]; }
-    float active = (v->s[4]>0.01f) ? SynRandBi()*v->s[4] : 0.0f; v->s[1] += 0.28f*(active-v->s[1]); v->s[2] += 0.28f*(v->s[1]-v->s[2]); float thump = (t<0.08f) ? SynRandBi()*vsinf(3.14159265f*(t/0.08f)) : 0.0f; v->s[0] += 0.02f*(thump-v->s[0]); return ((v->s[1]-v->s[2])*3.5f + v->s[0]*1.2f)*env;
+    float active = (v->s[4]>0.01f) ? random_range(-1.0f,1.0f)*v->s[4] : 0.0f; v->s[1] += 0.28f*(active-v->s[1]); v->s[2] += 0.28f*(v->s[1]-v->s[2]); float thump = (t<0.08f) ? random_range(-1.0f,1.0f)*vsinf(3.14159265f*(t/0.08f)) : 0.0f; v->s[0] += 0.02f*(thump-v->s[0]); return ((v->s[1]-v->s[2])*3.5f + v->s[0]*1.2f)*env;
 }
 
 static float GenCrackle(SynthVoice* v) {
     float env = vexp(-v->p[1]*(float)v->frame/AUDIO_RATE); if (v->s[3]<=0.0f) { if ((i32)(rand()%100)<(i32)v->p[2]) { v->s[3]=AUDIO_RATE*random_range(0.004f,0.012f); v->s[4]=1.0f; v->s[5]=0.93f; } else v->s[4] = 0.0f; } else { v->s[3]-=1.0f; v->s[4]*=v->s[5]; }
-    float active = (v->s[4]>0.01f) ? SynRandBi()*v->s[4] : 0.0f; v->s[1] += v->p[0]*(active-v->s[1]); v->s[2] += v->p[0]*(v->s[1]-v->s[2]); return (v->s[1]-v->s[2])*3.5f*env;
+    float active = (v->s[4]>0.01f) ? random_range(-1.0f,1.0f)*v->s[4] : 0.0f; v->s[1] += v->p[0]*(active-v->s[1]); v->s[2] += v->p[0]*(v->s[1]-v->s[2]); return (v->s[1]-v->s[2])*3.5f*env;
 } // p[0]=rc  p[1]=decay  p[2]=burst_chance
 
 static float GenSine(SynthVoice* v) { return vsinf(6.28318f * v->p[0]*v->pitch * (float)v->frame/AUDIO_RATE); }
@@ -710,13 +709,13 @@ static float GenClink(SynthVoice* v) { float t = (float)v->frame / AUDIO_RATE; r
 // Multi-partial ring for struck glass/metal objects.  Models the inharmonic overtone series of a real resonant body.  Each partial has its own amplitude weight and decay rate — high partials die fast (shimmer), fundamental sustains (body).
 static float GenRing(SynthVoice* v) { // p[0]=fundamental_freq  p[1]=base_decay  p[2]=partial_spread  p[3]=noise_attack.  Partial ratios below approximate a cylindrical glass vessel.  s[0..3] = phasor state for 4 partials (no extra filter state needed)
     float t=(float)v->frame / AUDIO_RATE; float f0=v->p[0] * v->pitch; float dec=v->p[1]; float sprd=v->p[2];/*how much faster upper partials decay vs fundamental*/ static const float ratios[4]={1.0f,2.76f,5.41f,8.93f},amps[4]={1.0f,0.35f,0.15f,0.06f}; /*Inharmonic partial ratios for glass, ratios approximate a cylindrical glass vessel.*/
-    float out=0.0f; for (u32 i = 0; i < 4; i++) { float decay_i=dec*(1.0f + i*sprd);/*upper partials decay faster*/ float env_i=vexp(-decay_i*t); out+=Osc(&v->s[i],f0*ratios[i])*amps[i]*env_i; } /*s[0..3] hold phasor state for each partial; s[4] is LP filter for click*/ return out + ((t < v->p[3]) ? LP(&v->s[4], SynRandBi(), 0.35f) * (1.0f - t/v->p[3]) * 0.3f : 0.0f);
+    float out=0.0f; for (u32 i = 0; i < 4; i++) { float decay_i=dec*(1.0f + i*sprd);/*upper partials decay faster*/ float env_i=vexp(-decay_i*t); out+=Osc(&v->s[i],f0*ratios[i])*amps[i]*env_i; } /*s[0..3] hold phasor state for each partial; s[4] is LP filter for click*/ return out + ((t < v->p[3]) ? LP(&v->s[4], random_range(-1.0f,1.0f), 0.35f) * (1.0f - t/v->p[3]) * 0.3f : 0.0f);
 }
 
 // Glass-on-plastic floor thud.  Contact transient (noise burst through BP for the floor body) + damped glass ring (GenRing logic inline, shortened decay from contact damping).  p[0]=glass_freq  p[1]=ring_decay  p[2]=floor_resonance_rc  p[3]=noise_attack
 static float GenBeakerThud(SynthVoice* v) {
     float t=(float)v->frame / AUDIO_RATE; float f0=v->p[0]*v->pitch; static const float ratios[4]={1.0f,2.76f,5.41f,8.93f}, amps[4]={0.7f,0.25f,0.08f,0.03f}; float glass = 0.0f; for (u32 i = 0; i < 4; i++) { float decay_i = v->p[1] * (1.0f + i * 1.8f); glass += Osc((float*)&v->s[i], f0 * ratios[i]) * amps[i] * vexp(-decay_i * t); }
-    if (v->frame%4==0){v->s[4] = SynRandBi();} float floor_body = BP(&v->s[5], &v->s[6], v->s[4], v->p[2]) * vexp(-30.0f*t) * 1.4f; /*Floor body: noise burst filtered through BP at plastic panel resonance.  The floor resonates at ~200-400Hz for thin plastic panels.*/ return glass + floor_body + ((t < v->p[3]) ? LP(&v->s[7], SynRandBi(), 0.4f)*(1.0f - t/v->p[3])*0.5f : 0.0f);
+    if (v->frame%4==0){v->s[4] = random_range(-1.0f,1.0f);} float floor_body = BP(&v->s[5], &v->s[6], v->s[4], v->p[2]) * vexp(-30.0f*t) * 1.4f; /*Floor body: noise burst filtered through BP at plastic panel resonance.  The floor resonates at ~200-400Hz for thin plastic panels.*/ return glass + floor_body + ((t < v->p[3]) ? LP(&v->s[7], random_range(-1.0f,1.0f), 0.4f)*(1.0f - t/v->p[3])*0.5f : 0.0f);
 }
 
 typedef struct { SynthFn fn; float dur, vol; float p[4]; } SynthPreset;
