@@ -68,8 +68,7 @@ INLINE Overlap SphSph(V3 a, float ar, V3 b, float br) { V3 dt=V3_AsubB(a,b); flo
 INLINE Overlap SphCap(ShapeSphere s, ShapeCapsule c) { V3 seg=V3_AsubB(c.tip,c.base); float l=V3_dot(seg,seg); float m=(l < PHY_EPSILON); V3 b=V3_AplusB(c.base, V3_ScaleByF(seg,vclamp(V3_dot(V3_AsubB(s.ctr, c.base),seg) / vmax(l, PHY_EPSILON), 0.0f, 1.0f) * (1.0f - m))); b = V3_AplusB(V3_ScaleByF(b,1.0f - m),V3_ScaleByF(c.base,m)); return SphSph(s.ctr,s.rad,b,c.rad); }
 INLINE Overlap CapCap(ShapeCapsule a, ShapeCapsule b) {
     Overlap r={0}; float sc,tc,distSq, radSum=a.rad + b.rad; V3 d1 = V3_AsubB(a.tip,a.base), d2=V3_AsubB(b.tip,b.base), vr=V3_AsubB(a.base,b.base); float qa=V3_dot(d1,d1), e=V3_dot(d2,d2), f=V3_dot(d2,vr);
-    if(qa < PHY_EPSILON && e < PHY_EPSILON){sc=tc=0.0f;}
-    else if(qa < PHY_EPSILON){sc=0.0f; tc=vclamp(f/e,0.0f,1.0f);}
+    if(qa < PHY_EPSILON && e < PHY_EPSILON){sc=tc=0.0f;} else if(qa < PHY_EPSILON){sc=0.0f; tc=vclamp(f/e,0.0f,1.0f);}
     else { float c=V3_dot(d1,vr); if(e < PHY_EPSILON){tc=0.0f; sc=vclamp(-c/qa,0.0f,1.0f);} else { float qb=V3_dot(d1,d2),denom=qa*e - qb*qb; sc=(denom > PHY_EPSILON) ? vclamp((qb*f - c*e)/denom,0.0f,1.0f) : 0.0f; tc=(qb*sc + f)/e; if(tc < 0.0f){tc=0.0f; sc=vclamp(-c/qa,0.0f,1.0f);}else if(tc > 1.0f){tc=1.0f; sc=vclamp((qb-c)/qa,0.0f,1.0f);} } }
     V3 ptA=V3_AplusB(a.base,V3_ScaleByF(d1,sc)), ptB=V3_AplusB(b.base,V3_ScaleByF(d2,tc)), diff=V3_AsubB(ptA,ptB); distSq=V3_dot(diff,diff); if(distSq >= radSum * radSum) return r;
     float dist=vsqrtf(vmax(distSq,0.0f)); r.pen=radSum - dist; r.hit=true; r.normal=(dist < PHY_EPSILON) ? (V3){0,1,0} : V3_ScaleByF(diff,1.0f/dist); r.point = V3_AplusB(ptB,V3_ScaleByF(r.normal,b.rad)); return r;
@@ -77,8 +76,7 @@ INLINE Overlap CapCap(ShapeCapsule a, ShapeCapsule b) {
 
 INLINE Overlap SphBoxAxes(V3 ctr, float rad, V3 boxCtr, V3 ax, V3 ay, V3 az, V3 hExt) {
     Overlap r={0}; V3 d = V3_AsubB(ctr,boxCtr); float lx = V3_dot(d,ax), ly = V3_dot(d,ay), lz = V3_dot(d,az); V3 localClosest = V3_AplusB(V3_AplusB(V3_ScaleByF(ax,vclamp(lx,-hExt.x,hExt.x)), V3_ScaleByF(ay,vclamp(ly,-hExt.y,hExt.y))), V3_ScaleByF(az,vclamp(lz,-hExt.z,hExt.z))); V3 delta = V3_AsubB(d,localClosest);
-    float distSq = V3_dot(delta,delta); if (distSq >= rad * rad) return r;
-    r.hit = true; float dist = vsqrtf(vmax(distSq, 0.0f));
+    float distSq = V3_dot(delta,delta); if (distSq >= rad * rad) return r; r.hit = true; float dist = vsqrtf(vmax(distSq, 0.0f));
     if (dist > PHY_EPSILON) { r.normal = V3_ScaleByF(delta, 1.0f/dist); r.pen=rad - dist; } else { float mind=hExt.x - vabs(lx), dy=hExt.y - vabs(ly), dz=hExt.z - vabs(lz); V3 nAx = V3_ScaleByF(ax,lx > 0.0f ? 1.0f : -1.0f); if(dy < mind){mind=dy; nAx = V3_ScaleByF(ay, ly > 0.0f ? 1.0f : -1.0f);} if(dz < mind){mind=dz; nAx = V3_ScaleByF(az, lz > 0.0f ? 1.0f : -1.0f);} r.normal = nAx; r.pen = rad + mind; }
     r.point = V3_AsubB(ctr, V3_ScaleByF(r.normal, rad - r.pen)); return r;
 }
@@ -101,10 +99,9 @@ static const u32 CollisionMaskTable[32] = {
 
 u32 GetCollisionMask(u32 layer) { u32 ctz = __builtin_ctz(layer | 1); u32 valid = (ctz < 32); return ((layer == L_NPCTrigger) | (layer == L_NPCClip)) ? L_NPC : (CollisionMaskTable[ctz * valid] * valid); }
 ShapeCapsule Entity_GetCap(u16 i) {
-    float scaleMax = vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));
-    float r = World.colliderSize[i].x * scaleMax; float hi = vmax(0.0f, (World.colliderSize[i].y * 0.5f * scaleMax) - r); V3 wc,axis;
-    if (i == PLAYER1 || World.layer[i] == L_NPC) { wc = V3_AplusB(World.position[i], World.colliderCenter[i]); axis = (V3){0.0f,1.0f,0.0f};/*Player+NPC remain strictly upright*/ }
-    else { wc = V3_AplusB(World.position[i], quat_rot_v3(World.rotation[i], World.colliderCenter[i])); axis = (World.colliderSize[i].z < 0.5f) ? quat_rot_v3(World.rotation[i], (V3){1,0,0}) : (World.colliderSize[i].z < 1.5f) ? quat_rot_v3(World.rotation[i], (V3){0,1,0}) : quat_rot_v3(World.rotation[i], (V3){0,0,1}); }
+    float scaleMax = vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z)); float r = World.colliderSize[i].x * scaleMax; float hi = vmax(0.0f, (World.colliderSize[i].y * 0.5f * scaleMax) - r); V3 wc,axis;
+    if (i == PLAYER1 || World.layer[i] == L_NPC) { wc = V3_AplusB(World.position[i], World.colliderCenter[i]); axis = (V3){0.0f,1.0f,0.0f};/*Player+NPC remain strictly upright*/ } 
+    else { wc = V3_AplusB(World.position[i], quat_rot_v3(World.rotation[i], World.colliderCenter[i])); axis = (World.colliderSize[i].z < 0.5f) ? quat_rot_v3(World.rotation[i], (V3){1,0,0}) : (World.colliderSize[i].z < 1.5f) ? quat_rot_v3(World.rotation[i], (V3){0,1,0}) : quat_rot_v3(World.rotation[i], (V3){0,0,1}); } 
     return (ShapeCapsule){.tip=V3_AplusB(wc,V3_ScaleByF(axis,hi)),.base=V3_AsubB(wc,V3_ScaleByF(axis,hi)),.rad=r};
 }
 
@@ -142,23 +139,18 @@ void ComputeConvexMeshInertiaTensor(u16 i) {
 }
 
 INLINE Manifold BoxBox(ShapeBox a, ShapeBox b) {
-    Manifold m={0}; V3 aAxes[3], bAxes[3]; aAxes[0]=quat_rot_v3(a.rot,(V3){1,0,0}); aAxes[1]=quat_rot_v3(a.rot,(V3){0,1,0}); aAxes[2]=quat_rot_v3(a.rot,(V3){0,0,1});
-    bAxes[0]=quat_rot_v3(b.rot,(V3){1,0,0}); bAxes[1]=quat_rot_v3(b.rot,(V3){0,1,0}); bAxes[2]=quat_rot_v3(b.rot,(V3){0,0,1});
-    float aExt[3] = { a.hExt.x, a.hExt.y, a.hExt.z }; float bExt[3] = { b.hExt.x, b.hExt.y, b.hExt.z }; V3 T = V3_AsubB(b.ctr,a.ctr); float R[3][3],AbsR[3][3];
-    for (int i=0;i<3;i++) for (int j=0;j<3;j++) { R[i][j]=V3_dot(aAxes[i],bAxes[j]); AbsR[i][j]=vabs(R[i][j])+1e-6f; }
-    float minOverlap=1e9f; int bestAxis=-1; bool flipNormal=false;
+    Manifold m={0}; V3 aAxes[3], bAxes[3]; aAxes[0]=quat_rot_v3(a.rot,(V3){1,0,0}); aAxes[1]=quat_rot_v3(a.rot,(V3){0,1,0}); aAxes[2]=quat_rot_v3(a.rot,(V3){0,0,1}); bAxes[0]=quat_rot_v3(b.rot,(V3){1,0,0}); bAxes[1]=quat_rot_v3(b.rot,(V3){0,1,0}); bAxes[2]=quat_rot_v3(b.rot,(V3){0,0,1}); float aExt[3]={a.hExt.x,a.hExt.y,a.hExt.z}; float bExt[3]={b.hExt.x,b.hExt.y,b.hExt.z};
+    V3 T = V3_AsubB(b.ctr,a.ctr); float R[3][3],AbsR[3][3]; for (int i=0;i<3;i++) for (int j=0;j<3;j++) { R[i][j]=V3_dot(aAxes[i],bAxes[j]); AbsR[i][j]=vabs(R[i][j])+1e-6f; } float minOverlap=1e9f; int bestAxis=-1; bool flipNormal=false;
     for (int i=0;i<3;i++) { float ra=aExt[i], rb=bExt[0]*AbsR[i][0]+bExt[1]*AbsR[i][1]+bExt[2]*AbsR[i][2]; float t=vabs(V3_dot(T,aAxes[i])); if(t>ra+rb) return m; float ov=(ra+rb)-t; if(ov<minOverlap-MANIFOLD_TIE_MARGIN){minOverlap=ov; bestAxis=i; flipNormal=(V3_dot(T,aAxes[i])<0.f);} }
     for (int i=0;i<3;i++) { float ra=aExt[0]*AbsR[0][i]+aExt[1]*AbsR[1][i]+aExt[2]*AbsR[2][i], rb=bExt[i]; float t=vabs(V3_dot(T,bAxes[i])); if(t>ra+rb) return m; float ov=(ra+rb)-t; if(ov<minOverlap-MANIFOLD_TIE_MARGIN){minOverlap=ov; bestAxis=3+i; flipNormal=(V3_dot(T,bAxes[i])<0.f);} }
     for (int i=0;i<3;i++) for (int j=0;j<3;j++) {
         int i1=(i+1)%3, i2=(i+2)%3, j1=(j+1)%3, j2=(j+2)%3; float t=vabs(V3_dot(T,aAxes[i2])*R[i1][j] - V3_dot(T,aAxes[i1])*R[i2][j]); float ra=aExt[i1]*AbsR[i2][j]+aExt[i2]*AbsR[i1][j]; float rb=bExt[j1]*AbsR[i][j2]+bExt[j2]*AbsR[i][j1]; if(t>ra+rb) return m;
         float axLenSq=1.f-(R[i][j]*R[i][j]); if (axLenSq>1e-4f) { float ov=((ra+rb)-t)/vsqrtf(axLenSq); if (ov < minOverlap-MANIFOLD_TIE_MARGIN) { V3 ea=V3_Cross(aAxes[i],bAxes[j]); minOverlap=ov; bestAxis=6+i*3+j; flipNormal=(V3_dot(T,ea)<0.f); } }
     }
-    if (bestAxis < 0) return m;
-    m.maxPen=minOverlap; V3 normal;
+    if (bestAxis < 0){return m;} m.maxPen=minOverlap; V3 normal;
     if (bestAxis >= 6) { // Fallback for edge-edge collisions
-        int i=(bestAxis - 6) / 3, j=(bestAxis - 6) % 3; V3 ea=V3_Cross(aAxes[i],bAxes[j]); normal = flipNormal ? V3_Normalize(ea) : V3_ScaleByF(V3_Normalize(ea),-1.f); m.normal = normal; m.n = 1; V3 sA=a.ctr;
-        sA=V3_AplusB(sA,V3_ScaleByF(aAxes[0],(V3_dot(aAxes[0],normal)<0.f?1.f:-1.f)*a.hExt.x)); sA=V3_AplusB(sA,V3_ScaleByF(aAxes[1],(V3_dot(aAxes[1],normal)<0.f?1.f:-1.f)*a.hExt.y)); sA=V3_AplusB(sA,V3_ScaleByF(aAxes[2],(V3_dot(aAxes[2],normal)<0.f?1.f:-1.f)*a.hExt.z));
-        m.p[0].point = V3_AplusB(sA,V3_ScaleByF(normal,minOverlap*0.5f)); m.p[0].pen = minOverlap; m.maxPen = minOverlap; return m;
+        int i=(bestAxis - 6) / 3, j=(bestAxis - 6) % 3; V3 ea=V3_Cross(aAxes[i],bAxes[j]); normal = flipNormal ? V3_Normalize(ea) : V3_ScaleByF(V3_Normalize(ea),-1.f); m.normal = normal; m.n = 1; V3 sA=a.ctr; sA=V3_AplusB(sA,V3_ScaleByF(aAxes[0],(V3_dot(aAxes[0],normal)<0.f?1.f:-1.f)*a.hExt.x));
+        sA=V3_AplusB(sA,V3_ScaleByF(aAxes[1],(V3_dot(aAxes[1],normal)<0.f?1.f:-1.f)*a.hExt.y)); sA=V3_AplusB(sA,V3_ScaleByF(aAxes[2],(V3_dot(aAxes[2],normal)<0.f?1.f:-1.f)*a.hExt.z)); m.p[0].point = V3_AplusB(sA,V3_ScaleByF(normal,minOverlap*0.5f)); m.p[0].pen = minOverlap; m.maxPen = minOverlap; return m;
     }
     int refAxis; float *refExt,*incExt; V3 *refAxes,*incAxes,refCenter,refNormal;
     if (bestAxis < 3) { refAxis = bestAxis; normal = flipNormal ? aAxes[refAxis] : V3_ScaleByF(aAxes[refAxis], -1.f); refAxes = aAxes; refExt = aExt; incAxes = bAxes; incExt = bExt; refCenter = a.ctr; refNormal = V3_ScaleByF(normal, -1.0f); } // Points outward from A towards B
@@ -179,14 +171,8 @@ INLINE Manifold BoxBox(ShapeBox a, ShapeBox b) {
     float refPlaneDist = V3_dot(refNormal, refCenter); // Keep points that are behind the reference face
     for (int i=0; i<clipCount; ++i) {
         float dist = V3_dot(refNormal, clipped[i]) - refPlaneDist;
-        if (dist <= 0.001f) { // Small skin tolerance
-            bool isDup = false;
-            for(int k=0; k<m.n; ++k) { V3 diff = V3_AsubB(clipped[i], m.p[k].point); if (V3_dot(diff, diff) < 0.00001f) { isDup = true; break; } }
-            if (!isDup && m.n < MANIFOLD_MAX) { m.p[m.n].point=clipped[i]; float pen=-dist; if(pen < 0){pen=0;} m.p[m.n].pen=pen; if (pen > m.maxPen){m.maxPen=pen;} m.n++; }
-        }
-    }
-    if (m.n == 0) { m.n = 1; m.p[0].point = V3_AplusB(refCenter, V3_ScaleByF(refNormal, 0.01f)); m.p[0].pen = minOverlap; m.maxPen = minOverlap; }
-    return m;
+        if (dist <= 0.001f) { bool isDup = false; for(int k=0; k<m.n; ++k) { V3 diff = V3_AsubB(clipped[i], m.p[k].point); if (V3_dot(diff, diff) < 0.00001f) { isDup = true; break; } } if (!isDup && m.n < MANIFOLD_MAX) { m.p[m.n].point=clipped[i]; float pen=-dist; if(pen < 0){pen=0;} m.p[m.n].pen=pen; if (pen > m.maxPen){m.maxPen=pen;} m.n++; } }
+    } if (m.n == 0) { m.n = 1; m.p[0].point = V3_AplusB(refCenter, V3_ScaleByF(refNormal, 0.01f)); m.p[0].pen = minOverlap; m.maxPen = minOverlap; } return m;
 }
 
 V3 MvVert(const float* M, V3 v) { return (V3){ M[0]*v.x + M[4]*v.y + M[8]*v.z  + M[12], M[1]*v.x + M[5]*v.y + M[9]*v.z  + M[13], M[2]*v.x + M[6]*v.y + M[10]*v.z + M[14] }; }
@@ -196,20 +182,12 @@ float copysignf(float magnitude, float sign) { union { float f; u32 i; } m, s; m
 INLINE V3 BoxSupport(ShapeBox b, V3 d) { V3 x=quat_rot_v3(b.rot,(V3){1,0,0}), y=quat_rot_v3(b.rot,(V3){0,1,0}), z=quat_rot_v3(b.rot,(V3){0,0,1}); float kx = copysignf(1.0f, V3_dot(d, x)); float ky = copysignf(1.0f, V3_dot(d, y)); float kz = copysignf(1.0f, V3_dot(d, z)); return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr, V3_ScaleByF(x, kx * b.hExt.x)), V3_ScaleByF(y, ky * b.hExt.y)), V3_ScaleByF(z, kz * b.hExt.z)); }
 INLINE V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db=V3_dot(cap.base,d), dt=V3_dot(cap.tip,d); float mask=(dt > db); V3 best=V3_AplusB(V3_ScaleByF(cap.tip,mask),V3_ScaleByF(cap.base,1.0f - mask)); float L = V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); V3 dir=V3_ScaleByF(d,cap.rad / vsqrtf(safeL)); float lmask=(L >= PHY_EPSILON); return V3_AplusB(best,V3_ScaleByF(dir,lmask)); }
 V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld) {
-    V3 dLocal = (V3){M[0]*dWorld.x + M[1]*dWorld.y + M[2]*dWorld.z,M[4]*dWorld.x + M[5]*dWorld.y + M[6]*dWorld.z,M[8]*dWorld.x + M[9]*dWorld.y + M[10]*dWorld.z};
-    bool haveAdj = adjIdx < uniqueCvxMeshCount && uniqueCvxMeshIndices[adjIdx] == m && cvxAdjOffsets[adjIdx] && physPos[m] && physVertCounts[m];
-    u32 n = modelVertexCounts[m]; const float* p = physPos[m];
+    V3 dLocal = (V3){M[0]*dWorld.x + M[1]*dWorld.y + M[2]*dWorld.z,M[4]*dWorld.x + M[5]*dWorld.y + M[6]*dWorld.z,M[8]*dWorld.x + M[9]*dWorld.y + M[10]*dWorld.z}; bool haveAdj = adjIdx < uniqueCvxMeshCount && uniqueCvxMeshIndices[adjIdx] == m && cvxAdjOffsets[adjIdx] && physPos[m] && physVertCounts[m]; u32 n = modelVertexCounts[m]; const float* p = physPos[m];
     if (unlikely(!haveAdj || V3_dot(dLocal, dLocal) < 0.000001f || n <= 64)) { float bestDot = -3.402823466e38F; u32 bestIdx = 0; for (u32 i = 0; i < n; ++i) { float dot = p[i*3]*dLocal.x + p[i*3+1]*dLocal.y + p[i*3+2]*dLocal.z; if (dot > bestDot) { bestDot=dot; bestIdx=i; } } return MvVert(M, (V3){p[bestIdx*3], p[bestIdx*3+1], p[bestIdx*3+2]}); }
-    u16 curr = cvxAdjStart[adjIdx]; 
-    if (curr >= n) curr = 0;
-    float currDot = p[curr*3]*dLocal.x + p[curr*3+1]*dLocal.y + p[curr*3+2]*dLocal.z;
-    for (u32 steps = 0; steps < n; ++steps) { // Hill-climbing search using adjacency information
-        u16 next = curr; float nextDot = currDot; u32 s = cvxAdjOffsets[adjIdx][curr]; u32 e = cvxAdjOffsets[adjIdx][curr+1]; 
-        for (u32 i = s; i < e; ++i) { u16 nb = cvxAdjLists[adjIdx][i]; float d = p[nb*3]*dLocal.x + p[nb*3+1]*dLocal.y + p[nb*3+2]*dLocal.z; if (d > nextDot) { nextDot = d; next = nb; } } 
-        if (next == curr) break;
-        curr = next; currDot = nextDot; 
-    }
-    return MvVert(M, (V3){p[curr*3], p[curr*3+1], p[curr*3+2]});
+    u16 curr = cvxAdjStart[adjIdx]; if (curr >= n) curr = 0; float currDot = p[curr*3]*dLocal.x + p[curr*3+1]*dLocal.y + p[curr*3+2]*dLocal.z;
+    for (u32 steps = 0; steps < n; ++steps) {/*Hill-climbing search using adjacency information*/
+        u16 next = curr; float nextDot = currDot; u32 s = cvxAdjOffsets[adjIdx][curr]; u32 e = cvxAdjOffsets[adjIdx][curr+1]; for (u32 i = s; i < e; ++i) { u16 nb = cvxAdjLists[adjIdx][i]; float d = p[nb*3]*dLocal.x + p[nb*3+1]*dLocal.y + p[nb*3+2]*dLocal.z; if (d > nextDot) { nextDot = d; next = nb; } } if (next == curr) break; curr = next; currDot = nextDot; 
+    } return MvVert(M, (V3){p[curr*3], p[curr*3+1], p[curr*3+2]});
 }
 
 INLINE void GJKSet(Simplex3D *s, int i, V3 v, V3 wA, V3 wB) { s->v[i] = v; s->wA[i] = wA; s->wB[i] = wB; }
@@ -217,25 +195,13 @@ INLINE void GJKCopy(Simplex3D *s, int dst, int src) { s->v[dst] = s->v[src]; s->
 INLINE void GJKSwap(Simplex3D *s, int i, int j) { V3 t = s->v[i]; s->v[i] = s->v[j]; s->v[j] = t; t = s->wA[i]; s->wA[i] = s->wA[j]; s->wA[j] = t; t = s->wB[i]; s->wB[i] = s->wB[j]; s->wB[j] = t; }
 bool GJKNextSimplex(Simplex3D *s, V3 *dir) {
     V3 A = s->v[s->n - 1], AO = {-A.x,-A.y,-A.z}; V3 wAA = s->wA[s->n - 1], wBA = s->wB[s->n - 1];
-    if (s->n == 2) {
-        V3 AB = V3_AsubB(s->v[0], A);
-        if (V3_dot(AB,AB) < PHY_EPSILON) AB=V3_AplusB(AB,V3_ScaleByF(*dir,0.001f));
-        if (V3_dot(AB,AO) > 0.f){*dir = V3_Cross(V3_Cross(AB,AO),AB);} else { s->n = 1; GJKSet(s,0,A,wAA,wBA); *dir = AO; }
-        if (V3_dot(*dir,*dir) < PHY_EPSILON) { V3 px = (vabs(AB.x) > 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; *dir = V3_Cross(AB,px); }
-        return true;
-    }
+    if (s->n == 2) { V3 AB = V3_AsubB(s->v[0], A); if (V3_dot(AB,AB) < PHY_EPSILON) AB=V3_AplusB(AB,V3_ScaleByF(*dir,0.001f)); if (V3_dot(AB,AO) > 0.f){*dir = V3_Cross(V3_Cross(AB,AO),AB);} else { s->n = 1; GJKSet(s,0,A,wAA,wBA); *dir = AO; } if (V3_dot(*dir,*dir) < PHY_EPSILON) { V3 px = (vabs(AB.x) > 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; *dir = V3_Cross(AB,px); } return true; }
     if (s->n == 3) {
-        V3 B=s->v[1], C=s->v[0], AB=V3_AsubB(B,A), AC=V3_AsubB(C,A), ABC=V3_Cross(AB,AC);
-        if (V3_dot(V3_Cross(ABC,AC),AO) > 0.f) { if (V3_dot(AC,AO) > 0.f) { GJKSet(s,1,A,wAA,wBA); s->n = 2; *dir = V3_Cross(V3_Cross(AC,AO),AC); } else { goto line_AB3; } }
-        else if (V3_dot(V3_Cross(AB,ABC),AO) > 0.f) { line_AB3: if (V3_dot(AB,AO) > 0.f) { GJKCopy(s,0,1); GJKSet(s,1,A,wAA,wBA); s->n = 2; *dir = V3_Cross(V3_Cross(AB,AO),AB); } else { GJKSet(s,0,A,wAA,wBA); s->n = 1; *dir = AO; } }
-        else { if (V3_dot(ABC,AO) > 0.f) {*dir = ABC;} else { GJKSwap(s,0,1); *dir = (V3){-ABC.x,-ABC.y,-ABC.z}; } }
-        return true;
+        V3 B=s->v[1], C=s->v[0], AB=V3_AsubB(B,A), AC=V3_AsubB(C,A), ABC=V3_Cross(AB,AC); if (V3_dot(V3_Cross(ABC,AC),AO) > 0.f) { if (V3_dot(AC,AO) > 0.f) { GJKSet(s,1,A,wAA,wBA); s->n = 2; *dir = V3_Cross(V3_Cross(AC,AO),AC); } else { goto line_AB3; } } 
+        else if (V3_dot(V3_Cross(AB,ABC),AO) > 0.f) { line_AB3: if (V3_dot(AB,AO) > 0.f) { GJKCopy(s,0,1); GJKSet(s,1,A,wAA,wBA); s->n = 2; *dir = V3_Cross(V3_Cross(AB,AO),AB); } else { GJKSet(s,0,A,wAA,wBA); s->n = 1; *dir = AO; } } else { if (V3_dot(ABC,AO) > 0.f) {*dir = ABC;} else { GJKSwap(s,0,1); *dir = (V3){-ABC.x,-ABC.y,-ABC.z}; } } return true;
     }
     V3 B=s->v[2], C=s->v[1], D=s->v[0], AB=V3_AsubB(B,A), AC=V3_AsubB(C,A), AD=V3_AsubB(D,A); V3 nABC=V3_Cross(AB,AC), nACD=V3_Cross(AC,AD), nADB=V3_Cross(AD,AB); nABC = V3_dot(nABC,AD) > 0.f ? (V3){-nABC.x,-nABC.y,-nABC.z} : nABC; nACD = V3_dot(nACD,AB) > 0.f ? (V3){-nACD.x,-nACD.y,-nACD.z} : nACD; nADB = V3_dot(nADB,AC) > 0.f ? (V3){-nADB.x,-nADB.y,-nADB.z} : nADB;
-    if (V3_dot(nABC,AO) > 0.f) { GJKCopy(s,0,1); GJKCopy(s,1,2); GJKSet(s,2,A,wAA,wBA); s->n=3; *dir=nABC; return true; }
-    if (V3_dot(nACD,AO) > 0.f) { GJKSet(s,2,A,wAA,wBA); s->n = 3; *dir=nACD; return true; }
-    if (V3_dot(nADB,AO) > 0.f) { GJKCopy(s,1,0); GJKCopy(s,0,2); GJKSet(s,2,A,wAA,wBA); s->n=3; *dir=nADB; return true; }
-    return false;
+    if (V3_dot(nABC,AO) > 0.f) { GJKCopy(s,0,1); GJKCopy(s,1,2); GJKSet(s,2,A,wAA,wBA); s->n=3; *dir=nABC; return true; } if (V3_dot(nACD,AO) > 0.f) { GJKSet(s,2,A,wAA,wBA); s->n = 3; *dir=nACD; return true; } if (V3_dot(nADB,AO) > 0.f) { GJKCopy(s,1,0); GJKCopy(s,0,2); GJKSet(s,2,A,wAA,wBA); s->n=3; *dir=nADB; return true; } return false;
 }
 
 typedef struct { int a,b,c; V3 n; float d; } EPAFace; typedef struct { V3 v,wA,wB; } EPAVert;
@@ -259,92 +225,58 @@ void SphTriTest(V3 sc, float sr, u16 mesh, u32 ti, const float* mx, Overlap* r) 
 }
 
 INLINE V3 TriSupport(V3 ta, V3 tb, V3 tc, V3 d) { float d1=V3_dot(ta,d),d2=V3_dot(tb,d),d3=V3_dot(tc,d); return d1>d2 ? (d1>d3 ? ta : tc) : (d2>d3 ? tb : tc); }
-typedef struct SupportCtx { V3 (*supA)(const struct SupportCtx *ctx, V3 dir); V3 (*supB)(const struct SupportCtx *ctx, V3 negDir); u16 prim,meshA,meshB; const float *matA,*matB; V3 ta,tb,tc; u16 adjA,adjB; ShapeBox boxShape; } SupportCtx;
-INLINE V3 _supA_hull(const SupportCtx *ctx, V3 d) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, d); }
-INLINE V3 _supA_sph(const SupportCtx *ctx, V3 d)  { return SphSupport(Entity_GetSph(ctx->prim), d); }
-INLINE V3 _supA_box(const SupportCtx *ctx, V3 d)  { return BoxSupport(Entity_GetBox(ctx->prim), d); }
-INLINE V3 _supA_boxShape(const SupportCtx *ctx, V3 d) { return BoxSupport(ctx->boxShape, d); }
-INLINE V3 _supA_cap(const SupportCtx *ctx, V3 d)  { return CapsuleSupport(Entity_GetCap(ctx->prim), d); }
-INLINE V3 _supB_hull(const SupportCtx *ctx, V3 nd)  { return HullSupport(ctx->meshB, ctx->matB, ctx->adjB, nd); }
-INLINE V3 _supB_hullA(const SupportCtx *ctx, V3 nd) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, nd); }
-INLINE V3 _supB_tri(const SupportCtx *ctx, V3 nd)   { return TriSupport(ctx->ta, ctx->tb, ctx->tc, nd); }
+typedef struct SupportCtx { V3 (*supA)(const struct SupportCtx *ctx, V3 dir); V3 (*supB)(const struct SupportCtx *ctx, V3 negDir); u16 prim,meshA,meshB; const float *matA,*matB; V3 ta,tb,tc; u16 adjA,adjB; ShapeBox boxShape; } SupportCtx; typedef struct { Simplex3D s; V3 dir; bool hit; } GJKResult;
+INLINE V3 _supA_hull(const SupportCtx *ctx, V3 d) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, d); }    INLINE V3 _supA_sph(const SupportCtx *ctx, V3 d)  { return SphSupport(Entity_GetSph(ctx->prim), d); }
+INLINE V3 _supA_box(const SupportCtx *ctx, V3 d)  { return BoxSupport(Entity_GetBox(ctx->prim), d); }             INLINE V3 _supA_boxShape(const SupportCtx *ctx, V3 d) { return BoxSupport(ctx->boxShape, d); }
+INLINE V3 _supA_cap(const SupportCtx *ctx, V3 d)  { return CapsuleSupport(Entity_GetCap(ctx->prim), d); }         INLINE V3 _supB_hull(const SupportCtx *ctx, V3 nd)  { return HullSupport(ctx->meshB, ctx->matB, ctx->adjB, nd); }
+INLINE V3 _supB_hullA(const SupportCtx *ctx, V3 nd) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, nd); } INLINE V3 _supB_tri(const SupportCtx *ctx, V3 nd)   { return TriSupport(ctx->ta, ctx->tb, ctx->tc, nd); }
 INLINE void GetSupportPair(const SupportCtx *ctx, V3 dir, V3 *wA, V3 *wB) { V3 nd = {-dir.x, -dir.y, -dir.z}; *wA = ctx->supA(ctx, dir); *wB = ctx->supB(ctx, nd); }
-typedef struct { Simplex3D s; V3 dir; bool hit; } GJKResult;
 GJKResult RunGJK(const SupportCtx *ctx, int maxIter) {
-    GJKResult res = {0}; res.dir = (V3){0, 1, 0}; V3 wA, wB;
-    GetSupportPair(ctx,res.dir,&wA,&wB);
-    res.s.wA[res.s.n] = wA; res.s.wB[res.s.n] = wB; res.s.v[res.s.n++] = V3_AsubB(wA, wB);
-    res.dir = (V3){-res.s.v[0].x, -res.s.v[0].y, -res.s.v[0].z};
-    if (V3_dot(res.dir, res.dir) < PHY_EPSILON) res.dir = (V3){0, 1, 0};
-    for (int it = 0; it < maxIter; ++it) { GetSupportPair(ctx, res.dir, &wA, &wB); V3 sup = V3_AsubB(wA, wB); if (V3_dot(sup, res.dir) < 0) {break;} res.s.wA[res.s.n] = wA; res.s.wB[res.s.n] = wB; res.s.v[res.s.n++] = sup; if (!GJKNextSimplex(&res.s, &res.dir)) { res.hit = true; break; } }
-    return res;
+    GJKResult res = {0}; res.dir = (V3){0, 1, 0}; V3 wA, wB; GetSupportPair(ctx,res.dir,&wA,&wB); res.s.wA[res.s.n] = wA; res.s.wB[res.s.n] = wB; res.s.v[res.s.n++] = V3_AsubB(wA, wB); res.dir = (V3){-res.s.v[0].x, -res.s.v[0].y, -res.s.v[0].z};
+    if (V3_dot(res.dir, res.dir) < PHY_EPSILON) res.dir = (V3){0, 1, 0}; for (int it = 0; it < maxIter; ++it) { GetSupportPair(ctx, res.dir, &wA, &wB); V3 sup = V3_AsubB(wA, wB); if (V3_dot(sup, res.dir) < 0) {break;} res.s.wA[res.s.n] = wA; res.s.wB[res.s.n] = wB; res.s.v[res.s.n++] = sup; if (!GJKNextSimplex(&res.s, &res.dir)) { res.hit = true; break; } } return res;
 }
 
 INLINE void RunGJKFallback(const SupportCtx *ctx, Simplex3D *s) { static const V3 kAx[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}}; for(int d=0;s->n<4 && d<6;++d){V3 wA,wB; GetSupportPair(ctx,kAx[d],&wA,&wB); V3 sup=V3_AsubB(wA,wB); bool dup=false; for (int k=0;k<s->n;++k){V3 dv=V3_AsubB(sup,s->v[k]); dup |= (V3_dot(dv,dv) < PHY_EPSILON * PHY_EPSILON); } if(!dup){s->wA[s->n]=wA; s->wB[s->n]=wB; s->v[s->n++]=sup;}} }
 typedef struct { EPAVert ev[EPA_MAX_VERTS]; EPAFace ef[EPA_MAX_FACES]; int nv, nf; } EPAState;
 void SeedEPA(EPAState *epa, const Simplex3D *s) {
-    static const int kTetFaces[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}}; epa->nv = 0; epa->nf = 0;
-    for (int i = 0; i < 4; i++) { epa->ev[epa->nv].wA = s->wA[i]; epa->ev[epa->nv].wB = s->wB[i]; epa->ev[epa->nv].v = s->v[i]; epa->nv++; }
+    static const int kTetFaces[4][3] = {{0,1,2},{0,3,1},{0,2,3},{1,3,2}}; epa->nv = 0; epa->nf = 0; for (int i = 0; i < 4; i++) { epa->ev[epa->nv].wA = s->wA[i]; epa->ev[epa->nv].wB = s->wB[i]; epa->ev[epa->nv].v = s->v[i]; epa->nv++; } 
     for (int f = 0; f < 4; f++) { EPAFace face = MakeEPAFace(epa->ev,kTetFaces[f][0],kTetFaces[f][1],kTetFaces[f][2]); if(face.d >= 0.f && epa->nf < EPA_MAX_FACES){epa->ef[epa->nf++]=face;} }
 }
 
 bool ExpandEPA(EPAState *epa, V3 sup, V3 wA, V3 wB) {
-    if(epa->nv >= EPA_MAX_VERTS){return false;}
-    epa->ev[epa->nv].v=sup; epa->ev[epa->nv].wA=wA; epa->ev[epa->nv].wB=wB;
-    int edges[EPA_MAX_EDGES][2], ne = 0, keep[EPA_MAX_FACES], nk = 0;
+    if(epa->nv >= EPA_MAX_VERTS){return false;} epa->ev[epa->nv].v=sup; epa->ev[epa->nv].wA=wA; epa->ev[epa->nv].wB=wB; int edges[EPA_MAX_EDGES][2], ne = 0, keep[EPA_MAX_FACES], nk = 0;
     for (int f = 0; f < epa->nf; f++) {
         if (V3_dot(epa->ef[f].n, V3_AsubB(sup, epa->ev[epa->ef[f].a].v)) > 0.f) {
-            int fv[3] = {epa->ef[f].a, epa->ef[f].b, epa->ef[f].c};
-            for (int e = 0; e < 3; e++) {
-                int ea = fv[e], eb = fv[(e + 1) % 3]; bool found = false;
-                for (int k = 0; k < ne; k++) if (edges[k][0] == eb && edges[k][1] == ea) { edges[k][0] = edges[--ne][0]; edges[k][1] = edges[ne][1]; found = true; break; }
-                if (!found && ne < EPA_MAX_EDGES) { edges[ne][0] = ea; edges[ne++][1] = eb; }
-            }
+            int fv[3]={epa->ef[f].a,epa->ef[f].b,epa->ef[f].c}; for(int e=0;e<3;e++){int ea=fv[e],eb=fv[(e+1) % 3]; bool found=false; for(int k=0;k<ne;k++)if(edges[k][0] == eb && edges[k][1] == ea){edges[k][0]=edges[--ne][0]; edges[k][1]=edges[ne][1]; found=true; break;} if(!found && ne < EPA_MAX_EDGES){edges[ne][0]=ea; edges[ne++][1]=eb;}}
         } else keep[nk++] = f;
     }
-    epa->nf = 0; for (int k = 0; k < nk; k++) epa->ef[epa->nf++] = epa->ef[keep[k]];
-    for (int k = 0; k < ne && epa->nf < EPA_MAX_FACES; k++) { EPAFace face = MakeEPAFace(epa->ev, edges[k][0], edges[k][1], epa->nv); if (face.d >= 0.f) epa->ef[epa->nf++] = face; }
-    epa->nv++; return true;
+    epa->nf = 0; for (int k = 0; k < nk; k++) epa->ef[epa->nf++] = epa->ef[keep[k]]; for (int k = 0; k < ne && epa->nf < EPA_MAX_FACES; k++) { EPAFace face = MakeEPAFace(epa->ev, edges[k][0], edges[k][1], epa->nv); if (face.d >= 0.f) epa->ef[epa->nf++] = face; } epa->nv++; return true;
 }
 
 INLINE bool BvhSphereAABBOverlap(V3 sc, float sr, V3 mn, V3 mx) { V3 cl = {vclamp(sc.x, mn.x, mx.x), vclamp(sc.y, mn.y, mx.y), vclamp(sc.z, mn.z, mx.z)}; V3 d = V3_AsubB(sc, cl); return V3_dot(d, d) <= sr * sr; }
 INLINE void BvhNodeWorldAABB(const BvhNode* node, const float* mx, V3* wMn, V3* wMx) {
     __m128 col0=_mm_loadu_ps(mx + 0); __m128 col1=_mm_loadu_ps(mx + 4); __m128 col2=_mm_loadu_ps(mx + 8); __m128 tr=_mm_loadu_ps(mx + 12);  __m128 mn_v=_mm_setr_ps(node->mn.x,node->mn.y,node->mn.z,0.0f); __m128 mx_v=_mm_setr_ps(node->mx.x,node->mx.y,node->mx.z,0.0f);
-    __m128 lc = _mm_mul_ps(_mm_add_ps(mn_v,mx_v),_mm_set1_ps(0.5f)); // lc = (mn + mx) * 0.5f   
-    __m128 lh = _mm_mul_ps(((__m128)((__v4sf)(mx_v) - (__v4sf)(mn_v))),_mm_set1_ps(0.5f)); // lh = (mx - mn) * 0.5f
+    __m128 lc = _mm_mul_ps(_mm_add_ps(mn_v,mx_v),_mm_set1_ps(0.5f));/*lc = (mn + mx) * 0.5f*/ __m128 lh = _mm_mul_ps(((__m128)((__v4sf)(mx_v) - (__v4sf)(mn_v))),_mm_set1_ps(0.5f)); /*lh = (mx - mn) * 0.5f*/
     __m128 lc_x = __builtin_shufflevector(lc,lc,0,0,0,0); __m128 lc_y = __builtin_shufflevector(lc,lc,1,1,1,1); __m128 lc_z = __builtin_shufflevector(lc,lc,2,2,2,2); // Replicate lc.x, lc.y, lc.z across vectors
-    __m128 wc = _mm_add_ps(_mm_add_ps(_mm_mul_ps(col0,lc_x), _mm_mul_ps(col1,lc_y)), _mm_add_ps(_mm_mul_ps(col2,lc_z),tr)); // wc = col0 * lc_x + col1 * lc_y + col2 * lc_z + tr
-    __v4si sign_mask = (__v4si)_mm_set1_ps(-0.0f); __v4si inv_mask = ~sign_mask;
+    __m128 wc = _mm_add_ps(_mm_add_ps(_mm_mul_ps(col0,lc_x), _mm_mul_ps(col1,lc_y)), _mm_add_ps(_mm_mul_ps(col2,lc_z),tr)); /*wc=col0 * lc_x + col1 * lc_y + col2 * lc_z + tr*/ __v4si sign_mask = (__v4si)_mm_set1_ps(-0.0f); __v4si inv_mask = ~sign_mask;
     __m128 abs_col0 = (__m128)((__v4si)col0 & inv_mask); __m128 abs_col1 = (__m128)((__v4si)col1 & inv_mask); __m128 abs_col2 = (__m128)((__v4si)col2 & inv_mask); // Take absolute value of matrix columns using bitwise AND
-    __m128 lh_x = __builtin_shufflevector(lh,lh,0,0,0,0); __m128 lh_y = __builtin_shufflevector(lh,lh,1,1,1,1); __m128 lh_z = __builtin_shufflevector(lh,lh,2,2,2,2); // Replicate lh components
-    __m128 wh = _mm_add_ps(_mm_add_ps(_mm_mul_ps(abs_col0,lh_x),_mm_mul_ps(abs_col1,lh_y)),_mm_mul_ps(abs_col2,lh_z)); // wh = abs_col0 * lh_x + abs_col1 * lh_y + abs_col2 * lh_z
-    __m128 wMn_v=((__m128)((__v4sf)(wc) - (__v4sf)(wh))); __m128 wMx_v=_mm_add_ps(wc,wh); // wMn = wc - wh, wMx = wc + wh
-    wMn->x = wMn_v[0]; wMn->y = wMn_v[1]; wMn->z = wMn_v[2]; wMx->x = wMx_v[0]; wMx->y = wMx_v[1]; wMx->z = wMx_v[2]; // Store back to V3 (avoids overwriting adjacent struct memory)
+    __m128 lh_x = __builtin_shufflevector(lh,lh,0,0,0,0); __m128 lh_y = __builtin_shufflevector(lh,lh,1,1,1,1); __m128 lh_z = __builtin_shufflevector(lh,lh,2,2,2,2);/*Replicate lh components*/ __m128 wh = _mm_add_ps(_mm_add_ps(_mm_mul_ps(abs_col0,lh_x),_mm_mul_ps(abs_col1,lh_y)),_mm_mul_ps(abs_col2,lh_z)); // wh = abs_col0 * lh_x + abs_col1 * lh_y + abs_col2 * lh_z
+    __m128 wMn_v=((__m128)((__v4sf)(wc) - (__v4sf)(wh))); __m128 wMx_v=_mm_add_ps(wc,wh);/*wMn = wc - wh, wMx = wc + wh*/ wMn->x = wMn_v[0]; wMn->y = wMn_v[1]; wMn->z = wMn_v[2]; wMx->x = wMx_v[0]; wMx->y = wMx_v[1]; wMx->z = wMx_v[2]; // Store back to V3 (avoids overwriting adjacent struct memory)
 }
 
 void BvhWalkSphMsh(V3 sc, float sr, u16 m, const float* mx, Overlap* r) {
     const BvhNode* nodes=modelBVHNodes[m]; const u16* triOrder = modelBVHTriOrder[m]; const BvhNode* stack[64]; int sp = 0; stack[sp++] = &nodes[0];
     while (sp > 0) {
-        const BvhNode* node = stack[--sp]; V3 wMn,wMx; BvhNodeWorldAABB(node,mx,&wMn,&wMx); if (!BvhSphereAABBOverlap(sc,sr,wMn,wMx)) continue;
-        if (node->triCount > 0) { for (u32 i = 0; i < node->triCount; i++) SphTriTest(sc, sr, m, triOrder[node->triStart + i], mx, r); } else { for (int o=0;o<8;++o) if (node->children[o] >= 0) stack[sp++] = &nodes[node->children[o]]; }
+        const BvhNode* node = stack[--sp]; V3 wMn,wMx; BvhNodeWorldAABB(node,mx,&wMn,&wMx); if (!BvhSphereAABBOverlap(sc,sr,wMn,wMx)) continue; if (node->triCount > 0) { for (u32 i = 0; i < node->triCount; i++) SphTriTest(sc, sr, m, triOrder[node->triStart + i], mx, r); } else { for (int o=0;o<8;++o) if (node->children[o] >= 0) stack[sp++] = &nodes[node->children[o]]; }
     }
 }
 
 static Overlap SphMsh(V3 sc, float sr, u16 m, const float* mx) { Overlap r={0}; if(m>=MAX_MDLS)return r; u32 tc=modelTriangleCounts[m]; if(!tc){return r;} if (BvhHasBVH(m)) { BvhWalkSphMsh(sc,sr,m,mx,&r); return r; } for(u32 ti=0;ti<tc;++ti){SphTriTest(sc,sr,m,ti,mx,&r);} return r; }
 static Overlap CapMsh(ShapeCapsule c, u16 m, const float* mx) { Overlap best=SphMsh(c.base,c.rad,m,mx), rt=SphMsh(c.tip,c.rad,m,mx); if(rt.pen>best.pen)best=rt; V3 d=V3_AsubB(c.tip,c.base); if(V3_Mag(d)>PHY_EPSILON){/*Hey I was doing a snowman of just the end spheres, don't hate the simplicity, I only use capsules for npcs and player*/for(int k=1;k<6;++k){float t=(float)k/5.0f; Overlap rm=SphMsh(V3_AplusB(c.base,V3_ScaleByF(d,t)),c.rad,m,mx); if(rm.pen>best.pen)best=rm;}} return best; }
 Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx, u16 adjIdx) {
-    Manifold m={0}; if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return m;
-    u8 col = World.col[prim]; V3 (*supA)(const SupportCtx*, V3) = (col == COLTYPE_SPH) ? _supA_sph : (col == COLTYPE_BOX) ? _supA_box : _supA_cap;
-    SupportCtx ctx = (SupportCtx){supA, _supB_hullA, .prim=prim, .meshA=mesh, .matA=mx, .adjA=adjIdx, .adjB=adjIdx};
-    GJKResult gjk = RunGJK(&ctx,GJK_ITER); if(!gjk.hit)return m;
-    if(gjk.s.n<4) RunGJKFallback(&ctx,&gjk.s); if(gjk.s.n<4)return m;
-    EPAState epa; SeedEPA(&epa,&gjk.s);
-    for(int it=0;it<EPA_ITER;++it){
-        int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break;
-        V3 bn=epa.ef[bf].n; V3 wA, wB; GetSupportPair(&ctx,bn,&wA,&wB); V3 sup=V3_AsubB(wA,wB);
-        if(V3_dot(bn,sup)-bd<PHY_EPSILON){return MakeEPAManifold(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c,bn,bd);}
-        if (!ExpandEPA(&epa,sup,wA,wB)) break;
-    }
+    Manifold m={0}; if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return m; u8 col = World.col[prim]; V3 (*supA)(const SupportCtx*, V3) = (col == COLTYPE_SPH) ? _supA_sph : (col == COLTYPE_BOX) ? _supA_box : _supA_cap; SupportCtx ctx = (SupportCtx){supA, _supB_hullA, .prim=prim, .meshA=mesh, .matA=mx, .adjA=adjIdx, .adjB=adjIdx};
+    GJKResult gjk = RunGJK(&ctx,GJK_ITER); if(!gjk.hit)return m; if(gjk.s.n<4) RunGJKFallback(&ctx,&gjk.s); if(gjk.s.n<4)return m; EPAState epa; SeedEPA(&epa,&gjk.s);
+    for(int it=0;it<EPA_ITER;++it){ int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break; V3 bn=epa.ef[bf].n; V3 wA,wB; GetSupportPair(&ctx,bn,&wA,&wB); V3 sup=V3_AsubB(wA,wB); if(V3_dot(bn,sup)-bd<PHY_EPSILON){return MakeEPAManifold(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c,bn,bd);} if (!ExpandEPA(&epa,sup,wA,wB))break;}
     return m;
 }
 
@@ -361,12 +293,8 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     Simplex3D *s = &gjk.s;
     while (s->n<4) {
         V3 fallbackDir={0.0f,1.0f,0.0f};
-        if(s->n==1) fallbackDir=(vabs(s->v[0].x)>0.5f)?(V3){0.0f,1.0f,0.0f}:(V3){1.0f,0.0f,0.0f};
-        else if(s->n==2){V3 edge=V3_AsubB(s->v[1],s->v[0]); fallbackDir=V3_Cross(edge,(vabs(edge.x)>0.5f)?(V3){0.0f,1.0f,0.0f}:(V3){1.0f,0.0f,0.0f});}
-        else if(s->n==3){V3 e1=V3_AsubB(s->v[1],s->v[0]), e2=V3_AsubB(s->v[2],s->v[0]); fallbackDir=V3_Cross(e1,e2);}
-        float fLen=V3_Mag(fallbackDir); fallbackDir=(fLen>PHY_EPSILON)?V3_ScaleByF(fallbackDir,1.0f/fLen):(V3){0.0f,1.0f,0.0f};
-        V3 wA, wB; GetSupportPair(&supCtx, fallbackDir, &wA, &wB); V3 sup=V3_AsubB(wA,wB); bool dup=false;
-        for (int k=0;k<s->n;k++){V3 dv=V3_AsubB(sup,s->v[k]); dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);}
+        if(s->n==1) fallbackDir=(vabs(s->v[0].x)>0.5f)?(V3){0.0f,1.0f,0.0f}:(V3){1.0f,0.0f,0.0f}; else if(s->n==2){V3 edge=V3_AsubB(s->v[1],s->v[0]); fallbackDir=V3_Cross(edge,(vabs(edge.x)>0.5f)?(V3){0.0f,1.0f,0.0f}:(V3){1.0f,0.0f,0.0f});} else if(s->n==3){V3 e1=V3_AsubB(s->v[1],s->v[0]), e2=V3_AsubB(s->v[2],s->v[0]); fallbackDir=V3_Cross(e1,e2);}
+        float fLen=V3_Mag(fallbackDir); fallbackDir=(fLen>PHY_EPSILON)?V3_ScaleByF(fallbackDir,1.0f/fLen):(V3){0.0f,1.0f,0.0f}; V3 wA, wB; GetSupportPair(&supCtx, fallbackDir, &wA, &wB); V3 sup=V3_AsubB(wA,wB); bool dup=false; for (int k=0;k<s->n;k++){V3 dv=V3_AsubB(sup,s->v[k]); dup|=(V3_dot(dv,dv)<PHY_EPSILON*PHY_EPSILON);} 
         if (!dup){s->wA[s->n]=wA; s->wB[s->n]=wB; s->v[s->n++]=sup;} else {fallbackDir=(V3){-fallbackDir.x,-fallbackDir.y,-fallbackDir.z}; GetSupportPair(&supCtx, fallbackDir, &wA, &wB); s->wA[s->n]=wA; s->wB[s->n]=wB; s->v[s->n++]=V3_AsubB(wA,wB);}
     }
     EPAState epa; SeedEPA(&epa, s); if (epa.nf<4){ return; } bool tHit=false; V3 tN={0}; float tD=0; V3 tP={0};
@@ -379,42 +307,20 @@ void CvxTriTest(CvxMshCtx* ctx, V3 ta, V3 tb, V3 tc) {
     else {
         float align=V3_dot(tN,best->normal);
         if (align>MANIFOLD_ALIGN_THRESHOLD) {
-            bool better=(tD>best->maxPen+MANIFOLD_TIE_MARGIN) || (vabs(tD-best->maxPen)<=MANIFOLD_TIE_MARGIN && V3_dot(tN,(V3){0,1,0})>V3_dot(best->normal,(V3){0,1,0}));
-            if (better){ best->normal=tN; best->maxPen=tD; ctx->bestTa=ta; ctx->bestTb=tb; ctx->bestTc=tc; ctx->bestTriN=tN; ctx->bestTriD=tD; ctx->bestDeepPoint=deepPoint; ctx->haveBestTri=true; }
-            bool spread=true;
-            for (int k=0;k<best->n;++k){V3 dv=V3_AsubB(deepPoint,best->p[k].point); if(V3_dot(dv,dv)<ctx->spreadEps*ctx->spreadEps){spread=false; if(tD>best->p[k].pen)best->p[k].pen=tD; break;}}
-            if (spread&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){deepPoint,tD};
-        } else if (tD>best->maxPen+MANIFOLD_TIE_MARGIN){
-            best->n=0; best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD};
-            ctx->bestTa=ta; ctx->bestTb=tb; ctx->bestTc=tc; ctx->bestTriN=tN; ctx->bestTriD=tD; ctx->bestDeepPoint=deepPoint; ctx->haveBestTri=true;
-        }
+            bool better=(tD>best->maxPen+MANIFOLD_TIE_MARGIN) || (vabs(tD-best->maxPen)<=MANIFOLD_TIE_MARGIN && V3_dot(tN,(V3){0,1,0})>V3_dot(best->normal,(V3){0,1,0})); if (better){ best->normal=tN; best->maxPen=tD; ctx->bestTa=ta; ctx->bestTb=tb; ctx->bestTc=tc; ctx->bestTriN=tN; ctx->bestTriD=tD; ctx->bestDeepPoint=deepPoint; ctx->haveBestTri=true; }
+            bool spread=true; for (int k=0;k<best->n;++k){V3 dv=V3_AsubB(deepPoint,best->p[k].point); if(V3_dot(dv,dv)<ctx->spreadEps*ctx->spreadEps){spread=false; if(tD>best->p[k].pen)best->p[k].pen=tD; break;}} if (spread&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){deepPoint,tD};
+        } else if (tD>best->maxPen+MANIFOLD_TIE_MARGIN){ best->n=0; best->normal=tN; best->maxPen=tD; best->p[best->n++]=(ManifoldPt){deepPoint,tD}; ctx->bestTa=ta; ctx->bestTb=tb; ctx->bestTc=tc; ctx->bestTriN=tN; ctx->bestTriD=tD; ctx->bestDeepPoint=deepPoint; ctx->haveBestTri=true; }
     }
 }
 
 void CvxMshFillExtraPoints(CvxMshCtx* ctx) {
-    Manifold* best = &ctx->best;
-    if (!ctx->haveBestTri || best->n == 0 || best->n >= MANIFOLD_MAX) return;
-    u32 hn = ctx->boxV ? ctx->boxN : modelVertexCounts[ctx->hullMesh];
-    if (!hn) return;
-    V3 ta=ctx->bestTa, tN=ctx->bestTriN;
-    V3 triEdge1=V3_AsubB(ctx->bestTb,ta), triEdge2=V3_AsubB(ctx->bestTc,ta);
-    float planeDist=V3_dot(tN,ctx->bestDeepPoint), tD=ctx->bestTriD;
-    float d00=V3_dot(triEdge1,triEdge1), d01=V3_dot(triEdge1,triEdge2), d11=V3_dot(triEdge2,triEdge2), denom=d00*d11-d01*d01;
-    bool validTri=vabs(denom)>PHY_EPSILON;
+    Manifold* best = &ctx->best; if (!ctx->haveBestTri || best->n == 0 || best->n >= MANIFOLD_MAX) return; u32 hn = ctx->boxV ? ctx->boxN : modelVertexCounts[ctx->hullMesh]; if (!hn) return; V3 ta=ctx->bestTa, tN=ctx->bestTriN; V3 triEdge1=V3_AsubB(ctx->bestTb,ta), triEdge2=V3_AsubB(ctx->bestTc,ta); float planeDist=V3_dot(tN,ctx->bestDeepPoint), tD=ctx->bestTriD;
+    float d00=V3_dot(triEdge1,triEdge1), d01=V3_dot(triEdge1,triEdge2), d11=V3_dot(triEdge2,triEdge2), denom=d00*d11-d01*d01; bool validTri=vabs(denom)>PHY_EPSILON;
     for (u32 i=0;i<hn && best->n<MANIFOLD_MAX;++i) {
-        V3 pt=ctx->boxV ? ctx->boxV[i] : MvVert(ctx->hullMx,MeshVert(ctx->hullMesh,i));
-        float distToPlane=V3_dot(tN,pt)-planeDist;
+        V3 pt=ctx->boxV ? ctx->boxV[i] : MvVert(ctx->hullMx,MeshVert(ctx->hullMesh,i)); float distToPlane=V3_dot(tN,pt)-planeDist;
         if (vabs(distToPlane)<ctx->thicknessTolerance) {
-            bool insideTri=false;
-            if (validTri){V3 projPt=V3_AsubB(pt,V3_ScaleByF(tN,distToPlane)), v2=V3_AsubB(projPt,ta); float d20=V3_dot(v2,triEdge1), d21=V3_dot(v2,triEdge2), v=(d11*d20-d01*d21)/denom, w=(d00*d21-d01*d20)/denom, u=1.0f-v-w; if(u>=-0.02f&&v>=-0.02f&&w>=-0.02f)insideTri=true;}
-            if (insideTri){
-                float ptPen=tD-distToPlane;
-                if(ptPen>0.0f){
-                    bool isDup=false;
-                    for(int k=0;k<best->n;++k){V3 diff=V3_AsubB(pt,best->p[k].point); if(V3_dot(diff,diff)<ctx->spreadEps*ctx->spreadEps){isDup=true;break;}}
-                    if(!isDup&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){pt,ptPen};
-                }
-            }
+            bool insideTri=false; if (validTri){V3 projPt=V3_AsubB(pt,V3_ScaleByF(tN,distToPlane)), v2=V3_AsubB(projPt,ta); float d20=V3_dot(v2,triEdge1), d21=V3_dot(v2,triEdge2), v=(d11*d20-d01*d21)/denom, w=(d00*d21-d01*d20)/denom, u=1.0f-v-w; if(u>=-0.02f&&v>=-0.02f&&w>=-0.02f)insideTri=true;}
+            if (insideTri){ float ptPen=tD-distToPlane; if(ptPen>0.0f){ bool isDup=false; for(int k=0;k<best->n;++k){V3 diff=V3_AsubB(pt,best->p[k].point); if(V3_dot(diff,diff)<ctx->spreadEps*ctx->spreadEps){isDup=true;break;}} if(!isDup&&best->n<MANIFOLD_MAX)best->p[best->n++]=(ManifoldPt){pt,ptPen}; } }
         }
     }
 }
@@ -422,80 +328,44 @@ void CvxMshFillExtraPoints(CvxMshCtx* ctx) {
 void BvhWalkAABB_CvxTri(u16 triMesh, const float* triMx, AABB3 hb, CvxMshCtx* ctx) {
     const BvhNode* nodes = modelBVHNodes[triMesh]; const u16* triOrder = modelBVHTriOrder[triMesh]; const BvhNode* stack[64]; int sp = 0; stack[sp++] = &nodes[0];
     while (sp > 0) {
-        const BvhNode* node = stack[--sp]; V3 wMn, wMx; BvhNodeWorldAABB(node, triMx, &wMn, &wMx);
-        bool bvhAABBOverlap = (wMx.x >= hb.mn.x && wMn.x <= hb.mx.x && wMx.y >= hb.mn.y && wMn.y <= hb.mx.y && wMx.z >= hb.mn.z && wMn.z <= hb.mx.z);
-        if (!bvhAABBOverlap) continue;
-        if (node->triCount > 0) { for (u32 i = 0; i < node->triCount; i++) { V3 ta, tb, tc; MeshTri(triMesh, triOrder[node->triStart + i], triMx, &ta, &tb, &tc); CvxTriTest(ctx, ta, tb, tc); } }
-        else { for (int o = 0; o < 8; o++) if (node->children[o] >= 0) stack[sp++] = &nodes[node->children[o]]; }
+        const BvhNode* node = stack[--sp]; V3 wMn, wMx; BvhNodeWorldAABB(node, triMx, &wMn, &wMx); bool bvhAABBOverlap = (wMx.x >= hb.mn.x && wMn.x <= hb.mx.x && wMx.y >= hb.mn.y && wMn.y <= hb.mx.y && wMx.z >= hb.mn.z && wMn.z <= hb.mx.z); if (!bvhAABBOverlap) continue;
+        if (node->triCount > 0) { for (u32 i = 0; i < node->triCount; i++) { V3 ta, tb, tc; MeshTri(triMesh, triOrder[node->triStart + i], triMx, &ta, &tb, &tc); CvxTriTest(ctx, ta, tb, tc); } } else { for (int o = 0; o < 8; o++) if (node->children[o] >= 0) stack[sp++] = &nodes[node->children[o]]; }
     }
 }
 
-// --- hull local-AABB cache (computed once per hull mesh, reused across queries) ---
-static AABB3 g_hullLocalAABB[MAX_MDLS];
-static u8 g_hullLocalAABBInit[MAX_MDLS] = {0};
+static AABB3 g_hullLocalAABB[MAX_MDLS]; static u8 g_hullLocalAABBInit[MAX_MDLS] = {0};
 Manifold CvxMsh(u16 hullMesh, const float* hullMx, u16 triMesh, const float* triMx, u16 adjHull) {
-    Manifold z={0}; if(hullMesh>=MAX_MDLS||adjHull>=MAX_MDLS||triMesh>=MAX_MDLS)return z;
-    u32 hn=modelVertexCounts[hullMesh]; if(!hn)return z;
+    Manifold z={0}; if(hullMesh>=MAX_MDLS||adjHull>=MAX_MDLS||triMesh>=MAX_MDLS)return z; u32 hn=modelVertexCounts[hullMesh]; if(!hn)return z;
     CvxMshCtx ctx={0}; ctx.hullMesh=hullMesh; ctx.hullMx=hullMx; ctx.adjHull=adjHull; AABB3 hb;
-    if (!g_hullLocalAABBInit[hullMesh]) {
-        AABB3 la={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}};
-        for (u32 i=0;i<hn;++i){ V3 v=MeshVert(hullMesh,i); la.mn.x=vmin(la.mn.x,v.x); la.mn.y=vmin(la.mn.y,v.y); la.mn.z=vmin(la.mn.z,v.z); la.mx.x=vmax(la.mx.x,v.x); la.mx.y=vmax(la.mx.y,v.y); la.mx.z=vmax(la.mx.z,v.z); }
-        g_hullLocalAABB[hullMesh]=la; g_hullLocalAABBInit[hullMesh]=1;
-    }
+    if (!g_hullLocalAABBInit[hullMesh]) { AABB3 la={{1e9f,1e9f,1e9f},{-1e9f,-1e9f,-1e9f}}; for (u32 i=0;i<hn;++i){ V3 v=MeshVert(hullMesh,i); la.mn.x=vmin(la.mn.x,v.x); la.mn.y=vmin(la.mn.y,v.y); la.mn.z=vmin(la.mn.z,v.z); la.mx.x=vmax(la.mx.x,v.x); la.mx.y=vmax(la.mx.y,v.y); la.mx.z=vmax(la.mx.z,v.z); } g_hullLocalAABB[hullMesh]=la; g_hullLocalAABBInit[hullMesh]=1; }
     { const AABB3* la=&g_hullLocalAABB[hullMesh]; V3 c[8]={{la->mn.x,la->mn.y,la->mn.z},{la->mn.x,la->mn.y,la->mx.z},{la->mn.x,la->mx.y,la->mn.z},{la->mn.x,la->mx.y,la->mx.z},{la->mx.x,la->mn.y,la->mn.z},{la->mx.x,la->mn.y,la->mx.z},{la->mx.x,la->mx.y,la->mn.z},{la->mx.x,la->mx.y,la->mx.z}};
-      hb.mn.x=1e9f;hb.mn.y=1e9f;hb.mn.z=1e9f;hb.mx.x=-1e9f;hb.mx.y=-1e9f;hb.mx.z=-1e9f;
-      for (int i=0;i<8;++i){ V3 w=MvVert(hullMx,c[i]); hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); } }
-    ctx.hb=hb; ctx.hullCenter = V3_ScaleByF(V3_AplusB(hb.mn, hb.mx), 0.5f); ctx.hullRadius = V3_Mag(V3_AsubB(hb.mx, hb.mn)) * 0.5f;
-    V3 hext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(hext.x,vmax(hext.y,hext.z))*0.15f);
-    float wscaleH=V3_Mag((V3){hullMx[0],hullMx[1],hullMx[2]}); ctx.thicknessTolerance=vclamp(modelBounds[hullMesh]*wscaleH*0.06f,0.003f,0.02f);
-    u32 triCount=modelTriangleCounts[triMesh]; if(!triCount)return ctx.best;
-    if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh, triMx, hb, &ctx); }
-    else { for (u32 ti=0;ti<triCount;++ti) { V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc); } }
-    CvxMshFillExtraPoints(&ctx);
-    return ctx.best;
+      hb.mn.x=1e9f;hb.mn.y=1e9f;hb.mn.z=1e9f;hb.mx.x=-1e9f;hb.mx.y=-1e9f;hb.mx.z=-1e9f; for (int i=0;i<8;++i){ V3 w=MvVert(hullMx,c[i]); hb.mn.x=vmin(hb.mn.x,w.x); hb.mn.y=vmin(hb.mn.y,w.y); hb.mn.z=vmin(hb.mn.z,w.z); hb.mx.x=vmax(hb.mx.x,w.x); hb.mx.y=vmax(hb.mx.y,w.y); hb.mx.z=vmax(hb.mx.z,w.z); } }
+    ctx.hb=hb; ctx.hullCenter = V3_ScaleByF(V3_AplusB(hb.mn, hb.mx), 0.5f); ctx.hullRadius = V3_Mag(V3_AsubB(hb.mx, hb.mn)) * 0.5f; V3 hext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(hext.x,vmax(hext.y,hext.z))*0.15f); float wscaleH=V3_Mag((V3){hullMx[0],hullMx[1],hullMx[2]}); ctx.thicknessTolerance=vclamp(modelBounds[hullMesh]*wscaleH*0.06f,0.003f,0.02f);
+    u32 triCount=modelTriangleCounts[triMesh]; if(!triCount)return ctx.best; if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh, triMx, hb, &ctx); } else { for (u32 ti=0;ti<triCount;++ti) { V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc); } } CvxMshFillExtraPoints(&ctx); return ctx.best;
 }
 
 void obb_axes(Quaternion q, V3 *ax, V3 *ay, V3 *az) { *ax=quat_rot_v3(q,(V3){1,0,0}); *ay=quat_rot_v3(q,(V3){0,1,0}); *az=quat_rot_v3(q,(V3){0,0,1}); }
 AABB3 BoxWorldAABB(ShapeBox b) { V3 x,y,z; obb_axes(b.rot,&x,&y,&z); V3 hx=V3_ScaleByF(x,b.hExt.x), hy=V3_ScaleByF(y,b.hExt.y), hz=V3_ScaleByF(z,b.hExt.z); V3 e ={vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)}; return (AABB3){V3_AsubB(b.ctr,e),V3_AplusB(b.ctr,e)}; }
 static Manifold BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
-    Manifold z={0}; if(triMesh>=MAX_MDLS||!modelTriangleCounts[triMesh]) return z;
-    CvxMshCtx ctx={0}; ctx.boxShape=box; ctx.adjHull=U16_MAX;
-    AABB3 hb=BoxWorldAABB(box); float skin=0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin; ctx.hb=hb;
-    ctx.hullCenter=box.ctr; ctx.hullRadius=V3_Mag(box.hExt);
-    V3 ext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(ext.x,vmax(ext.y,ext.z))*0.15f);
-    ctx.thicknessTolerance=vclamp(V3_Mag(box.hExt)*0.06f,0.003f,0.02f);
-    V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az);
-    V3 hx=V3_ScaleByF(ax,box.hExt.x),hy=V3_ScaleByF(ay,box.hExt.y),hz=V3_ScaleByF(az,box.hExt.z);
-    V3 bv[8]={V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz),
+    Manifold z={0}; if(triMesh>=MAX_MDLS||!modelTriangleCounts[triMesh]) return z; CvxMshCtx ctx={0}; ctx.boxShape=box; ctx.adjHull=U16_MAX; AABB3 hb=BoxWorldAABB(box); float skin=0.02f; hb.mn.x-=skin; hb.mn.y-=skin; hb.mn.z-=skin; hb.mx.x+=skin; hb.mx.y+=skin; hb.mx.z+=skin; ctx.hb=hb; ctx.hullCenter=box.ctr; ctx.hullRadius=V3_Mag(box.hExt);
+    V3 ext=V3_AsubB(hb.mx,hb.mn); ctx.spreadEps=vmax(0.02f,vmax(ext.x,vmax(ext.y,ext.z))*0.15f); ctx.thicknessTolerance=vclamp(V3_Mag(box.hExt)*0.06f,0.003f,0.02f); V3 ax,ay,az; obb_axes(box.rot,&ax,&ay,&az); V3 hx=V3_ScaleByF(ax,box.hExt.x),hy=V3_ScaleByF(ay,box.hExt.y),hz=V3_ScaleByF(az,box.hExt.z);
+    V3 bv[8]={V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz), 
               V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz),  V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
-    ctx.boxV=bv; ctx.boxN=8; if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh,triMx,ctx.hb,&ctx); }
-    else { u32 triCount=modelTriangleCounts[triMesh]; for(u32 ti=0;ti<triCount;++ti){V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc);} }
-    CvxMshFillExtraPoints(&ctx);
-    if(ctx.best.n) ctx.best.normal=V3_ScaleByF(ctx.best.normal,-1.f);
-    return ctx.best;
+    ctx.boxV=bv; ctx.boxN=8; if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh,triMx,ctx.hb,&ctx); } else { u32 triCount=modelTriangleCounts[triMesh]; for(u32 ti=0;ti<triCount;++ti){V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc);} } CvxMshFillExtraPoints(&ctx); if(ctx.best.n) ctx.best.normal=V3_ScaleByF(ctx.best.normal,-1.f); return ctx.best;
 }
 
 Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 adjA, u16 adjB) {
-    Manifold m={0}; if(meshA>=MAX_MDLS||adjA>=MAX_MDLS||meshB>=MAX_MDLS||adjB>=MAX_MDLS)return m;
-    SupportCtx ctx = (SupportCtx){_supA_hull, _supB_hull, .meshA=meshA, .meshB=meshB, .matA=matA, .matB=matB, .adjA=adjA, .adjB=adjB};
-    GJKResult gjk = RunGJK(&ctx,GJK_ITER); if(!gjk.hit)return m;
-    if(gjk.s.n<4) RunGJKFallback(&ctx,&gjk.s); if(gjk.s.n<4)return m;
+    Manifold m={0}; if(meshA>=MAX_MDLS||adjA>=MAX_MDLS||meshB>=MAX_MDLS||adjB>=MAX_MDLS)return m; SupportCtx ctx = (SupportCtx){_supA_hull, _supB_hull, .meshA=meshA, .meshB=meshB, .matA=matA, .matB=matB, .adjA=adjA, .adjB=adjB}; GJKResult gjk = RunGJK(&ctx,GJK_ITER); if(!gjk.hit)return m; if(gjk.s.n<4) RunGJKFallback(&ctx,&gjk.s); if(gjk.s.n<4)return m;
     EPAState epa; SeedEPA(&epa, &gjk.s);
     for(int it=0;it<EPA_ITER;++it) {
-        int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break;
-        V3 bn=epa.ef[bf].n; V3 wA, wB; GetSupportPair(&ctx, bn, &wA, &wB); V3 sup=V3_AsubB(wA,wB);
+        int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break; V3 bn=epa.ef[bf].n; V3 wA, wB; GetSupportPair(&ctx, bn, &wA, &wB); V3 sup=V3_AsubB(wA,wB);
         if (V3_dot(bn,sup)-bd<PHY_EPSILON) {
-            m.normal=bn; m.maxPen=bd; m.n=1; V3 deepPoint=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); m.p[0]=(ManifoldPt){deepPoint,bd};
-            u32 nVertsB = modelVertexCounts[meshB];
+            m.normal=bn; m.maxPen=bd; m.n=1; V3 deepPoint=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); m.p[0]=(ManifoldPt){deepPoint,bd}; u32 nVertsB = modelVertexCounts[meshB];
             if (nVertsB > 0) {
-                float planeDist=V3_dot(bn,deepPoint),wscaleB=V3_Mag((V3){matB[0],matB[1],matB[2]}),thicknessTolerance=vclamp(modelBounds[meshB]*wscaleB*0.06f,0.003f,0.02f);
-                const u8* vb = (u8*)physPos[meshB];
+                float planeDist=V3_dot(bn,deepPoint),wscaleB=V3_Mag((V3){matB[0],matB[1],matB[2]}),thicknessTolerance=vclamp(modelBounds[meshB]*wscaleB*0.06f,0.003f,0.02f); const u8* vb = (u8*)physPos[meshB]; 
                 for(u32 i=0;i<nVertsB;++i) {
                     const u8* p = vb + i * 12; V3 ptLocal = *(V3*)p; V3 pt = MvVert(matB,ptLocal); float distToPlane=V3_dot(bn,pt)-planeDist;
-                    if (vabs(distToPlane)<thicknessTolerance) { 
-                        float ptPen=bd-distToPlane; 
-                        if(ptPen>0.0f) { bool isDup=false; for(int k=0;k<m.n;++k){V3 diff=V3_AsubB(pt,m.p[k].point); if(V3_dot(diff,diff)<0.00001f){isDup=true; break;}} if(!isDup&&m.n<MANIFOLD_MAX){m.p[m.n++]=(ManifoldPt){pt,ptPen};} if(m.n>=MANIFOLD_MAX){break;} }
-                    }
+                    if (vabs(distToPlane)<thicknessTolerance) { float ptPen=bd-distToPlane;  if(ptPen>0.0f) { bool isDup=false; for(int k=0;k<m.n;++k){V3 diff=V3_AsubB(pt,m.p[k].point); if(V3_dot(diff,diff)<0.00001f){isDup=true; break;}} if(!isDup&&m.n<MANIFOLD_MAX){m.p[m.n++]=(ManifoldPt){pt,ptPen};} if(m.n>=MANIFOLD_MAX){break;} } }
                 }
             } return m;
         } if (!ExpandEPA(&epa,sup,wA,wB)) break;
@@ -513,56 +383,38 @@ void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this su
             for (int p=0;p<sc->m.n;++p) {
                 u16 a = sc->a, b = sc->b; V3 n = sc->m.normal; V3 rAarm = sc->rA[p], rBarm = sc->rB[p]; float targetVn = sc->targetVn[p]; float *accumN = &sc->accumN[p], *accumT = &sc->accumT[p]; bool bStatic = sc->bStatic;
                 float invMassA = sc->invMassA, invMassB = sc->invMassB, invSumN=sc->invSumN[p]; if (invSumN < PHY_EPSILON) continue;
-                bool canRotateA = sc->canRotateA, canRotateB = sc->canRotateB;
-                const float (*Ka)[3]=sc->Ka, (*Kb)[3]=sc->Kb;
-                V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],rAarm)), vAtB = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],rBarm));
-                float vn = V3_dot(V3_AsubB(vAtA,vAtB),n), j = (targetVn - vn) / invSumN, newAccumN = vmax(*accumN + j, 0.0f); 
-                j = newAccumN - *accumN; *accumN = newAccumN;
-                float deltaVn = j * invSumN; if (deltaVn < 0.0f){deltaVn = -deltaVn;} if (deltaVn > maxDelta){maxDelta = deltaVn;}
-                V3 impulse = V3_ScaleByF(n,j); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(impulse,invMassA));
-                if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b],V3_ScaleByF(impulse,invMassB));
-                if (canRotateA) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a],M33_v(Ka,V3_Cross(rAarm,impulse)));
-                if (canRotateB) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b],M33_v(Kb,V3_Cross(rBarm,impulse)));
-                V3 vAtA2 = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],rAarm)), vAtB2 = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],rBarm));
+                bool canRotateA = sc->canRotateA, canRotateB = sc->canRotateB; const float (*Ka)[3]=sc->Ka, (*Kb)[3]=sc->Kb; V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],rAarm)), vAtB = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],rBarm));
+                float vn = V3_dot(V3_AsubB(vAtA,vAtB),n), j = (targetVn - vn) / invSumN, newAccumN = vmax(*accumN + j, 0.0f); j = newAccumN - *accumN; *accumN = newAccumN; float deltaVn = j * invSumN; if (deltaVn < 0.0f){deltaVn = -deltaVn;} if (deltaVn > maxDelta){maxDelta = deltaVn;}
+                V3 impulse = V3_ScaleByF(n,j); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(impulse,invMassA)); if (!bStatic) World.velocity[b] = V3_AsubB(World.velocity[b],V3_ScaleByF(impulse,invMassB)); if (canRotateA) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a],M33_v(Ka,V3_Cross(rAarm,impulse)));
+                if (canRotateB) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b],M33_v(Kb,V3_Cross(rBarm,impulse))); V3 vAtA2 = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],rAarm)), vAtB2 = bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],rBarm));
                 V3 relVel2 = V3_AsubB(vAtA2,vAtB2), tangent = V3_AsubB(relVel2,V3_ScaleByF(n,V3_dot(relVel2,n))); float tLen = V3_Mag(tangent);
                 if (tLen > 0.0001f) {
-                    tangent = V3_ScaleByF(tangent,1.0f/tLen); V3 rAxT = V3_Cross(rAarm,tangent), rBxT = V3_Cross(rBarm,tangent);
-                    float angTermAT = canRotateA ? V3_dot(rAxT,M33_v(Ka,rAxT)) : 0.0f, angTermBT = canRotateB ? V3_dot(rBxT,M33_v(Kb,rBxT)) : 0.0f, invSumT = invMassA + invMassB + angTermAT + angTermBT;
+                    tangent = V3_ScaleByF(tangent,1.0f/tLen); V3 rAxT = V3_Cross(rAarm,tangent), rBxT = V3_Cross(rBarm,tangent); float angTermAT = canRotateA ? V3_dot(rAxT,M33_v(Ka,rAxT)) : 0.0f, angTermBT = canRotateB ? V3_dot(rBxT,M33_v(Kb,rBxT)) : 0.0f, invSumT = invMassA + invMassB + angTermAT + angTermBT;
                     if (invSumT > PHY_EPSILON) {
-                        float jt = -V3_dot(relVel2,tangent) / invSumT, friction; bool aIsSpecial = (World.col[a] == COLTYPE_CAP && (a == PLAYER1 || IdxIsNPC(World.instances[a].index)));
-                        if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.005f) / 0.10f, 0.0f, 1.0f); friction = 0.8f + mix * (0.6f - 0.8f); }
+                        float jt = -V3_dot(relVel2,tangent) / invSumT, friction; bool aIsSpecial = (World.col[a] == COLTYPE_CAP && (a == PLAYER1 || IdxIsNPC(World.instances[a].index))); if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.005f) / 0.10f, 0.0f, 1.0f); friction = 0.8f + mix * (0.6f - 0.8f); }
                         float maxT = friction * (*accumN), newAccumT = vclamp(*accumT + jt, -maxT, maxT); jt = newAccumT - *accumT; *accumT = newAccumT; float deltaVt = jt * invSumT; if (deltaVt < 0.0f) deltaVt = -deltaVt; if (deltaVt > maxDelta) maxDelta = deltaVt;
                         V3 fImpulse=V3_ScaleByF(tangent,jt); World.velocity[a]=V3_AplusB(World.velocity[a],V3_ScaleByF(fImpulse,invMassA)); if (!bStatic){World.velocity[b]=V3_AsubB(World.velocity[b],V3_ScaleByF(fImpulse,invMassB));}
                         if (canRotateA){World.angularVelocity[a]=V3_AplusB(World.angularVelocity[a],M33_v(Ka,V3_Cross(rAarm,fImpulse)));} if (canRotateB){World.angularVelocity[b]=V3_AsubB(World.angularVelocity[b],M33_v(Kb,V3_Cross(rBarm,fImpulse)));}
                     }
                 }
             }
-        }
-        if (maxDelta < 0.005f) break; // Don't use all iters if not needed.
+        } if (maxDelta < 0.005f) break; // Don't use all iters if not needed.
     }
 }
 
 void DrawSphereContact(V3 pos, float rad);
 void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
-    if (!m->n || (World.col[b] == COLTYPE_MSH && World.col[a] == COLTYPE_MSH)) return;
-    if (gContactCount >= MAX_GLOBAL_CONTACTS) { DualLogWarn("Ran out of global contact slots!\n"); return; }
-    SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m;
-    sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == COLTYPE_NONE || World.col[b] == COLTYPE_MSH || World.physSleep[b]);
-    for (int i=0;i<m->n;++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} }
-    quat_to_mat3(World.rotation[a],sc->Ra); BuildInvInertiaMatrix(a,sc->Ra,sc->Ka);
-    if (!sc->bStatic) { quat_to_mat3(World.rotation[b],sc->Rb); BuildInvInertiaMatrix(b,sc->Rb,sc->Kb); }
-    sc->invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a]; sc->invMassB = (sc->bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
+    if (!m->n || (World.col[b] == COLTYPE_MSH && World.col[a] == COLTYPE_MSH)) return; if (gContactCount >= MAX_GLOBAL_CONTACTS) { DualLogWarn("Ran out of global contact slots!\n"); return; }
+    SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m; sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == COLTYPE_NONE || World.col[b] == COLTYPE_MSH || World.physSleep[b]);
+    for (int i=0;i<m->n;++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} } quat_to_mat3(World.rotation[a],sc->Ra); BuildInvInertiaMatrix(a,sc->Ra,sc->Ka);
+    if (!sc->bStatic) { quat_to_mat3(World.rotation[b],sc->Rb); BuildInvInertiaMatrix(b,sc->Rb,sc->Kb); } sc->invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a]; sc->invMassB = (sc->bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
     sc->canRotateA = (World.col[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index)); sc->canRotateB = (!sc->bStatic && World.col[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index));
-    float bouncinessA = (World.instances[a].index == 485/*proj_plasmarifle_shot*/ ? 0.9f : 0.3f);
-    float bouncinessB = (World.instances[b].index == 485/*proj_plasmarifle_shot*/ ? 0.9f : 0.3f); if (sc->bStatic) bouncinessB = 0.0f;
+    float bouncinessA = (World.instances[a].index == 485/*proj_plasmarifle_shot*/ ? 0.9f : 0.3f); float bouncinessB = (World.instances[b].index == 485/*proj_plasmarifle_shot*/ ? 0.9f : 0.3f/*Everything is slightly responsive bounce*/); if (sc->bStatic) bouncinessB = 0.0f;
     if (a == PLAYER1 || b == PLAYER1 || IdxIsNPC(a) || IdxIsNPC(b)) bouncinessA = bouncinessB = 0.0f;
     for (int i=0;i<m->n;++i) {
-        sc->rA[i] = V3_AsubB(m->p[i].point,World.position[a]); sc->rB[i] = sc->bStatic ? (V3){0,0,0} : V3_AsubB(m->p[i].point,World.position[b]);
-        V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],sc->rA[i])), vAtB = sc->bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],sc->rB[i]));
-        float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal), e_r = (vn0 < -0.5f) ? vmax(bouncinessA,bouncinessB) : 0.0f;
-        sc->targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f; sc->targetVn[i] += 0.22f * vmax(m->p[i].pen - 0.06f, 0.0f) / dt; // per-point Baumgarte bias, frozen at gather time
-        V3 rAxN = V3_Cross(sc->rA[i],m->normal), rBxN = V3_Cross(sc->rB[i],m->normal);
-        sc->invSumN[i] = sc->invMassA + sc->invMassB + (sc->canRotateA ? V3_dot(rAxN,M33_v(sc->Ka,rAxN)) : 0.0f) + (sc->canRotateB ? V3_dot(rBxN,M33_v(sc->Kb,rBxN)) : 0.0f); sc->accumN[i] = 0.0f; sc->accumT[i] = 0.0f; // no warm-starting across substeps
+        sc->rA[i] = V3_AsubB(m->p[i].point,World.position[a]); sc->rB[i] = sc->bStatic ? (V3){0,0,0} : V3_AsubB(m->p[i].point,World.position[b]); V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],sc->rA[i])), vAtB = sc->bStatic ? (V3){0,0,0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],sc->rB[i]));
+        float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal), e_r = (vn0 < -0.5f) ? vmax(bouncinessA,bouncinessB) : 0.0f; sc->targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f; sc->targetVn[i] += 0.22f * vmax(m->p[i].pen - 0.06f, 0.0f) / dt; // per-point Baumgarte bias, frozen at gather time
+        V3 rAxN = V3_Cross(sc->rA[i],m->normal), rBxN = V3_Cross(sc->rB[i],m->normal); sc->invSumN[i] = sc->invMassA + sc->invMassB + (sc->canRotateA ? V3_dot(rAxN,M33_v(sc->Ka,rAxN)) : 0.0f) + (sc->canRotateB ? V3_dot(rBxN,M33_v(sc->Kb,rBxN)) : 0.0f); sc->accumN[i] = 0.0f; sc->accumT[i] = 0.0f; // no warm-starting across substeps
     }
 }
 
@@ -572,7 +424,7 @@ static void EntityColliderMatrixNow(u16 i, float M[16]) { // Convex meshes need 
 }
 
 static bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {
-    V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx = V3_dot(d,ax), ly = V3_dot(d,ay), lz = V3_dot(d,az);
+    V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx = V3_dot(d,ax), ly = V3_dot(d,ay), lz = V3_dot(d,az); 
     float cx = vclamp(lx,-box.hExt.x,box.hExt.x), cy = vclamp(ly,-box.hExt.y,box.hExt.y), cz = vclamp(lz,-box.hExt.z,box.hExt.z); float dx = lx-cx, dy = ly-cy, dz = lz-cz; return (dx*dx + dy*dy + dz*dz) <= radius*radius;
 }
 
@@ -594,20 +446,14 @@ void Physics(float dt) {
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0;
         for (u16 t=0;t<128;++t) triggerVolumes[t]=0xFFFF;
         for (u16 i=0;i<World.instCount;++i) { // 0. Broadphase cell lists
-            posBudget[i] = 0.64f; World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z);
-            World.instances[i].cellIndex=PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ);
-            u32 cell=(u32)World.instances[i].cellIndex; if(cell < WORLDX*WORLDX && cellCounts[cell] < 128){cellLists[cell][cellCounts[cell]++]=i;}
-            u16 idx=World.instances[i].index;
-            if (unlikely(((idx >= 595 && idx <= 601) || idx == 746) && (World.instances[i].entflags & EF_ACTIVE) && numTriggers < 128)) triggerVolumes[numTriggers++] = i;
+            posBudget[i] = 0.64f; World.instances[i].cellX=(i16)PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ=(i16)PosGetCellCoordZ(World.position[i].z); World.instances[i].cellIndex=PosGetCellCoordsP(World.instances[i].cellX,World.instances[i].cellZ);
+            u32 cell=(u32)World.instances[i].cellIndex; if(cell < WORLDX*WORLDX && cellCounts[cell] < 128){cellLists[cell][cellCounts[cell]++]=i;} u16 idx=World.instances[i].index; if (unlikely(((idx >= 595 && idx <= 601) || idx == 746) && (World.instances[i].entflags & EF_ACTIVE) && numTriggers < 128)) triggerVolumes[numTriggers++] = i;
         }
         if (numTriggers >= 127){DualLogWarn("Ran out of triggers!\n");} gContactCount=0;
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
-            u16 a=dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f;
-            acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
-            if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; }
-            else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
-            float linDrag = vexp(-0.1f * dtsub); World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag;
-            float angDrag = vexp(-2.0f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag);
+            u16 a=dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
+            if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; } else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
+            float linDrag = vexp(-0.1f * dtsub); World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; float angDrag = vexp(-2.0f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag);
             SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
             if (World.col[a] != COLTYPE_CAP) {
                 if (unlikely(!V3_IsSane(World.angularVelocity[a]))) { World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f}; }
@@ -629,14 +475,9 @@ void Physics(float dt) {
                 for (i32 dz = -radCells; dz <= radCells; ++dz) { // 2. Collisions
                     u32 cell = PosGetCellCoordsP(cx + dx,cz + dz);
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
-                        u16 b = cellLists[cell][k]; if (b == a || b >= World.instCount) continue;
-                        u8 colB = World.col[b]; ShapeBox boxB = colB==COLTYPE_BOX ? Entity_GetBox(b) : (ShapeBox){0}; ShapeCapsule capB = colB==COLTYPE_CAP ? Entity_GetCap(b) : (ShapeCapsule){0}; ShapeSphere sphB = colB==COLTYPE_SPH ? Entity_GetSph(b) : (ShapeSphere){0};
-                        if (unlikely(Cheats.noclip && b == PLAYER1)) continue;
-                        if (!(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue;
-                        if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !World.physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
-                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
-                        Manifold mf = {0}; float matB[16]; const float *mxB = &world_from_mdl[b*16];
-                        if (World.col[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
+                        u16 b = cellLists[cell][k]; if (b == a || b >= World.instCount) continue; u8 colB = World.col[b]; ShapeBox boxB = colB==COLTYPE_BOX ? Entity_GetBox(b) : (ShapeBox){0}; ShapeCapsule capB = colB==COLTYPE_CAP ? Entity_GetCap(b) : (ShapeCapsule){0}; ShapeSphere sphB = colB==COLTYPE_SPH ? Entity_GetSph(b) : (ShapeSphere){0};
+                        if (unlikely(Cheats.noclip && b == PLAYER1)) continue; if (!(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue; if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !World.physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
+                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue; Manifold mf = {0}; float matB[16]; const float *mxB = &world_from_mdl[b*16]; if (World.col[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
                         if      (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_CAP) { mf = OverlapToManifold(CapCap(capA,capB)); }
                         else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_BOX) { mf = OverlapToManifold(CapBox(capA,boxB)); }
                         else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_SPH) { Overlap r=SphCap(sphB,capA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.f); mf=OverlapToManifold(r); }
@@ -662,83 +503,55 @@ void Physics(float dt) {
                     }
                 }
             }
-            World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false);
-            for (int c = 0; c < contactCount; ++c) {
-                Manifold *mfp=&contactsMani[c]; World.colliding[a]=World.colliding[contactsOther[c]]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f})>=0.574f) {World.instances[a].entflags |= EF_GROUNDED;} PrepareSolverContact(a,contactsOther[c],mfp,dt);
-            }
+            World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false); for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; World.colliding[a]=World.colliding[contactsOther[c]]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f})>=0.574f) {World.instances[a].entflags |= EF_GROUNDED;} PrepareSolverContact(a,contactsOther[c],mfp,dt); }
             World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
         }
         SolveGlobalContacts(); // 3. Restitution
         for (u32 c=0; c<gContactCount; ++c) { // 3.5 Positional Correction (Projection)
-            SolverContact *sc = &gContacts[c];
-            float avgPen = 0.0f;
-            for (int p=0; p<sc->m.n; ++p) avgPen += sc->m.p[p].pen;
-            if (sc->m.n > 0) avgPen /= (float)sc->m.n;
-            float correction = vmax(avgPen - 0.005f, 0.0f) * 0.4f;
-            float massDiv = sc->invMassA + sc->invMassB + PHY_EPSILON;
-            SetPosition(sc->a, V3_AplusB(World.position[sc->a], V3_ScaleByF(sc->m.normal, correction * sc->invMassA / massDiv)));
+            SolverContact *sc = &gContacts[c]; float avgPen = 0.0f; for (int p=0; p<sc->m.n; ++p) avgPen += sc->m.p[p].pen; if (sc->m.n > 0)avgPen/=(float)sc->m.n; float correction=vmax(avgPen-0.005f,0.0f)*0.4f; float massDiv=sc->invMassA+sc->invMassB+PHY_EPSILON; SetPosition(sc->a,V3_AplusB(World.position[sc->a],V3_ScaleByF(sc->m.normal,correction*sc->invMassA/massDiv)));
             if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
         bool ladderTouched = false; World.invP1.radiationArea=World.Sys_Music.inZone=World.Sys_Music.elevator=World.Sys_Music.cyberTube=World.Sys_Music.distortion=false; World.gravity[PLAYER1] = 1.0f;
         for (u16 i=0;i<numTriggers;++i) {
-            u16 self = triggerVolumes[i];
-            u16 trigdx=World.instances[self].index;
-            if (Cheats.showPhys) DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f});
-            ShapeBox trigBox = Entity_GetBox(self);
+            u16 self = triggerVolumes[i]; u16 trigdx=World.instances[self].index; if (Cheats.showPhys) DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f}); ShapeBox trigBox = Entity_GetBox(self);
             for (u16 o=0;o<dynamicEntityCount;++o) { // 4. Triggers
-                u16 other = dynamicEntities[o]; if (World.col[other] == COLTYPE_NONE || !(World.instances[other].entflags & EF_ACTIVE)) continue;
-                float otherRadius = World.colliderSize[other].x * vmax(vmax(World.scale[other].x,World.scale[other].y),World.scale[other].z); if (otherRadius <= 0.0f) otherRadius = 0.32f;
-                bool touches = false;
-                if(World.col[other] == COLTYPE_CAP){ShapeCapsule oc=Entity_GetCap(other); V3 capMid=V3_ScaleByF(V3_AplusB(oc.tip,oc.base),0.5f); touches=CapsuleTouchesOBB(oc.base,otherRadius,trigBox) || CapsuleTouchesOBB(capMid,otherRadius,trigBox) || CapsuleTouchesOBB(oc.tip,otherRadius,trigBox);}
-                else touches=CapsuleTouchesOBB(World.position[other],otherRadius,trigBox);
-                if (!touches) continue;
-                if (other != PLAYER1 && trigdx == 596) { trigger_gravitylift_touch(self,other); continue; }
+                u16 other = dynamicEntities[o]; if (World.col[other] == COLTYPE_NONE || !(World.instances[other].entflags & EF_ACTIVE)) continue; float otherRadius = World.colliderSize[other].x * vmax(vmax(World.scale[other].x,World.scale[other].y),World.scale[other].z); if (otherRadius <= 0.0f) otherRadius = 0.32f;
+                bool touches = false; 
+                if(World.col[other] == COLTYPE_CAP){ShapeCapsule oc=Entity_GetCap(other); V3 capMid=V3_ScaleByF(V3_AplusB(oc.tip,oc.base),0.5f); touches=CapsuleTouchesOBB(oc.base,otherRadius,trigBox) || CapsuleTouchesOBB(capMid,otherRadius,trigBox) || CapsuleTouchesOBB(oc.tip,otherRadius,trigBox);} else touches=CapsuleTouchesOBB(World.position[other],otherRadius,trigBox);
+                if (!touches) continue; if (other != PLAYER1 && trigdx == 596) { trigger_gravitylift_touch(self,other); continue; }
                 switch(trigdx) {
-                    case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;
-                    case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force*(float)World.deltaTime),false); World.Sys_Music.cyberTube=true;} break;
-                    case 596/*trigger_gravitylift*/:trigger_gravitylift_touch(self,other); break;
-                    case 597/*trigger_ladder*/:if(other == PLAYER1){World.invP1.ladderState=1; ladderTouched=true; ladderTopY=trigBox.ctr.y + trigBox.hExt.y;} break;
-                    case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;
-                    case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elevator); World.Sys_Music.distortion=(tt == TT_Distortion);} break;
-                    case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */
-                    case 746/*weapon_grenadeenergmine_live*/:if(other == PLAYER1){TakeEnergy(256.0f);} break;
+                    case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;   case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force*(float)World.deltaTime),false); World.Sys_Music.cyberTube=true;} break;
+                    case 596/*trigger_gravitylift*/:trigger_gravitylift_touch(self,other); break;  case 597/*trigger_ladder*/:if(other == PLAYER1){World.invP1.ladderState=1; ladderTouched=true; ladderTopY=trigBox.ctr.y + trigBox.hExt.y;} break;
+                    case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;  case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elevator); World.Sys_Music.distortion=(tt == TT_Distortion);} break;
+                    case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */ case 746/*weapon_grenadeenergmine_live*/:if(other == PLAYER1){TakeEnergy(256.0f);} break;
                 }
             }
         }
-        ladderWalkOff = ladderTouched && (World.position[PLAYER1].y > ladderTopY + 0.48f);
-        if (!ladderTouched) World.invP1.ladderState=0;
+        ladderWalkOff = ladderTouched && (World.position[PLAYER1].y > ladderTopY + 0.48f); if (!ladderTouched) World.invP1.ladderState=0;
     }
     {   const i32 WAKE_CELLS = 2;
         for (u32 i=0;i<World.instCount;++i) {
-            if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true);
-            u32 ef = World.instances[i].entflags; bool canSleep = (i!=PLAYER1) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && (World.col[i]!=COLTYPE_NONE) && (World.mass[i] >= 0.001f); if (!canSleep) { World.physSleep[i]=0; continue; }
+            if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true); u32 ef = World.instances[i].entflags; bool canSleep = (i!=PLAYER1) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && (World.col[i]!=COLTYPE_NONE) && (World.mass[i] >= 0.001f); if (!canSleep) { World.physSleep[i]=0; continue; }
             i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z); bool nearAwake = false;
             for (i32 dx=-WAKE_CELLS; dx<=WAKE_CELLS && !nearAwake; ++dx)
               for (i32 dz=-WAKE_CELLS; dz<=WAKE_CELLS && !nearAwake; ++dz) {
                 u32 cl = PosGetCellCoordsP(cx+dx,cz+dz);
                 for (u16 k=0;k<cellCounts[cl];++k) {
-                    u16 j = cellLists[cl][k]; if (j==i) continue;
-                    u32 ej = World.instances[j].entflags; if (World.physSleep[j] || !(ej & EF_ACTIVE)) continue; // asleep/inactive bodies don't wake others
-                    float sj2 = V3_dot(World.velocity[j], World.velocity[j]);
-                    bool jMoving = sj2 > 0.0025f; bool jAnimWaking = AnimWaking(j); if (!(jMoving || jAnimWaking)) continue; // not a waker -> lets i sleep
-                    V3 d = V3_AsubB(World.position[i], World.position[j]);
-                    float rr = World.radius[i] + World.radius[j] + (jMoving ? 2.0f * vsqrtf(sj2) : 0.0f); // mover reach only when actually translating
-                    if (V3_dot(d,d) < rr*rr) { nearAwake=true; break; }
+                    u16 j = cellLists[cl][k]; if (j==i) continue; u32 ej = World.instances[j].entflags; if (World.physSleep[j] || !(ej & EF_ACTIVE)) continue;/*asleep/inactive bodies don't wake others*/
+                    float sj2 = V3_dot(World.velocity[j], World.velocity[j]); bool jMoving = sj2 > 0.0025f; bool jAnimWaking = AnimWaking(j); if (!(jMoving || jAnimWaking)) continue; /*not a waker -> lets i sleep*/
+                    V3 d = V3_AsubB(World.position[i], World.position[j]); float rr = World.radius[i] + World.radius[j] + (jMoving ? 2.0f * vsqrtf(sj2) : 0.0f);/*mover reach only when actually translating*/ if (V3_dot(d,d) < rr*rr) { nearAwake=true; break; }
                 }
             }
-            if (World.physSleep[i]) { if (nearAwake) World.physSleep[i]=0; }
-            else if (!nearAwake && (ef & EF_GROUNDED)) { float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]); if (sp2 < 0.0025f && asp2 < 0.0025f) { World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; } }
+            if (World.physSleep[i]) { if (nearAwake) World.physSleep[i]=0; } else if (!nearAwake && (ef & EF_GROUNDED)) { float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]); if (sp2 < 0.0025f && asp2 < 0.0025f) { World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; } }
         }
     }
-    if (World.invP1.radiationArea && World.instances[PLAYER1].radiation > 0.0f){AppendTextWarning(184,-1,-1,-T_WHITE,1);/*Radation Area*/} else {World.invP1.radiationArea = false; tWrnFinished[1]=0.0;}
-    if (World.instances[PLAYER1].radiation > 0.1f){AppendTextWarning(185,-1,186,T_RED,2);/*Radiation poisoning ##LBP*/} else {World.instances[PLAYER1].radiation = 0.0f; tWrnFinished[2]=0.0;}
+    if(World.invP1.radiationArea && World.instances[PLAYER1].radiation > 0.0f){AppendTextWarning(184,-1,-1,-T_WHITE,1);/*Radation Area*/}else{World.invP1.radiationArea=false; tWrnFinished[1]=0.0;} if(World.instances[PLAYER1].radiation > 0.1f){AppendTextWarning(185,-1,186,T_RED,2);/*Radiation poisoning ##LBP*/}else{World.instances[PLAYER1].radiation=0.0f; tWrnFinished[2]=0.0;}
 }
 
 void AddForce(u16 i, V3 f, bool imp) { if (imp) { World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f / vmax(World.mass[i],0.001f))); } else { World.instances[i].accumulatedForce = V3_AplusB(World.instances[i].accumulatedForce,f); } }
 INLINE float smooth_damp(float cur, float targ, float* vel, float tm, float dt) { float o=2.0f / vmax(tm,0.0001f); float x=o * dt; float exp=1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x); float d=cur - targ; float t=(*vel + o * d) * dt; *vel=(*vel - o * t) * exp; return targ + (d + t) * exp; }
 bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
-    float oldHeight = World.colliderSize[playerIdx].y; V3 oldPos = World.position[playerIdx];
-    World.colliderSize[playerIdx].y = targetHeight; World.position[playerIdx].y += (targetHeight - oldHeight); // Temporarily morph player into the standing capsule
+    float oldHeight = World.colliderSize[playerIdx].y; V3 oldPos = World.position[playerIdx]; World.colliderSize[playerIdx].y = targetHeight; World.position[playerIdx].y += (targetHeight - oldHeight); // Temporarily morph player into the standing capsule
     bool blocked = false; i32 cx=PosGetCellCoordX(World.position[playerIdx].x), cz=PosGetCellCoordZ(World.position[playerIdx].z); u32 mask=GetCollisionMask(World.layer[playerIdx]);
     for (i32 dx = -1; dx <= 1 && !blocked; ++dx) {
         for (i32 dz = -1; dz <= 1 && !blocked; ++dz) {
@@ -753,11 +566,9 @@ void ApplyPlayerMovements(float dt) {
     Entity *p = &World.instances[PLAYER1]; Quaternion r = World.rotation[PLAYER1]; float leanSpeed = 70.0f, leanMaxAngle = 35.0f; float leanInput = (float)LeanLeft() - (float)LeanRight(); bool doubleTapLean = DoubleTapLeanLeft() || DoubleTapLeanRight();
     bool movingForward = Forward() > 0.1f, leanRight = leanInput < 0.0f, leanLeft = leanInput > 0.0f;
     if (doubleTapLean) { World.invP1.leanResetting = true; World.invP1.leanVelocity = 0.0f; KeyState *kL = GetCodeMapping(7), *kR = GetCodeMapping(8); kL->pressed = kR->pressed = false; } // Double-tap lean: initiate smooth reset to upright over 0.2 seconds
-    if (World.invP1.leanResetting) { 
-        World.invP1.leanTarget = smooth_damp(World.invP1.leanTarget,0.0f,&World.invP1.leanVelocity,0.2f,dt); 
-        if(vabs(World.invP1.leanTarget) < 0.5f){World.invP1.leanTarget=World.invP1.leanVelocity=0.0f; World.invP1.leanResetting=false;} 
-    } else {
-        if (leanLeft || leanRight) { if(leanLeft){World.invP1.leanRightTapFinished =0;} if(leanRight){World.invP1.leanLeftTapFinished=0;} World.invP1.leanTarget=vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt),-leanMaxAngle,leanMaxAngle); }
+    if (World.invP1.leanResetting) { World.invP1.leanTarget = smooth_damp(World.invP1.leanTarget,0.0f,&World.invP1.leanVelocity,0.2f,dt); if(vabs(World.invP1.leanTarget) < 0.5f){World.invP1.leanTarget=World.invP1.leanVelocity=0.0f; World.invP1.leanResetting=false;} }
+    else {
+        if (leanLeft || leanRight) { if(leanLeft){World.invP1.leanRightTapFinished =0;} if(leanRight){World.invP1.leanLeftTapFinished=0;} World.invP1.leanTarget=vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt),-leanMaxAngle,leanMaxAngle); } 
         else if (movingForward) { if (vabs(World.invP1.leanTarget) < 0.5f) { World.invP1.leanTarget = 0.0f; } else { World.invP1.leanTarget -= (World.invP1.leanTarget > 0.0f ? 1.0f : -1.0f) * leanSpeed * dt; } }
     }
     World.cam_roll = World.invP1.leanTarget; float targetRatio=1.0f, transitionSec=0.2f; float currentRatio=World.invP1.currentCrouchRatio;
@@ -823,11 +634,11 @@ void ApplyPlayerMovements(float dt) {
     if (grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
         if (velChange > 2.0f && World.invP1.noiseFinished < World.pauseRelativeTime) {
-            RaycastHit lhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp = lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete;
+            RaycastHit lhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp = lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete; 
             play_wav(JumpLandSound(lstp),SfxVol() * (vclamp((velChange - 1.0f) / (11.72f - 1.0f),0.0f,1.0f) * (1.0f - 0.5f) * 0.8f * stepVolMod),World.position[PLAYER1],true); World.invP1.noiseFinished = World.pauseRelativeTime + 0.2f;
         }
         if (velChange >= 11.72f && World.invP1.fallPainFinished < World.pauseRelativeTime) {
-            World.invP1.fallPainFinished = World.pauseRelativeTime + 0.5f; DamageData dd = {0}; float falltake = 75.0f - random_range(0.0f,68.0f);
+            World.invP1.fallPainFinished = World.pauseRelativeTime + 0.5f; DamageData dd = {0}; float falltake = 75.0f - random_range(0.0f,68.0f); 
             if (falltake > World.instances[PLAYER1].health && falltake - World.instances[PLAYER1].health < 5.0f) falltake=World.instances[PLAYER1].health - 1.0f; dd.damage = falltake; TakeDamage(PLAYER1,dd); World.invP1.noiseFinished = World.pauseRelativeTime + 0.2f;
         }
     }
