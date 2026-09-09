@@ -614,7 +614,6 @@ void Targetted(u16 activator, u16 self) {
         if (tm) { bool bitOn = QuestBitIsSet(e->questBitID); bool pass = (tm == 1) ? bitOn : !bitOn;/*1==testQuestBitIsOn, 2==testQuestBitIsOff*/ UseTargets(activator, pass ? e->targetIdx : e->targetIfFalseIdx); }
         return;
     }
-    DualLog("Targetted a->ioflags:%u e:%u doorcond:%u\n", aioflags, e->index, ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)));
     if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; } // info_message
     if (e->index == 708) { World.gameFinished = true; return; }
     if (e->index == 707) { EmailTargetted(self); return; } // info_email
@@ -643,7 +642,7 @@ void UseTargets(u16 activator, u16 targetIdx) {
     if(targetIdx == IO_NONE){return;} bool wasActive=World.targetIOActive, succeeded=false; u8 entryLevel = World.currentLevel;
     if (!wasActive) { World.targetIOActive = true; World.targetIOEntryLevel = entryLevel; World.targetIOActivatorIdx = activator; World.targetIOActivatorEntity = World.instances[activator]; World.targetIOActivatorIoflags = World.instances[activator].ioflags; }
     const char* targetname = (targetIdx < ioNameCount) ? ioNames[targetIdx] : ""; // For logging only; matching is u16 compare against the interned table.
-    for (u8 lev = 0; lev < World.numLevels; ++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} DualLog("Target hit: %s on %u (lev %u), timestamp: %f\n",targetname,i,lev,World.pauseRelativeTime); Targetted(activator,i); succeeded=true; } }
+    for (u8 lev = 0; lev < World.numLevels; ++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } }
     if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (!wasActive) {World.targetIOActive=false;}
 }
 // Frob/Use

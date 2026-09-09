@@ -2,8 +2,7 @@
 #include "common.h"
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX];
 static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
-static const float WALK_SPEED=5.7f,SPRINT_SPEED=17.0f,PLAYER_MAX_CYBER_SPEED=10.0f,SPRINT_SPEED_FATIGUED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,PLAYER_PRONE_RATIO=0.32f;
-enum { MANIFOLD_MAX=4, CVXMSH_HULL_CACHE=1024, EPA_MAX_FACES=64, EPA_MAX_VERTS=128, EPA_MAX_EDGES=EPA_MAX_FACES*3, GJK_ITER=32, EPA_ITER=16, SOLVER_ITER_GLOBAL=32, MAX_GLOBAL_CONTACTS=8192 };
+static const float WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,PLAYER_PRONE_RATIO=0.32f;
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3],Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
@@ -14,7 +13,7 @@ INLINE bool AnimWaking(u16 j) {
     u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0;
 }
 // Trigger System
-void AddForce(u16 i, V3 f, bool imp); void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 targetIdx); void DeleteInstance(u16 i); void TakeEnergy(float take);
+void AddForce(u16 i, V3 f, bool imp); void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 targetIdx);
 void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); }
 void CyberItemOnTriggerEnter(u16 self, u16 other) {
     if(other!=PLAYER1){return;} float sfxVol=(float)Sys_Settings.VolumeEffects/100.0f; bool success=false;
@@ -624,7 +623,7 @@ void ApplyPlayerMovements(float dt) {
     V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0}; 
     bool isRunning = (inputLenSq > 0.01f); float speedAdjust = 0.0f; bool setSpeedAdjusted = false; if (Cheats.noclip) { speedAdjust = PLAYER_MAX_CYBER_SPEED*(isSprinting ? 2.5f : 1.5f); setSpeedAdjusted = true; } if (World.curLev==LEVEL_CYBERSPACE) { speedAdjust = PLAYER_MAX_CYBER_SPEED; setSpeedAdjusted = true; }
     BodyState b=World.instances[PLAYER1].bodyState; float v=WALK_SPEED; switch(b){ case BodyState_CrouchingDown: case BodyState_Crouch:v=CROUCH_SPEED; break; case BodyState_Prone: case BodyState_ProningDown: case BodyState_ProningUp:v=PLAYER_MAX_PRONE_SPEED; break; default:break; }
-    if((isSprinting||World.boosterActive) && isRunning){v=World.invP1.fatigue > 80.0f && !World.boosterActive ? SPRINT_SPEED_FATIGUED : SPRINT_SPEED; if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown) v-=(WALK_SPEED-CROUCH_SPEED)*1.5f; else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp) v-=(WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;}
+    if((isSprinting||World.boosterActive) && isRunning){v=World.invP1.fatigue > 80.0f && !World.boosterActive ? 10.0f : World.boosterActive ? 15.0f : 17.0f; if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown) v-=(WALK_SPEED-CROUCH_SPEED)*1.5f; else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp) v-=(WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;}
     float speed = (setSpeedAdjusted ? speedAdjust : v + (World.boosterActive ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f)) + (World.invP1.staminupActive ? 1.0f : 0.0f), accel=World.boosterActive && World.curLev!=LEVEL_CYBERSPACE ? 1.0f : 3.0f; V3 targetVel = V3_ScaleByF(w,speed); 
     if (onLadder && !ladderWalkOff) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed, p->right.z * s * speed * 0.3f}; accel = 5.0f; }
     else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }

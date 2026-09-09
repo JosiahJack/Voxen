@@ -849,7 +849,7 @@ void InitalizeEnvironment() {
     OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free");
 }
 
-void Physics(float dt); void UpdateAnims(void); void UpdateAudio(); bool ScrshotPressed(); void PSys_Update(float); void BioMonitorUpdate(void);
+void Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdate(),PSys_Update(float),BioMonitorUpdate(); bool ScrshotPressed();
 i32 main() {
     InitalizeEnvironment();
     while(1) {
@@ -865,6 +865,7 @@ i32 main() {
         ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ if(World.invP1.hasHardware & HW_BIO){BioMonitorUpdate();} if (!World.paused && !World.menuActive){PSys_Update(World.dt);} UpdateAudio(); gameTime = get_time() - gameT_start;
         if (likely(!World.paused && !World.menuActive)) UpdateInstanceMatrix4x4s(); // Before camviews so camview shadows render same as main pass
         drawCalls=uiDrawCalls=shadDrawCalls=vertsRendered=0; RenderCameraViews();if (likely(!World.paused && !World.menuActive)) CullCore();
+        AudioUpdate();
         Render(false/*!camview*/,0u);
         if (ScrshotPressed() && World.current_time > World.screenshotTimeout) Screenshot();
         for(i32 i=0;i<MAX_KEYS;++i){Sys_Input.keyStates[i].pressed=Sys_Input.keyStates[i].released=false;} for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) {Sys_Input.mouseButtons[i].pressed=Sys_Input.mouseButtons[i].released=false;} Sys_Input.scrollDelta=0; World.currentMouse_dx=World.currentMouse_dy=0; // Reset Input states, can't mset as we want to preserve down state

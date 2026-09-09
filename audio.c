@@ -1,6 +1,5 @@
 // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
 #include "common.h"
-enum{AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS)}; bool PositionVisibleFromPlayerCell(float,float);
 const char* sounds[SOUNDS_COUNT] = {
     ""/*0*/, ""/*1*/, ""/*2*/, ""/*3*/, ""/*4*/, ""/*5*/, ""/*6*/, ""/*7*/, ""/*8*/, ""/*9*/, ""/*10*/, ""/*11*/, ""/*12*/, ""/*13*/, ""/*14*/, ""/*15*/, ""/*16*/, ""/*17*/, ""/*18*/, ""/*19*/, ""/*20*/, ""/*21*/, ""/*22*/, ""/*23*/, ""/*24*/, ""/*25*/, ""/*26*/, ""/*27*/, ""/*28*/, ""/*29*/, ""/*30*/, ""/*31*/, ""/*32*/, ""/*33*/, ""/*34*/, ""/*35*/, ""/*36*/, ""/*37*/, ""/*38*/,
     "buttons/button_beep"/*39*/, "buttons/button_chonk"/*40*/, ""/*41*/, "buttons/button_clickclocktuck"/*42*/, "buttons/button_deny"/*43*/, "buttons/button_lswitch"/*44*/, "buttons/button_swipe"/*45*/, "buttons/keycard_success"/*46*/, "cyborgs/cyborg_die"/*47*/,"cyborgs/cyborg_die2"/*48*/, "cyborgs/cyborg_idle2"/*49*/, "cyborgs/cyborg_shoot"/*50*/,
@@ -101,6 +100,7 @@ const char* FootStepSound(FootStepType fstep) { static const int starts[]={0,268
 const char* JumpSound(FootStepType fstep) { static const int starts[]={0,540,546,552,558,564,570,576,582,588,594,600,606,612,618,624,630,636,642,648,429,651,661,667}; static const int counts[]={0,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,2,4,3,3}; return GetRandomSound(fstep,starts,counts,(int)(sizeof(starts)/sizeof(starts[0]))); }
 const char* JumpLandSound(FootStepType fstep) { static const int starts[]={0,537,543,549,555,561,567,573,579,585,591,597,603,609,615,621,627,633,639,645,428,655,658,664}; static const int counts[]={0,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,10,3,3,3}; return GetRandomSound(fstep,starts,counts,(int)(sizeof(starts)/sizeof(starts[0]))); }
 const char* RustleSound() { return sounds[random_range_u32(459,465)]; } // footsteps/Clothes/rustle01..07 (idle clothes scuff)
+enum{AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS)}; bool PositionVisibleFromPlayerCell(float,float);
 #if defined(_WIN32)
     typedef struct IMMDevice IMMDevice; typedef struct IMMDeviceEnumerator IMMDeviceEnumerator;  typedef struct { unsigned long Data1; u16 Data2,Data3; u8 Data4[8]; } GUID;
     typedef struct{ i32(__stdcall*q)(void*,const void*,void**); u32(__stdcall*a)(void*); u32(__stdcall*Release)(void*); i32(__stdcall* Activate)(void*,const void*,u32,void*,void**);} IMMDeviceVtbl; struct IMMDevice{IMMDeviceVtbl*lpVtbl;};
@@ -780,16 +780,14 @@ static FHandle pcm_fds[8]; static i32 pcm_fd_count = 0; pthread_t audThreadID; v
     void InitAudio() { InitSCFTables(); FHandle first = pcm_open_all(AUDIO_RATE,AUDIO_CHANNELS,AUDIO_FRAMES,AUDIO_PERIODS); if (first == INVALID_FHANDLE) { DualLog("ERROR: No WASAPI audio device found\n"); return; } pcm_fds[0] = first; pcm_fd_count = 1; pthread_create(&audThreadID,NULL,AudThread,NULL); }
 #else // Linux
     typedef void snd_pcm_t;
-    typedef int (*pfnspo)(snd_pcm_t**,const char*,int,int); typedef int (*pfn_snd_pcm_close)(snd_pcm_t*);    typedef int (*pfnspw)(snd_pcm_t*,const void*,u32);
-    typedef int (*pfnspr)(snd_pcm_t*,int,int);              typedef int (*pfnspp)(snd_pcm_t*);               typedef int (*pfnsphps)();
-    typedef int (*pfnsphpa)(snd_pcm_t*,void*);              typedef int (*pfnsphpsa)(snd_pcm_t*,void*,u32);  typedef int (*pfnsphpsf)(snd_pcm_t*,void*,int);
-    typedef int (*pfnsphp)(snd_pcm_t*,void*);               typedef int (*pfnsphpsc)(snd_pcm_t*, void*,u32); typedef int (*pfnsphpsrn)(snd_pcm_t*,void*,u32*,int*);
-    typedef int (*pfnsphpspsn)(snd_pcm_t*,void*,u64*,int*); typedef int (*pfnsphpspn)(snd_pcm_t*,void*,u32*,int*); static snd_pcm_t *apcm; static pfnspw snd_pcm_writei; static pfnspr snd_pcm_recover;
+    typedef int (*pfnspo)(snd_pcm_t**,const char*,int,int); typedef int (*pfn_snd_pcm_close)(snd_pcm_t*);    typedef int (*pfnspw)(snd_pcm_t*,const void*,u32); typedef int (*pfnspr)(snd_pcm_t*,int,int);              typedef int (*pfnspp)(snd_pcm_t*);               typedef int (*pfnsphps)();
+    typedef int (*pfnsphpa)(snd_pcm_t*,void*);              typedef int (*pfnsphpsa)(snd_pcm_t*,void*,u32);  typedef int (*pfnsphpsf)(snd_pcm_t*,void*,int);    typedef int (*pfnsphp)(snd_pcm_t*,void*);               typedef int (*pfnsphpsc)(snd_pcm_t*, void*,u32); typedef int (*pfnsphpsrn)(snd_pcm_t*,void*,u32*,int*);
+    typedef int (*pfnsphpspsn)(snd_pcm_t*,void*,u64*,int*); typedef int (*pfnsphpspn)(snd_pcm_t*,void*,u32*,int*); typedef int (*pfnspa)(snd_pcm_t*); static snd_pcm_t *apcm; static pfnspw snd_pcm_writei; static pfnspr snd_pcm_recover; static pfnspa snd_pcm_avail_update;
     static bool alsa_try_open_default() {
         void *so = dlopen("libasound.so.2",2); if (!so) {so = dlopen("libasound.so",2);} if (!so) { DualLog("Audio: libasound not found\n"); return false; }
         pfnspo spo = dlsym(so,"snd_pcm_open"); pfnsphpa sphpa = dlsym(so,"snd_pcm_hw_params_any"); pfnsphps sphps = dlsym(so,"snd_pcm_hw_params_sizeof"); pfnsphpsa sphpsa = dlsym(so,"snd_pcm_hw_params_set_access"); pfnsphpsf sphpsf = dlsym(so,"snd_pcm_hw_params_set_format"); pfnsphpsc sphpsc = dlsym(so,"snd_pcm_hw_params_set_channels");
-        pfnsphpsrn sphpsrn = dlsym(so,"snd_pcm_hw_params_set_rate_near"); pfnsphpspsn sphpspsn = dlsym(so,"snd_pcm_hw_params_set_period_size_near"); pfnsphpspn sphpspn= dlsym(so,"snd_pcm_hw_params_set_periods_near"); pfnsphp snd_pcm_hw_params = dlsym(so,"snd_pcm_hw_params"); snd_pcm_writei  = dlsym(so,"snd_pcm_writei"); snd_pcm_recover = dlsym(so,"snd_pcm_recover"); 
-        pfnspp spp = dlsym(so,"snd_pcm_prepare"); if (!spo || !sphps || !sphpa || !sphpsa || !sphpsf || !sphpsc || !sphpsrn || !sphpspsn || !sphpspn || !snd_pcm_hw_params || !snd_pcm_writei || !snd_pcm_recover || !spp) { DualLogError("Audio: libasound missing required symbols\n"); return false; }
+        pfnsphpsrn sphpsrn = dlsym(so,"snd_pcm_hw_params_set_rate_near"); pfnsphpspsn sphpspsn = dlsym(so,"snd_pcm_hw_params_set_period_size_near"); pfnsphpspn sphpspn= dlsym(so,"snd_pcm_hw_params_set_periods_near"); pfnsphp snd_pcm_hw_params = dlsym(so,"snd_pcm_hw_params"); snd_pcm_writei  = dlsym(so,"snd_pcm_writei"); snd_pcm_recover = dlsym(so,"snd_pcm_recover"); snd_pcm_avail_update = dlsym(so,"snd_pcm_avail_update");
+        pfnspp spp = dlsym(so,"snd_pcm_prepare"); if (!spo || !sphps || !sphpa || !sphpsa || !sphpsf || !sphpsc || !sphpsrn || !sphpspsn || !sphpspn || !snd_pcm_hw_params || !snd_pcm_writei || !snd_pcm_recover || !snd_pcm_avail_update || !spp) { DualLogError("Audio: libasound missing required symbols\n"); return false; }
         int r = spo(&apcm,"default",0,0);  if (r < 0 ||                            !apcm) { DualLogError("snd_pcm_open('default') failed: %d\n",r); return false; }
         int sz = sphps(); u8 hwp_buf[640]; if (sz > (int)sizeof(hwp_buf)                ) { DualLogError("hw_params_t too large (%d)\n",sz); return false; }
         void *hwp = hwp_buf;               if ((r = sphpa(apcm,hwp))                 < 0) { DualLogError("hw_params_any failed\n"); return false; }                     if ((r = sphpsa(apcm,hwp,3)) < 0) { DualLogError("set_access failed\n"); return false; } if ((r = sphpsf(apcm,hwp,2)) < 0) { DualLogError("set_format S16_LE failed\n"); return false; }
@@ -806,8 +804,8 @@ static FHandle pcm_fds[8]; static i32 pcm_fd_count = 0; pthread_t audThreadID; v
         if (pcm_params_setup(r,&p) >= 0 && pcm_fd_count < 8) pcm_fds[pcm_fd_count++] = r; else { DualLogError("Audio: raw device card=%d dev=%d setup failed, closing\n",card,dev); OS_Close(r); }
     }
 
-    void AudioUpdate() { i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; audio_mix_period(buf); if (apcm) { int r = snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); if (r < 0 && snd_pcm_recover(apcm,r,0) >= 0) { snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); } } }
-    void InitAudio() { InitSCFTables(); if (!alsa_try_open_default()) { for (i32 card = 0; card < 8; card++) { for (i32 dev = 0; dev < 8; dev++) init_pcm_device(card,dev); } if (pcm_fd_count == 0) {DualLogError("Audio: no output device found\n"); return; } } pthread_create(&audThreadID,NULL,AudThread,NULL); }
+    void AudioUpdate(){if(!apcm){return;} int a=snd_pcm_avail_update(apcm); do{i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; audio_mix_period(buf); int r=snd_pcm_writei(apcm,buf,(u32)AUDIO_FRAMES); if(r<0){if(snd_pcm_recover(apcm,r,0)<0)break; continue;} a-=AUDIO_FRAMES;}while(a>=(int)AUDIO_FRAMES); }
+    void InitAudio() { InitSCFTables(); if (!alsa_try_open_default()) { for (i32 card = 0; card < 8; card++) { for (i32 dev = 0; dev < 8; dev++) init_pcm_device(card,dev); } if (pcm_fd_count == 0) {DualLogError("Audio: no output device found\n"); return; } } /*pthread_create(&audThreadID,NULL,AudThread,NULL);*/ }
 #endif
 void* AudThread(void* arg) { (void)arg; while (1) { AudioUpdate(); OS_USleep(1000); } return NULL; }
 // Looping Ambients SFX System
