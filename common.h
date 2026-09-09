@@ -46,16 +46,14 @@ void DualLogError(const char* s, ...); void DualLog(const char* s, ...); void Du
     #define WINAPI __stdcall
     #define INVALID_FHANDLE ((void*) (i64)-1)
     typedef struct { void* handle; } OS_Thread;
-    struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; }; typedef uintptr_t pthread_t; typedef intptr_t pthread_mutex_t,pthread_cond_t; typedef int pthread_condattr_t; typedef u32 pthread_mutexattr_t;
-    typedef struct pthread_attr_t { unsigned p_state; void *stack; size_t s_size; struct sched_param param; } pthread_attr_t;
-    int pthread_create(pthread_t*,const pthread_attr_t*,void*(*func)(void*),void*); int pthread_join(pthread_t,void**); DLL_IMP void* WINAPI GetStdHandle(u32);
+    struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; };
+    DLL_IMP void* WINAPI GetStdHandle(u32);
 #else
     #define INVALID_FHANDLE -1
     typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
     typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
-    struct timespec {i64 tv_sec,tv_nsec;}; typedef u64 pthread_t; typedef u32 pthread_mutexattr_t; typedef struct {u8 _[40];} pthread_mutex_t; typedef struct {u8 _[48];} pthread_cond_t; typedef int pthread_condattr_t;
-    typedef struct {u32 flags; void* stack;} pthread_attr_t;
-    int pthread_create(pthread_t* restrict,const pthread_attr_t* restrict,void*(*start_routine)(void*),void* restrict); int pthread_join(pthread_t,void**); void *dlopen(const char*,int); void *dlsym(void*,const char*); INLINE long OS_Open(const char*,i32,i32);
+    struct timespec {i64 tv_sec,tv_nsec;};
+    void *dlopen(const char*,int); void *dlsym(void*,const char*); INLINE long OS_Open(const char*,i32,i32);
 #endif
 void* mcpy(void *dst, const void *src, size_t n);
 #if defined(_WIN32)
@@ -81,13 +79,12 @@ void* mcpy(void *dst, const void *src, size_t n);
     INLINE int OS_GetNumThreads() { SYSTEM_INFO si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
     INLINE void OS_Free(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x00008000)) DualLogError("VirtualFree failed\n"); }
     INLINE long OS_RawWrite(FHandle fd, const void* buf, size_t count) { u32 w; return WriteFile((void*)fd,(void*)buf,(u32)count,&w,NULL) ? (i64)w : -1; }
-    void* __stdcall GetProcessHeap(); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); void __stdcall Sleep(u32 dwMilliseconds); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
+    void* __stdcall GetProcessHeap(); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
     typedef u32 (__stdcall *LPTHREAD_START_ROUTINE)(void* lpParameter);
     void* __stdcall CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, u32 dwCreationFlags, u32* lpThreadId);
     INLINE u32 WINAPI thrtramp(void* a) { void** b=(void**)a; void*(*fn)(void*)=(void*(*)(void*))b[0]; void* arg=b[1]; HeapFree(GetProcessHeap(),0,b); fn(arg); return 0; }
     INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
     INLINE void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,0xFFFFFFFFUL); CloseHandle(t->handle); t->handle = NULL; }
-    INLINE void OS_USleep(u32 usec) { Sleep((usec + 999) / 1000); }
     INLINE double get_time() { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
 #else
     struct input_id { u16 bustype,vendor,product,version;}; struct input_event { struct { long tv_sec,tv_usec; } time; u16 type,code; i32 value; };
@@ -115,7 +112,6 @@ void* mcpy(void *dst, const void *src, size_t n);
     __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) { head->fn(head->arg); __atomic_store_n(&head->join_futex,1,__ATOMIC_SEQ_CST); SYSCALL3(202,&head->join_futex,1,0x7fffffff);/*futex wake*/  SYSCALL1(60,0); __builtin_unreachable(); }
     INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
     INLINE void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THRSTACKSZ); t->head = NULL; t->stack_base = NULL; }
-    INLINE void OS_USleep(u32 usec) { long ts[2] = {usec / 1000000,(usec % 1000000) * 1000L}; SYSCALL2(35,ts,ts); }
     INLINE double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 1e-9; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif 
 INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
