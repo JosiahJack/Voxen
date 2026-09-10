@@ -13,7 +13,7 @@ const char* creditPages[]={
 "----------------------------------------------------------------------\n"
 "Direct involvement list found...\n"
 "\n"
-"Lead Developer, Programmer, Artist, 3D Modeler\n"
+"Lead Developer, Programmer, Artist, 3D Modeler, Engine Developer\n"
 "W. Josiah Jack, aka Qmaster\n"
 "\n"
 "-3D Modelers-\n"
