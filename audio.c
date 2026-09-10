@@ -570,20 +570,12 @@ static bool WavInit(WaveFile *w, const char *path) {
 }
 
 static u64 WavReadPCMFrames(WaveFile *w, u64 framesToRead, float *out) {
-    if (!w || !out || framesToRead == 0) return 0;
-    u32 bps = w->bitsPerSample; u32 bpf = (u32)w->channels * (bps / 8); if (bpf == 0) return 0;
-    u64 framesLeft=w->bytesRemaining / bpf; if(framesToRead > framesLeft){framesToRead=framesLeft;}
-    u64 totalRead=0; u8  tmp[4096];
+    if(!w || !out || framesToRead == 0){return 0;} u32 bps = w->bitsPerSample; u32 bpf = (u32)w->channels * (bps / 8); if(bpf == 0){return 0;} u64 framesLeft=w->bytesRemaining / bpf; if(framesToRead > framesLeft){framesToRead=framesLeft;} u64 totalRead=0; u8  tmp[4096];
     while (framesToRead > 0) {
-        u64 batchFrames=framesToRead; u64 batchBytes=batchFrames * bpf;
-        if (batchBytes > sizeof(tmp)) { batchFrames = sizeof(tmp) / bpf; batchBytes  = batchFrames * bpf; }
-        long got=OS_Read(w->fp,tmp,(size_t)batchBytes);
-        u64 gotFrames=got / bpf; u64 samples=gotFrames * w->channels;
-        if (bps == 8) { for (u64 i = 0; i < samples; i++) {*out++ = (tmp[i] / 255.0f) * 2.0f - 1.0f;} }
-        else { for (u64 i = 0; i < samples; i++) {i16 s; mcpy(&s,tmp + i*2,2); *out++ = s * (1.0f / 32768.0f);} } // 16bit LE
+        u64 batchFrames=framesToRead; u64 batchBytes=batchFrames * bpf; if (batchBytes > sizeof(tmp)) { batchFrames = sizeof(tmp) / bpf; batchBytes  = batchFrames * bpf; } long got=OS_Read(w->fp,tmp,(size_t)batchBytes); u64 gotFrames=got / bpf; u64 samples=gotFrames * w->channels;
+        if (bps == 8) { for (u64 i = 0; i < samples; i++) {*out++ = (tmp[i] / 255.0f) * 2.0f - 1.0f;} } else { for (u64 i = 0; i < samples; i++) {i16 s; mcpy(&s,tmp + i*2,2); *out++ = s * (1.0f / 32768.0f);} } // 16bit LE
         w->bytesRemaining -= gotFrames * bpf; framesToRead -= gotFrames; totalRead += gotFrames; if (gotFrames < batchFrames) break;
-    }
-    return totalRead;
+    } return totalRead;
 }
 
 typedef struct mp3_channel_s { mp3 dec; bool open; u32 src_rate; u64 frames_decoded; u64 total_frames; float fade_vol,fade_target,fade_step; } mp3_channel_t; typedef struct log_msg_s { float *samples; size_t allocSize; u32 frame_count,frame_pos; } log_msg_t;
@@ -591,25 +583,20 @@ typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos;
 static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static u32 wav_count,ext_count; static u32 mp3_slot; static log_msg_t* log_msg;
 static mp3_channel_t* mp3_ch[2]; static bool mp3_paused=false; static float mp3_remaining[2]; static mp3_channel_t* mp3_fade_out_target[2]; static i32 mp3_fade_out_ms[2];
 static float *resample_stereo(float *src, size_t srcSize, u32 *frames, u32 src_rate, size_t* sz) {
-    if(src_rate == 0){src_rate=AUDIO_RATE;} if (src_rate == AUDIO_RATE){if(sz)*sz=srcSize; return src;}
-    u32 sf=*frames, df=(u32)((u64)sf*AUDIO_RATE/src_rate); float *dst=(float*)OS_Alloc(df*2*sizeof(float)); *sz=df*2*sizeof(float); float ratio=(float)sf/(float)df;
-    for (u32 i=0;i<df;++i) { float pos = i*ratio; u32 a = (u32)pos,b=a+1<sf?a+1:a; float t=pos-(float)a; dst[i*2+0]=src[a*2+0]+t*(src[b*2+0]-src[a*2+0]); dst[i*2+1] = src[a*2+1]+t*(src[b*2+1]-src[a*2+1]); }
-    OS_Free(src,srcSize); *frames=df; return dst;
+    if(src_rate == 0){src_rate=AUDIO_RATE;} if (src_rate == AUDIO_RATE){if(sz)*sz=srcSize; return src;} u32 sf=*frames, df=(u32)((u64)sf*AUDIO_RATE/src_rate); float *dst=OS_Alloc(df*2*sizeof(float)); *sz=df*2*sizeof(float); float ratio=(float)sf/(float)df;
+    for (u32 i=0;i<df;++i) { float pos = i*ratio; u32 a = (u32)pos,b=a+1<sf?a+1:a; float t=pos-(float)a; dst[i*2+0]=src[a*2+0]+t*(src[b*2+0]-src[a*2+0]); dst[i*2+1] = src[a*2+1]+t*(src[b*2+1]-src[a*2+1]); } OS_Free(src,srcSize); *frames=df; return dst;
 }
 
 static void WavUnInit(WaveFile *w) { if (w->fp != INVALID_FHANDLE) { OS_Close(w->fp); w->fp = INVALID_FHANDLE; } }
 static float *load_wav(const char *path,u32 *out_frames, size_t* sz) {
-    WaveFile wav; if (!WavInit(&wav,path)) {return NULL;} if (wav.channels > 2) { WavUnInit(&wav); return NULL; }
-    u64 frames = wav.totalPCMFrameCount; float *buf = (float*)OS_Alloc(frames*AUDIO_CHANNELS*sizeof(float)); size_t bufSize = frames*AUDIO_CHANNELS*sizeof(float); u64 got = WavReadPCMFrames(&wav,frames,buf);
-    if (wav.channels == 1) for (i64 i=(i64)got-1;i>=0;i--) { buf[i*2+1]=buf[i]; buf[i*2]=buf[i]; }
-    u32 src_rate = wav.sampleRate; WavUnInit(&wav); *out_frames = (u32)got; return resample_stereo(buf,bufSize,out_frames,src_rate,sz); // Reallocates and returns new buffer, freeing the buf alloc'ed here
+    WaveFile wav; if (!WavInit(&wav,path)) {return NULL;} if (wav.channels > 2) { WavUnInit(&wav); return NULL; } u64 frames = wav.totalPCMFrameCount; float *buf=OS_Alloc(frames*AUDIO_CHANNELS*sizeof(float)); size_t bufSize = frames*AUDIO_CHANNELS*sizeof(float); u64 got = WavReadPCMFrames(&wav,frames,buf);
+    if (wav.channels == 1) for (i64 i=(i64)got-1;i>=0;i--) { buf[i*2+1]=buf[i]; buf[i*2]=buf[i]; } u32 src_rate = wav.sampleRate; WavUnInit(&wav); *out_frames = (u32)got; return resample_stereo(buf,bufSize,out_frames,src_rate,sz); // Reallocates and returns new buffer, freeing the buf alloc'ed here
 }
 
 static float *load_mp3(const char *path, u32 *out_frames, size_t* sz) {
     mp3 dec; if (!mp3_init_file(&dec, path)) { return NULL; } u32 src_channels=dec.channels, src_rate=dec.sampleRate; u64 total = mp3_get_pcm_frame_count(&dec); if (total == 0) { mp3_uninit(&dec); return NULL; }
-    size_t bufSize = (size_t)total * AUDIO_CHANNELS * sizeof(float); float *buf = (float*)OS_Alloc(bufSize); mp3_seek_to_pcm_frame(&dec,0); u64 got = mp3_read_pcm_frames_f32(&dec,total,buf); mp3_uninit(&dec); if (got == 0) { OS_Free(buf,bufSize); return NULL; }
-    if (src_channels == 1) { for (i64 i=(i64)got - 1;i>=0;i--){buf[i*2+1]=buf[i]; buf[i*2]=buf[i];} }
-    *out_frames = (u32)got; return resample_stereo(buf, bufSize, out_frames, src_rate, sz); // Reallocates and returns new buffer, freeing the buf alloc'ed here
+    size_t bufSize = (size_t)total * AUDIO_CHANNELS * sizeof(float); float *buf=OS_Alloc(bufSize); mp3_seek_to_pcm_frame(&dec,0); u64 got = mp3_read_pcm_frames_f32(&dec,total,buf); mp3_uninit(&dec); if (got == 0) { OS_Free(buf,bufSize); return NULL; }
+    if (src_channels == 1) { for (i64 i=(i64)got - 1;i>=0;i--){buf[i*2+1]=buf[i]; buf[i*2]=buf[i];} } *out_frames = (u32)got; return resample_stereo(buf, bufSize, out_frames, src_rate, sz); // Reallocates and returns new buffer, freeing the buf alloc'ed here
 }
 
 INLINE float *load_audio(const char *path, u32 *out_frames, size_t* sz) { if (sEndsWith(path,".mp3")) { return load_mp3(path, out_frames, sz); } return load_wav(path, out_frames, sz); }
@@ -638,12 +625,8 @@ static void synth_mix(SynthVoice* v, float* mix) {
 }
 
 void synth_reverb_apply(float* mix, i32 frames){ if (rev_wet < 0.001f) return; for (i32 f = 0; f < frames; f++) { float mono = (mix[f*2+0] + mix[f*2+1]) * 0.5f; float wet  = reverb_tick(mono); mix[f*2+0] = mix[f*2+0] * rev_dry + wet * rev_wet; mix[f*2+1] = mix[f*2+1] * rev_dry + wet * rev_wet; } }
-static float LP(float *s, float in, float rc){ *s += rc*(in-*s); return *s; }
-static float HP(float *s, float in, float rc){ return in - LP(s,in,rc); }
-static float BP(float *s1,float *s2,float in,float rc){ float a=LP(s1,in,rc); return a-LP(s2,a,rc); }
-static float Phasor(float *ph, float freq){ *ph += freq/AUDIO_RATE; if(*ph>=1.0f) *ph-=1.0f; return *ph; }
-static float Osc(float *ph, float freq){ return vsinf(6.28318f*Phasor(ph,freq)); }
-static float FMOsc(float *c,float *m,float fc,float fm,float idx) { return vsinf(6.28318f*(Phasor(c,fc)+Osc(m,fm)*idx)); }
+static float LP(float *s, float in, float rc){ *s += rc*(in-*s); return *s; }                              static float HP(float *s, float in, float rc){ return in - LP(s,in,rc); }          static float BP(float *s1,float *s2,float in,float rc){ float a=LP(s1,in,rc); return a-LP(s2,a,rc); }
+static float Phasor(float *ph, float freq){ *ph += freq/AUDIO_RATE; if(*ph>=1.0f) *ph-=1.0f; return *ph; } static float Osc(float *ph, float freq){ return vsinf(6.28318f*Phasor(ph,freq)); } static float FMOsc(float *c,float *m,float fc,float fm,float idx) { return vsinf(6.28318f*(Phasor(c,fc)+Osc(m,fm)*idx)); }
 static float GenLaserSS1(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[3]*t); float fc=v->p[0]*v->pitch*(1.0f + v->p[1]*t); float idx=4.0f*vexp(-35.0f*t); float tone=FMOsc(&v->s[0],&v->s[1],fc,v->p[2]*fc, idx); float click = (t < 0.012f) ? LP(&v->s[2], random_range(-1.0f,1.0f), 0.4f)*(1.0f - t/0.012f)*0.4f : 0.0f; return (tone + click) * env; } // p[0]=base_freq  p[1]=sweep_rate  p[2]=fm_rate_ratio  p[3]=decay
 static float GenDoor(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float dur = (float)v->frames / AUDIO_RATE; float thud=vsinf(6.28318f * v->p[0]*v->pitch * t) * vexp(-8.0f*t) * 1.5f; float rc   = 0.08f + 0.05f*vsinf(6.28318f*3.0f*t); float hiss = BP(&v->s[0], &v->s[1], random_range(-1.0f,1.0f), rc) * 0.6f; return thud + hiss * vsinf(3.14159265f*(t/dur)); } // p[0]=pitch
 static float GenImpact(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[1]*t); if (v->frame%4==0) v->s[2] = random_range(-1.0f,1.0f); float noise = LP(&v->s[0], v->s[2], 0.3f); float ring  = vsinf(6.28318f * v->p[0]*v->pitch * t) * env; return noise*env*v->p[2] + ring*v->p[3]; } // p[0]=ring_freq  p[1]=decay  p[2]=noise_amt  p[3]=ring_amt
@@ -743,17 +726,12 @@ void play_wav(const char *path,float volume,V3 pos,bool positional) {
     u32 frames; size_t sz=0; float *buf = load_wav(p,&frames,&sz); if(!buf){DualLogError("Failed to load%s\n",p); return;} wav_ch[slot] = (wav_channel_t){.samples=buf, .allocSize=sz, .frame_count=frames, .frame_pos=0, .volume=volume, .looping=false, .positional=positional, .pos=pos, .playing=true};
 }
 
-void play_message(const char *path) {
-    log_msg_t *lm = (log_msg_t*)OS_Alloc(sizeof(log_msg_t)); lm->samples = load_wav(path,&lm->frame_count,&lm->allocSize); if (!lm->samples) { DualLogError("Failed to load %s\n",path); OS_Free(lm,sizeof(*lm)); return; }
-    lm->frame_pos = 0; log_msg_t *old = log_msg; log_msg = lm; if (old) { OS_Free(old->samples,old->allocSize); OS_Free(old,sizeof(*old)); } // superseded message freed immediately
-}
-
+void play_message(const char *path) { log_msg_t *lm=OS_Alloc(sizeof(log_msg_t)); lm->samples=load_wav(path,&lm->frame_count,&lm->allocSize); if(!lm->samples){DualLogError("Failed to load %s\n",path); OS_Free(lm,sizeof(*lm)); return; } lm->frame_pos=0; log_msg_t *old=log_msg; log_msg=lm; if(old){OS_Free(old->samples,old->allocSize); OS_Free(old,sizeof(*old));} }
 i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=load_audio(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=w->positional=false; w->playing=false; return 0; }
 i32 SndStart(wav_channel_t* w) { w->frame_pos = 0; w->playing = true; u32 n = ext_count; for (u32 i=0;i<n;++i) if (ext_ch[i] == w) return 0; if (n < MAX_CHANNELS) { ext_ch[n] = w; ext_count = n+1; } return 0; }
 void SndUninit(wav_channel_t* w) { if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; u32 n = ext_count; for (u32 i=0;i<n;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[n-1]; ext_count = n-1; break; } }
 static void mp3_open_slot(i32 s, const char *path, float fade_from, float fade_to, i32 fade_ms) {
-    mp3_channel_t *m = (mp3_channel_t*)OS_Alloc(sizeof(mp3_channel_t));
-    if (!mp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); OS_Free(m,sizeof(*m)); return; } m->src_rate = m->dec.sampleRate; m->total_frames = mp3_get_pcm_frame_count(&m->dec); mp3_seek_to_pcm_frame(&m->dec,0); m->frames_decoded = 0; m->open = true; float step = (fade_ms > 0) ? (fade_to - fade_from) / (AUDIO_RATE * fade_ms / 1000.0f) : 0.0f;
+    mp3_channel_t *m=OS_Alloc(sizeof(mp3_channel_t)); if (!mp3_init_file(&m->dec,path)) { DualLog("ERROR: Failed to load MP3 %s\n",path); OS_Free(m,sizeof(*m)); return; } m->src_rate = m->dec.sampleRate; m->total_frames = mp3_get_pcm_frame_count(&m->dec); mp3_seek_to_pcm_frame(&m->dec,0); m->frames_decoded = 0; m->open = true; float step = (fade_ms > 0) ? (fade_to - fade_from) / (AUDIO_RATE * fade_ms / 1000.0f) : 0.0f;
     m->fade_vol = step == 0.0f ? fade_to : fade_from; m->fade_target = fade_to; m->fade_step = step; mp3_remaining[s] = (!m->total_frames) ? 1.0f : (float)m->total_frames / (float)(m->src_rate ? m->src_rate : AUDIO_RATE); mp3_channel_t *old = mp3_ch[s]; mp3_ch[s] = m; mp3_ch_retire(s,old); // old track freed immediately
 }
 

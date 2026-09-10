@@ -617,15 +617,13 @@ void LoadLevelMod(u8 lev) {
         TextureSequenceInit(parent,par->texAnimResourceFolder);
     }
     for (int i=0;i<=lightsIdx;++i) { if (lightsFromFile[i].intensity < 0.11f && lightsFromFile[i].maxIntensity < 0.11f){continue;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
-    if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) { // Shield generators
-        World.shd1=AddInstance(754,(V3){-51.30664f,-47.42f,56.42651f}); World.shd2=AddInstance(754,(V3){71.5f,-47.42f,-66.6f}); World.shd3=AddInstance(754,(V3){-51.306650f,-47.42f,-66.66652f}); World.shd4=AddInstance(754,(V3){71.78664f,-47.42f,56.42651f}); 
-        World.rotation[World.shd1] = World.rotation[World.shd2] = World.rotation[World.shd3] = World.rotation[World.shd4] = QUAT_IDENTITY;
+    if(curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7){/*Shield generators*/
+        World.shd1=AddInstance(754,(V3){-51.30664f,-47.42f,56.42651f}); World.shd2=AddInstance(754,(V3){71.5f,-47.42f,-66.6f}); World.shd3=AddInstance(754,(V3){-51.306650f,-47.42f,-66.66652f}); World.shd4=AddInstance(754,(V3){71.78664f,-47.42f,56.42651f}); World.rotation[World.shd1] = World.rotation[World.shd2] = World.rotation[World.shd3] = World.rotation[World.shd4] = QUAT_IDENTITY;
     } else World.shd1=World.shd2=World.shd3=World.shd4=U16_MAX;
     headmountedLanternLight = AddLightSimple(World.position[PLAYER1],(Color3){1.0f,1.0f,1.0f},11.52f,0.0f,LIGHTON);
     // Create single ad-hoc weapon view model instance (no entity definition, no physics collider; like shield generators)
     if (World.instCount < INSTANCE_COUNT) {
-        u16 wvi = World.instCount; mset(&World.instances[wvi],0,sizeof(Entity));
-        World.instances[wvi].entflags=EF_ACTIVE; World.layer[wvi]=L_Default; World.instances[wvi].camView=255; World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
+        u16 wvi = World.instCount; mset(&World.instances[wvi],0,sizeof(Entity)); World.instances[wvi].entflags=EF_ACTIVE; World.layer[wvi]=L_Default; World.instances[wvi].camView=255; World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
         World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAX_TXRS; World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.mass[wvi]=World.rotation[wvi].w=1.0f; World.dynamicFriction[wvi]=0.5f; World.staticFriction[wvi]=0.6f;
         World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; // hidden until weapon equipped
         World.weaponVModelIndex=wvi; World.instCount++;
@@ -640,23 +638,13 @@ void ChangeAnim(Entity* e, u8 clip);
 u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span)); }
 void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
 void LoadLevelData(u8 curlevel) {
-    World.curLev = curlevel; SetLevelPointers(curlevel); // Ensures writing to correct current level
-    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Clear previous level slots. Claimed slots are fully initialized by AddInstance().
-    World.instCount = 3; // 0 == NULL, 1 == Player1, 2 == Player2
-    mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    mset(camViews,0,64 * sizeof(CamView)); camViewCount=0;
-    char filename[20]; // Minimum size for 0 through 13.
-    sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
-    FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); }
-    mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; LoadLevelMod(curlevel); OS_Free(fbuf,(size_t)fsize);
+    World.curLev = curlevel; SetLevelPointers(curlevel); mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; LoadLevelMod(curlevel); OS_Free(fbuf,(size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
     for (int i = PLAYER1; i < World.instCount; ++i) {
-        i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
-        World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
-        u16 mi = World.instances[i].modelIndex; World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
-        World.instances[i].shadRadius = World.radius[i] * 2.00f;
-        ComputeConvexMeshInertiaTensor(i);
-        if (World.mass[i] < 0.001f && World.col[i] != COLTYPE_NONE && World.col[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
+        i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z); World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
+        u16 mi = World.instances[i].modelIndex; World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); World.instances[i].shadRadius = World.radius[i] * 2.00f;
+        ComputeConvexMeshInertiaTensor(i); if (World.mass[i] < 0.001f && World.col[i] != COLTYPE_NONE && World.col[i] != COLTYPE_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
     }
     for (int i=PLAYER1;i<World.instCount;++i) {
         u16 constIndex = World.instances[i].index;
@@ -683,20 +671,19 @@ void LoadLevelData(u8 curlevel) {
 //             if (World.instances[i].generateContents) { // TODO in LoadLevelMod directly, saves not storing generateContents on Entity as it's ONLY for init
 //                 int numRandomGeneratedItems = 0;
 //                 for(int j=0;j<4;j++) {
-//                     if(numRandomGeneratedItems >= World.instances[i].maxRandomItems){break;} if(World.instances[i].randomItemDropChance[j] <= 0.0f){continue;}
-//                     u8 tempInt = random_range_u8(0,100); if(((float)tempInt / 100.0f) <= World.instances[i].randomItemDropChance[j]){World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; numRandomGeneratedItems++;}
+//                     if(numRandomGeneratedItems >= World.instances[i].maxRandomItems){break;} if(World.instances[i].randomItemDropChance[j] <= 0.0f){continue;} u8 tempInt = random_range_u8(0,100); if(((float)tempInt / 100.0f) <= World.instances[i].randomItemDropChance[j]){World.instances[i].contents[numRandomGeneratedItems] = World.instances[i].randomItem[j]; numRandomGeneratedItems++;}
 //                 }
 //             }
-        } else if (constIndex == 515) func_forcebridge(i); // func_forcebridge
-        else if (constIndex == 517) FuncWallInitAfterLoad(i);
-        else if (constIndex == 596) { World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,0.3f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); World.instances[i].topPoint=(V3){0.0f,World.position[i].y + (World.colliderSize[i].y * 0.5f),0.0f}; } /*trigger_gravitylift*/
-        else if (constIndex == 701) LogicTimerInitBeforeLoad(i);
-        else if (constIndex == 703) { if(World.instances[i].teleportID < 8){World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} }/*info_teleport_destination*/
-        else if (constIndex == 555) { } // prop_cyber_switch CyberSwitchInitAfterLoad(i);
-        else if (constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
-        else if (IdxIsButtonSwitch(World.instances[i].index)) ButtonSwitchInitAfterLoad(i);
-        else if (constIndex >= 448 && constIndex <= 457) { if(World.diffMis == 0 && World.instances[i].index == 448/*item_cyber_data*/){DeleteInstance(i);} }
-        else if (constIndex == 480) CyberMineInitBeforeLoad(i);
+        } else if(constIndex == 515){func_forcebridge(i);/*func_forcebridge*/}
+        else if(constIndex == 517){FuncWallInitAfterLoad(i);}
+        else if(constIndex == 596){World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,0.3f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); World.instances[i].topPoint=(V3){0.0f,World.position[i].y + (World.colliderSize[i].y * 0.5f),0.0f}; } /*trigger_gravitylift*/
+        else if(constIndex == 701){LogicTimerInitBeforeLoad(i);}
+        else if(constIndex == 703){if(World.instances[i].teleportID < 8){World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} }/*info_teleport_destination*/
+        else if(constIndex == 555){/*prop_cyber_switch CyberSwitchInitAfterLoad(i); TODO*/}
+        else if(constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
+        else if(IdxIsButtonSwitch(World.instances[i].index)) ButtonSwitchInitAfterLoad(i);
+        else if(constIndex >= 448 && constIndex <= 457){if(World.diffMis == 0 && World.instances[i].index == 448/*item_cyber_data*/){DeleteInstance(i);} }
+        else if(constIndex == 480){CyberMineInitBeforeLoad(i);}
         if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
     }
     World.levelLoadedLights[curlevel] = World.loadedLights; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
@@ -707,20 +694,12 @@ void RenderLoading(const char* restrict); void ResetLevelAudio(); void ResetLeve
 void LoadAllLevels() {
     double start_time = get_time();
     DebugRAM("start of LoadAllLevels"); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true;
-    entsFromFile = (Entity*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(Entity)); posFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
-    scaleFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));        rotationFromFile = (Quaternion*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(Quaternion));
-    colCtrFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));       colSzFromFile = (V3*)OS_Alloc((size_t)INSTANCE_COUNT * sizeof(V3));
-    ioNameCount = 1; ioNames[0][0] = '\0'; lightsFromFile = (Light*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(Light)); 
-    lanimsFromFile = (LightAnimation*)OS_Alloc((size_t)LIGHT_COUNT * sizeof(LightAnimation)); for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;}
-    mset(fwParentOf,0,sizeof(fwParentOf)); fwPoolUsed = 0;                                    for(u8 lev=0;lev<World.numLevels;++lev) LoadLevelData(lev);
-    OS_Free(entsFromFile, (size_t)INSTANCE_COUNT * sizeof(Entity)); OS_Free(colCtrFromFile, (size_t)INSTANCE_COUNT * sizeof(V3)); OS_Free(colSzFromFile, (size_t)INSTANCE_COUNT * sizeof(V3)); colCtrFromFile = NULL; colSzFromFile = NULL;
-    OS_Free(posFromFile, (size_t)INSTANCE_COUNT * sizeof(V3));      OS_Free(scaleFromFile, (size_t)INSTANCE_COUNT * sizeof(V3));  OS_Free(rotationFromFile, (size_t)INSTANCE_COUNT * sizeof(Quaternion));
-    OS_Free(lightsFromFile, (size_t)LIGHT_COUNT * sizeof(Light));   OS_Free(lanimsFromFile, (size_t)LIGHT_COUNT * sizeof(LightAnimation));
-    entsFromFile = NULL; posFromFile = NULL; scaleFromFile = NULL; rotationFromFile = NULL; lightsFromFile = NULL; lanimsFromFile = NULL;
-    DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\nLoad all levels... took %f secs\n",
-            World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],
-            World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13],get_time() - start_time);
-    DebugRAM("end of LoadAllLevels");
+    entsFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Entity)); posFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); scaleFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); rotationFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Quaternion)); colCtrFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); colSzFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
+    ioNameCount=1; ioNames[0][0]='\0'; lightsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(Light)); lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation)); for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;} mset(fwParentOf,0,sizeof(fwParentOf)); fwPoolUsed = 0; for(u8 lev=0;lev<World.numLevels;++lev){LoadLevelData(lev);}
+    OS_Free(entsFromFile,INSTANCE_COUNT*sizeof(Entity)); OS_Free(colCtrFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(colSzFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(posFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(scaleFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(rotationFromFile,INSTANCE_COUNT*sizeof(Quaternion)); OS_Free(lightsFromFile,LIGHT_COUNT*sizeof(Light)); OS_Free(lanimsFromFile,LIGHT_COUNT*sizeof(LightAnimation));
+    DebugRAM("end of LoadAllLevels"); DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\nLoad all levels... took %f secs\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
+                                              World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
+                                              World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13],get_time() - start_time);
 }
 
 void LoadLevel(u8 curlevel, V3 pos) {
@@ -729,8 +708,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     for (int i = 0; i < camViewCount; ++i) { if (levelCamViews[curlevel][i].visible == false && camViews[i].visible == true) { mcpy(&levelCamViews[curlevel][i], &camViews[i], sizeof(CamView)); levelCamViewTextures[curlevel][i] = camViewTextures[i]; } } // Initialize missing level camview entries from file data
     mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce)); for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
     DualLog("Switched to Level %d\n",curlevel); ResetLevelAudio(); ResetLevelMusic(); RenderLoading("Loading cull system..."); CullInit(); // Must be after level!
-    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights);
-                                 glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(7,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
+    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(7,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
     RenderLoading("Loading voxel lighting data..."); for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
     World.levelCurrentlyLoading = false; World.position[PLAYER1]=pos; World.velocity[PLAYER1]=(V3){0,0,0}; World.invP1.lastVelY=0.0f; World.invP1.wasGrounded=true; DebugRAM("end of LoadLevel");
@@ -740,23 +718,15 @@ void LoadLevel(u8 curlevel, V3 pos) {
 typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compressedSize; char savename[48]; } SaveHeader;
 #pragma pack(pop)
 void SaveGame(u8 slot, const char* savename) {
-    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenWriteonly(path); if(fd == (FHandle)-1){return;}
-    size_t sz=sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b=(u8*)OS_Alloc(maxCompSize); size_t finalCompSize=VoidSquasher((const u8*)&World,sz,b,maxCompSize);
-    if (finalCompSize > 0) {
-        SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=4, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize};
-        if (savename) { int i=0;   while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;}   header.savename[i]='\0'; }
-        World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot);
-    } else { DualLogError("Compression failed during SaveGame!\n"); }
-    OS_Free(b,maxCompSize); OS_Close(fd);
+    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenWriteonly(path); if(fd == (FHandle)-1){return;} size_t sz=sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b=OS_Alloc(maxCompSize); size_t finalCompSize=VoidSquasher((const u8*)&World,sz,b,maxCompSize);
+    if (finalCompSize > 0) { SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=4, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize}; if (savename) { int i=0;   while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;}   header.savename[i]='\0'; } World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot);}
+    else { DualLogError("Compression failed during SaveGame!\n"); }    OS_Free(b,maxCompSize); OS_Close(fd);
 }
 
 void LoadGame(u8 slot) {
-    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;}
-    SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343 || header.version != 4 || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; } 
-    u8* b = (u8*)OS_Alloc(header.compressedSize);
+    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343 || header.version != 4 || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
+    u8* b=OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
-        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize); // Decompress straight into the World struct
-        if (result == header.uncompressedSize) { SetLevelPointers(World.currentLevel); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
-    }
-    OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
+        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.currentLevel); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
+    } OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }

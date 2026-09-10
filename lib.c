@@ -1,15 +1,11 @@
 // lib.c - LibC replacement functions and other misc helpers.
 #include "common.h"
-#define SCRATCH_ARENA_SIZE (465ULL * 1024 * 1024)
-u8* scratch_base = NULL;
-u8* scratch_cur  = NULL;
-u8* scratch_end  = NULL;
-size_t initPhaseSize = 0;
-void OS_ScratchInit(void) { if(scratch_base){return;} scratch_base=(u8*)OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur=scratch_base; scratch_end=scratch_base + SCRATCH_ARENA_SIZE; initPhaseSize=0; }
-void* OS_AllocScratch(size_t amount) { if(!scratch_base){OS_ScratchInit();} size_t aligned=(amount + 15) & ~(size_t)15; if(scratch_cur+aligned > scratch_end){DualLogError("Scratch exhausted!\n"); OS_Exit(1);} void* p=scratch_cur; scratch_cur+=aligned; return p; }
-void OS_FreeInitPhaseInner(size_t amount) { initPhaseSize += (amount + 15) & ~(size_t)15; }
-void OS_FreeInitPhase(void) { scratch_cur -= initPhaseSize; if (scratch_cur < scratch_base) { DualLogError("OS_FreeInitPhase: cursor underflow! freed %zu bytes\n",initPhaseSize); OS_Exit(1); } mset(scratch_cur,0,initPhaseSize); scratch_cur = (u8*)(((uintptr_t)scratch_cur + 15) & ~(uintptr_t)15); initPhaseSize=0; }
-void OS_ScratchFree(void) { if (!scratch_base){return;} OS_Free(scratch_base, SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; initPhaseSize = 0; }
+#define SCRATCH_ARENA_SIZE (512ULL * 1024 * 1024) // 512mb
+u8* scratch_base,*scratch_cur,*scratch_end;
+void OS_ScratchInit(void) { if(scratch_base){return;} scratch_base=OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur=scratch_base; scratch_end=scratch_base + SCRATCH_ARENA_SIZE; }
+void* OS_AllocScratch(size_t amount) { if(!scratch_base){OS_ScratchInit();} size_t aligned=(amount + 15) & ~(size_t)15; if(scratch_cur+aligned > scratch_end){DualLogError("Scratch ovr!\n"); OS_Exit(1);} void* p=scratch_cur; scratch_cur+=aligned; return p; }
+void OS_FreeInitPhase(void) { scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
+void OS_ScratchFree(void) { OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; }
 typedef u16 u16_u __attribute__((__aligned__(1),__may_alias__));typedef u32 u32_u __attribute__((__aligned__(1),__may_alias__));typedef u64 u64_u __attribute__((__aligned__(1),__may_alias__));
 void* mcpy(void *dst,const void *src,size_t n){
     u8 *d=(u8*)dst; u8 *s=(u8*)src; size_t i=0;

@@ -1,8 +1,6 @@
 // particles.c - CPU-simulated, GPU-instanced particle system for Voxen
 #include "common.h"
-extern u32 psysquadVAO,psysquadVBO,psysInstancesID,particleSP,psysTrailsID,trailSP;
-PSys psys = {0};
-void PSys_SpawnTrail(V3 p0, V3 p1, u32 texIndex, u32 emitterIndex, float lifetime, float birth0);
+extern u32 psysquadVAO,psysquadVBO,psysInstancesID,particleSP,psysTrailsID,trailSP; PSys psys = {0}; void PSys_SpawnTrail(V3 p0, V3 p1, u32 texIndex, u32 emitterIndex, float lifetime, float birth0);
 INLINE u32 pack_rgba8(float r, float g, float b, float a) { return (((u32)(vclamp(a,0,1.f)*255.0f + .5f)) << 24) | (((u32)(vclamp(b,0,1.f)*255.0f + .5f)) << 16) | (((u32)(vclamp(g,0,1.f)*255.0f + .5f)) << 8) | ((u32)(vclamp(r,0,1.f)*255.0f + .5f)); }
 INLINE void unpack_rgba8(u32 p, float* r, float* g, float* b, float* a) { *r = (float)((p >> 0) & 0xFF)/255.0f; *g = (float)((p >> 8) & 0xFF)/255.0f; *b = (float)((p >> 16) & 0xFF)/255.0f; *a = (float)((p >> 24) & 0xFF)/255.0f; }
 INLINE u32 ColorToU32(Color c) { return pack_rgba8(c.r, c.g, c.b, c.a); }
@@ -49,7 +47,7 @@ void PSys_Simulate(float dt) {
 
 INLINE int sort_cmp(const void* a, const void* b) { u32 ka = ((const PartSortEntry*)a)->sortKey; u32 kb = ((const PartSortEntry*)b)->sortKey; return (ka > kb) - (ka < kb); }
 void PSys_Sort(void) { if (psys.aliveCount > 1) { qsort_new(psys.sortKeys, psys.aliveCount, sizeof(PartSortEntry), sort_cmp); } }
-void PSys_Upload(void) {if(psys.aliveCount==0){return;} GpuPartInst* s=(GpuPartInst*)OS_AllocScratch(psys.aliveCount*sizeof(GpuPartInst)); for(u32 i=0;i<psys.aliveCount;++i){s[i]=psys.gpuInstances[psys.sortKeys[i].index];} glBindBuffer(GL_SSBO, psysInstancesID); glBufferSubData(GL_SSBO,0,psys.aliveCount*sizeof(GpuPartInst),s);}
+void PSys_Upload(void) {if(psys.aliveCount==0){return;} GpuPartInst* s=OS_AllocScratch(psys.aliveCount*sizeof(GpuPartInst)); for(u32 i=0;i<psys.aliveCount;++i){s[i]=psys.gpuInstances[psys.sortKeys[i].index];} glBindBuffer(GL_SSBO, psysInstancesID); glBufferSubData(GL_SSBO,0,psys.aliveCount*sizeof(GpuPartInst),s);}
 static V3 trailSortCam;
 void PSys_SpawnTrail(V3 p0, V3 p1, u32 texIndex, u32 emitterIndex, float lifetime, float birth0) {
     if(psys.trailCount >= MAX_TRAIL_SEGS){return;} TrlSegInst* seg=&psys.trailSegments[psys.trailCount++]; float now=(float)World.pauseRelativeTime;
@@ -58,19 +56,14 @@ void PSys_SpawnTrail(V3 p0, V3 p1, u32 texIndex, u32 emitterIndex, float lifetim
 
 void PSys_PruneTrails(void) { float now = (float)World.pauseRelativeTime; u32 out = 0; for(u32 i=0;i<psys.trailCount;++i){TrlSegInst* s=&psys.trailSegments[i]; if(s->deathTime > now){if(out != i){psys.trailSegments[out]=*s;} out++;}} psys.trailCount=out;}
 INLINE int trail_cmp(const void* a, const void* b) {
-    const TrlSegInst* ta=(const TrlSegInst*)a; const TrlSegInst* tb=(const TrlSegInst*)b;
-    float ax=(ta->p0x + ta->p1x)*0.5f - trailSortCam.x, ay=(ta->p0y + ta->p1y)*0.5f - trailSortCam.y, az=(ta->p0z + ta->p1z)*0.5f - trailSortCam.z, bx=(tb->p0x + tb->p1x)*0.5f - trailSortCam.x, by=(tb->p0y + tb->p1y)*0.5f - trailSortCam.y, bz=(tb->p0z + tb->p1z)*0.5f - trailSortCam.z; float da=ax*ax + ay*ay + az*az, db=bx*bx + by*by + bz*bz; return da>db ? -1 : (da<db ? 1 : 0);
+    const TrlSegInst* ta=(const TrlSegInst*)a; const TrlSegInst* tb=(const TrlSegInst*)b; float ax=(ta->p0x + ta->p1x)*0.5f - trailSortCam.x, ay=(ta->p0y + ta->p1y)*0.5f - trailSortCam.y, az=(ta->p0z + ta->p1z)*0.5f - trailSortCam.z, bx=(tb->p0x + tb->p1x)*0.5f - trailSortCam.x, by=(tb->p0y + tb->p1y)*0.5f - trailSortCam.y, bz=(tb->p0z + tb->p1z)*0.5f - trailSortCam.z; float da=ax*ax + ay*ay + az*az, db=bx*bx + by*by + bz*bz; return da>db ? -1 : (da<db ? 1 : 0);
 }
 
 void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForward, u32 depthTex, float near, float far, float viewW, float viewH) {
-    if (psys.aliveCount == 0) return;
-    glUseProgram(particleSP); glBindVertexArray(psysquadVAO); glBindBufferBase(GL_SSBO,PARTICLE_SSBO_BINDING,psysInstancesID);
-    glUniformMatrix4fv(0, 1, GL_FALSE, viewProj); glUniform3f(1, camPos.x, camPos.y, camPos.z); glUniform3f(2, camRight.x, camRight.y, camRight.z); glUniform3f(3, camUp.x, camUp.y, camUp.z); glUniform3f(4, camForward.x, camForward.y, camForward.z);
-    glUniform1i(10, 8); glUniform2f(11, viewW, viewH); glUniform1f(12, near); glUniform1f(13, far); glActiveTexture(GL_TEXTURE0 + 8); glBindTexture(GL_TEXTURE_2D, depthTex); glEnable(GL_BLEND); glDepthMask(GL_FALSE); glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDisable(GL_CULL_FACE); 
-    u32 runStart = 0;
+    if (psys.aliveCount == 0) return; glUseProgram(particleSP); glBindVertexArray(psysquadVAO); glBindBufferBase(GL_SSBO,PARTICLE_SSBO_BINDING,psysInstancesID); glUniformMatrix4fv(0, 1, GL_FALSE, viewProj); glUniform3f(1, camPos.x, camPos.y, camPos.z); glUniform3f(2, camRight.x, camRight.y, camRight.z); glUniform3f(3, camUp.x, camUp.y, camUp.z); glUniform3f(4, camForward.x, camForward.y, camForward.z);
+    glUniform1i(10, 8); glUniform2f(11, viewW, viewH); glUniform1f(12, near); glUniform1f(13, far); glActiveTexture(GL_TEXTURE0 + 8); glBindTexture(GL_TEXTURE_2D, depthTex); glEnable(GL_BLEND); glDepthMask(GL_FALSE); glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDisable(GL_CULL_FACE); u32 runStart = 0;
     while (runStart < psys.aliveCount) {
-        i32 blend = (i32)(psys.sortKeys[runStart].sortKey >> 24); u32 runEnd = runStart + 1; while (runEnd < psys.aliveCount && (psys.sortKeys[runEnd].sortKey >> 24) == (u32)blend) runEnd++;
-        glUniform1i(5, (i32)runStart); glUniform1i(7, blend); if (blend == 1) glBlendFunc(1,1); else if (blend == 2) glBlendFunc(GL_DST_COLOR, GL_ZERO); else glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+        i32 blend = (i32)(psys.sortKeys[runStart].sortKey >> 24); u32 runEnd = runStart + 1; while (runEnd < psys.aliveCount && (psys.sortKeys[runEnd].sortKey >> 24) == (u32)blend) runEnd++; glUniform1i(5, (i32)runStart); glUniform1i(7, blend); if (blend == 1) glBlendFunc(1,1); else if (blend == 2) glBlendFunc(GL_DST_COLOR, GL_ZERO); else glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
         u32 count = runEnd - runStart; glDrawArraysInstanced(GL_TRIANGLE_STRIP,0,4,count); drawCalls++; vertsRendered += count * 4; runStart = runEnd;
     }
     glEnable(GL_CULL_FACE); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); glDepthFunc(GL_LESS);
@@ -94,8 +87,7 @@ void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForwar
     for (u32 i = 0; i < psys.trailCount; i++) {
         TrlSegInst* a = &psys.trailSegments[i];
         for (u32 j = 0; j < psys.trailCount; j++) {
-            if (j == i){continue;} TrlSegInst* b=&psys.trailSegments[j]; if (!(a->p1x == b->p0x && a->p1y == b->p0y && a->p1z == b->p0z)){continue;}
-            a->c10x = b->c00x = (a->c10x + b->c00x) * 0.5f; a->c10y = b->c00y = (a->c10y + b->c00y) * 0.5f; a->c10z = b->c00z = (a->c10z + b->c00z) * 0.5f; a->c11x = b->c01x = (a->c11x + b->c01x) * 0.5f; a->c11y = b->c01y = (a->c11y + b->c01y) * 0.5f; a->c11z = b->c01z = (a->c11z + b->c01z) * 0.5f;
+            if (j == i){continue;} TrlSegInst* b=&psys.trailSegments[j]; if (!(a->p1x == b->p0x && a->p1y == b->p0y && a->p1z == b->p0z)){continue;} a->c10x = b->c00x = (a->c10x + b->c00x) * 0.5f; a->c10y = b->c00y = (a->c10y + b->c00y) * 0.5f; a->c10z = b->c00z = (a->c10z + b->c00z) * 0.5f; a->c11x = b->c01x = (a->c11x + b->c01x) * 0.5f; a->c11y = b->c01y = (a->c11y + b->c01y) * 0.5f; a->c11z = b->c01z = (a->c11z + b->c01z) * 0.5f;
         }
     }
     trailSortCam=camPos; if(psys.trailCount > 1){qsort_new(psys.trailSegments,psys.trailCount,sizeof(TrlSegInst),trail_cmp);} glUseProgram(trailSP); glBindVertexArray(psysquadVAO); glBindBufferBase(GL_SSBO,TRAIL_SSBO_BINDING,psysTrailsID);

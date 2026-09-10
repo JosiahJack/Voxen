@@ -251,23 +251,16 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
  
 void SetWindowIcon(WinSysIcon*);
 void LoadTextures() {
-    double start_time = get_time();
-    DebugRAM("start LoadTextures");
-    texCnt = totalPixels = totalPaletteColors = 0u;
-    TextureDataParser texture_parser; 
-    if (unlikely(!ParseTextureData(&texture_parser, MAX_TXRS, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
+    double start_time = get_time(); DebugRAM("start LoadTextures"); texCnt = totalPixels = totalPaletteColors = 0u; TextureDataParser texture_parser; if (unlikely(!ParseTextureData(&texture_parser, MAX_TXRS, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
     i32 maxIndex = -1;
     for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != U16_MAX) {maxIndex = texture_parser.entries[k].index;} }
-    texCnt = (u16)(maxIndex + 1);
-    i32* parsIdx = OS_AllocScratch(texCnt * sizeof(i32));
-    mset(parsIdx, -1, texCnt * sizeof(i32));
+    texCnt = (u16)(maxIndex + 1); i32* parsIdx = OS_AllocScratch(texCnt * sizeof(i32)); mset(parsIdx, -1, texCnt * sizeof(i32));
     for (u32 k = 0; k < texture_parser.count; ++k) { if (texture_parser.entries[k].index < texCnt) {parsIdx[texture_parser.entries[k].index] = (i32)k;} }
     DualLog("Loading textures (%u) ... ", texture_parser.count);
     thread_png_arenas = (PngArena*)OS_AllocScratch((size_t)threadCnt * sizeof(PngArena));
     for (int t = 0; t < threadCnt; ++t) { thread_png_arenas[t].base = NULL; PngArenaInit(&thread_png_arenas[t]); }
     TexResult* texResults = OS_AllocScratch(texCnt * sizeof(TexResult)); // Unified result struct allocation
-    TextureParseTask tasks[32]; 
-    OS_Thread workers[32];
+    TextureParseTask tasks[32]; OS_Thread workers[32];
     _Atomic u32 shared_idx = 0; // The shared thread counter
     for (int t = 0; t < threadCnt; ++t) { tasks[t] = (TextureParseTask){.texCnt = texCnt, .shared_idx = &shared_idx, .parsIdx = parsIdx, .parser = &texture_parser, .results = texResults,.tid = t}; OS_ThreadCreate(&workers[t], TextureParsingWorker, &tasks[t]); }
     for (int t = 0; t < threadCnt; ++t) OS_ThreadJoin(&workers[t]);
@@ -306,25 +299,11 @@ void LoadTextures() {
     glBindBuffer(GL_SSBO,textureOffsetsID); glBufferData(GL_SSBO,texCnt * sizeof(u32),textureOffsets,GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO,textureSizesID);   glBufferData(GL_SSBO,texCnt * 2 * sizeof(i32),textureSizes,GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO,texPalOfsID);      glBufferData(GL_SSBO,texCnt * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW); glBindBuffer(GL_SSBO,0);
-    OS_FreeInitPhaseInner(texture_parser.count * sizeof(TextureData)); OS_Free(arena,arena_size);
-    OS_FreeInitPhaseInner(texCnt * sizeof(i32));                                      OS_FreeInitPhaseInner(texCnt * sizeof(TexResult));
-    OS_FreeInitPhaseInner(texCnt * 2 * sizeof(i32));                             OS_FreeInitPhaseInner(texCnt * sizeof(u32));        
+    OS_Free(arena,arena_size); // TODO just use scratch!
     for (int t=0; t<threadCnt; ++t) OS_Free(thread_png_arenas[t].base, 16777216);
-    OS_FreeInitPhaseInner((size_t)threadCnt * sizeof(PngArena));
-    FHandle fp = OS_OpenReadonly(WIN_ICON);
-    int windowIconFileSize = OS_FileSize(fp);
-    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,WIN_ICON);    
-    OS_Close(fp); PngArenaInit(&png_arena_main);
-    int w=1, h=1; 
-    u8* pixels = PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main);
-    if (!pixels) { DualLogError("Failed to load icon: %s\n",WIN_ICON); OS_Exit(1); }
-    WinSysIcon image = (WinSysIcon){w,h,pixels}; 
-    SetWindowIcon(&image);
-    OS_Free(file_buffer, windowIconFileSize); 
-    OS_Free(png_arena_main.base, 16777216); 
-    png_arena_main.base = NULL;
-    OS_FreeInitPhase();
-    DualLog(" took %.6f secs\n", get_time() - start_time);
+    FHandle fp=OS_OpenReadonly(WIN_ICON); int windowIconFileSize=OS_FileSize(fp); u8* file_buffer=OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,WIN_ICON); OS_Close(fp); PngArenaInit(&png_arena_main); int w=1, h=1;  u8* pixels=PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main); if (!pixels) { DualLogError("Failed to load icon: %s\n",WIN_ICON); OS_Exit(1); }
+    WinSysIcon image = (WinSysIcon){w,h,pixels}; SetWindowIcon(&image); OS_Free(file_buffer, windowIconFileSize);
+    OS_Free(png_arena_main.base, 16777216); png_arena_main.base = NULL; OS_FreeInitPhase(); DebugRAM("after textures load"); DualLog(" took %.6f secs\n", get_time() - start_time);
 }
 
 typedef struct { const u16 *frames;  u8 length; bool hasGlow; const u16 *glowFrames; u8 glowLength; const char* name; } TextureAnimClip;
@@ -359,15 +338,10 @@ static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
 
 void TextureSequenceInit(u16 self, char* trimmed_value) {
     Entity* e = &World.instances[self];
-    if (e->index == 526) return; // Skip prop_console02 for now, will need to split its screen off.
-    if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EDefs[e->index].modelIndex; return; }
+    if (e->index == 526) return; /*Skip prop_console02 for now, will need to split its screen off? TODO*/ if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EDefs[e->index].modelIndex; return; }
     e->textureAnimating = true; e->textureGlowAnimating = false; e->texAnimLight = U16_MAX; e->texAnimLight2 = U16_MAX;
-    e->texFrame = e->texGlowFrame = 0;
-    if (sEqual(trimmed_value,"ScreenDestroyed")) { World.instances[self].texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
-    if (sEqual(trimmed_value,"MedCamView1")) { e->textureAnimating = false; e->camView = 0; return; } // Sensaround occupies slots 0,1,2 for center, left, right respectively.
-    if (sEqual(trimmed_value,"MedCamView2")) { e->textureAnimating = false; e->camView = 1; return; }
-    for (int i=0;i<NUM_TEXTURE_CLIPS;++i) { if(sEqual(trimmed_value,textureAnimClips[i].name)){World.instances[self].texAnimClip=i; e->textureGlowAnimating=textureAnimClips[i].hasGlow; return;} }
-    e->textureAnimating = false; // Couldn't find match, just don't animate.
+    e->texFrame = e->texGlowFrame = 0; if (sEqual(trimmed_value,"ScreenDestroyed")) { World.instances[self].texAnimClip = NUM_TEXTURE_CLIPS - 1; return; } if (sEqual(trimmed_value,"MedCamView1")) { e->textureAnimating = false; e->camView = 0; return; } if (sEqual(trimmed_value,"MedCamView2")) { e->textureAnimating = false; e->camView = 1; return; }
+    for (int i=0;i<NUM_TEXTURE_CLIPS;++i) { if(sEqual(trimmed_value,textureAnimClips[i].name)){World.instances[self].texAnimClip=i; e->textureGlowAnimating=textureAnimClips[i].hasGlow; return;} } e->textureAnimating = false; // Couldn't find match, just don't animate.
 }
 
 void TextureSequenceUpdate(u16 self) {

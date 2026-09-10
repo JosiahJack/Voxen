@@ -5,7 +5,7 @@ typedef struct { void* ptr; size_t sz; } TAlloc;
 static TAlloc* ttAllocs = NULL;
 static int tallocCount=0;
 static void* ttalloc(size_t n) { if (tallocCount>=4674) {DualLogError("ttalloc too many!\n"); return NULL;} void*p=OS_AllocScratch(n); ttAllocs[tallocCount++]=(TAlloc){p,n}; return p; }
-static void  ttfree (void* p) { if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return;OS_FreeInitPhaseInner(ttAllocs[tallocCount-1].sz);tallocCount--; } // Make sure to pop off in reverse order!
+static void  ttfree (void* p) { if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return; tallocCount--; } // Make sure to pop off in reverse order!
 static u16 ttUSHORT(u8*p) {return p[0]*256 + p[1];} 
 static i16 ttSHORT (u8*p) {return p[0]*256 + p[1];}
 static u32 ttULONG (u8*p) {return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
@@ -398,26 +398,17 @@ void InitFontAtlasses() {
     FHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
     fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
-    if(!stbtt_InitFont_internal(&fontInfo[0],fontData[0],0)){DualLogError("%s font init failed\n",fontPaths[0]);OS_Exit(1);}
-    if(!stbtt_InitFont_internal(&fontInfo[1],fontData[1],0)){DualLogError("%s font init failed\n",fontPaths[1]);OS_Exit(1);}
+    if(!stbtt_InitFont_internal(&fontInfo[0],fontData[0],0)){DualLogError("%s font init failed\n",fontPaths[0]); OS_Exit(1);}
+    if(!stbtt_InitFont_internal(&fontInfo[1],fontData[1],0)){DualLogError("%s font init failed\n",fontPaths[1]); OS_Exit(1);}
     fallbackFonts[0]=LoadFallbackFont(fallbackFontPaths[0],2,0);
     fallbackFonts[1]=LoadFallbackFont(fallbackFontPaths[1],3,0);
     fallbackFonts[2]=LoadFallbackFont(fallbackFontPaths[2],4,0);
     u8* bmp = OS_AllocScratch(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
-    BuildAtlas(&fontAtlasTex, fontRanges, &numPackedGlyphs, fontPackedChar, &fixedNumberAdvanceWidth, 20.0f, 0, FONT_NORMAL, bmp);
-    mset(bmp, 0, FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
+    BuildAtlas(&fontAtlasTex,fontRanges,&numPackedGlyphs,fontPackedChar,&fixedNumberAdvanceWidth,20.0f,0,FONT_NORMAL,bmp);
+    mset(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
     BuildAtlas(&fontAtlasTexStopD, fontRangesStopD, &numPackedGlyphsStopD, fontPackedCharStopD, &fixedNumberAdvanceWidthStopD, 54.0f, 1, FONT_STOPD, bmp);
-    OS_FreeInitPhaseInner(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
-    OS_Free(fontData[0],sz1);
-    OS_Free(fontData[1],sz2);
-    OS_Free(fontData[2],fallbackFonts[0].size);
-    OS_Free(fontData[3],fallbackFonts[1].size);
-    OS_Free(fontData[4],fallbackFonts[2].size);
-    OS_FreeInitPhaseInner(4674 * sizeof(TAlloc));
-    OS_FreeInitPhase();
-    DebugRAM("after font load");
-    glUseProgram(textSP); glUniform1i(1,2);
-    DualLog(" took %f s\n",get_time()-t0);
+    OS_Free(fontData[0],sz1); OS_Free(fontData[1],sz2); OS_Free(fontData[2],fallbackFonts[0].size); OS_Free(fontData[3],fallbackFonts[1].size); OS_Free(fontData[4],fallbackFonts[2].size); OS_FreeInitPhase(); // TODO Just use scratch!
+    glUseProgram(textSP); glUniform1i(1,2); DebugRAM("after font load"); DualLog(" took %f s\n",get_time()-t0);
 }
 // Localization
 size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
@@ -431,21 +422,15 @@ size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
 
 static const char* localizations[8]={"./Data/text_english.txt","./Data/text_espanol.txt","./Data/text_deutsch.txt","./Data/text_francais.txt","./Data/text_nihongo.txt","./Data/text_russkiy.txt","./Data/text_italiano.txt","./Data/text_portugues.txt"};
 u8* LoadTextFile(const char* path, size_t* out_size, size_t* out_dp, int* out_utf16) {
-    FHandle dfd = INVALID_FHANDLE; int asz = 0;
-    u8* data = OS_OpenAndAllocateFileBufferReadonly(path, &dfd, &asz); if(!data || asz <= 0) { DualLogError("Failed to load text file: %s\n", path); *out_size = 0; return NULL; }
-    *out_size = (size_t)asz; *out_dp = 0; *out_utf16 = 0;
-    if(asz >= 2 && data[0]==0xFF && data[1]==0xFE) { *out_dp = 2; *out_utf16 = 1; }
-    else if(asz >= 3 && data[0]==0xEF && data[1]==0xBB && data[2]==0xBF) { *out_dp = 3; }
-    else { int nl=0; for(size_t i=1; i<(size_t)asz && i<1024; i+=2) if(data[i]==0) nl++; if(nl*3 > asz) *out_utf16 = 1; }
-    return data;
+    FHandle dfd = INVALID_FHANDLE; int asz = 0; u8* data = OS_OpenAndAllocateFileBufferReadonly(path, &dfd, &asz); if(!data || asz <= 0) { DualLogError("Failed to load text file: %s\n", path); *out_size = 0; return NULL; } *out_size = (size_t)asz; *out_dp = 0; *out_utf16 = 0;
+    if(asz >= 2 && data[0]==0xFF && data[1]==0xFE) { *out_dp = 2; *out_utf16 = 1; } else if(asz >= 3 && data[0]==0xEF && data[1]==0xBB && data[2]==0xBF) { *out_dp = 3; } else { int nl=0; for(size_t i=1; i<(size_t)asz && i<1024; i+=2) if(data[i]==0) nl++; if(nl*3 > asz) *out_utf16 = 1; } return data;
 }
 
 void LoadTextForLanguage(u8 lang) {
     char tf[256]={0}; sCpy2aSubFromb(tf,255,localizations[lang<8?lang:0],256);
     char line[T_LOGSTR_MAX]; size_t dp=0; int utf16=0,ln=0; Sys_Text.file_data = LoadTextFile(tf,&Sys_Text.file_size,&dp,&utf16);    
     while(dp<Sys_Text.file_size){size_t ls=dp;
-        if(utf16){while(dp+1<Sys_Text.file_size){u16 ch=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.file_size){u16 nx=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
-        else{while(dp<Sys_Text.file_size){u8 c=Sys_Text.file_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.file_size&&Sys_Text.file_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
+        if(utf16){while(dp+1<Sys_Text.file_size){u16 ch=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.file_size){u16 nx=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}} else{while(dp<Sys_Text.file_size){u8 c=Sys_Text.file_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.file_size&&Sys_Text.file_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
         size_t ll=dp-ls;if(ll==0){if(ln<T_LOGSTR_CNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
         if(utf16)utf16le_to_utf8(&Sys_Text.file_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1; mcpy(line,&Sys_Text.file_data[ls],ll);line[ll]='\0';}
         size_t sl=slen(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';
@@ -527,6 +512,6 @@ void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 ali
     if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
 
-void RenderTextL(i16 x, i16 y, u32 color, u8 fontID, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,fontID,scale,TALIGN_LEFT,s,a); __builtin_va_end(a); }                                                                                                                                                                                                            
-void RenderTextC(i16 x, i16 y, u32 color, u8 fontID, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,fontID,scale,TALIGN_CENTER,s,a); __builtin_va_end(a); }                                                                                                                                                                                                            
-void RenderTextR(i16 x, i16 y, u32 color, u8 fontID, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,fontID,scale,TALIGN_RIGHT,s,a); __builtin_va_end(a); } 
+void RenderTextL(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_LEFT,s,a); __builtin_va_end(a); }
+void RenderTextC(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_CENTER,s,a); __builtin_va_end(a); }
+void RenderTextR(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_RIGHT,s,a); __builtin_va_end(a); }
