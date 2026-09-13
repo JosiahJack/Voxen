@@ -296,7 +296,7 @@ void stbrp_pack_rects(stbrp_context*con,stbrp_rect*rects,int n){int i;for(i=0;i<
 typedef struct{void*uac;void*pack_info;int width,height,stride_in_bytes,padding,skip_missing;u32 h_oversample,v_oversample;u8*pixels;}stbtt_pack_context;
 typedef struct{u16 x0,y0,x1,y1;float xoff,yoff,xadvance,xoff2,yoff2;}stbtt_packedchar;
 typedef struct{float font_size;int first_unicode_codepoint_in_range;int*array_of_unicode_codepoints;int num_chars;stbtt_packedchar*chardata_for_range;u8 h_oversample,v_oversample;}FPackRange;
-int stbtt_PackBegin(stbtt_pack_context*spc,u8* px, int pw, int ph, int str, int pad, void* a){ stbrp_context*ctx=(stbrp_context*)ttalloc(sizeof(*ctx)); if (!ctx){return 0;} *ctx=(stbrp_context){pw-pad,ph-pad,0,0,0}; if(px){mset(px,0,(size_t)(pw*ph));} return *spc=(stbtt_pack_context){a,ctx,pw,ph,str ? str : pw,pad,0,1,1,px},1; }
+int stbtt_PackBegin(stbtt_pack_context*spc,u8* px, int sz, int str, int pad, void* a){ stbrp_context*ctx=(stbrp_context*)ttalloc(sizeof(*ctx)); if (!ctx){return 0;} *ctx=(stbrp_context){sz-pad,sz-pad,0,0,0}; if(px){mset(px,0,(size_t)(sz*sz));} return *spc=(stbtt_pack_context){a,ctx,sz,sz,str ? str : sz,pad,0,1,1,px},1; }
 void _pre(u8*p,int w,int h,int str,u32 kw,int vert){ int outer=vert?w:h, inner=vert?h:w, os=vert?1:str, is=vert?str:1; for(int j=0;j<outer;++j,p+=os){u8 buf[8]={0};int tot=0;for(int i=0;i<inner;++i){if(i<=inner-(int)kw){tot+=p[i*is]-buf[i&7];buf[(i+kw)&7]=p[i*is];}else tot-=buf[i&7];p[i*is]=(u8)(tot/kw);}} }
 float _oshift(int os){return os?-(float)(os-1)/(2.0f*(float)os):0.0f;}
 int stbtt_PackFontRanges(stbtt_pack_context*spc,const u8*fontdata,int fi,FPackRange*ranges,int nr){
@@ -365,10 +365,41 @@ static stbtt_fontinfo fontInfo[5]; static u8 *fontData[5]; static char uiTextBuf
 typedef struct{char*path;u8*data;size_t size;stbtt_fontinfo info;}LoadedFont;
 LoadedFont fallbackFonts[3];
 typedef struct{i32 first,count,startIndex;}GlyphRange;
-GlyphRange fontRanges[]     ={{0x0020,0x7E - 0x20 + 1,0},{0x00A0,0xFF - 0xA0 + 1,95},{0x0400,0x04FF - 0x0400 + 1,95+96},{0x3040,0x30FF - 0x3040 + 1,95+96+256}};
-GlyphRange fontRangesStopD[]={{0x0020,0x7E - 0x20 + 1,0},{0x00A0,0xFF - 0xA0 + 1,95},{0x0400,0x04FF - 0x0400 + 1,95+96},{0x3040,0x30FF - 0x3040 + 1,95+96+256}};
+GlyphRange fontRanges[] = {
+    {0x000A,1,0}/*\n*/, {0x0020,10,1}/* U+0020..U+0029*/, {0x002B,18,11}/* U+002B..U+003C*/, {0x003E,30,29}/* U+003E..U+005B*/, {0x005D,1,59}/*]*/, {0x005F,1,60}/*_*/, {0x0061,26,61}/* U+0061..U+007A*/, {0x00A1,1,87}/*¡*/, {0x00B0,1,88}/*°*/, {0x00BF,6,89}/* U+00BF..U+00C4*/, {0x00C7,4,95}/* U+00C7..U+00CA*/, {0x00CC,3,99}/* U+00CC..U+00CE*/, {0x00D1,1,102}/*Ñ*/,
+    {0x00D3,4,103}/* U+00D3..U+00D6*/, {0x00DA,1,107}/*Ú*/, {0x00DC,1,108}/*Ü*/, {0x00DF,6,109}/* U+00DF..U+00E4*/, {0x00E7,4,115}/* U+00E7..U+00EA*/, {0x00EC,2,119}/* U+00EC..U+00ED*/, {0x00EF,1,121}/*ï*/, {0x00F1,6,122}/* U+00F1..U+00F6*/, {0x00F9,4,128}/* U+00F9..U+00FC*/, {0x0153,1,132}/*œ*/, {0x0401,1,133}/*Ё*/,
+    {0x0410,64,134}/*АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдежзийклмнопрстуфхцчшщъыьэюя*/, {0x0451,1,198}/*ё*/, {0x2014,1,199}/*—*/, {0x2116,1,200}/*№*/, {0x3001,2,201}/*、。*/, {0x3005,1,203}/*々*/, {0x300C,4,204}/*「」『』*/, {0x3042,1,208}/*あ*/, {0x3044,1,209}/*い*/, {0x3046,1,210}/*う*/, {0x3048,1,211}/*え*/, {0x304A,6,212}/*おかがきぎく*/, {0x3051,5,218}/*げこごさざ*/,
+    {0x3057,7,223}/*しじすずせぜそ*/, {0x305F,3,230}/*ただち*/, {0x3063,2,233}/*っつ*/, {0x3066,6,235}/*てでとどなに*/, {0x306E,6,241}/*のはばぱひび*/, {0x3075,2,247}/*ふぶ*/, {0x3078,2,249}/*へべ*/, {0x307B,1,251}/*ほ*/, {0x307E,6,252}/*まみむめもや*/, {0x3087,7,258}/*ゃゆょよらりる*/, {0x308F,1,265}/*わ*/, {0x3092,2,266}/*をん*/,
+    {0x30A1,4,268}/*ァアィイ*/, {0x30A6,24,272}/*ウェエォオカガキギクグケゲコゴサザシスズセゼソゾ*/, {0x30BF,3,296}/*タダチ*/, {0x30C3,2,299}/*ッツ*/, {0x30C6,6,301}/*テデトドナニ*/, {0x30CD,27,307}/*ヌネノハバパヒビピフブプヘベペホボポマミムメモャヤュユョ*/, {0x30E9,5,334}/*ラリルレロ*/, {0x30EF,1,339}/*ワ*/, {0x30F3,1,340}/*ン*/, {0x30F6,1,341}/*ヶ*/, {0x30FB,2,342}/*・ー*/,
+    {0x4E00,1,344}/*一*/, {0x4E07,1,345}/*万*/, {0x4E09,3,346}/*三上下*/, {0x4E0D,2,349}/*不与*/, {0x4E2D,1,351}/*中*/, {0x4E3B,1,352}/*主*/, {0x4E45,1,353}/*久*/, {0x4E86,1,354}/*了*/, {0x4E8B,2,355}/*事二*/, {0x4E95,1,357}/*井*/, {0x4EA4,1,358}/*交*/, {0x4EBA,1,359}/*人*/, {0x4ED5,1,360}/*仕*/, {0x4ED8,1,361}/*付*/, {0x4EE3,1,362}/*代*/, {0x4EF6,1,363}/*件*/, {0x4F01,1,364}/*企*/, 
+    {0x4F0F,1,365}/*伏*/, {0x4F1A,1,366}/*会*/, {0x4F4D,2,367}/*位低*/, {0x4F53,1,369}/*体*/, {0x4F5C,1,370}/*作*/, {0x4F7F,1,371}/*使*/, {0x4F9B,1,372}/*供*/, {0x4FA1,1,373}/*価*/, {0x4FB5,1,374}/*侵*/, {0x4FDD,1,375}/*保*/, {0x4FE1,1,376}/*信*/, {0x4FEE,1,377}/*修*/, {0x5009,1,378}/*倉*/, {0x500B,1,379}/*個*/, {0x502B,1,380}/*倫*/, {0x505C,1,381}/*停*/, {0x5099,1,382}/*備*/,
+    {0x50B2,1,383}/*傲*/, {0x50B7,1,384}/*傷*/, {0x50BE,1,385}/*傾*/, {0x50CF,1,386}/*像*/, {0x512A,1,387}/*優*/, {0x5143,1,388}/*元*/, {0x5145,1,389}/*充*/, {0x5148,2,390}/*先光*/, {0x514D,1,392}/*免*/, {0x5165,1,393}/*入*/, {0x5168,1,394}/*全*/, {0x5177,1,395}/*具*/, {0x5185,1,396}/*内*/, {0x518D,1,397}/*再*/, {0x5197,1,398}/*冗*/, {0x51B7,1,399}/*冷*/, {0x51CD,1,400}/*凍*/,
+    {0x51E6,1,401}/*処*/, {0x51FA,1,402}/*出*/, {0x5206,2,403}/*分切*/, {0x521D,1,405}/*初*/, {0x5225,1,406}/*別*/, {0x5236,1,407}/*制*/, {0x523A,2,408}/*刺刻*/, {0x524A,1,410}/*削*/, {0x524D,1,411}/*前*/, {0x5264,1,412}/*剤*/, {0x5270,1,413}/*剰*/, {0x5272,1,414}/*割*/, {0x529B,1,415}/*力*/, {0x529F,2,416}/*功加*/, {0x52A9,1,418}/*助*/, {0x52B4,1,419}/*労*/, {0x52B9,1,420}/*効*/,
+    {0x52D5,1,421}/*動*/, {0x5316,1,422}/*化*/, {0x533B,1,423}/*医*/, {0x5341,1,424}/*十*/, {0x5348,1,425}/*午*/, {0x5358,1,426}/*単*/, {0x5373,2,427}/*即却*/, {0x539A,1,429}/*厚*/, {0x53CD,2,430}/*反収*/, {0x53D6,2,432}/*取受*/, {0x53E3,2,434}/*口古*/, {0x53EF,1,436}/*可*/, {0x53F3,1,437}/*右*/, {0x5408,1,438}/*合*/, {0x540D,1,439}/*名*/, {0x5420,1,440}/*吠*/, {0x5438,1,441}/*吸*/,
+    {0x544A,1,442}/*告*/, {0x547D,1,443}/*命*/, {0x54C0,2,444}/*哀品*/, {0x54E1,1,446}/*員*/, {0x554F,1,447}/*問*/, {0x5668,1,448}/*器*/, {0x56DE,1,449}/*回*/, {0x56F2,2,450}/*囲図*/, {0x5727,2,452}/*圧在*/, {0x5730,1,454}/*地*/, {0x57F7,1,455}/*執*/, {0x57F9,1,456}/*培*/, {0x5834,1,457}/*場*/, {0x5869,1,458}/*塩*/, {0x586B,1,459}/*填*/, {0x5883,1,460}/*境*/, {0x58A8,1,461}/*墨*/,
+    {0x58C1,1,462}/*壁*/, {0x58CA,1,463}/*壊*/, {0x5909,1,464}/*変*/, {0x5916,1,465}/*外*/, {0x591A,1,466}/*多*/, {0x5927,1,467}/*大*/, {0x5929,1,468}/*天*/, {0x592E,1,469}/*央*/, {0x59A8,1,470}/*妨*/, {0x59CB,1,471}/*始*/, {0x5B50,1,472}/*子*/, {0x5B58,1,473}/*存*/, {0x5B66,1,474}/*学*/, {0x5B87,1,475}/*宇*/, {0x5B89,1,476}/*安*/, {0x5B8C,1,477}/*完*/, {0x5B99,2,478}/*宙定*/,
+    {0x5B9F,1,480}/*実*/, {0x5BA4,1,481}/*室*/, {0x5BB9,1,482}/*容*/, {0x5BFE,1,483}/*対*/, {0x5C01,1,484}/*封*/, {0x5C04,1,485}/*射*/, {0x5C0B,1,486}/*尋*/, {0x5C0E,2,487}/*導小*/, {0x5C11,1,489}/*少*/, {0x5C48,1,490}/*屈*/, {0x5C4B,1,491}/*屋*/, {0x5DE5,2,492}/*工左*/, {0x5E02,1,494}/*市*/, {0x5E38,1,495}/*常*/, {0x5E74,1,496}/*年*/, {0x5E8A,1,497}/*床*/, {0x5EA6,2,498}/*度座*/,
+    {0x5EAB,1,500}/*庫*/, {0x5EC3,1,501}/*廃*/, {0x5ECA,1,502}/*廊*/, {0x5EF6,1,503}/*延*/, {0x5F15,1,504}/*引*/, {0x5F31,1,505}/*弱*/, {0x5F37,1,506}/*強*/, {0x5F3E,1,507}/*弾*/, {0x5F62,1,508}/*形*/, {0x5F71,1,509}/*影*/, {0x5F7C,1,510}/*彼*/, {0x5F8C,1,511}/*後*/, {0x5F97,1,512}/*得*/, {0x5FA1,1,513}/*御*/, {0x5FA9,1,514}/*復*/, {0x5FAE,1,515}/*微*/, {0x5FC3,1,516}/*心*/,
+    {0x5FC5,1,517}/*必*/, {0x5FDC,1,518}/*応*/, {0x5FE0,1,519}/*忠*/, {0x601D,1,520}/*思*/, {0x6025,1,521}/*急*/, {0x6027,1,522}/*性*/, {0x60D1,1,523}/*惑*/, {0x610F,1,524}/*意*/, {0x611F,1,525}/*感*/, {0x614B,1,526}/*態*/, {0x6162,2,527}/*慢慣*/, {0x6210,1,529}/*成*/, {0x6226,1,530}/*戦*/, {0x623B,1,531}/*戻*/, {0x6240,1,532}/*所*/, {0x624B,1,533}/*手*/, {0x6255,1,534}/*払*/,
+    {0x6295,1,535}/*投*/, {0x629C,1,536}/*抜*/, {0x62BC,2,537}/*押抽*/, {0x62CD,1,539}/*拍*/, {0x62D8,1,540}/*拘*/, {0x62FE,1,541}/*拾*/, {0x6301,1,542}/*持*/, {0x6355,1,543}/*捕*/, {0x6368,1,544}/*捨*/, {0x6398,1,545}/*掘*/, {0x63A1,1,546}/*採*/, {0x63A5,1,547}/*接*/, {0x63D0,1,548}/*提*/, {0x63DB,1,549}/*換*/, {0x640D,1,550}/*損*/, {0x6483,1,551}/*撃*/, {0x64CD,1,552}/*操*/,
+    {0x653B,1,553}/*攻*/, {0x653E,1,554}/*放*/, {0x6551,1,555}/*救*/, {0x6570,1,556}/*数*/, {0x6574,2,557}/*整敵*/, {0x6599,1,559}/*料*/, {0x65AD,1,560}/*断*/, {0x65B0,1,561}/*新*/, {0x65BD,1,562}/*施*/, {0x65E2,1,563}/*既*/, {0x65E5,1,564}/*日*/, {0x660E,2,565}/*明昏*/, {0x661F,2,567}/*星映*/, {0x6642,1,569}/*時*/, {0x666E,1,570}/*普*/, {0x6697,1,571}/*暗*/, {0x66DC,1,572}/*曜*/,
+    {0x66F4,1,573}/*更*/, {0x66FF,2,574}/*替最*/, {0x6708,2,576}/*月有*/, {0x672A,1,578}/*未*/, {0x672C,1,579}/*本*/, {0x673A,1,580}/*机*/, {0x6750,1,581}/*材*/, {0x675F,1,582}/*束*/, {0x6765,1,583}/*来*/, {0x676F,1,584}/*杯*/, {0x6790,1,585}/*析*/, {0x67D3,2,586}/*染柔*/, {0x67F1,1,588}/*柱*/, {0x683C,1,589}/*格*/, {0x6841,1,590}/*桁*/, {0x6848,1,591}/*案*/, {0x68C4,1,592}/*棄*/,
+    {0x6905,1,593}/*椅*/, {0x691C,1,594}/*検*/, {0x696D,1,595}/*業*/, {0x6975,1,596}/*極*/, {0x697D,1,597}/*楽*/, {0x69CB,1,598}/*構*/, {0x6A19,1,599}/*標*/, {0x6A29,1,600}/*権*/, {0x6A4B,1,601}/*橋*/, {0x6A5F,1,602}/*機*/, {0x6B21,1,603}/*次*/, {0x6B62,2,604}/*止正*/, {0x6B66,1,606}/*武*/, {0x6B6A,1,607}/*歪*/, {0x6B7B,1,608}/*死*/, {0x6BD2,1,609}/*毒*/, {0x6C17,1,610}/*気*/,
+    {0x6C5A,1,611}/*汚*/, {0x6C7A,1,612}/*決*/, {0x6CBB,1,613}/*治*/, {0x6CE8,1,614}/*注*/, {0x6D3B,1,615}/*活*/, {0x6D41,1,616}/*流*/, {0x6D44,1,617}/*浄*/, {0x6D88,1,618}/*消*/, {0x6DF1,1,619}/*深*/, {0x6E2C,1,620}/*測*/, {0x6E80,1,621}/*満*/, {0x6E90,1,622}/*源*/, {0x6E96,1,623}/*準*/, {0x6EB6,1,624}/*溶*/, {0x6FC0,1,625}/*激*/, {0x6FE1,1,626}/*濡*/, {0x706B,1,627}/*火*/,
+    {0x706F,1,628}/*灯*/, {0x7121,1,629}/*無*/, {0x713C,1,630}/*焼*/, {0x7167,1,631}/*照*/, {0x71B1,1,632}/*熱*/, {0x7206,1,633}/*爆*/, {0x7269,1,634}/*物*/, {0x72B6,1,635}/*状*/, {0x73FE,1,636}/*現*/, {0x7403,1,637}/*球*/, {0x7406,1,638}/*理*/, {0x74B0,1,639}/*環*/, {0x751F,1,640}/*生*/, {0x7523,1,641}/*産*/, {0x7528,1,642}/*用*/, {0x753B,1,643}/*画*/, {0x7559,1,644}/*留*/,
+    {0x7565,1,645}/*略*/, {0x7570,1,646}/*異*/, {0x75B2,1,647}/*疲*/, {0x7642,1,648}/*療*/, {0x7652,1,649}/*癒*/, {0x767A,1,650}/*発*/, {0x767D,1,651}/*白*/, {0x7684,1,652}/*的*/, {0x76E3,1,653}/*監*/, {0x76F4,1,654}/*直*/, {0x7720,1,655}/*眠*/, {0x7740,1,656}/*着*/, {0x7761,1,657}/*睡*/, {0x77E5,1,658}/*知*/, {0x77F3,1,659}/*石*/, {0x7814,2,660}/*研砕*/, {0x7834,1,662}/*破*/,
+    {0x78BA,1,663}/*確*/, {0x78C1,1,664}/*磁*/, {0x78E8,1,665}/*磨*/, {0x793E,1,666}/*社*/, {0x795E,1,667}/*神*/, {0x79C1,1,668}/*私*/, {0x79D1,2,669}/*科秒*/, {0x79FB,1,671}/*移*/, {0x7A0B,1,672}/*程*/, {0x7A76,1,673}/*究*/, {0x7A7A,1,674}/*空*/, {0x7A93,1,675}/*窓*/, {0x7ACB,1,676}/*立*/, {0x7AEF,1,677}/*端*/, {0x7AF6,1,678}/*競*/, {0x7BA1,1,679}/*管*/, {0x7BB1,1,680}/*箱*/,
+    {0x7BC4,1,681}/*範*/, {0x7C21,1,682}/*簡*/, {0x7D04,1,683}/*約*/, {0x7D19,2,684}/*紙級*/, {0x7D20,1,686}/*素*/, {0x7D30,1,687}/*細*/, {0x7D42,1,688}/*終*/, {0x7D4C,1,689}/*経*/, {0x7D50,1,690}/*結*/, {0x7D66,1,691}/*給*/, {0x7D9A,1,692}/*続*/, {0x7DAD,1,693}/*維*/, {0x7DCA,1,694}/*緊*/, {0x7DDA,1,695}/*線*/, {0x7DE8,1,696}/*編*/, {0x7F6E,1,697}/*置*/, {0x7FD2,1,698}/*習*/,
+    {0x8003,1,699}/*考*/, {0x8005,1,700}/*者*/, {0x8010,1,701}/*耐*/, {0x80FD,1,702}/*能*/, {0x8131,1,703}/*脱*/, {0x8133,1,704}/*脳*/, {0x81E8,1,705}/*臨*/, {0x81EA,1,706}/*自*/, {0x822C,1,707}/*般*/, {0x82BD,1,708}/*芽*/, {0x8349,1,709}/*草*/, {0x84B8,1,710}/*蒸*/, {0x84CB,1,711}/*蓋*/, {0x8513,1,712}/*蔓*/, {0x8535,1,713}/*蔵*/, {0x85AC,1,714}/*薬*/, {0x86CD,1,715}/*蛍*/,
+    {0x8840,1,716}/*血*/, {0x884C,1,717}/*行*/, {0x885D,1,718}/*衝*/, {0x8868,1,719}/*表*/, {0x88C5,1,720}/*装*/, {0x88DC,1,721}/*補*/, {0x88FD,1,722}/*製*/, {0x8907,1,723}/*複*/, {0x8981,1,724}/*要*/, {0x898B,1,725}/*見*/, {0x8996,1,726}/*視*/, {0x899A,1,727}/*覚*/, {0x89B3,1,728}/*観*/, {0x89E3,1,729}/*解*/, {0x8A00,1,730}/*言*/, {0x8A08,1,731}/*計*/, {0x8A18,1,732}/*記*/,
+    {0x8A2D,1,733}/*設*/, {0x8A31,1,734}/*許*/, {0x8A3A,1,735}/*診*/, {0x8A55,1,736}/*評*/, {0x8A66,1,737}/*試*/, {0x8A70,1,738}/*詰*/, {0x8A73,1,739}/*詳*/, {0x8A9E,1,740}/*語*/, {0x8AAD,1,741}/*読*/, {0x8AB2,1,742}/*課*/, {0x8ABF,1,743}/*調*/, {0x8AD6,1,744}/*論*/, {0x8B58,1,745}/*識*/, {0x8B66,1,746}/*警*/, {0x8B77,1,747}/*護*/, {0x8C61,1,748}/*象*/, {0x8CAF,1,749}/*貯*/,
+    {0x8CBB,1,750}/*費*/, {0x8CEA,1,751}/*質*/, {0x8D64,1,752}/*赤*/, {0x8D77,1,753}/*起*/, {0x8DB3,1,754}/*足*/, {0x8DEF,1,755}/*路*/, {0x8ECD,1,756}/*軍*/, {0x8EE2,1,757}/*転*/, {0x8EFD,1,758}/*轻*/, {0x8F38,1,759}/*輸*/, {0x8FBC,1,760}/*込*/, {0x8FCE,1,761}/*迎*/, {0x8FD1,1,762}/*近*/, {0x8FFD,1,763}/*追*/, {0x9000,2,764}/*退送*/, {0x901A,1,766}/*通*/, {0x9020,1,767}/*造*/,
+    {0x902E,1,768}/*逮*/, {0x9032,1,769}/*進*/, {0x9045,1,770}/*遅*/, {0x904A,1,771}/*遊*/, {0x904E,1,772}/*過*/, {0x9055,1,773}/*違*/, {0x9060,1,774}/*遠*/, {0x9069,1,775}/*適*/, {0x90E8,1,776}/*部*/, {0x914D,1,777}/*配*/, {0x91CD,3,778}/*重野量*/, {0x91D1,1,781}/*金*/, {0x925B,1,782}/*鉛*/, {0x9280,1,783}/*銀*/, {0x9285,1,784}/*銅*/, {0x92FC,1,785}/*鋼*/, {0x9320,1,786}/*錠*/,
+    {0x9396,1,787}/*鎖*/, {0x9577,1,788}/*長*/, {0x9589,1,789}/*閉*/, {0x958B,1,790}/*開*/, {0x9593,1,791}/*間*/, {0x95A2,1,792}/*関*/, {0x95C7,1,793}/*闇*/, {0x95D8,1,794}/*闘*/, {0x963B,1,795}/*阻*/, {0x9650,1,796}/*限*/, {0x9662,1,797}/*院*/, {0x9664,1,798}/*除*/, {0x9685,1,799}/*隅*/, {0x968A,1,800}/*隊*/, {0x96C6,1,801}/*集*/, {0x96E2,2,802}/*離難*/, {0x96F7,1,804}/*雷*/,
+    {0x96FB,1,805}/*電*/, {0x975E,1,806}/*非*/, {0x9762,1,807}/*面*/, {0x97F3,1,808}/*音*/, {0x97FF,1,809}/*響*/, {0x9805,2,810}/*項順*/, {0x9810,1,812}/*預*/, {0x982D,1,813}/*頭*/, {0x98DF,1,814}/*食*/, {0x98F2,1,815}/*飲*/, {0x990A,1,816}/*養*/, {0x9A13,1,817}/*駄*/, {0x9AA8,1,818}/*骨*/, {0x9AD8,1,819}/*高*/, {0x9ED2,1,820}/*黒*/, {0xFF01,1,821}/*！*/, {0xFF08,2,822}/*（）*/,
+    {0xFF1A,1,824}/*：*/, {0xFF1F,1,825}/*？*/ };
 i32 numFontRanges=sizeof(fontRanges)/sizeof(fontRanges[0]);
-i32 CodepointToPackedIndex(i32 cp,int fontID){ if(cp<32){cp=32;} if(cp>=447){cp=446;} const GlyphRange*ranges=(fontID==FONT_STOPD)?fontRangesStopD:fontRanges; i32 total=(fontID==FONT_STOPD)?numPackedGlyphsStopD:numPackedGlyphs; for(i32 i=0;i<numFontRanges;i++){if(cp>=ranges[i].first&&cp<ranges[i].first+ranges[i].count){i32 idx=ranges[i].startIndex+vmax((cp-ranges[i].first),0);if(idx<total){return idx;}}} return 0; }
+i32 CodepointToPackedIndex(i32 cp,int fontID){ if(cp<32){cp=32;} if(cp>=447){cp=446;} const GlyphRange*ranges=fontRanges; i32 total=(fontID==FONT_STOPD)?numPackedGlyphsStopD:numPackedGlyphs; for(i32 i=0;i<numFontRanges;i++){if(cp>=ranges[i].first&&cp<ranges[i].first+ranges[i].count){i32 idx=ranges[i].startIndex+vmax((cp-ranges[i].first),0);if(idx<total){return idx;}}} return 0; }
 LoadedFont LoadFallbackFont(const char*path,int fii,int ci){
     FHandle fd;int fsz;fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
     int off=stbtt_GetFontOffsetForIndex(fontData[fii],ci);if(off<0){DualLogError("Invalid collection index %d for font %s\n",ci,path);OS_Exit(1);}
@@ -377,8 +408,8 @@ LoadedFont LoadFallbackFont(const char*path,int fii,int ci){
 }
 int GetGlyphAndFont(u32 cp,stbtt_fontinfo**outFont,u8 fontID){ int g=stbtt_FindGlyphIndex(fontID==FONT_STOPD?&fontInfo[1]:&fontInfo[0],cp);if(g){*outFont=fontID==FONT_STOPD?&fontInfo[1]:&fontInfo[0];return g;} for(int i=0;i<3;i++){g=stbtt_FindGlyphIndex(&fallbackFonts[i].info,cp);if(g){*outFont=&fallbackFonts[i].info;return g;}} return 0; }
 void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp);
-void BuildAtlas(u32* atlasTex, GlyphRange* ranges, int* numPacked, stbtt_packedchar* packedChars, float* fixedNumAdv, float baseH, int fontIdx, u8 fontID, u8* bmp) {
-    stbtt_pack_context pc; stbtt_PackBegin(&pc,bmp,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0,16,NULL); pc.h_oversample=pc.v_oversample=3; pc.skip_missing=1; *numPacked=0;
+void BuildAtlas(u32* atlasTex, GlyphRange* ranges, int* numPacked, stbtt_packedchar* packedChars, float* fixedNumAdv, float baseH, int fontIdx, u8 fontID, u8* bmp, u32 sz) {
+    stbtt_pack_context pc; stbtt_PackBegin(&pc,bmp,sz,0,16,NULL); pc.h_oversample=pc.v_oversample=3; pc.skip_missing=1; *numPacked=0;
     for(int r=0; r<numFontRanges; ++r) { ranges[r].startIndex = *numPacked;
         for(int i=0; i<ranges[r].count; ++i) {
             if(*numPacked >= MAX_GLYPHS) break;
@@ -388,9 +419,10 @@ void BuildAtlas(u32* atlasTex, GlyphRange* ranges, int* numPacked, stbtt_packedc
             FPackRange range = {h, cp, NULL, 1, &packedChars[*numPacked], 0, 0}; stbtt_PackFontRanges(&pc, data, 0, &range, 1);
             int idx = (*numPacked)++; if(cp >= '0' && cp <= '9') *fixedNumAdv = vmax(*fixedNumAdv,packedChars[idx].xadvance);
         }
-    } ttfree(pc.pack_info); GenerateAndBindTexture(atlasTex, 0x8229, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0x1903, GL_UNSIGNED_BYTE, 0x2601, bmp);
+    } ttfree(pc.pack_info); GenerateAndBindTexture(atlasTex,0x8229,sz,sz,0x1903,GL_UNSIGNED_BYTE,0x2601,bmp);
 }
 
+void DumpFontAtlasBmp(const char* filename, u8* atlas, int size) { u32* rgba = OS_AllocScratch((size_t)size * size * 4);  for (int row = 0; row < size; ++row) { const u8* srcRow = atlas + row * size; u32* dstRow = rgba + (size - 1 - row) * size; for (int col = 0; col < size; ++col) { u8 v = srcRow[col]; dstRow[col] = v | (v<<8) | (v<<16) | (v<<24); } } BmpWrite(filename, size, size, rgba); }
 void InitFontAtlasses() {
     DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    5 fonts...");
@@ -404,9 +436,11 @@ void InitFontAtlasses() {
     fallbackFonts[1]=LoadFallbackFont(fallbackFontPaths[1],3,0);
     fallbackFonts[2]=LoadFallbackFont(fallbackFontPaths[2],4,0);
     u8* bmp = OS_AllocScratch(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
-    BuildAtlas(&fontAtlasTex,fontRanges,&numPackedGlyphs,fontPackedChar,&fixedNumberAdvanceWidth,20.0f,0,FONT_NORMAL,bmp);
-    mset(bmp,0,FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Secondary atlas
-    BuildAtlas(&fontAtlasTexStopD, fontRangesStopD, &numPackedGlyphsStopD, fontPackedCharStopD, &fixedNumberAdvanceWidthStopD, 54.0f, 1, FONT_STOPD, bmp);
+    BuildAtlas(&fontAtlasTex,fontRanges,&numPackedGlyphs,fontPackedChar,&fixedNumberAdvanceWidth,20.0f,0,FONT_NORMAL,bmp,FONT_ATLAS_SIZE);
+    DumpFontAtlasBmp("Screenshots/atlas_normal.bmp",bmp,FONT_ATLAS_SIZE);
+    u8* bmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2); // Primary atlas
+    BuildAtlas(&fontAtlasTexStopD,fontRanges,&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
+    DumpFontAtlasBmp("Screenshots/atlas_stopd.bmp",bmp2,FONT_ATLAS_SIZE2);
     OS_Free(fontData[0],sz1); OS_Free(fontData[1],sz2); OS_Free(fontData[2],fallbackFonts[0].size); OS_Free(fontData[3],fallbackFonts[1].size); OS_Free(fontData[4],fallbackFonts[2].size); OS_FreeInitPhase(); // TODO Just use scratch!
     glUseProgram(textSP); glUniform1i(1,2); DebugRAM("after font load"); DualLog(" took %f s\n",get_time()-t0);
 }
@@ -484,7 +518,7 @@ void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 ali
     va_list c; __builtin_va_copy(c,args); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,c); __builtin_va_end(c);
     glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
     glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex);
-    float invatsz = 1.0f/(float)FONT_ATLAS_SIZE;
+    float invatsz = 1.0f/(fontID==FONT_STOPD ? (float)FONT_ATLAS_SIZE2 : (float)FONT_ATLAS_SIZE);
     glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID); glBindVertexArray(textVAO);
     float xUsed=x, yUsed=y; if (scale < 1.0f) { xUsed *= (1/scale); yUsed *= (1/scale); }
     float alignMul = (align==TALIGN_CENTER) ? 0.5f : (align==TALIGN_RIGHT) ? 1.0f : 0.0f; // pen starts this far (as a fraction of line width) left of xUsed

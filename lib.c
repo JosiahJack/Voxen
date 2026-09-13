@@ -178,6 +178,13 @@ void BmpWrite(char const *filename, int x, int y, const void *data) {
     const u8 *pixels = (const u8 *)data; for (int j=y-1;j>=0;--j) OS_Write(f,(void*)(pixels + j*x*4),(size_t)x*4,filename); OS_Close(f);
 }
 
+void Screenshot() {
+    World.screenshotTimeout = World.current_time + 1.0;/*Prevent saving more than 1 per second for sanity purposes.*/ OS_MakeFolder("Screenshots"); u16 w=Sys_Settings.ScreenWidth, h=Sys_Settings.ScreenHeight;
+    u8* pixels = OS_Alloc(w * h * 4 * sizeof(char)); glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels); 
+    char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
+    BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
+}
+
 void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
     (void)context;
 //     static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
@@ -190,13 +197,6 @@ void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely alloc
 //             p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
 //         } p++;
 //     } DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
-}
-
-void Screenshot() {
-    World.screenshotTimeout = World.current_time + 1.0;/*Prevent saving more than 1 per second for sanity purposes.*/ OS_MakeFolder("Screenshots"); u16 w=Sys_Settings.ScreenWidth, h=Sys_Settings.ScreenHeight;
-    u8* pixels = OS_Alloc(w * h * 4 * sizeof(char)); glReadPixels(0,0,w,h,GL_RGBA,GL_UNSIGNED_BYTE,pixels); 
-    char filename[96]; sFormat(filename,sizeof(filename),"Screenshots/%.2f_x%.1f_y%.1f_z%.1f.bmp",get_time(),World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z);
-    BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
 }
 
 u32 random_range_rng = 0x12345678u;
