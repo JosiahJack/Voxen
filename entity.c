@@ -690,7 +690,7 @@ void LoadLevelData(u8 curlevel) {
 }
 
 u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
-void RenderLoading(const char* restrict); void ResetLevelAudio(); void ResetLevelMusic(); void CullInit();
+void RenderLoading(const char* restrict); void ResetLevelAudio(); void ResetLevelMusic(); void CullInit(); void mp3_clear();
 void LoadAllLevels() {
     double start_time = get_time();
     DebugRAM("start of LoadAllLevels"); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true;
@@ -707,7 +707,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.curLev = curlevel; SetLevelPointers(curlevel); mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView)); mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32)); camViewCount = levelCamViewCount[curlevel];
     for (int i = 0; i < camViewCount; ++i) { if (levelCamViews[curlevel][i].visible == false && camViews[i].visible == true) { mcpy(&levelCamViews[curlevel][i], &camViews[i], sizeof(CamView)); levelCamViewTextures[curlevel][i] = camViewTextures[i]; } } // Initialize missing level camview entries from file data
     mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce)); for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
-    DualLog("Switched to Level %d\n",curlevel); ResetLevelAudio(); ResetLevelMusic(); RenderLoading("Loading cull system..."); CullInit(); // Must be after level!
+    DualLog("Switched to Level %d\n",curlevel); ResetLevelAudio(); mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.combatImpulseFinished = get_time(); World.Sys_Music.combatImpulseFinished += 5.0; RenderLoading("Loading cull system..."); CullInit(); // Must be after level!
     glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(7,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
     RenderLoading("Loading voxel lighting data..."); for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all

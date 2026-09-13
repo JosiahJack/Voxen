@@ -9,7 +9,7 @@ bool SkyIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX)
 bool SkySunIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); }
 bool NeighborhoodInPVS(u16 x, u16 z, u8 r) { u32 cellIdx=(z*WORLDX)+x; for(int ix=(int)x-r;ix<=(int)x+r;++ix){for(int iz=(int)z-r;iz<=(int)z+r;++iz){if(unlikely(!XZPairInBounds(ix,iz))){continue;} int subIdx=iz*WORLDX + ix; if(get_cull_bit(precomputedVisibleCellsFromHere,cellIdx*ARRSIZE+subIdx)&&(gridCellStates[subIdx]&CELL_VISIBLE))return true;} } return false; }
 static u8* LoadCullPNG(const char* name, int level) {
-    char path[256]; sFormat(path,sizeof(path),"./Data/%s_%d.png",name,level); FHandle fp=OS_OpenReadonly(path); OS_Seek(fp,0,2); size_t size = OS_Tell(fp); if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n",path); OS_Exit(1); } u8* cullingFileBuffer=OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8)); OS_Seek(fp,0,0); long read_size = OS_Read(fp,cullingFileBuffer,size);
+    char path[256]; sFormat(path,sizeof(path),"./Data/%s_%d.png",name,level); FHandle fp=OS_OpenReadonly(path); size_t size = OS_FileSize(fp); if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n",path); OS_Exit(1); } u8* cullingFileBuffer=OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8)); OS_Seek(fp,0,0); long read_size = OS_Read(fp,cullingFileBuffer,size);
     OS_Close(fp); if ((size_t)read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); } i32 w,h; u8* pixels=PngLoad(cullingFileBuffer,size,&w,&h,&png_arena_main); if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); } OS_Free(cullingFileBuffer,MAX_CULL_FILESIZE * sizeof(u8)); return pixels;
 }
 

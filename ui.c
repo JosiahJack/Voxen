@@ -61,9 +61,9 @@ bool UI_Checkbox(i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn) {
 }
 
 __attribute__((noinline)) void UI_HeaderText(i16 x, const char* text) { RenderTextL(x,50,T_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderTextL(x,46,T_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderTextL(x,48,T_GREEN_MENU,FONT_STOPD,1.75f,text); }
-void PlayGameMusic(); void PlayMenuMusic();
+void PlayMenuMusic(),mp3_clear();
 __attribute__((noinline)) void MenuGoBack() {
-    if (returnToPause) { returnToPause = false; World.paused = true; World.menuActive = false; PlayGameMusic(); }
+    if (returnToPause) { returnToPause = false; World.paused = true; World.menuActive = false; mp3_clear(); }
     if (currentMenuPage == Mpg_Singleplayer || currentMenuPage == Mpg_Multiplayer || currentMenuPage == Mpg_Options) currentMenuPage = Mpg_FrontPage;//News
     else if (currentMenuPage == Mpg_Load || currentMenuPage == Mpg_NewGame || currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) currentMenuPage = Mpg_Singleplayer;
 }

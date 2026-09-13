@@ -252,7 +252,7 @@ typedef struct Emitter { bool active; V3 position; float emitAccumulator,emitRat
                          u32 texBaseIdx,textureFrameCount; float animSpeed,animWindow,softness,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; u32 colorRamp[64]; } Emitter;
 typedef struct GpuPartInst { float x,y,z,size; u32 color,data0,data1,pad; } GpuPartInst; typedef struct TrlSegInst { float p0x,p0y,p0z,padA,p1x,p1y,p1z,padB; float c00x,c00y,c00z,c00w,c01x,c01y,c01z,c01w,c10x,c10y,c10z,c10w,c11x,c11y,c11z,c11w; u32 color0,color1,uvData; float deathTime; float birth0,birth1,pad0,pad1; } TrlSegInst;
 typedef struct { Particle particles[MAX_PARTICLES]; Emitter emitters[MAX_EMITTERS]; GpuPartInst gpuInstances[MAX_PARTICLES]; TrlSegInst trailSegments[MAX_TRAIL_SEGS]; PartSortEntry sortKeys[MAX_PARTICLES]; u32 aliveCount,trailCount; } PSys; extern PSys psys;
-typedef struct { double clipFinished,combatImpulseFinished; bool inCombat,inZone,twoPlaying,distortion,cyberTube,elevator,levelEntry; } MusicSystem;
+typedef struct { double combatImpulseFinished; bool inCombat,inZone,twoPlaying,distortion,cyberTube,elevator,levelEntry; } MusicSystem;
 typedef /*FAT*/ struct  {
     u32 entflags,ioflags; u16 modelIndex,index/*constIndex for entity type, used for indexing into arrays for resource types when loading resources*/,portalIndex; V3 forward,right,lastPosition/*used for NPC logic, not physics*/,topPoint,targetPosition,startPosition,activatedScale,direction; u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
     i32 cellIndex; i16 cellX,cellZ;
