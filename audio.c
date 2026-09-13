@@ -618,16 +618,8 @@ static FHandle pcm_fds[8]; static i32 audfdcnt = 0;
         if((r=sphpspn(apcm,hwp,&periods,&dir))<0){DualLogError("set_periods(%d) failed\n",AUDIO_PERIODS); return false;} if ((r=snd_pcm_hw_params(apcm,hwp))<0){DualLogError("hw_params apply failed\n"); return false;} if((r=spp(apcm))<0){DualLogError("snd_pcm_prepare failed\n"); return false;} if ((r=spn(apcm,1)) < 0){DualLogError("spn failed:%d\n",r); return false;} return true;
     }
 
-    static void init_pcm_device(i32 card, i32 dev) {
-        FHandle r=pcm_open(card,dev,1|(1<<1)); if(r == INVALID_FHANDLE){return;} pcm_params_t p; hw_params_fill(&p.hw_params); pcm_sw_params_t *sw = &p.sw_params; mset(sw,0,sizeof(*sw)); sw->start_threshold = 1; sw->period_step = 1;
-        hw_params_set(&p.hw_params,0,3); hw_params_set(&p.hw_params,11,AUDIO_RATE); hw_params_set(&p.hw_params,10,AUDIO_CHANNELS); hw_params_set(&p.hw_params,13,AUDIO_FRAMES); hw_params_set(&p.hw_params,15,AUDIO_PERIODS); if (pcm_params_setup(r,&p) >= 0 && audfdcnt < 8) pcm_fds[audfdcnt++] = r; else{DualLogError("Init aud card=%d dev=%d failed\n",card,dev); OS_Close(r);}
-    }
-
-    void AudioUpdate() {
-        if (!apcm){return;} int a = snd_pcm_avail_update(apcm); if (a < 0) { if (snd_pcm_recover(apcm, a, 0) < 0){return;} a = snd_pcm_avail_update(apcm); if (a < 0){return;} }
-        while (a >= (int)AUDIO_FRAMES) { i16 buf[AUDIO_FRAMES*AUDIO_CHANNELS]; audio_mix_period(buf); u32 off = 0, left = AUDIO_FRAMES; while (left > 0) { int r = snd_pcm_writei(apcm, buf + off*AUDIO_CHANNELS, left); if (r == -11/*EAGAIN*/) return; if (r < 0) { if (snd_pcm_recover(apcm, r, 0) < 0) return; break; } off += (u32)r; left -= (u32)r; } a -= AUDIO_FRAMES; }
-    }
-
+    void init_pcm_device(i32 card, i32 dev){FHandle r=pcm_open(card,dev,1|(1<<1)); if(r == INVALID_FHANDLE){return;} pcm_params_t p; hw_params_fill(&p.hw_params); pcm_sw_params_t *sw = &p.sw_params; mset(sw,0,sizeof(*sw)); sw->start_threshold = 1; sw->period_step = 1; hw_params_set(&p.hw_params,0,3); hw_params_set(&p.hw_params,11,AUDIO_RATE); hw_params_set(&p.hw_params,10,AUDIO_CHANNELS); hw_params_set(&p.hw_params,13,AUDIO_FRAMES); hw_params_set(&p.hw_params,15,AUDIO_PERIODS); if(pcm_params_setup(r,&p)>=0 && audfdcnt<8)pcm_fds[audfdcnt++]=r; else{DualLogError("Init card=%d dev=%d failed\n",card,dev); OS_Close(r);}}
+    void AudioUpdate() { if(!apcm){return;} int a=snd_pcm_avail_update(apcm); if(a<0){if(snd_pcm_recover(apcm,a,0)<0){return;} a=snd_pcm_avail_update(apcm); if(a<0){return;}} while(a>=(int)AUDIO_FRAMES){i16 b[AUDIO_FRAMES*AUDIO_CHANNELS]; audio_mix_period(b); u32 off=0,left=AUDIO_FRAMES; while(left>0){int r=snd_pcm_writei(apcm,b+off*AUDIO_CHANNELS,left); if(r==-11/*EAGAIN*/)return; if(r<0){if(snd_pcm_recover(apcm,r,0)<0)return; break;} off+=(u32)r; left-=(u32)r;} a-=AUDIO_FRAMES;} }
     void InitAudio() { InitSCFTables(); if (!alsa_try_open_default()) { for (i32 card = 0; card < 8; card++) { for (i32 dev = 0; dev < 8; dev++) init_pcm_device(card,dev); } if (audfdcnt == 0) {DualLogError("Audio: no output device found\n"); return; } } }
 #endif
 // Looping Ambients SFX System
@@ -647,8 +639,6 @@ void MixAmbs() {
 
 void ResetLevelAudio(void){ambs=0; mset(ambReg,0,MAXAMB*sizeof(u16)); for(u32 s=0;s<MAXAMB;++s){if(ambientSlots[s].loaded){ambientSlots[s].sound.playing=false;}} for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){if(IdxIsAmbient(World.instances[i].index)){ambReg[ambs]=i; ambs++; if(ambs>=MAXAMB){DualLogError("Ambients %u > %u!\n",ambs,MAXAMB); break;}}}}
 // Music System
-#define BUFFER_MS 50
-#define AUD_BUFFER_T 0.05f
 const char* levelMusicLooped[MAX_LEVELS] = {"looped/track0","looped/track1","looped/track2","looped/track3","looped/track2","looped/track0","looped/track6","looped/track0","looped/track8","misc/null","looped/track10","looped/track11","looped/track12","looped/track13"};
 const char* reactorMusic[13] = {"THM4-01_reactorcombat1","THM4-02_reactorcombat2","THM4-03_reactorcombat3","THM4-04_reactorcombat4","THM4-05_reactorwalkingatocombat","THM4-06_reactorwalkingbtocombat","THM4-09_reactorwalkinga1","THM4-10_reactorwalkinga2","THM4-11_reactorwalkingb1","THM4-12_reactorwalkingb2","THM4-13_reactorwalkingb3","THM4-14_reactorwalkingc1","THM4-15_reactorwalkingc2"};
 const char* medicalMusic[11] = {"THM1-19_medicalstart","THM1-01_medicalwalking1","THM1-02_medicalwalking2","THM1-03_medicalwalking3","THM1-04_medicalwalking4","THM1-05_medicalcombat1","THM1-06_medicalcombat2","THM1-07_medicalcombat3","THM1-08_medicalcombat4","THM1-09_medicalcombat5","THM1-10_medicalcombat6"};
@@ -682,13 +672,11 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
             else if (ttype == TT_Elevator){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicElevator[World.curLev]);}else if(ttype == TT_Distortion){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicDistortion[World.curLev]);}
         } else { if(World.curLev != 9){sFormat(p,sizeof(p),"./Audio/music/%s.mp3",levelMusicLooped[World.curLev]);} }
         play_mp3(p,0); return;
-    } // Normal Dynamic Music System
-    if(mtype == MT_Override){mp3_clear();} sFormat(p,sizeof(p),"./Audio/music/%s.mp3",GetCorrespondingLevelClip(ttype)); play_mp3(p,BUFFER_MS); if (!World.Sys_Music.elevator){World.Sys_Music.levelEntry=false;}
+    } /*Normal Dynamic Music System:*/if(mtype == MT_Override){mp3_clear();} sFormat(p,sizeof(p),"./Audio/music/%s.mp3",GetCorrespondingLevelClip(ttype)); play_mp3(p,50/*ms*/); if (!World.Sys_Music.elevator){World.Sys_Music.levelEntry=false;}
 }
 
 void UpdateAudio() {
-    if (!World.paused && !World.menuActive) {MixAmbs();}
-    if ((World.paused && !World.menuActive) || !Sys_Settings.VolumeMusic) { mp3_paused = true; return; } mp3_paused = false; float remaining = mp3_remaining[mp3_slot]; if(remaining > AUD_BUFFER_T){return;} if(World.menuActive){play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return;}
+    if (!World.paused && !World.menuActive) {MixAmbs();} if ((World.paused && !World.menuActive) || !Sys_Settings.VolumeMusic) { mp3_paused = true; return; } mp3_paused = false; float remaining = mp3_remaining[mp3_slot]; if(remaining > 0.05f){return;} if(World.menuActive){play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return;}
     if(World.Sys_Music.inCombat && !World.Sys_Music.inZone && World.Sys_Music.combatImpulseFinished < World.pauseRelativeTime) { World.Sys_Music.inCombat=false; PlayTrack(TT_Combat,MT_Override); World.Sys_Music.combatImpulseFinished=World.pauseRelativeTime + 20.0; return; }
     if(World.Sys_Music.inZone){ if(World.Sys_Music.distortion){PlayTrack(TT_Distortion,MT_Override); return;} if(World.Sys_Music.elevator){PlayTrack(TT_Elevator,MT_Override); return;} } if(Sys_Settings.DynamicMusic){PlayTrack(TT_Walking,MT_Walking);}
 }

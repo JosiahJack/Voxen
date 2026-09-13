@@ -197,8 +197,7 @@ void ForceBridgeToggle(u16 self) { if (World.instances[self].active) {ForceBridg
 void ForceBridgeUpdate(u16 self) {
     Entity* e = &World.instances[self]; if(e->tickFinished >= World.pauseRelativeTime){return;} e->tickFinished = World.pauseRelativeTime + 0.05f;
     if (e->active) {
-        if (!e->lerping) return;
-        float sx=e->forceFieldDirectionX ? lerp(World.scale[self].x,e->activatedScale.x,0.1f) : World.scale[self].x, sy=e->forceFieldDirectionY ? lerp(World.scale[self].y,e->activatedScale.y,0.1f) : World.scale[self].y, sz=e->forceFieldDirectionZ ? lerp(World.scale[self].z,e->activatedScale.z,0.1f) : World.scale[self].z;
+        if (!e->lerping) return; float sx=e->forceFieldDirectionX ? lerp(World.scale[self].x,e->activatedScale.x,0.1f) : World.scale[self].x, sy=e->forceFieldDirectionY ? lerp(World.scale[self].y,e->activatedScale.y,0.1f) : World.scale[self].y, sz=e->forceFieldDirectionZ ? lerp(World.scale[self].z,e->activatedScale.z,0.1f) : World.scale[self].z;
         World.scale[self]=(V3){sx,sy,sz}; if(vabs(e->activatedScale.x - sx) < 0.08f && vabs(e->activatedScale.y - sy) < 0.08f && vabs(e->activatedScale.z - sz) < 0.08f){World.scale[self]=e->activatedScale; e->lerping=false;}
     } else if (e->lerping) { 
         float sx=e->forceFieldDirectionX ? lerp(World.scale[self].x,0.0f,0.1f) : World.scale[self].x, sy=e->forceFieldDirectionY ? lerp(World.scale[self].y,0.0f,0.1f) : World.scale[self].y, sz=e->forceFieldDirectionZ ? lerp(World.scale[self].z,0.0f,0.1f) : World.scale[self].z;
@@ -287,10 +286,7 @@ static void TargetIDDeactivate(u16 self) { Entity* e=&World.instances[self]; if(
 void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
     Entity* e=&World.instances[self]; if(e->enemy == WORLD){return;} Entity* npc=&World.instances[e->enemy];
     if (attackType == Att_Trnq) { e->textIndex=536;/*STUNNED*/ e->animSwapFinished=World.pauseRelativeTime - 1.0;/*expire damage text*/ }
-    else {
-        float mh = npcTable[npc->index - 419].health; if(damage > mh * 0.75f)e->textIndex = 514;/*SEVERE DAMAGE*/ else if(damage > mh * 0.50f)e->textIndex = 515;/*MAJOR DAMAGE*/ else if (damage > mh * 0.25f) e->textIndex = 513;/*NORMAL DAMAGE*/ else if (damage > 0.0f)e->textIndex = 512;/*MINOR DAMAGE*/ else e->textIndex = 511;/*NO DAMAGE*/
-        e->animSwapFinished = World.pauseRelativeTime + ((damage == 0.0f) ? 1.0f : 2.5f);
-    }
+    else { float mh = npcTable[npc->index - 419].health; if(damage > mh * 0.75f)e->textIndex = 514;/*SEVERE DAMAGE*/ else if(damage > mh * 0.50f)e->textIndex = 515;/*MAJOR DAMAGE*/ else if (damage > mh * 0.25f) e->textIndex = 513;/*NORMAL DAMAGE*/ else if (damage > 0.0f)e->textIndex = 512;/*MINOR DAMAGE*/ else e->textIndex = 511;/*NO DAMAGE*/ e->animSwapFinished = World.pauseRelativeTime + ((damage == 0.0f) ? 1.0f : 2.5f); }
 }
 
 void TargetIDUpdate(u16 self) {
@@ -371,8 +367,7 @@ float Tranquilize(u16 i, float amount, bool energy);
 static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
     Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return; // hit own host, ignore
     e->counter++;
-    DamageData dd = {.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity= e->damage * 1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx,
-                     .isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
+    DamageData dd = {.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity= e->damage * 1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx, .isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
     Entity* hit = &World.instances[hitIdx];
     if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; }
     if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; } // Railgun sphere impact

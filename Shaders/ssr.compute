@@ -17,54 +17,15 @@ layout(location=9) */
 vec3 DecodeOctahedral(vec2 enc) { vec2 encN = enc * 2.0 - 1.0; vec3 n = vec3(encN, 1.0 - abs(encN.x) - abs(encN.y)); n.xy -= max(-n.z, 0.0) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0); return normalize(n); }
 vec3 reconstructWorldPos(vec2 uv) { vec3 retval = vec3(0.0); float depth = texture(inputDepthID, uv).r; if (depth < 0.9999) { vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0); vec4 world = invViewProj * clip; retval = world.xyz / world.w; } return retval; }
 void main() {
-    uvec2 pixel = gl_GlobalInvocationID.xy; if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
-    vec2 screenSizeF = vec2(screenWidth, screenHeight) * float(SSR_RES); vec3 worldPos = reconstructWorldPos(((vec2(pixel * SSR_RES) + 0.5) / screenSizeF)); if (worldPos == vec3(0.0)) return;
-    vec4 specColor = imageLoad(inputSpecular, ivec2(pixel * SSR_RES)); if ((specColor.r + specColor.g + specColor.b) < 0.01) return;
-    
-    vec2 normalPack = imageLoad(inputNormal, ivec2(pixel * SSR_RES)).rg;
-    vec3 normal = DecodeOctahedral(normalPack);
-    vec3 viewDir = normalize(camPos - worldPos);
-    vec3 reflectDir = reflect(-viewDir, normal);
-    vec2 hitUV = vec2(0.0);
-    vec3 reflectionColor = vec3(0.0);
-    float totalWeight = 0.0;
-    vec3 marchPos = worldPos + normal * 0.05; // Offset slightly to avoid self-intersection
-    vec3 rayStep = reflectDir * 0.35;
-    vec2 screenSize = vec2(screenWidth, screenHeight);
-    ivec2 screenSizeLess1 = ivec2(screenWidth - 1, screenHeight - 1);
-    ivec2 zeroIVec2 = ivec2(0, 0);
-    const float MAX_THICKNESS = 1.2;
+    uvec2 pixel=gl_GlobalInvocationID.xy; if(pixel.x>=screenWidth || pixel.y>=screenHeight)return; vec2 scrSzF=vec2(screenWidth,screenHeight)*float(SSR_RES); vec3 worldPos=reconstructWorldPos(((vec2(pixel*SSR_RES)+0.5)/scrSzF)); if(worldPos == vec3(0.0))return; vec4 specColor=imageLoad(inputSpecular,ivec2(pixel*SSR_RES)); if((specColor.r+specColor.g+specColor.b)<0.01)return;
+    vec2 normalPack = imageLoad(inputNormal, ivec2(pixel * SSR_RES)).rg; vec3 normal=DecodeOctahedral(normalPack),viewDir=normalize(camPos-worldPos); vec3 reflectDir=reflect(-viewDir,normal),reflectionColor=vec3(0.0); vec2 hitUV = vec2(0.0); float totalWeight=0.0; vec3 marchPos = worldPos + normal * 0.05; // Offset slightly to avoid self-intersection
+    vec3 rayStep = reflectDir * 0.35; vec2 screenSize = vec2(screenWidth, screenHeight); ivec2 screenSizeLess1 = ivec2(screenWidth - 1, screenHeight - 1); ivec2 zeroIVec2 = ivec2(0, 0); const float MAX_THICKNESS = 1.2;
     for (int i = 0; i < 48; ++i) {
-        marchPos += rayStep;
-        vec4 clipPos = viewProjection * vec4(marchPos, 1.0);
-        vec2 ndc = clipPos.xy / clipPos.w;
-        hitUV = ndc * 0.5 + 0.5;
-        if (hitUV.x <= 0.01 || hitUV.x >= 0.99 || hitUV.y <= 0.01 || hitUV.y >= 0.99) break;
-
-        ivec2 samplePixel = ivec2(hitUV * screenSize);
-        samplePixel = clamp(samplePixel, zeroIVec2, screenSizeLess1);
-        vec2 sampleUV = (vec2(samplePixel * SSR_RES) + 0.5) / screenSizeF;
-        
-        vec3 sampledWorldPos = reconstructWorldPos(sampleUV);
-        if (sampledWorldPos == vec3(0.0)) continue;
-
-        vec2 sampledNormalPack = imageLoad(inputNormal, ivec2(samplePixel * SSR_RES)).rg;
-        vec3 sampledNormal = DecodeOctahedral(sampledNormalPack);
-        if (dot(reflectDir, sampledNormal) >= 0.0) continue;
-
-        float rayDepth = length(marchPos - camPos);
-        float sceneDepth = length(sampledWorldPos - camPos);
-        float depthDiff = rayDepth - sceneDepth;
-        if (depthDiff >= 0.0 && depthDiff < MAX_THICKNESS) {
-            float weight = 1.0 - (depthDiff / MAX_THICKNESS); // Fade weight as ray gets deeper into object
-            vec4 sampleColor = imageLoad(inputImage, samplePixel * SSR_RES);
-            reflectionColor += sampleColor.rgb * weight;
-            totalWeight += weight;
-            if (totalWeight >= 0.95) break; 
-        }
+        marchPos += rayStep; vec4 clipPos = viewProjection * vec4(marchPos, 1.0); vec2 ndc = clipPos.xy / clipPos.w; hitUV = ndc * 0.5 + 0.5; if (hitUV.x <= 0.01 || hitUV.x >= 0.99 || hitUV.y <= 0.01 || hitUV.y >= 0.99) break;
+        ivec2 samplePixel = ivec2(hitUV * screenSize); samplePixel = clamp(samplePixel, zeroIVec2, screenSizeLess1); vec2 sampUV = (vec2(samplePixel * SSR_RES) + 0.5) / scrSzF; vec3 sampledWorldPos = reconstructWorldPos(sampUV); if (sampledWorldPos == vec3(0.0)) continue;
+        vec2 sampledNormalPack = imageLoad(inputNormal, ivec2(samplePixel * SSR_RES)).rg; vec3 sampledNormal = DecodeOctahedral(sampledNormalPack); if (dot(reflectDir, sampledNormal) >= 0.0) continue;
+        float rayDepth = length(marchPos - camPos); float sceneDepth = length(sampledWorldPos - camPos); float depthDiff = rayDepth - sceneDepth;
+        if (depthDiff >= 0.0 && depthDiff < MAX_THICKNESS) { float weight = 1.0 - (depthDiff / MAX_THICKNESS);/*Fade weight as ray gets deeper into object*/ vec4 sampleColor = imageLoad(inputImage, samplePixel * SSR_RES); reflectionColor += sampleColor.rgb * weight; totalWeight += weight; if (totalWeight >= 0.95) break; }
     }
-
-    reflectionColor = (totalWeight > 0.0) ? reflectionColor / totalWeight : vec3(0.0);
-    vec3 result = reflectionColor * 0.651 * (specColor.rgb + vec3(0.1));
-    imageStore(outputImage, ivec2(pixel), vec4(result, 1.0));
+    reflectionColor = (totalWeight > 0.0) ? reflectionColor / totalWeight : vec3(0.0); vec3 result = reflectionColor * 0.651 * (specColor.rgb + vec3(0.1)); imageStore(outputImage, ivec2(pixel), vec4(result, 1.0));
 }
