@@ -1,58 +1,39 @@
 // text.c - Text and Font Rendering/Loading System
 #include "common.h"
 // stb_truetype.h - v1.26 - public domain, authored from 2009-2021 by Sean Barrett / RAD Game Tools...Heavily gutted by Josiah Jack
-typedef struct { void* ptr; size_t sz; } TAlloc;
-static TAlloc* ttAllocs = NULL;
-static int tallocCount=0;
+typedef struct { void* ptr; size_t sz; } TAlloc; static TAlloc* ttAllocs = NULL; static int tallocCount=0; typedef struct { u8*data; int cursor,size; } stbtt__buf;
 static void* ttalloc(size_t n) { if (tallocCount>=4674) {DualLogError("ttalloc too many!\n"); return NULL;} void*p=OS_AllocScratch(n); ttAllocs[tallocCount++]=(TAlloc){p,n}; return p; }
-static void  ttfree (void* p) { if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return; tallocCount--; } // Make sure to pop off in reverse order!
+static void ttfree (void* p) { if(!p||tallocCount==0||ttAllocs[tallocCount-1].ptr!=p)return; tallocCount--; } // Make sure to pop off in reverse order!
 static u16 ttUSHORT(u8*p) {return p[0]*256 + p[1];} 
 static i16 ttSHORT (u8*p) {return p[0]*256 + p[1];}
 static u32 ttULONG (u8*p) {return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
 #define stbtt_tag4(p,a,b,c,d) ((p)[0]==(a) && (p)[1]==(b) && (p)[2]==(c) && (p)[3]==(d))
 #define stbtt_tag(p,s) ((p)[0]==(s[0]) && (p)[1]==(s[1]) && (p)[2]==(s[2]) && (p)[3]==(s[3]))
-typedef struct { u8*data; int cursor,size; } stbtt__buf;
 static stbtt__buf stbtt__new_buf(const void*p,size_t s){stbtt__buf r; r.data=(u8*)p; r.size=(int)s; r.cursor=0; return r;}
-static u8  _bg8(stbtt__buf*b){return b->cursor>=b->size?0:b->data[b->cursor++];}
-static u8  _bp8(stbtt__buf*b){return b->cursor>=b->size?0:b->data[b->cursor];}
-static void _bsk(stbtt__buf*b,int o) { b->cursor = (o>b->size||o<0) ? b->size : o; }
-static void _bskip(stbtt__buf*b,int o){_bsk(b,b->cursor+o);}
-static u32 _bg(stbtt__buf*b,int n){u32 v=0;for(int i=0;i<n;i++)v=(v<<8)|_bg8(b); return v;}
-static stbtt__buf _brange(const stbtt__buf*b,int o,int s){stbtt__buf r=stbtt__new_buf(NULL,0); if(o<0||s<0||o>b->size||s>b->size-o)return r; r.data=b->data+o; r.size=s; return r;}
-static stbtt__buf _cff_idx(stbtt__buf*b){int c=b->cursor,n=_bg(b,2);if(n){int os=_bg8(b); _bskip(b,os*n); _bskip(b,_bg(b,os)-1);}return _brange(b,c,b->cursor-c);}
-static u32 _cff_int(stbtt__buf*b){int b0=_bg8(b);if(b0>=32&&b0<=246)return b0-139;if(b0>=247&&b0<=250)return(b0-247)*256+_bg8(b)+108;if(b0>=251&&b0<=254)return-(b0-251)*256-_bg8(b)-108;if(b0==28)return _bg(b,2);if(b0==29)return _bg(b,4);return 0;}
-static void _cff_skip_op(stbtt__buf*b){if(_bp8(b)==30){_bskip(b,1);while(b->cursor<b->size){int v=_bg8(b);if((v&0xF)==0xF||(v>>4)==0xF)break;}}else _cff_int(b);}
-static stbtt__buf _dict_get(stbtt__buf*b, int key) { b->cursor = (0 > b->size) ? b->size : 0; while(b->cursor < b->size) { int e,op,s=b->cursor; while(_bp8(b) >= 28) _cff_skip_op(b); e = b->cursor; op = _bg8(b); if(op==12) op = _bg8(b) | 0x100; if(op==key) return _brange(b,s,e-s); } return _brange(b,0,0); }
-static void _dict_ints(stbtt__buf*b,int key,int n,u32*out) { stbtt__buf op = _dict_get(b,key); for (int i=0;i<n && op.cursor<op.size;++i) {out[i] = (u32)_cff_int(&op);} }
-static stbtt__buf _cff_idx_get(stbtt__buf b,int i){_bsk(&b,0);int n=_bg(&b,2),os=_bg8(&b);_bskip(&b,i*os);int s=_bg(&b,os),e=_bg(&b,os);return _brange(&b,2+(n+1)*os+s,e-s);}
+static u8 BGet8(stbtt__buf*b){return b->cursor>=b->size?0:b->data[b->cursor++];}      static u8 BPeek8(stbtt__buf*b){return b->cursor>=b->size?0:b->data[b->cursor];}
+static void BSeek(stbtt__buf*b,int o) { b->cursor = (o>b->size||o<0) ? b->size : o; } static void BSkip(stbtt__buf*b,int o){BSeek(b,b->cursor+o);}                     static u32 BGet(stbtt__buf*b,int n){u32 v=0;for(int i=0;i<n;i++)v=(v<<8)|BGet8(b); return v;}
+static stbtt__buf BRange(const stbtt__buf*b,int o,int s){stbtt__buf r=stbtt__new_buf(NULL,0); if(o<0||s<0||o>b->size||s>b->size-o)return r; r.data=b->data+o; r.size=s; return r;}
+static stbtt__buf cff_idx(stbtt__buf*b){int c=b->cursor,n=BGet(b,2);if(n){int os=BGet8(b); BSkip(b,os*n); BSkip(b,BGet(b,os)-1);}return BRange(b,c,b->cursor-c);}
+static u32 cff_int(stbtt__buf*b){int b0=BGet8(b);if(b0>=32&&b0<=246)return b0-139;if(b0>=247&&b0<=250)return(b0-247)*256+BGet8(b)+108;if(b0>=251&&b0<=254)return-(b0-251)*256-BGet8(b)-108;if(b0==28)return BGet(b,2);if(b0==29)return BGet(b,4);return 0;}
+static void cff_skip_op(stbtt__buf*b){if(BPeek8(b)==30){BSkip(b,1);while(b->cursor<b->size){int v=BGet8(b);if((v&0xF)==0xF||(v>>4)==0xF)break;}}else cff_int(b);}
+static stbtt__buf _dict_get(stbtt__buf*b, int key) { b->cursor = (0 > b->size) ? b->size : 0; while(b->cursor < b->size) { int e,op,s=b->cursor; while(BPeek8(b) >= 28) cff_skip_op(b); e = b->cursor; op = BGet8(b); if(op==12) op = BGet8(b) | 0x100; if(op==key) return BRange(b,s,e-s); } return BRange(b,0,0); }
+static void _dict_ints(stbtt__buf*b,int key,int n,u32*out) { stbtt__buf op = _dict_get(b,key); for (int i=0;i<n && op.cursor<op.size;++i) {out[i] = (u32)cff_int(&op);} }
+static stbtt__buf cff_idx_get(stbtt__buf b,int i){BSeek(&b,0);int n=BGet(&b,2),os=BGet8(&b);BSkip(&b,i*os);int s=BGet(&b,os),e=BGet(&b,os);return BRange(&b,2+(n+1)*os+s,e-s);}
 enum{STBTT_vmove=1,STBTT_vline,STBTT_vcurve,STBTT_vcubic};
 typedef struct{i16 x,y,cx,cy,cx1,cy1;u8 type,padding;}stbtt_vertex;
 typedef struct{void*userdata;u8*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;stbtt__buf cff,charstrings,gsubrs,subrs,fontdicts,fdselect;}stbtt_fontinfo;
 static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttUSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(stbtt_tag(d+l+0,tag))return ttULONG(d+l+8);}return 0;}
-static stbtt__buf _get_subrs(stbtt__buf cff,stbtt__buf fd){u32 so=0,pl[2]={0,0};_dict_ints(&fd,18,2,pl);if(!pl[1]||!pl[0])return stbtt__new_buf(NULL,0);stbtt__buf pd=_brange(&cff,pl[1],pl[0]);_dict_ints(&pd,19,1,&so);if(!so)return stbtt__new_buf(NULL,0);_bsk(&cff,pl[1]+so);return _cff_idx(&cff);}
+static stbtt__buf _get_subrs(stbtt__buf cff,stbtt__buf fd){u32 so=0,pl[2]={0,0};_dict_ints(&fd,18,2,pl);if(!pl[1]||!pl[0])return stbtt__new_buf(NULL,0);stbtt__buf pd=BRange(&cff,pl[1],pl[0]);_dict_ints(&pd,19,1,&so);if(!so)return stbtt__new_buf(NULL,0);BSeek(&cff,pl[1]+so);return cff_idx(&cff);}
 static int stbtt_InitFont_internal(stbtt_fontinfo* info, u8* data, int fs) {
-    u32 cmap,t,i,nt;info->data=data;info->fontstart=fs;info->cff=stbtt__new_buf(NULL,0);
-    cmap=_find_table(data,fs,"cmap"); info->loca=_find_table(data,fs,"loca"); info->head=_find_table(data,fs,"head");
-    info->glyf=_find_table(data,fs,"glyf"); info->hhea=_find_table(data,fs,"hhea"); info->hmtx=_find_table(data,fs,"hmtx");
-    if(!cmap || !info->head || !info->hhea || !info->hmtx) return 0;
+    u32 cmap,t,i,nt;info->data=data;info->fontstart=fs;info->cff=stbtt__new_buf(NULL,0); 
+    cmap=_find_table(data,fs,"cmap"); info->loca=_find_table(data,fs,"loca"); info->head=_find_table(data,fs,"head"); info->glyf=_find_table(data,fs,"glyf"); info->hhea=_find_table(data,fs,"hhea"); info->hmtx=_find_table(data,fs,"hmtx"); if(!cmap || !info->head || !info->hhea || !info->hmtx) return 0;
     if(info->glyf){ if(!info->loca)return 0; }
     else{
-        u32 cs=2,chstr=0,fda=0,fds=0,cff=_find_table(data,fs,"CFF "); if(!cff)return 0;
-        info->fontdicts=stbtt__new_buf(NULL,0);info->fdselect=stbtt__new_buf(NULL,0);
-        info->cff=stbtt__new_buf(data+cff,16*1024*1024);stbtt__buf b=info->cff;
-        _bskip(&b,2);_bsk(&b,_bg8(&b)); _cff_idx(&b);
-        stbtt__buf tdi=_cff_idx(&b),td=_cff_idx_get(tdi,0);_cff_idx(&b);info->gsubrs=_cff_idx(&b);
-        _dict_ints(&td,17,1,&chstr); _dict_ints(&td,0x100|6,1,&cs);_dict_ints(&td,0x100|36,1,&fda);_dict_ints(&td,0x100|37,1,&fds);
-        info->subrs=_get_subrs(b,td);
-        if (cs!=2||chstr==0) return 0;
-        if (fda) { if(!fds) {return 0;} _bsk(&b,fda);info->fontdicts=_cff_idx(&b);info->fdselect=_brange(&b,fds,b.size-fds); }
-        _bsk(&b,chstr);info->charstrings=_cff_idx(&b);
+        u32 cs=2,chstr=0,fda=0,fds=0,cff=_find_table(data,fs,"CFF "); if(!cff)return 0; info->fontdicts=stbtt__new_buf(NULL,0);info->fdselect=stbtt__new_buf(NULL,0); info->cff=stbtt__new_buf(data+cff,16*1024*1024);stbtt__buf b=info->cff; BSkip(&b,2);BSeek(&b,BGet8(&b)); cff_idx(&b);
+        stbtt__buf tdi=cff_idx(&b),td=cff_idx_get(tdi,0);cff_idx(&b);info->gsubrs=cff_idx(&b); _dict_ints(&td,17,1,&chstr); _dict_ints(&td,0x100|6,1,&cs);_dict_ints(&td,0x100|36,1,&fda);_dict_ints(&td,0x100|37,1,&fds); info->subrs=_get_subrs(b,td); if (cs!=2||chstr==0) return 0;
+        if (fda) { if(!fds) {return 0;} BSeek(&b,fda);info->fontdicts=cff_idx(&b);info->fdselect=BRange(&b,fds,b.size-fds); } BSeek(&b,chstr);info->charstrings=cff_idx(&b);
     }
-    t=_find_table(data,fs,"maxp"); info->numGlyphs = t ? ttUSHORT(data+t+4) : 0xffff;
-    nt=ttUSHORT(data+cmap+2);info->index_map=0;
-    for(i=0;i<nt;++i){u32 er=cmap+4+8*i;switch(ttUSHORT(data+er)){case 3:switch(ttUSHORT(data+er+2)){case 1:case 10:info->index_map=cmap+ttULONG(data+er+4);}break;case 0:info->index_map=cmap+ttULONG(data+er+4);break;}}
-    if(!info->index_map)return 0;
-    info->indexToLocFormat=ttUSHORT(data+info->head+50);return 1;
+    t=_find_table(data,fs,"maxp"); info->numGlyphs = t ? ttUSHORT(data+t+4) : 0xffff; nt=ttUSHORT(data+cmap+2);info->index_map=0; for(i=0;i<nt;++i){u32 er=cmap+4+8*i;switch(ttUSHORT(data+er)){case 3:switch(ttUSHORT(data+er+2)){case 1:case 10:info->index_map=cmap+ttULONG(data+er+4);}break;case 0:info->index_map=cmap+ttULONG(data+er+4);break;}} if(!info->index_map)return 0; info->indexToLocFormat=ttUSHORT(data+info->head+50);return 1;
 }
 
 int _font_offset(u8*d,int idx){ if(stbtt_tag4(d,'1',0,0,0)||stbtt_tag(d,"typ1")||stbtt_tag(d,"OTTO")||stbtt_tag4(d,0,1,0,0)||stbtt_tag(d,"true")){return idx==0?0:-1;} if(stbtt_tag(d,"ttcf")&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=((i32)d[8]<<24)|((i32)d[9]<<16)|((i32)d[10]<<8)|d[11]; if(idx>=n){return -1;} return ttULONG(d+12+idx*4); } return -1; }
@@ -133,16 +114,16 @@ void _csclose(stbtt__csctx*c){if(c->first_x!=c->x||c->first_y!=c->y)_csv(c,STBTT
 void _csmove(stbtt__csctx*c,float dx,float dy){_csclose(c);c->first_x=c->x=c->x+dx;c->first_y=c->y=c->y+dy;_csv(c,STBTT_vmove,(int)c->x,(int)c->y,0,0,0,0);}
 void _csline(stbtt__csctx*c,float dx,float dy){c->x+=dx;c->y+=dy;_csv(c,STBTT_vline,(int)c->x,(int)c->y,0,0,0,0);}
 void _cscurve(stbtt__csctx*c,float d1,float e1,float d2,float e2,float d3,float e3){float cx1=c->x+d1,cy1=c->y+e1,cx2=cx1+d2,cy2=cy1+e2;c->x=cx2+d3;c->y=cy2+e3;_csv(c,STBTT_vcubic,(int)c->x,(int)c->y,(int)cx1,(int)cy1,(int)cx2,(int)cy2);}
-stbtt__buf _subr(stbtt__buf idx,int n){ _bsk(&idx,0); int c = _bg(&idx,2); int bias = (c >= 33900) ? 32768 : ((c >= 1240) ? 1131 : 107); n+=bias; return (n<0 || n>=c) ? stbtt__new_buf(NULL,0) : _cff_idx_get(idx,n); }
-stbtt__buf _cid_subrs(const stbtt_fontinfo*info,int gi){stbtt__buf fd=info->fdselect;int nr,st,end,v,fmt,sel=-1,i;_bsk(&fd,0);fmt=_bg8(&fd); if(fmt==0){_bskip(&fd,gi);sel=_bg8(&fd);} else if(fmt==3){nr=_bg(&fd,2);st=_bg(&fd,2);for(i=0;i<nr;i++){v=_bg8(&fd);end=_bg(&fd,2);if(gi>=st&&gi<end){sel=v;break;}st=end;}} if(sel==-1){return stbtt__new_buf(NULL,0);}return _get_subrs(info->cff,_cff_idx_get(info->fontdicts,sel));}
+stbtt__buf _subr(stbtt__buf idx,int n){ BSeek(&idx,0); int c = BGet(&idx,2); int bias = (c >= 33900) ? 32768 : ((c >= 1240) ? 1131 : 107); n+=bias; return (n<0 || n>=c) ? stbtt__new_buf(NULL,0) : cff_idx_get(idx,n); }
+stbtt__buf _cid_subrs(const stbtt_fontinfo*info,int gi){stbtt__buf fd=info->fdselect;int nr,st,end,v,fmt,sel=-1,i;BSeek(&fd,0);fmt=BGet8(&fd); if(fmt==0){BSkip(&fd,gi);sel=BGet8(&fd);} else if(fmt==3){nr=BGet(&fd,2);st=BGet(&fd,2);for(i=0;i<nr;i++){v=BGet8(&fd);end=BGet(&fd,2);if(gi>=st&&gi<end){sel=v;break;}st=end;}} if(sel==-1){return stbtt__new_buf(NULL,0);}return _get_subrs(info->cff,cff_idx_get(info->fontdicts,sel));}
 int _run_cs(const stbtt_fontinfo*info,int gi,stbtt__csctx*c){
     int hdr=1,mb=0,ssh=0,sp=0,hs=0,i,b0;float s[48],f;
-    stbtt__buf ss[10],subrs=info->subrs,b=_cff_idx_get(info->charstrings,gi);
+    stbtt__buf ss[10],subrs=info->subrs,b=cff_idx_get(info->charstrings,gi);
 #define ERR(x) return 0
 #define CHK(n) if(sp<(n))ERR(#n)
-    while(b.cursor<b.size){int cs=1;i=0;b0=_bg8(&b);
+    while(b.cursor<b.size){int cs=1;i=0;b0=BGet8(&b);
         switch(b0){
-        case 0x13:case 0x14:if(hdr)mb+=sp/2;hdr=0;_bskip(&b,(mb+7)/8);break;
+        case 0x13:case 0x14:if(hdr)mb+=sp/2;hdr=0;BSkip(&b,(mb+7)/8);break;
         case 0x01:case 0x03:case 0x12:case 0x17:mb+=sp/2;break;
         case 0x15:hdr=0;CHK(2);_csmove(c,s[sp-2],s[sp-1]);break;
         case 0x04:hdr=0;CHK(1);_csmove(c,0,s[sp-1]);break;
@@ -160,13 +141,13 @@ int _run_cs(const stbtt_fontinfo*info,int gi,stbtt__csctx*c){
         case 0x1D:CHK(1);if(ssh>=10)ERR("recursion");ss[ssh++]=b;b=_subr(b0==0x0A?subrs:info->gsubrs,(int)s[--sp]);if(!b.size)ERR("subr");b.cursor=0;cs=0;break;
         case 0x0B:if(ssh<=0)ERR("return");b=ss[--ssh];cs=0;break;
         case 0x0E:_csclose(c);return 1;
-        case 0x0C:{int b1=_bg8(&b);switch(b1){
+        case 0x0C:{int b1=BGet8(&b);switch(b1){
             case 0x22:CHK(7);_cscurve(c,s[0],0,s[1],s[2],s[3],0);_cscurve(c,s[4],0,s[5],-s[2],s[6],0);break;
             case 0x23:CHK(13);_cscurve(c,s[0],s[1],s[2],s[3],s[4],s[5]);_cscurve(c,s[6],s[7],s[8],s[9],s[10],s[11]);break;
             case 0x24:CHK(9);_cscurve(c,s[0],s[1],s[2],s[3],s[4],0);_cscurve(c,s[5],0,s[6],s[7],s[8],-(s[1]+s[3]+s[7]));break;
             case 0x25:CHK(11);{float dx=s[0]+s[2]+s[4]+s[6]+s[8],dy=s[1]+s[3]+s[5]+s[7]+s[9],d6x=s[10],d6y=s[10];if(vabs(dx)>vabs(dy))d6y=-dy;else d6x=-dx;_cscurve(c,s[0],s[1],s[2],s[3],s[4],s[5]);_cscurve(c,s[6],s[7],s[8],s[9],d6x,d6y);}break;
             default:ERR("escape");}}break;
-        default:if(b0!=255&&b0!=28&&b0<32)ERR("reserved");f=(b0==255)?(float)(i32)_bg(&b,4)/0x10000:(_bskip(&b,-1),(float)(i16)_cff_int(&b));if(sp>=48)ERR("overflow");s[sp++]=f;cs=0;break;}
+        default:if(b0!=255&&b0!=28&&b0<32)ERR("reserved");f=(b0==255)?(float)(i32)BGet(&b,4)/0x10000:(BSkip(&b,-1),(float)(i16)cff_int(&b));if(sp>=48)ERR("overflow");s[sp++]=f;cs=0;break;}
         if(cs)sp=0;}ERR("no endchar");
 #undef ERR
 #undef CHK

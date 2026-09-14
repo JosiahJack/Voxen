@@ -1,24 +1,15 @@
 // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
 #include "common.h"
 #define ARENA_ALIGN(p) ((char*)(((uintptr_t)(p) + 15) & ~(uintptr_t)15)) // 16-byte align sub-arena cursors
-enum{MAX_GLB_JOINTS=96,MAX_GLB_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLB_BLOCKS=64}; float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
-typedef struct { const char *data; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; } ModelDataParser; typedef struct { u32 start,end; int tid; } PhysGeomTask;
-BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS]; typedef struct { BvhNode *nodes; u8 *triOctants; u16 *triOrder,*triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
-typedef enum{glb_attribute_type_invalid,glb_attribute_type_position,glb_attribute_type_normal,glb_attribute_type_texcoord,glb_attribute_type_joints,glb_attribute_type_weights}glb_attribute_type; typedef enum{glb_component_type_invalid,glb_component_type_r_8u,glb_component_type_r_16u,glb_component_type_r_32f}glb_component_type;
-typedef enum{glbinvalid,glbscalar,glbv2,glbv3,glbv4,glbmat4}glb_type; typedef enum{glb_primitive_type_triangles}glb_primitive_type; typedef enum{glb_animpthtype_invalid,glb_animpthtype_translation,glb_animpthtype_rotation,glb_animpthtype_scale}glb_animt_path_type; typedef enum{glb_interp_linear,glb_interp_step}glb_interpolation_type;
-typedef struct{size_t size; void*data;} glb_buffer; typedef struct{glb_buffer*buffer; size_t offset,size;}glb_buffer_view; typedef struct{glb_component_type component_type; bool normalized; glb_type type; size_t offset,count,stride; glb_buffer_view*buffer_view;} glb_accessor;
-typedef struct{char*name; glb_attribute_type type;i32 index;glb_accessor*data;}glb_attribute; typedef struct{glb_primitive_type type; glb_accessor*indices; glb_attribute *attr; size_t attr_count; }glb_primitive; typedef struct{char *name; glb_primitive *primitives; size_t primitives_count;} glb_mesh;
-typedef struct glb_node glb_node; typedef struct{glb_node**joints;size_t joints_count;glb_accessor*inverse_bind_matrices;}glb_skin; struct glb_node{glb_node*parent,**children;size_t children_count;glb_skin*skin;glb_mesh*mesh;bool has_translation,has_rotation,has_scale;float translation[3],rotation[4],scale[3];};
-typedef struct{glb_accessor*input,*output;glb_interpolation_type interpolation;}glbanim_samp; typedef struct{glbanim_samp*sampler;glb_node*target_node;glb_animt_path_type target_path;}glb_anim_chan; typedef struct{glbanim_samp*samplers;size_t samplers_count;glb_anim_chan*channels;size_t channels_count;}glb_animt;
-typedef struct{glb_mesh*meshes;size_t meshes_count;glb_accessor*accessors;size_t accessors_count;glb_buffer_view*buffer_views;size_t buffer_views_count;glb_buffer*buffers;size_t buffers_count;glb_skin*skins;size_t skins_count;glb_node*nodes;size_t nodes_count;glb_animt*animations;size_t animations_count; const void*bin;size_t bin_size;}glb_data;
-typedef enum{JSMN_UND=0,JSMN_OBJECT=1,JSMN_ARRAY=2,JSMN_STRING=3,JSMN_PRIMITIVE=4}jsmntype_t; enum{JSMN_ERROR_NOMEM=-1,JSMN_ERROR_INVAL=-2,JSMN_ERROR_PART=-3}; typedef struct{jsmntype_t type;i64 start,end;i32 size,parent;}jsmntok_t; typedef struct{size_t pos;u32 toknext;i32 toksuper;}jsmn_parser;
+enum{MAX_GLB_JOINTS=96,MAX_GLB_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLB_BLOCKS=64}; float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch; typedef struct { const char *data; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; } ModelDataParser;
+typedef struct { u32 start,end; int tid; } PhysGeomTask; BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS]; typedef struct { BvhNode *nodes; u8 *triOctants; u16 *triOrder,*triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx; typedef enum{glb_attribute_type_invalid,glb_attribute_type_position,glb_attribute_type_normal,glb_attribute_type_texcoord,glb_attribute_type_joints,glb_attribute_type_weights}glb_attribute_type;
+typedef enum{glb_component_type_invalid,glb_component_type_r_8u,glb_component_type_r_16u,glb_component_type_r_32f}glb_component_type; typedef enum{glbinvalid,glbscalar,glbv2,glbv3,glbv4,glbmat4}glb_type; typedef enum{glb_primitive_type_triangles}glb_primitive_type; typedef enum{glb_animpthtype_invalid,glb_animpthtype_translation,glb_animpthtype_rotation,glb_animpthtype_scale}glb_animt_path_type; typedef enum{glb_interp_linear,glb_interp_step}glb_interpolation_type;
+typedef struct{size_t size; void*data;} glb_buffer; typedef struct{glb_buffer*buffer; size_t offset,size;}glb_buffer_view; typedef struct{glb_component_type component_type; bool normalized; glb_type type; size_t offset,count,stride; glb_buffer_view*buffer_view;} glb_accessor; typedef struct{char*name; glb_attribute_type type;i32 index;glb_accessor*data;}glb_attribute; typedef struct{glb_primitive_type type; glb_accessor*indices; glb_attribute *attr; size_t attr_count; }glb_primitive; typedef struct{char *name; glb_primitive *primitives; size_t primitives_count;} glb_mesh;
+typedef struct glb_node glb_node; typedef struct{glb_node**joints;size_t joints_count;glb_accessor*inverse_bind_matrices;}glb_skin; struct glb_node{glb_node*parent,**children;size_t children_count;glb_skin*skin;glb_mesh*mesh;bool has_translation,has_rotation,has_scale;float translation[3],rotation[4],scale[3];}; typedef struct{glb_accessor*input,*output;glb_interpolation_type interpolation;}glbanim_samp; typedef struct{glbanim_samp*sampler;glb_node*target_node;glb_animt_path_type target_path;}glb_anim_chan; typedef struct{glbanim_samp*samplers;size_t samplers_count;glb_anim_chan*channels;size_t channels_count;}glb_animt;
+typedef struct{glb_mesh*meshes;size_t meshes_count;glb_accessor*accessors;size_t accessors_count;glb_buffer_view*buffer_views;size_t buffer_views_count;glb_buffer*buffers;size_t buffers_count;glb_skin*skins;size_t skins_count;glb_node*nodes;size_t nodes_count;glb_animt*animations;size_t animations_count; const void*bin;size_t bin_size;}glb_data; typedef enum{JSMN_UND=0,JSMN_OBJECT=1,JSMN_ARRAY=2,JSMN_STRING=3,JSMN_PRIMITIVE=4}jsmntype_t; enum{JSMN_ERROR_NOMEM=-1,JSMN_ERROR_INVAL=-2,JSMN_ERROR_PART=-3}; typedef struct{jsmntype_t type;i64 start,end;i32 size,parent;}jsmntok_t; typedef struct{size_t pos;u32 toknext;i32 toksuper;}jsmn_parser;
 typedef struct { u16 j[4]; float w[4]; } VtxSkin; typedef struct { float *pos,*nrm,*uv; VtxSkin* skin; u32 vertCount,*indices,triCount; glb_node* jointNodes[MAX_GLB_JOINTS]; float invBind[MAX_GLB_JOINTS][16]; u32 jointCount; glb_animt* anim; glb_data* gltf; bool isTrAnim; glb_node** meshNodes; float **subPos,**subNrm,**subUv; u32 *subVertCnt,**subIndices,*subTriCount,submshCnt; } GltfMesh;
 static BvhBuildCtx thrd_bvh_ctx[32]; u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; u16 *cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES]; GltfMesh* gBlockMeshes; static u32 gBlockMeshCount = 0;
-static void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm) {
-	float tx=T[0],ty=T[1],tz=T[2],qx=R[0],qy=R[1],qz=R[2],qw=R[3],sx=S[0],sy=S[1],sz=S[2];
-	lm[0]=(1-2*qy*qy-2*qz*qz)*sx; lm[1]=(2*qx*qy+2*qz*qw)*sx; lm[2]=(2*qx*qz-2*qy*qw)*sx; lm[3]=lm[7]=lm[11]=0.0f; lm[4]=(2*qx*qy-2*qz*qw)*sy; lm[5]=(1-2*qx*qx-2*qz*qz)*sy; lm[6]=(2*qy*qz+2*qx*qw)*sy; lm[8]=(2*qx*qz+2*qy*qw)*sz; lm[9]=(2*qy*qz-2*qx*qw)*sz; lm[10]=(1-2*qx*qx-2*qy*qy)*sz; lm[12]=tx; lm[13]=ty; lm[14]=tz; lm[15]=1.0f;
-}
-
+static void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm){float tx=T[0],ty=T[1],tz=T[2],qx=R[0],qy=R[1],qz=R[2],qw=R[3],sx=S[0],sy=S[1],sz=S[2]; lm[0]=(1-2*qy*qy-2*qz*qz)*sx; lm[1]=(2*qx*qy+2*qz*qw)*sx; lm[2]=(2*qx*qz-2*qy*qw)*sx; lm[3]=lm[7]=lm[11]=0.0f; lm[4]=(2*qx*qy-2*qz*qw)*sy; lm[5]=(1-2*qx*qx-2*qz*qz)*sy; lm[6]=(2*qy*qz+2*qx*qw)*sy; lm[8]=(2*qx*qz+2*qy*qw)*sz; lm[9]=(2*qy*qz-2*qx*qw)*sz; lm[10]=(1-2*qx*qx-2*qy*qy)*sz; lm[12]=tx; lm[13]=ty; lm[14]=tz; lm[15]=1.0f;}
 void glb_node_transform_local(const glb_node* n, float* m){ Mat4FromTRS(n->translation,n->rotation,n->scale,m); }
 static u64 glb_component_read_integer(const void* i, glb_component_type t){return t==glb_component_type_r_16u?*((const u16*)i):t==glb_component_type_r_8u?*((const u8*)i):0;}
 static size_t glb_component_read_index(const void* i, glb_component_type t){return t==glb_component_type_r_16u?*((const u16*)i):t==glb_component_type_r_8u?*((const u8*)i):0;}
@@ -49,69 +40,38 @@ static int glb_parse_json_array_generic(jsmntok_t const* t, int i, const u8* j, 
 static glb_component_type json_to_comp_type(jsmntok_t const* t, const u8* j){ int ty=glb_json_to_int(t,j); return ty==5121?glb_component_type_r_8u:ty==5123?glb_component_type_r_16u:ty==5126?glb_component_type_r_32f:glb_component_type_invalid; }
 static int glb_parse_json_node_array(jsmntok_t const* t, int i, const u8* j, glb_node*** out, size_t* out_count) { i = glb_parse_json_array(t, i, j, sizeof(glb_node*), (void**)out, out_count); if (i < 0) return i; for (size_t m = 0; m < *out_count; ++m) { (*out)[m] = GLB_PTRINDEX(glb_node, glb_json_to_int(t+i, j)); ++i; } return i; }
 static void glb_parse_attribute_type(const char* n, glb_attribute_type* ot, int* oi){
-    const char* us=StringFindFirstCharWithin(n,'_');size_t l=us?(size_t)(us-n):slen(n);
-    *ot = l==8&&sCompUpToLen(n,"POSITION",8)==0?glb_attribute_type_position: l==6&&sCompUpToLen(n,"NORMAL",6)==0?glb_attribute_type_normal: l==8&&sCompUpToLen(n,"TEXCOORD",8)==0?glb_attribute_type_texcoord: l==6&&sCompUpToLen(n,"JOINTS",6)==0?glb_attribute_type_joints: l==7&&sCompUpToLen(n,"WEIGHTS",7)==0?glb_attribute_type_weights:glb_attribute_type_invalid;
+    const char* us=StringFindFirstCharWithin(n,'_');size_t l=us?(size_t)(us-n):slen(n); *ot = l==8&&sCompUpToLen(n,"POSITION",8)==0?glb_attribute_type_position: l==6&&sCompUpToLen(n,"NORMAL",6)==0?glb_attribute_type_normal: l==8&&sCompUpToLen(n,"TEXCOORD",8)==0?glb_attribute_type_texcoord: l==6&&sCompUpToLen(n,"JOINTS",6)==0?glb_attribute_type_joints: l==7&&sCompUpToLen(n,"WEIGHTS",7)==0?glb_attribute_type_weights:glb_attribute_type_invalid;
     if(us&&*ot!=glb_attribute_type_invalid){*oi=s2i32(us+1);if(*oi<0){*ot=glb_attribute_type_invalid;*oi=0;}}
 }
 
-static int glb_parse_json_attribute_list(jsmntok_t const* t, int i, const u8* j, glb_attribute** out, size_t* oc){
-    GLB_CHECK_TOKTYPE(t[i],JSMN_OBJECT); if(*out)return -1; *oc=t[i].size; *out=OS_Alloc(sizeof(glb_attribute) * *oc); ++i;
-    for(size_t k=0;k<*oc;++k){ GLB_CHECK_KEY(t[i]);i=glb_parse_json_string(t,i,j,&(*out)[k].name);if(i<0)return -1; glb_parse_attribute_type((*out)[k].name,&(*out)[k].type,&(*out)[k].index); (*out)[k].data=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i; } return i;
-}
-
-static int glb_parse_json_primitive(jsmntok_t const* t, int i, const u8* j, glb_primitive* out){
-    GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);out->type=glb_primitive_type_triangles;int sz=t[i].size;++i;
-    for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"indices")){++i;out->indices=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"attributes"))i=glb_parse_json_attribute_list(t,i+1,j,&out->attr,&out->attr_count); else i=glb_skip_json(t,i+1); if(i<0){return i;} } return i;
-}
-
-static int glb_parse_json_mesh(jsmntok_t const* t, int i, const u8* j, glb_mesh* out){
-    GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"primitives")){i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_primitive),(void**)&out->primitives,&out->primitives_count,(glb_parse_item_func)glb_parse_json_primitive);} else i=glb_skip_json(t,i+1); if(i<0){return i;}} return i;
-}
-
-static int glb_parse_json_accessor(jsmntok_t const* t, int i, const u8* j, glb_accessor* out){
+static int json_attribute_list(jsmntok_t const* t, int i, const u8* j, glb_attribute** out, size_t* oc){ GLB_CHECK_TOKTYPE(t[i],JSMN_OBJECT); if(*out)return -1; *oc=t[i].size; *out=OS_Alloc(sizeof(glb_attribute) * *oc); ++i; for(size_t k=0;k<*oc;++k){ GLB_CHECK_KEY(t[i]);i=glb_parse_json_string(t,i,j,&(*out)[k].name);if(i<0)return -1; glb_parse_attribute_type((*out)[k].name,&(*out)[k].type,&(*out)[k].index); (*out)[k].data=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i; } return i; }
+static int json_primitive(jsmntok_t const* t, int i, const u8* j, glb_primitive* out){GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);out->type=glb_primitive_type_triangles;int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"indices")){++i;out->indices=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"attributes"))i=json_attribute_list(t,i+1,j,&out->attr,&out->attr_count); else i=glb_skip_json(t,i+1); if(i<0){return i;} } return i;}
+static int json_mesh(jsmntok_t const* t, int i, const u8* j, glb_mesh* out){GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"primitives")){i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_primitive),(void**)&out->primitives,&out->primitives_count,(glb_parse_item_func)json_primitive);} else i=glb_skip_json(t,i+1); if(i<0){return i;}} return i;}
+static int json_accessor(jsmntok_t const* t, int i, const u8* j, glb_accessor* out){
     GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
         GLB_CHECK_KEY(t[i]);
              if(glb_json_strcmp(t+i,j,"bufferView")){++i;out->buffer_view=GLB_PTRINDEX(glb_buffer_view,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"byteOffset")){++i;out->offset=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"componentType")){++i;out->component_type=json_to_comp_type(t+i,j);++i;}
-        else if(glb_json_strcmp(t+i,j,"normalized")){++i;out->normalized=glb_json_to_bool(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"count")){++i;out->count=glb_json_to_size(t+i,j);++i;} 
-        else if(glb_json_strcmp(t+i,j,"type")){ ++i; out->type = glb_json_strcmp(t+i,j,"SCALAR")?glbscalar:glb_json_strcmp(t+i,j,"VEC2")?glbv2:glb_json_strcmp(t+i,j,"VEC3")?glbv3:glb_json_strcmp(t+i,j,"VEC4")?glbv4:glb_json_strcmp(t+i,j,"MAT4")?glbmat4:glbinvalid; ++i; }
+        else if(glb_json_strcmp(t+i,j,"normalized")){++i;out->normalized=glb_json_to_bool(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"count")){++i;out->count=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"type")){ ++i; out->type = glb_json_strcmp(t+i,j,"SCALAR")?glbscalar:glb_json_strcmp(t+i,j,"VEC2")?glbv2:glb_json_strcmp(t+i,j,"VEC3")?glbv3:glb_json_strcmp(t+i,j,"VEC4")?glbv4:glb_json_strcmp(t+i,j,"MAT4")?glbmat4:glbinvalid; ++i; }
         else{ i=glb_skip_json(t,i+1);} if(i<0){return i;}
     } return i;
 }
 
-static int glb_parse_json_buffer_view(jsmntok_t const* t, int i, const u8* j, glb_buffer_view* out){
-    GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
-    for(int k=0;k<sz;++k){
-        GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"buffer")){++i;out->buffer=GLB_PTRINDEX(glb_buffer,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"byteOffset")){++i;out->offset=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"byteLength")){++i;out->size=glb_json_to_size(t+i,j);++i;} else i=glb_skip_json(t,i+1);
-        if(i<0)return i;
-    } return i;
-}
-
+static int glb_parse_json_buffer_view(jsmntok_t const* t, int i, const u8* j, glb_buffer_view* out){ GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"buffer")){++i;out->buffer=GLB_PTRINDEX(glb_buffer,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"byteOffset")){++i;out->offset=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"byteLength")){++i;out->size=glb_json_to_size(t+i,j);++i;} else i=glb_skip_json(t,i+1); if(i<0)return i; } return i; }
 static int glb_parse_json_buffer(jsmntok_t const* t, int i, const u8* j, glb_buffer* out){ GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"byteLength")){++i;out->size=glb_json_to_size(t+i,j);++i;} else i=glb_skip_json(t,i+1); if(i<0)return i; } return i; }
-static int glb_parse_json_skin(jsmntok_t const* t, int i, const u8* j, glb_skin* out){
-    GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
-    for(int k=0;k<sz;++k){
-        GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"joints")){++i;i=glb_parse_json_node_array(t,i,j,&out->joints,&out->joints_count);}else if(glb_json_strcmp(t+i,j,"inverseBindMatrices")){++i;GLB_CHECK_TOKTYPE(t[i],JSMN_PRIMITIVE);out->inverse_bind_matrices=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;}else{i=glb_skip_json(t,i+1);} if(i<0){return i;}
-    } return i;
-}
-
+static int glb_parse_json_skin(jsmntok_t const* t, int i, const u8* j, glb_skin* out){ GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"joints")){++i;i=glb_parse_json_node_array(t,i,j,&out->joints,&out->joints_count);}else if(glb_json_strcmp(t+i,j,"inverseBindMatrices")){++i;GLB_CHECK_TOKTYPE(t[i],JSMN_PRIMITIVE);out->inverse_bind_matrices=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;}else{i=glb_skip_json(t,i+1);} if(i<0){return i;} } return i; }
 static int glb_parse_json_node(jsmntok_t const* t, int i, const u8* j, glb_node* out){
     GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT); out->rotation[3]=1.0f;out->scale[0]=1.0f;out->scale[1]=1.0f;out->scale[2]=1.0f; int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
         GLB_CHECK_KEY(t[i]);
-             if (glb_json_strcmp(t+i,j,"children")) { ++i; i = glb_parse_json_node_array(t, i, j, &out->children, &out->children_count); } else if(glb_json_strcmp(t+i,j,"mesh")){++i;GLB_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);out->mesh=GLB_PTRINDEX(glb_mesh,glb_json_to_int(t+i,j));++i;}
-        else if(glb_json_strcmp(t+i,j,"skin")){++i;GLB_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);out->skin=GLB_PTRINDEX(glb_skin,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"translation")){out->has_translation=1;i=glb_parse_json_float_array(t,i+1,j,out->translation,3);}
-        else if(glb_json_strcmp(t+i,j,"rotation")){out->has_rotation=1;i=glb_parse_json_float_array(t,i+1,j,out->rotation,4);} else if(glb_json_strcmp(t+i,j,"scale")){out->has_scale=1;i=glb_parse_json_float_array(t,i+1,j,out->scale,3);}else{i=glb_skip_json(t,i+1);}  if(i<0)return i;
+             if (glb_json_strcmp(t+i,j,"children")) { ++i; i = glb_parse_json_node_array(t, i, j, &out->children, &out->children_count); } else if(glb_json_strcmp(t+i,j,"mesh")){++i;GLB_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);out->mesh=GLB_PTRINDEX(glb_mesh,glb_json_to_int(t+i,j));++i;}else if(glb_json_strcmp(t+i,j,"skin")){++i;GLB_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);out->skin=GLB_PTRINDEX(glb_skin,glb_json_to_int(t+i,j));++i;}
+        else if(glb_json_strcmp(t+i,j,"translation")){out->has_translation=1;i=glb_parse_json_float_array(t,i+1,j,out->translation,3);}else if(glb_json_strcmp(t+i,j,"rotation")){out->has_rotation=1;i=glb_parse_json_float_array(t,i+1,j,out->rotation,4);} else if(glb_json_strcmp(t+i,j,"scale")){out->has_scale=1;i=glb_parse_json_float_array(t,i+1,j,out->scale,3);}else{i=glb_skip_json(t,i+1);}  if(i<0)return i;
     } return i;
 }
 
 static int glb_parse_json_animation_sampler(jsmntok_t const* t, int i, const u8* j, glbanim_samp* out){
     GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
-    for(int k=0;k<sz;++k){
-        GLB_CHECK_KEY(t[i]);
-        if(glb_json_strcmp(t+i,j,"input")){++i;out->input=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"output")){++i;out->output=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"interpolation")){ ++i; out->interpolation = glb_json_strcmp(t+i,j,"LINEAR")?glb_interp_linear:glb_interp_step; ++i; } else i=glb_skip_json(t,i+1);
-        if(i<0)return i;
-    } return i;
+    for(int k=0;k<sz;++k){GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"input")){++i;out->input=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"output")){++i;out->output=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"interpolation")){ ++i; out->interpolation = glb_json_strcmp(t+i,j,"LINEAR")?glb_interp_linear:glb_interp_step; ++i; } else i=glb_skip_json(t,i+1); if(i<0)return i;} return i;
 }
 
 static int glb_parse_json_animation_channel(jsmntok_t const* t, int i, const u8* j, glb_anim_chan* out){
@@ -121,14 +81,8 @@ static int glb_parse_json_animation_channel(jsmntok_t const* t, int i, const u8*
         if(glb_json_strcmp(t+i,j,"sampler")){++i;out->sampler=GLB_PTRINDEX(glbanim_samp,glb_json_to_int(t+i,j));++i;}
         else if(glb_json_strcmp(t+i,j,"target")){
             ++i;GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int tsz=t[i].size;++i;
-            for(int m=0;m<tsz;++m){
-                GLB_CHECK_KEY(t[i]);
-                if(glb_json_strcmp(t+i,j,"node")){++i;out->target_node=GLB_PTRINDEX(glb_node,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"path")){ ++i; out->target_path = glb_json_strcmp(t+i,j,"translation") ? glb_animpthtype_translation : glb_json_strcmp(t+i,j,"rotation") ? glb_animpthtype_rotation : glb_json_strcmp(t+i,j,"scale") ? glb_animpthtype_scale : glb_animpthtype_invalid; ++i; }
-                else i=glb_skip_json(t,i+1);
-                if(i<0)return i;
-            }
-        } else i=glb_skip_json(t,i+1);
-        if(i<0)return i;
+            for(int m=0;m<tsz;++m){GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"node")){++i;out->target_node=GLB_PTRINDEX(glb_node,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"path")){ ++i; out->target_path = glb_json_strcmp(t+i,j,"translation") ? glb_animpthtype_translation : glb_json_strcmp(t+i,j,"rotation") ? glb_animpthtype_rotation : glb_json_strcmp(t+i,j,"scale") ? glb_animpthtype_scale : glb_animpthtype_invalid; ++i; }else i=glb_skip_json(t,i+1); if(i<0)return i;}
+        } else i=glb_skip_json(t,i+1);    if(i<0)return i;
     } return i;
 }
 
@@ -136,10 +90,8 @@ static int glb_parse_json_animation(jsmntok_t const* t, int i, const u8* j, glb_
     GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
         GLB_CHECK_KEY(t[i]);
-             if(glb_json_strcmp(t+i,j,"samplers")){i=glb_parse_json_array_generic(t,i+1,j,sizeof(glbanim_samp),(void**)&out->samplers,&out->samplers_count,(glb_parse_item_func)glb_parse_json_animation_sampler); } 
-        else if(glb_json_strcmp(t+i,j,"channels")){i=glb_parse_json_array(t,i+1,j,sizeof(glb_anim_chan),(void**)&out->channels,&out->channels_count);if(i<0)return i; for(size_t m=0;m<out->channels_count;++m){i=glb_parse_json_animation_channel(t,i,j,&out->channels[m]);if(i<0)return i;} }
-        else i=glb_skip_json(t,i+1);
-        if(i<0)return i;
+        if(glb_json_strcmp(t+i,j,"samplers")){i=glb_parse_json_array_generic(t,i+1,j,sizeof(glbanim_samp),(void**)&out->samplers,&out->samplers_count,(glb_parse_item_func)glb_parse_json_animation_sampler); }else if(glb_json_strcmp(t+i,j,"channels")){i=glb_parse_json_array(t,i+1,j,sizeof(glb_anim_chan),(void**)&out->channels,&out->channels_count);if(i<0)return i; for(size_t m=0;m<out->channels_count;++m){i=glb_parse_json_animation_channel(t,i,j,&out->channels[m]);if(i<0)return i;} }
+        else i=glb_skip_json(t,i+1);    if(i<0)return i;
     }
     return i;
 }
@@ -148,21 +100,17 @@ static void glb_parse_json_root(jsmntok_t const* t, int i, const u8* j, glb_data
     if(t[i].type!=JSMN_OBJECT){return;} int sz =t[i].size; ++i;
     for (int k = 0; k < sz; ++k) {
         if(t[i].type!=JSMN_STRING||t[i].size==0)return;
-        if (glb_json_strcmp(t+i,j,"meshes")) i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_mesh),(void**)&out->meshes,&out->meshes_count,(glb_parse_item_func)glb_parse_json_mesh); else if (glb_json_strcmp(t+i,j,"accessors")) i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_accessor),(void**)&out->accessors,&out->accessors_count,(glb_parse_item_func)glb_parse_json_accessor);
+        if (glb_json_strcmp(t+i,j,"meshes")) i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_mesh),(void**)&out->meshes,&out->meshes_count,(glb_parse_item_func)json_mesh); else if (glb_json_strcmp(t+i,j,"accessors")) i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_accessor),(void**)&out->accessors,&out->accessors_count,(glb_parse_item_func)json_accessor);
         else if (glb_json_strcmp(t+i,j,"bufferViews")) i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_buffer_view),(void**)&out->buffer_views,&out->buffer_views_count,(glb_parse_item_func)glb_parse_json_buffer_view); else if (glb_json_strcmp(t+i,j,"buffers")) i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_buffer),(void**)&out->buffers,&out->buffers_count,(glb_parse_item_func)glb_parse_json_buffer);
         else if (glb_json_strcmp(t+i,j,"skins")) i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_skin),(void**)&out->skins,&out->skins_count,(glb_parse_item_func)glb_parse_json_skin); else if (glb_json_strcmp(t+i,j,"nodes")) i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_node),(void**)&out->nodes,&out->nodes_count,(glb_parse_item_func)glb_parse_json_node);
-        else if (glb_json_strcmp(t+i,j,"animations")) i = glb_parse_json_array_generic(t,i+1,j,sizeof(glb_animt),(void**)&out->animations,&out->animations_count,(glb_parse_item_func)glb_parse_json_animation); else i = glb_skip_json(t, i+1);
-        if (i < 0) return;
+        else if (glb_json_strcmp(t+i,j,"animations")) i = glb_parse_json_array_generic(t,i+1,j,sizeof(glb_animt),(void**)&out->animations,&out->animations_count,(glb_parse_item_func)glb_parse_json_animation); else i = glb_skip_json(t, i+1);    if (i < 0) return;
     }
 }
 
 static void jsmn_init(jsmn_parser* p){p->pos=0;p->toknext=0;p->toksuper=-1;}
 static jsmntok_t* jsmn_alloc_token(jsmn_parser* p, jsmntok_t* t, size_t n){if(p->toknext>=n)return NULL;jsmntok_t* tok=&t[p->toknext++];tok->start=tok->end=-1;tok->size=0;tok->parent=-1;return tok;}
 static void jsmn_fill_token(jsmntok_t* t, jsmntype_t ty, size_t s, size_t e){t->type=ty;t->start=s;t->end=e;t->size=0;}
-static int jsmn_parse_primitive(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n){
-    size_t s=p->pos; for(;p->pos<l&&js[p->pos];p->pos++){switch(js[p->pos]){case ':':case '\t':case '\r':case '\n':case ' ':case ',':case ']':case '}':goto f;}} p->pos=s;return JSMN_ERROR_PART; f:if(!t){p->pos--;return 0;} jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok){p->pos=s;return JSMN_ERROR_NOMEM;} jsmn_fill_token(tok,JSMN_PRIMITIVE,s,p->pos);tok->parent=p->toksuper;p->pos--;return 0;
-}
-
+static int jsmn_parse_primitive(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n){size_t s=p->pos; for(;p->pos<l&&js[p->pos];p->pos++){switch(js[p->pos]){case ':':case '\t':case '\r':case '\n':case ' ':case ',':case ']':case '}':goto f;}} p->pos=s;return JSMN_ERROR_PART; f:if(!t){p->pos--;return 0;} jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok){p->pos=s;return JSMN_ERROR_NOMEM;} jsmn_fill_token(tok,JSMN_PRIMITIVE,s,p->pos);tok->parent=p->toksuper;p->pos--;return 0;}
 static int jsmn_parse_string(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n){
     size_t s=p->pos;p->pos++;
     for(;p->pos<l&&js[p->pos];p->pos++){
@@ -178,11 +126,9 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
         switch(c){
             case '{':case '[': cnt++;if(!t)break;jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok)return JSMN_ERROR_NOMEM; if(p->toksuper!=-1){t[p->toksuper].size++;tok->parent=p->toksuper;} tok->type=(c=='{'?JSMN_OBJECT:JSMN_ARRAY);tok->start=p->pos;p->toksuper=p->toknext-1;break;
             case '}':case ']': if(!t)break;ty=(c=='}'?JSMN_OBJECT:JSMN_ARRAY);if(p->toknext<1)return JSMN_ERROR_INVAL; tok=&t[p->toknext-1]; for(;;){if(tok->start!=-1&&tok->end==-1){if(tok->type!=ty)return JSMN_ERROR_INVAL;tok->end=p->pos+1;p->toksuper=tok->parent;break;}if(tok->parent==-1){if(tok->type!=ty||p->toksuper==-1)return JSMN_ERROR_INVAL;break;}tok=&t[tok->parent];} break;
-            case '\"': r=jsmn_parse_string(p,js,l,t,n);if(r<0)return r;cnt++;if(p->toksuper!=-1&&t)t[p->toksuper].size++;break;
-            case '\t':case '\r':case '\n':case ' ':break; case ':':p->toksuper=p->toknext-1;break;
+            case '\"': r=jsmn_parse_string(p,js,l,t,n);if(r<0)return r;cnt++;if(p->toksuper!=-1&&t)t[p->toksuper].size++;break; case '\t':case '\r':case '\n':case ' ':break; case ':':p->toksuper=p->toknext-1;break;
             case ',': if(t&&p->toksuper!=-1&&t[p->toksuper].type!=JSMN_ARRAY&&t[p->toksuper].type!=JSMN_OBJECT){p->toksuper=t[p->toksuper].parent;for(i=p->toknext-1;i>=0;i--){if(t[i].type==JSMN_ARRAY||t[i].type==JSMN_OBJECT){if(t[i].start!=-1&&t[i].end==-1){p->toksuper=i;break;}}}} break;
-            case '-':case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':case 't':case 'f':case 'n': if(t&&p->toksuper!=-1){jsmntok_t* ot=&t[p->toksuper];if(ot->type==JSMN_OBJECT||(ot->type==JSMN_STRING&&ot->size!=0))return JSMN_ERROR_INVAL;} r=jsmn_parse_primitive(p,js,l,t,n);if(r<0)return r;cnt++;if(p->toksuper!=-1&&t)t[p->toksuper].size++;break;
-            default:return JSMN_ERROR_INVAL;
+            case '-':case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':case 't':case 'f':case 'n': if(t&&p->toksuper!=-1){jsmntok_t* ot=&t[p->toksuper];if(ot->type==JSMN_OBJECT||(ot->type==JSMN_STRING&&ot->size!=0))return JSMN_ERROR_INVAL;} r=jsmn_parse_primitive(p,js,l,t,n);if(r<0)return r;cnt++;if(p->toksuper!=-1&&t)t[p->toksuper].size++;break; default:return JSMN_ERROR_INVAL;
         }
     } if(t){for(i=p->toknext-1;i>=0;i--){if(t[i].start!=-1&&t[i].end==-1)return JSMN_ERROR_PART;}} return cnt;
 }
@@ -206,23 +152,21 @@ void glb_load_buffers(glb_data* data) { if(data->buffers_count&&data->buffers[0]
 typedef struct {u32 idx,key;} TriSort;
 int cmp(const void* a, const void* b) { u32 ka=((const TriSort*)a)->key, kb=((const TriSort*)b)->key; return (ka > kb) - (ka < kb); } // branchless 1 or -1
 void OptimizeVertexCache(u16* idx, u32 ic, u32 vc, u8* scratch) {
-    if(ic < 3 || !vc){return;} u32 tc = ic / 3; TriSort* t = (TriSort*)scratch; TriSort* t_tmp = (TriSort*)(scratch + (tc * sizeof(TriSort))); u16* n = (u16*)(scratch + (tc * sizeof(TriSort) * 2));
-    for (u32 i = 0; i < tc; ++i) { u16* p = idx + i * 3; u32 m = p[0] < p[1] ? p[0] : p[1]; m = m < p[2] ? m : p[2]; t[i].idx = i; t[i].key = (u16)m; }
+    if(ic < 3 || !vc){return;} u32 tc = ic / 3; TriSort* t = (TriSort*)scratch; TriSort* t_tmp = (TriSort*)(scratch + (tc * sizeof(TriSort))); u16* n = (u16*)(scratch + (tc * sizeof(TriSort) * 2)); for (u32 i = 0; i < tc; ++i) { u16* p = idx + i * 3; u32 m = p[0] < p[1] ? p[0] : p[1]; m = m < p[2] ? m : p[2]; t[i].idx = i; t[i].key = (u16)m; }
     if (tc >= 2) {
-        u32 b0[256]={0}, b1[256]={0}; for (u32 i=0;i<tc;++i) {u16 key = t[i].key; b0[key & 0xFF]++; b1[(key >> 8) & 0xFF]++;} u32 sum0=0, sum1=0; for (u32 i=0;i<256;++i) { u32 t0 = b0[i]; u32 t1 = b1[i]; b0[i] = sum0; b1[i] = sum1; sum0 += t0; sum1 += t1; } for (u32 i=0;i<tc;++i) {u32 radix0 = t[i].key & 0xFF; u32 dest = b0[radix0]++; t_tmp[dest] = t[i];}
-        for (u32 i=0;i<tc;++i) { u32 radix1 = (t_tmp[i].key >> 8) & 0xFF; u32 dest = b1[radix1]++; t[dest] = t_tmp[i]; }
+        u32 b0[256]={0}, b1[256]={0}; for (u32 i=0;i<tc;++i) {u16 key = t[i].key; b0[key & 0xFF]++; b1[(key >> 8) & 0xFF]++;} u32 sum0=0, sum1=0; for (u32 i=0;i<256;++i) { u32 t0 = b0[i]; u32 t1 = b1[i]; b0[i] = sum0; b1[i] = sum1; sum0 += t0; sum1 += t1; } for (u32 i=0;i<tc;++i) {u32 radix0 = t[i].key & 0xFF; u32 dest = b0[radix0]++; t_tmp[dest] = t[i];} for (u32 i=0;i<tc;++i) { u32 radix1 = (t_tmp[i].key >> 8) & 0xFF; u32 dest = b1[radix1]++; t[dest] = t_tmp[i]; }
     } for (u32 i = 0; i < tc; ++i) { u16* s = idx + t[i].idx * 3; u16* d = n + i * 3; d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; } mcpy(idx, n, ic * sizeof(u16));
 }
 
-u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, u32* r, u8* nv) { u32 oc=*vc; if(!oc||!ic){return v;} mset(r,0xFF,oc*sizeof(u32)); u32 nc=0; for(u32 i=0;i<ic;++i){u32 id=idx[i]; if(id<oc&&r[id]==0xFFFFFFFFU){r[id]=nc; ++nc;}} mset(r,0xFF,oc*sizeof(u32)); u32 write_ptr=0; for(u32 i=0;i<ic;++i){u32 id=idx[i]; if(id<oc){if(r[id]==0xFFFFFFFFU){r[id]=write_ptr; mcpy(nv+write_ptr*stride,v+id*stride,stride); write_ptr++;} idx[i]=(u16)r[id];}} *vc=nc; return nv; }
+u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, u32* r, u8* nv) { u32 oc=*vc; if(!oc||!ic){return v;} mset(r,0xFF,oc*sizeof(u32)); u32 nc=0; for(u32 i=0;i<ic;++i){u32 id=idx[i]; if(id<oc&&r[id]==U32_MAX){r[id]=nc; ++nc;}} mset(r,0xFF,oc*sizeof(u32)); u32 write_ptr=0; for(u32 i=0;i<ic;++i){u32 id=idx[i]; if(id<oc){if(r[id]==U32_MAX){r[id]=write_ptr; mcpy(nv+write_ptr*stride,v+id*stride,stride); write_ptr++;} idx[i]=(u16)r[id];}} *vc=nc; return nv; }
 #define _mm_min_ps(A, B) ((__m128)__builtin_ia32_minps((__v4sf)(A), (__v4sf)(B)))
 #define _mm_max_ps(A, B) ((__m128)__builtin_ia32_maxps((__v4sf)(A), (__v4sf)(B)))
 #define _mm_storeu_ps(P, A) (*(__m128_u *)(P) = (A))
 __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* restrict sv, u32 ec, u32* restrict ht, u32* restrict ht_used, u32* restrict remap_scr, u8* restrict cache_scr, float** restrict ov_pos, u32* ovc, u16** ot, u16* otc, __m128 mn_v, __m128 mx_v) {
     if (unlikely(!ec)){return false;} u16* final_t = OS_Alloc(ec * sizeof(u16)); /*Allocate final_t early so we can use it instead of ft_scratch*/ u32 used_slots_count = 0; u32* rem = (u32*)remap_scr; /*Reuse remap_scr for the 'rem' array!*/ u32 ucnt = 0;
-    for (u32 i=0; i<ec; ++i) { const float* v = sv + (i<<3); const u32* uv = (const u32*)v; u32 h0 = uv[0] ^ uv[1] ^ uv[2] ^ uv[3]; u32 h1 = uv[4] ^ uv[5] ^ uv[6] ^ uv[7]; u32 s = (h0 ^ h1) & (WELD_HASH_SIZE-1); while (ht[s] != 0xFFFFFFFFU) { if (mcmp(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (WELD_HASH_SIZE-1); } ht[s] = ucnt; rem[i] = ucnt; ht_used[used_slots_count++] = s; mcpy(sv+(ucnt<<3), v, 32); ++ucnt; nxt:; }
+    for (u32 i=0; i<ec; ++i) { const float* v = sv + (i<<3); const u32* uv = (const u32*)v; u32 h0 = uv[0] ^ uv[1] ^ uv[2] ^ uv[3]; u32 h1 = uv[4] ^ uv[5] ^ uv[6] ^ uv[7]; u32 s = (h0 ^ h1) & (WELD_HASH_SIZE-1); while (ht[s] != U32_MAX) { if (mcmp(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (WELD_HASH_SIZE-1); } ht[s] = ucnt; rem[i] = ucnt; ht_used[used_slots_count++] = s; mcpy(sv+(ucnt<<3), v, 32); ++ucnt; nxt:; }
     for(u32 i=0;i<ec;++i){final_t[i]=(u16)rem[i];} OptimizeVertexCache(final_t,ec,ucnt,cache_scr); float* final_verts=OS_Alloc(ucnt*CPU_VRT_SZ); OptimizeVertexFetch((u8*)sv,&ucnt,final_t,ec,CPU_VRT_SZ,remap_scr,(u8*)final_verts); *ov_pos = final_verts; *ovc = ucnt; *ot = final_t; *otc = ec/3;
-    float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr,mn_v); _mm_storeu_ps(mx_arr,mx_v); modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2]))))); for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]] = 0xFFFFFFFFU;} return true;
+    float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr,mn_v); _mm_storeu_ps(mx_arr,mx_v); modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2]))))); for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]]=U32_MAX;} return true;
 }
 
 static void Mat4Identity(float* m) { mset(m, 0, sizeof(float) * 16); m[0] = m[5] = m[10] = m[15] = 1.0f; }
@@ -462,15 +406,15 @@ INLINE u32 WeldHash(i32 x, i32 y, i32 z) { u32 h = ((u32)x * 0x8DA6B343u) ^ ((u3
 static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap) {
     u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m]; if (!vc || !tc) { physPos[m] = NULL; physTris[m] = NULL; physVertCounts[m] = 0; return; } const float* src=vPos[m]; mset(weldHt,0xFF,WELD_HASH_SIZE * sizeof(u32)); u32 usedSlots=0, weldedCount=0; float* weldedPos=OS_Alloc(vc*3*sizeof(float)); // worst case: no duplicates at all
     for (u32 i = 0; i < vc; ++i) {
-        float x = src[i*8+0], y = src[i*8+1], z = src[i*8+2]; i32 cx = (i32)vfloor(x * 10000), cy = (i32)vfloor(y * 10000), cz = (i32)vfloor(z * 10000); u32 found = 0xFFFFFFFFU;
-        for (i32 dz = -1; dz <= 1 && found == 0xFFFFFFFFU; ++dz)
-            for (i32 dy = -1; dy <= 1 && found == 0xFFFFFFFFU; ++dy)
-                for (i32 dx = -1; dx <= 1 && found == 0xFFFFFFFFU; ++dx) {
-                    u32 slot = WeldHash(cx+dx, cy+dy, cz+dz); while (weldHt[slot] != 0xFFFFFFFFU) { u32 cand = weldHt[slot]; float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z; if (ddx*ddx + ddy*ddy + ddz*ddz <= 0.0001f * 0.0001f) { found = cand; break; } slot = (slot + 1) & (WELD_HASH_SIZE - 1); }
+        float x = src[i*8+0], y = src[i*8+1], z = src[i*8+2]; i32 cx = (i32)vfloor(x * 10000), cy = (i32)vfloor(y * 10000), cz = (i32)vfloor(z * 10000); u32 found=U32_MAX;
+        for (i32 dz = -1; dz <= 1 && found == U32_MAX; ++dz)
+            for (i32 dy = -1; dy <= 1 && found == U32_MAX; ++dy)
+                for (i32 dx = -1; dx <= 1 && found == U32_MAX; ++dx) {
+                    u32 slot = WeldHash(cx+dx, cy+dy, cz+dz); while (weldHt[slot] != U32_MAX) { u32 cand = weldHt[slot]; float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z; if (ddx*ddx + ddy*ddy + ddz*ddz <= 0.0001f * 0.0001f) { found = cand; break; } slot = (slot + 1) & (WELD_HASH_SIZE - 1); }
                 }
-        if(found == 0xFFFFFFFFU){found=weldedCount; weldedPos[weldedCount*3+0]=x; weldedPos[weldedCount*3+1]=y; weldedPos[weldedCount*3+2]=z; ++weldedCount; u32 slot = WeldHash(cx, cy, cz); while (weldHt[slot] != 0xFFFFFFFFU) slot = (slot + 1) & (WELD_HASH_SIZE - 1); weldHt[slot] = found; weldHtUsed[usedSlots++] = slot; } remap[i] = (u16)found;
+        if(found == U32_MAX){found=weldedCount; weldedPos[weldedCount*3+0]=x; weldedPos[weldedCount*3+1]=y; weldedPos[weldedCount*3+2]=z; ++weldedCount; u32 slot = WeldHash(cx, cy, cz); while (weldHt[slot] != U32_MAX) slot = (slot + 1) & (WELD_HASH_SIZE - 1); weldHt[slot] = found; weldHtUsed[usedSlots++] = slot; } remap[i] = (u16)found;
     }
-    for(u32 i=0;i<usedSlots;++i){weldHt[weldHtUsed[i]]=0xFFFFFFFFU;/*reset shared scratch for the next model on this thread*/} float* exactPos=OS_Alloc(weldedCount*3*sizeof(float)); mcpy(exactPos,weldedPos,(size_t)weldedCount*3*sizeof(float)); OS_Free(weldedPos,(size_t)vc*3*sizeof(float));
+    for(u32 i=0;i<usedSlots;++i){weldHt[weldHtUsed[i]]=U32_MAX;/*reset shared scratch for the next model on this thread*/} float* exactPos=OS_Alloc(weldedCount*3*sizeof(float)); mcpy(exactPos,weldedPos,(size_t)weldedCount*3*sizeof(float)); OS_Free(weldedPos,(size_t)vc*3*sizeof(float));
     u16* weldedTris=OS_Alloc(tc*3*sizeof(u16)); const u16* srcTris = modelTriangles[m]; for (u32 i = 0; i < tc * 3; ++i) weldedTris[i] = remap[srcTris[i]]; physPos[m] = exactPos; physTris[m] = weldedTris; physVertCounts[m] = weldedCount;
 }
 

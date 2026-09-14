@@ -14,7 +14,7 @@ typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define likely(x)   __builtin_expect(!!(x),1)
 #define unlikely(x) __builtin_expect(!!(x),0)
 #define NULL ((void *)0)
-enum{U16_MAX=65535};
+enum{U16_MAX=65535,U32_MAX=0xFFFFFFFFU,U64_MAX=0xFFFFFFFFFFFFFFFFULL};
 typedef __builtin_va_list va_list;
 typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color; typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion; typedef u8 ColliderType;
 typedef struct { bool hit; V3 point,normal; float pen; } Overlap; typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
@@ -84,7 +84,7 @@ void* mcpy(void *dst, const void *src, size_t n);
     void* __stdcall CreateThread(void* lpThreadAttributes, size_t dwStackSize, LPTHREAD_START_ROUTINE lpStartAddress, void* lpParameter, u32 dwCreationFlags, u32* lpThreadId);
     INLINE u32 WINAPI thrtramp(void* a) { void** b=(void**)a; void*(*fn)(void*)=(void*(*)(void*))b[0]; void* arg=b[1]; HeapFree(GetProcessHeap(),0,b); fn(arg); return 0; }
     INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
-    INLINE void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,0xFFFFFFFFUL); CloseHandle(t->handle); t->handle = NULL; }
+    INLINE void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,U32_MAX); CloseHandle(t->handle); t->handle = NULL; }
     INLINE double get_time() { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
 #else
     struct input_id { u16 bustype,vendor,product,version;}; struct input_event { struct { long tv_sec,tv_usec; } time; u16 type,code; i32 value; };
@@ -130,13 +130,13 @@ enum {
     /*Entity Management*/ MAX_LEVELS=14,LEVEL_CYBERSPACE=13,CREDITS_PAGES=22,AVG_CPU_TAPS=2048,MAX_ENTITIES=768,INSTANCE_COUNT=8500,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,
     /*Lights*/ LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, 
     /*Models*/ MAX_MDLS=6400, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
-    /*Textures*/ MAX_TXRS = 2132, MAX_TOTAL_PIXELS = 44344620u, MAX_UNIQUE_COLORS = 48580u,
+    /*Textures*/ MAX_TXRS = 2132, MAX_TOTAL_PIXELS = 44344620u, MAX_UNIQUE_COLORS = 48580u,TEXHASH_SZ=256,NUM_TEXTURE_CLIPS=49,
     /*Animations*/ MAX_ANIMCLIPS = 10, MAX_ANIMS = 53, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2,
                    A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
     /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH=6, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=8000, MAX_WIRELINE_VRTS = 2024000,
                 MANIFOLD_MAX=4, CVXMSH_HULL_CACHE=1024, EPA_MAX_FACES=64, EPA_MAX_VERTS=128, EPA_MAX_EDGES=EPA_MAX_FACES*3, GJK_ITER=32, EPA_ITER=16, SOLVER_ITER_GLOBAL=32, MAX_GLOBAL_CONTACTS=8192,
     /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
-    /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,
+    /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS),REV_BUF_LEN=110251/*~2.5s @ 44100; prime*/,MAXAMB=256,
     /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
              T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_BUFFER_SIZE=1024, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
     /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
