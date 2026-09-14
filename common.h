@@ -136,7 +136,7 @@ enum {
     /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH=6, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=8000, MAX_WIRELINE_VRTS = 2024000,
                 MANIFOLD_MAX=4, CVXMSH_HULL_CACHE=1024, EPA_MAX_FACES=64, EPA_MAX_VERTS=128, EPA_MAX_EDGES=EPA_MAX_FACES*3, GJK_ITER=32, EPA_ITER=16, SOLVER_ITER_GLOBAL=32, MAX_GLOBAL_CONTACTS=8192,
     /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
-    /*Audio*/ MAX_CHANNELS = 128, SOUNDS_COUNT = 670,
+    /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,
     /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
              T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_BUFFER_SIZE=1024, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
     /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
@@ -304,18 +304,11 @@ extern u32 vbos[MAX_MDLS],tbos[MAX_MDLS]; extern FHandle console_log_file; exter
 extern u32 shadowmapIndirectionList[LIGHT_COUNT];
 extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
-extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile;
-extern u16 fwParentOf[INSTANCE_COUNT]; // instance -> owning func_wall mover_target, 0 == none
-extern const char* audioLogs[LOGCNT];
-extern u32 gridCellStates[ARRSIZE]; extern double tWrnFinished[10];
+extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile; extern u16 fwParentOf[INSTANCE_COUNT];/*instance -> owning func_wall mover_target, 0 == none*/ extern const char* audioLogs[LOGCNT]; extern u32 gridCellStates[ARRSIZE]; extern double tWrnFinished[10];
 extern float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16]; extern V3 ressurectionLocations[]; extern void PlayTrack(TrackType,MusicType);
-typedef struct { V3 normal; float d; } FrustumPlane;
-extern FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
-typedef struct PngArena { u8*base,*cursor,*end; } PngArena;
-extern PngArena png_arena_main;
-extern bool instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS],window_has_focus,ignore_next_mouse_delta,returnToPause,mouseMovementThisFrame,firstFrameMouselook; extern u8 particleBlendTexture[MAX_TXRS];
-extern u8 currentPlayerNameLength;
-extern i8 currentMenuItem;
+typedef struct { V3 normal; float d; } FrustumPlane; extern FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
+typedef struct PngArena { u8*base,*cursor,*end; } PngArena; extern PngArena png_arena_main;
+extern bool instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS],window_has_focus,ignore_next_mouse_delta,returnToPause,mouseMovementThisFrame,firstFrameMouselook; extern u8 particleBlendTexture[MAX_TXRS]; extern u8 currentPlayerNameLength; extern i8 currentMenuItem;
 typedef struct { int width,height; u8* pixels; } WinSysIcon;
 RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
 u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
@@ -324,7 +317,7 @@ void UseTargets(u16,u16),AddForce(u16,V3,bool),CenterStatusPrint(const char * re
      play_wav(const char*,float,V3,bool),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
      LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderTextR(i16,i16,u32,u8,float,const char* restrict,...),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
-const char* FootStepSound(FootStepType),*JumpSound(FootStepType),*JumpLandSound(FootStepType),*RustleSound(); FootStepType GetFootstepTypeForPrefab(int); char* StringFindFirstCharWithin(const char*,char); AnimationClip DoorGetClip(const Entity*,u8);
+const char *JumpSound(FootStepType),*JumpLandSound(FootStepType); FootStepType GetFootstepTypeForPrefab(int); char* StringFindFirstCharWithin(const char*,char); AnimationClip DoorGetClip(const Entity*,u8);
 // Quest bits (info_mission constIndex 710).  Only ever set/toggled/checked by info_mission entities.
 enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
 enum{IO_NONE=0}; u16 IOInternName(const char*);
@@ -448,7 +441,7 @@ u32 PosGetCellCoordsP(i32 cx, i32 cz);
 size_t slen(const char* s);
 char* data_parser_trim(char* s);
 i32 s2i32(const char *str);
-bool cEmpty(const char c), sEmpty(const char* a), sEqual(const char* a, const char* b), sEndsWith(const char *str, const char *suffix);
+bool cEmpty(const char),sEmpty(const char*),sEqual(const char*,const char*);
 int sCompUpToLen(const char* s1, const char* s2, size_t n);
 void scpy_to_a_from_b(char* a, const char* b, size_t bufsz),sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz),sCat(char* a, const char* b, size_t bufsz);
 char c2Lower(const char c), *sFindSub(const char* s, const char* sub),*StringFindFirstCharWithin(const char *s, char c);

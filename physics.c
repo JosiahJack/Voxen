@@ -560,7 +560,7 @@ bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
     } World.colliderSize[playerIdx].y = oldHeight; World.position[playerIdx] = oldPos; return blocked;
 }
 
-KeyState* GetCodeMapping(int settingIndex);
+KeyState* GetCodeMapping(int settingIndex); const char* FootStepSound(FootStepType);
 void ApplyPlayerMovements(float dt) {
     Entity *p = &World.instances[PLAYER1]; Quaternion r = World.rotation[PLAYER1]; float leanSpeed = 70.0f, leanMaxAngle = 35.0f; float leanInput = (float)LeanLeft() - (float)LeanRight(); bool doubleTapLean = DoubleTapLeanLeft() || DoubleTapLeanRight();
     bool movingForward = Forward() > 0.1f, leanRight = leanInput < 0.0f, leanLeft = leanInput > 0.0f;
@@ -611,13 +611,12 @@ void ApplyPlayerMovements(float dt) {
     float stepVolMod = fatigueWane > 3.4f ? 0.2f : fatigueWane > 1.9f ? 0.4f : 1.0f;
     float rustleVolMod = fatigueWane > 3.4f ? 0.65f : fatigueWane > 1.9f ? 0.7f : 1.0f;
     if (World.invP1.footstepFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f && !Cheats.noclip) && !World.boosterActive) {
-        RaycastHit fstep = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET);
-        FootStepType fstp = fstep.hit ? GetFootstepTypeForPrefab(World.instances[fstep.hitInstanceIndex].index) : FSTP_Concrete;
-        play_wav(FootStepSound(fstp),SfxVol() * random_range(0.4f,0.55f) * stepVolMod * 0.5f,World.position[PLAYER1],true);
+        RaycastHit fstep=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET);
+        play_wav(FootStepSound(fstep.hit ? GetFootstepTypeForPrefab(World.instances[fstep.hitInstanceIndex].index) : FSTP_Concrete),SfxVol() * random_range(0.4f,0.55f) * stepVolMod * 0.5f,World.position[PLAYER1],true);
         World.invP1.footstepFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
     }
     if (World.invP1.rustleFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f && !Cheats.noclip) && !World.boosterActive) {
-        play_wav(RustleSound(),SfxVol() * random_range(0.3f,0.5f) * rustleVolMod * 0.75f,World.position[PLAYER1],true); World.invP1.rustleFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
+        play_wav(sounds[random_range_u32(459,465)],SfxVol() * random_range(0.3f,0.5f) * rustleVolMod * 0.75f,World.position[PLAYER1],true); World.invP1.rustleFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));
     }
     float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y; p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
     V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0}; 
