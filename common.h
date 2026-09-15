@@ -16,8 +16,7 @@ typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define NULL ((void *)0)
 enum{U16_MAX=65535,U32_MAX=0xFFFFFFFFU,U64_MAX=0xFFFFFFFFFFFFFFFFULL};
 typedef __builtin_va_list va_list;
-typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color; typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion; typedef u8 ColliderType;
-typedef struct { bool hit; V3 point,normal; float pen; } Overlap; typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
+typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color; typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion; typedef u8 ColliderType; typedef struct { bool hit; V3 point,normal; float pen; } Overlap; typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
 #if defined(_WIN32)
     typedef void* FHandle;
 #else
@@ -120,33 +119,27 @@ INLINE void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_
 INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
 INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
 static const Quaternion QUAT_IDENTITY=(Quaternion){0.0f,0.0f,0.0f,1.0f};
-typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
-typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;
-typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer
-typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
-enum {
-    /*Culling*/ WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
+typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;         typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer   
+typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;  typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
+enum {/*Culling*/ WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                 MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,MAX_CULL_FILESIZE=500000,
-    /*Entity Management*/ MAX_LEVELS=14,LEVEL_CYBERSPACE=13,CREDITS_PAGES=22,AVG_CPU_TAPS=2048,MAX_ENTITIES=768,INSTANCE_COUNT=8500,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,
-    /*Lights*/ LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, 
-    /*Models*/ MAX_MDLS=6400, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
-    /*Textures*/ MAX_TXRS = 2132, MAX_TOTAL_PIXELS = 44344620u, MAX_UNIQUE_COLORS = 48580u,TEXHASH_SZ=256,NUM_TEXTURE_CLIPS=49,
-    /*Animations*/ MAX_ANIMCLIPS = 10, MAX_ANIMS = 53, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2,
-                   A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
-    /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH=6, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=8000, MAX_WIRELINE_VRTS = 2024000,
-                MANIFOLD_MAX=4, CVXMSH_HULL_CACHE=1024, EPA_MAX_FACES=64, EPA_MAX_VERTS=128, EPA_MAX_EDGES=EPA_MAX_FACES*3, GJK_ITER=32, EPA_ITER=16, SOLVER_ITER_GLOBAL=32, MAX_GLOBAL_CONTACTS=8192,
-    /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
-    /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS),REV_BUF_LEN=110251/*~2.5s @ 44100; prime*/,MAXAMB=256,
-    /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
-             T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_BUFFER_SIZE=1024, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
-    /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
-    /*Rendering*/ BLEND_OPAQUE=0,BLEND_CUTOUT=1,BLEND_PREMULT=2,BLEND_MULTIPLY=3,PARTICLE_FLAG_ADDITIVE=(1u<<0),PARTICLE_FLAG_SOFT=(1u<<1),PARTICLE_FLAG_LIT=(1u<<2),PARTICLE_FLAG_MULTIPLY=(1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE=(1u<<4),PARTICLE_FLAG_PHYSICS=(1u<<5),PARTICLE_FLAG_TRAIL=(1u<<6),MAX_PARTICLES=20480,MAX_EMITTERS=18,MAX_TRAIL_SEGS=4096,PARTICLE_SSBO_BINDING=10,TRAIL_SSBO_BINDING=11
-};
+      /*Entity Management*/ MAX_LEVELS=14,LEVEL_CYBERSPACE=13,CREDITS_PAGES=22,AVG_CPU_TAPS=2048,MAX_ENTITIES=768,INSTANCE_COUNT=8500,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,
+      /*Lights*/ LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, 
+      /*Models*/ MAX_MDLS=6400, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
+      /*Textures*/ MAX_TXRS = 2132, MAX_TOTAL_PIXELS = 44344620u, MAX_UNIQUE_COLORS = 48580u,TEXHASH_SZ=256,NUM_TEXTURE_CLIPS=49,
+      /*Animations*/ MAX_ANIMCLIPS = 10, MAX_ANIMS = 53, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2,
+                     A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
+      /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH=6, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=8000, MAX_WIRELINE_VRTS = 2024000,
+                  MANIFOLD_MAX=4, CVXMSH_HULL_CACHE=1024, EPA_MAX_FACES=64, EPA_MAX_VERTS=128, EPA_MAX_EDGES=EPA_MAX_FACES*3, GJK_ITER=32, EPA_ITER=16, SOLVER_ITER_GLOBAL=32, MAX_GLOBAL_CONTACTS=8192,
+      /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
+      /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS),REV_BUF_LEN=110251/*~2.5s @ 44100; prime*/,MAXAMB=256,
+      /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
+               T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_BUFFER_SIZE=1024, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
+      /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
+      /*Rendering*/ BLEND_OPAQUE=0,BLEND_CUTOUT=1,BLEND_PREMULT=2,BLEND_MULTIPLY=3,PARTICLE_FLAG_ADDITIVE=(1u<<0),PARTICLE_FLAG_SOFT=(1u<<1),PARTICLE_FLAG_LIT=(1u<<2),PARTICLE_FLAG_MULTIPLY=(1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE=(1u<<4),PARTICLE_FLAG_PHYSICS=(1u<<5),PARTICLE_FLAG_TRAIL=(1u<<6),MAX_PARTICLES=20480,MAX_EMITTERS=18,MAX_TRAIL_SEGS=4096,PARTICLE_SSBO_BINDING=10,TRAIL_SSBO_BINDING=11};
 u32 parse_numberu32(const char*, const char*,u32); u16 parse_numberu16(const char*, const char*,u32); u8 parse_numberu8(const char*, const char*,u32); bool parse_bool(const char*, const char*,u32);
-static const float PLAYER_RADIUS=0.48f,PLAYER_HEIGHT=2.00f,PLAYER_CAM_OFFSET_Y=0.84f,CELLSZ=2.56f,CELLXHALF=(CELLSZ * 0.5f),VOXEL_SIZE=(CELLSZ/(float)VOXELS_PER_CELL),VOXEL_HALF=(VOXEL_SIZE * 0.5f),/*COLCAP_DIR_X_F=0.0f,*/COLCAP_DIR_Y_F=1.0f,//,COLCAP_DIR_Z_F=2.0f,
-                   REFLEX_TIME_SCALE=0.25,DEFAULT_TIME_SCALE=1.0,BERSERK_DAMAGE_MULTIPLIER=4.0f/*Quad Damage!*/;
-static const double BERSERK_TIME=20.0,DETOX_TIME=60.0,GENIUS_TIME=180.0,MEDI_TIME=35.0,REFLEX_TIME=155.0,SIGHT_TIME=40.0,STAMINUP_TIME=60.0,SIGHT_SIDE_EFFECT_TIME=17.0,NITRO_MIN_TIME=1.0,NITRO_MAX_TIME=60.0,NITRO_DEFAULT_TIME=7.0,EARTH_SHAKER_MIN_TIME=4.0,
-                    EARTH_SHAKER_MAX_TIME=60.0,EARTH_SHAKER_DEFAULT_TIME=10.0;
+static const float PLAYER_RADIUS=0.48f,PLAYER_HEIGHT=2.00f,PLAYER_CAM_OFFSET_Y=0.84f,CELLSZ=2.56f,CELLXHALF=(CELLSZ * 0.5f),VOXEL_SIZE=(CELLSZ/(float)VOXELS_PER_CELL),VOXEL_HALF=(VOXEL_SIZE * 0.5f),/*COLCAP_DIR_X_F=0.0f,*/COLCAP_DIR_Y_F=1.0f,/*,COLCAP_DIR_Z_F=2.0f,*/REFLEX_TIME_SCALE=0.25,DEFAULT_TIME_SCALE=1.0,BERSERK_DAMAGE_MULTIPLIER=4.0f/*Quad Damage!*/;
+static const double BERSERK_TIME=20.0,DETOX_TIME=60.0,GENIUS_TIME=180.0,MEDI_TIME=35.0,REFLEX_TIME=155.0,SIGHT_TIME=40.0,STAMINUP_TIME=60.0,SIGHT_SIDE_EFFECT_TIME=17.0,NITRO_MIN_TIME=1.0,NITRO_MAX_TIME=60.0,NITRO_DEFAULT_TIME=7.0,EARTH_SHAKER_MIN_TIME=4.0,EARTH_SHAKER_MAX_TIME=60.0,EARTH_SHAKER_DEFAULT_TIME=10.0;
 enum{EF_ACTIVE=(1u<<0),EF_GRAVLIFT=(1u<<1),EF_GROUNDED=(1u<<2),EF_RIGIDBODY=(1u<<3),EF_NO_SHADOWS=(1u<<4),EF_ASLEEP=(1u<<5),EF_WALK_PATH_ON_START=(1u<<6),EF_TOUCHING_HURTS=(1u<<7),EF_ACT_AS_CORPSE_ONLY=(1u<<8),EF_DYING=(1u<<9),EF_DEATH_BURST_DONE=(1u<<10),
      EF_DEAD=(1u<<11),EF_TELEPORT_ON_DEATH=(1u<<12),EF_GO_INTO_PAIN=(1u<<13),EF_WANDERING=(1u<<14),EF_ACT_AS_TURRET=(1u<<15),EF_TARGID_ATTACHED=(1u<<16),EF_ENEM_IN_SIGHT=(1u<<17),EF_ENEM_IN_FRONT=(1u<<18),EF_ENEM_IN_FOV=(1u<<19),EF_ENEM_IN_LOS=(1u<<20),
      EF_FIRST_SIGHTING=(1u<<21),EF_DYING_SETUP=(1u<<22),EF_HAD_ENEMY=(1u<<23),EF_SHOT_FIRED=(1u<<24),EF_DEAD_CHECKS_DONE=(1u<<25),EF_HOP_DONE=(1u<<26),EF_LOCKED=(1u<<27),EF_HAS_CAMERA_VIEW=(1u<<28),EF_DAMAGE_ON_USE=(1u<<29),EF_MOVING=(1u<<30)};
@@ -159,33 +152,19 @@ enum{TARG_IOFLAGS_TRIPTRIGGER=(1u<<0),TARG_IOFLAGS_DOOROPEN=(1u<<1),TARG_IOFLAGS
      TARG_IOFLAGS_TEXTURE_CHG_TOGGLE=(1u<<13),TARG_IOFLAGS_LIGHT_ON=(1u<<14),TARG_IOFLAGS_LIGHT_OFF=(1u<<15),TARG_IOFLAGS_LIGHT_TOGGLE=(1u<<16),TARG_IOFLAGS_FUNCWALL_MOVE=(1u<<17),TARG_IOFLAGS_MISSION_BIT_ON=(1u<<18),TARG_IOFLAGS_MISSION_BIT_OFF=(1u<<19),
      TARG_IOFLAGS_MISSION_BIT_TOGGLE=(1u<<20),TARG_IOFLAGS_SWITCH_LOCK_TOGGLE=(1u<<21),TARG_IOFLAGS_INST_ACTIVATE=(1u<<22),TARG_IOFLAGS_INST_DEACTIVATE=(1u<<23),TARG_IOFLAGS_INST_TOGGLE=(1u<<24),TARG_IOFLAGS_PLAY_SOUND_ONCE=(1u<<25),
      TARG_IOFLAGS_STOP_SOUND=(1u<<26),TARG_IOFLAGS_START_FLASHING_TEX=(1u<<27),TARG_IOFLAGS_STOP_FLASHING_TEX=(1u<<28),TARG_IOFLAGS_BRANCH_FLIP=(1u<<29),TARG_IOFLAGS_BRANCH_FLIPONLY=(1u<<30),TARG_IOFLAGS_DISABLE_ON_AWAKE=(1u<<31)};
-typedef enum {BodyState_Standing=0,BodyState_Crouch=1,BodyState_CrouchingDown=2,BodyState_StandingUp=3,BodyState_Prone=4,BodyState_ProningDown=5,BodyState_ProningUp=6} BodyState;
-typedef enum {Att_None=0,Att_Melee=1,Att_MlEg=2,Att_Beam=3,Att_Magn=4,Att_HitS=5,Att_PjNd=6,Att_PjBm=7,Att_Ball=8,Att_Gas=9,Att_Trnq=10,Att_Drill=11} AttType;
-typedef enum {NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_MutantCyborg=5,NPCType_Cyber=6} NPCType;
-typedef enum {PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3} PerceptionLevel;
-typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Dead=8,AIState_Inspect=9,AIState_Interacting=10} AIState;
-typedef enum {AIMoveType_Walk=0,AIMoveType_Fly=1,AIMoveType_Swim=2,AIMoveType_Cyber=3,AIMoveType_None=4} AIMoveType;
-typedef enum {SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3} SecurityType;
-typedef enum {DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3} DoorState;
-typedef enum {FStat_Start=0,FStat_Target=1,FStat_MovingStart=2,FStat_MovingTarget=3,FStat_AjarMovingStart=4,FStat_AjarMovingTarget=5} FuncStates;
-typedef enum {ACC_None=0,ACC_Std=1,ACC_Med=2,ACC_Sci=3,ACC_Admin=4,ACC_Grp1=5,ACC_Grp2=6,ACC_Grp3=7,ACC_Grp4=8,ACC_GrpA=9,ACC_GrpB=10,ACC_Stor=11,ACC_Eng=12,ACC_Maint=13,ACC_Security=14,ACC_Per1=15,ACC_Per2=16,ACC_Per3=17,ACC_Per4=18,ACC_Per5=19} AccCardType;
-typedef enum {MT_None=0,MT_Walking=1,MT_Combat=2,MT_Override=3} MusicType;
-typedef enum {TT_None=0,TT_Walking=1,TT_Combat=2,TT_Revive=3,TT_Death=4,TT_Cybertube=5,TT_Elevator=6,TT_Distortion=7} TrackType;
-typedef enum {BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7 } BloodType;
-typedef enum {AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5} AudioLogType;
-typedef enum {EnergyType_Battery=0,EnergyType_ChargeStation=1 } EnergyType;
-typedef enum {Handedness_Center=0,Handedness_LH=1,Handedness_RH=2} Handedness;
-typedef enum {FSTP_None=0,FSTP_Carpet=1,FSTP_Concrete=2,FSTP_GrittyCrete=3,FSTP_Grass=4,FSTP_Gravel=5,FSTP_Rock=6,FSTP_Glass=7,FSTP_Marble=8,FSTP_Metal=9,FSTP_Grate=10,FSTP_Metal2=11,FSTP_Metpanel=12,FSTP_Panel=13,FSTP_Plaster=14,FSTP_Plastic=15,
-              FSTP_Plastic2=16,FSTP_Rubber=17,FSTP_Sand=18,FSTP_Squish=19,FSTP_Vent=20,FSTP_Water=21,FSTP_Wood=22,FSTP_Wood2=23} FootStepType;
-typedef enum {HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7} HUDColor;
-typedef enum {ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4} ForceFieldColor;
-typedef enum {TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9} TabMSG;
-typedef enum {PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3} PuzzleCellType;
-typedef enum {PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5} PuzzleGridType;
-typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox; typedef struct {V3 ctr; float rad;} ShapeSphere; typedef struct {V3 tip,base; float rad;} ShapeCapsule;
-ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i); bool PhysIsAsleep(u16 i);
-enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<<5),L_GunViewModel=(1u<<8),L_Geometry=(1u<<9),L_NPC=(1u<<10),L_PlayerBullets=(1u<<11),L_Player=(1u<<12),L_Corpse=(1u<<13),L_PhysObjects=(1u<<14),
-     L_PlayerTriggerOnly=(1u<<16),L_Trigger=(1u<<17),L_Door=(1u<<18),L_InterDebris=(1u<<19),L_Player2=(1u<<20),L_NPCTrigger=(1u<<23),L_NPCBullet=(1u<<24),L_NPCClip=(1u<<25),L_Clip=(1u<<26),L_Automap=(1u<<27),L_Culling=(1u<<28),L_CorpseSearchable=(1u<<29)};
+typedef enum {BodyState_Standing=0,BodyState_Crouch=1,BodyState_CrouchingDown=2,BodyState_StandingUp=3,BodyState_Prone=4,BodyState_ProningDown=5,BodyState_ProningUp=6} BodyState;  typedef enum {Att_None=0,Att_Melee=1,Att_MlEg=2,Att_Beam=3,Att_Magn=4,Att_HitS=5,Att_PjNd=6,Att_PjBm=7,Att_Ball=8,Att_Gas=9,Att_Trnq=10,Att_Drill=11} AttType;
+typedef enum {NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_MutantCyborg=5,NPCType_Cyber=6} NPCType;                        typedef enum {PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3} PerceptionLevel;
+typedef enum {AIMoveType_Walk=0,AIMoveType_Fly=1,AIMoveType_Swim=2,AIMoveType_Cyber=3,AIMoveType_None=4} AIMoveType;                                                                typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Dead=8,AIState_Inspect=9,AIState_Interacting=10} AIState;
+typedef enum {SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3} SecurityType;                                                            typedef enum {DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3} DoorState;
+typedef enum {FStat_Start=0,FStat_Target=1,FStat_MovingStart=2,FStat_MovingTarget=3,FStat_AjarMovingStart=4,FStat_AjarMovingTarget=5} FuncStates;                                   typedef enum {ACC_None=0,ACC_Std=1,ACC_Med=2,ACC_Sci=3,ACC_Admin=4,ACC_Grp1=5,ACC_Grp2=6,ACC_Grp3=7,ACC_Grp4=8,ACC_GrpA=9,ACC_GrpB=10,ACC_Stor=11,ACC_Eng=12,ACC_Maint=13,ACC_Security=14,ACC_Per1=15,ACC_Per2=16,ACC_Per3=17,ACC_Per4=18,ACC_Per5=19} AccCardType;
+typedef enum {MT_None=0,MT_Walking=1,MT_Combat=2,MT_Override=3} MusicType;                                                                                                          typedef enum {TT_None=0,TT_Walking=1,TT_Combat=2,TT_Revive=3,TT_Die=4,TT_Cybertube=5,TT_Elev=6,TT_Distortion=7} TrackType;
+typedef enum {BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7 } BloodType;   typedef enum {AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5} AudioLogType;
+typedef enum {EnergyType_Battery=0,EnergyType_ChargeStation=1 } EnergyType;            typedef enum {Handedness_Center=0,Handedness_LH=1,Handedness_RH=2} Handedness;               typedef enum {HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7} HUDColor;
+typedef enum {FSTP_None=0,FSTP_Carpet=1,FSTP_Concrete=2,FSTP_GrittyCrete=3,FSTP_Grass=4,FSTP_Gravel=5,FSTP_Rock=6,FSTP_Glass=7,FSTP_Marble=8,FSTP_Metal=9,FSTP_Grate=10,FSTP_Metal2=11,FSTP_Metpanel=12,FSTP_Panel=13,FSTP_Plaster=14,FSTP_Plastic=15,FSTP_Plastic2=16,FSTP_Rubber=17,FSTP_Sand=18,FSTP_Squish=19,FSTP_Vent=20,FSTP_Water=21,FSTP_Wood=22,FSTP_Wood2=23} FootStepType;
+typedef enum {ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4} ForceFieldColor;                            typedef enum {TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9} TabMSG;
+typedef enum {PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3} PuzzleCellType;                                                          typedef enum {PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5} PuzzleGridType;
+typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox; typedef struct {V3 ctr; float rad;} ShapeSphere; typedef struct {V3 tip,base; float rad;} ShapeCapsule; ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i); bool PhysIsAsleep(u16 i);
+enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<<5),L_GunViewModel=(1u<<8),L_Geometry=(1u<<9),L_NPC=(1u<<10),L_PlayerBullets=(1u<<11),L_Player=(1u<<12),L_Corpse=(1u<<13),L_PhysObjects=(1u<<14),L_PlayerTriggerOnly=(1u<<16),L_Trigger=(1u<<17),L_Door=(1u<<18),L_InterDebris=(1u<<19),L_Player2=(1u<<20),L_NPCTrigger=(1u<<23),L_NPCBullet=(1u<<24),L_NPCClip=(1u<<25),L_Clip=(1u<<26),L_Automap=(1u<<27),L_Culling=(1u<<28),L_CorpseSearchable=(1u<<29)};
 #define LMASK_PLAYER_COLLIDESWITH   (L_Clip|L_NPCBullet|L_Player2|L_Door|L_Trigger|L_PlayerTriggerOnly|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_COLLIDESWITH      (L_Clip|L_NPCClip|L_PlayerBullets|L_Player2|L_Player|L_Door|L_Trigger|L_NPCTrigger|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_SIGHT             (L_Default|L_Geometry|L_Door|L_InterDebris|L_PhysObjects|L_Player)
@@ -196,21 +175,12 @@ enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<
 #define LMASK_PLAYER_ATTACK         (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_CorpseSearchable)
 #define LMASK_EXPLOSION             (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_CorpseSearchable)
 #define LMASK_PLAYER_FEET           (L_Default|L_Geometry)
+typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; float ScreenCenterX,ScreenCenterY; bool Fullscreen; u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
+typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,showNPC,editMode; u8 dizzyLevel,animTest; } CheatsSystem; extern CheatsSystem Cheats;
 typedef struct {
-    i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; float ScreenCenterX,ScreenCenterY; bool Fullscreen;
-    u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,
-       QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;
-} SettingsSystem;
-extern SettingsSystem Sys_Settings;
-typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,showNPC,editMode; u8 dizzyLevel,animTest; } CheatsSystem;
-extern CheatsSystem Cheats;
-typedef struct {
-        double vmailFrameFinished,logFinished,blinkFinished,beepFinished,tickFinished,centerTabsTickFinished; i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count;
-        u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8]; u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
-        bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],
-             highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
-        u8 vmailActive;
-        AudioLogType logType; V3 objectInUsePos;
+        double vmailFrameFinished,logFinished,blinkFinished,beepFinished,tickFinished,centerTabsTickFinished; i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count; u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8]; u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
+        bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
+        u8 vmailActive; AudioLogType logType; V3 objectInUsePos;
 } SystemUI;
 typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
 extern TextSystem Sys_Text;
@@ -221,28 +191,21 @@ enum{PATCH_BERSERK=1, PATCH_DETOX=2, PATCH_GENIUS=4, PATCH_MEDI=8, PATCH_REFLEX=
 typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
     double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,jumpJetFinished,noiseFinished,radBleedFinished,
            leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished,fatigueBleedoffFinished,fatigueMoveFinished,footstepFinished,rustleFinished,fallPainFinished,ressurectingFinished;
-    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,
-          radAdjust,initialRadiation,weaponDipLerp,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity,leanVelocity,lastVelY;
+    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,radAdjust,initialRadiation,weaponDipLerp,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity,leanVelocity,lastVelY;
     u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
-    i32 lastAddedIndex,emailCurrent,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent/*Current slot in the general inventory (14 slots).*/,hardwareInvIndex/*Current index to the item look-up table.*/,
-        generalInventoryIndexRef[14],berserkIncrement;
+    i32 lastAddedIndex,emailCurrent,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent/*Current slot in the general inventory (14 slots).*/,hardwareInvIndex/*Current index to the item look-up table.*/,generalInventoryIndexRef[14],berserkIncrement;
     i16 ladderState,weaponCurrentPending,weaponIndexPending,weaponCurrent;
     u16 hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustIdx,heldAmmo,heldAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustIdx[14],patchActive,drainJPM;
-    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hwVers[HW_COUNT],hwVersSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenCur,generalInvCurrent,patchCur,
-       patchCounts[7],cyberItemIndex;
+    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hwVers[HW_COUNT],hwVersSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenCur,generalInvCurrent,patchCur,patchCounts[7],cyberItemIndex;
     bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData,radiationArea,leanResetting,wasGrounded;
 } InventorySystem;
-typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData;
-typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData; // For use with LiveSplit or other future speedrunner utilities for doing speedruns
-extern AutoSplitterData autoSplitter;
+typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData; typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/ extern AutoSplitterData autoSplitter;
 typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 extern CamView camViews[64],levelCamViews[14][64]; extern u8 camViewCount,levelCamViewCount[14]; extern u32 camViewTextures[64],levelCamViewTextures[14][64];
 typedef struct { // MUST PRESERVE ORDER TO MATCH TABLE!!
         const char* name; AttType attackType,attackType2,attackType3; float damage,damage2,damage3,range,range2,range3,health,healthForCyberNPC; PerceptionLevel perception; float disruptability,armorvalue,defense; AIMoveType moveType;
-        float yawSpeed,fov,fovAttack,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack1Speed,attack2Speed,attack3Speed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToActualAttack1,timeToActualAttack2,
-              timeToActualAttack3,timeBetweenAttack1,timeBetweenAttack2,timeBetweenAttack3,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax,timeAttack1WaitMin,timeAttack1WaitMax,timeAttack1WaitChance,timeAttack2WaitMin,timeAttack2WaitMax,timeAttack2WaitChance,timeAttack3WaitMin,timeAttack3WaitMax,timeAttack3WaitChance;
-        int attack1ProjectileLaunchedType/*Unused*/,attack2ProjectileLaunchedType/*Unused*/,attack3ProjectileLaunchedType/*Unused*/; float projectileSpeedAttack1,projectileSpeedAttack2,projectileSpeedAttack3;
-        bool hasLaserOnAttack1,hasLaserOnAttack2,hasLaserOnAttack3,explodeOnAttack3,preactivateMeleeColliders;/*Unused*/ double huntTime; float flightHeight; bool flightHeightIsPercentage,switchMaterialOnDeath;
+        float yawSpeed,fov,fovAttack,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack1Speed,attack2Speed,attack3Speed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToActualAttack1,timeToActualAttack2,timeToActualAttack3,timeBetweenAttack1,timeBetweenAttack2,timeBetweenAttack3,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax,timeAttack1WaitMin,timeAttack1WaitMax,timeAttack1WaitChance,timeAttack2WaitMin,timeAttack2WaitMax,timeAttack2WaitChance,timeAttack3WaitMin,timeAttack3WaitMax,timeAttack3WaitChance;
+        int attack1ProjectileLaunchedType/*Unused*/,attack2ProjectileLaunchedType/*Unused*/,attack3ProjectileLaunchedType/*Unused*/; float projectileSpeedAttack1,projectileSpeedAttack2,projectileSpeedAttack3; bool hasLaserOnAttack1,hasLaserOnAttack2,hasLaserOnAttack3,explodeOnAttack3,preactivateMeleeColliders;/*Unused*/ double huntTime; float flightHeight; bool flightHeightIsPercentage,switchMaterialOnDeath;
         float hearingRange,timeForTranquilization; bool hopsOnMove; NPCType type; int projectile1Prefab,projectile2Prefab,projectile3Prefab;
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
@@ -263,46 +226,33 @@ typedef /*FAT*/ struct  {
     V3 accumulatedForce,currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;    
     u16 enemy,messageIndex,teleportID,targetDestinationID,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,usableCustIdx,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx;
     i16 version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[4],randomItemCustIdx[4];
-    bool searchableInUse,dontReset,onlyOnce,allDone,currentTexture,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,
-         forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,textureGlowAnimating,textureAnimationStopsAtDead,texAnimInReverse,texAnimRandom,automapHidden,blocked,ajar;
+    bool srchInUse,dontReset,onlyOnce,allDone,curTex,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,textureGlowAnimating,texAnimStopsAtDie,texAnimInReverse,texAnimRandom,automapHidden,blocked,ajar;
     AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; char texAnimResourceFolder[TARG_STRLEN];
 } Entity; // phew what a porker of a struct, it's been a eatin!
 typedef struct {
-    u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed;
-    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount/*Numbers of instances of entities and lights loaded (always for just the current level)*/,shd1,shd2,shd3,shd4/*ShieldGenerators on this level*/,weaponVModelIndex,TeleportTouch_allTeleportTouches[8];
-    V3 weaponViewOffset; // Debug offset for weapon view model
+    u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_COUNT];
+    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shd1,shd2,shd3,shd4,weaponVModelIndex,TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS];
     float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS];
     double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp; float painStaticAlpha,empStaticAlpha;
     double gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs;
-    i32 fogFac,cursorPos_x,cursorPos_y; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
-    V3 debugLine_start,debugLine_end,cyberspaceRecallPoint;
+    i32 fogFac,cursorPos_x,cursorPos_y/*Separate internal cursor from system cursor.  Relatively pushed around by real cursor movement to give consistent platform behavior.*/,currentMouse_dx,currentMouse_dy;
     u32 missionBits/*QB_ bitmask, info_mission*/; bool questNotesActive[18],questNotesChecked[18];
-    u8 physSleep[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,numLevels,curLev,creditsPageIndex;
-    u8 diffCbt,diffPuz,diffMis,diffCyb,lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode,currentLevel; // Which level's per-level arrays the pointers (instances, position, etc.) currently point to.  Usually curLev, but diverges briefly during cross-level target I/O.
-    u8 levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levelCameraDestroyedCount[MAX_LEVELS],levelSmallNodeDestroyedCount[MAX_LEVELS],levelLargeNodeDestroyedCount[MAX_LEVELS];
-    bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive;
-    InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music;
-    Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
-    V3 levelPosition[MAX_LEVELS][INSTANCE_COUNT],levelScale[MAX_LEVELS][INSTANCE_COUNT],levelVelocity[MAX_LEVELS][INSTANCE_COUNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT],levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT],levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]/*xyz for Box,x=Sph r,else xyz for Capsule r,h,dir(0=X,1=Y,2=Z)*/,levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
-    ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT];
-    Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
-    u32 levelLayer[MAX_LEVELS][INSTANCE_COUNT];
+    u8 physSleep[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,numLevels,curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode,currentLevel,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
+    bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,*invTnsrValid,*colliding,targetIOActive;
+    InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
+    V3 debugLine_start,debugLine_end,cyberspaceRecallPoint,levelPosition[MAX_LEVELS][INSTANCE_COUNT],levelScale[MAX_LEVELS][INSTANCE_COUNT],levelVelocity[MAX_LEVELS][INSTANCE_COUNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT],levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT],levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]/*xyz for Box,x=Sph r,else xyz for Capsule r,h,dir(0=X,1=Y,2=Z)*/,levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
+    ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT]; Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
     float levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
     bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT],levelColliding[MAX_LEVELS][INSTANCE_COUNT];
-    u16 levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS];
     Light levelLights[MAX_LEVELS][LIGHT_COUNT]; LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT];
     Entity* instances; V3* position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize; ColliderType* col; Quaternion* rotation; u32* layer,targetIOActivatorIoflags; float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
-    i32 currentMouse_dx,currentMouse_dy; bool *invTnsrValid,*colliding,targetIOActive; Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
+    Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
     char playerName[27],audiologNames[LOGCNT][T_LOGSTR_MAX],audiologSubjects[LOGCNT][T_LOGSTR_MAX],audiologSenders[LOGCNT][T_LOGSTR_MAX],audioLogSpeech2Text[LOGCNT][T_LOGSTR_MAX];
 } GlobalContext; // Savable complete game state data
-extern GlobalContext World;
-extern float modelMatrices[INSTANCE_COUNT*16]; extern float *world_from_mdl; extern u16** modelTriangles; extern u32 modelVertexCounts[MAX_MDLS]; extern u16 modelTriangleCounts[MAX_MDLS]; extern float modelBounds[MAX_MDLS]; extern u16 mdlsCnt; extern u32 globalframe;
-extern float **physPos; extern u16** physTris; extern u32* physVertCounts; extern u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; extern u32 uniqueCvxMeshCount;
-extern u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; extern u16* cvxAdjLists[MAX_UNIQUE_CVX_MESHES]; extern u16 cvxAdjStart[MAX_UNIQUE_CVX_MESHES]; extern BvhNode** modelBVHNodes; extern u16** modelBVHTriOrder; extern u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
-extern u16 playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; extern AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; extern i32 threadCnt;
-extern u32 vbos[MAX_MDLS],tbos[MAX_MDLS]; extern FHandle console_log_file; extern u32 drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID;
-extern u32 shadowmapIndirectionList[LIGHT_COUNT];
-extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
+extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS];
+extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,vbos[MAX_MDLS],tbos[MAX_MDLS],drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_COUNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES],modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
+extern u16 mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],**modelBVHTriOrder,playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris;
+extern AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; extern BvhNode** modelBVHNodes; extern FHandle console_log_file; extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
 extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile; extern u16 fwParentOf[INSTANCE_COUNT];/*instance -> owning func_wall mover_target, 0 == none*/ extern const char* audioLogs[LOGCNT]; extern u32 gridCellStates[ARRSIZE]; extern double tWrnFinished[10];
 extern float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16]; extern V3 ressurectionLocations[]; extern void PlayTrack(TrackType,MusicType);
@@ -312,7 +262,7 @@ extern bool instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAX_TXRS],tran
 typedef struct { int width,height; u8* pixels; } WinSysIcon;
 RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
 u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
-double get_time(); float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData);
+double get_time(); float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),Tranquilize(u16 i, float amount, bool energy);
 void UseTargets(u16,u16),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),DebugRAM(const char*), DebugRAMPeak(void), DebugRAMBreakdown(void),
      play_wav(const char*,float,V3,bool),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
@@ -362,32 +312,15 @@ INLINE V3 V3_Normalize(V3 v) { float len_sq = V3_dot(v,v); if (len_sq < 0.000001
 INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2){float aw=q1.w,ax=q1.x,ay=q1.y,az=q1.z,bw=q2.w,bx=q2.x,by=q2.y,bz=q2.z; return (Quaternion){aw*bx+ax*bw+ay*bz-az*by,aw*by-ax*bz+ay*bw+az*bx,aw*bz+ax*by-ay*bx+az*bw,aw*bw-ax*bx-ay*by-az*bz};}
 INLINE V3 quat_rot_v3(Quaternion q, V3 v) {float x=q.x,y=q.y,z=q.z,w=q.w; float vx=v.x,vy=v.y,vz=v.z; float tx=2.0f*(y*vz-z*vy); float ty=2.0f*(z*vx-x*vz); float tz=2.0f*(x*vy-y*vx); return (V3){vx+w*tx+(y*tz-z*ty),vy+w*ty+(z*tx-x*tz),vz+w*tz+(x*ty-y*tx)};}
 // Game Typechecks (what, it's simple, don't hate it, just does the thing)
-INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }
-INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
-INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 760); }
-INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
-INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }
-INLINE bool IdxIsLightStaticSaveable(int c) { return c == 748; }
-INLINE bool IdxIsGenericTransform(int c) { return c == 749; }
-INLINE bool IdxIsNPC(int c) { return (c >= 419 && c <= 447); }
-INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
-INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }
-INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); }
-INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
-INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
-INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
-INLINE bool IdxIsAccessCard(u16 c) { return (c == 341 || c == 388 || (c >= 390 && c <= 398) || c == 417); }
-INLINE bool IdxIsGenericItem(u16 c) { return (c >= 307 && c <= 312) || c == 340 || c == 342 || (c >= 359 && c <= 366) || c == 368 || c == 369 || c == 371 || (c >= 399 && c <= 401); }
+INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }    INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }/*All doors except see-through doors.*/ INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 760); }  INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
+INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }            INLINE bool IdxIsLightStaticSaveable(int c) { return c == 748; }   INLINE bool IdxIsGenericTransform(int c) { return c == 749; }                                                                        INLINE bool IdxIsNPC(int c) { return (c >= 419 && c <= 447); }   INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
+INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }     INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); } INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }                                    INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
+INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }                                                        INLINE bool IdxIsAccessCard(u16 c) { return (c == 341 || c == 388 || (c >= 390 && c <= 398) || c == 417); }                          INLINE bool IdxIsGenericItem(u16 c) { return (c >= 307 && c <= 312) || c == 340 || c == 342 || (c >= 359 && c <= 366) || c == 368 || c == 369 || c == 371 || (c >= 399 && c <= 401); }
 INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 406) || c == 417 || (c >= 419 && c <= 447) || (c >= 458 && c <= 463) || (c >= 471 && c <= 476); }
 INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603)  || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
 INLINE bool IdxIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
-INLINE bool IdxIsWeapon(int c) { return (c >= 343 && c <= 358); }
-INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 343 && i <= 358) ? (i - 343) : -1; }
-INLINE bool IdxIsAudioLog(int c) { return c == 313; }
-INLINE float UsableOrDef(float cur, float def) { u32 c = *(u32*)&cur, d = *(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
-INLINE int UseableFromConst(int c){return c>=307?c-307:c;}
-INLINE int ItemStringIdx(int c){return UseableFromConst(c)+326;}
-INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
+INLINE bool IdxIsWeapon(int c) { return (c >= 343 && c <= 358); }         INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 343 && i <= 358) ? (i - 343) : -1; }                          INLINE bool IdxIsAudioLog(int c) { return c == 313; }                     INLINE float UsableOrDef(float cur, float def){u32 c=*(u32*)&cur,d=*(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
+INLINE int UseableFromConst(int c){return c>=307?c-307:c;}                INLINE int ItemStringIdx(int c){return UseableFromConst(c)+326;}                                                              INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
 INLINE u16 GetImpactType(u16 instanceIdx){switch(World.instances[instanceIdx].bloodType){ case BloodType_None:return 729; case BloodType_Red:return 724; case BloodType_Yellow:return 723; case BloodType_Green:return 722; case BloodType_Robot:return 730; case BloodType_Leaf:return 756; case BloodType_Mutation:return 757; case BloodType_GrayMutation:return 758; } return 729;}
 // Game logic inline helpers
 INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601]); }
@@ -397,12 +330,10 @@ INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.i
 INLINE float SfxVol() { return (float)Sys_Settings.VolumeEffects / 100.0f; }
 INLINE const char* SoundPath(i32 id) { return (id >= 0 && id < (i32)SOUNDS_COUNT) ? sounds[id] : ""; }
 INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ? audioLogs[id] : ""; }
-// GL
-enum {GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,
-      GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,
-      GL_DYNAMIC_DRAW=0x88E8,GL_TRIANGLE_STRIP=0x0005,GL_LESS=0x0201,GL_LEQUAL=0x0203,GL_ONE=1,GL_SRC_ALPHA=0x0302,GL_ONE_MINUS_SRC_ALPHA=0x0303,GL_DST_COLOR=0x0306,GL_ZERO=0,GL_TRUE=1};
+/*GL*/enum{GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,
+           GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8,GL_TRIANGLE_STRIP=0x0005,GL_LESS=0x0201,GL_LEQUAL=0x0203,GL_ONE=1,GL_SRC_ALPHA=0x0302,GL_ONE_MINUS_SRC_ALPHA=0x0303,GL_DST_COLOR=0x0306,GL_ZERO=0,GL_TRUE=1};
 // Particles
-typedef struct PSysDef { V3 pos; u32 textures[16]; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness; Color colorStart,colorEnd; Color rampColors[16]; float rampTimes[16]; u8 rampCount; float scaleKeys[16],scaleTimes[16]; u8 scaleCount; float velKeys[16],velTimes[16]; u8 velCount; float rotKeys[16],rotTimes[16];
+typedef struct PSysDef { V3 pos; u32 textures[16]; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness; Color colStart,colEnd; Color rampColors[16]; float rampTimes[16]; u8 rampCount; float scaleKeys[16],scaleTimes[16]; u8 scaleCount; float velKeys[16],velTimes[16]; u8 velCount; float rotKeys[16],rotTimes[16];
                          u8 rotCount; float emissKeys[16],emissTimes[16]; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd; } PSysDef;
 u16 PSysAdd(const PSysDef*);
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
@@ -435,26 +366,8 @@ INLINE void flag_set(u32 *flags, u32 bit, bool state) { *flags = (*flags & ~bit)
 INLINE bool BvhHasBVH(u16 m) { return (m < MAX_MDLS && modelBVHNodeCounts[m] && modelBVHNodes[m] != NULL); }
 INLINE float fast_atof(const char** p) { const char* c=*p; while (*c == ' ' || *c == '\t') {c++;} float s=1.0f; if(*c == '-'){s=-1.0f; c++;} float v=0.0f; while (*c >= '0' && *c <= '9') { v=v * 10.0f + (*c - '0'); c++; } if (*c == '.') { c++; float sub=0.1f; while (*c >= '0' && *c <= '9') { v += (*c - '0') * sub; sub*=0.1f; c++; } } *p=c; return s * v; }
 INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *c == '\t') {c++;} i32 s=1; if(*c == '-'){s=-1; c++;} i32 v = 0; while (*c >= '0' && *c <= '9') { v = v * 10 + (*c - '0'); c++; } *p = c; return v * s; }
-void *mcpy(void *dst, const void *src, size_t n), *mset(void *dst, int c, size_t n);
-i32 PosGetCellCoordX(float x), PosGetCellCoordZ(float z), PosGetCellCoords(float x, float z);
-u32 PosGetCellCoordsP(i32 cx, i32 cz);
-size_t slen(const char* s);
-char* data_parser_trim(char* s);
-i32 s2i32(const char *str);
-bool cEmpty(const char),sEmpty(const char*),sEqual(const char*,const char*);
-int sCompUpToLen(const char* s1, const char* s2, size_t n);
-void scpy_to_a_from_b(char* a, const char* b, size_t bufsz),sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz),sCat(char* a, const char* b, size_t bufsz);
-char c2Lower(const char c), *sFindSub(const char* s, const char* sub),*StringFindFirstCharWithin(const char *s, char c);
-const char* StringFindLastChar(const char* str, const char c);
-void double2str(char* dest, double value, int decs, size_t bufsz);
-int sFormatV(char* buf, size_t bufsz, const char* f, va_list args), sFormat(char* buffer, size_t bufsz, const char* format, ...);
-char* sUpToEndLine(char* buf, int sz, FHandle fd);
-void PrintLog(const char*, ...),DualLog(const char*, ...),DualLogWarn(const char*, ...),DualLogError(const char*, ...),CenterStatusPrint(const char* restrict, ...),BmpWrite(char const*,int,int,const void*),DebugRAM(const char*), Screenshot();
-extern char statusText[T_BUFFER_SIZE]; u8 random_range_u8(u8,u8); u32 random_range_u32(u32,u32); i32 random_range_i32(i32,i32); float random_range(float,float); u32 rand(); float lerp(float,float,float),inverse_lerp(float,float,float);
-char* sLevelFileUpToEndLine(char* buf, int size);
-void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp);
-size_t GetMaxCompressedSize(size_t srcSize);
-size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity);
-size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity);
-INLINE  int  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; } // memcmp replacement
-INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; } // memmove replacement
+void *mcpy(void *dst, const void *src, size_t n), *mset(void *dst, int c, size_t n); i32 PosGetCellCoordX(float x), PosGetCellCoordZ(float z), PosGetCellCoords(float x, float z); u32 PosGetCellCoordsP(i32 cx, i32 cz); size_t slen(const char* s); char* data_parser_trim(char* s); i32 s2i32(const char *str); bool cEmpty(const char),sEmpty(const char*),sEqual(const char*,const char*); int sCompUpToLen(const char* s1, const char* s2, size_t n);
+void scpy_to_a_from_b(char* a, const char* b, size_t bufsz),sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz),sCat(char* a, const char* b, size_t bufsz); char c2Lower(const char c), *sFindSub(const char* s, const char* sub),*StringFindFirstCharWithin(const char *s, char c); const char* StringFindLastChar(const char* str, const char c); void double2str(char* dest, double value, int decs, size_t bufsz);
+int sFormatV(char* buf, size_t bufsz, const char* f, va_list args), sFormat(char* buffer, size_t bufsz, const char* format, ...); char* sUpToEndLine(char* buf, int sz, FHandle fd); void PrintLog(const char*, ...),DualLog(const char*, ...),DualLogWarn(const char*, ...),DualLogError(const char*, ...),CenterStatusPrint(const char* restrict, ...),BmpWrite(char const*,int,int,const void*),DebugRAM(const char*), Screenshot();
+extern char statusText[T_BUFFER_SIZE]; u8 random_range_u8(u8,u8); u32 random_range_u32(u32,u32); i32 random_range_i32(i32,i32); float random_range(float,float); u32 rand(); float lerp(float,float,float),inverse_lerp(float,float,float); char* sLevelFileUpToEndLine(char* buf, int size); void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp);
+INLINE  int  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; }/*memcmp replacement*/ INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; }/*memmove replacement*/

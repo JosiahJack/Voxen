@@ -628,7 +628,6 @@ void LoadLevelMod(u8 lev) {
         World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; // hidden until weapon equipped
         World.weaponVModelIndex=wvi; World.instCount++;
     }
-    World.weaponViewOffset = (V3){0,0,0}; // reset debug offset each level
 }
 #undef KEY_EQ
 void func_forcebridge(u16 self); void CyberWallInitAfterLoad(u16 self); void FuncWallInitAfterLoad(u16); void LogicTimerInitBeforeLoad(u16); void ButtonSwitchInitAfterLoad(u16);
@@ -717,6 +716,24 @@ void LoadLevel(u8 curlevel, V3 pos) {
 #pragma pack(push, 1)
 typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compressedSize; char savename[48]; } SaveHeader;
 #pragma pack(pop)
+size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
+size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Find and pop the zeroes bubbles.  Turns an otherwise 232mb save file into ~23mb.
+    size_t s = 0, d = 0;
+    while (s < srcSize) {/*1. Hunt for Zeros*/
+        size_t zeroCount = 0; while (s + zeroCount < srcSize && src[s + zeroCount] == 0) { zeroCount++; } if(zeroCount > 0){if(zeroCount < 128){if (d >= dstCapacity){return 0;} dst[d++]=(u8)(0x80 + (zeroCount-1));}else{if(d + 5 > dstCapacity){return 0;} dst[d++] = 0xFF; u32 zCount32=(u32)zeroCount; mcpy(&dst[d],&zCount32,sizeof(u32)); d+=4;} s+=zeroCount; continue; }
+        size_t litCount = 0;/*2. Process Literal Data (Non-Zeros). It costs 2 bytes of overhead to break a literal run to compress 1 or 2 zeros. Only break a literal run if 3 or more zeros ahead.*/ while (s + litCount < srcSize && litCount < 128) { if (src[s + litCount] == 0) { size_t remain = srcSize - (s + litCount); if (remain >= 3 && src[s + litCount + 1] == 0 && src[s + litCount + 2] == 0) { break; } } litCount++; }
+        if (litCount > 0) { if (d + 1 + litCount > dstCapacity) {return 0;} dst[d++] = (u8)(litCount - 1); mcpy(&dst[d], &src[s], litCount); s += litCount; d += litCount; }
+    } return d;
+}
+
+size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Put the bubbles of zero back.
+    size_t s = 0, d = 0;
+    while (s < srcSize && d < dstCapacity) {
+        u8 cmd=src[s++];
+        if (cmd<128){size_t litCount=cmd+1; if(s + litCount>srcSize || d+litCount>dstCapacity){return 0;} mcpy(&dst[d],&src[s],litCount); s+=litCount; d+=litCount;}/*Literal Run*/else if(cmd<0xFF){size_t zeroCount=cmd-128+1; if(d+zeroCount>dstCapacity){return 0;} mset(&dst[d],0,zeroCount); d+=zeroCount;}/*Short 0 Run*/else{if(s+4>srcSize){return 0;} u32 zeroCount; mcpy(&zeroCount,&src[s],sizeof(u32)); s+=4; if(d+zeroCount>dstCapacity){return 0;} mset(&dst[d], 0, zeroCount); d += zeroCount; }/*Long 0 Run*/
+    } return d;
+}
+
 void SaveGame(u8 slot, const char* savename) {
     if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenWriteonly(path); if(fd == (FHandle)-1){return;} size_t sz=sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b=OS_Alloc(maxCompSize); size_t finalCompSize=VoidSquasher((const u8*)&World,sz,b,maxCompSize);
     if (finalCompSize > 0) { SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=4, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize}; if (savename) { int i=0;   while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;}   header.savename[i]='\0'; } World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot);}

@@ -3,15 +3,12 @@
 #include "credits.h"
 #include "Shaders/shaders.h"
 // Rendering
-u32 inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,
-    colorBufferID,texPalID,texPalOfsID,textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS],psysInstancesID,psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP;
+u32 globalframe=0,globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,
+    textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS],psysInstancesID,psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,modelVertexCounts[MAX_MDLS],*physVertCounts,threadCnt=1;
 float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 // Entity Management
-float modelMatrices[INSTANCE_COUNT*16];
-float *world_from_mdl = modelMatrices; // Alias for physics collision
-u16** modelTriangles; u32 modelVertexCounts[MAX_MDLS]; u16 modelTriangleCounts[MAX_MDLS]; float modelBounds[MAX_MDLS]; u16 mdlsCnt; float **physPos; u16** physTris; u32* physVertCounts;
+float modelMatrices[INSTANCE_COUNT*16],*world_from_mdl=modelMatrices,modelBounds[MAX_MDLS],**physPos; u16 **modelTriangles,modelTriangleCounts[MAX_MDLS],mdlsCnt,**physTris; u8 currentPlayerNameLength=0; i8 currentMenuItem=0,currentMenuTab=0,menuItemCount=4,menuTabCount=1;
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
-u8 currentPlayerNameLength=0; i8 currentMenuItem=0, currentMenuTab=0, menuItemCount=4, menuTabCount=1; i32 threadCnt=0; u32 globalframe=0,globalframesPerLastSecond;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {5,/*Forward=F*/ 0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/ 23,/*Prone=X*/ 16,/*Lean Left=Q*/ 4,/*Lean Right=E*/ 45,/*Sprint=LSHIFT*/ 38,/*Turn Left=LARROW*/ 39,/*Turn Right=RARROW*/ 36,/*Look Up=UARROW*/ 37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/ 27,/*Sensaround=2*/ 28,/*Lantern=3*/
                           29,/*Shield=4*/ 30,/*Infrared=5*/ 31,/*Email=6*/ 32,/*Booster=7*/ 33,/*Jumpjets=8*/ 56,/*Attack=LMB*/ 57,/*Use=RMB*/ 99,/*Menu/Back=ESCAPE*/ 97,/*Toggle Mode=TAB*/ 17,/*Reload=R*/ 127,/*Weapon+=MWHEEL+*/ 128,/* Weapon-=MWHEEL-*/ 6,/* Grenade=G*/ 19,/*Grenade + = T*/ 131,/*Grenade-=*/ 21,/*Ammo Type=V*/ 9,/*Patch Use=J*/ 8,/*Patch+=I*/ 132,/*Patch-=,*/
@@ -645,20 +642,15 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (World.instances[i].camView != 255) camViews[World.instances[i].camView].visible = true; if (transparentTexture[World.instances[i].texIndex]) { if(tcnt>1023){continue;} tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; } else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
     if (World.shd1 < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4) && opaqueCount < (INSTANCE_COUNT - 4)) { // Add shield generators in skybox.
-        visibleInstances[opaqueCount].index=World.shd1; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++; visibleInstances[opaqueCount].index=World.shd2; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
-        visibleInstances[opaqueCount].index=World.shd3; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++; visibleInstances[opaqueCount].index=World.shd4; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+        visibleInstances[opaqueCount].index=World.shd1; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++; visibleInstances[opaqueCount].index=World.shd2; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++; visibleInstances[opaqueCount].index=World.shd3; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++; visibleInstances[opaqueCount].index=World.shd4; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
     }
-    if (editModeSelection < U16_MAX && Cheats.editMode) {
-        if (transparentTexture[World.instances[editModeSelection].texIndex]) { if(tcnt<=1023){ tmpTransparent[tcnt].index = editModeSelection; tmpTransparent[tcnt].depth = 1.28f; tcnt++;} }
-        else { visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }
-    }
+    if (editModeSelection < U16_MAX && Cheats.editMode) {if (transparentTexture[World.instances[editModeSelection].texIndex]) { if(tcnt<=1023){ tmpTransparent[tcnt].index = editModeSelection; tmpTransparent[tcnt].depth = 1.28f; tcnt++;} }else { visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }}
     mcpy(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort)); glUseProgram(depthPrepassSP); glUniformMatrix4fv(2,1,0,viewProj); glEnable(GL_DEPTH_TEST); glColorMask(0,0,0,0); glDepthMask(1); glDepthFunc(0x0201/*GL_LESS*/); glDisable(GL_BLEND);
     if (opaqueCount > 1) qsort_new(visibleInstances,opaqueCount,sizeof(DepthSort),dsortInv);/*Needed for cutout bushes/foliage*/ if (tcnt > 1) qsort_new(visibleInstances + opaqueCount,tcnt,sizeof(DepthSort),dsort);
     u8 cullBlendState = 0xFF;
     for (u16 visibleIndex = 0; visibleIndex < opaqueCount + tcnt; ++visibleIndex) {
-        u16 i = visibleInstances[visibleIndex].index; Entity* e = &World.instances[i]; u16 tex = e->texIndex;
-        if (unlikely(transparentTexture[tex])) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); }/*Transparents (with sort)*/ else if (unlikely(doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f)) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); }/*Doublesided*/ else { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); }/*Opaque*/
-        currentModelType = GetAndBindModel(i,currentModelType); glUniform1ui(3,(u32)tex); u32 vertCount = modelTriangleCounts[currentModelType] * 3; glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered += vertCount;
+        u16 i=visibleInstances[visibleIndex].index; Entity* e=&World.instances[i]; u16 tex=e->texIndex; if(unlikely(transparentTexture[tex])){glEnable(GL_CULL_FACE); glEnable(GL_BLEND);}/*Transparents (with sort)*/ else if(unlikely(doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f)){glDisable(GL_CULL_FACE); glEnable(GL_BLEND);}/*Doublesided*/ else{glEnable(GL_CULL_FACE); glDisable(GL_BLEND);}/*Opaque*/
+        currentModelType=GetAndBindModel(i,currentModelType); glUniform1ui(3,(u32)tex); u32 vertCount = modelTriangleCounts[currentModelType] * 3; glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered += vertCount;
     }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][2]);
     glUseProgram(chunkSP); glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u);/*default constIndex*/ cullBlendState = 0xFF;
@@ -679,12 +671,11 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (unlikely((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573))) glDepthFunc(0x0202/*GL_EQUAL*/); /*Cutouts*/ else glDepthFunc(0x0203/*GL_LEQUAL*/); /*Actual alphas*/
         DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,grayscaleEnabled);
     }
-    
     u16 wvi = World.weaponVModelIndex;
     if (wvi > 0 && wvi < INSTANCE_COUNT) {
         int wep16 = Get16WeaponIndexFromConstIndex(World.instances[wvi].index);
         if (wep16 >= 0 && wep16 < 16 && World.instances[wvi].modelIndex < MAX_MDLS) { // Offset in player-local space (right,down,forward), rotated into world by the player view; reload/swap dip added on Y.  Pivot = player position, weapon stays locked to view.
-            World.weaponViewOffset = vWepOfs[wep16]; World.weaponViewOffset.y += wfx.reloadContainerPos.y; V3 weaponPos = V3_AplusB(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1], World.weaponViewOffset)); World.position[wvi] = weaponPos; World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1],vWepRot[wep16]); // view orientation + per-model correction
+            V3 weaponViewOffset=vWepOfs[wep16]; weaponViewOffset.y += wfx.reloadContainerPos.y; V3 weaponPos = V3_AplusB(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1],weaponViewOffset)); World.position[wvi] = weaponPos; World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1],vWepRot[wep16]); // view orientation + per-model correction
             u16 curN=0, curT=0, curG=0, curS=0, curM=0; DrawEntity(&World.instances[wvi],wvi,World.instances[wvi].index,World.instances[wvi].texIndex,&curN,&curT,&curG,&curS,&curM,false);
         }
     }
@@ -785,8 +776,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
     } DebugRAM("after edge adjacency");
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u); World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u); World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
-    { PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAX_TXRS},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colorStart=(Color){1,0,0,1},.colorEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
-    { PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAX_TXRS},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colorStart=(Color){1,1,1,1},.colorEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
+    { PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAX_TXRS},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colStart=(Color){1,0,0,1},.colEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
+    { PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAX_TXRS},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
     //TESTING TODO REMOVE! AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
 }

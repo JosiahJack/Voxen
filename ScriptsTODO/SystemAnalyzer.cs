@@ -50,8 +50,8 @@ public class SystemAnalyzer : MonoBehaviour {
 		for (int i=0;i<14;i++) {
 			nodeCount += LevelManager.a.levelSmallNodeCount[i];
 			nodeCount += LevelManager.a.levelLargeNodeCount[i];
-			nodeCount -= LevelManager.a.levelSmallNodeDestroyedCount[i];
-			nodeCount -= LevelManager.a.levelLargeNodeDestroyedCount[i];
+			nodeCount -= LevelManager.a.levSmNodeDestroyedCnt[i];
+			nodeCount -= LevelManager.a.levNodeDestroyedCnt[i];
 		}
 		processor.text = nodeCount.ToString();
 		descProgram.text = Text->stringTable[480];
