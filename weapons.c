@@ -118,7 +118,7 @@ void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev
 }
 
 void StartWeaponDip(float delay) { if (delay < 0.0f) {delay = 0.0f;} World.invP1.reloadFinished = World.pauseRelativeTime + delay; lerpStartTime = World.pauseRelativeTime; }
-extern V3 vWepOfs[16];
+extern V3 vWepOfs[16]; extern bool editFieldEditing; extern bool EditPanelPointerHover(void);
 void UpdateWeaponReloadDip() {
     int i = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
     if (i < 0 || i > 15) {i = 0;}
@@ -268,6 +268,7 @@ void StartNormalAttack(int wep16) { if ((wep16 < 0 || wep16 > 15) || (World.invP
 extern u16 editModeTestEntityDefinition;
 void CheckAttackInput(void) {
     if(!Attack()){return;} if(World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive=0; return;}
+    if (editFieldEditing || EditPanelPointerHover()) { return; }
     if (Cheats.editMode/*TODO use submode of editMode instead for spamming physobjects for fun and testing physics*/){World.invP1.holdingObject = true; World.invP1.heldObjectIndex = editModeTestEntityDefinition;}
     if (World.invP1.holdingObject && !World.mouseClickHeldOverGUI) { if (World.uiIsBlocking) { DropHeldItem(); return; } AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); return; }
     int w = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);

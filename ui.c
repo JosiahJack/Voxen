@@ -330,9 +330,52 @@ static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static con
 i32 tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10]; double tWrnFinished[10];
 void AppendTextWarning(i32 sidx, i32 sidx2, i32 sidx3, i32 col, i32 id) { tWrnTextIdx[id]=sidx; tWrnTextIdx2[id]=sidx2; tWrnTextIdx3[id]=sidx3; tWrnFinished[id]=tWrnFinished[id] < World.pauseRelativeTime ? World.pauseRelativeTime + 0.1f : tWrnFinished[id] + 0.1f; tWrnColorIdx[id] = col; }
 extern double game_actual_start_time; extern u16 editModeTestEntityDefinition;
+// Edit-mode info panel text editing (console-style entry)
+enum { EF_POSX,EF_POSY,EF_POSZ,EF_ROTX,EF_ROTY,EF_ROTZ,EF_ROTW,EF_SCLX,EF_SCLY,EF_SCLZ,EF_TEX,EF_MODEL,EF_GLOW,EF_SPEC,EF_NORM,EF_LAST };
+bool editFieldEditing=false; static u8 editFieldSlot=EF_LAST; static char editFieldBuffer[40]={0};
+#define EF_LABELX 982
+#define EF_VALUEX 1088
+static const i16 efRowY[EF_LAST]={160,188,216,244,272,300,328,356,384,412,440,468,496,524,552};
+static const char* efRowLabel[EF_LAST]={"position x","position y","position z","rotation x","rotation y","rotation z","rotation w","scale x","scale y","scale z","texIndex","modelIndex","glowIndex","specIndex","normIndex"};
+extern Quaternion quat_normalize(Quaternion);
+static void EditFieldValueText(u8 slot,u16 sel,char* out,size_t n){switch(slot){
+    case EF_POSX:sFormat(out,n,"%.2f",World.position[sel].x);break; case EF_POSY:sFormat(out,n,"%.2f",World.position[sel].y);break; case EF_POSZ:sFormat(out,n,"%.2f",World.position[sel].z);break;
+    case EF_ROTX:sFormat(out,n,"%.3f",World.rotation[sel].x);break; case EF_ROTY:sFormat(out,n,"%.3f",World.rotation[sel].y);break; case EF_ROTZ:sFormat(out,n,"%.3f",World.rotation[sel].z);break; case EF_ROTW:sFormat(out,n,"%.3f",World.rotation[sel].w);break;
+    case EF_SCLX:sFormat(out,n,"%.2f",World.scale[sel].x);break; case EF_SCLY:sFormat(out,n,"%.2f",World.scale[sel].y);break; case EF_SCLZ:sFormat(out,n,"%.2f",World.scale[sel].z);break;
+    case EF_TEX:sFormat(out,n,"%u",World.instances[sel].texIndex);break; case EF_MODEL:sFormat(out,n,"%u",World.instances[sel].modelIndex);break; case EF_GLOW:sFormat(out,n,"%u",World.instances[sel].glowIndex);break; case EF_SPEC:sFormat(out,n,"%u",World.instances[sel].specIndex);break; case EF_NORM:sFormat(out,n,"%u",World.instances[sel].normIndex);break;
+    default:sFormat(out,n,"");break;}}
+static bool EditSelIsActive(void){return Cheats.editMode&&editModeSelection<U16_MAX&&editModeSelection>=INSTS_1ST_IDX&&editModeSelection<World.instCount&&(World.instances[editModeSelection].entflags&EF_ACTIVE);}
+bool EditPanelPointerHover(void){if(!EditSelIsActive()||!World.inventoryMode)return false;u16 sel=editModeSelection;char v[40];for(int i=0;i<EF_LAST;++i){EditFieldValueText((u8)i,sel,v,40);float w=MeasureLineAdvance(v,FONT_NORMAL);if(World.cursorPos_x>=EF_VALUEX&&World.cursorPos_x<=EF_VALUEX+w&&World.cursorPos_y>=efRowY[i]&&World.cursorPos_y<=efRowY[i]+26)return true;}return false;}
+static void EditStop(void){editFieldEditing=false;editFieldSlot=EF_LAST;}
+static void EditFieldWrite(u16 s,Entity* e,float f,i32 iv){switch(editFieldSlot){
+    case EF_POSX:World.position[s].x=f;break; case EF_POSY:World.position[s].y=f;break; case EF_POSZ:World.position[s].z=f;break;
+    case EF_ROTX:World.rotation[s].x=f;World.rotation[s]=quat_normalize(World.rotation[s]);break; case EF_ROTY:World.rotation[s].y=f;World.rotation[s]=quat_normalize(World.rotation[s]);break; case EF_ROTZ:World.rotation[s].z=f;World.rotation[s]=quat_normalize(World.rotation[s]);break; case EF_ROTW:World.rotation[s].w=f;World.rotation[s]=quat_normalize(World.rotation[s]);break;
+    case EF_SCLX:World.scale[s].x=f;break; case EF_SCLY:World.scale[s].y=f;break; case EF_SCLZ:World.scale[s].z=f;break;
+    case EF_TEX:e->texIndex=(u16)vclamp(iv,0,MAX_TXRS-1);break; case EF_MODEL:e->modelIndex=(u16)vclamp(iv,0,MAX_MDLS-1);break; case EF_GLOW:e->glowIndex=(u16)vclamp(iv,0,MAX_TXRS-1);break; case EF_SPEC:e->specIndex=(u16)vclamp(iv,0,MAX_TXRS-1);break; case EF_NORM:e->normIndex=(u16)vclamp(iv,0,MAX_TXRS-1);break;}
+}
+
+static void EditFieldCommitLive(void){if(!EditSelIsActive())return;u16 s=editModeSelection;Entity* e=&World.instances[s];float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,e,f,s2i32(editFieldBuffer));}
+static void EditFieldStep(float delta){if(!editFieldEditing||!EditSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}
+    if(editFieldSlot<EF_TEX){int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=(editFieldSlot>=EF_ROTX&&editFieldSlot<=EF_ROTW)?3:2;char fmt[8];sFormat(fmt,8,"%%.%df",prec);sFormat(editFieldBuffer,40,fmt,cur);}
+    else{int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);i32 iv=(i32)cur+steps;iv=vclamp(iv,0,(editFieldSlot==EF_MODEL?MAX_MDLS-1:MAX_TXRS-1));sFormat(editFieldBuffer,40,"%d",iv);}
+    EditFieldCommitLive();
+}
+
+void EditFieldKey(i32 keycode){if(!editFieldEditing)return;
+    if(keycode==KEY_ESCAPE){EditStop();return;} if(keycode==KEY_ENTER||keycode==KEY_KP_ENTER){EditStop();return;}
+    size_t len=slen(editFieldBuffer); bool changed=false;
+    if(keycode>=KEY_0&&keycode<=KEY_9){if(len<39){editFieldBuffer[len]=(char)('0'+(keycode-KEY_0));editFieldBuffer[len+1]='\0';changed=true;}}
+    else if(keycode>=KEY_KP_0&&keycode<=KEY_KP_9){if(len<39){editFieldBuffer[len]=(char)('0'+(keycode-KEY_KP_0));editFieldBuffer[len+1]='\0';changed=true;}}
+    else if((keycode==KEY_MINUS||keycode==KEY_KP_SUBTRACT)&&len==0){if(len<39){editFieldBuffer[len]='-';editFieldBuffer[len+1]='\0';changed=true;}}
+    else if(keycode==KEY_PERIOD||keycode==KEY_KP_DECIMAL){bool hasdot=false;for(size_t k=0;k<len&&!hasdot;++k)if(editFieldBuffer[k]=='.')hasdot=true;if(!hasdot&&len<39){editFieldBuffer[len]='.';editFieldBuffer[len+1]='\0';changed=true;}}
+    else if(keycode==KEY_BACKSPACE){if(len>0){editFieldBuffer[len-1]='\0';changed=true;}}
+    if(changed)EditFieldCommitLive();
+}
+
 static double RenderUI() {
     drawCallsNormal = drawCalls;
     World.uiIsBlocking = false;
+    if(!EditSelIsActive())editFieldEditing=false;
     if (World.creditsActive) { // Render Credits
         if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed) { ++World.creditsPageIndex; if(World.creditsPageIndex > CREDITS_PAGES){World.creditsActive=false; return get_time();} /*Finished with Erthang!  That's it, go home.*/ }
         if (World.creditsPageIndex == 1) { CreditsStats(); RenderTextL(300,10,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); } else {RenderTextL(300,10,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]);}
@@ -360,6 +403,24 @@ static double RenderUI() {
 //         if (World.Sys_UI.showAutomapFull) { /*AutomapFullRawImage*/ /*PlayerIconFull*/ /*CloseFullmapButton*/ } if (World.Sys_UI.showMissionTimer) { /*MissionTimerT*/ /*MissionTimer*/ }
 //         if (World.Sys_UI.showCyberTimer) { /*CyberTimerT*/ /*CyberTimer*/ }
         if(!Cheats.noHUD){SideMFD(false/*Left*/); CenterMFD(); SideMFD(true/*Right*/);} // MFD
+        if (EditSelIsActive()) { // Edit mode selection highlight + object info panel
+            u16 sel=editModeSelection; Entity* e=&World.instances[sel];
+            V3 f=World.instances[PLAYER1].forward,rt=World.instances[PLAYER1].right,ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(rt,ff)),d=V3_AsubB(World.position[sel],World.position[PLAYER1]); float bz=V3_dot(d,f);
+            if (bz > 0.01f) { float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),k=384.0f/(bz*tanFov); float sx=683.0f+V3_dot(d,rt)*k, sy=384.0f-V3_dot(d,up)*k; if (sx > -48.0f && sx < 1414.0f && sy > -48.0f && sy < 816.0f) RenderUIImage((i16)(sx-24.0f),(i16)(sy-24.0f),48,48,1051); }
+            RenderUIImage(966,84,400,600,1025); // Edit object info panel bg
+            RenderTextL(EF_LABELX,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT OBJECT #%u",sel); {char v[40];sFormat(v,40,"%u",e->index);RenderTextL(EF_LABELX,132,T_GREEN,FONT_NORMAL,1.0f,"const index");RenderTextL(EF_VALUEX,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
+            for(int i=0;i<EF_LAST;++i){u8 slot=(u8)i;i16 y=efRowY[i];char v[40];EditFieldValueText(slot,sel,v,40);
+                bool editingThis=editFieldEditing&&editFieldSlot==slot; RenderTextL(EF_LABELX,y,editingThis?T_RED:T_GREEN,FONT_NORMAL,1.0f,"%s",efRowLabel[i]); 
+                if(editingThis){char buf[44];sFormat(buf,44,"%s%s",editFieldBuffer,caretOn?"|":"");RenderTextL(EF_VALUEX,y,T_RED,FONT_NORMAL,1.0f,"%s",buf);}
+                else {
+                    float w=MeasureLineAdvance(v,FONT_NORMAL);bool hov=World.inventoryMode&&World.cursorPos_x>=EF_VALUEX&&World.cursorPos_x<=EF_VALUEX+w&&World.cursorPos_y>=y&&World.cursorPos_y<=y+26; 
+                    if(hov){World.uiIsBlocking=true;if(!editFieldEditing&&(Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed||Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed)){sFormat(editFieldBuffer,40,"%s",v);editFieldSlot=slot;editFieldEditing=true;Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false;}} 
+                    RenderTextL(EF_VALUEX,y,hov?T_YELLOW:(i<EF_TEX?T_WHITE:T_GREEN),FONT_NORMAL,1.0f,"%s",v);
+                }
+            }
+            if(editFieldEditing&&Sys_Input.scrollDelta!=0.0f){EditFieldStep((float)Sys_Input.scrollDelta);Sys_Input.scrollDelta=0.0f;}
+            if(sel==World.weaponVModelIndex){int wep16=Get16WeaponIndexFromConstIndex(e->index);if(wep16>=0&&wep16<16){V3 offs=vWepOfs[wep16];offs.y+=wfx.reloadContainerPos.y;RenderTextL(EF_LABELX,580,T_GREEN,FONT_NORMAL,1.0f,"vm offset");RenderTextL(EF_VALUEX,580,T_YELLOW,FONT_NORMAL,1.0f,"%.2f %.2f %.2f",offs.x,offs.y,offs.z);}}
+        }
     }
     if (World.Sys_UI.vmailActive) {
         if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[World.Sys_UI.vmailActive]) {

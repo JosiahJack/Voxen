@@ -355,11 +355,11 @@ void TextEntry(i32 k) {
     char c = (k >= KEY_A && k <= KEY_Z) ? 'a' + (k - KEY_A) : ((k >= KEY_1 && k <= KEY_9) ? '1' + (k - KEY_1) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { World.playerName[currentPlayerNameLength] = c; World.playerName[++currentPlayerNameLength] = '\0'; }
 }
 
-void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName;
+void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName; extern bool editFieldEditing; extern void EditFieldKey(i32 keycode);
 void InputKey(char* keys,int key,int action) {
     if (key >= 0 && key <= 348) { i32 repeated=0; if(action == INPUT_RELEASE && keys[key] == INPUT_RELEASE){return;} if (action == INPUT_PRESS && keys[key] == INPUT_PRESS){repeated=1;} keys[key]=(char)action; if(repeated){action=INPUT_REPEAT;} } if (!window_has_focus) return; if (key == KEY_F10 && action) OS_Exit(0);
     if (World.menuActive && !returnToPause) { if (((key == KEY_RIGHT_ALT || key == KEY_LEFT_ALT) && action && Sys_Input.keyStates[KEY_ENTER].down) || (key == KEY_ENTER && action && (Sys_Input.keyStates[KEY_LEFT_ALT].down || Sys_Input.keyStates[KEY_RIGHT_ALT].down))){GoIntoGame();} }
-    if (key >=0 && key < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {Sys_Input.keyStates[key].down = true; if (action == INPUT_PRESS) Sys_Input.keyStates[key].pressed = true; else Sys_Input.keyStates[key].pressed = false; if (Cheats.consoleActive) ConsoleEmulator(key); else if (enteringPlayerName && World.menuActive) TextEntry(key);}
+    if (key >=0 && key < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {Sys_Input.keyStates[key].down = true; if (action == INPUT_PRESS) Sys_Input.keyStates[key].pressed = true; else Sys_Input.keyStates[key].pressed = false; if (Cheats.consoleActive) ConsoleEmulator(key); else if (editFieldEditing) EditFieldKey(key); else if (enteringPlayerName && World.menuActive) TextEntry(key);}
     else if (key >= 0 && key < MAX_KEYS && action == INPUT_RELEASE) { Sys_Input.keyStates[key].pressed=false; Sys_Input.keyStates[key].down=false; }
 }
 
@@ -387,22 +387,22 @@ bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.p
 void ForceShootMode() { if (Sys_Settings.NoShootMode){return;} if (World.inventoryMode) {World.cursorPos_x=663; World.cursorPos_y=371/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0; World.Sys_UI.vmailActive=false;} }
 void ForceInventoryMode() { if (!World.inventoryMode) {World.inventoryMode = true; World.cursorPos_x = 663; World.cursorPos_y = 371; ignore_next_mouse_delta = true;} } // Centered on UI baseline resolution 1366x768
 void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
-void ToggleConsole() { static bool imWasActPrior = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
+void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float);
 extern u16 editModeTestEntityDefinition;
 void InputProcessing() {
     mouseMovementThisFrame = false; PollEvents();
     if (window_has_focus) {
         if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);
-        if (Sprint() && Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition--; if (editModeTestEntityDefinition < 307) editModeTestEntityDefinition = 767; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
-        else if (Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition++; if (editModeTestEntityDefinition > 767) editModeTestEntityDefinition = 307; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
+        if (Sprint() && Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode && !editFieldEditing) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition--; if (editModeTestEntityDefinition < 307) editModeTestEntityDefinition = 767; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
+        else if (Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode && !editFieldEditing) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition++; if (editModeTestEntityDefinition > 767) editModeTestEntityDefinition = 307; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
         if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; SaveGame(7,"quicksave"); return; }
         if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
         if (Console()) ToggleConsole();
-        if (Menu() && !World.menuActive) { World.paused = !World.paused; return; } if (Menu() && World.menuActive) { MenuGoBack(); return; } if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
+        if (Menu() && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; } if (Menu() && World.menuActive) { MenuGoBack(); return; } if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
         if (ToggleMode()) ToggleInventoryMode(); if (Lantern()) World.invP1.hardwareIsActive ^= HW_LAN; if (Infrared()) World.invP1.hardwareIsActive ^= HW_INF;
-        if (WeaponCycUp() || (GetKeyRiseEdgeOrHeld(127,true) && Sys_Input.scrollDelta > 0)) { CycleWeaponSlot(+1); Sys_Input.scrollDelta = 0; } if (WeaponCycDown() || (GetKeyRiseEdgeOrHeld(128,true) && Sys_Input.scrollDelta < 0)) { CycleWeaponSlot(-1); Sys_Input.scrollDelta = 0; }
+        if (!editFieldEditing && (WeaponCycUp() || (GetKeyRiseEdgeOrHeld(127,true) && Sys_Input.scrollDelta > 0))) { CycleWeaponSlot(+1); Sys_Input.scrollDelta = 0; } if (!editFieldEditing && (WeaponCycDown() || (GetKeyRiseEdgeOrHeld(128,true) && Sys_Input.scrollDelta < 0))) { CycleWeaponSlot(-1); Sys_Input.scrollDelta = 0; }
         ApplyPlayerMovements(World.dt);
         if (!World.paused && !World.menuActive && !World.inventoryMode) { // Apply mouselook/keyboardlook/lean
             float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f; World.cam_yaw += (float)World.currentMouse_dx * s; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if(World.cam_yaw<0.0f){World.cam_yaw+=360.0f;} World.cam_pitch+=(float)World.currentMouse_dy * s; if (World.cam_pitch > 89.0f) {World.cam_pitch = 89.0f;} if (World.cam_pitch < -89.0f) {World.cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg

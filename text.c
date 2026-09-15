@@ -478,7 +478,7 @@ void LoadLogTextForLanguage(u8 lang) {
 }
 
 static float textVertexData[8192]; extern Color textColors[]; enum {TALIGN_LEFT=0,TALIGN_CENTER=1,TALIGN_RIGHT=2};
-static float MeasureLineAdvance(const char* p, u8 fontID) {
+float MeasureLineAdvance(const char* p, u8 fontID) {
     float w=0; int cc=0;
     while (*p) {
         const u8*s=(const u8*)p; u32 cp=0;

@@ -18,7 +18,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
 InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=false, .showFPS=false, .editMode=false, .showPhys=false};
 static bool shadowBuffersCreated = false; CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
-u16 editModeSelection, editModeTestEntityDefinition=343; u16 lastSpawned=U16_MAX;
+u16 editModeSelection=U16_MAX, editModeTestEntityDefinition=343; u16 lastSpawned=U16_MAX;
 double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u8 particleBlendTexture[MAX_TXRS];
 static u32 gpuQ[5][5]; static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
@@ -108,7 +108,7 @@ void cmd_undo() { if (Cheats.editMode) { if (lastSpawned < U16_MAX && lastSpawne
 void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; float shakeForce = (force < 0.48f) ? force : 0.48f; (void)shakeForce; } // TODO actually shake
 void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
 void cmd_shake() { Shake(-1.0f); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
-void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip=Cheats.notarget=true; CenterStatusPrint("edit mode: %s","Edit Mode activated!"); } else { Cheats.noclip=Cheats.notarget=false; CenterStatusPrint("%s","Edit Mode deactivated"); } }
+void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip=Cheats.notarget=true; CenterStatusPrint("edit mode: %s","Edit Mode activated!"); } else { Cheats.noclip=Cheats.notarget=false; editModeSelection = U16_MAX; CenterStatusPrint("%s","Edit Mode deactivated"); } }
 int ParseLevelArg(const char* arg) {
     if (!arg || !*arg) return -1;
     char clean[64] = {0}; int j = 0; for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') clean[j++] = c2Lower((u8)arg[i]); }   clean[j] = '\0';
@@ -126,6 +126,7 @@ static void cmd_loadlevel(const char* arg) {
 
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }
 static void cmd_summon(int itemConstIndex) { if (IdxInBounds(itemConstIndex)) { u16 spawned = SpawnDynamicObject(itemConstIndex,true); if (spawned < U16_MAX) { lastSpawned = spawned; } CenterStatusPrint("Summoned object ID %d",itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s",itemConstIndex); } }
+static void cmd_select(int instanceIdx) { if (instanceIdx >= 0 && instanceIdx < World.instCount) { editModeSelection=(u16)instanceIdx; CenterStatusPrint("Selected entity instance %u (const index %u)",editModeSelection,World.instances[editModeSelection].index); } else { CenterStatusPrint("Invalid instance: %d (loaded count: %u)",instanceIdx,World.instCount); } }
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; }                         static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
 static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacker!"); } static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
@@ -164,7 +165,7 @@ static const ConsoleCommand consoleCmds[] = {
     {"whosyourdaddy",  {.noArg = cmd_god},         NOARG},{"iddqd",           {.noArg=cmd_god}, NOARG},           {"notarget",    {.noArg=cmd_notarget},NOARG},  {"no target",     {.noArg = cmd_notarget},NOARG},  {"editmode",       {.noArg=cmd_edit},NOARG},       {"edit",                    {.noArg=cmd_edit},NOARG},
     {"edit mode",      {.noArg = cmd_edit},        NOARG},{"editor",          {.noArg=cmd_edit},NOARG},           {"undo",        {.noArg=cmd_undo},    NOARG},  {"showfps",       {.noArg = cmd_showfps}, NOARG},  {"show fps",       {.noArg=cmd_showfps},NOARG},    {"showlocation",            {.noArg=cmd_showlocation},NOARG},
     {"show location",  {.noArg = cmd_showlocation},NOARG},{"nohud",           {.noArg=cmd_nohud},NOARG},          {"no hud",      {.noArg=cmd_nohud},   NOARG},  {"bottomlessclip",{.noArg = cmd_bottomless},NOARG},{"bottomless clip",{.noArg=cmd_bottomless},NOARG}, {"load",                    {.withStr=cmd_loadlevel},CMD_STR},
-    {"loadarsenal",    {.withStr = cmd_loadarsenal},CMD_STR},{"load arsenal", {.withStr=cmd_loadarsenal},CMD_STR},{"summon_obj",  {.withInt=cmd_summon},CMD_INT},{"summonobj",     {.withInt = cmd_summon},CMD_INT},{"motherlode",     {.noArg=cmd_nomoney},   NOARG}, {"rosebud",                 {.noArg=cmd_nomoney},NOARG},
+    {"loadarsenal",    {.withStr = cmd_loadarsenal},CMD_STR},{"load arsenal", {.withStr=cmd_loadarsenal},CMD_STR},{"summon_obj",  {.withInt=cmd_summon},CMD_INT},{"summonobj",     {.withInt = cmd_summon},CMD_INT},{"select",          {.withInt=cmd_select},CMD_INT},{"motherlode",     {.noArg=cmd_nomoney},   NOARG}, {"rosebud",                 {.noArg=cmd_nomoney},NOARG},
     {"kaching",        {.noArg=cmd_nomoney},       NOARG},{"money",           {.noArg=cmd_nomoney},NOARG},        {"dizzy",       {.noArg=cmd_dizzy},   NOARG},  {"help",          {.noArg=cmd_help},        NOARG},{"ifeelthepower",  {.noArg = cmd_energy},  NOARG}, {"power",                   {.noArg=cmd_energy}, NOARG},
     {"energy",         {.noArg=cmd_energy},        NOARG},{"i feel the power",{.noArg = cmd_energy},NOARG},       {"i am shodan", {.noArg=cmd_iamshodan},NOARG}, {"iamshodan",     {.noArg=cmd_iamshodan},   NOARG},{"mr. bean",       {.noArg = cmd_mrbean},  NOARG}, {"simon foster",            {.noArg=cmd_simonfoster},NOARG},
     {"richard branson",{.noArg=cmd_richardbranson},NOARG},{"john wardley",    {.noArg = cmd_johnwardley},NOARG},  {"john mace",   {.noArg=cmd_johnmace}, NOARG}, {"melanie warn",  {.noArg=cmd_melaniewarn}, NOARG},{"damon hill",     {.noArg = cmd_damonhill},NOARG},{"michael schumacher",      {.noArg=cmd_michaelschumacher},NOARG},
@@ -310,6 +311,7 @@ void UpdateScreenSize(i32 width, i32 height) {
     glBindImageTexture(0,inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/*Main Rendered Color*/ glBindImageTexture(2,inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/*Specular*/ glBindImageTexture(4,outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/*SSR result*/ glBindImageTexture(5,inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F);/*Normal XYZ*/ glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D,outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER,0); ignore_next_mouse_delta = true;
 }
+extern V3 vWepOfs[16]; extern WeaponFireCtx wfx; // weapon view model: needed by RenderUI (ui.c)
 #include "ui.c"
 // Lights
 #define INVSQRT2 0.70710678118f

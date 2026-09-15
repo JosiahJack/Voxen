@@ -519,6 +519,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 458 || entIdx == 459 || entIdx == 460) { World.position[parent].y += 0.72f; } // prop_phys_barrel_chemical, prop_phys_barrel_radiation, prop_phys_barrel_toxic: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx == 463) { World.position[parent].y += 0.64f; } // prop_phys_toolcart: Move up to account for CG mod (origin moved vs Unity version)
         else if (entIdx >= 472 && entIdx <= 476) { World.position[parent].y += 0.342f; } // se_crate1, se_crate2, se_crate3, se_crate4, se_crate5: Move up to account for CG mod (origin moved vs Unity version)
+        else if (entIdx == 586 || (entIdx >= 540 && entIdx <= 544)) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.0f; } // prop_table, prop_chair01-05: map exports 0.04 scale; force 1.0
         else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
         else if (entIdx == 720) { /*u16 mist=*/AddInstance(648,World.position[parent]); }// ambient_mist
         else if (entIdx == 733) { /*u16 pipewater=*/AddInstance(649,World.position[parent]);/*ambient_pipewater_loop*/ /*u16 rain=*/AddInstance(653,(V3){World.position[parent].x,World.position[parent].y - 1.26f,World.position[parent].z});/*ambient_rain*/ }
@@ -532,9 +533,9 @@ void LoadLevelMod(u8 lev) {
     headmountedLanternLight = AddLightSimple(World.position[PLAYER1],(Color3){1.0f,1.0f,1.0f},11.52f,0.0f,LIGHTON);
     // Create single ad-hoc weapon view model instance (no entity definition, no physics collider; like shield generators)
     if (World.instCount < INSTANCE_COUNT) {
-        u16 wvi = World.instCount; mset(&World.instances[wvi],0,sizeof(Entity)); World.instances[wvi].entflags=EF_ACTIVE; World.layer[wvi]=L_Default; World.instances[wvi].camView=255; World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
+        u16 wvi = World.instCount; mset(&World.instances[wvi],0,sizeof(Entity)); World.instances[wvi].entflags=EF_ACTIVE|EF_NO_SHADOWS; World.layer[wvi]=L_Default; World.instances[wvi].camView=255; World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
         World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAX_TXRS; World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.mass[wvi]=World.rotation[wvi].w=1.0f; World.dynamicFriction[wvi]=0.5f; World.staticFriction[wvi]=0.6f;
-        World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; World.weaponVModelIndex=wvi; World.instCount++;
+        World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; World.weaponVModelIndex=wvi; World.instCount++; DualLog("Weapon view model entity index: %u (level %d)\n",wvi,curlevel);
     }
 }
 #undef KEY_EQ
@@ -592,6 +593,7 @@ void LoadLevelData(u8 curlevel) {
         else if(constIndex == 480){CyberMineInitBeforeLoad(i);}
         if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
     }
+    for (int i=PLAYER1;i<World.instCount;++i){ u16 mi=World.instances[i].messageIndex; World.instances[i].messageIndex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].messageLingdex; World.instances[i].messageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].lockedMessageLingdex; World.instances[i].lockedMessageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; } // Using blank 427
     World.levelLoadedLights[curlevel] = World.loadedLights; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
 }
 
