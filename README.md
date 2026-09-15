@@ -92,46 +92,46 @@ Exit with zero cleanup, let the OS handle it; does immediate fastest exit as use
 ### Table of Contents (Kind of):
 
 ```
-> ls *.* ./Shaders/*.glsl ./Shaders/*.compute | grep -vE 'README.md|builds.csv|voxen.exe|voxen.log|build.sh|Citadel.pdb|*.bin' | xargs perl -MList::Util=max -lne '$first{$ARGV} //= $_; $count{$ARGV} = $.; if(eof){$total += $.; $. = 0;} END { $max = max map {length} keys %first; printf "99999999 %7d total\n", $total; printf "%8d %-${max}s  %s\n", $count{$_}, $_, $first{$_} for keys %first }' 2>/dev/null | sort -nr | head -n 51 | sed 's/^99999999 //'
-   9564 total
-     981 citadel.c                           // citadel.c - Game logic.
-     883 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
-     845 audio.c                             // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
-     754 winput.c                            // winput.c - WinSys Windowing System and Input System interfacing with the OS.
-     732 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
-     645 physics.c                           // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
-     598 models.c                            // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
-     517 text.c                              // text.c - Text and Font Rendering/Loading System
-     467 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
+❯ ls *.* ./Shaders/*.glsl ./Shaders/*.compute | grep -vE 'README.md|builds.csv|voxen.exe|voxen.log|build.sh|Citadel.pdb|*.bin' | xargs perl -MList::Util=max -lne '$first{$ARGV} //= $_; $count{$ARGV} = $.; if(eof){$total += $.; $. = 0;} END { $max = max map {length} keys %first; printf "99999999 %7d total\n", $total; printf "%8d %-${max}s  %s\n", $count{$_}, $_, $first{$_} for keys %first }' 2>/dev/null | sort -nr | head -n 51 | sed 's/^99999999 //'
+   7494 total
+     845 citadel.c                           // citadel.c - Game logic.
+     701 voxen.c                             // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
+     656 entity.c                            // entity.c - Entity Definitions and Save Load System for levels and savegames
+     532 text.c                              // text.c - Text and Font Rendering/Loading System
+     514 audio.c                             // audio.c - Audio System supporting .mp3 + .wav filetypes only, uses Windows WASAPI or Linux ALSA("default" to work on PulseAudio and PipeWire or ALSA+dmix, w/ raw ioctl fallback).  Mixes synthesized sounds/music.
+     497 models.c                            // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
+     487 physics.c                           // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
+     442 winput.c                            // winput.c - WinSys Windowing System and Input System interfacing with the OS.
      396 ui.c                                // ui.c - User Interface(UI) aka HUD
-     391 ./Shaders/composite_frag.glsl       // composite.glsl - Composite rendered view + UI overlay, custom AA, VHS blur (subtle, magic!), SSR with tapped blur, Procedural skybox w/ stars + saturn + sun + station shield (if on!) that rotate, berserk color hallucinations, EMP screen rolling, fog, infrared grayscale.
      387 credits.h                           // credits.h - Credits for Citadel: The System Shock Fan Remake, salt the fries!
      381 weapons.c                           // weapons.c - Weapon System
-     361 textures.c                          // textures.c - 2D Texture Loading System
-     229 ./Shaders/chunk_frag.glsl           // chunk_frag.glsl: Generic shader for all world objects
-     211 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
+     373 common.h                            // common.h - Shared items between engine and gamecode (e.g. enums)
      176 culling.c                           // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
+     171 textures.c                          // textures.c - 2D Texture Loading System
+     146 ./Shaders/composite_frag.glsl       // composite.glsl - Composite rendered view + UI overlay, custom AA, VHS blur (subtle, magic!), SSR with tapped blur, Procedural skybox w/ stars + saturn + sun + station shield (if on!) that rotate, berserk color hallucinations, EMP screen rolling, fog, infrared grayscale.
+     141 lib.c                               // lib.c - LibC replacement functions and other misc helpers.
       98 particles.c                         // particles.c - CPU-simulated, GPU-instanced particle system for Voxen
+      95 ./Shaders/chunk_frag.glsl           // chunk_frag.glsl: Generic shader for all world objects
       93 biomonitor.c                        // biomonotor.c - Biomonitor Graph and Text displays.
-      83 ./Shaders/voxels.compute            // voxels.compute - Compute shader for determining light lists for voxels and updating voxel tables
-      70 ./Shaders/ssr.compute               // ssr.compute - Compute shader for Screen Space Reflections
+      83 ./Shaders/voxels.compute            // voxels.compute - Compute shader for determining light lists for voxels and updating voxel tables 
       33 ./Shaders/shadowmap_frag.glsl       // shadowmap_frag.glsl - Shadowmap Fragment Shader, uses alpha cutout on textures for {fence style shadows.  Writes into SSBO via atomicMin on typecast float dist with * 100000 scaling.
       32 ./Shaders/depth_prepass.glsl        // depth_prepass.glsl: Renders all opaque + cutout objects prior to main forward+ pass
+      31 ./Shaders/ssr.compute               // ssr.compute - Compute shader for Screen Space Reflections 
       29 ./Shaders/ui_frag.glsl              // ui_frag.glsl: Generic shader for unlit textured UI images (mostly cutouts)
       27 ./Shaders/particle_frag.glsl        // particle_frag.glsl - Particle fragment shader
       22 ./Shaders/text_frag.glsl            // text_frag.glsl - Text Fragment shader, supports both SystemShock font with black border around every character and StopD font with 3d drop shadow and top edge highlights
-      18 ./Shaders/particle_vert.glsl        // particle_vert.glsl - Instanced particle billboard vertex shader
-      18 ./Shaders/chunk_vert.glsl           // chunk_vert.glsl: Generic shader for unlit textured surfaces (all world geometry, items, enemies, doors, etc., without transparency for first pass prior to lighting.
+      16 ./Shaders/particle_vert.glsl        // particle_vert.glsl - Instanced particle billboard vertex shader
       15 ./Shaders/trail_frag.glsl           // trail_frag.glsl - Trail fragment shader (SSBO palette texture lookup)
-      15 ./Shaders/depth_prepass_vert.glsl   // depth_prepass_vert.glsl: vertex shader for depth prepass
       14 ./Shaders/trail_vert.glsl           // trail_vert.glsl - Camera-facing ribbon trail vertex shader (welded shared edges)
       10 ./Shaders/shadowmap_vert.glsl       // shadowmap_vert.glsl - Shadowmap Vertex shader
+       9 ./Shaders/depth_prepass_vert.glsl   // depth_prepass_vert.glsl: vertex shader for depth prepass
+       9 ./Shaders/chunk_vert.glsl           // chunk_vert.glsl: Generic shader for unlit textured surfaces (all world geometry, items, enemies, doors, etc., without transparency for first pass prior to lighting.
        6 ./Shaders/ui_vert.glsl              // ui_vert.glsl: Generic shader for unlit textured surfaces (all world geometry, items, enemies, doors, etc., without transparency for first pass prior to lighting.
        6 ./Shaders/text_vert.glsl            // text_vert.glsl - Text Vertex Shader
-       6 ./Shaders/shadowmaps_clear.compute  // shadowmaps_clear.compute - Compute shader for clearing the distances for shadowmaps in the SSBO to 0xFFFFFFFF
+       6 ./Shaders/shadowmaps_clear.compute  // shadowmaps_clear.compute - Compute shader for clearing the distances for shadowmaps in the SSBO to 0xFFFFFFFF U32_MAX
        6 ./Shaders/debugunlit_vert.glsl      // debugunlit_vert.glsl - Wireline Vertex Shader
        5 ./Shaders/composite_vert.glsl       // imageblit.glsl - Full screen quad unlit textured for presenting image buffers such as results from compute shaders, image effects, post-processing, etc..
-       4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe
+       4 ./Shaders/debugunlit_frag.glsl      // debugunlit_frag.glsl - Wireline Fragment Shader, colored wirelines used for physics wireframe view of colliders, velocity debug vectors, angular velocity debug vector and arc for orientation, raycast debug vector, and weapon lasers 
 ```
 
 ### Install Footprint
