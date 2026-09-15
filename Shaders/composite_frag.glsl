@@ -121,6 +121,7 @@ void main() {
                     }
                 } vec3 sunDir = normalize(-saturnCenter); float sunSize = 0.009; float sunDist = acos(dot(skyDir, sunDir)); float sunMask = smoothstep(sunSize, sunSize * 0.8, sunDist); vec3 sunColor = vec3(1.0, 0.97, 0.85); float corona = exp(-pow(sunDist / (sunSize * 1.5), 2.0)) * 1.2; skyColor += sunColor * (sunMask * 3.0 + corona * 1.5); // Sun
             } if (grayscaleEnabled > 0){skyColor = Grayscale(skyColor);} FragColor = vec4((color.rgb * max(0.1,color.a)) + skyColor, 1.0); // Add window alpha weighted color tint
+            return;
         }
     }
     vec2 ssRatio = vec2(screenWidth/SSR_RES, screenHeight/SSR_RES); ivec2 pixel = ivec2(texCoordUsed * ssRatio);
