@@ -495,7 +495,7 @@ float MeasureLineAdvance(const char* p, u8 fontID) {
     return w;
 }
 
-void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 align, const char* restrict format, va_list args) {
+void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 align, const char* restrict format, va_list args, bool is3D, u16 instIdx) {
     va_list c; __builtin_va_copy(c,args); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,c); __builtin_va_end(c);
     glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
     glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex);
@@ -527,6 +527,9 @@ void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 ali
     if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
 
-void RenderTextL(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_LEFT,s,a); __builtin_va_end(a); }
-void RenderTextC(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_CENTER,s,a); __builtin_va_end(a); }
-void RenderTextR(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_RIGHT,s,a); __builtin_va_end(a); }
+void RenderTextL(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_LEFT,s,a,0,0); __builtin_va_end(a); }
+void RenderTextC(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_CENTER,s,a,0,0); __builtin_va_end(a); }
+void RenderTextR(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_RIGHT,s,a,0,0); __builtin_va_end(a); }
+void RenderText3DL(V3 worldPos, u32 color, u8 f, float scale, u16 instIdx, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_LEFT,s,a,1,instIdx); __builtin_va_end(a); }
+void RenderText3DC(V3 worldPos, u32 color, u8 f, float scale, u16 instIdx, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_CENTER,s,a,1,instIdx); __builtin_va_end(a); }
+void RenderText3DR(V3 worldPos, u32 color, u8 f, float scale, u16 instIdx, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_RIGHT,s,a,1,instIdx); __builtin_va_end(a); }

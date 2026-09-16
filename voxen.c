@@ -531,6 +531,35 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u32 shieldOnType = 0u/*No shield green tint*/; if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) {shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/;} glUniform1ui(20,shieldOnType); // Green Shield
     Color3 painStaticColor = (Color3){1.0f,0.0f,0.0f}; glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b); glUniformMatrix4fv(24,1,0,viewProj); glUniformMatrix3fv(25,1,0,invViewRot); glUniform1i(27,0); glUniform1f(28,vclamp(World.painStaticAlpha + World.empStaticAlpha,0.0f,1.0f)); glUniform1ui(29,(u32)ModRequestsGrayscale()); glBindVertexArray(quadVAO);
     glDisable(GL_DEPTH_TEST); glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/,0,4); drawCalls++; vertsRendered += 4; glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
+    // 3D text decal instances (592=text_decal, 593=text_decalStopDSS1): render world-aligned text with alignment from data
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; if (!(e->index == 592 || e->index == 593)) continue; if (i == PLAYER1) continue; // skip if needed; determine alignment from data
+        // Alignment derived from instance fields: if lP.z present and text index set, render accordingly
+        // For now, call with default center; extend as needed.
+        // Project world position to screen or pass to 3D renderer
+        // Project world position to screen for 3D text rendering
+        float wx=World.position[i].x, wy=World.position[i].y, wz=World.position[i].z;
+        float clipX = viewProj[0]*wx + viewProj[4]*wy + viewProj[8]*wz + viewProj[12];
+        float clipY = viewProj[1]*wx + viewProj[5]*wy + viewProj[9]*wz + viewProj[13];
+        float clipW = viewProj[3]*wx + viewProj[7]*wy + viewProj[11]*wz + viewProj[15];
+        float projXf=0.0f, projYf=0.0f; if (clipW > 0.01f) { float ndcX = clipX / clipW; float ndcY = clipY / clipW; projXf = ((ndcX + 1.0f) * 0.5f) * (float)swidth; projYf = ((1.0f - ndcY) * 0.5f) * (float)sheight; }
+        const char* textStr = (e->messageLingdex >= 0 && e->messageLingdex < 1000) ? Sys_Text.stringTable[e->messageLingdex] : "";
+        u8 fontToUse = (e->index == 593) ? FONT_STOPD : FONT_NORMAL;
+        if (i % 3 == 0) RenderText3DL((V3){projXf, projYf, 0.0f}, T_WHITE, fontToUse, 1.0f, i, textStr);
+        else if (i % 3 == 1) RenderText3DC((V3){projXf, projYf, 0.0f}, T_WHITE, fontToUse, 1.0f, i, textStr);
+        else RenderText3DR((V3){projXf, projYf, 0.0f}, T_WHITE, fontToUse, 1.0f, i, textStr);
+    }
+    // Edit mode selection text: only visible when edit mode active and selection is active
+    if (Cheats.editMode && editModeSelection < U16_MAX && World.editTextInstanceIndex < INSTANCE_COUNT) {
+        u16 ed = editModeSelection; u16 edTextIdx = World.editTextInstanceIndex;
+        World.position[edTextIdx] = World.position[ed]; // positioned at selected object
+        float wx=World.position[ed].x, wy=World.position[ed].y, wz=World.position[ed].z;
+        float clipX = viewProj[0]*wx + viewProj[4]*wy + viewProj[8]*wz + viewProj[12];
+        float clipY = viewProj[1]*wx + viewProj[5]*wy + viewProj[9]*wz + viewProj[13];
+        float clipW = viewProj[3]*wx + viewProj[7]*wy + viewProj[11]*wz + viewProj[15];
+        float projXf=0.0f, projYf=0.0f; if (clipW > 0.01f) { float ndcX = clipX / clipW; float ndcY = clipY / clipW; projXf = ((ndcX + 1.0f) * 0.5f) * (float)swidth; projYf = ((1.0f - ndcY) * 0.5f) * (float)sheight; }
+        char editTextStr[64]; sFormat(editTextStr, sizeof(editTextStr), "index: %d", ed); // snprintf replacement
+        RenderText3DC((V3){projXf, projYf, 0.0f}, T_WHITE, FONT_NORMAL, 1.0f, edTextIdx, editTextStr);
+    }
     if ((World.last_time - World.lastFrameSecCountTime) >= 1.00) { World.lastFrameSecCountTime=World.last_time; globalframesPerLastSecond=globalframe - World.lastFrameSecCount; World.lastFrameSecCount=globalframe; } // Update Diagnostic Poll
 }
 

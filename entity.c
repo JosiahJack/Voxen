@@ -334,6 +334,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx == 446) { World.scale[i].x=World.scale[i].y=World.scale[i].z=1.1f; }/*npc_cyber_reaver*/  if (entIdx == 475 || entIdx == 476){World.scale[i]=(V3){1.75f,1.75f,1.75f};}/*se_crate4,se_crate5*/
     if (IdxIsNPC(entIdx)){InitNPC(i);} if (IdxIsDoor(entIdx)) { World.instances[i].SFXIndex = 75; } World.instances[i].modelIndex=EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAX_TXRS ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
     World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAX_TXRS ? 0 : EDefs[entIdx].specIndex; World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAX_TXRS ? 0 : EDefs[entIdx].normIndex; flag_set(&World.instances[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(entIdx));
+    if (entIdx == 592 || entIdx == 593) { World.instances[i].modelIndex = U16_MAX; } // 3D text decals (no mesh)
     World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f; if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; }/*ButtonSwitch*/
     if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=COLTYPE_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; World.levelInstCount[World.currentLevel]=World.instCount; return i;
 }
@@ -430,7 +431,7 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("stopSound"))       flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_SOUND, parse_bool(value, lineSpace, lineNum));               else if(KEY_EQ("startFlashingMaterials")) flag_set(&inst->ioflags, TARG_IOFLAGS_START_FLASHING_TEX, parse_bool(value, lineSpace, lineNum));
                 else if(KEY_EQ("stopFlashingMaterials"))  flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(value, lineSpace, lineNum));
                 else if(KEY_EQ("branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("resourceFolder") && *value) scpy_to_a_from_b(inst->texAnimResourceFolder, value, TARG_STRLEN);
-                else if(KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);                                      else if(KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
+                else if(KEY_EQ("lingdex") || KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);                                      else if(KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
                 else if(KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);                                       else if(KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("onSecond"))        inst->branchOnSecond = parse_bool(value, lineSpace, lineNum);                                           else if(KEY_EQ("onceEver"))        inst->relayOnceEver = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(value, lineSpace, lineNum);                                else if(KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
@@ -537,6 +538,13 @@ void LoadLevelMod(u8 lev) {
         World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAX_TXRS; World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.mass[wvi]=World.rotation[wvi].w=1.0f; World.dynamicFriction[wvi]=0.5f; World.staticFriction[wvi]=0.6f;
         World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; World.weaponVModelIndex=wvi; World.instCount++; DualLog("Weapon view model entity index: %u (level %d)\n",wvi,curlevel);
     }
+    // Ad-hoc editmode selection text entity (based on text_decal 592): positioned at selected object, displays "index: #"
+    if (World.instCount < INSTANCE_COUNT) {
+        u16 editTextIdx = World.instCount; mset(&World.instances[editTextIdx],0,sizeof(Entity)); World.instances[editTextIdx].entflags=EF_ACTIVE; World.layer[editTextIdx]=L_Default; World.instances[editTextIdx].camView=255; World.instances[editTextIdx].modelIndex=World.instances[editTextIdx].lodIndex=World.instances[editTextIdx].colMeshIndex=MAX_MDLS;
+        World.instances[editTextIdx].index=592; World.position[editTextIdx]=(V3){0.0f,0.0f,0.0f}; World.rotation[editTextIdx]=QUAT_IDENTITY; World.scale[editTextIdx].x=World.scale[editTextIdx].y=World.scale[editTextIdx].z=World.mass[editTextIdx]=World.rotation[editTextIdx].w=1.0f;
+        World.instances[editTextIdx].messageLingdex = 0; // placeholder; text set dynamically in render loop
+        World.editTextInstanceIndex = editTextIdx; World.instCount++; DualLog("Edit mode selection text entity index: %u (level %d)\n",editTextIdx,curlevel);
+    }
 }
 #undef KEY_EQ
 void func_forcebridge(u16 self); void CyberWallInitAfterLoad(u16 self); void FuncWallInitAfterLoad(u16); void LogicTimerInitBeforeLoad(u16); void ButtonSwitchInitAfterLoad(u16);
@@ -594,6 +602,12 @@ void LoadLevelData(u8 curlevel) {
         if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
     }
     for (int i=PLAYER1;i<World.instCount;++i){ u16 mi=World.instances[i].messageIndex; World.instances[i].messageIndex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].messageLingdex; World.instances[i].messageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].lockedMessageLingdex; World.instances[i].lockedMessageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; } // Using blank 427
+    for (int i=PLAYER1;i<World.instCount;++i){
+        if (World.instances[i].index == 592 || World.instances[i].index == 593) {
+            u16 li = World.instances[i].messageLingdex; const char* textStr = (li < T_LOGSTR_CNT && li > 0) ? Sys_Text.stringTable[li] : "N/A";
+            DualLog("World.instances[%d] constIndex:%u text:[%s] lingdex:%u lP:(%f,%f,%f)\n", i, (u16)World.instances[i].index, textStr, li, World.position[i].x, World.position[i].y, World.position[i].z);
+        }
+    }
     World.levelLoadedLights[curlevel] = World.loadedLights; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
 }
 

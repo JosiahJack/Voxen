@@ -403,6 +403,2149 @@ static double RenderUI() {
 //         if (World.Sys_UI.showAutomapFull) { /*AutomapFullRawImage*/ /*PlayerIconFull*/ /*CloseFullmapButton*/ } if (World.Sys_UI.showMissionTimer) { /*MissionTimerT*/ /*MissionTimer*/ }
 //         if (World.Sys_UI.showCyberTimer) { /*CyberTimerT*/ /*CyberTimer*/ }
         if(!Cheats.noHUD){SideMFD(false/*Left*/); CenterMFD(); SideMFD(true/*Right*/);} // MFD
+// UI setup pass: every Canvas element in place (Automap + Main Menu omitted,FX occluders skipped)
+// C# MFDManager: MFDManager.cs
+// C# MFDManager: QuestLogNotesManager.cs
+// C# MFDManager: Automap.cs
+RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.6,"0"); // MissionTimerT dummy
+RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.6,"0"); // MissionTimer dummy
+// C# MissionTimer: MissionTimer.cs
+// C# TabsLH: LeftMFDTabs.cs
+// C# ItemTabLH: ItemTabManager.cs
+RenderUIImage(33,528,237,237,1025); // ItemIcon UNMAPPED:[Textures/UI/itemicons/paperico.png]
+// C# ItemIcon: ItemIconManager.cs
+// C# ItemIcon: UIPointerMask.cs
+RenderTextL(28,540,T_YELLOW,FONT_NORMAL,0.6,"TEST"); // ItemText
+// C# ItemText: UIPointerMask.cs
+RenderUIImage(72,628,160,40,1087); // VaporizeButton
+// BTN VaporizeButton: VaporizeButton.OnVaporizeClick()
+// C# VaporizeButton: VaporizeButton.cs
+// C# VaporizeButton: UIButtonMask.cs
+RenderTextL(72,628,T_GREEN_MENU,FONT_NORMAL,0.6,"%s",883<1100?Sys_Text.stringTable[883]:"VAPORIZE"); // Text
+RenderUIImage(72,691,160,40,1087); // ApplyButton
+// BTN ApplyButton: MFDManager.ApplyButtonClicked()
+// C# ApplyButton: UIButtonMask.cs
+RenderTextL(72,691,T_GREEN_MENU,FONT_NORMAL,0.6,"%s",736<1100?Sys_Text.stringTable[736]:"APPLY"); // Text
+RenderUIImage(72,691,160,40,1087); // UseButton
+// BTN UseButton: UseButton.OnActivateClick()
+// C# UseButton: ActivateButton.cs
+RenderTextL(72,691,T_GREEN_MENU,FONT_NORMAL,0.6,"USE"); // Text
+// C# EReaderSectionsLH: EReaderSectionsButtons.cs
+RenderUIImage(22,718,65,40,1086); // EMAILButton
+// BTN EMAILButton: EReaderSectionsLH.OnClick()
+// C# EMAILButton: UIButtonMask.cs
+// C# EMAILButton: EReaderSectionsButtonHighlight.cs
+RenderTextL(22,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",42<1100?Sys_Text.stringTable[42]:"EMAIL"); // Text
+RenderUIImage(87,718,65,40,1087); // LOGSButton
+// BTN LOGSButton: EReaderSectionsLH.OnClick(1)
+// C# LOGSButton: UIButtonMask.cs
+// C# LOGSButton: EReaderSectionsButtonHighlight.cs
+RenderTextL(87,718,T_GREEN_MENU,FONT_NORMAL,0.6,"%s",39<1100?Sys_Text.stringTable[39]:"LOGS"); // Text
+RenderUIImage(153,718,65,40,1086); // DATAButton
+// BTN DATAButton: EReaderSectionsLH.OnClick(2)
+// C# DATAButton: UIButtonMask.cs
+// C# DATAButton: EReaderSectionsButtonHighlight.cs
+RenderTextL(153,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",43<1100?Sys_Text.stringTable[43]:"DATA"); // Text
+RenderUIImage(217,718,65,40,1086); // NOTESButton
+// BTN NOTESButton: EReaderSectionsLH.OnClick(3)
+// C# NOTESButton: UIButtonMask.cs
+// C# NOTESButton: EReaderSectionsButtonHighlight.cs
+RenderTextL(217,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",885<1100?Sys_Text.stringTable[885]:"NOTES"); // Text
+RenderTextL(60,614,T_YELLOW,FONT_NORMAL,0.6,"STD"); // AccessCardsList
+// C# AccessCardsList: UIPointerMask.cs
+// C# GrenadeTimerSliderLH: UIPointerMask.cs
+// C# GrenadeTimerSliderLH: GrenadeTimerSlider.cs
+RenderUIImage(37,714,230,29,952); // Background
+// C# Background: UIPointerMask.cs
+RenderUIImage(37,714,72,29,1079); // Fill
+// C# Fill: UIPointerMask.cs
+RenderUIImage(104,711,24,36,953); // Handle
+// C# Handle: UIPointerMask.cs
+RenderTextL(60,747,T_YELLOW,FONT_NORMAL,0.6,"TEST"); // TimeNumberText
+RenderUIImage(37,712,230,32,952); // Background
+RenderUIImage(37,712,16,32,0); // Fill QUAD:builtin-white
+RenderUIImage(37,696,32,64,953); // Handle
+RenderUIImage(31,535,227,209,1025); // BlockedBySecurityLH UNMAPPED:[Resources/BlockedBySecurity/blocked_00.
+// C# BlockedBySecurityLH: ImageSequenceTextureArrayUI.cs
+// C# BlockedBySecurityLH: PooledItemDestroy.cs
+RenderTextL(45,542,T_YELLOW,FONT_NORMAL,0.6,"%s",890<1100?Sys_Text.stringTable[890]:"Blocked by SHODAN level Security."); // BlockedBySecurityText
+// C# BlockedBySecurityText: UIPointerMask.cs
+RenderTextL(34,536,T_YELLOW,FONT_NORMAL,0.6,"DEAD CORTEX REAVER"); // DataHeaderTextLH
+// C# DataHeaderTextLH: UIPointerMask.cs
+RenderTextL(24,633,T_YELLOW,FONT_NORMAL,0.6,"%s",891<1100?Sys_Text.stringTable[891]:"No Items"); // DataNoItemsTextLH
+// C# DataNoItemsTextLH: UIPointerMask.cs
+// C# ElevatorUIControlLH: ElevatorKeypad.cs
+RenderUIImage(132,531,32,32,929); // CurrentFloorIndicator
+RenderUIImage(86,578,45,168,0); // ButtonBankLH QUAD:builtin-knob
+RenderUIImage(86,578,45,39,1025); // ElevButton1 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+// C# ElevButton1: UIButtonMask.cs
+RenderUIImage(88,583,40,34,1025); // Keypad.Button (1) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (1): Keypad.Button
+// C# Keypad.Button (1): ElevatorButton.cs
+// C# Keypad.Button (1): UIButtonMask.cs
+RenderTextL(89,580,T_GREEN,FONT_NORMAL,0.6,"R"); // Text (1)
+RenderUIImage(86,620,45,39,1025); // ElevButton2 UNMAPPED:[Textures/UI/hudbuttons/keypad_mid.png]
+// C# ElevButton2: UIButtonMask.cs
+RenderUIImage(88,623,40,34,1025); // Keypad.Button (2) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (2): Keypad.Button
+// C# Keypad.Button (2): ElevatorButton.cs
+// C# Keypad.Button (2): UIButtonMask.cs
+RenderTextL(89,620,T_GREEN,FONT_NORMAL,0.6,"1"); // Text (2)
+RenderUIImage(86,663,45,39,1025); // ElevButton3 UNMAPPED:[Textures/UI/hudbuttons/keypad_mid.png]
+// C# ElevButton3: UIButtonMask.cs
+RenderUIImage(88,666,40,34,1025); // Keypad.Button (3) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (3): Keypad.Button
+// C# Keypad.Button (3): ElevatorButton.cs
+// C# Keypad.Button (3): UIButtonMask.cs
+RenderTextL(89,663,T_GREEN,FONT_NORMAL,0.6,"2"); // Text (3)
+RenderUIImage(86,706,45,39,1025); // ElevButton4 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+// C# ElevButton4: UIButtonMask.cs
+RenderUIImage(88,707,40,34,1025); // Keypad.Button (4) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (4): Keypad.Button
+// C# Keypad.Button (4): ElevatorButton.cs
+// C# Keypad.Button (4): UIButtonMask.cs
+RenderTextL(89,704,T_GREEN,FONT_NORMAL,0.6,"3"); // Text (4)
+RenderUIImage(164,578,45,168,0); // ButtonBankRH QUAD:builtin-knob
+RenderUIImage(164,578,45,39,1025); // ElevButton5 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+// C# ElevButton5: UIButtonMask.cs
+RenderUIImage(167,582,40,34,1025); // Keypad.Button (5) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (5): Keypad.Button
+// C# Keypad.Button (5): ElevatorButton.cs
+// C# Keypad.Button (5): UIButtonMask.cs
+RenderTextL(168,580,T_GREEN,FONT_NORMAL,0.6,"6"); // Text (5)
+RenderUIImage(164,620,45,39,1025); // ElevButton6 UNMAPPED:[Textures/UI/hudbuttons/keypad_mid.png]
+// C# ElevButton6: UIButtonMask.cs
+RenderUIImage(167,623,40,34,1025); // Keypad.Button (6) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (6): Keypad.Button
+// C# Keypad.Button (6): ElevatorButton.cs
+// C# Keypad.Button (6): UIButtonMask.cs
+RenderTextL(168,620,T_GREEN,FONT_NORMAL,0.6,"7"); // Text (6)
+RenderUIImage(164,663,45,39,1025); // ElevButton7 UNMAPPED:[Textures/UI/hudbuttons/keypad_mid.png]
+// C# ElevButton7: UIButtonMask.cs
+RenderUIImage(167,666,40,34,1025); // Keypad.Button (7) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (7): Keypad.Button
+// C# Keypad.Button (7): ElevatorButton.cs
+// C# Keypad.Button (7): UIButtonMask.cs
+RenderTextL(168,663,T_GREEN,FONT_NORMAL,0.6,"8"); // Text (7)
+RenderUIImage(164,706,45,39,1025); // ElevButton8 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+// C# ElevButton8: UIButtonMask.cs
+RenderUIImage(167,707,40,34,1025); // Keypad.Button (8) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (8): Keypad.Button
+// C# Keypad.Button (8): ElevatorButton.cs
+// C# Keypad.Button (8): UIButtonMask.cs
+RenderTextL(168,704,T_GREEN,FONT_NORMAL,0.6,"9"); // Text (8)
+RenderUIImage(246,528,29,29,899); // CloseButton
+// BTN CloseButton: MFDManager.CloseElevatorPad()
+// C# CloseButton: UIButtonMask.cs
+RenderTextL(246,528,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+// C# KeycodeUIControlLH: KeypadKeycodeButtons.cs
+RenderUIImage(86,577,42,38,1025); // KeycodeButton1 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(88,580,38,35,1025); // Button (1) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (1): ?
+// C# Button (1): KeycodeButton.cs
+RenderTextL(80,572,T_GREEN,FONT_NORMAL,0.6,"1"); // Text
+RenderUIImage(127,577,42,38,1025); // KeycodeButton2 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(129,580,38,35,1025); // Button (2) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (2): ?
+// C# Button (2): KeycodeButton.cs
+RenderTextL(121,572,T_GREEN,FONT_NORMAL,0.6,"2"); // Text
+RenderUIImage(169,577,42,38,1025); // KeycodeButton3 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(169,580,38,35,1025); // Button (3) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (3): ?
+// C# Button (3): KeycodeButton.cs
+RenderTextL(161,572,T_GREEN,FONT_NORMAL,0.6,"3"); // Text
+RenderUIImage(86,620,42,38,1025); // KeycodeButton4 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(88,621,38,35,1025); // Button (4) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (4): ?
+// C# Button (4): KeycodeButton.cs
+RenderTextL(80,614,T_GREEN,FONT_NORMAL,0.6,"4"); // Text
+RenderUIImage(127,620,42,38,1025); // KeycodeButton5 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(129,621,38,35,1025); // Button (5) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (5): ?
+// C# Button (5): KeycodeButton.cs
+RenderTextL(121,614,T_GREEN,FONT_NORMAL,0.6,"5"); // Text
+RenderUIImage(169,620,42,38,1025); // KeycodeButton6 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(169,621,38,35,1025); // Button (6) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (6): ?
+// C# Button (6): KeycodeButton.cs
+RenderTextL(162,614,T_GREEN,FONT_NORMAL,0.6,"6"); // Text
+RenderUIImage(86,663,42,38,1025); // KeycodeButton7 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(88,665,38,35,1025); // Button (7) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (7): ?
+// C# Button (7): KeycodeButton.cs
+RenderTextL(80,657,T_GREEN,FONT_NORMAL,0.6,"7"); // Text
+RenderUIImage(127,663,42,38,1025); // KeycodeButton8 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(129,665,38,35,1025); // Button (8) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (8): ?
+// C# Button (8): KeycodeButton.cs
+RenderTextL(121,657,T_GREEN,FONT_NORMAL,0.6,"8"); // Text
+RenderUIImage(169,663,42,38,1025); // KeycodeButton9 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(169,665,38,35,1025); // Button (9) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (9): ?
+// C# Button (9): KeycodeButton.cs
+RenderTextL(162,657,T_GREEN,FONT_NORMAL,0.6,"9"); // Text
+RenderUIImage(86,706,42,38,1025); // KeycodeButtonBackSpace UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(88,707,38,35,1025); // Button (-) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (-): ?
+// C# Button (-): KeycodeButton.cs
+RenderTextL(80,700,T_GREEN,FONT_NORMAL,0.6,"-"); // Text
+RenderUIImage(127,706,42,38,1025); // KeycodeButton0 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(129,707,38,35,1025); // Button (0) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (0): ?
+// C# Button (0): KeycodeButton.cs
+RenderTextL(121,700,T_GREEN,FONT_NORMAL,0.6,"0"); // Text
+RenderUIImage(169,706,42,38,1025); // KeycodeButtonC UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(169,707,38,35,1025); // Button (C) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (C): ?
+// C# Button (C): KeycodeButton.cs
+RenderTextL(161,700,T_GREEN,FONT_NORMAL,0.6,"C"); // Text
+RenderUIImage(173,526,32,32,1025); // KeycodeOnes UNMAPPED:[Textures/UI/elnum_null.png]
+// C# KeycodeOnes: KeycodeDigitImage.cs
+RenderUIImage(132,526,32,32,1025); // KeycodeTens UNMAPPED:[Textures/UI/elnum_null.png]
+// C# KeycodeTens: KeycodeDigitImage.cs
+RenderUIImage(255,525,29,29,899); // CloseButton
+// BTN CloseButton: MFDManager.CloseKeycodePad()
+// C# CloseButton: UIButtonMask.cs
+RenderTextL(255,525,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+RenderUIImage(90,526,32,32,1025); // KeycodeHuns UNMAPPED:[Textures/UI/elnum_null.png]
+// C# KeycodeHuns: KeycodeDigitImage.cs
+RenderUIImage(20,528,263,240,0); // SearchContentsContainerLH QUAD:builtin-knob
+// C# SearchContentsContainerLH: SearchButton.cs
+RenderUIImage(259,534,29,29,899); // SearchCloseButtonLH
+// BTN SearchCloseButtonLH: MFDManager.CloseSearch()
+// C# SearchCloseButtonLH: UIButtonMask.cs
+RenderTextL(259,534,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+RenderUIImage(84,584,64,64,0); // SearchContentLH1 QUAD:none
+// BTN SearchContentLH1: SearchContentsContainerLH.SearchButtonClick()
+// C# SearchContentLH1: UIButtonMask.cs
+// C# SearchContentLH1: SearchContainerButton.cs
+RenderUIImage(174,584,64,64,0); // SearchContentLH2 QUAD:none
+// BTN SearchContentLH2: SearchContentsContainerLH.SearchButtonClick(1)
+// C# SearchContentLH2: UIButtonMask.cs
+// C# SearchContentLH2: SearchContainerButton.cs
+RenderUIImage(84,674,64,64,0); // SearchContentLH3 QUAD:none
+// BTN SearchContentLH3: SearchContentsContainerLH.SearchButtonClick(2)
+// C# SearchContentLH3: UIButtonMask.cs
+// C# SearchContentLH3: SearchContainerButton.cs
+RenderUIImage(174,674,64,64,0); // SearchContentLH4 QUAD:none
+// BTN SearchContentLH4: SearchContentsContainerLH.SearchButtonClick(3)
+// C# SearchContentLH4: UIButtonMask.cs
+// C# SearchContentLH4: SearchContainerButton.cs
+// C# AudioLogInfoLH: LogDataTabContainerManager.cs
+RenderUIImage(20,528,263,240,1272); // LogImage
+RenderTextL(29,540,T_YELLOW,FONT_NORMAL,0.6,"HACKER IS AWESOME"); // LogName
+// C# LogName: UIPointerMask.cs
+RenderTextL(29,557,T_YELLOW,FONT_NORMAL,0.6,"Sender: SHODAN"); // SenderText
+// C# SenderText: UIPointerMask.cs
+RenderTextL(29,701,T_YELLOW,FONT_NORMAL,0.6,"Subject:\n\nif only i had a sparq beam then all the world would be right"); // SubjectText
+// C# SubjectText: UIPointerMask.cs
+// C# PuzzleGridLH: PuzzleGrid.cs
+RenderUIImage(42,555,221,163,1025); // OuterColorBorder UNMAPPED:[Textures/UI/puzzle/gridcontainer_gray.p
+RenderUIImage(46,558,214,157,1025); // ContainerEdge UNMAPPED:[Textures/UI/puzzle/gridcontainer.png]
+RenderUIImage(25,621,29,29,1025); // NodeSource UNMAPPED:[Textures/UI/puzzle/node_source.png]
+RenderUIImage(250,621,29,29,1025); // Node UNMAPPED:[Textures/UI/puzzle/node_off.png]
+RenderUIImage(51,565,29,29,1025); // Button UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button: PuzzleGridLH.OnGridCellClick()
+// C# Button: UIButtonMask.cs
+// C# Button: PuzzleUIButton.cs
+RenderUIImage(51,565,29,29,1025); // GeniusHighlight UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderTextL(51,565,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(80,565,29,29,1025); // Button (1) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (1): PuzzleGridLH.OnGridCellClick(1)
+// C# Button (1): UIButtonMask.cs
+// C# Button (1): PuzzleUIButton.cs
+RenderTextL(80,565,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(80,565,29,29,1025); // GeniusHighlight (1) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(109,565,29,29,1025); // Button (2) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (2): PuzzleGridLH.OnGridCellClick(2)
+// C# Button (2): UIButtonMask.cs
+// C# Button (2): PuzzleUIButton.cs
+RenderTextL(109,565,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(109,565,29,29,1025); // GeniusHighlight (2) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(138,565,29,29,1025); // Button (3) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (3): PuzzleGridLH.OnGridCellClick(3)
+// C# Button (3): UIButtonMask.cs
+// C# Button (3): PuzzleUIButton.cs
+RenderTextL(138,565,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(138,565,29,29,1025); // GeniusHighlight (3) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(166,565,29,29,1025); // Button (4) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (4): PuzzleGridLH.OnGridCellClick(4)
+// C# Button (4): UIButtonMask.cs
+// C# Button (4): PuzzleUIButton.cs
+RenderTextL(166,565,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(166,565,29,29,1025); // GeniusHighlight (4) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(195,565,29,29,1025); // Button (5) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (5): PuzzleGridLH.OnGridCellClick(5)
+// C# Button (5): UIButtonMask.cs
+// C# Button (5): PuzzleUIButton.cs
+RenderTextL(195,565,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(195,565,29,29,1025); // GeniusHighlight (5) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(224,565,29,29,1025); // Button (6) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (6): PuzzleGridLH.OnGridCellClick(6)
+// C# Button (6): UIButtonMask.cs
+// C# Button (6): PuzzleUIButton.cs
+RenderTextL(224,565,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(224,565,29,29,1025); // GeniusHighlight (6) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(51,594,29,29,1025); // Button (7) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (7): PuzzleGridLH.OnGridCellClick(7)
+// C# Button (7): UIButtonMask.cs
+// C# Button (7): PuzzleUIButton.cs
+RenderTextL(51,594,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(51,594,29,29,1025); // GeniusHighlight (7) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(80,594,29,29,1025); // Button (8) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (8): PuzzleGridLH.OnGridCellClick(8)
+// C# Button (8): UIButtonMask.cs
+// C# Button (8): PuzzleUIButton.cs
+RenderTextL(80,594,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(80,594,29,29,1025); // GeniusHighlight (8) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(109,594,29,29,1025); // Button (9) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (9): PuzzleGridLH.OnGridCellClick(9)
+// C# Button (9): UIButtonMask.cs
+// C# Button (9): PuzzleUIButton.cs
+RenderTextL(109,594,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(109,594,29,29,1025); // GeniusHighlight (9) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(138,594,29,29,1025); // Button (10) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (10): PuzzleGridLH.OnGridCellClick(10)
+// C# Button (10): UIButtonMask.cs
+// C# Button (10): PuzzleUIButton.cs
+RenderTextL(138,594,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(138,594,29,29,1025); // GeniusHighlight (10) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(166,594,29,29,1025); // Button (11) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (11): PuzzleGridLH.OnGridCellClick(11)
+// C# Button (11): UIButtonMask.cs
+// C# Button (11): PuzzleUIButton.cs
+RenderTextL(166,594,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(166,594,29,29,1025); // GeniusHighlight (11) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(195,594,29,29,1025); // Button (12) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (12): PuzzleGridLH.OnGridCellClick(12)
+// C# Button (12): UIButtonMask.cs
+// C# Button (12): PuzzleUIButton.cs
+RenderTextL(195,594,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(195,594,29,29,1025); // GeniusHighlight (12) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(224,594,29,29,1025); // Button (13) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (13): PuzzleGridLH.OnGridCellClick(13)
+// C# Button (13): UIButtonMask.cs
+// C# Button (13): PuzzleUIButton.cs
+RenderTextL(224,594,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(224,594,29,29,1025); // GeniusHighlight (13) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(51,622,29,29,1025); // Button (14) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (14): PuzzleGridLH.OnGridCellClick(14)
+// C# Button (14): UIButtonMask.cs
+// C# Button (14): PuzzleUIButton.cs
+RenderTextL(51,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(51,622,29,29,1025); // GeniusHighlight (14) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(80,622,29,29,1025); // Button (15) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (15): PuzzleGridLH.OnGridCellClick(15)
+// C# Button (15): UIButtonMask.cs
+// C# Button (15): PuzzleUIButton.cs
+RenderTextL(80,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(80,622,29,29,1025); // GeniusHighlight (15) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(109,622,29,29,1025); // Button (16) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (16): PuzzleGridLH.OnGridCellClick(16)
+// C# Button (16): UIButtonMask.cs
+// C# Button (16): PuzzleUIButton.cs
+RenderTextL(109,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(109,622,29,29,1025); // GeniusHighlight (16) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(138,622,29,29,1025); // Button (17) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (17): PuzzleGridLH.OnGridCellClick(17)
+// C# Button (17): UIButtonMask.cs
+// C# Button (17): PuzzleUIButton.cs
+RenderTextL(138,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(138,622,29,29,1025); // GeniusHighlight (17) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(166,622,29,29,1025); // Button (18) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (18): PuzzleGridLH.OnGridCellClick(18)
+// C# Button (18): UIButtonMask.cs
+// C# Button (18): PuzzleUIButton.cs
+RenderTextL(166,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(166,622,29,29,1025); // GeniusHighlight (18) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(195,622,29,29,1025); // Button (19) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (19): PuzzleGridLH.OnGridCellClick(19)
+// C# Button (19): UIButtonMask.cs
+// C# Button (19): PuzzleUIButton.cs
+RenderTextL(195,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(195,622,29,29,1025); // GeniusHighlight (19) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(224,622,29,29,1025); // Button (20) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (20): PuzzleGridLH.OnGridCellClick(20)
+// C# Button (20): UIButtonMask.cs
+// C# Button (20): PuzzleUIButton.cs
+RenderTextL(224,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(224,622,29,29,1025); // GeniusHighlight (20) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(51,651,29,29,1025); // Button (21) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (21): PuzzleGridLH.OnGridCellClick(21)
+// C# Button (21): UIButtonMask.cs
+// C# Button (21): PuzzleUIButton.cs
+RenderTextL(51,651,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(51,651,29,29,1025); // GeniusHighlight (21) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(80,651,29,29,1025); // Button (22) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (22): PuzzleGridLH.OnGridCellClick(22)
+// C# Button (22): UIButtonMask.cs
+// C# Button (22): PuzzleUIButton.cs
+RenderTextL(80,651,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(80,651,29,29,1025); // GeniusHighlight (22) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(109,651,29,29,1025); // Button (23) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (23): PuzzleGridLH.OnGridCellClick(23)
+// C# Button (23): UIButtonMask.cs
+// C# Button (23): PuzzleUIButton.cs
+RenderTextL(109,651,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(109,651,29,29,1025); // GeniusHighlight (23) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(138,651,29,29,1025); // Button (24) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (24): PuzzleGridLH.OnGridCellClick(24)
+// C# Button (24): UIButtonMask.cs
+// C# Button (24): PuzzleUIButton.cs
+RenderTextL(138,651,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(138,651,29,29,1025); // GeniusHighlight (24) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(166,651,29,29,1025); // Button (25) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (25): PuzzleGridLH.OnGridCellClick(25)
+// C# Button (25): UIButtonMask.cs
+// C# Button (25): PuzzleUIButton.cs
+RenderTextL(166,651,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(166,651,29,29,1025); // GeniusHighlight (25) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(195,651,29,29,1025); // Button (26) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (26): PuzzleGridLH.OnGridCellClick(26)
+// C# Button (26): UIButtonMask.cs
+// C# Button (26): PuzzleUIButton.cs
+RenderTextL(195,651,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(195,651,29,29,1025); // GeniusHighlight (26) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(224,651,29,29,1025); // Button (27) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (27): PuzzleGridLH.OnGridCellClick(27)
+// C# Button (27): UIButtonMask.cs
+// C# Button (27): PuzzleUIButton.cs
+RenderTextL(224,651,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(224,651,29,29,1025); // GeniusHighlight (27) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(51,680,29,29,1025); // Button (28) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (28): PuzzleGridLH.OnGridCellClick(28)
+// C# Button (28): UIButtonMask.cs
+// C# Button (28): PuzzleUIButton.cs
+RenderTextL(51,680,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(51,680,29,29,1025); // GeniusHighlight (28) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(80,680,29,29,1025); // Button (29) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (29): PuzzleGridLH.OnGridCellClick(29)
+// C# Button (29): UIButtonMask.cs
+// C# Button (29): PuzzleUIButton.cs
+RenderTextL(80,680,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(80,680,29,29,1025); // GeniusHighlight (29) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(109,680,29,29,1025); // Button (30) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (30): PuzzleGridLH.OnGridCellClick(30)
+// C# Button (30): UIButtonMask.cs
+// C# Button (30): PuzzleUIButton.cs
+RenderTextL(109,680,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(109,680,29,29,1025); // GeniusHighlight (30) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(138,680,29,29,1025); // Button (31) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (31): PuzzleGridLH.OnGridCellClick(31)
+// C# Button (31): UIButtonMask.cs
+// C# Button (31): PuzzleUIButton.cs
+RenderTextL(138,680,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(138,680,29,29,1025); // GeniusHighlight (31) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(166,680,29,29,1025); // Button (32) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (32): PuzzleGridLH.OnGridCellClick(32)
+// C# Button (32): UIButtonMask.cs
+// C# Button (32): PuzzleUIButton.cs
+RenderTextL(166,680,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(166,680,29,29,1025); // GeniusHighlight (32) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(195,680,29,29,1025); // Button (33) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (33): PuzzleGridLH.OnGridCellClick(33)
+// C# Button (33): UIButtonMask.cs
+// C# Button (33): PuzzleUIButton.cs
+RenderTextL(195,680,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(195,680,29,29,1025); // GeniusHighlight (33) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(224,680,29,29,1025); // Button (34) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (34): PuzzleGridLH.OnGridCellClick(34)
+// C# Button (34): UIButtonMask.cs
+// C# Button (34): PuzzleUIButton.cs
+RenderTextL(224,680,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(224,680,29,29,1025); // GeniusHighlight (34) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(42,720,221,26,1025); // ProgressContainer UNMAPPED:[Textures/UI/puzzle/gridcontainer_gray.p
+RenderUIImage(45,726,225,13,0); // Background QUAD:builtin-knob
+RenderUIImage(48,726,6,13,1025); // Fill UNMAPPED:[Textures/UI/puzzle/puzzlesliderwire.png
+RenderUIImage(45,720,22,26,1078); // Handle
+RenderUIImage(259,527,29,29,899); // CloseButton
+// BTN CloseButton: MFDManager.ClosePuzzleGrid()
+// C# CloseButton: UIButtonMask.cs
+RenderTextL(259,527,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+// C# PuzzleWireLH: PuzzleWire.cs
+RenderUIImage(82,570,139,192,1025); // ContainerCenter UNMAPPED:[Textures/UI/puzzle/wire_center.png]
+RenderUIImage(34,521,235,44,1025); // LevelsBox UNMAPPED:[Textures/UI/puzzle/wire_levelsbox.png]
+RenderUIImage(40,526,235,34,0); // Background QUAD:builtin-knob
+RenderUIImage(43,526,6,34,1025); // Fill UNMAPPED:[Textures/UI/puzzle/puzzlesliderwire.png
+RenderUIImage(40,509,22,69,1078); // Handle
+RenderUIImage(204,522,66,42,1025); // TargetLine UNMAPPED:[Textures/UI/puzzle/wire_levelstargetlin
+RenderUIImage(57,566,26,29,1025); // NodeBase UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase: PuzzleWireLH.ClickLHNode()
+// C# NodeBase: UIButtonMask.cs
+// C# NodeBase: PuzzleUIButton.cs
+RenderUIImage(61,572,16,16,0); // SelectedIndicator QUAD:none
+RenderUIImage(58,569,22,22,0); // GeniusHint QUAD:none
+RenderUIImage(57,594,26,29,1025); // NodeBase (1) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (1): PuzzleWireLH.ClickLHNode(1)
+// C# NodeBase (1): UIButtonMask.cs
+// C# NodeBase (1): PuzzleUIButton.cs
+RenderUIImage(61,600,16,16,0); // SelectedIndicator (1) QUAD:none
+RenderUIImage(58,597,22,22,0); // GeniusHint (1) QUAD:none
+RenderUIImage(57,623,26,29,1025); // NodeBase (2) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (2): PuzzleWireLH.ClickLHNode(2)
+// C# NodeBase (2): UIButtonMask.cs
+// C# NodeBase (2): PuzzleUIButton.cs
+RenderUIImage(61,629,16,16,0); // SelectedIndicator (2) QUAD:none
+RenderUIImage(58,626,22,22,0); // GeniusHint (2) QUAD:none
+RenderUIImage(57,651,26,29,1025); // NodeBase (3) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (3): PuzzleWireLH.ClickLHNode(3)
+// C# NodeBase (3): UIButtonMask.cs
+// C# NodeBase (3): PuzzleUIButton.cs
+RenderUIImage(61,657,16,16,0); // SelectedIndicator (3) QUAD:none
+RenderUIImage(58,654,22,22,0); // GeniusHint (3) QUAD:none
+RenderUIImage(57,679,26,29,1025); // NodeBase (4) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (4): PuzzleWireLH.ClickLHNode(4)
+// C# NodeBase (4): UIButtonMask.cs
+// C# NodeBase (4): PuzzleUIButton.cs
+RenderUIImage(61,685,16,16,0); // SelectedIndicator (4) QUAD:none
+RenderUIImage(58,682,22,22,0); // GeniusHint (4) QUAD:none
+RenderUIImage(57,707,26,29,1025); // NodeBase (5) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (5): PuzzleWireLH.ClickLHNode(5)
+// C# NodeBase (5): UIButtonMask.cs
+// C# NodeBase (5): PuzzleUIButton.cs
+RenderUIImage(61,713,16,16,0); // SelectedIndicator (5) QUAD:none
+RenderUIImage(58,710,22,22,0); // GeniusHint (5) QUAD:none
+RenderUIImage(57,737,26,29,1025); // NodeBase (6) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (6): PuzzleWireLH.ClickLHNode(6)
+// C# NodeBase (6): UIButtonMask.cs
+// C# NodeBase (6): PuzzleUIButton.cs
+RenderUIImage(61,743,16,16,0); // SelectedIndicator (6) QUAD:none
+RenderUIImage(58,740,22,22,0); // GeniusHint (6) QUAD:none
+RenderUIImage(222,566,26,29,1025); // NodeBase UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase: PuzzleWireLH.ClickRHNode()
+// C# NodeBase: UIButtonMask.cs
+// C# NodeBase: PuzzleUIButton.cs
+RenderUIImage(227,572,16,16,0); // SelectedIndicator QUAD:none
+RenderUIImage(223,569,22,22,0); // GeniusHint QUAD:none
+RenderUIImage(222,594,26,29,1025); // NodeBase (1) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (1): PuzzleWireLH.ClickRHNode(1)
+// C# NodeBase (1): UIButtonMask.cs
+// C# NodeBase (1): PuzzleUIButton.cs
+RenderUIImage(227,600,16,16,0); // SelectedIndicator (1) QUAD:none
+RenderUIImage(223,597,22,22,0); // GeniusHint (1) QUAD:none
+RenderUIImage(222,623,26,29,1025); // NodeBase (2) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (2): PuzzleWireLH.ClickRHNode(2)
+// C# NodeBase (2): UIButtonMask.cs
+// C# NodeBase (2): PuzzleUIButton.cs
+RenderUIImage(227,629,16,16,0); // SelectedIndicator (2) QUAD:none
+RenderUIImage(223,626,22,22,0); // GeniusHint (2) QUAD:none
+RenderUIImage(222,651,26,29,1025); // NodeBase (3) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (3): PuzzleWireLH.ClickRHNode(3)
+// C# NodeBase (3): UIButtonMask.cs
+// C# NodeBase (3): PuzzleUIButton.cs
+RenderUIImage(227,657,16,16,0); // SelectedIndicator (3) QUAD:none
+RenderUIImage(223,654,22,22,0); // GeniusHint (3) QUAD:none
+RenderUIImage(222,679,26,29,1025); // NodeBase (4) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (4): PuzzleWireLH.ClickRHNode(4)
+// C# NodeBase (4): UIButtonMask.cs
+// C# NodeBase (4): PuzzleUIButton.cs
+RenderUIImage(227,685,16,16,0); // SelectedIndicator (4) QUAD:none
+RenderUIImage(223,682,22,22,0); // GeniusHint (4) QUAD:none
+RenderUIImage(222,707,26,29,1025); // NodeBase (5) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (5): PuzzleWireLH.ClickRHNode(5)
+// C# NodeBase (5): UIButtonMask.cs
+// C# NodeBase (5): PuzzleUIButton.cs
+RenderUIImage(227,713,16,16,0); // SelectedIndicator (5) QUAD:none
+RenderUIImage(223,710,22,22,0); // GeniusHint (5) QUAD:none
+RenderUIImage(222,736,26,29,1025); // NodeBase (6) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (6): PuzzleWireLH.ClickRHNode(6)
+// C# NodeBase (6): UIButtonMask.cs
+// C# NodeBase (6): PuzzleUIButton.cs
+RenderUIImage(227,743,16,16,0); // SelectedIndicator (6) QUAD:none
+RenderUIImage(223,740,22,22,0); // GeniusHint (6) QUAD:none
+RenderUIImage(259,736,29,29,899); // CloseButton
+// BTN CloseButton: MFDManager.ClosePuzzleWire()
+// C# CloseButton: UIButtonMask.cs
+RenderTextL(259,736,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+// C# SystemAnalyzerDisplayLH: SystemAnalyzer.cs
+RenderTextL(24,523,T_YELLOW,FONT_NORMAL,0.6,"%s",892<1100?Sys_Text.stringTable[892]:"SYSTEM ANALYZER"); // Header
+// C# Header: UIPointerMask.cs
+RenderTextL(24,547,T_GREEN,FONT_NORMAL,0.6,"Current level security:"); // DescriptionLevelSecurity
+// C# DescriptionLevelSecurity: UIPointerMask.cs
+RenderTextL(180,547,T_GREEN,FONT_NORMAL,0.6,"100%%"); // TextLevelSecurity
+// C# TextLevelSecurity: UIPointerMask.cs
+RenderTextL(24,566,T_GREEN,FONT_NORMAL,0.6,"Mining laser status:"); // DescriptionMiningLaser
+// C# DescriptionMiningLaser: UIPointerMask.cs
+RenderTextL(180,566,T_GREEN,FONT_NORMAL,0.6,"Charging"); // TextLaserStatus
+// C# TextLaserStatus: UIPointerMask.cs
+RenderTextL(24,585,T_GREEN,FONT_NORMAL,0.6,"Lifepod status:"); // DescriptionLifepods
+// C# DescriptionLifepods: UIPointerMask.cs
+RenderTextL(180,585,T_GREEN,FONT_NORMAL,0.6,"Disabled"); // TextLifepodStatus
+// C# TextLifepodStatus: UIPointerMask.cs
+RenderTextL(24,605,T_GREEN,FONT_NORMAL,0.6,"Station shield status:"); // DescriptionShield
+// C# DescriptionShield: UIPointerMask.cs
+RenderTextL(180,605,T_GREEN,FONT_NORMAL,0.6,"Off"); // TextShieldStatus
+// C# TextShieldStatus: UIPointerMask.cs
+RenderTextL(24,624,T_GREEN,FONT_NORMAL,0.6,"Reactor status:"); // DescriptionReactor
+// C# DescriptionReactor: UIPointerMask.cs
+RenderTextL(180,624,T_GREEN,FONT_NORMAL,0.6,"Normal"); // TextReactorStatus
+// C# TextReactorStatus: UIPointerMask.cs
+RenderTextL(24,643,T_GREEN,FONT_NORMAL,0.6,"Processor nodes:"); // DescriptionProcessors
+// C# DescriptionProcessors: UIPointerMask.cs
+RenderTextL(180,643,T_GREEN,FONT_NORMAL,0.6,"99"); // TextProcessors
+// C# TextProcessors: UIPointerMask.cs
+RenderTextL(24,662,T_GREEN,FONT_NORMAL,0.6,"Main Program:"); // DescriptionMainProgram
+// C# DescriptionMainProgram: UIPointerMask.cs
+RenderTextL(179,662,T_GREEN,FONT_NORMAL,0.6,"Downloading to earth"); // TextMainProgram
+// C# TextMainProgram: UIPointerMask.cs
+RenderTextL(24,681,T_GREEN,FONT_NORMAL,0.6,"Alpha Grove status:"); // DescriptionGroveAlphaStatus
+// C# DescriptionGroveAlphaStatus: UIPointerMask.cs
+RenderTextL(180,681,T_GREEN,FONT_NORMAL,0.6,"normal"); // TextGroveAlpha
+// C# TextGroveAlpha: UIPointerMask.cs
+RenderTextL(24,701,T_GREEN,FONT_NORMAL,0.6,"Beta Grove status:"); // DescriptionGroveBetaStatus
+// C# DescriptionGroveBetaStatus: UIPointerMask.cs
+RenderTextL(180,701,T_GREEN,FONT_NORMAL,0.6,"normal"); // TextGroveBeta
+// C# TextGroveBeta: UIPointerMask.cs
+RenderTextL(24,720,T_GREEN,FONT_NORMAL,0.6,"Gamma Grove status:"); // DescriptionGroveGammaStatus
+// C# DescriptionGroveGammaStatus: UIPointerMask.cs
+RenderTextL(180,720,T_GREEN,FONT_NORMAL,0.6,"launched"); // TextGroveGamma
+// C# TextGroveGamma: UIPointerMask.cs
+RenderTextL(24,739,T_GREEN,FONT_NORMAL,0.6,"Delta Grove status:"); // DescriptionGroveDeltaStatus
+// C# DescriptionGroveDeltaStatus: UIPointerMask.cs
+RenderTextL(180,739,T_GREEN,FONT_NORMAL,0.6,"launched"); // TextGroveDelta
+// C# TextGroveDelta: UIPointerMask.cs
+RenderUIImage(259,527,29,29,899); // CloseButton
+// BTN CloseButton: SystemAnalyzerDisplayLH.Close()
+// C# CloseButton: UIButtonMask.cs
+RenderTextL(259,527,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+RenderUIImage(21,501,262,262,1025); // MinigamesContainer
+// C# MinigamesContainer: UIPointerMask.cs
+RenderTextL(28,503,T_RED,FONT_NORMAL,0.6,"TRIOPTIMUM FUNPACK"); // Header
+RenderUIImage(32,540,115,24,0); // MiniGameButton0_Ping QUAD:builtin-white
+// BTN MiniGameButton0_Ping: MFDManager.MinigameStart_Ping()
+// C# MiniGameButton0_Ping: UIButtonMask.cs
+RenderTextL(37,541,T_GREEN,FONT_NORMAL,0.6,"Ping"); // Text
+RenderUIImage(32,575,115,24,0); // MiniGameButton1_15 QUAD:builtin-white
+// BTN MiniGameButton1_15: MFDManager.MinigameStart_15()
+// C# MiniGameButton1_15: UIButtonMask.cs
+RenderTextL(37,577,T_GREEN,FONT_NORMAL,0.6,"15"); // Text
+RenderUIImage(32,610,115,24,0); // MiniGameButton2_Wing0 QUAD:builtin-white
+// BTN MiniGameButton2_Wing0: MFDManager.MinigameStart_Wing0()
+// C# MiniGameButton2_Wing0: UIButtonMask.cs
+RenderTextL(37,612,T_GREEN,FONT_NORMAL,0.6,"Wing 0"); // Text
+RenderUIImage(32,646,115,24,0); // MiniGameButton3_Botbounce QUAD:builtin-white
+// BTN MiniGameButton3_Botbounce: MFDManager.MinigameStart_Botbounce()
+// C# MiniGameButton3_Botbounce: UIButtonMask.cs
+RenderTextL(37,647,T_GREEN,FONT_NORMAL,0.6,"Botbounce"); // Text
+RenderUIImage(156,540,115,24,0); // MiniGameButton4_EelZapper QUAD:builtin-white
+// BTN MiniGameButton4_EelZapper: MFDManager.MinigameStart_EelZapper()
+// C# MiniGameButton4_EelZapper: UIButtonMask.cs
+RenderTextL(161,541,T_GREEN,FONT_NORMAL,0.6,"Eel Zapper"); // Text
+RenderUIImage(156,575,115,24,0); // MiniGameButton5_Road QUAD:builtin-white
+// BTN MiniGameButton5_Road: MFDManager.MinigameStart_Road()
+// C# MiniGameButton5_Road: UIButtonMask.cs
+RenderTextL(161,577,T_GREEN,FONT_NORMAL,0.6,"Road"); // Text
+RenderUIImage(156,610,115,24,0); // MiniGameButton6_TriopToe QUAD:builtin-white
+// BTN MiniGameButton6_TriopToe: MFDManager.MinigameStart_TriopToe()
+// C# MiniGameButton6_TriopToe: UIButtonMask.cs
+RenderTextL(161,612,T_GREEN,FONT_NORMAL,0.6,"TriopToe"); // Text
+RenderUIImage(156,646,115,24,0); // MiniGameButton7_CorporateConquer QUAD:builtin-white
+// BTN MiniGameButton7_CorporateConquer: MFDManager.MinigameStart_CorporateConquer()
+// C# MiniGameButton7_CorporateConquer: UIButtonMask.cs
+RenderTextL(161,647,T_GREEN,FONT_NORMAL,0.6,"Corp Conq"); // Text
+RenderUIImage(32,681,115,24,0); // MiniGameButton8_Chess QUAD:builtin-white
+// BTN MiniGameButton8_Chess: MFDManager.MinigameStart_Chess()
+// C# MiniGameButton8_Chess: UIButtonMask.cs
+RenderTextL(37,682,T_GREEN,FONT_NORMAL,0.6,"Chess"); // Text
+RenderTextL(97,726,T_RED,FONT_NORMAL,0.6,"Don't Play on\n\nCompany Time"); // Footer
+RenderUIImage(261,504,19,19,0); // MinigameClose QUAD:none
+// BTN MinigameClose: MFDManager.TabReset()
+// C# MinigameClose: UIButtonMask.cs
+RenderUIImage(259,502,22,22,899); // Border
+RenderUIImage(21,501,262,262,0); // MinigameView QUAD:none
+// C# MinigameView: UIPointerMask.cs
+RenderUIImage(21,501,262,262,0); // PingGameOver QUAD:builtin-white
+// BTN PingGameOver: Ping.ResetOnGameOver()|Fifteen.Reset()
+RenderTextL(30,545,T_WHITE,FONT_NORMAL,0.6,"PUZZLE SOLVED!"); // gameOverText
+RenderTextL(91,710,T_WHITE,FONT_NORMAL,0.6,"YOU LOSE"); // winText
+RenderUIImage(261,504,19,19,0); // MinigameBack QUAD:none
+// BTN MinigameBack: MFDManager.OpenMinigames()
+// C# MinigameBack: UIButtonMask.cs
+RenderUIImage(259,502,22,22,899); // Border
+// C# TabButtonsPanelLH: TabButtons.cs
+RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.6,"T -"); // CyberTimerT
+RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.6,"99:99"); // CyberTimer
+// C# CyberTimer: CyberTimer.cs
+RenderUIImage(553,584,91,191,0); // WeaponShotsInventory QUAD:builtin-knob
+RenderTextL(553,584,T_RED,FONT_NORMAL,0.6,"%s",871<1100?Sys_Text.stringTable[871]:"SHOTS"); // TextShotsHeader
+// C# TextShotsHeader: UIPointerMask.cs
+RenderTextL(553,604,T_YELLOW,FONT_NORMAL,0.6,"SHOTS1"); // Text
+RenderTextL(553,624,T_GREEN,FONT_NORMAL,0.6,"SHOTS2"); // Text1
+RenderTextL(553,644,T_GREEN,FONT_NORMAL,0.6,"SHOTS3"); // Text1
+RenderTextL(553,664,T_GREEN,FONT_NORMAL,0.6,"SHOTS4"); // Text3
+RenderTextL(553,685,T_GREEN,FONT_NORMAL,0.6,"SHOTS5"); // Text4
+RenderTextL(553,705,T_GREEN,FONT_NORMAL,0.6,"SHOTS6"); // Text5
+RenderTextL(553,725,T_GREEN,FONT_NORMAL,0.6,"SHOTS7"); // Text6
+RenderUIImage(734,584,88,191,0); // GrenadeInventory QUAD:builtin-knob
+// C# GrenadeInventory: GrenadeButtonsManager.cs
+RenderTextL(734,584,T_RED,FONT_NORMAL,0.6,"%s",872<1100?Sys_Text.stringTable[872]:"GRENADES"); // Text
+// C# Text: UIPointerMask.cs
+RenderUIImage(734,604,59,20,0); // FragGrenadeButton QUAD:builtin-white
+// BTN FragGrenadeButton: ?
+// C# FragGrenadeButton: GrenadeButton.cs
+// C# FragGrenadeButton: UIButtonMask.cs
+RenderTextL(734,604,T_YELLOW,FONT_NORMAL,0.6,"%s",900<1100?Sys_Text.stringTable[900]:"FRAG"); // Text
+RenderUIImage(795,605,20,20,1086); // Button (1)
+// BTN Button (1): MainCamera.UseGrenade(7)
+// C# Button (1): UIPointerMask.cs
+RenderUIImage(800,609,11,11,1079); // Image
+RenderUIImage(734,624,59,20,0); // EMPGrenadeButton QUAD:builtin-white
+// BTN EMPGrenadeButton: ?
+// C# EMPGrenadeButton: GrenadeButton.cs
+// C# EMPGrenadeButton: UIButtonMask.cs
+RenderTextL(734,624,T_GREEN,FONT_NORMAL,0.6,"%s",901<1100?Sys_Text.stringTable[901]:"EMP"); // Text
+RenderUIImage(795,625,20,20,1086); // Button (2)
+// BTN Button (2): MainCamera.UseGrenade(9)
+// C# Button (2): UIPointerMask.cs
+RenderUIImage(800,630,11,11,1079); // Image
+RenderUIImage(734,644,59,20,0); // GasGrenadeButton QUAD:builtin-white
+// BTN GasGrenadeButton: ?
+// C# GasGrenadeButton: GrenadeButton.cs
+// C# GasGrenadeButton: UIButtonMask.cs
+RenderTextL(734,644,T_GREEN,FONT_NORMAL,0.6,"%s",902<1100?Sys_Text.stringTable[902]:"GAS"); // Text
+RenderUIImage(795,645,20,20,1086); // Button (3)
+// BTN Button (3): MainCamera.UseGrenade(13)
+// C# Button (3): UIPointerMask.cs
+RenderUIImage(800,650,11,11,1079); // Image
+RenderUIImage(734,664,59,20,0); // ConcussionGrenadeButton QUAD:builtin-white
+// BTN ConcussionGrenadeButton: ?
+// C# ConcussionGrenadeButton: GrenadeButton.cs
+// C# ConcussionGrenadeButton: UIButtonMask.cs
+RenderTextL(734,664,T_GREEN,FONT_NORMAL,0.6,"%s",903<1100?Sys_Text.stringTable[903]:"CONC"); // Text
+RenderUIImage(795,665,20,20,1086); // Button (4)
+// BTN Button (4): MainCamera.UseGrenade(8)
+// C# Button (4): UIPointerMask.cs
+RenderUIImage(800,670,11,11,1079); // Image
+RenderUIImage(734,685,59,20,0); // LandMineGrenadeButton QUAD:builtin-white
+// BTN LandMineGrenadeButton: ?
+// C# LandMineGrenadeButton: GrenadeButton.cs
+// C# LandMineGrenadeButton: UIButtonMask.cs
+RenderTextL(734,685,T_GREEN,FONT_NORMAL,0.6,"%s",904<1100?Sys_Text.stringTable[904]:"MINE"); // Text
+RenderUIImage(795,686,20,20,1086); // Button (5)
+// BTN Button (5): MainCamera.UseGrenade(11)
+// C# Button (5): UIPointerMask.cs
+RenderUIImage(800,690,11,11,1079); // Image
+RenderUIImage(734,705,59,20,0); // NitropackGrenadeButton QUAD:builtin-white
+// BTN NitropackGrenadeButton: ?
+// C# NitropackGrenadeButton: GrenadeButton.cs
+// C# NitropackGrenadeButton: UIButtonMask.cs
+RenderTextL(734,705,T_GREEN,FONT_NORMAL,0.6,"%s",905<1100?Sys_Text.stringTable[905]:"NTRO"); // Text
+RenderUIImage(795,706,20,20,1086); // Button (6)
+// BTN Button (6): MainCamera.UseGrenade(12)
+// C# Button (6): UIPointerMask.cs
+RenderUIImage(800,711,11,11,1079); // Image
+RenderUIImage(734,725,59,20,0); // EarthShakerGrenadeButton QUAD:builtin-white
+// BTN EarthShakerGrenadeButton: ?
+// C# EarthShakerGrenadeButton: GrenadeButton.cs
+// C# EarthShakerGrenadeButton: UIButtonMask.cs
+RenderTextL(734,725,T_GREEN,FONT_NORMAL,0.6,"%s",906<1100?Sys_Text.stringTable[906]:"SHKR"); // Text
+RenderUIImage(795,726,20,20,1086); // Button (7)
+// BTN Button (7): MainCamera.UseGrenade(10)
+// C# Button (7): UIPointerMask.cs
+RenderUIImage(800,731,11,11,1079); // Image
+RenderUIImage(706,584,88,191,0); // GrenadeCountsInventory QUAD:builtin-knob
+RenderTextL(706,584,T_RED,FONT_NORMAL,0.6,"#"); // Text
+RenderUIImage(706,604,86,20,0); // GrenadeCounts1 QUAD:builtin-white
+RenderTextL(706,604,T_YELLOW,FONT_NORMAL,0.6,"#1"); // Text
+RenderUIImage(706,624,86,20,0); // GrenadeCounts2 QUAD:builtin-white
+RenderTextL(706,624,T_GREEN,FONT_NORMAL,0.6,"#2"); // Text
+RenderUIImage(706,644,86,20,0); // GrenadeCounts3 QUAD:builtin-white
+RenderTextL(706,644,T_GREEN,FONT_NORMAL,0.6,"#3"); // Text
+RenderUIImage(706,664,86,20,0); // GrenadeCounts4 QUAD:builtin-white
+RenderTextL(706,664,T_GREEN,FONT_NORMAL,0.6,"#4"); // Text
+RenderUIImage(706,685,86,20,0); // GrenadeCounts5 QUAD:builtin-white
+RenderTextL(706,685,T_GREEN,FONT_NORMAL,0.6,"#5"); // Text
+RenderUIImage(706,705,86,20,0); // GrenadeCounts6 QUAD:builtin-white
+RenderTextL(706,705,T_GREEN,FONT_NORMAL,0.6,"#6"); // Text
+RenderUIImage(706,725,86,20,0); // GrenadeCounts7 QUAD:builtin-white
+RenderTextL(706,725,T_GREEN,FONT_NORMAL,0.6,"#7"); // Text
+RenderUIImage(831,584,99,191,0); // PatchInventory QUAD:builtin-knob
+RenderTextL(831,584,T_RED,FONT_NORMAL,0.6,"%s",873<1100?Sys_Text.stringTable[873]:"PATCHES"); // Text
+// C# Text: UIPointerMask.cs
+// BTN Button: ?
+// C# Button: PatchButton.cs
+// C# Button: UIButtonMask.cs
+RenderTextL(831,604,T_YELLOW,FONT_NORMAL,0.6,"%s",907<1100?Sys_Text.stringTable[907]:"STAMUP"); // Text
+RenderUIImage(910,605,20,20,1086); // Button
+// BTN Button: Button.DoubleClick()
+// C# Button: UIPointerMask.cs
+RenderUIImage(914,609,11,11,1079); // Image
+RenderTextL(869,604,T_YELLOW,FONT_NORMAL,0.6,"#1"); // CountsText
+// BTN Button (1): ?
+// C# Button (1): PatchButton.cs
+// C# Button (1): UIButtonMask.cs
+RenderTextL(831,624,T_GREEN,FONT_NORMAL,0.6,"%s",908<1100?Sys_Text.stringTable[908]:"SIGHT"); // Text
+RenderUIImage(910,625,20,20,1086); // Button (1)
+// BTN Button (1): Button
+// C# Button (1): UIPointerMask.cs
+RenderUIImage(914,630,11,11,1079); // Image
+RenderTextL(869,624,T_GREEN,FONT_NORMAL,0.6,"#2"); // CountsText1
+// BTN Button (2): ?
+// C# Button (2): PatchButton.cs
+// C# Button (2): UIButtonMask.cs
+RenderTextL(831,644,T_GREEN,FONT_NORMAL,0.6,"%s",909<1100?Sys_Text.stringTable[909]:"B'SERK"); // Text
+RenderUIImage(910,645,20,20,1086); // Button (2)
+// BTN Button (2): Button
+// C# Button (2): UIPointerMask.cs
+RenderUIImage(914,650,11,11,1079); // Image
+RenderTextL(869,644,T_GREEN,FONT_NORMAL,0.6,"#3"); // CountsText2
+// BTN Button (3): ?
+// C# Button (3): PatchButton.cs
+// C# Button (3): UIButtonMask.cs
+RenderTextL(831,664,T_GREEN,FONT_NORMAL,0.6,"%s",910<1100?Sys_Text.stringTable[910]:"MEDI"); // Text
+RenderUIImage(910,665,20,20,1086); // Button (3)
+// BTN Button (3): Button
+// C# Button (3): UIPointerMask.cs
+RenderUIImage(914,670,11,11,1079); // Image
+RenderTextL(869,664,T_GREEN,FONT_NORMAL,0.6,"#4"); // CountsText3
+// BTN Button (4): ?
+// C# Button (4): PatchButton.cs
+// C# Button (4): UIButtonMask.cs
+RenderTextL(831,685,T_GREEN,FONT_NORMAL,0.6,"%s",911<1100?Sys_Text.stringTable[911]:"REFLEX"); // Text
+RenderUIImage(910,686,20,20,1086); // Button (4)
+// BTN Button (4): Button
+// C# Button (4): UIPointerMask.cs
+RenderUIImage(914,690,11,11,1079); // Image
+RenderTextL(869,684,T_GREEN,FONT_NORMAL,0.6,"#5"); // CountsText4
+// BTN Button (5): ?
+// C# Button (5): PatchButton.cs
+// C# Button (5): UIButtonMask.cs
+RenderTextL(831,705,T_GREEN,FONT_NORMAL,0.6,"%s",912<1100?Sys_Text.stringTable[912]:"GENIUS"); // Text
+RenderUIImage(910,706,20,20,1086); // Button (5)
+// BTN Button (5): Button
+// C# Button (5): UIPointerMask.cs
+RenderUIImage(914,711,11,11,1079); // Image
+RenderTextL(869,705,T_GREEN,FONT_NORMAL,0.6,"#6"); // CountsText5
+// BTN Button (6): ?
+// C# Button (6): PatchButton.cs
+// C# Button (6): UIButtonMask.cs
+RenderTextL(831,725,T_GREEN,FONT_NORMAL,0.6,"%s",913<1100?Sys_Text.stringTable[913]:"DETOX"); // Text
+RenderUIImage(910,726,20,20,1086); // Button (6)
+// BTN Button (6): Button
+// C# Button (6): UIPointerMask.cs
+RenderUIImage(914,731,11,11,1079); // Image
+RenderTextL(869,725,T_GREEN,FONT_NORMAL,0.6,"#7"); // CountsText6
+RenderUIImage(870,584,37,191,0); // PatchCountsInventory QUAD:builtin-knob
+RenderTextL(870,584,T_RED,FONT_NORMAL,0.6,"#"); // Text
+RenderTextL(454,557,T_RED,FONT_NORMAL,0.6,"%s",874<1100?Sys_Text.stringTable[874]:"HARDWARE"); // Label
+// C# Label: UIPointerMask.cs
+RenderUIImage(458,575,445,188,0); // HarwareInventory QUAD:builtin-knob
+RenderUIImage(458,575,222,23,0); // Button QUAD:builtin-white
+// BTN Button: ?
+// C# Button: UIButtonMask.cs
+// C# Button: HardwareInvButton.cs
+RenderTextL(458,575,T_YELLOW,FONT_NORMAL,0.6,"HARDWARE #1"); // Text
+RenderUIImage(458,598,222,23,0); // Button (1) QUAD:builtin-white
+// BTN Button (1): ?
+// C# Button (1): UIButtonMask.cs
+// C# Button (1): HardwareInvButton.cs
+RenderTextL(458,598,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #2"); // Text
+RenderUIImage(458,621,222,23,0); // Button (2) QUAD:builtin-white
+// BTN Button (2): ?
+// C# Button (2): UIButtonMask.cs
+// C# Button (2): HardwareInvButton.cs
+RenderTextL(458,621,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #3"); // Text
+RenderUIImage(458,644,222,23,0); // Button (3) QUAD:builtin-white
+// BTN Button (3): ?
+// C# Button (3): UIButtonMask.cs
+// C# Button (3): HardwareInvButton.cs
+RenderTextL(458,644,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #4"); // Text
+RenderUIImage(458,667,222,23,0); // Button (4) QUAD:builtin-white
+// BTN Button (4): ?
+// C# Button (4): UIButtonMask.cs
+// C# Button (4): HardwareInvButton.cs
+RenderTextL(458,667,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #5"); // Text
+RenderUIImage(458,691,222,23,0); // Button (5) QUAD:builtin-white
+// BTN Button (5): ?
+// C# Button (5): UIButtonMask.cs
+// C# Button (5): HardwareInvButton.cs
+RenderTextL(458,691,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #6"); // Text
+RenderUIImage(458,714,222,23,0); // Button (6) QUAD:builtin-white
+// BTN Button (6): ?
+// C# Button (6): UIButtonMask.cs
+// C# Button (6): HardwareInvButton.cs
+RenderTextL(458,714,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #7"); // Text
+RenderUIImage(681,575,222,23,0); // Button (7) QUAD:builtin-white
+// BTN Button (7): ?
+// C# Button (7): UIButtonMask.cs
+// C# Button (7): HardwareInvButton.cs
+RenderTextL(681,575,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #8"); // Text
+RenderUIImage(681,598,222,23,0); // Button (8) QUAD:builtin-white
+// BTN Button (8): ?
+// C# Button (8): UIButtonMask.cs
+// C# Button (8): HardwareInvButton.cs
+RenderTextL(681,598,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #9"); // Text
+RenderUIImage(681,621,222,23,0); // Button (9) QUAD:builtin-white
+// BTN Button (9): ?
+// C# Button (9): UIButtonMask.cs
+// C# Button (9): HardwareInvButton.cs
+RenderTextL(681,621,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #10"); // Text
+RenderUIImage(681,644,222,23,0); // Button (10) QUAD:builtin-white
+// BTN Button (10): ?
+// C# Button (10): UIButtonMask.cs
+// C# Button (10): HardwareInvButton.cs
+RenderTextL(681,644,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #11"); // Text
+RenderUIImage(681,667,222,23,0); // Button (11) QUAD:builtin-white
+// BTN Button (11): ?
+// C# Button (11): UIButtonMask.cs
+// C# Button (11): HardwareInvButton.cs
+RenderTextL(681,667,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #12"); // Text
+RenderUIImage(681,691,222,23,0); // Button (12) QUAD:builtin-white
+// BTN Button (12): ?
+// C# Button (12): UIButtonMask.cs
+// C# Button (12): HardwareInvButton.cs
+RenderTextL(681,691,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #13"); // Text
+RenderUIImage(681,714,222,23,0); // Button (13) QUAD:builtin-white
+// BTN Button (13): ?
+// C# Button (13): UIButtonMask.cs
+// C# Button (13): HardwareInvButton.cs
+RenderTextL(681,714,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #14"); // Text
+RenderTextL(454,557,T_RED,FONT_NORMAL,0.6,"%s",875<1100?Sys_Text.stringTable[875]:"GENERAL"); // Label
+// C# Label: UIPointerMask.cs
+RenderUIImage(454,573,453,191,0); // GeneralInventory QUAD:builtin-knob
+RenderUIImage(454,573,226,24,0); // AccessCardsButton QUAD:builtin-white
+// BTN AccessCardsButton: ?
+// C# AccessCardsButton: GeneralInvButton.cs
+// C# AccessCardsButton: UIButtonMask.cs
+RenderTextL(454,573,T_YELLOW,FONT_NORMAL,0.6,"ACCESS CARDS"); // Text
+RenderUIImage(454,597,226,24,0); // Button (1) QUAD:builtin-white
+// BTN Button (1): ?
+// C# Button (1): GeneralInvButton.cs
+// C# Button (1): UIButtonMask.cs
+RenderTextL(454,597,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #2"); // Text
+RenderUIImage(641,599,20,20,1086); // ApplySubButton (1)
+// BTN ApplySubButton (1): Button
+// C# ApplySubButton (1): UIPointerMask.cs
+RenderUIImage(646,603,11,11,1079); // Image
+RenderUIImage(454,620,226,24,0); // Button (2) QUAD:builtin-white
+// BTN Button (2): ?
+// C# Button (2): GeneralInvButton.cs
+// C# Button (2): UIButtonMask.cs
+RenderTextL(454,620,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #3"); // Text
+RenderUIImage(641,622,20,20,1086); // ApplySubButton (2)
+// BTN ApplySubButton (2): Button
+// C# ApplySubButton (2): UIPointerMask.cs
+RenderUIImage(646,627,11,11,1079); // Image
+RenderUIImage(454,644,226,24,0); // Button (3) QUAD:builtin-white
+// BTN Button (3): ?
+// C# Button (3): GeneralInvButton.cs
+// C# Button (3): UIButtonMask.cs
+RenderTextL(454,644,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #4"); // Text
+RenderUIImage(641,646,20,20,1086); // ApplySubButton (3)
+// BTN ApplySubButton (3): Button
+// C# ApplySubButton (3): UIPointerMask.cs
+RenderUIImage(646,650,11,11,1079); // Image
+RenderUIImage(454,667,226,24,0); // Button (4) QUAD:builtin-white
+// BTN Button (4): ?
+// C# Button (4): GeneralInvButton.cs
+// C# Button (4): UIButtonMask.cs
+RenderTextL(454,667,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #5"); // Text
+RenderUIImage(641,669,20,20,1086); // ApplySubButton (4)
+// BTN ApplySubButton (4): Button
+// C# ApplySubButton (4): UIPointerMask.cs
+RenderUIImage(646,674,11,11,1079); // Image
+RenderUIImage(454,691,226,24,0); // Button (5) QUAD:builtin-white
+// BTN Button (5): ?
+// C# Button (5): GeneralInvButton.cs
+// C# Button (5): UIButtonMask.cs
+RenderTextL(454,691,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #6"); // Text
+RenderUIImage(641,693,20,20,1086); // ApplySubButton (5)
+// BTN ApplySubButton (5): Button
+// C# ApplySubButton (5): UIPointerMask.cs
+RenderUIImage(646,697,11,11,1079); // Image
+RenderUIImage(454,714,226,24,0); // Button (6) QUAD:builtin-white
+// BTN Button (6): ?
+// C# Button (6): GeneralInvButton.cs
+// C# Button (6): UIButtonMask.cs
+RenderTextL(454,714,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #7"); // Text
+RenderUIImage(641,716,20,20,1086); // ApplySubButton (6)
+// BTN ApplySubButton (6): Button
+// C# ApplySubButton (6): UIPointerMask.cs
+RenderUIImage(646,721,11,11,1079); // Image
+RenderUIImage(681,573,226,24,0); // Button (7) QUAD:builtin-white
+// BTN Button (7): ?
+// C# Button (7): GeneralInvButton.cs
+// C# Button (7): UIButtonMask.cs
+RenderTextL(681,573,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #8"); // Text
+RenderUIImage(868,575,20,20,1086); // ApplySubButton (7)
+// BTN ApplySubButton (7): Button
+// C# ApplySubButton (7): UIPointerMask.cs
+RenderUIImage(872,580,11,11,1079); // Image
+RenderUIImage(681,597,226,24,0); // Button (8) QUAD:builtin-white
+// BTN Button (8): ?
+// C# Button (8): GeneralInvButton.cs
+// C# Button (8): UIButtonMask.cs
+RenderTextL(681,597,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #9"); // Text
+RenderUIImage(868,599,20,20,1086); // ApplySubButton (8)
+// BTN ApplySubButton (8): Button
+// C# ApplySubButton (8): UIPointerMask.cs
+RenderUIImage(872,603,11,11,1079); // Image
+RenderUIImage(681,620,226,24,0); // Button (9) QUAD:builtin-white
+// BTN Button (9): ?
+// C# Button (9): GeneralInvButton.cs
+// C# Button (9): UIButtonMask.cs
+RenderTextL(681,620,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #10"); // Text
+RenderUIImage(868,622,20,20,1086); // ApplySubButton (9)
+// BTN ApplySubButton (9): Button
+// C# ApplySubButton (9): UIPointerMask.cs
+RenderUIImage(872,627,11,11,1079); // Image
+RenderUIImage(681,644,226,24,0); // Button (10) QUAD:builtin-white
+// BTN Button (10): ?
+// C# Button (10): GeneralInvButton.cs
+// C# Button (10): UIButtonMask.cs
+RenderTextL(681,644,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #11"); // Text
+RenderUIImage(868,646,20,20,1086); // ApplySubButton (10)
+// BTN ApplySubButton (10): Button
+// C# ApplySubButton (10): UIPointerMask.cs
+RenderUIImage(872,650,11,11,1079); // Image
+RenderUIImage(681,667,226,24,0); // Button (11) QUAD:builtin-white
+// BTN Button (11): ?
+// C# Button (11): GeneralInvButton.cs
+// C# Button (11): UIButtonMask.cs
+RenderTextL(681,667,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #12"); // Text
+RenderUIImage(868,669,20,20,1086); // ApplySubButton (11)
+// BTN ApplySubButton (11): Button
+// C# ApplySubButton (11): UIPointerMask.cs
+RenderUIImage(872,674,11,11,1079); // Image
+RenderUIImage(681,691,226,24,0); // Button (12) QUAD:builtin-white
+// BTN Button (12): ?
+// C# Button (12): GeneralInvButton.cs
+// C# Button (12): UIButtonMask.cs
+RenderTextL(681,691,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #13"); // Text
+RenderUIImage(868,693,20,20,1086); // ApplySubButton (12)
+// BTN ApplySubButton (12): Button
+// C# ApplySubButton (12): UIPointerMask.cs
+RenderUIImage(872,697,11,11,1079); // Image
+RenderUIImage(681,714,226,24,0); // Button (13) QUAD:builtin-white
+// BTN Button (13): ?
+// C# Button (13): GeneralInvButton.cs
+// C# Button (13): UIButtonMask.cs
+RenderTextL(681,714,T_GREEN,FONT_NORMAL,0.6,"GENERIC OBJECT #14"); // Text
+RenderUIImage(868,716,20,20,1086); // ApplySubButton (13)
+// BTN ApplySubButton (13): Button
+// C# ApplySubButton (13): UIPointerMask.cs
+RenderUIImage(872,721,11,11,1079); // Image
+RenderTextL(454,588,T_RED,FONT_NORMAL,0.6,"%s",876<1100?Sys_Text.stringTable[876]:"SOFTS"); // Label
+// C# Label: UIPointerMask.cs
+RenderUIImage(454,604,226,24,0); // ICEDrill QUAD:builtin-white
+// BTN ICEDrill: ICEDrill.SoftInvClick()
+// C# ICEDrill: UIButtonMask.cs
+// C# ICEDrill: SoftwareInvButton.cs
+RenderTextL(454,604,T_YELLOW,FONT_NORMAL,0.6,"I.C.E. DRILL"); // Text
+// C# Text: SoftwareInvText.cs
+RenderTextL(512,605,T_YELLOW,FONT_NORMAL,0.6,"V1"); // VersionText
+RenderUIImage(454,624,226,24,0); // Pulser QUAD:builtin-white
+// BTN Pulser: Pulser.SoftInvClick()
+// C# Pulser: UIButtonMask.cs
+// C# Pulser: SoftwareInvButton.cs
+RenderTextL(454,624,T_GREEN,FONT_NORMAL,0.6,"PULSER"); // Text
+// C# Text: SoftwareInvText.cs
+RenderTextL(512,625,T_GREEN,FONT_NORMAL,0.6,"V1"); // VersionText
+RenderUIImage(454,723,226,24,0); // CyberShield QUAD:builtin-white
+// BTN CyberShield: CyberShield.SoftInvClick()
+// C# CyberShield: UIButtonMask.cs
+// C# CyberShield: SoftwareInvButton.cs
+RenderTextL(454,723,T_GREEN,FONT_NORMAL,0.6,"CYBER SHIELD"); // Text
+// C# Text: SoftwareInvText.cs
+RenderTextL(512,724,T_GREEN,FONT_NORMAL,0.6,"V1"); // VersionText
+RenderUIImage(681,604,226,24,0); // Turbo QUAD:builtin-white
+// BTN Turbo: Turbo.SoftInvClick()
+// C# Turbo: UIButtonMask.cs
+// C# Turbo: SoftwareInvButton.cs
+RenderTextL(681,604,T_GREEN,FONT_NORMAL,0.6,"TURBO"); // Text
+// C# Text: SoftwareInvText.cs
+RenderTextL(738,601,T_GREEN,FONT_NORMAL,0.6,"V1"); // TurboCountText
+// C# TurboCountText: SoftwareButtonText.cs
+RenderUIImage(839,605,20,20,1086); // UseButton
+// BTN UseButton: Turbo.SoftInvClick(7)
+// C# UseButton: UIPointerMask.cs
+RenderUIImage(843,609,11,11,1079); // Image
+RenderUIImage(681,624,226,24,0); // Decoy QUAD:builtin-white
+// BTN Decoy: Decoy.SoftInvClick()
+// C# Decoy: UIButtonMask.cs
+// C# Decoy: SoftwareInvButton.cs
+RenderTextL(681,624,T_GREEN,FONT_NORMAL,0.6,"DECOY"); // Text
+// C# Text: SoftwareInvText.cs
+RenderTextL(738,625,T_GREEN,FONT_NORMAL,0.6,"V1"); // DecoyCountText
+// C# DecoyCountText: SoftwareButtonText.cs
+RenderUIImage(839,625,20,20,1086); // UseButton
+// BTN UseButton: Decoy.SoftInvClick(7)
+// C# UseButton: UIPointerMask.cs
+RenderUIImage(843,629,11,11,1079); // Image
+RenderUIImage(681,643,226,24,0); // Recall QUAD:builtin-white
+// BTN Recall: Recall.SoftInvClick()
+// C# Recall: UIButtonMask.cs
+// C# Recall: SoftwareInvButton.cs
+RenderTextL(681,643,T_GREEN,FONT_NORMAL,0.6,"RECALL"); // Text
+// C# Text: SoftwareInvText.cs
+RenderTextL(738,644,T_GREEN,FONT_NORMAL,0.6,"V1"); // RecallCountText
+// C# RecallCountText: SoftwareButtonText.cs
+RenderUIImage(839,645,20,20,1086); // UseButton
+// BTN UseButton: Recall.SoftInvClick(7)
+// C# UseButton: UIPointerMask.cs
+RenderUIImage(843,649,11,11,1079); // Image
+RenderUIImage(681,723,226,24,0); // Games QUAD:builtin-white
+// BTN Games: Games.SoftInvClick()
+// C# Games: UIButtonMask.cs
+// C# Games: SoftwareInvButton.cs
+RenderTextL(681,723,T_GREEN,FONT_NORMAL,0.6,"GAMES"); // Text
+// C# Text: SoftwareInvText.cs
+RenderTextL(454,557,T_RED,FONT_NORMAL,0.6,"%s",877<1100?Sys_Text.stringTable[877]:"LOGS"); // MultiMediaHeaderLabel
+// C# MultiMediaHeaderLabel: UIPointerMask.cs
+RenderUIImage(454,573,453,191,0); // LogTableofContents QUAD:builtin-knob
+// C# LogTableofContents: LogTableContentsButtonsManager.cs
+RenderUIImage(454,573,226,24,0); // Button QUAD:builtin-white
+// BTN Button: ?
+// C# Button: UIButtonMask.cs
+// C# Button: MultiMediaLogTableButton.cs
+RenderTextL(454,573,T_GREEN,FONT_NORMAL,0.6,"Level R Logs"); // Text
+RenderTextL(531,573,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText
+// C# CountText: LogCountsText.cs
+RenderUIImage(454,597,226,24,0); // Button (1) QUAD:builtin-white
+// BTN Button (1): ?
+// C# Button (1): UIButtonMask.cs
+// C# Button (1): MultiMediaLogTableButton.cs
+RenderTextL(454,597,T_GREEN,FONT_NORMAL,0.6,"Level 1 Logs"); // Text
+RenderTextL(531,597,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText (1)
+// C# CountText (1): LogCountsText.cs
+RenderUIImage(454,620,226,24,0); // Button (2) QUAD:builtin-white
+// BTN Button (2): ?
+// C# Button (2): UIButtonMask.cs
+// C# Button (2): MultiMediaLogTableButton.cs
+RenderTextL(454,620,T_GREEN,FONT_NORMAL,0.6,"Level 2 Logs"); // Text
+RenderTextL(531,620,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText (2)
+// C# CountText (2): LogCountsText.cs
+RenderUIImage(454,644,226,24,0); // Button (3) QUAD:builtin-white
+// BTN Button (3): ?
+// C# Button (3): UIButtonMask.cs
+// C# Button (3): MultiMediaLogTableButton.cs
+RenderTextL(454,644,T_GREEN,FONT_NORMAL,0.6,"Level 3 Logs"); // Text
+RenderTextL(531,644,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText (3)
+// C# CountText (3): LogCountsText.cs
+RenderUIImage(454,667,226,24,0); // Button (4) QUAD:builtin-white
+// BTN Button (4): ?
+// C# Button (4): UIButtonMask.cs
+// C# Button (4): MultiMediaLogTableButton.cs
+RenderTextL(454,667,T_GREEN,FONT_NORMAL,0.6,"Level 4 Logs"); // Text
+RenderTextL(531,667,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText (4)
+// C# CountText (4): LogCountsText.cs
+RenderUIImage(454,691,226,24,0); // Button (5) QUAD:builtin-white
+// BTN Button (5): ?
+// C# Button (5): UIButtonMask.cs
+// C# Button (5): MultiMediaLogTableButton.cs
+RenderTextL(454,691,T_GREEN,FONT_NORMAL,0.6,"Level 5 Logs"); // Text
+RenderTextL(531,691,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText (5)
+// C# CountText (5): LogCountsText.cs
+RenderUIImage(454,714,226,24,0); // Button (6) QUAD:builtin-white
+// BTN Button (6): ?
+// C# Button (6): UIButtonMask.cs
+// C# Button (6): MultiMediaLogTableButton.cs
+RenderTextL(454,714,T_GREEN,FONT_NORMAL,0.6,"Level 6 Logs"); // Text
+RenderTextL(531,714,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText (6)
+// C# CountText (6): LogCountsText.cs
+RenderUIImage(681,573,226,24,0); // Button (7) QUAD:builtin-white
+// BTN Button (7): ?
+// C# Button (7): UIButtonMask.cs
+// C# Button (7): MultiMediaLogTableButton.cs
+RenderTextL(681,573,T_GREEN,FONT_NORMAL,0.6,"Level 7 Logs"); // Text
+RenderTextL(751,573,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText (7)
+// C# CountText (7): LogCountsText.cs
+RenderUIImage(681,597,226,24,0); // Button (8) QUAD:builtin-white
+// BTN Button (8): ?
+// C# Button (8): UIButtonMask.cs
+// C# Button (8): MultiMediaLogTableButton.cs
+RenderTextL(681,597,T_GREEN,FONT_NORMAL,0.6,"Level 8 Logs"); // Text
+RenderTextL(751,597,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText (8)
+// C# CountText (8): LogCountsText.cs
+RenderUIImage(681,620,226,24,0); // Button (9) QUAD:builtin-white
+// BTN Button (9): ?
+// C# Button (9): UIButtonMask.cs
+// C# Button (9): MultiMediaLogTableButton.cs
+RenderTextL(681,620,T_GREEN,FONT_NORMAL,0.6,"Level 9 Logs"); // Text
+RenderTextL(751,620,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText (9)
+// C# CountText (9): LogCountsText.cs
+RenderUIImage(458,570,445,188,0); // LogsLevelFolder QUAD:builtin-knob
+// C# LogsLevelFolder: LogContentsButtonsManager.cs
+RenderUIImage(458,570,222,21,0); // Button QUAD:builtin-white
+// BTN Button: ?
+// C# Button: UIButtonMask.cs
+// C# Button: MultiMediaLogButton.cs
+RenderTextL(458,570,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text0
+RenderUIImage(458,591,222,21,0); // Button (1) QUAD:builtin-white
+// BTN Button (1): ?
+// C# Button (1): UIButtonMask.cs
+// C# Button (1): MultiMediaLogButton.cs
+RenderTextL(458,591,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text1
+RenderUIImage(458,612,222,21,0); // Button (2) QUAD:builtin-white
+// BTN Button (2): ?
+// C# Button (2): UIButtonMask.cs
+// C# Button (2): MultiMediaLogButton.cs
+RenderTextL(458,612,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text2
+RenderUIImage(458,633,222,21,0); // Button (3) QUAD:builtin-white
+// BTN Button (3): ?
+// C# Button (3): UIButtonMask.cs
+// C# Button (3): MultiMediaLogButton.cs
+RenderTextL(458,633,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text3
+RenderUIImage(458,654,222,21,0); // Button (4) QUAD:builtin-white
+// BTN Button (4): ?
+// C# Button (4): UIButtonMask.cs
+// C# Button (4): MultiMediaLogButton.cs
+RenderTextL(458,654,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text4
+RenderUIImage(458,675,222,21,0); // Button (5) QUAD:builtin-white
+// BTN Button (5): ?
+// C# Button (5): UIButtonMask.cs
+// C# Button (5): MultiMediaLogButton.cs
+RenderTextL(458,675,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text5
+RenderUIImage(458,696,222,21,0); // Button (6) QUAD:builtin-white
+// BTN Button (6): ?
+// C# Button (6): UIButtonMask.cs
+// C# Button (6): MultiMediaLogButton.cs
+RenderTextL(458,696,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text6
+RenderUIImage(458,717,222,21,0); // Button (7) QUAD:builtin-white
+// BTN Button (7): ?
+// C# Button (7): UIButtonMask.cs
+// C# Button (7): MultiMediaLogButton.cs
+RenderTextL(458,717,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text7
+RenderUIImage(681,570,222,21,0); // Button (8) QUAD:builtin-white
+// BTN Button (8): ?
+// C# Button (8): UIButtonMask.cs
+// C# Button (8): MultiMediaLogButton.cs
+RenderTextL(681,570,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text8
+RenderUIImage(681,591,222,21,0); // Button (9) QUAD:builtin-white
+// BTN Button (9): ?
+// C# Button (9): UIButtonMask.cs
+// C# Button (9): MultiMediaLogButton.cs
+RenderTextL(681,591,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text9
+RenderUIImage(681,612,222,21,0); // Button (10) QUAD:builtin-white
+// BTN Button (10): ?
+// C# Button (10): UIButtonMask.cs
+// C# Button (10): MultiMediaLogButton.cs
+RenderTextL(681,612,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text10
+RenderUIImage(681,633,222,21,0); // Button (11) QUAD:builtin-white
+// BTN Button (11): ?
+// C# Button (11): UIButtonMask.cs
+// C# Button (11): MultiMediaLogButton.cs
+RenderTextL(681,633,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text11
+RenderUIImage(681,654,222,21,0); // Button (12) QUAD:builtin-white
+// BTN Button (12): ?
+// C# Button (12): UIButtonMask.cs
+// C# Button (12): MultiMediaLogButton.cs
+RenderTextL(681,654,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text12
+RenderUIImage(681,675,222,21,0); // Button (13) QUAD:builtin-white
+// BTN Button (13): ?
+// C# Button (13): UIButtonMask.cs
+// C# Button (13): MultiMediaLogButton.cs
+RenderTextL(681,675,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text13
+RenderUIImage(681,696,222,21,0); // Button (14) QUAD:builtin-white
+// BTN Button (14): ?
+// C# Button (14): UIButtonMask.cs
+// C# Button (14): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text14
+// C# LogTextReader: LogTextReaderManager.cs
+RenderTextL(449,576,T_GREEN,FONT_NORMAL,0.6,"\"abc def ghi jkl mno pqrs tuv wxyz ABC DEF GHI JKL MNO PQRS TUV WXYZ !\"\\xA7\n$%%& /() =?* '<> #|; \\xB2\\xB3~ @`\\xB4 \\xA9\\xAB\\xBB \\xA4\\xBC\\x..."); // LogTextOutput
+// C# LogTextOutput: UIPointerMask.cs
+RenderUIImage(454,576,456,174,0); // MoreButton QUAD:builtin-white
+// BTN MoreButton: ?
+// C# MoreButton: UIButtonMask.cs
+// C# MoreButton: LogMoreButton.cs
+RenderTextL(654,647,T_YELLOW,FONT_NORMAL,0.6,"%s",26<1100?Sys_Text.stringTable[26]:"[MORE]"); // Text0
+RenderUIImage(453,718,69,31,0); // BackButton QUAD:builtin-white
+// BTN BackButton: ?
+// C# BackButton: UIButtonMask.cs
+// C# BackButton: LogBackButton.cs
+RenderTextL(453,718,T_YELLOW,FONT_NORMAL,0.6,"%s",879<1100?Sys_Text.stringTable[879]:"[BACK]"); // Text0
+RenderUIImage(458,570,445,188,0); // EmailTab QUAD:builtin-knob
+// C# EmailTab: EmailContentsButtonsManager.cs
+RenderUIImage(458,570,223,21,0); // Button QUAD:builtin-white
+// BTN Button: ?
+// C# Button: UIButtonMask.cs
+// C# Button: MultiMediaLogButton.cs
+RenderTextL(458,570,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text0
+RenderUIImage(458,591,223,21,0); // Button (1) QUAD:builtin-white
+// BTN Button (1): ?
+// C# Button (1): UIButtonMask.cs
+// C# Button (1): MultiMediaLogButton.cs
+RenderTextL(458,591,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text1
+RenderUIImage(458,612,223,21,0); // Button (2) QUAD:builtin-white
+// BTN Button (2): ?
+// C# Button (2): UIButtonMask.cs
+// C# Button (2): MultiMediaLogButton.cs
+RenderTextL(458,612,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text2
+RenderUIImage(458,633,223,21,0); // Button (3) QUAD:builtin-white
+// BTN Button (3): ?
+// C# Button (3): UIButtonMask.cs
+// C# Button (3): MultiMediaLogButton.cs
+RenderTextL(458,633,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text3
+RenderUIImage(458,654,223,21,0); // Button (4) QUAD:builtin-white
+// BTN Button (4): ?
+// C# Button (4): UIButtonMask.cs
+// C# Button (4): MultiMediaLogButton.cs
+RenderTextL(458,654,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text4
+RenderUIImage(458,675,223,21,0); // Button (5) QUAD:builtin-white
+// BTN Button (5): ?
+// C# Button (5): UIButtonMask.cs
+// C# Button (5): MultiMediaLogButton.cs
+RenderTextL(458,675,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text5
+RenderUIImage(458,696,223,21,0); // Button (6) QUAD:builtin-white
+// BTN Button (6): ?
+// C# Button (6): UIButtonMask.cs
+// C# Button (6): MultiMediaLogButton.cs
+RenderTextL(458,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text6
+RenderUIImage(458,717,223,21,0); // Button (7) QUAD:builtin-white
+// BTN Button (7): ?
+// C# Button (7): UIButtonMask.cs
+// C# Button (7): MultiMediaLogButton.cs
+RenderTextL(458,717,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text7
+RenderUIImage(681,570,223,21,0); // Button (8) QUAD:builtin-white
+// BTN Button (8): ?
+// C# Button (8): UIButtonMask.cs
+// C# Button (8): MultiMediaLogButton.cs
+RenderTextL(681,570,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text8
+RenderUIImage(681,591,223,21,0); // Button (9) QUAD:builtin-white
+// BTN Button (9): ?
+// C# Button (9): UIButtonMask.cs
+// C# Button (9): MultiMediaLogButton.cs
+RenderTextL(681,591,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text9
+RenderUIImage(681,612,223,21,0); // Button (10) QUAD:builtin-white
+// BTN Button (10): ?
+// C# Button (10): UIButtonMask.cs
+// C# Button (10): MultiMediaLogButton.cs
+RenderTextL(681,612,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text10
+RenderUIImage(681,633,223,21,0); // Button (11) QUAD:builtin-white
+// BTN Button (11): ?
+// C# Button (11): UIButtonMask.cs
+// C# Button (11): MultiMediaLogButton.cs
+RenderTextL(681,633,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text11
+RenderUIImage(681,654,223,21,0); // Button (12) QUAD:builtin-white
+// BTN Button (12): ?
+// C# Button (12): UIButtonMask.cs
+// C# Button (12): MultiMediaLogButton.cs
+RenderTextL(681,654,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text12
+RenderUIImage(681,675,223,21,0); // Button (13) QUAD:builtin-white
+// BTN Button (13): ?
+// C# Button (13): UIButtonMask.cs
+// C# Button (13): MultiMediaLogButton.cs
+RenderTextL(681,675,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text13
+RenderUIImage(681,696,223,21,0); // Button (14) QUAD:builtin-white
+// BTN Button (14): ?
+// C# Button (14): UIButtonMask.cs
+// C# Button (14): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (15) QUAD:builtin-white
+// BTN Button (15): ?
+// C# Button (15): UIButtonMask.cs
+// C# Button (15): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (16) QUAD:builtin-white
+// BTN Button (16): ?
+// C# Button (16): UIButtonMask.cs
+// C# Button (16): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (17) QUAD:builtin-white
+// BTN Button (17): ?
+// C# Button (17): UIButtonMask.cs
+// C# Button (17): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (18) QUAD:builtin-white
+// BTN Button (18): ?
+// C# Button (18): UIButtonMask.cs
+// C# Button (18): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (19) QUAD:builtin-white
+// BTN Button (19): ?
+// C# Button (19): UIButtonMask.cs
+// C# Button (19): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (20) QUAD:builtin-white
+// BTN Button (20): ?
+// C# Button (20): UIButtonMask.cs
+// C# Button (20): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (21) QUAD:builtin-white
+// BTN Button (21): ?
+// C# Button (21): UIButtonMask.cs
+// C# Button (21): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (22) QUAD:builtin-white
+// BTN Button (22): ?
+// C# Button (22): UIButtonMask.cs
+// C# Button (22): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (23) QUAD:builtin-white
+// BTN Button (23): ?
+// C# Button (23): UIButtonMask.cs
+// C# Button (23): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (24) QUAD:builtin-white
+// BTN Button (24): ?
+// C# Button (24): UIButtonMask.cs
+// C# Button (24): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(681,696,223,21,0); // Button (25) QUAD:builtin-white
+// BTN Button (25): ?
+// C# Button (25): UIButtonMask.cs
+// C# Button (25): MultiMediaLogButton.cs
+RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+RenderUIImage(458,570,445,188,0); // DataTab QUAD:builtin-knob
+// C# DataTab: EmailContentsButtonsManager.cs
+RenderUIImage(458,570,223,21,0); // Button QUAD:builtin-white
+// BTN Button: ?
+// C# Button: UIButtonMask.cs
+// C# Button: MultiMediaLogButton.cs
+RenderTextL(458,570,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text0
+RenderUIImage(458,591,223,21,0); // Button (1) QUAD:builtin-white
+// BTN Button (1): ?
+// C# Button (1): UIButtonMask.cs
+// C# Button (1): MultiMediaLogButton.cs
+RenderTextL(458,591,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text1
+RenderUIImage(458,612,223,21,0); // Button (2) QUAD:builtin-white
+// BTN Button (2): ?
+// C# Button (2): UIButtonMask.cs
+// C# Button (2): MultiMediaLogButton.cs
+RenderTextL(458,612,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text2
+RenderUIImage(458,633,223,21,0); // Button (3) QUAD:builtin-white
+// BTN Button (3): ?
+// C# Button (3): UIButtonMask.cs
+// C# Button (3): MultiMediaLogButton.cs
+RenderTextL(458,633,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text3
+RenderUIImage(458,654,223,21,0); // Button (4) QUAD:builtin-white
+// BTN Button (4): ?
+// C# Button (4): UIButtonMask.cs
+// C# Button (4): MultiMediaLogButton.cs
+RenderTextL(458,654,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text4
+RenderUIImage(458,675,223,21,0); // Button (5) QUAD:builtin-white
+// BTN Button (5): ?
+// C# Button (5): UIButtonMask.cs
+// C# Button (5): MultiMediaLogButton.cs
+RenderTextL(458,675,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text5
+RenderUIImage(458,696,223,21,0); // Button (6) QUAD:builtin-white
+// BTN Button (6): ?
+// C# Button (6): UIButtonMask.cs
+// C# Button (6): MultiMediaLogButton.cs
+RenderTextL(458,696,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text6
+RenderUIImage(458,717,223,21,0); // Button (7) QUAD:builtin-white
+// BTN Button (7): ?
+// C# Button (7): UIButtonMask.cs
+// C# Button (7): MultiMediaLogButton.cs
+RenderTextL(458,717,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text7
+RenderUIImage(681,570,223,21,0); // Button (8) QUAD:builtin-white
+// BTN Button (8): ?
+// C# Button (8): UIButtonMask.cs
+// C# Button (8): MultiMediaLogButton.cs
+RenderTextL(681,570,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text8
+RenderUIImage(681,591,223,21,0); // Button (9) QUAD:builtin-white
+// BTN Button (9): ?
+// C# Button (9): UIButtonMask.cs
+// C# Button (9): MultiMediaLogButton.cs
+RenderTextL(681,591,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text9
+RenderUIImage(681,612,223,21,0); // Button (10) QUAD:builtin-white
+// BTN Button (10): ?
+// C# Button (10): UIButtonMask.cs
+// C# Button (10): MultiMediaLogButton.cs
+RenderTextL(681,612,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text10
+RenderUIImage(681,633,223,21,0); // Button (11) QUAD:builtin-white
+// BTN Button (11): ?
+// C# Button (11): UIButtonMask.cs
+// C# Button (11): MultiMediaLogButton.cs
+RenderTextL(681,633,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text11
+RenderUIImage(681,654,223,21,0); // Button (12) QUAD:builtin-white
+// BTN Button (12): ?
+// C# Button (12): UIButtonMask.cs
+// C# Button (12): MultiMediaLogButton.cs
+RenderTextL(681,654,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text12
+RenderUIImage(453,570,166,39,0); // NoteToggle QUAD:none
+// C# NoteToggle: UIPointerMask.cs
+RenderUIImage(453,572,19,18,910); // Background
+RenderTextL(474,573,T_GREEN,FONT_NORMAL,0.6,"%s%d%s%s%u.",Sys_Text.stringTable[556],1,Sys_Text.stringTable[557],Sys_Text.stringTable[558],World.lev1SecCode); // Label
+RenderUIImage(453,599,166,39,0); // NoteToggle1 QUAD:none
+// C# NoteToggle1: UIPointerMask.cs
+RenderUIImage(453,600,19,18,910); // Background
+RenderTextL(474,602,T_GREEN,FONT_NORMAL,0.6,"%s%d%s%s%u.",Sys_Text.stringTable[556],2,Sys_Text.stringTable[557],Sys_Text.stringTable[558],World.lev2SecCode); // Label1
+RenderUIImage(453,628,166,39,0); // NoteToggle2 QUAD:none
+// C# NoteToggle2: UIPointerMask.cs
+RenderUIImage(453,629,19,18,910); // Background
+RenderTextL(474,631,T_GREEN,FONT_NORMAL,0.6,"%s%d%s%s%u.",Sys_Text.stringTable[556],3,Sys_Text.stringTable[557],Sys_Text.stringTable[558],World.lev3SecCode); // Label2
+RenderUIImage(453,657,166,39,0); // NoteToggle3 QUAD:none
+// C# NoteToggle3: UIPointerMask.cs
+RenderUIImage(453,658,19,18,910); // Background
+RenderTextL(474,660,T_GREEN,FONT_NORMAL,0.6,"%s%d%s%s%u.",Sys_Text.stringTable[556],4,Sys_Text.stringTable[557],Sys_Text.stringTable[558],World.lev4SecCode); // Label3
+RenderUIImage(453,686,166,39,0); // NoteToggle4 QUAD:none
+// C# NoteToggle4: UIPointerMask.cs
+RenderUIImage(453,687,19,18,910); // Background
+RenderTextL(474,689,T_GREEN,FONT_NORMAL,0.6,"%s%d%s%s%u.",Sys_Text.stringTable[556],5,Sys_Text.stringTable[557],Sys_Text.stringTable[558],World.lev5SecCode); // Label4
+RenderUIImage(453,715,166,39,0); // NoteToggle5 QUAD:none
+// C# NoteToggle5: UIPointerMask.cs
+RenderUIImage(453,716,19,18,910); // Background
+RenderTextL(474,718,T_GREEN,FONT_NORMAL,0.6,"%s%d%s%s%u.",Sys_Text.stringTable[556],6,Sys_Text.stringTable[557],Sys_Text.stringTable[558],World.lev6SecCode); // Label5
+RenderUIImage(620,570,166,39,0); // NoteToggle6 QUAD:none
+// C# NoteToggle6: UIPointerMask.cs
+RenderUIImage(620,572,19,18,910); // Background
+RenderTextL(641,573,T_GREEN,FONT_NORMAL,0.6,"Escape neurosurgery suite.  Keycode is 451."); // Label6
+RenderUIImage(620,599,166,39,0); // NoteToggle7 QUAD:none
+// C# NoteToggle7: UIPointerMask.cs
+RenderUIImage(620,600,19,18,910); // Background
+RenderTextL(641,602,T_GREEN,FONT_NORMAL,0.6,"Disengage laser safety override."); // Label7
+RenderUIImage(620,628,166,39,0); // NoteToggle8 QUAD:none
+// C# NoteToggle8: UIPointerMask.cs
+RenderUIImage(620,629,19,18,910); // Background
+RenderTextL(641,631,T_GREEN,FONT_NORMAL,0.6,"Activate the station energy shield."); // Label8
+RenderUIImage(620,657,166,39,0); // NoteToggle9 QUAD:none
+// C# NoteToggle9: UIPointerMask.cs
+RenderUIImage(620,658,19,18,910); // Background
+RenderTextL(641,660,T_GREEN,FONT_NORMAL,0.6,"Destroy the mining laser."); // Label9
+RenderUIImage(620,686,166,39,0); // NoteToggle10 QUAD:none
+// C# NoteToggle10: UIPointerMask.cs
+RenderUIImage(620,687,19,18,910); // Background
+RenderTextL(641,689,T_GREEN,FONT_NORMAL,0.6,"Enable master jettison."); // Label10
+RenderUIImage(620,715,166,39,0); // NoteToggle11 QUAD:none
+// C# NoteToggle11: UIPointerMask.cs
+RenderUIImage(620,716,19,18,910); // Background
+RenderTextL(641,718,T_GREEN,FONT_NORMAL,0.6,"Diagnose and repair broken relay: 428."); // Label11
+RenderUIImage(787,570,166,39,0); // NoteToggle12 QUAD:none
+// C# NoteToggle12: UIPointerMask.cs
+RenderUIImage(787,572,19,18,910); // Background
+RenderTextL(808,573,T_GREEN,FONT_NORMAL,0.6,"Jettison Beta Grove."); // Label12
+RenderUIImage(787,599,166,39,0); // NoteToggle13 QUAD:none
+// C# NoteToggle13: UIPointerMask.cs
+RenderUIImage(787,600,19,18,910); // Background
+RenderTextL(808,602,T_GREEN,FONT_NORMAL,0.6,"Destroy the four relay antennae."); // Label13
+RenderUIImage(787,628,166,39,0); // NoteToggle14 QUAD:none
+// C# NoteToggle14: UIPointerMask.cs
+RenderUIImage(787,629,19,18,910); // Background
+RenderTextL(808,631,T_GREEN,FONT_NORMAL,0.6,"Engage reactor self-destruct."); // Label14
+RenderUIImage(787,657,166,39,0); // NoteToggle15 QUAD:none
+// C# NoteToggle15: UIPointerMask.cs
+RenderUIImage(787,658,19,18,910); // Background
+RenderTextL(808,660,T_GREEN,FONT_NORMAL,0.6,"Escape on escape pod."); // Label15
+RenderUIImage(787,686,166,39,0); // NoteToggle16 QUAD:none
+// C# NoteToggle16: UIPointerMask.cs
+RenderUIImage(787,687,19,18,910); // Background
+RenderTextL(808,689,T_GREEN,FONT_NORMAL,0.6,"Access the bridge."); // Label16
+RenderUIImage(787,715,166,39,0); // NoteToggle17 QUAD:none
+// C# NoteToggle17: UIPointerMask.cs
+RenderUIImage(787,716,19,18,910); // Background
+RenderTextL(808,718,T_GREEN,FONT_NORMAL,0.6,"Destroy SHODAN."); // Label17
+// CenterMFD tab buttons + AddToInventoryHelper live in CenterMFD already
+// C# TabsRH: LeftMFDTabs.cs
+// C# ItemTabRH: ItemTabManager.cs
+RenderUIImage(1092,528,237,237,1025); // ItemIcon UNMAPPED:[Textures/UI/itemicons/paperico.png]
+// C# ItemIcon: ItemIconManager.cs
+// C# ItemIcon: UIPointerMask.cs
+RenderTextL(1087,540,T_YELLOW,FONT_NORMAL,0.6,"TEST"); // ItemText
+// C# ItemText: UIPointerMask.cs
+RenderUIImage(1131,628,160,40,1087); // VaporizeButton
+// BTN VaporizeButton: VaporizeButton.OnVaporizeClick()
+// C# VaporizeButton: VaporizeButton.cs
+// C# VaporizeButton: UIButtonMask.cs
+RenderTextL(1131,628,T_GREEN_MENU,FONT_NORMAL,0.6,"%s",883<1100?Sys_Text.stringTable[883]:"VAPORIZE"); // Text
+RenderUIImage(1131,691,160,40,1087); // ApplyButton
+// BTN ApplyButton: MFDManager.ApplyButtonClicked()
+// C# ApplyButton: UIButtonMask.cs
+RenderTextL(1131,691,T_GREEN_MENU,FONT_NORMAL,0.6,"%s",736<1100?Sys_Text.stringTable[736]:"APPLY"); // Text
+RenderUIImage(1131,691,160,40,1087); // UseButton
+// BTN UseButton: UseButton.OnActivateClick()
+// C# UseButton: ActivateButton.cs
+RenderTextL(1131,691,T_GREEN_MENU,FONT_NORMAL,0.6,"USE"); // Text
+// C# EReaderSectionsRH: EReaderSectionsButtons.cs
+RenderUIImage(1080,718,65,40,1086); // EMAILButton
+// BTN EMAILButton: EReaderSectionsRH.OnClick()
+// C# EMAILButton: UIButtonMask.cs
+// C# EMAILButton: EReaderSectionsButtonHighlight.cs
+RenderTextL(1080,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",42<1100?Sys_Text.stringTable[42]:"EMAIL"); // Text
+RenderUIImage(1146,718,65,40,1087); // LOGSButton
+// BTN LOGSButton: EReaderSectionsRH.OnClick(1)
+// C# LOGSButton: UIButtonMask.cs
+// C# LOGSButton: EReaderSectionsButtonHighlight.cs
+RenderTextL(1146,718,T_GREEN_MENU,FONT_NORMAL,0.6,"%s",39<1100?Sys_Text.stringTable[39]:"LOGS"); // Text
+RenderUIImage(1212,718,65,40,1086); // DATAButton
+// BTN DATAButton: EReaderSectionsRH.OnClick(2)
+// C# DATAButton: UIButtonMask.cs
+// C# DATAButton: EReaderSectionsButtonHighlight.cs
+RenderTextL(1212,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",43<1100?Sys_Text.stringTable[43]:"DATA"); // Text
+RenderUIImage(1276,718,65,40,1086); // NOTESButton
+// BTN NOTESButton: EReaderSectionsRH.OnClick(3)
+// C# NOTESButton: UIButtonMask.cs
+// C# NOTESButton: EReaderSectionsButtonHighlight.cs
+RenderTextL(1276,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",885<1100?Sys_Text.stringTable[885]:"NOTES"); // Text
+RenderTextL(1124,615,T_YELLOW,FONT_NORMAL,0.6,"STD"); // AccessCardsList
+// C# AccessCardsList: UIPointerMask.cs
+// C# GrenadeTimerSliderRH: UIPointerMask.cs
+// C# GrenadeTimerSliderRH: GrenadeTimerSlider.cs
+RenderUIImage(1095,714,230,29,952); // Background
+// C# Background: UIPointerMask.cs
+RenderUIImage(1095,714,72,29,1079); // Fill
+// C# Fill: UIPointerMask.cs
+RenderUIImage(1162,711,24,36,953); // Handle
+// C# Handle: UIPointerMask.cs
+RenderTextL(1119,747,T_YELLOW,FONT_NORMAL,0.6,"TEST"); // TimeNumberText
+RenderUIImage(1094,712,230,32,952); // Background
+RenderUIImage(1094,712,16,32,0); // Fill QUAD:builtin-white
+RenderUIImage(1094,696,32,64,953); // Handle
+RenderUIImage(1090,535,227,209,1025); // BlockedBySecurityRH UNMAPPED:[Resources/BlockedBySecurity/blocked_00.
+// C# BlockedBySecurityRH: ImageSequenceTextureArrayUI.cs
+// C# BlockedBySecurityRH: PooledItemDestroy.cs
+RenderTextL(1104,542,T_YELLOW,FONT_NORMAL,0.6,"%s",890<1100?Sys_Text.stringTable[890]:"Blocked by SHODAN level Security."); // BlockedBySecurityText
+// C# BlockedBySecurityText: UIPointerMask.cs
+RenderTextL(1092,536,T_YELLOW,FONT_NORMAL,0.6,"DEAD CORTEX REAVER"); // DataHeaderTextRH
+// C# DataHeaderTextRH: UIPointerMask.cs
+RenderTextL(1083,633,T_YELLOW,FONT_NORMAL,0.6,"%s",891<1100?Sys_Text.stringTable[891]:"No Items"); // DataNoItemsTextRH
+// C# DataNoItemsTextRH: UIPointerMask.cs
+// C# ElevatorUIControlRH: ElevatorKeypad.cs
+RenderUIImage(1191,531,32,32,929); // CurrentFloorIndicator
+RenderUIImage(1145,578,45,168,0); // ButtonBankLH QUAD:builtin-knob
+RenderUIImage(1145,578,45,39,1025); // ElevButton1 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+// C# ElevButton1: UIButtonMask.cs
+RenderUIImage(1147,583,40,34,1025); // Keypad.Button (1) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (1): Keypad.Button
+// C# Keypad.Button (1): ElevatorButton.cs
+// C# Keypad.Button (1): UIButtonMask.cs
+RenderTextL(1148,580,T_GREEN,FONT_NORMAL,0.6,"R"); // Text (1)
+RenderUIImage(1145,620,45,39,1025); // ElevButton2 UNMAPPED:[Textures/UI/hudbuttons/keypad_mid.png]
+// C# ElevButton2: UIButtonMask.cs
+RenderUIImage(1147,623,40,34,1025); // Keypad.Button (2) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (2): Keypad.Button
+// C# Keypad.Button (2): ElevatorButton.cs
+// C# Keypad.Button (2): UIButtonMask.cs
+RenderTextL(1148,620,T_GREEN,FONT_NORMAL,0.6,"1"); // Text (2)
+RenderUIImage(1145,663,45,39,1025); // ElevButton3 UNMAPPED:[Textures/UI/hudbuttons/keypad_mid.png]
+// C# ElevButton3: UIButtonMask.cs
+RenderUIImage(1147,666,40,34,1025); // Keypad.Button (3) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (3): Keypad.Button
+// C# Keypad.Button (3): ElevatorButton.cs
+// C# Keypad.Button (3): UIButtonMask.cs
+RenderTextL(1148,663,T_GREEN,FONT_NORMAL,0.6,"2"); // Text (3)
+RenderUIImage(1145,706,45,39,1025); // ElevButton4 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+// C# ElevButton4: UIButtonMask.cs
+RenderUIImage(1147,707,40,34,1025); // Keypad.Button (4) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (4): Keypad.Button
+// C# Keypad.Button (4): ElevatorButton.cs
+// C# Keypad.Button (4): UIButtonMask.cs
+RenderTextL(1148,704,T_GREEN,FONT_NORMAL,0.6,"3"); // Text (4)
+RenderUIImage(1223,578,45,168,0); // ButtonBankRH QUAD:builtin-knob
+RenderUIImage(1223,578,45,39,1025); // ElevButton5 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+// C# ElevButton5: UIButtonMask.cs
+RenderUIImage(1226,582,40,34,1025); // Keypad.Button (5) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (5): Keypad.Button
+// C# Keypad.Button (5): ElevatorButton.cs
+// C# Keypad.Button (5): UIButtonMask.cs
+RenderTextL(1227,580,T_GREEN,FONT_NORMAL,0.6,"6"); // Text (5)
+RenderUIImage(1223,620,45,39,1025); // ElevButton6 UNMAPPED:[Textures/UI/hudbuttons/keypad_mid.png]
+// C# ElevButton6: UIButtonMask.cs
+RenderUIImage(1226,623,40,34,1025); // Keypad.Button (6) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (6): Keypad.Button
+// C# Keypad.Button (6): ElevatorButton.cs
+// C# Keypad.Button (6): UIButtonMask.cs
+RenderTextL(1227,620,T_GREEN,FONT_NORMAL,0.6,"7"); // Text (6)
+RenderUIImage(1223,663,45,39,1025); // ElevButton7 UNMAPPED:[Textures/UI/hudbuttons/keypad_mid.png]
+// C# ElevButton7: UIButtonMask.cs
+RenderUIImage(1226,666,40,34,1025); // Keypad.Button (7) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (7): Keypad.Button
+// C# Keypad.Button (7): ElevatorButton.cs
+// C# Keypad.Button (7): UIButtonMask.cs
+RenderTextL(1227,663,T_GREEN,FONT_NORMAL,0.6,"8"); // Text (7)
+RenderUIImage(1223,706,45,39,1025); // ElevButton8 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+// C# ElevButton8: UIButtonMask.cs
+RenderUIImage(1226,707,40,34,1025); // Keypad.Button (8) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Keypad.Button (8): Keypad.Button
+// C# Keypad.Button (8): ElevatorButton.cs
+// C# Keypad.Button (8): UIButtonMask.cs
+RenderTextL(1227,704,T_GREEN,FONT_NORMAL,0.6,"9"); // Text (8)
+RenderUIImage(1305,528,29,29,899); // CloseButton
+// BTN CloseButton: MFDManager.CloseElevatorPad()
+// C# CloseButton: UIButtonMask.cs
+RenderTextL(1305,531,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+// C# KeycodeUIControlRH: KeypadKeycodeButtons.cs
+RenderUIImage(1144,577,42,38,1025); // KeycodeButton1 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1147,580,38,35,1025); // Button (1) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (1): ?
+// C# Button (1): KeycodeButton.cs
+RenderTextL(1139,572,T_GREEN,FONT_NORMAL,0.6,"1"); // Text
+RenderUIImage(1186,577,42,38,1025); // KeycodeButton2 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1188,580,38,35,1025); // Button (2) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (2): ?
+// C# Button (2): KeycodeButton.cs
+RenderTextL(1180,572,T_GREEN,FONT_NORMAL,0.6,"2"); // Text
+RenderUIImage(1228,577,42,38,1025); // KeycodeButton3 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1228,580,38,35,1025); // Button (3) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (3): ?
+// C# Button (3): KeycodeButton.cs
+RenderTextL(1220,572,T_GREEN,FONT_NORMAL,0.6,"3"); // Text
+RenderUIImage(1144,620,42,38,1025); // KeycodeButton4 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1147,621,38,35,1025); // Button (4) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (4): ?
+// C# Button (4): KeycodeButton.cs
+RenderTextL(1139,614,T_GREEN,FONT_NORMAL,0.6,"4"); // Text
+RenderUIImage(1186,620,42,38,1025); // KeycodeButton5 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1188,621,38,35,1025); // Button (5) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (5): ?
+// C# Button (5): KeycodeButton.cs
+RenderTextL(1180,614,T_GREEN,FONT_NORMAL,0.6,"5"); // Text
+RenderUIImage(1228,620,42,38,1025); // KeycodeButton6 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1228,621,38,35,1025); // Button (6) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (6): ?
+// C# Button (6): KeycodeButton.cs
+RenderTextL(1220,614,T_GREEN,FONT_NORMAL,0.6,"6"); // Text
+RenderUIImage(1144,663,42,38,1025); // KeycodeButton7 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1147,665,38,35,1025); // Button (7) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (7): ?
+// C# Button (7): KeycodeButton.cs
+RenderTextL(1139,657,T_GREEN,FONT_NORMAL,0.6,"7"); // Text
+RenderUIImage(1186,663,42,38,1025); // KeycodeButton8 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1188,665,38,35,1025); // Button (8) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (8): ?
+// C# Button (8): KeycodeButton.cs
+RenderTextL(1180,657,T_GREEN,FONT_NORMAL,0.6,"8"); // Text
+RenderUIImage(1228,663,42,38,1025); // KeycodeButton9 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1228,665,38,35,1025); // Button (9) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (9): ?
+// C# Button (9): KeycodeButton.cs
+RenderTextL(1220,657,T_GREEN,FONT_NORMAL,0.6,"9"); // Text
+RenderUIImage(1144,706,42,38,1025); // KeycodeButtonBackSpace UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1147,707,38,35,1025); // Button (-) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (-): ?
+// C# Button (-): KeycodeButton.cs
+RenderTextL(1139,700,T_GREEN,FONT_NORMAL,0.6,"-"); // Text
+RenderUIImage(1186,706,42,38,1025); // KeycodeButton0 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1188,707,38,35,1025); // Button (0) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (0): ?
+// C# Button (0): KeycodeButton.cs
+RenderTextL(1180,700,T_GREEN,FONT_NORMAL,0.6,"0"); // Text
+RenderUIImage(1228,706,42,38,1025); // KeycodeButtonC UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
+RenderUIImage(1228,707,38,35,1025); // Button (C) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
+// BTN Button (C): ?
+// C# Button (C): KeycodeButton.cs
+RenderTextL(1220,700,T_GREEN,FONT_NORMAL,0.6,"C"); // Text
+RenderUIImage(1232,526,32,32,1025); // KeycodeOnes UNMAPPED:[Textures/UI/elnum_null.png]
+// C# KeycodeOnes: KeycodeDigitImage.cs
+RenderUIImage(1191,526,32,32,1025); // KeycodeTens UNMAPPED:[Textures/UI/elnum_null.png]
+// C# KeycodeTens: KeycodeDigitImage.cs
+RenderUIImage(1149,526,32,32,1025); // KeycodeHuns UNMAPPED:[Textures/UI/elnum_null.png]
+// C# KeycodeHuns: KeycodeDigitImage.cs
+RenderUIImage(1314,525,29,29,899); // CloseButton
+// BTN CloseButton: MFDManager.CloseKeycodePad()
+// C# CloseButton: UIButtonMask.cs
+RenderTextL(1314,529,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+RenderUIImage(1079,528,263,240,0); // SearchContentsContainerRH QUAD:builtin-knob
+// C# SearchContentsContainerRH: SearchButton.cs
+RenderUIImage(1318,528,29,29,899); // SearchCloseButtonRH
+// BTN SearchCloseButtonRH: MFDManager.CloseSearch()
+// C# SearchCloseButtonRH: UIButtonMask.cs
+RenderTextL(1318,531,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+RenderUIImage(1143,584,64,64,0); // SearchContentRH1 QUAD:none
+// BTN SearchContentRH1: SearchContentsContainerRH.SearchButtonClick()
+// C# SearchContentRH1: UIButtonMask.cs
+// C# SearchContentRH1: SearchContainerButton.cs
+RenderUIImage(1233,584,64,64,0); // SearchContentRH2 QUAD:none
+// BTN SearchContentRH2: SearchContentsContainerRH.SearchButtonClick(1)
+// C# SearchContentRH2: UIButtonMask.cs
+// C# SearchContentRH2: SearchContainerButton.cs
+RenderUIImage(1143,674,64,64,0); // SearchContentRH3 QUAD:none
+// BTN SearchContentRH3: SearchContentsContainerRH.SearchButtonClick(2)
+// C# SearchContentRH3: UIButtonMask.cs
+// C# SearchContentRH3: SearchContainerButton.cs
+RenderUIImage(1233,674,64,64,0); // SearchContentRH4 QUAD:none
+// BTN SearchContentRH4: SearchContentsContainerRH.SearchButtonClick(3)
+// C# SearchContentRH4: UIButtonMask.cs
+// C# SearchContentRH4: SearchContainerButton.cs
+// C# AudioLogInfoRH: LogDataTabContainerManager.cs
+RenderUIImage(1079,528,263,240,1272); // LogImage
+RenderTextL(1088,540,T_YELLOW,FONT_NORMAL,0.6,"HACKER IS AWESOME"); // LogName
+// C# LogName: UIPointerMask.cs
+RenderTextL(1088,557,T_YELLOW,FONT_NORMAL,0.6,"Sender: SHODAN"); // SenderText
+// C# SenderText: UIPointerMask.cs
+RenderTextL(1088,701,T_YELLOW,FONT_NORMAL,0.6,"Subject:\n\nif only i had a sparq beam then all the world would be right"); // SubjectText
+// C# SubjectText: UIPointerMask.cs
+// C# PuzzleGridRH: PuzzleGrid.cs
+RenderUIImage(1101,554,221,163,1025); // OuterColorBorder UNMAPPED:[Textures/UI/puzzle/gridcontainer_gray.p
+RenderUIImage(1104,558,214,157,1025); // ContainerEdge UNMAPPED:[Textures/UI/puzzle/gridcontainer.png]
+RenderUIImage(1084,620,29,29,1025); // NodeSource UNMAPPED:[Textures/UI/puzzle/node_source.png]
+RenderUIImage(1309,620,29,29,1025); // Node UNMAPPED:[Textures/UI/puzzle/node_off.png]
+RenderUIImage(1110,564,29,29,1025); // Button UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button: PuzzleGridRH.OnGridCellClick()
+// C# Button: UIButtonMask.cs
+// C# Button: PuzzleUIButton.cs
+RenderTextL(1110,564,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1110,564,29,29,1025); // GeniusHighlight UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1139,564,29,29,1025); // Button (1) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (1): PuzzleGridRH.OnGridCellClick(1)
+// C# Button (1): UIButtonMask.cs
+// C# Button (1): PuzzleUIButton.cs
+RenderTextL(1139,564,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1139,564,29,29,1025); // GeniusHighlight (1) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1168,564,29,29,1025); // Button (2) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (2): PuzzleGridRH.OnGridCellClick(2)
+// C# Button (2): UIButtonMask.cs
+// C# Button (2): PuzzleUIButton.cs
+RenderTextL(1168,564,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1168,564,29,29,1025); // GeniusHighlight (2) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1196,564,29,29,1025); // Button (3) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (3): PuzzleGridRH.OnGridCellClick(3)
+// C# Button (3): UIButtonMask.cs
+// C# Button (3): PuzzleUIButton.cs
+RenderTextL(1196,564,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1196,564,29,29,1025); // GeniusHighlight (3) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1225,564,29,29,1025); // Button (4) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (4): PuzzleGridRH.OnGridCellClick(4)
+// C# Button (4): UIButtonMask.cs
+// C# Button (4): PuzzleUIButton.cs
+RenderTextL(1225,564,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1225,564,29,29,1025); // GeniusHighlight (4) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1254,564,29,29,1025); // Button (5) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (5): PuzzleGridRH.OnGridCellClick(5)
+// C# Button (5): UIButtonMask.cs
+// C# Button (5): PuzzleUIButton.cs
+RenderTextL(1254,564,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1254,564,29,29,1025); // GeniusHighlight (5) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1283,564,29,29,1025); // Button (6) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (6): PuzzleGridRH.OnGridCellClick(6)
+// C# Button (6): UIButtonMask.cs
+// C# Button (6): PuzzleUIButton.cs
+RenderTextL(1283,564,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1283,564,29,29,1025); // GeniusHighlight (6) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1110,593,29,29,1025); // Button (7) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (7): PuzzleGridRH.OnGridCellClick(7)
+// C# Button (7): UIButtonMask.cs
+// C# Button (7): PuzzleUIButton.cs
+RenderTextL(1110,593,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1110,593,29,29,1025); // GeniusHighlight (7) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1139,593,29,29,1025); // Button (8) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (8): PuzzleGridRH.OnGridCellClick(8)
+// C# Button (8): UIButtonMask.cs
+// C# Button (8): PuzzleUIButton.cs
+RenderTextL(1139,593,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1139,593,29,29,1025); // GeniusHighlight (8) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1168,593,29,29,1025); // Button (9) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (9): PuzzleGridRH.OnGridCellClick(9)
+// C# Button (9): UIButtonMask.cs
+// C# Button (9): PuzzleUIButton.cs
+RenderTextL(1168,593,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1168,593,29,29,1025); // GeniusHighlight (9) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1196,593,29,29,1025); // Button (10) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (10): PuzzleGridRH.OnGridCellClick(10)
+// C# Button (10): UIButtonMask.cs
+// C# Button (10): PuzzleUIButton.cs
+RenderTextL(1196,593,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1196,593,29,29,1025); // GeniusHighlight (10) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1225,593,29,29,1025); // Button (11) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (11): PuzzleGridRH.OnGridCellClick(11)
+// C# Button (11): UIButtonMask.cs
+// C# Button (11): PuzzleUIButton.cs
+RenderTextL(1225,593,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1225,593,29,29,1025); // GeniusHighlight (11) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1254,593,29,29,1025); // Button (12) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (12): PuzzleGridRH.OnGridCellClick(12)
+// C# Button (12): UIButtonMask.cs
+// C# Button (12): PuzzleUIButton.cs
+RenderTextL(1254,593,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1254,593,29,29,1025); // GeniusHighlight (12) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1283,593,29,29,1025); // Button (13) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (13): PuzzleGridRH.OnGridCellClick(13)
+// C# Button (13): UIButtonMask.cs
+// C# Button (13): PuzzleUIButton.cs
+RenderTextL(1283,593,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1283,593,29,29,1025); // GeniusHighlight (13) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1110,622,29,29,1025); // Button (14) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (14): PuzzleGridRH.OnGridCellClick(14)
+// C# Button (14): UIButtonMask.cs
+// C# Button (14): PuzzleUIButton.cs
+RenderTextL(1110,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1110,622,29,29,1025); // GeniusHighlight (14) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1139,622,29,29,1025); // Button (15) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (15): PuzzleGridRH.OnGridCellClick(15)
+// C# Button (15): UIButtonMask.cs
+// C# Button (15): PuzzleUIButton.cs
+RenderTextL(1139,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1139,622,29,29,1025); // GeniusHighlight (15) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1168,622,29,29,1025); // Button (16) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (16): PuzzleGridRH.OnGridCellClick(16)
+// C# Button (16): UIButtonMask.cs
+// C# Button (16): PuzzleUIButton.cs
+RenderTextL(1168,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1168,622,29,29,1025); // GeniusHighlight (16) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1196,622,29,29,1025); // Button (17) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (17): PuzzleGridRH.OnGridCellClick(17)
+// C# Button (17): UIButtonMask.cs
+// C# Button (17): PuzzleUIButton.cs
+RenderTextL(1196,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1196,622,29,29,1025); // GeniusHighlight (17) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1225,622,29,29,1025); // Button (18) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (18): PuzzleGridRH.OnGridCellClick(18)
+// C# Button (18): UIButtonMask.cs
+// C# Button (18): PuzzleUIButton.cs
+RenderTextL(1225,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1225,622,29,29,1025); // GeniusHighlight (18) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1254,622,29,29,1025); // Button (19) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (19): PuzzleGridRH.OnGridCellClick(19)
+// C# Button (19): UIButtonMask.cs
+// C# Button (19): PuzzleUIButton.cs
+RenderTextL(1254,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1254,622,29,29,1025); // GeniusHighlight (19) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1283,622,29,29,1025); // Button (20) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (20): PuzzleGridRH.OnGridCellClick(20)
+// C# Button (20): UIButtonMask.cs
+// C# Button (20): PuzzleUIButton.cs
+RenderTextL(1283,622,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1283,622,29,29,1025); // GeniusHighlight (20) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1110,650,29,29,1025); // Button (21) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (21): PuzzleGridRH.OnGridCellClick(21)
+// C# Button (21): UIButtonMask.cs
+// C# Button (21): PuzzleUIButton.cs
+RenderTextL(1110,650,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1110,650,29,29,1025); // GeniusHighlight (21) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1139,650,29,29,1025); // Button (22) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (22): PuzzleGridRH.OnGridCellClick(22)
+// C# Button (22): UIButtonMask.cs
+// C# Button (22): PuzzleUIButton.cs
+RenderTextL(1139,650,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1139,650,29,29,1025); // GeniusHighlight (22) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1168,650,29,29,1025); // Button (23) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (23): PuzzleGridRH.OnGridCellClick(23)
+// C# Button (23): UIButtonMask.cs
+// C# Button (23): PuzzleUIButton.cs
+RenderTextL(1168,650,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1168,650,29,29,1025); // GeniusHighlight (23) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1196,650,29,29,1025); // Button (24) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (24): PuzzleGridRH.OnGridCellClick(24)
+// C# Button (24): UIButtonMask.cs
+// C# Button (24): PuzzleUIButton.cs
+RenderTextL(1196,650,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1196,650,29,29,1025); // GeniusHighlight (24) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1225,650,29,29,1025); // Button (25) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (25): PuzzleGridRH.OnGridCellClick(25)
+// C# Button (25): UIButtonMask.cs
+// C# Button (25): PuzzleUIButton.cs
+RenderTextL(1225,650,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1225,650,29,29,1025); // GeniusHighlight (25) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1254,650,29,29,1025); // Button (26) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (26): PuzzleGridRH.OnGridCellClick(26)
+// C# Button (26): UIButtonMask.cs
+// C# Button (26): PuzzleUIButton.cs
+RenderTextL(1254,650,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1254,650,29,29,1025); // GeniusHighlight (26) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1283,650,29,29,1025); // Button (27) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (27): PuzzleGridRH.OnGridCellClick(27)
+// C# Button (27): UIButtonMask.cs
+// C# Button (27): PuzzleUIButton.cs
+RenderTextL(1283,650,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1283,650,29,29,1025); // GeniusHighlight (27) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1110,679,29,29,1025); // Button (28) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (28): PuzzleGridRH.OnGridCellClick(28)
+// C# Button (28): UIButtonMask.cs
+// C# Button (28): PuzzleUIButton.cs
+RenderTextL(1110,679,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1110,679,29,29,1025); // GeniusHighlight (28) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1139,679,29,29,1025); // Button (29) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (29): PuzzleGridRH.OnGridCellClick(29)
+// C# Button (29): UIButtonMask.cs
+// C# Button (29): PuzzleUIButton.cs
+RenderTextL(1139,679,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1139,679,29,29,1025); // GeniusHighlight (29) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1168,679,29,29,1025); // Button (30) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (30): PuzzleGridRH.OnGridCellClick(30)
+// C# Button (30): UIButtonMask.cs
+// C# Button (30): PuzzleUIButton.cs
+RenderTextL(1168,679,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1168,679,29,29,1025); // GeniusHighlight (30) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1196,679,29,29,1025); // Button (31) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (31): PuzzleGridRH.OnGridCellClick(31)
+// C# Button (31): UIButtonMask.cs
+// C# Button (31): PuzzleUIButton.cs
+RenderTextL(1196,679,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1196,679,29,29,1025); // GeniusHighlight (31) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1225,679,29,29,1025); // Button (32) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (32): PuzzleGridRH.OnGridCellClick(32)
+// C# Button (32): UIButtonMask.cs
+// C# Button (32): PuzzleUIButton.cs
+RenderTextL(1225,679,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1225,679,29,29,1025); // GeniusHighlight (32) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1254,679,29,29,1025); // Button (33) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (33): PuzzleGridRH.OnGridCellClick(33)
+// C# Button (33): UIButtonMask.cs
+// C# Button (33): PuzzleUIButton.cs
+RenderTextL(1254,679,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1254,679,29,29,1025); // GeniusHighlight (33) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1283,679,29,29,1025); // Button (34) UNMAPPED:[Textures/UI/puzzle/grid1_base.png]
+// BTN Button (34): PuzzleGridRH.OnGridCellClick(34)
+// C# Button (34): UIButtonMask.cs
+// C# Button (34): PuzzleUIButton.cs
+RenderTextL(1283,679,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); // Text dummy
+RenderUIImage(1283,679,29,29,1025); // GeniusHighlight (34) UNMAPPED:[Textures/UI/puzzle/geniusgrid_highlight
+RenderUIImage(1101,719,221,26,1025); // ProgressContainer UNMAPPED:[Textures/UI/puzzle/gridcontainer_gray.p
+RenderUIImage(1104,726,225,13,0); // Background QUAD:builtin-knob
+RenderUIImage(1107,726,6,13,1025); // Fill UNMAPPED:[Textures/UI/puzzle/puzzlesliderwire.png
+RenderUIImage(1104,719,22,26,1078); // Handle
+RenderUIImage(1318,526,29,29,899); // CloseButton
+// BTN CloseButton: MFDManager.ClosePuzzleGrid()
+// C# CloseButton: UIButtonMask.cs
+RenderTextL(1318,530,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+// C# PuzzleWireRH: PuzzleWire.cs
+RenderUIImage(1141,570,139,192,1025); // ContainerCenter UNMAPPED:[Textures/UI/puzzle/wire_center.png]
+RenderUIImage(1093,521,235,44,1025); // LevelsBox UNMAPPED:[Textures/UI/puzzle/wire_levelsbox.png]
+RenderUIImage(1099,526,235,34,0); // Background QUAD:builtin-knob
+RenderUIImage(1102,526,6,34,1025); // Fill UNMAPPED:[Textures/UI/puzzle/puzzlesliderwire.png
+RenderUIImage(1099,509,22,69,1078); // Handle
+RenderUIImage(1262,522,66,42,1025); // TargetLine UNMAPPED:[Textures/UI/puzzle/wire_levelstargetlin
+RenderUIImage(1116,566,26,29,1025); // NodeBase UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase: PuzzleWireRH.ClickLHNode()
+// C# NodeBase: UIButtonMask.cs
+// C# NodeBase: PuzzleUIButton.cs
+RenderUIImage(1120,572,16,16,0); // SelectedIndicator QUAD:none
+RenderUIImage(1117,569,22,22,0); // GeniusHint QUAD:none
+RenderUIImage(1116,594,26,29,1025); // NodeBase (1) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (1): PuzzleWireRH.ClickLHNode(1)
+// C# NodeBase (1): UIButtonMask.cs
+// C# NodeBase (1): PuzzleUIButton.cs
+RenderUIImage(1120,600,16,16,0); // SelectedIndicator (1) QUAD:none
+RenderUIImage(1117,597,22,22,0); // GeniusHint (1) QUAD:none
+RenderUIImage(1116,623,26,29,1025); // NodeBase (2) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (2): PuzzleWireRH.ClickLHNode(2)
+// C# NodeBase (2): UIButtonMask.cs
+// C# NodeBase (2): PuzzleUIButton.cs
+RenderUIImage(1120,629,16,16,0); // SelectedIndicator (2) QUAD:none
+RenderUIImage(1117,626,22,22,0); // GeniusHint (2) QUAD:none
+RenderUIImage(1116,651,26,29,1025); // NodeBase (3) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (3): PuzzleWireRH.ClickLHNode(3)
+// C# NodeBase (3): UIButtonMask.cs
+// C# NodeBase (3): PuzzleUIButton.cs
+RenderUIImage(1120,657,16,16,0); // SelectedIndicator (3) QUAD:none
+RenderUIImage(1117,654,22,22,0); // GeniusHint (3) QUAD:none
+RenderUIImage(1116,679,26,29,1025); // NodeBase (4) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (4): PuzzleWireRH.ClickLHNode(4)
+// C# NodeBase (4): UIButtonMask.cs
+// C# NodeBase (4): PuzzleUIButton.cs
+RenderUIImage(1120,685,16,16,0); // SelectedIndicator (4) QUAD:none
+RenderUIImage(1117,682,22,22,0); // GeniusHint (4) QUAD:none
+RenderUIImage(1116,707,26,29,1025); // NodeBase (5) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (5): PuzzleWireRH.ClickLHNode(5)
+// C# NodeBase (5): UIButtonMask.cs
+// C# NodeBase (5): PuzzleUIButton.cs
+RenderUIImage(1120,713,16,16,0); // SelectedIndicator (5) QUAD:none
+RenderUIImage(1117,710,22,22,0); // GeniusHint (5) QUAD:none
+RenderUIImage(1116,736,26,29,1025); // NodeBase (6) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (6): PuzzleWireRH.ClickLHNode(6)
+// C# NodeBase (6): UIButtonMask.cs
+// C# NodeBase (6): PuzzleUIButton.cs
+RenderUIImage(1120,743,16,16,0); // SelectedIndicator (6) QUAD:none
+RenderUIImage(1117,740,22,22,0); // GeniusHint (6) QUAD:none
+RenderUIImage(1281,566,26,29,1025); // NodeBase UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase: PuzzleWireRH.ClickRHNode()
+// C# NodeBase: UIButtonMask.cs
+// C# NodeBase: PuzzleUIButton.cs
+RenderUIImage(1285,572,16,16,0); // SelectedIndicator QUAD:none
+RenderUIImage(1282,569,22,22,0); // GeniusHint QUAD:none
+RenderUIImage(1281,594,26,29,1025); // NodeBase (1) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (1): PuzzleWireRH.ClickRHNode(1)
+// C# NodeBase (1): UIButtonMask.cs
+// C# NodeBase (1): PuzzleUIButton.cs
+RenderUIImage(1285,600,16,16,0); // SelectedIndicator (1) QUAD:none
+RenderUIImage(1282,597,22,22,0); // GeniusHint (1) QUAD:none
+RenderUIImage(1281,623,26,29,1025); // NodeBase (2) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (2): PuzzleWireRH.ClickRHNode(2)
+// C# NodeBase (2): UIButtonMask.cs
+// C# NodeBase (2): PuzzleUIButton.cs
+RenderUIImage(1285,629,16,16,0); // SelectedIndicator (2) QUAD:none
+RenderUIImage(1282,626,22,22,0); // GeniusHint (2) QUAD:none
+RenderUIImage(1281,651,26,29,1025); // NodeBase (3) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (3): PuzzleWireRH.ClickRHNode(3)
+// C# NodeBase (3): UIButtonMask.cs
+// C# NodeBase (3): PuzzleUIButton.cs
+RenderUIImage(1285,657,16,16,0); // SelectedIndicator (3) QUAD:none
+RenderUIImage(1282,654,22,22,0); // GeniusHint (3) QUAD:none
+RenderUIImage(1281,679,26,29,1025); // NodeBase (4) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (4): PuzzleWireRH.ClickRHNode(4)
+// C# NodeBase (4): UIButtonMask.cs
+// C# NodeBase (4): PuzzleUIButton.cs
+RenderUIImage(1285,685,16,16,0); // SelectedIndicator (4) QUAD:none
+RenderUIImage(1282,682,22,22,0); // GeniusHint (4) QUAD:none
+RenderUIImage(1281,707,26,29,1025); // NodeBase (5) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (5): PuzzleWireRH.ClickRHNode(5)
+// C# NodeBase (5): UIButtonMask.cs
+// C# NodeBase (5): PuzzleUIButton.cs
+RenderUIImage(1285,713,16,16,0); // SelectedIndicator (5) QUAD:none
+RenderUIImage(1282,710,22,22,0); // GeniusHint (5) QUAD:none
+RenderUIImage(1281,736,26,29,1025); // NodeBase (6) UNMAPPED:[Textures/UI/puzzle/wire_node.png]
+// BTN NodeBase (6): PuzzleWireRH.ClickRHNode(6)
+// C# NodeBase (6): UIButtonMask.cs
+// C# NodeBase (6): PuzzleUIButton.cs
+RenderUIImage(1285,743,16,16,0); // SelectedIndicator (6) QUAD:none
+RenderUIImage(1282,740,22,22,0); // GeniusHint (6) QUAD:none
+RenderUIImage(1318,736,29,29,899); // CloseButton
+// BTN CloseButton: MFDManager.ClosePuzzleWire()
+// C# CloseButton: UIButtonMask.cs
+RenderTextL(1318,739,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+// C# SystemAnalyzerDisplayRH: SystemAnalyzer.cs
+RenderTextL(1082,523,T_YELLOW,FONT_NORMAL,0.6,"%s",892<1100?Sys_Text.stringTable[892]:"SYSTEM ANALYZER"); // Header
+// C# Header: UIPointerMask.cs
+RenderTextL(1083,547,T_GREEN,FONT_NORMAL,0.6,"Current level security:"); // DescriptionLevelSecurity
+// C# DescriptionLevelSecurity: UIPointerMask.cs
+RenderTextL(1239,547,T_GREEN,FONT_NORMAL,0.6,"100%%"); // TextLevelSecurity
+// C# TextLevelSecurity: UIPointerMask.cs
+RenderTextL(1083,566,T_GREEN,FONT_NORMAL,0.6,"Mining laser status:"); // DescriptionMiningLaser
+// C# DescriptionMiningLaser: UIPointerMask.cs
+RenderTextL(1238,566,T_GREEN,FONT_NORMAL,0.6,"Charging"); // TextLaserStatus
+// C# TextLaserStatus: UIPointerMask.cs
+RenderTextL(1083,585,T_GREEN,FONT_NORMAL,0.6,"Lifepod status:"); // DescriptionLifepods
+// C# DescriptionLifepods: UIPointerMask.cs
+RenderTextL(1238,585,T_GREEN,FONT_NORMAL,0.6,"Disabled"); // TextLifepodStatus
+// C# TextLifepodStatus: UIPointerMask.cs
+RenderTextL(1083,605,T_GREEN,FONT_NORMAL,0.6,"Station shield status:"); // DescriptionShield
+// C# DescriptionShield: UIPointerMask.cs
+RenderTextL(1238,605,T_GREEN,FONT_NORMAL,0.6,"Off"); // TextShieldStatus
+// C# TextShieldStatus: UIPointerMask.cs
+RenderTextL(1083,624,T_GREEN,FONT_NORMAL,0.6,"Reactor status:"); // DescriptionReactor
+// C# DescriptionReactor: UIPointerMask.cs
+RenderTextL(1238,624,T_GREEN,FONT_NORMAL,0.6,"Normal"); // TextReactorStatus
+// C# TextReactorStatus: UIPointerMask.cs
+RenderTextL(1083,643,T_GREEN,FONT_NORMAL,0.6,"Processor nodes:"); // DescriptionProcessors
+// C# DescriptionProcessors: UIPointerMask.cs
+RenderTextL(1238,643,T_GREEN,FONT_NORMAL,0.6,"99"); // TextProcessors
+// C# TextProcessors: UIPointerMask.cs
+RenderTextL(1083,662,T_GREEN,FONT_NORMAL,0.6,"Main Program:"); // DescriptionMainProgram
+// C# DescriptionMainProgram: UIPointerMask.cs
+RenderTextL(1238,662,T_GREEN,FONT_NORMAL,0.6,"Downloading to earth"); // TextMainProgram
+// C# TextMainProgram: UIPointerMask.cs
+RenderTextL(1083,681,T_GREEN,FONT_NORMAL,0.6,"Alpha Grove status:"); // DescriptionGroveAlphaStatus
+// C# DescriptionGroveAlphaStatus: UIPointerMask.cs
+RenderTextL(1238,681,T_GREEN,FONT_NORMAL,0.6,"normal"); // TextGroveAlpha
+// C# TextGroveAlpha: UIPointerMask.cs
+RenderTextL(1083,701,T_GREEN,FONT_NORMAL,0.6,"Beta Grove status:"); // DescriptionGroveBetaStatus
+// C# DescriptionGroveBetaStatus: UIPointerMask.cs
+RenderTextL(1238,701,T_GREEN,FONT_NORMAL,0.6,"normal"); // TextGroveBeta
+// C# TextGroveBeta: UIPointerMask.cs
+RenderTextL(1083,720,T_GREEN,FONT_NORMAL,0.6,"Gamma Grove status:"); // DescriptionGroveGammaStatus
+// C# DescriptionGroveGammaStatus: UIPointerMask.cs
+RenderTextL(1238,720,T_GREEN,FONT_NORMAL,0.6,"launched"); // TextGroveGamma
+// C# TextGroveGamma: UIPointerMask.cs
+RenderTextL(1083,739,T_GREEN,FONT_NORMAL,0.6,"Delta Grove status:"); // DescriptionGroveDeltaStatus
+// C# DescriptionGroveDeltaStatus: UIPointerMask.cs
+RenderTextL(1238,739,T_GREEN,FONT_NORMAL,0.6,"launched"); // TextGroveDelta
+// C# TextGroveDelta: UIPointerMask.cs
+RenderUIImage(1318,527,29,29,899); // CloseButton
+// BTN CloseButton: SystemAnalyzerDisplayRH.Close()
+// C# CloseButton: UIButtonMask.cs
+RenderTextL(1318,527,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+// C# TabButtonsPanelRH: TabButtons.cs
+// TabButtonsPanelRH side tab buttons live in SideMFD already
+RenderTextL(1137,570,T_YELLOW,FONT_NORMAL,0.6,"level 1 elevator taken off line - SHODAN security block established 04.NOV.72"); // CyberSPrint
+// C# CyberSPrint: UIPointerMask.cs
+// C# CyberSPrint: PooledItemDestroy.cs
+// C# BioMonitorContainer: BioMonitor.cs
+// C# BioMonitorContainer: BiomonitorGraphSystem.cs
+RenderUIImage(0,0,480,80,0); // Graph QUAD:none
+RenderTextL(4,83,T_YELLOW,FONT_NORMAL,0.6,"%s",895<1100?Sys_Text.stringTable[895]:"Biomonitor:"); // BiomonitorHeader
+RenderTextL(4,99,T_GREEN,FONT_NORMAL,0.6,"%s",896<1100?Sys_Text.stringTable[896]:"Heart Rate:"); // BiomonitorTextHeart
+RenderTextL(70,99,T_GREEN,FONT_NORMAL,0.6,"100"); // BiomonitorTextHeartRate
+RenderTextL(122,99,T_GREEN,FONT_NORMAL,0.6,"BPM"); // BiomonitorTextBPM
+RenderTextL(4,131,T_GREEN,FONT_NORMAL,0.6,"%s",897<1100?Sys_Text.stringTable[897]:"Patches Active:"); // BiomonitorTextPatch
+RenderTextL(119,131,T_GREEN,FONT_NORMAL,0.6,"MEDI STAMINUP SIGHT GENIUS BERSERK REFLEX"); // BiomonitorTextPatchEffects
+RenderTextL(4,115,T_GREEN,FONT_NORMAL,0.6,"%s",898<1100?Sys_Text.stringTable[898]:"Fatigue:"); // BiomonitorTextFatigueDetail
+RenderTextL(66,115,T_GREEN,FONT_NORMAL,0.6,"Moderate"); // BiomonitorTextFatigue
+RenderTextL(1270,78,T_WHITE,FONT_NORMAL,0.6,"0"); // EnergyDrainText dummy
+RenderTextL(1308,78,T_WHITE,FONT_NORMAL,0.6,"0"); // EnergyJPMText dummy
+RenderUIImage(663,364,40,40,1074); // SearchFXLH
+// C# SearchFXLH: SearchFXReset.cs
+RenderUIImage(663,364,40,40,1074); // SearchFXRH
+// C# SearchFXRH: SearchFXReset.cs
         if (EditSelIsActive()) { // Edit mode selection highlight + object info panel
             u16 sel=editModeSelection; Entity* e=&World.instances[sel];
             V3 f=World.instances[PLAYER1].forward,rt=World.instances[PLAYER1].right,ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(rt,ff)),d=V3_AsubB(World.position[sel],World.position[PLAYER1]); float bz=V3_dot(d,f);
