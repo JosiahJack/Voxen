@@ -601,23 +601,31 @@ static u16 F32ToHalf(float f) {
 }
 
 void BuildTextDecalMeshes(void) {    mset(textDecalVBO,0,sizeof(textDecalVBO)); mset(textDecalVertexCount,0,sizeof(textDecalVertexCount)); // clear stale
-    const float DECAL_TEXT_SCALE = 0.05f; // glyph "pixel" -> world units base (player is ~2 units tall)
+    // Unity TextMesh sizes these decals by m_CharacterSize (text_decal 0.2, text_decalStopDSS1 9.0) x the 16px font import
+    // size / 10, so Unity's authored world height is 1.6 * m_CharacterSize * lS for BOTH families. Our atlases rasterize
+    // those fonts at 20px and 54px, hence the /20 and /54. DECAL_SCALE_NORMAL/STOPD are the world sizes we want: 1.6 is
+    // exact Unity parity, higher is bigger. StopD is the StopDSS1 family (door/keypad labels), NORMAL is text_decal.
+    const float DECAL_SCALE_NORMAL = 5.0f, DECAL_SCALE_STOPD = 2.5f, DECAL_PX_NORMAL = 0.2f/20.0f, DECAL_PX_STOPD = 9.0f/54.0f, DECAL_RASTER_RATIO = 54.0f/20.0f;
+    const float DECAL_PX_N = DECAL_SCALE_NORMAL*DECAL_PX_NORMAL, DECAL_PX_S = DECAL_SCALE_STOPD*DECAL_PX_STOPD;
     for (u8 lev=0; lev<World.numLevels; ++lev) {
         for (u16 i=INSTS_1ST_IDX; i<World.levelInstCount[lev]; ++i) {
             Entity* e = &World.levelInstances[lev][i];
             if (e->index!=592 && e->index!=593) continue;
-            if (e->messageLingdex == 0) continue; // ad-hoc instances (e.g. editmode selection text) carry no lingdex
             u8 fontID = (e->index==593) ? FONT_STOPD : FONT_NORMAL;
-            const char* str = (e->messageLingdex < T_LOGSTR_CNT) ? Sys_Text.stringTable[e->messageLingdex] : "";
-            if (!str) str="";
+            const char* str = NULL;
+            for (u16 k=0;k<decalInlineTextCount;++k) { if (decalInlineTextLevel[k]==lev && decalInlineTextInst[k]==i) { str=decalInlineText[k]; break; } } // literal level file text for decals with no (or invalid) lingdex
+            if (!str) { u16 li=e->messageLingdex; str=(li>0 && li<T_LOGSTR_CNT) ? Sys_Text.stringTable[li] : NULL; }
+            if (!str || !str[0]) continue;
             float invatsz = 1.0f/(fontID==FONT_STOPD ? (float)FONT_ATLAS_SIZE2 : (float)FONT_ATLAS_SIZE);
             float puv=10.0f*invatsz, bw=2.0f;
             float totalW = MeasureLineAdvance(str,fontID);
             V3 scl = World.levelScale[lev][i]; Quaternion rot = World.levelRotation[lev][i]; V3 pos = World.levelPosition[lev][i];
-            // precompute rotated normal (double-sided flat decal plane +Z)
-            V3 n = quat_rot_v3(rot,(V3){0.0f,0.0f,1.0f}); float nl = vsqrtf(n.x*n.x+n.y*n.y+n.z*n.z); if (nl>0.0001f){n.x/=nl;n.y/=nl;n.z/=nl;} else {n=(V3){0.0f,0.0f,1.0f};}
+            // precompute rotated normal: -Z matches Unity text_3d.shader VS_Main, which forces o.normal = (0,0,-1)
+            V3 n = quat_rot_v3(rot,(V3){0.0f,0.0f,-1.0f}); float nl = vsqrtf(n.x*n.x+n.y*n.y+n.z*n.z); if (nl>0.0001f){n.x/=nl;n.y/=nl;n.z/=nl;} else {n=(V3){0.0f,0.0f,-1.0f};}
+            float decalPx = (fontID==FONT_STOPD) ? DECAL_PX_S : DECAL_PX_N;
+            float rasterMul = (fontID==FONT_STOPD) ? DECAL_RASTER_RATIO : 1.0f;
             u16 halfVerts[720*8]; u32 vIdx=0;
-            const char* p = str; float xpos=-totalW*0.5f, ypos=-8.0f, ls=22.0f; int cc=0;
+            const char* p = str; float xpos=-totalW*0.5f, ypos=-8.0f*rasterMul, ls=22.0f*rasterMul; int cc=0;
             float x0=0,y0=0,x1=0,y1=0,s0=0,t0=0,s1=0,t1=0;
             while(*p) {
                 const u8* s=(const u8*)p; u32 cp=0;
@@ -637,7 +645,7 @@ void BuildTextDecalMeshes(void) {    mset(textDecalVBO,0,sizeof(textDecalVBO)); 
                 // 6 verts (2 tris) per glyph; transform local->world baked
                 const float L[6][5] = {{x0,y0,s0,t0},{x1,y1,s1,t1},{x1,y0,s1,t0},{x0,y0,s0,t0},{x0,y1,s0,t1},{x1,y1,s1,t1}};
                 for (int k=0;k<6;k++) {
-                    float lx=L[k][0]*DECAL_TEXT_SCALE*scl.x, ly=-L[k][1]*DECAL_TEXT_SCALE*scl.y, lz=0.0f; // negate y: glyph quads are y-down, world +Y is up
+                    float lx=L[k][0]*decalPx*scl.x, ly=-L[k][1]*decalPx*scl.y, lz=0.0f; // negate y: glyph quads are y-down, world +Y is up
                     V3 r=quat_rot_v3(rot,(V3){lx,ly,lz});
                     float wx=r.x+pos.x, wy=r.y+pos.y, wz=r.z+pos.z;
                     halfVerts[vIdx++]=F32ToHalf(wx); halfVerts[vIdx++]=F32ToHalf(wy); halfVerts[vIdx++]=F32ToHalf(wz);

@@ -63,8 +63,8 @@ void main() {
     vec3 worldPos=FragPos.xyz; vec3 viewDir=(camPos-worldPos); float distToPixelSq=dot(viewDir,viewDir); float distToPixel=sqrt(distToPixelSq); viewDir*=inversesqrt(distToPixelSq); ivec2 texSize=useCamView>0 ? ivec2(camViewSize) : textureSizes[texIndex]; vec2 uv=(vec2(TexCoord.x,1.0-TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import 
     vec4 albedoColor; if(useCamView>0){albedoColor=texture(camViewTex, vec2(TexCoord.x, TexCoord.y));}
     else if (useFontAtlas != 0u) { float sdf = texture(fontAtlas, TexCoord).r; float glyphAlpha = smoothstep(0.45, 0.55, sdf); albedoColor = vec4(getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize.x).rgb, glyphAlpha); }
-    else albedoColor=getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize.x); if (albedoColor.a < 0.05 && volume < 0.05) discard;
-    vec3 adjustedNormal=Normal; bool hasNormalMap=normInstanceIndex != 0; float blend = 0.0; float facing = dot(Normal, viewDir); if (distToPixel < 5.12 && hasNormalMap) blend = 1.0; else if (distToPixel < 30.0 && hasNormalMap) { blend = smoothstep(30.0,5.12,distToPixel) * smoothstep(0.1,0.4,facing); }
+    else albedoColor=getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize.x); if (useFontAtlas != 0u) { if (albedoColor.a < 0.05) discard; } else if (albedoColor.a < 0.05 && volume < 0.05) discard;/*Text decals cutout on SDF alpha alone; volume uniform belongs to chunk geometry*/
+    vec3 adjustedNormal=Normal; if (useFontAtlas != 0u && dot(Normal, viewDir) < 0.0) adjustedNormal = -Normal;/*Text decals are double-sided; light whichever face the viewer sees*/ bool hasNormalMap=normInstanceIndex != 0; float blend = 0.0; float facing = dot(Normal, viewDir); if (distToPixel < 5.12 && hasNormalMap) blend = 1.0; else if (distToPixel < 30.0 && hasNormalMap) { blend = smoothstep(30.0,5.12,distToPixel) * smoothstep(0.1,0.4,facing); }
     if (hasNormalMap && blend > 0.01) {
         vec3 dp1=dFdx(FragPos),dp2=dFdy(FragPos); vec2 duv1=dFdx(TexCoord),duv2=dFdy(TexCoord); float uvArea=abs(duv1.x*duv2.y - duv1.y*duv2.x);
         if (uvArea > 0.000000001) {

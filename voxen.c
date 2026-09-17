@@ -6,6 +6,7 @@
 u32 globalframe=0,globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,
     textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS],psysInstancesID,psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,modelVertexCounts[MAX_MDLS],*physVertCounts,threadCnt=1;
 u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; u32 textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT]; // 3D text decal world meshes (chunk VAO format, world-baked, per level)
+char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN]; u16 decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount; // decals whose lingdex is invalid carry literal text from the level file
 float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 // Entity Management
 float modelMatrices[INSTANCE_COUNT*16],*world_from_mdl=modelMatrices,modelBounds[MAX_MDLS],**physPos; u16 **modelTriangles,modelTriangleCounts[MAX_MDLS],mdlsCnt,**physTris; u8 currentPlayerNameLength=0; i8 currentMenuItem=0,currentMenuTab=0,menuItemCount=4,menuTabCount=1;
@@ -516,7 +517,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (!(World.instances[i].entflags & EF_ACTIVE)) continue;
         if (World.instances[i].cellIndex >= 0 && !((gridCellStates[World.instances[i].cellIndex] & CELL_VISIBLE) || ((gridCellStates[World.instances[i].cellIndex] & CELL_OPEN) == CELL_OPEN))) continue;
         if (cullBlendState != 2) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState = 2; }/*Double-sided*/
-        glDepthFunc(0x0203/*GL_LEQUAL*/); glUniform1ui(0,(u32)i); glUniform1ui(1,0u); glUniform1ui(17,0u); glUniform1ui(18,881u/*TODO debug: forcing white*/); glUniform1ui(19,0u); glUniform1ui(20,0u); glUniform1ui(25,(u32)cIdx); glUniform1ui(13,0u); glUniform1ui(30,0u);
+        glDepthFunc(0x0203/*GL_LEQUAL*/); glUniform1ui(0,(u32)i); glUniform1ui(1,0u); glUniform1ui(17,0u); glUniform1ui(18,(u32)World.instances[i].texIndex); glUniform1ui(19,0u); glUniform1ui(20,0u); glUniform1ui(25,(u32)cIdx); glUniform1ui(13,0u); glUniform1ui(30,0u); glUniform1f(27,0.0f);
         glActiveTexture(0x84C9/*GL_TEXTURE9*/); glBindTexture(GL_TEXTURE_2D,(cIdx==593)?fontAtlasTexStopD:fontAtlasTex);
         glBindVertexBuffer(0,textDecalVBO[tdLev][i],0,16/*VRT_ATT_SZ*/); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,(i32)textDecalVertexCount[tdLev][i]); drawCalls++; vertsRendered += textDecalVertexCount[tdLev][i];
     }

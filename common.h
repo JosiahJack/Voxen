@@ -135,6 +135,7 @@ enum {/*Culling*/ WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, AR
       /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS),REV_BUF_LEN=110251/*~2.5s @ 44100; prime*/,MAXAMB=256,
       /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
                T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_BUFFER_SIZE=1024, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
+      /*UI*/ MFD_READER_CONTENTS=0,MFD_READER_FOLDER=1,MFD_READER_TEXT=2,
       /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
       /*Rendering*/ BLEND_OPAQUE=0,BLEND_CUTOUT=1,BLEND_PREMULT=2,BLEND_MULTIPLY=3,PARTICLE_FLAG_ADDITIVE=(1u<<0),PARTICLE_FLAG_SOFT=(1u<<1),PARTICLE_FLAG_LIT=(1u<<2),PARTICLE_FLAG_MULTIPLY=(1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE=(1u<<4),PARTICLE_FLAG_PHYSICS=(1u<<5),PARTICLE_FLAG_TRAIL=(1u<<6),MAX_PARTICLES=20480,MAX_EMITTERS=18,MAX_TRAIL_SEGS=4096,PARTICLE_SSBO_BINDING=10,TRAIL_SSBO_BINDING=11};
 u32 parse_numberu32(const char*, const char*,u32); u16 parse_numberu16(const char*, const char*,u32); u8 parse_numberu8(const char*, const char*,u32); bool parse_bool(const char*, const char*,u32);
@@ -255,6 +256,10 @@ extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**phys
 extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,vbos[MAX_MDLS],tbos[MAX_MDLS],drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_COUNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES],modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
 extern u16 mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],**modelBVHTriOrder,playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris;
 extern u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; extern u32 textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
+#define DECAL_INLINE_TEXT_MAX 64
+#define DECAL_INLINE_TEXT_PEND 64
+#define DECAL_INLINE_TEXT_LEN 96
+extern char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN]; extern u16 decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount;
 extern AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; extern BvhNode** modelBVHNodes; extern FHandle console_log_file; extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
 extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile; extern u16 fwParentOf[INSTANCE_COUNT];/*instance -> owning func_wall mover_target, 0 == none*/ extern const char* audioLogs[LOGCNT]; extern u32 gridCellStates[ARRSIZE]; extern double tWrnFinished[10];

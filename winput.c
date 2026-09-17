@@ -349,7 +349,14 @@ InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D}
                                  {"JOY11",JOYSTICK_12},{"JOY12",JOYSTICK_13},{"JOY13",JOYSTICK_14},{"JOY14",JOYSTICK_15},{"JOY15",JOYSTICK_16},{"JOY16",JOYHAT_UP},{"JOY17",JOYHAT_RIGHT},{"BACKSPACE",KEY_BACKSPACE},{"TAB",KEY_TAB},{"NUMENTER",KEY_KP_ENTER},{"ESCAPE",KEY_ESCAPE},{"SPACE",KEY_SPACE},{"DELETE",KEY_DELETE},{"INSERT",KEY_INSERT},{"HOME",KEY_HOME},{"END",KEY_END},{"PAGEUP",KEY_PAGE_UP},{"PAGEDN",KEY_PAGE_DOWN},{"F1",KEY_F1},{"F2",KEY_F2},
                                  {"F3",KEY_F3},{"F4",KEY_F4},{"F5",KEY_F5},{"F6",KEY_F6},{"F7",KEY_F7},{"F8",KEY_F8},{"F9",KEY_F9},{"F10",KEY_F10},{"F11",KEY_F11},{"F12",KEY_F12},{"GRAVE",KEY_GRAVE_ACCENT},{"-",KEY_MINUS},{"=",KEY_EQUAL},{"[",KEY_LEFT_BRACKET},{"]",KEY_RIGHT_BRACKET},{"\\",KEY_BACKSLASH},{"/",KEY_SLASH},{".",KEY_PERIOD},{",",KEY_COMMA},{";",KEY_SEMICOLON},{"'",KEY_APOSTROPHE},{"CAPSLOCK",KEY_CAPS_LOCK},{"NUM0",KEY_KP_0},{"NUM4",KEY_KP_4},
                                  {"NUM5",KEY_KP_5},{"NUM6",KEY_KP_6},{"NUM7",KEY_KP_7},{"NUM8",KEY_KP_8},{"NUM9",KEY_KP_9},{"NUM*",KEY_KP_MULTIPLY},{"NUM-",KEY_KP_SUBTRACT},{"NUM.",KEY_KP_DECIMAL},{"MENU",KEY_MENU},{"PAUSE",KEY_PAUSE},{"NUMLOCK",KEY_NUM_LOCK},{"MWHEEL+",127},{"MWHEEL-",128},/*Handled special case for mousewheel +/-respectively*/{"PRINT",KEY_PRINT_SCREEN},{"JOY18",JOYHAT_DOWN},{"JOY19",JOYHAT_LEFT},{"UNUSED",0}};
-KeyState* GetCodeMapping(int settingIndex) {i32 i = Sys_Settings.InputCodeSettings[settingIndex]; if (i < 0 || i >= (i32)(sizeof(inputElements)/sizeof(inputElements[0]))) return &Sys_Input.keyStates[MAX_KEYS - 1];/*UNUSED NULL (e.g. setting unbound)*/ if (i >= 53 && i <= 60) return &Sys_Input.mouseButtons[inputElements[i].value]; return &Sys_Input.keyStates[inputElements[i].value];}
+static u8 uiMouseCaptured; static bool uiWheelBlocked; static KeyState unboundInput;
+bool UI_PointerBlocksGameplay(void); void UI_ProcessNavigation(void);
+KeyState* GetCodeMapping(int settingIndex) {
+    if (settingIndex<0 || settingIndex>=42) return &unboundInput;
+    i32 i=Sys_Settings.InputCodeSettings[settingIndex]; if (i<0 || i>=(i32)(sizeof(inputElements)/sizeof(inputElements[0])) || i==127 || i==128) return &unboundInput;
+    if (i>=53 && i<=60) { int button=inputElements[i].value; return (uiMouseCaptured&(1u<<button)) ? &unboundInput : &Sys_Input.mouseButtons[button]; }
+    return &Sys_Input.keyStates[inputElements[i].value];
+}
 void TextEntry(i32 k) {
     if (k == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { World.playerName[0] = '\0'; currentPlayerNameLength = 0; return; } if (k == KEY_ENTER || k == KEY_KP_ENTER) { currentMenuItem++; return; } if (k == KEY_BACKSPACE && currentPlayerNameLength > 0) { World.playerName[--currentPlayerNameLength] = '\0'; return; } if (currentPlayerNameLength >= 26) return;
     char c = (k >= KEY_A && k <= KEY_Z) ? 'a' + (k - KEY_A) : ((k >= KEY_1 && k <= KEY_9) ? '1' + (k - KEY_1) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { World.playerName[currentPlayerNameLength] = c; World.playerName[++currentPlayerNameLength] = '\0'; }
@@ -372,7 +379,7 @@ void InputCursorPos(double* x, double* y, double xpos, double ypos) {
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) {/*Uses UI baseline resolution 1366x768*/ i32 newX = clamp(World.cursorPos_x + World.currentMouse_dx,0,1366); if (newX != World.cursorPos_x) {mouseMovementThisFrame = true;} World.cursorPos_x = newX; i32 newY = clamp(World.cursorPos_y + World.currentMouse_dy,0, 768); if (newY != World.cursorPos_y) {mouseMovementThisFrame = true;} World.cursorPos_y = newY;}
 }
 
-static bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 127) {return Sys_Input.scrollDelta > 0;} if (i == 128) {return Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
+static bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { if (sI<0 || sI>=42) return false; i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 127) {return !uiWheelBlocked && Sys_Input.scrollDelta > 0;} if (i == 128) {return !uiWheelBlocked && Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
 static bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 static bool GetKeyPressed(int settingIndex) { return (settingIndex < 0) ? Sys_Input.keyStates[KEY_GRAVE_ACCENT].pressed : GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 bool Forward() { return GetKey(0); }                bool StrafeLeft() { return GetKey(1); }             bool Backpedal() { return GetKey(2); }            bool StrafeRight() { return GetKey(3); }            bool Jump() { return GetKey(4); }                   bool JumpDown() { return GetKeyPressed(4); }
@@ -391,8 +398,13 @@ void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = fal
 void SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float);
 extern u16 editModeTestEntityDefinition;
 void InputProcessing() {
+    for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (!Sys_Input.mouseButtons[i].down) uiMouseCaptured&=~(1u<<i);
     mouseMovementThisFrame = false; PollEvents();
+    uiWheelBlocked=window_has_focus && UI_PointerBlocksGameplay();
+    for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (uiWheelBlocked && Sys_Input.mouseButtons[i].pressed) uiMouseCaptured|=1u<<i;
+    World.uiIsBlocking=World.mouseClickHeldOverGUI=World.Sys_UI.mouseClickHeldOverGUI=false;
     if (window_has_focus) {
+        UI_ProcessNavigation();
         if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);
         if (Sprint() && Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode && !editFieldEditing) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition--; if (editModeTestEntityDefinition < 307) editModeTestEntityDefinition = 767; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
         else if (Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode && !editFieldEditing) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition++; if (editModeTestEntityDefinition > 767) editModeTestEntityDefinition = 307; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
@@ -402,7 +414,7 @@ void InputProcessing() {
         if (Console()) ToggleConsole();
         if (Menu() && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; } if (Menu() && World.menuActive) { MenuGoBack(); return; } if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
         if (ToggleMode()) ToggleInventoryMode(); if (Lantern()) World.invP1.hardwareIsActive ^= HW_LAN; if (Infrared()) World.invP1.hardwareIsActive ^= HW_INF;
-        if (!editFieldEditing && (WeaponCycUp() || (GetKeyRiseEdgeOrHeld(127,true) && Sys_Input.scrollDelta > 0))) { CycleWeaponSlot(+1); Sys_Input.scrollDelta = 0; } if (!editFieldEditing && (WeaponCycDown() || (GetKeyRiseEdgeOrHeld(128,true) && Sys_Input.scrollDelta < 0))) { CycleWeaponSlot(-1); Sys_Input.scrollDelta = 0; }
+        if (!editFieldEditing && (WeaponCycUp() || (!uiWheelBlocked && Sys_Input.scrollDelta > 0))) { CycleWeaponSlot(+1); Sys_Input.scrollDelta = 0; } if (!editFieldEditing && (WeaponCycDown() || (!uiWheelBlocked && Sys_Input.scrollDelta < 0))) { CycleWeaponSlot(-1); Sys_Input.scrollDelta = 0; }
         ApplyPlayerMovements(World.dt);
         if (!World.paused && !World.menuActive && !World.inventoryMode) { // Apply mouselook/keyboardlook/lean
             float s = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f; World.cam_yaw += (float)World.currentMouse_dx * s; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if(World.cam_yaw<0.0f){World.cam_yaw+=360.0f;} World.cam_pitch+=(float)World.currentMouse_dy * s; if (World.cam_pitch > 89.0f) {World.cam_pitch = 89.0f;} if (World.cam_pitch < -89.0f) {World.cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg

@@ -6,6 +6,14 @@ const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1",
 u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0;
 u8 MFD_DataL=0,MFD_DataR=0; // DataTab subview per side: 0=none,1=elevator,2=keycode,3=grid,4=wire,5=search,6=audiolog,7=sysanalyzer,8=blocked,9=minigames
 u8 MFD_MediaTab=1; // EReader table: MM_EMAIL_TABLE=0,MM_LOG_TABLE=1,MM_DATA_TABLE=2,MM_NOTES=3
+u8 MFD_ReaderView=MFD_READER_CONTENTS;
+static u8 mfdSelected[3]={1,1,1},mfdReturnTab[3]={1,1,1},mfdReturnView[3],mfdItemReader[2];
+INLINE void MFD_SelectTab(u8 panel,u8 tab,bool toggle) {
+    u8* current=panel==0?&MFD_CenterTab:panel==1?&MFD_LefTab:&MFD_RightTab;
+    *current=toggle && *current==tab ? 0 : tab; mfdSelected[panel]=tab;
+    if (!(panel && tab==2 && mfdItemReader[panel-1])) { mfdReturnTab[panel]=*current; mfdReturnView[panel]=panel==0?0:panel==1?MFD_DataL:MFD_DataR; }
+    play_wav(sounds[97],SfxVol(),(V3){0,0,0},false);
+}
 void WeaponFireStartWeaponDip(float t);
 void WeaponSelectSlot(int slot){
     int wi=(int)World.invP1.weaponInventoryIndices[slot]; if(wi<0||wi>=MAX_ENTITIES)return;
@@ -279,18 +287,15 @@ void HardwareButtons() {
     if (World.invP1.hasHardware & HW_LAN) { RenderUIImage(0,300,40,40,HwActiveTexIndex(lanOn,World.invP1.hwVers[HW_LAN_IDX],1004,1006,1007,1008,1008)); if (HwBtnClick(0,40,300,340)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (lanOn) World.invP1.hardwareIsActive &= ~HW_LAN; else World.invP1.hardwareIsActive |= HW_LAN; } } }
     if (World.invP1.hasHardware & HW_SHD) { RenderUIImage(0,360,40,40,HwActiveTexIndex(shdOn,World.invP1.hwVers[HW_SHD_IDX],1014,1015,1016,1017,1018)); if (HwBtnClick(0,40,360,400)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else if (shdOn) { play_wav(sounds[95],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive &= ~HW_SHD; } else { play_wav(sounds[96],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive |= HW_SHD; } } }
     if (World.invP1.hasHardware & HW_INF) { RenderUIImage(1326,180,40,40,HwActiveTexIndex(infOn,World.invP1.hwVers[HW_INF_IDX],998,999,999,999,999)); if (HwBtnClick(1326,1366,180,220)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { bool wasOn=(infOn) != 0; play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (wasOn) World.invP1.hardwareIsActive &= ~HW_INF; else World.invP1.hardwareIsActive |= HW_INF; } } }
-    if (World.invP1.hasHardware & HW_ERD) { RenderUIImage(1326,240,40,40,World.inventoryMode && CursorIsOverBounds(1326,1366,240,280) && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) ? 997 : ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1)) ? 997 : 996); if (HwBtnClick(1326,1366,240,280)) { play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false); MFD_CenterTab = 5; MFD_LefTab = 2; } }
+    if (World.invP1.hasHardware & HW_ERD) { RenderUIImage(1326,240,40,40,World.inventoryMode && CursorIsOverBounds(1326,1366,240,280) && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) ? 997 : ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1)) ? 997 : 996); }
     if (World.invP1.hasHardware & HW_BST) { RenderUIImage(1326,300,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_BST,World.invP1.hwVers[HW_BST_IDX],993,994,995,995,995)); if (HwBtnClick(1326,1366,300,340)) { if (World.invP1.hwVersSetting[HW_BST_IDX] >= 1 && noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (World.invP1.hardwareIsActive & HW_BST) World.invP1.hardwareIsActive &= ~HW_BST; else World.invP1.hardwareIsActive |= HW_BST; } } }
     if (World.invP1.hasHardware & HW_JET) { RenderUIImage(1326,360,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_JET,World.invP1.hwVers[HW_JET_IDX],1000,1001,1002,1003,1003)); if (HwBtnClick(1326,1366,360,400)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= HW_JET; } } }
 }
 
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
 void CenterMFD() {
-    RenderUIImage(400,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021);/*Main center tab button*/ RenderUIImage(480,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021);/*Hardware center tab button*/ RenderUIImage(560,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021);/*General center tab button*/ RenderUIImage(902,752,64,32,MFD_CenterTab == 4 ? 1024 : 1021);/*Software center tab button*/
-    if(HwBtnClick(400,464,752,784)){MFD_CenterTab = MFD_CenterTab == 1 ? 0 : 1; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-    if(HwBtnClick(480,544,752,784)){MFD_CenterTab = MFD_CenterTab == 2 ? 0 : 2; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-    if(HwBtnClick(560,624,752,784)){MFD_CenterTab = MFD_CenterTab == 3 ? 0 : 3; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-    if(HwBtnClick(902,966,752,784)){MFD_CenterTab = MFD_CenterTab == 4 ? 0 : 4; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+    RenderUIImage(400,752,64,32,mfdSelected[0] == 1 && MFD_CenterTab!=5 ? 1024 : 1021);/*Main center tab button*/ RenderUIImage(480,752,64,32,mfdSelected[0] == 2 && MFD_CenterTab!=5 ? 1024 : 1021);/*Hardware center tab button*/ RenderUIImage(560,752,64,32,mfdSelected[0] == 3 && MFD_CenterTab!=5 ? 1024 : 1021);/*General center tab button*/ RenderUIImage(902,752,64,32,mfdSelected[0] == 4 && MFD_CenterTab!=5 ? 1024 : 1021);/*Software center tab button*/
+
     if (World.inventoryMode && World.invP1.holdingObject && CursorIsOverBounds(345,1021,460,768)) { // Add to Inventory Helper
         World.uiIsBlocking = true; RenderUIImage(345,528,676,240,1075); RenderTextL(586,528,T_GREEN,FONT_NORMAL,1.0f,"ADD TO INVENTORY");
         if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; }
@@ -316,23 +321,30 @@ void CenterMFD() {
 
 void SideMFD(bool isRH) {
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex), tab = isRH ? MFD_RightTab : MFD_LefTab;
-    u8* stab = isRH ? &MFD_RightTab : &MFD_LefTab;
-    RenderUIImage(isRH ? 1350 : -16,520,32,40,tab == 1 ? 1024 : 1022); // Weapon side tab button
-    if(HwBtnClick(isRH ? 1350 : -16,isRH ? 1382 : 16,520,560)){*stab = tab == 1 ? 0 : 1; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-    RenderUIImage(isRH ? 1350 : -16,576,32,40,tab == 2 ? 1024 : 1022); // Item side tab button
-    if(HwBtnClick(isRH ? 1350 : -16,isRH ? 1382 : 16,576,616)){*stab = tab == 2 ? 0 : 2; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-    RenderUIImage(isRH ? 1350 : -16,632,32,40,tab == 3 ? 1024 : 1022); // Automap side tab button
-    if(HwBtnClick(isRH ? 1350 : -16,isRH ? 1382 : 16,632,672)){*stab = tab == 3 ? 0 : 3; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-    RenderUIImage(isRH ? 1350 : -16,688,32,40,tab == 5 ? 1024 : 1022); // Data side tab button
-    if(HwBtnClick(isRH ? 1350 : -16,isRH ? 1382 : 16,688,728)){*stab = tab == 5 ? 0 : 5; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-    tab = *stab;
+    u8 selected=tab?tab:mfdSelected[isRH?2:1];
+    RenderUIImage(isRH ? 1350 : -16,520,32,40,selected == 1 ? 1024 : 1022); // Weapon side tab button
+
+    RenderUIImage(isRH ? 1350 : -16,576,32,40,selected == 2 ? 1024 : 1022); // Item side tab button
+
+    RenderUIImage(isRH ? 1350 : -16,632,32,40,selected == 3 ? 1024 : 1022); // Automap side tab button
+
+    RenderUIImage(isRH ? 1350 : -16,688,32,40,selected == 5 ? 1024 : 1022); // Data side tab button
+
     if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1) { /*TODO Sensaround Plane*/ }
      if (tab == 0){return;} 
     //RenderUIImage(isRH ? 1022 : 24,520,320,240,1025); // TODO REMOVE Test BG for ensuring fit into 320x240 to match 1:1 scale that Doom's 320x200 would map to after 4:3 scaling applied (since the CRT's had non-square pixels that stretched 320x200 into 320x240 space, ish) TODO gate by search active
     if (tab == 1) { /*WeaponTabLH: WepNameTextLH, WepIconLH, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/
         int widx=World.invP1.weaponInventoryIndices[World.invP1.weaponCurrent];
         if (widx >= 0) { RenderTextL(isRH ? 1342 : 24,520,T_RED,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16){RenderUIImage(isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIconLH*/} }
-    } else if (tab == 2) { /*ItemTab: ItemIcon, ItemText, Vaporize/Apply/Use Buttons, EReaderSections, AccessCardsList*/ }
+    } else if (tab == 2 && mfdItemReader[isRH]) {
+        i16 x=isRH?1080:22; static const u16 labels[4]={42,39,43,885};
+        RenderTextL(x+6,540,T_YELLOW,FONT_NORMAL,0.6,"%s",Sys_Text.stringTable[349]);
+        for (u8 section=0;section<4;++section) { if (section==MM_NOTES && !World.diffMis) continue;
+            bool sectionSelected=MFD_MediaTab==section,unread=World.Sys_UI.highlightStatus[section];
+            RenderUIImage(x+65*section,718,65,40,sectionSelected||unread?1087:1086);
+            RenderTextL(x+65*section,718,sectionSelected?T_GREEN_MENU:T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",Sys_Text.stringTable[labels[section]]);
+        }
+    }
     else if (tab == 3) { /*AutomapTab: AutomapMask, Overlays, PlayerIcon, ZoomIn/Out/Full/Side Buttons*/ }
     else if (tab == 4) { /*TargetTab*/ }
     else if (tab == 5) { /*DataTab: Security, DataHeaders, ElevatorUIControl, KeycodeUIControl, SearchContents, AudioLogInfo, PuzzleGrid, PuzzleWire, SystemAnalyzer Display*/ }
@@ -384,6 +396,50 @@ void EditFieldKey(i32 keycode){if(!editFieldEditing)return;
     if(changed)EditFieldCommitLive();
 }
 
+bool UI_PointerBlocksGameplay(void) {
+    if (!World.inventoryMode) return false;
+    if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive) return true;
+    if (EditPanelPointerHover()) return true;
+    if (Cheats.noHUD || World.Sys_UI.vmailActive) return false;
+    if (CursorIsOverBounds(667,699,0,32)) return true;
+    u32 hw=World.invP1.hasHardware;
+    if (((hw&HW_BIO)&&CursorIsOverBounds(0,40,180,220)) || ((hw&HW_SNS)&&CursorIsOverBounds(0,40,240,280)) || ((hw&HW_LAN)&&CursorIsOverBounds(0,40,300,340)) || ((hw&HW_SHD)&&CursorIsOverBounds(0,40,360,400))) return true;
+    if (((hw&HW_INF)&&CursorIsOverBounds(1326,1366,180,220)) || ((hw&HW_ERD)&&CursorIsOverBounds(1326,1366,240,280)) || ((hw&HW_BST)&&CursorIsOverBounds(1326,1366,300,340)) || ((hw&HW_JET)&&CursorIsOverBounds(1326,1366,360,400))) return true;
+    if (CursorIsOverBounds(400,464,752,784) || CursorIsOverBounds(480,544,752,784) || CursorIsOverBounds(560,624,752,784) || CursorIsOverBounds(902,966,752,784)) return true;
+    for (int side=0;side<2;++side) for (int tab=0;tab<4;++tab) if (CursorIsOverBounds(side?1350:-16,side?1382:16,520+56*tab,560+56*tab)) return true;
+    if (World.invP1.holdingObject && CursorIsOverBounds(345,1021,460,768)) return true;
+    return (MFD_CenterTab && CursorIsOverBounds(345,1021,552,768)) || (MFD_LefTab && CursorIsOverBounds(24,344,520,768)) || (MFD_RightTab && CursorIsOverBounds(1022,1342,520,768));
+}
+
+void UI_ProcessNavigation(void) {
+    if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive || World.Sys_UI.vmailActive) return;
+    static const u16 keys[7]={KEY_F1,KEY_F2,KEY_F3,KEY_F4,KEY_F5,KEY_F7,KEY_F8}; static const u8 tabs[7]={1,2,3,5,1,2,3};
+    for (u8 i=0;i<7;++i) if (Sys_Input.keyStates[keys[i]].pressed) { Sys_Input.keyStates[keys[i]].pressed=false; MFD_SelectTab(i<4?1:2,tabs[i],true); }
+    for (u8 up=0;up<2;++up) { u16 key=up?KEY_PAGE_UP:KEY_PAGE_DOWN; if (!Sys_Input.keyStates[key].pressed) continue;
+        Sys_Input.keyStates[key].pressed=false; u8 tab=MFD_CenterTab?MFD_CenterTab:mfdSelected[0];
+        MFD_SelectTab(0,tab==5?1:1+(tab-1+(up?3:1))%4,false); MFD_ReaderView=MFD_READER_CONTENTS;
+    }
+    if (!World.inventoryMode || Cheats.noHUD) return;
+    if (HwBtnClick(667,699,0,32)) { ForceShootMode(); return; }
+    if ((World.invP1.hasHardware&HW_ERD) && HwBtnClick(1326,1366,240,280)) {
+        MFD_CenterTab=5; MFD_LefTab=2; mfdItemReader[0]=true; MFD_ReaderView=MFD_READER_CONTENTS;
+        MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened; if (MFD_MediaTab>MM_NOTES || (MFD_MediaTab==MM_NOTES && !World.diffMis)) MFD_MediaTab=MM_LOG_TABLE;
+        play_wav(sounds[97],SfxVol(),(V3){0,0,0},false); return;
+    }
+    static const i16 centerX[4]={400,480,560,902};
+    for (u8 i=0;i<4;++i) if (HwBtnClick(centerX[i],centerX[i]+64,752,784)) { MFD_SelectTab(0,i+1,true); return; }
+    for (u8 side=0;side<2;++side) {
+        for (u8 i=0;i<4;++i) if (HwBtnClick(side?1350:-16,side?1382:16,520+56*i,560+56*i)) { MFD_SelectTab(side+1,tabs[i],true); return; }
+        if ((side?MFD_RightTab:MFD_LefTab)!=2 || !mfdItemReader[side]) continue;
+        for (u8 section=0;section<4;++section) { if (section==MM_NOTES && !World.diffMis) continue; i16 x=(side?1080:22)+65*section;
+            if (!HwBtnClick(x,x+64,718,758)) continue;
+            MFD_CenterTab=5; MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened=section; MFD_ReaderView=MFD_READER_CONTENTS;
+            if (section>=MM_DATA_TABLE) { World.Sys_UI.highlightStatus[section]=false; World.Sys_UI.highlightTickCount[section]=0; }
+            play_wav(sounds[97],SfxVol(),(V3){0,0,0},false); return;
+        }
+    }
+}
+
 static double RenderUI() {
     drawCallsNormal = drawCalls;
     World.uiIsBlocking = false;
@@ -405,7 +461,6 @@ static double RenderUI() {
         if (!Cheats.noHUD) {
             TickBar(false/*health*/); TickBar(true/*energy*/);/*Health and Energy Bars*/ HardwareButtons();
             RenderUIImage(667,0,32,32,1020);/*ShootModeButton*/
-            if (World.inventoryMode && CursorIsOverBounds(667,699,0,32)) { /*ShootModeButton*/ World.uiIsBlocking = true; if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { ForceShootMode(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; } }
             for (int i=0;i<10;++i){ if (tWrnFinished[i] > World.pauseRelativeTime){
                 char flt[6]; if(tWrnTextIdx[i] == 185){sFormat(flt,6,"%.1f",(double)World.instances[PLAYER1].radiation);} RenderTextL(340,72+(i*18),tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[tWrnTextIdx[i]],tWrnTextIdx[i] == 185 ? flt : tWrnTextIdx2[i] >= 0 ? Sys_Text.stringTable[tWrnTextIdx2[i]] : "",tWrnTextIdx3[i] >= 0 ? Sys_Text.stringTable[tWrnTextIdx3[i]] : "");
             } /*Text Warnings System (e.g. radiation hazard + biohazard), stacks with timeout*/}
@@ -415,14 +470,7 @@ static double RenderUI() {
 //         if (World.Sys_UI.showAutomapFull) { /*AutomapFullRawImage*/ /*PlayerIconFull*/ /*CloseFullmapButton*/ } if (World.Sys_UI.showMissionTimer) { /*MissionTimerT*/ /*MissionTimer*/ }
 //         if (World.Sys_UI.showCyberTimer) { /*CyberTimerT*/ /*CyberTimer*/ }
         if(!Cheats.noHUD){SideMFD(false/*Left*/); CenterMFD(); SideMFD(true/*Right*/);} // MFD
-        if(!Cheats.consoleActive){ // Tab hotkeys: PgUp/PgDn cycle center, F1/F2 left MFD, F3/F4 right MFD
-            if(Sys_Input.keyStates[KEY_PAGE_DOWN].pressed){Sys_Input.keyStates[KEY_PAGE_DOWN].pressed=false; MFD_CenterTab=(MFD_CenterTab+1)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-            if(Sys_Input.keyStates[KEY_PAGE_UP].pressed){Sys_Input.keyStates[KEY_PAGE_UP].pressed=false; MFD_CenterTab=(MFD_CenterTab+5)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-            if(Sys_Input.keyStates[KEY_F2].pressed){Sys_Input.keyStates[KEY_F2].pressed=false; MFD_LefTab=(MFD_LefTab+1)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-            if(Sys_Input.keyStates[KEY_F1].pressed){Sys_Input.keyStates[KEY_F1].pressed=false; MFD_LefTab=(MFD_LefTab+5)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-            if(Sys_Input.keyStates[KEY_F4].pressed){Sys_Input.keyStates[KEY_F4].pressed=false; MFD_RightTab=(MFD_RightTab+1)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-            if(Sys_Input.keyStates[KEY_F3].pressed){Sys_Input.keyStates[KEY_F3].pressed=false; MFD_RightTab=(MFD_RightTab+5)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
-        }
+
 // UI setup pass: every Canvas element in place (Automap + Main Menu omitted,FX occluders skipped)
 // C# MFDManager: MFDManager.cs
 // C# MFDManager: QuestLogNotesManager.cs
@@ -432,7 +480,7 @@ RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.6,"0"); // MissionTimer dummy
 // C# MissionTimer: MissionTimer.cs
 // C# TabsLH: LeftMFDTabs.cs
 // C# ItemTabLH: ItemTabManager.cs
-if(MFD_LefTab==2){ // ItemTabLH
+if(MFD_LefTab==2 && !mfdItemReader[0]){ // ItemTabLH
 RenderUIImage(33,528,237,237,1025); // ItemIcon UNMAPPED:[Textures/UI/itemicons/paperico.png]
 // C# ItemIcon: ItemIconManager.cs
 // C# ItemIcon: UIPointerMask.cs
@@ -451,27 +499,6 @@ RenderUIImage(72,691,160,40,1087); // UseButton
 // BTN UseButton: UseButton.OnActivateClick()
 // C# UseButton: ActivateButton.cs
 RenderTextL(72,691,T_GREEN_MENU,FONT_NORMAL,0.6,"USE"); // Text
-// C# EReaderSectionsLH: EReaderSectionsButtons.cs
-RenderUIImage(22,718,65,40,1086); // EMAILButton
-// BTN EMAILButton: EReaderSectionsLH.OnClick()
-// C# EMAILButton: UIButtonMask.cs
-// C# EMAILButton: EReaderSectionsButtonHighlight.cs
-RenderTextL(22,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",42<1100?Sys_Text.stringTable[42]:"EMAIL"); // Text
-RenderUIImage(87,718,65,40,1087); // LOGSButton
-// BTN LOGSButton: EReaderSectionsLH.OnClick(1)
-// C# LOGSButton: UIButtonMask.cs
-// C# LOGSButton: EReaderSectionsButtonHighlight.cs
-RenderTextL(87,718,T_GREEN_MENU,FONT_NORMAL,0.6,"%s",39<1100?Sys_Text.stringTable[39]:"LOGS"); // Text
-RenderUIImage(153,718,65,40,1086); // DATAButton
-// BTN DATAButton: EReaderSectionsLH.OnClick(2)
-// C# DATAButton: UIButtonMask.cs
-// C# DATAButton: EReaderSectionsButtonHighlight.cs
-RenderTextL(153,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",43<1100?Sys_Text.stringTable[43]:"DATA"); // Text
-RenderUIImage(217,718,65,40,1086); // NOTESButton
-// BTN NOTESButton: EReaderSectionsLH.OnClick(3)
-// C# NOTESButton: UIButtonMask.cs
-// C# NOTESButton: EReaderSectionsButtonHighlight.cs
-RenderTextL(217,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",885<1100?Sys_Text.stringTable[885]:"NOTES"); // Text
 RenderTextL(60,614,T_YELLOW,FONT_NORMAL,0.6,"STD"); // AccessCardsList
 // C# AccessCardsList: UIPointerMask.cs
 // C# GrenadeTimerSliderLH: UIPointerMask.cs
@@ -1550,6 +1577,7 @@ if(MFD_CenterTab==5){ // EReader
 RenderTextL(454,557,T_RED,FONT_NORMAL,0.6,"%s",877<1100?Sys_Text.stringTable[877]:"LOGS"); // MultiMediaHeaderLabel
 // C# MultiMediaHeaderLabel: UIPointerMask.cs
 if(MFD_MediaTab==MM_LOG_TABLE){ // LogTable
+if(MFD_ReaderView==MFD_READER_CONTENTS){
 RenderUIImage(454,573,453,191,0); // LogTableofContents QUAD:builtin-knob
 // C# LogTableofContents: LogTableContentsButtonsManager.cs
 RenderUIImage(454,573,226,24,0); // Button QUAD:builtin-white
@@ -1622,6 +1650,7 @@ RenderUIImage(681,620,226,24,0); // Button (9) QUAD:builtin-white
 RenderTextL(681,620,T_GREEN,FONT_NORMAL,0.6,"Level 9 Logs"); // Text
 RenderTextL(751,620,T_GREEN,FONT_NORMAL,0.6,"3"); // CountText (9)
 // C# CountText (9): LogCountsText.cs
+}else if(MFD_ReaderView==MFD_READER_FOLDER){
 RenderUIImage(458,570,445,188,0); // LogsLevelFolder QUAD:builtin-knob
 // C# LogsLevelFolder: LogContentsButtonsManager.cs
 RenderUIImage(458,570,222,21,0); // Button QUAD:builtin-white
@@ -1699,6 +1728,7 @@ RenderUIImage(681,696,222,21,0); // Button (14) QUAD:builtin-white
 // C# Button (14): UIButtonMask.cs
 // C# Button (14): MultiMediaLogButton.cs
 RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Log"); // Text14
+}else if(MFD_ReaderView==MFD_READER_TEXT){
 // C# LogTextReader: LogTextReaderManager.cs
 RenderTextL(449,576,T_GREEN,FONT_NORMAL,0.6,"\"abc def ghi jkl mno pqrs tuv wxyz ABC DEF GHI JKL MNO PQRS TUV WXYZ !\"\\xA7\n$%%& /() =?* '<> #|; \\xB2\\xB3~ @`\\xB4 \\xA9\\xAB\\xBB \\xA4\\xBC\\x..."); // LogTextOutput
 // C# LogTextOutput: UIPointerMask.cs
@@ -1712,6 +1742,7 @@ RenderUIImage(453,718,69,31,0); // BackButton QUAD:builtin-white
 // C# BackButton: UIButtonMask.cs
 // C# BackButton: LogBackButton.cs
 RenderTextL(453,718,T_YELLOW,FONT_NORMAL,0.6,"%s",879<1100?Sys_Text.stringTable[879]:"[BACK]"); // Text0
+}
 }
 if(MFD_MediaTab==MM_EMAIL_TABLE){ // Email
 RenderUIImage(458,570,445,188,0); // EmailTab QUAD:builtin-knob
@@ -1994,7 +2025,7 @@ RenderTextL(808,718,T_GREEN,FONT_NORMAL,0.6,"Destroy SHODAN."); // Label17
 // C# ItemTabRH: ItemTabManager.cs
 }
 }
-if(MFD_RightTab==2){ // ItemTabRH
+if(MFD_RightTab==2 && !mfdItemReader[1]){ // ItemTabRH
 RenderUIImage(1092,528,237,237,1025); // ItemIcon UNMAPPED:[Textures/UI/itemicons/paperico.png]
 // C# ItemIcon: ItemIconManager.cs
 // C# ItemIcon: UIPointerMask.cs
@@ -2013,27 +2044,6 @@ RenderUIImage(1131,691,160,40,1087); // UseButton
 // BTN UseButton: UseButton.OnActivateClick()
 // C# UseButton: ActivateButton.cs
 RenderTextL(1131,691,T_GREEN_MENU,FONT_NORMAL,0.6,"USE"); // Text
-// C# EReaderSectionsRH: EReaderSectionsButtons.cs
-RenderUIImage(1080,718,65,40,1086); // EMAILButton
-// BTN EMAILButton: EReaderSectionsRH.OnClick()
-// C# EMAILButton: UIButtonMask.cs
-// C# EMAILButton: EReaderSectionsButtonHighlight.cs
-RenderTextL(1080,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",42<1100?Sys_Text.stringTable[42]:"EMAIL"); // Text
-RenderUIImage(1146,718,65,40,1087); // LOGSButton
-// BTN LOGSButton: EReaderSectionsRH.OnClick(1)
-// C# LOGSButton: UIButtonMask.cs
-// C# LOGSButton: EReaderSectionsButtonHighlight.cs
-RenderTextL(1146,718,T_GREEN_MENU,FONT_NORMAL,0.6,"%s",39<1100?Sys_Text.stringTable[39]:"LOGS"); // Text
-RenderUIImage(1212,718,65,40,1086); // DATAButton
-// BTN DATAButton: EReaderSectionsRH.OnClick(2)
-// C# DATAButton: UIButtonMask.cs
-// C# DATAButton: EReaderSectionsButtonHighlight.cs
-RenderTextL(1212,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",43<1100?Sys_Text.stringTable[43]:"DATA"); // Text
-RenderUIImage(1276,718,65,40,1086); // NOTESButton
-// BTN NOTESButton: EReaderSectionsRH.OnClick(3)
-// C# NOTESButton: UIButtonMask.cs
-// C# NOTESButton: EReaderSectionsButtonHighlight.cs
-RenderTextL(1276,718,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",885<1100?Sys_Text.stringTable[885]:"NOTES"); // Text
 RenderTextL(1124,615,T_YELLOW,FONT_NORMAL,0.6,"STD"); // AccessCardsList
 // C# AccessCardsList: UIPointerMask.cs
 // C# GrenadeTimerSliderRH: UIPointerMask.cs
