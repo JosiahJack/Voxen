@@ -533,3 +533,129 @@ void RenderTextR(i16 x, i16 y, u32 color, u8 f, float scale, const char* restric
 void RenderText3DL(V3 worldPos, u32 color, u8 f, float scale, u16 instIdx, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_LEFT,s,a,1,instIdx); __builtin_va_end(a); }
 void RenderText3DC(V3 worldPos, u32 color, u8 f, float scale, u16 instIdx, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_CENTER,s,a,1,instIdx); __builtin_va_end(a); }
 void RenderText3DR(V3 worldPos, u32 color, u8 f, float scale, u16 instIdx, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_RIGHT,s,a,1,instIdx); __builtin_va_end(a); }
+void RenderText3DWorld(V3 worldPos, Quaternion rot, u32 color, u8 fontID, float scale, const char* restrict s) {
+    sFormat(uiTextBuffer,T_BUFFER_SIZE,"%s",s);
+    glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f);
+    glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD?fontAtlasTexStopD:fontAtlasTex);
+    float invatsz = 1.0f/(fontID==FONT_STOPD ? (float)FONT_ATLAS_SIZE2 : (float)FONT_ATLAS_SIZE);
+    glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID); glBindVertexArray(textVAO);
+    float alignMul = 0.5f; float xUsed = 0.0f, yUsed = 0.0f; float ls = 22.0f * scale;
+    size_t vc = 0; const char*p = uiTextBuffer; float xpos = xUsed - MeasureLineAdvance(p,fontID)*alignMul, ypos = yUsed + (16.0f*scale);
+    int cc = 0; float puv = 10.0f * invatsz, bw = 2.0f;
+    while(*p) {
+        const u8* s_ = (const u8*)p; u32 cp = 0;
+        if (*s_ < 0x80) { cp = *s_++; }
+        else if ((*s_ & 0xE0) == 0xC0) { if (!s_[1]) break; cp = (*s_ & 0x1F) << 6; cp |= (s_[1] & 0x3F); s_ += 2; }
+        else if ((*s_ & 0xF0) == 0xE0) { if (!s_[1] || !s_[2]) break; cp = (*s_ & 0x0F) << 12; cp |= (s_[1] & 0x3F) << 6; cp |= (s_[2] & 0x3F); s_ += 3; }
+        else if ((*s_ & 0xF8) == 0xF0) { if (!s_[1] || !s_[2] || !s_[3]) break; cp = (*s_ & 0x07) << 18; cp |= (s_[1] & 0x3F) << 12; cp |= (s_[2] & 0x3F) << 6; cp |= (s_[3] & 0x3F); s_ += 4; }
+        else s_++;
+        p = (const char*)s_; cc++;
+        if (cp == '\n' || cc > 120) { xpos = xUsed - MeasureLineAdvance(p,fontID)*alignMul; ypos += ls; cc = 0; continue; }
+        int idx = CodepointToPackedIndex(cp, fontID);
+        const stbtt_packedchar* b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx;
+        float qx0 = vfloor((xpos + b->xoff) + 0.5f), qy0 = vfloor((ypos + b->yoff) + 0.5f);
+        float qs0 = b->x0 * invatsz, qt0 = b->y0 * invatsz, qs1 = b->x1 * invatsz, qt1 = b->y1 * invatsz;
+        float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw;
+        float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f;
+        // Build local-space vertex array; rotate and translate by quaternion/position
+        float localVerts[30*6] = {
+            vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0,
+            vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1
+        };
+        for (int k = 0; k < 6; k++) {
+            float lvx = localVerts[k*5], lvy = localVerts[k*5+1], lvz = localVerts[k*5+2];
+            V3 r = quat_rot_v3(rot, (V3){lvx, lvy, lvz});
+            localVerts[k*5] = r.x + worldPos.x;
+            localVerts[k*5+1] = r.y + worldPos.y;
+            localVerts[k*5+2] = r.z + worldPos.z;
+        }
+        if (vc >= 8192/30) break;
+        mcpy(textVertexData + vc * 30, localVerts, sizeof(localVerts)); vc++;
+        if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD){ xpos = qx0 + fixedNumberAdvanceWidthStopD; }
+        else xpos += b->xadvance;
+    }
+    if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); drawCalls++; vertsRendered += vc*6; }
+    glBindBuffer(GL_ARRAY_BUFFER,0); glDisable(GL_BLEND);
+}
+
+// --- 3D text decal world meshes (592 text_decal, 593 text_decalStopDSS1) ---
+// Built once at end of LoadAllLevels (Sys_Text.stringTable already populated for current language).
+// Each mesh is baked into world space (position/rotation/scale from the instance) using the chunk
+// VAO vertex format: pos xyz (half), normal xyz (half), uv st (half) = 16 bytes/vertex.
+// Rendered double-sided, lit, reusing chunkSP; skipped in shadowmap pass (instances have modelIndex U16_MAX)
+// but receive shadows via the normal chunk shader shadow sampling.
+static u16 F32ToHalf(float f) {
+    u32 x; mcpy(&x,&f,4);
+    u32 sign=(x>>16)&0x8000u, exp=(x>>23)&0xFFu, mant=x&0x7FFFFFu;
+    if (exp==0xFFu) return (u16)(sign | 0x7C00u | (mant?0x200u:0));
+    int e=(int)exp-127+15;
+    if (e>=31) return (u16)(sign|0x7C00u);
+    if (e<=0) {
+        if (e<-10) return (u16)sign;
+        mant|=0x800000u; u32 shift=(u32)(14-e); u32 h=mant>>shift;
+        if ((mant>>(shift-1))&1u) h++;
+        return (u16)(sign|h);
+    }
+    u32 h=((u32)e<<10)|(mant>>13); if (mant&0x1000u) h++;
+    return (u16)(sign|h);
+}
+
+void BuildTextDecalMeshes(void) {    mset(textDecalVBO,0,sizeof(textDecalVBO)); mset(textDecalVertexCount,0,sizeof(textDecalVertexCount)); // clear stale
+    const float DECAL_TEXT_SCALE = 0.05f; // glyph "pixel" -> world units base (player is ~2 units tall)
+    for (u8 lev=0; lev<World.numLevels; ++lev) {
+        for (u16 i=INSTS_1ST_IDX; i<World.levelInstCount[lev]; ++i) {
+            Entity* e = &World.levelInstances[lev][i];
+            if (e->index!=592 && e->index!=593) continue;
+            if (e->messageLingdex == 0) continue; // ad-hoc instances (e.g. editmode selection text) carry no lingdex
+            u8 fontID = (e->index==593) ? FONT_STOPD : FONT_NORMAL;
+            const char* str = (e->messageLingdex < T_LOGSTR_CNT) ? Sys_Text.stringTable[e->messageLingdex] : "";
+            if (!str) str="";
+            float invatsz = 1.0f/(fontID==FONT_STOPD ? (float)FONT_ATLAS_SIZE2 : (float)FONT_ATLAS_SIZE);
+            float puv=10.0f*invatsz, bw=2.0f;
+            float totalW = MeasureLineAdvance(str,fontID);
+            V3 scl = World.levelScale[lev][i]; Quaternion rot = World.levelRotation[lev][i]; V3 pos = World.levelPosition[lev][i];
+            // precompute rotated normal (double-sided flat decal plane +Z)
+            V3 n = quat_rot_v3(rot,(V3){0.0f,0.0f,1.0f}); float nl = vsqrtf(n.x*n.x+n.y*n.y+n.z*n.z); if (nl>0.0001f){n.x/=nl;n.y/=nl;n.z/=nl;} else {n=(V3){0.0f,0.0f,1.0f};}
+            u16 halfVerts[720*8]; u32 vIdx=0;
+            const char* p = str; float xpos=-totalW*0.5f, ypos=-8.0f, ls=22.0f; int cc=0;
+            float x0=0,y0=0,x1=0,y1=0,s0=0,t0=0,s1=0,t1=0;
+            while(*p) {
+                const u8* s=(const u8*)p; u32 cp=0;
+                if (*s<0x80){cp=*s++;}
+                else if ((*s&0xE0)==0xC0){ if(!s[1])break; cp=(*s&0x1F)<<6; cp|=(s[1]&0x3F); s+=2; }
+                else if ((*s&0xF0)==0xE0){ if(!s[1]||!s[2])break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }
+                else if ((*s&0xF8)==0xF0){ if(!s[1]||!s[2]||!s[3])break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
+                else s++;
+                p=(const char*)s; cc++;
+                if (cp=='\n'||cc>120){ xpos=-totalW*0.5f; ypos+=ls; cc=0; continue; }
+                int idx=CodepointToPackedIndex((i32)cp,fontID);
+                const stbtt_packedchar* b = ((fontID==FONT_STOPD)?fontPackedCharStopD:fontPackedChar)+idx;
+                float qx0=vfloor((xpos+b->xoff)+0.5f), qy0=vfloor((ypos+b->yoff)+0.5f);
+                float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
+                x0=qx0-bw; x1=(qx0+b->xoff2-b->xoff)+bw; y0=qy0-bw; y1=(qy0+b->yoff2-b->yoff)+bw;
+                s0=qs0-puv; t0=qt0-puv; s1=qs1+puv; t1=qt1+puv;
+                // 6 verts (2 tris) per glyph; transform local->world baked
+                const float L[6][5] = {{x0,y0,s0,t0},{x1,y1,s1,t1},{x1,y0,s1,t0},{x0,y0,s0,t0},{x0,y1,s0,t1},{x1,y1,s1,t1}};
+                for (int k=0;k<6;k++) {
+                    float lx=L[k][0]*DECAL_TEXT_SCALE*scl.x, ly=-L[k][1]*DECAL_TEXT_SCALE*scl.y, lz=0.0f; // negate y: glyph quads are y-down, world +Y is up
+                    V3 r=quat_rot_v3(rot,(V3){lx,ly,lz});
+                    float wx=r.x+pos.x, wy=r.y+pos.y, wz=r.z+pos.z;
+                    halfVerts[vIdx++]=F32ToHalf(wx); halfVerts[vIdx++]=F32ToHalf(wy); halfVerts[vIdx++]=F32ToHalf(wz);
+                    halfVerts[vIdx++]=F32ToHalf(n.x); halfVerts[vIdx++]=F32ToHalf(n.y); halfVerts[vIdx++]=F32ToHalf(n.z);
+                    halfVerts[vIdx++]=F32ToHalf(L[k][2]); halfVerts[vIdx++]=F32ToHalf(L[k][3]);
+                }
+                if (vIdx+8 > 720*8) break;
+                if (cp>='0'&&cp<='9'&&fontID==FONT_STOPD){ xpos=qx0+fixedNumberAdvanceWidthStopD; }
+                else xpos += b->xadvance;
+            }
+            u32 vertCount = vIdx/8;
+            if (vertCount==0) { textDecalVBO[lev][i]=0; textDecalVertexCount[lev][i]=0; continue; }
+            if (textDecalVBO[lev][i]==0) glGenBuffers(1,&textDecalVBO[lev][i]);
+            glBindBuffer(GL_ARRAY_BUFFER,textDecalVBO[lev][i]);
+            glBufferData(GL_ARRAY_BUFFER,vertCount*16,(const void*)halfVerts,GL_STATIC_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER,0);
+            textDecalVertexCount[lev][i]=vertCount;
+            DualLog("Built text decal mesh: level %u inst %u constIndex %u texIndex %u font %u verts %u text '%s'\n",lev,i,e->index,e->texIndex,fontID,vertCount,str);
+        }
+    }
+}

@@ -4,6 +4,8 @@ extern float reloadTime[16];
 u16 wepIconTexIndices[16]={584,636,819,1067,1068,1494,1072,1069,1070,1071,1073,1165,1989,1990,1991,1992};
 const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
 u8 MFD_LefTab=0,MFD_CenterTab=0,MFD_RightTab=0;
+u8 MFD_DataL=0,MFD_DataR=0; // DataTab subview per side: 0=none,1=elevator,2=keycode,3=grid,4=wire,5=search,6=audiolog,7=sysanalyzer,8=blocked,9=minigames
+u8 MFD_MediaTab=1; // EReader table: MM_EMAIL_TABLE=0,MM_LOG_TABLE=1,MM_DATA_TABLE=2,MM_NOTES=3
 void WeaponFireStartWeaponDip(float t);
 void WeaponSelectSlot(int slot){
     int wi=(int)World.invP1.weaponInventoryIndices[slot]; if(wi<0||wi>=MAX_ENTITIES)return;
@@ -277,14 +279,18 @@ void HardwareButtons() {
     if (World.invP1.hasHardware & HW_LAN) { RenderUIImage(0,300,40,40,HwActiveTexIndex(lanOn,World.invP1.hwVers[HW_LAN_IDX],1004,1006,1007,1008,1008)); if (HwBtnClick(0,40,300,340)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (lanOn) World.invP1.hardwareIsActive &= ~HW_LAN; else World.invP1.hardwareIsActive |= HW_LAN; } } }
     if (World.invP1.hasHardware & HW_SHD) { RenderUIImage(0,360,40,40,HwActiveTexIndex(shdOn,World.invP1.hwVers[HW_SHD_IDX],1014,1015,1016,1017,1018)); if (HwBtnClick(0,40,360,400)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else if (shdOn) { play_wav(sounds[95],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive &= ~HW_SHD; } else { play_wav(sounds[96],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive |= HW_SHD; } } }
     if (World.invP1.hasHardware & HW_INF) { RenderUIImage(1326,180,40,40,HwActiveTexIndex(infOn,World.invP1.hwVers[HW_INF_IDX],998,999,999,999,999)); if (HwBtnClick(1326,1366,180,220)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { bool wasOn=(infOn) != 0; play_wav(wasOn ? sounds[82] : sounds[98],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (wasOn) World.invP1.hardwareIsActive &= ~HW_INF; else World.invP1.hardwareIsActive |= HW_INF; } } }
-    if (World.invP1.hasHardware & HW_ERD) { RenderUIImage(1326,240,40,40,World.inventoryMode && CursorIsOverBounds(1326,1366,240,280) && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) ? 997 : ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1)) ? 997 : 996); if (HwBtnClick(1326,1366,240,280)) { play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false); MFD_CenterTab = 4; MFD_LefTab = 1; } }
+    if (World.invP1.hasHardware & HW_ERD) { RenderUIImage(1326,240,40,40,World.inventoryMode && CursorIsOverBounds(1326,1366,240,280) && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) ? 997 : ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1)) ? 997 : 996); if (HwBtnClick(1326,1366,240,280)) { play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false); MFD_CenterTab = 5; MFD_LefTab = 2; } }
     if (World.invP1.hasHardware & HW_BST) { RenderUIImage(1326,300,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_BST,World.invP1.hwVers[HW_BST_IDX],993,994,995,995,995)); if (HwBtnClick(1326,1366,300,340)) { if (World.invP1.hwVersSetting[HW_BST_IDX] >= 1 && noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); if (World.invP1.hardwareIsActive & HW_BST) World.invP1.hardwareIsActive &= ~HW_BST; else World.invP1.hardwareIsActive |= HW_BST; } } }
     if (World.invP1.hasHardware & HW_JET) { RenderUIImage(1326,360,40,40,HwActiveTexIndex(World.invP1.hardwareIsActive & HW_JET,World.invP1.hwVers[HW_JET_IDX],1000,1001,1002,1003,1003)); if (HwBtnClick(1326,1366,360,400)) { if (noEng) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[78],SfxVol(),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= HW_JET; } } }
 }
 
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
 void CenterMFD() {
-    RenderUIImage(400,752,64,32,MFD_CenterTab == 0 ? 1024 : 1021);/*Main center tab button*/ RenderUIImage(480,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021);/*Hardware center tab button*/ RenderUIImage(560,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021);/*General center tab button*/ RenderUIImage(902,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021);/*Software center tab button*/
+    RenderUIImage(400,752,64,32,MFD_CenterTab == 1 ? 1024 : 1021);/*Main center tab button*/ RenderUIImage(480,752,64,32,MFD_CenterTab == 2 ? 1024 : 1021);/*Hardware center tab button*/ RenderUIImage(560,752,64,32,MFD_CenterTab == 3 ? 1024 : 1021);/*General center tab button*/ RenderUIImage(902,752,64,32,MFD_CenterTab == 4 ? 1024 : 1021);/*Software center tab button*/
+    if(HwBtnClick(400,464,752,784)){MFD_CenterTab = MFD_CenterTab == 1 ? 0 : 1; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+    if(HwBtnClick(480,544,752,784)){MFD_CenterTab = MFD_CenterTab == 2 ? 0 : 2; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+    if(HwBtnClick(560,624,752,784)){MFD_CenterTab = MFD_CenterTab == 3 ? 0 : 3; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+    if(HwBtnClick(902,966,752,784)){MFD_CenterTab = MFD_CenterTab == 4 ? 0 : 4; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
     if (World.inventoryMode && World.invP1.holdingObject && CursorIsOverBounds(345,1021,460,768)) { // Add to Inventory Helper
         World.uiIsBlocking = true; RenderUIImage(345,528,676,240,1075); RenderTextL(586,528,T_GREEN,FONT_NORMAL,1.0f,"ADD TO INVENTORY");
         if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed = Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed = false; }
@@ -310,10 +316,16 @@ void CenterMFD() {
 
 void SideMFD(bool isRH) {
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex), tab = isRH ? MFD_RightTab : MFD_LefTab;
-    RenderUIImage(isRH ? 1350 : -16,520,32,40,tab == 0 ? 1024 : 1022); // Weapon side tab button
-    RenderUIImage(isRH ? 1350 : -16,576,32,40,tab == 1 ? 1024 : 1022); // Item side tab button
-    RenderUIImage(isRH ? 1350 : -16,632,32,40,tab == 2 ? 1024 : 1022); // Automap side tab button
-    RenderUIImage(isRH ? 1350 : -16,688,32,40,tab == 3 ? 1024 : 1022); // Data side tab button
+    u8* stab = isRH ? &MFD_RightTab : &MFD_LefTab;
+    RenderUIImage(isRH ? 1350 : -16,520,32,40,tab == 1 ? 1024 : 1022); // Weapon side tab button
+    if(HwBtnClick(isRH ? 1350 : -16,isRH ? 1382 : 16,520,560)){*stab = tab == 1 ? 0 : 1; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+    RenderUIImage(isRH ? 1350 : -16,576,32,40,tab == 2 ? 1024 : 1022); // Item side tab button
+    if(HwBtnClick(isRH ? 1350 : -16,isRH ? 1382 : 16,576,616)){*stab = tab == 2 ? 0 : 2; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+    RenderUIImage(isRH ? 1350 : -16,632,32,40,tab == 3 ? 1024 : 1022); // Automap side tab button
+    if(HwBtnClick(isRH ? 1350 : -16,isRH ? 1382 : 16,632,672)){*stab = tab == 3 ? 0 : 3; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+    RenderUIImage(isRH ? 1350 : -16,688,32,40,tab == 5 ? 1024 : 1022); // Data side tab button
+    if(HwBtnClick(isRH ? 1350 : -16,isRH ? 1382 : 16,688,728)){*stab = tab == 5 ? 0 : 5; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+    tab = *stab;
     if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1) { /*TODO Sensaround Plane*/ }
      if (tab == 0){return;} 
     //RenderUIImage(isRH ? 1022 : 24,520,320,240,1025); // TODO REMOVE Test BG for ensuring fit into 320x240 to match 1:1 scale that Doom's 320x200 would map to after 4:3 scaling applied (since the CRT's had non-square pixels that stretched 320x200 into 320x240 space, ish) TODO gate by search active
@@ -403,6 +415,14 @@ static double RenderUI() {
 //         if (World.Sys_UI.showAutomapFull) { /*AutomapFullRawImage*/ /*PlayerIconFull*/ /*CloseFullmapButton*/ } if (World.Sys_UI.showMissionTimer) { /*MissionTimerT*/ /*MissionTimer*/ }
 //         if (World.Sys_UI.showCyberTimer) { /*CyberTimerT*/ /*CyberTimer*/ }
         if(!Cheats.noHUD){SideMFD(false/*Left*/); CenterMFD(); SideMFD(true/*Right*/);} // MFD
+        if(!Cheats.consoleActive){ // Tab hotkeys: PgUp/PgDn cycle center, F1/F2 left MFD, F3/F4 right MFD
+            if(Sys_Input.keyStates[KEY_PAGE_DOWN].pressed){Sys_Input.keyStates[KEY_PAGE_DOWN].pressed=false; MFD_CenterTab=(MFD_CenterTab+1)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+            if(Sys_Input.keyStates[KEY_PAGE_UP].pressed){Sys_Input.keyStates[KEY_PAGE_UP].pressed=false; MFD_CenterTab=(MFD_CenterTab+5)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+            if(Sys_Input.keyStates[KEY_F2].pressed){Sys_Input.keyStates[KEY_F2].pressed=false; MFD_LefTab=(MFD_LefTab+1)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+            if(Sys_Input.keyStates[KEY_F1].pressed){Sys_Input.keyStates[KEY_F1].pressed=false; MFD_LefTab=(MFD_LefTab+5)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+            if(Sys_Input.keyStates[KEY_F4].pressed){Sys_Input.keyStates[KEY_F4].pressed=false; MFD_RightTab=(MFD_RightTab+1)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+            if(Sys_Input.keyStates[KEY_F3].pressed){Sys_Input.keyStates[KEY_F3].pressed=false; MFD_RightTab=(MFD_RightTab+5)%6; play_wav(sounds[97],SfxVol(),(V3){0.0f,0.0f,0.0f},false);}
+        }
 // UI setup pass: every Canvas element in place (Automap + Main Menu omitted,FX occluders skipped)
 // C# MFDManager: MFDManager.cs
 // C# MFDManager: QuestLogNotesManager.cs
@@ -412,6 +432,7 @@ RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.6,"0"); // MissionTimer dummy
 // C# MissionTimer: MissionTimer.cs
 // C# TabsLH: LeftMFDTabs.cs
 // C# ItemTabLH: ItemTabManager.cs
+if(MFD_LefTab==2){ // ItemTabLH
 RenderUIImage(33,528,237,237,1025); // ItemIcon UNMAPPED:[Textures/UI/itemicons/paperico.png]
 // C# ItemIcon: ItemIconManager.cs
 // C# ItemIcon: UIPointerMask.cs
@@ -465,16 +486,25 @@ RenderTextL(60,747,T_YELLOW,FONT_NORMAL,0.6,"TEST"); // TimeNumberText
 RenderUIImage(37,712,230,32,952); // Background
 RenderUIImage(37,712,16,32,0); // Fill QUAD:builtin-white
 RenderUIImage(37,696,32,64,953); // Handle
+}
+if(MFD_LefTab==5){ // DataTabLH
+if(MFD_DataL==8){ // Blocked
 RenderUIImage(31,535,227,209,1025); // BlockedBySecurityLH UNMAPPED:[Resources/BlockedBySecurity/blocked_00.
 // C# BlockedBySecurityLH: ImageSequenceTextureArrayUI.cs
 // C# BlockedBySecurityLH: PooledItemDestroy.cs
 RenderTextL(45,542,T_YELLOW,FONT_NORMAL,0.6,"%s",890<1100?Sys_Text.stringTable[890]:"Blocked by SHODAN level Security."); // BlockedBySecurityText
 // C# BlockedBySecurityText: UIPointerMask.cs
+}
+if(MFD_DataL==5){ // Search
 RenderTextL(34,536,T_YELLOW,FONT_NORMAL,0.6,"DEAD CORTEX REAVER"); // DataHeaderTextLH
 // C# DataHeaderTextLH: UIPointerMask.cs
+}
+if(MFD_DataL==0){ // idle
 RenderTextL(24,633,T_YELLOW,FONT_NORMAL,0.6,"%s",891<1100?Sys_Text.stringTable[891]:"No Items"); // DataNoItemsTextLH
 // C# DataNoItemsTextLH: UIPointerMask.cs
 // C# ElevatorUIControlLH: ElevatorKeypad.cs
+}
+if(MFD_DataL==1){ // Elevator
 RenderUIImage(132,531,32,32,929); // CurrentFloorIndicator
 RenderUIImage(86,578,45,168,0); // ButtonBankLH QUAD:builtin-knob
 RenderUIImage(86,578,45,39,1025); // ElevButton1 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
@@ -539,6 +569,8 @@ RenderUIImage(246,528,29,29,899); // CloseButton
 // C# CloseButton: UIButtonMask.cs
 RenderTextL(246,528,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
 // C# KeycodeUIControlLH: KeypadKeycodeButtons.cs
+}
+if(MFD_DataL==2){ // Keycode
 RenderUIImage(86,577,42,38,1025); // KeycodeButton1 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
 RenderUIImage(88,580,38,35,1025); // Button (1) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
 // BTN Button (1): ?
@@ -609,6 +641,8 @@ RenderUIImage(255,525,29,29,899); // CloseButton
 RenderTextL(255,525,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
 RenderUIImage(90,526,32,32,1025); // KeycodeHuns UNMAPPED:[Textures/UI/elnum_null.png]
 // C# KeycodeHuns: KeycodeDigitImage.cs
+}
+if(MFD_DataL==5){ // Search
 RenderUIImage(20,528,263,240,0); // SearchContentsContainerLH QUAD:builtin-knob
 // C# SearchContentsContainerLH: SearchButton.cs
 RenderUIImage(259,534,29,29,899); // SearchCloseButtonLH
@@ -632,6 +666,8 @@ RenderUIImage(174,674,64,64,0); // SearchContentLH4 QUAD:none
 // C# SearchContentLH4: UIButtonMask.cs
 // C# SearchContentLH4: SearchContainerButton.cs
 // C# AudioLogInfoLH: LogDataTabContainerManager.cs
+}
+if(MFD_DataL==6){ // AudioLog
 RenderUIImage(20,528,263,240,1272); // LogImage
 RenderTextL(29,540,T_YELLOW,FONT_NORMAL,0.6,"HACKER IS AWESOME"); // LogName
 // C# LogName: UIPointerMask.cs
@@ -640,6 +676,8 @@ RenderTextL(29,557,T_YELLOW,FONT_NORMAL,0.6,"Sender: SHODAN"); // SenderText
 RenderTextL(29,701,T_YELLOW,FONT_NORMAL,0.6,"Subject:\n\nif only i had a sparq beam then all the world would be right"); // SubjectText
 // C# SubjectText: UIPointerMask.cs
 // C# PuzzleGridLH: PuzzleGrid.cs
+}
+if(MFD_DataL==3){ // GridPuzzle
 RenderUIImage(42,555,221,163,1025); // OuterColorBorder UNMAPPED:[Textures/UI/puzzle/gridcontainer_gray.p
 RenderUIImage(46,558,214,157,1025); // ContainerEdge UNMAPPED:[Textures/UI/puzzle/gridcontainer.png]
 RenderUIImage(25,621,29,29,1025); // NodeSource UNMAPPED:[Textures/UI/puzzle/node_source.png]
@@ -863,6 +901,8 @@ RenderUIImage(259,527,29,29,899); // CloseButton
 // C# CloseButton: UIButtonMask.cs
 RenderTextL(259,527,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
 // C# PuzzleWireLH: PuzzleWire.cs
+}
+if(MFD_DataL==4){ // WirePuzzle
 RenderUIImage(82,570,139,192,1025); // ContainerCenter UNMAPPED:[Textures/UI/puzzle/wire_center.png]
 RenderUIImage(34,521,235,44,1025); // LevelsBox UNMAPPED:[Textures/UI/puzzle/wire_levelsbox.png]
 RenderUIImage(40,526,235,34,0); // Background QUAD:builtin-knob
@@ -958,6 +998,8 @@ RenderUIImage(259,736,29,29,899); // CloseButton
 // C# CloseButton: UIButtonMask.cs
 RenderTextL(259,736,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
 // C# SystemAnalyzerDisplayLH: SystemAnalyzer.cs
+}
+if(MFD_DataL==7){ // SysAnalyzer
 RenderTextL(24,523,T_YELLOW,FONT_NORMAL,0.6,"%s",892<1100?Sys_Text.stringTable[892]:"SYSTEM ANALYZER"); // Header
 // C# Header: UIPointerMask.cs
 RenderTextL(24,547,T_GREEN,FONT_NORMAL,0.6,"Current level security:"); // DescriptionLevelSecurity
@@ -1008,6 +1050,8 @@ RenderUIImage(259,527,29,29,899); // CloseButton
 // BTN CloseButton: SystemAnalyzerDisplayLH.Close()
 // C# CloseButton: UIButtonMask.cs
 RenderTextL(259,527,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+}
+if(MFD_DataL==9){ // Minigames
 RenderUIImage(21,501,262,262,1025); // MinigamesContainer
 // C# MinigamesContainer: UIPointerMask.cs
 RenderTextL(28,503,T_RED,FONT_NORMAL,0.6,"TRIOPTIMUM FUNPACK"); // Header
@@ -1063,9 +1107,14 @@ RenderUIImage(261,504,19,19,0); // MinigameBack QUAD:none
 // C# MinigameBack: UIButtonMask.cs
 RenderUIImage(259,502,22,22,899); // Border
 // C# TabButtonsPanelLH: TabButtons.cs
+}
+}
+if(World.curLev==LEVEL_CYBERSPACE){ // CyberTimer
 RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.6,"T -"); // CyberTimerT
 RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.6,"99:99"); // CyberTimer
 // C# CyberTimer: CyberTimer.cs
+}
+if(MFD_CenterTab==1){ // Main
 RenderUIImage(553,584,91,191,0); // WeaponShotsInventory QUAD:builtin-knob
 RenderTextL(553,584,T_RED,FONT_NORMAL,0.6,"%s",871<1100?Sys_Text.stringTable[871]:"SHOTS"); // TextShotsHeader
 // C# TextShotsHeader: UIPointerMask.cs
@@ -1227,6 +1276,8 @@ RenderUIImage(914,731,11,11,1079); // Image
 RenderTextL(869,725,T_GREEN,FONT_NORMAL,0.6,"#7"); // CountsText6
 RenderUIImage(870,584,37,191,0); // PatchCountsInventory QUAD:builtin-knob
 RenderTextL(870,584,T_RED,FONT_NORMAL,0.6,"#"); // Text
+}
+if(MFD_CenterTab==2){ // Hardware
 RenderTextL(454,557,T_RED,FONT_NORMAL,0.6,"%s",874<1100?Sys_Text.stringTable[874]:"HARDWARE"); // Label
 // C# Label: UIPointerMask.cs
 RenderUIImage(458,575,445,188,0); // HarwareInventory QUAD:builtin-knob
@@ -1300,6 +1351,8 @@ RenderUIImage(681,714,222,23,0); // Button (13) QUAD:builtin-white
 // C# Button (13): UIButtonMask.cs
 // C# Button (13): HardwareInvButton.cs
 RenderTextL(681,714,T_GREEN,FONT_NORMAL,0.6,"HARDWARE #14"); // Text
+}
+if(MFD_CenterTab==3){ // General
 RenderTextL(454,557,T_RED,FONT_NORMAL,0.6,"%s",875<1100?Sys_Text.stringTable[875]:"GENERAL"); // Label
 // C# Label: UIPointerMask.cs
 RenderUIImage(454,573,453,191,0); // GeneralInventory QUAD:builtin-knob
@@ -1425,6 +1478,8 @@ RenderUIImage(868,716,20,20,1086); // ApplySubButton (13)
 // BTN ApplySubButton (13): Button
 // C# ApplySubButton (13): UIPointerMask.cs
 RenderUIImage(872,721,11,11,1079); // Image
+}
+if(MFD_CenterTab==4){ // Software
 RenderTextL(454,588,T_RED,FONT_NORMAL,0.6,"%s",876<1100?Sys_Text.stringTable[876]:"SOFTS"); // Label
 // C# Label: UIPointerMask.cs
 RenderUIImage(454,604,226,24,0); // ICEDrill QUAD:builtin-white
@@ -1490,8 +1545,11 @@ RenderUIImage(681,723,226,24,0); // Games QUAD:builtin-white
 // C# Games: SoftwareInvButton.cs
 RenderTextL(681,723,T_GREEN,FONT_NORMAL,0.6,"GAMES"); // Text
 // C# Text: SoftwareInvText.cs
+}
+if(MFD_CenterTab==5){ // EReader
 RenderTextL(454,557,T_RED,FONT_NORMAL,0.6,"%s",877<1100?Sys_Text.stringTable[877]:"LOGS"); // MultiMediaHeaderLabel
 // C# MultiMediaHeaderLabel: UIPointerMask.cs
+if(MFD_MediaTab==MM_LOG_TABLE){ // LogTable
 RenderUIImage(454,573,453,191,0); // LogTableofContents QUAD:builtin-knob
 // C# LogTableofContents: LogTableContentsButtonsManager.cs
 RenderUIImage(454,573,226,24,0); // Button QUAD:builtin-white
@@ -1654,6 +1712,8 @@ RenderUIImage(453,718,69,31,0); // BackButton QUAD:builtin-white
 // C# BackButton: UIButtonMask.cs
 // C# BackButton: LogBackButton.cs
 RenderTextL(453,718,T_YELLOW,FONT_NORMAL,0.6,"%s",879<1100?Sys_Text.stringTable[879]:"[BACK]"); // Text0
+}
+if(MFD_MediaTab==MM_EMAIL_TABLE){ // Email
 RenderUIImage(458,570,445,188,0); // EmailTab QUAD:builtin-knob
 // C# EmailTab: EmailContentsButtonsManager.cs
 RenderUIImage(458,570,223,21,0); // Button QUAD:builtin-white
@@ -1786,6 +1846,8 @@ RenderUIImage(681,696,223,21,0); // Button (25) QUAD:builtin-white
 // C# Button (25): UIButtonMask.cs
 // C# Button (25): MultiMediaLogButton.cs
 RenderTextL(681,696,T_GREEN,FONT_NORMAL,0.6,"Email"); // Text14
+}
+if(MFD_MediaTab==MM_DATA_TABLE){ // DataTab
 RenderUIImage(458,570,445,188,0); // DataTab QUAD:builtin-knob
 // C# DataTab: EmailContentsButtonsManager.cs
 RenderUIImage(458,570,223,21,0); // Button QUAD:builtin-white
@@ -1853,6 +1915,8 @@ RenderUIImage(681,654,223,21,0); // Button (12) QUAD:builtin-white
 // C# Button (12): UIButtonMask.cs
 // C# Button (12): MultiMediaLogButton.cs
 RenderTextL(681,654,T_GREEN,FONT_NORMAL,0.6,"Data"); // Text12
+}
+if(MFD_MediaTab==MM_NOTES){ // Notes
 RenderUIImage(453,570,166,39,0); // NoteToggle QUAD:none
 // C# NoteToggle: UIPointerMask.cs
 RenderUIImage(453,572,19,18,910); // Background
@@ -1928,6 +1992,9 @@ RenderTextL(808,718,T_GREEN,FONT_NORMAL,0.6,"Destroy SHODAN."); // Label17
 // CenterMFD tab buttons + AddToInventoryHelper live in CenterMFD already
 // C# TabsRH: LeftMFDTabs.cs
 // C# ItemTabRH: ItemTabManager.cs
+}
+}
+if(MFD_RightTab==2){ // ItemTabRH
 RenderUIImage(1092,528,237,237,1025); // ItemIcon UNMAPPED:[Textures/UI/itemicons/paperico.png]
 // C# ItemIcon: ItemIconManager.cs
 // C# ItemIcon: UIPointerMask.cs
@@ -1981,16 +2048,25 @@ RenderTextL(1119,747,T_YELLOW,FONT_NORMAL,0.6,"TEST"); // TimeNumberText
 RenderUIImage(1094,712,230,32,952); // Background
 RenderUIImage(1094,712,16,32,0); // Fill QUAD:builtin-white
 RenderUIImage(1094,696,32,64,953); // Handle
+}
+if(MFD_RightTab==5){ // DataTabRH
+if(MFD_DataR==8){ // Blocked
 RenderUIImage(1090,535,227,209,1025); // BlockedBySecurityRH UNMAPPED:[Resources/BlockedBySecurity/blocked_00.
 // C# BlockedBySecurityRH: ImageSequenceTextureArrayUI.cs
 // C# BlockedBySecurityRH: PooledItemDestroy.cs
 RenderTextL(1104,542,T_YELLOW,FONT_NORMAL,0.6,"%s",890<1100?Sys_Text.stringTable[890]:"Blocked by SHODAN level Security."); // BlockedBySecurityText
 // C# BlockedBySecurityText: UIPointerMask.cs
+}
+if(MFD_DataR==5){ // Search
 RenderTextL(1092,536,T_YELLOW,FONT_NORMAL,0.6,"DEAD CORTEX REAVER"); // DataHeaderTextRH
 // C# DataHeaderTextRH: UIPointerMask.cs
+}
+if(MFD_DataR==0){ // idle
 RenderTextL(1083,633,T_YELLOW,FONT_NORMAL,0.6,"%s",891<1100?Sys_Text.stringTable[891]:"No Items"); // DataNoItemsTextRH
 // C# DataNoItemsTextRH: UIPointerMask.cs
 // C# ElevatorUIControlRH: ElevatorKeypad.cs
+}
+if(MFD_DataR==1){ // Elevator
 RenderUIImage(1191,531,32,32,929); // CurrentFloorIndicator
 RenderUIImage(1145,578,45,168,0); // ButtonBankLH QUAD:builtin-knob
 RenderUIImage(1145,578,45,39,1025); // ElevButton1 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
@@ -2055,6 +2131,8 @@ RenderUIImage(1305,528,29,29,899); // CloseButton
 // C# CloseButton: UIButtonMask.cs
 RenderTextL(1305,531,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
 // C# KeycodeUIControlRH: KeypadKeycodeButtons.cs
+}
+if(MFD_DataR==2){ // Keycode
 RenderUIImage(1144,577,42,38,1025); // KeycodeButton1 UNMAPPED:[Textures/UI/hudbuttons/keypad_end.png]
 RenderUIImage(1147,580,38,35,1025); // Button (1) UNMAPPED:[Textures/UI/hudbuttons/keypad_inner_on.
 // BTN Button (1): ?
@@ -2125,6 +2203,8 @@ RenderUIImage(1314,525,29,29,899); // CloseButton
 // BTN CloseButton: MFDManager.CloseKeycodePad()
 // C# CloseButton: UIButtonMask.cs
 RenderTextL(1314,529,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
+}
+if(MFD_DataR==5){ // Search
 RenderUIImage(1079,528,263,240,0); // SearchContentsContainerRH QUAD:builtin-knob
 // C# SearchContentsContainerRH: SearchButton.cs
 RenderUIImage(1318,528,29,29,899); // SearchCloseButtonRH
@@ -2148,6 +2228,8 @@ RenderUIImage(1233,674,64,64,0); // SearchContentRH4 QUAD:none
 // C# SearchContentRH4: UIButtonMask.cs
 // C# SearchContentRH4: SearchContainerButton.cs
 // C# AudioLogInfoRH: LogDataTabContainerManager.cs
+}
+if(MFD_DataR==6){ // AudioLog
 RenderUIImage(1079,528,263,240,1272); // LogImage
 RenderTextL(1088,540,T_YELLOW,FONT_NORMAL,0.6,"HACKER IS AWESOME"); // LogName
 // C# LogName: UIPointerMask.cs
@@ -2156,6 +2238,8 @@ RenderTextL(1088,557,T_YELLOW,FONT_NORMAL,0.6,"Sender: SHODAN"); // SenderText
 RenderTextL(1088,701,T_YELLOW,FONT_NORMAL,0.6,"Subject:\n\nif only i had a sparq beam then all the world would be right"); // SubjectText
 // C# SubjectText: UIPointerMask.cs
 // C# PuzzleGridRH: PuzzleGrid.cs
+}
+if(MFD_DataR==3){ // GridPuzzle
 RenderUIImage(1101,554,221,163,1025); // OuterColorBorder UNMAPPED:[Textures/UI/puzzle/gridcontainer_gray.p
 RenderUIImage(1104,558,214,157,1025); // ContainerEdge UNMAPPED:[Textures/UI/puzzle/gridcontainer.png]
 RenderUIImage(1084,620,29,29,1025); // NodeSource UNMAPPED:[Textures/UI/puzzle/node_source.png]
@@ -2379,6 +2463,8 @@ RenderUIImage(1318,526,29,29,899); // CloseButton
 // C# CloseButton: UIButtonMask.cs
 RenderTextL(1318,530,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
 // C# PuzzleWireRH: PuzzleWire.cs
+}
+if(MFD_DataR==4){ // WirePuzzle
 RenderUIImage(1141,570,139,192,1025); // ContainerCenter UNMAPPED:[Textures/UI/puzzle/wire_center.png]
 RenderUIImage(1093,521,235,44,1025); // LevelsBox UNMAPPED:[Textures/UI/puzzle/wire_levelsbox.png]
 RenderUIImage(1099,526,235,34,0); // Background QUAD:builtin-knob
@@ -2474,6 +2560,8 @@ RenderUIImage(1318,736,29,29,899); // CloseButton
 // C# CloseButton: UIButtonMask.cs
 RenderTextL(1318,739,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
 // C# SystemAnalyzerDisplayRH: SystemAnalyzer.cs
+}
+if(MFD_DataR==7){ // SysAnalyzer
 RenderTextL(1082,523,T_YELLOW,FONT_NORMAL,0.6,"%s",892<1100?Sys_Text.stringTable[892]:"SYSTEM ANALYZER"); // Header
 // C# Header: UIPointerMask.cs
 RenderTextL(1083,547,T_GREEN,FONT_NORMAL,0.6,"Current level security:"); // DescriptionLevelSecurity
@@ -2525,12 +2613,15 @@ RenderUIImage(1318,527,29,29,899); // CloseButton
 // C# CloseButton: UIButtonMask.cs
 RenderTextL(1318,527,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
 // C# TabButtonsPanelRH: TabButtons.cs
+}
+}
 // TabButtonsPanelRH side tab buttons live in SideMFD already
 RenderTextL(1137,570,T_YELLOW,FONT_NORMAL,0.6,"level 1 elevator taken off line - SHODAN security block established 04.NOV.72"); // CyberSPrint
 // C# CyberSPrint: UIPointerMask.cs
 // C# CyberSPrint: PooledItemDestroy.cs
 // C# BioMonitorContainer: BioMonitor.cs
 // C# BioMonitorContainer: BiomonitorGraphSystem.cs
+if((World.invP1.hardwareIsActive & HW_BIO)!=0){ // BioMonitor
 RenderUIImage(0,0,480,80,0); // Graph QUAD:none
 RenderTextL(4,83,T_YELLOW,FONT_NORMAL,0.6,"%s",895<1100?Sys_Text.stringTable[895]:"Biomonitor:"); // BiomonitorHeader
 RenderTextL(4,99,T_GREEN,FONT_NORMAL,0.6,"%s",896<1100?Sys_Text.stringTable[896]:"Heart Rate:"); // BiomonitorTextHeart
@@ -2540,6 +2631,7 @@ RenderTextL(4,131,T_GREEN,FONT_NORMAL,0.6,"%s",897<1100?Sys_Text.stringTable[897
 RenderTextL(119,131,T_GREEN,FONT_NORMAL,0.6,"MEDI STAMINUP SIGHT GENIUS BERSERK REFLEX"); // BiomonitorTextPatchEffects
 RenderTextL(4,115,T_GREEN,FONT_NORMAL,0.6,"%s",898<1100?Sys_Text.stringTable[898]:"Fatigue:"); // BiomonitorTextFatigueDetail
 RenderTextL(66,115,T_GREEN,FONT_NORMAL,0.6,"Moderate"); // BiomonitorTextFatigue
+}
 RenderTextL(1270,78,T_WHITE,FONT_NORMAL,0.6,"0"); // EnergyDrainText dummy
 RenderTextL(1308,78,T_WHITE,FONT_NORMAL,0.6,"0"); // EnergyJPMText dummy
 RenderUIImage(663,364,40,40,1074); // SearchFXLH

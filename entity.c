@@ -219,8 +219,8 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*585 prop_sparkingwire*/[585]={0,0,71,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,46,0,{0,0,0},{0,0,0}},/*586 prop_table*/[586]={619,0,92,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*587 prop_tv_on_a_post*/[587]={625,0,1228,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*588 prop_vendingmachines1*/[588]={627,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*589 prop_vendingmachines2*/[589]={614,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*590 prop_weapon_rack*/[590]={641,0,113,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*591 prop_xray*/[591]={660,0,153,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*592 text_decal*/[592]={77,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*593 text_decalStopDSS1*/[593]={77,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*594 trigger_counter*/[594]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*591 prop_xray*/[591]={660,0,153,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*592 text_decal*/[592]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*593 text_decalStopDSS1*/[593]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*594 trigger_counter*/[594]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*595 trigger_cyberpush*/[595]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*596 trigger_gravitylift*/[596]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*597 trigger_ladder*/[597]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*598 trigger_multiple*/[598]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*599 trigger_music*/[599]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*600 trigger_once*/[600]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -340,6 +340,18 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
 }
 
 static const char* mm_ptr; static const char* mm_end;
+// Unity text material index (genericMaterials[87..99]) -> Voxen texIndex of matching color texture (col*.png / white.png / black.png)
+u16 TextMatIndexToTexIndex(u16 matIndex) {
+    switch (matIndex) {
+        case 87: case 93: return 881;/*text_3dwhite, text_3dwhiteStopD -> white.png*/
+        case 88: case 92: return 1225;/*text_3dred, text_3dredStopD -> col3.png red*/
+        case 89: case 95: case 98: case 99: return 1224;/*text_3dgold*, text_3dgoldStopD, text_3dgoldunlit* -> col2.png yellow*/
+        case 90: return 1227;/*text_3dgreen -> col5.png green*/
+        case 91: case 94: case 97: return 0;/*text_3dblack* -> black.png*/
+        case 96: return 1226;/*text_3dblueStopD -> col4.png blue*/
+        default: return 881;/*white*/
+    }
+}
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
 static char* MmapGetLine(char* buf, int sz){if(mm_ptr>=mm_end){return NULL;} const char* start=mm_ptr; const char* p=start; while(p<mm_end&&*p!='\n'){++p;} int lineLen=(int)(p-start); if(p<mm_end&&*p =='\n'){mm_ptr=p+1;}else{mm_ptr=mm_end;}if(lineLen >= sz){lineLen=sz-1;} mcpy(buf,(void*)start,lineLen); while(lineLen>0&&(buf[lineLen-1]=='\r' || buf[lineLen - 1]=='\n')){--lineLen;} buf[lineLen]='\0'; return buf;}
 void SetLevelPointers(u8 lev) {
@@ -383,7 +395,7 @@ void LoadLevelMod(u8 lev) {
             entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; } inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
             fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f}; inst->relayEnabled = true;
         }
-        bool activeStateRead = false;
+        bool activeStateRead = false; bool matIndexRead = false; u16 matIndexTexIdx = 881;
         while (line[0] != '\0') {
             char* pipe = StringFindFirstCharWithin(line, '|'); char* kvString = line; if (pipe) { *pipe = '\0'; line = pipe + 1; } else { line += slen(line); } if (kvString[0] == '\0') continue; char* colon = StringFindFirstCharWithin(kvString, ':'); if (!colon || colon[1] == '\0') continue; *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);}
@@ -432,6 +444,7 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("stopFlashingMaterials"))  flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(value, lineSpace, lineNum));
                 else if(KEY_EQ("branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("resourceFolder") && *value) scpy_to_a_from_b(inst->texAnimResourceFolder, value, TARG_STRLEN);
                 else if(KEY_EQ("lingdex") || KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);                                      else if(KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
+                else if(KEY_EQ("matIndex")) { matIndexRead = true; matIndexTexIdx = TextMatIndexToTexIndex(parse_numberu16(value,lineSpace,lineNum)); }
                 else if(KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);                                       else if(KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("onSecond"))        inst->branchOnSecond = parse_bool(value, lineSpace, lineNum);                                           else if(KEY_EQ("onceEver"))        inst->relayOnceEver = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(value, lineSpace, lineNum);                                else if(KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
@@ -459,6 +472,7 @@ void LoadLevelMod(u8 lev) {
             }
         }
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true); // Default active if not specified
+        if (!isLight && (entsFromFile[entCount].index == 592 || entsFromFile[entCount].index == 593)) entsFromFile[entCount].texIndex = matIndexRead ? matIndexTexIdx : 881; // 3D text decals: material color texture, white default
         if (!isLight && entsFromFile[entCount].index == 517) { // func_wall: stash base transform + chunk children for spawn below
             fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp; u16 n=fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN, start=fwPoolUsed;
             for (u16 k=0;k<n;++k) { if (fwPoolUsed >= FW_POOL_MAX) { DualLogError("FuncWall chunk pool exhausted on line %u!\n",lineNum); break; } fwPoolPrefab[fwPoolUsed]=lwPrefab[k]; fwPoolPos[fwPoolUsed]=lwPos[k]; fwPoolRot[fwPoolUsed]=lwRot[k]; fwPoolScale[fwPoolUsed]=lwScale[k]; fwPoolUsed++; }
@@ -474,6 +488,7 @@ void LoadLevelMod(u8 lev) {
         par->randomMin=src->randomMin; par->randomMax=src->randomMax; par->useRandomTimes=src->useRandomTimes; par->health=src->health; par->cyberHealth=src->cyberHealth; par->radiation=src->radiation; par->idleTime=src->idleTime;
         par->timeSinceMovedEnough=src->timeSinceMovedEnough; par->tickTime=src->tickTime; par->waitBeforeClose=src->waitBeforeClose; par->onlyOnce=src->onlyOnce; par->stayOpen=src->stayOpen; par->startOpen=src->startOpen; par->ajar=src->ajar; par->ajarPercentage=src->ajarPercentage; par->timeBeforeLasersOn=src->timeBeforeLasersOn;
         par->toggleLasers=src->toggleLasers; par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->target2Idx=src->target2Idx; 
+        if (entIdx == 592 || entIdx == 593) par->texIndex = src->texIndex; // 3D text decal texture comes from level matIndex, not entity definition
         par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARG_STRLEN);
@@ -543,6 +558,7 @@ void LoadLevelMod(u8 lev) {
         u16 editTextIdx = World.instCount; mset(&World.instances[editTextIdx],0,sizeof(Entity)); World.instances[editTextIdx].entflags=EF_ACTIVE; World.layer[editTextIdx]=L_Default; World.instances[editTextIdx].camView=255; World.instances[editTextIdx].modelIndex=World.instances[editTextIdx].lodIndex=World.instances[editTextIdx].colMeshIndex=MAX_MDLS;
         World.instances[editTextIdx].index=592; World.position[editTextIdx]=(V3){0.0f,0.0f,0.0f}; World.rotation[editTextIdx]=QUAT_IDENTITY; World.scale[editTextIdx].x=World.scale[editTextIdx].y=World.scale[editTextIdx].z=World.mass[editTextIdx]=World.rotation[editTextIdx].w=1.0f;
         World.instances[editTextIdx].messageLingdex = 0; // placeholder; text set dynamically in render loop
+        World.instances[editTextIdx].texIndex = 881; // white.png; ad-hoc instance has no lingdex so no baked decal mesh is built for it
         World.editTextInstanceIndex = editTextIdx; World.instCount++; DualLog("Edit mode selection text entity index: %u (level %d)\n",editTextIdx,curlevel);
     }
 }
@@ -619,6 +635,7 @@ void LoadAllLevels() {
     entsFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Entity)); posFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); scaleFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); rotationFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Quaternion)); colCtrFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); colSzFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
     ioNameCount=1; ioNames[0][0]='\0'; lightsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(Light)); lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation)); for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;} mset(fwParentOf,0,sizeof(fwParentOf)); fwPoolUsed = 0; for(u8 lev=0;lev<World.numLevels;++lev){LoadLevelData(lev);}
     OS_Free(entsFromFile,INSTANCE_COUNT*sizeof(Entity)); OS_Free(colCtrFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(colSzFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(posFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(scaleFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(rotationFromFile,INSTANCE_COUNT*sizeof(Quaternion)); OS_Free(lightsFromFile,LIGHT_COUNT*sizeof(Light)); OS_Free(lanimsFromFile,LIGHT_COUNT*sizeof(LightAnimation));
+    BuildTextDecalMeshes(); // Build world-baked 3D text decal meshes (Sys_Text.stringTable already populated for current language).
     DebugRAM("end of LoadAllLevels"); DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\nLoad all levels... took %f secs\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
                                               World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
                                               World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13],get_time() - start_time);

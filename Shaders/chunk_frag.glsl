@@ -30,6 +30,8 @@ layout(location=27) uniform float volume;
 layout(location=28) uniform uvec2 camViewSize;
 layout(location=29) uniform sampler2D camViewTex;
 layout(location=30) uniform uint useCamView;
+layout(location=31) uniform sampler2D fontAtlas; // SDF glyph atlas for 3D text decals (alpha cutout only)
+layout(location=32) uniform uint useFontAtlas;
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(location=0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location=1) out vec4 outSpecular; // GL_COLOR_ATTACHMENT1
@@ -59,7 +61,9 @@ void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out
 float quintic_polynomial_smoothstep( float x ) { return x*x*x*(x*(x*6.0-15.0)+10.0); } // From https://iquilezles.org/articles/smoothsteps/
 void main() {
     vec3 worldPos=FragPos.xyz; vec3 viewDir=(camPos-worldPos); float distToPixelSq=dot(viewDir,viewDir); float distToPixel=sqrt(distToPixelSq); viewDir*=inversesqrt(distToPixelSq); ivec2 texSize=useCamView>0 ? ivec2(camViewSize) : textureSizes[texIndex]; vec2 uv=(vec2(TexCoord.x,1.0-TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import 
-    vec4 albedoColor; if(useCamView>0){albedoColor=texture(camViewTex, vec2(TexCoord.x, TexCoord.y));} else albedoColor=getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize.x); if (albedoColor.a < 0.05 && volume < 0.05) discard; 
+    vec4 albedoColor; if(useCamView>0){albedoColor=texture(camViewTex, vec2(TexCoord.x, TexCoord.y));}
+    else if (useFontAtlas != 0u) { float sdf = texture(fontAtlas, TexCoord).r; float glyphAlpha = smoothstep(0.45, 0.55, sdf); albedoColor = vec4(getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize.x).rgb, glyphAlpha); }
+    else albedoColor=getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize.x); if (albedoColor.a < 0.05 && volume < 0.05) discard;
     vec3 adjustedNormal=Normal; bool hasNormalMap=normInstanceIndex != 0; float blend = 0.0; float facing = dot(Normal, viewDir); if (distToPixel < 5.12 && hasNormalMap) blend = 1.0; else if (distToPixel < 30.0 && hasNormalMap) { blend = smoothstep(30.0,5.12,distToPixel) * smoothstep(0.1,0.4,facing); }
     if (hasNormalMap && blend > 0.01) {
         vec3 dp1=dFdx(FragPos),dp2=dFdy(FragPos); vec2 duv1=dFdx(TexCoord),duv2=dFdy(TexCoord); float uvArea=abs(duv1.x*duv2.y - duv1.y*duv2.x);

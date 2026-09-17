@@ -5,6 +5,7 @@
 // Rendering
 u32 globalframe=0,globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,
     textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS],psysInstancesID,psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,modelVertexCounts[MAX_MDLS],*physVertCounts,threadCnt=1;
+u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; u32 textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT]; // 3D text decal world meshes (chunk VAO format, world-baked, per level)
 float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 // Entity Management
 float modelMatrices[INSTANCE_COUNT*16],*world_from_mdl=modelMatrices,modelBounds[MAX_MDLS],**physPos; u16 **modelTriangles,modelTriangleCounts[MAX_MDLS],mdlsCnt,**physTris; u8 currentPlayerNameLength=0; i8 currentMenuItem=0,currentMenuTab=0,menuItemCount=4,menuTabCount=1;
@@ -490,7 +491,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         currentModelType=GetAndBindModel(i,currentModelType); glUniform1ui(3,(u32)tex); u32 vertCount = modelTriangleCounts[currentModelType] * 3; glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered += vertCount;
     }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][2]);
-    glUseProgram(chunkSP); glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u);/*default constIndex*/ cullBlendState = 0xFF;
+    glUseProgram(chunkSP); glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u);/*default constIndex*/ glUniform1i(31,9); glUniform1ui(32,0u); cullBlendState = 0xFF;
     bool grayscaleEnabled = ModRequestsGrayscale(); glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = World.fogColor[World.curLev].a + (float)(World.fogFac / 255u); // Alpha is base density for level.
     glUniform3f(12,World.fogColor[World.curLev].r * fogActual,World.fogColor[World.curLev].g * fogActual,World.fogColor[World.curLev].b * fogActual); // Fog Color(which is density)
@@ -507,6 +508,19 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if(likely(transparentTexture[tex])){if(cullBlendState != 1){glEnable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState=1;} }/*Transparents (with sort)*/ else if (unlikely(doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f)) { if(cullBlendState != 2){glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState=2;} }/*Doublesided*/ else continue;/*Opaque*/
         if (unlikely((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573))) glDepthFunc(0x0202/*GL_EQUAL*/); /*Cutouts*/ else glDepthFunc(0x0203/*GL_LEQUAL*/); /*Actual alphas*/ DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,grayscaleEnabled);
     }
+    // 3D text decals (592 text_decal, 593 text_decalStopDSS1): world-baked meshes, double-sided, lit via chunkSP, PVS culled
+    glUseProgram(chunkSP); glUniform1ui(32,1); u8 tdLev = World.curLev;
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
+        if (textDecalVBO[tdLev][i]==0 || textDecalVertexCount[tdLev][i]==0) continue;
+        u16 cIdx = World.instances[i].index; if (cIdx!=592 && cIdx!=593) continue;
+        if (!(World.instances[i].entflags & EF_ACTIVE)) continue;
+        if (World.instances[i].cellIndex >= 0 && !((gridCellStates[World.instances[i].cellIndex] & CELL_VISIBLE) || ((gridCellStates[World.instances[i].cellIndex] & CELL_OPEN) == CELL_OPEN))) continue;
+        if (cullBlendState != 2) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState = 2; }/*Double-sided*/
+        glDepthFunc(0x0203/*GL_LEQUAL*/); glUniform1ui(0,(u32)i); glUniform1ui(1,0u); glUniform1ui(17,0u); glUniform1ui(18,881u/*TODO debug: forcing white*/); glUniform1ui(19,0u); glUniform1ui(20,0u); glUniform1ui(25,(u32)cIdx); glUniform1ui(13,0u); glUniform1ui(30,0u);
+        glActiveTexture(0x84C9/*GL_TEXTURE9*/); glBindTexture(GL_TEXTURE_2D,(cIdx==593)?fontAtlasTexStopD:fontAtlasTex);
+        glBindVertexBuffer(0,textDecalVBO[tdLev][i],0,16/*VRT_ATT_SZ*/); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,(i32)textDecalVertexCount[tdLev][i]); drawCalls++; vertsRendered += textDecalVertexCount[tdLev][i];
+    }
+    glBindTexture(GL_TEXTURE_2D,0); glUniform1ui(32,0u); /* restore chunkSP font-atlas off for subsequent draws */
     u16 wvi = World.weaponVModelIndex;
     if (wvi > 0 && wvi < INSTANCE_COUNT) {
         int wep16 = Get16WeaponIndexFromConstIndex(World.instances[wvi].index);
@@ -531,23 +545,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u32 shieldOnType = 0u/*No shield green tint*/; if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) {shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/;} glUniform1ui(20,shieldOnType); // Green Shield
     Color3 painStaticColor = (Color3){1.0f,0.0f,0.0f}; glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b); glUniformMatrix4fv(24,1,0,viewProj); glUniformMatrix3fv(25,1,0,invViewRot); glUniform1i(27,0); glUniform1f(28,vclamp(World.painStaticAlpha + World.empStaticAlpha,0.0f,1.0f)); glUniform1ui(29,(u32)ModRequestsGrayscale()); glBindVertexArray(quadVAO);
     glDisable(GL_DEPTH_TEST); glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/,0,4); drawCalls++; vertsRendered += 4; glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
-    // 3D text decal instances (592=text_decal, 593=text_decalStopDSS1): render world-aligned text with alignment from data
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; if (!(e->index == 592 || e->index == 593)) continue; if (i == PLAYER1) continue; // skip if needed; determine alignment from data
-        // Alignment derived from instance fields: if lP.z present and text index set, render accordingly
-        // For now, call with default center; extend as needed.
-        // Project world position to screen or pass to 3D renderer
-        // Project world position to screen for 3D text rendering
-        float wx=World.position[i].x, wy=World.position[i].y, wz=World.position[i].z;
-        float clipX = viewProj[0]*wx + viewProj[4]*wy + viewProj[8]*wz + viewProj[12];
-        float clipY = viewProj[1]*wx + viewProj[5]*wy + viewProj[9]*wz + viewProj[13];
-        float clipW = viewProj[3]*wx + viewProj[7]*wy + viewProj[11]*wz + viewProj[15];
-        float projXf=0.0f, projYf=0.0f; if (clipW > 0.01f) { float ndcX = clipX / clipW; float ndcY = clipY / clipW; projXf = ((ndcX + 1.0f) * 0.5f) * (float)swidth; projYf = ((1.0f - ndcY) * 0.5f) * (float)sheight; }
-        const char* textStr = (e->messageLingdex >= 0 && e->messageLingdex < 1000) ? Sys_Text.stringTable[e->messageLingdex] : "";
-        u8 fontToUse = (e->index == 593) ? FONT_STOPD : FONT_NORMAL;
-        if (i % 3 == 0) RenderText3DL((V3){projXf, projYf, 0.0f}, T_WHITE, fontToUse, 1.0f, i, textStr);
-        else if (i % 3 == 1) RenderText3DC((V3){projXf, projYf, 0.0f}, T_WHITE, fontToUse, 1.0f, i, textStr);
-        else RenderText3DR((V3){projXf, projYf, 0.0f}, T_WHITE, fontToUse, 1.0f, i, textStr);
-    }
+    // 3D text decals are now world-baked meshes drawn via chunkSP in the main opaque/transparent geometry pass above.
     // Edit mode selection text: only visible when edit mode active and selection is active
     if (Cheats.editMode && editModeSelection < U16_MAX && World.editTextInstanceIndex < INSTANCE_COUNT) {
         u16 ed = editModeSelection; u16 edTextIdx = World.editTextInstanceIndex;
@@ -571,7 +569,12 @@ void RenderCameraViews() { // Render in-world camera views.  Pops player positio
 void UpdateInstanceMatrix4x4s() {
     i32 dirtyMin = -1, dirtyMax = -1;
     for (u32 i = INSTS_1ST_IDX; i < World.instCount; i++) {        
-        float x=World.rotation[i].x, y=World.rotation[i].y, z=World.rotation[i].z, w=World.rotation[i].w; float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z; float sclx=World.scale[i].x, scly=World.scale[i].y, sclz=World.scale[i].z; u32 m = i*16;
+        u32 m = i*16;
+        if (World.instances[i].index==592 || World.instances[i].index==593) { // 3D decal text: mesh is world-baked, matrix must be identity
+            mset(&modelMatrices[m],0,16*sizeof(float)); modelMatrices[m]=modelMatrices[m+5]=modelMatrices[m+10]=modelMatrices[m+15]=1.0f;
+            if (dirtyMin < 0) {dirtyMin = (i32)i;} dirtyMax = (i32)i; continue;
+        }
+        float x=World.rotation[i].x, y=World.rotation[i].y, z=World.rotation[i].z, w=World.rotation[i].w; float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z; float sclx=World.scale[i].x, scly=World.scale[i].y, sclz=World.scale[i].z;
         modelMatrices[m+0]=(1.0f-2.0f*(y2+z2))*sclx; modelMatrices[m+1]=(2.0f*(xy+wz))*sclx; modelMatrices[m+2]=(2.0f*(xz-wy))*sclx; modelMatrices[m+3]=modelMatrices[m+7]=modelMatrices[m+11]=0.0f; modelMatrices[m+4]=(2.0f*(xy-wz))*scly; modelMatrices[m+5]=(1.0f-2.0f*(x2+z2))*scly; modelMatrices[m+6]=(2.0f*(yz+wx))*scly;
         modelMatrices[m+8]=(2.0f*(xz+wy))*sclz; modelMatrices[m+9]=(2.0f*(yz-wx))*sclz; modelMatrices[m+10]=(1.0f-2.0f*(x2+y2))*sclz; modelMatrices[m+12]=World.position[i].x; modelMatrices[m+13]=World.position[i].y; modelMatrices[m+14]=World.position[i].z; modelMatrices[m+15]=1.0f; if (dirtyMin < 0) {dirtyMin = (i32)i;} dirtyMax = (i32)i;
     }
