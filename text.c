@@ -604,10 +604,10 @@ static u16 F32ToHalf(float f) {
 void BuildTextDecalMeshes(void) {    mset(textDecalVBO,0,sizeof(textDecalVBO)); mset(textDecalVertexCount,0,sizeof(textDecalVertexCount)); // clear stale
     // Unity TextMesh sizes these decals by m_CharacterSize (text_decal 0.2, text_decalStopDSS1 9.0) x the 16px font import
     // size / 10, so Unity's authored world height is 1.6 * m_CharacterSize * lS for BOTH families. Our atlases rasterize
-    // those fonts at 20px and 54px, hence the /20 and /54. DECAL_SCALE_NORMAL/STOPD are the world sizes we want; the
-    // StopD 2.5 value rendered like characterSize ~11.5 vs authored 9, so it carries the 9/11.5 correction. NORMAL (5.0)
-    // is calibrated from gameplay visibility and left untouched.
-    const float DECAL_SCALE_NORMAL = 5.0f, DECAL_SCALE_STOPD = 2.5f*9.0f/11.5f, DECAL_PX_NORMAL = 0.2f/20.0f, DECAL_PX_STOPD = 9.0f/54.0f;
+    // those fonts at 20px and 54px, hence the /20 and /54. DECAL_SCALE_NORMAL/STOPD are the world sizes we want; both
+    // are user-calibrated: StopD to characterSize 9 (2.5 rendered like 11.5, so carries 9/11.5), NORMAL so that a 0.7-lS
+    // stencil reads at the eye-correct ~0.25-units (5.0 rendered 0.7 units, 3.125x Unity parity -> carries 0.25/0.7).
+    const float DECAL_SCALE_NORMAL = 5.0f*0.25f/0.7f, DECAL_SCALE_STOPD = 2.5f*9.0f/11.5f, DECAL_PX_NORMAL = 0.2f/20.0f, DECAL_PX_STOPD = 9.0f/54.0f;
     const float DECAL_PX_N = DECAL_SCALE_NORMAL*DECAL_PX_NORMAL, DECAL_PX_S = DECAL_SCALE_STOPD*DECAL_PX_STOPD;
     for (u8 lev=0; lev<World.numLevels; ++lev) {
         for (u16 i=INSTS_1ST_IDX; i<World.levelInstCount[lev]; ++i) {

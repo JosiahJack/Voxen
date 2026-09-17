@@ -457,7 +457,7 @@ void RenderSearchFX(void) {
         float ey = 648.0f;
         float cx = sx + (ex - sx) * ep;
         float cy = sy + (ey - sy) * ep;
-        RenderUIImage((i16)(cx - w * 0.5f),(i16)(cy - h * 0.5f),(i16)(w + 0.5f),(i16)(h + 0.5f),1073);
+        RenderUIImage((i16)(cx - w * 0.5f),(i16)(cy - h * 0.5f),(i16)(w + 0.5f),(i16)(h + 0.5f),1074);
     }
 }
 
@@ -697,32 +697,28 @@ RenderUIImage(259,534,29,29,899); // SearchCloseButtonLH
 // BTN SearchCloseButtonLH: MFDManager.CloseSearch()
 // C# SearchCloseButtonLH: UIButtonMask.cs
 RenderTextL(259,534,T_STOPD_RED,FONT_NORMAL,0.6,"X"); // Text
-RenderUIImage(84,584,64,64,0); // SearchContentLH1 QUAD:none
+RenderUIImage(84,584,64,64,965); // SearchContentLH1 QUAD:none
 // BTN SearchContentLH1: SearchContentsContainerLH.SearchButtonClick()
 // C# SearchContentLH1: UIButtonMask.cs
 // C# SearchContentLH1: SearchContainerButton.cs
-RenderUIImage(174,584,64,64,0); // SearchContentLH2 QUAD:none
+RenderUIImage(174,584,64,64,965); // SearchContentLH2 QUAD:none
 // BTN SearchContentLH2: SearchContentsContainerLH.SearchButtonClick(1)
 // C# SearchContentLH2: UIButtonMask.cs
 // C# SearchContentLH2: SearchContainerButton.cs
-RenderUIImage(84,674,64,64,0); // SearchContentLH3 QUAD:none
+RenderUIImage(84,674,64,64,965); // SearchContentLH3 QUAD:none
 // BTN SearchContentLH3: SearchContentsContainerLH.SearchButtonClick(2)
 // C# SearchContentLH3: UIButtonMask.cs
 // C# SearchContentLH3: SearchContainerButton.cs
-RenderUIImage(174,674,64,64,0); // SearchContentLH4 QUAD:none
+RenderUIImage(174,674,64,64,965); // SearchContentLH4 QUAD:none
 // BTN SearchContentLH4: SearchContentsContainerLH.SearchButtonClick(3)
 // C# SearchContentLH4: UIButtonMask.cs
 // C# SearchContentLH4: SearchContainerButton.cs
 if (World.invP1.currentSearchItem >= 0) {
     int s = World.invP1.currentSearchItem;
     for (int i = 0; i < 4; i++) {
-        int contentIndex = World.instances[s].contents[i];
-        if (contentIndex >= 0) {
-            // Texture mapping for search contents: uses same item-icon mapping as inventory (placeholder 1025 for now)
-            int tex = 1025; // UNMAPPED placeholder; full itemicon GUID-to-texture registration is bounded follow-up
-            int cx[4] = {84, 174, 84, 174}; int cy[4] = {584, 584, 674, 674};
-            RenderUIImage(cx[i], cy[i], 64, 64, tex); // Search content image from searched object's contents[i]
-        }
+        int tex = 965; // frobicon dummy
+        int cx[4] = {84, 174, 84, 174}; int cy[4] = {584, 584, 674, 674};
+        RenderUIImage(cx[i], cy[i], 64, 64, tex); // Search content slot (dummy for positioning)
     }
 }
 // C# AudioLogInfoLH: LogDataTabContainerManager.cs
@@ -2273,12 +2269,9 @@ RenderUIImage(1233,674,64,64,0); // SearchContentRH4 QUAD:none
 if (World.invP1.currentSearchItem >= 0) {
     int s = World.invP1.currentSearchItem;
     for (int i = 0; i < 4; i++) {
-        int contentIndex = World.instances[s].contents[i];
-        if (contentIndex >= 0) {
-            int tex = 1025; // placeholder (see LH side)
-            int cx[4] = {1143, 1233, 1143, 1233}; int cy[4] = {584, 584, 674, 674};
-            RenderUIImage(cx[i], cy[i], 64, 64, tex);
-        }
+        int tex = 965; // frobicon dummy (RH)
+        int cx[4] = {1143, 1233, 1143, 1233}; int cy[4] = {584, 584, 674, 674};
+        RenderUIImage(cx[i], cy[i], 64, 64, tex); // Search content slot (dummy for positioning)
     }
 }
 // C# AudioLogInfoRH: LogDataTabContainerManager.cs
