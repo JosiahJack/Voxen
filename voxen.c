@@ -7,6 +7,7 @@ u32 globalframe=0,globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,
     textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS],psysInstancesID,psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,modelVertexCounts[MAX_MDLS],*physVertCounts,threadCnt=1;
 u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; u32 textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT]; // 3D text decal world meshes (chunk VAO format, world-baked, per level)
 char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN]; u16 decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount; // decals whose lingdex is invalid carry literal text from the level file
+DecalStyle decalStyles[DECAL_STYLE_MAX]; u16 decalStyleCount; // Unity TextMesh anchor/alignment/lineSpacing overrides per decal (from tA/tAl/tLs)
 float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 // Entity Management
 float modelMatrices[INSTANCE_COUNT*16],*world_from_mdl=modelMatrices,modelBounds[MAX_MDLS],**physPos; u16 **modelTriangles,modelTriangleCounts[MAX_MDLS],mdlsCnt,**physTris; u8 currentPlayerNameLength=0; i8 currentMenuItem=0,currentMenuTab=0,menuItemCount=4,menuTabCount=1;
@@ -483,7 +484,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if (World.shd1 < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4) && opaqueCount < (INSTANCE_COUNT - 4)) { // Add shield generators in skybox.
         visibleInstances[opaqueCount].index=World.shd1; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++; visibleInstances[opaqueCount].index=World.shd2; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++; visibleInstances[opaqueCount].index=World.shd3; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++; visibleInstances[opaqueCount].index=World.shd4; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
     }
-    if (editModeSelection < U16_MAX && Cheats.editMode) {if (transparentTexture[World.instances[editModeSelection].texIndex]) { if(tcnt<=1023){ tmpTransparent[tcnt].index = editModeSelection; tmpTransparent[tcnt].depth = 1.28f; tcnt++;} }else { visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }}
+    if (editModeSelection < U16_MAX && Cheats.editMode) {u16 selIdx=World.instances[editModeSelection].index; if (selIdx != 592 && selIdx != 593) { /* decals have no mesh: baked 3D text drawn in decal pass; force-draw would hit modelIndex U16_MAX */ if (transparentTexture[World.instances[editModeSelection].texIndex]) { if(tcnt<=1023){ tmpTransparent[tcnt].index = editModeSelection; tmpTransparent[tcnt].depth = 1.28f; tcnt++;} }else { visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }}}
     mcpy(visibleInstances + opaqueCount,tmpTransparent,tcnt * sizeof(DepthSort)); glUseProgram(depthPrepassSP); glUniformMatrix4fv(2,1,0,viewProj); glEnable(GL_DEPTH_TEST); glColorMask(0,0,0,0); glDepthMask(1); glDepthFunc(0x0201/*GL_LESS*/); glDisable(GL_BLEND);
     if (opaqueCount > 1) qsort_new(visibleInstances,opaqueCount,sizeof(DepthSort),dsortInv);/*Needed for cutout bushes/foliage*/ if (tcnt > 1) qsort_new(visibleInstances + opaqueCount,tcnt,sizeof(DepthSort),dsort);
     u8 cullBlendState = 0xFF;
@@ -571,10 +572,6 @@ void UpdateInstanceMatrix4x4s() {
     i32 dirtyMin = -1, dirtyMax = -1;
     for (u32 i = INSTS_1ST_IDX; i < World.instCount; i++) {        
         u32 m = i*16;
-        if (World.instances[i].index==592 || World.instances[i].index==593) { // 3D decal text: mesh is world-baked, matrix must be identity
-            mset(&modelMatrices[m],0,16*sizeof(float)); modelMatrices[m]=modelMatrices[m+5]=modelMatrices[m+10]=modelMatrices[m+15]=1.0f;
-            if (dirtyMin < 0) {dirtyMin = (i32)i;} dirtyMax = (i32)i; continue;
-        }
         float x=World.rotation[i].x, y=World.rotation[i].y, z=World.rotation[i].z, w=World.rotation[i].w; float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z; float sclx=World.scale[i].x, scly=World.scale[i].y, sclz=World.scale[i].z;
         modelMatrices[m+0]=(1.0f-2.0f*(y2+z2))*sclx; modelMatrices[m+1]=(2.0f*(xy+wz))*sclx; modelMatrices[m+2]=(2.0f*(xz-wy))*sclx; modelMatrices[m+3]=modelMatrices[m+7]=modelMatrices[m+11]=0.0f; modelMatrices[m+4]=(2.0f*(xy-wz))*scly; modelMatrices[m+5]=(1.0f-2.0f*(x2+z2))*scly; modelMatrices[m+6]=(2.0f*(yz+wx))*scly;
         modelMatrices[m+8]=(2.0f*(xz+wy))*sclz; modelMatrices[m+9]=(2.0f*(yz-wx))*sclz; modelMatrices[m+10]=(1.0f-2.0f*(x2+y2))*sclz; modelMatrices[m+12]=World.position[i].x; modelMatrices[m+13]=World.position[i].y; modelMatrices[m+14]=World.position[i].z; modelMatrices[m+15]=1.0f; if (dirtyMin < 0) {dirtyMin = (i32)i;} dirtyMax = (i32)i;
@@ -721,7 +718,7 @@ i32 main() {
         prePhys = get_time() - input_start; if (!World.paused && !World.menuActive) { double ps=get_time(); float dt=(float)vclamp((World.pauseRelativeTime - World.last_physics_time),0.0005,0.1); World.last_physics_time=World.pauseRelativeTime; World.dt=dt; Physics(dt); physTime=get_time() - ps; } else physTime=0.0;
         double gameT_start = get_time();
         ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ if(World.invP1.hasHardware & HW_BIO){BioMonitorUpdate();} if (!World.paused && !World.menuActive){PSys_Update(World.dt);} UpdateAudio(); gameTime = get_time() - gameT_start;
-        if (likely(!World.paused && !World.menuActive)) UpdateInstanceMatrix4x4s(); // Before camviews so camview shadows render same as main pass
+        if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) UpdateInstanceMatrix4x4s(); // Before camviews so camview shadows render same as main pass
         drawCalls=uiDrawCalls=shadDrawCalls=vertsRendered=0; RenderCameraViews(); if(likely(!World.paused && !World.menuActive)){CullCore();} AudioUpdate(); Render(false/*!camview*/,0u); if (ScrshotPressed() && World.current_time > World.screenshotTimeout) Screenshot();
         for(i32 i=0;i<MAX_KEYS;++i){Sys_Input.keyStates[i].pressed=Sys_Input.keyStates[i].released=false;} for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) {Sys_Input.mouseButtons[i].pressed=Sys_Input.mouseButtons[i].released=false;} Sys_Input.scrollDelta=0; World.currentMouse_dx=World.currentMouse_dy=0; // Reset Input states, can't mset as we want to preserve down state
         globalframe++; World.cpuTime = get_time() - World.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.

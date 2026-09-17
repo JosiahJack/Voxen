@@ -181,6 +181,7 @@ typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,
 typedef struct {
         double vmailFrameFinished,logFinished,blinkFinished,beepFinished,tickFinished,centerTabsTickFinished; i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count; u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8]; u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
         bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
+        bool searchFXActive[2]; double searchFXStartTime[2]; float searchFXCursorX[2],searchFXCursorY[2];
         u8 vmailActive; AudioLogType logType; V3 objectInUsePos;
 } SystemUI;
 typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
@@ -256,10 +257,13 @@ extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**phys
 extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,vbos[MAX_MDLS],tbos[MAX_MDLS],drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_COUNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES],modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
 extern u16 mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],**modelBVHTriOrder,playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris;
 extern u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; extern u32 textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
-#define DECAL_INLINE_TEXT_MAX 64
+#define DECAL_INLINE_TEXT_MAX 128
 #define DECAL_INLINE_TEXT_PEND 64
 #define DECAL_INLINE_TEXT_LEN 96
 extern char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN]; extern u16 decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount;
+#define DECAL_STYLE_MAX 256
+typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle; // Unity TextMesh anchor/alignment/lineSpacing override (tA/tAl/tLs from level file)
+extern DecalStyle decalStyles[DECAL_STYLE_MAX]; extern u16 decalStyleCount;
 extern AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; extern BvhNode** modelBVHNodes; extern FHandle console_log_file; extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
 extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile; extern u16 fwParentOf[INSTANCE_COUNT];/*instance -> owning func_wall mover_target, 0 == none*/ extern const char* audioLogs[LOGCNT]; extern u32 gridCellStates[ARRSIZE]; extern double tWrnFinished[10];

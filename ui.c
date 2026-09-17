@@ -440,6 +440,27 @@ void UI_ProcessNavigation(void) {
     }
 }
 
+void RenderSearchFX(void) {
+    for (int side=0;side<2;++side) {
+        if (!World.Sys_UI.searchFXActive[side]) continue;
+        double elapsed = World.pauseRelativeTime - World.Sys_UI.searchFXStartTime[side];
+        if (elapsed >= 1.0) { World.Sys_UI.searchFXActive[side] = false; continue; }
+        float t = (float)elapsed / 1.0f;
+        if (t > 1.0f) t = 1.0f;
+        float p = t < 0.4f ? t / 0.4f : 1.0f;  // scale up first 0.4s, hold
+        float ep = 1.0f - (1.0f - p) * (1.0f - p) * (1.0f - p);  // ease-out cubic
+        float scale = 40.0f + ep * (263.0f - 40.0f);
+        float w = scale, h = scale * 240.0f / 263.0f;
+        float sx = World.Sys_UI.searchFXCursorX[side];
+        float sy = World.Sys_UI.searchFXCursorY[side];
+        float ex = (side ? 1210.5f : 151.5f);
+        float ey = 648.0f;
+        float cx = sx + (ex - sx) * ep;
+        float cy = sy + (ey - sy) * ep;
+        RenderUIImage((i16)(cx - w * 0.5f),(i16)(cy - h * 0.5f),(i16)(w + 0.5f),(i16)(h + 0.5f),1073);
+    }
+}
+
 static double RenderUI() {
     drawCallsNormal = drawCalls;
     World.uiIsBlocking = false;
@@ -692,6 +713,18 @@ RenderUIImage(174,674,64,64,0); // SearchContentLH4 QUAD:none
 // BTN SearchContentLH4: SearchContentsContainerLH.SearchButtonClick(3)
 // C# SearchContentLH4: UIButtonMask.cs
 // C# SearchContentLH4: SearchContainerButton.cs
+if (World.invP1.currentSearchItem >= 0) {
+    int s = World.invP1.currentSearchItem;
+    for (int i = 0; i < 4; i++) {
+        int contentIndex = World.instances[s].contents[i];
+        if (contentIndex >= 0) {
+            // Texture mapping for search contents: uses same item-icon mapping as inventory (placeholder 1025 for now)
+            int tex = 1025; // UNMAPPED placeholder; full itemicon GUID-to-texture registration is bounded follow-up
+            int cx[4] = {84, 174, 84, 174}; int cy[4] = {584, 584, 674, 674};
+            RenderUIImage(cx[i], cy[i], 64, 64, tex); // Search content image from searched object's contents[i]
+        }
+    }
+}
 // C# AudioLogInfoLH: LogDataTabContainerManager.cs
 }
 if(MFD_DataL==6){ // AudioLog
@@ -2237,6 +2270,17 @@ RenderUIImage(1233,674,64,64,0); // SearchContentRH4 QUAD:none
 // BTN SearchContentRH4: SearchContentsContainerRH.SearchButtonClick(3)
 // C# SearchContentRH4: UIButtonMask.cs
 // C# SearchContentRH4: SearchContainerButton.cs
+if (World.invP1.currentSearchItem >= 0) {
+    int s = World.invP1.currentSearchItem;
+    for (int i = 0; i < 4; i++) {
+        int contentIndex = World.instances[s].contents[i];
+        if (contentIndex >= 0) {
+            int tex = 1025; // placeholder (see LH side)
+            int cx[4] = {1143, 1233, 1143, 1233}; int cy[4] = {584, 584, 674, 674};
+            RenderUIImage(cx[i], cy[i], 64, 64, tex);
+        }
+    }
+}
 // C# AudioLogInfoRH: LogDataTabContainerManager.cs
 }
 if(MFD_DataR==6){ // AudioLog
@@ -2644,10 +2688,7 @@ RenderTextL(66,115,T_GREEN,FONT_NORMAL,0.6,"Moderate"); // BiomonitorTextFatigue
 }
 RenderTextL(1270,78,T_WHITE,FONT_NORMAL,0.6,"0"); // EnergyDrainText dummy
 RenderTextL(1308,78,T_WHITE,FONT_NORMAL,0.6,"0"); // EnergyJPMText dummy
-RenderUIImage(663,364,40,40,1074); // SearchFXLH
-// C# SearchFXLH: SearchFXReset.cs
-RenderUIImage(663,364,40,40,1074); // SearchFXRH
-// C# SearchFXRH: SearchFXReset.cs
+RenderSearchFX();
         if (EditSelIsActive()) { // Edit mode selection highlight + object info panel
             u16 sel=editModeSelection; Entity* e=&World.instances[sel];
             V3 f=World.instances[PLAYER1].forward,rt=World.instances[PLAYER1].right,ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(rt,ff)),d=V3_AsubB(World.position[sel],World.position[PLAYER1]); float bz=V3_dot(d,f);

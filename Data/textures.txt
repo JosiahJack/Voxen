@@ -2739,6 +2739,7 @@ index: 1228
 index: 1229
 #Textures/col8.png
 index: 1230
+transparent: 1
 #Textures/a111spec.png
 index: 1231
 #Textures/a210spec.png

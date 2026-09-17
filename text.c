@@ -580,8 +580,9 @@ void RenderText3DWorld(V3 worldPos, Quaternion rot, u32 color, u8 fontID, float 
 
 // --- 3D text decal world meshes (592 text_decal, 593 text_decalStopDSS1) ---
 // Built once at end of LoadAllLevels (Sys_Text.stringTable already populated for current language).
-// Each mesh is baked into world space (position/rotation/scale from the instance) using the chunk
-// VAO vertex format: pos xyz (half), normal xyz (half), uv st (half) = 16 bytes/vertex.
+// Each mesh is baked in LOCAL space (glyph quads at origin, -Z normal); the instance's live model
+// matrix (World rotation/scale/position) places it, so editmode transform edits work like any entity.
+// Uses the chunk VAO vertex format: pos xyz (half), normal xyz (half), uv st (half) = 16 bytes/vertex.
 // Rendered double-sided, lit, reusing chunkSP; skipped in shadowmap pass (instances have modelIndex U16_MAX)
 // but receive shadows via the normal chunk shader shadow sampling.
 static u16 F32ToHalf(float f) {
@@ -603,9 +604,10 @@ static u16 F32ToHalf(float f) {
 void BuildTextDecalMeshes(void) {    mset(textDecalVBO,0,sizeof(textDecalVBO)); mset(textDecalVertexCount,0,sizeof(textDecalVertexCount)); // clear stale
     // Unity TextMesh sizes these decals by m_CharacterSize (text_decal 0.2, text_decalStopDSS1 9.0) x the 16px font import
     // size / 10, so Unity's authored world height is 1.6 * m_CharacterSize * lS for BOTH families. Our atlases rasterize
-    // those fonts at 20px and 54px, hence the /20 and /54. DECAL_SCALE_NORMAL/STOPD are the world sizes we want: 1.6 is
-    // exact Unity parity, higher is bigger. StopD is the StopDSS1 family (door/keypad labels), NORMAL is text_decal.
-    const float DECAL_SCALE_NORMAL = 5.0f, DECAL_SCALE_STOPD = 2.5f, DECAL_PX_NORMAL = 0.2f/20.0f, DECAL_PX_STOPD = 9.0f/54.0f, DECAL_RASTER_RATIO = 54.0f/20.0f;
+    // those fonts at 20px and 54px, hence the /20 and /54. DECAL_SCALE_NORMAL/STOPD are the world sizes we want; the
+    // StopD 2.5 value rendered like characterSize ~11.5 vs authored 9, so it carries the 9/11.5 correction. NORMAL (5.0)
+    // is calibrated from gameplay visibility and left untouched.
+    const float DECAL_SCALE_NORMAL = 5.0f, DECAL_SCALE_STOPD = 2.5f*9.0f/11.5f, DECAL_PX_NORMAL = 0.2f/20.0f, DECAL_PX_STOPD = 9.0f/54.0f;
     const float DECAL_PX_N = DECAL_SCALE_NORMAL*DECAL_PX_NORMAL, DECAL_PX_S = DECAL_SCALE_STOPD*DECAL_PX_STOPD;
     for (u8 lev=0; lev<World.numLevels; ++lev) {
         for (u16 i=INSTS_1ST_IDX; i<World.levelInstCount[lev]; ++i) {
@@ -618,14 +620,22 @@ void BuildTextDecalMeshes(void) {    mset(textDecalVBO,0,sizeof(textDecalVBO)); 
             if (!str || !str[0]) continue;
             float invatsz = 1.0f/(fontID==FONT_STOPD ? (float)FONT_ATLAS_SIZE2 : (float)FONT_ATLAS_SIZE);
             float puv=10.0f*invatsz, bw=2.0f;
-            float totalW = MeasureLineAdvance(str,fontID);
-            V3 scl = World.levelScale[lev][i]; Quaternion rot = World.levelRotation[lev][i]; V3 pos = World.levelPosition[lev][i];
-            // precompute rotated normal: -Z matches Unity text_3d.shader VS_Main, which forces o.normal = (0,0,-1)
-            V3 n = quat_rot_v3(rot,(V3){0.0f,0.0f,-1.0f}); float nl = vsqrtf(n.x*n.x+n.y*n.y+n.z*n.z); if (nl>0.0001f){n.x/=nl;n.y/=nl;n.z/=nl;} else {n=(V3){0.0f,0.0f,-1.0f};}
+            V3 scl = World.levelScale[lev][i]; Quaternion rot = World.levelRotation[lev][i];
             float decalPx = (fontID==FONT_STOPD) ? DECAL_PX_S : DECAL_PX_N;
-            float rasterMul = (fontID==FONT_STOPD) ? DECAL_RASTER_RATIO : 1.0f;
             u16 halfVerts[720*8]; u32 vIdx=0;
-            const char* p = str; float xpos=-totalW*0.5f, ypos=-8.0f*rasterMul, ls=22.0f*rasterMul; int cc=0;
+            // Unity TextMesh metrics in atlas px (hhea ascent+descent = raster height 20/54). anchor = which point of the
+            // text's block sits at the transform; alignment = how each line sits inside the block (multi-line only).
+            const int dix = (fontID==FONT_STOPD) ? 1 : 0;
+            const float DECAL_ASC_PX[2]={15.0f,45.6f}, DECAL_DESC_PX[2]={5.0f,8.4f}, DECAL_LINEH_PX[2]={21.8f,54.0f};
+            u8 anchor=0,algn=0; float lineSp=1.0f; // level file tA/tAl/tLs overrides (default UpperLeft/Left/1)
+            for (u16 k=0;k<decalStyleCount;++k){ if (decalStyles[k].level==lev && decalStyles[k].inst==i){ anchor=decalStyles[k].anchor; algn=decalStyles[k].align; lineSp=decalStyles[k].lineSp; break; } }
+            float blockW=MeasureLineAdvance(str,fontID); int nLines=1;
+            for (const char* q=str; *q; ++q){ if (*q=='\n'){ ++nLines; float lw=MeasureLineAdvance(q+1,fontID); if (lw>blockW) blockW=lw; } }
+            const float blockH=(nLines-1)*DECAL_LINEH_PX[dix]*lineSp + DECAL_ASC_PX[dix] + DECAL_DESC_PX[dix];
+            const u8 arow=anchor/3, acol=anchor%3; // TextAnchor rows Upper/Middle/Lower, cols Left/Center/Right
+            const float xLeft=-(float)acol*0.5f*blockW, yTop=-(float)arow*0.5f*blockH, lineH=DECAL_LINEH_PX[dix]*lineSp;
+            const float alignMul=(algn==2)?1.0f:((algn==1)?0.5f:0.0f);
+            const char* p = str; float xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)), ypos=yTop+DECAL_ASC_PX[dix]; int cc=0;
             float x0=0,y0=0,x1=0,y1=0,s0=0,t0=0,s1=0,t1=0;
             while(*p) {
                 const u8* s=(const u8*)p; u32 cp=0;
@@ -635,21 +645,19 @@ void BuildTextDecalMeshes(void) {    mset(textDecalVBO,0,sizeof(textDecalVBO)); 
                 else if ((*s&0xF8)==0xF0){ if(!s[1]||!s[2]||!s[3])break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
                 else s++;
                 p=(const char*)s; cc++;
-                if (cp=='\n'||cc>120){ xpos=-totalW*0.5f; ypos+=ls; cc=0; continue; }
+                if (cp=='\n'||cc>120){ xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)); ypos+=lineH; cc=0; continue; }
                 int idx=CodepointToPackedIndex((i32)cp,fontID);
                 const stbtt_packedchar* b = ((fontID==FONT_STOPD)?fontPackedCharStopD:fontPackedChar)+idx;
                 float qx0=vfloor((xpos+b->xoff)+0.5f), qy0=vfloor((ypos+b->yoff)+0.5f);
                 float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
                 x0=qx0-bw; x1=(qx0+b->xoff2-b->xoff)+bw; y0=qy0-bw; y1=(qy0+b->yoff2-b->yoff)+bw;
                 s0=qs0-puv; t0=qt0-puv; s1=qs1+puv; t1=qt1+puv;
-                // 6 verts (2 tris) per glyph; transform local->world baked
+                // 6 verts (2 tris) per glyph; local space only, live model matrix applies rotation/scale/position
                 const float L[6][5] = {{x0,y0,s0,t0},{x1,y1,s1,t1},{x1,y0,s1,t0},{x0,y0,s0,t0},{x0,y1,s0,t1},{x1,y1,s1,t1}};
                 for (int k=0;k<6;k++) {
-                    float lx=L[k][0]*decalPx*scl.x, ly=-L[k][1]*decalPx*scl.y, lz=0.0f; // negate y: glyph quads are y-down, world +Y is up
-                    V3 r=quat_rot_v3(rot,(V3){lx,ly,lz});
-                    float wx=r.x+pos.x, wy=r.y+pos.y, wz=r.z+pos.z;
-                    halfVerts[vIdx++]=F32ToHalf(wx); halfVerts[vIdx++]=F32ToHalf(wy); halfVerts[vIdx++]=F32ToHalf(wz);
-                    halfVerts[vIdx++]=F32ToHalf(n.x); halfVerts[vIdx++]=F32ToHalf(n.y); halfVerts[vIdx++]=F32ToHalf(n.z);
+                    float lx=L[k][0]*decalPx, ly=-L[k][1]*decalPx, lz=0.0f; // negate y: glyph quads are y-down, world +Y is up
+                    halfVerts[vIdx++]=F32ToHalf(lx); halfVerts[vIdx++]=F32ToHalf(ly); halfVerts[vIdx++]=F32ToHalf(lz);
+                    halfVerts[vIdx++]=F32ToHalf(0.0f); halfVerts[vIdx++]=F32ToHalf(0.0f); halfVerts[vIdx++]=F32ToHalf(-1.0f); // -Z normal, Unity text_3d parity; matrix rotates it
                     halfVerts[vIdx++]=F32ToHalf(L[k][2]); halfVerts[vIdx++]=F32ToHalf(L[k][3]);
                 }
                 if (vIdx+8 > 720*8) break;
@@ -663,7 +671,7 @@ void BuildTextDecalMeshes(void) {    mset(textDecalVBO,0,sizeof(textDecalVBO)); 
             glBufferData(GL_ARRAY_BUFFER,vertCount*16,(const void*)halfVerts,GL_STATIC_DRAW);
             glBindBuffer(GL_ARRAY_BUFFER,0);
             textDecalVertexCount[lev][i]=vertCount;
-            DualLog("Built text decal mesh: level %u inst %u constIndex %u texIndex %u font %u verts %u text '%s'\n",lev,i,e->index,e->texIndex,fontID,vertCount,str);
+            DualLog("Built text decal mesh: level %u inst %u constIndex %u texIndex %u font %u verts %u text '%s' rot(%f,%f,%f,%f) scl(%f,%f,%f)\n",lev,i,e->index,e->texIndex,fontID,vertCount,str,rot.x,rot.y,rot.z,rot.w,scl.x,scl.y,scl.z);
         }
     }
 }
