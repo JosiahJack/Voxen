@@ -586,7 +586,7 @@ static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 5
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
 u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0; void AddHardwareToInventory(int,int),mp3_clear();
 // Init && Main
-void MFD_NewGame(void);
+void MFD_NewGame(void); void MissionTimerInit(void);
 __attribute__((cold)) void NewGame() { // Reset World States
     CloseSearch(); MFD_NewGame(); World.invP1.currentSearchItem=U16_MAX;
     DualLog("Loading new game...\n"); RenderLoading("Loading new game...");
@@ -605,7 +605,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.invP1.hardwareInvReferenceIndex[12] =  0; World.invP1.hardwareInvReferenceIndex[13] =  0; World.invP1.generalInventoryIndexRef[0] = 81; // Hardcoded lookup indices into the Const main table.
     for (int i=1;i<HW_COUNT;i++) World.invP1.generalInventoryIndexRef[i] = -1; // Skips 0th index on purpose as it always holds access cards "item".
     for (int i=0;i<HW_COUNT;++i) World.invP1.hwVers[i] = World.invP1.hwVersSetting[i] = 0;
-    World.invP1.nitroTimeSetting = NITRO_DEFAULT_TIME; World.invP1.earthShakerTimeSetting = EARTH_SHAKER_DEFAULT_TIME; World.invP1.lastAddedIndex = World.invP1.globalLookupIndex = -1; World.invP1.hasNewEmail = World.invP1.hasNewNotes = World.invP1.isPulserNotDrill = true;
+    World.invP1.nitroTimeSetting = NITRO_DEFAULT_TIME; World.invP1.earthShakerTimeSetting = EARTH_SHAKER_DEFAULT_TIME; World.invP1.lastAddedIndex = World.invP1.globalLookupIndex = -1; World.invP1.hasNewEmail = World.invP1.hasNewNotes = World.invP1.isPulserNotDrill = true; MissionTimerInit();
     for (int i=0;i<7;++i) World.invP1.weaponInventoryIndices[i] = World.invP1.weaponInventoryAmmoIndices[i] = -1;
     World.invP1.sparqSetting = 50.0f; World.invP1.ionSetting = 100.0f; World.invP1.blasterSetting = 15.0f; World.invP1.plasmaSetting = 40.0f; World.invP1.stungunSetting = 20.0f; World.invP1.justFired = (World.pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
     World.invP1.resetAfterDeathTime = 0.5; World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.radFXFinished = World.pauseRelativeTime; World.Sys_UI.lastMultiMediaTabOpened = MM_EMAIL_TABLE;

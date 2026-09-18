@@ -4547,3 +4547,33 @@ index: 2129
 index: 2130
 #Textures/Sprites/vaporize/546_1297.png
 index: 2131
+#Textures/UI/elnum_null.png
+index: 2132
+#Textures/UI/hudbuttons/keypad_end.png
+index: 2133
+#Textures/UI/hudbuttons/keypad_inner_on.png
+index: 2134
+#Textures/UI/hudbuttons/keypad_mid.png
+index: 2135
+#Textures/UI/puzzle/geniusgrid_highlight.png
+index: 2136
+#Textures/UI/puzzle/grid1_base.png
+index: 2137
+#Textures/UI/puzzle/gridcontainer.png
+index: 2138
+#Textures/UI/puzzle/gridcontainer_gray.png
+index: 2139
+#Textures/UI/puzzle/node_off.png
+index: 2140
+#Textures/UI/puzzle/node_source.png
+index: 2141
+#Textures/UI/puzzle/puzzlesliderwire.png
+index: 2142
+#Textures/UI/puzzle/wire_center.png
+index: 2143
+#Textures/UI/puzzle/wire_levelsbox.png
+index: 2144
+#Textures/UI/puzzle/wire_levelstargetline.png
+index: 2145
+#Textures/UI/puzzle/wire_node.png
+index: 2146

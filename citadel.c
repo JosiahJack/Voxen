@@ -855,6 +855,47 @@ void SearchObject(int searchable) {
     MFD_OpenSearch(World.Sys_UI.lastSearchSideRH); SearchFXEnable(World.Sys_UI.lastSearchSideRH?1:0);
     play_wav(sounds[91],0.75f,(V3){0,0,0},false); ForceInventoryMode();
 }
+// Mission timer. Port of MissionTimer.cs (ScriptsTODO/MissionTimer.cs): Awake/UpdateToNextMission/Update.
+// Display (minutes/seconds countdown + mission label) is derived from misTimerT/misTimerMission at render time (ui.c MissionTimer/MissionTimerT, still placeholders); only logic lives here.
+void MissionTimerInit(void) { // Port of MissionTimer.Awake. Called on new game (see NewGame in voxen.c).
+    World.misTimerT = 6000.0f; World.misTimerFinished = World.pauseRelativeTime + 1.0f;
+    World.misTimerMission = 504; World.misTimerCurIdx = 0; World.misTimerLast = World.misTimerTimesUP = false;
+}
+void MissionTimerUpdateToNextMission(float newTimerAmount,int misTextIndex,int nextMissionIndex) {
+    if (World.misTimerCurIdx == (u8)nextMissionIndex) return;
+    // Unity also notifies QuestLogNotesManager here; that script is not ported (see ui_todo.md D2), so only the timer itself advances.
+    if (World.diffMis < 3) return; // Don't update timer on lower skill settings.
+    World.misTimerT = newTimerAmount; World.misTimerCurIdx = (u8)nextMissionIndex; World.misTimerMission = (u16)misTextIndex;
+    if (World.misTimerCurIdx == 4) World.misTimerLast = true; // No gameover for last timer.
+}
+void MissionTimerUpdate(void) { // Port of MissionTimer.Update. Called from ModUpdate below.
+    if (World.diffMis < 3) return;
+    if (World.paused || World.menuActive) return;
+    if (World.curLev == LEVEL_CYBERSPACE) return; // Timer doesn't count down in cyberspace.
+    if (World.misTimerTimesUP) {
+        if (World.instances[PLAYER1].health > 0.0f) {
+            World.invP1.radiationArea = true; World.instances[PLAYER1].radiation += 0.1f; // Port of GiveRadiation(0.1f) every frame; feeds the existing rad-bleed in ModUpdate.
+            return;
+        }
+    }
+    if (World.misTimerT <= 0.0f) {
+        if (World.misTimerLast) {
+            World.misTimerMission = 509; // Unity shows countdown text 869 + label 509 here; the 869 countdown is render-side, the label index is stored.
+            World.misTimerTimesUP = true;
+            return;
+        }
+        // Unity calls PlayerHealth.PlayerDeathToMenu (instant mission-fail death to menu). No equivalent in Voxen, so route through the normal death flow instead (resurrection still applies).
+        World.instances[PLAYER1].health = 0.0f; Death(PLAYER1,false);
+        return;
+    }
+    switch (World.misTimerCurIdx) {
+        case 0: if (QuestBitIsSet(QB_LaserDestroyed)) MissionTimerUpdateToNextMission(10800.0f,505,1); break;
+        case 1: if (QuestBitIsSet(QB_AntennaNorthDestroyed) && QuestBitIsSet(QB_AntennaSouthDestroyed) && QuestBitIsSet(QB_AntennaEastDestroyed) && QuestBitIsSet(QB_AntennaWestDestroyed)) MissionTimerUpdateToNextMission(2700.0f,506,2); break;
+        case 2: if (QuestBitIsSet(QB_SelfDestructActivated)) MissionTimerUpdateToNextMission(3000.0f,507,3); break;
+        case 3: if (QuestBitIsSet(QB_BridgeSeparated)) MissionTimerUpdateToNextMission(2700.0f,506,4); break;
+    }
+    if (World.misTimerFinished < World.pauseRelativeTime) { World.misTimerT -= 1.0f; World.misTimerFinished = World.pauseRelativeTime + 1.0; }
+}
 static int UseNameTableIndex(int index) {
     switch (index) {
         case 0:return 925; case 1:return 926; case 2:return 54; case 3:return 54; case 4: return 54; case 5: return 54; case 6: return 54; case 7: return 54; case 8: return 54; case 9: return 54; case 10: return 54; case 11: return 55; case 12: return 57; case 13: return 58; case 14: return 59; case 15: return 928; case 16: return 61; case 17: return 929; case 18: return 62; case 19: return 63; case 20: return 927; case 23: return 82; case 24: return 930; case 25: return 84; case 26: return 931;
@@ -902,7 +943,7 @@ void DrawAIDebug(u16 i) {
 }
 
 void ModUpdate() {
-    if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); PatchUpdate(); HardwareUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
+    if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e = &World.instances[i]; u16 constdex = e->index; DelayedSpawnUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);} if(IdxIsNPC(constdex)) { DrawAIDebug(i); /*AIControllerUpdate(i); AIAnimationControllerUpdate(i);*/ }

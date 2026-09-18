@@ -350,7 +350,7 @@ InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D}
                                  {"F3",KEY_F3},{"F4",KEY_F4},{"F5",KEY_F5},{"F6",KEY_F6},{"F7",KEY_F7},{"F8",KEY_F8},{"F9",KEY_F9},{"F10",KEY_F10},{"F11",KEY_F11},{"F12",KEY_F12},{"GRAVE",KEY_GRAVE_ACCENT},{"-",KEY_MINUS},{"=",KEY_EQUAL},{"[",KEY_LEFT_BRACKET},{"]",KEY_RIGHT_BRACKET},{"\\",KEY_BACKSLASH},{"/",KEY_SLASH},{".",KEY_PERIOD},{",",KEY_COMMA},{";",KEY_SEMICOLON},{"'",KEY_APOSTROPHE},{"CAPSLOCK",KEY_CAPS_LOCK},{"NUM0",KEY_KP_0},{"NUM4",KEY_KP_4},
                                  {"NUM5",KEY_KP_5},{"NUM6",KEY_KP_6},{"NUM7",KEY_KP_7},{"NUM8",KEY_KP_8},{"NUM9",KEY_KP_9},{"NUM*",KEY_KP_MULTIPLY},{"NUM-",KEY_KP_SUBTRACT},{"NUM.",KEY_KP_DECIMAL},{"MENU",KEY_MENU},{"PAUSE",KEY_PAUSE},{"NUMLOCK",KEY_NUM_LOCK},{"MWHEEL+",127},{"MWHEEL-",128},/*Handled special case for mousewheel +/-respectively*/{"PRINT",KEY_PRINT_SCREEN},{"JOY18",JOYHAT_DOWN},{"JOY19",JOYHAT_LEFT},{"UNUSED",0}};
 static u8 uiMouseCaptured; static bool uiWheelBlocked; static KeyState unboundInput;
-bool UI_PointerBlocksGameplay(void); void UI_ProcessNavigation(void);
+bool UIInteractions(void); void UI_ProcessNavigation(void);
 KeyState* GetCodeMapping(int settingIndex) {
     if (settingIndex<0 || settingIndex>=42) return &unboundInput;
     i32 i=Sys_Settings.InputCodeSettings[settingIndex]; if (i<0 || i>=(i32)(sizeof(inputElements)/sizeof(inputElements[0])) || i==127 || i==128) return &unboundInput;
@@ -400,7 +400,7 @@ extern u16 editModeTestEntityDefinition;
 void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (!Sys_Input.mouseButtons[i].down) uiMouseCaptured&=~(1u<<i);
     mouseMovementThisFrame = false; PollEvents();
-    uiWheelBlocked=window_has_focus && UI_PointerBlocksGameplay();
+    uiWheelBlocked=window_has_focus && UIInteractions();
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (uiWheelBlocked && Sys_Input.mouseButtons[i].pressed) uiMouseCaptured|=1u<<i;
     World.uiIsBlocking=World.mouseClickHeldOverGUI=World.Sys_UI.mouseClickHeldOverGUI=false;
     if (window_has_focus) {
