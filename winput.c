@@ -39,7 +39,7 @@ WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); 
         WSWin* win=GetPropW(h,L"WinSys"); if (!win) return DefWindowProcW(h,m,w,l);
         switch (m) {
             case 0x0021: if (((u16)((((u64)(l))>>16)&0xffff)) == 0x0201 && ((u16)(((u64)(l)) & 0xffff))!=1) win->win32.frameAction=1; break; case 0x0215: if (l==0&&win->win32.frameAction) { if (win->cursorMode==0x00034003) disableCursor(win); win->win32.frameAction=0; } break; case 0x0007: InputWindowFocus(1); if (win->win32.frameAction) break; if (win->cursorMode==0x00034003) disableCursor(win); return 0;
-            case 0x0008: if (win->cursorMode==0x00034003) enableCursor(win); InputWindowFocus(0); return 0;    case 0x0112: switch(w&0xfff0){case 0xF140:case 0xF170:break; case 0xF100:return 0;} break;    case 0x0010: OS_Exit(0);    
+            case 0x0008: if (win->cursorMode==0x00034003) enableCursor(win); InputWindowFocus(0); return 0;    case 0x0112: switch(w&0xfff0){case 0xF140:case 0xF170:break; case 0xF100:return 0;} break;    case 0x0010: OS_Exit(0); break;/*WM_CLOSE. Explicit break: was falling through into the WM_KEYDOWN group if OS_Exit ever returns.*/
             case 0x0100: case 0x0104: case 0x0101: case 0x0105: {
                 const int action=(((u16)((((u64)(l))>>16)&0xffff)) & 0x8000)?INPUT_RELEASE:INPUT_PRESS; int scancode=(((u16)((((u64)(l))>>16)&0xffff)) & (0x0100|0xff)); if (!scancode) scancode=MapVirtualKeyW((u32)w,0); if (scancode==0x54) scancode=0x137; if (scancode==0x146) scancode=0x45; if (scancode==0x136) scancode=0x36; int key = WinSys.win32.keycodes[scancode];
                 if (w==0x11) {if (((u16)((((u64)(l))>>16)&0xffff)) & 0x0100) key=KEY_RIGHT_CONTROL; else { MSG g; const u32 time=GetMessageTime(); if (PeekMessageW(&g,NULL,0,0,0)) { if (g.message == 0x0100 || g.message == 0x0104 || g.message == 0x0101 || g.message == 0x0105) { if(g.wParam == 0x12 && (((u16)((((u64)g.lParam)>>16)&0xffff)) & 0x0100)&&g.time==time){break;} } } key=KEY_LEFT_CONTROL; }} else if (w == 0xE5) break;
@@ -64,7 +64,7 @@ WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); 
     static void SetWindowDecorated(WSWin* w,i32 e) { (void)e; RECT r; u32 s=GetWindowLongW(w->win32.handle,-16); s &= ~(0x00C00000 | 0x00080000 | 0x00040000 | 0x00020000 | 0x00010000 | 0x80000000); s |= (0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000)); GetClientRect(w->win32.handle,&r); AdjustWindowRectEx(&r,s,0,0); ClientToScreen(w->win32.handle,(POINT*)&r.l); ClientToScreen(w->win32.handle,(POINT*)&r.r); SetWindowLongW(w->win32.handle,-16,s); SetWindowPos(w->win32.handle,NULL,r.l,r.t,r.r-r.l,r.b-r.t,0x0034); }
     static void PollEvents() {
         MSG m; while (PeekMessageW(&m,NULL,0,0,0x0001)) { if (m.message==0x0012) OS_Exit(0); else { TranslateMessage(&m); DispatchMessageW(&m); } } const int k[4][2]={{0xA0,KEY_LEFT_SHIFT},{0xA1,KEY_RIGHT_SHIFT},{0x5B,KEY_LEFT_SUPER},{0x5C,KEY_RIGHT_SUPER}}; for (int i=0;i<4;i++) { if ((GetKeyState(k[i][0])&0x8000)||window->keys[k[i][1]]!=INPUT_PRESS) continue; InputKey(window->keys,k[i][1],INPUT_RELEASE); }
-        int W,H; GetWindowSize(window,&W,&H); if (window->win32.lastCurX != W/2 || window->win32.lastCurY != H/2) SetCurV(window,W/2,H/2);
+        if (window->cursorMode==0x00034003 && WinSys.win32.disabledCursorWindow==window) { int W,H; GetWindowSize(window,&W,&H); if (window->win32.lastCurX != W/2 || window->win32.lastCurY != H/2) SetCurV(window,W/2,H/2); }/*Only re-center while the cursor is actually captured, otherwise we warp the OS cursor every frame*/
     }
     
     WSP PlatformGetModuleSymbol(void* m, const char* n) { return (WSP)GetProcAddress((HMODULE)m,n); }
@@ -89,9 +89,10 @@ WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); 
         int i, dC = WinSys.monitorCount; WSMon** d = NULL; u32 aI,dI; DISPLAY_DEVICEW a, dp; WSMon* m; if (dC) { d = OS_Alloc(WinSys.monitorCount*sizeof(WSMon*)); mcpy(d,WinSys.monitors,WinSys.monitorCount * sizeof(WSMon*)); }
         for (aI = 0;;aI++) {
             mset(&a,0,sizeof(a)); a.cb = sizeof(a); if (!EnumDisplayDevicesW(NULL,aI,&a,0)) break; if (!(a.StateFlags&1)) continue;
+            const int aType = (a.StateFlags & 0x00000004) ? 0 : 1;/*DISPLAY_DEVICE_PRIMARY_DEVICE lives on the adapter, and 0 means insert-first in InputMonitor*/
             for (dI=0;;++dI) {
-                mset(&dp,0,sizeof(dp)); dp.cb=sizeof(dp); if(!EnumDisplayDevicesW(a.DeviceName,dI,&dp,0))break; if(!(dp.StateFlags&1))continue; int dT=(dp.StateFlags&0x00000004) ? 1 : 0; for(i=0;i<dC;++i){if(d[i]&&wcscmp(d[i]->win32.displayName,dp.DeviceName)==0){d[i]=NULL; EnumDisplayMonitors(NULL,NULL,monitorCallback,(i64)WinSys.monitors[i]); break;}} if(i<dC)continue; m=createMonitor(&a,&dp); if(!m){OS_Free(d,WinSys.monitorCount*sizeof(WSMon*)); return;} InputMonitor(m,0x00040001,dT);
-            } if (dI == 0) {int aT = (a.StateFlags & 0x00000004) ? 0 : 1; for (i=0;i<dC;++i) { if (d[i] && wcscmp(d[i]->win32.adapterName,a.DeviceName) == 0) {d[i]=NULL; break;} } if (i < dC) continue; m = createMonitor(&a,NULL); if (!m) { OS_Free(d,WinSys.monitorCount*sizeof(WSMon*)); return; } InputMonitor(m,0x00040001,aT);}
+                mset(&dp,0,sizeof(dp)); dp.cb=sizeof(dp); if(!EnumDisplayDevicesW(a.DeviceName,dI,&dp,0))break; if(!(dp.StateFlags&1))continue; for(i=0;i<dC;++i){if(d[i]&&wcscmp(d[i]->win32.displayName,dp.DeviceName)==0){d[i]=NULL; EnumDisplayMonitors(NULL,NULL,monitorCallback,(i64)WinSys.monitors[i]); break;}} if(i<dC)continue; m=createMonitor(&a,&dp); if(!m){OS_Free(d,WinSys.monitorCount*sizeof(WSMon*)); return;} InputMonitor(m,0x00040001,aType);
+            } if (dI == 0) {for (i=0;i<dC;++i) { if (d[i] && wcscmp(d[i]->win32.adapterName,a.DeviceName) == 0) {d[i]=NULL; break;} } if (i < dC) continue; m = createMonitor(&a,NULL); if (!m) { OS_Free(d,WinSys.monitorCount*sizeof(WSMon*)); return; } InputMonitor(m,0x00040001,aType);}
         } for (i=0;i<dC;++i) { if (d[i]) InputMonitor(d[i],0x00040002,0); } if (d) OS_Free(d,WinSys.monitorCount*sizeof(WSMon*));
     }
     
@@ -353,7 +354,7 @@ static u8 uiMouseCaptured; static bool uiWheelBlocked; static KeyState unboundIn
 bool UIInteractions(void); void UI_ProcessNavigation(void);
 KeyState* GetCodeMapping(int settingIndex) {
     if (settingIndex<0 || settingIndex>=42) return &unboundInput;
-    i32 i=Sys_Settings.InputCodeSettings[settingIndex]; if (i<0 || i>=(i32)(sizeof(inputElements)/sizeof(inputElements[0])) || i==127 || i==128) return &unboundInput;
+    i32 i=Sys_Settings.InputCodeSettings[settingIndex]; if (i<0 || i>=(i32)(sizeof(inputElements)/sizeof(inputElements[0])) || !inputElements[i].name || i==127 || i==128) return &unboundInput;
     if (i>=53 && i<=60) { int button=inputElements[i].value; return (uiMouseCaptured&(1u<<button)) ? &unboundInput : &Sys_Input.mouseButtons[button]; }
     return &Sys_Input.keyStates[inputElements[i].value];
 }
@@ -391,7 +392,7 @@ bool WeaponCycDown() { return GetKeyPressed(29); }  bool Grenade() { return GetK
 bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }   bool Map() { return GetKeyPressed(37); }          bool SwimUp() {return Cheats.noclip && GetKey(38);} bool SwimDn() {return /*Cheats.noclip && */GetKey(39);} bool Console() { return GetKeyPressed(-1); }     bool ScrshotPressed() { return GetKeyPressed(41); }
 bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){return false;} if (World.pauseRelativeTime < World.invP1.leanLeftTapFinished) { World.invP1.leanLeftTapFinished = 0.0; return true; } World.invP1.leanLeftTapFinished = World.pauseRelativeTime + 0.5; return false; }
 bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.pauseRelativeTime < World.invP1.leanRightTapFinished) { World.invP1.leanRightTapFinished = 0.0; return true; } World.invP1.leanRightTapFinished = World.pauseRelativeTime + 0.5; return false; } 
-void ForceShootMode() { if (Sys_Settings.NoShootMode){return;} if (World.inventoryMode) {World.cursorPos_x=663; World.cursorPos_y=371/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0; World.Sys_UI.vmailActive=false;} }
+void ForceShootMode() { if (Sys_Settings.NoShootMode){return;} if (World.inventoryMode) {World.cursorPos_x=663; World.cursorPos_y=371/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); World.Sys_UI.vmailActive=0; }
 void ForceInventoryMode() { if (!World.inventoryMode) {World.inventoryMode = true; World.cursorPos_x = 663; World.cursorPos_y = 371; ignore_next_mouse_delta = true;} } // Centered on UI baseline resolution 1366x768
 void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
 void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
@@ -399,13 +400,14 @@ void SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float);
 extern u16 editModeTestEntityDefinition;
 void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (!Sys_Input.mouseButtons[i].down) uiMouseCaptured&=~(1u<<i);
-    mouseMovementThisFrame = false; PollEvents();
-    uiWheelBlocked=window_has_focus && UIInteractions();
-    for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (uiWheelBlocked && Sys_Input.mouseButtons[i].pressed) uiMouseCaptured|=1u<<i;
+    mouseMovementThisFrame = false; Sys_Input.scrollDelta = 0.0f;/*One frame of life per wheel event: nothing else in the frame clears it, so a wheel bound action used to latch forever*/ PollEvents();
     World.uiIsBlocking=World.mouseClickHeldOverGUI=World.Sys_UI.mouseClickHeldOverGUI=false;
+    uiWheelBlocked=window_has_focus && UIInteractions();/*Walks the UIRegion table: true whenever the pointer is over any live UI component*/
+    World.uiIsBlocking=uiWheelBlocked;/*Hovering UI suppresses use/fire; UI_ProcessNavigation can also raise it when it consumes a click*/
+    for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (uiWheelBlocked && Sys_Input.mouseButtons[i].pressed) uiMouseCaptured|=1u<<i;
     if (window_has_focus) {
         UI_ProcessNavigation();
-        if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);
+        if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);/*TODO debug easter egg, fires on every E press*/
         if (Sprint() && Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode && !editFieldEditing) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition--; if (editModeTestEntityDefinition < 307) editModeTestEntityDefinition = 767; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
         else if (Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode && !editFieldEditing) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition++; if (editModeTestEntityDefinition > 767) editModeTestEntityDefinition = 307; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
@@ -437,7 +439,8 @@ const Setting configTable[] = {
 };
 
 const int configTableSize = sizeof(configTable) / sizeof(Setting);
-INLINE i32 GetWinSysIndirectionIndexForAnInput(const char* val) { for (int i=0;i<134;++i) {if (sEqual(val,inputElements[i].name)) return i;} return 148; }
+/*Returns the "UNUSED" slot when the name is unknown. The old 148 was past the end of inputElements[134] and SaveConfig indexed straight into it.*/
+INLINE i32 GetWinSysIndirectionIndexForAnInput(const char* val) { i32 unused=0; for (int i=0;i<134;++i) { if (!inputElements[i].name) continue; if (sEqual(val,inputElements[i].name)) return i; if (!unused && sEqual("UNUSED",inputElements[i].name)) unused=i; } return unused; }
 void LoadConfig() {
     FHandle f = OS_OpenReadonly("./Data/Config.ini"); char line[512];
     while (sUpToEndLine(line,sizeof(line),f)) {

@@ -235,7 +235,8 @@ typedef /*FAT*/ struct  {
     bool srchInUse,generateContents,dontReset,onlyOnce,allDone,curTex,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,textureGlowAnimating,texAnimStopsAtDie,texAnimInReverse,texAnimRandom,automapHidden,blocked,ajar;
     AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; char texAnimResourceFolder[TARG_STRLEN];
 } Entity; // phew what a porker of a struct, it's been a eatin!
-typedef struct { V2 min,max; bool active,lmb,rmb,initialized; float lastLMB,lastRMB; u32 id; } UIRegion;
+// typedef struct { V2 min,max; bool active,lmb,rmb,initialized; float lastLMB,lastRMB; u32 id; } UIRegion;
+typedef struct{bool initialized,active;V2 min,max;double lastLMB,lastRMB;}UIComponent;
 typedef struct {
     u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_COUNT];
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shd1,shd2,shd3,shd4,weaponVModelIndex,TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex,misTimerMission;
@@ -247,7 +248,7 @@ typedef struct {
     u8 physSleep[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,numLevels,curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode,currentLevel,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
     bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,*invTnsrValid,*colliding,targetIOActive,misTimerLast,misTimerCurIdx,misTimerTimesUP;
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
-    UIRegion uiComponents[MAX_UI_ELEMENTS];
+    UIComponent uiComponents[MAX_UI_ELEMENTS];
     V3 debugLine_start,debugLine_end,cyberspaceRecallPoint,levelPosition[MAX_LEVELS][INSTANCE_COUNT],levelScale[MAX_LEVELS][INSTANCE_COUNT],levelVelocity[MAX_LEVELS][INSTANCE_COUNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT],levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT],levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]/*xyz for Box,x=Sph r,else xyz for Capsule r,h,dir(0=X,1=Y,2=Z)*/,levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
     ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT]; Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
     float levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
