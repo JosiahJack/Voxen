@@ -183,6 +183,9 @@ typedef struct {
         bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
         bool searchFXActive[2]; double searchFXStartTime[2]; float searchFXCursorX[2],searchFXCursorY[2];
         u8 vmailActive; AudioLogType logType; V3 objectInUsePos;
+        u8 MFD_LefTab,MFD_CenterTab,MFD_RightTab,MFD_DataL,MFD_DataR,MFD_MediaTab,MFD_ReaderView,mfdSelected[3],mfdReturnTab[3],mfdReturnView[3],mfdItemReader[2];
+        u8 mfdConsumable; i8 consumableClickRow; double consumableClickTime; bool mfdGeneralItem; i8 generalClickSlot; i16 generalClickItem; u16 generalClickCustom; double generalClickTime;
+        i32 tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10]; double tWrnFinished[10];
 } SystemUI;
 typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
 extern TextSystem Sys_Text;
@@ -199,7 +202,7 @@ typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen
     i32 lastAddedIndex,emailCurrent,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent/*Current slot in the general inventory (14 slots).*/,hardwareInvIndex/*Current index to the item look-up table.*/,generalInventoryIndexRef[14],berserkIncrement;
     i16 ladderState,weaponCurrentPending,weaponIndexPending,weaponCurrent;
     u16 hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustIdx,heldAmmo,heldAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustIdx[14],patchActive,drainJPM;
-    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hwVers[HW_COUNT],hwVersSetting[HW_COUNT],grenAmmo[7],grenConstIndex[7],grenCur,generalInvCurrent,patchCur,patchCounts[7],cyberItemIndex;
+    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hwVers[HW_COUNT],hwVersSetting[HW_COUNT],grenAmmo[7],grenCur,generalInvCurrent,patchCur,patchCounts[7],cyberItemIndex; u16 grenConstIndex[7];
     bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData,radiationArea,leanResetting,wasGrounded;
 } InventorySystem;
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData; typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/ extern AutoSplitterData autoSplitter;
@@ -234,14 +237,14 @@ typedef /*FAT*/ struct  {
 } Entity; // phew what a porker of a struct, it's been a eatin!
 typedef struct {
     u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_COUNT];
-    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shd1,shd2,shd3,shd4,weaponVModelIndex,TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS];
-    float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS];
+    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shd1,shd2,shd3,shd4,weaponVModelIndex,TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex;
+    float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT;
     double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp; float painStaticAlpha,empStaticAlpha;
     double gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs;
     i32 fogFac,cursorPos_x,cursorPos_y/*Separate internal cursor from system cursor.  Relatively pushed around by real cursor movement to give consistent platform behavior.*/,currentMouse_dx,currentMouse_dy;
     u32 missionBits/*QB_ bitmask, info_mission*/; bool questNotesActive[18],questNotesChecked[18];
     u8 physSleep[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,numLevels,curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode,currentLevel,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
-    bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,*invTnsrValid,*colliding,targetIOActive;
+    bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,*invTnsrValid,*colliding,targetIOActive,misTimerLast,misTimerCurIdx;
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
     V3 debugLine_start,debugLine_end,cyberspaceRecallPoint,levelPosition[MAX_LEVELS][INSTANCE_COUNT],levelScale[MAX_LEVELS][INSTANCE_COUNT],levelVelocity[MAX_LEVELS][INSTANCE_COUNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT],levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT],levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]/*xyz for Box,x=Sph r,else xyz for Capsule r,h,dir(0=X,1=Y,2=Z)*/,levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
     ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT]; Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
@@ -251,7 +254,6 @@ typedef struct {
     Entity* instances; V3* position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize; ColliderType* col; Quaternion* rotation; u32* layer,targetIOActivatorIoflags; float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
     Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
     char playerName[27],audiologNames[LOGCNT][T_LOGSTR_MAX],audiologSubjects[LOGCNT][T_LOGSTR_MAX],audiologSenders[LOGCNT][T_LOGSTR_MAX],audioLogSpeech2Text[LOGCNT][T_LOGSTR_MAX];
-    u16 editTextInstanceIndex; // Ad-hoc editmode selection text instance index
 } GlobalContext; // Savable complete game state data
 extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS];
 extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,vbos[MAX_MDLS],tbos[MAX_MDLS],drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_COUNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES],modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
@@ -266,7 +268,7 @@ typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle; //
 extern DecalStyle decalStyles[DECAL_STYLE_MAX]; extern u16 decalStyleCount;
 extern AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; extern BvhNode** modelBVHNodes; extern FHandle console_log_file; extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
-extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile; extern u16 fwParentOf[INSTANCE_COUNT];/*instance -> owning func_wall mover_target, 0 == none*/ extern const char* audioLogs[LOGCNT]; extern u32 gridCellStates[ARRSIZE]; extern double tWrnFinished[10];
+extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile; extern u16 fwParentOf[INSTANCE_COUNT];/*instance -> owning func_wall mover_target, 0 == none*/ extern const char* audioLogs[LOGCNT]; extern u32 gridCellStates[ARRSIZE];
 extern float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16]; extern V3 ressurectionLocations[]; extern void PlayTrack(TrackType,MusicType);
 typedef struct { V3 normal; float d; } FrustumPlane; extern FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
 typedef struct PngArena { u8*base,*cursor,*end; } PngArena; extern PngArena png_arena_main;

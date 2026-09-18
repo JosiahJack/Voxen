@@ -429,7 +429,7 @@ void Physics(float dt) {
             if (World.physSleep[i]) { if (nearAwake) World.physSleep[i]=0; } else if (!nearAwake && (ef & EF_GROUNDED)) { float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]); if (sp2 < 0.0025f && asp2 < 0.0025f) { World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; } }
         }
     }
-    if(World.invP1.radiationArea && World.instances[PLAYER1].radiation > 0.0f){AppendTextWarning(184,-1,-1,-T_WHITE,1);/*Radation Area*/}else{World.invP1.radiationArea=false; tWrnFinished[1]=0.0;} if(World.instances[PLAYER1].radiation > 0.1f){AppendTextWarning(185,-1,186,T_RED,2);/*Radiation poisoning ##LBP*/}else{World.instances[PLAYER1].radiation=0.0f; tWrnFinished[2]=0.0;}
+    if(World.invP1.radiationArea && World.instances[PLAYER1].radiation > 0.0f){AppendTextWarning(184,-1,-1,-T_WHITE,1);/*Radation Area*/}else{World.invP1.radiationArea=false; World.Sys_UI.tWrnFinished[1]=0.0;} if(World.instances[PLAYER1].radiation > 0.1f){AppendTextWarning(185,-1,186,T_RED,2);/*Radiation poisoning ##LBP*/}else{World.instances[PLAYER1].radiation=0.0f; World.Sys_UI.tWrnFinished[2]=0.0;}
 }
 
 void AddForce(u16 i, V3 f, bool imp) { if (imp) { World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f / vmax(World.mass[i],0.001f))); } else { World.instances[i].accumulatedForce = V3_AplusB(World.instances[i].accumulatedForce,f); } }

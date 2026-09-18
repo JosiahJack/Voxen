@@ -586,7 +586,9 @@ static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 5
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
 u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0; void AddHardwareToInventory(int,int),mp3_clear();
 // Init && Main
+void MFD_NewGame(void);
 __attribute__((cold)) void NewGame() { // Reset World States
+    CloseSearch(); MFD_NewGame(); World.invP1.currentSearchItem=U16_MAX;
     DualLog("Loading new game...\n"); RenderLoading("Loading new game...");
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
     for (int i=0;i<World.numLevels;++i) { World.worldMin_x[i] = levMins[i].x; World.worldMin_z[i] = levMins[i].y; World.voxMinCtrX[i] = World.worldMin_x[i] + VOXEL_HALF; World.voxMinCtrZ[i] = World.worldMin_z[i] + VOXEL_HALF; World.farPlane[i] = lFars[i]; World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f; }
