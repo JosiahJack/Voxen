@@ -1,24 +1,3 @@
-# Voxen UI TODO — Canvas render + interaction audit
-
-Source review:
-- `ui.c` (1825 lines, full read) — comments + `RenderUIImage` / `RenderTextL` / `RenderTextC` / `RenderTextR` calls.
-- `Tools/ui_layout.txt` (7842 lines; Canvas section `11–2143`, `2115` Canvas nodes parsed) — used as element inventory.
-- `~/ai-workspaces/Citadel/Assets/Scenes/CitadelScene.unity` (47 MB, 1588685 lines, 21382 `m_Name:`) — spot-confirmed hierarchy names and `m_MethodName:` onClick targets (e.g. `TeleportFX:907174`, `WepNameTextLH:895363`, `ClipBox:911584/933367`, `CloseFullmapButton:959369`, `OverloadButton:902384/9319251`, `AutomapFull:1090480`, `CyberSPrint:1088831`, `EMPStatic:1117628`, `VmailPlayer:1151708`, `MissionTimerT:1159355`, `BioMonitorContainer:1301887`, `StatusBar:1350628`, plus `ElevButtonClick`, `CloseElevatorPad:1070528`, `CloseKeycodePad:985612`, `AutomapZoomIn:1043390`, `ToggleSideTop:972081`, `OverloadEnergyClick:885532`, `LoadSecondaryAmmoType:1025654`, `OnVaporizeClick:892425`, `ApplyButtonClicked:837669`, `OnActivateClick:848333`, `MinigameStart_*`, `TabReset:437044`, `OpenMinigames:77135`, `TabButtonClick:857036`, etc.).
-
-Conventions applied:
-- `Image` element → needs `RenderUIImage`. `Text` → needs `RenderTextL/C/R` (Voxen uses almost exclusively `RenderTextL`; only `RenderTextC` is `ui.c:1809` status text; `RenderTextR` is never used).
-- `Button` element:
-  - If the Button node itself carries an `Image(...)` with a real sprite (`tex=908/899/950/951/1020-1024/1086/1087/keypad_*/puzzle_*/wire_node`, etc.) → needs **both** `RenderUIImage` (background) + `RenderText*` (child `Text`, if any) + interaction.
-  - If the Button has no `Image` (e.g. `PatchInventory/Button`, `ui_layout.txt:604`) or only a hitbox `Image(...,builtin-white)` / `Image(...,none)` with no distinct art (e.g. center weapon/grenade/general list rows, `SearchContentLH1-4`, `MinigameClose/MinigameBack` with `none`) → **must NOT** get a `RenderUIImage` per task rule; needs only child-`Text` render (if any) + interaction. These are marked “correctly omitted” below, not as missing.
-  - `RawImage` (automap, vmail video, biomonitor graph) has no 1:1 Voxen primitive; Voxen uses `RenderUIImage` placeholders (`tex 0` / `QUAD:none`). Treated as “needs a render call” and flagged where absent.
-- Shared code paths cover both sides: `SideMFD(isRH)` / `SideMFDHeader(isRH)` with `dx=isRH?1059:0` render LH+RH from one block; `CenterMFD`, `TickBar`, `TextWarnings` loop, `RenderConsumables`, etc. RH duplicates are therefore **not** double-counted — one entry notes “×2 (LH+RH)”.
-- `UNMAPPED:[...]` / `QUAD:builtin-white|builtin-knob|none` with `tex 0` in `ui.c` (e.g. elevator/keycode/puzzle/wire/minigame/EReader blocks) counts as a render call present, even though the texture id is still a placeholder.
-- Containers with no `Image`/`Text`/`Button`/`Slider`/`RawImage` (e.g. `MFDManager`, `TabsLH`, `TargetTabLH/RH`, `ButtonBank`, `Fill Area`, `Viewport`) need no render call and are omitted.
-
-Voxen interaction primitives searched: `HwBtnClick`, `UI_Button`, `UI_MenuButton`, `UI_MenuInteractable`, `UI_Slider`, `UI_Checkbox`, plus bespoke handlers (`WeaponSelectSlot`, `ConsumableSelect/Use`, `GeneralInvClick/Apply/Take`, `VaporizeClick`, `SearchTakeSlot/CloseSearch`, `MFD_SelectTab`, `ForceShootMode`).
-
----
-
 ## A — Missing render calls (`RenderUIImage` / `RenderTextL/C/R`)
 
 ### A1. Top-level Canvas FX / overlays / full-screen (all confirmed in Unity, none rendered in `ui.c`)
@@ -28,14 +7,14 @@ Voxen interaction primitives searched: `HwBtnClick`, `UI_Button`, `UI_MenuButton
 | `12 TeleportFX [OFF]` | `m_Name: TeleportFX` | Image `teleportstatic_red` | `RenderUIImage` |
 | `13 RadiationFX [OFF]` | present | Image `teleportstatic_white` | `RenderUIImage` |
 | `14 HealingFX [OFF]` | `m_Name: HealingFX` | Image (color, `none`) | `RenderUIImage` |
-| `15 ShieldFX [OFF]` | `m_Name: ShieldFX` | Image (color, `none`) | `RenderUIImage` |
+| `15 ShieldFX [OFF] (for damage take)` | `m_Name: ShieldFX` | Image (color, `none`) | `RenderUIImage` |
 | `16 ShieldActivation [OFF]` + `17 waveup` + `18 wavedn` | present | 2× Image `tex 1076` | 2× `RenderUIImage` |
 | `19 ShieldDeactivation [OFF]` + `20 waveup` + `21 wavedn` | present | 2× Image `tex 1076` | 2× `RenderUIImage` |
 | `22 Loading [OFF]` (Image black) | present | Image | `RenderUIImage` |
 | `23 LoadingText` | `m_Name: LoadingText` | Text `LOADING...` | `RenderTextL/C/R` |
 | `24 LoadingPercentText` | present | Text `0.00%` | `RenderTextL/C/R` |
 | `25 DeathRessurectionFX [OFF]` + `26 spawndelaycontainer (11)` + `28/30/32/34/36/38/40/42/44/46/48` (11 spawners, no visual — N/A) + `27 blackground` (Image black) | present | Image | `RenderUIImage` for `blackground` |
-| `29 Text 1 (1)`, `31 Text 1 (6)`, `33 Text 1 (2)`, `35 Text 1 (6)`, `37 Text 1 (7)`, `39 Text 1 (3)`, `41 Text 1 (6)`, `43 Text 1 (7)`, `45 Text 1 (4)`, `47 Text 1 (6)`, `49 Text 1 (5)` | present | 11× Text (resurrection sequence) | 11× `RenderTextL/C/R` |
+| `Ressurection Sequenced Text: 29 Text 1 (1)`, `31 Text 1 (6)`, `33 Text 1 (2)`, `35 Text 1 (6)`, `37 Text 1 (7)`, `39 Text 1 (3)`, `41 Text 1 (6)`, `43 Text 1 (7)`, `45 Text 1 (4)`, `47 Text 1 (6)`, `49 Text 1 (5)` | present | 11× Text | 11× `RenderTextL/C/R` |
 | `72 AutomapFull [OFF]` container N/A; `73 AutomapFullRawImage` | `m_Name: AutomapFullRawImage` | RawImage | `RenderUIImage` (no `SideMFD`/automap-full path renders it) |
 | `74 PlayerIconFull [OFF]` | `m_Name: PlayerIconFull` | Image `player_180` | `RenderUIImage` |
 | `75 CloseFullmapButton` + `76 Text CLOSE MAP` | `m_Name: CloseFullmapButton` | Button Image `908` (distinct) + Text | `RenderUIImage` + `RenderTextL/C/R` |
@@ -43,13 +22,9 @@ Voxen interaction primitives searched: `HwBtnClick`, `UI_Button`, `UI_MenuButton
 | `1443 EnergySurge [OFF]` | present | Image `944` | `RenderUIImage` |
 | `1444 HealthIndicatorCyber [OFF]` | present | Image `954` | `RenderUIImage` (cyberspace variant; only base `939/956` rendered) |
 | `1445 EnergyDrainText`, `1446 EnergyJPMText` | present | 2× Text (empty) | 2× `RenderTextL/C/R` |
-| `1514 EMPStatic`, `1515 PainStatic` | `m_Name: EMPStatic` | 2× Image `painstatic_*` | 2× `RenderUIImage` |
 | `1516 SightDimming` | present | Image `sightDimming` | `RenderUIImage` |
 | `1517 DeathFXContainer` N/A; `1518 DeathFX [OFF]` | `m_Name: DeathFXContainer` | Image (`none`) | `RenderUIImage` |
-| `2122 QuitBlank [OFF]` | present | Image black | `RenderUIImage` |
 | `2135 TouchEnterButton [OFF]` (under `2130 Console`) | present | Button Image `builtin-white` (distinct hitbox) + `Button->Pause.ConsoleEntryEnterDelegate()` | `RenderUIImage` (console text itself is rendered `ui.c:1808`; button bg is not) |
-
-Covered here (do not re-add): `ShootModeButton:59` (`RenderUIImage 1020`, `ui.c:1745`); `TextWarnings:60` + `WarningText (0-9):61-70` (loop `ui.c:1746-1748`); `MissionTimerT:77` + `MissionTimer:78` (placeholders `ui.c:1751-1752`, values static `"0"` — live timer still TODO); `CyberSPrint:1428` (`ui.c:1755`, static string); `BioMonitorContainer:1429` subtree (`Graph` placeholder `ui.c:1761` + 8 texts `ui.c:1762-1770`, values static); `EnergyIndicator:1441` + `HealthIndicator:1442` (`ui.c:232`); `VmailPlayer:1447` + 6 `Vmail*Video` RawImages (single `RenderUIImage vmailFrame`, `ui.c:1798` — shared path, covered); `SearchFXContainer:1454` + `SearchFXLH:1455`/`SearchFXRH:1456` (`RenderSearchFX`, `ui.c:614-634`); `StatusBar:2121` (`RenderTextC statusText`, `ui.c:1809`).
 
 ### A2. `WeaponTabLH/RH` — only name + icon rendered, rest missing (×2 LH+RH; layout `81-132` + RH mirror `1014-1065`; Unity `WepNameTextLH:895363`, `ClipBox:911584`, `EnergyHeatTicks:893739`, `EnergySlider:894318/1023523`, `OverloadButton:902384`, `ReloadNormalButton:1229770`)
 

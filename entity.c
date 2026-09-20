@@ -571,6 +571,7 @@ void LoadLevelMod(u8 lev) {
     if (World.instCount < INSTANCE_COUNT) {
         u16 wvi = World.instCount; mset(&World.instances[wvi],0,sizeof(Entity)); World.instances[wvi].entflags=EF_ACTIVE|EF_NO_SHADOWS; World.layer[wvi]=L_Default; World.instances[wvi].camView=255; World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
         World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAX_TXRS; World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.mass[wvi]=World.rotation[wvi].w=1.0f; World.dynamicFriction[wvi]=0.5f; World.staticFriction[wvi]=0.6f;
+        World.col[wvi]=COLTYPE_NONE; flag_set(&World.instances[wvi].entflags,EF_RIGIDBODY,false);
         World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; World.weaponVModelIndex=wvi; World.instCount++; DualLog("Weapon view model entity index: %u (level %d)\n",wvi,curlevel);
     }
     // Ad-hoc editmode selection text entity (based on text_decal 592): positioned at selected object, displays "index: #"

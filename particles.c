@@ -1,6 +1,6 @@
 // particles.c - CPU-simulated, GPU-instanced particle system for Voxen
 #include "common.h"
-extern u32 psysquadVAO,psysquadVBO,psysInstancesID,particleSP,psysTrailsID,trailSP; PSys psys = {0}; void PSys_SpawnTrail(V3 p0, V3 p1, u32 texIndex, u32 emitterIndex, float lifetime, float birth0);
+extern u32 psysquadVAO,psysquadVBO,psysInstancesID,particleSP,psysTrailsID,trailSP; PSys psys = {0}; GpuPartInst psysUploadBuffer[MAX_PARTICLES]; void PSys_SpawnTrail(V3 p0, V3 p1, u32 texIndex, u32 emitterIndex, float lifetime, float birth0);
 INLINE u32 pack_rgba8(float r, float g, float b, float a) { return (((u32)(vclamp(a,0,1.f)*255.0f + .5f)) << 24) | (((u32)(vclamp(b,0,1.f)*255.0f + .5f)) << 16) | (((u32)(vclamp(g,0,1.f)*255.0f + .5f)) << 8) | ((u32)(vclamp(r,0,1.f)*255.0f + .5f)); }
 INLINE void unpack_rgba8(u32 p, float* r, float* g, float* b, float* a) { *r = (float)((p >> 0) & 0xFF)/255.0f; *g = (float)((p >> 8) & 0xFF)/255.0f; *b = (float)((p >> 16) & 0xFF)/255.0f; *a = (float)((p >> 24) & 0xFF)/255.0f; }
 INLINE u32 ColorToU32(Color c) { return pack_rgba8(c.r, c.g, c.b, c.a); }
@@ -47,7 +47,7 @@ void PSys_Simulate(float dt) {
 
 INLINE int sort_cmp(const void* a, const void* b) { u32 ka = ((const PartSortEntry*)a)->sortKey; u32 kb = ((const PartSortEntry*)b)->sortKey; return (ka > kb) - (ka < kb); }
 void PSys_Sort(void) { if (psys.aliveCount > 1) { qsort_new(psys.sortKeys, psys.aliveCount, sizeof(PartSortEntry), sort_cmp); } }
-void PSys_Upload(void) {if(psys.aliveCount==0){return;} GpuPartInst* s=OS_AllocScratch(psys.aliveCount*sizeof(GpuPartInst)); for(u32 i=0;i<psys.aliveCount;++i){s[i]=psys.gpuInstances[psys.sortKeys[i].index];} glBindBuffer(GL_SSBO, psysInstancesID); glBufferSubData(GL_SSBO,0,psys.aliveCount*sizeof(GpuPartInst),s);}
+void PSys_Upload(void) {if(psys.aliveCount==0){return;} GpuPartInst* s=psysUploadBuffer; for(u32 i=0;i<psys.aliveCount;++i){s[i]=psys.gpuInstances[psys.sortKeys[i].index];} glBindBuffer(GL_SSBO, psysInstancesID); glBufferSubData(GL_SSBO,0,psys.aliveCount*sizeof(GpuPartInst),s);}
 static V3 trailSortCam;
 void PSys_SpawnTrail(V3 p0, V3 p1, u32 texIndex, u32 emitterIndex, float lifetime, float birth0) {
     if(psys.trailCount >= MAX_TRAIL_SEGS){return;} TrlSegInst* seg=&psys.trailSegments[psys.trailCount++]; float now=(float)World.pauseRelativeTime;

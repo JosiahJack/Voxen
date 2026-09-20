@@ -135,7 +135,7 @@ enum {/*Culling*/ WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, AR
       /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS),REV_BUF_LEN=110251/*~2.5s @ 44100; prime*/,MAXAMB=256,
       /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
                T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_BUFFER_SIZE=1024, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
-      /*UI*/ MFD_READER_CONTENTS=0,MFD_READER_FOLDER=1,MFD_READER_TEXT=2,MAX_UI_ELEMENTS=4096,
+      /*UI*/ UI_W=1366,UI_H=768,CURSOR_SZ=40,MFD_READER_CONTENTS=0,MFD_READER_FOLDER=1,MFD_READER_TEXT=2,MAX_UI_ELEMENTS=4096,TXT_PAD=4,TXT_H=24,TAB_THICK=16,MFD_SPACING=8,MFD_SPACINGCTR=19,SIDE_MFD_W=320,SIDE_MFD_H=240,CTR_MFD_W=640,CTR_MFD_H=184,UI_AUTOMAP_ZOOM_IN=0,UI_AUTOMAP_ZOOM_OUT=1,UI_AUTOMAP_FULL=2,UI_AUTOMAP_SIDE=3,
       /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
       /*Rendering*/ BLEND_OPAQUE=0,BLEND_CUTOUT=1,BLEND_PREMULT=2,BLEND_MULTIPLY=3,PARTICLE_FLAG_ADDITIVE=(1u<<0),PARTICLE_FLAG_SOFT=(1u<<1),PARTICLE_FLAG_LIT=(1u<<2),PARTICLE_FLAG_MULTIPLY=(1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE=(1u<<4),PARTICLE_FLAG_PHYSICS=(1u<<5),PARTICLE_FLAG_TRAIL=(1u<<6),MAX_PARTICLES=20480,MAX_EMITTERS=18,MAX_TRAIL_SEGS=4096,PARTICLE_SSBO_BINDING=10,TRAIL_SSBO_BINDING=11};
 u32 parse_numberu32(const char*, const char*,u32); u16 parse_numberu16(const char*, const char*,u32); u8 parse_numberu8(const char*, const char*,u32); bool parse_bool(const char*, const char*,u32);
@@ -186,6 +186,20 @@ typedef struct {
         u8 MFD_LefTab,MFD_CenterTab,MFD_RightTab,MFD_DataL,MFD_DataR,MFD_MediaTab,MFD_ReaderView,mfdSelected[3],mfdReturnTab[3],mfdReturnView[3],mfdItemReader[2];
         u8 mfdConsumable; i8 consumableClickRow; double consumableClickTime; bool mfdGeneralItem; i8 generalClickSlot; i16 generalClickItem; u16 generalClickCustom; double generalClickTime;
         i32 tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10]; double tWrnFinished[10];
+        /*Keycode pad (Unity KeypadKeycode). keycodeHuns/Tens/Ones: -1 = empty, else that digit; keycodeEntry accumulates right-to-left. keycodeValid/keycodeSolved/keycodeValue mirror the linked pad (tetheredKeypadKeycode).*/
+        i8 keycodeHuns,keycodeTens,keycodeOnes; i32 keycodeEntry,keycodeValue; bool keycodeValid,keycodeSolved;
+        /*Grid puzzle (Unity PuzzleGrid). tetheredPGP links the source puzzle; pg_* mirror its cells so the panel can run standalone. pg_cell[] = electrical grid, pg_type[] per-cell kind.*/
+        u8 pg_type[35],pg_gridType,pg_source,pg_output,pg_width,pg_height; bool pg_cell[35],pg_powered[35],pg_checked[35],pg_solved; float pg_progress;
+        /*Wire puzzle (Unity PuzzleWire). pw_curL/R[7] = wire endpoints by column, pw_tgtL/R[7] = goal columns, pw_wireOn[7] = placed wires.*/
+        i8 pw_curL[7],pw_curR[7],pw_tgtL[7],pw_tgtR[7]; bool pw_wireOn[7]; i8 pw_selectedWire; bool pw_selectedWireRH,pw_solved; float pw_temp;
+        /*Minigames (Funpack). mg_current: 0 Ping..8 Chess, -1 = none. mg_running/mg_solved are per side the games view sits on.*/
+        i8 mg_current; bool mg_running[2],mg_solved[2];
+        /*E-reader folder/reader. logFolderList[] caches the open level folder, email table or data table; logReferenceIndex is the entry on screen.*/
+        i16 logFolderList[16]; u8 logFolderCount; u16 logReferenceIndex; i16 logReaderPage;
+        /*Automap. autoZoom[2] 0..2 (0 = closest), autoSide[2] LH map / RH map.*/
+        u8 autoZoom[2]; bool autoSide[2],fullMapOpen[2];
+        /*Sensaround rearview overlay (TODO: SensaroundCenter render).*/
+        bool showSensaroundCenter;
 } SystemUI;
 typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
 extern TextSystem Sys_Text;
