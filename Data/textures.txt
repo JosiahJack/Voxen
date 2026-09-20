@@ -4577,3 +4577,6 @@ index: 2144
 index: 2145
 #Textures/UI/puzzle/wire_node.png
 index: 2146
+#Textures/UI/cursors/cursor_normal_dn.png
+index: 2147
+transparent: 1

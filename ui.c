@@ -12,7 +12,7 @@ typedef enum{UI_ID_NONE,
     UI_ID_CMFD_PATCH_USE_0,UI_ID_CMFD_PATCH_USE_6=UI_ID_CMFD_PATCH_USE_0+6,UI_ID_CMFD_PATCH_ROW_0,UI_ID_CMFD_PATCH_ROW_6=UI_ID_CMFD_PATCH_ROW_0+6,UI_ID_CMFD_HARDWARE_HEADER,UI_ID_CMFD_HARDWARE_ROW_0,UI_ID_CMFD_HARDWARE_ROW_11=UI_ID_CMFD_HARDWARE_ROW_0+11,UI_ID_CMFD_GENERAL_HEADER,UI_ID_CMFD_GENERAL_USE_0,UI_ID_CMFD_GENERAL_USE_13=UI_ID_CMFD_GENERAL_USE_0+13,UI_ID_CMFD_GENERAL_ROW_0,UI_ID_CMFD_GENERAL_ROW_13=UI_ID_CMFD_GENERAL_ROW_0+13,UI_ID_CMFD_SOFTWARE_HEADER,UI_ID_CMFD_SOFTWARE_ROW_0,UI_ID_CMFD_SOFTWARE_ROW_6=UI_ID_CMFD_SOFTWARE_ROW_0+6,
     UI_ID_CMFD_MEDIA_HEADER,UI_ID_CMFD_LOG_TABLE_0,UI_ID_CMFD_LOG_TABLE_9=UI_ID_CMFD_LOG_TABLE_0+9,UI_ID_CMFD_LOG_ENTRY_0,UI_ID_CMFD_LOG_ENTRY_14=UI_ID_CMFD_LOG_ENTRY_0+14,UI_ID_CMFD_LOG_TEXT,UI_ID_CMFD_LOG_MORE,UI_ID_CMFD_LOG_BACK,UI_ID_CMFD_EMAIL_ENTRY_0,UI_ID_CMFD_EMAIL_ENTRY_14=UI_ID_CMFD_EMAIL_ENTRY_0+14,UI_ID_CMFD_DATA_ENTRY_0,UI_ID_CMFD_DATA_ENTRY_12=UI_ID_CMFD_DATA_ENTRY_0+12,UI_ID_CMFD_NOTE_TOGGLE_0,UI_ID_CMFD_NOTE_TOGGLE_17=UI_ID_CMFD_NOTE_TOGGLE_0+17,
     /*Misc overlays*/UI_ID_CMFD_MISSION_TIMER,UI_ID_CMFD_CYBER_TIMER,UI_ID_CMFD_BIOMONITOR,UI_ID_CMFD_EDIT_PANEL,UI_ID_CMFD_EDIT_ROW_0,UI_ID_CMFD_EDIT_ROW_14=UI_ID_CMFD_EDIT_ROW_0+14,UI_ID_VMAIL_VIEWER,UI_ID_SENSA_CTR,UI_ID_SENSA_LH,UI_ID_SENSA_RH,
-    UI_MFD_IDS(LMFD),UI_MFD_IDS(RMFD),UI_ID_COUNT,
+    UI_MFD_IDS(LMFD),UI_ID_SIDEMFD_PAD,UI_MFD_IDS(RMFD),UI_ID_COUNT,
 } UIRegionID;
 #define UI_MFD_STRIDE (UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON)
 #define MID(rh,n) ((u32)UI_ID_LMFD_##n+((rh)?(u32)UI_MFD_STRIDE:0u))/*Mirror an LMFD id onto whichever side we are drawing*/
@@ -21,7 +21,7 @@ typedef enum{UI_ID_NONE,
 #define UI_KEY_BACKSPACE 10
 #define UI_KEY_CLEAR 11
 INLINE bool CursorIsOverBounds(float x0, float x1, float y0, float y1) { return World.cursorPos_x >= x0 && World.cursorPos_x <= x1 && World.cursorPos_y >= y0 && World.cursorPos_y <= y1;/*0,0=top left*/ }
-INLINE void UIR(u32 id, i16 x, i16 y, i16 w, i16 h) { if (!id) return; World.uiComponents[id].min=(V2){(float)x,(float)y}; World.uiComponents[id].max=(V2){(float)(x+w),(float)(y+h)}; World.uiComponents[id].initialized=World.uiComponents[id].active=true; }
+INLINE void UIR(u32 id, i16 x, i16 y, i16 w, i16 h){if(!id)return; if(!World.uiComponents[id].initialized){World.uiComponents[id].min=(V2){(float)x,(float)y}; World.uiComponents[id].max=(V2){(float)(x+w),(float)(y+h)}; World.uiComponents[id].initialized=true;} World.uiComponents[id].active=true;}
 INLINE void UIRImg(u32 id, i16 x, i16 y, i16 w, i16 h, u16 tex) { UIR(id,x,y,w,h); RenderUIImage(x,y,w,h,tex); }
 INLINE i16 UITextW(const char* t, float sc, i16 maxW) { float w=MeasureLineAdvance(t,FONT_NORMAL)*sc; if (w<1.0f) w=1.0f; return (maxW>0 && w>(float)maxW) ? maxW : (i16)w; }
 INLINE void UIRText(u32 id, i16 x, i16 y, u32 col, u8 font, float sc, i16 maxW, const char* t) { UIR(id,x,y,UITextW(t,sc,maxW),(i16)(22.0f*sc)); RenderTextL(x,y,col,font,sc,"%s",t); }
@@ -404,12 +404,12 @@ void ConsumableSetTimer(float fraction) {
 void RenderConsumableItem(bool isRH) {
     int row=ConsumableSelectedRow(); bool patch=World.Sys_UI.mfdConsumable==2; if (row<0 || !ConsumableCount(patch,row)) return;
     i16 dx=isRH?1059:0; int item=ConsumableItem(patch,row); const char* text=Sys_Text.stringTable[item+326];
-    UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.6f,260,text);
+    UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,text);
     u16 tex=GetItemFrobTexture(item+307); if (tex<MAX_TXRS) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
-    UIRImg(MID(isRH,ITEM_USE),dx+72,691,160,40,1087); RenderTextL(dx+72,691,T_GREEN_MENU,FONT_NORMAL,0.6f,"%s",Sys_Text.stringTable[736]);
+    UIRImg(MID(isRH,ITEM_USE),dx+72,691,160,40,1087); RenderTextL(dx+72,691,T_GREEN_MENU,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[736]);
     if (!patch && row>=5) {
         float min=row==5?2.0f:4.0f,value=row==5?World.invP1.nitroTimeSetting:World.invP1.earthShakerTimeSetting;
-        UIR(MID(isRH,ITEM_TIMER_VALUE),dx+112,626,58,20); RenderTextL(dx+112,626,T_GREEN,FONT_NORMAL,0.6f,"%.1f",(double)value);
+        UIR(MID(isRH,ITEM_TIMER_VALUE),dx+112,626,58,20); RenderTextL(dx+112,626,T_GREEN,FONT_NORMAL,0.8f,"%.1f",(double)value);
         UIRImg(MID(isRH,ITEM_TIMER_SLIDER),dx+40,650,224,24,1087); RenderUIImage(dx+40+(i16)(204.0f*vclamp((value-min)/(60.0f-min),0.0f,1.0f)),652,20,20,1086);
     }
 }
@@ -418,22 +418,21 @@ void RenderGeneralItem(bool isRH) {
     if (World.Sys_UI.mfdConsumable) { RenderConsumableItem(isRH); return; }
     if (!World.Sys_UI.mfdGeneralItem) return;
     int slot=World.invP1.generalInvCurrent,item=GeneralInvItem(slot); if (item<0) return;
-    i16 dx=isRH?1059:0; float width=MeasureLineAdvance(GeneralInvLabel(slot),FONT_NORMAL),scale=width>0?vmin(0.6f,260.0f/width):0.6f;
-    UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,scale,260,GeneralInvLabel(slot));
+    i16 dx=isRH?1059:0; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,GeneralInvLabel(slot));
     u16 tex=GetItemFrobTexture((u16)(item+307));
     if (item>=92 && item<=94) { static const u8 heads[19]={37,11,32,1,7,9,10,12,13,14,15,17,25,27,28,31,33,35,36}; u16 custom=World.invP1.generalInvCustIdx[slot]; tex=(u16)(1272+heads[custom<19?custom:0]); }
     if (tex<MAX_TXRS) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
     if (!slot) {
         i16 x=dx+36,y=638;
         for (int card=ACC_Std;card<=ACC_Per5;++card) if (InventoryHasAccessCard((AccCardType)card)) {
-            const char* code=AccessCardCodeForType((AccCardType)card); float w=MeasureLineAdvance(code,FONT_NORMAL)*0.6f;
+            const char* code=AccessCardCodeForType((AccCardType)card); float w=MeasureLineAdvance(code,FONT_NORMAL)*0.8f;
             if (x+w>dx+280) { x=dx+36; y+=20; }
-            RenderTextL(x,y,T_YELLOW,FONT_NORMAL,0.6,"%s",code); x+=(i16)(w+8);
+            RenderTextL(x,y,T_YELLOW,FONT_NORMAL,0.8,"%s",code); x+=(i16)(w+8);
         }
         UIR(MID(isRH,ITEM_ACCESS_CARDS),dx+36,638,244,(i16)((y+20)-638));/*One region over the whole wrapped card block; the codes are display only*/
     } else if (GeneralInvCanUse(slot) || GeneralInvCanVaporize(slot)) {
         bool use=GeneralInvCanUse(slot); i16 y=use?691:628;
-        UIRImg(use?MID(isRH,ITEM_USE):MID(isRH,ITEM_VAPORIZE),dx+72,y,160,40,1087); RenderTextL(dx+72,y,T_GREEN_MENU,FONT_NORMAL,0.6,"%s",Sys_Text.stringTable[use?736:883]);
+        UIRImg(use?MID(isRH,ITEM_USE):MID(isRH,ITEM_VAPORIZE),dx+72,y,160,40,1087); RenderTextL(dx+72,y,T_GREEN_MENU,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[use?736:883]);
     }
 }
 void UpdateSearchTether(void),CloseSearch(void); bool SearchTakeSlot(u8 slot);
@@ -462,16 +461,16 @@ void RenderSearch(bool isRH) {
         case 465: case 466: case 467: case 468: case 469: case 470: case 471: label=897; break;
         case 472: case 473: case 474: case 475: case 476: label=899; break;
     }
-    if (label) UIRText(MID(isRH,SEARCH_NAME),dx+34,536,T_YELLOW,FONT_NORMAL,0.6f,260,Sys_Text.stringTable[label]);
-    else if (IdxIsNPC(e->index)) UIRText(MID(isRH,SEARCH_NAME),dx+34,536,T_YELLOW,FONT_NORMAL,0.6f,260,npcTable[e->index-419].name);
+    if (label) RenderTextL(dx+34,536,T_YELLOW,FONT_NORMAL,0.8f,Sys_Text.stringTable[label]);
+    else if (IdxIsNPC(e->index)) RenderTextL(dx+34,536,T_YELLOW,FONT_NORMAL,0.8f,npcTable[e->index-419].name);
     bool any=false;
     for (u8 slot=0;slot<4;++slot) {
         i16 item=e->contents[slot]; if (item<0 || item>110) continue;
         any=true; u16 tex=GetItemFrobTexture((u16)(item+307));
         if (tex<MAX_TXRS) UIRImg(MID(isRH,SEARCH_ICON_0)+slot,(i16)(dx+84+90*(slot&1)),(i16)(584+90*(slot>>1)),64,64,tex);
     }
-    if (!any) UIRText(MID(isRH,SEARCH_EMPTY),dx+24,633,T_YELLOW,FONT_NORMAL,0.6f,260,Sys_Text.stringTable[891]);
-    UIRImg(MID(isRH,SEARCH_CLOSE),dx+259,isRH?528:534,29,29,899); RenderTextL(dx+259,isRH?531:534,T_STOPD_RED,FONT_NORMAL,0.6,"X");
+    if (!any) RenderTextL(dx+24,633,T_YELLOW,FONT_NORMAL,0.8f,Sys_Text.stringTable[891]);
+    UIRImg(MID(isRH,SEARCH_CLOSE),dx+259,isRH?528:534,29,29,899); RenderTextL(dx+259,isRH?531:534,T_STOPD_RED,FONT_NORMAL,0.8,"X");
 }
 
 static const i16 elevBtnY[4]={578,620,663,705}; static const char* elevBtnLabel[8]={"R","1","2","3","6","7","8","9"};/*TODO drive off elevFloorLabels[] + the linked elevator's floor set instead of this fixed strip*/
@@ -491,61 +490,61 @@ void SideMFD(bool isRH) { // 320x240
             i16 slot=World.invP1.weaponCurrent; if (slot>=0 && slot<7) { i32 widx=World.invP1.weaponInventoryIndices[slot]; if (widx >= 0) {UIRText(MID(isRH,WEAPON_NAME),isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W+TXT_PAD : TAB_THICK+MFD_SPACING+TXT_PAD,520,T_RED,FONT_NORMAL,0.8f,270,Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16) UIRImg(MID(isRH,WEAPON_ICON),isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIcon*/} }
         } else if (tab == 2 && World.Sys_UI.mfdItemReader[isRH]) {
             i16 x=isRH?1080:TAB_THICK+MFD_SPACING; static const u16 labels[4]={42,39,43,885};
-            UIRText(MID(isRH,MEDIA_HEADER),x+6,540,T_YELLOW,FONT_NORMAL,0.6f,260,Sys_Text.stringTable[349]);
+            UIRText(MID(isRH,MEDIA_HEADER),x+6,540,T_YELLOW,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[349]);
             for (u8 section=0;section<4;++section) { if (section==MM_NOTES && !World.diffMis) continue;
                 bool sectionSelected=World.Sys_UI.MFD_MediaTab==section,unread=World.Sys_UI.highlightStatus[section];
-                UIRImg(MID(isRH,MEDIA_TAB_0)+section,(i16)(x+65*section),718,65,40,sectionSelected||unread?1087:1086); RenderTextL(x+65*section,718,sectionSelected?T_GREEN_MENU:T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"%s",Sys_Text.stringTable[labels[section]]);
+                UIRImg(MID(isRH,MEDIA_TAB_0)+section,(i16)(x+65*section),718,65,40,sectionSelected||unread?1087:1086); RenderTextL(x+65*section,718,sectionSelected?T_GREEN_MENU:T_GREEN_MENU_SHADOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[labels[section]]);
             }
         } else if (tab == 3) {/*AutomapTab: AutomapMask, Overlays, PlayerIcon, ZoomIn/Out/Full/Side Buttons - TODO not ported*/ }
         else if (tab==2 && !World.Sys_UI.mfdItemReader[isRH?1:0]) RenderGeneralItem(isRH);
         else if(tab==4){/*DataTab*/
             u8 data = isRH ? World.Sys_UI.MFD_DataR : World.Sys_UI.MFD_DataL; i16 dx = isRH ? 1059 : 0;
-            if (data==8) {/*Blocked by SHODAN level security*/ UIRImg(UI_ID_NONE,31+dx,535,227,209,1110); UIRText(MID(isRH,BLOCKED_SECURITY_TEXT),45+dx,542,T_YELLOW,FONT_NORMAL,0.6f,0,890<1100?Sys_Text.stringTable[890]:"Blocked by SHODAN level Security."); }
+            if (data==8) {/*Blocked by SHODAN level security*/ UIRImg(UI_ID_NONE,31+dx,535,227,209,1110); UIRText(MID(isRH,BLOCKED_SECURITY_TEXT),45+dx,542,T_YELLOW,FONT_NORMAL,0.8f,0,890<1100?Sys_Text.stringTable[890]:"Blocked by SHODAN level Security."); }
             if (data==1) {/*Elevator*/
                 UIRImg(MID(isRH,ELEV_FLOOR_INDICATOR),132+dx,531,32,32,929);/*CurrentFloorIndicator*/
                 for (u8 b=0;b<2;++b) { i16 ex=(i16)(86+78*b+dx); RenderUIImage(ex,578,45,168,0);/*ButtonBank QUAD:builtin-knob*/
                     for (u8 i=0;i<4;++i) { u8 f=(u8)(b*4+i); i16 ey=elevBtnY[i]; UIRImg(MID(isRH,ELEV_BUTTON_0)+f,ex,ey,45,39,(i==0||i==3)?2133:2135);/*keypad_end / keypad_mid*/
-                        RenderUIImage((i16)(ex+2),(i16)(ey+4),40,34,2134);/*keypad_inner_on*/ RenderTextL((i16)(ex+3),(i16)(ey+2),T_GREEN,FONT_NORMAL,0.6,"%s",elevBtnLabel[f]); } }
-                UIRImg(MID(isRH,ELEV_CLOSE),246+dx,528,29,29,899); RenderTextL(246+dx,528,T_STOPD_RED,FONT_NORMAL,0.6,"X");
+                        RenderUIImage((i16)(ex+2),(i16)(ey+4),40,34,2134);/*keypad_inner_on*/ RenderTextL((i16)(ex+3),(i16)(ey+2),T_GREEN,FONT_NORMAL,0.8,"%s",elevBtnLabel[f]); } }
+                UIRImg(MID(isRH,ELEV_CLOSE),246+dx,528,29,29,899); RenderTextL(246+dx,528,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==2) {/*Keycode pad*/
                 for (u8 i=0;i<12;++i) { i16 kx=(i16)(keyBtnX[i%3]+dx),ky=keyBtnY[i/3]; UIRImg(MID(isRH,KEYCODE_0)+keyBtnK[i],kx,ky,42,38,2133);/*keypad_end*/
-                    RenderUIImage((i16)(kx+2),(i16)(ky+3),38,35,2134);/*keypad_inner_on*/ RenderTextL((i16)(kx-6),(i16)(ky-5),T_GREEN,FONT_NORMAL,0.6,"%s",keyBtnLabel[i]); }
+                    RenderUIImage((i16)(kx+2),(i16)(ky+3),38,35,2134);/*keypad_inner_on*/ RenderTextL((i16)(kx-6),(i16)(ky-5),T_GREEN,FONT_NORMAL,0.8,"%s",keyBtnLabel[i]); }
                 for (u8 d=0;d<3;++d) UIRImg(MID(isRH,KEYCODE_DIGIT_0)+d,(i16)(90+41*d+dx),526,32,32,2132);/*Hundreds/Tens/Ones elnum_null*/
-                UIRImg(MID(isRH,KEYCODE_CLOSE),255+dx,525,29,29,899); RenderTextL(255+dx,525,T_STOPD_RED,FONT_NORMAL,0.6,"X");
+                UIRImg(MID(isRH,KEYCODE_CLOSE),255+dx,525,29,29,899); RenderTextL(255+dx,525,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==5) RenderSearch(isRH);
             if (data==6) {/*AudioLog*/
                 UIRImg(MID(isRH,AUDIOLOG_IMAGE),20+dx,528,263,240,1272);/*LogImage*/
-                UIRText(MID(isRH,AUDIOLOG_NAME),29+dx,540,T_YELLOW,FONT_NORMAL,0.6f,0,"HACKER IS AWESOME"); UIRText(MID(isRH,AUDIOLOG_SENDER),29+dx,557,T_YELLOW,FONT_NORMAL,0.6f,0,"Sender: SHODAN");
-                UIR(MID(isRH,AUDIOLOG_SUBJECT),29+dx,701,(i16)(MeasureLineAdvance("Subject:",FONT_NORMAL)*0.6f),(i16)(3*22.0f*0.6f)); RenderTextL(29+dx,701,T_YELLOW,FONT_NORMAL,0.6,"Subject:\n\nif only i had a sparq beam then all the world would be right");
+                UIRText(MID(isRH,AUDIOLOG_NAME),29+dx,540,T_YELLOW,FONT_NORMAL,0.8f,0,"HACKER IS AWESOME"); UIRText(MID(isRH,AUDIOLOG_SENDER),29+dx,557,T_YELLOW,FONT_NORMAL,0.8f,0,"Sender: SHODAN");
+                UIR(MID(isRH,AUDIOLOG_SUBJECT),29+dx,701,(i16)(MeasureLineAdvance("Subject:",FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(29+dx,701,T_YELLOW,FONT_NORMAL,0.8,"Subject:\n\nif only i had a sparq beam then all the world would be right");
             }
             if (data==3) {/*GridPuzzle*/
                 RenderUIImage(42+dx,555,221,163,2139);/*OuterColorBorder gridcontainer_gray*/ RenderUIImage(46+dx,558,214,157,2138);/*ContainerEdge gridcontainer*/
                 UIRImg(MID(isRH,PUZZLE_NODE_SOURCE),25+dx,621,29,29,2141); UIRImg(MID(isRH,PUZZLE_NODE),250+dx,621,29,29,2140);
-                for (u8 c=0;c<35;++c) { i16 cx=(i16)(puzCellX[c%7]+dx),cy=puzCellY[c/7]; UIRImg(MID(isRH,PUZZLE_CELL_0)+c,cx,cy,29,29,2137);/*grid1_base*/ RenderTextL(cx,cy,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.6,"?"); RenderUIImage(cx,cy,29,29,2136);/*geniusgrid_highlight*/ }
+                for (u8 c=0;c<35;++c) { i16 cx=(i16)(puzCellX[c%7]+dx),cy=puzCellY[c/7]; UIRImg(MID(isRH,PUZZLE_CELL_0)+c,cx,cy,29,29,2137);/*grid1_base*/ RenderTextL(cx,cy,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.8,"?"); RenderUIImage(cx,cy,29,29,2136);/*geniusgrid_highlight*/ }
                 RenderUIImage(42+dx,720,221,26,2139);/*ProgressContainer*/ RenderUIImage(45+dx,726,225,13,0);/*Background QUAD:builtin-knob*/ RenderUIImage(48+dx,726,6,13,2142);/*Fill puzzlesliderwire*/
                 UIRImg(MID(isRH,PUZZLE_SLIDER),45+dx,720,225,26,1078);/*Handle - the whole bar is the drag region*/
-                UIRImg(MID(isRH,PUZZLE_CLOSE),259+dx,527,29,29,899); RenderTextL(259+dx,527,T_STOPD_RED,FONT_NORMAL,0.6,"X");
+                UIRImg(MID(isRH,PUZZLE_CLOSE),259+dx,527,29,29,899); RenderTextL(259+dx,527,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==4) {/*WirePuzzle*/
                 RenderUIImage(82+dx,570,139,192,2143);/*ContainerCenter wire_center*/ RenderUIImage(34+dx,521,235,44,2144);/*LevelsBox*/ RenderUIImage(40+dx,526,235,34,0);/*Background*/ RenderUIImage(43+dx,526,6,34,2142);/*Fill*/
                 UIRImg(MID(isRH,WIRE_SLIDER),40+dx,509,235,69,1078);/*Handle - whole levels box drags*/ UIRImg(MID(isRH,WIRE_TARGET),204+dx,522,66,42,2145);/*TargetLine*/
                 for (u8 n=0;n<14;++n) { i16 nx=(i16)((n<7?57:222)+dx),ny=wireNodeY[n%7]; UIRImg(MID(isRH,WIRE_NODE_0)+n,nx,ny,26,29,2146);/*wire_node*/ RenderUIImage((i16)(nx+4),(i16)(ny+6),16,16,0);/*SelectedIndicator*/ RenderUIImage((i16)(nx+1),(i16)(ny+3),22,22,0);/*GeniusHint*/ }
-                UIRImg(MID(isRH,WIRE_CLOSE),259+dx,736,29,29,899); RenderTextL(259+dx,736,T_STOPD_RED,FONT_NORMAL,0.6,"X");
+                UIRImg(MID(isRH,WIRE_CLOSE),259+dx,736,29,29,899); RenderTextL(259+dx,736,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==7) {/*SysAnalyzer*/
-                UIRText(MID(isRH,SYS_HEADER),24+dx,523,T_YELLOW,FONT_NORMAL,0.6f,0,892<1100?Sys_Text.stringTable[892]:"SYSTEM ANALYZER");
-                for (u8 r=0;r<11;++r) { UIRText(MID(isRH,SYS_DESC_0)+r,24+dx,sysRows[r].y,T_GREEN,FONT_NORMAL,0.6f,0,sysRows[r].d); UIRText(MID(isRH,SYS_VAL_0)+r,180+dx,sysRows[r].y,T_GREEN,FONT_NORMAL,0.6f,0,sysRows[r].v); }/*TODO values are placeholders, hook to level state*/
-                UIRImg(MID(isRH,SYS_CLOSE),259+dx,527,29,29,899); RenderTextL(259+dx,527,T_STOPD_RED,FONT_NORMAL,0.6,"X");
+                UIRText(MID(isRH,SYS_HEADER),24+dx,523,T_YELLOW,FONT_NORMAL,0.8f,0,892<1100?Sys_Text.stringTable[892]:"SYSTEM ANALYZER");
+                for (u8 r=0;r<11;++r) { UIRText(MID(isRH,SYS_DESC_0)+r,24+dx,sysRows[r].y,T_GREEN,FONT_NORMAL,0.8f,0,sysRows[r].d); UIRText(MID(isRH,SYS_VAL_0)+r,180+dx,sysRows[r].y,T_GREEN,FONT_NORMAL,0.8f,0,sysRows[r].v); }/*TODO values are placeholders, hook to level state*/
+                UIRImg(MID(isRH,SYS_CLOSE),259+dx,527,29,29,899); RenderTextL(259+dx,527,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==9) {/*Minigames*/
-                RenderUIImage(21+dx,501,262,262,1025);/*MinigamesContainer*/ UIRText(MID(isRH,MINIGAMES_HEADER),28+dx,503,T_RED,FONT_NORMAL,0.6f,0,"TRIOPTIMUM FUNPACK");
-                for (u8 g=0;g<9;++g) { UIRImg(MID(isRH,MINIGAME_0)+g,(i16)(mgX[g]+dx),mgY[g],115,24,0);/*QUAD:builtin-white*/ RenderTextL((i16)(mgX[g]+5+dx),(i16)(mgY[g]+1),T_GREEN,FONT_NORMAL,0.6,"%s",mgName[g]); }
-                UIR(MID(isRH,MINIGAMES_FOOTER),97+dx,726,(i16)(MeasureLineAdvance("Don't Play on",FONT_NORMAL)*0.6f),(i16)(3*22.0f*0.6f)); RenderTextL(97+dx,726,T_RED,FONT_NORMAL,0.6,"Don't Play on\n\nCompany Time");
+                RenderUIImage(21+dx,501,262,262,1025);/*MinigamesContainer*/ UIRText(MID(isRH,MINIGAMES_HEADER),28+dx,503,T_RED,FONT_NORMAL,0.8f,0,"TRIOPTIMUM FUNPACK");
+                for (u8 g=0;g<9;++g) { UIRImg(MID(isRH,MINIGAME_0)+g,(i16)(mgX[g]+dx),mgY[g],115,24,0);/*QUAD:builtin-white*/ RenderTextL((i16)(mgX[g]+5+dx),(i16)(mgY[g]+1),T_GREEN,FONT_NORMAL,0.8,"%s",mgName[g]); }
+                UIR(MID(isRH,MINIGAMES_FOOTER),97+dx,726,(i16)(MeasureLineAdvance("Don't Play on",FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(97+dx,726,T_RED,FONT_NORMAL,0.8,"Don't Play on\n\nCompany Time");
                 UIRImg(MID(isRH,MINIGAME_VIEW),21+dx,501,262,262,0);/*MinigameView QUAD:none*/
                 UIRImg(MID(isRH,MINIGAME_CLOSE),259+dx,502,22,22,899); UIRImg(MID(isRH,MINIGAME_BACK),259+dx,502,22,22,899);/*TODO back/close share the corner; only one is live at a time*/
-                RenderTextL(30+dx,545,T_WHITE,FONT_NORMAL,0.6,"PUZZLE SOLVED!"); RenderTextL(91+dx,710,T_WHITE,FONT_NORMAL,0.6,"YOU LOSE");
+                RenderTextL(30+dx,545,T_WHITE,FONT_NORMAL,0.8,"PUZZLE SOLVED!"); RenderTextL(91+dx,710,T_WHITE,FONT_NORMAL,0.8,"YOU LOSE");
             }
         }
     }
@@ -559,7 +558,7 @@ void CenterMFD() { //640x240
     if (Cheats.noHUD) return;
     static const i16 centerX[4]={400,480,560,902};
     for (u8 i=0;i<4;++i) UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.MFD_CenterTab!=5) ? 1024 : 1021);/*Main/Hardware/General/Software center tab buttons*/
-    if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,460,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,528,676,240,1075); RenderTextL(586,528,T_GREEN,FONT_NORMAL,0.8f,"ADD TO INVENTORY"); } }
+    if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,460,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,528,676,240,1075); RenderTextL(586,528,T_GREEN,FONT_NORMAL,0.8f,Sys_Text.stringTable[878]/*ADD TO INVENTORY*/); } }
     if (World.Sys_UI.showSensaroundCenter){
         /*TODO SensaroundCenter Center rearview image 630x240 texture*/
         UIR(UI_ID_SENSA_CTR,TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR,UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H,TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR+CTR_MFD_W,UI_W-TAB_THICK-TXT_PAD);
@@ -586,7 +585,7 @@ void CenterMFD() { //640x240
             for (int slot=0;slot<14;++slot) {
                 int ref=World.invP1.hardwareInvReferenceIndex[slot]; if (ref<0 || World.invP1.hwVers[slot] <= 0) continue;
                 i16 x=generalColX[slot < 7 ? 0 : 1], y=generalRowY[slot%7];
-                const char* label=Sys_Text.stringTable[ref+326]; float w=MeasureLineAdvance(label,FONT_NORMAL); float sc=w>0?vmin(0.6f,210.0f/w):0.8f;
+                const char* label=Sys_Text.stringTable[ref+326]; float w=MeasureLineAdvance(label,FONT_NORMAL); float sc=w>0?vmin(0.8f,210.0f/w):0.8f;
                 UIRText(UI_ID_CMFD_HARDWARE_ROW_0+slot,x,y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : (World.invP1.hasHardware&(1u<<slot) ? T_GREEN_MENU : T_GREEN_MENU_SHADOW),FONT_NORMAL,sc,210,label);
                 RenderTextL((i16)(x+195),y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : T_GREEN_MENU,FONT_NORMAL,0.8f,"v%d",(int)World.invP1.hwVers[slot]); }
         }
@@ -594,7 +593,7 @@ void CenterMFD() { //640x240
             UIRText(UI_ID_CMFD_GENERAL_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[875]/*GENERAL*/);
             for (u8 slot=0;slot<14;++slot) {
                 if (GeneralInvItem(slot)<0) continue;
-                i16 x=slot<7?372:681,y=generalRowY[slot%7]; float width=MeasureLineAdvance(GeneralInvLabel(slot),FONT_NORMAL),scale=width>0?vmin(0.8f,185.0f/width):0.6f;
+                i16 x=slot<7?372:681,y=generalRowY[slot%7]; float width=MeasureLineAdvance(GeneralInvLabel(slot),FONT_NORMAL),scale=width>0?vmin(0.8f,185.0f/width):0.8f;
                 UIRText(UI_ID_CMFD_GENERAL_ROW_0+slot,x,y,World.invP1.generalInvCurrent==slot?T_YELLOW:T_GREEN,FONT_NORMAL,scale,185,GeneralInvLabel(slot));
                 if (GeneralInvCanUse(slot)) { UIRImg(UI_ID_CMFD_GENERAL_USE_0+slot,(i16)(x+187),(i16)(y+2),20,20,1086); RenderUIImage(x+192,y+7,11,11,1079); }
             }
@@ -609,7 +608,7 @@ void CenterMFD() { //640x240
                 if (i<=2) RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"v%d",World.invP1.softVersions[i]+1); else if (i<=5) RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"x%d",count); else RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0); }
         }
         if (World.Sys_UI.MFD_CenterTab!=5) return;/*EReader*/
-        UIRText(UI_ID_CMFD_MEDIA_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.6f,260,Sys_Text.stringTable[877]/*LOGS*/);
+        UIRText(UI_ID_CMFD_MEDIA_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[877]/*LOGS*/);
         if (World.Sys_UI.MFD_MediaTab==MM_LOG_TABLE) {
             if (World.Sys_UI.MFD_ReaderView==MFD_READER_CONTENTS) { RenderUIImage(454,573,453,191,0);/*LogTableofContents*/
                 for (u8 i=0;i<10;++i) { i16 x=(i16)(i<7?454:681),y=generalRowY[i%7]; UIRImg(UI_ID_CMFD_LOG_TABLE_0+i,x,y,226,24,0);/*QUAD:builtin-white*/ RenderTextL(x,y,T_GREEN,FONT_NORMAL,0.8,"Level %s Logs",logLevelName[i]); RenderTextL((i16)(x+77),y,T_GREEN,FONT_NORMAL,0.8,"3");/*TODO real per level counts*/ }
@@ -732,17 +731,17 @@ static double RenderUI() {
                 RenderTextL(340,72+i*18,World.Sys_UI.tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx[i]],World.Sys_UI.tWrnTextIdx[i]==185?flt:World.Sys_UI.tWrnTextIdx2[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx2[i]]:"",World.Sys_UI.tWrnTextIdx3[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx3[i]]:"");
             }
             SideMFD(false); CenterMFD(); SideMFD(true);
-            if(World.diffMis>=3){UIR(UI_ID_CMFD_MISSION_TIMER,43,2,260,14); RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.6,"%s",World.misTimerMission<1100?Sys_Text.stringTable[World.misTimerMission]:"");/*MissionTimerT*/ {char misT[8]; if(World.misTimerTimesUP) sFormat(misT,sizeof(misT),"%s",869<1100?Sys_Text.stringTable[869]:""); else {float mt=World.misTimerT<0.0f?0.0f:World.misTimerT; int mm=(int)(mt/60.0f),ss=(int)(mt-(float)(mm*60)); sFormat(misT,sizeof(misT),"%02d:%02d",mm,ss);} RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.6,"%s",misT);}}
-            if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.6,"T -"); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"99:99"); }
+            if(World.diffMis>=3){UIR(UI_ID_CMFD_MISSION_TIMER,43,2,260,14); RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.8,"%s",World.misTimerMission<1100?Sys_Text.stringTable[World.misTimerMission]:"");/*MissionTimerT*/ {char misT[8]; if(World.misTimerTimesUP) sFormat(misT,sizeof(misT),"%s",869<1100?Sys_Text.stringTable[869]:""); else {float mt=World.misTimerT<0.0f?0.0f:World.misTimerT; int mm=(int)(mt/60.0f),ss=(int)(mt-(float)(mm*60)); sFormat(misT,sizeof(misT),"%02d:%02d",mm,ss);} RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.8,"%s",misT);}}
+            if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.8,"T -"); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"99:99"); }
             if (World.curLev==LEVEL_CYBERSPACE)RenderTextL(1137,570,T_YELLOW,FONT_NORMAL,0.8,Sys_Text.stringTable[442]/*"level 1 elevator taken off line - SHODAN security block established 04.NOV.72"*/);/*CyberSPrint*/
             if((World.invP1.hardwareIsActive & HW_BIO)!=0){/*BioMonitor*/
                 UIR(UI_ID_CMFD_BIOMONITOR,0,0,480,146); RenderUIImage(0,0,480,80,0);/*Graph QUAD:none*/
-                RenderTextL(4,83,T_YELLOW,FONT_NORMAL,0.6,"%s",895<1100?Sys_Text.stringTable[895]:"Biomonitor:"); RenderTextL(4,99,T_GREEN,FONT_NORMAL,0.8,"%s",896<1100?Sys_Text.stringTable[896]:"Heart Rate:");
-                RenderTextL(70,99,T_GREEN,FONT_NORMAL,0.6,"100"); RenderTextL(122,99,T_GREEN,FONT_NORMAL,0.8,"BPM");
-                RenderTextL(4,131,T_GREEN,FONT_NORMAL,0.6,"%s",897<1100?Sys_Text.stringTable[897]:"Patches Active:"); RenderTextL(119,131,T_GREEN,FONT_NORMAL,0.8,"MEDI STAMINUP SIGHT GENIUS BERSERK REFLEX");
-                RenderTextL(4,115,T_GREEN,FONT_NORMAL,0.6,"%s",898<1100?Sys_Text.stringTable[898]:"Fatigue:"); RenderTextL(66,115,T_GREEN,FONT_NORMAL,0.8,"Moderate");
+                RenderTextL(4,83,T_YELLOW,FONT_NORMAL,0.8,"%s",895<1100?Sys_Text.stringTable[895]:"Biomonitor:"); RenderTextL(4,99,T_GREEN,FONT_NORMAL,0.8,"%s",896<1100?Sys_Text.stringTable[896]:"Heart Rate:");
+                RenderTextL(70,99,T_GREEN,FONT_NORMAL,0.8,"100"); RenderTextL(122,99,T_GREEN,FONT_NORMAL,0.8,"BPM");
+                RenderTextL(4,131,T_GREEN,FONT_NORMAL,0.8,"%s",897<1100?Sys_Text.stringTable[897]:"Patches Active:"); RenderTextL(119,131,T_GREEN,FONT_NORMAL,0.8,"MEDI STAMINUP SIGHT GENIUS BERSERK REFLEX");
+                RenderTextL(4,115,T_GREEN,FONT_NORMAL,0.8,"%s",898<1100?Sys_Text.stringTable[898]:"Fatigue:"); RenderTextL(66,115,T_GREEN,FONT_NORMAL,0.8,"Moderate");
             }
-            RenderTextL(1270,78,T_WHITE,FONT_NORMAL,0.6,"0"); RenderTextL(1308,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderSearchFX();
+            RenderTextL(1270,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderTextL(1308,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderSearchFX();
         }
         if (EditSelIsActive()) {/*Edit mode selection highlight + object info panel*/
             u16 sel=editModeSelection; Entity* e=&World.instances[sel];

@@ -971,7 +971,8 @@ u16 GetItemFrobTexture(u16 index) {
 }
 
 u16 GetCursorTexture() {
-    if (World.paused || World.menuActive) return 1261;
-    if (!World.invP1.holdingObject) return GetCrosshairTexture();
-    u16 tex=GetItemFrobTexture(World.invP1.heldObjectIndex); return tex<MAX_TXRS?tex:1250;
+    if(World.paused || World.menuActive){if(Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down){return 2147;} return 1261;}
+    if(World.invP1.holdingObject) {u16 tex=GetItemFrobTexture(World.invP1.heldObjectIndex); return tex<MAX_TXRS?tex:1250;}
+    if(World.uiIsBlocking || World.mouseClickHeldOverGUI){if(Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down){return 2147;} return 1261;}
+    return GetCrosshairTexture();
 }
