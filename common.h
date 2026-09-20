@@ -16,6 +16,7 @@ typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 #define NULL ((void *)0)
 enum{U16_MAX=65535,U32_MAX=0xFFFFFFFFU,U64_MAX=0xFFFFFFFFFFFFFFFFULL};
 typedef __builtin_va_list va_list;
+extern size_t g_mmap_live; /* diagnostics (lib.c): live bytes from OS_AllocateRAM */
 typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color; typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion; typedef u8 ColliderType; typedef struct { bool hit; V3 point,normal; float pen; } Overlap; typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
 #if defined(_WIN32)
     typedef void* FHandle;
@@ -92,7 +93,7 @@ void* mcpy(void *dst, const void *src, size_t n);
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { long r = 231; __asm__ __volatile__("syscall":"+a"(r):"D"(exitCode):"rcx","r11","memory"); __builtin_unreachable(); }
     INLINE void OS_Close(FHandle fd) { long r = 3; __asm__ __volatile__("syscall":"+a"(r):"D"(fd):"rcx","r11","memory"); } // Only really needed to prevent hitting a 1024 file descriptor limit.
     INLINE long OS_Open(const char* path, i32 flags, i32 mode) { long r = 2; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"((long)flags),"d"((long)mode):"rcx","r11","memory"); return r; }
-    INLINE void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd) { long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return (void*)r; }
+    INLINE void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd) { long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); if((void*)r != (void*)-1) __atomic_add_fetch(&g_mmap_live,len,__ATOMIC_RELAXED); return (void*)r; }
     INLINE FHandle OS_OpenReadonly(const char* path) { FHandle f=OS_Open(path,0,0); return f < 0 ? DualLogError("Could not open file %s for reading\n",path), -1 : f; }
     INLINE FHandle OS_OpenWriteonly(const char* path) { FHandle f=OS_Open(path,1|00000100|00001000,0644); return f < 0 ? DualLogError("Failed to open %s for writing\n",path),-1 : f; }
     INLINE int OS_FileSize(FHandle f) { long r=5,s[18]; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(s):"rcx","r11","memory"); return (int)s[6]; }
@@ -100,7 +101,7 @@ void* mcpy(void *dst, const void *src, size_t n);
     INLINE long OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/) { i64 r = 8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(ofs),"d"(whence):"rcx","r11","memory"); return r; }
     INLINE long OS_Tell(FHandle fd) { i64 r=8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(0LL),"d"(1):"rcx","r11","memory"); return r; }
     INLINE int OS_GetNumThreads() { unsigned long m[16]; long r=204; __asm__ __volatile__("syscall":"+a"(r):"D"(0LL),"S"(128LL),"d"(m):"rcx","r11","memory"); int c = 0; for(int i=0;i<(r/8);i++) {c+=__builtin_popcountll(m[i]);} return r < 0 ? 1 : c; }
-    INLINE void OS_Free(void* p, size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
+    INLINE void OS_Free(void* p, size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __atomic_sub_fetch(&g_mmap_live,s,__ATOMIC_RELAXED); __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
     INLINE long OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
     #define SYSCALL1(n, a) syscall6(n,(long)(a),0,0,0,0,0)
     #define SYSCALL2(n, a, b) syscall6(n,(long)(a),(long)(b),0,0,0,0)
@@ -299,6 +300,7 @@ void UseTargets(u16,u16),AddForce(u16,V3,bool),CenterStatusPrint(const char * re
      play_wav(const char*,float,V3,bool),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
      LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderTextR(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DL(V3,u32,u8,float,u16,const char* restrict,...),RenderText3DC(V3,u32,u8,float,u16,const char* restrict,...),RenderText3DR(V3,u32,u8,float,u16,const char* restrict,...),RenderText3DWorld(V3,Quaternion,u32,u8,float,const char* restrict),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
+size_t AudioLiveBytes(void); /* diagnostics: live audio sample bytes */
 const char *JumpSound(FootStepType),*JumpLandSound(FootStepType); FootStepType GetFootstepTypeForPrefab(int); char* StringFindFirstCharWithin(const char*,char); AnimationClip DoorGetClip(const Entity*,u8);
 // Quest bits (info_mission constIndex 710).  Only ever set/toggled/checked by info_mission entities.
 enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};

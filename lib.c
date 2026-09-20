@@ -1,10 +1,10 @@
 // lib.c - LibC replacement functions and other misc helpers.
 #include "common.h"
-#define SCRATCH_ARENA_SIZE (162ULL * 1024 * 1024) // 2gb
+#define SCRATCH_ARENA_SIZE (48ULL * 1024 * 1024)
 u8* scratch_base,*scratch_cur,*scratch_end; size_t scratch_peak=0;
 void OS_ScratchInit(void) { if(scratch_base){return;} scratch_base=OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur=scratch_base; scratch_end=scratch_base + SCRATCH_ARENA_SIZE; }
 void* OS_AllocScratch(size_t amount) { if(!scratch_base){OS_ScratchInit();} size_t aligned=(amount + 15) & ~(size_t)15; if(scratch_cur+aligned > scratch_end){DualLogError("Scratch ovr!\n"); OS_Exit(1);} void* p=scratch_cur; scratch_cur+=aligned; size_t used=(size_t)(scratch_cur-scratch_base); if(used>scratch_peak)scratch_peak=used; return p; }
-void OS_FreeInitPhase(void) { DualLog("Scratch peak: %u MB\n", (u32)(scratch_peak >> 20)); scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
+void OS_FreeInitPhase(void) { DualLog("Scratch peak: %u MB", (u32)(scratch_peak >> 20)); scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
 void OS_ScratchFree(void) { DualLog("Scratch arena total peak: %u MB\n", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; }
 typedef u16 u16_u __attribute__((__aligned__(1),__may_alias__));typedef u32 u32_u __attribute__((__aligned__(1),__may_alias__));typedef u64 u64_u __attribute__((__aligned__(1),__may_alias__));
 void* mcpy(void *dst,const void *src,size_t n){
@@ -115,18 +115,41 @@ void Screenshot() {
     BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
 }
 
+size_t g_mmap_live = 0; /* diagnostics: live bytes from OS_AllocateRAM (anon + file-backed + thread stacks) */
+extern u32 totalPixels,totalPaletteColors; extern size_t cvxAdjLive;
+// static void ramline(const char* name, u64 bytes) { u32 kb=(u32)(bytes>>10); DualLog("  %s %uKB|%.2fMB\n",name,kb,bytes/1048576.0); }
+void DebugRAMPeak(void) { // VmHWM: kernel high-water mark of RSS over process lifetime, catches transient spikes between checkpoints (includes shared libs, unlike USS)
+    long fd = OS_OpenReadonly("/proc/self/status"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/status\n"); return; }
+    char buf[2048]; long n = OS_Read(fd,buf,sizeof(buf)-1); OS_Close(fd); if (n <= 0) return; buf[n]='\0';
+    u32 kb=0; for (char* p=buf;*p;++p) { if (mcmp(p,"VmHWM:",6)==0) { p+=6; while(*p==' '||*p=='\t') ++p; while(*p>='0'&&*p<='9') kb=kb*10+(u32)(*p++-'0'); break; } }
+    DualLog("Peak RSS (VmHWM): %uKB|%.2fMB\n",kb,kb/1024.0);
+}
+void DebugRAMBreakdown() { // Persistent-allocation census, diagnostics only: sums live structures; GPU/driver side estimated (not in USS)
+    //u64 physV=0,physT=0,bvhN=0,bvhT=0,gpuV=0,gpuT=0; u32 nM=mdlsCnt;
+    //for (u32 m=0;m<nM;++m){ physV+=(u64)physVertCounts[m]*12; physT+=(u64)modelTriangleCounts[m]*6; bvhN+=(u64)modelBVHNodeCounts[m]*sizeof(BvhNode); bvhT+=(u64)modelBVHTriOrderCounts[m]*2; gpuV+=(u64)modelVertexCounts[m]*VRT_ATT_SZ; gpuT+=(u64)modelTriangleCounts[m]*6; }
+    //DualLog("RAM breakdown (persistent):\n");
+    //ramline("mdl CPU phys verts",physV); ramline("mdl CPU phys tris",physT); ramline("mdl CPU BVH nodes",bvhN); ramline("mdl CPU BVH triorder",bvhT);
+    //ramline("mdl CPU ptr tables",(u64)nM*8*3); ramline("mdl BSS tables",(u64)MAX_MDLS*(4+2+4+2+8+4)+(u64)INSTANCE_COUNT*64);
+    //ramline("mdl GPU VBO est (driver)",gpuV); ramline("mdl GPU IBO est (driver)",gpuT);
+    //ramline("tex GPU pixels",((u64)totalPixels+3)/4*4); ramline("tex GPU palettes",(u64)totalPaletteColors*4); ramline("tex GPU preallocs",(u64)MAX_TOTAL_PIXELS+(u64)texCnt*4+(u64)texCnt*8);
+    //ramline("font GPU atlases",(u64)FONT_ATLAS_SIZE*FONT_ATLAS_SIZE+(u64)FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2);
+    //ramline("World (GlobalContext)",(u64)sizeof(GlobalContext)); ramline("audio live",AudioLiveBytes()); ramline("cvx adjacency",cvxAdjLive);
+    //{ u32 live=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); ramline("mmap live (all OS_Alloc)",live); }
+    //ramline("scratch peak",scratch_peak);
+    //DualLog("  (models=%u textures=%u uniqueCvx=%u; thread stacks 8MBx%u virtual)\n",nM,(u32)texCnt,uniqueCvxMeshCount,threadCnt);
+}
 void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
     (void)context;
-//     static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
-//     long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;
-//     size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0; long fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
-//     char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1); if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0'; OS_Close(fd); char* p = buf;
-//     while (*p) {
-//         if (mcmp(p,"Private_",8) == 0) {
-//             p += 8; size_t val = 0; if (mcmp(p,"Clean",5) !=0 && mcmp(p,"Dirty",5) != 0) { p++; continue; }    while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
-//             p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
-//         } p++;
-//     } DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB)\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0);
+    //static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
+    //long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;
+    //size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0; long fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
+    //char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1); if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0'; OS_Close(fd); char* p = buf;
+    //while (*p) {
+        //if (mcmp(p,"Private_",8) == 0) {
+            //p += 8; size_t val = 0; if (mcmp(p,"Clean",5) !=0 && mcmp(p,"Dirty",5) != 0) { p++; continue; }    while (*p && *p != ':') p++; if (*p != ':') { p++; continue; }
+            //p++; while(*p == ' ' || *p == '\t'){p++;} while(*p >= '0' && *p <= '9'){val=val * 10 + (*p - '0'); p++;} uss_bytes += val * 1024;
+        //} p++;
+    //} u32 mmapped=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB), MMAP %uKB|%.2fMB\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0,mmapped / 1024,mmapped / 1024.0 / 1024.0);
 }
 
 u32 random_range_rng = 0x12345678u;

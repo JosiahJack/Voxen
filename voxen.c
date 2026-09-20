@@ -585,7 +585,7 @@ static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0
 static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/ {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {-64.000f,-60.120f}/*13*/};
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 71.68f/*13*/};
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
-u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0; void AddHardwareToInventory(int,int),mp3_clear();
+u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0; size_t cvxAdjLive=0; /* diagnostics: live convex-adjacency bytes */ void AddHardwareToInventory(int,int),mp3_clear();
 // Init && Main
 void MFD_NewGame(void); void MissionTimerInit(void);
 __attribute__((cold)) void NewGame() { // Reset World States
@@ -640,7 +640,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
         u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16)); u32* writePos = OS_Alloc(vCount * sizeof(u32));
         mcpy(writePos, offsets, vCount * sizeof(u32));
         for (u32 i=0;i<uniqueEdgeCount;++i) { u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); adjList[writePos[a]++]=b; adjList[writePos[b]++]=a; }
-        cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList;
+        cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList; cvxAdjLive+=(vCount+1)*sizeof(u32)+uniqueEdgeCount*2*sizeof(u16);
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
     } DebugRAM("after edge adjacency");
     World.lev1SecCode = random_range_u8(0u,9u); World.lev2SecCode = random_range_u8(0u,9u); World.lev3SecCode = random_range_u8(0u,9u); World.lev4SecCode = random_range_u8(0u,9u); World.lev5SecCode = random_range_u8(0u,9u); World.lev6SecCode = random_range_u8(0u,9u); World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
@@ -705,7 +705,7 @@ void InitalizeEnvironment() {
     if (World.introNotPlayed) { currentMenuPage = Mpg_IntroVideo; PlayMenuMusic(); World.menuActive = true; World.introNotPlayed = false; } World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     NewGame();
     PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
-    OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free");
+    OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free"); DebugRAMPeak(); DebugRAMBreakdown();
 }
 
 void Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdate(),PSys_Update(float),BioMonitorUpdate(); bool ScrshotPressed();
@@ -730,7 +730,7 @@ i32 main() {
           glGetQueryObjectui64v(gpuQ[r][4],0x8866/*GL_QUERY_RESULT*/,&v); World.gpuCompMs=(double)v * 0.000001; World.gpuFrameMs=World.gpuShadowMs+World.gpuPreMs+World.gpuMainMs+World.gpuSsrMs+World.gpuCompMs;
         } gpuQFrame=(gpuQFrame+1)%5;
         ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
-        { static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (globalframe == dbgFrm[d]) {DebugRAM(dbgLbl[d]); if (globalframe == 1000) break;} }
+        { static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (globalframe == dbgFrm[d]) {DebugRAM(dbgLbl[d]); if (globalframe == 1000) {DebugRAMPeak(); break;}} }
     }
     return 0;
 }
