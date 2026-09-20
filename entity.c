@@ -572,7 +572,7 @@ void LoadLevelMod(u8 lev) {
         u16 wvi = World.instCount; mset(&World.instances[wvi],0,sizeof(Entity)); World.instances[wvi].entflags=EF_ACTIVE|EF_NO_SHADOWS; World.layer[wvi]=L_Default; World.instances[wvi].camView=255; World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
         World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAX_TXRS; World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.mass[wvi]=World.rotation[wvi].w=1.0f; World.dynamicFriction[wvi]=0.5f; World.staticFriction[wvi]=0.6f;
         World.col[wvi]=COLTYPE_NONE; flag_set(&World.instances[wvi].entflags,EF_RIGIDBODY,false);
-        World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; World.weaponVModelIndex=wvi; World.instCount++; DualLog("Weapon view model entity index: %u (level %d)\n",wvi,curlevel);
+        World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAX_ANIMS; World.weaponVModelIndex=wvi; World.instCount++;
     }
     // Ad-hoc editmode selection text entity (based on text_decal 592): positioned at selected object, displays "index: #"
     if (World.instCount < INSTANCE_COUNT) {
@@ -580,7 +580,7 @@ void LoadLevelMod(u8 lev) {
         World.instances[editTextIdx].index=592; World.position[editTextIdx]=(V3){0.0f,0.0f,0.0f}; World.rotation[editTextIdx]=QUAT_IDENTITY; World.scale[editTextIdx].x=World.scale[editTextIdx].y=World.scale[editTextIdx].z=World.mass[editTextIdx]=World.rotation[editTextIdx].w=1.0f;
         World.instances[editTextIdx].messageLingdex = 0; // placeholder; text set dynamically in render loop
         World.instances[editTextIdx].texIndex = 881; // white.png; ad-hoc instance has no lingdex so no baked decal mesh is built for it
-        World.editTextInstanceIndex = editTextIdx; World.instCount++; DualLog("Edit mode selection text entity index: %u (level %d)\n",editTextIdx,curlevel);
+        World.editTextInstanceIndex = editTextIdx; World.instCount++;
     }
 }
 #undef KEY_EQ
@@ -639,12 +639,6 @@ void LoadLevelData(u8 curlevel) {
         if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
     }
     for (int i=PLAYER1;i<World.instCount;++i){ u16 mi=World.instances[i].messageIndex; World.instances[i].messageIndex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].messageLingdex; World.instances[i].messageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].lockedMessageLingdex; World.instances[i].lockedMessageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; } // Using blank 427
-    for (int i=PLAYER1;i<World.instCount;++i){
-        if (World.instances[i].index == 592 || World.instances[i].index == 593) {
-            u16 li = World.instances[i].messageLingdex; const char* textStr = (li < T_LOGSTR_CNT && li > 0) ? Sys_Text.stringTable[li] : "N/A";
-            DualLog("World.instances[%d] constIndex:%u text:[%s] lingdex:%u lP:(%f,%f,%f) lR:(%f,%f,%f,%f) lS:(%f,%f,%f)\n", i, (u16)World.instances[i].index, textStr, li, World.position[i].x, World.position[i].y, World.position[i].z, World.rotation[i].x, World.rotation[i].y, World.rotation[i].z, World.rotation[i].w, World.scale[i].x, World.scale[i].y, World.scale[i].z);
-        }
-    }
     World.levelLoadedLights[curlevel] = World.loadedLights; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
 }
 
@@ -668,7 +662,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.curLev = curlevel; SetLevelPointers(curlevel); mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView)); mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32)); camViewCount = levelCamViewCount[curlevel];
     for (int i = 0; i < camViewCount; ++i) { if (levelCamViews[curlevel][i].visible == false && camViews[i].visible == true) { mcpy(&levelCamViews[curlevel][i], &camViews[i], sizeof(CamView)); levelCamViewTextures[curlevel][i] = camViewTextures[i]; } } // Initialize missing level camview entries from file data
     mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce)); for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
-    DualLog("Switched to Level %d\n",curlevel); ResetLevelAudio(); mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.combatImpulseFinished = get_time(); World.Sys_Music.combatImpulseFinished += 5.0; RenderLoading("Loading cull system..."); CullInit(); // Must be after level!
+    ResetLevelAudio(); mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.combatImpulseFinished = get_time(); World.Sys_Music.combatImpulseFinished += 5.0; RenderLoading("Loading cull system..."); CullInit(); // Must be after level!
     glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(7,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
     RenderLoading("Loading voxel lighting data..."); for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all

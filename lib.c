@@ -1,11 +1,11 @@
 // lib.c - LibC replacement functions and other misc helpers.
 #include "common.h"
-#define SCRATCH_ARENA_SIZE (512ULL * 1024 * 1024) // 512mb
-u8* scratch_base,*scratch_cur,*scratch_end;
+#define SCRATCH_ARENA_SIZE (162ULL * 1024 * 1024) // 2gb
+u8* scratch_base,*scratch_cur,*scratch_end; size_t scratch_peak=0;
 void OS_ScratchInit(void) { if(scratch_base){return;} scratch_base=OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur=scratch_base; scratch_end=scratch_base + SCRATCH_ARENA_SIZE; }
-void* OS_AllocScratch(size_t amount) { if(!scratch_base){OS_ScratchInit();} size_t aligned=(amount + 15) & ~(size_t)15; if(scratch_cur+aligned > scratch_end){DualLogError("Scratch ovr!\n"); OS_Exit(1);} void* p=scratch_cur; scratch_cur+=aligned; return p; }
-void OS_FreeInitPhase(void) { scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
-void OS_ScratchFree(void) { OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; }
+void* OS_AllocScratch(size_t amount) { if(!scratch_base){OS_ScratchInit();} size_t aligned=(amount + 15) & ~(size_t)15; if(scratch_cur+aligned > scratch_end){DualLogError("Scratch ovr!\n"); OS_Exit(1);} void* p=scratch_cur; scratch_cur+=aligned; size_t used=(size_t)(scratch_cur-scratch_base); if(used>scratch_peak)scratch_peak=used; return p; }
+void OS_FreeInitPhase(void) { DualLog("Scratch peak: %u MB\n", (u32)(scratch_peak >> 20)); scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
+void OS_ScratchFree(void) { DualLog("Scratch arena total peak: %u MB\n", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; }
 typedef u16 u16_u __attribute__((__aligned__(1),__may_alias__));typedef u32 u32_u __attribute__((__aligned__(1),__may_alias__));typedef u64 u64_u __attribute__((__aligned__(1),__may_alias__));
 void* mcpy(void *dst,const void *src,size_t n){
     u8 *d=(u8*)dst; u8 *s=(u8*)src; size_t i=0; for(;i+128<=n;i+=128){*(__m256i*)(d+i)=*(__m256i*)(s+i);*(__m256i*)(d+i+32)=*(__m256i*)(s+i+32);*(__m256i*)(d+i+64)=*(__m256i*)(s+i+64);*(__m256i*)(d+i+96)=*(__m256i*)(s+i+96);}for(;i+32<=n;i+=32){*(__m256i*)(d+i)=*(__m256i*)(s+i);} size_t rem=n-i; u8* rd=d+i; u8* rs=s+i;
