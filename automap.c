@@ -216,7 +216,7 @@ static void amRaster(void) {
     amPxPerUnit=(float)AM_H/((float)cells*CELLSZ);
     u8* expl=World.automapExplored[lev];
 
-    for (u32 i=0;i<sizeof(amPx);i+=4) { amPx[i]=0; amPx[i+1]=0; amPx[i+2]=0; amPx[i+3]=255; }/*opaque black*/
+    for (u32 i=0;i<sizeof(amPx);i+=4) { amPx[i]=0; amPx[i+1]=0; amPx[i+2]=0; amPx[i+3]=0; }/*transparent*/
 
     mset(amRadCells,0,sizeof(amRadCells));
     mset(amWedgeInst,0xFF,sizeof(amWedgeInst));
@@ -304,13 +304,14 @@ static void amRaster(void) {
         int cx=PosGetCellCoordX(ccx),cz=PosGetCellCoordZ(ccz);
         if (cx>=0&&cx<64&&cz>=0&&cz<64) amDiagCell[(u32)cz*64+(u32)cx]=1;
     }
-    /*Cell fills: black, dark orange under radiation; accessible triangle only for 45deg cells.*/
+    /*Cell fills: transparent, dark orange under radiation; accessible triangle only for 45deg cells.*/
     for (int cz=0;cz<64;++cz) for (int cx=0;cx<64;++cx) {
         u32 cell=(u32)cz*64+(u32)cx;
         if (!(gridCellStates[cell]&CELL_OPEN) || !expl[cell]) continue;
         float rx0=(cx-cx0)*cellPx+(float)AM_XOFF,ry0=(cz0+cells-1-cz)*cellPx;/*rx0,ry0 = top-left px*/
         bool rad=amRadCells[cell]!=0;
-        u8 r=rad?170:0,g=rad?85:0,b=0;
+        if (!rad) continue;/*black -> transparent: leave cleared alpha 0*/
+        u8 r=170,g=85,b=0;
         u16 wi=amWedgeInst[cell];
         if (wi!=U16_MAX) {
             /*Accessible triangle = empty cell corner + wedge hypotenuse endpoints.*/
@@ -536,64 +537,18 @@ static bool amReveal(void) {
     return changed;
 }
 
-static u32 amDoorHash(void) {
-    u32 h=0;
-    for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e=&World.instances[i];
-        if (IdxIsDoor(e->index)) h=h*31u+(u32)(i*7u+(u32)e->doorState);
-    }
-    return h;
-}
-
-/*--- Public API ---*/
-void AutomapInitGL(void) {
-    if (amReady) return;
-    GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL);
-    glGenFramebuffers(1,&amFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER,amFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amTexId,0);
-    glBindFramebuffer(GL_FRAMEBUFFER,0);
-    amReady=true;
-}
-void AutomapNewGame(void) {
-    mset(World.automapExplored,0,sizeof(World.automapExplored));
-    World.automapZoom=0; World.automapNextRaster=0.0; amBuiltLev=255;
-}
+static u32 amDoorHash(void) {u32 h=0; for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {Entity* e=&World.instances[i]; if (IdxIsDoor(e->index)) h=h*31u+(u32)(i*7u+(u32)e->doorState);} return h;}
+void AutomapInitGL(void) {if(amReady){return;} GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glGenFramebuffers(1,&amFBO); glBindFramebuffer(GL_FRAMEBUFFER,amFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amTexId,0); glBindFramebuffer(GL_FRAMEBUFFER,0); amReady=true;}
+void AutomapNewGame(void) {mset(World.automapExplored,0,sizeof(World.automapExplored)); World.automapZoom=0; World.automapNextRaster=0.0; amBuiltLev=255;}
 void AutomapOnLoad(void) { amBuiltLev=255; World.automapNextRaster=0.0; }/*force re-raster from loaded FoW*/
-
 void AutomapTick(void) {
-    if (!amReady || World.menuActive) return;
-    u8 lev=World.curLev;
-    if (lev>=LEVEL_CYBERSPACE) return;
-    bool fowChanged=amReveal();
-    u32 dh=amDoorHash();
-    double now=get_time();
-    if (fowChanged || dh!=amBuiltDoorHash || lev!=amBuiltLev || World.automapZoom!=amBuiltZoom || now>=World.automapNextRaster) {
-        amRaster();
-        amBuiltLev=lev; amBuiltDoorHash=dh; amBuiltZoom=World.automapZoom;
-        int nav=amNavVer();/*Unity cadence: 0.2s base, 0.1s nav v2, 0.05s nav v3*/
-        World.automapNextRaster=now+(nav>2?0.05:(nav>1?0.1:0.2));
-        glBindTexture(GL_TEXTURE_2D,amTexId);
-        glTexSubImage2D(GL_TEXTURE_2D,0,0,0,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,amPx);
-    }
+    if(!amReady || World.menuActive){return;} u8 lev=World.curLev; if(lev>=LEVEL_CYBERSPACE){return;} bool fowChanged=amReveal(); u32 dh=amDoorHash(); double now=get_time();
+    if(fowChanged || dh!=amBuiltDoorHash || lev!=amBuiltLev || World.automapZoom!=amBuiltZoom || now>=World.automapNextRaster) {amRaster(); amBuiltLev=lev; amBuiltDoorHash=dh; amBuiltZoom=World.automapZoom; int nav=amNavVer(); World.automapNextRaster=now+(nav>2?0:(nav>1?0.1:0.2)); glBindTexture(GL_TEXTURE_2D,amTexId); glTexSubImage2D(GL_TEXTURE_2D,0,0,0,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,amPx);}
 }
 
 void AutomapBlitToUI(void) {
-    if (!amReady || World.menuActive || World.paused || Cheats.noHUD) return;
-    if (World.curLev>=LEVEL_CYBERSPACE) return;
-    int n=0; int dx0[2],dy0[2],dx1[2],dy1[2];
-    if (World.Sys_UI.MFD_LefTab==3) { dx0[n]=AMAP_UI_X_L; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_L+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; }
-    if (World.Sys_UI.MFD_RightTab==3) { dx0[n]=AMAP_UI_X_R; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_R+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; }
-    if (!n) return;
-    glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
-    for (int k=0;k<n;++k) {
-        /*UI y-down -> GL y-up; raster row 0 (north) is texture bottom -> flip src.*/
-        int gx0=dx0[k],gy0=768-dy1[k],gx1=dx1[k],gy1=768-dy0[k];
-        glBlitFramebuffer(0,AM_H,AM_W,0, gx0,gy0,gx1,gy1, GL_COLOR_BUFFER_BIT,GL_LINEAR);
-    }
-    glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
+    if(!amReady || World.menuActive || World.paused || Cheats.noHUD){return;} if(World.curLev>=LEVEL_CYBERSPACE){return;} int n=0; int dx0[2],dy0[2],dx1[2],dy1[2]; if(World.Sys_UI.MFD_LefTab==3) { dx0[n]=AMAP_UI_X_L; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_L+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(World.Sys_UI.MFD_RightTab==3) { dx0[n]=AMAP_UI_X_R; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_R+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(!n){return;}
+    glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); for (int k=0;k<n;++k) {/*UI y-down -> GL y-up; raster row 0 (north) is texture bottom -> flip src.*/int gx0=dx0[k],gy0=768-dy1[k],gx1=dx1[k],gy1=768-dy0[k]; glBlitFramebuffer(0,AM_H,AM_W,0, gx0,gy0,gx1,gy1, GL_COLOR_BUFFER_BIT,GL_LINEAR);} glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
 }
 
 /*Dump the automap raster to Screenshots/ as a standalone BMP (north up).

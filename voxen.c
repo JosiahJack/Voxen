@@ -282,12 +282,8 @@ static void mat4_lookat_from(float* m, Quaternion* camRotation, V3 eye) {
 
 INLINE bool SphereInFrustum(FrustumPlane* ps, V3 c, float radius) { for (int i=0;i<6;++i) { if ((V3_dot(ps[i].normal,c) + ps[i].d) < -radius) return false; } return true; }
 void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
-    ps[0].normal.x = m[3] + m[0]; ps[0].normal.y = m[7] + m[4]; ps[0].normal.z = m[11] + m[8];  ps[0].d = m[15] + m[12]; // Left
-    ps[1].normal.x = m[3] - m[0]; ps[1].normal.y = m[7] - m[4]; ps[1].normal.z = m[11] - m[8];  ps[1].d = m[15] - m[12]; // Right
-    ps[2].normal.x = m[3] + m[1]; ps[2].normal.y = m[7] + m[5]; ps[2].normal.z = m[11] + m[9];  ps[2].d = m[15] + m[13]; // Bottom
-    ps[3].normal.x = m[3] - m[1]; ps[3].normal.y = m[7] - m[5]; ps[3].normal.z = m[11] - m[9];  ps[3].d = m[15] - m[13]; // Top
-    ps[4].normal.x = m[3] + m[2]; ps[4].normal.y = m[7] + m[6]; ps[4].normal.z = m[11] + m[10]; ps[4].d = m[15] + m[14]; // Near
-    ps[5].normal.x = m[3] - m[2]; ps[5].normal.y = m[7] - m[6]; ps[5].normal.z = m[11] - m[10]; ps[5].d = m[15] - m[14]; // Far
+    ps[0].normal.x = m[3] + m[0]; ps[0].normal.y = m[7] + m[4]; ps[0].normal.z = m[11] + m[8];  ps[0].d = m[15] + m[12];/*Left*/ ps[1].normal.x = m[3] - m[0]; ps[1].normal.y = m[7] - m[4]; ps[1].normal.z = m[11] - m[8];  ps[1].d = m[15] - m[12];/*Right*/ ps[2].normal.x = m[3] + m[1]; ps[2].normal.y = m[7] + m[5]; ps[2].normal.z = m[11] + m[9];  ps[2].d = m[15] + m[13];/*Bottom*/
+    ps[3].normal.x = m[3] - m[1]; ps[3].normal.y = m[7] - m[5]; ps[3].normal.z = m[11] - m[9];  ps[3].d = m[15] - m[13];/*Top*/ ps[4].normal.x = m[3] + m[2]; ps[4].normal.y = m[7] + m[6]; ps[4].normal.z = m[11] + m[10]; ps[4].d = m[15] + m[14];/*Near*/ ps[5].normal.x = m[3] - m[2]; ps[5].normal.y = m[7] - m[6]; ps[5].normal.z = m[11] - m[10]; ps[5].d = m[15] - m[14];/*Far*/
     for (int i=0;i<6;i++) { float len = V3_Mag(ps[i].normal); if(len > 1e-6f){ps[i].normal.x /= len; ps[i].normal.y /= len; ps[i].normal.z /= len; ps[i].d /= len;} } //Normalize (could use V3_Normalize but need len for d term of FrustumPlane).
 }
 
@@ -298,7 +294,7 @@ void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
 }
 
 __attribute__((noinline)) void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
-    glUseProgram(uiSP); glDisable(GL_BLEND); glBindVertexArray(textVAO); glUniform1ui(0,texIndex); glBindBuffer(GL_ARRAY_BUFFER,textVBO); float x1=x + width, y1=y + height, z=0.0f; float vertices[30] = {x,y1,z,0.0f,0.0f,x1,y,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,x,y1,z,0.0f,0.0f,x,y,z,0.0f,1.0f,x1,y,z,1.0f,1.0f};
+    glUseProgram(uiSP); glBindVertexArray(textVAO); glUniform1ui(0,texIndex); glBindBuffer(GL_ARRAY_BUFFER,textVBO); float x1=x + width, y1=y + height, z=0.0f; float vertices[30] = {x,y1,z,0.0f,0.0f,x1,y,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,x,y1,z,0.0f,0.0f,x,y,z,0.0f,1.0f,x1,y,z,1.0f,1.0f};
     glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,6); drawCalls++; uiDrawCalls++; vertsRendered += 6; glBindBuffer(GL_ARRAY_BUFFER,0);
 }
 
@@ -318,8 +314,7 @@ extern V3 vWepOfs[16]; extern WeaponFireCtx wfx; // weapon view model: needed by
 #include "automap.c" // CPU-rasterized automap (defines AMAP_UI_* rects used by ui.c)
 #include "ui.c"
 // Lights
-#define INVSQRT2 0.70710678118f
-Quaternion cubeQuats[6] = {{0.0f,INVSQRT2,0.0f,INVSQRT2}/*+X:Right*/,{0.0f,-INVSQRT2,0.0f,INVSQRT2}/*-X:Left*/,{-INVSQRT2,0.0f,0.0f,INVSQRT2}/*+Y:Up*/,{INVSQRT2,0.0f,0.0f,INVSQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
+static const float INVSQRT2=0.70710678118f; Quaternion cubeQuats[6] = {{0.0f,INVSQRT2,0.0f,INVSQRT2}/*+X:Right*/,{0.0f,-INVSQRT2,0.0f,INVSQRT2}/*-X:Left*/,{-INVSQRT2,0.0f,0.0f,INVSQRT2}/*+Y:Up*/,{INVSQRT2,0.0f,0.0f,INVSQRT2}/*-Y:Down*/,{0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,{0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
 void UpdateLights() {
     for (u16 lightIdx=0;lightIdx<World.loadedLights;++lightIdx) {
         V3 lightPos = World.lightsNewPosition[lightIdx]; World.lights[lightIdx].pos = lightPos;
@@ -501,13 +496,13 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform3f(12,World.fogColor[World.curLev].r * fogActual,World.fogColor[World.curLev].g * fogActual,World.fogColor[World.curLev].b * fogActual); // Fog Color(which is density)
     glUniform1ui(14,Sys_Settings.Reflections); glUniform1ui(15,Sys_Settings.Shadows); glUniform2f(8,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform3f(10,px,py,pz); glColorMask(1,1,1,1); glDepthMask(0); glDepthFunc(0x0203/*GL_LEQUAL*/); // Opaque Pass
     currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0; glUniform1f(9,0.0f); // Reset heat for infrared vision
-    for (u16 visibleIndex = 0; visibleIndex < opaqueCount; ++visibleIndex) { // Opaques (already front-to-back)
+    for (u16 visibleIndex = 0; visibleIndex < opaqueCount; ++visibleIndex) {/*Opaques (already front-to-back)*/
         u16 i = visibleInstances[visibleIndex].index; Entity* e = &World.instances[i]; u16 tex = e->texIndex; u32 constIndex = e->index; if (unlikely(transparentTexture[tex])) continue;
         if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { if(cullBlendState != 2){glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState=2;} }/*Doublesided (either)*/else { if(cullBlendState != 0){glEnable(GL_CULL_FACE); glDisable(GL_BLEND); cullBlendState=0;} } // Opaque
         DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,grayscaleEnabled);
     }
-    glDepthMask(1); currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0; // Transparents Pass
-    for (u16 visibleIndex = opaqueCount; visibleIndex < (opaqueCount + tcnt); ++visibleIndex) {
+    glDepthMask(1); currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0;
+    for (u16 visibleIndex = opaqueCount; visibleIndex < (opaqueCount + tcnt); ++visibleIndex) {/*Transparents Pass*/
         u16 i = visibleInstances[visibleIndex].index; Entity* e = &World.instances[i]; u16 tex = e->texIndex; u32 constIndex = e->index;
         if(likely(transparentTexture[tex])){if(cullBlendState != 1){glEnable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState=1;} }/*Transparents (with sort)*/ else if (unlikely(doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f)) { if(cullBlendState != 2){glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState=2;} }/*Doublesided*/ else continue;/*Opaque*/
         if (unlikely((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573))) glDepthFunc(0x0202/*GL_EQUAL*/); /*Cutouts*/ else glDepthFunc(0x0203/*GL_LEQUAL*/); /*Actual alphas*/ DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,grayscaleEnabled);
@@ -538,7 +533,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if(unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][3]);
     if(likely(Sys_Settings.Reflections>0u)){  glUseProgram(ssrSP); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3); glUniformMatrix4fv(6,1,0,invViewProj); glUniformMatrix4fv(4,1,GL_FALSE,viewProj); glDispatchCompute(((Sys_Settings.ScreenWidth/Sys_Settings.SSR_RES)+31)/32,((Sys_Settings.ScreenHeight/Sys_Settings.SSR_RES)+31)/32,1); }
-    glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glClearColor(0,0,0,0); glViewport(0,0,UI_W,UI_H); glDisable(GL_CULL_FACE); renderTime = get_time() - rendStart;
+    glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glClearColor(0,0,0,0); glViewport(0,0,UI_W,UI_H); glDisable(GL_CULL_FACE); renderTime = get_time() - rendStart; glEnable(GL_BLEND);
     RenderUI(); AutomapBlitToUI(); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][4]); glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight);
     glUseProgram(imageBlitSP); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,inputImageID); glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,inputUIID); glUniform1i(31,1); glUniform1i(32,3); glUniformMatrix4fv(33,1,0,invViewProj); double berserkTimeRemainingNormalized = World.invP1.berserkFinished > 0.0001 ? (World.invP1.berserkFinished - World.pauseRelativeTime) / BERSERK_TIME : 0.0;

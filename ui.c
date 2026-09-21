@@ -34,11 +34,8 @@ static u8 UIClicked(u32 id) {
     Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true;
     double* t=l?&World.uiComponents[id].lastLMB:&World.uiComponents[id].lastRMB; u8 dbl=(*t>0.0 && (World.pauseRelativeTime-*t)<=UI_DBLCLICK)?4u:0u; *t=dbl?0.0:World.pauseRelativeTime; return (u8)((l?1u:2u)|dbl);
 }
-
-extern float reloadTime[16];
-/*mk3,bls,drt,flch, ion,rpir,pipe,magn,magp,pstl,plsm,rail,riot,skrp,sprq,stun*/
-u16 wepIconTexIndices[16]={584,636,819,1067,1068,1494,1072,1069,1070,1071,1073,1165,1989,1990,1991,1992};
-const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
+                         /*mk3,bls,drt,flch, ion,rpir,pipe,magn,magp,pstl,plsm,rail,riot,skrp,sprq,stun*/
+u16 wepIconTexIndices[16]={584,636,819,1067,1068,1494,1072,1069,1070,1071,1073,1165,1989,1990,1991,1992}; const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"}; extern float reloadTime[16];
 void MFD_NewGame(void) {
     World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.consumableClickRow=-1,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.applyButtonReferenceIndex=-1,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,.logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
 }
@@ -203,6 +200,7 @@ void HardwareButtons() {
         else tex=(u16)HwActiveTexIndex((World.invP1.hardwareIsActive & b->bit)!=0,World.invP1.hwVers[b->idx],b->t[0],b->t[1],b->t[2],b->t[3],b->t[4]);
         UIRImg(UI_ID_HUD_HW_0+i,b->x,b->y,40,40,tex); }
 }
+
 static void HwToggle(u8 i) {
     const HwBtn* b=&hwBtns[i]; bool noEng=World.invP1.energy<=0.0f, on=(World.invP1.hardwareIsActive & b->bit)!=0;
     if (b->eng==3) { MFD_ResetGeneral(); World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdItemReader[0]=true; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;
@@ -215,7 +213,6 @@ extern V3 queuedLevelPos; extern u8 queuedLevelToLoad;
 void ActualChangeAmmoType(void); void OverloadButtonAction(void); void PlayLog(int logIndex); void CheckForUnreadLogs(void); void UseTargets(u16,u16);
 static const char* mgName[9]={"Ping","15","Wing 0","Botbounce","Eel Zapper","Road","TriopToe","Corp Conq","Chess"};
 static void SysUIDataClose(bool rh) { MFD_CloseDataSide(rh); World.Sys_UI.objectInUsePos=(V3){999.0f,999.0f,999.0f}; World.Sys_UI.usingObject=false; }
-/*Lock/object panels (keypad/elevator/grid/wire) fire their targets once, on the click that solves them; subsequent clicks are swallowed by the solved guard.*/
 static void KeycodeSetDigit(int n) { if (World.Sys_UI.keycodeOnes < 0) { World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes; } else if (World.Sys_UI.keycodeTens < 0) { World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10; } else if (World.Sys_UI.keycodeHuns < 0) { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } else { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } }
 static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeValid) return; if (s->keycodeSolved) return; play_wav(sounds[39],SfxVol(),(V3){0.0f,0.0f,0.0f},false);
     if (k>=0&&k<=9) KeycodeSetDigit(k);
@@ -224,6 +221,7 @@ static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeV
     if (s->keycodeEntry==s->keycodeValue) { if (s->keycodeHuns>=0) play_wav(sounds[46],SfxVol(),(V3){0.0f,0.0f,0.0f},false);/*code accepted*/ u16 pad=s->tetheredKeypadKeycode; if (pad>=INSTS_1ST_IDX && pad<World.instCount) { UseTargets(pad,World.instances[pad].targetIdx); if (World.instances[pad].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pad].messageLingdex]); } s->keycodeSolved=true; }
     else if (s->keycodeHuns>=0) play_wav(sounds[43],SfxVol(),(V3){0.0f,0.0f,0.0f},false);/*code not accepted*/
 }
+
 void UI_KeycodeKey(bool rh,int k) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (k<0||k>11) return; KeycodeKeypress(k); }
 void UI_KeycodeClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadKeycode=U16_MAX; World.Sys_UI.keycodeValid=false; World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes=-1; World.Sys_UI.keycodeEntry=-1; World.Sys_UI.keycodeValue=0; World.Sys_UI.keycodeSolved=false; SysUIDataClose(rh); }
 void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (btn<0||btn>7) return;
@@ -233,12 +231,13 @@ void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=tru
     if (!World.Sys_UI.buttonsEnabled[btn] || World.Sys_UI.buttonsDarkened[btn]) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); return; }/*Floor not accessible.*/
     u16 floor=World.Sys_UI.elevButtonSpawnIdx[btn]; queuedLevelPos=(floor!=U16_MAX && floor<World.instCount && (World.instances[floor].entflags&EF_ACTIVE)) ? World.position[floor] : (V3){0.0f,0.0f,0.0f}; queuedLevelToLoad=World.Sys_UI.elevButtonLevelIdx[btn];
 }
+
 void UI_ElevClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadElevator=U16_MAX; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.elevCurrentFloor=0; SysUIDataClose(rh); }
 void UI_AudioLogClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastLogSideRH=rh; if (!(World.invP1.hasHardware&HW_ERD)) return;
     if (World.Sys_UI.logActive) { World.Sys_UI.logActive=false; World.Sys_UI.audPaused=true; CenterStatusPrint("%s",Sys_Text.stringTable[1019]); return; }/*Log playback stopped.*/
     if (World.Sys_UI.logReferenceIndex<(u16)LOGCNT && World.invP1.hasLog[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex][0]) { PlayLog((int)World.Sys_UI.logReferenceIndex); World.Sys_UI.logActive=true; }
 }
-/*---- Grid puzzle (Unity PuzzleGrid.cs) ----*/
+
 static void PGToggleLine(int i,int dx,int dy) { int w=World.Sys_UI.pg_width,h=World.Sys_UI.pg_height,r=i/w+dy,c=i%w+dx; while (r>=0&&r<h&&c>=0&&c<w) { int ci=r*w+c; if (World.Sys_UI.pg_type[ci]!=PuzzleCellType_Standard) break; World.Sys_UI.pg_cell[ci]=!World.Sys_UI.pg_cell[ci]; r+=dy; c+=dx; } }
 static void PGFlipperPawn(int i) { World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; }
 static void PGFlipperKing(int i) { int w=World.Sys_UI.pg_width,h=World.Sys_UI.pg_height,r=i/w,c=i%w; World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; for (i8 dr=-1;dr<=1;++dr) for (i8 dc=-1;dc<=1;++dc) { if (!dr&&!dc) continue; int rr=r+dr,cc=c+dc; if (rr<0||rr>=h||cc<0||cc>=w) continue; int ci=rr*w+cc; if (World.Sys_UI.pg_type[ci]==PuzzleCellType_Standard) World.Sys_UI.pg_cell[ci]=!World.Sys_UI.pg_cell[ci]; } }

@@ -24,6 +24,6 @@ void main() {
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
     texUV.x = texUV.x % texSize.x; texUV.y = texUV.y % texSize.y;
     vec4 albedoColor = getTextureColor(texIndex,texUV,texSize.x);
-    if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
+//     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
     outUI = albedoColor;
 }
