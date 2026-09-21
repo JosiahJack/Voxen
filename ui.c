@@ -113,8 +113,7 @@ void RenderMenu() {
             RenderTextL(310,620,T_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", globalframesPerLastSecond);/*Helper to see vsync take effect.*/
             if (UI_Slider(UI_ID_MENU_FOV_SLIDER,400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,Sys_Settings.FOV,&newVal,&fovSliderActive,45,150,5,5,/*Field of View*/775)) { Sys_Settings.FOV = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
             if (UI_Slider(UI_ID_MENU_GAMMA_SLIDER,400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,Sys_Settings.Brightness,&newVal,&gammaSliderActive,0,100,2,6,/*Gamma*/774)) { Sys_Settings.Brightness = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
-            /*Resolution. Header hit area - UI_Button subtracts h from y internally, so pass y+h as y*/
-            if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { resDropdownOpen = !resDropdownOpen; currentMenuItem = 7; }
+            if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { DualLog("Resolution dropdown clicked! %u\n",globalframe); resDropdownOpen = !resDropdownOpen; currentMenuItem = 7; }
             overRes = overRes || currentMenuItem == 7; char resBuf[32];
             if (resDropdownCount > 0) sFormat(resBuf, sizeof(resBuf), "%ux%u",(u32)resModes[resSelectedIdx].w,(u32)resModes[resSelectedIdx].h); else sFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
             RenderUIImage(476, 710, 16, 16, overRes ? 1119 : 1077); RenderTextL(200, 710, overRes ? T_YELLOW : T_GREEN,FONT_NORMAL, 1.0f, "RESOLUTION %s", resBuf);

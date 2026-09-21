@@ -544,18 +544,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u32 shieldOnType = 0u/*No shield green tint*/; if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) {shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/;} glUniform1ui(20,shieldOnType); // Green Shield
     Color3 painStaticColor = (Color3){1.0f,0.0f,0.0f}; glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b); glUniformMatrix4fv(24,1,0,viewProj); glUniformMatrix3fv(25,1,0,invViewRot); glUniform1i(27,0); glUniform1f(28,vclamp(World.painStaticAlpha + World.empStaticAlpha,0.0f,1.0f)); glUniform1ui(29,(u32)ModRequestsGrayscale()); glBindVertexArray(quadVAO);
     glDisable(GL_DEPTH_TEST); glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/,0,4); drawCalls++; vertsRendered += 4; glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
-    // 3D text decals are now world-baked meshes drawn via chunkSP in the main opaque/transparent geometry pass above.
-    // Edit mode selection text: only visible when edit mode active and selection is active
     if (Cheats.editMode && editModeSelection < U16_MAX && World.editTextInstanceIndex < INSTANCE_COUNT) {
-        u16 ed = editModeSelection; u16 edTextIdx = World.editTextInstanceIndex;
-        World.position[edTextIdx] = World.position[ed]; // positioned at selected object
-        float wx=World.position[ed].x, wy=World.position[ed].y, wz=World.position[ed].z;
-        float clipX = viewProj[0]*wx + viewProj[4]*wy + viewProj[8]*wz + viewProj[12];
-        float clipY = viewProj[1]*wx + viewProj[5]*wy + viewProj[9]*wz + viewProj[13];
-        float clipW = viewProj[3]*wx + viewProj[7]*wy + viewProj[11]*wz + viewProj[15];
-        float projXf=0.0f, projYf=0.0f; if (clipW > 0.01f) { float ndcX = clipX / clipW; float ndcY = clipY / clipW; projXf = ((ndcX + 1.0f) * 0.5f) * (float)swidth; projYf = ((1.0f - ndcY) * 0.5f) * (float)sheight; }
-        char editTextStr[64]; sFormat(editTextStr, sizeof(editTextStr), "index: %d", ed); // snprintf replacement
-        RenderText3DC((V3){projXf, projYf, 0.0f}, T_WHITE, FONT_NORMAL, 1.0f, edTextIdx, editTextStr);
+        World.position[World.editTextInstanceIndex]=World.position[editModeSelection]; float wx=World.position[editModeSelection].x,wy=World.position[editModeSelection].y,wz=World.position[editModeSelection].z; float clipX=viewProj[0]*wx+viewProj[4]*wy+viewProj[8]*wz+viewProj[12],clipY=viewProj[1]*wx+viewProj[5]*wy+viewProj[9]*wz+viewProj[13],clipW=viewProj[3]*wx+viewProj[7]*wy+viewProj[11]*wz+viewProj[15];
+        float projXf=0,projYf=0; if(clipW>0.01f){float ndcX=clipX/clipW; float ndcY=clipY/clipW; projXf=((ndcX+1.0f)*0.5f)*(float)swidth; projYf=((1.0f-ndcY)*0.5f)*(float)sheight;} char editTextStr[64]; sFormat(editTextStr,sizeof(editTextStr),"index: %d",editModeSelection); RenderText3DC((V3){projXf,projYf,0.0f},T_WHITE,FONT_NORMAL,1.0f,editTextStr);
     }
     if ((World.last_time - World.lastFrameSecCountTime) >= 1.00) { World.lastFrameSecCountTime=World.last_time; globalframesPerLastSecond=globalframe - World.lastFrameSecCount; World.lastFrameSecCount=globalframe; } // Update Diagnostic Poll
 }

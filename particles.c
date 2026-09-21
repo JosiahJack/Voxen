@@ -29,56 +29,26 @@ void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForwar
         u32 count = runEnd - runStart; glDrawArraysInstanced(GL_TRIANGLE_STRIP,0,4,count); drawCalls++; vertsRendered += count * 4; runStart = runEnd;
     }
     glEnable(GL_CULL_FACE); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); glDepthFunc(GL_LESS);
-    if (psys.trailCount == 0){return;} // Particles barrier <<<<<<<<
-    float now = (float)World.pauseRelativeTime;
+    if (psys.trailCount == 0){return;} // Particles barrier <<<<<<
+    u32 ownerSlot[MAX_TRAIL_OWNERS]; u32 ownerMin[MAX_TRAIL_OWNERS]; u32 ownerMax[MAX_TRAIL_OWNERS]; u32 ownerCount = 0;
     for (u32 i = 0; i < psys.trailCount; i++) {
-        TrlSegInst* s = &psys.trailSegments[i];
-        u16 emIdx = (u16)(s->uvData >> 16);
-        Emitter* em = (emIdx < MAX_EMITTERS && psys.emitters[emIdx].active) ? &psys.emitters[emIdx] : NULL;
-        float life = em ? em->trailLifetime : 1.0f;
-        float t0=(life > 0.0f) ? vclamp((now - s->birth0) / life, 0.0f, 1.0f) : 0.0f, t1=(life > 0.0f) ? vclamp((now - s->birth1) / life, 0.0f, 1.0f) : 0.0f,r0,g0,b0,a0,r1,g1,b1,a1;
-        if (em) unpack_rgba8(em->trailColorStart, &r0, &g0, &b0, &a0); else { r0 = g0 = b0 = a0 = 1.0f; }
-        if (em) unpack_rgba8(em->trailColorEnd, &r1, &g1, &b1, &a1); else { r1 = g1 = b1 = a1 = 1.0f; }
-        s->color0 = pack_rgba8(r0 + (r1 - r0) * t0, g0 + (g1 - g0) * t0, b0 + (b1 - b0) * t0, a0 + (a1 - a0) * t0);
-        s->color1 = pack_rgba8(r0 + (r1 - r0) * t1, g0 + (g1 - g0) * t1, b0 + (b1 - b0) * t1, a0 + (a1 - a0) * t1);
-        float w0 = em ? em->trailWidthStart : 0.05f, w1 = em ? em->trailWidthEnd : 0.05f;
-        float w0o = w0 + (w1 - w0) * t0, w1o = w0 + (w1 - w0) * t1;
-        float sx = s->p1x - s->p0x, sy = s->p1y - s->p0y, sz = s->p1z - s->p0z;
-        float sl = vsqrtf(sx*sx + sy*sy + sz*sz);
-        if (sl < 1e-6f) { sx = 0.0f; sy = 0.0f; sz = 1.0f; sl = 1.0f; } else { sx /= sl; sy /= sl; sz /= sl; }
-        float cax = s->p0x, cay = s->p0y, caz = s->p0z;/*start edge on p0 so stitch weld lands on joint*/
-        float wa = w0o;
-        float vx = camPos.x - cax, vy = camPos.y - cay, vz = camPos.z - caz;
-        float vl = vsqrtf(vx*vx + vy*vy + vz*vz);
-        if (vl < 1e-6f) { vx = 0.0f; vy = 0.0f; vz = 1.0f; vl = 1.0f; } else { vx /= vl; vy /= vl; vz /= vl; }
-        float a0x = sy*vz - sz*vy, a0y = sz*vx - sx*vz, a0z = sx*vy - sy*vx;
-        float a0l = vsqrtf(a0x*a0x + a0y*a0y + a0z*a0z);
-        if (a0l < 1e-6f) { a0x = camRight.x; a0y = camRight.y; a0z = camRight.z; } else { a0x /= a0l; a0y /= a0l; a0z /= a0l; }
-        s->c00x = cax - a0x * wa;
-        s->c00y = cay - a0y * wa;
-        s->c00z = caz - a0z * wa;
-        s->c01x = cax + a0x * wa;
-        s->c01y = cay + a0y * wa;
-        s->c01z = caz + a0z * wa;
-        vx = camPos.x - s->p1x;
-        vy = camPos.y - s->p1y;
-        vz = camPos.z - s->p1z;
-        vl = vsqrtf(vx*vx + vy*vy + vz*vz);
-        if (vl < 1e-6f) { vx = 0.0f; vy = 0.0f; vz = 1.0f; vl = 1.0f; } else { vx /= vl; vy /= vl; vz /= vl; }
-        float a1x = sy*vz - sz*vy, a1y = sz*vx - sx*vz, a1z = sx*vy - sy*vx;
-        float a1l = vsqrtf(a1x*a1x + a1y*a1y + a1z*a1z);
-        if (a1l < 1e-6f) { a1x = camRight.x; a1y = camRight.y; a1z = camRight.z; } else { a1x /= a1l; a1y /= a1l; a1z /= a1l; }
-        s->c10x = s->p1x - a1x * w1o;
-        s->c10y = s->p1y - a1y * w1o;
-        s->c10z = s->p1z - a1z * w1o;
-        s->c11x = s->p1x + a1x * w1o;
-        s->c11y = s->p1y + a1y * w1o;
-        s->c11z = s->p1z + a1z * w1o;
+        TrlSegInst* s = &psys.trailSegments[i]; u32 slot = s->particleSlot; u32 ci = s->chainIndex; u32 oi = ownerCount; for (u32 k = 0; k < ownerCount; k++) { if (ownerSlot[k] == slot) { oi = k; break; } }
+        if (oi == ownerCount) { if (ownerCount >= MAX_TRAIL_OWNERS) continue; /*more distinct trail-owning particles alive than the table holds; extremely unlikely given segment budget, but degrade safely rather than overrun*/ ownerSlot[oi]=slot; ownerMin[oi]=ci; ownerMax[oi]=ci; ownerCount++; } else { if (ci < ownerMin[oi]) ownerMin[oi]=ci; if (ci > ownerMax[oi]) ownerMax[oi]=ci;}
     }
     for (u32 i = 0; i < psys.trailCount; i++) {
-        TrlSegInst* a = &psys.trailSegments[i];
+        TrlSegInst* s = &psys.trailSegments[i]; u16 emIdx = (u16)(s->uvData >> 16); Emitter* em = (emIdx < MAX_EMITTERS && psys.emitters[emIdx].active) ? &psys.emitters[emIdx] : NULL; u32 chainMin=s->chainIndex, chainMax=s->chainIndex; for (u32 k = 0; k < ownerCount; k++) { if (ownerSlot[k] == s->particleSlot) { chainMin=ownerMin[k]; chainMax=ownerMax[k]; break; } }
+        u32 span = chainMax - chainMin; float t = span > 0 ? (float)(s->chainIndex - chainMin) / (float)span : 0.0f; t = 1.0f - t; float t0 = t, t1 = t; float r0,g0,b0,a0,r1,g1,b1,a1; if (em) unpack_rgba8(em->trailColorStart, &r0, &g0, &b0, &a0); else { r0 = g0 = b0 = a0 = 1.0f; } if (em) unpack_rgba8(em->trailColorEnd, &r1, &g1, &b1, &a1); else { r1 = g1 = b1 = a1 = 1.0f; }
+        s->color0 = pack_rgba8(r0 + (r1 - r0) * t0, g0 + (g1 - g0) * t0, b0 + (b1 - b0) * t0, a0 + (a1 - a0) * t0); s->color1 = pack_rgba8(r0 + (r1 - r0) * t1, g0 + (g1 - g0) * t1, b0 + (b1 - b0) * t1, a0 + (a1 - a0) * t1); float w0 = em ? em->trailWidthStart : 0.05f, w1 = em ? em->trailWidthEnd : 0.05f; float w0o = w0 + (w1 - w0) * t0, w1o = w0 + (w1 - w0) * t1; float sx = s->p1x - s->p0x, sy = s->p1y - s->p0y, sz = s->p1z - s->p0z;
+        float sl = vsqrtf(sx*sx + sy*sy + sz*sz); if (sl < 1e-6f) { sx = 0.0f; sy = 0.0f; sz = 1.0f; sl = 1.0f; } else { sx /= sl; sy /= sl; sz /= sl; } float cax = s->p0x, cay = s->p0y, caz = s->p0z; float wa = w0o; float vx = camPos.x - cax, vy = camPos.y - cay, vz = camPos.z - caz; float vl = vsqrtf(vx*vx + vy*vy + vz*vz); if (vl < 1e-6f) { vx = 0.0f; vy = 0.0f; vz = 1.0f; vl = 1.0f; } else { vx /= vl; vy /= vl; vz /= vl; }
+        float a0x = sy*vz - sz*vy, a0y = sz*vx - sx*vz, a0z = sx*vy - sy*vx; float a0l = vsqrtf(a0x*a0x + a0y*a0y + a0z*a0z); if (a0l < 1e-6f) { a0x = camRight.x; a0y = camRight.y; a0z = camRight.z; } else { a0x /= a0l; a0y /= a0l; a0z /= a0l; } s->c00x = cax - a0x * wa; s->c00y = cay - a0y * wa; s->c00z = caz - a0z * wa; s->c01x = cax + a0x * wa; s->c01y = cay + a0y * wa; s->c01z = caz + a0z * wa;
+        vx = camPos.x - s->p1x; vy = camPos.y - s->p1y; vz = camPos.z - s->p1z; vl = vsqrtf(vx*vx + vy*vy + vz*vz); if (vl < 1e-6f) { vx = 0.0f; vy = 0.0f; vz = 1.0f; vl = 1.0f; } else { vx /= vl; vy /= vl; vz /= vl; } float a1x = sy*vz - sz*vy, a1y = sz*vx - sx*vz, a1z = sx*vy - sy*vx; float a1l = vsqrtf(a1x*a1x + a1y*a1y + a1z*a1z); if (a1l < 1e-6f) { a1x = camRight.x; a1y = camRight.y; a1z = camRight.z; } else { a1x /= a1l; a1y /= a1l; a1z /= a1l; }
+        s->c10x = s->p1x - a1x * w1o; s->c10y = s->p1y - a1y * w1o; s->c10z = s->p1z - a1z * w1o; s->c11x = s->p1x + a1x * w1o; s->c11y = s->p1y + a1y * w1o; s->c11z = s->p1z + a1z * w1o;
+    }
+    for (u32 i = 0; i < psys.trailCount; i++) {
+        TrlSegInst* a = &psys.trailSegments[i]; 
         for (u32 j = 0; j < psys.trailCount; j++) {
-            if (j == i){continue;} TrlSegInst* b=&psys.trailSegments[j]; if (((a->uvData>>16)&0xFFFFu) != ((b->uvData>>16)&0xFFFFu)){continue;}/*weld same-emitter segs only*/ if (!(a->p1x == b->p0x && a->p1y == b->p0y && a->p1z == b->p0z)){continue;} a->c10x = b->c00x = (a->c10x + b->c00x) * 0.5f; a->c10y = b->c00y = (a->c10y + b->c00y) * 0.5f; a->c10z = b->c00z = (a->c10z + b->c00z) * 0.5f; a->c11x = b->c01x = (a->c11x + b->c01x) * 0.5f; a->c11y = b->c01y = (a->c11y + b->c01y) * 0.5f; a->c11z = b->c01z = (a->c11z + b->c01z) * 0.5f;
+            if (j == i){continue;} TrlSegInst* b=&psys.trailSegments[j]; if (a->particleSlot != b->particleSlot){continue;}/*only weld within the same particle's own chain*/ if (((a->uvData>>16)&0xFFFFu) != ((b->uvData>>16)&0xFFFFu)){continue;} if (b->chainIndex != a->chainIndex + 1){continue;}/*unambiguous adjacency: b is the segment immediately newer than a*/
+            a->c10x = b->c00x = (a->c10x + b->c00x) * 0.5f; a->c10y = b->c00y = (a->c10y + b->c00y) * 0.5f; a->c10z = b->c00z = (a->c10z + b->c00z) * 0.5f; a->c11x = b->c01x = (a->c11x + b->c01x) * 0.5f; a->c11y = b->c01y = (a->c11y + b->c01y) * 0.5f; a->c11z = b->c01z = (a->c11z + b->c01z) * 0.5f;
         }
     }
     trailSortCam=camPos; if(psys.trailCount > 1){qsort_new(psys.trailSegments,psys.trailCount,sizeof(TrlSegInst),trail_cmp);} glUseProgram(trailSP); glBindVertexArray(psysquadVAO); glBindBufferBase(GL_SSBO,TRAIL_SSBO_BINDING,psysTrailsID);
@@ -106,9 +76,9 @@ void PSys_Update(float dt) {
             float dx=p->pos.x-p->trailSample.x, dy=p->pos.y-p->trailSample.y, dz=p->pos.z-p->trailSample.z;
             if(dx*dx+dy*dy+dz*dz >= 0.0004f){
                 if(psys.trailCount >= MAX_TRAIL_SEGS){return;} TrlSegInst* seg=&psys.trailSegments[psys.trailCount++]; seg->p0x=p->trailSample.x; seg->p0y=p->trailSample.y; seg->p0z=p->trailSample.z; seg->p1x=p->pos.x; seg->p1y=p->pos.y; seg->p1z=p->pos.z; seg->padA=seg->padB=0; seg->c00x=seg->c00y=seg->c00z=seg->c00w=seg->c01x=seg->c01y=seg->c01z=seg->c01w=seg->c10x=seg->c10y=seg->c10z=seg->c10w=seg->c11x=seg->c11y=seg->c11z=seg->c11w=0;
-                seg->color0=seg->color1=0; seg->uvData=(em->trailTexture&0xFFFF)|((p->emitterIndex&0xFFFF)<<16); seg->birth0=p->trailBirth; seg->birth1=(float)World.pauseRelativeTime; seg->deathTime=(float)World.pauseRelativeTime+em->trailLifetime; seg->pad0=0; seg->pad1=0; p->trailSample=p->pos; p->trailBirth=(float)World.pauseRelativeTime;
+                seg->color0=seg->color1=0; seg->uvData=(em->trailTexture&0xFFFF)|((p->emitterIndex&0xFFFF)<<16); seg->birth0=p->trailBirth; seg->birth1=(float)World.pauseRelativeTime; seg->deathTime=(float)World.pauseRelativeTime+em->trailLifetime; seg->chainIndex=p->trailHead; seg->particleSlot=(u32)i; p->trailHead++; if(p->trailChainLen < 0xFFFFu) p->trailChainLen++; p->trailSample=p->pos; p->trailBirth=(float)World.pauseRelativeTime;
             }
-        } 
+        }
         GpuPartInst* gpu=&psys.gpuInstances[i]; gpu->x=p->pos.x; gpu->y=p->pos.y; gpu->z=p->pos.z; gpu->size=p->baseSize*s; gpu->color=p->color; gpu->data0=(p->flags << 24) | (((p->textureIndex+p->animFrame) & 0xFFFF) << 8) | (((u32)(vclamp(p->rotation/6.2831853f,0.0f,1.0f)*255.0f)) & 0xFF);
         gpu->data1=(u32)(vclamp(em->softness,0,255.f/16.f) * 16.f+.5f) & 0xFF; gpu->pad=0; V3 d={p->pos.x-camPos.x,p->pos.y-camPos.y,p->pos.z-camPos.z}; float dist=d.x*camForward.x+d.y*camForward.y+d.z*camForward.z; psys.sortKeys[i].sortKey=((u32)p->blendMode << 24) | (0xFFFFFFu - ((u32)vclamp((dist+1000.0f)*10.0f,0,16777215.f))); psys.sortKeys[i].index=(u16)i; i++;
     }}
