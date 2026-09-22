@@ -160,7 +160,7 @@ static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
 
 void TextureSequenceInit(u16 self, char* trimmed_value) {
     Entity* e=&World.instances[self]; if(e->index == 526){return;/*prop_console02,need combined tex TODO*/} if(trimmed_value[0]=='\0'){e->textureAnimating=false; e->modelIndex=EDefs[e->index].modelIndex; return;} e->textureAnimating=true; e->textureGlowAnimating=false; e->texAnimLight=e->texAnimLight2=U16_MAX; e->texFrame=e->texGlowFrame=0; if(sEqual(trimmed_value,"ScreenDestroyed")){World.instances[self].texAnimClip=NUM_TEXTURE_CLIPS-1; return;}
-    if(sEqual(trimmed_value,"MedCamView1")) { e->textureAnimating = false; e->camView = 0; return; } if (sEqual(trimmed_value,"MedCamView2")) { e->textureAnimating=false; e->camView=1; return;} for(int i=0;i<NUM_TEXTURE_CLIPS;++i){if(sEqual(trimmed_value,textureAnimClips[i].name)){World.instances[self].texAnimClip=i; e->textureGlowAnimating=textureAnimClips[i].hasGlow; return;}} e->textureAnimating=false; // Couldn't find match, just don't animate.
+    {size_t vlen=slen(trimmed_value); size_t d=vlen; while(d>0&&trimmed_value[d-1]>='0'&&trimmed_value[d-1]<='9'){--d;} if(vlen-d>=1&&vlen-d<=2&&d>=7&&sCompUpToLen(trimmed_value+d-7,"CamView",7)==0){int cvn=0; for(size_t k=d;k<vlen;++k){cvn=cvn*10+(trimmed_value[k]-'0');} if(cvn>=1&&cvn<=64){e->textureAnimating=false; e->camView=(u8)(cvn-1); return;}}}/*<prefix>CamView<N>, e.g. SecCamView3: show this level's camera N-1*/ for(int i=0;i<NUM_TEXTURE_CLIPS;++i){if(sEqual(trimmed_value,textureAnimClips[i].name)){World.instances[self].texAnimClip=i; e->textureGlowAnimating=textureAnimClips[i].hasGlow; return;}} e->textureAnimating=false; // Couldn't find match, just don't animate.
 }
 
 void TextureSequenceUpdate(u16 self) {
