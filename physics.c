@@ -325,6 +325,7 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
 static void EntityColliderMatrixNow(u16 i, float M[16]){Quaternion q=World.rotation[i]; V3 sx=V3_ScaleByF(quat_rot_v3(q,(V3){1,0,0}),World.scale[i].x); V3 sy=V3_ScaleByF(quat_rot_v3(q,(V3){0,1,0}),World.scale[i].y); V3 sz=V3_ScaleByF(quat_rot_v3(q,(V3){0,0,1}),World.scale[i].z); V3 p=World.position[i]; M[0]=sx.x; M[1]=sx.y; M[2]=sx.z; M[3]=0.0f; M[4]=sy.x; M[5]=sy.y; M[6]=sy.z; M[7]=0.0f; M[8]=sz.x; M[9]=sz.y; M[10]=sz.z; M[11]=0.0f; M[12]=p.x; M[13]=p.y; M[14]=p.z; M[15]=1.0f;}
 static bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx=V3_dot(d,ax),ly=V3_dot(d,ay),lz=V3_dot(d,az); float cx=vclamp(lx,-box.hExt.x,box.hExt.x),cy=vclamp(ly,-box.hExt.y,box.hExt.y),cz=vclamp(lz,-box.hExt.z,box.hExt.z); float dx=lx-cx, dy=ly-cy, dz=lz-cz; return (dx*dx+dy*dy+dz*dz)<=radius*radius;}
 INLINE int V3_IsSane(V3 v) { union { float f; u32 i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
+static bool reverbZoneActive; static u16 activeReverbPreset;
 void Physics(float dt) {
     for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false); World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
     for (u16 i=0;i<World.instCount && dynamicEntityCount < 512;++i) {
@@ -409,12 +410,27 @@ void Physics(float dt) {
                     case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;   case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force*(float)World.deltaTime),false); World.Sys_Music.cyberTube=true;} break;
                     case 596/*trigger_gravitylift*/:trigger_gravitylift_touch(self,other); break;  case 597/*trigger_ladder*/:if(other == PLAYER1){World.invP1.ladderState=1; ladderTouched=true; ladderTopY=trigBox.ctr.y + trigBox.hExt.y;} break;
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;  case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elev); World.Sys_Music.distortion=(tt == TT_Distortion);} break;
-                    case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */ case 746/*weapon_grenadeenergmine_live*/:if(other == PLAYER1){TakeEnergy(256.0f);} break;
+                    case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */
+                    case 746/*weapon_grenadeenergmine_live*/:if(other == PLAYER1){TakeEnergy(256.0f);} break;
                 }
             }
         }
         ladderWalkOff = ladderTouched && (World.position[PLAYER1].y > ladderTopY + 0.48f); if (!ladderTouched) World.invP1.ladderState=0;
     }
+
+    // Reverb zones (fx_reverbzone constIndex 716): spherical distance check with hysteresis
+    // Enter at <= reverbMinDist, exit at > reverbMaxDist
+    activeReverbPreset = 0;
+    reverbZoneActive = false;
+    for (u16 i = PLAYER1; i < World.instCount; ++i) {
+        if (World.instances[i].index == 716) {
+            DrawSphereWireframe((Color){0.3f,0.05f,0.6f,0.6f},(ShapeSphere){World.position[i],World.instances[i].reverbMinDist});
+            DrawSphereWireframe((Color){0.3f,0.05f,0.6f,0.4f},(ShapeSphere){World.position[i],World.instances[i].reverbMaxDist});
+            float distSq=V3_SqDist(World.position[PLAYER1],World.position[i]),minDistSq=World.instances[i].reverbMinDist*World.instances[i].reverbMinDist,maxDistSq=World.instances[i].reverbMaxDist*World.instances[i].reverbMaxDist;
+            if (distSq <= maxDistSq) {reverbZoneActive = true; activeReverbPreset = World.instances[i].reverbPreset;}
+        }
+    }
+    if (!reverbZoneActive){synth_set_reverb_preset(0); World.invP1.inReverbZone=false;}else{synth_set_reverb_preset(activeReverbPreset); World.invP1.inReverbZone = true;}
     {   const i32 WAKE_CELLS = 2;
         for (u32 i=0;i<World.instCount;++i) {
             if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true); u32 ef = World.instances[i].entflags; bool canSleep = (i!=PLAYER1) && IdxIsDynamicObject(World.instances[i].index) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && (World.col[i]!=COLTYPE_NONE) && (World.mass[i] >= 0.001f); if (!canSleep) { World.physSleep[i]=0; continue; } i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z); bool nearAwake = false;

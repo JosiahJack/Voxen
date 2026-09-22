@@ -467,6 +467,7 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("x")) inst->forceFieldDirectionX = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("y")) inst->forceFieldDirectionY = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("z")) inst->forceFieldDirectionZ = parse_bool(value, lineSpace, lineNum); 
                 else if(KEY_EQ("activatedScaleX")) inst->activatedScale.x = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("activatedScaleY")) inst->activatedScale.y = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("activatedScaleZ")) inst->activatedScale.z = parse_float(value, lineSpace, lineNum);
                 else if(KEY_EQ("fieldColor"))          inst->fieldColor = (ForceFieldColor)parse_numberu8(value, lineSpace, lineNum);                      else if(KEY_EQ("touchEnabled")) inst->touchEnabled = parse_bool(value,lineSpace,lineNum);
+                else if(KEY_EQ("minDistance")) inst->reverbMinDist = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("maxDistance")) inst->reverbMaxDist = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("reverbPreset")) inst->reverbPreset = (u16)parse_numberu16(value, lineSpace, lineNum);
                 else if(KEY_EQ("center.x")) colCtrFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.y")) colCtrFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.z")) colCtrFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("size.x")) colSzFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.y")) colSzFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.z")) colSzFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("RobotSpawnDeactivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_RobotSpawnDeactivated; }   else if(KEY_EQ("IsotopeInstalled"))            { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsotopeInstalled; }
@@ -511,6 +512,7 @@ void LoadLevelMod(u8 lev) {
             if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
         par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed;
+        par->reverbMinDist=src->reverbMinDist; par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARG_STRLEN);
         if (entIdx == 517) { // func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative
             V3 sp = par->startPosition; if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3_AplusB(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } // fallback for entries lacking startPosition
@@ -519,6 +521,7 @@ void LoadLevelMod(u8 lev) {
         }
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
         if (entIdx >= 595 && entIdx <= 601) {if (colSzFromFile[e].x >= 0 || colSzFromFile[e].y>=0 || colSzFromFile[e].z>=0){World.colliderCenter[parent] = colCtrFromFile[e]; World.colliderSize[parent]=(V3){colSzFromFile[e].x<0.0f ? 1.0f : colSzFromFile[e].x,colSzFromFile[e].y<0.0f ? 1.0f : colSzFromFile[e].y,colSzFromFile[e].z<0.0f ? 1.0f : colSzFromFile[e].z };}else{World.colliderCenter[parent]=(V3){0,0,0}; World.colliderSize[parent]=(V3){1.f,1.f,1.f};}}
+        else if (entIdx == 716) { World.col[parent] = COLTYPE_NONE; }
         else if (entIdx == 515 && EDefs[entIdx].col == COLTYPE_BOX && EDefs[entIdx].colSz.x == 0.0f && EDefs[entIdx].colSz.y == 0.0f && EDefs[entIdx].colSz.z == 0.0f) { World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f}; }
         if (entIdx == 700) par->currentTargetIdx = par->branchOnSecond ? par->target2Idx : par->targetIdx;
         if (entIdx == 525) { par->texAnimLight=AddOffsetLight(par,(V3){5.81f,2.29f,38.05f-38.3552f},(Color3){0.3531f,0.4837f,0.6509f},1.85f,0.7f); par->texAnimLight2=AddOffsetLight(par,(V3){-10.1f,0.9f,18.21f-38.3552f},(Color3){0.3561f,0.3561f,0.8970f},2.0f,1.12f); } // prop_console01
@@ -627,11 +630,12 @@ void LoadLevelData(u8 curlevel) {
                 }
             }
         } else if(constIndex == 515){func_forcebridge(i);/*func_forcebridge*/}
+        else if(constIndex == 716){World.layer[i] = L_Trigger;} // fx_reverbzone
         else if(constIndex == 517){FuncWallInitAfterLoad(i);}
         else if(constIndex == 596){World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,0.3f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); World.instances[i].topPoint=(V3){0.0f,World.position[i].y + (World.colliderSize[i].y * 0.5f),0.0f}; } /*trigger_gravitylift*/
         else if(constIndex == 701){LogicTimerInitBeforeLoad(i);}
         else if(constIndex == 703){if(World.instances[i].teleportID < 8){World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} }/*info_teleport_destination*/
-        else if(constIndex == 555){/*prop_cyber_switch CyberSwitchInitAfterLoad(i); TODO*/}
+        else if(constIndex == 555){CyberSwitchInitAfterLoad(i);} // prop_cyber_switch
         else if(constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
         else if(IdxIsButtonSwitch(World.instances[i].index)) ButtonSwitchInitAfterLoad(i);
         else if(constIndex >= 448 && constIndex <= 457){if(World.diffMis == 0 && World.instances[i].index == 448/*item_cyber_data*/){DeleteInstance(i);} }
