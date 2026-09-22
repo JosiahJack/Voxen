@@ -119,10 +119,14 @@ size_t g_mmap_live = 0; /* diagnostics: live bytes from OS_AllocateRAM (anon + f
 extern u32 totalPixels,totalPaletteColors; extern size_t cvxAdjLive;
 // static void ramline(const char* name, u64 bytes) { u32 kb=(u32)(bytes>>10); DualLog("  %s %uKB|%.2fMB\n",name,kb,bytes/1048576.0); }
 void DebugRAMPeak(void) { // VmHWM: kernel high-water mark of RSS over process lifetime, catches transient spikes between checkpoints (includes shared libs, unlike USS)
-    long fd = OS_OpenReadonly("/proc/self/status"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/status\n"); return; }
+#if defined(_WIN32)
+    (void)0;/*no /proc on Windows*/
+#else
+    FHandle fd = OS_OpenReadonly("/proc/self/status"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/status\n"); return; }
     char buf[2048]; long n = OS_Read(fd,buf,sizeof(buf)-1); OS_Close(fd); if (n <= 0) return; buf[n]='\0';
     u32 kb=0; for (char* p=buf;*p;++p) { if (mcmp(p,"VmHWM:",6)==0) { p+=6; while(*p==' '||*p=='\t') ++p; while(*p>='0'&&*p<='9') kb=kb*10+(u32)(*p++-'0'); break; } }
     DualLog("Peak RSS (VmHWM): %uKB|%.2fMB\n",kb,kb/1024.0);
+#endif
 }
 void DebugRAMBreakdown() { // Persistent-allocation census, diagnostics only: sums live structures; GPU/driver side estimated (not in USS)
     //u64 physV=0,physT=0,bvhN=0,bvhT=0,gpuV=0,gpuT=0; u32 nM=mdlsCnt;

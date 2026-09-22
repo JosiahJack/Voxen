@@ -4,7 +4,7 @@
     UI_ID_##P##_PUZZLE_NODE_SOURCE,UI_ID_##P##_PUZZLE_NODE,UI_ID_##P##_PUZZLE_CELL_0,UI_ID_##P##_PUZZLE_CELL_34=UI_ID_##P##_PUZZLE_CELL_0+34,UI_ID_##P##_PUZZLE_SLIDER,UI_ID_##P##_PUZZLE_CLOSE,UI_ID_##P##_WIRE_SLIDER,UI_ID_##P##_WIRE_TARGET,UI_ID_##P##_WIRE_NODE_0,UI_ID_##P##_WIRE_NODE_13=UI_ID_##P##_WIRE_NODE_0+13,UI_ID_##P##_WIRE_CLOSE,UI_ID_##P##_SYS_HEADER,UI_ID_##P##_SYS_DESC_0,UI_ID_##P##_SYS_DESC_10=UI_ID_##P##_SYS_DESC_0+10,UI_ID_##P##_SYS_VAL_0,UI_ID_##P##_SYS_VAL_10=UI_ID_##P##_SYS_VAL_0+10,UI_ID_##P##_SYS_CLOSE,\
     UI_ID_##P##_MINIGAMES_HEADER,UI_ID_##P##_MINIGAME_0,UI_ID_##P##_MINIGAME_8=UI_ID_##P##_MINIGAME_0+8,UI_ID_##P##_MINIGAMES_FOOTER,UI_ID_##P##_MINIGAME_VIEW,UI_ID_##P##_MINIGAME_BACK,UI_ID_##P##_MINIGAME_CLOSE,UI_ID_##P##_SEARCH_NAME,UI_ID_##P##_SEARCH_ICON_0,UI_ID_##P##_SEARCH_ICON_3=UI_ID_##P##_SEARCH_ICON_0+3,UI_ID_##P##_SEARCH_EMPTY,UI_ID_##P##_SEARCH_CLOSE,UI_ID_##P##_AUTOMAP_ZOOM_IN,UI_ID_##P##_AUTOMAP_ZOOM_OUT
 typedef enum{UI_ID_NONE,
-    /*Menu*/UI_ID_MENU_SINGLEPLAYER,UI_ID_MENU_MULTIPLAYER,UI_ID_MENU_OPTIONS,UI_ID_MENU_QUIT,UI_ID_MENU_CONTINUE,UI_ID_MENU_NEW_GAME,UI_ID_MENU_PLAY_INTRO,UI_ID_MENU_PLAY_CREDITS,UI_ID_MENU_BACK,UI_ID_MENU_TAB_GRAPHICS,UI_ID_MENU_TAB_INPUT,UI_ID_MENU_TAB_AUDIO_LANG,UI_ID_MENU_MODEL_DETAIL,UI_ID_MENU_FXAA,UI_ID_MENU_SHADOWS,UI_ID_MENU_SSR,UI_ID_MENU_VSYNC,UI_ID_MENU_FOV_SLIDER,UI_ID_MENU_GAMMA_SLIDER,UI_ID_MENU_RESOLUTION,UI_ID_MENU_FULLSCREEN,UI_ID_MENU_TOGGLE_MONITOR,UI_ID_MENU_MASTER_VOLUME_SLIDER,UI_ID_MENU_MUSIC_VOLUME_SLIDER,
+    /*Menu*/UI_ID_MENU_SINGLEPLAYER,UI_ID_MENU_MULTIPLAYER,UI_ID_MENU_OPTIONS,UI_ID_MENU_QUIT,UI_ID_MENU_CONTINUE,UI_ID_MENU_NEW_GAME,UI_ID_MENU_PLAY_INTRO,UI_ID_MENU_PLAY_CREDITS,UI_ID_MENU_BACK,UI_ID_MENU_TAB_GRAPHICS,UI_ID_MENU_TAB_INPUT,UI_ID_MENU_TAB_AUDIO_LANG,UI_ID_MENU_MODEL_DETAIL,UI_ID_MENU_FXAA,UI_ID_MENU_SHADOWS,UI_ID_MENU_SSR,UI_ID_MENU_VSYNC,UI_ID_MENU_FOV_SLIDER,UI_ID_MENU_GAMMA_SLIDER,UI_ID_MENU_RESOLUTION,UI_ID_MENU_FULLSCREEN,UI_ID_MENU_TOGGLE_MONITOR,UI_ID_MENU_RES_APPLY,UI_ID_MENU_MASTER_VOLUME_SLIDER,UI_ID_MENU_MUSIC_VOLUME_SLIDER,
     /*NewGame*/UI_ID_MENU_NAME_INPUT,UI_ID_MENU_DIFF_COMBAT,UI_ID_MENU_DIFF_PUZZLE,UI_ID_MENU_DIFF_MISSION,UI_ID_MENU_DIFF_CYBER,UI_ID_MENU_DIFF_CELL_0,UI_ID_MENU_DIFF_CELL_15=UI_ID_MENU_DIFF_CELL_0+15,UI_ID_MENU_START,
     /*Pause*/UI_ID_PAUSE_RESUME,UI_ID_PAUSE_LOAD,UI_ID_PAUSE_SAVE,UI_ID_PAUSE_OPTIONS,UI_ID_PAUSE_QUIT_TO_MENU,UI_ID_PAUSE_QUIT_GAME,
     /*HUD*/UI_ID_HUD_SHOOTMODE,UI_ID_HUD_HW_0,UI_ID_HUD_HW_7=UI_ID_HUD_HW_0+7,
@@ -57,7 +57,7 @@ void WeaponFireStartWeaponDip(float t);
 void WeaponSelectSlot(int slot){int wi=(int)World.invP1.weaponInventoryIndices[slot]; if(wi<0||wi>=MAX_ENTITIES)return; if((int)World.invP1.weaponCurrent==slot)return; if(World.invP1.reloadFinished>World.pauseRelativeTime)return; World.invP1.weaponCurrentPending=(i16)slot; World.invP1.weaponIndexPending=(i16)wi; int w=Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip((w>=0&&w<16) ? reloadTime[w] : 0.5f);}
 __attribute__((noinline)) bool MenuEnter() { return !Cheats.consoleActive && (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
 __attribute__((noinline)) u8 UI_MenuInteractable(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
-    UIR(id,x,(i16)((float)y-h),(i16)w,(i16)h); bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y); if (cursorIsOver && mouseMovementThisFrame) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} } if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) return 1u;
+    UIR(id,x,(i16)((float)y-h),(i16)w,(i16)h); bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y); if (cursorIsOver && mouseMovementThisFrame && !resDropdownOpen) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} } if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) return 1u;
     if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) return 2u; return 0u;
 }
 
@@ -75,7 +75,7 @@ __attribute__((noinline)) void UI_HeaderText(i16 x, const char* text) { RenderTe
 void PlayMenuMusic(),mp3_clear();
 __attribute__((noinline)) void MenuGoBack() {if(returnToPause){returnToPause=World.menuActive=false; World.paused=true; mp3_clear();} if(currentMenuPage==Mpg_Singleplayer||currentMenuPage==Mpg_Multiplayer||currentMenuPage==Mpg_Options)currentMenuPage=Mpg_FrontPage;/*News*/else if(currentMenuPage==Mpg_Load||currentMenuPage==Mpg_NewGame||currentMenuPage==Mpg_IntroVideo||currentMenuPage==Mpg_CreditsVideo)currentMenuPage=Mpg_Singleplayer;}
 static void CreateShadowBuffers() { shadowMapSSBO=MakeSSBO(&shadowMapSSBO,5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32),NULL,GL_STATIC_DRAW); shadowMapsIndirectionID=MakeSSBO(&shadowMapsIndirectionID,6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW); shadowBuffersCreated=true; }
-__attribute__((noinline)) void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
+__attribute__((noinline)) void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; }
 static void MenuBackButton(i16 bgX, i16 bgY, i16 tX, i16 tY, i8 item) { RenderUIImage(bgX,bgY,84,36,1252);/*Back Button background*/ bool over=false; if (UI_Button(UI_ID_MENU_BACK,bgX,bgY+34,84,32,&over,item) || (MenuEnter() && currentMenuItem==item)) MenuGoBack(); over=over||currentMenuItem==item; RenderTextL(tX,tY,over ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]); }
 static void DiffDigits(i16 tx, i16 ty, u8 cur) { static const i16 dx4[4]={0,71,145,217}; for (u8 i=0;i<4;++i) RenderTextL(tx+dx4[i],ty,cur==i ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"%u",i); }
 void RenderMenu() {
@@ -98,13 +98,19 @@ void RenderMenu() {
     } else if (currentMenuPage == Mpg_Multiplayer) {
         menuItemCount = 1; menuTabCount = 1; UI_HeaderText(266,/*"MULTIPLAYER"*/Sys_Text.stringTable[720]); MenuBackButton(1060,724,1076,732,0);
     } else if (currentMenuPage == Mpg_Options) {
-        menuTabCount = 3; UI_HeaderText(238,/*"CONFIGURATION"*/Sys_Text.stringTable[745]);
+        menuTabCount = 3; UI_HeaderText(238,/*"CONFIGURATION"*/Sys_Text.stringTable[745]); if(currentMenuTab!=0){resDropdownOpen=false; resHoverIdx=-1;}
         if (currentMenuTab != 0) RenderUIImage(179,220, 1001,548, 1030);/*Config background*/
         if (currentMenuTab == 0) RenderUIImage(179,220, 1001,548, 1033);/*Config background graphics (empty alpha center)*/
         static const i16 cfgTabX[3]={190,354,520}; static const u16 cfgTabStr[3]={791,792,793}; static const i16 cfgTabTx[3]={200,366,530}; static const u32 cfgTabId[3]={UI_ID_MENU_TAB_GRAPHICS,UI_ID_MENU_TAB_INPUT,UI_ID_MENU_TAB_AUDIO_LANG};
         for (i8 t=2;t>=0;--t) { RenderUIImage(cfgTabX[t],196,160,30,currentMenuTab==t ? 920 : 921); if (UI_Button(cfgTabId[t],cfgTabX[t],196+30,160,30,NULL,t)) currentMenuTab=(u8)t; RenderTextL(cfgTabTx[t],202,currentMenuTab==t ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[cfgTabStr[t]]); }
         if (currentMenuTab == 0) {
-            bool overRes = false, overFull = false, overChgM = false; menuItemCount = 11;/*Graphics*/ u8 newVal;
+            bool overRes = false, overFull = false, overChgM = false, overApply = false; menuItemCount = 12;/*Graphics*/ u8 newVal;
+            if(resDropdownOpen){ bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
+                if(lmb||rmb){ int rlh=resDropdownCount*16; bool inList=resDropdownCount>0 && World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=710-rlh && World.cursorPos_y<=710;
+                    bool inHeader=World.cursorPos_x>=190 && World.cursorPos_x<=518 && World.cursorPos_y>710 && World.cursorPos_y<=726;
+                    if(inList){ int row=(World.cursorPos_y-(710-rlh))/16; if(row>=0 && row<resDropdownCount){resSelectedIdx=row;} }
+                    resDropdownOpen=false;
+                    if(inList||inHeader){ Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; } } }
             if (UI_Checkbox(UI_ID_MENU_MODEL_DETAIL,200,500,0,Sys_Settings.ModelDetail ?/*High*/915 :/*No Detail Level Models*/914,Sys_Settings.ModelDetail)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(UI_ID_MENU_FXAA,200,530,1,/*"FXAA"*/780,Sys_Settings.FXAA)) { Sys_Settings.FXAA = Sys_Settings.FXAA ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(UI_ID_MENU_SHADOWS,200,560,2,Sys_Settings.Shadows ?/*Soft*/787 :/*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; if (!shadowBuffersCreated) {CreateShadowBuffers();} SaveConfig(); }
@@ -113,16 +119,24 @@ void RenderMenu() {
             RenderTextL(310,620,T_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", globalframesPerLastSecond);/*Helper to see vsync take effect.*/
             if (UI_Slider(UI_ID_MENU_FOV_SLIDER,400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,Sys_Settings.FOV,&newVal,&fovSliderActive,45,150,5,5,/*Field of View*/775)) { Sys_Settings.FOV = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
             if (UI_Slider(UI_ID_MENU_GAMMA_SLIDER,400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,Sys_Settings.Brightness,&newVal,&gammaSliderActive,0,100,2,6,/*Gamma*/774)) { Sys_Settings.Brightness = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
-            if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { DualLog("Resolution dropdown clicked! %u\n",globalframe); resDropdownOpen = !resDropdownOpen; currentMenuItem = 7; }
+            if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { DualLog("Resolution dropdown clicked! %u\n",globalframe); if(!resDropdownOpen){ GatherResolutionModes(); if(resDropdownCount>0){resDropdownOpen=true;} } else{resDropdownOpen=false;} currentMenuItem = 7; }
             overRes = overRes || currentMenuItem == 7; char resBuf[32];
             if (resDropdownCount > 0) sFormat(resBuf, sizeof(resBuf), "%ux%u",(u32)resModes[resSelectedIdx].w,(u32)resModes[resSelectedIdx].h); else sFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
-            RenderUIImage(476, 710, 16, 16, overRes ? 1119 : 1077); RenderTextL(200, 710, overRes ? T_YELLOW : T_GREEN,FONT_NORMAL, 1.0f, "RESOLUTION %s", resBuf);
+            RenderUIImage(476,710,16,16,overRes ? 1119 : 1077); RenderTextL(200,710,overRes ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"RESOLUTION %s",resBuf);
+            if(resDropdownOpen && resDropdownCount>0){ int rlh2=resDropdownCount*16, rTop=710-rlh2;
+                resHoverIdx=(World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=rTop && World.cursorPos_y<rTop+rlh2) ? (World.cursorPos_y-rTop)/16 : -1;
+                RenderUIImage(336,rTop,160,rlh2,922);/*datapanel behind list*/
+                for(int ri=0;ri<resDropdownCount;++ri){char rb[32]; sFormat(rb,sizeof(rb),"%ux%u",(u32)resModes[ri].w,(u32)resModes[ri].h); if(ri==resSelectedIdx){RenderUIImage(336,rTop-2+ri*16,160,18,1087);} RenderTextL(366,rTop+ri*16,ri==resHoverIdx ? T_YELLOW : T_GREEN,FONT_NORMAL,0.9f,"%s",rb);}}
+            else{resHoverIdx=-1;}
             RenderUIImage(200,740, 16,16, 910);/*Fullscreen checkbox background*/
             if (UI_Button(UI_ID_MENU_FULLSCREEN,200,756, 210,16, &overFull, 8) || (MenuEnter() && currentMenuItem == 8)) { Sys_Settings.Fullscreen = Sys_Settings.Fullscreen == 1u ? 0u : 1u; ChangeFullScreenWindowed(true); SaveConfig(); }
             overFull = overFull || currentMenuItem == 8; if (Sys_Settings.Fullscreen) RenderUIImage(202,742, 12,12, 912);/*Checkbox check*/
             RenderTextL(220,740,overFull ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"Fullscreen"*/Sys_Text.stringTable[773]); RenderUIImage(588,730, 210,30, 1079);/*Toggle monitor button background*/
             if (UI_Button(UI_ID_MENU_TOGGLE_MONITOR,588,760, 210,30, &overChgM, 9) || (MenuEnter() && currentMenuItem == 9)) { CycleToNextMonitor(); }
             overChgM = overChgM || currentMenuItem == 9; RenderTextL(602,735,overChgM ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,/*"CHANGE MONITOR"*/Sys_Text.stringTable[1025]);
+            RenderUIImage(588,690, 210,30, 1079);/*Apply button background*/
+            if (UI_Button(UI_ID_MENU_RES_APPLY,588,720, 210,30, &overApply, 10) || (MenuEnter() && currentMenuItem == 10)) { ApplyStagedWindowedSize(); GatherResolutionModes(); currentMenuItem = 10; }
+            overApply = overApply || currentMenuItem == 10; RenderTextL(602,695,overApply ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"APPLY");
         } else if (currentMenuTab == 1) { menuItemCount = 49;/*Input - TODO: rebind rows not ported yet, only the BACK item is live*/ }
         else {
             menuItemCount = 10;/*Audio / Lang*/ u8 newVal;
@@ -722,7 +736,11 @@ static double RenderUI() {
     }
     if (World.menuActive) RenderMenu(); else if (World.paused) RenderPausedUI();
     if (World.menuActive || World.paused) {
-        if (Sys_Input.keyStates[KEY_DOWN].pressed) currentMenuItem=(currentMenuItem+1)>=menuItemCount?0:currentMenuItem+1;
+        if (resDropdownOpen && currentMenuPage==Mpg_Options && currentMenuTab==0) {
+            if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(resSelectedIdx<resDropdownCount-1){resSelectedIdx++;} }
+            else if (Sys_Input.keyStates[KEY_UP].pressed) { if(resSelectedIdx>0){resSelectedIdx--;} }
+        }
+        else if (Sys_Input.keyStates[KEY_DOWN].pressed) currentMenuItem=(currentMenuItem+1)>=menuItemCount?0:currentMenuItem+1;
         else if (Sys_Input.keyStates[KEY_UP].pressed) currentMenuItem=(currentMenuItem-1)<0?menuItemCount-1:currentMenuItem-1;
     } else if (!World.Sys_UI.vmailActive) {
         if (!Cheats.noHUD) {

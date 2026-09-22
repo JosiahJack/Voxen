@@ -24,8 +24,8 @@ FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
 u16 editModeSelection=U16_MAX, editModeTestEntityDefinition=343; u16 lastSpawned=U16_MAX;
 double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u8 particleBlendTexture[MAX_TXRS];
 static u32 gpuQ[5][5]; static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
-static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0;
-typedef struct {int w,h;} ResMode; ResMode resModes[8];
+static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0,resHoverIdx=-1;
+typedef struct {int w,h;} ResMode; ResMode resModes[16];
 GlobalContext World = {0};
 Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
                       {1.0f,0.498039216f,0.0f,1.0f}, /* 5 Orange T_ORANGE*/ {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red T_STOPD_RED*/ {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
@@ -646,7 +646,7 @@ void InitalizeEnvironment() {
     OS_ScratchInit(); // Set up the 465 MB scratch arena for init phases
     DebugRAM("program start"); DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\nEntity size: %u\n",sizeof(Entity));
     SetLevelPointers(0); WindowInit(); threadCnt = clamp(OS_GetNumThreads(),1,32); globalframe=0,World.menuActive=true,World.screenshotTimeout=1.0,World.creditsPageIndex=1,World.diffCbt=World.diffCyb=World.diffPuz=World.diffMis=2,World.deaths=0,World.cursorPos_x=680,World.cursorPos_y=384;
-    World.numLevels=MAX_LEVELS; World.startLevel=1/*medical*/; LoadConfig();/*Get settings before setting window size.*/ window = VCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); CenterWindowOnMonitor(); SetGLContext_GetFunctionPointers();
+    World.numLevels=MAX_LEVELS; World.startLevel=1/*medical*/; LoadConfig();/*Get settings before setting window size.*/ ClampWindowSizeToMonitor(); window = VCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); PlaceWindowOnMonitor((int)Sys_Settings.CurrentMonitor); SetGLContext_GetFunctionPointers();
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); // Black out the window as early as possible for better presentation.
     i32 major=0,minor=0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor); if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
     glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order

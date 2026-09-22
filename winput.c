@@ -5,13 +5,13 @@ typedef struct WSWin WSWin; WSWin* window; typedef struct WSCtx WSCtx; typedef s
 WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); void SaveConfig(); void InputWindowFocus(i32); void InputKey(char*,int,int); void InputMouseClick(char*,int,int),InputCursorPos(double*,double*,double,double),InputMonitor(WSMon*,int,int); const FBC* ChooseFBConfig(const FBC*, u32); static WSMon* AllocMonitor(const char*,int,int);
 #if defined(_WIN32)
     int __cdecl wcscmp(const u16*,const u16*); u16* wcscpy(u16*,const u16*); typedef struct { i32 x,y; } POINT; typedef struct { i32 l,t,r,b; } RECT; typedef struct { u32 s,maj,min; u8 _p[264]; u16 sp; u8 _p2[6]; } OSVERSIONINFOEXW; typedef struct _devicemodeW {u16 a[34]; u16 dmSize,b; u32 c; POINT dmPosition; u8 d[18]; u16 e[33]; u32 f,dmPelsWidth,dmPelsHeight,g,dmDisplayFrequency; u8 h[32]; } DEVMODEW,*LPDEVMODEW;
-    typedef i64 (__stdcall *WNDPROC)(void*,u32,u64,i64); typedef i32 (__stdcall *MONITORENUMPROC)(void*,void*,RECT*,i64); typedef struct _ICONINFO { i32 fIcon; u32 xHotspot,yHotspot; void *hbmMask,*hbmColor; } ICONINFO; typedef struct { u8 a[8]; u32 message; u8 b[4]; u64 wParam; i64 lParam; u32 time; u8 c[12]; } MSG; typedef struct { u32 cbSize; RECT rcMonitor; u8 a[16]; u8 b[4]; } MONITORINFO,*LPMONITORINFO;
+    typedef i64 (__stdcall *WNDPROC)(void*,u32,u64,i64); typedef i32 (__stdcall *MONITORENUMPROC)(void*,void*,RECT*,i64); typedef struct _ICONINFO { i32 fIcon; u32 xHotspot,yHotspot; void *hbmMask,*hbmColor; } ICONINFO; typedef struct { u8 a[8]; u32 message; u8 b[4]; u64 wParam; i64 lParam; u32 time; u8 c[12]; } MSG; typedef struct { u32 cbSize; RECT rcMonitor,rcWork; u8 b[4]; } MONITORINFO,*LPMONITORINFO;
     typedef struct { u32 cbSize; u8 a[36]; u16 szDevice[32]; } MONITORINFOEXW; typedef struct { u32 length; u8 a[4]; u32 showCmd; u8 b[16]; RECT rcNormalPosition; } WINDOWPLACEMENT; typedef struct { u32 cbSize,style; WNDPROC lpfnWndProc; i32 a,b; HINSTANCE hInstance; void *c,*d,*e; u16 *f,*n; void *g; } WNDCLASSEXW;
     typedef i32 (WINAPI * PFN_DwmIsCompositionEnabled)(i32*),(WINAPI * PFN_DwmFlush)(),(WINAPI * PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*,u32,u64),(WINAPI * PFN_SWE)(int),(WINAPI * PFN_GPFAIVA)(void*,int,int,u32,const int*,int*),(WINAPI * PFN_wglMakeCurrent)(void*,void*); typedef PROC (WINAPI * PFN_wglGetProcAddress)(const char*);
     typedef void *(WINAPI * FP_CCAA)(void*,void*,const int*),*(WINAPI * PFN_CC)(void*),*(WINAPI * PFN_wglGetCurrentDC)(),*(WINAPI * PFN_wglGetCurrentContext)(); typedef struct WGLContext { void* dc; void* handle; int interval; } WGLContext;
     PFN_wglGetCurrentDC wglGetCurrentDC; PFN_CC wglCreateContext; PFN_wglGetCurrentContext wglGetCurrentContext; PFN_wglMakeCurrent wglMakeCurrent; PFN_wglGetProcAddress wglGetProcAddress; PFN_GPFAIVA GPFAivARB; PFN_SWE wglSwapIntervalEXT; typedef struct WSWinWin32 { void* handle; bool frameAction; int width,height,lastCurX,lastCurY; } WSWinWin32; 
     typedef struct WSLibWin32 { HINSTANCE instance; void* helperWindowHandle; u16 helperWindowClass,mainWindowClass; short int keycodes[512]; double restoreCurPosX,restoreCurPosY; WSWin *disabledCursorWindow, *capturedCursorWindow; struct {HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush;} dwmapi; struct {HINSTANCE instance; PFN_RtlVerifyVersionInfo RtlVerifyVersionInfo;} ntdll; } WSLibWin32;
-    typedef struct WSMonWin32 { void* handle; u16 adapterName[32],displayName[32]; } WSMonWin32; typedef struct _DISPLAY_DEVICEW { u32 cb; u16 DeviceName[32],DeviceString[128]; u32 StateFlags; u8 _p[256]; } DISPLAY_DEVICEW; typedef struct { u16 nSize,nVersion; u32 dwFlags; u8 _p[32]; } PIXELFORMATDESCRIPTOR;
+    typedef struct WSMonWin32 { void* handle; u16 adapterName[32],displayName[32]; int isPrimary; } WSMonWin32; typedef struct _DISPLAY_DEVICEW { u32 cb; u16 DeviceName[32],DeviceString[128]; u32 StateFlags; u8 _p[256]; } DISPLAY_DEVICEW; typedef struct { u16 nSize,nVersion; u32 dwFlags; u8 _p[32]; } PIXELFORMATDESCRIPTOR;
     typedef struct { u32 bV5Size; i32 bV5Width,bV5Height; u16 bV5Planes,bV5BitCount; u32 bV5Compression; u8 _p[20]; u32 bV5RedMask,bV5GreenMask,bV5BlueMask,bV5AlphaMask; u8 _p2[52]; } BITMAPV5HEADER;
     DLL_IMP void* WINAPI CreateIconIndirect(ICONINFO*); DLL_IMP void* WINAPI GetDC(void*); DLL_IMP i32 WINAPI GetModuleHandleExW(u32,const u16*,HINSTANCE*); DLL_IMP int WINAPI ReleaseDC(void*,void*); DLL_IMP i32 WINAPI SetCursorPos(int,int); DLL_IMP int WINAPI WideCharToMultiByte(u32,u32,u16*,int,char*,int,const char*,i32*); DLL_IMP void* WINAPI SetCursor(void*); DLL_IMP i32 WINAPI GetCursorPos(POINT*);
     DLL_IMP int WINAPI MultiByteToWideChar(u32,u32,const char*,int,u16*,int); DLL_IMP i32 WINAPI ClipCursor(const RECT*); DLL_IMP i32 WINAPI ClientToScreen(void*,POINT*); DLL_IMP void* WINAPI CreateDCW(const u16*,const u16*,const u16*,const DEVMODEW*); DLL_IMP void* WINAPI GetPropW(void*,u16*); DLL_IMP i32 WINAPI GetMessageTime(); DLL_IMP i32 WINAPI GetClientRect(void*,RECT*); DLL_IMP void* WINAPI LoadCursorW(HINSTANCE,u16*);
@@ -78,27 +78,34 @@ WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); 
     u16* CreateWideStringFromUTF8Win32(const char* s) { u16* t; int c = MultiByteToWideChar(65001,0,(char*)s,-1,NULL,0); t = OS_Alloc(c*sizeof(u16)); MultiByteToWideChar(65001,0,(char*)s,-1,t,c); return t; }
     char* CreateUTF8FromWideStringWin32(const u16* s, int* sz) { *sz = WideCharToMultiByte(65001,0,(u16*)s,-1,NULL,0,NULL,NULL); char* t = OS_Alloc(*sz); WideCharToMultiByte(65001,0,(u16*)s,-1,t,*sz,NULL,NULL); return t; }
     i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp) { OSVERSIONINFOEXW o={0}; o.s=sizeof(o), o.maj=major, o.min=minor, o.sp=sp; u64 c=VerSetConditionMask(VerSetConditionMask(VerSetConditionMask(0,0x0000002,3),0x0000001,3),0x0000020,3); return WinSys.win32.ntdll.RtlVerifyVersionInfo(&o,0x0000023,c)==0; }
-    static i32 __stdcall monitorCallback(void* h, void* c, RECT* r, i64 d) { (void)c; (void)r; MONITORINFOEXW mi; mset(&mi,0,sizeof(mi)); mi.cbSize = sizeof(mi); if (GetMonitorInfoW(h,(MONITORINFO*)&mi)) { WSMon* m = (WSMon*)d; if (wcscmp(mi.szDevice, m->win32.adapterName) == 0) m->win32.handle = h; } return 1; }
+    static i32 __stdcall monitorCallback(void* h, void* c, RECT* r, i64 d) { (void)c; (void)r; MONITORINFOEXW mi; mset(&mi,0,sizeof(mi)); mi.cbSize = sizeof(mi); if (GetMonitorInfoW(h,(MONITORINFO*)&mi)) { WSMon* m = (WSMon*)d; u16* dn = m->win32.displayName[0] ? m->win32.displayName : m->win32.adapterName; int match=1; for(int k=0;;++k){ if(!dn[k]){break;} if(mi.szDevice[k]!=dn[k]){match=0; break;} } if (match) m->win32.handle = h; } return 1; }
     static WSMon* createMonitor(DISPLAY_DEVICEW* a, DISPLAY_DEVICEW* d) {
         WSMon* m; int wMM,hMM,nameSize=0; void* dc; RECT r; char* name=CreateUTF8FromWideStringWin32(d ? d->DeviceString : a->DeviceString,&nameSize); DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize=sizeof(dm); EnumDisplaySettingsW(a->DeviceName,0xFFFFFFFFU,&dm); dc=CreateDCW(L"DISPLAY",a->DeviceName,NULL,NULL); if(IsWindowsVersionOrGreaterWin32(((u8)((((u64)(0x0603))>>8)&0xff)),((u8)(((u64)(0x0603))&0xff)),0)){wMM=GetDeviceCaps(dc,4); hMM=GetDeviceCaps(dc,6);}
         else { wMM = (int)(dm.dmPelsWidth * 25.4f / GetDeviceCaps(dc,88)); hMM = (int)(dm.dmPelsHeight * 25.4f / GetDeviceCaps(dc,90)); }
-        DeleteDC(dc); m = AllocMonitor(name,wMM,hMM); OS_Free(name,nameSize); wcscpy(m->win32.adapterName, a->DeviceName); if (d) wcscpy(m->win32.displayName,d->DeviceName); r.l=dm.dmPosition.x; r.t=dm.dmPosition.y; r.r=dm.dmPosition.x + dm.dmPelsWidth; r.b=dm.dmPosition.y + dm.dmPelsHeight; EnumDisplayMonitors(NULL,&r,monitorCallback,(i64)m); return m;
+        DeleteDC(dc); m = AllocMonitor(name,wMM,hMM); m->win32.isPrimary = ((a->StateFlags & 0x00000004) || (d && (d->StateFlags & 0x00000004))) ? 1 : 0; OS_Free(name,nameSize); wcscpy(m->win32.adapterName, a->DeviceName); if (d) wcscpy(m->win32.displayName,d->DeviceName); r.l=dm.dmPosition.x; r.t=dm.dmPosition.y; r.r=dm.dmPosition.x + dm.dmPelsWidth; r.b=dm.dmPosition.y + dm.dmPelsHeight; EnumDisplayMonitors(NULL,&r,monitorCallback,(i64)m); return m;
     }
     
+    static void GetMonitorFullarea(WSMon* m, int* x, int* y, int* w, int* h);
     void WinSysPollMonitorsWin32() {
         int i, dC = WinSys.monitorCount; WSMon** d = NULL; u32 aI,dI; DISPLAY_DEVICEW a, dp; WSMon* m; if (dC) { d = OS_Alloc(WinSys.monitorCount*sizeof(WSMon*)); mcpy(d,WinSys.monitors,WinSys.monitorCount * sizeof(WSMon*)); }
         for (aI = 0;;aI++) {
             mset(&a,0,sizeof(a)); a.cb = sizeof(a); if (!EnumDisplayDevicesW(NULL,aI,&a,0)) break; if (!(a.StateFlags&1)) continue;
             const int aType = (a.StateFlags & 0x00000004) ? 0 : 1;/*DISPLAY_DEVICE_PRIMARY_DEVICE lives on the adapter, and 0 means insert-first in InputMonitor*/
             for (dI=0;;++dI) {
-                mset(&dp,0,sizeof(dp)); dp.cb=sizeof(dp); if(!EnumDisplayDevicesW(a.DeviceName,dI,&dp,0))break; if(!(dp.StateFlags&1))continue; for(i=0;i<dC;++i){if(d[i]&&wcscmp(d[i]->win32.displayName,dp.DeviceName)==0){d[i]=NULL; EnumDisplayMonitors(NULL,NULL,monitorCallback,(i64)WinSys.monitors[i]); break;}} if(i<dC)continue; m=createMonitor(&a,&dp); if(!m){OS_Free(d,WinSys.monitorCount*sizeof(WSMon*)); return;} InputMonitor(m,0x00040001,aType);
+                mset(&dp,0,sizeof(dp)); dp.cb=sizeof(dp); if(!EnumDisplayDevicesW(a.DeviceName,dI,&dp,0))break; if(!(dp.StateFlags&1))continue; for(i=0;i<dC;++i){if(d[i]&&wcscmp(d[i]->win32.displayName,dp.DeviceName)==0){d[i]=NULL; EnumDisplayMonitors(NULL,NULL,monitorCallback,(i64)WinSys.monitors[i]); break;}} if(i<dC)continue; m=createMonitor(&a,&dp); if(!m){OS_Free(d,WinSys.monitorCount*sizeof(WSMon*)); return;} InputMonitor(m,0x00040001,(m->win32.isPrimary ? 0 : 1));
             } if (dI == 0) {for (i=0;i<dC;++i) { if (d[i] && wcscmp(d[i]->win32.adapterName,a.DeviceName) == 0) {d[i]=NULL; break;} } if (i < dC) continue; m = createMonitor(&a,NULL); if (!m) { OS_Free(d,WinSys.monitorCount*sizeof(WSMon*)); return; } InputMonitor(m,0x00040001,aType);}
         } for (i=0;i<dC;++i) { if (d[i]) InputMonitor(d[i],0x00040002,0); } if (d) OS_Free(d,WinSys.monitorCount*sizeof(WSMon*));
+        { WSMon* sel=(Sys_Settings.CurrentMonitor<WinSys.monitorCount) ? WinSys.monitors[Sys_Settings.CurrentMonitor] : NULL; int pi=-1;
+          for (i=0;i<WinSys.monitorCount;++i){ if (WinSys.monitors[i]->win32.isPrimary){pi=i; break;} }
+          if (pi>0){ WSMon* pm=WinSys.monitors[pi]; mmov(WinSys.monitors+1,WinSys.monitors,(size_t)pi*sizeof(WSMon*)); WinSys.monitors[0]=pm; }
+          if (sel){ for (i=0;i<WinSys.monitorCount;++i){ if (WinSys.monitors[i]==sel){Sys_Settings.CurrentMonitor=(u8)i; break;} } } }
+        for (i=0;i<WinSys.monitorCount;++i){ WSMon* lm=WinSys.monitors[i]; int lx,ly,lw,lh; GetMonitorFullarea(lm,&lx,&ly,&lw,&lh); DualLog("Monitor %d: %s area=%d,%d %dx%d%s\n",i,lm->name,lx,ly,lw,lh,lm->win32.isPrimary ? " primary" : ""); }
     }
     
     static i64 __stdcall helperWindowProc(void* h, u32 m, u64 w, i64 l) { if (m == 0x007E) WinSysPollMonitorsWin32(); return DefWindowProcW(h,m,w,l); }
     static void GetMonitorPos(WSMon* m, int* x, int* y) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsExW(m->win32.adapterName,0xFFFFFFFFU,&dm,0x00000004); *x = dm.dmPosition.x; *y = dm.dmPosition.y; }
-    static void GetMonitorFullarea(WSMon* m, int* x, int* y, int* w, int* h) { MONITORINFO mi={0}; mi.cbSize=sizeof(mi); GetMonitorInfoW(m->win32.handle,&mi); *x=mi.rcMonitor.l; *y=mi.rcMonitor.t; *w=mi.rcMonitor.r - mi.rcMonitor.l; *h=mi.rcMonitor.b - mi.rcMonitor.t; }
+    static void GetMonitorFullarea(WSMon* m, int* x, int* y, int* w, int* h) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize=sizeof(dm); EnumDisplaySettingsExW(m->win32.adapterName,0xFFFFFFFFU,&dm,0x00000004); *x=dm.dmPosition.x; *y=dm.dmPosition.y; *w=dm.dmPelsWidth; *h=dm.dmPelsHeight; }
+    static void GetMonitorWorkarea(WSMon* m, int* x, int* y, int* w, int* h) { MONITORINFO mi={0}; mi.cbSize=sizeof(mi); if (m->win32.handle && GetMonitorInfoW(m->win32.handle,&mi) && mi.rcWork.r>mi.rcWork.l && mi.rcWork.b>mi.rcWork.t) { *x=mi.rcWork.l; *y=mi.rcWork.t; *w=mi.rcWork.r - mi.rcWork.l; *h=mi.rcWork.b - mi.rcWork.t; return; } DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize=sizeof(dm); EnumDisplaySettingsExW(m->win32.adapterName,0xFFFFFFFFU,&dm,0x00000004); *x=dm.dmPosition.x; *y=dm.dmPosition.y; *w=dm.dmPelsWidth; *h=dm.dmPelsHeight; }
     static void GetVideoMode(WSMon* m, vidmode* mode) { DEVMODEW dm; mset(&dm,0,sizeof(dm)); dm.dmSize = sizeof(dm); EnumDisplaySettingsW(m->win32.adapterName,0xFFFFFFFFU,&dm); mode->width=dm.dmPelsWidth; mode->height=dm.dmPelsHeight; mode->refreshRate=dm.dmDisplayFrequency; }
     static void makeContextCurrentWGL(WSWin* w) { wglMakeCurrent(w->context.wgl.dc,w->context.wgl.handle); }
     static void swapBuffersWGL(WSWin* w) { if (!IsWindowsVersionOrGreaterWin32(((u8)((((u64)(0x0602))>>8)&0xff)),((u8)(((u64)(0x0602))&0xff)),0)) { i32 e = 0; if ((i32)(WinSys.win32.dwmapi.IsCompositionEnabled(&e) >= 0) && e) { int c = vabs(w->context.wgl.interval); while (c--) WinSys.win32.dwmapi.Flush(); } } SwapBuffers(w->context.wgl.dc); }
@@ -165,7 +172,7 @@ WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); 
     
     static void GetWindowSize(WSWin* w, int* w_, int* h) { XWindowAttributes a; WinSys.x11.xlib.GetWindowAttributes(WinSys.x11.display,w->x11.handle,&a); *w_=a.width; *h=a.height; }
     static void SetWindowSize(int w_, int h) { w_=vmax(1,w_); h=vmax(1,h); updateNormalHints(window,w_,h); WinSys.x11.xlib.ResizeWindow(WinSys.x11.display,window->x11.handle,w_,h); }
-    static void SetWindowMonitor(int x,int y,int w_,int h) { updateNormalHints(window,w_,h); sendEventToWM(window,WinSys.x11.NWM_STATE,Sys_Settings.Fullscreen,WinSys.x11.NWM_STATE_FULLSCREEN,0,1,0); WinSys.x11.xlib.MoveResizeWindow(WinSys.x11.display,window->x11.handle,x,y,w_,h); }
+    static void SetWindowMonitor(int x,int y,int w_,int h){updateNormalHints(window,w_,h); sendEventToWM(window,WinSys.x11.NWM_STATE,0,WinSys.x11.NWM_STATE_FULLSCREEN,0,1,0); WinSys.x11.xlib.MoveResizeWindow(WinSys.x11.display,window->x11.handle,x,y,w_,h); sendEventToWM(window,WinSys.x11.NWM_STATE,1,WinSys.x11.NWM_STATE_FULLSCREEN,0,1,0);}
     i32 WindowFocused() { XID f; int s; WinSys.x11.xlib.GetInputFocus(WinSys.x11.display,&f,&s); return window->x11.handle==f; }
     i32 WindowVisible() { XWindowAttributes w; WinSys.x11.xlib.GetWindowAttributes(WinSys.x11.display,window->x11.handle,&w); return w.map_state==2; }
     static i32 WindowVisibleW(WSWin* w_) { XWindowAttributes wa; WinSys.x11.xlib.GetWindowAttributes(WinSys.x11.display,w_->x11.handle,&wa); return wa.map_state==2; }/*headless-safe: takes the window instead of the not-yet-assigned global*/
@@ -173,6 +180,7 @@ WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); 
     static void SetWindowDecorated(WSWin* w,i32 e) { struct {u64 f,fun,dec; i64 im; u64 st;} h={0}; h.f=2; h.dec=e?1:0; WinSys.x11.xlib.ChangeProperty(WinSys.x11.display,w->x11.handle,WinSys.x11.MOTIF_WM_HINTS,WinSys.x11.MOTIF_WM_HINTS,32,0,(u8*)&h,sizeof(h)/sizeof(i64)); }
     static void GetCursorPosV(WSWin* w, double* x, double* y) { XID r,c; int rx,ry,cx,cy; u32 m; WinSys.x11.xlib.QueryPointer(WinSys.x11.display,w->x11.handle,&r,&c,&rx,&ry,&cx,&cy,&m); *x=cx; *y=cy; }
     static void SetCurV(WSWin* w, double x, double y) { w->x11.warpCursorPosX=(int)x; w->x11.warpCursorPosY=(int)y; WinSys.x11.xlib.WarpPointer(WinSys.x11.display,0L,w->x11.handle,0,0,0,0,(int)x,(int)y); }    
+    void GetMonitorFullarea(WSMon* m, int* x, int* y, int* w, int* h);
     static void PollMonitors() {
         XRRScreenResources* sr = WinSys.x11.randr.GetScreenResourcesCurrent(WinSys.x11.display,WinSys.x11.root); RROutput p = WinSys.x11.randr.GetOutputPrimary(WinSys.x11.display,WinSys.x11.root); int dC = WinSys.monitorCount; WSMon** d = NULL; if (dC) { d = OS_Alloc(WinSys.monitorCount*sizeof(WSMon*)); mcpy(d,WinSys.monitors,WinSys.monitorCount * sizeof(WSMon*)); }
         for (int i = 0;  i < sr->noutput;  i++) {
@@ -180,6 +188,7 @@ WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); 
             XRRCrtcInfo* ci = WinSys.x11.randr.GetCrtcInfo(WinSys.x11.display, sr, oi->crtc); if (!ci) { WinSys.x11.randr.FreeOutputInfo(oi); continue; } if (ci->rotation == 2 || ci->rotation == 8) { wMM = oi->mm_height; hMM = oi->mm_width; } else { wMM = oi->mm_width; hMM = oi->mm_height; } if (wMM <= 0 || hMM <= 0) { wMM = (int) (ci->width * 25.4f / 96.f); hMM = (int) (ci->height * 25.4f / 96.f); } WSMon* m = AllocMonitor(oi->name, wMM, hMM);
             m->x11.output = sr->outputs[i]; m->x11.crtc = oi->crtc; t = (m->x11.output == p) ? 0 : 1; InputMonitor(m,0x00040001,t); WinSys.x11.randr.FreeOutputInfo(oi); WinSys.x11.randr.FreeCrtcInfo(ci);
         } WinSys.x11.randr.FreeScreenResources(sr); for (int i=0;i<dC;++i) if (d[i]) InputMonitor(d[i],0x00040002,0); if (d) OS_Free(d,WinSys.monitorCount*sizeof(WSMon*));
+        for (int li=0;li<WinSys.monitorCount;++li){ WSMon* lm=WinSys.monitors[li]; int lx,ly,lw,lh; GetMonitorFullarea(lm,&lx,&ly,&lw,&lh); DualLog("Monitor %d: %s area=%d,%d %dx%d%s\n",li,lm->name,lx,ly,lw,lh,(lm->x11.output==p) ? " primary" : ""); }
     }
     
     static void processEvent(XEvent* e) {
@@ -208,6 +217,14 @@ WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); 
     }
     
     void GetMonitorFullarea(WSMon* m, int* x, int* y, int* w, int* h) { XRRScreenResources* sr = WinSys.x11.randr.GetScreenResourcesCurrent(WinSys.x11.display,WinSys.x11.root); XRRCrtcInfo* ci = WinSys.x11.randr.GetCrtcInfo(WinSys.x11.display,sr,m->x11.crtc); if (ci) { *x = ci->x; *y = ci->y; *w = ci->width; *h = ci->height; WinSys.x11.randr.FreeCrtcInfo(ci); } else { *x = 0; *y = 0; *w = 0; *h = 0; } WinSys.x11.randr.FreeScreenResources(sr);}
+    void GetMonitorWorkarea(WSMon* m, int* x, int* y, int* w, int* h) {
+        int fx,fy,fw,fh; GetMonitorFullarea(m,&fx,&fy,&fw,&fh); *x=fx; *y=fy; *w=fw; *h=fh; if(!WinSys.x11.display){return;}
+        Atom waA=WinSys.x11.xlib.InternAtom(WinSys.x11.display,"_NET_WORKAREA",0), cdA=WinSys.x11.xlib.InternAtom(WinSys.x11.display,"_NET_CURRENT_DESKTOP",0);
+        u8* raw=0; u64 desk=0; u8* draw=0;
+        if(WinSysGetWindowPropertyX11(WinSys.x11.root,cdA,6,(u8**)&draw)>=1){ desk=(u64)(*(long*)draw); WinSys.x11.xlib.Free(draw); }
+        if(WinSysGetWindowPropertyX11(WinSys.x11.root,waA,6,(u8**)&raw)>=(desk+1)*4){ long* v=(long*)raw; int ax=(int)v[desk*4+0],ay=(int)v[desk*4+1],aw=(int)v[desk*4+2],ah=(int)v[desk*4+3];
+            int l=vmax(fx,ax),t=vmax(fy,ay),r=vmin(fx+fw,ax+aw),b=vmin(fy+fh,ay+ah); if(r>l&&b>t){*x=l;*y=t;*w=r-l;*h=b-t;} WinSys.x11.xlib.Free(raw); }
+    }
     void GetVideoMode(WSMon* m, vidmode* v) {
         XRRScreenResources *sr = WinSys.x11.randr.GetScreenResourcesCurrent(WinSys.x11.display,WinSys.x11.root); XRRCrtcInfo *ci = WinSys.x11.randr.GetCrtcInfo(WinSys.x11.display,sr,m->x11.crtc);
         if(ci){const XRRModeInfo *mi=NULL; for (int i = 0; i < sr->nmode; i++) if (sr->modes[i].id == ci->mode) { mi = sr->modes + i; break; } if(mi) { if (ci->rotation & (2 | 8)) { v->width = mi->height; v->height = mi->width; } else { v->width = mi->width; v->height = mi->height; } v->refreshRate = (mi->hTotal && mi->vTotal) ? (int)vround((double) mi->dotClock / ((double) mi->hTotal * (double) mi->vTotal)) : 0; } WinSys.x11.randr.FreeCrtcInfo(ci);}
@@ -313,36 +330,89 @@ void WinSysGetMonitorPos(WSMon* m, int* x, int* y) { *x = 0; *y = 0; GetMonitorP
 const vidmode* WinSysGetVideoMode(WSMon* m) { GetVideoMode(m,&m->currentMode); return &m->currentMode; }
 void InputWindowFocus(i32 f) { window_has_focus = f != 0; ignore_next_mouse_delta = true; WSWin* w = window; if (!f) { for (int k=0;k<=348;++k) if (w->keys[k] == INPUT_PRESS) InputKey(w->keys,k,INPUT_RELEASE); for (int b=0;b<=7;++b) if (w->mouseButtons[b] == INPUT_PRESS) InputMouseClick(w->mouseButtons,b,INPUT_RELEASE); } }
 void CenterWindowOnMonitor() {
-    if (Sys_Settings.CurrentMonitor > (WinSys.monitorCount - 1)) { Sys_Settings.CurrentMonitor=0; SaveConfig(); } WSMon* next=WinSys.monitors[Sys_Settings.CurrentMonitor]; int mx,my; WinSysGetMonitorPos(next,&mx,&my); const vidmode* mode=WinSysGetVideoMode(next); int xpos=mx + (mode->width - Sys_Settings.ScreenWidth)/2, ypos=my + (mode->height - Sys_Settings.ScreenHeight)/2; SetWindowPosition(window,xpos,ypos); ignore_next_mouse_delta=true;
+    if (WinSys.monitorCount<=0){return;} if (Sys_Settings.CurrentMonitor > (WinSys.monitorCount - 1)) { Sys_Settings.CurrentMonitor=0; SaveConfig(); } WSMon* next=WinSys.monitors[Sys_Settings.CurrentMonitor]; int mx,my,mw,mh; GetMonitorFullarea(next,&mx,&my,&mw,&mh); int xpos=mx + (mw - (int)Sys_Settings.ScreenWidth)/2, ypos=my + (mh - (int)Sys_Settings.ScreenHeight)/2; SetWindowPosition(window,xpos,ypos); ignore_next_mouse_delta=true;
     #if defined(_WIN32)
         void* h = window->win32.handle; ShowWindow(h,5); BringWindowToTop(h); SetForegroundWindow(h); SetFocus(h);
     #endif
 }
 
-WSMon* GetCurrentMonitor() {
-    int wx=0,wy=0,ww=0,wh=0,bA=0; GetWindowPos(window,&wx,&wy); GetWindowSize(window,&ww,&wh); WSMon *bM=GetPrimaryMonitor(); 
-    for(int i=0;i<WinSys.monitorCount;++i){int mx,my; WinSysGetMonitorPos(WinSys.monitors[i],&mx,&my); const vidmode* mode=WinSysGetVideoMode(WinSys.monitors[i]); int l=vmax(wx,mx),r=vmin(wx+ww,mx+mode->width), t=vmax(wy,my),b=vmin(wy+wh,my+mode->height); int area=(r>l&&b>t) ? (r-l)*(b-t) : 0; if(area > bA){bA =area; bM=WinSys.monitors[i];}} return bM;
+WSMon* GetCurrentMonitor() {int wx=0,wy=0,ww=0,wh=0,bA=0; GetWindowPos(window,&wx,&wy); GetWindowSize(window,&ww,&wh); WSMon *bM=GetPrimaryMonitor(); for(int i=0;i<WinSys.monitorCount;++i){int mx,my,mw,mh; GetMonitorFullarea(WinSys.monitors[i],&mx,&my,&mw,&mh); int l=vmax(wx,mx),r=vmin(wx+ww,mx+mw), t=vmax(wy,my),b=vmin(wy+wh,my+mh); int area=(r>l&&b>t) ? (r-l)*(b-t) : 0; if(area > bA){bA =area; bM=WinSys.monitors[i];}} return bM;}
+int GetCurrentMonitorIndex() {WSMon* cur=GetCurrentMonitor(); if(!cur){return 0;} for(int i=0;i<WinSys.monitorCount;++i){ if(WinSys.monitors[i]==cur){return i;} } return 0; }
+void GetFrameExtents(int* l,int* t,int* r,int* b) {
+#if defined(_WIN32)
+    RECT rc={0,0,0,0}; AdjustWindowRectEx(&rc,0x060A0000|0x00C00000,0,0); *l=-rc.l; *t=-rc.t; *r=rc.r; *b=rc.b;
+#else
+    static int cl=0,ct=0,cr=0,cb=0,have=0;
+    *l=*t=*r=*b=0;
+    if(window && WinSys.x11.display){ Atom fe=WinSys.x11.xlib.InternAtom(WinSys.x11.display,"_NET_FRAME_EXTENTS",0); u8* raw=0;
+        if(WinSysGetWindowPropertyX11(window->x11.handle,fe,6,(u8**)&raw)>=4){ long* v=(long*)raw; *l=(int)v[0]; *r=(int)v[1]; *t=(int)v[2]; *b=(int)v[3]; WinSys.x11.xlib.Free(raw); } }
+    if(*l||*t||*r||*b){ cl=*l; ct=*t; cr=*r; cb=*b; have=1; }
+    else if(have){ *l=cl; *t=ct; *r=cr; *b=cb; }/*undecorated reads go stale: serve last decorated values*/
+#endif
 }
 
-void ChangeResolution() {
-    if(resDropdownCount < 2){return;} resSelectedIdx=(resSelectedIdx+1)%resDropdownCount; Sys_Settings.ScreenWidth=(u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight=(u32)resModes[resSelectedIdx].h; WSMon* m=GetCurrentMonitor(); if(!m)m=GetPrimaryMonitor(); int mx,my; WinSysGetMonitorPos(m,&mx,&my); const vidmode* desktop=WinSysGetVideoMode(m);
-    int x=mx+(desktop->width-(int)Sys_Settings.ScreenWidth)/2,y=my+(desktop->height-(int)Sys_Settings.ScreenHeight)/2; SetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight); SetWindowPosition(window,x,y); UpdateScreenSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight); resDropdownOpen = false; SaveConfig();
+void GetDecorationOverhead(int* dw,int* dh) {int l,t,r,b; GetFrameExtents(&l,&t,&r,&b); *dw=l+r; *dh=t+b;}
+void ClampWindowSizeToMonitor() {
+    if(WinSys.monitorCount<=0){return;} int ci=(int)Sys_Settings.CurrentMonitor; if(ci<0||ci>=WinSys.monitorCount){ci=0; Sys_Settings.CurrentMonitor=0;} int mx,my,mw,mh; GetMonitorFullarea(WinSys.monitors[ci],&mx,&my,&mw,&mh); (void)mx; (void)my; (void)mw; (void)mh; int wx,wy,ww,wh; GetMonitorWorkarea(WinSys.monitors[ci],&wx,&wy,&ww,&wh); (void)wx; (void)wy; int ddw,ddh; GetDecorationOverhead(&ddw,&ddh); bool ch=false;
+    if(ww-ddw>=320 && (int)Sys_Settings.ScreenWidth>ww-ddw){Sys_Settings.ScreenWidth=(u16)(ww-ddw); ch=true;} if(wh-ddh>=200 && (int)Sys_Settings.ScreenHeight>wh-ddh){Sys_Settings.ScreenHeight=(u16)(wh-ddh); ch=true;} if(ch){SaveConfig();}
 }
 
-void GatherResolutionModes() {
-    resDropdownCount = 0; WSMon* m = GetCurrentMonitor(); if (!m) m=GetPrimaryMonitor(); const vidmode* d = WinSysGetVideoMode(m); if(!d) return; static const struct {int w,h;} cr[] = {{320,200},{640,400},{640,480},{800,600},{1024,768},{1280,720},{1280,800},{1366,768},{1440,900},{1600,900},{1920,1080},{2560,1440}}; int maxW = d->width, maxH = d->height,j;
-    for (int i = 0; i < 12 && resDropdownCount < 8; ++i) { if (cr[i].w > maxW || cr[i].h > maxH || cr[i].w < 320 || cr[i].h < 200) continue; for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == cr[i].w && resModes[j].h == cr[i].h) break; } if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){cr[i].w,cr[i].h}; } if (resDropdownCount < 8){resModes[resDropdownCount++]=(ResMode){d->width,d->height};} resSelectedIdx=0;
-    for (int i=0;i<resDropdownCount;++i) { if(resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight){resSelectedIdx=i; break;} }
+void PlaceWindowOnMonitor(int monIdx) {
+    if(WinSys.monitorCount<=0){return;} if(monIdx<0||monIdx>=WinSys.monitorCount){monIdx=0;} WSMon* m=WinSys.monitors[monIdx]; int w=(int)Sys_Settings.ScreenWidth,h=(int)Sys_Settings.ScreenHeight; int wx,wy,ww,wh,ddw,ddh; GetMonitorWorkarea(m,&wx,&wy,&ww,&wh); GetDecorationOverhead(&ddw,&ddh); int fl=0;
+    
+    {int ft,fr,fb; GetFrameExtents(&fl,&ft,&fr,&fb); (void)ft; (void)fr; (void)fb;}
+    int px=(w==ww-ddw) ? wx+fl : wx+(ww-w)/2, py=(h==wh-ddh) ? wy : wy+(wh-h)/2; SetWindowPosition(window,px,py); ignore_next_mouse_delta=true;
+    #if defined(_WIN32)
+        void* hw = window->win32.handle; ShowWindow(hw,5); BringWindowToTop(hw); SetForegroundWindow(hw); SetFocus(hw);
+    #endif
 }
 
+void ApplyStagedWindowedSizeOn(int monIdx) {
+    if(WinSys.monitorCount<=0){return;} if(monIdx<0||monIdx>=WinSys.monitorCount){monIdx=0;} if(resDropdownCount>0){ if(resSelectedIdx<0){resSelectedIdx=0;} if(resSelectedIdx>=resDropdownCount){resSelectedIdx=resDropdownCount-1;} Sys_Settings.ScreenWidth=(u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight=(u32)resModes[resSelectedIdx].h; } Sys_Settings.Fullscreen=0; window->decorated=1; SetWindowDecorated(window,1);
+    WSMon* m=WinSys.monitors[monIdx]; int wx,wy,ww,wh; GetMonitorWorkarea(m,&wx,&wy,&ww,&wh); (void)wx; (void)wy; int ddw,ddh; GetDecorationOverhead(&ddw,&ddh); int w=vmax(vmin((int)Sys_Settings.ScreenWidth,ww-ddw),320),h=vmax(vmin((int)Sys_Settings.ScreenHeight,wh-ddh),200); Sys_Settings.ScreenWidth=(u16)w; Sys_Settings.ScreenHeight=(u16)h; 
+    SetWindowSize(w,h); PlaceWindowOnMonitor(monIdx); UpdateScreenSize(w,h); resDropdownOpen=false; resHoverIdx=-1; SaveConfig();
+}
+
+void ApplyStagedWindowedSize() {int i=GetCurrentMonitorIndex(); Sys_Settings.CurrentMonitor=(u8)i; ApplyStagedWindowedSizeOn(i);}
+void GatherResolutionModesFor(int monIdx) {
+    int keepW=-1,keepH=-1;
+    if(resSelectedIdx>=0 && resSelectedIdx<resDropdownCount){keepW=resModes[resSelectedIdx].w; keepH=resModes[resSelectedIdx].h;}
+    resDropdownCount = 0; if(WinSys.monitorCount<=0){return;} if(monIdx<0||monIdx>=WinSys.monitorCount){monIdx=0;} WSMon* m = WinSys.monitors[monIdx];
+    int wx,wy,ww,wh; GetMonitorWorkarea(m,&wx,&wy,&ww,&wh); (void)wx; (void)wy;
+    static const struct {int w,h;} cr[] = {{320,200},{640,400},{640,480},{800,600},{1024,768},{1280,720},{1280,800},{1366,768},{1440,900},{1600,900},{1920,1080},{2560,1440}}; int j;
+    int fddw,fddh; GetDecorationOverhead(&fddw,&fddh);
+    for (int i = 0; i < 12 && resDropdownCount < 16; ++i) { if (cr[i].w+fddw > ww || cr[i].h+fddh > wh || cr[i].w < 320 || cr[i].h < 200) continue; for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == cr[i].w && resModes[j].h == cr[i].h) break; } if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){cr[i].w,cr[i].h}; }
+    { int fw=ww-fddw, fh=wh-fddh; if (fw>=320 && fh>=200 && resDropdownCount<16){ for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == fw && resModes[j].h == fh) break; } if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){fw,fh}; } }
+    if (resDropdownCount==0){resModes[resDropdownCount++]=(ResMode){vmax((int)Sys_Settings.ScreenWidth,320),vmax((int)Sys_Settings.ScreenHeight,200)};}
+    resSelectedIdx=-1;
+    for (int i=0;i<resDropdownCount;++i) { if(resModes[i].w == keepW && resModes[i].h == keepH){resSelectedIdx=i; break;} if(resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight){resSelectedIdx=i;} }
+    if(resSelectedIdx<0){ int cw=(int)Sys_Settings.ScreenWidth, chh=(int)Sys_Settings.ScreenHeight;
+    if(cw>=320 && chh>=200 && cw+fddw<=ww && chh+fddh<=wh && resDropdownCount<16){resModes[resDropdownCount++]=(ResMode){cw,chh}; resSelectedIdx=resDropdownCount-1;}else{resSelectedIdx=resDropdownCount-1;} }
+}
+
+void GatherResolutionModes() { GatherResolutionModesFor(GetCurrentMonitorIndex()); }
 void ChangeFullScreenWindowed(bool adjustToFit) {
-    int x,y,w,h,mx,my; WSMon* m = WinSys.monitors[Sys_Settings.CurrentMonitor]; const vidmode* mo = WinSysGetVideoMode(m); GetMonitorFullarea(m,&x,&y,&w,&h); window->decorated = (i32)(!Sys_Settings.Fullscreen); SetWindowDecorated(window, (i32)(!Sys_Settings.Fullscreen));
-    if(Sys_Settings.Fullscreen){SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth=w; Sys_Settings.ScreenHeight=h;}else{WinSysGetMonitorPos(m,&mx,&my); if(adjustToFit){Sys_Settings.ScreenWidth=vmax(vmin((w*3)/4,1366),320); Sys_Settings.ScreenHeight=vmax(vmin((h*3)/4,768),200); } SetWindowMonitor(mx + (mo->width - Sys_Settings.ScreenWidth)/2,my + (mo->height - Sys_Settings.ScreenHeight)/2,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);}
+    if(WinSys.monitorCount<=0){return;} int ci=(int)Sys_Settings.CurrentMonitor; if(ci<0||ci>=WinSys.monitorCount){ci=0; Sys_Settings.CurrentMonitor=0;}
+    WSMon* m = WinSys.monitors[ci]; int x,y,w,h; GetMonitorFullarea(m,&x,&y,&w,&h);
+    int sddw,sddh; GetDecorationOverhead(&sddw,&sddh);/*snapshot before style flip; live read goes stale while undecorated*/
+    window->decorated = (i32)(!Sys_Settings.Fullscreen); SetWindowDecorated(window, (i32)(!Sys_Settings.Fullscreen));
+    if(Sys_Settings.Fullscreen){SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth=w; Sys_Settings.ScreenHeight=h;}else{ if(adjustToFit){ int ax,ay,aw,ah; GetMonitorWorkarea(m,&ax,&ay,&aw,&ah); (void)ax; (void)ay;
+    if(aw-sddw>=320 && ah-sddh>=200){Sys_Settings.ScreenWidth=aw-sddw; Sys_Settings.ScreenHeight=ah-sddh;}else{Sys_Settings.ScreenWidth=vmax(vmin((w*3)/4,1366),320); Sys_Settings.ScreenHeight=vmax(vmin((h*3)/4,768),200);} SetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight); }
+#if defined(_WIN32)
+    /*decorated style recalc above restores frame*/
+#else
+    if(WinSys.x11.NWM_STATE && WinSys.x11.NWM_STATE_FULLSCREEN){ sendEventToWM(window,WinSys.x11.NWM_STATE,0,WinSys.x11.NWM_STATE_FULLSCREEN,0,1,0); }
+#endif
+    PlaceWindowOnMonitor(ci); }
     UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
 
 void SetVSync() { window->context.swapInterval((i32)Sys_Settings.Vsync); }
-void CycleToNextMonitor() { static double monitorSwitchTime = 0.0; if (get_time() >= monitorSwitchTime) { monitorSwitchTime = get_time() + 0.5; if(Sys_Settings.CurrentMonitor>(WinSys.monitorCount-1)){Sys_Settings.CurrentMonitor=0; SaveConfig();} if(WinSys.monitorCount>=2){Sys_Settings.CurrentMonitor=(Sys_Settings.CurrentMonitor+1)%WinSys.monitorCount; SaveConfig(); CenterWindowOnMonitor();} } }
+void CycleToNextMonitor() {
+    static double monitorSwitchTime = 0.0; if (get_time() < monitorSwitchTime) {return;} monitorSwitchTime = get_time() + 0.5; if(WinSys.monitorCount<=0){return;} Sys_Settings.CurrentMonitor++; if(Sys_Settings.CurrentMonitor>=WinSys.monitorCount)Sys_Settings.CurrentMonitor=0; SaveConfig(); DualLog("CycleToNextMonitor cur:%u\n",Sys_Settings.CurrentMonitor);
+    if (Sys_Settings.Fullscreen){ WSMon* m = WinSys.monitors[Sys_Settings.CurrentMonitor]; int x,y,w,h; GetMonitorFullarea(m,&x,&y,&w,&h); SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth=w; Sys_Settings.ScreenHeight=h; //SetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
+    }else{GatherResolutionModesFor(Sys_Settings.CurrentMonitor); ApplyStagedWindowedSizeOn(Sys_Settings.CurrentMonitor);}
+}
 // Input and Configuration System for Config.ini, keyboard and mouse support.
 double last_mouse_x,last_mouse_y;
 InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D},{"E",KEY_E},{"F",KEY_F},{"G",KEY_G},{"H",KEY_H},{"I",KEY_I},{"J",KEY_J},{"K",KEY_K},{"L",KEY_L},{"M",KEY_M},{"N",KEY_N},{"O",KEY_O},{"P",KEY_P},{"Q",KEY_Q},{"R",KEY_R},{"S",KEY_S},{"T",KEY_T},{"U",KEY_U},{"V",KEY_V},{"W",KEY_W},{"X",KEY_X},{"Y",KEY_Y},{"Z",KEY_Z},{"1",KEY_1},{"2",KEY_2},{"3",KEY_3},{"4",KEY_4},{"5",KEY_5},{"6",KEY_6},{"7",KEY_7},{"8",KEY_8},{"9",KEY_9},
