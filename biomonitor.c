@@ -3,15 +3,29 @@
 BioMonitorSystem bioMonitor;
 // CPU-rasterized graph texture (automap pattern): 620x36 matches Unity's BiomonitorGraphSystem graphWidth/graphHeight.
 static u8 biomPx[BIOM_GRAPH_W*BIOM_GRAPH_H*4]; static u32 biomTexId=0,biomFBO=0;
+/* Empty graph pixels stay fully transparent; only the 3 graphed lines carry visible alpha.
+   bioMonitor.backgroundColor (a=0.01) remains the logical "empty pixel" marker for the fade logic and is never written to the raster. */
+static const Color biomBgTransparent = {0.0f, 0.0f, 0.0f, 0.0f};
+/* Graph placement in UI y-down coords: above the biomonitor text block (text starts at y=83), left-aligned with it at x=4. */
+enum { BIOM_UI_X=4, BIOM_UI_Y=41 };
 INLINE void biomPutPx(int x,int y,Color c){ u8* p=&biomPx[((u32)y*BIOM_GRAPH_W+(u32)x)*4]; p[0]=(u8)(vclamp(c.r,0.0f,1.0f)*255.0f); p[1]=(u8)(vclamp(c.g,0.0f,1.0f)*255.0f); p[2]=(u8)(vclamp(c.b,0.0f,1.0f)*255.0f); p[3]=(u8)(vclamp(c.a,0.0f,1.0f)*255.0f); }
 void BiomonitorInitGL() {GenerateAndBindTexture(&biomTexId,GL_RGBA8,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,GL_LINEAR,NULL); glGenFramebuffers(1,&biomFBO); glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,biomTexId,0); glBindFramebuffer(GL_FRAMEBUFFER,0);}
 void BiomonitorBlitToUI() {
     if(!(World.invP1.hardwareIsActive & HW_BIO)){return;}
     glBindFramebuffer(GL_READ_FRAMEBUFFER,biomFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
-    /*No src flip: texture row 0 = graph minimum = bottom of the displayed graph (Unity SetPixel y=0 is the bottom row).*/
-    int gx0=0,gy0=0,gx1=BIOM_GRAPH_W,gy1=BIOM_GRAPH_H;
+    /*No src flip: texture row 0 = graph minimum = bottom of the displayed graph (Unity SetPixel y=0 is the bottom row).
+      UI y-down -> GL y-up (automap pattern): dest rect is (BIOM_UI_X,BIOM_UI_Y)-(BIOM_UI_X+620,BIOM_UI_Y+36) in y-down UI coords.*/
+    int gx0=BIOM_UI_X,gy0=UI_H-(BIOM_UI_Y+BIOM_GRAPH_H),gx1=BIOM_UI_X+BIOM_GRAPH_W,gy1=UI_H-BIOM_UI_Y;
     glBlitFramebuffer(0,0,BIOM_GRAPH_W,BIOM_GRAPH_H, gx0,gy0,gx1,gy1, GL_COLOR_BUFFER_BIT,GL_LINEAR);
     glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
+}
+/* Debug dump of the CPU-rasterized graph texture (automap AutomapDumpBMP pattern):
+   vertical flip so the BMP shows the graph as displayed (row 0 = graph minimum = bottom). */
+void BiomonitorDumpBMP() {
+    if(!(World.invP1.hardwareIsActive & HW_BIO)){return;} OS_MakeFolder("Screenshots");
+    static u8 flip[BIOM_GRAPH_W*BIOM_GRAPH_H*4];
+    for(int y=0;y<BIOM_GRAPH_H;++y){u8* dst=flip+(size_t)y*BIOM_GRAPH_W*4,*src=biomPx+(size_t)(BIOM_GRAPH_H-1-y)*BIOM_GRAPH_W*4; for(int x=0;x<BIOM_GRAPH_W;++x){u8* d=dst+(size_t)x*4,*s=src+(size_t)x*4; d[0]=s[0]; d[1]=s[1]; d[2]=s[2]; d[3]=s[3];}}
+    char p[96]; sFormat(p,sizeof(p),"Screenshots/biomonitor_%.2f.bmp",get_time()); BmpWrite(p,BIOM_GRAPH_W,BIOM_GRAPH_H,flip);
 }
 void BioMonitorClearGraphs() {
     for (int x=0;x<BIOM_GRAPH_W;x++) { for (int y=0; y<BIOM_GRAPH_H;y++) { /*tex.SetPixel(x,y,bioMonitor.backgroundColor);*/ /*texture cleared via buffer reset above*/ } }
@@ -93,7 +107,7 @@ void BioMonitorUpdate() {
             } else if (bioMonitor.col2.a > 0.01f) {
                 fadeDist = 275.0f; distPerc = (bioMonitor.currentIndex2 - x); if ((BIOM_GRAPH_W - x) < fadeDist && bioMonitor.currentIndex2 < fadeDist) distPerc +=  BIOM_GRAPH_W; if (distPerc < 0.0f || distPerc > fadeDist) distPerc = fadeDist;
                 distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f); if (distPerc == 0.0f) bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor; bioMonitor.col2.a = distPerc; biomPutPx(x,y,bioMonitor.col2);
-            } else { biomPutPx(x,y,bioMonitor.backgroundColor); }
+            } else { biomPutPx(x,y,biomBgTransparent); }
         }
     }
     glBindTexture(GL_TEXTURE_2D,biomTexId); glTexSubImage2D(GL_TEXTURE_2D,0,0,0,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,biomPx);

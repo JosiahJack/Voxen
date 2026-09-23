@@ -520,7 +520,7 @@ void LoadLevelMod(u8 lev) {
             if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
         par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed;
-        par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset;
+        par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset; par->requiredAccessCard=src->requiredAccessCard; par->musicType=src->musicType; par->messageIndex=src->messageIndex; par->lockedMessageLingdex=src->lockedMessageLingdex; par->SFXIndex=src->SFXIndex; par->touchEnabled=src->touchEnabled; par->doorOpen=src->doorOpen; par->percentMoved=src->percentMoved;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARG_STRLEN);
         if (entIdx == 517) { // func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative
             V3 sp = par->startPosition; if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3_AplusB(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } // fallback for entries lacking startPosition

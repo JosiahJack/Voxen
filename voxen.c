@@ -27,6 +27,7 @@ static u32 gpuQ[5][5]; static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp]
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0,resHoverIdx=-1;
 typedef struct {int w,h;} ResMode; ResMode resModes[16];
 GlobalContext World = {0};
+V3 debugWepOffset = {0, 0, 0}; // debug weapon view offset
 Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
                       {1.0f,0.498039216f,0.0f,1.0f}, /* 5 Orange T_ORANGE*/ {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red T_STOPD_RED*/ {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
                       {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title T_GREEN_MENU*/ {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/ {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/ {0.392156863f,0.031372549f,0.039215686f,1.0f} /* 12 Red Menu Text Dark T_RED_MENU*/ };
@@ -559,7 +560,7 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
 }
 //                        0 mk3 assault rifle              1 blaster             2 dartgun               3 flech                 4 ion  5 rapier    6 pipe               7 magnum            8 magpulse               9 pistol               10 plasma                 11 rail                              12 riot              13 skorp              14 sparq               15 stun
 Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},{0,0,0,1},{0,0,0,1},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
-        V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},  {0,0,0},  {0,0,0},        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
+        V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},  {-.2f,.5f,.8f},  {0,-.3f,.7f},        /*rapier / pipe: mesh extents require forward/down offset (pipe bbox z:-0.7..0.04 y:-1.26..-0.86; rapier bbox z:-1.07..0.13 y:-1.03..0.04)*/        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
 extern const u16 wepModelIndices[16]; extern WeaponFireCtx wfx; void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight; float sfov, snear, sfar; if (camView) { CamView* cv=&camViews[camViewIdx]; swidth=cv->width; sheight=cv->height; sfov=(float)cv->fov; snear=cv->near; sfar=cv->far; } else { swidth=Sys_Settings.ScreenWidth; sheight=Sys_Settings.ScreenHeight; sfov=(float)Sys_Settings.FOV; snear=0.02f; sfar=World.farPlane[World.curLev]; }
@@ -623,7 +624,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if (wvi > 0 && wvi < INSTANCE_COUNT) {
         int wep16 = Get16WeaponIndexFromConstIndex(World.instances[wvi].index);
         if (wep16 >= 0 && wep16 < 16 && World.instances[wvi].modelIndex < MAX_MDLS) { // Offset in player-local space (right,down,forward), rotated into world by the player view; reload/swap dip added on Y.  Pivot = player position, weapon stays locked to view.
-            V3 weaponViewOffset=vWepOfs[wep16]; weaponViewOffset.y += wfx.reloadContainerPos.y; V3 weaponPos = V3_AplusB(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1],weaponViewOffset)); World.position[wvi] = weaponPos; World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1],vWepRot[wep16]); // view orientation + per-model correction
+            V3 weaponViewOffset=vWepOfs[wep16]; weaponViewOffset.y += wfx.reloadContainerPos.y; weaponViewOffset = V3_AplusB(weaponViewOffset, debugWepOffset); V3 weaponPos = V3_AplusB(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1],weaponViewOffset)); World.position[wvi] = weaponPos; World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1],vWepRot[wep16]); // view orientation + per-model correction
             u16 curN=0, curT=0, curG=0, curS=0, curM=0; DrawEntity(&World.instances[wvi],wvi,World.instances[wvi].index,World.instances[wvi].texIndex,&curN,&curT,&curG,&curS,&curM,false);
         }
     }
@@ -734,7 +735,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
     { PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAX_TXRS},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
     AutomapNewGame();
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
-    //TESTING TODO REMOVE! AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
 }
 
 void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
@@ -791,7 +791,7 @@ void InitalizeEnvironment() {
     RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); RenderLoading("Loading models..."); DebugRAM("before LoadModels"); LoadModels(); DebugRAM("after LoadModels");
     if (World.introNotPlayed) { currentMenuPage = Mpg_IntroVideo; PlayMenuMusic(); World.menuActive = true; World.introNotPlayed = false; } World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     AutomapInitGL();
-    BiomonitorInitGL();
+    BiomonitorInitGL(); BioMonitorInit();
     NewGame();
     PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
     OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free"); DebugRAMPeak(); DebugRAMBreakdown();
@@ -811,7 +811,7 @@ i32 main() {
         double gameT_start = get_time();
         ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); if (!World.paused && !World.menuActive){PSys_Update(World.dt);} UpdateAudio(); gameTime = get_time() - gameT_start;
         if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) UpdateInstanceMatrix4x4s(); // Before camviews so camview shadows render same as main pass
-        drawCalls=uiDrawCalls=shadDrawCalls=vertsRendered=0; RenderCameraViews(); if(likely(!World.paused && !World.menuActive)){CullCore();} AudioUpdate(); AutomapTick(); Render(false/*!camview*/,0u); if (ScrshotPressed() && World.current_time > World.screenshotTimeout) { Screenshot(); AutomapDumpBMP(); }
+        drawCalls=uiDrawCalls=shadDrawCalls=vertsRendered=0; RenderCameraViews(); if(likely(!World.paused && !World.menuActive)){CullCore();} AudioUpdate(); AutomapTick(); Render(false/*!camview*/,0u); if (ScrshotPressed() && World.current_time > World.screenshotTimeout) { Screenshot(); AutomapDumpBMP(); BiomonitorDumpBMP(); }
         for(i32 i=0;i<MAX_KEYS;++i){Sys_Input.keyStates[i].pressed=Sys_Input.keyStates[i].released=false;} for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) {Sys_Input.mouseButtons[i].pressed=Sys_Input.mouseButtons[i].released=false;} Sys_Input.scrollDelta=0; World.currentMouse_dx=World.currentMouse_dy=0; // Reset Input states, can't mset as we want to preserve down state
         globalframe++; World.cpuTime = get_time() - World.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.
         if (globalframe > 4) { u8 r=(gpuQFrame+1)%5; u64 v;

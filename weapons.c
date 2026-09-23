@@ -216,6 +216,8 @@ void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u
     // Use appropriate animation clips from models.c: v_rapier (50) uses A_ATTACK_HIT (4), v_pipe (49) uses A_ATTACK_HIT (18) for hit
     if (hit) {
         PlayAnim(PLAYER1, isRapier ? A_ATTACK_HIT : A_ATTACK_HIT);
+        // Set view model animation clip
+        u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_COUNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; }
         wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = t; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeMissSnd = missSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
     }
@@ -223,10 +225,14 @@ void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
         Entity *in = &World.instances[i]; if(!(in->entflags & EF_ACTIVE) || in->health <= 0.0f || V3_Dist(World.position[i],p) >= 3.2f || V3_dot(look,V3_Normalize(V3_AsubB(World.position[i],p))) <= 0.666f){continue;}/*outside ~+-48deg cone*/
         PlayAnim(PLAYER1, A_ATTACK2);
+        // Set view model animation clip for nearby target hit
+        u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_COUNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; }
         wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = i; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd; wfx.pendingMeleeMissSnd = missSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
     }
-    if(!silent)play_wav(sounds[missSnd],1.0f,World.position[PLAYER1],false);PlayAnim(PLAYER1,isRapier?A_ATTACK2:A_ATTACK1);
+    if(!silent)play_wav(sounds[missSnd],1.0f,World.position[PLAYER1],false);PlayAnim(PLAYER1, A_ATTACK_MISS);
+    // Set view model animation clip for miss (no hit)
+    u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_COUNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = isRapier ? A_ATTACK_MISS : A_ATTACK_MISS; }
 }
 
 void FireRapier(int wep16) { FireMelee(wep16, true,  false, 246, 247, 246); } // wlaserrapier_hit/swing

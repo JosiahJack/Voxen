@@ -1,6 +1,6 @@
 // winput.c - WinSys Windowing System and Input System interfacing with the OS.
 #include "common.h"
-void CycleWeaponSlot(int dir),CloseFullmap(); extern double lerpStartTime;
+void CycleWeaponSlot(int dir),CloseFullmap(); extern double lerpStartTime; extern V3 debugWepOffset;
 typedef struct WSWin WSWin; WSWin* window; typedef struct WSCtx WSCtx; typedef struct WSLib WSLib; typedef struct WSMon WSMon; extern WSLib WinSys; typedef struct{int width,height,refreshRate;} vidmode; typedef struct{int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits; uintptr_t handle;}FBC; typedef void (*WSP)(void);
 WSP PlatformGetModuleSymbol(void*,const char*); void UpdateScreenSize(i32,i32); void SaveConfig(); void InputWindowFocus(i32); void InputKey(char*,int,int); void InputMouseClick(char*,int,int),InputCursorPos(double*,double*,double,double),InputMonitor(WSMon*,int,int); const FBC* ChooseFBConfig(const FBC*, u32); static WSMon* AllocMonitor(const char*,int,int);
 #if defined(_WIN32)
@@ -485,6 +485,13 @@ void InputProcessing() {
         if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
         if (Console()) ToggleConsole();
         if (Menu() && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; } if (Menu() && World.menuActive) { MenuGoBack(); return; } if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
+        // Debug weapon offset adjustment hooks
+        if (Sys_Input.keyStates[KEY_1].pressed) { debugWepOffset.x += 0.05f; }
+        else if (Sys_Input.keyStates[KEY_2].pressed) { debugWepOffset.x -= 0.05f; }
+        if (Sys_Input.keyStates[KEY_3].pressed) { debugWepOffset.y += 0.05f; }
+        else if (Sys_Input.keyStates[KEY_4].pressed) { debugWepOffset.y -= 0.05f; }
+        if (Sys_Input.keyStates[KEY_5].pressed) { debugWepOffset.z += 0.05f; }
+        else if (Sys_Input.keyStates[KEY_6].pressed) { debugWepOffset.z -= 0.05f; }
         if (ToggleMode()) ToggleInventoryMode(); 
         if (Lantern()) World.invP1.hardwareIsActive ^= HW_LAN; 
         if (Infrared()) World.invP1.hardwareIsActive ^= HW_INF;
