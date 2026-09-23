@@ -478,7 +478,6 @@ void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (uiWheelBlocked && Sys_Input.mouseButtons[i].pressed) uiMouseCaptured|=1u<<i;
     if (window_has_focus) {
         UI_ProcessNavigation();
-        if (Sys_Input.keyStates[KEY_E].pressed) play_wav("cyborgs/yourlevelsareterrible",0.1f,(V3){0.0f,0.0f,0.0f},false);/*TODO debug easter egg, fires on every E press*/
         if (Sprint() && Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode && !editFieldEditing) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition--; if (editModeTestEntityDefinition < 307) editModeTestEntityDefinition = 767; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
         else if (Sys_Input.keyStates[KEY_R].pressed && Cheats.editMode && !editFieldEditing) { bool foundValidDynamic = false; while (!foundValidDynamic) { editModeTestEntityDefinition++; if (editModeTestEntityDefinition > 767) editModeTestEntityDefinition = 307; if (IdxIsDynamicObject(editModeTestEntityDefinition)) foundValidDynamic = true; } }
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;

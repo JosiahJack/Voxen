@@ -152,11 +152,11 @@ void RenderMenu() {
         RenderUIImage(136,196,1088,558,1048);/*Newgame inset*/ RenderUIImage(136,196,1088,558,1049);/*Newgame background*/
         if (UI_MenuButton(UI_ID_MENU_NAME_INPUT,276,270,0,795,74, 226,146,/*"NAME:"*/Sys_Text.stringTable[746],299,214)) {/*Just for highlight*/ }
         enteringPlayerName = (currentMenuItem == 0);
-        if (World.playerName[0] == '\0') RenderTextL(642,232,T_RED_MENU,FONT_STOPD,1.0f,/*"ENTER NAME..."*/Sys_Text.stringTable[748]); else RenderTextL(518,232,enteringPlayerName ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,World.playerName);
-        if (UI_MenuButton(UI_ID_MENU_DIFF_COMBAT, 174,377,1,496,95, 148,202,/*"COMBAT"*/Sys_Text.stringTable[748],185,299)) { World.diffCbt = World.diffCbt >= 3 ? 0 : World.diffCbt + 1; }/*TODO string 748 is used for both ENTER NAME and COMBAT*/
-        if (UI_MenuButton(UI_ID_MENU_DIFF_MISSION,704,377,3,496,95, 510,202,/*"MISSION"*/Sys_Text.stringTable[749],726,299)) { World.diffMis = World.diffMis >= 3 ? 0 : World.diffMis + 1; }
-        if (UI_MenuButton(UI_ID_MENU_DIFF_PUZZLE, 174,568,2,496,92, 149,330,/*"PUZZLE"*/Sys_Text.stringTable[751],185,490)) { World.diffPuz = World.diffPuz >= 3 ? 0 : World.diffPuz + 1; }
-        if (UI_MenuButton(UI_ID_MENU_DIFF_CYBER,  704,568,4,496,92, 509,330,/*"CYBERSPACE"*/Sys_Text.stringTable[750],726,490)) { World.diffCyb = World.diffCyb >= 3 ? 0 : World.diffCyb + 1; }
+        if (World.playerName[0] == '\0') RenderTextL(642,232,T_RED_MENU,FONT_STOPD,1.0f,/*"ENTER NAME..."*/Sys_Text.stringTable[749]); else RenderTextL(518,232,enteringPlayerName ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,World.playerName);
+        if (UI_MenuButton(UI_ID_MENU_DIFF_COMBAT, 174,377,1,496,95, 148,202,/*"COMBAT"*/Sys_Text.stringTable[750],185,299)) { World.diffCbt = World.diffCbt >= 3 ? 0 : World.diffCbt + 1; }
+        if (UI_MenuButton(UI_ID_MENU_DIFF_MISSION,704,377,3,496,95, 510,202,/*"MISSION"*/Sys_Text.stringTable[751],726,299)) { World.diffMis = World.diffMis >= 3 ? 0 : World.diffMis + 1; }
+        if (UI_MenuButton(UI_ID_MENU_DIFF_PUZZLE, 174,568,2,496,92, 149,330,/*"PUZZLE"*/Sys_Text.stringTable[753],185,490)) { World.diffPuz = World.diffPuz >= 3 ? 0 : World.diffPuz + 1; }
+        if (UI_MenuButton(UI_ID_MENU_DIFF_CYBER,  704,568,4,496,92, 509,330,/*"CYBERSPACE"*/Sys_Text.stringTable[752],726,490)) { World.diffCyb = World.diffCyb >= 3 ? 0 : World.diffCyb + 1; }
         DiffDigits(162,270,World.diffCbt); DiffDigits(513,270,World.diffMis); DiffDigits(162,399,World.diffPuz); DiffDigits(730-217,399,World.diffCyb);
         {static const i16 dcx[4]={221,330,439,547}; for (u8 c=0;c<4;++c) for (u8 i=0;i<4;++i) { if (!UI_Button(UI_ID_MENU_DIFF_CELL_0+c*4+i,(i16)(dcx[i]+(c>=2?527:0)),(c&1)?651:460,82,79,NULL,(i8)(c+1))) continue; switch(c){case 0:World.diffCbt=i;break; case 1:World.diffPuz=i;break; case 2:World.diffMis=i;break; default:World.diffCyb=i;break;} currentMenuItem=(i8)(c+1); }}
         bool overStart = false; if (UI_Button(UI_ID_MENU_START,544,747, 282,68, &overStart, 5) || (MenuEnter() && currentMenuItem == 5)) GoIntoGame();

@@ -615,7 +615,7 @@ static void ProjectileRaycast(Entity* self, int n) {
 
 static void ProjectileLaunched(Entity* self, int n) {
     u16 sidx=(u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; int masterIdx; float launchSpd; switch (n) { case 1: masterIdx = npc->projectile1Prefab; launchSpd = npc->projectileSpeedAttack1; break; case 2: masterIdx = npc->projectile2Prefab; launchSpd = npc->projectileSpeedAttack2; break; default: masterIdx = npc->projectile3Prefab; launchSpd = npc->projectileSpeedAttack3; break; }
-    V3 spos=ai_gun_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); MuzzleBurst(self,n); u16 bb = SpawnDynamicObject((u16)masterIdx,false); if (!bb || bb >= INSTANCE_COUNT) bb = SpawnDynamicObject(370,false); // TODO validate in arg without double calling SpawnDynamicObject
+    V3 spos=ai_gun_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); MuzzleBurst(self,n); u16 bb = SpawnDynamicObject(masterIdx<768?masterIdx:370,false);
     if (!bb || bb >= INSTANCE_COUNT) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir; // TODO: store damage data into projectile entity fields for deferred impact
     V3 shove = V3_ScaleByF(dir, launchSpd); if (vabs(World.gravity[sidx]) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0,0,0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
@@ -781,7 +781,7 @@ void DoorUpdate(u16 self) {
 
 void CloseFullmap() {}
 u16 SpawnDynamicObject(int val, bool cheat) {
-    if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return 0xFFFF; } if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ",val,World.curLev,cheat); if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return 0xFFFF; }
+    if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return 0xFFFF; } if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return 0xFFFF; }
     if (World.instCount >= INSTANCE_COUNT) { DualLogError("Failed to spawn constIndex %u: instance table full (%u/%u)",val,World.instCount,INSTANCE_COUNT); return 0xFFFF; } u16 entityIndexInInstanceTable = AddInstance((u16)val, (V3){0.0f,0.0f,0.0f}); return entityIndexInInstanceTable;
 }
 // TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.

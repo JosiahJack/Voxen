@@ -94,18 +94,115 @@ int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c
 void cmd_noclip() { Cheats.noclip = !Cheats.noclip; if (Cheats.noclip) { World.velocity[PLAYER1] = (V3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
 void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; if (Cheats.showPhys) { debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); DebugRAM("showPhys ON"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/ } else { OS_Free(debugLineVerts, (size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); debugLineVerts = NULL; DebugRAM("showPhys OFF"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/ } }
 void cmd_shownpc() { Cheats.showNPC = !Cheats.showNPC; if (Cheats.showPhys || Cheats.showNPC) { if (!debugLineVerts) { debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); DebugRAM("showNPC ON"); } } else { if (debugLineVerts) { OS_Free(debugLineVerts, (size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); debugLineVerts = NULL; DebugRAM("showNPC OFF"); } } CenterStatusPrint("shownpc: %s", Cheats.showNPC ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
-void EnableCheatArsenal(u8 level) {
-    switch(level) {
-        case 1: // pipe, dartgun, pistol, sparqbeam, stungun, ammo tranq, ammo tranq, ammo needle, ammo needle, ammo needle, ammo standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader
-        case 2: // card std, pipe, dartgun, pistol, sparqbeam, tranq, needle, needle, needle, standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader, standard, tefl, standard, grenfrag, grengas
-        case 3: // card std, card eng, card sci, dartgun, pistol, sparqbeam, needle, needle, needle, standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader, standard, teflon, standard, grenfrag, grengas, grenfrag, teflon, standard, grenmine
-        case 4: case 5: // flechette, card eng, card sci, card std, rapier, dartgun, pistol, sparqbeam, needle, needle, needle, standard, battery, battery, berserk, stami, medi, medi, navunit, system, ereader, standard, teflon, standard, grenfrag, grengas, grenfrag, teflon, standard, grenmine, hornet, splinter, hornet
-        case 6: // flechetter, magnum, card eng, card sci, card std, rapier, pistol, sparqbeam, standard, battery, battery, grenconc, medi, medi, navunit, system, ereader, standard, teflon, standard, grenfrag, grenfrag, teflon, hollow, standard, grenmine, hornet, splinter, hornet, hollow
-        case 7: // flechetter, magnum, magpulse, shield, card eng, card sci, card std, grenemp, rapier, pistol, battery, battery, grenconc, medi, blaster, medi, magcart, navunit, system, ereader, teflon, standard, grenfrag, grenfrag, hollow, hornet, splinter, hornet, hollow, battery, hollow, hornet, grenconc, grenemp
-        case 8: // skorpion, slaglarge, slag, flechette, magnum, mk3, magpulse, shield, card eng, card sci, card std, grenemp, rapier, ionrifle, grenconc, medi, medi, magcart, navunit, system, ereader, grenmine, grenearth, grenfrag, grenfrag, hollow, grennitro, icad, splinter, hollow, magnesium, hollow, hornet, grenconc, grenemp, slag, slug, icad, grenconc, grenmine, grenmine, grenmine, grenmine, grenearth, grennitro, magnesium, magnesium, slug, slug
-        case 9: break; // skorpion, slaglarge, slag, magnum, mk3, magpulse, shield, grenemp, rapier, ionrifle, grenconc, medi, medi, magcart, navunit, ereader, grenmine, grenearth, grenfrag, grenfrag, hollow, grennitro, icad, hollow, magnesium, hollow, healthkit, grenconc, grenemp, slag, icad, grenearth, grennitro, magnesium, magnesium, slug, magcart, plasma, magcart, medi, icad, healthkit
+// Grid spawn positions for cheat arsenal: manhattan distance grid, 0.32f spacing, starting at 0.64f
+// Ordered by manhattan distance from player (|dx|+|dz|), then by |dy| closest to player Y first
+static const V3 ArsenalSpawnOffsets[] = {
+    // dist 0.64 (manhattan)
+    { 0.64f, 0.0f, 0.0f}, {-0.64f, 0.0f, 0.0f}, { 0.0f, 0.0f, 0.64f}, { 0.0f, 0.0f, -0.64f},
+    { 0.32f, 0.0f, 0.32f}, {-0.32f, 0.0f, 0.32f}, {-0.32f, 0.0f, -0.32f}, { 0.32f, 0.0f, -0.32f},
+    // dist 0.96
+    { 0.96f, 0.0f, 0.0f}, {-0.96f, 0.0f, 0.0f}, { 0.0f, 0.0f, 0.96f}, { 0.0f, 0.0f, -0.96f},
+    { 0.64f, 0.0f, 0.32f}, {-0.64f, 0.0f, 0.32f}, {-0.64f, 0.0f, -0.32f}, { 0.64f, 0.0f, -0.32f},
+    { 0.32f, 0.0f, 0.64f}, {-0.32f, 0.0f, 0.64f}, {-0.32f, 0.0f, -0.64f}, { 0.32f, 0.0f, -0.64f},
+    // dist 1.28
+    { 1.28f, 0.0f, 0.0f}, {-1.28f, 0.0f, 0.0f}, { 0.0f, 0.0f, 1.28f}, { 0.0f, 0.0f, -1.28f},
+    { 0.96f, 0.0f, 0.32f}, {-0.96f, 0.0f, 0.32f}, {-0.96f, 0.0f, -0.32f}, { 0.96f, 0.0f, -0.32f},
+    { 0.64f, 0.0f, 0.64f}, {-0.64f, 0.0f, 0.64f}, {-0.64f, 0.0f, -0.64f}, { 0.64f, 0.0f, -0.64f},
+    { 0.32f, 0.0f, 0.96f}, {-0.32f, 0.0f, 0.96f}, {-0.32f, 0.0f, -0.96f}, { 0.32f, 0.0f, -0.96f},
+    // dist 1.60
+    { 1.60f, 0.0f, 0.0f}, {-1.60f, 0.0f, 0.0f}, { 0.0f, 0.0f, 1.60f}, { 0.0f, 0.0f, -1.60f},
+    { 1.28f, 0.0f, 0.32f}, {-1.28f, 0.0f, 0.32f}, {-1.28f, 0.0f, -0.32f}, { 1.28f, 0.0f, -0.32f},
+    { 0.96f, 0.0f, 0.64f}, {-0.96f, 0.0f, 0.64f}, {-0.96f, 0.0f, -0.64f}, { 0.96f, 0.0f, -0.64f},
+    { 0.64f, 0.0f, 0.96f}, {-0.64f, 0.0f, 0.96f}, {-0.64f, 0.0f, -0.96f}, { 0.64f, 0.0f, -0.96f},
+    { 0.32f, 0.0f, 1.28f}, {-0.32f, 0.0f, 1.28f}, {-0.32f, 0.0f, -1.28f}, { 0.32f, 0.0f, -1.28f},
+};
+
+static bool IsCellOpenAt(V3 pos) {
+    float x = pos.x - World.worldMin_x[World.curLev] + CELLXHALF;
+    float z = pos.z - World.worldMin_z[World.curLev] + CELLXHALF;
+    int cx = (int)(x / CELLSZ);
+    int cz = (int)(z / CELLSZ);
+    if (cx < 0 || cx >= WORLDX || cz < 0 || cz >= WORLDX) return false;
+    u32 cell = (u32)cz * WORLDX + (u32)cx;
+    return (gridCellStates[cell] & CELL_OPEN) != 0;
+}
+
+static void SpawnArsenalItem(u16 constIndex, int* offsetIdx) {
+    V3 ppos = World.position[PLAYER1];
+    for (int i = *offsetIdx; i < (int)(sizeof(ArsenalSpawnOffsets)/sizeof(V3)); ++i) {
+        V3 spawnPos = V3_AplusB(ppos, ArsenalSpawnOffsets[i]);
+        spawnPos.y = ppos.y; // prefer player Y level
+        if (IsCellOpenAt(spawnPos)) {
+            u16 spawned = SpawnDynamicObject(constIndex, true);
+            if (spawned < U16_MAX) {
+                World.position[spawned] = spawnPos;
+                World.velocity[spawned] = (V3){0,0,0};
+                *offsetIdx = i + 1;
+                return;
+            }
+        }
     }
-} // TODO
+}
+
+void EnableCheatArsenal(u8 level) {
+    int offsetIdx = 0;
+    #define SPAWN(c) SpawnArsenalItem(c, &offsetIdx)
+    switch(level) {
+        case 1: // Medical: pipe, dartgun, pistol, sparqbeam, stungun, ammo tranq(x2), ammo needle(x3), ammo standard, battery(x2), berserk(x2), staminup(x2), medi(x2), navunit, system, ereader
+            SPAWN(349); SPAWN(345); SPAWN(352); SPAWN(357); SPAWN(358);
+            SPAWN(374); SPAWN(374); SPAWN(373); SPAWN(373); SPAWN(373); SPAWN(375);
+            SPAWN(359); SPAWN(359);
+            SPAWN(321); SPAWN(321); SPAWN(327); SPAWN(327); SPAWN(324); SPAWN(324);
+            SPAWN(329); SPAWN(328); SPAWN(330);
+            break;
+        case 2: // Engineering: card std, pipe, dartgun, pistol, sparqbeam, tranq, needle(x3), standard, battery(x2), berserk, stami, medi(x2), navunit, system, ereader, standard(x2), teflon, grenfrag, grengas
+            SPAWN(388); SPAWN(349); SPAWN(345); SPAWN(352); SPAWN(357);
+            SPAWN(374); SPAWN(373); SPAWN(373); SPAWN(373); SPAWN(375);
+            SPAWN(359); SPAWN(359); SPAWN(321); SPAWN(327); SPAWN(324); SPAWN(324);
+            SPAWN(329); SPAWN(328); SPAWN(330); SPAWN(375); SPAWN(375); SPAWN(376); SPAWN(314); SPAWN(320);
+            break;
+        case 3: // Science: card std, card eng, card sci, dartgun, pistol, sparqbeam, needle(x3), standard, battery(x2), berserk, stami, medi(x2), navunit, system, ereader, standard(x2), teflon, grenfrag, grengas, grenfrag, teflon, standard, grenmine
+            SPAWN(388); SPAWN(392); SPAWN(391); SPAWN(345); SPAWN(352); SPAWN(357);
+            SPAWN(373); SPAWN(373); SPAWN(373); SPAWN(375); SPAWN(359); SPAWN(359);
+            SPAWN(321); SPAWN(327); SPAWN(324); SPAWN(324); SPAWN(329); SPAWN(328); SPAWN(330);
+            SPAWN(375); SPAWN(375); SPAWN(376); SPAWN(314); SPAWN(320); SPAWN(314); SPAWN(376); SPAWN(375); SPAWN(318);
+            break;
+        case 4: case 5: // Security: flechette, card eng, card sci, card std, rapier, dartgun, pistol, sparqbeam, needle(x3), standard, battery(x2), berserk, stami, medi(x2), navunit, system, ereader, standard(x2), teflon, grenfrag, grengas, grenfrag, teflon, standard, grenmine, hornet, splinter, hornet
+            SPAWN(346); SPAWN(392); SPAWN(391); SPAWN(388); SPAWN(348); SPAWN(345); SPAWN(352); SPAWN(357);
+            SPAWN(373); SPAWN(373); SPAWN(373); SPAWN(375); SPAWN(359); SPAWN(359);
+            SPAWN(321); SPAWN(327); SPAWN(324); SPAWN(324); SPAWN(329); SPAWN(328); SPAWN(330);
+            SPAWN(375); SPAWN(375); SPAWN(376); SPAWN(314); SPAWN(320); SPAWN(314); SPAWN(376); SPAWN(375); SPAWN(318);
+            SPAWN(381); SPAWN(382); SPAWN(381);
+            break;
+        case 6: // Reactor: flechette, magnum, card eng, card sci, card std, rapier, pistol, sparqbeam, standard, battery(x2), grenconc, medi(x2), navunit, system, ereader, standard(x2), teflon, grenfrag(x2), teflon, hollow, standard, grenmine, hornet, splinter, hornet, hollow
+            SPAWN(346); SPAWN(350); SPAWN(392); SPAWN(391); SPAWN(388); SPAWN(348); SPAWN(352); SPAWN(357);
+            SPAWN(375); SPAWN(359); SPAWN(359); SPAWN(315); SPAWN(324); SPAWN(324);
+            SPAWN(329); SPAWN(328); SPAWN(330); SPAWN(375); SPAWN(375); SPAWN(376); SPAWN(314); SPAWN(314); SPAWN(376); SPAWN(377); SPAWN(375); SPAWN(318);
+            SPAWN(381); SPAWN(382); SPAWN(381); SPAWN(377);
+            break;
+        case 7: // Executive: flechette, magnum, magpulse, shield, card eng, card sci, card std, grenemp, rapier, pistol, battery(x2), grenconc, medi, blaster, medi, magcart, navunit, system, ereader, teflon, standard, grenfrag(x2), hollow, hornet, splinter, hornet, hollow, battery, hollow, hornet, grenconc, grenemp
+            SPAWN(346); SPAWN(350); SPAWN(351); SPAWN(333); SPAWN(392); SPAWN(391); SPAWN(388); SPAWN(316);
+            SPAWN(348); SPAWN(352); SPAWN(359); SPAWN(359); SPAWN(315); SPAWN(324); SPAWN(344); SPAWN(324); SPAWN(386);
+            SPAWN(329); SPAWN(328); SPAWN(330); SPAWN(376); SPAWN(375); SPAWN(314); SPAWN(314); SPAWN(377); SPAWN(381); SPAWN(382); SPAWN(381); SPAWN(377); SPAWN(359); SPAWN(377); SPAWN(381); SPAWN(315); SPAWN(316);
+            break;
+        case 8: // Bridge: skorpion, slaglarge, slag, flechette, magnum, mk3, magpulse, shield, card eng, card sci, card std, grenemp, rapier, ionrifle, grenconc, medi(x2), magcart, navunit, system, ereader, grenmine, grenearth, grenfrag(x2), hollow, grennitro, icad, splinter, hollow, magnesium, hollow, hornet, grenconc, grenemp, slag, slug, icad, grenconc, grenmine(x4), grenearth, grennitro, magnesium(x2), slug(x2)
+            SPAWN(356); SPAWN(385); SPAWN(384); SPAWN(346); SPAWN(350); SPAWN(343); SPAWN(351); SPAWN(333);
+            SPAWN(392); SPAWN(391); SPAWN(388); SPAWN(316); SPAWN(348); SPAWN(347); SPAWN(315);
+            SPAWN(324); SPAWN(324); SPAWN(386); SPAWN(329); SPAWN(328); SPAWN(330); SPAWN(318); SPAWN(317);
+            SPAWN(314); SPAWN(314); SPAWN(377); SPAWN(319); SPAWN(384); SPAWN(382); SPAWN(377); SPAWN(379); SPAWN(377); SPAWN(381); SPAWN(315); SPAWN(316);
+            SPAWN(384); SPAWN(383); SPAWN(384); SPAWN(315); SPAWN(318); SPAWN(318); SPAWN(318); SPAWN(318); SPAWN(317); SPAWN(319);
+            SPAWN(379); SPAWN(379); SPAWN(383); SPAWN(383);
+            break;
+        case 9: // Gamma Grove: skorpion, slaglarge, slag, magnum, mk3, magpulse, shield, grenemp, rapier, ionrifle, grenconc, medi(x2), magcart, navunit, ereader, grenmine, grenearth, grenfrag(x2), hollow, grennitro, icad, hollow, magnesium, hollow, healthkit, grenconc, grenemp, slag, icad, grenearth, grennitro, magnesium(x2), slug(x2), magcart, plasma, magcart, medi, icad, healthkit
+            SPAWN(356); SPAWN(385); SPAWN(384); SPAWN(350); SPAWN(343); SPAWN(351); SPAWN(333); SPAWN(316);
+            SPAWN(348); SPAWN(347); SPAWN(315); SPAWN(324); SPAWN(324); SPAWN(386); SPAWN(329); SPAWN(330); SPAWN(318); SPAWN(317);
+            SPAWN(314); SPAWN(314); SPAWN(377); SPAWN(319); SPAWN(384); SPAWN(377); SPAWN(379); SPAWN(377); SPAWN(362);
+            SPAWN(315); SPAWN(316); SPAWN(384); SPAWN(384); SPAWN(317); SPAWN(319); SPAWN(379); SPAWN(379); SPAWN(383); SPAWN(383);
+            SPAWN(386); SPAWN(353); SPAWN(386); SPAWN(324); SPAWN(384); SPAWN(362);
+            break;
+    }
+    #undef SPAWN
+}
 void cmd_kill() { World.instances[PLAYER1].health = World.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
 void cmd_undo() { if (Cheats.editMode) { if (lastSpawned < U16_MAX && lastSpawned >= INSTS_1ST_IDX) { DeleteInstance(lastSpawned); lastSpawned = U16_MAX; CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Nothing to undo"); } } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } }
 void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; float shakeForce = (force < 0.48f) ? force : 0.48f; (void)shakeForce; } // TODO actually shake
