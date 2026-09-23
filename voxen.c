@@ -225,7 +225,9 @@ static void cmd_loadlevel(const char* arg) {
 }
 
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }
-static void cmd_summon(int itemConstIndex) { if (IdxInBounds(itemConstIndex)) { u16 spawned = SpawnDynamicObject(itemConstIndex,true); if (spawned < U16_MAX) { lastSpawned = spawned; V3 sdir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right); World.position[spawned] = V3_AplusB(World.position[PLAYER1],V3_ScaleByF(sdir,2.0f)); World.velocity[spawned] = (V3){0,0,0}; if (IdxIsHardware(itemConstIndex)) { int v=(int)World.invP1.hwVers[itemConstIndex-328]+1; World.instances[spawned].custIdx[0]=(i16)(v>4?4:v); } } CenterStatusPrint("Summoned object ID %d",itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s",itemConstIndex); } }
+static void cmd_summon(int itemConstIndex) {
+    if (IdxInBounds(itemConstIndex)) { u16 spawned = SpawnDynamicObject(itemConstIndex,true); if (spawned < U16_MAX) { lastSpawned = spawned; V3 sdir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right); World.position[spawned] = V3_AplusB(World.position[PLAYER1],V3_ScaleByF(sdir,2.0f)); World.velocity[spawned] = (V3){0,0,0};
+    if (IdxIsHardware(itemConstIndex)) { int v=(int)World.invP1.hwVers[itemConstIndex-328]+1; World.instances[spawned].customIndex=(i16)(v>4?4:v); } } CenterStatusPrint("Summoned object ID %d",itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s",itemConstIndex); } }
 static void cmd_select(int instanceIdx) { if (instanceIdx >= 0 && instanceIdx < World.instCount) { editModeSelection=(u16)instanceIdx; CenterStatusPrint("Selected entity instance %u (const index %u)",editModeSelection,World.instances[editModeSelection].index); } else { CenterStatusPrint("Invalid instance: %d (loaded count: %u)",instanceIdx,World.instCount); } }
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; }                         static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
@@ -737,7 +739,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
 
 void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
 void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); }
-void LoadModels(),LoadTextures(),InitAudio(),LoadConfig(),synth_set_room(float,float); extern u32 random_range_rng;
+void LoadModels(),LoadTextures(),InitAudio(),LoadConfig(),BiomonitorInitGL(),synth_set_room(float,float); extern u32 random_range_rng;
 void InitalizeEnvironment() {
     game_start_time = get_time(); random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/ console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     OS_ScratchInit(); // Set up the 465 MB scratch arena for init phases
@@ -789,6 +791,7 @@ void InitalizeEnvironment() {
     RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); RenderLoading("Loading models..."); DebugRAM("before LoadModels"); LoadModels(); DebugRAM("after LoadModels");
     if (World.introNotPlayed) { currentMenuPage = Mpg_IntroVideo; PlayMenuMusic(); World.menuActive = true; World.introNotPlayed = false; } World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     AutomapInitGL();
+    BiomonitorInitGL();
     NewGame();
     PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
     OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free"); DebugRAMPeak(); DebugRAMBreakdown();
@@ -800,13 +803,13 @@ i32 main() {
     while(1) {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
         double curtime = get_time(); World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time,0.0); World.absoluteTime+=World.deltaTime; World.current_time=curtime; World.painStaticAlpha = vmax(0.0f,World.painStaticAlpha - (float)World.deltaTime * 2.0f); World.empStaticAlpha = vmax(0.0f,World.empStaticAlpha - (float)World.deltaTime * 4.0f);
-        if (!World.paused && !World.menuActive) { if (World.pauseRelativeTime < 0.001f) {World.pauseRelativeTime = World.last_physics_time = curtime;} World.pauseRelativeTime += World.deltaTime; }
+        if (!World.paused && !World.menuActive) { if (World.pauseRelativeTime < 0.001f) {World.pauseRelativeTime = World.last_physics_time = curtime;} World.pauseRelativeTime += World.deltaTime * World.timeScale; }/*Reflex slow-time: game-time advances at 0.25x while the patch is active (Citadel Time.timeScale); physics dt derives from this so the whole world slows, mouse-look stays raw*/
         double input_start = get_time();
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
         prePhys = get_time() - input_start; if (!World.paused && !World.menuActive) { double ps=get_time(); float dt=(float)vclamp((World.pauseRelativeTime - World.last_physics_time),0.0005,0.1); World.last_physics_time=World.pauseRelativeTime; World.dt=dt; Physics(dt); physTime=get_time() - ps; } else physTime=0.0;
         double gameT_start = get_time();
-        ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ if(World.invP1.hasHardware & HW_BIO){BioMonitorUpdate();} if (!World.paused && !World.menuActive){PSys_Update(World.dt);} UpdateAudio(); gameTime = get_time() - gameT_start;
+        ModUpdate();/*After physics so mod/gamecode can modify velocities before next frame.*/ BioMonitorUpdate(); if (!World.paused && !World.menuActive){PSys_Update(World.dt);} UpdateAudio(); gameTime = get_time() - gameT_start;
         if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) UpdateInstanceMatrix4x4s(); // Before camviews so camview shadows render same as main pass
         drawCalls=uiDrawCalls=shadDrawCalls=vertsRendered=0; RenderCameraViews(); if(likely(!World.paused && !World.menuActive)){CullCore();} AudioUpdate(); AutomapTick(); Render(false/*!camview*/,0u); if (ScrshotPressed() && World.current_time > World.screenshotTimeout) { Screenshot(); AutomapDumpBMP(); }
         for(i32 i=0;i<MAX_KEYS;++i){Sys_Input.keyStates[i].pressed=Sys_Input.keyStates[i].released=false;} for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) {Sys_Input.mouseButtons[i].pressed=Sys_Input.mouseButtons[i].released=false;} Sys_Input.scrollDelta=0; World.currentMouse_dx=World.currentMouse_dy=0; // Reset Input states, can't mset as we want to preserve down state

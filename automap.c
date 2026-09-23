@@ -2,7 +2,7 @@
 static u8 amPx[AM_W*AM_H*4],amBuiltLev=255,amBuiltZoom=255,amMdlState[MAX_MDLS]/*0=unknown,1=ok,2=no mesh*/,amMdlWall[MAX_MDLS]/*1=wall-like (draw), 0=floor-like (skip)*/,amHullN[MAX_MDLS],amCardState[MAX_MDLS]/*0=unknown,1=ok*/,amRadCells[ARRSIZE],amDiagCell[ARRSIZE],amDoorXR[256]/*1=X-running span, 0=Z-running*/; static bool amReady=false; static u32 amTexId=0,amFBO=0,amBuiltDoorHash=0; i32 amDoorN=0; static u16 amWedgeInst[ARRSIZE];
 typedef struct {float x,z;}AmPt;
 static float amBuiltPX=1e30f,amBuiltPZ=1e30f,amBuiltFX=0.0f,amBuiltFZ=-1.0f,amWinX0,amWinZ1,amPxPerUnit,amHullX[MAX_MDLS][AM_MAXHULL],amHullZ[MAX_MDLS][AM_MAXHULL],amMinX[MAX_MDLS],amMaxX[MAX_MDLS],amMinZ[MAX_MDLS],amMaxZ[MAX_MDLS],amMinY[MAX_MDLS],amMaxY[MAX_MDLS],amCardX[MAX_MDLS][4],amCardY[MAX_MDLS][4],amCardZ[MAX_MDLS][4],amCardNx[MAX_MDLS],amCardNy[MAX_MDLS],amCardNz[MAX_MDLS],amFloorY[ARRSIZE],amDoorX0[256],amDoorZ0[256],amDoorX1[256],amDoorZ1[256];
-INLINE int amNavVer(void) {/*nav hw ver: 0=none,1..3=v1..v3; gates zoom/overlays/cadence*/ return World.invP1.hwVers[HW_NAV_IDX]; }
+INLINE int amNavVer() {/*nav hw ver: 0=none,1..3=v1..v3; gates zoom/overlays/cadence*/ return World.invP1.hwVers[HW_NAV_IDX]; }
 static int amPtCmp(const void* a,const void* b) { const AmPt* pa=(const AmPt*)a,*pb=(const AmPt*)b; if(pa->x<pb->x){return -1;} if(pa->x>pb->x){return 1;} if(pa->z<pb->z){return -1;} if(pa->z>pb->z){return 1;} return 0; }/*monotone-chain hull of (x,z) verts; returns count*/
 static u8 amComputeModel(u16 m) {
     if(amMdlState[m]){return amHullN[m];} amMdlState[m]=2; amHullN[m]=0; amMdlWall[m]=0; if(!physPos || !physVertCounts){return 0;} float* pos=physPos[m]; u32 vc=physVertCounts[m]; if(!pos||!vc){return 0;} float minX=1e30f,maxX=-1e30f,minY=1e30f,maxY=-1e30f,minZ=1e30f,maxZ=-1e30f; for(u32 i=0;i<vc;++i){float x=pos[i*3+0],y=pos[i*3+1],z=pos[i*3+2]; if(x<minX){minX=x;} if(x>maxX){maxX=x;} if(y<minY){minY=y;} if(y>maxY){maxY=y;} if(z<minZ){minZ=z;} if(z>maxZ){maxZ=z;}}
@@ -40,7 +40,7 @@ INLINE int amEdgeHasDoor(int xrun,float fix,float a0,float a1) {
 
 static void amNPCColor(NPCType t,u8* r,u8* g,u8* b) { if(t==NPCType_Cyborg||t==NPCType_Supercyborg||t==NPCType_MutantCyborg){ *r=159; *g=76; *b=77; }/*cyborg*/else if(t==NPCType_Mutant||t==NPCType_Supermutant){ *r=185; *g=134; *b=37; }/*mutant*/else { *r=104; *g=95; *b=166; }/*robot*/}
 static int amNPCNeedVer(NPCType t) {if(t==NPCType_Robot){return 2;}if(t==NPCType_Cyborg||t==NPCType_Supercyborg||t==NPCType_MutantCyborg){return 3;}if(t==NPCType_Mutant||t==NPCType_Supermutant){return 3;}return 99;/*Cyber/unknown: no overlay*/}
-static void amRaster(void) {
+static void amRaster() {
     u8 lev=World.curLev; int nav=amNavVer(); int cells=16<<World.automapZoom;/*16,32,64; 0=closest*/ float x0c=World.worldMin_x[lev]-CELLXHALF,z0c=World.worldMin_z[lev]-CELLXHALF; float winW=(float)cells*CELLSZ; V3 app=World.position[PLAYER1]; float wantX0=app.x-winW*0.5f, wantZ1=app.z+winW*0.5f; float minX0=x0c,maxX0=x0c+64.0f*CELLSZ-winW; float minZ1=z0c+winW,maxZ1=z0c+64.0f*CELLSZ;
     amWinX0=wantX0<minX0?minX0:(wantX0>maxX0?maxX0:wantX0); amWinZ1=wantZ1<minZ1?minZ1:(wantZ1>maxZ1?maxZ1:wantZ1); if(maxX0<minX0){amWinX0=minX0;} if(maxZ1<minZ1){amWinZ1=maxZ1;} amPxPerUnit=(float)AM_H/winW; u8* expl=World.automapExplored[lev]; for (u32 i=0;i<sizeof(amPx);i+=4) { amPx[i]=0; amPx[i+1]=0; amPx[i+2]=0; amPx[i+3]=0; }/*transparent*/
     mset(amRadCells,0,sizeof(amRadCells)); mset(amWedgeInst,0xFF,sizeof(amWedgeInst)); mset(amDiagCell,0,sizeof(amDiagCell));
@@ -118,26 +118,26 @@ static void amRaster(void) {
     if(nav>=3){V3 p=World.position[PLAYER1]; float x=amWX(p.x),y=amWZ(p.z); amCircle(x,y,14.08f*amPxPerUnit,0,200,200);/*small: cyan*/amCircle(x,y,20.48f*amPxPerUnit,0,200,200);/*large: cyan*/}
 }
 
-static bool amReveal(void) {
+static bool amReveal() {
     u8 lev=World.curLev; V3 p=World.position[PLAYER1]; int pcx=PosGetCellCoordX(p.x),pcz=PosGetCellCoordZ(p.z); int r=(int)2; bool changed=false;
     for (int dz=-r;dz<=r;++dz) for (int dx=-r;dx<=r;++dx) {int cx=pcx+dx,cz=pcz+dz; if(cx<0||cx>63||cz<0||cz>63){continue;} float wx=World.worldMin_x[lev]+cx*CELLSZ-p.x,wz=World.worldMin_z[lev]+cz*CELLSZ-p.z; if(wx*wx+wz*wz>AM_FOW_RADIUS2){continue;} u32 cell=(u32)cz*64+(u32)cx; if(!(gridCellStates[cell]&CELL_OPEN)){continue;} if(!World.automapExplored[lev][cell]){ World.automapExplored[lev][cell]=1; changed=true; } } return changed;
 }
 
-static u32 amDoorHash(void) {u32 h=0; for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {Entity* e=&World.instances[i]; if(IdxIsDoor(e->index)){h=h*31u+(u32)(i*7u+(u32)e->doorState);}} return h;}
-void AutomapInitGL(void) {if(amReady){return;} GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glGenFramebuffers(1,&amFBO); glBindFramebuffer(GL_FRAMEBUFFER,amFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amTexId,0); glBindFramebuffer(GL_FRAMEBUFFER,0); amReady=true;}
-void AutomapNewGame(void) {mset(World.automapExplored,0,sizeof(World.automapExplored)); World.automapZoom=0; World.automapNextRaster=0.0; amBuiltLev=255; amBuiltPX=1e30f; amBuiltPZ=1e30f;}
-void AutomapOnLoad(void) { amBuiltLev=255; World.automapNextRaster=0.0; amBuiltPX=1e30f; amBuiltPZ=1e30f; }/*force re-raster from loaded FoW*/
-void AutomapTick(void) {
+static u32 amDoorHash() {u32 h=0; for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {Entity* e=&World.instances[i]; if(IdxIsDoor(e->index)){h=h*31u+(u32)(i*7u+(u32)e->doorState);}} return h;}
+void AutomapInitGL() {if(amReady){return;} GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glGenFramebuffers(1,&amFBO); glBindFramebuffer(GL_FRAMEBUFFER,amFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amTexId,0); glBindFramebuffer(GL_FRAMEBUFFER,0); amReady=true;}
+void AutomapNewGame() {mset(World.automapExplored,0,sizeof(World.automapExplored)); World.automapZoom=0; World.automapNextRaster=0.0; amBuiltLev=255; amBuiltPX=1e30f; amBuiltPZ=1e30f;}
+void AutomapOnLoad() { amBuiltLev=255; World.automapNextRaster=0.0; amBuiltPX=1e30f; amBuiltPZ=1e30f; }/*force re-raster from loaded FoW*/
+void AutomapTick() {
     if(!amReady || World.menuActive){return;} u8 lev=World.curLev; if(lev>=LEVEL_CYBERSPACE){return;} bool fowChanged=amReveal(); u32 dh=amDoorHash(); double now=get_time(); V3 tpp=World.position[PLAYER1]; V3 tpf=World.instances[PLAYER1].forward; float wpp=((float)(16<<World.automapZoom)*CELLSZ)/(float)AM_H;/*world/px*/ float mdx=tpp.x-amBuiltPX,mdz=tpp.z-amBuiltPZ,me=(0.25f*wpp)*(0.25f*wpp); float fdx=tpf.x-amBuiltFX,fdz=tpf.z-amBuiltFZ;
     bool moved=(mdx*mdx+mdz*mdz)>me || (fdx*fdx+fdz*fdz)>1e-6f;
     if(fowChanged || moved || dh!=amBuiltDoorHash || lev!=amBuiltLev || World.automapZoom!=amBuiltZoom || now>=World.automapNextRaster){amRaster(); amBuiltLev=lev; amBuiltDoorHash=dh; amBuiltZoom=World.automapZoom; amBuiltPX=tpp.x; amBuiltPZ=tpp.z; amBuiltFX=tpf.x; amBuiltFZ=tpf.z; int nav=amNavVer(); World.automapNextRaster=now+(nav>2?0:(nav>1?0.1:0.2)); glBindTexture(GL_TEXTURE_2D,amTexId); glTexSubImage2D(GL_TEXTURE_2D,0,0,0,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,amPx);}
 }
 
-void AutomapBlitToUI(void) {
+void AutomapBlitToUI() {
     if(!amReady || World.menuActive || World.paused || Cheats.noHUD){return;} if(World.curLev>=LEVEL_CYBERSPACE){return;} int n=0; int dx0[2],dy0[2],dx1[2],dy1[2]; if(World.Sys_UI.MFD_LefTab==3){ dx0[n]=AMAP_UI_X_L; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_L+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(World.Sys_UI.MFD_RightTab==3){ dx0[n]=AMAP_UI_X_R; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_R+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(!n){return;}
     glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); for (int k=0;k<n;++k) {/*UI y-down->GL y-up; row0=north=texture bottom: flip src*/int gx0=dx0[k],gy0=768-dy1[k],gx1=dx1[k],gy1=768-dy0[k]; glBlitFramebuffer(0,AM_H,AM_W,0, gx0,gy0,gx1,gy1, GL_COLOR_BUFFER_BIT,GL_LINEAR);} glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
 }
 
-void AutomapDumpBMP(void) {
+void AutomapDumpBMP() {
     if(!amReady){return;} if(World.Sys_UI.MFD_LefTab!=3 && World.Sys_UI.MFD_RightTab!=3){return;} OS_MakeFolder("Screenshots"); u8 flip[AM_W*AM_H*4]; for(int y=0;y<AM_H;++y){u8* dst=flip+(size_t)y*AM_W*4,*src=amPx+(size_t)(AM_H-1-y)*AM_W*4; for(int x=0;x<AM_W;++x){u8* d=dst+(size_t)x*4,*s=src+(size_t)x*4; d[0]=s[0]; d[1]=s[1]; d[2]=s[2]; d[3]=s[3];}} char p[96]; sFormat(p,sizeof(p),"Screenshots/automap_%.2f.bmp",get_time()); BmpWrite(p,AM_W,AM_H,flip);
 }

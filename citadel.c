@@ -1,6 +1,6 @@
 // citadel.c - Game logic.
 #include "common.h"
-__attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; static const u16 patchMsg[7] = {325,326,327,328,329,330,331}; void BiomonitorEnergyPulse(float),BioMonitorClearGraphs(void),TextureSequenceInit(u16,char*); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
+__attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; static const u16 patchMsg[7] = {325,326,327,328,329,330,331}; void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
     float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),ndcX=((World.inventoryMode ? World.cursorPos_x : 683.0f) - 683.0f)/384.0f, ndcY=-((World.inventoryMode ? World.cursorPos_y : 384.0f)-384.0f)/384.0f; V3 view=V3_Normalize((V3){ndcX*tanFov,ndcY*tanFov,-1.0f}),flipForward=(V3){-fwd.x,-fwd.y,-fwd.z}; V3 up=V3_Normalize(V3_Cross(rt,flipForward)); return (V3){view.x*rt.x+view.y*up.x+view.z*flipForward.x,view.x*rt.y+view.y*up.y+view.z*flipForward.y,view.x*rt.z+view.y*up.z+view.z*flipForward.z};
 }
@@ -13,17 +13,21 @@ void DropHeldItem() {
 }
 
 void PatchUse(int patchSlot) {
-    if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } World.invP1.patchCounts[patchSlot]--; World.invP1.patchActive |= (u16)(1u << patchSlot);
+    if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } if (patchSlot == 3 && World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[304]); return; }/*Medi refused at full health, patch not consumed (Citadel PlayerPatch.cs)*/
+    World.invP1.patchCounts[patchSlot]--; World.invP1.patchActive |= (u16)(1u << patchSlot);
     switch (patchSlot) {
-        case 0: if(World.invP1.berserkFinished > World.pauseRelativeTime){World.invP1.berserkFinished += BERSERK_TIME;} else{World.invP1.berserkFinished = World.pauseRelativeTime + BERSERK_TIME; World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0); World.invP1.berserkIncrement = 0;} break;
-        case 1: World.invP1.detoxFinished        = World.pauseRelativeTime + DETOX_TIME; World.invP1.radiated = 0.0f; break;                     case 2: World.invP1.geniusFinished       = World.pauseRelativeTime + GENIUS_TIME; World.geniusActive = true; break;
-        case 3: World.invP1.mediFinished         = World.pauseRelativeTime + MEDI_TIME; World.invP1.mediPatchPulseFinished = World.pauseRelativeTime + 0.5; World.invP1.mediPatchPulseCount = 0; break;                                                   case 4: World.invP1.reflexFinishedTime   = World.absoluteTime + REFLEX_TIME; World.timeScale = REFLEX_TIME_SCALE; break;/*TODO Handle restoring offset from absolute time at loading savegame*/
-        case 5: World.invP1.sightFinishedTime    = World.pauseRelativeTime + SIGHT_TIME; World.invP1.sightSideEffectFinishedTime = -1.0; break;  case 6: World.invP1.staminupFinishedTime = World.pauseRelativeTime + STAMINUP_TIME; World.invP1.staminupActive = true; World.invP1.fatigue = 0.0f; break;
+        case 0: if(World.invP1.berserkFinished > World.pauseRelativeTime){World.invP1.berserkFinished += BERSERK_TIME;} else{World.invP1.berserkFinished = World.pauseRelativeTime + BERSERK_TIME; World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0); World.invP1.berserkIncrement = 0; berserkSeedTime = random_range(0.0f,1000.0f);} break;/*Voxen intentionally extends (rather than Citadel's reset of) the berserk timer on re-use, without resetting the visual effect*/
+        case 1: PatchDisableAll(); World.invP1.patchActive |= PATCH_DETOX; World.invP1.detoxFinished = World.pauseRelativeTime + DETOX_TIME; break;/*Detox wipes all other patches on use; other patches may still be applied afterwards*/
+        case 2: if(World.invP1.geniusFinished > World.pauseRelativeTime) World.invP1.geniusFinished += GENIUS_TIME; else World.invP1.geniusFinished = World.pauseRelativeTime + GENIUS_TIME; World.geniusActive = true; break;
+        case 3: if(World.invP1.mediFinished > World.pauseRelativeTime) World.invP1.mediFinished += MEDI_TIME; else { World.invP1.mediFinished = World.pauseRelativeTime + MEDI_TIME; World.invP1.mediPatchPulseFinished = 0.0; } World.invP1.mediPatchPulseCount = 0; break;/*pulseFinished=0 heals immediately on fresh activation, matching Citadel*/
+        case 4: { double reflexDur = REFLEX_TIME * REFLEX_TIME_SCALE;/*155 real seconds of 0.25x slow-mo, tracked in game-time so it pauses and saves*/ if(World.invP1.reflexFinishedTime > World.pauseRelativeTime) World.invP1.reflexFinishedTime += reflexDur; else World.invP1.reflexFinishedTime = World.pauseRelativeTime + reflexDur; World.timeScale = REFLEX_TIME_SCALE; } break;
+        case 5: if(World.invP1.sightFinishedTime > World.pauseRelativeTime) World.invP1.sightFinishedTime += SIGHT_TIME; else { World.invP1.sightFinishedTime = World.pauseRelativeTime + SIGHT_TIME; World.invP1.sightSideEffectFinishedTime = -1.0; } break;
+        case 6: if(World.invP1.staminupFinishedTime > World.pauseRelativeTime) World.invP1.staminupFinishedTime += STAMINUP_TIME; else World.invP1.staminupFinishedTime = World.pauseRelativeTime + STAMINUP_TIME; World.invP1.staminupActive = true; World.invP1.fatigue = 0.0f; break;
     } CenterStatusPrint("%s",Sys_Text.stringTable[patchMsg[patchSlot]]); if (World.invP1.patchCounts[World.invP1.patchCur] <= 0) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } } play_wav(sounds[89],SfxVol(),(V3){0.0f,0.0f,0.0f},false);
 }
 
 void WeaponFireStartWeaponDip(float t) { if (t <= 0.0f) { World.invP1.reloadFinished = 0.0; return; } World.invP1.reloadFinished = World.pauseRelativeTime + (double)t; lerpStartTime = World.pauseRelativeTime; }
-void WeaponFireCompleteWeaponChange(void) { World.invP1.justChangedWeap = false; World.invP1.recoiling = false; /* CompleteWeaponChange called by UpdateWeaponReloadDip when reloadLerpValue >= 0.5f after reload dip */ }
+void WeaponFireCompleteWeaponChange() { World.invP1.justChangedWeap = false; World.invP1.recoiling = false; /* CompleteWeaponChange called by UpdateWeaponReloadDip when reloadLerpValue >= 0.5f after reload dip */ }
 bool InventoryHasAccessCard(AccCardType card) { return (World.invP1.accessCardOwned & (1u << card)) != 0; }
 bool InventoryHasAnyAccessCards() { return World.invP1.accessCardOwned != 0; }
 const char* AccessCardCodeForType(AccCardType a) { // Called by ItemTabManager
@@ -45,7 +49,7 @@ void AddHardwareToInventory(int index,int hwversion) {
     static const u8 textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32}; World.invP1.hardwareInvIndex = index; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hwVers[index] = (u8)hwversion; World.invP1.hwVersSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0; CenterStatusPrint("%s v%d",Sys_Text.stringTable[textIdx[index] + 326],hwversion);
 }
 
-void MFD_GeneralChanged(void);
+void MFD_GeneralChanged();
 bool AddGeneralObjectToInventory(int index, int custIdx){for(i8 i=1;i<14;++i){if(World.invP1.generalInventoryIndexRef[i]==-1){if(!InventoryHasAnyAccessCards()&&World.invP1.generalInvCurrent==0){World.invP1.generalInvCurrent=i;} World.invP1.generalInventoryIndexRef[i]=index; World.invP1.generalInvCustIdx[i]=(i16)custIdx; MFD_GeneralChanged(); CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]); return true;}} return false;}
 void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
 static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
@@ -152,7 +156,7 @@ void FuncWallMoveTarget(u16 self) { World.instances[self].funcState = FStat_Movi
 void FuncWallTargetted(u16 self) { Entity* e = &World.instances[self]; u8 st = (u8)e->funcState; bool toTarget = st == FStat_Start || st == FStat_MovingStart || st == FStat_AjarMovingTarget || (st > FStat_AjarMovingTarget && e->ajarPercentage > 0.0f); if (toTarget){FuncWallMoveTarget(self);} else{FuncWallMoveStart(self);} play_wav(sounds[76],1.0f,World.position[self],true); }
 void FuncWallUpdateInner(u16 self) {
     Entity* e = &World.instances[self]; if (e->funcState != FStat_MovingStart && e->funcState != FStat_MovingTarget) return; V3 goal = e->funcState == FStat_MovingStart ? e->startPosition : e->targetPosition; FuncStates doneState = e->funcState == FStat_MovingStart ? FStat_Start : FStat_Target; V3 delta = V3_AsubB(goal,World.position[self]);
-    float distanceLeft = V3_Mag(delta), total = V3_Dist(e->startPosition,e->targetPosition), dist = e->speed * (float)World.deltaTime; if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) { World.position[self]=goal; e->funcState=doneState; e->percentMoved=doneState == FStat_Target ? 1.0f : 0.0f; return; }
+    float distanceLeft = V3_Mag(delta), total = V3_Dist(e->startPosition,e->targetPosition), dist = e->speed * (float)World.deltaTime * World.timeScale; if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) { World.position[self]=goal; e->funcState=doneState; e->percentMoved=doneState == FStat_Target ? 1.0f : 0.0f; return; }
     if (distanceLeft > 0.0001f) World.position[self]=V3_AplusB(World.position[self],V3_ScaleByF(V3_Normalize(delta),dist)); if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,World.position[self]) / total;
 }
 void FuncWallUpdate(u16 self) { V3 prev = World.position[self]; FuncWallUpdateInner(self); FuncWallShiftChildren(self,V3_AsubB(World.position[self],prev)); }
@@ -201,7 +205,7 @@ void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (
 int GeneralInvItem(int slot);
 bool GeneralInvCanVaporize(int slot);
 void GeneralInvRemove(int slot);
-void VaporizeClick(void) {
+void VaporizeClick() {
     int slot=World.invP1.generalInvCurrent; if (!GeneralInvCanVaporize(slot)) return;
     GeneralInvRemove(slot); play_wav(sounds[89],SfxVol(),(V3){0},false);
 }
@@ -210,8 +214,8 @@ typedef struct { i8 norm,alt; } AmmoIconEntry;
 static const AmmoIconEntry ammoIconTable[51]={[36-36]={7,8}/*Magnesium/Penetrator*/,[37-36]={-2,-2}/*Energy*/,[38-36]={0,1}/*Needle/Tranq*/,[39-36]={9,10}/*Hornette/Splinter*/,[40-36]={-2,-2}/*Energy*/,[41-36]={-1,-1}/*Rapier, no ammo*/,[42-36]={-1,-1}/*Pipe, no ammo*/,[43-36]={5,6}/*Hollow/Slug*/,[44-36]={11,-1}/*Magcart*/,[45-36]={2,3 }/*Standard/Teflon*/,[46-36]={-2,-2}/*Energy*/,[47-36]={14,-1}/*Rail Rounds*/,[48-36]={4,-1}/*Rubber Slugs*/,[49-36]={12,13}/*Slag/Large Slag*/,[50-36]={-2,-2}/*Energy*/,[51-36]={-2,-2}/*Energy*/};
 i8 AmmoIconGet(int index,bool alt) { if (index < 343 || index > 358) {return -1;} const AmmoIconEntry* e = &ammoIconTable[index - 343]; return alt ? e->alt : e->norm; }
 static double creditsVidStartTime,creditsVidFinished; static u8 creditsVidPhase; // CreditsScroll, TODO video text phases: 0=text1 visible, 1=text2 visible, 2=text3 visible, 3=all hidden
-void CreditsOnEnable(void) { World.creditsActive=true; World.creditsPageIndex=0; creditsVidStartTime=World.absoluteTime; creditsVidFinished=World.absoluteTime + 37.2; creditsVidPhase=0; }
-void CreditsUpdate(void) {
+void CreditsOnEnable() { World.creditsActive=true; World.creditsPageIndex=0; creditsVidStartTime=World.absoluteTime; creditsVidFinished=World.absoluteTime + 37.2; creditsVidPhase=0; }
+void CreditsUpdate() {
     if (!World.creditsActive) return;
     double elapsed = World.absoluteTime - creditsVidStartTime;
     if (creditsVidFinished > 0.0) { // Drive video text phase transitions
@@ -224,7 +228,7 @@ void CreditsUpdate(void) {
     } if (ToggleMode()) { if (World.creditsPageIndex > 0){--World.creditsPageIndex;} } // right click — go back a page
 }
 
-void CyborgConversionToggleTargetted(void) {bool active=(World.ressurectionActiveLevels>>World.curLev)&1u; flag_setu16(&World.ressurectionActiveLevels,(1u<<World.curLev),!active); if(World.curLev==6)flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ play_wav(sounds[active ? 183 : 184],Sys_Settings.VolumeMessage,(V3){0.0f,0.0f,0.0f},false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);}
+void CyborgConversionToggleTargetted() {bool active=(World.ressurectionActiveLevels>>World.curLev)&1u; flag_setu16(&World.ressurectionActiveLevels,(1u<<World.curLev),!active); if(World.curLev==6)flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ play_wav(sounds[active ? 183 : 184],Sys_Settings.VolumeMessage,(V3){0.0f,0.0f,0.0f},false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);}
 void ElevatorButtonClick(u16 self) {
     Entity* e = &World.instances[self]; if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor]; bool doorClosed = door->doorOpen == DoorState_Closed; float dist = V3_Dist(World.Sys_UI.objectInUsePos,World.position[PLAYER1]); 
     if (dist > 2.0f/*tether dist*/ && !doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } if (!doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[7]); /*Door not closed.*/ return; } if (!(e->entflags & EF_ACTIVE)) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); /*Floor not accessible.*/ return; }
@@ -269,7 +273,7 @@ void PlayerEnergyUpdate() {
     if (anyDrain && World.invP1.energy <= 0.0f) { DeactivateHardwareOnEnergyDepleted(); World.invP1.drainJPM = 0; } // Depleted
 }
 // GeneralInventory
-void MFD_ShowGeneralItem(void),MFD_GeneralChanged(void);
+void MFD_ShowGeneralItem(),MFD_GeneralChanged();
 int GeneralInvItem(int slot) {
     if (slot<0 || slot>=14) return -1;
     if (!slot) return 81;
@@ -497,7 +501,7 @@ static Quaternion quat_slerp(Quaternion a, Quaternion b, float t) {
 
 static void AIFace(Entity* self, V3 goal) {
     u16 sidx=(u16)(self - World.instances); if (self->entflags & EF_ASLEEP) return; V3 fv = V3_AsubB(goal,World.position[sidx]); if (!ai_is_cyber(self)) fv.y = 0.0f; if (fv.x == 0.0f && fv.y == 0.0f && fv.z == 0.0f) return; u16 eidx = self->enemy; if (ai_is_cyber(self) && eidx) { World.rotation[sidx] = World.rotation[eidx]; return; }
-    if (fv.x == 0.0f && fv.z == 0.0f) { if (eidx){fv=V3_AsubB(World.position[eidx],World.position[sidx]);} else{fv.x += 0.001f;} } Quaternion lr = quat_look_rotation(fv, (V3){0.0f,1.0f,0.0f}); float t = (float)(0.2f * npcTable[self->index - 419].yawSpeed * World.deltaTime); World.rotation[sidx] = quat_slerp(World.rotation[sidx],lr,t);
+    if (fv.x == 0.0f && fv.z == 0.0f) { if (eidx){fv=V3_AsubB(World.position[eidx],World.position[sidx]);} else{fv.x += 0.001f;} } Quaternion lr = quat_look_rotation(fv, (V3){0.0f,1.0f,0.0f}); float t = (float)(0.2f * npcTable[self->index - 419].yawSpeed * World.deltaTime * World.timeScale); World.rotation[sidx] = quat_slerp(World.rotation[sidx],lr,t);
 }
 
 INLINE float quat_angle_deg(Quaternion a, Quaternion b) { float d = vclamp(vabs(quat_dot(a, b)), 0.0f, 1.0f); return 2.0f * vacosf(d) * (180.0f / PI); }
@@ -637,7 +641,7 @@ static void AIFlierMoveToHoverHeight(Entity* self) {
     u16 sidx=(u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; if (npc->runSpeed <= 0.0f) return; u16 eidx = self->enemy;
     if (eidx) { self->idealPos.y = World.position[eidx].y + AI_TARGET_OFFSET_Y; self->idealPos.x=World.position[sidx].x; self->idealPos.z=World.position[sidx].z; }
     else { V3 sp=ai_sight_pos(self); RaycastHit dn=Raycast(sp,(V3){0,-1,0},npc->sightRange,LMASK_NPC_SIGHT); RaycastHit up=Raycast(sp,(V3){0,1,0},npc->sightRange,LMASK_NPC_SIGHT); float dDn=dn.hit ? dn.distance : 0.0f, dUp=up.hit ? up.distance : 0.0f; float yH=npc->flightHeight * (npc->flightHeightIsPercentage ? dDn + dUp : 1.0f); V3 fp=dn.hit ? dn.point : World.position[sidx]; self->idealPos=(V3){fp.x,fp.y+yH,fp.z};}
-    float dy = self->idealPos.y - World.position[sidx].y; if (vabs(dy) < 0.16f) return; float spd  = npc->runSpeed * (float)World.deltaTime; float step = vmin(vabs(dy), spd) * (dy < 0.0f ? -1.0f : 1.0f); World.position[sidx].y += step;
+    float dy = self->idealPos.y - World.position[sidx].y; if (vabs(dy) < 0.16f) return; float spd  = npc->runSpeed * (float)World.deltaTime * World.timeScale; float step = vmin(vabs(dy), spd) * (dy < 0.0f ? -1.0f : 1.0f); World.position[sidx].y += step;
 }
 
 float AITranquilize(u16 idx, float amount, bool energy) { Entity* self = &World.instances[idx]; float secs = (amount < 3.0f) ? (float)npcTable[self->index - 419].timeForTranquilization : amount; if (npcTable[self->index - 419].type != NPCType_Robot || energy) { double a = World.pauseRelativeTime + secs, b = self->tranquilizeFinished + secs; self->tranquilizeFinished = a > b ? a : b; return secs; } return 0.0f; }
@@ -694,17 +698,22 @@ void HealthManagerInitAfterLoad(u16 self) {
     }
 }
 // Hardware
-static Color3 lantCol = (Color3){1.0f,1.0f,1.0f}; static float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f};
+static Color3 lantCol = (Color3){1.0f,1.0f,1.0f}; static float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f}; static const float SIGHT_LIGHT_INTENSITY=0.36f,SIGHT_LIGHT_RANGE=75.8f;/*Citadel sightLight: white spotlight, intensity 0.36, range 75.7961*/
 void HardwareUpdate() {
     bool infraredOn = (World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0, lanternOn = (World.invP1.hasHardware & HW_LAN) && (World.invP1.hardwareIsActive & HW_LAN) > 0;
-    if (lanternOn || infraredOn) { // Update headmounted lantern/infrared's light (infrared overrides lantern brightness/range)
-        V3 ppos = World.position[PLAYER1]; lanternPos = (V3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f}; float intensity = infraredOn ? 0.8f : lanternVersionBrightness[vclamp(World.invP1.hwVersSetting[7],0,2)]; UpdateLight(headmountedLanternLight,lanternPos,lantCol,infraredOn ? 50.35f : 11.52f,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
+    bool sightOn = (World.invP1.patchActive & PATCH_SIGHT) && World.invP1.sightFinishedTime != -1.0;/*Sight patch main-effect window only, not the side-effect window*/
+    if (lanternOn || infraredOn || sightOn) { // Headmounted light shared by lantern/infrared/sight: intensities stack, range takes the max of the active effects
+        V3 ppos = World.position[PLAYER1]; lanternPos = (V3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f}; float intensity = 0.0f, range = 0.0f;
+        if (infraredOn) { intensity += 0.8f; range = vmax(range,50.35f); }
+        if (lanternOn) { intensity += lanternVersionBrightness[vclamp(World.invP1.hwVersSetting[7],0,2)]; range = vmax(range,11.52f); }
+        if (sightOn) { intensity += SIGHT_LIGHT_INTENSITY; range = vmax(range,SIGHT_LIGHT_RANGE); }
+        UpdateLight(headmountedLanternLight,lanternPos,lantCol,range,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
     } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,false);
 }
 // Dermal Patches
 void PatchDisableAll(void){World.invP1.berserkFinished=World.invP1.berserkIncTime=World.invP1.detoxFinished=World.invP1.geniusFinished=World.invP1.mediFinished=World.invP1.reflexFinishedTime=World.invP1.sightFinishedTime=World.invP1.sightSideEffectFinishedTime=World.invP1.staminupFinishedTime=-1.0; World.invP1.mediPatchPulseFinished=0.0; World.invP1.mediPatchPulseCount=0; World.invP1.staminupActive=World.geniusActive=false; World.invP1.fatigue=0.0f; World.invP1.berserkIncrement=World.invP1.patchActive=0; World.timeScale=DEFAULT_TIME_SCALE;}
 void PatchUpdate() {
-    if (World.invP1.patchActive & PATCH_DETOX) { if (World.invP1.detoxFinished < World.pauseRelativeTime) World.invP1.patchActive -= PATCH_DETOX; } // Detox
+    if (World.invP1.patchActive & PATCH_DETOX) { if (World.invP1.detoxFinished < World.pauseRelativeTime) World.invP1.patchActive -= PATCH_DETOX; else World.instances[PLAYER1].radiation = 0.0f; } // Detox: other patches wiped on use only; radiation zeroed every frame while active
     if (World.invP1.patchActive & PATCH_MEDI) { // Medi
         if (World.invP1.mediPatchPulseFinished == 0.0) World.invP1.mediPatchPulseCount = 0;
         if (World.invP1.mediPatchPulseFinished < World.pauseRelativeTime) {
@@ -716,7 +725,7 @@ void PatchUpdate() {
     } else {
         World.invP1.mediPatchPulseFinished = 0.0; World.invP1.mediPatchPulseCount = 0;
     }
-    if (World.invP1.patchActive & PATCH_REFLEX) { if (World.invP1.reflexFinishedTime < World.absoluteTime && World.invP1.reflexFinishedTime != -1.0){ World.invP1.patchActive-=PATCH_REFLEX; World.invP1.reflexFinishedTime=-1.0; World.timeScale=DEFAULT_TIME_SCALE;}else{World.timeScale=REFLEX_TIME_SCALE;}}else{if(World.timeScale != DEFAULT_TIME_SCALE){World.timeScale=DEFAULT_TIME_SCALE;}}//Reflex
+    if (World.invP1.patchActive & PATCH_REFLEX) { if (World.invP1.reflexFinishedTime < World.pauseRelativeTime && World.invP1.reflexFinishedTime != -1.0){ World.invP1.patchActive-=PATCH_REFLEX; World.invP1.reflexFinishedTime=-1.0; World.timeScale=DEFAULT_TIME_SCALE;}else{World.timeScale=REFLEX_TIME_SCALE;}}else{if(World.timeScale != DEFAULT_TIME_SCALE){World.timeScale=DEFAULT_TIME_SCALE;}}//Reflex (tracked in game-time: pauses with the game and persists through save/load)
     if (World.invP1.patchActive & PATCH_BERSERK) { // Berserk
         if (World.invP1.berserkFinished < World.pauseRelativeTime) { World.invP1.berserkIncrement = 0; World.invP1.patchActive -= PATCH_BERSERK; }
         else if (World.invP1.berserkIncTime < World.pauseRelativeTime) { World.invP1.berserkIncrement++; if (World.invP1.berserkIncrement > 6) World.invP1.berserkIncrement = 6; World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0f); }
@@ -781,7 +790,7 @@ void DoorUpdate(u16 self) {
 
 void CloseFullmap() {}
 u16 SpawnDynamicObject(int val, bool cheat) {
-    if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return 0xFFFF; } if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return 0xFFFF; }
+    if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return 0xFFFF; } if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return 0xFFFF; } (void)cheat;
     if (World.instCount >= INSTANCE_COUNT) { DualLogError("Failed to spawn constIndex %u: instance table full (%u/%u)",val,World.instCount,INSTANCE_COUNT); return 0xFFFF; } u16 entityIndexInInstanceTable = AddInstance((u16)val, (V3){0.0f,0.0f,0.0f}); return entityIndexInInstanceTable;
 }
 // TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.

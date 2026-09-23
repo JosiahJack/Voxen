@@ -1,12 +1,19 @@
 // biomonotor.c - Biomonitor Graph and Text displays.
 #include "common.h"
-typedef struct {
-    double beatFinished,tick0Finished,tick1Finished,tick2Finished,tickFinished; float heartRate,widthPerc,heightPerc,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 patchEffects,heartRateText,header,bpmText,fatigueDetailText,fatigue;
-    Color currentColors[BIOM_GRAPH_H],colorsERG[BIOM_GRAPH_W][BIOM_GRAPH_H],colorsCHI[BIOM_GRAPH_W][BIOM_GRAPH_H],colorsECG[BIOM_GRAPH_W][BIOM_GRAPH_H],backgroundColor,ergColor,chiColor,ecgColor,col,col0,col1,col2;
-    int lastERG,lastCHI,lastECG,ymax,currentIndex0,currentIndex1,currentIndex2;
-} BioMonitorSystem;
 BioMonitorSystem bioMonitor;
-void BioMonitorClearGraphs(void) {
+// CPU-rasterized graph texture (automap pattern): 620x36 matches Unity's BiomonitorGraphSystem graphWidth/graphHeight.
+static u8 biomPx[BIOM_GRAPH_W*BIOM_GRAPH_H*4]; static u32 biomTexId=0,biomFBO=0;
+INLINE void biomPutPx(int x,int y,Color c){ u8* p=&biomPx[((u32)y*BIOM_GRAPH_W+(u32)x)*4]; p[0]=(u8)(vclamp(c.r,0.0f,1.0f)*255.0f); p[1]=(u8)(vclamp(c.g,0.0f,1.0f)*255.0f); p[2]=(u8)(vclamp(c.b,0.0f,1.0f)*255.0f); p[3]=(u8)(vclamp(c.a,0.0f,1.0f)*255.0f); }
+void BiomonitorInitGL() {GenerateAndBindTexture(&biomTexId,GL_RGBA8,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,GL_LINEAR,NULL); glGenFramebuffers(1,&biomFBO); glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,biomTexId,0); glBindFramebuffer(GL_FRAMEBUFFER,0);}
+void BiomonitorBlitToUI() {
+    if(!(World.invP1.hardwareIsActive & HW_BIO)){return;}
+    glBindFramebuffer(GL_READ_FRAMEBUFFER,biomFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
+    /*No src flip: texture row 0 = graph minimum = bottom of the displayed graph (Unity SetPixel y=0 is the bottom row).*/
+    int gx0=0,gy0=0,gx1=BIOM_GRAPH_W,gy1=BIOM_GRAPH_H;
+    glBlitFramebuffer(0,0,BIOM_GRAPH_W,BIOM_GRAPH_H, gx0,gy0,gx1,gy1, GL_COLOR_BUFFER_BIT,GL_LINEAR);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
+}
+void BioMonitorClearGraphs() {
     for (int x=0;x<BIOM_GRAPH_W;x++) { for (int y=0; y<BIOM_GRAPH_H;y++) { /*tex.SetPixel(x,y,bioMonitor.backgroundColor);*/ /*texture cleared via buffer reset above*/ } }
     for (int y=0;y<BIOM_GRAPH_H;y++) bioMonitor.currentColors[y] = bioMonitor.backgroundColor;
     bioMonitor.ymax = (BIOM_GRAPH_H - 1);
@@ -15,10 +22,10 @@ void BioMonitorClearGraphs(void) {
     for (int x=0;x<BIOM_GRAPH_W;x++) { for (int y=0; y<BIOM_GRAPH_H;y++) { bioMonitor.colorsERG[x][y] = bioMonitor.backgroundColor; bioMonitor.colorsCHI[x][y] = bioMonitor.backgroundColor; bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor; } }
 }
 
-static void IncrementERG(void) { bioMonitor.currentIndex0++; if (bioMonitor.currentIndex0 >= BIOM_GRAPH_W) {bioMonitor.currentIndex0 = 0;} }
-static void IncrementCHI(void) { bioMonitor.currentIndex1++; if (bioMonitor.currentIndex1 >= BIOM_GRAPH_W) {bioMonitor.currentIndex1 = 0;} }
-static void IncrementECG(void) { bioMonitor.currentIndex2++; if (bioMonitor.currentIndex2 >= BIOM_GRAPH_W) {bioMonitor.currentIndex2 = 0;} }
-void BioMonitorInit(void) {
+static void IncrementERG() { bioMonitor.currentIndex0++; if (bioMonitor.currentIndex0 >= BIOM_GRAPH_W) {bioMonitor.currentIndex0 = 0;} }
+static void IncrementCHI() { bioMonitor.currentIndex1++; if (bioMonitor.currentIndex1 >= BIOM_GRAPH_W) {bioMonitor.currentIndex1 = 0;} }
+static void IncrementECG() { bioMonitor.currentIndex2++; if (bioMonitor.currentIndex2 >= BIOM_GRAPH_W) {bioMonitor.currentIndex2 = 0;} }
+void BioMonitorInit() {
     bioMonitor.beatFinished=get_time() + 0.5; bioMonitor.widthPerc=0.4f; bioMonitor.heightPerc=0.1f; bioMonitor.backgroundColor=(Color){0.2f,0.2f,1.0f,0.01f}; bioMonitor.ergColor=(Color){0,0.5f,1.0f,1.0f}; bioMonitor.ymax=36; bioMonitor.chiColor=(Color){.7f,0,1.f,1.f};
     bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
 }
@@ -55,7 +62,7 @@ static void Push(int index, float val) { // Add a data point to the beginning of
 }
 
 void BiomonitorEnergyPulse(float take) { Push(0,take); IncrementERG(); Push(0,take); IncrementERG(); }
-void BioMonitorUpdate(void) {
+void BioMonitorUpdate() {
     if (!(World.invP1.hasHardware & HW_BIO) || !(World.invP1.hardwareIsActive & HW_BIO)) return;
     bioMonitor.header = 526; bioMonitor.heartRateText = 527; bioMonitor.bpmText = 529; bioMonitor.fatigueDetailText = 531; bioMonitor.fatigue=534; /*Low*/ if(World.invP1.fatigue >= 80.0f){bioMonitor.fatigue=532;/*High!*/}else if(World.invP1.fatigue <  80.0f && World.invP1.fatigue > 30.0f){bioMonitor.fatigue=533;/*Moderate*/}
     if (bioMonitor.beatFinished < World.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f + ((World.invP1.fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
@@ -79,15 +86,16 @@ void BioMonitorUpdate(void) {
             bioMonitor.col0 = bioMonitor.colorsERG[x][y]; bioMonitor.col1 = bioMonitor.colorsCHI[x][y]; bioMonitor.col2 = bioMonitor.colorsECG[x][y];
             if (bioMonitor.col0.a > 0.01f) {
                 fadeDist = 200.0f; distPerc = (bioMonitor.currentIndex0 - x); if ((BIOM_GRAPH_W - x) < fadeDist && bioMonitor.currentIndex0 < fadeDist) distPerc += BIOM_GRAPH_W; if (distPerc < 0.0f || distPerc > fadeDist) distPerc = fadeDist;
-                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f); if(distPerc == 0.0f){bioMonitor.colorsERG[x][y]=bioMonitor.backgroundColor;} bioMonitor.col0.a = distPerc; // tex.SetPixel(x,y,bioMonitor.col0); // TODO
+                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f); if(distPerc == 0.0f){bioMonitor.colorsERG[x][y]=bioMonitor.backgroundColor;} bioMonitor.col0.a = distPerc; biomPutPx(x,y,bioMonitor.col0);
             } else if (bioMonitor.col1.a > 0.01f) {
                 fadeDist = 180.0f; distPerc = (bioMonitor.currentIndex1 - x); if ((BIOM_GRAPH_W - x) < fadeDist && bioMonitor.currentIndex1 < fadeDist) distPerc += BIOM_GRAPH_W; if (distPerc < 0.0f || distPerc > fadeDist) distPerc = fadeDist;
-                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f); if (distPerc == 0.0f) bioMonitor.colorsCHI[x][y] = bioMonitor.backgroundColor; bioMonitor.col1.a = distPerc; // tex.SetPixel(x,y,bioMonitor.col1); // TODO
+                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f); if (distPerc == 0.0f) bioMonitor.colorsCHI[x][y] = bioMonitor.backgroundColor; bioMonitor.col1.a = distPerc; biomPutPx(x,y,bioMonitor.col1);
             } else if (bioMonitor.col2.a > 0.01f) {
                 fadeDist = 275.0f; distPerc = (bioMonitor.currentIndex2 - x); if ((BIOM_GRAPH_W - x) < fadeDist && bioMonitor.currentIndex2 < fadeDist) distPerc +=  BIOM_GRAPH_W; if (distPerc < 0.0f || distPerc > fadeDist) distPerc = fadeDist;
-                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f); if (distPerc == 0.0f) bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor; bioMonitor.col2.a = distPerc; // tex.SetPixel(x,y,bioMonitor.col2); // TODO
-            } else { }// tex.SetPixel(x,y,bioMonitor.backgroundColor); // TODO
+                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f); if (distPerc == 0.0f) bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor; bioMonitor.col2.a = distPerc; biomPutPx(x,y,bioMonitor.col2);
+            } else { biomPutPx(x,y,bioMonitor.backgroundColor); }
         }
     }
-    if (bioMonitor.tickFinished < World.pauseRelativeTime) { bioMonitor.tickFinished = World.pauseRelativeTime + 0.02f; IncrementERG(); IncrementCHI(); IncrementECG(); } // TODO actually render texture
+    glBindTexture(GL_TEXTURE_2D,biomTexId); glTexSubImage2D(GL_TEXTURE_2D,0,0,0,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,biomPx);
+    if (bioMonitor.tickFinished < World.pauseRelativeTime) { bioMonitor.tickFinished = World.pauseRelativeTime + 0.02f; IncrementERG(); IncrementCHI(); IncrementECG(); }
 }

@@ -407,7 +407,7 @@ void Physics(float dt) {
                 if(World.col[other] == COLTYPE_CAP){ShapeCapsule oc=Entity_GetCap(other); V3 capMid=V3_ScaleByF(V3_AplusB(oc.tip,oc.base),0.5f); touches=CapsuleTouchesOBB(oc.base,otherRadius,trigBox) || CapsuleTouchesOBB(capMid,otherRadius,trigBox) || CapsuleTouchesOBB(oc.tip,otherRadius,trigBox);} else touches=CapsuleTouchesOBB(World.position[other],otherRadius,trigBox);
                 if (!touches) continue; if (other != PLAYER1 && trigdx == 596) { trigger_gravitylift_touch(self,other); continue; }
                 switch(trigdx) {
-                    case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;   case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force*(float)World.deltaTime),false); World.Sys_Music.cyberTube=true;} break;
+                    case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;   case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force*(float)World.deltaTime*World.timeScale),false); World.Sys_Music.cyberTube=true;} break;
                     case 596/*trigger_gravitylift*/:trigger_gravitylift_touch(self,other); break;  case 597/*trigger_ladder*/:if(other == PLAYER1){World.invP1.ladderState=1; ladderTouched=true; ladderTopY=trigBox.ctr.y + trigBox.hExt.y;} break;
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;  case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elev); World.Sys_Music.distortion=(tt == TT_Distortion);} break;
                     case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */
@@ -417,16 +417,11 @@ void Physics(float dt) {
         }
         ladderWalkOff = ladderTouched && (World.position[PLAYER1].y > ladderTopY + 0.48f); if (!ladderTouched) World.invP1.ladderState=0;
     }
-
-    // Reverb zones (fx_reverbzone constIndex 716): spherical distance check with hysteresis
-    // Enter at <= reverbMinDist, exit at > reverbMaxDist
-    activeReverbPreset = 0;
-    reverbZoneActive = false;
+    activeReverbPreset = 0; reverbZoneActive = false;
     for (u16 i = PLAYER1; i < World.instCount; ++i) {
         if (World.instances[i].index == 716) {
-            DrawSphereWireframe((Color){0.3f,0.05f,0.6f,0.6f},(ShapeSphere){World.position[i],World.instances[i].reverbMinDist});
             DrawSphereWireframe((Color){0.3f,0.05f,0.6f,0.4f},(ShapeSphere){World.position[i],World.instances[i].reverbMaxDist});
-            float distSq=V3_SqDist(World.position[PLAYER1],World.position[i]),minDistSq=World.instances[i].reverbMinDist*World.instances[i].reverbMinDist,maxDistSq=World.instances[i].reverbMaxDist*World.instances[i].reverbMaxDist;
+            float distSq=V3_SqDist(World.position[PLAYER1],World.position[i]),maxDistSq=World.instances[i].reverbMaxDist*World.instances[i].reverbMaxDist;
             if (distSq <= maxDistSq) {reverbZoneActive = true; activeReverbPreset = World.instances[i].reverbPreset;}
         }
     }

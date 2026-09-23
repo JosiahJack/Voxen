@@ -1,4 +1,5 @@
 // ui.c - User Interface(UI) aka HUD
+void BiomonitorBlitToUI();
 #define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,UI_ID_##P##_TAB_ITEM,UI_ID_##P##_TAB_AUTOMAP,UI_ID_##P##_TAB_DATA,UI_ID_##P##_PANEL,UI_ID_##P##_WEAPON_NAME,UI_ID_##P##_WEAPON_ICON,UI_ID_##P##_MEDIA_HEADER,UI_ID_##P##_MEDIA_TAB_0,UI_ID_##P##_MEDIA_TAB_3=UI_ID_##P##_MEDIA_TAB_0+3,UI_ID_##P##_ITEM_NAME,UI_ID_##P##_ITEM_ICON,UI_ID_##P##_ITEM_USE,UI_ID_##P##_ITEM_VAPORIZE,UI_ID_##P##_ITEM_TIMER_VALUE,UI_ID_##P##_ITEM_TIMER_SLIDER,UI_ID_##P##_ITEM_ACCESS_CARDS,UI_ID_##P##_BLOCKED_SECURITY_TEXT,\
     UI_ID_##P##_ELEV_FLOOR_INDICATOR,UI_ID_##P##_ELEV_BUTTON_0,UI_ID_##P##_ELEV_BUTTON_7=UI_ID_##P##_ELEV_BUTTON_0+7,UI_ID_##P##_ELEV_CLOSE,UI_ID_##P##_KEYCODE_0,UI_ID_##P##_KEYCODE_11=UI_ID_##P##_KEYCODE_0+11,UI_ID_##P##_KEYCODE_DIGIT_0,UI_ID_##P##_KEYCODE_DIGIT_2=UI_ID_##P##_KEYCODE_DIGIT_0+2,UI_ID_##P##_KEYCODE_CLOSE,UI_ID_##P##_AUDIOLOG_IMAGE,UI_ID_##P##_AUDIOLOG_NAME,UI_ID_##P##_AUDIOLOG_SENDER,UI_ID_##P##_AUDIOLOG_SUBJECT,\
     UI_ID_##P##_PUZZLE_NODE_SOURCE,UI_ID_##P##_PUZZLE_NODE,UI_ID_##P##_PUZZLE_CELL_0,UI_ID_##P##_PUZZLE_CELL_34=UI_ID_##P##_PUZZLE_CELL_0+34,UI_ID_##P##_PUZZLE_SLIDER,UI_ID_##P##_PUZZLE_CLOSE,UI_ID_##P##_WIRE_SLIDER,UI_ID_##P##_WIRE_TARGET,UI_ID_##P##_WIRE_NODE_0,UI_ID_##P##_WIRE_NODE_13=UI_ID_##P##_WIRE_NODE_0+13,UI_ID_##P##_WIRE_CLOSE,UI_ID_##P##_SYS_HEADER,UI_ID_##P##_SYS_DESC_0,UI_ID_##P##_SYS_DESC_10=UI_ID_##P##_SYS_DESC_0+10,UI_ID_##P##_SYS_VAL_0,UI_ID_##P##_SYS_VAL_10=UI_ID_##P##_SYS_VAL_0+10,UI_ID_##P##_SYS_CLOSE,\
@@ -27,7 +28,7 @@ INLINE i16 UITextW(const char* t, float sc, i16 maxW) { float w=MeasureLineAdvan
 INLINE void UIRText(u32 id, i16 x, i16 y, u32 col, u8 font, float sc, i16 maxW, const char* t) { UIR(id,x,y,UITextW(t,sc,maxW),(i16)(22.0f*sc)); RenderTextL(x,y,col,font,sc,"%s",t); }
 INLINE bool UIOver(u32 id) { return UIC(id).active && CursorIsOverBounds(UIC(id).min.x,UIC(id).max.x,UIC(id).min.y,UIC(id).max.y); }
 void CreateUIElement(V2 min, V2 max, u32 idx) { if (!idx) return; UIC(idx).min=min; UIC(idx).max=max; UIC(idx).initialized=UIC(idx).active=true; }
-static void UI_BeginFrame(void) { for (u32 i=1;i<UI_ID_COUNT;++i) UIC(i).active=false; }
+static void UI_BeginFrame() { for (u32 i=1;i<UI_ID_COUNT;++i) UIC(i).active=false; }
 /*Consume a click over a region. Returns 0 none, 1 LMB, 2 RMB, +4 when it was a double click of that same button on that same region.*/
 static u8 UIClicked(u32 id) {
     if (!UIOver(id)) return 0; bool l=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, r=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed; if (!l && !r) return 0;
@@ -36,14 +37,14 @@ static u8 UIClicked(u32 id) {
 }
                          /*mk3,bls,drt,flch, ion,rpir,pipe,magn,magp,pstl,plsm,rail,riot,skrp,sprq,stun*/
 u16 wepIconTexIndices[16]={584,636,819,1067,1068,1494,1072,1069,1070,1071,1073,1165,1989,1990,1991,1992}; const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"}; extern float reloadTime[16];
-void MFD_NewGame(void) {
+void MFD_NewGame() {
     World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.consumableClickRow=-1,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.applyButtonReferenceIndex=-1,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,.logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
 }
-void MFD_GeneralChanged(void) { World.Sys_UI.generalClickSlot=-1; }
-void MFD_ResetGeneral(void) { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; MFD_GeneralChanged(); }
-void MFD_ShowGeneralItem(void) { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (side==2) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdSelected[side]=2; }
+void MFD_GeneralChanged() { World.Sys_UI.generalClickSlot=-1; }
+void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; MFD_GeneralChanged(); }
+void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (side==2) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdSelected[side]=2; }
 void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=side?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab,view=side?World.Sys_UI.MFD_DataR:World.Sys_UI.MFD_DataL; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && view!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=view;}} World.Sys_UI.MFD_DataL=World.Sys_UI.MFD_DataR=5; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4;}
-void MFD_CloseSearch(void) {for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; u8* view=side?&World.Sys_UI.MFD_DataR:&World.Sys_UI.MFD_DataL; if (*view!=5) continue; *view=World.Sys_UI.mfdReturnView[side+1]; if (*view==5) *view=0; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];}}
+void MFD_CloseSearch() {for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; u8* view=side?&World.Sys_UI.MFD_DataR:&World.Sys_UI.MFD_DataL; if (*view!=5) continue; *view=World.Sys_UI.mfdReturnView[side+1]; if (*view==5) *view=0; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];}}
 /*Data tab sub-views that are driven by frobbed objects; these are the "open" object panels. view 5 (search) is handled separately by MFD_OpenSearch/MFD_CloseSearch.*/
 INLINE bool SystemUIDataViewActive(u8 v) { return v==1||v==2||v==3||v==4||v==6||v==7||v==8||v==9; }
 void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?3:1; u8 tab=isRH?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab, view=isRH?World.Sys_UI.MFD_DataR:World.Sys_UI.MFD_DataL; if (tab!=4 && !SystemUIDataViewActive(view)) { World.Sys_UI.mfdReturnTab[side]=tab; World.Sys_UI.mfdReturnView[side]=view; } if (isRH) { World.Sys_UI.MFD_DataR=code; World.Sys_UI.MFD_RightTab=4; } else { World.Sys_UI.MFD_DataL=code; World.Sys_UI.MFD_LefTab=4; } }
@@ -200,7 +201,6 @@ void TickBar(bool isEnergy) {
     for (int i=7;i>=0;--i) if(i==7/*Always render at least 1 tick*/||p1H>(7-i)*11){RenderUIImage(1050-(i*16),tY,32,32,964);/*Tick Red*/} for (int i=7;i>=0;--i) if(p1H>88+(7-i)*11){RenderUIImage(1178-(i*16),tY,32,32,963);/*Tick Orange*/} for (int i=7;i>=0;--i) if(p1H>176+(7-i)*11){RenderUIImage(1306-(i*16),tY,32,32,962);/*Tick Green*/}
 }
 
-void BioMonitorClearGraphs(void);
 INLINE int HwActiveTexIndex(int active, int version, int off, int v1, int v2, int v3, int v4) { if (!active) return off; if (v4 >= 0 && version >= 4) return v4; if (version >= 3) return v3; if (version == 2) return v2; return v1; }
 /*eng: 0 needs energy, 1 needs energy only when hwVersSetting==0, 2 needs energy only when hwVersSetting>=1, 3 not a toggle (e-reader)*/
 typedef struct { u32 bit; u8 idx; i16 x,y; u16 t[5]; u8 sOn,sOff,eng; } HwBtn;
@@ -267,7 +267,7 @@ static void PGEvalPuzzle(void) { SystemUI* s=&World.Sys_UI; int w=(int)s->pg_wid
             if (power) { s->pg_powered[ni]=true; s->pg_checked[ni]=true; q[qt++]=ni; } } }
     int out=(int)s->pg_output; s->pg_solved=(out>=0 && out<n && s->pg_powered[out]); float cnt=0.0f; for (int i=0;i<n;++i) if (s->pg_powered[i]) cnt+=1.0f; s->pg_progress=cnt/(float)n;
 }
-void UI_PuzzleGridCell(bool rh,int cell) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (World.Sys_UI.tetheredPGP==U16_MAX) return; if (World.Sys_UI.pg_solved) return;
+void UI_PuzzleGridCell(bool rh,int cell) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (World.Sys_UI.tetheredPGP==U16_MAX) return; if (World.Sys_UI.pg_solved) return;/*TODO Genius patch: while active, show hover move-preview highlights (Citadel PuzzleGrid.cs:134).*/
     int n=(int)(World.Sys_UI.pg_width*World.Sys_UI.pg_height); if (n<=0||cell<0||cell>=n) return; if (World.Sys_UI.pg_type[cell]!=PuzzleCellType_Standard) return;
     PuzzleGridType gt=(World.diffPuz==1)?(PuzzleGridType)PuzzleGridType_King:(PuzzleGridType)World.Sys_UI.pg_gridType;
     switch (gt) { case PuzzleGridType_King:PGFlipperKing(cell); break; case PuzzleGridType_Queen:PGFlipperQueen(cell); break; case PuzzleGridType_Knight:PGFlipperKnight(cell); break; case PuzzleGridType_Rook:PGFlipperRook(cell); break; case PuzzleGridType_Bishop:PGFlipperBishop(cell); break; default:PGFlipperPawn(cell); break; }
@@ -275,7 +275,7 @@ void UI_PuzzleGridCell(bool rh,int cell) { World.Sys_UI.mouseClickHeldOverGUI=tr
 }
 void UI_PuzzleGridSlide(bool rh,float f) { (void)rh; (void)f; /*Unity's puzzle progress handle is a server-authoritative display; the fill is driven by puzzle state, not the drag.*/ }
 void UI_PuzzleGridClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPGP=U16_MAX; World.Sys_UI.pg_solved=false; World.Sys_UI.pg_width=World.Sys_UI.pg_height=0; SysUIDataClose(rh); }
-/*---- Wire puzzle (Unity PuzzleWire.cs). curL/curR hold the wire id occupying each column on that side; selectedWire is the chosen column (0..6) of the held wire, selectedWireRH is the side it was grabbed from. Clicking the same side re-grabs the wire there, clicking the other side swaps that column in.--*/
+/*---- Wire puzzle (Unity PuzzleWire.cs). curL/curR hold the wire id occupying each column on that side; selectedWire is the chosen column (0..6) of the held wire, selectedWireRH is the side it was grabbed from. Clicking the same side re-grabs the wire there, clicking the other side swaps that column in. TODO Genius patch: while active on hard difficulty, reveal all wire colors (Citadel PuzzleWire.cs:147, wirePuzzle.geniusActive).--*/
 static i8 PWFindCol(const i8* arr,int wire) { for (i8 c=0;c<7;++c) if ((int)arr[c]==wire) return c; return -1; }
 static void PWClickEnd(int spot,bool colRH) { if (spot<0||spot>6) return; i8* col=colRH?World.Sys_UI.pw_curR:World.Sys_UI.pw_curL;
     if (World.Sys_UI.pw_selectedWire < 0) { if (col[spot]>=0) { World.Sys_UI.pw_selectedWire=(i8)spot; World.Sys_UI.pw_selectedWireRH=colRH; } return; }
@@ -754,11 +754,29 @@ static double RenderUI() {
             if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.8,"T -"); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"99:99"); }
             if (World.curLev==LEVEL_CYBERSPACE)RenderTextL(1137,570,T_YELLOW,FONT_NORMAL,0.8,Sys_Text.stringTable[442]/*"level 1 elevator taken off line - SHODAN security block established 04.NOV.72"*/);/*CyberSPrint*/
             if((World.invP1.hardwareIsActive & HW_BIO)!=0){/*BioMonitor*/
-                UIR(UI_ID_CMFD_BIOMONITOR,0,0,480,146); RenderUIImage(0,0,480,80,0);/*Graph QUAD:none*/
-                RenderTextL(4,83,T_YELLOW,FONT_NORMAL,0.8,"%s",895<1100?Sys_Text.stringTable[895]:"Biomonitor:"); RenderTextL(4,99,T_GREEN,FONT_NORMAL,0.8,"%s",896<1100?Sys_Text.stringTable[896]:"Heart Rate:");
-                RenderTextL(70,99,T_GREEN,FONT_NORMAL,0.8,"100"); RenderTextL(122,99,T_GREEN,FONT_NORMAL,0.8,"BPM");
-                RenderTextL(4,131,T_GREEN,FONT_NORMAL,0.8,"%s",897<1100?Sys_Text.stringTable[897]:"Patches Active:"); RenderTextL(119,131,T_GREEN,FONT_NORMAL,0.8,"MEDI STAMINUP SIGHT GENIUS BERSERK REFLEX");
-                RenderTextL(4,115,T_GREEN,FONT_NORMAL,0.8,"%s",898<1100?Sys_Text.stringTable[898]:"Fatigue:"); RenderTextL(66,115,T_GREEN,FONT_NORMAL,0.8,"Moderate");
+                BiomonitorBlitToUI();
+                char biomText[128];
+                int y = 83;
+                RenderTextL(4,y,T_YELLOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[526]); /*Biomonitor Active:*/ y+=16;
+                RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[527]); /*Heart Rate:*/
+                sFormat(biomText,sizeof(biomText),"%d",(int)bioMonitor.heartRate); RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",biomText);
+                RenderTextL(142,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[529]); /*BPM*/ y+=16;
+                if (World.invP1.hwVers[HW_BIO_IDX] > 1 && World.invP1.patchActive) {
+                    RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[528]); /*Patches Active:*/
+                    int px = 119; bool first = true;
+                    if (World.invP1.patchActive & PATCH_MEDI) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[520]:" "); px += 40; first = false; }
+                    if (World.invP1.patchActive & PATCH_STAMINUP) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[521]:" "); px += 48; first = false; }
+                    if (World.invP1.patchActive & PATCH_SIGHT) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[522]:" "); px += 36; first = false; }
+                    if (World.invP1.patchActive & PATCH_GENIUS) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[523]:" "); px += 42; first = false; }
+                    if (World.invP1.patchActive & PATCH_BERSERK) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[524]:" "); px += 42; first = false; }
+                    if (World.invP1.patchActive & PATCH_REFLEX) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[525]:" "); px += 36; first = false; }
+                    if (World.invP1.patchActive & PATCH_DETOX) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[530]:" "); px += 36; first = false; }
+                    y+=16;
+                }
+                RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[531]); /*Fatigue:*/
+                if (World.invP1.fatigue >= 80.0f) RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[532]); /*High!*/
+                else if (World.invP1.fatigue > 30.0f) RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[533]); /*Moderate*/
+                else RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[534]); /*Low*/
             }
             RenderTextL(1270,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderTextL(1308,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderSearchFX();
         }

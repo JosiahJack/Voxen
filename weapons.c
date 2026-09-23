@@ -62,7 +62,7 @@ static void Recoil(int wep16) {
     V3 j={wfx.reloadContainerPos.x - s*0.5f*random_range(-1.0f,1.0f),wfx.reloadContainerPos.y,wfx.reloadContainerHome.z - s}; wfx.reloadContainerPos=(V3){j.x > 999.0f ? 0.0f : j.x, j.y > 999.0f ? 0.0f : j.y, j.z > 999.0f ? 0.0f : j.z }; wfx.recoiling=true;
 }
 
-static void Recoiling() { if(!wfx.recoiling){return;} float dt = (float)World.deltaTime; wfx.reloadContainerPos.x+=(wfx.reloadContainerHome.x - wfx.reloadContainerPos.x)*dt; wfx.reloadContainerPos.z+=(wfx.reloadContainerHome.z - wfx.reloadContainerPos.z)*dt; }
+static void Recoiling() { if(!wfx.recoiling){return;} float dt = (float)World.deltaTime * World.timeScale; wfx.reloadContainerPos.x+=(wfx.reloadContainerHome.x - wfx.reloadContainerPos.x)*dt; wfx.reloadContainerPos.z+=(wfx.reloadContainerHome.z - wfx.reloadContainerPos.z)*dt; }
 // ---- Weapon dip (reload/swap "animation") ----------------------------------
 static float reloadLerpValue = 0.0f;
 static u8 lerpUp = 0; // 0 idle, 1 lerping up, 2 lerping down
