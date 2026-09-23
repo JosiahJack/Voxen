@@ -207,11 +207,8 @@ typedef struct { u32 bit; u8 idx; i16 x,y; u16 t[5]; u8 sOn,sOff,eng; } HwBtn;
 static const HwBtn hwBtns[8]={{HW_BIO,HW_BIO_IDX,0,180,{989,991,992,992,992},78,78,1},{HW_SNS,HW_SNS_IDX,0,240,{1009,1011,1012,1013,1013},93,82,0},{HW_LAN,HW_LAN_IDX,0,300,{1004,1006,1007,1008,1008},78,78,0},{HW_SHD,HW_SHD_IDX,0,360,{1014,1015,1016,1017,1018},96,95,0},
                               {HW_INF,HW_INF_IDX,1326,180,{998,999,999,999,999},98,82,0},{HW_ERD,HW_ERD_IDX,1326,240,{996,997,997,997,997},0,0,3},{HW_BST,HW_BST_IDX,1326,300,{993,994,995,995,995},78,78,2},{HW_JET,HW_JET_IDX,1326,360,{1000,1001,1002,1003,1003},78,78,0}};
 void HardwareButtons() {
-    if(Cheats.noHUD){return;} u32 hw=World.invP1.hasHardware;
-    for (u8 i=0;i<8;++i) { const HwBtn* b=&hwBtns[i]; if (!(hw & b->bit)) continue; u16 tex;
-        if (b->eng==3) tex=((World.inventoryMode && UIOver(UI_ID_HUD_HW_0+i) && AnyLeftRightMouseDown()) || ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1))) ? 997 : 996;
-        else tex=(u16)HwActiveTexIndex((World.invP1.hardwareIsActive & b->bit)!=0,World.invP1.hwVers[b->idx],b->t[0],b->t[1],b->t[2],b->t[3],b->t[4]);
-        UIRImg(UI_ID_HUD_HW_0+i,b->x,b->y,40,40,tex); }
+    u32 hw=World.invP1.hasHardware;
+    for(u8 i=0;i<8;++i){const HwBtn* b=&hwBtns[i]; if (!(hw&b->bit))continue; u16 tex; if (b->eng==3) tex=((World.inventoryMode && UIOver(UI_ID_HUD_HW_0+i) && AnyLeftRightMouseDown()) || ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1))) ? 997 : 996; else tex=(u16)HwActiveTexIndex((World.invP1.hardwareIsActive & b->bit)!=0,World.invP1.hwVers[b->idx],b->t[0],b->t[1],b->t[2],b->t[3],b->t[4]); UIRImg(UI_ID_HUD_HW_0+i,b->x,b->y,40,40,tex); }
 }
 
 static void HwToggle(u8 i) {
@@ -598,9 +595,8 @@ void CenterMFD() { //640x240
             for (int slot=0;slot<14;++slot) {
                 int ref=World.invP1.hardwareInvReferenceIndex[slot]; if (ref<0 || World.invP1.hwVers[slot] <= 0) continue;
                 i16 x=generalColX[slot < 7 ? 0 : 1], y=generalRowY[slot%7];
-                const char* label=Sys_Text.stringTable[ref+326]; float w=MeasureLineAdvance(label,FONT_NORMAL); float sc=w>0?vmin(0.8f,210.0f/w):0.8f;
-                UIRText(UI_ID_CMFD_HARDWARE_ROW_0+slot,x,y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : (World.invP1.hasHardware&(1u<<slot) ? T_GREEN_MENU : T_GREEN_MENU_SHADOW),FONT_NORMAL,sc,210,label);
-                RenderTextL((i16)(x+195),y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : T_GREEN_MENU,FONT_NORMAL,0.8f,"v%d",(int)World.invP1.hwVers[slot]); }
+                const char* label=Sys_Text.stringTable[ref+326]; UIRText(UI_ID_CMFD_HARDWARE_ROW_0+slot,x,y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : (World.invP1.hasHardware&(1u<<slot) ? T_GREEN_MENU : T_GREEN_MENU_SHADOW),FONT_NORMAL,0.8f,210,label); RenderTextL((i16)(x+300),y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : T_GREEN_MENU,FONT_NORMAL,0.8f,"v%d",(int)World.invP1.hwVers[slot]);
+            }
         }
         if (World.Sys_UI.MFD_CenterTab==3) {/*General*/
             UIRText(UI_ID_CMFD_GENERAL_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[875]/*GENERAL*/);
@@ -658,7 +654,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_HUD_SHOOTMODE: ForceShootMode(); return;
         case UI_ID_HUD_HW_0 ... UI_ID_HUD_HW_7: HwToggle((u8)(id-UI_ID_HUD_HW_0)); return;
         case UI_ID_CMFD_ADD_TO_INVENTORY: if (World.invP1.holdingObject) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); } return;
-        case UI_ID_CMFD_TAB_MAIN ... UI_ID_CMFD_TAB_SOFTWARE: MFD_SelectTab(0,(u8)(id-UI_ID_CMFD_TAB_MAIN+1),true); return;
+        case UI_ID_CMFD_TAB_MAIN ... UI_ID_CMFD_TAB_SOFTWARE: MFD_SelectTab(0,(u8)(id-UI_ID_CMFD_TAB_MAIN+1),true); if(World.Sys_UI.MFD_CenterTab==1){World.Sys_UI.firstMain=true;}else if(World.Sys_UI.MFD_CenterTab==2){World.Sys_UI.firstHardware=true;}else if(World.Sys_UI.MFD_CenterTab==3){World.Sys_UI.firstGeneral=true;} return;
         case UI_ID_CMFD_WEAPON_ROW_0 ... UI_ID_CMFD_WEAPON_ROW_6: if (left) WeaponSelectSlot((int)(id-UI_ID_CMFD_WEAPON_ROW_0)); return;
         case UI_ID_CMFD_GREN_USE_0 ... UI_ID_CMFD_GREN_USE_6: ConsumableUse(false,(int)(id-UI_ID_CMFD_GREN_USE_0)); return;
         case UI_ID_CMFD_GREN_ROW_0 ... UI_ID_CMFD_GREN_ROW_6: { int row=(int)(id-UI_ID_CMFD_GREN_ROW_0); ConsumableSelect(false,row); if (dbl) ConsumableUse(false,row); return; }
@@ -718,7 +714,7 @@ void UI_ProcessNavigation(void) {
     for (u8 i=0;i<7;++i) if (Sys_Input.keyStates[keys[i]].pressed) { Sys_Input.keyStates[keys[i]].pressed=false; MFD_SelectTab(i<4?1:2,tabs[i],true); }
     for (u8 up=0;up<2;++up) { u16 key=up?KEY_PAGE_UP:KEY_PAGE_DOWN; if (!Sys_Input.keyStates[key].pressed) continue;
         Sys_Input.keyStates[key].pressed=false; u8 tab=World.Sys_UI.MFD_CenterTab?World.Sys_UI.MFD_CenterTab:World.Sys_UI.mfdSelected[0];
-        MFD_SelectTab(0,tab==5?1:1+(tab-1+(up?3:1))%4,false); World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
+        MFD_SelectTab(0,tab==5?1:1+(tab-1+(up?3:1))%4,false); World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; if(tab==1){World.Sys_UI.firstMain=true;}else if(tab==2){World.Sys_UI.firstHardware=true;}else if(tab==3){World.Sys_UI.firstGeneral=true;}
     }
     if (!World.inventoryMode || Cheats.noHUD) { MFD_GeneralChanged(); return; }
     if (World.Sys_UI.generalClickSlot>=0 && World.pauseRelativeTime-World.Sys_UI.generalClickTime>UI_DBLCLICK) MFD_GeneralChanged();

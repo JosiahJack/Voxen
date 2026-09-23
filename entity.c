@@ -361,7 +361,7 @@ void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
     World.currentLevel=lev; World.instances=World.levelInstances[lev]; World.position=World.levelPosition[lev]; World.scale=World.levelScale[lev]; World.velocity=World.levelVelocity[lev]; World.angularVelocity=World.levelAngularVelocity[lev]; World.colliderCenter=World.levelColliderCenter[lev]; World.colliderSize=World.levelColliderSize[lev]; World.col=World.levelCollider[lev]; World.rotation=World.levelRotation[lev]; World.layer=World.levelLayer[lev];
     World.mass=World.levelMass[lev]; World.radius=World.levelRadius[lev]; World.gravity=World.levelGravity[lev]; World.invInertiaTensor=World.levelInvInertiaTensor[lev]; World.dynamicFriction=World.levelDynamicFriction[lev]; World.staticFriction=World.levelStaticFriction[lev]; World.invTnsrValid=World.levelInvTnsrValid[lev]; World.colliding=World.levelColliding[lev]; World.instCount=World.levelInstCount[lev]; World.lights=World.levelLights[lev]; if (fwSnapValid[lev]) mcpy(fwParentOf,fwParentSnap[lev],sizeof(fwParentOf));/*func_wall child links are per-level*/
-    World.lanims=World.levelLAnims[lev]; World.lightsNewPosition=World.levelLightsNewPosition[lev]; World.loadedLights=World.levelLoadedLights[lev]; World.weaponVModelIndex=(u16)(World.instCount-1);
+    World.lanims=World.levelLAnims[lev]; World.lightsNewPosition=World.levelLightsNewPosition[lev]; World.loadedLights=World.levelLoadedLights[lev]; World.weaponVModelIndex=World.levelWepVModel[lev];
 }
 
 void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
@@ -426,11 +426,10 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("contents[1]")) inst->contents[1] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[2]")) inst->contents[2] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[3]")) inst->contents[3] = parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("customIndex[0]") || KEY_EQ("custIdx[0]")) inst->custIdx[0] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("customIndex[1]") || KEY_EQ("custIdx[1]")) inst->custIdx[1] = parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("customIndex[2]") || KEY_EQ("custIdx[2]")) inst->custIdx[2] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("customIndex[3]") || KEY_EQ("custIdx[3]")) inst->custIdx[3] = parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("customIndex")) inst->customIndex = parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("randomItem[0]")) inst->randomItem[0] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItem[1]")) inst->randomItem[1] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItem[2]")) inst->randomItem[2] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItem[3]")) inst->randomItem[3] = parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("randomItemDropChance[0]")) inst->randomItemDropChance[0] = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("randomItemDropChance[1]")) inst->randomItemDropChance[1] = parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("randomItemDropChance[2]")) inst->randomItemDropChance[2] = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("randomItemDropChance[3]")) inst->randomItemDropChance[3] = parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("customIndex"))inst->usableCustIdx=(u16)parse_numberi16(value,lineSpace,lineNum);                   else if(KEY_EQ("amount"))          inst->amount = parse_float(value, lineSpace, lineNum);
+                else if(KEY_EQ("customIndex"))inst->customIndex=(u16)parse_numberi16(value,lineSpace,lineNum);                   else if(KEY_EQ("amount"))          inst->amount = parse_float(value, lineSpace, lineNum);
                 else if(KEY_EQ("resetTime"))       inst->resetTime = parse_float(value, lineSpace, lineNum);                       else if(KEY_EQ("minSecurityLevel"))inst->minSecurityLevel = parse_float(value, lineSpace, lineNum);
                 else if(KEY_EQ("damageOnUse"))     inst->damage = parse_float(value, lineSpace, lineNum);                          else if(KEY_EQ("target"))          inst->targetIdx = IOInternName(value);
                 else if(KEY_EQ("targetname"))      inst->targetnameIdx = IOInternName(value);                                      else if(KEY_EQ("target2"))         inst->target2Idx = IOInternName(value);
@@ -507,7 +506,7 @@ void LoadLevelMod(u8 lev) {
     i32 totalEnts = entCount + 1;
     for (i32 e=0;e<totalEnts;++e) {
         Entity* src = &entsFromFile[e]; u16 entIdx = src->index; u16 parent = AddInstance(entIdx,posFromFile[e]); Entity* par = &World.instances[parent]; par->lastPosition = posFromFile[e]; World.rotation[parent] = rotationFromFile[e]; if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
-        par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/ par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->usableCustIdx=src->usableCustIdx;
+        par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/ par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
         for (u8 slot=0;slot<4;++slot) { par->contents[slot]=src->contents[slot]; par->custIdx[slot]=src->custIdx[slot]; par->randomItem[slot]=src->randomItem[slot]; par->randomItemCustIdx[slot]=src->randomItemCustIdx[slot]; par->randomItemDropChance[slot]=src->randomItemDropChance[slot]; }
         par->generateContents=src->generateContents; par->maxRandomItems=src->maxRandomItems; par->srchInUse=src->srchInUse;
         par->amount=src->amount; par->resetTime=src->resetTime; par->minSecurityLevel=src->minSecurityLevel; par->damage=src->damage; par->delay=src->delay; par->active=src->active; par->activatedScale=src->activatedScale;
@@ -521,7 +520,7 @@ void LoadLevelMod(u8 lev) {
             if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
         par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed;
-        par->customIndex=src->customIndex; par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset;
+        par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARG_STRLEN);
         if (entIdx == 517) { // func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative
             V3 sp = par->startPosition; if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3_AplusB(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } // fallback for entries lacking startPosition
@@ -652,7 +651,7 @@ void LoadLevelData(u8 curlevel) {
         if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
     }
     for (int i=PLAYER1;i<World.instCount;++i){ u16 mi=World.instances[i].messageIndex; World.instances[i].messageIndex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].messageLingdex; World.instances[i].messageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].lockedMessageLingdex; World.instances[i].lockedMessageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; } // Using blank 427
-    World.levelLoadedLights[curlevel] = World.loadedLights; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
+    World.levelLoadedLights[curlevel] = World.loadedLights; World.levelWepVModel[curlevel]=World.weaponVModelIndex; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
 }
 
 u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }

@@ -473,7 +473,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         float dx = lightPos.x - playerPos.x, dy = lightPos.y - playerPos.y, dz = lightPos.z - playerPos.z; float distSqrdToPlayer = dx*dx + dy*dy + dz*dz; float dotResult = (dx*pf.x + dy*pf.y + dz*pf.z); if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue; candidates[numCandidates++] = i; if (numCandidates >= MAX_SHADOWMAPS) break;
     }
     if (numCandidates == 0) { shadowTime = get_time() - shadowStartTime; return; }
-    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if (EntNotVisible(i, (World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsNPC(World.instances[i].index)){continue;} shadowCasterIndices[numCasters++]=i; if(numCasters >= SC_MAX){break;} }
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(EntNotVisible(i,(World.instances[i].entflags & EF_NO_SHADOWS)) || IdxIsNPC(World.instances[i].index)){continue;} shadowCasterIndices[numCasters++]=i; if(numCasters >= SC_MAX){break;} }
     for (i32 i=0;i+8<=numCasters;i+=8) {
         float lx[8], ly[8], lz[8], lr[8], lsr[8]; for (int k=0;k<8;++k){u16 j=shadowCasterIndices[i + k]; lx[k]=World.position[j].x; ly[k]=World.position[j].y; lz[k]=World.position[j].z; lr[k]=World.radius[j]; lsr[k]=World.instances[j].shadRadius; sc_origIdx[i + k]=j;}
         _mm256_store_ps(&sc_posX[i],_mm256_loadu_ps(lx)); _mm256_store_ps(&sc_posY[i],_mm256_loadu_ps(ly)); _mm256_store_ps(&sc_posZ[i],_mm256_loadu_ps(lz)); _mm256_store_ps(&sc_radius[i],_mm256_loadu_ps(lr)); _mm256_store_ps(&sc_shadRadius[i],_mm256_loadu_ps(lsr));
