@@ -542,10 +542,10 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
         glVertexAttribFormat(2,2,GL_FLOAT,GL_FALSE,6*sizeof(float));    glVertexAttribBinding(2,0); glEnableVertexAttribArray(2); /*uv xy float*/
         glBindVertexBuffer(0,sensaroundVBO,0,8*sizeof(float));
     }
-    float verts[6*8],*p=verts;/*pos3 normal3 uv2; 2 triangles, u:00->11, v:0 at screen bottom (aligned to the rendered texture's v=0 = world ground)*/
+    float verts[6*8],*p=verts;/*pos3 normal3 uv2; 2 triangles.  Top row (world y=0, screen top) gets v=1, bottom row v=0: camview texture v=0 is the GL framebuffer bottom (ground), so this keeps the image upright.*/
     #define SENVA(x,y,u,v) { float*n=p; n[0]=(x);n[1]=(y);n[2]=0.0f;n[3]=0.0f;n[4]=1.0f;n[5]=0.0f;n[6]=u;n[7]=v; p+=8; }
-    SENVA(0.0f,0.0f,0.0f,0.0f); SENVA(1.0f,1.0f,1.0f,1.0f); SENVA(1.0f,0.0f,1.0f,0.0f);
-    SENVA(0.0f,0.0f,0.0f,0.0f); SENVA(0.0f,1.0f,0.0f,1.0f); SENVA(1.0f,1.0f,1.0f,1.0f);
+    SENVA(0.0f,0.0f,0.0f,1.0f); SENVA(1.0f,1.0f,1.0f,0.0f); SENVA(1.0f,0.0f,1.0f,1.0f);
+    SENVA(0.0f,0.0f,0.0f,1.0f); SENVA(0.0f,1.0f,0.0f,0.0f); SENVA(1.0f,1.0f,1.0f,0.0f);
     #undef SENVA
     glBindVertexArray(sensaroundVAO); glBindBuffer(GL_ARRAY_BUFFER,sensaroundVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(verts),verts,GL_DYNAMIC_DRAW);
     glUseProgram(chunkSP);
@@ -553,7 +553,6 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
     glUniformMatrix4fv(2,1,GL_FALSE,vp);
     glUniform1ui(0,0);       /*instanceIndex -> identity modelMatrices[0]*/
     glUniform1ui(1,0);       /*normInstanceIndex*/
-    glUniform1ui(6,UI_W);    glUniform1ui(7,UI_H); /*screenWidth/Height*/
     glUniform2f(8,0.0f,0.0f);/*worldMin: forces quad voxel lookup into range (quad spans [0,1])*/
     glUniform1f(9,0.0f);     /*heat*/
     glUniform3f(10,0.0f,0.0f,1000.0f);/*camPos: fixed far point so viewDir normalization in the shader can't hit a zero length*/
@@ -567,17 +566,19 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
     glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[camViewIdx]); glUniform1i(29,6);/*camViewTex*/
     glUniform1ui(30,1);      /*useCamView*/
     glUniform1ui(32,0);      /*useFontAtlas*/
+    i32 wasCull=0,wasDepth=0; glGetIntegerv(GL_CULL_FACE,&wasCull); glGetIntegerv(GL_DEPTH_TEST,&wasDepth);
     glDisable(GL_CULL_FACE); glDisable(GL_DEPTH_TEST);
     glDrawArrays(0x0004/*GL_TRIANGLES*/,0,6); drawCalls++; uiDrawCalls++; vertsRendered += 6;
+    if (wasCull) glEnable(GL_CULL_FACE); if (wasDepth) glEnable(GL_DEPTH_TEST);
     glBindVertexArray(0); glBindBuffer(GL_ARRAY_BUFFER,0);
 }
 void SideMFD(bool isRH) { // 320x240
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex), tab = isRH ? World.Sys_UI.MFD_RightTab : World.Sys_UI.MFD_LefTab; u8 selected=tab?tab:World.Sys_UI.mfdSelected[isRH?2:1];
     for (u8 i=0;i<4;++i) UIRImg(MID(isRH,TAB_WEAPON)+i,isRH ? 1350 : -TAB_THICK,(i16)(520+56*i),32,40,selected==i+1 ? 1024 : 1022);/*Weapon/Item/Automap/Data side tab buttons*/
-    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1 && !isRH) {
-        i16 sx=isRH ? UI_H-TAB_THICK-MFD_SPACING-SIDE_MFD_W : TAB_THICK+MFD_SPACING, sy=isRH ? UI_H-TAB_THICK-MFD_SPACING : TAB_THICK+MFD_SPACING+SIDE_MFD_W, sw=UI_H-TAB_THICK-TXT_PAD-SIDE_MFD_H, sh=UI_H-TAB_THICK-TXT_PAD;/*Sensaround Plane*/
-        UIR(isRH ? UI_ID_SENSA_RH : UI_ID_SENSA_LH,sx,sy,sw,sh);
-        DrawSensaroundQuad(sx,sy,sw,sh,isRH ? sensaroundCamViewRight : sensaroundCamViewLeft);
+    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1) {
+        i16 sx=isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W : TAB_THICK+MFD_SPACING, sy=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H;/*Sensaround Plane, mirror about screen center for RH*/
+        UIR(isRH ? UI_ID_SENSA_RH : UI_ID_SENSA_LH,sx,sy,SIDE_MFD_W,SIDE_MFD_H);
+        DrawSensaroundQuad(sx,sy,SIDE_MFD_W,SIDE_MFD_H,isRH ? sensaroundCamViewRight : sensaroundCamViewLeft);
     } else {
         if (tab == 1) {/*WeaponTab: WepNameText, WepIcon, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/
             i16 slot=World.invP1.weaponCurrent; if (slot>=0 && slot<7) { i32 widx=World.invP1.weaponInventoryIndices[slot]; if (widx >= 0) {UIRText(MID(isRH,WEAPON_NAME),isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W+TXT_PAD : TAB_THICK+MFD_SPACING+TXT_PAD,520,T_RED,FONT_NORMAL,0.8f,270,Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16)UIRImg(MID(isRH,WEAPON_ICON),isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIcon*/
@@ -654,10 +655,10 @@ void CenterMFD() { //640x240
     static const i16 centerX[4]={400,480,560,902};
     for (u8 i=0;i<4;++i) UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.MFD_CenterTab!=5) ? 1024 : 1021);/*Main/Hardware/General/Software center tab buttons*/
     if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,460,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,528,676,240,1075); RenderTextL(586,528,T_GREEN,FONT_NORMAL,0.8f,Sys_Text.stringTable[878]/*ADD TO INVENTORY*/); } }
-    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0){
-        i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H;/*SensaroundCenter rearview image 630x240 texture*/
-        UIR(UI_ID_SENSA_CTR,sx,sy,sx+CTR_MFD_W,UI_W-TAB_THICK-TXT_PAD);
-        DrawSensaroundQuad(sx,sy,sx+CTR_MFD_W-sx,UI_W-TAB_THICK-TXT_PAD-sy,sensaroundCamViewCenter);
+    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0) {
+        i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H;/*SensaroundCenter rearview over the center MFD content area*/
+        UIR(UI_ID_SENSA_CTR,sx,sy,CTR_MFD_W,CTR_MFD_H);
+        DrawSensaroundQuad(sx,sy,CTR_MFD_W,CTR_MFD_H,sensaroundCamViewCenter);
     } else {
         i16 hdrH=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H+TXT_PAD;
         if (World.Sys_UI.MFD_CenterTab==1) {/*Main*/
