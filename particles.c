@@ -11,7 +11,7 @@ INLINE float sample_curve(const float* curve, float t) { int idx = (int)(t * 31.
 u16 PSysAdd(const PSysDef* pd) {
     for (u16 i = 0; i < MAX_EMITTERS; i++) {
         if (psys.emitters[i].active || psys.emitters[i].aliveCount){continue;} Emitter* em=&psys.emitters[i]; u16 fc=0; while(fc<16 && pd->textures[fc]!=MAX_TXRS){fc++;} if(fc == 0){fc=1;} em->active=true; em->position = pd->pos; em->emitAccumulator=em->age=0; em->emitRate = pd->emitRate; em->duration = pd->duration; em->aliveCount = 0;
-        em->maxAlive=2000; em->physicsMode=(pd->gravity != 0) ? 1 : 0; em->trail=pd->trail; em->trailTexture = (u16)(pd->trailTexture & 0xFFFFu); em->lifetimeMin=pd->lifetimeMin>0.0f ? pd->lifetimeMin : 0.5f; em->lifetimeMax=pd->lifetimeMax>0 ? pd->lifetimeMax : 2.0f; if(em->lifetimeMax <= em->lifetimeMin){em->lifetimeMax=em->lifetimeMin + 0.01f;}
+        em->maxAlive=2000; em->physicsMode=(pd->gravity != 0) ? 1 : 0; em->trail=pd->trail; em->shapeType=pd->shapeType; em->shapeRadius=pd->shapeRadius; em->shapeAngle=pd->shapeAngle; em->trailTexture = (u16)(pd->trailTexture & 0xFFFFu); em->lifetimeMin=pd->lifetimeMin>0.0f ? pd->lifetimeMin : 0.5f; em->lifetimeMax=pd->lifetimeMax>0 ? pd->lifetimeMax : 2.0f; if(em->lifetimeMax <= em->lifetimeMin){em->lifetimeMax=em->lifetimeMin + 0.01f;}
         em->sizeMin=pd->sizeMin; em->sizeMax=pd->sizeMax; em->speedMin = pd->speedMin; em->speedMax = pd->speedMax; em->rotMin=0; em->rotMax = 6.2831853f; em->aVelMin=pd->rotCount >= 1 ? pd->rotKeys[0] : -1.0f; em->aVelMax=em->aVelMin; em->gravity=pd->gravity; em->trailLifetime=pd->trailLifetime>0.0f ? pd->trailLifetime : 1.0f; 
         em->trailColorStart=ColorToU32(pd->trailColorStart); em->trailColorEnd=ColorToU32(pd->trailColorEnd); em->trailWidthStart=pd->trailWidthStart>0 ? pd->trailWidthStart : 0.05f; em->trailWidthEnd=(pd->trailWidthEnd>0) ? pd->trailWidthEnd : em->trailWidthStart; em->texBaseIdx=pd->textures[0]; em->textureFrameCount = fc; em->animSpeed = 10.0f;
         em->animWindow=pd->animWindow>0 ? pd->animWindow : 1.0f; em->softness=pd->softness>0 ? pd->softness : 1.0f; for(int c=0;c<32;++c){em->scaleCurve[c]=1.0f; em->velocityCurve[c]=1.0f; em->rotationCurve[c]=0; em->emissionCurve[c] = 1.0f; }
@@ -62,8 +62,17 @@ void PSys_Update(float dt) {
     for (u16 i = 0; i < MAX_EMITTERS; i++) {/*Update emitters*/
         Emitter* em = &psys.emitters[i]; if(!em->active){continue;} em->age+=dt; if(em->duration > 0.0f&& em->age>=em->duration){em->active=false; continue;} float rate = em->emitRate; if (em->duration > 0.0f && em->duration < 1e6f){rate*=sample_curve(em->emissionCurve,em->age/em->duration);} em->emitAccumulator+=rate*dt; int count=(int)em->emitAccumulator; em->emitAccumulator-=(float)count; 
         for (int p = 0; p < count; p++) {
-            if ((psys.aliveCount >= MAX_PARTICLES) || (em->aliveCount >= em->maxAlive)){break;} Particle* part = &psys.particles[psys.aliveCount]; float angle = random_range(0.0f,6.2831853f), speed = random_range(em->speedMin,em->speedMax);
-            part->pos=em->position; part->vel.x=vcosf(angle)*speed; part->vel.y=random_range(-0.5f,0.5f)*speed; part->vel.z=vsinf(angle)*speed; part->age=0.0f; part->invLifetime=1.0f/random_range(em->lifetimeMin,em->lifetimeMax); part->baseSize=random_range(em->sizeMin,em->sizeMax); part->rotation=random_range(em->rotMin,em->rotMax);
+            if ((psys.aliveCount >= MAX_PARTICLES) || (em->aliveCount >= em->maxAlive)){break;} Particle* part = &psys.particles[psys.aliveCount]; float angle = random_range(0.0f,6.2831853f), speed = random_range(em->speedMin,em->speedMax); V3 dir;
+            if (em->shapeType == 1) {
+                float y = random_range(-1.0f,1.0f), radial = vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f), radius = random_range(0.0f,em->shapeRadius);
+                dir=(V3){radial*vcosf(angle),y,radial*vsinf(angle)}; part->pos.x=em->position.x+dir.x*radius; part->pos.y=em->position.y+dir.y*radius; part->pos.z=em->position.z+dir.z*radius;
+            } else if (em->shapeType == 2) {
+                float halfAngle=em->shapeAngle*0.0174532925f, cosMin=vcosf(halfAngle), y=random_range(cosMin,1.0f), radial=vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f);
+                dir=(V3){radial*vcosf(angle),y,radial*vsinf(angle)}; part->pos=em->position;
+            } else {
+                dir=(V3){vcosf(angle),random_range(-0.5f,0.5f),vsinf(angle)}; part->pos=em->position;
+            }
+            part->vel.x=dir.x*speed; part->vel.y=dir.y*speed; part->vel.z=dir.z*speed; part->age=0.0f; part->invLifetime=1.0f/random_range(em->lifetimeMin,em->lifetimeMax); part->baseSize=random_range(em->sizeMin,em->sizeMax); part->rotation=random_range(em->rotMin,em->rotMax);
             part->angularVelocity = random_range(em->aVelMin,em->aVelMax); part->color = sample_color_ramp(em,0.0f); part->emitterIndex = i; part->flags=0; part->blendMode=particleBlendTexture[em->texBaseIdx]; if (part->blendMode == 1) { part->flags |= PARTICLE_FLAG_ADDITIVE; } else if (part->blendMode == 2) { part->flags |= PARTICLE_FLAG_MULTIPLY; } 
             if (em->softness > 0.0f) { part->flags |= PARTICLE_FLAG_SOFT; } part->textureIndex=em->texBaseIdx; part->animFrame=0; part->trailSample=em->position; part->trailBirth=(float)World.pauseRelativeTime; psys.aliveCount++; em->aliveCount++;
         }

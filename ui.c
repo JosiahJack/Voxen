@@ -532,12 +532,52 @@ static const i16 puzCellX[7]={51,80,109,138,166,195,224},puzCellY[5]={565,594,62
 static const i16 wireNodeY[7]={566,594,623,651,679,707,736};
 static const i16 mgX[9]={32,32,32,32,156,156,156,156,32},mgY[9]={540,575,610,646,540,575,610,646,681};/*mgName is defined with the UI row handlers*/
 static const struct { const char* d,*v; i16 y; } sysRows[11]={{"Current level security:","100%",547},{"Mining laser status:","Charging",566},{"Lifepod status:","Disabled",585},{"Station shield status:","Off",605},{"Reactor status:","Normal",624},{"Processor nodes:","99",643},{"Main Program:","Downloading to earth",662},{"Alpha Grove status:","normal",681},{"Beta Grove status:","normal",701},{"Gamma Grove status:","launched",720},{"Delta Grove status:","launched",739}};
+static u32 sensaroundVAO=0,sensaroundVBO=0;
+void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the rendered sensaround cam view texture as a HUD quad at the exact pixel rect used by the UIR call.  Uses the chunk shader's useCamView path (uniforms 28/29/30) like the in-world camera screens.  The quad only spans [0,1]^2 in world space so the shader's voxel lighting lookup stays in-bounds; the projection bakes in the stretch to the target UI rectangle.
+    if (camViewIdx >= camViewCount || w <= 0 || h <= 0) return;
+    if (!sensaroundVAO) {
+        glGenVertexArrays(1,&sensaroundVAO); glGenBuffers(1,&sensaroundVBO); glBindVertexArray(sensaroundVAO);
+        glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,0);                  glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); /*pos xyz float @ 0*/
+        glVertexAttribFormat(1,3,GL_FLOAT,GL_FALSE,3*sizeof(float));    glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); /*normal xyz float*/
+        glVertexAttribFormat(2,2,GL_FLOAT,GL_FALSE,6*sizeof(float));    glVertexAttribBinding(2,0); glEnableVertexAttribArray(2); /*uv xy float*/
+        glBindVertexBuffer(0,sensaroundVBO,0,8*sizeof(float));
+    }
+    float verts[6*8],*p=verts;/*pos3 normal3 uv2; 2 triangles, u:00->11, v:0 at screen bottom (aligned to the rendered texture's v=0 = world ground)*/
+    #define SENVA(x,y,u,v) { float*n=p; n[0]=(x);n[1]=(y);n[2]=0.0f;n[3]=0.0f;n[4]=1.0f;n[5]=0.0f;n[6]=u;n[7]=v; p+=8; }
+    SENVA(0.0f,0.0f,0.0f,0.0f); SENVA(1.0f,1.0f,1.0f,1.0f); SENVA(1.0f,0.0f,1.0f,0.0f);
+    SENVA(0.0f,0.0f,0.0f,0.0f); SENVA(0.0f,1.0f,0.0f,1.0f); SENVA(1.0f,1.0f,1.0f,1.0f);
+    #undef SENVA
+    glBindVertexArray(sensaroundVAO); glBindBuffer(GL_ARRAY_BUFFER,sensaroundVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(verts),verts,GL_DYNAMIC_DRAW);
+    glUseProgram(chunkSP);
+    float vp[16]={ 2.0f*(float)w/UI_W,0,0,0, 0,-2.0f*(float)h/UI_H,0,0, 0,0,1,0, (2.0f*(float)x/UI_W)-1.0f,1.0f-(2.0f*(float)y/UI_H),0,1 };// column-major: maps quad world [0,1] to pixel rect (x,y,w,h)
+    glUniformMatrix4fv(2,1,GL_FALSE,vp);
+    glUniform1ui(0,0);       /*instanceIndex -> identity modelMatrices[0]*/
+    glUniform1ui(1,0);       /*normInstanceIndex*/
+    glUniform1ui(6,UI_W);    glUniform1ui(7,UI_H); /*screenWidth/Height*/
+    glUniform2f(8,0.0f,0.0f);/*worldMin: forces quad voxel lookup into range (quad spans [0,1])*/
+    glUniform1f(9,0.0f);     /*heat*/
+    glUniform3f(10,0.0f,0.0f,1000.0f);/*camPos: fixed far point so viewDir normalization in the shader can't hit a zero length*/
+    glUniform1ui(14,0);      /*reflectionsEnabled*/
+    glUniform1ui(15,0);      /*shadowsEnabled*/
+    glUniform1ui(17,1);      /*unlit: skip fog, output albedo straight*/
+    glUniform1ui(19,0);      /*glowIndex*/
+    glUniform1ui(20,0);      /*specIndex*/
+    glUniform1f(27,1.0f);    /*volume: >= 0.05 so alpha isn't discarded*/
+    glUniform2ui(28,(u32)camViews[camViewIdx].width,(u32)camViews[camViewIdx].height);/*camViewSize*/
+    glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[camViewIdx]); glUniform1i(29,6);/*camViewTex*/
+    glUniform1ui(30,1);      /*useCamView*/
+    glUniform1ui(32,0);      /*useFontAtlas*/
+    glDisable(GL_CULL_FACE); glDisable(GL_DEPTH_TEST);
+    glDrawArrays(0x0004/*GL_TRIANGLES*/,0,6); drawCalls++; uiDrawCalls++; vertsRendered += 6;
+    glBindVertexArray(0); glBindBuffer(GL_ARRAY_BUFFER,0);
+}
 void SideMFD(bool isRH) { // 320x240
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex), tab = isRH ? World.Sys_UI.MFD_RightTab : World.Sys_UI.MFD_LefTab; u8 selected=tab?tab:World.Sys_UI.mfdSelected[isRH?2:1];
     for (u8 i=0;i<4;++i) UIRImg(MID(isRH,TAB_WEAPON)+i,isRH ? 1350 : -TAB_THICK,(i16)(520+56*i),32,40,selected==i+1 ? 1024 : 1022);/*Weapon/Item/Automap/Data side tab buttons*/
-    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1) {
-        /*TODO Sensaround Plane*/
-        UIR(isRH ? UI_ID_SENSA_RH : UI_ID_SENSA_LH,isRH ? UI_H-TAB_THICK-MFD_SPACING-SIDE_MFD_W: TAB_THICK+MFD_SPACING,isRH ? UI_H-TAB_THICK-MFD_SPACING: TAB_THICK+MFD_SPACING+SIDE_MFD_W,UI_H-TAB_THICK-TXT_PAD-SIDE_MFD_H,UI_H-TAB_THICK-TXT_PAD);
+    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1 && !isRH) {
+        i16 sx=isRH ? UI_H-TAB_THICK-MFD_SPACING-SIDE_MFD_W : TAB_THICK+MFD_SPACING, sy=isRH ? UI_H-TAB_THICK-MFD_SPACING : TAB_THICK+MFD_SPACING+SIDE_MFD_W, sw=UI_H-TAB_THICK-TXT_PAD-SIDE_MFD_H, sh=UI_H-TAB_THICK-TXT_PAD;/*Sensaround Plane*/
+        UIR(isRH ? UI_ID_SENSA_RH : UI_ID_SENSA_LH,sx,sy,sw,sh);
+        DrawSensaroundQuad(sx,sy,sw,sh,isRH ? sensaroundCamViewRight : sensaroundCamViewLeft);
     } else {
         if (tab == 1) {/*WeaponTab: WepNameText, WepIcon, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/
             i16 slot=World.invP1.weaponCurrent; if (slot>=0 && slot<7) { i32 widx=World.invP1.weaponInventoryIndices[slot]; if (widx >= 0) {UIRText(MID(isRH,WEAPON_NAME),isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W+TXT_PAD : TAB_THICK+MFD_SPACING+TXT_PAD,520,T_RED,FONT_NORMAL,0.8f,270,Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16)UIRImg(MID(isRH,WEAPON_ICON),isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIcon*/
@@ -614,9 +654,10 @@ void CenterMFD() { //640x240
     static const i16 centerX[4]={400,480,560,902};
     for (u8 i=0;i<4;++i) UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.MFD_CenterTab!=5) ? 1024 : 1021);/*Main/Hardware/General/Software center tab buttons*/
     if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,460,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,528,676,240,1075); RenderTextL(586,528,T_GREEN,FONT_NORMAL,0.8f,Sys_Text.stringTable[878]/*ADD TO INVENTORY*/); } }
-    if (World.Sys_UI.showSensaroundCenter && (World.invP1.hasHardware & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1){
-        /*TODO SensaroundCenter Center rearview image 630x240 texture*/
-        UIR(UI_ID_SENSA_CTR,TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR,UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H,TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR+CTR_MFD_W,UI_W-TAB_THICK-TXT_PAD);
+    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0){
+        i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H;/*SensaroundCenter rearview image 630x240 texture*/
+        UIR(UI_ID_SENSA_CTR,sx,sy,sx+CTR_MFD_W,UI_W-TAB_THICK-TXT_PAD);
+        DrawSensaroundQuad(sx,sy,sx+CTR_MFD_W-sx,UI_W-TAB_THICK-TXT_PAD-sy,sensaroundCamViewCenter);
     } else {
         i16 hdrH=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H+TXT_PAD;
         if (World.Sys_UI.MFD_CenterTab==1) {/*Main*/

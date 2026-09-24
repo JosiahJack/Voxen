@@ -1,6 +1,7 @@
 // entity.c - Entity Definitions and Save Load System for levels and savegames
 #include "common.h"
 void AddDoorPortal(u16,u16),TextureSequenceInit(u16,char*),AddCamView(V3,Quaternion,u8,u16,u16,float,float); Entity* entsFromFile; V3 *posFromFile, *scaleFromFile; Quaternion *rotationFromFile; Light *lightsFromFile; LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL; u16 headmountedLanternLight; bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
+u8 sensaroundCamViewCenter=255,sensaroundCamViewLeft=255,sensaroundCamViewRight=255; // HUD sensaround cam view indices, assigned during level load
 EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,dynFriction,statFriction,animationNum,col,colCtr,colSz
 /*0 chunk_black*/[0]={178,0,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*1 chunk_blocker*/[1]={178,0,1230,MAX_TXRS,1230,160,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*2 chunk_bridg1_1*/[2]={661,0,44,MAX_TXRS,MAX_TXRS,43,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*3 chunk_bridg1_1flipx*/[3]={667,0,44,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*4 chunk_bridg1_2*/[4]={662,0,45,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*5 chunk_bridg1_3*/[5]={20,0,47,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*6 chunk_bridg1_3_slice45*/[6]={21,0,47,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*7 chunk_bridg1_3flipx*/[7]={663,0,47,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -485,6 +486,9 @@ void LoadLevelMod(u8 lev) {
     else if(curlevel == 9){AddCamView((V3){53.36000f,108.73700f,8.72300f},(Quaternion){-0.11027f,0.77231f,-0.13966f,-0.60982f},71u,256u,256u,0.5f,16.582f);/*BridgeScreen1_Camera*/}
     else if(curlevel == 10){AddCamView((V3){6.27000f,137.70000f,20.88000f},(Quaternion){0.05778f,-0.25920f,0.01554f,0.96397f},68u,256u,256u,1.3f,9.4f);/*GroveScreen1_Camera*/ AddCamView((V3){24.67000f,136.79999f,-26.02000f},(Quaternion){-0.00879f,-0.90735f,0.01901f,-0.41985f},68u,256u,256u,4.0f,13.6f);/*GroveScreen2_Camera*/}
     else if(curlevel == 12){AddCamView((V3){35.80700f,196.89301f,-4.98400f},(Quaternion){0.12369f,0.00000f,0.00000f,0.99232f},68u,256u,256u,0.7f,4.32f);/*GroveScreen3_Camera*/ AddCamView((V3){-9.23000f,199.00000f,2.98000f},(Quaternion){0.08830f,-0.69488f,0.08661f,0.70841f},68u,256u,256u,1.5f,8.04f);/*GroveScreen4_Camera*/}
+    sensaroundCamViewCenter=(u8)camViewCount; AddCamView((V3){0.0f,0.0f,0.0f},QUAT_IDENTITY,85u,336u,448u,0.2f,1000.0f);/*Sensaround center rear view (always positioned/oriented per-frame in UpdateSensaroundCamViews)*/
+    sensaroundCamViewLeft=(u8)camViewCount;   AddCamView((V3){0.0f,0.0f,0.0f},QUAT_IDENTITY,65u,256u,384u,0.2f,1000.0f);/*Sensaround left side view*/
+    sensaroundCamViewRight=(u8)camViewCount;  AddCamView((V3){0.0f,0.0f,0.0f},QUAT_IDENTITY,65u,256u,384u,0.2f,1000.0f);/*Sensaround right side view*/
     mset(lineSpace,0,LINE_LEN_MAX * sizeof(char)); u32 lineNum = 0; i32 entCount = -1, lightsIdx = -1; char* line; pendDecalCount = 0; for (u16 i=0;i<LIGHT_COUNT;++i) { mset(&lightsFromFile[i],0,sizeof(Light)); mset(&lanimsFromFile[i],0,sizeof(LightAnimation)); lightsFromFile[i].range = 5.5f; lightsFromFile[i].col = (Color3){1.0f,1.0f,1.0f}; lightsFromFile[i].spotAng=0.0f; }
     while (MmapGetLine(lineSpace, LINE_LEN_MAX)) {
         lineNum++; line=lineSpace; char* firstColon=StringFindFirstCharWithin(line,':'); int firstKeyLen=firstColon ? (int)(firstColon - line) : 0; bool isLight=!(firstKeyLen == 10 && sCompUpToLen(line,"constIndex",10) == 0); Entity* inst=NULL; Light* lit=NULL; LightAnimation* lanim=NULL;
@@ -766,6 +770,37 @@ void LoadLevel(u8 curlevel, V3 pos) {
     RenderLoading("Loading voxel lighting data..."); for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32)); // Set to invalid values for all
     World.levelCurrentlyLoading = false; World.position[PLAYER1]=pos; World.velocity[PLAYER1]=(V3){0,0,0}; World.invP1.lastVelY=0.0f; World.invP1.wasGrounded=true; DebugRAM("end of LoadLevel");
+}
+// HUD sensaround cameras: repositioned at the player each frame and oriented from the player's facing.
+// Center(rear) shows whatever is behind the player when the hardware is active (version > 0); the left/right
+// side views kick in at version > 1 and look 90 degrees to each side of the rear view.
+void UpdateSensaroundCamViews() {
+    /* Self-heal indices: our 3 sensaround camviews are always the tail of camViews (assigned last in
+       LoadLevelMod) and uniquely use far=1000.0f.  Re-deriving them keeps things working after a save game
+       is loaded (LoadGame restores camViews directly without re-running LoadLevelMod). */
+    if (camViewCount < 3 || camViews[camViewCount-1].far != 1000.0f) { sensaroundCamViewCenter=sensaroundCamViewLeft=sensaroundCamViewRight=255; return; }
+    sensaroundCamViewCenter=(u8)(camViewCount-3); sensaroundCamViewLeft=(u8)(camViewCount-2); sensaroundCamViewRight=(u8)(camViewCount-1);
+    bool hwActive = (World.invP1.hardwareIsActive & HW_SNS) != 0;
+    u16 hwVer = World.invP1.hwVers[HW_SNS_IDX];
+    bool centerOn = hwActive && hwVer > 0;
+    bool sidesOn  = hwActive && hwVer > 1;
+    camViews[sensaroundCamViewCenter].visible = centerOn;
+    camViews[sensaroundCamViewLeft ].visible = sidesOn;
+    camViews[sensaroundCamViewRight].visible = sidesOn;
+    if (!hwActive) return;
+    V3 fwd = World.instances[PLAYER1].forward;
+    if (V3_dot(fwd,fwd) < 0.001f) fwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f}); /* fallback before physics tick */
+    V3 rear = V3_ScaleByF(fwd,-1.0f); const V3 up = {0.0f,1.0f,0.0f};
+    camViews[sensaroundCamViewCenter].position = World.position[PLAYER1];
+    camViews[sensaroundCamViewCenter].rotation = quat_look_rotation(rear,up);
+    if (sidesOn) {
+        V3 leftDir  = V3_Normalize((V3){ rear.z, rear.y, -rear.x });/* rear rotated +90deg about world +Y -> player's left */
+        V3 rightDir = V3_Normalize((V3){ -rear.z, rear.y,  rear.x });/* rear rotated -90deg about world +Y -> player's right */
+        camViews[sensaroundCamViewLeft ].position = World.position[PLAYER1];
+        camViews[sensaroundCamViewLeft ].rotation = quat_look_rotation(leftDir,up);
+        camViews[sensaroundCamViewRight].position = World.position[PLAYER1];
+        camViews[sensaroundCamViewRight].rotation = quat_look_rotation(rightDir,up);
+    }
 }
 // Save Game System
 #pragma pack(push, 1)

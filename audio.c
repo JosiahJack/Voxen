@@ -339,41 +339,13 @@ i32 GetFreeWavSlot(){i32 retval=-1; for (u32 i=0;i<wav_count;++i){if(!wav_ch[i].
 // Audio Synthesis Engine
 static float rev_buf[4][REV_BUF_LEN]/*4 comb delay lines, ~1.7MB static*/,ap_buf[2][3533];/*2 allpass lines, prime lengths*/ static u32 rev_idx[4],ap_idx[2],rev_len[4];/*per-comb delay length in samples*/ static float rev_fb[4]/*per-comb feedback gain*/, rev_lp[4]/*per-comb LP filter state (damps high freqs in tail)*/,rev_wet=0.20f,rev_dry=1.00f; static SynthVoice syn_ch[MAX_SYNTH_VOICES];
 static const u32 REV_BASE[4]={1373,1607,1931,2269};/*Base delay lengths (small room). Scaled up for larger spaces. Chosen as mutually prime to prevent periodicity artifacts.*/ static const u32 AP_LEN[2]={379,547};/*Allpass delay lengths — fixed, short for diffusion not coloration.*/
-// Unity AudioReverbPreset enum -> (sz, wet) mapping for synth_set_room
-// 0=Off, 1=Generic, 2=PaddedCell, 3=Room, 4=Bathroom, 5=Livingroom, 6=Stoneroom, 7=Auditorium, 8=ConcertHall,
-// 9=Cave, 10=Arena, 11=Hangar, 12=CarpetedHallway, 13=Hallway, 14=StoneCorridor, 15=Alley, 16=Forest,
-// 17=City, 18=Mountains, 19=Quarry, 20=Plain, 21=ParkingLot, 22=SewerPipe, 23=Underwater, 24=Drugged, 25=Dizzy, 26=Psychotic, 27=User
-static const struct {float sz, wet;} ReverbPresetParams[28] = {
-    {0.0f, 0.0f},      // 0: Off
-    {0.3f, 0.4f},      // 1: Generic
-    {0.1f, 0.3f},      // 2: PaddedCell
-    {0.4f, 0.5f},      // 3: Room
-    {0.6f, 0.7f},      // 4: Bathroom
-    {0.5f, 0.6f},      // 5: Livingroom
-    {0.8f, 0.7f},      // 6: Stoneroom
-    {0.9f, 0.8f},      // 7: Auditorium
-    {1.0f, 0.9f},      // 8: ConcertHall
-    {0.95f, 0.85f},    // 9: Cave
-    {1.0f, 0.8f},      // 10: Arena
-    {0.9f, 0.75f},     // 11: Hangar
-    {0.2f, 0.4f},      // 12: CarpetedHallway
-    {0.4f, 0.5f},      // 13: Hallway
-    {0.7f, 0.65f},     // 14: StoneCorridor
-    {0.5f, 0.55f},     // 15: Alley
-    {0.4f, 0.4f},      // 16: Forest
-    {0.6f, 0.5f},      // 17: City
-    {0.8f, 0.6f},      // 18: Mountains
-    {0.85f, 0.7f},     // 19: Quarry
-    {0.2f, 0.3f},      // 20: Plain
-    {0.5f, 0.45f},     // 21: ParkingLot
-    {0.9f, 0.8f},      // 22: SewerPipe
-    {0.7f, 0.9f},      // 23: Underwater
-    {0.3f, 0.6f},      // 24: Drugged
-    {0.4f, 0.7f},      // 25: Dizzy
-    {0.9f, 0.95f},     // 26: Psychotic
-    {0.5f, 0.5f}       // 27: User (default)
-};
-void synth_set_room(float sz, float wet) { float scale=1.0f + sz*4.0f; float fb=0.3f + sz*0.62f; for (u32 i=0;i<4;++i){u32 len=(u32)(REV_BASE[i]*scale); if(len>=REV_BUF_LEN){len=REV_BUF_LEN-1;} rev_len[i]=len; rev_fb[i]=fb*(0.97f+i*0.007f);/*slight spread across combs*/ rev_lp[i]=0.0f; rev_idx[i]=0;} ap_idx[0]=ap_idx[1]=0; rev_wet=wet; rev_dry=1.0f; }
+static const struct {float sz,wet;} ReverbPresetParams[28]={{0.0f,0.0f}/*0:Off[unused]*/,{0.3f,0.4f}/*1:Generic[unused]*/,{0.1f,0.3f}/*2:PaddedCell*/,{0.4f,0.5f}/*3:Room*/,{0.6f,0.7f}/*4:Bathroom[unused]*/,{0.5f,0.6f}/*5:Livingroom*/,{0.8f,0.7f}/*6:Stoneroom[unused]*/,{0.9f,0.8f}/*7:Auditorium*/,{1.0f,0.9f}/*8:ConcertHall*/,{0.95f,0.85f}/*9:Cave*/,{1.0f,0.8f}/*10:Arena[unused]*/,{0.9f,0.75f}/*11:Hangar*/,{0.2f,0.4f}/*12:CarpetedHallway*/,
+                                                            {0.4f,0.5f}/*13:Hallway*/,{0.7f,0.65f}/*14:StoneCorridor*/,{0.5f,0.55f}/*15:Alley*/,{0.4f,0.4f}/*16:Forest*/,{0.6f,0.5f}/*17:City[unused]*/,{0.8f,0.6f}/*18:Mountains[unused]*/,{0.85f,0.7f}/*19:Quarry[unused]*/,{0.2f,0.3f}/*20:Plain[unused]*/,{0.5f,0.45f}/*21:ParkingLot[unused]*/,{0.9f,0.8f}/*22:SewerPipe*/,{0.7f,0.9f}/*23:Underwater[unused]*/,{0.3f,0.6f}/*24:Drugged[unused]*/,
+                                                            {0.4f,0.7f}/*25:Dizzy[unused]*/,{0.9f,0.95f}/*26:Psychotic[unused]*/,{0.5f,0.5f}/*27:User (default)[unused]*/};
+void synth_set_room(float sz, float wet) {
+    static float last_sz=-1.0f; static bool first_call=true; if(first_call||sz!=last_sz){float scale=1.0f+sz*4.0f,fb=0.3f+sz*0.62f; for(u32 i=0;i<4;++i){u32 len=(u32)(REV_BASE[i]*scale); if(len>=REV_BUF_LEN){len=REV_BUF_LEN-1;} rev_len[i]=len; rev_fb[i]=fb*(0.97f+i*0.007f); rev_lp[i]=0.0f; rev_idx[i]=0;} mset(rev_buf,0,sizeof(rev_buf)); mset(ap_buf,0,sizeof(ap_buf)); ap_idx[0]=ap_idx[1]=0; last_sz=sz; first_call=false;} rev_wet=wet; rev_dry=1.0f;
+}
+
 void synth_set_reverb_preset(u16 preset) { if (preset < 28) { synth_set_room(ReverbPresetParams[preset].sz, ReverbPresetParams[preset].wet); } else { synth_set_room(0.5f, 0.5f); } }
 static float reverb_tick(float in){float s=0.0f; for(u32 i=0;i<4;++i){float delayed=rev_buf[i][rev_idx[i]]; rev_lp[i]+=0.5f*(delayed-rev_lp[i]); rev_buf[i][rev_idx[i]]=in+rev_lp[i]*rev_fb[i]; rev_idx[i]=(rev_idx[i]+1>=rev_len[i]) ? 0 : rev_idx[i]+1; s+=delayed;} s*=0.25f; for(u32 i=0;i<2;++i){float delayed=ap_buf[i][ap_idx[i]]; float w=s+delayed*0.5f; ap_buf[i][ap_idx[i]]=w; ap_idx[i]=(ap_idx[i]+1>=AP_LEN[i]) ? 0 : ap_idx[i]+1; s=delayed-0.5f*w;} return s;}
 static SynthVoice* SynAlloc() { for (u32 i = 0; i < MAX_SYNTH_VOICES; i++){ if (!syn_ch[i].active){return &syn_ch[i];} } return NULL; }
