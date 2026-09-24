@@ -396,6 +396,9 @@ static void VaporizeCorpse(u16 self,bool energyVaporized) { Entity* e=&World.ins
 static inline bool IsGrenade(u16 i) { return ((i >= 314 && i <= 320) || i == 370 || i == 372 || i == 387 || i == 389 || (i >= 402 && i <= 404)); }
 static void Death(u16 self,bool energyVaporized) {
     Entity* e = &World.instances[self]; if (e->entflags & EF_DEAD_CHECKS_DONE) return; UseDeathTargets(self); bool isNPC = IdxIsNPC(e->index); bool isObj = IdxIsDynamicObject(e->index); if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->entflags |= EF_DEAD_CHECKS_DONE; return; }
+    if (e->index == 477) { /* sec_camera has no dynamic-object path; deathFX 1 is CameraExplosions. */
+        e->deathBurst = 725; ObjectDeath(self); DeleteInstance(self); return;
+    }
     /* NPCs retain their entity mesh for AI death animation. Only non-NPC corpses vaporize. */
     bool vaporize=IdxIsCorpse(e->index); bool isGrenade=IsGrenade(e->index), doTeleport=(e->entflags & EF_TELEPORT_ON_DEATH) != 0; if (e->iceActive) World.col[self] = COLTYPE_NONE;
     if (vaporize && e->index != 477/*sec_camera*/ && !isGrenade) VaporizeCorpse(self,energyVaporized); else if (isObj && !isNPC) ObjectDeath(self); else if (e->index == 279/*screen*/) ScreenDeath(self); else if (doTeleport) TeleportAway(self); else if (isGrenade) GrenadeExplode(self);

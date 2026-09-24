@@ -215,9 +215,17 @@ static double AIDeathAnimationDuration(const Entity* self) {
     if (clip.framerate <= 0 || clip.speed <= 0 || clip.frameEnd <= clip.frameStart) return 0.0;
     return (double)(clip.frameEnd - clip.frameStart + 1) / ((double)clip.framerate * clip.speed);
 }
+static void SpawnNPCDeathBurst(Entity* self) {
+    if (!self) return;
+    if (self->index == 437) { /* npc_servbot prefab deathBurst child */
+        const PSysDef* preset = PSysTypeGet(147);
+        if (preset) { PSysDef def = *preset; V3 p=World.position[(u16)(self - World.instances)]; p.x-=self->right.x*.005f; p.y-=.032f; p.z-=self->right.z*.005f; p.x-=self->forward.x*.078f; p.z-=self->forward.z*.078f; def.pos = p; def.textures[0] = 386; def.emitRate = 0.0f; def.duration = 1.5f; def.burstCount = 80; def.colStart = (Color){1.0f,0.84076905f,0.8349056f,1.0f}; def.colEnd = (Color){1.0f,1.0f,1.0f,1.0f}; def.rotationMode = 1; def.colorMode = 1; def.blendMode = 4; def.blendModeOverride = true; PSysAdd(&def); }
+    }
+    if (self->deathBurst > 0) SpawnDynamicObject(self->deathBurst, false);
+}
 static void AIDying(u16 i) {
     if (!(World.instances[i].entflags & EF_DYING_SETUP)) {
-        World.instances[i].enemy = 0; NPCTable* npc = &npcTable[World.instances[i].index - 419]; float dbt = deathBurstTimer[World.instances[i].index - 419]; if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; } else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { if (World.instances[i].deathBurst > 0) { SpawnDynamicObject(World.instances[i].deathBurst, false); } flag_set(&World.instances[i].entflags, EF_DEATH_BURST_DONE, true); }
+        World.instances[i].enemy = 0; NPCTable* npc = &npcTable[World.instances[i].index - 419]; float dbt = deathBurstTimer[World.instances[i].index - 419]; if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; } else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(&World.instances[i]); flag_set(&World.instances[i].entflags, EF_DEATH_BURST_DONE, true); }
         u16 sidx = i; if (!(World.instances[i].entflags & EF_ACT_AS_CORPSE_ONLY) && !(World.instances[i].entflags & EF_TELEPORT_ON_DEATH)) { int sded=sfxDeath[World.instances[i].index - 419]; if (sded >= 0 && sded < (i16)SOUNDS_COUNT){play_wav(sounds[sded],SfxVol(),World.position[sidx],true);} } { u16 _nid = World.instances[i].index - 419; World.gravity[i] = (ai_is_cyber(&World.instances[i]) || ai_gibs_on_death(_nid)) ? 0.0f : 1.0f; } // Citadel: gibbed/flier corpses don't fall while dying; cyber never falls.
         flag_set(&World.instances[i].entflags,EF_ASLEEP,false); World.layer[i] = L_Corpse; flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true); u16 npcID = World.instances[i].index - 419; double deathWait = npc->timeTillDead; if (ai_gibs_on_death(npcID)) { double animWait = AIDeathAnimationDuration(&World.instances[i]); if (animWait > deathWait) deathWait = animWait; } World.instances[i].timeTillDeadFinished = World.pauseRelativeTime + deathWait; if (npc->switchMaterialOnDeath && npcDeathTexture[npcID] != U16_MAX) { World.instances[i].texIndex = npcDeathTexture[npcID]; }
         /* Citadel's zero-g death object is a 25-frame sequence at 24 fps. Voxen
@@ -235,7 +243,7 @@ static void AIDying(u16 i) {
 }
 
 static void AIDead(u16 idx) {
-    Entity* self = &World.instances[idx]; flag_set(&World.instances[idx].entflags,EF_ASLEEP,false); flag_set(&World.instances[idx].entflags,EF_DEAD,true); flag_set(&World.instances[idx].entflags,EF_DYING,false); flag_set(&World.instances[idx].entflags,EF_DYING_SETUP,false); if (World.instances[idx].entflags & EF_DEAD_GIBS_DONE){return;}
+    Entity* self = &World.instances[idx]; flag_set(&World.instances[idx].entflags,EF_ASLEEP,false); flag_set(&World.instances[idx].entflags,EF_DEAD,true); flag_set(&World.instances[idx].entflags,EF_DYING,false); flag_set(&World.instances[idx].entflags,EF_DYING_SETUP,false); if (World.instances[idx].entflags & EF_DEAD_GIBS_DONE){return;} flag_set(&World.instances[idx].entflags,EF_DEAD_GIBS_DONE,true);
     World.instances[idx].currentState = AIState_Dead; World.layer[idx] = L_Corpse; if (World.instances[idx].entflags & EF_TELEPORT_ON_DEATH) { World.gravity[idx] = 1.0f; DeleteInstance(idx); /* TeleportAway not yet fully implemented; keep delete for now */ }
     else if (ai_is_cyber(self)) { World.gravity[idx] = 0.0f; DeleteInstance(idx); /* Gib effect: spawn basic debris using deathBurst index if defined */ }
     else if (ai_gibs_on_death(World.instances[idx].index - 419)) {
@@ -258,7 +266,7 @@ static void AIDead(u16 idx) {
         }
         DeleteInstance(idx);
     } else { /*Enable search collider for non-gib corpses (Avian Mutant index 2 always searchable)*/ World.layer[idx] = L_Corpse | L_CorpseSearchable; World.velocity[idx].x = 0.0f; World.velocity[idx].z = 0.0f; if (World.instances[idx].index != 433) World.gravity[idx] = 1.0f;/*Hopper deactivates itself*/ }
-    flag_set(&World.instances[idx].entflags, EF_DEAD_CHECKS_DONE, true); flag_set(&World.instances[idx].entflags, EF_DEAD_GIBS_DONE, true);
+    flag_set(&World.instances[idx].entflags, EF_DEAD_CHECKS_DONE, true);
 }
 
 static DamageData SetNPCData(Entity* self, int n){DamageData dd={0}; NPCTable* npc=&npcTable[self->index - 419]; dd.owner=(u16)(self - World.instances); switch(n){case 1:dd.damage=npc->damage; dd.attackType=npc->attackType; break; case 2:dd.damage=npc->damage2; dd.attackType=npc->attackType2; break; default:dd.damage=npc->damage3; dd.attackType=npc->attackType3; break;} dd.penetration=0; dd.defense=0; dd.offense=0; dd.armorvalue=0; dd.berserkActive=false; return dd;}
@@ -337,7 +345,7 @@ float AITranquilize(u16 idx, float amount, bool energy) { Entity* self = &World.
 void AIAlert(u16 idx) { if (!World.diffCbt){return;} Entity* self = &World.instances[idx]; AISetEnemy(idx,PLAYER1); self->currentDestination = World.position[PLAYER1]; flag_set(&self->entflags, EF_ENEM_IN_SIGHT, false); }
 void AIAwakeFromSleep(u16 idx) { flag_set(&World.instances[idx].entflags,EF_ASLEEP,false); AIAlert(idx);/*deactivate sleeping cables*/ }
 static void AIThink(u16 idx) {
-    Entity* self = &World.instances[idx]; if ((self->entflags & EF_DYING_SETUP) && self->deathBurstFinished < World.pauseRelativeTime && !(self->entflags & EF_DEATH_BURST_DONE)) { if (self->deathBurst > 0) { SpawnDynamicObject(self->deathBurst, false); } flag_set(&self->entflags,EF_DEATH_BURST_DONE,true); }
+    Entity* self = &World.instances[idx]; if ((self->entflags & EF_DYING_SETUP) && self->deathBurstFinished < World.pauseRelativeTime && !(self->entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(self); flag_set(&self->entflags,EF_DEATH_BURST_DONE,true); }
     if (!ai_has_health(self)) { if (!(self->entflags & EF_DYING) && !(self->entflags & EF_DEAD)){flag_set(&self->entflags,EF_DYING,true); self->currentState=AIState_Dying;}else if((self->entflags & EF_DEAD) && self->currentState != AIState_Dead){self->currentState=AIState_Dead;}else if((self->entflags & EF_DYING) && self->currentState != AIState_Dying){self->currentState=AIState_Dying;} }
     switch (self->currentState) { case AIState_Idle:AIIdle(idx); break; case AIState_Walk:AIWalk(idx); break; case AIState_Run:AIRun(idx); break; case AIState_Attack1:AIAttack(self,1); break; case AIState_Attack2:AIAttack(self,2); break; case AIState_Attack3:AIAttack(self,3); break; case AIState_Pain:AIPain(self); break; case AIState_Dying:AIDying(idx); break; case AIState_Dead:AIDead(idx); break; default:AIIdle(idx); break; }
     if (self->currentState == AIState_Dead || self->currentState == AIState_Dying) return;
