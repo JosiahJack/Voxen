@@ -1,6 +1,7 @@
 // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
 #include "common.h"
 #define ARENA_ALIGN(p) ((char*)(((uintptr_t)(p) + 15) & ~(uintptr_t)15)) // 16-byte align sub-arena cursors
+extern WeaponFireCtx wfx; // from weapons.c / voxen.c
 enum { SUB_MAIN = 32 }; typedef struct { u8* base; u8* cur; u8* end; } SubArena; static SubArena thrd_sub[SUB_MAIN + 1];
 static void OS_SubArenaSliceInit(u32 idx, u8* base, size_t sz) { SubArena* a = &thrd_sub[idx]; a->base = base; a->cur = base; a->end = base + sz; }
 static void* OS_SubArenaAlloc(i32 tid, size_t n) { if (tid < 0) tid = SUB_MAIN; SubArena* a = &thrd_sub[tid]; size_t aligned = (n + 15) & ~(size_t)15; if (a->cur + aligned > a->end) { DualLogError("SubArena %d ovr! want %u, cap %u MB\n", tid,(u32)n, (u32)((a->end - a->base))); OS_Exit(1); } void* p = a->cur; a->cur += aligned; mset(p, 0, aligned); return p; } /* Zero-fill: glb parsers leave optional fields (byteOffset, normalized, node TRS) unset and rely on zero defaults; wave reuse would otherwise expose stale bytes (matches old never-reused scratch) */
@@ -490,6 +491,7 @@ void ChangeAnim(Entity* e, u8 c) { if(e->clip == c){return;} e->clip=c; e->curre
 void UpdateAnims(void) {
     if (World.paused || World.menuActive){return;} static double lastPauseTime=0; if(lastPauseTime == 0.0){lastPauseTime=World.pauseRelativeTime;} double animDT=World.pauseRelativeTime-lastPauseTime; lastPauseTime=World.pauseRelativeTime; if(animDT > 0.1){animDT=0.1;} if(animDT <= 0.0){return;} bool portalsNeedUpdated=false; u8 animTest=Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
+        if (i == World.weaponVModelIndex) continue; /* view model handled manually */
         Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->ajar) continue;
         if (animTest == 1) {
             u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0;
@@ -525,4 +527,11 @@ void UpdateAnims(void) {
             if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     } if (portalsNeedUpdated){PortalCulling();}
+    if (World.weaponVModelIndex > 0 && World.weaponVModelIndex < INSTANCE_COUNT) {
+        Entity* e = &World.instances[World.weaponVModelIndex];
+        if (wfx.pendingMeleeFinished > 0.0 && World.pauseRelativeTime >= wfx.pendingMeleeFinished) {
+            e->animationNum = (Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex) == 5) ? 50 : 49;
+            e->clip = A_IDLE; e->frame = modelAnimationClips[e->animationNum][A_IDLE].frameStart; e->currentFrameFinished = 0.0;
+        }
+    }
 }

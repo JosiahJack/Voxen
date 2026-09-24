@@ -421,7 +421,7 @@ InputElement inputElements[134]={{"A",KEY_A},{"B",KEY_B},{"C",KEY_C},{"D",KEY_D}
                                  {"JOY11",JOYSTICK_12},{"JOY12",JOYSTICK_13},{"JOY13",JOYSTICK_14},{"JOY14",JOYSTICK_15},{"JOY15",JOYSTICK_16},{"JOY16",JOYHAT_UP},{"JOY17",JOYHAT_RIGHT},{"BACKSPACE",KEY_BACKSPACE},{"TAB",KEY_TAB},{"NUMENTER",KEY_KP_ENTER},{"ESCAPE",KEY_ESCAPE},{"SPACE",KEY_SPACE},{"DELETE",KEY_DELETE},{"INSERT",KEY_INSERT},{"HOME",KEY_HOME},{"END",KEY_END},{"PAGEUP",KEY_PAGE_UP},{"PAGEDN",KEY_PAGE_DOWN},{"F1",KEY_F1},{"F2",KEY_F2},
                                  {"F3",KEY_F3},{"F4",KEY_F4},{"F5",KEY_F5},{"F6",KEY_F6},{"F7",KEY_F7},{"F8",KEY_F8},{"F9",KEY_F9},{"F10",KEY_F10},{"F11",KEY_F11},{"F12",KEY_F12},{"GRAVE",KEY_GRAVE_ACCENT},{"-",KEY_MINUS},{"=",KEY_EQUAL},{"[",KEY_LEFT_BRACKET},{"]",KEY_RIGHT_BRACKET},{"\\",KEY_BACKSLASH},{"/",KEY_SLASH},{".",KEY_PERIOD},{",",KEY_COMMA},{";",KEY_SEMICOLON},{"'",KEY_APOSTROPHE},{"CAPSLOCK",KEY_CAPS_LOCK},{"NUM0",KEY_KP_0},{"NUM4",KEY_KP_4},
                                  {"NUM5",KEY_KP_5},{"NUM6",KEY_KP_6},{"NUM7",KEY_KP_7},{"NUM8",KEY_KP_8},{"NUM9",KEY_KP_9},{"NUM*",KEY_KP_MULTIPLY},{"NUM-",KEY_KP_SUBTRACT},{"NUM.",KEY_KP_DECIMAL},{"MENU",KEY_MENU},{"PAUSE",KEY_PAUSE},{"NUMLOCK",KEY_NUM_LOCK},{"MWHEEL+",127},{"MWHEEL-",128},/*Handled special case for mousewheel +/-respectively*/{"PRINT",KEY_PRINT_SCREEN},{"JOY18",JOYHAT_DOWN},{"JOY19",JOYHAT_LEFT},{"UNUSED",0}};
-static u8 uiMouseCaptured; static bool uiWheelBlocked; static KeyState unboundInput;
+static u8 uiMouseCaptured; static bool uiWheelBlocked; static KeyState unboundInput; bool rebindCaptureActive = false;/*Set by the Input tab when a binding row is capturing a key; suppresses Menu() ESC-back + wheel capture while capturing.*/
 bool UIInteractions(void); void UI_ProcessNavigation(void);
 KeyState* GetCodeMapping(int settingIndex) {
     if (settingIndex<0 || settingIndex>=42) return &unboundInput;
@@ -483,8 +483,8 @@ void InputProcessing() {
         if (Sys_Input.keyStates[KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn;
         if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; SaveGame(7,"quicksave"); return; }
         if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
-        if (Console()) ToggleConsole();
-        if (Menu() && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; } if (Menu() && World.menuActive) { MenuGoBack(); return; } if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
+        if (Console() && !rebindCaptureActive) ToggleConsole();
+        if (Menu() && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; } if (Menu() && World.menuActive && !rebindCaptureActive) { MenuGoBack(); return; } if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
         // Debug weapon offset adjustment hooks
         if (Sys_Input.keyStates[KEY_1].pressed) { debugWepOffset.x += 0.05f; }
         else if (Sys_Input.keyStates[KEY_2].pressed) { debugWepOffset.x -= 0.05f; }

@@ -28,6 +28,7 @@ static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame
 typedef struct {int w,h;} ResMode; ResMode resModes[16];
 GlobalContext World = {0};
 V3 debugWepOffset = {0, 0, 0}; // debug weapon view offset
+static float shakeAmp = 0.15f;
 Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
                       {1.0f,0.498039216f,0.0f,1.0f}, /* 5 Orange T_ORANGE*/ {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red T_STOPD_RED*/ {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
                       {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title T_GREEN_MENU*/ {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/ {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/ {0.392156863f,0.031372549f,0.039215686f,1.0f} /* 12 Red Menu Text Dark T_RED_MENU*/ };
@@ -206,7 +207,7 @@ void EnableCheatArsenal(u8 level) {
 }
 void cmd_kill() { World.instances[PLAYER1].health = World.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
 void cmd_undo() { if (Cheats.editMode) { if (lastSpawned < U16_MAX && lastSpawned >= INSTS_1ST_IDX) { DeleteInstance(lastSpawned); lastSpawned = U16_MAX; CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Nothing to undo"); } } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } }
-void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; float shakeForce = (force < 0.48f) ? force : 0.48f; (void)shakeForce; } // TODO actually shake
+void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; shakeAmp = (force < 0.48f) ? force : 0.48f; }
 void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
 void cmd_shake() { Shake(-1.0f); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
 void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip=Cheats.notarget=true; CenterStatusPrint("edit mode: %s","Edit Mode activated!"); } else { Cheats.noclip=Cheats.notarget=false; editModeSelection = U16_MAX; CenterStatusPrint("%s","Edit Mode deactivated"); } }
@@ -564,6 +565,9 @@ Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,
 extern const u16 wepModelIndices[16]; extern WeaponFireCtx wfx; void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight; float sfov, snear, sfar; if (camView) { CamView* cv=&camViews[camViewIdx]; swidth=cv->width; sheight=cv->height; sfov=(float)cv->fov; snear=cv->near; sfar=cv->far; } else { swidth=Sys_Settings.ScreenWidth; sheight=Sys_Settings.ScreenHeight; sfov=(float)Sys_Settings.FOV; snear=0.02f; sfar=World.farPlane[World.curLev]; }
+    float shakeOffset = (World.shakeFinished > World.pauseRelativeTime) ? (shakeAmp * vcosf((float)(World.pauseRelativeTime * 20.0f))) * (World.shakeFinished - World.pauseRelativeTime) : 0.0f;
+    Quaternion savedRotation = World.rotation[PLAYER1]; float savedCamYaw = World.cam_yaw, savedCamPitch = World.cam_pitch, savedCamRoll = World.cam_roll;
+    if (shakeOffset != 0.0f) { World.cam_yaw += shakeOffset; World.cam_pitch += shakeOffset * 0.5f; quat_from_yaw_pitch_roll(&World.rotation[PLAYER1], World.cam_yaw, World.cam_pitch, World.cam_roll); }
     V3 playerPos = World.position[PLAYER1]; float px=playerPos.x, py=playerPos.y, pz=playerPos.z, aspect3D=(float)swidth / (float)sheight; float view[16],viewProj[16],invViewRot[9],invViewProj[16]; GetProjections(view,viewProj,invViewRot,invViewProj,sfov,aspect3D,snear,sfar); ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
     glBindVertexArray(chunkVAO);/*Common vao for RenderDynamicShadowmaps and Rasterized Geometry*/ glEnable(GL_DEPTH_TEST);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][0]); if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps(); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][1]);
@@ -620,6 +624,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glBindVertexBuffer(0,textDecalVBO[tdLev][i],0,16/*VRT_ATT_SZ*/); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,(i32)textDecalVertexCount[tdLev][i]); drawCalls++; vertsRendered += textDecalVertexCount[tdLev][i];
     }
     glBindTexture(GL_TEXTURE_2D,0); glUniform1ui(32,0u); /* restore chunkSP font-atlas off for subsequent draws */
+    if (World.shakeFinished > World.pauseRelativeTime) { World.rotation[PLAYER1] = savedRotation; World.cam_yaw = savedCamYaw; World.cam_pitch = savedCamPitch; World.cam_roll = savedCamRoll; }
     u16 wvi = World.weaponVModelIndex;
     if (wvi > 0 && wvi < INSTANCE_COUNT) {
         int wep16 = Get16WeaponIndexFromConstIndex(World.instances[wvi].index);
@@ -634,12 +639,12 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][3]);
     if(likely(Sys_Settings.Reflections>0u)){  glUseProgram(ssrSP); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3); glUniformMatrix4fv(6,1,0,invViewProj); glUniformMatrix4fv(4,1,GL_FALSE,viewProj); glDispatchCompute(((Sys_Settings.ScreenWidth/Sys_Settings.SSR_RES)+31)/32,((Sys_Settings.ScreenHeight/Sys_Settings.SSR_RES)+31)/32,1); }
     glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glClearColor(0,0,0,0); glViewport(0,0,UI_W,UI_H); glDisable(GL_CULL_FACE); renderTime = get_time() - rendStart; glEnable(GL_BLEND);
-    RenderUI(); AutomapBlitToUI(); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][4]); glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight);
+    RenderUI(); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][4]); glBindFramebuffer(GL_FRAMEBUFFER,0); glViewport(0,0,swidth,sheight);
     glUseProgram(imageBlitSP); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,inputImageID); glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D,inputUIID); glUniform1i(31,1); glUniform1i(32,3); glUniformMatrix4fv(33,1,0,invViewProj); double berserkTimeRemainingNormalized = World.invP1.berserkFinished > 0.0001 ? (World.invP1.berserkFinished - World.pauseRelativeTime) / BERSERK_TIME : 0.0;
     if (World.invP1.berserkFinished < World.pauseRelativeTime && World.invP1.berserkFinished > 0.0001) World.invP1.berserkFinished = berserkTimeRemainingNormalized = 0.0;
     glUniform1ui(5,Sys_Settings.Reflections); glUniform1ui(6,Sys_Settings.FXAA); glUniform1f(14,Sys_Settings.FOV); glUniform1f(16,aspect3D); glUniform1ui(22,Sys_Settings.Shadows); glUniform1f(9,(float)berserkTimeRemainingNormalized); glUniform1f(10,berserkSeedTime); glUniform1ui(11,Sys_Settings.Brightness);
-    float shakeOffset = (World.shakeFinished > World.pauseRelativeTime) ? (0.15f * vcosf((float)(World.pauseRelativeTime * 20.0f))) * (World.shakeFinished - World.pauseRelativeTime) : 0.0f; glUniform3f(12,deg2rad(World.cam_yaw + shakeOffset),deg2rad(World.cam_pitch + shakeOffset * 0.5f),deg2rad(World.cam_roll)); glUniform3f(13,px,py,pz); glUniform1f(15,(float)World.pauseRelativeTime * 0.1f); glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
+    glUniform3f(12,deg2rad(World.cam_yaw),deg2rad(World.cam_pitch),deg2rad(World.cam_roll)); glUniform3f(13,px,py,pz); glUniform1f(15,(float)World.pauseRelativeTime * 0.1f); glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
     glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); glUniform1ui(19,((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     u32 shieldOnType = 0u/*No shield green tint*/; if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) {shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/;} glUniform1ui(20,shieldOnType); // Green Shield
     Color3 painStaticColor = (Color3){1.0f,0.0f,0.0f}; glUniform3f(23,painStaticColor.r,painStaticColor.g,painStaticColor.b); glUniformMatrix4fv(24,1,0,viewProj); glUniformMatrix3fv(25,1,0,invViewRot); glUniform1i(27,0); glUniform1f(28,vclamp(World.painStaticAlpha + World.empStaticAlpha,0.0f,1.0f)); glUniform1ui(29,(u32)ModRequestsGrayscale()); glBindVertexArray(quadVAO);

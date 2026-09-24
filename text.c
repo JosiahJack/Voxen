@@ -422,7 +422,7 @@ void InitFontAtlasses() {
     u8* bmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2); // Primary atlas
     BuildAtlas(&fontAtlasTexStopD,fontRanges,&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
     DumpFontAtlasBmp("Screenshots/atlas_stopd.bmp",bmp2,FONT_ATLAS_SIZE2);
-    OS_Free(fontData[0],sz1); OS_Free(fontData[1],sz2); OS_Free(fontData[2],fallbackFonts[0].size); OS_Free(fontData[3],fallbackFonts[1].size); OS_Free(fontData[4],fallbackFonts[2].size); OS_FreeInitPhase(); // TODO Just use scratch!
+    OS_FreeInitPhase(); // Using scratch arena; no individual frees needed
     glUseProgram(textSP); glUniform1i(1,2); DebugRAM("after font load"); DualLog(" took %f s\n",get_time()-t0);
 }
 // Localization

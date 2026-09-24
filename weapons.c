@@ -41,6 +41,9 @@ INLINE Quaternion QuatFromToRotation(V3 from,V3 to) {
 }
 
 INLINE bool WeaponsHaveAnyHeat() { if (Cheats.redbull) {return false;} for (int i=0;i<7;i++) {if (World.invP1.currentEnergyWeaponHeat[i] > 0.0f) {return true;}} return false; }
+static bool hudHeatTickOn[9];/*Citadel EnergyHeatTickManager.ticks: 9 HUD heat ticks, tick i lit when heat >= 10*(i+1)*/
+void HudHeatBleed(float heat) { float tempFloat=10.0f; for (int i=0;i<9;i++) { hudHeatTickOn[i]=heat >= tempFloat; tempFloat += 10.0f; } }
+bool HudHeatTickOn(int i) { return (i>=0&&i<9) ? hudHeatTickOn[i] : false; }
 void HeatBleedOff() {
     static double heatTickFinished = 0.0;
     static const float heatTickTime = 0.50f;
@@ -52,7 +55,7 @@ void HeatBleedOff() {
             World.invP1.currentEnergyWeaponHeat[i] -= 10.0f;
             if (World.invP1.currentEnergyWeaponHeat[i] <= 0.0f) World.invP1.currentEnergyWeaponHeat[i] = 0.0f;
         }
-        // if (CurrentWeaponUsesEnergy()) HudHeatBleed(World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent]); TODO
+        if (CurrentWeaponUsesEnergy()) HudHeatBleed(World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent]);
     }
     heatTickFinished = World.pauseRelativeTime + heatTickTime;
 }
@@ -72,7 +75,7 @@ static void WeaponLerpGetTargetDown() { reloadLerpValue = reloadLerpValue / 0.5f
 void CompleteWeaponChange() {
     if (World.invP1.weaponIndexPending == -1) return;
     World.invP1.weaponCurrent = (u8)World.invP1.weaponCurrentPending;
-    if (CurrentWeaponUsesEnergy()) { /*HudHeatBleed(World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent]);*/ }
+    if (CurrentWeaponUsesEnergy()) { HudHeatBleed(World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent]); }
     World.invP1.weaponIndex = (u16)World.invP1.weaponIndexPending;
     // Set the single ad-hoc view-model instance's appearance.  Model indices come from ./Data/models.txt:
     // only pipe/rapier use the v_pipe/v_rapier models (5728/5748); all others reuse the matching weapon_ EDefs model.
@@ -112,6 +115,7 @@ void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev
     }
     if (nextSlot == curSlot) return;
     int wi = (int)World.invP1.weaponInventoryIndices[nextSlot];
+    play_wav(sounds[80],SfxVol(),(V3){0,0,0},false);/*changeweapon*/
     World.invP1.weaponCurrentPending = (i16)nextSlot;
     World.invP1.weaponIndexPending = (i16)wi;
     WeaponFireStartWeaponDip(0.5f);
@@ -289,14 +293,14 @@ void CheckUIStateAndAttack(void) {
     if (wepClass[wepdex] == WC_ENERGY) {
         u16 wc = World.invP1.weaponCurrent;
         if (World.invP1.energy > 0.0f || Cheats.bottomless || Cheats.redbull) {
-            if(World.invP1.currentEnergyWeaponHeat[wc]>wfx.overheatedPercent && !Cheats.bottomless && !Cheats.redbull){/*TODO PlayUIOneShotSavable(238);*//*noammo*/ World.invP1.waitTilNextFire=World.pauseRelativeTime + 0.8f; CenterStatusPrint("%s",Sys_Text.stringTable[11]);} 
+            if(World.invP1.currentEnergyWeaponHeat[wc]>wfx.overheatedPercent && !Cheats.bottomless && !Cheats.redbull){play_wav(sounds[238],SfxVol(),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire=World.pauseRelativeTime + 0.8f; CenterStatusPrint("%s",Sys_Text.stringTable[11]);} 
             else { FireWeapon(wepdex,false); }
         } else { CenterStatusPrint("%s", Sys_Text.stringTable[207]);/*not enough energy*/ }
         return;
     }
     u16 wc = World.invP1.weaponCurrent; bool alt = World.invP1.wepLoadedWithAlternate[wc];
     u16 amount = alt ? World.invP1.currentMagazineAmount2[wc] : World.invP1.currentMagazineAmount[wc];
-    if (amount > 0 || Cheats.bottomless) { FireWeapon(wepdex, false); } else {/* TODO PlayUIOneShotSavable(238);*//*noammo*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.8f; }
+    if (amount > 0 || Cheats.bottomless) { FireWeapon(wepdex, false); } else {play_wav(sounds[238],SfxVol(),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.8f; }
 }
 
 void Unload(bool isSilent) {

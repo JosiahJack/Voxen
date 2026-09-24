@@ -134,7 +134,8 @@ void AutomapTick() {
 }
 
 void AutomapBlitToUI() {
-    if(!amReady || World.menuActive || World.paused || Cheats.noHUD){return;} if(World.curLev>=LEVEL_CYBERSPACE){return;} int n=0; int dx0[2],dy0[2],dx1[2],dy1[2]; if(World.Sys_UI.MFD_LefTab==3){ dx0[n]=AMAP_UI_X_L; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_L+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(World.Sys_UI.MFD_RightTab==3){ dx0[n]=AMAP_UI_X_R; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_R+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(!n){return;}
+    if(!amReady || World.menuActive || World.paused || Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE){return;}
+    int n=0; int dx0[2],dy0[2],dx1[2],dy1[2]; if(World.Sys_UI.MFD_LefTab==3){ dx0[n]=AMAP_UI_X_L; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_L+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(World.Sys_UI.MFD_RightTab==3){ dx0[n]=AMAP_UI_X_R; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_R+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(!n){return;}
     glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); for (int k=0;k<n;++k) {/*UI y-down->GL y-up; row0=north=texture bottom: flip src*/int gx0=dx0[k],gy0=768-dy1[k],gx1=dx1[k],gy1=768-dy0[k]; glBlitFramebuffer(0,AM_H,AM_W,0, gx0,gy0,gx1,gy1, GL_COLOR_BUFFER_BIT,GL_LINEAR);} glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
 }
 

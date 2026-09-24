@@ -1968,3 +1968,175 @@ index: 5989
 animated: 1
 animationNum: 52
 frame: 1 40
+#Models/npc_bot_cortex_reaver_gib0.obj
+index: 5990
+#Models/npc_bot_cortex_reaver_gib1.obj
+index: 5991
+#Models/npc_bot_cortex_reaver_gib10.obj
+index: 5992
+#Models/npc_bot_cortex_reaver_gib2.obj
+index: 5993
+#Models/npc_bot_cortex_reaver_gib3.obj
+index: 5994
+#Models/npc_bot_cortex_reaver_gib4.obj
+index: 5995
+#Models/npc_bot_cortex_reaver_gib5.obj
+index: 5996
+#Models/npc_bot_cortex_reaver_gib6.obj
+index: 5997
+#Models/npc_bot_cortex_reaver_gib7.obj
+index: 5998
+#Models/npc_bot_cortex_reaver_gib8.obj
+index: 5999
+#Models/npc_bot_cortex_reaver_gib9.obj
+index: 6000
+#Models/npc_botexec_gib.obj
+index: 6001
+#Models/npc_botexec_gib_head.obj
+index: 6002
+#Models/npc_botexec_gib_leftarmupper.obj
+index: 6003
+#Models/npc_botexec_gib_leftfoot.obj
+index: 6004
+#Models/npc_botexec_gib_leftforearm.obj
+index: 6005
+#Models/npc_botexec_gib_leftleg.obj
+index: 6006
+#Models/npc_botexec_gib_rightarm.obj
+index: 6007
+#Models/npc_botexec_gib_rightfemur.obj
+index: 6008
+#Models/npc_botexec_gib_rightleg.obj
+index: 6009
+#Models/npc_flierbot_gib_gun_lh_mesh.obj
+index: 6010
+#Models/npc_flierbot_gib_gun_rh_mesh.obj
+index: 6011
+#Models/npc_flierbot_gib_mesh_001.obj
+index: 6012
+#Models/npc_flierbot_gib_nose_mesh.obj
+index: 6013
+#Models/npc_flierbot_gibbody_mesh.obj
+index: 6014
+#Models/npc_flierbot_gibwinglh_mesh.obj
+index: 6015
+#Models/npc_maintenancebot_gib_bodyshell_lh.obj
+index: 6016
+#Models/npc_maintenancebot_gib_bodyshell_rh.obj
+index: 6017
+#Models/npc_maintenancebot_gib_leg.obj
+index: 6018
+#Models/npc_maintenancebot_gib_leg_001.obj
+index: 6019
+#Models/npc_maintenancebot_gib_leg_002.obj
+index: 6020
+#Models/npc_maintenancebot_gib_leg_003.obj
+index: 6021
+#Models/npc_maintenancebot_gib_npc_maintenancebot_pincers_lh.obj
+index: 6022
+#Models/npc_maintenancebot_gib_npc_maintenancebot_pincers_rh.obj
+index: 6023
+#Models/npc_maintenancebot_gib_npc_maintenancebot_pincers_stalk1.obj
+index: 6024
+#Models/npc_maintenancebot_gib_npc_maintenancebot_pincers_stalk2.obj
+index: 6025
+#Models/npc_repairbot_gib1.obj
+index: 6026
+#Models/npc_repairbot_gib1_001.obj
+index: 6027
+#Models/npc_repairbot_gib1_002.obj
+index: 6028
+#Models/npc_repairbot_gib1_003.obj
+index: 6029
+#Models/npc_repairbot_gib1_004.obj
+index: 6030
+#Models/npc_repairbot_gib1_005.obj
+index: 6031
+#Models/npc_repairbot_gibcenter.obj
+index: 6032
+#Models/npc_repairbot_gibmandibleleft.obj
+index: 6033
+#Models/npc_repairbot_gibmandiblelink.obj
+index: 6034
+#Models/npc_repairbot_gibmandibleright.obj
+index: 6035
+#Models/npc_sec1bot_gib1_mesh.obj
+index: 6036
+#Models/npc_sec1bot_gib2_mesh.obj
+index: 6037
+#Models/npc_sec1bot_gib3_mesh.obj
+index: 6038
+#Models/npc_sec1bot_gib4_mesh.obj
+index: 6039
+#Models/npc_sec1bot_gib5_mesh.obj
+index: 6040
+#Models/npc_sec1bot_gib6_mesh.obj
+index: 6041
+#Models/npc_sec1bot_gib7_mesh.obj
+index: 6042
+#Models/npc_sec2bot_gibarmleft.obj
+index: 6043
+#Models/npc_sec2bot_gibarmright.obj
+index: 6044
+#Models/npc_sec2bot_gibfinger1.obj
+index: 6045
+#Models/npc_sec2bot_gibfinger3.obj
+index: 6046
+#Models/npc_sec2bot_gibgun.obj
+index: 6047
+#Models/npc_sec2bot_gibmain.obj
+index: 6048
+#Models/npc_sec2bot_gibmain_003.obj
+index: 6049
+#Models/npc_sec2bot_gibmain_004.obj
+index: 6050
+#Models/npc_sec2bot_gibmain_005.obj
+index: 6051
+#Models/npc_sec2bot_gibmain_006.obj
+index: 6052
+#Models/npc_servbotgib1.obj
+index: 6053
+#Models/npc_servbotgib10.obj
+index: 6054
+#Models/npc_servbotgib11.obj
+index: 6055
+#Models/npc_servbotgib2.obj
+index: 6056
+#Models/npc_servbotgib3.obj
+index: 6057
+#Models/npc_servbotgib5.obj
+index: 6058
+#Models/npc_servbotgib7.obj
+index: 6059
+#Models/npc_servbotgib8.obj
+index: 6060
+#Models/npc_servbotgib9.obj
+index: 6061
+#Models/sec_cpunode_gib_base_000.obj
+index: 6062
+#Models/sec_cpunode_gib_base_001.obj
+index: 6063
+#Models/sec_cpunode_gib_base_002.obj
+index: 6064
+#Models/sec_cpunode_gib_base_003.obj
+index: 6065
+#Models/sec_cpunode_gib_base_004.obj
+index: 6066
+#Models/sec_cpunode_gib_base_005.obj
+index: 6067
+#Models/sec_cpunode_gib_cap1.obj
+index: 6068
+#Models/sec_cpunode_gib_cap2.obj
+index: 6069
+#Models/sec_cpunode_gib_cap_002.obj
+index: 6070
+#Models/sec_cpunode_gib_panel2.obj
+index: 6071
+#Models/sec_cpunode_gib_tower_001.obj
+index: 6072
+#Models/sec_cpunode_gib_tower_002.obj
+index: 6073
+#Models/sec_cpunode_gib_tower_003.obj
+index: 6074
+#Models/sec_cpunode_gib_towerpanel1.obj
+index: 6075
