@@ -23,5 +23,6 @@ void main() {
     float fade = 1.0; if ((vFlags & 2u) != 0u) { float sceneDist = linearizeSceneDepth(gl_FragCoord.xy / uViewportSize); fade = clamp((sceneDist - vViewDist) / max(vSoftness, 0.0001f), 0.0, 1.0); }
     if (uBlendMode == 1) { outColor = vec4(texColor.rgb * vColor.rgb * vColor.a * fade, 0.0); return; } // Additive (brightness-as-alpha, adds to scene)
     if (uBlendMode == 2) { outColor = vec4(mix(texColor.rgb * vColor.rgb, vec3(1.0), 1.0 - fade), 1.0); return; } // Multiply (soft-fades toward no darkening)
+    if (uBlendMode == 3) { float blackAsAlpha = max(max(texColor.r, texColor.g), texColor.b); outColor = vec4(texColor.rgb * vColor.rgb, blackAsAlpha * vColor.a * fade); return; }
     outColor = texColor * vColor * fade;
 }

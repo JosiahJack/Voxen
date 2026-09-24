@@ -32,6 +32,7 @@ layout(location=29) uniform sampler2D camViewTex;
 layout(location=30) uniform uint useCamView;
 layout(location=31) uniform sampler2D fontAtlas; // SDF glyph atlas for 3D text decals (alpha cutout only)
 layout(location=32) uniform uint useFontAtlas;
+layout(location=33) uniform vec2 hopperDeathEffect; // x: red tint, y: normalized magenta rim strength
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(location=0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location=1) out vec4 outSpecular; // GL_COLOR_ATTACHMENT1
@@ -94,6 +95,11 @@ void main() {
         vec3 lightColor=lights[lightIdx].col; vec3 baseLighting=albedoColor.rgb*lightColor*intensity*(attenuation*attenuation/sqrt(sqrt(attenuation))),halfDir=normalize(lightDir+viewDir); lighting=fma(baseLighting,vec3(spotFalloff*shadowFactor),lighting); iTot=fma(intensity,attenuation*1.5,iTot); float ndh=max(dot(adjustedNormal,halfDir),0.0); float spec=clamp(pow(ndh,100.0),0.0,1.0); lighting+=specColor.rgb*intensity*attenuation*spotFalloff*spec*shadowFactor*strength;
     }
     float rim=1.0-max(dot(adjustedNormal,viewDir),0.0); lighting+=clamp(rim*rim*rim*rim*0.25*clamp(iTot,0.0,1.0)*specColor.rgb,0.0,1.0);/*Specular "rim" fresnel (tested and perf impact ~zero)*/ lighting=(unlit>0||useCamView>0)?albedoColor.rgb:lighting+glowColor.rgb; if(heat>0.0){lighting+=albedoColor.rgb*heat; lighting=pow(lighting,vec3(1.2)); lighting+=clamp(rim*rim*rim*rim*0.5*specColor.rgb,0.0,1.0);}
+    /* NPC_Hopper_Death: _HSVAAdjust.x raises red while _RimColor supplies
+     * the magenta edge highlight. The C side supplies both as one vec2 so
+     * ordinary world geometry needs no extra uniforms or state. */
+    if (hopperDeathEffect.x > 0.0) lighting *= vec3(1.0 + hopperDeathEffect.x, 1.0, 1.0);
+    if (hopperDeathEffect.y > 0.0) lighting += vec3(1.0, 0.0, 0.75) * hopperDeathEffect.y * rim * rim * rim;
     lighting.rgb += vec3((getBlueNoise(ivec2(gl_FragCoord.xy)) - 0.5) * 0.003921569); // Blue Noise Dither for banding (0.03ms performance cost, leaving in for quality)
     if (unlit == 0) {/*Fog*/ float fogFac = clamp(distToPixel * 0.013950893, 0.0, 1.0);/*This is inverse of fog dist so * (1 / 71.68 far plane)*/ float lum = dot(lighting, vec3(0.299, 0.587, 0.114)); fogFac = clamp(fogFac*(1.0-lum),0.0,1.0); lighting=mix(fogColor,lighting,1.0-fogFac);} outAlbedo=vec4(lighting.rgb,albedoColor.a);
 }

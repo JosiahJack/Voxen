@@ -536,9 +536,20 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
 DepthSort visibleInstances[INSTANCE_COUNT];
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
+static void SetHopperDeathEffect(Entity* e) {
+    float redTint = 0.0f, rimStrength = 0.0f;
+    if (e->deathAnimationActive && e->index == 433) {
+        float elapsed = (float)(World.pauseRelativeTime - (double)e->deathAnimationStart); if (elapsed < 0.0f) elapsed = 0.0f;
+        u32 tick = (u32)(elapsed / 0.05f); /* NPC_Hopper_Death uses 0.05-second ticks. */
+        redTint = elapsed < 0.35f ? 0.5f * vmin((float)tick, 6.0f) : 0.0f;
+        rimStrength = vmax(0.0f, 1.0f - ((float)tick * 15.0f / 255.0f));
+    }
+    glUniform2f(33, redTint, rimStrength);
+}
+
 void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, bool grayscaleEnabled) {
     u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; if (Cheats.showPhys) {if (World.col[i] == COLTYPE_BOX) {DrawBoxCollider(i);} else if (World.col[i] == COLTYPE_SPH) {DrawSphereCollider(i);} else if (World.col[i] == COLTYPE_CVX) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_MSH) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);} DrawAngularVelocity(i);}
-    glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,(float)(1.0f - (vclamp((float)(World.pauseRelativeTime - 0.0f) / 2.0f, 0.0f, 1.0f)))); /* cyber wall panel alpha with fade */ glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
+    SetHopperDeathEffect(e); glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,(float)(1.0f - (vclamp((float)(World.pauseRelativeTime - 0.0f) / 2.0f, 0.0f, 1.0f)))); /* cyber wall panel alpha with fade */ glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
     if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); }
     glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); glUniform1i(29,6); }
     if((*curN) != (norm) || norm==0) { *curN=norm; glUniform1ui( 1,(u32)norm); } if((*curT) != ( tex) ||  tex==0) { *curT= tex; glUniform1ui(18,(u32)tex ); } if((*curG) != (glow) || glow==0) { *curG=glow; glUniform1ui(19,(u32)glow); } if((*curS) != (spec) || spec==0) { *curS=spec; glUniform1ui(20,(u32)spec); }
@@ -622,7 +633,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (!(World.instances[i].entflags & EF_ACTIVE)) continue;
         if (World.instances[i].cellIndex >= 0 && !((gridCellStates[World.instances[i].cellIndex] & CELL_VISIBLE) || ((gridCellStates[World.instances[i].cellIndex] & CELL_OPEN) == CELL_OPEN))) continue;
         if (cullBlendState != 2) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState = 2; }/*Double-sided*/
-        glDepthFunc(0x0203/*GL_LEQUAL*/); glUniform1ui(0,(u32)i); glUniform1ui(1,0u); glUniform1ui(17,0u); glUniform1ui(18,(u32)World.instances[i].texIndex); glUniform1ui(19,0u); glUniform1ui(20,0u); glUniform1ui(25,(u32)cIdx); glUniform1ui(13,0u); glUniform1ui(30,0u); glUniform1f(27,0.0f);
+        glDepthFunc(0x0203/*GL_LEQUAL*/); glUniform1ui(0,(u32)i); glUniform1ui(1,0u); glUniform1ui(17,0u); glUniform1ui(18,(u32)World.instances[i].texIndex); glUniform1ui(19,0u); glUniform1ui(20,0u); glUniform1ui(25,(u32)cIdx); glUniform1ui(13,0u); glUniform1ui(30,0u); glUniform2f(33,0.0f,0.0f); glUniform1f(27,0.0f);
         glActiveTexture(0x84C9/*GL_TEXTURE9*/); glBindTexture(GL_TEXTURE_2D,(cIdx==593)?fontAtlasTexStopD:fontAtlasTex);
         glBindVertexBuffer(0,textDecalVBO[tdLev][i],0,16/*VRT_ATT_SZ*/); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,(i32)textDecalVertexCount[tdLev][i]); drawCalls++; vertsRendered += textDecalVertexCount[tdLev][i];
     }
