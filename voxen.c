@@ -22,7 +22,7 @@ InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .
 static bool shadowBuffersCreated = false; CamView camViews[64], levelCamViews[14][64]; u8 camViewCount, levelCamViewCount[14]; u32 camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
 u16 editModeSelection=U16_MAX, editModeTestEntityDefinition=343; u16 lastSpawned=U16_MAX;
-double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u8 particleBlendTexture[MAX_TXRS];
+double game_start_time,game_actual_start_time,shadowTime,physTime,renderTime,prePhys,gameTime,raycastMs; u32 raycastCalls; u32 shadowmapIndirectionList[LIGHT_COUNT]; u16 texCnt; bool doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS]; u8 particleBlendTexture[MAX_TXRS];
 static u32 gpuQ[5][5]; static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
 static const u8 Mpg_FrontPage=0,Mpg_Singleplayer=1,Mpg_Multiplayer=2,Mpg_NewGame=3,Mpg_Load=4,Mpg_Options=5,Mpg_Save=6,Mpg_IntroVideo=7,Mpg_CreditsVideo=8; u8 currentMenuPage = Mpg_FrontPage; bool resDropdownOpen = false; int resDropdownCount=0,resSelectedIdx=0,resHoverIdx=-1;
 typedef struct {int w,h;} ResMode; ResMode resModes[16];
@@ -323,17 +323,20 @@ INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist)
 }
 
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist);
+static u16 rayCellHeads[ARRSIZE],rayNext[INSTANCE_COUNT]; static u32 rayGridFrame=U32_MAX;
+INLINE void RayGridRebuild(void) { rayGridFrame=globalframe; for (u32 c=0;c<ARRSIZE;++c){rayCellHeads[c]=INSTANCE_COUNT;} for (u16 i=0;i<World.instCount;++i){ u16 c=(u16)World.instances[i].cellIndex; if (c>=ARRSIZE){c=(u16)PosGetCellCoords(World.position[i].x,World.position[i].z);} rayNext[i]=rayCellHeads[c]; rayCellHeads[c]=i; } }
 RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
-    RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT }; dir = V3_Normalize(dir); return result;
-    for (u16 i = 0; i < World.instCount; ++i) {
+    double rStart = get_time();
+    RaycastHit result = { .hit = false, .distance = maxDist, .point = {0.0f, 0.0f, 0.0f}, .normal = {0.0f, 0.0f, 0.0f}, .hitInstanceIndex = INSTANCE_COUNT }; dir = V3_Normalize(dir); const float maxDistSq = maxDist * maxDist;
+    if (unlikely(rayGridFrame != globalframe)) RayGridRebuild(); float wx=World.worldMin_x[World.curLev],wz=World.worldMin_z[World.curLev],ex=origin.x+dir.x*maxDist,ez=origin.z+dir.z*maxDist; float xA=vmin(origin.x,ex)-24.0f,xB=vmax(origin.x,ex)+24.0f,zA=vmin(origin.z,ez)-24.0f,zB=vmax(origin.z,ez)+24.0f; i32 b0x=(i32)vfloor((xA-wx+CELLXHALF)/CELLSZ),b1x=(i32)vfloor((xB-wx+CELLXHALF)/CELLSZ),b0z=(i32)vfloor((zA-wz+CELLXHALF)/CELLSZ),b1z=(i32)vfloor((zB-wz+CELLXHALF)/CELLSZ); b0x=clamp(b0x,0,WORLDX-1); b1x=clamp(b1x,0,WORLDX-1); b0z=clamp(b0z,0,WORLDZ-1); b1z=clamp(b1z,0,WORLDZ-1);
+    for (i32 cz=b0z;cz<=b1z;++cz) { for (i32 cx=b0x;cx<=b1x;++cx) { u32 cellP=(u32)cz*WORLDX+(u32)cx; for (u16 i=rayCellHeads[cellP]; i<INSTANCE_COUNT; i=rayNext[i]) {
         if (!(layerMask & World.layer[i])){continue;} if (!(World.instances[i].entflags & EF_ACTIVE)){continue;} u16 mindex = World.instances[i].modelIndex;
         if (mindex >= MAX_MDLS) {
-            ColliderType ct = World.col[i]; if (ct != COLTYPE_CAP && ct != COLTYPE_SPH) continue; V3 objPos = World.position[i]; float scaleMax = vmax(World.scale[i].x, vmax(World.scale[i].y, World.scale[i].z)); float boundRad = 0.0f; if (ct == COLTYPE_CAP) { float rad = World.colliderSize[i].x * scaleMax; float hi = vmax(0.0f, World.colliderSize[i].y * 0.5f * scaleMax - rad); boundRad = hi + rad; } else { boundRad = World.colliderSize[i].x * scaleMax; }
-            boundRad = vmax(boundRad, 0.1f); u16 instCellIdx = PosGetCellCoords(objPos.x, objPos.z); if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} } V3 delta = V3_AsubB(objPos, origin); float distSqrd = V3_dot(delta, delta);
-            float maxDistToObj = vmax(maxDist - boundRad, maxDist); if (distSqrd >= maxDistToObj * maxDistToObj) continue; RaycastHit ch = {0}; if (ct == COLTYPE_CAP) ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance); else ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance); if (!ch.hit || ch.distance >= result.distance) continue; ch.hitInstanceIndex = i; result = ch; continue;
+            ColliderType ct = World.col[i]; if (ct != COLTYPE_CAP && ct != COLTYPE_SPH) continue; V3 objPos = World.position[i]; V3 delta = V3_AsubB(objPos, origin); if (V3_dot(delta, delta) >= maxDistSq) continue;
+            u16 instCellIdx = PosGetCellCoords(objPos.x, objPos.z); if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} } RaycastHit ch = {0}; if (ct == COLTYPE_CAP) ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance); else ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance); if (!ch.hit || ch.distance >= result.distance) continue; ch.hitInstanceIndex = i; result = ch; continue;
         }
-        if (mindex >= mdlsCnt) continue; V3 objPos = World.position[i]; u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); V3 delta = V3_AsubB(objPos,origin); float distSqrd = V3_dot(delta,delta), radBounds = vmax(modelBounds[mindex],1.81f); float maxDistToObj = vmax(maxDist - radBounds,maxDist); if (distSqrd >= (maxDistToObj * maxDistToObj)) continue;
-        if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} } u32 triCount = modelTriangleCounts[mindex]; if (triCount < 1) continue;
+        if (mindex >= mdlsCnt) continue; V3 objPos = World.position[i]; V3 delta = V3_AsubB(objPos,origin); if (V3_dot(delta,delta) >= maxDistSq) continue;
+        u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z); if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} } u32 triCount = modelTriangleCounts[mindex]; if (triCount < 1) continue;
         float M[16]; mcpy(M,&modelMatrices[i * 16],16 * sizeof(float)); float m00=M[0], m10=M[1], m20=M[2], m01=M[4], m11=M[5], m21=M[6], m02=M[8], m12=M[9], m22=M[10], tx=M[12], ty=M[13], tz=M[14];
         float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20); float sclx2 = sclx * sclx; float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21); float scly2 = scly * scly; float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22); float sclz2 = sclz * sclz;
         V3 rel = {origin.x - tx, origin.y - ty, origin.z - tz}; V3 localOrigin = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2, (rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2, (rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2}; V3 localDir =    {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
@@ -352,7 +355,7 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                 } else {  for(int o=0;o<8&&sp<64;++o) { if(node->children[o] >= 0){stack[sp++]=&nodes[node->children[o]];} }  }
             } continue;
         } DualLogError("Missing bvh for %u!!\n",mindex); OS_Exit(1);
-    } return result;
+    } } } raycastMs += get_time() - rStart; raycastCalls++; return result;
 }
 // Credits Sys
 char creditStats[4096];
