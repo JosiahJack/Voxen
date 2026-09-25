@@ -124,7 +124,7 @@ typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool
 typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;  typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 enum {/*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                 MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,MAX_CULL_FILESIZE=500000,
-      /*Entity Management*/MAX_LEVELS=14,LEVEL_CYBERSPACE=13,CREDITS_PAGES=22,AVG_CPU_TAPS=2048,MAX_ENTITIES=864,INSTANCE_COUNT=8500,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,
+      /*Entity Management*/MAX_LEVELS=14,LEVEL_CYBERSPACE=13,CREDITS_PAGES=22,AVG_CPU_TAPS=2048,MAX_ENTITIES=864,INSTANCE_COUNT=8500,MAX_LEVEL_PARTICLES=128,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,
       /*Lights*/LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32,SHADOW_NEARMESH_MAX=512,SC_MAX=(SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/MAX_MDLS=6400, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
       /*Textures*/MAX_TXRS=4096,MAX_TOTAL_PIXELS=44500000u, MAX_UNIQUE_COLORS = 50000u,TEXHASH_SZ=256,NUM_TEXTURE_CLIPS=49,
@@ -241,11 +241,12 @@ typedef struct {
 extern BioMonitorSystem bioMonitor;
 typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead; u8 lev;} Portal;
 typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; float trailBirth; u16 trailHead,trailChainLen; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
-typedef struct Emitter { bool active,looping,spawnedAny; V3 position; float emitAccumulator,emitRate,age,duration; u16 aliveCount,maxAlive; u8 physicsMode,trail,shapeType; u16 trailTexture; float shapeRadius,shapeAngle,lifetimeMin,lifetimeMax,sizeMin,sizeMax,speedMin,speedMax,rotMin,rotMax,aVelMin,aVelMax,gravity,trailLifetime,trailWidthStart,trailWidthEnd; u32 trailColorStart,trailColorEnd;
+typedef struct Emitter { bool active,looping,spawnedAny; V3 position; Quaternion orientation; float emitAccumulator,emitRate,age,duration; u16 aliveCount,maxAlive; u8 physicsMode,trail,shapeType; u16 trailTexture; float shapeRadius,shapeAngle,lifetimeMin,lifetimeMax,sizeMin,sizeMax,speedMin,speedMax,rotMin,rotMax,aVelMin,aVelMax,gravity,trailLifetime,trailWidthStart,trailWidthEnd; u32 trailColorStart,trailColorEnd;
                          u32 texBaseIdx,textureFrameCount; u8 blendMode,rotationMode,colorMode; u16 burstRemaining; float animSpeed,animWindow,softness,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; u32 colorRamp[64]; } Emitter;
 typedef struct GpuPartInst { float x,y,z,size; u32 color,data0,data1,pad; } GpuPartInst;
 typedef struct TrlSegInst { float p0x,p0y,p0z,padA,p1x,p1y,p1z,padB; float c00x,c00y,c00z,c00w,c01x,c01y,c01z,c01w,c10x,c10y,c10z,c10w,c11x,c11y,c11z,c11w; u32 color0,color1,uvData; float deathTime; float trailWidthStart,trailWidthEnd; u32 chainIndex,trailOwner; } TrlSegInst;
 typedef struct { Particle particles[MAX_PARTICLES]; Emitter emitters[MAX_EMITTERS]; GpuPartInst gpuInstances[MAX_PARTICLES]; TrlSegInst trailSegments[MAX_TRAIL_SEGS]; PartSortEntry sortKeys[MAX_PARTICLES]; u32 aliveCount,trailCount,nextTrailOwner; } PSys; extern PSys psys;
+typedef struct { u16 emitters[MAX_LEVEL_PARTICLES],count; } LevelParticles;
 typedef struct { double combatImpulseFinished; bool inCombat,inZone,twoPlaying,distortion,cyberTube,elevator,levelEntry; } MusicSystem;
 typedef /*FAT*/ struct  {
     u32 entflags,ioflags; u16 modelIndex,index/*constIndex for entity type, used for indexing into arrays for resource types when loading resources*/,portalIndex; V3 forward,right,lastPosition/*used for NPC logic, not physics*/,topPoint,targetPosition,startPosition,activatedScale,direction; u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
@@ -281,8 +282,8 @@ typedef struct {
     ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT]; Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
     float levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
     bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT],levelColliding[MAX_LEVELS][INSTANCE_COUNT];
-    Light levelLights[MAX_LEVELS][LIGHT_COUNT]; LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT];
-    Entity* instances; V3* position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize; ColliderType* col; Quaternion* rotation; u32* layer,targetIOActivatorIoflags; float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
+    Light levelLights[MAX_LEVELS][LIGHT_COUNT]; LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT]; LevelParticles levelParticles[MAX_LEVELS];
+    Entity* instances; LevelParticles* particles; V3* position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize; ColliderType* col; Quaternion* rotation; u32* layer,targetIOActivatorIoflags; float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
     Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
     char playerName[27],audiologNames[LOGCNT][T_LOGSTR_MAX],audiologSubjects[LOGCNT][T_LOGSTR_MAX],audiologSenders[LOGCNT][T_LOGSTR_MAX],audioLogSpeech2Text[LOGCNT][T_LOGSTR_MAX];
 } GlobalContext; // Savable complete game state data
@@ -343,7 +344,7 @@ INLINE float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.333333
 INLINE float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
 INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f + fp*(0.69314718f + fp*(0.24022651f + fp*0.05550411f)); /*poly approx 2^fp on [0,1]*/ int ei=(int)ip + 127; u32 bits=(u32)(ei << 23); union{u32 i; float f;}u={bits}; return u.f*p;}
 INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
-INLINE i32 clamp(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
+INLINE i32 vclampi(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
 INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
 INLINE V3 V3_AplusB(V3 a, V3 b) { return (V3){a.x + b.x, a.y + b.y, a.z + b.z}; }
 INLINE V3 V3_AsubB(V3 a, V3 b) { return (V3){a.x - b.x, a.y - b.y, a.z - b.z}; }
@@ -361,7 +362,7 @@ INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2){float aw=q1.w,ax=q
 INLINE V3 quat_rot_v3(Quaternion q, V3 v) {float x=q.x,y=q.y,z=q.z,w=q.w; float vx=v.x,vy=v.y,vz=v.z; float tx=2.0f*(y*vz-z*vy); float ty=2.0f*(z*vx-x*vz); float tz=2.0f*(x*vy-y*vx); return (V3){vx+w*tx+(y*tz-z*ty),vy+w*ty+(z*tx-x*tz),vz+w*tz+(x*ty-y*tx)};}
 Quaternion quat_look_rotation(V3 fwd, V3 up);
 // Game Typechecks (what, it's simple, don't hate it, just does the thing)
-INLINE u8 hardware14fromConstdex(u16 c) { return clamp(c - 21,0,14); }    INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }/*All doors except see-through doors.*/ INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 855); }  INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; } INLINE bool IdxIsGib(int c) { return (c >= 768 && c <= 855); }
+INLINE u8 hardware14fromConstdex(u16 c) { return vclampi(c - 21,0,14); }    INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }/*All doors except see-through doors.*/ INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 855); }  INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; } INLINE bool IdxIsGib(int c) { return (c >= 768 && c <= 855); }
 INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }            INLINE bool IdxIsLightStaticSaveable(int c) { return c == 748; }   INLINE bool IdxIsGenericTransform(int c) { return c == 749; }                                                                        INLINE bool IdxIsNPC(int c) { return (c >= 419 && c <= 447); }   INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
 INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }     INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); } INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }                                    INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
 INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }                                                        INLINE bool IdxIsAccessCard(u16 c) { return (c == 341 || c == 388 || (c >= 390 && c <= 398) || c == 417); }                          INLINE bool IdxIsGenericItem(u16 c) { return (c >= 307 && c <= 312) || c == 340 || c == 342 || (c >= 359 && c <= 366) || c == 368 || c == 369 || c == 371 || (c >= 399 && c <= 401); }
@@ -377,21 +378,21 @@ INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
 // Audio inline helpers
-INLINE float SfxMaster(){return clamp((float)Sys_Settings.VolumeMaster/100.f,0,1.f);} INLINE float SfxMsg(){return clamp((float)Sys_Settings.VolumeMessage/100.f,0,1.f);}
-INLINE float SfxMusic(){ return clamp((float)Sys_Settings.VolumeMusic /100.f,0,1.f);} INLINE float SfxVol(){return clamp((float)Sys_Settings.VolumeEffects/100.f,0,1.f);}
-INLINE float AppliedFXVol(float v){return v*SfxMaster()*SfxVol();}
-INLINE float AppliedMsgVol(float v){return v*SfxMsg()*SfxVol();}
-INLINE float AppliedMusicVol(float v){return v*SfxMusic()*SfxVol();}
+INLINE float SfxMaster(){return vclamp((float)Sys_Settings.VolumeMaster/100.f,0,1.f);} INLINE float SfxMsg(){return vclamp((float)Sys_Settings.VolumeMessage/100.f,0,1.f);}
+INLINE float SfxMusic(){ return vclamp((float)Sys_Settings.VolumeMusic /100.f,0,1.f);} INLINE float SfxVol(){return vclamp((float)Sys_Settings.VolumeEffects/100.f,0,1.f);}
+INLINE float AppliedFXVol(float v){return vclamp(v*SfxMaster()*SfxVol(),0,1.f);}
+INLINE float AppliedMsgVol(float v){return vclamp(v*SfxMaster()*SfxMsg(),0,1.f);}
+INLINE float AppliedMusicVol(float v){return vclamp(v*SfxMaster()*SfxMusic(),0,1.f);}
 INLINE const char* SoundPath(i32 id) { return (id >= 0 && id < (i32)SOUNDS_COUNT) ? sounds[id] : ""; }
 INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ? audioLogs[id] : ""; }
 /*GL*/enum{GL_ARRAY_BUFFER=0x8892,GL_DEPTH_BUFFER_BIT=0x00000100,GL_READ_WRITE=0x88BA,GL_SSBO=0x90D2,GL_CULL_FACE=0x0B44,GL_BLEND=0x0BE2,GL_DEPTH_TEST=0x0B71,GL_RGB=0x1907,GL_TEXTURE0=0x84C0,GL_TEXTURE5=0x84C5,GL_COLOR_ATTACHMENT0=0x8CE0,GL_RG16F=0x822F,GL_TEXTURE1=0x84C1,GL_TEXTURE6=0x84C6,GL_COLOR_ATTACHMENT1=0x8CE1,GL_ELEMENT_ARRAY_BUFFER=0x8893,GL_RGB16F=0x881B,GL_TEXTURE2=0x84C2,GL_TEXTURE_2D=0x0DE1,GL_COLOR_ATTACHMENT2=0x8CE2,GL_FALSE=0,GL_RGBA=0x1908,
            GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_READ_FRAMEBUFFER=0x8CA8,GL_DRAW_FRAMEBUFFER=0x8CA9,GL_LINEAR=0x2601,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8,GL_TRIANGLE_STRIP=0x0005,GL_LESS=0x0201,GL_LEQUAL=0x0203,GL_ONE=1,GL_SRC_ALPHA=0x0302,GL_ONE_MINUS_SRC_ALPHA=0x0303,GL_DST_COLOR=0x0306,GL_ZERO=0,GL_TRUE=1};
 // Particles
 typedef struct PSysDef { V3 pos; u32 textures[16]; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness,shapeRadius,shapeAngle; u8 shapeType; Color colStart,colEnd; Color rampColors[16]; float rampTimes[16]; u8 rampCount; float scaleKeys[16],scaleTimes[16]; u8 scaleCount; float velKeys[16],velTimes[16]; u8 velCount; float rotKeys[16],rotTimes[16];
-                         u8 rotCount; float emissKeys[16],emissTimes[16]; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; } PSysDef;
+                         u8 rotCount; float emissKeys[16],emissTimes[16]; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; } PSysDef;
 typedef struct { const char* prefab; const char* gameObject; u64 sourceId; PSysDef def; } ParticleTypeDef;
 const PSysDef* PSysTypeGet(u16);
-u16 PSysAdd(const PSysDef*);
+u16 PSysAdd(const PSysDef*); void PSysAddLevelLoops(void),PSysClearLevel(u8);
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
 typedef void(*FGL_C)(u32), (*FGL_FL)(),   (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
 typedef void(*FGL_CS)(u32),(*FGL_RB)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32),  (*FGL_CTSI2D)(u32,i32,i32,i32,i32,i32,i32,i32);

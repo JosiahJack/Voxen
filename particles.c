@@ -48,7 +48,7 @@ const PSysDef particleTypeDefs[162] = {
     /** CenterSpatter */ {.pos=(V3){0,0,0},.textures={MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=0.f,.duration=1.1f,.sizeMin=.65f,.sizeMax=.65f,.speedMin=0.f,.speedMax=0.f,.lifetimeMin=.4f,.lifetimeMax=.4f,.gravity=0.f,.animWindow=1.f,.softness=1.f,.shapeRadius=1.f,.shapeAngle=25.f,.shapeType=0,.colStart=(Color){.1921569f,.5019608f,.5019608f,1.f},.colEnd=(Color){.08627451f,.2705882f,.2705882f,0.f},.rampColors={(Color){.1921569f,.5019608f,.5019608f,1.f},(Color){.1102537f,.3229872f,.3229872f,0.f},(Color){.08627451f,.2705882f,.2705882f,0.f}},.rampTimes={0.f,.77353f,1.f},.rampCount=3,.scaleKeys={0.f,1.f},.scaleTimes={0.f,1.f},.scaleCount=2},
     /** Shockwave */ {.pos=(V3){0,0,0},.textures={820,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=0.f,.duration=1.1f,.sizeMin=1.2f,.sizeMax=1.2f,.speedMin=0.f,.speedMax=0.f,.lifetimeMin=.8f,.lifetimeMax=.8f,.gravity=0.f,.animWindow=1.f,.softness=1.f,.shapeRadius=1.f,.shapeAngle=25.f,.shapeType=0,.colStart=(Color){.3882353f,1.f,1.f,1.f},.colEnd=(Color){.1529412f,.3882353f,.3882353f,0.f},.rampColors={(Color){.3882353f,1.f,1.f,1.f},(Color){.1529412f,.3882353f,.3882353f,.47941f},(Color){.1529412f,.3882353f,.3882353f,0.f}},.rampTimes={0.f,.52059f,1.f},.rampCount=3,.scaleKeys={.081967f,.7996f,1.f},.scaleTimes={0.f,.47415f,1.f},.scaleCount=3},
     /** ef_sparkspits */ {.pos=(V3){0,0,0},.textures={579,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=0.f,.duration=1e9f,.sizeMin=.04f,.sizeMax=.04f,.speedMin=8.f,.speedMax=8.f,.lifetimeMin=.5f,.lifetimeMax=.5f,.gravity=0.f,.animWindow=1.f,.softness=1.f,.shapeRadius=.2f,.shapeAngle=25.f,.shapeType=1,.colStart=(Color){1.f,.9764706f,.9333333f,1.f},.colEnd=(Color){.1686275f,0.f,0.f,1.f},.rampColors={(Color){1.f,.9764706f,.9333333f,1.f},(Color){1.f,.4941177f,0.f,1.f},(Color){.1686275f,0.f,0.f,1.f}},.rampTimes={0.f,.48824f,1.f},.rampCount=3,.scaleKeys={1.f,.42857f},.scaleTimes={0.f,1.f},.scaleCount=2},
-    /** ef_spraydrips */ {.pos=(V3){0,0,0},.textures={821,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=10.f,.duration=1e9f,.sizeMin=1.f,.sizeMax=1.f,.speedMin=.2f,.speedMax=.5f,.lifetimeMin=4.5f,.lifetimeMax=4.5f,.gravity=.1f,.animWindow=1.f,.softness=1.f,.shapeRadius=.01f,.shapeAngle=10.f,.shapeType=2,.colStart=(Color){1.f,1.f,1.f,.4980392f},.colEnd=(Color){.6037736f,.6037736f,.6037736f,0.f},.rampColors={(Color){1.f,1.f,1.f,.4980392f},(Color){1.f,1.f,1.f,.4117647f},(Color){.6037736f,.6037736f,.6037736f,0.f}},.rampTimes={0.f,.48824f,1.f},.rampCount=3,.scaleKeys={0.f,.53846f},.scaleTimes={0.f,1.f},.scaleCount=2},
+    /** ef_spraydrips */ {.pos=(V3){0,0,0},.textures={821,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=10.f,.duration=1e9f,.sizeMin=1.f,.sizeMax=1.f,.speedMin=.2f,.speedMax=.5f,.lifetimeMin=4.5f,.lifetimeMax=4.5f,.gravity=.981f,.animWindow=1.f,.softness=1.f,.shapeRadius=.01f,.shapeAngle=10.f,.shapeType=2,.colStart=(Color){1.f,1.f,1.f,.4980392f},.colEnd=(Color){.6037736f,.6037736f,.6037736f,0.f},.rampColors={(Color){1.f,1.f,1.f,.4980392f},(Color){1.f,1.f,1.f,.4117647f},(Color){.6037736f,.6037736f,.6037736f,0.f}},.rampTimes={0.f,.48824f,1.f},.rampCount=3,.scaleKeys={0.f,.53846f},.scaleTimes={0.f,1.f},.scaleCount=2},
     /** subparticles */ {.pos=(V3){0,0,0},.textures={821,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=0.f,.duration=1.f,.sizeMin=1.5f,.sizeMax=1.5f,.speedMin=0.f,.speedMax=0.f,.lifetimeMin=1.f,.lifetimeMax=1.f,.gravity=.1f,.animWindow=1.f,.softness=1.f,.shapeRadius=.04f,.shapeAngle=10.f,.shapeType=0,.colStart=(Color){1.f,1.f,1.f,.2588235f},.colEnd=(Color){.6037736f,.6037736f,.6037736f,0.f},.rampColors={(Color){1.f,1.f,1.f,.2588235f},(Color){1.f,1.f,1.f,.2235294f},(Color){.6037736f,.6037736f,.6037736f,0.f}},.rampTimes={0.f,.48824f,1.f},.rampCount=3,.scaleKeys={0.f,.72308f},.scaleTimes={0.f,1.f},.scaleCount=2},
     /** ef_steam */ {.pos=(V3){0,0,0},.textures={583,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=60.f,.duration=1e9f,.sizeMin=1.f,.sizeMax=1.f,.speedMin=1.f,.speedMax=2.f,.lifetimeMin=2.f,.lifetimeMax=2.f,.gravity=0.f,.animWindow=1.f,.softness=1.f,.shapeRadius=.01f,.shapeAngle=10.f,.shapeType=2,.colStart=(Color){1.f,1.f,1.f,.4980392f},.colEnd=(Color){.6037736f,.6037736f,.6037736f,0.f},.rampColors={(Color){1.f,1.f,1.f,.4980392f},(Color){1.f,1.f,1.f,.2235294f},(Color){.6037736f,.6037736f,.6037736f,0.f}},.rampTimes={0.f,.48824f,1.f},.rampCount=3,.scaleKeys={0.f,1.f},.scaleTimes={0.f,1.f},.scaleCount=2},
     /** env_sparkssmall */ {.pos=(V3){0,0,0},.textures={67,817,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=0.f,.duration=1e9f,.sizeMin=.01f,.sizeMax=.01f,.speedMin=2.f,.speedMax=5.f,.lifetimeMin=.3f,.lifetimeMax=.5f,.gravity=1.f,.animWindow=1.f,.softness=1.f,.shapeRadius=.01f,.shapeAngle=20.f,.shapeType=2,.colStart=(Color){1.f,.9903652f,.8602941f,1.f},.colEnd=(Color){.7941176f,.3795415f,.3795415f,0.f},.rampColors={(Color){1.f,.9903652f,.8602941f,1.f},(Color){1.f,.829716f,.4632353f,1.f},(Color){.9447899f,.7089957f,.4407917f,1.f},(Color){.7941176f,.3795415f,.3795415f,0.f}},.rampTimes={0.f,.47353f,.61471f,1.f},.rampCount=4,.trail=1,.trailTexture=67,.trailColorStart=(Color){1.f,.9903652f,.8602941f,1.f},.trailColorEnd=(Color){.7941176f,.3795415f,.3795415f,0.f},.trailLifetime=.115f,.trailWidthStart=0.01f,.trailWidthEnd=0.01f},
@@ -178,22 +178,88 @@ INLINE void build_color_ramp(Emitter* e, const Color* c, const float* d, int n) 
 INLINE void build_curve(float* curve, const float* keys, const float* times, int numKeys) { for (int i=0;i<32;++i){float t=(float)i/31.0f; int k=0; while(k<numKeys-1 && times[k+1]<=t){k++;} if(k>=numKeys-1){curve[i]=keys[numKeys-1];}else{float localT=(t-times[k])/(times[k+1]-times[k]); curve[i]=keys[k]+(keys[k+1]-keys[k])*localT;}} }
 INLINE u32 sample_color_ramp(Emitter* em, float t) { int idx = (int)(t * 63.0f); if (idx < 0) idx = 0; if (idx >= 64) idx = 63; return em->colorRamp[idx]; }
 INLINE float sample_curve(const float* curve, float t) { int idx = (int)(t * 31.0f); if (idx < 0) idx = 0; if (idx >= 31) return curve[31]; float localT = t * 31.0f - idx; return curve[idx] + (curve[idx + 1] - curve[idx]) * localT; }
+static bool PSysLevelOwnsEmitter(u16 emitter) {
+    if (!World.particles) return false;
+    for (u16 i = 0; i < World.particles->count; ++i) if (World.particles->emitters[i] == emitter) return true;
+    return false;
+}
+
+static void PSysCompactLevelList(void) {
+    LevelParticles* list = World.particles;
+    if (!list) return;
+    u16 out = 0;
+    for (u16 i = 0; i < list->count; ++i) {
+        u16 emitter = list->emitters[i];
+        if (emitter < MAX_EMITTERS && (psys.emitters[emitter].active || psys.emitters[emitter].aliveCount)) list->emitters[out++] = emitter;
+    }
+    list->count = out;
+}
+
+void PSysClearLevel(u8 level) {
+    if (level >= MAX_LEVELS) return;
+    LevelParticles* list = &World.levelParticles[level];
+    if (list->count > MAX_LEVEL_PARTICLES) list->count = MAX_LEVEL_PARTICLES;
+    for (u16 i = 0; i < list->count; ++i) {
+        u16 emitterIndex = list->emitters[i];
+        if (emitterIndex >= MAX_EMITTERS) continue;
+        Emitter* em = &psys.emitters[emitterIndex];
+        u32 out = 0;
+        for (u32 p = 0; p < psys.aliveCount; ++p) {
+            if (psys.particles[p].emitterIndex == emitterIndex) continue;
+            if (out != p) psys.particles[out] = psys.particles[p];
+            out++;
+        }
+        psys.aliveCount = out;
+        u32 trailOut = 0;
+        for (u32 t = 0; t < psys.trailCount; ++t) {
+            if ((psys.trailSegments[t].uvData >> 16) == emitterIndex) continue;
+            if (trailOut != t) psys.trailSegments[trailOut] = psys.trailSegments[t];
+            trailOut++;
+        }
+        psys.trailCount = trailOut;
+        em->active = false;
+        em->aliveCount = 0;
+    }
+    list->count = 0;
+}
+
+void PSysAddLevelLoops(void) {
+    if (!World.particles) return;
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
+        u16 type;
+        switch (World.instances[i].index) {
+            case 720: type = 7; break;
+            case 733: type = 45; break;
+            case 734: type = 47; break;
+            default: continue;
+        }
+        const PSysDef* preset = PSysTypeGet(type);
+        if (!preset) continue;
+        PSysDef def = *preset;
+        def.pos = World.position[i];
+        def.rotation = World.rotation[i];
+        PSysAdd(&def);
+    }
+}
+
 u16 PSysAdd(const PSysDef* pd) {
     PSysDef def=*pd; if(def.trail){def.trailTexture=881u;}
+    LevelParticles* list = World.particles;
+    if (!list || list->count >= MAX_LEVEL_PARTICLES) return U16_MAX;
     for (u16 i = 0; i < MAX_EMITTERS; i++) {
-        if (psys.emitters[i].active || psys.emitters[i].aliveCount){continue;} Emitter* em=&psys.emitters[i]; u16 fc=0; while(fc<16 && def.textures[fc]!=MAX_TXRS){fc++;} u32 baseTex = def.textures[0] < MAX_TXRS ? def.textures[0] : 0; if(fc == 0){fc=1;} em->active=true; em->looping=def.looping; em->spawnedAny=false; em->position = def.pos; em->emitAccumulator=em->age=0; em->emitRate = def.emitRate; em->duration = def.duration; em->aliveCount = 0;
+        if (psys.emitters[i].active || psys.emitters[i].aliveCount){continue;} Emitter* em=&psys.emitters[i]; u16 fc=0; while(fc<16 && def.textures[fc]!=MAX_TXRS){fc++;} u32 baseTex = def.textures[0] < MAX_TXRS ? def.textures[0] : 0; if(fc == 0){fc=1;} em->active=true; em->looping=def.looping; em->spawnedAny=false; em->position = def.pos; float rotationLength = def.rotation.x*def.rotation.x + def.rotation.y*def.rotation.y + def.rotation.z*def.rotation.z + def.rotation.w*def.rotation.w; if (rotationLength < 0.000001f) { em->orientation = QUAT_IDENTITY; } else { float invRotationLength = 1.0f/vsqrtf(rotationLength); em->orientation = (Quaternion){def.rotation.x*invRotationLength,def.rotation.y*invRotationLength,def.rotation.z*invRotationLength,def.rotation.w*invRotationLength}; } em->emitAccumulator=em->age=0; em->emitRate = def.emitRate; em->duration = def.duration; em->aliveCount = 0;
         em->maxAlive=2000; em->physicsMode=(def.gravity != 0) ? 1 : 0; em->trail=def.trail; em->shapeType=def.shapeType; em->rotationMode=def.rotationMode; em->colorMode=def.colorMode; em->burstRemaining=def.burstCount; em->shapeRadius=def.shapeRadius; em->shapeAngle=def.shapeAngle; em->trailTexture = (u16)(def.trailTexture & 0xFFFFu); em->lifetimeMin=def.lifetimeMin>0.0f ? def.lifetimeMin : 0.5f; em->lifetimeMax=def.lifetimeMax>0 ? def.lifetimeMax : 2.0f; if(em->lifetimeMax <= em->lifetimeMin){em->lifetimeMax=em->lifetimeMin + 0.01f;}
         em->sizeMin=def.sizeMin; em->sizeMax=def.sizeMax; em->speedMin = def.speedMin; em->speedMax = def.speedMax; em->rotMin=0.0f; em->rotMax=def.rotationMode == 1 ? 0.0f : 6.2831853f; em->aVelMin=def.rotationMode == 1 ? 0.0f : (def.rotCount >= 1 ? def.rotKeys[0] : -1.0f); em->aVelMax=em->aVelMin; em->gravity=def.gravity; em->trailLifetime=def.trailLifetime>0.0f ? def.trailLifetime : 1.0f;
         em->trailColorStart=ColorToU32(def.trailColorStart); em->trailColorEnd=ColorToU32(def.trailColorEnd); em->trailWidthStart=def.trailWidthStart>0 ? def.trailWidthStart : 0.05f; em->trailWidthEnd=(def.trailWidthEnd>0) ? def.trailWidthEnd : em->trailWidthStart; em->texBaseIdx=baseTex; em->textureFrameCount = fc; em->animSpeed = 10.0f; em->blendMode = def.blendModeOverride ? def.blendMode : particleBlendTexture[baseTex];
         em->animWindow=def.animWindow>0 ? def.animWindow : 1.0f; em->softness=def.softness>0 ? def.softness : 1.0f; for(int c=0;c<32;++c){em->scaleCurve[c]=1.0f; em->velocityCurve[c]=1.0f; em->rotationCurve[c]=0; em->emissionCurve[c] = 1.0f; }
         if(def.rampCount >= 2){build_color_ramp(em,def.rampColors,def.rampTimes,def.rampCount);}else{Color cc[2]={def.colStart,def.colEnd}; float tt[2]={0,1.0f}; build_color_ramp(em,cc,tt,2);} if(def.scaleCount >= 2){build_curve(em->scaleCurve,def.scaleKeys,def.scaleTimes,def.scaleCount);}
-        if(def.velCount >= 2){build_curve(em->velocityCurve,def.velKeys,def.velTimes,def.velCount);} if(def.rotCount >= 2){build_curve(em->rotationCurve,def.rotKeys,def.rotTimes,def.rotCount);} if(def.emissCount >= 2){build_curve(em->emissionCurve,def.emissKeys,def.emissTimes,def.emissCount);} return i;
+        if(def.velCount >= 2){build_curve(em->velocityCurve,def.velKeys,def.velTimes,def.velCount);} if(def.rotCount >= 2){build_curve(em->rotationCurve,def.rotKeys,def.rotTimes,def.rotCount);} if(def.emissCount >= 2){build_curve(em->emissionCurve,def.emissKeys,def.emissTimes,def.emissCount);} list->emitters[list->count++] = i; return i;
     } return U16_MAX;
 }
 
 INLINE int trail_cmp(const void* a, const void* b){TrlSegInst* ta=(TrlSegInst*)a; TrlSegInst* tb=(TrlSegInst*)b; float ax=(ta->p0x+ta->p1x)*0.5f-trailSortCam.x,ay=(ta->p0y+ta->p1y)*0.5f-trailSortCam.y,az=(ta->p0z+ta->p1z)*0.5f-trailSortCam.z,bx=(tb->p0x+tb->p1x)*0.5f-trailSortCam.x,by=(tb->p0y+tb->p1y)*0.5f-trailSortCam.y,bz=(tb->p0z+tb->p1z)*0.5f-trailSortCam.z; float da=ax*ax+ay*ay+az*az,db=bx*bx+by*by+bz*bz; return da>db?-1:(da<db?1:0);}
 void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForward, u32 depthTex, float near, float far, float viewW, float viewH) {
-    if (psys.aliveCount == 0) return; glUseProgram(particleSP); glBindVertexArray(psysquadVAO); glBindBufferBase(GL_SSBO,PARTICLE_SSBO_BINDING,psysInstancesID); glUniformMatrix4fv(0, 1, GL_FALSE, viewProj); glUniform3f(1, camPos.x, camPos.y, camPos.z); glUniform3f(2, camRight.x, camRight.y, camRight.z); glUniform3f(3, camUp.x, camUp.y, camUp.z); glUniform3f(4, camForward.x, camForward.y, camForward.z);
+    if (!World.particles || psys.aliveCount == 0) return; glUseProgram(particleSP); glBindVertexArray(psysquadVAO); glBindBufferBase(GL_SSBO,PARTICLE_SSBO_BINDING,psysInstancesID); glUniformMatrix4fv(0, 1, GL_FALSE, viewProj); glUniform3f(1, camPos.x, camPos.y, camPos.z); glUniform3f(2, camRight.x, camRight.y, camRight.z); glUniform3f(3, camUp.x, camUp.y, camUp.z); glUniform3f(4, camForward.x, camForward.y, camForward.z);
     glUniform1i(10, 8); glUniform2f(11, viewW, viewH); glUniform1f(12, near); glUniform1f(13, far); glActiveTexture(GL_TEXTURE0 + 8); glBindTexture(GL_TEXTURE_2D, depthTex); glEnable(GL_BLEND); glDepthMask(GL_FALSE); glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDisable(GL_CULL_FACE); u32 runStart = 0;
     while (runStart < psys.aliveCount) {
         i32 blend = (i32)(psys.sortKeys[runStart].sortKey >> 24); u32 runEnd = runStart + 1; while (runEnd < psys.aliveCount && (psys.sortKeys[runEnd].sortKey >> 24) == (u32)blend) runEnd++; glDepthMask(blend == 4 ? GL_TRUE : GL_FALSE); glUniform1i(5, (i32)runStart); glUniform1i(7, blend); if (blend == 1) glBlendFunc(1,1); else if (blend == 2) glBlendFunc(GL_DST_COLOR, GL_ZERO); else glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
@@ -229,19 +295,22 @@ void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForwar
 
 INLINE int sort_cmp(const void* a, const void* b) { u32 ka = ((const PartSortEntry*)a)->sortKey; u32 kb = ((const PartSortEntry*)b)->sortKey; return (ka > kb) - (ka < kb); }
 void PSys_Update(float dt) {
-    float now=(float)World.pauseRelativeTime; u32 out=0; for(u32 i=0;i<psys.trailCount;++i){TrlSegInst* s=&psys.trailSegments[i]; if(s->deathTime > now){if(out!=i){psys.trailSegments[out]=*s;} out++;}} psys.trailCount=out;/*Prune trails*/
+    if (!World.particles) { psys.aliveCount = 0; psys.trailCount = 0; return; }
+    if (World.particles->count > MAX_LEVEL_PARTICLES) World.particles->count = MAX_LEVEL_PARTICLES;
+    PSysCompactLevelList();
+    float now=(float)World.pauseRelativeTime; u32 out=0; for(u32 i=0;i<psys.trailCount;++i){TrlSegInst* s=&psys.trailSegments[i]; if(s->deathTime > now && PSysLevelOwnsEmitter((u16)(s->uvData >> 16))){if(out!=i){psys.trailSegments[out]=*s;} out++;}} psys.trailCount=out;/*Prune trails*/
     for (u16 i = 0; i < MAX_EMITTERS; i++) {/*Update emitters*/
-        Emitter* em = &psys.emitters[i]; if(!em->active){continue;} em->age+=dt; if(em->duration > 0.0f&& em->age>=em->duration){em->active=false; continue;} int count=0; if(em->burstRemaining){count=em->burstRemaining; em->burstRemaining=0; em->emitAccumulator=0.0f;} else { float rate = em->emitRate; if (em->duration > 0.0f && em->duration < 1e6f){rate*=sample_curve(em->emissionCurve,em->age/em->duration);} em->emitAccumulator+=rate*dt; count=(int)em->emitAccumulator; em->emitAccumulator-=(float)count; } 
+        if (!PSysLevelOwnsEmitter(i)) continue; Emitter* em = &psys.emitters[i]; if(!em->active){continue;} em->age+=dt; if(em->duration > 0.0f&& em->age>=em->duration){em->active=false; continue;} int count=0; if(em->burstRemaining){count=em->burstRemaining; em->burstRemaining=0; em->emitAccumulator=0.0f;} else { float rate = em->emitRate; if (em->duration > 0.0f && em->duration < 1e6f){rate*=sample_curve(em->emissionCurve,em->age/em->duration);} em->emitAccumulator+=rate*dt; count=(int)em->emitAccumulator; em->emitAccumulator-=(float)count; }
         for (int p = 0; p < count; p++) {
             if ((psys.aliveCount >= MAX_PARTICLES) || (em->aliveCount >= em->maxAlive)){break;} Particle* part = &psys.particles[psys.aliveCount]; float angle = random_range(0.0f,6.2831853f), speed = random_range(em->speedMin,em->speedMax); V3 dir;
             if (em->shapeType == 1) {
                 float y = random_range(-1.0f,1.0f), radial = vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f), radius = random_range(0.0f,em->shapeRadius);
-                dir=(V3){radial*vcosf(angle),y,radial*vsinf(angle)}; part->pos.x=em->position.x+dir.x*radius; part->pos.y=em->position.y+dir.y*radius; part->pos.z=em->position.z+dir.z*radius;
+                dir=quat_rot_v3(em->orientation,(V3){radial*vcosf(angle),y,radial*vsinf(angle)}); part->pos.x=em->position.x+dir.x*radius; part->pos.y=em->position.y+dir.y*radius; part->pos.z=em->position.z+dir.z*radius;
             } else if (em->shapeType == 2) {
-                float halfAngle=em->shapeAngle*0.0174532925f, cosMin=vcosf(halfAngle), y=random_range(cosMin,1.0f), radial=vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f);
-                dir=(V3){radial*vcosf(angle),y,radial*vsinf(angle)}; float radius=random_range(0.0f,em->shapeRadius); part->pos=(V3){em->position.x+dir.x*radius,em->position.y,em->position.z+dir.z*radius};
+                float halfAngle=em->shapeAngle*0.0174532925f, cosMin=vcosf(halfAngle), y=random_range(-1.0f,-cosMin), radial=vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f);
+                V3 localDir=(V3){radial*vcosf(angle),y,radial*vsinf(angle)}; float radius=random_range(0.0f,em->shapeRadius); V3 offset=quat_rot_v3(em->orientation,(V3){localDir.x,0.0f,localDir.z}); part->pos=(V3){em->position.x+offset.x*radius,em->position.y,em->position.z+offset.z*radius}; dir=quat_rot_v3(em->orientation,localDir);
             } else {
-                dir=(V3){vcosf(angle),random_range(-0.5f,0.5f),vsinf(angle)}; part->pos=em->position;
+                dir=quat_rot_v3(em->orientation,(V3){vcosf(angle),random_range(-0.5f,0.5f),vsinf(angle)}); part->pos=em->position;
             }
             part->vel.x=dir.x*speed; part->vel.y=dir.y*speed; part->vel.z=dir.z*speed; part->age=0.0f; part->invLifetime=1.0f/random_range(em->lifetimeMin,em->lifetimeMax); part->baseSize=random_range(em->sizeMin,em->sizeMax); part->rotation=random_range(em->rotMin,em->rotMax);
             part->angularVelocity = random_range(em->aVelMin,em->aVelMax); part->color = em->colorMode == 1 ? sample_color_ramp(em,random_range(0.0f,1.0f)) : sample_color_ramp(em,0.0f); part->emitterIndex = i; part->flags=0; part->blendMode=em->blendMode; if (part->blendMode == 1) { part->flags |= PARTICLE_FLAG_ADDITIVE; } else if (part->blendMode == 2) { part->flags |= PARTICLE_FLAG_MULTIPLY; } 
@@ -249,9 +318,9 @@ void PSys_Update(float dt) {
         }
     }
     {u32 i=0; V3 camPos=World.position[PLAYER1], camForward=World.instances[PLAYER1].forward; while (i < psys.aliveCount) {
-        Particle* p = &psys.particles[i]; Emitter* em = &psys.emitters[p->emitterIndex]; p->age += dt; float t=p->age*p->invLifetime,s,vs,r; if (t >= 1.0f) { psys.aliveCount--; em->aliveCount--; psys.particles[i] = psys.particles[psys.aliveCount]; continue; }
+        Particle* p = &psys.particles[i]; if (p->emitterIndex >= MAX_EMITTERS || !PSysLevelOwnsEmitter(p->emitterIndex)) { if (p->emitterIndex < MAX_EMITTERS && psys.emitters[p->emitterIndex].aliveCount) psys.emitters[p->emitterIndex].aliveCount--; psys.aliveCount--; psys.particles[i] = psys.particles[psys.aliveCount]; continue; } Emitter* em = &psys.emitters[p->emitterIndex]; p->age += dt; float t=p->age*p->invLifetime,s,vs,r; if (t >= 1.0f) { psys.aliveCount--; em->aliveCount--; psys.particles[i] = psys.particles[psys.aliveCount]; continue; }
         if(em->active){s=sample_curve(em->scaleCurve,t); vs=sample_curve(em->velocityCurve,t); r=sample_curve(em->rotationCurve,t)*dt; if(em->colorMode != 1) p->color=sample_color_ramp(em,t); if(em->textureFrameCount>1){float it=t/(em->animWindow>0.0f ? em->animWindow : 1.0f); p->animFrame=(u16)(it*em->textureFrameCount) % em->textureFrameCount;}} else{s=1.0f; vs=1.0f; r=0;}
-        p->pos.x+=p->vel.x*vs*dt; p->pos.y+=p->vel.y*vs*dt; p->pos.z+=p->vel.z*vs*dt; p->rotation+=p->angularVelocity*dt+r; if(em->physicsMode){p->vel.y-=em->gravity*dt;} 
+        p->pos.x+=p->vel.x*vs*dt; p->pos.z+=p->vel.z*vs*dt; if(em->physicsMode){p->vel.y-=em->gravity*dt; p->pos.y+=p->vel.y*dt;} else {p->pos.y+=p->vel.y*vs*dt;} p->rotation+=p->angularVelocity*dt+r;
         if(em->trail){
             float dx=p->pos.x-p->trailSample.x, dy=p->pos.y-p->trailSample.y, dz=p->pos.z-p->trailSample.z;
             if(dx*dx+dy*dy+dz*dz >= 0.0004f){
@@ -262,5 +331,5 @@ void PSys_Update(float dt) {
         GpuPartInst* gpu=&psys.gpuInstances[i]; gpu->x=p->pos.x; gpu->y=p->pos.y; gpu->z=p->pos.z; gpu->size=p->baseSize*s; gpu->color=p->color; gpu->data0=(p->flags << 24) | (((p->textureIndex+p->animFrame) & 0xFFFF) << 8) | (((u32)(vclamp(p->rotation/6.2831853f,0.0f,1.0f)*255.0f)) & 0xFF);
         gpu->data1=(u32)(vclamp(em->softness,0,255.f/16.f) * 16.f+.5f) & 0xFF; gpu->pad=0; V3 d={p->pos.x-camPos.x,p->pos.y-camPos.y,p->pos.z-camPos.z}; float dist=d.x*camForward.x+d.y*camForward.y+d.z*camForward.z; psys.sortKeys[i].sortKey=((u32)p->blendMode << 24) | (0xFFFFFFu - ((u32)vclamp((dist+1000.0f)*10.0f,0,16777215.f))); psys.sortKeys[i].index=(u16)i; i++;
     }}
-    if(psys.aliveCount>1){qsort_new(psys.sortKeys,psys.aliveCount,sizeof(PartSortEntry),sort_cmp);} if(psys.aliveCount==0){return;} GpuPartInst* s=psysUploadBuffer; for(u32 i=0;i<psys.aliveCount;++i){s[i]=psys.gpuInstances[psys.sortKeys[i].index];} glBindBuffer(GL_SSBO, psysInstancesID); glBufferSubData(GL_SSBO,0,psys.aliveCount*sizeof(GpuPartInst),s);
+    PSysCompactLevelList(); if(psys.aliveCount>1){qsort_new(psys.sortKeys,psys.aliveCount,sizeof(PartSortEntry),sort_cmp);} if(psys.aliveCount==0){return;} GpuPartInst* s=psysUploadBuffer; for(u32 i=0;i<psys.aliveCount;++i){s[i]=psys.gpuInstances[psys.sortKeys[i].index];} glBindBuffer(GL_SSBO, psysInstancesID); glBufferSubData(GL_SSBO,0,psys.aliveCount*sizeof(GpuPartInst),s);
 }
