@@ -1,6 +1,6 @@
 // ai.c - NPC AI logic, ported from Unity Citadel AIController.cs.
 #include "common.h"
-static const float AI_STOP_DIST=1.28f, AI_STOP_DIST_SQ=(AI_STOP_DIST * AI_STOP_DIST), AI_POS_CHECK_DELAY=2.0f, AI_WANDER_RANGE=79.0f, AI_TARGET_OFFSET_Y=0.24f, AI_TICK_TIME=0.1f, AI_RAYCAST_TICK_TIME=0.2f; u16 npcCountInWorldPerType[NUM_AI_TYPES]; void DoorActuate(u16 self); void initGunOffsets(void); void TextureSequenceStart(u16 self, u8 clipIndex); Quaternion quat_normalize(Quaternion q); bool PositionVisibleFromPlayerCell(float,float); bool XZPairInBounds(i32,i32);
+static const float AI_STOP_DIST=1.28f, AI_STOP_DIST_SQ=(AI_STOP_DIST * AI_STOP_DIST), AI_POS_CHECK_DELAY=2.0f, AI_WANDER_RANGE=79.0f, AI_TARGET_OFFSET_Y=0.24f, AI_TICK_TIME=0.1f, AI_RAYCAST_TICK_TIME=0.2f; u16 npcCountInWorldPerType[NUM_AI_TYPES]; void DoorActuate(u16 self); void TextureSequenceStart(u16 self, u8 clipIndex); Quaternion quat_normalize(Quaternion q); bool PositionVisibleFromPlayerCell(float,float); bool XZPairInBounds(i32,i32); u16 AddLightSimple(V3,Color3,float,float,u16);
 // Name,AtkTyp1,2,3,Dmg1,2,3,Range1,2,3,Health,CybHealth,Percp,Disrp,Armr,Def,Movtyp,Yawspd,FOV,FOVAtk,FOVStartMov,DistToSeeBehind,SightRange,WalkSpd,RunSpd,AtkSpd1,2,3,AtkForce3,AtkRad3,TtPain,TbwPain,TtDead,TtActualAtk1,2,3,TbwAtk1,2,3,TEnemChg,TIdleSFXMin,TIdleSFXMax,TAtk1WaitMin,TAtk1WaitMax,TAtk1WaitChnc,TAtk2WaitMin,TAtk2WaitMax,TAtk2WaitChnc,TAtk3WaitMin,TAtk3WaitMax,TAtk3WaitChnc,ProjType1,2,3,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,PreActMeleCols,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType,AtkProj1,2,3
 NPCTable npcTable[NUM_AI_TYPES] = {
 /* 0*/{"AUTOBOMB"              ,0,0,1,  0,  0,200,   0,    0,2.4,50,0,1,0.5,40,1,1,300,180,120,55,3.84,50,2.5,2.5,0,0,0,100,6,0,0,0.1,0,0,0,0,0,0,3,5,12,0.5,1,0.1,1,3,0.5,0,0,0,0,0,0,0,0,0,0,0,0,1,0,20,0,0,0,10,3,0,2,0,0,0 },
@@ -56,7 +56,6 @@ static const NPCGibRange npcGibRanges[NUM_AI_TYPES] = {
 INLINE bool ai_gibs_on_death(u16 npcID) { return npcID < NUM_AI_TYPES && npcGibRanges[npcID].first != 0; }
 float GetDamageTakeAmount(DamageData* dd);
 void InitNPC(u16 i) {
-    static bool gunOffsetsInit = false; if (!gunOffsetsInit) { initGunOffsets(); gunOffsetsInit = true; }
     World.layer[i] = L_NPC; u16 npcID = World.instances[i].index - 419; flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
     World.instances[i].currentDestination = World.instances[i].lastPosition = World.instances[i].idealPos = World.position[i]; World.instances[i].idealTransformForward = World.instances[i].forward;
     World.instances[i].tickFinished = World.pauseRelativeTime + AI_TICK_TIME + (double)random_range(0.0f, 1.0f); World.instances[i].tickTime = World.instances[i].tickFinished + (double)random_range(0.0f, 1.0f); World.instances[i].idleTime = World.pauseRelativeTime + (double)random_range(npcTable[npcID].timeIdleSFXMin,npcTable[npcID].timeIdleSFXMax);
@@ -76,10 +75,104 @@ bool HasHealth(u16 i) { if(IsCyberNPC(i)){return (World.instances[i].cyberHealth
 INLINE bool ai_is_cyber(Entity* e)  { return npcTable[e->index - 419].type == NPCType_Cyber; }
 INLINE bool ai_has_health(Entity* e){ return ai_is_cyber(e) ? e->cyberHealth > 0.0f : e->health > 0.0f; }
 float sightPointHeights[NUM_AI_TYPES]={0.746f,0.824f,0.261f,0.89f,0.86f,0.875f,0.736f,0.923f,1.082f,1.014f,0.578f/*10*/,0.797f,0.185f,1.155f,1.759f,0.843f,0.133f,0.651f,0.323f,0.0f,0.0f/*20*/,0.0f,-0.662f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f/*28*/};
-V3 gunOfs[NUM_AI_TYPES]; V3 gunOfs2[NUM_AI_TYPES];
-void initGunOffsets(void) { for (int i=0;i<NUM_AI_TYPES;i++) { gunOfs[i]=(V3){0.0f,sightPointHeights[i]+0.3f,0.0f}; gunOfs2[i]=(V3){0.0f,sightPointHeights[i]+0.15f,0.0f}; } }
+INLINE V3 ai_sight_pos(Entity* e);
+typedef struct { V3 gunPoint, gunPoint2; } AIMuzzleOffsets;
+/* Rest-pose gunPoint offsets read from the Citadel npc_* prefabs. Attack2
+   uses gunPoint; Attack3 uses gunPoint2 when present and otherwise gunPoint.
+   Values are relative to the NPC root and rotate with its current heading. */
+static const AIMuzzleOffsets aiMuzzleOffsets[NUM_AI_TYPES] = {
+    [0]={{0.0000f,0.0000f,0.0000f},{0.0000f,0.0000f,0.0000f}},
+    [1]={{0.2034f,0.5728f,1.4950f},{-0.3500f,0.5500f,1.0000f}},
+    [2]={{0.0000f,0.0000f,0.0000f},{0.0000f,0.0000f,0.0000f}},
+    [3]={{0.0000f,0.3350f,0.6800f},{0.0000f,0.3350f,0.6800f}},
+    [4]={{0.0000f,0.8600f,0.0000f},{0.0000f,0.8600f,0.0000f}},
+    [5]={{0.0000f,1.3170f,0.2050f},{0.0000f,1.3170f,0.2050f}},
+    [6]={{0.2450f,0.6190f,0.9770f},{-0.6700f,0.9500f,0.0000f}},
+    [7]={{0.1221f,0.6699f,1.2048f},{-0.1770f,0.6113f,0.6103f}},
+    [8]={{0.2969f,0.4550f,0.8212f},{0.0015f,1.0694f,0.3210f}},
+    [9]={{0.0000f,0.5048f,0.7103f},{0.0000f,0.5048f,0.7103f}},
+    [10]={{0.0000f,-0.1740f,0.2980f},{0.0000f,-0.1740f,0.2980f}},
+    [11]={{0.0000f,1.0250f,1.3230f},{0.0000f,1.2490f,0.6870f}},
+    [12]={{0.0000f,0.4500f,0.5000f},{0.0000f,0.4500f,0.5000f}},
+    [13]={{0.0000f,1.2330f,0.4200f},{0.0000f,1.2330f,0.4200f}},
+    [14]={{0.0000f,1.7590f,0.2150f},{0.0000f,1.7590f,0.2150f}},
+    [15]={{0.0000f,0.0000f,0.0000f},{0.0000f,0.0000f,0.0000f}},
+    [16]={{0.0000f,-0.2840f,0.2560f},{0.0000f,-0.2840f,0.2560f}},
+    [17]={{0.0896f,0.4884f,0.7545f},{0.0896f,0.4884f,0.7545f}},
+    [18]={{-1.0198f,0.1295f,1.1798f},{-1.0198f,0.1295f,1.1798f}},
+    [19]={{0.0000f,0.0000f,0.9000f},{0.0000f,0.0000f,0.9000f}},
+    [20]={{0.0000f,0.0000f,0.4700f},{0.0000f,0.0000f,0.4700f}},
+    [21]={{0.0000f,0.0000f,1.2220f},{0.0000f,0.0000f,1.2220f}},
+    [22]={{0.0000f,-0.4100f,0.8460f},{0.0000f,-0.4100f,0.8460f}},
+    [23]={{0.0000f,0.0000f,0.3950f},{0.0000f,0.0000f,0.3950f}},
+    [24]={{0.0000f,-0.4380f,-0.6690f},{0.0000f,-0.4380f,-0.6690f}},
+    [25]={{-0.4650f,0.0000f,-0.3930f},{-0.4650f,0.0000f,-0.3930f}},
+    [26]={{0.0000f,-0.5590f,-0.3840f},{0.0000f,-0.5590f,-0.3840f}},
+    [27]={{0.0000f,0.0000f,-0.2980f},{0.0000f,0.0000f,-0.2980f}},
+    [28]={{0.0000f,0.0000f,0.5170f},{0.0000f,0.0000f,0.5170f}},
+};
+typedef struct { Color3 color; float unityIntensity, range; } AIMuzzleLightData;
+/* Values with serialized Unity muzzle lights use their prefab color, intensity,
+   and range. Entries for projectile prefabs without a muzzle Light use a
+   restrained visual fallback. Unity intensity is scaled by 0.35 in Voxen's
+   light loader, so the activation code applies that conversion as well. */
+static const AIMuzzleLightData aiMuzzleLights[NUM_AI_TYPES][2] = {
+    [1]={{{0.9044f,0.8595f,0.6717f},10.09f,2.0f},{{0.9044f,0.8595f,0.6717f},10.09f,2.0f}},
+    [3]={{{0.6706f,0.8487f,0.9059f},3.46f,2.0f},{{0.6706f,0.8487f,0.9059f},3.46f,2.0f}},
+    [4]={{{0.9044f,0.8595f,0.6717f},10.09f,2.0f},{{0.9044f,0.8595f,0.6717f},10.09f,2.0f}},
+    [5]={{{0.0803f,0.0000f,1.0000f},4.21f,5.0f},{{0.0803f,0.0000f,1.0000f},4.21f,5.0f}},
+    [6]={{{0.8679f,0.1226f,0.0000f},10.09f,2.0f},{{0.8679f,0.1226f,0.0000f},10.09f,2.0f}},
+    [7]={{{0.9608f,0.9195f,0.8039f},10.09f,2.0f},{{0.9608f,0.9195f,0.8039f},10.09f,2.0f}},
+    [8]={{{0.8731f,1.0000f,0.6368f},7.0f,2.0f},{{0.8679f,0.1696f,0.1187f},10.0f,2.5f}},
+    [9]={{{0.8774f,0.0000f,0.0000f},2.56f,2.0f},{{0.8774f,0.0000f,0.0000f},2.56f,2.0f}},
+    [10]={{{0.0387f,0.7453f,0.0387f},5.0f,2.0f},{{0.0387f,0.7453f,0.0387f},5.0f,2.0f}},
+    [11]={{{1.0000f,0.9794f,0.7500f},1.0f,2.0f},{{1.0000f,0.9794f,0.7500f},2.5f,2.0f}},
+    [12]={{{0.8160f,0.8844f,1.0000f},8.69f,2.0f},{{0.8160f,0.8844f,1.0000f},8.69f,2.0f}},
+    [13]={{{0.8412f,1.0000f,0.3821f},3.0f,2.0f},{{0.8412f,1.0000f,0.3821f},3.0f,2.0f}},
+    [14]={{{1.0000f,0.5035f,0.2784f},2.0f,7.0f},{{1.0000f,0.5035f,0.2784f},2.0f,7.0f}},
+    [16]={{{0.9061f,0.5943f,1.0000f},2.5f,2.0f},{{0.9061f,0.5943f,1.0000f},2.5f,2.0f}},
+    [17]={{{0.6500f,1.0000f,0.2500f},2.5f,2.0f},{{0.6500f,1.0000f,0.2500f},2.5f,2.0f}},
+    [18]={{{0.9849f,0.5425f,1.0000f},2.0f,3.0f},{{0.9849f,0.5425f,1.0000f},2.0f,3.0f}},
+    [19]={{{0.9245f,0.8921f,0.5190f},5.0f,2.0f},{{0.9245f,0.8921f,0.5190f},5.0f,2.0f}},
+    [20]={{{1.0000f,0.9807f,0.7358f},2.5f,2.0f},{{1.0000f,0.9807f,0.7358f},2.5f,2.0f}},
+    [22]={{{0.6706f,0.9059f,0.8552f},10.09f,2.0f},{{0.6706f,0.9059f,0.8552f},10.09f,2.0f}},
+    [23]={{{0.5000f,1.0000f,0.3000f},3.0f,2.0f},{{0.5000f,1.0000f,0.3000f},3.0f,2.0f}},
+    [24]={{{1.0000f,0.8500f,0.6500f},3.0f,2.0f},{{1.0000f,0.8500f,0.6500f},3.0f,2.0f}},
+    [25]={{{1.0000f,0.8500f,0.6500f},3.0f,2.0f},{{1.0000f,0.8500f,0.6500f},3.0f,2.0f}},
+    [26]={{{1.0000f,0.8500f,0.6500f},3.0f,2.0f},{{1.0000f,0.8500f,0.6500f},3.0f,2.0f}},
+    [27]={{{1.0000f,0.8500f,0.6500f},3.0f,2.0f},{{1.0000f,0.8500f,0.6500f},3.0f,2.0f}},
+    [28]={{{1.0000f,0.8500f,0.6500f},3.0f,2.0f},{{1.0000f,0.8500f,0.6500f},3.0f,2.0f}},
+};
+static const double AI_MUZZLE_FLASH_TIME=0.085;
+static const u16 AI_MUZZLE_LIGHT_POOL_SIZE=24;
+typedef struct { u16 lights[24], count; double expires[24]; bool ready; } AIMuzzleLightPool;
+static AIMuzzleLightPool aiMuzzlePools[MAX_LEVELS];
+static double aiMuzzleLightsUpdatedAt=-1.0;
+static float ai_muzzle_marker(u16 slot) { return -100.0f-(float)slot; }
+static void ai_ensure_muzzle_pool(void) {
+    u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIMuzzleLightPool* p=&aiMuzzlePools[lev];
+    if (p->ready) { for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_muzzle_marker(i)) { p->ready=false; break; } }
+    if (p->ready) return; p->count=0;
+    while (p->count<AI_MUZZLE_LIGHT_POOL_SIZE && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0,0,0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_muzzle_marker(i); p->count++; }
+    p->ready=p->count>0;
+}
+static void ai_update_muzzle_lights(void) {
+    if (aiMuzzleLightsUpdatedAt==World.pauseRelativeTime) return; aiMuzzleLightsUpdatedAt=World.pauseRelativeTime; u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIMuzzleLightPool* p=&aiMuzzlePools[lev];
+    if (!p->ready) return; for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_muzzle_marker(i)) { p->ready=false; p->count=0; return; }
+    for (u16 i=0;i<p->count;i++) if (p->expires[i]>0.0 && p->expires[i]<=World.pauseRelativeTime) { u16 li=p->lights[i]; UpdateLight(li,World.lights[li].pos,World.lights[li].col,World.lights[li].range,0.0f,0.0f,0.0f,ai_muzzle_marker(i),QUAT_IDENTITY,false,false); p->expires[i]=0.0; }
+}
+static void ai_muzzle_flash(Entity* self, int attackNum) {
+    if (attackNum<1 || attackNum>3) attackNum=1; u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return; ai_ensure_muzzle_pool(); u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIMuzzleLightPool* p=&aiMuzzlePools[lev]; if (!p->count) return;
+    int liSlot=(attackNum==3)?1:0; AIMuzzleLightData d=aiMuzzleLights[npc][liSlot]; if (d.unityIntensity<=0.0f || d.range<=0.0f) return; u16 chosen=0; double oldest=1e30;
+    for (u16 i=0;i<p->count;i++) { if (p->expires[i]<=World.pauseRelativeTime) { chosen=i; oldest=-1.0; break; } if (p->expires[i]<oldest) { oldest=p->expires[i]; chosen=i; } }
+    u16 idx=p->lights[chosen]; u16 selfIdx=(u16)(self-World.instances); V3 pos;
+    if (attackNum==1) pos=ai_sight_pos(self);
+    else { V3 off=aiMuzzleOffsets[npc].gunPoint; if (attackNum==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f)) off=aiMuzzleOffsets[npc].gunPoint2; if (off.x==0.0f && off.y==0.0f && off.z==0.0f) pos=ai_sight_pos(self); else pos=V3_AplusB(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],off)); }
+    float intensity=d.unityIntensity*0.35f; UpdateLight(idx,pos,d.color,vclamp(d.range,0.32f,15.36f),intensity,intensity,0.0f,ai_muzzle_marker(chosen),QUAT_IDENTITY,true,false); p->expires[chosen]=World.pauseRelativeTime+AI_MUZZLE_FLASH_TIME;
+}
 INLINE V3 ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3_AplusB(World.position[idx],(V3){0.0f,sightPointHeights[World.instances[idx].index - 419],0.0f}); }
-INLINE V3 ai_gun_pos(Entity* e, int n) { u16 idx=(u16)(e - World.instances); u16 npcIdx=World.instances[idx].index - 419; V3 off = (n == 3) ? gunOfs[npcIdx] : gunOfs2[npcIdx]; if (n == 2 && off.x == 0.0f && off.y == 0.0f && off.z == 0.0f) off=gunOfs2[npcIdx]; return V3_AplusB(World.position[idx],off); }
+INLINE V3 ai_gun_pos(Entity* e, int n) { u16 idx=(u16)(e - World.instances); u16 npc=World.instances[idx].index-419; V3 off=(n==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f))?aiMuzzleOffsets[npc].gunPoint2:aiMuzzleOffsets[npc].gunPoint; if(off.x==0.0f && off.y==0.0f && off.z==0.0f) off=(V3){0.0f,sightPointHeights[npc]+0.3f,0.0f}; return V3_AplusB(World.position[idx],quat_rot_v3(World.rotation[idx],off)); }
+INLINE V3 ai_attack_pos(Entity* e, int n) { return n==1 ? ai_sight_pos(e) : ai_gun_pos(e,n); }
 Quaternion quat_look_rotation(V3 fwd, V3 up) {
     fwd=V3_Normalize(fwd); V3 r = V3_Normalize(V3_Cross(up,fwd)); up=V3_Cross(fwd,r); float m00=r.x, m01=r.y, m02=r.z, m10=up.x, m11=up.y, m12=up.z, m20=fwd.x, m21=fwd.y, m22=fwd.z; float tr = m00 + m11 + m22; Quaternion q;
     if (tr > 0.0f){float s=0.5f/vsqrtf(tr+1.0f); q.w=(0.25f/s); q.x=(m12-m21)*s; q.y=(m20-m02)*s; q.z=(m01-m10)*s;}else if(m00 > m11 && m00 > m22){float s=2.0f*vsqrtf(1.0f+m00-m11-m22); q.w=(m12-m21)/s; q.x=0.25f*s; q.y=(m01+m10)/s; q.z=(m20+m02)/s;}else if(m11 > m22){float s=2.0f*vsqrtf(1.0f+m11-m00-m22); q.w=(m20-m02)/s; q.x=(m01+m10)/s; q.y=0.25f*s; q.z=(m12+m21)/s; } else { float s = 2.0f * vsqrtf(1.0f + m22 - m00 - m11); q.w=(m01-m10)/s; q.x=(m20+m02)/s; q.y=(m12+m21)/s; q.z=0.25f*s;} return q;
@@ -289,16 +382,9 @@ static void AITransitionAttackToRun(Entity* self, int n) {
     } *wait = (random_range(0.0f, 1.0f) < chance) ? World.pauseRelativeTime + random_range(wmin, wmax) : World.pauseRelativeTime;
 }
 
-static void MuzzleBurst(Entity* self, int attackNum) {
-    if (attackNum < 1 || attackNum > 3){attackNum=1;}
-    if (attackNum == 1) return; /* Melee attacks never spawn a grenade burst. */
-    int prefab = 370; // Frag burst fallback, matches ProjectileLaunched default.
-    if (prefab > 0) { u16 burst = SpawnDynamicObject(prefab, false); if (burst != 0xFFFF && burst < INSTANCE_COUNT) { World.position[burst] = ai_gun_pos(self,attackNum); } }
-}
 static void ProjectileRaycast(Entity* self, int n) {
     if (n < 1 || n > 3){n = 1;} V3 spos = (n == 1) ? ai_sight_pos(self) : ai_gun_pos(self, n); u16 selfIdx=(u16)(self - World.instances); u16 eidx = self->enemy; V3 targ = eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*10.0f,spos.y,spos.z + self->forward.z*10.0f}; V3 dir=(n == 1) ? self->forward : V3_Normalize(V3_AsubB(targ,spos)); float range;
     switch (n) { case 1: range = npcTable[self->index - 419].range; break; case 2: range = npcTable[self->index - 419].range2; break; default: range = npcTable[self->index - 419].range3; break; }
-    MuzzleBurst(self,n);
     // Origin sits inside own capsule; push start forward so we don't hit ourselves.
     V3 opos = {spos.x + dir.x*0.55f, spos.y + dir.y*0.55f, spos.z + dir.z*0.55f};
     RaycastHit hit = Raycast(opos, dir, range, LMASK_NPC_ATTACK); if(!hit.hit){return;} u16 hi = hit.hitInstanceIndex;
@@ -312,7 +398,7 @@ static void ProjectileRaycast(Entity* self, int n) {
 static void ProjectileLaunched(Entity* self, int n) {
     u16 sidx=(u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; int masterIdx; float launchSpd; switch (n) { case 1: masterIdx = npc->projectile1Prefab; launchSpd = npc->projectileSpeedAttack1; break; case 2: masterIdx = npc->projectile2Prefab; launchSpd = npc->projectileSpeedAttack2; break; default: masterIdx = npc->projectile3Prefab; launchSpd = npc->projectileSpeedAttack3; break; }
     DamageData dd = SetNPCData(self,n); dd.attackType=Att_Ball; // Citadel ProjectileLaunched always uses ProjectileLaunched.
-    V3 spos=ai_gun_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); MuzzleBurst(self,n); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370,false);
+    V3 spos=ai_attack_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370,false);
     if (bb==0xFFFF || bb==0 || bb>=INSTANCE_COUNT) bb=SpawnDynamicObject(370,false); if (bb==0xFFFF || bb==0 || bb>=INSTANCE_COUNT) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir;
     proj->damage=dd.damage; proj->strength=dd.penetration; proj->speed=dd.offense; proj->attackType=dd.attackType; proj->recentMostActivator=sidx;
     if (proj->countToTrigger < 1) proj->countToTrigger = 1;
@@ -326,11 +412,17 @@ static void AIExplodeAttack(Entity* self) {
     DamageData selfdd = SetNPCData(self, 3); TakeDamage(selfIdx, selfdd); // Self-destruct through real pipeline (Citadel healthManager.TakeDamage).
 }
 
-static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || ind > 3){ind=1;/*Melee hitscan by default.*/} switch (att) { case Att_Melee:ProjectileRaycast(self,ind); break; case Att_HitS:ProjectileRaycast(self,ind); World.fogFac += 1; break; case Att_Ball:ProjectileLaunched(self,ind); World.fogFac += 1; break; default: break; } }
+static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || ind > 3){ind=1;/*Melee hitscan by default.*/} switch (att) { case Att_Melee:ProjectileRaycast(self,ind); break; case Att_HitS: case Att_PjBm:ai_muzzle_flash(self,ind); ProjectileRaycast(self,ind); World.fogFac += 1; break; case Att_Ball:ai_muzzle_flash(self,ind); ProjectileLaunched(self,ind); World.fogFac += 1; break; default: break; } }
 void AIAttack(Entity* self, int slot) {
     u16 sidx = (u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; if (slot == 3 && npc->explodeOnAttack3) { World.fogFac += 5; AIExplodeAttack(self); return; } AIApplyAttackMovement(self, slot == 1 ? npc->attack1Speed : slot == 2 ? npc->attack2Speed : npc->attack3Speed); int sat = slot == 1 ? sfxAttack1[self->index - 419] : slot == 2 ? sfxAttack2[self->index - 419] : sfxAttack3[self->index - 419];
     float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); u32 tb = slot == 1 ? npc->timeBetweenAttack1 : slot == 2 ? npc->timeBetweenAttack2 : npc->timeBetweenAttack3;
-    (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) ? (flag_set(&self->entflags,EF_SHOT_FIRED,true),(*s_time < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) ? (play_wav(sounds[sat],AppliedFXVol(1.0f),World.position[sidx],true), *s_time=World.pauseRelativeTime + tb) : 0,AIMakeAttack(self,slot == 1 ? npc->attackType : slot == 2 ? npc->attackType2 : npc->attackType3,slot)) : 0;
+    int configuredAttack=slot==1 ? npc->attackType : slot==2 ? npc->attackType2 : npc->attackType3; AttType attack=(AttType)configuredAttack;
+    /* NPCTable keeps the serialized IDs read from Unity's enemy table. Map
+       its projectile IDs to Voxen's hit-scan and launched-projectile paths. */
+    if (configuredAttack==4) attack=Att_HitS; /* Unity Projectile */
+    else if (configuredAttack==5) attack=Att_PjBm; /* Unity ProjectileEnergyBeam */
+    else if (configuredAttack==7) attack=Att_Ball; /* Unity ProjectileLaunched */
+    (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) ? (flag_set(&self->entflags,EF_SHOT_FIRED,true),(*s_time < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) ? (play_wav(sounds[sat],AppliedFXVol(1.0f),World.position[sidx],true), *s_time=World.pauseRelativeTime + tb) : 0,AIMakeAttack(self,attack,slot)) : 0;
     (slot == 3 && self->enemy) ? (self->index == 427 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f, 0.15f, 0.18f, 0.85f}) : self->index == 433 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){0.96f,1.0f,0.0f,0.88f}) : (void)0) : (void)0; if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self,slot);
 }
 
@@ -354,7 +446,7 @@ static void AIThink(u16 idx) {
 }
 
 void AIControllerUpdate(u16 idx) {
-    Entity* self=&World.instances[idx]; if(!(self->entflags & EF_ACTIVE)){return;} u16 edx=self->index; if(!IdxIsNPC(edx)){return;} u16 ndx=edx-419;
+    ai_update_muzzle_lights(); Entity* self=&World.instances[idx]; if(!(self->entflags & EF_ACTIVE)){return;} u16 edx=self->index; if(!IdxIsNPC(edx)){return;} u16 ndx=edx-419;
     if(npcTable[ndx].type != NPCType_Cyber && npcTable[ndx].moveType != AIMoveType_Fly && self->currentState != AIState_Dead && self->currentState != AIState_Dying) World.gravity[idx] = 1.0f;
     if (self->tickTime < World.pauseRelativeTime) {
         self->tickTime = World.pauseRelativeTime + AI_RAYCAST_TICK_TIME;
