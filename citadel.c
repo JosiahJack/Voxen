@@ -1,8 +1,12 @@
 // citadel.c - Game logic.
 #include "common.h"
-__attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; static const u16 patchMsg[7] = {325,326,327,328,329,330,331}; void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*),GrenadeActivate(u16); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
+__attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; static const u16 patchMsg[7] = {340,341,342,343,344,345,346}; /*Patch names in the +326 item-name table (Citadel: useableItemIndex+326, useableItemIndex=14+slot); Citadel composes "<name>" + stringTable[589]*/ void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*),GrenadeActivate(u16); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
-    float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),ndcX=((World.inventoryMode ? World.cursorPos_x : 683.0f) - 683.0f)/384.0f, ndcY=-((World.inventoryMode ? World.cursorPos_y : 384.0f)-384.0f)/384.0f; V3 view=V3_Normalize((V3){ndcX*tanFov,ndcY*tanFov,-1.0f}),flipForward=(V3){-fwd.x,-fwd.y,-fwd.z}; V3 up=V3_Normalize(V3_Cross(rt,flipForward)); return (V3){view.x*rt.x+view.y*up.x+view.z*flipForward.x,view.x*rt.y+view.y*up.y+view.z*flipForward.y,view.x*rt.z+view.y*up.z+view.z*flipForward.z};
+    float px=World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f, py=World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f;
+    float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight;
+    float ndcX=(px-(float)UI_W*0.5f)/((float)UI_W*0.5f),ndcY=((float)UI_H*0.5f-py)/((float)UI_H*0.5f);
+    V3 view=V3_Normalize((V3){ndcX*aspect*tanFov,ndcY*tanFov,-1.0f}),flipForward=(V3){-fwd.x,-fwd.y,-fwd.z}; V3 up=V3_Normalize(V3_Cross(rt,flipForward));
+    return (V3){view.x*rt.x+view.y*up.x+view.z*flipForward.x,view.x*rt.y+view.y*up.y+view.z*flipForward.y,view.x*rt.z+view.y*up.z+view.z*flipForward.z};
 }
 
 static i16 GrenadeTypeFromConst(u16 idx) { switch(idx) { case 370:return 7; case 372:return 8; case 387:return 9; case 389:return 10; case 402:return 11; case 403:return 12; case 404:return 13; default:return -1; } }
@@ -27,7 +31,7 @@ void PatchUse(int patchSlot) {
         case 4: { double reflexDur = REFLEX_TIME * REFLEX_TIME_SCALE;/*155 real seconds of 0.25x slow-mo, tracked in game-time so it pauses and saves*/ if(World.invP1.reflexFinishedTime > World.pauseRelativeTime) World.invP1.reflexFinishedTime += reflexDur; else World.invP1.reflexFinishedTime = World.pauseRelativeTime + reflexDur; World.timeScale = REFLEX_TIME_SCALE; } break;
         case 5: if(World.invP1.sightFinishedTime > World.pauseRelativeTime) World.invP1.sightFinishedTime += SIGHT_TIME; else { World.invP1.sightFinishedTime = World.pauseRelativeTime + SIGHT_TIME; World.invP1.sightSideEffectFinishedTime = -1.0; } break;
         case 6: if(World.invP1.staminupFinishedTime > World.pauseRelativeTime) World.invP1.staminupFinishedTime += STAMINUP_TIME; else World.invP1.staminupFinishedTime = World.pauseRelativeTime + STAMINUP_TIME; World.invP1.staminupActive = true; World.invP1.fatigue = 0.0f; break;
-    } CenterStatusPrint("%s",Sys_Text.stringTable[patchMsg[patchSlot]]); if (World.invP1.patchCounts[World.invP1.patchCur] <= 0) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } } play_wav(sounds[89],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
+    } bool depleted = World.invP1.patchCounts[patchSlot] <= 0; if (depleted) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } } if (depleted) CenterStatusPrint("%s%s%s",Sys_Text.stringTable[590],Sys_Text.stringTable[patchMsg[patchSlot]],Sys_Text.stringTable[589]); else CenterStatusPrint("%s%s",Sys_Text.stringTable[patchMsg[patchSlot]],Sys_Text.stringTable[589]); play_wav(sounds[89],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
 }
 
 void WeaponFireStartWeaponDip(float t) { if (t <= 0.0f) { World.invP1.reloadFinished = 0.0; return; } World.invP1.reloadFinished = World.pauseRelativeTime + (double)t; lerpStartTime = World.pauseRelativeTime; }
@@ -71,8 +75,8 @@ void AddAudioLogToInventory(int index) {
 static inline void ItemAdd(u8 *cur, u8 *counts, int idx, int uIdx, int sysIdx) { if (!counts[*cur]) {*cur=(i8)idx;} counts[idx]++; CenterStatusPrint("%s%s", Sys_Text.stringTable[ItemStringIdx(uIdx)], Sys_Text.stringTable[sysIdx]); }
 void AddGrenadeToInventory(int i, int u) { if (i >= 0){if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.MFD_CenterTab=1;} World.invP1.grenConstIndex[i]=(i16)u; ItemAdd(&World.invP1.grenCur,World.invP1.grenAmmo,i,u,34);} }
 void   AddPatchToInventory(int i, int u) { if (i >= 0){if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.MFD_CenterTab=1;} ItemAdd(&World.invP1.patchCur,World.invP1.patchCounts,i,u,35);} }
-static inline void GrenadeCycle(int step){int cur= World.invP1.grenCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(   World.invP1.grenAmmo[next]>0){World.invP1.grenCur =(i8)next; CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
-static inline void   PatchCycle(int step){int cur=World.invP1.patchCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(World.invP1.patchCounts[next]>0){World.invP1.patchCur=(i8)next; CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
+static inline void GrenadeCycle(int step){int cur= World.invP1.grenCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(   World.invP1.grenAmmo[next]>0){ if (next==cur) return; World.invP1.grenCur =(i8)next; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
+static inline void   PatchCycle(int step){int cur=World.invP1.patchCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(World.invP1.patchCounts[next]>0){World.invP1.patchCur=(i8)next; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ CenterStatusPrint("%s",Sys_Text.stringTable[patchMsg[next]]); return;}}}
 void RemoveGrenade(int i) { if(World.invP1.grenAmmo[i] > 0){World.invP1.grenAmmo[i]--;} if(!World.invP1.grenAmmo[i]){GrenadeCycle(-1);} }
 static i8 GetExistingCyberItemIndex() { if (World.invP1.softVersions[SW_TURBO]  > 0) {return 0;} if (World.invP1.softVersions[SW_DECOY]  > 0) {return 1;} if (World.invP1.softVersions[SW_RECALL] > 0) {return 2;} return -1; }
 static void UseTurbo() {if(World.invP1.softVersions[SW_TURBO]<=0){World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); return;} if(--World.invP1.softVersions[SW_TURBO]==0)World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); if(World.invP1.turboFinished > World.pauseRelativeTime){World.invP1.turboFinished+=World.invP1.turboCyberTime;}else{World.invP1.turboFinished=World.invP1.turboCyberTime+World.pauseRelativeTime;}}
@@ -83,6 +87,7 @@ void UseCyberspaceItem() {
     switch(World.invP1.cyberItemIndex) {case 0: if (!World.invP1.softVersions[SW_TURBO])  { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); return; } UseTurbo();  break; case 1: if (!World.invP1.softVersions[SW_DECOY])  { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); return; } UseDecoy();  break; case 2: if (!World.invP1.softVersions[SW_RECALL]) { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); return; } UseRecall(); break;}
 }
 
+void UseCyberspaceItemByIndex(int idx) { World.invP1.cyberItemIndex = (i8)idx; UseCyberspaceItem(); }/*MFD software tab rows 3..5 map to the 0..2 turbo/decoy/recall selector*/
 void CycleCyberSpaceItemUp() { int next = World.invP1.cyberItemIndex + 1; if (next > 2){next=0;} for (int c = 0; c <= 7; c++) { if (World.invP1.hasSoft & (1u << (SW_TURBO+next))) { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (++next > 2) {next = 0;} } }
 void CycleCyberSpaceItemDn() { int next = World.invP1.cyberItemIndex - 1; if (next < 0){next=2;} for (int c = 0; c <= 7; c++) { if (World.invP1.hasSoft & (1u << (SW_TURBO+next))) { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (--next < 0) {next = 2;} } }
 void RemoveWeapon(i32 slot) { World.invP1.weaponInventoryIndices[slot] = World.invP1.weaponInventoryAmmoIndices[slot] = -1; if (slot == World.invP1.weaponCurrent) { bool anyLeft = false; for (int i=0;i<7;i++) if (World.invP1.weaponInventoryIndices[i] >= 0) { anyLeft = true; break; } if (!anyLeft) World.instances[World.weaponVModelIndex].modelIndex = MAX_MDLS; } }
@@ -109,10 +114,10 @@ void UseGrenade(int index) {
 
 void InventoryUpdate() {
     if (Grenade()) { if (World.curLev == LEVEL_CYBERSPACE){UseCyberspaceItem();} else if (World.invP1.grenCur >= 0 && World.invP1.grenCur < 7 && World.invP1.grenAmmo[World.invP1.grenCur] > 0){UseGrenade(World.invP1.grenConstIndex[World.invP1.grenCur]);} else {CenterStatusPrint("%s",Sys_Text.stringTable[322]);/*Out of grenades.*/} }
-    if (GrenadeCycUp())  { if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemUp(); else GrenadeCycle( 1); } if (GrenadeCycDown()){ if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemDn(); else GrenadeCycle(-1); }
+    if (GrenadeCycUp())  { if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemUp(); else GrenadeCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1); } if (GrenadeCycDown()){ if (World.curLev == LEVEL_CYBERSPACE) CycleCyberSpaceItemDn(); else GrenadeCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1); }
     if (RecentLog() && (World.invP1.hasHardware & HW_ERD)) {
         if(World.invP1.lastAddedIndex>=0){int temp=World.invP1.lastAddedIndex; PlayLog(temp); World.invP1.lastAddedIndex=FindNextUnreadLog(); if(World.invP1.lastAddedIndex==temp)World.invP1.lastAddedIndex=-1; CheckForUnreadLogs(); }else{int temp=World.invP1.lastAddedIndex; World.invP1.lastAddedIndex=FindNextUnreadLog(); if(World.invP1.lastAddedIndex==temp){World.invP1.lastAddedIndex=-1;} CheckForUnreadLogs(); CenterStatusPrint("%s",Sys_Text.stringTable[1019]);/*Log playback stopped.*/}
-    } if (Patch()) { if (World.invP1.patchCur >= 0 && World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0){PatchUse(World.invP1.patchCur);} else {CenterStatusPrint("%s",Sys_Text.stringTable[324]); /*Out of patches.*/} } if (PatchCycUp()){PatchCycle( 1);} else if (PatchCycDown()){PatchCycle(-1);}
+    } if (Patch()) { if (World.invP1.patchCur >= 0 && World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0){PatchUse(World.invP1.patchCur);} else {CenterStatusPrint("%s",Sys_Text.stringTable[324]); /*Out of patches.*/} } if (PatchCycUp()){PatchCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1);} else if (PatchCycDown()){PatchCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1);}
 }
 
 void AddItemFail(int index/*Expects usableItem index*/) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[318]);/*Inventory full.*/ }
@@ -363,21 +368,16 @@ void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseV
     }
 }
 
-static void SpawnExplosionParticle(u16 type,V3 pos,float count,float size,Color color) {
-    const PSysDef* preset=PSysTypeGet(type); if(!preset)return;
-    PSysDef def=*preset; def.pos=pos; def.burstCount=(u16)count; def.emitRate=0.0f;
-    def.duration=1.5f; def.lifetimeMin=0.45f; def.lifetimeMax=0.7f;
-    def.sizeMin=size; def.sizeMax=size; def.colStart=color; def.colEnd=(Color){color.r,color.g,color.b,0.0f};
-    def.rampCount=0; def.trail=0; PSysAdd(&def);
-}
+static void SpawnExplosionPreset(u16 type,V3 pos) { const PSysDef* preset=PSysTypeGet(type); if(!preset)return; PSysDef def=*preset; def.pos=pos; PSysAdd(&def); }
 void SpawnExplosionEffect(V3 pos, int explosionType) {
-    Color color={1.0f,0.48f,0.12f,1.0f};
-    if(explosionType==3)color=(Color){0.42f,1.0f,0.28f,1.0f};
-    else if(explosionType==4)color=(Color){0.22f,0.68f,1.0f,1.0f};
-    /* Unity's pooled grenade effects are a flash plus an expanding shockwave. */
-    SpawnExplosionParticle(4,pos,1.0f,4.0f,color);  /* centerBurst */
-    SpawnExplosionParticle(8,pos,1.0f,5.5f,color);  /* Shockwave */
-    if(explosionType==1)SpawnExplosionParticle(1,pos,12.0f,0.12f,color); /* frag debris */
+    /* Unity's GrenadeActivate pulls the grenade's explosionType pool object and enables it in place, so each
+       type plays the emitters of that pool: frag/concussion/earth/nitro/mine share GrenadeFragExplosions
+       (ef_fragexplosion), EMP uses GrenadeEMPExplosions (ef_empexplosion) and gas uses GasExplosions. */
+    switch (explosionType) {
+        case 3: SpawnExplosionPreset(PSYS_gasExplosions,pos); SpawnExplosionPreset(PSYS_gasSmoke,pos); break;/*GasExplosions*/
+        case 4: SpawnExplosionPreset(PSYS_ef_empexplosion,pos); SpawnExplosionPreset(PSYS_sprinkles,pos); SpawnExplosionPreset(PSYS_sparkles,pos); break;/*GrenadeEMPExplosions*/
+        default: SpawnExplosionPreset(PSYS_CentralFireball,pos); SpawnExplosionPreset(PSYS_FireSpits,pos); break;/*GrenadeFragExplosions*/
+    }
 }
 void GrenadeExplode(u16 self) {
     if(self>=World.instCount)return; Entity* e = &World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; flag_set(&e->entflags,EF_ACTIVE,false);
@@ -403,19 +403,20 @@ void ReduceCurrentLevelSecurity(SecurityType stype) { // Typical level: 4 CPU no
     switch(stype){case SecurityType_Camera:drop=(camScore/total)*100.0f; if(World.levCamDestroyedCnt[lev]<255)World.levCamDestroyedCnt[lev]++; break; case SecurityType_NodeSmall:drop=(nodeSmallScore/total)*100.0f; if (World.levSmNodeDestroyedCnt[lev]<255)World.levSmNodeDestroyedCnt[lev]++; break; case SecurityType_NodeLarge:drop=(nodeLargeScore/total)*100.0f; if(World.levNodeDestroyedCnt[lev]<255) World.levNodeDestroyedCnt[lev]++; break; default:return;}
     int cur=(int)World.levelSecurity[lev]-(int)drop; if (cur<0) cur=0; World.levelSecurity[lev]=(u8)cur; if (World.levCamDestroyedCnt[lev]==World.levelCameraCount[lev] && World.levSmNodeDestroyedCnt[lev]==World.levelSmallNodeCount[lev] && World.levNodeDestroyedCnt[lev]==World.levelLargeNodeCount[lev]) World.levelSecurity[lev]=0; CenterStatusPrint("%s%d%s", Sys_Text.stringTable[306], (int)World.levelSecurity[lev], Sys_Text.stringTable[307]);
 }
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-static void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
-    Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return; e->counter++; DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(World.invP1.patchActive & PATCH_BERSERK)!=0};
+void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
+    if(self>=World.instCount||hitIdx>=World.instCount)return; Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return;/*other.gameObject == host*/ e->counter++;/*numHits++*/
+    DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(e->recentMostActivator==PLAYER1&&(World.invP1.patchActive & PATCH_BERSERK)!=0)};
+    dd.damage = GetDamageTakeAmount(&dd);
     Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; } if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }/*Railgun sphere impact*/
+    /* Utils.GetMainHealthManager(hitGO) != null: the impact effect is pooled per projectile and only spawns for colliders carrying health. */
+    bool hasHealthManager=hitIdx==PLAYER1||IdxIsNPC(hit->index)||hit->health>0.0f||hit->cyberHealth>0.0f; if(hasHealthManager)SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);
     if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {
-        dd.damage = GetDamageTakeAmount(&dd); if (e->counter < e->countToTrigger) dd.damage *= 0.85f;/*per-hit falloff*/ dd.impactVelocity = dd.damage * 1.5f; if (e->counter > 0) dd.impactVelocity /= 3.0f; if (World.curLev != LEVEL_CYBERSPACE && e->recentMostActivator == PLAYER1) { ApplyImpactForce(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); } float dmgFinal = TakeDamage(hitIdx,dd); float tranq=-1.0f;
-        if (dd.isOtherNPC) { if(!(hit->entflags & EF_ASLEEP)){World.Sys_Music.inCombat=true;} if(dd.attackType == Att_Trnq){float stunAmount=vclamp(3.0f+(World.invP1.stungunSetting/100.0f)*7.0f,3.0f,10.0f); tranq=Tranquilize(hitIdx,stunAmount,true);} } if (dmgFinal < 0.0f) {dmgFinal = 0.0f;} CreateTargetIDInstance(dmgFinal,hitIdx,tranq); SpawnImpactEffect(GetImpactType(hitIdx),hitPos);
+        if (e->counter < e->countToTrigger) dd.damage *= 0.85f;/*per-hit falloff*/ dd.impactVelocity = dd.damage * 1.5f; if (e->counter > 0) dd.impactVelocity /= 3.0f; bool hostIsNPC=e->recentMostActivator<World.instCount&&IdxIsNPC(World.instances[e->recentMostActivator].index); if (World.curLev != LEVEL_CYBERSPACE && !hostIsNPC) { ApplyImpactForce(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); } float dmgFinal = TakeDamage(hitIdx,dd); float tranq=-1.0f;
+        if (dd.isOtherNPC) { if(!(hit->entflags & EF_ASLEEP)){World.Sys_Music.inCombat=true;} if(dd.attackType == Att_Trnq){float stunAmount=vclamp(3.0f+(World.invP1.stungunSetting/100.0f)*7.0f,3.0f,10.0f); tranq=Tranquilize(hitIdx,stunAmount,true);} } if (dmgFinal < 0.0f) {dmgFinal = 0.0f;} CreateTargetIDInstance(dmgFinal,hitIdx,tranq);
     }
-    if (e->counter >= e->countToTrigger) { SpawnImpactEffect(GetImpactType(hitIdx),hitPos); if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
+    if(e->countToTrigger<1)e->countToTrigger=1; if (e->counter >= e->countToTrigger) { SpawnProjectileImpactParticles(e->index,hitPos,hitNormal); if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
 }
-#pragma GCC diagnostic pop
-void ProjectileEffectImpactInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->counter=0; if(e->countToTrigger < 1){e->countToTrigger=1;} }
+void ProjectileEffectImpactInitAfterLoad(u16 self) { if(self>=World.instCount)return;Entity* e=&World.instances[self]; e->counter=0;e->currentTargetIdx=0;e->lookUpIndex=(e->index==484||e->index==491)?5:0;if(e->countToTrigger<1){e->countToTrigger=e->index==485?5:(e->index==495?2:1);} }
  // None  Melee  MelEn  EnBm   Mag    Proj   Needle ProjEB ProjLn Gas    Tranq  Drill
 static const float attackTypeMult[7][12]={[NPCType_Mutant]={1,1,1,1,0,1,2,1,1,2,1,1},[NPCType_Supermutant]={1,1,1,1,0,1,1,1,1,1.5,1,1},[NPCType_Robot]={1,1,1,1,4,1,0,1,1,0,1,1},[NPCType_Cyborg]={1,1,1,1,2,1,1,1,1,1,1,1},[NPCType_Supercyborg]={1,1,1,1,2,1,0,1,1,0,1,1},[NPCType_MutantCyborg]={1,1,1,1,0.5,1,2,1,1,2,1.5,1},[NPCType_Cyber]={1,1,1,1,1,1,1,1,1,1,1,0}}; // Attack type damage multiplier table [NPCType][AttType], 1.0f = no change, 0.0f = immune, other = multiplier
 static const i16 objectDeathSound[] = {[458]=63,[459]=66,[460]=66,[464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,[472]=62,[473]=62,[474]=62,[475]=62,[476]=62,[477]=61,[478]=65,[479]=69,[525]=68,[526]=68,};
@@ -681,8 +682,8 @@ bool SearchTakeSlot(u8 slot) {
     if (s==U16_MAX || slot>=4 || World.invP1.holdingObject) return false;
     Entity* e=&World.instances[s]; i16 item=e->contents[slot]; if (item<0 || item>110 || !IdxIsUsableObject((u16)(item+307))) return false;
     ResetHeldItem(); World.invP1.heldObjectIndex=(u16)(item+307); World.invP1.heldObjectCustIdx=(u16)e->custIdx[slot]; World.invP1.holdingObject=true;
-    e->contents[slot]=e->custIdx[slot]=-1; ForceInventoryMode();
-    CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]);
+    e->contents[slot]=e->custIdx[slot]=-1;
+    if (Sys_Settings.QuickItemPickup) AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx),ResetHeldItem(); else ForceInventoryMode(),CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]);/*Inventory mode is turned on when picking something up*/
     for (u8 i=0;i<4;++i) if (e->contents[i]>=0) return true;
     CloseSearch(); return true;
 }
@@ -778,14 +779,14 @@ void UseEntity(u16 i) {
     } else { int t = UseNameTableIndex(ent->index); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t >= 0 ? Sys_Text.stringTable[t] : ""); }
 }
 
-INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy){float bx=World.inventoryMode?(float)World.cursorPos_x:683.0f,by=World.inventoryMode?(float)World.cursorPos_y:384.0f,t=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),nx=((bx+dx)-683.0f)/384.0f,ny=-((by+dy)-384.0f)/384.0f;V3 v=V3_Normalize((V3){nx*t,ny*t,-1.0f}),ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(r,ff));return(V3){v.x*r.x+v.y*up.x+v.z*ff.x,v.x*r.y+v.y*up.y+v.z*ff.y,v.x*r.z+v.y*up.z+v.z*ff.z};}
+INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy){float px=(World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f)+dx,py=(World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f)+dy,t=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,nx=(px-(float)UI_W*0.5f)/((float)UI_W*0.5f),ny=((float)UI_H*0.5f-py)/((float)UI_H*0.5f);V3 v=V3_Normalize((V3){nx*aspect*t,ny*t,-1.0f}),ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(r,ff));return(V3){v.x*r.x+v.y*up.x+v.z*ff.x,v.x*r.y+v.y*up.y+v.z*ff.y,v.x*r.z+v.y*up.z+v.z*ff.z};}
 INLINE bool FrobRayIsFrobable(RaycastHit h){if(!h.hit)return false;u16 i=h.hitInstanceIndex;if(i>=World.instCount)return false;u16 e=World.instances[i].index;if((World.layer[i]&L_CorpseSearchable)) return true;return IsFrobUsableSpecial(e)||IdxIsUsableObject(e)||IdxIsSearchable(e)||IdxIsDoor(e)||IdxIsButtonSwitch(e)||IdxIsNPC(e)||IdxIsGib(e);}
 extern bool editFieldEditing;
 static bool TargetIDFrob(V3 p,V3 f,V3 r){V3 dir=ScreenPointToRayOffset(f,r,0,0);RaycastHit h=Raycast(p,dir,TargetIDGetSensingRange(true),LMASK_PLAYER_TARGET_ID_FROB);if(!h.hit||h.hitInstanceIndex>=World.instCount||!IdxIsNPC(World.instances[h.hitInstanceIndex].index))return false;u16 i=h.hitInstanceIndex;Entity* e=&World.instances[i];if(e->health<=0.0f){if(World.layer[i]&L_CorpseSearchable){UseEntity(i);return true;}return false;}if((World.invP1.hasHardware&HW_TID)&&World.invP1.hwVers[HW_TID_IDX]>1){if(targetIDAttached[i]&&targetIDAttachedFinished[i]<=World.pauseRelativeTime)targetIDAttached[i]=false;if(!targetIDAttached[i]){CreateTargetIDInstance(-1.0f,i,-1.0f);return true;}}CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[e->index-419].name);return true;}
 static void Frob(V3 p,V3 f,V3 r){
     if(World.uiIsBlocking||World.curLev==LEVEL_CYBERSPACE)return;
     if(Cheats.editMode){V3 d0=ScreenPointToRayOffset(f,r,0,0);RaycastHit fh=Raycast(p,d0,World.farPlane[World.curLev],LMASK_PLAYER_FROB);editModeSelection=(fh.hit&&fh.hitInstanceIndex>=INSTS_1ST_IDX&&fh.hitInstanceIndex<World.instCount)?fh.hitInstanceIndex:U16_MAX; if(editModeSelection<U16_MAX){editFieldEditing=false; CenterStatusPrint("Selected object %u (const index %u)",editModeSelection,World.instances[editModeSelection].index);}else{CenterStatusPrint("Object deselected");return;}}
-    if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0;return;}if(World.invP1.holdingObject){DropHeldItem();return;}if(TargetIDFrob(p,f,r))return;float o=(float)Sys_Settings.ScreenHeight*0.02f;RaycastHit fh={0},bh={0};bool ok=false;V3 d0=ScreenPointToRayOffset(f,r,0,0);fh=Raycast(p,d0,FROB_DISTANCE,LMASK_PLAYER_FROB);bh=fh;ok=FrobRayIsFrobable(fh);float ox[8]={0,0,o,-o,o,-o,-o,o},oy[8]={-o,o,0,0,o,-o,o,-o};for(int i=0;i<8&&!ok;++i){V3 d=ScreenPointToRayOffset(f,r,ox[i],oy[i]);RaycastHit th=Raycast(p,d,FROB_DISTANCE,LMASK_PLAYER_FROB);if(FrobRayIsFrobable(th)){bh=th;ok=true;}}if(!ok)bh=fh;if(Cheats.showPhys){World.debugLine_start=p;World.debugLineFinished=World.pauseRelativeTime+3.0;V3 dbg=ok?ScreenPointToRayOffset(f,r,0,0):d0;RaycastHit dh=ok?bh:fh;World.debugLine_end=dh.hit?dh.point:(V3){dbg.x*FROB_DISTANCE+p.x,dbg.y*FROB_DISTANCE+p.y,dbg.z*FROB_DISTANCE+p.z};}if(!ok){if(fh.hit){u16 idx=fh.hitInstanceIndex;if(idx<World.instCount){u16 ei=World.instances[idx].index;if(IdxIsGeometry(ei)||IdxIsDoor(ei)||World.instances[idx].index>=595){int t=UseNameTableIndex(ei);CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t>=0?Sys_Text.stringTable[t]:"");return;}}}CenterStatusPrint("%s",Sys_Text.stringTable[30]);}else UseEntity(bh.hitInstanceIndex);}
+    if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0;return;}if(World.invP1.holdingObject){DropHeldItem();return;}if(TargetIDFrob(p,f,r))return;float o=(float)UI_H*0.02f;RaycastHit fh={0},bh={0};bool ok=false;V3 d0=ScreenPointToRayOffset(f,r,0,0);fh=Raycast(p,d0,FROB_DISTANCE,LMASK_PLAYER_FROB);bh=fh;ok=FrobRayIsFrobable(fh);float ox[8]={0,0,o,-o,o,-o,-o,o},oy[8]={-o,o,0,0,o,-o,o,-o};for(int i=0;i<8&&!ok;++i){V3 d=ScreenPointToRayOffset(f,r,ox[i],oy[i]);RaycastHit th=Raycast(p,d,FROB_DISTANCE,LMASK_PLAYER_FROB);if(FrobRayIsFrobable(th)){bh=th;ok=true;}}if(!ok)bh=fh;if(Cheats.showPhys){World.debugLine_start=p;World.debugLineFinished=World.pauseRelativeTime+3.0;V3 dbg=ok?ScreenPointToRayOffset(f,r,0,0):d0;RaycastHit dh=ok?bh:fh;World.debugLine_end=dh.hit?dh.point:(V3){dbg.x*FROB_DISTANCE+p.x,dbg.y*FROB_DISTANCE+p.y,dbg.z*FROB_DISTANCE+p.z};}if(!ok){if(fh.hit){u16 idx=fh.hitInstanceIndex;if(idx<World.instCount){u16 ei=World.instances[idx].index;if(IdxIsGeometry(ei)||IdxIsDoor(ei)||World.instances[idx].index>=595){int t=UseNameTableIndex(ei);CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t>=0?Sys_Text.stringTable[t]:"");return;}}}CenterStatusPrint("%s",Sys_Text.stringTable[30]);}else UseEntity(bh.hitInstanceIndex);}
 // Update
 void WeaponsUpdate(); void TextureSequenceUpdate(u16 self); void AIAnimationControllerUpdate(u16 selfIdx); void AIControllerUpdate(u16 selfIdx);
 extern float sightPointHeights[NUM_AI_TYPES];
@@ -799,7 +800,7 @@ void DrawAIDebug(u16 i) {
 }
 
 void ModUpdate() {
-    if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
+    if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); InventoryUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);} if(IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }

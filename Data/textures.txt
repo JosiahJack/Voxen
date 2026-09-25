@@ -4580,3 +4580,13 @@ index: 2146
 #Textures/UI/cursors/cursor_normal_dn.png
 index: 2147
 transparent: 1
+#Textures/Sprites/gasexplosion/gasexplosion_0.png
+index: 2148
+#Textures/Sprites/gasexplosion/gasexplosion_1.png
+index: 2149
+#Textures/Sprites/gasexplosion/gasexplosion_2.png
+index: 2150
+#Textures/Sprites/gasexplosion/gasexplosion_3.png
+index: 2151
+#Textures/Sprites/gasexplosion/gasexplosion_4.png
+index: 2152

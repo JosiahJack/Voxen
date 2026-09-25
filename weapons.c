@@ -101,7 +101,8 @@ void CompleteWeaponChange() {
 }
 
 void WeaponFireStartWeaponDip(float t); // Forward declaration from citadel.c
-void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev
+void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev; dead in cyberspace, only 2 weapons so up is down
+    if (World.curLev == LEVEL_CYBERSPACE) { World.invP1.isPulserNotDrill = !World.invP1.isPulserNotDrill; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ return; }
     if (World.invP1.reloadFinished > World.pauseRelativeTime) return; // Dip in progress
     int curSlot = (int)World.invP1.weaponCurrent;
     int nextSlot = curSlot;
@@ -137,17 +138,39 @@ void UpdateWeaponReloadDip() {
 }
 
 static void RotateViewWeapon() { if(!World.inventoryMode) {wfx.reloadContainerRot=QUAT_IDENTITY; return;} float h = (float)Sys_Settings.ScreenWidth * 0.5f; wfx.reloadContainerRot = QuatEulerY(wfx.wepYRot = ((wfx.tempVec.x - h) / h) * 48.0f); }
+/* Entity const index -> particleTypeDefs[] index, matched by the emitter's GameObject name in particles.c. */
 static u16 ImpactParticleType(u16 prefab) {
     switch (prefab) {
-        case 721: return 17; case 722: return 19; case 723: return 20; case 724: return 18;
-        case 725: return 13; case 726: return 27; case 729: return 38; case 730: return 40;
-        case 731: return 42; case 739: return 16; case 740: return 30;
-        default: return U16_MAX;
+        case 721: return 13;  /* ef_particle_bloodspurtsmall */       case 722: return 15;  /* ef_particle_bloodspurtsmallgreen */
+        case 723: return 16;  /* ef_particle_bloodspurtsmallyellow */ case 724: return 14;  /* ef_particle_bloodspurttiny */
+        case 725: return 21;  /* ef_particle_camerahit */             case 726: return 23;  /* ef_particle_darthit */
+        case 729: return 35;  /* ef_particle_sparksmall */            case 730: return 37;  /* ef_particle_sparkssmallblue */
+        case 731: return 39;  /* ef_particle_sparqhit */              case 739: return 12;  /* ef_particle_blasterhit */
+        case 740: return 26;  /* ef_particle_ionhit */
+        default: return U16_MAX;/* 756 leafburst, 757 mutationburst, 758 graytationburst have no preset in the table */
     }
 }
 static bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     u16 type=ImpactParticleType(prefab); const PSysDef* preset=PSysTypeGet(type); if (!preset) return false;
     PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); def.emitRate=60.0f; if (def.duration<=0.0f || def.duration>2.0f) def.duration=1.0f; PSysAdd(&def); return true;
+}
+/* Projectile const index -> its own ProjectileEffectImpact.impactType pool, matched by the emitter's GameObject name in particles.c. */
+static u16 ProjectileImpactParticleType(u16 projectile) {
+    switch (projectile) {
+        case 481: return 148; /* proj_enemshot2 */         case 482: case 490: return 154; /* proj_magpulse_shot, proj_magpulsenpc_shot */
+        case 483: return 159; /* proj_stungun_shot */     case 484: case 491: return 158; /* proj_rail_shot, proj_railnpc_shot */
+        case 485: return 156; /* proj_plasmarifle_shot */ case 486: return 153; /* proj_enemshot6 */
+        case 487: return 152; /* proj_enemshot5 */        case 488: return 150; /* proj_enemshot4 */
+        case 489: return 35;  /* proj_throwingstar uses PoolType.SparksSmall */
+        default: return U16_MAX;/* 492..495 use PoolType.CyberDissolve, whose emitter isn't in the particle table */
+    }
+}
+void SpawnProjectileImpactParticles(u16 projectile,V3 pos,V3 normal) {
+    /* Unity spawns the projectile's own pooled impact effect; blood/spark-by-bloodtype
+       effects are hitscan-only (WeaponFire/AIController), so they aren't spawned here. */
+    u16 type=ProjectileImpactParticleType(projectile); const PSysDef* preset=PSysTypeGet(type); if(!preset)return;
+    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal);
+    def.emitRate=60.0f; if (def.duration<=0.0f || def.duration>2.0f) def.duration=1.0f; PSysAdd(&def);
 }
 static bool DidRayHit(int wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right);dir.x+=random_range(-d,d);dir.y+=random_range(-d,d);RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;return true;}return false;}
 void CreateStandardImpactMarks(int wep16) {
@@ -258,14 +281,28 @@ void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u
 void FireRapier(int wep16) { FireMelee(wep16, true,  false, 246, 247, 246); } // wlaserrapier_hit/swing
 void FirePipe(int wep16)   { FireMelee(wep16, false, false, 253, 254, 252); } // wpipe_hit/swing/dmg
 void FireBeachball(int wep16, float shoveForce, u16 prefabID) { // Acts like a beachball for NPC collisions, but a baseball for walls/floor (prevents corner-catching); handled by the projectile's own collider setup.
-    u16 ball = SpawnDynamicObject(prefabID,1);
-    DamageData dd={.damage=CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16],.owner=PLAYER1,.attackType=attTypeWep[wep16],.offense=offenseWep[wep16],.penetration=penetrationWep[wep16]};
-    (void)dd;// ProjectileEffectImpact.dd = dd; // attach damage payload to the projectile instance TODO
-    World.position[ball] = World.position[PLAYER1];
-    V3 fwd = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
-    World.instances[ball].forward = fwd;
-    World.velocity[ball] = (V3){0,0,0}; // clear any stale velocity before the impulse
-    World.velocity[ball] = V3_AplusB(World.velocity[ball], V3_ScaleByF(fwd, shoveForce / vmax(World.mass[ball],0.0001f)));
+    u16 ball = SpawnDynamicObject(prefabID,1); if (ball == 0xFFFF || ball >= World.instCount) return;
+    Entity* proj = &World.instances[ball]; u16 wc = World.invP1.weaponCurrent; bool alt = World.invP1.wepLoadedWithAlternate[wc];
+    World.layer[ball] = L_PlayerBullets; proj->forward = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
+    proj->damage = alt ? dmgForWep2[wep16] : (CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16]); proj->strength = alt ? penetrationWep2[wep16] : penetrationWep[wep16]; proj->speed = alt ? offenseWep2[wep16] : offenseWep[wep16]; proj->attackType = attTypeWep[wep16]; proj->recentMostActivator = PLAYER1; ProjectileEffectImpactInitAfterLoad(ball);
+    World.position[ball] = World.position[PLAYER1]; World.velocity[ball] = (V3){0,0,0}; // clear any stale velocity before the impulse
+    AddForce(ball, V3_ScaleByF(proj->forward, shoveForce), true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
+}
+void FireCyberBeachball(bool isPulser, float shoveForce, u16 prefabID) { // Same beachball/baseball split, but damage and attack type come from the held cyber software version
+    u16 ball = SpawnDynamicObject(prefabID,1); if (ball == 0xFFFF || ball >= World.instCount) return;
+    Entity* proj = &World.instances[ball];
+    World.layer[ball] = L_PlayerBullets; proj->forward = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
+    proj->damage = isPulser ? (1.0f + 0.25f * (float)World.invP1.softVersions[SW_PULSER]) : 10.0f * (float)World.invP1.softVersions[SW_DRILL];
+    proj->strength = proj->speed = 0.0f;/*Citadel leaves DamageData.penetration/offense at 0 on the cyber path*/
+    proj->attackType = isPulser ? Att_Ball/*ProjectileLaunched*/ : Att_Drill; proj->recentMostActivator = PLAYER1; ProjectileEffectImpactInitAfterLoad(ball);
+    World.position[ball] = World.position[PLAYER1]; World.velocity[ball] = (V3){0,0,0};
+    AddForce(ball, V3_ScaleByF(proj->forward, shoveForce), true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
+}
+void FireCyberWeapon(void) { // Reuses waitTilNextFire: cyberspace has no equipped weapon, so it is free to carry the cyber fire rate
+    if (World.invP1.waitTilNextFire >= World.pauseRelativeTime) return;
+    if (World.invP1.isPulserNotDrill) { if (!(World.invP1.hasSoft & (1u<<SW_PULSER))) return; World.shotsFired++; FireCyberBeachball(true,railgunShotForce,492); play_wav(sounds[258],AppliedFXVol(1.0f),World.position[PLAYER1],false);/*wpulser*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.08; }
+    else { if (!(World.invP1.hasSoft & (1u<<SW_DRILL))) return; World.shotsFired++; FireCyberBeachball(false,plasmaShotForce,495); play_wav(sounds[241],AppliedFXVol(1.0f),World.position[PLAYER1],false);/*wdrill*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.5; }
+    World.invP1.justFired = World.pauseRelativeTime;
 }
 
 void FirePlasma(int w){FireBeachball(w,plasmaShotForce,485);} void FireRailgun(int w){FireBeachball(w,railgunShotForce,484);} void FireMagpulse(int w){FireBeachball(w,magpulseShotForce,482);} void FireStungun(int w){FireBeachball(w,stungunShotForce,483);}
@@ -294,6 +331,7 @@ void StartNormalAttack(int wep16) { if ((wep16 < 0 || wep16 > 15) || (World.invP
 extern u16 editModeTestEntityDefinition;
 void CheckAttackInput(void) {
     if(!Attack()){return;} if(World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive=0; return;}
+    if (World.curLev == LEVEL_CYBERSPACE) { FireCyberWeapon(); return; }
     if (editFieldEditing || EditPanelPointerHover()) { return; }
     if (Cheats.editMode/*TODO use submode of editMode instead for spamming physobjects for fun and testing physics*/){World.invP1.holdingObject = true; World.invP1.heldObjectIndex = editModeTestEntityDefinition;}
     if (World.invP1.holdingObject && !World.mouseClickHeldOverGUI) { if (World.uiIsBlocking) { DropHeldItem(); return; } AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); return; }

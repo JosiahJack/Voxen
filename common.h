@@ -306,7 +306,7 @@ typedef struct { V3 normal; float d; } FrustumPlane; extern FrustumPlane lightFr
 typedef struct PngArena { u8*base,*cursor,*end; } PngArena; extern PngArena png_arena_main;
 extern bool instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS],window_has_focus,ignore_next_mouse_delta,returnToPause,mouseMovementThisFrame,firstFrameMouselook; extern u8 particleBlendTexture[MAX_TXRS]; extern u8 currentPlayerNameLength; extern i8 currentMenuItem;
 typedef struct { int width,height; u8* pixels; } WinSysIcon;
-RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
+RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3); void ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
 u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
 void AutomapTick(),AutomapInitGL(),AutomapBlitToUI(),AutomapNewGame(),AutomapOnLoad(),AutomapDumpBMP(),BiomonitorDumpBMP(),BioMonitorInit(),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),HudHeatBleed(float),CyberSwitchInitAfterLoad(u16),synth_set_reverb_preset(u16),MFD_ResetGeneral(); bool HudHeatTickOn(int);
 double get_time();
@@ -391,6 +391,14 @@ INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ?
 typedef struct PSysDef { V3 pos; u32 textures[16]; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness,shapeRadius,shapeAngle; u8 shapeType; Color colStart,colEnd; Color rampColors[16]; float rampTimes[16]; u8 rampCount; float scaleKeys[16],scaleTimes[16]; u8 scaleCount; float velKeys[16],velTimes[16]; u8 velCount; float rotKeys[16],rotTimes[16];
                          u8 rotCount; float emissKeys[16],emissTimes[16]; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; } PSysDef;
 typedef struct { const char* prefab; const char* gameObject; u64 sourceId; PSysDef def; } ParticleTypeDef;
+/* particleTypeDefs[] indices for the grenade explosion pool effects (Citadel PoolType.GrenadeFragExplosions/EMPExplosions/GasExplosions) */
+#define PSYS_CentralFireball 5
+#define PSYS_FireSpits 6
+#define PSYS_ef_empexplosion 162
+#define PSYS_sprinkles 163
+#define PSYS_sparkles 164
+#define PSYS_gasExplosions 165
+#define PSYS_gasSmoke 166
 const PSysDef* PSysTypeGet(u16);
 u16 PSysAdd(const PSysDef*); void PSysAddLevelLoops(void),PSysClearLevel(u8);
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);

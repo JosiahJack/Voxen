@@ -23,6 +23,14 @@ typedef enum{UI_ID_NONE,
 #define UI_KEY_BACKSPACE 10
 #define UI_KEY_CLEAR 11
 INLINE bool CursorIsOverBounds(float x0, float x1, float y0, float y1) { return World.cursorPos_x >= x0 && World.cursorPos_x <= x1 && World.cursorPos_y >= y0 && World.cursorPos_y <= y1;/*0,0=top left*/ }
+/* Projects a world point (relative to the player) into the 1366x768 UI space. Inverse of ScreenPointToRay: the
+   renderer uses a vertical FOV scaled by the real window aspect, so x needs the aspect term and y does not. */
+INLINE bool WorldToScreenPoint(V3 d, float* sx, float* sy) {
+    V3 f=World.instances[PLAYER1].forward,rt=World.instances[PLAYER1].right,ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(rt,ff));
+    float bz=V3_dot(d,f); if(bz<=0.01f)return false;
+    float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,hw=(float)UI_W*0.5f,hh=(float)UI_H*0.5f;
+    *sx=hw+V3_dot(d,rt)*(hw*aspect)/(bz*tanFov); *sy=hh-V3_dot(d,up)*hh/(bz*tanFov); return *sx > -48.0f && *sx < (float)UI_W+48.0f && *sy > -48.0f && *sy < (float)UI_H+48.0f;
+}
 INLINE void UIR(u32 id, i16 x, i16 y, i16 w, i16 h){if(!id)return; if(!World.uiComponents[id].initialized){World.uiComponents[id].min=(V2){(float)x,(float)y}; World.uiComponents[id].max=(V2){(float)(x+w),(float)(y+h)}; World.uiComponents[id].initialized=true;} World.uiComponents[id].active=true;}
 INLINE void UIRImg(u32 id, i16 x, i16 y, i16 w, i16 h, u16 tex) { UIR(id,x,y,w,h); RenderUIImage(x,y,w,h,tex); }
 INLINE i16 UITextW(const char* t, float sc, i16 maxW) { float w=MeasureLineAdvance(t,FONT_NORMAL)*sc; if (w<1.0f) w=1.0f; return (maxW>0 && w>(float)maxW) ? maxW : (i16)w; }
@@ -350,10 +358,14 @@ void UI_LogMore(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_U
 void UI_LogBack(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; else if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; else World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; }
 void UI_NoteToggleClick(int note) { World.Sys_UI.mouseClickHeldOverGUI=true; if (note<0||note>17) return; if (!World.questNotesActive[note]) return; World.questNotesChecked[note]=!World.questNotesChecked[note]; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>=HW_COUNT) return; World.invP1.hardwareInvCurrent=idx; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>6) return;
-    if (idx==SW_GAMES) { if (World.invP1.hasMinigame) { World.Sys_UI.mg_current=-1; MFD_OpenData(false,9); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); } return; }
-    if (idx<=2) World.invP1.cyberItemIndex=(i8)idx;/*row 0 Turbo, 1 Decoy, 2 Recall arm the cyber item*/
-    play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+void UseCyberspaceItemByIndex(int);
+void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>6) return; bool cyber = World.curLev == LEVEL_CYBERSPACE;/*row 0 ICE Drill, 1 Pulser, 2 Cyber Shield, 3 Turbo, 4 Decoy, 5 Recall, 6 Games*/
+    if (idx==SW_DRILL)  { World.invP1.isPulserNotDrill = false; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ return; }
+    if (idx==SW_PULSER) { World.invP1.isPulserNotDrill = true;  play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ return; }
+    if (idx==SW_SHIELD) { CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 461 : 460]); return; }
+    if (idx==SW_GAMES)  { if (World.invP1.hasMinigame) { if (!cyber) { World.Sys_UI.mg_current=-1; MFD_OpenData(false,9); } CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 443 : 309]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false); } return; }
+    if (!cyber) { CenterStatusPrint("%s",Sys_Text.stringTable[460]); return; }
+    UseCyberspaceItemByIndex(idx - SW_TURBO); }
 void UI_WeaponIconClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastWeaponSideRH=rh; if (CurrentWeaponUsesEnergy()) OverloadButtonAction(); else ActualChangeAmmoType(); }
 void UI_AutomapClick(bool rh,int action) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastAutomapSideRH=rh; u8 side=rh?1:0; u8* z=&World.automapZoom;/*single shared zoom: both MFDs blit the same automap texture, so either side's buttons drive it*/
     if (World.invP1.hwVers[HW_NAV_IDX]<2 && action!=UI_AUTOMAP_FULL && action!=UI_AUTOMAP_SIDE) { CenterStatusPrint("%s",Sys_Text.stringTable[465]); return; }/*Map hardware version doesn't support zoom.*/
@@ -714,11 +726,11 @@ void CenterMFD() { //640x240
         if (World.Sys_UI.MFD_CenterTab==4) {/*Software*/
             UIRText(UI_ID_CMFD_SOFTWARE_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[876]/*SOFTS*/);
             for (int i=0;i<7;++i) { bool owned; int count=0;
-                if (i<=2) owned=(World.invP1.hasSoft&(1u<<(i+3)))!=0; else if (i<=5) { count=World.invP1.softVersions[i]; owned=count>0 || (World.invP1.hasSoft&(1u<<(i+3)))!=0; if (count<0) count=0; } else owned=World.invP1.hasMinigame;
+                if (i<SW_GAMES) { count=World.invP1.softVersions[i]; if (count<0) count=0; owned=(World.invP1.hasSoft&(1u<<i))!=0 || count>0; } else owned=World.invP1.hasMinigame;
                 if (!owned) continue;
-                i16 y=(i16)(588+i*32); const char* label=swLabels[i]; bool selected=i==World.invP1.cyberItemIndex; float w=MeasureLineAdvance(label,FONT_NORMAL),sc=w>0?vmin(0.8f,210.0f/w):0.8f;
+                i16 y=(i16)(588+i*32); const char* label=swLabels[i]; bool selected = (i==SW_DRILL) ? !World.invP1.isPulserNotDrill : (i==SW_PULSER) ? World.invP1.isPulserNotDrill : (i>=SW_TURBO && i<=SW_RECALL) ? (i-SW_TURBO)==World.invP1.cyberItemIndex : false; float w=MeasureLineAdvance(label,FONT_NORMAL),sc=w>0?vmin(0.8f,210.0f/w):0.8f;
                 UIRText(UI_ID_CMFD_SOFTWARE_ROW_0+i,454,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,sc,210,label);
-                if (i<=2) RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"v%d",World.invP1.softVersions[i]+1); else if (i<=5) RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"x%d",count); else RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0); }
+                if (i<SW_GAMES) RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,(i<=SW_SHIELD)?"v%d":"x%d",count); else RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0); }
         }
         if (World.Sys_UI.MFD_CenterTab!=5) return;/*EReader*/
         UIRText(UI_ID_CMFD_MEDIA_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[877]/*LOGS*/);
@@ -860,7 +872,7 @@ static double RenderUI() {
         if (!Cheats.noHUD) {
             for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){/*TargetID*/
                 Entity* e=&World.instances[i]; if(!IdxIsNPC(e->index))continue; V3 tpos=World.position[i]; tpos.y+=0.48f; i16 textIdx=TargetIDGetText(i); bool tid=TargetIDShouldRender(i),hw=(World.invP1.hasHardware&HW_TID)!=0; float targetRange=V3_Dist(tpos,World.position[PLAYER1]); bool alive=(e->entflags&EF_ACTIVE)&&!(e->entflags&EF_DEAD)&&e->health>0.0f; bool exception=!hw&&alive&&targetRange<=10.0f&&(textIdx==511||(textIdx==536&&tid)); if(!tid&&!exception)continue;
-                V3 f=World.instances[PLAYER1].forward,rt=World.instances[PLAYER1].right,ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(rt,ff)),d=V3_AsubB(tpos,World.position[PLAYER1]); float bz=V3_dot(d,f); if(bz<=0.01f)continue; float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),k=384.0f/(bz*tanFov),sx=683.0f+V3_dot(d,rt)*k,sy=384.0f-V3_dot(d,up)*k; if(sx < -48.0f||sx > 1414.0f||sy < -48.0f||sy > 816.0f)continue;
+                float sx,sy; if(!WorldToScreenPoint(V3_AsubB(tpos,World.position[PLAYER1]),&sx,&sy))continue;
                 if(tid&&hw)RenderUIImage((i16)(sx-64.0f),(i16)sy,128,128,1051);
                 char label[192]={0}; size_t used=0; u8 ver=World.invP1.hwVers[HW_TID_IDX]; float range=targetRange;
                 if(tid&&hw){
@@ -908,8 +920,7 @@ static double RenderUI() {
         }
         if (EditSelIsActive()) {/*Edit mode selection highlight + object info panel*/
             u16 sel=editModeSelection; Entity* e=&World.instances[sel];
-            V3 f=World.instances[PLAYER1].forward,rt=World.instances[PLAYER1].right,ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(rt,ff)),d=V3_AsubB(World.position[sel],World.position[PLAYER1]); float bz=V3_dot(d,f);
-            if (bz > 0.01f) { float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),k=384.0f/(bz*tanFov); float sx=683.0f+V3_dot(d,rt)*k, sy=384.0f-V3_dot(d,up)*k; if (sx > -48.0f && sx < 1414.0f && sy > -48.0f && sy < 816.0f) RenderUIImage((i16)(sx-24.0f),(i16)(sy-24.0f),48,48,1051); }
+            float sx,sy; if (WorldToScreenPoint(V3_AsubB(World.position[sel],World.position[PLAYER1]),&sx,&sy)) RenderUIImage((i16)(sx-24.0f),(i16)(sy-24.0f),48,48,1051);
             RenderUIImage(966,84,400,600,1025);/*Edit object info panel bg (non-interactive backdrop)*/
             RenderTextL(EF_LABELX,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT OBJECT #%u",sel); {char v[40];sFormat(v,40,"%u",e->index);RenderTextL(EF_LABELX,132,T_GREEN,FONT_NORMAL,1.0f,"const index"); RenderTextL(EF_VALUEX,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
             for(int i=0;i<EF_LAST;++i){u8 slot=(u8)i;i16 y=efRowY[i];char v[40];EditFieldValueText(slot,sel,v,40);
