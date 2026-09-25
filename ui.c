@@ -4,7 +4,7 @@ void BiomonitorBlitToUI();
 #define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,UI_ID_##P##_TAB_ITEM,UI_ID_##P##_TAB_AUTOMAP,UI_ID_##P##_TAB_DATA,UI_ID_##P##_PANEL,UI_ID_##P##_WEAPON_NAME,UI_ID_##P##_WEAPON_ICON,UI_ID_##P##_WEAPON_AMMO,UI_ID_##P##_WEAPON_RELOAD,UI_ID_##P##_WEAPON_UNLOAD,UI_ID_##P##_WEAPON_OVERLOAD,UI_ID_##P##_WEAPON_ENERGY_SLIDER,UI_ID_##P##_MEDIA_HEADER,UI_ID_##P##_MEDIA_TAB_0,UI_ID_##P##_MEDIA_TAB_3=UI_ID_##P##_MEDIA_TAB_0+3,UI_ID_##P##_ITEM_NAME,UI_ID_##P##_ITEM_ICON,UI_ID_##P##_ITEM_USE,UI_ID_##P##_ITEM_VAPORIZE,UI_ID_##P##_ITEM_TIMER_VALUE,UI_ID_##P##_ITEM_TIMER_SLIDER,UI_ID_##P##_ITEM_ACCESS_CARDS,UI_ID_##P##_BLOCKED_SECURITY_TEXT,\
     UI_ID_##P##_ELEV_FLOOR_INDICATOR,UI_ID_##P##_ELEV_BUTTON_0,UI_ID_##P##_ELEV_BUTTON_7=UI_ID_##P##_ELEV_BUTTON_0+7,UI_ID_##P##_ELEV_CLOSE,UI_ID_##P##_KEYCODE_0,UI_ID_##P##_KEYCODE_11=UI_ID_##P##_KEYCODE_0+11,UI_ID_##P##_KEYCODE_DIGIT_0,UI_ID_##P##_KEYCODE_DIGIT_2=UI_ID_##P##_KEYCODE_DIGIT_0+2,UI_ID_##P##_KEYCODE_CLOSE,UI_ID_##P##_AUDIOLOG_IMAGE,UI_ID_##P##_AUDIOLOG_NAME,UI_ID_##P##_AUDIOLOG_SENDER,UI_ID_##P##_AUDIOLOG_SUBJECT,\
     UI_ID_##P##_PUZZLE_NODE_SOURCE,UI_ID_##P##_PUZZLE_NODE,UI_ID_##P##_PUZZLE_CELL_0,UI_ID_##P##_PUZZLE_CELL_34=UI_ID_##P##_PUZZLE_CELL_0+34,UI_ID_##P##_PUZZLE_SLIDER,UI_ID_##P##_PUZZLE_CLOSE,UI_ID_##P##_WIRE_SLIDER,UI_ID_##P##_WIRE_TARGET,UI_ID_##P##_WIRE_NODE_0,UI_ID_##P##_WIRE_NODE_13=UI_ID_##P##_WIRE_NODE_0+13,UI_ID_##P##_WIRE_CLOSE,UI_ID_##P##_SYS_HEADER,UI_ID_##P##_SYS_DESC_0,UI_ID_##P##_SYS_DESC_10=UI_ID_##P##_SYS_DESC_0+10,UI_ID_##P##_SYS_VAL_0,UI_ID_##P##_SYS_VAL_10=UI_ID_##P##_SYS_VAL_0+10,UI_ID_##P##_SYS_CLOSE,\
-    UI_ID_##P##_MINIGAMES_HEADER,UI_ID_##P##_MINIGAME_0,UI_ID_##P##_MINIGAME_8=UI_ID_##P##_MINIGAME_0+8,UI_ID_##P##_MINIGAMES_FOOTER,UI_ID_##P##_MINIGAME_VIEW,UI_ID_##P##_MINIGAME_BACK,UI_ID_##P##_MINIGAME_CLOSE,UI_ID_##P##_SEARCH_NAME,UI_ID_##P##_SEARCH_ICON_0,UI_ID_##P##_SEARCH_ICON_3=UI_ID_##P##_SEARCH_ICON_0+3,UI_ID_##P##_SEARCH_EMPTY,UI_ID_##P##_SEARCH_CLOSE,UI_ID_##P##_AUTOMAP_ZOOM_IN,UI_ID_##P##_AUTOMAP_ZOOM_OUT
+    UI_ID_##P##_MINIGAMES_HEADER,UI_ID_##P##_MINIGAME_0,UI_ID_##P##_MINIGAME_8=UI_ID_##P##_MINIGAME_0+8,UI_ID_##P##_MINIGAMES_FOOTER,UI_ID_##P##_MINIGAME_VIEW,UI_ID_##P##_MINIGAME_BACK,UI_ID_##P##_MINIGAME_CLOSE,UI_ID_##P##_SEARCH_NAME,UI_ID_##P##_SEARCH_ICON_0,UI_ID_##P##_SEARCH_ICON_3=UI_ID_##P##_SEARCH_ICON_0+3,UI_ID_##P##_SEARCH_EMPTY,UI_ID_##P##_SEARCH_CLOSE,UI_ID_##P##_AUTOMAP_ZOOM_IN,UI_ID_##P##_AUTOMAP_ZOOM_OUT,UI_ID_##P##_AUTOMAP_FULL
 typedef enum{UI_ID_NONE,
     /*Menu*/UI_ID_MENU_SINGLEPLAYER,UI_ID_MENU_MULTIPLAYER,UI_ID_MENU_OPTIONS,UI_ID_MENU_QUIT,UI_ID_MENU_CONTINUE,UI_ID_MENU_NEW_GAME,UI_ID_MENU_PLAY_INTRO,UI_ID_MENU_PLAY_CREDITS,UI_ID_MENU_BACK,UI_ID_MENU_TAB_GRAPHICS,UI_ID_MENU_TAB_INPUT,UI_ID_MENU_TAB_AUDIO_LANG,UI_ID_MENU_MODEL_DETAIL,UI_ID_MENU_FXAA,UI_ID_MENU_SHADOWS,UI_ID_MENU_SSR,UI_ID_MENU_VSYNC,UI_ID_MENU_FOV_SLIDER,UI_ID_MENU_GAMMA_SLIDER,UI_ID_MENU_RESOLUTION,UI_ID_MENU_FULLSCREEN,UI_ID_MENU_TOGGLE_MONITOR,UI_ID_MENU_RES_APPLY,UI_ID_MENU_MASTER_VOLUME_SLIDER,UI_ID_MENU_MUSIC_VOLUME_SLIDER,UI_ID_MENU_INPUT_0,UI_ID_MENU_INPUT_40=UI_ID_MENU_INPUT_0+40,
     /*NewGame*/UI_ID_MENU_NAME_INPUT,UI_ID_MENU_DIFF_COMBAT,UI_ID_MENU_DIFF_PUZZLE,UI_ID_MENU_DIFF_MISSION,UI_ID_MENU_DIFF_CYBER,UI_ID_MENU_DIFF_CELL_0,UI_ID_MENU_DIFF_CELL_15=UI_ID_MENU_DIFF_CELL_0+15,UI_ID_MENU_START,
@@ -13,7 +13,7 @@ typedef enum{UI_ID_NONE,
     /*Center MFD*/UI_ID_CMFD_ADD_TO_INVENTORY,UI_ID_CMFD_TAB_MAIN,UI_ID_CMFD_TAB_HARDWARE,UI_ID_CMFD_TAB_GENERAL,UI_ID_CMFD_TAB_SOFTWARE,UI_ID_CMFD_WEAPON_HEADER,UI_ID_CMFD_SHOTS_HEADER,UI_ID_CMFD_WEAPON_ROW_0,UI_ID_CMFD_WEAPON_ROW_6=UI_ID_CMFD_WEAPON_ROW_0+6,UI_ID_CMFD_GREN_HEADER,UI_ID_CMFD_PATCH_HEADER,UI_ID_CMFD_GREN_USE_0,UI_ID_CMFD_GREN_USE_6=UI_ID_CMFD_GREN_USE_0+6,UI_ID_CMFD_GREN_ROW_0,UI_ID_CMFD_GREN_ROW_6=UI_ID_CMFD_GREN_ROW_0+6,
     UI_ID_CMFD_PATCH_USE_0,UI_ID_CMFD_PATCH_USE_6=UI_ID_CMFD_PATCH_USE_0+6,UI_ID_CMFD_PATCH_ROW_0,UI_ID_CMFD_PATCH_ROW_6=UI_ID_CMFD_PATCH_ROW_0+6,UI_ID_CMFD_HARDWARE_HEADER,UI_ID_CMFD_HARDWARE_ROW_0,UI_ID_CMFD_HARDWARE_ROW_11=UI_ID_CMFD_HARDWARE_ROW_0+11,UI_ID_CMFD_GENERAL_HEADER,UI_ID_CMFD_GENERAL_USE_0,UI_ID_CMFD_GENERAL_USE_13=UI_ID_CMFD_GENERAL_USE_0+13,UI_ID_CMFD_GENERAL_ROW_0,UI_ID_CMFD_GENERAL_ROW_13=UI_ID_CMFD_GENERAL_ROW_0+13,UI_ID_CMFD_SOFTWARE_HEADER,UI_ID_CMFD_SOFTWARE_ROW_0,UI_ID_CMFD_SOFTWARE_ROW_6=UI_ID_CMFD_SOFTWARE_ROW_0+6,
     UI_ID_CMFD_MEDIA_HEADER,UI_ID_CMFD_LOG_TABLE_0,UI_ID_CMFD_LOG_TABLE_9=UI_ID_CMFD_LOG_TABLE_0+9,UI_ID_CMFD_LOG_ENTRY_0,UI_ID_CMFD_LOG_ENTRY_14=UI_ID_CMFD_LOG_ENTRY_0+14,UI_ID_CMFD_LOG_TEXT,UI_ID_CMFD_LOG_MORE,UI_ID_CMFD_LOG_BACK,UI_ID_CMFD_EMAIL_ENTRY_0,UI_ID_CMFD_EMAIL_ENTRY_14=UI_ID_CMFD_EMAIL_ENTRY_0+14,UI_ID_CMFD_DATA_ENTRY_0,UI_ID_CMFD_DATA_ENTRY_12=UI_ID_CMFD_DATA_ENTRY_0+12,UI_ID_CMFD_NOTE_TOGGLE_0,UI_ID_CMFD_NOTE_TOGGLE_17=UI_ID_CMFD_NOTE_TOGGLE_0+17,
-    /*Misc overlays*/UI_ID_CMFD_MISSION_TIMER,UI_ID_CMFD_CYBER_TIMER,UI_ID_CMFD_BIOMONITOR,UI_ID_CMFD_EDIT_PANEL,UI_ID_CMFD_EDIT_ROW_0,UI_ID_CMFD_EDIT_ROW_14=UI_ID_CMFD_EDIT_ROW_0+14,UI_ID_VMAIL_VIEWER,UI_ID_SENSA_CTR,UI_ID_SENSA_LH,UI_ID_SENSA_RH,
+    /*Misc overlays*/UI_ID_CMFD_MISSION_TIMER,UI_ID_CMFD_CYBER_TIMER,UI_ID_CMFD_BIOMONITOR,UI_ID_CMFD_EDIT_PANEL,UI_ID_CMFD_EDIT_ROW_0,UI_ID_CMFD_EDIT_ROW_14=UI_ID_CMFD_EDIT_ROW_0+14,UI_ID_VMAIL_VIEWER,UI_ID_FULLMAP_CLOSE,UI_ID_SENSA_CTR,UI_ID_SENSA_LH,UI_ID_SENSA_RH,
     UI_MFD_IDS(LMFD),UI_ID_SIDEMFD_PAD,UI_MFD_IDS(RMFD),UI_ID_COUNT,
 } UIRegionID;
 #define UI_MFD_STRIDE (UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON)
@@ -356,12 +356,14 @@ void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if 
     play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_WeaponIconClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastWeaponSideRH=rh; if (CurrentWeaponUsesEnergy()) OverloadButtonAction(); else ActualChangeAmmoType(); }
 void UI_AutomapClick(bool rh,int action) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastAutomapSideRH=rh; u8 side=rh?1:0; u8* z=&World.automapZoom;/*single shared zoom: both MFDs blit the same automap texture, so either side's buttons drive it*/
-    if (World.invP1.hwVers[HW_NAV_IDX]<2) { CenterStatusPrint("%s",Sys_Text.stringTable[465]); return; }/*Map hardware version doesn't support zoom.*/
+    if (World.invP1.hwVers[HW_NAV_IDX]<2 && action!=UI_AUTOMAP_FULL && action!=UI_AUTOMAP_SIDE) { CenterStatusPrint("%s",Sys_Text.stringTable[465]); return; }/*Map hardware version doesn't support zoom.*/
     if (action==UI_AUTOMAP_ZOOM_IN) { if (*z==0) { CenterStatusPrint("%s",Sys_Text.stringTable[317]); return; } (*z)--; }
     else if (action==UI_AUTOMAP_ZOOM_OUT) { if (*z==2) { CenterStatusPrint("%s",Sys_Text.stringTable[316]); return; } (*z)++; }
-    else if (action==UI_AUTOMAP_FULL) { World.Sys_UI.fullMapOpen[side]=!World.Sys_UI.fullMapOpen[side]; }
+    else if (action==UI_AUTOMAP_FULL) { bool open=!(World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]); World.Sys_UI.fullMapOpen[0]=World.Sys_UI.fullMapOpen[1]=open; }
     else if (action==UI_AUTOMAP_SIDE) { World.Sys_UI.autoSide[side]=!World.Sys_UI.autoSide[side]; }
     else return; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+
+void CloseFullmap() { World.Sys_UI.fullMapOpen[0]=World.Sys_UI.fullMapOpen[1]=false; }
 
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
 static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988}; double avgCPUt[AVG_CPU_TAPS]={0}; int avgCPUt_idx = 0;
@@ -371,7 +373,7 @@ extern double game_actual_start_time; extern u16 editModeTestEntityDefinition;
 enum { EF_POSX,EF_POSY,EF_POSZ,EF_ROTX,EF_ROTY,EF_ROTZ,EF_ROTW,EF_SCLX,EF_SCLY,EF_SCLZ,EF_TEX,EF_MODEL,EF_GLOW,EF_SPEC,EF_NORM,EF_LAST };
 bool editFieldEditing=false; static u8 editFieldSlot=EF_LAST; static char editFieldBuffer[40]={0};
 #define EF_LABELX 982
-#define EF_VALUEX 1088
+#define EF_VALUEX 1108
 static const i16 efRowY[EF_LAST]={160,188,216,244,272,300,328,356,384,412,440,468,496,524,552};
 static const char* efRowLabel[EF_LAST]={"position x","position y","position z","rotation x","rotation y","rotation z","rotation w","scale x","scale y","scale z","texIndex","modelIndex","glowIndex","specIndex","normIndex"};
 extern Quaternion quat_normalize(Quaternion);
@@ -605,7 +607,7 @@ void SideMFD(bool isRH) { // 320x240
                 bool sectionSelected=World.Sys_UI.MFD_MediaTab==section,unread=World.Sys_UI.highlightStatus[section];
                 UIRImg(MID(isRH,MEDIA_TAB_0)+section,(i16)(x+65*section),718,65,40,sectionSelected||unread?1087:1086); RenderTextL(x+65*section,718,sectionSelected?T_GREEN_MENU:T_GREEN_MENU_SHADOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[labels[section]]);
             }
-        } else if (tab == 3) {AutomapBlitToUI();}
+        } else if (tab == 3) {AutomapBlitToUI(); i16 cx=(i16)(AMAP_UI_X_L+(isRH?(AMAP_UI_X_R-AMAP_UI_X_L):0)+AMAP_UI_W/2),fy=691; UIRImg(MID(isRH,AUTOMAP_ZOOM_OUT),cx-40,fy,20,14,1087); RenderTextL(cx-40,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_OUT))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"-"); UIRImg(MID(isRH,AUTOMAP_ZOOM_IN),cx-65,fy,20,14,1087); RenderTextL(cx-65,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_IN))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"+"); UIRImg(MID(isRH,AUTOMAP_FULL),cx+55,fy,40,14,1087); RenderTextL(cx+55,fy,UIOver(MID(isRH,AUTOMAP_FULL))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"FULL");}
         else if (tab==2 && !World.Sys_UI.mfdItemReader[isRH?1:0]) RenderGeneralItem(isRH);
         else if(tab==4){/*DataTab*/
             u8 data = isRH ? World.Sys_UI.MFD_DataR : World.Sys_UI.MFD_DataL; i16 dx = isRH ? 1059 : 0;
@@ -790,6 +792,8 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_TAB_WEAPON ... UI_ID_LMFD_TAB_DATA: MFD_SelectTab((u8)(rh?2:1),(u8)(id-UI_ID_LMFD_TAB_WEAPON+1),true); return;
         case UI_ID_LMFD_AUTOMAP_ZOOM_IN: UI_AutomapClick(rh,UI_AUTOMAP_ZOOM_IN); return;
         case UI_ID_LMFD_AUTOMAP_ZOOM_OUT: UI_AutomapClick(rh,UI_AUTOMAP_ZOOM_OUT); return;
+        case UI_ID_LMFD_AUTOMAP_FULL: UI_AutomapClick(rh,UI_AUTOMAP_FULL); return;
+        case UI_ID_FULLMAP_CLOSE: CloseFullmap(); return;
         case UI_ID_LMFD_MEDIA_TAB_0 ... UI_ID_LMFD_MEDIA_TAB_3: { u8 section=(u8)(id-UI_ID_LMFD_MEDIA_TAB_0); if (section==MM_NOTES && !World.diffMis) return;
             World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened=section; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
             if (section>=MM_DATA_TABLE) { World.Sys_UI.highlightStatus[section]=false; World.Sys_UI.highlightTickCount[section]=0; } play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false); return; }
@@ -871,7 +875,7 @@ static double RenderUI() {
                 RenderTextL(340,72+i*18,World.Sys_UI.tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx[i]],World.Sys_UI.tWrnTextIdx[i]==185?flt:World.Sys_UI.tWrnTextIdx2[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx2[i]]:"",World.Sys_UI.tWrnTextIdx3[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx3[i]]:"");
             }
             
-            SideMFD(false); CenterMFD(); SideMFD(true);
+            if (!World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]) { SideMFD(false); CenterMFD(); SideMFD(true); } else { AutomapBlitFullToUI(); UIRImg(UI_ID_FULLMAP_CLOSE,(i16)((UI_W-146)/2),706,146,28,1087); RenderTextL(610,710,T_YELLOW,FONT_NORMAL,0.8,"CLOSE"); }
             if(World.diffMis>=3){UIR(UI_ID_CMFD_MISSION_TIMER,43,2,260,14); RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.8,"%s",World.misTimerMission<1100?Sys_Text.stringTable[World.misTimerMission]:"");/*MissionTimerT*/ {char misT[8]; if(World.misTimerTimesUP) sFormat(misT,sizeof(misT),"%s",869<1100?Sys_Text.stringTable[869]:""); else {float mt=World.misTimerT<0.0f?0.0f:World.misTimerT; int mm=(int)(mt/60.0f),ss=(int)(mt-(float)(mm*60)); sFormat(misT,sizeof(misT),"%02d:%02d",mm,ss);} RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.8,"%s",misT);}}
             if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.8,"T -"); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"99:99"); }
             if (World.curLev==LEVEL_CYBERSPACE)RenderTextL(1137,570,T_YELLOW,FONT_NORMAL,0.8,Sys_Text.stringTable[442]/*"level 1 elevator taken off line - SHODAN security block established 04.NOV.72"*/);/*CyberSPrint*/
@@ -907,7 +911,7 @@ static double RenderUI() {
             V3 f=World.instances[PLAYER1].forward,rt=World.instances[PLAYER1].right,ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(rt,ff)),d=V3_AsubB(World.position[sel],World.position[PLAYER1]); float bz=V3_dot(d,f);
             if (bz > 0.01f) { float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),k=384.0f/(bz*tanFov); float sx=683.0f+V3_dot(d,rt)*k, sy=384.0f-V3_dot(d,up)*k; if (sx > -48.0f && sx < 1414.0f && sy > -48.0f && sy < 816.0f) RenderUIImage((i16)(sx-24.0f),(i16)(sy-24.0f),48,48,1051); }
             RenderUIImage(966,84,400,600,1025);/*Edit object info panel bg (non-interactive backdrop)*/
-            RenderTextL(EF_LABELX,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT OBJECT #%u",sel); {char v[40];sFormat(v,40,"%u",e->index);RenderTextL(EF_LABELX,132,T_GREEN,FONT_NORMAL,1.0f,"const index");RenderTextL(EF_VALUEX,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
+            RenderTextL(EF_LABELX,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT OBJECT #%u",sel); {char v[40];sFormat(v,40,"%u",e->index);RenderTextL(EF_LABELX,132,T_GREEN,FONT_NORMAL,1.0f,"const index"); RenderTextL(EF_VALUEX,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
             for(int i=0;i<EF_LAST;++i){u8 slot=(u8)i;i16 y=efRowY[i];char v[40];EditFieldValueText(slot,sel,v,40);
                 bool editingThis=editFieldEditing&&editFieldSlot==slot; RenderTextL(EF_LABELX,y,editingThis?T_RED:T_GREEN,FONT_NORMAL,1.0f,"%s",efRowLabel[i]);
                 if(editingThis){char buf[44];sFormat(buf,44,"%s%s",editFieldBuffer,caretOn?"|":"");RenderTextL(EF_VALUEX,y,T_RED,FONT_NORMAL,1.0f,"%s",buf);}
@@ -949,5 +953,9 @@ static double RenderUI() {
     }
     i16 curhalf=CURSOR_SZ/2; float curhalff=(float)curhalf;
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused){RenderUIImage((i16)(World.cursorPos_x) - curhalf,(i16)(World.cursorPos_y) - curhalf,CURSOR_SZ,CURSOR_SZ,GetCursorTexture());}else if (!Cheats.noHUD){RenderUIImage((i16)((float)UI_W*0.5f-curhalff),(i16)((float)UI_H*0.5f-curhalff),CURSOR_SZ,CURSOR_SZ,GetCursorTexture());}/*Centered on UI fixed resolution 1366x768 FBO*/
+    if(World.invP1.grenActive && World.invP1.holdingObject && !World.menuActive && !World.paused && !Cheats.noHUD) {
+        i16 cursorX=World.inventoryMode?World.cursorPos_x:(i16)(UI_W/2),cursorY=World.inventoryMode?World.cursorPos_y:(i16)(UI_H/2);
+        RenderTextL(cursorX+curhalf+6,cursorY-8,T_YELLOW,FONT_NORMAL,0.8f,"Live");
+    }
     return time_now;
 }

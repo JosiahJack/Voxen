@@ -297,7 +297,6 @@ static void AIRun(u16 selfIdx) {
     flag_set(&self->entflags,EF_SHOT_FIRED,false); AISetHuntFinished(selfIdx); NPCTable* ndat = &npcTable[self->index - 419]; float nr = ndat->range, near = nr * nr, mr = ndat->range2, mid  = mr * mr, fr = ndat->range3, far  = fr * fr, rangeToEnemy=100000.0f;
     if (AICanAttack(selfIdx,near,1,&rangeToEnemy)) { AIStartAttack(self,1); return; } if (AICanAttack(selfIdx, mid,2,&rangeToEnemy)) { AIStartAttack(self,2); return; } if (AICanAttack(selfIdx, far,3,&rangeToEnemy)) { AIStartAttack(self,3); return; }
     if (ndat->moveType != AIMoveType_None && rangeToEnemy > AI_STOP_DIST_SQ) { if (AIWithinAngleToTarget(self)) { if (ndat->hopsOnMove && !(World.instances[selfIdx].entflags & EF_ACT_AS_TURRET)){ AIHopMove(selfIdx); } else { AIRunMove(selfIdx); } } else if (World.diffCbt >= 2 && random_range(0.0f,1.0f) < 0.5f) { AIFace(self,self->currentDestination); } }
-    DualLog("NPC %u (state=%d) velocity: %.3f %.3f %.3f\n", World.instances[selfIdx].index, self->currentState, World.velocity[selfIdx].x, World.velocity[selfIdx].y, World.velocity[selfIdx].z);
 }
 
 static void AIPain(Entity* self) { if (self->timeTillPainFinished < World.pauseRelativeTime) { self->currentState = AIState_Run; flag_set(&self->entflags, EF_GO_INTO_PAIN, false); self->timeTillPainFinished = World.pauseRelativeTime + npcTable[self->index - 419].timeBetweenPain; } }

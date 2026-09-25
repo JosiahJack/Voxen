@@ -1,6 +1,7 @@
 // entity.c - Entity Definitions and Save Load System for levels and savegames
 #include "common.h"
-void AddDoorPortal(u16,u16),TextureSequenceInit(u16,char*),AddCamView(V3,Quaternion,u8,u16,u16,float,float); Entity* entsFromFile; V3 *posFromFile, *scaleFromFile; Quaternion *rotationFromFile; Light *lightsFromFile; LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL; u16 headmountedLanternLight; bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
+static u16 teleportDestinations[MAX_LEVELS][8]; static bool teleportDestinationsInitialized;
+void AddDoorPortal(u16,u16),TextureSequenceInit(u16,char*),AddCamView(V3,Quaternion,u8,u16,u16,float,float),GravityLiftSyncAllVisuals(void); Entity* entsFromFile; V3 *posFromFile, *scaleFromFile; Quaternion *rotationFromFile; Light *lightsFromFile; LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL; u16 headmountedLanternLight; bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
 u8 sensaroundCamViewCenter=255,sensaroundCamViewLeft=255,sensaroundCamViewRight=255; // HUD sensaround cam view indices, assigned during level load
 EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,dynFriction,statFriction,animationNum,col,colCtr,colSz
 /*0 chunk_black*/[0]={178,0,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*1 chunk_blocker*/[1]={178,0,1230,MAX_TXRS,1230,160,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*2 chunk_bridg1_1*/[2]={661,0,44,MAX_TXRS,MAX_TXRS,43,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*3 chunk_bridg1_1flipx*/[3]={667,0,44,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -259,7 +260,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*694 func_switch7*/[694]={612,0,854,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{1.523325f,0,0},{0.2008026f,0.64f,0.64f}},/*695 func_switch8*/[695]={616,0,856,855,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.04f,0.0f,0.0001220703f},{0.08f,0.64f,0.64f}},
 /*696 func_switchbroken1*/[696]={617,0,618,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*697 clip_npc*/[697]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{1.005016f,0,0},{2.010033f,16.0f,16.0f}},
 /*698 clip_objects*/[698]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,(V3){0,0,0},(V3){2.56f,2.56f,2.56f}},/*699 logic_relay*/[699]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*700 logic_branch*/[700]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*701 logic_timer*/[701]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*702 logic_spawner*/[702]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*703 info_teleport_destination*/[703]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*701 logic_timer*/[701]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*702 logic_spawner*/[702]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*703 info_teleport_destination*/[703]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_CAP,{0,0,0},{0.75f,2.0f,1.0f}},
 /*704 prop_debris_panel*/[704]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*705 info_cyborgconversion*/[705]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*706 info_elev_destination*/[706]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*707 info_email*/[707]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*708 info_gameend*/[708]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*709 info_message*/[709]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*710 info_mission*/[710]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*711 info_note*/[711]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*712 info_playsound*/[712]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -444,8 +445,10 @@ u16 TextMatIndexToTexIndex(u16 matIndex) {
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
 static char* MmapGetLine(char* buf, int sz){if(mm_ptr>=mm_end){return NULL;} const char* start=mm_ptr; const char* p=start; while(p<mm_end&&*p!='\n'){++p;} int lineLen=(int)(p-start); if(p<mm_end&&*p =='\n'){mm_ptr=p+1;}else{mm_ptr=mm_end;}if(lineLen >= sz){lineLen=sz-1;} mcpy(buf,(void*)start,lineLen); while(lineLen>0&&(buf[lineLen-1]=='\r' || buf[lineLen - 1]=='\n')){--lineLen;} buf[lineLen]='\0'; return buf;}
 static u16 fwParentSnap[MAX_LEVELS][INSTANCE_COUNT]; static bool fwSnapValid[MAX_LEVELS];/*per-level fwParentOf snapshot: fwParentOf is rewritten by every level load; SetLevelPointers restores the current level's*/
+u16 GetTeleportDestination(u8 lev,u16 id){return lev<MAX_LEVELS&&id<8?teleportDestinations[lev][id]:U16_MAX;}
 void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
+    if(teleportDestinationsInitialized)mcpy(World.TeleportTouch_allTeleportTouches,teleportDestinations[lev],sizeof(World.TeleportTouch_allTeleportTouches));
     World.currentLevel=lev; World.instances=World.levelInstances[lev]; World.position=World.levelPosition[lev]; World.scale=World.levelScale[lev]; World.velocity=World.levelVelocity[lev]; World.angularVelocity=World.levelAngularVelocity[lev]; World.colliderCenter=World.levelColliderCenter[lev]; World.colliderSize=World.levelColliderSize[lev]; World.col=World.levelCollider[lev]; World.rotation=World.levelRotation[lev]; World.layer=World.levelLayer[lev];
     World.mass=World.levelMass[lev]; World.radius=World.levelRadius[lev]; World.gravity=World.levelGravity[lev]; World.invInertiaTensor=World.levelInvInertiaTensor[lev]; World.dynamicFriction=World.levelDynamicFriction[lev]; World.staticFriction=World.levelStaticFriction[lev]; World.invTnsrValid=World.levelInvTnsrValid[lev]; World.colliding=World.levelColliding[lev]; World.instCount=World.levelInstCount[lev]; World.lights=World.levelLights[lev]; World.particles=&World.levelParticles[lev]; if (fwSnapValid[lev]) mcpy(fwParentOf,fwParentSnap[lev],sizeof(fwParentOf));/*func_wall child links are per-level*/
     World.lanims=World.levelLAnims[lev]; World.lightsNewPosition=World.levelLightsNewPosition[lev]; World.loadedLights=World.levelLoadedLights[lev]; World.weaponVModelIndex=World.levelWepVModel[lev];
@@ -468,6 +471,17 @@ static DecalPend* PendDecal(u16 ent) {
     if (pendDecalCount && pendDecals[pendDecalCount-1].ent == ent) return &pendDecals[pendDecalCount-1]; // current decal still open
     if (pendDecalCount >= DECAL_INLINE_TEXT_PEND) { DualLogError("decal staging full\n"); return NULL; }
     DecalPend* pd = &pendDecals[pendDecalCount++]; mset(pd,0,sizeof(*pd)); pd->ent=ent; pd->lineSp=1.0f; return pd;
+}
+/* Prefab transforms are inherited when the level data omits unchanged localScale axes. */
+static V3 TriggerPrefabScale(u16 entIdx) {
+    switch (entIdx) {
+        case 595: return (V3){2.56f,2.56f,2.56f}; /* trigger_cyberpush */
+        case 596: return (V3){1.0f,1.0f,1.0f}; /* trigger_gravitylift: scene collider dimensions are baked into level data */
+        case 597: return (V3){1.0f,2.4f,0.16f}; /* trigger_ladder */
+        case 598: case 599: case 600: case 601:
+            return (V3){2.56f,2.56f,2.56f};
+        default: return (V3){1.0f,1.0f,1.0f};
+    }
 }
 u16 IOInternName(const char* name){if(!name || !*name){return IO_NONE;} for(u16 i=1;i<ioNameCount;++i){if(sEqual(ioNames[i],name)){return i;}} if(ioNameCount >= MAX_IO_NAMES){DualLogError("IO name full!\n"); return IO_NONE;} scpy_to_a_from_b(ioNames[ioNameCount],name,TARG_STRLEN); return ioNameCount++;}
 static void FWBeginBlock(i32 cnt){V3 *p,*s; Quaternion *r; if(fwCollecting&&fwLastChunkSlot<FW_MAX_CHILDREN){p=&lwPos[fwLastChunkSlot]; r=&lwRot[fwLastChunkSlot]; s=&lwScale[fwLastChunkSlot];}else{switch(fwStage++){case 1:p=&fwContainerPos; r=&fwContainerRot; s=&fwContainerScale; break; case 2:p=&fwInfoLocalTmp; r=&fwInfoRotDummy; s=&fwInfoScaleDummy; break; default:p=&posFromFile[cnt]; r=&rotationFromFile[cnt]; s=&scaleFromFile[cnt]; break;}} fwCurP=p; fwCurR=r; fwCurS=s;}
@@ -497,7 +511,7 @@ void LoadLevelMod(u8 lev) {
             for (u8 slot=0;slot<4;++slot) inst->contents[slot]=inst->custIdx[slot]=inst->randomItem[slot]=inst->randomItemCustIdx[slot]=-1;
             fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f}; inst->relayEnabled = true;
         }
-        bool activeStateRead = false; bool matIndexRead = false; u16 matIndexTexIdx = 881;
+        bool activeStateRead = false; bool matIndexRead = false; u8 scaleReadMask = 0; u16 matIndexTexIdx = 881;
         while (line[0] != '\0') {
             char* pipe = StringFindFirstCharWithin(line, '|'); char* kvString = line; if (pipe) { *pipe = '\0'; line = pipe + 1; } else { line += slen(line); } if (kvString[0] == '\0') continue; char* colon = StringFindFirstCharWithin(kvString, ':'); if (!colon || colon[1] == '\0') continue; *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);}
@@ -506,10 +520,11 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("lP.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].x=v;} else {FWBeginBlock(entCount); if(fwCurP){fwCurP->x=v;}} } else if(KEY_EQ("lP.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].y=v;} else if(fwCurP){fwCurP->y=v;} }
                 else if(KEY_EQ("lP.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].z=v;} else if(fwCurP){fwCurP->z=v;} }                           else if(KEY_EQ("lR.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].x=v;} else if(fwCurR){fwCurR->x=v;} }
                 else if(KEY_EQ("lR.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].y=v;} else if(fwCurR){fwCurR->y=v;} }                      else if(KEY_EQ("lR.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].z=v;} else if(fwCurR){fwCurR->z=v;} }
-                else if(KEY_EQ("lR.w")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].w=v;} else if(fwCurR){fwCurR->w=v;} }                      else if(KEY_EQ("lS.x"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].x=v;} else if(fwCurS){fwCurS->x=v;} }
-                else if(KEY_EQ("lS.y"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].y=v;} else if(fwCurS){fwCurS->y=v;} }                      else if(KEY_EQ("lS.z"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].z=v;} else if(fwCurS){fwCurS->z=v;} }
+                else if(KEY_EQ("lR.w")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].w=v;} else if(fwCurR){fwCurR->w=v;} }                      else if(KEY_EQ("lS.x"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].x=v; scaleReadMask|=1u;} else if(fwCurS){fwCurS->x=v;} }
+                else if(KEY_EQ("lS.y"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].y=v; scaleReadMask|=2u;} else if(fwCurS){fwCurS->y=v;} }                      else if(KEY_EQ("lS.z"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].z=v; scaleReadMask|=4u;} else if(fwCurS){fwCurS->z=v;} }
                 else if(KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
                 else if(KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("keycode")) inst->keycode=parse_numberu16(value,lineSpace,lineNum);
                 else if(KEY_EQ("radiationAmount")) inst->radiation=parse_float(value,lineSpace,lineNum);                           else if(KEY_EQ("ammo"))inst->ammo=parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("ammo2"))inst->ammo2=parse_numberi16(value,lineSpace,lineNum);                                      else if(KEY_EQ("useableItemIndex"))inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("generateContents")) inst->generateContents = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("searchableInUse")) inst->srchInUse = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("maxRandomItems")) inst->maxRandomItems = (u8)parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[0]")) inst->contents[0] = parse_numberi16(value,lineSpace,lineNum);
@@ -554,6 +569,7 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("resourceFolder") && *value) scpy_to_a_from_b(inst->texAnimResourceFolder, value, TARG_STRLEN);
                 else if(KEY_EQ("lingdex") || KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);                                      else if(KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
                 else if(KEY_EQ("matIndex")) { matIndexRead = true; matIndexTexIdx = TextMatIndexToTexIndex(parse_numberu16(value,lineSpace,lineNum)); }
+                else if(KEY_EQ("texIndex")) inst->texIndex = parse_numberu16(value,lineSpace,lineNum);
                 else if(KEY_EQ("text")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) { u16 k=0; while(value[k] && k<DECAL_INLINE_TEXT_LEN-1) { pd->text[k]=(value[k]=='#')?'\n':value[k]; ++k; } pd->text[k]='\0'; } } }
                 else if(KEY_EQ("tA")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->anchor=(u8)(v<0?0:(v>8?8:v)); } } }
                 else if(KEY_EQ("tAl")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->align=(u8)(v<0?0:(v>2?2:v)); } } }
@@ -586,6 +602,12 @@ void LoadLevelMod(u8 lev) {
             }
         }
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true); // Default active if not specified
+        if (!isLight && entsFromFile[entCount].index >= 595 && entsFromFile[entCount].index <= 601) {
+            V3 prefabScale=TriggerPrefabScale(entsFromFile[entCount].index);
+            if (!(scaleReadMask&1u)) scaleFromFile[entCount].x=prefabScale.x;
+            if (!(scaleReadMask&2u)) scaleFromFile[entCount].y=prefabScale.y;
+            if (!(scaleReadMask&4u)) scaleFromFile[entCount].z=prefabScale.z;
+        }
         if (!isLight && (entsFromFile[entCount].index == 592 || entsFromFile[entCount].index == 593)) entsFromFile[entCount].texIndex = matIndexRead ? matIndexTexIdx : 881; // 3D text decals: material color texture, white default
         if (!isLight && entsFromFile[entCount].index == 517) { // func_wall: stash base transform + chunk children for spawn below
             fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp; u16 n=fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN, start=fwPoolUsed;
@@ -599,12 +621,13 @@ void LoadLevelMod(u8 lev) {
         par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/ par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
         for (u8 slot=0;slot<4;++slot) { par->contents[slot]=src->contents[slot]; par->custIdx[slot]=src->custIdx[slot]; par->randomItem[slot]=src->randomItem[slot]; par->randomItemCustIdx[slot]=src->randomItemCustIdx[slot]; par->randomItemDropChance[slot]=src->randomItemDropChance[slot]; }
         par->generateContents=src->generateContents; par->maxRandomItems=src->maxRandomItems; par->srchInUse=src->srchInUse;
-        par->amount=src->amount; par->resetTime=src->resetTime; par->minSecurityLevel=src->minSecurityLevel; par->damage=src->damage; par->delay=src->delay; par->active=src->active; par->activatedScale=src->activatedScale;
+        par->amount=src->amount; par->resetTime=src->resetTime; par->minSecurityLevel=src->minSecurityLevel; par->keycode=src->keycode; par->damage=src->damage; par->delay=src->delay; par->active=src->active; par->activatedScale=src->activatedScale;
         par->forceFieldDirectionX=src->forceFieldDirectionX; par->forceFieldDirectionY=src->forceFieldDirectionY; par->forceFieldDirectionZ=src->forceFieldDirectionZ; par->fieldColor=src->fieldColor; par->timeInterval=src->timeInterval;
         par->randomMin=src->randomMin; par->randomMax=src->randomMax; par->useRandomTimes=src->useRandomTimes; par->health=src->health; par->cyberHealth=src->cyberHealth; par->radiation=src->radiation; par->idleTime=src->idleTime;
         par->timeSinceMovedEnough=src->timeSinceMovedEnough; par->tickTime=src->tickTime; par->waitBeforeClose=src->waitBeforeClose; par->onlyOnce=src->onlyOnce; par->stayOpen=src->stayOpen; par->startOpen=src->startOpen; par->ajar=src->ajar; par->ajarPercentage=src->ajarPercentage; par->timeBeforeLasersOn=src->timeBeforeLasersOn;
         par->toggleLasers=src->toggleLasers; par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->target2Idx=src->target2Idx; 
         if (entIdx == 592 || entIdx == 593) par->texIndex = src->texIndex; // 3D text decal texture comes from level matIndex, not entity definition
+        else if (entIdx == 112 && src->texIndex > 0 && src->texIndex < MAX_TXRS) par->texIndex = src->texIndex; // Explicit gravity-lift visual material state
         if (entIdx == 592 || entIdx == 593) { DecalPend* pd=NULL; for (u16 k=0;k<pendDecalCount;++k) { if (pendDecals[k].ent == (u16)e) { pd=&pendDecals[k]; break; } } if (pd) { i16 li = (i16)src->messageLingdex;
             if (li <= 0 || li >= T_LOGSTR_CNT) { if (decalInlineTextCount < DECAL_INLINE_TEXT_MAX) { mcpy(decalInlineText[decalInlineTextCount],pd->text,DECAL_INLINE_TEXT_LEN); decalInlineTextLevel[decalInlineTextCount]=curlevel; decalInlineTextInst[decalInlineTextCount]=parent; ++decalInlineTextCount; } else DualLogError("Too many inline text decals\n"); }
             if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
@@ -691,8 +714,10 @@ AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips
 u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span)); }
 void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
 void LoadLevelData(u8 curlevel) {
+    if(!teleportDestinationsInitialized){for(u8 l=0;l<MAX_LEVELS;++l)for(u8 id=0;id<8;++id)teleportDestinations[l][id]=U16_MAX;teleportDestinationsInitialized=true;}
+    if(curlevel<MAX_LEVELS)for(u8 id=0;id<8;++id)teleportDestinations[curlevel][id]=U16_MAX;
     World.curLev = curlevel; TargetIDReset(); SetLevelPointers(curlevel); mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf)); LoadLevelMod(curlevel); PSysAddLevelLoops(); if (curlevel<MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel]=true; } OS_Free(fbuf,(size_t)fsize);
+    mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf)); LoadLevelMod(curlevel); GravityLiftSyncAllVisuals(); PSysAddLevelLoops(); if (curlevel<MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel]=true; } OS_Free(fbuf,(size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
     for (int i = PLAYER1; i < World.instCount; ++i) {
         i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z); World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
@@ -730,9 +755,9 @@ void LoadLevelData(u8 curlevel) {
         } else if(constIndex == 515){func_forcebridge(i);/*func_forcebridge*/}
         else if(constIndex == 716){World.layer[i] = L_Trigger;} // fx_reverbzone
         else if(constIndex == 517){FuncWallInitAfterLoad(i);}
-        else if(constIndex == 596){World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,0.3f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); World.instances[i].topPoint=(V3){0.0f,World.position[i].y + (World.colliderSize[i].y * 0.5f),0.0f}; } /*trigger_gravitylift*/
+        else if(constIndex == 596){World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); World.instances[i].topPoint=(V3){0.0f,World.position[i].y + (World.colliderSize[i].y * 0.5f),0.0f}; } /*trigger_gravitylift*/
         else if(constIndex == 701){LogicTimerInitBeforeLoad(i);}
-        else if(constIndex == 703){if(World.instances[i].teleportID < 8){World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} }/*info_teleport_destination*/
+        else if(constIndex == 703){World.layer[i]=L_Trigger;if(World.instances[i].teleportID < 8){teleportDestinations[curlevel][World.instances[i].teleportID]=i;World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} }/*info_teleport_destination*/
         else if(constIndex == 555){CyberSwitchInitAfterLoad(i);} // prop_cyber_switch
         else if(constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
         else if(IdxIsButtonSwitch(World.instances[i].index)) ButtonSwitchInitAfterLoad(i);
