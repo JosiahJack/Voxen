@@ -1,7 +1,7 @@
 // ui.c - User Interface(UI) aka HUD
 static u32 sensaroundFBO = 0;
 void BiomonitorBlitToUI();
-#define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,UI_ID_##P##_TAB_ITEM,UI_ID_##P##_TAB_AUTOMAP,UI_ID_##P##_TAB_DATA,UI_ID_##P##_PANEL,UI_ID_##P##_WEAPON_NAME,UI_ID_##P##_WEAPON_ICON,UI_ID_##P##_MEDIA_HEADER,UI_ID_##P##_MEDIA_TAB_0,UI_ID_##P##_MEDIA_TAB_3=UI_ID_##P##_MEDIA_TAB_0+3,UI_ID_##P##_ITEM_NAME,UI_ID_##P##_ITEM_ICON,UI_ID_##P##_ITEM_USE,UI_ID_##P##_ITEM_VAPORIZE,UI_ID_##P##_ITEM_TIMER_VALUE,UI_ID_##P##_ITEM_TIMER_SLIDER,UI_ID_##P##_ITEM_ACCESS_CARDS,UI_ID_##P##_BLOCKED_SECURITY_TEXT,\
+#define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,UI_ID_##P##_TAB_ITEM,UI_ID_##P##_TAB_AUTOMAP,UI_ID_##P##_TAB_DATA,UI_ID_##P##_PANEL,UI_ID_##P##_WEAPON_NAME,UI_ID_##P##_WEAPON_ICON,UI_ID_##P##_WEAPON_AMMO,UI_ID_##P##_WEAPON_RELOAD,UI_ID_##P##_WEAPON_UNLOAD,UI_ID_##P##_WEAPON_OVERLOAD,UI_ID_##P##_WEAPON_ENERGY_SLIDER,UI_ID_##P##_MEDIA_HEADER,UI_ID_##P##_MEDIA_TAB_0,UI_ID_##P##_MEDIA_TAB_3=UI_ID_##P##_MEDIA_TAB_0+3,UI_ID_##P##_ITEM_NAME,UI_ID_##P##_ITEM_ICON,UI_ID_##P##_ITEM_USE,UI_ID_##P##_ITEM_VAPORIZE,UI_ID_##P##_ITEM_TIMER_VALUE,UI_ID_##P##_ITEM_TIMER_SLIDER,UI_ID_##P##_ITEM_ACCESS_CARDS,UI_ID_##P##_BLOCKED_SECURITY_TEXT,\
     UI_ID_##P##_ELEV_FLOOR_INDICATOR,UI_ID_##P##_ELEV_BUTTON_0,UI_ID_##P##_ELEV_BUTTON_7=UI_ID_##P##_ELEV_BUTTON_0+7,UI_ID_##P##_ELEV_CLOSE,UI_ID_##P##_KEYCODE_0,UI_ID_##P##_KEYCODE_11=UI_ID_##P##_KEYCODE_0+11,UI_ID_##P##_KEYCODE_DIGIT_0,UI_ID_##P##_KEYCODE_DIGIT_2=UI_ID_##P##_KEYCODE_DIGIT_0+2,UI_ID_##P##_KEYCODE_CLOSE,UI_ID_##P##_AUDIOLOG_IMAGE,UI_ID_##P##_AUDIOLOG_NAME,UI_ID_##P##_AUDIOLOG_SENDER,UI_ID_##P##_AUDIOLOG_SUBJECT,\
     UI_ID_##P##_PUZZLE_NODE_SOURCE,UI_ID_##P##_PUZZLE_NODE,UI_ID_##P##_PUZZLE_CELL_0,UI_ID_##P##_PUZZLE_CELL_34=UI_ID_##P##_PUZZLE_CELL_0+34,UI_ID_##P##_PUZZLE_SLIDER,UI_ID_##P##_PUZZLE_CLOSE,UI_ID_##P##_WIRE_SLIDER,UI_ID_##P##_WIRE_TARGET,UI_ID_##P##_WIRE_NODE_0,UI_ID_##P##_WIRE_NODE_13=UI_ID_##P##_WIRE_NODE_0+13,UI_ID_##P##_WIRE_CLOSE,UI_ID_##P##_SYS_HEADER,UI_ID_##P##_SYS_DESC_0,UI_ID_##P##_SYS_DESC_10=UI_ID_##P##_SYS_DESC_0+10,UI_ID_##P##_SYS_VAL_0,UI_ID_##P##_SYS_VAL_10=UI_ID_##P##_SYS_VAL_0+10,UI_ID_##P##_SYS_CLOSE,\
     UI_ID_##P##_MINIGAMES_HEADER,UI_ID_##P##_MINIGAME_0,UI_ID_##P##_MINIGAME_8=UI_ID_##P##_MINIGAME_0+8,UI_ID_##P##_MINIGAMES_FOOTER,UI_ID_##P##_MINIGAME_VIEW,UI_ID_##P##_MINIGAME_BACK,UI_ID_##P##_MINIGAME_CLOSE,UI_ID_##P##_SEARCH_NAME,UI_ID_##P##_SEARCH_ICON_0,UI_ID_##P##_SEARCH_ICON_3=UI_ID_##P##_SEARCH_ICON_0+3,UI_ID_##P##_SEARCH_EMPTY,UI_ID_##P##_SEARCH_CLOSE,UI_ID_##P##_AUTOMAP_ZOOM_IN,UI_ID_##P##_AUTOMAP_ZOOM_OUT
@@ -262,7 +262,7 @@ static void HwToggle(u8 i) {
 }
 
 extern V3 queuedLevelPos; extern u8 queuedLevelToLoad;
-void ActualChangeAmmoType(void); void OverloadButtonAction(void); void PlayLog(int logIndex); void CheckForUnreadLogs(void); void UseTargets(u16,u16);
+void ActualChangeAmmoType(void); void OverloadButtonAction(void); void ReloadSecret(bool isSilent); void Unload(bool isSilent); void PlayLog(int logIndex); void CheckForUnreadLogs(void); void UseTargets(u16,u16);
 static const char* mgName[9]={"Ping","15","Wing 0","Botbounce","Eel Zapper","Road","TriopToe","Corp Conq","Chess"};
 static void SysUIDataClose(bool rh) { MFD_CloseDataSide(rh); World.Sys_UI.objectInUsePos=(V3){999.0f,999.0f,999.0f}; World.Sys_UI.usingObject=false; }
 static void KeycodeSetDigit(int n) { if (World.Sys_UI.keycodeOnes < 0) { World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes; } else if (World.Sys_UI.keycodeTens < 0) { World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10; } else if (World.Sys_UI.keycodeHuns < 0) { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } else { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } }
@@ -582,7 +582,22 @@ void SideMFD(bool isRH) { // 320x240
     } else {
         if (tab == 1) {/*WeaponTab: WepNameText, WepIcon, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/
             i16 slot=World.invP1.weaponCurrent; if (slot>=0 && slot<7) { i32 widx=World.invP1.weaponInventoryIndices[slot]; if (widx >= 0) {UIRText(MID(isRH,WEAPON_NAME),isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W+TXT_PAD : TAB_THICK+MFD_SPACING+TXT_PAD,520,T_RED,FONT_NORMAL,0.8f,270,Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16)UIRImg(MID(isRH,WEAPON_ICON),isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIcon*/
-            if (CurrentWeaponUsesEnergy()) { i16 tx0=(i16)((isRH ? 1207 : 24)); for (int ti=0;ti<9;++ti) if (HudHeatTickOn(ti)) RenderUIImage((i16)(tx0+ti*24),652,20,20,946);/*EnergyHeatTicks: tex 946 ener_overheattickgreen*/} } }
+            if (CurrentWeaponUsesEnergy()) {
+                i16 tx0=(i16)(isRH ? 1207 : 24);
+                for (int ti=0;ti<9;++ti) if (HudHeatTickOn(ti)) RenderUIImage((i16)(tx0+ti*24),652,20,20,947);/*EnergyHeatTicks: tex 947 ener_overheattickgreen*/
+                i16 sliderX=tx0, sliderY=680, sliderPos=(i16)(World.invP1.weaponEnergySetting[slot] * 1.64f);
+                UIRImg(MID(isRH,WEAPON_ENERGY_SLIDER),sliderX,sliderY,180,20,952);/*Energy slider border*/
+                RenderUIImage((i16)(sliderX+sliderPos),sliderY+2,16,16,953);/*Energy slider handle*/
+                RenderTextL(sliderX,662,T_GREEN,FONT_NORMAL,0.8f,"%s %u",Sys_Text.stringTable[17],(u8)World.invP1.weaponEnergySetting[slot]);
+                UIRImg(MID(isRH,WEAPON_OVERLOAD),(i16)(tx0+210),676,84,40,World.invP1.overloadEnabled?951:950);
+                UIRText(MID(isRH,WEAPON_OVERLOAD),(i16)(tx0+214),686,UIOver(MID(isRH,WEAPON_OVERLOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,76,World.invP1.overloadEnabled?Sys_Text.stringTable[19]:Sys_Text.stringTable[20]);
+            } else if (wep16 != 5 && wep16 != 6) {
+                i16 x0=(i16)(isRH ? 1207 : 24); char ammoText[48]; GetWeaponAmmoText(slot,ammoText,sizeof(ammoText));
+                UIRImg(MID(isRH,WEAPON_AMMO),x0,652,140,42,World.invP1.wepLoadedWithAlternate[slot]?897:898);/*Ammo pane*/
+                UIRText(MID(isRH,WEAPON_AMMO),(i16)(x0+5),663,T_GREEN,FONT_NORMAL,0.9f,130,ammoText);
+                UIRImg(MID(isRH,WEAPON_RELOAD),(i16)(x0+148),652,60,40,908); UIRText(MID(isRH,WEAPON_RELOAD),(i16)(x0+153),663,UIOver(MID(isRH,WEAPON_RELOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,50,Sys_Text.stringTable[11]);
+                UIRImg(MID(isRH,WEAPON_UNLOAD),(i16)(x0+214),652,60,40,908); UIRText(MID(isRH,WEAPON_UNLOAD),(i16)(x0+219),663,UIOver(MID(isRH,WEAPON_UNLOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,50,Sys_Text.stringTable[881]);
+            } } }
         } else if (tab == 2 && World.Sys_UI.mfdItemReader[isRH]) {
             i16 x=isRH?1080:TAB_THICK+MFD_SPACING; static const u16 labels[4]={42,39,43,885};
             UIRText(MID(isRH,MEDIA_HEADER),x+6,540,T_YELLOW,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[349]);
@@ -726,12 +741,21 @@ void CenterMFD() { //640x240
 }
 
 /*Sliders need .down rather than .pressed, so they get their own short pass ahead of the click walk.*/
+static void UI_WeaponEnergySliderSet(bool rh) {
+    if (!CurrentWeaponUsesEnergy()) return;
+    int slot=World.invP1.weaponCurrent;
+    if (slot<0 || slot>=7) return;
+    float value=((float)World.cursorPos_x-UIC(MID(rh,WEAPON_ENERGY_SLIDER)).min.x)/164.0f;
+    World.invP1.weaponEnergySetting[slot]=vclamp(value*100.0f,0.0f,100.0f);
+    World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true;
+}
 static void UI_DragRegions(void) {
     if (!Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down) return;
     for (u8 s=0;s<2;++s) {
         u32 id=MID(s,ITEM_TIMER_SLIDER); if (UIOver(id)) { World.Sys_UI.lastItemSideRH=s!=0; ConsumableSetTimer(((float)World.cursorPos_x-UIC(id).min.x)/224.0f); World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
         id=MID(s,PUZZLE_SLIDER); if (UIOver(id)) { UI_PuzzleGridSlide(s!=0,vclamp(((float)World.cursorPos_x-UIC(id).min.x)/225.0f,0.0f,1.0f)); World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
         id=MID(s,WIRE_SLIDER); if (UIOver(id)) { UI_WireSlide(s!=0,vclamp(((float)World.cursorPos_x-UIC(id).min.x)/235.0f,0.0f,1.0f)); World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
+        id=MID(s,WEAPON_ENERGY_SLIDER); if (UIOver(id)) UI_WeaponEnergySliderSet(s!=0);
     }
 }
 /*c: 1 LMB, 2 RMB, +4 double click of that same button.*/
@@ -773,6 +797,10 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; MFD_GeneralChanged(); if (GeneralInvCanVaporize(World.invP1.generalInvCurrent)) VaporizeClick(); return;
         case UI_ID_LMFD_ITEM_TIMER_SLIDER: World.Sys_UI.lastItemSideRH=rh; ConsumableSetTimer(((float)World.cursorPos_x-UIC(MID(rh,ITEM_TIMER_SLIDER)).min.x)/224.0f); return;
         case UI_ID_LMFD_WEAPON_ICON: UI_WeaponIconClick(rh); return;
+        case UI_ID_LMFD_WEAPON_RELOAD: World.Sys_UI.lastWeaponSideRH=rh; ReloadSecret(false); return;
+        case UI_ID_LMFD_WEAPON_UNLOAD: World.Sys_UI.lastWeaponSideRH=rh; Unload(false); return;
+        case UI_ID_LMFD_WEAPON_OVERLOAD: UI_WeaponIconClick(rh); return;
+        case UI_ID_LMFD_WEAPON_ENERGY_SLIDER: UI_WeaponEnergySliderSet(rh); return;
         case UI_ID_LMFD_ELEV_BUTTON_0 ... UI_ID_LMFD_ELEV_BUTTON_7: UI_ElevFloorClick(rh,(int)(id-UI_ID_LMFD_ELEV_BUTTON_0)); return;
         case UI_ID_LMFD_ELEV_CLOSE: UI_ElevClose(rh); return;
         case UI_ID_LMFD_KEYCODE_0 ... UI_ID_LMFD_KEYCODE_11: UI_KeycodeKey(rh,(int)(id-UI_ID_LMFD_KEYCODE_0)); return;

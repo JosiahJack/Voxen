@@ -137,8 +137,19 @@ void UpdateWeaponReloadDip() {
 }
 
 static void RotateViewWeapon() { if(!World.inventoryMode) {wfx.reloadContainerRot=QUAT_IDENTITY; return;} float h = (float)Sys_Settings.ScreenWidth * 0.5f; wfx.reloadContainerRot = QuatEulerY(wfx.wepYRot = ((wfx.tempVec.x - h) / h) * 48.0f); }
-static void SpawnSparksSmallAt(V3 pos, V3 normal) { const PSysDef* preset = PSysTypeGet(35); if (!preset) return; PSysDef def = *preset; def.pos = pos; def.rotation = QuatFromToRotation((V3){0,-1,0}, V3_ScaleByF(normal, -1.0f)); def.emitRate = 60.0f; def.duration = 0.1f; def.blendMode = 3; def.blendModeOverride = true; PSysAdd(&def); }
-static bool DidRayHit(int wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right);dir.x+=random_range(-d,d);dir.y+=random_range(-d,d);RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;SpawnSparksSmallAt(h.point,h.normal);return true;}return false;}
+static u16 ImpactParticleType(u16 prefab) {
+    switch (prefab) {
+        case 721: return 17; case 722: return 19; case 723: return 20; case 724: return 18;
+        case 725: return 13; case 726: return 27; case 729: return 38; case 730: return 40;
+        case 731: return 42; case 739: return 16; case 740: return 30;
+        default: return U16_MAX;
+    }
+}
+static bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
+    u16 type=ImpactParticleType(prefab); const PSysDef* preset=PSysTypeGet(type); if (!preset) return false;
+    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); def.emitRate=60.0f; if (def.duration<=0.0f || def.duration>2.0f) def.duration=1.0f; PSysAdd(&def); return true;
+}
+static bool DidRayHit(int wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right);dir.x+=random_range(-d,d);dir.y+=random_range(-d,d);RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;return true;}return false;}
 void CreateStandardImpactMarks(int wep16) {
     if (!wfx.tempHit.hit) return;
     Entity* e = &World.instances[wfx.tempHit.hitInstanceIndex];
@@ -149,17 +160,21 @@ void CreateStandardImpactMarks(int wep16) {
     World.rotation[markInst] = quat_multiply(QuatFromToRotation((V3){0,1,0},V3_ScaleByF(wfx.tempHit.normal,-1.0f)),QuatEulerZ((float)(int)random_range(0.0f,3.99f) * 90.0f));
 }
 
-void CreateStandardImpactEffects(){if(wfx.tempHitEnt==0xFFFF)return;u16 ent=wfx.tempHitEnt;if(ent>=World.instCount)return;u16 prefab=GetImpactType(ent);if(prefab==0||prefab>=MAX_ENTITIES)prefab=731;V3 pos=wfx.tempHit.hit?V3_AplusB(wfx.tempHit.point,V3_ScaleByF(wfx.tempHit.normal,wfx.hitOffset)):World.position[ent];V3 n=wfx.tempHit.hit?wfx.tempHit.normal:(V3){0,1,0};u16 fx=SpawnDynamicObject(prefab,-1);if(fx!=0xFFFF&&fx<INSTANCE_COUNT){World.position[fx]=pos;World.rotation[fx]=QuatFromToRotation((V3){0,1,0},n);}}
+void CreateStandardImpactEffects(){if(wfx.tempHitEnt==0xFFFF)return;u16 ent=wfx.tempHitEnt;if(ent>=World.instCount)return;u16 prefab=GetImpactType(ent);if(prefab==0||prefab>=MAX_ENTITIES)prefab=731;V3 pos=wfx.tempHit.hit?V3_AplusB(wfx.tempHit.point,V3_ScaleByF(wfx.tempHit.normal,wfx.hitOffset)):World.position[ent];V3 n=wfx.tempHit.hit?wfx.tempHit.normal:(V3){0,1,0};if(SpawnImpactParticleForPrefab(prefab,pos,n))return;u16 fx=SpawnDynamicObject(prefab,-1);if(fx!=0xFFFF&&fx<INSTANCE_COUNT){World.position[fx]=pos;World.rotation[fx]=QuatFromToRotation((V3){0,1,0},n);}}
 static void CreateBeamImpactEffects(int wep16) {
     int impactConstdex=731;/*Cyan sparq*/ if(wep16 == 1){impactConstdex=739;/*Red laser (blaster)*/}else if(wep16 == 4){impactConstdex=740;/*Yellow laser (ion)*/}
+    if (SpawnImpactParticleForPrefab((u16)impactConstdex, wfx.tempHit.point, wfx.tempHit.normal)) return;
     u16 fx = SpawnDynamicObject((u16)impactConstdex, -1); if(fx == 0xFFFF){return;}
     World.position[fx] = wfx.tempHit.point; World.rotation[fx] = QuatFromToRotation((V3){0,1,0},wfx.tempHit.normal);
 }
 
 static void CreateBeamEffects(int wep16) {
-    u16 laserPrefab=405;/*sparq*/ if(wep16 == 1){laserPrefab=406;/*blaster*/} else if(wep16 == 4){laserPrefab=407;/*ion*/}
-    u16 beam = SpawnDynamicObject(laserPrefab, -1); if (beam == 0xFFFF) return;
-    World.position[beam] = wfx.reloadContainerPos; // muzzle-relative start point, LaserDrawing.startPoint/endPoint equivalent handled by the beam entity's own update, using its position and a linked end-point field (not modeled here).
+    V3 start=wfx.reloadContainerPos; V3 delta=V3_AsubB(wfx.tempHit.point,start); float distance=V3_Mag(delta); if(distance<0.01f)return;
+    const PSysDef* preset=PSysTypeGet(38); if(!preset)return; PSysDef def=*preset;
+    Color c=(wep16==1)?(Color){1.f,0.18f,0.12f,1.f}:(wep16==4)?(Color){1.f,0.9f,0.15f,1.f}:(Color){0.3f,1.f,1.f,1.f};
+    def.pos=start; def.rotation=QuatFromToRotation((V3){0,1,0},V3_Normalize(delta)); def.speedMin=def.speedMax=vclamp(distance*6.0f,800.0f,4000.0f);
+    def.lifetimeMin=0.2f; def.lifetimeMax=0.2f; def.trail=1; def.trailTexture=67; def.trailLifetime=0.45f; def.trailWidthStart=0.035f; def.trailWidthEnd=0.005f; def.trailColorStart=c;
+    def.trailColorEnd=(Color){c.r,c.g,c.b,0.f}; def.rampColors[0]=c; for(int i=1;i<def.rampCount;++i)def.rampColors[i]=(Color){c.r,c.g,c.b,1.f-def.rampTimes[i]}; def.emitRate=1.0f; def.duration=0.02f; def.shapeRadius=0.0f; def.shapeAngle=1.0f; PSysAdd(&def);
 }
 
 static float DamageForPower(int w) { // Slope-of-slopes curve: interpolates damage/energy ratio across the energy setting, then scales by the interpolated energy drain itself. See design spreadsheet.

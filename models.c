@@ -447,11 +447,11 @@ void LoadModels() {
     OS_FreeInitPhase(); DebugRAM("after models load"); DualLog(" vertices: %u, tris: %u, %f secs\n",tv,tt,get_time() - startModelTime);
 }
 
-u8 numClips[MAX_ANIMS] = {/*0*/4,/*1*/4,/*2*/6,/*3*/7,/*4*/4,/*5*/4,/*6*/4,/*7*/4,/*8*/4,/*9*/4,/*10*/4,/*11*/4,/*12*/4,/*13*/4,/*14*/4,/*15*/4,/*16*/4,/*17*/4,/*18*/4,/*19*/4,/*20*/4,/*21*/1,/*22*/1,/*23*/6,/*24*/8,/*25*/6,/*26*/10,/*27*/8,/*28*/7,/*29*/5,/*30*/5,/*31*/7,/*32*/8,/*33*/5,/*34*/4,/*35*/5,/*36*/6,/*37*/4,/*38*/2,/*39*/6,/*40*/5,/*41*/6,/*42*/3,/*43*/3,/*44*/5,/*45*/4,/*46*/1,/*47*/4,/*48*/4,/*49*/3,/*50*/3,/*51*/7,/*52*/1};
+u8 numClips[MAX_ANIMS] = {/*0*/4,/*1*/4,/*2*/6,/*3*/8,/*4*/4,/*5*/4,/*6*/4,/*7*/4,/*8*/4,/*9*/4,/*10*/4,/*11*/4,/*12*/4,/*13*/4,/*14*/4,/*15*/4,/*16*/4,/*17*/4,/*18*/4,/*19*/4,/*20*/4,/*21*/1,/*22*/1,/*23*/6,/*24*/8,/*25*/6,/*26*/10,/*27*/8,/*28*/7,/*29*/5,/*30*/5,/*31*/7,/*32*/8,/*33*/5,/*34*/4,/*35*/5,/*36*/6,/*37*/4,/*38*/2,/*39*/6,/*40*/5,/*41*/6,/*42*/3,/*43*/3,/*44*/5,/*45*/4,/*46*/1,/*47*/4,/*48*/4,/*49*/3,/*50*/3,/*51*/7,/*52*/1};
 AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
     [0]={[A_IDLE_CLOSED]={1.0f,2,2,699,24},[A_OPENING]={1.0f,2,11,699,24},[A_IDLE_OPEN]={1.0f,11,11,708,24},[A_CLOSING]={1.0f,12,21,709,24}},/*doorB (door2)*/[1]={[A_IDLE_CLOSED]={1.0f,2,2,719,24},[A_OPENING]={1.0f,2,12,719,24},[A_IDLE_OPEN]={1.0f,12,12,729,24},[A_CLOSING]={1.0f,14,24,731,24}},/*doorA (door1)*/
     [2]={[A_IDLE]={1.0f,0,37,742,30},[A_WALK]={1.0f,50,99,780,30},[A_RUN]={1.1f,50,99,792,30},[A_ATTACK1]={0.75f,111,136,830,30},[A_PAIN]={0.5f,138,150,856,30},[A_DYING]={0.75f,153,176,869,30}},/*npc_humanoid_mutant*/
-    [3]={[A_IDLE]={1.0f,1,207,893,24},[A_ATTACK1]={1.0f,219,239,1100,24},[A_WALK]={1.0f,252,308,1121,24},[A_RUN]={1.0f,252,308,1121,24},[A_PAIN]={1.0f,321,330,1177,24},[A_PAIN2]={1.0f,331,344,1187,24},[A_DYING]={1.0f,345,369,1201,24}},/*npc_cyborg_drone*/
+    [3]={[A_IDLE]={1.0f,1,207,893,24},[A_ATTACK1]={1.0f,219,239,1100,24},[A_ATTACK2]={1.0f,219,239,1100,24},/*Same imported attack clip drives this NPC's Attack2 projectile state.*/[A_WALK]={1.0f,252,308,1121,24},[A_RUN]={1.0f,252,308,1121,24},[A_PAIN]={1.0f,321,330,1177,24},[A_PAIN2]={1.0f,331,344,1187,24},[A_DYING]={1.0f,345,369,1201,24}},/*npc_cyborg_drone*/
     [4]={[A_IDLE_CLOSED]={1.0f,2,2,1234,24},[A_OPENING]={1.5f,2,44,1234,24},[A_IDLE_OPEN]={1.0f,44,44,1276,24},[A_CLOSING]={1.75f,46,96,1277,24}},/*doorD (door4, bulkhead 1)*/ [5]={[A_IDLE_CLOSED]={1.0f,2,2,1328,24},[A_OPENING]={1.0f,2,25,1328,24},[A_IDLE_OPEN]={1.0f,25,25,1351,24},[A_CLOSING]={1.0f,27,44,1352,24}},/*doorC (door3)*/
     [6]={[A_IDLE_CLOSED]={1.0f,1,1,1370,24},[A_OPENING]={1.2f,1,30,1370,24},[A_IDLE_OPEN]={1.0f,30,30,1399,24},[A_CLOSING]={1.2f,32,66,1400,24}},/*doorJ (xdoor1)*/ [7]={[A_IDLE_CLOSED]={1.0f,3,3,1435,24},[A_OPENING]={1.2f,3,24,1435,24},[A_IDLE_OPEN]={1.0f,26,26,1457,24},[A_CLOSING]={1.2f,27,49,1458,24}},/*doorK (xdoor2)*/
     [8]={[A_IDLE_CLOSED]={1.0f,3,3,1481,24},[A_OPENING]={1.2f,3,27,1481,24},[A_IDLE_OPEN]={1.0f,27,27,1505,24},[A_CLOSING]={1.2f,30,51,1506,24}},/*doorL (door10)*/ [9]={[A_IDLE_CLOSED]={1.0f,3,3,1528,24},[A_OPENING]={1.0f,3,15,1528,24},[A_IDLE_OPEN]={1.0f,28,28,1541,24},[A_CLOSING]={1.0f,28,39,1541,24}},/*doorE (door5)*/
@@ -487,7 +487,7 @@ AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameS
 };
 
 void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
-void ChangeAnim(Entity* e, u8 c) { if(e->clip == c){return;} e->clip=c; e->currentFrameFinished=0.0; e->frame=modelAnimationClips[e->animationNum][e->clip].frameStart; }
+void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAX_ANIMS || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&modelAnimationClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
 void UpdateAnims(void) {
     if (World.paused || World.menuActive){return;} static double lastPauseTime=0; if(lastPauseTime == 0.0){lastPauseTime=World.pauseRelativeTime;} double animDT=World.pauseRelativeTime-lastPauseTime; lastPauseTime=World.pauseRelativeTime; if(animDT > 0.1){animDT=0.1;} if(animDT <= 0.0){return;} bool portalsNeedUpdated=false; u8 animTest=Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
@@ -519,7 +519,8 @@ void UpdateAnims(void) {
                 }
             }
         }
-        if (animTest || e->clip >= numClips[e->animationNum]){continue;} AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue; e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / clip->framerate;
+        /* Clip IDs are sparse (A_DYING is 9) while numClips stores a count. Validate by table capacity and clip data, not count-vs-ID. */
+        if (animTest || e->clip >= MAX_ANIMCLIPS){continue;} AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue; e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / clip->framerate;
         if (e->currentFrameFinished >= timePerFrame) {
             u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1; u16 prevFrame = e->frame;
             e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
