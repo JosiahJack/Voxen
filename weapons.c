@@ -115,7 +115,7 @@ void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev
     }
     if (nextSlot == curSlot) return;
     int wi = (int)World.invP1.weaponInventoryIndices[nextSlot];
-    play_wav(sounds[80],SfxVol(),(V3){0,0,0},false);/*changeweapon*/
+    play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/
     World.invP1.weaponCurrentPending = (i16)nextSlot;
     World.invP1.weaponIndexPending = (i16)wi;
     WeaponFireStartWeaponDip(0.5f);
@@ -294,14 +294,14 @@ void CheckUIStateAndAttack(void) {
     if (wepClass[wepdex] == WC_ENERGY) {
         u16 wc = World.invP1.weaponCurrent;
         if (World.invP1.energy > 0.0f || Cheats.bottomless || Cheats.redbull) {
-            if(World.invP1.currentEnergyWeaponHeat[wc]>wfx.overheatedPercent && !Cheats.bottomless && !Cheats.redbull){play_wav(sounds[238],SfxVol(),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire=World.pauseRelativeTime + 0.8f; CenterStatusPrint("%s",Sys_Text.stringTable[11]);} 
+            if(World.invP1.currentEnergyWeaponHeat[wc]>wfx.overheatedPercent && !Cheats.bottomless && !Cheats.redbull){play_wav(sounds[238],AppliedFXVol(1.0f),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire=World.pauseRelativeTime + 0.8f; CenterStatusPrint("%s",Sys_Text.stringTable[11]);} 
             else { FireWeapon(wepdex,false); }
         } else { CenterStatusPrint("%s", Sys_Text.stringTable[207]);/*not enough energy*/ }
         return;
     }
     u16 wc = World.invP1.weaponCurrent; bool alt = World.invP1.wepLoadedWithAlternate[wc];
     u16 amount = alt ? World.invP1.currentMagazineAmount2[wc] : World.invP1.currentMagazineAmount[wc];
-    if (amount > 0 || Cheats.bottomless) { FireWeapon(wepdex, false); } else {play_wav(sounds[238],SfxVol(),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.8f; }
+    if (amount > 0 || Cheats.bottomless) { FireWeapon(wepdex, false); } else {play_wav(sounds[238],AppliedFXVol(1.0f),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.8f; }
 }
 
 void Unload(bool isSilent) {

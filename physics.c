@@ -6,11 +6,13 @@ static const float WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3],Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
-SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount; float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ u16 dynamicEntities[512],dynamicEntityCount;
+SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount; float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT];
 bool PhysIsAsleep(u16 i) { return World.physSleep[i] != 0; } // exposed for showPhys debug coloring
 INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAX_ANIMS && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
+void AddForce(u16 i, V3 f, bool imp){if(imp){World.velocity[i]=V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f/vmax(World.mass[i],0.001f)));}else{World.instances[i].accumulatedForce=V3_AplusB(World.instances[i].accumulatedForce,f);} World.physSleep[i]=false;}
 // Trigger System
-void AddForce(u16 i, V3 f, bool imp); void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 targetIdx);
+void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 targetIdx); void GrenadeOnCollision(u16 self);
+static bool IsImpactGrenade(u16 idx) { return idx == 370 || idx == 372 || idx == 387 || idx == 404; }
 void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); }
 void CyberItemOnTriggerEnter(u16 self, u16 other) {
     if(other!=PLAYER1){return;} float sfxVol=(float)Sys_Settings.VolumeEffects/100.0f; bool success=false;
@@ -327,13 +329,12 @@ static bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {V3 d=V3_AsubB(
 INLINE int V3_IsSane(V3 v) { union { float f; u32 i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
 static bool reverbZoneActive; static u16 activeReverbPreset;
 void Physics(float dt) {
-    for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false); World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
-    for (u16 i=0;i<World.instCount && dynamicEntityCount < 512;++i) {
-        if (World.col[i] == COLTYPE_MSH || World.col[i] == COLTYPE_CVX) { World.radius[i] = modelBounds[World.col[i] == COLTYPE_CVX ? World.instances[i].colMeshIndex : World.instances[i].modelIndex] * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); }
-        else if (likely(World.col[i] == COLTYPE_BOX)) { float hx = World.colliderSize[i].x * 0.5f * World.scale[i].x, hy = World.colliderSize[i].y * 0.5f * World.scale[i].y, hz = World.colliderSize[i].z * 0.5f * World.scale[i].z; World.radius[i] = vsqrtf(hx * hx + hy * hy + hz * hz); }
-        else if (World.col[i] == COLTYPE_SPH || World.col[i] == COLTYPE_CAP) { World.radius[i] = vmax(World.colliderSize[i].x,World.colliderSize[i].y) * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z)); }
-        else World.radius[i] = World.colliderSize[i].x * vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));
-        if ((World.instances[i].entflags & EF_RIGIDBODY) && (World.instances[i].entflags & EF_ACTIVE) && !(World.physSleep[i]) && World.col[i] != COLTYPE_NONE && vabs(World.scale[i].x) > 0.01f && vabs(World.scale[i].y) > 0.01f && vabs(World.scale[i].z) > 0.01f) {dynamicEntities[dynamicEntityCount++]=i;}
+    mset(grenadeImpactQueued,0,sizeof(grenadeImpactQueued)); for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false); World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
+    for (u16 i=0;i<World.instCount;++i) {/*Update the radius for all entities for rendering and physics, then add dynamic ones to dynamicEntities[]*/
+        float absx=vabs(World.scale[i].x),absy=vabs(World.scale[i].y),absz=vabs(World.scale[i].z);
+        if(World.col[i]==COLTYPE_MSH||World.col[i]==COLTYPE_CVX){World.radius[i]=modelBounds[World.col[i]==COLTYPE_CVX ? World.instances[i].colMeshIndex : World.instances[i].modelIndex]*vmax(vmax(absx,absy),absz);}else if(likely(World.col[i] == COLTYPE_BOX)){float hx=World.colliderSize[i].x*.5f*absx,hy=World.colliderSize[i].y*.5f*absy,hz=World.colliderSize[i].z*0.5f*absz; World.radius[i]=vsqrtf(hx*hx+hy*hy+hz*hz);}
+        else if(World.col[i] == COLTYPE_SPH || World.col[i] == COLTYPE_CAP) { World.radius[i] = vmax(World.colliderSize[i].x,World.colliderSize[i].y) * vmax(absx,vmax(absy,absz));}else{World.radius[i]=vmax(World.colliderSize[i].x,0.02f)*vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));}
+        if((World.instances[i].entflags&EF_RIGIDBODY) && dynamicEntityCount<512 && (World.instances[i].entflags&EF_ACTIVE) && !World.physSleep[i]/*Done earler, this here is what skips sleeping ones!*/ && absx>.01f && absy>.01f && absz>.01f){dynamicEntities[dynamicEntityCount++]=i;}
     }
     for (u8 s=0;s<World.substeps;++s) {
         if (!World.invP1.radiationArea) { float bleed = (World.invP1.patchActive & PATCH_DETOX) ? 2.0f : (World.invP1.hasHardware & HW_ENV ? 0.5f : 1.0f); World.instances[PLAYER1].radiation = vmax(0.0f, World.instances[PLAYER1].radiation - dtsub * bleed); }/*Radiation bleedoff / detox / envirosuit handling*/ else { World.instances[PLAYER1].radiation = vmin(100.0f, World.instances[PLAYER1].radiation); }
@@ -388,7 +389,7 @@ void Physics(float dt) {
                         else if (World.col[a] == COLTYPE_CVX && World.col[b] == COLTYPE_BOX) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
                         else if (World.col[a] == COLTYPE_CVX && World.col[b] == COLTYPE_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,mxA,mxB,World.instances[a].adjacencyIdx,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else { mf=OverlapToManifold(SphSph(World.position[a],World.colliderSize[a].x,World.position[b],World.colliderSize[b].x)); }
-                        if (likely(mf.n && contactCount < 32)) { contactsMani[contactCount] = mf; contactsOther[contactCount] = b; contactCount++; }
+                        if (mf.n) { if (IsImpactGrenade(World.instances[a].index)) grenadeImpactQueued[a]=1; if ((World.instances[b].entflags & EF_ACTIVE) && IsImpactGrenade(World.instances[b].index)) grenadeImpactQueued[b]=1; if (likely(contactCount < 32)) { contactsMani[contactCount] = mf; contactsOther[contactCount] = b; contactCount++; } }
                     }
                 }
             }
@@ -428,7 +429,8 @@ void Physics(float dt) {
     if (!reverbZoneActive){synth_set_reverb_preset(0); World.invP1.inReverbZone=false;}else{synth_set_reverb_preset(activeReverbPreset); World.invP1.inReverbZone = true;}
     {   const i32 WAKE_CELLS = 2;
         for (u32 i=0;i<World.instCount;++i) {
-            if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true); u32 ef = World.instances[i].entflags; bool canSleep = (i!=PLAYER1) && IdxIsDynamicObject(World.instances[i].index) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && (World.col[i]!=COLTYPE_NONE) && (World.mass[i] >= 0.001f); if (!canSleep) { World.physSleep[i]=0; continue; } i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z); bool nearAwake = false;
+            if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true); u32 ef = World.instances[i].entflags; bool canSleep=(i!=PLAYER1 && IdxIsDynamicObject(World.instances[i].index) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && World.col[i]!=COLTYPE_NONE && World.mass[i] >= 0.001f && !IdxIsNPC(World.instances[i].index)); if(!canSleep){World.physSleep[i]=0;continue;}
+            i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z); bool nearAwake = false;
             for (i32 dx=-WAKE_CELLS; dx<=WAKE_CELLS && !nearAwake; ++dx)
               for (i32 dz=-WAKE_CELLS; dz<=WAKE_CELLS && !nearAwake; ++dz) {
                 u32 cl = PosGetCellCoordsP(cx+dx,cz+dz);
@@ -437,13 +439,13 @@ void Physics(float dt) {
                     V3 d = V3_AsubB(World.position[i], World.position[j]); float rr = World.radius[i] + World.radius[j] + (jMoving ? 2.0f * vsqrtf(sj2) : 0.0f);/*mover reach only when actually translating*/ if (V3_dot(d,d) < rr*rr) { nearAwake=true; break; }
                 }
             }
-            if (World.physSleep[i]) { if (nearAwake) World.physSleep[i]=0; } else if (!nearAwake && (ef & EF_GROUNDED)) { float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]); if (sp2 < 0.0025f && asp2 < 0.0025f) { World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; } }
+            if(World.physSleep[i]){if(nearAwake)World.physSleep[i]=0;} else if(!nearAwake && (ef & EF_GROUNDED)) { float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]); if(sp2 < 0.0025f && asp2 < 0.0025f){World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; } }
         }
     }
+    u8 collisionLevel=World.currentLevel; u16 collisionCount=World.instCount; for (u16 i=INSTS_1ST_IDX;i<collisionCount && World.currentLevel==collisionLevel;++i) if (grenadeImpactQueued[i] && (World.instances[i].entflags & EF_ACTIVE)) GrenadeOnCollision(i);
     if(World.invP1.radiationArea && World.instances[PLAYER1].radiation > 0.0f){AppendTextWarning(184,-1,-1,-T_WHITE,1);/*Radation Area*/}else{World.invP1.radiationArea=false; World.Sys_UI.tWrnFinished[1]=0.0;} if(World.instances[PLAYER1].radiation > 0.1f){AppendTextWarning(185,-1,186,T_RED,2);/*Radiation poisoning ##LBP*/}else{World.instances[PLAYER1].radiation=0.0f; World.Sys_UI.tWrnFinished[2]=0.0;}
 }
 
-void AddForce(u16 i, V3 f, bool imp) { if (imp) { World.velocity[i] = V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f / vmax(World.mass[i],0.001f))); } else { World.instances[i].accumulatedForce = V3_AplusB(World.instances[i].accumulatedForce,f); } }
 INLINE float smooth_damp(float cur, float targ, float* vel, float tm, float dt) { float o=2.0f / vmax(tm,0.0001f); float x=o * dt; float exp=1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x); float d=cur - targ; float t=(*vel + o * d) * dt; *vel=(*vel - o * t) * exp; return targ + (d + t) * exp; }
 bool CantStand(u16 playerIdx, float targetHeight) { // I can't stand it.
     float oldHeight = World.colliderSize[playerIdx].y; V3 oldPos = World.position[playerIdx]; World.colliderSize[playerIdx].y = targetHeight; World.position[playerIdx].y += (targetHeight - oldHeight); bool blocked=false; i32 cx=PosGetCellCoordX(World.position[playerIdx].x),cz=PosGetCellCoordZ(World.position[playerIdx].z); u32 mask=GetCollisionMask(World.layer[playerIdx]);
@@ -465,7 +467,7 @@ void ApplyPlayerMovements(float dt) {
     bool inGravLift = ((p->entflags & EF_GRAVLIFT) > 0); bool grounded = !inGravLift && ((p->entflags & EF_GROUNDED) > 0); bool jumpjettin = ((World.invP1.hasHardware & HW_JET) > 0 && (World.invP1.hardwareIsActive & HW_JET) > 0); bool onLadder = World.invP1.ladderState > 0;
     if (JumpDown() && (grounded || onLadder) && !jumpjettin) {
         if (onLadder) { World.invP1.ladderState = 0; onLadder = false; float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y; V3 fwd = V3_Normalize((V3){2.0f*(xz+wy), 2.0f*(r.y*r.z - r.w*r.x), 1.0f - 2.0f*(r.x*r.x+y2)}); World.velocity[PLAYER1] = V3_ScaleByF(fwd, 6.0f); }
-        else{if(!Cheats.noclip){World.velocity[PLAYER1].y+=(World.invP1.fatigue>80.0f ? 2.0f : 4.51f)+0.2f; if(!World.boosterActive&&!Cheats.noclip){World.invP1.fatigue += 6.5f;}} RaycastHit jhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType jfstp=jhit.hit ? GetFootstepTypeForPrefab(World.instances[jhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpSound(jfstp),SfxVol(),World.position[PLAYER1],true);}
+        else{if(!Cheats.noclip){World.velocity[PLAYER1].y+=(World.invP1.fatigue>80.0f ? 2.0f : 4.51f)+0.2f; if(!World.boosterActive&&!Cheats.noclip){World.invP1.fatigue += 6.5f;}} RaycastHit jhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType jfstp=jhit.hit ? GetFootstepTypeForPrefab(World.instances[jhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpSound(jfstp),AppliedFXVol(1.0f),World.position[PLAYER1],true);}
     }
     if (Jump() && jumpjettin && World.invP1.jumpJetFinished < World.pauseRelativeTime && World.invP1.energy > 0.0f) {
         if (!Cheats.noclip) {World.velocity[PLAYER1].y += 1.3f;} World.invP1.jumpJetFinished = World.pauseRelativeTime + 0.1f; if (World.invP1.jumpJetSuckFinished < World.pauseRelativeTime) { World.invP1.jumpJetSuckFinished=World.pauseRelativeTime+1.0f; float energysuck = 11.0f; switch (World.invP1.hwVersSetting[10]) { case 0: energysuck=11.0f; break; case 1:energysuck=26.0f; break; case 2:energysuck=22.0f; break; } TakeEnergy(energysuck); }
@@ -478,9 +480,9 @@ void ApplyPlayerMovements(float dt) {
     bool isSprinting=Sprint() && (grounded || inGravLift || World.invP1.ladderState>0 || Cheats.noclip); if(World.invP1.fatigueMoveFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip)&&!World.boosterActive){World.invP1.fatigue+=isSprinting ? 2.85f : 1.0f; World.invP1.fatigueMoveFinished=World.pauseRelativeTime+0.298f;/*Ensure no sync w/ bleedoff*/}
     float stepVolMod=fatigueWane>3.4f ? 0.2f : fatigueWane > 1.9f ? 0.4f : 1.0f,rustleVolMod=fatigueWane>3.4f ? 0.65f : fatigueWane > 1.9f ? 0.7f : 1.0f;
     if(World.invP1.footstepFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f && !Cheats.noclip) && !World.boosterActive){
-        RaycastHit fstep=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); play_wav(FootStepSound(fstep.hit ? GetFootstepTypeForPrefab(World.instances[fstep.hitInstanceIndex].index) : FSTP_Concrete),SfxVol()*random_range(0.4f,0.55f)*stepVolMod*0.5f,World.position[PLAYER1],true); World.invP1.footstepFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
+        RaycastHit fstep=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); play_wav(FootStepSound(fstep.hit ? GetFootstepTypeForPrefab(World.instances[fstep.hitInstanceIndex].index) : FSTP_Concrete),AppliedFXVol(random_range(0.4f,0.55f)*stepVolMod*0.5f),World.position[PLAYER1],true); World.invP1.footstepFinished = World.pauseRelativeTime + (isSprinting ? random_range(0.2f,0.3f) : random_range(0.35f,0.65f));
     }
-    if(World.invP1.rustleFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip) && !World.boosterActive){play_wav(sounds[random_range_u32(459,465)],SfxVol()*random_range(0.3f,0.5f)*rustleVolMod*0.75f,World.position[PLAYER1],true); World.invP1.rustleFinished=World.pauseRelativeTime+(isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));}
+    if(World.invP1.rustleFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip) && !World.boosterActive){play_wav(sounds[random_range_u32(459,465)],AppliedFXVol(random_range(0.3f,0.5f)*rustleVolMod*0.75f),World.position[PLAYER1],true); World.invP1.rustleFinished=World.pauseRelativeTime+(isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));}
     float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y; p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
     V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0}; 
     bool isRunning = (inputLenSq > 0.01f); float speedAdjust = 0.0f; bool setSpeedAdjusted = false; if (Cheats.noclip) { speedAdjust = PLAYER_MAX_CYBER_SPEED*(isSprinting ? 2.5f : 1.5f); setSpeedAdjusted = true; } if (World.curLev==LEVEL_CYBERSPACE) { speedAdjust = PLAYER_MAX_CYBER_SPEED; setSpeedAdjusted = true; }
@@ -492,7 +494,7 @@ void ApplyPlayerMovements(float dt) {
     if (World.invP1.fatigueBleedoffFinished<World.pauseRelativeTime && World.curLev!=LEVEL_CYBERSPACE && !Cheats.noclip){World.invP1.fatigue-=fatigueWane;/*Fatigue bleed off*/ World.invP1.fatigueBleedoffFinished=World.pauseRelativeTime +0.3f;} World.invP1.fatigue=vclamp(World.invP1.fatigue,0.0f,100.0f); if (World.invP1.fatigue > 80.0f){AppendTextWarning(868,-1,-1,T_WHITE,0);/*Fatigue high*/}
     if (grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
-        if(velChange>2.0f && World.invP1.noiseFinished<World.pauseRelativeTime){RaycastHit lhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp=lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpLandSound(lstp),SfxVol()*(vclamp((velChange-1.f)/10.72f,0,1.0f)*(1.f-.5f)*.8f*stepVolMod),World.position[PLAYER1],true); World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}
+        if(velChange>2.0f && World.invP1.noiseFinished<World.pauseRelativeTime){RaycastHit lhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp=lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpLandSound(lstp),AppliedFXVol(vclamp((velChange-1.f)/10.72f,0,1.0f)*(1.f-.5f)*.8f*stepVolMod),World.position[PLAYER1],true); World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}
         if(velChange>=11.72f&&World.invP1.fallPainFinished<World.pauseRelativeTime){World.invP1.fallPainFinished=World.pauseRelativeTime+0.5f; DamageData dd={0}; float falltake=75.f-random_range(0,68.f); if(falltake>World.instances[PLAYER1].health&&falltake-World.instances[PLAYER1].health<5.0f)falltake=World.instances[PLAYER1].health-1.f; dd.damage=falltake; TakeDamage(PLAYER1,dd); World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}
     } World.invP1.wasGrounded=grounded; World.invP1.lastVelY=World.velocity[PLAYER1].y;
 }
