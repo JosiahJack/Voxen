@@ -5062,13 +5062,13 @@ constIndex:283|lP.x:41.58|lP.y:34.24|lP.z:-51.2033|lR.z:.70711|lR.w:-.7071|lS.x:
 constIndex:0|lP.x:39.02|lP.y:35.84|lP.z:17.9167|lR.x:.5|lR.y:.5|lR.z:.5|lR.w:-.5
 constIndex:67|lP.x:39.02|lP.y:35.84|lP.z:17.9167|lR.x:.5|lR.y:.5|lR.z:.5|lR.w:-.5
 constIndex:42|lP.x:-48.02|lP.y:37.44|lP.z:15.3567|lR.x:-.5|lR.y:.5|lR.z:.5|lR.w:.5|lS.z:.75
-constIndex:706|lP.x:-1.9688|lP.y:33.6865|lP.z:-46.261
-constIndex:706|lP.x:59.5022|lP.y:31.8125|lP.z:35.773
-constIndex:706|lP.x:-4.5088|lP.y:35.6205|lP.z:43.71
-constIndex:706|lP.x:-14.7078|lP.y:33.7015|lP.z:-30.939
+constIndex:706|lP.x:-1.9688|lP.y:33.6865|lP.z:-46.261|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
+constIndex:706|lP.x:59.5022|lP.y:31.8125|lP.z:35.773|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
+constIndex:706|lP.x:-4.5088|lP.y:35.6205|lP.z:43.71|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
+constIndex:706|lP.x:-14.7078|lP.y:33.7015|lP.z:-30.939|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:658|lP.x:-1.6828|lP.y:33.5335|lP.z:-25.839|lR.x:-.37062|lR.y:-.60224|lR.z:-.31323|lR.w:.6339
-constIndex:706|lP.x:-58.3108|lP.y:33.7345|lP.z:-38.3
-constIndex:706|lP.x:-1.9628|lP.y:33.7225|lP.z:-69.18999
+constIndex:706|lP.x:-58.3108|lP.y:33.7345|lP.z:-38.3|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
+constIndex:706|lP.x:-1.9628|lP.y:33.7225|lP.z:-69.18999|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:573|lP.x:21.1002|lP.y:34.5605|lP.z:-3.9233|lR.y:.70711|lR.w:.70711
 constIndex:573|lP.x:9.5002|lP.y:34.5605|lP.z:-2.5633
 constIndex:573|lP.x:22.4602|lP.y:34.5605|lP.z:7.6767
@@ -5150,7 +5150,7 @@ constIndex:572|lP.x:-21.4238|lP.y:32.6365|lP.z:-40.13
 constIndex:572|lP.x:-23.5898|lP.y:32.6365|lP.z:-44.246
 constIndex:592|lR.w:-1|text:GAMMA|lingdex:637|matIndex:88|lP.x:81.7042|lP.y:35.1585|lP.z:-21.828|tAl:1|tLs:0.5
 constIndex:592|lR.y:-1|lR.w:0|text:BETA|lingdex:636|matIndex:88|lP.x:4.0382|lP.y:37.0595|lP.z:34.627|tAl:1|tLs:0.5
-constIndex:706|lP.x:.6112|lP.y:35.6205|lP.z:43.71
+constIndex:706|lP.x:.6112|lP.y:35.6205|lP.z:43.71|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:693|lP.x:-55.705|lP.y:34.242|lP.z:-21.8253|lR.y:1|lR.w:0
 constIndex:603|lP.x:-7.39866|lP.y:32.641|lP.z:-28.32696|lR.x:-.57875|lR.y:.40626|lR.z:.40626|lR.w:.57875|logIndex:102
 constIndex:693|lP.x:14.625|lP.y:34.231|lP.z:-66.5663|lR.y:.70711|lR.w:-.70711
@@ -5253,7 +5253,7 @@ constIndex:710|lP.x:8.6082|lP.y:34.968|lP.z:27.64106|lR.x:-.70711|lR.w:.70711|le
 constIndex:712|lP.x:54.0772|lP.y:31.4985|lP.z:40.318|SFXClip:206|loopingAmbient:0|playEverywhere:1|currentlyPlaying:0|playSoundOnParticleEmit:0|numparticles:0|burstemittcnt1:15|burstemittcnt2:30|targetname:lev6jettisonenablespawns|enemyAlert:0|sendEmail:0|lockCodeToScreenMaterialChanger:0|spawnerActivate:0|spawnerActivateAlerted:0|cyborgConversionToggle:0|togglePuzzlePanelLocked:0|testQuestBitIsOn:0|testQuestBitIsOff:0|sendSprintMessage:0|radiationTreatment:0|screenShake:0|awakeSleepingEnemy:0|doorAccessCardOverrideToggle:0|alreadyDisabledThisGOOnceEver:0|gameObject.activeInHierarchy:1|AudioSource.enabled:1|time:0|clip.name:vox_jettisonenabled
 constIndex:707|lP.x:2.59159|lP.y:35.693|lP.z:35.386|lR.x:-.70711|lR.w:.70711|emailIndex:119|autoPlayEmail:1|targetname:lev6betajettisonedspawns|enemyAlert:0|sendEmail:0|lockCodeToScreenMaterialChanger:0|spawnerActivate:0|spawnerActivateAlerted:0|cyborgConversionToggle:0|togglePuzzlePanelLocked:0|testQuestBitIsOn:0|testQuestBitIsOff:0|sendSprintMessage:0|radiationTreatment:0|screenShake:0|awakeSleepingEnemy:0|doorAccessCardOverrideToggle:0|alreadyDisabledThisGOOnceEver:0|gameObject.activeInHierarchy:1
 constIndex:697|lP.x:-22.408|lP.y:33.889|lP.z:-30.7423|center.x:0|center.y:0|center.z:0|size.x:2.56|size.y:2.56|size.z:2.56
-constIndex:706|lP.x:54.27659|lP.y:33.7345|lP.z:-61.49423|lR.y:-.70711|lR.w:.70711
+constIndex:706|lP.x:54.27659|lP.y:33.7345|lP.z:-61.49423|lR.y:-.70711|lR.w:.70711|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:666|lP.x:-1.879|lP.y:34.583|lP.z:-13.1333|lR.y:-.70711|lR.w:.70711|lS.x:2|lS.z:2
 constIndex:666|lP.x:-2.399|lP.y:34.583|lP.z:-14.9683|lS.x:2|lS.z:2
 constIndex:754|lP.x:72.16501|lP.y:31.401|lP.z:9.40302|lR.y:.70711|lR.z:.70711|lR.w:0|lS.x:.8|lS.y:.8|lS.z:.8

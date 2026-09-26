@@ -4590,3 +4590,30 @@ index: 2150
 index: 2151
 #Textures/Sprites/gasexplosion/gasexplosion_4.png
 index: 2152
+// Automap SIDE view schematics, one per level. Slot = level index, matching Automap.automapsSideImages[LevelManager.a.currentLevel] in Citadel: 0=LR, 1..9=L1..L9, 10=G1, 11=G2, 12=G4.
+#Textures/UI/hudmaps/automap_side_LR.png
+index: 2153
+#Textures/UI/hudmaps/automap_side_L1.png
+index: 2154
+#Textures/UI/hudmaps/automap_side_L2.png
+index: 2155
+#Textures/UI/hudmaps/automap_side_L3.png
+index: 2156
+#Textures/UI/hudmaps/automap_side_L4.png
+index: 2157
+#Textures/UI/hudmaps/automap_side_L5.png
+index: 2158
+#Textures/UI/hudmaps/automap_side_L6.png
+index: 2159
+#Textures/UI/hudmaps/automap_side_L7.png
+index: 2160
+#Textures/UI/hudmaps/automap_side_L8.png
+index: 2161
+#Textures/UI/hudmaps/automap_side_L9.png
+index: 2162
+#Textures/UI/hudmaps/automap_side_LG1.png
+index: 2163
+#Textures/UI/hudmaps/automap_side_LG2.png
+index: 2164
+#Textures/UI/hudmaps/automap_side_LG4.png
+index: 2165

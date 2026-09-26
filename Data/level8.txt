@@ -4371,7 +4371,7 @@ constIndex:239|lP.x:-25.8256|lP.y:81.92|lP.z:-5.5872
 constIndex:239|lP.x:-25.8256|lP.y:81.92|lP.z:-8.1472
 constIndex:113|lP.x:-10.4656|lP.y:76.8|lP.z:17.4528|lR.x:-.7071|lR.w:.70711
 constIndex:228|lP.x:45.8544|lP.y:74.24|lP.z:-8.1472
-constIndex:706|lP.x:2.303|lP.y:106.77|lP.z:-38.554
+constIndex:706|lP.x:2.303|lP.y:106.77|lP.z:-38.554|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:668|lP.x:53.809|lP.y:105.706|lP.z:-35.755|lR.x:-.5|lR.y:-.5|lR.z:-.5|lR.w:.5
 constIndex:597|lP.x:55.286|lP.y:104.414|lP.z:-35.767|lS.x:.16|lS.y:2.4|center.x:0|center.y:0|center.z:0|size.x:1|size.y:1|size.z:1
 constIndex:592|lR.y:1|lR.w:0|lS.x:0.5|lS.y:0.5|lS.z:0.5|text:COMPUTER PROGRAM ENTRY|lingdex:642|matIndex:88|lP.x:62.375|lP.y:104.476|lP.z:-9.278

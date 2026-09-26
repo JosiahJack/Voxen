@@ -50,7 +50,7 @@ int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
     if(bufsz == 0){return 0;} size_t pos=0;
     while (*f && pos < bufsz - 1) {
         if (*f != '%') { buf[pos++] = *f++; continue; } f++; // skip '%'
-        int width = 0; char padChar = ' '; if (*f == '0') { padChar = '0'; f++; } while (*f >= '0' && *f <= '9') { width = width * 10 + (*f - '0'); f++; } int decimals = 9; if (*f == '.') { f++; if (*f >= '1' && *f <= '9') { decimals = *f - '0'; } f++; }
+        int width = 0; char padChar = ' '; if (*f == '0') { padChar = '0'; f++; } while (*f >= '0' && *f <= '9') { width = width * 10 + (*f - '0'); f++; } int decimals = 9; if (*f == '.') { f++; if (*f >= '0' && *f <= '9') { decimals = *f - '0'; } f++; }/*0 is a valid precision: %.0f prints just the integer part*/
         switch (*f) {
             case 'x': { u32 val=__builtin_va_arg(args,u32); char num[32]; int i=0; const char* hexChars="0123456789abcdef"; do {num[i++]=hexChars[val % 16]; val/=16;}while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++] = num[i];} } break;
             case 'u': { u32 val=__builtin_va_arg(args,u32); char num[32]; int i=0; do{num[i++]='0' + (val % 10); val/=10; }while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++]=num[i];} } break;

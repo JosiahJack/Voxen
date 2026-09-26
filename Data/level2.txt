@@ -4310,7 +4310,7 @@ constIndex:305|lP.x:-2.6|lP.y:-25.6|lP.z:-2.58|lR.x:1|lR.w:0
 constIndex:171|lP.x:17.88|lP.y:-30.72|lP.z:40.94
 constIndex:144|lP.x:15.32|lP.y:-30.72|lP.z:-28.18|lR.x:-.5|lR.y:.5|lR.z:.5|lR.w:.5
 constIndex:712|lP.x:-26.21766|lP.y:-28.212|lP.z:-22.30071|SFXClip:105|loopingAmbient:0|playEverywhere:1|currentlyPlaying:0|playSoundOnParticleEmit:0|numparticles:0|burstemittcnt1:15|burstemittcnt2:30|targetname:lev2powersurge|enemyAlert:0|sendEmail:0|lockCodeToScreenMaterialChanger:0|spawnerActivate:0|spawnerActivateAlerted:0|cyborgConversionToggle:0|togglePuzzlePanelLocked:0|testQuestBitIsOn:0|testQuestBitIsOff:0|sendSprintMessage:0|radiationTreatment:0|screenShake:0|awakeSleepingEnemy:0|doorAccessCardOverrideToggle:0|alreadyDisabledThisGOOnceEver:0|gameObject.activeInHierarchy:1|AudioSource.enabled:1|time:0|clip.name:machine_on
-constIndex:706|lP.x:51.20589|lP.y:-28.30795|lP.z:-25.9704
+constIndex:706|lP.x:51.20589|lP.y:-28.30795|lP.z:-25.9704|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:675|lP.x:47.41389|lP.y:-28.03895|lP.z:-22.4594|lR.y:.70711|lR.w:.70711
 constIndex:582|lP.x:42.21689|lP.y:-29.76895|lP.z:32.2206|lR.x:-.70711|lR.w:.70711
 constIndex:557|lP.x:40.76189|lP.y:-29.4272|lP.z:25.41378|lR.x:-.70711|lR.w:.70711|lS.x:.0398|lS.y:.0398|lS.z:.0398
@@ -4371,7 +4371,7 @@ constIndex:557|lP.x:-9.75111|lP.y:-29.43295|lP.z:40.5206|lR.x:-.70711|lR.w:.7071
 constIndex:586|lP.x:-17.98211|lP.y:-29.43295|lP.z:33.1766|lR.x:-.70711|lR.w:.70711|lS.x:.0398|lS.y:.0398|lS.z:.0398
 constIndex:548|lP.x:-18.07855|lP.y:-28.40377|lP.z:33.16059|lR.y:1|lR.w:0
 constIndex:586|lP.x:17.89389|lP.y:-29.42713|lP.z:20.46681|lR.x:-.70711|lR.w:.70711|lS.x:.0398|lS.y:.0398|lS.z:.0398
-constIndex:706|lP.x:5.32389|lP.y:-28.38895|lP.z:33.28318
+constIndex:706|lP.x:5.32389|lP.y:-28.38895|lP.z:33.28318|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:675|lP.x:5.06589|lP.y:-28.61495|lP.z:29.4256
 constIndex:746|lP.x:6.89489|lP.y:-31.39895|lP.z:-.0994
 constIndex:746|lP.x:.98789|lP.y:-31.39895|lP.z:7.8506

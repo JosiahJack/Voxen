@@ -1,10 +1,10 @@
 // ui.c - User Interface(UI) aka HUD
 static u32 sensaroundFBO = 0;
 void BiomonitorBlitToUI();
-#define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,UI_ID_##P##_TAB_ITEM,UI_ID_##P##_TAB_AUTOMAP,UI_ID_##P##_TAB_DATA,UI_ID_##P##_PANEL,UI_ID_##P##_WEAPON_NAME,UI_ID_##P##_WEAPON_ICON,UI_ID_##P##_WEAPON_AMMO,UI_ID_##P##_WEAPON_RELOAD,UI_ID_##P##_WEAPON_UNLOAD,UI_ID_##P##_WEAPON_OVERLOAD,UI_ID_##P##_WEAPON_ENERGY_SLIDER,UI_ID_##P##_MEDIA_HEADER,UI_ID_##P##_MEDIA_TAB_0,UI_ID_##P##_MEDIA_TAB_3=UI_ID_##P##_MEDIA_TAB_0+3,UI_ID_##P##_ITEM_NAME,UI_ID_##P##_ITEM_ICON,UI_ID_##P##_ITEM_USE,UI_ID_##P##_ITEM_VAPORIZE,UI_ID_##P##_ITEM_TIMER_VALUE,UI_ID_##P##_ITEM_TIMER_SLIDER,UI_ID_##P##_ITEM_ACCESS_CARDS,UI_ID_##P##_BLOCKED_SECURITY_TEXT,\
+#define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,UI_ID_##P##_TAB_ITEM,UI_ID_##P##_TAB_AUTOMAP,UI_ID_##P##_TAB_DATA,UI_ID_##P##_PANEL,UI_ID_##P##_WEAPON_NAME,UI_ID_##P##_WEAPON_ICON,UI_ID_##P##_WEAPON_AMMO,UI_ID_##P##_WEAPON_RELOAD,UI_ID_##P##_WEAPON_UNLOAD,UI_ID_##P##_WEAPON_OVERLOAD,UI_ID_##P##_WEAPON_ENERGY_SLIDER,UI_ID_##P##_MEDIA_HEADER,UI_ID_##P##_MEDIA_TAB_0,UI_ID_##P##_MEDIA_TAB_3=UI_ID_##P##_MEDIA_TAB_0+3,UI_ID_##P##_ITEM_NAME,UI_ID_##P##_ITEM_ICON,UI_ID_##P##_ITEM_USE,UI_ID_##P##_ITEM_VAPORIZE,UI_ID_##P##_ITEM_SKATE,UI_ID_##P##_ITEM_BOOST,UI_ID_##P##_ITEM_TIMER_VALUE,UI_ID_##P##_ITEM_TIMER_SLIDER,UI_ID_##P##_ITEM_ACCESS_CARDS,UI_ID_##P##_BLOCKED_SECURITY_TEXT,\
     UI_ID_##P##_ELEV_FLOOR_INDICATOR,UI_ID_##P##_ELEV_BUTTON_0,UI_ID_##P##_ELEV_BUTTON_7=UI_ID_##P##_ELEV_BUTTON_0+7,UI_ID_##P##_ELEV_CLOSE,UI_ID_##P##_KEYCODE_0,UI_ID_##P##_KEYCODE_11=UI_ID_##P##_KEYCODE_0+11,UI_ID_##P##_KEYCODE_DIGIT_0,UI_ID_##P##_KEYCODE_DIGIT_2=UI_ID_##P##_KEYCODE_DIGIT_0+2,UI_ID_##P##_KEYCODE_CLOSE,UI_ID_##P##_AUDIOLOG_IMAGE,UI_ID_##P##_AUDIOLOG_NAME,UI_ID_##P##_AUDIOLOG_SENDER,UI_ID_##P##_AUDIOLOG_SUBJECT,\
     UI_ID_##P##_PUZZLE_NODE_SOURCE,UI_ID_##P##_PUZZLE_NODE,UI_ID_##P##_PUZZLE_CELL_0,UI_ID_##P##_PUZZLE_CELL_34=UI_ID_##P##_PUZZLE_CELL_0+34,UI_ID_##P##_PUZZLE_SLIDER,UI_ID_##P##_PUZZLE_CLOSE,UI_ID_##P##_WIRE_SLIDER,UI_ID_##P##_WIRE_TARGET,UI_ID_##P##_WIRE_NODE_0,UI_ID_##P##_WIRE_NODE_13=UI_ID_##P##_WIRE_NODE_0+13,UI_ID_##P##_WIRE_CLOSE,UI_ID_##P##_SYS_HEADER,UI_ID_##P##_SYS_DESC_0,UI_ID_##P##_SYS_DESC_10=UI_ID_##P##_SYS_DESC_0+10,UI_ID_##P##_SYS_VAL_0,UI_ID_##P##_SYS_VAL_10=UI_ID_##P##_SYS_VAL_0+10,UI_ID_##P##_SYS_CLOSE,\
-    UI_ID_##P##_MINIGAMES_HEADER,UI_ID_##P##_MINIGAME_0,UI_ID_##P##_MINIGAME_8=UI_ID_##P##_MINIGAME_0+8,UI_ID_##P##_MINIGAMES_FOOTER,UI_ID_##P##_MINIGAME_VIEW,UI_ID_##P##_MINIGAME_BACK,UI_ID_##P##_MINIGAME_CLOSE,UI_ID_##P##_SEARCH_NAME,UI_ID_##P##_SEARCH_ICON_0,UI_ID_##P##_SEARCH_ICON_3=UI_ID_##P##_SEARCH_ICON_0+3,UI_ID_##P##_SEARCH_EMPTY,UI_ID_##P##_SEARCH_CLOSE,UI_ID_##P##_AUTOMAP_ZOOM_IN,UI_ID_##P##_AUTOMAP_ZOOM_OUT,UI_ID_##P##_AUTOMAP_FULL
+    UI_ID_##P##_MINIGAMES_HEADER,UI_ID_##P##_MINIGAME_0,UI_ID_##P##_MINIGAME_8=UI_ID_##P##_MINIGAME_0+8,UI_ID_##P##_MINIGAMES_FOOTER,UI_ID_##P##_MINIGAME_VIEW,UI_ID_##P##_MINIGAME_BACK,UI_ID_##P##_MINIGAME_CLOSE,UI_ID_##P##_SEARCH_NAME,UI_ID_##P##_SEARCH_ICON_0,UI_ID_##P##_SEARCH_ICON_3=UI_ID_##P##_SEARCH_ICON_0+3,UI_ID_##P##_SEARCH_EMPTY,UI_ID_##P##_SEARCH_CLOSE,UI_ID_##P##_AUTOMAP_ZOOM_IN,UI_ID_##P##_AUTOMAP_ZOOM_OUT,UI_ID_##P##_AUTOMAP_FULL,UI_ID_##P##_AUTOMAP_SIDE
 typedef enum{UI_ID_NONE,
     /*Menu*/UI_ID_MENU_SINGLEPLAYER,UI_ID_MENU_MULTIPLAYER,UI_ID_MENU_OPTIONS,UI_ID_MENU_QUIT,UI_ID_MENU_CONTINUE,UI_ID_MENU_NEW_GAME,UI_ID_MENU_PLAY_INTRO,UI_ID_MENU_PLAY_CREDITS,UI_ID_MENU_BACK,UI_ID_MENU_TAB_GRAPHICS,UI_ID_MENU_TAB_INPUT,UI_ID_MENU_TAB_AUDIO_LANG,UI_ID_MENU_MODEL_DETAIL,UI_ID_MENU_FXAA,UI_ID_MENU_SHADOWS,UI_ID_MENU_SSR,UI_ID_MENU_VSYNC,UI_ID_MENU_FOV_SLIDER,UI_ID_MENU_GAMMA_SLIDER,UI_ID_MENU_RESOLUTION,UI_ID_MENU_FULLSCREEN,UI_ID_MENU_TOGGLE_MONITOR,UI_ID_MENU_RES_APPLY,UI_ID_MENU_MASTER_VOLUME_SLIDER,UI_ID_MENU_MUSIC_VOLUME_SLIDER,UI_ID_MENU_INPUT_0,UI_ID_MENU_INPUT_40=UI_ID_MENU_INPUT_0+40,
     /*NewGame*/UI_ID_MENU_NAME_INPUT,UI_ID_MENU_DIFF_COMBAT,UI_ID_MENU_DIFF_PUZZLE,UI_ID_MENU_DIFF_MISSION,UI_ID_MENU_DIFF_CYBER,UI_ID_MENU_DIFF_CELL_0,UI_ID_MENU_DIFF_CELL_15=UI_ID_MENU_DIFF_CELL_0+15,UI_ID_MENU_START,
@@ -22,14 +22,18 @@ typedef enum{UI_ID_NONE,
 #define UI_DBLCLICK 0.5
 #define UI_KEY_BACKSPACE 10
 #define UI_KEY_CLEAR 11
+#define TARGETID_MARKER_REF_RANGE 7.68f/*Range at which the authored 128px TargetID marker is the right on-screen size*/
+#define TARGETID_TEXT_BASE_OFFSET 64.0f/*Pixels the two-line label sits above the projected head at the reference range*/
+#define TARGETID_TEXT_Y_GAIN 0.6f/*Label slides down as the target nears and up as it recedes, scaled from the base offset*/
 INLINE bool CursorIsOverBounds(float x0, float x1, float y0, float y1) { return World.cursorPos_x >= x0 && World.cursorPos_x <= x1 && World.cursorPos_y >= y0 && World.cursorPos_y <= y1;/*0,0=top left*/ }
-/* Projects a world point (relative to the player) into the 1366x768 UI space. Inverse of ScreenPointToRay: the
-   renderer uses a vertical FOV scaled by the real window aspect, so x needs the aspect term and y does not. */
+/* Projects a world point (relative to the player) into the 1366x768 UI space. Inverse of ScreenPointToRay:
+   ndcX = (cot(fov/2)/aspect)*dx/bz maps onto UI_W*0.5 of pixels, so x divides by the window aspect while y
+   (ndcY = cot(fov/2)*dy/bz onto UI_H*0.5) does not. Both collapse to 384.0 for a 16:9 window. */
 INLINE bool WorldToScreenPoint(V3 d, float* sx, float* sy) {
     V3 f=World.instances[PLAYER1].forward,rt=World.instances[PLAYER1].right,ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(rt,ff));
     float bz=V3_dot(d,f); if(bz<=0.01f)return false;
-    float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,hw=(float)UI_W*0.5f,hh=(float)UI_H*0.5f;
-    *sx=hw+V3_dot(d,rt)*(hw*aspect)/(bz*tanFov); *sy=hh-V3_dot(d,up)*hh/(bz*tanFov); return *sx > -48.0f && *sx < (float)UI_W+48.0f && *sy > -48.0f && *sy < (float)UI_H+48.0f;
+    float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,k=tanFov*bz;
+    *sx=(float)UI_W*0.5f+V3_dot(d,rt)*((float)UI_W*0.5f/aspect)/k; *sy=(float)UI_H*0.5f-V3_dot(d,up)*(float)UI_H*0.5f/k; return *sx > -48.0f && *sx < (float)UI_W+48.0f && *sy > -48.0f && *sy < (float)UI_H+48.0f;
 }
 INLINE void UIR(u32 id, i16 x, i16 y, i16 w, i16 h){if(!id)return; if(!World.uiComponents[id].initialized){World.uiComponents[id].min=(V2){(float)x,(float)y}; World.uiComponents[id].max=(V2){(float)(x+w),(float)(y+h)}; World.uiComponents[id].initialized=true;} World.uiComponents[id].active=true;}
 INLINE void UIRImg(u32 id, i16 x, i16 y, i16 w, i16 h, u16 tex) { UIR(id,x,y,w,h); RenderUIImage(x,y,w,h,tex); }
@@ -52,7 +56,7 @@ void MFD_NewGame() {
 }
 void MFD_GeneralChanged() { World.Sys_UI.generalClickSlot=-1; }
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; MFD_GeneralChanged(); }
-void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (side==2) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdSelected[side]=2; }
+void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (side==2) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdSelected[side]=2; }
 void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=side?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab,view=side?World.Sys_UI.MFD_DataR:World.Sys_UI.MFD_DataL; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && view!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=view;}} World.Sys_UI.MFD_DataL=World.Sys_UI.MFD_DataR=5; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4;}
 void MFD_CloseSearch() {for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; u8* view=side?&World.Sys_UI.MFD_DataR:&World.Sys_UI.MFD_DataL; if (*view!=5) continue; *view=World.Sys_UI.mfdReturnView[side+1]; if (*view==5) *view=0; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];}}
 /*Data tab sub-views that are driven by frobbed objects; these are the "open" object panels. view 5 (search) is handled separately by MFD_OpenSearch/MFD_CloseSearch.*/
@@ -249,7 +253,7 @@ void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
 void TickBar(bool isEnergy) {
     RenderUIImage(isEnergy ? 1333 : 1332,isEnergy ? 36 : 2,32,32,isEnergy ? 939 : 956);/*Indicator*/ int p1H=isEnergy ? World.invP1.energy : World.instances[PLAYER1].health; if(p1H>255){p1H=255;} i16 tY=isEnergy ? 35 : 4;
     for (int i=7;i>=0;--i) if(i==7/*Always render at least 1 tick*/||p1H>(7-i)*11){RenderUIImage(1050-(i*16),tY,32,32,964);/*Tick Red*/} for (int i=7;i>=0;--i) if(p1H>88+(7-i)*11){RenderUIImage(1178-(i*16),tY,32,32,963);/*Tick Orange*/} for (int i=7;i>=0;--i) if(p1H>176+(7-i)*11){RenderUIImage(1306-(i*16),tY,32,32,962);/*Tick Green*/}
-}
+    if (isEnergy && World.invP1.drainJPM > 0) RenderTextL(1340,tY+8,T_GREEN,FONT_NORMAL,0.8f,"%d J/min",(int)World.invP1.drainJPM);/*PlayerEnergy.cs shows the summed drainJPM plus " J/min" while above zero, and blanks both otherwise*/ }
 
 INLINE int HwActiveTexIndex(int active, int version, int off, int v1, int v2, int v3, int v4) { if (!active) return off; if (v4 >= 0 && version >= 4) return v4; if (version >= 3) return v3; if (version == 2) return v2; return v1; }
 /*eng: 0 needs energy, 1 needs energy only when hwVersSetting==0, 2 needs energy only when hwVersSetting>=1, 3 not a toggle (e-reader)*/
@@ -343,21 +347,70 @@ void UI_MinigameInput(bool rh,int x,int y) { (void)rh;(void)x;(void)y; /*The Fun
 void UI_MinigameBack(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_current<0) return; World.Sys_UI.mg_current=-1; World.Sys_UI.mg_running[rh?1:0]=false; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_MinigameClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_running[rh?1:0]) World.Sys_UI.mg_running[rh?1:0]=false; World.Sys_UI.mg_current=-1; MFD_CloseDataSide(rh); }
 /*---- E-reader log/email/data navigation (Unity MFDManager + ReaderView) ----*/
+#define LOG_IMG_BASE 1272/*logImages[] -> Textures/UI/logimages. Manifest order matches Unity's logImages sprite array, so index n == texture LOG_IMG_BASE+n.*/
+/*Unity LogTextOutput is a UI Text with default HorizontalOverflow=Wrap; Voxen's RenderTextL only honors an explicit \n, so the raw speech-to-text used to render as one clipped line. Page by wrapped lines instead of Unity's flat 568-char strip, which is sized for Unity's 1284x420 field and would not fit the center MFD.*/
+#define LOG_TX 372
+#define LOG_TY 574
+#define LOG_TW 520
+#define LOG_TSC 0.8f
+#define LOG_TLINES 8
+#define LOG_PAGE_CHARS 568
+#define LOG_BTN_Y 721
+static int UILogWrap(char* out,int outSz,int startChar,int maxLines) {/*word-wraps the whole log; emits lines starting at or after startChar (up to maxLines) into out joined by \n; returns the total wrapped line count*/
+    int li=(int)World.Sys_UI.logReferenceIndex; if (li<0||li>=LOGCNT||!out||outSz<8) { if(out&&outSz) *out=0; return 0; }
+    const char* s=World.audioLogSpeech2Text[li]; char line[T_LOGSTR_MAX]; float maxU=(float)LOG_TW/LOG_TSC;
+    int total=0,op=0,emitted=0,lineStart=0;
+    while (*s) {
+        int n=0; float w=0; const char* lastSp=NULL; int lastN=0;
+        while (*s && n<(int)sizeof(line)-5) {
+            const u8* c=(const u8*)s; int clen=(*c<0x80)?1:(((*c&0xE0)==0xC0)?2:3);
+            if (n+clen>=(int)sizeof(line)-1) break;
+            mcpy(line+n,s,(size_t)clen); n+=clen; s+=clen; line[n]=0;
+            if (c[clen-1]==' '||c[clen-1]==',') { lastSp=s; lastN=n; }
+            w=MeasureLineAdvance(line,FONT_NORMAL);
+            if (w>maxU && n>0) { if (lastSp) { s=lastSp; n=lastN; } else { s-=clen; n-=clen; } break; }
+        }
+        if (!n) break;
+        line[n]=0; if (line[n-1]==' ') line[--n]=0;
+        if (lineStart>=startChar && emitted<maxLines && op+n+1<outSz) { mcpy(out+op,line,(size_t)n); op+=n; out[op++]='\n'; emitted++; }
+        lineStart+=n; total++;
+    }
+    out[op]=0; return total;
+}
+static char logPageBuf[T_LOGSTR_MAX];/*current page: wrapped lines joined by \n*/
+static char UILogCountBuf[8];
+static int UILogTotalLines(void) { return UILogWrap(logPageBuf,sizeof(logPageBuf),(int)World.Sys_UI.logReaderPage*LOG_PAGE_CHARS,LOG_TLINES); }
+static int UILogFullLines(void) { return UILogWrap(UILogCountBuf,1,0,0); }/*total wrapped lines of the whole log, for the multipage test*/
+static bool UILogHasMore(void) { int li=(int)World.Sys_UI.logReferenceIndex; if (li<0||li>=LOGCNT) return false; return (int)slen(World.audioLogSpeech2Text[li]) > (int)(World.Sys_UI.logReaderPage+1)*LOG_PAGE_CHARS; }
+static const char* UILogTextPage() { UILogTotalLines(); return logPageBuf; }
+void MFD_OpenAudioLog(int idx) {/*Unity MFDManager.SendAudioLogToDataTab: LH data tab always, RH only when that log has an RH image.*/
+    if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD;/*ereader stays powered on*/
+    World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6);
+    World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; }
+
 static void UIOpenEntryAndRead(int idx,bool playable) { if (idx<0||idx>=LOGCNT) return; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.logReaderPage=0; World.invP1.readLog[idx]=true;
     if (playable && (World.invP1.hasHardware&HW_ERD) && audioLogs[idx] && audioLogs[idx][0]) PlayLog(idx);
     CheckForUnreadLogs(); if (!World.invP1.hasNewEmail && !World.invP1.hasNewLogs && !World.invP1.hasNewNotes) World.Sys_UI.highlightStatus[MM_EMAIL_TABLE]=World.Sys_UI.highlightStatus[MM_LOG_TABLE]=World.Sys_UI.highlightStatus[MM_DATA_TABLE]=false; }
-void UI_LogTableClick(int level) { World.Sys_UI.mouseClickHeldOverGUI=true; if (level<0||level>9) return; World.Sys_UI.logFolderCount=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER;
-    for (int i=0;i<LOGCNT && World.Sys_UI.logFolderCount<16;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogType[i]==AudioLogType_Normal && Sys_Text.audioLogLevelFound[i]==(u8)level) { World.Sys_UI.logFolderList[World.Sys_UI.logFolderCount]=(i16)i; World.Sys_UI.logFolderCount++; }
+void UI_LogTableClick(int level) { World.Sys_UI.mouseClickHeldOverGUI=true; if (level<0||level>9) return; World.invP1.hardwareIsActive|=HW_ERD;/*keep the ereader tabs on: Unity MultiMediaLogTableButton sets hardwareIsActive[2]*/ World.Sys_UI.logFolderCount=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER;
+    for (int i=0;i<LOGCNT && World.Sys_UI.logFolderCount<15;++i)/*folder renders 15 buttons (Unity LogContentsButtonsManager)*/ if (World.invP1.hasLog[i] && Sys_Text.audioLogLevelFound[i]==(u8)level) { World.Sys_UI.logFolderList[World.Sys_UI.logFolderCount]=(i16)i; World.Sys_UI.logFolderCount++; }
     play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_LogEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>=(int)World.Sys_UI.logFolderCount) return; UIOpenEntryAndRead((int)World.Sys_UI.logFolderList[entry],true); }
 static int UIEmailRefAt(int pos) { int c=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogType[i]==AudioLogType_Email) { if (c==pos) return i; ++c; } return -1; }
 static int UIDataRefAt(int pos) { int c=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogType[i]==AudioLogType_Papers) { if (c==pos) return i; ++c; } return -1; }
 void UI_EmailEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>14) return; int idx=UIEmailRefAt(entry); if (idx<0) return; UIOpenEntryAndRead(idx,false); }/*emails have no voice track*/
 void UI_DataEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>12) return; int idx=UIDataRefAt(entry); if (idx<0) return; UIOpenEntryAndRead(idx,false); }
-void UI_LogMore(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView!=MFD_READER_TEXT) return; World.Sys_UI.logReaderPage++; }
-void UI_LogBack(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; else if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; else World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; }
+void UI_LogMore(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView!=MFD_READER_TEXT) return;
+    if (UILogHasMore()) { World.Sys_UI.logReaderPage++; return; }/*[MORE]: another wrapped page follows*/
+    World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER;/*[CLOSE]: no more text, back to the folder (Unity LogMoreButton close branch)*/ }
+void UI_LogBack(void) { World.Sys_UI.mouseClickHeldOverGUI=true;
+    if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) { if (World.Sys_UI.logReaderPage>0) { World.Sys_UI.logReaderPage--; return; } return; }/*[BACK]: previous page, drawn only on multipage logs (Unity LogTextReaderManager)*/
+    if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; }
 void UI_NoteToggleClick(int note) { World.Sys_UI.mouseClickHeldOverGUI=true; if (note<0||note>17) return; if (!World.questNotesActive[note]) return; World.questNotesChecked[note]=!World.questNotesChecked[note]; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>=HW_COUNT) return; World.invP1.hardwareInvCurrent=idx; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>=HW_COUNT) return; World.invP1.hardwareInvCurrent=idx; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
+    bool rh=World.Sys_UI.lastItemSideRH; World.Sys_UI.mfdHardwareItem=true; World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false;
+    if (idx==HW_SYS_IDX) { /*the system analyzer is a data-tab view, so it opens on the last-used data side rather than the item side*/
+        MFD_OpenData(World.Sys_UI.lastDataSideRH,7); return; }
+    if (rh) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; }
 void UseCyberspaceItemByIndex(int);
 void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>6) return; bool cyber = World.curLev == LEVEL_CYBERSPACE;/*row 0 ICE Drill, 1 Pulser, 2 Cyber Shield, 3 Turbo, 4 Decoy, 5 Recall, 6 Games*/
     if (idx==SW_DRILL)  { World.invP1.isPulserNotDrill = false; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ return; }
@@ -481,7 +534,19 @@ void RenderConsumableItem(bool isRH) {
     }
 }
 
+/*The booster is the one hardware whose mode the player picks instead of inheriting it from the item's version; hwVersSetting[HW_BST_IDX]==0 is skates and >=1 is boost, matching Inventory.BoosterSetToSkates()/BoosterSetToBoost()*/
+static void BoosterSetMode(bool boost) { if (!(World.invP1.hasHardware & HW_BST)) return; World.invP1.hwVersSetting[HW_BST_IDX] = boost ? (u8)vmax(1,(int)World.invP1.hwVers[HW_BST_IDX]-1) : 0; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+static void RenderHardwareItem(bool isRH) {
+    int slot=World.invP1.hardwareInvCurrent; i16 dx=isRH?1059:0; int ref=World.invP1.hardwareInvReferenceIndex[slot];
+    UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,ref<0?"":Sys_Text.stringTable[ref+326]);
+    if (slot==HW_BST_IDX) { /*the booster is the only hardware with selectable modes, so it gets the SKATE/BOOST pair instead of a plain readout*/
+        bool skates=World.invP1.hwVersSetting[HW_BST_IDX]==0; for(u8 m=0;m<2;++m){ u32 rid = m ? MID(isRH,ITEM_BOOST) : MID(isRH,ITEM_SKATE); i16 y=m?691:628; UIRImg(rid,dx+34,y,160,40,1087); RenderTextL(dx+34,y,skates==(m==0)?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8,"%s",m?"BOOST":"SKATE"); } return; }
+    u16 tex=ref<0?MAX_TXRS:GetItemFrobTexture((u16)(ref+307)); /*hardware frob icons live at 328..339, not 307..318: hardwareInvReferenceIndex is the +21 remap that lines names and icons up*/
+    if (tex<MAX_TXRS) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
+    RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8,"v%d",(int)World.invP1.hwVers[slot]);
+}
 void RenderGeneralItem(bool isRH) {
+    if (World.Sys_UI.mfdHardwareItem) { RenderHardwareItem(isRH); return; }
     if (World.Sys_UI.mfdConsumable) { RenderConsumableItem(isRH); return; }
     if (!World.Sys_UI.mfdGeneralItem) return;
     int slot=World.invP1.generalInvCurrent,item=GeneralInvItem(slot); if (item<0) return;
@@ -528,7 +593,7 @@ void RenderSearch(bool isRH) {
         case 465: case 466: case 467: case 468: case 469: case 470: case 471: label=897; break;
         case 472: case 473: case 474: case 475: case 476: label=899; break;
     }
-    if (label) RenderTextL(dx+34,536,T_YELLOW,FONT_NORMAL,0.8f,Sys_Text.stringTable[label]);
+    if (label) RenderTextL(dx+34,523,T_YELLOW,FONT_NORMAL,0.8f,Sys_Text.stringTable[label]);
     else if (IdxIsNPC(e->index)) RenderTextL(dx+34,536,T_YELLOW,FONT_NORMAL,0.8f,npcTable[e->index-419].name);
     bool any=false;
     for (u8 slot=0;slot<4;++slot) {
@@ -537,7 +602,7 @@ void RenderSearch(bool isRH) {
         if (tex<MAX_TXRS) UIRImg(MID(isRH,SEARCH_ICON_0)+slot,(i16)(dx+84+90*(slot&1)),(i16)(584+90*(slot>>1)),64,64,tex);
     }
     if (!any) RenderTextL(dx+24,633,T_YELLOW,FONT_NORMAL,0.8f,Sys_Text.stringTable[891]);
-    UIRImg(MID(isRH,SEARCH_CLOSE),dx+259,isRH?528:534,29,29,899); RenderTextL(dx+259,isRH?531:534,T_STOPD_RED,FONT_NORMAL,0.8,"X");
+    UIRImg(MID(isRH,SEARCH_CLOSE),dx+291,508,29,29,899); RenderTextL(dx+300,518,T_STOPD_RED,FONT_NORMAL,0.8,"X");
 }
 
 static const i16 elevBtnY[4]={578,620,663,705}; static const char* elevBtnLabel[8]={"R","1","2","3","6","7","8","9"};/*TODO drive off elevFloorLabels[] + the linked elevator's floor set instead of this fixed strip*/
@@ -545,7 +610,24 @@ static const i16 keyBtnX[3]={86,127,169},keyBtnY[4]={577,620,663,706}; static co
 static const i16 puzCellX[7]={51,80,109,138,166,195,224},puzCellY[5]={565,594,622,651,680};
 static const i16 wireNodeY[7]={566,594,623,651,679,707,736};
 static const i16 mgX[9]={32,32,32,32,156,156,156,156,32},mgY[9]={540,575,610,646,540,575,610,646,681};/*mgName is defined with the UI row handlers*/
-static const struct { const char* d,*v; i16 y; } sysRows[11]={{"Current level security:","100%",547},{"Mining laser status:","Charging",566},{"Lifepod status:","Disabled",585},{"Station shield status:","Off",605},{"Reactor status:","Normal",624},{"Processor nodes:","99",643},{"Main Program:","Downloading to earth",662},{"Alpha Grove status:","normal",681},{"Beta Grove status:","normal",701},{"Gamma Grove status:","launched",720},{"Delta Grove status:","launched",739}};
+/*System analyzer status rows, driven off SystemAnalyzer.cs: descriptions are stringTable[474..484] and every value below is the same expression the Unity Update() uses*/
+static const i16 sysRowY[11]={547,566,585,605,624,643,662,681,701,720,739};
+static void SystemStatusValue(int r, char* out, size_t n) {
+    bool laser=QuestBitIsSet(QB_LaserDestroyed), destruct=QuestBitIsSet(QB_SelfDestructActivated);
+    switch(r){
+        case 0: sFormat(out,n,"%d%s",(int)GetCurrentLevelSecurity(),Sys_Text.stringTable[307]); break;
+        case 1: sFormat(out,n,"%s",Sys_Text.stringTable[laser?486:485]); break;
+        case 2: sFormat(out,n,"%s",Sys_Text.stringTable[destruct?488:487]); break;
+        case 3: sFormat(out,n,"%s",Sys_Text.stringTable[QuestBitIsSet(QB_ShieldActivated)?490:489]); break;
+        case 4: sFormat(out,n,"%s",Sys_Text.stringTable[destruct?491:492]); break;
+        case 5: { int nodes=0; for(int i=0;i<MAX_LEVELS;++i) nodes+=(int)World.levelSmallNodeCount[i]+(int)World.levelLargeNodeCount[i]-(int)World.levSmNodeDestroyedCnt[i]-(int)World.levNodeDestroyedCnt[i]; sFormat(out,n,"%d",nodes); break; }
+        case 6: sFormat(out,n,"%s",Sys_Text.stringTable[!laser?494:!QuestBitIsSet(QB_BetaGroveJettisoned)?495:!(QuestBitIsSet(QB_AntennaNorthDestroyed)&&QuestBitIsSet(QB_AntennaSouthDestroyed)&&QuestBitIsSet(QB_AntennaWestDestroyed)&&QuestBitIsSet(QB_AntennaEastDestroyed))?496:!QuestBitIsSet(QB_BridgeSeparated)?497:498]); break;
+        case 7: sFormat(out,n,"%s",Sys_Text.stringTable[492]); break;
+        case 8: sFormat(out,n,"%s",Sys_Text.stringTable[QuestBitIsSet(QB_BetaGroveJettisoned)?493:492]); break;
+        case 9: sFormat(out,n,"%s",Sys_Text.stringTable[493]); break;
+        default: sFormat(out,n,"%s",Sys_Text.stringTable[492]); break;
+    }
+}
 static u32 sensaroundVAO=0,sensaroundVBO=0;
 void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the rendered sensaround cam view texture as a HUD quad at the exact pixel rect used by the UIR call.  Uses the chunk shader's useCamView path (uniforms 28/29/30) like the in-world camera screens.  The quad only spans [0,1]^2 in world space so the shader's voxel lighting lookup stays in-bounds; the projection bakes in the stretch to the target UI rectangle.
     if (camViewIdx >= camViewCount || w <= 0 || h <= 0) return;
@@ -590,7 +672,7 @@ void SideMFD(bool isRH) { // 320x240
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex), tab = isRH ? World.Sys_UI.MFD_RightTab : World.Sys_UI.MFD_LefTab; u8 selected=tab?tab:World.Sys_UI.mfdSelected[isRH?2:1];
     for (u8 i=0;i<4;++i) UIRImg(MID(isRH,TAB_WEAPON)+i,isRH ? 1350 : -TAB_THICK,(i16)(520+56*i),32,40,selected==i+1 ? 1024 : 1022);/*Weapon/Item/Automap/Data side tab buttons*/
     if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1) {
-        i16 sx=isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W : TAB_THICK+MFD_SPACING, sy=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H;/*Sensaround Plane, mirror about screen center for RH*/
+        i16 sx=isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W : TAB_THICK+MFD_SPACING, sy=UI_H-TAB_THICK-TXT_PAD-SIDE_MFD_H;/*Sensaround Plane, mirror about screen center for RH*/
         UIR(isRH ? UI_ID_SENSA_RH : UI_ID_SENSA_LH,sx,sy,SIDE_MFD_W,SIDE_MFD_H);
         DrawSensaroundQuad(sx,sy,SIDE_MFD_W,SIDE_MFD_H,isRH ? sensaroundCamViewRight : sensaroundCamViewLeft);
     } else {
@@ -615,33 +697,29 @@ void SideMFD(bool isRH) { // 320x240
         } else if (tab == 2 && World.Sys_UI.mfdItemReader[isRH]) {
             i16 x=isRH?1080:TAB_THICK+MFD_SPACING; static const u16 labels[4]={42,39,43,885};
             UIRText(MID(isRH,MEDIA_HEADER),x+6,540,T_YELLOW,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[349]);
-            for (u8 section=0;section<4;++section) { if (section==MM_NOTES && !World.diffMis) continue;
-                bool sectionSelected=World.Sys_UI.MFD_MediaTab==section,unread=World.Sys_UI.highlightStatus[section];
-                UIRImg(MID(isRH,MEDIA_TAB_0)+section,(i16)(x+65*section),718,65,40,sectionSelected||unread?1087:1086); RenderTextL(x+65*section,718,sectionSelected?T_GREEN_MENU:T_GREEN_MENU_SHADOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[labels[section]]);
-            }
-        } else if (tab == 3) {AutomapBlitToUI(); i16 cx=(i16)(AMAP_UI_X_L+(isRH?(AMAP_UI_X_R-AMAP_UI_X_L):0)+AMAP_UI_W/2),fy=691; UIRImg(MID(isRH,AUTOMAP_ZOOM_OUT),cx-40,fy,20,14,1087); RenderTextL(cx-40,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_OUT))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"-"); UIRImg(MID(isRH,AUTOMAP_ZOOM_IN),cx-65,fy,20,14,1087); RenderTextL(cx-65,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_IN))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"+"); UIRImg(MID(isRH,AUTOMAP_FULL),cx+55,fy,40,14,1087); RenderTextL(cx+55,fy,UIOver(MID(isRH,AUTOMAP_FULL))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"FULL");}
+            for(u8 section=0;section<4;++section){if(section==MM_NOTES && !World.diffMis)continue; bool sectionSelected=World.Sys_UI.MFD_MediaTab==section,unread=World.Sys_UI.highlightStatus[section]; UIRImg(MID(isRH,MEDIA_TAB_0)+section,(i16)(x+65*section),718,65,40,sectionSelected||unread?1087:1086); RenderTextL(x+65*section,718,sectionSelected?T_GREEN_MENU:T_GREEN_MENU_SHADOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[labels[section]]);}
+        } else if (tab == 3) { u8 aside=isRH?1:0; if (World.Sys_UI.autoSide[aside]) AutomapSideBlitToUI(isRH); else AutomapBlitToUI(); i16 cx=(i16)(AMAP_UI_X_L+(isRH?(AMAP_UI_X_R-AMAP_UI_X_L):0)+AMAP_UI_W/2),fy=691; UIRImg(MID(isRH,AUTOMAP_ZOOM_OUT),cx-40,fy,20,14,1087); RenderTextL(cx-40,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_OUT))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"-"); UIRImg(MID(isRH,AUTOMAP_ZOOM_IN),cx-65,fy,20,14,1087); RenderTextL(cx-65,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_IN))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"+"); UIRImg(MID(isRH,AUTOMAP_FULL),cx+55,fy,40,14,1087); RenderTextL(cx+55,fy,UIOver(MID(isRH,AUTOMAP_FULL))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[889]); UIRImg(MID(isRH,AUTOMAP_SIDE),cx+105,fy,40,14,1087); RenderTextL(cx+105,fy,UIOver(MID(isRH,AUTOMAP_SIDE))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[World.Sys_UI.autoSide[aside]?887:888]);}
         else if (tab==2 && !World.Sys_UI.mfdItemReader[isRH?1:0]) RenderGeneralItem(isRH);
         else if(tab==4){/*DataTab*/
-            u8 data = isRH ? World.Sys_UI.MFD_DataR : World.Sys_UI.MFD_DataL; i16 dx = isRH ? 1059 : 0;
+            u8 data = isRH ? World.Sys_UI.MFD_DataR : World.Sys_UI.MFD_DataL; i16 dx = isRH ? 1059 : 0, closeButtonX=291,closeButtonY=508,closeButtonTextX=300,closeButtonTextY=518;
             if (data==8) {/*Blocked by SHODAN level security*/ UIRImg(UI_ID_NONE,31+dx,535,227,209,1110); UIRText(MID(isRH,BLOCKED_SECURITY_TEXT),45+dx,542,T_YELLOW,FONT_NORMAL,0.8f,0,890<1100?Sys_Text.stringTable[890]:"Blocked by SHODAN level Security."); }
             if (data==1) {/*Elevator*/
                 UIRImg(MID(isRH,ELEV_FLOOR_INDICATOR),132+dx,531,32,32,929);/*CurrentFloorIndicator*/
-                for (u8 b=0;b<2;++b) { i16 ex=(i16)(86+78*b+dx); RenderUIImage(ex,578,45,168,0);/*ButtonBank QUAD:builtin-knob*/
-                    for (u8 i=0;i<4;++i) { u8 f=(u8)(b*4+i); i16 ey=elevBtnY[i]; UIRImg(MID(isRH,ELEV_BUTTON_0)+f,ex,ey,45,39,(i==0||i==3)?2133:2135);/*keypad_end / keypad_mid*/
-                        RenderUIImage((i16)(ex+2),(i16)(ey+4),40,34,2134);/*keypad_inner_on*/ RenderTextL((i16)(ex+3),(i16)(ey+2),T_GREEN,FONT_NORMAL,0.8,"%s",elevBtnLabel[f]); } }
-                UIRImg(MID(isRH,ELEV_CLOSE),246+dx,528,29,29,899); RenderTextL(246+dx,528,T_STOPD_RED,FONT_NORMAL,0.8,"X");
+                for (u8 b=0;b<2;++b) { i16 ex=(i16)(86+78*b+dx); RenderUIImage(ex,578,45,168,0);/*ButtonBank QUAD:builtin-knob*/ for (u8 i=0;i<4;++i) { u8 f=(u8)(b*4+i); i16 ey=elevBtnY[i]; UIRImg(MID(isRH,ELEV_BUTTON_0)+f,ex,ey,45,39,(i==0||i==3)?2133:2135);/*keypad_end / keypad_mid*/ RenderUIImage((i16)(ex+2),(i16)(ey+4),40,34,2134);/*keypad_inner_on*/ RenderTextL((i16)(ex+3),(i16)(ey+2),T_GREEN,FONT_NORMAL,0.8,"%s",elevBtnLabel[f]); } }
+                UIRImg(MID(isRH,ELEV_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==2) {/*Keycode pad*/
-                for (u8 i=0;i<12;++i) { i16 kx=(i16)(keyBtnX[i%3]+dx),ky=keyBtnY[i/3]; UIRImg(MID(isRH,KEYCODE_0)+keyBtnK[i],kx,ky,42,38,2133);/*keypad_end*/
-                    RenderUIImage((i16)(kx+2),(i16)(ky+3),38,35,2134);/*keypad_inner_on*/ RenderTextL((i16)(kx-6),(i16)(ky-5),T_GREEN,FONT_NORMAL,0.8,"%s",keyBtnLabel[i]); }
+                for (u8 i=0;i<12;++i) { i16 kx=(i16)(keyBtnX[i%3]+dx),ky=keyBtnY[i/3]; UIRImg(MID(isRH,KEYCODE_0)+keyBtnK[i],kx,ky,42,38,2133);/*keypad_end*/ RenderUIImage((i16)(kx+2),(i16)(ky+3),38,35,2134);/*keypad_inner_on*/ RenderTextL((i16)(kx-6),(i16)(ky-5),T_GREEN,FONT_NORMAL,0.8,"%s",keyBtnLabel[i]); }
                 for (u8 d=0;d<3;++d) UIRImg(MID(isRH,KEYCODE_DIGIT_0)+d,(i16)(90+41*d+dx),526,32,32,2132);/*Hundreds/Tens/Ones elnum_null*/
-                UIRImg(MID(isRH,KEYCODE_CLOSE),255+dx,525,29,29,899); RenderTextL(255+dx,525,T_STOPD_RED,FONT_NORMAL,0.8,"X");
+                UIRImg(MID(isRH,KEYCODE_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==5) RenderSearch(isRH);
-            if (data==6) {/*AudioLog*/
-                UIRImg(MID(isRH,AUDIOLOG_IMAGE),20+dx,528,263,240,1272);/*LogImage*/
-                UIRText(MID(isRH,AUDIOLOG_NAME),29+dx,540,T_YELLOW,FONT_NORMAL,0.8f,0,"HACKER IS AWESOME"); UIRText(MID(isRH,AUDIOLOG_SENDER),29+dx,557,T_YELLOW,FONT_NORMAL,0.8f,0,"Sender: SHODAN");
-                UIR(MID(isRH,AUDIOLOG_SUBJECT),29+dx,701,(i16)(MeasureLineAdvance("Subject:",FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(29+dx,701,T_YELLOW,FONT_NORMAL,0.8,"Subject:\n\nif only i had a sparq beam then all the world would be right");
+            if (data==6) {/*AudioLog: LH shows name+sender+subject+LH image, RH shows name+RH image only. Unity LogDataTabContainerManager.SendLogData.*/
+                int li=(int)World.Sys_UI.logReferenceIndex; if(li<0||li>=LOGCNT){li=0;} u16 im=(u16)(isRH?Sys_Text.audioLogImagesRefIndicesRH[li]:Sys_Text.audioLogImagesRefIndicesLH[li]);
+                UIRImg(MID(isRH,AUDIOLOG_IMAGE),20+dx,528,263,240,(u16)(LOG_IMG_BASE+im));/*LogImage*/
+                char snd[192]; if(isRH) snd[0]=0; else sFormat(snd,sizeof(snd),"%s%s",Sys_Text.stringTable[893],World.audiologSenders[li]);
+                UIRText(MID(isRH,AUDIOLOG_NAME),29+dx,523,T_YELLOW,FONT_NORMAL,0.8f,0,World.audiologNames[li]); UIRText(MID(isRH,AUDIOLOG_SENDER),29+dx,557,T_YELLOW,FONT_NORMAL,0.8f,0,snd);
+                UIR(MID(isRH,AUDIOLOG_SUBJECT),29+dx,701,(i16)(MeasureLineAdvance(Sys_Text.stringTable[894],FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(29+dx,701,T_YELLOW,FONT_NORMAL,0.8,isRH?"":"%s\n\n%s",Sys_Text.stringTable[894],World.audiologSubjects[li]);
             }
             if (data==3) {/*GridPuzzle*/
                 RenderUIImage(42+dx,555,221,163,2139);/*OuterColorBorder gridcontainer_gray*/ RenderUIImage(46+dx,558,214,157,2138);/*ContainerEdge gridcontainer*/
@@ -649,26 +727,26 @@ void SideMFD(bool isRH) { // 320x240
                 for (u8 c=0;c<35;++c) { i16 cx=(i16)(puzCellX[c%7]+dx),cy=puzCellY[c/7]; UIRImg(MID(isRH,PUZZLE_CELL_0)+c,cx,cy,29,29,2137);/*grid1_base*/ RenderTextL(cx,cy,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.8,"?"); RenderUIImage(cx,cy,29,29,2136);/*geniusgrid_highlight*/ }
                 RenderUIImage(42+dx,720,221,26,2139);/*ProgressContainer*/ RenderUIImage(45+dx,726,225,13,0);/*Background QUAD:builtin-knob*/ RenderUIImage(48+dx,726,6,13,2142);/*Fill puzzlesliderwire*/
                 UIRImg(MID(isRH,PUZZLE_SLIDER),45+dx,720,225,26,1078);/*Handle - the whole bar is the drag region*/
-                UIRImg(MID(isRH,PUZZLE_CLOSE),259+dx,527,29,29,899); RenderTextL(259+dx,527,T_STOPD_RED,FONT_NORMAL,0.8,"X");
+                UIRImg(MID(isRH,PUZZLE_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==4) {/*WirePuzzle*/
                 RenderUIImage(82+dx,570,139,192,2143);/*ContainerCenter wire_center*/ RenderUIImage(34+dx,521,235,44,2144);/*LevelsBox*/ RenderUIImage(40+dx,526,235,34,0);/*Background*/ RenderUIImage(43+dx,526,6,34,2142);/*Fill*/
                 UIRImg(MID(isRH,WIRE_SLIDER),40+dx,509,235,69,1078);/*Handle - whole levels box drags*/ UIRImg(MID(isRH,WIRE_TARGET),204+dx,522,66,42,2145);/*TargetLine*/
                 for (u8 n=0;n<14;++n) { i16 nx=(i16)((n<7?57:222)+dx),ny=wireNodeY[n%7]; UIRImg(MID(isRH,WIRE_NODE_0)+n,nx,ny,26,29,2146);/*wire_node*/ RenderUIImage((i16)(nx+4),(i16)(ny+6),16,16,0);/*SelectedIndicator*/ RenderUIImage((i16)(nx+1),(i16)(ny+3),22,22,0);/*GeniusHint*/ }
-                UIRImg(MID(isRH,WIRE_CLOSE),259+dx,736,29,29,899); RenderTextL(259+dx,736,T_STOPD_RED,FONT_NORMAL,0.8,"X");
+                UIRImg(MID(isRH,WIRE_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==7) {/*SysAnalyzer*/
                 UIRText(MID(isRH,SYS_HEADER),24+dx,523,T_YELLOW,FONT_NORMAL,0.8f,0,892<1100?Sys_Text.stringTable[892]:"SYSTEM ANALYZER");
-                for (u8 r=0;r<11;++r) { UIRText(MID(isRH,SYS_DESC_0)+r,24+dx,sysRows[r].y,T_GREEN,FONT_NORMAL,0.8f,0,sysRows[r].d); UIRText(MID(isRH,SYS_VAL_0)+r,180+dx,sysRows[r].y,T_GREEN,FONT_NORMAL,0.8f,0,sysRows[r].v); }/*TODO values are placeholders, hook to level state*/
-                UIRImg(MID(isRH,SYS_CLOSE),259+dx,527,29,29,899); RenderTextL(259+dx,527,T_STOPD_RED,FONT_NORMAL,0.8,"X");
+                char sysVal[128]; for (u8 r=0;r<11;++r) { SystemStatusValue(r,sysVal,sizeof(sysVal)); UIRText(MID(isRH,SYS_DESC_0)+r,24+dx,sysRowY[r],T_GREEN,FONT_NORMAL,0.65f,0,Sys_Text.stringTable[474+r]); UIRText(MID(isRH,SYS_VAL_0)+r,200+dx,sysRowY[r],T_GREEN,FONT_NORMAL,0.65f,0,sysVal); }
+                UIRImg(MID(isRH,SYS_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==9) {/*Minigames*/
                 RenderUIImage(21+dx,501,262,262,1025);/*MinigamesContainer*/ UIRText(MID(isRH,MINIGAMES_HEADER),28+dx,503,T_RED,FONT_NORMAL,0.8f,0,"TRIOPTIMUM FUNPACK");
                 for (u8 g=0;g<9;++g) { UIRImg(MID(isRH,MINIGAME_0)+g,(i16)(mgX[g]+dx),mgY[g],115,24,0);/*QUAD:builtin-white*/ RenderTextL((i16)(mgX[g]+5+dx),(i16)(mgY[g]+1),T_GREEN,FONT_NORMAL,0.8,"%s",mgName[g]); }
                 UIR(MID(isRH,MINIGAMES_FOOTER),97+dx,726,(i16)(MeasureLineAdvance("Don't Play on",FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(97+dx,726,T_RED,FONT_NORMAL,0.8,"Don't Play on\n\nCompany Time");
                 UIRImg(MID(isRH,MINIGAME_VIEW),21+dx,501,262,262,0);/*MinigameView QUAD:none*/
-                if (World.Sys_UI.mg_current<0) { UIRImg(MID(isRH,MINIGAME_CLOSE),259+dx,502,22,22,899); RenderTextL(259+dx,502,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }/*list active, puzzles deactive: close shuts the data tab, returning to the last user-selected tab*/
-                else { UIRImg(MID(isRH,MINIGAME_BACK),259+dx,502,22,22,899); RenderTextL(259+dx,502,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }/*game running: back returns to the list*/
+                if (World.Sys_UI.mg_current<0) { UIRImg(MID(isRH,MINIGAME_CLOSE),closeButtonX+dx,closeButtonY,22,22,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }/*list active, puzzles deactive: close shuts the data tab, returning to the last user-selected tab*/
+                else { UIRImg(MID(isRH,MINIGAME_BACK),closeButtonX+dx,closeButtonY,22,22,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X"); }/*game running: back returns to the list*/
                 RenderTextL(30+dx,545,T_WHITE,FONT_NORMAL,0.8,"PUZZLE SOLVED!"); RenderTextL(91+dx,710,T_WHITE,FONT_NORMAL,0.8,"YOU LOSE");
             }
         }
@@ -689,7 +767,7 @@ void CenterMFD() { //640x240
         UIR(UI_ID_SENSA_CTR,sx,sy,CTR_MFD_W,CTR_MFD_H);
         DrawSensaroundQuad(sx,sy,CTR_MFD_W,CTR_MFD_H,sensaroundCamViewCenter);
     } else {
-        i16 hdrH=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H+TXT_PAD;
+        i16 hdrH=UI_H-TAB_THICK-TXT_PAD-184+TXT_PAD;
         if (World.Sys_UI.MFD_CenterTab==1) {/*Main*/
             /*Column Hdrs*/UIRText(UI_ID_CMFD_WEAPON_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,200,Sys_Text.stringTable[870]/*"WEAPONS"*/); UIRText(UI_ID_CMFD_SHOTS_HEADER,574,hdrH,T_RED,FONT_NORMAL,0.8f,120,Sys_Text.stringTable[871]/*"SHOTS"*/); UIRText(UI_ID_CMFD_GREN_HEADER,722,hdrH,T_RED,FONT_NORMAL,0.8f,120,Sys_Text.stringTable[872/*GRENADES*/]); UIRText(UI_ID_CMFD_PATCH_HEADER,868,hdrH,T_RED,FONT_NORMAL,0.8f,120,Sys_Text.stringTable[873/*PATCHES*/]);
             for (int row=0;row<7;++row) {/*Grenades*/
@@ -733,20 +811,23 @@ void CenterMFD() { //640x240
                 if (i<SW_GAMES) RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,(i<=SW_SHIELD)?"v%d":"x%d",count); else RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0); }
         }
         if (World.Sys_UI.MFD_CenterTab!=5) return;/*EReader*/
-        UIRText(UI_ID_CMFD_MEDIA_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[877]/*LOGS*/);
+        static const u16 mediaHdr[4]={42/*EMAIL*/,39/*LOGS*/,43/*DATA*/,885/*NOTES*/};/*Unity MFDManager.Open*TableContents sets multiMediaHeaderLabel per tab. Indexed by MFD_MediaTab: EMAIL=0,LOG=1,DATA=2,NOTES=3 (same order as the side-MFD labels[]).*/
+        UIRText(UI_ID_CMFD_MEDIA_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[mediaHdr[World.Sys_UI.MFD_MediaTab&3]]);
         if (World.Sys_UI.MFD_MediaTab==MM_LOG_TABLE) {
-            if (World.Sys_UI.MFD_ReaderView==MFD_READER_CONTENTS) { RenderUIImage(454,573,453,191,0);/*LogTableofContents*/
-                for (u8 i=0;i<10;++i) { i16 x=(i16)(i<7?454:681),y=generalRowY[i%7]; UIRImg(UI_ID_CMFD_LOG_TABLE_0+i,x,y,226,24,0);/*QUAD:builtin-white*/ RenderTextL(x,y,T_GREEN,FONT_NORMAL,0.8,"Level %s Logs",logLevelName[i]); RenderTextL((i16)(x+77),y,T_GREEN,FONT_NORMAL,0.8,"%d",World.invP1.numLogsFromLevel[i]); }
-            } else if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) { RenderUIImage(458,570,445,188,0);/*LogsLevelFolder*/
-                for (u8 i=0;i<15;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; UIRImg(UI_ID_CMFD_LOG_ENTRY_0+i,x,y,222,21,0); RenderTextL(x,y,T_GREEN,FONT_NORMAL,0.8,"Log"); }
+            if (World.Sys_UI.MFD_ReaderView==MFD_READER_CONTENTS) {
+                for (u8 i=0;i<10;++i) { if (!World.invP1.numLogsFromLevel[i]) continue;/*Unity LogTableContentsButtonsManager: only levels holding logs get a button*/ i16 x=(i16)(i<7?454:681),y=generalRowY[i%7]; UIR(UI_ID_CMFD_LOG_TABLE_0+i,x,y,226,24); RenderTextL(x,y,T_GREEN,FONT_NORMAL,0.8,"%s%d: %d",Sys_Text.stringTable[40]/*Level */,i,World.invP1.numLogsFromLevel[i]);/*raw audioLogLevelFound index: Unity OpenLogsLevelFolder prints curlevel unoffset*/ }
+            } else if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) {
+                for (u8 i=0;i<15;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; int li=i<(int)World.Sys_UI.logFolderCount?World.Sys_UI.logFolderList[i]:-1; if(li<0){continue;} UIR(UI_ID_CMFD_LOG_ENTRY_0+i,x,y,222,21); RenderTextL(x,y,World.invP1.readLog[li]?T_GREEN_MENU_GLOW:T_GREEN,FONT_NORMAL,0.8,"%s",World.audiologNames[li]); }
             } else if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) {
-                UIR(UI_ID_CMFD_LOG_TEXT,372,576,456,140); RenderTextL(372,576,T_GREEN,FONT_NORMAL,0.8,"\"abc def ghi jkl mno pqrs tuv wxyz ABC DEF GHI JKL MNO PQRS TUV WXYZ !\"\\xA7\n$%%& /() =?* '<> #|; \\xB2\\xB3~ @`\\xB4 \\xA9\\xAB\\xBB \\xA4\\xBC\\x...");
-                UIRImg(UI_ID_CMFD_LOG_MORE,372,576,456,174,0); RenderTextL(654,647,T_YELLOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[26]/*[MORE]*/); 
-                UIRImg(UI_ID_CMFD_LOG_BACK,372,718,69,31,0); RenderTextL(372,718,T_YELLOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[879]/*[BACK]*/);
+                UIR(UI_ID_CMFD_LOG_TEXT,LOG_TX,LOG_TY,LOG_TW,LOG_TLINES*22); RenderTextL(LOG_TX,LOG_TY,T_GREEN,FONT_NORMAL,LOG_TSC,"%s",UILogTextPage());
+                i16 cmw=(i16)(TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR); bool more=UILogHasMore(); int totL=UILogFullLines();
+                const char* mcb=Sys_Text.stringTable[more?26:27];/*[MORE] while text remains, else [CLOSE]: Unity LogMoreButton*/ i16 mcbW=(i16)(MeasureLineAdvance(mcb,FONT_NORMAL)*0.8f);
+                UIR(UI_ID_CMFD_LOG_MORE,(i16)(cmw+CTR_MFD_W-mcbW),LOG_BTN_Y,mcbW,26); RenderTextL((i16)(cmw+CTR_MFD_W-mcbW),LOG_BTN_Y,T_YELLOW,FONT_NORMAL,0.8,"%s",mcb);
+                if (totL>LOG_TLINES) { const char* bk=Sys_Text.stringTable[879];/*[BACK] on every page of a multipage log*/ i16 bkW=(i16)(MeasureLineAdvance(bk,FONT_NORMAL)*0.8f); UIR(UI_ID_CMFD_LOG_BACK,372,LOG_BTN_Y,bkW,26); RenderTextL(372,LOG_BTN_Y,T_YELLOW,FONT_NORMAL,0.8,"%s",bk); } 
             }
         }
-        if (World.Sys_UI.MFD_MediaTab==MM_EMAIL_TABLE) { RenderUIImage(458,hdrH+22,445,188,0);/*EmailTab*/ for (u8 i=0;i<15;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; UIRImg(UI_ID_CMFD_EMAIL_ENTRY_0+i,x,y,223,21,0); RenderTextL(x,y,T_GREEN,FONT_NORMAL,0.8,"Email"); } }
-        if (World.Sys_UI.MFD_MediaTab==MM_DATA_TABLE) { RenderUIImage(458,hdrH+22,445,188,0);/*DataTab*/ for (u8 i=0;i<13;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; UIRImg(UI_ID_CMFD_DATA_ENTRY_0+i,x,y,223,21,0); RenderTextL(x,y,T_GREEN,FONT_NORMAL,0.8,"Data"); } }
+        if (World.Sys_UI.MFD_MediaTab==MM_EMAIL_TABLE) { for (u8 i=0;i<15;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; int li=UIEmailRefAt(i); if(li<0){continue;} UIR(UI_ID_CMFD_EMAIL_ENTRY_0+i,x,y,223,21); RenderTextL(x,y,World.invP1.readLog[li]?T_GREEN_MENU_GLOW:T_GREEN,FONT_NORMAL,0.8,"%s",World.audiologNames[li]); } }
+        if (World.Sys_UI.MFD_MediaTab==MM_DATA_TABLE) { for (u8 i=0;i<13;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; int li=UIDataRefAt(i); if(li<0){continue;} UIR(UI_ID_CMFD_DATA_ENTRY_0+i,x,y,223,21); RenderTextL(x,y,World.invP1.readLog[li]?T_GREEN_MENU_GLOW:T_GREEN,FONT_NORMAL,0.8,"%s",World.audiologNames[li]); } }
         if (World.Sys_UI.MFD_MediaTab==MM_NOTES) {
             const u32 secCode[6]={World.lev1SecCode,World.lev2SecCode,World.lev3SecCode,World.lev4SecCode,World.lev5SecCode,World.lev6SecCode};
             for(u8 i=0;i<18;++i){i16 x=(i16)(372+(i/6)*167),y=(i16)(hdrH+22+(i%6)*29); UIR(UI_ID_CMFD_NOTE_TOGGLE_0+i,x,y,166,39); RenderUIImage(x,(i16)(y+2),19,18,910);/*Background*/ if (i<6)RenderTextL((i16)(x+21),(i16)(y+3),T_GREEN,FONT_NORMAL,0.8,"%s%d%s%s%u.",Sys_Text.stringTable[556],i+1,Sys_Text.stringTable[557],Sys_Text.stringTable[558],secCode[i]); else RenderTextL((i16)(x+21),(i16)(y+3),T_GREEN,FONT_NORMAL,0.8,"%s",noteText[i-6]);}
@@ -805,12 +886,15 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_AUTOMAP_ZOOM_IN: UI_AutomapClick(rh,UI_AUTOMAP_ZOOM_IN); return;
         case UI_ID_LMFD_AUTOMAP_ZOOM_OUT: UI_AutomapClick(rh,UI_AUTOMAP_ZOOM_OUT); return;
         case UI_ID_LMFD_AUTOMAP_FULL: UI_AutomapClick(rh,UI_AUTOMAP_FULL); return;
+        case UI_ID_LMFD_AUTOMAP_SIDE: UI_AutomapClick(rh,UI_AUTOMAP_SIDE); return;
         case UI_ID_FULLMAP_CLOSE: CloseFullmap(); return;
         case UI_ID_LMFD_MEDIA_TAB_0 ... UI_ID_LMFD_MEDIA_TAB_3: { u8 section=(u8)(id-UI_ID_LMFD_MEDIA_TAB_0); if (section==MM_NOTES && !World.diffMis) return;
             World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened=section; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
             if (section>=MM_DATA_TABLE) { World.Sys_UI.highlightStatus[section]=false; World.Sys_UI.highlightTickCount[section]=0; } play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false); return; }
         case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.generalInvCurrent; MFD_GeneralChanged(); if (GeneralInvCanUse(s)) GeneralInvApply(s,World.invP1.generalInvCustIdx[s]); } return; }
         case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; MFD_GeneralChanged(); if (GeneralInvCanVaporize(World.invP1.generalInvCurrent)) VaporizeClick(); return;
+        case UI_ID_LMFD_ITEM_SKATE: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(false); return;
+        case UI_ID_LMFD_ITEM_BOOST: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(true); return;
         case UI_ID_LMFD_ITEM_TIMER_SLIDER: World.Sys_UI.lastItemSideRH=rh; ConsumableSetTimer(((float)World.cursorPos_x-UIC(MID(rh,ITEM_TIMER_SLIDER)).min.x)/224.0f); return;
         case UI_ID_LMFD_WEAPON_ICON: UI_WeaponIconClick(rh); return;
         case UI_ID_LMFD_WEAPON_RELOAD: World.Sys_UI.lastWeaponSideRH=rh; ReloadSecret(false); return;
@@ -871,15 +955,22 @@ static double RenderUI() {
     } else if (!World.Sys_UI.vmailActive) {
         if (!Cheats.noHUD) {
             for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){/*TargetID*/
-                Entity* e=&World.instances[i]; if(!IdxIsNPC(e->index))continue; V3 tpos=World.position[i]; tpos.y+=0.48f; i16 textIdx=TargetIDGetText(i); bool tid=TargetIDShouldRender(i),hw=(World.invP1.hasHardware&HW_TID)!=0; float targetRange=V3_Dist(tpos,World.position[PLAYER1]); bool alive=(e->entflags&EF_ACTIVE)&&!(e->entflags&EF_DEAD)&&e->health>0.0f; bool exception=!hw&&alive&&targetRange<=10.0f&&(textIdx==511||(textIdx==536&&tid)); if(!tid&&!exception)continue;
+                Entity* e=&World.instances[i]; if(!IdxIsNPC(e->index))continue; V3 tpos=World.position[i]; tpos.y+=1.0f; i16 textIdx=TargetIDGetText(i); bool tid=TargetIDShouldRender(i),hw=(World.invP1.hasHardware&HW_TID)!=0; float targetRange=V3_Dist(tpos,World.position[PLAYER1]); bool alive=(e->entflags&EF_ACTIVE)&&!(e->entflags&EF_DEAD)&&e->health>0.0f; bool exception=!hw&&alive&&targetRange<=10.0f&&(textIdx==511||(textIdx==536&&tid)); if(!tid&&!exception)continue;
                 float sx,sy; if(!WorldToScreenPoint(V3_AsubB(tpos,World.position[PLAYER1]),&sx,&sy))continue;
-                if(tid&&hw)RenderUIImage((i16)(sx-64.0f),(i16)sy,128,128,1051);
+                /* The marker is a fixed world size, so scale it with range; 128px is the authored size at 7.68m. */
+                float imgSz=vclamp(128.0f * (TARGETID_MARKER_REF_RANGE / vmax(targetRange,0.25f)), 24.0f, 640.0f), imgHalf=imgSz*0.5f;
+                if(tid&&hw)RenderUIImage((i16)(sx-imgHalf),(i16)sy,(i16)(imgSz*1.2f),(i16)(imgSz*1.38f),1051);
                 char label[192]={0}; size_t used=0; u8 ver=World.invP1.hwVers[HW_TID_IDX]; float range=targetRange;
-                if(tid&&hw){
-                    if(ver>1){used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s",npcTable[e->index-419].name);} if(ver>2&&used<sizeof(label))used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s%.0f",used?"\n":"",e->health); if((World.invP1.hasHardware&HW_TID)&&used<sizeof(label))used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s%.1fM",used?"\n":"",range);
-                    if(ver>1&&used<sizeof(label)){const char* attitude=(e->entflags&EF_ASLEEP)?Sys_Text.stringTable[519]:(e->currentState==AIState_Run||e->currentState==AIState_Attack1||e->currentState==AIState_Attack2||e->currentState==AIState_Attack3||e->currentState==AIState_Pain)?Sys_Text.stringTable[518]:Sys_Text.stringTable[516];used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s%s",used?"\n":"",attitude);}
+                const char* attitude=(e->entflags&EF_ASLEEP)?Sys_Text.stringTable[519]:(e->currentState==AIState_Run||e->currentState==AIState_Attack1||e->currentState==AIState_Attack2||e->currentState==AIState_Attack3||e->currentState==AIState_Pain)?Sys_Text.stringTable[518]:Sys_Text.stringTable[516];
+                const char* status=textIdx>=0?Sys_Text.stringTable[textIdx]:attitude;
+                if(tid&&hw){/*Two lines: "SERV-BOT 4" then "20, 6.3M, Idle". The number is this NPC's 1-based index within its own type.*/
+                    if(ver>1)used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s %u",npcTable[e->index-419].name,e->npcNumber);
+                    if(ver>2&&used<sizeof(label))used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s%.0f, %.1fM, %s",used?"\n":"",e->health,range,status);
+                } else if(textIdx>=0)used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s",status);
+                if(label[0]){/*Font stays fixed size; the label only slides down as the target gets closer and up as it gets further.*/
+                    float textY=sy-TARGETID_TEXT_BASE_OFFSET+vclamp(TARGETID_TEXT_Y_GAIN*TARGETID_TEXT_BASE_OFFSET*(TARGETID_MARKER_REF_RANGE/vmax(targetRange,0.25f)-1.0f),-128.0f,96.0f);
+                    RenderText3DC((V3){sx,textY,0.0f},T_YELLOW,FONT_NORMAL,0.8f,label);
                 }
-                if(textIdx>=0&&used<sizeof(label))sFormat(label+used,sizeof(label)-used,"%s%s",used?"\n":"",Sys_Text.stringTable[textIdx]); if(label[0])RenderText3DC((V3){sx,sy-64.0f,0.0f},T_YELLOW,FONT_NORMAL,0.8f,label);
             }
             TickBar(false); TickBar(true); HardwareButtons(); UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020);
             for (u8 i=0;i<10;++i) if (World.Sys_UI.tWrnFinished[i]>World.pauseRelativeTime) {

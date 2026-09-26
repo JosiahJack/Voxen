@@ -3980,7 +3980,7 @@ constIndex:0|lP.x:38.0961|lP.y:109.5369|lP.z:-15.2706
 constIndex:228|lP.x:25.2961|lP.y:112.4169|lP.z:-53.6706|lR.x:-.5|lR.y:.5|lR.z:.5|lR.w:.5
 constIndex:199|lP.x:30.4161|lP.y:109.5369|lP.z:33.3694|lR.x:-.7071|lR.w:.70711
 constIndex:0|lP.x:-.3039|lP.y:109.5369|lP.z:-12.7106
-constIndex:706|lP.x:4.889|lP.y:58.727|lP.z:19.975
+constIndex:706|lP.x:4.889|lP.y:58.727|lP.z:19.975|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:597|lP.x:10.03|lP.y:81.825|lP.z:-6.587|lS.y:28.16|lS.z:.24|center.x:0|center.y:0|center.z:0|size.x:1|size.y:1|size.z:1
 constIndex:746|lP.x:25.541|lP.y:69.00301|lP.z:-.618
 constIndex:746|lP.x:25.541|lP.y:69.00301|lP.z:-5.277
@@ -3998,7 +3998,7 @@ constIndex:669|lP.x:12.542|lP.y:69.472|lP.z:-1.83|lR.y:1|lR.w:0
 constIndex:669|lP.x:13.768|lP.y:69.472|lP.z:-5.573|lR.y:-.70711|lR.w:.70711
 constIndex:669|lP.x:6.255|lP.y:69.472|lP.z:-2.95|lR.y:.70711|lR.w:.70711
 constIndex:669|lP.x:7.465|lP.y:69.472|lP.z:-6.783
-constIndex:706|lP.x:9.983|lP.y:96.922|lP.z:-41.9
+constIndex:706|lP.x:9.983|lP.y:96.922|lP.z:-41.9|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:670|lP.x:8.74|lP.y:97.505|lP.z:-25.977|lR.y:.70711|lR.w:.70711
 constIndex:670|lP.x:7.472|lP.y:97.505|lP.z:-24.784
 constIndex:556|lP.x:16.397|lP.y:87.138|lP.z:30.269|lR.y:.70711|lR.z:.70711|lR.w:0|enemyAlert:0|sendEmail:0|lockCodeToScreenMaterialChanger:0|spawnerActivate:0|spawnerActivateAlerted:0|cyborgConversionToggle:0|togglePuzzlePanelLocked:0|testQuestBitIsOn:0|testQuestBitIsOff:0|sendSprintMessage:0|radiationTreatment:0|screenShake:0|awakeSleepingEnemy:0|doorAccessCardOverrideToggle:0|alreadyDisabledThisGOOnceEver:0|gameObject.activeInHierarchy:0

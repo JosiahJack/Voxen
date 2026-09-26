@@ -1469,7 +1469,7 @@ constIndex:103|lP.x:34.2628|lP.y:174.8411|lP.z:-12.97944|lR.y:.70711|lR.z:.70711
 constIndex:103|lP.x:35.9128|lP.y:174.8411|lP.z:-13.88944|lR.x:.2706|lR.y:.65328|lR.z:.65328|lR.w:-.2706|lS.x:1.41422
 constIndex:136|lP.x:31.7028|lP.y:174.8411|lP.z:-10.41944|lR.y:.70711|lR.z:.70711|lR.w:0
 constIndex:136|lP.x:39.3828|lP.y:174.8411|lP.z:4.94056|lR.x:-.7071|lR.w:.70711
-constIndex:706|lP.x:11.214|lP.y:168.558|lP.z:-23.302
+constIndex:706|lP.x:11.214|lP.y:168.558|lP.z:-23.302|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:566|lP.x:-25.20501|lP.y:164.011|lP.z:-13.65822|lR.x:-.70711|lR.w:.70711
 constIndex:542|lP.x:-19.815|lP.y:167.066|lP.z:2.17|lR.x:.59898|lR.y:.07655|lR.z:.79501|lR.w:-.05767
 constIndex:577|lP.x:-15.932|lP.y:170.547|lP.z:11.55299|lR.x:.96255|lR.y:.01987|lR.z:-.06774|lR.w:.26174

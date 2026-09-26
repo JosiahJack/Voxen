@@ -25,20 +25,6 @@ float magpulseShotForce=2.2f, stungunShotForce=2.2f, railgunShotForce=5.0f, plas
 WeaponFireCtx wfx = { .verticalOffset=-0.2f,.fireDistance=200.0f,.overheatedPercent=80.0f,.reloadContainerHome={0},.pendingMeleeFinished=0.0 };
 INLINE Quaternion QuatEulerY(float degY) { float r=deg2rad(degY)*0.5f; return (Quaternion){0.0f,vsinf(r),0.0f,vcosf(r)}; }
 INLINE Quaternion QuatEulerZ(float degZ) { float r=deg2rad(degZ)*0.5f; return (Quaternion){0.0f,0.0f,vsinf(r),vcosf(r)}; }
-INLINE Quaternion QuatFromToRotation(V3 from,V3 to) {
-    V3 f=V3_Normalize(from),t=V3_Normalize(to);
-    float d=V3_dot(f,t);
-    if (d > 0.999999f) return QUAT_IDENTITY;
-    if (d < -0.999999f) {
-        V3 ax=V3_Cross((V3){1.0f,0.0f,0.0f},f);
-        if (V3_Mag(ax) < 0.000001f) ax=V3_Cross((V3){0.0f,1.0f,0.0f},f);
-        ax=V3_Normalize(ax);
-        return (Quaternion){ax.x,ax.y,ax.z,0.0f};
-    }
-    V3 ax=V3_Cross(f,t);
-    float s=vsqrtf((1.0f+d)*2.0f), invs=1.0f/s;
-    return (Quaternion){ax.x*invs,ax.y*invs,ax.z*invs,s*0.5f};
-}
 
 INLINE bool WeaponsHaveAnyHeat() { if (Cheats.redbull) {return false;} for (int i=0;i<7;i++) {if (World.invP1.currentEnergyWeaponHeat[i] > 0.0f) {return true;}} return false; }
 static bool hudHeatTickOn[9];/*Citadel EnergyHeatTickManager.ticks: 9 HUD heat ticks, tick i lit when heat >= 10*(i+1)*/
@@ -154,6 +140,20 @@ static bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     u16 type=ImpactParticleType(prefab); const PSysDef* preset=PSysTypeGet(type); if (!preset) return false;
     PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); def.emitRate=60.0f; if (def.duration<=0.0f || def.duration>2.0f) def.duration=1.0f; PSysAdd(&def); return true;
 }
+/* Blood/sparks by the struck target's blood type (Const.a.GetImpactType). Shared with the NPC hitscan path. */
+void SpawnImpactEffectParticle(u16 prefab, V3 pos, V3 normal) {
+    if (!SpawnImpactParticleForPrefab(prefab,pos,normal)) { u16 fx=SpawnDynamicObject(prefab,-1); if(fx!=0xFFFF&&fx<INSTANCE_COUNT){World.position[fx]=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); World.rotation[fx]=QuatFromToRotation((V3){0,1,0},normal);} }
+}
+/* Particle-trail version of a beam between two points. Unity uses a LineRenderer; the trail texture supplies the
+   beam gradient and the particle chain supplies the geometry. */
+void SpawnBeamTrail(u16 presetType, V3 from, V3 to, Color c) {
+    const PSysDef* preset=PSysTypeGet(presetType); if(!preset)return; V3 delta=V3_AsubB(to,from); float dist=V3_Mag(delta); if(dist<0.01f)return;
+    PSysDef def=*preset; def.pos=from; def.rotation=QuatFromToRotation((V3){0,1,0},V3_Normalize(delta));
+    def.speedMin=def.speedMax=vclamp(dist*6.0f,800.0f,4000.0f); def.trailColorStart=c; def.trailColorEnd=(Color){c.r,c.g,c.b,0.f};
+    def.rampColors[0]=c; for(int i=1;i<def.rampCount;++i)def.rampColors[i]=(Color){c.r,c.g,c.b,1.f-def.rampTimes[i]};
+    def.emitRate=1.0f; def.duration=0.02f; PSysAdd(&def);
+}
+void SpawnTargetingLaser(V3 from, V3 to) { SpawnBeamTrail(PSYS_npc_targetlaser,from,to,(Color){1.0f,0.15f,0.18f,1.0f}); }
 /* Projectile const index -> its own ProjectileEffectImpact.impactType pool, matched by the emitter's GameObject name in particles.c. */
 static u16 ProjectileImpactParticleType(u16 projectile) {
     switch (projectile) {

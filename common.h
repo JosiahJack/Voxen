@@ -186,7 +186,7 @@ typedef struct {
         bool searchFXActive[2]; double searchFXStartTime[2]; float searchFXCursorX[2],searchFXCursorY[2];
         u8 vmailActive; AudioLogType logType; V3 objectInUsePos;
         u8 MFD_LefTab,MFD_CenterTab,MFD_RightTab,MFD_DataL,MFD_DataR,MFD_MediaTab,MFD_ReaderView,mfdSelected[3],mfdReturnTab[3],mfdReturnView[3],mfdItemReader[2];
-        u8 mfdConsumable; i8 consumableClickRow; double consumableClickTime; bool mfdGeneralItem; i8 generalClickSlot; i16 generalClickItem; u16 generalClickCustom; double generalClickTime;
+        u8 mfdConsumable; i8 consumableClickRow; double consumableClickTime; bool mfdGeneralItem,mfdHardwareItem; i8 generalClickSlot; i16 generalClickItem; u16 generalClickCustom; double generalClickTime;
         i32 tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10]; double tWrnFinished[10];
         /*Keycode pad (Unity KeypadKeycode). keycodeHuns/Tens/Ones: -1 = empty, else that digit; keycodeEntry accumulates right-to-left. keycodeValid/keycodeSolved/keycodeValue mirror the linked pad (tetheredKeypadKeycode).*/
         i8 keycodeHuns,keycodeTens,keycodeOnes; i32 keycodeEntry,keycodeValue; bool keycodeValid,keycodeSolved;
@@ -211,7 +211,7 @@ enum{PATCH_BERSERK=1, PATCH_DETOX=2, PATCH_GENIUS=4, PATCH_MEDI=8, PATCH_REFLEX=
          HW_SYS=1/*System Analyzer*/,    HW_NAV=2/*Navigation Unit*/,    HW_ERD=4/*Datareader/EReader*/,    HW_SNS=8/*Sensaround*/,   HW_TID=16/*Target Identifier*/,   HW_SHD=32/*Energy Shield*/,   HW_BIO=64/*Biomonitor*/,  HW_LAN=128/*Head Mounted Lantern*/,  HW_ENV=256/*Envirosuit*/,  HW_BST=512/*Turbo Motion Booster*/,  HW_JET=1024/*Jump Jet Boots*/,  HW_INF=2048/*Infrared Night Sight Enhancement*/,
      HW_SYS_IDX=0/*System Analyzer*/,HW_NAV_IDX=1/*Navigation Unit*/,HW_ERD_IDX=2/*Datareader/EReader*/,HW_SNS_IDX=3/*Sensaround*/,HW_TID_IDX=4/*Target Identifier*/,HW_SHD_IDX=5/*Energy Shield*/,HW_BIO_IDX=6/*Biomonitor*/,HW_LAN_IDX=7/*Head Mounted Lantern*/,HW_ENV_IDX=8/*Envirosuit*/,HW_BST_IDX=9/*Turbo Motion Booster*/,HW_JET_IDX=10/*Jump Jet Boots*/,HW_INF_IDX=11/*Infrared Night Sight Enhancement*/};
 typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
-    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,jumpJetFinished,noiseFinished,radBleedFinished,
+    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,jumpJetFinished,doubleJumpFinished,noiseFinished,radBleedFinished,
            leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished,fatigueBleedoffFinished,fatigueMoveFinished,footstepFinished,rustleFinished,fallPainFinished,ressurectingFinished,mediPatchPulseFinished;
     float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,radAdjust,initialRadiation,weaponDipLerp,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity,leanVelocity,lastVelY;
     u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
@@ -233,6 +233,7 @@ typedef struct { // MUST PRESERVE ORDER TO MATCH TABLE!!
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
 void TargetIDReset(); bool TargetIDShouldRender(u16); i16 TargetIDGetText(u16);
+u16 ai_next_npc_number(u16); void ai_reset_npc_numbering(void);
 typedef struct {
     double beatFinished,tick0Finished,tick1Finished,tick2Finished,tickFinished; float heartRate,widthPerc,heightPerc,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 patchEffects,heartRateText,header,bpmText,fatigueDetailText,fatigue;
     Color currentColors[BIOM_GRAPH_H],colorsERG[BIOM_GRAPH_W][BIOM_GRAPH_H],colorsCHI[BIOM_GRAPH_W][BIOM_GRAPH_H],colorsECG[BIOM_GRAPH_W][BIOM_GRAPH_H],backgroundColor,ergColor,chiColor,ecgColor,col,col0,col1,col2;
@@ -254,9 +255,9 @@ typedef /*FAT*/ struct  {
     u8 clip,animationNum,texAnimClip,camView,securityThreshold,lerpUp,maxRandomItems,questBitID/*QB_*/,questTestMode/*0 none,1 fire target if bit ON,2 fire target if bit OFF*/,branchOnSecond,relayEnabled,relayOnceEver,relayAlreadyDone; FuncStates/*u8*/ funcState; BodyState/*u8*/ bodyState; 
     float shadRadius,health,cyberHealth,radiation,speed,ajarPercentage,percentMoved,timeForTranquilization,gracePeriodFinished,meleeDamageFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,randWaitAtt1Finished,randWaitAtt2Finished,randWaitAtt3Finished,
           attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animFinished,animSwapFinished,delay,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFireFinished,delayResetFinished,delayFinished,
-          tickFinished,tickTime,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[4],reverbMaxDist,deathAnimationStart;
+          tickFinished,tickTime,aiThinkFinished/*AI think tick; separate from tickFinished, which texture sequences also drive*/,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[4],reverbMaxDist,deathAnimationStart;
     V3 accumulatedForce,currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;    
-    u16 enemy,messageIndex,teleportID,targetDestinationID,keycode,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx,reverbPreset;
+    u16 enemy,messageIndex,teleportID,targetDestinationID,keycode,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx,reverbPreset,npcNumber/*1-based per NPC type, assigned at load; shown by the TargetID*/;
     i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[4],randomItemCustIdx[4];
     bool srchInUse,generateContents,dontReset,onlyOnce,allDone,curTex,useRandomTimes,active,touchEnabled,broken,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,textureGlowAnimating,texAnimStopsAtDie,texAnimInReverse,texAnimRandom,automapHidden,blocked,ajar,deathAnimationActive;
     AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; char texAnimResourceFolder[TARG_STRLEN];
@@ -275,7 +276,7 @@ typedef struct {
     u8 automapZoom;/*0=closest 16x16, 1=32x32, 2=fullest 64x64 cells*/
     double automapNextRaster;/*throttle timer for re-raster (transient)*/
     u8 physSleep[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,numLevels,curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode,currentLevel,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
-    bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,boosterActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,*invTnsrValid,*colliding,targetIOActive,misTimerLast,misTimerCurIdx,misTimerTimesUP;
+    bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,*invTnsrValid,*colliding,targetIOActive,misTimerLast,misTimerCurIdx,misTimerTimesUP;
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
     UIComponent uiComponents[MAX_UI_ELEMENTS];
     V3 debugLine_start,debugLine_end,cyberspaceRecallPoint,levelPosition[MAX_LEVELS][INSTANCE_COUNT],levelScale[MAX_LEVELS][INSTANCE_COUNT],levelVelocity[MAX_LEVELS][INSTANCE_COUNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT],levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT],levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]/*xyz for Box,x=Sph r,else xyz for Capsule r,h,dir(0=X,1=Y,2=Z)*/,levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
@@ -306,11 +307,11 @@ typedef struct { V3 normal; float d; } FrustumPlane; extern FrustumPlane lightFr
 typedef struct PngArena { u8*base,*cursor,*end; } PngArena; extern PngArena png_arena_main;
 extern bool instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAX_TXRS],transparentTexture[MAX_TXRS],window_has_focus,ignore_next_mouse_delta,returnToPause,mouseMovementThisFrame,firstFrameMouselook; extern u8 particleBlendTexture[MAX_TXRS]; extern u8 currentPlayerNameLength; extern i8 currentMenuItem;
 typedef struct { int width,height; u8* pixels; } WinSysIcon;
-RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3); void ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
+RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3); void SpawnImpactEffectParticle(u16,V3,V3),SpawnBeamTrail(u16,V3,V3,Color),SpawnTargetingLaser(V3,V3),ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
 u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
-void AutomapTick(),AutomapInitGL(),AutomapBlitToUI(),AutomapNewGame(),AutomapOnLoad(),AutomapDumpBMP(),BiomonitorDumpBMP(),BioMonitorInit(),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),HudHeatBleed(float),CyberSwitchInitAfterLoad(u16),synth_set_reverb_preset(u16),MFD_ResetGeneral(); bool HudHeatTickOn(int);
+void MFD_OpenData(bool,u8); void MFD_OpenAudioLog(int); void AutomapTick(),AutomapInitGL(),AutomapBlitToUI(),AutomapSideBlitToUI(bool),AutomapNewGame(),AutomapOnLoad(),AutomapDumpBMP(),BiomonitorDumpBMP(),BioMonitorInit(),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),HudHeatBleed(float),CyberSwitchInitAfterLoad(u16),synth_set_reverb_preset(u16),MFD_ResetGeneral(); bool HudHeatTickOn(int);
 double get_time();
-float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),Tranquilize(u16,float,bool),MeasureLineAdvance(const char*,u8);
+float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
 void UseTargets(u16,u16),AddForce(u16,V3,bool),CenterStatusPrint(const char * restrict fmt, ...),DebugRAM(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
      play_wav(const char*,float,V3,bool),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
@@ -320,7 +321,7 @@ const char *JumpSound(FootStepType),*JumpLandSound(FootStepType); FootStepType G
 // Quest bits (info_mission constIndex 710).  Only ever set/toggled/checked by info_mission entities.
 enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
 enum{IO_NONE=0}; u16 IOInternName(const char*);
-bool QuestBitIsSet(u8),RessurectPlayer(),Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),Console(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();
+bool QuestBitIsSet(u8),RessurectPlayer(),PlayerIsMoving(),Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),Console(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible();
 // Synthesized Audio
 typedef enum {SND_LASER_PISTOL=0,SND_LASER_RIFLE,SND_DOOR,SND_IMPACT_GLASS,SND_IMPACT_METAL,SND_EXPLOSION,SND_HISS,SND_PIPE,SND_SHIELD_HIT,SND_FOOTSTEP,SND_SAND_FOOTSTEP,SND_TAP_CASE,SND_PLASTIC_TAP,SND_SPARK_SMALL,SND_CRACKLE,SND_SINE,SND_CLINK,SND_BEAKER_CLINK,SND_BEAKER_THUD,SND_COUNT} SoundID;
 typedef struct SynthVoice SynthVoice; typedef float (*SynthFn)(SynthVoice*); typedef struct SynthVoice { SynthFn fn; u32 frame,frames; float vol,pitch; V3 pos; bool positional,active; float p[4]/*preset params*/,s[8]/*generator state (extra slots vs original for richer sounds)*/; } SynthVoice;
@@ -360,6 +361,20 @@ INLINE V3 V3_Cross(V3 a, V3 b) { return (V3){a.y * b.z - a.z * b.y, a.z * b.x - 
 INLINE V3 V3_Normalize(V3 v) { float len_sq = V3_dot(v,v); if (len_sq < 0.000001f){return v;} float inv_len = vinvsqtf(len_sq); return (V3){v.x * inv_len, v.y * inv_len, v.z * inv_len}; }
 INLINE Quaternion quat_multiply(Quaternion q1, Quaternion q2){float aw=q1.w,ax=q1.x,ay=q1.y,az=q1.z,bw=q2.w,bx=q2.x,by=q2.y,bz=q2.z; return (Quaternion){aw*bx+ax*bw+ay*bz-az*by,aw*by-ax*bz+ay*bw+az*bx,aw*bz+ax*by-ay*bx+az*bw,aw*bw-ax*bx-ay*by-az*bz};}
 INLINE V3 quat_rot_v3(Quaternion q, V3 v) {float x=q.x,y=q.y,z=q.z,w=q.w; float vx=v.x,vy=v.y,vz=v.z; float tx=2.0f*(y*vz-z*vy); float ty=2.0f*(z*vx-x*vz); float tz=2.0f*(x*vy-y*vx); return (V3){vx+w*tx+(y*tz-z*ty),vy+w*ty+(z*tx-x*tz),vz+w*tz+(x*ty-y*tx)};}
+INLINE Quaternion QuatFromToRotation(V3 from,V3 to) {
+    V3 f=V3_Normalize(from),t=V3_Normalize(to);
+    float d=V3_dot(f,t);
+    if (d > 0.999999f) return QUAT_IDENTITY;
+    if (d < -0.999999f) {
+        V3 ax=V3_Cross((V3){1.0f,0.0f,0.0f},f);
+        if (V3_Mag(ax) < 0.000001f) ax=V3_Cross((V3){0.0f,1.0f,0.0f},f);
+        ax=V3_Normalize(ax);
+        return (Quaternion){ax.x,ax.y,ax.z,0.0f};
+    }
+    V3 ax=V3_Cross(f,t);
+    float s=vsqrtf((1.0f+d)*2.0f), invs=1.0f/s;
+    return (Quaternion){ax.x*invs,ax.y*invs,ax.z*invs,s*0.5f};
+}
 Quaternion quat_look_rotation(V3 fwd, V3 up);
 // Game Typechecks (what, it's simple, don't hate it, just does the thing)
 INLINE u8 hardware14fromConstdex(u16 c) { return vclampi(c - 21,0,14); }    INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }/*All doors except see-through doors.*/ INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 855); }  INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; } INLINE bool IdxIsGib(int c) { return (c >= 768 && c <= 855); }
@@ -398,7 +413,9 @@ typedef struct { const char* prefab; const char* gameObject; u64 sourceId; PSysD
 #define PSYS_sprinkles 163
 #define PSYS_sparkles 164
 #define PSYS_gasExplosions 165
-#define PSYS_gasSmoke 166
+#define PSYS_npc_laserbeam 166
+#define PSYS_npc_targetlaser 167
+#define PSYS_gasSmoke 168
 const PSysDef* PSysTypeGet(u16);
 u16 PSysAdd(const PSysDef*); void PSysAddLevelLoops(void),PSysClearLevel(u8);
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);

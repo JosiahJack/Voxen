@@ -1,6 +1,10 @@
 // ai.c - NPC AI logic, ported from Unity Citadel AIController.cs.
 #include "common.h"
 static const float AI_STOP_DIST=1.28f, AI_STOP_DIST_SQ=(AI_STOP_DIST * AI_STOP_DIST), AI_POS_CHECK_DELAY=2.0f, AI_WANDER_RANGE=79.0f, AI_TARGET_OFFSET_Y=0.24f, AI_TICK_TIME=0.1f, AI_RAYCAST_TICK_TIME=0.2f; u16 npcCountInWorldPerType[NUM_AI_TYPES]; void DoorActuate(u16 self); void TextureSequenceStart(u16 self, u8 clipIndex); Quaternion quat_normalize(Quaternion q); bool PositionVisibleFromPlayerCell(float,float); bool XZPairInBounds(i32,i32); u16 AddLightSimple(V3,Color3,float,float,u16);
+/* Per-NPC-type instance numbering for the TargetID ("SERV-BOT 4"). Each type counts up from 1 independently as its
+   NPCs are loaded, so a type loaded later starts at 1 again. */
+u16 ai_next_npc_number(u16 type) { if (type >= NUM_AI_TYPES) return 0; if (npcCountInWorldPerType[type] < U16_MAX) npcCountInWorldPerType[type]++; return npcCountInWorldPerType[type]; }
+void ai_reset_npc_numbering(void) { mset(npcCountInWorldPerType,0,sizeof(npcCountInWorldPerType)); }
 // Name,AtkTyp1,2,3,Dmg1,2,3,Range1,2,3,Health,CybHealth,Percp,Disrp,Armr,Def,Movtyp,Yawspd,FOV,FOVAtk,FOVStartMov,DistToSeeBehind,SightRange,WalkSpd,RunSpd,AtkSpd1,2,3,AtkForce3,AtkRad3,TtPain,TbwPain,TtDead,TtActualAtk1,2,3,TbwAtk1,2,3,TEnemChg,TIdleSFXMin,TIdleSFXMax,TAtk1WaitMin,TAtk1WaitMax,TAtk1WaitChnc,TAtk2WaitMin,TAtk2WaitMax,TAtk2WaitChnc,TAtk3WaitMin,TAtk3WaitMax,TAtk3WaitChnc,ProjType1,2,3,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,PreActMeleCols,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType,AtkProj1,2,3
 NPCTable npcTable[NUM_AI_TYPES] = {
 /* 0*/{"AUTOBOMB"              ,0,0,1,  0,  0,200,   0,    0,2.4,50,0,1,0.5,40,1,1,300,180,120,55,3.84,50,2.5,2.5,0,0,0,100,6,0,0,0.1,0,0,0,0,0,0,3,5,12,0.5,1,0.1,1,3,0.5,0,0,0,0,0,0,0,0,0,0,0,0,1,0,20,0,0,0,10,3,0,2,0,0,0 },
@@ -37,7 +41,76 @@ int sfxIdle[NUM_AI_TYPES]   ={-1,-1, -1,-1,58, -1, 59, -1, 59, 52,-1, -1,-1,-1,-
 int sfxAttack1[NUM_AI_TYPES]={-1,-1,108,-1,-1,146, -1,146,252,247,-1, -1,-1,-1,-1,122, -1,108,146, -1, -1,118,-1,125,258,258,258,258,258}; int sfxAttack2[NUM_AI_TYPES] =   {-1,256, -1,148,50, 50,50, 50, 50,250, 50, 50,146,259,148, -1,121, -1, -1,147, -1, -1,146, -1,258,258,258,258,258};
 int sfxAttack3[NUM_AI_TYPES]={-1,-1, -1,-1,-1,244,244,244,245, -1,-1,149,-1,-1,-1, -1, -1, -1, -1,244, -1, -1,-1, -1,258,258,258,258,258}; int sfxDeath[NUM_AI_TYPES] =     {-1, 48,110,143,48,145,48, 51, 47, 47,142,143,144, 47,162,123,120,134,144,144,120,117,144,124, -1, -1, -1, -1, -1};
 float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,0.9f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
-static const u16 npcDeathTexture[NUM_AI_TYPES] = { [16] = 564 }; /*Textures/npc_invisomut_dead.png*/
+static const u16 npcDeathTexture[NUM_AI_TYPES] = { [16] = 564 }; /*Textures/npc_invisomut_dead.png. 0 = no override, which is what the unset entries read as.*/
+
+/* Unity AIController.MuzzleBurst() activates the prefab's muzzleBurst child on attack 2 and muzzleBurst2 on
+   attack 3, and the prefab's deathBurst child on death. Each of those children is a container of the particle
+   systems below; the records here are the particleTypeDefs[] entries for those emitters. Sets are deduped
+   because the multi-gun bots repeat the same burst per gun, and capped so one death/shot can't eat the
+   per-level emitter budget. */
+typedef struct { u16 p[6]; u8 n; } AIPresetSet;
+static const AIPresetSet aiMuzzleBursts[NUM_AI_TYPES][2] = {
+    /* 0 AUTOBOMB        */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /* 1 CYBORG ASSASSIN */ {{{72,0,0,0,0,0},1},{{0,0,0,0,0,0},0}},
+    /* 2 AVIAN MUTANT    */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /* 3 EXEC-BOT        */ {{{96,97,129,0,0,0},3},{{0,0,0,0,0,0},0}},
+    /* 4 CYBORG DRONE    */ {{{81,0,0,0,0,0},1},{{0,0,0,0,0,0},0}},
+    /* 5 CORTEX REAVER   */ {{{56,58,0,0,0,0},2},{{0,0,0,0,0,0},0}},
+    /* 6 CYBORG WARRIOR  */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /* 7 CYBORG ENFORCER */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /* 8 CYBORG ELITE    */ {{{81,82,0,0,0,0},2},{{84,85,0,0,0,0},2}},
+    /* 9 CYBORG DIEGO    */ {{{78,0,0,0,0,0},1},{{0,0,0,0,0,0},0}},
+    /*10 SEC-1 BOT       */ {{{96,97,129,0,0,0},3},{{0,0,0,0,0,0},0}},
+    /*11 SEC-2 BOT       */ {{{30,31,29,32,0,0},4},{{141,34,0,0,0,0},2}},
+    /*12 MAINT BOT       */ {{{118,121,124,0,0,0},3},{{0,0,0,0,0,0},0}},
+    /*13 MUTANT CYBORG   */ {{{125,0,0,0,0,0},1},{{125,0,0,0,0,0},1}},
+    /*14 HOPPER          */ {{{112,113,114,0,0,0},3},{{0,0,0,0,0,0},0}},
+    /*15 HUMANOID MUTANT */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*16 INVISOMUT       */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*17 VIRUS MUTANT    */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*18 SERVBOT         */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*19 FLIER BOT       */ {{{106,103,104,105,0,0},4},{{0,0,0,0,0,0},0}},
+    /*20 ZEROG MUTANT    */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*21 GORILLA TIGER   */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*22 REPAIRBOT       */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*23 PLANT MUTANT    */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*24 CYBER DOG       */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*25 CYBER GUARD     */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*26 CYBER RAM       */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*27 CYBER REAVER    */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+    /*28 SHODAN          */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
+};
+static const AIPresetSet aiDeathBursts[NUM_AI_TYPES] = {
+    /* 0 AUTOBOMB        */ {{5,6,50,51,49,0},5},/*ef_fragexplosion + smoke*/
+    /* 1 CYBORG ASSASSIN */ {{0,0,0,0,0,0},0},
+    /* 2 AVIAN MUTANT    */ {{0,0,0,0,0,0},0},
+    /* 3 EXEC-BOT        */ {{100,129,102,126,101,0},5},
+    /* 4 CYBORG DRONE    */ {{0,0,0,0,0,0},0},
+    /* 5 CORTEX REAVER   */ {{54,53,55,0,0,0},3},
+    /* 6 CYBORG WARRIOR  */ {{0,0,0,0,0,0},0},/*deathLightning is a light, not particles*/
+    /* 7 CYBORG ENFORCER */ {{80,0,0,0,0,0},1},
+    /* 8 CYBORG ELITE    */ {{0,0,0,0,0,0},0},
+    /* 9 CYBORG DIEGO    */ {{0,0,0,0,0,0},0},
+    /*10 SEC-1 BOT       */ {{138,53,55,135,0,0},4},
+    /*11 SEC-2 BOT       */ {{54,53,55,0,0,0},3},
+    /*12 MAINT BOT       */ {{117,116,119,120,122,0},5},
+    /*13 MUTANT CYBORG   */ {{0,0,0,0,0,0},0},
+    /*14 HOPPER          */ {{0,0,0,0,0,0},0},
+    /*15 HUMANOID MUTANT */ {{115,0,0,0,0,0},1},
+    /*16 INVISOMUT       */ {{0,0,0,0,0,0},0},
+    /*17 VIRUS MUTANT    */ {{16,17,0,0,0,0},2},/*yellow blood spurt + tiny*/
+    /*18 SERVBOT         */ {{145,0,0,0,0,0},1},
+    /*19 FLIER BOT       */ {{80,109,107,0,0,0},3},
+    /*20 ZEROG MUTANT    */ {{0,0,0,0,0,0},0},
+    /*21 GORILLA TIGER   */ {{0,0,0,0,0,0},0},
+    /*22 REPAIRBOT       */ {{100,129,102,126,133,0},5},
+    /*23 PLANT MUTANT    */ {{127,102,126,128,130,131},6},
+    /*24 CYBER DOG       */ {{0,0,0,0,0,0},0},
+    /*25 CYBER GUARD     */ {{0,0,0,0,0,0},0},
+    /*26 CYBER RAM       */ {{0,0,0,0,0,0},0},
+    /*27 CYBER REAVER    */ {{0,0,0,0,0,0},0},
+    /*28 SHODAN          */ {{0,0,0,0,0,0},0},
+};
 // NPC gib ranges use the complete Citadel HealthManager gibObjects set. The
 // primary member is the search collider and receives the NPC's searchable
 // contents; the remaining members are visual/physical pieces of the same
@@ -58,7 +131,7 @@ float GetDamageTakeAmount(DamageData* dd);
 void InitNPC(u16 i) {
     World.layer[i] = L_NPC; u16 npcID = World.instances[i].index - 419; flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
     World.instances[i].currentDestination = World.instances[i].lastPosition = World.instances[i].idealPos = World.position[i]; World.instances[i].idealTransformForward = World.instances[i].forward;
-    World.instances[i].tickFinished = World.pauseRelativeTime + AI_TICK_TIME + (double)random_range(0.0f, 1.0f); World.instances[i].tickTime = World.instances[i].tickFinished + (double)random_range(0.0f, 1.0f); World.instances[i].idleTime = World.pauseRelativeTime + (double)random_range(npcTable[npcID].timeIdleSFXMin,npcTable[npcID].timeIdleSFXMax);
+    World.instances[i].aiThinkFinished = World.pauseRelativeTime + AI_TICK_TIME + (double)random_range(0.0f, 1.0f); World.instances[i].tickTime = World.pauseRelativeTime + AI_RAYCAST_TICK_TIME + (double)random_range(0.0f, 1.0f); World.instances[i].idleTime = World.pauseRelativeTime + (double)random_range(npcTable[npcID].timeIdleSFXMin,npcTable[npcID].timeIdleSFXMax);
     World.instances[i].attack1SoundTime = World.instances[i].attack2SoundTime = World.instances[i].attack3SoundTime = World.pauseRelativeTime; World.instances[i].huntFinished = World.pauseRelativeTime; int diff = (npcTable[npcID].type == NPCType_Cyber) ? World.diffCyb : World.diffCbt;
     if (diff <= 1) { World.instances[i].huntFinished += vmax((npcTable[npcID].huntTime * 0.75),60.0); }/*More forgetful on easy.*/ else if (diff >= 3) { World.instances[i].huntFinished += vmax((npcTable[npcID].huntTime * 2.00),60.0); }/*Good memory on hard.*/ else { World.instances[i].huntFinished += vmax(npcTable[npcID].huntTime,60.0); }
     World.instances[i].attackFinished = World.pauseRelativeTime + 1.0; World.instances[i].attack2Finished = World.instances[i].attack3Finished = World.instances[i].timeTillPainFinished = World.instances[i].timeTillDeadFinished = World.instances[i].meleeDamageFinished = World.instances[i].gracePeriodFinished = World.pauseRelativeTime;
@@ -172,6 +245,19 @@ static void ai_muzzle_flash(Entity* self, int attackNum) {
 }
 INLINE V3 ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3_AplusB(World.position[idx],(V3){0.0f,sightPointHeights[World.instances[idx].index - 419],0.0f}); }
 INLINE V3 ai_gun_pos(Entity* e, int n) { u16 idx=(u16)(e - World.instances); u16 npc=World.instances[idx].index-419; V3 off=(n==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f))?aiMuzzleOffsets[npc].gunPoint2:aiMuzzleOffsets[npc].gunPoint; if(off.x==0.0f && off.y==0.0f && off.z==0.0f) off=(V3){0.0f,sightPointHeights[npc]+0.3f,0.0f}; return V3_AplusB(World.position[idx],quat_rot_v3(World.rotation[idx],off)); }
+static void ai_spawn_presets(const AIPresetSet* set, V3 pos) { for (u8 i=0;i<set->n;i++){const PSysDef* preset=PSysTypeGet(set->p[i]); if(!preset)continue; PSysDef def=*preset; def.pos=pos; PSysAdd(&def);} }
+static void ai_muzzle_particles(Entity* self, int attackNum) {
+    if (attackNum<1 || attackNum>3) attackNum=1; u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return;
+    if (npc==18) ai_spawn_presets(&aiMuzzleBursts[npc][1],ai_gun_pos(self,1));/*Unity activates the servbot's burst on every attack, not just attack2*/
+    if (attackNum==1) return;/*No muzzle burst for attack 1 melee.*/ ai_spawn_presets(&aiMuzzleBursts[npc][attackNum==3?1:0],ai_gun_pos(self,attackNum));
+}
+/* Unity AIController.MakeLaserEffect() spawns a LaserDrawing line (line_sparqbeam material, width 0.2, 0.15s life)
+   from the sight point to the ray hit when the NPC's attack has hasLaserOnAttack set. */
+static void ai_laser_beam(Entity* self, int attackNum, V3 hitPos) {
+    u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return; const NPCTable* npcTab=&npcTable[npc];
+    bool has=attackNum==1?npcTab->hasLaserOnAttack1:(attackNum==2?npcTab->hasLaserOnAttack2:npcTab->hasLaserOnAttack3); if(!has)return;
+    SpawnBeamTrail(PSYS_npc_laserbeam,ai_sight_pos(self),hitPos,(Color){1,1,1,1});
+}
 INLINE V3 ai_attack_pos(Entity* e, int n) { return n==1 ? ai_sight_pos(e) : ai_gun_pos(e,n); }
 Quaternion quat_look_rotation(V3 fwd, V3 up) {
     fwd=V3_Normalize(fwd); V3 r = V3_Normalize(V3_Cross(up,fwd)); up=V3_Cross(fwd,r); float m00=r.x, m01=r.y, m02=r.z, m10=up.x, m11=up.y, m12=up.z, m20=fwd.x, m21=fwd.y, m22=fwd.z; float tr = m00 + m11 + m22; Quaternion q;
@@ -309,17 +395,14 @@ static double AIDeathAnimationDuration(const Entity* self) {
 }
 static void SpawnNPCDeathBurst(Entity* self) {
     if (!self) return;
-    if (self->index == 437) { /* npc_servbot prefab deathBurst child */
-        const PSysDef* preset = PSysTypeGet(147);
-        if (preset) { PSysDef def = *preset; V3 p=World.position[(u16)(self - World.instances)]; p.x-=self->right.x*.005f; p.y-=.032f; p.z-=self->right.z*.005f; p.x-=self->forward.x*.078f; p.z-=self->forward.z*.078f; def.pos = p; def.textures[0] = 386; def.emitRate = 0.0f; def.duration = 1.5f; def.burstCount = 80; def.colStart = (Color){1.0f,0.84076905f,0.8349056f,1.0f}; def.colEnd = (Color){1.0f,1.0f,1.0f,1.0f}; def.rotationMode = 1; def.colorMode = 1; def.blendMode = 4; def.blendModeOverride = true; PSysAdd(&def); }
-    }
+    u16 npc=(u16)(self->index-419); if (npc<NUM_AI_TYPES) { V3 p=World.position[(u16)(self - World.instances)]; if (self->index == 437) { p.x-=self->right.x*.005f; p.y-=.032f; p.z-=self->right.z*.005f; p.x-=self->forward.x*.078f; p.z-=self->forward.z*.078f; } ai_spawn_presets(&aiDeathBursts[npc],p); }
     if (self->deathBurst > 0) SpawnDynamicObject(self->deathBurst, false);
 }
 static void AIDying(u16 i) {
     if (!(World.instances[i].entflags & EF_DYING_SETUP)) {
         World.instances[i].enemy = 0; NPCTable* npc = &npcTable[World.instances[i].index - 419]; float dbt = deathBurstTimer[World.instances[i].index - 419]; if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; } else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(&World.instances[i]); flag_set(&World.instances[i].entflags, EF_DEATH_BURST_DONE, true); }
         u16 sidx = i; if (!(World.instances[i].entflags & EF_ACT_AS_CORPSE_ONLY) && !(World.instances[i].entflags & EF_TELEPORT_ON_DEATH)) { int sded=sfxDeath[World.instances[i].index - 419]; if (sded >= 0 && sded < (i16)SOUNDS_COUNT){play_wav(sounds[sded],AppliedFXVol(1.0f),World.position[sidx],true);} } { u16 _nid = World.instances[i].index - 419; World.gravity[i] = (ai_is_cyber(&World.instances[i]) || ai_gibs_on_death(_nid)) ? 0.0f : 1.0f; } // Citadel: gibbed/flier corpses don't fall while dying; cyber never falls.
-        flag_set(&World.instances[i].entflags,EF_ASLEEP,false); World.layer[i] = L_Corpse; flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true); u16 npcID = World.instances[i].index - 419; double deathWait = npc->timeTillDead; if (ai_gibs_on_death(npcID)) { double animWait = AIDeathAnimationDuration(&World.instances[i]); if (animWait > deathWait) deathWait = animWait; } World.instances[i].timeTillDeadFinished = World.pauseRelativeTime + deathWait; if (npc->switchMaterialOnDeath && npcDeathTexture[npcID] != U16_MAX) { World.instances[i].texIndex = npcDeathTexture[npcID]; }
+        flag_set(&World.instances[i].entflags,EF_ASLEEP,false); World.layer[i] = L_Corpse; flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true); u16 npcID = World.instances[i].index - 419; double deathWait = npc->timeTillDead; if (ai_gibs_on_death(npcID)) { double animWait = AIDeathAnimationDuration(&World.instances[i]); if (animWait > deathWait) deathWait = animWait; } World.instances[i].timeTillDeadFinished = World.pauseRelativeTime + deathWait; if (npc->switchMaterialOnDeath && npcDeathTexture[npcID] != 0) { World.instances[i].texIndex = npcDeathTexture[npcID]; }
         /* Citadel's zero-g death object is a 25-frame sequence at 24 fps. Voxen
          * has one mesh, so keep it visible and switch only its texture. Clip 48
          * is the available zerog37..zerog52 death tail (16 source frames). */
@@ -386,15 +469,18 @@ static void ProjectileRaycast(Entity* self, int n) {
     switch (n) { case 1: range = npcTable[self->index - 419].range; break; case 2: range = npcTable[self->index - 419].range2; break; default: range = npcTable[self->index - 419].range3; break; }
     // Origin sits inside own capsule; push start forward so we don't hit ourselves.
     V3 opos = {spos.x + dir.x*0.55f, spos.y + dir.y*0.55f, spos.z + dir.z*0.55f};
+    ai_muzzle_particles(self,n);
     RaycastHit hit = Raycast(opos, dir, range, LMASK_NPC_ATTACK); if(!hit.hit){return;} u16 hi = hit.hitInstanceIndex;
     if (hi == selfIdx){return;} // Wrong layer mask previously let melee hurt self; never hit owner.
-    if (n == 3 && self->index == 427 && eidx) DrawLine(ai_sight_pos(self), World.position[eidx],(Color){1.0f,0.15f,0.18f,0.85f}); // Targeting laser (Cyborg Elite, attack3)
+    ai_laser_beam(self,n,hit.point);
+    if (n == 3 && self->index == 427 && eidx) { DrawLine(ai_sight_pos(self), World.position[eidx],(Color){1.0f,0.15f,0.18f,0.85f}); SpawnTargetingLaser(ai_sight_pos(self),World.position[eidx]); } // Targeting laser (Cyborg Elite, attack3)
     DamageData dd = SetNPCData(self,n); dd.attackType=Att_HitS; // Citadel ProjectileRaycast always uses Projectile, even for Melee.
     dd.hitpoint=hit.point; dd.attacknormal=dir; dd.impactVelocity=dd.damage; bool hitPlayer=(hi == PLAYER1); if(hitPlayer){dd.impactVelocity *= 0.5f;} dd.isOtherNPC=!hitPlayer && IdxIsNPC(World.instances[hi].index);
-    if (hi){ai_apply_damage(dd,hi);} u16 impactCI = GetImpactType(hi); if(impactCI){u16 imp = SpawnDynamicObject(impactCI,true); if(imp && imp < INSTANCE_COUNT){World.position[imp]=hit.point;}}
+    if (hi){ai_apply_damage(dd,hi);} u16 impactCI = GetImpactType(hi); if(impactCI){SpawnImpactEffectParticle(impactCI,hit.point,hit.normal);}
 }
 
 static void ProjectileLaunched(Entity* self, int n) {
+    if (n < 1 || n > 3){n = 3;} ai_muzzle_particles(self,n);
     u16 sidx=(u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; int masterIdx; float launchSpd; switch (n) { case 1: masterIdx = npc->projectile1Prefab; launchSpd = npc->projectileSpeedAttack1; break; case 2: masterIdx = npc->projectile2Prefab; launchSpd = npc->projectileSpeedAttack2; break; default: masterIdx = npc->projectile3Prefab; launchSpd = npc->projectileSpeedAttack3; break; }
     DamageData dd = SetNPCData(self,n); dd.attackType=Att_Ball; // Citadel ProjectileLaunched always uses ProjectileLaunched.
     V3 spos=ai_attack_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370,false);
@@ -413,7 +499,7 @@ static void AIExplodeAttack(Entity* self) {
 static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || ind > 3){ind=1;/*Melee hitscan by default.*/} switch (att) { case Att_Melee:ProjectileRaycast(self,ind); break; case Att_HitS: case Att_PjBm:ai_muzzle_flash(self,ind); ProjectileRaycast(self,ind); World.fogFac += 1; break; case Att_Ball:ai_muzzle_flash(self,ind); ProjectileLaunched(self,ind); World.fogFac += 1; break; default: break; } }
 void AIAttack(Entity* self, int slot) {
     u16 sidx = (u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; if (slot == 3 && npc->explodeOnAttack3) { World.fogFac += 5; AIExplodeAttack(self); return; } AIApplyAttackMovement(self, slot == 1 ? npc->attack1Speed : slot == 2 ? npc->attack2Speed : npc->attack3Speed); int sat = slot == 1 ? sfxAttack1[self->index - 419] : slot == 2 ? sfxAttack2[self->index - 419] : sfxAttack3[self->index - 419];
-    float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); u32 tb = slot == 1 ? npc->timeBetweenAttack1 : slot == 2 ? npc->timeBetweenAttack2 : npc->timeBetweenAttack3;
+    float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = slot == 1 ? npc->timeBetweenAttack1 : slot == 2 ? npc->timeBetweenAttack2 : npc->timeBetweenAttack3;/*float: sub-second cadences truncated to 0 and lost the debounce*/
     int configuredAttack=slot==1 ? npc->attackType : slot==2 ? npc->attackType2 : npc->attackType3; AttType attack=(AttType)configuredAttack;
     /* NPCTable keeps the serialized IDs read from Unity's enemy table. Map
        its projectile IDs to Voxen's hit-scan and launched-projectile paths. */
@@ -428,10 +514,10 @@ static void AIFlierMoveToHoverHeight(Entity* self) {
     u16 sidx=(u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; if (npc->runSpeed <= 0.0f) return; u16 eidx = self->enemy;
     if (eidx) { self->idealPos.y = World.position[eidx].y + AI_TARGET_OFFSET_Y; self->idealPos.x=World.position[sidx].x; self->idealPos.z=World.position[sidx].z; }
     else if (NPCInPlayerPVS(sidx)) { V3 sp=ai_sight_pos(self), fp={0.0f,0.0f,0.0f}; RaycastHit dn=Raycast(sp,(V3){0,-1,0},npc->sightRange,LMASK_NPC_SIGHT); RaycastHit up=Raycast(sp,(V3){0,1,0},npc->sightRange,LMASK_NPC_SIGHT); float dDn=0.0f, dUp=0.0f; if (dn.hit) { dDn=dn.distance; fp=dn.point; } if (up.hit) dUp=up.distance; float yH=npc->flightHeight * (npc->flightHeightIsPercentage ? dDn + dUp : 1.0f); self->idealPos=(V3){fp.x,fp.y+yH,fp.z};}
-    float dy = self->idealPos.y - World.position[sidx].y; if (vabs(dy) < 0.16f) return; float spd  = npc->runSpeed * (float)World.deltaTime * World.timeScale; float step = vmin(vabs(dy), spd) * (dy < 0.0f ? -1.0f : 1.0f); World.position[sidx].y += step;
+    float dy = self->idealPos.y - World.position[sidx].y; if (vabs(dy) < 0.16f) return; float spd  = npc->runSpeed * AI_TICK_TIME * World.timeScale;/*Runs on the think tick, not per frame, so a frame delta would step ~1/6 of the intended speed*/ float step = vmin(vabs(dy), spd) * (dy < 0.0f ? -1.0f : 1.0f); World.position[sidx].y += step;
 }
 
-float AITranquilize(u16 idx, float amount, bool energy) { Entity* self = &World.instances[idx]; float secs = (amount < 3.0f) ? (float)npcTable[self->index - 419].timeForTranquilization : amount; if (npcTable[self->index - 419].type != NPCType_Robot || energy) { double a = World.pauseRelativeTime + secs, b = self->tranquilizeFinished + secs; self->tranquilizeFinished = a > b ? a : b; return secs; } return 0.0f; }
+/*AITranquilize duplicate of Tranquilize() above removed; nothing called it.*/
 void AIAlert(u16 idx) { if (!World.diffCbt){return;} Entity* self = &World.instances[idx]; AISetEnemy(idx,PLAYER1); self->currentDestination = World.position[PLAYER1]; flag_set(&self->entflags, EF_ENEM_IN_SIGHT, false); }
 void AIAwakeFromSleep(u16 idx) { flag_set(&World.instances[idx].entflags,EF_ASLEEP,false); AIAlert(idx);/*deactivate sleeping cables*/ }
 static void AIThink(u16 idx) {
@@ -455,8 +541,8 @@ void AIControllerUpdate(u16 idx) {
             else AIEnemyInFrontChecks(self,eidx);
         }
     }
-    if (self->tickFinished < World.pauseRelativeTime) {
-        self->tickFinished = World.pauseRelativeTime + AI_TICK_TIME;
+    if (self->aiThinkFinished < World.pauseRelativeTime) {
+        self->aiThinkFinished = World.pauseRelativeTime + AI_TICK_TIME;
         AIThink(idx);
     }
     if (self->currentState == AIState_Dead || self->currentState == AIState_Idle) return;

@@ -422,9 +422,11 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx == 424) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.8f; }/*npc_cortex_reaver*/ if (entIdx == 430) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.9f; }/*npc_sec2_bot*/   if (entIdx == 431) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.4f; }/*npc_maint_bot*/     if (entIdx == 433) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.88f; }/*npc_hopper*/
     if (entIdx == 439) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.4f; }/*npc_zerog_mutant*/  if (entIdx == 441) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.75f; }/*npc_repairbot*/ if (entIdx == 444) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.666f; }/*npc_cyberguard*/  if (entIdx == 445) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.5f; }/*npc_cyberram*/
     if (entIdx == 446) { World.scale[i].x=World.scale[i].y=World.scale[i].z=1.1f; }/*npc_cyber_reaver*/  if (entIdx == 475 || entIdx == 476){World.scale[i]=(V3){1.75f,1.75f,1.75f};}/*se_crate4,se_crate5*/
-    if (IdxIsNPC(entIdx)){InitNPC(i);} if (IdxIsDoor(entIdx)) { World.instances[i].SFXIndex = 75; } World.instances[i].modelIndex=EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAX_TXRS ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
+    if (IdxIsNPC(entIdx)){InitNPC(i); World.instances[i].npcNumber = ai_next_npc_number((u16)(entIdx - 419));} if (IdxIsDoor(entIdx)) { World.instances[i].SFXIndex = 75; } World.instances[i].modelIndex=EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAX_TXRS ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
     World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAX_TXRS ? 0 : EDefs[entIdx].specIndex; World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAX_TXRS ? 0 : EDefs[entIdx].normIndex; flag_set(&World.instances[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(entIdx));
     if (entIdx == 592 || entIdx == 593) { World.instances[i].modelIndex = U16_MAX; } // 3D text decals (no mesh)
+    if (World.levelCurrentlyLoading) { /*Tally the level's security objects so the security split and the system analyzer's node total have real denominators; guarded so runtime spawns never inflate them*/
+        u8 sl=World.currentLevel; if (sl<MAX_LEVELS) { u8* dst=entIdx==477?&World.levelCameraCount[sl]:entIdx==478?&World.levelLargeNodeCount[sl]:entIdx==479?&World.levelSmallNodeCount[sl]:0; if (dst && *dst<255) (*dst)++; } }
     World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f; if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; }/*ButtonSwitch*/
     if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=COLTYPE_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; World.levelInstCount[World.currentLevel]=World.instCount; return i;
 }
@@ -509,6 +511,7 @@ void LoadLevelMod(u8 lev) {
         else {
             entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; } inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
             for (u8 slot=0;slot<4;++slot) inst->contents[slot]=inst->custIdx[slot]=inst->randomItem[slot]=inst->randomItemCustIdx[slot]=-1;
+            inst->relayEnabled=true;/*Unity LogicRelay: public bool relayEnabled = true; level data never writes the key, so absent must mean enabled.*/
             fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f}; inst->relayEnabled = true;
         }
         bool activeStateRead = false; bool matIndexRead = false; u8 scaleReadMask = 0; u16 matIndexTexIdx = 881;
@@ -527,6 +530,49 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("keycode")) inst->keycode=parse_numberu16(value,lineSpace,lineNum);
                 else if(KEY_EQ("radiationAmount")) inst->radiation=parse_float(value,lineSpace,lineNum);                           else if(KEY_EQ("ammo"))inst->ammo=parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("ammo2"))inst->ammo2=parse_numberi16(value,lineSpace,lineNum);                                      else if(KEY_EQ("useableItemIndex"))inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
+                /* Citadel serializes the AIController's whole state into the level file. These flags drive InitNPC's
+                   starting state (wandering/roaming) and the early-out checks, so they have to survive the load or every
+                   authored patroller, sleeping enemy and turret comes up idle/awake and mobile. */
+                else if(KEY_EQ("idleTime"))       inst->idleTime=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("lookUpIndex"))   inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
+                else if(KEY_EQ("wandering"))     flag_set(&inst->entflags, EF_WANDERING, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("asleep"))        flag_set(&inst->entflags, EF_ASLEEP, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("actAsTurret"))   flag_set(&inst->entflags, EF_ACT_AS_TURRET, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("actAsCorpseOnly")) flag_set(&inst->entflags, EF_ACT_AS_CORPSE_ONLY, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("teleportOnDeath")) flag_set(&inst->entflags, EF_TELEPORT_ON_DEATH, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("firstSighting"))  flag_set(&inst->entflags, EF_FIRST_SIGHTING, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("shotFired"))      flag_set(&inst->entflags, EF_SHOT_FIRED, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("goIntoPain"))     flag_set(&inst->entflags, EF_GO_INTO_PAIN, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("dyingSetup"))     flag_set(&inst->entflags, EF_DYING_SETUP, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("ai_dying"))       flag_set(&inst->entflags, EF_DYING, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("ai_dead"))        flag_set(&inst->entflags, EF_DEAD, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("hopDone"))        flag_set(&inst->entflags, EF_HOP_DONE, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("deathBurstDone")) flag_set(&inst->entflags, EF_DEATH_BURST_DONE, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("hadEnemy"))       flag_set(&inst->entflags, EF_HAD_ENEMY, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("walkPathOnStart")) flag_set(&inst->entflags, EF_WALK_PATH_ON_START, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("inSight"))        flag_set(&inst->entflags, EF_ENEM_IN_SIGHT, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("infront"))        flag_set(&inst->entflags, EF_ENEM_IN_FRONT, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("inProjFOV"))      flag_set(&inst->entflags, EF_ENEM_IN_FOV, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("LOSpossible"))    flag_set(&inst->entflags, EF_ENEM_IN_LOS, parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("currentState"))   inst->currentState=(AIState)vclampi(parse_numberi16(value,lineSpace,lineNum),0,AIState_Dead);
+                else if(KEY_EQ("attack1SoundTime"))  inst->attack1SoundTime=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("attack2SoundTime"))  inst->attack2SoundTime=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("attack3SoundTime"))  inst->attack3SoundTime=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("currentDestination.x")) inst->currentDestination.x=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("currentDestination.y")) inst->currentDestination.y=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("currentDestination.z")) inst->currentDestination.z=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("idealTransformForward.x")) inst->idealTransformForward.x=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("idealTransformForward.y")) inst->idealTransformForward.y=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("idealTransformForward.z")) inst->idealTransformForward.z=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("idealPos.x")) inst->idealPos.x=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("idealPos.y")) inst->idealPos.y=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("idealPos.z")) inst->idealPos.z=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("targettingPosition.x")) inst->targettingPosition.x=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("targettingPosition.y")) inst->targettingPosition.y=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("targettingPosition.z")) inst->targettingPosition.z=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("lastKnownEnemyPos.x")) inst->lastKnownEnemyPos.x=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("lastKnownEnemyPos.y")) inst->lastKnownEnemyPos.y=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("lastKnownEnemyPos.z")) inst->lastKnownEnemyPos.z=parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("generateContents")) inst->generateContents = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("searchableInUse")) inst->srchInUse = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("maxRandomItems")) inst->maxRandomItems = (u8)parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[0]")) inst->contents[0] = parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("contents[1]")) inst->contents[1] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[2]")) inst->contents[2] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[3]")) inst->contents[3] = parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("customIndex[0]") || KEY_EQ("custIdx[0]")) inst->custIdx[0] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("customIndex[1]") || KEY_EQ("custIdx[1]")) inst->custIdx[1] = parse_numberi16(value,lineSpace,lineNum);
@@ -584,6 +630,7 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("maxDistance")) inst->reverbMaxDist = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("reverbPreset")) inst->reverbPreset = (u16)parse_numberu16(value, lineSpace, lineNum);
                 else if(KEY_EQ("center.x")) colCtrFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.y")) colCtrFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.z")) colCtrFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("size.x")) colSzFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.y")) colSzFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.z")) colSzFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("emailIndex")) inst->emailIndex = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("autoPlayEmail")) inst->autoPlayEmail = parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("RobotSpawnDeactivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_RobotSpawnDeactivated; }   else if(KEY_EQ("IsotopeInstalled"))            { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsotopeInstalled; }
                 else if(KEY_EQ("ShieldActivated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_ShieldActivated; }         else if(KEY_EQ("LaserSafetyOverriden"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserSafetyOverriden; }
                 else if(KEY_EQ("LaserDestroyed"))              { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserDestroyed; }          else if(KEY_EQ("BetaGroveCyberUnlocked"))      { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BetaGroveCyberUnlocked; }
@@ -618,7 +665,10 @@ void LoadLevelMod(u8 lev) {
     i32 totalEnts = entCount + 1;
     for (i32 e=0;e<totalEnts;++e) {
         Entity* src = &entsFromFile[e]; u16 entIdx = src->index; u16 parent = AddInstance(entIdx,posFromFile[e]); Entity* par = &World.instances[parent]; par->lastPosition = posFromFile[e]; World.rotation[parent] = rotationFromFile[e]; if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
-        par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/ par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
+        par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/
+        /* InitNPC() stamps its own start-up state, so put the loaded AIController state back on top of it. The
+           flags above already ride along through the OR; these fields are not part of entflags. */
+        if (IdxIsNPC(entIdx)) { par->currentState=src->currentState; par->currentDestination=src->currentDestination; par->idealPos=src->idealPos; par->idealTransformForward=src->idealTransformForward; par->targettingPosition=src->targettingPosition; par->lastKnownEnemyPos=src->lastKnownEnemyPos; par->attack1SoundTime=src->attack1SoundTime; par->attack2SoundTime=src->attack2SoundTime; par->attack3SoundTime=src->attack3SoundTime; } par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
         for (u8 slot=0;slot<4;++slot) { par->contents[slot]=src->contents[slot]; par->custIdx[slot]=src->custIdx[slot]; par->randomItem[slot]=src->randomItem[slot]; par->randomItemCustIdx[slot]=src->randomItemCustIdx[slot]; par->randomItemDropChance[slot]=src->randomItemDropChance[slot]; }
         par->generateContents=src->generateContents; par->maxRandomItems=src->maxRandomItems; par->srchInUse=src->srchInUse;
         par->amount=src->amount; par->resetTime=src->resetTime; par->minSecurityLevel=src->minSecurityLevel; par->keycode=src->keycode; par->damage=src->damage; par->delay=src->delay; par->active=src->active; par->activatedScale=src->activatedScale;
@@ -642,6 +692,8 @@ void LoadLevelMod(u8 lev) {
         }
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
         if (entIdx >= 595 && entIdx <= 601) {if (colSzFromFile[e].x >= 0 || colSzFromFile[e].y>=0 || colSzFromFile[e].z>=0){World.colliderCenter[parent] = colCtrFromFile[e]; World.colliderSize[parent]=(V3){colSzFromFile[e].x<0.0f ? 1.0f : colSzFromFile[e].x,colSzFromFile[e].y<0.0f ? 1.0f : colSzFromFile[e].y,colSzFromFile[e].z<0.0f ? 1.0f : colSzFromFile[e].z };}else{World.colliderCenter[parent]=(V3){0,0,0}; World.colliderSize[parent]=(V3){1.f,1.f,1.f};}}
+        else if (entIdx == 706) { /* info_elev_destination: elev_volume child BoxCollider. Extents authored per-instance in level*.txt (extracted from CitadelScene prefab overrides). col stays COLTYPE_NONE so it never collides, only the trigger test. */
+            if (colSzFromFile[e].x >= 0 || colSzFromFile[e].y >= 0 || colSzFromFile[e].z >= 0) { World.colliderCenter[parent]=colCtrFromFile[e]; World.colliderSize[parent]=(V3){colSzFromFile[e].x<0.0f ? 2.56f : colSzFromFile[e].x,colSzFromFile[e].y<0.0f ? 2.56f : colSzFromFile[e].y,colSzFromFile[e].z<0.0f ? 2.56f : colSzFromFile[e].z}; } else { World.colliderCenter[parent]=(V3){0.013999939f,0.20199966f,0.03299904f}; World.colliderSize[parent]=(V3){2.56f,2.56f,2.56f}; } }
         else if (entIdx == 716) { World.col[parent] = COLTYPE_NONE; }
         else if (entIdx == 515 && EDefs[entIdx].col == COLTYPE_BOX && EDefs[entIdx].colSz.x == 0.0f && EDefs[entIdx].colSz.y == 0.0f && EDefs[entIdx].colSz.z == 0.0f) { World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f}; }
         if (entIdx == 700) par->currentTargetIdx = par->branchOnSecond ? par->target2Idx : par->targetIdx;
@@ -716,7 +768,7 @@ void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
 void LoadLevelData(u8 curlevel) {
     if(!teleportDestinationsInitialized){for(u8 l=0;l<MAX_LEVELS;++l)for(u8 id=0;id<8;++id)teleportDestinations[l][id]=U16_MAX;teleportDestinationsInitialized=true;}
     if(curlevel<MAX_LEVELS)for(u8 id=0;id<8;++id)teleportDestinations[curlevel][id]=U16_MAX;
-    World.curLev = curlevel; TargetIDReset(); SetLevelPointers(curlevel); mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    World.curLev = curlevel; TargetIDReset(); ai_reset_npc_numbering(); SetLevelPointers(curlevel); mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf)); LoadLevelMod(curlevel); GravityLiftSyncAllVisuals(); PSysAddLevelLoops(); if (curlevel<MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel]=true; } OS_Free(fbuf,(size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
     for (int i = PLAYER1; i < World.instCount; ++i) {
@@ -775,7 +827,7 @@ void LoadAllLevels() {
     double start_time = get_time();
     DebugRAM("start of LoadAllLevels"); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true;
     entsFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Entity)); posFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); scaleFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); rotationFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Quaternion)); colCtrFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); colSzFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
-    ioNameCount=1; ioNames[0][0]='\0'; lightsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(Light)); lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation)); for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;} fwPoolUsed = 0; for(u8 lev=0;lev<World.numLevels;++lev){LoadLevelData(lev);}
+    ioNameCount=1; ioNames[0][0]='\0'; lightsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(Light)); lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation)); for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;} fwPoolUsed = 0; for(u8 lev=0;lev<World.numLevels;++lev){for(i32 i=0;i<INSTANCE_COUNT;++i){colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1};}/*OS_Alloc is a raw anonymous mmap and so zero-fills: absent size/center keys read 0.0, which passes the "present" test and yields zero-extent colliders (degenerate trigger_once boxes that can never be touched). Sentinel to -1 per level so indices aren't inherited across levels.*/ LoadLevelData(lev);}
     OS_Free(entsFromFile,INSTANCE_COUNT*sizeof(Entity)); OS_Free(colCtrFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(colSzFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(posFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(scaleFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(rotationFromFile,INSTANCE_COUNT*sizeof(Quaternion)); OS_Free(lightsFromFile,LIGHT_COUNT*sizeof(Light)); OS_Free(lanimsFromFile,LIGHT_COUNT*sizeof(LightAnimation));
     BuildTextDecalMeshes(); // Build world-baked 3D text decal meshes (Sys_Text.stringTable already populated for current language).
     DebugRAM("end of LoadAllLevels"); DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\nLoad all levels... took %f secs\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],

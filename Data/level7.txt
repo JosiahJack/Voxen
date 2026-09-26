@@ -5455,8 +5455,8 @@ constIndex:144|lP.x:12.4611|lP.y:47.36|lP.z:-48.7344
 constIndex:548|lP.x:-35.845|lP.y:50.98843|lP.z:17.414|lR.y:.70711|lR.w:.70711
 constIndex:557|lP.x:-35.965|lP.y:49.91443|lP.z:17.747|lR.x:-.49991|lR.y:-.50009|lR.z:-.49991|lR.w:.50009|lS.x:.0398|lS.y:.0398|lS.z:.0398
 constIndex:597|lP.x:54.312|lP.y:48.62443|lP.z:-15.395|lS.x:.24|lS.y:2.56|lS.z:1.28|center.x:0|center.y:0|center.z:0|size.x:1|size.y:1|size.z:1
-constIndex:706|lP.x:17.48|lP.y:50.98643|lP.z:56.21
-constIndex:706|lP.x:25.113|lP.y:48.44443|lP.z:-10.649
+constIndex:706|lP.x:17.48|lP.y:50.98643|lP.z:56.21|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
+constIndex:706|lP.x:25.113|lP.y:48.44443|lP.z:-10.649|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
 constIndex:566|lP.x:-48.984|lP.y:44.82084|lP.z:6.738|lR.x:-.70711|lR.w:.70711
 constIndex:566|lP.x:-47.27464|lP.y:44.82084|lP.z:8.31601|lR.x:-.70711|lR.w:.70711
 constIndex:707|lP.x:25.37165|lP.y:48.847|lP.z:-7.67194|lR.x:-.70711|lR.w:.70711|emailIndex:91|autoPlayEmail:0|targetname:lev7email1|enemyAlert:0|sendEmail:0|lockCodeToScreenMaterialChanger:0|spawnerActivate:0|spawnerActivateAlerted:0|cyborgConversionToggle:0|togglePuzzlePanelLocked:0|testQuestBitIsOn:0|testQuestBitIsOff:0|sendSprintMessage:0|radiationTreatment:0|screenShake:0|awakeSleepingEnemy:0|doorAccessCardOverrideToggle:0|alreadyDisabledThisGOOnceEver:0|gameObject.activeInHierarchy:1

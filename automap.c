@@ -1,5 +1,5 @@
 //automap.c - CPU automap, side MFD, 320x200
-static u8 amPx[AM_W*AM_H*4],amFullPx[AM_FULL_W*AM_FULL_H*4],amBuiltLev=255,amBuiltZoom=255,amMdlState[MAX_MDLS]/*0=unknown,1=ok,2=no mesh*/,amMdlWall[MAX_MDLS]/*1=wall-like (draw), 0=floor-like (skip)*/,amHullN[MAX_MDLS],amCardState[MAX_MDLS]/*0=unknown,1=ok*/,amRadCells[ARRSIZE],amDiagCell[ARRSIZE],amDoorXR[256]/*1=X-running span, 0=Z-running*/; static bool amReady=false,amBuiltFull=false; static u32 amTexId=0,amFBO=0,amFullTexId=0,amFullFBO=0,amBuiltDoorHash=0; i32 amDoorN=0; static u16 amWedgeInst[ARRSIZE]; static int amDrawW,amDrawH; static u8* amDrawPx; static float amMapScaleX,amMapScaleY,amMapOffsetX;
+static u8 amPx[AM_W*AM_H*4],amFullPx[AM_FULL_W*AM_FULL_H*4],amBuiltLev=255,amBuiltZoom=255,amMdlState[MAX_MDLS]/*0=unknown,1=ok,2=no mesh*/,amMdlWall[MAX_MDLS]/*1=wall-like (draw), 0=floor-like (skip)*/,amHullN[MAX_MDLS],amCardState[MAX_MDLS]/*0=unknown,1=ok*/,amRadCells[ARRSIZE],amElevCells[ARRSIZE],amDiagCell[ARRSIZE],amDoorXR[256]/*1=X-running span, 0=Z-running*/; static bool amReady=false,amBuiltFull=false; static u32 amTexId=0,amFBO=0,amFullTexId=0,amFullFBO=0,amBuiltDoorHash=0; i32 amDoorN=0; static u16 amWedgeInst[ARRSIZE]; static int amDrawW,amDrawH; static u8* amDrawPx; static float amMapScaleX,amMapScaleY,amMapOffsetX;
 typedef struct {float x,z;}AmPt;
 static float amBuiltPX=1e30f,amBuiltPZ=1e30f,amBuiltFX=0.0f,amBuiltFZ=-1.0f,amWinX0,amWinZ1,amPxPerUnit,amHullX[MAX_MDLS][AM_MAXHULL],amHullZ[MAX_MDLS][AM_MAXHULL],amMinX[MAX_MDLS],amMaxX[MAX_MDLS],amMinZ[MAX_MDLS],amMaxZ[MAX_MDLS],amMinY[MAX_MDLS],amMaxY[MAX_MDLS],amCardX[MAX_MDLS][4],amCardY[MAX_MDLS][4],amCardZ[MAX_MDLS][4],amCardNx[MAX_MDLS],amCardNy[MAX_MDLS],amCardNz[MAX_MDLS],amFloorY[ARRSIZE],amDoorX0[256],amDoorZ0[256],amDoorX1[256],amDoorZ1[256];
 INLINE int amNavVer() {/*nav hw ver: 0=none,1..3=v1..v3; gates zoom/overlays/cadence*/ return World.invP1.hwVers[HW_NAV_IDX]; }
@@ -43,12 +43,16 @@ static int amNPCNeedVer(NPCType t) {if(t==NPCType_Robot){return 2;}if(t==NPCType
 static void amRaster(u8 zoom, bool full) {
     u8 lev=World.curLev; int nav=amNavVer(); int cells=16<<zoom;/*16,32,64; 0=closest*/ float x0c=World.worldMin_x[lev]-CELLXHALF,z0c=World.worldMin_z[lev]-CELLXHALF; float winW=(float)cells*CELLSZ; V3 app=World.position[PLAYER1]; float wantX0=app.x-winW*0.5f, wantZ1=app.z+winW*0.5f; float minX0=x0c,maxX0=x0c+64.0f*CELLSZ-winW; float minZ1=z0c+winW,maxZ1=z0c+64.0f*CELLSZ;
     amDrawW=full?AM_FULL_W:AM_W; amDrawH=full?AM_FULL_H:AM_H; amDrawPx=full?amFullPx:amPx; if(full){amWinX0=x0c; amWinZ1=z0c+64.0f*CELLSZ;}/*Unity: full map camera forced to center, never follows player*/ else {amWinX0=wantX0<minX0?minX0:(wantX0>maxX0?maxX0:wantX0); amWinZ1=wantZ1<minZ1?minZ1:(wantZ1>maxZ1?maxZ1:wantZ1); if(maxX0<minX0){amWinX0=minX0;} if(maxZ1<minZ1){amWinZ1=maxZ1;}} amPxPerUnit=(float)amDrawH/winW; amMapScaleX=full?(float)amDrawW/winW:amPxPerUnit; amMapScaleY=amPxPerUnit; amMapOffsetX=full?0.0f:(float)AM_XOFF;  u8* expl=World.automapExplored[lev]; for (u32 i=0;i<(u32)amDrawW*amDrawH*4;i+=4) { amDrawPx[i]=0; amDrawPx[i+1]=0; amDrawPx[i+2]=0; amDrawPx[i+3]=0; }/*transparent*/
-    mset(amRadCells,0,sizeof(amRadCells)); mset(amWedgeInst,0xFF,sizeof(amWedgeInst)); mset(amDiagCell,0,sizeof(amDiagCell));
+    mset(amRadCells,0,sizeof(amRadCells)); mset(amElevCells,0,sizeof(amElevCells)); mset(amWedgeInst,0xFF,sizeof(amWedgeInst)); mset(amDiagCell,0,sizeof(amDiagCell));
     if(nav>=3){/*rad triggers (nav v3+): expand bounds to overlapped cells*/
         for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
             Entity* e=&World.instances[i]; if(e->index!=601||!(e->entflags&EF_ACTIVE)){continue;} V3 c=World.colliderCenter[i],s=World.colliderSize[i],p=World.position[i]; float x0=p.x+c.x-s.x*0.5f,x1=p.x+c.x+s.x*0.5f,z0=p.z+c.z-s.z*0.5f,z1=p.z+c.z+s.z*0.5f;
             /*floor min, ceil max: fill touched cells*/ int ax=(int)vfloor((x0-x0c)/CELLSZ),bx=(int)vceil((x1-x0c)/CELLSZ); int az=(int)vfloor((z0-z0c)/CELLSZ),bz=(int)vceil((z1-z0c)/CELLSZ); if(ax<0){ax=0;} if(az<0){az=0;} if(bx>63){bx=63;} if(bz>63){bz=63;} for(int cz=az;cz<=bz;++cz)for(int cx=ax;cx<=bx;++cx)amRadCells[cz*64+cx]=1;
         }
+    }
+    for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {/*elev dest cells (706): fill every cell the elev_volume box overlaps, not just the origin cell*/
+        Entity* e=&World.instances[i]; if(e->index!=706||!(e->entflags&EF_ACTIVE)){continue;} V3 c=World.colliderCenter[i],s=World.colliderSize[i],p=World.position[i]; V3 rc=quat_rot_v3(World.rotation[i],c); float x0=p.x+rc.x-s.x*0.5f,x1=p.x+rc.x+s.x*0.5f,z0=p.z+rc.z-s.z*0.5f,z1=p.z+rc.z+s.z*0.5f;
+        int ax=(int)vfloor((x0-x0c)/CELLSZ),bx=(int)vceil((x1-x0c)/CELLSZ); int az=(int)vfloor((z0-z0c)/CELLSZ),bz=(int)vceil((z1-z0c)/CELLSZ); if(ax<0){ax=0;} if(az<0){az=0;} if(bx>63){bx=63;} if(bz>63){bz=63;} for(int cz=az;cz<=bz;++cz)for(int cx=ax;cx<=bx;++cx)amElevCells[(u32)cz*64+(u32)cx]=1;
     }
     for(u32 c=0;c<ARRSIZE;++c){amFloorY[c]=-1e30f;} float x0f=World.worldMin_x[lev]-CELLXHALF,z0f=World.worldMin_z[lev]-CELLXHALF;
     for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {/*Get floor heights for difference check to draw dark green line between cells of different heights.*/
@@ -63,9 +67,9 @@ static void amRaster(u8 zoom, bool full) {
         V3 ip=World.position[i]; Quaternion iq=World.rotation[i]; V3 is=World.scale[i]; float ccx=0,ccz=0; for (int k=0;k<4;++k) {V3 v=quat_rot_v3(iq,(V3){amCardX[cm][k]*is.x,amCardY[cm][k]*is.y,amCardZ[cm][k]*is.z}); ccx+=ip.x+v.x; ccz+=ip.z+v.z;} ccx*=0.25f; ccz*=0.25f; int cx=PosGetCellCoordX(ccx),cz=PosGetCellCoordZ(ccz); if(cx>=0&&cx<64&&cz>=0&&cz<64){amDiagCell[(u32)cz*64+(u32)cx]=1;}
     }
     for (int cz=0;cz<64;++cz) for (int cx=0;cx<64;++cx) {/*cell fills: transparent; rad dark orange; wedge cells get access tri only*/
-        u32 cell=(u32)cz*64+(u32)cx; if(!(gridCellStates[cell]&CELL_OPEN)||!expl[cell]){continue;} float wx0=x0c+(float)cx*CELLSZ,wx1=wx0+CELLSZ; float wz0=z0c+(float)cz*CELLSZ,wz1=wz0+CELLSZ; float rx0=amWX(wx0),rx1=amWX(wx1),ry0=amWZ(wz1),ry1=amWZ(wz0);/*top-left px*/ if(rx1<0.0f||rx0>(float)amDrawW||ry1<0.0f||ry0>(float)amDrawH){continue;}/*outside zoom window*/ bool rad=amRadCells[cell]!=0; if(!rad){continue;}/*black -> transparent: leave cleared alpha 0*/
-        u8 r=170,g=85,b=0; u16 wi=amWedgeInst[cell]; 
-        if(wi!=U16_MAX){/*access tri = empty corner + hypotenuse ends*/
+        u32 cell=(u32)cz*64+(u32)cx; if(!(gridCellStates[cell]&CELL_OPEN)||!expl[cell]){continue;} float wx0=x0c+(float)cx*CELLSZ,wx1=wx0+CELLSZ; float wz0=z0c+(float)cz*CELLSZ,wz1=wz0+CELLSZ; float rx0=amWX(wx0),rx1=amWX(wx1),ry0=amWZ(wz1),ry1=amWZ(wz0);/*top-left px*/ if(rx1<0.0f||rx0>(float)amDrawW||ry1<0.0f||ry0>(float)amDrawH){continue;}/*outside zoom window*/ bool rad=amRadCells[cell]!=0,elev=amElevCells[cell]!=0; if(!rad&&!elev){continue;}/*black -> transparent: leave cleared alpha 0*/
+        u8 r,g,b; if(elev){r=90;g=49;b=8;}/*elev cell 0.353,0.192,0.031*/ else if(lev==5||lev==11){r=132;g=104;b=0;}/*rad 0.518,0.408,0 on L5/L11*/ else {r=112;g=4;b=4;}/*rad 0.439,0.016,0.016*/ u16 wi=amWedgeInst[cell]; 
+        if(rad&&wi!=U16_MAX){/*access tri = empty corner + hypotenuse ends*/
             Entity* e=&World.instances[wi]; u16 m=e->modelIndex; float wx[3],wz[3]; for (u8 k=0;k<3;++k) { V3 v=quat_rot_v3(World.rotation[wi],(V3){amHullX[m][k]*World.scale[wi].x,0.0f,amHullZ[m][k]*World.scale[wi].z}); wx[k]=amWX(World.position[wi].x+v.x); wz[k]=amWZ(World.position[wi].z+v.z); } float gx=(wx[0]+wx[1]+wx[2])/3.0f,gy=(wz[0]+wz[1]+wz[2])/3.0f; float corns[4][2]={{rx0,ry0},{rx1,ry0},{rx1,ry1},{rx0,ry1}}; int ei=0; float bd=-1.0f;
             for (int k=0;k<4;++k) { float dx=corns[k][0]-gx,dy=corns[k][1]-gy,d2=dx*dx+dy*dy; if(d2>bd){bd=d2;ei=k;} } int h0=0,h1=1; float bl=-1.0f;/*longest wedge edge = hypotenuse*/ for (int k=0;k<3;++k) { int a=k,bb=(k+1)%3; float dx=wx[a]-wx[bb],dy=wz[a]-wz[bb],d2=dx*dx+dy*dy; if(d2>bl){bl=d2;h0=a;h1=bb;} } amFillTri(corns[ei][0],corns[ei][1],wx[h0],wz[h0],wx[h1],wz[h1],r,g,b);
         } else {amFillRect((int)rx0,(int)ry0,(int)(rx1+0.5f),(int)(ry1+0.5f),r,g,b);}
@@ -143,6 +147,16 @@ void AutomapBlitToUI() {
     if(!amReady || World.menuActive || World.paused || Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE){return;}
     int n=0; int dx0[2],dy0[2],dx1[2],dy1[2]; if(World.Sys_UI.MFD_LefTab==3){ dx0[n]=AMAP_UI_X_L; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_L+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(World.Sys_UI.MFD_RightTab==3){ dx0[n]=AMAP_UI_X_R; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_R+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(!n){return;}
     glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); for (int k=0;k<n;++k) {/*UI y-down->GL y-up; row0=north=texture bottom: flip src*/int gx0=dx0[k],gy0=768-dy1[k],gx1=dx1[k],gy1=768-dy0[k]; glBlitFramebuffer(0,AM_H,AM_W,0, gx0,gy0,gx1,gy1, GL_COLOR_BUFFER_BIT,GL_LINEAR);} glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
+}
+
+/*Automap SIDE view: Automap.cs's inSideView swaps the whole rasterised map for one static per-level schematic, so this only draws the image and leaves the top-down and full maps untouched*/
+#define AMAP_SIDE_TEX_BASE 2153
+void AutomapSideBlitToUI(bool isRH) {
+    if(World.menuActive || World.paused || Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE){return;}
+    u8 lev=World.curLev; if(lev>=LEVEL_CYBERSPACE){return;}
+    u16 tex=(u16)(AMAP_SIDE_TEX_BASE+lev);/*slot == level, matching automapsSideImages[currentLevel]: 0=LR, 1..9, 10=G1, 11=G2, 12=G4*/
+    i16 x=(i16)(AMAP_UI_X_L+(isRH?(AMAP_UI_X_R-AMAP_UI_X_L):0)+(AMAP_UI_W-71)/2), y=(i16)(AMAP_UI_Y+(AMAP_UI_H-71)/2);
+    RenderUIImage(x,y,71,71,tex);
 }
 
 void AutomapBlitFullToUI() {
