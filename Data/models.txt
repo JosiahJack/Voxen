@@ -179,8 +179,8 @@ index: 79
 #Models/cyber_switch.glb
 index: 80
 animated: 1
-animationNum: 52
-frame: 1 4
+animationNum: 58
+frame: 1 2
 
 #Models/g_conc_collider.obj
 index: 84
@@ -2140,3 +2140,39 @@ index: 6073
 index: 6074
 #Models/sec_cpunode_gib_towerpanel1.obj
 index: 6075
+
+
+
+
+
+
+#Models/cyber_data.glb
+index: 6076
+animated: 1
+animationNum: 53
+frame: 1 260
+
+#Models/cyber_datafrag.glb
+index: 6336
+animated: 1
+animationNum: 54
+frame: 1 80
+
+#Models/cyber_exit.glb
+index: 6416
+animated: 1
+animationNum: 55
+frame: 1 100
+
+#Models/cyber_ice.glb
+index: 6516
+animated: 1
+animationNum: 56
+frame: 1 99
+
+#Models/cyber_item.glb
+index: 6615
+animated: 1
+animationNum: 57
+frame: 1 260
+

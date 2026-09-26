@@ -1,6 +1,7 @@
 // weapons.c - Weapon System
 #include "common.h"
 FootStepType GetFootstepTypeForPrefab(int pid); bool ChangeAmmoType();
+void ApplyImpactForceWithSound(u16 target, float vel, V3 normal, V3 pt);/*citadel.c: impact force + velocity-modulated impact sound*/
 float delayBetweenShotsForWeapon[16]={1.0f,0.6f,0.5f,0.1f,0.8f,1.6f,0.65f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,1.1f,0.75f}; float delayBetweenShotsForWeapon2[16]={1.0f,4.5f,0.5f,0.15f,4.0f,1.6f,0.75f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,5.0f,0.75f};
 float dmgForWep[16]={75.0f,12.0f,15.0f,10.0f,18.0f,150.0f,15.0f,60.0f,45.0f,22.0f,50.0f,185.0f,6.0f,35.0f,6.0f,2.0f}; float dmgForWep2[16]={160.0f,70.0f,5.0f,22.0f,108.0f,0.0f,0.0f,85.0f,80.0f,33.0f,350.0f,0.0f,0.0f,35.0f,36.0f,15.0f};
 float damageOverloadForWeapon[16]={0.0f,115.0f,0.0f,0.0f,180.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,60.0f,0.0f};
@@ -216,13 +217,14 @@ void HitScanFire(int wep16) {
     dd.damage=alt ? dmgForWep2[wep16] : (CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16]); dd.offense=alt ? offenseWep2[wep16] : offenseWep[wep16]; dd.penetration=alt ? penetrationWep2[wep16] : penetrationWep[wep16];
     float dmgFinal = 0.0f;
     if (b && World.instances[ent].health > 0.0f) {
-        dd.damage*=0.8f;/*rebalancing factor*/ dmgFinal=TakeDamage(ent,dd);
-        if (!dd.isOtherNPC || wep16==12) { AddForce((u16)wfx.tempHitEnt, V3_ScaleByF(dd.attacknormal, dd.impactVelocity * 0.01f), false); } // impact force linked to physics
+        dd.damage*=0.8f;/*rebalancing factor*/ dmgFinal=TakeDamage(ent,dd); dd.impactVelocity+=dd.damage;/*Unity: impactVelocity += damage*/
         if (npc && !(World.instances[wfx.tempHitEnt].entflags & EF_ASLEEP)) { /* Music combat state set; function deferred */ }
     if (dmgFinal < 0.0f) dmgFinal = 0.0f;
     (void)dmgFinal; (void)tranq; // CreateTargetIDInstance placeholder: data captured but instance tracking deferred
     // TODO: CreateTargetIDInstance for deferred impact tracking when HealthManager ported
-    } if (isBeam){CreateBeamEffects(wep16);}
+    }
+    if (b && (!dd.isOtherNPC || wep16==12)) { ApplyImpactForceWithSound(ent,dd.impactVelocity,dd.attacknormal,dd.hitpoint); }/*impact force+sound for any dynamic object (Unity: Utils.ApplyImpactForce + ObjectImpact)*/
+    if (isBeam){CreateBeamEffects(wep16);}
 }
 
 void BiomonitorEnergyPulse(float take);
@@ -241,8 +243,10 @@ void MeleeHitUpdate(void) {
     wfx.tempHitEnt = targ;
     CreateStandardImpactEffects();
     if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);
-    if(World.instances[targ].health<=0.0f&&!dd.isOtherNPC){if(!silent){play_wav(sounds[wfx.pendingMeleeHitSnd], AppliedFXVol(1.0f), World.position[targ], false);World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}return;}
-    dd.impactVelocity = 80.0f + dd.damage; //if ((!dd.isOtherNPC || wep16==12) && (!isRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForce(targ,dd.impactVelocity,dd.attacknormal,dd.hitpoint); } TODO
+    if(World.instances[targ].health<=0.0f&&!dd.isOtherNPC){if(!silent){play_wav(sounds[wfx.pendingMeleeHitSnd], AppliedFXVol(1.0f), World.position[targ], false);World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}}
+    dd.impactVelocity = 80.0f + dd.damage;
+    if ((!dd.isOtherNPC || wep16==12) && (!isRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForceWithSound(targ,dd.impactVelocity,dd.attacknormal,World.position[targ]); }/*melee impact force+sound for any dynamic object (Unity: WeaponFire melee)*/
+    if(World.instances[targ].health<=0.0f&&!dd.isOtherNPC){return;}
     float dmgFinal = TakeDamage(targ,dd);
     if (dmgFinal < 0.0f) {dmgFinal = 0.0f;}
     (void)dmgFinal; // CreateTargetIDInstance(dmgFinal, targ, -1.0f); TODO

@@ -1,6 +1,6 @@
 // lib.c - LibC replacement functions and other misc helpers.
 #include "common.h"
-#define SCRATCH_ARENA_SIZE (48ULL * 1024 * 1024)
+#define SCRATCH_ARENA_SIZE (86ULL * 1024 * 1024)
 u8* scratch_base,*scratch_cur,*scratch_end; size_t scratch_peak=0;
 void OS_ScratchInit(void) { if(scratch_base){return;} scratch_base=OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur=scratch_base; scratch_end=scratch_base + SCRATCH_ARENA_SIZE; }
 void* OS_AllocScratch(size_t amount) { if(!scratch_base){OS_ScratchInit();} size_t aligned=(amount + 15) & ~(size_t)15; if(scratch_cur+aligned > scratch_end){DualLogError("Scratch ovr!\n"); OS_Exit(1);} void* p=scratch_cur; scratch_cur+=aligned; size_t used=(size_t)(scratch_cur-scratch_base); if(used>scratch_peak)scratch_peak=used; return p; }
@@ -146,7 +146,7 @@ void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely alloc
     (void)context;
     //static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
     //long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;
-    //size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0; long fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
+    //size_t heap_bytes = (size_t)((char*)current_brk - (char*)heap_start); size_t uss_bytes = 0; FHandle fd = OS_OpenReadonly("/proc/self/smaps_rollup"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/smaps_rollup\n"); return; }
     //char buf[4096]; long bytes_read = OS_Read(fd,buf,sizeof(buf)-1); if (bytes_read > 0) { buf[bytes_read] = '\0'; } else buf[0] = '\0'; OS_Close(fd); char* p = buf;
     //while (*p) {
         //if (mcmp(p,"Private_",8) == 0) {

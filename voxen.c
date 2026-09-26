@@ -15,7 +15,7 @@ bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPau
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {5,/*Forward=F*/ 0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/ 23,/*Prone=X*/ 16,/*Lean Left=Q*/ 4,/*Lean Right=E*/ 45,/*Sprint=LSHIFT*/ 38,/*Turn Left=LARROW*/ 39,/*Turn Right=RARROW*/ 36,/*Look Up=UARROW*/ 37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/ 27,/*Sensaround=2*/ 28,/*Lantern=3*/
                           29,/*Shield=4*/ 30,/*Infrared=5*/ 31,/*Email=6*/ 32,/*Booster=7*/ 33,/*Jumpjets=8*/ 56,/*Attack=LMB*/ 57,/*Use=RMB*/ 99,/*Menu/Back=ESCAPE*/ 97,/*Toggle Mode=TAB*/ 17,/*Reload=R*/ 127,/*Weapon+=MWHEEL+*/ 128,/* Weapon-=MWHEEL-*/ 6,/* Grenade=G*/ 19,/*Grenade + = T*/ 131,/*Grenade-=*/ 21,/*Ammo Type=V*/ 9,/*Patch Use=J*/ 8,/*Patch+=I*/ 132,/*Patch-=,*/
-                          12,/*Full Map=M*/ 21,/*Swim Up= V*/ 2,/*Swim Down=C*/ 101/*Screenshot=F12*/},
+                          12,/*Full Map=M*/ 21,/*Swim Up= V*/ 2,/*Swim Down=C*/ 101,/*Screenshot=F12*/ 102/*Console=GRAVE*/},
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u, 
     .InvCybLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
 InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=false, .showFPS=false, .editMode=false, .showPhys=false};
@@ -824,7 +824,7 @@ void InitalizeEnvironment() {
     AutomapInitGL();
     BiomonitorInitGL(); BioMonitorInit();
     NewGame();
-    //PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
+    PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
     OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free"); DebugRAMPeak(); DebugRAMBreakdown();
 }
 
@@ -850,7 +850,12 @@ i32 main() {
           glGetQueryObjectui64v(gpuQ[r][4],0x8866/*GL_QUERY_RESULT*/,&v); World.gpuCompMs=(double)v * 0.000001; World.gpuFrameMs=World.gpuShadowMs+World.gpuPreMs+World.gpuMainMs+World.gpuSsrMs+World.gpuCompMs;
         } gpuQFrame=(gpuQFrame+1)%5;
         ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
-        { static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"frame 4","frame 100","frame 200","frame 500","frame 1000"}; for (int d=0;d<5;d++) if (globalframe == dbgFrm[d]) {DebugRAM(dbgLbl[d]); if (globalframe == 1000) {DebugRAMPeak(); break;}} }
+        { static u32 dbgGameFrame = 0; if (!World.menuActive && !World.paused) dbgGameFrame++; /*only count gameplay frames for RAM/timing checkpoints*/
+          static const u32 dbgFrm[] = {4,100,200,500,1000}; static const char* dbgLbl[] = {"gameframe 4","gameframe 100","gameframe 200","gameframe 500","gameframe 1000"};
+          for (int d=0;d<5;d++) if (dbgGameFrame == dbgFrm[d]) { DebugRAM(dbgLbl[d]);
+            DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Ray:%.3f(%u)\n",
+              dbgLbl[d],World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs,shadowTime*1000,physTime*1000,World.substeps,renderTime*1000,prePhys*1000,gameTime*1000,raycastMs*1000,raycastCalls);
+            if (dbgGameFrame == 1000) { DebugRAMPeak(); break; } } }
     }
     return 0;
 }

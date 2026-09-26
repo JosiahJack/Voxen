@@ -149,6 +149,15 @@ void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; s
 void CyberTimerUpdate(u16 self) { if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e=&World.instances[self]; if(e->cyberTimer <= 0.0f){UIExitCyberspace(); return;} if(e->timerFinished >= World.pauseRelativeTime){return;} e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds=e->cyberTimer - (e->minutes * 60.0f); e->timerFinished=World.pauseRelativeTime + 1.0; }
 void CyberWallInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->tickFinished=World.pauseRelativeTime + 2.0; e->animSwapFinished=0.0; } // alpha pushed via glUniform1f(27, ...) in voxen.c
 void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (World.pauseRelativeTime < e->tickFinished) {return;} e->tickFinished = World.pauseRelativeTime + 0.05; }
+void ExitCyberspace(void); /*forward decl*/
+/*Cyber pickups (448-451,454-457): spherical distance check vs player; pickup deletes the instance.*/
+void CyberItemUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ DeleteInstance(self); } }
+/*Cyber exit (554): spherical distance check vs player; exits cyberspace.*/
+void CyberExitUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(World.curLev != LEVEL_CYBERSPACE)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 2.0f){ ExitCyberspace(); } }
+/*Cyber switch (555): spherical distance check vs player; one-shot activate (off->on frame), fires targets.*/
+void CyberSwitchUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(e->active)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ e->active=true; ChangeAnim(e,A_ACTIVATED); if(e->textIndex>0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); UseTargets(self,e->targetIdx); } }
+/*Cyber data fragment (552): spherical distance check vs player; shows message.*/
+void CyberDataFragUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(e->allDone)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ e->allDone=true; if(e->textIndex>0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); } }
 void SearchFXEnable(int side) {
     side=side==1; World.Sys_UI.searchFXActive[side]=true; World.Sys_UI.searchFXStartTime[side]=World.pauseRelativeTime;
     World.Sys_UI.searchFXCursorX[side]=(float)World.cursorPos_x; World.Sys_UI.searchFXCursorY[side]=(float)World.cursorPos_y;
@@ -362,6 +371,14 @@ void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
     V3 n = V3_Normalize(normal); if (V3_Mag(n) < 0.0001f) {n = (V3){0.0f,1.0f,0.0f};/*At least make it pop off the floor*/} AddForce(target,V3_ScaleByF(n,vel),true); V3 lever = V3_AsubB(pt, World.position[target]); World.angularVelocity[target].x += lever.y * vel * 0.05f; World.angularVelocity[target].z += -lever.x * vel * 0.05f; (void)pt; // torque applied relative to point lever arm
 }
 
+/*Unity ObjectImpact.cs parity: impact sound with volume modulated by impact velocity.
+  Threshold vel>2 (minVolumeSpeed), vol=(vel/10)*0.3 (maxVolumeSpeed), sound 523 (physics/impact_lightweight).
+  Pitch is a +- semitone shift (Unity: random 0.8-1.2x multiplier), applied dynamically during mixing.*/
+void ApplyImpactForceWithSound(u16 target, float vel, V3 normal, V3 pt) {
+    ApplyImpactForce(target, vel, normal, pt);
+    if (vel > 2.0f) play_wav_ext(sounds[523], AppliedFXVol((vel / 10.0f) * 0.3f), pt, true, random_range(-2.0f,2.0f));
+}
+
 void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseVel) { 
     if (radius <= 0.0f || baseVel <= 0.0f) return; float r2 = radius * radius;
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
@@ -412,10 +429,12 @@ void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNorm
     Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; } if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }/*Railgun sphere impact*/
     /* Utils.GetMainHealthManager(hitGO) != null: the impact effect is pooled per projectile and only spawns for colliders carrying health. */
     bool hasHealthManager=hitIdx==PLAYER1||IdxIsNPC(hit->index)||hit->health>0.0f||hit->cyberHealth>0.0f; if(hasHealthManager)SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);
+    bool hostIsNPC=e->recentMostActivator<World.instCount&&IdxIsNPC(World.instances[e->recentMostActivator].index);
     if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {
-        if (e->counter < e->countToTrigger) dd.damage *= 0.85f;/*per-hit falloff*/ dd.impactVelocity = dd.damage * 1.5f; if (e->counter > 0) dd.impactVelocity /= 3.0f; bool hostIsNPC=e->recentMostActivator<World.instCount&&IdxIsNPC(World.instances[e->recentMostActivator].index); if (World.curLev != LEVEL_CYBERSPACE && !hostIsNPC) { ApplyImpactForce(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); } float dmgFinal = TakeDamage(hitIdx,dd); float tranq=-1.0f;
+        if (e->counter < e->countToTrigger) dd.damage *= 0.85f;/*per-hit falloff*/ dd.impactVelocity = dd.damage * 1.5f; if (e->counter > 0) dd.impactVelocity /= 3.0f; float dmgFinal = TakeDamage(hitIdx,dd); float tranq=-1.0f;
         if (dd.isOtherNPC) { if(!(hit->entflags & EF_ASLEEP)){World.Sys_Music.inCombat=true;} if(dd.attackType == Att_Trnq){float stunAmount=vclamp(3.0f+(World.invP1.stungunSetting/100.0f)*7.0f,3.0f,10.0f); tranq=Tranquilize(hitIdx,stunAmount,true);} } if (dmgFinal < 0.0f) {dmgFinal = 0.0f;} CreateTargetIDInstance(dmgFinal,hitIdx,tranq);
     }
+    if (World.curLev != LEVEL_CYBERSPACE && !hostIsNPC) { ApplyImpactForceWithSound(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); }/*impact force+sound for any dynamic object (Unity: Utils.ApplyImpactForce + ObjectImpact)*/
     if(e->countToTrigger<1)e->countToTrigger=1; if (e->counter >= e->countToTrigger) { SpawnProjectileImpactParticles(e->index,hitPos,hitNormal); if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
 }
 void ProjectileEffectImpactInitAfterLoad(u16 self) { if(self>=World.instCount)return;Entity* e=&World.instances[self]; e->counter=0;e->currentTargetIdx=0;e->lookUpIndex=(e->index==484||e->index==491)?5:0;if(e->countToTrigger<1){e->countToTrigger=e->index==485?5:(e->index==495?2:1);} }
@@ -806,6 +825,7 @@ void ModUpdate() {
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);} if(IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
+        if(constdex==552){CyberDataFragUpdate(i);} if(constdex==554){CyberExitUpdate(i);} if(constdex==555){CyberSwitchUpdate(i);} if((constdex>=448&&constdex<=451)||(constdex>=454&&constdex<=457)){CyberItemUpdate(i);}
     }
     if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) { World.invP1.painSoundFinished = World.pauseRelativeTime + (double)random_range(2.5f,4.0f); play_wav(sounds[140]/*player/playerpain1*/,AppliedFXVol(0.2f),(V3){0,0,0},false); }
     if (World.invP1.radBleedFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { World.invP1.radBleedFinished = World.pauseRelativeTime + 1.8; float take=World.instances[PLAYER1].radiation*0.2f; World.instances[PLAYER1].health-=take; World.painStaticAlpha = take > 15.0f ? 1.0f : take > 10.0f ? 0.8f : 0.3f; }

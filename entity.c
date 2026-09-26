@@ -155,11 +155,11 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*443 npc_cyberdog*/[443]={302,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.50f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.72f,0,0}},/*444 npc_cyberguard*/[444]={303,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.00f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.0f,0,0}},
 /*445 npc_cyberram*/[445]={304,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.00f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.44f,0,0}},/*446 npc_cyber_reaver*/[446]={305,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.20f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.72f,0,0}},
 /*447 npc_cybershodan*/[447]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,4.51f,0.15f,1.0f,MAX_ANIMS,COLTYPE_CAP,{0,0,0},{0.28f,2.0f,0}},
-/*448 item_cyber_data*/[448]={65,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*449 item_cyber_decoy*/[449]={72,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
-/*450 item_cyber_drill*/[450]={68,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*451 item_cyber_game*/[451]={65,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*448 item_cyber_data*/[448]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*449 item_cyber_decoy*/[449]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*450 item_cyber_drill*/[450]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*451 item_cyber_game*/[451]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
 /*452 item_cyber_integrity*/[452]={69,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*453 item_cyber_keycard*/[453]={70,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
-/*454 item_cyber_pulser*/[454]={65,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*455 item_cyber_recall*/[455]={65,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
-/*456 item_cyber_shield*/[456]={65,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*457 item_cyber_turbo*/[457]={65,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*454 item_cyber_pulser*/[454]={6615,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,57,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*455 item_cyber_recall*/[455]={6615,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,57,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*456 item_cyber_shield*/[456]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*457 item_cyber_turbo*/[457]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
 /*458 prop_phys_barrel_chemical*/[458]={12,332,30,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*459 prop_phys_barrel_radiation*/[459]={12,332,31,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*460 prop_phys_barrel_toxic*/[460]={12,332,33,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*461 prop_phys_cart*/[461]={40,333,416,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*462 prop_phys_pot*/[462]={494,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*463 prop_phys_toolcart*/[463]={624,335,865,866,864,MAX_TXRS,20.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
@@ -201,9 +201,9 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*545 prop_chandelier*/[545]={496,0,644,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*546 prop_charge_station*/[546]={44,0,77,76,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*547 prop_clothes*/[547]={47,0,97,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*548 prop_computer*/[548]={48,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*549 prop_couch*/[549]={59,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*550 prop_couch2*/[550]={59,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*551 prop_cpuscreen*/[551]={178,0,768,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*552 prop_cyber_datafrag*/[552]={78,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*553 prop_cyber_decoy*/[553]={78,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*554 prop_cyber_exit*/[554]={78,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*555 prop_cyber_switch*/[555]={0,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*556 prop_cyberport*/[556]={62,0,117,116,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*551 prop_cpuscreen*/[551]={178,0,768,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*552 prop_cyber_datafrag*/[552]={6336,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,54,0,{0,0,0},{0,0,0}},
+/*553 prop_cyber_decoy*/[553]={78,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*554 prop_cyber_exit*/[554]={6416,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,55,0,{0,0,0},{0,0,0}},
+/*555 prop_cyber_switch*/[555]={80,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,58,0,{0,0,0},{0,0,0}},/*556 prop_cyberport*/[556]={62,0,117,116,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*557 prop_desk01*/[557]={74,0,125,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*558 prop_desk02*/[558]={75,0,124,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*559 prop_dexmissile*/[559]={76,0,164,162,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*560 prop_foliage_fernpoison*/[560]={160,0,331,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*561 prop_foliage_bush*/[561]={495,0,643,642,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*562 prop_foliage_fern*/[562]={160,0,333,330,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -265,7 +265,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*707 info_email*/[707]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*708 info_gameend*/[708]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*709 info_message*/[709]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*710 info_mission*/[710]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*711 info_note*/[711]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*712 info_playsound*/[712]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*713 info_ressurection_point*/[713]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*714 info_screenshake*/[714]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*715 info_spawnpoint*/[715]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*716 fx_reverbzone*/[716]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*717 ef_cyber_ice*/[717]={MAX_MDLS,U16_MAX,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0.0f,0.004354001f,-0.014725f},{1.0f,0.0f,0.0f}},
+/*716 fx_reverbzone*/[716]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*717 ef_cyber_ice*/[717]={6516,U16_MAX,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,56,COLTYPE_SPH,{0.0f,0.004354001f,-0.014725f},{1.0f,0.0f,0.0f}},
 /*718 ef_fragexplosion*/[718]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*719 ef_line_sparqbeam*/[719]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*720 ef_mist*/[720]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*721 ef_particle_bloodspurtsmall*/[721]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*722 ef_particle_bloodspurtsmallgreen*/[722]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*723 ef_particle_bloodspurtsmallyellow*/[723]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*724 ef_particle_bloodspurttiny*/[724]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -912,4 +912,15 @@ void LoadGame(u8 slot) {
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
         size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.currentLevel); AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
     } OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
+}
+
+/*Read just the save header for a slot (for the load/save menu slot list). Returns true and fills out (NUL-terminated) when a valid save file exists; false when the slot is unused/corrupt.*/
+bool ReadSaveSlotName(u8 slot, char* out, size_t cap) {
+    if (slot > 7 || !out || cap == 0) return false;
+    char path[]="./Data/sav0.bin"; path[10]=(char)('0'+slot);
+    FHandle fd=OS_OpenReadonly(path); if (fd == (FHandle)-1) return false;
+    SaveHeader header; bool ok = OS_Read(fd,&header,sizeof(SaveHeader))==sizeof(SaveHeader) && header.magicNumber==0x56415343u && header.version==7 && header.uncompressedSize==(u32)sizeof(GlobalContext);
+    OS_Close(fd); if (!ok) return false;
+    size_t i=0; while (i+1<cap && i<sizeof(header.savename) && header.savename[i]!='\0') { out[i]=header.savename[i]; ++i; } out[i]='\0';
+    return out[0]!='\0';
 }

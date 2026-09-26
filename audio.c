@@ -327,7 +327,7 @@ static u64 WavReadPCMFrames(Wav *w, u64 ftr/*Frames to read*/, float *out) {
 }
 
 typedef struct mp3_channel_s { mp3 dec; bool open; u32 src_rate; u64 frames_decoded; u64 total_frames; float fade_vol,fade_target,fade_step; } mp3_channel_t; typedef struct log_msg_s { float *samples; size_t allocSize; u32 frame_count,frame_pos; } log_msg_t;
-typedef struct { char soundPath[128]; float *samples; u32 frame_count,frame_pos; float volume; bool looping,positional; bool playing; V3 pos; size_t allocSize; } wav_channel_t;
+typedef struct { char soundPath[128]; float *samples; u32 frame_count; float frame_pos; float volume; float pitch;/*semitones, 0 = no shift; applied dynamically during mixing*/ bool looping,positional; bool playing; V3 pos; size_t allocSize; } wav_channel_t;
 static wav_channel_t wav_ch[MAX_CHANNELS],*ext_ch[MAX_CHANNELS]; static u32 wav_count,ext_count; static u32 mp3_slot; static log_msg_t* log_msg;
 static mp3_channel_t* mp3_ch[2]; static bool mp3_paused=false; static float mp3_remaining[2]; static mp3_channel_t* mp3_fade_out_target[2]; static i32 mp3_fade_out_ms[2];
 size_t AudioLiveBytes() { size_t t=0; for (u32 i=0;i<MAX_CHANNELS;++i) t+=wav_ch[i].allocSize; for (int s=0;s<2;++s) { if(mp3_ch[s]) t+=sizeof(mp3_channel_t)+mp3_ch[s]->dec.dataCapacity; if(mp3_fade_out_target[s]) t+=sizeof(mp3_channel_t)+mp3_fade_out_target[s]->dec.dataCapacity; } if(log_msg) t+=sizeof(log_msg_t)+log_msg->allocSize; return t; } /* diagnostics only */
@@ -399,7 +399,10 @@ void play_synth_at(SoundID id, float vol, float pitch, V3 pos){if ((u32)id >= SN
 // Audio Mixing
 static void wave_mix(wav_channel_t* w, float* mix) {
     float vol=AppliedFXVol(w->volume); if(w->positional){if(!PositionVisibleFromPlayerCell(w->pos.x,w->pos.z)){vol=0.0f;/*Skip audio if source cell not in player PVS*/}else{vol*=vclamp(1.0f-V3_Dist(w->pos,World.position[PLAYER1])/20.0f,0.0f,1.0f);}}
-    for(i32 f=0;f<AUDIO_FRAMES;++f){if (w->frame_pos >= w->frame_count){if(w->looping){w->frame_pos=0;}else{w->playing=false; break;}} mix[f*2+0] += w->samples[w->frame_pos*2+0]*vol; mix[f*2+1] += w->samples[w->frame_pos*2+1]*vol; w->frame_pos++;}
+    float step=(w->pitch==0.0f)?1.0f:__builtin_exp2f(w->pitch/12.0f);/*semitone offset -> resample rate; 0 = no shift*/
+    for(i32 f=0;f<AUDIO_FRAMES;++f){u32 i0=(u32)w->frame_pos; if (i0 >= w->frame_count){if(w->looping){w->frame_pos=0.0f; i0=0;}else{w->playing=false; break;}} u32 i1=(i0+1<w->frame_count)?i0+1:i0; float t=w->frame_pos-(float)i0;
+        float l=w->samples[i0*2+0]+t*(w->samples[i1*2+0]-w->samples[i0*2+0]), r=w->samples[i0*2+1]+t*(w->samples[i1*2+1]-w->samples[i0*2+1]);
+        mix[f*2+0]+=l*vol; mix[f*2+1]+=r*vol; w->frame_pos+=step;}
 }
 
 static void audio_mix_period(i16 *out) {
@@ -419,10 +422,11 @@ static void audio_mix_period(i16 *out) {
     } for (u32 i = 0; i < AUDIO_FRAMES * AUDIO_CHANNELS; i++) { float s = mix[i]; s = s > 1.0f ? 1.0f : (s < -1.0f ? -1.0f : s); out[i] = (i16)(s * 32767.0f); }
 }
 
-void play_wav(const char *path,float volume,V3 pos,bool positional) {
+void play_wav_ext(const char *path,float volume,V3 pos,bool positional,float pitch) {
     if(!path || slen(path) < 1 || sEqual(path,"null")){return;} char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path); i32 slot=GetFreeWavSlot(); if(slot==-1){ if(wav_count < MAX_CHANNELS){ slot=(i32)wav_count; wav_count++; } } if(slot==-1){DualLogWarn("Max WAV channels (%d) reached\n",MAX_CHANNELS); return;}
-    u32 frames; size_t sz=0; float *buf = load_wav(p,&frames,&sz); if(!buf){DualLogError("Failed to load%s\n",p); return;} wav_ch[slot] = (wav_channel_t){.samples=buf, .allocSize=sz, .frame_count=frames, .frame_pos=0, .volume=volume, .looping=false, .positional=positional, .pos=pos, .playing=true};
+    u32 frames; size_t sz=0; float *buf = load_wav(p,&frames,&sz); if(!buf){DualLogError("Failed to load%s\n",p); return;} wav_ch[slot] = (wav_channel_t){.samples=buf, .allocSize=sz, .frame_count=frames, .frame_pos=0, .volume=volume, .pitch=pitch, .looping=false, .positional=positional, .pos=pos, .playing=true};
 }
+void play_wav(const char *path,float volume,V3 pos,bool positional) { play_wav_ext(path,volume,pos,positional,0.0f);/*default pitch 0 = no adjustment*/ }
 
 void play_message(const char *path) {/*audioLogs[] stores bare extensionless paths (e.g. "logs/honig-1") but the tracks ship as mp3 under Audio, so resolve prefix+extension+decoder here.*/
     char p[160]; sFormat(p,sizeof(p),"./Audio/%s.mp3",path); log_msg_t *lm=OS_Alloc(sizeof(log_msg_t)); lm->samples=load_mp3(p,&lm->frame_count,&lm->allocSize); if(!lm->samples){DualLogError("Failed to load %s\n",p); OS_Free(lm,sizeof(*lm)); return; } lm->frame_pos=0; log_msg_t *old=log_msg; log_msg=lm; if(old){OS_Free(old->samples,old->allocSize); OS_Free(old,sizeof(*old));} }
@@ -433,7 +437,7 @@ void play_mp3(const char *path, i32 fade_ms) {
 }
 
 INLINE bool sEndsWith(const char *str, const char *suffix) { size_t slen=0, suflen=0; while(str[slen]){slen++;} while(suffix[suflen]){suflen++;} if(slen < suflen){return false;} for (size_t i=0;i<suflen;i++){ char a=str[slen - suflen + i], b=suffix[i]; if(a >= 'A' && a <= 'Z'){a+=32;} if(b >= 'A' && b <= 'Z'){b+=32;} if(a != b){return false;} } return true; }
-i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=(sEndsWith(path,".mp3")) ? load_mp3(path,&frames,&sz) : load_wav(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->looping=w->positional=false; w->playing=false; return 0; }
+i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=(sEndsWith(path,".mp3")) ? load_mp3(path,&frames,&sz) : load_wav(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->pitch=0.0f; w->looping=w->positional=false; w->playing=false; return 0; }
 i32 SndStart(wav_channel_t* w) { w->frame_pos = 0; w->playing = true; u32 n = ext_count; for (u32 i=0;i<n;++i) if (ext_ch[i] == w) return 0; if (n < MAX_CHANNELS) { ext_ch[n] = w; ext_count = n+1; } return 0; }
 void SndUninit(wav_channel_t* w) { if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; u32 n = ext_count; for (u32 i=0;i<n;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[n-1]; ext_count = n-1; break; } }
 void mp3_clear() { for (i32 i=0;i<2;i++) { mp3_fade_out_target[i]=NULL; mp3_channel_t *old=mp3_ch[i]; mp3_ch[i]=NULL; if (old) { mp3_uninit(&old->dec); OS_Free(old,sizeof(*old)); } } mp3_slot=0; } // clearing fade targets avoids a dangling compare now that frees are immediate
