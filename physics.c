@@ -384,9 +384,49 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
 static void EntityColliderMatrixNow(u16 i, float M[16]){Quaternion q=World.rotation[i]; V3 sx=V3_ScaleByF(quat_rot_v3(q,(V3){1,0,0}),World.scale[i].x); V3 sy=V3_ScaleByF(quat_rot_v3(q,(V3){0,1,0}),World.scale[i].y); V3 sz=V3_ScaleByF(quat_rot_v3(q,(V3){0,0,1}),World.scale[i].z); V3 p=World.position[i]; M[0]=sx.x; M[1]=sx.y; M[2]=sx.z; M[3]=0.0f; M[4]=sy.x; M[5]=sy.y; M[6]=sy.z; M[7]=0.0f; M[8]=sz.x; M[9]=sz.y; M[10]=sz.z; M[11]=0.0f; M[12]=p.x; M[13]=p.y; M[14]=p.z; M[15]=1.0f;}
 static bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx=V3_dot(d,ax),ly=V3_dot(d,ay),lz=V3_dot(d,az); float cx=vclamp(lx,-box.hExt.x,box.hExt.x),cy=vclamp(ly,-box.hExt.y,box.hExt.y),cz=vclamp(lz,-box.hExt.z,box.hExt.z); float dx=lx-cx, dy=ly-cy, dz=lz-cz; return (dx*dx+dy*dy+dz*dz)<=radius*radius;}
 INLINE int V3_IsSane(V3 v) { union { float f; u32 i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
+/* ---- NPC hop diagnostics: track the first npc_servbot (const 437) and spam its per-substep physics state.
+       NPC_DIAG 0 silences it; PHYS_DIAG_CONST picks which const index to follow. The contact summary reads
+       gContactCount, so it is only meaningful from the narrowphase to the end of that same substep. ---- */
+#ifndef NPC_DIAG
+#define NPC_DIAG 0/*0 = off; 1 = spam the tracked NPC's per-substep physics to stdout/console.log*/
+#endif
+#define PHYS_DIAG_CONST 437/*npc_servbot (hover drone)*/
+static u16 physDiagBody=U16_MAX; static bool physDiagActive=false, physDiagHeader=false, physDiagHaveLast=false;
+static float physDiagSubY=0.0f, physDiagLastFrameY=0.0f, physDiagLastEndVel=0.0f, physDiagLastPosBudget=0.0f; static u32 physDiagFrames=0;
+static void physDiagResolve(void) {
+    if (physDiagBody < World.instCount && World.instances[physDiagBody].index == PHYS_DIAG_CONST && (World.instances[physDiagBody].entflags & EF_ACTIVE)) { physDiagActive = true; return; }
+    physDiagBody = U16_MAX; physDiagActive = false; physDiagHeader = false; physDiagHaveLast = false;
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) if (World.instances[i].index == PHYS_DIAG_CONST) { physDiagBody = i; physDiagActive = true; return; }
+}
+static void physDiagHeaderDump(u16 i) {
+    Entity* e=&World.instances[i];
+    DualLog("[DIAG] === inst=%u const=%u col=%d ctr=(%.3f,%.3f,%.3f) sz=(%.3f,%.3f,%.3f) scale=(%.2f,%.2f,%.2f) mass=%.3f layer=%u radius=%.3f state=%d sleep=%u grav=%.3f\n",
+        i, e->index, (int)World.col[i], World.colliderCenter[i].x, World.colliderCenter[i].y, World.colliderCenter[i].z,
+        World.colliderSize[i].x, World.colliderSize[i].y, World.colliderSize[i].z, World.scale[i].x, World.scale[i].y, World.scale[i].z,
+        World.mass[i], (u32)World.layer[i], World.radius[i], (int)e->currentState, (u32)World.physSleep[i], World.gravity[i]);
+    physDiagHeader = true;
+}
+static void physDiag(const char* stage, u8 sub);
+void physDiagExternal(const char* stage) { if (!NPC_DIAG) return; if (physDiagBody >= World.instCount || !physDiagActive) { physDiagResolve(); if (physDiagBody >= World.instCount || !physDiagActive) return; } physDiag(stage, 255); }
+static void physDiag(const char* stage, u8 sub) {
+    if (!NPC_DIAG) return;
+    if (physDiagBody >= World.instCount || !physDiagActive) { physDiagResolve(); if (physDiagBody >= World.instCount || !physDiagActive) return; }
+    u16 i = physDiagBody; if (!physDiagHeader) physDiagHeaderDump(i);
+    int nc=0, np=0; float maxPen=0.0f, sumPen=0.0f, maxBias=0.0f, corr=0.0f; V3 nrm=(V3){0,0,0}; u16 other=U16_MAX; float oPen=0.0f, oBias=0.0f, oAccum=0.0f, oCorr=0.0f; bool oStatic=false, oSleep=false;
+    for (u32 c=0;c<gContactCount;++c) { SolverContact* sc=&gContacts[c]; u16 o=(sc->a==i)?sc->b:((sc->b==i)?sc->a:U16_MAX); if (o==U16_MAX) continue; nc++; np+=sc->m.n; int first=1; float avg=0.0f;
+        for (int p=0;p<sc->m.n;++p) { float pen=sc->m.p[p].pen; sumPen+=pen; avg+=pen; float bias=0.22f*vmax(pen-0.06f,0.0f)/((World.dt>0.0f)?World.dt:1.0f); if(vabs(bias)>maxBias)maxBias=vabs(bias);
+            if (pen>maxPen) { maxPen=pen; nrm=sc->m.normal; if(first){other=o; oStatic=sc->bStatic; oSleep=World.physSleep[o]!=0; oPen=pen; oBias=bias; oAccum=sc->accumN[p];} } first=0; }
+        if (sc->m.n>0) { float a=avg/(float)sc->m.n; oCorr=vmax(a-0.005f,0.0f)*0.4f; corr+=oCorr; } }
+    DualLog("[DIAG] f=%u s=%u %s t=%.3f dt=%.4f nsub=%u | pos.y=%.5f vel.y=%.5f dY=%.5f grav=%.3f accF.y=%.4f budget=%.4f | nc=%d np=%d maxPen=%.5f sumPen=%.5f ny=%.2f bias=%.3f corr=%.4f | o_inst=%u o_const=%u o_static=%d o_sleep=%d o_pen=%.5f o_bias=%.3f o_accumN=%.4f o_corr=%.4f\n",
+        physDiagFrames, sub, stage, World.current_time, World.dt, (u32)World.substeps,
+        World.position[i].y, World.velocity[i].y, World.position[i].y-physDiagSubY, World.gravity[i], World.instances[i].accumulatedForce.y, posBudget[i],
+        nc, np, maxPen, sumPen, nrm.y, maxBias, corr, other, (other<World.instCount)?World.instances[other].index:0, (int)oStatic, (int)oSleep, oPen, oBias, oAccum, oCorr);
+    physDiagSubY = World.position[i].y;
+}
 static bool reverbZoneActive; static u16 activeReverbPreset;
 void Physics(float dt) {
     if(gravityLiftOverlapLevel!=World.curLev){mset(gravityLiftWasInside,0,sizeof(gravityLiftWasInside));mset(gravityLiftTopSupport,0,sizeof(gravityLiftTopSupport));teleportWasTouching=0;gravityLiftOverlapLevel=World.curLev;}
+    if (NPC_DIAG) { physDiagResolve(); if (physDiagActive && physDiagBody < World.instCount) { if (physDiagHaveLast) { float d=World.position[physDiagBody].y-physDiagLastFrameY; if (vabs(d)>0.05f) DualLog("[DIAG] *** HOP frame t=%.3f dt=%.4f dY=%+.5f prevEndVel.y=%+.5f prevBudget=%.4f state=%d grounded=%d\n", d, physDiagLastEndVel, physDiagLastPosBudget, (int)World.instances[physDiagBody].currentState, (int)((World.instances[physDiagBody].entflags&EF_GROUNDED)?1:0)); } physDiagFrames++; physDiagSubY=World.position[physDiagBody].y; } }
     mset(grenadeImpactQueued,0,sizeof(grenadeImpactQueued)); mset(projectileImpactQueued,0,sizeof(projectileImpactQueued));mset(projectileContactThisFrame,0,sizeof(projectileContactThisFrame)); for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false); World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
     for (u16 i=0;i<World.instCount;++i) {/*Update the radius for all entities for rendering and physics, then add dynamic ones to dynamicEntities[]*/
         float absx=vabs(World.scale[i].x),absy=vabs(World.scale[i].y),absz=vabs(World.scale[i].z);
@@ -395,6 +435,7 @@ void Physics(float dt) {
         if((World.instances[i].entflags&EF_RIGIDBODY) && (World.instances[i].entflags&EF_ACTIVE) && !World.physSleep[i]/*Done earler, this here is what skips sleeping ones!*/ && absx>.01f && absy>.01f && absz>.01f){if(dynamicEntityCount<512){dynamicEntities[dynamicEntityCount++]=i;}else{WarnPhysicsCapacity(1,"Reached the 512 active dynamic-body limit; additional bodies are skipped.");}}
     }
     for (u8 s=0;s<World.substeps;++s) {
+        if (NPC_DIAG) physDiag("pre-int", s);
         mset(gravityLiftTouched,0,sizeof(gravityLiftTouched)); teleportTouched=0; flag_set(&World.instances[PLAYER1].entflags,EF_GRAVLIFT,false);
         if (!World.invP1.radiationArea) { float bleed = (World.invP1.patchActive & PATCH_DETOX) ? 2.0f : (World.invP1.hasHardware & HW_ENV ? 0.5f : 1.0f); World.instances[PLAYER1].radiation = vmax(0.0f, World.instances[PLAYER1].radiation - dtsub * bleed); }/*Radiation bleedoff / detox / envirosuit handling*/ else { World.instances[PLAYER1].radiation = vmin(100.0f, World.instances[PLAYER1].radiation); }
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0; for (u16 t=0;t<128;++t) triggerVolumes[t]=0xFFFF;
@@ -454,10 +495,13 @@ void Physics(float dt) {
             }
             World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false); for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; u16 b=contactsOther[c]; World.colliding[a]=World.colliding[b]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f})>=0.574f) {World.instances[a].entflags |= EF_GROUNDED;} if ((World.instances[b].entflags&EF_RIGIDBODY) && !World.physSleep[b] && World.mass[b]>=0.001f && V3_dot(mfp->normal,(V3){0.0f,-1.0f,0.0f})>=0.574f) {World.instances[b].entflags |= EF_GROUNDED;} PrepareSolverContact(a,b,mfp,dt); } World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
         }
+        if (NPC_DIAG) physDiag("post-narrow", s);
         SolveGlobalContacts(); // 3. Restitution
+        if (NPC_DIAG) physDiag("post-solve", s);
         for (u32 c=0; c<gContactCount; ++c) { // 3.5 Positional Correction (Projection)
             SolverContact *sc = &gContacts[c]; float avgPen = 0.0f; for (int p=0; p<sc->m.n; ++p) avgPen += sc->m.p[p].pen; if (sc->m.n > 0)avgPen/=(float)sc->m.n; float correction=vmax(avgPen-0.005f,0.0f)*0.4f; float massDiv=sc->invMassA+sc->invMassB+PHY_EPSILON; SetPosition(sc->a,V3_AplusB(World.position[sc->a],V3_ScaleByF(sc->m.normal,correction*sc->invMassA/massDiv))); if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
+        if (NPC_DIAG) physDiag("post-corr", s);
         bool ladderTouched = false; World.invP1.radiationArea=World.Sys_Music.inZone=World.Sys_Music.elevator=World.Sys_Music.cyberTube=World.Sys_Music.distortion=false; World.gravity[PLAYER1] = 1.0f;
         for (u16 i=0;i<numTriggers;++i) {
             u16 self = triggerVolumes[i]; u16 trigdx=World.instances[self].index; if (Cheats.showPhys) {if(trigdx==703)DrawCapsuleCollider(self);else DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f});} ShapeBox trigBox = Entity_GetBox(self); ShapeCapsule teleportCap=trigdx==703?Entity_GetCap(self):(ShapeCapsule){0};
@@ -505,8 +549,10 @@ void Physics(float dt) {
             if(World.physSleep[i]){if(nearAwake)World.physSleep[i]=0;} else if(!nearAwake && (ef & EF_GROUNDED)) { float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]); if(sp2 < 0.0025f && asp2 < 0.0025f){World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; } }
         }
     }
+    if (NPC_DIAG && physDiagActive && physDiagBody < World.instCount) { physDiagLastFrameY=World.position[physDiagBody].y; physDiagLastEndVel=World.velocity[physDiagBody].y; physDiagLastPosBudget=posBudget[physDiagBody]; physDiagHaveLast=true; }
     u8 collisionLevel=World.currentLevel; u16 collisionCount=World.instCount; for (u16 i=INSTS_1ST_IDX;i<collisionCount && World.currentLevel==collisionLevel;++i) if (grenadeImpactQueued[i] && (World.instances[i].entflags & EF_ACTIVE)) GrenadeOnCollision(i);
     for(u16 i=INSTS_1ST_IDX;i<collisionCount&&World.currentLevel==collisionLevel;++i){if(!IsImpactProjectile(World.instances[i].index))continue;if(projectileImpactQueued[i]&&(World.instances[i].entflags&EF_ACTIVE)){u16 target=projectileImpactTarget[i];World.instances[i].currentTargetIdx=(u16)(target+1);ProjectileEffectImpactOnCollision(i,target,projectileImpactPoint[i],projectileImpactNormal[i]);}if(!projectileContactThisFrame[i])World.instances[i].currentTargetIdx=0;}
+    if (NPC_DIAG) physDiag("end-physics", 255);
     if(World.invP1.radiationArea && World.instances[PLAYER1].radiation > 0.0f){AppendTextWarning(184,-1,-1,-T_WHITE,1);/*Radation Area*/}else{World.invP1.radiationArea=false; World.Sys_UI.tWrnFinished[1]=0.0;} if(World.instances[PLAYER1].radiation > 0.1f){AppendTextWarning(185,-1,186,T_RED,2);/*Radiation poisoning ##LBP*/}else{World.instances[PLAYER1].radiation=0.0f; World.Sys_UI.tWrnFinished[2]=0.0;}
 }
 

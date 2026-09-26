@@ -6,36 +6,40 @@ static const float AI_STOP_DIST=1.28f, AI_STOP_DIST_SQ=(AI_STOP_DIST * AI_STOP_D
 u16 ai_next_npc_number(u16 type) { if (type >= NUM_AI_TYPES) return 0; if (npcCountInWorldPerType[type] < U16_MAX) npcCountInWorldPerType[type]++; return npcCountInWorldPerType[type]; }
 void ai_reset_npc_numbering(void) { mset(npcCountInWorldPerType,0,sizeof(npcCountInWorldPerType)); }
 // Name,AtkTyp1,2,3,Dmg1,2,3,Range1,2,3,Health,CybHealth,Percp,Disrp,Armr,Def,Movtyp,Yawspd,FOV,FOVAtk,FOVStartMov,DistToSeeBehind,SightRange,WalkSpd,RunSpd,AtkSpd1,2,3,AtkForce3,AtkRad3,TtPain,TbwPain,TtDead,TtActualAtk1,2,3,TbwAtk1,2,3,TEnemChg,TIdleSFXMin,TIdleSFXMax,TAtk1WaitMin,TAtk1WaitMax,TAtk1WaitChnc,TAtk2WaitMin,TAtk2WaitMax,TAtk2WaitChnc,TAtk3WaitMin,TAtk3WaitMax,TAtk3WaitChnc,ProjType1,2,3,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,PreActMeleCols,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType,AtkProj1,2,3
+// Every column is the raw enemy_tables.csv value, and the enums in common.h are numbered to match the Unity
+// converters in Utils.cs. Movtyp is the one exception: CYBORG ENFORCER, CYBORG ELITE GUARD, CYBORG OF EDWARD
+// DIEGO, SECURITY-2 ROBOT and MUTANT CYBORG carry 5 or 6, which Utils.GetMoveTypeFromInt has no case for and so
+// maps to None (statue). They walk here instead, which is what they do in the game.
 NPCTable npcTable[NUM_AI_TYPES] = {
 /* 0*/{"AUTOBOMB"              ,0,0,1,  0,  0,200,   0,    0,2.4,50,0,1,0.5,40,1,1,300,180,120,55,3.84,50,2.5,2.5,0,0,0,100,6,0,0,0.1,0,0,0,0,0,0,3,5,12,0.5,1,0.1,1,3,0.5,0,0,0,0,0,0,0,0,0,0,0,0,1,0,20,0,0,0,10,3,0,2,0,0,0 },
-/* 1*/{"CYBORG ASSASSIN"       ,0,4,7, 30, 50, 35, 3.3,   10,20,65,0,2,0.6,5,4,1,180,180,80,15,3.2,50,2,2,0,0,0,0,0,0.45,5,2.083,0,0.25,0.2,0.91,0.91,1.58,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,3,0,0,0,0,0,60,0,0,0,10,3,0,3,0,0,489 },
+/* 1*/{"CYBORG ASSASSIN"       ,0,4,7,30,50,35,3.3,10,20,65,0,2,0.6,5,4,4,180,180,80,15,3.2,50,2,2,0,0,0,0,0,0.45,5,2.083,0,0.25,0.2,0.91,0.91,1.58,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,3,0,0,0,0,0,60,0,0,0,10,3,0,3,0,0,489},
 /* 2*/{"AVIAN MUTANT"          ,1,0,0, 40, 40,  0, 3.3,   10,20,125,0,1,0.25,0,2,2,180,180,80,15,5.12,50,2,2,3.5,0,0,0,0,2,5,1,0.1,0,0,1,0,0,3,5,12,0.5,1,0.1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,60,0.65,1,0,10,3,0,1,0,0,0 },
-/* 3*/{"EXEC-BOT"              ,0,4,0, 30, 35,  0, 3.3,   10,20,225,0,1,0.2,40,2,1,200,180,15,30,4.12,50,1.5,1.5,0,0,0,0,0,0.45,7,0.15,0,0.2,0,0,1.5,0,3,5,12,0,0,0,0.97,2,0.3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
-/* 4*/{"CYBORG DRONE"          ,0,4,0, 20, 20, 20, 3.3,   25,50,60,0,1,0.3,0,2,1,65,180,80,15,3.2,50,1.6,2.2,0,0,0,0,0,0.542,15,0.958,0,0.1,0,0,1,0,3,20,45,0,0,0,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,3,0,0,0 },
-/* 5*/{"CORTEX REAVER"         ,0,4,7, 80,325,125, 3.3,   20,30,580,0,1,0.1,40,2,1,180,180,80,15,3.84,50,2,2,0,0,0,0,0,0.583,5,0.333,0,0.35244,0.324,0,1,1,3,15,30,0,0,0,0.2,1,0.5,8,15,1,0,0,0,0,0,10,0,0,0,0,0,600,0,0,0,10,3,0,2,0,0,372 },
-/* 6*/{"CYBORG WARRIOR"        ,0,4,7, 35, 35,150, 3.3,   20,20,120,0,1,0.1,5,4,1,180,180,30,15,3.2,50,2.4,2.4,0,0,0,0,0,0.5,5,2.2,0,0.339,0.201,0,0.83,0.542,3,15,30,0,0,0,1,2,0.5,10,20,1,0,0,0,0,0,10,0,0,0,0,0,180,0,0,0,10,3,0,3,0,0,370 },
-/* 7*/{"CYBORG ENFORCER"       ,1,4,7, 60, 60, 80, 3.3,   15,30,285,0,1,0.1,30,5,1,180,180,80,15,3.2,50,2.8,2.8,2.8,0,0.3,0,0,2,5,1.5,0.23471,0.393738,0.313266,0.958,0.958,0.958,5,15,30,0.1,0.3,0.1,0.1,0.5,0.5,10,25,1,0,0,0,0,0,10,0,0,0,0,0,600,0,0,0,10,3,0,4,0,0,387 },
-/* 8*/{"CYBORG ELITE GUARD"    ,1,7,4, 70, 75,  0, 3.3,   10,50,380,0,1,0.05,50,6,1,180,180,80,15,3.2,50,3,3,1.5,0,0,0,0,0.4665,5,1.5,0.5,0.2653,0.117045,0.733,0.7,0.867,5,15,30,0.05,0.2,0.1,0.5,2,0.8,2,3,0.5,0,0,0,0,2,0,0,1,0,0,0,600,0,0,0,15,3,0,4,0,490,0 },
-/* 9*/{"CYBORG OF EDWARD DIEGO",1,7,0, 80, 95,  0, 3.3,   40,50,900,0,2,0,55,6,1,180,180,80,15,3.2,50,2.8,2.8,0,0,0,0,0,0,0,0,0.28,0.363188,0.2,1.4,0.833,3,5,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2.5,0,0,0,0,0,1,600,0,0,0,15,3,0,4,0,490,0 },
-/*10*/{"SECURITY-1 ROBOT"      ,0,4,0, 35, 35,  0, 3.3,   10,20,170,0,1,0.15,40,4,2,180,180,80,15,4.12,50,2.5,2.5,1.5,0,0,0,0,2,5,0.05,0.5,0.1,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,600,1.28,0,0,10,3,0,2,0,0,0 },
-/*11*/{"SECURITY-2 ROBOT"      ,0,4,4, 65, 65, 15, 3.3,    5,35,300,0,2,0.05,50,5,1,180,180,60,25,4.12,50,1.5,1.5,1.5,0,0,0,0,0.75,5,0.25,0.5,0.39,0.1,1.2,1,1.5,3,5,12,0.5,1,0.1,3,3.5,1,2.5,3.5,1,0,0,0,0,0,0,0,0,0,0,0,600,0,0,0,10,3,0,2,0,0,0 },
-/*12*/{"MAINTENANCE ROBOT"     ,1,0,0, 25, 25,  0, 3.3,  3.3,20,75,0,1,0.3,40,3,1,180,180,80,15,3.84,50,2.2,2.6,0.02,0.02,0,0,0,0,0,1.6,3,0.7,0.2,2,1.3,3,3,5,12,0.5,1,0.1,1,2,0.3,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
-/*13*/{"MUTANT CYBORG"         ,1,7,0, 35, 75, 50,   2,   30,49,340,0,1,0.2,15,6,1,180,180,60,15,3.2,50,1.5,1.5,0,0,0,0,0,0.583,3.5,3.41,0.265,0.285,0.2,0.625,0.75,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2.8,0,0,0,0,0,0,180,0,0,0,10,3,0,6,0,491,0 },
-/*14*/{"HOPPER"                ,0,4,0, 35, 35,  0,   0,17.92,17.92,150,0,1,0.25,35,4,1,180,160,80,15,3.84,50,7,7,0,0,0,0,0,0.708,5,0,0.5,0.1,0.5,0.5,0.5,0.5,3,5,12,0.5,1,0.1,0.5,1,0.5,1,2,0.5,0,0,0,0,0,0,0,1,0,0,0,180,0,0,0,10,3,1,2,0,0,0 },
-/*15*/{"HUMANOID MUTANT"       ,1,0,0, 12, 12,  0, 3.3,   10,20,50,0,0,0.4,0,3,1,60,180,80,15,2.56,50,1.4,2,0.5,0,0,0,0,0.42,5,0.967,0.5,0.1,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,20,0,0,0,10,3,0,0,0,0,0 },
+/* 3*/{"EXEC-BOT"              ,0,4,0,30,35,0,3.3,10,20,225,0,1,0.2,40,2,2,200,180,15,30,4.12,50,1.5,1.5,0,0,0,0,0,0.45,7,0.15,0,0.2,0,0,1.5,0,3,5,12,0,0,0,0.97,2,0.3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0},
+/* 4*/{"CYBORG DRONE"          ,0,4,0,20,20,20,3.3,25,50,60,0,1,0.3,0,2,2,65,180,80,15,3.2,50,1.6,2.2,0,0,0,0,0,0.542,15,0.958,0,0.1,0,0,1,0,3,20,45,0,0,0,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,3,0,0,0},
+/* 5*/{"CORTEX REAVER"         ,0,4,7,80,325,125,3.3,20,30,580,0,1,0.1,40,2,2,180,180,80,15,3.84,50,2,2,0,0,0,0,0,0.583,5,0.333,0,0.35244,0.324,0,1,1,3,15,30,0,0,0,0.2,1,0.5,8,15,1,0,0,0,0,0,10,0,0,0,0,0,600,0,0,0,10,3,0,2,0,0,372},
+/* 6*/{"CYBORG WARRIOR"        ,0,4,7,35,35,150,3.3,20,20,120,0,1,0.1,5,4,4,180,180,30,15,3.2,50,2.4,2.4,0,0,0,0,0,0.5,5,2.2,0,0.339,0.201,0,0.83,0.542,3,15,30,0,0,0,1,2,0.5,10,20,1,0,0,0,0,0,10,0,0,0,0,0,180,0,0,0,10,3,0,3,0,0,370},
+/* 7*/{"CYBORG ENFORCER"       ,1,4,7,60,60,80,3.3,15,30,285,0,1,0.1,30,5,1,180,180,80,15,3.2,50,2.8,2.8,2.8,0,0.3,0,0,2,5,1.5,0.23471,0.393738,0.313266,0.958,0.958,0.958,5,15,30,0.1,0.3,0.1,0.1,0.5,0.5,10,25,1,0,0,0,0,0,10,0,0,0,0,0,600,0,0,0,10,3,0,4,0,0,387},
+/* 8*/{"CYBORG ELITE GUARD"    ,1,7,4,70,75,0,3.3,10,50,380,0,1,0.05,50,6,1,180,180,80,15,3.2,50,3,3,1.5,0,0,0,0,0.4665,5,1.5,0.5,0.2653,0.117045,0.733,0.7,0.867,5,15,30,0.05,0.2,0.1,0.5,2,0.8,2,3,0.5,0,0,0,0,2,0,0,1,0,0,0,600,0,0,0,15,3,0,4,0,490,0},
+/* 9*/{"CYBORG OF EDWARD DIEGO",1,7,0,80,95,0,3.3,40,50,900,0,2,0,55,6,1,180,180,80,15,3.2,50,2.8,2.8,0,0,0,0,0,0,0,0,0.28,0.363188,0.2,1.4,0.833,3,5,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2.5,0,0,0,0,0,1,600,0,0,0,15,3,0,4,0,490,0},
+/*10*/{"SECURITY-1 ROBOT"      ,0,4,0,35,35,0,3.3,10,20,170,0,1,0.15,40,4,4,180,180,80,15,4.12,50,2.5,2.5,1.5,0,0,0,0,2,5,0.05,0.5,0.1,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,600,1.28,0,0,10,3,0,2,0,0,0},
+/*11*/{"SECURITY-2 ROBOT"      ,0,4,4,65,65,15,3.3,5,35,300,0,2,0.05,50,5,1,180,180,60,25,4.12,50,1.5,1.5,1.5,0,0,0,0,0.75,5,0.25,0.5,0.39,0.1,1.2,1,1.5,3,5,12,0.5,1,0.1,3,3.5,1,2.5,3.5,1,0,0,0,0,0,0,0,0,0,0,0,600,0,0,0,10,3,0,2,0,0,0},
+/*12*/{"MAINTENANCE ROBOT"     ,1,0,0,25,25,0,3.3,3.3,20,75,0,1,0.3,40,3,3,180,180,80,15,3.84,50,2.2,2.6,0.02,0.02,0,0,0,0,0,1.6,3,0.7,0.2,2,1.3,3,3,5,12,0.5,1,0.1,1,2,0.3,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0},
+/*13*/{"MUTANT CYBORG"         ,1,7,0,35,75,50,2,30,49,340,0,1,0.2,15,6,1,180,180,60,15,3.2,50,1.5,1.5,0,0,0,0,0,0.583,3.5,3.41,0.265,0.285,0.2,0.625,0.75,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2.8,0,0,0,0,0,0,180,0,0,0,10,3,0,5,0,491,0},
+/*14*/{"HOPPER"                ,0,4,0,35,35,0,0,17.92,17.92,150,0,1,0.25,35,4,4,180,160,80,15,3.84,50,7,7,0,0,0,0,0,0.708,5,0,0.5,0.1,0.5,0.5,0.5,0.5,3,5,12,0.5,1,0.1,0.5,1,0.5,1,2,0.5,0,0,0,0,0,0,0,1,0,0,0,180,0,0,0,10,3,1,2,0,0,0},
+/*15*/{"HUMANOID MUTANT"       ,1,0,0,12,12,0,3.3,10,20,50,0,0,0.4,0,3,3,60,180,80,15,2.56,50,1.4,2,0.5,0,0,0,0,0.42,5,0.967,0.5,0.1,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,20,0,0,0,10,3,0,0,0,0,0},
 /*16*/{"INVISIBLE MUTANT"      ,0,7,0, 10, 35,  0, 3.3,   20,20,350,0,1,0.05,0,2,2,180,180,80,15,2.56,50,0.7,0.7,1.5,0.7,0.7,0,0,0.875,5,1.125,0.875,0.4,0.2,1.2,0.875,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2,0,0,0,0,0,0,60,0.32,0,1,10,3,0,0,0,486,0 },
-/*17*/{"VIRUS MUTANT"          ,0,7,0, 45, 30,  0, 3.3,   20,20,140,0,0,0.1,0,3,1,180,180,80,15,2.56,50,2.5,2.5,2.5,0.3,0,0,0,0.542,3,1.792,0.2874,0.2874,0.2874,0.958,0.958,0.958,3,5,12,0.5,1,0.1,0.5,0,0.5,1,2,0.5,0,0,0,0,1.75,0,0,0,0,0,0,20,0,0,0,10,3,0,1,0,481,0 },
-/*18*/{"SERV-BOT"              ,1,0,0,  8,  0,  0, 3.3,   10,20,20,0,1,0.5,20,2,1,180,180,80,15,3.84,50,2,2,1.2,0,0,0,0,1.125,2,0.98,0.2,0.1,0.2,0.834,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
+/*17*/{"VIRUS MUTANT"          ,0,7,0,45,30,0,3.3,20,20,140,0,0,0.1,0,3,3,180,180,80,15,2.56,50,2.5,2.5,2.5,0.3,0,0,0,0.542,3,1.792,0.2874,0.2874,0.2874,0.958,0.958,0.958,3,5,12,0.5,1,0.1,0.5,0,0.5,1,2,0.5,0,0,0,0,1.75,0,0,0,0,0,0,20,0,0,0,10,3,0,1,0,481,0},
+/*18*/{"SERV-BOT"              ,1,0,0,8,0,0,3.3,10,20,20,0,1,0.5,20,2,2,180,180,80,15,3.84,50,2,2,1.2,0,0,0,0,1.125,2,0.98,0.2,0.1,0.2,0.834,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0},
 /*19*/{"FLIER BOT"             ,0,4,7, 30,150,  0, 3.3,   35,40,75,0,1,0.3,30,2,2,180,180,80,15,5.12,50,1.5,1.5,1.5,0,0,0,0,1.375,5,0.6,0.1,0.1,0.2,1,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,10,12,1,0,0,0,0,0,10,0,0,0,0,0,180,0.85,1,0,10,3,0,2,0,0,404 },
 /*20*/{"ZERO-G MUTANT"         ,0,7,0, 20, 20,  0, 3.3,   20,20,90,0,1,0.5,0,2,2,180,180,80,15,2.56,50,0.8,1.4,0,0.8,0,0,0,0.1,0,0.1,0.5,0.05,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2,0,0,0,0,0,0,60,1.96,0,0,10,3,0,0,0,488,0 },
-/*21*/{"GORILLA TIGER MUTANT"  ,1,0,0, 60, 60,  0, 3.3, 3.84,20,200,0,1,0.1,0,3,1,180,180,80,15,2.56,50,3,3.5,1,2,0,0,0,0.667,5,1.625,0.5,0.1,0.2,0.958,1.042,3,3,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,1,0,0,0 },
-/*22*/{"REPAIR BOT"            ,0,4,0, 12, 12,  0, 3.3,  3.3,20,65,0,1,0.4,25,3,1,180,180,80,15,3.84,50,2.25,3,0.5,0,0,0,0,0,0,0.05,0.2,0.1,0.2,1.25,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0 },
+/*21*/{"GORILLA TIGER MUTANT"  ,1,0,0,60,60,0,3.3,3.84,20,200,0,1,0.1,0,3,3,180,180,80,15,2.56,50,3,3.5,1,2,0,0,0,0.667,5,1.625,0.5,0.1,0.2,0.958,1.042,3,3,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,1,0,0,0},
+/*22*/{"REPAIR BOT"            ,0,4,0,12,12,0,3.3,3.3,20,65,0,1,0.4,25,3,3,180,180,80,15,3.84,50,2.25,3,0.5,0,0,0,0,0,0,0.05,0.2,0.1,0.2,1.25,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0},
 /*23*/{"PLANT MUTANT"          ,0,7,0, 35, 25,  0, 3.3,   20,20,115,0,1,0.3,0,1,1,180,180,80,15,2.56,50,0.8,1.2,0.1,0,0,0,0,0.375,2,2.208,0.89,0.82,0.2,1.91,1.027,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,3.5,0,0,0,0,0,0,20,0,0,0,10,3,0,0,0,487,0 },
-/*24*/{"CYBER DOG"             ,0,7,0,  0, 25,  0,   0,   20,0,0,20,1,0.5,0,1,4,250,240,50,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.3,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1.5,0,0,0,0,0,0,500,0.75,0,0,10,0,0,5,0,493,0 },
-/*25*/{"CYBER GUARD"           ,0,7,0,  0, 25,  0,   0,   20,0,0,35,1,0.4,0,1,4,250,240,50,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,0.8,0,0,0,0,0,0,500,0.75,0,0,10,0,0,5,0,493,0 },
-/*26*/{"CYBER RAM"             ,0,7,0,  0, 35,  0,   0,   20,0,0,40,1,0.25,0,1,4,80,240,50,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,1.2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,5,0,494,0 },
-/*27*/{"CYBER CORTEX REAVER"   ,0,7,0,  0, 45,  0,   0,   20,0,0,80,1,0.1,0,1,4,80,240,50,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,5,0,494,0 },
-/*28*/{"SHODAN"                ,0,7,0,  0, 55,  0,   0,   20,0,0,500,2,0,0,1,4,360,280,280,15,20.48,25.6,0,0,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.05,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,5,0,494,0 }};
+/*24*/{"CYBER DOG"             ,0,7,0,0,25,0,0,20,0,0,20,1,0.5,0,1,1,250,240,50,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.3,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1.5,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,493,0},
+/*25*/{"CYBER GUARD"           ,0,7,0,0,25,0,0,20,0,0,35,1,0.4,0,1,1,250,240,50,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,0.8,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,493,0},
+/*26*/{"CYBER RAM"             ,0,7,0,0,35,0,0,20,0,0,40,1,0.25,0,1,1,80,240,50,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,1.2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0},
+/*27*/{"CYBER CORTEX REAVER"   ,0,7,0,0,45,0,0,20,0,0,80,1,0.1,0,1,1,80,240,50,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0},
+/*28*/{"SHODAN"                ,0,7,0,0,55,0,0,20,0,0,500,2,0,0,1,1,360,280,280,15,20.48,25.6,0,0,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.05,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0}};
 //                  NPC Sounds 0, 1,  2, 3, 4,  5,  6,  7,  8,  9,10, 11,12,13,14, 15, 16, 17, 18, 19, 20, 21,22, 23, 24, 25, 26, 27, 28                                      0,  1,  2,  3, 4,  5, 6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28
 int sfxIdle[NUM_AI_TYPES]   ={-1,-1, -1,-1,58, -1, 59, -1, 59, 52,-1, -1,-1,-1,-1, -1,121, -1, -1, -1,121,118,-1, -1, -1, -1, -1, -1, -1}; int sfxSightSound[NUM_AI_TYPES] ={-1, -1,111,150,58,150,59,152,152, -1,150,150,151,152,150, -1,121, -1,151,150,121,119,151, -1, -1, -1, -1, -1, -1};
 int sfxAttack1[NUM_AI_TYPES]={-1,-1,108,-1,-1,146, -1,146,252,247,-1, -1,-1,-1,-1,122, -1,108,146, -1, -1,118,-1,125,258,258,258,258,258}; int sfxAttack2[NUM_AI_TYPES] =   {-1,256, -1,148,50, 50,50, 50, 50,250, 50, 50,146,259,148, -1,121, -1, -1,147, -1, -1,146, -1,258,258,258,258,258};
@@ -500,21 +504,27 @@ static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || in
 void AIAttack(Entity* self, int slot) {
     u16 sidx = (u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; if (slot == 3 && npc->explodeOnAttack3) { World.fogFac += 5; AIExplodeAttack(self); return; } AIApplyAttackMovement(self, slot == 1 ? npc->attack1Speed : slot == 2 ? npc->attack2Speed : npc->attack3Speed); int sat = slot == 1 ? sfxAttack1[self->index - 419] : slot == 2 ? sfxAttack2[self->index - 419] : sfxAttack3[self->index - 419];
     float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = slot == 1 ? npc->timeBetweenAttack1 : slot == 2 ? npc->timeBetweenAttack2 : npc->timeBetweenAttack3;/*float: sub-second cadences truncated to 0 and lost the debounce*/
-    int configuredAttack=slot==1 ? npc->attackType : slot==2 ? npc->attackType2 : npc->attackType3; AttType attack=(AttType)configuredAttack;
-    /* NPCTable keeps the serialized IDs read from Unity's enemy table. Map
-       its projectile IDs to Voxen's hit-scan and launched-projectile paths. */
-    if (configuredAttack==4) attack=Att_HitS; /* Unity Projectile */
-    else if (configuredAttack==5) attack=Att_PjBm; /* Unity ProjectileEnergyBeam */
-    else if (configuredAttack==7) attack=Att_Ball; /* Unity ProjectileLaunched */
+    AttType attack = slot==1 ? npc->attackType : slot==2 ? npc->attackType2 : npc->attackType3;/*NPCTable holds the raw enemy_tables.csv ints; AttType is numbered to match Utils.GetAttackTypeFromInt.*/
     (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) ? (flag_set(&self->entflags,EF_SHOT_FIRED,true),(*s_time < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) ? (play_wav(sounds[sat],AppliedFXVol(1.0f),World.position[sidx],true), *s_time=World.pauseRelativeTime + tb) : 0,AIMakeAttack(self,attack,slot)) : 0;
     (slot == 3 && self->enemy) ? (self->index == 427 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f, 0.15f, 0.18f, 0.85f}) : self->index == 433 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){0.96f,1.0f,0.0f,0.88f}) : (void)0) : (void)0; if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self,slot);
 }
 
 static void AIFlierMoveToHoverHeight(Entity* self) {
-    u16 sidx=(u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; if (npc->runSpeed <= 0.0f) return; u16 eidx = self->enemy;
+    u16 sidx=(u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419];
+    if (npc->runSpeed <= 0.0f) return; u16 eidx = self->enemy;
     if (eidx) { self->idealPos.y = World.position[eidx].y + AI_TARGET_OFFSET_Y; self->idealPos.x=World.position[sidx].x; self->idealPos.z=World.position[sidx].z; }
-    else if (NPCInPlayerPVS(sidx)) { V3 sp=ai_sight_pos(self), fp={0.0f,0.0f,0.0f}; RaycastHit dn=Raycast(sp,(V3){0,-1,0},npc->sightRange,LMASK_NPC_SIGHT); RaycastHit up=Raycast(sp,(V3){0,1,0},npc->sightRange,LMASK_NPC_SIGHT); float dDn=0.0f, dUp=0.0f; if (dn.hit) { dDn=dn.distance; fp=dn.point; } if (up.hit) dUp=up.distance; float yH=npc->flightHeight * (npc->flightHeightIsPercentage ? dDn + dUp : 1.0f); self->idealPos=(V3){fp.x,fp.y+yH,fp.z};}
-    float dy = self->idealPos.y - World.position[sidx].y; if (vabs(dy) < 0.16f) return; float spd  = npc->runSpeed * AI_TICK_TIME * World.timeScale;/*Runs on the think tick, not per frame, so a frame delta would step ~1/6 of the intended speed*/ float step = vmin(vabs(dy), spd) * (dy < 0.0f ? -1.0f : 1.0f); World.position[sidx].y += step;
+    /* Unity always looks for the floor to hover over here (no PVS test), so a patrolling flyer keeps its height
+       off-screen too. With nothing below, hold the current height: Unity falls back to the zero vector, which
+       would command a climb to y=0 out of a shaft that has no floor. */
+    else { V3 sp=ai_sight_pos(self); RaycastHit dn=Raycast(sp,(V3){0,-1,0},npc->sightRange,LMASK_NPC_SIGHT);
+           if (dn.hit) { float dUp=0.0f; if (npc->flightHeightIsPercentage) { RaycastHit up=Raycast(sp,(V3){0,1,0},npc->sightRange,LMASK_NPC_SIGHT); if (up.hit) dUp=up.distance; }
+               float yH=npc->flightHeight * (npc->flightHeightIsPercentage ? dn.distance + dUp : 1.0f); self->idealPos=(V3){dn.point.x,dn.point.y+yH,dn.point.z}; }
+           else { self->idealPos.x=World.position[sidx].x; self->idealPos.y=World.position[sidx].y; self->idealPos.z=World.position[sidx].z; } }
+    /* Move with an impulse and let physics integrate it, so the flyer obeys gravity, contacts and other bodies
+       like anything else instead of having its position overwritten. runSpeed caps the hover speed (Unity uses
+       it as its MoveTowards step) and the error-to-velocity term closes the gap without overshooting. */
+    float dy = self->idealPos.y - World.position[sidx].y, maxV = npc->runSpeed * World.timeScale, vDesired = vclamp(dy * 8.0f, -maxV, maxV);
+    AddForce(sidx, (V3){0.0f, (vDesired - World.velocity[sidx].y) * World.mass[sidx], 0.0f}, true);
 }
 
 /*AITranquilize duplicate of Tranquilize() above removed; nothing called it.*/
@@ -526,12 +536,14 @@ static void AIThink(u16 idx) {
     switch (self->currentState) { case AIState_Idle:AIIdle(idx); break; case AIState_Walk:AIWalk(idx); break; case AIState_Run:AIRun(idx); break; case AIState_Attack1:AIAttack(self,1); break; case AIState_Attack2:AIAttack(self,2); break; case AIState_Attack3:AIAttack(self,3); break; case AIState_Pain:AIPain(self); break; case AIState_Dying:AIDying(idx); break; case AIState_Dead:AIDead(idx); break; default:AIIdle(idx); break; }
     if (self->currentState == AIState_Dead || self->currentState == AIState_Dying) return;
     if (self->entflags & EF_ASLEEP) return;
-    if (npcTable[self->index - 419].moveType == AIMoveType_Fly && self->tranquilizeFinished < World.pauseRelativeTime) AIFlierMoveToHoverHeight(self);
 }
 
 void AIControllerUpdate(u16 idx) {
     ai_update_muzzle_lights(); Entity* self=&World.instances[idx]; if(!(self->entflags & EF_ACTIVE)){return;} u16 edx=self->index; if(!IdxIsNPC(edx)){return;} u16 ndx=edx-419;
-    if(npcTable[ndx].type != NPCType_Cyber && npcTable[ndx].moveType != AIMoveType_Fly && self->currentState != AIState_Dead && self->currentState != AIState_Dying) World.gravity[idx] = 1.0f;
+    /* Unity sets useGravity = false for Fly and cyber NPCs when the controller starts, and only turns it back on
+       for cases that are neither; entity.c has no such init, so mirror it here or the hover servo spends its
+       whole budget cancelling gravity. Dying/dead keep the gravity they had so corpses still fall. */
+    if (self->currentState != AIState_Dead && self->currentState != AIState_Dying) World.gravity[idx] = (npcTable[ndx].type == NPCType_Cyber || npcTable[ndx].moveType == AIMoveType_Fly) ? 0.0f : 1.0f;
     if (self->tickTime < World.pauseRelativeTime) {
         self->tickTime = World.pauseRelativeTime + AI_RAYCAST_TICK_TIME;
         flag_set(&self->entflags,EF_ENEM_IN_SIGHT,AICheckIfPlayerInSight(idx)); u16 eidx=self->enemy;
@@ -547,5 +559,5 @@ void AIControllerUpdate(u16 idx) {
     }
     if (self->currentState == AIState_Dead || self->currentState == AIState_Idle) return;
     u16 eidx=self->enemy; if ((self->entflags & EF_ACT_AS_TURRET) && eidx) self->currentDestination = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; if (npcTable[ndx].type == NPCType_Cyber && eidx) self->currentDestination = World.position[eidx];
-    V3 toTarget = V3_AsubB(self->currentDestination,ai_sight_pos(self)); if (npcTable[ndx].type != NPCType_Cyber) toTarget.y = 0.0f; self->idealTransformForward = V3_Normalize(toTarget); float sqmag = V3_dot(toTarget, toTarget); if (sqmag > 1e-6f || npcTable[ndx].type == NPCType_Cyber) AIFace(self,self->currentDestination);
+    V3 toTarget = V3_AsubB(self->currentDestination,ai_sight_pos(self)); if (npcTable[ndx].type != NPCType_Cyber) toTarget.y = 0.0f; self->idealTransformForward = V3_Normalize(toTarget); float sqmag = V3_dot(toTarget, toTarget); if (sqmag > 1e-6f || npcTable[ndx].type == NPCType_Cyber) AIFace(self,self->currentDestination);    if (npcTable[ndx].moveType == AIMoveType_Fly && self->tranquilizeFinished < World.pauseRelativeTime) AIFlierMoveToHoverHeight(self);/*Per frame, matching Unity's FixedUpdate movement block*/
 }
