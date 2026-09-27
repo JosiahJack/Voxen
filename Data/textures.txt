@@ -4617,3 +4617,2292 @@ index: 2163
 index: 2164
 #Textures/UI/hudmaps/automap_side_LG4.png
 index: 2165
+#Textures/AAIntro/1a9_0000.png
+index: 2166
+#Textures/AAIntro/1a9_0001.png
+index: 2167
+#Textures/AAIntro/1a9_0002.png
+index: 2168
+#Textures/AAIntro/1a9_0003.png
+index: 2169
+#Textures/AAIntro/1a9_0004.png
+index: 2170
+#Textures/AAIntro/1a9_0005.png
+index: 2171
+#Textures/AAIntro/1a9_0006.png
+index: 2172
+#Textures/AAIntro/1a9_0007.png
+index: 2173
+#Textures/AAIntro/1a9_0008.png
+index: 2174
+#Textures/AAIntro/1a9_0009.png
+index: 2175
+#Textures/AAIntro/1a9_0010.png
+index: 2176
+#Textures/AAIntro/1a9_0011.png
+index: 2177
+#Textures/AAIntro/1a9_0012.png
+index: 2178
+#Textures/AAIntro/1a9_0013.png
+index: 2179
+#Textures/AAIntro/1a9_0014.png
+index: 2180
+#Textures/AAIntro/1a9_0015.png
+index: 2181
+#Textures/AAIntro/1a9_0016.png
+index: 2182
+#Textures/AAIntro/1a9_0017.png
+index: 2183
+#Textures/AAIntro/1a9_0018.png
+index: 2184
+#Textures/AAIntro/1a9_0019.png
+index: 2185
+#Textures/AAIntro/1a9_0020.png
+index: 2186
+#Textures/AAIntro/1a9_0021.png
+index: 2187
+#Textures/AAIntro/1a9_0022.png
+index: 2188
+#Textures/AAIntro/1a9_0023.png
+index: 2189
+#Textures/AAIntro/1a9_0024.png
+index: 2190
+#Textures/AAIntro/1a9_0025.png
+index: 2191
+#Textures/AAIntro/1a9_0026.png
+index: 2192
+#Textures/AAIntro/1a9_0027.png
+index: 2193
+#Textures/AAIntro/1a9_0028.png
+index: 2194
+#Textures/AAIntro/1a9_0029.png
+index: 2195
+#Textures/AAIntro/1aa_0000.png
+index: 2196
+#Textures/AAIntro/1aa_0001.png
+index: 2197
+#Textures/AAIntro/1aa_0002.png
+index: 2198
+#Textures/AAIntro/1aa_0003.png
+index: 2199
+#Textures/AAIntro/1aa_0004.png
+index: 2200
+#Textures/AAIntro/1aa_0005.png
+index: 2201
+#Textures/AAIntro/1aa_0006.png
+index: 2202
+#Textures/AAIntro/1aa_0007.png
+index: 2203
+#Textures/AAIntro/1aa_0008.png
+index: 2204
+#Textures/AAIntro/1aa_0009.png
+index: 2205
+#Textures/AAIntro/1aa_0010.png
+index: 2206
+#Textures/AAIntro/1aa_0011.png
+index: 2207
+#Textures/AAIntro/1aa_0012.png
+index: 2208
+#Textures/AAIntro/1aa_0013.png
+index: 2209
+#Textures/AAIntro/1aa_0014.png
+index: 2210
+#Textures/AAIntro/1aa_0015.png
+index: 2211
+#Textures/AAIntro/1aa_0016.png
+index: 2212
+#Textures/AAIntro/1aa_0017.png
+index: 2213
+#Textures/AAIntro/1aa_0018.png
+index: 2214
+#Textures/AAIntro/1aa_0019.png
+index: 2215
+#Textures/AAIntro/1aa_0020.png
+index: 2216
+#Textures/AAIntro/1aa_0021.png
+index: 2217
+#Textures/AAIntro/1aa_0022.png
+index: 2218
+#Textures/AAIntro/1aa_0023.png
+index: 2219
+#Textures/AAIntro/1aa_0024.png
+index: 2220
+#Textures/AAIntro/1aa_0025.png
+index: 2221
+#Textures/AAIntro/1aa_0026.png
+index: 2222
+#Textures/AAIntro/1aa_0027.png
+index: 2223
+#Textures/AAIntro/1aa_0028.png
+index: 2224
+#Textures/AAIntro/1aa_0029.png
+index: 2225
+#Textures/AAIntro/1aa_0030.png
+index: 2226
+#Textures/AAIntro/1aa_0031.png
+index: 2227
+#Textures/AAIntro/1ab_0000.png
+index: 2228
+#Textures/AAIntro/1ab_0001.png
+index: 2229
+#Textures/AAIntro/1ab_0002.png
+index: 2230
+#Textures/AAIntro/1ab_0003.png
+index: 2231
+#Textures/AAIntro/1ab_0004.png
+index: 2232
+#Textures/AAIntro/1ab_0005.png
+index: 2233
+#Textures/AAIntro/1ab_0006.png
+index: 2234
+#Textures/AAIntro/1ab_0007.png
+index: 2235
+#Textures/AAIntro/1ab_0008.png
+index: 2236
+#Textures/AAIntro/1ab_0009.png
+index: 2237
+#Textures/AAIntro/1ab_0010.png
+index: 2238
+#Textures/AAIntro/1ab_0011.png
+index: 2239
+#Textures/AAIntro/1ab_0012.png
+index: 2240
+#Textures/AAIntro/1ab_0013.png
+index: 2241
+#Textures/AAIntro/1ab_0014.png
+index: 2242
+#Textures/AAIntro/1ab_0015.png
+index: 2243
+#Textures/AAIntro/1ab_0016.png
+index: 2244
+#Textures/AAIntro/1ab_0017.png
+index: 2245
+#Textures/AAIntro/1ab_0018.png
+index: 2246
+#Textures/AAIntro/1ab_0019.png
+index: 2247
+#Textures/AAIntro/1ab_0020.png
+index: 2248
+#Textures/AAIntro/1ab_0021.png
+index: 2249
+#Textures/AAIntro/1ab_0022.png
+index: 2250
+#Textures/AAIntro/1ab_0023.png
+index: 2251
+#Textures/AAIntro/1ab_0024.png
+index: 2252
+#Textures/AAIntro/1ab_0025.png
+index: 2253
+#Textures/AAIntro/1ab_0026.png
+index: 2254
+#Textures/AAIntro/1ab_0027.png
+index: 2255
+#Textures/AAIntro/1ab_0028.png
+index: 2256
+#Textures/AAIntro/1ab_0029.png
+index: 2257
+#Textures/AAIntro/1ab_0030.png
+index: 2258
+#Textures/AAIntro/1ab_0031.png
+index: 2259
+#Textures/AAIntro/1ac_0000.png
+index: 2260
+#Textures/AAIntro/1ac_0001.png
+index: 2261
+#Textures/AAIntro/1ac_0002.png
+index: 2262
+#Textures/AAIntro/1ac_0003.png
+index: 2263
+#Textures/AAIntro/1ac_0004.png
+index: 2264
+#Textures/AAIntro/1ac_0005.png
+index: 2265
+#Textures/AAIntro/1ac_0006.png
+index: 2266
+#Textures/AAIntro/1ac_0007.png
+index: 2267
+#Textures/AAIntro/1ac_0008.png
+index: 2268
+#Textures/AAIntro/1ac_0009.png
+index: 2269
+#Textures/AAIntro/1ac_0010.png
+index: 2270
+#Textures/AAIntro/1ac_0011.png
+index: 2271
+#Textures/AAIntro/1ac_0012.png
+index: 2272
+#Textures/AAIntro/1ac_0013.png
+index: 2273
+#Textures/AAIntro/1ac_0014.png
+index: 2274
+#Textures/AAIntro/1ac_0015.png
+index: 2275
+#Textures/AAIntro/1ac_0016.png
+index: 2276
+#Textures/AAIntro/1ac_0017.png
+index: 2277
+#Textures/AAIntro/1ac_0018.png
+index: 2278
+#Textures/AAIntro/1ac_0019.png
+index: 2279
+#Textures/AAIntro/1ac_0020.png
+index: 2280
+#Textures/AAIntro/1ac_0021.png
+index: 2281
+#Textures/AAIntro/1ac_0022.png
+index: 2282
+#Textures/AAIntro/1ac_0023.png
+index: 2283
+#Textures/AAIntro/1ac_0024.png
+index: 2284
+#Textures/AAIntro/1ac_0025.png
+index: 2285
+#Textures/AAIntro/1ac_0026.png
+index: 2286
+#Textures/AAIntro/1ac_0027.png
+index: 2287
+#Textures/AAIntro/1ac_0028.png
+index: 2288
+#Textures/AAIntro/1ac_0029.png
+index: 2289
+#Textures/AAIntro/1ac_0030.png
+index: 2290
+#Textures/AAIntro/1ac_0031.png
+index: 2291
+#Textures/AAIntro/1ac_0032.png
+index: 2292
+#Textures/AAIntro/1ac_0033.png
+index: 2293
+#Textures/AAIntro/1ac_0034.png
+index: 2294
+#Textures/AAIntro/1ac_0035.png
+index: 2295
+#Textures/AAIntro/1ac_0036.png
+index: 2296
+#Textures/AAIntro/1ac_0037.png
+index: 2297
+#Textures/AAIntro/1ac_0038.png
+index: 2298
+#Textures/AAIntro/1ac_0039.png
+index: 2299
+#Textures/AAIntro/1ac_0040.png
+index: 2300
+#Textures/AAIntro/1ac_0041.png
+index: 2301
+#Textures/AAIntro/1ac_0042.png
+index: 2302
+#Textures/AAIntro/1ac_0043.png
+index: 2303
+#Textures/AAIntro/1ac_0044.png
+index: 2304
+#Textures/AAIntro/1ac_0045.png
+index: 2305
+#Textures/AAIntro/1ac_0046.png
+index: 2306
+#Textures/AAIntro/1ac_0047.png
+index: 2307
+#Textures/AAIntro/1ac_0048.png
+index: 2308
+#Textures/AAIntro/1ac_0049.png
+index: 2309
+#Textures/AAIntro/1ac_0050.png
+index: 2310
+#Textures/AAIntro/1ac_0051.png
+index: 2311
+#Textures/AAIntro/1ac_0052.png
+index: 2312
+#Textures/AAIntro/1ac_0053.png
+index: 2313
+#Textures/AAIntro/1ac_0054.png
+index: 2314
+#Textures/AAIntro/1ac_0055.png
+index: 2315
+#Textures/AAIntro/1ac_0056.png
+index: 2316
+#Textures/AAIntro/1ac_0057.png
+index: 2317
+#Textures/AAIntro/1ac_0058.png
+index: 2318
+#Textures/AAIntro/1ac_0059.png
+index: 2319
+#Textures/AAIntro/1ac_0060.png
+index: 2320
+#Textures/AAIntro/1ac_0061.png
+index: 2321
+#Textures/AAIntro/1ac_0062.png
+index: 2322
+#Textures/AAIntro/1ac_0063.png
+index: 2323
+#Textures/AAIntro/1ac_0064.png
+index: 2324
+#Textures/AAIntro/1ac_0065.png
+index: 2325
+#Textures/AAIntro/1ac_0066.png
+index: 2326
+#Textures/AAIntro/1ac_0067.png
+index: 2327
+#Textures/AAIntro/1ac_0068.png
+index: 2328
+#Textures/AAIntro/1ac_0069.png
+index: 2329
+#Textures/AAIntro/1ac_0070.png
+index: 2330
+#Textures/AAIntro/1ac_0071.png
+index: 2331
+#Textures/AAIntro/1ac_0072.png
+index: 2332
+#Textures/AAIntro/1ac_0073.png
+index: 2333
+#Textures/AAIntro/1ac_0074.png
+index: 2334
+#Textures/AAIntro/1ac_0075.png
+index: 2335
+#Textures/AAIntro/1ac_0076.png
+index: 2336
+#Textures/AAIntro/1ac_0077.png
+index: 2337
+#Textures/AAIntro/1ac_0078.png
+index: 2338
+#Textures/AAIntro/1ac_0079.png
+index: 2339
+#Textures/AAIntro/1ac_0080.png
+index: 2340
+#Textures/AAIntro/1ac_0081.png
+index: 2341
+#Textures/AAIntro/1ac_0082.png
+index: 2342
+#Textures/AAIntro/1ac_0083.png
+index: 2343
+#Textures/AAIntro/1ac_0084.png
+index: 2344
+#Textures/AAIntro/1ac_0085.png
+index: 2345
+#Textures/AAIntro/1ac_0086.png
+index: 2346
+#Textures/AAIntro/1ac_0087.png
+index: 2347
+#Textures/AAIntro/1ac_0088.png
+index: 2348
+#Textures/AAIntro/1ac_0089.png
+index: 2349
+#Textures/AAIntro/1ac_0090.png
+index: 2350
+#Textures/AAIntro/1ac_0091.png
+index: 2351
+#Textures/AAIntro/1ac_0092.png
+index: 2352
+#Textures/AAIntro/1ac_0093.png
+index: 2353
+#Textures/AAIntro/1ac_0094.png
+index: 2354
+#Textures/AAIntro/1ac_0095.png
+index: 2355
+#Textures/AAIntro/1ac_0096.png
+index: 2356
+#Textures/AAIntro/1ac_0097.png
+index: 2357
+#Textures/AAIntro/1ac_0098.png
+index: 2358
+#Textures/AAIntro/1ac_0099.png
+index: 2359
+#Textures/AAIntro/1ac_0100.png
+index: 2360
+#Textures/AAIntro/1ac_0101.png
+index: 2361
+#Textures/AAIntro/1ac_0102.png
+index: 2362
+#Textures/AAIntro/1ad_0000.png
+index: 2363
+#Textures/AAIntro/1ad_0001.png
+index: 2364
+#Textures/AAIntro/1ad_0002.png
+index: 2365
+#Textures/AAIntro/1ad_0003.png
+index: 2366
+#Textures/AAIntro/1ad_0004.png
+index: 2367
+#Textures/AAIntro/1ad_0005.png
+index: 2368
+#Textures/AAIntro/1ad_0006.png
+index: 2369
+#Textures/AAIntro/1ad_0007.png
+index: 2370
+#Textures/AAIntro/1ad_0008.png
+index: 2371
+#Textures/AAIntro/1ad_0009.png
+index: 2372
+#Textures/AAIntro/1ad_0010.png
+index: 2373
+#Textures/AAIntro/1ad_0011.png
+index: 2374
+#Textures/AAIntro/1ad_0012.png
+index: 2375
+#Textures/AAIntro/1ad_0013.png
+index: 2376
+#Textures/AAIntro/1ad_0014.png
+index: 2377
+#Textures/AAIntro/1ad_0015.png
+index: 2378
+#Textures/AAIntro/1ad_0016.png
+index: 2379
+#Textures/AAIntro/1ad_0017.png
+index: 2380
+#Textures/AAIntro/1ad_0018.png
+index: 2381
+#Textures/AAIntro/1ad_0019.png
+index: 2382
+#Textures/AAIntro/1ad_0020.png
+index: 2383
+#Textures/AAIntro/1ad_0021.png
+index: 2384
+#Textures/AAIntro/1ad_0022.png
+index: 2385
+#Textures/AAIntro/1ad_0023.png
+index: 2386
+#Textures/AAIntro/1ad_0024.png
+index: 2387
+#Textures/AAIntro/1ae_0000.png
+index: 2388
+#Textures/AAIntro/1ae_0001.png
+index: 2389
+#Textures/AAIntro/1ae_0002.png
+index: 2390
+#Textures/AAIntro/1ae_0003.png
+index: 2391
+#Textures/AAIntro/1ae_0004.png
+index: 2392
+#Textures/AAIntro/1ae_0005.png
+index: 2393
+#Textures/AAIntro/1ae_0006.png
+index: 2394
+#Textures/AAIntro/1ae_0007.png
+index: 2395
+#Textures/AAIntro/1ae_0008.png
+index: 2396
+#Textures/AAIntro/1ae_0009.png
+index: 2397
+#Textures/AAIntro/1ae_0010.png
+index: 2398
+#Textures/AAIntro/1ae_0011.png
+index: 2399
+#Textures/AAIntro/1ae_0012.png
+index: 2400
+#Textures/AAIntro/1ae_0013.png
+index: 2401
+#Textures/AAIntro/1ae_0014.png
+index: 2402
+#Textures/AAIntro/1ae_0015.png
+index: 2403
+#Textures/AAIntro/1ae_0016.png
+index: 2404
+#Textures/AAIntro/1ae_0017.png
+index: 2405
+#Textures/AAIntro/1ae_0018.png
+index: 2406
+#Textures/AAIntro/1ae_0019.png
+index: 2407
+#Textures/AAIntro/1ae_0020.png
+index: 2408
+#Textures/AAIntro/1ae_0021.png
+index: 2409
+#Textures/AAIntro/1ae_0022.png
+index: 2410
+#Textures/AAIntro/1ae_0023.png
+index: 2411
+#Textures/AAIntro/1ae_0024.png
+index: 2412
+#Textures/AAIntro/1af_0000.png
+index: 2413
+#Textures/AAIntro/1af_0001.png
+index: 2414
+#Textures/AAIntro/1af_0002.png
+index: 2415
+#Textures/AAIntro/1af_0003.png
+index: 2416
+#Textures/AAIntro/1af_0004.png
+index: 2417
+#Textures/AAIntro/1af_0005.png
+index: 2418
+#Textures/AAIntro/1af_0006.png
+index: 2419
+#Textures/AAIntro/1af_0007.png
+index: 2420
+#Textures/AAIntro/1af_0008.png
+index: 2421
+#Textures/AAIntro/1af_0009.png
+index: 2422
+#Textures/AAIntro/1af_0010.png
+index: 2423
+#Textures/AAIntro/1af_0011.png
+index: 2424
+#Textures/AAIntro/1af_0012.png
+index: 2425
+#Textures/AAIntro/1af_0013.png
+index: 2426
+#Textures/AAIntro/1af_0014.png
+index: 2427
+#Textures/AAIntro/1af_0015.png
+index: 2428
+#Textures/AAIntro/1af_0016.png
+index: 2429
+#Textures/AAIntro/1af_0017.png
+index: 2430
+#Textures/AAIntro/1af_0018.png
+index: 2431
+#Textures/AAIntro/1af_0019.png
+index: 2432
+#Textures/AAIntro/1af_0020.png
+index: 2433
+#Textures/AAIntro/1b0_0000.png
+index: 2434
+#Textures/AAIntro/1b0_0001.png
+index: 2435
+#Textures/AAIntro/1b0_0002.png
+index: 2436
+#Textures/AAIntro/1b0_0003.png
+index: 2437
+#Textures/AAIntro/1b0_0004.png
+index: 2438
+#Textures/AAIntro/1b0_0005.png
+index: 2439
+#Textures/AAIntro/1b0_0006.png
+index: 2440
+#Textures/AAIntro/1b0_0007.png
+index: 2441
+#Textures/AAIntro/1b0_0008.png
+index: 2442
+#Textures/AAIntro/1b0_0009.png
+index: 2443
+#Textures/AAIntro/1b0_0010.png
+index: 2444
+#Textures/AAIntro/1b0_0011.png
+index: 2445
+#Textures/AAIntro/1b0_0012.png
+index: 2446
+#Textures/AAIntro/1b0_0013.png
+index: 2447
+#Textures/AAIntro/1b0_0014.png
+index: 2448
+#Textures/AAIntro/1b0_0015.png
+index: 2449
+#Textures/AAIntro/1b0_0016.png
+index: 2450
+#Textures/AAIntro/1b0_0017.png
+index: 2451
+#Textures/AAIntro/1b0_0018.png
+index: 2452
+#Textures/AAIntro/1b0_0019.png
+index: 2453
+#Textures/AAIntro/1b1_0000.png
+index: 2454
+#Textures/AAIntro/1b1_0001.png
+index: 2455
+#Textures/AAIntro/1b1_0002.png
+index: 2456
+#Textures/AAIntro/1b1_0003.png
+index: 2457
+#Textures/AAIntro/1b1_0004.png
+index: 2458
+#Textures/AAIntro/1b1_0005.png
+index: 2459
+#Textures/AAIntro/1b1_0006.png
+index: 2460
+#Textures/AAIntro/1b1_0007.png
+index: 2461
+#Textures/AAIntro/1b1_0008.png
+index: 2462
+#Textures/AAIntro/1b1_0009.png
+index: 2463
+#Textures/AAIntro/1b1_0010.png
+index: 2464
+#Textures/AAIntro/1b1_0011.png
+index: 2465
+#Textures/AAIntro/1b1_0012.png
+index: 2466
+#Textures/AAIntro/1b1_0013.png
+index: 2467
+#Textures/AAIntro/1b1_0014.png
+index: 2468
+#Textures/AAIntro/1b1_0015.png
+index: 2469
+#Textures/AAIntro/1b2_0000.png
+index: 2470
+#Textures/AAIntro/1b2_0001.png
+index: 2471
+#Textures/AAIntro/1b2_0002.png
+index: 2472
+#Textures/AAIntro/1b2_0003.png
+index: 2473
+#Textures/AAIntro/1b2_0004.png
+index: 2474
+#Textures/AAIntro/1b2_0005.png
+index: 2475
+#Textures/AAIntro/1b2_0006.png
+index: 2476
+#Textures/AAIntro/1b2_0007.png
+index: 2477
+#Textures/AAIntro/1b2_0008.png
+index: 2478
+#Textures/AAIntro/1b2_0009.png
+index: 2479
+#Textures/AAIntro/1b2_0010.png
+index: 2480
+#Textures/AAIntro/1b2_0011.png
+index: 2481
+#Textures/AAIntro/1b2_0012.png
+index: 2482
+#Textures/AAIntro/1b2_0013.png
+index: 2483
+#Textures/AAIntro/1b2_0014.png
+index: 2484
+#Textures/AAIntro/1b2_0015.png
+index: 2485
+#Textures/AAIntro/1b3_0000.png
+index: 2486
+#Textures/AAIntro/1b3_0001.png
+index: 2487
+#Textures/AAIntro/1b3_0002.png
+index: 2488
+#Textures/AAIntro/1b3_0003.png
+index: 2489
+#Textures/AAIntro/1b3_0004.png
+index: 2490
+#Textures/AAIntro/1b3_0005.png
+index: 2491
+#Textures/AAIntro/1b3_0006.png
+index: 2492
+#Textures/AAIntro/1b3_0007.png
+index: 2493
+#Textures/AAIntro/1b3_0008.png
+index: 2494
+#Textures/AAIntro/1b3_0009.png
+index: 2495
+#Textures/AAIntro/1b3_0010.png
+index: 2496
+#Textures/AAIntro/1b3_0011.png
+index: 2497
+#Textures/AAIntro/1b3_0012.png
+index: 2498
+#Textures/AAIntro/1b3_0013.png
+index: 2499
+#Textures/AAIntro/1b3_0014.png
+index: 2500
+#Textures/AAIntro/1b4_0000.png
+index: 2501
+#Textures/AAIntro/1b4_0001.png
+index: 2502
+#Textures/AAIntro/1b4_0002.png
+index: 2503
+#Textures/AAIntro/1b4_0003.png
+index: 2504
+#Textures/AAIntro/1b4_0004.png
+index: 2505
+#Textures/AAIntro/1b4_0005.png
+index: 2506
+#Textures/AAIntro/1b4_0006.png
+index: 2507
+#Textures/AAIntro/1b4_0007.png
+index: 2508
+#Textures/AAIntro/1b4_0008.png
+index: 2509
+#Textures/AAIntro/1b4_0009.png
+index: 2510
+#Textures/AAIntro/1b4_0010.png
+index: 2511
+#Textures/AAIntro/1b4_0011.png
+index: 2512
+#Textures/AAIntro/1b4_0012.png
+index: 2513
+#Textures/AAIntro/1b4_0013.png
+index: 2514
+#Textures/AAIntro/1b4_0014.png
+index: 2515
+#Textures/AAIntro/1b4_0015.png
+index: 2516
+#Textures/AAIntro/1b4_0016.png
+index: 2517
+#Textures/AAIntro/1b4_0017.png
+index: 2518
+#Textures/AAIntro/1b4_0018.png
+index: 2519
+#Textures/AAIntro/1b4_0019.png
+index: 2520
+#Textures/AAIntro/1b4_0020.png
+index: 2521
+#Textures/AAIntro/1b4_0021.png
+index: 2522
+#Textures/AAIntro/1b4_0022.png
+index: 2523
+#Textures/AAIntro/1b4_0023.png
+index: 2524
+#Textures/AAIntro/1b4_0024.png
+index: 2525
+#Textures/AAIntro/1b4_0025.png
+index: 2526
+#Textures/AAIntro/1b4_0026.png
+index: 2527
+#Textures/AAIntro/1b4_0027.png
+index: 2528
+#Textures/AAIntro/1b4_0028.png
+index: 2529
+#Textures/AAIntro/1b4_0029.png
+index: 2530
+#Textures/AAIntro/1b4_0030.png
+index: 2531
+#Textures/AAIntro/1b4_0031.png
+index: 2532
+#Textures/AAIntro/1b4_0032.png
+index: 2533
+#Textures/AAIntro/1b4_0033.png
+index: 2534
+#Textures/AAIntro/1b4_0034.png
+index: 2535
+#Textures/AAIntro/1b4_0035.png
+index: 2536
+#Textures/AAIntro/1b4_0036.png
+index: 2537
+#Textures/AAIntro/1b4_0037.png
+index: 2538
+#Textures/AAIntro/1b4_0038.png
+index: 2539
+#Textures/AAIntro/1b4_0039.png
+index: 2540
+#Textures/AAIntro/1b4_0040.png
+index: 2541
+#Textures/AAIntro/1b4_0041.png
+index: 2542
+#Textures/AAIntro/1b4_0042.png
+index: 2543
+#Textures/AAIntro/1b4_0043.png
+index: 2544
+#Textures/AAIntro/1b4_0044.png
+index: 2545
+#Textures/AAIntro/1b4_0045.png
+index: 2546
+#Textures/AAIntro/1b4_0046.png
+index: 2547
+#Textures/AAIntro/1b4_0047.png
+index: 2548
+#Textures/AAIntro/1b4_0048.png
+index: 2549
+#Textures/AAIntro/1b4_0049.png
+index: 2550
+#Textures/AAIntro/1b4_0050.png
+index: 2551
+#Textures/AAIntro/1b4_0051.png
+index: 2552
+#Textures/AAIntro/1b4_0052.png
+index: 2553
+#Textures/AAIntro/1b4_0053.png
+index: 2554
+#Textures/AAIntro/1b4_0054.png
+index: 2555
+#Textures/AAIntro/1b4_0055.png
+index: 2556
+#Textures/AAIntro/1b4_0056.png
+index: 2557
+#Textures/AAIntro/1b4_0057.png
+index: 2558
+#Textures/AAIntro/1b4_0058.png
+index: 2559
+#Textures/AAIntro/1b4_0059.png
+index: 2560
+#Textures/AAIntro/1b4_0060.png
+index: 2561
+#Textures/AAIntro/1b4_0061.png
+index: 2562
+#Textures/AAIntro/1b4_0062.png
+index: 2563
+#Textures/AAIntro/1b4_0063.png
+index: 2564
+#Textures/AAIntro/1b4_0064.png
+index: 2565
+#Textures/AAIntro/1b4_0065.png
+index: 2566
+#Textures/AAIntro/1b4_0066.png
+index: 2567
+#Textures/AAIntro/1b4_0067.png
+index: 2568
+#Textures/AAIntro/1b4_0068.png
+index: 2569
+#Textures/AAIntro/1b4_0069.png
+index: 2570
+#Textures/AAIntro/1b5_0000.png
+index: 2571
+#Textures/AAIntro/1b5_0001.png
+index: 2572
+#Textures/AAIntro/1b5_0002.png
+index: 2573
+#Textures/AAIntro/1b5_0003.png
+index: 2574
+#Textures/AAIntro/1b5_0004.png
+index: 2575
+#Textures/AAIntro/1b5_0005.png
+index: 2576
+#Textures/AAIntro/1b5_0006.png
+index: 2577
+#Textures/AAIntro/1b5_0007.png
+index: 2578
+#Textures/AAIntro/1b5_0008.png
+index: 2579
+#Textures/AAIntro/1b5_0009.png
+index: 2580
+#Textures/AAIntro/1b5_0010.png
+index: 2581
+#Textures/AAIntro/1b5_0011.png
+index: 2582
+#Textures/AAIntro/1b5_0012.png
+index: 2583
+#Textures/AAIntro/1b5_0013.png
+index: 2584
+#Textures/AAIntro/1b5_0014.png
+index: 2585
+#Textures/AAIntro/1b5_0015.png
+index: 2586
+#Textures/AAIntro/1b5_0016.png
+index: 2587
+#Textures/AAIntro/1b5_0017.png
+index: 2588
+#Textures/AAIntro/1b5_0018.png
+index: 2589
+#Textures/AAIntro/1b5_0019.png
+index: 2590
+#Textures/AAIntro/1b5_0020.png
+index: 2591
+#Textures/AAIntro/1b5_0021.png
+index: 2592
+#Textures/AAIntro/1b5_0022.png
+index: 2593
+#Textures/AAIntro/1b5_0023.png
+index: 2594
+#Textures/AAIntro/1b5_0024.png
+index: 2595
+#Textures/AAIntro/1b5_0025.png
+index: 2596
+#Textures/AAIntro/1b5_0026.png
+index: 2597
+#Textures/AAIntro/1b5_0027.png
+index: 2598
+#Textures/AAIntro/1b5_0028.png
+index: 2599
+#Textures/AAIntro/1b5_0029.png
+index: 2600
+#Textures/AAIntro/1b5_0030.png
+index: 2601
+#Textures/AAIntro/1b5_0031.png
+index: 2602
+#Textures/AAIntro/1b5_0032.png
+index: 2603
+#Textures/AAIntro/1b5_0033.png
+index: 2604
+#Textures/AAIntro/1b5_0034.png
+index: 2605
+#Textures/AAIntro/1b5_0035.png
+index: 2606
+#Textures/AAIntro/1b5_0036.png
+index: 2607
+#Textures/AAIntro/1b5_0037.png
+index: 2608
+#Textures/AAIntro/1b5_0038.png
+index: 2609
+#Textures/AAIntro/1b5_0039.png
+index: 2610
+#Textures/AAIntro/1b5_0040.png
+index: 2611
+#Textures/AAIntro/1b5_0041.png
+index: 2612
+#Textures/AAIntro/1b5_0042.png
+index: 2613
+#Textures/AAIntro/1b5_0043.png
+index: 2614
+#Textures/AAIntro/1b5_0044.png
+index: 2615
+#Textures/AAIntro/1b5_0045.png
+index: 2616
+#Textures/AAIntro/1b5_0046.png
+index: 2617
+#Textures/AAIntro/1b5_0047.png
+index: 2618
+#Textures/AAIntro/1b5_0048.png
+index: 2619
+#Textures/AAIntro/1b5_0049.png
+index: 2620
+#Textures/AAIntro/1b5_0050.png
+index: 2621
+#Textures/AAIntro/1b5_0051.png
+index: 2622
+#Textures/AAIntro/1b5_0052.png
+index: 2623
+#Textures/AAIntro/1b6_0000.png
+index: 2624
+#Textures/AAIntro/1b6_0001.png
+index: 2625
+#Textures/AAIntro/1b6_0002.png
+index: 2626
+#Textures/AAIntro/1b6_0003.png
+index: 2627
+#Textures/AAIntro/1b6_0004.png
+index: 2628
+#Textures/AAIntro/1b6_0005.png
+index: 2629
+#Textures/AAIntro/1b6_0006.png
+index: 2630
+#Textures/AAIntro/1b6_0007.png
+index: 2631
+#Textures/AAIntro/1b6_0008.png
+index: 2632
+#Textures/AAIntro/1b6_0009.png
+index: 2633
+#Textures/AAIntro/1b6_0010.png
+index: 2634
+#Textures/AAIntro/1b6_0011.png
+index: 2635
+#Textures/AAIntro/1b6_0012.png
+index: 2636
+#Textures/AAIntro/1b6_0013.png
+index: 2637
+#Textures/AAIntro/1b6_0014.png
+index: 2638
+#Textures/AAIntro/1b6_0015.png
+index: 2639
+#Textures/AAIntro/1b6_0016.png
+index: 2640
+#Textures/AAIntro/1b6_0017.png
+index: 2641
+#Textures/AAIntro/1b6_0018.png
+index: 2642
+#Textures/AAIntro/1b6_0019.png
+index: 2643
+#Textures/AAIntro/1b6_0020.png
+index: 2644
+#Textures/AAIntro/1b6_0021.png
+index: 2645
+#Textures/AAIntro/1b6_0022.png
+index: 2646
+#Textures/AAIntro/1b6_0023.png
+index: 2647
+#Textures/AAIntro/1b6_0024.png
+index: 2648
+#Textures/AAIntro/1b6_0025.png
+index: 2649
+#Textures/AAIntro/1b6_0026.png
+index: 2650
+#Textures/AAIntro/1b6_0027.png
+index: 2651
+#Textures/AAIntro/1b6_0028.png
+index: 2652
+#Textures/AAIntro/1b6_0029.png
+index: 2653
+#Textures/AAIntro/1b6_0030.png
+index: 2654
+#Textures/AAIntro/1b6_0031.png
+index: 2655
+#Textures/AAIntro/1b6_0032.png
+index: 2656
+#Textures/AAIntro/1b6_0033.png
+index: 2657
+#Textures/AAIntro/1b6_0034.png
+index: 2658
+#Textures/AAIntro/1b6_0035.png
+index: 2659
+#Textures/AAIntro/1b6_0036.png
+index: 2660
+#Textures/AAIntro/1b6_0037.png
+index: 2661
+#Textures/AAIntro/1b6_0038.png
+index: 2662
+#Textures/AAIntro/1b6_0039.png
+index: 2663
+#Textures/AAIntro/1b6_0040.png
+index: 2664
+#Textures/AAIntro/1b6_0041.png
+index: 2665
+#Textures/AAIntro/1b6_0042.png
+index: 2666
+#Textures/AAIntro/1b6_0043.png
+index: 2667
+#Textures/AAIntro/1b6_0044.png
+index: 2668
+#Textures/AAIntro/1b6_0045.png
+index: 2669
+#Textures/AAIntro/1b6_0046.png
+index: 2670
+#Textures/AAIntro/1b7_0000.png
+index: 2671
+#Textures/AAIntro/1b7_0001.png
+index: 2672
+#Textures/AAIntro/1b7_0002.png
+index: 2673
+#Textures/AAIntro/1b7_0003.png
+index: 2674
+#Textures/AAIntro/1b7_0004.png
+index: 2675
+#Textures/AAIntro/1b7_0005.png
+index: 2676
+#Textures/AAIntro/1b7_0006.png
+index: 2677
+#Textures/AAIntro/1b7_0007.png
+index: 2678
+#Textures/AAIntro/1b7_0008.png
+index: 2679
+#Textures/AAIntro/1b7_0009.png
+index: 2680
+#Textures/AAIntro/1b7_0010.png
+index: 2681
+#Textures/AAIntro/1b7_0011.png
+index: 2682
+#Textures/AAIntro/1b7_0012.png
+index: 2683
+#Textures/AAIntro/1b7_0013.png
+index: 2684
+#Textures/AAIntro/1b7_0014.png
+index: 2685
+#Textures/AAIntro/1b7_0015.png
+index: 2686
+#Textures/AAIntro/1b7_0016.png
+index: 2687
+#Textures/AAIntro/1b7_0017.png
+index: 2688
+#Textures/AAIntro/1b7_0018.png
+index: 2689
+#Textures/AAIntro/1b7_0019.png
+index: 2690
+#Textures/AAIntro/1b7_0020.png
+index: 2691
+#Textures/AAIntro/1b7_0021.png
+index: 2692
+#Textures/AAIntro/1b7_0022.png
+index: 2693
+#Textures/AAIntro/1b7_0023.png
+index: 2694
+#Textures/AAIntro/1b7_0024.png
+index: 2695
+#Textures/AAIntro/1b7_0025.png
+index: 2696
+#Textures/AAIntro/1b7_0026.png
+index: 2697
+#Textures/AAIntro/1b7_0027.png
+index: 2698
+#Textures/AAIntro/1b7_0028.png
+index: 2699
+#Textures/AAIntro/1b7_0029.png
+index: 2700
+#Textures/AAIntro/1b7_0030.png
+index: 2701
+#Textures/AAIntro/1b7_0031.png
+index: 2702
+#Textures/AAIntro/1b7_0032.png
+index: 2703
+#Textures/AAIntro/1b7_0033.png
+index: 2704
+#Textures/AAIntro/1b7_0034.png
+index: 2705
+#Textures/AAIntro/1b7_0035.png
+index: 2706
+#Textures/AAIntro/1b7_0036.png
+index: 2707
+#Textures/AAIntro/1b7_0037.png
+index: 2708
+#Textures/AAIntro/1b7_0038.png
+index: 2709
+#Textures/AAIntro/1b7_0039.png
+index: 2710
+#Textures/AAIntro/1b7_0040.png
+index: 2711
+#Textures/AAIntro/1b7_0041.png
+index: 2712
+#Textures/AAIntro/1b8_0000.png
+index: 2713
+#Textures/AAIntro/1b8_0001.png
+index: 2714
+#Textures/AAIntro/1b8_0002.png
+index: 2715
+#Textures/AAIntro/1b8_0003.png
+index: 2716
+#Textures/AAIntro/1b8_0004.png
+index: 2717
+#Textures/AAIntro/1b8_0005.png
+index: 2718
+#Textures/AAIntro/1b8_0006.png
+index: 2719
+#Textures/AAIntro/1b8_0007.png
+index: 2720
+#Textures/AAIntro/1b8_0008.png
+index: 2721
+#Textures/AAIntro/1b8_0009.png
+index: 2722
+#Textures/AAIntro/1b8_0010.png
+index: 2723
+#Textures/AAIntro/1b8_0011.png
+index: 2724
+#Textures/AAIntro/1b8_0012.png
+index: 2725
+#Textures/AAIntro/1b8_0013.png
+index: 2726
+#Textures/AAIntro/1b8_0014.png
+index: 2727
+#Textures/AAIntro/1b8_0015.png
+index: 2728
+#Textures/AAIntro/1b8_0016.png
+index: 2729
+#Textures/AAIntro/1b8_0017.png
+index: 2730
+#Textures/AAIntro/1b8_0018.png
+index: 2731
+#Textures/AAIntro/1b8_0019.png
+index: 2732
+#Textures/AAIntro/1b8_0020.png
+index: 2733
+#Textures/AAIntro/1b8_0021.png
+index: 2734
+#Textures/AAIntro/1b8_0022.png
+index: 2735
+#Textures/AAIntro/1b8_0023.png
+index: 2736
+#Textures/AAIntro/1b8_0024.png
+index: 2737
+#Textures/AAIntro/1b8_0025.png
+index: 2738
+#Textures/AAIntro/1b8_0026.png
+index: 2739
+#Textures/AAIntro/1b8_0027.png
+index: 2740
+#Textures/AAIntro/1b8_0028.png
+index: 2741
+#Textures/AAIntro/1b8_0029.png
+index: 2742
+#Textures/AAIntro/1b8_0030.png
+index: 2743
+#Textures/AAIntro/1b8_0031.png
+index: 2744
+#Textures/AAIntro/1b8_0032.png
+index: 2745
+#Textures/AAIntro/1b8_0033.png
+index: 2746
+#Textures/AAIntro/1b8_0034.png
+index: 2747
+#Textures/AAIntro/1b8_0035.png
+index: 2748
+#Textures/AAIntro/1b8_0036.png
+index: 2749
+#Textures/AAIntro/1b8_0037.png
+index: 2750
+#Textures/AAIntro/1b8_0038.png
+index: 2751
+#Textures/AAIntro/1b8_0039.png
+index: 2752
+#Textures/AAIntro/1b8_0040.png
+index: 2753
+#Textures/AAIntro/1b8_0041.png
+index: 2754
+#Textures/AAIntro/1b8_0042.png
+index: 2755
+#Textures/AAIntro/1b8_0043.png
+index: 2756
+#Textures/AAIntro/1b8_0044.png
+index: 2757
+#Textures/AAIntro/1b8_0045.png
+index: 2758
+#Textures/AAIntro/1b8_0046.png
+index: 2759
+#Textures/AAIntro/1b9_0000.png
+index: 2760
+#Textures/AAIntro/1b9_0001.png
+index: 2761
+#Textures/AAIntro/1b9_0002.png
+index: 2762
+#Textures/AAIntro/1b9_0003.png
+index: 2763
+#Textures/AAIntro/1b9_0004.png
+index: 2764
+#Textures/AAIntro/1b9_0005.png
+index: 2765
+#Textures/AAIntro/1b9_0006.png
+index: 2766
+#Textures/AAIntro/1b9_0007.png
+index: 2767
+#Textures/AAIntro/1b9_0008.png
+index: 2768
+#Textures/AAIntro/1b9_0009.png
+index: 2769
+#Textures/AAIntro/1b9_0010.png
+index: 2770
+#Textures/AAIntro/1b9_0011.png
+index: 2771
+#Textures/AAIntro/1b9_0012.png
+index: 2772
+#Textures/AAIntro/1b9_0013.png
+index: 2773
+#Textures/AAIntro/1b9_0014.png
+index: 2774
+#Textures/AAIntro/1b9_0015.png
+index: 2775
+#Textures/AAIntro/1b9_0016.png
+index: 2776
+#Textures/AAIntro/1b9_0017.png
+index: 2777
+#Textures/AAIntro/1b9_0018.png
+index: 2778
+#Textures/AAIntro/1b9_0019.png
+index: 2779
+#Textures/AAIntro/1b9_0020.png
+index: 2780
+#Textures/AAIntro/1b9_0021.png
+index: 2781
+#Textures/AAIntro/1b9_0022.png
+index: 2782
+#Textures/AAIntro/1b9_0023.png
+index: 2783
+#Textures/AAIntro/1b9_0024.png
+index: 2784
+#Textures/AAIntro/1b9_0025.png
+index: 2785
+#Textures/AAIntro/1b9_0026.png
+index: 2786
+#Textures/AAIntro/1b9_0027.png
+index: 2787
+#Textures/AAIntro/1b9_0028.png
+index: 2788
+#Textures/AAIntro/1b9_0029.png
+index: 2789
+#Textures/AAIntro/1b9_0030.png
+index: 2790
+#Textures/AAIntro/1b9_0031.png
+index: 2791
+#Textures/AAIntro/1b9_0032.png
+index: 2792
+#Textures/AAIntro/1b9_0033.png
+index: 2793
+#Textures/AAIntro/1b9_0034.png
+index: 2794
+#Textures/AAIntro/1b9_0035.png
+index: 2795
+#Textures/AAIntro/1b9_0036.png
+index: 2796
+#Textures/AAIntro/1b9_0037.png
+index: 2797
+#Textures/AAIntro/1b9_0038.png
+index: 2798
+#Textures/AAIntro/1b9_0039.png
+index: 2799
+#Textures/AAIntro/1b9_0040.png
+index: 2800
+#Textures/AAIntro/1b9_0041.png
+index: 2801
+#Textures/AAIntro/1ba_0000.png
+index: 2802
+#Textures/AAIntro/1ba_0001.png
+index: 2803
+#Textures/AAIntro/1ba_0002.png
+index: 2804
+#Textures/AAIntro/1ba_0003.png
+index: 2805
+#Textures/AAIntro/1ba_0004.png
+index: 2806
+#Textures/AAIntro/1ba_0005.png
+index: 2807
+#Textures/AAIntro/1ba_0006.png
+index: 2808
+#Textures/AAIntro/1ba_0007.png
+index: 2809
+#Textures/AAIntro/1ba_0008.png
+index: 2810
+#Textures/AAIntro/1ba_0009.png
+index: 2811
+#Textures/AAIntro/1ba_0010.png
+index: 2812
+#Textures/AAIntro/1ba_0011.png
+index: 2813
+#Textures/AAIntro/1ba_0012.png
+index: 2814
+#Textures/AAIntro/1ba_0013.png
+index: 2815
+#Textures/AAIntro/1ba_0014.png
+index: 2816
+#Textures/AAIntro/1ba_0015.png
+index: 2817
+#Textures/AAIntro/1ba_0016.png
+index: 2818
+#Textures/AAIntro/1ba_0017.png
+index: 2819
+#Textures/AAIntro/1ba_0018.png
+index: 2820
+#Textures/AAIntro/1ba_0019.png
+index: 2821
+#Textures/AAIntro/1ba_0020.png
+index: 2822
+#Textures/AAIntro/1ba_0021.png
+index: 2823
+#Textures/AAIntro/1ba_0022.png
+index: 2824
+#Textures/AAIntro/1ba_0023.png
+index: 2825
+#Textures/AAIntro/1ba_0024.png
+index: 2826
+#Textures/AAIntro/1ba_0025.png
+index: 2827
+#Textures/AAIntro/1ba_0026.png
+index: 2828
+#Textures/AAIntro/1ba_0027.png
+index: 2829
+#Textures/AAIntro/1ba_0028.png
+index: 2830
+#Textures/AAIntro/1ba_0029.png
+index: 2831
+#Textures/AAIntro/1ba_0030.png
+index: 2832
+#Textures/AAIntro/1ba_0031.png
+index: 2833
+#Textures/AAIntro/1ba_0032.png
+index: 2834
+#Textures/AAIntro/1ba_0033.png
+index: 2835
+#Textures/AAIntro/1ba_0034.png
+index: 2836
+#Textures/AAIntro/1ba_0035.png
+index: 2837
+#Textures/AAIntro/1bb_0000.png
+index: 2838
+#Textures/AAIntro/1bb_0001.png
+index: 2839
+#Textures/AAIntro/1bb_0002.png
+index: 2840
+#Textures/AAIntro/1bb_0003.png
+index: 2841
+#Textures/AAIntro/1bb_0004.png
+index: 2842
+#Textures/AAIntro/1bb_0005.png
+index: 2843
+#Textures/AAIntro/1bb_0006.png
+index: 2844
+#Textures/AAIntro/1bb_0007.png
+index: 2845
+#Textures/AAIntro/1bb_0008.png
+index: 2846
+#Textures/AAIntro/1bb_0009.png
+index: 2847
+#Textures/AAIntro/1bb_0010.png
+index: 2848
+#Textures/AAIntro/1bb_0011.png
+index: 2849
+#Textures/AAIntro/1bb_0012.png
+index: 2850
+#Textures/AAIntro/1bb_0013.png
+index: 2851
+#Textures/AAIntro/1bb_0014.png
+index: 2852
+#Textures/AAIntro/1bb_0015.png
+index: 2853
+#Textures/AAIntro/1bb_0016.png
+index: 2854
+#Textures/AAIntro/1bb_0017.png
+index: 2855
+#Textures/AAIntro/1bb_0018.png
+index: 2856
+#Textures/AAIntro/1bb_0019.png
+index: 2857
+#Textures/AAIntro/1bb_0020.png
+index: 2858
+#Textures/AAIntro/1bb_0021.png
+index: 2859
+#Textures/AAIntro/1bb_0022.png
+index: 2860
+#Textures/AAIntro/1bb_0023.png
+index: 2861
+#Textures/AAIntro/1bb_0024.png
+index: 2862
+#Textures/AAIntro/1bb_0025.png
+index: 2863
+#Textures/AAIntro/1bb_0026.png
+index: 2864
+#Textures/AAIntro/1bb_0027.png
+index: 2865
+#Textures/AAIntro/1bb_0028.png
+index: 2866
+#Textures/AAIntro/1bb_0029.png
+index: 2867
+#Textures/AAIntro/1bb_0030.png
+index: 2868
+#Textures/AAIntro/1bb_0031.png
+index: 2869
+#Textures/AAIntro/1bb_0032.png
+index: 2870
+#Textures/AAIntro/1bb_0033.png
+index: 2871
+#Textures/AAIntro/1bb_0034.png
+index: 2872
+#Textures/AAIntro/1bb_0035.png
+index: 2873
+#Textures/AAIntro/1bb_0036.png
+index: 2874
+#Textures/AAIntro/1bb_0037.png
+index: 2875
+#Textures/AAIntro/1bb_0038.png
+index: 2876
+#Textures/AAIntro/1bb_0039.png
+index: 2877
+#Textures/AAIntro/1bb_0040.png
+index: 2878
+#Textures/AAIntro/1bb_0041.png
+index: 2879
+#Textures/AAIntro/1bb_0042.png
+index: 2880
+#Textures/AAIntro/1bb_0043.png
+index: 2881
+#Textures/AAIntro/1bb_0044.png
+index: 2882
+#Textures/AAIntro/1bb_0045.png
+index: 2883
+#Textures/AAIntro/1bb_0046.png
+index: 2884
+#Textures/AAIntro/1bb_0047.png
+index: 2885
+#Textures/AAIntro/1bb_0048.png
+index: 2886
+#Textures/AAIntro/1bb_0049.png
+index: 2887
+#Textures/AAIntro/1bb_0050.png
+index: 2888
+#Textures/AAIntro/1bb_0051.png
+index: 2889
+#Textures/AAIntro/1bb_0052.png
+index: 2890
+#Textures/AAIntro/1bb_0053.png
+index: 2891
+#Textures/AAIntro/1bb_0054.png
+index: 2892
+#Textures/AAIntro/1bb_0055.png
+index: 2893
+#Textures/AAIntro/1bb_0056.png
+index: 2894
+#Textures/AAIntro/1bb_0057.png
+index: 2895
+#Textures/AAIntro/1bb_0058.png
+index: 2896
+#Textures/AAIntro/1bb_0059.png
+index: 2897
+#Textures/AAIntro/1bb_0060.png
+index: 2898
+#Textures/AAIntro/1bb_0061.png
+index: 2899
+#Textures/AAIntro/1bb_0062.png
+index: 2900
+#Textures/AAOutro/0001.png
+index: 2901
+#Textures/AAOutro/0003.png
+index: 2902
+#Textures/AAOutro/0004.png
+index: 2903
+#Textures/AAOutro/0006.png
+index: 2904
+#Textures/AAOutro/0008.png
+index: 2905
+#Textures/AAOutro/0012.png
+index: 2906
+#Textures/AAOutro/0014.png
+index: 2907
+#Textures/AAOutro/0016.png
+index: 2908
+#Textures/AAOutro/0019.png
+index: 2909
+#Textures/AAOutro/0022.png
+index: 2910
+#Textures/AAOutro/0024.png
+index: 2911
+#Textures/AAOutro/0026.png
+index: 2912
+#Textures/AAOutro/0030.png
+index: 2913
+#Textures/AAOutro/0032.png
+index: 2914
+#Textures/AAOutro/0034.png
+index: 2915
+#Textures/AAOutro/0038.png
+index: 2916
+#Textures/AAOutro/0040.png
+index: 2917
+#Textures/AAOutro/0044.png
+index: 2918
+#Textures/AAOutro/0049.png
+index: 2919
+#Textures/AAOutro/0052.png
+index: 2920
+#Textures/AAOutro/0056.png
+index: 2921
+#Textures/AAOutro/0057.png
+index: 2922
+#Textures/AAOutro/0059.png
+index: 2923
+#Textures/AAOutro/0062.png
+index: 2924
+#Textures/AAOutro/0065.png
+index: 2925
+#Textures/AAOutro/0068.png
+index: 2926
+#Textures/AAOutro/0070.png
+index: 2927
+#Textures/AAOutro/0072.png
+index: 2928
+#Textures/AAOutro/0076.png
+index: 2929
+#Textures/AAOutro/0079.png
+index: 2930
+#Textures/AAOutro/0081.png
+index: 2931
+#Textures/AAOutro/0085.png
+index: 2932
+#Textures/AAOutro/0086.png
+index: 2933
+#Textures/AAOutro/0089.png
+index: 2934
+#Textures/AAOutro/0092.png
+index: 2935
+#Textures/AAOutro/0094.png
+index: 2936
+#Textures/AAOutro/0096.png
+index: 2937
+#Textures/AAOutro/0098.png
+index: 2938
+#Textures/AAOutro/0102.png
+index: 2939
+#Textures/AAOutro/0104.png
+index: 2940
+#Textures/AAOutro/0106.png
+index: 2941
+#Textures/AAOutro/0110.png
+index: 2942
+#Textures/AAOutro/0112.png
+index: 2943
+#Textures/AAOutro/0114.png
+index: 2944
+#Textures/AAOutro/0116.png
+index: 2945
+#Textures/AAOutro/0120.png
+index: 2946
+#Textures/AAOutro/0122.png
+index: 2947
+#Textures/AAOutro/0124.png
+index: 2948
+#Textures/AAOutro/0126.png
+index: 2949
+#Textures/AAOutro/0128.png
+index: 2950
+#Textures/AAOutro/0132.png
+index: 2951
+#Textures/AAOutro/0134.png
+index: 2952
+#Textures/AAOutro/0136.png
+index: 2953
+#Textures/AAOutro/0140.png
+index: 2954
+#Textures/AAOutro/0142.png
+index: 2955
+#Textures/AAOutro/0144.png
+index: 2956
+#Textures/AAOutro/0146.png
+index: 2957
+#Textures/AAOutro/0150.png
+index: 2958
+#Textures/AAOutro/0152.png
+index: 2959
+#Textures/AAOutro/0154.png
+index: 2960
+#Textures/AAOutro/0156.png
+index: 2961
+#Textures/AAOutro/0158.png
+index: 2962
+#Textures/AAOutro/0160.png
+index: 2963
+#Textures/AAOutro/0162.png
+index: 2964
+#Textures/AAOutro/0164.png
+index: 2965
+#Textures/AAOutro/0168.png
+index: 2966
+#Textures/AAOutro/0170.png
+index: 2967
+#Textures/AAOutro/0172.png
+index: 2968
+#Textures/AAOutro/0174.png
+index: 2969
+#Textures/AAOutro/0178.png
+index: 2970
+#Textures/AAOutro/0180.png
+index: 2971
+#Textures/AAOutro/0182.png
+index: 2972
+#Textures/AAOutro/0186.png
+index: 2973
+#Textures/AAOutro/0188.png
+index: 2974
+#Textures/AAOutro/0192.png
+index: 2975
+#Textures/AAOutro/0194.png
+index: 2976
+#Textures/AAOutro/0196.png
+index: 2977
+#Textures/AAOutro/0198.png
+index: 2978
+#Textures/AAOutro/0202.png
+index: 2979
+#Textures/AAOutro/0204.png
+index: 2980
+#Textures/AAOutro/0208.png
+index: 2981
+#Textures/AAOutro/0210.png
+index: 2982
+#Textures/AAOutro/0214.png
+index: 2983
+#Textures/AAOutro/0216.png
+index: 2984
+#Textures/AAOutro/0218.png
+index: 2985
+#Textures/AAOutro/0220.png
+index: 2986
+#Textures/AAOutro/0224.png
+index: 2987
+#Textures/AAOutro/0226.png
+index: 2988
+#Textures/AAOutro/0230.png
+index: 2989
+#Textures/AAOutro/0232.png
+index: 2990
+#Textures/AAOutro/0236.png
+index: 2991
+#Textures/AAOutro/0238.png
+index: 2992
+#Textures/AAOutro/0242.png
+index: 2993
+#Textures/AAOutro/0244.png
+index: 2994
+#Textures/AAOutro/0248.png
+index: 2995
+#Textures/AAOutro/0250.png
+index: 2996
+#Textures/AAOutro/0254.png
+index: 2997
+#Textures/AAOutro/0256.png
+index: 2998
+#Textures/AAOutro/0260.png
+index: 2999
+#Textures/AAOutro/0262.png
+index: 3000
+#Textures/AAOutro/0266.png
+index: 3001
+#Textures/AAOutro/0268.png
+index: 3002
+#Textures/AAOutro/0270.png
+index: 3003
+#Textures/AAOutro/0274.png
+index: 3004
+#Textures/AAOutro/0278.png
+index: 3005
+#Textures/AAOutro/0280.png
+index: 3006
+#Textures/AAOutro/0284.png
+index: 3007
+#Textures/AAOutro/0286.png
+index: 3008
+#Textures/AAOutro/0288.png
+index: 3009
+#Textures/AAOutro/0292.png
+index: 3010
+#Textures/AAOutro/0294.png
+index: 3011
+#Textures/AAOutro/0298.png
+index: 3012
+#Textures/AAOutro/0300.png
+index: 3013
+#Textures/AAOutro/0304.png
+index: 3014
+#Textures/AAOutro/0306.png
+index: 3015
+#Textures/AAOutro/0310.png
+index: 3016
+#Textures/AAOutro/0312.png
+index: 3017
+#Textures/AAOutro/0316.png
+index: 3018
+#Textures/AAOutro/0320.png
+index: 3019
+#Textures/AAOutro/0322.png
+index: 3020
+#Textures/AAOutro/0324.png
+index: 3021
+#Textures/AAOutro/0328.png
+index: 3022
+#Textures/AAOutro/0330.png
+index: 3023
+#Textures/AAOutro/0334.png
+index: 3024
+#Textures/AAOutro/0336.png
+index: 3025
+#Textures/AAOutro/0340.png
+index: 3026
+#Textures/AAOutro/0342.png
+index: 3027
+#Textures/AAOutro/0346.png
+index: 3028
+#Textures/AAOutro/0348.png
+index: 3029
+#Textures/AAOutro/0352.png
+index: 3030
+#Textures/AAOutro/0354.png
+index: 3031
+#Textures/AAOutro/0358.png
+index: 3032
+#Textures/AAOutro/0360.png
+index: 3033
+#Textures/AAOutro/0364.png
+index: 3034
+#Textures/AAOutro/0366.png
+index: 3035
+#Textures/AAOutro/0368.png
+index: 3036
+#Textures/AAOutro/0372.png
+index: 3037
+#Textures/AAOutro/0374.png
+index: 3038
+#Textures/AAOutro/0378.png
+index: 3039
+#Textures/AAOutro/0380.png
+index: 3040
+#Textures/AAOutro/0382.png
+index: 3041
+#Textures/AAOutro/0384.png
+index: 3042
+#Textures/AAOutro/0386.png
+index: 3043
+#Textures/AAOutro/0390.png
+index: 3044
+#Textures/AAOutro/0392.png
+index: 3045
+#Textures/AAOutro/0394.png
+index: 3046
+#Textures/AAOutro/0398.png
+index: 3047
+#Textures/AAOutro/0408.png
+index: 3048
+#Textures/AAOutro/0418.png
+index: 3049
+#Textures/AAOutro/0420.png
+index: 3050
+#Textures/AAOutro/0422.png
+index: 3051
+#Textures/AAOutro/0426.png
+index: 3052
+#Textures/AAOutro/0428.png
+index: 3053
+#Textures/AAOutro/0430.png
+index: 3054
+#Textures/AAOutro/0434.png
+index: 3055
+#Textures/AAOutro/0436.png
+index: 3056
+#Textures/AAOutro/0438.png
+index: 3057
+#Textures/AAOutro/0440.png
+index: 3058
+#Textures/AAOutro/0444.png
+index: 3059
+#Textures/AAOutro/0446.png
+index: 3060
+#Textures/AAOutro/0448.png
+index: 3061
+#Textures/AAOutro/0450.png
+index: 3062
+#Textures/AAOutro/0454.png
+index: 3063
+#Textures/AAOutro/0456.png
+index: 3064
+#Textures/AAOutro/0458.png
+index: 3065
+#Textures/AAOutro/0462.png
+index: 3066
+#Textures/AAOutro/0464.png
+index: 3067
+#Textures/AAOutro/0466.png
+index: 3068
+#Textures/AAOutro/0468.png
+index: 3069
+#Textures/AAOutro/0470.png
+index: 3070
+#Textures/AAOutro/0474.png
+index: 3071
+#Textures/AAOutro/0476.png
+index: 3072
+#Textures/AAOutro/0478.png
+index: 3073
+#Textures/AAOutro/0480.png
+index: 3074
+#Textures/AAOutro/0482.png
+index: 3075
+#Textures/AAOutro/0484.png
+index: 3076
+#Textures/AAOutro/0486.png
+index: 3077
+#Textures/AAOutro/0488.png
+index: 3078
+#Textures/AAOutro/0492.png
+index: 3079
+#Textures/AAOutro/0494.png
+index: 3080
+#Textures/AAOutro/0496.png
+index: 3081
+#Textures/AAOutro/0502.png
+index: 3082
+#Textures/AAOutro/0504.png
+index: 3083
+#Textures/AAOutro/0506.png
+index: 3084
+#Textures/AAOutro/0508.png
+index: 3085
+#Textures/AAOutro/0512.png
+index: 3086
+#Textures/AAOutro/0514.png
+index: 3087
+#Textures/AAOutro/0516.png
+index: 3088
+#Textures/AAOutro/0518.png
+index: 3089
+#Textures/AAOutro/0520.png
+index: 3090
+#Textures/AAOutro/0524.png
+index: 3091
+#Textures/AAOutro/0532.png
+index: 3092
+#Textures/AAOutro/0536.png
+index: 3093
+#Textures/AAOutro/0538.png
+index: 3094
+#Textures/AAOutro/0550.png
+index: 3095
+#Textures/AAOutro/0552.png
+index: 3096
+#Textures/AAOutro/0556.png
+index: 3097
+#Textures/AAOutro/0560.png
+index: 3098
+#Textures/AAOutro/0578.png
+index: 3099
+#Textures/AAOutro/0582.png
+index: 3100
+#Textures/AAOutro/0586.png
+index: 3101
+#Textures/AAOutro/0590.png
+index: 3102
+#Textures/AAOutro/0622.png
+index: 3103
+#Textures/AAOutro/0626.png
+index: 3104
+#Textures/AAOutro/0632.png
+index: 3105
+#Textures/AAOutro/0634.png
+index: 3106
+#Textures/AAOutro/0648.png
+index: 3107
+#Textures/AAOutro/0650.png
+index: 3108
+#Textures/AAOutro/0652.png
+index: 3109
+#Textures/AAOutro/0654.png
+index: 3110
+#Textures/AAOutro/0656.png
+index: 3111
+#Textures/AAOutro/0658.png
+index: 3112
+#Textures/AAOutro/0660.png
+index: 3113
+#Textures/AAOutro/0662.png
+index: 3114
+#Textures/AAOutro/0664.png
+index: 3115
+#Textures/AAOutro/0666.png
+index: 3116
+#Textures/AAOutro/0668.png
+index: 3117
+#Textures/AAOutro/0670.png
+index: 3118
+#Textures/AAOutro/0672.png
+index: 3119
+#Textures/AAOutro/0676.png
+index: 3120
+#Textures/AAOutro/0680.png
+index: 3121
+#Textures/AAOutro/0682.png
+index: 3122
+#Textures/AAOutro/0684.png
+index: 3123
+#Textures/AAOutro/0686.png
+index: 3124
+#Textures/AAOutro/0690.png
+index: 3125
+#Textures/AAOutro/0692.png
+index: 3126
+#Textures/AAOutro/0694.png
+index: 3127
+#Textures/AAOutro/0696.png
+index: 3128
+#Textures/AAOutro/0698.png
+index: 3129
+#Textures/AAOutro/0700.png
+index: 3130
+#Textures/AAOutro/0702.png
+index: 3131
+#Textures/AAOutro/0704.png
+index: 3132
+#Textures/AAOutro/0706.png
+index: 3133
+#Textures/AAOutro/0708.png
+index: 3134
+#Textures/AAOutro/0710.png
+index: 3135
+#Textures/AAOutro/0714.png
+index: 3136
+#Textures/AAOutro/0716.png
+index: 3137
+#Textures/AAOutro/0720.png
+index: 3138
+#Textures/AAOutro/0722.png
+index: 3139
+#Textures/AAOutro/0724.png
+index: 3140
+#Textures/AAOutro/0726.png
+index: 3141
+#Textures/AAOutro/0728.png
+index: 3142
+#Textures/AAOutro/0730.png
+index: 3143
+#Textures/AAOutro/0732.png
+index: 3144
+#Textures/AAOutro/0734.png
+index: 3145
+#Textures/AAOutro/0738.png
+index: 3146
+#Textures/AAOutro/0740.png
+index: 3147
+#Textures/AAOutro/0742.png
+index: 3148
+#Textures/AAOutro/0744.png
+index: 3149
+#Textures/AAOutro/0746.png
+index: 3150
+#Textures/AAOutro/0748.png
+index: 3151
+#Textures/AAOutro/0750.png
+index: 3152
+#Textures/AAOutro/0752.png
+index: 3153
+#Textures/AAOutro/0754.png
+index: 3154
+#Textures/AAOutro/0756.png
+index: 3155
+#Textures/AAOutro/0758.png
+index: 3156
+#Textures/AAOutro/0760.png
+index: 3157
+#Textures/AAOutro/0762.png
+index: 3158
+#Textures/AAOutro/0764.png
+index: 3159
+#Textures/AAOutro/0766.png
+index: 3160
+#Textures/AAOutro/0768.png
+index: 3161
+#Textures/AAOutro/0770.png
+index: 3162
+#Textures/AAOutro/0772.png
+index: 3163
+#Textures/AAOutro/0774.png
+index: 3164
+#Textures/AAOutro/0776.png
+index: 3165
+#Textures/AAOutro/0778.png
+index: 3166
+#Textures/AAOutro/0780.png
+index: 3167
+#Textures/AAOutro/0782.png
+index: 3168
+#Textures/AAOutro/0784.png
+index: 3169
+#Textures/AAOutro/0786.png
+index: 3170
+#Textures/AAOutro/0788.png
+index: 3171
+#Textures/AAOutro/0790.png
+index: 3172
+#Textures/AAOutro/0792.png
+index: 3173
+#Textures/AAOutro/0794.png
+index: 3174
+#Textures/AAOutro/0796.png
+index: 3175
+#Textures/AAOutro/0798.png
+index: 3176
+#Textures/AAOutro/0800.png
+index: 3177
+#Textures/AAOutro/0802.png
+index: 3178
+#Textures/AAOutro/0804.png
+index: 3179
+#Textures/AAOutro/0806.png
+index: 3180
+#Textures/AAOutro/0808.png
+index: 3181
+#Textures/AAOutro/0812.png
+index: 3182
+#Textures/AAOutro/0814.png
+index: 3183
+#Textures/AAOutro/0816.png
+index: 3184
+#Textures/AAOutro/0818.png
+index: 3185
+#Textures/AAOutro/0822.png
+index: 3186
+#Textures/AAOutro/0824.png
+index: 3187
+#Textures/AAOutro/0826.png
+index: 3188
+#Textures/AAOutro/0828.png
+index: 3189
+#Textures/AAOutro/0830.png
+index: 3190
+#Textures/AAOutro/0832.png
+index: 3191
+#Textures/AAOutro/0834.png
+index: 3192
+#Textures/AAOutro/0836.png
+index: 3193
+#Textures/AAOutro/0838.png
+index: 3194
+#Textures/AAOutro/0840.png
+index: 3195
+#Textures/AAOutro/0842.png
+index: 3196
+#Textures/AAOutro/0844.png
+index: 3197
+#Textures/AAOutro/0848.png
+index: 3198
+#Textures/AAOutro/0852.png
+index: 3199
+#Textures/AAOutro/0854.png
+index: 3200
+#Textures/AAOutro/0856.png
+index: 3201
+#Textures/AAOutro/0858.png
+index: 3202
+#Textures/AAOutro/0860.png
+index: 3203
+#Textures/AAOutro/0862.png
+index: 3204
+#Textures/AAOutro/0864.png
+index: 3205
+#Textures/AAOutro/0866.png
+index: 3206
+#Textures/AAOutro/0868.png
+index: 3207
+#Textures/AAOutro/0870.png
+index: 3208
+#Textures/AAOutro/0872.png
+index: 3209
+#Textures/AAOutro/0874.png
+index: 3210
+#Textures/AAOutro/0878.png
+index: 3211
+#Textures/AAOutro/0880.png
+index: 3212
+#Textures/AAOutro/0882.png
+index: 3213
+#Textures/AAOutro/0884.png
+index: 3214
+#Textures/AAOutro/0886.png
+index: 3215
+#Textures/AAOutro/0888.png
+index: 3216
+#Textures/AAOutro/0890.png
+index: 3217
+#Textures/AAOutro/0892.png
+index: 3218
+#Textures/AAOutro/0894.png
+index: 3219
+#Textures/AAOutro/0896.png
+index: 3220
+#Textures/AAOutro/0898.png
+index: 3221
+#Textures/AAOutro/0900.png
+index: 3222
+#Textures/AAOutro/0902.png
+index: 3223
+#Textures/AAOutro/0904.png
+index: 3224
+#Textures/AAOutro/0906.png
+index: 3225
+#Textures/AAOutro/0908.png
+index: 3226
+#Textures/AAOutro/0910.png
+index: 3227
+#Textures/AAOutro/0914.png
+index: 3228
+#Textures/AAOutro/0916.png
+index: 3229
+#Textures/AAOutro/0920.png
+index: 3230
+#Textures/AAOutro/0922.png
+index: 3231
+#Textures/AAOutro/0924.png
+index: 3232
+#Textures/AAOutro/0926.png
+index: 3233
+#Textures/AAOutro/0928.png
+index: 3234
+#Textures/AAOutro/0930.png
+index: 3235
+#Textures/AAOutro/0932.png
+index: 3236
+#Textures/AAOutro/0934.png
+index: 3237
+#Textures/AAOutro/0936.png
+index: 3238
+#Textures/AAOutro/0938.png
+index: 3239
+#Textures/AAOutro/0940.png
+index: 3240
+#Textures/AAOutro/0944.png
+index: 3241
+#Textures/AAOutro/0946.png
+index: 3242
+#Textures/AAOutro/0950.png
+index: 3243
+#Textures/AAOutro/0952.png
+index: 3244
+#Textures/AAOutro/0954.png
+index: 3245
+#Textures/AAOutro/0956.png
+index: 3246
+#Textures/AAOutro/0958.png
+index: 3247
+#Textures/AAOutro/0960.png
+index: 3248
+#Textures/AAOutro/0962.png
+index: 3249
+#Textures/AAOutro/0964.png
+index: 3250
+#Textures/AAOutro/0966.png
+index: 3251
+#Textures/AAOutro/0968.png
+index: 3252
+#Textures/AAOutro/0970.png
+index: 3253
+#Textures/AAOutro/0972.png
+index: 3254
+#Textures/AAOutro/0974.png
+index: 3255
+#Textures/AAOutro/0976.png
+index: 3256
+#Textures/AAOutro/0980.png
+index: 3257
+#Textures/AAOutro/0982.png
+index: 3258
+#Textures/AAOutro/0986.png
+index: 3259
+#Textures/AAOutro/0988.png
+index: 3260
+#Textures/AAOutro/0990.png
+index: 3261
+#Textures/AAOutro/0992.png
+index: 3262
+#Textures/AAOutro/0994.png
+index: 3263
+#Textures/AAOutro/0996.png
+index: 3264
+#Textures/AAOutro/0998.png
+index: 3265
+#Textures/AAOutro/1000.png
+index: 3266
+#Textures/AAOutro/1004.png
+index: 3267
+#Textures/AAOutro/1006.png
+index: 3268
+#Textures/AAOutro/1008.png
+index: 3269
+#Textures/AAOutro/1012.png
+index: 3270
+#Textures/AAOutro/1014.png
+index: 3271
+#Textures/AAOutro/1016.png
+index: 3272
+#Textures/AAOutro/1018.png
+index: 3273
+#Textures/AAOutro/1020.png
+index: 3274
+#Textures/AAOutro/1022.png
+index: 3275
+#Textures/AAOutro/1024.png
+index: 3276
+#Textures/AAOutro/1028.png
+index: 3277
+#Textures/AAOutro/1030.png
+index: 3278
+#Textures/AAOutro/1032.png
+index: 3279
+#Textures/AAOutro/1036.png
+index: 3280
+#Textures/AAOutro/1038.png
+index: 3281
+#Textures/AAOutro/1040.png
+index: 3282
+#Textures/AAOutro/1042.png
+index: 3283
+#Textures/AAOutro/1046.png
+index: 3284
+#Textures/AAOutro/1048.png
+index: 3285
+#Textures/AAOutro/1050.png
+index: 3286
+#Textures/AAOutro/1054.png
+index: 3287
+#Textures/AAOutro/1056.png
+index: 3288
+#Textures/AAOutro/1058.png
+index: 3289
+#Textures/AAOutro/1060.png
+index: 3290
+#Textures/AAOutro/1064.png
+index: 3291
+#Textures/AAOutro/1066.png
+index: 3292
+#Textures/AAOutro/1068.png
+index: 3293
+#Textures/AAOutro/1070.png
+index: 3294
+#Textures/AAOutro/1072.png
+index: 3295
+#Textures/AAOutro/1076.png
+index: 3296
+#Textures/AAOutro/1078.png
+index: 3297
+#Textures/AAOutro/1082.png
+index: 3298
+#Textures/AAOutro/1084.png
+index: 3299
+#Textures/AAOutro/1086.png
+index: 3300
+#Textures/AAOutro/1088.png
+index: 3301
+#Textures/AAOutro/1090.png
+index: 3302
+#Textures/AAOutro/1094.png
+index: 3303
+#Textures/AAOutro/1096.png
+index: 3304
+#Textures/AAOutro/1098.png
+index: 3305
+#Textures/AAOutro/1102.png
+index: 3306
+#Textures/AAOutro/1104.png
+index: 3307
+#Textures/AAOutro/1106.png
+index: 3308
+
+// Intro (AAIntro) video frames: indices 2166..2900, playback order (clip then frame).
+// Credits (AAOutro) video frames: indices 2901..3308, playback order (frame number).

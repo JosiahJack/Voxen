@@ -14,8 +14,8 @@ float modelMatrices[INSTANCE_COUNT*16],*world_from_mdl=modelMatrices,modelBounds
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {5,/*Forward=F*/ 0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/ 23,/*Prone=X*/ 16,/*Lean Left=Q*/ 4,/*Lean Right=E*/ 45,/*Sprint=LSHIFT*/ 38,/*Turn Left=LARROW*/ 39,/*Turn Right=RARROW*/ 36,/*Look Up=UARROW*/ 37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/ 27,/*Sensaround=2*/ 28,/*Lantern=3*/
-                          29,/*Shield=4*/ 30,/*Infrared=5*/ 31,/*Email=6*/ 32,/*Booster=7*/ 33,/*Jumpjets=8*/ 56,/*Attack=LMB*/ 57,/*Use=RMB*/ 99,/*Menu/Back=ESCAPE*/ 97,/*Toggle Mode=TAB*/ 17,/*Reload=R*/ 127,/*Weapon+=MWHEEL+*/ 128,/* Weapon-=MWHEEL-*/ 6,/* Grenade=G*/ 19,/*Grenade + = T*/ 131,/*Grenade-=*/ 21,/*Ammo Type=V*/ 9,/*Patch Use=J*/ 8,/*Patch+=I*/ 132,/*Patch-=,*/
-                          12,/*Full Map=M*/ 21,/*Swim Up= V*/ 2,/*Swim Down=C*/ 101,/*Screenshot=F12*/ 102/*Console=GRAVE*/},
+                          29,/*Shield=4*/ 30,/*Infrared=5*/ 31,/*Email=6*/ 32,/*Booster=7*/ 33,/*Jumpjets=8*/ 56,/*Attack=LMB*/ 57,/*Use=RMB*/ 99,/*Menu/Back=ESCAPE*/ 80,/*Toggle Mode=TAB*/ 17,/*Reload=R*/ 127,/*Weapon+=MWHEEL+*/ 128,/* Weapon-=MWHEEL-*/ 6,/* Grenade=G*/ 19,/*Grenade + = T*/ 131,/*Grenade-=*/ 21,/*Ammo Type=V*/ 9,/*Patch Use=J*/ 8,/*Patch+=I*/ 132,/*Patch-=,*/
+                          12,/*Full Map=M*/ 21,/*Swim Up= V*/ 2,/*Swim Down=C*/ 101,/*Screenshot=F12*/ 102,/*Console=GRAVE*/},
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u, 
     .InvCybLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
 InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=false, .showFPS=false, .editMode=false, .showPhys=false};
@@ -31,7 +31,7 @@ V3 debugWepOffset = {0, 0, 0}; // debug weapon view offset
 static float shakeAmp = 0.15f;
 Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
                       {1.0f,0.498039216f,0.0f,1.0f}, /* 5 Orange T_ORANGE*/ {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red T_STOPD_RED*/ {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
-                      {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title T_GREEN_MENU*/ {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/ {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/ {0.392156863f,0.031372549f,0.039215686f,1.0f} /* 12 Red Menu Text Dark T_RED_MENU*/ };
+                      {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title T_GREEN_MENU*/ {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/ {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/ {0.392156863f,0.031372549f,0.039215686f,1.0f}, /* 12 Red Menu Text Dark T_RED_MENU*/ {0.594339600f,0.232689545f,0.232689545f,1.0f} /* 13 Intro/Outro Subtitle #973B3B T_VIDEOTEXT*/ };
 // Wireline Rendering
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex* debugLineVerts = NULL;
@@ -210,7 +210,8 @@ void cmd_undo() { if (Cheats.editMode) { if (lastSpawned < U16_MAX && lastSpawne
 void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; shakeAmp = (force < 0.48f) ? force : 0.48f; }
 void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
 void cmd_shake() { Shake(-1.0f); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
-void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip=Cheats.notarget=true; CenterStatusPrint("edit mode: %s","Edit Mode activated!"); } else { Cheats.noclip=Cheats.notarget=false; editModeSelection = U16_MAX; CenterStatusPrint("%s","Edit Mode deactivated"); } }
+void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip=Cheats.notarget=true; Cheats.editSubMode=0; CenterStatusPrint("edit mode: %s","Edit Mode activated!"); } else { Cheats.noclip=Cheats.notarget=false; editModeSelection = U16_MAX; CenterStatusPrint("%s","Edit Mode deactivated"); } }
+static void cmd_editsub(int submode) { if (submode < 0 || submode > 1) { CenterStatusPrint("Invalid edit submode: %d (0=select, 1=spawn physics objects)",submode); return; } Cheats.editSubMode=(u8)submode; CenterStatusPrint("Edit submode: %s",submode==0?"select":submode==1?"spawn physics objects":"?"); }
 int ParseLevelArg(const char* arg) {
     if (!arg || !*arg) return -1;
     char clean[64] = {0}; int j = 0; for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') clean[j++] = c2Lower((u8)arg[i]); }   clean[j] = '\0';
@@ -232,7 +233,7 @@ static void cmd_summon(int itemConstIndex) {
     if (IdxIsHardware(itemConstIndex)) { int v=(int)World.invP1.hwVers[itemConstIndex-328]+1; World.instances[spawned].customIndex=(i16)(v>4?4:v); } } CenterStatusPrint("Summoned object ID %d",itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s",itemConstIndex); } }
 static void cmd_select(int instanceIdx) { if (instanceIdx >= 0 && instanceIdx < World.instCount) { editModeSelection=(u16)instanceIdx; CenterStatusPrint("Selected entity instance %u (const index %u)",editModeSelection,World.instances[editModeSelection].index); } else { CenterStatusPrint("Invalid instance: %d (loaded count: %u)",instanceIdx,World.instCount); } }
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
-static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; }                         static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
+static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; if (Cheats.showFPS && (World.invP1.hasHardware & HW_BIO)) World.invP1.hardwareIsActive |= HW_BIO;/*hold the biomonitor on so its graphs carry the frame-time scopes*/ }                         static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
 static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacker!"); } static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
 static void cmd_god() { Cheats.god = !Cheats.god; CenterStatusPrint("god mode: %s", Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_energy() { Cheats.redbull = !Cheats.redbull; if (Cheats.redbull) {CenterStatusPrint("%s", Sys_Text.stringTable[1006]);/*"I feel the power! 0 energy consumption!"*/} else {CenterStatusPrint("%s", Sys_Text.stringTable[1005]);/*Energy usage normal*/} }
@@ -268,6 +269,7 @@ static const ConsoleCommand consoleCmds[] = {
     {"noclip",         {.noArg=cmd_noclip},        NOARG},{"idclip",          {.noArg=cmd_noclip},NOARG},         {"no clip",     {.noArg = cmd_noclip},NOARG},  {"showphys",      {.noArg = cmd_showphys},NOARG},  { "god",           {.noArg=cmd_god}, NOARG},       {"overwhelming",            {.noArg=cmd_god}, NOARG}, 
     {"whosyourdaddy",  {.noArg = cmd_god},         NOARG},{"iddqd",           {.noArg=cmd_god}, NOARG},           {"notarget",    {.noArg=cmd_notarget},NOARG},  {"no target",     {.noArg = cmd_notarget},NOARG},  {"editmode",       {.noArg=cmd_edit},NOARG},       {"edit",                    {.noArg=cmd_edit},NOARG},
     {"edit mode",      {.noArg = cmd_edit},        NOARG},{"editor",          {.noArg=cmd_edit},NOARG},           {"undo",        {.noArg=cmd_undo},    NOARG},  {"showfps",       {.noArg = cmd_showfps}, NOARG},  {"show fps",       {.noArg=cmd_showfps},NOARG},    {"showlocation",            {.noArg=cmd_showlocation},NOARG},
+    {"editsub",        {.withInt=cmd_editsub},     CMD_INT},
     {"show location",  {.noArg = cmd_showlocation},NOARG},{"nohud",           {.noArg=cmd_nohud},NOARG},          {"no hud",      {.noArg=cmd_nohud},   NOARG},  {"bottomlessclip",{.noArg = cmd_bottomless},NOARG},{"bottomless clip",{.noArg=cmd_bottomless},NOARG}, {"load",                    {.withStr=cmd_loadlevel},CMD_STR},
     {"loadarsenal",    {.withStr = cmd_loadarsenal},CMD_STR},{"load arsenal", {.withStr=cmd_loadarsenal},CMD_STR},{"summon_obj",  {.withInt=cmd_summon},CMD_INT},{"summonobj",     {.withInt = cmd_summon},CMD_INT},{"select",          {.withInt=cmd_select},CMD_INT},{"motherlode",     {.noArg=cmd_nomoney},   NOARG}, {"rosebud",                 {.noArg=cmd_nomoney},NOARG},
     {"kaching",        {.noArg=cmd_nomoney},       NOARG},{"money",           {.noArg=cmd_nomoney},NOARG},        {"dizzy",       {.noArg=cmd_dizzy},   NOARG},  {"help",          {.noArg=cmd_help},        NOARG},{"ifeelthepower",  {.noArg = cmd_energy},  NOARG}, {"power",                   {.noArg=cmd_energy}, NOARG},
@@ -820,11 +822,12 @@ void InitalizeEnvironment() {
     glUseProgram(shadowmapsSP); glUniform1ui(9,SHADOW_MAP_SIZE); glUseProgram(shadowmapsClearSP); glUniform1ui(0,SHADOW_MAP_SIZE); glUseProgram(chunkSP); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE); // One time set uniforms
     for (int f=0;f<5;++f) glGenQueries(5,gpuQ[f]);
     RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); RenderLoading("Loading models..."); DebugRAM("before LoadModels"); LoadModels(); DebugRAM("after LoadModels");
-    if (World.introNotPlayed) { currentMenuPage = Mpg_IntroVideo; PlayMenuMusic(); World.menuActive = true; World.introNotPlayed = false; } World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
+    { FHandle indone=OS_OpenReadonly("introdone.dat"); if (indone!=(FHandle)-1) OS_Close(indone);/*sentinel exists: intro already played, skip*/ else { indone=OS_OpenWriteonly("introdone.dat"); if (indone!=(FHandle)-1) OS_Close(indone);/*create sentinel, then play intro*/ ChangeMenuPage(Mpg_IntroVideo); } }/*ChangeMenuPage so the first-run cutscene also gets its clip audio + start time*/ World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     AutomapInitGL();
     BiomonitorInitGL(); BioMonitorInit();
     NewGame();
-    PlayMenuMusic(); World.menuActive = true; currentMenuPage = Mpg_FrontPage; // Comment out for immediate testing
+    if (currentMenuPage != Mpg_IntroVideo) { currentMenuPage = Mpg_FrontPage; PlayMenuMusic(); }/*first run plays the intro cutscene (Citadel CheckAndPlayIntro); otherwise the title music fronts the menu*/
+    World.menuActive = true;
     OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free"); DebugRAMPeak(); DebugRAMBreakdown();
 }
 

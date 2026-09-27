@@ -262,26 +262,16 @@ void VaporizeClick() {int slot=World.invP1.generalInvCurrent; if(!GeneralInvCanV
 typedef struct { i8 norm,alt; } AmmoIconEntry;
 static const AmmoIconEntry ammoIconTable[51]={[36-36]={7,8}/*Magnesium/Penetrator*/,[37-36]={-2,-2}/*Energy*/,[38-36]={0,1}/*Needle/Tranq*/,[39-36]={9,10}/*Hornette/Splinter*/,[40-36]={-2,-2}/*Energy*/,[41-36]={-1,-1}/*Rapier, no ammo*/,[42-36]={-1,-1}/*Pipe, no ammo*/,[43-36]={5,6}/*Hollow/Slug*/,[44-36]={11,-1}/*Magcart*/,[45-36]={2,3 }/*Standard/Teflon*/,[46-36]={-2,-2}/*Energy*/,[47-36]={14,-1}/*Rail Rounds*/,[48-36]={4,-1}/*Rubber Slugs*/,[49-36]={12,13}/*Slag/Large Slag*/,[50-36]={-2,-2}/*Energy*/,[51-36]={-2,-2}/*Energy*/};
 i8 AmmoIconGet(int index,bool alt) { if (index < 343 || index > 358) {return -1;} const AmmoIconEntry* e = &ammoIconTable[index - 343]; return alt ? e->alt : e->norm; }
-static double creditsVidStartTime,creditsVidFinished; static u8 creditsVidPhase; // CreditsScroll, TODO video text phases: 0=text1 visible, 1=text2 visible, 2=text3 visible, 3=all hidden
-void CreditsOnEnable() { World.creditsActive=true; World.creditsPageIndex=0; creditsVidStartTime=World.absoluteTime; creditsVidFinished=World.absoluteTime + 37.2; creditsVidPhase=0; }
-void CreditsUpdate() {
-    if (!World.creditsActive) return;
-    double elapsed = World.absoluteTime - creditsVidStartTime;
-    if (creditsVidFinished > 0.0) { // Drive video text phase transitions
-        if (elapsed >  7.0 && creditsVidPhase == 0) { creditsVidPhase = 1; CenterStatusPrint("Credits phase: text2 visible"); } if (elapsed > 11.0 && creditsVidPhase == 1) { creditsVidPhase = 2; CenterStatusPrint("Credits phase: text3 visible"); } if (elapsed > 14.0 && creditsVidPhase == 2) { creditsVidPhase = 3; CenterStatusPrint("Credits phase: text hidden"); }
-        if (World.absoluteTime >= creditsVidFinished) { creditsVidFinished=0.0; creditsVidPhase=3; CenterStatusPrint("Credits video finished"); }
-    }
-    if (Menu()) { if (creditsVidFinished > 0.0) { creditsVidFinished = 0.0; return; /*skip video*/} MenuGoBack(); return; } if (creditsVidFinished > 0.0) return; // absorb all click input while video playing
-    if (Attack()) { // left click — advance
-        if (!(World.creditsPageIndex >= CREDITS_PAGES)) { ++World.creditsPageIndex; if (!World.gameFinished && World.creditsPageIndex == 1) ++World.creditsPageIndex;/*skip stats page when not finishing game*/ if (World.creditsPageIndex >= CREDITS_PAGES) World.creditsPageIndex = CREDITS_PAGES;/*bottom*/ } else { World.creditsActive = false; MenuGoBack(); } return;
-    } if (ToggleMode()) { if (World.creditsPageIndex > 0){--World.creditsPageIndex;} } // right click — go back a page
-}
+/*Menu video text overlay playback (intro/credits) lives in ui.c RenderVideoPage; the old CreditsScroll phase driver below was dead code and is removed.*/
 
 void CyborgConversionToggleTargetted() {bool active=(World.ressurectionActiveLevels>>World.curLev)&1u; flag_setu16(&World.ressurectionActiveLevels,(1u<<World.curLev),!active); if(World.curLev==6)flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ play_wav(sounds[active ? 183 : 184], AppliedFXVol(1.0f), (V3){0.0f,0.0f,0.0f}, false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);}
+bool PlayerInElevatorCell(void); bool FindElevatorKeypadPos(u8 level,V3* outPos);
 void ElevatorButtonClick(u16 self) {
-    Entity* e = &World.instances[self]; if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor]; bool doorClosed = door->doorOpen == DoorState_Closed; float dist = V3_Dist(World.Sys_UI.objectInUsePos,World.position[PLAYER1]); 
-    if (dist > 2.0f/*tether dist*/ && !doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } if (!doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[7]); /*Door not closed.*/ return; } if (!(e->entflags & EF_ACTIVE)) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); /*Floor not accessible.*/ return; }
-    queuedLevelPos=(e->targetDestinationID != U16_MAX && e->targetDestinationID < World.instCount) ? World.position[e->targetDestinationID] : (V3){0.0f,0.0f,0.0f}; queuedLevelToLoad=(u8)e->teleportID;
+    Entity* e = &World.instances[self]; if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor]; bool doorClosed = door->doorOpen == DoorState_Closed;
+    if (!PlayerInElevatorCell()) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } if (!doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[7]); /*Door not closed.*/ return; } if (!(e->entflags & EF_ACTIVE)) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); /*Floor not accessible.*/ return; }
+    /*Preserve the player's relative offset from the keypad across the level load.*/
+    V3 srcKeypad=World.Sys_UI.objectInUsePos; V3 offset=V3_AsubB(World.position[PLAYER1],srcKeypad);
+    u8 destLevel=(u8)e->teleportID; V3 destKeypad; if (FindElevatorKeypadPos(destLevel,&destKeypad)) queuedLevelPos=V3_AplusB(destKeypad,offset); else queuedLevelPos=(e->targetDestinationID != U16_MAX && e->targetDestinationID < World.instCount) ? World.position[e->targetDestinationID] : (V3){0.0f,0.0f,0.0f}; queuedLevelToLoad=destLevel;
 }
 
 void EmailTargetted(u16 self) { Entity* e=&World.instances[self]; u16 idx=e->emailIndex; if(idx>=LOGCNT){return;} if(World.invP1.hasLog[idx]){return;} World.invP1.hasLog[idx]=World.invP1.hasNewEmail=true; World.invP1.lastAddedIndex=idx; if(Sys_Text.audioLogType[idx] == AudioLogType_Email){World.invP1.beepDone=true;} if(e->autoPlayEmail){PlayLastAddedLog(idx);} }
@@ -295,21 +285,33 @@ static i16 targetIDText[INSTANCE_COUNT]; static double targetIDTextFinished[INST
 void TargetIDReset() { mset(targetIDText,0,sizeof(targetIDText));mset(targetIDTextFinished,0,sizeof(targetIDTextFinished));mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished));mset(targetIDAttached,0,sizeof(targetIDAttached)); }
 float TargetIDGetSensingRange(bool manual) { u8 ver=World.invP1.hwVers[HW_TID_IDX]; if(manual)return ver==0?12.0f:ver>=4?18.0f:13.0f; return ver==0?12.0f:ver<=2?0.0f:ver==3?13.0f:20.0f; }
 float TargetIDGetTetherRange() { return World.invP1.hwVers[HW_TID_IDX]>=4?22.0f:15.0f; }
+/*One definition of "this NPC is in the player's PVS", shared by the TargetID acquire paths below and the
+  render loop in ui.c so sensing and drawing can never disagree. Plain cell visibility, no neighborhood
+  fallback: the marker and its label are an unlit HUD overlay with no depth test, so without this an NPC in a
+  room the player can't see still paints a marker over whatever wall is in front of it.*/
+bool TargetIDInPlayerPVS(u16 npc) { if (unlikely(npc>=World.instCount))return false; if (unlikely(World.curLev >= LEVEL_CYBERSPACE)) return true;/*Culling is disabled in cyberspace (CullCore early-outs), so never gate there.*/ return gridCellStates[World.instances[npc].cellIndex] & CELL_VISIBLE; }
 void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
-    if(self>=World.instCount||!IdxIsNPC(World.instances[self].index))return; Entity* npc=&World.instances[self];
+    if(self>=World.instCount||!IdxIsNPC(World.instances[self].index))return; if(!TargetIDInPlayerPVS(self))return;/*out of PVS: never latch sensing state*/ Entity* npc=&World.instances[self];
     if(attackType==Att_Trnq){targetIDText[self]=536;targetIDTextFinished[self]=World.pauseRelativeTime;}
     else{float mh=npcTable[npc->index-419].health;targetIDText[self]=damage>mh*.75f?514:damage>mh*.50f?515:damage>mh*.25f?513:damage>0.0f?512:511;targetIDTextFinished[self]=World.pauseRelativeTime+(damage==0.0f?1.0:2.5);}
 }
 bool TargetIDShouldRender(u16 npc) {
     if(npc>=World.instCount||!IdxIsNPC(World.instances[npc].index))return false; Entity* e=&World.instances[npc];
-    if(!(e->entflags&EF_ACTIVE)||(e->entflags&EF_DEAD)||e->health<=0.0f||V3_Dist(World.position[npc],World.position[PLAYER1])>10.0f)return false;
+    if(!(e->entflags&EF_ACTIVE)||(e->entflags&EF_DEAD)||e->health<=0.0f)return false;
+    if(!TargetIDInPlayerPVS(npc))return false;/*NPC left the PVS after acquiring: stop sensing and stop drawing.*/
+    i16 textIdx=TargetIDGetText(npc);
+    bool hw=(World.invP1.hasHardware&HW_TID)!=0; u8 ver=World.invP1.hwVers[HW_TID_IDX]; bool sufficientHw=hw&&(ver==0||ver>=3);
+    if(textIdx==511)return true;/*NO DAMAGE always displays, regardless of hardware ownership/version/distance.*/
+    if(textIdx>=512&&textIdx<=515&&sufficientHw)return true;/*Damage status bypasses distance with sufficient Target Identifier hardware.*/
+    if(V3_Dist(World.position[npc],World.position[PLAYER1])>10.0f)return false;
     if(targetIDAttached[npc]&&targetIDAttachedFinished[npc]<World.pauseRelativeTime)targetIDAttached[npc]=false;
-    if((World.invP1.hasHardware&HW_TID)&&(World.invP1.hwVers[HW_TID_IDX]==0||World.invP1.hwVers[HW_TID_IDX]>=3))return true;
+    if(sufficientHw)return true;
     return targetIDAttached[npc];
 }
 i16 TargetIDGetText(u16 npc) { if(npc>=World.instCount)return -1; Entity* e=&World.instances[npc]; if(e->tranquilizeFinished>World.pauseRelativeTime)return 536; if(targetIDText[npc]&&targetIDTextFinished[npc]<=World.pauseRelativeTime)targetIDText[npc]=0; return targetIDText[npc]?targetIDText[npc]:-1; }
 void CreateTargetIDInstance(float damage,u16 hitIdx,float tranq) {
     if(hitIdx==WORLD||hitIdx>=World.instCount)return; Entity* npc=&World.instances[hitIdx]; if(!(npc->entflags&EF_ACTIVE)||!IdxIsNPC(npc->index)||npc->health<=0.0f)return;
+    if(!TargetIDInPlayerPVS(hitIdx))return;/*acquire is PVS-gated, not just rendering*/
     bool hw=(World.invP1.hasHardware&HW_TID)!=0; if(!hw&&tranq<=0.0f&&damage>0.0f)return; if(V3_Dist(World.position[hitIdx],World.position[PLAYER1])>TargetIDGetTetherRange())return;
     targetIDAttached[hitIdx]=true; targetIDAttachedFinished[hitIdx]=World.pauseRelativeTime+(hw?9999999.0:vmax(1.0f,tranq));
     if(tranq>0.0f){targetIDText[hitIdx]=536;targetIDTextFinished[hitIdx]=World.pauseRelativeTime+tranq;} else if(damage>=0.0f)TargetIDSendDamageReceive(hitIdx,damage,Att_None);
@@ -662,6 +664,8 @@ static void PuzzlePanelUse(u16 i) {
         MFD_OpenData(false,3);
     }else{
         World.Sys_UI.tetheredPWP=i; World.Sys_UI.pw_selectedWire=-1; World.Sys_UI.pw_solved=false;
+        /*True wire colors (Unity PuzzleWire rememberColors); on hard these are hidden (all yellow) until Genius reveals them.*/
+        { static const u8 trueColors[7]={T_RED,T_ORANGE,T_YELLOW,T_GREEN,T_WHITE,T_DARK_YELLOW,T_GREEN_MENU}; for (u8 w=0;w<7;++w) World.Sys_UI.pw_wireColor[w]=trueColors[w]; }
         MFD_OpenData(false,4);
     }
     CenterStatusPrint("%s",Sys_Text.stringTable[190]);
@@ -672,10 +676,77 @@ static bool PanelUseAllowed(u16 i) {
     if(e->entflags&EF_LOCKED){u16 msg=(u16)e->lockedMessageLingdex;if(msg<T_LOGSTR_CNT&&msg!=0)CenterStatusPrint("%s",Sys_Text.stringTable[msg]);else CenterStatusPrint("%s",Sys_Text.stringTable[302]);return false;}
     return true;
 }
+/*Elevator floor button layouts, from Textures/UI/ElevatorCheetSheet.txt (Unity ElevatorKeypad buttonText/buttonsEnabled/buttonsDarkened ground truth).
+  label: index into elevFloorLabels[] (R=0,1=1..9=9,G1=10,G2=11,G4=12), -1 = hidden (not drawn, not clickable).
+  darkened: drawn dimmed, not clickable (Unity buttonsDarkened).*/
+typedef struct { i8 label; bool darkened; } ElevBtnDef;
+static const ElevBtnDef elevLayouts[12][8] = {
+    {{1,0},{2,0},{3,1},{6,1},{7,1},{8,1},{-1,0},{-1,0}},/*0: 1 to 2*/
+    {{0,0},{1,1},{2,0},{3,0},{6,1},{7,1},{8,1},{-1,0}},/*1: 2 to 3*/
+    {{3,0},{4,0},{5,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*2: 3 to 4*/
+    {{1,1},{2,1},{3,0},{6,0},{7,1},{8,1},{-1,0},{-1,0}},/*3: 3 to 6*/
+    {{5,0},{6,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*4: 5 to 6*/
+    {{6,0},{10,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*5: 6 to G1*/
+    {{6,0},{11,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*6: 6 to G2*/
+    {{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*7: 6 to G3 (all hidden)*/
+    {{6,0},{12,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*8: 6 to G4*/
+    {{1,1},{2,1},{3,1},{6,0},{7,0},{8,1},{-1,0},{-1,0}},/*9: 6 to 7*/
+    {{1,1},{2,1},{3,1},{6,1},{7,0},{8,0},{-1,0},{-1,0}},/*10: 7 to 8*/
+    {{1,1},{2,1},{3,1},{6,1},{8,0},{9,0},{-1,0},{-1,0}},/*11: 8 to 9*/
+};
+/*Panel (level, x, y, z) -> elevLayouts index. Matched against Unity scene KeypadElevator instances by position.*/
+static const struct { u8 level; float x,y,z; u8 layout; } elevPanelMap[] = {
+    {0,9.97f,-55.08f,39.40f,1},{1,49.88f,-44.58f,-18.0f,0},
+    {2,52.47f,-27.94f,-25.62f,1},{2,3.79f,-27.94f,33.30f,1},
+    {3,15.27f,-14.91f,-11.50f,1},{3,1.17f,-15.09f,12.75f,2},{3,6.32f,-15.09f,-20.52f,3},
+    {4,-1.33f,1.64f,3.88f,2},
+    {5,-15.31f,14.26f,-39.68f,4},{5,8.94f,13.16f,-7.61f,2},
+    {6,-0.62f,34.09f,-69.24f,8},{6,-58.26f,34.14f,-39.71f,5},{6,-5.81f,36.02f,43.52f,6},{6,85.10f,34.14f,-37.09f,7},{6,-0.63f,34.10f,-46.09f,4},{6,60.81f,32.22f,35.84f,9},{6,-13.43f,34.14f,-30.73f,3},
+    {7,16.27f,51.38f,56.23f,10},{7,26.57f,48.82f,-10.34f,9},
+    {8,11.33f,97.46f,-41.43f,11},{8,3.58f,59.06f,20.01f,10},
+    {9,3.57f,107.16f,-38.31f,11},
+    {10,42.46f,136.38f,-7.83f,5},{11,9.91f,168.94f,-23.22f,6},{12,19.09f,196.14f,18.14f,8},
+};
+/*Elevator floor label index -> destination level. Labels: 0=R,1-9,10=G1,11=G2,12=G4,13=C.*/
+static u8 ElevLabelToLevel(i8 labelIdx) {
+    if (labelIdx>=1 && labelIdx<=9) return (u8)labelIdx;
+    if (labelIdx==10) return 10; if (labelIdx==11) return 11; if (labelIdx==12) return 12;
+    if (labelIdx==0) return 0;/*R*/
+    return 255;
+}
+/*True if the player is inside an elevator volume (entity 706), using the same box-overlap logic as the automap elevator cell fill.*/
+bool PlayerInElevatorCell(void) {
+    V3 pp=World.position[PLAYER1];
+    for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
+        Entity* e=&World.instances[i]; if(e->index!=706||!(e->entflags&EF_ACTIVE)){continue;}
+        V3 c=World.colliderCenter[i],s=World.colliderSize[i],p=World.position[i];
+        V3 rc=quat_rot_v3(World.rotation[i],c);
+        float x0=p.x+rc.x-s.x*0.5f,x1=p.x+rc.x+s.x*0.5f,z0=p.z+rc.z-s.z*0.5f,z1=p.z+rc.z+s.z*0.5f;
+        float y0=p.y+rc.y-s.y*0.5f,y1=p.y+rc.y+s.y*0.5f;
+        if (pp.x>=x0&&pp.x<=x1&&pp.y>=y0&&pp.y<=y1&&pp.z>=z0&&pp.z<=z1) return true;
+    }
+    return false;
+}
 static void ElevatorPanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
     World.Sys_UI.tetheredKeypadElevator=i; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.objectInUsePos=World.position[i]; World.Sys_UI.usingObject=true;
+    /*Link to nearest active door (Unity KeypadElevator.linkedDoor).*/
+    { V3 kp=World.position[i]; float best=1e30f; for (u32 d=INSTS_1ST_IDX;d<World.instCount;++d) { Entity* de=&World.instances[d]; if(!IdxIsDoor(de->index)||!(de->entflags&EF_ACTIVE)) continue; V3 dd=V3_AsubB(World.position[d],kp); float dist2=V3_dot(dd,dd); if(dist2<best){best=dist2; World.Sys_UI.linkedElevatorDoor=(u16)d;} } }
+    /*Drive floor buttons off the linked elevator's floor set (Unity ElevatorKeypad).*/
+    int layout=-1; V3 pp=World.position[i];
+    for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) {
+        if (elevPanelMap[m].level==World.currentLevel) { float dx=elevPanelMap[m].x-pp.x,dz=elevPanelMap[m].z-pp.z; if (dx*dx+dz*dz<4.0f) { layout=elevPanelMap[m].layout; break; } }
+    }
+    if (layout<0) layout=1;/*fallback: 2 to 3 strip*/
+    for (int b=0;b<8;++b) { World.Sys_UI.elevButtonLabelIdx[b]=elevLayouts[layout][b].label; World.Sys_UI.buttonsDarkened[b]=elevLayouts[layout][b].darkened; World.Sys_UI.buttonsEnabled[b]=elevLayouts[layout][b].label>=0; World.Sys_UI.elevButtonLevelIdx[b]=ElevLabelToLevel(elevLayouts[layout][b].label); World.Sys_UI.elevButtonSpawnIdx[b]=U16_MAX; }
     ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(false,1);
+}
+/*Find the keypad position on a given level (for elevator relative-positioning). Returns false if not found.*/
+bool FindElevatorKeypadPos(u8 level,V3* outPos) {
+    for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) {
+        if (elevPanelMap[m].level==level) { outPos->x=elevPanelMap[m].x; outPos->y=elevPanelMap[m].y; outPos->z=elevPanelMap[m].z; return true; }
+    }
+    return false;
 }
 static void KeycodePanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
@@ -806,14 +877,14 @@ extern bool editFieldEditing;
 static bool TargetIDFrob(V3 p,V3 f,V3 r){V3 dir=ScreenPointToRayOffset(f,r,0,0);RaycastHit h=Raycast(p,dir,TargetIDGetSensingRange(true),LMASK_PLAYER_TARGET_ID_FROB);if(!h.hit||h.hitInstanceIndex>=World.instCount||!IdxIsNPC(World.instances[h.hitInstanceIndex].index))return false;u16 i=h.hitInstanceIndex;Entity* e=&World.instances[i];if(e->health<=0.0f){if(World.layer[i]&L_CorpseSearchable){UseEntity(i);return true;}return false;}if((World.invP1.hasHardware&HW_TID)&&World.invP1.hwVers[HW_TID_IDX]>1){if(targetIDAttached[i]&&targetIDAttachedFinished[i]<=World.pauseRelativeTime)targetIDAttached[i]=false;if(!targetIDAttached[i]){CreateTargetIDInstance(-1.0f,i,-1.0f);return true;}}CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[e->index-419].name);return true;}
 static void Frob(V3 p,V3 f,V3 r){
     if(World.uiIsBlocking||World.curLev==LEVEL_CYBERSPACE)return;
-    if(Cheats.editMode){V3 d0=ScreenPointToRayOffset(f,r,0,0);RaycastHit fh=Raycast(p,d0,World.farPlane[World.curLev],LMASK_PLAYER_FROB);editModeSelection=(fh.hit&&fh.hitInstanceIndex>=INSTS_1ST_IDX&&fh.hitInstanceIndex<World.instCount)?fh.hitInstanceIndex:U16_MAX; if(editModeSelection<U16_MAX){editFieldEditing=false; CenterStatusPrint("Selected object %u (const index %u)",editModeSelection,World.instances[editModeSelection].index);}else{CenterStatusPrint("Object deselected");return;}}
+    if(Cheats.editMode){V3 d0=ScreenPointToRayOffset(f,r,0,0);RaycastHit fh=Raycast(p,d0,World.farPlane[World.curLev],LMASK_PLAYER_FROB);editModeSelection=(fh.hit&&fh.hitInstanceIndex>=INSTS_1ST_IDX&&fh.hitInstanceIndex<World.instCount)?fh.hitInstanceIndex:U16_MAX; if(editModeSelection<U16_MAX){editFieldEditing=false; CenterStatusPrint("Selected object %u (const index %u)",editModeSelection,World.instances[editModeSelection].index);}else{CenterStatusPrint("Object deselected");}return;/*No pickup/search/use while in edit mode; selection only.*/}
     if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0;return;}if(World.invP1.holdingObject){DropHeldItem();return;}if(TargetIDFrob(p,f,r))return;float o=(float)UI_H*0.02f;RaycastHit fh={0},bh={0};bool ok=false;V3 d0=ScreenPointToRayOffset(f,r,0,0);fh=Raycast(p,d0,FROB_DISTANCE,LMASK_PLAYER_FROB);bh=fh;ok=FrobRayIsFrobable(fh);float ox[8]={0,0,o,-o,o,-o,-o,o},oy[8]={-o,o,0,0,o,-o,o,-o};for(int i=0;i<8&&!ok;++i){V3 d=ScreenPointToRayOffset(f,r,ox[i],oy[i]);RaycastHit th=Raycast(p,d,FROB_DISTANCE,LMASK_PLAYER_FROB);if(FrobRayIsFrobable(th)){bh=th;ok=true;}}if(!ok)bh=fh;if(Cheats.showPhys){World.debugLine_start=p;World.debugLineFinished=World.pauseRelativeTime+3.0;V3 dbg=ok?ScreenPointToRayOffset(f,r,0,0):d0;RaycastHit dh=ok?bh:fh;World.debugLine_end=dh.hit?dh.point:(V3){dbg.x*FROB_DISTANCE+p.x,dbg.y*FROB_DISTANCE+p.y,dbg.z*FROB_DISTANCE+p.z};}if(!ok){if(fh.hit){u16 idx=fh.hitInstanceIndex;if(idx<World.instCount){u16 ei=World.instances[idx].index;if(IdxIsGeometry(ei)||IdxIsDoor(ei)||World.instances[idx].index>=595){int t=UseNameTableIndex(ei);CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t>=0?Sys_Text.stringTable[t]:"");return;}}}CenterStatusPrint("%s",Sys_Text.stringTable[30]);}else UseEntity(bh.hitInstanceIndex);}
 // Update
 void WeaponsUpdate(); void TextureSequenceUpdate(u16 self); void AIAnimationControllerUpdate(u16 selfIdx); void AIControllerUpdate(u16 selfIdx);
-extern float sightPointHeights[NUM_AI_TYPES];
+extern const V3 sightPointOffsets[NUM_AI_TYPES];
 void DrawAIDebug(u16 i) {
     if ((!IdxIsNPC(World.instances[i].index)) || !Cheats.showNPC) return; World.layer[i] = L_NPC; World.layer[PLAYER1] = L_Player; Quaternion r = World.rotation[i]; float x=r.x,y=r.y,z=r.z,w=r.w; V3 fwd = V3_Normalize((V3){2.0f*(x*z + w*y), 0.0f, 1.0f - 2.0f*(x*x + y*y)}); u16 npcIdx = World.instances[i].index - 419;
-    V3 sightPt = V3_AplusB(World.position[i],(V3){0.0f,sightPointHeights[npcIdx],0.0f}); DrawLine(sightPt,V3_AplusB(sightPt,V3_ScaleByF(fwd,0.6f)),(Color){1.0f,1.0f,0.0f,1.0f}); V3 enemPt = World.position[PLAYER1]; enemPt.y -= 0.24f;
+    V3 sightPt = V3_AplusB(World.position[i],quat_rot_v3(World.rotation[i],sightPointOffsets[npcIdx])); DrawLine(sightPt,V3_AplusB(sightPt,V3_ScaleByF(fwd,0.6f)),(Color){1.0f,1.0f,0.0f,1.0f}); V3 enemPt = World.position[PLAYER1]; enemPt.y -= 0.24f;
     RaycastHit hit = Raycast(sightPt,V3_AsubB(enemPt,sightPt),20.0f,LMASK_NPC_SIGHT); if (hit.hit && hit.hitInstanceIndex == PLAYER1) { DrawLine(sightPt,hit.point,(Color){1.0f,0.0f,0.0f,1.0f}); } else {DrawLine(sightPt,enemPt,(Color){0.0f,1.0f,1.0f,1.0f});} Entity* e = &World.instances[i]; Color dbgCol;
     if (e->currentState == AIState_Idle) dbgCol = (Color){0.0f,1.0f,0.0f,1.0f}; else if (e->currentState == AIState_Walk || e->currentState == AIState_Run) { if (e->entflags & EF_ENEM_IN_SIGHT) dbgCol = (Color){1.0f,0.0f,0.0f,1.0f}; else dbgCol = (Color){1.0f,1.0f,0.0f,1.0f}; }
     else if (e->currentState == AIState_Attack1 || e->currentState == AIState_Attack2 || e->currentState == AIState_Attack3) dbgCol = (Color){1.0f,0.0f,1.0f,1.0f}; else if (e->currentState == AIState_Pain) dbgCol = (Color){1.0f,0.0f,1.0f,1.0f}; else if (e->currentState == AIState_Dead) dbgCol = (Color){0.5f,0.5f,0.5f,1.0f}; else { dbgCol = (Color){1.0f,0.9f,0.8f,1.0f}; }

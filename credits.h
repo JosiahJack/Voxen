@@ -385,3 +385,5 @@ const char* creditPages[]={
 "\n"
 "Click to continue...\n"
 };
+#define CREDITS_PAGE_COUNT (sizeof(creditPages)/sizeof(creditPages[0]))
+_Static_assert(CREDITS_PAGE_COUNT==CREDITS_PAGES,"creditPages[] size must match CREDITS_PAGES");

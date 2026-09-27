@@ -468,6 +468,7 @@ void ForceInventoryMode() { if (!World.inventoryMode) {World.inventoryMode = tru
 void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
 void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float);
+void HwToggle(u8);/*ui.c: the HUD hardware button handler, shared with the Lantern/Infrared hotkeys so both paths play the same sounds*/
 extern u16 editModeTestEntityDefinition;
 void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (!Sys_Input.mouseButtons[i].down) uiMouseCaptured&=~(1u<<i);
@@ -493,10 +494,10 @@ void InputProcessing() {
         if (Sys_Input.keyStates[KEY_5].pressed) { debugWepOffset.z += 0.05f; }
         else if (Sys_Input.keyStates[KEY_6].pressed) { debugWepOffset.z -= 0.05f; }
         if (ToggleMode()) ToggleInventoryMode(); 
-        if (Lantern()) World.invP1.hardwareIsActive ^= HW_LAN; 
-        if (Infrared()) World.invP1.hardwareIsActive ^= HW_INF;
+        if (Lantern()) HwToggle(2);/*hwBtns[2]=HW_LAN, sOn/sOff 78*/
+        if (Infrared()) HwToggle(4);/*hwBtns[4]=HW_INF, sOn/sOff 98/82*/
         // Hardware hotkeys with energy checks (matching HwToggle logic)
-        if (Biomonitor()) { if (!(World.invP1.hasHardware & HW_BIO) || (World.invP1.energy<=0.0f && World.invP1.hwVersSetting[HW_BIO_IDX]==0)) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_BIO)?78:78],AppliedFXVol(1.0f),(V3){0,0,0},false); World.invP1.hardwareIsActive ^= HW_BIO; if ((World.invP1.hardwareIsActive&HW_BIO)==0) BioMonitorClearGraphs(); } }
+        if (Biomonitor()) HwToggle(0);/*hwBtns[0]=HW_BIO; no-op while Cheats.showFPS, which holds the biomonitor on for the frame-time graphs*/
         if (Sensaround()) { if (!(World.invP1.hasHardware & HW_SNS) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SNS)?82:93],AppliedFXVol(1.0f),(V3){0,0,0},false); World.invP1.hardwareIsActive ^= HW_SNS; } }
         if (Shield()) { if (!(World.invP1.hasHardware & HW_SHD) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SHD)?95:96],AppliedFXVol(1.0f),(V3){0,0,0},false); World.invP1.hardwareIsActive ^= HW_SHD; } }
         if (Email()) { if (World.invP1.hasHardware & HW_ERD) { World.invP1.hardwareIsActive|=HW_ERD;/*Unity EReaderOn: hardwareIsActive[2]=true keeps the ereader tabs on*/ MFD_ResetGeneral(); World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdItemReader[0]=true; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened; if (World.Sys_UI.MFD_MediaTab>MM_NOTES || (World.Sys_UI.MFD_MediaTab==MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false); } }

@@ -136,6 +136,6 @@ if ! $IS_CI; then
 #         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
         *)        ./voxen ;;   # linux
     esac
-    rm -f ./Shaders/*.h ./voxen.upx ./voxen.pdb #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
-    rm -r ./temp_build
 fi
+rm -f ./Shaders/*.h ./voxen.upx ./voxen.pdb #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
+rm -r ./temp_build

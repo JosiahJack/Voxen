@@ -76,19 +76,26 @@ static void Push(int index, float val) { // Add a data point to the beginning of
 }
 
 void BiomonitorEnergyPulse(float take) { Push(0,take); IncrementERG(); Push(0,take); IncrementERG(); }
+/*showFPS repurposes the three graphs as frame-time scopes: ERG=gpu ms, CHI=cpu ms, ECG=total frame ms.
+  Each reading is mapped from 0..full-scale into its graph's authored min..max, so 0ms sits on the
+  baseline and full scale pins the top without disturbing the non-cheat graph ranges.*/
+enum { BIOM_FS_GPU=33, BIOM_FS_CPU=17, BIOM_FS_FRAME=33 };/*ms at the top of the graph: 30fps for gpu/frame, 60fps for cpu*/
+INLINE float biomMsToGraph(int graph, double ms, int fullScale) { return bioMonitor.min[graph] + vclamp((float)ms/(float)fullScale,0.0f,1.0f) * (bioMonitor.max[graph] - bioMonitor.min[graph]); }
+
 void BioMonitorUpdate() {
     if (!(World.invP1.hasHardware & HW_BIO) || !(World.invP1.hardwareIsActive & HW_BIO)) return;
     bioMonitor.header = 526; bioMonitor.heartRateText = 527; bioMonitor.bpmText = 529; bioMonitor.fatigueDetailText = 531; bioMonitor.fatigue=534; /*Low*/ if(World.invP1.fatigue >= 80.0f){bioMonitor.fatigue=532;/*High!*/}else if(World.invP1.fatigue <  80.0f && World.invP1.fatigue > 30.0f){bioMonitor.fatigue=533;/*Moderate*/}
     if (bioMonitor.beatFinished < World.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f + ((World.invP1.fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
     static const float beatThresh=0.1f, beatVariation=0.05f;
-    /*Energy Usage*/ bioMonitor.ergValue = vclamp((World.invP1.drainJPM / 255.0f),0.0f,1.0f);
-    /*Chi Brain Waves*/ float brainFactor = 0.15f; if (World.invP1.geniusFinished > World.pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f); if(Cheats.showFPS){bioMonitor.chiValue=(((float)World.thisFrameTime/16.0f) * 0.5f) - 2.0f;}else{bioMonitor.chiValue=(float)(vsinf(World.pauseRelativeTime * 10.0 * (double)brainFactor));}
-    /*ECG: Create shifted sine wave for heart beat.  Apply percent fatigued to 200bpm max heart rate with baseline 50bpm.*/ float fatigueFactor = ((World.invP1.fatigue / 100.0f) * 120.0f) + 20.0f; fatigueFactor = fatigueFactor / 60.0f;
+    /*Energy Usage / showFPS: GPU ms*/ bioMonitor.ergValue = Cheats.showFPS ? biomMsToGraph(BIOM_ERG,World.gpuFrameMs,BIOM_FS_GPU) : vclamp((World.invP1.drainJPM / 255.0f),0.0f,1.0f);
+    /*Chi Brain Waves / showFPS: CPU ms*/ float brainFactor = 0.15f; if (World.invP1.geniusFinished > World.pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f); if(Cheats.showFPS){bioMonitor.chiValue=biomMsToGraph(BIOM_CHI,World.cpuFrameTime,BIOM_FS_CPU);}else{bioMonitor.chiValue=(float)(vsinf(World.pauseRelativeTime * 10.0 * (double)brainFactor));}
+    /*ECG: Create shifted sine wave for heart beat.  Apply percent fatigued to 200bpm max heart rate with baseline 50bpm.  showFPS overrides with total frame ms.*/ if (Cheats.showFPS) { bioMonitor.ecgValue = biomMsToGraph(BIOM_ECG,World.thisFrameTime,BIOM_FS_FRAME); }
+    else { float fatigueFactor = ((World.invP1.fatigue / 100.0f) * 120.0f) + 20.0f; fatigueFactor = fatigueFactor / 60.0f;
     if (bioMonitor.beatFinished < World.pauseRelativeTime) bioMonitor.beatFinished = World.pauseRelativeTime + (1.0 / (double)fatigueFactor);
     bioMonitor.beatShift = (bioMonitor.beatFinished - World.pauseRelativeTime) / (1.0 / (double)fatigueFactor);
     if (bioMonitor.beatShift > 0.94f) bioMonitor.ecgValue = vsinf(bioMonitor.beatShift * 35.0f); else bioMonitor.ecgValue = 0.0f;
-    if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range(-beatVariation,beatVariation);
-    if (bioMonitor.tick0Finished < World.pauseRelativeTime) { bioMonitor.tick0Finished = World.pauseRelativeTime + 0.0211f; Push(0,bioMonitor.ergValue); IncrementERG(); Push(0,bioMonitor.ergValue); IncrementERG(); Push(0,bioMonitor.ergValue); }
+    if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range(-beatVariation,beatVariation); }
+    if (bioMonitor.tick0Finished < World.pauseRelativeTime) { bioMonitor.tick0Finished = World.pauseRelativeTime + (Cheats.showFPS?0.0104f:0.0211f); Push(0,bioMonitor.ergValue); IncrementERG(); Push(0,bioMonitor.ergValue); IncrementERG(); Push(0,bioMonitor.ergValue); }
     if (bioMonitor.tick1Finished < World.pauseRelativeTime) {
         if (Cheats.showFPS) bioMonitor.tick1Finished = World.pauseRelativeTime + 0.0104f; else bioMonitor.tick1Finished = World.pauseRelativeTime + 0.05f;
         Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue);

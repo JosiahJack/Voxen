@@ -127,7 +127,7 @@ enum {/*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARR
       /*Entity Management*/MAX_LEVELS=14,LEVEL_CYBERSPACE=13,CREDITS_PAGES=22,AVG_CPU_TAPS=2048,MAX_ENTITIES=864,INSTANCE_COUNT=8500,MAX_LEVEL_PARTICLES=128,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,
       /*Lights*/LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32,SHADOW_NEARMESH_MAX=512,SC_MAX=(SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/MAX_MDLS=7000, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
-      /*Textures*/MAX_TXRS=4096,MAX_TOTAL_PIXELS=44500000u, MAX_UNIQUE_COLORS = 50000u,TEXHASH_SZ=256,NUM_TEXTURE_CLIPS=49,
+      /*Textures*/MAX_TXRS=4096,MAX_TOTAL_PIXELS=475000000u, MAX_UNIQUE_COLORS = 86000u,TEXHASH_SZ=256,NUM_TEXTURE_CLIPS=49,
       /*Animations*/ MAX_ANIMCLIPS = 10, MAX_ANIMS = 59, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2,
                      A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
       /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH=6, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=8000, MAX_WIRELINE_VRTS = 2024000,
@@ -135,7 +135,7 @@ enum {/*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARR
       /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
       /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS),REV_BUF_LEN=110251/*~2.5s @ 44100; prime*/,MAXAMB=256,
       /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
-               T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_BUFFER_SIZE=1024, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
+               T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13/*#973B3B, Unity intro/outro subtitle cards*/, T_BUFFER_SIZE=4096/*longest credits page is 988 source bytes and creditStats[] is 4096, so the shared UI text buffer has to hold a whole page*/, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
       /*UI*/ UI_W=1366,UI_H=768,CURSOR_SZ=40,MFD_READER_CONTENTS=0,MFD_READER_FOLDER=1,MFD_READER_TEXT=2,MAX_UI_ELEMENTS=4096,TXT_PAD=4,TXT_H=24,TAB_THICK=16,MFD_SPACING=8,MFD_SPACINGCTR=19,SIDE_MFD_W=320,SIDE_MFD_H=240,CTR_MFD_W=640,CTR_MFD_H=240,UI_AUTOMAP_ZOOM_IN=0,UI_AUTOMAP_ZOOM_OUT=1,UI_AUTOMAP_FULL=2,UI_AUTOMAP_SIDE=3,
       /*Automap*/ AM_W=320,AM_H=200,AM_FULL_W=700,AM_FULL_H=700,AM_MAXHULL=10,AMAP_UI_X_L=24,AMAP_UI_X_R=1022,AMAP_UI_Y=524,AMAP_UI_W=320,AMAP_UI_H=200,AM_XOFF=((AM_W-AM_H)/2),
       /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
@@ -179,10 +179,11 @@ enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<
 #define LMASK_EXPLOSION             (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_CorpseSearchable)
 #define LMASK_PLAYER_FEET           (L_Default|L_Geometry)
 typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; float ScreenCenterX,ScreenCenterY; bool Fullscreen; u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
-typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,showNPC,editMode; u8 dizzyLevel,animTest; } CheatsSystem; extern CheatsSystem Cheats;
+typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,showNPC,editMode; u8 dizzyLevel,animTest,editSubMode; } CheatsSystem; extern CheatsSystem Cheats;
 typedef struct {
         double vmailFrameFinished,logFinished,blinkFinished,beepFinished,tickFinished,centerTabsTickFinished; i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count; u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8]; u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
         bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
+        i8 elevButtonLabelIdx[8];/*index into elevFloorLabels[], -1 = hidden (not drawn, not clickable)*/
         bool searchFXActive[2]; double searchFXStartTime[2]; float searchFXCursorX[2],searchFXCursorY[2];
         u8 vmailActive; AudioLogType logType; V3 objectInUsePos;
         u8 MFD_LefTab,MFD_CenterTab,MFD_RightTab,MFD_DataL,MFD_DataR,MFD_MediaTab,MFD_ReaderView,mfdSelected[3],mfdReturnTab[3],mfdReturnView[3],mfdItemReader[2];
@@ -192,15 +193,15 @@ typedef struct {
         i8 keycodeHuns,keycodeTens,keycodeOnes; i32 keycodeEntry,keycodeValue; bool keycodeValid,keycodeSolved;
         /*Grid puzzle (Unity PuzzleGrid). tetheredPGP links the source puzzle; pg_* mirror its cells so the panel can run standalone. pg_cell[] = electrical grid, pg_type[] per-cell kind.*/
         u8 pg_type[35],pg_gridType,pg_source,pg_output,pg_width,pg_height; bool pg_cell[35],pg_powered[35],pg_checked[35],pg_solved; float pg_progress;
-        /*Wire puzzle (Unity PuzzleWire). pw_curL/R[7] = wire endpoints by column, pw_tgtL/R[7] = goal columns, pw_wireOn[7] = placed wires.*/
-        i8 pw_curL[7],pw_curR[7],pw_tgtL[7],pw_tgtR[7]; bool pw_wireOn[7]; i8 pw_selectedWire; bool pw_selectedWireRH,pw_solved; float pw_temp;
+        /*Wire puzzle (Unity PuzzleWire). pw_curL/R[7] = wire endpoints by column, pw_tgtL/R[7] = goal columns, pw_wireOn[7] = placed wires, pw_wireColor[7] = true wire colors (text color idx).*/
+        i8 pw_curL[7],pw_curR[7],pw_tgtL[7],pw_tgtR[7]; bool pw_wireOn[7]; u8 pw_wireColor[7]; i8 pw_selectedWire; bool pw_selectedWireRH,pw_solved; float pw_temp;
         /*Minigames (Funpack). mg_current: 0 Ping..8 Chess, -1 = none. mg_running/mg_solved are per side the games view sits on.*/
         i8 mg_current; bool mg_running[2],mg_solved[2];
         /*E-reader folder/reader. logFolderList[] caches the open level folder, email table or data table; logReferenceIndex is the entry on screen.*/
         i16 logFolderList[16]; u8 logFolderCount; u16 logReferenceIndex; i16 logReaderPage;
         /*Automap. autoSide[2] LH map / RH map.*/
         bool autoSide[2],fullMapOpen[2];
-        /*Sensaround rearview overlay (TODO: SensaroundCenter render).*/
+        /*Sensaround rearview overlay.*/
         bool showSensaroundCenter,firstMain,firstGeneral,firstHardware,firstWeapon;
 } SystemUI;
 typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
@@ -232,7 +233,7 @@ typedef struct { // MUST PRESERVE ORDER TO MATCH TABLE!!
         float hearingRange,timeForTranquilization; bool hopsOnMove; NPCType type; int projectile1Prefab,projectile2Prefab,projectile3Prefab;
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
-void TargetIDReset(); bool TargetIDShouldRender(u16); i16 TargetIDGetText(u16);
+void TargetIDReset(); bool TargetIDShouldRender(u16); bool TargetIDInPlayerPVS(u16); i16 TargetIDGetText(u16);
 u16 ai_next_npc_number(u16); void ai_reset_npc_numbering(void);
 typedef struct {
     double beatFinished,tick0Finished,tick1Finished,tick2Finished,tickFinished; float heartRate,widthPerc,heightPerc,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 patchEffects,heartRateText,header,bpmText,fatigueDetailText,fatigue;

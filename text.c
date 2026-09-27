@@ -477,7 +477,9 @@ void LoadLogTextForLanguage(u8 lang) {
         nxt:continue;}
 }
 
-static float textVertexData[8192]; extern Color textColors[]; enum {TALIGN_LEFT=0,TALIGN_CENTER=1,TALIGN_RIGHT=2};
+/*30 floats (6 verts x 5) per glyph quad: sized for the longest credits page (988 source bytes, ~966 glyphs) so whole pages draw instead of stopping at 273 glyphs.*/
+#define TEXT_VTX_FLOATS 65536
+static float textVertexData[TEXT_VTX_FLOATS]; extern Color textColors[]; enum {TALIGN_LEFT=0,TALIGN_CENTER=1,TALIGN_RIGHT=2};
 float MeasureLineAdvance(const char* p, u8 fontID) {
     float w=0; int cc=0;
     while (*p) {
@@ -493,7 +495,7 @@ void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 ali
     while(*p) {
         const u8*s=(const u8*)p; u32 cp=0; if (*s<0x80) { cp=*s++; }else if ((*s&0xE0)==0xC0) { if (!s[1]) break; cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }else if ((*s&0xF0)==0xE0) { if (!s[1] || !s[2]) break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }else if ((*s&0xF8)==0xF0) { if (!s[1] || !s[2] || !s[3]) break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }else s++;
         p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed); ypos+=ls; cc=0; continue; } int idx=CodepointToPackedIndex(cp,fontID); const stbtt_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx; float qx0=vfloor((xpos+b->xoff)+0.5f),qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
-        float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw; float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f; float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 }; if (vc >= 8192/30) break; mcpy(textVertexData + vc * 30,tv,sizeof(tv)); vc++;
+        float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw; float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f; float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 }; if (vc >= TEXT_VTX_FLOATS/30) break; mcpy(textVertexData + vc * 30,tv,sizeof(tv)); vc++;
         if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD){xpos = qx0 + fixedNumberAdvanceWidthStopD;}else xpos += b->xadvance;
     } if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
@@ -512,7 +514,7 @@ void RenderText3DWorld(V3 worldPos, Quaternion rot, u32 color, u8 fontID, float 
         if(*s_<0x80){cp=*s_++;}else if((*s_&0xE0)==0xC0){if(!s_[1])break; cp=(*s_&0x1F)<<6; cp|=(s_[1]&0x3F); s_+=2;}else if((*s_&0xF0)==0xE0){if(!s_[1]||!s_[2])break; cp=(*s_&0x0F)<<12; cp|=(s_[1] & 0x3F)<<6; cp|=(s_[2] & 0x3F); s_+=3;}else if((*s_&0xF8)==0xF0){if(!s_[1] || !s_[2] || !s_[3])break; cp=(*s_ & 0x07)<<18; cp |= (s_[1] & 0x3F) << 12; cp |= (s_[2] & 0x3F) << 6; cp |= (s_[3] & 0x3F); s_ += 4;}else s_++;
         p = (const char*)s_; cc++; if (cp == '\n' || cc > 120){xpos=xUsed-MeasureLineAdvance(p,fontID)*alignMul; ypos += ls; cc = 0; continue; } int idx = CodepointToPackedIndex(cp, fontID); const stbtt_packedchar* b=((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar)+idx; float qx0=vfloor((xpos+b->xoff)+0.5f), qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz,qt0=b->y0*invatsz,qs1=b->x1*invatsz,qt1=b->y1*invatsz;
         float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw; float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f; float localVerts[30*6] = {vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1};
-        for(int k=0;k<6;++k){float lvx = localVerts[k*5], lvy = localVerts[k*5+1], lvz = localVerts[k*5+2]; V3 r = quat_rot_v3(rot, (V3){lvx, lvy, lvz}); localVerts[k*5]=r.x+worldPos.x; localVerts[k*5+1]=r.y+worldPos.y; localVerts[k*5+2]=r.z+worldPos.z;} if (vc >= 8192/30) break; mcpy(textVertexData + vc * 30, localVerts, sizeof(localVerts)); vc++; if(cp>='0'&&cp<='9'&&fontID==FONT_STOPD){xpos=qx0+fixedNumberAdvanceWidthStopD;}else xpos += b->xadvance;
+        for(int k=0;k<6;++k){float lvx = localVerts[k*5], lvy = localVerts[k*5+1], lvz = localVerts[k*5+2]; V3 r = quat_rot_v3(rot, (V3){lvx, lvy, lvz}); localVerts[k*5]=r.x+worldPos.x; localVerts[k*5+1]=r.y+worldPos.y; localVerts[k*5+2]=r.z+worldPos.z;} if (vc >= TEXT_VTX_FLOATS/30) break; mcpy(textVertexData + vc * 30, localVerts, sizeof(localVerts)); vc++; if(cp>='0'&&cp<='9'&&fontID==FONT_STOPD){xpos=qx0+fixedNumberAdvanceWidthStopD;}else xpos += b->xadvance;
     }
     if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); drawCalls++; vertsRendered += vc*6; } glBindBuffer(GL_ARRAY_BUFFER,0); glDisable(GL_BLEND);
 }

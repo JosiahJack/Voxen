@@ -221,7 +221,7 @@ void HitScanFire(int wep16) {
         if (npc && !(World.instances[wfx.tempHitEnt].entflags & EF_ASLEEP)) { /* Music combat state set; function deferred */ }
     if (dmgFinal < 0.0f) dmgFinal = 0.0f;
     (void)dmgFinal; (void)tranq; // CreateTargetIDInstance placeholder: data captured but instance tracking deferred
-    // TODO: CreateTargetIDInstance for deferred impact tracking when HealthManager ported
+    (void)dmgFinal;
     }
     if (b && (!dd.isOtherNPC || wep16==12)) { ApplyImpactForceWithSound(ent,dd.impactVelocity,dd.attacknormal,dd.hitpoint); }/*impact force+sound for any dynamic object (Unity: Utils.ApplyImpactForce + ObjectImpact)*/
     if (isBeam){CreateBeamEffects(wep16);}
@@ -239,7 +239,6 @@ void MeleeHitUpdate(void) {
     DamageData dd = {.hitIdx = targ,.isOtherNPC = IdxIsNPC(World.instances[targ].index),.attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right),.damage = dmgForWep[wep16],.offense = offenseWep[wep16],
                      .penetration = penetrationWep[wep16],.owner = PLAYER1,.attackType = Att_Melee};
     if (isRapier) { dd.attackType = Att_MlEg; if (World.invP1.energy < 4.0f) dd.damage = dmgForWep[6] / 2.0f; /*half power on low energy*/}
-    // uou.HitForce(dd); // knock physics objects around - hook up to physics engine TODO
     wfx.tempHitEnt = targ;
     CreateStandardImpactEffects();
     if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);
@@ -249,7 +248,7 @@ void MeleeHitUpdate(void) {
     if(World.instances[targ].health<=0.0f&&!dd.isOtherNPC){return;}
     float dmgFinal = TakeDamage(targ,dd);
     if (dmgFinal < 0.0f) {dmgFinal = 0.0f;}
-    (void)dmgFinal; // CreateTargetIDInstance(dmgFinal, targ, -1.0f); TODO
+    (void)dmgFinal;
     if(!silent){World.invP1.noiseFinished=World.pauseRelativeTime+0.5;BloodType bt=World.instances[targ].bloodType;if(bt==BloodType_Red||bt==BloodType_Yellow||bt==BloodType_Green)play_wav(sounds[wfx.pendingMeleeFleshSnd], AppliedFXVol(1.0f), (V3){0,0,0}, false);else if(isRapier&&World.invP1.energy<4.0f)play_wav(sounds[67], AppliedFXVol(1.0f), (V3){0,0,0}, false);else play_wav(sounds[wfx.pendingMeleeHitSnd], AppliedFXVol(1.0f), (V3){0,0,0}, false);}
     if (isRapier) { TakeEnergy(3.666f); BiomonitorEnergyPulse(3.666f); } // 3 hits per energy tick
 }
@@ -337,7 +336,7 @@ void CheckAttackInput(void) {
     if(!Attack()){return;} if(World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive=0; return;}
     if (World.curLev == LEVEL_CYBERSPACE) { FireCyberWeapon(); return; }
     if (editFieldEditing || EditPanelPointerHover()) { return; }
-    if (Cheats.editMode/*TODO use submode of editMode instead for spamming physobjects for fun and testing physics*/){World.invP1.holdingObject = true; World.invP1.heldObjectIndex = editModeTestEntityDefinition;}
+    if (Cheats.editMode && Cheats.editSubMode==1){World.invP1.holdingObject = true; World.invP1.heldObjectIndex = editModeTestEntityDefinition;}
     if (World.invP1.holdingObject && !World.mouseClickHeldOverGUI) { if (World.uiIsBlocking) { DropHeldItem(); return; } AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); return; }
     int w = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
     if (w == -1 || World.invP1.holdingObject || World.mouseClickHeldOverGUI){return; /*No weapon*/} StartNormalAttack(w);
@@ -391,7 +390,7 @@ void LoadSecondaryAmmoType(bool isSilent) {
     Unload(true); World.invP1.wepLoadedWithAlternate[wc] = true;
     World.invP1.currentMagazineAmount2[wc] = (World.invP1.wepAmmoSecondary[wep16] >= magazinePitchCountForWeapon2[wep16]) ? magazinePitchCountForWeapon2[wep16] : (u8)World.invP1.wepAmmoSecondary[wep16];
     World.invP1.wepAmmoSecondary[wep16] -= World.invP1.currentMagazineAmount2[wc];
-    (void)isSilent;//if (!isSilent) PlayUIOneShotSavable((wep16==0 || wep16==3) ? 248 : 260); TODO
+    (void)isSilent; if (!isSilent) play_wav(sounds[(wep16==0 || wep16==3) ? 248 : 260], AppliedFXVol(1.0f), (V3){0,0,0}, false); // wlocknload / wreload
     StartWeaponDip(reloadTime[wep16]); wfx.reloadContainerPos = wfx.reloadContainerHome;
 }
 
