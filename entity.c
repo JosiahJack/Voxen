@@ -232,7 +232,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*607 us_puz_elevatorkeypad4*/[607]={210,0,249,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*608 us_puz_keypad*/[608]={211,0,414,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*609 us_puz_panel_blue_grid*/[609]={0,0,604,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*610 us_puz_panel_brown_grid*/[610]={0,0,604,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
 /*611 us_puz_panel_gray_grid*/[611]={0,0,634,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*612 us_puz_panel_red_grid*/[612]={0,0,625,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
-/*613 us_puz_panel_teal_grid*/[613]={0,0,601,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*614 us_relaypanel*/[614]={0,0,617,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,45,0,{0,0,0},{0,0,0}},/*615 us_retinalscanner*/[615]={79,0,46,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*616 prop_vending1_1*/[616]={627,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*613 us_puz_panel_teal_grid*/[613]={0,0,601,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*614 us_relaypanel: model 5596 = puzzlepanel3 frame 0 (closed cover), anim 45 walks frames 1-17 open and 18 installed; box collider from the prefab BoxCollider (0.64,0.64,0.18 at z-0.04) so the panel can be frobbed*/[614]={5596,0,617,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,45,COLTYPE_BOX,{0.0f,0.0f,-0.04f},{0.64f,0.64f,0.18f}},/*615 us_retinalscanner*/[615]={79,0,46,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*616 prop_vending1_1*/[616]={627,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*617 prop_vending1_2*/[617]={628,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*618 prop_vending1_3*/[618]={629,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*619 prop_vending2_1*/[619]={614,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*620 prop_vending2_2*/[620]={621,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*621 ambient_airhiss*/[621]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*622 ambient_clicker*/[622]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*623 ambient_compressor*/[623]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*624 ambient_dishwasher*/[624]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*625 ambient_drip_amb*/[625]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*626 ambient_fan*/[626]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -467,6 +467,8 @@ void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
 char lineSpace[LINE_LEN_MAX]; char ioNames[MAX_IO_NAMES][TARG_STRLEN]; u16 ioNameCount,fwParentOf[INSTANCE_COUNT]; static u16 fwSlotStart[INSTANCE_COUNT],fwSlotCount[INSTANCE_COUNT],fwPoolUsed,fwPoolPrefab[FW_POOL_MAX],fwCurChild,fwLastChunkSlot,lwPrefab[FW_MAX_CHILDREN];
 static V3 fwBasePos[INSTANCE_COUNT],fwInfoLocal[INSTANCE_COUNT],fwBaseScale[INSTANCE_COUNT],fwPoolPos[FW_POOL_MAX],fwPoolScale[FW_POOL_MAX],lwPos[FW_MAX_CHILDREN],lwScale[FW_MAX_CHILDREN],fwInfoLocalTmp,fwContainerPos,fwContainerScale,fwInfoScaleDummy,*fwCurP,*fwCurS;
 static Quaternion fwBaseRot[INSTANCE_COUNT],fwPoolRot[FW_POOL_MAX],lwRot[FW_MAX_CHILDREN],fwContainerRot,fwInfoRotDummy,*fwCurR; static bool fwLine,fwCollecting,fwPendingChild; static i32 fwStage; // transform block counter: 0 own, 1 func_wall container, 2 info_target, >=3 chunk children
+/*InteractablePanel-shaped lines (us_relaypanel 614, us_retinalscanner 615, us_isotopepanel 602): the dump writes the object's own transform first and then one transform block per sub-GO (installationItem + effects, Unity Utils.SaveSubActivatedGOState). Voxen represents the placed item with its own model instance instead of child objects, so only block 0 (the object's own transform) is applied; the sub-GO blocks are counted but dropped. Without this they overwrote the panel's own position/rotation/scale (level 7 relay panels came out 90 deg off, the level 3 retinal scanner came out zero-scaled).*/
+static bool ipLine; static i32 ipBlock; static V3 ipSubPos,ipSubScale; static Quaternion ipSubRot; static V3 *ipCurP; static Quaternion *ipCurR; static V3 *ipCurS;
 typedef struct { u16 ent; u8 anchor,align; float lineSp; char text[DECAL_INLINE_TEXT_LEN]; } DecalPend; // per level staging: `text:`/tA/tAl/tLs precede `lingdex`, resolved in copy loop
 static DecalPend pendDecals[DECAL_INLINE_TEXT_PEND]; static u16 pendDecalCount;
 static DecalPend* PendDecal(u16 ent) {
@@ -512,19 +514,36 @@ void LoadLevelMod(u8 lev) {
             entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; } inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
             for (u8 slot=0;slot<4;++slot) inst->contents[slot]=inst->custIdx[slot]=inst->randomItem[slot]=inst->randomItemCustIdx[slot]=-1;
             inst->relayEnabled=true;/*Unity LogicRelay: public bool relayEnabled = true; level data never writes the key, so absent must mean enabled.*/
-            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f}; inst->relayEnabled = true;
+            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; ipLine=false; ipBlock=0; ipCurP=NULL; ipCurR=NULL; ipCurS=NULL; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f}; inst->relayEnabled = true;
         }
         bool activeStateRead = false; bool matIndexRead = false; u8 scaleReadMask = 0; u16 matIndexTexIdx = 881;
         while (line[0] != '\0') {
             char* pipe = StringFindFirstCharWithin(line, '|'); char* kvString = line; if (pipe) { *pipe = '\0'; line = pipe + 1; } else { line += slen(line); } if (kvString[0] == '\0') continue; char* colon = StringFindFirstCharWithin(kvString, ':'); if (!colon || colon[1] == '\0') continue; *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);}
             else {
-                     if(KEY_EQ("constIndex")){inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517);}
-                else if(KEY_EQ("lP.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].x=v;} else {FWBeginBlock(entCount); if(fwCurP){fwCurP->x=v;}} } else if(KEY_EQ("lP.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].y=v;} else if(fwCurP){fwCurP->y=v;} }
-                else if(KEY_EQ("lP.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){posFromFile[entCount].z=v;} else if(fwCurP){fwCurP->z=v;} }                           else if(KEY_EQ("lR.x")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].x=v;} else if(fwCurR){fwCurR->x=v;} }
-                else if(KEY_EQ("lR.y")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].y=v;} else if(fwCurR){fwCurR->y=v;} }                      else if(KEY_EQ("lR.z")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].z=v;} else if(fwCurR){fwCurR->z=v;} }
-                else if(KEY_EQ("lR.w")) { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){rotationFromFile[entCount].w=v;} else if(fwCurR){fwCurR->w=v;} }                      else if(KEY_EQ("lS.x"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].x=v; scaleReadMask|=1u;} else if(fwCurS){fwCurS->x=v;} }
-                else if(KEY_EQ("lS.y"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].y=v; scaleReadMask|=2u;} else if(fwCurS){fwCurS->y=v;} }                      else if(KEY_EQ("lS.z"))    { float v=parse_float(value,lineSpace,lineNum); if(!fwLine){scaleFromFile[entCount].z=v; scaleReadMask|=4u;} else if(fwCurS){fwCurS->z=v;} }
+                     if(KEY_EQ("constIndex")){inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517); ipLine=(inst->index == 614 || inst->index == 615 || inst->index == 602);}
+                else if(KEY_EQ("lP.x")||KEY_EQ("lP.y")||KEY_EQ("lP.z")||KEY_EQ("lR.x")||KEY_EQ("lR.y")||KEY_EQ("lR.z")||KEY_EQ("lR.w")||KEY_EQ("lS.x")||KEY_EQ("lS.y")||KEY_EQ("lS.z")) {
+                    /*One block per transform: lP.x starts a new one. func_wall (517) keeps its own staged collection; InteractablePanel objects (ipLine) take block 0 only and drop the sub-GO blocks; everything else writes straight to the object.*/
+                    float v=parse_float(value,lineSpace,lineNum);
+                    if (KEY_EQ("lP.x")) {
+                        if (fwLine) { FWBeginBlock(entCount); }
+                        else if (ipLine) {
+                            if (ipBlock == 0) { ipCurP=&posFromFile[entCount]; ipCurR=&rotationFromFile[entCount]; ipCurS=&scaleFromFile[entCount]; }
+                            else { ipCurP=&ipSubPos; ipCurR=&ipSubRot; ipCurS=&ipSubScale; }
+                            ipBlock++;
+                        }
+                    }
+                    if (KEY_EQ("lP.x")) { if(fwLine){ if(fwCurP)fwCurP->x=v; } else if(ipLine){ if(ipCurP)ipCurP->x=v; } else posFromFile[entCount].x=v; }
+                    else if (KEY_EQ("lP.y")) { if(fwLine){ if(fwCurP)fwCurP->y=v; } else if(ipLine){ if(ipCurP)ipCurP->y=v; } else posFromFile[entCount].y=v; }
+                    else if (KEY_EQ("lP.z")) { if(fwLine){ if(fwCurP)fwCurP->z=v; } else if(ipLine){ if(ipCurP)ipCurP->z=v; } else posFromFile[entCount].z=v; }
+                    else if (KEY_EQ("lR.x")) { if(fwLine){ if(fwCurR)fwCurR->x=v; } else if(ipLine){ if(ipCurR)ipCurR->x=v; } else rotationFromFile[entCount].x=v; }
+                    else if (KEY_EQ("lR.y")) { if(fwLine){ if(fwCurR)fwCurR->y=v; } else if(ipLine){ if(ipCurR)ipCurR->y=v; } else rotationFromFile[entCount].y=v; }
+                    else if (KEY_EQ("lR.z")) { if(fwLine){ if(fwCurR)fwCurR->z=v; } else if(ipLine){ if(ipCurR)ipCurR->z=v; } else rotationFromFile[entCount].z=v; }
+                    else if (KEY_EQ("lR.w")) { if(fwLine){ if(fwCurR)fwCurR->w=v; } else if(ipLine){ if(ipCurR)ipCurR->w=v; } else rotationFromFile[entCount].w=v; }
+                    else if (KEY_EQ("lS.x")) { if(fwLine){ if(fwCurS)fwCurS->x=v; } else if(ipLine){ if(ipCurS)ipCurS->x=v; } else { scaleFromFile[entCount].x=v; scaleReadMask|=1u; } }
+                    else if (KEY_EQ("lS.y")) { if(fwLine){ if(fwCurS)fwCurS->y=v; } else if(ipLine){ if(ipCurS)ipCurS->y=v; } else { scaleFromFile[entCount].y=v; scaleReadMask|=2u; } }
+                    else if (KEY_EQ("lS.z")) { if(fwLine){ if(fwCurS)fwCurS->z=v; } else if(ipLine){ if(ipCurS)ipCurS->z=v; } else { scaleFromFile[entCount].z=v; scaleReadMask|=4u; } }
+                }
                 else if(KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
                 else if(KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("keycode")) inst->keycode=parse_numberu16(value,lineSpace,lineNum);
@@ -594,6 +613,8 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("randomMax"))      inst->randomMax = parse_float(value, lineSpace, lineNum);                        else if(KEY_EQ("useRandomTimes")) inst->useRandomTimes = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("onlyOnce"))        inst->onlyOnce = parse_bool(value, lineSpace, lineNum);                         else if(KEY_EQ("stayOpen"))        inst->stayOpen = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("startOpen"))       inst->startOpen = parse_bool(value, lineSpace, lineNum);                        else if(KEY_EQ("ajar"))            inst->ajar = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("open"))            inst->panelOpen      = parse_bool(value,lineSpace,lineNum);/*InteractablePanel cover state (only us_relaypanel/isotopepanel/retinalscanner carry these keys)*/
+                else if(KEY_EQ("installed"))       inst->panelInstalled = parse_bool(value,lineSpace,lineNum);/*InteractablePanel: the required item is already in place*/
                 else if(KEY_EQ("ajarPercentage"))  inst->ajarPercentage = parse_float(value, lineSpace, lineNum);                  else if(KEY_EQ("timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(value, lineSpace, lineNum);
                 else if(KEY_EQ("toggleLasers"))    inst->toggleLasers = parse_bool(value, lineSpace, lineNum);                                                              else if(KEY_EQ("changeLayerOnOpenClose")) inst->changeLayerOnOpenClose=parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("waitBeforeClose")) inst->waitBeforeClose=parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;                                    else if(KEY_EQ("doorOpen")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPEN,parse_bool(value,lineSpace,lineNum));

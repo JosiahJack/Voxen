@@ -11,3 +11,4 @@ temp_build_gc/*
 Shaders/*.h
 *.kate-swp
 Data/sav*.bin
+introdone.dat

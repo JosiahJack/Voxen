@@ -165,7 +165,7 @@ void SearchFXEnable(int side) {
 void SearchFXResetEnable(u16 self) { Entity* e = &World.instances[self]; if (e->itemLifeTime <= 0.0f) {e->itemLifeTime = 3.0f;} e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
 void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
-void DelayedSpawnUpdate(u16 s) { Entity* e=&World.instances[s]; if(!e->active||e->timerFinished<=0.0||e->timerFinished>World.pauseRelativeTime){return;} e->active=false; if(!e->doSelfAfterList){return;} if(e->despawnInstead){if(e->destroyAfterListInsteadOfDeactivate){DeleteInstance(s);}else{flag_set(&e->entflags,EF_ACTIVE,false);}}else flag_set(&e->entflags,EF_ACTIVE,true);}
+void DelayedSpawnUpdate(u16 s) { Entity* e=&World.instances[s]; if(!e->active||e->timerFinished<=0.0||e->timerFinished>World.pauseRelativeTime){return;} e->active=false; if(!e->doSelfAfterList){return;} if(e->despawnInstead){DeleteInstance(s);/*despawn means gone, not deactivated*/}else flag_set(&e->entflags,EF_ACTIVE,true);}
 void FuncWallShiftChildren(u16 self, V3 delta) { if (vabs(delta.x)+vabs(delta.y)+vabs(delta.z) < 0.00001f) {return;} for (u16 i=PLAYER1;i<World.instCount;++i) { if (fwParentOf[i]==self) { World.position[i]=V3_AplusB(World.position[i],delta); } } }
 void FuncWallInitAfterLoad(u16 self) {
     Entity* e=&World.instances[self]; V3 prev=World.position[self]; float distTotal=V3_Dist(e->startPosition,e->targetPosition); float f=0; if((u8)e->funcState>FStat_AjarMovingTarget)f=e->ajarPercentage; else if(e->funcState==FStat_AjarMovingTarget) f=e->ajarPercentage;
@@ -639,7 +639,8 @@ void Targetted(u16 activator, u16 self) {
     if (aioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags, EF_ACTIVE, true); else if (aioflags & TARG_IOFLAGS_INST_DEACTIVATE) { if (e->camView != 255) { e->camView = 255; TextureSequenceInit(self, "Static"); flag_set(&e->entflags, EF_ACTIVE, true); }/*camera destroyed: keep its screen, switch it to Static*/ else { flag_set(&e->entflags, EF_ACTIVE, false); } } else if (aioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags, EF_ACTIVE, !(e->entflags & EF_ACTIVE));
 }
 
-extern char ioNames[MAX_IO_NAMES][TARG_STRLEN]; extern u16 ioNameCount;
+extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
+INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy); extern u16 ioNameCount;
 void UseTargets(u16 activator, u16 targetIdx) {
     if(targetIdx==IO_NONE){return;} bool wasActive=World.targetIOActive,succeeded=false; u8 entryLevel=World.currentLevel; if(!wasActive){World.targetIOActive=true; World.targetIOEntryLevel=entryLevel; World.targetIOActivatorIdx=activator; World.targetIOActivatorEntity=World.instances[activator]; World.targetIOActivatorIoflags=World.instances[activator].ioflags;} const char* targetname=(targetIdx<ioNameCount) ? ioNames[targetIdx] : "";
     for (u8 lev = 0; lev < World.numLevels; ++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } }
@@ -651,7 +652,7 @@ void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 c
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
 static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
 static bool IsElevatorPanel(u16 index) { return index>=604&&index<=607; }
-static bool IsFrobUsableSpecial(u16 index) { return index==574||index==608||IsElevatorPanel(index)||IsPuzzleGridPanel(index)||IsPuzzleWirePanel(index); }
+static bool IsFrobUsableSpecial(u16 index) { return index==574||index==608||index==614||index==602||IsElevatorPanel(index)||IsPuzzleGridPanel(index)||IsPuzzleWirePanel(index); }/*614 us_relaypanel, 602 us_isotopepanel: InteractablePanel*/
 static void PuzzlePanelUse(u16 i) {
     Entity* e=&World.instances[i];
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return;}
@@ -675,6 +676,79 @@ static bool PanelUseAllowed(u16 i) {
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return false;}
     if(e->entflags&EF_LOCKED){u16 msg=(u16)e->lockedMessageLingdex;if(msg<T_LOGSTR_CNT&&msg!=0)CenterStatusPrint("%s",Sys_Text.stringTable[msg]);else CenterStatusPrint("%s",Sys_Text.stringTable[302]);return false;}
     return true;
+}
+
+/*---- InteractablePanel (Citadel us_relaypanel / us_isotopepanel / us_retinalscanner) -----------------------------------
+  Unity InteractablePanel.Use: the first frob throws the cover open (open=true, "Open" anim, SFX, message). The next
+  frob while holding the required item installs it: installed=true, the installationItem child goes active, the
+  effects fire, the held item is consumed and UseTargets runs. Holding the wrong item gives the deny click (43) plus
+  the wrongItem message; frobbing an installed panel with an empty hand gives the alreadyInstalled message, and with
+  the right item only the alreadyInstalled SFX.
+  Voxen has no child GameObjects, so the placed item is the panel model's own frame: anim 45 (puzzlepanel3, "frame: 0 18"
+  in Data/models.txt) A_OPENING 1-17 opens the cover and A_INSTALLED (frame 18, model 5614) is the item-in-place look.
+  The level dump carries none of Unity's per-instance requiredIndex/messages/SFX/target, so the panels that are
+  actually usable are listed in relayPanelScripts[], keyed by the targetname added to their level-data line; panels with
+  no entry (the decorative level-3 ones, all saved open+installed) just animate and take no item.*/
+typedef struct { const char* name; u8 item; u16 msgOpen,msgInst,msgWrong,msgAlready; i16 sfxOpen,sfxInst,sfxAlready; const char* target; bool blowUp; } RelayPanelScript;
+static const RelayPanelScript relayPanelScripts[] = {
+    /*name                     item  open inst wrong already  sfxO sfxI sfxA  target                    15s fuse*/
+    {"panelRelay428",             57,  262, 260, 259,  261,    225,  42,  226,  "lev3fixtherelay",       false},/*level 3 maintenance, "relay 428": interface demodulator*/
+    {"panelAntenna1",             56,  152, 606, 604,  605,     91,  42,  166,  "lev7antenna1",          true },/*level 7 engineering antennas: Z-44 plastique*/
+    {"panelAntenna2",             56,  152, 606, 604,  605,     91,  42,  166,  "lev7antenna2",          true },
+    {"panelAntenna3",             56,  152, 606, 604,  605,     91,  42,  166,  "lev7antenna3",          true },
+    {"panelAntenna4",             56,  152, 606, 604,  605,     91,  42,  166,  "lev7antenna4",          true },
+    {"panelIsolinear",            64,  151, 211, 210,  212,     91,  42,  166,  "lev9isolinearactivated",false},/*level 9: isolinear chipset*/
+};
+extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
+static const RelayPanelScript* RelayPanelScriptFor(const Entity* e) {
+    if (!e->targetnameIdx || e->targetnameIdx>=MAX_IO_NAMES) return NULL;
+    for (u32 i=0;i<sizeof(relayPanelScripts)/sizeof(relayPanelScripts[0]);++i) if (sEqual(ioNames[e->targetnameIdx],relayPanelScripts[i].name)) return &relayPanelScripts[i];
+    return NULL;
+}
+static void RelayPanelMsg(u16 msg) { if (msg>0 && msg<T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[msg]); }
+static void RelayPanelSfx(i16 sfx, V3 pos) { if (sfx>0 && sfx<SOUNDS_COUNT) play_wav(sounds[sfx],AppliedFXVol(1.0f),pos,true); }
+static void RelayPanelUse(u16 self) {
+    Entity* e=&World.instances[self]; if(!PanelUseAllowed(self))return;
+    const RelayPanelScript* sc = RelayPanelScriptFor(e);
+    /*UseData.mainIndex equivalent: the useable item index of whatever is in hand (-1 == empty hand).*/
+    i16 held = (World.invP1.holdingObject && World.invP1.heldObjectIndex>=INSTS_1ST_IDX) ? (i16)(World.invP1.heldObjectIndex-307) : -1;
+    if (!e->panelOpen) { e->panelOpen=true; ChangeAnim(e,A_OPENING); RelayPanelSfx(sc?sc->sfxOpen:91,World.position[self]); RelayPanelMsg(sc?sc->msgOpen:0); return; }
+    if (e->panelInstalled && held<0) { RelayPanelMsg(sc?sc->msgAlready:0); return; }/*already installed, empty hand*/
+    if (sc && held==(i16)sc->item) {
+        if (e->panelInstalled) { RelayPanelSfx(sc->sfxAlready,World.position[self]); return; }/*wrong hand is not the issue: right item, already in*/
+        e->panelInstalled=true; ChangeAnim(e,A_INSTALLED); RelayPanelSfx(sc->sfxInst?sc->sfxInst:42,World.position[self]); RelayPanelMsg(sc->msgInst);
+        ResetHeldItem();/*the item goes into the panel, so it leaves the hand for good*/
+        if (sc->target && *sc->target) UseTargets(self,IOInternName(sc->target));
+        if (sc->blowUp) { e->panelArmed=true; e->panelTimer = World.pauseRelativeTime + (e->delay>0.0f?(double)e->delay:15.0); }/*prefab DelayedSpawn: ExplosionTimer arms 15s after the installationItem goes active*/
+        return;
+    }
+    play_wav(sounds[43]/*button_deny, aaaahhh!! Try again*/,AppliedFXVol(1.0f),World.position[self],true); RelayPanelMsg(sc?sc->msgWrong:0);
+}
+/*Cover animation finishing into the open pose, and the armed 15s fuse: Unity's DelayedSpawn on the panel's
+  ExplosionTimer activates the Explosion child (ExplosionLife/GrenadeActivate + light + sound) and basedestroyed
+  after the delay. Voxen plays the explosion in place and removes the panel itself (DeleteInstance, not a despawn).*/
+static void RelayPanelUpdate(u16 self) {
+    Entity* e=&World.instances[self];
+    /*Panels that load already open/installed (the level data carries their state) start on the matching frame
+      instead of the closed cover: installed (frame 18) wins over open (frame 17).*/
+    if (e->clip==A_IDLE_CLOSED) { if (e->panelInstalled) ChangeAnim(e,A_INSTALLED); else if (e->panelOpen) ChangeAnim(e,A_IDLE_OPEN); }
+    if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=DoorGetClip(e,A_OPENING); if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
+    if (e->panelArmed && World.pauseRelativeTime>=e->panelTimer) {
+        e->panelArmed=false; V3 p=World.position[self];
+        play_wav(sounds[64]/*explosion1*/,AppliedFXVol(1.0f),p,true); SpawnExplosionEffect(p,1); Shake(-1.0f); World.fogFac += 5.0f;
+        DeleteInstance(self);
+    }
+}
+/*Frob with the item in hand (Citadel MouseLookScript.FrobWithHeldObject): only these useables are "frob users", and
+  they are consumed by whatever UseHandler answers the frob; anything else you carry is put away as usual.*/
+static bool HeldItemIsFrobUser(i16 item) { return item==54||item==56||item==57||item==61||item==64||item==92||item==93||item==94; }
+bool FrobHeldItemIntoPanel(V3 p, V3 f, V3 r) {
+    if (!World.invP1.holdingObject) return false;
+    i16 item=(i16)(World.invP1.heldObjectIndex-307); if (!HeldItemIsFrobUser(item)) return false;
+    RaycastHit h=Raycast(p,ScreenPointToRayOffset(f,r,0,0),FROB_DISTANCE,LMASK_PLAYER_FROB);
+    if (!h.hit || h.hitInstanceIndex>=World.instCount) return false;
+    u16 idx=h.hitInstanceIndex; if (World.instances[idx].index!=614 && World.instances[idx].index!=602) return false;
+    RelayPanelUse(idx); return true;/*the panel decides: it either installs the item (consuming it) or refuses it*/
 }
 /*Elevator floor button layouts, from Textures/UI/ElevatorCheetSheet.txt (Unity ElevatorKeypad buttonText/buttonsEnabled/buttonsDarkened ground truth).
   label: index into elevFloorLabels[] (R=0,1=1..9=9,G1=10,G2=11,G4=12), -1 = hidden (not drawn, not clickable).
@@ -863,7 +937,7 @@ static int UseNameTableIndex(int index) {
 void UseEntity(u16 i) {
     Entity* ent = &World.instances[i];
     if (IdxIsSearchable(ent->index) || (World.layer[i]&L_CorpseSearchable) || (IdxIsGib(ent->index) && (World.layer[i]&L_Corpse))) { SearchObject(i); } else if (IdxIsDoor(ent->index)) DoorUse(i,PLAYER1); else if (IdxIsNPC(ent->index)) CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[World.instances[i].index - 419].name); else if (IdxIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
-    else if(ent->index==574) HealingBedUse(i,PLAYER1); else if(IsElevatorPanel(ent->index)) ElevatorPanelUse(i); else if(ent->index==608) KeycodePanelUse(i); else if(IsPuzzleGridPanel(ent->index)||IsPuzzleWirePanel(ent->index)) PuzzlePanelUse(i);
+    else if(ent->index==574) HealingBedUse(i,PLAYER1); else if(ent->index==614||ent->index==602) RelayPanelUse(i); else if(IsElevatorPanel(ent->index)) ElevatorPanelUse(i); else if(ent->index==608) KeycodePanelUse(i); else if(IsPuzzleGridPanel(ent->index)||IsPuzzleWirePanel(ent->index)) PuzzlePanelUse(i);
     else if (IdxIsGeometry(ent->index)) { int t = UseNameTableIndex(ent->index); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t >= 0 ? Sys_Text.stringTable[t] : ""); }
     else if (IdxIsUsableObject(ent->index)) {
         World.invP1.holdingObject = true; World.invP1.heldObjectIndex = ent->index; World.invP1.heldObjectCustIdx = ent->customIndex; World.invP1.heldAmmo = ent->ammo; World.invP1.heldAmmo2 = ent->ammo2; World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
@@ -878,7 +952,7 @@ static bool TargetIDFrob(V3 p,V3 f,V3 r){V3 dir=ScreenPointToRayOffset(f,r,0,0);
 static void Frob(V3 p,V3 f,V3 r){
     if(World.uiIsBlocking||World.curLev==LEVEL_CYBERSPACE)return;
     if(Cheats.editMode){V3 d0=ScreenPointToRayOffset(f,r,0,0);RaycastHit fh=Raycast(p,d0,World.farPlane[World.curLev],LMASK_PLAYER_FROB);editModeSelection=(fh.hit&&fh.hitInstanceIndex>=INSTS_1ST_IDX&&fh.hitInstanceIndex<World.instCount)?fh.hitInstanceIndex:U16_MAX; if(editModeSelection<U16_MAX){editFieldEditing=false; CenterStatusPrint("Selected object %u (const index %u)",editModeSelection,World.instances[editModeSelection].index);}else{CenterStatusPrint("Object deselected");}return;/*No pickup/search/use while in edit mode; selection only.*/}
-    if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0;return;}if(World.invP1.holdingObject){DropHeldItem();return;}if(TargetIDFrob(p,f,r))return;float o=(float)UI_H*0.02f;RaycastHit fh={0},bh={0};bool ok=false;V3 d0=ScreenPointToRayOffset(f,r,0,0);fh=Raycast(p,d0,FROB_DISTANCE,LMASK_PLAYER_FROB);bh=fh;ok=FrobRayIsFrobable(fh);float ox[8]={0,0,o,-o,o,-o,-o,o},oy[8]={-o,o,0,0,o,-o,o,-o};for(int i=0;i<8&&!ok;++i){V3 d=ScreenPointToRayOffset(f,r,ox[i],oy[i]);RaycastHit th=Raycast(p,d,FROB_DISTANCE,LMASK_PLAYER_FROB);if(FrobRayIsFrobable(th)){bh=th;ok=true;}}if(!ok)bh=fh;if(Cheats.showPhys){World.debugLine_start=p;World.debugLineFinished=World.pauseRelativeTime+3.0;V3 dbg=ok?ScreenPointToRayOffset(f,r,0,0):d0;RaycastHit dh=ok?bh:fh;World.debugLine_end=dh.hit?dh.point:(V3){dbg.x*FROB_DISTANCE+p.x,dbg.y*FROB_DISTANCE+p.y,dbg.z*FROB_DISTANCE+p.z};}if(!ok){if(fh.hit){u16 idx=fh.hitInstanceIndex;if(idx<World.instCount){u16 ei=World.instances[idx].index;if(IdxIsGeometry(ei)||IdxIsDoor(ei)||World.instances[idx].index>=595){int t=UseNameTableIndex(ei);CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t>=0?Sys_Text.stringTable[t]:"");return;}}}CenterStatusPrint("%s",Sys_Text.stringTable[30]);}else UseEntity(bh.hitInstanceIndex);}
+    if(World.Sys_UI.vmailActive){World.Sys_UI.vmailActive=0;return;}if(World.invP1.holdingObject){if(FrobHeldItemIntoPanel(p,f,r)){return;} DropHeldItem();return;}if(TargetIDFrob(p,f,r))return;float o=(float)UI_H*0.02f;RaycastHit fh={0},bh={0};bool ok=false;V3 d0=ScreenPointToRayOffset(f,r,0,0);fh=Raycast(p,d0,FROB_DISTANCE,LMASK_PLAYER_FROB);bh=fh;ok=FrobRayIsFrobable(fh);float ox[8]={0,0,o,-o,o,-o,-o,o},oy[8]={-o,o,0,0,o,-o,o,-o};for(int i=0;i<8&&!ok;++i){V3 d=ScreenPointToRayOffset(f,r,ox[i],oy[i]);RaycastHit th=Raycast(p,d,FROB_DISTANCE,LMASK_PLAYER_FROB);if(FrobRayIsFrobable(th)){bh=th;ok=true;}}if(!ok)bh=fh;if(Cheats.showPhys){World.debugLine_start=p;World.debugLineFinished=World.pauseRelativeTime+3.0;V3 dbg=ok?ScreenPointToRayOffset(f,r,0,0):d0;RaycastHit dh=ok?bh:fh;World.debugLine_end=dh.hit?dh.point:(V3){dbg.x*FROB_DISTANCE+p.x,dbg.y*FROB_DISTANCE+p.y,dbg.z*FROB_DISTANCE+p.z};}if(!ok){if(fh.hit){u16 idx=fh.hitInstanceIndex;if(idx<World.instCount){u16 ei=World.instances[idx].index;if(IdxIsGeometry(ei)||IdxIsDoor(ei)||World.instances[idx].index>=595){int t=UseNameTableIndex(ei);CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t>=0?Sys_Text.stringTable[t]:"");return;}}}CenterStatusPrint("%s",Sys_Text.stringTable[30]);}else UseEntity(bh.hitInstanceIndex);}
 // Update
 void WeaponsUpdate(); void TextureSequenceUpdate(u16 self); void AIAnimationControllerUpdate(u16 selfIdx); void AIControllerUpdate(u16 selfIdx);
 extern const V3 sightPointOffsets[NUM_AI_TYPES];
@@ -894,7 +968,7 @@ void DrawAIDebug(u16 i) {
 void ModUpdate() {
     if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
+        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==614) RelayPanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);} if(IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
         if(constdex==552){CyberDataFragUpdate(i);} if(constdex==554){CyberExitUpdate(i);} if(constdex==555){CyberSwitchUpdate(i);} if((constdex>=448&&constdex<=451)||(constdex>=454&&constdex<=457)){CyberItemUpdate(i);}
     }
