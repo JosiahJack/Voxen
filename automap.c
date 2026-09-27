@@ -135,6 +135,9 @@ static bool amReveal() {
 
 static u32 amDoorHash() {u32 h=0; for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {Entity* e=&World.instances[i]; if(IdxIsDoor(e->index)){h=h*31u+(u32)(i*7u+(u32)e->doorState);}} return h;}
 void AutomapInitGL() {if(amReady){return;} GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glGenFramebuffers(1,&amFBO); glBindFramebuffer(GL_FRAMEBUFFER,amFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amTexId,0); GenerateAndBindTexture(&amFullTexId,GL_RGBA8,AM_FULL_W,AM_FULL_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glGenFramebuffers(1,&amFullFBO); glBindFramebuffer(GL_FRAMEBUFFER,amFullFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amFullTexId,0); glBindFramebuffer(GL_FRAMEBUFFER,0); amReady=true;}
+/*Wipe both map FBOs.  AutomapTick early-outs on World.menuActive, so without this the last level's map
+  pixels sit in the textures for the whole time the main menu is up.*/
+void AutomapClearRenderTargets() { if(!amReady){return;} glBindFramebuffer(GL_FRAMEBUFFER,amFBO); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,amFullFBO); glClear(GL_COLOR_BUFFER_BIT); }
 void AutomapNewGame() {mset(World.automapExplored,0,sizeof(World.automapExplored)); World.automapZoom=0; World.automapNextRaster=0.0; amBuiltLev=255; amBuiltPX=1e30f; amBuiltPZ=1e30f;}
 void AutomapOnLoad() { amBuiltLev=255; World.automapNextRaster=0.0; amBuiltPX=1e30f; amBuiltPZ=1e30f; }/*force re-raster from loaded FoW*/
 void AutomapTick() {

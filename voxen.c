@@ -233,7 +233,8 @@ static void cmd_summon(int itemConstIndex) {
     if (IdxIsHardware(itemConstIndex)) { int v=(int)World.invP1.hwVers[itemConstIndex-328]+1; World.instances[spawned].customIndex=(i16)(v>4?4:v); } } CenterStatusPrint("Summoned object ID %d",itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s",itemConstIndex); } }
 static void cmd_select(int instanceIdx) { if (instanceIdx >= 0 && instanceIdx < World.instCount) { editModeSelection=(u16)instanceIdx; CenterStatusPrint("Selected entity instance %u (const index %u)",editModeSelection,World.instances[editModeSelection].index); } else { CenterStatusPrint("Invalid instance: %d (loaded count: %u)",instanceIdx,World.instCount); } }
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
-static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; if (Cheats.showFPS && (World.invP1.hasHardware & HW_BIO)) World.invP1.hardwareIsActive |= HW_BIO;/*hold the biomonitor on so its graphs carry the frame-time scopes*/ }                         static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
+static u16 showfpsSavedBioBit = 0;
+static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; if (!(World.invP1.hasHardware & HW_BIO)) return; if (Cheats.showFPS) { showfpsSavedBioBit = World.invP1.hardwareIsActive & HW_BIO; World.invP1.hardwareIsActive |= HW_BIO; BioMonitorAlignCursors(); }/*hold the biomonitor on so its graphs carry the frame-time scopes*/ else { World.invP1.hardwareIsActive = (World.invP1.hardwareIsActive & ~HW_BIO) | showfpsSavedBioBit;/*give the bit back to however the player had it, otherwise the cheat leaves a camview rendering every 0.5s for the rest of the session*/ } }                         static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
 static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacker!"); } static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
 static void cmd_god() { Cheats.god = !Cheats.god; CenterStatusPrint("god mode: %s", Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_energy() { Cheats.redbull = !Cheats.redbull; if (Cheats.redbull) {CenterStatusPrint("%s", Sys_Text.stringTable[1006]);/*"I feel the power! 0 energy consumption!"*/} else {CenterStatusPrint("%s", Sys_Text.stringTable[1005]);/*Energy usage normal*/} }
@@ -579,6 +580,21 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
 Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},{0,0,0,1},{0,0,0,1},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
         V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},  {-.2f,.5f,.8f},  {0,-.3f,.7f},        /*rapier / pipe: mesh extents require forward/down offset (pipe bbox z:-0.7..0.04 y:-1.26..-0.86; rapier bbox z:-1.07..0.13 y:-1.03..0.04)*/        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
 extern const u16 wepModelIndices[16]; extern WeaponFireCtx wfx; void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
+static bool clearRenderTargetsOnNextFrame = false;
+void RequestClearRenderTargets() { clearRenderTargetsOnNextFrame = true; }
+/*Wipe every offscreen render target.  gBufferFBO and uiFBO are re-cleared each frame by Render below, but the
+  CPU-rasterized automap and biomonitor FBOs only get written while the game is live (AutomapTick early-outs
+  on World.menuActive, BioMonitorUpdate needs the biomonitor on), so they hold the last gameplay frame on
+  exit to the main menu.  Driven from the top of Render rather than from the UI event itself, because the
+  menu click lands mid-RenderUI and clearing uiFBO there would wipe the UI frame in flight.*/
+static void ClearAllRenderTargets() {
+    /*Clear color is already (0,0,0,0) here: Render's uiFBO clear last frame set it and nothing after changes it.
+      The FBO binding is left pointing at the last helper's target, since the caller's next line rebinds gBufferFBO.*/
+    glClearColor(0.0f,0.0f,0.0f,0.0f);
+    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+    glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClear(GL_COLOR_BUFFER_BIT);
+    AutomapClearRenderTargets(); BiomonitorClearRenderTarget();
+}
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight; float sfov, snear, sfar; if (camView) { CamView* cv=&camViews[camViewIdx]; swidth=cv->width; sheight=cv->height; sfov=(float)cv->fov; snear=cv->near; sfar=cv->far; } else { swidth=Sys_Settings.ScreenWidth; sheight=Sys_Settings.ScreenHeight; sfov=(float)Sys_Settings.FOV; snear=0.02f; sfar=World.farPlane[World.curLev]; }
     float shakeOffset = (World.shakeFinished > World.pauseRelativeTime) ? (shakeAmp * vcosf((float)(World.pauseRelativeTime * 20.0f))) * (World.shakeFinished - World.pauseRelativeTime) : 0.0f;
@@ -588,6 +604,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glBindVertexArray(chunkVAO);/*Common vao for RenderDynamicShadowmaps and Rasterized Geometry*/ glEnable(GL_DEPTH_TEST);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][0]); if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps(); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][1]);
     double rendStart = get_time(); UpdateLights(); // This is where the voxels get updated!
+    if (unlikely(clearRenderTargetsOnNextFrame)) { clearRenderTargetsOnNextFrame = false; ClearAllRenderTargets(); }/*before the gBuffer clear below, so no in-flight target gets wiped*/
     glViewport(0,0,swidth,sheight); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); 
     glEnable(GL_CULL_FACE); glDisable(GL_BLEND);/*Opaques*/ u16 currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0, opaqueCount = 0; bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX); DepthSort tmpTransparent[1024]; u16 tcnt = 0;
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { // Determine base visibility

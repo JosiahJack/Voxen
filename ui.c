@@ -355,7 +355,7 @@ void RenderPausedUI() {
     menuItemCount = 6; menuTabCount = 1; static const i16 pY[6]={330,390,450,510,570,714},pH[6]={52,52,60,60,60,42},pTx[6]={610,630,635,599,546,572},pTy[6]={306,364,422,480,538,690}; static const u16 pStr[6]={725,726,727,721,728,729};
     RenderUIImage(519,276,328,300,1025);/*Pause Menu background*/ RenderUIImage(519,276,328,300,1080);/*Pause Menu background outline*/ RenderUIImage(519,672,328,42,1252);/*Pause Quit Game background*/ RenderTextL(610,210,T_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,/*"PAUSED"*/Sys_Text.stringTable[724]);
     for (u8 i=0;i<6;++i) { bool over=false; if (UI_Button(UI_ID_PAUSE_RESUME+i,522,pY[i],322,pH[i],&over,(i8)i) || (MenuEnter() && currentMenuItem==i)) { if (i==0) World.paused=false; else if (i==5) OS_Exit(0);
-            else { if (i==4) DualLog("Player exited to menu\n"); ChangeMenuPage(i==1?Mpg_Load:i==2?Mpg_Save:i==3?Mpg_Options:Mpg_FrontPage); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); } }
+            else { if (i==4) { DualLog("Player exited to menu\n"); RequestClearRenderTargets(); } ChangeMenuPage(i==1?Mpg_Load:i==2?Mpg_Save:i==3?Mpg_Options:Mpg_FrontPage); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); } }
         over=over||currentMenuItem==i; RenderTextL(pTx[i],pTy[i],over ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,Sys_Text.stringTable[pStr[i]]); }
 }
 
@@ -818,10 +818,10 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
     glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[camViewIdx]); glUniform1i(29,6);/*camViewTex*/
     glUniform1ui(30,1);      /*useCamView*/
     glUniform1ui(32,0);      /*useFontAtlas*/
-    i32 wasCull=0,wasDepth=0; glGetIntegerv(GL_CULL_FACE,&wasCull); glGetIntegerv(GL_DEPTH_TEST,&wasDepth);
-    glDisable(GL_CULL_FACE); glDisable(GL_DEPTH_TEST);
+    i32 wasCull=0,wasDepth=0,wasBlend=0; glGetIntegerv(GL_CULL_FACE,&wasCull); glGetIntegerv(GL_DEPTH_TEST,&wasDepth); glGetIntegerv(GL_BLEND,&wasBlend);
+    glDisable(GL_CULL_FACE); glDisable(GL_DEPTH_TEST); glDisable(GL_BLEND);/*blend off for the blit only: the camview target is already opaque, and the chunk shader's unlit path emits a straight alpha that would otherwise blend against the HUD*/
     glDrawArrays(0x0004/*GL_TRIANGLES*/,0,6); drawCalls++; uiDrawCalls++; vertsRendered += 6;
-    if (wasCull) glEnable(GL_CULL_FACE); if (wasDepth) glEnable(GL_DEPTH_TEST);
+    if (wasCull) glEnable(GL_CULL_FACE); if (wasDepth) glEnable(GL_DEPTH_TEST); if (wasBlend) glEnable(GL_BLEND);
     glBindVertexArray(0); glBindBuffer(GL_ARRAY_BUFFER,0);
 }
 void SideMFD(bool isRH) { // 320x240
@@ -1162,6 +1162,7 @@ static double RenderUI() {
             if (World.curLev==LEVEL_CYBERSPACE)RenderTextL(1137,570,T_YELLOW,FONT_NORMAL,0.8,Sys_Text.stringTable[442]/*"level 1 elevator taken off line - SHODAN security block established 04.NOV.72"*/);/*CyberSPrint*/
             if((World.invP1.hardwareIsActive & HW_BIO)!=0){/*BioMonitor*/
                 BiomonitorBlitToUI();
+                if (!Cheats.showFPS) {/*showFPS turns the graphs into frame-time scopes, so the stock readout is hidden to keep the graph area clear*/
                 char biomText[128];
                 int y = 83;
                 RenderTextL(4,y,T_YELLOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[526]); /*Biomonitor Active:*/ y+=16;
@@ -1184,6 +1185,7 @@ static double RenderUI() {
                 if (World.invP1.fatigue >= 80.0f) RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[532]); /*High!*/
                 else if (World.invP1.fatigue > 30.0f) RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[533]); /*Moderate*/
                 else RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[534]); /*Low*/
+                }
             }
             RenderTextL(1270,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderTextL(1308,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderSearchFX();
         }
@@ -1208,7 +1210,7 @@ static double RenderUI() {
         }
         UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,World.Sys_UI.vmailFrame);/*Vmail viewer*/
     }
-    i16 debugTextStartY = 65;/*Diagnostics / Debugging*/
+    i16 debugTextStartY = 90;/*Diagnostics / Debugging.  Clears the biomonitor graph (BIOM_UI_Y=41, 36 tall) so the scopes stay legible.*/
     if (Cheats.showLocation && !World.menuActive) RenderTextL(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
     i16 lineSpacing = 18;
     if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);

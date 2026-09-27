@@ -10,6 +10,8 @@ static const Color biomBgTransparent = {0.0f, 0.0f, 0.0f, 0.0f};
 enum { BIOM_UI_X=4, BIOM_UI_Y=41 };
 INLINE void biomPutPx(int x,int y,Color c){ u8* p=&biomPx[((u32)y*BIOM_GRAPH_W+(u32)x)*4]; p[0]=(u8)(vclamp(c.r,0.0f,1.0f)*255.0f); p[1]=(u8)(vclamp(c.g,0.0f,1.0f)*255.0f); p[2]=(u8)(vclamp(c.b,0.0f,1.0f)*255.0f); p[3]=(u8)(vclamp(c.a,0.0f,1.0f)*255.0f); }
 void BiomonitorInitGL() {GenerateAndBindTexture(&biomTexId,GL_RGBA8,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,GL_LINEAR,NULL); glGenFramebuffers(1,&biomFBO); glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,biomTexId,0); glBindFramebuffer(GL_FRAMEBUFFER,0);}
+extern FGL_C glClear;
+void BiomonitorClearRenderTarget() { if(!biomFBO){return;} glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glClear(GL_COLOR_BUFFER_BIT); }
 void BiomonitorBlitToUI() {
     if(!(World.invP1.hardwareIsActive & HW_BIO)){return;}
     glBindFramebuffer(GL_READ_FRAMEBUFFER,biomFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
@@ -35,6 +37,11 @@ void BioMonitorClearGraphs() {
     bioMonitor.currentIndex0=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex1=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex2=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f));
     for (int x=0;x<BIOM_GRAPH_W;x++) { for (int y=0; y<BIOM_GRAPH_H;y++) { bioMonitor.colorsERG[x][y] = bioMonitor.backgroundColor; bioMonitor.colorsCHI[x][y] = bioMonitor.backgroundColor; bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor; } }
 }
+
+/*showFPS scopes start all three cursors on one column, so their heads line up and a column is the same
+  instant on every trace.  The stock graphs start at independent random columns and advance at different
+  per-tick rates, so this belongs on the showFPS transition only, not on a general clear.*/
+void BioMonitorAlignCursors() { BioMonitorClearGraphs(); int idx=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex0=bioMonitor.currentIndex1=bioMonitor.currentIndex2=idx; }
 
 static void IncrementERG() { bioMonitor.currentIndex0++; if (bioMonitor.currentIndex0 >= BIOM_GRAPH_W) {bioMonitor.currentIndex0 = 0;} }
 static void IncrementCHI() { bioMonitor.currentIndex1++; if (bioMonitor.currentIndex1 >= BIOM_GRAPH_W) {bioMonitor.currentIndex1 = 0;} }
@@ -79,28 +86,34 @@ void BiomonitorEnergyPulse(float take) { Push(0,take); IncrementERG(); Push(0,ta
 /*showFPS repurposes the three graphs as frame-time scopes: ERG=gpu ms, CHI=cpu ms, ECG=total frame ms.
   Each reading is mapped from 0..full-scale into its graph's authored min..max, so 0ms sits on the
   baseline and full scale pins the top without disturbing the non-cheat graph ranges.*/
-enum { BIOM_FS_GPU=33, BIOM_FS_CPU=17, BIOM_FS_FRAME=33 };/*ms at the top of the graph: 30fps for gpu/frame, 60fps for cpu*/
-INLINE float biomMsToGraph(int graph, double ms, int fullScale) { return bioMonitor.min[graph] + vclamp((float)ms/(float)fullScale,0.0f,1.0f) * (bioMonitor.max[graph] - bioMonitor.min[graph]); }
+static const float biomFsGpu=33.0f, biomFsCpu=17.0f, biomFsFrame=16.6666f;/*ms at the top of each graph: 30fps for gpu, 60fps for cpu and frame*/
+INLINE float biomMsToGraph(int graph, double ms, float fullScale) { return bioMonitor.min[graph] + vclamp((float)ms/fullScale,0.0f,1.0f) * (bioMonitor.max[graph] - bioMonitor.min[graph]); }
 
 void BioMonitorUpdate() {
     if (!(World.invP1.hasHardware & HW_BIO) || !(World.invP1.hardwareIsActive & HW_BIO)) return;
     bioMonitor.header = 526; bioMonitor.heartRateText = 527; bioMonitor.bpmText = 529; bioMonitor.fatigueDetailText = 531; bioMonitor.fatigue=534; /*Low*/ if(World.invP1.fatigue >= 80.0f){bioMonitor.fatigue=532;/*High!*/}else if(World.invP1.fatigue <  80.0f && World.invP1.fatigue > 30.0f){bioMonitor.fatigue=533;/*Moderate*/}
     if (bioMonitor.beatFinished < World.pauseRelativeTime) bioMonitor.heartRate = vfloor((70.0f + ((World.invP1.fatigue / 100.0f) * 110.0f)) * random_range(0.95f,1.05f));
     static const float beatThresh=0.1f, beatVariation=0.05f;
-    /*Energy Usage / showFPS: GPU ms*/ bioMonitor.ergValue = Cheats.showFPS ? biomMsToGraph(BIOM_ERG,World.gpuFrameMs,BIOM_FS_GPU) : vclamp((World.invP1.drainJPM / 255.0f),0.0f,1.0f);
-    /*Chi Brain Waves / showFPS: CPU ms*/ float brainFactor = 0.15f; if (World.invP1.geniusFinished > World.pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f); if(Cheats.showFPS){bioMonitor.chiValue=biomMsToGraph(BIOM_CHI,World.cpuFrameTime,BIOM_FS_CPU);}else{bioMonitor.chiValue=(float)(vsinf(World.pauseRelativeTime * 10.0 * (double)brainFactor));}
-    /*ECG: Create shifted sine wave for heart beat.  Apply percent fatigued to 200bpm max heart rate with baseline 50bpm.  showFPS overrides with total frame ms.*/ if (Cheats.showFPS) { bioMonitor.ecgValue = biomMsToGraph(BIOM_ECG,World.thisFrameTime,BIOM_FS_FRAME); }
+    /*Energy Usage / showFPS: GPU ms*/ bioMonitor.ergValue = Cheats.showFPS ? biomMsToGraph(BIOM_ERG,World.gpuFrameMs,biomFsGpu) : vclamp((World.invP1.drainJPM / 255.0f),0.0f,1.0f);
+    /*Chi Brain Waves / showFPS: CPU ms*/ float brainFactor = 0.15f; if (World.invP1.geniusFinished > World.pauseRelativeTime) brainFactor = 0.35f + random_range(-0.3f,0.3f); if(Cheats.showFPS){bioMonitor.chiValue=biomMsToGraph(BIOM_CHI,World.cpuFrameTime,biomFsCpu);}else{bioMonitor.chiValue=(float)(vsinf(World.pauseRelativeTime * 10.0 * (double)brainFactor));}
+    /*ECG: Create shifted sine wave for heart beat.  Apply percent fatigued to 200bpm max heart rate with baseline 50bpm.  showFPS overrides with total frame ms.*/ if (Cheats.showFPS) { bioMonitor.ecgValue = biomMsToGraph(BIOM_ECG,World.thisFrameTime,biomFsFrame); }
     else { float fatigueFactor = ((World.invP1.fatigue / 100.0f) * 120.0f) + 20.0f; fatigueFactor = fatigueFactor / 60.0f;
     if (bioMonitor.beatFinished < World.pauseRelativeTime) bioMonitor.beatFinished = World.pauseRelativeTime + (1.0 / (double)fatigueFactor);
     bioMonitor.beatShift = (bioMonitor.beatFinished - World.pauseRelativeTime) / (1.0 / (double)fatigueFactor);
     if (bioMonitor.beatShift > 0.94f) bioMonitor.ecgValue = vsinf(bioMonitor.beatShift * 35.0f); else bioMonitor.ecgValue = 0.0f;
     if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range(-beatVariation,beatVariation); }
-    if (bioMonitor.tick0Finished < World.pauseRelativeTime) { bioMonitor.tick0Finished = World.pauseRelativeTime + (Cheats.showFPS?0.0104f:0.0211f); Push(0,bioMonitor.ergValue); IncrementERG(); Push(0,bioMonitor.ergValue); IncrementERG(); Push(0,bioMonitor.ergValue); }
-    if (bioMonitor.tick1Finished < World.pauseRelativeTime) {
-        if (Cheats.showFPS) bioMonitor.tick1Finished = World.pauseRelativeTime + 0.0104f; else bioMonitor.tick1Finished = World.pauseRelativeTime + 0.05f;
-        Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue);
+    /*showFPS: one sample per column at one interval on all three, so the three heads stay locked together and
+      a given column is the same instant on every trace.  The stock rates are per-graph (ERG 2 cols/tick,
+      CHI 3, ECG 1) and deliberately left alone.*/
+    if (Cheats.showFPS) {
+        if (bioMonitor.tick0Finished < World.pauseRelativeTime) { bioMonitor.tick0Finished = World.pauseRelativeTime + 0.0104f; Push(0,bioMonitor.ergValue); IncrementERG(); }
+        if (bioMonitor.tick1Finished < World.pauseRelativeTime) { bioMonitor.tick1Finished = World.pauseRelativeTime + 0.0104f; Push(1,bioMonitor.chiValue); IncrementCHI(); }
+        if (bioMonitor.tick2Finished < World.pauseRelativeTime) { bioMonitor.tick2Finished = World.pauseRelativeTime + 0.0104f; Push(2,bioMonitor.ecgValue); IncrementECG(); }
+    } else {
+        if (bioMonitor.tick0Finished < World.pauseRelativeTime) { bioMonitor.tick0Finished = World.pauseRelativeTime + 0.0211f; Push(0,bioMonitor.ergValue); IncrementERG(); Push(0,bioMonitor.ergValue); IncrementERG(); Push(0,bioMonitor.ergValue); }
+        if (bioMonitor.tick1Finished < World.pauseRelativeTime) { bioMonitor.tick1Finished = World.pauseRelativeTime + 0.05f; Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue); }
+        if (bioMonitor.tick2Finished < World.pauseRelativeTime) { bioMonitor.tick2Finished = World.pauseRelativeTime + 0.0104f; Push(2,bioMonitor.ecgValue); IncrementECG(); Push(2,bioMonitor.ecgValue); }
     }
-    if (bioMonitor.tick2Finished < World.pauseRelativeTime) { bioMonitor.tick2Finished = World.pauseRelativeTime + 0.0104f; Push(2,bioMonitor.ecgValue); IncrementECG(); Push(2,bioMonitor.ecgValue); }
     float distPerc = 1.0f, fadeDist = 100.0f;
     for (int x=0;x<BIOM_GRAPH_W;x++) {
         for (int y=0; y<BIOM_GRAPH_H;y++) {
