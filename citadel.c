@@ -12,7 +12,7 @@ V3 ScreenPointToRay(V3 fwd, V3 rt) {
 static i16 GrenadeTypeFromConst(u16 idx) { switch(idx) { case 370:return 7; case 372:return 8; case 387:return 9; case 389:return 10; case 402:return 11; case 403:return 12; case 404:return 13; default:return -1; } }
 static bool IsLiveGrenade(u16 idx) { return GrenadeTypeFromConst(idx) >= 7; }
 static const float grenadeDamage[7]={150,325,80,375,230,200,150},grenadePenetration[7]={20,35,100,50,35,25,100},grenadeOffense[7]={3,6,3,6,5,3,3},grenadeRadius[7]={4,7,6,7.5f,5.1f,5.12f,4}; static const AttType grenadeAttackType[7]={Att_HitS,Att_HitS,Att_Magn,Att_HitS,Att_HitS,Att_HitS,Att_Gas};
-static void GrenadeInit(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index)-7; if(idx<0||idx>=7)return; Entity* e=&World.instances[self]; if(e->damage<=0.0f)e->damage=grenadeDamage[idx]; if(e->strength<=0.0f)e->strength=grenadePenetration[idx]; if(e->speed<=0.0f)e->speed=grenadeOffense[idx]; if(e->attackType==Att_None)e->attackType=grenadeAttackType[idx]; }
+void GrenadeInit(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index)-7; if(idx<0||idx>=7)return; Entity* e=&World.instances[self]; if(e->damage<=0.0f)e->damage=grenadeDamage[idx]; if(e->strength<=0.0f)e->strength=grenadePenetration[idx]; if(e->speed<=0.0f)e->speed=grenadeOffense[idx]; if(e->attackType==Att_None)e->attackType=grenadeAttackType[idx]; }
 void ResetHeldItem() { World.invP1.heldObjectIndex=World.invP1.heldObjectCustIdx=U16_MAX; World.invP1.heldAmmo=World.invP1.heldAmmo2=0; World.invP1.heldObjectLoadedAlternate=World.invP1.holdingObject=World.invP1.grenActive=false; }
 void DropHeldItem() {
     if (World.invP1.heldObjectIndex >= World.instCount) { ResetHeldItem(); return; }    if (World.invP1.dropFinished > World.pauseRelativeTime) {return;} World.invP1.dropFinished = World.pauseRelativeTime + 0.2;/*Prevent immediate re-grab at high fps*/ u16 n = AddInstance(World.invP1.heldObjectIndex,World.position[PLAYER1]);
@@ -414,7 +414,7 @@ void GrenadeActivate(u16 self) {
     if(idx==10){World.invP1.earthShakerTimeSetting=vclamp((float)World.invP1.earthShakerTimeSetting,4.0f,60.0f);e->timerFinished=World.pauseRelativeTime+World.invP1.earthShakerTimeSetting;}
     else if(idx==12){World.invP1.nitroTimeSetting=vclamp((float)World.invP1.nitroTimeSetting,2.0f,60.0f);e->timerFinished=World.pauseRelativeTime+World.invP1.nitroTimeSetting;}
 }
-void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=grenadeRadius[idx-7]; for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (i != PLAYER1 && !IdxIsNPC(o->index)) continue; if (V3_SqDist(World.position[i], origin) < (pr * pr)) { GrenadeExplode(self); return; } } } }
+void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=grenadeRadius[idx-7]; bool npcMine = GrenadeIsNPCMine(self); /*Deliberate divergence from Unity GrenadeProximity, which prox-senses Player and NPC alike.  An NPC mine arms on the player; a player's own mine arms on NPCs.*/ for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; if (V3_SqDist(World.position[i], origin) < (pr * pr)) { GrenadeExplode(self); return; } } } }
 void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index); if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
 float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= BERSERK_DAMAGE_MULTIPLIER; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (fx == WORLD || fx == U16_MAX) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
@@ -689,15 +689,20 @@ static bool PanelUseAllowed(u16 i) {
   The level dump carries none of Unity's per-instance requiredIndex/messages/SFX/target, so the panels that are
   actually usable are listed in relayPanelScripts[], keyed by the targetname added to their level-data line; panels with
   no entry (the decorative level-3 ones, all saved open+installed) just animate and take no item.*/
-typedef struct { const char* name; u8 item; u16 msgOpen,msgInst,msgWrong,msgAlready; i16 sfxOpen,sfxInst,sfxAlready; const char* target; bool blowUp; } RelayPanelScript;
+/*How the installed item shows up. puzzlepanel3's animation has one chipset baked into frame 18, so only the relay 428
+  panel (whose installationItem IS a chipset mesh) may use it; the antenna and isolinear panels get a real item entity
+  spawned at the installationItem transform, and the isotope panel is its own model with an interim A_INSTALL clip.*/
+typedef enum { PanelInstallFrame, PanelInstallEntity, PanelInstallAnim } PanelInstallKind;
+typedef struct { const char* name; u8 item; u16 itemConst; PanelInstallKind kind; u16 msgOpen,msgInst,msgWrong,msgAlready; i16 sfxOpen,sfxInst,sfxAlready; const char* target; bool blowUp; u16 wreckTex; } RelayPanelScript;
 static const RelayPanelScript relayPanelScripts[] = {
-    /*name                     item  open inst wrong already  sfxO sfxI sfxA  target                    15s fuse*/
-    {"panelRelay428",             57,  262, 260, 259,  261,    225,  42,  226,  "lev3fixtherelay",       false},/*level 3 maintenance, "relay 428": interface demodulator*/
-    {"panelAntenna1",             56,  152, 606, 604,  605,     91,  42,  166,  "lev7antenna1",          true },/*level 7 engineering antennas: Z-44 plastique*/
-    {"panelAntenna2",             56,  152, 606, 604,  605,     91,  42,  166,  "lev7antenna2",          true },
-    {"panelAntenna3",             56,  152, 606, 604,  605,     91,  42,  166,  "lev7antenna3",          true },
-    {"panelAntenna4",             56,  152, 606, 604,  605,     91,  42,  166,  "lev7antenna4",          true },
-    {"panelIsolinear",            64,  151, 211, 210,  212,     91,  42,  166,  "lev9isolinearactivated",false},/*level 9: isolinear chipset*/
+    /*name             item itemConst kind               open inst wrong already  sfxO sfxI sfxA target                     fuse wreck*/
+    {"panelRelay428",   57,  364,      PanelInstallFrame,  262, 260, 259,  261,    225,  42,  226, "lev3fixtherelay",        false, 0     },/*level 3 maintenance "relay 428": interface demodulator, chipset baked into the frame*/
+    {"panelAntenna1",   56,  363,      PanelInstallEntity, 152, 606, 604,  605,     91,  42,  166, "lev7antenna1",           true,  618   },/*level 7 engineering antennas: Z-44 plastique placed on the panel, 15s fuse*/
+    {"panelAntenna2",   56,  363,      PanelInstallEntity, 152, 606, 604,  605,     91,  42,  166, "lev7antenna2",           true,  618   },
+    {"panelAntenna3",   56,  363,      PanelInstallEntity, 152, 606, 604,  605,     91,  42,  166, "lev7antenna3",           true,  618   },
+    {"panelAntenna4",   56,  363,      PanelInstallEntity, 152, 606, 604,  605,     91,  42,  166, "lev7antenna4",           true,  618   },
+    {"panelIsolinear",  64,  371,      PanelInstallEntity, 151, 211, 210,  212,     91,  42,  166, "lev9isolinearactivated", false, 0     },/*level 9: isolinear chipset placed on the panel*/
+    {"panelIsotope",    61,  0,        PanelInstallAnim,   285, 283, 282,  284,     91, 235,  235, "levRinstallisotope",     false, 0     },/*level 0 reactor "isotope panel": X-22 goes in via A_INSTALL then A_INSTALLED*/
 };
 extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
 static const RelayPanelScript* RelayPanelScriptFor(const Entity* e) {
@@ -716,7 +721,11 @@ static void RelayPanelUse(u16 self) {
     if (e->panelInstalled && held<0) { RelayPanelMsg(sc?sc->msgAlready:0); return; }/*already installed, empty hand*/
     if (sc && held==(i16)sc->item) {
         if (e->panelInstalled) { RelayPanelSfx(sc->sfxAlready,World.position[self]); return; }/*wrong hand is not the issue: right item, already in*/
-        e->panelInstalled=true; ChangeAnim(e,A_INSTALLED); RelayPanelSfx(sc->sfxInst?sc->sfxInst:42,World.position[self]); RelayPanelMsg(sc->msgInst);
+        e->panelInstalled=true;
+        if (sc->kind==PanelInstallFrame) ChangeAnim(e,A_INSTALLED);                                  /*item baked into the model frame*/
+        else if (sc->kind==PanelInstallAnim) ChangeAnim(e,A_INSTALL);                                /*isotope: interim clip, then A_INSTALLED*/
+        else if (sc->itemConst) { u16 it=AddInstance(sc->itemConst,e->panelItemPos); if (it) World.rotation[it]=e->panelItemRot; }/*real item entity on the panel*/
+        RelayPanelSfx(sc->sfxInst?sc->sfxInst:42,World.position[self]); RelayPanelMsg(sc->msgInst);
         ResetHeldItem();/*the item goes into the panel, so it leaves the hand for good*/
         if (sc->target && *sc->target) UseTargets(self,IOInternName(sc->target));
         if (sc->blowUp) { e->panelArmed=true; e->panelTimer = World.pauseRelativeTime + (e->delay>0.0f?(double)e->delay:15.0); }/*prefab DelayedSpawn: ExplosionTimer arms 15s after the installationItem goes active*/
@@ -733,10 +742,14 @@ static void RelayPanelUpdate(u16 self) {
       instead of the closed cover: installed (frame 18) wins over open (frame 17).*/
     if (e->clip==A_IDLE_CLOSED) { if (e->panelInstalled) ChangeAnim(e,A_INSTALLED); else if (e->panelOpen) ChangeAnim(e,A_IDLE_OPEN); }
     if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=DoorGetClip(e,A_OPENING); if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
+    if (e->panelOpen && e->clip==A_INSTALL) { AnimationClip c=DoorGetClip(e,A_INSTALL); if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_INSTALLED); }/*isotope: insertion clip hands over to the installed frame*/
     if (e->panelArmed && World.pauseRelativeTime>=e->panelTimer) {
         e->panelArmed=false; V3 p=World.position[self];
         play_wav(sounds[64]/*explosion1*/,AppliedFXVol(1.0f),p,true); SpawnExplosionEffect(p,1); Shake(-1.0f); World.fogFac += 5.0f;
-        DeleteInstance(self);
+        /*Unity activates the Explosion and basedestroyed children and leaves the panel (the installationItem stays
+          active too). Voxen keeps the panel instance and swaps in the destroyed texture (Textures/pnl3_ded.png) on
+          the same model, so the burnt panel is what is left behind.*/
+        const RelayPanelScript* sc=RelayPanelScriptFor(e); if (sc && sc->wreckTex) e->texIndex=sc->wreckTex;
     }
 }
 /*Frob with the item in hand (Citadel MouseLookScript.FrobWithHeldObject): only these useables are "frob users", and
