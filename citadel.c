@@ -10,7 +10,7 @@ V3 ScreenPointToRay(V3 fwd, V3 rt) {
 }
 
 static i16 GrenadeTypeFromConst(u16 idx) { switch(idx) { case 370:return 7; case 372:return 8; case 387:return 9; case 389:return 10; case 402:return 11; case 403:return 12; case 404:return 13; default:return -1; } }
-static bool IsLiveGrenade(u16 idx) { return GrenadeTypeFromConst(idx) >= 7; }
+bool IsLiveGrenade(u16 idx) { return GrenadeTypeFromConst(idx) >= 7; }
 static const float grenadeDamage[7]={150,325,80,375,230,200,150},grenadePenetration[7]={20,35,100,50,35,25,100},grenadeOffense[7]={3,6,3,6,5,3,3},grenadeRadius[7]={4,7,6,7.5f,5.1f,5.12f,4}; static const AttType grenadeAttackType[7]={Att_HitS,Att_HitS,Att_Magn,Att_HitS,Att_HitS,Att_HitS,Att_Gas};
 void GrenadeInit(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index)-7; if(idx<0||idx>=7)return; Entity* e=&World.instances[self]; if(e->damage<=0.0f)e->damage=grenadeDamage[idx]; if(e->strength<=0.0f)e->strength=grenadePenetration[idx]; if(e->speed<=0.0f)e->speed=grenadeOffense[idx]; if(e->attackType==Att_None)e->attackType=grenadeAttackType[idx]; }
 void ResetHeldItem() { World.invP1.heldObjectIndex=World.invP1.heldObjectCustIdx=U16_MAX; World.invP1.heldAmmo=World.invP1.heldAmmo2=0; World.invP1.heldObjectLoadedAlternate=World.invP1.holdingObject=World.invP1.grenActive=false; }
@@ -266,14 +266,14 @@ void ButtonSwitchUseTargets(u16 self) { Entity* e=&World.instances[self]; UseTar
 static __attribute__((noinline)) void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; play_wav(sounds[468], AppliedFXVol(0.85f), (V3){0,0,0}, false);/*blocked_by_security*/ MFD_OpenData(World.Sys_UI.lastDataSideRH,8);/*MFDManager.BlockedBySecurity() opens tab 4 on the last-used data side and raises the blocked view there*/ CenterStatusPrint("%s",Sys_Text.stringTable[25]); }
 static __attribute__((noinline)) void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,EF_LOCKED,locked); }
 void ButtonSwitchUse(u16 self, u16 activator) {
-    Entity* e = &World.instances[self]; if(Cheats.superoverride || World.diffMis == 0){EntitySetLocked(e,false);} else if(GetCurrentLevelSecurity() > e->securityThreshold){UIBlockedBySecurity(World.position[self]); return;}
+    Entity* e = &World.instances[self]; if(Cheats.superoverride || World.diffMis == 0){EntitySetLocked(e,false);} else if(GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[self]); return;}
     if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex], AppliedFXVol(1.0f), World.position[self], true); return; }
     if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true);
     CenterStatusPrint("%s",Sys_Text.stringTable[e->messageIndex]); if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World.pauseRelativeTime + e->delay; } else ButtonSwitchUseTargets(self);
 }
 
 void ButtonSwitchUpdate(u16 self) { double t=World.pauseRelativeTime; Entity* e=&World.instances[self]; if (e->delayFinished > 0.0 && e->delayFinished < t){e->delayFinished=0.0; ButtonSwitchUseTargets(self);} if (e->index == 689 && e->active && e->tickFinished < t) { TextureChangerToggle(self); e->tickFinished=t+1.5f; } }
-void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= (u8)e->minSecurityLevel) { if(!e->broken){HealthManagerHealingBed(PLAYER1,UsableOrDef(e->amount,170.0f),true); World.instances[PLAYER1].radiation=0.0f; World.invP1.radiationArea=false; CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav(sounds[103], AppliedFXVol(1.0f), World.position[self], false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
+void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= UsableOrDef(e->minSecurityLevel,100.0f)) { if(!e->broken){HealthManagerHealingBed(PLAYER1,UsableOrDef(e->amount,170.0f),true); World.instances[PLAYER1].radiation=0.0f; World.invP1.radiationArea=false; CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav(sounds[103], AppliedFXVol(1.0f), World.position[self], false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
 int GeneralInvItem(int slot);
 bool GeneralInvCanVaporize(int slot);
 void GeneralInvRemove(int slot);
@@ -350,6 +350,18 @@ void PlayerEnergyUpdate() {
     for (int hw=3;hw<=11;++hw) { u16 bit=(u16)(1u << hw); if (!(World.invP1.hardwareIsActive & bit) || hw == 4 || hw == 8 || hw == 10) continue;/*No energy usage*/ if (hw==9 && World.invP1.ladderState>0) continue;/*Booster boost is ignored on a ladder*/ if (hw==9 && !PlayerIsMoving()) continue;/*...and only burns energy while the player is actually moving*/ ver=World.invP1.hwVersSetting[hw]; float drain=hwDrain[hw][ver];  World.invP1.drainJPM += hwDrainJPM[hw][ver]; if (drain > 0.0f) { TakeEnergy(drain); anyDrain = true; } }
     if (anyDrain && World.invP1.energy <= 0.0f) { DeactivateHardwareOnEnergyDepleted(); World.invP1.drainJPM = 0; } // Depleted
 }
+void ChargeStationUse(u16 self, u16 owner) {
+    Entity* e=&World.instances[self];
+    if (GetCurrentLevelSecurity() > UsableOrDef(e->minSecurityLevel,100.0f)) { UIBlockedBySecurity(World.position[self]); return; }
+    if (e->rechargeFinished < World.pauseRelativeTime) {
+        if (World.invP1.energy >= 255.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[303]); return; }
+        GiveEnergy(UsableOrDef(e->amount,170.0f),EnergyType_ChargeStation);
+        if (e->damage > 0.0f) { DamageData dd={0}; dd.damage = vmin(e->damage,World.instances[PLAYER1].health - 1.0f); if (dd.damage > 0.0f) TakeDamage(PLAYER1,dd); } /*zap, never lethal*/
+        if (e->usedMsgLingdex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->usedMsgLingdex]);
+        if (e->requireRecharge) e->rechargeFinished = World.pauseRelativeTime + UsableOrDef(e->resetTime,150.0f);
+        UseTargets(owner,e->targetIdx);
+    } else if (e->rechargeMsgLingdex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->rechargeMsgLingdex]);
+}
 // GeneralInventory
 void MFD_ShowGeneralItem(),MFD_GeneralChanged();
 int GeneralInvItem(int slot) {
@@ -402,11 +414,28 @@ void ApplyImpactForceWithSound(u16 target, float vel, V3 normal, V3 pt) {
     if (vel > 2.0f) play_wav_ext(sounds[523], AppliedFXVol((vel / 10.0f) * 0.3f), pt, true, random_range(-3.8631f,3.1564f));/*Unity ObjectImpact pitch Random.Range(0.8,1.2) playback ratio = 12*log2(r) semitones*/
 }
 
+/* Utils.ApplyImpactForceSphere (Utils.cs:1675-1734). The C# tests the colliders a Physics.OverlapSphere returns,
+   so the player (slot 1) is in the list and takes half damage; the loop here used to start at INSTS_1ST_IDX (2) and
+   so the player never took splash damage at all. Damage falloff is linear over the radius, but floored at 33% of the
+   *un-halved* incoming damage (Utils.cs:1704-1713) -- the halve is applied before the floor and the floor is
+   measured from the original, so the player floor is still 33%, not 16.5%. Past 4 units the C# requires line of
+   sight through layerMaskExplosion before the blast connects (Utils.cs:1692-1698); inside 4 units it always hits.
+   Blast impulse is baseVel scaled by that same falloff exactly once, and is not derived from the scaled splash
+   damage, so bodies with and without a HealthManager get the same push. The C# also halves the impulse on Unity
+   layer 10, which is NPC (Utils.cs:1721), and caps the velocity change at (0.5+5*mass)*min(damage/100,2) (1727-1729). */
 void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseVel) { 
-    if (radius <= 0.0f || baseVel <= 0.0f) return; float r2 = radius * radius;
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
-        Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || (e->entflags & EF_DEAD)) continue; if (!(e->entflags & EF_RIGIDBODY) && !IdxIsNPC(e->index) && i != PLAYER1) continue; float sqd = V3_SqDist(World.position[i], center); if (sqd > r2) continue; float dist = vsqrtf(sqd); float falloff = 1.0f - (dist / radius); if (falloff <= 0.0f) continue;
-        V3 normal; if(dist > 0.0001f){normal=V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist);}else{normal = (V3){0.0f,1.0f,0.0f};} ApplyImpactForce(i,baseVel * falloff,normal,World.position[i]); if (dd && dd->damage > 0.0f && i != dd->owner) { DamageData splash=*dd; splash.damage = dd->damage * falloff; splash.hitIdx = i; splash.hitpoint=World.position[i]; splash.attacknormal=normal; TakeDamage(i,splash); }
+    if (radius <= 0.0f || baseVel <= 0.0f) return; float r2 = radius * radius; float origDamage = dd ? dd->damage : 0.0f;
+    float damageScale = vmin(origDamage / 100.0f, 2.0f);/*measured off the original damage, so it is the same for every body in the blast*/
+    for (u16 i = PLAYER1; i < World.instCount; i++) {
+        Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || (e->entflags & EF_DEAD)) continue; if (!(e->entflags & EF_RIGIDBODY) && !IdxIsNPC(e->index) && i != PLAYER1) continue; float sqd = V3_SqDist(World.position[i], center); if (sqd > r2) continue; float dist = vsqrtf(sqd);
+        if (dist >= 4.0f) { RaycastHit sight = Raycast(center, V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist), radius + 0.02f, LMASK_EXPLOSION); if (!(sight.hit && sight.hitInstanceIndex == i)) continue; }
+        float distPenalty = (radius - dist) / radius; if (distPenalty < 0.0f) distPenalty = 0.0f;
+        V3 normal; if(dist > 0.0001f){normal=V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist);}else{normal = (V3){0.0f,1.0f,0.0f};}
+        float impactVel = baseVel * distPenalty;
+        if (dd && origDamage > 0.0f && i != dd->owner) { DamageData splash=*dd; if (i == PLAYER1) splash.damage *= 0.5f; /*halve for player*/ splash.damage *= distPenalty; float saturation = origDamage * 0.33f; if (splash.damage < saturation) splash.damage = saturation;
+            splash.impactVelocity = impactVel; splash.hitIdx = i; splash.hitpoint=World.position[i]; splash.attacknormal=normal; TakeDamage(i,splash); }
+        if (World.layer[i] & L_NPC) impactVel *= 0.5f;
+        ApplyImpactForce(i,vmin(impactVel,(0.5f + 5.0f * World.mass[i]) * damageScale),normal,World.position[i]);
     }
 }
 
@@ -424,7 +453,7 @@ void SpawnExplosionEffect(V3 pos, int explosionType) {
 void GrenadeExplode(u16 self) {
     if(self>=World.instCount)return; Entity* e = &World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; flag_set(&e->entflags,EF_ACTIVE,false);
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=WORLD,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
-    i16 idx=GrenadeTypeFromConst(e->index); float radius=(idx>=7&&idx<=13) ? grenadeRadius[idx-7] : (e->strength>0.0f ? e->strength : 4.0f); ApplyImpactForceSphere(&dd,World.position[self],radius,e->damage * 1.5f); if (!GrenadeIsNPCMine(self)) { World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 2.0; } int soundIndex=60,explosionType=2;
+    i16 idx=GrenadeTypeFromConst(e->index); float radius=(idx>=7&&idx<=13) ? grenadeRadius[idx-7] : (e->strength>0.0f ? e->strength : 4.0f); ApplyImpactForceSphere(&dd,World.position[self],radius,e->damage * 0.1f); /*GrenadeActivate.cs:106 passes impactScale 1.0f, and Utils.cs:1683 makes impactVelocity damage*impactScale*0.1, so the blast impulse is damage*0.1 before falloff*/ if (!GrenadeIsNPCMine(self)) { World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 2.0; } int soundIndex=60,explosionType=2;
     switch (idx) {case 7: case 11: soundIndex = 64; World.fogFac += 5; explosionType = 1; break;/*frag, mine*/ case 8: case 10: soundIndex = 60; World.fogFac += 7; explosionType = 2; break;/*conc, earth*/ case 9:  soundIndex = 67; explosionType = 4; break;/*emp*/ case 12: soundIndex = 60; World.fogFac += 6;  explosionType = 2; break;/*nitro*/ case 13: soundIndex = 63; World.fogFac += 10; explosionType = 3; break;/*gas*/}
     play_wav(SoundPath(soundIndex), AppliedFXVol(1.0f), World.position[self], true); SpawnExplosionEffect(World.position[self],explosionType); Shake(-1.0f); DeleteInstance(self);
 }
@@ -435,7 +464,7 @@ void GrenadeActivate(u16 self) {
     if(idx==10){World.invP1.earthShakerTimeSetting=vclamp((float)World.invP1.earthShakerTimeSetting,4.0f,60.0f);e->timerFinished=World.pauseRelativeTime+World.invP1.earthShakerTimeSetting;}
     else if(idx==12){World.invP1.nitroTimeSetting=vclamp((float)World.invP1.nitroTimeSetting,2.0f,60.0f);e->timerFinished=World.pauseRelativeTime+World.invP1.nitroTimeSetting;}
 }
-void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=grenadeRadius[idx-7]; bool npcMine = GrenadeIsNPCMine(self); /*Deliberate divergence from Unity GrenadeProximity, which prox-senses Player and NPC alike.  An NPC mine arms on the player; a player's own mine arms on NPCs.*/ for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; if (V3_SqDist(World.position[i], origin) < (pr * pr)) { GrenadeExplode(self); return; } } } }
+void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=1.451f; /*weapon_grenademine_live ProxCollision m_Radius, not blast radius.  Unity arms on OnTriggerEnter, so the sensing body's own collider radius adds to the trigger sphere (GrenadeProximity.cs); colliderSize.x is that radius for COLTYPE_CAP/COLTYPE_SPW, and mesh-collider bodies leave it at 0 so they test at the bare trigger radius.*/ bool npcMine = GrenadeIsNPCMine(self); /*Deliberate divergence from Unity GrenadeProximity, which prox-senses Player and NPC alike.  An NPC mine arms on the player; a player's own mine arms on NPCs.*/ for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; float rr = pr + ((World.col[i] == COLTYPE_CAP || World.col[i] == COLTYPE_SPH) ? World.colliderSize[i].x : 0.0f); if (V3_SqDist(World.position[i], origin) < (rr * rr)) { GrenadeExplode(self); return; } } } }
 void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index); if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
 float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= BERSERK_DAMAGE_MULTIPLIER; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (fx == WORLD || fx == U16_MAX) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
@@ -530,13 +559,6 @@ float TakeDamage(u16 self,DamageData dd) {
     if (isCyber) { if (World.instances[self].cyberHealth <= 0.0f) { if (!World.instances[self].iceActive && isNPC) {World.cyberkills++;} Death(self,false); } } else { if (World.instances[self].health <= 0.0f) { if (isNPC) {World.kills++;} Death(self,dd.attackType == Att_Beam); } }    return take;
 }
 
-void HealthManagerInitAfterLoad(u16 self) {
-    if (self == PLAYER1) { World.instances[self].health=211.0f; World.instances[self].cyberHealth=255.0f; World.invP1.noiseFinished = World.pauseRelativeTime - 31.0;/*guarantee no combat music on start*/ return; }
-    if (IdxIsNPC(World.instances[self].index)) {
-        if (IsCyberEntity(self)) { if (World.instances[self].cyberHealth < 0.0f) World.instances[self].cyberHealth = npcTable[World.instances[self].index - 419].healthForCyberNPC; } else { if (World.instances[self].health < 0.0f) World.instances[self].health = npcTable[World.instances[self].index - 419].health; }
-        if (World.diffCbt == 0) { World.instances[self].health = 1.0f; } if (World.instances[self].entflags & EF_ACT_AS_CORPSE_ONLY) { World.instances[self].health = 0.0f; World.instances[self].cyberHealth = 0.0f; UseDeathTargets(self); if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH){TeleportAway(self);}else{NPCDeath(self);} }
-    }
-}
 // Hardware
 static Color3 lantCol = (Color3){1.0f,1.0f,1.0f}; static float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f}; static const float SIGHT_LIGHT_INTENSITY=0.36f,SIGHT_LIGHT_RANGE=75.8f;/*Citadel sightLight: white spotlight, intensity 0.36, range 75.7961*/
 void HardwareUpdate() {
@@ -616,7 +638,7 @@ void DoorActuate(u16 self) {
 }
 
 void DoorUse(u16 self, u16 activator) {
-    if (activator == WORLD) return; Entity* e = &World.instances[self]; if (GetCurrentLevelSecurity() > e->securityThreshold) { UIBlockedBySecurity(World.position[self]); return; } if (Cheats.superoverride || World.diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = ACC_None; }
+    if (activator == WORLD) return; Entity* e = &World.instances[self]; if (GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)) { UIBlockedBySecurity(World.position[self]); return; } if (Cheats.superoverride || World.diffMis <= 0) { EntitySetLocked(e,false); e->requiredAccessCard = ACC_None; }
     if (World.diffMis <= 1) { e->requiredAccessCard = ACC_None; } if (e->useFinished >= World.pauseRelativeTime) return; e->useFinished = World.pauseRelativeTime + 0.15f;
     if (e->requiredAccessCard != ACC_None) { if (!DoorInventoryHasAccessCard(e->requiredAccessCard)) {CenterStatusPrint("%s%s",AccessCardCodeForType(e->requiredAccessCard),Sys_Text.stringTable[2]); play_wav(sounds[467], AppliedFXVol(0.7f), World.position[self], true); return;} else {e->requiredAccessCard = ACC_None;}}
     if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); play_wav(sounds[467], AppliedFXVol(0.55f), World.position[self], true); return; }  if ((e->onlyTargetOnce && !e->targetAlreadyDone) || !e->onlyTargetOnce) { e->targetAlreadyDone = true; UseTargets(self,e->targetIdx); } if (e->ajar) e->ajar = false; DoorActuate(self);
@@ -673,7 +695,7 @@ void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 c
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
 static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
 static bool IsElevatorPanel(u16 index) { return index>=604&&index<=607; }
-static bool IsFrobUsableSpecial(u16 index) { return index==574||index==608||index==614||index==602||IsElevatorPanel(index)||IsPuzzleGridPanel(index)||IsPuzzleWirePanel(index); }/*614 us_relaypanel, 602 us_isotopepanel: InteractablePanel*/
+static bool IsFrobUsableSpecial(u16 index) { return index==574||index==546||index==608||index==614||index==602||IsElevatorPanel(index)||IsPuzzleGridPanel(index)||IsPuzzleWirePanel(index); }/*546 prop_charge_station; 614 us_relaypanel, 602 us_isotopepanel: InteractablePanel*/
 static void PuzzlePanelUse(u16 i) {
     Entity* e=&World.instances[i];
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return;}
@@ -971,7 +993,7 @@ static int UseNameTableIndex(int index) {
 void UseEntity(u16 i) {
     Entity* ent = &World.instances[i];
     if (IdxIsSearchable(ent->index) || (World.layer[i]&L_CorpseSearchable) || (IdxIsGib(ent->index) && (World.layer[i]&L_Corpse))) { SearchObject(i); } else if (IdxIsDoor(ent->index)) DoorUse(i,PLAYER1); else if (IdxIsNPC(ent->index)) CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[World.instances[i].index - 419].name); else if (IdxIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
-    else if(ent->index==574) HealingBedUse(i,PLAYER1); else if(ent->index==614||ent->index==602) RelayPanelUse(i); else if(IsElevatorPanel(ent->index)) ElevatorPanelUse(i); else if(ent->index==608) KeycodePanelUse(i); else if(IsPuzzleGridPanel(ent->index)||IsPuzzleWirePanel(ent->index)) PuzzlePanelUse(i);
+    else if(ent->index==574) HealingBedUse(i,PLAYER1); else if(ent->index==546) ChargeStationUse(i,PLAYER1); else if(ent->index==614||ent->index==602) RelayPanelUse(i); else if(IsElevatorPanel(ent->index)) ElevatorPanelUse(i); else if(ent->index==608) KeycodePanelUse(i); else if(IsPuzzleGridPanel(ent->index)||IsPuzzleWirePanel(ent->index)) PuzzlePanelUse(i);
     else if (IdxIsGeometry(ent->index)) { int t = UseNameTableIndex(ent->index); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t >= 0 ? Sys_Text.stringTable[t] : ""); }
     else if (IdxIsUsableObject(ent->index)) {
         World.invP1.holdingObject = true; World.invP1.heldObjectIndex = ent->index; World.invP1.heldObjectCustIdx = ent->customIndex; World.invP1.heldAmmo = ent->ammo; World.invP1.heldAmmo2 = ent->ammo2; World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;

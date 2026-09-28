@@ -32,7 +32,7 @@ NPCTable npcTable[NUM_AI_TYPES] = {
 /*18*/{"SERV-BOT"              ,1,0,0,8,0,0,3.3,10,20,20,0,1,0.5,20,2,2,180,180,80,15,3.84,50,2,2,1.2,0,0,0,0,1.125,2,0.98,0.2,0.1,0.2,0.834,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0},
 /*19*/{"FLIER BOT"             ,0,4,7, 30,150,  0, 3.3,   35,40,75,0,1,0.3,30,2,2,180,180,80,15,5.12,50,1.5,1.5,1.5,0,0,0,0,1.375,5,0.6,0.1,0.1,0.2,1,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,10,12,1,0,0,0,0,0,10,0,0,0,0,0,180,0.85,1,0,10,3,0,2,0,0,404 },
 /*20*/{"ZERO-G MUTANT"         ,0,7,0, 20, 20,  0, 3.3,   20,20,90,0,1,0.5,0,2,2,180,180,80,15,2.56,50,0.8,1.4,0,0.8,0,0,0,0.1,0,0.1,0.5,0.05,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,2,0,0,0,0,0,0,60,1.96,0,0,10,3,0,0,0,488,0 },
-/*21*/{"GORILLA TIGER MUTANT"  ,1,0,0,60,60,0,3.3,3.84,20,200,0,1,0.1,0,3,3,180,180,80,15,2.56,50,3,3.5,1,2,0,0,0,0.667,5,1.625,0.5,0.1,0.2,0.958,1.042,3,3,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,1,0,0,0},
+/*21*/{"GORILLA TIGER MUTANT"  ,1,0,0,60,60,0,3.3,3.84,20,200,0,1,0.1,0,3,1,180,180,80,15,2.56,50,3,3.5,1,2,0,0,0,0.667,5,1.625,0.5,0.1,0.2,0.958,1.042,3,3,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,1,0,0,0},
 /*22*/{"REPAIR BOT"            ,0,4,0,12,12,0,3.3,3.3,20,65,0,1,0.4,25,3,3,180,180,80,15,3.84,50,2.25,3,0.5,0,0,0,0,0,0,0.05,0.2,0.1,0.2,1.25,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0},
 /*23*/{"PLANT MUTANT"          ,0,7,0, 35, 25,  0, 3.3,   20,20,115,0,1,0.3,0,1,1,180,180,80,15,2.56,50,0.8,1.2,0.1,0,0,0,0,0.375,2,2.208,0.89,0.82,0.2,1.91,1.027,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,3.5,0,0,0,0,0,0,20,0,0,0,10,3,0,0,0,487,0 },
 /*24*/{"CYBER DOG"             ,0,7,0,0,25,0,0,20,0,0,20,1,0.5,0,1,1,250,240,50,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.3,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1.5,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,493,0},
@@ -131,9 +131,19 @@ static const NPCGibRange npcGibRanges[NUM_AI_TYPES] = {
     [22]={804,813,810},  // REPAIR BOT
 };
 INLINE bool ai_gibs_on_death(u16 npcID) { return npcID < NUM_AI_TYPES && npcGibRanges[npcID].first != 0; }
+/* Unity carries bloodType as a serialized HealthManager field, so there is no table in the C#; these are the values
+   read off each npc_*.prefab's live (isNPC:1) HealthManager. 0=None 1=Red 2=Yellow 3=Green 4=Robot 5=Leaf 6=Mutation
+   7=GrayMutation. Without these every NPC keeps BloodType_None, so GetImpactType always returns SparksSmall and
+   weapons.c never picks the wet-flesh melee sound. The three gib/corpse bodies that differ from the live body
+   (plant 5=Leaf, virus 6=Mutation) have no separate instance here. */
+static const u8 npcBloodTypes[NUM_AI_TYPES] = {
+    4,1,2,4,1,4,1,1,1,1, /*419-428: autobomb,cyborg_assassin,avian_mutant,exec_bot,cyborg_drone,cortex_reaver,cyborg_warrior,cyborg_enforcer,cyborg_elite,cyborg_diego*/
+    4,4,4,2,4,1,2,2,4,4, /*429-438: sec1_bot,sec2_bot,maint_bot,mutant_cyborg,hopper,humanoid_mutant,invisomut,virus_mutant,servbot,flier_bot*/
+    1,1,4,3,0,0,0,0,0    /*439-447: zerog_mutant,gorilla_tiger_mutant,repairbot,plant_mutant,cyberdog,cyberguard,cyberram,cyber_reaver,cybershodan*/
+};
 float GetDamageTakeAmount(DamageData* dd);
 void InitNPC(u16 i) {
-    World.layer[i] = L_NPC; u16 npcID = World.instances[i].index - 419; flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
+    World.layer[i] = L_NPC; u16 npcID = World.instances[i].index - 419; if (npcID < NUM_AI_TYPES) World.instances[i].bloodType = (BloodType)npcBloodTypes[npcID]; flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
     World.instances[i].currentDestination = World.instances[i].lastPosition = World.instances[i].idealPos = World.position[i]; World.instances[i].idealTransformForward = World.instances[i].forward;
     World.instances[i].aiThinkFinished = World.pauseRelativeTime + AI_TICK_TIME + (double)random_range(0.0f, 1.0f); World.instances[i].tickTime = World.pauseRelativeTime + AI_RAYCAST_TICK_TIME + (double)random_range(0.0f, 1.0f); World.instances[i].idleTime = World.pauseRelativeTime + (double)random_range(npcTable[npcID].timeIdleSFXMin,npcTable[npcID].timeIdleSFXMax);
     World.instances[i].attack1SoundTime = World.instances[i].attack2SoundTime = World.instances[i].attack3SoundTime = World.pauseRelativeTime; World.instances[i].huntFinished = World.pauseRelativeTime; int diff = (npcTable[npcID].type == NPCType_Cyber) ? World.diffCyb : World.diffCbt;
@@ -292,7 +302,7 @@ bool AICheckIfEnemyInSight(u16 idx) {
     if (hit.hit) {
         if (hit.hitInstanceIndex == eidx) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); return true; } NPCType t = npcTable[World.instances[idx].index - 419].type;
         if (t != NPCType_Mutant && t != NPCType_Supermutant && t != NPCType_Cyber) {/*Smarte npcs attempt to open doors btw them and player.*/
-            u16 hi=hit.hitInstanceIndex; if (hi&&V3_SqDist(hit.point,spos)<4.0f&&IdxIsDoor(World.instances[hi].index)){Entity* dr=&World.instances[hi]; if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && World.diffCbt > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= dr->securityThreshold && (dr->requiredAccessCard == ACC_None)) DoorActuate(hi);}
+            u16 hi=hit.hitInstanceIndex; if (hi&&V3_SqDist(hit.point,spos)<4.0f&&IdxIsDoor(World.instances[hi].index)){Entity* dr=&World.instances[hi]; if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && World.diffCbt > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= UsableOrDef((float)dr->securityThreshold,100.0f) && (dr->requiredAccessCard == ACC_None)) DoorActuate(hi);}
         }
     } flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, false); return false;
 }
@@ -347,7 +357,15 @@ static V3 AIGetAStarPoint(Entity* self) {
 }
 
 static V3 AIGetSearchPoint(Entity* self) { NPCType t = npcTable[self->index - 419].type; if (t == NPCType_Mutant || t == NPCType_Supermutant) {return AIGetWanderPoint(self);} return AIGetAStarPoint(self); }
-static void AIHopMove(u16 self) { if (!(World.instances[self].entflags & EF_HOP_DONE)){flag_set(&World.instances[self].entflags,EF_HOP_DONE,true); AddForce(self,V3_ScaleByF(World.instances[self].forward,500.0f),true); AddForce(self,(V3){0,5.0f,0},true);} else {flag_set(&World.instances[self].entflags,EF_HOP_DONE,false);} }
+/* Unity gates the hop impulse on clip progress: AIController.cs:804 (Run/HopMove) and :636 (Walk) both fire once
+   past playbackTime 0.1395 and only clear the hopDone latch when the clip rewinds below it, i.e. once per loop.
+   The old toggle here cleared the latch on every 10Hz think tick, so it fired ~5x a second. Served by both AIWalk
+   and AIRun, so the up impulse from the Walk path (:642) is kept -- without it the hopper never leaves the floor. */
+static void AIHopMove(u16 self) {
+    Entity* e = &World.instances[self]; if (e->animationNum >= MAX_ANIMS || e->clip >= MAX_ANIMCLIPS) {flag_set(&e->entflags,EF_HOP_DONE,false); return;}
+    AnimationClip c = modelAnimationClips[e->animationNum][e->clip]; float normTime = (c.frameEnd > c.frameStart) ? (float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart) : 0.0f;
+    if (normTime > 0.1395f) { if (!(e->entflags & EF_HOP_DONE)) { flag_set(&e->entflags,EF_HOP_DONE,true); AddForce(self,V3_ScaleByF(e->forward,500.0f),true); AddForce(self,(V3){0,5.0f,0},true); } } else { flag_set(&e->entflags,EF_HOP_DONE,false); }
+}
 static void AIWalk(u16 self) {
     if ((AICheckPain(self)) || (World.instances[self].entflags & EF_ASLEEP)){return;} if ((World.instances[self].entflags & EF_ENEM_IN_SIGHT) || World.instances[self].enemy){World.instances[self].currentState=AIState_Run; return;} if (World.instances[self].entflags & EF_ACT_AS_TURRET) {World.instances[self].currentState = AIState_Idle; return;}
     if ((npcTable[World.instances[self].index - 419].moveType == AIMoveType_None) || (World.instances[self].tranquilizeFinished >= World.pauseRelativeTime)){return;} u16 sidx = self; if (!PositionVisibleFromPlayerCell(World.position[sidx].x,World.position[sidx].z)){return;}
@@ -497,10 +515,14 @@ static void ProjectileLaunched(Entity* self, int n) {
     V3 shove = V3_ScaleByF(dir, launchSpd); if (vabs(World.gravity[sidx]) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0,0,0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
 
+/* AIController.ExplodeAttack (AIController.cs:1350-1362) hands the blast to the same Utils.ApplyImpactForceSphere
+   the grenades and the railgun use, so it goes through ApplyImpactForceSphere here too rather than a second copy of
+   the falloff rules. The C# passes impactScale 1.5; the force column (attack3Force) already carries the table's
+   blast strength, so it is the baseVel argument. */
 static void AIExplodeAttack(Entity* self) {
     u16 selfIdx=(u16)(self - World.instances);
     float radius = npcTable[self->index - 419].attack3Radius; float force=npcTable[self->index - 419].attack3Force; V3 epos = ai_sight_pos(self); DamageData dd = SetNPCData(self, 3);
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (i == selfIdx) continue; Entity* t = &World.instances[i]; if (!(t->entflags & EF_ACTIVE)) continue; float dsq = V3_SqDist(epos,World.position[i]); if(dsq>=radius*radius)continue; float dist=vsqrtf(dsq), falloff=1.0f-dist/radius; DamageData tdd=dd; tdd.damage *= falloff; ai_apply_damage(tdd,i); if (dist > 0.001f) AddForce(i,V3_ScaleByF(V3_Normalize(V3_AsubB(World.position[i],epos)),force * falloff),true); }
+    ApplyImpactForceSphere(&dd, epos, radius, force);
     DamageData selfdd = SetNPCData(self, 3); TakeDamage(selfIdx, selfdd); // Self-destruct through real pipeline (Citadel healthManager.TakeDamage).
 }
 

@@ -425,7 +425,7 @@ static void physDiag(const char* stage, u8 sub) {
 }
 static bool reverbZoneActive; static u16 activeReverbPreset;
 void Physics(float dt) {
-    if(gravityLiftOverlapLevel!=World.curLev){mset(gravityLiftWasInside,0,sizeof(gravityLiftWasInside));mset(gravityLiftTopSupport,0,sizeof(gravityLiftTopSupport));teleportWasTouching=0;gravityLiftOverlapLevel=World.curLev;}
+    if(gravityLiftOverlapLevel!=World.curLev){mset(gravityLiftWasInside,0,sizeof(gravityLiftWasInside));mset(gravityLiftTopSupport,0,sizeof(gravityLiftTopSupport));teleportWasTouching=0;ladderSFXFinished=0.0;gravityLiftOverlapLevel=World.curLev;}
     if (NPC_DIAG) { physDiagResolve(); if (physDiagActive && physDiagBody < World.instCount) { if (physDiagHaveLast) { float d=World.position[physDiagBody].y-physDiagLastFrameY; if (vabs(d)>0.05f) DualLog("[DIAG] *** HOP frame t=%.3f dt=%.4f dY=%+.5f prevEndVel.y=%+.5f prevBudget=%.4f state=%d grounded=%d\n", d, physDiagLastEndVel, physDiagLastPosBudget, (int)World.instances[physDiagBody].currentState, (int)((World.instances[physDiagBody].entflags&EF_GROUNDED)?1:0)); } physDiagFrames++; physDiagSubY=World.position[physDiagBody].y; } }
     mset(grenadeImpactQueued,0,sizeof(grenadeImpactQueued)); mset(projectileImpactQueued,0,sizeof(projectileImpactQueued));mset(projectileContactThisFrame,0,sizeof(projectileContactThisFrame)); for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false); World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
     for (u16 i=0;i<World.instCount;++i) {/*Update the radius for all entities for rendering and physics, then add dynamic ones to dynamicEntities[]*/
