@@ -97,6 +97,7 @@ INLINE void MFD_SelectTab(u8 panel,u8 tab,bool toggle) {
 }
 
 void WeaponFireStartWeaponDip(float t);
+void RemoveWeapon(i32 slot); /* citadel.c: takes the weapon out of the 7-slot inventory; if it was the held one, the previous weapon takes over in hand (or the view model is hidden when none are left) */
 void WeaponSelectSlot(int slot){int wi=(int)World.invP1.weaponInventoryIndices[slot]; if(wi<0||wi>=MAX_ENTITIES)return; if((int)World.invP1.weaponCurrent==slot)return; if(World.invP1.reloadFinished>World.pauseRelativeTime)return; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ World.invP1.weaponCurrentPending=(i16)slot; World.invP1.weaponIndexPending=(i16)wi; int w=Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip((w>=0&&w<16) ? reloadTime[w] : 0.5f);}
 __attribute__((noinline)) bool MenuEnter() { return !Cheats.consoleActive && (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
 /*One click per press, and only the first consumer of a frame sees it. The UI is immediate-mode: without this the click that leaves the credit pages is still latched on the same frame and lands on the menu underneath (PLAY CREDITS sits right under the cursor) and restarts them, and a held button fires a widget every frame.
@@ -190,15 +191,10 @@ static void RenderVideoPage(u8 page) {
         vidTxtBuf[op]=0;
         if (op) RenderTextC(VIDTXT_CX,VIDTXT_Y,T_WHITE,FONT_NORMAL,VIDTXT_SCALE,"%s",vidTxtBuf);/*white reads against the dark clip frames; Unity's own card tint is #973B3B = T_VIDEOTEXT if you want it back*/
     }
-    /*Unity MainMenuHandler leaves the intro on any key/click once it is 1.5s in; the credits clip is skipped the same way into the first credit page.*/
     bool mouseClick = !uiClickBlocked && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed), click = mouseClick || MenuEnter(), anyKey = Sys_Input.keyStates[KEY_ESCAPE].pressed; for (int k=0;!anyKey&&k<MAX_KEYS;++k) if (Sys_Input.keyStates[k].pressed) anyKey=true;
     if (click) { uiClickBlocked = uiClickLock = true; }/*UI_CLICK_CONSUMED: latch every skip input, Enter included, so the press that leaves the clip cannot also land on the menu underneath*/
     bool skip = isIntro ? (elapsed>1.5 && (click||anyKey)) : (click || Sys_Input.keyStates[KEY_ESCAPE].pressed);
-    if (skip || elapsed >= vidLen) {
-        /*MenuGoBack halts the clip audio and hands the menu its title music, so every exit path out of a clip page sounds the same.*/
-        if (isIntro) MenuGoBack();/*intro over: back to the Singleplayer page*/
-        else { World.creditsActive=true; World.creditsPageIndex=0; /*outro skipped or over: the credit pages take over*/ }
-    }
+    if(skip || elapsed >= vidLen){if (isIntro) MenuGoBack();/*intro over: back to the Singleplayer page*/ else { World.creditsActive=true; World.creditsPageIndex=0; /*outro skipped or over: the credit pages take over*/ }}
 }
 static void MenuBackButton(i16 bgX, i16 bgY, i16 tX, i16 tY, i8 item) { RenderUIImage(bgX,bgY,84,36,1252);/*Back Button background*/ bool over=false; if (UI_Button(UI_ID_MENU_BACK,bgX,bgY+34,84,32,&over,item) || (MenuEnter() && currentMenuItem==item && !rebindCaptureActive)) MenuGoBack(); over=over||currentMenuItem==item; RenderTextL(tX,tY,over ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]); }
 static void DiffDigits(i16 tx, i16 ty, u8 cur) { static const i16 dx4[4]={0,71,145,217}; for (u8 i=0;i<4;++i) RenderTextL(tx+dx4[i],ty,cur==i ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"%u",i); }
@@ -648,7 +644,7 @@ void GeneralInvClick(int slot,int custom),GeneralInvApply(int slot,int custom),V
 bool InventoryHasAccessCard(AccCardType card);
 const char* AccessCardCodeForType(AccCardType card);
 u16 GetItemFrobTexture(u16 index);
-static const i16 generalStartRowY=586,generalColX[2]={372,712},generalRowY[7]={generalStartRowY,generalStartRowY+1*TXT_H,generalStartRowY+2*TXT_H,generalStartRowY+3*TXT_H,generalStartRowY+4*TXT_H,generalStartRowY+5*TXT_H,generalStartRowY+6*TXT_H};
+static const i16 generalStartRowY=586,generalColX[2]={372,684},generalRowY[7]={generalStartRowY,generalStartRowY+1*TXT_H,generalStartRowY+2*TXT_H,generalStartRowY+3*TXT_H,generalStartRowY+4*TXT_H,generalStartRowY+5*TXT_H,generalStartRowY+6*TXT_H};
 static const char* GeneralInvLabel(int slot) { int item=GeneralInvItem(slot); return item<0?"":Sys_Text.stringTable[slot?item+326:597]; }
 static const u8 grenadeItems[7]={7,9,13,8,11,12,10},patchSlots[7]={6,5,0,3,4,2,1};
 void UseGrenade(int),PatchUse(int);
@@ -824,6 +820,21 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
     if (wasCull) glEnable(GL_CULL_FACE); if (wasDepth) glEnable(GL_DEPTH_TEST); if (wasBlend) glEnable(GL_BLEND);
     glBindVertexArray(0); glBindBuffer(GL_ARRAY_BUFFER,0);
 }
+/*Unity AmmoIconManager.SetAmmoIcon port: ammo icon texture per weapon, now the real Textures/UI/ammoicons art (3309..3323, appended to Data/textures.txt). Returns 0 for energy/rapier/pipe/no-weapon (Unity hides the icon there).*/
+static u16 WeaponAmmoIconTex(int wep16,bool alt) {
+    switch (wep16) {
+        case 0: return alt ? 3315 : 3313;/*MK3: penetrator/magnesium*/
+        case 2: return alt ? 3323 : 3314;/*Dartgun: tranq/needle*/
+        case 3: return alt ? 3320 : 3310;/*Flechette: splinter/hornet*/
+        case 7: return alt ? 3319 : 3309;/*Magnum: heavy slug/hollow-tip*/
+        case 8: return 3312;/*Magpulse: magcart*/
+        case 9: return alt ? 3322 : 3321;/*Pistol: teflon/standard*/
+        case 11: return 3316;/*Railgun: rail round*/
+        case 12: return 3317;/*Riotgun: rubber slugs*/
+        case 13: return alt ? 3311 : 3318;/*Skorpion: large slag/slag*/
+        default: return 0;
+    }
+}
 void SideMFD(bool isRH) { // 320x240
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex), tab = isRH ? World.Sys_UI.MFD_RightTab : World.Sys_UI.MFD_LefTab; u8 selected=tab?tab:World.Sys_UI.mfdSelected[isRH?2:1];
     for (u8 i=0;i<4;++i) UIRImg(MID(isRH,TAB_WEAPON)+i,isRH ? 1350 : -TAB_THICK,(i16)(520+56*i),32,40,selected==i+1 ? 1024 : 1022);/*Weapon/Item/Automap/Data side tab buttons*/
@@ -846,7 +857,9 @@ void SideMFD(bool isRH) { // 320x240
             } else if (wep16 != 5 && wep16 != 6) {
                 i16 x0=(i16)(isRH ? 1207 : 24); char ammoText[48]; GetWeaponAmmoText(slot,ammoText,sizeof(ammoText));
                 UIRImg(MID(isRH,WEAPON_AMMO),x0,652,140,42,World.invP1.wepLoadedWithAlternate[slot]?897:898);/*Ammo pane*/
-                UIRText(MID(isRH,WEAPON_AMMO),(i16)(x0+5),663,T_GREEN,FONT_NORMAL,0.9f,130,ammoText);
+                u16 ammoIconTex=WeaponAmmoIconTex(wep16,World.invP1.wepLoadedWithAlternate[slot]!=0);
+                if (ammoIconTex) { UIRImg(UI_ID_NONE,(i16)(x0+4),654,34,36,ammoIconTex);/*Ammo icon (Unity clipBox icon)*/ UIRText(MID(isRH,WEAPON_AMMO),(i16)(x0+42),663,T_GREEN,FONT_NORMAL,0.9f,92,ammoText); }
+                else UIRText(MID(isRH,WEAPON_AMMO),(i16)(x0+5),663,T_GREEN,FONT_NORMAL,0.9f,130,ammoText);
                 UIRImg(MID(isRH,WEAPON_RELOAD),(i16)(x0+148),652,60,40,908); UIRText(MID(isRH,WEAPON_RELOAD),(i16)(x0+153),663,UIOver(MID(isRH,WEAPON_RELOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,50,Sys_Text.stringTable[11]);
                 UIRImg(MID(isRH,WEAPON_UNLOAD),(i16)(x0+214),652,60,40,908); UIRText(MID(isRH,WEAPON_UNLOAD),(i16)(x0+219),663,UIOver(MID(isRH,WEAPON_UNLOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,50,Sys_Text.stringTable[881]);
             } } }
@@ -924,7 +937,7 @@ void CenterMFD() { //640x240
     if (Cheats.noHUD) return;
     static const i16 centerX[4]={400,480,560,902};
     for (u8 i=0;i<4;++i) UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.MFD_CenterTab!=5) ? 1024 : 1021);/*Main/Hardware/General/Software center tab buttons*/
-    if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,460,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,528,676,240,1075); RenderTextL(586,528,T_GREEN,FONT_NORMAL,0.8f,Sys_Text.stringTable[878]/*ADD TO INVENTORY*/); } }
+    if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,552,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,557,676,210,1075); RenderTextL(586,558,T_GREEN,FONT_NORMAL,0.8f,Sys_Text.stringTable[878]/*ADD TO INVENTORY*/); } }
     if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0) {
         i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H;/*SensaroundCenter rearview over the center MFD content area*/
         UIR(UI_ID_SENSA_CTR,sx,sy,CTR_MFD_W,CTR_MFD_H);
@@ -952,7 +965,7 @@ void CenterMFD() { //640x240
             for (int slot=0;slot<14;++slot) {
                 int ref=World.invP1.hardwareInvReferenceIndex[slot]; if (ref<0 || World.invP1.hwVers[slot] <= 0) continue;
                 i16 x=generalColX[slot < 7 ? 0 : 1], y=generalRowY[slot%7];
-                const char* label=Sys_Text.stringTable[ref+326]; UIRText(UI_ID_CMFD_HARDWARE_ROW_0+slot,x,y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : (World.invP1.hasHardware&(1u<<slot) ? T_GREEN_MENU : T_GREEN_MENU_SHADOW),FONT_NORMAL,0.8f,210,label); RenderTextL((i16)(x+300),y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : T_GREEN_MENU,FONT_NORMAL,0.8f,"v%d",(int)World.invP1.hwVers[slot]);
+                const char* label=Sys_Text.stringTable[ref+326]; UIRText(UI_ID_CMFD_HARDWARE_ROW_0+slot,x,y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : (World.invP1.hasHardware&(1u<<slot) ? T_GREEN_MENU : T_GREEN_MENU_SHADOW),FONT_NORMAL,0.8f,210,label); RenderTextL((i16)(x+(slot<7 ? 276 : 309)),y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : T_GREEN_MENU,FONT_NORMAL,0.8f,"v%d",(int)World.invP1.hwVers[slot]);
             }
         }
         if (World.Sys_UI.MFD_CenterTab==3) {/*General*/
@@ -1024,7 +1037,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_HUD_HW_0 ... UI_ID_HUD_HW_7: HwToggle((u8)(id-UI_ID_HUD_HW_0)); return;
         case UI_ID_CMFD_ADD_TO_INVENTORY: if (World.invP1.holdingObject) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); } return;
         case UI_ID_CMFD_TAB_MAIN ... UI_ID_CMFD_TAB_SOFTWARE: MFD_SelectTab(0,(u8)(id-UI_ID_CMFD_TAB_MAIN+1),true); if(World.Sys_UI.MFD_CenterTab==1){World.Sys_UI.firstMain=true;}else if(World.Sys_UI.MFD_CenterTab==2){World.Sys_UI.firstHardware=true;}else if(World.Sys_UI.MFD_CenterTab==3){World.Sys_UI.firstGeneral=true;} return;
-        case UI_ID_CMFD_WEAPON_ROW_0 ... UI_ID_CMFD_WEAPON_ROW_6: if (left) WeaponSelectSlot((int)(id-UI_ID_CMFD_WEAPON_ROW_0)); return;
+        case UI_ID_CMFD_WEAPON_ROW_0 ... UI_ID_CMFD_WEAPON_ROW_6: { int row=(int)(id-UI_ID_CMFD_WEAPON_ROW_0); if (left) WeaponSelectSlot(row); else RemoveWeapon(row); return; }/*RMB takes the weapon out of the inventory; the region click path already delivers c==2/6 here, this used to swallow it behind if (left) */
         case UI_ID_CMFD_GREN_USE_0 ... UI_ID_CMFD_GREN_USE_6: ConsumableUse(false,(int)(id-UI_ID_CMFD_GREN_USE_0)); return;
         case UI_ID_CMFD_GREN_ROW_0 ... UI_ID_CMFD_GREN_ROW_6: { int row=(int)(id-UI_ID_CMFD_GREN_ROW_0); ConsumableSelect(false,row); if (dbl) ConsumableUse(false,row); return; }
         case UI_ID_CMFD_PATCH_USE_0 ... UI_ID_CMFD_PATCH_USE_6: ConsumableUse(true,(int)(id-UI_ID_CMFD_PATCH_USE_0)); return;
@@ -1216,7 +1229,7 @@ static double RenderUI() {
     if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);
     if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"CPU ms::Shad:%.3f, Phys:%.3f, Subs:%u, Rend:%.3f, Pre Phys:%.3f, Logic:%.3f, Ray:%.3f(%u)",shadowTime * 1000,physTime * 1000,World.substeps,renderTime * 1000,prePhys * 1000,gameTime * 1000,raycastMs * 1000,raycastCalls);
     if (!World.menuActive && !Cheats.noHUD && !World.paused && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Grounded: %u  weaponCurrent: %d  weaponIndex: %d  pendingIdx: %d  wep16: %d  viewModel: %u  reloadDone: %.2f",(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0,(int)World.invP1.weaponCurrent,(int)World.invP1.weaponIndex,(int)World.invP1.weaponIndexPending,Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex),((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==5||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==6)?49u:((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==0||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==1)?50u:0u)),World.invP1.reloadFinished);
-    if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u, Reverb: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,Sprint(),World.invP1.inReverbZone);
+    if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u, Reverb: %u, Making Noise: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,Sprint(),World.invP1.inReverbZone,World.invP1.makingNoise);
     if (!Cheats.noHUD && Cheats.showLocation) RenderTextL(16,debugTextStartY + (lineSpacing * 5),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderTextL(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (World.statusTextDecayFinished > World.current_time) RenderTextC(683,164,T_WHITE,FONT_NORMAL,1.0f, "%s",statusText);

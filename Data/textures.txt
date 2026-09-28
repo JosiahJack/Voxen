@@ -6903,6 +6903,37 @@ index: 3306
 index: 3307
 #Textures/AAOutro/1106.png
 index: 3308
-
 // Intro (AAIntro) video frames: indices 2166..2900, playback order (clip then frame).
 // Credits (AAOutro) video frames: indices 2901..3308, playback order (frame number).
+
+// Side MFD ammo icons: indices 3309..3323, one per ammo type (see WeaponAmmoIconTex in ui.c), alphabetical by file.
+#Textures/UI/ammoicons/ss1_hollow.png
+index: 3309
+#Textures/UI/ammoicons/ss1_hornet.png
+index: 3310
+#Textures/UI/ammoicons/ss1_largeslag.png
+index: 3311
+#Textures/UI/ammoicons/ss1_magcart.png
+index: 3312
+#Textures/UI/ammoicons/ss1_magnesium.png
+index: 3313
+#Textures/UI/ammoicons/ss1_needle.png
+index: 3314
+#Textures/UI/ammoicons/ss1_penetrator.png
+index: 3315
+#Textures/UI/ammoicons/ss1_rail.png
+index: 3316
+#Textures/UI/ammoicons/ss1_rubberslug.png
+index: 3317
+#Textures/UI/ammoicons/ss1_slag.png
+index: 3318
+#Textures/UI/ammoicons/ss1_slug.png
+index: 3319
+#Textures/UI/ammoicons/ss1_splinter.png
+index: 3320
+#Textures/UI/ammoicons/ss1_standard.png
+index: 3321
+#Textures/UI/ammoicons/ss1_teflon.png
+index: 3322
+#Textures/UI/ammoicons/ss1_tranq.png
+index: 3323

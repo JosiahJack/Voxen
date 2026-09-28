@@ -106,7 +106,7 @@ void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev; dead in cyberspace
     play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/
     World.invP1.weaponCurrentPending = (i16)nextSlot;
     World.invP1.weaponIndexPending = (i16)wi;
-    WeaponFireStartWeaponDip(0.5f);
+    int w16=Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip(w16>=0?reloadTime[w16]:0.5f);
 }
 
 void StartWeaponDip(float delay) { if (delay < 0.0f) {delay = 0.0f;} World.invP1.reloadFinished = World.pauseRelativeTime + delay; lerpStartTime = World.pauseRelativeTime; }
@@ -173,11 +173,11 @@ void SpawnProjectileImpactParticles(u16 projectile,V3 pos,V3 normal) {
     PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal);
     def.emitRate=60.0f; if (def.duration<=0.0f || def.duration>2.0f) def.duration=1.0f; PSysAdd(&def);
 }
-static bool DidRayHit(int wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right);dir.x+=random_range(-d,d);dir.y+=random_range(-d,d);RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;return true;}return false;}
+static bool DidRayHit(int wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRayPixels(World.instances[PLAYER1].forward,World.instances[PLAYER1].right,random_range(-d,d),random_range(-d,d));RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;return true;}return false;}
 void CreateStandardImpactMarks(int wep16) {
     if (!wfx.tempHit.hit) return;
     Entity* e = &World.instances[wfx.tempHit.hitInstanceIndex];
-    if ((e->entflags & EF_RIGIDBODY) || IdxIsDoor(e->index)) return; // Don't create bullet holes on objects that move.
+    if ((e->entflags & EF_RIGIDBODY) || IdxIsDoor(e->index) || IdxIsNPC(e->index) || e->index==279/*chunk_screen*/ || e->index==477/*sec_camera*/) return; // Don't create bullet holes on objects that move, take damage, animate, or are doors (Unity: skips Rigidbody, HealthManager, Animator/Animation, Door).
     V3 pos = V3_AplusB(wfx.tempHit.point, V3_ScaleByF(wfx.tempHit.normal, 0.16f));
     u16 markInst = SpawnDynamicObject(wepBulletHolePrefab[wep16], -1); if (markInst == 0xFFFF) return;
     World.position[markInst] = pos;
@@ -218,16 +218,17 @@ void HitScanFire(int wep16) {
     float dmgFinal = 0.0f;
     if (b && World.instances[ent].health > 0.0f) {
         dd.damage*=0.8f;/*rebalancing factor*/ dmgFinal=TakeDamage(ent,dd); dd.impactVelocity+=dd.damage;/*Unity: impactVelocity += damage*/
-        if (npc && !(World.instances[wfx.tempHitEnt].entflags & EF_ASLEEP)) { /* Music combat state set; function deferred */ }
-    if (dmgFinal < 0.0f) dmgFinal = 0.0f;
-    (void)dmgFinal; (void)tranq; // CreateTargetIDInstance placeholder: data captured but instance tracking deferred
-    (void)dmgFinal;
+        if (npc && !(World.instances[wfx.tempHitEnt].entflags & EF_ASLEEP)) { World.Sys_Music.inCombat=true; }
     }
-    if (b && (!dd.isOtherNPC || wep16==12)) { ApplyImpactForceWithSound(ent,dd.impactVelocity,dd.attacknormal,dd.hitpoint); }/*impact force+sound for any dynamic object (Unity: Utils.ApplyImpactForce + ObjectImpact)*/
+    if (dmgFinal < 0.0f) dmgFinal = 0.0f;
+    CreateTargetIDInstance(dmgFinal,ent,tranq);/*Unity: after the health>0 block*/
+    if (b && (!dd.isOtherNPC || wep16==12)) { ApplyImpactForceWithSound(ent,(wep16==12 ? 10.0f : 1.0f)*dd.impactVelocity,dd.attacknormal,dd.hitpoint); }/*riotgun: 10x impact force; others as Unity*/
     if (isBeam){CreateBeamEffects(wep16);}
 }
 
 void BiomonitorEnergyPulse(float take);
+/* Voxen equivalent of Unity's Utils.GetMainHealthManager(targ) != null: NPCs plus the damageable non-NPC scripted objects (screens, cameras). */
+static bool MeleeTargetHasHealthManager(u16 targ){u16 idx=World.instances[targ].index;return IdxIsNPC(idx)||idx==279/*chunk_screen*/||idx==477/*sec_camera*/;}
 void MeleeHitUpdate(void) {
     if (wfx.pendingMeleeFinished <= 0.0 || World.pauseRelativeTime < wfx.pendingMeleeFinished) return;
     wfx.pendingMeleeFinished = 0.0;
@@ -242,14 +243,13 @@ void MeleeHitUpdate(void) {
     wfx.tempHitEnt = targ;
     CreateStandardImpactEffects();
     if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);
-    if(World.instances[targ].health<=0.0f&&!dd.isOtherNPC){if(!silent){play_wav(sounds[wfx.pendingMeleeHitSnd], AppliedFXVol(1.0f), World.position[targ], false);World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}}
+    if(!MeleeTargetHasHealthManager(targ)){if(!silent){if(!isRapier){FootStepType fstp=GetFootstepTypeForPrefab(World.instances[targ].index);play_wav(JumpLandSound(fstp),AppliedFXVol(1.0f),World.position[PLAYER1],false);play_wav(sounds[wfx.pendingMeleeHitSnd],AppliedFXVol(0.65f),World.position[PLAYER1],false);}else{play_wav(sounds[wfx.pendingMeleeHitSnd],AppliedFXVol(1.0f),World.position[PLAYER1],false);}World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}return;}/*no health manager: material footstep at 1.0 + hit sound at 0.65 (rapier: hit sound at 1.0)*/
     dd.impactVelocity = 80.0f + dd.damage;
     if ((!dd.isOtherNPC || wep16==12) && (!isRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForceWithSound(targ,dd.impactVelocity,dd.attacknormal,World.position[targ]); }/*melee impact force+sound for any dynamic object (Unity: WeaponFire melee)*/
-    if(World.instances[targ].health<=0.0f&&!dd.isOtherNPC){return;}
     float dmgFinal = TakeDamage(targ,dd);
     if (dmgFinal < 0.0f) {dmgFinal = 0.0f;}
-    (void)dmgFinal;
-    if(!silent){World.invP1.noiseFinished=World.pauseRelativeTime+0.5;BloodType bt=World.instances[targ].bloodType;if(bt==BloodType_Red||bt==BloodType_Yellow||bt==BloodType_Green)play_wav(sounds[wfx.pendingMeleeFleshSnd], AppliedFXVol(1.0f), (V3){0,0,0}, false);else if(isRapier&&World.invP1.energy<4.0f)play_wav(sounds[67], AppliedFXVol(1.0f), (V3){0,0,0}, false);else play_wav(sounds[wfx.pendingMeleeHitSnd], AppliedFXVol(1.0f), (V3){0,0,0}, false);}
+    CreateTargetIDInstance(dmgFinal,targ,-1.0f);/*Unity melee call*/
+    if(!silent){World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;BloodType bt=World.instances[targ].bloodType;if(bt==BloodType_Red||bt==BloodType_Yellow||bt==BloodType_Green)play_wav(sounds[wfx.pendingMeleeFleshSnd], AppliedFXVol(1.0f), (V3){0,0,0}, false);else if(isRapier&&World.invP1.energy<4.0f)play_wav(sounds[67], AppliedFXVol(1.0f), (V3){0,0,0}, false);else play_wav(sounds[wfx.pendingMeleeHitSnd], AppliedFXVol(1.0f), (V3){0,0,0}, false);}
     if (isRapier) { TakeEnergy(3.666f); BiomonitorEnergyPulse(3.666f); } // 3 hits per energy tick
 }
 
@@ -310,7 +310,7 @@ void FireCyberWeapon(void) { // Reuses waitTilNextFire: cyberspace has no equipp
 
 void FirePlasma(int w){FireBeachball(w,plasmaShotForce,485);} void FireRailgun(int w){FireBeachball(w,railgunShotForce,484);} void FireMagpulse(int w){FireBeachball(w,magpulseShotForce,482);} void FireStungun(int w){FireBeachball(w,stungunShotForce,483);}
 typedef void (*FireFn)(int); FireFn wepSpecialFire[16]={0,0,0,0,0,FireRapier,FirePipe,0,FireMagpulse,0,FirePlasma,FireRailgun,0,0,0,FireStungun};
-void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;if(!isSilent&&wepClass[wep16] != WC_MELEE)play_wav(sounds[wepFireSound[wep16]], AppliedFXVol(1.0f), World.position[PLAYER1], false);bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmokePrefab[wep16]){u16 smk=SpawnDynamicObject(wepSmokePrefab[wep16],-1);if(smk!=0xFFFF){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
+void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;if(wep16 != 5 && wep16 != 6){World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}/*Unity: pipe/rapier swings make no noise unless they hit*/if(!isSilent&&wepClass[wep16] != WC_MELEE)play_wav(sounds[wepFireSound[wep16]], AppliedFXVol(1.0f), World.position[PLAYER1], false);if(wepClass[wep16]!=WC_MELEE){const PSysDef* mfp=PSysTypeGet(53/*centerFlash*/);if(mfp){PSysDef mfd=*mfp;mfd.pos=V3_AplusB(wfx.reloadContainerPos,V3_ScaleByF(World.instances[PLAYER1].forward,0.5f));mfd.lifetimeMin=mfd.lifetimeMax=0.05f;PSysAdd(&mfd);}}/*muzzle flash, visible 0.05s (Unity: per-weapon muzFlash GameObject)*/bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmokePrefab[wep16]){u16 smk=SpawnDynamicObject(wepSmokePrefab[wep16],-1);if(smk!=0xFFFF){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
     World.fogFac += wepFogInc[wep16]; u16 wc = World.invP1.weaponCurrent;
     if (wepClass[wep16] == WC_ENERGY) {
         float setting = World.invP1.weaponEnergySetting[wc];
@@ -318,26 +318,27 @@ void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;World.invP1
         else { World.invP1.currentEnergyWeaponHeat[wc] += setting; if (World.invP1.currentEnergyWeaponHeat[wc] > 100.0f) {World.invP1.currentEnergyWeaponHeat[wc] = 100.0f;} }
     }
     if (wepClass[wep16] != WC_MELEE) { // Take ammo/energy. Melee weapons consume neither and don't count towards shotsFired.
+        bool wasOverload = World.invP1.overloadEnabled; // Unity checks the flag here for the fire delay, before clearing it.
         if (wepClass[wep16] == WC_ENERGY) {
-            if (World.invP1.overloadEnabled) { World.invP1.overloadEnabled = false; if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(energyDrainOverloadForWeapon[wep16]); BiomonitorEnergyPulse(energyDrainOverloadForWeapon[wep16]); } }
+            if (wasOverload) { World.invP1.overloadEnabled = false; if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(energyDrainOverloadForWeapon[wep16]); BiomonitorEnergyPulse(energyDrainOverloadForWeapon[wep16]); } }
             else { float takeEnerg = (World.invP1.weaponEnergySetting[wc]/100.0f) * (energyDrainHiForWeapon[wep16]-energyDrainLowForWeapon[wep16]); if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(takeEnerg); BiomonitorEnergyPulse(takeEnerg); } }
         } else { if (World.invP1.wepLoadedWithAlternate[wc]) { if (!Cheats.bottomless) World.invP1.currentMagazineAmount2[wc]--; } else { if (!Cheats.bottomless) World.invP1.currentMagazineAmount[wc]--; } }
         World.shotsFired++;
-    }
-    Recoil(wep16);
-    if (World.invP1.wepLoadedWithAlternate[wc] || World.invP1.overloadEnabled) { World.invP1.overloadEnabled = false; World.invP1.waitTilNextFire = World.pauseRelativeTime + delayBetweenShotsForWeapon2[wep16]; }
-    else { World.invP1.waitTilNextFire = World.pauseRelativeTime + delayBetweenShotsForWeapon[wep16]; }
+        Recoil(wep16);
+        if (World.invP1.wepLoadedWithAlternate[wc] || wasOverload) { World.invP1.overloadEnabled = false; World.invP1.waitTilNextFire = World.pauseRelativeTime + delayBetweenShotsForWeapon2[wep16]; }
+        else { World.invP1.waitTilNextFire = World.pauseRelativeTime + delayBetweenShotsForWeapon[wep16]; }
+    } else Recoil(wep16);
 }
 
 static bool pendingAttackWep16Valid = false; static int  pendingAttackWep16 = -1; void DropHeldItem(); void ResetHeldItem(); void AddItemToInventory(int index, int custIdx);
 void StartNormalAttack(int wep16) { if ((wep16 < 0 || wep16 > 15) || (World.invP1.waitTilNextFire >= World.pauseRelativeTime) || (World.invP1.reloadFinished >= World.pauseRelativeTime)) return; pendingAttackWep16=wep16; pendingAttackWep16Valid=true; }
 extern u16 editModeTestEntityDefinition;
 void CheckAttackInput(void) {
-    if(!Attack()){return;} if(World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive=0; return;}
+    if(!Attack()){return;} if(World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive=0; World.invP1.waitTilNextFire=World.pauseRelativeTime+0.8f; return;}
     if (World.curLev == LEVEL_CYBERSPACE) { FireCyberWeapon(); return; }
     if (editFieldEditing || EditPanelPointerHover()) { return; }
     if (Cheats.editMode && Cheats.editSubMode==1){World.invP1.holdingObject = true; World.invP1.heldObjectIndex = editModeTestEntityDefinition;}
-    if (World.invP1.holdingObject && !World.mouseClickHeldOverGUI) { if (World.uiIsBlocking) { DropHeldItem(); return; } if (FrobHeldItemIntoPanel(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right)) { return; }/*frob-user items go to whatever UseHandler is under the cursor (InteractablePanel), and are consumed there*/ AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); return; }
+    if (World.invP1.holdingObject && !World.mouseClickHeldOverGUI) { if (!World.uiIsBlocking) { if (FrobHeldItemIntoPanel(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right)) { return; }/*frob-use items go to whatever UseHandler is under the cursor (InteractablePanel), and are consumed there*/ DropHeldItem(); return; } AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); return; }
     int w = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
     if (w == -1 || World.invP1.holdingObject || World.mouseClickHeldOverGUI){return; /*No weapon*/} StartNormalAttack(w);
 }
@@ -345,7 +346,7 @@ void CheckAttackInput(void) {
 void CheckUIStateAndAttack(void) {
     if (!pendingAttackWep16Valid) return;
     int wepdex = pendingAttackWep16; pendingAttackWep16Valid = false;
-    if (World.uiIsBlocking || World.invP1.holdingObject || World.mouseClickHeldOverGUI || World.invP1.reloadFinished >= World.pauseRelativeTime || World.invP1.waitTilNextFire >= World.pauseRelativeTime || wepdex < 0 || wepdex > 15) return;
+    if (World.uiIsBlocking || World.invP1.holdingObject || World.mouseClickHeldOverGUI || World.invP1.reloadFinished >= World.pauseRelativeTime || World.invP1.waitTilNextFire >= World.pauseRelativeTime || wepdex < 0 || wepdex > 15 || World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]) return;
     World.invP1.justFired = World.pauseRelativeTime; if (wepClass[wepdex] == WC_MELEE) { FireWeapon(wepdex,false); return; }
     if (wepClass[wepdex] == WC_ENERGY) {
         u16 wc = World.invP1.weaponCurrent;

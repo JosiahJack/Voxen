@@ -90,7 +90,28 @@ void UseCyberspaceItem() {
 void UseCyberspaceItemByIndex(int idx) { World.invP1.cyberItemIndex = (i8)idx; UseCyberspaceItem(); }/*MFD software tab rows 3..5 map to the 0..2 turbo/decoy/recall selector*/
 void CycleCyberSpaceItemUp() { int next = World.invP1.cyberItemIndex + 1; if (next > 2){next=0;} for (int c = 0; c <= 7; c++) { if (World.invP1.hasSoft & (1u << (SW_TURBO+next))) { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (++next > 2) {next = 0;} } }
 void CycleCyberSpaceItemDn() { int next = World.invP1.cyberItemIndex - 1; if (next < 0){next=2;} for (int c = 0; c <= 7; c++) { if (World.invP1.hasSoft & (1u << (SW_TURBO+next))) { World.invP1.cyberItemIndex = (i8)next; return; } if (c == 7) { World.invP1.cyberItemIndex = -1; return; } if (--next < 0) {next = 2;} } }
-void RemoveWeapon(i32 slot) { World.invP1.weaponInventoryIndices[slot] = World.invP1.weaponInventoryAmmoIndices[slot] = -1; if (slot == World.invP1.weaponCurrent) { bool anyLeft = false; for (int i=0;i<7;i++) if (World.invP1.weaponInventoryIndices[i] >= 0) { anyLeft = true; break; } if (!anyLeft) World.instances[World.weaponVModelIndex].modelIndex = MAX_MDLS; } }
+void CompleteWeaponChange(void); /* defined in weapons.c: applies pending weapon change to state, view model, and HUD */
+void RemoveWeapon(i32 slot) {
+    if (slot < 0 || slot >= 7 || World.invP1.weaponInventoryIndices[slot] < 0) return;
+    if (World.invP1.holdingObject) return; /* hands full, same refusal as GeneralInvTake */
+    /* The weapon leaves the 7-slot list and becomes the held object, carrying its loaded magazines: AddItemToInventory -> AddWeaponToInventory reads heldAmmo/heldAmmo2/heldObjectLoadedAlternate to put them back (ADD TO INVENTORY, or a quick pickup). heldObjectIndex is the EDD, and a weapon's EDD is 343..358 - the very value weaponInventoryIndices already holds - so store it verbatim. Subtracting 307 was wrong: IdxIsWeapon, GetItemFrobTexture and ItemStringIdx all key off 343..358, and the -307 consumers (RelayPanelUse, HeldItemIsFrobUser) want the EDD too. */
+    World.invP1.heldAmmo = World.invP1.currentMagazineAmount[slot]; World.invP1.heldAmmo2 = World.invP1.currentMagazineAmount2[slot]; World.invP1.heldObjectLoadedAlternate = World.invP1.wepLoadedWithAlternate[slot];
+    World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldObjectIndex = (u16)World.invP1.weaponInventoryIndices[slot]; World.invP1.grenActive = false; World.invP1.holdingObject = true;
+    /* Unity's WeaponCurrent holds a List and RemoveWeapon drops the entry, so the rows below close up. Every per-slot array has to slide with it or the MFD renders a blank row (it draws row generalRowY[slot] for a populated slot, so a -1 hole leaves a gap) and the magazines/heat/energy setting desync from their weapon. */
+    for (i32 i=slot;i<6;++i) { World.invP1.weaponInventoryIndices[i]=World.invP1.weaponInventoryIndices[i+1]; World.invP1.weaponInventoryAmmoIndices[i]=World.invP1.weaponInventoryAmmoIndices[i+1]; World.invP1.currentMagazineAmount[i]=World.invP1.currentMagazineAmount[i+1]; World.invP1.currentMagazineAmount2[i]=World.invP1.currentMagazineAmount2[i+1]; World.invP1.wepLoadedWithAlternate[i]=World.invP1.wepLoadedWithAlternate[i+1]; World.invP1.currentEnergyWeaponHeat[i]=World.invP1.currentEnergyWeaponHeat[i+1]; World.invP1.weaponEnergySetting[i]=World.invP1.weaponEnergySetting[i+1]; }
+    World.invP1.weaponInventoryIndices[6]=World.invP1.weaponInventoryAmmoIndices[6]=-1; World.invP1.currentMagazineAmount[6]=World.invP1.currentMagazineAmount2[6]=0; World.invP1.wepLoadedWithAlternate[6]=false; World.invP1.currentEnergyWeaponHeat[6]=0.0f; World.invP1.weaponEnergySetting[6]=0.0f;
+    /* Everything at or above the hole moved down one, so the held row does too; if the held weapon was the one removed this lands on the weapon above it (Unity: WeaponCurrent.RemoveWeapon). */
+    if (slot <= World.invP1.weaponCurrent && World.invP1.weaponCurrent > 0) World.invP1.weaponCurrent--;
+    if (World.invP1.weaponCurrent < 0) World.invP1.weaponCurrent = 0;
+    World.invP1.weaponCurrentPending = World.invP1.weaponCurrent;
+    World.invP1.weaponIndexPending = (World.invP1.weaponCurrent >= 0 && World.invP1.weaponInventoryIndices[World.invP1.weaponCurrent] >= 0) ? (i16)World.invP1.weaponInventoryIndices[World.invP1.weaponCurrent] : -1;
+    u8 numweapons = 0; for (int i = 0; i < 7; i++) if (World.invP1.weaponInventoryIndices[i] >= 0) numweapons++;
+    World.invP1.numweapons = numweapons;
+    if (!numweapons) { for (int i = 0; i < 7; i++) World.invP1.currentMagazineAmount[i] = World.invP1.currentMagazineAmount2[i] = 0; }
+    if (World.invP1.weaponIndexPending < 0) { World.instances[World.weaponVModelIndex].modelIndex = MAX_MDLS; World.invP1.weaponCurrentPending = World.invP1.weaponIndexPending = -1; ForceInventoryMode(); return; } /* no valid weapon selected: hide the view model */
+    CompleteWeaponChange(); /* updates weapon state, view model, and HUD */
+    ForceInventoryMode(); /* so the held weapon and its ADD TO INVENTORY button are on screen */
+}
 static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index == 4) ? 5.0f : (wep16Index == 10) ? 13.0f : (wep16Index == 14) ? 2.0f : 3.0f; }
 __attribute__((noinline)) void AddAmmoToInventory(int index,int constIndex,int amount,bool isSecondary) { if(index < 0){return;} if(isSecondary){World.invP1.wepAmmoSecondary[index]+=(u16)amount;} else {World.invP1.wepAmmo[index]+=(u16)amount;} CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(constIndex)],Sys_Text.stringTable[630]); }
 bool AddWeaponToInventory(int index,int ammo1,int ammo2,bool loadedAlt) {
@@ -131,14 +152,12 @@ void AddItemToInventory(int index, int custIdx) {
             case 314: AddGrenadeToInventory(0,index); break; /*Frag*/ case 315: AddGrenadeToInventory(3,index); break; /*Concussion*/ case 316: AddGrenadeToInventory(1,index); break; /*EMP*/ case 317: AddGrenadeToInventory(6,index); break; /*Earth Shaker*/ case 318: AddGrenadeToInventory(4,index); break; /*Land Mine*/ case 319: AddGrenadeToInventory(5,index); break;/*Nitropak*/
             case 320: AddGrenadeToInventory(2,index); break; /*Gas*/
             case 321: case 322: case 323: case 324: case 325: case 326: case 327: AddPatchToInventory(index-321,index); break;
-            case 21: AddHardwareToInventory(0,custIdx); break; case 22: AddHardwareToInventory(1,custIdx); break; case 23: AddHardwareToInventory(2,custIdx); break; case 24: AddHardwareToInventory(3,custIdx); break; case 25: AddHardwareToInventory(4,custIdx); break; case 26: AddHardwareToInventory(5,custIdx); break;
-            case 27: AddHardwareToInventory(6,custIdx); break; case 28: AddHardwareToInventory(7,custIdx); break; case 29: AddHardwareToInventory(8,custIdx); break; case 30: AddHardwareToInventory(9,custIdx); break; case 31: AddHardwareToInventory(10,custIdx);break; case 32: AddHardwareToInventory(11,custIdx); break;
-            case 60: AddAmmoToInventory(12,index,magazinePitchCountForWeapon[12],false); break; /*rubber slugs*/      case 65: AddAmmoToInventory(8,index,magazinePitchCountForWeapon2[8],true); break; /*magpulse cartridge super*/ case 66: AddAmmoToInventory(2,index,magazinePitchCountForWeapon[2],false); break; /*needle darts*/ 
-            case 67: AddAmmoToInventory(2,index,magazinePitchCountForWeapon2[2],true); break; /*tranquilizer darts*/  case 68: AddAmmoToInventory(9,index,magazinePitchCountForWeapon[9],false); break; /*standard bullets*/         case 69: AddAmmoToInventory(9,index,magazinePitchCountForWeapon2[9],true); break; /*teflon bullets*/
-            case 70: AddAmmoToInventory(7,index,magazinePitchCountForWeapon[7],false); break; /*hollow point rounds*/ case 71: AddAmmoToInventory(7,index,magazinePitchCountForWeapon2[7],true); break; /*slug rounds*/              case 72: AddAmmoToInventory(0,index,magazinePitchCountForWeapon[0],false); break; /*magnesium tipped slugs*/
-            case 73: AddAmmoToInventory(0,index,magazinePitchCountForWeapon2[0],true); break; /*penetrator slugs*/    case 74: AddAmmoToInventory(3,index,magazinePitchCountForWeapon[3],false); break; /*hornet clip*/              case 75: AddAmmoToInventory(3,index,magazinePitchCountForWeapon2[3],true); break; /*splinter clip*/
-            case 76: AddAmmoToInventory(11,index,magazinePitchCountForWeapon[11],false); break; /*rail rounds*/       case 77: AddAmmoToInventory(13,index,magazinePitchCountForWeapon[13],false); break; /*slag magazine*/          case 78: AddAmmoToInventory(13,index,magazinePitchCountForWeapon2[13],true); break; /*large slag magazine*/ 
-            case 79: AddAmmoToInventory(8,index,magazinePitchCountForWeapon[8],false); break; /*magpulse cartridges*/ case 80: AddAmmoToInventory(8,index,magazinePitchCountForWeapon2[8],false); break; /*small magpulse cartridges*/ default: return;
+            case 367: AddAmmoToInventory(12,index,magazinePitchCountForWeapon[12],false); break; /*DC rubber slugs*/     case 373: AddAmmoToInventory(2,index,magazinePitchCountForWeapon[2],false); break; /*SV needle darts*/ 
+            case 374: AddAmmoToInventory(2,index,magazinePitchCountForWeapon2[2],true); break; /*SV tranq darts*/  case 375: AddAmmoToInventory(9,index,magazinePitchCountForWeapon[9],false); break; /*ML standard rounds*/         case 376: AddAmmoToInventory(9,index,magazinePitchCountForWeapon2[9],true); break; /*ML teflon coated rounds*/
+            case 377: AddAmmoToInventory(7,index,magazinePitchCountForWeapon[7],false); break; /*hollow-tip 2100 clip*/ case 378: AddAmmoToInventory(7,index,magazinePitchCountForWeapon2[7],true); break; /*heavy slug 2100 clip*/              case 379: AddAmmoToInventory(0,index,magazinePitchCountForWeapon[0],false); break; /*MARK3 magnesium-t*/
+            case 380: AddAmmoToInventory(0,index,magazinePitchCountForWeapon2[0],true); break; /*MARK3 penetrator*/    case 381: AddAmmoToInventory(3,index,magazinePitchCountForWeapon[3],false); break; /*AM hornet clip*/              case 382: AddAmmoToInventory(3,index,magazinePitchCountForWeapon2[3],true); break; /*AM splinter clip*/
+            case 383: AddAmmoToInventory(11,index,magazinePitchCountForWeapon[11],false); break; /*MM rail clip*/       case 384: AddAmmoToInventory(13,index,magazinePitchCountForWeapon[13],false); break; /*RF slag clip*/          case 385: AddAmmoToInventory(13,index,magazinePitchCountForWeapon2[13],true); break; /*RF large slag clip*/ 
+            case 386: AddAmmoToInventory(8,index,magazinePitchCountForWeapon[8],false); break; /*SB magpulse cart*/ default: return;
         }
     } play_wav(sounds[87], AppliedFXVol(1.0f), (V3){0}, false);
 }
@@ -343,10 +362,12 @@ bool GeneralInvCanUse(int slot) { int item=GeneralInvItem(slot); return slot>0 &
 bool GeneralInvCanVaporize(int slot) { int item=GeneralInvItem(slot); return slot>0 && item>=0 && (item<6 || item==33 || item==35 || item==58 || item==62); }
 void GeneralInvRemove(int slot) {
     if (slot<=0 || slot>=14) return;
-    World.invP1.generalInventoryIndexRef[slot]=-1; World.invP1.generalInvCustIdx[slot]=U16_MAX; MFD_GeneralChanged();
-    if (World.invP1.generalInvCurrent!=slot) return;
-    World.invP1.generalInvCurrent=0;
-    for (int step=1;step<=14;++step) { int next=(slot-step+14)%14; if (GeneralInvItem(next)>=0) { World.invP1.generalInvCurrent=(u8)next; break; } }
+    /* Unity's general inventory is a list, so removing an item closes the rows up rather than leaving a hole: the MFD draws generalRowY[slot%7] for a populated slot, so a gap at 3 blanks left-column row 3 and a gap at 10 blanks right-column row 3. Slot 0 is the reserved access-card reader row and is never removable, so the shift starts at 1. */
+    for (int i=slot;i<13;++i) { World.invP1.generalInventoryIndexRef[i]=World.invP1.generalInventoryIndexRef[i+1]; World.invP1.generalInvCustIdx[i]=World.invP1.generalInvCustIdx[i+1]; }
+    World.invP1.generalInventoryIndexRef[13]=-1; World.invP1.generalInvCustIdx[13]=U16_MAX; MFD_GeneralChanged();
+    /* The cursor indexes a slot, so it slides with its item. When the selected row itself goes, whatever slid into it takes the cursor; if nothing slid in, fall back to the last valid item (Unity: VaporizeButton scans 13 down to 0). */
+    if (World.invP1.generalInvCurrent==slot) { if (GeneralInvItem(slot)<0) { World.invP1.generalInvCurrent=0; for (int i=13;i>=0;--i) { if (GeneralInvItem(i)>=0) { World.invP1.generalInvCurrent=(u8)i; break; } } } }
+    else if (World.invP1.generalInvCurrent>slot) World.invP1.generalInvCurrent--;
 }
 void GeneralInvClick(int buttonIdx,int customIdx) {
     (void)customIdx; int item=GeneralInvItem(buttonIdx); if (item<0) return;
@@ -378,7 +399,7 @@ void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
   Pitch is a +- semitone shift (Unity: random 0.8-1.2x multiplier), applied dynamically during mixing.*/
 void ApplyImpactForceWithSound(u16 target, float vel, V3 normal, V3 pt) {
     ApplyImpactForce(target, vel, normal, pt);
-    if (vel > 2.0f) play_wav_ext(sounds[523], AppliedFXVol((vel / 10.0f) * 0.3f), pt, true, random_range(-2.0f,2.0f));
+    if (vel > 2.0f) play_wav_ext(sounds[523], AppliedFXVol((vel / 10.0f) * 0.3f), pt, true, random_range(-3.8631f,3.1564f));/*Unity ObjectImpact pitch Random.Range(0.8,1.2) playback ratio = 12*log2(r) semitones*/
 }
 
 void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseVel) { 
@@ -403,7 +424,7 @@ void SpawnExplosionEffect(V3 pos, int explosionType) {
 void GrenadeExplode(u16 self) {
     if(self>=World.instCount)return; Entity* e = &World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; flag_set(&e->entflags,EF_ACTIVE,false);
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=WORLD,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
-    i16 idx=GrenadeTypeFromConst(e->index); float radius=(idx>=7&&idx<=13) ? grenadeRadius[idx-7] : (e->strength>0.0f ? e->strength : 4.0f); ApplyImpactForceSphere(&dd,World.position[self],radius,e->damage * 1.5f); if (!GrenadeIsNPCMine(self)) { World.invP1.noiseFinished = World.pauseRelativeTime + 2.0; } int soundIndex=60,explosionType=2;
+    i16 idx=GrenadeTypeFromConst(e->index); float radius=(idx>=7&&idx<=13) ? grenadeRadius[idx-7] : (e->strength>0.0f ? e->strength : 4.0f); ApplyImpactForceSphere(&dd,World.position[self],radius,e->damage * 1.5f); if (!GrenadeIsNPCMine(self)) { World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 2.0; } int soundIndex=60,explosionType=2;
     switch (idx) {case 7: case 11: soundIndex = 64; World.fogFac += 5; explosionType = 1; break;/*frag, mine*/ case 8: case 10: soundIndex = 60; World.fogFac += 7; explosionType = 2; break;/*conc, earth*/ case 9:  soundIndex = 67; explosionType = 4; break;/*emp*/ case 12: soundIndex = 60; World.fogFac += 6;  explosionType = 2; break;/*nitro*/ case 13: soundIndex = 63; World.fogFac += 10; explosionType = 3; break;/*gas*/}
     play_wav(SoundPath(soundIndex), AppliedFXVol(1.0f), World.position[self], true); SpawnExplosionEffect(World.position[self],explosionType); Shake(-1.0f); DeleteInstance(self);
 }
@@ -959,6 +980,8 @@ void UseEntity(u16 i) {
 }
 
 INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy){float px=(World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f)+dx,py=(World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f)+dy,t=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,nx=(px-(float)UI_W*0.5f)/((float)UI_W*0.5f),ny=((float)UI_H*0.5f-py)/((float)UI_H*0.5f);V3 v=V3_Normalize((V3){nx*aspect*t,ny*t,-1.0f}),ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(r,ff));return(V3){v.x*r.x+v.y*up.x+v.z*ff.x,v.x*r.y+v.y*up.y+v.z*ff.y,v.x*r.z+v.y*up.z+v.z*ff.z};}
+/* Non-static wrapper so weapons.c can apply pixel drift before the ray is built (Unity: drift added to the screen point before ScreenPointToRay). */
+V3 ScreenPointToRayPixels(V3 f,V3 r,float dx,float dy){return ScreenPointToRayOffset(f,r,dx,dy);}
 INLINE bool FrobRayIsFrobable(RaycastHit h){if(!h.hit)return false;u16 i=h.hitInstanceIndex;if(i>=World.instCount)return false;u16 e=World.instances[i].index;if((World.layer[i]&L_CorpseSearchable)) return true;return IsFrobUsableSpecial(e)||IdxIsUsableObject(e)||IdxIsSearchable(e)||IdxIsDoor(e)||IdxIsButtonSwitch(e)||IdxIsNPC(e)||IdxIsGib(e);}
 extern bool editFieldEditing;
 static bool TargetIDFrob(V3 p,V3 f,V3 r){V3 dir=ScreenPointToRayOffset(f,r,0,0);RaycastHit h=Raycast(p,dir,TargetIDGetSensingRange(true),LMASK_PLAYER_TARGET_ID_FROB);if(!h.hit||h.hitInstanceIndex>=World.instCount||!IdxIsNPC(World.instances[h.hitInstanceIndex].index))return false;u16 i=h.hitInstanceIndex;Entity* e=&World.instances[i];if(e->health<=0.0f){if(World.layer[i]&L_CorpseSearchable){UseEntity(i);return true;}return false;}if((World.invP1.hasHardware&HW_TID)&&World.invP1.hwVers[HW_TID_IDX]>1){if(targetIDAttached[i]&&targetIDAttachedFinished[i]<=World.pauseRelativeTime)targetIDAttached[i]=false;if(!targetIDAttached[i]){CreateTargetIDInstance(-1.0f,i,-1.0f);return true;}}CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[e->index-419].name);return true;}
