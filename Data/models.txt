@@ -2141,23 +2141,16 @@ index: 6074
 #Models/sec_cpunode_gib_towerpanel1.obj
 index: 6075
 
-
-
-
-
-
 #Models/cyber_data.glb
 index: 6076
 animated: 1
 animationNum: 53
 frame: 1 260
-
 #Models/cyber_datafrag.glb
 index: 6336
 animated: 1
 animationNum: 54
 frame: 1 80
-
 #Models/cyber_exit.glb
 index: 6416
 animated: 1
@@ -2176,3 +2169,7 @@ animated: 1
 animationNum: 57
 frame: 1 260
 
+#Models/genericLOD3card_slice45.obj
+index: 6875
+#Models/maint2_6d.obj
+index: 6876
