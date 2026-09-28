@@ -239,8 +239,6 @@ void HitScanFire(int wep16) {
 }
 
 void BiomonitorEnergyPulse(float take);
-/* Voxen equivalent of Unity's Utils.GetMainHealthManager(targ) != null: NPCs plus the damageable non-NPC scripted objects (screens, cameras). */
-static bool MeleeTargetHasHealthManager(u16 targ){u16 idx=World.instances[targ].index;return IdxIsNPC(idx)||idx==279/*chunk_screen*/||idx==477/*sec_camera*/;}
 void MeleeHitUpdate(void) {
     if (wfx.pendingMeleeFinished <= 0.0 || World.pauseRelativeTime < wfx.pendingMeleeFinished) return;
     wfx.pendingMeleeFinished = 0.0;
@@ -255,7 +253,7 @@ void MeleeHitUpdate(void) {
     wfx.tempHitEnt = targ;
     CreateStandardImpactEffects();
     if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);
-    if(!MeleeTargetHasHealthManager(targ)){if(!silent){if(!isRapier){FootStepType fstp=GetFootstepTypeForPrefab(World.instances[targ].index);play_wav(JumpLandSound(fstp),AppliedFXVol(1.0f),World.position[PLAYER1],false);play_wav(sounds[wfx.pendingMeleeHitSnd],AppliedFXVol(0.65f),World.position[PLAYER1],false);}else{play_wav(sounds[wfx.pendingMeleeHitSnd],AppliedFXVol(1.0f),World.position[PLAYER1],false);}World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}return;}/*no health manager: material footstep at 1.0 + hit sound at 0.65 (rapier: hit sound at 1.0)*/
+    if(!IsDamageable(&World.instances[targ])){if(!silent){if(!isRapier){FootStepType fstp=GetFootstepTypeForPrefab(World.instances[targ].index);play_wav(JumpLandSound(fstp),AppliedFXVol(1.0f),World.position[PLAYER1],false);play_wav(sounds[wfx.pendingMeleeHitSnd],AppliedFXVol(0.65f),World.position[PLAYER1],false);}else{play_wav(sounds[wfx.pendingMeleeHitSnd],AppliedFXVol(1.0f),World.position[PLAYER1],false);}World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}return;}/*no health manager: material footstep at 1.0 + hit sound at 0.65 (rapier: hit sound at 1.0)*/
     dd.impactVelocity = 80.0f + dd.damage;
     if ((!dd.isOtherNPC || wep16==12) && (!isRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForceWithSound(targ,dd.impactVelocity,dd.attacknormal,World.position[targ]); }/*melee impact force+sound for any dynamic object (Unity: WeaponFire melee)*/
     float dmgFinal = TakeDamage(targ,dd);
@@ -329,17 +327,20 @@ void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;if(wep16 !=
         if (World.invP1.overloadEnabled) World.invP1.currentEnergyWeaponHeat[wc] = 100.0f;
         else { World.invP1.currentEnergyWeaponHeat[wc] += setting; if (World.invP1.currentEnergyWeaponHeat[wc] > 100.0f) {World.invP1.currentEnergyWeaponHeat[wc] = 100.0f;} }
     }
+    bool wasOverload = World.invP1.overloadEnabled; // Unity reads the flag here, before the ammo block clears it, for the fire delay below.
     if (wepClass[wep16] != WC_MELEE) { // Take ammo/energy. Melee weapons consume neither and don't count towards shotsFired.
-        bool wasOverload = World.invP1.overloadEnabled; // Unity checks the flag here for the fire delay, before clearing it.
         if (wepClass[wep16] == WC_ENERGY) {
             if (wasOverload) { World.invP1.overloadEnabled = false; if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(energyDrainOverloadForWeapon[wep16]); BiomonitorEnergyPulse(energyDrainOverloadForWeapon[wep16]); } }
             else { float takeEnerg = (World.invP1.weaponEnergySetting[wc]/100.0f) * (energyDrainHiForWeapon[wep16]-energyDrainLowForWeapon[wep16]); if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(takeEnerg); BiomonitorEnergyPulse(takeEnerg); } }
         } else { if (World.invP1.wepLoadedWithAlternate[wc]) { if (!Cheats.bottomless) World.invP1.currentMagazineAmount2[wc]--; } else { if (!Cheats.bottomless) World.invP1.currentMagazineAmount[wc]--; } }
         World.shotsFired++;
-        Recoil(wep16);
-        if (World.invP1.wepLoadedWithAlternate[wc] || wasOverload) { World.invP1.overloadEnabled = false; World.invP1.waitTilNextFire = World.pauseRelativeTime + delayBetweenShotsForWeapon2[wep16]; }
-        else { World.invP1.waitTilNextFire = World.pauseRelativeTime + delayBetweenShotsForWeapon[wep16]; }
-    } else Recoil(wep16);
+    }
+    /* Unity WeaponFire: Recoil(index) and the waitTilNextFire assignment sit OUTSIDE the melee-ammo branch, so the
+       pipe and rapier do get their delay (delayBetweenShotsForWeapon[6]=0.65s, [5]=1.6s).  Keeping them inside
+       let the pipe be swung as fast as the attack input repeats. */
+    Recoil(wep16);
+    if (World.invP1.wepLoadedWithAlternate[wc] || wasOverload) { World.invP1.overloadEnabled = false; World.invP1.waitTilNextFire = World.pauseRelativeTime + delayBetweenShotsForWeapon2[wep16]; }
+    else { World.invP1.waitTilNextFire = World.pauseRelativeTime + delayBetweenShotsForWeapon[wep16]; }
 }
 
 static bool pendingAttackWep16Valid = false; static int  pendingAttackWep16 = -1; void DropHeldItem(); void ResetHeldItem(); void AddItemToInventory(int index, int custIdx);

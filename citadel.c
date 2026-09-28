@@ -93,7 +93,6 @@ static void UseTurbo() {if(World.invP1.softVersions[SW_TURBO]<=0){World.invP1.ha
    decoy keeps EF_RIGIDBODY off because the prefab has no Rigidbody -- it holds position instead of falling.
    Reusing the existing DelayedSpawnUpdate arming (active + timerFinished + doSelfAfterList + despawnInstead) is the
    same 15s teardown Unity's DelayedSpawn performs, so the expiry goes through CyberDecoyExpired. */
-#define CYBER_DECOY_CONST 553u
 #define CYBER_DECOY_LIFETIME 15.0
 static void UseDecoy() {if (World.decoyActive) { CenterStatusPrint("%s",Sys_Text.stringTable[537]); return; } if (World.invP1.softVersions[SW_DECOY] <= 0) { World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); return; } if (--World.invP1.softVersions[SW_DECOY] == 0) World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); u16 decoyIdx = SpawnDynamicObject(CYBER_DECOY_CONST,true);
     if(decoyIdx != U16_MAX){World.position[decoyIdx]=World.position[PLAYER1]; World.velocity[decoyIdx]=(V3){0,0,0}; flag_set(&World.instances[decoyIdx].entflags,EF_RIGIDBODY,false);
@@ -245,8 +244,37 @@ void ForceBridgeUpdate(u16 self) {
 }
 
 void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,World.instances[self].targetIdx); }
-void TriggerCounterDelayedTarget(u16 self, u16 act) { World.instances[self].delayFinished = World.pauseRelativeTime + World.instances[self].delay; TriggerCounterTarget(self,act); }
+void TriggerCounterDelayedTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; }/*Unity StartCoroutine(DelayedTarget); the target fires from TriggerCounterUpdate once the delay elapses. This used to also call the target immediately, so the delay was never honored.*/
+void TriggerCounterUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished > 0.0 && e->delayFinished < World.pauseRelativeTime) { e->delayFinished = 0.0; TriggerCounterTarget(self, e->recentMostActivator); } }
+void LogicRelayDelayTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; }/*LogicRelay.cs:19,22 defers to StartCoroutine(DelayedTarget) when delay > 0. The relay's own ioflags ride the deferred hop, so they are re-read at fire time rather than captured.*/
+void LogicRelayUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(e->recentMostActivator, e->targetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
 void TriggerCounterTargetted(u16 self, u16 act) { Entity* e=&World.instances[self]; e->counter++; if (e->counter != e->countToTrigger) {return;} if (e->delay <= 0.0f){TriggerCounterTarget(self,act);}else{TriggerCounterDelayedTarget(self,act);} if (!e->dontReset){e->counter=0;} }
+
+// SpawnManager (constIndex 702).  Spawn points are the info_spawnpoint (715) entities on this level: Unity's
+// spawnLocations array is an unordered Random.Range pick and each spawner's list is exactly that set, so the list
+// does not need storing.  Two Unity checks have no Voxen equivalent and are noted inline.
+void SpawnManagerActivate(u16 self, bool alerted) { Entity* e=&World.instances[self]; e->alertEnemiesOnAwake=alerted; e->active=true; e->delayFinished=World.pauseRelativeTime; }
+void SpawnManagerUpdate(u16 self) {
+    Entity* e=&World.instances[self]; if (World.paused || World.menuActive || !e->active) {return;}/*SpawnManager.Update:40-42*/
+    u16 levelNpcs=0,count=0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i){ Entity* n=&World.instances[i]; if(!IdxIsNPC(n->index)) {continue;} ++levelNpcs; if(!(n->entflags&EF_ACTIVE) || (n->health <= 0.0f && n->cyberHealth <= 0.0f)) {continue;} if(e->countOnlySameIndex && n->index!=e->spawnIndex) {continue;} ++count;}
+    if (levelNpcs > 300) {return;}/*SpawnManager.Update:48 bails on a crowded level*/
+    if (e->numberActive != count) {e->numberActive = count;}
+    if (e->numberActive >= e->numberToSpawn) {return;}
+    if (e->delayFinished >= World.pauseRelativeTime) {return;}
+    e->delayFinished = World.pauseRelativeTime + (double)random_range(e->minDelayBetweenSpawns, e->maxDelayBetweenSpawns);
+    if (World.diffCbt == 0) {return;}/*SpawnManager.Spawn():101 - combat 0 spawns nothing*/
+    u16 spots=0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {if(World.instances[i].index==SPAWNPOINT_CONST) {++spots;}}
+    if (!spots) {return;}
+    /* GetRandomLocation():99-116 re-rolls until it hits a point that is neither AreaClear nor AreaHidden.  Voxen
+       has neither concept, so every spawn point is usable and the first random pick stands. */
+    u16 want=(u16)random_range_u32(0,spots-1),spot=0;/*SpawnManager.GetRandomLocation():99 uses Random.Range(0, spawnLocations.Length-1), which is inclusive of both ends and so never picks the LAST point. Kept as-is for parity -- change to (0,spots) to make every point reachable.*/ for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i){ if(World.instances[i].index!=SPAWNPOINT_CONST) {continue;} if(want--==0){spot=i;break;} }
+    if (!spot) {return;}
+    u16 npc=SpawnDynamicObject(e->spawnIndex,false); if (npc==0xFFFF) {return;}/*SpawnManager.Spawn():119-122 logs and bails*/
+    World.position[npc]=World.position[spot]; World.scale[npc]=(V3){1.0f,1.0f,1.0f};
+    if (!e->alertEnemiesOnAwake) {flag_set(&World.instances[npc].entflags, EF_WANDERING, true); return;}/*aic.wandering = true, except for index 14 which SpawnManager.Spawn():132 skips; 14 is not an NPC constIndex in Voxen's table, so there is no such exception*/
+    AIAlert(npc);/*SetEnemy(player1)*/
+    if (count + 1 >= e->numberToSpawn) {e->delayFinished = World.pauseRelativeTime + (double)e->allSpawnedResetDelay;}/*SpawnManager.Update:73-74 holds the wave back once it is full*/
+}
 void TextureChangerToggle(u16 self) {
     u16 alt = 0, glowAlt = 0;
     if (World.instances[self].index == 538) { alt = 1118; glowAlt = 1116; } else if (World.instances[self].index == 689) { alt = 841; glowAlt = 840; } else if (World.instances[self].index == 690) { alt = 844; glowAlt = 843; } else if (World.instances[self].index == 695) { alt = 858; glowAlt = 857; } else return;
@@ -512,13 +540,43 @@ void ReduceCurrentLevelSecurity(SecurityType stype) { // Typical level: 4 CPU no
     switch(stype){case SecurityType_Camera:drop=(camScore/total)*100.0f; if(World.levCamDestroyedCnt[lev]<255)World.levCamDestroyedCnt[lev]++; break; case SecurityType_NodeSmall:drop=(nodeSmallScore/total)*100.0f; if (World.levSmNodeDestroyedCnt[lev]<255)World.levSmNodeDestroyedCnt[lev]++; break; case SecurityType_NodeLarge:drop=(nodeLargeScore/total)*100.0f; if(World.levNodeDestroyedCnt[lev]<255) World.levNodeDestroyedCnt[lev]++; break; default:return;}
     int cur=(int)World.levelSecurity[lev]-(int)drop; if (cur<0) cur=0; World.levelSecurity[lev]=(u8)cur; if (World.levCamDestroyedCnt[lev]==World.levelCameraCount[lev] && World.levSmNodeDestroyedCnt[lev]==World.levelSmallNodeCount[lev] && World.levNodeDestroyedCnt[lev]==World.levelLargeNodeCount[lev]) World.levelSecurity[lev]=0; CenterStatusPrint("%s%d%s", Sys_Text.stringTable[306], (int)World.levelSecurity[lev], Sys_Text.stringTable[307]);
 }
+/*Security-code displays.  Unity CodeScreen.Update re-assigns Const.a.screenCodes[matIndex] every 0.3s, and
+  Texture slots 768..777 are Textures/screencode0..9.png, the same range EPerms[551].texIndex (768) already sits in.
+  A code screen starts unlocked and flickers a random digit: Unity CodeScreen.Update re-picks
+  Const.a.screenCodes[Random.Range(0,10)] every 0.3s while Const.a.questData.levNSecCodeLocked is false, and
+  this level file flags the screens (codeScreen:1, Entity.codeScreen) so entity.c can put them on the
+  ScreenCodeRandom clip with texAnimRandom.  This function is the lock: Unity's Const.LockCPUScreenCode, driven by
+  TargetIO.lockCodeToScreenMaterialChanger off the CPU node's UseTargets, freezes levNSecCode and pins the material
+  to the real digit once that level's last node falls.  It is called from ObjectDeath only when
+  CPUNodesRemainOnLevel() is false, so the code stays guessable until the level is actually cleared.  It walks every
+  loaded level, not just the current one, because a display is addressed by instance index and UseTargets already
+  treats cross-level targets as ordinary.*/
+static void CodeScreensSetForLevel(u8 lev) {
+    if (lev < 1 || lev > 6) return;
+    const u8 code[6] = {World.lev1SecCode,World.lev2SecCode,World.lev3SecCode,World.lev4SecCode,World.lev5SecCode,World.lev6SecCode};
+    u8 digit = code[lev-1]; if (digit > 9) return;
+    u8 entryLevel = World.currentLevel;
+    for (u8 l = 0; l < World.numLevels; ++l) {
+        if (l != World.currentLevel) SetLevelPointers(l);
+        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* s = &World.instances[i]; if (s->index != 551 || !s->codeScreen) continue; s->texIndex = (u16)(768 + digit); s->textureAnimating = false; s->texAnimRandom = false; }
+    }
+    if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
+}
+/* Any sec_cpunode/sec_cpunode_small still standing on the level that World.currentLevel points at.  ObjectDeath
+   sets EF_DEAD_CHECKS_DONE before it calls this, so the node that just fell never counts itself.  A plain scan of
+   the current level needs no SetLevelPointers dance and no per-level node tally, and it stays correct for runtime
+   spawned and deleted nodes alike. */
+static bool CPUNodesRemainOnLevel(void) {
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { const Entity* n = &World.instances[i]; if ((n->index == 478 || n->index == 479) && !(n->entflags & EF_DEAD_CHECKS_DONE)) return true; }
+    return false;
+}
 void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
     if(self>=World.instCount||hitIdx>=World.instCount)return; Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return;/*other.gameObject == host*/ e->counter++;/*numHits++*/
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(e->recentMostActivator==PLAYER1&&(World.invP1.patchActive & PATCH_BERSERK)!=0)};
     dd.damage = GetDamageTakeAmount(&dd);
     Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; } if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }/*Railgun sphere impact*/
     /* Utils.GetMainHealthManager(hitGO) != null: the impact effect is pooled per projectile and only spawns for colliders carrying health. */
-    bool hasHealthManager=hitIdx==PLAYER1||IdxIsNPC(hit->index)||hit->health>0.0f||hit->cyberHealth>0.0f||hit->index==CYBER_DECOY_CONST; if(hasHealthManager)SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);/*the decoy has no health, but cyber NPCs emptying magazines into it should still spark*/
+    bool hasHealthManager=hitIdx==PLAYER1||IsDamageable(hit); if(hasHealthManager)SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);/*the decoy has no health, but cyber NPCs emptying magazines into it should still spark*/
     bool hostIsNPC=e->recentMostActivator<World.instCount&&IdxIsNPC(World.instances[e->recentMostActivator].index);
     if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {
         if (e->counter < e->countToTrigger) dd.damage *= 0.85f;/*per-hit falloff*/ dd.impactVelocity = dd.damage * 1.5f; if (e->counter > 0) dd.impactVelocity /= 3.0f; float dmgFinal = TakeDamage(hitIdx,dd); float tranq=-1.0f;
@@ -559,6 +617,7 @@ static void ObjectDeath(u16 self) {
     if (World.instances[self].entflags & EF_DEATH_BURST_DONE) { CreateDeathEffects(self,World.instances[self].deathBurst); DropSearchables(self); if (World.instances[self].index != 279){World.col[self]=COLTYPE_NONE;} HideSelf(self); } else { World.col[self] = COLTYPE_NONE; DropSearchables(self); CreateDeathEffects(self,World.instances[self].deathBurst); }
     flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true); World.instances[self].automapHidden = true;
     if (World.instances[self].securityThreshold > 0) { SecurityType stype = SecurityType_None; if(World.instances[self].index == 477){stype=SecurityType_Camera;}else if(World.instances[self].index == 479){stype=SecurityType_NodeSmall;} else if(World.instances[self].index == 478){stype=SecurityType_NodeLarge;} if(stype != SecurityType_None){ReduceCurrentLevelSecurity(stype);} }
+    if ((World.instances[self].index == 478 || World.instances[self].index == 479) && !CPUNodesRemainOnLevel()) CodeScreensSetForLevel(World.curLev);/*sec_cpunode/sec_cpunode_small: the last node on the level reveals its security code on the displays and stops the flicker.  Deliberately outside the securityThreshold guard above -- that branch is about the level security percentage, and a node with no threshold still has to set its code screen.*/
     u16 idx = World.instances[self].index; SpawnSecCpuNodeGibs(self); play_wav(SoundPath((idx < 527 && objectDeathSound[idx] != 0) ? objectDeathSound[idx] : 62/*crate_break*/), AppliedFXVol(1.0f), World.position[self], true); if(e->deathBurst != 0){HideSelf(self);}
 }
 
@@ -700,16 +759,19 @@ void QuestBitSet(u8 qb)    { if (qb < QB_COUNT && !QuestBitIsSet(qb)) { World.mi
 void QuestBitClear(u8 qb)  { if (qb < QB_COUNT &&  QuestBitIsSet(qb)) { World.missionBits &= ~(1u << qb); QuestBitNoteSideEffects(qb, false); } }
 void QuestBitToggle(u8 qb) { if (qb < QB_COUNT) { World.missionBits ^=  (1u << qb); QuestBitNoteSideEffects(qb, QuestBitIsSet(qb)); } }
 void Targetted(u16 activator, u16 self) {
-    Entity* e = &World.instances[self]; u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
-    if (e->index == 699) { if (!e->relayEnabled) return; if (e->relayOnceEver) { if (e->relayAlreadyDone) return; e->relayAlreadyDone = true; } u32 savedFlags = World.targetIOActivatorIoflags; World.targetIOActivatorIoflags = e->ioflags; UseTargets(activator,e->targetIdx); World.targetIOActivatorIoflags = savedFlags; return; }
+    Entity* e = &World.instances[self]; u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags; u32 aioflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : World.instances[activator].ioflagsHi;
+    if (e->index == 699) { if (!e->relayEnabled) return; if (e->relayOnceEver) { if (e->relayAlreadyDone) return; e->relayAlreadyDone = true; } if (e->delay > 0.0f) { LogicRelayDelayTarget(self, activator); return; } u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator,e->targetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; return; }
+    if (e->index == 702) { if (aioflagsHi & TARG_IOFLAGHI_SPAWNER_ACTIVATE_ALERTED) { SpawnManagerActivate(self, true); } else if (aioflagsHi & TARG_IOFLAGHI_SPAWNER_ACTIVATE) { SpawnManagerActivate(self, false); } return; }
     if (e->index == 700) {
-        if (!(aioflags & TARG_IOFLAGS_BRANCH_FLIPONLY)) { if (e->relayEnabled && e->currentTargetIdx != IO_NONE) { u32 savedFlags = World.targetIOActivatorIoflags; World.targetIOActivatorIoflags = e->ioflags; UseTargets(activator,e->currentTargetIdx); World.targetIOActivatorIoflags = savedFlags; e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx; } }
+        if (!(aioflags & TARG_IOFLAGS_BRANCH_FLIPONLY)) { if (e->relayEnabled && e->currentTargetIdx != IO_NONE) { u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator,e->currentTargetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx; } }
         if (aioflags & (TARG_IOFLAGS_BRANCH_FLIP | TARG_IOFLAGS_BRANCH_FLIPONLY)) { e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx; }   return;
     }
-    if (e->index == 710) { // info_mission: quest bit set/clear/toggle, or test-and-branch via target/targetIfFalse.  Mode comes from the activating targetIO bits, falling back to the info_mission's own line.
-        if (e->questBitID == QB_None) return; u32 modeFlags = aioflags ? aioflags : e->ioflags; if(modeFlags & TARG_IOFLAGS_MISSION_BIT_TOGGLE){QuestBitToggle(e->questBitID); DualLog("info_mission toggled bit %u -> %u\n",e->questBitID,(unsigned)QuestBitIsSet(e->questBitID)); return; }
-        if (modeFlags & TARG_IOFLAGS_MISSION_BIT_OFF){QuestBitClear(e->questBitID); return;} if(modeFlags & TARG_IOFLAGS_MISSION_BIT_ON){QuestBitSet(e->questBitID); return;} u8 tm = e->questTestMode; if (!tm && activator != WORLD && activator < World.instCount) tm = World.instances[activator].questTestMode;
-        if (tm) { bool bitOn = QuestBitIsSet(e->questBitID); bool pass = (tm == 1) ? bitOn : !bitOn;/*1==testQuestBitIsOn, 2==testQuestBitIsOff*/ UseTargets(activator, pass ? e->targetIdx : e->targetIfFalseIdx); }   return;
+    if (e->index == 710 && e->questBitID != QB_None) { // info_mission/QuestBitRelay.  EnableBits/DisableBits/ToggleBits/TestBits act on the *activating* object's bits (Unity TargetIO.Targetted reads tempUD, never the receiver's own line), so no fallback to e->ioflags here.  A fired test hands its own line down instead: Unity QuestBits.RunTargets does ud.SetBits(tio) + UseTargets(null,ud,target).  Unity keeps evaluating the remaining TargetIO actions, hence no early out.
+        if (aioflags & TARG_IOFLAGS_MISSION_BIT_ON) QuestBitSet(e->questBitID);
+        if (aioflags & TARG_IOFLAGS_MISSION_BIT_OFF) QuestBitClear(e->questBitID);
+        if (aioflags & TARG_IOFLAGS_MISSION_BIT_TOGGLE) QuestBitToggle(e->questBitID);
+        u8 tm = e->questTestMode; if (!tm && activator != WORLD && activator < World.instCount) tm = World.instances[activator].questTestMode;/*1==testQuestBitIsOn, 2==testQuestBitIsOff*/
+        if (tm) { bool bitOn = QuestBitIsSet(e->questBitID); u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator, (tm == 1) == bitOn ? e->targetIdx : e->targetIfFalseIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
     }
     if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; }/*info_message*/   if (e->index == 708) { World.gameFinished = true; return; }
     if (e->index == 707) { EmailTargetted(self); return; }/*info_email*/                                                 if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) { if(e->index == 598 || e->index == 600){TriggerTargetted(self,activator);}else if(e->index == 594){TriggerCounterTargetted(self,activator);} }
@@ -719,12 +781,13 @@ void Targetted(u16 activator, u16 self) {
     if (aioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) { World.instances[self].active=!World.instances[self].active; if (e->index == 596) GravityLiftSyncVisuals(self); } if (aioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
     if (aioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self);                                                  if (aioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e, (e->entflags & EF_LOCKED) == 0);
     if (aioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags, EF_ACTIVE, true); else if (aioflags & TARG_IOFLAGS_INST_DEACTIVATE) { if (e->camView != 255) { e->camView = 255; TextureSequenceInit(self, "Static"); flag_set(&e->entflags, EF_ACTIVE, true); }/*camera destroyed: keep its screen, switch it to Static*/ else { flag_set(&e->entflags, EF_ACTIVE, false); } } else if (aioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags, EF_ACTIVE, !(e->entflags & EF_ACTIVE));
+    if ((aioflags & TARG_IOFLAGS_ENEMY_ALERT) && IdxIsNPC(e->index)) AIAlert(self);/*TargetIO.cs:211 alerts the receiver, after the activate/deactivate block above so a dormant NPC is awake before it is alerted*/
 }
 
 extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
 INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy); extern u16 ioNameCount;
 void UseTargets(u16 activator, u16 targetIdx) {
-    if(targetIdx==IO_NONE){return;} bool wasActive=World.targetIOActive,succeeded=false; u8 entryLevel=World.currentLevel; if(!wasActive){World.targetIOActive=true; World.targetIOEntryLevel=entryLevel; World.targetIOActivatorIdx=activator; World.targetIOActivatorEntity=World.instances[activator]; World.targetIOActivatorIoflags=World.instances[activator].ioflags;} const char* targetname=(targetIdx<ioNameCount) ? ioNames[targetIdx] : "";
+    if(targetIdx==IO_NONE){return;} bool wasActive=World.targetIOActive,succeeded=false; u8 entryLevel=World.currentLevel; if(!wasActive){World.targetIOActive=true; World.targetIOEntryLevel=entryLevel; World.targetIOActivatorIdx=activator; World.targetIOActivatorEntity=World.instances[activator]; World.targetIOActivatorIoflagsHi=World.targetIOActivatorEntity.ioflagsHi; World.targetIOActivatorIoflags=World.instances[activator].ioflags;} const char* targetname=(targetIdx<ioNameCount) ? ioNames[targetIdx] : "";
     for (u8 lev = 0; lev < World.numLevels; ++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } }
     if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (!wasActive) {World.targetIOActive=false;}
 }
@@ -1152,7 +1215,7 @@ void DrawAIDebug(u16 i) {
 void ModUpdate() {
     if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==CYBER_DECOY_CONST) CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ if(constdex==614) RelayPanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
+        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==CYBER_DECOY_CONST) CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ if(constdex==614) RelayPanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(constdex == 594){TriggerCounterUpdate(i);} if(constdex == 699){LogicRelayUpdate(i);} if(constdex == 702){SpawnManagerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);} if(IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
         if(constdex==552){CyberDataFragUpdate(i);} if(constdex==554){CyberExitUpdate(i);} if(constdex==555){CyberSwitchUpdate(i);} if((constdex>=448&&constdex<=451)||(constdex>=454&&constdex<=457)){CyberItemUpdate(i);}
     }

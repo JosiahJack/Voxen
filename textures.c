@@ -159,7 +159,7 @@ static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
 };
 
 // Per-clip frame period in seconds. Shared by TextureSequenceStart and TextureSequenceUpdate so the first frame is held for the same time as every frame after it. 0.04166 is 1/24s, the film rate the model animations run at.
-static float TextureClipPeriod(u16 clip) { return (clip==5||clip==6||clip==1) ? 0.5f/*ExecScreen1, ExecScreen2, BrokenClock*/ : (clip==43) ? 0.3f/*ShodanStatic*/ : (clip==44) ? 0.2f/*Static*/ : (clip==9) ? 0.17f/*MagCartridge*/ : (clip==47||clip==48) ? 0.04166f/*ZeroGMutant, ZeroGMutantDeath*/ : 0.35f; }
+static float TextureClipPeriod(u16 clip) { return (clip==5||clip==6||clip==1) ? 0.5f/*ExecScreen1, ExecScreen2, BrokenClock*/ : (clip==41||clip==43) ? 0.3f/*ScreenCodeRandom, ShodanStatic*/ : (clip==44) ? 0.2f/*Static*/ : (clip==9) ? 0.17f/*MagCartridge*/ : (clip==47||clip==48) ? 0.04166f/*ZeroGMutant, ZeroGMutantDeath*/ : 0.35f; }
 
 void TextureSequenceInit(u16 self, char* trimmed_value) {
     Entity* e=&World.instances[self]; if(e->index == 526){/*prop_console02: combined texture handled via child screen export; allow animation*/} if(trimmed_value[0]=='\0'){e->textureAnimating=false; e->modelIndex=EDefs[e->index].modelIndex; return;} e->textureAnimating=true; e->textureGlowAnimating=false; e->texAnimLight=e->texAnimLight2=U16_MAX; e->texFrame=e->texGlowFrame=0; if(sEqual(trimmed_value,"ScreenDestroyed")){World.instances[self].texAnimClip=NUM_TEXTURE_CLIPS-1; return;}
