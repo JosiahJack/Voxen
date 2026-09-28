@@ -124,8 +124,10 @@ bool UI_Slider(u32 id, i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLab
 u8 UI_MenuButton(u32 id, i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH, i16 tX, i16 tY, const char* text, i16 pX, i16 pY){bool over=false; u8 retvalue=0u; retvalue=UI_Button(id,bX,bY,bW,bH,&over,menuItem); if(!retvalue)retvalue=(MenuEnter()&&currentMenuItem==menuItem); over=over||currentMenuItem==menuItem; RenderTextL(tX,tY,over ? T_STOPD_RED : T_RED_MENU,FONT_STOPD,1.5f,text); RenderUIImage(pX,pY,40,40,over ? 1029 : 1028);/*Menu pad*/ return retvalue;}
 bool UI_Checkbox(u32 id, i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn){RenderUIImage(x,y,16,16,910);/*Checkbox background*/ bool over=false; bool changed=(UI_Button(id,x,y+16,210,16,&over,mitem)||(MenuEnter()&&currentMenuItem==mitem)); over=over||currentMenuItem==mitem; if(currentlyOn)RenderUIImage(x+2,y+2,12,12,912);/*Checkbox check*/ RenderTextL(x+20,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[textIdx]); return changed;}
 __attribute__((noinline)) void UI_HeaderText(i16 x, const char* text) { RenderTextL(x,50,T_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderTextL(x,46,T_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderTextL(x,48,T_GREEN_MENU,FONT_STOPD,1.75f,text); }
-void PlayMenuMusic(),mp3_clear(),PlayVideoPageMusic(bool);
-__attribute__((noinline)) void MenuGoBack() {if(enteringSaveName){SaveSlotCancelTyping();return;} if(returnToPause){returnToPause=World.menuActive=false; World.paused=true; mp3_clear();} if(currentMenuPage==Mpg_Singleplayer||currentMenuPage==Mpg_Multiplayer||currentMenuPage==Mpg_Options)currentMenuPage=Mpg_FrontPage;/*News*/else if(currentMenuPage==Mpg_Load||currentMenuPage==Mpg_NewGame||currentMenuPage==Mpg_IntroVideo||currentMenuPage==Mpg_CreditsVideo)currentMenuPage=Mpg_Singleplayer;}
+void PlayMenuMusic(),mp3_clear(),PlayVideoPageMusic(bool),StopVideoPageMusic();
+__attribute__((noinline)) void MenuGoBack() {if(enteringSaveName){SaveSlotCancelTyping();return;} bool leavingClipPage=(currentMenuPage==Mpg_IntroVideo||currentMenuPage==Mpg_CreditsVideo), toPause=returnToPause; if(toPause){returnToPause=World.menuActive=false; World.paused=true; mp3_clear();} if(currentMenuPage==Mpg_Singleplayer||currentMenuPage==Mpg_Multiplayer||currentMenuPage==Mpg_Options)currentMenuPage=Mpg_FrontPage;/*News*/else if(currentMenuPage==Mpg_Load||currentMenuPage==Mpg_NewGame||currentMenuPage==Mpg_IntroVideo||currentMenuPage==Mpg_CreditsVideo)currentMenuPage=Mpg_Singleplayer;
+    /*A clip page owns the music bus, so every way out of one has to stop its audio and hand the menu its title music. The Menu key lands here straight from InputProcessing (winput.c) before RenderVideoPage ever sees the press, so the teardown cannot live in the page's own skip branch. The selection is reset as ChangeMenuPage would, so the press that left the clip cannot also act on the page underneath.*/
+    if (leavingClipPage) { currentMenuItem = currentMenuTab = 0; if (toPause) StopVideoPageMusic(); else PlayMenuMusic(); } }
 static void CreateShadowBuffers() { shadowMapSSBO=MakeSSBO(&shadowMapSSBO,5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32),NULL,GL_STATIC_DRAW); shadowMapsIndirectionID=MakeSSBO(&shadowMapsIndirectionID,6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW); shadowBuffersCreated=true; }
 // Menu video playback (Mpg_IntroVideo / Mpg_CreditsVideo).
 // The webm clips are played as a flipbook of the frames already in the texture array (Data/textures.txt): Textures/AAIntro (735 x 320x150) and Textures/AAOutro (408 x 1280x720),
@@ -152,7 +154,6 @@ static const float INTRO_VID_LEN = 117.5f, CREDITS_VID_LEN = 37.2f;
 static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.1f,59.3f,69.1f,74.5f,81.2f,89.2f,98.4f,105.0f};
 static const float outroTextAt[3] = {0.0f,7.0f,11.0f};/*CreditsScroll swaps to card 2 at 7s, card 3 at 11s, then hides all cards at 14s*/
 __attribute__((noinline)) void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; if (pg==Mpg_Save||pg==Mpg_Load) { SaveSlotCancelTyping(); RefreshSaveSlots(); }/*reparse save headers whenever the Save/Load page is assigned*/
-    /*Voxen has no video audio track, so each clip gets its own music bed: the intro theme under the intro cutscene, the credits loop under the outro and the credit pages (Unity Music.creditsMusic).*/
     if (pg==Mpg_IntroVideo) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); }
     if (pg==Mpg_CreditsVideo) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); } }
 static char vidTxtBuf[T_LOGSTR_MAX];
@@ -190,14 +191,13 @@ static void RenderVideoPage(u8 page) {
         if (op) RenderTextC(VIDTXT_CX,VIDTXT_Y,T_WHITE,FONT_NORMAL,VIDTXT_SCALE,"%s",vidTxtBuf);/*white reads against the dark clip frames; Unity's own card tint is #973B3B = T_VIDEOTEXT if you want it back*/
     }
     /*Unity MainMenuHandler leaves the intro on any key/click once it is 1.5s in; the credits clip is skipped the same way into the first credit page.*/
-    bool click = (!uiClickBlocked && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed)) || MenuEnter(), skip = false;
-    if (click && !MenuEnter()) { uiClickBlocked = uiClickLock = true; }/*UI_CLICK_CONSUMED by the clip skip*/
-    if (isIntro) { bool anyInput=click||Sys_Input.keyStates[KEY_ESCAPE].pressed; for (int k=0;!anyInput&&k<MAX_KEYS;++k) if (Sys_Input.keyStates[k].pressed) anyInput=true; skip = elapsed>1.5 && anyInput; }
-    else skip = click || Sys_Input.keyStates[KEY_ESCAPE].pressed;
+    bool mouseClick = !uiClickBlocked && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed), click = mouseClick || MenuEnter(), anyKey = Sys_Input.keyStates[KEY_ESCAPE].pressed; for (int k=0;!anyKey&&k<MAX_KEYS;++k) if (Sys_Input.keyStates[k].pressed) anyKey=true;
+    if (click) { uiClickBlocked = uiClickLock = true; }/*UI_CLICK_CONSUMED: latch every skip input, Enter included, so the press that leaves the clip cannot also land on the menu underneath*/
+    bool skip = isIntro ? (elapsed>1.5 && (click||anyKey)) : (click || Sys_Input.keyStates[KEY_ESCAPE].pressed);
     if (skip || elapsed >= vidLen) {
-        /*Leaving the clip stops its audio: PlayMenuMusic clears the bus and hands the menu its title music back.*/
-        if (isIntro) { PlayMenuMusic(); MenuGoBack(); }/*intro over: back to the Singleplayer page*/
-        else { World.creditsActive=true; World.creditsPageIndex=0; PlayMenuMusic(); MenuGoBack();/*outro skipped or over: clip audio stops, the credit pages take over*/ }
+        /*MenuGoBack halts the clip audio and hands the menu its title music, so every exit path out of a clip page sounds the same.*/
+        if (isIntro) MenuGoBack();/*intro over: back to the Singleplayer page*/
+        else { World.creditsActive=true; World.creditsPageIndex=0; /*outro skipped or over: the credit pages take over*/ }
     }
 }
 static void MenuBackButton(i16 bgX, i16 bgY, i16 tX, i16 tY, i8 item) { RenderUIImage(bgX,bgY,84,36,1252);/*Back Button background*/ bool over=false; if (UI_Button(UI_ID_MENU_BACK,bgX,bgY+34,84,32,&over,item) || (MenuEnter() && currentMenuItem==item && !rebindCaptureActive)) MenuGoBack(); over=over||currentMenuItem==item; RenderTextL(tX,tY,over ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]); }

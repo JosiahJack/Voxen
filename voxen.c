@@ -839,11 +839,12 @@ void InitalizeEnvironment() {
     glUseProgram(shadowmapsSP); glUniform1ui(9,SHADOW_MAP_SIZE); glUseProgram(shadowmapsClearSP); glUniform1ui(0,SHADOW_MAP_SIZE); glUseProgram(chunkSP); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE); // One time set uniforms
     for (int f=0;f<5;++f) glGenQueries(5,gpuQ[f]);
     RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); RenderLoading("Loading models..."); DebugRAM("before LoadModels"); LoadModels(); DebugRAM("after LoadModels");
-    { FHandle indone=OS_OpenReadonly("introdone.dat"); if (indone!=(FHandle)-1) OS_Close(indone);/*sentinel exists: intro already played, skip*/ else { indone=OS_OpenWriteonly("introdone.dat"); if (indone!=(FHandle)-1) OS_Close(indone);/*create sentinel, then play intro*/ ChangeMenuPage(Mpg_IntroVideo); } }/*ChangeMenuPage so the first-run cutscene also gets its clip audio + start time*/ World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
+    bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat"); if (playIntroAtBoot) { FHandle indone=OS_OpenWriteonly("./Data/introdone.dat"); if (indone!=(FHandle)-1) OS_Close(indone);/*sentinel absent: first run, so stamp it now and play the intro once it can be shown*/ } World.absoluteTime = World.current_time = get_time(); World.pauseRelativeTime = World.last_physics_time = 0.0;
     AutomapInitGL();
     BiomonitorInitGL(); BioMonitorInit();
-    NewGame();
-    if (currentMenuPage != Mpg_IntroVideo) { currentMenuPage = Mpg_FrontPage; PlayMenuMusic(); }/*first run plays the intro cutscene (Citadel CheckAndPlayIntro); otherwise the title music fronts the menu*/
+    NewGame(); currentMenuPage = Mpg_FrontPage;
+    if (playIntroAtBoot) ChangeMenuPage(Mpg_IntroVideo);/*must come after NewGame (it resets the page to Mpg_FrontPage) and go through ChangeMenuPage so the cutscene also gets its clip audio + start time*/
+    else { PlayMenuMusic(); }/*the title music fronts the menu*/
     World.menuActive = true;
     OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free"); DebugRAMPeak(); DebugRAMBreakdown();
 }
