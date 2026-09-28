@@ -1,6 +1,11 @@
 // citadel.c - Game logic.
 #include "common.h"
-__attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; static const u16 patchMsg[7] = {340,341,342,343,344,345,346}; /*Patch names in the +326 item-name table (Citadel: useableItemIndex+326, useableItemIndex=14+slot); Citadel composes "<name>" + stringTable[589]*/ void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*),GrenadeActivate(u16); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
+__attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; static const u16 patchMsg[7] = {340,341,342,343,344,345,346}; /*Patch names in the +326 item-name table (Citadel: useableItemIndex+326, useableItemIndex=14+slot); Citadel composes "<name>" + stringTable[589]*/
+void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*),GrenadeActivate(u16); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
+/*Cyber decoy lifecycle + AI plumbing.  CyberDecoyRetargetAll lives in ai.c: it is the single choke point where a
+  cyber NPC's enemy pointer is forced from the player onto the live decoy instance (or handed back to the player
+  once the decoy expires), so no LOS check has to remember to consult the decoy itself.*/
+void CyberDecoySetTarget(u16); void CyberDecoyRetargetAll(void); void CyberDecoySpawned(u16); void CyberDecoyExpired(u16); bool CyberDecoyIsLive(u16*); u16 CyberDecoyTarget(void);
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
     float px=World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f, py=World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f;
     float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight;
@@ -80,7 +85,20 @@ static inline void   PatchCycle(int step){int cur=World.invP1.patchCur, next=cur
 void RemoveGrenade(int i) { if(World.invP1.grenAmmo[i] > 0){World.invP1.grenAmmo[i]--;} if(!World.invP1.grenAmmo[i]){GrenadeCycle(-1);} }
 static i8 GetExistingCyberItemIndex() { if (World.invP1.softVersions[SW_TURBO]  > 0) {return 0;} if (World.invP1.softVersions[SW_DECOY]  > 0) {return 1;} if (World.invP1.softVersions[SW_RECALL] > 0) {return 2;} return -1; }
 static void UseTurbo() {if(World.invP1.softVersions[SW_TURBO]<=0){World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); return;} if(--World.invP1.softVersions[SW_TURBO]==0)World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); if(World.invP1.turboFinished > World.pauseRelativeTime){World.invP1.turboFinished+=World.invP1.turboCyberTime;}else{World.invP1.turboFinished=World.invP1.turboCyberTime+World.pauseRelativeTime;}}
-static void UseDecoy() {if (World.decoyActive) { CenterStatusPrint("%s",Sys_Text.stringTable[537]); return; } if (World.invP1.softVersions[SW_DECOY] <= 0) { World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); return; } if (--World.invP1.softVersions[SW_DECOY] == 0) World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); u16 decoyIdx = SpawnDynamicObject(417,true);/*417 = CyberDecoy constIndex*/ if(decoyIdx != U16_MAX){World.position[decoyIdx]=World.position[PLAYER1];}}
+/* Cyber decoy.  Unity (Inventory.SpawnDecoy) instantiates prop_cyber_decoy (constIndex 553) at the player and
+   DelayedSpawn (delay 15, destroyOnExpire) tears it down after 15s; the prefab has no HealthManager, so nothing else
+   can remove it.  Voxen was spawning 417 instead -- item_cyber_decoy, a usable-object pickup -- which dropped a card on
+   the floor, and World.decoyActive was then left claiming a decoy existed for the rest of the level.
+   Collider radius 0.48 (prefabs SphereCollider 0.96 under the root's 0.5 local scale) comes from EDefs[553], and the
+   decoy keeps EF_RIGIDBODY off because the prefab has no Rigidbody -- it holds position instead of falling.
+   Reusing the existing DelayedSpawnUpdate arming (active + timerFinished + doSelfAfterList + despawnInstead) is the
+   same 15s teardown Unity's DelayedSpawn performs, so the expiry goes through CyberDecoyExpired. */
+#define CYBER_DECOY_CONST 553u
+#define CYBER_DECOY_LIFETIME 15.0
+static void UseDecoy() {if (World.decoyActive) { CenterStatusPrint("%s",Sys_Text.stringTable[537]); return; } if (World.invP1.softVersions[SW_DECOY] <= 0) { World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); return; } if (--World.invP1.softVersions[SW_DECOY] == 0) World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); u16 decoyIdx = SpawnDynamicObject(CYBER_DECOY_CONST,true);
+    if(decoyIdx != U16_MAX){World.position[decoyIdx]=World.position[PLAYER1]; World.velocity[decoyIdx]=(V3){0,0,0}; flag_set(&World.instances[decoyIdx].entflags,EF_RIGIDBODY,false);
+        World.instances[decoyIdx].active = true; World.instances[decoyIdx].doSelfAfterList = true; World.instances[decoyIdx].despawnInstead = true; World.instances[decoyIdx].timerFinished = World.pauseRelativeTime + CYBER_DECOY_LIFETIME;
+        World.decoyActive=true; CyberDecoySpawned(decoyIdx);}}
 static void UseRecall() { if (World.invP1.softVersions[SW_RECALL] <= 0) {return;} if (--World.invP1.softVersions[SW_RECALL] == 0) {World.invP1.hasSoft &= (u8)~(1u << SW_RECALL);} World.position[PLAYER1] = World.cyberspaceRecallPoint; }
 void UseCyberspaceItem() {
     if (World.invP1.cyberItemIndex <= 0) { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); if (World.invP1.cyberItemIndex < 0) { CenterStatusPrint("%s",Sys_Text.stringTable[473]); return; } }
@@ -184,6 +202,16 @@ void SearchFXEnable(int side) {
 void SearchFXResetEnable(u16 self) { Entity* e = &World.instances[self]; if (e->itemLifeTime <= 0.0f) {e->itemLifeTime = 3.0f;} e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
 void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
+void CyberDecoySpawned(u16 decoy) { World.decoyInstance = decoy; CyberDecoySetTarget(decoy);/*cyber NPCs already engaged with the player switch to the decoy the moment it exists (AIController.cs:1630,1708)*/ }
+void CyberDecoyExpired(u16 decoy) { if (decoy >= World.instCount || World.instances[decoy].index != CYBER_DECOY_CONST) return; if (World.decoyActive) { World.decoyActive = false; World.decoyInstance = U16_MAX; CyberDecoySetTarget(U16_MAX); } }
+/*Whether the recorded decoy instance is still the live one.  World.decoyActive alone is not enough: the instance
+  table is refilled on every level load and DeleteInstance compacts it, so a stale index can point at a wall.  This
+  validates the cached World.decoyInstance and refreshes it if the decoy moved slots, so the AI hot paths can compare
+  an enemy index against World.decoyInstance instead of rescanning the table.*/
+bool CyberDecoyIsLive(u16* out) { if (!World.decoyActive) { World.decoyInstance = U16_MAX; return false; } u16 d = World.decoyInstance;
+    if (d >= INSTS_1ST_IDX && d < World.instCount && World.instances[d].index == CYBER_DECOY_CONST) { if (out) *out = d; return true; }
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) if (World.instances[i].index == CYBER_DECOY_CONST) { World.decoyInstance = i; if (out) *out = i; return true; }
+    World.decoyInstance = U16_MAX; return false; }
 void DelayedSpawnUpdate(u16 s) { Entity* e=&World.instances[s]; if(!e->active||e->timerFinished<=0.0||e->timerFinished>World.pauseRelativeTime){return;} e->active=false; if(!e->doSelfAfterList){return;} if(e->despawnInstead){DeleteInstance(s);/*despawn means gone, not deactivated*/}else flag_set(&e->entflags,EF_ACTIVE,true);}
 void FuncWallShiftChildren(u16 self, V3 delta) { if (vabs(delta.x)+vabs(delta.y)+vabs(delta.z) < 0.00001f) {return;} for (u16 i=PLAYER1;i<World.instCount;++i) { if (fwParentOf[i]==self) { World.position[i]=V3_AplusB(World.position[i],delta); } } }
 void FuncWallInitAfterLoad(u16 self) {
@@ -265,11 +293,21 @@ void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->
 void ButtonSwitchUseTargets(u16 self) { Entity* e=&World.instances[self]; UseTargets(self,e->targetIdx); e->active=!e->active; if(e->index == 689 || e->index == 690 || e->index == 695) { TextureChangerToggle(self); if(e->index == 689 && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} } }
 static __attribute__((noinline)) void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; play_wav(sounds[468], AppliedFXVol(0.85f), (V3){0,0,0}, false);/*blocked_by_security*/ MFD_OpenData(World.Sys_UI.lastDataSideRH,8);/*MFDManager.BlockedBySecurity() opens tab 4 on the last-used data side and raises the blocked view there*/ CenterStatusPrint("%s",Sys_Text.stringTable[25]); }
 static __attribute__((noinline)) void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,EF_LOCKED,locked); }
+/*Button-switch click SFX.  The success sound is a prefab constant, not level data: no func_switch* prefab serializes
+  SFXIndex and no Data/level*.txt line carries one, so every switch in the game fell through to e->SFXIndex == 0 and
+  played sounds[0] on every press.  Values read straight off the prefab SoundOnUse components
+  (Assets/Resources/Prefabs/func_switch{1,2,3,4,5,7,8}.prefab -> m_Sound.clip guid -> Const.a.sounds).  func_switch6
+  (693) is unused by any level.  Same table shape as doorSFXIndex in LoadLevelData, one row per constIndex. */
+typedef struct { u16 constIndex, sfxIndex; } ButtonSwitchSFXDef;
+static const ButtonSwitchSFXDef buttonSwitchSFX[] = {{688,44},{689,40},{690,44},{691,41},{692,41},{694,45},{695,40}};
+static void ButtonSwitchPlaySFX(u16 self) {
+    const Entity* e=&World.instances[self]; for (size_t i=0;i<sizeof(buttonSwitchSFX)/sizeof(buttonSwitchSFX[0]);++i) if (buttonSwitchSFX[i].constIndex==e->index) { if (buttonSwitchSFX[i].sfxIndex < SOUNDS_COUNT) play_wav(sounds[buttonSwitchSFX[i].sfxIndex], AppliedFXVol(1.0f), World.position[self], true); return; }
+}
 void ButtonSwitchUse(u16 self, u16 activator) {
     Entity* e = &World.instances[self]; if(Cheats.superoverride || World.diffMis == 0){EntitySetLocked(e,false);} else if(GetCurrentLevelSecurity() > UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[self]); return;}
-    if ((e->entflags & EF_LOCKED) != 0) { CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex], AppliedFXVol(1.0f), World.position[self], true); return; }
-    if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true);
-    CenterStatusPrint("%s",Sys_Text.stringTable[e->messageIndex]); if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World.pauseRelativeTime + e->delay; } else ButtonSwitchUseTargets(self);
+    if ((e->entflags & EF_LOCKED) != 0) { if (e->lockedMessageLingdex >= 0 && e->lockedMessageLingdex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->lockedMessageLingdex]); if (e->SFXLockedIndex >= 0 && e->SFXLockedIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXLockedIndex], AppliedFXVol(1.0f), World.position[self], true); return; }
+    ButtonSwitchPlaySFX(self);
+    if (e->messageIndex >= 0 && e->messageIndex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageIndex]); if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World.pauseRelativeTime + e->delay; } else ButtonSwitchUseTargets(self);
 }
 
 void ButtonSwitchUpdate(u16 self) { double t=World.pauseRelativeTime; Entity* e=&World.instances[self]; if (e->delayFinished > 0.0 && e->delayFinished < t){e->delayFinished=0.0; ButtonSwitchUseTargets(self);} if (e->index == 689 && e->active && e->tickFinished < t) { TextureChangerToggle(self); e->tickFinished=t+1.5f; } }
@@ -480,7 +518,7 @@ void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNorm
     dd.damage = GetDamageTakeAmount(&dd);
     Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; } if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }/*Railgun sphere impact*/
     /* Utils.GetMainHealthManager(hitGO) != null: the impact effect is pooled per projectile and only spawns for colliders carrying health. */
-    bool hasHealthManager=hitIdx==PLAYER1||IdxIsNPC(hit->index)||hit->health>0.0f||hit->cyberHealth>0.0f; if(hasHealthManager)SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);
+    bool hasHealthManager=hitIdx==PLAYER1||IdxIsNPC(hit->index)||hit->health>0.0f||hit->cyberHealth>0.0f||hit->index==CYBER_DECOY_CONST; if(hasHealthManager)SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);/*the decoy has no health, but cyber NPCs emptying magazines into it should still spark*/
     bool hostIsNPC=e->recentMostActivator<World.instCount&&IdxIsNPC(World.instances[e->recentMostActivator].index);
     if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {
         if (e->counter < e->countToTrigger) dd.damage *= 0.85f;/*per-hit falloff*/ dd.impactVelocity = dd.damage * 1.5f; if (e->counter > 0) dd.impactVelocity /= 3.0f; float dmgFinal = TakeDamage(hitIdx,dd); float tranq=-1.0f;
@@ -540,6 +578,7 @@ static void Death(u16 self,bool energyVaporized) {
 
 float TakeDamage(u16 self,DamageData dd) {
     if (Cheats.god && self == PLAYER1) return 0.0f;
+    if (self < World.instCount && World.instances[self].index == CYBER_DECOY_CONST) return 0.0f;/*the decoy projection absorbs nothing: its prefab carries no HealthManager, and without this the health-0 fallthrough below would run Death() on the very first cyber shot and delete the decoy*/
     bool isCyber = IsCyberEntity(self); float* hp = isCyber ? &World.instances[self].cyberHealth : &World.instances[self].health; u16 selfIdx = World.instances[self].index; bool isNPC = IdxIsNPC(selfIdx), isPlayer = (self == PLAYER1); bool isGrenade = IsGrenade(selfIdx);
     if (isCyber) { if (dd.attackType == Att_Drill && isNPC){return 0.0f;} if (dd.attackType != Att_Drill && World.instances[self].iceActive){return 0.0f;} } if (*hp <= 0.0f) { bool allowPost = (isNPC || World.instances[self].iceActive || isPlayer || isGrenade || selfIdx == 279/*chunk_screen*/ || selfIdx == 477/*sec_camera*/); if (!allowPost) return 0.0f; } float take = dd.damage;
     if (isPlayer) {
@@ -691,11 +730,94 @@ void UseTargets(u16 activator, u16 targetIdx) {
 }
 // Frob/Use
 #define FROB_DISTANCE 4.9f
-void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 code);
+void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 code),MFD_OpenPaperLog(int,V3);
+/*us_paperlog (603).  Unity PaperLog.Use (PaperLog.cs) is four lines: center-tab to the log view, hand logIndex to
+  SendPaperLogToDataTab, force inventory mode.  Voxen had no path for it at all -- 603 matched none of the frobbable
+  classes, so a paper log printed its name and did nothing -- even though all eight level-placed copies carry a
+  logIndex.*/
+static void PaperLogUse(u16 self) { MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
 static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
 static bool IsElevatorPanel(u16 index) { return index>=604&&index<=607; }
-static bool IsFrobUsableSpecial(u16 index) { return index==574||index==546||index==608||index==614||index==602||IsElevatorPanel(index)||IsPuzzleGridPanel(index)||IsPuzzleWirePanel(index); }/*546 prop_charge_station; 614 us_relaypanel, 602 us_isotopepanel: InteractablePanel*/
+static bool IsFrobUsableSpecial(u16 index) { return index==574||index==546||index==608||index==614||index==602||index==603/*us_paperlog*/||IsElevatorPanel(index)||IsPuzzleGridPanel(index)||IsPuzzleWirePanel(index); }/*546 prop_charge_station; 614 us_relaypanel, 602 us_isotopepanel: InteractablePanel; 603 us_paperlog: PaperLog*/
+/*---- Wire puzzle data (Unity PuzzleWirePuzzle.cs) ----------------------------------------------------------------------------
+  Split by provenance, because the two halves come from different places:
+    per instance, from the level line  currentPositionsLeft[i] / currentPositionsRight[i] -> Entity.wireCurL/R
+    per prefab, static below          solutionPositions*, wiresOn, rowsActive, wireColors
+  Voxen used to invent both halves: the targets were left at whatever the previous panel left behind (a stale solved
+  panel handed the next one the previous answer), and the current positions were ignored entirely, so every wire
+  puzzle opened with the column arrays all -1.  Values below are read straight out of
+  Assets/Resources/Prefabs/us_puz_panel_*_wire.prefab (741 blue, 742 brown, 743 gray, 744 red, 745 teal).
+  Unity's YAML packs these as fixed-width fields, so the extraction is 8 chars per int and 2 per bool/HUDColor:
+  currentPositionsLeft: 02000000 00000000 04000000 ... -> {2,0,4,...}; wiresOn: 01010100000000 -> {T,T,T,F,...}.
+  wireColors are HUDColor (Enumerations.cs:73 White,Red,Orange,Yellow,Green,Blue,Purple,Gray) and the first three live
+  wire slots of 741/743/744 are Blue(5) and 742's third is Purple(6), so this needs real blue and purple text colors --
+  T_BLUE/T_PURPLE were appended to textColors[] from PuzzleWire's serialized actualColorBlue/actualColorPurple.*/
+/* hudColorToText / hudColorToRGB now live in common.h: the wire puzzle needs the HUDColor itself (for the line tint)
+   and its text-colour equivalent (for the Genius hint glyph) on both sides of the citadel.c / ui.c split. */
+typedef struct { u16 constIndex; i8 tgtL[7],tgtR[7]; bool wireOn[7]; u8 wireColor[7]; u8 rowsActive[7]; } WirePuzzleDef;
+static const WirePuzzleDef wirePuzzleDefs[] = {
+    /*741 blue  */{741,{1,2,5,-1,-1,-1,-1},{1,3,4,-1,-1,-1,-1},{true,true,true,false,false,false,false},{0,5,4,0,0,0,0},{1,1,1,1,1,1,0}},
+    /*742 brown */{742,{1,3,2,-1,-1,-1,-1},{2,4,3,-1,-1,-1,-1},{true,true,true,false,false,false,false},{1,5,6,2,2,2,2},{1,1,1,1,1,1,0}},
+    /*743 gray  */{743,{1,2,5,-1,-1,-1,-1},{1,3,4,-1,-1,-1,-1},{true,true,true,false,false,false,false},{0,5,4,0,0,0,0},{1,1,1,1,1,1,0}},
+    /*744 red   */{744,{2,1,-1,-1,-1,-1,-1},{2,1,-1,-1,-1,-1,-1},{true,true,false,false,false,false,false},{0,5,0,0,0,0,0},{1,1,1,1,0,0,0}},
+    /*745 teal  */{745,{0,1,2,3,-1,-1,-1},{2,4,5,0,-1,-1,-1},{true,true,true,true,false,false,false},{4,4,4,4,4,4,4},{1,1,1,1,1,1,0}},
+};
+static const WirePuzzleDef* WirePuzzleDefFor(u16 constIndex) { for (u32 i=0;i<sizeof(wirePuzzleDefs)/sizeof(wirePuzzleDefs[0]);++i) if (wirePuzzleDefs[i].constIndex==constIndex) return &wirePuzzleDefs[i]; return NULL; }
+/*Unity indexes currentPositions by wire ("wire 2 sits on row 3"); pw_curL/pw_curR are indexed by column ("row 3 holds
+  wire 2"), which is what PWFindCol and the swap-on-click in ui.c expect.  Inverting the permutation is the whole
+  conversion; the target arrays stay wire-indexed, matching PWEval.*/
+static void WireLoadInstance(u16 self, const WirePuzzleDef* def) {
+    Entity* e=&World.instances[self];
+    for (u8 c=0;c<7;++c) { World.Sys_UI.pw_curL[c]=-1; World.Sys_UI.pw_curR[c]=-1; }
+    for (u8 w=0;w<7;++w) { int l=(int)e->wireCurL[w], r=(int)e->wireCurR[w]; if (w<7 && l>=0 && l<7) World.Sys_UI.pw_curL[l]=(i8)w; if (w<7 && r>=0 && r<7) World.Sys_UI.pw_curR[r]=(i8)w; }/*All seven slots, not just the first three: 745 teal runs four wires and level5's teal instance saves currentPositionsRight[3..5], so a w<3 guard dropped its fourth wire and left that panel unsolvable.*/
+    for (u8 w=0;w<7;++w) { World.Sys_UI.pw_tgtL[w]=def->tgtL[w]; World.Sys_UI.pw_tgtR[w]=def->tgtR[w]; World.Sys_UI.pw_wireOn[w]=def->wireOn[w]; World.Sys_UI.pw_rowActive[w]=def->rowsActive[w]!=0; World.Sys_UI.pw_wireColor[w]=def->wireColor[w];/*raw HUDColor, as PuzzleWire.wireColors holds it*/ }
+}
+/*---- Grid puzzle cell layouts (Unity PuzzleGridPuzzle.cellType / gridType) --------------------------------
+  PuzzleGridPuzzle.Save writes only puzzleSolved, grid[0..34], fired and locked.  cellType, gridType, width,
+  height, sourceIndex and outputIndex are scene-authoring overrides on the prefab instances in
+  Assets/Scenes/CitadelScene.unity and are absent from Data/level*.txt, so they cannot be parsed -- but the saved
+  grid[] bits *are* per instance and unique enough to identify which panel this is, so the table below is keyed by
+  the 35-bit saved board.  All 11 placed panels are covered; width/height/source/output are 7/5/14/20 on every one
+  of them, so only cellType and gridType need entries.
+  Note the layout is NOT a single shared board and NOT all-King: levRmedbeddoor and levRrobotspawncontrol are
+  Rook(4), lev4hiddenclosetforcedoor is Knight(3), and lev1wall1relay plus both lev7antennafield1 are Bishop(5).
+  Voxen was flipping every cell as a Pawn outside Easy and laying every cell down as Standard, which turned all
+  eleven into the same easy puzzle.
+  Ambiguity: lev5flightbay3iris (first placement) and lev5flightbay23bulkhead have byte-identical saved grid[], so
+  the two Voxen instances that share that board cannot be told apart; both get the iris cellType, so lev5flightbay23
+  bulkhead's cells 7 and 21 come up Bypass and Standard here instead of Bypass and And.  The other 33 cells and all
+  ten other panels are exact.  First match wins, so iris has to stay first in the table.*/
+typedef struct { const char* initGrid; u8 gridType; u8 cellType[35]; } GridPuzzleDef;
+/*gridType is King for every puzzle in Citadel.  It is a straight pass-through -- PuzzleGridPuzzle.gridType (serialized)
+  -> MFDManager.SendGridPuzzleToDataTab -> PuzzleGrid.SendGrid -> gridType, and its only use is picking which chess piece
+  is drawn on a Standard cell (PuzzleGrid.cs:117 click, :141 hover) -- and every value in the project is 0: all five
+  Resources/Prefabs/us_puz_panel_*_grid.prefab files plus both scene instances (CitadelScene.unity:877857, :1324931)
+  serialize gridType: 0, and no content code ever writes another.  Voxen's PuzzleGridType enum already matches Unity's
+  "King,Queen,Knight,Rook,Bishop,Pawn" ordinal order exactly, so the King rows below are correct as written.*/
+static const GridPuzzleDef gridPuzzleDefs[] = {
+/* lev5flightbay3iris        */{"10000001000011111110010000110000000",0,{0,0,0,0,0,0,0,3,2,1,1,1,3,1,3,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0}},
+    /* levRmedbeddoor            */{"00000101110101001100111101010000010",0,{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,3,1,1,0,3,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
+    /* lev4hiddenclosetforcedoor */{"00010000010100110001000101000001000",0,{0,1,0,1,0,0,0,1,1,1,1,1,1,0,1,1,1,2,1,1,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0}},
+    /* lev2doorarmory            */{"10000000100000110011100100000000000",0,{0,0,0,0,0,0,0,0,1,2,1,1,0,0,3,1,1,1,1,3,3,0,1,1,1,1,0,0,0,0,0,0,0,0,0}},
+    /* lev5flightbay3iris (2nd)  */{"00000000000110111100100001100000000",0,{0,0,0,0,0,0,0,1,2,1,1,3,1,0,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0,0}},
+    /* levRrobotspawncontrol     */{"00000101110101000100011101010000111",0,{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,2,1,1,0,2,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
+    /* lev1wall1relay            */{"00100001010101101110110000000010111",0,{1,1,1,0,1,1,1,1,0,1,0,1,0,1,1,0,1,1,1,0,1,1,0,1,0,1,0,1,1,1,1,0,1,1,1}},
+    /* lev7antennafield1         */{"00000000000001000000000000000000000",0,{1,1,1,0,3,1,2,0,0,1,0,3,0,1,1,1,1,0,1,3,3,1,0,0,0,1,1,1,1,1,1,1,1,1,1}},
+    /* lev7antennafield1 (2nd)   */{"00000000000000110001100000000000000",0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,1,1,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+    /* lev5flightbay23bulkhead   */{"10000001000011111110010000110000000",0,{0,0,0,0,0,0,0,1,2,1,1,1,3,1,3,1,1,1,1,0,2,1,1,1,1,1,3,1,0,0,0,0,0,0,0}},
+    /* lev1xdoor1                */{"00000001000011111110110000110000000",0,{0,0,0,0,0,0,0,3,2,1,1,1,3,1,3,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0}},
+};
+static const GridPuzzleDef* GridPuzzleDefFor(const bool* cells) { char key[36]; for (u8 c=0;c<35;++c) key[c]=cells[c]?'1':'0'; key[35]=0;
+    for (u32 i=0;i<sizeof(gridPuzzleDefs)/sizeof(gridPuzzleDefs[0]);++i) if (sCompUpToLen(gridPuzzleDefs[i].initGrid,key,35)==0) return &gridPuzzleDefs[i];/*35 bytes of board, both keys are NUL-terminated at 35*/ return NULL; }
+static void GridLoadInstance(u16 self) {
+    Entity* e=&World.instances[self];
+    const GridPuzzleDef* def=GridPuzzleDefFor(e->gridCells);
+    World.Sys_UI.pg_width=7; World.Sys_UI.pg_height=5; World.Sys_UI.pg_source=14; World.Sys_UI.pg_output=20;
+    if (def) { World.Sys_UI.pg_gridType=(PuzzleGridType)def->gridType; mcpy(World.Sys_UI.pg_type,def->cellType,sizeof(def->cellType)); }
+    else { World.Sys_UI.pg_gridType=PuzzleGridType_King; mset(World.Sys_UI.pg_type,PuzzleCellType_Standard,sizeof(World.Sys_UI.pg_type)); }
+    mcpy(World.Sys_UI.pg_cell,e->gridCells,sizeof(e->gridCells));/*Unity passes the component's own grid[] straight into SendGrid; PGEvalPuzzle forces the And cells true on the first pass, which is why the table only carries cellType.*/
+    World.Sys_UI.pg_solved=e->puzzleSolved; World.Sys_UI.pg_fired=e->puzzleFired;/*both are per-component in Unity, so they come off the entity rather than being reset on open*/ }
 static void PuzzlePanelUse(u16 i) {
     Entity* e=&World.instances[i];
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return;}
@@ -704,12 +826,16 @@ static void PuzzlePanelUse(u16 i) {
     if(IsPuzzleGridPanel(e->index)){
         bool initialize=World.Sys_UI.tetheredPGP!=i||World.Sys_UI.pg_width==0||World.Sys_UI.pg_height==0;
         World.Sys_UI.tetheredPGP=i;
-        if(initialize){World.Sys_UI.pg_width=7;World.Sys_UI.pg_height=5;World.Sys_UI.pg_source=14;World.Sys_UI.pg_output=20;World.Sys_UI.pg_gridType=(World.diffPuz==1)?PuzzleGridType_King:PuzzleGridType_Pawn;mset(World.Sys_UI.pg_type,0,sizeof(World.Sys_UI.pg_type));mset(World.Sys_UI.pg_cell,0,sizeof(World.Sys_UI.pg_cell));for(u8 c=0;c<35;++c)World.Sys_UI.pg_type[c]=PuzzleCellType_Standard;World.Sys_UI.pg_solved=false;}
+        if(initialize){GridLoadInstance(i);}
         MFD_OpenData(false,3);
     }else{
+        const WirePuzzleDef* def=WirePuzzleDefFor(e->index);
         World.Sys_UI.tetheredPWP=i; World.Sys_UI.pw_selectedWire=-1; World.Sys_UI.pw_solved=false;
-        /*True wire colors (Unity PuzzleWire rememberColors); on hard these are hidden (all yellow) until Genius reveals them.*/
-        { static const u8 trueColors[7]={T_RED,T_ORANGE,T_YELLOW,T_GREEN,T_WHITE,T_DARK_YELLOW,T_GREEN_MENU}; for (u8 w=0;w<7;++w) World.Sys_UI.pw_wireColor[w]=trueColors[w]; }
+        if(def) WireLoadInstance(i,def);
+        else { for(u8 c=0;c<7;++c){World.Sys_UI.pw_curL[c]=(i8)c;World.Sys_UI.pw_curR[c]=(i8)c;World.Sys_UI.pw_tgtL[c]=(i8)c;World.Sys_UI.pw_tgtR[c]=(i8)c;World.Sys_UI.pw_wireOn[c]=true;World.Sys_UI.pw_rowActive[c]=true;World.Sys_UI.pw_wireColor[c]=HUDC_YELLOW;} }
+        /*Unity sends rememberColors on every SendWirePuzzleData; on hard the display colors collapse to all-Yellow
+          until Genius reveals them, which is why the colors are stored true here and the display rule is applied at
+          the draw site in ui.c rather than baked into pw_wireColor.*/
         MFD_OpenData(false,4);
     }
     CenterStatusPrint("%s",Sys_Text.stringTable[190]);
@@ -993,7 +1119,7 @@ static int UseNameTableIndex(int index) {
 void UseEntity(u16 i) {
     Entity* ent = &World.instances[i];
     if (IdxIsSearchable(ent->index) || (World.layer[i]&L_CorpseSearchable) || (IdxIsGib(ent->index) && (World.layer[i]&L_Corpse))) { SearchObject(i); } else if (IdxIsDoor(ent->index)) DoorUse(i,PLAYER1); else if (IdxIsNPC(ent->index)) CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[World.instances[i].index - 419].name); else if (IdxIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
-    else if(ent->index==574) HealingBedUse(i,PLAYER1); else if(ent->index==546) ChargeStationUse(i,PLAYER1); else if(ent->index==614||ent->index==602) RelayPanelUse(i); else if(IsElevatorPanel(ent->index)) ElevatorPanelUse(i); else if(ent->index==608) KeycodePanelUse(i); else if(IsPuzzleGridPanel(ent->index)||IsPuzzleWirePanel(ent->index)) PuzzlePanelUse(i);
+    else if(ent->index==574) HealingBedUse(i,PLAYER1); else if(ent->index==546) ChargeStationUse(i,PLAYER1); else if(ent->index==614||ent->index==602) RelayPanelUse(i); else if(IsElevatorPanel(ent->index)) ElevatorPanelUse(i); else if(ent->index==608) KeycodePanelUse(i); else if(IsPuzzleGridPanel(ent->index)||IsPuzzleWirePanel(ent->index)) PuzzlePanelUse(i); else if(ent->index==603) PaperLogUse(i);
     else if (IdxIsGeometry(ent->index)) { int t = UseNameTableIndex(ent->index); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t >= 0 ? Sys_Text.stringTable[t] : ""); }
     else if (IdxIsUsableObject(ent->index)) {
         World.invP1.holdingObject = true; World.invP1.heldObjectIndex = ent->index; World.invP1.heldObjectCustIdx = ent->customIndex; World.invP1.heldAmmo = ent->ammo; World.invP1.heldAmmo2 = ent->ammo2; World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
@@ -1026,7 +1152,7 @@ void DrawAIDebug(u16 i) {
 void ModUpdate() {
     if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==614) RelayPanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
+        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==CYBER_DECOY_CONST) CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ if(constdex==614) RelayPanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);} if(IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
         if(constdex==552){CyberDataFragUpdate(i);} if(constdex==554){CyberExitUpdate(i);} if(constdex==555){CyberSwitchUpdate(i);} if((constdex>=448&&constdex<=451)||(constdex>=454&&constdex<=457)){CyberItemUpdate(i);}
     }

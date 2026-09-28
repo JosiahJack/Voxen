@@ -31,7 +31,9 @@ V3 debugWepOffset = {0, 0, 0}; // debug weapon view offset
 static float shakeAmp = 0.15f;
 Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0.874509804f,0.0f,1.0f},/* 1 Yellow T_YELLOW*/  {0.623529412f,0.611764706f,0.0f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/ {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/ {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
                       {1.0f,0.498039216f,0.0f,1.0f}, /* 5 Orange T_ORANGE*/ {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red T_STOPD_RED*/ {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/ {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
-                      {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title T_GREEN_MENU*/ {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/ {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/ {0.392156863f,0.031372549f,0.039215686f,1.0f}, /* 12 Red Menu Text Dark T_RED_MENU*/ {0.594339600f,0.232689545f,0.232689545f,1.0f} /* 13 Intro/Outro Subtitle #973B3B T_VIDEOTEXT*/ };
+                      {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title T_GREEN_MENU*/ {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/ {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/ {0.392156863f,0.031372549f,0.039215686f,1.0f}, /* 12 Red Menu Text Dark T_RED_MENU*/ {0.594339600f,0.232689545f,0.232689545f,1.0f} /* 13 Intro/Outro Subtitle #973B3B T_VIDEOTEXT*/,
+                      {0.0f,0.039215688f,0.835294200f,1.0f} /* 14 PuzzleWire actualColorBlue T_BLUE*/,
+                      {0.546864600f,0.152723400f,0.830188700f,1.0f} /* 15 PuzzleWire actualColorPurple T_PURPLE*/ };
 // Wireline Rendering
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex* debugLineVerts = NULL;
@@ -400,10 +402,22 @@ void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
     out[12] = a[0] * b[12] + a[4] * b[13] + a[8] * b[14] + a[12] * b[15]; out[13] = a[1] * b[12] + a[5] * b[13] + a[9] * b[14] + a[13] * b[15]; out[14] = a[2] * b[12] + a[6] * b[13] + a[10]* b[14] + a[14] * b[15]; out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
 }
 
-__attribute__((noinline)) void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) {
-    glUseProgram(uiSP); glBindVertexArray(textVAO); glUniform1ui(0,texIndex); glBindBuffer(GL_ARRAY_BUFFER,textVBO); float x1=x + width, y1=y + height, z=0.0f; float vertices[30] = {x,y1,z,0.0f,0.0f,x1,y,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,x,y1,z,0.0f,0.0f,x,y,z,0.0f,1.0f,x1,y,z,1.0f,1.0f};
+/*Rotated, tinted UI image.  RenderUIImage below is the axis-aligned untinted case and just forwards here.
+  ui_vert.glsl bakes a fixed 1366x768 pixel->NDC matrix and has no transform uniform, so the rotation is folded into
+  the six vertex positions on the CPU rather than pushed to the GPU.  radians turns clockwise in screen space (y grows
+  downward), which is exactly what atan2(dy,dx) returns for UI coordinates, so a caller can pass a direction straight
+  through.  pivotX/pivotY are in 0..1 image space, (0.5,0.5) = centre.  tintR/G/B multiply the texel colour; the UI
+  textures are mostly cutouts, so this is how a near-white source image (wire.png) gets a real colour out of it.*/
+__attribute__((noinline)) void RenderUIImageExtended(i16 x, i16 y, i16 width, i16 height, u32 texIndex, float radians, float pivotX, float pivotY, float tintR, float tintG, float tintB) {
+    glUseProgram(uiSP); glBindVertexArray(textVAO); glUniform1ui(0,texIndex); glUniform4f(1,tintR,tintG,tintB,1.0f); glBindBuffer(GL_ARRAY_BUFFER,textVBO);
+    float w=(float)width, h=(float)height, cs=vcosf(radians), sn=vsinf(radians), pvx=w*pivotX, pvy=h*pivotY, z=0.0f;
+    /*Same two triangles, same corner order and same UVs as the axis-aligned path; only the positions move.*/
+    const float cornerX[6]={0.0f,w,w,0.0f,0.0f,w}, cornerY[6]={h,0.0f,h,h,0.0f,0.0f}, uvX[6]={0.0f,1.0f,1.0f,0.0f,0.0f,1.0f}, uvY[6]={0.0f,1.0f,0.0f,0.0f,1.0f,1.0f};
+    float vertices[30];
+    for (int i=0;i<6;++i) { float dx=cornerX[i]-pvx, dy=cornerY[i]-pvy; vertices[i*5+0]=(float)x+pvx+dx*cs-dy*sn; vertices[i*5+1]=(float)y+pvy+dx*sn+dy*cs; vertices[i*5+2]=z; vertices[i*5+3]=uvX[i]; vertices[i*5+4]=uvY[i]; }
     glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,6); drawCalls++; uiDrawCalls++; vertsRendered += 6; glBindBuffer(GL_ARRAY_BUFFER,0);
 }
+__attribute__((noinline)) void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) { RenderUIImageExtended(x,y,width,height,texIndex,0.0f,0.5f,0.5f,1.0f,1.0f,1.0f); }
 
 void RenderLoading(const char * restrict text) { glBindFramebuffer(GL_FRAMEBUFFER,0); glClear(GL_COLOR_BUFFER_BIT); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); RenderTextC(683,384,T_WHITE,FONT_NORMAL,1,text); window->context.swapBuffers(window); }
 void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp) { if (*id == 0) {glGenTextures(1,id);} glBindTexture(GL_TEXTURE_2D,*id); glTexImage2D(GL_TEXTURE_2D,0,internalFormat,width,height,0,format,type,bmp); glTexParameteri(GL_TEXTURE_2D,0x2801/*GL_TEXTURE_MIN_FILTER*/,filt); glTexParameteri(GL_TEXTURE_2D,0x2800/*GL_TEXTURE_MAG_FILTER*/,filt); }
@@ -721,7 +735,7 @@ static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0
 static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/ {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {-64.000f,-60.120f}/*13*/};
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 71.68f/*13*/};
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
-u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0; size_t cvxAdjLive=0; /* diagnostics: live convex-adjacency bytes */ void AddHardwareToInventory(int,int),mp3_clear();
+u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0; size_t cvxAdjLive=0; /* diagnostics: live convex-adjacency bytes */ void AddHardwareToInventory(int,int),mp3_clear(); void NewGameDifficultyPass(void);/*entity.c: the mission-difficulty access-card / audiolog / cyber-data removals, run once from NewGame after every level is resident.*/
 // Init && Main
 void MFD_NewGame(void); void MissionTimerInit(void);
 __attribute__((cold)) void NewGame() { // Reset World States
@@ -748,13 +762,13 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.invP1.resetAfterDeathTime = 0.5; World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.radFXFinished = World.pauseRelativeTime; World.Sys_UI.lastMultiMediaTabOpened = MM_EMAIL_TABLE;
     World.Sys_UI.logFinished = World.pauseRelativeTime; World.Sys_UI.tickFinished = World.Sys_UI.centerTabsTickFinished = World.current_time + 0.1 + (double)random_range(0.0f,1.0f); World.Sys_UI.blinkFinished = 1.0 + World.pauseRelativeTime; World.Sys_UI.beepFinished = 3.0 + World.pauseRelativeTime;
     World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = -1.0; World.invP1.mediPatchPulseFinished = 0.0; World.invP1.mediPatchPulseCount = 0; World.invP1.berserkIncrement = World.invP1.patchActive = 0; World.invP1.staminupActive = World.geniusActive = false; World.invP1.inReverbZone = false; World.timeScale = DEFAULT_TIME_SCALE; 
-    World.cam_yaw = 90.0f; World.cam_pitch = 0.0f; World.cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode; World.gameFinished = World.creditsActive = World.decoyActive = false; World.damageDealt = World.damageReceived = 0.0f;
+    World.cam_yaw = 90.0f; World.cam_pitch = 0.0f; World.cam_roll = 0.0f; World.inventoryMode = Sys_Settings.NoShootMode; World.gameFinished = World.creditsActive = World.decoyActive = false; World.decoyInstance = U16_MAX; World.damageDealt = World.damageReceived = 0.0f;
     World.ressurections = World.deaths = World.kills = World.cyberkills = 0u; World.shotsFired = World.grenadesThrown = World.savesScummed = 0U; World.creditsPageIndex = 0u;
     for (int i=0;i<14;++i) {World.levelSecurity[i] = 100u;}
     mset(&Sys_Input,0,sizeof(Sys_Input)); World.currentMouse_dx = World.currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0,lev);
-    DebugRAM("before runtime LoadAllLevels"); LoadAllLevels(); DebugRAM("after runtime LoadAllLevels"); LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); DebugRAM("after runtime LoadLevel"); World.invP1.currentCrouchRatio = 1.0f;
+    DebugRAM("before runtime LoadAllLevels"); LoadAllLevels(); DebugRAM("after runtime LoadAllLevels"); NewGameDifficultyPass();/*mission-difficulty item removals: once, here, where diffMis is final and every level is resident -- see NewGameDifficultyPass in entity.c.*/ LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); DebugRAM("after runtime LoadLevel"); World.invP1.currentCrouchRatio = 1.0f;
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
             World.levelInstances[lev][i].adjacencyIdx = U16_MAX;

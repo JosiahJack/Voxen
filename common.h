@@ -137,7 +137,14 @@ enum {/*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARR
       /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
       /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS),REV_BUF_LEN=110251/*~2.5s @ 44100; prime*/,MAXAMB=256,
       /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
-               T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13/*#973B3B, Unity intro/outro subtitle cards*/, T_BUFFER_SIZE=4096/*longest credits page is 988 source bytes and creditStats[] is 4096, so the shared UI text buffer has to hold a whole page*/, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
+               T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13/*#973B3B, Unity intro/outro subtitle cards*/, T_BLUE = 14/*PuzzleWire actualColorBlue*/, T_PURPLE = 15/*PuzzleWire actualColorPurple*/, T_BUFFER_SIZE=4096/*longest credits page is 988 source bytes and creditStats[] is 4096, so the shared UI text buffer has to hold a whole page*/, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
+               /*Wire puzzle colours.  PuzzleWire.hudColors[7] = true per-wire colours; the Unity HUDColor order is
+                 White=0, Red=1, Orange=2, Yellow=3, Green=4, Blue=5, Purple=6, Gray=7.  The RGB values are the
+                 actualColor* fields on the PuzzleWire UI object in Assets/Scenes/CitadelScene.unity:879089-879094,
+                 which is what GetColor() hands to the LineRenderer's startColor/endColor.  It has no case for White
+                 or Gray, so both fall through to actualColorRed -- a "White" wire really is drawn red in Citadel,
+                 and the tables below reproduce that rather than special-casing it.*/
+               HUDC_WHITE=0, HUDC_RED=1, HUDC_ORANGE=2, HUDC_YELLOW=3, HUDC_GREEN=4, HUDC_BLUE=5, HUDC_PURPLE=6, HUDC_GRAY=7,
       /*UI*/ UI_W=1366,UI_H=768,CURSOR_SZ=40,MFD_READER_CONTENTS=0,MFD_READER_FOLDER=1,MFD_READER_TEXT=2,MAX_UI_ELEMENTS=4096,TXT_PAD=4,TXT_H=24,TAB_THICK=16,MFD_SPACING=8,MFD_SPACINGCTR=19,SIDE_MFD_W=320,SIDE_MFD_H=240,CTR_MFD_W=640,CTR_MFD_H=240,UI_AUTOMAP_ZOOM_IN=0,UI_AUTOMAP_ZOOM_OUT=1,UI_AUTOMAP_FULL=2,UI_AUTOMAP_SIDE=3,
       /*Automap*/ AM_W=320,AM_H=200,AM_FULL_W=700,AM_FULL_H=700,AM_MAXHULL=10,AMAP_UI_X_L=24,AMAP_UI_X_R=1022,AMAP_UI_Y=524,AMAP_UI_W=320,AMAP_UI_H=200,AM_XOFF=((AM_W-AM_H)/2),
       /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
@@ -195,8 +202,10 @@ typedef struct {
         i8 keycodeHuns,keycodeTens,keycodeOnes; i32 keycodeEntry,keycodeValue; bool keycodeValid,keycodeSolved;
         /*Grid puzzle (Unity PuzzleGrid). tetheredPGP links the source puzzle; pg_* mirror its cells so the panel can run standalone. pg_cell[] = electrical grid, pg_type[] per-cell kind.*/
         u8 pg_type[35],pg_gridType,pg_source,pg_output,pg_width,pg_height; bool pg_cell[35],pg_powered[35],pg_checked[35],pg_solved; float pg_progress;
-        /*Wire puzzle (Unity PuzzleWire). pw_curL/R[7] = wire endpoints by column, pw_tgtL/R[7] = goal columns, pw_wireOn[7] = placed wires, pw_wireColor[7] = true wire colors (text color idx).*/
-        i8 pw_curL[7],pw_curR[7],pw_tgtL[7],pw_tgtR[7]; bool pw_wireOn[7]; u8 pw_wireColor[7]; i8 pw_selectedWire; bool pw_selectedWireRH,pw_solved; float pw_temp;
+        /*Wire puzzle (Unity PuzzleWire). pw_curL/R[7] = wire endpoints by column, pw_tgtL/R[7] = goal columns, pw_wireOn[7] = placed wires, pw_rowActive[7] = visible node rows, pw_wireColor[7] = true wire colors as raw HUDColor, the way PuzzleWire.wireColors stores them.  hudColorToText/hudColorToRGB below turn that into the glyph colour and the line tint.*/
+        i8 pw_curL[7],pw_curR[7],pw_tgtL[7],pw_tgtR[7]; bool pw_wireOn[7],pw_rowActive[7]; u8 pw_wireColor[7]; i8 pw_selectedWire; bool pw_selectedWireRH,pw_solved; float pw_temp;
+        /*Grid puzzle fire-once latch (PuzzleGridPuzzle.cs:26,96-102): onlyFireOnce and alreadyFiredMessageLingdex are prefab-constant across constIndex 609..613, so the latch lives in the puzzle state, not on the Entity.*/
+        bool pg_fired;
         /*Minigames (Funpack). mg_current: 0 Ping..8 Chess, -1 = none. mg_running/mg_solved are per side the games view sits on.*/
         i8 mg_current; bool mg_running[2],mg_solved[2];
         /*E-reader folder/reader. logFolderList[] caches the open level folder, email table or data table; logReferenceIndex is the entry on screen.*/
@@ -261,11 +270,22 @@ typedef /*FAT*/ struct  {
           tickFinished,tickTime,aiThinkFinished/*AI think tick; separate from tickFinished, which texture sequences also drive*/,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,rechargeFinished/*prop_charge_station: absolute pauseRelativeTime station becomes usable again*/,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[7],reverbMaxDist,deathAnimationStart;
     V3 accumulatedForce,currentDestination,lastKnownEnemyPos,targettingPosition,idealTransformForward,idealPos;    
     u16 enemy,messageIndex,teleportID,targetDestinationID,keycode,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,rechargeMsgLingdex,usedMsgLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx,reverbPreset,npcNumber/*1-based per NPC type, assigned at load; shown by the TargetID*/;
-    i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7];
+    i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,logIndex/*us_paperlog (PaperLog.cs), which paper log this prop opens*/,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7];
     bool srchInUse,generateContents,generationDone/*SearchableItem.generationDone: the random-contents roll happens once (SearchableItem.cs:22,34)*/,dontReset,onlyOnce,allDone,curTex,useRandomTimes,active,panelOpen,panelInstalled,panelArmed/*InteractablePanel (us_relaypanel/us_isotopepanel/us_retinalscanner): cover open, item installed, 15s fuse armed*/;
     V3 panelItemPos; Quaternion panelItemRot;/*InteractablePanel installationItem transform (first sub-GO block of the level line): where a placed-item entity is spawned*/
     bool touchEnabled,broken,requireRecharge,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,textureGlowAnimating,texAnimStopsAtDie,texAnimInReverse,texAnimRandom,automapHidden,blocked,ajar,deathAnimationActive;
     AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; char texAnimResourceFolder[TARG_STRLEN];
+    /*Wire puzzle (PuzzleWirePuzzle.currentPositionsLeft / currentPositionsRight): per-instance level data, 7 node rows
+      per side, indexed by wire.  Every us_puz_panel_*_wire line in Data/level*.txt carries currentPositionsLeft[i] and
+      currentPositionsRight[i], and two instances of the same constIndex really do differ, so this has to be parsed per
+      instance -- PuzzlePanelUse then inverts it into the column-indexed pw_curL/pw_curR the UI works in.  The solution,
+      wiresOn, rowsActive and wireColors are prefab constants and live in a static table in citadel.c.*/
+    i8 wireCurL[7],wireCurR[7];
+    /*Grid puzzle (Unity PuzzleGridPuzzle). puzzleSolved, grid[0..34] and fired are the only three things that
+      component's Save() writes, and all three are in Data/level*.txt for every one of the 11 placed panels, so
+      they parse per instance.  cellType, gridType, width/height and sourceIndex/outputIndex are *not* saved --
+      they are scene-authoring data, so the layout table in citadel.c is keyed by the saved grid[] bits instead.*/
+    bool gridCells[35],puzzleFired,puzzleSolved;
 } Entity; // phew what a porker of a struct, it's been a eatin!
 // typedef struct { V2 min,max; bool active,lmb,rmb,initialized; float lastLMB,lastRMB; u32 id; } UIRegion;
 typedef struct{bool initialized,active;V2 min,max;double lastLMB,lastRMB;}UIComponent;
@@ -290,7 +310,7 @@ typedef struct {
     bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT],levelColliding[MAX_LEVELS][INSTANCE_COUNT];
     Light levelLights[MAX_LEVELS][LIGHT_COUNT]; LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT]; LevelParticles levelParticles[MAX_LEVELS];
     Entity* instances; LevelParticles* particles; V3* position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize; ColliderType* col; Quaternion* rotation; u32* layer,targetIOActivatorIoflags; float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
-    Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
+    Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx,decoyInstance/*live prop_cyber_decoy (constIndex 553) instance, or U16_MAX.  Cached rather than re-found per call: the AI sight and acquisition paths query it every AI raycast tick and the instance table is too big to scan there.*/; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
     char playerName[27],audiologNames[LOGCNT][T_LOGSTR_MAX],audiologSubjects[LOGCNT][T_LOGSTR_MAX],audiologSenders[LOGCNT][T_LOGSTR_MAX],audioLogSpeech2Text[LOGCNT][T_LOGSTR_MAX];
 } GlobalContext; // Savable complete game state data
 extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS];
@@ -353,6 +373,23 @@ INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f +
 INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 INLINE i32 vclampi(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
 INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
+/*wire.png's brightest row is 222/255; dividing the target colour by this puts the top of the strip at exactly Unity's
+  colour and lets the texture's own gradient darken the rest of the wire.  WIRE_THICK is the drawn line thickness in
+  pixels; see the PuzzleWire.ChangeAppearance note at the draw site in ui.c for why it is not derived from the prefab.*/
+#define WIRE_TEX_PEAK (222.0f/255.0f)
+#define WIRE_THICK 8.0f
+/*PuzzleWire.GetColor(HUDColor) -> the panel's actualColor* RGB, pre-divided by the source texture's peak so the tint
+  passed to RenderUIImageExtended lands on Unity's colour at the brightest row of wire.png.*/
+INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f/WIRE_TEX_PEAK; switch (hud) {
+    case HUDC_RED:    *r=0.9215687f;  *g=0.13725491f; *b=0.16862746f; break;
+    case HUDC_ORANGE: *r=1.0f;        *g=0.6f;        *b=0.0f;        break;
+    case HUDC_YELLOW: *r=0.89019614f; *g=0.8745099f;  *b=0.0f;        break;
+    case HUDC_GREEN:  *r=0.37254903f; *g=0.654902f;   *b=0.16862746f; break;
+    case HUDC_BLUE:   *r=0.0f;        *g=0.039215688f;*b=0.8352942f;  break;
+    case HUDC_PURPLE: *r=0.5468646f;  *g=0.1527234f;  *b=0.8301887f;  break;
+    default:          *r=0.9215687f;  *g=0.13725491f; *b=0.16862746f; break;/*White and Gray both fall out of GetColor onto actualColorRed*/ }
+    *r*=inv; *g*=inv; *b*=inv; }
+INLINE u8 hudColorToText(u8 hud) { switch (hud) { case HUDC_WHITE:return T_WHITE; case HUDC_RED:return T_RED; case HUDC_ORANGE:return T_ORANGE; case HUDC_YELLOW:return T_YELLOW; case HUDC_GREEN:return T_GREEN; case HUDC_BLUE:return T_BLUE; case HUDC_PURPLE:return T_PURPLE; default:return T_RED;/*Gray: PuzzleWire.GetColor has no Gray case and falls through to actualColorRed*/ } }
 INLINE V3 V3_AplusB(V3 a, V3 b) { return (V3){a.x + b.x, a.y + b.y, a.z + b.z}; }
 INLINE V3 V3_AsubB(V3 a, V3 b) { return (V3){a.x - b.x, a.y - b.y, a.z - b.z}; }
 INLINE V3 V3_ScaleByF(V3 v, float s) { return (V3){v.x * s, v.y * s, v.z * s}; }
@@ -386,7 +423,7 @@ Quaternion quat_look_rotation(V3 fwd, V3 up);
 INLINE u8 hardware14fromConstdex(u16 c) { return vclampi(c - 21,0,14); }    INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }/*All doors except see-through doors.*/ INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 855); }  INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; } INLINE bool IdxIsGib(int c) { return (c >= 768 && c <= 855); }
 INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }            INLINE bool IdxIsLightStaticSaveable(int c) { return c == 748; }   INLINE bool IdxIsGenericTransform(int c) { return c == 749; }                                                                        INLINE bool IdxIsNPC(int c) { return (c >= 419 && c <= 447); }   INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
 INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }     INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); } INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }                                    INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
-INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }                                                        INLINE bool IdxIsAccessCard(u16 c) { return (c == 341 || c == 388 || (c >= 390 && c <= 398) || c == 417); }                          INLINE bool IdxIsGenericItem(u16 c) { return (c >= 307 && c <= 312) || c == 340 || c == 342 || (c >= 359 && c <= 366) || c == 368 || c == 369 || c == 371 || (c >= 399 && c <= 401); }
+INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }                                                        INLINE bool IdxIsAccessCard(u16 c) { return (c == 341 || c == 388 || (c >= 390 && c <= 398) || c == 417); }/*389 (weapon_grenadeearth_live) sits in that numeric gap but is not a card -- the range test must skip it.*/                          INLINE bool IdxIsGenericItem(u16 c) { return (c >= 307 && c <= 312) || c == 340 || c == 342 || (c >= 359 && c <= 365)/*MouseLookScript.cs:1073-1079 AddItemToInventory takes general-inventory slots 52..58, i.e. constIndex 359..365; 366 (item_chipset_bitflag) -> slot 59 is the one value Unity does not put in the general inventory*/ || c == 368 || c == 369 || c == 371 || (c >= 399 && c <= 401); }
 INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 406) || c == 417 || (c >= 419 && c <= 447) || (c >= 458 && c <= 463) || (c >= 471 && c <= 476) || (c >= 768 && c <= 855); }
 INLINE bool InstIsFuncWallChild(u32 inst) { u16 p=(inst<(u32)INSTANCE_COUNT)?fwParentOf[inst]:0; return p!=0 && p<World.instCount && World.instances[p].index==517; }/*chunk child of a func_wall mover (517): dynamic geometry, excluded from static automap/culling derivation*/
 INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603)  || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }

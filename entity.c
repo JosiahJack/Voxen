@@ -190,10 +190,19 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*508 door_elevator1*/[508]={0,0,202,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,14,COLTYPE_MSH,{0,0,0},{0,0,0}},/*509 door_elevator2*/[509]={0,0,203,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,15,COLTYPE_MSH,{0,0,0},{0,0,0}},/*510 door_elevator3*/[510]={0,0,206,205,MAX_TXRS,MAX_TXRS,0,0,0,16,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*511 door_elevator4*/[511]={0,0,203,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,17,COLTYPE_MSH,{0,0,0},{0,0,0}},/*512 door_secret1*/[512]={0,0,210,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,19,COLTYPE_MSH,{0,0,0},{0,0,0}},/*513 door_secret2*/[513]={0,0,209,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,18,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*514 door_secret3*/[514]={94,0,211,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,20,COLTYPE_MSH,{0,0,0},{0,0,0}},/*515 func_forcebridge*/[515]={78,0,38,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0,0,0}},/*516 prop_lift2*/[516]={215,U16_MAX,155,154,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0.0f,0.0f,0.0f},{1.0f,1.0f,1.0f}},
-/*517 func_wall*/[517]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,10.0f,0.6f,0.6f,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*518 BulletHoleLarge*/[518]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*519 BulletHoleScorchLarge*/[519]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*520 BulletHoleScorchSmall*/[520]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*521 BulletHoleSmall*/[521]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*522 BulletHoleTiny*/[522]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*523 BulletHoleTinySpread*/[523]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*524 func_door_cyber*/[524]={178,U16_MAX,1224,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0.0f,1.31f,0.0f},{2.56f,0.06f,2.56f}},
+/* Bullet hole decals (Assets/Resources/Prefabs/BulletHole*.prefab + their Projector material .mat _ShadowTex).
+   Unity projects these with a Projector component, i.e. a multiplicative darkening of whatever is behind them. Voxen has no
+   multiply-blended entity pass, so each mask is baked to a black-RGB / (1-mask)-alpha decal card: normal alpha blending of
+   (0,0,0,1-m) is algebraically scene*(m), the same result the Projector shader produces from the same greyscale mask.
+   The `_CombineTex` GUID (92b0a732ad112a541100162a44295342) shared by all four materials is an orphaned reference with no .meta
+   in the project, so the per-material _ShadowTex is the whole image. 518/521 -> BulletHole1, 522 -> BulletHole3,
+   519/520 -> BulletHoleScorch, 523 -> BulletHoleTinySpread.  model 5988 is genericLOD3card_zero.obj, a flat 2.56-unit quad in
+   the local XZ plane; the size is applied per spawn as World.scale = m_OrthographicSize/1.28 (CreateStandardImpactMarks).
+   m_OrthographicSize: 518=0.06 519=0.2 520=0.1 521=0.04 522=0.15 523=0.3.  Pure decals: no collider. */
+/*517 func_wall*/[517]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,10.0f,0.6f,0.6f,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*518 BulletHoleLarge*/[518]={5988,0,3324,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*519 BulletHoleScorchLarge*/[519]={5988,0,3326,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*520 BulletHoleScorchSmall*/[520]={5988,0,3326,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*521 BulletHoleSmall*/[521]={5988,0,3324,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*522 BulletHoleTiny*/[522]={5988,0,3325,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*523 BulletHoleTinySpread*/[523]={5988,0,3327,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*524 func_door_cyber*/[524]={178,U16_MAX,1224,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0.0f,1.31f,0.0f},{2.56f,0.06f,2.56f}},
 /*525 prop_console01*/[525]={49,0,100,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*526 prop_console02*/[526]={50,0,100,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*527 prop_grate1_1*/[527]={186,0,359,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*528 prop_grate1_2*/[528]={187,0,360,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*529 prop_grate1_3*/[529]={188,0,361,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*530 se_cabinet*/[530]={39,0,70,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
@@ -208,7 +217,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*547 prop_clothes*/[547]={47,0,97,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*548 prop_computer*/[548]={48,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*549 prop_couch*/[549]={59,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*550 prop_couch2*/[550]={59,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*551 prop_cpuscreen*/[551]={178,0,768,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*552 prop_cyber_datafrag*/[552]={6336,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,54,0,{0,0,0},{0,0,0}},
-/*553 prop_cyber_decoy*/[553]={78,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*554 prop_cyber_exit*/[554]={6416,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,55,0,{0,0,0},{0,0,0}},
+/*553 prop_cyber_decoy*/[553]={72,0,152,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.48f,0,0}},/*Model 72 is Models/cyberplayer.obj, already the exact export of Assets/Models/cyberplayer.blend (guid 8c797e3b879bb1d4687244d5b1cc8f77, the mesh both MeshRenderers in prop_cyber_decoy.prefab point at) -- it was sitting unused under proj_cyberplayer_shot's placeholder, so the decoy needs no new model.  It was cube.obj (78) before, which is why the projection rendered as a white box.  Tex 152 is cyberpanel_slice45, the decoy's _MainTex; the green comes from the material's _Color tint (0.373,0.655,0.169) and this model carries no UVs, so no tint override is possible or needed.  Collider: the prefab's SphereCollider radius 0.96 under the root's 0.5 local scale -> 0.48 effective; sphere collider size.x is a radius.*//*554 prop_cyber_exit*/[554]={6416,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,55,0,{0,0,0},{0,0,0}},
 /*555 prop_cyber_switch*/[555]={80,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,58,0,{0,0,0},{0,0,0}},/*556 prop_cyberport*/[556]={62,0,117,116,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*557 prop_desk01*/[557]={74,0,125,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*558 prop_desk02*/[558]={75,0,124,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*559 prop_dexmissile*/[559]={76,0,164,162,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*560 prop_foliage_fernpoison*/[560]={160,0,331,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
@@ -264,8 +273,8 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*690 func_switch3*/[690]={611,0,842,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.02285008f,0.000053061f,-0.000056993f},{0.02f,0.32f,0.32f}},/*691 func_switch4*/[691]={612,0,846,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0.06f,0,0},{0.2f,0.64f,0.64f}},
 /*692 func_switch5*/[692]={614,0,848,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.64f,0.64f,0.08f}},/*693 func_switch5broken*/[693]={613,0,847,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.64f,0.64f,0.08f}},
 /*694 func_switch7*/[694]={612,0,854,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{1.523325f,0,0},{0.2008026f,0.64f,0.64f}},/*695 func_switch8*/[695]={616,0,856,855,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.04f,0.0f,0.0001220703f},{0.08f,0.64f,0.64f}},
-/*696 func_switchbroken1*/[696]={617,0,618,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*697 clip_npc*/[697]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{1.005016f,0,0},{2.010033f,16.0f,16.0f}},
-/*698 clip_objects*/[698]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,(V3){0,0,0},(V3){2.56f,2.56f,2.56f}},/*699 logic_relay*/[699]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*700 logic_branch*/[700]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*696 func_switchbroken1*/[696]={617,0,618,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*697 clip_npc*/[697]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{1.005016f,0,0},{2.010033f,16.0f,16.0f}},
+/*698 clip_objects*/[698]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,(V3){0,0,0},(V3){2.56f,2.56f,2.56f}},/*COLTYPE_BOX, not COLTYPE_NONE: all 152 level-placed clip instances (68 of 697, 3 of 698 in levels 1-2 and the rest elsewhere) carry their own center and size, parsed into colCtrFromFile / colSzFromFile, and COLTYPE_NONE was discarding every one of them, so 152 volumes were not solid to anything.  TODO(R4): they still land on L_Default and may deserve their own layer now that they block movement.*//*699 logic_relay*/[699]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*700 logic_branch*/[700]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*701 logic_timer*/[701]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*702 logic_spawner*/[702]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*703 info_teleport_destination*/[703]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_CAP,{0,0,0},{0.75f,2.0f,1.0f}},
 /*704 prop_debris_panel*/[704]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*705 info_cyborgconversion*/[705]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*706 info_elev_destination*/[706]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*707 info_email*/[707]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*708 info_gameend*/[708]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*709 info_message*/[709]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -428,13 +437,16 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx == 424) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.8f; }/*npc_cortex_reaver*/ if (entIdx == 430) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.9f; }/*npc_sec2_bot*/   if (entIdx == 431) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.4f; }/*npc_maint_bot*/     if (entIdx == 433) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.88f; }/*npc_hopper*/
     if (entIdx == 439) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.4f; }/*npc_zerog_mutant*/  if (entIdx == 441) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.75f; }/*npc_repairbot*/ if (entIdx == 444) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.666f; }/*npc_cyberguard*/  if (entIdx == 445) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.5f; }/*npc_cyberram*/
     if (entIdx == 446) { World.scale[i].x=World.scale[i].y=World.scale[i].z=1.1f; }/*npc_cyber_reaver*/  if (entIdx == 475 || entIdx == 476){World.scale[i]=(V3){1.75f,1.75f,1.75f};}/*se_crate4,se_crate5*/
+    if (entIdx == 553) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.5f; }/*prop_cyber_decoy: the prefab root carries m_LocalScale 0.5 and Inventory.UseDecoy instantiates it without rescaling, so the decoy model renders at half size.*/
     if (IdxIsNPC(entIdx)){InitNPC(i); World.instances[i].npcNumber = ai_next_npc_number((u16)(entIdx - 419)); if (npcTable[entIdx - 419].type == NPCType_Cyber) { if (World.instances[i].cyberHealth <= 0.0f) World.instances[i].cyberHealth = npcTable[entIdx - 419].healthForCyberNPC; } else if (World.instances[i].health <= 0.0f) World.instances[i].health = npcTable[entIdx - 419].health;/*health/cyberHealth default when the record leaves them unset; a loaded -1 sentinel is kept off by the copy guard below*/}
-    else if (IsLiveGrenade(entIdx) && World.instances[i].health <= 0.0f) World.instances[i].health = 15.0f;/*all seven live grenade prefabs carry health 15; chain-detonate on damage*/ if (IdxIsDoor(entIdx)) { World.instances[i].SFXIndex = 75; } World.instances[i].modelIndex=EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAX_TXRS ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
+    else if (IsLiveGrenade(entIdx) && World.instances[i].health <= 0.0f) World.instances[i].health = 15.0f;/*all seven live grenade prefabs carry health 15; chain-detonate on damage*/
+    else if (entIdx == 574 /*prop_healingbed*/ && World.instances[i].health <= 0.0f) World.instances[i].health = 9999999.0f;/*prop_healingbed.prefab serializes health 9999999: the bed must be indestructible so it cannot be shot down under the player*/
+    if (IdxIsDoor(entIdx)) { World.instances[i].SFXIndex = 75; } World.instances[i].modelIndex=EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAX_TXRS ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
     World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAX_TXRS ? 0 : EDefs[entIdx].specIndex; World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAX_TXRS ? 0 : EDefs[entIdx].normIndex; flag_set(&World.instances[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(entIdx));
     if (entIdx == 592 || entIdx == 593) { World.instances[i].modelIndex = U16_MAX; } // 3D text decals (no mesh)
     if (World.levelCurrentlyLoading) { /*Tally the level's security objects so the security split and the system analyzer's node total have real denominators; guarded so runtime spawns never inflate them*/
         u8 sl=World.currentLevel; if (sl<MAX_LEVELS) { u8* dst=entIdx==477?&World.levelCameraCount[sl]:entIdx==478?&World.levelLargeNodeCount[sl]:entIdx==479?&World.levelSmallNodeCount[sl]:0; if (dst && *dst<255) (*dst)++; } }
-    World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f; if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; }/*ButtonSwitch*/
+    World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f; if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; World.instances[i].SFXLockedIndex = -1; }/*ButtonSwitch: every func_switch* prefab serializes SFXLockedIndex -1, i.e. no locked click. The success SFX comes from buttonSwitchSFX in citadel.c, the same prefab-constant-table shape doorSFXIndex uses in LoadLevelData.*/
     if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=COLTYPE_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; World.levelInstCount[World.currentLevel]=World.instCount; return i;
 }
 
@@ -651,7 +663,15 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("tA")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->anchor=(u8)(v<0?0:(v>8?8:v)); } } }
                 else if(KEY_EQ("tAl")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->align=(u8)(v<0?0:(v>2?2:v)); } } }
                 else if(KEY_EQ("tLs")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) pd->lineSp=parse_float(value,lineSpace,lineNum); } }
-                else if(KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);                                       else if(KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);                                       else if(KEY_EQ("SFXClip"))         inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);/*info_playsound (712): PlaySoundTriggered.cs does Const.a.sounds[SFXClip], the same sounds[] index SFXIndex already carries*/ else if(KEY_EQ("SFXLockedIndex")) inst->SFXLockedIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
+                else if(KEY_EQ("trackType"))       inst->trackType = (TrackType)parse_numberi16(value, lineSpace, lineNum);/*trigger_music (599)*/      else if(KEY_EQ("textIndex"))       inst->textIndex = (i16)parse_numberi16(value, lineSpace, lineNum);/*prop_cyber_datafrag (552), prop_cyber_switch (555)*/
+                else if(KEY_EQ("logIndex"))        inst->logIndex = (i16)parse_numberi16(value, lineSpace, lineNum);/*us_paperlog (603): PaperLog.cs logIndex, the AudioLogType_Papers entry this prop opens*/
+                else if(keyLen==23 && sCompUpToLen(key,"currentPositionsLeft[",21)==0 && key[21]>='0' && key[21]<='6' && key[22]==']') inst->wireCurL[key[21]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);/*us_puz_panel_*_wire (741..745)*/
+                else if(keyLen==24 && sCompUpToLen(key,"currentPositionsRight[",22)==0 && key[22]>='0' && key[22]<='6' && key[23]==']') inst->wireCurR[key[22]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);
+                else if(keyLen>=8 && sCompUpToLen(key,"grid[",5)==0 && key[keyLen-1]==']') { int gi=0; bool gok=true; for (int k=5;k<keyLen-1;++k) { if (key[k]<'0'||key[k]>'9') { gok=false; break; } gi=gi*10+(key[k]-'0'); } if (gok && gi<35) inst->gridCells[gi]=parse_bool(value,lineSpace,lineNum); }/*PuzzleGridPuzzle.grid[0..34], key width varies with the index*/
+                else if(KEY_EQ("fired"))          inst->puzzleFired = parse_bool(value,lineSpace,lineNum);/*PuzzleGridPuzzle.fired: the onlyFireOnce latch*/
+                else if(KEY_EQ("puzzleSolved"))  inst->puzzleSolved = parse_bool(value,lineSpace,lineNum);
+                else if(KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("onSecond"))        inst->branchOnSecond = parse_bool(value, lineSpace, lineNum);                                           else if(KEY_EQ("onceEver"))        inst->relayOnceEver = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(value, lineSpace, lineNum);                                else if(KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
                 else if(KEY_EQ("testQuestBitIsOff"))   inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 2 : inst->questTestMode;                else if(KEY_EQ("ForceBridge.activated")) inst->active = parse_bool(value,lineSpace,lineNum);
@@ -806,7 +826,7 @@ void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
 void LoadLevelData(u8 curlevel) {
     if(!teleportDestinationsInitialized){for(u8 l=0;l<MAX_LEVELS;++l)for(u8 id=0;id<8;++id)teleportDestinations[l][id]=U16_MAX;teleportDestinationsInitialized=true;}
     if(curlevel<MAX_LEVELS)for(u8 id=0;id<8;++id)teleportDestinations[curlevel][id]=U16_MAX;
-    World.curLev = curlevel; TargetIDReset(); ai_reset_npc_numbering(); SetLevelPointers(curlevel); World.invP1.makingNoise=false;/*clear noise at level loads*/ mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    World.curLev = curlevel; TargetIDReset(); ai_reset_npc_numbering(); SetLevelPointers(curlevel); World.invP1.makingNoise=false;/*clear noise at level loads*/ World.decoyActive=false; World.decoyInstance=U16_MAX;/*a decoy is spawned into one level and dies with it; a stale true would leave cyber NPCs retargeting a dead instance index*/ mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf)); LoadLevelMod(curlevel); GravityLiftSyncAllVisuals(); PSysAddLevelLoops(); if (curlevel<MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel]=true; } OS_Free(fbuf,(size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
     for (int i = PLAYER1; i < World.instCount; ++i) {
@@ -820,8 +840,7 @@ void LoadLevelData(u8 curlevel) {
         if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
         else if (IdxIsUsableObject(constIndex)) {
             if (World.diffPuz == 3 && World.instances[i].index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
-            if (World.diffMis <= 1 && IdxIsAccessCard(World.instances[i].index)) DeleteInstance(i); // Remove access cards on Mission difficulty 1 or 0
-            if (World.diffMis == 0 && World.instances[i].index == 313) DeleteInstance(i); // Remove audiologs on Mission difficulty 0
+            /*Difficulty-based instance removals (access cards, audiologs, item_cyber_data) run in NewGameDifficultyPass from NewGame(), never here: a level reloaded mid-game would otherwise re-apply the mission-difficulty removals and strip items the player already picked up or already used.*/
         } else if (IdxIsDoor(World.instances[i].index)) {
             World.layer[i] = L_Door;
             if (World.instances[i].startOpen) World.instances[i].stayOpen = true;
@@ -858,7 +877,7 @@ void LoadLevelData(u8 curlevel) {
         else if(constIndex == 555){CyberSwitchInitAfterLoad(i);} // prop_cyber_switch
         else if(constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
         else if(IdxIsButtonSwitch(World.instances[i].index)) ButtonSwitchInitAfterLoad(i);
-        else if(constIndex >= 448 && constIndex <= 457){if(World.diffMis == 0 && World.instances[i].index == 448/*item_cyber_data*/){DeleteInstance(i);} }
+        else if(constIndex >= 448 && constIndex <= 457){/*item_cyber_data's mission-difficulty-0 removal moved to NewGameDifficultyPass.*/}
         else if(constIndex == 480){CyberMineInitBeforeLoad(i);}
         else if(constIndex == 402){World.layer[i] = L_NPC; GrenadeInit(i);}/*weapon_grenademine_live.  Level data is init-only, so every placed live landmine is an NPC mine; any layer other than L_PlayerBullets makes GrenadeIsNPCMine report true.  L_NPC rather than Unity's NPCBullet(24) because layerMaskPlayerAttack includes NPC but not NPCBullet, so only L_NPC lets player weapons and melee reach it.  GrenadeInit supplies the prefab damage/penetration/offense/attackType, which the level-load path otherwise leaves zero.*/
         if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
@@ -868,6 +887,29 @@ void LoadLevelData(u8 curlevel) {
 }
 
 u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
+
+/*Mission-difficulty instance removals.  Called once from NewGame() after every level is resident, and from nowhere else:
+   LoadLevelData used to strip these per level, which meant a mid-game level reload re-applied the removals and deleted
+   access cards / audiologs / cyber-software the player had already been given or already used.  Walking the levels the way
+   UseTargets (citadel.c) does, with SetLevelPointers swapping the live pointers in and back out, keeps the removals a
+   pure function of the difficulty chosen at NewGame time.
+     access cards  (IdxIsAccessCard)  gone on mission 0 and 1; 389 is deliberately absent -- that slot is
+       weapon_grenadeearth_live, not a card, and a 388..398 range test would delete every Earthshaker in the game.
+     item_audiolog (313)               gone on mission 0.
+     item_cyber_data (448)             gone on mission 0 (CyberItem.cs:9-13 disables SoftwareType.Data and nothing else). */
+void NewGameDifficultyPass(void) {
+    for (u8 lev = 0; lev < World.numLevels; ++lev) {
+        u8 entryLevel = World.curLev; if (entryLevel != lev) SetLevelPointers(lev);
+        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
+            if (!IdxIsUsableObject(World.instances[i].index)) continue;
+            u16 ci = World.instances[i].index; bool del = false;
+            if (World.diffMis <= 1 && (ci == 341 || ci == 388 || (ci >= 390 && ci <= 398) || ci == 417)) del = true;
+            if (World.diffMis == 0 && (ci == 313 || ci == 448)) del = true;
+            if (del) DeleteInstance(i);
+        }
+        if (World.curLev != entryLevel) SetLevelPointers(entryLevel);
+    }
+}
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();
 void LoadAllLevels() {
     double start_time = get_time();
@@ -950,12 +992,12 @@ size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapac
 
 void SaveGame(u8 slot, const char* savename) {
     if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenWriteonly(path); if(fd == (FHandle)-1){return;} size_t sz=sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b=OS_Alloc(maxCompSize); size_t finalCompSize=VoidSquasher((const u8*)&World,sz,b,maxCompSize);
-    if (finalCompSize > 0) { SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=8, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize}; if (savename) { int i=0;   while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;}   header.savename[i]='\0'; } World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot);}
+    if (finalCompSize > 0) { SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=9, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize}; if (savename) { int i=0;   while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;}   header.savename[i]='\0'; } World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot);}
     else { DualLogError("Compression failed during SaveGame!\n"); }    OS_Free(b,maxCompSize); OS_Close(fd);
 }
 
 void LoadGame(u8 slot) {
-    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343 || header.version != 8 || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
+    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343 || header.version != 9 || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
     u8* b=OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
         size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.currentLevel); AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
@@ -967,7 +1009,7 @@ bool ReadSaveSlotName(u8 slot, char* out, size_t cap) {
     if (slot > 7 || !out || cap == 0) return false;
     char path[]="./Data/sav0.bin"; path[10]=(char)('0'+slot);
     FHandle fd=OS_OpenReadonly(path); if (fd == (FHandle)-1) return false;
-    SaveHeader header; bool ok = OS_Read(fd,&header,sizeof(SaveHeader))==sizeof(SaveHeader) && header.magicNumber==0x56415343u && header.version==8 && header.uncompressedSize==(u32)sizeof(GlobalContext);
+    SaveHeader header; bool ok = OS_Read(fd,&header,sizeof(SaveHeader))==sizeof(SaveHeader) && header.magicNumber==0x56415343u && header.version==9 && header.uncompressedSize==(u32)sizeof(GlobalContext);
     OS_Close(fd); if (!ok) return false;
     size_t i=0; while (i+1<cap && i<sizeof(header.savename) && header.savename[i]!='\0') { out[i]=header.savename[i]; ++i; } out[i]='\0';
     return out[0]!='\0';

@@ -35,7 +35,7 @@ void CyberItemOnTriggerEnter(u16 self, u16 other) {
     }
     if(success){DeleteInstance(self);}
 }
-void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World.instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; World.layer[other] = 24; World.velocity[other] = V3_ScaleByF(World.velocity[other],-1.0f); }
+void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World.instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; World.layer[other] = L_NPCBullet;/*L_NPCBullet, not a bare 24: the enums are bit flags, so only L_NPCBullet happens to equal 1<<24.  An adjacent enum insertion would have silently turned this into a different collision layer.*/ World.velocity[other] = V3_ScaleByF(World.velocity[other],-1.0f); }
 void CyberMineInitBeforeLoad(u16 self) { Entity* e=&World.instances[self]; e->damage=55.0f; if(World.diffCyb<3){if(random_range(0.0f,1.0f)<0.2f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=33.0f;} if(World.diffCyb<2){if(random_range(0.0f,1.0f)<0.33f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=22.0f;} if(World.diffCyb<1){if(random_range(0.0f,1.0f)<0.50f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=11.0f;} }
 float TakeDamage(u16 self,DamageData dd);
 void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) return; PlayerTakeDamage(PLAYER1,e->damage); play_wav(sounds[67], AppliedFXVol(1.0f), World.position[self], false); flag_set(&e->entflags,EF_ACTIVE,false); }

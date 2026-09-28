@@ -161,7 +161,38 @@ bool IsCyberNPC(u16 i) { u16 npcID = World.instances[i].index - 419; return npcT
 bool HasHealth(u16 i) { if(IsCyberNPC(i)){return (World.instances[i].cyberHealth > 0.0f);} return (World.instances[i].health > 0.0f); }
 INLINE bool ai_is_cyber(Entity* e)  { return npcTable[e->index - 419].type == NPCType_Cyber; }
 INLINE bool ai_has_health(Entity* e){ return ai_is_cyber(e) ? e->cyberHealth > 0.0f : e->health > 0.0f; }
-/*sightPoint local offset from each npc_*.prefab (Citadel/ConversionData/Prefabs), in the NPC's own frame.
+void AISetEnemy(u16, u16); bool CyberDecoyIsLive(u16*);/*entity-c side of the decoy: CyberDecoyIsLive re-validates the cached World.decoyInstance and lives next to UseDecoy in citadel.c*/
+/* ---- Cyber decoy targeting -------------------------------------------------------
+   Unity (AIController.cs:1630,1708) lets a cyber NPC that can see the player re-evaluate its target while
+   Player.decoyActive is up, and the decoy wins: prop_cyber_decoy is a Player-tagged prop, so the cyber NPC's own
+   "shoot the thing I hate" test lands on it.  Voxen implemented the flag as blindness instead -- both decoyActive
+   checks cleared EF_ENEM_IN_LOS and returned false, so for 15s every cyber NPC simply stopped seeing anything
+   rather than being lured, and with the old 417 spawn there was no decoy to lure them to anyway.
+
+   The fix redirects the enemy pointer.  Three places, deliberately:
+     CyberDecoySetTarget  bulk rewrite on spawn and on expiry (the bulk pass is the only place that can see
+                          every NPC at once, including ones already fighting something else);
+     AISetEnemy           the acquisition choke point, so any path that "just noticed the player" ends up on the
+                          decoy without each caller having to know the decoy exists;
+     AIUpdate's enAlive   the decoy has no health, so without an exemption the very next tick reads it as a corpse
+                          and drops it again.
+   A cyber NPC already engaged with a real NPC is left alone: the decoy is a distraction for the player, not a
+   reason to break up a firefight. */
+
+u16 CyberDecoyTarget(void) { u16 d = U16_MAX; return CyberDecoyIsLive(&d) ? d : U16_MAX; }
+
+void CyberDecoySetTarget(u16 decoy) {
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
+        Entity* e = &World.instances[i]; if (!IdxIsNPC(e->index) || npcTable[e->index - 419].type != NPCType_Cyber) continue;
+        if (e->currentState == AIState_Dead || e->currentState == AIState_Dying) continue;
+        u16 en = e->enemy; if (!en) continue;
+        if (decoy != U16_MAX) { if (en == PLAYER1) { AISetEnemy(i, decoy); flag_set(&e->entflags, EF_ENEM_IN_LOS, true); } }
+        /*decoy gone: hand the NPC back with a clean slate rather than a hard player lock, so it re-acquires
+          through the normal PVS/FOV path instead of tracking the player through the level.*/
+        else if (!IdxIsNPC(World.instances[en].index) && en != PLAYER1) { e->enemy = 0; e->posCheckFinished = World.pauseRelativeTime; flag_set(&e->entflags, EF_ENEM_IN_LOS, false); }
+    }
+}
+void CyberDecoyRetargetAll(void) { CyberDecoySetTarget(CyberDecoyTarget()); }/*sightPoint local offset from each npc_*.prefab (Citadel/ConversionData/Prefabs), in the NPC's own frame.
   Unity raycasts from sightPoint.transform.position, i.e. the NPC transform position plus this offset rotated
   by the NPC rotation -- so the offset has to be rotated, not just added in world Y (ai_gun_pos does the same
   for the muzzles).*/
@@ -296,7 +327,7 @@ INLINE bool NPCInPlayerPVS(u16 idx) { if (unlikely(World.curLev >= LEVEL_CYBERSP
 bool AICheckIfEnemyInSight(u16 idx) {
     u16 eidx=World.instances[idx].enemy; if (!eidx || !ai_has_health(&World.instances[idx])) return false; bool enIsNPC = (World.layer[eidx] & L_NPC) != 0; int diff = ai_is_cyber(&World.instances[idx]) ? World.diffCyb : World.diffCbt; if (!NPCInPlayerPVS(idx)) return false;/*Cell PVS gate, same as the player path below. Was skipped for NPC targets, so NPCs tracked enemies through the whole level.*/
     if (diff == 0 && (World.instances[idx].index - 419) != 28) return false; if (Cheats.notarget && !enIsNPC) { World.instances[idx].enemy = 0; World.instances[idx].posCheckFinished = World.pauseRelativeTime + AI_POS_CHECK_DELAY; World.instances[idx].lastPosition = World.position[idx]; flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, false); return false; }
-    if (ai_is_cyber(&World.instances[idx]) && World.decoyActive) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, false); return false; } float dist = V3_Dist(World.position[eidx], ai_sight_pos(&World.instances[idx])); if (dist > npcTable[World.instances[idx].index - 419].sightRange) return false; if (ai_is_cyber(&World.instances[idx])) return true;/*Cyborgs see through geometry by design; every other target, NPC included, falls through to the raycast.*/
+    if (ai_is_cyber(&World.instances[idx]) && World.decoyActive && eidx == World.decoyInstance) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); return true; }/*the decoy is a fake cyber player: no health, but it is the target, and cyber NPCs see through geometry, so it is in LOS by construction.  Checked before the range test so the NPC keeps the decoy once the player has run off past sightRange.*/ float dist = V3_Dist(World.position[eidx], ai_sight_pos(&World.instances[idx])); if (dist > npcTable[World.instances[idx].index - 419].sightRange) return false; if (ai_is_cyber(&World.instances[idx])) return true;/*Cyborgs see through geometry by design; every other target, NPC included, falls through to the raycast.*/
     V3 spos=ai_sight_pos(&World.instances[idx]); V3 lineN=V3_Normalize(V3_AsubB(World.position[eidx],spos));
     RaycastHit hit=Raycast(spos,lineN,npcTable[World.instances[idx].index-419].sightRange,enIsNPC?(LMASK_NPC_SIGHT|L_NPC):LMASK_NPC_SIGHT);/*L_NPC only when the target is an NPC: LMASK_NPC_SIGHT omits it, so the ray would otherwise pass straight through the target.*/
     if (hit.hit) {
@@ -309,14 +340,15 @@ bool AICheckIfEnemyInSight(u16 idx) {
 
 void AISetHuntFinished(u16 idx) { World.instances[idx].huntFinished = World.pauseRelativeTime; int diff = ai_is_cyber(&World.instances[idx]) ? World.diffCyb : World.diffCbt; double ht = npcTable[World.instances[idx].index - 419].huntTime, mn=60.0; if(diff <= 1){World.instances[idx].huntFinished += (ht * 0.75 > mn ? ht * 0.75 : mn);}else if(diff >= 3){World.instances[idx].huntFinished += (ht * 2.0  > mn ? ht * 2.0 : mn);}else{World.instances[idx].huntFinished += (ht > mn ? ht : mn);} }
 void AISetEnemy(u16 idx, u16 eidx) {
-    if(!eidx){return;} World.instances[idx].enemy=eidx; World.instances[idx].posCheckFinished=World.pauseRelativeTime + AI_POS_CHECK_DELAY; flag_set(&World.instances[idx].entflags,EF_WANDERING,false); World.instances[idx].wanderFinished=World.pauseRelativeTime;
+    if (!eidx) {return;} if (eidx == PLAYER1) { u16 d = CyberDecoyTarget(); if (d != U16_MAX && ai_is_cyber(&World.instances[idx])) eidx = d; }/*acquisition choke point: while a decoy is up, a cyber NPC that just spotted the player acquires the decoy instead (AIController.cs:1630,1708)*/
+    World.instances[idx].enemy=eidx; World.instances[idx].posCheckFinished=World.pauseRelativeTime + AI_POS_CHECK_DELAY; flag_set(&World.instances[idx].entflags,EF_WANDERING,false); World.instances[idx].wanderFinished=World.pauseRelativeTime;
     World.instances[idx].lastPosition = World.position[idx]; World.instances[idx].lastKnownEnemyPos = World.position[eidx]; World.instances[idx].targettingPosition = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; AISetHuntFinished(idx);
 }
 
 void AIPlaySightSound(u16 idx) { if ((!(World.instances[idx].entflags&EF_FIRST_SIGHTING)) || (!ai_has_health(&World.instances[idx])) || (World.instances[idx].entflags&EF_ACT_AS_CORPSE_ONLY)){return;} flag_set(&World.instances[idx].entflags,EF_FIRST_SIGHTING,false); i16 sfx = sfxSightSound[World.instances[idx].index - 419]; if (sfx >= 39 && sfx < SOUNDS_COUNT){play_wav(sounds[sfx],AppliedFXVol(1.0f),World.position[idx],true);} }
 bool AICheckIfPlayerInSight(u16 idx) {
     int diff = ai_is_cyber(&World.instances[idx]) ? World.diffCyb : World.diffCbt; if (!NPCInPlayerPVS(idx) || (diff == 0 && (World.instances[idx].index - 419) != 28)) return false; if (World.instances[idx].enemy) return AICheckIfEnemyInSight(idx);
-    flag_set(&World.instances[idx].entflags,EF_ENEM_IN_LOS,false); if ((ai_is_cyber(&World.instances[idx]) && World.decoyActive) || Cheats.notarget){return false;} V3 playerPos=World.position[PLAYER1], spos=ai_sight_pos(&World.instances[idx]); float dist=V3_Dist(playerPos,spos); NPCTable* npc = &npcTable[World.instances[idx].index - 419]; if (dist > npc->sightRange) return false;
+    flag_set(&World.instances[idx].entflags,EF_ENEM_IN_LOS,false); if (Cheats.notarget){return false;} V3 playerPos=World.position[PLAYER1], spos=ai_sight_pos(&World.instances[idx]); float dist=V3_Dist(playerPos,spos); NPCTable* npc = &npcTable[World.instances[idx].index - 419]; if (dist > npc->sightRange) return false;
     if (ai_is_cyber(&World.instances[idx])) { AISetEnemy(idx,PLAYER1); AIPlaySightSound(idx); return true; } V3 checkN = V3_Normalize(V3_AsubB(playerPos,spos)); float cosA = vclamp(V3_dot(checkN,World.instances[idx].forward), -1.0f, 1.0f); float angle = vacosf(cosA) * (180.0f / PI); bool makingNoise = World.invP1.makingNoise;
     if (angle < npc->fov * 0.5f) { RaycastHit hit = Raycast(spos, checkN, dist + 0.1f, LMASK_NPC_SIGHT); if (hit.hit && hit.hitInstanceIndex == PLAYER1) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); AISetEnemy(idx,PLAYER1); AIPlaySightSound(idx); return true; } if (!hit.hit && makingNoise && dist < npc->hearingRange) { AISetEnemy(idx,PLAYER1); AIPlaySightSound(idx); return true; } }
     else { if (dist < npc->distToSeeBehind) { RaycastHit hit = Raycast(spos,checkN,dist + 0.1f,LMASK_NPC_SIGHT); if (hit.hit && hit.hitInstanceIndex == PLAYER1) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); AISetEnemy(idx,PLAYER1); AIPlaySightSound(idx); return true; } } if (makingNoise && dist < npc->hearingRange) { AISetEnemy(idx,PLAYER1); AIPlaySightSound(idx); return true; } }   return false;
@@ -574,7 +606,7 @@ void AIControllerUpdate(u16 idx) {
         self->tickTime = World.pauseRelativeTime + AI_RAYCAST_TICK_TIME;
         flag_set(&self->entflags,EF_ENEM_IN_SIGHT,AICheckIfPlayerInSight(idx)); u16 eidx=self->enemy;
         if (eidx && ai_has_health(self)) {
-            bool enAlive = npcTable[ndx].type == NPCType_Cyber ? World.instances[eidx].cyberHealth > 0.0f : World.instances[eidx].health > 0.0f;
+            bool enAlive = (npcTable[ndx].type == NPCType_Cyber && eidx == World.decoyInstance) || (npcTable[ndx].type == NPCType_Cyber ? World.instances[eidx].cyberHealth > 0.0f : World.instances[eidx].health > 0.0f);/*the decoy projection has no health by design, so it would otherwise read as a corpse on the very next tick and be dropped*/
             if (!enAlive) { if (npcTable[ndx].type == NPCType_Cyber) self->currentState = AIState_Idle; else { flag_set(&self->entflags, EF_WANDERING, true); self->wanderFinished = World.pauseRelativeTime + random_range(3.0f, 8.0f); self->currentState = AIState_Walk; } self->enemy = 0; self->posCheckFinished = World.pauseRelativeTime; self->lastPosition = World.position[idx]; }
             else AIEnemyInFrontChecks(self,eidx);
         }

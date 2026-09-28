@@ -461,32 +461,81 @@ static void PGFlipperRook(int i) { World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell
 static void PGFlipperBishop(int i) { World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; PGToggleLine(i,1,1); PGToggleLine(i,-1,1); PGToggleLine(i,1,-1); PGToggleLine(i,-1,-1); }
 static void PGFlipperQueen(int i) { World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; PGToggleLine(i,1,0); PGToggleLine(i,-1,0); PGToggleLine(i,0,1); PGToggleLine(i,0,-1); PGToggleLine(i,1,1); PGToggleLine(i,-1,1); PGToggleLine(i,1,-1); PGToggleLine(i,-1,-1); }
 static void PGFlipperKnight(int i) { int w=World.Sys_UI.pg_width,h=World.Sys_UI.pg_height,r=i/w,c=i%w; World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; static const i8 dr[8]={-2,-1,1,2,2,1,-1,-2},dc[8]={1,2,2,1,-1,-2,-2,-1}; for (u8 n=0;n<8;++n) { int rr=r+dr[n],cc=c+dc[n]; if (rr<0||rr>=h||cc<0||cc>=w) continue; int ci=rr*w+cc; if (World.Sys_UI.pg_type[ci]==PuzzleCellType_Standard) World.Sys_UI.pg_cell[ci]=!World.Sys_UI.pg_cell[ci]; } }
-static void PGEvalPuzzle(void) { SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height; if (w<=0||h<=0) return; int n=w*h; if (n>35) n=35;
-    for (int i=0;i<n;++i) { s->pg_powered[i]=false; s->pg_checked[i]=false; } int src=(int)s->pg_source; if (src<0||src>=n) return; s->pg_powered[src]=true;
-    int q[35],qt=0,qh=0; q[qt++]=src; while (qh<qt) { int idx=q[qh++],r=idx/w,c=idx%w;
-        for (i8 dr=-1;dr<=1;++dr) for (i8 dc=-1;dc<=1;++dc) { if (dr&&dc) continue; if (!dr&&!dc) continue; int rr=r+dr,cc=c+dc; if (rr<0||rr>=h||cc<0||cc>=w) continue; int ni=rr*w+cc; if (s->pg_checked[ni]) continue; int pc=0;
-            for (i8 dr2=-1;dr2<=1;++dr2) for (i8 dc2=-1;dc2<=1;++dc2) { if (!dr2&&!dc2) continue; int cr=r+dr2,cl=c+dc2; if (cr<0||cr>=h||cl<0||cl>=w) continue; if (s->pg_powered[cr*w+cl]) ++pc; }
-            bool power=false; if (s->pg_type[ni]==PuzzleCellType_Standard && s->pg_cell[ni] && pc>0) power=true; else if (s->pg_type[ni]==PuzzleCellType_And && pc>1) power=true; else if (s->pg_type[ni]==PuzzleCellType_Bypass && pc>0) power=true;
-            if (power) { s->pg_powered[ni]=true; s->pg_checked[ni]=true; q[qt++]=ni; } } }
-    int out=(int)s->pg_output; s->pg_solved=(out>=0 && out<n && s->pg_powered[out]); float cnt=0.0f; for (int i=0;i<n;++i) if (s->pg_powered[i]) cnt+=1.0f; s->pg_progress=cnt/(float)n;
-}
+/*---- Grid power propagation (Unity PuzzleGrid.cs) ---------------------------------------------------------------------------------
+  ReturnCellAbove/Below/ToLeft/ToRight return the neighbour index, or -1 when it is off the board or is an Off cell
+  (Off cells are walls, so a Bypass or Standard cell can never be reached through one).  The four diagonals take no
+  Off test at all in Unity, which is why they are not routed through here -- the flippers and the Genius preview do
+  their own bounds math. */
+static int PGOrth(int i,int dr,int dc) { SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height,r=i/w+dr,c=i%w+dc; if (r<0||r>=h||c<0||c>=w) return -1; int j=r*w+c; return s->pg_type[j]==PuzzleCellType_Off?-1:j; }
+/*CheckCellForPower.  Called both on the source cell's neighbours during the walk and on each dequeued cell, and it
+  is what lets an And gate light up in a single pass rather than a second sweep.*/
+static void PGCheckCellForPower(int i) { SystemUI* s=&World.Sys_UI; int a=PGOrth(i,-1,0),b=PGOrth(i,1,0),l=PGOrth(i,0,-1),r=PGOrth(i,0,1),pc=0;
+    if (a!=-1 && s->pg_powered[a]) ++pc; if (b!=-1 && s->pg_powered[b]) ++pc; if (l!=-1 && s->pg_powered[l]) ++pc; if (r!=-1 && s->pg_powered[r]) ++pc;
+    if (s->pg_type[i]==PuzzleCellType_And) { if (pc>1) s->pg_powered[i]=true; }
+    else if (s->pg_type[i]==PuzzleCellType_Standard || s->pg_type[i]==PuzzleCellType_Bypass) { if ((s->pg_cell[i] || s->pg_type[i]==PuzzleCellType_Bypass) && pc>0) s->pg_powered[i]=true; } }
+static void PGEvalPuzzle(void) {
+    SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height; if (w<=0||h<=0) return; int n=w*h; if (n>35) n=35;
+    for (int i=0;i<n;++i) { s->pg_powered[i]=false; s->pg_checked[i]=false; if (s->pg_type[i]==PuzzleCellType_And) s->pg_cell[i]=true; }/*And gates are always conducting, whatever the player has clicked*/
+    int src=(int)s->pg_source; if (src<0||src>=n) return;
+    s->pg_powered[src]=s->pg_cell[src]; if (!s->pg_powered[src]) return;/*the source node has to be a plus itself, or nothing conducts*/
+    int q[142],qt=0,qh=0; q[qt++]=src;/*142, not 35: Unity's queue is a List and a cell is re-added once per powered neighbour that reaches it (the !pg_checked guard only stops it once dequeued), so the high-water mark is 1+4*35.  A 35-entry array smashes the stack on a busy board.*/
+    while (qh<qt) { int mi=q[qh++]; if (s->pg_checked[mi]) continue;
+        int a=PGOrth(mi,-1,0),b=PGOrth(mi,1,0),l=PGOrth(mi,0,-1),r=PGOrth(mi,0,1); bool isAnd=s->pg_type[mi]==PuzzleCellType_And;
+        if (a!=-1 && !s->pg_checked[a] && s->pg_cell[a]) { q[qt++]=a; if (isAnd) PGCheckCellForPower(a); }
+        if (b!=-1 && !s->pg_checked[b] && s->pg_cell[b]) { q[qt++]=b; if (isAnd) PGCheckCellForPower(b); }
+        if (l!=-1 && !s->pg_checked[l] && s->pg_cell[l]) { q[qt++]=l; if (isAnd) PGCheckCellForPower(l); }
+        if (r!=-1 && !s->pg_checked[r] && s->pg_cell[r]) q[qt++]=r;/*Unity's And pre-pass covers above/below/left but not right.  Kept as-is: dropping it would change which boards are solvable.*/
+        PGCheckCellForPower(mi); s->pg_checked[mi]=true; }
+    /*Unity reports the furthest powered column on the progress slider, not a powered-cell fraction.*/
+    float prog=0.0f; for (int c=0;c<w;++c) { for (int r2=0;r2<h;++r2) if (s->pg_powered[r2*w+c]) { prog=(c+1==w)?6.75f/7.0f:(float)(c+1)/7.0f; break; } }
+    s->pg_progress=prog;
+    int out=(int)s->pg_output; if (out>=0 && out<n && s->pg_powered[out]) s->pg_solved=true;/*latched: PuzzleSolved early-returns on puzzleSolved, so the board never un-solves*/ }
 void UI_PuzzleGridCell(bool rh,int cell) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (World.Sys_UI.tetheredPGP==U16_MAX) return; if (World.Sys_UI.pg_solved) return;
     int n=(int)(World.Sys_UI.pg_width*World.Sys_UI.pg_height); if (n<=0||cell<0||cell>=n) return; if (World.Sys_UI.pg_type[cell]!=PuzzleCellType_Standard) return;
     PuzzleGridType gt=(World.diffPuz==1)?(PuzzleGridType)PuzzleGridType_King:(PuzzleGridType)World.Sys_UI.pg_gridType;
     switch (gt) { case PuzzleGridType_King:PGFlipperKing(cell); break; case PuzzleGridType_Queen:PGFlipperQueen(cell); break; case PuzzleGridType_Knight:PGFlipperKnight(cell); break; case PuzzleGridType_Rook:PGFlipperRook(cell); break; case PuzzleGridType_Bishop:PGFlipperBishop(cell); break; default:PGFlipperPawn(cell); break; }
-    PGEvalPuzzle(); if (World.Sys_UI.pg_solved) { u16 pg=World.Sys_UI.tetheredPGP; if (pg>=INSTS_1ST_IDX && pg<World.instCount) { UseTargets(pg,World.instances[pg].targetIdx); if (World.instances[pg].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pg].messageLingdex]); } }
+    PGEvalPuzzle();
+    {   /*PuzzleGrid.OnGridCellClick ends with puzzleGP.SendDataBackToPanel(this), copying the live board back onto
+          the component; PuzzleSolved sets puzzleGP.puzzleSolved and UseTargets latches onlyFireOnce into fired.*/
+        u16 pgi=World.Sys_UI.tetheredPGP; if (pgi>=INSTS_1ST_IDX && pgi<World.instCount) { Entity* pe=&World.instances[pgi];
+            mcpy(pe->gridCells,World.Sys_UI.pg_cell,sizeof(pe->gridCells)); pe->puzzleSolved=World.Sys_UI.pg_solved; if (World.Sys_UI.pg_fired) pe->puzzleFired=true; } }
+    if (World.Sys_UI.pg_solved) {
+        /*PuzzleGridPuzzle.UseTargets: onlyFireOnce (1 on all five grid prefabs, 609..613) latches `fired` and refuses to
+          re-fire, answering with alreadyFiredMessageLingdex 312 instead.  Voxen re-ran the whole target chain every
+          time the board came up solved, so a panel whose target re-latches a door or re-triggers an alarm could be
+          driven repeatedly.*/
+        if (World.Sys_UI.pg_fired) { CenterStatusPrint("%s",Sys_Text.stringTable[312]); return; }
+        World.Sys_UI.pg_fired = true;
+        u16 pg=World.Sys_UI.tetheredPGP; if (pg>=INSTS_1ST_IDX && pg<World.instCount) { UseTargets(pg,World.instances[pg].targetIdx); if (World.instances[pg].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pg].messageLingdex]); } }
 }
 void UI_PuzzleGridSlide(bool rh,float f) { (void)rh; (void)f; /*Unity's puzzle progress handle is a server-authoritative display; the fill is driven by puzzle state, not the drag.*/ }
 void UI_PuzzleGridClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPGP=U16_MAX; World.Sys_UI.pg_solved=false; World.Sys_UI.pg_width=World.Sys_UI.pg_height=0; SysUIDataClose(rh); }
 /*---- Wire puzzle (Unity PuzzleWire.cs). curL/curR hold the wire id occupying each column on that side; selectedWire is the chosen column (0..6) of the held wire, selectedWireRH is the side it was grabbed from. Clicking the same side re-grabs the wire there, clicking the other side swaps that column in. Genius patch (wirePuzzle.geniusActive): while active, hint markers are shown at each active wire's target columns in the wire's true color (pw_wireColor); on hard difficulty this reveals the per-wire colors instead of all-Yellow (Unity sets wireColors to rememberColors).--*/
 static i8 PWFindCol(const i8* arr,int wire) { for (i8 c=0;c<7;++c) if ((int)arr[c]==wire) return c; return -1; }
 static void PWClickEnd(int spot,bool colRH) { if (spot<0||spot>6) return; i8* col=colRH?World.Sys_UI.pw_curR:World.Sys_UI.pw_curL;
-    if (World.Sys_UI.pw_selectedWire < 0) { if (col[spot]>=0) { World.Sys_UI.pw_selectedWire=(i8)spot; World.Sys_UI.pw_selectedWireRH=colRH; } return; }
-    if (World.Sys_UI.pw_selectedWireRH == colRH) { World.Sys_UI.pw_selectedWire=(col[spot]>=0)?(i8)spot:(i8)-1; return; }/*same side: change which wire is held*/
-    i8 sel=World.Sys_UI.pw_selectedWire; i8 temp=col[spot]; col[spot]=col[sel]; col[sel]=temp; World.Sys_UI.pw_selectedWire=-1;
+    /*PuzzleWire.ClickLHNode is "if (selectedWireLH) { selectedWire < 0 ? SelectWireLH : MoveEndpointLeft } else SelectWireLH",
+      and ClickRHNode mirrors it.  There is no re-grab step: a second click on the side you are already holding a wire on is
+      a MOVE, not a re-selection.  Voxen was re-selecting there, so two same-side clicks never moved anything and a wire
+      could only be dragged by clicking across to the other side and back -- the panel was effectively unplayable.
+      MoveEndpoint also displaces the wire that currently holds the target spot, which is exactly the swap below.*/
+    if (World.Sys_UI.pw_selectedWire >= 0 && World.Sys_UI.pw_selectedWireRH == colRH) {
+        i8 sel=World.Sys_UI.pw_selectedWire; i8 temp=col[spot]; col[spot]=col[sel]; col[sel]=temp; World.Sys_UI.pw_selectedWire=-1; return; }
+    /*SelectWireX only takes a wire when "wireNPosition == spot && wireIsActive[N]", and it resets selectedWire to -1
+      before testing, so a node held by an inactive wire simply leaves nothing selected.*/
+    World.Sys_UI.pw_selectedWire=-1;
+    if (col[spot]>=0 && World.Sys_UI.pw_wireOn[col[spot]]) { World.Sys_UI.pw_selectedWire=(i8)spot; World.Sys_UI.pw_selectedWireRH=colRH; }
 }
-static void PWEval(void) { float match=0.0f; for (i8 w=0;w<7;++w) { i8 l=PWFindCol(World.Sys_UI.pw_curL,w),r=PWFindCol(World.Sys_UI.pw_curR,w); if (World.Sys_UI.pw_wireOn[w] && l>=0 && r>=0 && l==World.Sys_UI.pw_tgtL[w] && r==World.Sys_UI.pw_tgtR[w]) match+=0.19f; } if (World.diffPuz==1) match+=0.19f;/*Easy draws a free 0.19, mirroring the Unity bonus*/ World.Sys_UI.pw_temp=match; World.Sys_UI.pw_solved=(match>0.92f); }
-void UI_WireNodeClick(bool rh,int node) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (World.Sys_UI.tetheredPWP==U16_MAX) return; if (World.Sys_UI.pw_solved) return; if (node<0||node>13) return;
+static void PWEval(void) { float match=0.0f; bool all=true;
+    /*PuzzleWire.EvaluatePuzzle scores 0.19 per correct ENDPOINT -- fourteen independent awards, not one per wire -- and
+      then wins on "tempF > 0.92f OR AllWiresCorrect()".  Scoring a whole wire at once made the threshold unreachable
+      (0.19*4 = 0.76 on the four-wire teal panel), so Unity's near-miss tolerance could never fire and only the
+      all-wires-correct case solved anything.*/
+    for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 l=PWFindCol(World.Sys_UI.pw_curL,w),r=PWFindCol(World.Sys_UI.pw_curR,w);
+        bool lok=(l>=0 && l==World.Sys_UI.pw_tgtL[w]), rok=(r>=0 && r==World.Sys_UI.pw_tgtR[w]);
+        if (lok) match+=0.19f; if (rok) match+=0.19f; if (!(lok&&rok)) all=false; }
+    if (World.diffPuz==1) match+=0.19f;/*Easy draws a free 0.19, mirroring the Unity bonus*/
+    World.Sys_UI.pw_temp=match; World.Sys_UI.pw_solved=(match>0.92f || all); }
+void UI_WireNodeClick(bool rh,int node) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (World.Sys_UI.tetheredPWP==U16_MAX) return; if (World.Sys_UI.pw_solved) return; if (node<0||node>13) return; if (!World.Sys_UI.pw_rowActive[node%7]) return;/*hidden node rows take no input either: nodeRowIsActive false means SetActive(false), so the row has no button.*/
     PWClickEnd(node%7, node>=7); PWEval();
     if (World.Sys_UI.pw_solved) { u16 pw=World.Sys_UI.tetheredPWP; if (pw>=INSTS_1ST_IDX && pw<World.instCount) { UseTargets(pw,World.instances[pw].targetIdx); if (World.instances[pw].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pw].messageLingdex]); } }
 }
@@ -539,6 +588,16 @@ void MFD_OpenAudioLog(int idx) {/*Unity MFDManager.SendAudioLogToDataTab: LH dat
     if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD;/*ereader stays powered on*/
     World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6);
     World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; }
+/*Unity PaperLog.Use -> MFDManager.SendPaperLogToDataTab (MFDManager.cs:1174-1194).  Unlike SendAudioLogToDataTab this
+  opens a side only when that log actually has an image on it, and it does not add the log to the data-tab folder:
+  LogDataTabContainerManager.SendLogData only fills in the name/sender/subject/image fields, so frobbing a paper log
+  reads it once and leaves the player's log folder alone.*/
+void MFD_OpenPaperLog(int idx, V3 tetherPoint) {
+    if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD;
+    if (Sys_Text.audioLogImagesRefIndicesLH[idx]) MFD_OpenData(false,6);
+    if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6);
+    World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT;
+    World.Sys_UI.objectInUsePos=tetherPoint; World.Sys_UI.usingObject=true; }
 
 static void UIOpenEntryAndRead(int idx,bool playable) { if (idx<0||idx>=LOGCNT) return; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.logReaderPage=0; World.invP1.readLog[idx]=true;
     if (playable && (World.invP1.hasHardware&HW_ERD) && audioLogs[idx] && audioLogs[idx][0]) PlayLog(idx);
@@ -879,7 +938,14 @@ void SideMFD(bool isRH) { // 320x240
             }
             if (data==2) {/*Keycode pad*/
                 for (u8 i=0;i<12;++i) { i16 kx=(i16)(keyBtnX[i%3]+dx),ky=keyBtnY[i/3]; UIRImg(MID(isRH,KEYCODE_0)+keyBtnK[i],kx,ky,42,38,2133);/*keypad_end*/ RenderUIImage((i16)(kx+2),(i16)(ky+3),38,35,2134);/*keypad_inner_on*/ RenderTextC((i16)(kx+21),(i16)(ky+14),T_GREEN,FONT_NORMAL,0.8,"%s",keyBtnLabel[i]); }
-                for (u8 d=0;d<3;++d) UIRImg(MID(isRH,KEYCODE_DIGIT_0)+d,(i16)(90+41*d+dx),526,32,32,2132);/*Hundreds/Tens/Ones elnum_null*/
+                /*KeycodeDigitImage.digits[] is elnum0..elnum9 with elnum_null last at index 10, and its Update() maps a
+                  -1 entry to 10, so an unfilled slot shows elnum_null and a filled one shows its own digit sprite
+                  (923..932 here, 2132 for the blank).  The three GameObjects sit at anchoredPosition.x -26 / 0 / 25.9,
+                  so left to right is Huns, Tens, Ones.  The display is driven by those three fields alone and never by
+                  currentEntry, which is why MFDManager.SendKeypadKeycodeToDataTab's difficultyMission<=1 preload of
+                  currentEntry=keycode still shows three blank slots until something is actually typed.*/
+                i8 keyDigits[3]={World.Sys_UI.keycodeHuns,World.Sys_UI.keycodeTens,World.Sys_UI.keycodeOnes};
+                for (u8 d=0;d<3;++d) { i8 dg=keyDigits[d]; UIRImg(MID(isRH,KEYCODE_DIGIT_0)+d,(i16)(90+41*d+dx),526,32,32,dg<0?2132:923+dg); }
                 UIRImg(MID(isRH,KEYCODE_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==5) RenderSearch(isRH);
@@ -908,7 +974,28 @@ void SideMFD(bool isRH) { // 320x240
                 UIRImg(MID(isRH,WIRE_SLIDER),40+dx,509,235,69,1078);/*Handle - whole levels box drags*/ UIRImg(MID(isRH,WIRE_TARGET),204+dx,522,66,42,2145);/*TargetLine*/
                 i8 geniusHintWire[14]; for (u8 n=0;n<14;++n) geniusHintWire[n]=-1;
                 if (World.geniusActive) { for (u8 w=0;w<7;++w) if (World.Sys_UI.pw_wireOn[w]) { i8 l=World.Sys_UI.pw_tgtL[w],r=World.Sys_UI.pw_tgtR[w]; if (l>=0&&l<7) geniusHintWire[l]=(i8)w; if (r>=0&&r<7) geniusHintWire[7+r]=(i8)w; } }/*Unity PuzzleWire: geniusHintsLH/RH[wireTarget].enabled=true while geniusActive; wireColors revert to rememberColors (true per-wire colors) instead of all-Yellow on hard.*/
-                for (u8 n=0;n<14;++n) { i16 nx=(i16)((n<7?57:222)+dx),ny=wireNodeY[n%7]; UIRImg(MID(isRH,WIRE_NODE_0)+n,nx,ny,26,29,2146);/*wire_node*/ RenderUIImage((i16)(nx+4),(i16)(ny+6),16,16,0);/*SelectedIndicator*/ if (geniusHintWire[n]>=0) RenderTextL((i16)(nx+1),(i16)(ny+3),World.Sys_UI.pw_wireColor[geniusHintWire[n]],FONT_NORMAL,1.0f,"◆");/*GeniusHint in the wire's true color*/ }
+                /*PuzzleWire.Update's display rule: outside Genius every wire is Yellow on hard (difficultyPuzzle 3),
+                  and with Genius active the true rememberColors come back.  pw_wireColor holds the true colors; this
+                  is where Unity's all-Yellow substitution actually has to happen.*/
+                u8 wireHud[7]; for (u8 w=0;w<7;++w) wireHud[w]=(World.diffPuz==3 && !World.geniusActive) ? (u8)HUDC_YELLOW : World.Sys_UI.pw_wireColor[w];
+                /*PuzzleWire.ChangeAppearance gives every wire a LineRenderer from GetPositionOfLHNode(wireNLHPosition)
+                  to GetPositionOfRHNode(wireNRHPosition) and paints both ends GetColor(wireColors[N]).  Voxen has no
+                  LineRenderer, so each wire is a wire.png quad stretched between the two node centres and rotated onto
+                  that run, tinted to the same colour.  Drawn before the nodes so the sprite caps cover the ends, which
+                  is the overlap Unity gets for free from the endpoints sitting exactly on the node centres.  Unity's
+                  serialized widthMultiplier is 0.004 in a runtime-built MFD canvas whose absolute scale is not in the
+                  scene dump (the ratio it implies against the 106-unit line length is sub-pixel), so WIRE_THICK is
+                  picked from the 26x29 node sprite instead.  CheckEnabledNodes enables wires purely on wireIsActive,
+                  so a wire still draws when its node row is hidden.*/
+                for (u8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 lc=PWFindCol(World.Sys_UI.pw_curL,w),rc=PWFindCol(World.Sys_UI.pw_curR,w); if (lc<0||lc>6||rc<0||rc>6) continue;
+                    float x0=(float)((57+dx)+13), y0=(float)wireNodeY[lc]+14.5f, x1=(float)((222+dx)+13), y1=(float)wireNodeY[rc]+14.5f;
+                    float len=vsqrtf((x1-x0)*(x1-x0)+(y1-y0)*(y1-y0)), cx=(x0+x1)*0.5f, cy=(y0+y1)*0.5f, tr,tg,tb;
+                    if (len<0.5f) continue;/*both ends on the same row: nothing to draw between them*/
+                    hudColorToRGB(wireHud[w],&tr,&tg,&tb);
+                    RenderUIImageExtended((i16)vround(cx-len*0.5f),(i16)vround(cy-WIRE_THICK*0.5f),(i16)vround(len),(i16)WIRE_THICK,3328/*wire.png*/,
+                        __builtin_atan2f(y1-y0,x1-x0),0.5f,0.5f,tr,tg,tb); }
+                u8 wireDraw[7]; for (u8 w=0;w<7;++w) wireDraw[w]=hudColorToText(wireHud[w]);
+                for (u8 n=0;n<14;++n) { if (!World.Sys_UI.pw_rowActive[n%7]) continue;/*PuzzleWire.CheckEnabledNodes: nodeRowIsActive[i] false hides both that row's LH and RH node.*/ i16 nx=(i16)((n<7?57:222)+dx),ny=wireNodeY[n%7]; UIRImg(MID(isRH,WIRE_NODE_0)+n,nx,ny,26,29,2146);/*wire_node*/ RenderUIImage((i16)(nx+4),(i16)(ny+6),16,16,0);/*SelectedIndicator*/ if (geniusHintWire[n]>=0) RenderTextL((i16)(nx+1),(i16)(ny+3),wireDraw[geniusHintWire[n]],FONT_NORMAL,1.0f,"◆");/*GeniusHint in the wire's true color*/ }
                 UIRImg(MID(isRH,WIRE_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==7) {/*SysAnalyzer*/

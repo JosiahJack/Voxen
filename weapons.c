@@ -139,7 +139,10 @@ static u16 ImpactParticleType(u16 prefab) {
 }
 static bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     u16 type=ImpactParticleType(prefab); const PSysDef* preset=PSysTypeGet(type); if (!preset) return false;
-    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); def.emitRate=60.0f; if (def.duration<=0.0f || def.duration>2.0f) def.duration=1.0f; PSysAdd(&def); return true;
+    /*The preset is used verbatim: lifetime, emission rate, size and colour all come out of particleTypeDefs for the
+      emitter that the Unity prefab actually points at.  This used to force emitRate 60 and clamp any duration outside
+      (0,2] down to 1.0s, which silently retimed every impact effect regardless of what the prefab asked for.*/
+    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def); return true;
 }
 /* Blood/sparks by the struck target's blood type (Const.a.GetImpactType). Shared with the NPC hitscan path. */
 void SpawnImpactEffectParticle(u16 prefab, V3 pos, V3 normal) {
@@ -168,20 +171,29 @@ static u16 ProjectileImpactParticleType(u16 projectile) {
 }
 void SpawnProjectileImpactParticles(u16 projectile,V3 pos,V3 normal) {
     /* Unity spawns the projectile's own pooled impact effect; blood/spark-by-bloodtype
-       effects are hitscan-only (WeaponFire/AIController), so they aren't spawned here. */
+       effects are hitscan-only (WeaponFire/AIController), so they aren't spawned here.  Preset used verbatim, same
+       as SpawnImpactParticleForPrefab: no local lifetime or emission-rate override. */
     u16 type=ProjectileImpactParticleType(projectile); const PSysDef* preset=PSysTypeGet(type); if(!preset)return;
-    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal);
-    def.emitRate=60.0f; if (def.duration<=0.0f || def.duration>2.0f) def.duration=1.0f; PSysAdd(&def);
+    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def);
 }
 static bool DidRayHit(int wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRayPixels(World.instances[PLAYER1].forward,World.instances[PLAYER1].right,random_range(-d,d),random_range(-d,d));RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;return true;}return false;}
+/*Bullet-hole decal size.  Unity drives it from the prefab's Projector m_OrthographicSize; Voxen has no projector
+  pass, so the same number is the card's half-extent.  EDefs[518..523] all use model 5988 (genericLOD3card_zero.obj),
+  a flat quad in the local XZ plane spanning +/-1.28, i.e. 2.56 units wide, so scale = halfSize / 1.28.
+    518 BulletHoleLarge 0.06   519 BulletHoleScorchLarge 0.2   520 BulletHoleScorchSmall 0.1
+    521 BulletHoleSmall 0.04   522 BulletHoleTiny 0.15          523 BulletHoleTinySpread 0.3
+  A wall and a floor differ by 90 degrees about X, not about Y, which is why the two rotations compose: orient -Y onto
+  the impact normal, then spin about that normal so all four hole variants read the same way on a surface. */
+static const float bulletHoleSize[6] = {0.06f,0.2f,0.1f,0.04f,0.15f,0.3f};
 void CreateStandardImpactMarks(int wep16) {
     if (!wfx.tempHit.hit) return;
     Entity* e = &World.instances[wfx.tempHit.hitInstanceIndex];
     if ((e->entflags & EF_RIGIDBODY) || IdxIsDoor(e->index) || IdxIsNPC(e->index) || e->index==279/*chunk_screen*/ || e->index==477/*sec_camera*/) return; // Don't create bullet holes on objects that move, take damage, animate, or are doors (Unity: skips Rigidbody, HealthManager, Animator/Animation, Door).
     V3 pos = V3_AplusB(wfx.tempHit.point, V3_ScaleByF(wfx.tempHit.normal, 0.16f));
-    u16 markInst = SpawnDynamicObject(wepBulletHolePrefab[wep16], -1); if (markInst == 0xFFFF) return;
+    u16 hole = wepBulletHolePrefab[wep16]; u16 markInst = SpawnDynamicObject(hole, -1); if (markInst == 0xFFFF) return;
     World.position[markInst] = pos;
     World.rotation[markInst] = quat_multiply(QuatFromToRotation((V3){0,1,0},V3_ScaleByF(wfx.tempHit.normal,-1.0f)),QuatEulerZ((float)(int)random_range(0.0f,3.99f) * 90.0f));
+    if (hole >= 518 && hole <= 523) World.scale[markInst] = V3_ScaleByF((V3){1,1,1}, bulletHoleSize[hole - 518] / 1.28f);
 }
 
 void CreateStandardImpactEffects(){if(wfx.tempHitEnt==0xFFFF)return;u16 ent=wfx.tempHitEnt;if(ent>=World.instCount)return;u16 prefab=GetImpactType(ent);if(prefab==0||prefab>=MAX_ENTITIES)prefab=731;V3 pos=wfx.tempHit.hit?V3_AplusB(wfx.tempHit.point,V3_ScaleByF(wfx.tempHit.normal,wfx.hitOffset)):World.position[ent];V3 n=wfx.tempHit.hit?wfx.tempHit.normal:(V3){0,1,0};if(SpawnImpactParticleForPrefab(prefab,pos,n))return;u16 fx=SpawnDynamicObject(prefab,-1);if(fx!=0xFFFF&&fx<INSTANCE_COUNT){World.position[fx]=pos;World.rotation[fx]=QuatFromToRotation((V3){0,1,0},n);}}

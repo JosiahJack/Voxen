@@ -1,6 +1,7 @@
 // ui_frag.glsl: Generic shader for unlit textured UI images (mostly cutouts)
 in vec2 TexCoord;
 layout(location=0) uniform uint texIndex;
+layout(location=1) uniform vec4 uiTint; // RGB colour tint, alpha scales the texel alpha.  Every draw goes through RenderUIImage/Extended, which always sets it, so it is never left at GL's default of 0.
 layout(location=0) out vec4 outUI; // GL_COLOR_ATTACHMENT0
 layout(std430,binding=12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
@@ -25,5 +26,5 @@ void main() {
     texUV.x = texUV.x % texSize.x; texUV.y = texUV.y % texSize.y;
     vec4 albedoColor = getTextureColor(texIndex,texUV,texSize.x);
 //     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
-    outUI = albedoColor;
+    outUI = albedoColor * uiTint; // White tint for the ~1500 axis-aligned UI images; the puzzle wires use wire.png, a near-white 16x16 strip, and need their real colour multiplied in.
 }

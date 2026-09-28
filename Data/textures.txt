@@ -6937,3 +6937,32 @@ index: 3321
 index: 3322
 #Textures/UI/ammoicons/ss1_tranq.png
 index: 3323
+// Bullet-hole decal masks from Citadel Assets/Standard Assets/Effects/Projectors/Textures.
+// Baked for Voxen's transparent entity pass: RGB is forced to black and alpha is 1 - mask, so the engine's
+// GL_SRC_ALPHA / GL_ONE_MINUS_SRC_ALPHA over-blend reproduces the Projector shader's multiply of whatever is
+// behind the decal (dst*(1-a) == dst*mask).  transparent sorts them back-to-front; doublesided is off because
+// genericLOD3card_zero.obj is single-sided with its -Y normal, which the spawn rotation already aims outward.
+#Textures/bullethole1.png
+index: 3324
+transparent: 1
+doublesided: 0
+#Textures/bullethole3.png
+index: 3325
+transparent: 1
+doublesided: 0
+#Textures/bullethole_scorch.png
+index: 3326
+transparent: 1
+doublesided: 0
+#Textures/bullethole_tinyspread.png
+index: 3327
+transparent: 1
+doublesided: 0
+
+// Wire puzzle line art.  16x16 near-white vertical shading strip, 222 down to 171.  Stretched along U between the
+// two wire nodes and rotated to match the run (PuzzleWire.ChangeAppearance sets LineRenderer positions 0 and 1 to
+// the LH/RH node points), tinted per wire by the panel's actualColor* through ui_frag.glsl's uiTint.
+// wire_yellow.png is the pre-baked hard-difficulty yellow variant and stays unused: Voxen tints instead, so the
+// Genius restore of the true per-wire colours needs no second texture.
+#Textures/UI/puzzle/wire.png
+index: 3328
