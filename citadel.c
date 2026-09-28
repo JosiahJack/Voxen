@@ -254,6 +254,21 @@ void TriggerCounterTargetted(u16 self, u16 act) { Entity* e=&World.instances[sel
 // spawnLocations array is an unordered Random.Range pick and each spawner's list is exactly that set, so the list
 // does not need storing.  Two Unity checks have no Voxen equivalent and are noted inline.
 void SpawnManagerActivate(u16 self, bool alerted) { Entity* e=&World.instances[self]; e->alertEnemiesOnAwake=alerted; e->active=true; e->delayFinished=World.pauseRelativeTime; }
+// AreaHidden + AreaClear for a spawn point (SpawnManager.GetRandomLocation).  Unity rejects a point that is
+// AreaHidden (not currently in the player's PVS) or not AreaClear (overlapping an area), then re-rolls.  AreaHidden
+// maps onto the culled PVS directly; the spawn point is static, so its entity cellIndex is the cell its position
+// resolves to.  AreaClear reuses CantStand's collision path via AreaHasClearance with span 0, i.e. a single
+// strict 0.48-radius sphere test at the exact point.
+// DIVERGENCE (intended): a bare sphere is a tighter volume than Unity's area overlap, so this is stricter than the
+// reference game -- a cramped-but-legal spawn point can be rejected where Unity would accept it.  Pass
+// AREA_SWEEP_SPAN instead of 0 to sweep like CantStand does, which makes it far more permissive.
+static bool SpawnPointIsClear(u16 spot) {
+    V3 p=World.position[spot]; if(World.curLev>=LEVEL_CYBERSPACE||PositionVisibleFromPlayerCell(p.x,p.z)) {/*cyberspace never builds PVS bits (culling.c:151), so treat it as all-visible, matching TargetIDInPlayerPVS. No spawner sits on 13 today.*/
+        ShapeCapsule ball={.tip=p,.base=p,.rad=0.48f};/* tip==base is a sphere */
+        return AreaHasClearance(ball,ball,0.0f,LMASK_NPC_COLLIDESWITH,0xFFFFu);
+    }
+    return false;
+}
 void SpawnManagerUpdate(u16 self) {
     Entity* e=&World.instances[self]; if (World.paused || World.menuActive || !e->active) {return;}/*SpawnManager.Update:40-42*/
     u16 levelNpcs=0,count=0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i){ Entity* n=&World.instances[i]; if(!IdxIsNPC(n->index)) {continue;} ++levelNpcs; if(!(n->entflags&EF_ACTIVE) || (n->health <= 0.0f && n->cyberHealth <= 0.0f)) {continue;} if(e->countOnlySameIndex && n->index!=e->spawnIndex) {continue;} ++count;}
@@ -265,10 +280,12 @@ void SpawnManagerUpdate(u16 self) {
     if (World.diffCbt == 0) {return;}/*SpawnManager.Spawn():101 - combat 0 spawns nothing*/
     u16 spots=0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {if(World.instances[i].index==SPAWNPOINT_CONST) {++spots;}}
     if (!spots) {return;}
-    /* GetRandomLocation():99-116 re-rolls until it hits a point that is neither AreaClear nor AreaHidden.  Voxen
-       has neither concept, so every spawn point is usable and the first random pick stands. */
-    u16 want=(u16)random_range_u32(0,spots-1),spot=0;/*SpawnManager.GetRandomLocation():99 uses Random.Range(0, spawnLocations.Length-1), which is inclusive of both ends and so never picks the LAST point. Kept as-is for parity -- change to (0,spots) to make every point reachable.*/ for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i){ if(World.instances[i].index!=SPAWNPOINT_CONST) {continue;} if(want--==0){spot=i;break;} }
-    if (!spot) {return;}
+    /* GetRandomLocation():99-116 takes 10 shots, returns the first clear point once more than 8 have been clear,
+       otherwise keeps the last clear one and gives up entirely if none were.  Random.Range(0, Length-1) there is
+       inclusive at both ends and so never yields the LAST point; kept for parity, and random_range_u32 is also
+       inclusive so the two agree. */
+    u16 spot=0,valid=0; for (u8 shot=0;shot<10;++shot){ u16 want=(u16)random_range_u32(0,spots-1),cand=0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i){ if(World.instances[i].index!=SPAWNPOINT_CONST) {continue;} if(want--==0){cand=i;break;} } if (!cand||!SpawnPointIsClear(cand)) {continue;} spot=cand; if (++valid>8) break; }
+    if (!valid) {return;}/*GetRandomLocation returns null; Spawn():122 logs and bails*/
     u16 npc=SpawnDynamicObject(e->spawnIndex,false); if (npc==0xFFFF) {return;}/*SpawnManager.Spawn():119-122 logs and bails*/
     World.position[npc]=World.position[spot]; World.scale[npc]=(V3){1.0f,1.0f,1.0f};
     if (!e->alertEnemiesOnAwake) {flag_set(&World.instances[npc].entflags, EF_WANDERING, true); return;}/*aic.wandering = true, except for index 14 which SpawnManager.Spawn():132 skips; 14 is not an NPC constIndex in Voxen's table, so there is no such exception*/

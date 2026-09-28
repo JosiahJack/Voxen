@@ -230,10 +230,10 @@ void SphTriTest(V3 sc, float sr, u16 mesh, u32 ti, const float* mx, Overlap* r) 
 }
 
 INLINE V3 TriSupport(V3 ta, V3 tb, V3 tc, V3 d) { float d1=V3_dot(ta,d),d2=V3_dot(tb,d),d3=V3_dot(tc,d); return d1>d2 ? (d1>d3 ? ta : tc) : (d2>d3 ? tb : tc); }
-typedef struct SupportCtx { V3 (*supA)(const struct SupportCtx *ctx, V3 dir); V3 (*supB)(const struct SupportCtx *ctx, V3 negDir); u16 prim,meshA,meshB; const float *matA,*matB; V3 ta,tb,tc; u16 adjA,adjB; ShapeBox boxShape; } SupportCtx; typedef struct { Simplex3D s; V3 dir; bool hit; } GJKResult;
+typedef struct SupportCtx { V3 (*supA)(const struct SupportCtx *ctx, V3 dir); V3 (*supB)(const struct SupportCtx *ctx, V3 negDir); u16 prim,meshA,meshB; const float *matA,*matB; V3 ta,tb,tc; u16 adjA,adjB; ShapeBox boxShape; ShapeCapsule capShape; } SupportCtx; typedef struct { Simplex3D s; V3 dir; bool hit; } GJKResult;
 INLINE V3 _supA_hull(const SupportCtx *ctx, V3 d) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, d); }    INLINE V3 _supA_sph(const SupportCtx *ctx, V3 d)  { return SphSupport(Entity_GetSph(ctx->prim), d); }
 INLINE V3 _supA_box(const SupportCtx *ctx, V3 d)  { return BoxSupport(Entity_GetBox(ctx->prim), d); }             INLINE V3 _supA_boxShape(const SupportCtx *ctx, V3 d) { return BoxSupport(ctx->boxShape, d); }
-INLINE V3 _supA_cap(const SupportCtx *ctx, V3 d)  { return CapsuleSupport(Entity_GetCap(ctx->prim), d); }         INLINE V3 _supB_hull(const SupportCtx *ctx, V3 nd)  { return HullSupport(ctx->meshB, ctx->matB, ctx->adjB, nd); }
+INLINE V3 _supA_cap(const SupportCtx *ctx, V3 d)  { return CapsuleSupport(Entity_GetCap(ctx->prim), d); }         INLINE V3 _supA_capShape(const SupportCtx *ctx, V3 d) { return CapsuleSupport(ctx->capShape, d); }         INLINE V3 _supB_hull(const SupportCtx *ctx, V3 nd)  { return HullSupport(ctx->meshB, ctx->matB, ctx->adjB, nd); }
 INLINE V3 _supB_hullA(const SupportCtx *ctx, V3 nd) { return HullSupport(ctx->meshA, ctx->matA, ctx->adjA, nd); } INLINE V3 _supB_tri(const SupportCtx *ctx, V3 nd)   { return TriSupport(ctx->ta, ctx->tb, ctx->tc, nd); }
 INLINE void GetSupportPair(const SupportCtx *ctx, V3 dir, V3 *wA, V3 *wB) { V3 nd = {-dir.x, -dir.y, -dir.z}; *wA = ctx->supA(ctx, dir); *wB = ctx->supB(ctx, nd); }
 GJKResult RunGJK(const SupportCtx *ctx, int maxIter) {GJKResult res={0}; res.dir=(V3){0,1,0}; V3 wA,wB; GetSupportPair(ctx,res.dir,&wA,&wB); res.s.wA[res.s.n]=wA; res.s.wB[res.s.n]=wB; res.s.v[res.s.n++]=V3_AsubB(wA, wB); res.dir=(V3){-res.s.v[0].x,-res.s.v[0].y,-res.s.v[0].z}; if(V3_dot(res.dir,res.dir)<PHY_EPSILON) res.dir=(V3){0,1,0}; for(int it=0;it<maxIter;++it){GetSupportPair(ctx,res.dir,&wA,&wB); V3 sup=V3_AsubB(wA,wB); if(V3_dot(sup,res.dir)<0){break;} res.s.wA[res.s.n]=wA; res.s.wB[res.s.n]=wB; res.s.v[res.s.n++]=sup; if(!GJKNextSimplex(&res.s,&res.dir)){res.hit = true; break;}} return res;}
@@ -257,9 +257,17 @@ INLINE void BvhNodeWorldAABB(const BvhNode* node, const float* mx, V3* wMn, V3* 
 void BvhWalkSphMsh(V3 sc, float sr, u16 m, const float* mx, Overlap* r) {const BvhNode* nodes=modelBVHNodes[m]; const u16* to=modelBVHTriOrder[m]; const BvhNode* stack[64]; int sp=0; stack[sp++]=&nodes[0]; while(sp>0){const BvhNode* node=stack[--sp]; V3 wMn,wMx; BvhNodeWorldAABB(node,mx,&wMn,&wMx); if(!BvhSphereAABBOverlap(sc,sr,wMn,wMx))continue; if(node->triCount > 0){for(u32 i=0;i<node->triCount;++i)SphTriTest(sc,sr,m,to[node->triStart+i],mx,r);}else{for(int o=0;o<8;++o)if(node->children[o]>=0)stack[sp++]=&nodes[node->children[o]];}}}
 static Overlap SphMsh(V3 sc, float sr, u16 m, const float* mx) { Overlap r={0}; if(m>=MAX_MDLS)return r; u32 tc=modelTriangleCounts[m]; if(!tc){return r;} if (BvhHasBVH(m)) { BvhWalkSphMsh(sc,sr,m,mx,&r); return r; } for(u32 ti=0;ti<tc;++ti){SphTriTest(sc,sr,m,ti,mx,&r);} return r; }
 static Overlap CapMsh(ShapeCapsule c, u16 m, const float* mx) { Overlap best=SphMsh(c.base,c.rad,m,mx), rt=SphMsh(c.tip,c.rad,m,mx); if(rt.pen>best.pen)best=rt; V3 d=V3_AsubB(c.tip,c.base); if(V3_Mag(d)>PHY_EPSILON){for(int k=1;k<6;++k){float t=(float)k/5.0f; Overlap rm=SphMsh(V3_AplusB(c.base,V3_ScaleByF(d,t)),c.rad,m,mx); if(rm.pen>best.pen)best=rm;}} return best;}
+static Manifold RunGjkEpa(SupportCtx* ctx) {
+    Manifold m={0}; GJKResult gjk=RunGJK(ctx,GJK_ITER); if(!gjk.hit)return m; if(gjk.s.n<4) RunGJKFallback(ctx,&gjk.s); if(gjk.s.n<4)return m; EPAState epa; SeedEPA(&epa,&gjk.s);
+    for(int it=0;it<EPA_ITER;++it){ int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break; V3 bn=epa.ef[bf].n; V3 wA,wB; GetSupportPair(ctx,bn,&wA,&wB); V3 sup=V3_AsubB(wA,wB); if(V3_dot(bn,sup)-bd<PHY_EPSILON){return MakeEPAManifold(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c,bn,bd);} if (!ExpandEPA(&epa,sup,wA,wB))break;}    return m;
+}
 Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx, u16 adjIdx) {
-    Manifold m={0}; if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return m; u8 col=World.col[prim]; V3 (*supA)(const SupportCtx*,V3)=(col == COLTYPE_SPH) ? _supA_sph : (col == COLTYPE_BOX) ? _supA_box : _supA_cap; SupportCtx ctx=(SupportCtx){supA,_supB_hullA,.prim=prim,.meshA=mesh,.matA=mx,.adjA=adjIdx,.adjB=adjIdx}; GJKResult gjk=RunGJK(&ctx,GJK_ITER); if(!gjk.hit)return m; if(gjk.s.n<4) RunGJKFallback(&ctx,&gjk.s); if(gjk.s.n<4)return m; EPAState epa; SeedEPA(&epa,&gjk.s);
-    for(int it=0;it<EPA_ITER;++it){ int bf=-1; float bd=1e9f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break; V3 bn=epa.ef[bf].n; V3 wA,wB; GetSupportPair(&ctx,bn,&wA,&wB); V3 sup=V3_AsubB(wA,wB); if(V3_dot(bn,sup)-bd<PHY_EPSILON){return MakeEPAManifold(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c,bn,bd);} if (!ExpandEPA(&epa,sup,wA,wB))break;}    return m;
+    if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return (Manifold){0}; u8 col=World.col[prim]; V3 (*supA)(const SupportCtx*,V3)=(col == COLTYPE_SPH) ? _supA_sph : (col == COLTYPE_BOX) ? _supA_box : _supA_cap; SupportCtx ctx=(SupportCtx){supA,_supB_hullA,.prim=prim,.meshA=mesh,.matA=mx,.adjA=adjIdx,.adjB=adjIdx}; return RunGjkEpa(&ctx);
+}
+// Same test against a capsule the caller already has in hand, so probes that are not entities (the SpawnManager's
+// free-floating area-clear sphere) can be tested against convex level geometry without an instance slot.
+Manifold PrimitiveCvxCapsule(ShapeCapsule cap, u16 mesh, const float* mx, u16 adjIdx) {
+    if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return (Manifold){0}; SupportCtx ctx=(SupportCtx){_supA_capShape,_supB_hullA,.meshA=mesh,.matA=mx,.adjA=adjIdx,.adjB=adjIdx,.capShape=cap}; return RunGjkEpa(&ctx);
 }
 
 typedef struct {V3 mn,mx;} AABB3; typedef struct {u16 hullMesh; const float* hullMx; const V3* boxV; u32 boxN; AABB3 hb; V3 hullCenter; float hullRadius,spreadEps,thicknessTolerance; Manifold best; u16 adjHull; ShapeBox boxShape; V3 bestTa,bestTb,bestTc,bestTriN,bestDeepPoint; float bestTriD; bool haveBestTri;} CvxMshCtx;
@@ -557,22 +565,65 @@ void Physics(float dt) {
 }
 
 INLINE float smooth_damp(float cur, float targ, float* vel, float tm, float dt) { float o=2.0f / vmax(tm,0.0001f); float x=o * dt; float exp=1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x); float d=cur - targ; float t=(*vel + o * d) * dt; *vel=(*vel - o * t) * exp; return targ + (d + t) * exp; }
-bool CantStand(u16 playerIdx, float targetHeight) { // Match Unity's prospective shape while keeping the player's current lower extent fixed.
-    if(playerIdx>=World.instCount||targetHeight<=World.colliderSize[playerIdx].y)return false;
-    float oldHeight=World.colliderSize[playerIdx].y,oldCenterY=World.colliderCenter[playerIdx].y; bool blocked=false; u32 mask=GetCollisionMask(World.layer[playerIdx]);
-    World.colliderSize[playerIdx].y=targetHeight; World.colliderCenter[playerIdx].y=oldCenterY+(oldHeight-targetHeight)*0.5f; ShapeCapsule prospective=Entity_GetCap(playerIdx);
-    for(u16 b=0;b<World.instCount&&!blocked;++b){if(b==playerIdx||!(World.instances[b].entflags&EF_ACTIVE)||!(mask&World.layer[b])||World.col[b]==COLTYPE_NONE)continue; float pen=0.0f;
+// One placement test: does `probe` (world space) intersect anything on `mask`?  Shared by CantStand and the
+// SpawnManager's AreaClear so both use one collision path.
+static bool AreaBlockedAt(ShapeCapsule probe, u32 mask, u16 self) {
+    for(u16 b=0;b<World.instCount;++b){if(b==self||!(World.instances[b].entflags&EF_ACTIVE)||!(mask&World.layer[b])||World.col[b]==COLTYPE_NONE)continue; float pen=0.0f;
         switch(World.col[b]){
-            case COLTYPE_CAP:{Overlap r=CapCap(prospective,Entity_GetCap(b));if(r.hit)pen=r.pen;break;}
-            case COLTYPE_BOX:{Overlap r=CapBox(prospective,Entity_GetBox(b));if(r.hit)pen=r.pen;break;}
-            case COLTYPE_SPH:{Overlap r=SphCap(Entity_GetSph(b),prospective);if(r.hit)pen=r.pen;break;}
-            case COLTYPE_CVX:{u16 mesh=World.instances[b].colMeshIndex,adj=World.instances[b].adjacencyIdx;if(mesh<MAX_MDLS&&adj<MAX_MDLS){Manifold r=PrimitiveCvx(playerIdx,mesh,&world_from_mdl[b*16],adj);pen=r.maxPen;}break;}
-            case COLTYPE_MSH:{Overlap r=CapMsh(prospective,World.instances[b].modelIndex,&world_from_mdl[b*16]);if(r.hit)pen=r.pen;break;}
+            case COLTYPE_CAP:{Overlap r=CapCap(probe,Entity_GetCap(b));if(r.hit)pen=r.pen;break;}
+            case COLTYPE_BOX:{Overlap r=CapBox(probe,Entity_GetBox(b));if(r.hit)pen=r.pen;break;}
+            case COLTYPE_SPH:{Overlap r=SphCap(Entity_GetSph(b),probe);if(r.hit)pen=r.pen;break;}
+            case COLTYPE_CVX:{u16 mesh=World.instances[b].colMeshIndex,adj=World.instances[b].adjacencyIdx;if(mesh<MAX_MDLS&&adj<MAX_MDLS){Manifold r=PrimitiveCvxCapsule(probe,mesh,&world_from_mdl[b*16],adj);pen=r.maxPen;}break;}/*probe is always a capsule, and the player is COLTYPE_CAP, so this matches the old PrimitiveCvx(playerIdx,...) selection while also working for probes with no instance*/
+            case COLTYPE_MSH:{Overlap r=CapMsh(probe,World.instances[b].modelIndex,&world_from_mdl[b*16]);if(r.hit)pen=r.pen;break;}
             default:break;
         }
-        if(pen>0.08f)blocked=true;
+        if(pen>0.08f)return true;
     }
-    World.colliderSize[playerIdx].y=oldHeight; World.colliderCenter[playerIdx].y=oldCenterY; return blocked;
+    return false;
+}
+
+// One vertical walk: try `probe` at every offset from 0 out to `steps`, and stop as soon as `travel` -- the shape
+// the mover currently occupies -- cannot reach that offset.  Clearance is only ever granted for space the mover can
+// physically get to.  That constraint is what stops a crawlway ceiling from reading as "open room two metres up",
+// which is what a plain any-free-sample sweep did: the standing capsule was blocked at the player but clear well
+// above the ceiling, so the player stood up straight through it.
+static bool AreaSweepDir(ShapeCapsule probe, ShapeCapsule travel, int steps, float sign, u32 mask, u16 self) {
+    for (int s=0; s<=steps; ++s) {
+        float d = sign * (float)s * AREA_SWEEP_STEP;
+        if (s) { ShapeCapsule t=travel; t.tip.y+=d; t.base.y+=d; if (AreaBlockedAt(t,mask,self)) {return false;} }
+        ShapeCapsule p=probe; p.tip.y+=d; p.base.y+=d; if (!AreaBlockedAt(p,mask,self)) {return true;}
+    }
+    return false;
+}
+
+// Report whether `probe` fits anywhere within +/- span of where it started.  `travel` bounds how far the search may
+// walk (pass travel for the same shape when the probe moves freely, as the spawner's area test does).  span=0
+// degenerates to a strict single-position test.  span 2.56 is 33 offsets per direction, each costing one travel scan
+// plus one probe scan, and each walk bails at the first offset the mover cannot reach.  Only reached on
+// held-crouch frames and on an actual spawn, so the extra passes over the collider list are not on a hot path.
+bool AreaHasClearance(ShapeCapsule probe, ShapeCapsule travel, float span, u32 mask, u16 self) {
+    int steps=(int)(span/AREA_SWEEP_STEP+0.5f);
+    return AreaSweepDir(probe,travel,steps,+1.0f,mask,self) || AreaSweepDir(probe,travel,steps,-1.0f,mask,self);
+}
+
+bool CantStand(u16 playerIdx, float targetHeight) { // Match Unity's prospective shape while keeping the player's current lower extent fixed.
+    if(playerIdx>=World.instCount||targetHeight<=World.colliderSize[playerIdx].y)return false;
+    float oldHeight=World.colliderSize[playerIdx].y,oldCenterY=World.colliderCenter[playerIdx].y;
+    ShapeCapsule current=Entity_GetCap(playerIdx);/*the shape the player occupies right now, i.e. how far they can slide*/
+    World.colliderSize[playerIdx].y=targetHeight; World.colliderCenter[playerIdx].y=oldCenterY+(oldHeight-targetHeight)*0.5f; ShapeCapsule prospective=Entity_GetCap(playerIdx);
+    bool clear=AreaHasClearance(prospective,current,AREA_SWEEP_SPAN,GetCollisionMask(World.layer[playerIdx]),playerIdx);
+    World.colliderSize[playerIdx].y=oldHeight; World.colliderCenter[playerIdx].y=oldCenterY; return !clear;
+}
+
+// One gate for every up-transition, so all of them report the refusal.  Unity checks the target height before
+// allowing the rise; the prone paths had no check at all, so the collider just grew until the solver stalled.  That
+// leaves currentCrouchRatio short of PLAYER_CROUCH_RATIO, which the ProningUp -> Crouch test at the bottom of this
+// file can never satisfy, so prone under a low crawlway wedges the state machine.  Lingdes 187/188 are
+// "Can't stand here." / "Can't crouch here." (text_english.txt).
+INLINE bool StandBlocked(float targetHeight) {
+    if (!CantStand(PLAYER1, targetHeight)) return false;
+    CenterStatusPrint("%s", Sys_Text.stringTable[targetHeight >= PLAYER_HEIGHT ? 187 : 188]);
+    return true;
 }
 
 KeyState* GetCodeMapping(int settingIndex); const char* FootStepSound(FootStepType);
@@ -583,8 +634,8 @@ void ApplyPlayerMovements(float dt) {
     if (World.invP1.leanResetting) { World.invP1.leanTarget = smooth_damp(World.invP1.leanTarget,0.0f,&World.invP1.leanVelocity,0.2f,dt); if(vabs(World.invP1.leanTarget) < 0.5f){World.invP1.leanTarget=World.invP1.leanVelocity=0.0f; World.invP1.leanResetting=false;} }
     else {if (leanLeft || leanRight) { if(leanLeft){World.invP1.leanRightTapFinished =0;} if(leanRight){World.invP1.leanLeftTapFinished=0;} World.invP1.leanTarget=vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt),-leanMaxAngle,leanMaxAngle); } else if (movingForward) { if (vabs(World.invP1.leanTarget) < 0.5f) { World.invP1.leanTarget = 0.0f; } else { World.invP1.leanTarget -= (World.invP1.leanTarget > 0.0f ? 1.0f : -1.0f) * leanSpeed * dt; } }}
     World.cam_roll = World.invP1.leanTarget; float targR=1.0f, transitionSec=0.2f; float currentRatio=World.invP1.currentCrouchRatio;
-    if (Crouch()) { if (p->bodyState == BodyState_Crouch) { if (!CantStand(PLAYER1,PLAYER_HEIGHT)){p->bodyState = BodyState_StandingUp;}} else if (currentRatio > PLAYER_CROUCH_RATIO) { p->bodyState = BodyState_CrouchingDown;} else {p->bodyState=BodyState_ProningUp;} }
-    else if (Prone()) {if (p->bodyState == BodyState_Standing) { p->bodyState = BodyState_ProningDown; } else if (currentRatio > PLAYER_CROUCH_RATIO) { if (!CantStand(PLAYER1,PLAYER_HEIGHT)){p->bodyState=BodyState_StandingUp;}else{p->bodyState = BodyState_ProningDown;} } else if (p->bodyState == BodyState_Crouch) { p->bodyState = BodyState_ProningDown; } else { p->bodyState = BodyState_ProningUp; } }
+    if (Crouch()) { if (p->bodyState == BodyState_Crouch) { if (!StandBlocked(PLAYER_HEIGHT)){p->bodyState = BodyState_StandingUp;}} else if (currentRatio > PLAYER_CROUCH_RATIO) { p->bodyState = BodyState_CrouchingDown;} else {if (!StandBlocked(PLAYER_HEIGHT*PLAYER_CROUCH_RATIO)){p->bodyState=BodyState_ProningUp;}} }
+    else if (Prone()) {if (p->bodyState == BodyState_Standing) { p->bodyState = BodyState_ProningDown; } else if (currentRatio > PLAYER_CROUCH_RATIO) { if (!StandBlocked(PLAYER_HEIGHT)){p->bodyState=BodyState_StandingUp;}else{p->bodyState = BodyState_ProningDown;} } else if (p->bodyState == BodyState_Crouch) { p->bodyState = BodyState_ProningDown; } else { if (!StandBlocked(PLAYER_HEIGHT*PLAYER_CROUCH_RATIO)){p->bodyState = BodyState_ProningUp;} } }
     float fatigueWane = 1.0f; if (Cheats.fatigueCheat || World.invP1.staminupActive) World.invP1.fatigue = 0.0f;
     switch(p->bodyState){case BodyState_CrouchingDown:targR=-.01f; fatigueWane=2.f; break; case BodyState_StandingUp:targR=1.01f; fatigueWane=2.f; break; case BodyState_ProningDown:targR=-.01f; fatigueWane=3.5f; break; case BodyState_ProningUp:targR=1.01f; transitionSec+=.1f; fatigueWane=3.5f; break; case BodyState_Crouch:targR=PLAYER_CROUCH_RATIO; fatigueWane=2.f; break; case BodyState_Prone:targR=PLAYER_PRONE_RATIO; fatigueWane=3.5f; break;}
     bool inGravLift = ((p->entflags & EF_GRAVLIFT) > 0); bool grounded = !inGravLift && ((p->entflags & EF_GROUNDED) > 0); bool jumpjettin = ((World.invP1.hasHardware & HW_JET) > 0 && (World.invP1.hardwareIsActive & HW_JET) > 0); bool onLadder = World.invP1.ladderState > 0; bool boosterOn = (World.invP1.hasHardware & HW_BST) && (World.invP1.hardwareIsActive & HW_BST);/*Citadel Inventory.BoosterActive(); the old World.boosterActive flag was declared but never assigned anywhere*/

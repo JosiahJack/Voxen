@@ -175,7 +175,15 @@ typedef enum {EnergyType_Battery=0,EnergyType_ChargeStation=1 } EnergyType;     
 typedef enum {FSTP_None=0,FSTP_Carpet=1,FSTP_Concrete=2,FSTP_GrittyCrete=3,FSTP_Grass=4,FSTP_Gravel=5,FSTP_Rock=6,FSTP_Glass=7,FSTP_Marble=8,FSTP_Metal=9,FSTP_Grate=10,FSTP_Metal2=11,FSTP_Metpanel=12,FSTP_Panel=13,FSTP_Plaster=14,FSTP_Plastic=15,FSTP_Plastic2=16,FSTP_Rubber=17,FSTP_Sand=18,FSTP_Squish=19,FSTP_Vent=20,FSTP_Water=21,FSTP_Wood=22,FSTP_Wood2=23} FootStepType;
 typedef enum {ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4} ForceFieldColor;                            typedef enum {TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9} TabMSG;
 typedef enum {PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3} PuzzleCellType;                                                          typedef enum {PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5} PuzzleGridType;
-typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox; typedef struct {V3 ctr; float rad;} ShapeSphere; typedef struct {V3 tip,base; float rad;} ShapeCapsule; ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i); bool PhysIsAsleep(u16 i);
+typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox; typedef struct {V3 ctr; float rad;} ShapeSphere; typedef struct {V3 tip,base; float rad;} ShapeCapsule; ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i);
+// Vertical clearance sweep, shared by CantStand (physics.c) and the SpawnManager's AreaClear test (citadel.c).
+// `travel` is the shape the mover currently occupies and bounds how far the search may walk; pass the same shape as
+// `probe` when it moves freely.  Sample step and penetration tolerance are both 0.08f by separate routes; the span
+// bounds how far above and below the probe the search is willing to travel.
+#define AREA_SWEEP_STEP 0.08f
+#define AREA_SWEEP_SPAN 2.56f
+bool AreaHasClearance(ShapeCapsule probe, ShapeCapsule travel, float span, u32 mask, u16 self);
+bool PositionVisibleFromPlayerCell(float x, float z);/*culling.c:6 - transient PVS visibility, not the static CELL_OPEN geometry state. SpawnManager's AreaHidden.*/bool PhysIsAsleep(u16 i);
 enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<<5),L_GunViewModel=(1u<<8),L_Geometry=(1u<<9),L_NPC=(1u<<10),L_PlayerBullets=(1u<<11),L_Player=(1u<<12),L_Corpse=(1u<<13),L_PhysObjects=(1u<<14),L_PlayerTriggerOnly=(1u<<16),L_Trigger=(1u<<17),L_Door=(1u<<18),L_InterDebris=(1u<<19),L_Player2=(1u<<20),L_NPCTrigger=(1u<<23),L_NPCBullet=(1u<<24),L_NPCClip=(1u<<25),L_Clip=(1u<<26),L_Automap=(1u<<27),L_Culling=(1u<<28),L_CorpseSearchable=(1u<<29)};
 #define LMASK_PLAYER_COLLIDESWITH   (L_Clip|L_NPCBullet|L_Player2|L_Door|L_Trigger|L_PlayerTriggerOnly|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_COLLIDESWITH      (L_Clip|L_NPCClip|L_PlayerBullets|L_Player2|L_Player|L_Door|L_Trigger|L_NPCTrigger|L_Default|L_TransparentFX|L_Geometry|L_NPC)
