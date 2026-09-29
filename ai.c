@@ -84,37 +84,98 @@ static const AIPresetSet aiMuzzleBursts[NUM_AI_TYPES][2] = {
     /*27 CYBER REAVER    */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
     /*28 SHODAN          */ {{{0,0,0,0,0,0},0},{{0,0,0,0,0,0},0}},
 };
-static const AIPresetSet aiDeathBursts[NUM_AI_TYPES] = {
-    /* 0 AUTOBOMB        */ {{5,6,50,51,49,0},5},/*ef_fragexplosion + smoke*/
-    /* 1 CYBORG ASSASSIN */ {{0,0,0,0,0,0},0},
-    /* 2 AVIAN MUTANT    */ {{0,0,0,0,0,0},0},
-    /* 3 EXEC-BOT        */ {{100,129,102,126,101,0},5},
-    /* 4 CYBORG DRONE    */ {{0,0,0,0,0,0},0},
-    /* 5 CORTEX REAVER   */ {{54,53,55,0,0,0},3},
-    /* 6 CYBORG WARRIOR  */ {{0,0,0,0,0,0},0},/*deathLightning is a light, not particles*/
-    /* 7 CYBORG ENFORCER */ {{80,0,0,0,0,0},1},
-    /* 8 CYBORG ELITE    */ {{0,0,0,0,0,0},0},
-    /* 9 CYBORG DIEGO    */ {{76,75,0,0,0,0},2},/*centerflare + redburst (prefab deathBurst children)*/
-    /*10 SEC-1 BOT       */ {{138,53,55,135,0,0},4},
-    /*11 SEC-2 BOT       */ {{54,53,55,0,0,0},3},
-    /*12 MAINT BOT       */ {{117,116,119,120,122,0},5},
-    /*13 MUTANT CYBORG   */ {{0,0,0,0,0,0},0},
-    /*14 HOPPER          */ {{0,0,0,0,0,0},0},
-    /*15 HUMANOID MUTANT */ {{115,0,0,0,0,0},1},
-    /*16 INVISOMUT       */ {{0,0,0,0,0,0},0},
-    /*17 VIRUS MUTANT    */ {{16,17,0,0,0,0},2},/*yellow blood spurt + tiny*/
-    /*18 SERVBOT         */ {{145,0,0,0,0,0},1},
-    /*19 FLIER BOT       */ {{80,109,107,0,0,0},3},
-    /*20 ZEROG MUTANT    */ {{0,0,0,0,0,0},0},
-    /*21 GORILLA TIGER   */ {{0,0,0,0,0,0},0},
-    /*22 REPAIRBOT       */ {{100,129,102,126,133,0},5},
-    /*23 PLANT MUTANT    */ {{127,102,126,128,130,131},6},
-    /*24 CYBER DOG       */ {{0,0,0,0,0,0},0},
-    /*25 CYBER GUARD     */ {{0,0,0,0,0,0},0},
-    /*26 CYBER RAM       */ {{0,0,0,0,0,0},0},
-    /*27 CYBER REAVER    */ {{0,0,0,0,0,0},0},
-    /*28 SHODAN          */ {{0,0,0,0,0,0},0},
-};
+  /* Unity AIController.deathBurst is a GameObject activated at death; its children hold the
+     particle systems and lights. Entry [0] of each prefab's child set is Entity.deathBurst (the
+     particle preset spawned at npcDeathBurstOffset), and aiDeathBursts below carries only the
+     remaining children, so nothing is spawned twice. */
+  static const AIPresetSet aiDeathBursts[NUM_AI_TYPES] = {
+      /* 0 AUTOBOMB        */ {{6,50,51,49,0,0},4},/*ef_fragexplosion + smoke*/
+      /* 1 CYBORG ASSASSIN */ {{0,0,0,0,0,0},0},
+      /* 2 AVIAN MUTANT    */ {{0,0,0,0,0,0},0},
+      /* 3 EXEC-BOT        */ {{129,102,126,101,0},4},
+      /* 4 CYBORG DRONE    */ {{0,0,0,0,0,0},0},
+      /* 5 CORTEX REAVER   */ {{53,55,135,0,0},3},/*3x centerFlash under 5x deathSubBurst*/
+      /* 6 CYBORG WARRIOR  */ {{0,0,0,0,0,0},0},/*deathLightning is a light, not particles*/
+      /* 7 CYBORG ENFORCER */ {{0,0,0,0,0,0},0},
+      /* 8 CYBORG ELITE    */ {{0,0,0,0,0,0},0},
+      /* 9 CYBORG DIEGO    */ {{75,0,0,0,0,0},1},/*redburst under centerflare*/
+      /*10 SEC-1 BOT       */ {{53,55,135,0,0},3},
+      /*11 SEC-2 BOT       */ {{53,55,135,0,0},3},
+      /*12 MAINT BOT       */ {{117,116,119,120,122},5},/*deathSubBurst(2) + 6x deathFlames*/
+      /*13 MUTANT CYBORG   */ {{0,0,0,0,0,0},0},
+      /*14 HOPPER          */ {{0,0,0,0,0,0},0},
+      /*15 HUMANOID MUTANT */ {{0,0,0,0,0,0},0},/*bloodpool children absent from preset table*/
+      /*16 INVISOMUT       */ {{0,0,0,0,0,0},0},
+      /*17 VIRUS MUTANT    */ {{17,0,0,0,0,0},1},/*yellow blood spurt + tiny*/
+      /*18 SERVBOT         */ {{0,0,0,0,0,0},0},
+      /*19 FLIER BOT       */ {{109,107,0,0,0,0},2},/*subBurst + smoke*/
+      /*20 ZEROG MUTANT    */ {{0,0,0,0,0,0},0},
+      /*21 GORILLA TIGER   */ {{0,0,0,0,0,0},0},
+      /*22 REPAIRBOT       */ {{129,102,126,133,0},4},
+      /*23 PLANT MUTANT    */ {{102,126,128,130,131},5},
+      /*24 CYBER DOG       */ {{0,0,0,0,0,0},0},
+      /*25 CYBER GUARD     */ {{0,0,0,0,0,0},0},
+      /*26 CYBER RAM       */ {{0,0,0,0,0,0},0},
+      /*27 CYBER REAVER    */ {{0,0,0,0,0,0},0},
+      /*28 SHODAN          */ {{0,0,0,0,0,0},0},
+  };
+  /* The prefab child GameObject carrying Entity.deathBurst is not at the NPC origin, so its local
+     offset has to be rotated by the NPC's facing. Read from each prefab's deathBurst Transform
+     m_LocalPosition; NPC 17 uses the bloodspurt child because the deathBurst node itself carries
+     no ParticleSystem. Rotations are identity everywhere except humanoid mutant, whose single
+     particle child sits at the node origin, so no rotation term is needed here. */
+  static const V3 npcDeathBurstOffset[NUM_AI_TYPES] = {
+      [0]={0.0f,0.0f,0.0f},            /*AUTOBOMB         CentralFireball*/
+      [3]={0.0f,0.28f,0.159f},        /*EXEC-BOT         particle_deathburst*/
+      [5]={-0.085f,1.28f,-1.72f},     /*CORTEX REAVER    deathBurst*/
+      [7]={0.0f,0.5f,0.081f},         /*CYBORG ENFORCER  deathBurst*/
+      [9]={0.0f,1.674f,0.164f},       /*CYBORG DIEGO     deathBurst*/
+      [10]={-6.965f,-0.86f,-0.453f},  /*SEC-1 BOT        deathBurst*/
+      [11]={-0.085f,1.28f,-1.72f},    /*SEC-2 BOT        deathBurst*/
+      [12]={-0.078f,0.07f,0.196f},    /*MAINT BOT        deathBurst*/
+      [15]={-0.001f,0.85f,0.108f},    /*HUMANOID MUTANT  deathBurst*/
+      [17]={0.186f,0.692f,-0.207f},   /*VIRUS MUTANT     bloodspurtsmallyellow child*/
+      [18]={-0.005f,-0.032f,-0.078f}, /*SERVBOT          deathBurst*/
+      [22]={0.0f,-0.563f,-0.029f},    /*REPAIRBOT        particle_deathburst*/
+      [23]={0.0f,-0.356f,0.0f},      /*PLANT MUTANT     particle_deathburst*/
+  };
+  /* Entity.deathBurst holds a particleTypeDefs index, not a const index. U16_MAX means the prefab
+     has no death burst. Stamped onto every NPC by InitNPC, since the converted level records only
+     carry deathBurst.activeSelf / childCount and never the effect itself. */
+  static const u16 npcDeathBurstPreset[NUM_AI_TYPES] = {
+      [0]=5,/*ef_fragexplosion CentralFireball*/
+      [3]=100,[5]=54/*deathSubBurst*/,[7]=80/*deathBurst*/,[9]=76/*centerflare*/,[10]=138/*deathSubBurst*/,
+      [11]=54/*deathSubBurst*/,[12]=123/*deathSubBurst(1)*/,[15]=115/*deathBurstTempFX*/,[17]=16/*yellow spurt*/,
+      [18]=145/*deathBurst*/,[19]=80/*deathBurst*/,[22]=100,[23]=127,
+  };
+  typedef struct { V3 offset; Color3 color; float range,intensity,duration; } AIDeathBurstLight;
+  /* Point lights inside each deathBurst subtree, offsets already summed through the parent chain
+     so they are relative to the NPC origin. Range and intensity are the prefab Light values;
+     duration tracks the owning particle system's lifetime. */
+  static const AIDeathBurstLight aiDeathBurstLights[NUM_AI_TYPES][6] = {
+        /* 5 CORTEX REAVER  5x deathSubBurst, green*/
+        [5]={{{0.185f,0.907f,0.471f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f},
+             {{-0.127f,0.481f,0.471f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f},
+             {{0.219f,0.334f,0.036f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f},
+             {{-0.557f,0.998f,-0.361f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f},
+             {{0.429f,0.867f,-0.356f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}},
+        /*10 SEC-1 BOT      2x lightPoint, green*/
+        [10]={{{0.133f,-0.265f,0.66f},{0.0387f,0.7453f,0.0387f},2.0f,5.0f,0.4f},
+              {{-0.562f,0.064f,0.66f},{0.0387f,0.7453f,0.0387f},2.0f,5.0f,0.4f}},
+        /*11 SEC-2 BOT      3x deathSubBurst, warm*/
+        [11]={{{0.185f,0.907f,0.471f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f},
+              {{-0.127f,0.481f,0.471f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f},
+              {{0.219f,0.334f,0.036f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f}},
+        /*12 MAINT BOT      6x deathFlames*/
+        [12]={{{-0.078f,0.37f,0.196f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f},
+              {{-0.166f,0.183f,0.472f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f},
+              {{0.011f,-0.054f,0.4f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f},
+              {{-0.087f,0.185f,-0.396f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f},
+              {{-0.078f,-0.107f,-0.258f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f},
+              {{0.091f,-0.107f,0.182f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}},
+      [19]={{{0.0f,0.0f,0.0f},{0.9117f,0.9811f,0.9534f},2.5f,1.0f,0.8f}},
+  };
+  static const u8 aiDeathBurstLightCount[NUM_AI_TYPES] = { [5]=5, [10]=2, [11]=3, [12]=6, [19]=1 };
 // NPC gib ranges use the complete Citadel HealthManager gibObjects set. The
 // primary member is the search collider and receives the NPC's searchable
 // contents; the remaining members are visual/physical pieces of the same
@@ -145,7 +206,7 @@ static const u8 npcBloodTypes[NUM_AI_TYPES] = {
 };
 float GetDamageTakeAmount(DamageData* dd);
 void InitNPC(u16 i) {
-    World.layer[i] = L_NPC; u16 npcID = World.instances[i].index - 419; if (npcID < NUM_AI_TYPES) World.instances[i].bloodType = (BloodType)npcBloodTypes[npcID]; flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
+    World.layer[i] = L_NPC; u16 npcID = World.instances[i].index - 419; if (npcID < NUM_AI_TYPES) { World.instances[i].bloodType = (BloodType)npcBloodTypes[npcID]; World.instances[i].deathBurst = npcDeathBurstPreset[npcID] ? npcDeathBurstPreset[npcID] : U16_MAX;/*0 is a real preset (ef_mist_gentle), so an unlisted row must not read as one.*/ } flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
     World.instances[i].currentDestination = World.instances[i].lastPosition = World.instances[i].idealPos = World.position[i]; World.instances[i].idealTransformForward = World.instances[i].forward;
     World.instances[i].aiThinkFinished = World.pauseRelativeTime + AI_TICK_TIME + (double)random_range(0.0f, 1.0f); World.instances[i].tickTime = World.pauseRelativeTime + AI_RAYCAST_TICK_TIME + (double)random_range(0.0f, 1.0f); World.instances[i].idleTime = World.pauseRelativeTime + (double)random_range(npcTable[npcID].timeIdleSFXMin,npcTable[npcID].timeIdleSFXMax);
     World.instances[i].attack1SoundTime = World.instances[i].attack2SoundTime = World.instances[i].attack3SoundTime = World.pauseRelativeTime; World.instances[i].huntFinished = World.pauseRelativeTime; int diff = (npcTable[npcID].type == NPCType_Cyber) ? World.diffCyb : World.diffCbt;
@@ -268,39 +329,53 @@ static const AIMuzzleLightData aiMuzzleLights[NUM_AI_TYPES][2] = {
     [28]={{{1.0000f,0.8500f,0.6500f},3.0f,2.0f},{{1.0000f,0.8500f,0.6500f},3.0f,2.0f}},
 };
 static const double AI_MUZZLE_FLASH_TIME=0.085;
-static const u16 AI_MUZZLE_LIGHT_POOL_SIZE=24;
-typedef struct { u16 lights[24], count; double expires[24]; bool ready; } AIMuzzleLightPool;
-static AIMuzzleLightPool aiMuzzlePools[MAX_LEVELS];
-static double aiMuzzleLightsUpdatedAt=-1.0;
-static float ai_muzzle_marker(u16 slot) { return -100.0f-(float)slot; }
-static void ai_ensure_muzzle_pool(void) {
-    u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIMuzzleLightPool* p=&aiMuzzlePools[lev];
-    if (p->ready) { for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_muzzle_marker(i)) { p->ready=false; break; } }
+static const u16 AI_EFFECT_LIGHT_POOL_SIZE=24;
+typedef struct { u16 lights[24], count; double expires[24]; bool ready; } AIEffectLightPool;
+static AIEffectLightPool aiEffectPools[MAX_LEVELS];
+static double aiEffectLightsUpdatedAt=-1.0;
+static float ai_effect_marker(u16 slot) { return -100.0f-(float)slot; }
+static void ai_ensure_effect_pool(void) {
+    u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev];
+    if (p->ready) { for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_effect_marker(i)) { p->ready=false; break; } }
     if (p->ready) return; p->count=0;
-    while (p->count<AI_MUZZLE_LIGHT_POOL_SIZE && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0,0,0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_muzzle_marker(i); p->count++; }
+    while (p->count<AI_EFFECT_LIGHT_POOL_SIZE && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0,0,0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_effect_marker(i); p->count++; }
     p->ready=p->count>0;
 }
-static void ai_update_muzzle_lights(void) {
-    if (aiMuzzleLightsUpdatedAt==World.pauseRelativeTime) return; aiMuzzleLightsUpdatedAt=World.pauseRelativeTime; u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIMuzzleLightPool* p=&aiMuzzlePools[lev];
-    if (!p->ready) return; for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_muzzle_marker(i)) { p->ready=false; p->count=0; return; }
-    for (u16 i=0;i<p->count;i++) if (p->expires[i]>0.0 && p->expires[i]<=World.pauseRelativeTime) { u16 li=p->lights[i]; UpdateLight(li,World.lights[li].pos,World.lights[li].col,World.lights[li].range,0.0f,0.0f,0.0f,ai_muzzle_marker(i),QUAT_IDENTITY,false,false); p->expires[i]=0.0; }
+static void ai_update_effect_lights(void) {
+    if (aiEffectLightsUpdatedAt==World.pauseRelativeTime) return; aiEffectLightsUpdatedAt=World.pauseRelativeTime; u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev];
+    if (!p->ready) return; for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_effect_marker(i)) { p->ready=false; p->count=0; return; }
+    for (u16 i=0;i<p->count;i++) if (p->expires[i]>0.0 && p->expires[i]<=World.pauseRelativeTime) { u16 li=p->lights[i]; UpdateLight(li,World.lights[li].pos,World.lights[li].col,World.lights[li].range,0.0f,0.0f,0.0f,ai_effect_marker(i),QUAT_IDENTITY,false,false); p->expires[i]=0.0; }
 }
-static void ai_muzzle_flash(Entity* self, int attackNum) {
-    if (attackNum<1 || attackNum>3) attackNum=1; u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return; ai_ensure_muzzle_pool(); u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIMuzzleLightPool* p=&aiMuzzlePools[lev]; if (!p->count) return;
-    int liSlot=(attackNum==3)?1:0; AIMuzzleLightData d=aiMuzzleLights[npc][liSlot]; if (d.unityIntensity<=0.0f || d.range<=0.0f) return; u16 chosen=0; double oldest=1e30;
+/* One pooled light flash. Unity intensity is scaled by 0.35, matching both the level light loader
+   and the muzzle-flash path, so prefab and effect lights sit at the same visible brightness. */
+static void ai_effect_flash(V3 pos, Color3 col, float range, float unityIntensity, double duration) {
+    if (unityIntensity<=0.0f || range<=0.0f || duration<=0.0) return; ai_ensure_effect_pool(); u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev]; if (!p->count) return;
+    u16 chosen=0; double oldest=1e30;
     for (u16 i=0;i<p->count;i++) { if (p->expires[i]<=World.pauseRelativeTime) { chosen=i; oldest=-1.0; break; } if (p->expires[i]<oldest) { oldest=p->expires[i]; chosen=i; } }
-    u16 idx=p->lights[chosen]; u16 selfIdx=(u16)(self-World.instances); V3 pos;
+    u16 idx=p->lights[chosen]; float intensity=unityIntensity*0.35f;
+    UpdateLight(idx,pos,col,vclamp(range,0.32f,15.36f),intensity,intensity,0.0f,ai_effect_marker(chosen),QUAT_IDENTITY,true,false);
+    p->expires[chosen]=World.pauseRelativeTime+duration;
+}
+/* Unity AIController.MuzzleBurst(attackNum) runs for every attack, including the Attack1 melee
+   hitscan, and lights up on Attack1 only for index 18: the servbot's muzzleBurst GameObject holds
+   nothing but three purple point lights, so for it the light is the entire effect. Every other
+   index lights slot 0 on Attack2 and slot 1 on Attack3, and nothing on Attack1. */
+static void ai_muzzle_flash(Entity* self, int attackNum) {
+    if (attackNum<1 || attackNum>3) attackNum=1; u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return;
+    if (npc==18) attackNum=1; else if (attackNum==1) return;
+    int liSlot=(attackNum==3)?1:0; AIMuzzleLightData d=aiMuzzleLights[npc][liSlot]; if (d.unityIntensity<=0.0f || d.range<=0.0f) return;
+    u16 selfIdx=(u16)(self-World.instances); V3 pos;
     if (attackNum==1) pos=ai_sight_pos(self);
     else { V3 off=aiMuzzleOffsets[npc].gunPoint; if (attackNum==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f)) off=aiMuzzleOffsets[npc].gunPoint2; if (off.x==0.0f && off.y==0.0f && off.z==0.0f) pos=ai_sight_pos(self); else pos=V3_AplusB(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],off)); }
-    float intensity=d.unityIntensity*0.35f; UpdateLight(idx,pos,d.color,vclamp(d.range,0.32f,15.36f),intensity,intensity,0.0f,ai_muzzle_marker(chosen),QUAT_IDENTITY,true,false); p->expires[chosen]=World.pauseRelativeTime+AI_MUZZLE_FLASH_TIME;
+    ai_effect_flash(pos,d.color,d.range,d.unityIntensity,AI_MUZZLE_FLASH_TIME);
 }
 INLINE V3 ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3_AplusB(World.position[idx],quat_rot_v3(World.rotation[idx],sightPointOffsets[World.instances[idx].index - 419])); }
 INLINE V3 ai_gun_pos(Entity* e, int n) { u16 idx=(u16)(e - World.instances); u16 npc=World.instances[idx].index-419; V3 off=(n==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f))?aiMuzzleOffsets[npc].gunPoint2:aiMuzzleOffsets[npc].gunPoint; if(off.x==0.0f && off.y==0.0f && off.z==0.0f) off=(V3){0.0f,sightPointOffsets[npc].y+0.3f,0.0f}; return V3_AplusB(World.position[idx],quat_rot_v3(World.rotation[idx],off)); }
 static void ai_spawn_presets(const AIPresetSet* set, V3 pos) { for (u8 i=0;i<set->n;i++){const PSysDef* preset=PSysTypeGet(set->p[i]); if(!preset)continue; PSysDef def=*preset; def.pos=pos; PSysAdd(&def);} }
 static void ai_muzzle_particles(Entity* self, int attackNum) {
     if (attackNum<1 || attackNum>3) attackNum=1; u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return;
-    if (npc==18) ai_spawn_presets(&aiMuzzleBursts[npc][1],ai_gun_pos(self,1));/*Unity activates the servbot's burst on every attack, not just attack2*/
-    if (attackNum==1) return;/*No muzzle burst for attack 1 melee.*/ ai_spawn_presets(&aiMuzzleBursts[npc][attackNum==3?1:0],ai_gun_pos(self,attackNum));
+    if (npc==18) { ai_spawn_presets(&aiMuzzleBursts[npc][1],ai_gun_pos(self,1)); ai_muzzle_flash(self,1); }/*Unity activates the servbot's burst on every attack, not just attack2*/
+    if (attackNum==1) return;/*No muzzle burst for attack 1 melee.*/ ai_spawn_presets(&aiMuzzleBursts[npc][attackNum==3?1:0],ai_gun_pos(self,attackNum)); ai_muzzle_flash(self,attackNum);/*Unity drives particles and lights from the same MuzzleBurst(attackNum) call.*/
 }
 /* Unity AIController.MakeLaserEffect() spawns a LaserDrawing line (line_sparqbeam material, width 0.2, 0.15s life)
    from the sight point to the ray hit when the NPC's attack has hasLaserOnAttack set. */
@@ -453,14 +528,19 @@ static double AIDeathAnimationDuration(const Entity* self) {
     if (clip.framerate <= 0 || clip.speed <= 0 || clip.frameEnd <= clip.frameStart) return 0.0;
     return (double)(clip.frameEnd - clip.frameStart + 1) / ((double)clip.framerate * clip.speed);
 }
-static void SpawnNPCDeathBurst(Entity* self) {
+  static void SpawnNPCDeathBurst(Entity* self) {
     if (!self) return;
-    u16 npc=(u16)(self->index-419); if (npc<NUM_AI_TYPES) { V3 p=World.position[(u16)(self - World.instances)]; if (self->index == 437) { p.x-=self->right.x*.005f; p.y-=.032f; p.z-=self->right.z*.005f; p.x-=self->forward.x*.078f; p.z-=self->forward.z*.078f; } ai_spawn_presets(&aiDeathBursts[npc],p); }
-    /* Entity.deathBurst is never assigned by the converter -- the converted level data only
-       carries deathBurst.activeSelf / childCount. The live path is aiDeathBursts[] above, which
-       names the prefab's deathBurst particle systems by particleTypeDefs index. This call was
-       also a latent crash: deathBurst 0 means entity 0, not "none". */
-}
+    u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return;
+    u16 selfIdx=(u16)(self - World.instances);
+    /* Unity places the death burst at the prefab child GameObject's local offset rather than at
+       the NPC origin, so rotate npcDeathBurstOffset by the body's facing. */
+    V3 origin=V3_AplusB(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],npcDeathBurstOffset[npc]));
+    const PSysDef* primary=PSysTypeGet(self->deathBurst);
+    if (primary) { PSysDef def=*primary; def.pos=origin; PSysAdd(&def); }
+    ai_spawn_presets(&aiDeathBursts[npc],origin);
+    u8 lightCount=aiDeathBurstLightCount[npc];
+    for (u8 i=0;i<lightCount;i++) { const AIDeathBurstLight* dl=&aiDeathBurstLights[npc][i]; V3 lp=V3_AplusB(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],dl->offset)); ai_effect_flash(lp,dl->color,dl->range,dl->intensity,(double)dl->duration); }
+  }
 static void AIDying(u16 i) {
     if (!(World.instances[i].entflags & EF_DYING_SETUP)) {
         World.instances[i].enemy = 0; NPCTable* npc = &npcTable[World.instances[i].index - 419]; float dbt = deathBurstTimer[World.instances[i].index - 419]; if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; } else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(&World.instances[i]); flag_set(&World.instances[i].entflags, EF_DEATH_BURST_DONE, true); }
@@ -563,7 +643,7 @@ static void AIExplodeAttack(Entity* self) {
     DamageData selfdd = SetNPCData(self, 3); TakeDamage(selfIdx, selfdd); // Self-destruct through real pipeline (Citadel healthManager.TakeDamage).
 }
 
-static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || ind > 3){ind=1;/*Melee hitscan by default.*/} switch (att) { case Att_Melee:ProjectileRaycast(self,ind); break; case Att_HitS: case Att_PjBm:ai_muzzle_flash(self,ind); ProjectileRaycast(self,ind); World.fogFac += 1; break; case Att_Ball:ai_muzzle_flash(self,ind); ProjectileLaunched(self,ind); World.fogFac += 1; break; default: break; } }
+static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || ind > 3){ind=1;/*Melee hitscan by default.*/} switch (att) { case Att_Melee:ProjectileRaycast(self,ind); break; case Att_HitS: case Att_PjBm:ProjectileRaycast(self,ind); World.fogFac += 1; break; case Att_Ball:ProjectileLaunched(self,ind); World.fogFac += 1; break; default: break; } }
 void AIAttack(Entity* self, int slot) {
     u16 sidx = (u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; if (slot == 3 && npc->explodeOnAttack3) { World.fogFac += 5; AIExplodeAttack(self); return; } AIApplyAttackMovement(self, slot == 1 ? npc->attack1Speed : slot == 2 ? npc->attack2Speed : npc->attack3Speed); int sat = slot == 1 ? sfxAttack1[self->index - 419] : slot == 2 ? sfxAttack2[self->index - 419] : sfxAttack3[self->index - 419];
     float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = slot == 1 ? npc->timeBetweenAttack1 : slot == 2 ? npc->timeBetweenAttack2 : npc->timeBetweenAttack3;/*float: sub-second cadences truncated to 0 and lost the debounce*/
@@ -602,7 +682,7 @@ static void AIThink(u16 idx) {
 }
 
 void AIControllerUpdate(u16 idx) {
-    ai_update_muzzle_lights(); Entity* self=&World.instances[idx]; if(!(self->entflags & EF_ACTIVE)){return;} u16 edx=self->index; if(!IdxIsNPC(edx)){return;} u16 ndx=edx-419;
+    ai_update_effect_lights(); Entity* self=&World.instances[idx]; if(!(self->entflags & EF_ACTIVE)){return;} u16 edx=self->index; if(!IdxIsNPC(edx)){return;} u16 ndx=edx-419;
     /* Unity sets useGravity = false for Fly and cyber NPCs when the controller starts, and only turns it back on
        for cases that are neither; entity.c has no such init, so mirror it here or the hover servo spends its
        whole budget cancelling gravity. Dying/dead keep the gravity they had so corpses still fall. */
