@@ -300,7 +300,7 @@ void ConsoleEmulator(i32 keycode) {
     else if (keycode >= KEY_1 && keycode <= KEY_9) { /*Handle number keys 1-9*/ if (currentEntryLength < (T_BUFFER_SIZE - 1)) { char c = '1' + (keycode - KEY_1); /*Map to '1'-'9'*/ consoleEntryText[currentEntryLength] = c; consoleEntryText[currentEntryLength + 1] = '\0'; currentEntryLength++; } }
     else if (keycode == KEY_0) { /*Handle '0'*/ if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]='0'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; } }
     else if (keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) { if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=(Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? '_' : '-'; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; } }
-    else if (keycode == KEY_BACKSPACE && currentEntryLength > 0) { currentEntryLength--; consoleEntryText[currentEntryLength]='\0'; } // Handle backspace
+    else if (keycode == KEY_BACKSPACE && currentEntryLength > 0) { currentEntryLength--; consoleEntryText[currentEntryLength]='\0'; }
     else if (keycode == KEY_SPACE) { /*Handle space*/ if (currentEntryLength < (T_BUFFER_SIZE - 1)) { consoleEntryText[currentEntryLength]=' '; consoleEntryText[currentEntryLength + 1]='\0'; currentEntryLength++; } }
     else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
 }
@@ -692,7 +692,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glBindTexture(GL_TEXTURE_2D,0); return;
     } // <<<<<<<<<<<<< CAM VIEW BARRIER
     PSys_Render(viewProj,playerPos,(V3){invViewRot[0],invViewRot[1],invViewRot[2]},(V3){invViewRot[3],invViewRot[4],invViewRot[5]},(V3){-invViewRot[6],-invViewRot[7],-invViewRot[8]},inputDepthID,snear,sfar,(float)swidth,(float)sheight);
-    if(unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj); // Draw Debug Lines
+    if(unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj);
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][3]);
     if(likely(Sys_Settings.Reflections>0u)){  glUseProgram(ssrSP); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3); glUniformMatrix4fv(6,1,0,invViewProj); glUniformMatrix4fv(4,1,GL_FALSE,viewProj); glDispatchCompute(((Sys_Settings.ScreenWidth/Sys_Settings.SSR_RES)+31)/32,((Sys_Settings.ScreenHeight/Sys_Settings.SSR_RES)+31)/32,1); }
     glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glClearColor(0,0,0,0); glViewport(0,0,UI_W,UI_H); glDisable(GL_CULL_FACE); renderTime = get_time() - rendStart; glEnable(GL_BLEND);
@@ -817,7 +817,7 @@ void InitalizeEnvironment() {
     World.numLevels=MAX_LEVELS; World.startLevel=1/*medical*/; LoadConfig();/*Get settings before setting window size.*/ ClampWindowSizeToMonitor(); window = VCreateWindow(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); PlaceWindowOnMonitor((int)Sys_Settings.CurrentMonitor); SetGLContext_GetFunctionPointers();
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); // Black out the window as early as possible for better presentation.
     i32 major=0,minor=0; glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/,&major); glGetIntegerv(0x821C/*GL_MINOR_VERSION*/,&minor); if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
-    glFrontFace(0x0901/*GL_CCW*/); // Set triangle winding order
+    glFrontFace(0x0901/*GL_CCW*/);
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/); glClearColor(0,0,0,1);
     CompileShaders();
     u32 tvaos[4],tvbos[4]; glGenVertexArrays(4,tvaos); glGenBuffers(4,tvbos); quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; chunkVBO=tvbos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; 

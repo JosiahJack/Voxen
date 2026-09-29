@@ -30,7 +30,7 @@ void BiomonitorDumpBMP() {
     char p[96]; sFormat(p,sizeof(p),"Screenshots/biomonitor_%.2f.bmp",get_time()); BmpWrite(p,BIOM_GRAPH_W,BIOM_GRAPH_H,flip);
 }
 void BioMonitorClearGraphs() {
-    for (int x=0;x<BIOM_GRAPH_W;x++) { for (int y=0; y<BIOM_GRAPH_H;y++) { /*tex.SetPixel(x,y,bioMonitor.backgroundColor);*/ /*texture cleared via buffer reset above*/ } }
+    for (int x=0;x<BIOM_GRAPH_W;x++) { for (int y=0; y<BIOM_GRAPH_H;y++) { /*texture cleared via buffer reset above*/ } }
     for (int y=0;y<BIOM_GRAPH_H;y++) bioMonitor.currentColors[y] = bioMonitor.backgroundColor;
     bioMonitor.ymax = (BIOM_GRAPH_H - 1);
     bioMonitor.beatFinished=World.pauseRelativeTime; bioMonitor.tick0Finished=World.pauseRelativeTime + 0.0211f; bioMonitor.tick1Finished=World.pauseRelativeTime + 0.05f; bioMonitor.tick2Finished=World.pauseRelativeTime + 0.0104f; bioMonitor.tickFinished=World.pauseRelativeTime + 0.02f;

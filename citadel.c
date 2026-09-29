@@ -881,6 +881,7 @@ void Targetted(u16 activator, u16 self) {
     if (aioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) { World.instances[self].active=!World.instances[self].active; if (e->index == 596) GravityLiftSyncVisuals(self); } if (aioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
     if (aioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self);                                                  if (aioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e, (e->entflags & EF_LOCKED) == 0);
     if (aioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags, EF_ACTIVE, true); else if (aioflags & TARG_IOFLAGS_INST_DEACTIVATE) { if (e->camView != 255) { e->camView = 255; TextureSequenceInit(self, "Static"); flag_set(&e->entflags, EF_ACTIVE, true); }/*camera destroyed: keep its screen, switch it to Static*/ else { flag_set(&e->entflags, EF_ACTIVE, false); } } else if (aioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags, EF_ACTIVE, !(e->entflags & EF_ACTIVE));
+    if ((aioflagsHi & TARG_IOFLAGHI_AWAKE_SLEEPING) && IdxIsNPC(e->index)) AIAwakeFromSleep(self);/*TargetIO.cs:398-400.  Runs before the alert below: aiac_idle freezes on EF_ASLEEP, so alerting a still-dormant NPC would be swallowed.  No asleep test needed -- AwakeFromSleep is idempotent.*/
     if ((aioflags & TARG_IOFLAGS_ENEMY_ALERT) && IdxIsNPC(e->index)) AIAlert(self);/*TargetIO.cs:211 alerts the receiver, after the activate/deactivate block above so a dormant NPC is awake before it is alerted*/
 }
 

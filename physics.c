@@ -376,7 +376,7 @@ void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this su
                     }
                 }
             }
-        } if (maxDelta < 0.005f) break; // Don't use all iters if not needed.
+        } if (maxDelta < 0.005f) break;
     }
 }
 

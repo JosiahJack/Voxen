@@ -6,10 +6,6 @@ static const float AI_STOP_DIST=1.28f, AI_STOP_DIST_SQ=(AI_STOP_DIST * AI_STOP_D
 u16 ai_next_npc_number(u16 type) { if (type >= NUM_AI_TYPES) return 0; if (npcCountInWorldPerType[type] < U16_MAX) npcCountInWorldPerType[type]++; return npcCountInWorldPerType[type]; }
 void ai_reset_npc_numbering(void) { mset(npcCountInWorldPerType,0,sizeof(npcCountInWorldPerType)); }
 // Name,AtkTyp1,2,3,Dmg1,2,3,Range1,2,3,Health,CybHealth,Percp,Disrp,Armr,Def,Movtyp,Yawspd,FOV,FOVAtk,FOVStartMov,DistToSeeBehind,SightRange,WalkSpd,RunSpd,AtkSpd1,2,3,AtkForce3,AtkRad3,TtPain,TbwPain,TtDead,TtActualAtk1,2,3,TbwAtk1,2,3,TEnemChg,TIdleSFXMin,TIdleSFXMax,TAtk1WaitMin,TAtk1WaitMax,TAtk1WaitChnc,TAtk2WaitMin,TAtk2WaitMax,TAtk2WaitChnc,TAtk3WaitMin,TAtk3WaitMax,TAtk3WaitChnc,ProjType1,2,3,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,PreActMeleCols,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType,AtkProj1,2,3
-// Every column is the raw enemy_tables.csv value, and the enums in common.h are numbered to match the Unity
-// converters in Utils.cs. Every column is now the raw enemy_tables.csv value including Movtyp, which the shipped
-// table keeps in 0..4 for all 29 types; an older revision carried 5 or 6 for some cyborgs, which
-// Utils.GetMoveTypeFromInt has no case for and so maps to None (statue).
 NPCTable npcTable[NUM_AI_TYPES] = {
 /* 0*/{"AUTOBOMB"              ,0,0,1,  0,  0,200,   0,    0,2.4,50,0,1,0.5,40,1,1,300,180,120,55,3.84,50,2.5,2.5,0,0,0,100,6,0,0,0.1,0,0,0,0,0,0,3,5,12,0.5,1,0.1,1,3,0.5,0,0,0,0,0,0,0,0,0,0,0,0,1,0,20,0,0,0,10,3,0,2,0,0,0 },
 /* 1*/{"CYBORG ASSASSIN"       ,0,4,7,30,50,35,3.3,10,20,65,0,2,0.6,5,4,1,180,180,80,15,3.2,50,2,2,0,0,0,0,0,0.45,5,2.083,0,0.25,0.2,0.91,0.91,1.58,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,3,0,0,0,0,0,60,0,0,0,10,3,0,3,0,0,489},
@@ -176,10 +172,6 @@ static const AIPresetSet aiMuzzleBursts[NUM_AI_TYPES][2] = {
       [19]={{{0.0f,0.0f,0.0f},{0.9117f,0.9811f,0.9534f},2.5f,1.0f,0.8f}},
   };
   static const u8 aiDeathBurstLightCount[NUM_AI_TYPES] = { [5]=5, [10]=2, [11]=3, [12]=6, [19]=1 };
-// NPC gib ranges use the complete Citadel HealthManager gibObjects set. The
-// primary member is the search collider and receives the NPC's searchable
-// contents; the remaining members are visual/physical pieces of the same
-// gibbed body. A zero first ID means the NPC does not gib.
 typedef struct { u16 first, last, primary; } NPCGibRange;
 /* Unity's corpse health lives on the searchCollider child, so it is NPC_CORPSE_HEALTH for the 15 types that declare one -- see
    npcSearchColliderMask / ai_has_search_collider in common.h. */
@@ -214,7 +206,7 @@ void InitNPC(u16 i) {
     World.instances[i].attackFinished = World.pauseRelativeTime + 1.0; World.instances[i].attack2Finished = World.instances[i].attack3Finished = World.instances[i].timeTillPainFinished = World.instances[i].timeTillDeadFinished = World.instances[i].gracePeriodFinished = World.pauseRelativeTime;
     World.instances[i].randWaitAtt1Finished = World.instances[i].randWaitAtt2Finished = World.instances[i].randWaitAtt3Finished = World.instances[i].tranquilizeFinished = World.instances[i].deathBurstFinished = World.instances[i].wanderFinished = World.instances[i].posCheckFinished = World.instances[i].timeTillEnemyChangeFinished = World.pauseRelativeTime;
     World.instances[i].timeSinceMovedEnough = 0.0; World.instances[i].currentState = AIState_Idle; if (npcID == 20 && !World.instances[i].textureAnimating) { TextureSequenceStart(i, 47); } u8 c=A_IDLE; if ((World.instances[i].entflags & EF_WANDERING) && (random_range(0.0f,1.0f) < 0.5f)){World.instances[i].currentState = AIState_Walk;} else {flag_set(&World.instances[i].entflags,EF_WANDERING,false);}
-    if (World.instances[i].entflags & EF_ASLEEP) { World.instances[i].currentState=AIState_Idle; /*flag_set(&World.instances[e->sleepingCables].entflags, EF_ACTIVE, true);*//*deactivated sleeping cables in AIAwakeFromSleep*/ }
+    if (World.instances[i].entflags & EF_ASLEEP) { World.instances[i].currentState=AIState_Idle; /*deactivated sleeping cables in AIAwakeFromSleep*/ }
     switch (World.instances[i].currentState){case AIState_Walk:c=A_WALK; break; case AIState_Run:c=A_RUN; break; case AIState_Attack1:c=A_ATTACK1; break; case AIState_Attack2:c=A_ATTACK2; break; case AIState_Attack3:c=A_ATTACK3; break; case AIState_Pain:c=A_PAIN; break; case AIState_Dying: case AIState_Dead:c=A_DYING; break;}
     World.instances[i].clip = c; World.instances[i].frame = modelAnimationClips[World.instances[i].animationNum][c].frameStart; World.instances[i].currentFrameFinished = 0.0;
 }
@@ -583,8 +575,6 @@ static void AIDead(u16 idx) {
     World.instances[idx].currentState = AIState_Dead; World.layer[idx] = L_Corpse; if (World.instances[idx].entflags & EF_TELEPORT_ON_DEATH) { World.gravity[idx] = 1.0f; DeleteInstance(idx); /* TeleportAway not yet fully implemented; keep delete for now */ }
     else if (ai_is_cyber(self)) { World.gravity[idx] = 0.0f; DeleteInstance(idx); /* Gib effect: spawn basic debris using deathBurst index if defined */ }
     else if (ai_gibs_on_death(World.instances[idx].index - 419)) {
-        // Spawn the complete gibObjects set only after the death animation has
-        // finished. The primary/searchable member inherits the NPC contents.
         u16 npcID = World.instances[idx].index - 419; NPCGibRange range = npcGibRanges[npcID];
         V3 gibPos = World.position[idx]; Quaternion gibRot = World.rotation[idx];
         for (u16 gibConst = range.first; gibConst <= range.last; ++gibConst) {
@@ -601,7 +591,7 @@ static void AIDead(u16 idx) {
             }
         }
         DeleteInstance(idx);
-    } else { /*Non-gib corpse: the body itself carries the NPC contents and stays the searchable object, but it rides the plain corpse layer rather than the frob/attack-visible searchable layer.  Search reaches it because LMASK_PLAYER_FROB and the weapon masks include L_Corpse.  Unity's equivalent health lives on the searchCollider child (see npcSearchColliderMask), so only the 15 types that declare that child get it.*/ World.layer[idx] = L_Corpse; if (ai_has_search_collider((u16)(World.instances[idx].index - 419))) { World.instances[idx].health = NPC_CORPSE_HEALTH; } World.velocity[idx].x = 0.0f; World.velocity[idx].z = 0.0f; if (World.instances[idx].index != 433) World.gravity[idx] = 1.0f;/*Hopper deactivates itself*/ }
+    } else { /*Non-gib corpse: the body itself carries the NPC contents and stays the searchable object, but it rides the plain corpse layer rather than the frob/attack-visible searchable layer.  Search reaches it because LMASK_PLAYER_FROB and the weapon masks include L_Corpse.  Unity's equivalent health lives on the searchCollider child (see npcSearchColliderMask), so only the 15 types that declare that child get it.*/ World.layer[idx] = L_Corpse; if (ai_has_search_collider((u16)(World.instances[idx].index - 419))) { World.instances[idx].health = NPC_CORPSE_HEALTH; } World.velocity[idx].x = 0.0f; World.velocity[idx].z = 0.0f; if (World.instances[idx].index != 433) World.gravity[idx] = 1.0f; }
     flag_set(&World.instances[idx].entflags, EF_DEAD_CHECKS_DONE, true);
 }
 
@@ -632,7 +622,7 @@ static void ProjectileRaycast(Entity* self, int n) {
     V3 opos = {spos.x + dir.x*0.55f, spos.y + dir.y*0.55f, spos.z + dir.z*0.55f};
     ai_muzzle_particles(self,n);
     RaycastHit hit = Raycast(opos, dir, range, LMASK_NPC_ATTACK); if(!hit.hit){return;} u16 hi = hit.hitInstanceIndex;
-    if (hi == selfIdx){return;} // Wrong layer mask previously let melee hurt self; never hit owner.
+    if (hi == selfIdx){return;}
     ai_laser_beam(self,n,hit.point);
     if (n == 3 && self->index == 427 && eidx) { DrawLine(ai_sight_pos(self), World.position[eidx],(Color){1.0f,0.15f,0.18f,0.85f}); SpawnTargetingLaser(ai_sight_pos(self),World.position[eidx]); } // Targeting laser (Cyborg Elite, attack3)
     DamageData dd = SetNPCData(self,n); dd.attackType=Att_HitS; // Citadel ProjectileRaycast always uses Projectile, even for Melee.
@@ -690,7 +680,7 @@ static void AIFlierMoveToHoverHeight(Entity* self) {
 
 /*AITranquilize duplicate of Tranquilize() above removed; nothing called it.*/
 void AIAlert(u16 idx) { if (!World.diffCbt){return;} Entity* self = &World.instances[idx]; AISetEnemy(idx,PLAYER1); self->currentDestination = World.position[PLAYER1]; flag_set(&self->entflags, EF_ENEM_IN_SIGHT, false); }
-void AIAwakeFromSleep(u16 idx) { flag_set(&World.instances[idx].entflags,EF_ASLEEP,false); AIAlert(idx);/*deactivate sleeping cables*/ }
+void AIAwakeFromSleep(u16 idx) { flag_set(&World.instances[idx].entflags,EF_ASLEEP,false); AIAlert(idx); }
 static void AIThink(u16 idx) {
     Entity* self = &World.instances[idx]; if ((self->entflags & EF_DYING_SETUP) && self->deathBurstFinished < World.pauseRelativeTime && !(self->entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(self); flag_set(&self->entflags,EF_DEATH_BURST_DONE,true); }
     if (!ai_has_health(self)) { if (!(self->entflags & EF_DYING) && !(self->entflags & EF_DEAD)){flag_set(&self->entflags,EF_DYING,true); self->currentState=AIState_Dying;}else if((self->entflags & EF_DEAD) && self->currentState != AIState_Dead){self->currentState=AIState_Dead;}else if((self->entflags & EF_DYING) && self->currentState != AIState_Dying){self->currentState=AIState_Dying;} }

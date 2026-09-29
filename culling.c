@@ -91,7 +91,7 @@ i32 CastStraight(i32 px, i32 pz, i32 sign, bool isX) {
                 u32 cf=isX ? sign>0 ? CELL_CLOSEDEAST : CELL_CLOSEDWEST : sign>0 ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH; if((gridCellStates[prevCellIdx]&cf)&&gridCellStates[prevCellIdx]&CELL_OPEN)return crd; i32 subCellIdx=(z*WORLDX)+x; if(gridCellStates[subCellIdx]&CELL_OPEN){gridCellStates[subCellIdx]|=CELL_VISIBLE;}else{gridCellStates[subCellIdx]&=~CELL_VISIBLE;} curVis=true;
             }
         } if (!curVis) break;
-        for (int offset = -1; offset <= 1; offset += 2) { // Check perpendicular neighbors
+        for (int offset = -1; offset <= 1; offset += 2) { /*Check perpendicular neighbors*/
             i32 checkX = isX ? x : x + offset, checkZ = isX ? z + offset : z;
             if (XZPairInBounds(checkX, checkZ)) { i32 checkCellIdx = (checkZ * WORLDX) + checkX; if (CastRayCellCheck(x, z, checkX, checkZ) > 0) { if (gridCellStates[checkCellIdx] & CELL_OPEN) gridCellStates[checkCellIdx] |= CELL_VISIBLE; else gridCellStates[checkCellIdx] &= ~CELL_VISIBLE; } else gridCellStates[checkCellIdx] &= ~CELL_VISIBLE; }
         }
@@ -108,7 +108,7 @@ static void MarchAxis(i32 st, i32 end, i32 step, i32 ox, i32 oz, i32 sign, bool 
 void DetermineVisibleCells(i32 startX, i32 startZ) {
     if (!XZPairInBounds(startX,startZ)) return;
     for (i32 x=0;x<WORLDX;x++) { for (i32 z=0;z<WORLDZ;z++) { i32 subCellIdx = (z * WORLDX) + x; gridCellStates[subCellIdx] &= ~CELL_VISIBLE; } /*Clear all to not visible.*/ }
-    gridCellStates[(startZ * WORLDX) + startX] |= CELL_VISIBLE; // Force starting player cell to visible.
+    gridCellStates[(startZ * WORLDX) + startX] |= CELL_VISIBLE; /*Force starting player cell to visible.*/
     CastStraight(startX,startZ,1,true); // Cast to the right (East) [ ][3]
     MarchAxis(startX,WORLDX - 1,1,0,startZ + 1,1,1);             // [1][2]
     MarchAxis(startX,WORLDX - 1,1,0,startZ - 1,1,1);             // [ ][3]
@@ -150,7 +150,7 @@ void PortalCulling() { // Called just once at end of animation loop for the fram
 void CullCore() {
     playerCellIdx = PosGetCellCoords(World.position[PLAYER1].x,World.position[PLAYER1].z); if (World.curLev >= LEVEL_CYBERSPACE) return;
     u16 cellX = PosGetCellCoordX(World.position[PLAYER1].x), cellZ = PosGetCellCoordZ(World.position[PLAYER1].z); float pos_x = World.worldMin_x[World.curLev] + (cellX * CELLSZ), pos_z = World.worldMin_z[World.curLev] + (cellZ * CELLSZ);
-    for (int i=0;i<World.instCount;++i) { float dx = pos_x - World.position[i].x, dz = pos_z - World.position[i].z; float distSqrd = dx*dx + dz*dz; instanceIsLODArray[i] = (distSqrd >= 655.36f);/*25.6f * 25.6f*/ } PortalCulling(); // Update based on portal states.
+    for (int i=0;i<World.instCount;++i) { float dx = pos_x - World.position[i].x, dz = pos_z - World.position[i].z; float distSqrd = dx*dx + dz*dz; instanceIsLODArray[i] = (distSqrd >= 655.36f);/*25.6f * 25.6f*/ } PortalCulling();
 }
 
 static void ApplyOpenPortalEdges(void) { // Clears closed-edge bits for lev-matched portals currently marked open. Called from CullInit after DetermineClosedEdges() so the precomputed visibility table (and every later PVS recompute) treats open/ajar door portals as passable from the start.
