@@ -536,6 +536,8 @@ static V3 fwBasePos[INSTANCE_COUNT],fwInfoLocal[INSTANCE_COUNT],fwBaseScale[INST
 static Quaternion fwBaseRot[INSTANCE_COUNT],fwPoolRot[FW_POOL_MAX],lwRot[FW_MAX_CHILDREN],fwContainerRot,fwInfoRotDummy,*fwCurR; static bool fwLine,fwCollecting,fwPendingChild; static i32 fwStage; // transform block counter: 0 own, 1 func_wall container, 2 info_target, >=3 chunk children
 /*InteractablePanel-shaped lines (us_relaypanel 614, us_retinalscanner 615, us_isotopepanel 602): the dump writes the object's own transform first and then one transform block per sub-GO (installationItem + effects, Unity Utils.SaveSubActivatedGOState). Voxen represents the placed item with its own model instance instead of child objects, so only block 0 (the object's own transform) is applied; the sub-GO blocks are counted but dropped. Without this they overwrote the panel's own position/rotation/scale (level 7 relay panels came out 90 deg off, the level 3 retinal scanner came out zero-scaled).*/
 static bool ipLine,ipSubRotSet; static i32 ipBlock; static V3 ipSubPos,ipSubScale; static Quaternion ipSubRot; static V3 *ipCurP; static Quaternion *ipCurR; static V3 *ipCurS;
+static bool npcLine; static i32 npcBlock;/*NPC lines carry trailing gib/searchCollider/deathBurst sub-GO transform blocks after the NPC's own block-0 transform (same shape as the InteractablePanel problem above). npcBlock counts lP.x-delimited blocks 1-based, so block0 -- the NPC's own transform -- is npcBlock==1 and everything past it is dropped in the assignment chain below.*/
+static bool npcRootRotSet[INSTANCE_COUNT];/*per-record: did block 0 carry explicit lR keys (vs the QUAT_IDENTITY default)? File-static, not World state, so saves are unaffected.*/
 typedef struct { u16 ent; u8 anchor,align; float lineSp; char text[DECAL_INLINE_TEXT_LEN]; } DecalPend; // per level staging: `text:`/tA/tAl/tLs precede `lingdex`, resolved in copy loop
 static DecalPend pendDecals[DECAL_INLINE_TEXT_PEND]; static u16 pendDecalCount;
 static DecalPend* PendDecal(u16 ent) {
@@ -581,16 +583,16 @@ void LoadLevelMod(u8 lev) {
             entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; } inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
             for (u8 slot=0;slot<4;++slot) inst->contents[slot]=inst->custIdx[slot]=-1; for (u8 slot=0;slot<7;++slot) inst->randomItem[slot]=inst->randomItemCustIdx[slot]=-1;
             inst->relayEnabled=true;/*Unity LogicRelay: public bool relayEnabled = true; level data never writes the key, so absent must mean enabled.*/
-            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; ipLine=false; ipBlock=0; ipSubRotSet=false; ipCurP=NULL; ipCurR=NULL; ipCurS=NULL; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f}; inst->relayEnabled = true;
+            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; ipLine=false; ipBlock=0; ipSubRotSet=false; ipCurP=NULL; ipCurR=NULL; ipCurS=NULL; npcLine=false; npcBlock=0; npcRootRotSet[entCount]=false; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f}; inst->relayEnabled = true;
         }
         bool constIndexRead = false; bool activeStateRead = false; bool matIndexRead = false; u8 scaleReadMask = 0; u16 matIndexTexIdx = 881;
         while (line[0] != '\0') {
             char* pipe = StringFindFirstCharWithin(line, '|'); char* kvString = line; if (pipe) { *pipe = '\0'; line = pipe + 1; } else { line += slen(line); } if (kvString[0] == '\0') continue; char* colon = StringFindFirstCharWithin(kvString, ':'); if (!colon || colon[1] == '\0') continue; *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);}
             else {
-                     if(KEY_EQ("constIndex")){if(!constIndexRead){/*SaveObject.Save writes the master PrefabIdentifier.constIndex as field 0, then appends per-component saves; GrenadeActivate.Save emits its own "constIndex" (the grenade type: 7 frag, 8 conc, 9 emp, 10 earth, 11 mine, 12 nitro, 13 gas, 14 plastique) onto the same record.  Both keys share a name, so keep the first.  Otherwise the 10 level-placed live landmines (402 then 11) loaded as chunk_bridg1_5 and never detonated.*/ constIndexRead=true; inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517); ipLine=(inst->index == 614 || inst->index == 615 || inst->index == 602);}}
+                     if(KEY_EQ("constIndex")){if(!constIndexRead){/*SaveObject.Save writes the master PrefabIdentifier.constIndex as field 0, then appends per-component saves; GrenadeActivate.Save emits its own "constIndex" (the grenade type: 7 frag, 8 conc, 9 emp, 10 earth, 11 mine, 12 nitro, 13 gas, 14 plastique) onto the same record.  Both keys share a name, so keep the first.  Otherwise the 10 level-placed live landmines (402 then 11) loaded as chunk_bridg1_5 and never detonated.*/ constIndexRead=true; inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517); ipLine=(inst->index == 614 || inst->index == 615 || inst->index == 602); npcLine=IdxIsNPC(inst->index);}}
                 else if(KEY_EQ("lP.x")||KEY_EQ("lP.y")||KEY_EQ("lP.z")||KEY_EQ("lR.x")||KEY_EQ("lR.y")||KEY_EQ("lR.z")||KEY_EQ("lR.w")||KEY_EQ("lS.x")||KEY_EQ("lS.y")||KEY_EQ("lS.z")) {
-                    /*One block per transform: lP.x starts a new one. func_wall (517) keeps its own staged collection; InteractablePanel objects (ipLine) take block 0 only and drop the sub-GO blocks; everything else writes straight to the object.*/
+                    /*One block per transform: lP.x starts a new one. func_wall (517) keeps its own staged collection; InteractablePanel objects (ipLine) take block 0 only and drop the sub-GO blocks; NPC lines (npcLine) likewise take block 0 only; everything else writes straight to the object.*/
                     float v=parse_float(value,lineSpace,lineNum);
                     if (KEY_EQ("lP.x")) {
                         if (fwLine) { FWBeginBlock(entCount); }
@@ -599,14 +601,16 @@ void LoadLevelMod(u8 lev) {
                             else { ipCurP=&ipSubPos; ipCurR=&ipSubRot; ipCurS=&ipSubScale; if (ipBlock == 1) { ipSubPos=(V3){0.0f,0.0f,0.0f}; ipSubScale=(V3){1.0f,1.0f,1.0f}; ipSubRot=QUAT_IDENTITY; }/*block 1 is InteractablePanel.installationItem*/ }
                             ipBlock++;
                         }
+                        else if (npcLine) { npcBlock++; }
                     }
-                    if (KEY_EQ("lP.x")) { if(fwLine){ if(fwCurP)fwCurP->x=v; } else if(ipLine){ if(ipCurP)ipCurP->x=v; } else posFromFile[entCount].x=v; }
+                    if (npcLine && npcBlock > 1) { /*trailing gib/searchCollider/deathBurst sub-GO transform on an NPC line: not the NPC's own transform, so drop the whole lP/lR/lS key (same rationale as ipLine block-0 above; without this the last gib's -90deg X rotation overwrote the NPC's facing)*/ }
+                    else if (KEY_EQ("lP.x")) { if(fwLine){ if(fwCurP)fwCurP->x=v; } else if(ipLine){ if(ipCurP)ipCurP->x=v; } else posFromFile[entCount].x=v; }
                     else if (KEY_EQ("lP.y")) { if(fwLine){ if(fwCurP)fwCurP->y=v; } else if(ipLine){ if(ipCurP)ipCurP->y=v; } else posFromFile[entCount].y=v; }
                     else if (KEY_EQ("lP.z")) { if(fwLine){ if(fwCurP)fwCurP->z=v; } else if(ipLine){ if(ipCurP)ipCurP->z=v; } else posFromFile[entCount].z=v; }
-                    else if (KEY_EQ("lR.x")) { if(fwLine){ if(fwCurR)fwCurR->x=v; } else if(ipLine){ if(ipCurR)ipCurR->x=v; } else rotationFromFile[entCount].x=v; }
-                    else if (KEY_EQ("lR.y")) { if(fwLine){ if(fwCurR)fwCurR->y=v; } else if(ipLine){ if(ipCurR)ipCurR->y=v; } else rotationFromFile[entCount].y=v; }
-                    else if (KEY_EQ("lR.z")) { if(fwLine){ if(fwCurR)fwCurR->z=v; } else if(ipLine){ if(ipCurR)ipCurR->z=v; } else rotationFromFile[entCount].z=v; }
-                    else if (KEY_EQ("lR.w")) { if(fwLine){ if(fwCurR)fwCurR->w=v; } else if(ipLine){ if(ipCurR)ipCurR->w=v; if(ipBlock>1) ipSubRotSet=true; } else rotationFromFile[entCount].w=v; }
+                    else if (KEY_EQ("lR.x")) { if(fwLine){ if(fwCurR)fwCurR->x=v; } else if(ipLine){ if(ipCurR)ipCurR->x=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].x=v; } }
+                    else if (KEY_EQ("lR.y")) { if(fwLine){ if(fwCurR)fwCurR->y=v; } else if(ipLine){ if(ipCurR)ipCurR->y=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].y=v; } }
+                    else if (KEY_EQ("lR.z")) { if(fwLine){ if(fwCurR)fwCurR->z=v; } else if(ipLine){ if(ipCurR)ipCurR->z=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].z=v; } }
+                    else if (KEY_EQ("lR.w")) { if(fwLine){ if(fwCurR)fwCurR->w=v; } else if(ipLine){ if(ipCurR)ipCurR->w=v; if(ipBlock>1) ipSubRotSet=true; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].w=v; } }
                     else if (KEY_EQ("lS.x")) { if(fwLine){ if(fwCurS)fwCurS->x=v; } else if(ipLine){ if(ipCurS)ipCurS->x=v; } else { scaleFromFile[entCount].x=v; scaleReadMask|=1u; } }
                     else if (KEY_EQ("lS.y")) { if(fwLine){ if(fwCurS)fwCurS->y=v; } else if(ipLine){ if(ipCurS)ipCurS->y=v; } else { scaleFromFile[entCount].y=v; scaleReadMask|=2u; } }
                     else if (KEY_EQ("lS.z")) { if(fwLine){ if(fwCurS)fwCurS->z=v; } else if(ipLine){ if(ipCurS)ipCurS->z=v; } else { scaleFromFile[entCount].z=v; scaleReadMask|=4u; } }
@@ -783,6 +787,11 @@ void LoadLevelMod(u8 lev) {
     i32 totalEnts = entCount + 1;
     for (i32 e=0;e<totalEnts;++e) {
         Entity* src = &entsFromFile[e]; u16 entIdx = src->index; u16 parent = AddInstance(entIdx,posFromFile[e]); Entity* par = &World.instances[parent]; par->lastPosition = posFromFile[e]; World.rotation[parent] = rotationFromFile[e]; if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
+        if (IdxIsNPC(entIdx) && npcTable[entIdx-419].type != NPCType_Cyber) { V3 f = src->idealTransformForward; Quaternion r = World.rotation[parent];
+            if (!npcRootRotSet[e]) { if (vabs(f.y) < 1e-3f && (vabs(f.x) > 1e-6f || vabs(f.z) > 1e-6f)) { float yaw = __builtin_atan2f(f.x, f.z), half = yaw * 0.5f; World.rotation[parent] = (Quaternion){0.0f, vsinf(half), 0.0f, vcosf(half)}; } }/*block-0 rotation absent (the converter dropped it on gib-bearing lines): recover yaw from the Unity facing vector; Voxen models are the visible mesh authored upright, so placement is yaw-only and trailing gib lR is never authoritative*/
+            else if (vabs(r.x) > 1e-3f || vabs(r.z) > 1e-3f) World.rotation[parent] = QUAT_IDENTITY;/*explicit block-0 rotation is tilted (unobserved on non-cyber records): upright default, same as a fresh AddInstance*/
+            /*explicit yaw-only block-0 rotation is the authoritative Unity placement: keep as parsed*/
+            par->forward = V3_Normalize(quat_rot_v3(World.rotation[parent], (V3){0.0f,0.0f,1.0f})); }
         bool srcActive=(src->entflags & EF_ACTIVE)!=0; par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/
           flag_set(&par->entflags,EF_ACTIVE,srcActive);/*...but EF_ACTIVE is the one bit that has to be able to go 1->0: AddInstance (entity.c) seeds EF_ACTIVE from the entity
              definitions, and `|=` can only ever add bits, so every record carrying go.activeSelf:0 was still born active.  That silently ignored the
