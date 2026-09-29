@@ -389,6 +389,7 @@ typedef struct SynthVoice SynthVoice; typedef float (*SynthFn)(SynthVoice*); typ
 float sinf(float x); float tanf(float x); float cosf(float x);
 #define PI 3.14159265f
 #define TAU 6.2831853f
+#define SERVBOT_MESH_YAW_DEG (-99.0f)/*npc_servbot (437) mesh-vs-forward yaw correction, tuned in-game. Render side (voxen.c UpdateInstanceMatrix4x4s) yaws the mesh by this about global Y; spawn side (entity.c load loop) counter-yaws by minus this so absolute placements are unchanged. Keep both in sync here, not at the use sites.*/
 #define vabs(x) ((x) < 0 ? -(x) : (x))
 #define vmin(a,b) ((a) < (b) ? (a) : (b))
 #define vmax(a,b) ((a) > (b) ? (a) : (b))

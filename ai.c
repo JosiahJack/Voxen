@@ -94,7 +94,7 @@ static const AIPresetSet aiDeathBursts[NUM_AI_TYPES] = {
     /* 6 CYBORG WARRIOR  */ {{0,0,0,0,0,0},0},/*deathLightning is a light, not particles*/
     /* 7 CYBORG ENFORCER */ {{80,0,0,0,0,0},1},
     /* 8 CYBORG ELITE    */ {{0,0,0,0,0,0},0},
-    /* 9 CYBORG DIEGO    */ {{0,0,0,0,0,0},0},
+    /* 9 CYBORG DIEGO    */ {{76,75,0,0,0,0},2},/*centerflare + redburst (prefab deathBurst children)*/
     /*10 SEC-1 BOT       */ {{138,53,55,135,0,0},4},
     /*11 SEC-2 BOT       */ {{54,53,55,0,0,0},3},
     /*12 MAINT BOT       */ {{117,116,119,120,122,0},5},
@@ -456,7 +456,10 @@ static double AIDeathAnimationDuration(const Entity* self) {
 static void SpawnNPCDeathBurst(Entity* self) {
     if (!self) return;
     u16 npc=(u16)(self->index-419); if (npc<NUM_AI_TYPES) { V3 p=World.position[(u16)(self - World.instances)]; if (self->index == 437) { p.x-=self->right.x*.005f; p.y-=.032f; p.z-=self->right.z*.005f; p.x-=self->forward.x*.078f; p.z-=self->forward.z*.078f; } ai_spawn_presets(&aiDeathBursts[npc],p); }
-    if (self->deathBurst > 0) SpawnDynamicObject(self->deathBurst, false);
+    /* Entity.deathBurst is never assigned by the converter -- the converted level data only
+       carries deathBurst.activeSelf / childCount. The live path is aiDeathBursts[] above, which
+       names the prefab's deathBurst particle systems by particleTypeDefs index. This call was
+       also a latent crash: deathBurst 0 means entity 0, not "none". */
 }
 static void AIDying(u16 i) {
     if (!(World.instances[i].entflags & EF_DYING_SETUP)) {
