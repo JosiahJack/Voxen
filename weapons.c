@@ -133,8 +133,9 @@ static u16 ImpactParticleType(u16 prefab) {
         case 725: return 21;  /* ef_particle_camerahit */             case 726: return 23;  /* ef_particle_darthit */
         case 729: return 35;  /* ef_particle_sparksmall */            case 730: return 37;  /* ef_particle_sparkssmallblue */
         case 731: return 39;  /* ef_particle_sparqhit */              case 739: return 12;  /* ef_particle_blasterhit */
-        case 740: return 26;  /* ef_particle_ionhit */
-        default: return U16_MAX;/* 756 leafburst, 757 mutationburst, 758 graytationburst have no preset in the table */
+        case 740: return 26;  /* ef_particle_ionhit */              case 756: return 184; /* ef_particle_leafburst */
+        case 757: return 185; /* ef_particle_mutationburst */       case 758: return 186; /* ef_particle_graytationburst */
+        default: return U16_MAX;
     }
 }
 static bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {

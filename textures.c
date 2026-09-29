@@ -159,6 +159,15 @@ static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
 };
 
 // Per-clip frame period in seconds. Shared by TextureSequenceStart and TextureSequenceUpdate so the first frame is held for the same time as every frame after it. 0.04166 is 1/24s, the film rate the model animations run at.
+// prop_cpuscreen digits.  Clip 41 is the ten-digit "ScreenCodeRandom" sequence that Unity's CodeScreen.Update cycles
+// every 0.3s; its frame indices are 160..169, which resolve through sequenceTextures to textures 1443..1452.
+// Indexing sequenceTextures directly (rather than hardcoding 1443) keeps this correct if the table is reordered.
+#define SCREEN_CODE_CLIP 41
+INLINE u16 ScreenCodeTexture(u8 digit) { return sequenceTextures[textureAnimClips[SCREEN_CODE_CLIP].frames[digit%10u]]; }
+// Stop the flicker and latch the level's real digit.  This is the lock: Unity's Const.LockCPUScreenCode, driven by
+// the last CPU node dying on the level.  texIndex has to come from sequenceTextures -- the array is only ~305 long,
+// so any index outside it reads unrelated memory.
+void CodeScreenShowDigit(u16 self, u8 digit) { Entity* e=&World.instances[self]; e->textureAnimating=false; e->texAnimRandom=false; e->texIndex=ScreenCodeTexture(digit); }
 static float TextureClipPeriod(u16 clip) { return (clip==5||clip==6||clip==1) ? 0.5f/*ExecScreen1, ExecScreen2, BrokenClock*/ : (clip==41||clip==43) ? 0.3f/*ScreenCodeRandom, ShodanStatic*/ : (clip==44) ? 0.2f/*Static*/ : (clip==9) ? 0.17f/*MagCartridge*/ : (clip==47||clip==48) ? 0.04166f/*ZeroGMutant, ZeroGMutantDeath*/ : 0.35f; }
 
 void TextureSequenceInit(u16 self, char* trimmed_value) {

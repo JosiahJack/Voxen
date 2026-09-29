@@ -244,8 +244,8 @@ void ForceBridgeUpdate(u16 self) {
 }
 
 void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,World.instances[self].targetIdx); }
-void TriggerCounterDelayedTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; }/*Unity StartCoroutine(DelayedTarget); the target fires from TriggerCounterUpdate once the delay elapses. This used to also call the target immediately, so the delay was never honored.*/
-void TriggerCounterUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished > 0.0 && e->delayFinished < World.pauseRelativeTime) { e->delayFinished = 0.0; TriggerCounterTarget(self, e->recentMostActivator); } }
+void TriggerCounterDelayedTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }/*Capture the activating bits now, while the activator is still resolvable.*//*Unity StartCoroutine(DelayedTarget); the target fires from TriggerCounterUpdate once the delay elapses. This used to also call the target immediately, so the delay was never honored.*/
+void TriggerCounterUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 sf=World.targetIOActivatorIoflags,sfh=World.targetIOActivatorIoflagsHi; bool wa=World.targetIOActive; World.targetIOActive=true; World.targetIOActivatorIoflags=e->deferredIoflags; World.targetIOActivatorIoflagsHi=e->deferredIoflagsHi; UseTargets(e->recentMostActivator,e->targetIdx); World.targetIOActivatorIoflags=sf; World.targetIOActivatorIoflagsHi=sfh; World.targetIOActive=wa; }/*Marking the chain active stops UseTargets re-seeding from World.instances[activator], which by now points at the player's level.*/
 void LogicRelayDelayTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; }/*LogicRelay.cs:19,22 defers to StartCoroutine(DelayedTarget) when delay > 0. The relay's own ioflags ride the deferred hop, so they are re-read at fire time rather than captured.*/
 void LogicRelayUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(e->recentMostActivator, e->targetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
 void TriggerCounterTargetted(u16 self, u16 act) { Entity* e=&World.instances[self]; e->counter++; if (e->counter != e->countToTrigger) {return;} if (e->delay <= 0.0f){TriggerCounterTarget(self,act);}else{TriggerCounterDelayedTarget(self,act);} if (!e->dontReset){e->counter=0;} }
@@ -570,12 +570,15 @@ void ReduceCurrentLevelSecurity(SecurityType stype) { // Typical level: 4 CPU no
   treats cross-level targets as ordinary.*/
 static void CodeScreensSetForLevel(u8 lev) {
     if (lev < 1 || lev > 6) return;
-    const u8 code[6] = {World.lev1SecCode,World.lev2SecCode,World.lev3SecCode,World.lev4SecCode,World.lev5SecCode,World.lev6SecCode};
-    u8 digit = code[lev-1]; if (digit > 9) return;
+    /*The level's code is drawn here, the moment its last node dies -- Unity's Const.LockCPUScreenCode, which
+      re-rolls once and marks the code locked.  Drawing it at lock rather than at NewGame is what makes the
+      self-destruct pads' 289/290 guard reachable: no nodes cleared, no code.*/
+    i8 *code = &World.lev1SecCode; if (code[lev-1] < 0) { code[lev-1] = (i8)random_range_u8(0u,9u); }
+    u8 digit = (u8)code[lev-1];
     u8 entryLevel = World.currentLevel;
     for (u8 l = 0; l < World.numLevels; ++l) {
         if (l != World.currentLevel) SetLevelPointers(l);
-        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* s = &World.instances[i]; if (s->index != 551 || !s->codeScreen) continue; s->texIndex = (u16)(768 + digit); s->textureAnimating = false; s->texAnimRandom = false; }
+        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* s = &World.instances[i]; if (s->index != 551 || !s->codeScreen) continue; CodeScreenShowDigit(i, digit); }
     }
     if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
 }
@@ -600,7 +603,7 @@ void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNorm
         if (dd.isOtherNPC) { if(!(hit->entflags & EF_ASLEEP)){World.Sys_Music.inCombat=true;} if(dd.attackType == Att_Trnq){float stunAmount=vclamp(3.0f+(World.invP1.stungunSetting/100.0f)*7.0f,3.0f,10.0f); tranq=Tranquilize(hitIdx,stunAmount,true);} } if (dmgFinal < 0.0f) {dmgFinal = 0.0f;} CreateTargetIDInstance(dmgFinal,hitIdx,tranq);
     }
     if (World.curLev != LEVEL_CYBERSPACE && !hostIsNPC) { ApplyImpactForceWithSound(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); }/*impact force+sound for any dynamic object (Unity: Utils.ApplyImpactForce + ObjectImpact)*/
-    if(e->countToTrigger<1)e->countToTrigger=1; if (e->counter >= e->countToTrigger) { SpawnProjectileImpactParticles(e->index,hitPos,hitNormal); if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
+    if(e->countToTrigger<1)e->countToTrigger=1; if (e->counter >= e->countToTrigger) { if(!hasHealthManager)SpawnProjectileImpactParticles(e->index,hitPos,hitNormal); if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
 }
 void ProjectileEffectImpactInitAfterLoad(u16 self) { if(self>=World.instCount)return;Entity* e=&World.instances[self]; e->counter=0;e->currentTargetIdx=0;e->lookUpIndex=(e->index==484||e->index==491)?5:0;if(e->countToTrigger<1){e->countToTrigger=e->index==485?5:(e->index==495?2:1);} }
  // None  Melee  MelEn  EnBm   Mag    Proj   Needle ProjEB ProjLn Gas    Tranq  Drill
@@ -646,6 +649,11 @@ static void Death(u16 self,bool energyVaporized) {
     if (e->index == 477) { /* sec_camera has no dynamic-object path; deathFX 1 is CameraExplosions. */
         e->deathBurst = 725; ObjectDeath(self); DeleteInstance(self); return;
     }
+    if (e->index == 478 || e->index == 479) { /* sec_cpunode(_small): ObjectDeath spawns gibs 840..853, drops the level security and latches the code screen, but the
+        prefab serializes no deathFX, so deathBurst stays 0 and ObjectDeath's trailing HideSelf never runs -- the node would hang in the air as an
+        unpickable shell.  Unity destroys the object outright.  DeleteInstance also stops a dead node still counting in CPUNodesRemainOnLevel. */
+        ObjectDeath(self); DeleteInstance(self); return;
+    }
     /* NPCs retain their entity mesh for AI death animation. Only non-NPC corpses vaporize. */
     bool vaporize=IdxIsCorpse(e->index); bool isGrenade=IsGrenade(e->index), doTeleport=(e->entflags & EF_TELEPORT_ON_DEATH) != 0; if (e->iceActive) World.col[self] = COLTYPE_NONE;
     if (vaporize && e->index != 477/*sec_camera*/ && !isGrenade) VaporizeCorpse(self,energyVaporized); else if (isObj && !isNPC) ObjectDeath(self); else if (e->index == 279/*screen*/) ScreenDeath(self); else if (doTeleport) TeleportAway(self); else if (isGrenade) GrenadeExplode(self);
@@ -669,7 +677,7 @@ float TakeDamage(u16 self,DamageData dd) {
         }
     }
     if (isCyber) { World.instances[self].cyberHealth -= take; if (isPlayer) { World.damageReceived += take; if (World.instances[self].cyberHealth <= 0.0f) { ExitCyberspace(); return 0.0f; } } if (dd.owner == PLAYER1){World.damageDealt += take;} }
-    else { if(selfIdx == 477/*Camera constIndex 477 gets one-shot by tranq*/ && dd.attackType == Att_Trnq){take=World.instances[self].health + 1.0f;} take=ApplyAttTypeAdjustments(self,take,dd.attackType); World.instances[self].health-=take; if (isPlayer) { World.damageReceived+=take; World.Sys_Music.inCombat=true; } if (dd.owner == PLAYER1){World.damageDealt+=take;} }
+    else { if(selfIdx == 477/*Camera constIndex 477 gets one-shot by tranq*/ && dd.attackType == Att_Trnq){take=World.instances[self].health + 1.0f;} take=ApplyAttTypeAdjustments(self,take,dd.attackType); if(!isPlayer)DualLog("TakeDamage inst %u ci %u hp %.3f->%.3f take %.3f att %d owner %u\n",(u32)self,(u32)selfIdx,World.instances[self].health,World.instances[self].health-take,take,(int)dd.attackType,(u32)dd.owner); World.instances[self].health-=take; if (isPlayer) { World.damageReceived+=take; World.Sys_Music.inCombat=true; } if (dd.owner == PLAYER1){World.damageDealt+=take;} }
     if (isNPC && (World.instances[self].health > 0.0f || (isCyber && World.instances[self].cyberHealth > 0.0f))) { if (npcTable[selfIdx - 419].timeBetweenPain > 0.0f) flag_set(&World.instances[self].entflags,EF_GO_INTO_PAIN,true); World.instances[self].recentMostActivator = dd.owner; TargetIDSendDamageReceive(self,take,dd.attackType); AICheckPain(self); }
     if (isCyber) { if (World.instances[self].cyberHealth <= 0.0f) { if (!World.instances[self].iceActive && isNPC) {World.cyberkills++;} Death(self,false); } } else { if (World.instances[self].health <= 0.0f) { if (isNPC) {World.kills++;} Death(self,dd.attackType == Att_Beam); } }    return take;
 }
@@ -783,10 +791,18 @@ void Targetted(u16 activator, u16 self) {
         if (!(aioflags & TARG_IOFLAGS_BRANCH_FLIPONLY)) { if (e->relayEnabled && e->currentTargetIdx != IO_NONE) { u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator,e->currentTargetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx; } }
         if (aioflags & (TARG_IOFLAGS_BRANCH_FLIP | TARG_IOFLAGS_BRANCH_FLIPONLY)) { e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx; }   return;
     }
-    if (e->index == 710 && e->questBitID != QB_None) { // info_mission/QuestBitRelay.  EnableBits/DisableBits/ToggleBits/TestBits act on the *activating* object's bits (Unity TargetIO.Targetted reads tempUD, never the receiver's own line), so no fallback to e->ioflags here.  A fired test hands its own line down instead: Unity QuestBits.RunTargets does ud.SetBits(tio) + UseTargets(null,ud,target).  Unity keeps evaluating the remaining TargetIO actions, hence no early out.
+    if (e->index == 710 && e->questBitID != QB_None) { // info_mission/QuestBitRelay.  EnableBits/DisableBits act on the *activating* object's bits (Unity TargetIO.Targetted reads tempUD, never the receiver's own line), so no fallback to e->ioflags here.  Unity keeps evaluating the remaining TargetIO actions, hence no early out.
         if (aioflags & TARG_IOFLAGS_MISSION_BIT_ON) QuestBitSet(e->questBitID);
         if (aioflags & TARG_IOFLAGS_MISSION_BIT_OFF) QuestBitClear(e->questBitID);
         if (aioflags & TARG_IOFLAGS_MISSION_BIT_TOGGLE) QuestBitToggle(e->questBitID);
+    }
+    /*TestBits is separate from the set path because Unity looks the relay up per-action: QuestBitRelay only ships on
+      info_mission, so a testQuestBitIsOn object without one is a no-op in the reference game (level8's lev8firstdoor
+      gate is exactly that).  DIVERGENCE (intended): a test is honoured on any entity that names a bit and a test mode,
+      so those gates actually fire.  Naming a bit is what opts in -- questBitID defaults to QB_None, matching Unity's
+      "if (<boolean> && ...)", so the untagged gates stay inert rather than all testing bit 0 at once.  A fired test
+      hands its own line down instead: Unity QuestBits.RunTargets does ud.SetBits(tio) + UseTargets(null,ud,target).*/
+    if (e->questBitID != QB_None) {
         u8 tm = e->questTestMode; if (!tm && activator != WORLD && activator < World.instCount) tm = World.instances[activator].questTestMode;/*1==testQuestBitIsOn, 2==testQuestBitIsOff*/
         if (tm) { bool bitOn = QuestBitIsSet(e->questBitID); u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator, (tm == 1) == bitOn ? e->targetIdx : e->targetIfFalseIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
     }
@@ -923,7 +939,14 @@ static void PuzzlePanelUse(u16 i) {
 static bool PanelUseAllowed(u16 i) {
     Entity* e=&World.instances[i];
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return false;}
-    if(e->entflags&EF_LOCKED){u16 msg=(u16)e->lockedMessageLingdex;if(msg<T_LOGSTR_CNT&&msg!=0)CenterStatusPrint("%s",Sys_Text.stringTable[msg]);else CenterStatusPrint("%s",Sys_Text.stringTable[302]);return false;}
+    if(e->entflags&EF_LOCKED){
+        u16 msg=(u16)e->lockedMessageLingdex;if(msg<T_LOGSTR_CNT&&msg!=0)CenterStatusPrint("%s",Sys_Text.stringTable[msg]);else CenterStatusPrint("%s",Sys_Text.stringTable[302]);
+        /*KeypadKeycode.cs:35-42 and KeypadElevator.cs:47-51 - a locked panel answers with a Vox message naming the
+          reason instead of opening, by firing lockedTarget.  Only keypads and elevator panels carry the field, so
+          the rest of the locked path is unchanged.*/
+        if(e->lockedTargetIdx!=IO_NONE)UseTargets(i,e->lockedTargetIdx);
+        return false;
+    }
     return true;
 }
 
@@ -1086,7 +1109,19 @@ bool FindElevatorKeypadPos(u8 level,V3* outPos) {
 }
 static void KeycodePanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
-    SystemUI* s=&World.Sys_UI; s->tetheredKeypadKeycode=i; s->keycodeValue=World.instances[i].keycode; s->keycodeValid=true; s->keycodeSolved=false;
+    Entity* e=&World.instances[i];
+    /*KeypadKeycode.cs:45-80 - the two level-R self-destruct pads take no keycode of their own; the three digits are
+      the level security codes the player has to have read off the CPU screens, huns/tens/ones from 1,2,3 on one pad
+      and 4,5,6 on the other.  Both records ship keycode 666 as a placeholder, which this overwrites.  A code the
+      player has not earned is -1 and refuses the pad with 289/290 plus the security MFD tab, same as
+      MFDManager.BlockedBySecurity.  Unity draws all six at NewGame so that guard is dead there; here they are drawn
+      at lock (CodeScreensSetForLevel) so it is live.*/
+    if(e->useQuestKeycode1||e->useQuestKeycode2){
+        const i8 *c=&World.lev1SecCode; int off=e->useQuestKeycode1?0:3; u16 msg=e->useQuestKeycode1?289:290;
+        if(c[off]<0||c[off+1]<0||c[off+2]<0){UIBlockedBySecurity(World.position[i]);CenterStatusPrint("%s",Sys_Text.stringTable[msg]);return;}
+        e->keycode=(u16)(c[off]*100 + c[off+1]*10 + c[off+2]);
+    }
+    SystemUI* s=&World.Sys_UI; s->tetheredKeypadKeycode=i; s->keycodeValue=e->keycode; s->keycodeValid=true; s->keycodeSolved=false;
     s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; s->objectInUsePos=World.position[i]; s->usingObject=true;
     ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(false,2);
 }
@@ -1229,10 +1264,40 @@ void DrawAIDebug(u16 i) {
     DrawSphereWireframe(dbgCol, (ShapeSphere){sightPt, 0.32f});
 }
 
+/* sec_camera (477) SecurityCameraRotate.  Sweeps the camera back and forth between startYAngle and endYAngle,
+   pausing waitTime at each end, and only advances while the mesh is on screen (Unity: mR.isVisible).  Unity calls
+   transform.Rotate(0, degreesYPerSecond * tickTime, 0, Space.World) once per Update() and never uses tickTime as a
+   timestep, so at 60Hz that is 4 * 0.1 = 0.4 deg per frame = 24 deg/sec; stepped by World.dt here so the sweep speed
+   does not track the frame rate.  The yaw is composed onto the authored rotation rather than accumulated in world
+   space, which is what the wrapper-GameObject note in SecurityCameraRotate.cs describes and keeps the prefab's droop
+   from precessing.  Start(): waitingFinished = relativeTime, rotatePositive = true. */
+#define CAM_SWEEP_DEG_PER_SEC 24.0f
+#define CAM_SWEEP_EPSILON    1.0f
+INLINE float CamYawFromQuat(Quaternion q) { /*standard ZYX yaw extraction, only used to seed the sweep, so Unity's
+    ZXY eulerAngles.y ordering does not have to be reproduced exactly*/
+    float d = __builtin_atan2f(2.0f*(q.w*q.y + q.x*q.z), 1.0f - 2.0f*(q.y*q.y + q.z*q.z)) * (180.0f / 3.14159265f);
+    if (d < 0.0f) d += 360.0f; return d;
+}
+void SecurityCameraRotateUpdate(u16 self) {
+    Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return;
+    /*Unity: if (mR == null || !mR.isVisible || !mR.enabled) return -- the sweep is frozen whenever the camera is
+       off screen.  playerFrustumPlanes is rebuilt in Render(), so here it still holds last frame's planes, which is
+       fine for a gate.  Unity mR.isVisible is true when any part of the renderer is in frustum, hence the radius. */
+    if (!SphereInFrustum(playerFrustumPlanes, World.position[self], 1.28f)) return;
+    if (!e->camSweepInit) { e->camSweepInit = true; e->camYaw0 = CamYawFromQuat(World.rotation[self]); e->camYaw = e->camYaw0; }/*seeded lazily so the authored lR.* has already been applied*/
+    if (e->camWaitingFinished >= World.pauseRelativeTime) return;/*Unity: if (waitingFinished < relativeTime)*/
+    float dt = World.dt;
+    if (e->camRotatePositive) { if (vabs(e->camYaw - e->camEndYAngle) <= CAM_SWEEP_EPSILON) { e->camRotatePositive = false; e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime; } else e->camYaw += CAM_SWEEP_DEG_PER_SEC * dt; }
+    else { if (vabs(e->camYaw - e->camStartYAngle) <= CAM_SWEEP_EPSILON) { e->camRotatePositive = true; e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime; } else e->camYaw -= CAM_SWEEP_DEG_PER_SEC * dt; }
+    if (e->camYaw < 0.0f) e->camYaw += 360.0f; else if (e->camYaw >= 360.0f) e->camYaw -= 360.0f;
+    float half = deg2rad(e->camYaw - e->camYaw0) * 0.5f; Quaternion yaw = {0.0f, vsinf(half), 0.0f, vcosf(half)};
+    World.rotation[self] = quat_multiply(yaw, World.rotation[self]);
+}
+
 void ModUpdate() {
     if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==CYBER_DECOY_CONST) CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ if(constdex==614) RelayPanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(constdex == 594){TriggerCounterUpdate(i);} if(constdex == 699){LogicRelayUpdate(i);} if(constdex == 702){SpawnManagerUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
+        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==CYBER_DECOY_CONST) CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ if(constdex==614) RelayPanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(constdex == 594){TriggerCounterUpdate(i);} if(constdex == 699){LogicRelayUpdate(i);} if(constdex == 702){SpawnManagerUpdate(i);} if(constdex == 477){SecurityCameraRotateUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);} if(IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
         if(constdex==552){CyberDataFragUpdate(i);} if(constdex==554){CyberExitUpdate(i);} if(constdex==555){CyberSwitchUpdate(i);} if((constdex>=448&&constdex<=451)||(constdex>=454&&constdex<=457)){CyberItemUpdate(i);}
     }

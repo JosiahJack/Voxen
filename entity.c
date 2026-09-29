@@ -169,7 +169,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*458 prop_phys_barrel_chemical*/[458]={12,332,30,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*459 prop_phys_barrel_radiation*/[459]={12,332,31,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*460 prop_phys_barrel_toxic*/[460]={12,332,33,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*461 prop_phys_cart*/[461]={40,333,416,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*462 prop_phys_pot*/[462]={494,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*463 prop_phys_toolcart*/[463]={624,335,865,866,864,MAX_TXRS,20.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*464 se_briefcase*/[464]={34,0,66,65,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*465 se_corpse_blueshirt*/[465]={51,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*466 se_corpse_brownshirt*/[466]={52,0,128,MAX_TXRS,129,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*467 se_corpse_eaten*/[467]={MAX_ANIMS,0,130,MAX_TXRS,131,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*464 se_briefcase*/[464]={34,0,66,65,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*465 se_corpse_blueshirt*/[465]={51,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*466 se_corpse_brownshirt*/[466]={52,0,128,MAX_TXRS,129,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*467 se_corpse_eaten*/[467]={53,0,130,MAX_TXRS,131,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*468 se_corpse_labcoat*/[468]={55,0,132,MAX_TXRS,133,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*469 se_corpse_security*/[469]={56,0,136,MAX_TXRS,137,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*470 se_corpse_tan*/[470]={57,0,138,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*471 se_corpse_torso*/[471]={58,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*472 se_crate1*/[472]={60,0,145,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},/*473 se_crate2*/[473]={60,0,143,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
 /*474 se_crate3*/[474]={60,0,144,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},/*475 se_crate4*/[475]={60,0,146,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.25f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
@@ -448,7 +448,28 @@ static float DefaultPrefabHealth(u16 entIdx) {
         case 525: case 526: return 200.0f;            /*prop_console01 / prop_console02*/
         default: return 0.0f;
     }
-}
+  }
+  /* HealthManager bloodType per prefab, read off the bloodType: field each prefab serializes in Citadel's
+     Assets/Resources/Prefabs/.  BloodType_None is Unity's own default and maps to the orange SparksSmall pool
+     (Const.cs GetImpactType), so only prefabs that actually declare a value appear here.  The converter drops
+     the field, so without this every prop reports None and shots throw orange sparks off metal barrels, crates,
+     cameras, CPU nodes and consoles; bloodType 4 (Robot) is the blue SparksSmall pool.  NPCs 419..447 are absent
+     on purpose: InitNPC draws theirs from npcBloodTypes[]. */
+  static BloodType DefaultPrefabBloodType(u16 entIdx) {
+      switch (entIdx) {
+          case 458: case 459: case 460:                     /*prop_phys_barrel_chemical / _radiation / _toxic*/
+          case 477:                                          /*sec_camera*/
+          case 478: case 479:                                /*sec_cpunode / _small*/
+          case 525: case 526: return BloodType_Robot;       /*prop_console01 / prop_console02*/
+          case 464:                                          /*se_briefcase*/
+          case 472: case 473: case 474: case 475: case 476:  /*se_crate1..5*/
+                      return BloodType_GrayMutation;
+          case 465: case 466: case 467: case 468:            /*se_corpse_blueshirt / _brownshirt / _eaten / _labcoat*/
+          case 469: case 470: case 471: return BloodType_Red;/*se_corpse_security / _tan / _torso*/
+          default: return BloodType_None;
+      }
+  }
+
 __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {    if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return 0; } if (World.instCount >= INSTANCE_COUNT) { DualLogError("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return 0; }
     u16 i = World.instCount; mset(&World.instances[i],0,sizeof(Entity)); World.instances[i].entflags=EF_ACTIVE; World.layer[i]=L_Default;World.instances[i].camView=255; World.instances[i].modelIndex=World.instances[i].lodIndex=World.instances[i].colMeshIndex=MAX_MDLS; World.scale[i].x=World.scale[i].y=World.scale[i].z=World.mass[i]=World.rotation[i].w=1.0f; World.dynamicFriction[i]=0.5f; World.staticFriction[i]=0.6f;
     for (u8 slot=0;slot<4;++slot) World.instances[i].contents[slot]=World.instances[i].custIdx[slot]=-1; for (u8 slot=0;slot<7;++slot) World.instances[i].randomItem[slot]=World.instances[i].randomItemCustIdx[slot]=-1;
@@ -465,7 +486,10 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {    if (entIdx >=
     if (entIdx == 592 || entIdx == 593) { World.instances[i].modelIndex = U16_MAX; } // 3D text decals (no mesh)
     float defHealth = DefaultPrefabHealth(entIdx);/*default health for every prefab whose HealthManager the level data leaves unset (runtime spawns, any order-dependent read).  Values are the health: field serialized in the matching prefab under Assets/Resources/Prefabs/, so crates, prop_console01/02, se_corpse_* (health 50, without which a corpse carries none, IsDamageable() rejects it and melee can never gib a body), barrels, sec_camera, sec_cpunode(_small), chunk_screen and se_briefcase are damageable exactly as they are in Unity.*/
     if (defHealth > 0.0f && World.instances[i].health <= 0.0f) World.instances[i].health = defHealth;
+    if (!IdxIsNPC(entIdx)) World.instances[i].bloodType = DefaultPrefabBloodType(entIdx);/*before parsing, so a bloodType: key in the level data still overrides; InitNPC has already claimed the NPC types*/
     if (entIdx == 717 /*ef_cyber_ice*/ && World.instances[i].cyberHealth <= 0.0f) World.instances[i].cyberHealth = 100.0f;/*ef_cyber_ice.prefab serializes cyberHealth 100, health -1*/
+      if (entIdx == 477 /*sec_camera*/) { Entity* ce = &World.instances[i]; ce->camStartYAngle = 0.0f; ce->camEndYAngle = 180.0f; ce->camWaitTime = 0.8f; ce->camRotatePositive = true; }/*SecurityCameraRotate field defaults; the level lines override all three.  SecurityCameraRotate.Start() also seeds waitingFinished to the current time and rotatePositive to true, and its [HideInInspector] 'active' flag is written but never read by Update(), so the enabled:0 on these records does not stop the sweep in Unity.*/
+    World.instances[i].questBitID = QB_None;/*AddInstance zero-fills, which would read as bit 0 (QB_RobotSpawnDeactivated). Unity's QuestBitRelay guards every bit with "if (<boolean> && ...)", so a relay that names no bit does nothing at all; QB_None reproduces that. Level parsing assigns a real bit to whichever boolean the record carries.*/
     if (entIdx == 594 /*trigger_counter*/) World.instances[i].dontReset = true;/*trigger_counter.prefab serializes dontReset 1, i.e. counter keeps accumulating past countToTrigger instead of clearing. AddInstance zero-fills the struct, so without this the flag reads 0 and the counter resets.*/
     if (entIdx == 702 /*logic_spawner*/) { Entity* sm=&World.instances[i]; if (sm->numberToSpawn == 0) sm->numberToSpawn = 1; if (sm->maxDelayBetweenSpawns <= 0.0f) { sm->minDelayBetweenSpawns = 15.0f; sm->maxDelayBetweenSpawns = 45.0f; } if (sm->allSpawnedResetDelay <= 0.0f) sm->allSpawnedResetDelay = 120.0f; }/*logic_spawner.prefab serializes numberToSpawn 1, minDelay 15, maxDelay 45, allSpawnedResetDelay 120, NPCSpawner 1, everything else off. Start() also seeds delayFinished = PauseScript.relativeTime, so arm the first check on the first update instead.*/
     if (World.levelCurrentlyLoading) { /*Tally the level's security objects so the security split and the system analyzer's node total have real denominators; guarded so runtime spawns never inflate them*/
@@ -588,7 +612,8 @@ void LoadLevelMod(u8 lev) {
                     else if (KEY_EQ("lS.z")) { if(fwLine){ if(fwCurS)fwCurS->z=v; } else if(ipLine){ if(ipCurS)ipCurS->z=v; } else { scaleFromFile[entCount].z=v; scaleReadMask|=4u; } }
                 }
                 else if(KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
-                else if(KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("bloodType")) inst->bloodType=(BloodType)parse_numberu8(value,lineSpace,lineNum);
+                  else if(KEY_EQ("startYAngle")) inst->camStartYAngle=parse_float(value,lineSpace,lineNum); else if(KEY_EQ("endYAngle")) inst->camEndYAngle=parse_float(value,lineSpace,lineNum); else if(KEY_EQ("waitTime")) inst->camWaitTime=parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("keycode")) inst->keycode=parse_numberu16(value,lineSpace,lineNum);
                 else if(KEY_EQ("radiationAmount")) inst->radiation=parse_float(value,lineSpace,lineNum);                           else if(KEY_EQ("ammo"))inst->ammo=parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("ammo2"))inst->ammo2=parse_numberi16(value,lineSpace,lineNum);                                      else if(KEY_EQ("useableItemIndex"))inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
@@ -658,6 +683,7 @@ void LoadLevelMod(u8 lev) {
                    permanent 0, so every counter in every level silently counted up forever and never ran its target. */
                 else if(KEY_EQ("counter"))           inst->counter = parse_numberu16(value,lineSpace,lineNum);          else if(KEY_EQ("countToTrigger")) inst->countToTrigger = parse_numberu16(value,lineSpace,lineNum);
                 else if(KEY_EQ("dontReset"))         inst->dontReset = parse_bool(value,lineSpace,lineNum);
+                else if(KEY_EQ("lockedTarget"))    inst->lockedTargetIdx = IOInternName(value);                                            else if(KEY_EQ("useQuestKeycode1")) inst->useQuestKeycode1 = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("useQuestKeycode2")) inst->useQuestKeycode2 = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("locked"))          flag_set(&inst->entflags,EF_LOCKED,parse_bool(value,lineSpace,lineNum));        else if(KEY_EQ("active"))          inst->active = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("timeInterval"))   inst->timeInterval = parse_float(value, lineSpace, lineNum);                     else if(KEY_EQ("randomMin"))      inst->randomMin = parse_float(value, lineSpace, lineNum);
                 else if(KEY_EQ("randomMax"))      inst->randomMax = parse_float(value, lineSpace, lineNum);                        else if(KEY_EQ("useRandomTimes")) inst->useRandomTimes = parse_bool(value, lineSpace, lineNum);
@@ -765,13 +791,13 @@ void LoadLevelMod(u8 lev) {
         par->forceFieldDirectionX=src->forceFieldDirectionX; par->forceFieldDirectionY=src->forceFieldDirectionY; par->forceFieldDirectionZ=src->forceFieldDirectionZ; par->fieldColor=src->fieldColor; par->timeInterval=src->timeInterval;
         par->randomMin=src->randomMin; par->randomMax=src->randomMax; par->useRandomTimes=src->useRandomTimes; if(src->health>=0.0f)par->health=src->health; if(src->cyberHealth>=0.0f)par->cyberHealth=src->cyberHealth; par->radiation=src->radiation; par->idleTime=src->idleTime;/*level data writes -1 for "unset"; copying it would stomp the table default set in AddInstance()*/
         par->timeSinceMovedEnough=src->timeSinceMovedEnough; par->tickTime=src->tickTime; par->waitBeforeClose=src->waitBeforeClose; par->onlyOnce=src->onlyOnce; par->stayOpen=src->stayOpen; par->startOpen=src->startOpen; par->ajar=src->ajar; par->ajarPercentage=src->ajarPercentage; par->timeBeforeLasersOn=src->timeBeforeLasersOn;
-        par->toggleLasers=src->toggleLasers; par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->target2Idx=src->target2Idx; 
+        par->toggleLasers=src->toggleLasers; par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->target2Idx=src->target2Idx; par->camStartYAngle=src->camStartYAngle; par->camEndYAngle=src->camEndYAngle; par->camWaitTime=src->camWaitTime; par->camRotatePositive=src->camRotatePositive;
         if (entIdx == 592 || entIdx == 593) par->texIndex = src->texIndex; // 3D text decal texture comes from level matIndex, not entity definition
         else if (entIdx == 112 && src->texIndex > 0 && src->texIndex < MAX_TXRS) par->texIndex = src->texIndex; // Explicit gravity-lift visual material state
         if (entIdx == 592 || entIdx == 593) { DecalPend* pd=NULL; for (u16 k=0;k<pendDecalCount;++k) { if (pendDecals[k].ent == (u16)e) { pd=&pendDecals[k]; break; } } if (pd) { i16 li = (i16)src->messageLingdex;
             if (li <= 0 || li >= T_LOGSTR_CNT) { if (decalInlineTextCount < DECAL_INLINE_TEXT_MAX) { mcpy(decalInlineText[decalInlineTextCount],pd->text,DECAL_INLINE_TEXT_LEN); decalInlineTextLevel[decalInlineTextCount]=curlevel; decalInlineTextInst[decalInlineTextCount]=parent; ++decalInlineTextCount; } else DualLogError("Too many inline text decals\n"); }
             if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
-        par->panelItemPos=src->panelItemPos; par->panelItemRot=src->panelItemRot; par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
+        par->panelItemPos=src->panelItemPos; par->panelItemRot=src->panelItemRot; par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->lockedTargetIdx=src->lockedTargetIdx; par->deferredIoflags=src->deferredIoflags; par->deferredIoflagsHi=src->deferredIoflagsHi; par->useQuestKeycode1=src->useQuestKeycode1; par->useQuestKeycode2=src->useQuestKeycode2; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed; par->codeScreen=src->codeScreen;
         par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset; par->requiredAccessCard=src->requiredAccessCard; par->musicType=src->musicType; par->messageIndex=src->messageIndex; par->counter=src->counter; par->countToTrigger=src->countToTrigger; par->dontReset=src->dontReset; par->ioflagsHi=src->ioflagsHi; par->spawnIndex=src->spawnIndex; par->numberToSpawn=src->numberToSpawn; par->numberActive=src->numberActive; par->countOnlySameIndex=src->countOnlySameIndex; par->alertEnemiesOnAwake=src->alertEnemiesOnAwake; par->minDelayBetweenSpawns=src->minDelayBetweenSpawns; par->maxDelayBetweenSpawns=src->maxDelayBetweenSpawns; par->allSpawnedResetDelay=src->allSpawnedResetDelay; par->lockedMessageLingdex=src->lockedMessageLingdex; par->SFXIndex=src->SFXIndex; par->touchEnabled=src->touchEnabled; par->doorOpen=src->doorOpen; par->percentMoved=src->percentMoved;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARG_STRLEN);
@@ -834,7 +860,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 538) { scpy_to_a_from_b(par->texAnimResourceFolder,"BrokenClock",TARG_STRLEN); } /*prop_broken_clock*/
         else if (entIdx == 551 && par->codeScreen) { scpy_to_a_from_b(par->texAnimResourceFolder,"ScreenCodeRandom",TARG_STRLEN); } /*prop_cpuscreen*/
         TextureSequenceInit(parent,par->texAnimResourceFolder);
-        if (entIdx == 551 && par->codeScreen) { par->texAnimRandom = true; par->texAnimStopsAtDie = false; }/*prop_cpuscreen: Unity CodeScreen.Update re-picks screenCodes[Random.Range(0,10)] every 0.3s while that level's code is unlocked, so the display flickers. texAnimRandom makes TextureSequenceUpdate choose a random frame per tick; texAnimStopsAtDie must be off because these entities carry no health (health 0) and would otherwise hold frame 0 and halt after 10 ticks. CodeScreensSetForLevel clears textureAnimating on the level's first node death, which is what locks the code.*/
+        if (entIdx == 551 && par->codeScreen) { par->texAnimRandom = true; par->texAnimStopsAtDie = false; }/*prop_cpuscreen: Unity CodeScreen.Update re-picks screenCodes[Random.Range(0,10)] every 0.3s while that level's code is unlocked, so the display flickers. texAnimRandom makes TextureSequenceUpdate choose a random frame per tick; texAnimStopsAtDie must be off because these entities carry no health (health 0) and would otherwise hold frame 0 and halt after 10 ticks. CodeScreensSetForLevel clears textureAnimating once the level's LAST node dies (CPUNodesRemainOnLevel goes false) and latches the drawn digit, which is what locks the code.*/
     }
     for (int i=0;i<=lightsIdx;++i) { if (lightsFromFile[i].intensity < 0.11f && lightsFromFile[i].maxIntensity < 0.11f){continue;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); AddLight(&lightsFromFile[i],&lanimsFromFile[i]); }
     if(curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7){/*Shield generators*/
@@ -1014,6 +1040,11 @@ void UpdateSensaroundCamViews() {
 // Save Game System
 #pragma pack(push, 1)
 typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compressedSize; char savename[48]; } SaveHeader;
+/*Bump when the saved layout changes -- any new/removed/reordered field in Entity or GlobalContext.  LoadGame
+  cross-checks it against the reader's own sizeof(GlobalContext), so a stale value fails loudly instead of
+  misreading a save.  Keep SaveGame, LoadGame and ReadSaveSlotName all on this one name: they drifted apart once
+  already (a save wrote v10 while the loader still demanded v9, so nothing could ever be loaded).*/
+#define SAVE_VERSION 10
 #pragma pack(pop)
 size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
 size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Find and pop the zeroes bubbles.  Turns an otherwise 232mb save file into ~23mb.
@@ -1035,12 +1066,12 @@ size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapac
 
 void SaveGame(u8 slot, const char* savename) {
     if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenWriteonly(path); if(fd == (FHandle)-1){return;} size_t sz=sizeof(GlobalContext); size_t maxCompSize=GetMaxCompressedSize(sz); u8* b=OS_Alloc(maxCompSize); size_t finalCompSize=VoidSquasher((const u8*)&World,sz,b,maxCompSize);
-    if (finalCompSize > 0) { SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=10, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize}; if (savename) { int i=0;   while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;}   header.savename[i]='\0'; } World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot);}
+    if (finalCompSize > 0) { SaveHeader header = {.magicNumber=0x56415343/*'CSAV'*/, .version=SAVE_VERSION, .uncompressedSize=(u32)sz, .compressedSize=(u32)finalCompSize}; if (savename) { int i=0;   while(savename[i] != '\0' && i < 47){header.savename[i]=savename[i]; i++;}   header.savename[i]='\0'; } World.justSavedTimeStamp = get_time(); OS_Write(fd,&header,sizeof(SaveHeader),path); OS_Write(fd,b,finalCompSize,path); CenterStatusPrint("Saved to Slot %d",slot);}
     else { DualLogError("Compression failed during SaveGame!\n"); }    OS_Free(b,maxCompSize); OS_Close(fd);
 }
 
 void LoadGame(u8 slot) {
-    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343 || header.version != 9 || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
+    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343 || header.version != SAVE_VERSION || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
     u8* b=OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
         size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.currentLevel); AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
@@ -1052,7 +1083,7 @@ bool ReadSaveSlotName(u8 slot, char* out, size_t cap) {
     if (slot > 7 || !out || cap == 0) return false;
     char path[]="./Data/sav0.bin"; path[10]=(char)('0'+slot);
     FHandle fd=OS_OpenReadonly(path); if (fd == (FHandle)-1) return false;
-    SaveHeader header; bool ok = OS_Read(fd,&header,sizeof(SaveHeader))==sizeof(SaveHeader) && header.magicNumber==0x56415343u && header.version==10 && header.uncompressedSize==(u32)sizeof(GlobalContext);
+    SaveHeader header; bool ok = OS_Read(fd,&header,sizeof(SaveHeader))==sizeof(SaveHeader) && header.magicNumber==0x56415343u && header.version==SAVE_VERSION && header.uncompressedSize==(u32)sizeof(GlobalContext);
     OS_Close(fd); if (!ok) return false;
     size_t i=0; while (i+1<cap && i<sizeof(header.savename) && header.savename[i]!='\0') { out[i]=header.savename[i]; ++i; } out[i]='\0';
     return out[0]!='\0';
