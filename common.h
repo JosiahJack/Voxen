@@ -193,12 +193,20 @@ enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<
 #define LMASK_PLAYER_COLLIDESWITH   (L_Clip|L_NPCBullet|L_Player2|L_Door|L_Trigger|L_PlayerTriggerOnly|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_COLLIDESWITH      (L_Clip|L_NPCClip|L_PlayerBullets|L_Player2|L_Player|L_Door|L_Trigger|L_NPCTrigger|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_SIGHT             (L_Default|L_Geometry|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2)
-#define LMASK_NPC_ATTACK            (L_Default|L_Geometry|L_NPC|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2)
+/* Dead NPCs keep their original (usually capsule) collider -- only the layer changes.  L_Corpse therefore carries two independent
+   meanings that Unity splits across two GameObjects and Voxen expresses with two bits:
+     - CollisionMaskTable row 13 restricts the corpse's collider to the world only (Default/Geometry/PhysObjects/Door/Clip), so a
+       body rests on the floor and physically interacts with nothing else.
+     - The raycast masks below still include L_Corpse, because Voxen traces the raw mesh where Unity swapped in a separate search
+       Collider.  A corpse must stay hittable by the frob ray (so the player can search it) and by weapon and grenade rays (so
+       corpses can be damaged and vaporized).  Dropping the layer from these masks makes corpses intangible, the opposite of the
+       intent.  NPC attack rays include it too, so an NPC can put a finishing shot into a downed body. */
+#define LMASK_NPC_ATTACK            (L_Default|L_Geometry|L_NPC|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_Corpse)
 #define LMASK_NPC_COLLISION         (L_Default|L_TransparentFX|L_Geometry|L_NPC|L_Door|L_InterDebris|L_Player|L_Clip|L_NPCClip|L_PhysObjects)
-#define LMASK_PLAYER_FROB           (L_Default|L_Geometry|L_BlocksRaycast|L_Door|L_InterDebris|L_PhysObjects|L_CorpseSearchable|L_NPC)
-#define LMASK_PLAYER_TARGET_ID_FROB (L_Default|L_Geometry|L_Door|L_NPC|L_CorpseSearchable)
-#define LMASK_PLAYER_ATTACK         (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_CorpseSearchable)
-#define LMASK_EXPLOSION             (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_CorpseSearchable)
+#define LMASK_PLAYER_FROB           (L_Default|L_Geometry|L_BlocksRaycast|L_Door|L_InterDebris|L_PhysObjects|L_CorpseSearchable|L_NPC|L_Corpse)
+#define LMASK_PLAYER_TARGET_ID_FROB (L_Default|L_Geometry|L_Door|L_NPC|L_CorpseSearchable|L_Corpse)
+#define LMASK_PLAYER_ATTACK         (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_CorpseSearchable|L_Corpse)
+#define LMASK_EXPLOSION             (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_CorpseSearchable|L_Corpse)
 #define LMASK_PLAYER_FEET           (L_Default|L_Geometry)
 typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; float ScreenCenterX,ScreenCenterY; bool Fullscreen; u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
 typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,showNPC,editMode; u8 dizzyLevel,animTest,editSubMode; } CheatsSystem; extern CheatsSystem Cheats;
@@ -458,6 +466,17 @@ INLINE bool IsDamageable(const Entity* e) { return IdxIsNPC(e->index) || e->heal
 INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }     INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); } INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }                                    INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
 INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }                                                        INLINE bool IdxIsAccessCard(u16 c) { return (c == 341 || c == 388 || (c >= 390 && c <= 398) || c == 417); }/*389 (weapon_grenadeearth_live) sits in that numeric gap but is not a card -- the range test must skip it.*/                          INLINE bool IdxIsGenericItem(u16 c) { return (c >= 307 && c <= 312) || c == 340 || c == 342 || (c >= 359 && c <= 365)/*MouseLookScript.cs:1073-1079 AddItemToInventory takes general-inventory slots 52..58, i.e. constIndex 359..365; 366 (item_chipset_bitflag) -> slot 59 is the one value Unity does not put in the general inventory*/ || c == 368 || c == 369 || c == 371 || (c >= 399 && c <= 401); }
 INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 406) || c == 417 || (c >= 419 && c <= 447) || (c >= 458 && c <= 463) || (c >= 471 && c <= 476) || (c >= 768 && c <= 855); }
+/* Bitmask over the 29 NPC types (0..28) for the 15 prefabs that declare a "searchCollider" child with its OWN HealthManager:
+   health 50, maxhealth 50, gibOnDeath 0, vaporizeCorpse 1 (e.g. npc_humanoid_mutant.prefab:6036-6043; the ROOT HealthManager is
+   health -1, meaning "take it from the NPC table").  AIController.Dead():1577-1582 activates that collider and freezes X/Z, so it --
+   not the corpse mesh -- is what survives to be searched, shot and vaporized, and it absorbs 50 damage first.  Three of them name the
+   child something else: npc_avian_mutant -> npc_mutant_avian_corpse, npc_hopper -> npc_hopper_die, npc_zerog_mutant -> npc_zerogmut_death.
+   All 15 carry vaporizeCorpse 1 and all 14 others carry 0, so this doubles as the "may this corpse vaporize" test.  A positive list
+   is required rather than the tempting "not gib and not cyber" negation: AUTOBOMB is neither a gib nor a cyber type but has no
+   searchCollider, and HealthManager.cs:492 would refuse to vaporize it.  Bits 1,2,4,6,7,8,9,13,14,15,16,17,20,21,23 in npcTable order. */
+#define NPC_CORPSE_HEALTH 50.0f
+static const u64 npcSearchColliderMask = 0xB3E3D6ULL;
+INLINE bool ai_has_search_collider(u16 npcID) { return npcID < 64 && (npcSearchColliderMask >> npcID) & 1u; }
 INLINE bool InstIsFuncWallChild(u32 inst) { u16 p=(inst<(u32)INSTANCE_COUNT)?fwParentOf[inst]:0; return p!=0 && p<World.instCount && World.instances[p].index==517; }/*chunk child of a func_wall mover (517): dynamic geometry, excluded from static automap/culling derivation*/
 INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603)  || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
 INLINE bool IdxIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755)); }
@@ -489,6 +508,11 @@ typedef struct { const char* prefab; const char* gameObject; u64 sourceId; PSysD
 #define PSYS_sprinkles 163
 #define PSYS_sparkles 164
 #define PSYS_gasExplosions 165
+/* HealthManager.VaporizeCorpse:508-509 pools.  Neither ever became a const index in Voxen (the old inline 2 / 1 were PoolType
+ * ORDINALS handed to SpawnDynamicObject, which is where the "Indices 0 to 306 (level chunks)" error came from), so both are now
+ * first-class presets driven by the converted sprite ranges: CorpseHit = 546_1329..1332 (4 frames), Vaporize = 546_1292..1297 (6). */
+#define PSYS_ef_corpsehit_puff 187
+#define PSYS_ef_vaporize_puff 188
 #define PSYS_npc_laserbeam 166
 #define PSYS_npc_targetlaser 167
 #define PSYS_gasSmoke 168

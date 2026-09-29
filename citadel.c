@@ -510,7 +510,7 @@ void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseV
     if (radius <= 0.0f || baseVel <= 0.0f) return; float r2 = radius * radius; float origDamage = dd ? dd->damage : 0.0f;
     float damageScale = vmin(origDamage / 100.0f, 2.0f);/*measured off the original damage, so it is the same for every body in the blast*/
     for (u16 i = PLAYER1; i < World.instCount; i++) {
-        Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || (e->entflags & EF_DEAD)) continue; if (!(e->entflags & EF_RIGIDBODY) && !IdxIsNPC(e->index) && i != PLAYER1 && !IsDamageable(e)) continue;/*IsDamageable() widens the blast to static damageable props (sec_cpunode 478/479, consoles, cameras) which have health but no EF_RIGIDBODY, so grenades used to skip them entirely.  ApplyImpactForce below still no-ops for them, so only the damage applies.*/ float sqd = V3_SqDist(World.position[i], center); if (sqd > r2) continue; float dist = vsqrtf(sqd);
+        Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || (e->entflags & EF_DEAD)) { if (!IdxIsNPC(e->index) || !(World.layer[i] & L_Corpse)) continue;/*Corpses are normally skipped here, but a dead NPC on the corpse layer stays in the blast so grenades can vaporize it (Death() re-entry).*/ } if (!(e->entflags & EF_RIGIDBODY) && !IdxIsNPC(e->index) && i != PLAYER1 && !IsDamageable(e)) continue;/*IsDamageable() widens the blast to static damageable props (sec_cpunode 478/479, consoles, cameras) which have health but no EF_RIGIDBODY, so grenades used to skip them entirely.  ApplyImpactForce below still no-ops for them, so only the damage applies.*/ float sqd = V3_SqDist(World.position[i], center); if (sqd > r2) continue; float dist = vsqrtf(sqd);
         if (dist >= 4.0f) { RaycastHit sight = Raycast(center, V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist), radius + 0.02f, LMASK_EXPLOSION); if (!(sight.hit && sight.hitInstanceIndex == i)) continue; }
         float distPenalty = (radius - dist) / radius; if (distPenalty < 0.0f) distPenalty = 0.0f;
         V3 normal; if(dist > 0.0001f){normal=V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist);}else{normal = (V3){0.0f,1.0f,0.0f};}
@@ -618,7 +618,7 @@ static void TeleportAway(u16 self) {
 }
 
 static void DropSearchables(u16 self) {for(int i=0;i<4;i++){if(World.instances[self].contents[i]<=-1){continue;} u16 spawned=SpawnDynamicObject(World.instances[self].contents[i]+307,true); if(spawned!=U16_MAX){World.position[spawned]=World.position[self]; World.instances[spawned].custIdx[0]=World.instances[self].custIdx[i];}else{CenterStatusPrint("BUG: Failed to make search obj.");} World.instances[self].contents[i]=World.instances[self].custIdx[i]=-1;}}
-static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} V3 pos = World.position[self]; if (World.col[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
+static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} if (!IdxInBounds((int)fxPoolType) || IdxIsGeometry((int)fxPoolType)) {return; /*PoolType is an ordinal enum (None..LeafBurst, 0..29), not a const index.  Feeding one to SpawnDynamicObject makes it try to spawn a level chunk, which is where "Indices 0 to 306 (level chunks) not possible when not on edit mode!" came from.  Refuse here so no caller can reach that.*/} V3 pos = World.position[self]; if (World.col[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
 static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.gravity[self] = 0.0f; }
 static void SpawnSecCpuNodeGibs(u16 self) {
     if (World.instances[self].index != 478) return;
@@ -642,10 +642,35 @@ static void ObjectDeath(u16 self) {
 }
 
 static void ScreenDeath(u16 self) { Entity* e=&World.instances[self]; if(e->entflags & EF_DEAD_CHECKS_DONE){return;} flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true); play_wav(sounds[69], AppliedFXVol(1.0f), World.position[self], true);/*screen_destroy*/ if (e->entflags & EF_DEATH_BURST_DONE) ObjectDeath(self);/*gib path*/ }
-static void VaporizeCorpse(u16 self,bool energyVaporized) { Entity* e=&World.instances[self]; flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true); DropSearchables(self); e->modelIndex=MAX_MDLS; if (IdxIsNPC(e->index) || IdxIsSearchable(e->index)) DeleteInstance(self); CreateDeathEffects(self,energyVaporized ? 2 : ((e->deathBurst == 0) ? 1/*Corpse hit fallback*/ : e->deathBurst)); }
 static inline bool IsGrenade(u16 i) { return ((i >= 314 && i <= 320) || i == 370 || i == 372 || i == 387 || i == 389 || (i >= 402 && i <= 404)); }
+/* HealthManager.cs:492 -- if (vaporizeCorpse && !isSecCamera && !isGrenade) VaporizeCorpse(energyVaporized).  On the 29 NPC prefabs
+   that flag is 1 on exactly the 15 that declare a searchCollider (all of them) and 0 on the other 14, so AUTOBOMB, the 8 gib types
+   and the 5 cyber types are all refused.  Non-NPCs keep the HealthManager field default (true), which is the behaviour the Death()
+   dynamic-object path already had. */
+static bool CanVaporize(u16 self) { Entity* e=&World.instances[self]; if (e->index == 477/*sec_camera*/ || IsGrenade(e->index)) {return false;} if (IdxIsNPC(e->index)) {return ai_has_search_collider((u16)(e->index - 419));} return true; }
+static void SpawnDeathEffectAt(u16 type, V3 pos) { const PSysDef* preset = PSysTypeGet(type); if (!preset) return; PSysDef def = *preset; def.pos = pos; PSysAdd(&def); }
+static void VaporizeCorpse(u16 self,bool energyVaporized) { Entity* e=&World.instances[self]; if (!CanVaporize(self)) {return;}
+    /* Always drop first, whatever happens to the visual: Unity's VaporizeCorpse calls searchObject.SpawnContents() before it tears
+       the body down, and a corpse whose contents were already taken is a no-op rather than an error. */
+    DropSearchables(self);
+    /* Unity HealthManager.VaporizeCorpse:508-509 -- deathFX defaults to PoolType.CorpseHit, overridden to PoolType.Vaporize when
+       energyVaporized.  An authored deathFX (Voxen's deathBurst, a real const index such as 725 for sec_camera) still wins, matching
+       "if deathFX == None -> CorpseHit".  Spawn before DeleteInstance so the effect reads a live instance. */
+    V3 pos = World.position[self]; if (World.col[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); }
+    if (e->deathBurst != 0 && IdxInBounds((int)e->deathBurst) && !IdxIsGeometry((int)e->deathBurst)) { CreateDeathEffects(self,e->deathBurst); }
+    else { SpawnDeathEffectAt(energyVaporized ? PSYS_ef_vaporize_puff : PSYS_ef_corpsehit_puff, pos); }
+    e->modelIndex=MAX_MDLS; if (IdxIsNPC(e->index) || IdxIsSearchable(e->index)) DeleteInstance(self); }
 static void Death(u16 self,bool energyVaporized) {
-    Entity* e = &World.instances[self]; if (e->entflags & EF_DEAD_CHECKS_DONE) return; UseDeathTargets(self); bool isNPC = IdxIsNPC(e->index); bool isObj = IdxIsDynamicObject(e->index); if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->entflags |= EF_DEAD_CHECKS_DONE; return; }
+    Entity* e = &World.instances[self];
+    if (e->entflags & EF_DEAD_CHECKS_DONE) {
+        /* Unity guards Death() with deathDone, so a second hit on a body is inert there.  Voxen wants corpses destructible, so a
+           repeat hit landing on an NPC corpse that still exists vaporizes it -- Death() below must not replay, or UseDeathTargets
+           and the gib spawn would fire twice.  Energy-beam shots (and grenade splash) go through here. */
+        if (!IdxIsNPC(e->index) || !(World.layer[self] & L_Corpse) || self == PLAYER1 || IsGrenade(e->index) || (e->entflags & (EF_TELEPORT_ON_DEATH | EF_ACT_AS_CORPSE_ONLY))) return;
+        VaporizeCorpse(self, energyVaporized);
+        return;
+    }
+    UseDeathTargets(self); bool isNPC = IdxIsNPC(e->index); bool isObj = IdxIsDynamicObject(e->index); if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->entflags |= EF_DEAD_CHECKS_DONE; return; }
     if (e->index == 477) { /* sec_camera has no dynamic-object path; deathFX 1 is CameraExplosions. */
         e->deathBurst = 725; ObjectDeath(self); DeleteInstance(self); return;
     }
@@ -679,7 +704,13 @@ float TakeDamage(u16 self,DamageData dd) {
     if (isCyber) { World.instances[self].cyberHealth -= take; if (isPlayer) { World.damageReceived += take; if (World.instances[self].cyberHealth <= 0.0f) { ExitCyberspace(); return 0.0f; } } if (dd.owner == PLAYER1){World.damageDealt += take;} }
     else { if(selfIdx == 477/*Camera constIndex 477 gets one-shot by tranq*/ && dd.attackType == Att_Trnq){take=World.instances[self].health + 1.0f;} take=ApplyAttTypeAdjustments(self,take,dd.attackType); if(!isPlayer)DualLog("TakeDamage inst %u ci %u hp %.3f->%.3f take %.3f att %d owner %u\n",(u32)self,(u32)selfIdx,World.instances[self].health,World.instances[self].health-take,take,(int)dd.attackType,(u32)dd.owner); World.instances[self].health-=take; if (isPlayer) { World.damageReceived+=take; World.Sys_Music.inCombat=true; } if (dd.owner == PLAYER1){World.damageDealt+=take;} }
     if (isNPC && (World.instances[self].health > 0.0f || (isCyber && World.instances[self].cyberHealth > 0.0f))) { if (npcTable[selfIdx - 419].timeBetweenPain > 0.0f) flag_set(&World.instances[self].entflags,EF_GO_INTO_PAIN,true); World.instances[self].recentMostActivator = dd.owner; TargetIDSendDamageReceive(self,take,dd.attackType); AICheckPain(self); }
-    if (isCyber) { if (World.instances[self].cyberHealth <= 0.0f) { if (!World.instances[self].iceActive && isNPC) {World.cyberkills++;} Death(self,false); } } else { if (World.instances[self].health <= 0.0f) { if (isNPC) {World.kills++;} Death(self,dd.attackType == Att_Beam); } }    return take;
+    /* EnergyBeam and ProjectileEnergyBeam both reach HealthManager.Death as energyVaporized and take the corpse out at once, so they
+       must not be gated on the corpse's remaining 50 health.  Checked before the <= 0 dispatch below because a beam landing on a
+       barely-hurt corpse leaves it comfortably positive and would otherwise only chip it.  Everything else still wittles the corpse
+       down hit by hit, which is the intended divergence from Unity's inert deathDone guard. */
+    if (!isCyber && (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) && (World.layer[self] & L_Corpse)
+        && (dd.attackType == Att_Beam || dd.attackType == Att_PjBm)) { VaporizeCorpse(self,true); return take; }
+    if (isCyber) { if (World.instances[self].cyberHealth <= 0.0f) { if (!World.instances[self].iceActive && isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.cyberkills++;} Death(self,false); } } else { if (World.instances[self].health <= 0.0f) { if (isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.kills++;} Death(self,dd.attackType == Att_Beam || dd.attackType == Att_PjBm); } }    return take;
 }
 
 // Hardware
@@ -1233,7 +1264,7 @@ static int UseNameTableIndex(int index) {
 
 void UseEntity(u16 i) {
     Entity* ent = &World.instances[i];
-    if (IdxIsSearchable(ent->index) || (World.layer[i]&L_CorpseSearchable) || (IdxIsGib(ent->index) && (World.layer[i]&L_Corpse))) { SearchObject(i); } else if (IdxIsDoor(ent->index)) DoorUse(i,PLAYER1); else if (IdxIsNPC(ent->index)) CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[World.instances[i].index - 419].name); else if (IdxIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
+    if (IdxIsSearchable(ent->index) || (World.layer[i]&(L_Corpse|L_CorpseSearchable)) || (IdxIsGib(ent->index) && (World.layer[i]&L_Corpse))) { SearchObject(i); } else if (IdxIsDoor(ent->index)) DoorUse(i,PLAYER1); else if (IdxIsNPC(ent->index)) CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[World.instances[i].index - 419].name); else if (IdxIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
     else if(ent->index==574) HealingBedUse(i,PLAYER1); else if(ent->index==546) ChargeStationUse(i,PLAYER1); else if(ent->index==614||ent->index==602) RelayPanelUse(i); else if(IsElevatorPanel(ent->index)) ElevatorPanelUse(i); else if(ent->index==608) KeycodePanelUse(i); else if(IsPuzzleGridPanel(ent->index)||IsPuzzleWirePanel(ent->index)) PuzzlePanelUse(i); else if(ent->index==603) PaperLogUse(i);
     else if (IdxIsGeometry(ent->index)) { int t = UseNameTableIndex(ent->index); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],t >= 0 ? Sys_Text.stringTable[t] : ""); }
     else if (IdxIsUsableObject(ent->index)) {
@@ -1245,9 +1276,9 @@ void UseEntity(u16 i) {
 INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy){float px=(World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f)+dx,py=(World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f)+dy,t=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,nx=(px-(float)UI_W*0.5f)/((float)UI_W*0.5f),ny=((float)UI_H*0.5f-py)/((float)UI_H*0.5f);V3 v=V3_Normalize((V3){nx*aspect*t,ny*t,-1.0f}),ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(r,ff));return(V3){v.x*r.x+v.y*up.x+v.z*ff.x,v.x*r.y+v.y*up.y+v.z*ff.y,v.x*r.z+v.y*up.z+v.z*ff.z};}
 /* Non-static wrapper so weapons.c can apply pixel drift before the ray is built (Unity: drift added to the screen point before ScreenPointToRay). */
 V3 ScreenPointToRayPixels(V3 f,V3 r,float dx,float dy){return ScreenPointToRayOffset(f,r,dx,dy);}
-INLINE bool FrobRayIsFrobable(RaycastHit h){if(!h.hit)return false;u16 i=h.hitInstanceIndex;if(i>=World.instCount)return false;u16 e=World.instances[i].index;if((World.layer[i]&L_CorpseSearchable)) return true;return IsFrobUsableSpecial(e)||IdxIsUsableObject(e)||IdxIsSearchable(e)||IdxIsDoor(e)||IdxIsButtonSwitch(e)||IdxIsNPC(e)||IdxIsGib(e);}
+INLINE bool FrobRayIsFrobable(RaycastHit h){if(!h.hit)return false;u16 i=h.hitInstanceIndex;if(i>=World.instCount)return false;u16 e=World.instances[i].index;if((World.layer[i]&(L_Corpse|L_CorpseSearchable)))return true;return IsFrobUsableSpecial(e)||IdxIsUsableObject(e)||IdxIsSearchable(e)||IdxIsDoor(e)||IdxIsButtonSwitch(e)||IdxIsNPC(e)||IdxIsGib(e);}
 extern bool editFieldEditing;
-static bool TargetIDFrob(V3 p,V3 f,V3 r){V3 dir=ScreenPointToRayOffset(f,r,0,0);RaycastHit h=Raycast(p,dir,TargetIDGetSensingRange(true),LMASK_PLAYER_TARGET_ID_FROB);if(!h.hit||h.hitInstanceIndex>=World.instCount||!IdxIsNPC(World.instances[h.hitInstanceIndex].index))return false;u16 i=h.hitInstanceIndex;Entity* e=&World.instances[i];if(e->health<=0.0f){if(World.layer[i]&L_CorpseSearchable){UseEntity(i);return true;}return false;}if((World.invP1.hasHardware&HW_TID)&&World.invP1.hwVers[HW_TID_IDX]>1){if(targetIDAttached[i]&&targetIDAttachedFinished[i]<=World.pauseRelativeTime)targetIDAttached[i]=false;if(!targetIDAttached[i]){CreateTargetIDInstance(-1.0f,i,-1.0f);return true;}}CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[e->index-419].name);return true;}
+static bool TargetIDFrob(V3 p,V3 f,V3 r){V3 dir=ScreenPointToRayOffset(f,r,0,0);RaycastHit h=Raycast(p,dir,TargetIDGetSensingRange(true),LMASK_PLAYER_TARGET_ID_FROB);if(!h.hit||h.hitInstanceIndex>=World.instCount||!IdxIsNPC(World.instances[h.hitInstanceIndex].index))return false;u16 i=h.hitInstanceIndex;Entity* e=&World.instances[i];if(e->health<=0.0f){if(World.layer[i]&(L_Corpse|L_CorpseSearchable)){UseEntity(i);return true;}return false;}if((World.invP1.hasHardware&HW_TID)&&World.invP1.hwVers[HW_TID_IDX]>1){if(targetIDAttached[i]&&targetIDAttachedFinished[i]<=World.pauseRelativeTime)targetIDAttached[i]=false;if(!targetIDAttached[i]){CreateTargetIDInstance(-1.0f,i,-1.0f);return true;}}CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[e->index-419].name);return true;}
 static void Frob(V3 p,V3 f,V3 r){
     if(World.uiIsBlocking||World.curLev==LEVEL_CYBERSPACE)return;
     if(Cheats.editMode){V3 d0=ScreenPointToRayOffset(f,r,0,0);RaycastHit fh=Raycast(p,d0,World.farPlane[World.curLev],LMASK_PLAYER_FROB);editModeSelection=(fh.hit&&fh.hitInstanceIndex>=INSTS_1ST_IDX&&fh.hitInstanceIndex<World.instCount)?fh.hitInstanceIndex:U16_MAX; if(editModeSelection<U16_MAX){editFieldEditing=false; CenterStatusPrint("Selected object %u (const index %u)",editModeSelection,World.instances[editModeSelection].index);}else{CenterStatusPrint("Object deselected");}return;/*No pickup/search/use while in edit mode; selection only.*/}

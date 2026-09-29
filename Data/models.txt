@@ -1165,10 +1165,10 @@ frame: 2 25
 frame: 27 49
 
 #Models/door9.glb
-index: 1793
+index: 1679
 animated: 1
 animationNum: 13
-frame: 2 24
+frame: 2 14
 frame: 26 52
 
 #Models/door_elevator1.glb
@@ -1549,7 +1549,7 @@ frame: 126 148
 index: 4998
 animated: 1
 animationNum: 38
-frame: 154
+frame: 1 54
 frame: 58 95
 
 #Models/npc_sec2bot.glb

@@ -120,6 +120,8 @@ static const AIPresetSet aiDeathBursts[NUM_AI_TYPES] = {
 // contents; the remaining members are visual/physical pieces of the same
 // gibbed body. A zero first ID means the NPC does not gib.
 typedef struct { u16 first, last, primary; } NPCGibRange;
+/* Unity's corpse health lives on the searchCollider child, so it is NPC_CORPSE_HEALTH for the 15 types that declare one -- see
+   npcSearchColliderMask / ai_has_search_collider in common.h. */
 static const NPCGibRange npcGibRanges[NUM_AI_TYPES] = {
     [3]={779,787,779},   // EXEC-BOT
     [5]={768,778,768},   // CORTEX REAVER
@@ -469,10 +471,10 @@ static void AIDying(u16 i) {
          * and drive the shader's red/rim effect from this pause-relative timer. */
         if (npcID == 14) { World.instances[i].deathAnimationActive = true; World.instances[i].deathAnimationStart = (float)World.pauseRelativeTime; }
         if (World.instances[i].index == 428 || World.instances[i].index == 439) World.velocity[sidx] = (V3){0.0f,World.velocity[sidx].y,0.0f}; // Prevent gibs on Exec bot or fake melt on Zero-G mutant from having horizontal movement (looks nicer).
-        if (World.instances[i].index == 433) World.layer[i] = L_Corpse; // Hopper: enable capsule collider (implicit in layer change)
+        if (World.instances[i].index == 433) World.layer[i] = L_Corpse; // Hopper: drop to the corpse layer while dying
         flag_set(&World.instances[i].entflags, EF_DYING_SETUP, true);
     }
-    if (World.instances[i].timeTillDeadFinished <= World.pauseRelativeTime) { flag_set(&World.instances[i].entflags,EF_DEAD,true); flag_set(&World.instances[i].entflags,EF_DYING,false); World.instances[i].currentState = AIState_Dead; } if (World.instances[i].index == 439) World.layer[i] = L_Corpse | L_CorpseSearchable; // Zero-G mutant enables search collider while still dying
+    if (World.instances[i].timeTillDeadFinished <= World.pauseRelativeTime) { flag_set(&World.instances[i].entflags,EF_DEAD,true); flag_set(&World.instances[i].entflags,EF_DYING,false); World.instances[i].currentState = AIState_Dead; } if (World.instances[i].index == 439) World.layer[i] = L_Corpse; // Zero-G mutant drops to the corpse layer while still dying (search via LMASK_PLAYER_FROB_CORPSE)
 }
 
 static void AIDead(u16 idx) {
@@ -498,7 +500,7 @@ static void AIDead(u16 idx) {
             }
         }
         DeleteInstance(idx);
-    } else { /*Enable search collider for non-gib corpses (Avian Mutant index 2 always searchable)*/ World.layer[idx] = L_Corpse | L_CorpseSearchable; World.velocity[idx].x = 0.0f; World.velocity[idx].z = 0.0f; if (World.instances[idx].index != 433) World.gravity[idx] = 1.0f;/*Hopper deactivates itself*/ }
+    } else { /*Non-gib corpse: the body itself carries the NPC contents and stays the searchable object, but it rides the plain corpse layer rather than the frob/attack-visible searchable layer.  Search reaches it because LMASK_PLAYER_FROB and the weapon masks include L_Corpse.  Unity's equivalent health lives on the searchCollider child (see npcSearchColliderMask), so only the 15 types that declare that child get it.*/ World.layer[idx] = L_Corpse; if (ai_has_search_collider((u16)(World.instances[idx].index - 419))) { World.instances[idx].health = NPC_CORPSE_HEALTH; } World.velocity[idx].x = 0.0f; World.velocity[idx].z = 0.0f; if (World.instances[idx].index != 433) World.gravity[idx] = 1.0f;/*Hopper deactivates itself*/ }
     flag_set(&World.instances[idx].entflags, EF_DEAD_CHECKS_DONE, true);
 }
 
