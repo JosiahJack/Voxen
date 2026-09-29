@@ -1083,15 +1083,6 @@ animated: 1
 animationNum: 1
 frame: 2 24
 
-#Models/npc_humanoidmutant.glb
-index: 742
-animated: 1
-animationNum: 2
-frame: 0 37
-frame: 50 99
-frame: 111 150
-frame: 153 176
-
 #Models/npc_cyborg_drone.glb
 index: 893
 animated: 1
@@ -1232,16 +1223,6 @@ animated: 1
 animationNum: 22
 frame: 1 50
 
-#Models/npc_bot_cortex_reaver.glb
-index: 2104
-animated: 1
-animationNum: 23
-frame: 3 36
-frame: 38 56
-frame: 58 81
-frame: 84 96
-frame: 99 106
-
 #Models/npc_cyborgassassin.glb
 index: 2200
 animated: 1
@@ -1267,18 +1248,6 @@ index: 2698
 animated: 1
 animationNum: 25
 frame: 334 417
-
-#Models/npc_cyborg_elite.glb
-index: 2782
-animated: 1
-animationNum: 26
-frame: 1 68
-frame: 90 173
-frame: 194 214
-frame: 216 233
-frame: 235 244
-frame: 319 386
-frame: 401 450
 
 #Models/npc_cyborg_enforcer.glb
 index: 3100
@@ -1963,11 +1932,6 @@ frame: 176 243
 #Models/genericLOD3card_zero.obj
 index: 5988
 
-#Models/g_energmine.glb
-index: 5989
-animated: 1
-animationNum: 52
-frame: 1 40
 #Models/npc_bot_cortex_reaver_gib0.obj
 index: 5990
 #Models/npc_bot_cortex_reaver_gib1.obj
@@ -2173,3 +2137,59 @@ frame: 1 260
 index: 6875
 #Models/maint2_6d.obj
 index: 6876
+
+# --- relocated blocks -------------------------------------------------------------------------------------------
+# Each model below was moved out of the middle to the end so its full authored frame set is kept and no two models share an
+# index.  LoadGLBAnimatedSources assigns an animated model to base+ordinal and skips an index another model already claimed,
+# and it walks this file front to back, so an oversized block in the middle silently steals indices from whatever comes after
+# it.  Moving the block out costs a hole and costs no frames.  Frame ranges below are exactly as authored; only index moved.
+# models.c rows 23, 2, 26 and 52 shift their clip bases by the deltas noted in each comment.
+
+#Models/npc_bot_cortex_reaver.glb
+index: 6877
+animated: 1
+animationNum: 23
+frame: 3 36
+frame: 38 56
+frame: 58 81
+frame: 84 96
+frame: 99 106
+# Moved from 2104 (delta +4773).  Ranges total 34+19+24+13+8 = 98 frames, so 2104 packed 2104..2201 and overran
+# npc_cyborgassassin at 2200 by 2.  The reaver is built first, being earlier in this file, and the loader keeps the first
+# claim on an index, so the reaver took 2200..2201 and the assassin's A_IDLE frames 1-2 were never baked -- the assassin
+# played reaver dying frames there.  2104..2199 is now a free hole.
+
+#Models/npc_humanoidmutant.glb
+index: 6975
+animated: 1
+animationNum: 2
+frame: 0 37
+frame: 50 99
+frame: 111 150
+frame: 153 176
+# Moved from 742 (delta +6233).  Ranges total 38+50+40+24 = 152 frames, so 742 packed 742..893 and overran
+# npc_cyborg_drone at 893 by 1, costing the drone its A_IDLE frame 1.  742..892 is now a free hole.
+
+#Models/npc_cyborg_elite.glb
+index: 7127
+animated: 1
+animationNum: 26
+frame: 1 68
+frame: 90 173
+frame: 194 214
+frame: 216 233
+frame: 235 244
+frame: 319 386
+frame: 401 450
+# Moved from 2782 (delta +4345).  Ranges total 68+84+21+18+10+68+50 = 319 frames, so 2782 packed 2782..3100 and overran
+# npc_cyborg_enforcer at 3100 by 1, costing the enforcer its A_IDLE frame 1.  2782..3099 is now a free hole.
+
+#Models/g_energmine.glb
+index: 7446
+animated: 1
+animationNum: 52
+frame: 1 40
+# Moved from 5989 (delta +1457).  40 frames at 5989 packed 5989..6028 and swallowed 39 gib meshes that follow it
+# (npc_bot_cortex_reaver_gib0..gib10, npc_botexec_gib*, npc_flierbot_gib*, npc_maintenancebot_gib*, npc_repairbot_gib1*).
+# entity.c const indices 768..806 name those models directly, so each of those gibs would have rendered as an energy-mine
+# frame.  5989..6028 is now a free hole.

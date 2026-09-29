@@ -720,9 +720,11 @@ void RenderCameraViews() { // Render in-world camera views.  Pops player positio
 
 void UpdateInstanceMatrix4x4s() {
     i32 dirtyMin = -1, dirtyMax = -1;
+    float servoHalf = -99.0f*(PI/180.0f)*0.5f; Quaternion servoYaw = {0.0f,vsinf(servoHalf),0.0f,vcosf(servoHalf)};/*npc_servbot (437) render-only mesh correction: hardcoded -80deg yaw about +Y, post-multiplied so only the rendered mesh turns; World.rotation (physics, forward, muzzle, AI) is untouched*/
     for (u32 i = INSTS_1ST_IDX; i < World.instCount; i++) {        
         u32 m = i*16;
         float x=World.rotation[i].x, y=World.rotation[i].y, z=World.rotation[i].z, w=World.rotation[i].w; float x2=x*x, y2=y*y, z2=z*z, xy=x*y, xz=x*z, yz=y*z, wx=w*x, wy=w*y, wz=w*z; float sclx=World.scale[i].x, scly=World.scale[i].y, sclz=World.scale[i].z;
+        if (World.instances[i].index == 437/*npc_servbot: render-only -80deg mesh yaw*/) { Quaternion q = quat_multiply(servoYaw,(Quaternion){x,y,z,w}); x=q.x; y=q.y; z=q.z; w=q.w; x2=x*x; y2=y*y; z2=z*z; xy=x*y; xz=x*z; yz=y*z; wx=w*x; wy=w*y; wz=w*z; }/*pre-multiplied: yaw about the global Y up axis; World.rotation (physics, forward, muzzle, AI) is untouched*/
         modelMatrices[m+0]=(1.0f-2.0f*(y2+z2))*sclx; modelMatrices[m+1]=(2.0f*(xy+wz))*sclx; modelMatrices[m+2]=(2.0f*(xz-wy))*sclx; modelMatrices[m+3]=modelMatrices[m+7]=modelMatrices[m+11]=0.0f; modelMatrices[m+4]=(2.0f*(xy-wz))*scly; modelMatrices[m+5]=(1.0f-2.0f*(x2+z2))*scly; modelMatrices[m+6]=(2.0f*(yz+wx))*scly;
         modelMatrices[m+8]=(2.0f*(xz+wy))*sclz; modelMatrices[m+9]=(2.0f*(yz-wx))*sclz; modelMatrices[m+10]=(1.0f-2.0f*(x2+y2))*sclz; modelMatrices[m+12]=World.position[i].x; modelMatrices[m+13]=World.position[i].y; modelMatrices[m+14]=World.position[i].z; modelMatrices[m+15]=1.0f; if (dirtyMin < 0) {dirtyMin = (i32)i;} dirtyMax = (i32)i;
     }

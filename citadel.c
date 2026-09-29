@@ -613,8 +613,14 @@ static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE){retu
 static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxIsNPC(World.instances[self].index) || World.instances[self].health <= 0.0f){return take;} NPCType t = npcTable[World.instances[self].index - 419].type; if (at >= 12){return take;} return take * attackTypeMult[t][at]; }
 static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;}/*Unity HealthManager.UseDeathTargets: 'if (isPlayer) return.  Player death does nothing.'*/ if (World.instances[self].targetOnDeathIdx != IO_NONE) UseTargets(self,World.instances[self].targetOnDeathIdx); }
 static void TeleportAway(u16 self) { 
-    if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;} flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true); World.col[self] = COLTYPE_NONE; World.gravity[self] = 0.0f; World.velocity[self] = (V3){0,0,0}; World.angularVelocity[self] = (V3){0,0,0}; World.instances[self].modelIndex = U16_MAX; 
-    V3 fxPos = World.position[self]; if(World.col[self] != COLTYPE_NONE){fxPos=V3_AplusB(fxPos,World.colliderCenter[self]);} SpawnImpactEffect(735,fxPos); play_wav(sounds[106], AppliedFXVol(1.0f), fxPos, false);
+    if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;} flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true);
+    /*Unity HealthManager.TeleportAway (HealthManager.cs:536) does Utils.Activate(teleportEffect) and only
+     * afterwards disables collision and deactivates visibleMeshEntity.  Order matters here for a second
+     * reason: the burst has to be created while modelIndex is still live, because PSysAddEx snapshots the
+     * model so the emitter can go on spawning from the last visible frame after the body is hidden.*/
+    const PSysDef* dgo = PSysTypeGet(PSYS_ef_diego_teleport); if (dgo) { PSysDef d = *dgo; d.pos = World.position[self]; d.rotation = World.rotation[self]; PSysAddEx(&d, self); }
+    World.col[self] = COLTYPE_NONE; World.gravity[self] = 0.0f; World.velocity[self] = (V3){0,0,0}; World.angularVelocity[self] = (V3){0,0,0}; World.instances[self].modelIndex = U16_MAX; 
+    play_wav(sounds[106]/*misc/teleport*/, AppliedFXVol(1.0f), World.position[self], false);
 }
 
 static void DropSearchables(u16 self) {for(int i=0;i<4;i++){if(World.instances[self].contents[i]<=-1){continue;} u16 spawned=SpawnDynamicObject(World.instances[self].contents[i]+307,true); if(spawned!=U16_MAX){World.position[spawned]=World.position[self]; World.instances[spawned].custIdx[0]=World.instances[self].custIdx[i];}else{CenterStatusPrint("BUG: Failed to make search obj.");} World.instances[self].contents[i]=World.instances[self].custIdx[i]=-1;}}

@@ -2,7 +2,7 @@
 #include "common.h"
 extern u32 psysquadVAO,psysquadVBO,psysInstancesID,particleSP,psysTrailsID,trailSP; PSys psys = {0}; GpuPartInst psysUploadBuffer[MAX_PARTICLES]; static V3 trailSortCam;
 /* BEGIN GENERATED PARTICLE TYPE TABLE */
-const PSysDef particleTypeDefs[189] = {
+const PSysDef particleTypeDefs[190] = {
     /** ef_mist_gentle (2), ef_mist_gentle (1), ef_mist_gentle */ {.pos=(V3){0,0,0},.textures={583,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=1.f,.duration=1e9f,.sizeMin=1.f,.sizeMax=1.f,.speedMin=.4f,.speedMax=.5f,.lifetimeMin=3.5f,.lifetimeMax=20.f,.gravity=.02f,.animWindow=1.f,.softness=1.f,.shapeRadius=.08f,.shapeAngle=15.f,.shapeType=2,.colStart=(Color){.1603774f,.1603774f,.1603774f,.6901961f},.colEnd=(Color){.4150943f,.4150943f,.4150943f,0.f},.rampColors={(Color){.1603774f,.1603774f,.1603774f,.6901961f},(Color){.1985849f,.1985849f,.1985849f,.07377163f},(Color){.4150943f,.4150943f,.4150943f,0.f}},.rampTimes={0.f,.15f,1.f},.rampCount=3,.scaleKeys={0.f,6.f},.scaleTimes={0.f,1.f},.scaleCount=2,.emissKeys={3.f,3.f,0.f,0.f,3.f},.emissTimes={0.f,.090879f,.13166f,.96206f,1.f},.emissCount=5},
     /** bitsburst (1) */ {.pos=(V3){0,0,0},.textures={579,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=0.f,.duration=1.5f,.sizeMin=.02f,.sizeMax=.05f,.speedMin=5.f,.speedMax=10.f,.lifetimeMin=.8f,.lifetimeMax=1.2f,.gravity=2.f,.animWindow=1.f,.softness=1.f,.shapeRadius=1.28f,.shapeAngle=60.f,.shapeType=2,.colStart=(Color){.9150943f,.7122673f,.5827252f,1.f},.colEnd=(Color){.9150943f,.7122673f,.5827252f,0.f},.rampColors={(Color){.9150943f,.7122673f,.5827252f,1.f},(Color){.9150943f,.7122673f,.5827252f,.01176f},(Color){.9150943f,.7122673f,.5827252f,0.f}},.rampTimes={0.f,.98824f,1.f},.rampCount=3},
     /** glassbursteffect */ {.pos=(V3){0,0,0},.textures={69,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=0.f,.duration=1.5f,.sizeMin=.05f,.sizeMax=.2f,.speedMin=3.f,.speedMax=8.f,.lifetimeMin=.2f,.lifetimeMax=.8f,.gravity=.5f,.animWindow=1.f,.softness=1.f,.shapeRadius=1.28f,.shapeAngle=60.f,.shapeType=2,.colStart=(Color){1.f,1.f,1.f,1.f},.colEnd=(Color){1.f,1.f,1.f,0.f},.rampColors={(Color){1.f,1.f,1.f,1.f},(Color){1.f,1.f,1.f,0.f}},.rampTimes={0.f,1.f},.rampCount=2},
@@ -202,8 +202,19 @@ const PSysDef particleTypeDefs[189] = {
      * list is null in the export, so the frames come from Textures/Sprites/vaporize/546_1292..1297.png -- 6 frames, contiguous indices
      * 2126..2131. */
     /** ef_vaporize (PoolType.Vaporize: vaporizePuff) */ {.pos=(V3){0,0,0},.textures={2126,2127,2128,2129,2130,2131,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=0.0f,.duration=.9f,.sizeMin=15.0f,.sizeMax=20.0f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=.7f,.lifetimeMax=.8f,.gravity=0.f,.animWindow=1.f,.softness=1.f,.shapeRadius=.01f,.shapeAngle=20.0f,.shapeType=0,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.burstCount=10},
+    /* Unity npc_cyborg_diego.prefab -> teleportFX -> ParticleSystem &8092239910951538054, a
+     * ParticleSystemMeshSpawnModule over Assets/Models/npc_cyborg_diegoteleportfx.blend, which is
+     * a higher-subdivided version of the diego mesh so a particle can be born on every vertex.
+     * startLifetime TwoConstants .2/.3, startSpeed Constant 0 (static), startSize Constant .015,
+     * rateOverTime Constant 10000, startColor TwoConstants (.5849056,.44419718,.45201436,1) -
+     * (.41509432,.041117832,.056076877,1), colorOverLifetime alpha 1->0.
+     * Two changes were unavoidable: the export carries a null material/sprite, so the sprite is
+     * Burst.png (67) drawn additively to stand in for the pink shimmer, and Unity's TwoConstants
+     * startColor cannot be combined with the alpha ramp in one PSysDef, so the per-particle colour
+     * randomness is folded into the shared ramp (min colour -> max colour -> transparent). */
+    /** ef_diego_teleport (npc_cyborg_diego teleportFX) */ {.pos=(V3){0,0,0},.textures={67,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS},.emitRate=10000.f,.duration=.1f,.sizeMin=.015f,.sizeMax=.015f,.speedMin=0.f,.speedMax=0.f,.lifetimeMin=.2f,.lifetimeMax=.3f,.gravity=0.f,.animWindow=1.f,.softness=1.f,.shapeRadius=1.f,.shapeAngle=25.f,.shapeType=0,.colStart=(Color){.5849056f,.4441972f,.4520144f,1.f},.colEnd=(Color){.4150943f,.0411178f,.0560769f,0.f},.rampColors={(Color){.5849056f,.4441972f,.4520144f,1.f},(Color){.4150943f,.0411178f,.0560769f,1.f},(Color){.4150943f,.0411178f,.0560769f,0.f}},.rampTimes={0.f,.5f,1.f},.rampCount=3,.blendMode=1,.blendModeOverride=1,.useMesh=1},
 };
-const u16 particleTypeDefCount = 189;
+const u16 particleTypeDefCount = 190;
 const PSysDef* PSysTypeGet(u16 index) {
     return index < particleTypeDefCount ? &particleTypeDefs[index] : 0;
 }
@@ -279,7 +290,8 @@ void PSysAddLevelLoops(void) {
     }
 }
 
-u16 PSysAdd(const PSysDef* pd) {
+u16 PSysAdd(const PSysDef* pd) { return PSysAddEx(pd, U16_MAX); }
+u16 PSysAddEx(const PSysDef* pd, u16 meshInstance) {
     PSysDef def=*pd; if(def.trail){def.trailTexture=881u;}/*textures/white.png, an opaque sprite.  Trails are drawn with
          glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA) (particles.c, the PSys trail draw), which is alpha, not
          additive.  The presets' own converted trailTexture is 583 = ParticleCloudWhite.png for the blood spurts, a
@@ -292,7 +304,7 @@ u16 PSysAdd(const PSysDef* pd) {
     if (!list || list->count >= MAX_LEVEL_PARTICLES) return U16_MAX;
     for (u16 i = 0; i < MAX_EMITTERS; i++) {
         if (psys.emitters[i].active || psys.emitters[i].aliveCount){continue;} Emitter* em=&psys.emitters[i]; u16 fc=0; while(fc<16 && def.textures[fc]!=MAX_TXRS){fc++;} u32 baseTex = def.textures[0] < MAX_TXRS ? def.textures[0] : 0; if(fc == 0){fc=1;} em->active=true; em->looping=def.looping; em->spawnedAny=false; em->position = def.pos; float rotationLength = def.rotation.x*def.rotation.x + def.rotation.y*def.rotation.y + def.rotation.z*def.rotation.z + def.rotation.w*def.rotation.w; if (rotationLength < 0.000001f) { em->orientation = QUAT_IDENTITY; } else { float invRotationLength = 1.0f/vsqrtf(rotationLength); em->orientation = (Quaternion){def.rotation.x*invRotationLength,def.rotation.y*invRotationLength,def.rotation.z*invRotationLength,def.rotation.w*invRotationLength}; } em->emitAccumulator=em->age=0; em->emitRate = def.emitRate; em->duration = def.duration; em->aliveCount = 0;
-        em->maxAlive=2000; em->physicsMode=(def.gravity != 0) ? 1 : 0; em->trail=def.trail; em->shapeType=def.shapeType; em->rotationMode=def.rotationMode; em->colorMode=def.colorMode; em->burstRemaining=def.burstCount; em->shapeRadius=def.shapeRadius; em->shapeAngle=def.shapeAngle; em->trailTexture = (u16)(def.trailTexture & 0xFFFFu); em->lifetimeMin=def.lifetimeMin>0.0f ? def.lifetimeMin : 0.5f; em->lifetimeMax=def.lifetimeMax>0 ? def.lifetimeMax : 2.0f; if(em->lifetimeMax <= em->lifetimeMin){em->lifetimeMax=em->lifetimeMin + 0.01f;}
+        em->maxAlive=2000; em->physicsMode=(def.gravity != 0) ? 1 : 0; em->trail=def.trail; em->shapeType=def.shapeType; em->useMesh=def.useMesh; em->meshInstance=meshInstance; em->meshModelIdx=(def.useMesh&&meshInstance<INSTANCE_COUNT)?World.instances[meshInstance].modelIndex:U16_MAX;/*emitters are recycled, so these three are always rewritten, never left stale*/ em->rotationMode=def.rotationMode; em->colorMode=def.colorMode; em->burstRemaining=def.burstCount; em->shapeRadius=def.shapeRadius; em->shapeAngle=def.shapeAngle; em->trailTexture = (u16)(def.trailTexture & 0xFFFFu); em->lifetimeMin=def.lifetimeMin>0.0f ? def.lifetimeMin : 0.5f; em->lifetimeMax=def.lifetimeMax>0 ? def.lifetimeMax : 2.0f; if(em->lifetimeMax <= em->lifetimeMin){em->lifetimeMax=em->lifetimeMin + 0.01f;}
         em->sizeMin=def.sizeMin; em->sizeMax=def.sizeMax; em->speedMin = def.speedMin; em->speedMax = def.speedMax; em->rotMin=0.0f; em->rotMax=def.rotationMode == 1 ? 0.0f : 6.2831853f; em->aVelMin=def.rotationMode == 1 ? 0.0f : (def.rotCount >= 1 ? def.rotKeys[0] : -1.0f); em->aVelMax=em->aVelMin; em->gravity=def.gravity; em->trailLifetime=def.trailLifetime>0.0f ? def.trailLifetime : 1.0f;
         em->trailColorStart=ColorToU32(def.trailColorStart); em->trailColorEnd=ColorToU32(def.trailColorEnd); em->trailWidthStart=def.trailWidthStart>0 ? def.trailWidthStart : 0.05f; em->trailWidthEnd=(def.trailWidthEnd>0) ? def.trailWidthEnd : em->trailWidthStart; em->texBaseIdx=baseTex; em->textureFrameCount = fc; em->animSpeed = 10.0f; em->blendMode = def.blendModeOverride ? def.blendMode : particleBlendTexture[baseTex];
         em->animWindow=def.animWindow>0 ? def.animWindow : 1.0f; em->softness=def.softness>0 ? def.softness : 1.0f; for(int c=0;c<32;++c){em->scaleCurve[c]=1.0f; em->velocityCurve[c]=1.0f; em->rotationCurve[c]=0; em->emissionCurve[c] = 1.0f; }
@@ -346,8 +358,9 @@ void PSys_Update(float dt) {
     for (u16 i = 0; i < MAX_EMITTERS; i++) {/*Update emitters*/
         if (!PSysLevelOwnsEmitter(i)) continue; Emitter* em = &psys.emitters[i]; if(!em->active){continue;} em->age+=dt; if(em->duration > 0.0f&& em->age>=em->duration){em->active=false; continue;} int count=0; if(em->burstRemaining){count=em->burstRemaining; em->burstRemaining=0; em->emitAccumulator=0.0f;} else { float rate = em->emitRate; if (em->duration > 0.0f && em->duration < 1e6f){rate*=sample_curve(em->emissionCurve,em->age/em->duration);} em->emitAccumulator+=rate*dt; count=(int)em->emitAccumulator; em->emitAccumulator-=(float)count; }
         for (int p = 0; p < count; p++) {
-            if ((psys.aliveCount >= MAX_PARTICLES) || (em->aliveCount >= em->maxAlive)){break;} Particle* part = &psys.particles[psys.aliveCount]; float angle = random_range(0.0f,6.2831853f), speed = random_range(em->speedMin,em->speedMax); V3 dir;
-            if (em->shapeType == 1) {
+            if ((psys.aliveCount >= MAX_PARTICLES) || (em->aliveCount >= em->maxAlive)){break;} Particle* part = &psys.particles[psys.aliveCount]; float angle = random_range(0.0f,6.2831853f), speed = random_range(em->speedMin,em->speedMax); V3 dir; u16 mdl = U16_MAX; if (em->useMesh && em->meshInstance < INSTANCE_COUNT) { u16 cur = World.instances[em->meshInstance].modelIndex; mdl = (cur < MAX_MDLS && physPos[cur] && physVertCounts[cur]) ? cur : em->meshModelIdx; if (mdl >= MAX_MDLS || !physPos[mdl] || !physVertCounts[mdl]) mdl = U16_MAX; } const float* Mp = (mdl != U16_MAX) ? &modelMatrices[em->meshInstance*16] : NULL;
+            if (Mp) { const float* vp = physPos[mdl] + (u32)random_range_u32(0u,physVertCounts[mdl]-1u)*3u; part->pos = (V3){Mp[0]*vp[0]+Mp[4]*vp[1]+Mp[8]*vp[2]+Mp[12],Mp[1]*vp[0]+Mp[5]*vp[1]+Mp[9]*vp[2]+Mp[13],Mp[2]*vp[0]+Mp[6]*vp[1]+Mp[10]*vp[2]+Mp[14]}; dir = (V3){0,0,0};/*the vertex is the whole spawn position; velocity comes out zero because speedMin==speedMax==0*/ }
+            else if (em->shapeType == 1) {
                 float y = random_range(-1.0f,1.0f), radial = vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f), radius = random_range(0.0f,em->shapeRadius);
                 dir=quat_rot_v3(em->orientation,(V3){radial*vcosf(angle),y,radial*vsinf(angle)}); part->pos.x=em->position.x+dir.x*radius; part->pos.y=em->position.y+dir.y*radius; part->pos.z=em->position.z+dir.z*radius;
             } else if (em->shapeType == 2) {
