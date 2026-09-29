@@ -8137,7 +8137,7 @@ constIndex:595|lP.x:123.78|lP.y:28.18|lP.z:-16.62|lS.x:2.56|lS.y:2.56|lS.z:2.56|
 constIndex:595|lP.x:123.78|lP.y:15.38|lP.z:-11.5|lS.x:2.56|lS.y:2.56|lS.z:2.56|force:2750|direction.x:0|direction.y:-1|direction.z:0|center.x:0|center.y:0|center.z:0|size.x:1|size.y:11|size.z:1
 constIndex:595|lP.x:155.764|lP.y:-15.342|lP.z:42.23|lS.x:2.56|lS.y:2.56|lS.z:2.56|force:2750|direction.x:0|direction.y:0|direction.z:-1|center.x:0|center.y:0|center.z:0|size.x:2|size.y:1|size.z:5
 constIndex:595|lP.x:155.764|lP.y:-15.342|lP.z:1.27|lS.x:2.56|lS.y:2.56|lS.z:2.56|force:1800|direction.x:0|direction.y:0|direction.z:-1|center.x:0|center.y:0|center.z:0|size.x:2|size.y:1|size.z:9
-constIndex:708|lP.x:183.8899|lP.y:76.4|lP.z:34.55389|lR.x:-.70711|lR.w:.70711
+constIndex:708|targetname:gameend|lP.x:183.8899|lP.y:76.4|lP.z:34.55389|lR.x:-.70711|lR.w:.70711
 constIndex:595|lP.x:185.19|lP.y:84.49|lP.z:-29.38|lS.x:2.56|lS.y:2.56|lS.z:2.56|force:2750|direction.x:0|direction.y:0|direction.z:1|center.x:0|center.y:0|center.z:0|size.x:1|size.y:1|size.z:14
 constIndex:595|lP.x:235.116|lP.y:33.2|lP.z:-15.331|lS.x:2.56|lS.y:2.56|lS.z:2.56|force:2750|direction.x:0|direction.y:-1|direction.z:0|center.x:0|center.y:0|center.z:0|size.x:1|size.y:3|size.z:1
 constIndex:595|lP.x:142.92|lP.y:14.7|lP.z:90.91|lS.x:2.56|lS.y:2.56|lS.z:2.56|force:2750|direction.x:-1|direction.y:0|direction.z:0|center.x:0|center.y:0|center.z:0|size.x:4|size.y:2.5|size.z:1

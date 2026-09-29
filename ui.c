@@ -157,6 +157,10 @@ static const float outroTextAt[3] = {0.0f,7.0f,11.0f};/*CreditsScroll swaps to c
 __attribute__((noinline)) void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; if (pg==Mpg_Save||pg==Mpg_Load) { SaveSlotCancelTyping(); RefreshSaveSlots(); }/*reparse save headers whenever the Save/Load page is assigned*/
     if (pg==Mpg_IntroVideo) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); }
     if (pg==Mpg_CreditsVideo) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); } }
+/* Unity GameEnd.cs Targetted(): Const.a.gameFinished = true; PauseScript.a.PauseEnable();
+   PauseScript.a.NoSavePauseQuit() (quit to and enable the main menu, no save); MainMenuHandler.a.PlayCredits().
+   The credits clip plays on the Mpg_CreditsVideo page and hands off to World.creditsActive when it ends. */
+void GameEndSequence() { World.gameFinished = true; World.paused = true; World.menuActive = true; ChangeMenuPage(Mpg_CreditsVideo); }
 static char vidTxtBuf[T_LOGSTR_MAX];
 static void RenderVideoPage(u8 page) {
     bool isIntro = (page==Mpg_IntroVideo);

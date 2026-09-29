@@ -510,7 +510,7 @@ void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseV
     if (radius <= 0.0f || baseVel <= 0.0f) return; float r2 = radius * radius; float origDamage = dd ? dd->damage : 0.0f;
     float damageScale = vmin(origDamage / 100.0f, 2.0f);/*measured off the original damage, so it is the same for every body in the blast*/
     for (u16 i = PLAYER1; i < World.instCount; i++) {
-        Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || (e->entflags & EF_DEAD)) continue; if (!(e->entflags & EF_RIGIDBODY) && !IdxIsNPC(e->index) && i != PLAYER1) continue; float sqd = V3_SqDist(World.position[i], center); if (sqd > r2) continue; float dist = vsqrtf(sqd);
+        Entity* e = &World.instances[i]; if (!(e->entflags & EF_ACTIVE) || (e->entflags & EF_DEAD)) continue; if (!(e->entflags & EF_RIGIDBODY) && !IdxIsNPC(e->index) && i != PLAYER1 && !IsDamageable(e)) continue;/*IsDamageable() widens the blast to static damageable props (sec_cpunode 478/479, consoles, cameras) which have health but no EF_RIGIDBODY, so grenades used to skip them entirely.  ApplyImpactForce below still no-ops for them, so only the damage applies.*/ float sqd = V3_SqDist(World.position[i], center); if (sqd > r2) continue; float dist = vsqrtf(sqd);
         if (dist >= 4.0f) { RaycastHit sight = Raycast(center, V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist), radius + 0.02f, LMASK_EXPLOSION); if (!(sight.hit && sight.hitInstanceIndex == i)) continue; }
         float distPenalty = (radius - dist) / radius; if (distPenalty < 0.0f) distPenalty = 0.0f;
         V3 normal; if(dist > 0.0001f){normal=V3_ScaleByF(V3_AsubB(World.position[i],center), 1.0f / dist);}else{normal = (V3){0.0f,1.0f,0.0f};}
@@ -611,7 +611,7 @@ static const float attackTypeMult[7][12]={[NPCType_Mutant]={1,1,1,1,0,1,2,1,1,2,
 static const i16 objectDeathSound[] = {[458]=63,[459]=66,[460]=66,[464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,[472]=62,[473]=62,[474]=62,[475]=62,[476]=62,[477]=61,[478]=65,[479]=69,[525]=68,[526]=68,};
 static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE){return true;} Entity* e=&World.instances[self]; if (self != PLAYER1 && e->cyberHealth > 0.0f){return true;} return (IdxIsNPC(e->index) && (e->index - 419) > 23);/*24-28 are cyber enemies*/}
 static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxIsNPC(World.instances[self].index) || World.instances[self].health <= 0.0f){return take;} NPCType t = npcTable[World.instances[self].index - 419].type; if (at >= 12){return take;} return take * attackTypeMult[t][at]; }
-static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (World.instances[self].targetIdx != IO_NONE) UseTargets(self,World.instances[self].targetIdx); }
+static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;}/*Unity HealthManager.UseDeathTargets: 'if (isPlayer) return.  Player death does nothing.'*/ if (World.instances[self].targetOnDeathIdx != IO_NONE) UseTargets(self,World.instances[self].targetOnDeathIdx); }
 static void TeleportAway(u16 self) { 
     if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;} flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true); World.col[self] = COLTYPE_NONE; World.gravity[self] = 0.0f; World.velocity[self] = (V3){0,0,0}; World.angularVelocity[self] = (V3){0,0,0}; World.instances[self].modelIndex = U16_MAX; 
     V3 fxPos = World.position[self]; if(World.col[self] != COLTYPE_NONE){fxPos=V3_AplusB(fxPos,World.colliderCenter[self]);} SpawnImpactEffect(735,fxPos); play_wav(sounds[106], AppliedFXVol(1.0f), fxPos, false);
@@ -806,7 +806,7 @@ void Targetted(u16 activator, u16 self) {
         u8 tm = e->questTestMode; if (!tm && activator != WORLD && activator < World.instCount) tm = World.instances[activator].questTestMode;/*1==testQuestBitIsOn, 2==testQuestBitIsOff*/
         if (tm) { bool bitOn = QuestBitIsSet(e->questBitID); u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator, (tm == 1) == bitOn ? e->targetIdx : e->targetIfFalseIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
     }
-    if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; }/*info_message*/   if (e->index == 708) { World.gameFinished = true; return; }
+    if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; }/*info_message*/   if (e->index == 708) { GameEndSequence(); return; }/*info_gameend: Unity GameEnd.cs Targetted() sets gameFinished, pauses, enables the main menu and plays the credits*/
     if (e->index == 707) { EmailTargetted(self); return; }/*info_email*/                                                 if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) { if(e->index == 598 || e->index == 600){TriggerTargetted(self,activator);}else if(e->index == 594){TriggerCounterTargetted(self,activator);} }
     if (aioflags & TARG_IOFLAGS_UNLOCK) EntitySetLocked(e, false);                                                       if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true);                                     if (IdxIsButtonSwitch(e->index)) ButtonSwitchUse(self,activator);
     if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && (e->entflags & EF_LOCKED) == 0 && (e->requiredAccessCard == ACC_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) { DoorForceClose(self); } else if (IdxIsDoor(e->index)) { DoorTargetted(self, activator); }
@@ -1275,23 +1275,25 @@ void DrawAIDebug(u16 i) {
 #define CAM_SWEEP_EPSILON    1.0f
 INLINE float CamYawFromQuat(Quaternion q) { /*standard ZYX yaw extraction, only used to seed the sweep, so Unity's
     ZXY eulerAngles.y ordering does not have to be reproduced exactly*/
-    float d = __builtin_atan2f(2.0f*(q.w*q.y + q.x*q.z), 1.0f - 2.0f*(q.y*q.y + q.z*q.z)) * (180.0f / 3.14159265f);
+    float d = __builtin_atan2f(2.0f*(q.x*q.z + q.y*q.w), 1.0f - 2.0f*(q.x*q.x + q.y*q.y)) * (180.0f / 3.14159265f); /*m02/m22 of the rotation matrix: Unity eulerAngles.y, i.e. the Y angle of the ZXY decomposition, which is what startYAngle/endYAngle were authored against.  The ZYX form (2(wy+xz) over 1-2(y^2+z^2)) agrees for an untilted camera but diverges once the prefab droop is present, which every level camera has.*/
     if (d < 0.0f) d += 360.0f; return d;
 }
 void SecurityCameraRotateUpdate(u16 self) {
-    Entity* e = &World.instances[self]; if (!(e->entflags & EF_ACTIVE)) return;
+    Entity* e = &World.instances[self]; if (!e->camRotateEnabled) return;/*Unity: sec_camera.prefab ships SecurityCameraRotate disabled, so Unity dispatches no Update() at all for the 127 enabled:0 records*/
+    if (!(e->entflags & EF_ACTIVE)) return;
     /*Unity: if (mR == null || !mR.isVisible || !mR.enabled) return -- the sweep is frozen whenever the camera is
        off screen.  playerFrustumPlanes is rebuilt in Render(), so here it still holds last frame's planes, which is
        fine for a gate.  Unity mR.isVisible is true when any part of the renderer is in frustum, hence the radius. */
     if (!SphereInFrustum(playerFrustumPlanes, World.position[self], 1.28f)) return;
-    if (!e->camSweepInit) { e->camSweepInit = true; e->camYaw0 = CamYawFromQuat(World.rotation[self]); e->camYaw = e->camYaw0; }/*seeded lazily so the authored lR.* has already been applied*/
+    if (!e->camSweepInit) { e->camSweepInit = true; e->camBaseRot = World.rotation[self]; e->camYaw0 = CamYawFromQuat(e->camBaseRot); e->camYaw = e->camYaw0; }/*seeded lazily so the authored lR.* has already been applied*/
     if (e->camWaitingFinished >= World.pauseRelativeTime) return;/*Unity: if (waitingFinished < relativeTime)*/
     float dt = World.dt;
     if (e->camRotatePositive) { if (vabs(e->camYaw - e->camEndYAngle) <= CAM_SWEEP_EPSILON) { e->camRotatePositive = false; e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime; } else e->camYaw += CAM_SWEEP_DEG_PER_SEC * dt; }
     else { if (vabs(e->camYaw - e->camStartYAngle) <= CAM_SWEEP_EPSILON) { e->camRotatePositive = true; e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime; } else e->camYaw -= CAM_SWEEP_DEG_PER_SEC * dt; }
     if (e->camYaw < 0.0f) e->camYaw += 360.0f; else if (e->camYaw >= 360.0f) e->camYaw -= 360.0f;
+    /*Absolute, not cumulative: composed onto the captured authored rotation.  Pre-multiplying the (camYaw-camYaw0) delta onto the previous frame's result would sum 0.4+0.8+1.2+... instead of applying 0.4 each frame, and each world-space Y pre-multiply would precess the prefab droop, which is the skew. */
     float half = deg2rad(e->camYaw - e->camYaw0) * 0.5f; Quaternion yaw = {0.0f, vsinf(half), 0.0f, vcosf(half)};
-    World.rotation[self] = quat_multiply(yaw, World.rotation[self]);
+    World.rotation[self] = quat_multiply(yaw, e->camBaseRot);
 }
 
 void ModUpdate() {
