@@ -334,8 +334,20 @@ void LogicTimerInitBeforeLoad(u16 self) { Entity* e=&World.instances[self]; if(e
 void LogicTimerUseTargets(u16 self) { UseTargets(self,World.instances[self].targetIdx); }
 void LogicTimerUpdate(u16 self) { Entity* e=&World.instances[self]; if(!e->active || e->intervalFinished >= World.pauseRelativeTime){return;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); LogicTimerUseTargets(self); }
 void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; World.instances[self].active = !World.instances[self].active; }
-void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->delayFinished=0.0f; if(e->active){e->tickFinished=World.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);} }
-void ButtonSwitchUseTargets(u16 self) { Entity* e=&World.instances[self]; UseTargets(self,e->targetIdx); e->active=!e->active; if(e->index == 689 || e->index == 690 || e->index == 695) { TextureChangerToggle(self); if(e->index == 689 && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} } }
+void ButtonSwitchHoldPose(Entity* e){ e->switchAnimFinished=0.0; ChangeAnim(e, e->active ? A_ACTIVATED : A_INACTIVE); }
+/* Unity ButtonSwitch.SetActive plays "Activating"/"Deactivating" on every toggle when animateModel is set
+  (ButtonSwitch.cs:117), and each transient clip settles on the matching held pose. Only func_switch4, 5 and 7
+  serialize animateModel: 1; of those only switch4.glb/switch5.glb carry an animationNum in Data/models.txt, so
+  the clip length comes from the same frames/(framerate*speed) the animator steps by rather than a fixed guess. */
+void ButtonSwitchAnimate(Entity* e){
+    if (e->animationNum >= MAX_ANIMS) return;
+    u8 move = e->active ? A_ACTIVATE : A_DEACTIVATE;
+    const AnimationClip* c = &modelAnimationClips[e->animationNum][move];
+    if (c->framerate <= 0 || c->speed <= 0 || c->frameEnd < c->frameStart) { ButtonSwitchHoldPose(e); return; }
+    ChangeAnim(e, move); e->switchAnimFinished = World.pauseRelativeTime + (double)(c->frameEnd - c->frameStart + 1) / ((double)c->framerate * c->speed);
+}
+void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->delayFinished=0.0f; ButtonSwitchHoldPose(e); if(e->active){e->tickFinished=World.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);} }
+void ButtonSwitchUseTargets(u16 self) { Entity* e=&World.instances[self]; UseTargets(self,e->targetIdx); e->active=!e->active; ButtonSwitchAnimate(e); if(e->index == 689 || e->index == 690 || e->index == 695) { TextureChangerToggle(self); if(e->index == 689 && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} } }
 static __attribute__((noinline)) void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; play_wav(sounds[468], AppliedFXVol(0.85f), (V3){0,0,0}, false);/*blocked_by_security*/ MFD_OpenData(World.Sys_UI.lastDataSideRH,8);/*MFDManager.BlockedBySecurity() opens tab 4 on the last-used data side and raises the blocked view there*/ CenterStatusPrint("%s",Sys_Text.stringTable[25]); }
 static __attribute__((noinline)) void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,EF_LOCKED,locked); }
 /*Button-switch click SFX.  The success sound is a prefab constant, not level data: no func_switch* prefab serializes
@@ -355,7 +367,7 @@ void ButtonSwitchUse(u16 self, u16 activator) {
     if (e->messageIndex >= 0 && e->messageIndex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageIndex]); if (e->delay > 0.0f) { e->recentMostActivator = activator; e->delayFinished = World.pauseRelativeTime + e->delay; } else ButtonSwitchUseTargets(self);
 }
 
-void ButtonSwitchUpdate(u16 self) { double t=World.pauseRelativeTime; Entity* e=&World.instances[self]; if (e->delayFinished > 0.0 && e->delayFinished < t){e->delayFinished=0.0; ButtonSwitchUseTargets(self);} if (e->index == 689 && e->active && e->tickFinished < t) { TextureChangerToggle(self); e->tickFinished=t+1.5f; } }
+void ButtonSwitchUpdate(u16 self) { double t=World.pauseRelativeTime; Entity* e=&World.instances[self]; if (e->switchAnimFinished > 0.0 && e->switchAnimFinished <= t){ ButtonSwitchHoldPose(e); } if (e->delayFinished > 0.0 && e->delayFinished < t){e->delayFinished=0.0; ButtonSwitchUseTargets(self);} if (e->index == 689 && e->active && e->tickFinished < t) { TextureChangerToggle(self); e->tickFinished=t+1.5f; } }
 void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= UsableOrDef(e->minSecurityLevel,100.0f)) { if(!e->broken){HealthManagerHealingBed(PLAYER1,UsableOrDef(e->amount,170.0f),true); World.instances[PLAYER1].radiation=0.0f; World.invP1.radiationArea=false; CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav(sounds[103], AppliedFXVol(1.0f), World.position[self], false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
 int GeneralInvItem(int slot);
 bool GeneralInvCanVaporize(int slot);
@@ -783,15 +795,32 @@ static void QuestBitNoteSideEffects(u8 qb, bool isOn) {
 bool RessurectPlayer(void) { if(!((World.ressurectionActiveLevels >> World.curLev) & 1u)){return false;} if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) LoadLevel(6, ressurectionLocations[6]); else if (World.curLev < 13) World.position[PLAYER1] = ressurectionLocations[World.curLev]; PlayTrack(TT_Revive, MT_Override); World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0; CenterStatusPrint("BRAIN ACTIVITY SATISFACTORY..."); return true; }
 // Doors
 static bool DoorInventoryHasAccessCard(AccCardType card) { return card == ACC_None || (World.invP1.accessCardOwned & (1u << card)); }
-static float DoorGetProgress(const Entity* e, u8 clip) { AnimationClip c = DoorGetClip(e,clip); if(c.frameEnd <= c.frameStart){return 1.0f;} return DoorClamp01((float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart)); } 
 static void DoorOpen(u16 self) { Entity* e = &World.instances[self]; ChangeAnim(e,A_OPENING); e->doorOpen = e->doorState = DoorState_Opening; e->waitBeforeClose = World.pauseRelativeTime + e->delay; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true); }
 static void DoorClose(u16 self) { Entity* e = &World.instances[self]; ChangeAnim(e,A_CLOSING); e->doorOpen = e->doorState = DoorState_Closing; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true); }
 void DoorForceOpen(u16 self) { World.instances[self].requiredAccessCard = ACC_None; EntitySetLocked(&World.instances[self],false); DoorOpen(self); }
 void DoorForceClose(u16 self) { if (World.instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
-    Entity* e = &World.instances[self]; if (e->doorOpen == DoorState_Open) { DoorClose(self); return; } if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; } bool op = e->doorOpen == DoorState_Opening;
+    Entity* e = &World.instances[self];
+    /* Settle a finished stroke before reading it. Frob() runs ahead of DoorUpdate() inside ModUpdate(), so a
+       button press landing on the frame the door reaches frameEnd still sees doorOpen == Opening with
+       frame == frameEnd, which the inversion below turns into a full 0% jump. Reconciling first sends that
+       case down the clean DoorClose/DoorOpen path, where frameStart genuinely is the right resume point. */
+    { AnimationClip o=DoorGetClip(e,A_OPENING), c=DoorGetClip(e,A_CLOSING);
+      if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= o.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); }
+      else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= c.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); } }
+    if (e->doorOpen == DoorState_Open) { DoorClose(self); return; } if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; } bool op = e->doorOpen == DoorState_Opening;
     if (op || e->doorOpen == DoorState_Closing) {
-        int src = op ? A_OPENING : A_CLOSING, dst = op ? A_CLOSING : A_OPENING; AnimationClip dstClip = DoorGetClip(e,dst); u16 newFrm = DoorFrameFromProgress(dstClip,1.0f - DoorGetProgress(e,src)); // Direct frame assignment (mid-anim reversal): clip + frame + matching model.
+        /* Unity keeps normalizedTime on the transient clip, so reversing mid-swing resumes the opposite clip at
+           1 - t. Voxen keeps the raw frame, so recover t from the source clip and map it onto the destination's
+           range, which is a different length on most doors (e.g. doorD opens over 42 frames and closes over 50).
+           Clamp into the source range first: UpdateAnims advances with a modulo, so a long tick can leave frame at
+           or past frameEnd, and a frame left over from the other clip would saturate the ratio to 1.0 and snap
+           the door to the start of its new clip. With the clamp, 0% is only reachable at a real endpoint. */
+        u8 src = op ? A_OPENING : A_CLOSING, dst = op ? A_CLOSING : A_OPENING;
+        AnimationClip srcClip = DoorGetClip(e,src), dstClip = DoorGetClip(e,dst);
+        u32 f = e->frame; if (f < srcClip.frameStart) f = srcClip.frameStart; if (f > srcClip.frameEnd) f = srcClip.frameEnd;
+        float p = (srcClip.frameEnd > srcClip.frameStart) ? (float)(f - srcClip.frameStart) / (float)(srcClip.frameEnd - srcClip.frameStart) : 1.0f;
+        u16 newFrm = DoorFrameFromProgress(dstClip,1.0f - p); // Direct frame assignment (mid-anim reversal): clip + frame + matching model.
         e->clip = dst; e->frame = newFrm; e->currentFrameFinished = 0.0; e->modelIndex = dstClip.frameStartModelIndex + (u16)(newFrm - dstClip.frameStart); e->doorOpen = e->doorState = op ? DoorState_Closing : DoorState_Opening;
         if (!op) e->waitBeforeClose = World.pauseRelativeTime + e->delay; if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true);
     }
@@ -845,8 +874,9 @@ void Targetted(u16 activator, u16 self) {
     }
     if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; }/*info_message*/   if (e->index == 708) { GameEndSequence(); return; }/*info_gameend: Unity GameEnd.cs Targetted() sets gameFinished, pauses, enables the main menu and plays the credits*/
     if (e->index == 707) { EmailTargetted(self); return; }/*info_email*/                                                 if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) { if(e->index == 598 || e->index == 600){TriggerTargetted(self,activator);}else if(e->index == 594){TriggerCounterTargetted(self,activator);} }
-    if (aioflags & TARG_IOFLAGS_UNLOCK) EntitySetLocked(e, false);                                                       if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true);                                     if (IdxIsButtonSwitch(e->index)) ButtonSwitchUse(self,activator);
-    if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index)) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && (e->entflags & EF_LOCKED) == 0 && (e->requiredAccessCard == ACC_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) { DoorForceClose(self); } else if (IdxIsDoor(e->index)) { DoorTargetted(self, activator); }
+    if (aioflags & TARG_IOFLAGS_UNLOCK) { EntitySetLocked(e, false); if (IdxIsDoor(e->index) && (aioflags & (TARG_IOFLAGS_DOOROPEN | TARG_IOFLAGS_DOOROPENIFUNLOCKED))) e->requiredAccessCard = ACC_None;/*TargetIO.cs:145 pairs dr.Unlock() with dr.accessCardUsedByPlayer = true -- that flag is what retires a card requirement on a scripted unlock, and doorOpenIfUnlocked tests it alongside Inventory.a.HasAccessCard(). Voxen has no such field; DoorUse tests requiredAccessCard directly, so drop it here. Scoped to the force-open combos, which are exactly the records that used to clear it inside DoorForceOpen. UNLOCK-without-open still leaves the card check in DoorUse intact. */ }                                                       if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true);                                     if (IdxIsButtonSwitch(e->index)) ButtonSwitchUse(self,activator);
+/* Unity's ForceOpen() calls OpenDoor(), which does anim.Play(openClip,0,0f) -- it restarts the swing at 0% even mid-stroke, and skips the security/access-card/locked-message checks. That is the right call for a bare doorOpen record (3 of 83), but a record that also unlocks the door is a keypad or button acting as a keycard: 62 of 83. Those want the ordinary use path, so a door that is already moving reverses from its current frame via DoorActuate instead of snapping to 0%, and the door's own threshold, access card and locked message all still apply. TARG_IOFLAGS_UNLOCK already ran above, so the door is unlocked by the time DoorUse checks it. */
+    if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index) && !(aioflags & TARG_IOFLAGS_UNLOCK)) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && !(aioflags & TARG_IOFLAGS_UNLOCK) && (e->entflags & EF_LOCKED) == 0 && (e->requiredAccessCard == ACC_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) { DoorForceClose(self); } else if (IdxIsDoor(e->index)) { DoorTargetted(self, activator); }
     if (aioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self, false); else if (aioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self, false); else if (aioflags & TARG_IOFLAGS_FBRIDGE_TOGGLE) ForceBridgeToggle(self);
     if (aioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) { World.instances[self].active=!World.instances[self].active; if (e->index == 596) GravityLiftSyncVisuals(self); } if (aioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
     if (aioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self);                                                  if (aioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e, (e->entflags & EF_LOCKED) == 0);

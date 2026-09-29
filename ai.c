@@ -502,9 +502,27 @@ static bool AICanAttack(u16 selfIdx, float dsq, u8 type, float* rangeToEnemy) {
 }
 
 static void AIBrakingMovement(Entity* self) { u16 sidx=(u16)(self - World.instances); u8 ni=self->index-419; if (ni == 1 || (ni >= 3 && ni <= 9) || (ni >= 11 && ni <= 13) || ni == 17 || ni == 23) { World.velocity[sidx].x *= 0.15f; World.velocity[sidx].z *= 0.15f; } }
+/* Real on-screen length of an attack clip: frames / (framerate * speed), the same timePerFrame
+   UpdateAnims advances by. 0 when the NPC's model has no clip for that slot, which is the signal
+   to fall back to the authored cadence. */
+static double ai_attack_clip_time(const Entity* self, int slot) {
+    if (self->animationNum >= MAX_ANIMS || slot < 1 || slot > 3) return 0.0;
+    u8 c = (u8)(A_ATTACK1 + (slot - 1)); if (c >= MAX_ANIMCLIPS) return 0.0;
+    const AnimationClip* clip = &modelAnimationClips[self->animationNum][c];
+    if (clip->framerate <= 0 || clip->speed <= 0 || clip->frameEnd < clip->frameStart) return 0.0;
+    return (double)(clip->frameEnd - clip->frameStart + 1) / ((double)clip->framerate * clip->speed);
+}
+
 static void AIStartAttack(Entity* self, int n) {
     AIBrakingMovement(self); NPCTable* npc = &npcTable[self->index - 419]; double between, toActual; switch (n) { case 1: between = npc->timeBetweenAttack1; toActual = npc->timeToActualAttack1; break; case 2: between = npc->timeBetweenAttack2; toActual = npc->timeToActualAttack2; break; default: between = npc->timeBetweenAttack3; toActual = npc->timeToActualAttack3; break; }
-    self->attackFinished = World.pauseRelativeTime + between + toActual; self->gracePeriodFinished = World.pauseRelativeTime + toActual; self->currentState = (AIState)(AIState_Attack1 + (n - 1));
+    /* Exit Attack on the animation's last frame instead of the authored cadence. Unity uses
+       timeBetweenAttack + timeToActualAttack, which is a fire-rate budget unrelated to the clip
+       and overruns it for most NPCs (median 1.75 loops, up to 12.6). timeToActualAttack stays a
+       floor: it is when the grace-period shot fires, and AIAttack only runs while still in the
+       attack state, so ending earlier would swallow the projectile entirely. */
+    double clipTime = ai_attack_clip_time(self, n);
+    double dur = clipTime > 0.0 ? (clipTime > toActual ? clipTime : toActual) : between + toActual;
+    self->attackFinished = World.pauseRelativeTime + dur; self->gracePeriodFinished = World.pauseRelativeTime + toActual; self->currentState = (AIState)(AIState_Attack1 + (n - 1));
 }
 
 static void AIRun(u16 selfIdx) {
