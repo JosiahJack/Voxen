@@ -521,7 +521,7 @@ void UpdateAnims(void) {
             }
         }
         /* Clip IDs are sparse (A_DYING is 9) while numClips stores a count. Validate by table capacity and clip data, not count-vs-ID. */
-        if (animTest || e->clip >= MAX_ANIMCLIPS){continue;} AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if (clip->framerate <= 0 || clip->speed <= 0) continue; e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / clip->framerate;
+        if (animTest || e->clip >= MAX_ANIMCLIPS){continue;} AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if(e->entflags & EF_ASLEEP){e->modelIndex=clip->frameStartModelIndex; continue;} if (clip->framerate <= 0 || clip->speed <= 0) continue; e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / clip->framerate;
         if (e->currentFrameFinished >= timePerFrame) {
             u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1; u16 prevFrame = e->frame;
             e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);

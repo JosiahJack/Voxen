@@ -794,14 +794,11 @@ __attribute__((cold)) void NewGame() { // Reset World States
         cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList; cvxAdjLive+=(vCount+1)*sizeof(u32)+uniqueEdgeCount*2*sizeof(u16);
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
     } DebugRAM("after edge adjacency");
-    /*Codes start unknown (-1) and are drawn when the level's code screen locks, i.e. when its last CPU node dies.
-     That is what the level-R self-destruct pads check: lingdes 289/290 say "Blocked by extant CPU nodes on one of
-     levels 1, 2, or 3" / "4, 5, or 6", so a code the player has not had to clear nodes for must not exist yet.
-     QuestBits.cs:38 ResetQuestData draws all six up front, which is why the guard is dead in the reference game.*/
     World.lev1SecCode = World.lev2SecCode = World.lev3SecCode = -1; World.lev4SecCode = World.lev5SecCode = World.lev6SecCode = -1; World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
+    // TESTING STUFF, TODO Delete once hardware and particle systems are fully confirmed and tested as good (they aren't yet).
     //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAX_TXRS},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colStart=(Color){1,0,0,1},.colEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.shapeRadius=2.56f,.shapeType=1,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
     //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAX_TXRS},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
-    AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
+    //AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
     AutomapNewGame();
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
 }

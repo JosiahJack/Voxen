@@ -7,7 +7,7 @@ static const float WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3],Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
-SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount; float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projectileImpactQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projectileImpactTarget[INSTANCE_COUNT]; static V3 projectileImpactPoint[INSTANCE_COUNT],projectileImpactNormal[INSTANCE_COUNT]; static float nextCapacityWarn[5],gravityLiftDiagAfter[INSTANCE_COUNT]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
+SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount; float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projectileImpactQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projectileImpactTarget[INSTANCE_COUNT]; static V3 projectileImpactPoint[INSTANCE_COUNT],projectileImpactNormal[INSTANCE_COUNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
 static void WarnPhysicsCapacity(u8 kind,const char* message){if(kind<5&&World.pauseRelativeTime>=nextCapacityWarn[kind]){DualLogWarn("%s\n",message);nextCapacityWarn[kind]=World.pauseRelativeTime+5.0f;}}
 bool PhysIsAsleep(u16 i) { return World.physSleep[i] != 0; } // exposed for showPhys debug coloring
 INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAX_ANIMS && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
@@ -78,7 +78,7 @@ static void GravityLiftApplyTopSupport(u16 body) {
 }
 void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
     Entity *lift=&World.instances[self]; if(entering)lift->initialBurstFinished=World.pauseRelativeTime+1.0f;
-    float forceY=0.0f,gravityAccel=GravityLiftGravityAccel(other),mass=vmax(World.mass[other],0.001f); const char *phase=lift->active?"rise":"off";
+    float forceY=0.0f,gravityAccel=GravityLiftGravityAccel(other),mass=vmax(World.mass[other],0.001f);
     /* Unity marks the player as being in a gravity lift for both OnForce and OffForce. */
     if(other==PLAYER1)flag_set(&World.instances[other].entflags,EF_GRAVLIFT,true);
     bool initialBurst=entering||lift->initialBurstFinished>World.pauseRelativeTime,jumpingFromTop=false;
@@ -86,10 +86,9 @@ void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
         float bottomY=GravityLiftBodyBottomY(other),topY=GravityLiftTopY(self),gap=topY-bottomY,velY=World.velocity[other].y;
         float stopDist=velY>0.0f ? (velY*velY)/(2.0f*16.0f) : 0.0f;
         if(gap<=vmax(lift->distancePaddingToTopPoint,stopDist+0.20f)){
-            phase="top";
             bool topContact=other==PLAYER1&&World.col[other]==COLTYPE_CAP&&gap<=0.08f&&gap>=-0.12f,topJumpZone=other==PLAYER1&&World.col[other]==COLTYPE_CAP&&gap<=vmax(lift->distancePaddingToTopPoint,0.12f)&&gap>=-0.12f;
             if(other==PLAYER1){
-                if(topJumpZone&&JumpDown()){gravityLiftTopSupport[other]=0;flag_set(&World.instances[other].entflags,EF_GROUNDED,true);phase="top-jump";jumpingFromTop=true;}
+                if(topJumpZone&&JumpDown()){gravityLiftTopSupport[other]=0;flag_set(&World.instances[other].entflags,EF_GROUNDED,true);jumpingFromTop=true;}
                 else if(topContact&&vabs(velY)<0.75f){flag_set(&World.instances[other].entflags,EF_GROUNDED,true);gravityLiftTopSupport[other]=(u16)(self+1u);}
                 else if(World.col[other]==COLTYPE_CAP)gravityLiftTopSupport[other]=(u16)(self+1u);
             }
@@ -104,7 +103,6 @@ void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
         }
     }else{if(other==PLAYER1)gravityLiftTopSupport[other]=0;if(World.velocity[other].y<lift->offStrengthFactor){forceY=lift->offStrengthFactor-World.velocity[other].y;if(initialBurst)forceY*=2.0f;/*Unity's weak upward force offsets gravity so occupants drift down slowly.*/}}
     AddForce(other,(V3){0.0f,forceY,0.0f},false);
-    if(Cheats.showPhys&&World.pauseRelativeTime>=gravityLiftDiagAfter[other]){float netAy=-gravityAccel+forceY/mass;DualLog("GravityLift lift=%u body=%u phase=%s entering=%u mass=%.3f gravity=%.3f vy=%.3f forceY=%.3f netAy=%.3f dt=%.5f substeps=%u\n",self,other,phase,(u32)entering,World.mass[other],World.gravity[other],World.velocity[other].y,forceY,netAy,World.dt,(u32)World.substeps);gravityLiftDiagAfter[other]=World.pauseRelativeTime+0.25f;}
 }
 // Physics System
 INLINE void SetPosition(u16 i, V3 newpos) { float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;} V3 dir=V3_Normalize(V3_AsubB(newpos,World.position[i])); World.position[i]=V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed)); flag_set(&World.instances[i].entflags,EF_MOVING,true); posBudget[i] -= allowed; }
