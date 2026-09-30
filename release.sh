@@ -8,7 +8,7 @@ OUTDIR="${1:-..}"
 STAGE="$OUTDIR/$ARCHIVE_BASE"
 mkdir -p "$OUTDIR"
 rm -rf "$STAGE"
-mkdir -p "$STAGE/Data" "$STAGE/Models"
+mkdir -p "$STAGE/Data" "$STAGE/Models" "$STAGE/Screenshots"
 (cd Data && tar cf - --exclude='*.bin' .) | (cd "$STAGE/Data" && tar xf -)
 cp -r Fonts Textures Audio "$STAGE/"
 (cd Models && tar cf - --exclude='*.blend' .) | (cd "$STAGE/Models" && tar xf -)
