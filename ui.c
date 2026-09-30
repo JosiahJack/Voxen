@@ -85,14 +85,25 @@ void MFD_NewGame() {
 void MFD_GeneralChanged() { World.Sys_UI.generalClickSlot=-1; }
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; MFD_GeneralChanged(); }
 void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (side==2) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdSelected[side]=2; }
-void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=side?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab,view=side?World.Sys_UI.MFD_DataR:World.Sys_UI.MFD_DataL; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && view!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=view;}} World.Sys_UI.MFD_DataL=World.Sys_UI.MFD_DataR=5; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4;}
-void MFD_CloseSearch() {for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; u8* view=side?&World.Sys_UI.MFD_DataR:&World.Sys_UI.MFD_DataL; if (*view!=5) continue; *view=World.Sys_UI.mfdReturnView[side+1]; if (*view==5) *view=0; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];}}
+void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=side?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4;}
+void MFD_CloseSearch() {if (World.Sys_UI.MFD_Data!=5) return; for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} u8 rv=World.Sys_UI.mfdReturnView[1]; if (rv==5) rv=0; World.Sys_UI.MFD_Data=rv;}
 /*Data tab sub-views that are driven by frobbed objects; these are the "open" object panels. view 5 (search) is handled separately by MFD_OpenSearch/MFD_CloseSearch.*/
 INLINE bool SystemUIDataViewActive(u8 v) { return v==1||v==2||v==3||v==4||v==6||v==7||v==8||v==9; }
-void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=isRH?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab, view=isRH?World.Sys_UI.MFD_DataR:World.Sys_UI.MFD_DataL; if (tab!=4 && !SystemUIDataViewActive(view)) { World.Sys_UI.mfdReturnTab[side]=tab; World.Sys_UI.mfdReturnView[side]=view; } if (isRH) { World.Sys_UI.MFD_DataR=code; World.Sys_UI.MFD_RightTab=4; } else { World.Sys_UI.MFD_DataL=code; World.Sys_UI.MFD_LefTab=4; } }
-void MFD_CloseDataSide(bool isRH) { u8 side=isRH?2:1; u8* tab=isRH?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; u8* view=isRH?&World.Sys_UI.MFD_DataR:&World.Sys_UI.MFD_DataL; if (!SystemUIDataViewActive(*view)) return; u8 rt=World.Sys_UI.mfdReturnTab[side]; *tab=rt; *view=(rt==4)?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
+/*The data tab is ONE view shared by both MFDs, not a per-hand one.  Voxen kept MFD_DataL and MFD_DataR, so only the
+  hand the object was raised on ever showed the panel: the other screen rendered its own stale view, which is why the
+  grid could appear on the left or the right but never on both at once.  Unity drives puzzleGridLH/puzzleGridRH from
+  the same tetheredPGP, so both hands show the same thing.  MFD_OpenData still takes the side to decide which hand's
+  TAB is raised, but the view code itself goes to the one field.  The two saves are separate on purpose: a hand's return TAB is recorded whenever that hand was not
+  already on the data tab (the audio log opens on both hands in a row, and the second call would otherwise leave that
+  hand's return tab stale for MFD_CloseData to restore as 0), while the return VIEW is only recorded when no data view
+  was already up, so a view opened on top of another does not overwrite what it was opened over.*/
+void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=isRH?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab; if (tab!=4) World.Sys_UI.mfdReturnTab[side]=tab; if (!SystemUIDataViewActive(World.Sys_UI.MFD_Data)) World.Sys_UI.mfdReturnView[side]=World.Sys_UI.MFD_Data; World.Sys_UI.MFD_Data=code; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4; }
+/*Unity RevertDataTabState() TabReset's and ReturnToLastTab's BOTH sides, because the view is shared.  Closing is
+  therefore a single operation on the one view plus both hands' tabs, not a per-side call -- a per-side version would
+  restore the shared view on the first call and then early-out on the second, stranding that hand on the data tab.*/
+void MFD_CloseData(void) { if (!SystemUIDataViewActive(World.Sys_UI.MFD_Data)) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
 INLINE void MFD_SelectTab(u8 panel,u8 tab,bool toggle) {
-    MFD_GeneralChanged(); if (panel && tab==2) World.Sys_UI.lastItemSideRH=panel==2; u8* current=panel==0?&World.Sys_UI.MFD_CenterTab:panel==1?&World.Sys_UI.MFD_LefTab:&World.Sys_UI.MFD_RightTab; *current=toggle && *current==tab ? 0 : tab; World.Sys_UI.mfdSelected[panel]=tab; u8 view=panel==0?0:panel==1?World.Sys_UI.MFD_DataL:World.Sys_UI.MFD_DataR;
+    MFD_GeneralChanged(); if (panel && tab==2) World.Sys_UI.lastItemSideRH=panel==2; if (panel && tab==4) World.Sys_UI.lastDataSideRH=panel==2; u8* current=panel==0?&World.Sys_UI.MFD_CenterTab:panel==1?&World.Sys_UI.MFD_LefTab:&World.Sys_UI.MFD_RightTab; *current=toggle && *current==tab ? 0 : tab; World.Sys_UI.mfdSelected[panel]=tab; u8 view=World.Sys_UI.MFD_Data;
     if (!(panel && ((tab==2 && World.Sys_UI.mfdItemReader[panel-1]) || (tab==4 && view==5)))) { World.Sys_UI.mfdReturnTab[panel]=*current; if (view!=5) World.Sys_UI.mfdReturnView[panel]=view; } if (panel && tab==4 && view==5) World.Sys_UI.lastSearchSideRH=panel==2; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false);
 }
 
@@ -407,7 +418,7 @@ extern V3 queuedLevelPos; extern u8 queuedLevelToLoad;
 bool PlayerInElevatorCell(void); bool FindElevatorKeypadPos(u8 level,V3* outPos);
 void ActualChangeAmmoType(void); void OverloadButtonAction(void); void ReloadSecret(bool isSilent); void Unload(bool isSilent); void PlayLog(int logIndex); void CheckForUnreadLogs(void); void UseTargets(u16,u16);
 static const char* mgName[9]={"Ping","15","Wing 0","Botbounce","Eel Zapper","Road","TriopToe","Corp Conq","Chess"};
-static void SysUIDataClose(bool rh) { MFD_CloseDataSide(rh); World.Sys_UI.objectInUsePos=(V3){999.0f,999.0f,999.0f}; World.Sys_UI.usingObject=false; }
+static void SysUIDataClose(void) { MFD_CloseData(); World.Sys_UI.objectInUsePos=(V3){999.0f,999.0f,999.0f}; World.Sys_UI.usingObject=false; }
 static void KeycodeSetDigit(int n) { if (World.Sys_UI.keycodeOnes < 0) { World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes; } else if (World.Sys_UI.keycodeTens < 0) { World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10; } else if (World.Sys_UI.keycodeHuns < 0) { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } else { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } }
 static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeValid) return; if (s->keycodeSolved) return; play_wav(sounds[39],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
     if (k>=0&&k<=9) KeycodeSetDigit(k);
@@ -418,7 +429,7 @@ static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeV
 }
 
 void UI_KeycodeKey(bool rh,int k) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (k<0||k>11) return; KeycodeKeypress(k); }
-void UI_KeycodeClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadKeycode=U16_MAX; World.Sys_UI.keycodeValid=false; World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes=-1; World.Sys_UI.keycodeEntry=-1; World.Sys_UI.keycodeValue=0; World.Sys_UI.keycodeSolved=false; SysUIDataClose(rh); }
+void UI_KeycodeClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadKeycode=U16_MAX; World.Sys_UI.keycodeValid=false; World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes=-1; World.Sys_UI.keycodeEntry=-1; World.Sys_UI.keycodeValue=0; World.Sys_UI.keycodeSolved=false; SysUIDataClose(); }
 void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (btn<0||btn>7) return;
     if (World.Sys_UI.linkedElevatorDoor==U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); return; }/*Too far away from that.*/
     Entity* door=&World.instances[World.Sys_UI.linkedElevatorDoor]; bool doorClosed=door->doorOpen==DoorState_Closed;
@@ -432,7 +443,7 @@ void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=tru
     queuedLevelToLoad=destLevel;
 }
 
-void UI_ElevClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadElevator=U16_MAX; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.elevCurrentFloor=0; SysUIDataClose(rh); }
+void UI_ElevClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadElevator=U16_MAX; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.elevCurrentFloor=0; SysUIDataClose(); }
 void UI_AudioLogClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastLogSideRH=rh; if (!(World.invP1.hasHardware&HW_ERD)) return;
     if (World.Sys_UI.logActive) { World.Sys_UI.logActive=false; World.Sys_UI.audPaused=true; CenterStatusPrint("%s",Sys_Text.stringTable[1019]); return; }/*Log playback stopped.*/
     if (World.Sys_UI.logReferenceIndex<(u16)LOGCNT && World.invP1.hasLog[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex][0]) { PlayLog((int)World.Sys_UI.logReferenceIndex); World.Sys_UI.logActive=true; }
@@ -477,7 +488,7 @@ static void PGCheckCellForPower(int i) { SystemUI* s=&World.Sys_UI; int a=PGOrth
     if (a!=-1 && s->pg_powered[a]) ++pc; if (b!=-1 && s->pg_powered[b]) ++pc; if (l!=-1 && s->pg_powered[l]) ++pc; if (r!=-1 && s->pg_powered[r]) ++pc;
     if (s->pg_type[i]==PuzzleCellType_And) { if (pc>1) s->pg_powered[i]=true; }
     else if (s->pg_type[i]==PuzzleCellType_Standard || s->pg_type[i]==PuzzleCellType_Bypass) { if ((s->pg_cell[i] || s->pg_type[i]==PuzzleCellType_Bypass) && pc>0) s->pg_powered[i]=true; } }
-static void PGEvalPuzzle(void) {
+void PGEvalPuzzle(void) {
     SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height; if (w<=0||h<=0) return; int n=w*h; if (n>35) n=35;
     for (int i=0;i<n;++i) { s->pg_powered[i]=false; s->pg_checked[i]=false; if (s->pg_type[i]==PuzzleCellType_And) s->pg_cell[i]=true; }/*And gates are always conducting, whatever the player has clicked*/
     int src=(int)s->pg_source; if (src<0||src>=n) return;
@@ -502,6 +513,8 @@ void UI_PuzzleGridCell(bool rh,int cell) { World.Sys_UI.mouseClickHeldOverGUI=tr
     {   /*PuzzleGrid.OnGridCellClick ends with puzzleGP.SendDataBackToPanel(this), copying the live board back onto
           the component; PuzzleSolved sets puzzleGP.puzzleSolved and UseTargets latches onlyFireOnce into fired.*/
         u16 pgi=World.Sys_UI.tetheredPGP; if (pgi>=INSTS_1ST_IDX && pgi<World.instCount) { Entity* pe=&World.instances[pgi];
+            /*The Entity is the durable store (levelInstances[lev] inside GlobalContext, so it survives level
+              changes and save/load), so a click writes straight back to it and no second cache is involved.*/
             mcpy(pe->gridCells,World.Sys_UI.pg_cell,sizeof(pe->gridCells)); pe->puzzleSolved=World.Sys_UI.pg_solved; if (World.Sys_UI.pg_fired) pe->puzzleFired=true; } }
     if (World.Sys_UI.pg_solved) {
         /*PuzzleGridPuzzle.UseTargets: onlyFireOnce (1 on all five grid prefabs, 609..613) latches `fired` and refuses to
@@ -510,11 +523,17 @@ void UI_PuzzleGridCell(bool rh,int cell) { World.Sys_UI.mouseClickHeldOverGUI=tr
           driven repeatedly.*/
         if (World.Sys_UI.pg_fired) { CenterStatusPrint("%s",Sys_Text.stringTable[312]); return; }
         World.Sys_UI.pg_fired = true;
+        play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0,0,0},false);/*code accepted / puzzle solved sound*/
         u16 pg=World.Sys_UI.tetheredPGP; if (pg>=INSTS_1ST_IDX && pg<World.instCount) { UseTargets(pg,World.instances[pg].targetIdx); if (World.instances[pg].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pg].messageLingdex]); } }
 }
 void UI_PuzzleGridSlide(bool rh,float f) { (void)rh; (void)f; /*Unity's puzzle progress handle is a server-authoritative display; the fill is driven by puzzle state, not the drag.*/ }
-void UI_PuzzleGridClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPGP=U16_MAX; World.Sys_UI.pg_solved=false; World.Sys_UI.pg_width=World.Sys_UI.pg_height=0; SysUIDataClose(rh); }
-/*---- Wire puzzle (Unity PuzzleWire.cs). curL/curR hold the wire id occupying each column on that side; selectedWire is the chosen column (0..6) of the held wire, selectedWireRH is the side it was grabbed from. Clicking the same side re-grabs the wire there, clicking the other side swaps that column in. Genius patch (wirePuzzle.geniusActive): while active, hint markers are shown at each active wire's target columns in the wire's true color (pw_wireColor); on hard difficulty this reveals the per-wire colors instead of all-Yellow (Unity sets wireColors to rememberColors).--*/
+/*Unity MFDManager.ClosePuzzleGrid does not care which hand's close button was hit: it resets puzzleGridLH *and*
+  puzzleGridRH and then calls RevertDataTabState, which TabReset/ReturnToLastTab's each side.  With the data view now
+  shared there is only one view to clear, and MFD_CloseData puts both hands' tabs back, so the duplicate grid on the
+  other MFD goes away with it.  The puzzle is not pinned to the side it was raised on, because the player can bring the
+  other hand's data tab up on the same puzzle while it is open, and either close button has to leave both screens clean.*/
+void UI_PuzzleGridClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPGP=U16_MAX; World.Sys_UI.pg_solved=false; World.Sys_UI.pg_width=World.Sys_UI.pg_height=0; SysUIDataClose(); }
+/*---- Wire puzzle (Unity PuzzleWire.cs). curL/curR hold the wire id occupying each node column (0-6 left end, 7-13 right end); selectedWire is the chosen column of the held wire and selectedWireRH is which END is held, not which MFD hand -- the board is one shared state rendered on both MFDs. Clicking the end you are already holding is a MOVE, not a re-grab; clicking the other end swaps that column in. Genius patch (wirePuzzle.geniusActive): while active, hint markers are shown at each active wire's target columns in the wire's true color (pw_wireColor); on hard difficulty this reveals the per-wire colors instead of all-Yellow (Unity sets wireColors to rememberColors).--*/
 static i8 PWFindCol(const i8* arr,int wire) { for (i8 c=0;c<7;++c) if ((int)arr[c]==wire) return c; return -1; }
 static void PWClickEnd(int spot,bool colRH) { if (spot<0||spot>6) return; i8* col=colRH?World.Sys_UI.pw_curR:World.Sys_UI.pw_curL;
     /*PuzzleWire.ClickLHNode is "if (selectedWireLH) { selectedWire < 0 ? SelectWireLH : MoveEndpointLeft } else SelectWireLH",
@@ -544,13 +563,13 @@ void UI_WireNodeClick(bool rh,int node) { World.Sys_UI.mouseClickHeldOverGUI=tru
     if (World.Sys_UI.pw_solved) { u16 pw=World.Sys_UI.tetheredPWP; if (pw>=INSTS_1ST_IDX && pw<World.instCount) { UseTargets(pw,World.instances[pw].targetIdx); if (World.instances[pw].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pw].messageLingdex]); } }
 }
 void UI_WireSlide(bool rh,float f) { (void)rh; (void)f; /*Unity's wire level handle is a server-authoritative display, dragging is not a real action.*/ }
-void UI_WireClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPWP=U16_MAX; World.Sys_UI.pw_solved=false; World.Sys_UI.pw_selectedWire=-1; SysUIDataClose(rh); }
-void UI_SysAnalyzerClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; MFD_CloseDataSide(rh); }
+void UI_WireClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPWP=U16_MAX; World.Sys_UI.pw_solved=false; World.Sys_UI.pw_selectedWire=-1; SysUIDataClose(); }
+void UI_SysAnalyzerClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; MFD_CloseData(); }
 /*---- Minigames (Unity MFDManager OpenMinigames/MinigameStart_*) ----*/
 void UI_MinigameStart(bool rh,int game) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastMinigameSideRH=rh; if (game<0||game>8) return; if (!World.invP1.hasMinigame) return; World.Sys_UI.mg_current=(i8)game; World.Sys_UI.mg_running[rh?1:0]=true; CenterStatusPrint("%s %s",Sys_Text.stringTable[1021],mgName[game]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_MinigameInput(bool rh,int x,int y) { (void)rh;(void)x;(void)y; /*The Funpack gameplay engines are not ported yet; a click inside the running view would land here and is only consumed.*/ World.Sys_UI.mouseClickHeldOverGUI=true; }
 void UI_MinigameBack(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_current<0) return; World.Sys_UI.mg_current=-1; World.Sys_UI.mg_running[rh?1:0]=false; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-void UI_MinigameClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_running[rh?1:0]) World.Sys_UI.mg_running[rh?1:0]=false; World.Sys_UI.mg_current=-1; MFD_CloseDataSide(rh); }
+void UI_MinigameClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_running[rh?1:0]) World.Sys_UI.mg_running[rh?1:0]=false; World.Sys_UI.mg_current=-1; MFD_CloseData(); }
 /*---- E-reader log/email/data navigation (Unity MFDManager + ReaderView) ----*/
 #define LOG_IMG_BASE 1272/*logImages[] -> Textures/UI/logimages. Manifest order matches Unity's logImages sprite array, so index n == texture LOG_IMG_BASE+n.*/
 /*Unity LogTextOutput is a UI Text with default HorizontalOverflow=Wrap; Voxen's RenderTextL only honors an explicit \n, so the raw speech-to-text used to render as one clipped line. Page by wrapped lines instead of Unity's flat 568-char strip, which is sized for Unity's 1284x420 field and would not fit the center MFD.*/
@@ -788,7 +807,7 @@ void RenderSearchFX(void) {
         if (!World.Sys_UI.searchFXActive[side]) continue;
         double elapsed = World.pauseRelativeTime - World.Sys_UI.searchFXStartTime[side];
         if (elapsed >= 1.0) { World.Sys_UI.searchFXActive[side] = false; continue; }
-        if (Cheats.noHUD || (side?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab)!=4 || (side?World.Sys_UI.MFD_DataR:World.Sys_UI.MFD_DataL)!=5 || World.Sys_UI.tetheredSearchable==U16_MAX) continue;
+        if (Cheats.noHUD || (side?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab)!=4 || World.Sys_UI.MFD_Data!=5 || World.Sys_UI.tetheredSearchable==U16_MAX) continue;
         float t = (float)elapsed / 1.0f; if (t > 1.0f) t = 1.0f;
         float p = t < 0.4f ? t / 0.4f : 1.0f;/*scale up first 0.4s, hold*/
         float ep = 1.0f - (1.0f - p) * (1.0f - p) * (1.0f - p);/*ease-out cubic*/
@@ -949,7 +968,7 @@ void SideMFD(bool isRH) { // 320x240
         } else if (tab == 3) { u8 aside=isRH?1:0; if (World.Sys_UI.autoSide[aside]) AutomapSideBlitToUI(isRH); else AutomapBlitToUI(); i16 cx=(i16)(AMAP_UI_X_L+(isRH?(AMAP_UI_X_R-AMAP_UI_X_L):0)+AMAP_UI_W/2),fy=691; UIRImg(MID(isRH,AUTOMAP_ZOOM_OUT),cx-40,fy,20,14,1087); RenderTextL(cx-40,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_OUT))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"-"); UIRImg(MID(isRH,AUTOMAP_ZOOM_IN),cx-65,fy,20,14,1087); RenderTextL(cx-65,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_IN))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"+"); UIRImg(MID(isRH,AUTOMAP_FULL),cx+55,fy,40,14,1087); RenderTextL(cx+55,fy,UIOver(MID(isRH,AUTOMAP_FULL))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[889]); UIRImg(MID(isRH,AUTOMAP_SIDE),cx+105,fy,40,14,1087); RenderTextL(cx+105,fy,UIOver(MID(isRH,AUTOMAP_SIDE))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[World.Sys_UI.autoSide[aside]?887:888]);}
         else if (tab==2 && !World.Sys_UI.mfdItemReader[isRH?1:0]) RenderGeneralItem(isRH);
         else if(tab==4){/*DataTab*/
-            u8 data = isRH ? World.Sys_UI.MFD_DataR : World.Sys_UI.MFD_DataL; i16 dx = isRH ? 1059 : 0, closeButtonX=291,closeButtonY=508,closeButtonTextX=300,closeButtonTextY=518;
+            u8 data = World.Sys_UI.MFD_Data; i16 dx = isRH ? 1059 : 0, closeButtonX=291,closeButtonY=508,closeButtonTextX=300,closeButtonTextY=518;
             if (data==8) {/*Blocked by SHODAN level security*/ UIRImg(UI_ID_NONE,31+dx,535,227,209,1110); UIRText(MID(isRH,BLOCKED_SECURITY_TEXT),45+dx,542,T_YELLOW,FONT_NORMAL,0.8f,0,890<1100?Sys_Text.stringTable[890]:"Blocked by SHODAN level Security."); }
             if (data==1) {/*Elevator*/
                 UIRImg(MID(isRH,ELEV_FLOOR_INDICATOR),132+dx,531,32,32,929);/*CurrentFloorIndicator*/
@@ -977,9 +996,45 @@ void SideMFD(bool isRH) { // 320x240
                 UIR(MID(isRH,AUDIOLOG_SUBJECT),29+dx,701,(i16)(MeasureLineAdvance(Sys_Text.stringTable[894],FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(29+dx,701,T_YELLOW,FONT_NORMAL,0.8,isRH?"":"%s\n\n%s",Sys_Text.stringTable[894],World.audiologSubjects[li]);
             }
             if (data==3) {/*GridPuzzle*/
-                RenderUIImage(42+dx,555,221,163,2139);/*OuterColorBorder gridcontainer_gray*/ RenderUIImage(46+dx,558,214,157,2138);/*ContainerEdge gridcontainer*/
-                UIRImg(MID(isRH,PUZZLE_NODE_SOURCE),25+dx,621,29,29,2141); UIRImg(MID(isRH,PUZZLE_NODE),250+dx,621,29,29,2140);
-                for (u8 c=0;c<35;++c) { i16 cx=(i16)(puzCellX[c%7]+dx),cy=puzCellY[c/7]; UIRImg(MID(isRH,PUZZLE_CELL_0)+c,cx,cy,29,29,2137);/*grid1_base*/ RenderTextL(cx,cy,T_GREEN_MENU_SHADOW,FONT_NORMAL,0.8,"?"); }
+                /* Unity GridPuzzlePanel puts the themed gridcontainer_* under the cells and the
+                   unthemed gridcontainer over it, so both layers follow pg_theme here. */
+                u16 outerTex=PG_TEX_CONTAINER_GRAY, innerTex=PG_TEX_CONTAINER_BASE;
+                switch(PGThemeOffset(World.Sys_UI.pg_theme)){
+                    case 1: outerTex=innerTex=PG_TEX_CONTAINER_GREEN; break;
+                    case 2: outerTex=innerTex=PG_TEX_CONTAINER_PURPLE; break;
+                    case 3: outerTex=innerTex=PG_TEX_CONTAINER_BLUE; break;
+                }
+                RenderUIImage(42+dx,555,221,163,outerTex);/*OuterColorBorder gridcontainer_gray*/ RenderUIImage(46+dx,558,214,157,innerTex);/*ContainerEdge gridcontainer*/
+                UIRImg(MID(isRH,PUZZLE_NODE_SOURCE),25+dx,621,29,29,2141); UIRImg(MID(isRH,PUZZLE_NODE),250+dx,621,29,29,World.Sys_UI.pg_solved?PG_TEX_NODE_ON:2140);
+                /* One sprite per cell, chosen exactly like Unity PuzzleGrid.UpdateCellImages():
+                   Standard off -> gridX*, Standard on unpowered -> gridPlus*, Standard on powered ->
+                   gridPlusOn0 (unthemed); And powered -> gridSpecialOn0*, And unpowered -> gridSpecial*;
+                   Bypass powered -> gridAlwaysOn1 (unthemed), Bypass unpowered -> gridAlwaysOn0*; Off -> gridNull. */
+                u16 toff=PGThemeOffset(World.Sys_UI.pg_theme);
+                for (u8 c=0;c<35;++c) {
+                    PuzzleCellType ct=World.Sys_UI.pg_type[c];
+                    /*Off cells are skipped entirely.  Unity's UpdateCellImages has no Off branch at all, so the cell
+                      keeps whatever its Image component already held and nothing is drawn, and OnGridCellClick only
+                      acts on Standard.  Voxen fell through to texture 0, which painted an opaque black square over the
+                      themed container.  UI_BeginFrame clears every component's active flag each frame, so not calling
+                      UIRImg here also leaves the cell correctly unclickable.*/
+                    if (ct==PuzzleCellType_Off) continue;
+                    i16 cx=(i16)(puzCellX[c%7]+dx),cy=puzCellY[c/7];
+                    u16 tex;
+                    bool cellOn=World.Sys_UI.pg_cell[c];
+                    bool powered=World.Sys_UI.pg_powered[c];
+                    if (ct==PuzzleCellType_Standard) {
+                        if (!cellOn) tex=(u16)(PG_TEX_X_GRAY+toff);
+                        else if (powered) tex=PG_TEX_PLUS_ON0;
+                        else tex=(u16)(PG_TEX_PLUS_GRAY+toff);
+                    } else if (ct==PuzzleCellType_And) {
+                        tex=powered ? (u16)(PG_TEX_SPECIAL_ON0_GRAY+toff) : (u16)(PG_TEX_SPECIAL_GRAY+toff);
+                    } else {/*PuzzleCellType_Bypass*/
+                        tex=powered ? PG_TEX_ALWAYSON1 : (u16)(PG_TEX_ALWAYSON0_GRAY+toff);
+                    }
+                    /*Register click area and render cell using the same texture*/
+                    UIRImg(MID(isRH,PUZZLE_CELL_0)+c,cx,cy,29,29,tex);
+                }
                 /*Genius hover preview: highlight cells that would be toggled by clicking the hovered cell (Unity PuzzleGrid OnGridCellHover).*/
                 if (World.geniusActive && !World.Sys_UI.pg_solved) {
                     int hoverCell=-1; for (u8 c=0;c<35;++c) if (UIOver(MID(isRH,PUZZLE_CELL_0)+c)) { hoverCell=(int)c; break; }

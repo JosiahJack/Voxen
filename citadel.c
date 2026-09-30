@@ -607,15 +607,20 @@ void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNorm
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(e->recentMostActivator==PLAYER1&&(World.invP1.patchActive & PATCH_BERSERK)!=0)};
     dd.damage = GetDamageTakeAmount(&dd);
     Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; } if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }/*Railgun sphere impact*/
-    /* Utils.GetMainHealthManager(hitGO) != null: the impact effect is pooled per projectile and only spawns for colliders carrying health. */
-    bool hasHealthManager=hitIdx==PLAYER1||IsDamageable(hit); if(hasHealthManager)SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);/*the decoy has no health, but cyber NPCs emptying magazines into it should still spark*/
+    /* Impact effect on every contact, ricochets included.  Unity gates the first spawn on
+       Utils.GetMainHealthManager(hitGO) != null and only plays the pooled effect unconditionally once
+       numHits >= hitCountBeforeRemoval, so against bare level geometry -- which carries no HealthManager -- a
+       plasma bolt (hitCountBeforeRemoval 5) ricocheted four times in silence and only sparked on the fifth and
+       final contact.  Deciding this per contact rather than per collider is what makes the bolt leave a fresh
+       plasmahit/maghit sprite at every wall and floor bounce.  Damage stays gated separately, below. */
+    SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);
     bool hostIsNPC=e->recentMostActivator<World.instCount&&IdxIsNPC(World.instances[e->recentMostActivator].index);
     if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {
         if (e->counter < e->countToTrigger) dd.damage *= 0.85f;/*per-hit falloff*/ dd.impactVelocity = dd.damage * 1.5f; if (e->counter > 0) dd.impactVelocity /= 3.0f; float dmgFinal = TakeDamage(hitIdx,dd); float tranq=-1.0f;
         if (dd.isOtherNPC) { if(!(hit->entflags & EF_ASLEEP)){World.Sys_Music.inCombat=true;} if(dd.attackType == Att_Trnq){float stunAmount=vclamp(3.0f+(World.invP1.stungunSetting/100.0f)*7.0f,3.0f,10.0f); tranq=Tranquilize(hitIdx,stunAmount,true);} } if (dmgFinal < 0.0f) {dmgFinal = 0.0f;} CreateTargetIDInstance(dmgFinal,hitIdx,tranq);
     }
     if (World.curLev != LEVEL_CYBERSPACE && !hostIsNPC) { ApplyImpactForceWithSound(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); }/*impact force+sound for any dynamic object (Unity: Utils.ApplyImpactForce + ObjectImpact)*/
-    if(e->countToTrigger<1)e->countToTrigger=1; if (e->counter >= e->countToTrigger) { if(!hasHealthManager)SpawnProjectileImpactParticles(e->index,hitPos,hitNormal); if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
+    if(e->countToTrigger<1)e->countToTrigger=1; if (e->counter >= e->countToTrigger) { if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
 }
 void ProjectileEffectImpactInitAfterLoad(u16 self) { if(self>=World.instCount)return;Entity* e=&World.instances[self]; e->counter=0;e->currentTargetIdx=0;e->lookUpIndex=(e->index==484||e->index==491)?5:0;if(e->countToTrigger<1){e->countToTrigger=e->index==485?5:(e->index==495?2:1);} }
  // None  Melee  MelEn  EnBm   Mag    Proj   Needle ProjEB ProjLn Gas    Tranq  Drill
@@ -887,9 +892,28 @@ void Targetted(u16 activator, u16 self) {
 
 extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
 INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy); extern u16 ioNameCount;
+// Unity reads the actions off the *activator* (TargetIO.Targetted consumes tempUD set by the activating relay), never off
+// the target, so a light needs only a targetname to be findable plus this consumer.  TARG_IOFLAGS_LIGHT_ON/OFF/TOGGLE were
+// parsed into entity ioflags but had no reader anywhere in the engine, so every lightOn/lightOff/lightToggle was inert.
+void TargetLight(u16 activator, u16 lightIdx) {
+    if (!World.lightTargetnames || lightIdx >= World.loadedLights) return;
+    u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
+    u32 a = aioflags & (TARG_IOFLAGS_LIGHT_ON|TARG_IOFLAGS_LIGHT_OFF|TARG_IOFLAGS_LIGHT_TOGGLE);
+    if (!a) return;
+    bool on = (World.lights[lightIdx].lflags & LIGHTON) != 0;
+    if      (a & TARG_IOFLAGS_LIGHT_ON)  on = true;
+    else if (a & TARG_IOFLAGS_LIGHT_OFF) on = false;
+    else                                 on = !on;
+    flag_set(&World.lights[lightIdx].lflags, LIGHTON, on);
+    /* LIGHTON alone is not enough: the renderer scales by intensity, and level data can leave that baked at
+       minIntensity (.01) from a stale save while maxIntensity still holds the authored value.  Toggling the bit
+       without moving intensity to the matching lerp endpoint leaves a light that is on and still invisible, which is
+       exactly what lev1wall1light did. */
+    World.lights[lightIdx].intensity = on ? World.lights[lightIdx].maxIntensity : World.lights[lightIdx].minIntensity;
+}
 void UseTargets(u16 activator, u16 targetIdx) {
     if(targetIdx==IO_NONE){return;} bool wasActive=World.targetIOActive,succeeded=false; u8 entryLevel=World.currentLevel; if(!wasActive){World.targetIOActive=true; World.targetIOEntryLevel=entryLevel; World.targetIOActivatorIdx=activator; World.targetIOActivatorEntity=World.instances[activator]; World.targetIOActivatorIoflagsHi=World.targetIOActivatorEntity.ioflagsHi; World.targetIOActivatorIoflags=World.instances[activator].ioflags;} const char* targetname=(targetIdx<ioNameCount) ? ioNames[targetIdx] : "";
-    for (u8 lev = 0; lev < World.numLevels; ++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } }
+    for (u8 lev = 0; lev < World.numLevels; ++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } if (World.lightTargetnames) { for (u16 l = 0; l < World.loadedLights; ++l) { if (World.lightTargetnames[l] != targetIdx) {continue;} TargetLight(activator,l); succeeded=true; } } }
     if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (!wasActive) {World.targetIOActive=false;}
 }
 // Frob/Use
@@ -937,61 +961,110 @@ static void WireLoadInstance(u16 self, const WirePuzzleDef* def) {
     for (u8 w=0;w<7;++w) { int l=(int)e->wireCurL[w], r=(int)e->wireCurR[w]; if (w<7 && l>=0 && l<7) World.Sys_UI.pw_curL[l]=(i8)w; if (w<7 && r>=0 && r<7) World.Sys_UI.pw_curR[r]=(i8)w; }/*All seven slots, not just the first three: 745 teal runs four wires and level5's teal instance saves currentPositionsRight[3..5], so a w<3 guard dropped its fourth wire and left that panel unsolvable.*/
     for (u8 w=0;w<7;++w) { World.Sys_UI.pw_tgtL[w]=def->tgtL[w]; World.Sys_UI.pw_tgtR[w]=def->tgtR[w]; World.Sys_UI.pw_wireOn[w]=def->wireOn[w]; World.Sys_UI.pw_rowActive[w]=def->rowsActive[w]!=0; World.Sys_UI.pw_wireColor[w]=def->wireColor[w];/*raw HUDColor, as PuzzleWire.wireColors holds it*/ }
 }
-/*---- Grid puzzle cell layouts (Unity PuzzleGridPuzzle.cellType / gridType) --------------------------------
-  PuzzleGridPuzzle.Save writes only puzzleSolved, grid[0..34], fired and locked.  cellType, gridType, width,
-  height, sourceIndex and outputIndex are scene-authoring overrides on the prefab instances in
-  Assets/Scenes/CitadelScene.unity and are absent from Data/level*.txt, so they cannot be parsed -- but the saved
-  grid[] bits *are* per instance and unique enough to identify which panel this is, so the table below is keyed by
-  the 35-bit saved board.  All 11 placed panels are covered; width/height/source/output are 7/5/14/20 on every one
-  of them, so only cellType and gridType need entries.
-  Note the layout is NOT a single shared board and NOT all-King: levRmedbeddoor and levRrobotspawncontrol are
-  Rook(4), lev4hiddenclosetforcedoor is Knight(3), and lev1wall1relay plus both lev7antennafield1 are Bishop(5).
-  Voxen was flipping every cell as a Pawn outside Easy and laying every cell down as Standard, which turned all
-  eleven into the same easy puzzle.
-  Ambiguity: lev5flightbay3iris (first placement) and lev5flightbay23bulkhead have byte-identical saved grid[], so
-  the two Voxen instances that share that board cannot be told apart; both get the iris cellType, so lev5flightbay23
-  bulkhead's cells 7 and 21 come up Bypass and Standard here instead of Bypass and And.  The other 33 cells and all
-  ten other panels are exact.  First match wins, so iris has to stay first in the table.*/
-typedef struct { const char* initGrid; u8 gridType; u8 cellType[35]; } GridPuzzleDef;
-/*gridType is King for every puzzle in Citadel.  It is a straight pass-through -- PuzzleGridPuzzle.gridType (serialized)
-  -> MFDManager.SendGridPuzzleToDataTab -> PuzzleGrid.SendGrid -> gridType, and its only use is picking which chess piece
-  is drawn on a Standard cell (PuzzleGrid.cs:117 click, :141 hover) -- and every value in the project is 0: all five
-  Resources/Prefabs/us_puz_panel_*_grid.prefab files plus both scene instances (CitadelScene.unity:877857, :1324931)
-  serialize gridType: 0, and no content code ever writes another.  Voxen's PuzzleGridType enum already matches Unity's
-  "King,Queen,Knight,Rook,Bishop,Pawn" ordinal order exactly, so the King rows below are correct as written.*/
+/*---- Grid puzzle per-instance data (Unity PuzzleGridPuzzle) --------------------------------------------
+  PuzzleGridPuzzle.Save writes only puzzleSolved, grid[0..34], fired and locked.  cellType, gridType, theme,
+  sourceIndex, outputIndex, securityThreshhold and target are scene-authoring overrides on the prefab instances in
+  Assets/Scenes/CitadelScene.unity and are absent from Data/level*.txt, so they have to be baked in here.
+
+  Keyed by the level-local position the level file itself carries (lP, which is what World.position[] holds), NOT by
+  the 35-bit saved board.  The board is mutable, so a board key breaks the moment a player flips a cell, and it is
+  also not unique: lev5flightbay3iris and lev5flightbay23bulkhead ship byte-identical grid[] yet differ on cellType 7
+  and 21 (Bypass+And vs Standard+Standard), so a board key silently gave bulkhead iris's layout.
+
+  Every value below is read out of the scene's PrefabInstance modifications for the PuzzleGridPuzzle component
+  (script guid 4cc3aebad1e319a47842939088a42748) of the five us_puz_panel_*_grid prefabs, merged over the prefab
+  defaults.  All 21 prefab instances in CitadelScene.unity were enumerated; 11 carry a real layout (width 7,
+  height 5, source 14, output 20) and are listed here, and the other 10 are the panel mesh reused on wire panels
+  with no grid data at all (width/height 0, no grid/cellType arrays).
+
+  gridType is PuzzleGridType {King,Queen,Knight,Rook,Bishop,Pawn} (Enumerations.cs:86) and is NOT uniformly King:
+  the two Bishop(4) panels are levRmedbeddoor and levRrobotspawncontrol, lev4hiddenclosetforcedoor is Rook(3), and
+  lev1wall1relay plus both lev7antennafield1 are Pawn(5).  It only picks which piece a Standard cell behaves like
+  (PuzzleGrid.cs:117 click, :141 hover) and is overridden to King outright on Easy difficulty (PuzzleGrid.cs:114).
+  theme is HUDColor, and PuzzleGrid.UpdateCellImages only branches on Gray/Green/Purple/Blue -- White, Red, Orange
+  and Yellow all fall through to the default gray sprites, so theme is recorded for completeness but does not change
+  the current art.  securityThreshhold is 90 on lev1xdoor1 and 100 everywhere else.  target is the TargetIO name and
+  is what fires the door/relay on solve; all nine distinct names appear as targetname somewhere in Data/level*.txt.*/
+typedef struct { V3 pos; u8 gridType, theme, security; const char* target; u8 cellType[35]; } GridPuzzleDef;
 static const GridPuzzleDef gridPuzzleDefs[] = {
-/* lev5flightbay3iris        */{"10000001000011111110010000110000000",0,{0,0,0,0,0,0,0,3,2,1,1,1,3,1,3,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0}},
-    /* levRmedbeddoor            */{"00000101110101001100111101010000010",0,{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,3,1,1,0,3,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
-    /* lev4hiddenclosetforcedoor */{"00010000010100110001000101000001000",0,{0,1,0,1,0,0,0,1,1,1,1,1,1,0,1,1,1,2,1,1,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0}},
-    /* lev2doorarmory            */{"10000000100000110011100100000000000",0,{0,0,0,0,0,0,0,0,1,2,1,1,0,0,3,1,1,1,1,3,3,0,1,1,1,1,0,0,0,0,0,0,0,0,0}},
-    /* lev5flightbay3iris (2nd)  */{"00000000000110111100100001100000000",0,{0,0,0,0,0,0,0,1,2,1,1,3,1,0,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0,0}},
-    /* levRrobotspawncontrol     */{"00000101110101000100011101010000111",0,{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,2,1,1,0,2,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
-    /* lev1wall1relay            */{"00100001010101101110110000000010111",0,{1,1,1,0,1,1,1,1,0,1,0,1,0,1,1,0,1,1,1,0,1,1,0,1,0,1,0,1,1,1,1,0,1,1,1}},
-    /* lev7antennafield1         */{"00000000000001000000000000000000000",0,{1,1,1,0,3,1,2,0,0,1,0,3,0,1,1,1,1,0,1,3,3,1,0,0,0,1,1,1,1,1,1,1,1,1,1}},
-    /* lev7antennafield1 (2nd)   */{"00000000000000110001100000000000000",0,{0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,1,1,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
-    /* lev5flightbay23bulkhead   */{"10000001000011111110010000110000000",0,{0,0,0,0,0,0,0,1,2,1,1,1,3,1,3,1,1,1,1,0,2,1,1,1,1,1,3,1,0,0,0,0,0,0,0}},
-    /* lev1xdoor1                */{"00000001000011111110110000110000000",0,{0,0,0,0,0,0,0,3,2,1,1,1,3,1,3,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0}},
+    /*0 R.ReactorLevel       teal   levRmedbeddoor*/{{-4.4910f,-54.6630f,30.3431f},4,2,100,"levRmedbeddoor",{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,3,1,1,0,3,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
+    /*1 1.MedicalLevel       blue   lev1wall1relay*/{{39.7100f,-44.4490f,32.5760f},5,0,100,"lev1wall1relay",{1,1,1,0,1,1,1,1,0,1,0,1,0,1,1,0,1,1,1,0,1,1,0,1,0,1,0,1,1,1,1,0,1,1,1}},
+    /*1 1.MedicalLevel       teal   lev1xdoor1*/{{6.0450f,-42.7601f,1.1690f},0,1,90,"lev1xdoor1",{0,0,0,0,0,0,0,3,2,1,1,1,3,1,3,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0}},
+    /*2 2.ScienceLevel       red    levRrobotspawncontrol*/{{-24.3560f,-28.0130f,34.6520f},4,2,100,"levRrobotspawncontrol",{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,2,1,1,0,2,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
+    /*2 2.ScienceLevel       red    lev2doorarmory*/{{39.6969f,-27.4656f,-7.7154f},0,1,100,"lev2doorarmory",{0,0,0,0,0,0,0,0,1,2,1,1,0,0,3,1,1,1,1,3,3,0,1,1,1,1,0,0,0,0,0,0,0,0,0}},
+    /*4 4.StorageLevel       brown  lev4hiddenclosetforcedoor*/{{-10.1910f,-9.5700f,24.9638f},3,3,100,"lev4hiddenclosetforcedoor",{0,1,0,1,0,0,0,1,1,1,1,1,1,0,1,1,1,2,1,1,1,1,1,1,1,1,1,0,0,1,0,1,0,0,0}},
+    /*5 5.FlightDeck         brown  lev5flightbay3iris*/{{-15.4832f,9.6899f,23.7354f},0,1,100,"lev5flightbay3iris",{0,0,0,0,0,0,0,3,2,1,1,1,3,1,3,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0}},
+    /*5 5.FlightDeck         brown  lev5flightbay3iris*/{{-14.0602f,12.2240f,22.9740f},0,1,100,"lev5flightbay3iris",{0,0,0,0,0,0,0,1,2,1,1,3,1,0,1,1,1,1,0,2,3,1,1,1,1,3,1,0,0,0,0,0,0,0,0}},
+    /*5 5.FlightDeck         brown  lev5flightbay23bulkhead*/{{-14.0472f,13.9730f,2.4340f},0,1,100,"lev5flightbay23bulkhead",{0,0,0,0,0,0,0,1,2,1,1,1,3,1,3,1,1,1,1,0,2,1,1,1,1,1,3,1,0,0,0,0,0,0,0}},
+    /*7 7.EngineeringLevel   brown  lev7antennafield1*/{{4.6211f,50.6000f,54.9166f},5,0,100,"lev7antennafield1",{0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,1,1,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
+    /*7 7.EngineeringLevel   gray   lev7antennafield1*/{{3.3831f,50.8220f,56.1656f},5,0,100,"lev7antennafield1",{1,1,1,0,3,1,2,0,0,1,0,3,0,1,1,1,1,0,1,3,3,1,0,0,0,1,1,1,1,1,1,1,1,1,1}},
 };
-static const GridPuzzleDef* GridPuzzleDefFor(const bool* cells) { char key[36]; for (u8 c=0;c<35;++c) key[c]=cells[c]?'1':'0'; key[35]=0;
-    for (u32 i=0;i<sizeof(gridPuzzleDefs)/sizeof(gridPuzzleDefs[0]);++i) if (sCompUpToLen(gridPuzzleDefs[i].initGrid,key,35)==0) return &gridPuzzleDefs[i];/*35 bytes of board, both keys are NUL-terminated at 35*/ return NULL; }
+/*Level-local lP is the level file's own precision, so match on a tolerance rather than exact equality.  0.05 is well
+  under the smallest gap between any two placed panels on the same level (level 5's two at y 23.74/22.97 are 0.77
+  apart, and the two lev7antennafield1 are 1.6 apart) while absorbing the decimal truncation in the level text.*/
+static const GridPuzzleDef* GridPuzzleDefFor(V3 pos) {
+    for (u32 i=0;i<sizeof(gridPuzzleDefs)/sizeof(gridPuzzleDefs[0]);++i) {
+        const GridPuzzleDef* d=&gridPuzzleDefs[i];
+        if (vabs(pos.x-d->pos.x)<0.05f && vabs(pos.y-d->pos.y)<0.05f && vabs(pos.z-d->pos.z)<0.05f) return d;
+    }
+    return NULL;
+}
 static void GridLoadInstance(u16 self) {
     Entity* e=&World.instances[self];
-    const GridPuzzleDef* def=GridPuzzleDefFor(e->gridCells);
+    const GridPuzzleDef* def=GridPuzzleDefFor(World.position[self]);
     World.Sys_UI.pg_width=7; World.Sys_UI.pg_height=5; World.Sys_UI.pg_source=14; World.Sys_UI.pg_output=20;
-    if (def) { World.Sys_UI.pg_gridType=(PuzzleGridType)def->gridType; mcpy(World.Sys_UI.pg_type,def->cellType,sizeof(def->cellType)); }
-    else { World.Sys_UI.pg_gridType=PuzzleGridType_King; mset(World.Sys_UI.pg_type,PuzzleCellType_Standard,sizeof(World.Sys_UI.pg_type)); }
-    mcpy(World.Sys_UI.pg_cell,e->gridCells,sizeof(e->gridCells));/*Unity passes the component's own grid[] straight into SendGrid; PGEvalPuzzle forces the And cells true on the first pass, which is why the table only carries cellType.*/
-    World.Sys_UI.pg_solved=e->puzzleSolved; World.Sys_UI.pg_fired=e->puzzleFired;/*both are per-component in Unity, so they come off the entity rather than being reset on open*/ }
+    /*Intern the scene-authored target so UseTargets has something to fire.  The level line carries only grid/solved/
+      fired, so e->targetIdx is IO_NONE until now; all nine distinct names appear as targetname somewhere in the level
+      data, so the interned index matches the entity that actually listens for it.  levRrobotspawncontrol's own level
+      line already carries target:levRrobotspawncontrol, and IOInternName returns that same index, so this is a no-op
+      there rather than a second, different name.*/
+    if (def) { if (def->target) e->targetIdx=IOInternName(def->target);
+               /*securityThreshhold is a scene override too and is absent from every one of the 11 level lines, so the
+                 entity reads 0 and PuzzlePanelUse's UsableOrDef would fall back to 100.  lev1xdoor1 is authored 90.
+                 Safe to re-assert: no record in the level data writes a panel's securityThreshhold at runtime.*/
+               e->securityThreshold=def->security; }
+    /*NOT re-asserting def->locked here.  PuzzleGridPuzzle.locked is a save field that TargetIO's unlock record
+      mutates at runtime (entity.c maps unlockPuzzlePad to TARG_IOFLAGS_UNLOCK, and EntityTargetted clears EF_LOCKED),
+      and both locked panels are unlocked that way: level 7's gray lev7antennafield1 by func_logic_relay 699 at
+      line 8009 (unlockPuzzlePad:1) and level 2's levRrobotspawncontrol by the keypad at line 6101.  Re-asserting the
+      scene value on every open would re-lock the panel the moment the player walked back to it after a relay fired.
+      The 2 panels whose level lines carry locked:1 are already seeded correctly by the loader, and the 9 that do not
+      are all authored locked:0, so the scene value never has to be written back at all.*/
+    /*Always load from this panel's own Entity.  There used to be an InventorySystem pg_*Cache consulted first, but it
+      is a single global slot keyed only on 7x5 plus gridType, and gridType is shared by 10 of the 11 panels (5 King,
+      2 Bishop, 3 Pawn).  Solving one King panel and walking to another therefore restored the first panel's cells, and
+      worse, its cellType[] with them.  e->gridCells lives in levelInstances[lev] inside GlobalContext, so it already
+      survives level transitions and save/load on its own; UI_PuzzleGridCell writes it back on every click.  The cache
+      had no durability the Entity did not already have and only added a cross-panel contamination path.*/
+    if (def) {
+        World.Sys_UI.pg_gridType=(PuzzleGridType)def->gridType; World.Sys_UI.pg_theme=def->theme; mcpy(World.Sys_UI.pg_type,def->cellType,sizeof(def->cellType));
+    } else {
+        World.Sys_UI.pg_gridType=PuzzleGridType_King; World.Sys_UI.pg_theme=HUDColor_Gray; mset(World.Sys_UI.pg_type,PuzzleCellType_Standard,sizeof(World.Sys_UI.pg_type));
+    }
+    mcpy(World.Sys_UI.pg_cell,e->gridCells,sizeof(e->gridCells));
+    World.Sys_UI.pg_solved=e->puzzleSolved; World.Sys_UI.pg_fired=e->puzzleFired;
+    { PGEvalPuzzle(); }
+}
 static void PuzzlePanelUse(u16 i) {
     Entity* e=&World.instances[i];
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return;}
     if(e->entflags&EF_LOCKED){CenterStatusPrint("%s",Sys_Text.stringTable[302]);return;}
     World.Sys_UI.objectInUsePos=World.position[i]; World.Sys_UI.usingObject=true; ForceInventoryMode();
     if(IsPuzzleGridPanel(e->index)){
+        if(!e->panelOpen){
+            e->panelOpen=true;
+            ChangeAnim(e,A_OPENING);
+            play_wav(sounds[91],AppliedFXVol(1.0f),World.position[i],true);
+        }
         bool initialize=World.Sys_UI.tetheredPGP!=i||World.Sys_UI.pg_width==0||World.Sys_UI.pg_height==0;
         World.Sys_UI.tetheredPGP=i;
-        if(initialize){GridLoadInstance(i);}
-        MFD_OpenData(false,3);
+        if(initialize){
+            GridLoadInstance(i);
+        }
+        /*Unity's MFDManager.SendGridPuzzleToDataTab raises the grid on whichever side the player last used the data
+          tab on, same as BlockedBySecurity above; it was hardcoded to the left hand MFD here, so a player who had
+          been reading their inventory on the right got the puzzle thrown onto the other screen.*/
+        MFD_OpenData(World.Sys_UI.lastDataSideRH,3);
     }else{
         const WirePuzzleDef* def=WirePuzzleDefFor(e->index);
         World.Sys_UI.tetheredPWP=i; World.Sys_UI.pw_selectedWire=-1; World.Sys_UI.pw_solved=false;
@@ -1000,7 +1073,7 @@ static void PuzzlePanelUse(u16 i) {
         /*Unity sends rememberColors on every SendWirePuzzleData; on hard the display colors collapse to all-Yellow
           until Genius reveals them, which is why the colors are stored true here and the display rule is applied at
           the draw site in ui.c rather than baked into pw_wireColor.*/
-        MFD_OpenData(false,4);
+        MFD_OpenData(World.Sys_UI.lastDataSideRH,4);
     }
     CenterStatusPrint("%s",Sys_Text.stringTable[190]);
 }
@@ -1076,6 +1149,11 @@ static void RelayPanelUse(u16 self) {
 /*Cover animation finishing into the open pose, and the armed 15s fuse: Unity's DelayedSpawn on the panel's
   ExplosionTimer activates the Explosion child (ExplosionLife/GrenadeActivate + light + sound) and basedestroyed
   after the delay. Voxen plays the explosion in place and removes the panel itself (DeleteInstance, not a despawn).*/
+static void PuzzlePanelUpdate(u16 self) {
+    Entity* e=&World.instances[self];
+    if (e->clip==A_IDLE_CLOSED && e->panelOpen) ChangeAnim(e,A_IDLE_OPEN);
+    if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=DoorGetClip(e,A_OPENING); if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
+}
 static void RelayPanelUpdate(u16 self) {
     Entity* e=&World.instances[self];
     /*Panels that load already open/installed (the level data carries their state) start on the matching frame
@@ -1367,13 +1445,15 @@ void SecurityCameraRotateUpdate(u16 self) {
 void ModUpdate() {
     if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==CYBER_DECOY_CONST) CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ if(constdex==614) RelayPanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(constdex == 594){TriggerCounterUpdate(i);} if(constdex == 699){LogicRelayUpdate(i);} if(constdex == 702){SpawnManagerUpdate(i);} if(constdex == 477){SecurityCameraRotateUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
+        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==CYBER_DECOY_CONST) CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ if(constdex==614) RelayPanelUpdate(i); if(IsPuzzleGridPanel(constdex)) PuzzlePanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(constdex == 594){TriggerCounterUpdate(i);} if(constdex == 699){LogicRelayUpdate(i);} if(constdex == 702){SpawnManagerUpdate(i);} if(constdex == 477){SecurityCameraRotateUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);} if(IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
         if(constdex==552){CyberDataFragUpdate(i);} if(constdex==554){CyberExitUpdate(i);} if(constdex==555){CyberSwitchUpdate(i);} if((constdex>=448&&constdex<=451)||(constdex>=454&&constdex<=457)){CyberItemUpdate(i);}
     }
     if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) { World.invP1.painSoundFinished = World.pauseRelativeTime + (double)random_range(2.5f,4.0f); play_wav(sounds[140]/*player/playerpain1*/,AppliedFXVol(0.2f),(V3){0,0,0},false); }
     if (!Cheats.god && World.invP1.radBleedFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { World.invP1.radBleedFinished = World.pauseRelativeTime + 1.8; float take=World.instances[PLAYER1].radiation*0.2f; World.instances[PLAYER1].health-=take; World.painStaticAlpha = take > 15.0f ? 1.0f : take > 10.0f ? 0.8f : 0.3f; }
     if (World.invP1.radSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { double minT = World.instances[PLAYER1].radiation > 50.0f ? 0.5 : 1.0; World.invP1.radSoundFinished = World.pauseRelativeTime + minT + (double)random_range(0.0f,2.0f); play_wav(sounds[90]/*hud/radiation*/,AppliedFXVol(0.18f),(V3){0,0,0},false); }
+    /*Puzzle panel tether distance check: sever tether if player moves too far*/
+    if (World.Sys_UI.tetheredPGP != U16_MAX) { u16 pg=World.Sys_UI.tetheredPGP; if (pg<World.instCount && (World.instances[pg].entflags&EF_ACTIVE)) { float d2=V3_SqDist(World.position[PLAYER1],World.position[pg]); if (d2 > 64.0f) { UI_PuzzleGridClose(false); } } }
 }
 
 u16 GetCrosshairTexture() { switch(World.invP1.weaponIndex) { case 343:case 345:case 350:case 352:case 355:return 1121;/*red*/case 344:case 347:case 357:return 1253;/*blue*/case 348:case 349:return 1066;/*orange*/case 351:case 354:return 1122;/*yellow*/ case 353:case 358:return 1161;/*teal*/default:return 1260;/*green*/ } }

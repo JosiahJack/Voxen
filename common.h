@@ -216,14 +216,14 @@ typedef struct {
         i8 elevButtonLabelIdx[8];/*index into elevFloorLabels[], -1 = hidden (not drawn, not clickable)*/
         bool searchFXActive[2]; double searchFXStartTime[2]; float searchFXCursorX[2],searchFXCursorY[2];
         u8 vmailActive; AudioLogType logType; V3 objectInUsePos;
-        u8 MFD_LefTab,MFD_CenterTab,MFD_RightTab,MFD_DataL,MFD_DataR,MFD_MediaTab,MFD_ReaderView,mfdSelected[3],mfdReturnTab[3],mfdReturnView[3],mfdItemReader[2];
+        u8 MFD_LefTab,MFD_CenterTab,MFD_RightTab,MFD_Data,MFD_MediaTab,MFD_ReaderView,mfdSelected[3],mfdReturnTab[3],mfdReturnView[3],mfdItemReader[2];
         u8 mfdConsumable; i8 consumableClickRow; double consumableClickTime; bool mfdGeneralItem,mfdHardwareItem; i8 generalClickSlot; i16 generalClickItem; u16 generalClickCustom; double generalClickTime;
         i32 tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10]; double tWrnFinished[10];
         /*Keycode pad (Unity KeypadKeycode). keycodeHuns/Tens/Ones: -1 = empty, else that digit; keycodeEntry accumulates right-to-left. keycodeValid/keycodeSolved/keycodeValue mirror the linked pad (tetheredKeypadKeycode).*/
         i8 keycodeHuns,keycodeTens,keycodeOnes; i32 keycodeEntry,keycodeValue; bool keycodeValid,keycodeSolved;
         /*Grid puzzle (Unity PuzzleGrid). tetheredPGP links the source puzzle; pg_* mirror its cells so the panel can run standalone. pg_cell[] = electrical grid, pg_type[] per-cell kind.*/
-        u8 pg_type[35],pg_gridType,pg_source,pg_output,pg_width,pg_height; bool pg_cell[35],pg_powered[35],pg_checked[35],pg_solved; float pg_progress;
-        /*Wire puzzle (Unity PuzzleWire). pw_curL/R[7] = wire endpoints by column, pw_tgtL/R[7] = goal columns, pw_wireOn[7] = placed wires, pw_rowActive[7] = visible node rows, pw_wireColor[7] = true wire colors as raw HUDColor, the way PuzzleWire.wireColors stores them.  hudColorToText/hudColorToRGB below turn that into the glyph colour and the line tint.*/
+        u8 pg_type[35],pg_gridType,pg_theme,pg_source,pg_output,pg_width,pg_height; bool pg_cell[35],pg_powered[35],pg_checked[35],pg_solved; float pg_progress;
+        /*Wire puzzle (Unity PuzzleWire). pw_curL/R[7] = wire endpoints by column, pw_tgtL/R[7] = goal columns, pw_wireOn[7] = placed wires, pw_rowActive[7] = visible node rows, pw_wireColor[7] = true wire colors as raw HUDColor, the way PuzzleWire.wireColors stores them.  hudColorToText/hudColorToRGB below turn that into the glyph colour and the line tint.  pw_curL/R are the two ends of the board (node columns 0-6 and 7-13) and pw_selectedWireRH is which end is held -- the L/R here is PuzzleWire.selectedWireLH, NOT MFD handedness.  The board is one shared set of state drawn on both MFDs, so nothing below is indexed by hand.*/
         i8 pw_curL[7],pw_curR[7],pw_tgtL[7],pw_tgtR[7]; bool pw_wireOn[7],pw_rowActive[7]; u8 pw_wireColor[7]; i8 pw_selectedWire; bool pw_selectedWireRH,pw_solved; float pw_temp;
         /*Grid puzzle fire-once latch (PuzzleGridPuzzle.cs:26,96-102): onlyFireOnce and alreadyFiredMessageLingdex are prefab-constant across constIndex 609..613, so the latch lives in the puzzle state, not on the Entity.*/
         bool pg_fired;
@@ -277,7 +277,7 @@ typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB,
 typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; float trailBirth; u16 trailHead,trailChainLen; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
 typedef struct Emitter { bool active,looping,spawnedAny; V3 position; Quaternion orientation; float emitAccumulator,emitRate,age,duration; u16 aliveCount,maxAlive; u8 physicsMode,trail,shapeType; u16 trailTexture; float shapeRadius,shapeAngle,lifetimeMin,lifetimeMax,sizeMin,sizeMax,speedMin,speedMax,rotMin,rotMax,aVelMin,aVelMax,gravity,trailLifetime,trailWidthStart,trailWidthEnd; u32 trailColorStart,trailColorEnd;
                          u32 texBaseIdx,textureFrameCount; u8 blendMode,rotationMode,colorMode; u16 burstRemaining; float animSpeed,animWindow,softness,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; u32 colorRamp[64];
-                         bool useMesh; u16 meshInstance/*instance whose modelMatrices give the vertex transform*/,meshModelIdx/*that instance's model when the emitter was created; the fallback once the parent hides its own mesh, since Diego blanks modelIndex on teleport but the burst must keep spawning from the last visible frame*/; } Emitter;
+                         bool useMesh; u16 meshInstance/*instance whose modelMatrices give the vertex transform, for mesh-spawn emission only; unrelated to parenting*/,meshModelIdx/*that instance's model when the emitter was created; the fallback once the parent hides its own mesh, since Diego blanks modelIndex on teleport but the burst must keep spawning from the last visible frame*/; u16 parentIdx/*instance this emitter rides. U16_MAX (the default for every preset) means the emitter sits at a fixed world position forever. A valid index makes PSys_Update pull the emitter onto that instance's world position every frame and carry its live particles along with it, so the effect travels with its owner -- this is how every mesh-less proj_* rides its bolt. The emitter switches itself off as soon as the instance stops existing (cleared EF_ACTIVE) or the index goes out of range*/; } Emitter;
 typedef struct GpuPartInst { float x,y,z,size; u32 color,data0,data1,pad; } GpuPartInst;
 typedef struct TrlSegInst { float p0x,p0y,p0z,padA,p1x,p1y,p1z,padB; float c00x,c00y,c00z,c00w,c01x,c01y,c01z,c01w,c10x,c10y,c10z,c10w,c11x,c11y,c11z,c11w; u32 color0,color1,uvData; float deathTime; float trailWidthStart,trailWidthEnd; u32 chainIndex,trailOwner; } TrlSegInst;
 typedef struct { Particle particles[MAX_PARTICLES]; Emitter emitters[MAX_EMITTERS]; GpuPartInst gpuInstances[MAX_PARTICLES]; TrlSegInst trailSegments[MAX_TRAIL_SEGS]; PartSortEntry sortKeys[MAX_PARTICLES]; u32 aliveCount,trailCount,nextTrailOwner; } PSys; extern PSys psys;
@@ -338,6 +338,7 @@ typedef struct {
     bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT],levelColliding[MAX_LEVELS][INSTANCE_COUNT];
     Light levelLights[MAX_LEVELS][LIGHT_COUNT]; LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT]; LevelParticles levelParticles[MAX_LEVELS];
     Entity* instances; LevelParticles* particles; V3* position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize; ColliderType* col; Quaternion* rotation; u32* layer,targetIOActivatorIoflags,targetIOActivatorIoflagsHi; float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
+    u16 levelLightTargetnames[MAX_LEVELS][LIGHT_COUNT];/*targetname index per World light, parallel to levelLAnims.  Off Light itself, which is a packed 64-byte GL-transfer struct.*/ u16 *lightTargetnames;
     Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx,decoyInstance/*live prop_cyber_decoy (constIndex 553) instance, or U16_MAX.  Cached rather than re-found per call: the AI sight and acquisition paths query it every AI raycast tick and the instance table is too big to scan there.*/; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
     char playerName[27],audiologNames[LOGCNT][T_LOGSTR_MAX],audiologSubjects[LOGCNT][T_LOGSTR_MAX],audiologSenders[LOGCNT][T_LOGSTR_MAX],audioLogSpeech2Text[LOGCNT][T_LOGSTR_MAX];
 } GlobalContext; // Savable complete game state data
@@ -489,6 +490,56 @@ INLINE u16 GetImpactType(u16 instanceIdx){switch(World.instances[instanceIdx].bl
 INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601]); }
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
+void UI_PuzzleGridClose(bool rh);
+void PGEvalPuzzle(void);
+// Grid puzzle sprite indices.  Mirrors the sprite fields on Citadel Assets/Scripts/PuzzleGrid.cs:
+// gridPlus -> grid0_base, gridX -> grid1_base, gridPlusOn0 -> grid0_onFull0, etc.  Each family is
+// stored Gray, Green, Purple, Blue in file-name order, so a theme is a +0/+1/+2/+3 offset.  The
+// pre-2147 puzzle frames (geniusgrid_highlight, grid1_base, gridcontainer*, node_*, wire_*) keep
+// their original indices.  These live at 3331+ because 2147..2165 were already cursor/gas/automap.
+#define PG_TEX_PLUS_GRAY 3365 /* grid0_base */
+#define PG_TEX_PLUS_GREEN 3366
+#define PG_TEX_PLUS_PURPLE 3367
+#define PG_TEX_PLUS_BLUE 3368
+#define PG_TEX_X_GRAY 3369 /* grid1_base */
+#define PG_TEX_X_GREEN 3370
+#define PG_TEX_X_PURPLE 3371
+#define PG_TEX_X_BLUE 3372
+#define PG_TEX_PLUS_ON0 3373 /* grid0_onFull0: powered + */
+#define PG_TEX_PLUS_ON1 3374
+#define PG_TEX_X_ON0 3375
+#define PG_TEX_X_ON1 3376
+#define PG_TEX_SPECIAL_GRAY 3377 /* grid_special0 */
+#define PG_TEX_SPECIAL_GREEN 3378
+#define PG_TEX_SPECIAL_PURPLE 3379
+#define PG_TEX_SPECIAL_BLUE 3380
+#define PG_TEX_SPECIAL_ON0_GRAY 3381 /* grid_special1_0 */
+#define PG_TEX_SPECIAL_ON0_GREEN 3382
+#define PG_TEX_SPECIAL_ON0_PURPLE 3383
+#define PG_TEX_SPECIAL_ON0_BLUE 3384
+#define PG_TEX_SPECIAL_ON1_GRAY 3385 /* grid_special1_1 */
+#define PG_TEX_SPECIAL_ON1_GREEN 3386
+#define PG_TEX_SPECIAL_ON1_PURPLE 3387
+#define PG_TEX_SPECIAL_ON1_BLUE 3388
+#define PG_TEX_ALWAYSON0_GRAY 3389 /* grid_alwayson0 */
+#define PG_TEX_ALWAYSON0_GREEN 3390
+#define PG_TEX_ALWAYSON0_PURPLE 3391
+#define PG_TEX_ALWAYSON0_BLUE 3392
+#define PG_TEX_ALWAYSON1 3393 /* grid_alwayson1: unthemed */
+#define PG_TEX_CONTAINER_GRAY 2139 /* gridcontainer_gray */
+#define PG_TEX_CONTAINER_BASE 2138
+#define PG_TEX_CONTAINER_BLUE 3395
+#define PG_TEX_CONTAINER_GREEN 3396
+#define PG_TEX_CONTAINER_PURPLE 3397
+#define PG_TEX_NODE_ON 3398
+/* theme (HUDColor) -> per-family sprite offset */
+/*Puzzle grid only ships four themed sprite sets (the un-suffixed base plus _green/_purple/_blue), but HUDColor has
+  eight values, so the enum was scrambled when the extra colors were added.  The pairs are aliases: White==Gray,
+  Red==Green, Orange==Purple, Yellow==Blue.  Folding each pair onto one slot gives the sprite set to use, 0=gray
+  (White/Gray), 1=green (Red/Green), 2=purple (Orange/Purple), 3=blue (Yellow/Blue).  Previously only the real
+  Green/Purple/Blue were mapped and every White/Red/Orange/Yellow panel fell through to 0, so the ten puzzles
+  authored with theme 0..3 all rendered with the gray set regardless of what the scene asked for.*/
+INLINE u16 PGThemeOffset(HUDColor t){ return t==HUDColor_Red||t==HUDColor_Green ? 1u : t==HUDColor_Orange||t==HUDColor_Purple ? 2u : t==HUDColor_Yellow||t==HUDColor_Blue ? 3u : 0u; }
 // Audio inline helpers
 INLINE float SfxMaster(){return vclamp((float)Sys_Settings.VolumeMaster/100.f,0,1.f);} INLINE float SfxMsg(){return vclamp((float)Sys_Settings.VolumeMessage/100.f,0,1.f);}
 INLINE float SfxMusic(){ return vclamp((float)Sys_Settings.VolumeMusic /100.f,0,1.f);} INLINE float SfxVol(){return vclamp((float)Sys_Settings.VolumeEffects/100.f,0,1.f);}
@@ -521,7 +572,7 @@ typedef struct { const char* prefab; const char* gameObject; u64 sourceId; PSysD
 #define PSYS_npc_targetlaser 167
 #define PSYS_gasSmoke 168
 const PSysDef* PSysTypeGet(u16);
-u16 PSysAdd(const PSysDef*); u16 PSysAddEx(const PSysDef*,u16/*meshInstance, or U16_MAX for origin emission*/); void PSysAddLevelLoops(void),PSysClearLevel(u8);
+u16 PSysAdd(const PSysDef*); u16 PSysAddEx(const PSysDef*,u16/*meshInstance, or U16_MAX for origin emission*/); u16 PSysAddFollow(const PSysDef*,u16/*instance the emitter tracks every frame*/); void PSysAddLevelLoops(void),PSysClearLevel(u8);
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
 typedef void(*FGL_C)(u32), (*FGL_FL)(),   (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
 typedef void(*FGL_CS)(u32),(*FGL_RB)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32),  (*FGL_CTSI2D)(u32,i32,i32,i32,i32,i32,i32,i32);

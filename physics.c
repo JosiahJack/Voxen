@@ -125,7 +125,8 @@ INLINE Overlap CapBox(ShapeCapsule c,ShapeBox b){V3 ax=quat_rot_v3(b.rot,(V3){1,
 static const u32 CollisionMaskTable[32] = {
     [0]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_Corpse|L_PhysObjects|L_Trigger|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip|L_CorpseSearchable,/*L_Default*/ [1]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_PhysObjects|L_Trigger|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip,/*L_TransparentFX*/
     [9]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_PhysObjects|L_Trigger|L_Door|L_InterDebris|L_Player2|L_Clip,/*L_Geometry*/ [10]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_PhysObjects|L_Trigger|L_NPCTrigger|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_NPCClip|L_Clip,/*L_NPC*/
-    [11]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_Corpse|L_PhysObjects|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip|L_CorpseSearchable,/*L_PlayerBullets*/ [12]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PhysObjects|L_PlayerTriggerOnly|L_Trigger|L_Door|L_Player2|L_NPCBullet|L_Clip,/*L_Player*/
+    [11]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Corpse|L_PhysObjects|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip|L_CorpseSearchable,/*L_PlayerBullets*/
+    [12]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PhysObjects|L_PlayerTriggerOnly|L_Trigger|L_Door|L_Player2|L_NPCBullet|L_Clip,/*L_Player*/
     [13]=L_Default|L_Geometry|L_PhysObjects|L_Door|L_Clip,/*L_Corpse: world only.  A dead body rests on level geometry and nothing else -- no bullets from either side, no player, no NPCs.*/ [14]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_Corpse|L_PhysObjects|L_Door|L_InterDebris|L_NPCBullet|L_Clip,/*L_PhysObjects*/ [16]=L_Player|L_Player2,/*L_PlayerTriggerOnly*/
     [17]=L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_PhysObjects|L_Door|L_InterDebris|L_Clip,/*L_Trigger*/ [18]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_Corpse|L_PhysObjects|L_Trigger|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip,/*L_Door*/ 
     [19]=L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_PhysObjects|L_Trigger|L_Door|L_NPCBullet|L_Clip,/*L_InterDebris*/ [20]=L_Default|L_TransparentFX|L_Geometry|L_NPC|L_PlayerBullets|L_Player|L_PhysObjects|L_PlayerTriggerOnly|L_Trigger|L_Door|L_InterDebris|L_Player2|L_NPCBullet|L_Clip,/*L_Player2*/
@@ -134,13 +135,6 @@ static const u32 CollisionMaskTable[32] = {
 u32 GetCollisionMask(u32 layer) { u32 ctz = __builtin_ctz(layer | 1); u32 valid = (ctz < 32); return ((layer == L_NPCTrigger) | (layer == L_NPCClip)) ? L_NPC : (CollisionMaskTable[ctz * valid] * valid); }
 ShapeCapsule Entity_GetCap(u16 i) {
     float scaleMax = vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z)); float r = World.colliderSize[i].x * scaleMax; float hi = vmax(0.0f, (World.colliderSize[i].y * 0.5f * scaleMax) - r); V3 wc,axis;
-    /* An NPC's capsule is derived from the SAME branch whether it is alive (L_NPC) or dead (L_Corpse), so dying changes the
-       collider's layer and nothing else -- not its size, not its offset, not its type, not its axis.  The old test keyed off
-       World.layer alone, so the L_NPC -> L_Corpse flip on death silently switched to the prop branch below, which rotates the
-       collider offset by the body rotation and re-aims the capsule axis from colliderSize.z.  Combined with the death animation
-       spinning World.rotation, that made the corpse's collider tumble and swing its offset around every frame.  Keying off
-       IdxIsNPC instead means the layer can no longer reach this function.  Player is unchanged.  Props, debris and the corpse/gib
-       props keep the rotated prop branch; gibs (const 768..853) are not NPCs, so they are unaffected. */
     if (i==PLAYER1||World.layer[i]==L_NPC||IdxIsNPC(World.instances[i].index)){wc=V3_AplusB(World.position[i],World.colliderCenter[i]); axis=(V3){0,1.0f,0};/*Player+NPCs remain upright, alive or dead*/}else{wc=V3_AplusB(World.position[i],quat_rot_v3(World.rotation[i],World.colliderCenter[i])); axis=(World.colliderSize[i].z<0.5f) ? quat_rot_v3(World.rotation[i],(V3){1,0,0}) : (World.colliderSize[i].z<1.5f) ? quat_rot_v3(World.rotation[i],(V3){0,1,0}) : quat_rot_v3(World.rotation[i],(V3){0,0,1});} 
     return (ShapeCapsule){.tip=V3_AplusB(wc,V3_ScaleByF(axis,hi)),.base=V3_AsubB(wc,V3_ScaleByF(axis,hi)),.rad=r};
 }
@@ -460,7 +454,13 @@ void Physics(float dt) {
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
             u16 a=dynamicEntities[i]; if (IdxIsNPC(World.instances[a].index) && (World.instances[a].entflags & EF_ASLEEP)) { continue; } V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; } else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
-            float linDrag = vexp(-0.1f * dtsub); World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; float angDrag = vexp(-2.0f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag); SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
+            /* Unity proj_magpulse_shot / proj_plasmarifle_shot both declare m_Drag: 0, so a bolt has to keep its
+               launch speed for its whole flight.  This blanket 0.1/s XZ drag was bleeding it off within a couple of
+               metres, and because it leaves Y alone the result reads as the bolt sagging, i.e. as if gravity were
+               acting on it -- World.gravity for a proj_* is already 0.  NPC/projectile launch speeds are tuned
+               against the drag-free Unity values, so only these need the exemption. */
+            float linDrag = (World.instances[a].index >= 481 && World.instances[a].index <= 495) ? 1.0f : vexp(-0.1f * dtsub);
+            World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; float angDrag = vexp(-2.0f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag); SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
             if (World.col[a] != COLTYPE_CAP) {
                 if (unlikely(!V3_IsSane(World.angularVelocity[a]))) { World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f}; }
                 else {float avel = V3_Mag(World.angularVelocity[a]); if (avel > MAX_ANGULAR_SPEED) { World.angularVelocity[a] = V3_ScaleByF(World.angularVelocity[a],MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; } if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(World.angularVelocity[a],1.f / avel),avel * dtsub); World.rotation[a] = quat_normalize(quat_multiply(dq,World.rotation[a])); } }
@@ -478,7 +478,14 @@ void Physics(float dt) {
                 for (i32 dz = -radCells; dz <= radCells; ++dz) { // 2. Collisions
                     u32 cell = PosGetCellCoordsP(cx + dx,cz + dz);
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
-                        u16 b = cellLists[cell][k]; if (b == a || b >= World.instCount) continue; u8 colB = World.col[b]; ShapeBox boxB = colB==COLTYPE_BOX ? Entity_GetBox(b) : (ShapeBox){0}; ShapeCapsule capB = colB==COLTYPE_CAP ? Entity_GetCap(b) : (ShapeCapsule){0}; ShapeSphere sphB = colB==COLTYPE_SPH ? Entity_GetSph(b) : (ShapeSphere){0};
+                        u16 b = cellLists[cell][k]; if (b == a || b >= World.instCount) continue;
+    /* Player bullets fire from World.position[PLAYER1], so their 0.2 sphere starts inside the shooter's own capsule
+       and the push-out normal throws the bolt off its aim vector on the spawn frame.  A layer mask cannot fix this:
+       the bolt is a rigidbody, so it is iterated as `a` against the player as `b`, and because the pair is evaluated
+       in both directions the mask only has to fail once -- it did not.  This is the same exclusion noclip already
+       had, which is why the bug disappeared under noclip and came back without it. */
+    { bool aP=(a==PLAYER1), bP=(b==PLAYER1); u16 bj = aP ? b : a;
+      if (unlikely((aP||bP) && bj<World.instCount && World.layer[bj]==L_PlayerBullets)) continue; } u8 colB = World.col[b]; ShapeBox boxB = colB==COLTYPE_BOX ? Entity_GetBox(b) : (ShapeBox){0}; ShapeCapsule capB = colB==COLTYPE_CAP ? Entity_GetCap(b) : (ShapeCapsule){0}; ShapeSphere sphB = colB==COLTYPE_SPH ? Entity_GetSph(b) : (ShapeSphere){0};
                         if (unlikely(Cheats.noclip && b == PLAYER1)) continue; if (World.instances[b].index==703 || !(World.instances[b].entflags & EF_ACTIVE) || !(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue; /*EF_ACTIVE: the broadphase inserts every instance (physics.c:455) and DeleteInstance only clears this flag, so without it a deleted/gibbed/relayed-away body keeps colliding as an invisible solid.*/ if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !World.physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
                         V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue; Manifold mf = {0}; float matB[16]; const float *mxB = &world_from_mdl[b*16]; if (World.col[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
                         if      (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_CAP) { mf = OverlapToManifold(CapCap(capA,capB)); }

@@ -1,6 +1,7 @@
 // weapons.c - Weapon System
 #include "common.h"
 FootStepType GetFootstepTypeForPrefab(int pid); bool ChangeAmmoType();
+void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt);/*citadel.c: impact force only, no ObjectImpact sound*/
 void ApplyImpactForceWithSound(u16 target, float vel, V3 normal, V3 pt);/*citadel.c: impact force + velocity-modulated impact sound*/
 float delayBetweenShotsForWeapon[16]={1.0f,0.6f,0.5f,0.1f,0.8f,1.6f,0.65f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,1.1f,0.75f}; float delayBetweenShotsForWeapon2[16]={1.0f,4.5f,0.5f,0.15f,4.0f,1.6f,0.75f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,5.0f,0.75f};
 float dmgForWep[16]={75.0f,12.0f,15.0f,10.0f,18.0f,150.0f,15.0f,60.0f,45.0f,22.0f,50.0f,185.0f,6.0f,35.0f,6.0f,2.0f}; float dmgForWep2[16]={160.0f,70.0f,5.0f,22.0f,108.0f,0.0f,0.0f,85.0f,80.0f,33.0f,350.0f,0.0f,0.0f,35.0f,36.0f,15.0f};
@@ -138,12 +139,41 @@ static u16 ImpactParticleType(u16 prefab) {
         default: return U16_MAX;
     }
 }
+/* Unity impact prefabs are ParticleSystem hierarchies, and the whole hierarchy has to spawn: ef_particle_sparqhit is
+   Burst + CenterSpatter2 + BlueSparksSmall + CenterSpatter + Shockwave, where the Shockwave is the only emitter
+   carrying the size-over-time curve, and ef_particle_camerahit is Bits + CenterSpatter + DarkBurst + CenterSpatter2.
+   particleTypeDefs does group a prefab's systems contiguously, but the root comes first for some prefabs and last
+   for others, and child GameObject names repeat across prefabs, so each prefab's membership is listed explicitly. */
+static const struct { u16 prefab; u8 type; } impactEffectTypes[] = {
+    { 721, 13 },                                                    /* ef_particle_bloodspurtsmall */
+    { 722, 14 }, { 722, 15 },                                       /* bloodspurtsmallgreen: tiny + green */
+    { 723, 16 },                                                    /* bloodspurtsmallyellow */
+    { 724, 17 },                                                    /* bloodspurttiny */
+    { 725, 18 }, { 725, 19 }, { 725, 20 }, { 725, 21 }, { 725, 22 }, /* camerahit: Bits, CenterSpatter, DarkBurst, root, CenterSpatter2 */
+    { 726, 23 },                                                    /* darthit */
+    { 729, 35 }, { 729, 36 },                                       /* sparkssmall: root + centerburst */
+    { 730, 37 }, { 730, 38 },                                       /* sparkssmallblue: root + centerburst */
+    { 731, 39 }, { 731, 40 }, { 731, 41 }, { 731, 42 }, { 731, 43 }, /* sparqhit: root, CenterSpatter2, BlueSparksSmall, CenterSpatter, Shockwave */
+    { 739, 8 }, { 739, 9 }, { 739, 10 }, { 739, 11 }, { 739, 12 },   /* blasterhit: Shockwave, CenterSpatter, CenterSpatter2, BlueSparksSmall, root */
+    { 740, 24 }, { 740, 25 }, { 740, 26 }, { 740, 27 }, { 740, 28 }, /* ionhit: Shockwave, CenterSpatter, root, BlueSparksSmall, CenterSpatter2 */
+};
 static bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     u16 type=ImpactParticleType(prefab); const PSysDef* preset=PSysTypeGet(type); if (!preset) return false;
     /*The preset is used verbatim: lifetime, emission rate, size and colour all come out of particleTypeDefs for the
       emitter that the Unity prefab actually points at.  This used to force emitRate 60 and clamp any duration outside
       (0,2] down to 1.0s, which silently retimed every impact effect regardless of what the prefab asked for.*/
-    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def); return true;
+    /* wfx.hitOffset is never initialised, so it is 0 and the emitter used to land exactly on the hit point, buried
+       in the surface.  Pull it back along -normal (back toward the shooter) so the flash sits just clear of the wall. */
+    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def);
+    /* Every sibling in the prefab's hierarchy, each with its own preset.  All children sit at identity local
+       transforms, so they share the root's world placement.  Emitters whose burstCount was 0 emit nothing at
+       all, which is why only the root of each prefab used to be visible. */
+    for (u32 i = 0; i < sizeof(impactEffectTypes)/sizeof(*impactEffectTypes); ++i) {
+        if (impactEffectTypes[i].prefab != prefab || impactEffectTypes[i].type == type) continue;
+        const PSysDef* cd = PSysTypeGet(impactEffectTypes[i].type); if (!cd) continue;
+        PSysDef cdef = *cd; cdef.pos = def.pos; cdef.rotation = def.rotation; PSysAdd(&cdef);
+    }
+    return true;
 }
 /* Blood/sparks by the struck target's blood type (Const.a.GetImpactType). Shared with the NPC hitscan path. */
 void SpawnImpactEffectParticle(u16 prefab, V3 pos, V3 normal) {
@@ -153,29 +183,90 @@ void SpawnImpactEffectParticle(u16 prefab, V3 pos, V3 normal) {
    beam gradient and the particle chain supplies the geometry. */
 void SpawnBeamTrail(u16 presetType, V3 from, V3 to, Color c) {
     const PSysDef* preset=PSysTypeGet(presetType); if(!preset)return; V3 delta=V3_AsubB(to,from); float dist=V3_Mag(delta); if(dist<0.01f)return;
-    PSysDef def=*preset; def.pos=from; def.rotation=QuatFromToRotation((V3){0,1,0},V3_Normalize(delta));
-    def.speedMin=def.speedMax=vclamp(dist*6.0f,800.0f,4000.0f); def.trailColorStart=c; def.trailColorEnd=(Color){c.r,c.g,c.b,0.f};
-    def.rampColors[0]=c; for(int i=1;i<def.rampCount;++i)def.rampColors[i]=(Color){c.r,c.g,c.b,1.f-def.rampTimes[i]};
-    def.emitRate=1.0f; def.duration=0.02f; PSysAdd(&def);
+    /* The laser IS the trail; the particle is only a carrier that streaks from `from` to `to` so the trail has
+       geometry to hang off.  So it carries no texture and zero size: particle_vert.glsl culls any instance with
+       size<=0 (gl_Position=vec4(0,0,2,1)), leaving the trail segments as the only draw call. */
+    /* Tile the span with BEAM_SEGS emitters, each covering 1/BEAM_SEGS of the beam, all spawned on the same frame.
+       A single emitter with a large burstCount does NOT achieve this: every carrier is born at `from` with the
+       same velocity ramp, the same lifetime and no positional jitter, so the extra carriers trace the exact same
+       polyline over the exact same points and the beam still renders as one thin line.  Separate emitters are the
+       only way to get geometry distributed along the whole span at t=0. */
+    const int BEAM_SEGS=8;
+    /* Unity LaserDrawing.Awake() sets width 0.2 and lineLife 0.15.  The carrier's life is cut well below that so
+       each segment's trail is laid down within the first frame or two: the trail only gains a segment once a
+       carrier has moved 0.02 units, so a carrier that lives the full 0.15s draws its 1/8 of the beam gradually and
+       the beam reads as a row of separate stubs for most of that time.  The trail segments then outlive the carrier
+       by a wide margin, so the finished beam hangs in the air at full length. */
+    const float life=0.04f, trailLife=0.40f;
+    for (int seg=0; seg<BEAM_SEGS; ++seg) {
+        PSysDef def=*preset; float f0=(float)seg/(float)BEAM_SEGS;
+        V3 segFrom=V3_AplusB(from,V3_ScaleByF(delta,f0));
+        def.pos=segFrom; def.rotation=QuatFromToRotation((V3){0,1,0},V3_Normalize(delta));
+        for(int i=0;i<16;++i)def.textures[i]=MAX_TXRS;
+        def.sizeMin=def.sizeMax=0.0f; def.shapeType=3;/*axial, so the carrier flies down the beam and not in a cone around it*/
+        def.lifetimeMin=def.lifetimeMax=life; def.trailLifetime=trailLife;
+        def.trailWidthStart=def.trailWidthEnd=0.05f;/*a quarter of Unity's 0.2.  The cross-section puts the corners at
+            p +/- a*(width/2), so the rendered ribbon is exactly this many world units across -- no hidden factor.*/
+        /* Travel this segment and stop ON its far end.  A linear velocity ramp 1->0 integrates to half, so
+           2*segDist/life covers exactly segDist by the time the carrier dies.  The ramp also has to keep sampling
+           after the emitter's own duration expires (particles.c gates curve sampling on em->active). */
+        float segDist=dist/(float)BEAM_SEGS;
+        def.speedMin=def.speedMax=segDist*(2.0f/life);
+        def.velKeys[0]=1.0f; def.velKeys[1]=0.0f; def.velTimes[0]=0.0f; def.velTimes[1]=1.0f; def.velCount=2;
+        /* Same colour at both ends of the gradient: the beam is a constant-brightness line, and a fading tail made
+           the far half of it vanish before the near half did. */
+        def.trailColorStart=c; def.trailColorEnd=c;
+        def.rampColors[0]=c; for(int i=1;i<def.rampCount;++i)def.rampColors[i]=c;
+        /* burst, not rate: a rate of 1 over the old 0.02s window never reached an integral particle, so the beam
+           emitted nothing at all.  burstCount fires on the first update regardless of dt. */
+        def.emitRate=0.0f; def.burstCount=1; def.duration=life+0.05f; PSysAdd(&def);
+    }
 }
 void SpawnTargetingLaser(V3 from, V3 to) { SpawnBeamTrail(PSYS_npc_targetlaser,from,to,(Color){1.0f,0.15f,0.18f,1.0f}); }
 /* Projectile const index -> its own ProjectileEffectImpact.impactType pool, matched by the emitter's GameObject name in particles.c. */
+/* Unity ProjectileEffectImpact.impactType selects a PoolType, and each pool is its own multi-emitter hierarchy in
+   CitadelScene.unity.  This table used to return the projectile's OWN ribbon preset (dur 15s, rate 10) for magpulse,
+   plasma, railgun and stungun, so an impact spawned a fifteen-second emitter at the hit point -- the spritesheet
+   animation looked right and then the emitter sat there instead of removing itself.  The values below are the pool
+   contents, read from the scene: PoolType.MagpulseImpacts -> magpulse_impact{ magpulse_center, sparks_spits };
+   PlasmaImpacts -> plasmarifle_hit{ sparkssmall }; RailgunImpacts -> railgun_impacts{ centerumbra, sparkssmall,
+   shockwave, railshot_smoke }; StungunImpacts -> stungun_impacts{ sparkssmall }; SparksSmall -> sparkssmall. */
+static const struct { u16 proj; u8 type; } projectileImpactTypes[] = {
+    { 481, 177 },                                                   /* proj_enemshot2: impact_enemshot2 */
+    { 482, 169 }, { 482, 170 },                                     /* magpulse: magpulse_center, sparks_spits */
+    { 483, 171 }, { 483, 182 },                                     /* stungun: stungun_impacts, sparkssmall */
+    { 484, 172 }, { 484, 173 }, { 484, 174 }, { 484, 175 },         /* railgun: root, centerumbra, shockwave, smoke */
+    { 485, 176 }, { 485, 183 },                                     /* plasma: plasmarifle_hit, sparkssmall */
+    { 486, 181 }, { 486, 173 }, { 486, 182 }, { 486, 174 },         /* enemshot6: root, centerumbra, sparkssmall, shockwave */
+    { 487, 180 },                                                   /* enemshot5: the one AlphaBlend emitter in the game */
+    { 488, 178 }, { 488, 179 },                                     /* enemshot4: root, particle_spits */
+    { 489, 182 },                                                   /* proj_throwingstar: PoolType.SparksSmall */
+    { 490, 169 }, { 490, 170 },                                     /* magpulsenpc: same pool as 482 */
+    { 491, 172 }, { 491, 173 }, { 491, 174 }, { 491, 175 },         /* railnpc: same pool as 484 */
+    /* 492..495 use PoolType.CyberDissolve (particle_cyberdissolve{ dust_ones }); that emitter is not in the
+       particle table, so these still have no impact effect. */
+};
 static u16 ProjectileImpactParticleType(u16 projectile) {
-    switch (projectile) {
-        case 481: return 148; /* proj_enemshot2 */         case 482: case 490: return 154; /* proj_magpulse_shot, proj_magpulsenpc_shot */
-        case 483: return 159; /* proj_stungun_shot */     case 484: case 491: return 158; /* proj_rail_shot, proj_railnpc_shot */
-        case 485: return 156; /* proj_plasmarifle_shot */ case 486: return 153; /* proj_enemshot6 */
-        case 487: return 152; /* proj_enemshot5 */        case 488: return 150; /* proj_enemshot4 */
-        case 489: return 35;  /* proj_throwingstar uses PoolType.SparksSmall */
-        default: return U16_MAX;/* 492..495 use PoolType.CyberDissolve, whose emitter isn't in the particle table */
+    for (u32 i = 0; i < sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes); ++i) {
+        if (projectileImpactTypes[i].proj == projectile) return projectileImpactTypes[i].type;
     }
+    return U16_MAX;
 }
 void SpawnProjectileImpactParticles(u16 projectile,V3 pos,V3 normal) {
     /* Unity spawns the projectile's own pooled impact effect; blood/spark-by-bloodtype
        effects are hitscan-only (WeaponFire/AIController), so they aren't spawned here.  Preset used verbatim, same
        as SpawnImpactParticleForPrefab: no local lifetime or emission-rate override. */
     u16 type=ProjectileImpactParticleType(projectile); const PSysDef* preset=PSysTypeGet(type); if(!preset)return;
-    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def);
+    /* Same 0.08 pull-back as SpawnImpactParticleForPrefab: wfx.hitOffset is 0, which buried the burst in the wall. */
+    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def);
+    /* Every sibling in the impact pool's hierarchy, each with its own preset and its own short duration.  The
+       previous single-type lookup also picked the wrong preset: for magpulse, plasma, railgun and stungun it
+       returned the bolt's own 15-second ribbon, which is why the impact animation played but never went away. */
+    for (u32 i = 0; i < sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes); ++i) {
+        if (projectileImpactTypes[i].proj != projectile || projectileImpactTypes[i].type == type) continue;
+        const PSysDef* cd=PSysTypeGet(projectileImpactTypes[i].type); if (!cd) continue;
+        PSysDef cdef=*cd; cdef.pos=def.pos; cdef.rotation=def.rotation; PSysAdd(&cdef);
+    }
 }
 static bool DidRayHit(int wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRayPixels(World.instances[PLAYER1].forward,World.instances[PLAYER1].right,random_range(-d,d),random_range(-d,d));RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;return true;}return false;}
 /*Bullet-hole decal size.  Unity drives it from the prefab's Projector m_OrthographicSize; Voxen has no projector
@@ -206,12 +297,13 @@ static void CreateBeamImpactEffects(int wep16) {
 }
 
 static void CreateBeamEffects(int wep16) {
-    V3 start=wfx.reloadContainerPos; V3 delta=V3_AsubB(wfx.tempHit.point,start); float distance=V3_Mag(delta); if(distance<0.01f)return;
-    const PSysDef* preset=PSysTypeGet(38); if(!preset)return; PSysDef def=*preset;
+    /* Unity WeaponFire.CreateBeamEffects: LaserDrawing prefabs 405 (turquoise, sparq), 406 (red, blaster),
+       407 (yellow, ion), from the weapon transform + verticalOffset(-0.2) out to tempHit.point.  Voxen has no
+       world-space weapon object, and wfx.reloadContainerPos is the view-model dip offset rather than a world
+       position, so the player origin stands in for transform.position. */
     Color c=(wep16==1)?(Color){1.f,0.18f,0.12f,1.f}:(wep16==4)?(Color){1.f,0.9f,0.15f,1.f}:(Color){0.3f,1.f,1.f,1.f};
-    def.pos=start; def.rotation=QuatFromToRotation((V3){0,1,0},V3_Normalize(delta)); def.speedMin=def.speedMax=vclamp(distance*6.0f,800.0f,4000.0f);
-    def.lifetimeMin=0.2f; def.lifetimeMax=0.2f; def.trail=1; def.trailTexture=67; def.trailLifetime=0.45f; def.trailWidthStart=0.035f; def.trailWidthEnd=0.005f; def.trailColorStart=c;
-    def.trailColorEnd=(Color){c.r,c.g,c.b,0.f}; def.rampColors[0]=c; for(int i=1;i<def.rampCount;++i)def.rampColors[i]=(Color){c.r,c.g,c.b,1.f-def.rampTimes[i]}; def.emitRate=1.0f; def.duration=0.02f; def.shapeRadius=0.0f; def.shapeAngle=1.0f; PSysAdd(&def);
+    V3 start=World.position[PLAYER1]; start.y-=0.2f;
+    SpawnBeamTrail(PSYS_npc_laserbeam,start,wfx.tempHit.point,c);
 }
 
 static float DamageForPower(int w) { // Slope-of-slopes curve: interpolates damage/energy ratio across the energy setting, then scales by the interpolated energy drain itself. See design spreadsheet.
@@ -235,7 +327,7 @@ void HitScanFire(int wep16) {
     }
     if (dmgFinal < 0.0f) dmgFinal = 0.0f;
     CreateTargetIDInstance(dmgFinal,ent,tranq);/*Unity: after the health>0 block*/
-    if (b && (!dd.isOtherNPC || wep16==12)) { ApplyImpactForceWithSound(ent,(wep16==12 ? 10.0f : 1.0f)*dd.impactVelocity,dd.attacknormal,dd.hitpoint); }/*riotgun: 10x impact force; others as Unity*/
+    if (b && (!dd.isOtherNPC || wep16==12)) { float force=(wep16==12 ? 10.0f : 1.0f)*dd.impactVelocity; if (isBeam) ApplyImpactForce(ent,force,dd.attacknormal,dd.hitpoint); else ApplyImpactForceWithSound(ent,force,dd.attacknormal,dd.hitpoint); }/*riotgun: 10x impact force; others as Unity.  A beam takes force only: Unity's WeaponFire hitscan calls Utils.ApplyImpactForce and never ObjectImpact, so a beam's only noise is the weapon's own report, which wepFireSound already plays.*/
     if (isBeam){CreateBeamEffects(wep16);}
 }
 
@@ -291,13 +383,28 @@ void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u
 
 void FireRapier(int wep16) { FireMelee(wep16, true,  false, 246, 247, 246); } // wlaserrapier_hit/swing
 void FirePipe(int wep16)   { FireMelee(wep16, false, false, 253, 254, 252); } // wpipe_hit/swing/dmg
+static void AttachProjectileRibbon(u16 prefabID, u16 ball) {
+    static const struct { u16 prefab, root, child; } ribbons[] = {
+        { 482, 154, 155      },   /* proj_magpulse_shot:        bolt glow + sparks_spits */
+        { 490, 154, 155      },   /* proj_magpulsenpc_shot:     same pair */
+        { 485, 156, U16_MAX },   /* proj_plasmarifle_shot:    plasma core, no child emitter   */
+        { 483, 159, U16_MAX },   /* proj_stungun_shot:        same pairing, not yet audited   */
+    };
+    for (u32 i = 0; i < sizeof(ribbons)/sizeof(*ribbons); ++i) {
+        if (ribbons[i].prefab != prefabID) continue;
+        if (ribbons[i].root != U16_MAX) { const PSysDef* root=PSysTypeGet(ribbons[i].root); if (root) { PSysDef d=*root; d.pos=World.position[ball]; PSysAddFollow(&d,ball); } }
+        if (ribbons[i].child != U16_MAX) { const PSysDef* ch=PSysTypeGet(ribbons[i].child); if (ch) { PSysDef d=*ch; d.pos=World.position[ball]; PSysAddFollow(&d,ball); } }
+    }
+}
 void FireBeachball(int wep16, float shoveForce, u16 prefabID) { // Acts like a beachball for NPC collisions, but a baseball for walls/floor (prevents corner-catching); handled by the projectile's own collider setup.
     u16 ball = SpawnDynamicObject(prefabID,1); if (ball == 0xFFFF || ball >= World.instCount) return;
     Entity* proj = &World.instances[ball]; u16 wc = World.invP1.weaponCurrent; bool alt = World.invP1.wepLoadedWithAlternate[wc];
     World.layer[ball] = L_PlayerBullets; proj->forward = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
     proj->damage = alt ? dmgForWep2[wep16] : (CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16]); proj->strength = alt ? penetrationWep2[wep16] : penetrationWep[wep16]; proj->speed = alt ? offenseWep2[wep16] : offenseWep[wep16]; proj->attackType = attTypeWep[wep16]; proj->recentMostActivator = PLAYER1; ProjectileEffectImpactInitAfterLoad(ball);
-    World.position[ball] = World.position[PLAYER1]; World.velocity[ball] = (V3){0,0,0}; // clear any stale velocity before the impulse
+    V3 spawn = World.position[PLAYER1];
+    World.position[ball] = spawn; World.velocity[ball] = (V3){0,0,0}; // clear any stale velocity before the impulse
     AddForce(ball, V3_ScaleByF(proj->forward, shoveForce), true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
+    AttachProjectileRibbon(prefabID, ball);
 }
 void FireCyberBeachball(bool isPulser, float shoveForce, u16 prefabID) { // Same beachball/baseball split, but damage and attack type come from the held cyber software version
     u16 ball = SpawnDynamicObject(prefabID,1); if (ball == 0xFFFF || ball >= World.instCount) return;

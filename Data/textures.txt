@@ -1758,30 +1758,7 @@ index: 799
 index: 800
 #Textures/severedhead.png
 index: 801
-#Textures/sheet_corpsehit.png
-index: 802
-#Textures/sheet_cratehit.png
-index: 803
-#Textures/sheet_emphit.png
-index: 804
-#Textures/sheet_enemshot4.png
-index: 805
-#Textures/sheet_gasexplosion.png
-index: 806
-#Textures/sheet_magpulse.png
-index: 807
-#Textures/sheet_plasmahit.png
-index: 808
-#Textures/sheet_plasmashot.png
-index: 809
-#Textures/sheet_railhit.png
-index: 810
-#Textures/sheet_screendestroyed.png
-index: 811
-#Textures/sheet_stunhit.png
-index: 812
-#Textures/sheet_vaporize.png
-index: 813
+
 #Textures/skeleton.png
 index: 815
 #Textures/skull.png
@@ -4557,8 +4534,7 @@ index: 2134
 index: 2135
 #Textures/UI/puzzle/geniusgrid_highlight.png
 index: 2136
-#Textures/UI/puzzle/grid1_base.png
-index: 2137
+# grid1_base.png moved to 3335 with the rest of the themed gridX family (see the puzzle block below).
 #Textures/UI/puzzle/gridcontainer.png
 index: 2138
 #Textures/UI/puzzle/gridcontainer_gray.png
@@ -4577,6 +4553,80 @@ index: 2144
 index: 2145
 #Textures/UI/puzzle/wire_node.png
 index: 2146
+// Grid puzzle cell/frame sprites.  Placed in their own contiguous block past the end of the
+// pre-existing ranges instead of 2147..: 2147..2165 were already taken by cursor_normal_dn,
+// gasexplosion_0..4 and automap_side_* (see automap.c AMAP_SIDE_TEX_BASE and particles.c
+// gasExplosions).  LoadTextures keeps the LAST entry for a duplicated index (textures.c
+// parsIdx[index] = k), so sharing those indices silently resolved the puzzle sprites to the
+// automap/cursor images.  Sprite names below match the fields on Citadel PuzzleGrid.cs.
+#Textures/UI/puzzle/grid0_base.png
+index: 3365
+#Textures/UI/puzzle/grid0_base_green.png
+index: 3366
+#Textures/UI/puzzle/grid0_base_purple.png
+index: 3367
+#Textures/UI/puzzle/grid0_base_blue.png
+index: 3368
+#Textures/UI/puzzle/grid1_base.png
+index: 3369
+#Textures/UI/puzzle/grid1_base_green.png
+index: 3370
+#Textures/UI/puzzle/grid1_base_purple.png
+index: 3371
+#Textures/UI/puzzle/grid1_base_blue.png
+index: 3372
+#Textures/UI/puzzle/grid0_onFull0.png
+index: 3373
+#Textures/UI/puzzle/grid0_onFull1.png
+index: 3374
+#Textures/UI/puzzle/grid1_onFull0.png
+index: 3375
+#Textures/UI/puzzle/grid1_onFull1.png
+index: 3376
+#Textures/UI/puzzle/grid_special0.png
+index: 3377
+#Textures/UI/puzzle/grid_special0_green.png
+index: 3378
+#Textures/UI/puzzle/grid_special0_purple.png
+index: 3379
+#Textures/UI/puzzle/grid_special0_blue.png
+index: 3380
+#Textures/UI/puzzle/grid_special1_0.png
+index: 3381
+#Textures/UI/puzzle/grid_special1_0_green.png
+index: 3382
+#Textures/UI/puzzle/grid_special1_0_purple.png
+index: 3383
+#Textures/UI/puzzle/grid_special1_0_blue.png
+index: 3384
+#Textures/UI/puzzle/grid_special1_1.png
+index: 3385
+#Textures/UI/puzzle/grid_special1_1_green.png
+index: 3386
+#Textures/UI/puzzle/grid_special1_1_purple.png
+index: 3387
+#Textures/UI/puzzle/grid_special1_1_blue.png
+index: 3388
+#Textures/UI/puzzle/grid_alwayson0.png
+index: 3389
+#Textures/UI/puzzle/grid_alwayson0_green.png
+index: 3390
+#Textures/UI/puzzle/grid_alwayson0_purple.png
+index: 3391
+#Textures/UI/puzzle/grid_alwayson0_blue.png
+index: 3392
+#Textures/UI/puzzle/grid_alwayson1.png
+index: 3393
+#Textures/UI/puzzle/grid_null.png
+index: 3394
+#Textures/UI/puzzle/gridcontainer_blue.png
+index: 3395
+#Textures/UI/puzzle/gridcontainer_green.png
+index: 3396
+#Textures/UI/puzzle/gridcontainer_purple.png
+index: 3397
+#Textures/UI/puzzle/node_on.png
+index: 3398
 #Textures/UI/cursors/cursor_normal_dn.png
 index: 2147
 transparent: 1
@@ -6966,3 +7016,28 @@ doublesided: 0
 // Genius restore of the true per-wire colours needs no second texture.
 #Textures/UI/puzzle/wire.png
 index: 3328
+// ef_particle_sparqhit.prefab: CenterSpatter2 and CenterSpatter both use ef_sparqspatter
+// -> Textures/SparqSpatter.png.  Both emitters were shipped with an all-MAX_TXRS (blank)
+// texture list because this file was never registered, so the sparq impact had no spatter.
+#Textures/SparqSpatter.png
+index: 3329
+
+// proj_magpulse_shot.prefab's root emitter material (ef_magpulse_bullet.mat -> Textures/magshot01.png, a 64x64
+// full-resolution texture).  Registered for completeness, but the bolt preset draws the 20x19 slice sprite
+// Textures/Sprites/magshot/546_0133.png (index 2089) instead, which is the one the magpulse reads as a single frame.
+#Textures/magshot01.png
+index: 3330
+// magpulse_center, the root of the PoolType.MagpulseImpacts burst, is an animated 5-frame spritesheet in Unity --
+// ef_magpulse_sheet.mat points at Textures/sheet_magpulse.png with no TextureSheetAnimationModule, which is the
+// uncut sheet and reads as a smeared sprite.  These are the five individual frames in filename order, and the
+// preset lists them consecutively so textureFrameCount resolves to 5 and animWindow drives the cycle.
+#Textures/Sprites/maghit/546_1276.png
+index: 3331
+#Textures/Sprites/maghit/546_1277.png
+index: 3332
+#Textures/Sprites/maghit/546_1278.png
+index: 3333
+#Textures/Sprites/maghit/546_1279.png
+index: 3334
+#Textures/Sprites/maghit/546_1280.png
+index: 3335
