@@ -411,7 +411,7 @@ void AISetHuntFinished(u16 idx) { World.instances[idx].huntFinished = World.paus
 void AISetEnemy(u16 idx, u16 eidx) {
     if (!eidx) {return;} if (eidx == PLAYER1) { u16 d = CyberDecoyTarget(); if (d != U16_MAX && ai_is_cyber(&World.instances[idx])) eidx = d; }/*acquisition choke point: while a decoy is up, a cyber NPC that just spotted the player acquires the decoy instead (AIController.cs:1630,1708)*/
     World.instances[idx].enemy=eidx; World.instances[idx].posCheckFinished=World.pauseRelativeTime + AI_POS_CHECK_DELAY; flag_set(&World.instances[idx].entflags,EF_WANDERING,false); World.instances[idx].wanderFinished=World.pauseRelativeTime;
-    World.instances[idx].lastPosition = World.position[idx]; World.instances[idx].lastKnownEnemyPos = World.position[eidx]; World.instances[idx].targettingPosition = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; AISetHuntFinished(idx);
+    World.instances[idx].lastPosition = World.position[idx]; World.instances[idx].targettingPosition = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; AISetHuntFinished(idx);
 }
 
 void AIPlaySightSound(u16 idx) { if ((!(World.instances[idx].entflags&EF_FIRST_SIGHTING)) || (!ai_has_health(&World.instances[idx])) || (World.instances[idx].entflags&EF_ACT_AS_CORPSE_ONLY)){return;} flag_set(&World.instances[idx].entflags,EF_FIRST_SIGHTING,false); i16 sfx = sfxSightSound[World.instances[idx].index - 419]; if (sfx >= 39 && sfx < SOUNDS_COUNT){play_wav(sounds[sfx],AppliedFXVol(1.0f),World.position[idx],true);} }
@@ -440,7 +440,7 @@ bool AICheckPain(u16 self) {
         if (!atkIsPlayer && IdxIsNPC(World.instances[atkIdx].index)) {
             NPCType mt = npcTable[ndx].type, at = npcTable[World.instances[atkIdx].index - 419].type; bool canFight = World.instances[atkIdx].index != World.instances[self].index; if ((mt == NPCType_Robot && World.instances[self].enemy) || ((mt == NPCType_Cyborg || mt == NPCType_Supercyborg || mt == NPCType_Robot) && (at == NPCType_Cyborg || at == NPCType_Supercyborg || at == NPCType_Robot))) canFight = false; if (canFight) World.instances[self].enemy=atkIdx;
         } else World.instances[self].enemy=atkIdx;
-        World.instances[self].posCheckFinished=World.pauseRelativeTime+AI_POS_CHECK_DELAY; flag_set(&World.instances[self].entflags,EF_WANDERING,false); World.instances[self].wanderFinished=World.pauseRelativeTime; World.instances[self].lastPosition=World.position[self]; if(World.instances[self].enemy){World.instances[self].lastKnownEnemyPos=World.instances[self].currentDestination=World.position[World.instances[self].enemy];}
+        World.instances[self].posCheckFinished=World.pauseRelativeTime+AI_POS_CHECK_DELAY; flag_set(&World.instances[self].entflags,EF_WANDERING,false); World.instances[self].wanderFinished=World.pauseRelativeTime; World.instances[self].lastPosition=World.position[self]; if(World.instances[self].enemy){World.instances[self].currentDestination=World.position[World.instances[self].enemy];}
     } flag_set(&World.instances[self].entflags, EF_GO_INTO_PAIN, false); World.instances[self].timeTillPainFinished = World.pauseRelativeTime + npcTable[ndx].timeToPain; return true;
 }
 
@@ -524,7 +524,7 @@ static void AIRun(u16 selfIdx) {
         if(dToLast < 0.48f && dToEn > AI_STOP_DIST && !(self->entflags & EF_WANDERING)){self->wanderFinished = World.pauseRelativeTime + 5.0f;/*Same search time as Quake 1*/ flag_set(&self->entflags,EF_WANDERING,true); self->currentDestination=AIGetSearchPoint(self);} else {flag_set(&self->entflags,EF_WANDERING,false);}
     }
     if (!(self->entflags & EF_ENEM_IN_SIGHT)) { if(self->huntFinished > World.pauseRelativeTime){AIHunt(self);} else {self->enemy=0; flag_set(&self->entflags,EF_WANDERING,true); self->wanderFinished=World.pauseRelativeTime + 1.0; self->currentState=AIState_Walk;} return; }
-    if (self->enemy && !(self->entflags & EF_WANDERING)) { self->targettingPosition=(V3){World.position[self->enemy].x,World.position[self->enemy].y + AI_TARGET_OFFSET_Y,World.position[self->enemy].z}; self->currentDestination=self->targettingPosition; self->lastKnownEnemyPos=self->targettingPosition; }
+    if (self->enemy && !(self->entflags & EF_WANDERING)) { self->targettingPosition=(V3){World.position[self->enemy].x,World.position[self->enemy].y + AI_TARGET_OFFSET_Y,World.position[self->enemy].z}; self->currentDestination=self->targettingPosition; }
     flag_set(&self->entflags,EF_SHOT_FIRED,false); AISetHuntFinished(selfIdx); NPCTable* ndat = &npcTable[self->index - 419]; float nr = ndat->range, near = nr * nr, mr = ndat->range2, mid  = mr * mr, fr = ndat->range3, far  = fr * fr, rangeToEnemy=100000.0f;
     if (AICanAttack(selfIdx,near,1,&rangeToEnemy)) { AIStartAttack(self,1); return; } if (AICanAttack(selfIdx, mid,2,&rangeToEnemy)) { AIStartAttack(self,2); return; } if (AICanAttack(selfIdx, far,3,&rangeToEnemy)) { AIStartAttack(self,3); return; }
     if (ndat->moveType != AIMoveType_None && rangeToEnemy > AI_STOP_DIST_SQ) { if (AIWithinAngleToTarget(self)) { if (ndat->hopsOnMove && !(World.instances[selfIdx].entflags & EF_ACT_AS_TURRET)){ AIHopMove(selfIdx); } else { AIRunMove(selfIdx); } } else if (World.diffCbt >= 2 && random_range(0.0f,1.0f) < 0.5f) { AIFace(self,self->currentDestination); } }

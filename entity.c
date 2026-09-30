@@ -711,9 +711,7 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("targettingPosition.x")) inst->targettingPosition.x=parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("targettingPosition.y")) inst->targettingPosition.y=parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("targettingPosition.z")) inst->targettingPosition.z=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("lastKnownEnemyPos.x")) inst->lastKnownEnemyPos.x=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("lastKnownEnemyPos.y")) inst->lastKnownEnemyPos.y=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("lastKnownEnemyPos.z")) inst->lastKnownEnemyPos.z=parse_float(value,lineSpace,lineNum);
+                
                 else if(KEY_EQ("generateContents")) inst->generateContents = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("generationDone")) inst->generationDone = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("searchableInUse")) inst->srchInUse = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("maxRandomItems")) inst->maxRandomItems = (u8)parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[0]")) inst->contents[0] = parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("contents[1]")) inst->contents[1] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[2]")) inst->contents[2] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[3]")) inst->contents[3] = parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("customIndex[0]") || KEY_EQ("custIdx[0]")) inst->custIdx[0] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("customIndex[1]") || KEY_EQ("custIdx[1]")) inst->custIdx[1] = parse_numberi16(value,lineSpace,lineNum);
@@ -862,7 +860,7 @@ void LoadLevelMod(u8 lev) {
              in the hierarchy before any script runs.  src->entflags already has EF_ACTIVE cleared by the go.activeSelf parse, so it is the authority. */
         /* InitNPC() stamps its own start-up state, so put the loaded AIController state back on top of it. The
            flags above already ride along through the OR; these fields are not part of entflags. */
-        if (IdxIsNPC(entIdx)) { par->currentState=src->currentState; par->currentDestination=src->currentDestination; par->idealPos=src->idealPos; par->idealTransformForward=src->idealTransformForward; par->targettingPosition=src->targettingPosition; par->lastKnownEnemyPos=src->lastKnownEnemyPos; par->attack1SoundTime=src->attack1SoundTime; par->attack2SoundTime=src->attack2SoundTime; par->attack3SoundTime=src->attack3SoundTime; } par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
+        if (IdxIsNPC(entIdx)) { par->currentState=src->currentState; par->currentDestination=src->currentDestination; par->idealPos=src->idealPos; par->idealTransformForward=src->idealTransformForward; par->targettingPosition=src->targettingPosition; par->attack1SoundTime=src->attack1SoundTime; par->attack2SoundTime=src->attack2SoundTime; par->attack3SoundTime=src->attack3SoundTime; } par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
         for (u8 slot=0;slot<4;++slot) { par->contents[slot]=src->contents[slot]; par->custIdx[slot]=src->custIdx[slot]; } for (u8 slot=0;slot<7;++slot) { par->randomItem[slot]=src->randomItem[slot]; par->randomItemCustIdx[slot]=src->randomItemCustIdx[slot]; par->randomItemDropChance[slot]=src->randomItemDropChance[slot]; }
         par->generateContents=src->generateContents; par->generationDone=src->generationDone; par->maxRandomItems=src->maxRandomItems; par->srchInUse=src->srchInUse;
         par->amount=src->amount; par->resetTime=src->resetTime; par->minSecurityLevel=src->minSecurityLevel; par->keycode=src->keycode; par->damage=src->damage; par->delay=src->delay; par->active=src->active; par->activatedScale=src->activatedScale;
@@ -1148,7 +1146,7 @@ typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compres
   cross-checks it against the reader's own sizeof(GlobalContext), so a stale value fails loudly instead of
   misreading a save.  Keep SaveGame, LoadGame and ReadSaveSlotName all on this one name: they drifted apart once
   already (a save wrote v10 while the loader still demanded v9, so nothing could ever be loaded).*/
-#define SAVE_VERSION 13
+#define SAVE_VERSION 15
 #pragma pack(pop)
 size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
 size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Find and pop the zeroes bubbles.  Turns an otherwise 232mb save file into ~23mb.

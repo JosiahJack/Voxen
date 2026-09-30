@@ -543,13 +543,13 @@ void PlayTrack(TrackType ttype, MusicType mtype) {
     if(mtype==MT_Override){mp3_clear();} sFormat(p,sizeof(p),"./Audio/music/%s.mp3",GetCorrespondingLevelClip(ttype)); play_mp3(p,50/*ms*/); if (!World.Sys_Music.elevator){World.Sys_Music.levelEntry=false;}
 }
 
-static u8 musicZoneLast=0;/*last override active in UpdateAudio: 0=none,1=elevator,2=distortion*/
+static u32 musicZoneLast=0;/*active zone signature: 0=none, else zoneTrack | zoneMusic<<8*/
 void UpdateAudio() {
     if (!World.paused && !World.menuActive) {MixAmbs();} if ((World.paused && !World.menuActive) || (!Sys_Settings.VolumeMusic && !videoPageClip)) { mp3_paused = true; return; } mp3_paused = false;/*a video page owns its clip audio, so the music slider does not silence it*/
-    /*Unity MusicTrigger plays on OnTriggerEnter and calls Music.Stop() on OnTriggerExit, so a zone change takes effect at once instead of waiting out the running track. Mirror that: 0=none,1=elevator,2=distortion.*/
-    u8 zone=(u8)(World.Sys_Music.inZone?(World.Sys_Music.distortion?2:(World.Sys_Music.elevator?1:0)):0); bool zoneChanged=(zone!=musicZoneLast); musicZoneLast=zone;
-    if(zoneChanged && !World.menuActive){ if(zone==2){PlayTrack(TT_Distortion,MT_Override); return;} if(zone==1){PlayTrack(TT_Elev,MT_Override); return;} if(Sys_Settings.DynamicMusic){PlayTrack(TT_Walking,MT_Walking);} return; }
+    /*Unity MusicTrigger plays on OnTriggerEnter and calls Music.Stop() on OnTriggerExit, so a zone change takes effect at once instead of waiting out the running track. The zone carries the trigger's own trackType/musicType rather than a hardcoded elevator/distortion pair, so every authored track is reachable.*/
+    u32 zone=World.Sys_Music.inZone?(((u32)World.Sys_Music.zoneTrack&0xFFu)|((u32)World.Sys_Music.zoneMusic<<8)):0u; if(!zone&&(World.Sys_Music.elevator||World.Sys_Music.distortion))zone=(u32)(World.Sys_Music.distortion?TT_Distortion:TT_Elev)|((u32)MT_Override<<8); bool zoneChanged=(zone!=musicZoneLast); musicZoneLast=zone;
+    if(zoneChanged && !World.menuActive){ if(zone){PlayTrack((TrackType)(zone&0xFFu),(MusicType)((zone>>8)&0xFFu)); return;} if(Sys_Settings.DynamicMusic){PlayTrack(TT_Walking,MT_Walking);} return; }
     float remaining = mp3_remaining[mp3_slot]; if(remaining > 0.05f){return;} if(videoPageClip){play_mp3(videoPageClip,150); return;/*intro/credits bed is shorter than its clip, so loop it*/} if(World.menuActive){play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500); return;}
     if(World.Sys_Music.inCombat && !World.Sys_Music.inZone && World.Sys_Music.combatImpulseFinished < World.pauseRelativeTime) { World.Sys_Music.inCombat=false; PlayTrack(TT_Combat,MT_Override); World.Sys_Music.combatImpulseFinished=World.pauseRelativeTime + 20.0; return; }
-    if(World.Sys_Music.inZone){ if(World.Sys_Music.distortion){PlayTrack(TT_Distortion,MT_Override); return;} if(World.Sys_Music.elevator){PlayTrack(TT_Elev,MT_Override); return;} } if(Sys_Settings.DynamicMusic){PlayTrack(TT_Walking,MT_Walking);}
+    if(World.Sys_Music.inZone){ if(zone){PlayTrack((TrackType)(zone&0xFFu),(MusicType)((zone>>8)&0xFFu)); return;} } if(Sys_Settings.DynamicMusic){PlayTrack(TT_Walking,MT_Walking);}
 }

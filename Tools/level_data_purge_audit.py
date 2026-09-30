@@ -206,6 +206,10 @@ DROP_BY_REASON = {
     "AIController.index", "childTR.gameObject.activeSelf", "deathBurst.activeSelf",
     "deathBurst.transform.childCount", "rangeToEnemy", "searchColliderGO.activeSelf",
     "targetID", "tempVec.x", "tempVec.y", "tempVec.z", "visibleMeshVisible",
+    # lastKnownEnemyPos parsed into Entity.lastKnownEnemyPos, which had no reader
+    # anywhere: ai.c only ever wrote it (AISetEnemy) and entity.c only copied it.
+    # Field, parse branches, copy line and these keys are all gone now.
+    "lastKnownEnemyPos.x", "lastKnownEnemyPos.y", "lastKnownEnemyPos.z",
 }
 DROP = set(DROP_BY_REASON)
 
