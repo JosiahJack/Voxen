@@ -1043,6 +1043,27 @@ void EntityDumpAll(const char *pathFmt, u16 pass){
         u32 count = World.levelInstCount[lev]; OS_Write(f,&lev,sizeof(lev),path); OS_Write(f,&count,sizeof(count),path);
         OS_Write(f,World.levelInstances[lev],(size_t)count * sizeof(Entity),path);
     }
+    /* Lights, light positions and decal staging are written by the same loader and are
+       in scope for level-data purging, so the dump has to cover them or the differ
+       cannot see a purge that changed a light.  Each is a plain struct array with its
+       own count, appended after the entity records. */
+    u32 lsz = sizeof(Light);
+    OS_Write(f,&lsz,sizeof(lsz),path);
+    for(u32 lev=0; lev<nlev; lev++) OS_Write(f,World.levelLights[lev],(size_t)LIGHT_COUNT * sizeof(Light),path);
+    u32 v3sz = sizeof(V3);
+    OS_Write(f,&v3sz,sizeof(v3sz),path);
+    for(u32 lev=0; lev<nlev; lev++) OS_Write(f,World.levelLightsNewPosition[lev],(size_t)LIGHT_COUNT * sizeof(V3),path);
+    u32 lasz = sizeof(LightAnimation), lcount2 = nlev * LIGHT_COUNT;
+    OS_Write(f,&lasz,sizeof(lasz),path); OS_Write(f,&lcount2,sizeof(lcount2),path);
+    for(u32 lev=0; lev<nlev; lev++) OS_Write(f,World.levelLAnims[lev],(size_t)LIGHT_COUNT * sizeof(LightAnimation),path);
+    extern DecalStyle decalStyles[]; extern u16 decalStyleCount;
+    extern char decalInlineText[][DECAL_INLINE_TEXT_LEN]; extern u16 decalInlineTextCount;
+    u32 dsz = sizeof(DecalStyle);
+    OS_Write(f,&dsz,sizeof(dsz),path); OS_Write(f,&decalStyleCount,sizeof(decalStyleCount),path);
+    OS_Write(f,decalStyles,(size_t)decalStyleCount * sizeof(DecalStyle),path);
+    u16 tcount = decalInlineTextCount; u32 tsz = DECAL_INLINE_TEXT_LEN;
+    OS_Write(f,&tsz,sizeof(tsz),path); OS_Write(f,&tcount,sizeof(tcount),path);
+    OS_Write(f,decalInlineText,(size_t)decalInlineTextCount * DECAL_INLINE_TEXT_LEN,path);
     OS_Close(f); DualLog("Wrote entity dump to %s\n",path);
 }
 
