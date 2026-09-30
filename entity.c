@@ -430,60 +430,112 @@ void DeleteInstance(u16 i) { if (i <= PLAYER1 || i >= World.instCount) return; i
    Assets/Resources/Prefabs/.  0 means the prefab has no health (chunks, foliage, gibs, decals) and IsDamageable()
    then rejects it exactly as Unity's GetMainHealthManager would.  NPCs 419..447 are absent on purpose: AddInstance
    draws theirs from npcTable[]. */
-static float DefaultPrefabHealth(u16 entIdx) {
-    switch (entIdx) {
-        case 279: return 5.0f;                         /*chunk_screen*/
-        case 458: case 459: case 460: return 50.0f;    /*prop_phys_barrel_chemical / _radiation / _toxic*/
-        case 464: return 14.0f;                        /*se_briefcase*/
-        case 465: case 466: case 467: case 468:        /*se_corpse_blueshirt / _brownshirt / _eaten / _labcoat*/
-        case 469: case 470: case 471: return 50.0f;    /*se_corpse_security / _tan / _torso*/
-        case 472: case 473: case 474: case 475:        /*se_crate1..4*/
-        case 476: return 20.0f;                        /*se_crate5*/
-        case 477: return 10.0f;                        /*sec_camera*/
-        case 478: return 50.0f;                        /*sec_cpunode*/
-        case 479: return 35.0f;                        /*sec_cpunode_small*/
-        case 525: case 526: return 200.0f;            /*prop_console01 / prop_console02*/
-        default: return 0.0f;
-    }
-  }
-  /* HealthManager bloodType per prefab, read off the bloodType: field each prefab serializes in Citadel's
-     Assets/Resources/Prefabs/.  BloodType_None is Unity's own default and maps to the orange SparksSmall pool
-     (Const.cs GetImpactType), so only prefabs that actually declare a value appear here.  The converter drops
-     the field, so without this every prop reports None and shots throw orange sparks off metal barrels, crates,
-     cameras, CPU nodes and consoles; bloodType 4 (Robot) is the blue SparksSmall pool.  NPCs 419..447 are absent
-     on purpose: InitNPC draws theirs from npcBloodTypes[]. */
-  static BloodType DefaultPrefabBloodType(u16 entIdx) {
-      switch (entIdx) {
-          case 458: case 459: case 460:                     /*prop_phys_barrel_chemical / _radiation / _toxic*/
-          case 477:                                          /*sec_camera*/
-          case 478: case 479:                                /*sec_cpunode / _small*/
-          case 525: case 526: return BloodType_Robot;       /*prop_console01 / prop_console02*/
-          case 464:                                          /*se_briefcase*/
-          case 472: case 473: case 474: case 475: case 476:  /*se_crate1..5*/
-                      return BloodType_GrayMutation;
-          case 465: case 466: case 467: case 468:            /*se_corpse_blueshirt / _brownshirt / _eaten / _labcoat*/
-          case 469: case 470: case 471: return BloodType_Red;/*se_corpse_security / _tan / _torso*/
-          default: return BloodType_None;
-      }
-  }
+/*Prefab constants that deviate from what AddInstance already knows: root scale, HealthManager health, and
+  HealthManager bloodType.  Values are the m_LocalScale / health / bloodType fields serialized in the matching
+  prefab under Citadel/Assets/Resources/Prefabs/.  The converter drops bloodType, so without this every prop reports
+  BloodType_None (Unity's own default, which maps to the orange SparksSmall pool per Const.cs GetImpactType) and
+  shots throw orange sparks off metal barrels, crates, cameras, CPU nodes and consoles; blood 4 (Robot) is the blue
+  SparksSmall pool.  NPCs 419..447 are absent on purpose: InitNPC draws theirs from npcBloodTypes[].  Health covers
+  every prefab whose level data leaves health unset -- runtime spawns, and any order-dependent read -- and is what
+  makes crates, consoles and se_corpse_* damageable at all, since a corpse with no health is rejected by IsDamageable
+  and can never be gibered.
+  Kept as a sparse list instead of three more EPerms columns: only 33 of 864 prefabs deviate, and appending three
+  fields to all 864 positional EDefs rows would churn the entire table to replace ~30 lines of switch.  scale
+  {0,0,0} means leave AddInstance's 1.0, health 0 means leave whatever the prefab or level data already set. */
+typedef struct { u16 entIdx; V3 scale; float health; BloodType blood; } PrefabConst;
+static const PrefabConst prefabConsts[] = {
+    {279, {0,0,0},      5.0f, BloodType_None},       /*chunk_screen*/
+    {424, {0.8f,0.8f,0.8f}, 0.0f, BloodType_None},   /*npc_cortex_reaver*/
+    {430, {0.9f,0.9f,0.9f}, 0.0f, BloodType_None},   /*npc_sec2_bot*/
+    {431, {0.4f,0.4f,0.4f}, 0.0f, BloodType_None},   /*npc_maint_bot*/
+    {433, {0.88f,0.88f,0.88f}, 0.0f, BloodType_None},/*npc_hopper*/
+    {439, {0.4f,0.4f,0.4f}, 0.0f, BloodType_None},   /*npc_zerog_mutant*/
+    {441, {0.75f,0.75f,0.75f}, 0.0f, BloodType_None},/*npc_repairbot*/
+    {444, {0.666f,0.666f,0.666f}, 0.0f, BloodType_None},/*npc_cyberguard*/
+    {445, {0.5f,0.5f,0.5f}, 0.0f, BloodType_None},   /*npc_cyberram*/
+    {446, {1.1f,1.1f,1.1f}, 0.0f, BloodType_None},   /*npc_cyber_reaver*/
+    {458, {0,0,0},     50.0f, BloodType_Robot},       /*prop_phys_barrel_chemical*/
+    {459, {0,0,0},     50.0f, BloodType_Robot},       /*prop_phys_barrel_radiation*/
+    {460, {0,0,0},     50.0f, BloodType_Robot},       /*prop_phys_barrel_toxic*/
+    {464, {0,0,0},     14.0f, BloodType_GrayMutation},/*se_briefcase*/
+    {465, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_blueshirt*/
+    {466, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_brownshirt*/
+    {467, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_eaten*/
+    {468, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_labcoat*/
+    {469, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_security*/
+    {470, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_tan*/
+    {471, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_torso*/
+    {472, {0,0,0},     20.0f, BloodType_GrayMutation},/*se_crate1*/
+    {473, {0,0,0},     20.0f, BloodType_GrayMutation},/*se_crate2*/
+    {474, {0,0,0},     20.0f, BloodType_GrayMutation},/*se_crate3*/
+    {475, {1.75f,1.75f,1.75f}, 20.0f, BloodType_GrayMutation},/*se_crate4*/
+    {476, {1.75f,1.75f,1.75f}, 20.0f, BloodType_GrayMutation},/*se_crate5*/
+    {477, {0,0,0},     10.0f, BloodType_Robot},       /*sec_camera*/
+    {478, {0,0,0},     50.0f, BloodType_Robot},       /*sec_cpunode*/
+    {479, {0,0,0},     35.0f, BloodType_Robot},       /*sec_cpunode_small*/
+    {525, {0,0,0},    200.0f, BloodType_Robot},       /*prop_console01*/
+    {526, {0,0,0},    200.0f, BloodType_Robot},       /*prop_console02*/
+    {553, {0.5f,0.5f,0.5f}, 0.0f, BloodType_None},   /*prop_cyber_decoy: the prefab root carries m_LocalScale 0.5 and Inventory.UseDecoy instantiates it without rescaling, so the decoy model renders at half size.*/
+};
+static const PrefabConst* PrefabConstFor(u16 entIdx) {
+    for (u32 k = 0; k < sizeof(prefabConsts)/sizeof(prefabConsts[0]); ++k) if (prefabConsts[k].entIdx == entIdx) return &prefabConsts[k];
+    return 0;
+}
+/*Centroid-geometry export nudge: the converter moved some prefab origins relative to Unity's, so the level file's
+  lP lands the model off from where the author placed it.  Added to the parsed position, never replacing it.
+  Applied unconditionally for any prefab in the list, which is safe because none of these constIndexes also appear
+  in the per-prefab chain it was pulled out of -- the chain's else-if gave every prefab at most one behaviour, and
+  the two scale-forcing cases (345, 540..544/586) that survive in it discard a bad exported lS rather than supply a
+  missing one, so they must keep running after this. */
+typedef struct { u16 entIdx; V3 offset; } CgOffset;
+static const CgOffset cgOffsets[] = {
+    {309, {0,0.12f,0}},   {365, {0,0.12f,0}},   {369, {0,0.12f,0}},   /*item_beaker, item_flask, item_testtube*/
+    {310, {0,0.0975f,0}}, /*item_beverage*/
+    {314, {0,0.095f,0}},  /*weapon_grenadefrag*/
+    {315, {0,0.065f,0}},  /*weapon_grenadeconc*/
+    {316, {0,0.08f,0}},   /*weapon_grenadeemp*/
+    {317, {0,0.12f,0}},   /*weapon_grenadeearth*/
+    {318, {0,0.02f,0}},   /*weapon_grenadeemine*/
+    {319, {0,0.09f,0}},   /*weapon_grenadegas*/
+    {328, {0,0.04f,0}},   /*item_hw_system*/
+    {332, {0,0.015f,0}},  /*item_hw_targetid*/
+    {333, {0,0.028f,0}},  /*item_hw_shield*/
+    {342, {0,0.12f,0}},   /*item_workerhelmet*/
+    {343, {0,0.16f,0}},   /*weapon_blaster: up*/
+    {346, {0,0,0.16f}},   /*weapon_blaster: over*/
+    {348, {0,0,0.6f}},    /*weapon_blaster: over*/
+    {350, {0,0.16f,0}},   /*weapon_magnum*/
+    {352, {0,0.16f,0}},   /*weapon_pistol*/
+    {358, {0,0.16f,0}},   /*weapon_stungun*/
+    {361, {0,0.05f,0}},   /*item_logic_probe*/
+    {363, {0,0.04f,0}},   /*item_plastique*/
+    {364, {0,0.03f,0}},   {366, {0,0.03f,0}},   /*item_chipset_isolinear*/
+    {368, {0,0.04f,0}},   /*item_isotopex22*/
+    {371, {0,0.015f,0}},  /*item_chipset_isolinear*/
+    {379, {0,0.025f,0}},  {380, {0,0.025f,0}},  {381, {0,0.025f,0}},  {382, {0,0.025f,0}},  {384, {0,0.025f,0}},  /*item_ammo_hornet, _splinter, _magnesium, _penetrator*/
+    {399, {0,0.01f,0}},   /*item_head_male*/
+    {458, {0,0.72f,0}},   {459, {0,0.72f,0}},   {460, {0,0.72f,0}},   /*prop_phys_barrel_chemical, _radiation, _toxic*/
+    {463, {0,0.64f,0}},   /*prop_phys_toolcart*/
+    {472, {0,0.342f,0}},  {473, {0,0.342f,0}},  {474, {0,0.342f,0}},  {475, {0,0.342f,0}},  {476, {0,0.342f,0}},  /*se_crate1..5*/
+};
+static const CgOffset* CgOffsetFor(u16 entIdx) {
+    for (u32 k = 0; k < sizeof(cgOffsets)/sizeof(cgOffsets[0]); ++k) if (cgOffsets[k].entIdx == entIdx) return &cgOffsets[k];
+    return 0;
+}
 
-__attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {    if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return 0; } if (World.instCount >= INSTANCE_COUNT) { DualLogError("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return 0; }
+__attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {    if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; } if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return WORLD; }
     u16 i = World.instCount; mset(&World.instances[i],0,sizeof(Entity)); World.instances[i].entflags=EF_ACTIVE; World.layer[i]=L_Default;World.instances[i].camView=255; World.instances[i].modelIndex=World.instances[i].lodIndex=World.instances[i].colMeshIndex=MAX_MDLS; World.scale[i].x=World.scale[i].y=World.scale[i].z=World.mass[i]=World.rotation[i].w=1.0f; World.dynamicFriction[i]=0.5f; World.staticFriction[i]=0.6f;
     for (u8 slot=0;slot<4;++slot) World.instances[i].contents[slot]=World.instances[i].custIdx[slot]=-1; for (u8 slot=0;slot<7;++slot) World.instances[i].randomItem[slot]=World.instances[i].randomItemCustIdx[slot]=-1;
     World.instances[i].index = entIdx;    World.position[i] = pos;
-    if (entIdx == 424) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.8f; }/*npc_cortex_reaver*/ if (entIdx == 430) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.9f; }/*npc_sec2_bot*/   if (entIdx == 431) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.4f; }/*npc_maint_bot*/     if (entIdx == 433) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.88f; }/*npc_hopper*/
-    if (entIdx == 439) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.4f; }/*npc_zerog_mutant*/  if (entIdx == 441) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.75f; }/*npc_repairbot*/ if (entIdx == 444) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.666f; }/*npc_cyberguard*/  if (entIdx == 445) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.5f; }/*npc_cyberram*/
-    if (entIdx == 446) { World.scale[i].x=World.scale[i].y=World.scale[i].z=1.1f; }/*npc_cyber_reaver*/  if (entIdx == 475 || entIdx == 476){World.scale[i]=(V3){1.75f,1.75f,1.75f};}/*se_crate4,se_crate5*/
-    if (entIdx == 553) { World.scale[i].x=World.scale[i].y=World.scale[i].z=0.5f; }/*prop_cyber_decoy: the prefab root carries m_LocalScale 0.5 and Inventory.UseDecoy instantiates it without rescaling, so the decoy model renders at half size.*/
+    const PrefabConst* pc = PrefabConstFor(entIdx); if (pc && pc->scale.x) World.scale[i] = pc->scale;/*must land before InitNPC below, and before the level's own lS is applied: this supplies a missing prefab root scale, it does not override one. The scale-forcing cases further down (345, 540..544, 586) are the opposite and deliberately stay where they are, because those discard a bad exported lS -- 14.4 on the dartgun, 0.0398 on the tables and chairs -- rather than supplying a missing one.*/
     if (IdxIsNPC(entIdx)){InitNPC(i); World.instances[i].npcNumber = ai_next_npc_number((u16)(entIdx - 419)); if (npcTable[entIdx - 419].type == NPCType_Cyber) { if (World.instances[i].cyberHealth <= 0.0f) World.instances[i].cyberHealth = npcTable[entIdx - 419].healthForCyberNPC; } else if (World.instances[i].health <= 0.0f) World.instances[i].health = npcTable[entIdx - 419].health;/*health/cyberHealth default when the record leaves them unset; a loaded -1 sentinel is kept off by the copy guard below*/}
     else if (IsLiveGrenade(entIdx) && World.instances[i].health <= 0.0f) World.instances[i].health = 15.0f;/*all seven live grenade prefabs carry health 15; chain-detonate on damage*/
     else if (entIdx == 574 /*prop_healingbed*/ && World.instances[i].health <= 0.0f) World.instances[i].health = 9999999.0f;/*prop_healingbed.prefab serializes health 9999999: the bed must be indestructible so it cannot be shot down under the player*/
-    if (IdxIsDoor(entIdx)) { World.instances[i].SFXIndex = 75; } World.instances[i].modelIndex=EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAX_TXRS ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
+    World.instances[i].modelIndex=EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAX_TXRS ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
     World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAX_TXRS ? 0 : EDefs[entIdx].specIndex; World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAX_TXRS ? 0 : EDefs[entIdx].normIndex; flag_set(&World.instances[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(entIdx));
     if (entIdx == 592 || entIdx == 593) { World.instances[i].modelIndex = U16_MAX; } // 3D text decals (no mesh)
-    float defHealth = DefaultPrefabHealth(entIdx);/*default health for every prefab whose HealthManager the level data leaves unset (runtime spawns, any order-dependent read).  Values are the health: field serialized in the matching prefab under Assets/Resources/Prefabs/, so crates, prop_console01/02, se_corpse_* (health 50, without which a corpse carries none, IsDamageable() rejects it and melee can never gib a body), barrels, sec_camera, sec_cpunode(_small), chunk_screen and se_briefcase are damageable exactly as they are in Unity.*/
-    if (defHealth > 0.0f && World.instances[i].health <= 0.0f) World.instances[i].health = defHealth;
-    if (!IdxIsNPC(entIdx)) World.instances[i].bloodType = DefaultPrefabBloodType(entIdx);/*Prefab constant, NOT per-instance state: HealthManager.bloodType is a serialized prefab field and no level*.txt record carries a bloodType key, so the parser has no branch for it and must never grow one.  InitNPC has already claimed the NPC types.*/
+    if (pc && pc->health > 0.0f && World.instances[i].health <= 0.0f) World.instances[i].health = pc->health;
+    if (!IdxIsNPC(entIdx) && pc) World.instances[i].bloodType = pc->blood;/*Prefab constant, NOT per-instance state: HealthManager.bloodType is a serialized prefab field and no level*.txt record carries a bloodType key, so the parser has no branch for it and must never grow one.  InitNPC has already claimed the NPC types.*/
     if (entIdx == 717 /*ef_cyber_ice*/ && World.instances[i].cyberHealth <= 0.0f) World.instances[i].cyberHealth = 100.0f;/*ef_cyber_ice.prefab serializes cyberHealth 100, health -1*/
       if (entIdx == 477 /*sec_camera*/) { Entity* ce = &World.instances[i]; ce->camStartYAngle = 0.0f; ce->camEndYAngle = 180.0f; ce->camWaitTime = 0.8f; ce->camRotatePositive = true; ce->camRotateEnabled = false; }/*SecurityCameraRotate field defaults; the level lines override the three angles.  camRotateEnabled defaults FALSE because sec_camera.prefab ships the SecurityCameraRotate component with m_Enabled: 0 -- a disabled MonoBehaviour is dispatched neither Start() nor Update(), so the sweep never runs at all.  The [HideInInspector] 'active' flag that Start() copies from enabled is never read by Update() and is irrelevant either way.*/
     World.instances[i].questBitID = QB_None;/*AddInstance zero-fills, which would read as bit 0 (QB_RobotSpawnDeactivated). Unity's QuestBitRelay guards every bit with "if (<boolean> && ...)", so a relay that names no bit does nothing at all; QB_None reproduces that. Level parsing assigns a real bit to whichever boolean the record carries.*/
@@ -524,7 +576,7 @@ void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
     if(srcLevel >= MAX_LEVELS || dstLevel >= MAX_LEVELS || srcLevel == dstLevel){return;} u16 s=PLAYER1; World.levelInstances[dstLevel][s]=World.levelInstances[srcLevel][s]; World.levelPosition[dstLevel][s]=World.levelPosition[srcLevel][s]; World.levelScale[dstLevel][s]=World.levelScale[srcLevel][s];
     World.levelVelocity[dstLevel][s]=World.levelVelocity[srcLevel][s]; World.levelAngularVelocity[dstLevel][s]=World.levelAngularVelocity[srcLevel][s]; World.levelColliderCenter[dstLevel][s]=World.levelColliderCenter[srcLevel][s]; World.levelColliderSize[dstLevel][s]=World.levelColliderSize[srcLevel][s];
     World.levelCollider[dstLevel][s]=World.levelCollider[srcLevel][s]; World.levelRotation[dstLevel][s]=World.levelRotation[srcLevel][s]; World.levelLayer[dstLevel][s]=World.levelLayer[srcLevel][s]; World.levelMass[dstLevel][s]=World.levelMass[srcLevel][s]; World.levelRadius[dstLevel][s]=World.levelRadius[srcLevel][s];
-    World.levelGravity[dstLevel][s]=World.levelGravity[srcLevel][s]; mcpy(World.levelInertiaTensor[dstLevel][s],World.levelInertiaTensor[srcLevel][s],6 * sizeof(float)); mcpy(World.levelInvInertiaTensor[dstLevel][s],World.levelInvInertiaTensor[srcLevel][s],6 * sizeof(float));
+    World.levelGravity[dstLevel][s]=World.levelGravity[srcLevel][s]; mcpy(World.levelInvInertiaTensor[dstLevel][s],World.levelInvInertiaTensor[srcLevel][s],6 * sizeof(float));
     World.levelDynamicFriction[dstLevel][s]=World.levelDynamicFriction[srcLevel][s]; World.levelStaticFriction[dstLevel][s]=World.levelStaticFriction[srcLevel][s]; World.levelInvTnsrValid[dstLevel][s]=World.levelInvTnsrValid[srcLevel][s]; World.levelColliding[dstLevel][s]=World.levelColliding[srcLevel][s];
 }
 
@@ -556,7 +608,7 @@ static V3 TriggerPrefabScale(u16 entIdx) {
 u16 IOInternName(const char* name){if(!name || !*name){return IO_NONE;} for(u16 i=1;i<ioNameCount;++i){if(sEqual(ioNames[i],name)){return i;}} if(ioNameCount >= MAX_IO_NAMES){DualLogError("IO name full!\n"); return IO_NONE;} scpy_to_a_from_b(ioNames[ioNameCount],name,TARG_STRLEN); return ioNameCount++;}
 static void FWBeginBlock(i32 cnt){V3 *p,*s; Quaternion *r; if(fwCollecting&&fwLastChunkSlot<FW_MAX_CHILDREN){p=&lwPos[fwLastChunkSlot]; r=&lwRot[fwLastChunkSlot]; s=&lwScale[fwLastChunkSlot];}else{switch(fwStage++){case 1:p=&fwContainerPos; r=&fwContainerRot; s=&fwContainerScale; break; case 2:p=&fwInfoLocalTmp; r=&fwInfoRotDummy; s=&fwInfoScaleDummy; break; default:p=&posFromFile[cnt]; r=&rotationFromFile[cnt]; s=&scaleFromFile[cnt]; break;}} fwCurP=p; fwCurR=r; fwCurS=s;}
 void LoadLevelMod(u8 lev) {
-    u8 curlevel = vclamp(lev, 0, 13); World.levelCurrentlyLoading = true;/*precondition only, for AddInstance's level-security tally (entity.c:492) -- NOT redundant bookkeeping and deliberately kept: the tally reads this global.  curLev and instCount=3 were dropped here as pure duplicates: LoadLevelData:911 sets both one line earlier and nothing runs in between.*/
+    u8 curlevel = vclamp(lev, 0, 13); World.levelCurrentlyLoading = true;/*precondition only, for AddInstance's level-security tally above -- NOT redundant bookkeeping. The tally must not see runtime spawns, and this flag is its only way to tell load-time from run-time. Nothing outside the loader reads it; the main loop gates level changes on the queuedLevelToLoad sentinel instead.*/
     if(curlevel == 0){AddCamView((V3){-14.16170f,-54.72389f,20.71170f},(Quaternion){0.03959f,0.41918f,-0.01830f,0.90686f},85u,256u,256u,0.84f,16.223f);/*ReacScreen1_Camera*/ AddCamView((V3){36.38030f,-57.61589f,-0.30230f},(Quaternion){0.12279f,0.69636f,-0.12279f,0.69636f},50u,256u,256u,2.0f,17.05f);/*ReacScreen1_Camera (1)*/ AddCamView((V3){-0.64170f,-54.17389f,-5.37830f},(Quaternion){0.17111f,0.16779f,-0.02959f,0.97041f},65u,256u,256u,0.513f,26.13f);/*ReacScreen1_Camera (2)*/}
     else if(curlevel == 1){AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);/*MedScreen14_Camera*/ AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);/*MedScreen15_Camera*/}
     else if(curlevel == 2) { AddCamView((V3){36.73389f,-24.66895f,9.47060f},(Quaternion){0.11769f,-0.23125f,0.02819f,0.96534f},75u,256u,256u,0.695f,13.73f);/*SciScreen6_Camera*/}
@@ -850,40 +902,13 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 716) { World.col[parent] = COLTYPE_NONE; }
         else if (entIdx == 515 && EDefs[entIdx].col == COLTYPE_BOX && EDefs[entIdx].colSz.x == 0.0f && EDefs[entIdx].colSz.y == 0.0f && EDefs[entIdx].colSz.z == 0.0f) { World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f}; }
         if (entIdx == 700) par->currentTargetIdx = par->branchOnSecond ? par->target2Idx : par->targetIdx;
+        { const CgOffset* co = CgOffsetFor(entIdx); if (co) World.position[parent] = V3_AplusB(World.position[parent], co->offset); }/*moved out of the chain below: none of these constIndexes collide with the cases that remain, so an add-then-switch is the same as the else-if it replaces*/
         if (entIdx == 525) { par->texAnimLight=AddOffsetLight(par,(V3){5.81f,2.29f,38.05f-38.3552f},(Color3){0.3531f,0.4837f,0.6509f},1.85f,0.7f); par->texAnimLight2=AddOffsetLight(par,(V3){-10.1f,0.9f,18.21f-38.3552f},(Color3){0.3561f,0.3561f,0.8970f},2.0f,1.12f); } // prop_console01
         else if (entIdx == 279) { par->texAnimLight = AddOffsetLight(par,(V3){0.0f,-0.08f,0.0f},(Color3){0.909803922f,0.929411765f,1.0f},3.2f,1.575f); } // chunk_screen
         else if (par->index == 574) { // prop_healingbed
             Color3 green = {0.0f, 0.925490196f, 0.082352941f}; par->texAnimLight=AddOffsetLight(par,(V3){0.5292511f,0.065f,0.915f},green,3.0f,0.72f); par->texAnimLight2=AddOffsetLight(par,(V3){-0.5317497f,0.065f,1.039f},green,3.0f,0.72f); par->textureAnimating=true; par->texAnimClip=12; par->texFrame=0;
             scpy_to_a_from_b(par->texAnimResourceFolder,"MedicalBed",TARG_STRLEN);
-        } else if (entIdx == 309 || entIdx == 365 || entIdx == 369) { World.position[parent].y += 0.12f; } // item_beaker || item_flask || item_testtube: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 328) { World.position[parent].y += 0.04f; } // item_hw_system: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 310) { World.position[parent].y += 0.0975f; } // item_beverage: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 314) { World.position[parent].y += 0.095f; } // weapon_grenadefrag: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 315) { World.position[parent].y += 0.065f; } // weapon_grenadeconc: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 316) { World.position[parent].y += 0.08f; } // weapon_grenadeemp: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 317) { World.position[parent].y += 0.12f; } // weapon_grenadeearth: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 318) { World.position[parent].y += 0.02f; } // weapon_grenadeemine: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 319) { World.position[parent].y += 0.09f; } // weapon_grenadegas: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 332) { World.position[parent].y += 0.015f; } // item_hw_targetid: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 333) { World.position[parent].y += 0.028f; } // item_hw_shield: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 342) { World.position[parent].y += 0.12f; } // item_workerhelmet: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 343) { World.position[parent].y += 0.16f; } // weapon_blaster: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 346) { World.position[parent].z += 0.16f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 348) { World.position[parent].z += 0.6f; } // weapon_blaster: Move over to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 345) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.00f; } // weapon_dartgun
-        else if (entIdx == 350) { World.position[parent].y += 0.16f; } // weapon_magnum: Move over to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 352) { World.position[parent].y += 0.16f; } // weapon_pistol: Move over to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 358) { World.position[parent].y += 0.16f; } // weapon_stungun: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 361) { World.position[parent].y += 0.05f; } // item_logic_probe: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 363) { World.position[parent].y += 0.04f; } // item_plastique: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 364 || entIdx == 366) { World.position[parent].y += 0.03f; } // item_chipset_isolinear: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 368) { World.position[parent].y += 0.04f; } // item_isotopex22: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 371) { World.position[parent].y += 0.015f; } // item_chipset_isolinear: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 379 || entIdx == 380 || entIdx == 381 || entIdx == 382 || entIdx == 384) { World.position[parent].y += 0.025f; } // item_ammo_hornet, item_ammo_splinter, item_ammo_magnesium, item_ammo_penetrator: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 399) { World.position[parent].y += 0.01f; } // item_head_male: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 458 || entIdx == 459 || entIdx == 460) { World.position[parent].y += 0.72f; } // prop_phys_barrel_chemical, prop_phys_barrel_radiation, prop_phys_barrel_toxic: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx == 463) { World.position[parent].y += 0.64f; } // prop_phys_toolcart: Move up to account for CG mod (origin moved vs Unity version)
-        else if (entIdx >= 472 && entIdx <= 476) { World.position[parent].y += 0.342f; } // se_crate1, se_crate2, se_crate3, se_crate4, se_crate5: Move up to account for CG mod (origin moved vs Unity version)
+        } else if (entIdx == 345) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.00f; } // weapon_dartgun
         else if (entIdx == 586 || (entIdx >= 540 && entIdx <= 544)) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.0f; } // prop_table, prop_chair01-05: map exports 0.04 scale; force 1.0
         else if (entIdx == 218 || entIdx == 220) { Quaternion c = quat_from_axis_angle((V3){0.0f,1.0f,0.0f},PI); World.rotation[parent] = quat_multiply(quat_multiply(c,World.rotation[parent]),(Quaternion){-c.x,-c.y,-c.z,c.w}); } // chunk_reac2_4, chunk_reac2_5: the export is a flipped basis, not a turned instance, so conjugate by 180deg about Y (which flips the mesh's local X and Z and leaves Y). Conjugation spins the rotation's axis while preserving its angle, so the level file's authored placement is untouched. Checked against level 7 instance 4180: lR (0,.7071,.7071,0) -> (0,-.7071,.7071,0) exactly, and it is non-identity on all 6 (218) / 4 (220) orientations these prefabs use, so every instance gets corrected.
         else if (entIdx == 53) { World.rotation[parent] = quat_multiply(World.rotation[parent], quat_from_axis_angle((V3){1.0f,0.0f,0.0f},PI*0.5f)); } // chunk_eng2_6: the Unity prefab is a parent gameobject carrying eng_wallpump as an animated child with localRotation euler 90,0,0, and the exporter never applied that child transform. The level data's lR already holds the parent's own rotation (verified: level 7's lR 0.5,0.5,0.5,-0.5 is Unity's parent localRotation euler -90,0,-90), so all that is missing is the child term, composed on the right of quat_multiply exactly as Unity composes child-in-parent.
@@ -971,18 +996,19 @@ void LoadLevelData(u8 curlevel) {
                 }
                 World.instances[i].generationDone = true;
             }
-        } else if(constIndex == 515){func_forcebridge(i);/*func_forcebridge*/}
-        else if(constIndex == 716){World.layer[i] = L_Trigger;} // fx_reverbzone
-        else if(constIndex == 517){FuncWallInitAfterLoad(i);}
-        else if(constIndex == 596){World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); World.instances[i].topPoint=(V3){0.0f,World.position[i].y + (World.colliderSize[i].y * 0.5f),0.0f}; } /*trigger_gravitylift*/
-        else if(constIndex == 701){LogicTimerInitBeforeLoad(i);}
-        else if(constIndex == 703){World.layer[i]=L_Trigger;if(World.instances[i].teleportID < 8){teleportDestinations[curlevel][World.instances[i].teleportID]=i;World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} }/*info_teleport_destination*/
-        else if(constIndex == 555){CyberSwitchInitAfterLoad(i);} // prop_cyber_switch
-        else if(constIndex == 21 || constIndex == 22) CyberWallInitAfterLoad(i); // chunk_cyberpanel or chunk_cyberpanel_slice45
-        else if(IdxIsButtonSwitch(World.instances[i].index)) ButtonSwitchInitAfterLoad(i);
-        else if(constIndex >= 448 && constIndex <= 457){/*item_cyber_data's mission-difficulty-0 removal moved to NewGameDifficultyPass.*/}
-        else if(constIndex == 480){CyberMineInitBeforeLoad(i);}
-        else if(constIndex == 402){World.layer[i] = L_NPC; GrenadeInit(i);}/*weapon_grenademine_live.  Level data is init-only, so every placed live landmine is an NPC mine; any layer other than L_PlayerBullets makes GrenadeIsNPCMine report true.  L_NPC rather than Unity's NPCBullet(24) because layerMaskPlayerAttack includes NPC but not NPCBullet, so only L_NPC lets player weapons and melee reach it.  GrenadeInit supplies the prefab damage/penetration/offense/attackType, which the level-load path otherwise leaves zero.*/
+        } else switch (constIndex) {
+            case 21: case 22: CyberWallInitAfterLoad(i); break; // chunk_cyberpanel, chunk_cyberpanel_slice45
+            case 515: func_forcebridge(i); break;
+            case 716: World.layer[i] = L_Trigger; break; // fx_reverbzone
+            case 517: FuncWallInitAfterLoad(i); break;
+            case 596: World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); World.instances[i].topPoint=(V3){0.0f,World.position[i].y + (World.colliderSize[i].y * 0.5f),0.0f}; break; /*trigger_gravitylift*/
+            case 701: LogicTimerInitBeforeLoad(i); break;
+            case 703: World.layer[i]=L_Trigger;if(World.instances[i].teleportID < 8){teleportDestinations[curlevel][World.instances[i].teleportID]=i;World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} break;/*info_teleport_destination*/
+            case 555: CyberSwitchInitAfterLoad(i); break; // prop_cyber_switch
+            case 480: CyberMineInitBeforeLoad(i); break;
+            case 402: World.layer[i] = L_NPC; GrenadeInit(i); break;/*weapon_grenademine_live.  Level data is init-only, so every placed live landmine is an NPC mine; any layer other than L_PlayerBullets makes GrenadeIsNPCMine report true.  L_NPC rather than Unity's NPCBullet(24) because layerMaskPlayerAttack includes NPC but not NPCBullet, so only L_NPC lets player weapons and melee reach it.  GrenadeInit supplies the prefab damage/penetration/offense/attackType, which the level-load path otherwise leaves zero.*/
+            default: if (IdxIsButtonSwitch(constIndex)) ButtonSwitchInitAfterLoad(i); break;/*688..692, 694, 695: disjoint from every case above, so folding this into default preserves the old chain's order*/
+        }
         if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
     }
     for (int i=PLAYER1;i<World.instCount;++i){ u16 mi=World.instances[i].messageIndex; World.instances[i].messageIndex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].messageLingdex; World.instances[i].messageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].lockedMessageLingdex; World.instances[i].lockedMessageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; } // Using blank 427
@@ -1007,7 +1033,8 @@ u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride
    Raw structs are dumped rather than a named field list so the differ sees fields
    nobody remembered to write down; the tool filters pointer-typed members, whose
    values legitimately vary between runs. */
-void EntityDumpAll(const char *path){
+void EntityDumpAll(const char *pathFmt, u16 pass){
+    char path[TARG_STRLEN]; sFormat(path,sizeof(path),pathFmt,pass);
     FHandle f = OS_OpenWriteonly(path); if(f == INVALID_FHANDLE){ DualLogError("EntityDumpAll: cannot open %s\n",path); return; }
     static const char magic[8] = {'V','O','X','E','N','E','D','1'};
     u32 esz = sizeof(Entity), nlev = World.numLevels;
@@ -1100,7 +1127,7 @@ typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compres
   cross-checks it against the reader's own sizeof(GlobalContext), so a stale value fails loudly instead of
   misreading a save.  Keep SaveGame, LoadGame and ReadSaveSlotName all on this one name: they drifted apart once
   already (a save wrote v10 while the loader still demanded v9, so nothing could ever be loaded).*/
-#define SAVE_VERSION 11
+#define SAVE_VERSION 13
 #pragma pack(pop)
 size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
 size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Find and pop the zeroes bubbles.  Turns an otherwise 232mb save file into ~23mb.
@@ -1127,7 +1154,8 @@ void SaveGame(u8 slot, const char* savename) {
 }
 
 void LoadGame(u8 slot) {
-    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343 || header.version != SAVE_VERSION || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
+    if(slot > 7){return;} char path[]="./Data/sav0.bin"; path[10]='0' + slot; FHandle fd=OS_OpenReadonly(path); if(fd == (FHandle)-1){return;} SaveHeader header; if (OS_Read(fd,&header,sizeof(SaveHeader)) != sizeof(SaveHeader) || header.magicNumber != 0x56415343) { DualLogError("Corrupted save file header!\n"); OS_Close(fd); return; }
+    if (header.version != SAVE_VERSION || header.uncompressedSize != sizeof(GlobalContext)) { DualLogError("Save is from an incompatible build (v%u, %u bytes; this build wants v%u, %zu bytes) -- start a new game.\n", header.version, header.uncompressedSize, (u32)SAVE_VERSION, sizeof(GlobalContext)); OS_Close(fd); return; }/*split out of the header check above, which reported a plain version or layout-size mismatch as corruption.  The two saves in Data/ are both v7 and were already unloadable by v11: this project bumps the constant rather than migrating, so name the real reason.*/
     u8* b=OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
         size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.currentLevel); AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }

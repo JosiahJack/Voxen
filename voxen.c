@@ -138,7 +138,7 @@ static void SpawnArsenalItem(u16 constIndex, int* offsetIdx) {
         spawnPos.y = ppos.y; // prefer player Y level
         if (IsCellOpenAt(spawnPos)) {
             u16 spawned = SpawnDynamicObject(constIndex, true);
-            if (spawned < U16_MAX) {
+            if (EntIdxIsValid(spawned)) {
                 World.position[spawned] = spawnPos;
                 World.velocity[spawned] = (V3){0,0,0};
                 *offsetIdx = i + 1;
@@ -231,7 +231,7 @@ static void cmd_loadlevel(const char* arg) {
 
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }
 static void cmd_summon(int itemConstIndex) {
-    if (IdxInBounds(itemConstIndex)) { u16 spawned = SpawnDynamicObject(itemConstIndex,true); if (spawned < U16_MAX) { lastSpawned = spawned; V3 sdir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right); World.position[spawned] = V3_AplusB(World.position[PLAYER1],V3_ScaleByF(sdir,2.0f)); World.velocity[spawned] = (V3){0,0,0};
+    if (IdxInBounds(itemConstIndex)) { u16 spawned = SpawnDynamicObject(itemConstIndex,true); if (EntIdxIsValid(spawned)) { lastSpawned = spawned; V3 sdir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right); World.position[spawned] = V3_AplusB(World.position[PLAYER1],V3_ScaleByF(sdir,2.0f)); World.velocity[spawned] = (V3){0,0,0};
     if (IdxIsHardware(itemConstIndex)) { int v=(int)World.invP1.hwVers[itemConstIndex-328]+1; World.instances[spawned].customIndex=(i16)(v>4?4:v); } } CenterStatusPrint("Summoned object ID %d",itemConstIndex); } else { CenterStatusPrint("Invalid object ID: %s",itemConstIndex); } }
 static void cmd_select(int instanceIdx) { if (instanceIdx >= 0 && instanceIdx < World.instCount) { editModeSelection=(u16)instanceIdx; CenterStatusPrint("Selected entity instance %u (const index %u)",editModeSelection,World.instances[editModeSelection].index); } else { CenterStatusPrint("Invalid instance: %d (loaded count: %u)",instanceIdx,World.instCount); } }
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
@@ -740,7 +740,28 @@ static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0
 static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/ {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {-64.000f,-60.120f}/*13*/};
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 71.68f/*13*/};
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
-u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0; size_t cvxAdjLive=0; /* diagnostics: live convex-adjacency bytes */ void AddHardwareToInventory(int,int),mp3_clear(); void NewGameDifficultyPass(void);/*entity.c: the mission-difficulty access-card / audiolog / cyber-data removals, run once from NewGame after every level is resident.*/
+u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount=0; size_t cvxAdjLive=0; /* diagnostics: live convex-adjacency bytes */
+// Level-load tallies and buffers that are appended to rather than indexed by instance.  Nothing reset them, so NewGame's second pass in a session started appending on top of the first pass's entries: the decal text and style tables ended up holding a stale copy of every decal, and the convex-adjacency builder re-allocated without ever handing back the previous pass's mappings.
+static u16 dumpPass = 0;
+static void ResetLoadTallies(void) {
+    decalInlineTextCount = decalStyleCount = 0;
+    /*The security tallies are deliberately load-time-fixed: AddInstance counts them only under
+      levelCurrentlyLoading so a runtime spawn can never change a denominator, and the destroyed counters then
+      accumulate and persist across level switches and save/loads (both live in GlobalContext, and the destroyed
+      state lives in each level's entity table).  That is the intended semantics.  All it needed was a reset --
+      without one, NewGame's second pass in a session re-counted every security object on top of the first pass's
+      figures and doubled all six arrays.*/
+    mset(World.levelCameraCount,0,sizeof(World.levelCameraCount)); mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount)); mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));
+    mset(World.levCamDestroyedCnt,0,sizeof(World.levCamDestroyedCnt)); mset(World.levSmNodeDestroyedCnt,0,sizeof(World.levSmNodeDestroyedCnt)); mset(World.levNodeDestroyedCnt,0,sizeof(World.levNodeDestroyedCnt));
+    for (u32 u = 0; u < uniqueCvxMeshCount; ++u) {
+        if (cvxAdjOffsets[u]) { OS_Free(cvxAdjOffsets[u], cvxAdjOffsetBytes[u]); cvxAdjOffsets[u] = 0; cvxAdjOffsetBytes[u] = 0; }
+        if (cvxAdjLists[u]) { OS_Free(cvxAdjLists[u], cvxAdjListBytes[u]); cvxAdjLists[u] = 0; cvxAdjListBytes[u] = 0; }
+    }
+    uniqueCvxMeshCount = 0; cvxAdjLive = 0;
+    ResetDoorPortals();
+    mset(World.physSleep, 0, sizeof(World.physSleep));
+}
+ void AddHardwareToInventory(int,int),mp3_clear(); void NewGameDifficultyPass(void);/*entity.c: the mission-difficulty access-card / audiolog / cyber-data removals, run once from NewGame after every level is resident.*/
 // Init && Main
 void MFD_NewGame(void); void MissionTimerInit(void);
 __attribute__((cold)) void NewGame() { // Reset World States
@@ -773,7 +794,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     mset(&Sys_Input,0,sizeof(Sys_Input)); World.currentMouse_dx = World.currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0,lev);
-    DebugRAM("before runtime LoadAllLevels"); LoadAllLevels(); DebugRAM("after runtime LoadAllLevels"); NewGameDifficultyPass();/*mission-difficulty item removals: once, here, where diffMis is final and every level is resident -- see NewGameDifficultyPass in entity.c.*/ { extern char *getenv(const char*); char *dumpPath = getenv("VOXEN_DUMP_ENTITIES"); if(dumpPath) EntityDumpAll(dumpPath); }/*opt-in: snapshot the loaded entity tables here, before LoadLevel spawns the player, so two builds diff on loader state alone.*/ LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); DebugRAM("after runtime LoadLevel"); World.invP1.currentCrouchRatio = 1.0f;
+    DebugRAM("before runtime LoadAllLevels"); ResetLoadTallies(); LoadAllLevels(); DebugRAM("after runtime LoadAllLevels"); NewGameDifficultyPass();/*mission-difficulty item removals: once, here, where diffMis is final and every level is resident -- see NewGameDifficultyPass in entity.c.*/ LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); DebugRAM("after runtime LoadLevel"); World.invP1.currentCrouchRatio = 1.0f;
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
             World.levelInstances[lev][i].adjacencyIdx = U16_MAX;
@@ -795,9 +816,9 @@ __attribute__((cold)) void NewGame() { // Reset World States
         u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16)); u32* writePos = OS_Alloc(vCount * sizeof(u32));
         mcpy(writePos, offsets, vCount * sizeof(u32));
         for (u32 i=0;i<uniqueEdgeCount;++i) { u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); adjList[writePos[a]++]=b; adjList[writePos[b]++]=a; }
-        cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList; cvxAdjLive+=(vCount+1)*sizeof(u32)+uniqueEdgeCount*2*sizeof(u16);
+        cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList; cvxAdjOffsetBytes[u]=(vCount+1)*sizeof(u32); cvxAdjListBytes[u]=uniqueEdgeCount*2*sizeof(u16); cvxAdjLive+=cvxAdjOffsetBytes[u]+cvxAdjListBytes[u];
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
-    } DebugRAM("after edge adjacency");
+    } DebugRAM("after edge adjacency"); { extern char *getenv(const char*); char *dumpPath = getenv("VOXEN_DUMP_ENTITIES"); if(dumpPath) EntityDumpAll(dumpPath, dumpPass++); }/*opt-in: snapshot the loaded entity tables, once every loader pass that writes them has run, so two builds diff on loader state alone. The path is a format string taking the NewGame pass index, so the menu pass and the real start land in separate files and can be diffed against each other for idempotence.*/
     World.lev1SecCode = World.lev2SecCode = World.lev3SecCode = -1; World.lev4SecCode = World.lev5SecCode = World.lev6SecCode = -1; World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
     // TESTING STUFF, TODO Delete once hardware and particle systems are fully confirmed and tested as good (they aren't yet).
     //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAX_TXRS},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colStart=(Color){1,0,0,1},.colEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.shapeRadius=2.56f,.shapeType=1,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
@@ -865,7 +886,7 @@ void InitalizeEnvironment() {
     NewGame(); currentMenuPage = Mpg_FrontPage;
     if (playIntroAtBoot) ChangeMenuPage(Mpg_IntroVideo);/*must come after NewGame (it resets the page to Mpg_FrontPage) and go through ChangeMenuPage so the cutscene also gets its clip audio + start time*/
     else { PlayMenuMusic(); }/*the title music fronts the menu*/
-    World.menuActive = true;
+    //World.menuActive = true; COMMENTED for immediate into game
     OS_ScratchFree(); DualLog("Game Initialized in %f secs\n",get_time() - game_start_time); DebugRAM("InitializeEnvironment after scratch free"); DebugRAMPeak(); DebugRAMBreakdown();
 }
 

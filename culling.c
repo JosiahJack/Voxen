@@ -1,6 +1,14 @@
 // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
 #include "common.h"
 u32 gridCellStates[ARRSIZE],precomputedVisibleCellsFromHere[524288];/*4096 * 4096 / 32*/ u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u32 numActivePortals = 0;
+void ResetDoorPortals(void) {
+    /*AddDoorPortal numbered doors off this counter and nothing reset it, so the second NewGame pass in a session
+      restarted at 260 instead of 0 and appended a second copy of every portal in the table. A third pass would have
+      overrun MAX_PORTALS (the data has 260 portal-blocking doors against a 640 cap) and silently stopped blocking.
+      AddDoorPortal always writes the slot it claims before counting it, so zeroing the count is enough and
+      activePortals itself does not need clearing.*/
+    numActivePortals = 0;
+}
 bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
 bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }

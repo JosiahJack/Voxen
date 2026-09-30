@@ -286,7 +286,7 @@ void SpawnManagerUpdate(u16 self) {
        inclusive so the two agree. */
     u16 spot=0,valid=0; for (u8 shot=0;shot<10;++shot){ u16 want=(u16)random_range_u32(0,spots-1),cand=0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i){ if(World.instances[i].index!=SPAWNPOINT_CONST) {continue;} if(want--==0){cand=i;break;} } if (!cand||!SpawnPointIsClear(cand)) {continue;} spot=cand; if (++valid>8) break; }
     if (!valid) {return;}/*GetRandomLocation returns null; Spawn():122 logs and bails*/
-    u16 npc=SpawnDynamicObject(e->spawnIndex,false); if (npc==0xFFFF) {return;}/*SpawnManager.Spawn():119-122 logs and bails*/
+    u16 npc=SpawnDynamicObject(e->spawnIndex,false); if (!EntIdxIsValid(npc)) {return;}/*SpawnManager.Spawn():119-122 logs and bails*/
     World.position[npc]=World.position[spot]; World.scale[npc]=(V3){1.0f,1.0f,1.0f};
     if (!e->alertEnemiesOnAwake) {flag_set(&World.instances[npc].entflags, EF_WANDERING, true); return;}/*aic.wandering = true, except for index 14 which SpawnManager.Spawn():132 skips; 14 is not an NPC constIndex in Voxen's table, so there is no such exception*/
     AIAlert(npc);/*SetEnemy(player1)*/
@@ -562,12 +562,21 @@ void GrenadeActivate(u16 self) {
 void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=1.451f; /*weapon_grenademine_live ProxCollision m_Radius, not blast radius.  Unity arms on OnTriggerEnter, so the sensing body's own collider radius adds to the trigger sphere (GrenadeProximity.cs); colliderSize.x is that radius for COLTYPE_CAP/COLTYPE_SPW, and mesh-collider bodies leave it at 0 so they test at the bare trigger radius.*/ bool npcMine = GrenadeIsNPCMine(self); /*Deliberate divergence from Unity GrenadeProximity, which prox-senses Player and NPC alike.  An NPC mine arms on the player; a player's own mine arms on NPCs.*/ for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; float rr = pr + ((World.col[i] == COLTYPE_CAP || World.col[i] == COLTYPE_SPH) ? World.colliderSize[i].x : 0.0f); if (V3_SqDist(World.position[i], origin) < (rr * rr)) { GrenadeExplode(self); return; } } } }
 void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index); if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
 float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= BERSERK_DAMAGE_MULTIPLIER; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
-void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (fx == WORLD || fx == U16_MAX) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
+void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (!EntIdxIsValid(fx)) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void ExitCyberspace(void) { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel(World.startLevel < World.numLevels ? World.startLevel : 0, (V3){0.0f,0.0f,0.0f}); }
-void ReduceCurrentLevelSecurity(SecurityType stype) { // Typical level: 4 CPU nodes. 20 cameras, 100% = 4x + 20y.  Assuming that a good camera percentage is 2-3%, CPU % would be about 10-15 each
-    u8 lev = World.curLev; if (lev >= 14 || stype == SecurityType_None) return; const float camScore=4.0f, nodeSmallScore=10.0f, nodeLargeScore=27.0f; float total = (World.levelCameraCount[lev]*camScore)+(World.levelSmallNodeCount[lev]*nodeSmallScore)+(World.levelLargeNodeCount[lev]*nodeLargeScore); if (total <= 0.0f) return; float drop = camScore;
-    switch(stype){case SecurityType_Camera:drop=(camScore/total)*100.0f; if(World.levCamDestroyedCnt[lev]<255)World.levCamDestroyedCnt[lev]++; break; case SecurityType_NodeSmall:drop=(nodeSmallScore/total)*100.0f; if (World.levSmNodeDestroyedCnt[lev]<255)World.levSmNodeDestroyedCnt[lev]++; break; case SecurityType_NodeLarge:drop=(nodeLargeScore/total)*100.0f; if(World.levNodeDestroyedCnt[lev]<255) World.levNodeDestroyedCnt[lev]++; break; default:return;}
-    int cur=(int)World.levelSecurity[lev]-(int)drop; if (cur<0) cur=0; World.levelSecurity[lev]=(u8)cur; if (World.levCamDestroyedCnt[lev]==World.levelCameraCount[lev] && World.levSmNodeDestroyedCnt[lev]==World.levelSmallNodeCount[lev] && World.levNodeDestroyedCnt[lev]==World.levelLargeNodeCount[lev]) World.levelSecurity[lev]=0; CenterStatusPrint("%s%d%s", Sys_Text.stringTable[306], (int)World.levelSecurity[lev], Sys_Text.stringTable[307]);
+void ReduceCurrentLevelSecurity(SecurityType stype) { // cam 4, small node 10, large node 27 -- a typical 4-node/20-camera level then puts cameras near 2% and nodes near 10-13%
+    static const u32 score[3]={4u,10u,27u}; u8 lev = World.curLev; if (lev >= MAX_LEVELS || stype == SecurityType_None) return;
+    u8* tot[3]={&World.levelCameraCount[lev],&World.levelSmallNodeCount[lev],&World.levelLargeNodeCount[lev]};
+    u8* dcd[3]={&World.levCamDestroyedCnt[lev],&World.levSmNodeDestroyedCnt[lev],&World.levNodeDestroyedCnt[lev]};
+    u32 t=(u32)stype-1u; if (*dcd[t] < 255u) (*dcd[t])++;
+    u32 total=0u, dead=0u; for (u32 i=0u;i<3u;++i) { total += (u32)*tot[i]*score[i]; dead += (u32)*dcd[i]*score[i]; }
+    if (!total) return;
+    u8 before = World.levelSecurity[lev], after;
+    //  ceiling, so any surviving weight keeps the level above 0 and only killing every security object reaches it
+    after = dead >= total ? 0u : (u8)(((total-dead)*100u + total-1u) / total); if (after > 100u) after = 100u;
+    if (after >= before && before) after = before > 1u ? (u8)(before-1u) : before; // a kill must never read as 58 -> 58
+    World.levelSecurity[lev] = after;
+    CenterStatusPrint("%s%d%s", Sys_Text.stringTable[306], (int)World.levelSecurity[lev], Sys_Text.stringTable[307]);
 }
 /*Security-code displays.  Unity CodeScreen.Update re-assigns Const.a.screenCodes[matIndex] every 0.3s, and
   Texture slots 768..777 are Textures/screencode0..9.png, the same range EPerms[551].texIndex (768) already sits in.
@@ -640,7 +649,7 @@ static void TeleportAway(u16 self) {
     play_wav(sounds[106]/*misc/teleport*/, AppliedFXVol(1.0f), World.position[self], false);
 }
 
-static void DropSearchables(u16 self) {for(int i=0;i<4;i++){if(World.instances[self].contents[i]<=-1){continue;} u16 spawned=SpawnDynamicObject(World.instances[self].contents[i]+307,true); if(spawned!=U16_MAX){World.position[spawned]=World.position[self]; World.instances[spawned].custIdx[0]=World.instances[self].custIdx[i];}else{CenterStatusPrint("BUG: Failed to make search obj.");} World.instances[self].contents[i]=World.instances[self].custIdx[i]=-1;}}
+static void DropSearchables(u16 self) {for(int i=0;i<4;i++){if(World.instances[self].contents[i]<=-1){continue;} u16 spawned=SpawnDynamicObject(World.instances[self].contents[i]+307,true); if(EntIdxIsValid(spawned)){World.position[spawned]=World.position[self]; World.instances[spawned].custIdx[0]=World.instances[self].custIdx[i];}else{CenterStatusPrint("BUG: Failed to make search obj.");} World.instances[self].contents[i]=World.instances[self].custIdx[i]=-1;}}
 static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} if (!IdxInBounds((int)fxPoolType) || IdxIsGeometry((int)fxPoolType)) {return; /*PoolType is an ordinal enum (None..LeafBurst, 0..29), not a const index.  Feeding one to SpawnDynamicObject makes it try to spawn a level chunk, which is where "Indices 0 to 306 (level chunks) not possible when not on edit mode!" came from.  Refuse here so no caller can reach that.*/} V3 pos = World.position[self]; if (World.col[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
 static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.gravity[self] = 0.0f; }
 static void SpawnSecCpuNodeGibs(u16 self) {
@@ -648,7 +657,7 @@ static void SpawnSecCpuNodeGibs(u16 self) {
     V3 pos = World.position[self]; Quaternion rot = World.rotation[self];
     for (u16 gibConst = 840; gibConst <= 853; ++gibConst) {
         u16 gib = SpawnDynamicObject(gibConst, false);
-        if (gib == U16_MAX || gib >= World.instCount || gib == self) continue;
+        if (!EntIdxIsValid(gib) || gib == self) continue;
         World.position[gib] = pos; World.rotation[gib] = rot;
         World.velocity[gib] = (V3){0.0f, World.velocity[self].y, 0.0f};
         World.gravity[gib] = 1.0f; World.layer[gib] = L_Corpse;
@@ -659,8 +668,8 @@ static void ObjectDeath(u16 self) {
     Entity* e = &World.instances[self]; if (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) return;
     if (World.instances[self].entflags & EF_DEATH_BURST_DONE) { CreateDeathEffects(self,World.instances[self].deathBurst); DropSearchables(self); if (World.instances[self].index != 279){World.col[self]=COLTYPE_NONE;} HideSelf(self); } else { World.col[self] = COLTYPE_NONE; DropSearchables(self); CreateDeathEffects(self,World.instances[self].deathBurst); }
     flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true); World.instances[self].automapHidden = true;
-    if (World.instances[self].securityThreshold > 0) { SecurityType stype = SecurityType_None; if(World.instances[self].index == 477){stype=SecurityType_Camera;}else if(World.instances[self].index == 479){stype=SecurityType_NodeSmall;} else if(World.instances[self].index == 478){stype=SecurityType_NodeLarge;} if(stype != SecurityType_None){ReduceCurrentLevelSecurity(stype);} }
-    if ((World.instances[self].index == 478 || World.instances[self].index == 479) && !CPUNodesRemainOnLevel()) CodeScreensSetForLevel(World.curLev);/*sec_cpunode/sec_cpunode_small: the last node on the level reveals its security code on the displays and stops the flicker.  Deliberately outside the securityThreshold guard above -- that branch is about the level security percentage, and a node with no threshold still has to set its code screen.*/
+    { SecurityType stype = SecurityType_None; if(World.instances[self].index == 477){stype=SecurityType_Camera;}else if(World.instances[self].index == 479){stype=SecurityType_NodeSmall;} else if(World.instances[self].index == 478){stype=SecurityType_NodeLarge;} if(stype != SecurityType_None){ReduceCurrentLevelSecurity(stype);} }
+    if ((World.instances[self].index == 478 || World.instances[self].index == 479) && !CPUNodesRemainOnLevel()) CodeScreensSetForLevel(World.curLev);/*sec_cpunode/sec_cpunode_small: the last node on the level reveals its security code on the displays and stops the flicker.  Independent of the level security percentage above -- revealing the code is a node-behaviour rule, not a percentage one.*/
     u16 idx = World.instances[self].index; SpawnSecCpuNodeGibs(self); play_wav(SoundPath((idx < 527 && objectDeathSound[idx] != 0) ? objectDeathSound[idx] : 62/*crate_break*/), AppliedFXVol(1.0f), World.position[self], true); if(e->deathBurst != 0){HideSelf(self);}
 }
 
@@ -845,8 +854,8 @@ void DoorUpdate(u16 self) {
 }
 
 u16 SpawnDynamicObject(int val, bool cheat) {
-    if (!IdxInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return 0xFFFF; } if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return 0xFFFF; } (void)cheat;
-    if (World.instCount >= INSTANCE_COUNT) { DualLogError("Failed to spawn constIndex %u: instance table full (%u/%u)",val,World.instCount,INSTANCE_COUNT); return 0xFFFF; } u16 entityIndexInInstanceTable = AddInstance((u16)val, (V3){0.0f,0.0f,0.0f}); return entityIndexInInstanceTable;
+    if (!IdxInBounds(val)) { DualLogWarn("Const index out of bounds: %u", val); return WORLD; } if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return WORLD; } (void)cheat;
+    if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("Failed to spawn constIndex %u: instance table full (%u/%u)",val,World.instCount,INSTANCE_COUNT); return WORLD; } u16 entityIndexInInstanceTable = AddInstance((u16)val, (V3){0.0f,0.0f,0.0f}); return entityIndexInInstanceTable;
 }
 // TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.
 void TriggerTargetted(u16 self, u16 activator) { UseTargets(activator, World.instances[self].targetIdx); }

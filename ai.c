@@ -579,7 +579,7 @@ static void AIDead(u16 idx) {
         V3 gibPos = World.position[idx]; Quaternion gibRot = World.rotation[idx];
         for (u16 gibConst = range.first; gibConst <= range.last; ++gibConst) {
             u16 gib = SpawnDynamicObject(gibConst, false);
-            if (gib == 0xFFFF || gib >= INSTANCE_COUNT || gib == idx) continue;
+            if (!EntIdxIsValid(gib) || gib == idx) continue;
             World.position[gib] = gibPos; World.rotation[gib] = gibRot;
             World.velocity[gib] = (V3){0.0f, World.velocity[idx].y, 0.0f}; World.gravity[gib] = 1.0f;
             World.layer[gib] = L_Corpse;
@@ -635,7 +635,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     u16 sidx=(u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; int masterIdx; float launchSpd; switch (n) { case 1: masterIdx = npc->projectile1Prefab; launchSpd = npc->projectileSpeedAttack1; break; case 2: masterIdx = npc->projectile2Prefab; launchSpd = npc->projectileSpeedAttack2; break; default: masterIdx = npc->projectile3Prefab; launchSpd = npc->projectileSpeedAttack3; break; }
     DamageData dd = SetNPCData(self,n); dd.attackType=Att_Ball; // Citadel ProjectileLaunched always uses ProjectileLaunched.
     V3 spos=ai_attack_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370,false);
-    if (bb==0xFFFF || bb==0 || bb>=INSTANCE_COUNT) bb=SpawnDynamicObject(370,false); if (bb==0xFFFF || bb==0 || bb>=INSTANCE_COUNT) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir;
+    if (!EntIdxIsValid(bb)) bb=SpawnDynamicObject(370,false); if (!EntIdxIsValid(bb)) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir;
     proj->damage=dd.damage; proj->strength=dd.penetration; proj->speed=dd.offense; proj->attackType=dd.attackType; proj->recentMostActivator=sidx; ProjectileEffectImpactInitAfterLoad(bb);
     V3 shove = V3_ScaleByF(dir, launchSpd); if (vabs(World.gravity[sidx]) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0,0,0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
