@@ -483,7 +483,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {    if (entIdx >=
     if (entIdx == 592 || entIdx == 593) { World.instances[i].modelIndex = U16_MAX; } // 3D text decals (no mesh)
     float defHealth = DefaultPrefabHealth(entIdx);/*default health for every prefab whose HealthManager the level data leaves unset (runtime spawns, any order-dependent read).  Values are the health: field serialized in the matching prefab under Assets/Resources/Prefabs/, so crates, prop_console01/02, se_corpse_* (health 50, without which a corpse carries none, IsDamageable() rejects it and melee can never gib a body), barrels, sec_camera, sec_cpunode(_small), chunk_screen and se_briefcase are damageable exactly as they are in Unity.*/
     if (defHealth > 0.0f && World.instances[i].health <= 0.0f) World.instances[i].health = defHealth;
-    if (!IdxIsNPC(entIdx)) World.instances[i].bloodType = DefaultPrefabBloodType(entIdx);/*before parsing, so a bloodType: key in the level data still overrides; InitNPC has already claimed the NPC types*/
+    if (!IdxIsNPC(entIdx)) World.instances[i].bloodType = DefaultPrefabBloodType(entIdx);/*Prefab constant, NOT per-instance state: HealthManager.bloodType is a serialized prefab field and no level*.txt record carries a bloodType key, so the parser has no branch for it and must never grow one.  InitNPC has already claimed the NPC types.*/
     if (entIdx == 717 /*ef_cyber_ice*/ && World.instances[i].cyberHealth <= 0.0f) World.instances[i].cyberHealth = 100.0f;/*ef_cyber_ice.prefab serializes cyberHealth 100, health -1*/
       if (entIdx == 477 /*sec_camera*/) { Entity* ce = &World.instances[i]; ce->camStartYAngle = 0.0f; ce->camEndYAngle = 180.0f; ce->camWaitTime = 0.8f; ce->camRotatePositive = true; ce->camRotateEnabled = false; }/*SecurityCameraRotate field defaults; the level lines override the three angles.  camRotateEnabled defaults FALSE because sec_camera.prefab ships the SecurityCameraRotate component with m_Enabled: 0 -- a disabled MonoBehaviour is dispatched neither Start() nor Update(), so the sweep never runs at all.  The [HideInInspector] 'active' flag that Start() copies from enabled is never read by Update() and is irrelevant either way.*/
     World.instances[i].questBitID = QB_None;/*AddInstance zero-fills, which would read as bit 0 (QB_RobotSpawnDeactivated). Unity's QuestBitRelay guards every bit with "if (<boolean> && ...)", so a relay that names no bit does nothing at all; QB_None reproduces that. Level parsing assigns a real bit to whichever boolean the record carries.*/
@@ -492,7 +492,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {    if (entIdx >=
     if (World.levelCurrentlyLoading) { /*Tally the level's security objects so the security split and the system analyzer's node total have real denominators; guarded so runtime spawns never inflate them*/
         u8 sl=World.currentLevel; if (sl<MAX_LEVELS) { u8* dst=entIdx==477?&World.levelCameraCount[sl]:entIdx==478?&World.levelLargeNodeCount[sl]:entIdx==479?&World.levelSmallNodeCount[sl]:0; if (dst && *dst<255) (*dst)++; } }
     World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f; if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; World.instances[i].SFXLockedIndex = -1; }/*ButtonSwitch: every func_switch* prefab serializes SFXLockedIndex -1, i.e. no locked click. The success SFX comes from buttonSwitchSFX in citadel.c, the same prefab-constant-table shape doorSFXIndex uses in LoadLevelData.*/
-    if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=COLTYPE_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; World.levelInstCount[World.currentLevel]=World.instCount; return i;
+    if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=COLTYPE_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; return i;/*levelInstCount[curlevel] is written once, at the end of LoadLevelData (entity.c:968), not per instance: its only readers are SetLevelPointers (right after a load), the LoadAllLevels entity-count log, and BuildTextDecalMeshes (which runs once, after every level is resident).  No reader observes a mid-load count, so the per-AddInstance store was redundant -- and it ran 8500 times a level.*/
 }
 
 static const char* mm_ptr; static const char* mm_end;
@@ -556,7 +556,7 @@ static V3 TriggerPrefabScale(u16 entIdx) {
 u16 IOInternName(const char* name){if(!name || !*name){return IO_NONE;} for(u16 i=1;i<ioNameCount;++i){if(sEqual(ioNames[i],name)){return i;}} if(ioNameCount >= MAX_IO_NAMES){DualLogError("IO name full!\n"); return IO_NONE;} scpy_to_a_from_b(ioNames[ioNameCount],name,TARG_STRLEN); return ioNameCount++;}
 static void FWBeginBlock(i32 cnt){V3 *p,*s; Quaternion *r; if(fwCollecting&&fwLastChunkSlot<FW_MAX_CHILDREN){p=&lwPos[fwLastChunkSlot]; r=&lwRot[fwLastChunkSlot]; s=&lwScale[fwLastChunkSlot];}else{switch(fwStage++){case 1:p=&fwContainerPos; r=&fwContainerRot; s=&fwContainerScale; break; case 2:p=&fwInfoLocalTmp; r=&fwInfoRotDummy; s=&fwInfoScaleDummy; break; default:p=&posFromFile[cnt]; r=&rotationFromFile[cnt]; s=&scaleFromFile[cnt]; break;}} fwCurP=p; fwCurR=r; fwCurS=s;}
 void LoadLevelMod(u8 lev) {
-    u8 curlevel = vclamp(lev, 0, 13); World.curLev = curlevel; World.levelCurrentlyLoading = true; World.instCount = 3;
+    u8 curlevel = vclamp(lev, 0, 13); World.levelCurrentlyLoading = true;/*precondition only, for AddInstance's level-security tally (entity.c:492) -- NOT redundant bookkeeping and deliberately kept: the tally reads this global.  curLev and instCount=3 were dropped here as pure duplicates: LoadLevelData:911 sets both one line earlier and nothing runs in between.*/
     if(curlevel == 0){AddCamView((V3){-14.16170f,-54.72389f,20.71170f},(Quaternion){0.03959f,0.41918f,-0.01830f,0.90686f},85u,256u,256u,0.84f,16.223f);/*ReacScreen1_Camera*/ AddCamView((V3){36.38030f,-57.61589f,-0.30230f},(Quaternion){0.12279f,0.69636f,-0.12279f,0.69636f},50u,256u,256u,2.0f,17.05f);/*ReacScreen1_Camera (1)*/ AddCamView((V3){-0.64170f,-54.17389f,-5.37830f},(Quaternion){0.17111f,0.16779f,-0.02959f,0.97041f},65u,256u,256u,0.513f,26.13f);/*ReacScreen1_Camera (2)*/}
     else if(curlevel == 1){AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);/*MedScreen14_Camera*/ AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);/*MedScreen15_Camera*/}
     else if(curlevel == 2) { AddCamView((V3){36.73389f,-24.66895f,9.47060f},(Quaternion){0.11769f,-0.23125f,0.02819f,0.96534f},75u,256u,256u,0.695f,13.73f);/*SciScreen6_Camera*/}
@@ -580,7 +580,7 @@ void LoadLevelMod(u8 lev) {
             entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; } inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
             for (u8 slot=0;slot<4;++slot) inst->contents[slot]=inst->custIdx[slot]=-1; for (u8 slot=0;slot<7;++slot) inst->randomItem[slot]=inst->randomItemCustIdx[slot]=-1;
             inst->relayEnabled=true;/*Unity LogicRelay: public bool relayEnabled = true; level data never writes the key, so absent must mean enabled.*/
-            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; ipLine=false; ipBlock=0; ipSubRotSet=false; ipCurP=NULL; ipCurR=NULL; ipCurS=NULL; npcLine=false; npcBlock=0; npcRootRotSet[entCount]=false; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f}; inst->relayEnabled = true;
+            fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; ipLine=false; ipBlock=0; ipSubRotSet=false; ipCurP=NULL; ipCurR=NULL; ipCurS=NULL; npcLine=false; npcBlock=0; npcRootRotSet[entCount]=false; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f};/*relayEnabled is seeded once, at the top of this block (line 582)*/
         }
         bool constIndexRead = false; bool activeStateRead = false; bool matIndexRead = false; u8 scaleReadMask = 0; u16 matIndexTexIdx = 881;
         while (line[0] != '\0') {
@@ -613,7 +613,7 @@ void LoadLevelMod(u8 lev) {
                     else if (KEY_EQ("lS.z")) { if(fwLine){ if(fwCurS)fwCurS->z=v; } else if(ipLine){ if(ipCurS)ipCurS->z=v; } else { scaleFromFile[entCount].z=v; scaleReadMask|=4u; } }
                 }
                 else if(KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
-                else if(KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("bloodType")) inst->bloodType=(BloodType)parse_numberu8(value,lineSpace,lineNum);
+                else if(KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);/*bloodType is a prefab constant (AddInstance, DefaultPrefabBloodType) and no level record carries the key -- deliberately no parse branch.*/
                   else if(KEY_EQ("startYAngle")) inst->camStartYAngle=parse_float(value,lineSpace,lineNum); else if(KEY_EQ("endYAngle")) inst->camEndYAngle=parse_float(value,lineSpace,lineNum); else if(KEY_EQ("waitTime")) inst->camWaitTime=parse_float(value,lineSpace,lineNum);
                   else if(KEY_EQ("enabled") && inst->index == 477) inst->camRotateEnabled=parse_bool(value,lineSpace,lineNum);/*SecurityCameraRotate.enabled; sec_camera.prefab ships this component with m_Enabled: 0, so 127 of the 149 camera records (enabled:0) never sweep in Unity*/
                 else if(KEY_EQ("keycode")) inst->keycode=parse_numberu16(value,lineSpace,lineNum);
@@ -737,7 +737,6 @@ void LoadLevelMod(u8 lev) {
                 else if(keyLen==24 && sCompUpToLen(key,"currentPositionsRight[",22)==0 && key[22]>='0' && key[22]<='6' && key[23]==']') inst->wireCurR[key[22]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);
                 else if(sCompUpToLen(key,"grid[",5)==0 && keyLen>=7 && key[keyLen-1]==']') { int gi=0; bool gok=true; for (int k=5;k<keyLen-1;++k) { if (key[k]<'0'||key[k]>'9') { gok=false; break; } gi=gi*10+(key[k]-'0'); } if (gok && gi<35) inst->gridCells[gi]=parse_bool(value,lineSpace,lineNum); }/*PuzzleGridPuzzle.grid[0..34], key width varies with the index*/
                 else if(KEY_EQ("fired"))          inst->puzzleFired = parse_bool(value,lineSpace,lineNum);/*PuzzleGridPuzzle.fired: the onlyFireOnce latch*/
-                else if(KEY_EQ("puzzleSolved"))  inst->puzzleSolved = parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("onSecond"))        inst->branchOnSecond = parse_bool(value, lineSpace, lineNum);                                           else if(KEY_EQ("onceEver"))        inst->relayOnceEver = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(value, lineSpace, lineNum);                                else if(KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
@@ -748,7 +747,20 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("maxDistance")) inst->reverbMaxDist = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("reverbPreset")) inst->reverbPreset = (u16)parse_numberu16(value, lineSpace, lineNum);
                 else if(KEY_EQ("center.x")) colCtrFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.y")) colCtrFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.z")) colCtrFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("size.x")) colSzFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.y")) colSzFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.z")) colSzFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("direction.x")) inst->direction.x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("direction.y")) inst->direction.y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("direction.z")) inst->direction.z = parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("force")) inst->force = parse_float(value,lineSpace,lineNum);/*trigger_cyberpush (595)*/
                 else if(KEY_EQ("emailIndex")) inst->emailIndex = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("autoPlayEmail")) inst->autoPlayEmail = parse_bool(value,lineSpace,lineNum);
+                /*TeleportTouch.Save() (Citadel/Assets/Scripts/TeleportTouch.cs:49-52).  The loader had no branch for
+                  these three, so all 8 info_teleport_destination records (constIndex 703, levels 2/6/7/9) loaded as id
+                  0: entity.c:958 put every pad on slot 0 and physics.c:45 teleported to whichever held it.  justUsed
+                  is a SaveRelativeTimeDifferential, so it rebases on pauseRelativeTime like nextthink does.*/
+                else if(KEY_EQ("teleportID")) inst->teleportID = parse_numberu16(value,lineSpace,lineNum);
+                else if(KEY_EQ("targetDestinationID")) inst->targetDestinationID = parse_numberu16(value,lineSpace,lineNum);
+                else if(KEY_EQ("justUsed")) inst->justUsed = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;
+                else if(KEY_EQ("allDone")) inst->allDone = parse_bool(value,lineSpace,lineNum);/*trigger_* onlyOnce latch (TriggerTriggerTripped, CyberSwitchUpdate)*/
+                else if(KEY_EQ("iceActive")) inst->iceActive = parse_bool(value,lineSpace,lineNum);/*prop_cyber_switch (555)*/
+                else if(KEY_EQ("broken")) inst->broken = parse_bool(value,lineSpace,lineNum);/*prop_healingbed (574)*/
+                else if(KEY_EQ("despawnInstead")) inst->despawnInstead = parse_bool(value,lineSpace,lineNum);/*us_relaypanel (614)*/
                 else if(KEY_EQ("RobotSpawnDeactivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_RobotSpawnDeactivated; }   else if(KEY_EQ("IsotopeInstalled"))            { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsotopeInstalled; }
                 else if(KEY_EQ("ShieldActivated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_ShieldActivated; }         else if(KEY_EQ("LaserSafetyOverriden"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserSafetyOverriden; }
                 else if(KEY_EQ("LaserDestroyed"))              { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserDestroyed; }          else if(KEY_EQ("BetaGroveCyberUnlocked"))      { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BetaGroveCyberUnlocked; }
@@ -813,6 +825,15 @@ void LoadLevelMod(u8 lev) {
             if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
         par->panelItemPos=src->panelItemPos; par->panelItemRot=src->panelItemRot; par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->lockedTargetIdx=src->lockedTargetIdx; par->deferredIoflags=src->deferredIoflags; par->deferredIoflagsHi=src->deferredIoflagsHi; par->useQuestKeycode1=src->useQuestKeycode1; par->useQuestKeycode2=src->useQuestKeycode2; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed; par->codeScreen=src->codeScreen;
+        /*Carry block for fields the parse loop writes to the staging record.  Hand-maintained, so every key the parser
+          writes must appear here exactly once -- Tools/parse_coverage_check.py diffs inst-> writes against par-> copies
+          and fails on a non-empty set.  gridCells is the puzzle board the UI reads back (citadel.c:1044), wireCurL/R
+          the wire-puzzle layout, teleportID/targetDestinationID/justUsed the TeleportTouch pair physics.c:45 resolves.*/
+        mcpy(par->gridCells,src->gridCells,sizeof(par->gridCells)); mcpy(par->wireCurL,src->wireCurL,sizeof(par->wireCurL)); mcpy(par->wireCurR,src->wireCurR,sizeof(par->wireCurR));
+        par->puzzleFired=src->puzzleFired; par->emailIndex=src->emailIndex; par->autoPlayEmail=src->autoPlayEmail; par->logIndex=src->logIndex; par->textIndex=src->textIndex; par->trackType=src->trackType; par->rechargeMsgLingdex=src->rechargeMsgLingdex;
+        par->teleportID=src->teleportID; par->targetDestinationID=src->targetDestinationID; par->justUsed=src->justUsed;
+        par->allDone=src->allDone; par->iceActive=src->iceActive; par->broken=src->broken; par->despawnInstead=src->despawnInstead; par->panelOpen=src->panelOpen; par->panelInstalled=src->panelInstalled; par->requireRecharge=src->requireRecharge; par->rechargeFinished=src->rechargeFinished; par->SFXLockedIndex=src->SFXLockedIndex; par->usedMsgLingdex=src->usedMsgLingdex;
+        par->direction.x=src->direction.x; par->direction.y=src->direction.y; par->direction.z=src->direction.z; par->force=src->force;/*trigger_cyberpush (595): physics.c:536 scales .force by the target mass and pushes along .direction*/
         par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset; par->requiredAccessCard=src->requiredAccessCard; par->musicType=src->musicType; par->messageIndex=src->messageIndex; par->counter=src->counter; par->countToTrigger=src->countToTrigger; par->dontReset=src->dontReset; par->ioflagsHi=src->ioflagsHi; par->spawnIndex=src->spawnIndex; par->numberToSpawn=src->numberToSpawn; par->numberActive=src->numberActive; par->countOnlySameIndex=src->countOnlySameIndex; par->alertEnemiesOnAwake=src->alertEnemiesOnAwake; par->minDelayBetweenSpawns=src->minDelayBetweenSpawns; par->maxDelayBetweenSpawns=src->maxDelayBetweenSpawns; par->allSpawnedResetDelay=src->allSpawnedResetDelay; par->lockedMessageLingdex=src->lockedMessageLingdex; par->SFXIndex=src->SFXIndex; par->touchEnabled=src->touchEnabled; par->doorOpen=src->doorOpen; par->percentMoved=src->percentMoved;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARG_STRLEN);
         if (entIdx == 517) { // func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative
@@ -979,6 +1000,25 @@ u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride
        weapon_grenadeearth_live, not a card, and a 388..398 range test would delete every Earthshaker in the game.
      item_audiolog (313)               gone on mission 0.
      item_cyber_data (448)             gone on mission 0 (CyberItem.cs:9-13 disables SoftwareType.Data and nothing else). */
+/* Snapshot every level's entity table to a binary file for Tools/entity_dump_diff.py.
+   The struct layout is not written here -- the tool recovers it from the compiler
+   (Tools/entity_layout.py), so this format cannot desync from the real Entity.
+   Point the VOXEN_DUMP_ENTITIES environment variable at a path to produce one.
+   Raw structs are dumped rather than a named field list so the differ sees fields
+   nobody remembered to write down; the tool filters pointer-typed members, whose
+   values legitimately vary between runs. */
+void EntityDumpAll(const char *path){
+    FHandle f = OS_OpenWriteonly(path); if(f == INVALID_FHANDLE){ DualLogError("EntityDumpAll: cannot open %s\n",path); return; }
+    static const char magic[8] = {'V','O','X','E','N','E','D','1'};
+    u32 esz = sizeof(Entity), nlev = World.numLevels;
+    OS_Write(f,magic,8,path); OS_Write(f,&esz,sizeof(esz),path); OS_Write(f,&nlev,sizeof(nlev),path);
+    for(u32 lev=0; lev<nlev; lev++){
+        u32 count = World.levelInstCount[lev]; OS_Write(f,&lev,sizeof(lev),path); OS_Write(f,&count,sizeof(count),path);
+        OS_Write(f,World.levelInstances[lev],(size_t)count * sizeof(Entity),path);
+    }
+    OS_Close(f); DualLog("Wrote entity dump to %s\n",path);
+}
+
 void NewGameDifficultyPass(void) {
     for (u8 lev = 0; lev < World.numLevels; ++lev) {
         u8 entryLevel = World.curLev; if (entryLevel != lev) SetLevelPointers(lev);

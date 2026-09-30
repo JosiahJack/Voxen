@@ -3719,8 +3719,8 @@ constIndex:559|lP.x:-42.4452|lP.y:12.839|lP.z:-31.952|lR.x:-.56733|lR.y:.42206|l
 constIndex:559|lP.x:-39.89|lP.y:12.839|lP.z:29.4917|lR.x:-.35987|lR.y:.60868|lR.z:.60868|lR.w:.35987
 constIndex:559|lP.x:-37.33|lP.y:12.839|lP.z:32.0517|lR.x:-.16233|lR.y:.68822|lR.z:.68822|lR.w:.16233
 constIndex:559|lP.x:-39.89|lP.y:12.839|lP.z:-34.5083|lR.x:-.69179|lR.y:.1464|lR.z:.1464|lR.w:.69179
-constIndex:755|lP.x:19.7312|lP.y:13.84721|lP.z:-39.1084|lR.x:-.70711|lR.w:.70711|lS.x:.8|lS.y:.8|lS.z:.8
-constIndex:756|lP.x:18.2712|lP.y:13.766|lP.z:-39.2164|lR.x:-.70711|lR.w:.70711|lS.x:.8|lS.y:.8|lS.z:.8
+constIndex:617|lP.x:19.7312|lP.y:13.84721|lP.z:-39.1084|lR.x:-.70711|lR.w:.70711|lS.x:.8|lS.y:.8|lS.z:.8
+constIndex:618|lP.x:18.2712|lP.y:13.766|lP.z:-39.2164|lR.x:-.70711|lR.w:.70711|lS.x:.8|lS.y:.8|lS.z:.8
 constIndex:599|lP.x:-38.75|lP.y:12.79|lP.z:-.03507|lS.x:2.56|lS.y:2.56|lS.z:2.56|tick:.1|trackType:12|musicType:4|center.x:0|center.y:0|center.z:0|size.x:6|size.y:3|size.z:6
 constIndex:597|lP.x:7.344|lP.y:14.724|lP.z:8.968|lR.y:.70711|lR.w:.70711|lS.y:3.84|lS.z:.16|center.x:0|center.y:0|center.z:0|size.x:1|size.y:1|size.z:1
 constIndex:536|lP.x:55.27917|lP.y:8.38056|lP.z:11.00891|lS.x:1.1|lS.z:1.1

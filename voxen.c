@@ -773,7 +773,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     mset(&Sys_Input,0,sizeof(Sys_Input)); World.currentMouse_dx = World.currentMouse_dy = 0; last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) CopyPlayerState(0,lev);
-    DebugRAM("before runtime LoadAllLevels"); LoadAllLevels(); DebugRAM("after runtime LoadAllLevels"); NewGameDifficultyPass();/*mission-difficulty item removals: once, here, where diffMis is final and every level is resident -- see NewGameDifficultyPass in entity.c.*/ LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); DebugRAM("after runtime LoadLevel"); World.invP1.currentCrouchRatio = 1.0f;
+    DebugRAM("before runtime LoadAllLevels"); LoadAllLevels(); DebugRAM("after runtime LoadAllLevels"); NewGameDifficultyPass();/*mission-difficulty item removals: once, here, where diffMis is final and every level is resident -- see NewGameDifficultyPass in entity.c.*/ { extern char *getenv(const char*); char *dumpPath = getenv("VOXEN_DUMP_ENTITIES"); if(dumpPath) EntityDumpAll(dumpPath); }/*opt-in: snapshot the loaded entity tables here, before LoadLevel spawns the player, so two builds diff on loader state alone.*/ LoadLevel(World.startLevel,(V3){10.52f,-43.792f + 0.84f,20.2908f}); DebugRAM("after runtime LoadLevel"); World.invP1.currentCrouchRatio = 1.0f;
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // 1. Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
             World.levelInstances[lev][i].adjacencyIdx = U16_MAX;

@@ -363,6 +363,7 @@ extern bool instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAX_TXRS],tran
 typedef struct { int width,height; u8* pixels; } WinSysIcon;
 RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3),ScreenPointToRayPixels(V3,V3,float,float); void SpawnImpactEffectParticle(u16,V3,V3),SpawnBeamTrail(u16,V3,V3,Color),SpawnTargetingLaser(V3,V3),ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
 u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
+void EntityDumpAll(const char *path);/*entity.c: writes every level's entity table to a binary file for Tools/entity_dump_diff.py; enabled by the VOXEN_DUMP_ENTITIES environment variable.*/
 void MFD_OpenData(bool,u8); void MFD_OpenAudioLog(int); void AutomapTick(),AutomapInitGL(),AutomapBlitToUI(),AutomapSideBlitToUI(bool),AutomapNewGame(),AutomapOnLoad(),AutomapDumpBMP(),AutomapClearRenderTargets(),BiomonitorDumpBMP(),BiomonitorClearRenderTarget(),BioMonitorInit(),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),BioMonitorAlignCursors(),RequestClearRenderTargets(),HudHeatBleed(float),CyberSwitchInitAfterLoad(u16),synth_set_reverb_preset(u16),MFD_ResetGeneral(); bool HudHeatTickOn(int);
 double get_time();
 float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
