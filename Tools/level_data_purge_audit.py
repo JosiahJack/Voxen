@@ -186,7 +186,42 @@ def load_deny(argv):
                     DENY.add(ln)
 
 
+# Keys dropped from the corpus entirely, whatever their value.  Every one of these
+# is emitted by AIController.Save() in Unity purely as savegame state, and Voxen has
+# no use for it.  Each was checked by grepping every field/bit the key lands in:
+#
+#   rangeToEnemy  is a local out-parameter in ai.c (AICanAttack), not an Entity field.
+#   tempVec       only substring-matches reloadContainerRot in common.h.
+#   the rest      appear in no quoted KEY_EQ and no other loader path, so the loader
+#                 never sees them and the data value is unreachable.
+#
+# Deliberately NOT in this list, because Voxen genuinely reads them:
+#   currentState, idleTime, SFXIndex, idealPos, targettingPosition,
+#   currentDestination, idealTransformForward, attack1/2/3SoundTime,
+#   and every entflags bit behind actAsTurret/asleep/wandering/ai_dead/ai_dying/
+#   dyingSetup/deathBurstDone/firstSighting/goIntoPain/hadEnemy/hopDone/inSight/
+#   infront/inProjFOV/LOSpossible/shotFired.  idealTransformForward in particular is
+#   the yaw-recovery source at entity.c:852 for NPC records with no block-0 rotation.
+DROP_BY_REASON = {
+    "AIController.index", "childTR.gameObject.activeSelf", "deathBurst.activeSelf",
+    "deathBurst.transform.childCount", "rangeToEnemy", "searchColliderGO.activeSelf",
+    "targetID", "tempVec.x", "tempVec.y", "tempVec.z", "visibleMeshVisible",
+}
+DROP = set(DROP_BY_REASON)
+
+
+def load_drop(argv):
+    for a in argv:
+        if a.startswith("--drop-keys="):
+            for ln in open(a.split("=", 1)[1]):
+                ln = ln.strip()
+                if ln and not ln.startswith("#"):
+                    DROP.add(ln)
+
+
 def pair_is_purgeable(key, val, ci, is_light):
+    if key in DROP:
+        return True
     if is_presence_sensitive(key) or key in DENY:
         return False
     return light_is_default(key, val) if is_light else entity_is_default(key, val, ci)
@@ -211,7 +246,9 @@ def record_purge_mask(aligned, ci, is_light):
     for _, k, v in aligned:
         fv = as_float(v)
         own.append(k)
-        per_key[k].append(fv is not None and pair_is_purgeable(k, fv, ci, is_light))
+        # A DROP key goes unconditionally; the duplicate-key rule below still
+        # governs value-based purging only.
+        per_key[k].append(k in DROP or (fv is not None and pair_is_purgeable(k, fv, ci, is_light)))
     key_ok = {k: all(oks) for k, oks in per_key.items()}
     return [key_ok[k] for k in own]
 
@@ -265,6 +302,7 @@ def main():
     dry = "--dry-run" in sys.argv
     do_list = "--list" in sys.argv
     load_deny(sys.argv)
+    load_drop(sys.argv)
 
     files = sorted(glob.glob(DATA_GLOB))
     total_bytes = sum(os.path.getsize(f) for f in files)
