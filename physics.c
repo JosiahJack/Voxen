@@ -458,7 +458,7 @@ void Physics(float dt) {
         }
         gContactCount=0;
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
-            u16 a=dynamicEntities[i]; V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
+            u16 a=dynamicEntities[i]; if (IdxIsNPC(World.instances[a].index) && (World.instances[a].entflags & EF_ASLEEP)) { continue; } V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; } else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
             float linDrag = vexp(-0.1f * dtsub); World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; float angDrag = vexp(-2.0f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag); SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
             if (World.col[a] != COLTYPE_CAP) {

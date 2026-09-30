@@ -883,6 +883,20 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
     if (wasCull) glEnable(GL_CULL_FACE); if (wasDepth) glEnable(GL_DEPTH_TEST); if (wasBlend) glEnable(GL_BLEND);
     glBindVertexArray(0); glBindBuffer(GL_ARRAY_BUFFER,0);
 }
+/*Unity WeaponMagazineCounter port: the side MFD clip readout is a 3-digit odometer (100s/10s/1s) fed only by the loaded clip,
+   never the reserve -- the "12mg | 96mg, 48pn" string belongs to Inventory.GetTextForWeaponAmmo, which Voxen keeps on the
+   general-inventory weapon rows.  indicatorSprites[0..9] are Textures/UI/num_0..num_9 (tex 1053..1062) and [10] is
+   nullsprite, so 10 means draw nothing.  Unity blanks all three digits for no weapon, rapier, pipe, cyberspace, or a
+   pending weapon switch.  wep16 + 36 == Unity's const index, so its 41/42 rapier/pipe tests are 5/6 here. */
+static void WeaponMagazineDigits(int wep16,int slot,int out[3]) {
+    out[0]=out[1]=out[2]=10;
+    if (wep16<0||wep16==5||wep16==6||slot<0||slot>6||World.invP1.weaponCurrentPending>=0||World.curLev==LEVEL_CYBERSPACE) return;
+    int amount=World.invP1.wepLoadedWithAlternate[slot]?World.invP1.currentMagazineAmount2[slot]:World.invP1.currentMagazineAmount[slot];
+    if (amount<0) return;
+    out[2]=amount%10;
+    if (amount>9) out[1]=(amount/10)%10;
+    if (amount>99) out[0]=(amount/100)%10;
+}
 /*Unity AmmoIconManager.SetAmmoIcon port: ammo icon texture per weapon, now the real Textures/UI/ammoicons art (3309..3323, appended to Data/textures.txt). Returns 0 for energy/rapier/pipe/no-weapon (Unity hides the icon there).*/
 static u16 WeaponAmmoIconTex(int wep16,bool alt) {
     switch (wep16) {
@@ -918,11 +932,13 @@ void SideMFD(bool isRH) { // 320x240
                 UIRImg(MID(isRH,WEAPON_OVERLOAD),(i16)(tx0+210),676,84,40,World.invP1.overloadEnabled?951:950);
                 UIRText(MID(isRH,WEAPON_OVERLOAD),(i16)(tx0+214),686,UIOver(MID(isRH,WEAPON_OVERLOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,76,World.invP1.overloadEnabled?Sys_Text.stringTable[19]:Sys_Text.stringTable[20]);
             } else if (wep16 != 5 && wep16 != 6) {
-                i16 x0=(i16)(isRH ? 1207 : 24); char ammoText[48]; GetWeaponAmmoText(slot,ammoText,sizeof(ammoText));
+                i16 x0=(i16)(isRH ? 1207 : 24);
                 UIRImg(MID(isRH,WEAPON_AMMO),x0,652,140,42,World.invP1.wepLoadedWithAlternate[slot]?897:898);/*Ammo pane*/
                 u16 ammoIconTex=WeaponAmmoIconTex(wep16,World.invP1.wepLoadedWithAlternate[slot]!=0);
-                if (ammoIconTex) { UIRImg(UI_ID_NONE,(i16)(x0+4),654,34,36,ammoIconTex);/*Ammo icon (Unity clipBox icon)*/ UIRText(MID(isRH,WEAPON_AMMO),(i16)(x0+42),663,T_GREEN,FONT_NORMAL,0.9f,92,ammoText); }
-                else UIRText(MID(isRH,WEAPON_AMMO),(i16)(x0+5),663,T_GREEN,FONT_NORMAL,0.9f,130,ammoText);
+                if (ammoIconTex) UIRImg(UI_ID_NONE,(i16)(x0+4),654,34,36,ammoIconTex);/*Ammo icon (Unity clipBox icon)*/
+                int dig[3]; WeaponMagazineDigits(wep16,slot,dig);
+                static const i16 digX[3]={42,58,75};/*Unity digit cells are 20x20 on a 16.2 pitch, hundreds first, centred in the 42px pane.*/
+                for (int d=0;d<3;++d) if (dig[d]<10) RenderUIImage((i16)(x0+digX[d]),663,20,20,1053+dig[d]);/*tex 10 == nullsprite: skip*/
                 UIRImg(MID(isRH,WEAPON_RELOAD),(i16)(x0+148),652,60,40,908); UIRText(MID(isRH,WEAPON_RELOAD),(i16)(x0+153),663,UIOver(MID(isRH,WEAPON_RELOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,50,Sys_Text.stringTable[11]);
                 UIRImg(MID(isRH,WEAPON_UNLOAD),(i16)(x0+214),652,60,40,908); UIRText(MID(isRH,WEAPON_UNLOAD),(i16)(x0+219),663,UIOver(MID(isRH,WEAPON_UNLOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,50,Sys_Text.stringTable[881]);
             } } }
