@@ -399,9 +399,7 @@ void LoadTextures() {
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
     glBindBuffer(GL_SSBO, colorBufferID);
-    void* dst = glMapBufferRange(GL_SSBO, 0, packed_size, 0x0002 | 0x0004);
-    mcpy(dst, all_indices, packed_size);
-    glUnmapBuffer(GL_SSBO);
+    glBufferSubData(GL_SSBO, 0, packed_size, all_indices);
     
     glBindBuffer(GL_SSBO, texPalID);
     glBufferData(GL_SSBO, totalPaletteColors * sizeof(u32), texturePalettes, GL_STATIC_DRAW);

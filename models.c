@@ -29,7 +29,7 @@ enum{MAX_GLB_JOINTS=96,MAX_GLB_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLB_BLOCKS=64}; float
 typedef struct { const char *data; int size; } RawOBJ;
 typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData;
 typedef struct { ModelData* entries; u32 count; } ModelDataParser;
-typedef struct { u32 start,end; int tid; } PhysGeomTask; BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
+typedef struct { u32 start,end; int tid; } PhysGeomTask; BvhNode** modelBVHNodes; u16** modelBVHTriOrder,modelBVHNodeCounts[MAX_MDLS]; u32 modelBVHTriOrderCounts[MAX_MDLS];
 typedef struct { BvhNode *nodes; u8 *triOctants; u16 *triOrder,*triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 typedef enum { glb_attribute_type_invalid,glb_attribute_type_position,glb_attribute_type_normal,glb_attribute_type_texcoord,glb_attribute_type_joints,glb_attribute_type_weights}glb_attribute_type;
 typedef enum { glb_component_type_invalid,glb_component_type_r_8u,glb_component_type_r_16u,glb_component_type_r_32f } glb_component_type;
