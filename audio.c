@@ -147,7 +147,7 @@ static __attribute__((noinline)) int mp3L3_read_side_info(mp3_bs *bs, mp3L3_gr_i
     } while(--gr_count);    if(part_23_sum+bs->pos > bs->limit+main_data_begin*8){return -1;} return main_data_begin;
 }
 
-static __attribute__((noinline)) float mp3L3_ldexp_q2(float y, int exp_q2) { static const float g_expfrac[4]={9.31322575e-10f,7.83145814e-10f,6.58544508e-10f,5.53767716e-10f}; int e; do { e=vmin(30*4,exp_q2); y*=g_expfrac[e&3]*(1<<30>>(e>>2)); } while ((exp_q2-=e)>0); return y; }
+static __attribute__((noinline)) float mp3L3_ldexp_q2(float y, int exp_q2) { static const float g_expfrac[4]={0.000000000931322575f,0.000000000783145814f,0.000000000658544508f,0.000000000553767716f}; int e; do { e=vmin(30*4,exp_q2); y*=g_expfrac[e&3]*(1<<30>>(e>>2)); } while ((exp_q2-=e)>0); return y; }
 static __attribute__((noinline)) void mp3L3_decode_scalefactors(const u8 *hdr, u8 *ist_pos, mp3_bs *bs, const mp3L3_gr_info *gr, float *scf, int ch) {
     const u8 *scf_partition=g_scf_partitions[!!gr->n_short_sfb+!gr->n_long_sfb]; u8 scf_size[4],iscf[40]; u8 *iscfp=iscf; int i,scf_shift=gr->scalefac_scale+1,gain_exp,scfsi=gr->scfsi; float gain; if (MP3_HDR_TEST_MPEG1(hdr)) { static const u8 g_scfc_decode[16]={0,1,2,3,12,5,6,7,9,10,11,13,14,15,18,19}; int part=g_scfc_decode[gr->scalefac_compress]; scf_size[1]=scf_size[0]=(u8)(part>>2); scf_size[3]=scf_size[2]=(u8)(part&3); }
     else { static const u8 g_mod[6*4]={5,5,4,4,5,5,4,1,4,3,1,1,5,6,6,1,4,4,4,1,4,3,1,1}; int k,modprod,sfc,ist=MP3_HDR_TEST_I_STEREO(hdr)&&ch; sfc=gr->scalefac_compress>>ist; for (k=ist*3*4; sfc>=0; sfc-=modprod,k+=4) { for (modprod=1,i=3;i>=0;i--) {scf_size[i]=(u8)(sfc/modprod%g_mod[k+i]); modprod*=g_mod[k+i];} } scf_partition+=k; scfsi=-16; }

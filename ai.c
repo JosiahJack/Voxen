@@ -342,7 +342,7 @@ static void ai_update_effect_lights(void) {
    and the muzzle-flash path, so prefab and effect lights sit at the same visible brightness. */
 static void ai_effect_flash(V3 pos, Color3 col, float range, float unityIntensity, double duration) {
     if (unityIntensity<=0.0f || range<=0.0f || duration<=0.0) return; ai_ensure_effect_pool(); u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev]; if (!p->count) return;
-    u16 chosen=0; double oldest=1e30;
+    u16 chosen=0; double oldest=1000000000000000000000000000000.0;
     for (u16 i=0;i<p->count;i++) { if (p->expires[i]<=World.pauseRelativeTime) { chosen=i; oldest=-1.0; break; } if (p->expires[i]<oldest) { oldest=p->expires[i]; chosen=i; } }
     u16 idx=p->lights[chosen]; float intensity=unityIntensity*0.35f;
     UpdateLight(idx,pos,col,vclamp(range,0.32f,15.36f),intensity,intensity,0.0f,ai_effect_marker(chosen),QUAT_IDENTITY,true,false);
@@ -382,12 +382,12 @@ Quaternion quat_look_rotation(V3 fwd, V3 up) {
     if (tr > 0.0f){float s=0.5f/vsqrtf(tr+1.0f); q.w=(0.25f/s); q.x=(m12-m21)*s; q.y=(m20-m02)*s; q.z=(m01-m10)*s;}else if(m00 > m11 && m00 > m22){float s=2.0f*vsqrtf(1.0f+m00-m11-m22); q.w=(m12-m21)/s; q.x=0.25f*s; q.y=(m01+m10)/s; q.z=(m20+m02)/s;}else if(m11 > m22){float s=2.0f*vsqrtf(1.0f+m11-m00-m22); q.w=(m20-m02)/s; q.x=(m01+m10)/s; q.y=0.25f*s; q.z=(m12+m21)/s; } else { float s = 2.0f * vsqrtf(1.0f + m22 - m00 - m11); q.w=(m01-m10)/s; q.x=(m20+m02)/s; q.y=(m12+m21)/s; q.z=0.25f*s;} return q;
 }
 
-void aiac_idle(Entity* self) { if ((self->entflags & EF_ASLEEP) || self->tranquilizeFinished >= World.pauseRelativeTime) {self->currentFrameFinished=World.pauseRelativeTime + 1e9; return;/*freeze*/} ChangeAnim(self,A_IDLE); }
+void aiac_idle(Entity* self) { if ((self->entflags & EF_ASLEEP) || self->tranquilizeFinished >= World.pauseRelativeTime) {self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/} ChangeAnim(self,A_IDLE); }
 void aiac_walk(Entity* self){if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self); return;} u16 idx=(u16)(self-World.instances); V3 v=World.velocity[idx]; if((v.x*v.x+v.y*v.y+v.z*v.z)>(0.32f*0.32f)){ChangeAnim(self,A_WALK); return;} if (self->animSwapFinished<World.pauseRelativeTime){self->animSwapFinished=World.pauseRelativeTime+.5f; ChangeAnim(self,A_IDLE);}}
 void aiac_dying(Entity* self) { flag_set(&self->entflags,EF_ASLEEP,false); AnimationClip cl=modelAnimationClips[self->animationNum][A_DYING]; if(cl.frameEnd == cl.frameStart){ChangeAnim(self,A_DYING); return;} ChangeAnim(self,A_DYING);}
 void AIAnimationControllerUpdate(u16 idx) {
     Entity* self = &World.instances[idx]; if((!(self->entflags & EF_ACTIVE)) || (self->animationNum >= MAX_ANIMS)){return;} if(self->currentState == AIState_Dying){aiac_dying(self); return;}
-    if(self->currentState == AIState_Dead){AnimationClip cl=modelAnimationClips[self->animationNum][A_DYING]; self->clip=A_DYING; self->frame=cl.frameEnd; self->modelIndex=cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart); self->currentFrameFinished=World.pauseRelativeTime + 1e9; return;/*freeze*/} if(self->entflags & EF_ASLEEP){aiac_idle(self); return;}
+    if(self->currentState == AIState_Dead){AnimationClip cl=modelAnimationClips[self->animationNum][A_DYING]; self->clip=A_DYING; self->frame=cl.frameEnd; self->modelIndex=cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart); self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/} if(self->entflags & EF_ASLEEP){aiac_idle(self); return;}
     if(self->currentState == AIState_Run && self->tranquilizeFinished >= World.pauseRelativeTime){aiac_idle(self); return;}
     switch (self->currentState) { case AIState_Walk:aiac_walk(self); break; case AIState_Run:if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self);}else{ChangeAnim(self,A_RUN);} break; case AIState_Attack1:ChangeAnim(self,A_ATTACK1); break; case AIState_Attack2:ChangeAnim(self,A_ATTACK2); break; case AIState_Attack3:ChangeAnim(self,A_ATTACK3); break; case AIState_Pain:ChangeAnim(self,A_PAIN); break; default:aiac_idle(self); break; }
 }
@@ -431,7 +431,7 @@ static void AIFace(Entity* self, V3 goal) {
 }
 
 INLINE float quat_angle_deg(Quaternion a, Quaternion b) { float d = vclamp(vabs(quat_dot(a, b)), 0.0f, 1.0f); return 2.0f * vacosf(d) * (180.0f / PI); }
-static bool AIWithinAngleToTarget(Entity* self) { if (ai_is_cyber(self)){return true;} if(V3_dot(self->idealTransformForward,self->idealTransformForward)<=1e-6f)return false; u16 sidx=(u16)(self - World.instances); Quaternion lr=quat_look_rotation(self->idealTransformForward,(V3){0,1,0}); float ang=quat_angle_deg(World.rotation[sidx],lr); float fovMov=npcTable[self->index - 419].fovStartMovement; if(ang<fovMov)return true; if(ang<fovMov*1.5f&&random_range(0.0f,1.0f)<0.5f){return true;} return false; }
+static bool AIWithinAngleToTarget(Entity* self) { if (ai_is_cyber(self)){return true;} if(V3_dot(self->idealTransformForward,self->idealTransformForward)<=0.000001f)return false; u16 sidx=(u16)(self - World.instances); Quaternion lr=quat_look_rotation(self->idealTransformForward,(V3){0,1,0}); float ang=quat_angle_deg(World.rotation[sidx],lr); float fovMov=npcTable[self->index - 419].fovStartMovement; if(ang<fovMov)return true; if(ang<fovMov*1.5f&&random_range(0.0f,1.0f)<0.5f){return true;} return false; }
 bool AICheckPain(u16 self) {
     u16 ndx=World.instances[self].index - 419; if(ai_is_cyber(&World.instances[self]) || (World.instances[self].entflags & EF_ASLEEP) || (npcTable[ndx].timeBetweenPain <= 0.0f) || (!(World.instances[self].entflags & EF_GO_INTO_PAIN) || World.instances[self].timeTillPainFinished >= World.pauseRelativeTime)){return false;}
     World.instances[self].currentState = AIState_Pain; u16 atkIdx = World.instances[self].recentMostActivator;
@@ -454,7 +454,7 @@ static V3 AIGetAStarPoint(Entity* self) {
     u16 sidx=(u16)(self - World.instances); i32 cx=PosGetCellCoordX(World.position[sidx].x), cz=PosGetCellCoordZ(World.position[sidx].z); if (!XZPairInBounds(cx,cz)) return AIGetWanderPoint(self);
     u32 current=(u32)cz*WORLDX+(u32)cx; V3 ep=self->enemy ? World.position[self->enemy] : World.position[sidx]; V3 cands[4]; i32 dx[4]={0,0,1,-1}, dz[4]={1,-1,0,0}; u32 closed[4]={CELL_CLOSEDNORTH,CELL_CLOSEDSOUTH,CELL_CLOSEDEAST,CELL_CLOSEDWEST}; int count=0;
     for (int i=0;i<4;++i) { i32 nx=cx+dx[i], nz=cz+dz[i]; if (!XZPairInBounds(nx,nz) || (gridCellStates[current]&closed[i]) || !(gridCellStates[(u32)nz*WORLDX+(u32)nx]&CELL_OPEN)) continue; cands[count++]=World.position[sidx]; cands[count-1].x+=dx[i]*CELLSZ; cands[count-1].z+=dz[i]*CELLSZ; }
-    int best=0; float bestD=count ? V3_SqDist(ep,cands[0]) : 1e9f; for (int i=1;i<count;++i) { float d=V3_SqDist(ep,cands[i]); if (d<bestD) { bestD=d; best=i; } } return count ? cands[best] : AIGetWanderPoint(self);
+    int best=0; float bestD=count ? V3_SqDist(ep,cands[0]) : 1000000000.0f; for (int i=1;i<count;++i) { float d=V3_SqDist(ep,cands[i]); if (d<bestD) { bestD=d; best=i; } } return count ? cands[best] : AIGetWanderPoint(self);
 }
 
 static V3 AIGetSearchPoint(Entity* self) { NPCType t = npcTable[self->index - 419].type; if (t == NPCType_Mutant || t == NPCType_Supermutant) {return AIGetWanderPoint(self);} return AIGetAStarPoint(self); }
@@ -710,5 +710,5 @@ void AIControllerUpdate(u16 idx) {
     }
     if (self->currentState == AIState_Dead || self->currentState == AIState_Idle) return;
     u16 eidx=self->enemy; if ((self->entflags & EF_ACT_AS_TURRET) && eidx) self->currentDestination = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; if (npcTable[ndx].type == NPCType_Cyber && eidx) self->currentDestination = World.position[eidx];
-    V3 toTarget = V3_AsubB(self->currentDestination,ai_sight_pos(self)); if (npcTable[ndx].type != NPCType_Cyber) toTarget.y = 0.0f; self->idealTransformForward = V3_Normalize(toTarget); float sqmag = V3_dot(toTarget, toTarget); if (sqmag > 1e-6f || npcTable[ndx].type == NPCType_Cyber) AIFace(self,self->currentDestination);    if (npcTable[ndx].moveType == AIMoveType_Fly && self->tranquilizeFinished < World.pauseRelativeTime) AIFlierMoveToHoverHeight(self);/*Per frame, matching Unity's FixedUpdate movement block*/
+    V3 toTarget = V3_AsubB(self->currentDestination,ai_sight_pos(self)); if (npcTable[ndx].type != NPCType_Cyber) toTarget.y = 0.0f; self->idealTransformForward = V3_Normalize(toTarget); float sqmag = V3_dot(toTarget, toTarget); if (sqmag > 0.000001f || npcTable[ndx].type == NPCType_Cyber) AIFace(self,self->currentDestination);    if (npcTable[ndx].moveType == AIMoveType_Fly && self->tranquilizeFinished < World.pauseRelativeTime) AIFlierMoveToHoverHeight(self);/*Per frame, matching Unity's FixedUpdate movement block*/
 }

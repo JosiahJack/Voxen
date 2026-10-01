@@ -282,13 +282,13 @@ __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* restrict sv, u32
 static void Mat4Identity(float* m) { mset(m, 0, sizeof(float) * 16); m[0] = m[5] = m[10] = m[15] = 1.0f; }
 static void Mat4Mul(const float* restrict a, const float* restrict b, float* restrict out) { for (int c = 0; c < 4; ++c) for (int r = 0; r < 4; ++r) { float s = 0.0f; for (int k = 0; k < 4; ++k) s += a[k*4+r] * b[c*4+k]; out[c*4+r] = s; } }
 static void Mat4TransformPoint(const float* restrict m, const float* restrict v, float* restrict out) { out[0] = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]  + m[12]; out[1] = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]  + m[13]; out[2] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14]; }
-static void Mat4TransformDir(const float* restrict m, const float* restrict v, float* restrict out) { float x = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]; float y = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]; float z = m[2]*v[0] + m[6]*v[1] + m[10]*v[2]; float len = vsqrtf(x*x + y*y + z*z), inv = (len > 1e-8f) ? 1.0f/len : 0.0f; out[0] = x*inv; out[1] = y*inv; out[2] = z*inv; }
+static void Mat4TransformDir(const float* restrict m, const float* restrict v, float* restrict out) { float x = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]; float y = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]; float z = m[2]*v[0] + m[6]*v[1] + m[10]*v[2]; float len = vsqrtf(x*x + y*y + z*z), inv = (len > 0.00000001f) ? 1.0f/len : 0.0f; out[0] = x*inv; out[1] = y*inv; out[2] = z*inv; }
 static bool ParseGLBStatic(u32 mindex, const u8* bytes, size_t size, float* restrict sv, u32* restrict ht, u32* restrict ht_used, u32* restrict remap_scr, u8* restrict cache_scr, float** restrict ov_pos, u32* ovc, u16** ot, u16* otc, i32 tid) {
     *ov_pos=NULL; *ot=NULL; *ovc=*otc=0; glb_data* data = NULL; void* sub_mark=OS_SubArenaMark(tid); glb_parse(tid,bytes,size,&data); glb_load_buffers(data);
     glb_node* meshNode = NULL; for (size_t i = 0; i < data->nodes_count; ++i) { if (data->nodes[i].mesh && !data->nodes[i].skin) { meshNode = &data->nodes[i]; break; } } if (!meshNode) {  for (size_t i = 0; i < data->nodes_count; ++i) { if(data->nodes[i].mesh){meshNode = &data->nodes[i]; break;} }  }
     glb_mesh* mesh = meshNode->mesh; float gm[16]; Mat4Identity(gm); const glb_node* parents[32]; int parentCount = 0; const glb_node* curr = meshNode;
     while (curr && parentCount < 32) { parents[parentCount++] = curr; curr = curr->parent; } for (int i = parentCount - 1; i >= 0; --i) { float local[16]; glb_node_transform_local(parents[i], local); float next[16]; Mat4Mul(gm, local, next); mcpy(gm, next, sizeof(float) * 16); } // Multiply in reverse order (root to child)
-    __m128 mn_v=_mm_set1_ps(1e9f), mx_v=_mm_set1_ps(-1e9f); u32 ec = 0;
+    __m128 mn_v=_mm_set1_ps(1000000000.0f), mx_v=_mm_set1_ps(-1000000000.0f); u32 ec = 0;
     for (size_t p = 0; p < mesh->primitives_count; ++p) {
         glb_primitive* prim = &mesh->primitives[p];
         if (prim->type != glb_primitive_type_triangles){continue;} const glb_accessor* posAcc=glb_find_accessor(prim,glb_attribute_type_position,0); const glb_accessor* nrmAcc=glb_find_accessor(prim,glb_attribute_type_normal,0); const glb_accessor* uvAcc=glb_find_accessor(prim,glb_attribute_type_texcoord,0); u32 vc = (u32)posAcc->count; u32 ic = prim->indices ? (u32)prim->indices->count : vc;
@@ -300,7 +300,7 @@ static bool ParseGLBStatic(u32 mindex, const u8* bytes, size_t size, float* rest
 }
 
 static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* restrict d, int fs, float* restrict tp, float* restrict tn, float* restrict tu, float* restrict sv, u32* restrict ht, u32* restrict ht_used, u32* restrict remap_scr, u8* restrict cache_scr, float** restrict ov_pos, u32* ovc, u16** ot, u16* otc, i32 tid) {
-    *ov_pos=NULL; *ot=NULL; *ovc=*otc=0; u32 pc=0,nc=0,uc=0,ec=0; __m128 mn_v=_mm_set1_ps(1e9f), mx_v=_mm_set1_ps(-1e9f); const char *p=d, *e=d+fs;
+    *ov_pos=NULL; *ot=NULL; *ovc=*otc=0; u32 pc=0,nc=0,uc=0,ec=0; __m128 mn_v=_mm_set1_ps(1000000000.0f), mx_v=_mm_set1_ps(-1000000000.0f); const char *p=d, *e=d+fs;
     while (likely(p < e)) {
         while (p < e && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p; if (p >= e) break; if (*p == '#') { while (p < e && *p != '\n') ++p; continue; }
         if (*p == 'v') {
@@ -328,7 +328,7 @@ static void SampleV3(const glbanim_samp* s, float t, float* o3) { u32 i0; float 
 static void SampleQuat(const glbanim_samp* samp, float t, float* outq /* xyzw */) {
 	u32 i0; float frac; FindBracket(samp, t, &i0, &frac); float q0[4]; ReadSamplerValue(samp, i0, 4, q0); if (frac <= 0.0f || samp->interpolation == glb_interp_step) { mcpy(outq, q0, sizeof(float)*4); return; } float q1[4]; ReadSamplerValue(samp, i0+1, 4, q1); float d = q0[0]*q1[0] + q0[1]*q1[1] + q0[2]*q1[2] + q0[3]*q1[3]; float qb[4];
 	if(d < 0.0f){qb[0]=-q1[0]; qb[1]=-q1[1]; qb[2]=-q1[2]; qb[3]=-q1[3]; d=-d;}else mcpy(qb,q1,sizeof(float)*4); if(d > 0.9995f){for(int c=0;c<4;++c)outq[c]=q0[c]+(qb[c]-q0[c])*frac;} /*nearly parallel: nlerp*/ else {float theta0=vacosf(d),theta=theta0*frac; float s1=sinf(theta)/sinf(theta0),s0=cosf(theta)-d*s1; for(int c=0;c<4;++c){outq[c]=q0[c]*s0 + qb[c]*s1;}}
-	float len = vsqrtf(outq[0]*outq[0]+outq[1]*outq[1]+outq[2]*outq[2]+outq[3]*outq[3]); if(len > 1e-8f){float inv = 1.0f/len; for(int c=0;c<4;++c)outq[c]*=inv;}
+	float len = vsqrtf(outq[0]*outq[0]+outq[1]*outq[1]+outq[2]*outq[2]+outq[3]*outq[3]); if(len > 0.00000001f){float inv = 1.0f/len; for(int c=0;c<4;++c)outq[c]*=inv;}
 }
 
 static void NodeLocalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, float* outM) {
@@ -369,7 +369,7 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
             float jf[4] = { 0, 0, 0, 0 }, wf[4] = { 0, 0, 0, 0 };
             glbread_float(jntAcc, i, jf, 4);
             glbread_float(wgtAcc, i, wf, 4);
-            float wsum = wf[0] + wf[1] + wf[2] + wf[3], winv = (wsum > 1e-6f) ? 1.0f/wsum : 0.0f; for(int k=0;k<4;++k){i32 jj=(i32)jf[k]; out->skin[i].j[k]=(jj >= 0 && jj < MAX_GLB_JOINTS) ? (u16)jj : 0; out->skin[i].w[k]=wf[k]*winv;}
+            float wsum = wf[0] + wf[1] + wf[2] + wf[3], winv = (wsum > 0.000001f) ? 1.0f/wsum : 0.0f; for(int k=0;k<4;++k){i32 jj=(i32)jf[k]; out->skin[i].j[k]=(jj >= 0 && jj < MAX_GLB_JOINTS) ? (u16)jj : 0; out->skin[i].w[k]=wf[k]*winv;}
         }
         
         u32 tc; if(prim->indices){tc=(u32)(prim->indices->count / 3); out->indices=OS_SubArenaAlloc(-1,tc*3*sizeof(u32)); for(u32 k=0;k<tc*3;++k)out->indices[k]=(u32)glbread_index(prim->indices,k);}
@@ -398,12 +398,12 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
  
 static void SkinFrameToScratch(GltfMesh* restrict gm, float t, float* restrict posedPos, float* restrict posedNrm, float* restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
 	float skinMat[MAX_GLB_JOINTS][16]; for(u32 j=0;j<gm->jointCount;++j){float g[16]; NodeGlobalMatrixAtTime(gm,gm->jointNodes[j],t,g); Mat4Mul(g,gm->invBind[j],skinMat[j]);}
-	for(u32 v=0;v<gm->vertCount;++v){const VtxSkin* sk=&gm->skin[v]; float blended[16]={0}; for (int k=0;k<4;++k){float w=sk->w[k]; if (w <= 0.0f){continue;} const float* m=skinMat[sk->j[k]]; for(int e=0;e<16;++e)blended[e]+=m[e]*w;} Mat4TransformPoint(blended,&gm->pos[v*3],&posedPos[v*3]); Mat4TransformDir(blended,&gm->nrm[v*3],&posedNrm[v*3]);} __m128 mn_v = _mm_set1_ps(1e9f), mx_v = _mm_set1_ps(-1e9f); u32 ec = 0, cornerCount = gm->triCount * 3;
+	for(u32 v=0;v<gm->vertCount;++v){const VtxSkin* sk=&gm->skin[v]; float blended[16]={0}; for (int k=0;k<4;++k){float w=sk->w[k]; if (w <= 0.0f){continue;} const float* m=skinMat[sk->j[k]]; for(int e=0;e<16;++e)blended[e]+=m[e]*w;} Mat4TransformPoint(blended,&gm->pos[v*3],&posedPos[v*3]); Mat4TransformDir(blended,&gm->nrm[v*3],&posedNrm[v*3]);} __m128 mn_v = _mm_set1_ps(1000000000.0f), mx_v = _mm_set1_ps(-1000000000.0f); u32 ec = 0, cornerCount = gm->triCount * 3;
 	for (u32 k = 0; k < cornerCount; ++k) {u32 vi = gm->indices[k]; float* dst=sv+(ec << 3); dst[0]=-posedPos[vi*3+0]; dst[1]=posedPos[vi*3+1]; dst[2]=posedPos[vi*3+2]; dst[3]=-posedNrm[vi*3+0]; dst[4]=posedNrm[vi*3+1]; dst[5]=posedNrm[vi*3+2]; dst[6]=gm->uv[vi*2+0]; dst[7]=gm->uv[vi*2+1]; __m128 pos_v=_mm_loadu_ps(dst); mn_v=_mm_min_ps(mn_v,pos_v); mx_v=_mm_max_ps(mx_v,pos_v); ++ec;} *outEc = ec; *outMn = mn_v; *outMx = mx_v;
 }
 
 static void TransformFrameToScratch(GltfMesh* restrict gm, float t, float* restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
-    __m128 mn_v = _mm_set1_ps(1e9f), mx_v = _mm_set1_ps(-1e9f); u32 ec = 0;
+    __m128 mn_v = _mm_set1_ps(1000000000.0f), mx_v = _mm_set1_ps(-1000000000.0f); u32 ec = 0;
     for (u32 s = 0; s < gm->submshCnt; ++s) {
         float gm_mat[16]; NodeGlobalMatrixAtTime(gm, gm->meshNodes[s], t, gm_mat); const float* restrict spos=gm->subPos[s]; const float* restrict snrm=gm->subNrm[s]; const float* restrict suv=gm->subUv[s]; const u32* restrict sidx=gm->subIndices[s]; u32 cornerCount=gm->subTriCount[s] * 3;
         for (u32 k = 0; k < cornerCount; ++k) {
@@ -437,7 +437,7 @@ static void BakeGLBAnimWave(u32 modelStart, u32 modelEnd) {
 
 // Recursive(ew) centroid-based, each tri goes into exactly one octant containing its centroid, no tri dupes. The node AABB is the union of its tri AABBs (NOT the octant AABB) — guarantees any query that overlaps a tri also overlaps its ancestor nodes, so traversal never misses a tri. triIdxArray is modified in-place: on return it is partitioned by octant so that each child's triangles are contiguous (matches the leaf ranges written to ctx->triOrder).
 static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, u16 m, const float* restrict pos, const u16* restrict tris, u16* triIdxArray, u32 triCount, u32 depth) {
-    if (triCount == 0){return -1;} if (ctx->nodeCount >= BVH_MAX_NODES_PER_MDL){depth = BVH_MAX_DEPTH;} i32 nodeIdx = ctx->nodeCount++; BvhNode* node = &ctx->nodes[nodeIdx]; node->triStart = 0; node->triCount = 0; for(int i = 0; i < 8; i++){node->children[i]=-1;} __m128 mn_v=_mm_set1_ps(1e9f); __m128 mx_v=_mm_set1_ps(-1e9f);
+    if (triCount == 0){return -1;} if (ctx->nodeCount >= BVH_MAX_NODES_PER_MDL){depth = BVH_MAX_DEPTH;} i32 nodeIdx = ctx->nodeCount++; BvhNode* node = &ctx->nodes[nodeIdx]; node->triStart = 0; node->triCount = 0; for(int i = 0; i < 8; i++){node->children[i]=-1;} __m128 mn_v=_mm_set1_ps(1000000000.0f); __m128 mx_v=_mm_set1_ps(-1000000000.0f);
     for (u32 i = 0; i < triCount; i++){u32 triIdx=triIdxArray[i]; u32 i0=tris[triIdx*3+0],i1=tris[triIdx*3+1],i2=tris[triIdx*3+2]; __m128 v0=_mm_loadu_ps(pos+(size_t)i0*3); __m128 v1=_mm_loadu_ps(pos+(size_t)i1*3); __m128 v2=_mm_loadu_ps(pos+(size_t)i2*3); mn_v=_mm_min_ps(mn_v,_mm_min_ps(_mm_min_ps(v0,v1),v2)); mx_v=_mm_max_ps(mx_v,_mm_max_ps(_mm_max_ps(v0,v1),v2));}
     float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr, mn_v); _mm_storeu_ps(mx_arr, mx_v); node->mn = (V3){mn_arr[0], mn_arr[1], mn_arr[2]}; node->mx = (V3){mx_arr[0], mx_arr[1], mx_arr[2]}; 
     if (depth >= 3 || triCount <= BVH_LEAF_MAX_TRIS || ctx->nodeCount + 8 > BVH_MAX_NODES_PER_MDL) { u32 startIdx = ctx->triCount; for (u32 i = 0; i < triCount && ctx->triCount < BVH_MAX_TRIS_PER_MDL; i++) { ctx->triOrder[ctx->triCount++] = triIdxArray[i]; } node->triStart = startIdx; node->triCount = (u16)triCount; return nodeIdx; } 
@@ -487,9 +487,9 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
 
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { // Ray-vs-AABB slab test. Returns entry t (>=0) if the ray hits the AABB within [0, maxDist], or -1.0f if no hit. Handles axis-aligned rays (zero direction component) correctly.
     float tmin = 0.0f, tmax = maxDist;
-    if (vabs(dir.x) < 1e-8f) { if (origin.x < mn.x || origin.x > mx.x) return -1.0f; } else { float inv=1.0f/dir.x; float t1=(mn.x-origin.x) * inv, t2=(mx.x-origin.x) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } //X slab
-    if (vabs(dir.y) < 1e-8f) { if (origin.y < mn.y || origin.y > mx.y) return -1.0f; } else { float inv=1.0f/dir.y; float t1=(mn.y-origin.y) * inv, t2=(mx.y-origin.y) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } //Y slab
-    if (vabs(dir.z) < 1e-8f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; } else { float inv=1.0f/dir.z; float t1=(mn.z-origin.z) * inv, t2=(mx.z-origin.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } /*Z slab*/ return tmin;
+    if (vabs(dir.x) < 0.00000001f) { if (origin.x < mn.x || origin.x > mx.x) return -1.0f; } else { float inv=1.0f/dir.x; float t1=(mn.x-origin.x) * inv, t2=(mx.x-origin.x) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } //X slab
+    if (vabs(dir.y) < 0.00000001f) { if (origin.y < mn.y || origin.y > mx.y) return -1.0f; } else { float inv=1.0f/dir.y; float t1=(mn.y-origin.y) * inv, t2=(mx.y-origin.y) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } //Y slab
+    if (vabs(dir.z) < 0.00000001f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; } else { float inv=1.0f/dir.z; float t1=(mn.z-origin.z) * inv, t2=(mx.z-origin.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } /*Z slab*/ return tmin;
 }
 
 INLINE u32 WeldHash(i32 x, i32 y, i32 z) { u32 h = ((u32)x * 0x8DA6B343u) ^ ((u32)y * 0xD8163841u) ^ ((u32)z * 0xCB1AB31Fu); return h & (WELD_HASH_SIZE - 1); }
