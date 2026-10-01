@@ -999,7 +999,7 @@ void LoadLevelData(u8 curlevel) {
             case 515: func_forcebridge(i); break;
             case 716: World.layer[i] = L_Trigger; break; // fx_reverbzone
             case 517: FuncWallInitAfterLoad(i); break;
-            case 596: World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); World.instances[i].topPoint=(V3){0.0f,World.position[i].y + (World.colliderSize[i].y * 0.5f),0.0f}; break; /*trigger_gravitylift*/
+            case 596: World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); break; /*trigger_gravitylift*/
             case 701: LogicTimerInitBeforeLoad(i); break;
             case 703: World.layer[i]=L_Trigger;if(World.instances[i].teleportID < 8){teleportDestinations[curlevel][World.instances[i].teleportID]=i;World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} break;/*info_teleport_destination*/
             case 555: CyberSwitchInitAfterLoad(i); break; // prop_cyber_switch
@@ -1079,11 +1079,26 @@ void NewGameDifficultyPass(void) {
     }
 }
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();
+/* The door layer and laser behaviours are keyed off the prefab rather than the per-instance key, so confirm the
+   corpus still agrees: changeLayerOnOpenClose:1 and toggleLasers:1 must appear on exactly the types listed in
+   IdxIsLayerDoor/IdxIsLaserDoor. A mismatch means someone re-exported with a differently-keyed prefab, and the
+   on/off keys would then be silently ignored. */
+static void DoorTypeAudit(u8 lev) {
+    u32 badLayer=0, badLaser=0, badAperture=0;
+    for (u16 i=PLAYER1;i<World.instCount;++i) {
+        Entity* e=&World.instances[i]; if (!IdxIsDoor(e->index)) continue;
+        if ((e->changeLayerOnOpenClose!=0) != IdxIsLayerDoor(e->index)) badLayer++;
+        if ((e->toggleLasers!=0) != IdxIsLaserDoor(e->index)) badLaser++;
+        if (IdxIsLaserDoor(e->index) && e->modelIndex < MAX_MDLS && (modelMax[e->modelIndex].x - modelMin[e->modelIndex].x) <= 0.0f) badAperture++;
+    }
+    if (badLayer||badLaser) DualLogError("Door type audit level %u: %u changeLayerOnOpenClose and %u toggleLasers records disagree with their prefab\n",lev,badLayer,badLaser);
+    if (badAperture) DualLogError("Door laser audit level %u: %u laser doors have an empty model AABB, so their grid would never draw\n",lev,badAperture);
+}
 void LoadAllLevels() {
     double start_time = get_time();
     DebugRAM("start of LoadAllLevels"); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true;
     entsFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Entity)); posFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); scaleFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); rotationFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Quaternion)); colCtrFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); colSzFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
-    ioNameCount=1; ioNames[0][0]='\0'; lightsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(Light)); lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation)); for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;} fwPoolUsed = 0; for(u8 lev=0;lev<World.numLevels;++lev){for(i32 i=0;i<INSTANCE_COUNT;++i){colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1};}/*OS_Alloc is a raw anonymous mmap and so zero-fills: absent size/center keys read 0.0, which passes the "present" test and yields zero-extent colliders (degenerate trigger_once boxes that can never be touched). Sentinel to -1 per level so indices aren't inherited across levels.*/ LoadLevelData(lev);}
+    ioNameCount=1; ioNames[0][0]='\0'; lightsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(Light)); lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation)); for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;} fwPoolUsed = 0; for(u8 lev=0;lev<World.numLevels;++lev){for(i32 i=0;i<INSTANCE_COUNT;++i){colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1};}/*OS_Alloc is a raw anonymous mmap and so zero-fills: absent size/center keys read 0.0, which passes the "present" test and yields zero-extent colliders (degenerate trigger_once boxes that can never be touched). Sentinel to -1 per level so indices aren't inherited across levels.*/ LoadLevelData(lev); DoorTypeAudit(lev);}
     OS_Free(entsFromFile,INSTANCE_COUNT*sizeof(Entity)); OS_Free(colCtrFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(colSzFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(posFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(scaleFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(rotationFromFile,INSTANCE_COUNT*sizeof(Quaternion)); OS_Free(lightsFromFile,LIGHT_COUNT*sizeof(Light)); OS_Free(lanimsFromFile,LIGHT_COUNT*sizeof(LightAnimation));
     BuildTextDecalMeshes(); // Build world-baked 3D text decal meshes (Sys_Text.stringTable already populated for current language).
     DebugRAM("end of LoadAllLevels"); DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\nLoad all levels... took %f secs\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
@@ -1146,7 +1161,7 @@ typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compres
   cross-checks it against the reader's own sizeof(GlobalContext), so a stale value fails loudly instead of
   misreading a save.  Keep SaveGame, LoadGame and ReadSaveSlotName all on this one name: they drifted apart once
   already (a save wrote v10 while the loader still demanded v9, so nothing could ever be loaded).*/
-#define SAVE_VERSION 15
+#define SAVE_VERSION 16
 #pragma pack(pop)
 size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
 size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Find and pop the zeroes bubbles.  Turns an otherwise 232mb save file into ~23mb.

@@ -1,21 +1,117 @@
-// textures.c - 2D Texture Loading System
+// textures.c - 2D Texture Loading System and Texture Animations
 #include "common.h"
-u32 totalPixels,totalPaletteColors; void SetWindowIcon(WinSysIcon*);
-typedef struct { u16 index; bool transparent; bool doublesided; u8 blend; char path[128]; } TextureData; typedef struct { TextureData* entries; u32 count; u32 capacity; } TextureDataParser; typedef struct { u8 r,g,b; } PngPalEntry; typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8 img_depth, img_color_type, img_error; u16 img_palette_count; PngPalEntry img_palette[256]; u8 img_trns[256]; u8* img_buffer, *img_buffer_end; } PngContext;
-typedef struct { u8* indices; u32* palette,palSize; i32 w, h; } TexResult; typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; i32* parsIdx; const TextureDataParser* parser; TexResult* results;int tid; } TextureParseTask; typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData; typedef struct { u16 fast[1<<9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman;
-typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length, z_distance; } pngzbuf; enum { PNGFmt_none=0, PNGFmt_sub=1, PNGFmt_up=2, PNGFmt_avg=3, PNGFmt_paeth=4, PNGFmt_avg_first, PNGFmt_paeth_first }; PngArena png_arena_main; static PngArena* thread_png_arenas = NULL;
-void PngArenaInit(PngArena* arena) { if (!arena->base) { arena->base = OS_Alloc(16777216); arena->cursor = arena->base; arena->end = arena->base + 16777216; } }
-void* PngArenaAlloc(PngArena* a, size_t s) { s = (s + 15) & ~(size_t)15; /*Keep every allocation 16-byte aligned*/ if(!a->base||a->cursor+s>a->end){DualLogError("PngArena overflow: need %zu bytes, %zu remaining - raise arena size in PngArenaInit and rebuild\n",s,(size_t)(a->end - a->cursor)); OS_Exit(1);} void* p=a->cursor; a->cursor+=s; return p; }
-static u32 PngGet32be(PngContext* s) { if(s->img_buffer + 4 > s->img_buffer_end){s->img_error=1; return 0;} const u8* p = s->img_buffer; s->img_buffer += 4; return ((u32)p[0] << 24) | ((u32)p[1] << 16) | ((u32)p[2] << 8) | p[3]; }
-static i32 BitReverse(i32 n, i32 b) { n=((n&0xAAAA)>>1)|((n&0x5555)<<1); n=((n&0xCCCC)>>2)|((n&0x3333)<<2); n=((n&0xF0F0)>>4)|((n&0x0F0F)<<4); n=((n&0xFF00)>>8)|((n&0x00FF)<<8); return n>>(16-b); }
-static i32 PngHuf(PngHuffman* z, const u8* sl, i32 num) {
-    i32 i,k=0,code=0,nc[16],sz[17]={0}; mset(z->fast,0,sizeof(z->fast)); if(num != 32) { for(i=0;i<num;++i)++sz[sl[i]]; } sz[0]=0; for(i=1;i<16;++i){ if(sz[i]>(1<<i)){return 0;} nc[i]=code; z->firstcode[i]=(u16)code; z->firstsymbol[i]=(u16)k; code+=sz[i]; if(sz[i]&&code-1>=(1<<i)){return 0;} z->maxcode[i]=code<<(16-i); code<<=1; k+=sz[i]; }
-    z->maxcode[16]=0x10000; for(i=0;i<num;++i){ int s=(num==32)?5:sl[i]; if(!s){continue;} int c=nc[s]-z->firstcode[s]+z->firstsymbol[s]; u16 fv=(u16)((s<<9)|i); z->size[c]=(u8)s; z->value[c]=(u16)i; if(s<=9){ int j=BitReverse(nc[s],s); while(j<(1<<9)){z->fast[j]=fv; j+=(1<<s);} } ++nc[s]; } return 1;
+
+typedef struct { u16 index; bool transparent, doublesided; u8 blend; char path[128]; } TextureData;
+typedef struct { TextureData* entries; u32 count, capacity; } TextureDataParser;
+typedef struct { u8 r, g, b; } PngPalEntry;
+typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8 img_depth, img_color_type, img_error; u16 img_palette_count; PngPalEntry img_palette[256]; u8 img_trns[256], *img_buffer, *img_buffer_end; } PngContext;
+typedef struct { u8* indices; u32* palette, palSize; i32 w, h; } TexResult;
+typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; i32* parsIdx; const TextureDataParser* parser; TexResult* results; int tid; } TextureParseTask;
+typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData;
+typedef struct { u16 fast[1 << 9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman;
+typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length, z_distance; } pngzbuf;
+
+enum { PNGFmt_none = 0, PNGFmt_sub = 1, PNGFmt_up = 2, PNGFmt_avg = 3, PNGFmt_paeth = 4, PNGFmt_avg_first, PNGFmt_paeth_first };
+
+PngArena png_arena_main;
+static PngArena* thread_png_arenas = NULL;
+u32 totalPixels, totalPaletteColors;
+
+void PngArenaInit(PngArena* arena) {
+    if (!arena->base) {
+        arena->base = OS_Alloc(16777216);
+        arena->cursor = arena->base;
+        arena->end = arena->base + 16777216;
+    }
 }
-#define REFILL(z) if(z->num_bits<16 && z->zbuffer < z->zbuffer_end){do{z->code_buffer|=(u32)(*z->zbuffer++)<<z->num_bits;z->num_bits+=8;}while(z->num_bits<=24 && z->zbuffer < z->zbuffer_end);}
-INLINE u32 PngZReceive(pngzbuf* z, int n) { REFILL(z); u32 k=z->code_buffer&((1u<<n)-1); z->code_buffer>>=n; z->num_bits-=n; return k; }
-INLINE u32 PngHuffman_decode(pngzbuf* a, PngHuffman* z) { REFILL(a); int b=z->fast[a->code_buffer&511], s; if(b){ s=b>>9; a->code_buffer>>=s; a->num_bits-=s; return b&511; } int k=BitReverse(a->code_buffer,16); for(s=10; s<16 && k>=z->maxcode[s]; ++s); b=(k>>(16-s))-z->firstcode[s]+z->firstsymbol[s]; if (b < 0 || ((u32)b) >= 288) return 0; a->code_buffer>>=s; a->num_bits-=s; return z->value[b]; }
-static u8 PngZDefLen(int i) { return (i<144)?8:(i<256)?9:(i<280)?7:8; }
+
+void* PngArenaAlloc(PngArena* a, size_t s) {
+    s=(s + 15) & ~(size_t)15;/*Keep every allocation 16-byte aligned*/
+    if (!a->base || a->cursor + s > a->end) { DualLogError("PngArena overflow\n"); OS_Exit(1); }
+    
+    void* p = a->cursor;
+    a->cursor += s;
+    return p;
+}
+
+static u32 PngGet32be(PngContext* s) {
+    if (s->img_buffer + 4 > s->img_buffer_end) { s->img_error = 1; return 0; }
+    
+    const u8* p = s->img_buffer;
+    s->img_buffer += 4;
+    return ((u32)p[0] << 24) | ((u32)p[1] << 16) | ((u32)p[2] << 8) | p[3];
+}
+
+static i32 BitReverse(i32 n, i32 b) {
+    n = ((n & 0xAAAA) >> 1) | ((n & 0x5555) << 1);
+    n = ((n & 0xCCCC) >> 2) | ((n & 0x3333) << 2);
+    n = ((n & 0xF0F0) >> 4) | ((n & 0x0F0F) << 4);
+    n = ((n & 0xFF00) >> 8) | ((n & 0x00FF) << 8);
+    return n >> (16 - b);
+}
+
+static i32 PngHuf(PngHuffman* z, const u8* sl, i32 num) {
+    i32 i, k=0, code=0, nc[16], sz[17] = {0};
+    mset(z->fast, 0, sizeof(z->fast));
+    if(num != 32) { for (i=0;i<num;++i) { ++sz[sl[i]]; } }
+    sz[0] = 0;
+    for (i=1;i<16;++i) {
+        if (sz[i] > (1<<i)) { return 0; }
+        
+        nc[i] = code;
+        z->firstcode[i] = (u16)code;
+        z->firstsymbol[i] = (u16)k;
+        code += sz[i];
+        if (sz[i] && code - 1 >= (1 << i)) { return 0; }
+        
+        z->maxcode[i] = code << (16 - i);
+        code <<= 1;
+        k += sz[i];
+    }
+    
+    z->maxcode[16] = 0x10000;
+    for (i=0;i<num;++i) {
+        int s = (num == 32) ? 5 : sl[i]; if (!s) { continue; }
+        
+        int c = nc[s] - z->firstcode[s] + z->firstsymbol[s];
+        u16 fv = (u16)((s << 9) | i);
+        z->size[c] = (u8)s;
+        z->value[c] = (u16)i;
+        if(s <= 9){
+            int j=BitReverse(nc[s],s);
+            while (j < (1 << 9)) { z->fast[j] = fv; j += (1 << s); }
+        }
+        
+        ++nc[s];
+    }
+    
+    return 1;
+}
+
+INLINE u32 PngZReceive(pngzbuf* z, int n) {
+    if (z->num_bits < 16 && z->zbuffer < z->zbuffer_end) { do { z->code_buffer |= (u32)(*z->zbuffer++) << z->num_bits; z->num_bits += 8; } while (z->num_bits <= 24 && z->zbuffer < z->zbuffer_end); }
+    u32 k=z->code_buffer&((1u<<n)-1);
+    z->code_buffer>>=n;
+    z->num_bits-=n;
+    return k;
+}
+
+INLINE u32 PngHuffman_decode(pngzbuf* a, PngHuffman* z) {
+    if (a->num_bits < 16 && a->zbuffer < a->zbuffer_end) { do { a->code_buffer |= (u32)(*a->zbuffer++) << a->num_bits; a->num_bits += 8; } while (a->num_bits <= 24 && a->zbuffer < a->zbuffer_end); }
+    int b = z->fast[a->code_buffer&511], s;
+    if (b) { s = b >> 9; a->code_buffer >>= s; a->num_bits -= s; return b & 511; }
+    
+    int k = BitReverse(a->code_buffer,16);
+    for (s=10;s<16 && k >= z->maxcode[s];++s) { };
+    b = (k >> (16 - s)) - z->firstcode[s] + z->firstsymbol[s];
+    if (b < 0 || ((u32)b) >= 288) return 0;
+    
+    a->code_buffer>>=s;
+    a->num_bits -= s;
+    return z->value[b];
+}
+
+static u8 PngZDefLen(int i) { return (i < 144) ? 8 : ((i < 256) ? 9 : ((i<280) ? 7 : 8)); }
 u8* PngDecode(const u8* buffer, i32 len, i32 initial_size, i32* outlen, PngArena* arena) {
     pngzbuf a={0}; u8 *p=(u8*)PngArenaAlloc(arena,initial_size),d_len[288],*zout_end; i32 f,t; a.zbuffer=(u8*)buffer; a.zbuffer_end=(u8*)buffer+len; a.zout_start=a.zout=p; a.zbuffer+=2; zout_end=p+initial_size;
     do {if(a.zbuffer>=a.zbuffer_end){return NULL;} f=PngZReceive(&a,1); t=PngZReceive(&a,2);
@@ -84,107 +180,456 @@ u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
 }
  
 static void* TextureParsingWorker(void* arg) {
-    TextureParseTask* t = (TextureParseTask*)arg; u32 i;
-    while ((i = __atomic_fetch_add((u32*)t->shared_idx,1,0)) < t->texCnt) {/*Dynamic Work Stealing: Threads fetch next available index automatically*/
-        i32 pIdx = t->parsIdx[i]; if(unlikely(pIdx < 0 || pIdx >= (i32)t->parser->count)){continue;} doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided; transparentTexture[i] = t->parser->entries[pIdx].transparent; particleBlendTexture[i] = t->parser->entries[pIdx].blend; FHandle dummy_fd; int sz=0; const char* d =(const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path,&dummy_fd,&sz); if(unlikely(!d || sz <= 0))continue;
-        int w=0,h=0; u8 *pix=PngLoad((const u8*)d,sz,&w,&h,&thread_png_arenas[t->tid]); if(!pix||w<1||h<1){OS_Free((void*)d,(size_t)sz); continue;} u32 nP=(u32)w*h; u8 *idx=(u8*)OS_Alloc(nP); u32 *pal=(u32*)OS_Alloc(256*sizeof(u32)); u32 pSz=0; u32 exact_hash[TEXHASH_SZ]; mset(exact_hash,0xFF,sizeof(exact_hash));/*Fast Exact Match Hash Map, 0xFFFFFFFF U32_MAX = empty*/ u8 exact_idx[TEXHASH_SZ],nearest_cache[32768]; bool nearclear=false;/*15-bit Color Space Cache for fast nearest-neighbor fallback*/
+    TextureParseTask* t = (TextureParseTask*)arg;
+    u32 i;
+    while ((i = __atomic_fetch_add((u32*)t->shared_idx,1,0)) < t->texCnt) { /*Dynamic Work Stealing: Threads fetch next available index automatically*/
+        i32 pIdx = t->parsIdx[i];
+        if(unlikely(pIdx < 0 || pIdx >= (i32)t->parser->count)) { continue; }
+        
+          doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided;
+          transparentTexture[i] = t->parser->entries[pIdx].transparent;
+        particleBlendTexture[i] = t->parser->entries[pIdx].blend;
+        FHandle dummy_fd;
+        int sz = 0;
+        const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path, &dummy_fd, &sz);
+        if(unlikely(!d || sz <= 0)) continue;
+        
+        int w = 0, h = 0;
+        u8 *pix=PngLoad((const u8*)d, sz, &w, &h, &thread_png_arenas[t->tid]);
+        if (!pix || w < 1 || h < 1) { OS_Free((void*)d,(size_t)sz); continue; }
+        
+        u32 nP = (u32)w*h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256*sizeof(u32));
+        u32 pSz = 0; u32 exact_hash[TEXHASH_SZ];
+        mset(exact_hash, 0xFF, sizeof(exact_hash)); /*Fast Exact Match Hash Map, 0xFFFFFFFF U32_MAX = empty*/
+        u8 exact_idx[TEXHASH_SZ], nearest_cache[32768]; /*15-bit Color Space Cache for fast nearest-neighbor fallback*/
+        bool nearclear = false; 
         for (u32 p = 0; p < nP; ++p) {
-            u32 c = ((u32*)pix)[p]; u32 h_val = (c * 0x9E3779B9u);/*Murmur-style avalanche hash*/ h_val ^= h_val >> 16; u32 slot = h_val & (TEXHASH_SZ - 1); for (u32 probe = 0; probe < TEXHASH_SZ; ++probe) { if(exact_hash[slot] == U32_MAX){break;} if(exact_hash[slot] == c){idx[p]=exact_idx[slot]; goto found;} slot = (slot + 1) & (TEXHASH_SZ - 1); } if (pSz < 256) { pal[pSz] = c; idx[p] = (u8)pSz; exact_hash[slot] = c; exact_idx[slot] = (u8)pSz; pSz++; }
-            else {/*Fallback: Check Nearest Neighbor Cache first (R5 G5 B5)*/
-                if (!nearclear) { mset(nearest_cache,0xFF,sizeof(nearest_cache)); nearclear = true; } u32 cache_key = ((c & 0xF8) >> 3) | ((c & 0xF800) >> 6) | ((c & 0xF80000) >> 9); if (nearest_cache[cache_key] != 0xFF) { idx[p] = nearest_cache[cache_key]; goto found; } u32 best = 0, bestDist = ~0u;/*Cache Miss: Full Search*/ i32 r1 = c & 255, g1 = (c>>8) & 255, b1 = (c>>16) & 255, a1 = c>>24; 
-                for (u32 k = 0; k < 256; ++k) { u32 pc = pal[k]; i32 dr = (pc&255)-r1, dg = ((pc>>8)&255)-g1, db = ((pc>>16)&255)-b1, da = (pc>>24)-a1; u32 dist = dr*dr + dg*dg + db*db + da*da; if (dist < bestDist) { bestDist = dist; best = k; } } idx[p] = (u8)best; nearest_cache[cache_key] = (u8)best; // Update Cache
-            } found:;
-        } t->results[i] = (TexResult){.indices = idx, .palette = pal, .palSize = pSz, .w = w, .h = h}; OS_Free((void*)d,(size_t)sz);
-    } return NULL;
+            u32 c = ((u32*)pix)[p];
+            u32 h_val = (c * 0x9E3779B9u);/*Murmur-style avalanche hash*/
+            h_val ^= h_val >> 16;
+            u32 slot = h_val & (TEXHASH_SZ - 1);
+            for (u32 probe=0;probe<TEXHASH_SZ;++probe) {
+                if (exact_hash[slot] == U32_MAX) { break; }
+                if (exact_hash[slot] == c) { idx[p] = exact_idx[slot]; goto found; }
+                
+                slot = (slot + 1) & (TEXHASH_SZ - 1);
+            }
+            
+            if (pSz < 256) {
+                pal[pSz] = c;
+                idx[p] = (u8)pSz;
+                exact_hash[slot] = c;
+                exact_idx[slot] = (u8)pSz;
+                pSz++;
+            } else { /*Fallback: Check Nearest Neighbor Cache first (R5 G5 B5)*/
+                if (!nearclear) { mset(nearest_cache, 0xFF, sizeof(nearest_cache)); nearclear = true; }
+                u32 cache_key = ((c & 0xF8) >> 3) | ((c & 0xF800) >> 6) | ((c & 0xF80000) >> 9);
+                if (nearest_cache[cache_key] != 0xFF) { idx[p] = nearest_cache[cache_key]; goto found; }
+                u32 best = 0, bestDist = ~0u; /*Cache Miss: Full Search*/
+                i32 r1 = c & 255, g1 = (c>>8) & 255, b1 = (c>>16) & 255, a1 = c>>24; 
+                for (u32 k = 0; k < 256; ++k) {
+                    u32 pc = pal[k];
+                    i32 dr = (pc&255)-r1, dg = ((pc>>8)&255)-g1, db = ((pc>>16)&255)-b1, da = (pc>>24)-a1;
+                    u32 dist = dr*dr + dg*dg + db*db + da*da;
+                    if (dist < bestDist) { bestDist = dist; best = k; }
+                }
+                
+                idx[p] = (u8)best;
+                nearest_cache[cache_key] = (u8)best; // Update Cache
+            }
+            
+            found:;
+        }
+        
+        t->results[i] = (TexResult){.indices = idx, .palette = pal, .palSize = pSz, .w = w, .h = h};
+        OS_Free((void*)d,(size_t)sz);
+    }
+    
+    return NULL;
 }
  
 static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     FHandle fd; int sz; char *data = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz), *cur = data, *end = data + sz; u32 line = 0, m_idx = 0;
     while (cur < end) {
-        char *s = cur; while (cur < end && *cur != '\n' && *cur != '\r') cur++; size_t len = cur - s; line++; if (len <= 0) { cur++; continue; } while (cEmpty(*s)) s++; char *le = s + (cur - s) - 1; while (le > s && cEmpty(*le)) le--; if (*s == '\0' || (s[0] == '/' && s[1] == '/') || s[0] == '#') { if (cur < end && (*cur == '\r' || *cur == '\n')) cur++; continue; } char *col = StringFindFirstCharWithin(s, ':');
-        if (col && sCompUpToLen(s, "index", col - s) == 0) { char *v = col + 1; while (cEmpty(*v)) v++; u32 idx = parse_numberu32(v, s, line); if (idx > m_idx) m_idx = idx; }  if (cur < end && (*cur == '\r' || *cur == '\n')) cur++;
+        char *s = cur;
+        while (cur < end && *cur != '\n' && *cur != '\r') { cur++; }
+        size_t len = cur - s;
+        line++;
+        if (len <= 0) { cur++; continue; }
+        
+        while (cEmpty(*s)) { s++; }
+        char *le = s + (cur - s) - 1;
+        while (le > s && cEmpty(*le)) { le--; }
+        if (*s == '\0' || (s[0] == '/' && s[1] == '/') || s[0] == '#') {
+            if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; }
+            continue;
+        }
+        
+        char *col = StringFindFirstCharWithin(s, ':');
+        if (col && sCompUpToLen(s, "index", col - s) == 0) {
+            char *v = col + 1;
+            while (cEmpty(*v)) { v++; }
+            u32 idx = parse_numberu32(v, s, line);
+            if (idx > m_idx) { m_idx = idx; }
+        }
+        
+        if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; }
     }
-    if (!m_idx || m_idx >= maxS) { if (!m_idx) DualLogWarn("No entries in %s\n", fn); else DualLogWarn("Index %u too large in %s\n",m_idx,fn); OS_Free(data,sz); return false; } p->entries = OS_AllocScratch((p->count = p->capacity = m_idx + 1) * sizeof(TextureData)); for (u32 i = 0; i < p->count; ++i) p->entries[i] = (TextureData){.index = U16_MAX}; TextureData e = {.index = U16_MAX}; line = 0; cur = data;
+    
+    if (!m_idx || m_idx >= maxS) {
+        if (!m_idx) { DualLogWarn("No entries in %s\n", fn); }
+        else { DualLogWarn("Index %u too large in %s\n",m_idx,fn); OS_Free(data,sz); return false; }
+    }
+
+    p->entries = OS_AllocScratch((p->count = p->capacity = m_idx + 1) * sizeof(TextureData));
+    for (u32 i = 0; i < p->count; ++i) { p->entries[i] = (TextureData){.index = U16_MAX}; }
+    TextureData e = {.index = U16_MAX}; line = 0; cur = data;
     while (cur < end) {
-        char *s = cur; while (cur < end && *cur != '\n' && *cur != '\r') cur++; size_t len = cur - s; line++; if (len < 3) { cur++; continue; } while (cEmpty(*s)) s++; char *le = s + (cur - s) - 1; while (le > s && cEmpty(*le)) le--; if (s[0] == '/' && s[1] == '/') { cur++; continue; }
-        if (*s == '#') { if (e.path[0] && e.index < p->capacity) p->entries[e.index] = e; e = (TextureData){.index = U16_MAX}; size_t aL = le - s; if (aL >= sizeof(e.path)) aL = sizeof(e.path) - 1; mcpy(e.path,s + 1,aL); e.path[aL] = 0; }
-        else {
+        char *s = cur;
+        while (cur < end && *cur != '\n' && *cur != '\r') { cur++; }
+        size_t len = cur - s;
+        line++;
+        if (len < 3) { cur++; continue; }
+        
+        while (cEmpty(*s)) { s++; }
+        char *le = s + (cur - s) - 1;
+        while (le > s && cEmpty(*le)) { le--; }
+        if (s[0] == '/' && s[1] == '/') { cur++; continue; }
+        
+        if (*s == '#') {
+            if (e.path[0] && e.index < p->capacity) { p->entries[e.index] = e; }
+            e = (TextureData){.index = U16_MAX};
+            size_t aL = le - s;
+            if (aL >= sizeof(e.path)) { aL = sizeof(e.path) - 1; }
+            mcpy(e.path,s + 1,aL); e.path[aL] = 0;
+        } else {
             char *col = StringFindFirstCharWithin(s, ':');
             if (col) {
-                char *k=s,*v=col+1,tk[256]={0},tv[256]={0}; while(cEmpty(*k) && k < col) k++; while(cEmpty(*v) && v <= le) v++; size_t kL = col - k, vL = (le >= v) ? (le - v + 1) : 0;
-                if(kL&&vL){sCpy2aSubFromb(tk,kL,k,256); sCpy2aSubFromb(tv,vL,v,256); char *ke=tk+slen(tk)-1, *ve=tv+slen(tv)-1; while(ke>tk&&cEmpty(*ke))*ke-- =0; while(ve>tv&&cEmpty(*ve))*ve-- =0; if(sEqual(tk,"index"))e.index=parse_numberu16(tv,s,line); else if(sEqual(tk,"transparent"))e.transparent=parse_bool(tv,s,line); else if(sEqual(tk,"doublesided"))e.doublesided=parse_bool(tv,s,line); else if(sEqual(tk,"blend"))e.blend=parse_numberu8(tv,s,line);}
+                char *k = s,*v = col + 1, tk[256] = {0}, tv[256] = {0};
+                while(cEmpty(*k) && k < col) { k++; }
+                while(cEmpty(*v) && v <= le) { v++; }
+                size_t kL = col - k, vL = (le >= v) ? (le - v + 1) : 0;
+                if (kL&&vL) {
+                    sCpy2aSubFromb(tk, kL, k, 256);
+                    sCpy2aSubFromb(tv, vL, v, 256);
+                    char *ke = tk + slen(tk) - 1, *ve = tv + slen(tv) - 1;
+                    while(ke>tk&&cEmpty(*ke)) {*ke-- = 0; }
+                    while(ve>tv&&cEmpty(*ve)) {*ve-- = 0; }
+                    
+                         if (sEqual(tk, "index"))       { e.index       = parse_numberu16(tv,s,line); }
+                    else if (sEqual(tk, "transparent")) { e.transparent = parse_bool(tv,s,line); }
+                    else if (sEqual(tk, "doublesided")) { e.doublesided = parse_bool(tv,s,line); }
+                    else if (sEqual(tk, "blend"))       { e.blend       = parse_numberu8(tv,s,line); }
+                }
             }
-        } if (cur < end && (*cur == '\r' || *cur == '\n')) cur++;
-    } if (e.path[0] && e.index < p->capacity) p->entries[e.index] = e; OS_Free(data, sz); return true;
+        }
+        
+        if (cur < end && (*cur == '\r' || *cur == '\n')) { cur++; }
+    }
+    
+    if (e.path[0] && e.index < p->capacity) { p->entries[e.index] = e; }
+    OS_Free(data, sz);
+    return true;
 }
 
+void SetWindowIcon(WinSysIcon*);
 void LoadTextures() {
-    double start_time = get_time(); DebugRAM("start LoadTextures"); texCnt = totalPixels = totalPaletteColors = 0u; TextureDataParser texture_parser; if (unlikely(!ParseTextureData(&texture_parser, MAX_TXRS, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); } i32 maxIndex = -1;
-    for(u32 k=0;k<texture_parser.count;++k){if(texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != U16_MAX) {maxIndex = texture_parser.entries[k].index;} } texCnt = (u16)(maxIndex + 1); i32* parsIdx = OS_AllocScratch(texCnt * sizeof(i32)); mset(parsIdx, -1, texCnt * sizeof(i32)); 
-    for(u32 k=0;k<texture_parser.count;++k){if(texture_parser.entries[k].index < texCnt) {parsIdx[texture_parser.entries[k].index] = (i32)k;} } DualLog("Loading textures (%u) ... ", texture_parser.count); thread_png_arenas = (PngArena*)OS_AllocScratch((size_t)threadCnt*sizeof(PngArena));
-    for(int t=0;t<(i32)threadCnt;++t){thread_png_arenas[t].base = NULL; PngArenaInit(&thread_png_arenas[t]); } TexResult* texResults = OS_AllocScratch(texCnt * sizeof(TexResult)); TextureParseTask tasks[32]; OS_Thread workers[32]; _Atomic u32 shared_idx = 0;/*The shared thread counter*/
-    for(int t=0;t<(i32)threadCnt;++t){tasks[t] = (TextureParseTask){.texCnt=texCnt,.shared_idx=&shared_idx,.parsIdx=parsIdx,.parser=&texture_parser,.results=texResults,.tid =t}; OS_ThreadCreate(&workers[t],TextureParsingWorker,&tasks[t]);} for(int t=0;t<(i32)threadCnt;++t)OS_ThreadJoin(&workers[t]);
-    totalPixels = totalPaletteColors = 0u; for (u16 i = 0; i < texCnt; ++i) { if (texResults[i].indices) { totalPixels += (u32)texResults[i].w * texResults[i].h; totalPaletteColors += texResults[i].palSize; } } size_t offsets_size = texCnt * sizeof(u32); size_t palettes_size = totalPaletteColors * sizeof(u32); size_t indices_size = totalPixels; size_t arena_size = offsets_size + palettes_size + indices_size;
-    void* arena = OS_AllocateRAM(arena_size, 0x1|0x2, 0x20|0x02|0x08000, INVALID_FHANDLE); u8* cur = (u8*)arena; u32* textureOffsets = (u32*)cur; cur += offsets_size; i32* textureSizes = OS_AllocScratch(texCnt * 2 * sizeof(i32)); u32* texturePaletteOffsets = OS_AllocScratch(texCnt * sizeof(u32)); u32* texturePalettes = (u32*)cur; cur += palettes_size; u8* all_indices = cur; u32 pixel_base = 0, color_base = 0;
-    for (u16 i=0; i<texCnt; ++i) {
-        if (!texResults[i].indices){continue;} u32 numP=(u32)texResults[i].w*texResults[i].h; u32 palS=texResults[i].palSize; textureOffsets[i]=pixel_base; texturePaletteOffsets[i]=color_base; textureSizes[i*2]=texResults[i].w; textureSizes[i*2 + 1]=texResults[i].h; mcpy(all_indices+pixel_base,texResults[i].indices,numP); 
-        mcpy(texturePalettes + color_base, texResults[i].palette, palS * sizeof(u32)); pixel_base += numP; color_base += palS; OS_Free(texResults[i].indices, numP); OS_Free(texResults[i].palette, palS * sizeof(u32));
+    double start_time = get_time();
+    DebugRAM("start LoadTextures");
+    texCnt = totalPixels = totalPaletteColors = 0u;
+    TextureDataParser texture_parser;
+    if (unlikely(!ParseTextureData(&texture_parser, MAX_TXRS, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
+    
+    i32 maxIndex = -1;
+    for (u32 k=0;k<texture_parser.count;++k) {
+        if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != U16_MAX) { maxIndex = texture_parser.entries[k].index; }
     }
-    DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels); i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32); glBindBuffer(GL_SSBO, colorBufferID); void* dst = glMapBufferRange(GL_SSBO,0,packed_size,0x0002|0x0004); mcpy(dst,all_indices,packed_size); glUnmapBuffer(GL_SSBO);
-    glBindBuffer(GL_SSBO,texPalID);         glBufferData(GL_SSBO,totalPaletteColors * sizeof(u32),texturePalettes, GL_STATIC_DRAW); glBindBuffer(GL_SSBO,textureOffsetsID); glBufferData(GL_SSBO,texCnt * sizeof(u32),textureOffsets,GL_STATIC_DRAW); glBindBuffer(GL_SSBO,textureSizesID);   glBufferData(GL_SSBO,texCnt * 2 * sizeof(i32),textureSizes,GL_STATIC_DRAW);
-    glBindBuffer(GL_SSBO,texPalOfsID);      glBufferData(GL_SSBO,texCnt * sizeof(u32),texturePaletteOffsets,GL_STATIC_DRAW); glBindBuffer(GL_SSBO,0);     /* Main arena: scratch-backed; no individual free. Thread arenas must stay independent due to concurrent PngArenaAlloc in TextureParsingWorker. */ for(int t=0;t<(i32)threadCnt;++t)OS_Free(thread_png_arenas[t].base, 16777216);
-    FHandle fp=OS_OpenReadonly(WIN_ICON); int windowIconFileSize=OS_FileSize(fp); u8* file_buffer=OS_AllocateFileBackedRAMReadonly(windowIconFileSize,fp,WIN_ICON); OS_Close(fp); PngArenaInit(&png_arena_main); int w=1, h=1;  u8* pixels=PngLoad(file_buffer,windowIconFileSize,&w,&h,&png_arena_main); if (!pixels) { DualLogError("Failed to load icon: %s\n",WIN_ICON); OS_Exit(1); }
-    WinSysIcon image = (WinSysIcon){w,h,pixels}; SetWindowIcon(&image); OS_Free(file_buffer, windowIconFileSize); OS_Free(png_arena_main.base, 16777216); png_arena_main.base = NULL; OS_FreeInitPhase(); DebugRAM("after textures load"); DualLog(" took %.6f secs\n", get_time() - start_time);
+    
+    texCnt = (u16)(maxIndex + 1);
+    i32* parsIdx = OS_AllocScratch(texCnt * sizeof(i32));
+    mset(parsIdx, -1, texCnt * sizeof(i32)); 
+    for (u32 k=0;k<texture_parser.count;++k) {
+        if (texture_parser.entries[k].index < texCnt) { parsIdx[texture_parser.entries[k].index] = (i32)k; }
+    }
+    
+    DualLog("Loading textures (%u) ... ", texture_parser.count);
+    thread_png_arenas = (PngArena*)OS_AllocScratch((size_t)threadCnt*sizeof(PngArena));
+    for (int t=0;t<(i32)threadCnt;++t) { thread_png_arenas[t].base = NULL; PngArenaInit(&thread_png_arenas[t]); }
+    
+    TexResult* texResults = OS_AllocScratch(texCnt * sizeof(TexResult));
+    TextureParseTask tasks[32];
+    OS_Thread workers[32]; _Atomic u32 shared_idx = 0;/*The shared thread counter*/
+    for (int t=0;t<(i32)threadCnt;++t) {
+        tasks[t] = (TextureParseTask){.texCnt = texCnt, .shared_idx = &shared_idx, .parsIdx = parsIdx, .parser = &texture_parser, .results = texResults, .tid = t};
+        OS_ThreadCreate(&workers[t], TextureParsingWorker,&tasks[t]);
+    }
+    for (int t=0;t<(i32)threadCnt;++t) {OS_ThreadJoin(&workers[t]); }
+    
+    totalPixels = totalPaletteColors = 0u;
+    for (u16 i=0;i<texCnt;++i) { if (texResults[i].indices) { totalPixels += (u32)texResults[i].w * texResults[i].h; totalPaletteColors += texResults[i].palSize; } }
+    size_t offsets_size = texCnt * sizeof(u32), palettes_size = totalPaletteColors * sizeof(u32), indices_size = totalPixels;
+    size_t arena_size = offsets_size + palettes_size + indices_size;
+    void* arena = OS_AllocateRAM(arena_size, 0x1|0x2, 0x20|0x02|0x08000, INVALID_FHANDLE);
+    u8* cur = (u8*)arena;
+    u32* textureOffsets = (u32*)cur;
+    cur += offsets_size;
+    i32* textureSizes          = OS_AllocScratch(texCnt * 2 * sizeof(i32));
+    u32* texturePaletteOffsets = OS_AllocScratch(texCnt * sizeof(u32));
+    u32* texturePalettes = (u32*)cur;
+    cur += palettes_size;
+    u8* all_indices = cur;
+    u32 pixel_base = 0, color_base = 0;
+    for (u16 i=0;i<texCnt;++i) {
+        if (!texResults[i].indices) { continue; }
+        
+        u32 numP = (u32)texResults[i].w * texResults[i].h;
+        u32 palS = texResults[i].palSize;
+        textureOffsets[i]=pixel_base;
+        texturePaletteOffsets[i] = color_base;
+        textureSizes[i * 2]     = texResults[i].w;
+        textureSizes[i * 2 + 1] = texResults[i].h;
+        mcpy(all_indices+pixel_base,texResults[i].indices,numP); 
+        mcpy(texturePalettes + color_base, texResults[i].palette, palS * sizeof(u32));
+        pixel_base += numP;
+        color_base += palS;
+        OS_Free(texResults[i].indices, numP);
+        OS_Free(texResults[i].palette, palS * sizeof(u32));
+    }
+    
+    DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
+    i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
+    glBindBuffer(GL_SSBO, colorBufferID);
+    void* dst = glMapBufferRange(GL_SSBO, 0, packed_size, 0x0002 | 0x0004);
+    mcpy(dst, all_indices, packed_size);
+    glUnmapBuffer(GL_SSBO);
+    
+    glBindBuffer(GL_SSBO, texPalID);
+    glBufferData(GL_SSBO, totalPaletteColors * sizeof(u32), texturePalettes, GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_SSBO, textureOffsetsID);
+    glBufferData(GL_SSBO, texCnt * sizeof(u32), textureOffsets, GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_SSBO, textureSizesID);
+    glBufferData(GL_SSBO, texCnt * 2 * sizeof(i32), textureSizes, GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_SSBO, texPalOfsID);
+    glBufferData(GL_SSBO, texCnt * sizeof(u32), texturePaletteOffsets, GL_STATIC_DRAW);
+    
+    glBindBuffer(GL_SSBO, 0);
+    
+    for (int t=0;t<(i32)threadCnt;++t) { OS_Free(thread_png_arenas[t].base, 16777216); }
+    
+    FHandle fp = OS_OpenReadonly(WIN_ICON);
+    int windowIconFileSize = OS_FileSize(fp);
+    u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, WIN_ICON);
+    OS_Close(fp); PngArenaInit(&png_arena_main);
+    int w = 1, h = 1;
+    u8* pixels = PngLoad(file_buffer, windowIconFileSize, &w, &h, &png_arena_main);
+    if (!pixels) { DualLogError("Failed to load icon: %s\n", WIN_ICON); OS_Exit(1); }
+    
+    WinSysIcon image = (WinSysIcon){w, h, pixels};
+    SetWindowIcon(&image);
+    OS_Free(file_buffer, windowIconFileSize);
+    OS_Free(png_arena_main.base, 16777216);
+    OS_Free(arena, arena_size);
+    png_arena_main.base = NULL;
+    OS_FreeInitPhase();
+    DebugRAM("after textures load");
+    DualLog(" took %.6f secs\n", get_time() - start_time);
 }
 
 typedef struct { const u16 *frames;  u8 length; bool hasGlow; const u16 *glowFrames; u8 glowLength; const char* name; } TextureAnimClip;
-u16 sequenceTextures[]={1159,1160,881,1162,1163,1164,/*scr_exp 01 - 06*/ 1310,1311,1312,1313,/*bridg1_1 001 - 004*/ 1115,1116,/*broken_clock01_glow 01 - 02*/ 1117,1118,/*broken_clock 01 - 02*/ 1124,1125,1126,1127,1128,1129,1130,/*g_energmine 00 - 06*/ 1131,1132,1133,1134,1135,1136,1137,1138,/*g_energmine_glow 00 - 07 (yes different count, supported!)*/
-                        1314,1315,1316,1317,/*scr_cita2_ 0 - 3*/ 1318,1319,1320,1321,/*scr_cita3_ 0 - 3*/ 1322,1323,1324,1325,1326,1327,1328,1329,/*scr_cita_ 0 - 7*/ 1330,/*engscreen1_04 index 45*/ 0,1331,1332,1333,1334,1335,1336,1337,/*scr_static2 0 - 6, then scr_static2_a*/ 1338,1339,1340,1341,1342,1343,/*scr_static 0 - 5*/
-                        1344,1345,1346,1347,/*screen1 0 - 3*/ 1348,1349,1350,1351,1352,/*screen2 0 - 4*/ 1353,1354,1355,1356,/*screen3 0 - 3*/ 1357,1358,1359,1360,1361,1362,/*screen4 0 - 5*/ 1363,1364,1365,1366,/*screen5 0 - 3*/ 1367,1368,1369,1370,/*triop1 0 - 3*/ 1371,1372,1373,1374,1375,1376,1377,1378,1379,1380,/*triop2 0 - 9*/
-                        1381,1382,1383,1384,1385,1386,1387,1388,/*triop3 0 - 7*/ 1389,/*triop4_8 index 105*/ 1381,/*triop3_0 index 106*/ 1390,1391,1392,1393,1394,1395,1396,1397,/*dna 0 - 7*/ 1398,1399,1400,1401,/*edcolor 0 - 3*/ 1402,1403,1404,1405,/*edgray 0 - 3*/ 1406,1407,1408,1409,1410,1411,1412,1413,1414,1415,1416,/*ammo_magcart 00 - 10*/
-                        1417,1418,1419,1420,1421,1422,1423,1424,1425,1426,1427,/*ammo_magcart_glow 00 - 10*/ 1428,1429,1430,1431,1432,1433,1434,1435,1436,1437,/*medicalbed 00 - 9*/ 1438,1439,1440,1441,1442,/*rad1_1 00 - 04*/ 1443,1444,1445,1446,1447,1448,1449,1450,1451,1452,/*screencode 0 - 9*/
-                        1453,1454,1455,1456,1457,1458,1459,1460,1461,1462,1463,1464,1465,1466,1467,1468,1469,1470,1471,1472,1473,1474,1475,1476,1477,1478,1479,1480,1481,1482,1483,1484,1485,1486,1487,1488,1489,/*shodanstatic 00 - 36*/ 1166,1167,1168,1169,/*telepad 00 - 03*/ 1490,1491,1492,1493,/*telepad_00_glow*/ 0,/*black index 212*/ 0,/*black*/ 0,/*black*/
-                        0,/*black*/ 0,/*black*/ 0,/*black index 217*/ 1495,1496,1497,1498,1499,1500,1501,1502,1503,1504,1505,1506,/*medscreen13 00 - 11*/ 1507,1508,1509,1510,1511,1512,1513,1514,/*medscreen24 00 - 07*/ 1515,1516,1517,1518,1519,1520,1521,1522,/*medscreen16 00 - 07*/
-                        1523,1524,1525,1526,1527,1528,1529,1530,1531,1532,1533,1534,1535,1536,1537,1538,1539,1540,1541,1542,1543,1544,1545,1546,1547,1548,1549,1550,1551,1552,1553,1554,1555,1556,1557,1558,1559,1560,1561,1562,1563,1564,1565,1566,1567,1568,1569,1570,1571,1572,1573,1574,1575,/*zerog 00 - 52*/ 1576,1577,1578/*door_x1 01 - 03 ends at index 305*/};
-static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
-    /*0*/{(u16[]){6,7,8,9,9,8,7,6},8,false,NULL,0,"Bridge11"}, /*1*/{(u16[]){10,11},2,true,(u16[]){12,13},2,"BrokenClock"}, /*2*/{(u16[]){14,15,16,17,18,19,20},7,true,(u16[]){21,22,23,24,25,26,27,28},8,"EnergMine"},/*3*/{(u16[]){29,30,31,32,45,45,45,29,30,31,32,29,30,31,32,29,30,31,32,29,45,45,45,29,30,31,32,29,30,31,32,29,30,31,32,29,30,31,32,29,45,45,45},43,false,NULL,0,"EngScreen1"},/*4*/{(u16[]){52,51,50,49,49,50,51,52},8,false,NULL,0,"EngScreen2"},
-    /*5*/{(u16[]){29,30,31,32,45,29,30,31,45,29,30,31,45},13,false,NULL,0,"ExecScreen1"},/*6*/{(u16[]){83,84,85,86,83,83,86,85,84,83,103,83,84,85,86,83,83,86,85,84,83},21,false,NULL,0,"ExecScreen2"},/*7*/{(u16[]){115,115,117},3,false,NULL,0,"ExecScreen3"},/*8*/{(u16[]){115,115,115,115,116,117,118},7,false,NULL,0,"ExecScreen4"},/*9*/{(u16[]){123,124,125,126,127,128,129,130,131,132,133},11,true,(u16[]){134,135,136,137,138,139,140,141,142,143,144},11,"MagCartridge"},
-    /*10*/{(u16[]){29,30,31,32,37},5,false,NULL,0,"MaintScreen1"}, /*11*/{(u16[]){33,34,35,36,32,29},6,false,NULL,0,"MaintScreen2"}, /*12*/{(u16[]){145,146,147,148,149,150,151,152,153,154},10,false,NULL,0,"MedicalBed"},/*13*/{(u16[]){54,59,118,116,118,59},6,false,NULL,0,"MedScreen1"}, /*14*/{(u16[]){79,80,81,82},4,false,NULL,0,"MedScreen2"}, /*15*/{(u16[]){99,98,97,92},4,false,NULL,0,"MedScreen3"}, /*16*/{(u16[]){29,30,31,36},4,false,NULL,0,"MedScreen4"},
-    /*17*/{(u16[]){56,55,54,59,59,54,55,56},8,false,NULL,0,"MedScreen5"}, /*18*/{(u16[]){61,61,62,62,61,61,215,216,217,218,219,220},12,false,NULL,0,"MedScreen6"}, /*19*/{(u16[]){119,120,121,122},4,false,NULL,0,"MedScreen7"},/*20*/{(u16[]){59,54,55,56},4,false,NULL,0,"MedScreen8"}, /*21*/{(u16[]){37,38,39,40,41,42,43,44},8,false,NULL,0,"MedScreen9"}, /*22*/{(u16[]){83,84,85,86,83,83,86,85,84,83},10,false,NULL,0,"MedScreen10"},
-    /*23*/{(u16[]){67,66,66,67,79,80,80,79},8,false,NULL,0,"MedScreen11"},/*24*/{(u16[]){221,222,223,224,225,226,227,228,229,230,231,232},12,false,NULL,0,"MedScreen13"}, /*25*/{(u16[]){79,80,81,82,82,81,80,79},8,false,NULL,0,"MedScreen16"}, /*26*/{(u16[]){73,74,75,76,77,78},6,false,NULL,0,"MedScreen18"},/*27*/{(u16[]){73,74,76,75,77,76,78,73},8,false,NULL,0,"MedScreen22"}, /*28*/{(u16[]){29,30,31,32},4,false,NULL,0,"MedScreen23"},
-    /*29*/{(u16[]){233,234,235,236,237,238,239,240},8,false,NULL,0,"MedScreen24"}, /*30*/{(u16[]){92,93,94,95},4,false,NULL,0,"MedScreen25"},/*31*/{(u16[]){241,242,243,244,245,246,247,248},8,false,NULL,0,"MedScreen27"}, /*32*/{(u16[]){64,65,66,67,68},5,false,NULL,0,"MedScreen29"}, /*33*/{(u16[]){155,156,157,158,159},5,false,NULL,0,"Rad1_1"}, /*34*/{(u16[]){61,61,62,62},4,false,NULL,0,"ReacScreen4"},/*35*/{(u16[]){62,61,60},3,false,NULL,0,"SciScreen1"},
-    /*36*/{(u16[]){107,108,109,111,112,113,114},7,false,NULL,0,"SciScreen2"}, /*37*/{(u16[]){33,34,35,36},4,false,NULL,0,"SciScreen3"}, /*38*/{(u16[]){188,189,113,112},4,false,NULL,0,"SciScreen4"},/*39*/{(u16[]){79,80,80,79,73,74,76,77,75},9,false,NULL,0,"SciScreen5"}, /*40*/{(u16[]){0,1,2,3,4,5},6,false,NULL,0,"ScreenDestroyed"}, /*41*/{(u16[]){160,161,162,163,164,165,166,167,168,169},10,false,NULL,0,"ScreenCodeRandom"},
-    /*42*/{(u16[]){29,30,31},3,false,NULL,0,"SecScreen4"},/*43*/{(u16[]){170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,203,204,205,206,205,203,204,206,205,204,203,206,205,203,204,205,206,203,206,205,203,204,203},60,false,NULL,0,"ShodanStatic"},/*44*/{(u16[]){203,204,205,206,203,206,205,203,204,205,206,203,206,205,203,204,203},17,false,NULL,0,"Static"},
-    /*45*/{(u16[]){207,208,209,210},4,true,(u16[]){211,212,213,214},4,"Telepad"}, /*46*/{(u16[]){303,304,305},3,false,NULL,0,"XDoor1"},/*47*/{(u16[]){249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302},54,false,NULL,0,"ZeroGMutant"},/*48*/{(u16[]){287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302},16,false,NULL,0,"ZeroGMutantDeath"},
+u16 sequenceTextures[]={
+    1159,1160,881,1162,1163,1164,/*scr_exp 01 - 06*/
+    1310,1311,1312,1313,/*bridg1_1 001 - 004*/
+    1115,1116,/*broken_clock01_glow 01 - 02*/
+    1117,1118,/*broken_clock 01 - 02*/
+    1124,1125,1126,1127,1128,1129,1130,/*g_energmine 00 - 06*/
+    1131,1132,1133,1134,1135,1136,1137,1138,/*g_energmine_glow 00 - 07 (yes different count, supported!)*/
+    1314,1315,1316,1317,/*scr_cita2_ 0 - 3*/
+    1318,1319,1320,1321,/*scr_cita3_ 0 - 3*/
+    1322,1323,1324,1325,1326,1327,1328,1329,/*scr_cita_ 0 - 7*/
+    1330,/*engscreen1_04 index 45*/
+    0,1331,1332,1333,1334,1335,1336,1337,/*scr_static2 0 - 6, then scr_static2_a*/
+    1338,1339,1340,1341,1342,1343,/*scr_static 0 - 5*/
+    1344,1345,1346,1347,/*screen1 0 - 3*/
+    1348,1349,1350,1351,1352,/*screen2 0 - 4*/
+    1353,1354,1355,1356,/*screen3 0 - 3*/
+    1357,1358,1359,1360,1361,1362,/*screen4 0 - 5*/
+    1363,1364,1365,1366,/*screen5 0 - 3*/
+    1367,1368,1369,1370,/*triop1 0 - 3*/
+    1371,1372,1373,1374,1375,1376,1377,1378,1379,1380,/*triop2 0 - 9*/
+    1381,1382,1383,1384,1385,1386,1387,1388,/*triop3 0 - 7*/
+    1389,/*triop4_8 index 105*/
+    1381,/*triop3_0 index 106*/
+    1390,1391,1392,1393,1394,1395,1396,1397,/*dna 0 - 7*/
+    1398,1399,1400,1401,/*edcolor 0 - 3*/
+    1402,1403,1404,1405,/*edgray 0 - 3*/
+    1406,1407,1408,1409,1410,1411,1412,1413,1414,1415,1416,/*ammo_magcart 00 - 10*/
+    1417,1418,1419,1420,1421,1422,1423,1424,1425,1426,1427,/*ammo_magcart_glow 00 - 10*/
+    1428,1429,1430,1431,1432,1433,1434,1435,1436,1437,/*medicalbed 00 - 9*/
+    1438,1439,1440,1441,1442,/*rad1_1 00 - 04*/
+    1443,1444,1445,1446,1447,1448,1449,1450,1451,1452,/*screencode 0 - 9*/
+    1453,1454,1455,1456,1457,1458,1459,1460,1461,1462,1463,1464,1465,1466,1467,1468,1469,1470,1471,1472,1473,1474,1475,1476,1477,1478,1479,1480,1481,1482,1483,1484,1485,1486,1487,1488,1489,/*shodanstatic 00 - 36*/
+    1166,1167,1168,1169,/*telepad 00 - 03*/ 1490,1491,1492,1493,/*telepad_00_glow*/
+    0,/*black index 212*/
+    0,/*black*/
+    0,/*black*/
+    0,/*black*/
+    0,/*black*/
+    0,/*black index 217*/
+    1495,1496,1497,1498,1499,1500,1501,1502,1503,1504,1505,1506,/*medscreen13 00 - 11*/
+    1507,1508,1509,1510,1511,1512,1513,1514,/*medscreen24 00 - 07*/
+    1515,1516,1517,1518,1519,1520,1521,1522,/*medscreen16 00 - 07*/
+    1523,1524,1525,1526,1527,1528,1529,1530,1531,1532,1533,1534,1535,1536,1537,1538,1539,1540,1541,1542,1543,1544,1545,1546,1547,1548,1549,1550,1551,1552,1553,1554,1555,1556,1557,1558,1559,1560,1561,1562,1563,1564,1565,1566,1567,1568,1569,1570,1571,1572,1573,1574,1575,/*zerog 00 - 52*/
+    1576,1577,1578/*door_x1 01 - 03 ends at index 305*/
 };
 
-// Per-clip frame period in seconds. Shared by TextureSequenceStart and TextureSequenceUpdate so the first frame is held for the same time as every frame after it. 0.04166 is 1/24s, the film rate the model animations run at.
-// prop_cpuscreen digits.  Clip 41 is the ten-digit "ScreenCodeRandom" sequence that Unity's CodeScreen.Update cycles
-// every 0.3s; its frame indices are 160..169, which resolve through sequenceTextures to textures 1443..1452.
-// Indexing sequenceTextures directly (rather than hardcoding 1443) keeps this correct if the table is reordered.
-#define SCREEN_CODE_CLIP 41
-INLINE u16 ScreenCodeTexture(u8 digit) { return sequenceTextures[textureAnimClips[SCREEN_CODE_CLIP].frames[digit%10u]]; }
-// Stop the flicker and latch the level's real digit.  This is the lock: Unity's Const.LockCPUScreenCode, driven by
-// the last CPU node dying on the level.  texIndex has to come from sequenceTextures -- the array is only ~305 long,
-// so any index outside it reads unrelated memory.
-void CodeScreenShowDigit(u16 self, u8 digit) { Entity* e=&World.instances[self]; e->textureAnimating=false; e->texAnimRandom=false; e->texIndex=ScreenCodeTexture(digit); }
-static float TextureClipPeriod(u16 clip) { return (clip==5||clip==6||clip==1) ? 0.5f/*ExecScreen1, ExecScreen2, BrokenClock*/ : (clip==41||clip==43) ? 0.3f/*ScreenCodeRandom, ShodanStatic*/ : (clip==44) ? 0.2f/*Static*/ : (clip==9) ? 0.17f/*MagCartridge*/ : (clip==47||clip==48) ? 0.04166f/*ZeroGMutant, ZeroGMutantDeath*/ : 0.35f; }
+static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
+    /*0*/{(u16[]){6,7,8,9,9,8,7,6},8,false,NULL,0,"Bridge11"},
+    /*1*/{(u16[]){10,11},2,true,(u16[]){12,13},2,"BrokenClock"},
+    /*2*/{(u16[]){14,15,16,17,18,19,20},7,true,(u16[]){21,22,23,24,25,26,27,28},8,"EnergMine"},
+    /*3*/{(u16[]){29,30,31,32,45,45,45,29,30,31,32,29,30,31,32,29,30,31,32,29,45,45,45,29,30,31,32,29,30,31,32,29,30,31,32,29,30,31,32,29,45,45,45},43,false,NULL,0,"EngScreen1"},
+    /*4*/{(u16[]){52,51,50,49,49,50,51,52},8,false,NULL,0,"EngScreen2"},
+    /*5*/{(u16[]){29,30,31,32,45,29,30,31,45,29,30,31,45},13,false,NULL,0,"ExecScreen1"},
+    /*6*/{(u16[]){83,84,85,86,83,83,86,85,84,83,103,83,84,85,86,83,83,86,85,84,83},21,false,NULL,0,"ExecScreen2"},
+    /*7*/{(u16[]){115,115,117},3,false,NULL,0,"ExecScreen3"},
+    /*8*/{(u16[]){115,115,115,115,116,117,118},7,false,NULL,0,"ExecScreen4"},
+    /*9*/{(u16[]){123,124,125,126,127,128,129,130,131,132,133},11,true,(u16[]){134,135,136,137,138,139,140,141,142,143,144},11,"MagCartridge"},
+    /*10*/{(u16[]){29,30,31,32,37},5,false,NULL,0,"MaintScreen1"},
+    /*11*/{(u16[]){33,34,35,36,32,29},6,false,NULL,0,"MaintScreen2"},
+    /*12*/{(u16[]){145,146,147,148,149,150,151,152,153,154},10,false,NULL,0,"MedicalBed"},
+    /*13*/{(u16[]){54,59,118,116,118,59},6,false,NULL,0,"MedScreen1"},
+    /*14*/{(u16[]){79,80,81,82},4,false,NULL,0,"MedScreen2"},
+    /*15*/{(u16[]){99,98,97,92},4,false,NULL,0,"MedScreen3"},
+    /*16*/{(u16[]){29,30,31,36},4,false,NULL,0,"MedScreen4"},
+    /*17*/{(u16[]){56,55,54,59,59,54,55,56},8,false,NULL,0,"MedScreen5"},
+    /*18*/{(u16[]){61,61,62,62,61,61,215,216,217,218,219,220},12,false,NULL,0,"MedScreen6"},
+    /*19*/{(u16[]){119,120,121,122},4,false,NULL,0,"MedScreen7"},
+    /*20*/{(u16[]){59,54,55,56},4,false,NULL,0,"MedScreen8"},
+    /*21*/{(u16[]){37,38,39,40,41,42,43,44},8,false,NULL,0,"MedScreen9"},
+    /*22*/{(u16[]){83,84,85,86,83,83,86,85,84,83},10,false,NULL,0,"MedScreen10"},
+    /*23*/{(u16[]){67,66,66,67,79,80,80,79},8,false,NULL,0,"MedScreen11"},
+    /*24*/{(u16[]){221,222,223,224,225,226,227,228,229,230,231,232},12,false,NULL,0,"MedScreen13"},
+    /*25*/{(u16[]){79,80,81,82,82,81,80,79},8,false,NULL,0,"MedScreen16"},
+    /*26*/{(u16[]){73,74,75,76,77,78},6,false,NULL,0,"MedScreen18"},
+    /*27*/{(u16[]){73,74,76,75,77,76,78,73},8,false,NULL,0,"MedScreen22"},
+    /*28*/{(u16[]){29,30,31,32},4,false,NULL,0,"MedScreen23"},
+    /*29*/{(u16[]){233,234,235,236,237,238,239,240},8,false,NULL,0,"MedScreen24"},
+    /*30*/{(u16[]){92,93,94,95},4,false,NULL,0,"MedScreen25"},
+    /*31*/{(u16[]){241,242,243,244,245,246,247,248},8,false,NULL,0,"MedScreen27"},
+    /*32*/{(u16[]){64,65,66,67,68},5,false,NULL,0,"MedScreen29"},
+    /*33*/{(u16[]){155,156,157,158,159},5,false,NULL,0,"Rad1_1"},
+    /*34*/{(u16[]){61,61,62,62},4,false,NULL,0,"ReacScreen4"},
+    /*35*/{(u16[]){62,61,60},3,false,NULL,0,"SciScreen1"},
+    /*36*/{(u16[]){107,108,109,111,112,113,114},7,false,NULL,0,"SciScreen2"},
+    /*37*/{(u16[]){33,34,35,36},4,false,NULL,0,"SciScreen3"},
+    /*38*/{(u16[]){188,189,113,112},4,false,NULL,0,"SciScreen4"},
+    /*39*/{(u16[]){79,80,80,79,73,74,76,77,75},9,false,NULL,0,"SciScreen5"},
+    /*40*/{(u16[]){0,1,2,3,4,5},6,false,NULL,0,"ScreenDestroyed"},
+    /*41*/{(u16[]){160,161,162,163,164,165,166,167,168,169},10,false,NULL,0,"ScreenCodeRandom"},
+    /*42*/{(u16[]){29,30,31},3,false,NULL,0,"SecScreen4"},
+    /*43*/{(u16[]){170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,203,204,205,206,205,203,204,206,205,204,203,206,205,203,204,205,206,203,206,205,203,204,203},60,false,NULL,0,"ShodanStatic"},
+    /*44*/{(u16[]){203,204,205,206,203,206,205,203,204,205,206,203,206,205,203,204,203},17,false,NULL,0,"Static"},
+    /*45*/{(u16[]){207,208,209,210},4,true,(u16[]){211,212,213,214},4,"Telepad"},
+    /*46*/{(u16[]){303,304,305},3,false,NULL,0,"XDoor1"},
+    /*47*/{(u16[]){249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302},54,false,NULL,0,"ZeroGMutant"},
+    /*48*/{(u16[]){287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302},16,false,NULL,0,"ZeroGMutantDeath"},
+};
+
+INLINE u16 ScreenCodeTexture(u8 digit) { return sequenceTextures[textureAnimClips[41].frames[digit%10u]]; }
+void CodeScreenShowDigit(u16 self, u8 digit) { Entity* e = &World.instances[self]; e->textureAnimating = false; e->texAnimRandom = false; e->texIndex = ScreenCodeTexture(digit); }
+static float TextureClipPeriod(u16 clip) {
+    return (clip == 5 || clip == 6 || clip == 1)
+           ? 0.5f /*ExecScreen1, ExecScreen2, BrokenClock*/
+           : (clip == 41 || clip == 43)
+             ? 0.3f /*ScreenCodeRandom, ShodanStatic*/
+             : (clip == 44)
+               ? 0.2f /*Static*/
+               : (clip == 9)
+                 ? 0.17f /*MagCartridge*/
+                 : (clip == 47 || clip == 48)
+                   ? 0.04166f /*ZeroGMutant, ZeroGMutantDeath*/
+                   : 0.35f;
+}
 
 void TextureSequenceInit(u16 self, char* trimmed_value) {
-    Entity* e=&World.instances[self]; if(e->index == 526){/*prop_console02: combined texture handled via child screen export; allow animation*/} if(trimmed_value[0]=='\0'){e->textureAnimating=false; e->modelIndex=EDefs[e->index].modelIndex; return;} e->textureAnimating=true; e->textureGlowAnimating=false; e->texAnimLight=e->texAnimLight2=U16_MAX; e->texFrame=e->texGlowFrame=0; if(sEqual(trimmed_value,"ScreenDestroyed")){World.instances[self].texAnimClip=NUM_TEXTURE_CLIPS-1; return;}
-    {size_t vlen=slen(trimmed_value); size_t d=vlen; while(d>0&&trimmed_value[d-1]>='0'&&trimmed_value[d-1]<='9'){--d;} if(vlen-d>=1&&vlen-d<=2&&d>=7&&sCompUpToLen(trimmed_value+d-7,"CamView",7)==0){int cvn=0; for(size_t k=d;k<vlen;++k){cvn=cvn*10+(trimmed_value[k]-'0');} if(cvn>=1&&cvn<=64){e->textureAnimating=false; e->camView=(u8)(cvn-1); return;}}}/*<prefix>CamView<N>, e.g. SecCamView3: show this level's camera N-1*/ for(int i=0;i<NUM_TEXTURE_CLIPS;++i){if(sEqual(trimmed_value,textureAnimClips[i].name)){World.instances[self].texAnimClip=i; e->textureGlowAnimating=textureAnimClips[i].hasGlow; return;}} e->textureAnimating=false; // Couldn't find match, just don't animate.
+    Entity* e=&World.instances[self];
+    if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EDefs[e->index].modelIndex; return;}
+    
+    e->textureAnimating = true;
+    e->textureGlowAnimating = false;
+    e->texAnimLight = e->texAnimLight2 = U16_MAX;
+    e->texFrame = e->texGlowFrame = 0;
+    if (sEqual(trimmed_value,"ScreenDestroyed")) { World.instances[self].texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
+    
+    {
+        size_t vlen=slen(trimmed_value);
+        size_t d=vlen;
+        while(d>0&&trimmed_value[d-1]>='0'&&trimmed_value[d-1]<='9'){--d;}
+        if(vlen - d >= 1 && vlen - d <= 2 && d >= 7 && sCompUpToLen(trimmed_value + d - 7,"CamView",7) == 0) {
+            int cvn = 0;
+            for (size_t k=d;k<vlen;++k) { cvn = cvn * 10 + (trimmed_value[k] - '0'); }
+            if (cvn >= 1 && cvn <= 64) { e->textureAnimating = false; e->camView = (u8)(cvn - 1); return;} /*<prefix>CamView<N>, e.g. SecCamView3: show this level's camera N - 1*/
+        }
+    }
+    
+    for(int i=0;i<NUM_TEXTURE_CLIPS;++i){
+        if (sEqual(trimmed_value,textureAnimClips[i].name)) { World.instances[self].texAnimClip = i; e->textureGlowAnimating = textureAnimClips[i].hasGlow; return; }
+    }
+    
+    e->textureAnimating = false; // Couldn't find match, just don't animate.
 }
 
 void TextureSequenceStart(u16 self, u8 clipIndex) {
-    Entity* e=&World.instances[self]; if (clipIndex >= NUM_TEXTURE_CLIPS) return; const TextureAnimClip* clip=&textureAnimClips[clipIndex];
-    e->texAnimClip=clipIndex; e->texFrame=0; e->texGlowFrame=0; e->textureAnimating=true; e->textureGlowAnimating=clip->hasGlow; e->texAnimRandom=false; e->texAnimInReverse=false; e->texAnimStopsAtDie=true;
-    e->texIndex=sequenceTextures[clip->frames[0]]; if (clip->hasGlow && clip->glowFrames) e->glowIndex=sequenceTextures[clip->glowFrames[0]];
-    e->tickFinished=World.pauseRelativeTime+TextureClipPeriod(clipIndex);
+    Entity* e = &World.instances[self];
+    if (clipIndex >= NUM_TEXTURE_CLIPS) return;
+    
+    const TextureAnimClip* clip = &textureAnimClips[clipIndex];
+    e->texAnimClip = clipIndex;
+    e->texFrame = e->texGlowFrame = 0;
+    e->textureAnimating = e->texAnimStopsAtDie = true;
+    e->textureGlowAnimating = clip->hasGlow;
+    e->texAnimRandom = e->texAnimInReverse = false;
+    e->texIndex=sequenceTextures[clip->frames[0]];
+    if (clip->hasGlow && clip->glowFrames) e->glowIndex = sequenceTextures[clip->glowFrames[0]];
+    e->tickFinished = World.pauseRelativeTime+TextureClipPeriod(clipIndex);
 }
 
 void TextureSequenceUpdate(u16 self) {
-    Entity* e=&World.instances[self]; u16 tClip=e->texAnimClip; if (tClip >= NUM_TEXTURE_CLIPS) { e->textureAnimating=false; return; } const TextureAnimClip* clip=&textureAnimClips[tClip]; bool stopAtDie=e->texAnimStopsAtDie && e->health <= 0.0f; e->tickFinished=World.pauseRelativeTime+TextureClipPeriod(tClip); 
-    if (e->texAnimRandom && (!stopAtDie)) { e->texFrame = random_range_u32(0,clip->length-1); if(clip->hasGlow){e->texGlowFrame=random_range_u32(0,clip->glowLength-1);}}else if(e->texAnimInReverse){if(stopAtDie){if(e->texFrame > 0)e->texFrame--; }else e->texFrame=(e->texFrame == 0) ? clip->length-1 : e->texFrame-1; if(clip->hasGlow){e->texGlowFrame=(e->texGlowFrame==0) ? clip->glowLength-1 : e->texGlowFrame-1;}}else{if(stopAtDie){if(e->texFrame < clip->length - 1)e->texFrame++;}else e->texFrame=(e->texFrame+1)%clip->length; if(clip->hasGlow){e->texGlowFrame=(e->texGlowFrame+1)%clip->glowLength;}}
-    if (stopAtDie && e->texFrame >= clip->length - 1) { e->textureAnimating=false; if(e->texAnimLight < World.loadedLights){flag_set(&World.lights[e->texAnimLight].lflags,LIGHTON,false);} if(e->texAnimLight2 < World.loadedLights){flag_set(&World.lights[e->texAnimLight2].lflags,LIGHTON,false);} }
-    e->texIndex = sequenceTextures[clip->frames[e->texFrame]]; if (clip->hasGlow && clip->glowFrames) { e->glowIndex = sequenceTextures[clip->glowFrames[e->texGlowFrame]]; } if (e->index == 279 && !clip->hasGlow) { e->glowIndex = e->texIndex; }
+    Entity* e = &World.instances[self];
+    u16 tClip = e->texAnimClip;
+    if (tClip >= NUM_TEXTURE_CLIPS) {
+        e->textureAnimating = false;
+    } else {
+        const TextureAnimClip* clip = &textureAnimClips[tClip];
+        bool stopAtDie = e->texAnimStopsAtDie && e->health <= 0.0f;
+        e->tickFinished = World.pauseRelativeTime+TextureClipPeriod(tClip); 
+        if (e->texAnimRandom && (!stopAtDie)) {
+            e->texFrame = random_range_u32(0,clip->length-1);
+            if (clip->hasGlow) { e->texGlowFrame=random_range_u32(0,clip->glowLength-1); }
+        } else if (e->texAnimInReverse) {
+            if (stopAtDie) {
+                if (e->texFrame > 0) e->texFrame--;
+            } else e->texFrame = (e->texFrame == 0) ? clip->length-1 : e->texFrame-1;
+            
+            if (clip->hasGlow) { e->texGlowFrame = (e->texGlowFrame == 0) ? clip->glowLength - 1 : e->texGlowFrame - 1;}
+        } else {
+            if (stopAtDie) {
+                if (e->texFrame < clip->length - 1) { e->texFrame++; }
+            } else e->texFrame = (e->texFrame+1) % clip->length;
+            
+            if (clip->hasGlow) { e->texGlowFrame = (e->texGlowFrame + 1) % clip->glowLength;}
+        }
+        
+        if (stopAtDie && e->texFrame >= clip->length - 1) {
+            e->textureAnimating=false;
+            if(e->texAnimLight  < World.loadedLights){flag_set(&World.lights[e->texAnimLight].lflags,LIGHTON,false);}
+            if(e->texAnimLight2 < World.loadedLights){flag_set(&World.lights[e->texAnimLight2].lflags,LIGHTON,false);}
+        }
+        
+        e->texIndex = sequenceTextures[clip->frames[e->texFrame]];
+        if (clip->hasGlow && clip->glowFrames) { e->glowIndex = sequenceTextures[clip->glowFrames[e->texGlowFrame]]; }
+        if (e->index == 279 && !clip->hasGlow) { e->glowIndex = e->texIndex; }
+    }
 }

@@ -624,7 +624,7 @@ static void ProjectileRaycast(Entity* self, int n) {
     RaycastHit hit = Raycast(opos, dir, range, LMASK_NPC_ATTACK); if(!hit.hit){return;} u16 hi = hit.hitInstanceIndex;
     if (hi == selfIdx){return;}
     ai_laser_beam(self,n,hit.point);
-    if (n == 3 && self->index == 427 && eidx) { DrawLine(ai_sight_pos(self), World.position[eidx],(Color){1.0f,0.15f,0.18f,0.85f}); SpawnTargetingLaser(ai_sight_pos(self),World.position[eidx]); } // Targeting laser (Cyborg Elite, attack3)
+    if (n == 3 && self->index == 427 && eidx) { if (Cheats.showNPC) { DrawLine(ai_sight_pos(self), World.position[eidx],(Color){1.0f,0.15f,0.18f,0.85f}); } SpawnTargetingLaser(ai_sight_pos(self),World.position[eidx]); } // Targeting laser (Cyborg Elite, attack3)
     DamageData dd = SetNPCData(self,n); dd.attackType=Att_HitS; // Citadel ProjectileRaycast always uses Projectile, even for Melee.
     dd.hitpoint=hit.point; dd.attacknormal=dir; dd.impactVelocity=dd.damage; bool hitPlayer=(hi == PLAYER1); if(hitPlayer){dd.impactVelocity *= 0.5f;} dd.isOtherNPC=!hitPlayer && IdxIsNPC(World.instances[hi].index);
     if (hi){ai_apply_damage(dd,hi);} u16 impactCI = GetImpactType(hi); if(impactCI){SpawnImpactEffectParticle(impactCI,hit.point,hit.normal);}
@@ -657,7 +657,7 @@ void AIAttack(Entity* self, int slot) {
     float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = slot == 1 ? npc->timeBetweenAttack1 : slot == 2 ? npc->timeBetweenAttack2 : npc->timeBetweenAttack3;/*float: sub-second cadences truncated to 0 and lost the debounce*/
     AttType attack = slot==1 ? npc->attackType : slot==2 ? npc->attackType2 : npc->attackType3;/*NPCTable holds the raw enemy_tables.csv ints; AttType is numbered to match Utils.GetAttackTypeFromInt.*/
     (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) ? (flag_set(&self->entflags,EF_SHOT_FIRED,true),(*s_time < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) ? (play_wav(sounds[sat],AppliedFXVol(1.0f),World.position[sidx],true), *s_time=World.pauseRelativeTime + tb) : 0,AIMakeAttack(self,attack,slot)) : 0;
-    (slot == 3 && self->enemy) ? (self->index == 427 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f, 0.15f, 0.18f, 0.85f}) : self->index == 433 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){0.96f,1.0f,0.0f,0.88f}) : (void)0) : (void)0; if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self,slot);
+    if (Cheats.showNPC) { (slot == 3 && self->enemy) ? (self->index == 427 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f, 0.15f, 0.18f, 0.85f}) : self->index == 433 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){0.96f,1.0f,0.0f,0.88f}) : (void)0) : (void)0; } if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self,slot);
 }
 
 static void AIFlierMoveToHoverHeight(Entity* self) {

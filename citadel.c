@@ -848,9 +848,92 @@ void DoorUse(u16 self, u16 activator) {
 }
 
 void DoorTargetted(u16 self, u16 activator) { if ((World.instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&World.instances[self],false); if (!World.instances[self].targettingOnlyUnlocks) DoorUse(self,activator); }
+/* Unity Door.SetCollisionLayer() (Door.cs:324) swaps a door's collision layer between Door(18) and InterDebris(19)
+   as it opens and closes, gated on changeLayerOnOpenClose. Keyed off the prefab: the corpus sets that key on
+   exactly doorB/doorE/doorG and on no other door, so the per-instance key is redundant. */
+static void DoorLayerUpdate(u16 self, Entity* e) {
+    if (!IdxIsLayerDoor(e->index)) return;
+    u32 want = (e->doorState == DoorState_Closed) ? L_Door : L_InterDebris;
+    if (World.layer[self] != want) World.layer[self] = want;
+}
+/* Unity Door.cs:313-319 only runs the grid while the door is fully Closed. Here it re-arms partway through the
+   closing stroke instead: timeBeforeLasersOn is read as a percentage of the closing clip. Unity saves that field
+   but never reads it, so there is no Unity timing to match -- the value just never had any effect. 0, the default
+   on doorK, therefore means the grid only comes up once the door is shut, and an ajar door carries none.
+
+   Drawn through DrawLine() rather than SpawnBeamTrail(): a particle trail has a lifetime, so a grid would have to
+   re-spawn its emitters every frame and would vanish whenever the particle pool ran dry. Wirelines are rebuilt
+   from door state each frame instead, so the grid is exactly as persistent as the door is closed.
+
+   The aperture comes from the CLOSED frame's model, not the current one: a laser grid spans the fixed doorway and
+   the door panel travels through it, so an AABB taken from the animating model would drag the bars along with the
+   stroke. doorJ/doorK are COLTYPE_MSH with a zero collider size, so the model bounds are the only aperture source. */
+static bool DoorLasersOn(const Entity* e, AnimationClip closing) {
+    if (e->ajar) return false;
+    if (e->doorState == DoorState_Closed) return true;
+    if (e->doorState != DoorState_Closing || e->clip != A_CLOSING) return false;
+    float p = (closing.frameEnd > closing.frameStart) ? (float)(e->frame - closing.frameStart) / (float)(closing.frameEnd - closing.frameStart) : 1.0f;
+    return (p * 100.0f >= e->timeBeforeLasersOn);
+}
+/* Door laser grid. Unity doorK carries exactly ONE laserLine, so the whole gate is this geometry: two strokes
+   crossing as an X, each stroke a yellow-orange-yellow triplet of crossed quads. Widths are world-space because
+   the strokes are real crossed quads rather than screen-space expansion. */
+#define DOOR_LASER_HALFTHICK 0.015f /* half-width of one laser line */
+#define DOOR_LASER_TRIPLET  0.0225f /* spacing between the three lines of a triplet */
+void DoorLaserDraw(u16 self) {
+    Entity* e = &World.instances[self];
+    if (!DoorLasersOn(e, DoorGetClip(e, A_CLOSING))) return;
+    if (V3_SqDist(World.position[self], World.position[PLAYER1]) > 2500.0f) return; /* ~50m */
+    AnimationClip closing = DoorGetClip(e, A_CLOSING);
+    u16 m = (u16)(closing.frameStartModelIndex + (u16)(closing.frameEnd - closing.frameStart));
+    if (m >= MAX_MDLS) return;
+    V3 mn = modelMin[m], mx = modelMax[m];
+    V3 ctr = (V3){(mn.x+mx.x)*0.5f * World.scale[self].x, (mn.y+mx.y)*0.5f * World.scale[self].y, (mn.z+mx.z)*0.5f * World.scale[self].z};
+    V3 he  = (V3){(mx.x-mn.x)*0.5f * World.scale[self].x, (mx.y-mn.y)*0.5f * World.scale[self].y, (mx.z-mn.z)*0.5f * World.scale[self].z};
+    V3 c = V3_AplusB(World.position[self], quat_rot_v3(World.rotation[self], ctr));
+    bool wideX = he.x >= he.z;
+    V3 right = quat_rot_v3(World.rotation[self], wideX ? (V3){1.0f,0.0f,0.0f} : (V3){0.0f,0.0f,1.0f});
+    V3 up = quat_rot_v3(World.rotation[self], (V3){0.0f,1.0f,0.0f});
+    float hw = (wideX ? he.x : he.z) * 0.94f, hh = he.y; /* stop just inside the frame so the bars read as inset */
+    if (hw <= 0.0f || hh <= 0.0f) return;
+    /* Two different endpoint layouts, because the two laser doors are not the same shape.
+       doorK (506): its Unity laserLines entry is a flat card with BoxCollider size (0.015, 2.56, 2.56) centred
+       at local (-0.012, 1.28, 0) -- a 2.56 SQUARE curtain spanning the full door height. So the X is inscribed in
+       a square at the aperture centre, half-extent limited by the narrower axis. Using the aperture's own
+       half-extents here gave a wide, squat, lopsided cross.
+       doorJ (505): keeps the original corner-to-corner endpoints with each end shifted along the door's up axis,
+       one way at the start and the other at the end. Forcing the square onto it looks wrong. */
+    V3 lo, hi, lf, rf;
+    if (e->index == 506) {
+        float halfX = vmin(hw, hh);
+        if (halfX <= 0.0f) return;
+        lo = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right,-halfX), V3_ScaleByF(up,-halfX)));
+        hi = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right, halfX), V3_ScaleByF( up, halfX)));
+        lf = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right,-halfX), V3_ScaleByF( up, halfX)));
+        rf = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right, halfX), V3_ScaleByF(up,-halfX)));
+    } else {
+        lo = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right,-hw), V3_ScaleByF(up,-hh)));
+        hi = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right, hw), V3_ScaleByF( up,hh)));
+        lf = V3_AplusB(lo, V3_ScaleByF(up, 2.56f));
+        rf = V3_AsubB(hi, V3_ScaleByF(up, 2.56f));
+    }
+    V3 face = V3_Normalize(V3_Cross(right,up)); /* door plane normal, used to keep the triplet spread in-plane */
+    const Color band[3] = {{1.0f,0.82f,0.08f,1.0f},{1.0f,0.42f,0.04f,1.0f},{1.0f,0.82f,0.08f,1.0f}};
+    const float spread[3] = {-DOOR_LASER_TRIPLET, 0.0f, DOOR_LASER_TRIPLET};
+    for (int pass = 0; pass < 2; ++pass) {
+        V3 a = pass ? lf : lo, b = pass ? rf : hi;
+        V3 dir = V3_Normalize(V3_AsubB(b,a));
+        V3 perp = V3_Normalize(V3_Cross(dir, face));
+        for (int k = 0; k < 3; ++k) {
+            V3 o = V3_ScaleByF(perp, spread[k]);
+            DrawCrossedLine(V3_AplusB(a,o), V3_AplusB(b,o), perp, DOOR_LASER_HALFTHICK, band[k]);
+        }
+    }
+}
 void DoorUpdate(u16 self) {
     Entity* e = &World.instances[self]; if(e->ajar){return;} AnimationClip opening=DoorGetClip(e,A_OPENING), closing=DoorGetClip(e,A_CLOSING);
     if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= opening.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); } else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); } if (World.pauseRelativeTime > e->waitBeforeClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
+    DoorLayerUpdate(self, e);
 }
 
 u16 SpawnDynamicObject(int val, bool cheat) {
@@ -1454,7 +1537,7 @@ void SecurityCameraRotateUpdate(u16 self) {
 void ModUpdate() {
     if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==CYBER_DECOY_CONST) CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ if(constdex==614) RelayPanelUpdate(i); if(IsPuzzleGridPanel(constdex)) PuzzlePanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(constdex == 594){TriggerCounterUpdate(i);} if(constdex == 699){LogicRelayUpdate(i);} if(constdex == 702){SpawnManagerUpdate(i);} if(constdex == 477){SecurityCameraRotateUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
+        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==CYBER_DECOY_CONST) CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ if(constdex==614) RelayPanelUpdate(i); if(IsPuzzleGridPanel(constdex)) PuzzlePanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(constdex == 594){TriggerCounterUpdate(i);} if(constdex == 699){LogicRelayUpdate(i);} if(constdex == 598 || constdex == 600){TriggerTrippedUpdate(i);} if(constdex == 702){SpawnManagerUpdate(i);} if(constdex == 477){SecurityCameraRotateUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
         if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);} if(IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
         if(constdex==552){CyberDataFragUpdate(i);} if(constdex==554){CyberExitUpdate(i);} if(constdex==555){CyberSwitchUpdate(i);} if((constdex>=448&&constdex<=451)||(constdex>=454&&constdex<=457)){CyberItemUpdate(i);}
     }

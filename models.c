@@ -1,32 +1,141 @@
 // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
 #include "common.h"
+
 #define ARENA_ALIGN(p) ((char*)(((uintptr_t)(p) + 15) & ~(uintptr_t)15)) // 16-byte align sub-arena cursors
+
 extern WeaponFireCtx wfx; // from weapons.c / voxen.c
-enum { SUB_MAIN = 32 }; typedef struct { u8* base; u8* cur; u8* end; } SubArena; static SubArena thrd_sub[SUB_MAIN + 1];
+
+enum { SUB_MAIN = 32 };
+
+typedef struct { u8* base; u8* cur; u8* end; } SubArena;
+static SubArena thrd_sub[SUB_MAIN + 1];
+
 static void OS_SubArenaSliceInit(u32 idx, u8* base, size_t sz) { SubArena* a = &thrd_sub[idx]; a->base = base; a->cur = base; a->end = base + sz; }
-static void* OS_SubArenaAlloc(i32 tid, size_t n) { if (tid < 0) tid = SUB_MAIN; SubArena* a = &thrd_sub[tid]; size_t aligned = (n + 15) & ~(size_t)15; if (a->cur + aligned > a->end) { DualLogError("SubArena %d ovr! want %u, cap %u MB\n", tid,(u32)n, (u32)((a->end - a->base))); OS_Exit(1); } void* p = a->cur; a->cur += aligned; mset(p, 0, aligned); return p; } /* Zero-fill: glb parsers leave optional fields (byteOffset, normalized, node TRS) unset and rely on zero defaults; wave reuse would otherwise expose stale bytes (matches old never-reused scratch) */
+static void* OS_SubArenaAlloc(i32 tid, size_t n) {
+    if (tid < 0) { tid = SUB_MAIN; }
+    SubArena* a = &thrd_sub[tid];
+    size_t aligned = (n + 15) & ~(size_t)15;
+    if (a->cur + aligned > a->end) { DualLogError("SubArena %d ovr! want %u, cap %u MB\n", tid,(u32)n, (u32)((a->end - a->base))); OS_Exit(1); }
+    
+    void* p = a->cur; a->cur += aligned; mset(p, 0, aligned);
+    return p;
+}
+
 static void* OS_SubArenaMark(i32 tid) { return (void*)(tid < 0 ? thrd_sub[SUB_MAIN].cur : thrd_sub[tid].cur); }
 static void OS_SubArenaRelease(i32 tid, void* mark) { SubArena* a = (tid < 0) ? &thrd_sub[SUB_MAIN] : &thrd_sub[tid]; a->cur = (u8*)mark; }
-enum{MAX_GLB_JOINTS=96,MAX_GLB_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLB_BLOCKS=64}; float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch; typedef struct { const char *data; int size; } RawOBJ; typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData; typedef struct { ModelData* entries; u32 count; } ModelDataParser;
-typedef struct { u32 start,end; int tid; } PhysGeomTask; BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS]; typedef struct { BvhNode *nodes; u8 *triOctants; u16 *triOrder,*triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx; typedef enum{glb_attribute_type_invalid,glb_attribute_type_position,glb_attribute_type_normal,glb_attribute_type_texcoord,glb_attribute_type_joints,glb_attribute_type_weights}glb_attribute_type;
-typedef enum{glb_component_type_invalid,glb_component_type_r_8u,glb_component_type_r_16u,glb_component_type_r_32f}glb_component_type; typedef enum{glbinvalid,glbscalar,glbv2,glbv3,glbv4,glbmat4}glb_type; typedef enum{glb_primitive_type_triangles}glb_primitive_type; typedef enum{glb_animpthtype_invalid,glb_animpthtype_translation,glb_animpthtype_rotation,glb_animpthtype_scale}glb_animt_path_type; typedef enum{glb_interp_linear,glb_interp_step}glb_interpolation_type;
-typedef struct{size_t size; void*data;} glb_buffer; typedef struct{glb_buffer*buffer; size_t offset,size;}glb_buffer_view; typedef struct{glb_component_type component_type; bool normalized; glb_type type; size_t offset,count,stride; glb_buffer_view*buffer_view;} glb_accessor; typedef struct{char*name; glb_attribute_type type;i32 index;glb_accessor*data;}glb_attribute; typedef struct{glb_primitive_type type; glb_accessor*indices; glb_attribute *attr; size_t attr_count; }glb_primitive; typedef struct{char *name; glb_primitive *primitives; size_t primitives_count;} glb_mesh;
-typedef struct glb_node glb_node; typedef struct{glb_node**joints;size_t joints_count;glb_accessor*inverse_bind_matrices;}glb_skin; struct glb_node{glb_node*parent,**children;size_t children_count;glb_skin*skin;glb_mesh*mesh;bool has_translation,has_rotation,has_scale;float translation[3],rotation[4],scale[3];}; typedef struct{glb_accessor*input,*output;glb_interpolation_type interpolation;}glbanim_samp; typedef struct{glbanim_samp*sampler;glb_node*target_node;glb_animt_path_type target_path;}glb_anim_chan; typedef struct{glbanim_samp*samplers;size_t samplers_count;glb_anim_chan*channels;size_t channels_count;}glb_animt;
-typedef struct{glb_mesh*meshes;size_t meshes_count;glb_accessor*accessors;size_t accessors_count;glb_buffer_view*buffer_views;size_t buffer_views_count;glb_buffer*buffers;size_t buffers_count;glb_skin*skins;size_t skins_count;glb_node*nodes;size_t nodes_count;glb_animt*animations;size_t animations_count; const void*bin;size_t bin_size;}glb_data; typedef enum{JSMN_UND=0,JSMN_OBJECT=1,JSMN_ARRAY=2,JSMN_STRING=3,JSMN_PRIMITIVE=4}jsmntype_t; enum{JSMN_ERROR_NOMEM=-1,JSMN_ERROR_INVAL=-2,JSMN_ERROR_PART=-3}; typedef struct{jsmntype_t type;i64 start,end;i32 size,parent;}jsmntok_t; typedef struct{size_t pos;u32 toknext;i32 toksuper;}jsmn_parser;
-typedef struct { u16 j[4]; float w[4]; } VtxSkin; typedef struct { float *pos,*nrm,*uv; VtxSkin* skin; u32 vertCount,*indices,triCount; glb_node* jointNodes[MAX_GLB_JOINTS]; float invBind[MAX_GLB_JOINTS][16]; u32 jointCount; glb_animt* anim; glb_data* gltf; bool isTrAnim; glb_node** meshNodes; float **subPos,**subNrm,**subUv; u32 *subVertCnt,**subIndices,*subTriCount,submshCnt; } GltfMesh;
-static BvhBuildCtx thrd_bvh_ctx[32]; u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; u16 *cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES]; size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES]; GltfMesh* gBlockMeshes; static u32 gBlockMeshCount = 0;
-static void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm){float tx=T[0],ty=T[1],tz=T[2],qx=R[0],qy=R[1],qz=R[2],qw=R[3],sx=S[0],sy=S[1],sz=S[2]; lm[0]=(1-2*qy*qy-2*qz*qz)*sx; lm[1]=(2*qx*qy+2*qz*qw)*sx; lm[2]=(2*qx*qz-2*qy*qw)*sx; lm[3]=lm[7]=lm[11]=0.0f; lm[4]=(2*qx*qy-2*qz*qw)*sy; lm[5]=(1-2*qx*qx-2*qz*qz)*sy; lm[6]=(2*qy*qz+2*qx*qw)*sy; lm[8]=(2*qx*qz+2*qy*qw)*sz; lm[9]=(2*qy*qz-2*qx*qw)*sz; lm[10]=(1-2*qx*qx-2*qy*qy)*sz; lm[12]=tx; lm[13]=ty; lm[14]=tz; lm[15]=1.0f;}
-void glb_node_transform_local(const glb_node* n, float* m){ Mat4FromTRS(n->translation,n->rotation,n->scale,m); }
-static u64 glb_component_read_integer(const void* i, glb_component_type t){return t==glb_component_type_r_16u?*((const u16*)i):t==glb_component_type_r_8u?*((const u8*)i):0;}
-static size_t glb_component_read_index(const void* i, glb_component_type t){return t==glb_component_type_r_16u?*((const u16*)i):t==glb_component_type_r_8u?*((const u8*)i):0;}
-static float glb_component_read_float(const void* i, glb_component_type t, bool n) { if(t==glb_component_type_r_32f) return *((const float*)i); if(n) return t==glb_component_type_r_16u?*((const u16*)i)/65535.f:t==glb_component_type_r_8u?*((const u8*)i)/255.f:0; return (float)glb_component_read_integer(i, t); }
-size_t glb_num_components(glb_type t){return t==glbv2 ? 2:t==glbv3 ? 3 : t==glbv4 ? 4 : t==glbmat4 ? 16 : 1;}
-size_t glb_component_size(glb_component_type ct){return ct==glb_component_type_r_8u?1:ct==glb_component_type_r_16u?2:ct==glb_component_type_r_32f?4:0;}
-static bool glb_element_read_float(const u8* e, glb_type ty, glb_component_type ct, bool n, float* o, size_t es){ size_t nc=glb_num_components(ty); if(es<nc) return 0; size_t cs=glb_component_size(ct); for(size_t i=0;i<nc;++i) o[i]=glb_component_read_float(e+cs*i,ct,n); return 1; }
+
+enum{MAX_GLB_JOINTS=96,MAX_GLB_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLB_BLOCKS=64}; float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
+
+typedef struct { const char *data; int size; } RawOBJ;
+typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData;
+typedef struct { ModelData* entries; u32 count; } ModelDataParser;
+typedef struct { u32 start,end; int tid; } PhysGeomTask; BvhNode** modelBVHNodes; u16** modelBVHTriOrder; u32 modelBVHNodeCounts[MAX_MDLS],modelBVHTriOrderCounts[MAX_MDLS];
+typedef struct { BvhNode *nodes; u8 *triOctants; u16 *triOrder,*triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
+typedef enum { glb_attribute_type_invalid,glb_attribute_type_position,glb_attribute_type_normal,glb_attribute_type_texcoord,glb_attribute_type_joints,glb_attribute_type_weights}glb_attribute_type;
+typedef enum { glb_component_type_invalid,glb_component_type_r_8u,glb_component_type_r_16u,glb_component_type_r_32f } glb_component_type;
+typedef enum { glbinvalid,glbscalar,glbv2,glbv3,glbv4,glbmat4}glb_type;
+typedef enum { glb_primitive_type_triangles}glb_primitive_type;
+typedef enum { glb_animpthtype_invalid,glb_animpthtype_translation,glb_animpthtype_rotation,glb_animpthtype_scale } glb_animt_path_type;
+typedef enum { glb_interp_linear,glb_interp_step } glb_interpolation_type;
+typedef struct { size_t size; void*data;} glb_buffer;
+typedef struct { glb_buffer*buffer; size_t offset,size;}glb_buffer_view;
+typedef struct { glb_component_type component_type; bool normalized; glb_type type; size_t offset,count,stride; glb_buffer_view*buffer_view;} glb_accessor;
+typedef struct { char*name; glb_attribute_type type;i32 index;glb_accessor*data;}glb_attribute;
+typedef struct { glb_primitive_type type; glb_accessor*indices; glb_attribute *attr; size_t attr_count; }glb_primitive;
+typedef struct { char *name; glb_primitive *primitives; size_t primitives_count;} glb_mesh;
+typedef struct glb_node glb_node;
+typedef struct { glb_node **joints; size_t joints_count;glb_accessor *inverse_bind_matrices; } glb_skin;
+struct glb_node{ glb_node*parent, **children; size_t children_count; glb_skin *skin; glb_mesh *mesh; bool has_translation, has_rotation, has_scale; float translation[3], rotation[4], scale[3]; };
+typedef struct { glb_accessor*input,*output;glb_interpolation_type interpolation;}glbanim_samp;
+typedef struct { glbanim_samp*sampler;glb_node*target_node;glb_animt_path_type target_path;}glb_anim_chan;
+typedef struct { glbanim_samp*samplers;size_t samplers_count;glb_anim_chan*channels;size_t channels_count;}glb_animt;
+typedef struct {
+    glb_mesh *meshes;
+    size_t meshes_count;
+    glb_accessor *accessors;
+    size_t accessors_count;
+    glb_buffer_view *buffer_views;
+    size_t buffer_views_count;
+    glb_buffer *buffers;
+    size_t buffers_count;
+    glb_skin *skins;
+    size_t skins_count;
+    glb_node *nodes;
+    size_t nodes_count;
+    glb_animt *animations;
+    size_t animations_count;
+    const void *bin;
+    size_t bin_size;
+} glb_data;
+
+typedef enum { JSMN_UND = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
+enum { JSMN_ERROR_NOMEM = -1,JSMN_ERROR_INVAL = -2, JSMN_ERROR_PART = -3 };
+typedef struct { jsmntype_t type;i64 start,end;i32 size,parent; } jsmntok_t;
+typedef struct { size_t pos;u32 toknext;i32 toksuper; } jsmn_parser;
+typedef struct { u16 j[4]; float w[4]; } VtxSkin;
+typedef struct {
+    float *pos, *nrm, *uv;
+    VtxSkin* skin;
+    u32 vertCount, *indices, triCount;
+    glb_node* jointNodes[MAX_GLB_JOINTS];
+    float invBind[MAX_GLB_JOINTS][16];
+    u32 jointCount;
+    glb_animt* anim;
+    glb_data* gltf;
+    bool isTrAnim;
+    glb_node **meshNodes;
+    float **subPos, **subNrm, **subUv;
+    u32 *subVertCnt, **subIndices, *subTriCount, submshCnt;
+} GltfMesh;
+
+static BvhBuildCtx thrd_bvh_ctx[32];
+u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES];
+u16 *cvxAdjLists[MAX_UNIQUE_CVX_MESHES], cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
+size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES], cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
+GltfMesh* gBlockMeshes;
+static u32 gBlockMeshCount = 0;
+
+static void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm) {
+    float tx=T[0],ty=T[1],tz=T[2],qx=R[0],qy=R[1],qz=R[2],qw=R[3],sx=S[0],sy=S[1],sz=S[2];
+    lm[0]  = (1 - 2*qy*qy - 2*qz*qz) * sx; lm[1]  = (2*qx*qy + 2*qz*qw) * sx;     lm[2]  = (2*qx*qz - 2*qy*qw) * sx;   lm[3]  = 0.0f;
+    lm[4]  = (2*qx*qy - 2*qz*qw) * sy;     lm[5]  = (1 - 2*qx*qx - 2*qz*qz) * sy; lm[6]  = (2*qy*qz + 2*qx*qw) * sy;   lm[7]  = 0.0f;
+    lm[8]  = (2*qx*qz + 2*qy*qw) * sz;     lm[9]  = (2*qy*qz - 2*qx*qw) * sz;     lm[10] = (1 - 2*qx*qx - 2*qy*qy)*sz; lm[11] = 0.0f;
+    lm[12] = tx;                           lm[13] = ty;                           lm[14] = tz;                         lm[15] = 1.0f; 
+}
+
+void glb_node_transform_local(const glb_node* n, float* m) { Mat4FromTRS(n->translation,n->rotation,n->scale,m); }
+static u64 glb_component_read_integer(const void* i, glb_component_type t) { return t == glb_component_type_r_16u ? *((const u16*)i) : t == glb_component_type_r_8u ? *((const u8*)i) : 0; }
+static size_t glb_component_read_index(const void* i, glb_component_type t) { return t == glb_component_type_r_16u ? *((const u16*)i) : t == glb_component_type_r_8u ? *((const u8*)i) : 0; }
+static float glb_component_read_float(const void* i, glb_component_type t, bool n) {
+    if (t == glb_component_type_r_32f) return *((const float*)i);
+    if (n) return t == glb_component_type_r_16u ? *((const u16*)i)/65535.f : (t == glb_component_type_r_8u ? *((const u8*)i)/255.f : 0.0f);
+    return (float)glb_component_read_integer(i, t);
+}
+
+size_t glb_num_components(glb_type t) { return t == glbv2 ? 2 : (t == glbv3 ? 3 : (t == glbv4 ? 4 : (t == glbmat4 ? 16 : 1))); }
+size_t glb_component_size(glb_component_type ct) { return ct == glb_component_type_r_8u? 1 : ct == glb_component_type_r_16u ? 2 : ct == glb_component_type_r_32f ? 4 : 0; }
+static bool glb_element_read_float(const u8* e, glb_type ty, glb_component_type ct, bool n, float* o, size_t es) {
+    size_t nc = glb_num_components(ty);
+    if (es<nc) return 0;
+    
+    size_t cs = glb_component_size(ct);
+    for (size_t i=0;i<nc;++i) { o[i]=glb_component_read_float(e+cs*i,ct,n); }
+    return 1;
+}
+
 const u8* glb_buffer_view_data(const glb_buffer_view* v){if(!v->buffer->data)return NULL;return(const u8*)v->buffer->data+v->offset;}
-static const glb_accessor* glb_find_accessor(const glb_primitive* p, glb_attribute_type t, i32 idx){for(size_t i=0;i<p->attr_count;++i){const glb_attribute*a=&p->attr[i];if(a->type==t&&a->index==idx)return a->data;}return NULL;}
-bool glbread_float(const glb_accessor* a, size_t i, float* o, size_t es){  if(!a->buffer_view){mset(o,0,es*sizeof(float));return 1;} const u8*e=glb_buffer_view_data(a->buffer_view);if(!e)return 0; e+=a->offset+a->stride*i; return glb_element_read_float(e,a->type,a->component_type,a->normalized,o,es); }
-size_t glbread_index(const glb_accessor* a, size_t i){ if(!a->buffer_view)return 0; const u8*e=glb_buffer_view_data(a->buffer_view);if(!e)return 0; e+=a->offset+a->stride*i; return glb_component_read_index(e,a->component_type); }
+static const glb_accessor* glb_find_accessor(const glb_primitive* p, glb_attribute_type t, i32 idx) { for(size_t i=0;i<p->attr_count;++i) { const glb_attribute *a = &p->attr[i]; if (a->type == t && a->index == idx) { return a->data; } } return NULL; }
+bool glbread_float(const glb_accessor* a, size_t i, float* o, size_t es){ 
+    if (!a->buffer_view) { mset(o, 0, es * sizeof(float)); return 1; }
+    
+    const u8 *e = glb_buffer_view_data(a->buffer_view);
+    if(!e) { return 0; }
+    
+    e+=a->offset+a->stride*i;
+    return glb_element_read_float(e, a->type, a->component_type, a->normalized, o, es);
+}
+
+size_t glbread_index(const glb_accessor* a, size_t i) { if (!a->buffer_view) { return 0; } const u8*e = glb_buffer_view_data(a->buffer_view); if (!e) { return 0; } e += a->offset + a->stride * i; return glb_component_read_index(e, a->component_type); }
 #define GLB_CHECK_TOKTYPE(t, ty) if((t).type!=(ty))return -1;
 #define GLB_CHECK_KEY(t) if((t).type!=JSMN_STRING||(t).size==0)return -1;
 #define GLB_PTRINDEX(ty, idx) (ty*)((size_t)idx+1)
@@ -172,7 +281,7 @@ __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* restrict sv, u32
     if (unlikely(!ec)){return false;} u16* final_t = OS_SubArenaAlloc(tid,ec * sizeof(u16)); /*Allocate final_t early so we can use it instead of ft_scratch*/ u32 used_slots_count = 0; u32* rem = (u32*)remap_scr; /*Reuse remap_scr for the 'rem' array!*/ u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) { const float* v = sv + (i<<3); const u32* uv = (const u32*)v; u32 h0 = uv[0] ^ uv[1] ^ uv[2] ^ uv[3]; u32 h1 = uv[4] ^ uv[5] ^ uv[6] ^ uv[7]; u32 s = (h0 ^ h1) & (WELD_HASH_SIZE-1); while (ht[s] != U32_MAX) { if (mcmp(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (WELD_HASH_SIZE-1); } ht[s] = ucnt; rem[i] = ucnt; ht_used[used_slots_count++] = s; mcpy(sv+(ucnt<<3), v, 32); ++ucnt; nxt:; }
     for(u32 i=0;i<ec;++i){final_t[i]=(u16)rem[i];} OptimizeVertexCache(final_t,ec,ucnt,cache_scr); float* final_verts=OS_SubArenaAlloc(tid,ucnt*CPU_VRT_SZ); OptimizeVertexFetch((u8*)sv,&ucnt,final_t,ec,CPU_VRT_SZ,remap_scr,(u8*)final_verts); *ov_pos = final_verts; *ovc = ucnt; *ot = final_t; *otc = ec/3;
-    float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr,mn_v); _mm_storeu_ps(mx_arr,mx_v); modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2]))))); for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]]=U32_MAX;} return true;
+    float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr,mn_v); _mm_storeu_ps(mx_arr,mx_v); modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2]))))); modelMin[mindex]=(V3){mn_arr[0],mn_arr[1],mn_arr[2]}; modelMax[mindex]=(V3){mx_arr[0],mx_arr[1],mx_arr[2]};/* free: the min/max are already in registers here, so the local AABB costs two stores. Door laser grids need an aperture and COLTYPE_MSH prefabs carry no collider size (doorJ/doorK are {0,0,0}), so the model bounds are the only source. */ for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]]=U32_MAX;} return true;
 }
 
 static void Mat4Identity(float* m) { mset(m, 0, sizeof(float) * 16); m[0] = m[5] = m[10] = m[15] = 1.0f; }
@@ -448,18 +557,29 @@ void LoadModels() {
 
 u8 numClips[MAX_ANIMS] = {/*0*/4,/*1*/4,/*2*/6,/*3*/8,/*4*/4,/*5*/4,/*6*/4,/*7*/4,/*8*/4,/*9*/4,/*10*/4,/*11*/4,/*12*/4,/*13*/4,/*14*/4,/*15*/4,/*16*/4,/*17*/4,/*18*/4,/*19*/4,/*20*/4,/*21*/1,/*22*/1,/*23*/6,/*24*/8,/*25*/6,/*26*/10,/*27*/8,/*28*/7,/*29*/5,/*30*/5,/*31*/7,/*32*/8,/*33*/5,/*34*/4,/*35*/5,/*36*/6,/*37*/4,/*38*/2,/*39*/6,/*40*/5,/*41*/6,/*42*/3,/*43*/3,/*44*/5,/*45*/4,/*46*/1,/*47*/4,/*48*/4,/*49*/3,/*50*/3,/*51*/7,/*52*/1};
 AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
-    [0]={[A_IDLE_CLOSED]={1.0f,2,2,699,24},[A_OPENING]={1.0f,2,11,699,24},[A_IDLE_OPEN]={1.0f,11,11,708,24},[A_CLOSING]={1.0f,12,21,709,24}},/*doorB (door2)*/[1]={[A_IDLE_CLOSED]={1.0f,2,2,719,24},[A_OPENING]={1.0f,2,12,719,24},[A_IDLE_OPEN]={1.0f,12,12,729,24},[A_CLOSING]={1.0f,14,24,731,24}},/*doorA (door1)*/
-    [2]={[A_IDLE]={1.0f,0,37,6975,30},[A_WALK]={1.0f,50,99,7013,30},[A_RUN]={1.1f,50,99,7013,30},/*A_RUN replays the same 50 frames as A_WALK (models.txt lists one "frame: 50 99" range) at a higher speed, so it takes A_WALK's base.  At 7012 it spanned 7012..7061 and ran 12 models into A_ATTACK1, which owns 7063..7088.*/[A_ATTACK1]={0.75f,111,136,7063,30},[A_PAIN]={0.5f,138,150,7090,30},[A_DYING]={0.75f,153,176,7103,30}},/*npc_humanoid_mutant*/
-    [3]={[A_IDLE]={1.0f,1,207,893,24},[A_ATTACK1]={1.0f,219,239,1100,24},[A_ATTACK2]={1.0f,219,239,1100,24},/*Same imported attack clip drives this NPC's Attack2 projectile state.*/[A_WALK]={1.0f,252,308,1121,24},[A_RUN]={1.0f,252,308,1121,24},[A_PAIN]={1.0f,321,330,1177,24},[A_PAIN2]={1.0f,331,344,1187,24},[A_DYING]={1.0f,345,369,1201,24}},/*npc_cyborg_drone*/
-    [4]={[A_IDLE_CLOSED]={1.0f,2,2,1234,24},[A_OPENING]={1.5f,2,44,1234,24},[A_IDLE_OPEN]={1.0f,44,44,1276,24},[A_CLOSING]={1.75f,46,96,1277,24}},/*doorD (door4, bulkhead 1)*/ [5]={[A_IDLE_CLOSED]={1.0f,2,2,1328,24},[A_OPENING]={1.0f,2,25,1328,24},[A_IDLE_OPEN]={1.0f,25,25,1351,24},[A_CLOSING]={1.0f,27,44,1352,24}},/*doorC (door3)*/
-    [6]={[A_IDLE_CLOSED]={1.0f,1,1,1370,24},[A_OPENING]={1.2f,1,30,1370,24},[A_IDLE_OPEN]={1.0f,30,30,1399,24},[A_CLOSING]={1.2f,32,66,1400,24}},/*doorJ (xdoor1)*/ [7]={[A_IDLE_CLOSED]={1.0f,3,3,1435,24},[A_OPENING]={1.2f,3,24,1435,24},[A_IDLE_OPEN]={1.0f,26,26,1457,24},[A_CLOSING]={1.2f,27,49,1458,24}},/*doorK (xdoor2)*/
-    [8]={[A_IDLE_CLOSED]={1.0f,3,3,1481,24},[A_OPENING]={1.2f,3,27,1481,24},[A_IDLE_OPEN]={1.0f,27,27,1505,24},[A_CLOSING]={1.2f,30,51,1506,24}},/*doorL (door10)*/ [9]={[A_IDLE_CLOSED]={1.0f,3,3,1528,24},[A_OPENING]={1.0f,3,15,1528,24},[A_IDLE_OPEN]={1.0f,28,28,1541,24},[A_CLOSING]={1.0f,28,39,1541,24}},/*doorE (door5)*/
-    [10]={[A_IDLE_CLOSED]={1.0f,2,2,1553,24},[A_OPENING]={1.0f,2,23,1553,24},[A_IDLE_OPEN]={1.0f,23,23,1574,24},[A_CLOSING]={1.0f,27,45,1575,24}},/*doorF (door6)*/ [11]={[A_IDLE_CLOSED]={1.0f,3,3,1594,24},[A_OPENING]={1.0f,3,22,1594,24},[A_IDLE_OPEN]={1.0f,22,22,1613,24},[A_CLOSING]={1.0f,25,42,1614,24}},/*doorG (door7)*/
-    [12]={[A_IDLE_CLOSED]={1.0f,2,2,1632,24},[A_OPENING]={1.0f,2,25,1632,24},[A_IDLE_OPEN]={1.0f,25,25,1655,24},[A_CLOSING]={1.0f,27,49,1656,24}},/*doorH (door8)*/ [13]={[A_IDLE_CLOSED]={1.0f,2,2,1679,24},[A_OPENING]={1.0f,2,14,1679,24},[A_IDLE_OPEN]={1.0f,14,14,1691,24},[A_CLOSING]={1.0f,26,52,1692,24}},/*doorI (door9)*/
-    [14]={[A_IDLE_CLOSED]={1.0f,2,2,1719,24},[A_OPENING]={1.0f,2,20,1719,24},[A_IDLE_OPEN]={1.0f,20,20,1737,24},[A_CLOSING]={1.0f,22,41,1738,24}},/*door_elevator1*/ [15]={[A_IDLE_CLOSED]={1.0f,2,2,1758,24},[A_OPENING]={1.5f,2,21,1758,24},[A_IDLE_OPEN]={1.0f,21,21,1777,24},[A_CLOSING]={1.5f,23,41,1778,24}},/*door_elevator2*/
-    [16]={[A_IDLE_CLOSED]={1.0f,2,2,1797,24},[A_OPENING]={1.0f,2,22,1797,24},[A_IDLE_OPEN]={1.0f,22,22,1817,24},[A_CLOSING]={1.0f,24,43,1818,24}},/*door_elevator3*/ [17]={[A_IDLE_CLOSED]={1.0f,2,2,1838,24},[A_OPENING]={2.0f,2,32,1838,24},[A_IDLE_OPEN]={1.0f,32,32,1868,24},[A_CLOSING]={2.0f,34,62,1869,24}},/*door_elevator4*/
-    [18]={[A_IDLE_CLOSED]={1.0f,2,2,1898,24},[A_OPENING]={1.0f,2,21,1898,24},[A_IDLE_OPEN]={1.0f,21,21,1917,24},[A_CLOSING]={1.0f,23,41,1918,24}},/*door_secret2 (door_wall1)*/ [19]={[A_IDLE_CLOSED]={1.0f,2,2,1937,24},[A_OPENING]={1.0f,2,21,1937,24},[A_IDLE_OPEN]={1.0f,21,21,1956,24},[A_CLOSING]={1.0f,23,41,1957,24}},/*door_secret1 (door_wall2)*/
-    [20]={[A_IDLE_CLOSED]={1.0f,2,2,1976,24},[A_OPENING]={1.0f,2,17,1976,24},[A_IDLE_OPEN]={1.0f,17,17,1991,24},[A_CLOSING]={1.0f,19,33,1992,24}},/*door_secret3 (door_wall3)*/ [21]={[A_LOOP_ALL]={1.0f,1,47,2007,24}},/*chunk_eng2_6 (eng_wallpump)*/ [22]={[A_LOOP_ALL]={1.0f,1,50,2054,24}},/*flight_fanwall*/
+    [0]={[A_IDLE_CLOSED]={1.0f,2,2,699,24},[A_OPENING]={1.0f,2,11,699,24},[A_IDLE_OPEN]={1.0f,11,11,708,24},[A_CLOSING]={1.0f,12,21,709,24}},/*doorB (door2)*/
+    [1]={[A_IDLE_CLOSED]={1.0f,2,2,719,24},[A_OPENING]={1.0f,2,12,719,24},[A_IDLE_OPEN]={1.0f,12,12,729,24},[A_CLOSING]={1.0f,14,24,731,24}},/*doorA (door1)*/
+    [2]={[A_IDLE]={1.0f,0,37,6975,30},[A_WALK]={1.0f,50,99,7013,30},[A_RUN]={1.1f,50,99,7013,30},[A_ATTACK1]={0.75f,111,136,7063,30},[A_PAIN]={0.5f,138,150,7090,30},[A_DYING]={0.75f,153,176,7103,30}},/*npc_humanoid_mutant*/
+    [3]={[A_IDLE]={1.0f,1,207,893,24},[A_ATTACK1]={1.0f,219,239,1100,24},[A_ATTACK2]={1.0f,219,239,1100,24},[A_WALK]={1.0f,252,308,1121,24},[A_RUN]={1.0f,252,308,1121,24},[A_PAIN]={1.0f,321,330,1177,24},[A_PAIN2]={1.0f,331,344,1187,24},[A_DYING]={1.0f,345,369,1201,24}},/*npc_cyborg_drone*/
+    [4]={[A_IDLE_CLOSED]={1.0f,2,2,1234,24},[A_OPENING]={1.5f,2,44,1234,24},[A_IDLE_OPEN]={1.0f,44,44,1276,24},[A_CLOSING]={1.75f,46,96,1277,24}},/*doorD (door4, bulkhead 1)*/
+    [5]={[A_IDLE_CLOSED]={1.0f,2,2,1328,24},[A_OPENING]={1.0f,2,25,1328,24},[A_IDLE_OPEN]={1.0f,25,25,1351,24},[A_CLOSING]={1.0f,27,44,1352,24}},/*doorC (door3)*/
+    [6]={[A_IDLE_CLOSED]={1.0f,1,1,1370,24},[A_OPENING]={1.2f,1,30,1370,24},[A_IDLE_OPEN]={1.0f,30,30,1399,24},[A_CLOSING]={1.2f,32,66,1400,24}},/*doorJ (xdoor1)*/
+    [7]={[A_IDLE_CLOSED]={1.0f,3,3,1435,24},[A_OPENING]={1.2f,3,24,1435,24},[A_IDLE_OPEN]={1.0f,26,26,1457,24},[A_CLOSING]={1.2f,27,49,1458,24}},/*doorK (xdoor2)*/
+    [8]={[A_IDLE_CLOSED]={1.0f,3,3,1481,24},[A_OPENING]={1.2f,3,27,1481,24},[A_IDLE_OPEN]={1.0f,27,27,1505,24},[A_CLOSING]={1.2f,30,51,1506,24}},/*doorL (door10)*/
+    [9]={[A_IDLE_CLOSED]={1.0f,3,3,1528,24},[A_OPENING]={1.0f,3,15,1528,24},[A_IDLE_OPEN]={1.0f,28,28,1541,24},[A_CLOSING]={1.0f,28,39,1541,24}},/*doorE (door5)*/
+    [10]={[A_IDLE_CLOSED]={1.0f,2,2,1553,24},[A_OPENING]={1.0f,2,23,1553,24},[A_IDLE_OPEN]={1.0f,23,23,1574,24},[A_CLOSING]={1.0f,27,45,1575,24}},/*doorF (door6)*/
+    [11]={[A_IDLE_CLOSED]={1.0f,3,3,1594,24},[A_OPENING]={1.0f,3,22,1594,24},[A_IDLE_OPEN]={1.0f,22,22,1613,24},[A_CLOSING]={1.0f,25,42,1614,24}},/*doorG (door7)*/
+    [12]={[A_IDLE_CLOSED]={1.0f,2,2,1632,24},[A_OPENING]={1.0f,2,25,1632,24},[A_IDLE_OPEN]={1.0f,25,25,1655,24},[A_CLOSING]={1.0f,27,49,1656,24}},/*doorH (door8)*/
+    [13]={[A_IDLE_CLOSED]={1.0f,2,2,1679,24},[A_OPENING]={1.0f,2,14,1679,24},[A_IDLE_OPEN]={1.0f,14,14,1691,24},[A_CLOSING]={1.0f,26,52,1692,24}},/*doorI (door9)*/
+    [14]={[A_IDLE_CLOSED]={1.0f,2,2,1719,24},[A_OPENING]={1.0f,2,20,1719,24},[A_IDLE_OPEN]={1.0f,20,20,1737,24},[A_CLOSING]={1.0f,22,41,1738,24}},/*door_elevator1*/
+    [15]={[A_IDLE_CLOSED]={1.0f,2,2,1758,24},[A_OPENING]={1.5f,2,21,1758,24},[A_IDLE_OPEN]={1.0f,21,21,1777,24},[A_CLOSING]={1.5f,23,41,1778,24}},/*door_elevator2*/
+    [16]={[A_IDLE_CLOSED]={1.0f,2,2,1797,24},[A_OPENING]={1.0f,2,22,1797,24},[A_IDLE_OPEN]={1.0f,22,22,1817,24},[A_CLOSING]={1.0f,24,43,1818,24}},/*door_elevator3*/
+    [17]={[A_IDLE_CLOSED]={1.0f,2,2,1838,24},[A_OPENING]={2.0f,2,32,1838,24},[A_IDLE_OPEN]={1.0f,32,32,1868,24},[A_CLOSING]={2.0f,34,62,1869,24}},/*door_elevator4*/
+    [18]={[A_IDLE_CLOSED]={1.0f,2,2,1898,24},[A_OPENING]={1.0f,2,21,1898,24},[A_IDLE_OPEN]={1.0f,21,21,1917,24},[A_CLOSING]={1.0f,23,41,1918,24}},/*door_secret2 (door_wall1)*/
+    [19]={[A_IDLE_CLOSED]={1.0f,2,2,1937,24},[A_OPENING]={1.0f,2,21,1937,24},[A_IDLE_OPEN]={1.0f,21,21,1956,24},[A_CLOSING]={1.0f,23,41,1957,24}},/*door_secret1 (door_wall2)*/
+    [20]={[A_IDLE_CLOSED]={1.0f,2,2,1976,24},[A_OPENING]={1.0f,2,17,1976,24},[A_IDLE_OPEN]={1.0f,17,17,1991,24},[A_CLOSING]={1.0f,19,33,1992,24}},/*door_secret3 (door_wall3)*/
+    [21]={[A_LOOP_ALL]={1.0f,1,47,2007,24}},/*chunk_eng2_6 (eng_wallpump)*/
+    [22]={[A_LOOP_ALL]={1.0f,1,50,2054,24}},/*flight_fanwall*/
     [23]={[A_IDLE]={1.0f,3,3,6877,24},[A_WALK]={1.0f,3,36,6877,24},[A_ATTACK1]={1.0f,38,56,6911,24},[A_ATTACK2]={1.0f,58,81,6930,24},[A_ATTACK3]={1.0f,58,81,6930,24},[A_RUN]={1.0f,3,36,6877,24},[A_PAIN]={1.0f,84,96,6954,24},[A_DYING]={1.0f,99,106,6967,24}},/*npc_bot_cortex_reaver*/
     [24]={[A_IDLE]={1.0f,1,60,2200,24},[A_ATTACK2]={1.0f,62,83,2260,24},[A_ATTACK3]={1.0f,86,122,2282,24},[A_RUN]={1.0f,143,182,2319,24},[A_WALK]={1.0f,143,182,2319,24},[A_PAIN]={1.0f,204,214,2359,24},[A_PAIN2]={1.0f,216,227,2370,24},[A_DYING]={1.0f,229,268,2382,24}},/*npc_cyborgassassin*/
     [25]={[A_IDLE]={1.0f,1,155,2422,30},[A_RUN]={1.0f,190,243,2577,30},[A_WALK]={1.0f,190,243,2577,30},[A_ATTACK2]={1.0f,265,289,2631,30},[A_ATTACK1]={1.0f,291,332,2656,30},[A_DYING]={1.0f,334,417,2698,30}},/*npc_cyborg_diego*/
@@ -470,20 +590,31 @@ AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameS
     [30]={[A_IDLE]={1.0f,1,39,3776,24},[A_WALK]={2.0f,1,39,3776,24},[A_RUN]={2.0f,1,39,3776,24},[A_PAIN]={1.0f,41,73,3815,24},[A_PAIN2]={0.5384f,75,95,3848,24},[A_ATTACK2]={1.0f,97,121,3869,24},[A_ATTACK3]={1.0f,106,121,3878,24}},/*npc_flierbot*/
     [31]={[A_IDLE]={1.0f,1,73,3894,24},[A_WALK]={1.0f,88,130,3967,24},[A_RUN]={1.0f,88,130,3967,24},[A_PAIN]={1.0f,144,159,4010,24},[A_ATTACK1]={1.0f,162,183,4026,24},[A_ATTACK2]={1.0f,186,209,4048,24},[A_DYING]={1.0f,212,237,4072,24}},/*npc_gortiger*/
     [32]={[A_IDLE]={1.0f,1,47,4098,24},[A_WALK]={1.0f,49,87,4145,24},[A_RUN]={1.0f,49,87,4145,24},[A_PAIN]={1.0f,88,107,4184,24},[A_PAIN2]={1.0f,109,125,4204,24},[A_PAIN3]={1.0f,127,144,4221,24},[A_ATTACK2]={1.0f,145,157,4239,24},[A_DYING]={1.0f,160,239,4252,24}},/*npc_hopper*/
-    [33]={[A_IDLE]={1.0f,1,30,4332,24},[A_WALK]={1.0f,1,30,4332,24},[A_RUN]={1.0f,1,30,4332,24},[A_PAIN]={1.0f,35,51,4362,24},[A_ATTACK2]={1.0f,52,72,4379,24},[A_DYING]={1.0f,79,103,4400,24}},/*npc_invisomut*/ [34]={[A_IDLE]={1.0f,2,2,4425,24},[A_ATTACK1]={2.0f,2,71,4425,24},[A_WALK]={2.0f,80,107,4495,24},[A_RUN]={2.0f,80,107,4495,24},[A_DYING]={1.0f,117,150,4523,24}},/*npc_maintenancebot*/
+    [33]={[A_IDLE]={1.0f,1,30,4332,24},[A_WALK]={1.0f,1,30,4332,24},[A_RUN]={1.0f,1,30,4332,24},[A_PAIN]={1.0f,35,51,4362,24},[A_ATTACK2]={1.0f,52,72,4379,24},[A_DYING]={1.0f,79,103,4400,24}},/*npc_invisomut*/
+    [34]={[A_IDLE]={1.0f,2,2,4425,24},[A_ATTACK1]={2.0f,2,71,4425,24},[A_WALK]={2.0f,80,107,4495,24},[A_RUN]={2.0f,80,107,4495,24},[A_DYING]={1.0f,117,150,4523,24}},/*npc_maintenancebot*/
     [35]={[A_IDLE]={2.5f,1,59,4557,24},[A_WALK]={2.5f,1,59,4557,24},[A_RUN]={2.5f,1,59,4557,24},[A_ATTACK1]={1.0f,61,79,4616,24},[A_PAIN]={1.0f,81,93,4635,24},[A_DYING]={1.0f,94,119,4648,24}},/*npc_mutant_avian*/
     [36]={[A_IDLE]={1.0f,1,78,4674,24},[A_WALK]={1.0f,90,129,4752,24},[A_RUN]={1.0f,90,129,4752,24},[A_ATTACK2]={1.0f,142,185,4792,24},[A_DYING]={1.0f,188,225,4836,24},[A_PAIN]={1.0f,227,235,4874,24}},/*npc_plantmutant*/
-    [37]={[A_IDLE]={1.0f,1,42,4883,24},[A_WALK]={2.0f,58,85,4925,24},[A_RUN]={2.0f,58,85,4925,24},[A_ATTACK1]={1.0f,102,123,4953,24},[A_ATTACK2]={1.0f,126,148,4975,24}},/*npc_repairbot*/ [38]={[A_IDLE]={1.0f,1,54,4998,24},[A_WALK]={1.0f,1,54,4998,24},[A_RUN]={1.0f,58,95,5052,24}},/*npc_sec1bot*/
+    [37]={[A_IDLE]={1.0f,1,42,4883,24},[A_WALK]={2.0f,58,85,4925,24},[A_RUN]={2.0f,58,85,4925,24},[A_ATTACK1]={1.0f,102,123,4953,24},[A_ATTACK2]={1.0f,126,148,4975,24}},/*npc_repairbot*/
+    [38]={[A_IDLE]={1.0f,1,54,4998,24},[A_WALK]={1.0f,1,54,4998,24},[A_RUN]={1.0f,58,95,5052,24}},/*npc_sec1bot*/
     [39]={[A_IDLE]={0.333f,1,17,5090,24},[A_WALK]={0.333f,19,38,5107,24},[A_RUN]={0.333f,19,38,5107,24},[A_ATTACK2]={0.25f,39,48,5127,24},[A_ATTACK3]={1.0f,49,56,5137,24},[A_PAIN]={1.0f,58,63,5145,24},[A_DYING]={0.2f,65,66,5151,24}},/*npc_sec2bot*/
     [40]={[A_IDLE]={0.18f,1,9,5153,24},[A_WALK]={0.333f,1,9,5153,24},[A_RUN]={0.333f,1,9,5153,24},[A_ATTACK1]={0.5f,18,28,5162,24},[A_PAIN]={0.333f,54,63,5173,24},[A_DYING]={0.333f,77,85,5183,24}},/*npc_servbot*/
     [41]={[A_IDLE]={1.0f,1,66,5192,24},[A_WALK]={2.0f,79,132,5258,24},[A_RUN]={2.5f,79,132,5258,24},[A_PAIN]={1.0f,145,157,5312,24},[A_ATTACK2]={1.0f,159,181,5325,24},[A_DYING]={1.0f,183,221,5348,24}},/*npc_virusmutant*/
-    [42]={[A_IDLE]={1.0f,1,121,5387,24},[A_DYING]={1.0f,121,157,5507,24}},/*npc_zerogmut*/ [43]={[A_IDLE_CLOSED]={1.0f,1,1,5544,24},[A_OPENING]={1.2f,2,21,5545,24},[A_IDLE_OPEN]={1.0f,21,21,5564,24}},/*puzzlepanel1*/
-    [44]={[A_IDLE_CLOSED]={1.0f,0,0,5565,24},[A_OPENING]={1.2f,1,17,5566,24},[A_IDLE_OPEN]={1.0f,17,17,5582,24},[A_INSTALL]={1.0f,19,30,5584,24},[A_INSTALLED]={1.0f,18,18,5583,24}},/*puzzlepanel2*/ [45]={[A_IDLE_CLOSED]={1.0f,0,0,5596,24},[A_OPENING]={1.2f,1,17,5597,24},[A_IDLE_OPEN]={1.0f,17,17,5613,24},[A_INSTALLED]={1.0f,18,18,5614,24}},/*puzzlepanel3*/
-    [46]={[A_LOOP_ALL]={1.0f,1,100,5615,24}},/*sparkingwire*/ [47]={[A_INACTIVE]={1.0f,2,2,5715,24},[A_ACTIVATE]={1.2f,2,4,5715,24},[A_ACTIVATED]={1.0f,4,4,5717,24},[A_DEACTIVATE]={1.0f,5,6,5718,24}},/*switch4*/ [48]={[A_INACTIVE]={1.0f,2,2,5720,24},[A_ACTIVATE]={1.2f,2,6,5720,24},[A_ACTIVATED]={1.0f,6,6,5724,24},[A_DEACTIVATE]={1.0f,8,10,5725,24}},/*switch5*/
-    [49]={[A_IDLE]={1.0f,1,1,5728,24},[A_ATTACK_MISS]={1.0f,1,13,5728,24},[A_ATTACK_HIT]={1.0f,18,24,5741,24}},/*v_pipe*/ [50]={[A_IDLE]={1.0f,1,1,5748,24},[A_ATTACK_MISS]={0.5f,4,22,5749,24},[A_ATTACK_HIT]={1.0f,4,22,5748,24}},/*v_rapier*/
-    [51]={[A_IDLE]={1.0f,1,65,5768,24},[A_WALK]={1.0f,75,98,5833,24},[A_RUN]={1.0f,75,98,5833,24},[A_ATTACK2]={1.0f,109,126,5857,24},[A_ATTACK1]={1.0f,128,142,5875,24},[A_PAIN]={1.0f,144,159,5890,24},[A_PAIN2]={1.0f,161,174,5906,24},[A_DYING]={1.0f,176,243,5920,24}},/*npc_mutant_cyborg*/ [52]={[A_LOOP_ALL]={1.0f,1,40,7446,24}},/*g_energmine*/
-    [53]={[A_LOOP_ALL]={1.0f,1,260,6076,24}},/*cyber_data*/ [54]={[A_LOOP_ALL]={1.0f,1,80,6336,24}},/*cyber_datafrag*/ [55]={[A_LOOP_ALL]={1.0f,1,100,6416,24}},/*cyber_exit*/
-    [56]={[A_LOOP_ALL]={1.0f,1,99,6516,24}},/*cyber_ice*/ [57]={[A_LOOP_ALL]={1.0f,1,260,6615,24}},/*cyber_item*/
+    [42]={[A_IDLE]={1.0f,1,121,5387,24},[A_DYING]={1.0f,121,157,5507,24}},/*npc_zerogmut*/
+    [43]={[A_IDLE_CLOSED]={1.0f,1,1,5544,24},[A_OPENING]={1.2f,2,21,5545,24},[A_IDLE_OPEN]={1.0f,21,21,5564,24}},/*puzzlepanel1*/
+    [44]={[A_IDLE_CLOSED]={1.0f,0,0,5565,24},[A_OPENING]={1.2f,1,17,5566,24},[A_IDLE_OPEN]={1.0f,17,17,5582,24},[A_INSTALL]={1.0f,19,30,5584,24},[A_INSTALLED]={1.0f,18,18,5583,24}},/*puzzlepanel2*/
+    [45]={[A_IDLE_CLOSED]={1.0f,0,0,5596,24},[A_OPENING]={1.2f,1,17,5597,24},[A_IDLE_OPEN]={1.0f,17,17,5613,24},[A_INSTALLED]={1.0f,18,18,5614,24}},/*puzzlepanel3*/
+    [46]={[A_LOOP_ALL]={1.0f,1,100,5615,24}},/*sparkingwire*/
+    [47]={[A_INACTIVE]={1.0f,2,2,5715,24},[A_ACTIVATE]={1.2f,2,4,5715,24},[A_ACTIVATED]={1.0f,4,4,5717,24},[A_DEACTIVATE]={1.0f,5,6,5718,24}},/*switch4*/
+    [48]={[A_INACTIVE]={1.0f,2,2,5720,24},[A_ACTIVATE]={1.2f,2,6,5720,24},[A_ACTIVATED]={1.0f,6,6,5724,24},[A_DEACTIVATE]={1.0f,8,10,5725,24}},/*switch5*/
+    [49]={[A_IDLE]={1.0f,1,1,5728,24},[A_ATTACK_MISS]={1.0f,1,13,5728,24},[A_ATTACK_HIT]={1.0f,18,24,5741,24}},/*v_pipe*/
+    [50]={[A_IDLE]={1.0f,1,1,5748,24},[A_ATTACK_MISS]={0.5f,4,22,5749,24},[A_ATTACK_HIT]={1.0f,4,22,5748,24}},/*v_rapier*/
+    [51]={[A_IDLE]={1.0f,1,65,5768,24},[A_WALK]={1.0f,75,98,5833,24},[A_RUN]={1.0f,75,98,5833,24},[A_ATTACK2]={1.0f,109,126,5857,24},[A_ATTACK1]={1.0f,128,142,5875,24},[A_PAIN]={1.0f,144,159,5890,24},[A_PAIN2]={1.0f,161,174,5906,24},[A_DYING]={1.0f,176,243,5920,24}},/*npc_mutant_cyborg*/
+    [52]={[A_LOOP_ALL]={1.0f,1,40,7446,24}},/*g_energmine*/
+    [53]={[A_LOOP_ALL]={1.0f,1,260,6076,24}},/*cyber_data*/
+    [54]={[A_LOOP_ALL]={1.0f,1,80,6336,24}},/*cyber_datafrag*/
+    [55]={[A_LOOP_ALL]={1.0f,1,100,6416,24}},/*cyber_exit*/
+    [56]={[A_LOOP_ALL]={1.0f,1,99,6516,24}},/*cyber_ice*/
+    [57]={[A_LOOP_ALL]={1.0f,1,260,6615,24}},/*cyber_item*/
     [58]={[A_INACTIVE]={1.0f,1,1,80,24},[A_ACTIVATED]={1.0f,2,2,81,24}},/*cyber_switch: 1=off, 2=on*/
 };
 

@@ -3,14 +3,14 @@
 #include "credits.h"
 #include "Shaders/shaders.h"
 // Rendering
-u32 globalframe=0,globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,
+u32 globalframe=0,globalframesPerLastSecond,inputImageID,inputUIID,inputDepthID,inputWorldPosID,inputSpecID,inputNormalID,gBufferFBO,uiFBO,outputImageID,depthPrepassSP,chunkSP,chunkVAO,chunkVBO,uiSP,debugUnlitSP,shadowmapsSP,shadowmapsClearSP,shadowMapSSBO,shadowMapsIndirectionID,ssrSP,imageBlitSP,quadVAO,quadVBO,textSP,textVAO,textVBO,debugLinesVAO,debugLinesVBO,wireLinesVAO,wireLinesVBO,matricesBufferID,cellVisibleDataID,debugLineColors,colorBufferID,texPalID,texPalOfsID,
     textureOffsetsID,textureSizesID,lightsID,voxListCntsID,voxelLightListsID,voxelUpdateSP,vbos[MAX_MDLS],tbos[MAX_MDLS],psysInstancesID,psysTrailsID,psysquadVAO,psysquadVBO,particleSP,trailSP,modelVertexCounts[MAX_MDLS],*physVertCounts,threadCnt=1;
 u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; u32 textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT]; // 3D text decal world meshes (chunk VAO format, world-baked, per level)
 char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN]; u16 decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount; // decals whose lingdex is invalid carry literal text from the level file
 DecalStyle decalStyles[DECAL_STYLE_MAX]; u16 decalStyleCount; // Unity TextMesh anchor/alignment/lineSpacing overrides per decal (from tA/tAl/tLs)
 float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
 // Entity Management
-float modelMatrices[INSTANCE_COUNT*16],*world_from_mdl=modelMatrices,modelBounds[MAX_MDLS],**physPos; u16 **modelTriangles,modelTriangleCounts[MAX_MDLS],mdlsCnt,**physTris; u8 currentPlayerNameLength=0; i8 currentMenuItem=0,currentMenuTab=0,menuItemCount=4,menuTabCount=1;
+float modelMatrices[INSTANCE_COUNT*16],*world_from_mdl=modelMatrices,modelBounds[MAX_MDLS],**physPos; V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS]; u16 **modelTriangles,modelTriangleCounts[MAX_MDLS],mdlsCnt,**physTris; u8 currentPlayerNameLength=0; i8 currentMenuItem=0,currentMenuTab=0,menuItemCount=4,menuTabCount=1;
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {5,/*Forward=F*/ 0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/ 23,/*Prone=X*/ 16,/*Lean Left=Q*/ 4,/*Lean Right=E*/ 45,/*Sprint=LSHIFT*/ 38,/*Turn Left=LARROW*/ 39,/*Turn Right=RARROW*/ 36,/*Look Up=UARROW*/ 37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/ 27,/*Sensaround=2*/ 28,/*Lantern=3*/
@@ -37,8 +37,47 @@ Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0
 // Wireline Rendering
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex* debugLineVerts = NULL;
+/* Gameplay lines (door laser grids) need real width and depth. GL_LINES is clamped to 1px in a core profile and
+   glLineWidth is not dependable, so these are ordinary world-space quads instead. Each stroke is two quads
+   crossed about its own axis, foliage-cross style, so it stays visible from every direction rather than
+   flattening to an edge-on card the way a single camera-facing billboard does. */
+typedef struct { float x,y,z,r,g,b,a; } WireVertex;
+enum { MAX_WIRELINE_QUADS = 8192 };
+static WireVertex* wireVerts = NULL; static u32 wireVertCount = 0;
+static void EmitWireQuad(V3 c0, V3 c1, V3 c2, V3 c3, Color c) {
+    if (!wireVerts || wireVertCount + 6 > (u32)(MAX_WIRELINE_QUADS*6)) return;
+    const V3 p[6] = {c0,c1,c2, c0,c2,c3};
+    for (int v = 0; v < 6; ++v) {
+        WireVertex* w = &wireVerts[wireVertCount++];
+        w->x = p[v].x; w->y = p[v].y; w->z = p[v].z; w->r = c.r; w->g = c.g; w->b = c.b; w->a = c.a;
+    }
+}
+/* perp must be unit length and perpendicular to (b-a); the second quad is derived from it to form the cross. */
+void DrawCrossedLine(V3 a, V3 b, V3 perp, float halfThick, Color c) {
+    V3 o0 = V3_ScaleByF(perp, halfThick);
+    EmitWireQuad(V3_AsubB(a,o0), V3_AplusB(a,o0), V3_AplusB(b,o0), V3_AsubB(b,o0), c);
+    V3 q = V3_Normalize(V3_Cross(V3_Normalize(V3_AsubB(b,a)), perp));
+    V3 r0 = V3_ScaleByF(q, halfThick);
+    EmitWireQuad(V3_AsubB(a,r0), V3_AplusB(a,r0), V3_AplusB(b,r0), V3_AsubB(b,r0), c);
+}
+
+/* Kept separate from DrawDebugLines on purpose. The debug draw is only invoked when debugLineVertCount > 1, which
+   is 0 whenever the cheat draws are off -- so folding the gameplay flush into it meant the lasers silently
+   stopped being submitted the moment the debug gating went in. */
+INLINE void DrawWireLines(float* viewProj) {
+    if (!wireVerts || !wireVertCount) return;
+    glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVertex),wireVerts);
+    glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST);
+    /* Culling is on for the opaque pass (voxen.c), so each crossed quad would otherwise only show from one
+       side of its own plane and the cross would read as a half-lit blob. glGetIntegerv has no header
+       declaration, so this assumes the same on-state the opaque pass leaves and restores it afterwards. */
+    glDisable(GL_CULL_FACE);
+    glBindVertexArray(wireLinesVAO); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount);
+    glEnable(GL_CULL_FACE);
+    drawCalls++; vertsRendered += wireVertCount; wireVertCount = 0;
+}
 INLINE void DrawDebugLines(float* viewProj) {
-    if (!debugLineVerts || World.debugLineVertCount == 0) {return;} glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO); 
+    if (!debugLineVerts || World.debugLineVertCount == 0) {return;} glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO);
     glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount; glEnable(GL_DEPTH_TEST); World.debugLineVertCount = 0;
 }
 
@@ -96,8 +135,8 @@ typedef void (*ConsoleCmdFuncNoArg)(); typedef void (*ConsoleCmdFuncInt)(int); t
 typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
 int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
 void cmd_noclip() { Cheats.noclip = !Cheats.noclip; if (Cheats.noclip) { World.velocity[PLAYER1] = (V3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
-void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; if (Cheats.showPhys) { debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); DebugRAM("showPhys ON"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/ } else { OS_Free(debugLineVerts, (size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); debugLineVerts = NULL; DebugRAM("showPhys OFF"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/ } }
-void cmd_shownpc() { Cheats.showNPC = !Cheats.showNPC; if (Cheats.showPhys || Cheats.showNPC) { if (!debugLineVerts) { debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); DebugRAM("showNPC ON"); } } else { if (debugLineVerts) { OS_Free(debugLineVerts, (size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); debugLineVerts = NULL; DebugRAM("showNPC OFF"); } } CenterStatusPrint("shownpc: %s", Cheats.showNPC ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
+void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; DebugRAM(Cheats.showPhys?"showPhys ON":"showPhys OFF"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[Cheats.showPhys?1000:717]);/*"ACTIVATED"/"DISABLED"*/ }
+void cmd_shownpc() { Cheats.showNPC = !Cheats.showNPC; DebugRAM(Cheats.showNPC?"showNPC ON":"showNPC OFF"); CenterStatusPrint("shownpc: %s", Sys_Text.stringTable[Cheats.showNPC ? 1000 : 717]); }
 // Grid spawn positions for cheat arsenal: manhattan distance grid, 0.32f spacing, starting at 0.64f
 // Ordered by manhattan distance from player (|dx|+|dz|), then by |dy| closest to player Y first
 static const V3 ArsenalSpawnOffsets[] = {
@@ -564,7 +603,7 @@ static void SetHopperDeathEffect(Entity* e) {
 }
 
 void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, bool grayscaleEnabled) {
-    u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; if (Cheats.showPhys) {if (World.col[i] == COLTYPE_BOX) {DrawBoxCollider(i);} else if (World.col[i] == COLTYPE_SPH) {DrawSphereCollider(i);} else if (World.col[i] == COLTYPE_CVX) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_MSH) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);} DrawAngularVelocity(i);}
+    u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; if (IdxIsLaserDoor(constIndex)) { DoorLaserDraw(i); } if (Cheats.showPhys) {if (World.col[i] == COLTYPE_BOX) {DrawBoxCollider(i);} else if (World.col[i] == COLTYPE_SPH) {DrawSphereCollider(i);} else if (World.col[i] == COLTYPE_CVX) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_MSH) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);} DrawAngularVelocity(i);}
     /* The collider wireframe is all this instance has: it reached DrawEntity only because showphys is on, since a
        model-less body is otherwise rejected by EntNotVisible before it ever gets here.  Carrying on would bind
        vbos[MAX_MDLS], so stop here. */
@@ -644,7 +683,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         currentModelType=GetAndBindModel(i,currentModelType); glUniform1ui(3,(u32)tex); u32 vertCount = modelTriangleCounts[currentModelType] * 3; glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered += vertCount;
     }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][2]);
-    glUseProgram(chunkSP); glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u);/*default constIndex*/ glUniform1i(31,9); glUniform1ui(32,0u); cullBlendState = 0xFF;
+    glUseProgram(chunkSP); glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u);/*default constIndex*/ glUniform1i(31,9); glUniform1ui(32,0u); glUniform1ui(34,(World.curLev == LEVEL_CYBERSPACE) ? 1u : 0u);/*cyberspace: shader uses hardcoded neon directionals, else the sun*/ cullBlendState = 0xFF;
     bool grayscaleEnabled = ModRequestsGrayscale(); glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = World.fogColor[World.curLev].a + (float)(World.fogFac / 255u); // Alpha is base density for level.
     glUniform3f(12,World.fogColor[World.curLev].r * fogActual,World.fogColor[World.curLev].g * fogActual,World.fogColor[World.curLev].b * fogActual); // Fog Color(which is density)
@@ -696,7 +735,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glBindTexture(GL_TEXTURE_2D,0); return;
     } // <<<<<<<<<<<<< CAM VIEW BARRIER
     PSys_Render(viewProj,playerPos,(V3){invViewRot[0],invViewRot[1],invViewRot[2]},(V3){invViewRot[3],invViewRot[4],invViewRot[5]},(V3){-invViewRot[6],-invViewRot[7],-invViewRot[8]},inputDepthID,snear,sfar,(float)swidth,(float)sheight);
-    if(unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj);
+    DrawWireLines(viewProj); if(unlikely(World.debugLineVertCount > 1)) DrawDebugLines(viewProj);
     glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D,inputDepthID); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][3]);
     if(likely(Sys_Settings.Reflections>0u)){  glUseProgram(ssrSP); glUniform3f(3,playerPos.x,playerPos.y,playerPos.z); glUniform1i(5,3); glUniformMatrix4fv(6,1,0,invViewProj); glUniformMatrix4fv(4,1,GL_FALSE,viewProj); glDispatchCompute(((Sys_Settings.ScreenWidth/Sys_Settings.SSR_RES)+31)/32,((Sys_Settings.ScreenHeight/Sys_Settings.SSR_RES)+31)/32,1); }
     glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClearColor(0,0,0,0); glClear(GL_COLOR_BUFFER_BIT); glClearColor(0,0,0,0); glViewport(0,0,UI_W,UI_H); glDisable(GL_CULL_FACE); renderTime = get_time() - rendStart; glEnable(GL_BLEND);
@@ -843,7 +882,7 @@ void InitalizeEnvironment() {
     glFrontFace(0x0901/*GL_CCW*/);
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/); glClearColor(0,0,0,1);
     CompileShaders();
-    u32 tvaos[4],tvbos[4]; glGenVertexArrays(4,tvaos); glGenBuffers(4,tvbos); quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; chunkVBO=tvbos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; 
+    u32 tvaos[5],tvbos[5]; glGenVertexArrays(5,tvaos); glGenBuffers(5,tvbos); quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; chunkVBO=tvbos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; wireLinesVAO=tvaos[4]; wireLinesVBO=tvbos[4]; 
     float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
     glBindVertexArray(quadVAO); glBindBuffer(GL_ARRAY_BUFFER,quadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
     glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos xy float @ offset 0
@@ -857,10 +896,14 @@ void InitalizeEnvironment() {
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
     glBindVertexBuffer(0,textVBO,0,5*sizeof(float));
-    glBindVertexArray(debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW);
+    glBindVertexArray(debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW); debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); /* allocated unconditionally, not under the showphys/shownpc cheats: door laser grids are gameplay and draw through this same path, so the staging buffer has to outlive the cheats being off. */
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
     glBindVertexBuffer(0,debugLinesVBO,0,sizeof(DebugLineVertex));
+    glBindVertexArray(wireLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_QUADS*6*sizeof(WireVertex),NULL,GL_DYNAMIC_DRAW); wireVerts = (WireVertex*)OS_Alloc((size_t)MAX_WIRELINE_QUADS*6*sizeof(WireVertex));
+    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
+    glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
+    glBindVertexBuffer(0,wireLinesVBO,0,sizeof(WireVertex));
     glGenVertexArrays(1,&psysquadVAO); glGenBuffers(1,&psysquadVBO); static const float quadVerts[16]={-1.0f,-1.0f,0.0f,0.0f,1.0f,-1.0f,1.0f,0.0f,-1.0f,1.0f,0.0f,1.0f,1.0f,1.0f,1.0f,1.0f,}; 
     glBindVertexArray(psysquadVAO); glBindBuffer(GL_ARRAY_BUFFER,psysquadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadVerts),quadVerts,GL_STATIC_DRAW); glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2*sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); glBindVertexBuffer(0,psysquadVBO,0,4 * sizeof(float));
