@@ -6983,3 +6983,7 @@ constIndex:584|lP.x:30.865003|lP.y:-43.266|lP.z:-46.613004|lR.x:-0.707107|lR.w:0
 constIndex:584|lP.x:36.11|lP.y:-43.266|lP.z:-46.643004|lR.x:-0.707107|lR.w:0.707107|targetname:lev1sleepingcyborgs
 constIndex:584|lP.x:25.13|lP.y:-41.983998|lP.z:-41.413004|lR.x:0.707107|lR.w:-0.707107|targetname:lev1sleepingcyborgs
 constIndex:584|lP.x:30.33|lP.y:-41.983998|lP.z:-41.443004|lR.x:0.707107|lR.w:-0.707107|targetname:lev1sleepingcyborgs
+lP.x:-18.77172|lP.y:-40.753|lP.z:-2.277513|intensity:3|range:1.5|color.r:1|color.g:.6798|color.b:.1933
+lP.x:-18.53861|lP.y:-40.753|lP.z:-1.873182|intensity:4|range:1.5|color.r:1|color.g:.6798|color.b:.1933
+lP.x:-18.23282|lP.y:-39.5695|lP.z:-2.953449|intensity:5.34|range:2|color.r:.6179|color.g:.6956|color.b:1
+lP.x:-18.56206|lP.y:-39.274|lP.z:-1.575675|intensity:5.34|range:1|color.r:1|color.g:.2311|color.b:.2311

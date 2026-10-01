@@ -5542,7 +5542,7 @@ constIndex:508|lP.x:-14.6808|lP.y:32.64955|lP.z:-29.508|delay:5.25|securityThres
 constIndex:513|lP.x:-7.06|lP.y:32.6395|lP.z:-32.143|delay:5|locked:1|securityThreshhold:100|stayOpen:1|lockedMessageLingdex:3|waitBeforeClose:-21.27726|targetname:lev6diegosecretdoor|gameObject.activeInHierarchy:1
 constIndex:507|lP.x:-55.6998|lP.y:32.6395|lP.z:-24.236|lR.y:.70711|lR.w:.70711|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
 constIndex:510|lP.x:-57.0198|lP.y:32.6395|lP.z:-38.403|lR.y:.70711|lR.w:.70711|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
-constIndex:510|lP.x:-59.4918|lP.y:32.6395|lP.z:-38.403|lR.y:.70711|lR.w:.70711|delay:5.25|locked:1|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
+constIndex:510|lP.x:-59.4918|lP.y:32.6395|lP.z:-38.403|lR.y:.70711|lR.w:.70711|delay:5.25|locked:1|securityThreshhold:100|lockedMessageLingdex:1046|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
 constIndex:510|lP.x:-55.6998|lP.y:32.6395|lP.z:-34.672|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
 constIndex:507|lP.x:-51.7658|lP.y:32.6395|lP.z:-25.603|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
 constIndex:510|lP.x:83.8812|lP.y:32.6395|lP.z:-38.403|lR.y:.70711|lR.w:.70711|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
@@ -5554,10 +5554,10 @@ constIndex:510|lP.x:-1.94|lP.y:32.6395|lP.z:-67.9|delay:5.25|securityThreshhold:
 constIndex:507|lP.x:12.2292|lP.y:32.6395|lP.z:-66.563|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
 constIndex:505|lP.x:-21.1728|lP.y:32.6395|lP.z:-30.723|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|timeBeforeLasersOn:1.2|toggleLasers:1|gameObject.activeInHierarchy:1
 constIndex:507|lP.x:-5.6388|lP.y:32.6395|lP.z:-43.523|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
-constIndex:507|lP.x:5.74|lP.y:32.6395|lP.z:-32.123|lR.y:.70711|lR.w:-.70711|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
+constIndex:507|lP.x:5.8|lP.y:32.6395|lP.z:-32.123|lR.y:.70711|lR.w:-.70711|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
 constIndex:507|lP.x:15.9802|lP.y:32.6395|lP.z:-32.104|lR.y:.70711|lR.w:.70711|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
-constIndex:510|lP.x:-1.9528|lP.y:32.6365|lP.z:-70.356|delay:5.25|locked:1|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
-constIndex:510|lP.x:86.3162|lP.y:32.6395|lP.z:-38.403|lR.y:.70711|lR.w:.70711|delay:5.25|locked:1|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
+constIndex:510|lP.x:-1.9528|lP.y:32.6365|lP.z:-70.356|delay:5.25|locked:1|securityThreshhold:100|lockedMessageLingdex:1046|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
+constIndex:510|lP.x:86.3162|lP.y:32.6395|lP.z:-38.403|lR.y:.70711|lR.w:.70711|delay:5.25|locked:1|securityThreshhold:100|lockedMessageLingdex:1046|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
 constIndex:498|lP.x:59.5002|lP.y:30.7195|lP.z:29.516|lR.y:-.70711|lR.w:-.70711|delay:5.5|locked:1|securityThreshhold:100|lockedMessageLingdex:202|waitBeforeClose:-21.27726|targetname:lev6diegocloset|gameObject.activeInHierarchy:1
 constIndex:502|lP.x:-63.3798|lP.y:34.5605|lP.z:42.367|delay:7|locked:1|securityThreshhold:100|lockedMessageLingdex:200|waitBeforeClose:-21.27726|changeLayerOnOpenClose:1|targetname:lev6maintenanceaccess|gameObject.activeInHierarchy:1
 constIndex:507|lP.x:-58.2598|lP.y:34.5605|lP.z:31.834|lR.y:.70711|lR.w:.70711|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
@@ -5576,8 +5576,8 @@ constIndex:503|lP.x:40.1402|lP.y:34.5595|lP.z:17.917|lR.y:-.70711|lR.w:.70711|de
 constIndex:503|lP.x:23.6602|lP.y:34.5605|lP.z:-6.467|delay:5|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|requiredAccessCard:4|gameObject.activeInHierarchy:1
 constIndex:503|lP.x:-1.94|lP.y:34.5475|lP.z:-11.405|delay:5|locked:1|securityThreshhold:100|ajar:1|ajarPercentage:.35|lockedMessageLingdex:205|waitBeforeClose:-21.27726|doorOpenState:3|gameObject.activeInHierarchy:1
 constIndex:507|lP.x:3.18|lP.y:34.5595|lP.z:37.029|lR.y:.70711|lR.w:.70711|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
-constIndex:510|lP.x:-4.5|lP.y:34.5475|lP.z:44.831|delay:5.25|locked:1|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
-constIndex:510|lP.x:-.7698|lP.y:34.5595|lP.z:40.957|lR.y:.70711|lR.w:.70711|delay:5.25|locked:1|securityThreshhold:100|stayOpen:1|lockedMessageLingdex:3|waitBeforeClose:-21.27726|targetname:lev6betagrovedoor|gameObject.activeInHierarchy:1
+constIndex:510|lP.x:-4.5|lP.y:34.5475|lP.z:44.831|delay:5.25|locked:1|securityThreshhold:100|lockedMessageLingdex:1046|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
+constIndex:510|lP.x:-.7698|lP.y:34.5595|lP.z:40.957|lR.y:.70711|lR.w:.70711|delay:5.25|locked:1|securityThreshhold:100|stayOpen:1|lockedMessageLingdex:1046|waitBeforeClose:-21.27726|targetname:lev6betagrovedoor|gameObject.activeInHierarchy:1
 constIndex:500|lP.x:-21.1018|lP.y:34.5605|lP.z:17.917|lR.y:1|lR.w:0|delay:5.5|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|changeLayerOnOpenClose:1|gameObject.activeInHierarchy:1
 constIndex:500|lP.x:-41.4998|lP.y:34.5605|lP.z:17.917|lR.y:1|lR.w:0|delay:5.5|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|changeLayerOnOpenClose:1|gameObject.activeInHierarchy:1
 constIndex:511|lP.x:-1.94|lP.y:32.6395|lP.z:-44.88|delay:5.25|securityThreshhold:100|lockedMessageLingdex:3|waitBeforeClose:-21.27726|gameObject.activeInHierarchy:1
