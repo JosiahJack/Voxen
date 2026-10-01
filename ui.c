@@ -162,7 +162,7 @@ static void CreateShadowBuffers() { shadowMapSSBO=MakeSSBO(&shadowMapSSBO,5,(MAX
 #define VIDTXT_W 893
 #define VIDTXT_SCALE 1.44f /*Unity 18pt design px = 28.8px on the 1366x768 buffer; FONT_NORMAL's atlas is a 20px em*/
 static double introVidStart = 0.0, creditsVidStart = 0.0;
-static const float INTRO_VID_LEN = 117.5f, CREDITS_VID_LEN = 37.2f;
+static const float INTRO_VID_LEN = 117.141f, CREDITS_VID_LEN = 54.144f;/*Measured from the clip audio at 48 kHz: intro 5622784 frames, outro 2598912 frames. The flipbook is advanced as elapsed*frames/vidLen, so this sets the effective per-frame rate: 6.276 fps intro, 7.535 fps outro.*/
 static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.1f,59.3f,69.1f,74.5f,81.2f,89.2f,98.4f,105.0f};
 static const float outroTextAt[3] = {0.0f,7.0f,11.0f};/*CreditsScroll swaps to card 2 at 7s, card 3 at 11s, then hides all cards at 14s*/
 __attribute__((noinline)) void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; if (pg==Mpg_Save||pg==Mpg_Load) { SaveSlotCancelTyping(); RefreshSaveSlots(); }/*reparse save headers whenever the Save/Load page is assigned*/
@@ -178,12 +178,16 @@ static void RenderVideoPage(u8 page) {
     double start = isIntro ? introVidStart : creditsVidStart;
     if (start <= 0.0) { start=World.absoluteTime; if (isIntro) introVidStart=start; else creditsVidStart=start; }/*page entered without ChangeMenuPage (startup intro)*/
     double elapsed = World.absoluteTime - start;
-    const float* at = isIntro ? introTextAt : outroTextAt; int cardCount = isIntro ? 15 : 3; double vidLen = isIntro ? INTRO_VID_LEN : CREDITS_VID_LEN; double cardsEnd = isIntro ? vidLen : 14.0/*CreditsScroll deactivates all three outro cards at 14s, leaving the video to run on to 37.2s*/;
+    const float* at = isIntro ? introTextAt : outroTextAt; int cardCount = isIntro ? 15 : 3; double vidLen = isIntro ? INTRO_VID_LEN : CREDITS_VID_LEN; double cardsEnd = isIntro ? vidLen : 14.0/*CreditsScroll deactivates all three outro cards at 14s, leaving the video to run on to the end of its audio*/;
     /*Flipbook: the whole frame set is spread evenly over the clip length, so the last frame lands as the clip ends.*/
     int frames = isIntro ? VIDFRM_INTRO_COUNT : VIDFRM_OUTRO_COUNT; u32 frameBase = isIntro ? VIDFRM_INTRO_BASE : VIDFRM_OUTRO_BASE;
     if (frameBase+(u32)frames > (u32)texCnt) frames = 0;/*frames missing from textures.txt: leave the black ground rather than sample past the array*/
     i32 frame = frames>0 ? (i32)(elapsed*(double)frames/vidLen) : 0; if (frame<0) frame = 0; else if (frame>=frames) frame = frames-1;
-    if (frames>0) RenderUIImage(VIDFRM_X,isIntro?VIDFRM_INTRO_Y:VIDFRM_OUTRO_Y,isIntro?VIDFRM_INTRO_W:VIDFRM_OUTRO_W,isIntro?VIDFRM_INTRO_H:VIDFRM_OUTRO_H,frameBase+(u32)frame);
+    { static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu; /*zero order hold: a ring slot that is still decoding must keep the last frame on screen, not punch a hole to the background*/
+      if (heldBase != frameBase) { heldBase = frameBase; heldRt = 0xFFFFFFFFu; }
+      if (frames>0) { u32 want = frameBase+(u32)frame; u32 nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt);
+        u32 rt = VideoFrameTexIndex(want); if (rt != 0xFFFFFFFFu) heldRt = rt;
+        if (heldRt != 0xFFFFFFFFu) RenderUIImage(VIDFRM_X,isIntro?VIDFRM_INTRO_Y:VIDFRM_OUTRO_Y,isIntro?VIDFRM_INTRO_W:VIDFRM_OUTRO_W,isIntro?VIDFRM_INTRO_H:VIDFRM_OUTRO_H,heldRt); } }
     int card=-1; if (elapsed < cardsEnd) for (int i=cardCount-1;i>=0;--i) if (elapsed >= at[i]) { card=i; break; }/*Unity keeps exactly one text GameObject active, so only the newest card whose time came up is drawn*/
     if (card>=0) {
         /*Subtitle card, drawn by hand: word-wrap stringTable[613+card] (intro) / [610+card] (credits) to VIDTXT_W, then one centered draw at (VIDTXT_CX,VIDTXT_Y).*/
@@ -1383,7 +1387,7 @@ static double RenderUI() {
             if (World.Sys_UI.vmailFrame == (vmailStartFrames[World.Sys_UI.vmailActive]+11)) play_wav(sounds[99], AppliedFXVol(1.0f), (V3){0,0,0}, false);
             World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[World.Sys_UI.vmailActive]) World.Sys_UI.vmailFrame = vmailEndFrames[World.Sys_UI.vmailActive];
         }
-        UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,World.Sys_UI.vmailFrame);/*Vmail viewer*/
+        { static u32 heldMail = 0xFFFFFFFFu; u32 mrt = VideoFrameTexIndex(World.Sys_UI.vmailFrame); if (mrt != 0xFFFFFFFFu) heldMail = mrt; if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,heldMail);/*Vmail viewer*/ }
     }
     i16 debugTextStartY = 90;
     if (Cheats.showLocation && !World.menuActive) RenderTextL(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);

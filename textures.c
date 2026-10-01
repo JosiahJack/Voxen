@@ -4,6 +4,99 @@
 typedef struct { u16 index; bool transparent, doublesided; u8 blend; char path[128]; } TextureData;
 typedef struct { TextureData* entries; u32 count, capacity; } TextureDataParser;
 typedef struct { u8 r, g, b; } PngPalEntry;
+#define VIDEO_RING 8
+#define VIDEO_MAXFRAME (1280u*720u)
+typedef struct { char path[96]; u32 texIdx, w, h; } VidFrameRec;
+static VidFrameRec* g_vidFrames = NULL; static u32 g_vidFrameCnt = 0;
+static u32 g_vidPalOffs[VIDEO_RING], g_vidIdxOffs[VIDEO_RING];
+static u8* g_vidFrameFlag = NULL;
+static u32* g_vidDims = NULL;
+typedef struct { u32 state; u32 frameTexIdx, palSize, w, h; u8* idx; u32* pal; } VidSlot;
+static VidSlot g_vidSlot[VIDEO_RING];
+static void* g_vidRingBuf = NULL; static size_t g_vidRingSize, g_vidRingIdxSize, g_vidRingPalSize;
+static u32 g_vidTexBase, g_vidPalBase; static i32* g_vidSizesCPU = NULL; static u16 g_vidSlotTex[VIDEO_RING];
+static u32 g_vidReqGen = 0, g_vidReqFrame = 0xFFFFFFFFu, g_vidPreFrame = 0xFFFFFFFFu;
+static u32 g_vidLastTex = 0xFFFFFFFFu; static u32 g_vidLastWant = 0xFFFFFFFFu; static bool g_vidUp = false;
+static PngArena g_vidArena; static OS_Thread g_vidThr;
+static INLINE void vid_yield(void) { long r = 24; __asm__ __volatile__("syscall"::"a"(r):"rcx","r11","memory"); } /*sched_yield, the worker is idle most of the time and a bare spin would burn a core*/
+static bool has_sub(const char* h,const char* n);
+static bool is_vid_path(const char* p);
+static VidFrameRec* vid_find(u32 texIdx) { for (u32 k=0;k<g_vidFrameCnt;++k) { if (g_vidFrames[k].texIdx==texIdx) return &g_vidFrames[k]; } return NULL; }
+static const u8 bayer8[64] = { 0,32, 8,40, 2,34,10,42, 48,16,56,24,50,18,58,26, 12,44, 4,36,14,46, 6,38, 60,28,52,20,62,30,54,22, 3,35,11,43, 1,33, 9,41, 51,19,59,27,49,17,57,25, 15,47, 7,39,13,45, 5,37, 63,31,55,23,61,29,53,21};
+typedef struct { u32 distinct, exactHits, snaps, errSum, errMax; } PalStats;
+static void vid_decode(VidFrameRec* r, VidSlot* s) { /*Same palette extraction as the load worker, but straight into a ring slot. Critically this keeps the nearest-neighbour fallback: dropping it left s->idx[p] UNWRITTEN once the palette filled, which is what produced the popping pixels*/
+    FHandle fd; int sz = 0; const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(r->path, &fd, &sz); if (unlikely(!d || sz <= 0)) return;
+    int w = 0, h = 0; u8* pix = PngLoad((const u8*)d, sz, &w, &h, &g_vidArena);
+    if (likely(pix && w > 0 && h > 0 && (u32)w*h <= VIDEO_MAXFRAME)) {
+        u32 nP = (u32)w*h, bs = 0, x = 0, y = 0; u32 eh[TEXHASH_SZ]; mset(eh, 0xFF, sizeof(eh)); u8 ei[TEXHASH_SZ]; u8 nearcache[32768]; mset(nearcache, 0xFF, sizeof(nearcache));
+        for (u32 p=0;p<nP;++p, ++x) {
+            if (x == (u32)w) { x = 0; y++; }
+            u32 c = ((u32*)pix)[p]; u32 hv = (c*0x9E3779B9u); hv ^= hv>>16; u32 sl = hv & (TEXHASH_SZ-1);
+            for (u32 pr=0;pr<TEXHASH_SZ;++pr) { if (eh[sl]==U32_MAX) break; if (eh[sl]==c) { s->idx[p]=ei[sl]; goto vidfound; } sl = (sl+1)&(TEXHASH_SZ-1); }
+            if (bs < 256) { s->pal[bs]=c; s->idx[p]=(u8)bs; eh[sl]=c; ei[sl]=(u8)bs; bs++; goto vidfound; }
+            /*Palette full: snap to nearest. Ordered-dithered, otherwise a smooth gradient collapses onto one hard band edge and reads as a sharp pop*/
+            { i32 dz = (i32)bayer8[(y & 7u)*8u + (x & 7u)] - 32; i32 rr = (i32)(c & 255) + (dz>>2), gg = (i32)((c>>8)&255) + (dz>>2), bb = (i32)((c>>16)&255) + (dz>>2);
+              if (rr<0) rr=0; if (rr>255) rr=255; if (gg<0) gg=0; if (gg>255) gg=255; if (bb<0) bb=0; if (bb>255) bb=255;
+              u32 dc = ((u32)rr) | ((u32)gg<<8) | ((u32)bb<<16) | (c & 0xFF000000u);
+              u32 ck = ((dc & 0xF8) >> 3) | ((dc & 0xF800) >> 6) | ((dc & 0xF80000) >> 9);
+              u8 hit = nearcache[ck];
+              if (hit == 0xFF) { u32 bestI = 0, bestD = ~0u;
+                  for (u32 k=0;k<256;++k) { u32 pc = s->pal[k]; i32 dr=(i32)(pc&255)-rr, dg=(i32)((pc>>8)&255)-gg, db=(i32)((pc>>16)&255)-bb;
+                      u32 dist = (u32)(dr*dr+dg*dg+db*db); if (dist<bestD) { bestD=dist; bestI=k; } }
+                  hit = (u8)bestI; nearcache[ck] = hit; }
+              s->idx[p] = hit; }
+            vidfound:;
+        }
+        s->palSize = bs; s->w = (u32)w; s->h = (u32)h; s->frameTexIdx = r->texIdx;
+    }
+    OS_Free((void*)d,(size_t)sz);
+}
+static void* vid_worker(void* arg) { /*Decode-ahead: never touches GL. Slot state carries the upload handshake: 0 claimed, 1 decoded-awaiting-upload, 2 uploaded*/
+    (void)arg; u32 last = 0, lastPri = 0xFFFFFFFFu, lastPre = 0xFFFFFFFFu, slot = 0;
+    for (;;) { u32 g = __atomic_load_n(&g_vidReqGen, __ATOMIC_ACQUIRE);
+        if (g != last) { last = g;
+            for (u32 pass=0;pass<2;++pass) { u32* lp = pass?&lastPre:&lastPri; u32 want = __atomic_load_n(pass?&g_vidPreFrame:&g_vidReqFrame, __ATOMIC_RELAXED);
+                if (want == 0xFFFFFFFFu || want == *lp) continue; /*the 60fps caller bumps the generation ~120x/s; without this the worker re-decodes the same 720p frame over and over and falls behind*/
+                *lp = want; VidFrameRec* r = vid_find(want); if (!r) continue;
+                VidSlot* s = &g_vidSlot[slot]; slot = (slot + 1u) % VIDEO_RING;
+                __atomic_store_n(&s->state, 0u, __ATOMIC_RELAXED); /*claim before decode, so the main thread cannot upload a half-written slot*/
+                vid_decode(r, s);
+                __atomic_store_n(&s->state, 1u, __ATOMIC_RELEASE); } }
+        else { u32 spins = 0; while (spins++ < 4096u) { __asm__ __volatile__("pause"); } vid_yield(); } }
+}
+u32 VideoPeekFrame(u32 texIdx) { /*Next frame in the same clip, so the worker can stay ahead of playback*/
+    if (!g_vidUp || texIdx == 0xFFFFFFFFu) return 0xFFFFFFFFu; for (u32 k=0;k<g_vidFrameCnt;++k) { if (g_vidFrames[k].texIdx==texIdx) { if (k+1u < g_vidFrameCnt) return g_vidFrames[k+1].texIdx; return 0xFFFFFFFFu; } } return 0xFFFFFFFFu; }
+void VideoInit(void) { if (g_vidUp) return; PngArenaInit(&g_vidArena); g_vidUp = true; OS_ThreadCreate(&g_vidThr, vid_worker, NULL); }
+void VideoRequestFrame(u32 texIdx) { /*want and the frame after it: the clip advances ~11fps while this runs at 60fps, so asking one step ahead is what keeps the ring fed*/
+    if (!g_vidUp || texIdx == 0xFFFFFFFFu || !vid_find(texIdx)) return;
+    if (__atomic_load_n(&g_vidReqFrame, __ATOMIC_RELAXED) == texIdx) return; /*already queued, the 60fps caller must not re-queue the same frame every render*/
+    for (u32 r=0;r<VIDEO_RING;++r) { if (g_vidSlot[r].frameTexIdx == texIdx && __atomic_load_n(&g_vidSlot[r].state,__ATOMIC_ACQUIRE)) return; /*already decoded*/ }
+    __atomic_store_n(&g_vidReqFrame, texIdx, __ATOMIC_RELAXED); __atomic_fetch_add(&g_vidReqGen, 1, __ATOMIC_RELEASE);
+}
+void VideoPrefetchFrame(u32 texIdx) { /*Next clip frame, decoded in the same worker pass so playback is never a frame behind*/
+    if (!g_vidUp || texIdx == 0xFFFFFFFFu || texIdx == __atomic_load_n(&g_vidReqFrame, __ATOMIC_RELAXED)) return;
+    for (u32 r=0;r<VIDEO_RING;++r) { if (g_vidSlot[r].frameTexIdx == texIdx && __atomic_load_n(&g_vidSlot[r].state,__ATOMIC_ACQUIRE)) return; }
+    if (!vid_find(texIdx)) return; __atomic_store_n(&g_vidPreFrame, texIdx, __ATOMIC_RELAXED); __atomic_fetch_add(&g_vidReqGen, 1, __ATOMIC_RELEASE);
+}
+u32 VideoFrameTexIndex(u32 texIdx) { /*Exact match only. The old nearest-slot fallback could walk backwards, and worse, could match a frame from a different clip that happened to be numerically closer. Playback is monotonic, so the correct answer when the wanted frame is not resident is to hold the previous one*/
+    if (!g_vidUp) return 0xFFFFFFFFu;
+    u32 best = 0xFFFFFFFFu;
+    for (u32 r=0;r<VIDEO_RING;++r) { VidSlot* s = &g_vidSlot[r];
+        u32 st = __atomic_load_n(&s->state, __ATOMIC_ACQUIRE);
+        if (s->frameTexIdx == 0xFFFFFFFFu || st == 0) continue;
+        if (st == 1) {
+            glBindBuffer(GL_SSBO, colorBufferID); glBufferSubData(GL_SSBO, g_vidIdxOffs[r], s->w*s->h, s->idx);
+            glBindBuffer(GL_SSBO, texPalID); glBufferSubData(GL_SSBO, g_vidPalOffs[r]*sizeof(u32), s->palSize*sizeof(u32), s->pal);
+            g_vidSizesCPU[r*2] = (i32)s->w; g_vidSizesCPU[r*2+1] = (i32)s->h;
+            glBindBuffer(GL_SSBO, textureSizesID); glBufferSubData(GL_SSBO, (size_t)g_vidSlotTex[r]*2*sizeof(i32), 2*sizeof(i32), &g_vidSizesCPU[r*2]);
+            glBindBuffer(GL_SSBO, 0); g_vidLastTex = s->frameTexIdx; __atomic_store_n(&s->state, 2u, __ATOMIC_RELEASE);
+        }
+        if (s->frameTexIdx == texIdx) best = g_vidSlotTex[r];
+    }
+    if (best == 0xFFFFFFFFu) return 0xFFFFFFFFu;
+    g_vidLastWant = texIdx;
+    return best;
+}
 typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8 img_depth, img_color_type, img_error; u16 img_palette_count; PngPalEntry img_palette[256]; u8 img_trns[256], *img_buffer, *img_buffer_end; } PngContext;
 typedef struct { u8* indices; u32* palette, palSize; i32 w, h; } TexResult;
 typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; i32* parsIdx; const TextureDataParser* parser; TexResult* results; int tid; } TextureParseTask;
@@ -193,7 +286,10 @@ static void* TextureParsingWorker(void* arg) {
         int sz = 0;
         const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path, &dummy_fd, &sz);
         if(unlikely(!d || sz <= 0)) continue;
-        
+        if (g_vidFrameFlag[i]) { /*Video flipbook frame: never decoded here, w/h come from IHDR and the page is filled at playback*/
+            if (sz > 24) { g_vidDims[i] = (((u32)(u8)d[16]<<24)|((u32)(u8)d[17]<<16)|((u32)(u8)d[18]<<8)|(u32)(u8)d[19]) << 16 | (((u32)(u8)d[20]<<24)|((u32)(u8)d[21]<<16)|((u32)(u8)d[22]<<8)|(u32)(u8)d[23]); }
+            OS_Free((void*)d,(size_t)sz); continue; }
+
         int w = 0, h = 0;
         u8 *pix=PngLoad((const u8*)d, sz, &w, &h, &thread_png_arenas[t->tid]);
         if (!pix || w < 1 || h < 1) { OS_Free((void*)d,(size_t)sz); continue; }
@@ -202,7 +298,7 @@ static void* TextureParsingWorker(void* arg) {
         u32 pSz = 0; u32 exact_hash[TEXHASH_SZ];
         mset(exact_hash, 0xFF, sizeof(exact_hash)); /*Fast Exact Match Hash Map, 0xFFFFFFFF U32_MAX = empty*/
         u8 exact_idx[TEXHASH_SZ], nearest_cache[32768]; /*15-bit Color Space Cache for fast nearest-neighbor fallback*/
-        bool nearclear = false; 
+        bool nearclear = false;
         for (u32 p = 0; p < nP; ++p) {
             u32 c = ((u32*)pix)[p];
             u32 h_val = (c * 0x9E3779B9u);/*Murmur-style avalanche hash*/
@@ -333,6 +429,8 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
 }
 
 void SetWindowIcon(WinSysIcon*);
+static bool has_sub(const char* h,const char* n){ for(;*h;++h){ const char* a=h,*b=n; while(*a&&*b&&*a==*b){++a;++b;} if(!*b) return true; } return false; }
+static bool is_vid_path(const char* p){ return has_sub(p,"AAIntro")||has_sub(p,"AAOutro")||has_sub(p,"VMail"); }
 void LoadTextures() {
     double start_time = get_time();
     DebugRAM("start LoadTextures");
@@ -346,6 +444,13 @@ void LoadTextures() {
     }
     
     texCnt = (u16)(maxIndex + 1);
+    g_vidFrameFlag = OS_Alloc(texCnt); mset(g_vidFrameFlag, 0, texCnt);
+    g_vidDims = OS_Alloc((size_t)texCnt * sizeof(u32)); mset(g_vidDims, 0, (size_t)texCnt * sizeof(u32));
+    { u32 vc = 0;
+      for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti < texCnt && is_vid_path(texture_parser.entries[k].path)) { g_vidFrameFlag[ti] = 1; vc++; } }
+      g_vidFrames = OS_Alloc((vc ? vc : 1) * sizeof(VidFrameRec)); g_vidFrameCnt = 0;
+      for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti >= texCnt || !g_vidFrameFlag[ti]) continue; VidFrameRec* r = &g_vidFrames[g_vidFrameCnt++]; r->texIdx = ti; r->w = r->h = 0; size_t pl = slen(texture_parser.entries[k].path); if (pl > sizeof(r->path)-1) pl = sizeof(r->path)-1; mcpy(r->path, texture_parser.entries[k].path, pl); r->path[pl] = 0; }
+      DualLog("Video frames paged: %u (%.2f MB excluded from palette)\n", g_vidFrameCnt, ((double)g_vidFrameCnt*0.0)); }
     i32* parsIdx = OS_AllocScratch(texCnt * sizeof(i32));
     mset(parsIdx, -1, texCnt * sizeof(i32)); 
     for (u32 k=0;k<texture_parser.count;++k) {
@@ -367,24 +472,35 @@ void LoadTextures() {
     
     totalPixels = totalPaletteColors = 0u;
     for (u16 i=0;i<texCnt;++i) { if (texResults[i].indices) { totalPixels += (u32)texResults[i].w * texResults[i].h; totalPaletteColors += texResults[i].palSize; } }
-    size_t offsets_size = texCnt * sizeof(u32), palettes_size = totalPaletteColors * sizeof(u32), indices_size = totalPixels;
+    size_t ringpal_size = (size_t)VIDEO_RING * 256 * sizeof(u32), ringidx_size = (size_t)VIDEO_RING * VIDEO_MAXFRAME;
+    size_t offsets_size = (texCnt + VIDEO_RING) * sizeof(u32), palettes_size = totalPaletteColors * sizeof(u32), indices_size = totalPixels;
     size_t arena_size = offsets_size + palettes_size + indices_size;
     void* arena = OS_AllocateRAM(arena_size, 0x1|0x2, 0x20|0x02|0x08000, INVALID_FHANDLE);
     u8* cur = (u8*)arena;
     u32* textureOffsets = (u32*)cur;
     cur += offsets_size;
-    i32* textureSizes          = OS_AllocScratch(texCnt * 2 * sizeof(i32));
-    u32* texturePaletteOffsets = OS_AllocScratch(texCnt * sizeof(u32));
+    i32* textureSizes          = OS_AllocScratch((texCnt + VIDEO_RING) * 2 * sizeof(i32));
+    u32* texturePaletteOffsets = OS_AllocScratch((texCnt + VIDEO_RING) * sizeof(u32));
     u32* texturePalettes = (u32*)cur;
     cur += palettes_size;
     u8* all_indices = cur;
+    /*Ring lives outside the arena: this one is freed at the end of the load, the ring is refilled every played frame*/
+    g_vidRingBuf = OS_Alloc(ringidx_size + ringpal_size);
+    u8* ringIndices = (u8*)g_vidRingBuf; (void)ringIndices;
+    u32* ringPalettes = (u32*)((u8*)g_vidRingBuf + ringidx_size);
+    g_vidTexBase = (u32)ringidx_size; /*SSBO layout: [ring indices][ring palettes][texture indices], so freed-arena indices stay addressable*/
+    for (u32 r=0;r<VIDEO_RING;++r) { u16 si = (u16)(texCnt + r); g_vidPalOffs[r] = totalPaletteColors + r*256; g_vidIdxOffs[r] = r * VIDEO_MAXFRAME; textureOffsets[si] = g_vidIdxOffs[r]; texturePaletteOffsets[si] = g_vidPalOffs[r]; textureSizes[si*2] = 0; textureSizes[si*2+1] = 0; g_vidSlotTex[r] = si; }
+    g_vidRingSize = ringidx_size + ringpal_size; g_vidRingIdxSize = ringidx_size; g_vidRingPalSize = ringpal_size; g_vidPalBase = totalPaletteColors; g_vidSizesCPU = OS_Alloc(VIDEO_RING * 2 * sizeof(i32));
+    for (u32 r=0;r<VIDEO_RING;++r) { g_vidSlot[r].idx = (u8*)g_vidRingBuf + (size_t)r*VIDEO_MAXFRAME; g_vidSlot[r].pal = ringPalettes + (size_t)r*256; }
+    for (u32 k=0;k<g_vidFrameCnt;++k) { g_vidFrames[k].w = g_vidDims[g_vidFrames[k].texIdx] >> 16; g_vidFrames[k].h = g_vidDims[g_vidFrames[k].texIdx] & 0xFFFF; }
+    { size_t vp=0; for (u32 k=0;k<g_vidFrameCnt;++k) vp += (size_t)g_vidFrames[k].w*g_vidFrames[k].h; DualLog("Video ring reserved: %u slots x %u B = %.2f MB (frames would have been %.2f MB)\n",VIDEO_RING,VIDEO_MAXFRAME,(double)ringidx_size/1048576.0,(double)vp/1048576.0); }
     u32 pixel_base = 0, color_base = 0;
     for (u16 i=0;i<texCnt;++i) {
         if (!texResults[i].indices) { continue; }
         
         u32 numP = (u32)texResults[i].w * texResults[i].h;
         u32 palS = texResults[i].palSize;
-        textureOffsets[i]=pixel_base;
+        textureOffsets[i]=g_vidTexBase + pixel_base;
         texturePaletteOffsets[i] = color_base;
         textureSizes[i * 2]     = texResults[i].w;
         textureSizes[i * 2 + 1] = texResults[i].h;
@@ -398,23 +514,25 @@ void LoadTextures() {
     
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
-    if (packed_size > (i32)MAX_TOTAL_PIXELS) { DualLogError("colorBufferID too small: need %u bytes, MAX_TOTAL_PIXELS is %u\n",(u32)packed_size,MAX_TOTAL_PIXELS); OS_Exit(1); } /*colorBufferID is allocated at exactly MAX_TOTAL_PIXELS, an under-sized value makes glBufferSubData fail with GL_INVALID_VALUE and silently leaves every texture unwritten*/
+    if (packed_size > (i32)MAX_TOTAL_PIXELS || indices_size + ringidx_size > MAX_TOTAL_PIXELS) { DualLogError("colorBufferID too small: need %zu B (textures %zu + video ring %zu), MAX_TOTAL_PIXELS is %u\n",packed_size,(size_t)indices_size,ringidx_size,MAX_TOTAL_PIXELS); OS_Exit(1); } /*colorBufferID is allocated at exactly MAX_TOTAL_PIXELS, an under-sized value makes glBufferSubData fail with GL_INVALID_VALUE and silently leaves every texture unwritten*/
     glBindBuffer(GL_SSBO, colorBufferID);
-    glBufferSubData(GL_SSBO, 0, packed_size, all_indices);
-    
+    glBufferSubData(GL_SSBO, g_vidTexBase, packed_size, all_indices);
     glBindBuffer(GL_SSBO, texPalID);
-    glBufferData(GL_SSBO, totalPaletteColors * sizeof(u32), texturePalettes, GL_STATIC_DRAW);
+    glBufferData(GL_SSBO, (totalPaletteColors + VIDEO_RING*256) * sizeof(u32), texturePalettes, GL_STATIC_DRAW);
+    glBufferSubData(GL_SSBO, totalPaletteColors * sizeof(u32), ringpal_size, ringPalettes);
     
     glBindBuffer(GL_SSBO, textureOffsetsID);
-    glBufferData(GL_SSBO, texCnt * sizeof(u32), textureOffsets, GL_STATIC_DRAW);
+    glBufferData(GL_SSBO, (texCnt + VIDEO_RING) * sizeof(u32), textureOffsets, GL_STATIC_DRAW);
     
     glBindBuffer(GL_SSBO, textureSizesID);
-    glBufferData(GL_SSBO, texCnt * 2 * sizeof(i32), textureSizes, GL_STATIC_DRAW);
+    glBufferData(GL_SSBO, (texCnt + VIDEO_RING) * 2 * sizeof(i32), textureSizes, GL_STATIC_DRAW);
     
     glBindBuffer(GL_SSBO, texPalOfsID);
-    glBufferData(GL_SSBO, texCnt * sizeof(u32), texturePaletteOffsets, GL_STATIC_DRAW);
+    glBufferData(GL_SSBO, (texCnt + VIDEO_RING) * sizeof(u32), texturePaletteOffsets, GL_STATIC_DRAW);
     
     glBindBuffer(GL_SSBO, 0);
+    texCnt = (u16)(texCnt + VIDEO_RING);
+    VideoInit();
     
     for (int t=0;t<(i32)threadCnt;++t) { OS_Free(thread_png_arenas[t].base, 16777216); }
     
