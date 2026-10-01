@@ -88,7 +88,7 @@ const float ssr_weights[9] = float[](0.0625,0.125,0.0625,0.125,0.25,0.125,0.0625
 void main() {
     vec2 texCoordUsed = TexCoord; if (empEffectActive > 0u) texCoordUsed.y += timeVal * 15.0; vec4 color = texture(tex, texCoordUsed).rgba; vec4 worldPosPacked; bool isSky = false;
     if (skyVisible > 0) {
-        isSky = (((color.a > 0.0 && color.a < 0.21)));/*Sky hack alpha (alpha of 0 for when noclipping) (the extra color.a < 0.001 check for noclip has no discernible quality impact, leaving)*/ float mappedLat=0.0;
+        isSky = (color.a < 0.21);/*Sky hack alpha (alpha of 0 for when noclipping) (the extra color.a < 0.001 check for noclip has no discernible quality impact, leaving)*/ float mappedLat=0.0;
         if (isSky) {
             vec2 ndc = texCoordUsed * 2.0 - 1.0; float fovRad = fov * PI / 180.0; /*Convert FOV to radians*/ float tanHalfFov = tan(fovRad * 0.5); vec3 viewDir = normalize(vec3(ndc.x * tanHalfFov * aspect, ndc.y * tanHalfFov, -1.0)); float cy = cos(camRot.x + timeVal * skyRotateSpeed);/*Yaw + time-based rotation*/ float sy = sin(camRot.x + timeVal * skyRotateSpeed);
             float cp = cos(camRot.y);/*Pitch*/ float sp = sin(camRot.y); mat3 yawMatrix = mat3(cy, 0.0, sy, 0.0, 1.0, 0.0, -sy, 0.0, cy); mat3 pitchMatrix = mat3(1.0, 0.0, 0.0, 0.0, cp, -sp, 0.0, sp, cp); mat3 skyRotMatrix = yawMatrix * pitchMatrix;/*Combine yaw and pitch*/ vec3 skyDir = skyRotMatrix * viewDir;/*Yaw and pitch for sky*/

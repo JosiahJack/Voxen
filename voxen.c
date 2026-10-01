@@ -37,10 +37,6 @@ Color textColors[] = {{1.0f,1.0f,1.0f,1.0f},/* 0 White T_WHITE*/ {0.890196078f,0
 // Wireline Rendering
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex* debugLineVerts = NULL;
-/* Gameplay lines (door laser grids) need real width and depth. GL_LINES is clamped to 1px in a core profile and
-   glLineWidth is not dependable, so these are ordinary world-space quads instead. Each stroke is two quads
-   crossed about its own axis, foliage-cross style, so it stays visible from every direction rather than
-   flattening to an edge-on card the way a single camera-facing billboard does. */
 typedef struct { float x,y,z,r,g,b,a; } WireVertex;
 enum { MAX_WIRELINE_QUADS = 8192 };
 static WireVertex* wireVerts = NULL; static u32 wireVertCount = 0;
@@ -52,7 +48,6 @@ static void EmitWireQuad(V3 c0, V3 c1, V3 c2, V3 c3, Color c) {
         w->x = p[v].x; w->y = p[v].y; w->z = p[v].z; w->r = c.r; w->g = c.g; w->b = c.b; w->a = c.a;
     }
 }
-/* perp must be unit length and perpendicular to (b-a); the second quad is derived from it to form the cross. */
 void DrawCrossedLine(V3 a, V3 b, V3 perp, float halfThick, Color c) {
     V3 o0 = V3_ScaleByF(perp, halfThick);
     EmitWireQuad(V3_AsubB(a,o0), V3_AplusB(a,o0), V3_AplusB(b,o0), V3_AsubB(b,o0), c);
@@ -61,16 +56,10 @@ void DrawCrossedLine(V3 a, V3 b, V3 perp, float halfThick, Color c) {
     EmitWireQuad(V3_AsubB(a,r0), V3_AplusB(a,r0), V3_AplusB(b,r0), V3_AsubB(b,r0), c);
 }
 
-/* Kept separate from DrawDebugLines on purpose. The debug draw is only invoked when debugLineVertCount > 1, which
-   is 0 whenever the cheat draws are off -- so folding the gameplay flush into it meant the lasers silently
-   stopped being submitted the moment the debug gating went in. */
 INLINE void DrawWireLines(float* viewProj) {
     if (!wireVerts || !wireVertCount) return;
     glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVertex),wireVerts);
     glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST);
-    /* Culling is on for the opaque pass (voxen.c), so each crossed quad would otherwise only show from one
-       side of its own plane and the cross would read as a half-lit blob. glGetIntegerv has no header
-       declaration, so this assumes the same on-state the opaque pass leaves and restores it afterwards. */
     glDisable(GL_CULL_FACE);
     glBindVertexArray(wireLinesVAO); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount);
     glEnable(GL_CULL_FACE);
@@ -128,10 +117,29 @@ void DrawAngularVelocity(u16 i) {
 // Console System - CHEATS!
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
 V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,{-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
-static const V3 groveCheatSpawns[3] = { {42.453f, 136.007f, -6.534f}/*10/G1*/, {11.214f, 168.558f, -23.302f}/*11/G2*/, {17.77f, 195.747f, 18.103f}/*12/G4*/ };
+static const V3 groveCheatSpawns[3] = { {42.453f, 136.847f, -6.534f}/*10/G1*/, {11.214f, 169.398f, -23.302f}/*11/G2*/, {17.77f, 196.587f, 18.103f}/*12/G4*/ };
 static V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,{126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
 static void AddToHistory(const char* entry) { if (slen(entry) == 0 || (numHistory > 0 && sEqual(entry,history[numHistory - 1]))){return;} if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],entry,T_BUFFER_SIZE); numHistory++; } else { for (int i = 0; i < 7 - 1; i++) {scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE);/*Shift list toward 0*/} scpy_to_a_from_b(history[7 - 1],entry,T_BUFFER_SIZE); } }
-void RecallHistory(int d) {/*1 up (older),-1 down (newer)*/if(d==1){if(historyPos>0){historyPos--; scpy_to_a_from_b(consoleEntryText,history[historyPos],T_BUFFER_SIZE); currentEntryLength=slen(consoleEntryText);}}/*up*/else if(d==-1){if(historyPos<numHistory){historyPos++; if(historyPos==numHistory){consoleEntryText[0]=currentEntryLength=0;}else{scpy_to_a_from_b(consoleEntryText,history[historyPos],T_BUFFER_SIZE); currentEntryLength=slen(consoleEntryText);}}}/*down*/}
+void RecallHistory(int d) { /*1 up (older),-1 down (newer)*/
+    if (d == 1) { /*up*/
+        if (historyPos>0) {
+            historyPos--;
+            scpy_to_a_from_b(consoleEntryText, history[historyPos], T_BUFFER_SIZE);
+            currentEntryLength=slen(consoleEntryText);
+        }
+    } else if (d == -1) { /*down*/
+        if (historyPos<numHistory) {
+            historyPos++;
+            if (historyPos==numHistory) {
+                consoleEntryText[0] = currentEntryLength = 0;
+            } else{
+                scpy_to_a_from_b(consoleEntryText, history[historyPos], T_BUFFER_SIZE);
+                currentEntryLength = slen(consoleEntryText);
+            }
+        }
+    }
+}
+
 typedef void (*ConsoleCmdFuncNoArg)(); typedef void (*ConsoleCmdFuncInt)(int); typedef void (*ConsoleCmdFuncStr)(const char*);
 typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
 int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
@@ -559,6 +567,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
             const __m256 anyFace = _mm256_or_ps(_mm256_or_ps(posXface, negXface),_mm256_or_ps(_mm256_or_ps(posYface, negYface), _mm256_or_ps(posZface, negZface))); const __m256 valid = _mm256_and_ps(inRange, anyFace); unsigned mask = (unsigned)_mm256_movemask_ps(valid);
             while (mask) {
                 int bit = __builtin_ctz(mask); mask &= mask - 1; if (unlikely(nearbyMeshCount >= SHADOW_NEARMESH_MAX)) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); k = numCastersAligned; break; } u16 instIdx = sc_origIdx[k + bit]; Entity* e = &World.instances[instIdx];
+                V3 sc = World.scale[instIdx]; if (vabs(sc.x) < 0.6f || vabs(sc.y) < 0.6f || vabs(sc.z) < 0.6f) { continue; }/*sub-0.6 extent aliases to nothing in a face*/
                 u16 modelType = (instanceIsLODArray[instIdx] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex; localMeshes[nearbyMeshCount].instanceIdx = instIdx; localMeshes[nearbyMeshCount].sortKey = ((u32)modelType << 16) | e->texIndex; nearbyMeshCount++; posSum += World.position[instIdx].x + World.position[instIdx].y + World.position[instIdx].z; if (ShadowCasterMoved(instIdx)) anyMoved = true;
             }
             if (k == numCastersAligned && nearbyMeshCount >= SHADOW_NEARMESH_MAX) break;
@@ -566,7 +575,8 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         if (nearbyMeshCount < SHADOW_NEARMESH_MAX) {
             for (; k < numCasters; ++k) {
                 V3 d = V3_AsubB(World.position[sc_origIdx[k]],lpos); float distToLightSqrd = V3_dot(d,d); float radSum = (effectiveRadius + World.radius[sc_origIdx[k]]); if (distToLightSqrd >= radSum * radSum) continue; u8 faceMaskScalar = GetCubemapFaceMask(d, World.instances[sc_origIdx[k]].shadRadius); if (faceMaskScalar == 0) continue;
-                u16 instIdx = sc_origIdx[k]; Entity* e = &World.instances[instIdx]; u16 modelType = (instanceIsLODArray[instIdx] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex; localMeshes[nearbyMeshCount].instanceIdx = instIdx; localMeshes[nearbyMeshCount].sortKey = ((u32)modelType << 16) | e->texIndex; nearbyMeshCount++; posSum += World.position[instIdx].x + World.position[instIdx].y + World.position[instIdx].z;
+                u16 instIdx = sc_origIdx[k]; Entity* e = &World.instances[instIdx]; V3 sc = World.scale[instIdx]; if (vabs(sc.x) < 0.6f || vabs(sc.y) < 0.6f || vabs(sc.z) < 0.6f) { continue; }/*sub-0.6 extent aliases to nothing in a face*/
+                u16 modelType = (instanceIsLODArray[instIdx] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex; localMeshes[nearbyMeshCount].instanceIdx = instIdx; localMeshes[nearbyMeshCount].sortKey = ((u32)modelType << 16) | e->texIndex; nearbyMeshCount++; posSum += World.position[instIdx].x + World.position[instIdx].y + World.position[instIdx].z;
                 if (ShadowCasterMoved(instIdx)) anyMoved = true; if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
             }
         }

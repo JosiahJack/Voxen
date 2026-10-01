@@ -168,10 +168,25 @@ static void ApplyOpenPortalEdges(void) { // Clears closed-edge bits for lev-matc
     }
 }
 
+// Grove ceiling grates let the skybox through the cell they sit in.  The baked
+// worldcellskyvis PNG already paints most of these cells blue, but the bake is
+// an XZ projection of a 3D valley: a grate authored above a terrace can land in
+// a cell the player never occupies as blue, and a hand-painted cell drifts as
+// the grove layout changes.  Driving the flag off the placed grate chunks ties
+// it to the geometry that actually opens the roof.
+static void MarkSkyVisibleChunks(void) {
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
+        if (World.instances[i].index != 93/*chunk_grove1_1, the grove ceiling grate window*/) {continue;}
+        u32 cell = (u32)PosGetCellCoords(World.position[i].x, World.position[i].z);
+        gridCellStates[cell] |= CELL_SEES_SKYBOX|CELL_SEES_SUN;
+    }
+}
+
 void CullInit() {
     if (World.curLev == LEVEL_CYBERSPACE){return;} double start_time = get_time(); DualLog("Culling ");
     DetermineClosedEdges(); // For each cell, get visibility as though player were there and put into gridCellStates.  Then store the visibility of gridCellStates into the table of all visible cells for that cell at the appropriate offset for looking up later when actually re-assigning gridCellStates from this precalculated visibility state for the particular cell.
     ApplyOpenPortalEdges(); // DetermineClosedEdges() just reset every edge to its static closed state; reopen doors that start open/ajar BEFORE baking the precomputed visibility table below.
+    MarkSkyVisibleChunks(); // Before the bake, so the sky bits are final by the time the precomputed table is written.
     for (i32 z=0;z<WORLDZ;z++) {
         for (i32 x=0;x<WORLDX;x++) {
             DetermineVisibleCells(x,z); i32 cellIdx = (z * WORLDX) + x; for (i32 z2=0;z2<WORLDZ;z2++) { for (i32 x2=0;x2<WORLDX;x2++) { i32 subCellIdx = (z2 * WORLDX) + x2; size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + subCellIdx; set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,(gridCellStates[subCellIdx] & CELL_VISIBLE)); } }

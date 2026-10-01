@@ -12,3 +12,4 @@ Shaders/*.h
 *.kate-swp
 Data/sav*.bin
 Data/introdone.dat
+./Tools/__pycache__/*

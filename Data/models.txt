@@ -2193,3 +2193,7 @@ frame: 1 40
 # (npc_bot_cortex_reaver_gib0..gib10, npc_botexec_gib*, npc_flierbot_gib*, npc_maintenancebot_gib*, npc_repairbot_gib1*).
 # entity.c const indices 768..806 name those models directly, so each of those gibs would have rendered as an energy-mine
 # frame.  5989..6028 is now a free hole.
+#Models/grovedome.obj
+index: 7487
+#Models/grove1_2_slice45.obj
+index: 7488
