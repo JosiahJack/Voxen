@@ -5151,9 +5151,9 @@ constIndex:572|lP.x:-23.5898|lP.y:32.6365|lP.z:-44.246
 constIndex:592|lR.w:-1|text:GAMMA|lingdex:637|matIndex:88|lP.x:81.7042|lP.y:35.1585|lP.z:-21.828|tAl:1|tLs:0.5
 constIndex:592|lR.y:-1|lR.w:0|text:BETA|lingdex:636|matIndex:88|lP.x:4.0382|lP.y:37.0595|lP.z:34.627|tAl:1|tLs:0.5
 constIndex:706|lP.x:.6112|lP.y:35.6205|lP.z:43.71|center.x:0.014|center.y:0.202|center.z:0.032999|size.x:2.56|size.y:2.56|size.z:2.56
-constIndex:693|lP.x:-55.705|lP.y:34.242|lP.z:-21.8253|lR.y:1|lR.w:0
+constIndex:693|lP.x:-55.705|lP.y:34.242|lP.z:-21.8253|lR.y:.70711|lR.z:.70711|lR.w:0
 constIndex:603|lP.x:-7.39866|lP.y:32.641|lP.z:-28.32696|lR.x:-.57875|lR.y:.40626|lR.z:.40626|lR.w:.57875|logIndex:102
-constIndex:693|lP.x:14.625|lP.y:34.231|lP.z:-66.5663|lR.y:.70711|lR.w:-.70711
+constIndex:693|lP.x:14.625|lP.y:34.231|lP.z:-66.5663|lR.x:.5|lR.y:.5|lR.z:.5|lR.w:-.5
 constIndex:536|lP.x:-38.554|lP.y:32.64|lP.z:-44.3983|lR.y:-.95435|lR.w:.2987|lS.x:1.1|lS.z:1.1
 constIndex:583|lP.x:-47.05|lP.y:32.64|lP.z:-40.1253|lR.y:-.94229|lR.w:-.33479|lS.y:1.1|lS.z:1.1
 constIndex:603|lP.x:-49.546|lP.y:32.641|lP.z:-47.4983|lR.x:-.70711|lR.w:.70711|logIndex:105
@@ -5186,7 +5186,7 @@ constIndex:679|lP.x:-28.1378|lP.y:36.4595|lP.z:31.9727|lR.y:1|lR.w:0|lS.x:.5|lS.
 constIndex:678|lP.x:-13.42|lP.y:36.132|lP.z:7.8377|lR.y:.70711|lR.w:.70711
 constIndex:677|lP.x:-6.762|lP.y:36.132|lP.z:31.9727|lR.y:1|lR.w:0
 constIndex:556|lP.x:10.8492|lP.y:34.4245|lP.z:-42.246|lR.x:-.5|lR.y:.5|lR.z:.5|lR.w:.5|gameObject.activeInHierarchy:1
-constIndex:693|lP.x:82.5435|lP.y:34.236|lP.z:-21.8263|lR.y:1|lR.w:0
+constIndex:693|lP.x:82.5435|lP.y:34.236|lP.z:-21.8263|lR.y:.70711|lR.z:.70711|lR.w:0
 constIndex:687|lP.x:9.534|lP.y:35.416|lP.z:41.7827|lR.y:.70711|lR.w:-.70711|lS.x:.5|lS.z:.5
 constIndex:682|lP.x:9.538|lP.y:35.469|lP.z:41.3967|lR.y:.70711|lR.w:-.70711|lS.x:.5|lS.z:.5
 constIndex:712|lP.x:3.60863|lP.y:35.58895|lP.z:34.7267|SFXClip:213|playEverywhere:1|burstemittcnt1:15|burstemittcnt2:30|targetname:lev6masterjettisonnotenabled|gameObject.activeInHierarchy:1|AudioSource.enabled:1|clip.name:vox_nomasterjettisonenabled

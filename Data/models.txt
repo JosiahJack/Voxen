@@ -692,7 +692,7 @@ index: 492
 index: 493
 #Models/pot.obj
 index: 494
-#Models/prop_bush.glb
+#Models/prop_bush.obj
 index: 495
 #Models/prop_chandelier.obj
 index: 496
