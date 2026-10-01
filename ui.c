@@ -1385,7 +1385,7 @@ static double RenderUI() {
         }
         UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,World.Sys_UI.vmailFrame);/*Vmail viewer*/
     }
-    i16 debugTextStartY = 90;/*Diagnostics / Debugging.  Clears the biomonitor graph (BIOM_UI_Y=41, 36 tall) so the scopes stay legible.*/
+    i16 debugTextStartY = 90;
     if (Cheats.showLocation && !World.menuActive) RenderTextL(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
     i16 lineSpacing = 18;
     if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);
