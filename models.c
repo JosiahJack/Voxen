@@ -556,7 +556,7 @@ void LoadModels() {
                 for (u32 k = 0; k < vc; ++k) { __m256 v_in=(*(__m256_u const *)(&verts[k*8])); __m128i v_half=_mm256_cvtps_ph(v_in,0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/); _mm_storeu_si128((__m128i*)&mpv[k*8],v_half); }
                 glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
             }
-            glBindBuffer(GL_ARRAY_BUFFER,0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
+            glBindBuffer(GL_ARRAY_BUFFER,0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0); glFinish(); // Force driver to retire per-buffer mapped-write staging, otherwise ~78MB of it stays resident on NVIDIA Linux. Must be one sync after the whole loop, a per-model glFinish makes it worse.
             if (threadCnt > 1) { for(int i=0;i<(i32)threadCnt;++i){OS_ThreadJoin(&pth[i]);}} else { for(int t=0;t<(i32)threadCnt;++t){PhysGeomWorker(&ptasks[t]);} /*Single threaded fallback*/} // Regroup the physics deduplication passes after GPU upload, this does save about 0.18secs!
             for (u32 m = sub; m < subEnd; ++m) { if (vPos[m]) { vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; } }
             for (u32 si = 0; si < threadCnt; ++si) OS_SubArenaRelease(si, wmarks[si]);

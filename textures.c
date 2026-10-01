@@ -398,6 +398,7 @@ void LoadTextures() {
     
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
+    if (packed_size > (i32)MAX_TOTAL_PIXELS) { DualLogError("colorBufferID too small: need %u bytes, MAX_TOTAL_PIXELS is %u\n",(u32)packed_size,MAX_TOTAL_PIXELS); OS_Exit(1); } /*colorBufferID is allocated at exactly MAX_TOTAL_PIXELS, an under-sized value makes glBufferSubData fail with GL_INVALID_VALUE and silently leaves every texture unwritten*/
     glBindBuffer(GL_SSBO, colorBufferID);
     glBufferSubData(GL_SSBO, 0, packed_size, all_indices);
     
