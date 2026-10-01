@@ -136,75 +136,70 @@ bool glbread_float(const glb_accessor* a, size_t i, float* o, size_t es){
 }
 
 size_t glbread_index(const glb_accessor* a, size_t i) { if (!a->buffer_view) { return 0; } const u8*e = glb_buffer_view_data(a->buffer_view); if (!e) { return 0; } e += a->offset + a->stride * i; return glb_component_read_index(e, a->component_type); }
-#define GLB_CHECK_TOKTYPE(t, ty) if((t).type!=(ty))return -1;
-#define GLB_CHECK_KEY(t) if((t).type!=JSMN_STRING||(t).size==0)return -1;
-#define GLB_PTRINDEX(ty, idx) (ty*)((size_t)idx+1)
-#define GLB_PTRFIXUP(v, d, s) if(v){if((size_t)v>s)return; v=&d[(size_t)v-1];}
-#define GLB_PTRFIXUP_REQ(v, d, s) if(!v||(size_t)v>s)return; v=&d[(size_t)v-1];
-static int glb_json_strcmp(jsmntok_t const* t, const u8* j, const char* s){GLB_CHECK_TOKTYPE(*t, JSMN_STRING); size_t sl=slen(s),nl=(size_t)(t->end-t->start); return sl==nl?sCompUpToLen((const char*)j+t->start,s,sl)==0:0; }
-static int glb_json_to_int(jsmntok_t const* t, const u8* j){ GLB_CHECK_TOKTYPE(*t, JSMN_PRIMITIVE); const char* p=(const char*)j+t->start; return (int)fast_atoi(&p); }
+static int glb_json_strcmp(jsmntok_t const* t, const u8* j, const char* s) { if ((*t).type!=JSMN_STRING) return -1; size_t sl=slen(s),nl=(size_t)(t->end-t->start); return sl==nl?sCompUpToLen((const char*)j+t->start,s,sl)==0:0; }
+static int glb_json_to_int(jsmntok_t const* t, const u8* j){ if ((*t).type!=JSMN_PRIMITIVE) return -1; const char* p=(const char*)j+t->start; return (int)fast_atoi(&p); }
 static size_t glb_json_to_size(jsmntok_t const* t, const u8* j){ if(t->type != JSMN_PRIMITIVE){return 0;} size_t r=0;const char*p=(const char*)j+t->start,*e=(const char*)j+t->end; while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;}return r; }
-static float glb_json_to_float(jsmntok_t const* t, const u8* j){ GLB_CHECK_TOKTYPE(*t, JSMN_PRIMITIVE); const char* p=(const char*)j+t->start; return fast_atof(&p); }
+static float glb_json_to_float(jsmntok_t const* t, const u8* j){ if ((*t).type!=JSMN_PRIMITIVE) return -1; const char* p=(const char*)j+t->start; return fast_atof(&p); }
 static bool glb_json_to_bool(jsmntok_t const* t, const u8* j){int sz=(int)(t->end-t->start);return sz==4&&sCompUpToLen((const char*)j+t->start,"true",4)==0;}
 static int glb_skip_json(jsmntok_t const* t, int i){int e=i+1;while(i<e){switch(t[i].type){case JSMN_OBJECT:e+=t[i].size*2;break;case JSMN_ARRAY:e+=t[i].size;break;case JSMN_PRIMITIVE:case JSMN_STRING:break;default:return -1;}i++;}return i;}
-static int glb_parse_json_float_array(jsmntok_t const* t, int i, const u8* j, float* o, int s){GLB_CHECK_TOKTYPE(t[i], JSMN_ARRAY);if(t[i].size!=s)return -1;++i;for(int k=0;k<s;++k){GLB_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);o[k]=glb_json_to_float(t+i,j);++i;}return i;}
-static int glb_parse_json_string(jsmntok_t const* t, int i, const u8* j, i32 tid, char** out){ GLB_CHECK_TOKTYPE(t[i], JSMN_STRING);if(*out)return -1; int sz=(int)(t[i].end-t[i].start);char*r=OS_SubArenaAlloc(tid,sz+1); sCpy2aSubFromb(r,sz,(const char*)j+t[i].start,sz+1);*out=r;return i+1; }
+static int glb_parse_json_float_array(jsmntok_t const* t, int i, const u8* j, float* o, int s){if (t[i].type!=JSMN_ARRAY) return -1;if(t[i].size!=s)return -1;++i;for(int k=0;k<s;++k){if (t[i].type!=JSMN_PRIMITIVE) return -1;o[k]=glb_json_to_float(t+i,j);++i;}return i;}
+static int glb_parse_json_string(jsmntok_t const* t, int i, const u8* j, i32 tid, char** out){ if (t[i].type!=JSMN_STRING) return -1;if(*out)return -1; int sz=(int)(t[i].end-t[i].start);char*r=OS_SubArenaAlloc(tid,sz+1); sCpy2aSubFromb(r,sz,(const char*)j+t[i].start,sz+1);*out=r;return i+1; }
 static int glb_parse_json_array(jsmntok_t const* t, int i, const u8* j, size_t es, i32 tid, void** out, size_t* os){ (void)j;if(t[i].type!=JSMN_ARRAY)return -1;if(*out)return -1;int sz=t[i].size;*out=OS_SubArenaAlloc(tid,es*sz); *os=sz;return i+1; }
 typedef int (*glb_parse_item_func)(jsmntok_t const* t, int i, const u8* j, i32 tid, void* out);
 static int glb_parse_json_array_generic(jsmntok_t const* t, int i, const u8* j, size_t elem_size, i32 tid, void** out_array, size_t* out_count, glb_parse_item_func parse_item) { i = glb_parse_json_array(t, i, j, elem_size, tid, out_array, out_count); if (i < 0) return i; for(size_t k=0;k<*out_count;++k){i=parse_item(t,i,j,tid,(char*)*out_array + k * elem_size); if(i<0)return i;} return i; }
 static glb_component_type json_to_comp_type(jsmntok_t const* t, const u8* j){ int ty=glb_json_to_int(t,j); return ty==5121?glb_component_type_r_8u:ty==5123?glb_component_type_r_16u:ty==5126?glb_component_type_r_32f:glb_component_type_invalid; }
-static int glb_parse_json_node_array(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_node*** out, size_t* out_count) { i = glb_parse_json_array(t, i, j, sizeof(glb_node*), tid, (void**)out, out_count); if (i < 0) return i; for (size_t m = 0; m < *out_count; ++m) { (*out)[m] = GLB_PTRINDEX(glb_node, glb_json_to_int(t+i, j)); ++i; } return i; }
+static int glb_parse_json_node_array(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_node*** out, size_t* out_count) { i = glb_parse_json_array(t, i, j, sizeof(glb_node*), tid, (void**)out, out_count); if (i < 0) return i; for (size_t m = 0; m < *out_count; ++m) { (*out)[m] = (glb_node*)((size_t)glb_json_to_int(t+i, j)+1); ++i; } return i; }
 static void glb_parse_attribute_type(const char* n, glb_attribute_type* ot, int* oi){
     const char* us=StringFindFirstCharWithin(n,'_');size_t l=us?(size_t)(us-n):slen(n); *ot = l==8&&sCompUpToLen(n,"POSITION",8)==0?glb_attribute_type_position: l==6&&sCompUpToLen(n,"NORMAL",6)==0?glb_attribute_type_normal: l==8&&sCompUpToLen(n,"TEXCOORD",8)==0?glb_attribute_type_texcoord: l==6&&sCompUpToLen(n,"JOINTS",6)==0?glb_attribute_type_joints: l==7&&sCompUpToLen(n,"WEIGHTS",7)==0?glb_attribute_type_weights:glb_attribute_type_invalid;
     if(us&&*ot!=glb_attribute_type_invalid){*oi=s2i32(us+1);if(*oi<0){*ot=glb_attribute_type_invalid;*oi=0;}}
 }
 
-static int json_attribute_list(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_attribute** out, size_t* oc){ GLB_CHECK_TOKTYPE(t[i],JSMN_OBJECT); if(*out)return -1; *oc=t[i].size; *out=OS_SubArenaAlloc(tid,sizeof(glb_attribute) * *oc); ++i; for(size_t k=0;k<*oc;++k){ GLB_CHECK_KEY(t[i]);i=glb_parse_json_string(t,i,j,tid,&(*out)[k].name);if(i<0)return -1; glb_parse_attribute_type((*out)[k].name,&(*out)[k].type,&(*out)[k].index); (*out)[k].data=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i; } return i; }
-static int json_primitive(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_primitive* out){GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);out->type=glb_primitive_type_triangles;int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"indices")){++i;out->indices=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"attributes"))i=json_attribute_list(t,i+1,j,tid,&out->attr,&out->attr_count); else i=glb_skip_json(t,i+1); if(i<0){return i;} } return i;}
-static int json_mesh(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_mesh* out){GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"primitives")){i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_primitive),tid,(void**)&out->primitives,&out->primitives_count,(glb_parse_item_func)json_primitive);} else i=glb_skip_json(t,i+1); if(i<0){return i;}} return i;}
+static int json_attribute_list(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_attribute** out, size_t* oc){ if (t[i].type!=JSMN_OBJECT) return -1; if(*out)return -1; *oc=t[i].size; *out=OS_SubArenaAlloc(tid,sizeof(glb_attribute) * *oc); ++i; for(size_t k=0;k<*oc;++k){ if(t[i].type!=JSMN_STRING||t[i].size==0)return -1;i=glb_parse_json_string(t,i,j,tid,&(*out)[k].name);if(i<0)return -1; glb_parse_attribute_type((*out)[k].name,&(*out)[k].type,&(*out)[k].index); (*out)[k].data=(glb_accessor*)((size_t)glb_json_to_int(t+i,j)+1);++i; } return i; }
+static int json_primitive(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_primitive* out){if (t[i].type!=JSMN_OBJECT) return -1;out->type=glb_primitive_type_triangles;int sz=t[i].size;++i; for(int k=0;k<sz;++k){ if(t[i].type!=JSMN_STRING||t[i].size==0)return -1; if(glb_json_strcmp(t+i,j,"indices")){++i;out->indices=(glb_accessor*)((size_t)glb_json_to_int(t+i,j)+1);++i;} else if(glb_json_strcmp(t+i,j,"attributes"))i=json_attribute_list(t,i+1,j,tid,&out->attr,&out->attr_count); else i=glb_skip_json(t,i+1); if(i<0){return i;} } return i;}
+static int json_mesh(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_mesh* out){if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i; for(int k=0;k<sz;++k){ if(t[i].type!=JSMN_STRING||t[i].size==0)return -1; if(glb_json_strcmp(t+i,j,"primitives")){i=glb_parse_json_array_generic(t,i+1,j,sizeof(glb_primitive),tid,(void**)&out->primitives,&out->primitives_count,(glb_parse_item_func)json_primitive);} else i=glb_skip_json(t,i+1); if(i<0){return i;}} return i;}
 static int json_accessor(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_accessor* out){ (void)tid;
-    GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
+    if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
-        GLB_CHECK_KEY(t[i]);
-             if(glb_json_strcmp(t+i,j,"bufferView")){++i;out->buffer_view=GLB_PTRINDEX(glb_buffer_view,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"byteOffset")){++i;out->offset=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"componentType")){++i;out->component_type=json_to_comp_type(t+i,j);++i;}
+        if(t[i].type!=JSMN_STRING||t[i].size==0)return -1;
+             if(glb_json_strcmp(t+i,j,"bufferView")){++i;out->buffer_view=(glb_buffer_view*)((size_t)glb_json_to_int(t+i,j)+1);++i;} else if(glb_json_strcmp(t+i,j,"byteOffset")){++i;out->offset=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"componentType")){++i;out->component_type=json_to_comp_type(t+i,j);++i;}
         else if(glb_json_strcmp(t+i,j,"normalized")){++i;out->normalized=glb_json_to_bool(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"count")){++i;out->count=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"type")){ ++i; out->type = glb_json_strcmp(t+i,j,"SCALAR")?glbscalar:glb_json_strcmp(t+i,j,"VEC2")?glbv2:glb_json_strcmp(t+i,j,"VEC3")?glbv3:glb_json_strcmp(t+i,j,"VEC4")?glbv4:glb_json_strcmp(t+i,j,"MAT4")?glbmat4:glbinvalid; ++i; }
         else{ i=glb_skip_json(t,i+1);} if(i<0){return i;}
     } return i;
 }
 
-static int glb_parse_json_buffer_view(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_buffer_view* out){ (void)tid; GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"buffer")){++i;out->buffer=GLB_PTRINDEX(glb_buffer,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"byteOffset")){++i;out->offset=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"byteLength")){++i;out->size=glb_json_to_size(t+i,j);++i;} else i=glb_skip_json(t,i+1); if(i<0)return i; } return i; }
-static int glb_parse_json_buffer(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_buffer* out){ (void)tid; GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"byteLength")){++i;out->size=glb_json_to_size(t+i,j);++i;} else i=glb_skip_json(t,i+1); if(i<0)return i; } return i; }
-static int glb_parse_json_skin(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_skin* out){ GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i; for(int k=0;k<sz;++k){ GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"joints")){++i;i=glb_parse_json_node_array(t,i,j,tid,&out->joints,&out->joints_count);}else if(glb_json_strcmp(t+i,j,"inverseBindMatrices")){++i;GLB_CHECK_TOKTYPE(t[i],JSMN_PRIMITIVE);out->inverse_bind_matrices=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;}else{i=glb_skip_json(t,i+1);} if(i<0){return i;} } return i; }
+static int glb_parse_json_buffer_view(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_buffer_view* out){ (void)tid; if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i; for(int k=0;k<sz;++k){ if(t[i].type!=JSMN_STRING||t[i].size==0)return -1; if(glb_json_strcmp(t+i,j,"buffer")){++i;out->buffer=(glb_buffer*)((size_t)glb_json_to_int(t+i,j)+1);++i;} else if(glb_json_strcmp(t+i,j,"byteOffset")){++i;out->offset=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"byteLength")){++i;out->size=glb_json_to_size(t+i,j);++i;} else i=glb_skip_json(t,i+1); if(i<0)return i; } return i; }
+static int glb_parse_json_buffer(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_buffer* out){ (void)tid; if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i; for(int k=0;k<sz;++k){ if(t[i].type!=JSMN_STRING||t[i].size==0)return -1; if(glb_json_strcmp(t+i,j,"byteLength")){++i;out->size=glb_json_to_size(t+i,j);++i;} else i=glb_skip_json(t,i+1); if(i<0)return i; } return i; }
+static int glb_parse_json_skin(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_skin* out){ if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i; for(int k=0;k<sz;++k){ if(t[i].type!=JSMN_STRING||t[i].size==0)return -1; if(glb_json_strcmp(t+i,j,"joints")){++i;i=glb_parse_json_node_array(t,i,j,tid,&out->joints,&out->joints_count);}else if(glb_json_strcmp(t+i,j,"inverseBindMatrices")){++i;if (t[i].type!=JSMN_PRIMITIVE) return -1;out->inverse_bind_matrices=(glb_accessor*)((size_t)glb_json_to_int(t+i,j)+1);++i;}else{i=glb_skip_json(t,i+1);} if(i<0){return i;} } return i; }
 static int glb_parse_json_node(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_node* out){
-    GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT); out->rotation[3]=1.0f;out->scale[0]=1.0f;out->scale[1]=1.0f;out->scale[2]=1.0f; int sz=t[i].size;++i;
+    if (t[i].type!=JSMN_OBJECT) return -1; out->rotation[3]=1.0f;out->scale[0]=1.0f;out->scale[1]=1.0f;out->scale[2]=1.0f; int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
-        GLB_CHECK_KEY(t[i]);
-             if (glb_json_strcmp(t+i,j,"children")) { ++i; i = glb_parse_json_node_array(t, i, j, tid, &out->children, &out->children_count); } else if(glb_json_strcmp(t+i,j,"mesh")){++i;GLB_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);out->mesh=GLB_PTRINDEX(glb_mesh,glb_json_to_int(t+i,j));++i;}else if(glb_json_strcmp(t+i,j,"skin")){++i;GLB_CHECK_TOKTYPE(t[i], JSMN_PRIMITIVE);out->skin=GLB_PTRINDEX(glb_skin,glb_json_to_int(t+i,j));++i;}
+        if(t[i].type!=JSMN_STRING||t[i].size==0)return -1;
+             if (glb_json_strcmp(t+i,j,"children")) { ++i; i = glb_parse_json_node_array(t, i, j, tid, &out->children, &out->children_count); } else if(glb_json_strcmp(t+i,j,"mesh")){++i;if (t[i].type!=JSMN_PRIMITIVE) return -1;out->mesh=(glb_mesh*)((size_t)glb_json_to_int(t+i,j)+1);++i;}else if(glb_json_strcmp(t+i,j,"skin")){++i;if (t[i].type!=JSMN_PRIMITIVE) return -1;out->skin=(glb_skin*)((size_t)glb_json_to_int(t+i,j)+1);++i;}
         else if(glb_json_strcmp(t+i,j,"translation")){out->has_translation=1;i=glb_parse_json_float_array(t,i+1,j,out->translation,3);}else if(glb_json_strcmp(t+i,j,"rotation")){out->has_rotation=1;i=glb_parse_json_float_array(t,i+1,j,out->rotation,4);} else if(glb_json_strcmp(t+i,j,"scale")){out->has_scale=1;i=glb_parse_json_float_array(t,i+1,j,out->scale,3);}else{i=glb_skip_json(t,i+1);}  if(i<0)return i;
     } return i;
 }
 
 static int glb_parse_json_animation_sampler(jsmntok_t const* t, int i, const u8* j, i32 tid, glbanim_samp* out){ (void)tid;
-    GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
-    for(int k=0;k<sz;++k){GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"input")){++i;out->input=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"output")){++i;out->output=GLB_PTRINDEX(glb_accessor,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"interpolation")){ ++i; out->interpolation = glb_json_strcmp(t+i,j,"LINEAR")?glb_interp_linear:glb_interp_step; ++i; } else i=glb_skip_json(t,i+1); if(i<0)return i;} return i;
+    if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i;
+    for(int k=0;k<sz;++k){if(t[i].type!=JSMN_STRING||t[i].size==0)return -1; if(glb_json_strcmp(t+i,j,"input")){++i;out->input=(glb_accessor*)((size_t)glb_json_to_int(t+i,j)+1);++i;} else if(glb_json_strcmp(t+i,j,"output")){++i;out->output=(glb_accessor*)((size_t)glb_json_to_int(t+i,j)+1);++i;} else if(glb_json_strcmp(t+i,j,"interpolation")){ ++i; out->interpolation = glb_json_strcmp(t+i,j,"LINEAR")?glb_interp_linear:glb_interp_step; ++i; } else i=glb_skip_json(t,i+1); if(i<0)return i;} return i;
 }
 
 static int glb_parse_json_animation_channel(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_anim_chan* out){ (void)tid;
-    GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
+    if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
-        GLB_CHECK_KEY(t[i]);
-        if(glb_json_strcmp(t+i,j,"sampler")){++i;out->sampler=GLB_PTRINDEX(glbanim_samp,glb_json_to_int(t+i,j));++i;}
+        if(t[i].type!=JSMN_STRING||t[i].size==0)return -1;
+        if(glb_json_strcmp(t+i,j,"sampler")){++i;out->sampler=(glbanim_samp*)((size_t)glb_json_to_int(t+i,j)+1);++i;}
         else if(glb_json_strcmp(t+i,j,"target")){
-            ++i;GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int tsz=t[i].size;++i;
-            for(int m=0;m<tsz;++m){GLB_CHECK_KEY(t[i]); if(glb_json_strcmp(t+i,j,"node")){++i;out->target_node=GLB_PTRINDEX(glb_node,glb_json_to_int(t+i,j));++i;} else if(glb_json_strcmp(t+i,j,"path")){ ++i; out->target_path = glb_json_strcmp(t+i,j,"translation") ? glb_animpthtype_translation : glb_json_strcmp(t+i,j,"rotation") ? glb_animpthtype_rotation : glb_json_strcmp(t+i,j,"scale") ? glb_animpthtype_scale : glb_animpthtype_invalid; ++i; }else i=glb_skip_json(t,i+1); if(i<0)return i;}
+            ++i;if (t[i].type!=JSMN_OBJECT) return -1;int tsz=t[i].size;++i;
+            for(int m=0;m<tsz;++m){if(t[i].type!=JSMN_STRING||t[i].size==0)return -1; if(glb_json_strcmp(t+i,j,"node")){++i;out->target_node=(glb_node*)((size_t)glb_json_to_int(t+i,j)+1);++i;} else if(glb_json_strcmp(t+i,j,"path")){ ++i; out->target_path = glb_json_strcmp(t+i,j,"translation") ? glb_animpthtype_translation : glb_json_strcmp(t+i,j,"rotation") ? glb_animpthtype_rotation : glb_json_strcmp(t+i,j,"scale") ? glb_animpthtype_scale : glb_animpthtype_invalid; ++i; }else i=glb_skip_json(t,i+1); if(i<0)return i;}
         } else i=glb_skip_json(t,i+1);    if(i<0)return i;
     } return i;
 }
 
 static int glb_parse_json_animation(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_animt* out){
-    GLB_CHECK_TOKTYPE(t[i], JSMN_OBJECT);int sz=t[i].size;++i;
+    if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
-        GLB_CHECK_KEY(t[i]);
+        if(t[i].type!=JSMN_STRING||t[i].size==0)return -1;
         if(glb_json_strcmp(t+i,j,"samplers")){i=glb_parse_json_array_generic(t,i+1,j,sizeof(glbanim_samp),tid,(void**)&out->samplers,&out->samplers_count,(glb_parse_item_func)glb_parse_json_animation_sampler); }else if(glb_json_strcmp(t+i,j,"channels")){i=glb_parse_json_array(t,i+1,j,sizeof(glb_anim_chan),tid,(void**)&out->channels,&out->channels_count);if(i<0)return i; for(size_t m=0;m<out->channels_count;++m){i=glb_parse_json_animation_channel(t,i,j,tid,&out->channels[m]);if(i<0)return i;} }
         else i=glb_skip_json(t,i+1);    if(i<0)return i;
     }
@@ -252,14 +247,14 @@ void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
     u32 tmp;mcpy(&tmp,d,4); const u8* ptr=(const u8*)d; mcpy(&tmp,ptr+8,4); const u8* jc=ptr+12; u32 jl;mcpy(&jl,jc,4); mcpy(&tmp,jc+4,4); jc+=8;const void* bin=NULL;size_t bsz=0; if(8<=sz-20-jl){ const u8* bc=jc+jl;u32 bl;mcpy(&bl,bc,4); mcpy(&tmp,bc+4,4); bc+=8;bin=bc;bsz=bl; } jsmn_parser p={0,0,0};int tc=jsmn_parse(&p,(const char*)jc,jl,NULL,0);
     jsmntok_t* t=OS_SubArenaAlloc(tid,sizeof(jsmntok_t)*(tc+1));jsmn_init(&p); tc=jsmn_parse(&p,(const char*)jc,jl,t,tc);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);} t[tc].type=JSMN_UND; glb_data* data=OS_SubArenaAlloc(tid,sizeof(glb_data)); glb_parse_json_root(t,0,jc,tid,data);
     for(size_t m=0;m<data->meshes_count;++m)
-        for(size_t n=0;n<data->meshes[m].primitives_count;++n){ GLB_PTRFIXUP(data->meshes[m].primitives[n].indices,data->accessors,data->accessors_count); for(size_t k=0;k<data->meshes[m].primitives[n].attr_count;++k){GLB_PTRFIXUP_REQ(data->meshes[m].primitives[n].attr[k].data,data->accessors,data->accessors_count);} }
-    for(size_t m=0;m<data->accessors_count;++m){ GLB_PTRFIXUP(data->accessors[m].buffer_view,data->buffer_views,data->buffer_views_count); if(data->accessors[m].stride==0){data->accessors[m].stride=glb_component_size(data->accessors[m].component_type)*glb_num_components(data->accessors[m].type);} }
-    for(size_t m=0;m<data->buffer_views_count;++m){GLB_PTRFIXUP_REQ(data->buffer_views[m].buffer,data->buffers,data->buffers_count);}
-    for(size_t m=0;m<data->skins_count;++m){for(size_t n=0;n<data->skins[m].joints_count;++n){GLB_PTRFIXUP_REQ(data->skins[m].joints[n],data->nodes,data->nodes_count);}GLB_PTRFIXUP(data->skins[m].inverse_bind_matrices,data->accessors,data->accessors_count);}
-    for(size_t m=0;m<data->nodes_count;++m){ for(size_t n=0;n<data->nodes[m].children_count;++n){GLB_PTRFIXUP_REQ(data->nodes[m].children[n],data->nodes,data->nodes_count); data->nodes[m].children[n]->parent=&data->nodes[m];} GLB_PTRFIXUP(data->nodes[m].mesh,data->meshes,data->meshes_count); GLB_PTRFIXUP(data->nodes[m].skin,data->skins,data->skins_count); }
+        for(size_t n=0;n<data->meshes[m].primitives_count;++n){ glb_accessor* ix=data->meshes[m].primitives[n].indices; if(ix){if((size_t)ix>data->accessors_count)return; data->meshes[m].primitives[n].indices=&data->accessors[(size_t)ix-1];} for(size_t k=0;k<data->meshes[m].primitives[n].attr_count;++k){ glb_accessor* ad=data->meshes[m].primitives[n].attr[k].data; if(!ad||(size_t)ad>data->accessors_count)return; data->meshes[m].primitives[n].attr[k].data=&data->accessors[(size_t)ad-1];} }
+    for(size_t m=0;m<data->accessors_count;++m){ glb_buffer_view* bv=data->accessors[m].buffer_view; if(bv){if((size_t)bv>data->buffer_views_count)return; data->accessors[m].buffer_view=&data->buffer_views[(size_t)bv-1];} if(data->accessors[m].stride==0){data->accessors[m].stride=glb_component_size(data->accessors[m].component_type)*glb_num_components(data->accessors[m].type);} }
+    for(size_t m=0;m<data->buffer_views_count;++m){ glb_buffer* b=data->buffer_views[m].buffer; if(!b||(size_t)b>data->buffers_count)return; data->buffer_views[m].buffer=&data->buffers[(size_t)b-1];}
+    for(size_t m=0;m<data->skins_count;++m){for(size_t n=0;n<data->skins[m].joints_count;++n){glb_node* jt=data->skins[m].joints[n];if(!jt||(size_t)jt>data->nodes_count)return; data->skins[m].joints[n]=&data->nodes[(size_t)jt-1];} glb_accessor* ib=data->skins[m].inverse_bind_matrices; if(ib){if((size_t)ib>data->accessors_count)return; data->skins[m].inverse_bind_matrices=&data->accessors[(size_t)ib-1];}}
+    for(size_t m=0;m<data->nodes_count;++m){ for(size_t n=0;n<data->nodes[m].children_count;++n){glb_node* ch=data->nodes[m].children[n];if(!ch||(size_t)ch>data->nodes_count)return; data->nodes[m].children[n]=&data->nodes[(size_t)ch-1]; data->nodes[m].children[n]->parent=&data->nodes[m];} glb_mesh* ms=data->nodes[m].mesh; if(ms){if((size_t)ms>data->meshes_count)return; data->nodes[m].mesh=&data->meshes[(size_t)ms-1];} glb_skin* sk=data->nodes[m].skin; if(sk){if((size_t)sk>data->skins_count)return; data->nodes[m].skin=&data->skins[(size_t)sk-1];} }
     for(size_t m=0;m<data->animations_count;++m){
-        for(size_t n=0;n<data->animations[m].samplers_count;++n){GLB_PTRFIXUP_REQ(data->animations[m].samplers[n].input,data->accessors,data->accessors_count);GLB_PTRFIXUP_REQ(data->animations[m].samplers[n].output,data->accessors,data->accessors_count);}
-        for(size_t n=0;n<data->animations[m].channels_count;++n){GLB_PTRFIXUP_REQ(data->animations[m].channels[n].sampler,data->animations[m].samplers,data->animations[m].samplers_count);GLB_PTRFIXUP(data->animations[m].channels[n].target_node,data->nodes,data->nodes_count);}
+        for(size_t n=0;n<data->animations[m].samplers_count;++n){ glb_accessor* si=data->animations[m].samplers[n].input; if(!si||(size_t)si>data->accessors_count)return; data->animations[m].samplers[n].input=&data->accessors[(size_t)si-1]; glb_accessor* so=data->animations[m].samplers[n].output; if(!so||(size_t)so>data->accessors_count)return; data->animations[m].samplers[n].output=&data->accessors[(size_t)so-1];}
+        for(size_t n=0;n<data->animations[m].channels_count;++n){ glbanim_samp* cs=data->animations[m].channels[n].sampler; if(!cs||(size_t)cs>data->animations[m].samplers_count)return; data->animations[m].channels[n].sampler=&data->animations[m].samplers[(size_t)cs-1]; glb_node* tn=data->animations[m].channels[n].target_node; if(tn){if((size_t)tn>data->nodes_count)return; data->animations[m].channels[n].target_node=&data->nodes[(size_t)tn-1];} }
     } *out_data=data; (*out_data)->bin=bin; (*out_data)->bin_size=bsz;
 }
 
@@ -352,20 +347,38 @@ bool IsGLBSourcePath(const char* path) { if (!path){return false;} const char* d
 static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     mset(out,0,sizeof(*out)); glb_data* data = NULL; glb_parse(-1,bytes,size,&data); glb_load_buffers(data); glb_animt* bestAnim = &data->animations[0]; size_t maxChannels = 0;
     for (size_t a = 0; a < data->animations_count; ++a) { if (data->animations[a].channels_count > maxChannels) { maxChannels = data->animations[a].channels_count; bestAnim = &data->animations[a]; } }
-    out->anim = bestAnim; out->gltf = data; glb_node* skinNode = NULL; for (size_t i = 0; i < data->nodes_count; ++i) if (data->nodes[i].skin && data->nodes[i].mesh) { skinNode = &data->nodes[i]; break; }
-    if (skinNode) {/*Skeletal mesh animation (skinned)*/
+    out->anim = bestAnim;
+    out->gltf = data;
+    glb_node* skinNode = NULL;
+    for (size_t i = 0; i < data->nodes_count; ++i) {
+        if (data->nodes[i].skin && data->nodes[i].mesh) { skinNode = &data->nodes[i]; break; }
+    }
+    
+    if (skinNode) { /*Skeletal mesh animation (skinned)*/
         out->isTrAnim=false; glb_mesh* mesh=skinNode->mesh; glb_primitive* prim = &mesh->primitives[0];
         const glb_accessor* posAcc=glb_find_accessor(prim,glb_attribute_type_position,0); const glb_accessor* nrmAcc=glb_find_accessor(prim,glb_attribute_type_normal,0); const glb_accessor* uvAcc=glb_find_accessor(prim,glb_attribute_type_texcoord,0); const glb_accessor* jntAcc=glb_find_accessor(prim, glb_attribute_type_joints,0);
         const glb_accessor* wgtAcc=glb_find_accessor(prim,glb_attribute_type_weights,0); u32 vc=(u32)posAcc->count; out->vertCount=vc; out->pos=OS_SubArenaAlloc(-1,vc*3*sizeof(float)); out->nrm=OS_SubArenaAlloc(-1,vc*3*sizeof(float)); out->uv=OS_SubArenaAlloc(-1,vc*2*sizeof(float)); out->skin=OS_SubArenaAlloc(-1,vc*sizeof(VtxSkin));
-        for (u32 i = 0; i < vc; ++i) {
-            glbread_float(posAcc,i,&out->pos[i*3],3); if(nrmAcc){glbread_float(nrmAcc,i,&out->nrm[i*3],3);}else{out->nrm[i*3]=0.0f; out->nrm[i*3+1]=1.0f; out->nrm[i*3+2]=0.0f;} if(uvAcc){glbread_float(uvAcc,i,&out->uv[i*2],2); out->uv[i*2+1]=1.0f-out->uv[i*2+1];/*Flip V*/}else{out->uv[i*2]=0.0f; out->uv[i*2+1]=0.0f;}
-            float jf[4]={0,0,0,0},wf[4]={0,0,0,0}; glbread_float(jntAcc,i,jf,4); glbread_float(wgtAcc,i,wf,4); float wsum = wf[0]+wf[1]+wf[2]+wf[3], winv=(wsum>1e-6f) ? 1.0f/wsum : 0.0f; for(int k=0;k<4;++k){i32 jj=(i32)jf[k]; out->skin[i].j[k]=(jj >= 0 && jj < MAX_GLB_JOINTS) ? (u16)jj : 0; out->skin[i].w[k]=wf[k]*winv;}
+        for (u32 i=0;i<vc;++i) {
+            glbread_float(posAcc, i, &out->pos[i*3], 3);
+            if (nrmAcc){ glbread_float(nrmAcc, i, &out->nrm[i*3], 3); }
+            else { out->nrm[i*3]=0.0f; out->nrm[i*3+1]=1.0f; out->nrm[i*3 + 2] = 0.0f; }
+            
+            if (uvAcc) { glbread_float(uvAcc, i, &out->uv[i*2], 2); out->uv[i*2 + 1] = 1.0f - out->uv[i*2 + 1]; /*Flip V*/ }
+            else { out->uv[i*2] = 0.0f; out->uv[i*2+1] = 0.0f;}
+            
+            float jf[4] = { 0, 0, 0, 0 }, wf[4] = { 0, 0, 0, 0 };
+            glbread_float(jntAcc, i, jf, 4);
+            glbread_float(wgtAcc, i, wf, 4);
+            float wsum = wf[0] + wf[1] + wf[2] + wf[3], winv = (wsum > 1e-6f) ? 1.0f/wsum : 0.0f; for(int k=0;k<4;++k){i32 jj=(i32)jf[k]; out->skin[i].j[k]=(jj >= 0 && jj < MAX_GLB_JOINTS) ? (u16)jj : 0; out->skin[i].w[k]=wf[k]*winv;}
         }
+        
         u32 tc; if(prim->indices){tc=(u32)(prim->indices->count / 3); out->indices=OS_SubArenaAlloc(-1,tc*3*sizeof(u32)); for(u32 k=0;k<tc*3;++k)out->indices[k]=(u32)glbread_index(prim->indices,k);}
         else{tc=vc/3; out->indices=OS_SubArenaAlloc(-1,tc*3*sizeof(u32)); for(u32 k=0;k<tc*3;++k)out->indices[k]=k;} out->triCount = tc; glb_skin* skin = skinNode->skin;
         out->jointCount = (u32)skin->joints_count; for (u32 j = 0; j < out->jointCount; ++j) { out->jointNodes[j] = skin->joints[j]; if (skin->inverse_bind_matrices) glbread_float(skin->inverse_bind_matrices, j, out->invBind[j], 16); else Mat4Identity(out->invBind[j]); } return;
     }
-    u32 submshCnt=0,si=0; out->isTrAnim=true;/*Transform-based Animation (node TRS)*/ for (size_t i=0;i<data->nodes_count;++i){if(data->nodes[i].mesh){for(size_t p=0;p<data->nodes[i].mesh->primitives_count;++p){if(data->nodes[i].mesh->primitives[p].type==glb_primitive_type_triangles){++submshCnt;}}}}
+    
+    u32 submshCnt=0,si=0; out->isTrAnim=true; /*Transform-based Animation (node TRS)*/
+    for (size_t i=0;i<data->nodes_count;++i){if(data->nodes[i].mesh){for(size_t p=0;p<data->nodes[i].mesh->primitives_count;++p){if(data->nodes[i].mesh->primitives[p].type==glb_primitive_type_triangles){++submshCnt;}}}}
     out->submshCnt=submshCnt; out->meshNodes=OS_SubArenaAlloc(-1,submshCnt*sizeof(glb_node*)); out->subPos=OS_SubArenaAlloc(-1,submshCnt * sizeof(float*)); out->subNrm=OS_SubArenaAlloc(-1,submshCnt*sizeof(float*)); out->subUv=OS_SubArenaAlloc(-1,submshCnt*sizeof(float*)); out->subVertCnt=OS_SubArenaAlloc(-1,submshCnt*sizeof(u32));
     out->subIndices=OS_SubArenaAlloc(-1,submshCnt * sizeof(u32*)); out->subTriCount=OS_SubArenaAlloc(-1,submshCnt * sizeof(u32)); for (u32 s = 0; s < submshCnt; ++s) { out->subPos[s]=NULL; out->subNrm[s]=NULL; out->subUv[s]=NULL; out->subIndices[s]=NULL; }
     for (size_t i = 0; i < data->nodes_count; ++i) {
