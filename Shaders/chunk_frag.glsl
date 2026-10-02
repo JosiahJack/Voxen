@@ -108,13 +108,13 @@ void main() {
         vec3 cyberDirB = normalize(vec3(-0.55, 0.35, -0.5)); vec3 cyberColB = vec3(0.9, 0.35, 0.95);
         lighting += albedoColor.rgb * cyberColA * (clamp(dot(adjustedNormal, cyberDirA), 0.0, 1.0) * 0.9);
         lighting += albedoColor.rgb * cyberColB * (clamp(dot(adjustedNormal, cyberDirB), 0.0, 1.0) * 0.6);
-    } else if (sunEnabled > 0u) { // sun is off entirely in cells that can't see it, and whenever shadows are off
-        vec3 sunCol = vec3(1.0, 0.97, 0.85); /*sunDirection comes from the CPU (same value the shadowmap pass used), so the light and its map can't drift apart.*/
-        vec3 sunProj = (sunShadowMatrix * vec4(FragPos, 1.0)).xyz; // ortho, so w == 1 and the divide is free
-        float sunShadow = 1.0;
-        if (all(lessThan(abs(sunProj.xy), vec2(1.0)))) { sunShadow = texture(sunShadowMap, vec3(sunProj.xy, sunProj.z - 0.0012)); } // 0.0012 NDC ~= 0.1 world units over the map's 3.5*64 depth range (tunable); outside the ortho box = lit
-        lighting += albedoColor.rgb * sunCol * (clamp(dot(adjustedNormal, sunDirection), 0.0, 1.0) * sunShadow);
-    }
+    }// else if (sunEnabled > 0u) { // sun is off entirely in cells that can't see it, and whenever shadows are off
+    //    vec3 sunCol = vec3(1.0, 0.97, 0.85); /*sunDirection comes from the CPU (same value the shadowmap pass used), so the light and its map can't drift apart.*/
+    //    vec3 sunProj = (sunShadowMatrix * vec4(FragPos, 1.0)).xyz; // ortho, so w == 1 and the divide is free
+    //    float sunShadow = 1.0;
+    //    if (all(lessThan(abs(sunProj.xy), vec2(1.0)))) { sunShadow = texture(sunShadowMap, vec3(sunProj.xy, sunProj.z - 0.0012)); } // 0.0012 NDC ~= 0.1 world units over the map's 3.5*64 depth range (tunable); outside the ortho box = lit
+    //    lighting += albedoColor.rgb * sunCol * (clamp(dot(adjustedNormal, sunDirection), 0.0, 1.0) * sunShadow);
+    //}
     float rim=1.0-max(dot(adjustedNormal,viewDir),0.0); lighting+=clamp(rim*rim*rim*rim*0.25*clamp(iTot,0.0,1.0)*specColor.rgb,0.0,1.0);/*Specular "rim" fresnel (tested and perf impact ~zero)*/ lighting=(unlit>0||useCamView>0)?albedoColor.rgb:lighting+glowColor.rgb; if(heat>0.0){lighting+=albedoColor.rgb*heat; lighting=pow(lighting,vec3(1.2)); lighting+=clamp(rim*rim*rim*rim*0.5*specColor.rgb,0.0,1.0);}
     /* NPC_Hopper_Death: _HSVAAdjust.x raises red while _RimColor supplies
      * the magenta edge highlight. The C side supplies both as one vec2 so
