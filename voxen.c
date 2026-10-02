@@ -9,6 +9,7 @@ u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; u32 textDecalVertexCount[MAX_LEVEL
 char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN]; u16 decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount; // decals whose lingdex is invalid carry literal text from the level file
 DecalStyle decalStyles[DECAL_STYLE_MAX]; u16 decalStyleCount; // Unity TextMesh anchor/alignment/lineSpacing overrides per decal (from tA/tAl/tLs)
 float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16];
+u32 sunShadowFBO=0,sunShadowTex=0; float sunShadowMatrix[16]; V3 sunDirection={0.0f,1.0f,0.0f}; static FrustumPlane sunShadowFrustum[6]; // sunlight directional shadowmap: single 2048x2048 ortho depth map, no cascades
 // Entity Management
 float modelMatrices[INSTANCE_COUNT*16],*world_from_mdl=modelMatrices,modelBounds[MAX_MDLS],**physPos; V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS]; u16 **modelTriangles,modelTriangleCounts[MAX_MDLS],mdlsCnt,**physTris; u8 currentPlayerNameLength=0; i8 currentMenuItem=0,currentMenuTab=0,menuItemCount=4,menuTabCount=1;
 bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
@@ -116,8 +117,11 @@ void DrawAngularVelocity(u16 i) {
 #include "winput.c"
 // Console System - CHEATS!
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
+/*Unity ressurectionLocation[] (LevelManager.cs, one entry per level) with +1.0 on Y, so the table is capsule-feet
+  space: Unity's player transform is the capsule centre and the capsule is 2 units tall, and Voxen's player position is
+  the camera, which sits PLAYER_CAM_OFFSET_Y above the capsule centre.  Every placement from this table therefore has to
+  take RESSURECT_FEET_TO_CAMERA off the Y or the player arrives floating that far above the spot.*/
 V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,{-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
-static const V3 groveCheatSpawns[3] = { {42.453f, 136.847f, -6.534f}/*10/G1*/, {11.214f, 169.398f, -23.302f}/*11/G2*/, {17.77f, 196.587f, 18.103f}/*12/G4*/ };
 static V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,{126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
 static void AddToHistory(const char* entry) { if (slen(entry) == 0 || (numHistory > 0 && sEqual(entry,history[numHistory - 1]))){return;} if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],entry,T_BUFFER_SIZE); numHistory++; } else { for (int i = 0; i < 7 - 1; i++) {scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE);/*Shift list toward 0*/} scpy_to_a_from_b(history[7 - 1],entry,T_BUFFER_SIZE); } }
 void RecallHistory(int d) { /*1 up (older),-1 down (newer)*/
@@ -274,7 +278,12 @@ int ParseLevelArg(const char* arg) {
 u8 queuedLevelToLoad = 255u; V3 queuedLevelPos;
 static void cmd_loadlevel(const char* arg) {
     if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; }/*"Cannot load levels via cheat while on the main menu!"*/ int level=ParseLevelArg(arg); if(level == -2){return;/*Already printed g3 message*/} if(level < 0 || level > 12){CenterStatusPrint("cmd_loadlevel invalid level argument %d",level); return;}
-    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad=level; queuedLevelPos=(level == 13) ? cyberSpaceEntryLocations[World.currentLevel < 8 ? (u8)World.currentLevel : 0] : ((level > 9) ? groveCheatSpawns[level-10] : ressurectionLocations[level]); LoadLevel(level,queuedLevelPos);
+    CenterStatusPrint("Loading level %u",level); queuedLevelToLoad=level;
+    if (level == 13) queuedLevelPos=cyberSpaceEntryLocations[World.currentLevel < 8 ? (u8)World.currentLevel : 0];
+    else if (level > 9) { /*Groves, as Unity's CheatLoadLevel does: cheatG1/G2/G4Spawn is the level's own info_elev_destination volume, so there is no separate spawn table to keep in sync.*/
+        if (!ElevatorDefaultDestinationPos(level,&queuedLevelPos)) queuedLevelPos=(V3){0.0f,0.0f,0.0f}; else queuedLevelPos.y+=PLAYER_CAM_OFFSET_Y; }
+    else { queuedLevelPos=ressurectionLocations[level]; queuedLevelPos.y-=RESSURECT_FEET_TO_CAMERA; }
+    LoadLevel(level,queuedLevelPos);
 }
 
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }
@@ -288,7 +297,8 @@ static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; if (Cheats.showFPS
 static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacker!"); } static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
 static void cmd_god() { Cheats.god = !Cheats.god; CenterStatusPrint("god mode: %s", Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_energy() { Cheats.redbull = !Cheats.redbull; if (Cheats.redbull) {CenterStatusPrint("%s", Sys_Text.stringTable[1006]);/*"I feel the power! 0 energy consumption!"*/} else {CenterStatusPrint("%s", Sys_Text.stringTable[1005]);/*Energy usage normal*/} }
-static void SetSkyRotateSpeed() { static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; glUseProgram(imageBlitSP); glUniform1f(30,skyRotateSpeeds[Cheats.dizzyLevel]); }
+static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; /*Sky yaw rate table (dizzy levels).  Lives at file scope: composite_frag's uniform 30 and the sun direction below both read it.*/
+static void SetSkyRotateSpeed() { glUseProgram(imageBlitSP); glUniform1f(30,skyRotateSpeeds[Cheats.dizzyLevel]); }
 static void cmd_dizzy() { Cheats.dizzyLevel = (Cheats.dizzyLevel >= 3) ? 0 : Cheats.dizzyLevel + 1; SetSkyRotateSpeed(); }
 static void cmd_bottomless() { Cheats.bottomless = !Cheats.bottomless; if (Cheats.bottomless) {CenterStatusPrint("bottomlessclip! %s",Sys_Text.stringTable[1002]);/*"Bring it!"*/} else {CenterStatusPrint("%s",Sys_Text.stringTable[1003]);/*"Hose disconnected from interdimensional wormhole. Normal ammo operation restored."*/} }
 static void cmd_animtest() { Cheats.animTest++; if (Cheats.animTest > 2) {Cheats.animTest = 0;} if (Cheats.animTest == 1) {CenterStatusPrint("animation test looping enabled!");} else if (Cheats.animTest == 2) {CenterStatusPrint("animation test step enabled! Press 1");} else {CenterStatusPrint("animation test disabled");} }
@@ -599,6 +609,74 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     } glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); glBindBuffer(GL_SSBO, shadowMapsIndirectionID); glBufferData(GL_SSBO, World.loadedLights * sizeof(u32), shadowmapIndirectionList, GL_DYNAMIC_DRAW); shadowTime = get_time() - shadowStartTime;
 }
 
+#define SUN_SHADOW_RADIUS 64.0f // ortho shadowmap half-extent around the player, world units (tunable, unapproved)
+/*Sunlight direction.  The fixed base angle is yawed by exactly the angle the procedural sky is yawed by every frame:
+  composite_frag uses camRot.x + timeVal*skyRotateSpeed (its uniforms 15 and 30), so a celestial feature at a fixed
+  sky direction sweeps world-space as Quaternion.Euler(0,theta,0) does in Unity's SkyRotate.cs -- which is the axis and
+  sense Voxen already picked, at Voxen's own (deliberately slower than Unity's) rate.*/
+V3 SunDirection(void) { float yaw=(float)World.pauseRelativeTime * 0.1f * skyRotateSpeeds[Cheats.dizzyLevel]; /*timeVal * skyRotateSpeed, both exactly as Render feeds the composite*/ float c=vcosf(yaw), s=vsinf(yaw); V3 b={0.35f,1.0f,0.25f}; return V3_Normalize((V3){b.x*c+b.z*s, b.y, -b.x*s+b.z*c}); }
+void InitSunShadowmap(void) { // single 2048x2048 sunlight depth map + FBO, no cascades
+    i32 prevUnit=0; glGetIntegerv(GL_ACTIVE_TEXTURE,&prevUnit); glActiveTexture(GL_TEXTURE10); /*Private unit, always set explicitly: unit 4 holds outputImageID from UpdateScreenSize and is never re-bound, and unit 1 holds inputUIID, so binding "whatever is active" would silently steal one of them.*/
+    glGenTextures(1,&sunShadowTex); glBindTexture(GL_TEXTURE_2D,sunShadowTex);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,SUN_SHADOW_SIZE,SUN_SHADOW_SIZE,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_INT,NULL);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR); // LINEAR = 2x2 HW PCF on sampler2DShadow
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_BORDER); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_BORDER);
+    const float sunBorderCol[4]={1.0f,1.0f,1.0f,1.0f}; glTexParameterfv(GL_TEXTURE_2D,GL_TEXTURE_BORDER_COLOR,sunBorderCol); // outside the ortho box = lit
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_COMPARE_MODE,GL_COMPARE_REF_TO_TEXTURE); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_COMPARE_FUNC,GL_LEQUAL);
+    glGenFramebuffers(1,&sunShadowFBO); glBindFramebuffer(GL_FRAMEBUFFER,sunShadowFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,sunShadowTex,0);
+    glDrawBuffers(0,NULL); // depth-only FBO: no color buffers
+    u32 sunFBStatus=glCheckFramebufferStatus(GL_FRAMEBUFFER); if (sunFBStatus != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Sun shadowmap framebuffer incomplete: %d\n",sunFBStatus);
+    glActiveTexture((u32)prevUnit); /*put the caller's unit back, still bound to whatever it had*/
+    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
+}
+/*Sunlight directional shadowmap.  Reuses the main pass' depth prepass program (depth-only + alpha cutout, so no new
+  shaders), its LOD/EF_NO_SHADOWS/visibility filtering and the same ortho-ish frustum test ExtractFrustumPlanes +
+  SphereInFrustum give to the light cubemap pass above.  Backface culling is OFF: the world is a sealed interior whose
+  surfaces that sunlight actually reaches are seen from behind by the light, so a culled pass would cast almost nothing.*/
+void RenderSunShadowmap(void) {
+    if (Sys_Settings.Shadows == 0u || sunShadowFBO == 0u) return; // respects the sun-visible uniform: no sun without shadows on
+    V3 sunDir=SunDirection(); sunDirection=sunDir; // uploaded to chunkSP as uniform 38, so the lit direction and the map that casts for it can never disagree
+    V3 target=World.position[PLAYER1];
+    V3 fwd={-sunDir.x,-sunDir.y,-sunDir.z}; // light travel direction
+    V3 right=V3_Normalize(V3_Cross(fwd,(V3){0.0f,0.0f,1.0f}));
+    V3 up=V3_Cross(right,fwd);
+    const float S=SUN_SHADOW_RADIUS, eyeDist=S*2.0f;
+    V3 eye={target.x+sunDir.x*eyeDist,target.y+sunDir.y*eyeDist,target.z+sunDir.z*eyeDist};
+    // column-major view matrix; view -Z = fwd so Z column = -fwd = sunDir
+    float view[16]={right.x,up.x,sunDir.x,0.0f, right.y,up.y,sunDir.y,0.0f, right.z,up.z,sunDir.z,0.0f,
+        -(right.x*eye.x+right.y*eye.y+right.z*eye.z),-(up.x*eye.x+up.y*eye.y+up.z*eye.z),-(sunDir.x*eye.x+sunDir.y*eye.y+sunDir.z*eye.z),1.0f};
+    const float texel=(2.0f*S)/(float)SUN_SHADOW_SIZE; // snap the ortho box to texel grid: no shimmer when the camera moves
+    float plsx=right.x*target.x+right.y*target.y+right.z*target.z+view[12], plsy=up.x*target.x+up.y*target.y+up.z*target.z+view[13];
+    float qx=plsx/texel, qy=plsy/texel; // manual roundf: math.h round() is not in the loader's header set
+    view[12]+=(float)((int)(qx+(qx>=0.0f?0.5f:-0.5f)))*texel-plsx; view[13]+=(float)((int)(qy+(qy>=0.0f?0.5f:-0.5f)))*texel-plsy;
+    const float znear=S*0.5f, zfar=S*4.0f;
+    float ortho[16]={1.0f/S,0.0f,0.0f,0.0f, 0.0f,1.0f/S,0.0f,0.0f, 0.0f,0.0f,-2.0f/(zfar-znear),0.0f, 0.0f,0.0f,-(zfar+znear)/(zfar-znear),1.0f};
+    mul_mat4(sunShadowMatrix,ortho,view); ExtractFrustumPlanes(sunShadowMatrix,sunShadowFrustum);
+    glBindFramebuffer(GL_FRAMEBUFFER,sunShadowFBO); glViewport(0,0,SUN_SHADOW_SIZE,SUN_SHADOW_SIZE); glClear(GL_DEPTH_BUFFER_BIT);
+    glDisable(GL_CULL_FACE); // user spec: backface culling OFF for the sun shadowmap pass
+    glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); glDepthFunc(0x0201/*GL_LESS*/); glDisable(GL_BLEND);
+    glUseProgram(depthPrepassSP); glUniformMatrix4fv(2,1,GL_FALSE,sunShadowMatrix); // depth-only + alpha cutout, no new shaders needed
+    u16 currentModelType=0xFFFF,currentTexIndex=0xFFFF; u32 currentSortKey=0xFFFFFFFF,currentTriCount=0; bool useDetail=Sys_Settings.ModelDetail;
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
+        if (i == World.weaponVModelIndex) continue; // camera-locked viewmodel: keep out, like the main depth prepass
+        Entity* e=&World.instances[i]; if (EntNotVisible(i,(e->entflags & EF_NO_SHADOWS))) continue;
+        float radius=modelBounds[e->modelIndex] * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+        if (!SphereInFrustum(sunShadowFrustum,World.position[i],radius)) continue; // same sphere/plane reject the main pass and the light cubemaps use
+        u16 modelType=(instanceIsLODArray[i]||useDetail<1u)&&e->lodIndex<mdlsCnt?e->lodIndex:e->modelIndex;
+        u32 sortKey=((u32)modelType<<16)|e->texIndex;
+        glUniform1ui(0,i);
+        if (sortKey != currentSortKey) {
+            currentSortKey=sortKey;
+            if (modelType != currentModelType) { currentModelType=modelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); currentTriCount=modelTriangleCounts[modelType]*3; }
+            if (e->texIndex != currentTexIndex) { currentTexIndex=e->texIndex; glUniform1ui(3,(u32)currentTexIndex); }
+        }
+        glDrawElements(0x0004/*GL_TRIANGLES*/,currentTriCount,GL_UNSIGNED_SHORT,0); drawCalls++; shadDrawCalls++; vertsRendered+=currentTriCount;
+    }
+    glEnable(GL_CULL_FACE); // main render re-sets cull state per instance anyway; restore the default
+    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); // caller rebinds per-pass right after
+}
+
 DepthSort visibleInstances[INSTANCE_COUNT];
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
@@ -669,7 +747,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if (shakeOffset != 0.0f) { World.cam_yaw += shakeOffset; World.cam_pitch += shakeOffset * 0.5f; quat_from_yaw_pitch_roll(&World.rotation[PLAYER1], World.cam_yaw, World.cam_pitch, World.cam_roll); }
     V3 playerPos = World.position[PLAYER1]; float px=playerPos.x, py=playerPos.y, pz=playerPos.z, aspect3D=(float)swidth / (float)sheight; float view[16],viewProj[16],invViewRot[9],invViewProj[16]; GetProjections(view,viewProj,invViewRot,invViewProj,sfov,aspect3D,snear,sfar); ExtractFrustumPlanes(viewProj,playerFrustumPlanes);
     glBindVertexArray(chunkVAO);/*Common vao for RenderDynamicShadowmaps and Rasterized Geometry*/ glEnable(GL_DEPTH_TEST);
-    glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][0]); if (likely(Sys_Settings.Shadows > 0u)) RenderShadowmaps(); glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][1]);
+    /*Sun lighting is gated twice: the shadowmap only renders when this is on, and the fragment shader's sunEnabled (below) is the same flag, so a cell that can't see the sun never gets sunlight and shadows-off means no sun at all.*/
+    bool sunActive = !camView && likely(Sys_Settings.Shadows > 0u) && SkySunIsVisible(); if (sunActive && sunShadowFBO == 0u) InitSunShadowmap();/*shadows can be toggled on after boot, which is the only path that gets here with no map yet*/
+    glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][0]); if (likely(Sys_Settings.Shadows > 0u)) { RenderShadowmaps(); if (sunActive) RenderSunShadowmap(); } glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][1]);
     double rendStart = get_time(); UpdateLights(); // This is where the voxels get updated!
     if (unlikely(clearRenderTargetsOnNextFrame)) { clearRenderTargetsOnNextFrame = false; ClearAllRenderTargets(); }/*before the gBuffer clear below, so no in-flight target gets wiped*/
     glViewport(0,0,swidth,sheight); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); 
@@ -694,7 +774,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         currentModelType=GetAndBindModel(i,currentModelType); glUniform1ui(3,(u32)tex); u32 vertCount = modelTriangleCounts[currentModelType] * 3; glDrawElements(0x0004/*GL_TRIANGLES*/,vertCount,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered += vertCount;
     }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/,gpuQ[gpuQFrame][2]);
-    glUseProgram(chunkSP); glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u);/*default constIndex*/ glUniform1i(31,9); glUniform1ui(32,0u); glUniform1ui(34,(World.curLev == LEVEL_CYBERSPACE) ? 1u : 0u);/*cyberspace: shader uses hardcoded neon directionals, else the sun*/ cullBlendState = 0xFF;
+    glUseProgram(chunkSP); glUniformMatrix4fv(2,1,0,viewProj); glUniform1ui(25,0u);/*default constIndex*/ glUniform1i(31,9); glUniform1ui(32,0u); glUniform1ui(34,(World.curLev == LEVEL_CYBERSPACE) ? 1u : 0u);/*cyberspace: shader uses hardcoded neon directionals, else the sun*/
+    glUniform1ui(37,(u32)(sunActive?1u:0u)); if (sunActive) { glUniform3f(38,sunDirection.x,sunDirection.y,sunDirection.z); glUniformMatrix4fv(40,1,GL_FALSE,sunShadowMatrix); glActiveTexture(GL_TEXTURE10); glBindTexture(GL_TEXTURE_2D,sunShadowTex); glUniform1i(36,10); glActiveTexture(GL_TEXTURE0); } // sunlight shadowmap (unit 10), same matrix and direction the pass above just rendered with
+    cullBlendState = 0xFF;
     bool grayscaleEnabled = ModRequestsGrayscale(); glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = World.fogColor[World.curLev].a + (float)(World.fogFac / 255u); // Alpha is base density for level.
     glUniform3f(12,World.fogColor[World.curLev].r * fogActual,World.fogColor[World.curLev].g * fogActual,World.fogColor[World.curLev].b * fogActual); // Fog Color(which is density)
@@ -929,7 +1011,7 @@ void InitalizeEnvironment() {
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2}; glDrawBuffers(3,drawBuffers);
     u32 status = glCheckFramebufferStatus(GL_FRAMEBUFFER); if (status != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Framebuffer incomplete: Error code %d\n",status); float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1}; mcpy(&modelMatrices[0],mat,16 * sizeof(float));
     matricesBufferID=MakeSSBO(&matricesBufferID,1,INSTANCE_COUNT*16*sizeof(float),modelMatrices,GL_STATIC_DRAW); voxListCntsID=MakeSSBO(&voxListCntsID,2,VOXEL_COUNT*sizeof(u32),NULL,GL_STATIC_DRAW); voxelLightListsID=MakeSSBO(&voxelLightListsID,3,VOXEL_COUNT*MAX_LIGHTS_PER_VOXEL*sizeof(u32),NULL,GL_STATIC_DRAW);
-    lightsID=MakeSSBO(&lightsID,4,LIGHT_COUNT*sizeof(Light),NULL,GL_STATIC_DRAW); if (Sys_Settings.Shadows){CreateShadowBuffers();/*5,6*/} cellVisibleDataID=MakeSSBO(&cellVisibleDataID,7,ARRSIZE*sizeof(u32),NULL,GL_STATIC_DRAW); texPalID= MakeSSBO(&texPalID,8,MAX_UNIQUE_COLORS*sizeof(u32),NULL,GL_STATIC_DRAW);
+    lightsID=MakeSSBO(&lightsID,4,LIGHT_COUNT*sizeof(Light),NULL,GL_STATIC_DRAW); if (Sys_Settings.Shadows){CreateShadowBuffers();/*5,6*/ InitSunShadowmap();} cellVisibleDataID=MakeSSBO(&cellVisibleDataID,7,ARRSIZE*sizeof(u32),NULL,GL_STATIC_DRAW); texPalID= MakeSSBO(&texPalID,8,MAX_UNIQUE_COLORS*sizeof(u32),NULL,GL_STATIC_DRAW);
     texPalOfsID= MakeSSBO(&texPalOfsID,9,MAX_TXRS*sizeof(u32),NULL,GL_STATIC_DRAW); psysInstancesID = MakeSSBO(&psysInstancesID,10,MAX_PARTICLES*sizeof(GpuPartInst),NULL,GL_DYNAMIC_DRAW); MakeSSBO(&psysTrailsID,11,MAX_TRAIL_SEGS*sizeof(TrlSegInst),NULL,GL_DYNAMIC_DRAW); colorBufferID= MakeSSBO(&colorBufferID,12,MAX_TOTAL_PIXELS*sizeof(u8),NULL,GL_STATIC_DRAW);
     textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW); textureSizesID = MakeSSBO(&textureSizesID,15,MAX_TXRS*2*sizeof(i32),NULL,GL_STATIC_DRAW);
     glUseProgram(shadowmapsSP); glUniform1ui(9,SHADOW_MAP_SIZE); glUseProgram(shadowmapsClearSP); glUniform1ui(0,SHADOW_MAP_SIZE); glUseProgram(chunkSP); glUniform1ui(21,SHADOW_MAP_SIZE); glUniform1f(22,(float)SHADOW_MAP_SIZE); glUniform1ui(23,LIGHT_COUNT); glUniform1ui(24,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE); // One time set uniforms

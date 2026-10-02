@@ -5680,7 +5680,7 @@ constIndex:592|lR.y:0.70711|lR.w:-0.70711|lS.x:0.5|lS.y:0.5|lS.z:0.5|text:ADMINI
 constIndex:592|lR.y:1|lR.w:0|lS.x:0.7|lS.y:0.7|text:EMERGENCY|lingdex:666|matIndex:88|lP.x:-2.95|lP.y:52.24543|lP.z:14.0106|tA:4|tAl:1|tLs:0.8
 constIndex:592|lR.y:1|lR.w:0|lS.x:0.7|lS.y:0.7|text:MEDICAL|lingdex:692|matIndex:88|lP.x:-2.95|lP.y:52.019|lP.z:14.0106|tA:4|tAl:1|tLs:0.8
 constIndex:592|lR.y:1|lR.w:0|lS.x:0.7|lS.y:0.7|text:AREA|lingdex:663|matIndex:88|lP.x:-2.95|lP.y:51.81443|lP.z:14.0106|tA:4|tAl:1|tLs:0.8
-constIndex:574|lP.x:12.396|lP.y:49.91528|lP.z:10.109|lR.y:.70723|lR.z:.70698|lR.w:0
+constIndex:574|lP.x:12.396|lP.y:49.91528|lP.z:10.109|lR.y:.70723|lR.z:.70698|lR.w:0|health:50
 constIndex:592|lR.y:0.70711|lR.w:0.70711|lS.x:0.5|lS.y:0.5|lS.z:0.5|text:CITADEL|lingdex:669|matIndex:87|lP.x:31.5801|lP.y:50.39143|lP.z:-38.128|tAl:1
 constIndex:382|lP.x:37.47965|lP.y:49.93791|lP.z:-58.62278|lR.x:.6706|lR.y:.222|lR.z:.29817|lR.w:-.64195|useableItemIndex:75|customIndex:-1
 constIndex:476|lP.x:-43.50995|lP.y:44.81994|lP.z:-51.72946|lR.x:-.68237|lR.y:-.18398|lR.z:-.18194|lR.w:.68368|lS.x:1.75|lS.y:1.75|lS.z:1.75|lookUpIndex:-1|maxRandomItems:2|customIndex[0]:-1|customIndex[1]:-1|customIndex[2]:-1|customIndex[3]:-1|randomItemCustomIndex[0]:-1|randomItemCustomIndex[1]:-1|randomItemCustomIndex[2]:-1|randomItemCustomIndex[3]:-1|randomItemCustomIndex[4]:-1|randomItemCustomIndex[5]:-1|randomItemCustomIndex[6]:-1|randomItemDropChance[0]:25|randomItemDropChance[1]:25|randomItemDropChance[2]:25|randomItemDropChance[3]:25|randomItemDropChance[4]:25|randomItemDropChance[5]:25|randomItemDropChance[6]:25|health:20|cyberHealth:-1|gameObject.activeInHierarchy:1

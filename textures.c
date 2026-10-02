@@ -18,13 +18,13 @@ static u32 g_vidTexBase, g_vidPalBase; static i32* g_vidSizesCPU = NULL; static 
 static u32 g_vidReqGen = 0, g_vidReqFrame = 0xFFFFFFFFu, g_vidPreFrame = 0xFFFFFFFFu;
 static u32 g_vidLastTex = 0xFFFFFFFFu; static u32 g_vidLastWant = 0xFFFFFFFFu; static bool g_vidUp = false;
 static PngArena g_vidArena; static OS_Thread g_vidThr;
-static INLINE void vid_yield(void) { long r = 24; __asm__ __volatile__("syscall"::"a"(r):"rcx","r11","memory"); } /*sched_yield, the worker is idle most of the time and a bare spin would burn a core*/
+INLINE void vid_yield(void) { long r = 24; __asm__ __volatile__("syscall"::"a"(r):"rcx","r11","memory"); } /*sched_yield, the worker is idle most of the time and a bare spin would burn a core*/
 static bool has_sub(const char* h,const char* n);
 static bool is_vid_path(const char* p);
 static VidFrameRec* vid_find(u32 texIdx) { for (u32 k=0;k<g_vidFrameCnt;++k) { if (g_vidFrames[k].texIdx==texIdx) return &g_vidFrames[k]; } return NULL; }
 static const u8 bayer8[64] = { 0,32, 8,40, 2,34,10,42, 48,16,56,24,50,18,58,26, 12,44, 4,36,14,46, 6,38, 60,28,52,20,62,30,54,22, 3,35,11,43, 1,33, 9,41, 51,19,59,27,49,17,57,25, 15,47, 7,39,13,45, 5,37, 63,31,55,23,61,29,53,21};
 typedef struct { u32 distinct, exactHits, snaps, errSum, errMax; } PalStats;
-static void vid_decode(VidFrameRec* r, VidSlot* s) { /*Same palette extraction as the load worker, but straight into a ring slot. Critically this keeps the nearest-neighbour fallback: dropping it left s->idx[p] UNWRITTEN once the palette filled, which is what produced the popping pixels*/
+static void vid_decode(VidFrameRec* r, VidSlot* s) { /*Same palette extraction as the load worker, but straight into a ring slot.*/
     FHandle fd; int sz = 0; const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(r->path, &fd, &sz); if (unlikely(!d || sz <= 0)) return;
     int w = 0, h = 0; u8* pix = PngLoad((const u8*)d, sz, &w, &h, &g_vidArena);
     if (likely(pix && w > 0 && h > 0 && (u32)w*h <= VIDEO_MAXFRAME)) {
@@ -34,7 +34,7 @@ static void vid_decode(VidFrameRec* r, VidSlot* s) { /*Same palette extraction a
             u32 c = ((u32*)pix)[p]; u32 hv = (c*0x9E3779B9u); hv ^= hv>>16; u32 sl = hv & (TEXHASH_SZ-1);
             for (u32 pr=0;pr<TEXHASH_SZ;++pr) { if (eh[sl]==U32_MAX) break; if (eh[sl]==c) { s->idx[p]=ei[sl]; goto vidfound; } sl = (sl+1)&(TEXHASH_SZ-1); }
             if (bs < 256) { s->pal[bs]=c; s->idx[p]=(u8)bs; eh[sl]=c; ei[sl]=(u8)bs; bs++; goto vidfound; }
-            /*Palette full: snap to nearest. Ordered-dithered, otherwise a smooth gradient collapses onto one hard band edge and reads as a sharp pop*/
+            /*Palette full: snap to nearest. Ordered-dithered*/
             { i32 dz = (i32)bayer8[(y & 7u)*8u + (x & 7u)] - 32; i32 rr = (i32)(c & 255) + (dz>>2), gg = (i32)((c>>8)&255) + (dz>>2), bb = (i32)((c>>16)&255) + (dz>>2);
               if (rr<0) rr=0; if (rr>255) rr=255; if (gg<0) gg=0; if (gg>255) gg=255; if (bb<0) bb=0; if (bb>255) bb=255;
               u32 dc = ((u32)rr) | ((u32)gg<<8) | ((u32)bb<<16) | (c & 0xFF000000u);

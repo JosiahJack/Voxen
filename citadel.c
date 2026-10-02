@@ -380,12 +380,33 @@ i8 AmmoIconGet(int index,bool alt) { if (index < 343 || index > 358) {return -1;
 
 void CyborgConversionToggleTargetted() {bool active=(World.ressurectionActiveLevels>>World.curLev)&1u; flag_setu16(&World.ressurectionActiveLevels,(1u<<World.curLev),!active); if(World.curLev==6)flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ play_wav(sounds[active ? 183 : 184], AppliedFXVol(1.0f), (V3){0.0f,0.0f,0.0f}, false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);}
 bool PlayerInElevatorCell(void); bool FindElevatorKeypadPos(u8 level,V3* outPos);
+/*Where a bare LoadLevel(lev,Vector3.zero) lands: the volume belonging to that level's own elevator.  Unity resolves this
+  with a fixed index into its flat elevatorTargetDestinations[] (LevelManager.cs:256-271 takes 25,0,1,3,6,7,9,17,19,21,
+  22,23,24 for levels 0..12), but that array's order within a level is not the order the volumes appear in the level
+  file, so a per-level ordinal off the file order picks the wrong one (verified against the scene: level 6's second array
+  entry is the level file's fourth volume).  Asking which volume stands with that level's panel is both order-free and
+  what Unity's per-keypad targetDestination[] amounts to.*/
+bool ElevatorDefaultDestinationPos(u8 level,V3* outPos) { V3 panel; if (FindElevatorKeypadPos(level,&panel) && ElevatorDestinationPosNear(level,panel,outPos)) return true; return GetElevatorDestinationPos(level,0,outPos); }
+/*The volume an elevator button belongs to: Unity gives each KeypadElevator a targetDestination[] of specific volumes
+  and ElevatorButton.cs loads at that one, so pick the destination volume the destination panel stands with.*/
+bool ElevatorDestinationPosNear(u8 level,V3 fromPos,V3* outPos) {
+    V3 best; float bestSq=0.0f; bool found=false;
+    for (u8 n=0;n<MAX_LEVELS;++n) { V3 p; if(!GetElevatorDestinationPos(level,n,&p)) break; /*past the last one the level has*/ V3 d=V3_AsubB(p,fromPos); float sq=V3_dot(d,d); if(!found||sq<bestSq){best=p;bestSq=sq;found=true;} }
+    if(found)*outPos=best; return found;
+}
 void ElevatorButtonClick(u16 self) {
     Entity* e = &World.instances[self]; if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor]; bool doorClosed = door->doorOpen == DoorState_Closed;
     if (!PlayerInElevatorCell()) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } if (!doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[7]); /*Door not closed.*/ return; } if (!(e->entflags & EF_ACTIVE)) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); /*Floor not accessible.*/ return; }
-    /*Preserve the player's relative offset from the keypad across the level load.*/
-    V3 srcKeypad=World.Sys_UI.objectInUsePos; V3 offset=V3_AsubB(World.position[PLAYER1],srcKeypad);
-    u8 destLevel=(u8)e->teleportID; V3 destKeypad; if (FindElevatorKeypadPos(destLevel,&destKeypad)) queuedLevelPos=V3_AplusB(destKeypad,offset); else queuedLevelPos=(e->targetDestinationID != U16_MAX && e->targetDestinationID < World.instCount) ? World.position[e->targetDestinationID] : (V3){0.0f,0.0f,0.0f}; queuedLevelToLoad=destLevel;
+    /*Preserve the player's relative offset from the keypad across the level load, measured the way Unity measures it:
+      Voxen's player position is the camera, Unity's playerCapsule transform is the capsule centre PLAYER_CAM_OFFSET_Y
+      below it, so the camera height has to come off the offset or every arrival lands 0.84 too high.*/
+    V3 srcKeypad=World.Sys_UI.objectInUsePos; V3 offset=V3_AsubB(World.position[PLAYER1],srcKeypad); offset.y-=PLAYER_CAM_OFFSET_Y;
+    u8 destLevel=(u8)e->teleportID; V3 destKeypad,destVolume; bool hasKeypad=FindElevatorKeypadPos(destLevel,&destKeypad); V3 dest;
+    if (hasKeypad && ElevatorDestinationPosNear(destLevel,destKeypad,&destVolume)) dest=V3_AplusB(destVolume,offset); /*Unity loads at the destination volume, not at the panel*/
+    else if (hasKeypad) dest=V3_AplusB(destKeypad,offset);
+    else dest=(e->targetDestinationID != U16_MAX && e->targetDestinationID < World.instCount) ? World.position[e->targetDestinationID] : (V3){0.0f,0.0f,0.0f};
+    dest.y+=PLAYER_CAM_OFFSET_Y; /*level data and Unity both place the capsule, Voxen places the camera*/
+    queuedLevelPos=dest; queuedLevelToLoad=destLevel;
 }
 
 void EmailTargetted(u16 self) { Entity* e=&World.instances[self]; u16 idx=e->emailIndex; if(idx>=LOGCNT){return;} if(World.invP1.hasLog[idx]){return;} World.invP1.hasLog[idx]=World.invP1.hasNewEmail=true; World.invP1.lastAddedIndex=idx; if(Sys_Text.audioLogType[idx] == AudioLogType_Email){World.invP1.beepDone=true;} if(e->autoPlayEmail){PlayLastAddedLog(idx);} }
@@ -758,6 +779,7 @@ void HardwareUpdate() {
         UpdateLight(headmountedLanternLight,lanternPos,lantCol,range,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
     } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,false);
 }
+
 // Dermal Patches
 void PatchDisableAll(void){World.invP1.berserkFinished=World.invP1.berserkIncTime=World.invP1.detoxFinished=World.invP1.geniusFinished=World.invP1.mediFinished=World.invP1.reflexFinishedTime=World.invP1.sightFinishedTime=World.invP1.sightSideEffectFinishedTime=World.invP1.staminupFinishedTime=-1.0; World.invP1.mediPatchPulseFinished=0.0; World.invP1.mediPatchPulseCount=0; World.invP1.staminupActive=World.geniusActive=false; World.invP1.fatigue=0.0f; World.invP1.berserkIncrement=World.invP1.patchActive=0; World.timeScale=DEFAULT_TIME_SCALE;}
 void PatchUpdate() {
@@ -785,6 +807,7 @@ void PatchUpdate() {
     }
     if (World.invP1.patchActive & PATCH_STAMINUP) { if (World.invP1.staminupFinishedTime < World.pauseRelativeTime) { World.invP1.staminupActive=false; World.invP1.fatigue=100.0f; World.invP1.patchActive -= PATCH_STAMINUP; } else { World.invP1.fatigue = 0.0f; World.invP1.staminupActive = true; } } // Staminup
 }
+
 // Quest Bits / Mission I/O — side effects on quest notes checklist when bits change
 static void QuestBitNoteSideEffects(u8 qb, bool isOn) {
     if (isOn) {
@@ -805,8 +828,21 @@ static void QuestBitNoteSideEffects(u8 qb, bool isOn) {
         }
     }
 }
+
 // Ressurection: when player dies on a level with resurrection active, teleport back to the ressurection point instead of counting a death.
-bool RessurectPlayer(void) { if(!((World.ressurectionActiveLevels >> World.curLev) & 1u)){return false;} if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) LoadLevel(6, ressurectionLocations[6]); else if (World.curLev < 13) World.position[PLAYER1] = ressurectionLocations[World.curLev]; PlayTrack(TT_Revive, MT_Override); World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0; CenterStatusPrint("BRAIN ACTIVITY SATISFACTORY..."); return true; }
+bool RessurectPlayer(void) {
+    if (!((World.ressurectionActiveLevels >> World.curLev) & 1u)) { return false; }
+    V3 spot=(V3){0.0f,0.0f,0.0f};
+    
+    if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { spot=ressurectionLocations[6]; spot.y-=RESSURECT_FEET_TO_CAMERA; LoadLevel(6, spot); }
+    else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y-=RESSURECT_FEET_TO_CAMERA; World.position[PLAYER1] = spot; }
+    
+    PlayTrack(TT_Revive, MT_Override);
+    World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0;
+    CenterStatusPrint("BRAIN ACTIVITY SATISFACTORY..."); // TODO actual timed text appearances and then restore movement and unpause game.
+    return true;
+}
+
 // Doors
 static bool DoorInventoryHasAccessCard(AccCardType card) { return card == ACC_None || (World.invP1.accessCardOwned & (1u << card)); }
 static void DoorOpen(u16 self) { Entity* e = &World.instances[self]; ChangeAnim(e,A_OPENING); e->doorOpen = e->doorState = DoorState_Opening; e->waitBeforeClose = World.pauseRelativeTime + e->delay; if (e->SFXIndex > 0 && e->SFXIndex < SOUNDS_COUNT) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true); }
@@ -856,6 +892,7 @@ static void DoorLayerUpdate(u16 self, Entity* e) {
     u32 want = (e->doorState == DoorState_Closed) ? L_Door : L_InterDebris;
     if (World.layer[self] != want) World.layer[self] = want;
 }
+
 /* Unity Door.cs:313-319 only runs the grid while the door is fully Closed. Here it re-arms partway through the
    closing stroke instead: timeBeforeLasersOn is read as a percentage of the closing clip. Unity saves that field
    but never reads it, so there is no Unity timing to match -- the value just never had any effect. 0, the default
@@ -875,6 +912,7 @@ static bool DoorLasersOn(const Entity* e, AnimationClip closing) {
     float p = (closing.frameEnd > closing.frameStart) ? (float)(e->frame - closing.frameStart) / (float)(closing.frameEnd - closing.frameStart) : 1.0f;
     return (p * 100.0f >= e->timeBeforeLasersOn);
 }
+
 /* Door laser grid. Unity doorK carries exactly ONE laserLine, so the whole gate is this geometry: two strokes
    crossing as an X, each stroke a yellow-orange-yellow triplet of crossed quads. Widths are world-space because
    the strokes are real crossed quads rather than screen-space expansion. */
@@ -930,6 +968,7 @@ void DoorLaserDraw(u16 self) {
         }
     }
 }
+
 void DoorUpdate(u16 self) {
     Entity* e = &World.instances[self]; if(e->ajar){return;} AnimationClip opening=DoorGetClip(e,A_OPENING), closing=DoorGetClip(e,A_CLOSING);
     if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= opening.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); } else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); } if (World.pauseRelativeTime > e->waitBeforeClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
@@ -940,6 +979,7 @@ u16 SpawnDynamicObject(int val, bool cheat) {
     if (!IdxInBounds(val)) { DualLogWarn("Const index out of bounds: %u", val); return WORLD; } if (IdxIsGeometry(val) && !Cheats.editMode) { CenterStatusPrint("Indices 0 to 306 (level chunks)\nnot possible when not on edit mode!"); return WORLD; } (void)cheat;
     if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("Failed to spawn constIndex %u: instance table full (%u/%u)",val,World.instCount,INSTANCE_COUNT); return WORLD; } u16 entityIndexInInstanceTable = AddInstance((u16)val, (V3){0.0f,0.0f,0.0f}); return entityIndexInInstanceTable;
 }
+
 // TargetIO: Full game cross-level target handling.  Iterates all loaded levels, temporarily swaps active pointers via SetLevelPointers(), finds matching targetname(s), and calls Targetted().  Activator from cur level. Recursion is safe via targetIOActive flag.
 void TriggerTargetted(u16 self, u16 activator) { UseTargets(activator, World.instances[self].targetIdx); }
 bool QuestBitIsSet(u8 qb) { return (qb < QB_COUNT) && ((World.missionBits >> qb) & 1u); }
@@ -1003,11 +1043,13 @@ void TargetLight(u16 activator, u16 lightIdx) {
        exactly what lev1wall1light did. */
     World.lights[lightIdx].intensity = on ? World.lights[lightIdx].maxIntensity : World.lights[lightIdx].minIntensity;
 }
+
 void UseTargets(u16 activator, u16 targetIdx) {
     if(targetIdx==IO_NONE){return;} bool wasActive=World.targetIOActive,succeeded=false; u8 entryLevel=World.currentLevel; if(!wasActive){World.targetIOActive=true; World.targetIOEntryLevel=entryLevel; World.targetIOActivatorIdx=activator; World.targetIOActivatorEntity=World.instances[activator]; World.targetIOActivatorIoflagsHi=World.targetIOActivatorEntity.ioflagsHi; World.targetIOActivatorIoflags=World.instances[activator].ioflags;} const char* targetname=(targetIdx<ioNameCount) ? ioNames[targetIdx] : "";
     for (u8 lev = 0; lev < World.numLevels; ++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } if (World.lightTargetnames) { for (u16 l = 0; l < World.loadedLights; ++l) { if (World.lightTargetnames[l] != targetIdx) {continue;} TargetLight(activator,l); succeeded=true; } } }
     if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (!wasActive) {World.targetIOActive=false;}
 }
+
 // Frob/Use
 #define FROB_DISTANCE 4.9f
 void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 code),MFD_OpenPaperLog(int,V3);
@@ -1043,6 +1085,7 @@ static const WirePuzzleDef wirePuzzleDefs[] = {
     /*744 red   */{744,{2,1,-1,-1,-1,-1,-1},{2,1,-1,-1,-1,-1,-1},{true,true,false,false,false,false,false},{0,5,0,0,0,0,0},{1,1,1,1,0,0,0}},
     /*745 teal  */{745,{0,1,2,3,-1,-1,-1},{2,4,5,0,-1,-1,-1},{true,true,true,true,false,false,false},{4,4,4,4,4,4,4},{1,1,1,1,1,1,0}},
 };
+
 static const WirePuzzleDef* WirePuzzleDefFor(u16 constIndex) { for (u32 i=0;i<sizeof(wirePuzzleDefs)/sizeof(wirePuzzleDefs[0]);++i) if (wirePuzzleDefs[i].constIndex==constIndex) return &wirePuzzleDefs[i]; return NULL; }
 /*Unity indexes currentPositions by wire ("wire 2 sits on row 3"); pw_curL/pw_curR are indexed by column ("row 3 holds
   wire 2"), which is what PWFindCol and the swap-on-click in ui.c expect.  Inverting the permutation is the whole
@@ -1053,6 +1096,7 @@ static void WireLoadInstance(u16 self, const WirePuzzleDef* def) {
     for (u8 w=0;w<7;++w) { int l=(int)e->wireCurL[w], r=(int)e->wireCurR[w]; if (w<7 && l>=0 && l<7) World.Sys_UI.pw_curL[l]=(i8)w; if (w<7 && r>=0 && r<7) World.Sys_UI.pw_curR[r]=(i8)w; }/*All seven slots, not just the first three: 745 teal runs four wires and level5's teal instance saves currentPositionsRight[3..5], so a w<3 guard dropped its fourth wire and left that panel unsolvable.*/
     for (u8 w=0;w<7;++w) { World.Sys_UI.pw_tgtL[w]=def->tgtL[w]; World.Sys_UI.pw_tgtR[w]=def->tgtR[w]; World.Sys_UI.pw_wireOn[w]=def->wireOn[w]; World.Sys_UI.pw_rowActive[w]=def->rowsActive[w]!=0; World.Sys_UI.pw_wireColor[w]=def->wireColor[w];/*raw HUDColor, as PuzzleWire.wireColors holds it*/ }
 }
+
 /*---- Grid puzzle per-instance data (Unity PuzzleGridPuzzle) --------------------------------------------
   PuzzleGridPuzzle.Save writes only puzzleSolved, grid[0..34], fired and locked.  cellType, gridType, theme,
   sourceIndex, outputIndex, securityThreshhold and target are scene-authoring overrides on the prefab instances in
@@ -1091,6 +1135,7 @@ static const GridPuzzleDef gridPuzzleDefs[] = {
     /*7 7.EngineeringLevel   brown  lev7antennafield1*/{{4.6211f,50.6000f,54.9166f},5,0,100,"lev7antennafield1",{0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,1,1,1,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0}},
     /*7 7.EngineeringLevel   gray   lev7antennafield1*/{{3.3831f,50.8220f,56.1656f},5,0,100,"lev7antennafield1",{1,1,1,0,3,1,2,0,0,1,0,3,0,1,1,1,1,0,1,3,3,1,0,0,0,1,1,1,1,1,1,1,1,1,1}},
 };
+
 /*Level-local lP is the level file's own precision, so match on a tolerance rather than exact equality.  0.05 is well
   under the smallest gap between any two placed panels on the same level (level 5's two at y 23.74/22.97 are 0.77
   apart, and the two lev7antennafield1 are 1.6 apart) while absorbing the decimal truncation in the level text.*/
@@ -1101,6 +1146,7 @@ static const GridPuzzleDef* GridPuzzleDefFor(V3 pos) {
     }
     return NULL;
 }
+
 static void GridLoadInstance(u16 self) {
     Entity* e=&World.instances[self];
     const GridPuzzleDef* def=GridPuzzleDefFor(World.position[self]);
@@ -1137,6 +1183,7 @@ static void GridLoadInstance(u16 self) {
     World.Sys_UI.pg_solved=e->puzzleSolved; World.Sys_UI.pg_fired=e->puzzleFired;
     { PGEvalPuzzle(); }
 }
+
 static void PuzzlePanelUse(u16 i) {
     Entity* e=&World.instances[i];
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return;}
@@ -1169,6 +1216,7 @@ static void PuzzlePanelUse(u16 i) {
     }
     CenterStatusPrint("%s",Sys_Text.stringTable[190]);
 }
+
 static bool PanelUseAllowed(u16 i) {
     Entity* e=&World.instances[i];
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return false;}
@@ -1209,12 +1257,14 @@ static const RelayPanelScript relayPanelScripts[] = {
     {"panelIsolinear",  64,  371,      PanelInstallEntity, 151, 211, 210,  212,     91,  42,  166, "lev9isolinearactivated", false, 0     },/*level 9: isolinear chipset placed on the panel*/
     {"panelIsotope",    61,  0,        PanelInstallAnim,   285, 283, 282,  284,     91, 235,  235, "levRinstallisotope",     false, 0     },/*level 0 reactor "isotope panel": X-22 goes in via A_INSTALL then A_INSTALLED*/
 };
+
 extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
 static const RelayPanelScript* RelayPanelScriptFor(const Entity* e) {
     if (!e->targetnameIdx || e->targetnameIdx>=MAX_IO_NAMES) return NULL;
     for (u32 i=0;i<sizeof(relayPanelScripts)/sizeof(relayPanelScripts[0]);++i) if (sEqual(ioNames[e->targetnameIdx],relayPanelScripts[i].name)) return &relayPanelScripts[i];
     return NULL;
 }
+
 static void RelayPanelMsg(u16 msg) { if (msg>0 && msg<T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[msg]); }
 static void RelayPanelSfx(i16 sfx, V3 pos) { if (sfx>0 && sfx<SOUNDS_COUNT) play_wav(sounds[sfx],AppliedFXVol(1.0f),pos,true); }
 static void RelayPanelUse(u16 self) {
@@ -1238,6 +1288,7 @@ static void RelayPanelUse(u16 self) {
     }
     play_wav(sounds[43]/*button_deny, aaaahhh!! Try again*/,AppliedFXVol(1.0f),World.position[self],true); RelayPanelMsg(sc?sc->msgWrong:0);
 }
+
 /*Cover animation finishing into the open pose, and the armed 15s fuse: Unity's DelayedSpawn on the panel's
   ExplosionTimer activates the Explosion child (ExplosionLife/GrenadeActivate + light + sound) and basedestroyed
   after the delay. Voxen plays the explosion in place and removes the panel itself (DeleteInstance, not a despawn).*/
@@ -1246,6 +1297,7 @@ static void PuzzlePanelUpdate(u16 self) {
     if (e->clip==A_IDLE_CLOSED && e->panelOpen) ChangeAnim(e,A_IDLE_OPEN);
     if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=DoorGetClip(e,A_OPENING); if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
 }
+
 static void RelayPanelUpdate(u16 self) {
     Entity* e=&World.instances[self];
     /*Panels that load already open/installed (the level data carries their state) start on the matching frame
@@ -1262,6 +1314,7 @@ static void RelayPanelUpdate(u16 self) {
         const RelayPanelScript* sc=RelayPanelScriptFor(e); if (sc && sc->wreckTex) e->texIndex=sc->wreckTex;
     }
 }
+
 /*Frob with the item in hand (Citadel MouseLookScript.FrobWithHeldObject): only these useables are "frob users", and
   they are consumed by whatever UseHandler answers the frob; anything else you carry is put away as usual.*/
 static bool HeldItemIsFrobUser(i16 item) { return item==54||item==56||item==57||item==61||item==64||item==92||item==93||item==94; }
@@ -1273,6 +1326,7 @@ bool FrobHeldItemIntoPanel(V3 p, V3 f, V3 r) {
     u16 idx=h.hitInstanceIndex; if (World.instances[idx].index!=614 && World.instances[idx].index!=602) return false;
     RelayPanelUse(idx); return true;/*the panel decides: it either installs the item (consuming it) or refuses it*/
 }
+
 /*Elevator floor button layouts, from Textures/UI/ElevatorCheetSheet.txt (Unity ElevatorKeypad buttonText/buttonsEnabled/buttonsDarkened ground truth).
   label: index into elevFloorLabels[] (R=0,1=1..9=9,G1=10,G2=11,G4=12), -1 = hidden (not drawn, not clickable).
   darkened: drawn dimmed, not clickable (Unity buttonsDarkened).*/
@@ -1291,6 +1345,7 @@ static const ElevBtnDef elevLayouts[12][8] = {
     {{1,1},{2,1},{3,1},{6,1},{7,0},{8,0},{-1,0},{-1,0}},/*10: 7 to 8*/
     {{1,1},{2,1},{3,1},{6,1},{8,0},{9,0},{-1,0},{-1,0}},/*11: 8 to 9*/
 };
+
 /*Panel (level, x, y, z) -> elevLayouts index. Matched against Unity scene KeypadElevator instances by position.*/
 static const struct { u8 level; float x,y,z; u8 layout; } elevPanelMap[] = {
     {0,9.97f,-55.08f,39.40f,1},{1,49.88f,-44.58f,-18.0f,0},
@@ -1304,6 +1359,7 @@ static const struct { u8 level; float x,y,z; u8 layout; } elevPanelMap[] = {
     {9,3.57f,107.16f,-38.31f,11},
     {10,42.46f,136.38f,-7.83f,5},{11,9.91f,168.94f,-23.22f,6},{12,19.09f,196.14f,18.14f,8},
 };
+
 /*Elevator floor label index -> destination level. Labels: 0=R,1-9,10=G1,11=G2,12=G4,13=C.*/
 static u8 ElevLabelToLevel(i8 labelIdx) {
     if (labelIdx>=1 && labelIdx<=9) return (u8)labelIdx;
@@ -1311,9 +1367,10 @@ static u8 ElevLabelToLevel(i8 labelIdx) {
     if (labelIdx==0) return 0;/*R*/
     return 255;
 }
+
 /*True if the player is inside an elevator volume (entity 706), using the same box-overlap logic as the automap elevator cell fill.*/
 bool PlayerInElevatorCell(void) {
-    V3 pp=World.position[PLAYER1];
+    V3 pp=World.position[PLAYER1]; pp.y-=PLAYER_CAM_OFFSET_Y; /*camera -> capsule centre: the volumes are level data, and Unity compares them against playerCapsuleTransform*/
     for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e=&World.instances[i]; if(e->index!=706||!(e->entflags&EF_ACTIVE)){continue;}
         V3 c=World.colliderCenter[i],s=World.colliderSize[i],p=World.position[i];
@@ -1324,6 +1381,7 @@ bool PlayerInElevatorCell(void) {
     }
     return false;
 }
+
 static void ElevatorPanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
     World.Sys_UI.tetheredKeypadElevator=i; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.objectInUsePos=World.position[i]; World.Sys_UI.usingObject=true;
@@ -1338,6 +1396,7 @@ static void ElevatorPanelUse(u16 i) {
     for (int b=0;b<8;++b) { World.Sys_UI.elevButtonLabelIdx[b]=elevLayouts[layout][b].label; World.Sys_UI.buttonsDarkened[b]=elevLayouts[layout][b].darkened; World.Sys_UI.buttonsEnabled[b]=elevLayouts[layout][b].label>=0; World.Sys_UI.elevButtonLevelIdx[b]=ElevLabelToLevel(elevLayouts[layout][b].label); World.Sys_UI.elevButtonSpawnIdx[b]=U16_MAX; }
     ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(false,1);
 }
+
 /*Find the keypad position on a given level (for elevator relative-positioning). Returns false if not found.*/
 bool FindElevatorKeypadPos(u8 level,V3* outPos) {
     for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) {
@@ -1345,6 +1404,7 @@ bool FindElevatorKeypadPos(u8 level,V3* outPos) {
     }
     return false;
 }
+
 static void KeycodePanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
     Entity* e=&World.instances[i];

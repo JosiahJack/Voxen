@@ -1,235 +1,690 @@
 // entity.c - Entity Definitions and Save Load System for levels and savegames
 #include "common.h"
-static u16 teleportDestinations[MAX_LEVELS][8]; static bool teleportDestinationsInitialized;
-Quaternion quat_from_axis_angle(V3,float); void AddDoorPortal(u16,u16),TextureSequenceInit(u16,char*),AddCamView(V3,Quaternion,u8,u16,u16,float,float),GravityLiftSyncAllVisuals(void); Entity* entsFromFile; V3 *posFromFile, *scaleFromFile; Quaternion *rotationFromFile; Light *lightsFromFile; LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL; u16 headmountedLanternLight; bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
-u8 sensaroundCamViewCenter=255,sensaroundCamViewLeft=255,sensaroundCamViewRight=255; // HUD sensaround cam view indices, assigned during level load
+static u16 teleportDestinations[MAX_LEVELS][8];
+static bool teleportDestinationsInitialized;
+/*info_elev_destination (706) instances per level, in level-file order.  Unity's LevelManager.elevatorTargetDestinations[]
+  is the same set as one flat array grouped by level (level 1 first ... groves ... level 0 last), so a per-level ordinal
+  addresses either one.  MAX matches the busiest level (6 has 8); anything past it in a level file is ignored, because
+  every consumer here wants a default or nearest volume, not an exhaustive list.*/
+#define MAX_ELEV_DESTS_PER_LEVEL 8
+static u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL]; static u8 elevatorDestCounts[MAX_LEVELS];
+Quaternion quat_from_axis_angle(V3,float);
+void AddDoorPortal(u16,u16), TextureSequenceInit(u16,char*), AddCamView(V3,Quaternion,u8,u16,u16,float,float), GravityLiftSyncAllVisuals(void);
+Entity* entsFromFile;
+V3 *posFromFile, *scaleFromFile;
+Quaternion *rotationFromFile;
+Light *lightsFromFile;
+LightAnimation *lanimsFromFile;
+static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL;
+u16 headmountedLanternLight;
+bool alreadyReadLightOnOnce[LIGHT_COUNT] = {0};
+u8 sensaroundCamViewCenter = 255, sensaroundCamViewLeft = 255, sensaroundCamViewRight = 255; // HUD sensaround cam view indices, assigned during level load
+
 EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex,mass,dynFriction,statFriction,animationNum,col,colCtr,colSz
-/*0 chunk_black*/[0]={178,0,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*1 chunk_blocker*/[1]={178,0,1230,MAX_TXRS,1230,160,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*2 chunk_bridg1_1*/[2]={661,0,44,MAX_TXRS,MAX_TXRS,43,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*3 chunk_bridg1_1flipx*/[3]={667,0,44,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*4 chunk_bridg1_2*/[4]={662,0,45,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*5 chunk_bridg1_3*/[5]={20,0,47,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*6 chunk_bridg1_3_slice45*/[6]={21,0,47,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*7 chunk_bridg1_3flipx*/[7]={663,0,47,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*8 chunk_bridg1_4*/[8]={22,0,48,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*9 chunk_bridg1_4_slice32*/[9]={23,0,48,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*10 chunk_bridg1_4_slice32flipx*/[10]={24,0,48,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*11 chunk_bridg1_5*/[11]={25,0,50,49,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*12 chunk_bridg2_2*/[12]={26,0,MAX_ANIMS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*13 chunk_bridg2_3*/[13]={27,0,56,54,MAX_TXRS,55,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*14 chunk_bridg2_4*/[14]={28,0,57,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*15 chunk_bridg2_5*/[15]={29,0,59,MAX_TXRS,MAX_TXRS,58,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*16 chunk_bridg2_6*/[16]={30,0,60,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*17 chunk_bridg2_7*/[17]={664,0,61,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*18 chunk_bridg2_8*/[18]={31,0,62,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*19 chunk_bridg2_9*/[19]={32,0,64,63,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*20 chunk_crate_impenetrable*/[20]={61,0,150,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*21 chunk_cyberpanel*/[21]={178,0,151,151,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*22 chunk_cyberpanel_slice45*/[22]={6875,0,152,152,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*23 chunk_eng1_1*/[23]={96,0,254,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*24 chunk_eng1_1d*/[24]={95,0,253,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*25 chunk_eng1_2*/[25]={98,0,256,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*26 chunk_eng1_2d*/[26]={97,0,255,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*27 chunk_eng1_3*/[27]={100,0,259,258,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*28 chunk_eng1_3d*/[28]={99,0,257,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*29 chunk_eng1_4*/[29]={101,0,260,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*30 chunk_eng1_5*/[30]={103,0,262,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*31 chunk_eng1_5_slice45lh*/[31]={104,0,262,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*32 chunk_eng1_5_slice45rh*/[32]={105,0,262,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*33 chunk_eng1_5d*/[33]={102,0,261,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*34 chunk_eng1_6*/[34]={107,0,266,265,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*35 chunk_eng1_6d*/[35]={106,0,264,263,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*36 chunk_eng1_7*/[36]={108,0,269,268,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*37 chunk_eng1_7d*/[37]={665,0,267,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*38 chunk_eng1_8*/[38]={109,0,271,270,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*39 chunk_eng1_9*/[39]={111,0,273,251,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*40 chunk_eng1_9d*/[40]={110,0,272,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*41 chunk_eng2_1*/[41]={113,0,276,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*42 chunk_eng2_1_slice45*/[42]={116,0,276,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*43 chunk_eng2_1_slice384high*/[43]={114,0,276,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*44 chunk_eng2_1_slice384highrh*/[44]={115,0,276,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*45 chunk_eng2_1d*/[45]={112,0,275,274,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*46 chunk_eng2_2*/[46]={117,0,279,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*47 chunk_eng2_2d*/[47]={666,0,277,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*48 chunk_eng2_3*/[48]={119,0,282,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*49 chunk_eng2_3d*/[49]={118,0,281,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*50 chunk_eng2_4*/[50]={178,0,283,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
-/*51 chunk_eng2_5*/[51]={120,0,285,MAX_TXRS,MAX_TXRS,284,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*52 chunk_eng2_5_slice45*/[52]={121,0,285,MAX_TXRS,MAX_TXRS,284,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*53 chunk_eng2_6 (wall pump)*/[53]={0,0,141,142,MAX_TXRS,MAX_TXRS,0,0,0,21,0,{0,0,0},{0,0,0}}/*Looped static prop, anim overwrites, not a missing-model.*/,
-/*54 chunk_exec1_1*/[54]={124,0,287,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*55 chunk_exec1_1d*/[55]={123,0,286,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*56 chunk_exec1_2*/[56]={126,0,291,290,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*57 chunk_exec1_2d*/[57]={125,0,289,288,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*58 chunk_exec2_1*/[58]={127,0,292,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*59 chunk_exec2_2*/[59]={129,0,295,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*60 chunk_exec2_2d*/[60]={128,0,294,293,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*61 chunk_exec2_3*/[61]={130,0,296,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*62 chunk_exec2_4*/[62]={131,0,297,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*63 chunk_exec2_4_slice45*/[63]={132,0,297,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*64 chunk_exec2_5*/[64]={133,0,298,MAX_TXRS,1257,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*65 chunk_exec2_6*/[65]={134,0,299,MAX_TXRS,1257,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*66 chunk_exec2_7*/[66]={133,0,300,MAX_TXRS,1257,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_exec2_5's mesh*/,/*67 chunk_exec3_1*/[67]={127,0,303,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_exec2_1's mesh*/,
-/*68 chunk_exec3_1d*/[68]={135,0,302,301,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*69 chunk_exec3_2*/[69]={129,0,304,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_exec2_2's mesh*/,/*70 chunk_exec3_4*/[70]={178,0,305,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
-/*71 chunk_exec4_1*/[71]={136,0,307,306,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*72 chunk_exec4_2*/[72]={137,0,308,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*73 chunk_exec4_3*/[73]={138,0,309,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*74 chunk_exec4_4*/[74]={139,0,311,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*75 chunk_exec4_5*/[75]={178/*generic LOD card on purpose*/,0,312,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*76 chunk_exec4_6*/[76]={141,0,313,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*77 chunk_exec6_1*/[77]={142,0,315,314,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*78 chunk_exteriorpanel1*/[78]={131,0,1228,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*79 chunk_fan1*/[79]={0,0,96,192,MAX_TXRS,MAX_TXRS,0,0,0,22,0,{0,0,0},{0,0,0}}/*Looped static prop, anim overwrites, not a missing-model.*/,/*80 chunk_flight1_1*/[80]={146,0,319,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*81 chunk_flight1_1b*/[81]={146,0,318,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_flight1_1's mesh*/,/*82 chunk_flight1_2*/[82]={147,0,320,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*83 chunk_flight1_2_slice45rh*/[83]={149,0,320,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*84 chunk_flight1_3*/[84]={150,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*85 chunk_flight1_4*/[85]={151,0,322,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*86 chunk_flight1_5*/[86]={147,0,323,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_flight1_2's mesh*/,
-/*87 chunk_flight1_5_slice45lh*/[87]={148,0,323,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*88 chunk_flight1_6*/[88]={152,0,325,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*89 chunk_flight2_1*/[89]={153,0,326,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*90 chunk_flight2_2*/[90]={154,0,327,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*91 chunk_flight2_2_slice45*/[91]={155,0,327,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*92 chunk_flight2_3*/[92]={156,0,328,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*TODO: Add grove grass extrusion in-shader instead of the Unity method of geometry shader + extra verts on separate meshes*//*93 chunk_grove1_1*/[93]={189,0,362,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*94 chunk_grove1_2*/[94]={178,0,363,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,/*95 chunk_grove1_2_slice45*/[95]={7488,0,363,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*real grove1_2_slice45 geometry, not the genericLOD3card_slice45 fallback*/,
-/*96 chunk_grove1_3*/[96]={178,0,364,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,/*97 chunk_grove1_4*/[97]={178,0,365,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
-/*98 chunk_grove1_5*/[98]={178,0,367,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,/*99 chunk_grove1_6*/[99]={178,0,368,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
-/*100 chunk_grove1_7*/[100]={178,0,369,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,/*101 chunk_grove2_1*/[101]={190,0,370,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*102 chunk_grove2_2*/[102]={191,0,371,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_grove2_3's mesh*/,
-/*103 chunk_grove2_3*/[103]={191,0,372,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*104 chunk_grove2_4*/[104]={341,0,374,373,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*105 chunk_grove2_5*/[105]={192,0,375,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*106 chunk_grove2_6*/[106]={192,0,376,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_grove2_5's mesh*/,
+/*0 chunk_black*/[0]={178,0,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*1 chunk_blocker*/[1]={178,0,1230,MAX_TXRS,1230,160,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*2 chunk_bridg1_1*/[2]={661,0,44,MAX_TXRS,MAX_TXRS,43,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*3 chunk_bridg1_1flipx*/[3]={667,0,44,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*4 chunk_bridg1_2*/[4]={662,0,45,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*5 chunk_bridg1_3*/[5]={20,0,47,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*6 chunk_bridg1_3_slice45*/[6]={21,0,47,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*7 chunk_bridg1_3flipx*/[7]={663,0,47,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*8 chunk_bridg1_4*/[8]={22,0,48,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*9 chunk_bridg1_4_slice32*/[9]={23,0,48,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*10 chunk_bridg1_4_slice32flipx*/[10]={24,0,48,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*11 chunk_bridg1_5*/[11]={25,0,50,49,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*12 chunk_bridg2_2*/[12]={26,0,MAX_ANIMS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*13 chunk_bridg2_3*/[13]={27,0,56,54,MAX_TXRS,55,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*14 chunk_bridg2_4*/[14]={28,0,57,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*15 chunk_bridg2_5*/[15]={29,0,59,MAX_TXRS,MAX_TXRS,58,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*16 chunk_bridg2_6*/[16]={30,0,60,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*17 chunk_bridg2_7*/[17]={664,0,61,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*18 chunk_bridg2_8*/[18]={31,0,62,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*19 chunk_bridg2_9*/[19]={32,0,64,63,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*20 chunk_crate_impenetrable*/[20]={61,0,150,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*21 chunk_cyberpanel*/[21]={178,0,151,151,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*22 chunk_cyberpanel_slice45*/[22]={6875,0,152,152,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*23 chunk_eng1_1*/[23]={96,0,254,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*24 chunk_eng1_1d*/[24]={95,0,253,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*25 chunk_eng1_2*/[25]={98,0,256,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*26 chunk_eng1_2d*/[26]={97,0,255,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*27 chunk_eng1_3*/[27]={100,0,259,258,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*28 chunk_eng1_3d*/[28]={99,0,257,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*29 chunk_eng1_4*/[29]={101,0,260,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*30 chunk_eng1_5*/[30]={103,0,262,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*31 chunk_eng1_5_slice45lh*/[31]={104,0,262,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*32 chunk_eng1_5_slice45rh*/[32]={105,0,262,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*33 chunk_eng1_5d*/[33]={102,0,261,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*34 chunk_eng1_6*/[34]={107,0,266,265,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*35 chunk_eng1_6d*/[35]={106,0,264,263,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*36 chunk_eng1_7*/[36]={108,0,269,268,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*37 chunk_eng1_7d*/[37]={665,0,267,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*38 chunk_eng1_8*/[38]={109,0,271,270,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*39 chunk_eng1_9*/[39]={111,0,273,251,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*40 chunk_eng1_9d*/[40]={110,0,272,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*41 chunk_eng2_1*/[41]={113,0,276,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*42 chunk_eng2_1_slice45*/[42]={116,0,276,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*43 chunk_eng2_1_slice384high*/[43]={114,0,276,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*44 chunk_eng2_1_slice384highrh*/[44]={115,0,276,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*45 chunk_eng2_1d*/[45]={112,0,275,274,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*46 chunk_eng2_2*/[46]={117,0,279,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*47 chunk_eng2_2d*/[47]={666,0,277,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*48 chunk_eng2_3*/[48]={119,0,282,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*49 chunk_eng2_3d*/[49]={118,0,281,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*50 chunk_eng2_4*/[50]={178,0,283,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*51 chunk_eng2_5*/[51]={120,0,285,MAX_TXRS,MAX_TXRS,284,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*52 chunk_eng2_5_slice45*/[52]={121,0,285,MAX_TXRS,MAX_TXRS,284,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*53 chunk_eng2_6 (wall pump)*/[53]={0,0,141,142,MAX_TXRS,MAX_TXRS,0,0,0,21,0,{0,0,0},{0,0,0}}/*Looped static prop, anim overwrites, not a missing-model.*/,
+
+/*54 chunk_exec1_1*/[54]={124,0,287,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*55 chunk_exec1_1d*/[55]={123,0,286,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*56 chunk_exec1_2*/[56]={126,0,291,290,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*57 chunk_exec1_2d*/[57]={125,0,289,288,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*58 chunk_exec2_1*/[58]={127,0,292,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*59 chunk_exec2_2*/[59]={129,0,295,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*60 chunk_exec2_2d*/[60]={128,0,294,293,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*61 chunk_exec2_3*/[61]={130,0,296,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*62 chunk_exec2_4*/[62]={131,0,297,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*63 chunk_exec2_4_slice45*/[63]={132,0,297,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*64 chunk_exec2_5*/[64]={133,0,298,MAX_TXRS,1257,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*65 chunk_exec2_6*/[65]={134,0,299,MAX_TXRS,1257,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*66 chunk_exec2_7*/[66]={133,0,300,MAX_TXRS,1257,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_exec2_5's mesh*/,
+/*67 chunk_exec3_1*/[67]={127,0,303,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_exec2_1's mesh*/,
+/*68 chunk_exec3_1d*/[68]={135,0,302,301,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*69 chunk_exec3_2*/[69]={129,0,304,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_exec2_2's mesh*/,
+/*70 chunk_exec3_4*/[70]={178,0,305,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*71 chunk_exec4_1*/[71]={136,0,307,306,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*72 chunk_exec4_2*/[72]={137,0,308,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*73 chunk_exec4_3*/[73]={138,0,309,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*74 chunk_exec4_4*/[74]={139,0,311,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*75 chunk_exec4_5*/[75]={178,0,312,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*76 chunk_exec4_6*/[76]={141,0,313,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*77 chunk_exec6_1*/[77]={142,0,315,314,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*78 chunk_exteriorpanel1*/[78]={131,0,1228,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*79 chunk_fan1*/[79]={0,0,96,192,MAX_TXRS,MAX_TXRS,0,0,0,22,0,{0,0,0},{0,0,0}}/*Looped static prop, anim overwrites, not a missing-model.*/,
+
+/*80 chunk_flight1_1*/[80]={146,0,319,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*81 chunk_flight1_1b*/[81]={146,0,318,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_flight1_1's mesh*/,
+/*82 chunk_flight1_2*/[82]={147,0,320,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*83 chunk_flight1_2_slice45rh*/[83]={149,0,320,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*84 chunk_flight1_3*/[84]={150,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*85 chunk_flight1_4*/[85]={151,0,322,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*86 chunk_flight1_5*/[86]={147,0,323,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_flight1_2's mesh*/,
+/*87 chunk_flight1_5_slice45lh*/[87]={148,0,323,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*88 chunk_flight1_6*/[88]={152,0,325,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*89 chunk_flight2_1*/[89]={153,0,326,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*90 chunk_flight2_2*/[90]={154,0,327,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*91 chunk_flight2_2_slice45*/[91]={155,0,327,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*92 chunk_flight2_3*/[92]={156,0,328,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*TODO: Add grove grass extrusion in-shader instead of the Unity method of geometry shader + extra verts on separate meshes*/
+/*93 chunk_grove1_1*/[93]={189,0,362,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*94 chunk_grove1_2*/[94]={178,0,363,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*95 chunk_grove1_2_slice45*/[95]={7488,0,363,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*96 chunk_grove1_3*/[96]={178,0,364,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*97 chunk_grove1_4*/[97]={178,0,365,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*98 chunk_grove1_5*/[98]={178,0,367,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*99 chunk_grove1_6*/[99]={178,0,368,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*100 chunk_grove1_7*/[100]={178,0,369,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*101 chunk_grove2_1*/[101]={190,0,370,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*102 chunk_grove2_2*/[102]={191,0,371,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_grove2_3's mesh*/,
+/*103 chunk_grove2_3*/[103]={191,0,372,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*104 chunk_grove2_4*/[104]={341,0,374,373,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*105 chunk_grove2_5*/[105]={192,0,375,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*106 chunk_grove2_6*/[106]={192,0,376,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_grove2_5's mesh*/,
 /*107 chunk_grove2_7*/[107]={191,0,378,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*TODO add the new shared grove2_7/grove2_8 mesh,shares chunk_grove2_3's mesh for now*/,
 /*108 chunk_grove2_8*/[108]={191,0,379,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*TODO add the new shared grove2_7/grove2_8 mesh,shares chunk_grove2_3's mesh for now*/,
-/*109 chunk_grove2_9*/[109]={191,0,385,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_grove2_3's mesh*/,/*110 chunk_grove2_9b*/[110]={191,0,381,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_grove2_3's mesh*/,/*111 chunk_grove2_9c*/[111]={191,0,383,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_grove2_3's mesh*/,
-/*112 chunk_lift1*/[112]={213,0,1246,1247,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*113 chunk_maint1_1*/[113]={218,0,430,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*114 chunk_maint1_2*/[114]={220,0,432,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*115 chunk_maint1_2d*/[115]={219,0,431,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*116 chunk_maint1_3*/[116]={222,0,436,435,437,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*117 chunk_maint1_3b*/[117]={221,0,434,433,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*118 chunk_maint1_4*/[118]={224,0,441,440,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*119 chunk_maint1_4b*/[119]={223,0,439,438,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*120 chunk_maint1_5*/[120]={225,0,443,442,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*121 chunk_maint1_6*/[121]={226,0,96,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*122 chunk_maint1_7*/[122]={227,0,447,446,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*123 chunk_blockerflightbay*/[123]={178,U16_MAX,1230,MAX_TXRS,1242,160,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0,1.44f,0},{2.56f,0.32f,2.56f}},
-/*124 chunk_maint1_9*/[124]={606,0,450,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_stor1_7's mesh*/,/*125 chunk_maint1_9d*/[125]={620,0,449,448,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_stor1_7d's*/,/*126 chunk_maint2_1*/[126]={178,0,455,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,/*127 chunk_maint2_1b*/[127]={228,0,451,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*128 chunk_maint2_1d*/[128]={229,0,453,452,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*129 chunk_maint2_2*/[129]={230,0,457,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*130 chunk_maint2_3*/[130]={232,0,460,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*131 chunk_maint2_3d*/[131]={231,0,459,458,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*132 chunk_maint2_4*/[132]={233,0,464,463,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*133 chunk_maint2_4d*/[133]={235,0,462,461,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_maint2_5's mesh*/,/*134 chunk_maint2_5*/[134]={235,0,468,467,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*135 chunk_maint2_5d*/[135]={234,0,466,465,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*136 chunk_maint2_6*/[136]={236,0,472,471,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*137 chunk_maint2_6d*/[137]={6876,0,470,470,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*138 chunk_maint2_7*/[138]={238,0,476,475,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*139 chunk_maint2_7d*/[139]={237,0,474,473,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*140 chunk_maint2_8*/[140]={239,0,478,477,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*141 chunk_maint2_9*/[141]={240,0,480,479,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*142 chunk_maint2_9_slice45RH*/[142]={242,0,480,479,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*143 chunk_maint2_9_slice128_top*/[143]={241,0,480,479,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*144 chunk_maint3_1*/[144]={244,0,483,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*145 chunk_maint3_1_slice32_lh*/[145]={246,0,483,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*146 chunk_maint3_1_slice32_rh*/[146]={245,0,483,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*147 chunk_maint3_1_slice45*/[147]={247,0,483,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*148 chunk_maint3_1d*/[148]={243,0,482,481,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*149 chunk_med1_1*/[149]={249,0,486,MAX_TXRS,1256,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*150 chunk_med1_1_half_top*/[150]={250,0,486,MAX_TXRS,1256,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*151 chunk_med1_1_slice128high*/[151]={251,0,486,MAX_TXRS,1256,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*152 chunk_med1_1_slice192RH*/[152]={252,0,486,MAX_TXRS,1256,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*153 chunk_med1_1_slice256*/[153]={253,0,486,MAX_TXRS,1256,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*154 chunk_med1_1d*/[154]={248,0,485,484,1236,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*155 chunk_med1_2*/[155]={255,0,489,488,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*156 chunk_med1_2d*/[156]={254,0,487,MAX_TXRS,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*157 chunk_med1_3*/[157]={257,0,493,492,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*158 chunk_med1_3d*/[158]={256,0,491,490,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*159 chunk_med1_4*/[159]={258,0,494,MAX_TXRS,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*160 chunk_med1_5*/[160]={669,0,495,MAX_TXRS,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*161 chunk_med1_6*/[161]={259,0,496,MAX_TXRS,1256,509,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*162 chunk_med1_7*/[162]={262,0,499,MAX_TXRS,1268,498,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*163 chunk_med1_7_slice14_64*/[163]={263,0,499,MAX_TXRS,1268,1254,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*164 chunk_med1_7_slice45_320lh*/[164]={264,0,499,MAX_TXRS,1268,1254,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*165 chunk_med1_7_slice45_320rh*/[165]={265,0,499,MAX_TXRS,1268,1254,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*166 chunk_med1_7_slice96high*/[166]={266,0,499,MAX_TXRS,1268,1254,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*167 chunk_med1_7d*/[167]={260,0,497,MAX_TXRS,1269,1270,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*168 chunk_med1_7d_slice128*/[168]={261,0,497,MAX_TXRS,1269,1270,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*169 chunk_med1_8*/[169]={268,0,503,MAX_TXRS,1242,502,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*170 chunk_med1_8d*/[170]={267,0,501,MAX_TXRS,1242,163,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*171 chunk_med1_9*/[171]={278,0,507,MAX_TXRS,1267,506,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*172*/[172]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*173*/[173]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*174 chunk_med1_9d*/[174]={269,0,505,MAX_TXRS,1267,504,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*175 unused*/[175]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*176 chunk_med1_9d_ofs112_90*/[176]={270,0,505,MAX_TXRS,1267,504,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*177 chunk_med1_9d_ofs144_90*/[177]={272,0,505,MAX_TXRS,1267,504,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*178 chunk_med2_1*/[178]={280,0,513,511,1254,512,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*179 chunk_med2_1_slice32RH*/[179]={281,0,513,MAX_TXRS,1254,512,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*180 chunk_med2_1d*/[180]={279,0,510,508,1254,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*181 chunk_med2_2*/[181]={283,0,517,516,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*182 chunk_med2_2_half_bottom*/[182]={284,0,517,516,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*183 chunk_med2_2d*/[183]={282,0,515,516,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*184 chunk_med2_3*/[184]={286,0,521,520,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*185 chunk_med2_3d*/[185]={285,0,519,518,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*186 chunk_med2_4*/[186]={287,0,523,522,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*187 chunk_med2_5*/[187]={288,0,527,526,539,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0,1.44f,0},{2.56f,0.32f,2.56f}},/*188 chunk_med2_6*/[188]={289,0,528,MAX_TXRS,1271,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*189 chunk_med2_7*/[189]={290,0,530,529,1245,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*190 chunk_med2_8*/[190]={291,0,531,MAX_TXRS,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*191 chunk_med2_8_half_top*/[191]={292,0,531,MAX_TXRS,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*192 chunk_med2_8_slice32RH*/[192]={293,0,531,MAX_TXRS,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*193 chunk_med2_8_slice45*/[193]={294,0,531,MAX_TXRS,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*194 chunk_med2_9*/[194]={296,0,535,534,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*195 chunk_med2_9d*/[195]={295,0,533,532,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*196 chunk_med3_1*/[196]={297,0,536,MAX_TXRS,1236,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*197 chunk_rad1_1*/[197]={501,0,660,659,1231,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*198 chunk_rad1_2*/[198]={501,0,662,661,1231,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*199 chunk_reac1_1*/[199]={502,0,664,MAX_TXRS,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*200 chunk_reac1_1_slice45*/[200]={339,0,664,MAX_TXRS,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*uses the existing reac1_1_slice45 mesh*/,
-/*201 chunk_reac1_2*/[201]={503,0,665,MAX_TXRS,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*202 chunk_reac1_3*/[202]={504,0,666,MAX_TXRS,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*203 chunk_reac1_4*/[203]={505,0,668,667,669,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*204 chunk_reac1_5*/[204]={506,0,671,670,1239,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*205 chunk_reac1_6*/[205]={507,0,673,672,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*206 chunk_reac1_7*/[206]={342,0,676,675,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*207 chunk_reac1_8*/[207]={508,0,678,677,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*208 chunk_reac1_9*/[208]={509,0,680,680,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*209 chunk_reac2_1*/[209]={512,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*210 chunk_reac2_1_slice45LH*/[210]={514,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*211 chunk_reac2_1_slice45LH_up*/[211]={515,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*212 chunk_reac2_1_slice45RH*/[212]={516,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*213 chunk_reac2_1_slice45RH_up*/[213]={517,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*214 chunk_reac2_1b*/[214]={510,0,681,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*215 chunk_reac2_1bmirror*/[215]={511,0,681,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*216 chunk_reac2_1mirror*/[216]={513,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*217 chunk_reac2_2*/[217]={518,0,684,683,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*218 chunk_reac2_4*/[218]={519,0,685,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*219 chunk_reac2_4_slice128lower*/[219]={340,0,685,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*220 chunk_reac2_5*/[220]={520,0,687,686,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*221 chunk_reac2_6*/[221]={521,0,689,688,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*222 chunk_reac2_7*/[222]={522,0,691,690,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*223 chunk_reac2_8*/[223]={523,0,693,692,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*224 chunk_reac2_9*/[224]={524,0,694,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*225 chunk_reac3_1*/[225]={525,0,696,695,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*226 chunk_reac3_2*/[226]={526,0,697,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*227 chunk_reac3_3*/[227]={527,0,698,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*228 chunk_reac3_4*/[228]={528,0,699,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*229 chunk_reac3_5*/[229]={529,0,701,700,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*230 chunk_reac3_6*/[230]={530,0,703,702,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*231 chunk_reac3_7*/[231]={531,0,704,MAX_TXRS,705,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*232 chunk_reac4_1*/[232]={532,0,707,706,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*233 chunk_reac4_1_slice45lh*/[233]={533,0,707,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*234 chunk_reac4_2*/[234]={534,0,709,708,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*235 chunk_reac5_1*/[235]={535,0,711,710,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*236 chunk_reac5_2*/[236]={536,0,713,712,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*237 chunk_reac5_3*/[237]={537,0,715,714,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*238 chunk_reac6_1*/[238]={538,0,716,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*239 chunk_reac6_2*/[239]={539,0,717,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_reac6_3's mesh*/,
-/*240 chunk_reac6_3*/[240]={539,0,719,718,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*241 chunk_sci1_1*/[241]={540,0,722,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*242 chunk_sci1_1_slice45_toplh*/[242]={542,0,722,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*243 chunk_sci1_1_slice45_toprh*/[243]={543,0,722,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*244 chunk_sci1_1d*/[244]={541,0,721,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*245 chunk_sci1_2*/[245]={545,0,724,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*246 chunk_sci1_2_slice45lh*/[246]={546,0,724,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*247 chunk_sci1_2_slice45lh_up*/[247]={547,0,724,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*248 chunk_sci1_2_slice45rh*/[248]={548,0,724,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*249 chunk_sci1_2_slice45rh_up*/[249]={549,0,724,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*250 chunk_sci1_2d*/[250]={544,0,723,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*251 chunk_sci1_3*/[251]={550,0,726,725,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*252 chunk_sci1_4*/[252]={498,0,727,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*253 chunk_sci1_5*/[253]={551,0,728,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*254 chunk_sci1_6*/[254]={552,0,729,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*255 chunk_sci1_6_slice45*/[255]={553,0,729,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*256 chunk_sci1_7*/[256]={555,0,731,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*257 chunk_sci1_7d*/[257]={554,0,730,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*258 chunk_sci1_8*/[258]={557,0,734,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*259 chunk_sci1_8d*/[259]={556,0,733,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*260 chunk_sci1_9*/[260]={559,0,737,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*261 chunk_sci1_9d*/[261]={558,0,736,735,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*262 chunk_sci2_1*/[262]={561,0,739,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*263 chunk_sci2_1_slice45lh*/[263]={563,0,739,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*264 chunk_sci2_1_slice45rh*/[264]={562,0,739,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*265 chunk_sci2_1d*/[265]={560,0,738,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*266 chunk_sci2_2*/[266]={565,0,742,741,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*267 chunk_sci2_2d*/[267]={564,0,740,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*268 chunk_sci2_3*/[268]={566,0,744,743,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*269 chunk_sci2_4*/[269]={567,0,745,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*270 chunk_sci2_5*/[270]={569,0,747,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*271 chunk_sci2_5d*/[271]={568,0,746,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*272 chunk_sci3_1*/[272]={571,0,749,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*273 chunk_sci3_1d*/[273]={570,0,748,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*274 chunk_sci3_2*/[274]={572,0,750,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*275 chunk_sci3_3*/[275]={573,0,752,751,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*276 chunk_sci3_4*/[276]={574,0,754,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*277 chunk_sci3_5*/[277]={575,0,756,755,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*278 chunk_sci3_6*/[278]={576,0,758,757,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*279 chunk_screen*/[279]={5988,0,881,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*280 chunk_sec1_1*/[280]={178,0,787,MAX_TXRS,787,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,/*281 chunk_sec1_1b*/[281]={178,0,785,MAX_TXRS,785,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
-/*282 chunk_sec1_1c*/[282]={577,0,786,MAX_TXRS,786,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*283 chunk_sec1_1c_slice45*/[283]={580,0,786,MAX_TXRS,786,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*284 chunk_sec1_1c_slice64highlh*/[284]={581,0,786,MAX_TXRS,786,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*285 chunk_sec1_1c_slice64highrh*/[285]={582,0,786,MAX_TXRS,786,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*286 unused*/[286]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*287 unused*/[287]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*288 chunk_sec1_2*/[288]={584,0,789,MAX_TXRS,1233,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*289 chunk_sec1_2b*/[289]={583,0,788,MAX_TXRS,1233,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*290 chunk_sec1_3*/[290]={585,0,790,MAX_TXRS,1233,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*291 chunk_sec1_3_slice45*/[291]={586,0,790,MAX_TXRS,1233,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*292 chunk_stor1_1*/[292]={597,0,824,823,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*293 chunk_stor1_2*/[293]={598,0,825,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_stor1_3's mesh*/,
-/*294 chunk_stor1_3*/[294]={598,0,826,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*295 chunk_stor1_4*/[295]={599,0,827,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*296 chunk_stor1_5*/[296]={600,0,828,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*297 chunk_stor1_6*/[297]={601,0,829,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*298 chunk_stor1_6_slice128_up_lh*/[298]={602,0,829,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*299 chunk_stor1_6_slice128_up_rh*/[299]={603,0,829,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*300 chunk_stor1_6_slice192lh*/[300]={604,0,829,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*301 chunk_stor1_6_slice192rh*/[301]={605,0,829,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*302 chunk_stor1_7*/[302]={606,0,833,MAX_TXRS,834,832,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*303 chunk_stor1_7_slice45*/[303]={607,0,833,MAX_TXRS,834,832,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*304 chunk_stor1_7d*/[304]={620,0,831,830,834,832,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*305 chunk_teleporter*/[305]={178,0,1166,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*109 chunk_grove2_9*/[109]={191,0,385,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_grove2_3's mesh*/,
+/*110 chunk_grove2_9b*/[110]={191,0,381,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_grove2_3's mesh*/,
+/*111 chunk_grove2_9c*/[111]={191,0,383,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_grove2_3's mesh*/,
+
+/*112 chunk_lift1*/[112]={213,0,1246,1247,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*113 chunk_maint1_1*/[113]={218,0,430,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*114 chunk_maint1_2*/[114]={220,0,432,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*115 chunk_maint1_2d*/[115]={219,0,431,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*116 chunk_maint1_3*/[116]={222,0,436,435,437,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*117 chunk_maint1_3b*/[117]={221,0,434,433,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*118 chunk_maint1_4*/[118]={224,0,441,440,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*119 chunk_maint1_4b*/[119]={223,0,439,438,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*120 chunk_maint1_5*/[120]={225,0,443,442,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*121 chunk_maint1_6*/[121]={226,0,96,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*122 chunk_maint1_7*/[122]={227,0,447,446,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*123 chunk_blockerflightbay*/[123]={178,U16_MAX,1230,MAX_TXRS,1242,160,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0,1.44f,0},{2.56f,0.32f,2.56f}},
+
+/*124 chunk_maint1_9*/[124]={606,0,450,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_stor1_7's mesh*/,
+/*125 chunk_maint1_9d*/[125]={620,0,449,448,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_stor1_7d's*/,
+/*126 chunk_maint2_1*/[126]={178,0,455,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*127 chunk_maint2_1b*/[127]={228,0,451,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*128 chunk_maint2_1d*/[128]={229,0,453,452,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*129 chunk_maint2_2*/[129]={230,0,457,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*130 chunk_maint2_3*/[130]={232,0,460,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*131 chunk_maint2_3d*/[131]={231,0,459,458,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*132 chunk_maint2_4*/[132]={233,0,464,463,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*133 chunk_maint2_4d*/[133]={235,0,462,461,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_maint2_5's mesh*/,
+/*134 chunk_maint2_5*/[134]={235,0,468,467,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*135 chunk_maint2_5d*/[135]={234,0,466,465,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*136 chunk_maint2_6*/[136]={236,0,472,471,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*137 chunk_maint2_6d*/[137]={6876,0,470,470,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*138 chunk_maint2_7*/[138]={238,0,476,475,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*139 chunk_maint2_7d*/[139]={237,0,474,473,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*140 chunk_maint2_8*/[140]={239,0,478,477,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*141 chunk_maint2_9*/[141]={240,0,480,479,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*142 chunk_maint2_9_slice45RH*/[142]={242,0,480,479,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*143 chunk_maint2_9_slice128_top*/[143]={241,0,480,479,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*144 chunk_maint3_1*/[144]={244,0,483,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*145 chunk_maint3_1_slice32_lh*/[145]={246,0,483,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*146 chunk_maint3_1_slice32_rh*/[146]={245,0,483,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*147 chunk_maint3_1_slice45*/[147]={247,0,483,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*148 chunk_maint3_1d*/[148]={243,0,482,481,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*149 chunk_med1_1*/[149]={249,0,486,MAX_TXRS,1256,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*150 chunk_med1_1_half_top*/[150]={250,0,486,MAX_TXRS,1256,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*151 chunk_med1_1_slice128high*/[151]={251,0,486,MAX_TXRS,1256,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*152 chunk_med1_1_slice192RH*/[152]={252,0,486,MAX_TXRS,1256,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*153 chunk_med1_1_slice256*/[153]={253,0,486,MAX_TXRS,1256,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*154 chunk_med1_1d*/[154]={248,0,485,484,1236,1255,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*155 chunk_med1_2*/[155]={255,0,489,488,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*156 chunk_med1_2d*/[156]={254,0,487,MAX_TXRS,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*157 chunk_med1_3*/[157]={257,0,493,492,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*158 chunk_med1_3d*/[158]={256,0,491,490,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*159 chunk_med1_4*/[159]={258,0,494,MAX_TXRS,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*160 chunk_med1_5*/[160]={669,0,495,MAX_TXRS,1256,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*161 chunk_med1_6*/[161]={259,0,496,MAX_TXRS,1256,509,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*162 chunk_med1_7*/[162]={262,0,499,MAX_TXRS,1268,498,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*163 chunk_med1_7_slice14_64*/[163]={263,0,499,MAX_TXRS,1268,1254,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*164 chunk_med1_7_slice45_320lh*/[164]={264,0,499,MAX_TXRS,1268,1254,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*165 chunk_med1_7_slice45_320rh*/[165]={265,0,499,MAX_TXRS,1268,1254,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*166 chunk_med1_7_slice96high*/[166]={266,0,499,MAX_TXRS,1268,1254,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*167 chunk_med1_7d*/[167]={260,0,497,MAX_TXRS,1269,1270,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*168 chunk_med1_7d_slice128*/[168]={261,0,497,MAX_TXRS,1269,1270,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*169 chunk_med1_8*/[169]={268,0,503,MAX_TXRS,1242,502,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*170 chunk_med1_8d*/[170]={267,0,501,MAX_TXRS,1242,163,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*171 chunk_med1_9*/[171]={278,0,507,MAX_TXRS,1267,506,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
+/*172*/[172]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*173*/[173]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*174 chunk_med1_9d*/[174]={269,0,505,MAX_TXRS,1267,504,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
+/*175 unused*/[175]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*176 chunk_med1_9d_ofs112_90*/[176]={270,0,505,MAX_TXRS,1267,504,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*177 chunk_med1_9d_ofs144_90*/[177]={272,0,505,MAX_TXRS,1267,504,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*178 chunk_med2_1*/[178]={280,0,513,511,1254,512,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*179 chunk_med2_1_slice32RH*/[179]={281,0,513,MAX_TXRS,1254,512,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*180 chunk_med2_1d*/[180]={279,0,510,508,1254,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*181 chunk_med2_2*/[181]={283,0,517,516,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*182 chunk_med2_2_half_bottom*/[182]={284,0,517,516,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*183 chunk_med2_2d*/[183]={282,0,515,516,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*184 chunk_med2_3*/[184]={286,0,521,520,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*185 chunk_med2_3d*/[185]={285,0,519,518,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*186 chunk_med2_4*/[186]={287,0,523,522,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*187 chunk_med2_5*/[187]={288,0,527,526,539,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0,1.44f,0},{2.56f,0.32f,2.56f}},
+/*188 chunk_med2_6*/[188]={289,0,528,MAX_TXRS,1271,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*189 chunk_med2_7*/[189]={290,0,530,529,1245,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*190 chunk_med2_8*/[190]={291,0,531,MAX_TXRS,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*191 chunk_med2_8_half_top*/[191]={292,0,531,MAX_TXRS,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*192 chunk_med2_8_slice32RH*/[192]={293,0,531,MAX_TXRS,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*193 chunk_med2_8_slice45*/[193]={294,0,531,MAX_TXRS,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*194 chunk_med2_9*/[194]={296,0,535,534,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*195 chunk_med2_9d*/[195]={295,0,533,532,1242,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*196 chunk_med3_1*/[196]={297,0,536,MAX_TXRS,1236,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*197 chunk_rad1_1*/[197]={501,0,660,659,1231,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*198 chunk_rad1_2*/[198]={501,0,662,661,1231,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*199 chunk_reac1_1*/[199]={502,0,664,MAX_TXRS,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*200 chunk_reac1_1_slice45*/[200]={339,0,664,MAX_TXRS,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*uses the existing reac1_1_slice45 mesh*/,
+/*201 chunk_reac1_2*/[201]={503,0,665,MAX_TXRS,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*202 chunk_reac1_3*/[202]={504,0,666,MAX_TXRS,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*203 chunk_reac1_4*/[203]={505,0,668,667,669,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*204 chunk_reac1_5*/[204]={506,0,671,670,1239,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*205 chunk_reac1_6*/[205]={507,0,673,672,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*206 chunk_reac1_7*/[206]={342,0,676,675,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*207 chunk_reac1_8*/[207]={508,0,678,677,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*208 chunk_reac1_9*/[208]={509,0,680,680,1243,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*209 chunk_reac2_1*/[209]={512,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*210 chunk_reac2_1_slice45LH*/[210]={514,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*211 chunk_reac2_1_slice45LH_up*/[211]={515,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*212 chunk_reac2_1_slice45RH*/[212]={516,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*213 chunk_reac2_1_slice45RH_up*/[213]={517,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*214 chunk_reac2_1b*/[214]={510,0,681,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*215 chunk_reac2_1bmirror*/[215]={511,0,681,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*216 chunk_reac2_1mirror*/[216]={513,0,682,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*217 chunk_reac2_2*/[217]={518,0,684,683,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*218 chunk_reac2_4*/[218]={519,0,685,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*219 chunk_reac2_4_slice128lower*/[219]={340,0,685,MAX_TXRS,1235,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*220 chunk_reac2_5*/[220]={520,0,687,686,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*221 chunk_reac2_6*/[221]={521,0,689,688,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*222 chunk_reac2_7*/[222]={522,0,691,690,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*223 chunk_reac2_8*/[223]={523,0,693,692,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*224 chunk_reac2_9*/[224]={524,0,694,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*225 chunk_reac3_1*/[225]={525,0,696,695,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*226 chunk_reac3_2*/[226]={526,0,697,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*227 chunk_reac3_3*/[227]={527,0,698,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*228 chunk_reac3_4*/[228]={528,0,699,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*229 chunk_reac3_5*/[229]={529,0,701,700,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*230 chunk_reac3_6*/[230]={530,0,703,702,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*231 chunk_reac3_7*/[231]={531,0,704,MAX_TXRS,705,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*232 chunk_reac4_1*/[232]={532,0,707,706,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*233 chunk_reac4_1_slice45lh*/[233]={533,0,707,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*234 chunk_reac4_2*/[234]={534,0,709,708,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*235 chunk_reac5_1*/[235]={535,0,711,710,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*236 chunk_reac5_2*/[236]={536,0,713,712,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*237 chunk_reac5_3*/[237]={537,0,715,714,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*238 chunk_reac6_1*/[238]={538,0,716,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*239 chunk_reac6_2*/[239]={539,0,717,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_reac6_3's mesh*/,
+/*240 chunk_reac6_3*/[240]={539,0,719,718,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*241 chunk_sci1_1*/[241]={540,0,722,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*242 chunk_sci1_1_slice45_toplh*/[242]={542,0,722,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*243 chunk_sci1_1_slice45_toprh*/[243]={543,0,722,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*244 chunk_sci1_1d*/[244]={541,0,721,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*245 chunk_sci1_2*/[245]={545,0,724,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*246 chunk_sci1_2_slice45lh*/[246]={546,0,724,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*247 chunk_sci1_2_slice45lh_up*/[247]={547,0,724,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*248 chunk_sci1_2_slice45rh*/[248]={548,0,724,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*249 chunk_sci1_2_slice45rh_up*/[249]={549,0,724,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*250 chunk_sci1_2d*/[250]={544,0,723,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*251 chunk_sci1_3*/[251]={550,0,726,725,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*252 chunk_sci1_4*/[252]={498,0,727,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*253 chunk_sci1_5*/[253]={551,0,728,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*254 chunk_sci1_6*/[254]={552,0,729,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*255 chunk_sci1_6_slice45*/[255]={553,0,729,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*256 chunk_sci1_7*/[256]={555,0,731,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*257 chunk_sci1_7d*/[257]={554,0,730,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*258 chunk_sci1_8*/[258]={557,0,734,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*259 chunk_sci1_8d*/[259]={556,0,733,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*260 chunk_sci1_9*/[260]={559,0,737,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*261 chunk_sci1_9d*/[261]={558,0,736,735,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*262 chunk_sci2_1*/[262]={561,0,739,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*263 chunk_sci2_1_slice45lh*/[263]={563,0,739,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*264 chunk_sci2_1_slice45rh*/[264]={562,0,739,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*265 chunk_sci2_1d*/[265]={560,0,738,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*266 chunk_sci2_2*/[266]={565,0,742,741,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*267 chunk_sci2_2d*/[267]={564,0,740,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*268 chunk_sci2_3*/[268]={566,0,744,743,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*269 chunk_sci2_4*/[269]={567,0,745,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*270 chunk_sci2_5*/[270]={569,0,747,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*271 chunk_sci2_5d*/[271]={568,0,746,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*272 chunk_sci3_1*/[272]={571,0,749,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*273 chunk_sci3_1d*/[273]={570,0,748,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*274 chunk_sci3_2*/[274]={572,0,750,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*275 chunk_sci3_3*/[275]={573,0,752,751,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*276 chunk_sci3_4*/[276]={574,0,754,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*277 chunk_sci3_5*/[277]={575,0,756,755,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*278 chunk_sci3_6*/[278]={576,0,758,757,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*279 chunk_screen*/[279]={5988,0,881,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*280 chunk_sec1_1*/[280]={178,0,787,MAX_TXRS,787,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*281 chunk_sec1_1b*/[281]={178,0,785,MAX_TXRS,785,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
+/*282 chunk_sec1_1c*/[282]={577,0,786,MAX_TXRS,786,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*283 chunk_sec1_1c_slice45*/[283]={580,0,786,MAX_TXRS,786,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*284 chunk_sec1_1c_slice64highlh*/[284]={581,0,786,MAX_TXRS,786,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*285 chunk_sec1_1c_slice64highrh*/[285]={582,0,786,MAX_TXRS,786,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*286 unused*/[286]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*287 unused*/[287]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*288 chunk_sec1_2*/[288]={584,0,789,MAX_TXRS,1233,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*289 chunk_sec1_2b*/[289]={583,0,788,MAX_TXRS,1233,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*290 chunk_sec1_3*/[290]={585,0,790,MAX_TXRS,1233,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*291 chunk_sec1_3_slice45*/[291]={586,0,790,MAX_TXRS,1233,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*292 chunk_stor1_1*/[292]={597,0,824,823,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*293 chunk_stor1_2*/[293]={598,0,825,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*shares chunk_stor1_3's mesh*/,
+/*294 chunk_stor1_3*/[294]={598,0,826,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*295 chunk_stor1_4*/[295]={599,0,827,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*296 chunk_stor1_5*/[296]={600,0,828,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*297 chunk_stor1_6*/[297]={601,0,829,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*298 chunk_stor1_6_slice128_up_lh*/[298]={602,0,829,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*299 chunk_stor1_6_slice128_up_rh*/[299]={603,0,829,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*300 chunk_stor1_6_slice192lh*/[300]={604,0,829,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*301 chunk_stor1_6_slice192rh*/[301]={605,0,829,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*302 chunk_stor1_7*/[302]={606,0,833,MAX_TXRS,834,832,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*303 chunk_stor1_7_slice45*/[303]={607,0,833,MAX_TXRS,834,832,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*304 chunk_stor1_7d*/[304]={620,0,831,830,834,832,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*305 chunk_teleporter*/[305]={178,0,1166,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
 /*306 chunk_white*/[306]={178,0,881,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
 /*307 item_paper_wad*/[307]={487,0,1250,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.06f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{-0.001254f,-0.001190498f,0.006335999f},{0.0451f,0,0}},
-/*308 item_warecasing*/[308]={637,0,1251,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.8f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0.09397449f},{0.540964f,0.405398f,0.187949f}},/*309 item_beaker*/[309]={14,682,36,MAX_TXRS,1242,MAX_TXRS,0.28f,0.1f,0.2f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*310 item_beverage*/[310]={18,683,37,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.12f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*311 item_skull*/[311]={593,70,816,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.451f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*312 item_arm*/[312]={7,678,28,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*313 item_audiolog*/[313]={11,679,52,80,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*314 weapon_grenadefrag*/[314]={182,73,348,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*315 weapon_grenadeconc*/[315]={165,84,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*316 weapon_grenadeemp*/[316]={168,85,338,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.8f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*317 weapon_grenadeearth*/[317]={181,86,346,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*318 weapon_grenademine*/[318]={184,87,353,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*319 weapon_grenadenitro*/[319]={300,301,356,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*320 weapon_grenadegas*/[320]={183,89,349,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.9f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*321 item_patch_berserk*/[321]={488,491,590,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*322 item_patch_detox*/[322]={488,491,591,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*323 item_patch_genius*/[323]={488,491,592,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*324 item_patch_medi*/[324]={488,491,600,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*325 item_patch_reflex*/[325]={488,491,641,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*326 item_patch_sight*/[326]={488,491,646,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*327 item_patch_staminup*/[327]={488,491,647,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*328 item_hw_system*/[328]={207,68,405,404,MAX_TXRS,MAX_TXRS,0.17f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*329 item_hw_navunit*/[329]={204,696,907,1259,MAX_TXRS,MAX_TXRS,0.1f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*330 item_hw_ereader*/[330]={200,692,397,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.12f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*331 item_hw_sensaround*/[331]={205,697,402,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.12f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*332 item_hw_targetid*/[332]={208,90,408,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.08f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*333 item_hw_shield*/[333]={206,91,403,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*334 item_hw_bio*/[334]={197,689,393,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.1f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*335 item_hw_lantern*/[335]={203,695,401,400,MAX_TXRS,MAX_TXRS,0.11f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*336 item_hw_envirosuit*/[336]={199,691,396,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.451f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*337 item_hw_booster*/[337]={198,690,395,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.16f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*338 item_hw_jumpjets*/[338]={202,694,399,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.32f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*339 item_hw_infrared*/[339]={201,693,398,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.1f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*340 item_fireextinguisher*/[340]={144,684,317,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*341 item_access_card_admin*/[341]={0,672,9,82,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*342 item_workerhelmet*/[342]={648,94,886,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.8f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*343 weapon_mk3*/[343]={646,309,885,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*344 weapon_blaster*/[344]={638,310,875,874,MAX_TXRS,MAX_TXRS,0.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*345 weapon_dartgun*/[345]={640,311,876,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*346 weapon_flechette*/[346]={642,312,880,879,MAX_TXRS,MAX_TXRS,0.4f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*347 weapon_ionrifle*/[347]={643,313,883,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.8f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*348 weapon_rapier*/[348]={653,314,891,890,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*349 weapon_pipe*/[349]={649,647,887,MAX_TXRS,1241,MAX_TXRS,0.85f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*350 weapon_magnum*/[350]={644,315,877,MAX_TXRS,1231,MAX_TXRS,0.6f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*351 weapon_magpulse*/[351]={645,316,884,MAX_TXRS,1231,MAX_TXRS,0.65f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*352 weapon_pistol*/[352]={650,317,878,MAX_TXRS,1231,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*353 weapon_plasma*/[353]={651,318,888,MAX_TXRS,1240,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*354 weapon_railgun*/[354]={652,319,889,MAX_TXRS,1231,MAX_TXRS,1.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*355 weapon_riotgun*/[355]={654,320,892,MAX_TXRS,1231,MAX_TXRS,0.55f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*356 weapon_skorpion*/[356]={655,321,893,MAX_TXRS,1231,MAX_TXRS,1.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*357 weapon_sparqbeam*/[357]={656,322,895,894,1231,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*358 weapon_stungun*/[358]={657,323,896,MAX_TXRS,1231,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*359 item_battery*/[359]={13,680,35,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*360 item_battery_icad*/[360]={13,680,34,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*361 item_logic_probe*/[361]={217,306,427,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.15f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*362 item_healthkit*/[362]={196,688,391,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.25f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*363 item_plastique*/[363]={492,308,599,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.4f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*364 item_chipset_interfacedemod*/[364]={45,325,78,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*365 item_flask*/[365]={145,685,36,MAX_TXRS,1242,MAX_TXRS,0.22f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*366 item_chipset_bitflag*/[366]={45,325,633,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*367 item_ammo_rubber*/[367]={8,676,19,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.25f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*368 item_isotopex22*/[368]={209,326,413,412,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*369 item_testtube*/[369]={622,612,36,MAX_TXRS,1242,MAX_TXRS,0.21f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*370 weapon_grenadefrag_live*/[370]={182,73,347,630,MAX_TXRS,MAX_TXRS,1.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*371 item_chipset_isolinear*/[371]={46,308,409,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.26f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*372 weapon_grenadeconc_live*/[372]={165,84,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*373 item_ammo_needle*/[373]={4,U16_MAX,15,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.15f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},
-/*374 item_ammo_tranq*/[374]={4,U16_MAX,27,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.15f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},/*375 item_ammo_standard*/[375]={5,U16_MAX,25,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0001984993f,0.0f,0.02172501f},{0.1209471f,0.2176701f,0.04345007f}},
-/*376 item_ammo_teflon*/[376]={5,U16_MAX,26,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0001984993f,0.0f,0.02172501f},{0.1209471f,0.2176701f,0.04345007f}},/*377 item_ammo_hollow*/[377]={5,U16_MAX,11,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0002185023f,0.0f,0.02122951f},{0.1423431f,0.2127061f,0.04245907f}},
+/*308 item_warecasing*/[308]={637,0,1251,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.8f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0.09397449f},{0.540964f,0.405398f,0.187949f}},
+/*309 item_beaker*/[309]={14,682,36,MAX_TXRS,1242,MAX_TXRS,0.28f,0.1f,0.2f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*310 item_beverage*/[310]={18,683,37,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.12f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*311 item_skull*/[311]={593,70,816,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.451f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*312 item_arm*/[312]={7,678,28,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*313 item_audiolog*/[313]={11,679,52,80,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*314 weapon_grenadefrag*/[314]={182,73,348,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*315 weapon_grenadeconc*/[315]={165,84,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*316 weapon_grenadeemp*/[316]={168,85,338,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.8f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*317 weapon_grenadeearth*/[317]={181,86,346,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*318 weapon_grenademine*/[318]={184,87,353,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*319 weapon_grenadenitro*/[319]={300,301,356,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*320 weapon_grenadegas*/[320]={183,89,349,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.9f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*321 item_patch_berserk*/[321]={488,491,590,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*322 item_patch_detox*/[322]={488,491,591,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*323 item_patch_genius*/[323]={488,491,592,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*324 item_patch_medi*/[324]={488,491,600,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*325 item_patch_reflex*/[325]={488,491,641,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*326 item_patch_sight*/[326]={488,491,646,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*327 item_patch_staminup*/[327]={488,491,647,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*328 item_hw_system*/[328]={207,68,405,404,MAX_TXRS,MAX_TXRS,0.17f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*329 item_hw_navunit*/[329]={204,696,907,1259,MAX_TXRS,MAX_TXRS,0.1f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*330 item_hw_ereader*/[330]={200,692,397,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.12f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*331 item_hw_sensaround*/[331]={205,697,402,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.12f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*332 item_hw_targetid*/[332]={208,90,408,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.08f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*333 item_hw_shield*/[333]={206,91,403,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.14f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*334 item_hw_bio*/[334]={197,689,393,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.1f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*335 item_hw_lantern*/[335]={203,695,401,400,MAX_TXRS,MAX_TXRS,0.11f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*336 item_hw_envirosuit*/[336]={199,691,396,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.451f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*337 item_hw_booster*/[337]={198,690,395,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.16f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*338 item_hw_jumpjets*/[338]={202,694,399,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.32f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*339 item_hw_infrared*/[339]={201,693,398,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.1f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*340 item_fireextinguisher*/[340]={144,684,317,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*341 item_access_card_admin*/[341]={0,672,9,82,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*342 item_workerhelmet*/[342]={648,94,886,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.8f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*343 weapon_mk3*/[343]={646,309,885,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*344 weapon_blaster*/[344]={638,310,875,874,MAX_TXRS,MAX_TXRS,0.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*345 weapon_dartgun*/[345]={640,311,876,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*346 weapon_flechette*/[346]={642,312,880,879,MAX_TXRS,MAX_TXRS,0.4f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*347 weapon_ionrifle*/[347]={643,313,883,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.8f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*348 weapon_rapier*/[348]={653,314,891,890,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*349 weapon_pipe*/[349]={649,647,887,MAX_TXRS,1241,MAX_TXRS,0.85f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*350 weapon_magnum*/[350]={644,315,877,MAX_TXRS,1231,MAX_TXRS,0.6f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*351 weapon_magpulse*/[351]={645,316,884,MAX_TXRS,1231,MAX_TXRS,0.65f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*352 weapon_pistol*/[352]={650,317,878,MAX_TXRS,1231,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*353 weapon_plasma*/[353]={651,318,888,MAX_TXRS,1240,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*354 weapon_railgun*/[354]={652,319,889,MAX_TXRS,1231,MAX_TXRS,1.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*355 weapon_riotgun*/[355]={654,320,892,MAX_TXRS,1231,MAX_TXRS,0.55f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*356 weapon_skorpion*/[356]={655,321,893,MAX_TXRS,1231,MAX_TXRS,1.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*357 weapon_sparqbeam*/[357]={656,322,895,894,1231,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*358 weapon_stungun*/[358]={657,323,896,MAX_TXRS,1231,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*359 item_battery*/[359]={13,680,35,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*360 item_battery_icad*/[360]={13,680,34,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*361 item_logic_probe*/[361]={217,306,427,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.15f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*362 item_healthkit*/[362]={196,688,391,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.25f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*363 item_plastique*/[363]={492,308,599,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.4f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*364 item_chipset_interfacedemod*/[364]={45,325,78,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*365 item_flask*/[365]={145,685,36,MAX_TXRS,1242,MAX_TXRS,0.22f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*366 item_chipset_bitflag*/[366]={45,325,633,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*367 item_ammo_rubber*/[367]={8,676,19,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.25f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*368 item_isotopex22*/[368]={209,326,413,412,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*369 item_testtube*/[369]={622,612,36,MAX_TXRS,1242,MAX_TXRS,0.21f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*370 weapon_grenadefrag_live*/[370]={182,73,347,630,MAX_TXRS,MAX_TXRS,1.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*371 item_chipset_isolinear*/[371]={46,308,409,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.26f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*372 weapon_grenadeconc_live*/[372]={165,84,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*373 item_ammo_needle*/[373]={4,U16_MAX,15,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.15f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},
+/*374 item_ammo_tranq*/[374]={4,U16_MAX,27,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.15f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},
+/*375 item_ammo_standard*/[375]={5,U16_MAX,25,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0001984993f,0.0f,0.02172501f},{0.1209471f,0.2176701f,0.04345007f}},
+/*376 item_ammo_teflon*/[376]={5,U16_MAX,26,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0001984993f,0.0f,0.02172501f},{0.1209471f,0.2176701f,0.04345007f}},
+/*377 item_ammo_hollow*/[377]={5,U16_MAX,11,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0002185023f,0.0f,0.02122951f},{0.1423431f,0.2127061f,0.04245907f}},
 /*378 item_ammo_slug*/[378]={3,U16_MAX,23,22,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_BOX,{0.0002185023f,0.0f,0.02122951f},{0.1423431f,0.2127061f,0.04245907f}},
-/*379 item_ammo_magnesium*/[379]={1,673,14,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*380 item_ammo_penetrator*/[380]={1,673,16,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*381 item_ammo_hornet*/[381]={1,673,12,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*382 item_ammo_splinter*/[382]={1,673,24,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*383 item_ammo_rail*/[383]={6,675,17,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.40f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*384 item_ammo_slag*/[384]={1,673,21,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*385 item_ammo_slaglarge*/[385]={10,677,20,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.40f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*386 item_ammo_magcart*/[386]={2,674,13,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*387 weapon_grenadeemp_live*/[387]={168,85,337,627,MAX_TXRS,MAX_TXRS,0.8f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*388 item_access_card_std*/[388]={0,672,79,867,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*389 weapon_grenadeearth_live*/[389]={181,86,345,628,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*390 item_access_card_group1*/[390]={0,672,7,159,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*391 item_access_card_science*/[391]={0,672,2,343,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*392 item_access_card_eng*/[392]={0,672,3,81,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*393 item_access_card_groupB*/[393]={0,672,7,159,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*394 item_access_card_security*/[394]={0,672,10,344,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*395 item_access_card_per5diego*/[395]={0,672,8,341,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*396 item_access_card_medi*/[396]={0,672,1,161,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*397 item_access_card_group3*/[397]={0,672,7,159,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*398 item_access_card_purple*/[398]={0,672,5,342,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*399 item_head_male*/[399]={194,194,389,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.29f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*400 item_head_female*/[400]={193,686,388,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.30f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*401 item_severedhead*/[401]={590,327,801,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.28f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*402 weapon_grenademine_live*/[402]={184,87,351,352,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*403 weapon_grenadenitro_live*/[403]={185,88,354,355,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*404 weapon_grenadegas_live*/[404]={183,89,349,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.9f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*405 to 416 unused*/[405]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*406*/[406]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*407*/[407]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*408*/[408]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*409*/[409]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*410*/[410]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*411*/[411]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*412*/[412]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*413*/[413]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*414*/[414]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*415*/[415]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*416*/[416]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*417 item_access_card_perdarcy*/[417]={0,672,8,341,MAX_TXRS,MAX_TXRS,0.2f,0,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*418 unused*/[418]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*419 npc_autobomb*/[419]={299,328,542,541,MAX_TXRS,MAX_TXRS,1.0f,0.15f,1.0f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*420 npc_cyborg_assassin*/[420]={306,0,545,544,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,24,COLTYPE_CAP,{0,0.96f,0},{0.48f,2.0f,0}},
-/*421 npc_avian_mutant*/[421]={328,0,568,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.0f,0.15f,1.0f,35,COLTYPE_CAP,{0,0.64f,0},{0.64f,1.60f,0}},/*422 npc_exec_bot*/[422]={316,0,555,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.2f,0.15f,1.0f,29,COLTYPE_CAP,{0,0.96f,0},{0.48f,2.025f,0}},
-/*423 npc_cyborg_drone*/[423]={312,0,547,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,3,COLTYPE_CAP,{0,0,0},{0.36f,2.00f,0}},/*424 npc_cortex_reaver*/[424]={300,0,543,MAX_TXRS,MAX_TXRS,MAX_TXRS,5.0f,0.15f,1.0f,23,COLTYPE_CAP,{0,1.28f,0},{1.28f,2.5f,0}},
-/*425 npc_cyborg_warrior*/[425]={315,0,554,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,28,COLTYPE_CAP,{0,0,0},{0.48f,2.00f,0}},/*426 npc_cyborg_enforcer*/[426]={314,0,550,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,27,COLTYPE_CAP,{0,1.03f,0},{0.40f,2.08f,0}},
-/*427 npc_cyborg_elite*/[427]={313,0,548,MAX_TXRS,MAX_TXRS,MAX_TXRS,3.5f,0.15f,1.0f,26,COLTYPE_CAP,{0,1.09f,0},{0.44f,2.20f,0}},/*428 npc_cyborg_diego*/[428]={309,0,546,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.0f,0.15f,1.0f,25,COLTYPE_CAP,{0,1.04f,0},{0.48f,2.12f,0}},
-/*429 npc_sec1_bot*/[429]={333,0,573,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,38,COLTYPE_CAP,{0,0.76f,0},{0.76f,1.8f,0}},/*430 npc_sec2_bot*/[430]={335,0,574,MAX_TXRS,MAX_TXRS,MAX_TXRS,4.51f,0.15f,1.0f,39,COLTYPE_CAP,{0,1.08f,0},{1.12f,2.40f,0}},
-/*431 npc_maint_bot*/[431]={325,0,567,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,34,COLTYPE_SPH,{0,0.78f,0},{2.00f,0,0}},/*432 npc_mutant_cyborg*/[432]={329,0,569,MAX_TXRS,MAX_TXRS,MAX_TXRS,3.0f,0.15f,1.0f,51,COLTYPE_CAP,{0,0.12f,0},{0.75f,2.30f,0}},
-/*433 npc_hopper*/[433]={322,0,562,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.0f,0.15f,1.0f,32,COLTYPE_CAP,{0,1.04f,-0.16f},{0.96f,2.38f,0}},/*434 npc_humanoid_mutant*/[434]={323,0,563,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.4f,0.15f,1.0f,2,COLTYPE_CAP,{0,0,0},{0.38f,2.00f,0}},
-/*435 npc_invisomut*/[435]={324,329,565,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.3f,0.15f,1.0f,33,COLTYPE_CVX,{0,0,0},{0,0,0}},/*436 npc_virus_mutant*/[436]={330,0,576,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.4f,0.15f,1.0f,41,COLTYPE_CAP,{0,0.95f,0.16f},{0.72f,1.90f,0}},
-/*437 npc_servbot*/[437]={5153,54,575,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.50f,0.15f,1.0f,40,COLTYPE_CVX,{0,0,0},{0,0,0}},/*438 npc_flier_bot*/[438]={318,0,558,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.75f,0.15f,1.0f,30,COLTYPE_SPH,{0,0.16f,0},{0.8f,0,0}},
-/*439 npc_zerog_mutant*/[439]={395,0,1170,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.30f,0.15f,1.0f,42,COLTYPE_SPH,{0,0,0},{1.6f,0,0}},/*440 npc_gorilla_tiger_mutant*/[440]={320,330,560,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.00f,0.15f,1.0f,31,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*441 npc_repairbot*/[441]={331,331,572,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.50f,0.15f,1.0f,37,COLTYPE_CVX,{0,0,0},{0,0,0}},/*442 npc_plant_mutant*/[442]={330,0,570,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.80f,0.15f,1.0f,36,COLTYPE_CAP,{0,0.72f,0},{0.6f,1.44f,0}},
-/*443 npc_cyberdog*/[443]={302,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.50f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.72f,0,0}},/*444 npc_cyberguard*/[444]={303,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.00f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.0f,0,0}},
-/*445 npc_cyberram*/[445]={304,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.00f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.44f,0,0}},/*446 npc_cyber_reaver*/[446]={305,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.20f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.72f,0,0}},
+/*379 item_ammo_magnesium*/[379]={1,673,14,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*380 item_ammo_penetrator*/[380]={1,673,16,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*381 item_ammo_hornet*/[381]={1,673,12,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*382 item_ammo_splinter*/[382]={1,673,24,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*383 item_ammo_rail*/[383]={6,675,17,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.40f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*384 item_ammo_slag*/[384]={1,673,21,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*385 item_ammo_slaglarge*/[385]={10,677,20,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.40f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*386 item_ammo_magcart*/[386]={2,674,13,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.35f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*387 weapon_grenadeemp_live*/[387]={168,85,337,627,MAX_TXRS,MAX_TXRS,0.8f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*388 item_access_card_std*/[388]={0,672,79,867,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*389 weapon_grenadeearth_live*/[389]={181,86,345,628,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*390 item_access_card_group1*/[390]={0,672,7,159,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*391 item_access_card_science*/[391]={0,672,2,343,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*392 item_access_card_eng*/[392]={0,672,3,81,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*393 item_access_card_groupB*/[393]={0,672,7,159,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*394 item_access_card_security*/[394]={0,672,10,344,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*395 item_access_card_per5diego*/[395]={0,672,8,341,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*396 item_access_card_medi*/[396]={0,672,1,161,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*397 item_access_card_group3*/[397]={0,672,7,159,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*398 item_access_card_purple*/[398]={0,672,5,342,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*399 item_head_male*/[399]={194,194,389,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.29f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*400 item_head_female*/[400]={193,686,388,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.30f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*401 item_severedhead*/[401]={590,327,801,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.28f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*402 weapon_grenademine_live*/[402]={184,87,351,352,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*403 weapon_grenadenitro_live*/[403]={185,88,354,355,MAX_TXRS,MAX_TXRS,1.2f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*404 weapon_grenadegas_live*/[404]={183,89,349,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.9f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*405 to 416 unused*/[405]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*406*/[406]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*407*/[407]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*408*/[408]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*409*/[409]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*410*/[410]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*411*/[411]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*412*/[412]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*413*/[413]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*414*/[414]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*415*/[415]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*416*/[416]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*417 item_access_card_perdarcy*/[417]={0,672,8,341,MAX_TXRS,MAX_TXRS,0.2f,0,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*418 unused*/[418]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*419 npc_autobomb*/[419]={299,328,542,541,MAX_TXRS,MAX_TXRS,1.0f,0.15f,1.0f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*420 npc_cyborg_assassin*/[420]={306,0,545,544,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,24,COLTYPE_CAP,{0,0.96f,0},{0.48f,2.0f,0}},
+/*421 npc_avian_mutant*/[421]={328,0,568,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.0f,0.15f,1.0f,35,COLTYPE_CAP,{0,0.64f,0},{0.64f,1.60f,0}},
+/*422 npc_exec_bot*/[422]={316,0,555,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.2f,0.15f,1.0f,29,COLTYPE_CAP,{0,0.96f,0},{0.48f,2.025f,0}},
+/*423 npc_cyborg_drone*/[423]={312,0,547,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,3,COLTYPE_CAP,{0,0,0},{0.36f,2.00f,0}},
+/*424 npc_cortex_reaver*/[424]={300,0,543,MAX_TXRS,MAX_TXRS,MAX_TXRS,5.0f,0.15f,1.0f,23,COLTYPE_CAP,{0,1.28f,0},{1.28f,2.5f,0}},
+/*425 npc_cyborg_warrior*/[425]={315,0,554,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,28,COLTYPE_CAP,{0,0,0},{0.48f,2.00f,0}},
+/*426 npc_cyborg_enforcer*/[426]={314,0,550,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,27,COLTYPE_CAP,{0,1.03f,0},{0.40f,2.08f,0}},
+/*427 npc_cyborg_elite*/[427]={313,0,548,MAX_TXRS,MAX_TXRS,MAX_TXRS,3.5f,0.15f,1.0f,26,COLTYPE_CAP,{0,1.09f,0},{0.44f,2.20f,0}},
+/*428 npc_cyborg_diego*/[428]={309,0,546,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.0f,0.15f,1.0f,25,COLTYPE_CAP,{0,1.04f,0},{0.48f,2.12f,0}},
+/*429 npc_sec1_bot*/[429]={333,0,573,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,38,COLTYPE_CAP,{0,0.76f,0},{0.76f,1.8f,0}},
+/*430 npc_sec2_bot*/[430]={335,0,574,MAX_TXRS,MAX_TXRS,MAX_TXRS,4.51f,0.15f,1.0f,39,COLTYPE_CAP,{0,1.08f,0},{1.12f,2.40f,0}},
+/*431 npc_maint_bot*/[431]={325,0,567,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.15f,1.0f,34,COLTYPE_SPH,{0,0.78f,0},{2.00f,0,0}},
+/*432 npc_mutant_cyborg*/[432]={329,0,569,MAX_TXRS,MAX_TXRS,MAX_TXRS,3.0f,0.15f,1.0f,51,COLTYPE_CAP,{0,0.12f,0},{0.75f,2.30f,0}},
+/*433 npc_hopper*/[433]={322,0,562,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.0f,0.15f,1.0f,32,COLTYPE_CAP,{0,1.04f,-0.16f},{0.96f,2.38f,0}},
+/*434 npc_humanoid_mutant*/[434]={323,0,563,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.4f,0.15f,1.0f,2,COLTYPE_CAP,{0,0,0},{0.38f,2.00f,0}},
+/*435 npc_invisomut*/[435]={324,329,565,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.3f,0.15f,1.0f,33,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*436 npc_virus_mutant*/[436]={330,0,576,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.4f,0.15f,1.0f,41,COLTYPE_CAP,{0,0.95f,0.16f},{0.72f,1.90f,0}},
+/*437 npc_servbot*/[437]={5153,54,575,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.50f,0.15f,1.0f,40,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*438 npc_flier_bot*/[438]={318,0,558,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.75f,0.15f,1.0f,30,COLTYPE_SPH,{0,0.16f,0},{0.8f,0,0}},
+/*439 npc_zerog_mutant*/[439]={395,0,1170,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.30f,0.15f,1.0f,42,COLTYPE_SPH,{0,0,0},{1.6f,0,0}},
+/*440 npc_gorilla_tiger_mutant*/[440]={320,330,560,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.00f,0.15f,1.0f,31,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*441 npc_repairbot*/[441]={331,331,572,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.50f,0.15f,1.0f,37,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*442 npc_plant_mutant*/[442]={330,0,570,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.80f,0.15f,1.0f,36,COLTYPE_CAP,{0,0.72f,0},{0.6f,1.44f,0}},
+/*443 npc_cyberdog*/[443]={302,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.50f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.72f,0,0}},
+/*444 npc_cyberguard*/[444]={303,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.00f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.0f,0,0}},
+/*445 npc_cyberram*/[445]={304,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.00f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.44f,0,0}},
+/*446 npc_cyber_reaver*/[446]={305,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.20f,0.15f,1.0f,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.72f,0,0}},
 /*447 npc_cybershodan*/[447]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,4.51f,0.15f,1.0f,MAX_ANIMS,COLTYPE_CAP,{0,0,0},{0.28f,2.0f,0}},
-/*448 item_cyber_data*/[448]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*449 item_cyber_decoy*/[449]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
-/*450 item_cyber_drill*/[450]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*451 item_cyber_game*/[451]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
-/*452 item_cyber_integrity*/[452]={69,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*453 item_cyber_keycard*/[453]={70,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
-/*454 item_cyber_pulser*/[454]={6615,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,57,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*455 item_cyber_recall*/[455]={6615,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,57,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
-/*456 item_cyber_shield*/[456]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},/*457 item_cyber_turbo*/[457]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
-/*458 prop_phys_barrel_chemical*/[458]={12,332,30,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*459 prop_phys_barrel_radiation*/[459]={12,332,31,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*460 prop_phys_barrel_toxic*/[460]={12,332,33,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*461 prop_phys_cart*/[461]={40,333,416,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*462 prop_phys_pot*/[462]={494,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},/*463 prop_phys_toolcart*/[463]={624,335,865,866,864,MAX_TXRS,20.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*464 se_briefcase*/[464]={34,0,66,65,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*465 se_corpse_blueshirt*/[465]={51,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*466 se_corpse_brownshirt*/[466]={52,0,128,MAX_TXRS,129,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*467 se_corpse_eaten*/[467]={53,0,130,MAX_TXRS,131,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*468 se_corpse_labcoat*/[468]={55,0,132,MAX_TXRS,133,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*469 se_corpse_security*/[469]={56,0,136,MAX_TXRS,137,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*470 se_corpse_tan*/[470]={57,0,138,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*471 se_corpse_torso*/[471]={58,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*472 se_crate1*/[472]={60,0,145,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},/*473 se_crate2*/[473]={60,0,143,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
-/*474 se_crate3*/[474]={60,0,144,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},/*475 se_crate4*/[475]={60,0,146,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.25f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
-/*476 se_crate5*/[476]={60,0,145,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.25f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},/*477 sec_camera*/[477]={589,0,73,72,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*478 sec_cpunode*/[478]={587,0,242,248,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*479 sec_cpunode_small*/[479]={588,0,107,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*480 weapon_cyber_mine*/[480]={71,0,1224,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*481 proj_enemshot2*/[481]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*482 proj_magpulse_shot*/[482]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},/*483 proj_stungun_shot*/[483]={MAX_MDLS,0,835,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
-/*484 proj_rail_shot*/[484]={652,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},/*485 proj_plasmarifle_shot*/[485]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
-/*486 proj_enemshot6*/[486]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*487 proj_enemshot5*/[487]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*488 proj_enemshot4*/[488]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*489 proj_throwingstar*/[489]={307,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
-/*490 proj_magpulsenpc_shot*/[490]={645,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},/*491 proj_railnpc_shot*/[491]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
-/*492 proj_cyberplayer_shot*/[492]={72,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},/*493 proj_cyberdog_shot*/[493]={63,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
-/*494 proj_cyberreaver_shot*/[494]={64,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},/*495 proj_cyberice_shot*/[495]={68,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
-/*496 doorA*/[496]={719,0,185,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,1,COLTYPE_MSH,{0,0,0},{0,0,0}},/*497 doorB*/[497]={0,0,189,188,MAX_TXRS,MAX_TXRS,0,0,0,0,COLTYPE_MSH,{0,0,0},{0,0,0}},/*498 doorC*/[498]={0,0,184,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,5,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*499 doorD*/[499]={0,0,196,197,MAX_TXRS,MAX_TXRS,0,0,0,4,COLTYPE_MSH,{0,0,0},{0,0,0}},/*500 doorE*/[500]={0,0,208,207,MAX_TXRS,MAX_TXRS,0,0,0,9,COLTYPE_MSH,{0,0,0},{0,0,0}},/*501 doorF*/[501]={0,0,187,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,10,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*502 doorG*/[502]={0,0,193,194,MAX_TXRS,MAX_TXRS,0,0,0,11,COLTYPE_MSH,{0,0,0},{0,0,0}},/*503 doorH*/[503]={0,0,190,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,12,COLTYPE_MSH,{0,0,0},{0,0,0}},/*504 doorI*/[504]={0,0,200,199,MAX_TXRS,MAX_TXRS,0,0,0,13,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*505 doorJ*/[505]={0,0,215,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,6,COLTYPE_MSH,{0,0,0},{0,0,0}},/*506 doorK*/[506]={0,0,214,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,7,COLTYPE_MSH,{0,0,0},{0,0,0}},/*507 doorL*/[507]={0,0,191,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,8,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*508 door_elevator1*/[508]={0,0,202,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,14,COLTYPE_MSH,{0,0,0},{0,0,0}},/*509 door_elevator2*/[509]={0,0,203,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,15,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
+/*448 item_cyber_data*/[448]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*449 item_cyber_decoy*/[449]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*450 item_cyber_drill*/[450]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*451 item_cyber_game*/[451]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*452 item_cyber_integrity*/[452]={69,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*453 item_cyber_keycard*/[453]={70,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*454 item_cyber_pulser*/[454]={6615,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,57,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*455 item_cyber_recall*/[455]={6615,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,57,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*456 item_cyber_shield*/[456]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+/*457 item_cyber_turbo*/[457]={6076,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,53,COLTYPE_SPH,{0,0,0},{1.5f,0,0}},
+
+/*458 prop_phys_barrel_chemical*/[458]={12,332,30,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*459 prop_phys_barrel_radiation*/[459]={12,332,31,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*460 prop_phys_barrel_toxic*/[460]={12,332,33,MAX_TXRS,MAX_TXRS,MAX_TXRS,1.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*461 prop_phys_cart*/[461]={40,333,416,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.5f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*462 prop_phys_pot*/[462]={494,334,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+/*463 prop_phys_toolcart*/[463]={624,335,865,866,864,MAX_TXRS,20.0f,0.5f,0,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
+
+/*464 se_briefcase*/[464]={34,0,66,65,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*465 se_corpse_blueshirt*/[465]={51,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*466 se_corpse_brownshirt*/[466]={52,0,128,MAX_TXRS,129,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*467 se_corpse_eaten*/[467]={53,0,130,MAX_TXRS,131,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*468 se_corpse_labcoat*/[468]={55,0,132,MAX_TXRS,133,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*469 se_corpse_security*/[469]={56,0,136,MAX_TXRS,137,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*470 se_corpse_tan*/[470]={57,0,138,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*471 se_corpse_torso*/[471]={58,0,126,MAX_TXRS,127,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*472 se_crate1*/[472]={60,0,145,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
+/*473 se_crate2*/[473]={60,0,143,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
+/*474 se_crate3*/[474]={60,0,144,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.75f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
+/*475 se_crate4*/[475]={60,0,146,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.25f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
+/*476 se_crate5*/[476]={60,0,145,MAX_TXRS,MAX_TXRS,MAX_TXRS,2.25f,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0.684186f,0.6841861f,0.6841861f}},
+
+/*477 sec_camera*/[477]={589,0,73,72,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*478 sec_cpunode*/[478]={587,0,242,248,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*479 sec_cpunode_small*/[479]={588,0,107,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
+/*480 weapon_cyber_mine*/[480]={71,0,1224,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*481 proj_enemshot2*/[481]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*482 proj_magpulse_shot*/[482]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+/*483 proj_stungun_shot*/[483]={MAX_MDLS,0,835,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+/*484 proj_rail_shot*/[484]={652,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+/*485 proj_plasmarifle_shot*/[485]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+/*486 proj_enemshot6*/[486]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*487 proj_enemshot5*/[487]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.2f,0.5f,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*488 proj_enemshot4*/[488]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*489 proj_throwingstar*/[489]={307,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+/*490 proj_magpulsenpc_shot*/[490]={645,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+/*491 proj_railnpc_shot*/[491]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+/*492 proj_cyberplayer_shot*/[492]={72,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+/*493 proj_cyberdog_shot*/[493]={63,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+/*494 proj_cyberreaver_shot*/[494]={64,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+/*495 proj_cyberice_shot*/[495]={68,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.3f,0.5f,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.2f,0.2f,0.2f}},
+
+/*496 doorA*/[496]={719,0,185,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,1,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*497 doorB*/[497]={0,0,189,188,MAX_TXRS,MAX_TXRS,0,0,0,0,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*498 doorC*/[498]={0,0,184,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,5,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*499 doorD*/[499]={0,0,196,197,MAX_TXRS,MAX_TXRS,0,0,0,4,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*500 doorE*/[500]={0,0,208,207,MAX_TXRS,MAX_TXRS,0,0,0,9,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*501 doorF*/[501]={0,0,187,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,10,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*502 doorG*/[502]={0,0,193,194,MAX_TXRS,MAX_TXRS,0,0,0,11,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*503 doorH*/[503]={0,0,190,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,12,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*504 doorI*/[504]={0,0,200,199,MAX_TXRS,MAX_TXRS,0,0,0,13,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*505 doorJ*/[505]={0,0,215,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,6,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*506 doorK*/[506]={0,0,214,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,7,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*507 doorL*/[507]={0,0,191,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,8,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*508 door_elevator1*/[508]={0,0,202,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,14,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*509 door_elevator2*/[509]={0,0,203,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,15,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*510 door_elevator3*/[510]={0,0,204,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,16,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*511 door_elevator4*/[511]={0,0,206,205,MAX_TXRS,MAX_TXRS,0,0,0,17,COLTYPE_MSH,{0,0,0},{0,0,0}},/*512 door_secret1*/[512]={0,0,210,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,19,COLTYPE_MSH,{0,0,0},{0,0,0}},/*513 door_secret2*/[513]={0,0,209,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,18,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*514 door_secret3*/[514]={94,0,211,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,20,COLTYPE_MSH,{0,0,0},{0,0,0}},/*515 func_forcebridge*/[515]={78,0,38,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0,0,0}},/*516 prop_lift2*/[516]={215,U16_MAX,155,154,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0.0f,0.0f,0.0f},{1.0f,1.0f,1.0f}},
-/*517 func_wall*/[517]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,10.0f,0.6f,0.6f,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*518 BulletHoleLarge*/[518]={5988,0,3324,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*519 BulletHoleScorchLarge*/[519]={5988,0,3326,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*520 BulletHoleScorchSmall*/[520]={5988,0,3326,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*521 BulletHoleSmall*/[521]={5988,0,3324,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*522 BulletHoleTiny*/[522]={5988,0,3325,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*523 BulletHoleTinySpread*/[523]={5988,0,3327,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*524 func_door_cyber*/[524]={178,U16_MAX,1224,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0.0f,1.31f,0.0f},{2.56f,0.06f,2.56f}},
-/*525 prop_console01*/[525]={49,0,100,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*526 prop_console02*/[526]={50,0,100,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*527 prop_grate1_1*/[527]={186,0,359,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*528 prop_grate1_2*/[528]={187,0,360,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*529 prop_grate1_3*/[529]={188,0,361,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*530 se_cabinet*/[530]={39,0,70,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*531 se_thermos*/[531]={623,0,863,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*532 prop_beaker_holder*/[532]={15,0,36,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*533 prop_bed*/[533]={16,0,246,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*534 prop_bed_hospital*/[534]={608,0,759,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*535 prop_bed_neurosurgery*/[535]={17,0,18,MAX_TXRS,1238,29,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*536 prop_bonepile1*/[536]={19,0,815,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*537 prop_bridgewall1*/[537]={33,0,784,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*538 prop_broken_clock*/[538]={38,0,1117,1115,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*539 prop_brokengun*/[539]={639,0,878,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*540 prop_chair01*/[540]={41,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*541 prop_chair02*/[541]={42,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*542 prop_chair03*/[542]={43,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*543 prop_chair04*/[543]={41,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*544 prop_chair05*/[544]={42,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*545 prop_chandelier*/[545]={496,0,644,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*546 prop_charge_station*/[546]={44,0,77,76,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*547 prop_clothes*/[547]={47,0,97,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*548 prop_computer*/[548]={48,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*549 prop_couch*/[549]={59,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*550 prop_couch2*/[550]={59,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*551 prop_cpuscreen*/[551]={5988,0,768,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*552 prop_cyber_datafrag*/[552]={6336,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,54,0,{0,0,0},{0,0,0}},
-/*553 prop_cyber_decoy*/[553]={72,0,152,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.48f,0,0}},/*554 prop_cyber_exit*/[554]={6416,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,55,0,{0,0,0},{0,0,0}},
-/*555 prop_cyber_switch*/[555]={80,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,58,0,{0,0,0},{0,0,0}},/*556 prop_cyberport*/[556]={62,0,117,116,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*557 prop_desk01*/[557]={74,0,125,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*558 prop_desk02*/[558]={75,0,124,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*559 prop_dexmissile*/[559]={76,0,164,162,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*560 prop_foliage_fernpoison*/[560]={160,0,331,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*561 prop_foliage_bush*/[561]={495,0,643,642,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*562 prop_foliage_fern*/[562]={160,0,333,330,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*563 prop_foliage_fernblueflower*/[563]={159,0,333,330,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*564 prop_foliage_pinetreem*/[564]={489,0,594,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*565 prop_foliage_poisonbush1*/[565]={493,0,638,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*566 prop_gear_large*/[566]={166,0,335,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*567 prop_gear_small*/[567]={167,0,336,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*568 prop_grass1*/[568]={MAX_MDLS,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*569 prop_grass2*/[569]={MAX_MDLS,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*570 prop_grass3*/[570]={MAX_MDLS,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*571 prop_grass4*/[571]={MAX_MDLS,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*572 prop_grass5*/[572]={MAX_MDLS,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*573 prop_grate4*/[573]={161,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*574 prop_healingbed*/[574]={195,0,1139,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*575 prop_lamp*/[575]={212,0,423,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*576 prop_light_emergsignal*/[576]={216,0,426,0,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*577 prop_microscope*/[577]={298,0,645,MAX_TXRS,1241,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*578 prop_pipe*/[578]={490,0,595,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*579 prop_puddle*/[579]={157,0,648,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*580 prop_puddle_grease*/[580]={157,0,650,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*581 prop_puddle_oil*/[581]={157,0,652,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*582 prop_shelves*/[582]={591,0,94,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*583 prop_skeleton*/[583]={592,0,815,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*584 prop_sleeping_cables*/[584]={595,0,71,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*585 prop_sparkingwire*/[585]={0,0,71,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,46,0,{0,0,0},{0,0,0}}/*Looped static prop, anim overwrites, not a missing-model.*/,/*586 prop_table*/[586]={619,0,92,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*587 prop_tv_on_a_post*/[587]={625,0,1228,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*588 prop_vendingmachines1*/[588]={627,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*589 prop_vendingmachines2*/[589]={614,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*590 prop_weapon_rack*/[590]={641,0,113,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
-/*591 prop_xray*/[591]={660,0,153,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},/*592 text_decal*/[592]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*593 text_decalStopDSS1*/[593]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*594 trigger_counter*/[594]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*511 door_elevator4*/[511]={0,0,206,205,MAX_TXRS,MAX_TXRS,0,0,0,17,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*512 door_secret1*/[512]={0,0,210,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,19,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*513 door_secret2*/[513]={0,0,209,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,18,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*514 door_secret3*/[514]={94,0,211,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,20,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
+/*515 func_forcebridge*/[515]={78,0,38,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0,0,0},{0,0,0}},
+
+/*516 prop_lift2*/[516]={215,U16_MAX,155,154,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0.0f,0.0f,0.0f},{1.0f,1.0f,1.0f}},
+
+/*517 func_wall*/[517]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,10.0f,0.6f,0.6f,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*518 BulletHoleLarge*/[518]={5988,0,3324,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*519 BulletHoleScorchLarge*/[519]={5988,0,3326,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*520 BulletHoleScorchSmall*/[520]={5988,0,3326,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*521 BulletHoleSmall*/[521]={5988,0,3324,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*522 BulletHoleTiny*/[522]={5988,0,3325,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*523 BulletHoleTinySpread*/[523]={5988,0,3327,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*524 func_door_cyber*/[524]={178,U16_MAX,1224,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{0.0f,1.31f,0.0f},{2.56f,0.06f,2.56f}},
+
+/*525 prop_console01*/[525]={49,0,100,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*526 prop_console02*/[526]={50,0,100,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*527 prop_grate1_1*/[527]={186,0,359,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*528 prop_grate1_2*/[528]={187,0,360,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*529 prop_grate1_3*/[529]={188,0,361,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
+/*530 se_cabinet*/[530]={39,0,70,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*531 se_thermos*/[531]={623,0,863,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
+/*532 prop_beaker_holder*/[532]={15,0,36,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*533 prop_bed*/[533]={16,0,246,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*534 prop_bed_hospital*/[534]={608,0,759,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*535 prop_bed_neurosurgery*/[535]={17,0,18,MAX_TXRS,1238,29,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*536 prop_bonepile1*/[536]={19,0,815,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*537 prop_bridgewall1*/[537]={33,0,784,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*538 prop_broken_clock*/[538]={38,0,1117,1115,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*539 prop_brokengun*/[539]={639,0,878,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*540 prop_chair01*/[540]={41,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*541 prop_chair02*/[541]={42,0,3336,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*542 prop_chair03*/[542]={43,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*543 prop_chair04*/[543]={41,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*544 prop_chair05*/[544]={42,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*545 prop_chandelier*/[545]={496,0,644,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*546 prop_charge_station*/[546]={44,0,77,76,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*547 prop_clothes*/[547]={47,0,97,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*548 prop_computer*/[548]={48,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*549 prop_couch*/[549]={59,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*550 prop_couch2*/[550]={59,0,195,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*551 prop_cpuscreen*/[551]={5988,0,768,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*552 prop_cyber_datafrag*/[552]={6336,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,54,0,{0,0,0},{0,0,0}},
+/*553 prop_cyber_decoy*/[553]={72,0,152,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_SPH,{0,0,0},{0.48f,0,0}},
+/*554 prop_cyber_exit*/[554]={6416,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,55,0,{0,0,0},{0,0,0}},
+/*555 prop_cyber_switch*/[555]={80,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,58,0,{0,0,0},{0,0,0}},
+/*556 prop_cyberport*/[556]={62,0,117,116,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*557 prop_desk01*/[557]={74,0,125,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*558 prop_desk02*/[558]={75,0,124,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*559 prop_dexmissile*/[559]={76,0,164,162,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*560 prop_foliage_fernpoison*/[560]={160,0,331,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*561 prop_foliage_bush*/[561]={495,0,643,642,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*562 prop_foliage_fern*/[562]={160,0,333,330,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*563 prop_foliage_fernblueflower*/[563]={159,0,333,330,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*564 prop_foliage_pinetreem*/[564]={489,0,594,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*565 prop_foliage_poisonbush1*/[565]={493,0,638,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*566 prop_gear_large*/[566]={166,0,335,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*567 prop_gear_small*/[567]={167,0,336,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*568 prop_grass1*/[568]={MAX_MDLS,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*569 prop_grass2*/[569]={MAX_MDLS,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*570 prop_grass3*/[570]={MAX_MDLS,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*571 prop_grass4*/[571]={MAX_MDLS,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*572 prop_grass5*/[572]={MAX_MDLS,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*573 prop_grate4*/[573]={161,0,329,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*574 prop_healingbed*/[574]={195,0,1139,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*575 prop_lamp*/[575]={212,0,423,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*576 prop_light_emergsignal*/[576]={216,0,426,0,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*577 prop_microscope*/[577]={298,0,645,MAX_TXRS,1241,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*578 prop_pipe*/[578]={490,0,595,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*579 prop_puddle*/[579]={157,0,648,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*580 prop_puddle_grease*/[580]={157,0,650,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*581 prop_puddle_oil*/[581]={157,0,652,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*582 prop_shelves*/[582]={591,0,94,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*583 prop_skeleton*/[583]={592,0,815,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*584 prop_sleeping_cables*/[584]={595,0,71,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*585 prop_sparkingwire*/[585]={0,0,71,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,46,0,{0,0,0},{0,0,0}}/*Looped static prop, anim overwrites, not a missing-model.*/,
+/*586 prop_table*/[586]={619,0,92,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*587 prop_tv_on_a_post*/[587]={625,0,1228,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*588 prop_vendingmachines1*/[588]={627,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*589 prop_vendingmachines2*/[589]={614,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*590 prop_weapon_rack*/[590]={641,0,113,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+/*591 prop_xray*/[591]={660,0,153,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
+/*592 text_decal*/[592]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*593 text_decalStopDSS1*/[593]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*594 trigger_counter*/[594]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
 /*595 trigger_cyberpush*/[595]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*596 trigger_gravitylift*/[596]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*597 trigger_ladder*/[597]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -237,25 +692,33 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*599 trigger_music*/[599]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*600 trigger_once*/[600]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*601 trigger_radiation*/[601]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
 /*602 us_isotopepanel*/[602]={5565,0,616,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,44,COLTYPE_MSH,{0.0f,0.0f,0.0f},{0.9f,0.9f,0.2f}},
+
 /*603 us_paperlog*/[603]={486,0,580,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
 /*604 us_puz_elevatorkeypad*/[604]={615,0,247,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*605 us_puz_elevatorkeypad2*/[605]={618,0,250,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*606 us_puz_elevatorkeypad3*/[606]={615,0,247,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*607 us_puz_elevatorkeypad4*/[607]={210,0,249,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
 /*608 us_puz_keypad*/[608]={211,0,414,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
 /*609 us_puz_panel_blue_grid*/[609]={5544,0,604,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*610 us_puz_panel_brown_grid*/[610]={5544,0,604,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*611 us_puz_panel_gray_grid*/[611]={5544,0,634,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*612 us_puz_panel_red_grid*/[612]={5544,0,625,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*613 us_puz_panel_teal_grid*/[613]={5544,0,601,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
 /*614 us_relaypanel*/[614]={5596,0,617,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,45,COLTYPE_MSH,{0.0f,0.0f,-0.04f},{0.64f,0.64f,0.18f}},
 /*615 us_retinalscanner*/[615]={79,0,46,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
 /*616 prop_vending1_1*/[616]={627,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*617 prop_vending1_2*/[617]={628,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*618 prop_vending1_3*/[618]={629,0,870,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*619 prop_vending2_1*/[619]={614,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*620 prop_vending2_2*/[620]={621,0,871,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
+
 /*621 ambient_airhiss*/[621]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*622 ambient_clicker*/[622]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*623 ambient_compressor*/[623]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
@@ -268,53 +731,168 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*630 ambient_intake*/[630]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*631 ambient_lathe*/[631]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*632 ambient_lev3loop1*/[632]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*633 ambient_lev3loop2*/[633]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*634 ambient_lev3loop3*/[634]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*635 ambient_lev3loop4*/[635]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*636 ambient_liquid_bubble*/[636]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*637 ambient_liquid_lava2*/[637]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*638 ambient_looping*/[638]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*639 ambient_machgear_loop*/[639]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*640 ambient_machine_ambience*/[640]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*641 ambient_machine_go*/[641]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*642 ambient_machine_humamb7*/[642]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*643 ambient_machine_humlonoise*/[643]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*644 ambient_machine_loop1*/[644]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*645 ambient_machine_loop2*/[645]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*646 ambient_machinea1*/[646]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*647 ambient_machinevat_loop*/[647]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*648 ambient_mist*/[648]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*649 ambient_pipewater_loop*/[649]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*650 ambient_powerloom*/[650]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*651 ambient_pump*/[651]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*652 ambient_pump2*/[652]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*653 ambient_rain*/[653]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*654 ambient_steam_loop*/[654]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*655 ambient_washing_machine*/[655]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*656 decal_blood_die*/[656]={77,0,237,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*657 decal_blood_resist*/[657]={77,0,240,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*658 decal_blood_stayaway*/[658]={77,0,235,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*659 decal_blood_words2*/[659]={77,0,236,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*660 decal_bloodfonta*/[660]={178,0,118,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*661 decal_bloodfonte*/[661]={178,0,121,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*662 decal_bloodfontg*/[662]={178,0,122,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*663 decal_bloodfonth*/[663]={178,0,89,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*664 decal_bloodfontr*/[664]={178,0,139,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*665 decal_bloodfonty*/[665]={178,0,140,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*666 decal_bloodsplat2*/[666]={157,0,130,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*667 decal_logo_antenna*/[667]={77,0,182,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*668 decal_logo_armory*/[668]={77,0,178,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*669 decal_logo_biohazard*/[669]={77,0,180,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*670 decal_logo_bridge*/[670]={77,0,181,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*671 decal_logo_cyborg*/[671]={77,0,176,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*672 decal_logo_gears*/[672]={77,0,174,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*673 decal_logo_medical*/[673]={77,0,165,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*674 decal_logo_radhazard*/[674]={77,0,177,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*675 decal_logo_research*/[675]={77,0,175,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*676 decal_logo_security*/[676]={77,0,167,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*677 decal_painting1*/[677]={77,0,218,216,MAX_TXRS,217,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*678 decal_painting2*/[678]={77,0,220,219,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*679 decal_painting3*/[679]={77,0,222,221,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*680 decal_posterbetterfuture*/[680]={77,0,226,MAX_TXRS,MAX_TXRS,225,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*681 decal_postergenetics*/[681]={77,0,224,MAX_TXRS,MAX_TXRS,223,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*682 decal_scorch1*/[682]={77,0,227,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*683 decal_scorch2*/[683]={77,0,228,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*684 decal_scorch3*/[684]={77,0,229,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*685 decal_scorch4*/[685]={77,0,230,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*686 decal_scorchtiny*/[686]={77,0,232,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*687 decal_blood_splat*/[687]={77,0,234,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*688 func_switch1*/[688]={609,0,837,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.32f,0.04f,0.32f}},/*689 func_switch2*/[689]={610,0,839,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.0243553f,0.0f,0.000004883f},{0.0476318f,0.64f,0.64f}},
-/*690 func_switch3*/[690]={611,0,842,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.02285008f,0.000053061f,-0.000056993f},{0.02f,0.32f,0.32f}},/*691 func_switch4*/[691]={5715,0,846,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,47,0,{0.06f,0,0},{0.2f,0.64f,0.64f}},
-/*692 func_switch5*/[692]={614,0,848,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.64f,0.64f,0.08f}},/*693 func_switch5broken*/[693]={613,0,847,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.64f,0.64f,0.08f}},
-/*694 func_switch7*/[694]={612,0,854,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{1.523325f,0,0},{0.2008026f,0.64f,0.64f}},/*695 func_switch8*/[695]={616,0,856,855,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.04f,0.0f,0.0001220703f},{0.08f,0.64f,0.64f}},
-/*696 func_switchbroken1*/[696]={617,0,618,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*697 clip_npc*/[697]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{1.005016f,0,0},{2.010033f,16.0f,16.0f}},
-/*698 clip_objects*/[698]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,(V3){0,0,0},(V3){2.56f,2.56f,2.56f}},/*COLTYPE_BOX, not COLTYPE_NONE: all 152 level-placed clip instances (68 of 697, 3 of 698 in levels 1-2 and the rest elsewhere) carry their own center and size, parsed into colCtrFromFile / colSzFromFile, and COLTYPE_NONE was discarding every one of them, so 152 volumes were not solid to anything.  TODO(R4): they still land on L_Default and may deserve their own layer now that they block movement.*//*699 logic_relay*/[699]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*700 logic_branch*/[700]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*701 logic_timer*/[701]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*702 logic_spawner*/[702]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*703 info_teleport_destination*/[703]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_CAP,{0,0,0},{0.75f,2.0f,1.0f}},
-/*704 prop_debris_panel*/[704]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*705 info_cyborgconversion*/[705]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*706 info_elev_destination*/[706]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*707 info_email*/[707]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*708 info_gameend*/[708]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*709 info_message*/[709]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*710 info_mission*/[710]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*711 info_note*/[711]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*712 info_playsound*/[712]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*713 info_ressurection_point*/[713]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*714 info_screenshake*/[714]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*715 info_spawnpoint*/[715]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*716 fx_reverbzone*/[716]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*717 ef_cyber_ice*/[717]={6516,U16_MAX,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,56,COLTYPE_SPH,{0.0f,0.004354001f,-0.014725f},{1.0f,0.0f,0.0f}},
-/*718 ef_fragexplosion*/[718]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*719 ef_line_sparqbeam*/[719]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*720 ef_mist*/[720]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*721 ef_particle_bloodspurtsmall*/[721]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*722 ef_particle_bloodspurtsmallgreen*/[722]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*723 ef_particle_bloodspurtsmallyellow*/[723]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*724 ef_particle_bloodspurttiny*/[724]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*725 ef_particle_camerahit*/[725]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*726 ef_particle_darthit*/[726]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*727 ef_particle_sec2muzburst*/[727]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*728 ef_particle_sec2rotmuzburst*/[728]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*729 ef_particle_sparksmall*/[729]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*730 ef_particle_sparksmallblue*/[730]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*731 ef_particle_sparqhit*/[731]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*732 ef_sparkspits*/[732]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*733 ef_spraydrips*/[733]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*734 ef_steam*/[734]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*735 env_sparksmall*/[735]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*736 TargetIDInstance*/[736]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*737 prop_papers01*/[737]={484,0,580,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*738 prop_papers02*/[738]={485,0,580,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*739 ef_particle_blasterhit*/[739]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*740 ef_particle_ionhit*/[740]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*741 us_puz_panel_blue_wire*/[741]={0,0,604,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*742 us_puz_panel_brown_wire*/[742]={0,0,631,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
-/*743 us_puz_panel_gray_wire*/[743]={0,0,634,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*744 us_puz_panel_red_wire*/[744]={0,0,625,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},/*745 us_puz_panel_teal_wire*/[745]={0,0,601,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
-/*746 weapon_grenadeenergmine_live*/[746]={169,0,852,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*747 decal_logo_storage*/[747]={77,0,169,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*748 light_animated*/[748]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*749 generic_transform*/[749]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*750 chunk_crate_impenetrable2*/[750]={61,0,147,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*751 chunk_crate_impenetrable3*/[751]={61,0,148,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*752 chunk_crate_impenetrable4*/[752]={61,0,149,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*753 npc_sec3_bot*/[753]={681,0,553,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*754 prop_shieldgenerator*/[754]={143,0,316,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*755 unused*/[755]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*756 ef_particle_leafburst*/[756]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*757 ef_particle_mutationburst*/[757]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*758 ef_particle_graytationburst*/[758]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*759 through 766 unused*/[759]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*760 chunk_maint2_2_slice45*/[760]={6875,0,457,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*uses the genericLOD3card_slice45 card*/,
-/*761*/[761]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*762*/[762]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*763*/[763]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*764*/[764]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*765*/[765]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*766*/[766]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*633 ambient_lev3loop2*/[633]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*634 ambient_lev3loop3*/[634]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*635 ambient_lev3loop4*/[635]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*636 ambient_liquid_bubble*/[636]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*637 ambient_liquid_lava2*/[637]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*638 ambient_looping*/[638]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*639 ambient_machgear_loop*/[639]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*640 ambient_machine_ambience*/[640]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*641 ambient_machine_go*/[641]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*642 ambient_machine_humamb7*/[642]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*643 ambient_machine_humlonoise*/[643]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*644 ambient_machine_loop1*/[644]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*645 ambient_machine_loop2*/[645]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*646 ambient_machinea1*/[646]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*647 ambient_machinevat_loop*/[647]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*648 ambient_mist*/[648]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*649 ambient_pipewater_loop*/[649]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*650 ambient_powerloom*/[650]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*651 ambient_pump*/[651]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*652 ambient_pump2*/[652]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*653 ambient_rain*/[653]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*654 ambient_steam_loop*/[654]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*655 ambient_washing_machine*/[655]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*656 decal_blood_die*/[656]={77,0,237,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*657 decal_blood_resist*/[657]={77,0,240,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*658 decal_blood_stayaway*/[658]={77,0,235,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*659 decal_blood_words2*/[659]={77,0,236,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*660 decal_bloodfonta*/[660]={178,0,118,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*661 decal_bloodfonte*/[661]={178,0,121,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*662 decal_bloodfontg*/[662]={178,0,122,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*663 decal_bloodfonth*/[663]={178,0,89,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*664 decal_bloodfontr*/[664]={178,0,139,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*665 decal_bloodfonty*/[665]={178,0,140,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*666 decal_bloodsplat2*/[666]={157,0,130,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*667 decal_logo_antenna*/[667]={77,0,182,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*668 decal_logo_armory*/[668]={77,0,178,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*669 decal_logo_biohazard*/[669]={77,0,180,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*670 decal_logo_bridge*/[670]={77,0,181,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*671 decal_logo_cyborg*/[671]={77,0,176,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*672 decal_logo_gears*/[672]={77,0,174,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*673 decal_logo_medical*/[673]={77,0,165,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*674 decal_logo_radhazard*/[674]={77,0,177,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*675 decal_logo_research*/[675]={77,0,175,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*676 decal_logo_security*/[676]={77,0,167,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*677 decal_painting1*/[677]={77,0,218,216,MAX_TXRS,217,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*678 decal_painting2*/[678]={77,0,220,219,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*679 decal_painting3*/[679]={77,0,222,221,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*680 decal_posterbetterfuture*/[680]={77,0,226,MAX_TXRS,MAX_TXRS,225,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*681 decal_postergenetics*/[681]={77,0,224,MAX_TXRS,MAX_TXRS,223,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*682 decal_scorch1*/[682]={77,0,227,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*683 decal_scorch2*/[683]={77,0,228,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*684 decal_scorch3*/[684]={77,0,229,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*685 decal_scorch4*/[685]={77,0,230,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*686 decal_scorchtiny*/[686]={77,0,232,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*687 decal_blood_splat*/[687]={77,0,234,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*688 func_switch1*/[688]={609,0,837,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.32f,0.04f,0.32f}},
+/*689 func_switch2*/[689]={610,0,839,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.0243553f,0.0f,0.000004883f},{0.0476318f,0.64f,0.64f}},
+/*690 func_switch3*/[690]={611,0,842,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.02285008f,0.000053061f,-0.000056993f},{0.02f,0.32f,0.32f}},
+/*691 func_switch4*/[691]={5715,0,846,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,47,0,{0.06f,0,0},{0.2f,0.64f,0.64f}},
+/*692 func_switch5*/[692]={614,0,848,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.64f,0.64f,0.08f}},
+/*693 func_switch5broken*/[693]={613,0,847,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.64f,0.64f,0.08f}},
+/*694 func_switch7*/[694]={612,0,854,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{1.523325f,0,0},{0.2008026f,0.64f,0.64f}},
+/*695 func_switch8*/[695]={616,0,856,855,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{-0.04f,0.0f,0.0001220703f},{0.08f,0.64f,0.64f}},
+/*696 func_switchbroken1*/[696]={617,0,618,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*697 clip_npc*/[697]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,{1.005016f,0,0},{2.010033f,16.0f,16.0f}},
+/*698 clip_objects*/[698]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_BOX,(V3){0,0,0},(V3){2.56f,2.56f,2.56f}},
+
+/*699 logic_relay*/[699]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*700 logic_branch*/[700]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*701 logic_timer*/[701]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*702 logic_spawner*/[702]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*703 info_teleport_destination*/[703]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0.75f,2.0f,1.0f}},
+
+/*704 prop_debris_panel*/[704]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*705 info_cyborgconversion*/[705]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*706 info_elev_destination*/[706]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*707 info_email*/[707]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*708 info_gameend*/[708]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*709 info_message*/[709]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*710 info_mission*/[710]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*711 info_note*/[711]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*712 info_playsound*/[712]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*713 info_ressurection_point*/[713]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*714 info_screenshake*/[714]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*715 info_spawnpoint*/[715]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*716 fx_reverbzone*/[716]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*717 ef_cyber_ice*/[717]={6516,U16_MAX,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,56,COLTYPE_SPH,{0.0f,0.004354001f,-0.014725f},{1.0f,0.0f,0.0f}},
+/*718 ef_fragexplosion*/[718]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*719 ef_line_sparqbeam*/[719]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*720 ef_mist*/[720]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*721 ef_particle_bloodspurtsmall*/[721]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*722 ef_particle_bloodspurtsmallgreen*/[722]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*723 ef_particle_bloodspurtsmallyellow*/[723]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*724 ef_particle_bloodspurttiny*/[724]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*725 ef_particle_camerahit*/[725]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*726 ef_particle_darthit*/[726]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*727 ef_particle_sec2muzburst*/[727]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*728 ef_particle_sec2rotmuzburst*/[728]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*729 ef_particle_sparksmall*/[729]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*730 ef_particle_sparksmallblue*/[730]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*731 ef_particle_sparqhit*/[731]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*732 ef_sparkspits*/[732]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*733 ef_spraydrips*/[733]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*734 ef_steam*/[734]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*735 env_sparksmall*/[735]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*736 TargetIDInstance, unused now*/[736]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*737 prop_papers01*/[737]={484,0,580,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*738 prop_papers02*/[738]={485,0,580,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*739 ef_particle_blasterhit*/[739]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*740 ef_particle_ionhit*/[740]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*741 us_puz_panel_blue_wire*/[741]={0,0,604,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
+/*742 us_puz_panel_brown_wire*/[742]={0,0,631,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
+/*743 us_puz_panel_gray_wire*/[743]={0,0,634,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
+/*744 us_puz_panel_red_wire*/[744]={0,0,625,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
+/*745 us_puz_panel_teal_wire*/[745]={0,0,601,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,43,0,{0,0,0},{0,0,0}},
+
+/*746 weapon_grenadeenergmine_live*/[746]={169,0,852,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*747 decal_logo_storage*/[747]={77,0,169,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*748 light_animated*/[748]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*749 generic_transform*/[749]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*750 chunk_crate_impenetrable2*/[750]={61,0,147,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*751 chunk_crate_impenetrable3*/[751]={61,0,148,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*752 chunk_crate_impenetrable4*/[752]={61,0,149,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*753 npc_sec3_bot, made with my son one day to show him blender, used the sprite sheet that was cut from the game*/[753]={681,0,553,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*754 prop_shieldgenerator*/[754]={143,0,316,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*755 unused*/[755]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*756 ef_particle_leafburst*/[756]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*757 ef_particle_mutationburst*/[757]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*758 ef_particle_graytationburst*/[758]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*759 through 766 unused*/[759]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*760 chunk_maint2_2_slice45*/[760]={6875,0,457,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*761*/[761]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*762*/[762]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*763*/[763]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*764*/[764]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*765*/[765]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*766*/[766]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
 /*767 player (mostly just so any index checks don't accidentally trigger against player by its index)*/[767]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
 /*768 gib_npc_bot_cortex_reaver_gib0*/[768]={5990,5990,543,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.5f,0.4f,0.5f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*769 gib_npc_bot_cortex_reaver_gib1*/[769]={5991,5991,543,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.5f,0.4f,0.5f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*770 gib_npc_bot_cortex_reaver_gib10*/[770]={5992,5992,543,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.5f,0.4f,0.5f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
@@ -401,14 +979,19 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*851 gib_sec_cpunode_gib_tower_002*/[851]={6073,6073,242,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.5f,0.4f,0.5f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*852 gib_sec_cpunode_gib_tower_003*/[852]={6074,6074,242,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.5f,0.4f,0.5f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
 /*853 gib_sec_cpunode_gib_towerpanel1*/[853]={6075,6075,242,MAX_TXRS,MAX_TXRS,MAX_TXRS,0.5f,0.4f,0.5f,MAX_ANIMS,COLTYPE_CVX,{0,0,0},{0,0,0}},
-/*854 unused*/[854]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*855 unused*/[855]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*kept empty: inside gib/dynamic constIndex ranges, unusable for static props*/
-/*856 prop_bridgewall2*/[856]={33,0,93,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*red bridge-wall variant (citmat2_1): same mesh as 537, texIndex 93. Scene instances carrying a citmat2_1 material override load as this (converter drops the override, so level records are remapped by position match)*/
-/*857 prop_bridgewall3*/[857]={33,0,85,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*blue bridge-wall variant (citmat1_3): same mesh as 537, texIndex 85*/
-/*858 prop_bridgewall4*/[858]={33,0,87,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*blue bridge-wall variant (citmat1_5): same mesh as 537, texIndex 87*/
-/*859 grovedome*/[859]={7487,0,316,MAX_TXRS,MAX_TXRS,160,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*Citadel constIndex 751. Unity prefab is a single GameObject with no collider and no albedo (blocker_grovedome.mat has a null _MainTex), so texIndex 316 reuses the translucent shield-panel shell already used for the shield generator dome and normIndex 160 is obsidian_normal.*/
-/*860 pumpkin1*/[860]={497,0,654,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*Citadel pumpkin1. Raw model prefab Assets/Models/pumpkin.blend (guid 943d2daa7acac6e4bba514691fa63eac), not a Prefabs/ entry. Model 497 is Models/pumpkin.obj, authored ~20 units across so level data carries lS 0.02. texIndex 654 is pumpkin_1.png; its _EmissionMap is the shared chunk_norm texture2darray rather than a glow map, hence no glowIndex. All three pumpkins have no collider.*/
-/*861 pumpkin2*/[861]={497,0,656,655,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},/*Citadel pumpkin2. texIndex 656 is pumpkin_2.png, glowIndex 655 is pumpkin_2_glow.png. lS 0.02.*/
-/*862 pumpkin3*/[862]={497,0,658,657,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}/*Citadel pumpkin3. texIndex 658 is pumpkin_3.png, glowIndex 657 is pumpkin_3_glow.png. lS 0.01/0.01/0.015, only pumpkin with non-uniform scale.*/
+
+/*854 unused*/[854]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*855 unused*/[855]={MAX_MDLS,0,MAX_TXRS,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*856 prop_bridgewall2*/[856]={33,0,93,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*857 prop_bridgewall3*/[857]={33,0,85,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*858 prop_bridgewall4*/[858]={33,0,87,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*859 grovedome*/[859]={7487,0,316,MAX_TXRS,MAX_TXRS,160,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+
+/*860 secret*/[860]={497,0,654,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*861 shhh*/[861]={497,0,656,655,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
+/*862 nothin to see here ;)*/[862]={497,0,658,657,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}}
 };
 
 static bool cardChunk[307]={/*0*/1,/*1*/1,/*2*/1,/*3*/1,/*4*/1,/*5*/1,/*6*/0,/*7*/1,/*8*/1,/*9*/0,/*10*/0,/*11*/1,/*12*/1,/*13*/1,/*14*/1,/*15*/1,/*16*/1,/*17*/1,/*18*/1,/*19*/1,/*20*/0,/*21*/1,/*22*/0,/*23*/1,/*24*/1,/*25*/1,/*26*/1,/*27*/1,/*28*/1,/*29*/1,/*30*/1,/*31*/0,/*32*/0,/*33*/1,/*34*/1,/*35*/1,/*36*/1,/*37*/1,/*38*/1,/*39*/1,/*40*/1,/*41*/1,/*42*/0,/*43*/0,/*44*/0,/*45*/1,/*46*/1,/*47*/1,/*48*/1,/*49*/1,/*50*/1,/*51*/1,/*52*/0,/*53*/1,/*54*/1,
@@ -443,78 +1026,73 @@ void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAni
     else if (sEqual(k,"targetname")) {lightTargetnameFile[lIdx] = IOInternName(v);}
 }
 
-u16 headmountedLanternLight; V3 lanternPos;
+u16 headmountedLanternLight;
+V3 lanternPos;
 #define CHGD(a,b) (vabs((a) - (b)) > 0.0001f)
 void UpdateLight(u16 i, V3 pos, Color3 col, float range, float intensity, float max, float min, float spotAng, Quaternion spotDir, bool on, bool shad) {
     bool changed = ((!!(World.lights[i].lflags & SHADON) - shad) || (!!(World.lights[i].lflags & LIGHTON) -  on) || CHGD(World.lights[i].range,range) || CHGD(World.lights[i].pos.x,pos.x) || CHGD(World.lights[i].pos.y,pos.y) || CHGD(World.lights[i].pos.z,pos.z));
-    World.lights[i].intensity=intensity; World.lights[i].minIntensity=min; World.lights[i].maxIntensity=max; World.lights[i].spotAng=spotAng; World.lights[i].spotDir=spotDir; World.lights[i].col=col; World.lights[i].pos=World.lightsNewPosition[i]=pos; World.lights[i].range=range; World.lights[i].lflags = (World.lights[i].lflags & ~(LIGHTON | SHADON | LDIRTY)) | ((World.lights[i].lflags & LDIRTY) | (changed << 4) | on | (shad << 1));
+    World.lights[i].intensity = intensity;
+    World.lights[i].minIntensity = min;
+    World.lights[i].maxIntensity = max;
+    World.lights[i].spotAng = spotAng;
+    World.lights[i].spotDir = spotDir;
+    World.lights[i].col = col;
+    World.lights[i].pos = World.lightsNewPosition[i]=pos;
+    World.lights[i].range = range;
+    World.lights[i].lflags = (World.lights[i].lflags & ~(LIGHTON | SHADON | LDIRTY)) | ((World.lights[i].lflags & LDIRTY) | (changed << 4) | on | (shad << 1));
 }
 #undef CHGD
+
 // Level Loading and Entity Management System
 void InitNPC(u16 i); bool IsLiveGrenade(u16);
 void CloseSearch(void);
-void DeleteInstance(u16 i) { if (i <= PLAYER1 || i >= World.instCount) return; if(World.Sys_UI.tetheredSearchable==i){CloseSearch();} for(u16 j=INSTS_1ST_IDX;j<World.instCount;++j){if(World.instances[j].enemy==i)World.instances[j].enemy=WORLD;} flag_set(&World.instances[i].entflags,EF_ACTIVE,false); } // Don't delete null ent, player 1, nor player 2 or already empty slots.
-/* HealthManager default per prefab constant, read off the health: field each prefab serializes in Citadel's
-   Assets/Resources/Prefabs/.  0 means the prefab has no health (chunks, foliage, gibs, decals) and IsDamageable()
-   then rejects it exactly as Unity's GetMainHealthManager would.  NPCs 419..447 are absent on purpose: AddInstance
-   draws theirs from npcTable[]. */
-/*Prefab constants that deviate from what AddInstance already knows: root scale, HealthManager health, and
-  HealthManager bloodType.  Values are the m_LocalScale / health / bloodType fields serialized in the matching
-  prefab under Citadel/Assets/Resources/Prefabs/.  The converter drops bloodType, so without this every prop reports
-  BloodType_None (Unity's own default, which maps to the orange SparksSmall pool per Const.cs GetImpactType) and
-  shots throw orange sparks off metal barrels, crates, cameras, CPU nodes and consoles; blood 4 (Robot) is the blue
-  SparksSmall pool.  NPCs 419..447 are absent on purpose: InitNPC draws theirs from npcBloodTypes[].  Health covers
-  every prefab whose level data leaves health unset -- runtime spawns, and any order-dependent read -- and is what
-  makes crates, consoles and se_corpse_* damageable at all, since a corpse with no health is rejected by IsDamageable
-  and can never be gibered.
-  Kept as a sparse list instead of three more EPerms columns: only 33 of 864 prefabs deviate, and appending three
-  fields to all 864 positional EDefs rows would churn the entire table to replace ~30 lines of switch.  scale
-  {0,0,0} means leave AddInstance's 1.0, health 0 means leave whatever the prefab or level data already set. */
+void DeleteInstance(u16 i) {
+    if (i <= PLAYER1 || i >= World.instCount) return;
+    
+    if (World.Sys_UI.tetheredSearchable==i) { CloseSearch(); }
+    for (u16 j=INSTS_1ST_IDX;j<World.instCount;++j) { if(World.instances[j].enemy==i)World.instances[j].enemy=WORLD; }
+    flag_set(&World.instances[i].entflags,EF_ACTIVE,false);
+}
+
 typedef struct { u16 entIdx; V3 scale; float health; BloodType blood; } PrefabConst;
 static const PrefabConst prefabConsts[] = {
-    {279, {0,0,0},      5.0f, BloodType_None},       /*chunk_screen*/
-    {424, {0.8f,0.8f,0.8f}, 0.0f, BloodType_None},   /*npc_cortex_reaver*/
-    {430, {0.9f,0.9f,0.9f}, 0.0f, BloodType_None},   /*npc_sec2_bot*/
-    {431, {0.4f,0.4f,0.4f}, 0.0f, BloodType_None},   /*npc_maint_bot*/
-    {433, {0.88f,0.88f,0.88f}, 0.0f, BloodType_None},/*npc_hopper*/
-    {439, {0.4f,0.4f,0.4f}, 0.0f, BloodType_None},   /*npc_zerog_mutant*/
-    {441, {0.75f,0.75f,0.75f}, 0.0f, BloodType_None},/*npc_repairbot*/
-    {444, {0.666f,0.666f,0.666f}, 0.0f, BloodType_None},/*npc_cyberguard*/
-    {445, {0.5f,0.5f,0.5f}, 0.0f, BloodType_None},   /*npc_cyberram*/
-    {446, {1.1f,1.1f,1.1f}, 0.0f, BloodType_None},   /*npc_cyber_reaver*/
-    {458, {0,0,0},     50.0f, BloodType_Robot},       /*prop_phys_barrel_chemical*/
-    {459, {0,0,0},     50.0f, BloodType_Robot},       /*prop_phys_barrel_radiation*/
-    {460, {0,0,0},     50.0f, BloodType_Robot},       /*prop_phys_barrel_toxic*/
-    {464, {0,0,0},     14.0f, BloodType_GrayMutation},/*se_briefcase*/
-    {465, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_blueshirt*/
-    {466, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_brownshirt*/
-    {467, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_eaten*/
-    {468, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_labcoat*/
-    {469, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_security*/
-    {470, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_tan*/
-    {471, {0,0,0},     50.0f, BloodType_Red},         /*se_corpse_torso*/
-    {472, {0,0,0},     20.0f, BloodType_GrayMutation},/*se_crate1*/
-    {473, {0,0,0},     20.0f, BloodType_GrayMutation},/*se_crate2*/
-    {474, {0,0,0},     20.0f, BloodType_GrayMutation},/*se_crate3*/
-    {475, {1.75f,1.75f,1.75f}, 20.0f, BloodType_GrayMutation},/*se_crate4*/
-    {476, {1.75f,1.75f,1.75f}, 20.0f, BloodType_GrayMutation},/*se_crate5*/
-    {477, {0,0,0},     10.0f, BloodType_Robot},       /*sec_camera*/
-    {478, {0,0,0},     50.0f, BloodType_Robot},       /*sec_cpunode*/
-    {479, {0,0,0},     35.0f, BloodType_Robot},       /*sec_cpunode_small*/
-    {525, {0,0,0},    200.0f, BloodType_Robot},       /*prop_console01*/
-    {526, {0,0,0},    200.0f, BloodType_Robot},       /*prop_console02*/
-    {553, {0.5f,0.5f,0.5f}, 0.0f, BloodType_None},   /*prop_cyber_decoy: the prefab root carries m_LocalScale 0.5 and Inventory.UseDecoy instantiates it without rescaling, so the decoy model renders at half size.*/
+    {279, {0.00f,0.00f,0.00f},    5.0f, BloodType_None},        /*chunk_screen*/
+    {424, {0.8f,0.80f,0.80f},     0.0f, BloodType_None},        /*npc_cortex_reaver*/
+    {430, {0.9f,0.9f,0.90f},      0.0f, BloodType_None},        /*npc_sec2_bot*/
+    {431, {0.40f,0.40f,0.40f},    0.0f, BloodType_None},        /*npc_maint_bot*/
+    {433, {0.88f,0.88f,0.88f},    0.0f, BloodType_None},        /*npc_hopper*/
+    {439, {0.40f,0.40f,0.40f},    0.0f, BloodType_None},        /*npc_zerog_mutant*/
+    {441, {0.75f,0.75f,0.75f},    0.0f, BloodType_None},        /*npc_repairbot*/
+    {444, {0.666f,0.666f,0.666f}, 0.0f, BloodType_None},        /*npc_cyberguard*/
+    {445, {0.5f,0.5f,0.5f},       0.0f, BloodType_None},        /*npc_cyberram*/
+    {446, {1.1f,1.1f,1.1f},       0.0f, BloodType_None},        /*npc_cyber_reaver*/
+    {458, {0,0,0},               50.0f, BloodType_Robot},       /*prop_phys_barrel_chemical*/
+    {459, {0,0,0},               50.0f, BloodType_Robot},       /*prop_phys_barrel_radiation*/
+    {460, {0,0,0},               50.0f, BloodType_Robot},       /*prop_phys_barrel_toxic*/
+    {464, {0,0,0},               14.0f, BloodType_GrayMutation},/*se_briefcase*/
+    {465, {0,0,0},               50.0f, BloodType_Red},         /*se_corpse_blueshirt*/
+    {466, {0,0,0},               50.0f, BloodType_Red},         /*se_corpse_brownshirt*/
+    {467, {0,0,0},               50.0f, BloodType_Red},         /*se_corpse_eaten*/
+    {468, {0,0,0},               50.0f, BloodType_Red},         /*se_corpse_labcoat*/
+    {469, {0,0,0},               50.0f, BloodType_Red},         /*se_corpse_security*/
+    {470, {0,0,0},               50.0f, BloodType_Red},         /*se_corpse_tan*/
+    {471, {0,0,0},               50.0f, BloodType_Red},         /*se_corpse_torso*/
+    {472, {0,0,0},               20.0f, BloodType_GrayMutation},/*se_crate1*/
+    {473, {0,0,0},               20.0f, BloodType_GrayMutation},/*se_crate2*/
+    {474, {0,0,0},               20.0f, BloodType_GrayMutation},/*se_crate3*/
+    {475, {1.75f,1.75f,1.75f},   20.0f, BloodType_GrayMutation},/*se_crate4*/
+    {476, {1.75f,1.75f,1.75f},   20.0f, BloodType_GrayMutation},/*se_crate5*/
+    {477, {0,0,0},               10.0f, BloodType_Robot},       /*sec_camera*/
+    {478, {0,0,0},               50.0f, BloodType_Robot},       /*sec_cpunode*/
+    {479, {0,0,0},               35.0f, BloodType_Robot},       /*sec_cpunode_small*/
+    {525, {0,0,0},              200.0f, BloodType_Robot},       /*prop_console01*/
+    {526, {0,0,0},              200.0f, BloodType_Robot},       /*prop_console02*/
+    {553, {0.5f,0.5f,0.5f}, 0.0f, BloodType_None},              /*prop_cyber_decoy*/
 };
-static const PrefabConst* PrefabConstFor(u16 entIdx) {
-    for (u32 k = 0; k < sizeof(prefabConsts)/sizeof(prefabConsts[0]); ++k) if (prefabConsts[k].entIdx == entIdx) return &prefabConsts[k];
-    return 0;
-}
-/*Centroid-geometry export nudge: the converter moved some prefab origins relative to Unity's, so the level file's
-  lP lands the model off from where the author placed it.  Added to the parsed position, never replacing it.
-  Applied unconditionally for any prefab in the list, which is safe because none of these constIndexes also appear
-  in the per-prefab chain it was pulled out of -- the chain's else-if gave every prefab at most one behaviour, and
-  the two scale-forcing cases (345, 540..544/586) that survive in it discard a bad exported lS rather than supply a
-  missing one, so they must keep running after this. */
+
+static const PrefabConst* PrefabConstFor(u16 entIdx) { for (u32 k = 0; k < sizeof(prefabConsts)/sizeof(prefabConsts[0]); ++k) { if (prefabConsts[k].entIdx == entIdx) { return &prefabConsts[k]; } } return 0; }
+
+/*TODO Replace this offset correction factor from level data by baking it into the level*.txt data*/
 typedef struct { u16 entIdx; V3 offset; } CgOffset;
 static const CgOffset cgOffsets[] = {
     {309, {0,0.12f,0}},   {365, {0,0.12f,0}},   {369, {0,0.12f,0}},   /*item_beaker, item_flask, item_testtube*/
@@ -546,20 +1124,35 @@ static const CgOffset cgOffsets[] = {
     {463, {0,0.64f,0}},   /*prop_phys_toolcart*/
     {472, {0,0.342f,0}},  {473, {0,0.342f,0}},  {474, {0,0.342f,0}},  {475, {0,0.342f,0}},  {476, {0,0.342f,0}},  /*se_crate1..5*/
 };
-static const CgOffset* CgOffsetFor(u16 entIdx) {
-    for (u32 k = 0; k < sizeof(cgOffsets)/sizeof(cgOffsets[0]); ++k) if (cgOffsets[k].entIdx == entIdx) return &cgOffsets[k];
-    return 0;
-}
 
-__attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {    if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; } if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return WORLD; }
-    u16 i = World.instCount; mset(&World.instances[i],0,sizeof(Entity)); World.instances[i].entflags=EF_ACTIVE; World.layer[i]=L_Default;World.instances[i].camView=255; World.instances[i].modelIndex=World.instances[i].lodIndex=World.instances[i].colMeshIndex=MAX_MDLS; World.scale[i].x=World.scale[i].y=World.scale[i].z=World.mass[i]=World.rotation[i].w=1.0f; World.dynamicFriction[i]=0.5f; World.staticFriction[i]=0.6f;
-    for (u8 slot=0;slot<4;++slot) World.instances[i].contents[slot]=World.instances[i].custIdx[slot]=-1; for (u8 slot=0;slot<7;++slot) World.instances[i].randomItem[slot]=World.instances[i].randomItemCustIdx[slot]=-1;
-    World.instances[i].index = entIdx;    World.position[i] = pos;
-    const PrefabConst* pc = PrefabConstFor(entIdx); if (pc && pc->scale.x) World.scale[i] = pc->scale;/*must land before InitNPC below, and before the level's own lS is applied: this supplies a missing prefab root scale, it does not override one. The scale-forcing cases further down (345, 540..544, 586) are the opposite and deliberately stay where they are, because those discard a bad exported lS -- 14.4 on the dartgun, 0.0398 on the tables and chairs -- rather than supplying a missing one.*/
-    if (IdxIsNPC(entIdx)){InitNPC(i); World.instances[i].npcNumber = ai_next_npc_number((u16)(entIdx - 419)); if (npcTable[entIdx - 419].type == NPCType_Cyber) { if (World.instances[i].cyberHealth <= 0.0f) World.instances[i].cyberHealth = npcTable[entIdx - 419].healthForCyberNPC; } else if (World.instances[i].health <= 0.0f) World.instances[i].health = npcTable[entIdx - 419].health;/*health/cyberHealth default when the record leaves them unset; a loaded -1 sentinel is kept off by the copy guard below*/}
-    else if (IsLiveGrenade(entIdx) && World.instances[i].health <= 0.0f) World.instances[i].health = 15.0f;/*all seven live grenade prefabs carry health 15; chain-detonate on damage*/
-    else if (entIdx == 574 /*prop_healingbed*/ && World.instances[i].health <= 0.0f) World.instances[i].health = 9999999.0f;/*prop_healingbed.prefab serializes health 9999999: the bed must be indestructible so it cannot be shot down under the player*/
-    World.instances[i].modelIndex=EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAX_TXRS ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
+static const CgOffset* CgOffsetFor(u16 entIdx) { for (u32 k = 0; k < sizeof(cgOffsets)/sizeof(cgOffsets[0]); ++k) { if (cgOffsets[k].entIdx == entIdx) { return &cgOffsets[k]; } } return 0; }
+
+__attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
+    if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; }
+    if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return WORLD; }
+    
+    u16 i = World.instCount;
+    mset(&World.instances[i],0,sizeof(Entity));
+    World.instances[i].entflags=EF_ACTIVE;
+    World.layer[i] = L_Default;World.instances[i].camView = 255; /*Sentinel value signaling that this mesh does not show a rendered camera view upon itself*/
+    World.instances[i].modelIndex = World.instances[i].lodIndex = World.instances[i].colMeshIndex = MAX_MDLS; /*Invalidate all model fields*/
+    World.scale[i].x = World.scale[i].y = World.scale[i].z = World.mass[i]=World.rotation[i].w=1.0f; /*Scale 1.0 for all axes, Quat Identity needs 1.0 for w*/
+    World.dynamicFriction[i] = 0.5f;
+    World.staticFriction[i] = 0.6f;
+    for (u8 slot=0;slot<4;++slot) { World.instances[i].contents[slot] = World.instances[i].custIdx[slot] = -1; }
+    for (u8 slot=0;slot<7;++slot) { World.instances[i].randomItem[slot] = World.instances[i].randomItemCustIdx[slot] = -1; }
+    World.instances[i].index = entIdx;
+    World.position[i] = pos;
+    const PrefabConst* pc = PrefabConstFor(entIdx);
+    if (pc && pc->scale.x) World.scale[i] = pc->scale;/*Default prefab scale (smaller sublist not in Edefs to save RAM).*/
+    if (IdxIsNPC(entIdx)) {
+        InitNPC(i); World.instances[i].npcNumber = ai_next_npc_number((u16)(entIdx - 419));
+        if (npcTable[entIdx - 419].type == NPCType_Cyber) {
+            if (World.instances[i].cyberHealth <= 0.0f) { World.instances[i].cyberHealth = npcTable[entIdx - 419].healthForCyberNPC; }
+        } else if (World.instances[i].health <= 0.0f) { World.instances[i].health = npcTable[entIdx - 419].health;/*health/cyberHealth default when the record leaves them unset; a loaded -1 sentinel is kept off by the copy guard below*/}
+    } else if (IsLiveGrenade(entIdx) && World.instances[i].health <= 0.0f) { World.instances[i].health = 15.0f; }
+    else if (entIdx == 574 /*prop_healingbed*/ && World.instances[i].health <= 0.0f) World.instances[i].health = 9999999.0f;/*Only the level 7 one is not industructible*/
+    World.instances[i].modelIndex = EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAX_TXRS ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAX_TXRS ? 0 : EDefs[entIdx].glowIndex;
     World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAX_TXRS ? 0 : EDefs[entIdx].specIndex; World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAX_TXRS ? 0 : EDefs[entIdx].normIndex; flag_set(&World.instances[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(entIdx));
     if (entIdx == 592 || entIdx == 593) { World.instances[i].modelIndex = U16_MAX; } // 3D text decals (no mesh)
     if (pc && pc->health > 0.0f && World.instances[i].health <= 0.0f) World.instances[i].health = pc->health;
@@ -592,6 +1185,14 @@ u16 TextMatIndexToTexIndex(u16 matIndex) {
 static char* MmapGetLine(char* buf, int sz){if(mm_ptr>=mm_end){return NULL;} const char* start=mm_ptr; const char* p=start; while(p<mm_end&&*p!='\n'){++p;} int lineLen=(int)(p-start); if(p<mm_end&&*p =='\n'){mm_ptr=p+1;}else{mm_ptr=mm_end;}if(lineLen >= sz){lineLen=sz-1;} mcpy(buf,(void*)start,lineLen); while(lineLen>0&&(buf[lineLen-1]=='\r' || buf[lineLen - 1]=='\n')){--lineLen;} buf[lineLen]='\0'; return buf;}
 static u16 fwParentSnap[MAX_LEVELS][INSTANCE_COUNT]; static bool fwSnapValid[MAX_LEVELS];/*per-level fwParentOf snapshot: fwParentOf is rewritten by every level load; SetLevelPointers restores the current level's*/
 u16 GetTeleportDestination(u8 lev,u16 id){return lev<MAX_LEVELS&&id<8?teleportDestinations[lev][id]:U16_MAX;}
+/*Position of a level's nth elevator destination volume, in level-data (Unity capsule-centre) space.  Reads the level's
+  own instance/position arrays rather than World.instances, which points at whichever level is currently loaded.*/
+bool GetElevatorDestinationPos(u8 lev,u8 nth,V3* outPos) {
+    if (lev>=MAX_LEVELS || nth>=elevatorDestCounts[lev]) return false;
+    u16 idx=elevatorDestinations[lev][nth]; if (idx<INSTS_1ST_IDX || idx>=World.levelInstCount[lev]) return false;
+    if (World.levelInstances[lev][idx].index!=706) return false;
+    *outPos=World.levelPosition[lev][idx]; return true;
+}
 void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
     if(teleportDestinationsInitialized)mcpy(World.TeleportTouch_allTeleportTouches,teleportDestinations[lev],sizeof(World.TeleportTouch_allTeleportTouches));
@@ -914,18 +1515,40 @@ void LoadLevelMod(u8 lev) {
         par->direction.x=src->direction.x; par->direction.y=src->direction.y; par->direction.z=src->direction.z; par->force=src->force;/*trigger_cyberpush (595): physics.c:536 scales .force by the target mass and pushes along .direction*/
         par->reverbMaxDist=src->reverbMaxDist; par->reverbPreset=src->reverbPreset; par->requiredAccessCard=src->requiredAccessCard; par->musicType=src->musicType; par->messageIndex=src->messageIndex; par->counter=src->counter; par->countToTrigger=src->countToTrigger; par->dontReset=src->dontReset; par->ioflagsHi=src->ioflagsHi; par->spawnIndex=src->spawnIndex; par->numberToSpawn=src->numberToSpawn; par->numberActive=src->numberActive; par->countOnlySameIndex=src->countOnlySameIndex; par->alertEnemiesOnAwake=src->alertEnemiesOnAwake; par->minDelayBetweenSpawns=src->minDelayBetweenSpawns; par->maxDelayBetweenSpawns=src->maxDelayBetweenSpawns; par->allSpawnedResetDelay=src->allSpawnedResetDelay; par->lockedMessageLingdex=src->lockedMessageLingdex; par->SFXIndex=src->SFXIndex; par->touchEnabled=src->touchEnabled; par->doorOpen=src->doorOpen; par->percentMoved=src->percentMoved;
         scpy_to_a_from_b(par->texAnimResourceFolder, src->texAnimResourceFolder, TARG_STRLEN);
-        if (entIdx == 517) { // func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative
-            V3 sp = par->startPosition; if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3_AplusB(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } // fallback for entries lacking startPosition
-            World.position[parent] = par->lastPosition = sp; World.rotation[parent] = quat_multiply(fwBaseRot[e],rotationFromFile[e]); World.scale[parent] = (V3){fwBaseScale[e].x*scaleFromFile[e].x,fwBaseScale[e].y*scaleFromFile[e].y,fwBaseScale[e].z*scaleFromFile[e].z}; par->targetPosition = V3_AplusB(sp,fwInfoLocal[e]);/*info_target offset denotes full travel*/ if (par->speed <= 0.0f) par->speed = 0.64f;
+        if (entIdx == 517) { /*func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative*/
+            V3 sp = par->startPosition;
+            if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3_AplusB(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } /*fallback for entries lacking startPosition*/
+            World.position[parent] = par->lastPosition = sp;
+            World.rotation[parent] = quat_multiply(fwBaseRot[e],rotationFromFile[e]);
+            World.scale[parent] = (V3){fwBaseScale[e].x * scaleFromFile[e].x, fwBaseScale[e].y * scaleFromFile[e].y, fwBaseScale[e].z * scaleFromFile[e].z}; par->targetPosition = V3_AplusB(sp,fwInfoLocal[e]);/*info_target offset denotes full travel*/ if (par->speed <= 0.0f) par->speed = 0.64f;
             for(u16 k=0;k<fwSlotCount[e];++k){u16 pi=fwPoolPrefab[fwSlotStart[e]+k]; if(pi>=307)continue; u16 c=AddInstance(pi,V3_AplusB(sp,quat_rot_v3(fwBaseRot[e],fwPoolPos[fwSlotStart[e]+k]))); if(c == 0)continue; World.rotation[c]=quat_multiply(fwBaseRot[e],fwPoolRot[fwSlotStart[e]+k]); V3 cs=fwPoolScale[fwSlotStart[e]+k]; World.scale[c]=(V3){World.scale[parent].x*cs.x,World.scale[parent].y*cs.y,World.scale[parent].z*cs.z}; fwParentOf[c]=parent;}
         }
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
-        if (entIdx >= 595 && entIdx <= 601) {if (colSzFromFile[e].x >= 0 || colSzFromFile[e].y>=0 || colSzFromFile[e].z>=0){World.colliderCenter[parent] = colCtrFromFile[e]; World.colliderSize[parent]=(V3){colSzFromFile[e].x<0.0f ? 1.0f : colSzFromFile[e].x,colSzFromFile[e].y<0.0f ? 1.0f : colSzFromFile[e].y,colSzFromFile[e].z<0.0f ? 1.0f : colSzFromFile[e].z };}else{World.colliderCenter[parent]=(V3){0,0,0}; World.colliderSize[parent]=(V3){1.f,1.f,1.f};}}
-        else if (entIdx == 706) { /* info_elev_destination: elev_volume child BoxCollider. Extents authored per-instance in level*.txt (extracted from CitadelScene prefab overrides). col stays COLTYPE_NONE so it never collides, only the trigger test. */
-            if (colSzFromFile[e].x >= 0 || colSzFromFile[e].y >= 0 || colSzFromFile[e].z >= 0) { World.colliderCenter[parent]=colCtrFromFile[e]; World.colliderSize[parent]=(V3){colSzFromFile[e].x<0.0f ? 2.56f : colSzFromFile[e].x,colSzFromFile[e].y<0.0f ? 2.56f : colSzFromFile[e].y,colSzFromFile[e].z<0.0f ? 2.56f : colSzFromFile[e].z}; } else { World.colliderCenter[parent]=(V3){0.013999939f,0.20199966f,0.03299904f}; World.colliderSize[parent]=(V3){2.56f,2.56f,2.56f}; } }
-        else if (entIdx == 697 || entIdx == 698) { /* clip_npc / clip_objects: BoxCollider extents are authored per-instance in level*.txt and parsed into colCtrFromFile / colSzFromFile (entity.c:747-748), but nothing ever copied them, so all 68 level-1 clip_npc boxes ran at the EDefs fallback 2.010033x16x16 -- invisible 16x16 m volumes straddling the sleeping drones. Apply them, same as 595..601 / 706 above. */
-            if (colSzFromFile[e].x >= 0 || colSzFromFile[e].y >= 0 || colSzFromFile[e].z >= 0) { World.colliderCenter[parent]=colCtrFromFile[e]; World.colliderSize[parent]=(V3){colSzFromFile[e].x<0.0f ? 2.56f : colSzFromFile[e].x,colSzFromFile[e].y<0.0f ? 2.56f : colSzFromFile[e].y,colSzFromFile[e].z<0.0f ? 2.56f : colSzFromFile[e].z}; } else { World.colliderCenter[parent]=(V3){0,0,0}; World.colliderSize[parent]=(V3){2.56f,2.56f,2.56f}; } }
-        else if (entIdx == 716) { World.col[parent] = COLTYPE_NONE; }
+        if (entIdx >= 595 && entIdx <= 601) {
+            if (colSzFromFile[e].x >= 0 || colSzFromFile[e].y>=0 || colSzFromFile[e].z>=0) {
+                World.colliderCenter[parent] = colCtrFromFile[e];
+                World.colliderSize[parent] = (V3){colSzFromFile[e].x<0.0f ? 1.0f : colSzFromFile[e].x,colSzFromFile[e].y < 0.0f ? 1.0f : colSzFromFile[e].y, colSzFromFile[e].z < 0.0f ? 1.0f : colSzFromFile[e].z};
+            } else{
+                World.colliderCenter[parent] = (V3){0.0f, 0.0f, 0.0f};
+                World.colliderSize[parent] = (V3){1.0f, 1.0f, 1.0f};
+            }
+        } else if (entIdx == 706) { /* info_elev_destination */
+            if (colSzFromFile[e].x >= 0 || colSzFromFile[e].y >= 0 || colSzFromFile[e].z >= 0) {
+                World.colliderCenter[parent] = colCtrFromFile[e];
+                World.colliderSize[parent] = (V3){colSzFromFile[e].x < 0.0f ? 2.56f : colSzFromFile[e].x, colSzFromFile[e].y < 0.0f ? 2.56f : colSzFromFile[e].y, colSzFromFile[e].z < 0.0f ? 2.56f : colSzFromFile[e].z};
+            } else {
+                World.colliderCenter[parent] = (V3){0.013999939f, 0.20199966f, 0.03299904f};
+                World.colliderSize[parent] = (V3){2.56f, 2.56f, 2.56f};
+            }
+        } else if (entIdx == 697 || entIdx == 698) {
+            if (colSzFromFile[e].x >= 0.0f || colSzFromFile[e].y >= 0.0f || colSzFromFile[e].z >= 0.0f) {
+                World.colliderCenter[parent]=colCtrFromFile[e];
+                World.colliderSize[parent]=(V3){colSzFromFile[e].x < 0.0f ? 2.56f : colSzFromFile[e].x, colSzFromFile[e].y < 0.0f ? 2.56f : colSzFromFile[e].y, colSzFromFile[e].z < 0.0f ? 2.56f : colSzFromFile[e].z};
+            } else {
+                World.colliderCenter[parent] = (V3){0.0f, 0.0f, 0.0f};
+                World.colliderSize[parent] = (V3){2.56f, 2.56f, 2.56f};
+            }
+        } else if (entIdx == 716) { World.col[parent] = COLTYPE_NONE; }
         else if (entIdx == 515 && EDefs[entIdx].col == COLTYPE_BOX && EDefs[entIdx].colSz.x == 0.0f && EDefs[entIdx].colSz.y == 0.0f && EDefs[entIdx].colSz.z == 0.0f) { World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f}; }
         if (entIdx == 700) par->currentTargetIdx = par->branchOnSecond ? par->target2Idx : par->targetIdx;
         { const CgOffset* co = CgOffsetFor(entIdx); if (co) World.position[parent] = V3_AplusB(World.position[parent], co->offset); }/*moved out of the chain below: none of these constIndexes collide with the cases that remain, so an add-then-switch is the same as the else-if it replaces*/
@@ -980,6 +1603,7 @@ void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
 void LoadLevelData(u8 curlevel) {
     if(!teleportDestinationsInitialized){for(u8 l=0;l<MAX_LEVELS;++l)for(u8 id=0;id<8;++id)teleportDestinations[l][id]=U16_MAX;teleportDestinationsInitialized=true;}
     if(curlevel<MAX_LEVELS)for(u8 id=0;id<8;++id)teleportDestinations[curlevel][id]=U16_MAX;
+    if(curlevel<MAX_LEVELS)elevatorDestCounts[curlevel]=0;
     World.curLev = curlevel; TargetIDReset(); ai_reset_npc_numbering(); SetLevelPointers(curlevel); World.invP1.makingNoise=false;/*clear noise at level loads*/ World.decoyActive=false; World.decoyInstance=U16_MAX;/*a decoy is spawned into one level and dies with it; a stale true would leave cyber NPCs retargeting a dead instance index*/ mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf)); LoadLevelMod(curlevel); GravityLiftSyncAllVisuals(); PSysAddLevelLoops(); if (curlevel<MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel]=true; } OS_Free(fbuf,(size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
@@ -1030,6 +1654,7 @@ void LoadLevelData(u8 curlevel) {
             case 596: World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); break; /*trigger_gravitylift*/
             case 701: LogicTimerInitBeforeLoad(i); break;
             case 703: World.layer[i]=L_Trigger;if(World.instances[i].teleportID < 8){teleportDestinations[curlevel][World.instances[i].teleportID]=i;World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} break;/*info_teleport_destination*/
+            case 706: if(curlevel<MAX_LEVELS&&elevatorDestCounts[curlevel]<MAX_ELEV_DESTS_PER_LEVEL)elevatorDestinations[curlevel][elevatorDestCounts[curlevel]++]=i; break;/*info_elev_destination: ordinal within the level, which is what Unity's flat elevatorTargetDestinations[] order amounts to*/
             case 555: CyberSwitchInitAfterLoad(i); break; // prop_cyber_switch
             case 480: CyberMineInitBeforeLoad(i); break;
             case 402: World.layer[i] = L_NPC; GrenadeInit(i); break;/*weapon_grenademine_live.  Level data is init-only, so every placed live landmine is an NPC mine; any layer other than L_PlayerBullets makes GrenadeIsNPCMine report true.  L_NPC rather than Unity's NPCBullet(24) because layerMaskPlayerAttack includes NPC but not NPCBullet, so only L_NPC lets player weapons and melee reach it.  GrenadeInit supplies the prefab damage/penetration/offense/attackType, which the level-load path otherwise leaves zero.*/
@@ -1136,20 +1761,86 @@ void LoadAllLevels() {
 
 void LoadLevel(u8 curlevel, V3 pos) {
     CloseSearch();
-    DebugRAM("start of LoadLevel"); World.levelCurrentlyLoading = true; World.paused = false; World.menuActive = false; RenderLoading("Loading level..."); if (World.currentLevel != curlevel) CopyPlayerState(World.currentLevel,curlevel);
-    if (World.currentLevel != curlevel) PSysClearLevel(World.currentLevel); World.curLev = curlevel; SetLevelPointers(curlevel); if (World.particles->count == 0) PSysAddLevelLoops(); mcpy(camViews,levelCamViews[curlevel],64 * sizeof(CamView)); mcpy(camViewTextures,levelCamViewTextures[curlevel],64 * sizeof(u32)); camViewCount = levelCamViewCount[curlevel];
-    for (int i = 0; i < camViewCount; ++i) { if (levelCamViews[curlevel][i].visible == false && camViews[i].visible == true) { mcpy(&levelCamViews[curlevel][i], &camViews[i], sizeof(CamView)); levelCamViewTextures[curlevel][i] = camViewTextures[i]; } } // Initialize missing level camview entries from file data
-    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce)); for (int i=0;i<World.loadedLights;++i) World.lightsNewPosition[i]=World.lights[i].pos;
-    ResetLevelAudio(); mp3_clear(); World.Sys_Music.levelEntry = true; World.Sys_Music.inZone = World.Sys_Music.cyberTube = false; World.Sys_Music.combatImpulseFinished = get_time(); World.Sys_Music.combatImpulseFinished += 5.0; RenderLoading("Loading cull system..."); CullInit(); // Must be after level!
-    glUseProgram(voxelUpdateSP); glUniform2f(0,World.voxMinCtrX[World.curLev],World.voxMinCtrZ[World.curLev]); glUniform1f(1,World.farPlane[World.curLev] * World.farPlane[World.curLev]); glUniform1ui(2,World.loadedLights); glUniform2f(3,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(4,SHADOW_MAP_SIZE); glUniform1ui(6,(u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(7,SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);
-    RenderLoading("Loading voxel lighting data..."); for (u16 i = 0; i < World.loadedLights; i++) { World.lightsNewPosition[i] = World.lights[i].pos; }
-    mset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,World.loadedLights * sizeof(u32));
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e=&World.instances[i]; if (IdxIsNPC(e->index) && e->enemy == PLAYER1) e->enemy = WORLD; /*level entry: NPCs drop the player, so nothing re-aggros from the level they came from*/
-        if (World.diffCbt == 0 && IdxIsNPC(e->index)) { if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->health = 0.0f; e->cyberHealth = 0.0f; } else { e->health = 1.0f; if (npcTable[e->index - 419].type == NPCType_Cyber) e->cyberHealth = 1.0f; } } /*Combat 0 is one-hit-kills; corpse-only NPCs stay dead.  cyberHealth is only written for cyber NPCs, because IsCyberEntity routes damage by cyberHealth > 0 and blanketing it would turn every NPC into a cyber one.*/ }
-    /* SpawnManager.Start() scales the target population by combat difficulty (SpawnManager.cs:110-120).  Applied
-       here, not in AddInstance, because the level data overwrites numberToSpawn after AddInstance runs. */
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* e = &World.instances[i]; if (e->index != 702) continue; u16 n = e->numberToSpawn; if (World.diffCbt == 1) n = (u16)(n / 2); else if (World.diffCbt == 3) n = (u16)(n + n / 2); else if (World.diffCbt > 3) n = (u16)(n * 5); e->numberToSpawn = (n < 1) ? 1 : n; e->delayFinished = World.pauseRelativeTime; }
-    World.levelCurrentlyLoading = false; World.position[PLAYER1]=pos; World.velocity[PLAYER1]=(V3){0,0,0}; World.invP1.lastVelY=0.0f; World.invP1.wasGrounded=true; World.invP1.ladderState=0; World.invP1.noiseFinished=World.pauseRelativeTime-1.0;/*ladder and noise timers are absolute pauseRelativeTime stamps, so without this a climb on the way out silences the first steps of the next level and its NPCs hear the player.  Ladder and grav lift contact state are already re-derived every substep (physics.c:439, :505).*/ DebugRAM("end of LoadLevel");
+    DebugRAM("start of LoadLevel");
+    World.levelCurrentlyLoading = true;
+    World.paused = World.menuActive = false;
+    RenderLoading("Loading level...");
+    if (World.currentLevel != curlevel) {
+        CopyPlayerState(World.currentLevel,curlevel);
+        PSysClearLevel(World.currentLevel);
+        World.curLev = curlevel;
+        SetLevelPointers(curlevel);
+    }
+    
+    if (World.particles->count == 0) { PSysAddLevelLoops(); }
+    
+    mcpy(camViews, levelCamViews[curlevel],64 * sizeof(CamView));
+    mcpy(camViewTextures, levelCamViewTextures[curlevel], 64 * sizeof(u32));
+    camViewCount = levelCamViewCount[curlevel];
+    for (int i = 0; i < camViewCount; ++i) { /*Initialize missing level camview entries from file data*/
+        if (levelCamViews[curlevel][i].visible == false && camViews[i].visible == true) {
+            mcpy(&levelCamViews[curlevel][i], &camViews[i], sizeof(CamView));
+            levelCamViewTextures[curlevel][i] = camViewTextures[i];
+        }
+    }
+    
+    mset(alreadyReadLightOnOnce, 0, sizeof(alreadyReadLightOnOnce));
+    for (int i=0;i<World.loadedLights;++i) { World.lightsNewPosition[i]=World.lights[i].pos; }
+    ResetLevelAudio();
+    mp3_clear();
+    World.Sys_Music.levelEntry = true;
+    World.Sys_Music.inZone = World.Sys_Music.cyberTube = false;
+    World.Sys_Music.combatImpulseFinished = get_time();
+    World.Sys_Music.combatImpulseFinished += 5.0;
+    RenderLoading("Loading cull system...");
+    CullInit(); // Must be after level!
+    glUseProgram(voxelUpdateSP);
+    glUniform2f(0, World.voxMinCtrX[World.curLev], World.voxMinCtrZ[World.curLev]);
+    glUniform1f(1, World.farPlane[World.curLev] * World.farPlane[World.curLev]);
+    glUniform1ui(2, World.loadedLights);
+    glUniform2f(3, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]);
+    glUniform1ui(4, SHADOW_MAP_SIZE);
+    glUniform1ui(6, (u32)MAX_LIGHTS_PER_VOXEL);
+    glUniform1ui(7, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
+    RenderLoading("Loading voxel lighting data...");
+    for (u16 i=0;i<World.loadedLights;++i) { World.lightsNewPosition[i] = World.lights[i].pos; }
+    mset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, World.loadedLights * sizeof(u32));
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
+        Entity* e = &World.instances[i];
+        if (IdxIsNPC(e->index) && e->enemy == PLAYER1) { e->enemy = WORLD; /*level entry: NPCs drop the player, so nothing re-aggros from the level they came from*/ }
+        
+        if (World.diffCbt == 0 && IdxIsNPC(e->index)) { /*Combat difficulty 0 == one hit kill; corpse-only NPCs need to stay dead.*/
+            if (e->entflags & EF_ACT_AS_CORPSE_ONLY) {
+                e->health = 0.0f;
+                e->cyberHealth = 0.0f;
+            } else {
+                e->health = 1.0f;
+                if (npcTable[e->index - 419].type == NPCType_Cyber) { e->cyberHealth = 1.0f; }
+            }
+        }
+    }
+    
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
+        Entity* e = &World.instances[i];
+        if (e->index != 702) continue;
+        
+        u16 n = e->numberToSpawn;
+        if (World.diffCbt == 1) { n = (u16)(n / 2); }
+        else if (World.diffCbt == 3) { n = (u16)(n + n / 2); }
+        else if (World.diffCbt > 3) { n = (u16)(n * 5); }
+        
+        e->numberToSpawn = (n < 1) ? 1 : n;
+        e->delayFinished = World.pauseRelativeTime;
+    }
+    
+    World.levelCurrentlyLoading = false;
+    World.position[PLAYER1] = pos;
+    World.velocity[PLAYER1] = (V3){0.0f, 0.0f, 0.0f};
+    World.invP1.lastVelY = 0.0f;
+    World.invP1.wasGrounded = true;
+    World.invP1.ladderState = 0;
+    World.invP1.noiseFinished=World.pauseRelativeTime - 1.0;
+    DebugRAM("end of LoadLevel");
 }
 // HUD sensaround cameras: repositioned at the player each frame and oriented from the player's facing.
 // Center(rear) shows whatever is behind the player when the hardware is active (version > 0); the left/right

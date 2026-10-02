@@ -688,7 +688,7 @@ index: 490
 index: 491
 #Models/plastique.obj
 index: 492
-#Models/poisonbush1.obj
+#Models/poisonbush1.glb
 index: 493
 #Models/pot.obj
 index: 494
@@ -2189,11 +2189,6 @@ index: 7446
 animated: 1
 animationNum: 52
 frame: 1 40
-# Moved from 5989 (delta +1457).  40 frames at 5989 packed 5989..6028 and swallowed 39 gib meshes that follow it
-# (npc_bot_cortex_reaver_gib0..gib10, npc_botexec_gib*, npc_flierbot_gib*, npc_maintenancebot_gib*, npc_repairbot_gib1*).
-# entity.c const indices 768..806 name those models directly, so each of those gibs would have rendered as an energy-mine
-# frame.  5989..6028 is now a free hole.
-#Models/grovedome.obj
-index: 7487
+
 #Models/grove1_2_slice45.obj
 index: 7488
