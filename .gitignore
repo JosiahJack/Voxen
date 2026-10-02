@@ -13,3 +13,4 @@ Shaders/*.h
 Data/sav*.bin
 Data/introdone.dat
 ./Tools/__pycache__/*
+voxen.rdi

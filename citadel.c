@@ -1452,34 +1452,46 @@ bool SearchTakeSlot(u8 slot) {
 void SearchObject(int searchable) {
     UpdateSearchTether();
     if (searchable<INSTS_1ST_IDX || searchable>=World.instCount || !(World.instances[searchable].entflags&EF_ACTIVE)) return;
-    Entity* e=&World.instances[searchable];
-    static bool loggedSearch=false;
-    if (!loggedSearch) {
-        DualLog("SearchObject: instance=%d constIndex=%u tether=%u srchInUse=%d contents=[%d,%d,%d,%d] custIdx=[%d,%d,%d,%d]\n",searchable,(u32)e->index,(u32)World.Sys_UI.tetheredSearchable,(int)e->srchInUse,(int)e->contents[0],(int)e->contents[1],(int)e->contents[2],(int)e->contents[3],(int)e->custIdx[0],(int)e->custIdx[1],(int)e->custIdx[2],(int)e->custIdx[3]);
-        loggedSearch=true;
-    }
+    Entity* e = &World.instances[searchable];
     if (World.Sys_UI.tetheredSearchable==searchable && e->srchInUse) {
-        for (u8 slot=0;slot<4;++slot) if (e->contents[slot]>=0) { SearchTakeSlot(slot); return; }
+        for (u8 slot=0;slot<4;++slot) {
+            if (e->contents[slot]>=0) {
+                SearchTakeSlot(slot);
+                return;
+            }
+        }
+        
         return;
     }
-    CloseSearch(); World.Sys_UI.tetheredSearchable=World.invP1.currentSearchItem=(u16)searchable; e->srchInUse=true;
-    World.Sys_UI.objectInUsePos=World.position[searchable]; World.Sys_UI.usingObject=true;
-    MFD_OpenSearch(World.Sys_UI.lastSearchSideRH); SearchFXEnable(World.Sys_UI.lastSearchSideRH?1:0);
-    play_wav(sounds[91], AppliedFXVol(0.75f), (V3){0,0,0}, false); ForceInventoryMode();
+    CloseSearch();
+    World.Sys_UI.tetheredSearchable = World.invP1.currentSearchItem = (u16)searchable;
+    e->srchInUse = true;
+    World.Sys_UI.objectInUsePos = World.position[searchable];
+    World.Sys_UI.usingObject = true;
+    MFD_OpenSearch(World.Sys_UI.lastSearchSideRH);
+    SearchFXEnable(World.Sys_UI.lastSearchSideRH ? 1 : 0);
+    play_wav(sounds[91], AppliedFXVol(0.75f), (V3){0,0,0}, false);
+    ForceInventoryMode();
 }
-// Mission timer. Port of MissionTimer.cs (ScriptsTODO/MissionTimer.cs): Awake/UpdateToNextMission/Update.
-// Display (minutes/seconds countdown + mission label) is derived from misTimerT/misTimerMission at render time (ui.c MissionTimer/MissionTimerT, still placeholders); only logic lives here.
-void MissionTimerInit(void) { // Port of MissionTimer.Awake. Called on new game (see NewGame in voxen.c).
-    World.misTimerT = 6000.0f; World.misTimerFinished = World.pauseRelativeTime + 1.0f;
-    World.misTimerMission = 504; World.misTimerCurIdx = 0; World.misTimerLast = World.misTimerTimesUP = false;
+
+void MissionTimerInit(void) {
+    World.misTimerT = 6000.0f;
+    World.misTimerFinished = World.pauseRelativeTime + 1.0f;
+    World.misTimerMission = 504;
+    World.misTimerCurIdx = 0;
+    World.misTimerLast = World.misTimerTimesUP = false;
 }
+
 void MissionTimerUpdateToNextMission(float newTimerAmount,int misTextIndex,int nextMissionIndex) {
     if (World.misTimerCurIdx == (u8)nextMissionIndex) return;
-    // Unity also notifies QuestLogNotesManager here; that script is not ported (see ui_todo.md D2), so only the timer itself advances.
     if (World.diffMis < 3) return; // Don't update timer on lower skill settings.
-    World.misTimerT = newTimerAmount; World.misTimerCurIdx = (u8)nextMissionIndex; World.misTimerMission = (u16)misTextIndex;
-    if (World.misTimerCurIdx == 4) World.misTimerLast = true; // No gameover for last timer.
+    
+    World.misTimerT = newTimerAmount;
+    World.misTimerCurIdx = (u8)nextMissionIndex;
+    World.misTimerMission = (u16)misTextIndex;
+    if (World.misTimerCurIdx == 4) { World.misTimerLast = true; /*No gameover for last timer.*/ }
 }
+
 void MissionTimerUpdate(void) { // Port of MissionTimer.Update. Called from ModUpdate below.
     if (World.diffMis < 3) return;
     if (World.paused || World.menuActive) return;
@@ -1490,22 +1502,26 @@ void MissionTimerUpdate(void) { // Port of MissionTimer.Update. Called from ModU
             return;
         }
     }
+    
     if (World.misTimerT <= 0.0f) {
         if (World.misTimerLast) {
             World.misTimerMission = 509; // Unity shows countdown text 869 + label 509 here; the 869 countdown is render-side, the label index is stored.
             World.misTimerTimesUP = true;
             return;
         }
+        
         // Unity calls PlayerHealth.PlayerDeathToMenu (instant mission-fail death to menu). No equivalent in Voxen, so route through the normal death flow instead (resurrection still applies).
         World.instances[PLAYER1].health = 0.0f; Death(PLAYER1,false);
         return;
     }
+    
     switch (World.misTimerCurIdx) {
         case 0: if (QuestBitIsSet(QB_LaserDestroyed)) MissionTimerUpdateToNextMission(10800.0f,505,1); break;
         case 1: if (QuestBitIsSet(QB_AntennaNorthDestroyed) && QuestBitIsSet(QB_AntennaSouthDestroyed) && QuestBitIsSet(QB_AntennaEastDestroyed) && QuestBitIsSet(QB_AntennaWestDestroyed)) MissionTimerUpdateToNextMission(2700.0f,506,2); break;
         case 2: if (QuestBitIsSet(QB_SelfDestructActivated)) MissionTimerUpdateToNextMission(3000.0f,507,3); break;
         case 3: if (QuestBitIsSet(QB_BridgeSeparated)) MissionTimerUpdateToNextMission(2700.0f,506,4); break;
     }
+    
     if (World.misTimerFinished < World.pauseRelativeTime) { World.misTimerT -= 1.0f; World.misTimerFinished = World.pauseRelativeTime + 1.0; }
 }
 static int UseNameTableIndex(int index) {
@@ -1528,22 +1544,55 @@ static int UseNameTableIndex(int index) {
         case 685: return 1031; case 686: return 1031; case 687: return 1030; default: return -1; // No name available; caller will print just the prefix
     }
 }
-/*Pumpkin easter eggs.  Unity gives these three nothing but a targetname carrying the joke, so they have no string-table entry, UseNameTableIndex returns -1, and the frob prefix printed with an empty name.  Print the interned targetname verbatim instead -- never localized, which is correct here since the source strings bypass the string table entirely.  Returns NULL for every other index so the callers fall back unchanged.*/
-static const char* UseSecretText(int index, u16 inst) {
-    if (index < 860 || index > 862 || inst >= World.instCount) {return NULL;}
+
+static const char* UseSecretText(int index, u16 inst) { /*sshhhhhh, pretend you didn't see this ;)*/
+    if (index < 860 || index > 862 || inst >= World.instCount) { return NULL; }
     u16 n = World.instances[inst].targetnameIdx;
     return (n && n < MAX_IO_NAMES) ? ioNames[n] : NULL;
 }
 
 void UseEntity(u16 i) {
     Entity* ent = &World.instances[i];
-    if (IdxIsSearchable(ent->index) || (World.layer[i]&(L_Corpse|L_CorpseSearchable)) || (IdxIsGib(ent->index) && (World.layer[i]&L_Corpse))) { SearchObject(i); } else if (IdxIsDoor(ent->index)) DoorUse(i,PLAYER1); else if (IdxIsNPC(ent->index)) CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[World.instances[i].index - 419].name); else if (IdxIsButtonSwitch(ent->index)) ButtonSwitchUse(i,PLAYER1);
-    else if(ent->index==574) HealingBedUse(i,PLAYER1); else if(ent->index==546) ChargeStationUse(i,PLAYER1); else if(ent->index==614||ent->index==602) RelayPanelUse(i); else if(IsElevatorPanel(ent->index)) ElevatorPanelUse(i); else if(ent->index==608) KeycodePanelUse(i); else if(IsPuzzleGridPanel(ent->index)||IsPuzzleWirePanel(ent->index)) PuzzlePanelUse(i); else if(ent->index==603) PaperLogUse(i);
-    else if (IdxIsGeometry(ent->index)) { int t = UseNameTableIndex(ent->index); const char* sec = UseSecretText(ent->index,i); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],sec ? sec : (t >= 0 ? Sys_Text.stringTable[t] : "")); }
-    else if (IdxIsUsableObject(ent->index)) {
-        World.invP1.holdingObject = true; World.invP1.heldObjectIndex = ent->index; World.invP1.heldObjectCustIdx = ent->customIndex; World.invP1.heldAmmo = ent->ammo; World.invP1.heldAmmo2 = ent->ammo2; World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
-        if (Sys_Settings.QuickItemPickup) { AddItemToInventory(ent->index,ent->customIndex); ResetHeldItem(); } else { CenterStatusPrint("%s%s",Sys_Text.stringTable[World.invP1.heldObjectIndex - 307 + 326],Sys_Text.stringTable[319]); /* picked up.*/ ForceInventoryMode(); }/*Inventory mode is turned on when picking something up*/ DeleteInstance(i);
-    } else { int t = UseNameTableIndex(ent->index); const char* sec = UseSecretText(ent->index,i); CenterStatusPrint("%s%s",Sys_Text.stringTable[29],sec ? sec : (t >= 0 ? Sys_Text.stringTable[t] : "")); }
+    if (   IdxIsSearchable(ent->index)
+        || (World.layer[i]&(L_Corpse|L_CorpseSearchable))
+        || (IdxIsGib(ent->index) && (World.layer[i] & L_Corpse)) ) {
+        
+        SearchObject(i);
+    } else if (IdxIsDoor(ent->index)) { DoorUse(i,PLAYER1); }
+    else if (IdxIsNPC(ent->index)) { CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[World.instances[i].index - 419].name); }
+    else if (IdxIsButtonSwitch(ent->index)) { ButtonSwitchUse(i,PLAYER1); }
+    else if (ent->index==574) { HealingBedUse(i,PLAYER1); }
+    else if (ent->index==546) { ChargeStationUse(i,PLAYER1); }
+    else if (ent->index==614||ent->index==602) { RelayPanelUse(i); }
+    else if (IsElevatorPanel(ent->index)) { ElevatorPanelUse(i); }
+    else if (ent->index==608) { KeycodePanelUse(i); }
+    else if (IsPuzzleGridPanel(ent->index)||IsPuzzleWirePanel(ent->index)) { PuzzlePanelUse(i); }
+    else if (ent->index==603) { PaperLogUse(i); }
+    else if (IdxIsGeometry(ent->index)) {
+        int t = UseNameTableIndex(ent->index);
+        const char* sec = UseSecretText(ent->index,i);
+        CenterStatusPrint("%s%s", Sys_Text.stringTable[29], sec ? sec : (t >= 0 ? Sys_Text.stringTable[t] : ""));
+    } else if (IdxIsUsableObject(ent->index)) {
+        World.invP1.holdingObject = true;
+        World.invP1.heldObjectIndex = ent->index;
+        World.invP1.heldObjectCustIdx = ent->customIndex;
+        World.invP1.heldAmmo = ent->ammo;
+        World.invP1.heldAmmo2 = ent->ammo2;
+        World.invP1.heldObjectLoadedAlternate = ent->heldObjectLoadedAlternate;
+        if (Sys_Settings.QuickItemPickup) { 
+            AddItemToInventory(ent->index,ent->customIndex);
+            ResetHeldItem();
+        } else {
+            CenterStatusPrint("%s%s", Sys_Text.stringTable[World.invP1.heldObjectIndex - 307 + 326], Sys_Text.stringTable[319]); /* picked up.*/
+            ForceInventoryMode();
+        }
+        
+        DeleteInstance(i);
+    } else {
+        int t = UseNameTableIndex(ent->index);
+        const char* sec = UseSecretText(ent->index,i);
+        CenterStatusPrint("%s%s",Sys_Text.stringTable[29],sec ? sec : (t >= 0 ? Sys_Text.stringTable[t] : ""));
+    }
 }
 
 INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy){float px=(World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f)+dx,py=(World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f)+dy,t=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,nx=(px-(float)UI_W*0.5f)/((float)UI_W*0.5f),ny=((float)UI_H*0.5f-py)/((float)UI_H*0.5f);V3 v=V3_Normalize((V3){nx*aspect*t,ny*t,-1.0f}),ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(r,ff));return(V3){v.x*r.x+v.y*up.x+v.z*ff.x,v.x*r.y+v.y*up.y+v.z*ff.y,v.x*r.z+v.y*up.z+v.z*ff.z};}
@@ -1568,50 +1617,112 @@ void DrawAIDebug(u16 i) {
     DrawSphereWireframe(dbgCol, (ShapeSphere){sightPt, 0.32f});
 }
 
-/* sec_camera (477) SecurityCameraRotate.  Sweeps the camera back and forth between startYAngle and endYAngle,
-   pausing waitTime at each end, and only advances while the mesh is on screen (Unity: mR.isVisible).  Unity calls
-   transform.Rotate(0, degreesYPerSecond * tickTime, 0, Space.World) once per Update() and never uses tickTime as a
-   timestep, so at 60Hz that is 4 * 0.1 = 0.4 deg per frame = 24 deg/sec; stepped by World.dt here so the sweep speed
-   does not track the frame rate.  The yaw is composed onto the authored rotation rather than accumulated in world
-   space, which is what the wrapper-GameObject note in SecurityCameraRotate.cs describes and keeps the prefab's droop
-   from precessing.  Start(): waitingFinished = relativeTime, rotatePositive = true. */
-#define CAM_SWEEP_DEG_PER_SEC 24.0f
-#define CAM_SWEEP_EPSILON    1.0f
-INLINE float CamYawFromQuat(Quaternion q) { /*standard ZYX yaw extraction, only used to seed the sweep, so Unity's
-    ZXY eulerAngles.y ordering does not have to be reproduced exactly*/
-    float d = __builtin_atan2f(2.0f*(q.x*q.z + q.y*q.w), 1.0f - 2.0f*(q.x*q.x + q.y*q.y)) * (180.0f / 3.14159265f); /*m02/m22 of the rotation matrix: Unity eulerAngles.y, i.e. the Y angle of the ZXY decomposition, which is what startYAngle/endYAngle were authored against.  The ZYX form (2(wy+xz) over 1-2(y^2+z^2)) agrees for an untilted camera but diverges once the prefab droop is present, which every level camera has.*/
+INLINE float CamYawFromQuat(Quaternion q) { /*standard ZYX yaw extraction, only used to seed the sweep, so Unity's ZXY eulerAngles.y ordering does not have to be reproduced exactly*/
+    float d = __builtin_atan2f(2.0f * (q.x*q.z + q.y*q.w), 1.0f - 2.0f * (q.x*q.x + q.y*q.y)) * (180.0f / 3.14159265f);
     if (d < 0.0f) d += 360.0f; return d;
 }
-void SecurityCameraRotateUpdate(u16 self) {
-    Entity* e = &World.instances[self]; if (!e->camRotateEnabled) return;/*Unity: sec_camera.prefab ships SecurityCameraRotate disabled, so Unity dispatches no Update() at all for the 127 enabled:0 records*/
+
+void SecurityCameraRotateUpdate(u16 self) { /*Sweeps the camera back and forth between startYAngle and endYAngle about the Y axis (yaw) only*/
+    Entity* e = &World.instances[self];
+    if (!e->camRotateEnabled) return;
     if (!(e->entflags & EF_ACTIVE)) return;
-    /*Unity: if (mR == null || !mR.isVisible || !mR.enabled) return -- the sweep is frozen whenever the camera is
-       off screen.  playerFrustumPlanes is rebuilt in Render(), so here it still holds last frame's planes, which is
-       fine for a gate.  Unity mR.isVisible is true when any part of the renderer is in frustum, hence the radius. */
     if (!SphereInFrustum(playerFrustumPlanes, World.position[self], 1.28f)) return;
-    if (!e->camSweepInit) { e->camSweepInit = true; e->camBaseRot = World.rotation[self]; e->camYaw0 = CamYawFromQuat(e->camBaseRot); e->camYaw = e->camYaw0; }/*seeded lazily so the authored lR.* has already been applied*/
-    if (e->camWaitingFinished >= World.pauseRelativeTime) return;/*Unity: if (waitingFinished < relativeTime)*/
+    
+    if (!e->camSweepInit) { e->camSweepInit = true; e->camBaseRot = World.rotation[self]; e->camYaw0 = CamYawFromQuat(e->camBaseRot); e->camYaw = e->camYaw0; }
+    if (e->camWaitingFinished >= World.pauseRelativeTime) return;
+        
     float dt = World.dt;
-    if (e->camRotatePositive) { if (vabs(e->camYaw - e->camEndYAngle) <= CAM_SWEEP_EPSILON) { e->camRotatePositive = false; e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime; } else e->camYaw += CAM_SWEEP_DEG_PER_SEC * dt; }
-    else { if (vabs(e->camYaw - e->camStartYAngle) <= CAM_SWEEP_EPSILON) { e->camRotatePositive = true; e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime; } else e->camYaw -= CAM_SWEEP_DEG_PER_SEC * dt; }
-    if (e->camYaw < 0.0f) e->camYaw += 360.0f; else if (e->camYaw >= 360.0f) e->camYaw -= 360.0f;
-    /*Absolute, not cumulative: composed onto the captured authored rotation.  Pre-multiplying the (camYaw-camYaw0) delta onto the previous frame's result would sum 0.4+0.8+1.2+... instead of applying 0.4 each frame, and each world-space Y pre-multiply would precess the prefab droop, which is the skew. */
-    float half = deg2rad(e->camYaw - e->camYaw0) * 0.5f; Quaternion yaw = {0.0f, vsinf(half), 0.0f, vcosf(half)};
+    if (e->camRotatePositive) { // flip
+        if (vabs(e->camYaw - e->camEndYAngle) <= 1.0f) {
+            e->camRotatePositive = false;
+            e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime;
+        } else e->camYaw += 24.0f * dt;
+    } else { // ney ney
+        if (vabs(e->camYaw - e->camStartYAngle) <= 1.0f) {
+            e->camRotatePositive = true;
+            e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime;
+        } else e->camYaw -= 24.0f * dt;
+    }
+    
+    if (e->camYaw < 0.0f) { e->camYaw += 360.0f; }
+    else if (e->camYaw >= 360.0f) { e->camYaw -= 360.0f; }
+    
+    float half = deg2rad(e->camYaw - e->camYaw0) * 0.5f;
+    Quaternion yaw = {0.0f, vsinf(half), 0.0f, vcosf(half)};
     World.rotation[self] = quat_multiply(yaw, e->camBaseRot);
 }
 
 void ModUpdate() {
-    if (World.paused || World.menuActive) return; UpdateSearchTether(); WeaponsUpdate(); InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate(); if (Use()) Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f});
+    if (World.paused || World.menuActive) return;
+    
+    UpdateSearchTether();
+    WeaponsUpdate();
+    InventoryUpdate();
+    PlayerEnergyUpdate();
+    PatchUpdate();
+    HardwareUpdate();
+    MissionTimerUpdate();
+    if (Use()) { Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); }
+    if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) { DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f}); }
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e = &World.instances[i]; u16 constdex = e->index; if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) GrenadeUpdate(i); DelayedSpawnUpdate(i); if(constdex==CYBER_DECOY_CONST) CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ if(constdex==614) RelayPanelUpdate(i); if(IsPuzzleGridPanel(constdex)) PuzzlePanelUpdate(i); if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) TextureSequenceUpdate(i); if(IdxIsButtonSwitch(constdex)){ButtonSwitchUpdate(i);} if(IdxIsDoor(constdex)){DoorUpdate(i);}    if(constdex == 701){LogicTimerUpdate(i);} if(constdex == 594){TriggerCounterUpdate(i);} if(constdex == 699){LogicRelayUpdate(i);} if(constdex == 598 || constdex == 600){TriggerTrippedUpdate(i);} if(constdex == 702){SpawnManagerUpdate(i);} if(constdex == 477){SecurityCameraRotateUpdate(i);} if(e->itemLifeTime > 0.0f){SearchFXResetUpdate(i);}
-        if(e->cyberTimer > 0.0f){CyberTimerUpdate(i);}          if(constdex == 515){ForceBridgeUpdate(i);} if(constdex == 517){FuncWallUpdate(i);}   if(constdex == 21 || constdex == 22){CyberWallUpdate(i);} if(IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
-        if(constdex==552){CyberDataFragUpdate(i);} if(constdex==554){CyberExitUpdate(i);} if(constdex==555){CyberSwitchUpdate(i);} if((constdex>=448&&constdex<=451)||(constdex>=454&&constdex<=457)){CyberItemUpdate(i);}
+        Entity* e = &World.instances[i];
+        u16 constdex = e->index;
+        if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) { GrenadeUpdate(i); }
+        DelayedSpawnUpdate(i);
+        if (constdex==CYBER_DECOY_CONST) { CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ }
+        if (constdex==614) { RelayPanelUpdate(i); }
+        if (IsPuzzleGridPanel(constdex)) { PuzzlePanelUpdate(i); }
+        if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) { TextureSequenceUpdate(i); }
+        if (IdxIsButtonSwitch(constdex)){ ButtonSwitchUpdate(i); }
+        if (IdxIsDoor(constdex)) { DoorUpdate(i); }
+        if (constdex == 701) { LogicTimerUpdate(i); }
+        if (constdex == 594) { TriggerCounterUpdate(i); }
+        if (constdex == 699) { LogicRelayUpdate(i); }
+        if (constdex == 598 || constdex == 600) { TriggerTrippedUpdate(i); }
+        if (constdex == 702) { SpawnManagerUpdate(i); }
+        if (constdex == 477) { SecurityCameraRotateUpdate(i); }
+        if (e->itemLifeTime > 0.0f) { SearchFXResetUpdate(i); }
+        if (e->cyberTimer > 0.0f) { CyberTimerUpdate(i); }
+        if (constdex == 515) { ForceBridgeUpdate(i); }
+        if (constdex == 517) { FuncWallUpdate(i); }
+        if (constdex == 21 || constdex == 22) { CyberWallUpdate(i); }
+        if (IdxIsNPC(constdex)) {
+            DrawAIDebug(i);
+            AIControllerUpdate(i);
+            AIAnimationControllerUpdate(i);
+        }
+        
+        if (constdex == 552) { CyberDataFragUpdate(i); }
+        if (constdex==554) { CyberExitUpdate(i); }
+        if (constdex==555) { CyberSwitchUpdate(i); }
+        if (constdex>=448 && constdex <= 457) { CyberItemUpdate(i); }
     }
-    if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) { World.invP1.painSoundFinished = World.pauseRelativeTime + (double)random_range(2.5f,4.0f); play_wav(sounds[140]/*player/playerpain1*/,AppliedFXVol(0.2f),(V3){0,0,0},false); }
-    if (!Cheats.god && World.invP1.radBleedFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { World.invP1.radBleedFinished = World.pauseRelativeTime + 1.8; float take=World.instances[PLAYER1].radiation*0.2f; World.instances[PLAYER1].health-=take; World.painStaticAlpha = take > 15.0f ? 1.0f : take > 10.0f ? 0.8f : 0.3f; }
-    if (World.invP1.radSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { double minT = World.instances[PLAYER1].radiation > 50.0f ? 0.5 : 1.0; World.invP1.radSoundFinished = World.pauseRelativeTime + minT + (double)random_range(0.0f,2.0f); play_wav(sounds[90]/*hud/radiation*/,AppliedFXVol(0.18f),(V3){0,0,0},false); }
-    /*Puzzle panel tether distance check: sever tether if player moves too far*/
-    if (World.Sys_UI.tetheredPGP != U16_MAX) { u16 pg=World.Sys_UI.tetheredPGP; if (pg<World.instCount && (World.instances[pg].entflags&EF_ACTIVE)) { float d2=V3_SqDist(World.position[PLAYER1],World.position[pg]); if (d2 > 64.0f) { UI_PuzzleGridClose(false); } } }
+    
+    if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) {
+        World.invP1.painSoundFinished = World.pauseRelativeTime + (double)random_range(2.5f,4.0f);
+        play_wav(sounds[140]/*player/playerpain1*/,AppliedFXVol(0.2f),(V3){0,0,0},false);
+    }
+    
+    if (!Cheats.god && World.invP1.radBleedFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { /*Radiation damage pulse*/
+        World.invP1.radBleedFinished = World.pauseRelativeTime + 1.8;
+        float take = World.instances[PLAYER1].radiation * 0.2f;
+        World.instances[PLAYER1].health -= take;
+        World.painStaticAlpha = take > 15.0f ? 1.0f : take > 10.0f ? 0.8f : 0.3f;
+    }
+    
+    if (World.invP1.radSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) {
+        double minT = World.instances[PLAYER1].radiation > 50.0f ? 0.5 : 1.0;
+        World.invP1.radSoundFinished = World.pauseRelativeTime + minT + (double)random_range(0.0f, 2.0f);
+        play_wav(sounds[90]/*hud/radiation*/, AppliedFXVol(0.18f), (V3){0.0f, 0.0f, 0.0f}, false);
+    }
+    
+    if (World.Sys_UI.tetheredPGP != U16_MAX) { /*Panel tether sever if player moves too far*/
+        u16 pg = World.Sys_UI.tetheredPGP;
+        if (pg < World.instCount && (World.instances[pg].entflags & EF_ACTIVE)) {
+            float d2 = V3_SqDist(World.position[PLAYER1], World.position[pg]);
+            if (d2 > 64.0f) { UI_PuzzleGridClose(false); }
+        }
+    }
 }
 
 u16 GetCrosshairTexture() { switch(World.invP1.weaponIndex) { case 343:case 345:case 350:case 352:case 355:return 1121;/*red*/case 344:case 347:case 357:return 1253;/*blue*/case 348:case 349:return 1066;/*orange*/case 351:case 354:return 1122;/*yellow*/ case 353:case 358:return 1161;/*teal*/default:return 1260;/*green*/ } }
@@ -1632,8 +1743,20 @@ u16 GetItemFrobTexture(u16 index) {
 }
 
 u16 GetCursorTexture() {
-    if(World.paused || World.menuActive){if(Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down){return 2147;} return 1261;}
-    if(World.invP1.holdingObject) {u16 tex=GetItemFrobTexture(World.invP1.heldObjectIndex); return tex<MAX_TXRS?tex:1250;}
-    if(World.uiIsBlocking || World.mouseClickHeldOverGUI){if(Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down){return 2147;} return 1261;}
+    if (World.paused || World.menuActive) {
+        if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down){ return 2147; }
+        return 1261;
+    }
+    
+    if (World.invP1.holdingObject) {
+        u16 tex = GetItemFrobTexture(World.invP1.heldObjectIndex);
+        return tex < MAX_TXRS ? tex : 1250;
+    }
+    
+    if (World.uiIsBlocking || World.mouseClickHeldOverGUI) {
+        if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) { return 2147; }
+        return 1261;
+    }
+    
     return GetCrosshairTexture();
 }
