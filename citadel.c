@@ -62,11 +62,11 @@ void AddHardwareToInventory(int index,int hwversion) {
     static const u8 textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32}; World.invP1.hardwareInvIndex = index; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hwVers[index] = (u8)hwversion; World.invP1.hwVersSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0; CenterStatusPrint("%s v%d",Sys_Text.stringTable[textIdx[index] + 326],hwversion);
 }
 
-void MFD_GeneralChanged();
 bool AddGeneralObjectToInventory(int index, int custIdx){
     if (!World.Sys_UI.firstGeneral){World.Sys_UI.firstGeneral=true; World.Sys_UI.MFD_CenterTab=3;}
-    for(i8 i=1;i<14;++i){if(World.invP1.generalInventoryIndexRef[i]==-1){if(!InventoryHasAnyAccessCards()&&World.invP1.generalInvCurrent==0){World.invP1.generalInvCurrent=i;} World.invP1.generalInventoryIndexRef[i]=index; World.invP1.generalInvCustIdx[i]=(i16)custIdx; MFD_GeneralChanged(); CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]); return true;}} return false;
+    for(i8 i=1;i<14;++i){if(World.invP1.generalInventoryIndexRef[i]==-1){if(!InventoryHasAnyAccessCards()&&World.invP1.generalInvCurrent==0){World.invP1.generalInvCurrent=i;} World.invP1.generalInventoryIndexRef[i]=index; World.invP1.generalInvCustIdx[i]=(i16)custIdx; World.Sys_UI.generalClickSlot = -1; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]); return true;}} return false;
 }
+
 void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
 static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
 void PlayLog(int logIndex) {if(logIndex<0||logIndex>=LOGCNT||!(World.invP1.hasHardware&HW_ERD)){return;} play_message(AudioLogPath(logIndex)); World.invP1.readLog[logIndex]=true; if(Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail){World.Sys_UI.vmailActive=true;} CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); MFD_OpenAudioLog(logIndex);/*Unity PlayLog ends with MFDManager.SendAudioLogToDataTab(logIndex)*/}
@@ -479,29 +479,41 @@ void ChargeStationUse(u16 self, u16 owner) {
     } else if (e->rechargeMsgLingdex < T_LOGSTR_CNT) CenterStatusPrint("%s",Sys_Text.stringTable[e->rechargeMsgLingdex]);
 }
 // GeneralInventory
-void MFD_ShowGeneralItem(),MFD_GeneralChanged();
+void MFD_ShowGeneralItem();
 int GeneralInvItem(int slot) {
     if (slot<0 || slot>=14) return -1;
     if (!slot) return 81;
     int item=World.invP1.generalInventoryIndexRef[slot]; if (item<0) return -1;
-    item=UseableFromConst(item); return IdxIsGenericItem(item+307)?item:-1;
+    
+    item=UseableFromConst(item);
+    return IdxIsGenericItem(item + 307) ? item : -1;
 }
 bool GeneralInvCanUse(int slot) { int item=GeneralInvItem(slot); return slot>0 && (item==52 || item==53 || item==55); }
 bool GeneralInvCanVaporize(int slot) { int item=GeneralInvItem(slot); return slot>0 && item>=0 && (item<6 || item==33 || item==35 || item==58 || item==62); }
 void GeneralInvRemove(int slot) {
     if (slot<=0 || slot>=14) return;
-    /* Unity's general inventory is a list, so removing an item closes the rows up rather than leaving a hole: the MFD draws generalRowY[slot%7] for a populated slot, so a gap at 3 blanks left-column row 3 and a gap at 10 blanks right-column row 3. Slot 0 is the reserved access-card reader row and is never removable, so the shift starts at 1. */
+
     for (int i=slot;i<13;++i) { World.invP1.generalInventoryIndexRef[i]=World.invP1.generalInventoryIndexRef[i+1]; World.invP1.generalInvCustIdx[i]=World.invP1.generalInvCustIdx[i+1]; }
-    World.invP1.generalInventoryIndexRef[13]=-1; World.invP1.generalInvCustIdx[13]=U16_MAX; MFD_GeneralChanged();
-    /* The cursor indexes a slot, so it slides with its item. When the selected row itself goes, whatever slid into it takes the cursor; if nothing slid in, fall back to the last valid item (Unity: VaporizeButton scans 13 down to 0). */
-    if (World.invP1.generalInvCurrent==slot) { if (GeneralInvItem(slot)<0) { World.invP1.generalInvCurrent=0; for (int i=13;i>=0;--i) { if (GeneralInvItem(i)>=0) { World.invP1.generalInvCurrent=(u8)i; break; } } } }
-    else if (World.invP1.generalInvCurrent>slot) World.invP1.generalInvCurrent--;
+    World.invP1.generalInventoryIndexRef[13] = -1;
+    World.invP1.generalInvCustIdx[13] = U16_MAX;
+    World.Sys_UI.generalClickSlot = -1;
+    if (World.invP1.generalInvCurrent==slot) {
+        if (GeneralInvItem(slot) < 0) {
+            World.invP1.generalInvCurrent = 0;
+            for (int i=13;i>=0;--i) {
+                if (GeneralInvItem(i) >= 0) { World.invP1.generalInvCurrent = (u8)i; break; }
+            }
+        }
+    } else if (World.invP1.generalInvCurrent>slot) World.invP1.generalInvCurrent--;
 }
+
 void GeneralInvClick(int buttonIdx,int customIdx) {
     (void)customIdx; int item=GeneralInvItem(buttonIdx); if (item<0) return;
+    
     World.invP1.generalInvCurrent=(u8)buttonIdx; World.invP1.generalInvIndex=(u16)item;
     World.mouseClickHeldOverGUI=World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; MFD_ShowGeneralItem();
 }
+
 void GeneralInvApply(int buttonIdx,int customIdx) {
     (void)customIdx; if (!GeneralInvCanUse(buttonIdx) || World.invP1.holdingObject) return;
     int item=GeneralInvItem(buttonIdx);
@@ -509,6 +521,7 @@ void GeneralInvApply(int buttonIdx,int customIdx) {
     if (item==55) World.instances[PLAYER1].health=255.0f; else GiveEnergy(item==52?83.0f:255.0f,EnergyType_Battery);
     GeneralInvRemove(buttonIdx);
 }
+
 void GeneralInvDoubleClick(int buttonIdx,int customIdx) { GeneralInvClick(buttonIdx,customIdx); GeneralInvApply(buttonIdx,customIdx); }
 void GeneralInventoryActivate() { int slot=World.invP1.generalInvCurrent; if (slot<14) GeneralInvApply(slot,World.invP1.generalInvCustIdx[slot]); }
 bool GeneralInvTake(int slot) {
@@ -516,6 +529,7 @@ bool GeneralInvTake(int slot) {
     ResetHeldItem(); World.invP1.heldObjectIndex=(u16)(item+307); World.invP1.heldObjectCustIdx=World.invP1.generalInvCustIdx[slot]; World.invP1.holdingObject=true;
     GeneralInvRemove(slot); ForceInventoryMode(); CenterStatusPrint("%s%s",Sys_Text.stringTable[item+326],Sys_Text.stringTable[319]); return true;
 }
+
 static bool GrenadeIsNPCMine(u16 self) { return World.layer[self] != L_PlayerBullets; }
 void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
     if (target == WORLD || target >= World.instCount || vel <= 0.0f){return;} Entity* e = &World.instances[target]; if((e->entflags & EF_DEAD) || (!(e->entflags & EF_RIGIDBODY) && target != PLAYER1)){return;}

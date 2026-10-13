@@ -255,7 +255,7 @@ const char* creditPages[]={
 "\n"
 "The invaluable resources at SystemShock.org\n"
 "ran by Kolya\n",
-
+//-----------------------------------------------------------------------------
 "----------------------------------------------------------------------\n"
 "Protoype Tools for when this project used the Unity 3D engine :( ...\n"
 "\n"
@@ -282,8 +282,7 @@ const char* creditPages[]={
 "Williams College, Casual Effects, Unity Technologies, Quix0r,\n"
 "WeaverDev, Nishad Tardalkar, Pacmikey\n"
 "----------------------------------------------------------------------\n",
-
-
+//-----------------------------------------------------------------------------
 "XMI2MID and RIPXMI\n"
 "by Markus Hein\n"
 "\n"
@@ -305,8 +304,7 @@ const char* creditPages[]={
 "\n"
 "Batch Converter: ImageBatch 1.2\n"
 "by Dmitry Kopasov\n",
-
-
+//-----------------------------------------------------------------------------
 "DTValidator\n"
 "by Darren Tsung\n"
 "\n"
@@ -324,8 +322,7 @@ const char* creditPages[]={
 "\n"
 "Simple File Browser\n"
 "by yasirkula\n",
-
-
+//-----------------------------------------------------------------------------
 "----------------------------------------------------------------------\n"
 "Protoype Tools for when this project\n"
 "used a variant of the Quake 1 engine...\n"
@@ -339,6 +336,7 @@ const char* creditPages[]={
 "Prototype Code Editing: FTE QuakeC Compiler\n"
 "by Forethough Entertainment, Spike, Moodles, Blub/0, TimeServ, Bigfoot,\n"
 "Molgrum, Up2nOgOoD, RjLan, CheapAlert, purplehaze, avirox, and XavioR\n",
+//-----------------------------------------------------------------------------
 "\n"
 "\n"
 "Prototype 3D Model Exporter: Blender MDL Exporter\n"
@@ -360,8 +358,7 @@ const char* creditPages[]={
 "Prototype Pallete Lump: PCX2LMP V1.1\n"
 "by Richard Nichols\n"
 "----------------------------------------------------------------------\n",
-
-
+//-----------------------------------------------------------------------------
 "======================================================================\n"
 "Special Thanks\n"
 "======================================================================\n"
@@ -373,8 +370,7 @@ const char* creditPages[]={
 "To McDonald's for the employee reminder and vague reference:\n"
 "\n"
 "Don't Forget to Salt the Fries!\n",
-
-
+//-----------------------------------------------------------------------------
 "======================================================================\n"
 "Thank you, and good night.\n"
 "======================================================================\n"
@@ -385,5 +381,3 @@ const char* creditPages[]={
 "\n"
 "Click to continue...\n"
 };
-#define CREDITS_PAGE_COUNT (sizeof(creditPages)/sizeof(creditPages[0]))
-_Static_assert(CREDITS_PAGE_COUNT==CREDITS_PAGES,"creditPages[] size must match CREDITS_PAGES");

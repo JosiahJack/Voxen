@@ -15,7 +15,7 @@ void* OS_AllocScratch(size_t amount) {
     return p;
 }
     
-void OS_FreeInitPhase(void) { DualLog("Scratch peak: %u MB", (u32)(scratch_peak >> 20)); scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
+void OS_FreeInitPhase(void) { scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
 void OS_ScratchFree(void) { DualLog("Scratch arena total peak: %u MB\n", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; }
 
 typedef u16 u16_u __attribute__((__aligned__(1),__may_alias__));
@@ -99,7 +99,12 @@ static void DualLogMain(bool writeToFileToo, const char *prefix, const char *fmt
     #else
         FHandle out=color ? 2/*stderr*/ : 1/*stdout*/;
     #endif
-    if (prefix){OS_RawWrite(out,prefix,slen(prefix)); OS_RawWrite(out,"\033[0m ",5); } OS_RawWrite(out,buf,slen(buf)); if (console_log_file != INVALID_FHANDLE && writeToFileToo) { if(prefix){OS_Write(console_log_file,prefix,slen(prefix),"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log");} OS_Write(console_log_file,buf,slen(buf),"console.log"); }
+    if (prefix) { OS_RawWrite(out,prefix,slen(prefix)); OS_RawWrite(out,"\033[0m ",5); }
+    OS_RawWrite(out,buf,slen(buf));
+    if (console_log_file != INVALID_FHANDLE && writeToFileToo) {
+        if(prefix) { OS_Write(console_log_file,prefix,slen(prefix),"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }
+        OS_Write(console_log_file,buf,slen(buf),"console.log");
+    }
 }
 void PrintLog(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(false,NULL,s,a); __builtin_va_end(a); }
 void DualLog(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,NULL,s,a); __builtin_va_end(a); } void DualLogWarn(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,"\033[1;38;5;208mWARN:",s,a); __builtin_va_end(a); } void DualLogError(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,"\033[1;31mERROR:",s,a); __builtin_va_end(a); }
@@ -156,16 +161,9 @@ void DebugRAMPeak(void) { // VmHWM: kernel high-water mark of RSS over process l
 void DebugRAMBreakdown() { // Persistent-allocation census, diagnostics only: sums live structures; GPU/driver side estimated (not in USS)
     u64 physV=0,physT=0,bvhN=0,bvhT=0,gpuV=0,gpuT=0; u32 nM=mdlsCnt;
     for (u32 m=0;m<nM;++m){ physV+=(u64)physVertCounts[m]*12; physT+=(u64)modelTriangleCounts[m]*6; bvhN+=(u64)modelBVHNodeCounts[m]*sizeof(BvhNode); bvhT+=(u64)modelBVHTriOrderCounts[m]*2; gpuV+=(u64)modelVertexCounts[m]*VRT_ATT_SZ; gpuT+=(u64)modelTriangleCounts[m]*6; }
-    DualLog("RAM breakdown (persistent):\n");
-    ramline("mdl CPU phys verts",physV); ramline("mdl CPU phys tris",physT); ramline("mdl CPU BVH nodes",bvhN); ramline("mdl CPU BVH triorder",bvhT);
-    ramline("mdl CPU ptr tables",(u64)nM*8*3); ramline("mdl BSS tables",(u64)MAX_MDLS*(4+2+4+2+8+4)+(u64)INSTANCE_COUNT*64);
-    ramline("mdl GPU VBO est (driver)",gpuV); ramline("mdl GPU IBO est (driver)",gpuT);
-    ramline("tex GPU pixels",((u64)totalPixels+3)/4*4); ramline("tex GPU palettes",(u64)totalPaletteColors*4); ramline("tex GPU preallocs",(u64)MAX_TOTAL_PIXELS+(u64)texCnt*4+(u64)texCnt*8);
-    ramline("font GPU atlases",(u64)FONT_ATLAS_SIZE*FONT_ATLAS_SIZE+(u64)FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2);
-    ramline("World (GlobalContext)",(u64)sizeof(GlobalContext)); ramline("audio live",AudioLiveBytes()); ramline("cvx adjacency",cvxAdjLive);
-    { u32 live=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); ramline("mmap live (all OS_Alloc)",live); }
-    ramline("scratch peak",scratch_peak);
-    DualLog("  (models=%u textures=%u uniqueCvx=%u; thread stacks 8MBx%u virtual)\n",nM,(u32)texCnt,uniqueCvxMeshCount,threadCnt);
+    DualLog("RAM breakdown (persistent): "); ramline("phys verts",physV); ramline("mdl CPU phys tris",physT); ramline("mdl CPU BVH nodes",bvhN); ramline("mdl CPU BVH triorder",bvhT); ramline("mdl CPU ptr tables",(u64)nM*8*3); ramline("mdl BSS tables",(u64)MAX_MDLS*(4+2+4+2+8+4)+(u64)INSTANCE_COUNT*64); ramline("mdl GPU VBO est (driver)",gpuV); ramline("mdl GPU IBO est (driver)",gpuT);
+    ramline("tex GPU pixels",((u64)totalPixels+3)/4*4); ramline("tex GPU palettes",(u64)totalPaletteColors*4); ramline("tex GPU preallocs",(u64)MAX_TOTAL_PIXELS+(u64)texCnt*4+(u64)texCnt*8); ramline("font GPU atlases",(u64)FONT_ATLAS_SIZE*FONT_ATLAS_SIZE+(u64)FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2); ramline("World (GlobalContext)",(u64)sizeof(GlobalContext)); ramline("audio live",AudioLiveBytes()); ramline("cvx adjacency",cvxAdjLive);
+    u32 live=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); ramline("mmap live (all OS_Alloc)",live); ramline("scratch peak",scratch_peak); DualLog("  (models=%u textures=%u uniqueCvx=%u; thread stacks 8MBx%u virtual)\n",nM,(u32)texCnt,uniqueCvxMeshCount,threadCnt);
 }
 void DebugRAM(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
     (void)context;

@@ -2070,10 +2070,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
 
 void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
 void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); }
-
 void LoadModels(), LoadTextures(), InitAudio(), LoadConfig(), BiomonitorInitGL(), synth_set_room(float,float);
 extern u32 random_range_rng;
-
 void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
@@ -2208,34 +2206,15 @@ void InitalizeEnvironment() {
     textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
     textureSizesID = MakeSSBO(&textureSizesID,15,MAX_TXRS*2*sizeof(i32),NULL,GL_STATIC_DRAW);
     
-    // Set permanent uniforms on shaders (keeps c in sync with glsl for constants)
-    glUseProgram(shadowmapsSP);
-    glUniform1ui(9, SHADOW_MAP_SIZE);
-    
-    glUseProgram(shadowmapsClearSP);
-    glUniform1ui(0, SHADOW_MAP_SIZE);
-    
-    glUseProgram(chunkSP);
-    glUniform1ui(21, SHADOW_MAP_SIZE);
-    glUniform1f(22, (float)SHADOW_MAP_SIZE);
-    glUniform1ui(23, LIGHT_COUNT);
-    glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL);
-    glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
+    glUseProgram(shadowmapsSP);      glUniform1ui( 9, SHADOW_MAP_SIZE); // Set permanent uniforms on shaders (keeps c in sync with glsl for constants)
+    glUseProgram(shadowmapsClearSP); glUniform1ui( 0, SHADOW_MAP_SIZE);
+    glUseProgram(chunkSP);           glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
     
     for (int f=0;f<5;++f) { glGenQueries(5,gpuQ[f]); }
-    RenderLoading("Loading textures...");
-    DebugRAM("before LoadTextures");
-    LoadTextures();
-    DebugRAM("after LoadTextures");
-    RenderLoading("Loading models...");
-    DebugRAM("before LoadModels");
-    LoadModels();
-    DebugRAM("after LoadModels");
+    RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); 
+    RenderLoading("Loading models...");   DebugRAM("before LoadModels");   LoadModels();   DebugRAM("after LoadModels");
     bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
-    if (playIntroAtBoot) {
-        FHandle indone=OS_OpenWriteonly("./Data/introdone.dat");
-        if (indone!=(FHandle)-1) { OS_Close(indone);/*sentinel absent: first run, so stamp it now and play the intro once it can be shown*/}
-    }
+    if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
         
     World.absoluteTime = World.current_time = get_time();
     World.pauseRelativeTime = World.last_physics_time = 0.0;
@@ -2258,11 +2237,7 @@ void Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdate(),PSys_Update(float)
 i32 main() {
     InitalizeEnvironment();
     while(1) {
-        if (queuedLevelToLoad != 255u) {
-            LoadLevel(queuedLevelToLoad,queuedLevelPos);
-            queuedLevelToLoad = 255u;
-            continue;
-        }
+        if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
         
         double curtime = get_time();
         World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time, 0.0);
@@ -2276,45 +2251,32 @@ i32 main() {
         }
         
         double input_start = get_time();
-        
         InputProcessing(); // Before anims and physics to allow them to respond immediately.
-        
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
-        
         prePhys = get_time() - input_start;
         if (!World.paused && !World.menuActive) {
             double ps = get_time();
             float dt = (float)vclamp((World.pauseRelativeTime - World.last_physics_time), 0.0005, 0.1);
             World.last_physics_time = World.pauseRelativeTime;
             World.dt = dt;
-            
             Physics(dt);
-            
             physTime = get_time() - ps;
         } else physTime=0.0;
         
         double gameT_start = get_time();
-        
         ModUpdate(); /*After physics so mod/gamecode can modify velocities before next frame.*/
-        
         BioMonitorUpdate();
         if (!World.paused && !World.menuActive){ PSys_Update(World.dt); } /*Particles*/
-        
         UpdateAudio();
-        
         gameTime = get_time() - gameT_start;
-        
         if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) { UpdateInstanceMatrix4x4s(); /*Before camviews so camview shadows render same as main pass*/ }
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         UpdateSensaroundCamViews();
         RenderCameraViews(); /*Before main Render() so that tv screens are up to date*/
-        
         if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/
         AudioUpdate();
         AutomapTick();
-        
         Render(false/*!camview*/,0u);
-        
         if (ScrshotPressed() && World.current_time > World.screenshotTimeout) {
             Screenshot();
             //AutomapDumpBMP(); // Uncomment for testing
@@ -2325,7 +2287,6 @@ i32 main() {
         for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) { Sys_Input.mouseButtons[i].pressed=Sys_Input.mouseButtons[i].released=false; }
         Sys_Input.scrollDelta = 0;
         World.currentMouse_dx = World.currentMouse_dy = 0;
-        
         globalframe++;
         World.cpuTime = get_time() - World.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.
         if (globalframe > 4) {
@@ -2342,21 +2303,20 @@ i32 main() {
         gpuQFrame=(gpuQFrame+1)%5;
         ((WSWin*)window)->context.swapBuffers(((WSWin*)window));
         CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
-        
-        {
-            static u32 dbgGameFrame = 0;
-            if (!World.menuActive && !World.paused) { dbgGameFrame++; /*only count gameplay frames for RAM/timing checkpoints*/}
-            static const u32 dbgFrm[] = {4, 100, 200, 500, 1000};
-            static const char* dbgLbl[] = {"gameframe 4","gameframe 100","gameframe 200","gameframe 500","gameframe 1000"};
-            for (int d=0;d<5;d++) {
-                if (dbgGameFrame == dbgFrm[d]) {
-                    DebugRAM(dbgLbl[d]);
-                    DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Ray:%.3f(%u)\n",
-                        dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000, World.substeps, renderTime*1000,
-                        prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
-                    
-                    if (dbgGameFrame == 1000) { DebugRAMPeak(); break; }
-                }
+
+        // RAM and frame consistency debug stats
+        static u32 dbgGameFrame = 0;
+        if (!World.menuActive && !World.paused) { dbgGameFrame++; /*only count gameplay frames for RAM/timing checkpoints*/}
+        static const u32 dbgFrm[] = {4, 100, 200, 500, 1000};
+        static const char* dbgLbl[] = {"gameframe 4","gameframe 100","gameframe 200","gameframe 500","gameframe 1000"};
+        for (int d=0;d<5;d++) {
+            if (dbgGameFrame == dbgFrm[d]) {
+                DebugRAM(dbgLbl[d]);
+                DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Ray:%.3f(%u)\n",
+                    dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000, World.substeps, renderTime*1000,
+                    prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
+                
+                if (dbgGameFrame == 1000) { DebugRAMPeak(); break; }
             }
         }
     }

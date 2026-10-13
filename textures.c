@@ -484,23 +484,29 @@ void LoadTextures() {
     u32* texturePalettes = (u32*)cur;
     cur += palettes_size;
     u8* all_indices = cur;
+    
     /*Ring lives outside the arena: this one is freed at the end of the load, the ring is refilled every played frame*/
     g_vidRingBuf = OS_Alloc(ringidx_size + ringpal_size);
-    u8* ringIndices = (u8*)g_vidRingBuf; (void)ringIndices;
+    u8* ringIndices = (u8*)g_vidRingBuf;
+    (void)ringIndices;
     u32* ringPalettes = (u32*)((u8*)g_vidRingBuf + ringidx_size);
     g_vidTexBase = (u32)ringidx_size; /*SSBO layout: [ring indices][ring palettes][texture indices], so freed-arena indices stay addressable*/
     for (u32 r=0;r<VIDEO_RING;++r) { u16 si = (u16)(texCnt + r); g_vidPalOffs[r] = totalPaletteColors + r*256; g_vidIdxOffs[r] = r * VIDEO_MAXFRAME; textureOffsets[si] = g_vidIdxOffs[r]; texturePaletteOffsets[si] = g_vidPalOffs[r]; textureSizes[si*2] = 0; textureSizes[si*2+1] = 0; g_vidSlotTex[r] = si; }
-    g_vidRingSize = ringidx_size + ringpal_size; g_vidRingIdxSize = ringidx_size; g_vidRingPalSize = ringpal_size; g_vidPalBase = totalPaletteColors; g_vidSizesCPU = OS_Alloc(VIDEO_RING * 2 * sizeof(i32));
+    g_vidRingSize = ringidx_size + ringpal_size;
+    g_vidRingIdxSize = ringidx_size;
+    g_vidRingPalSize = ringpal_size;
+    g_vidPalBase = totalPaletteColors;
+    g_vidSizesCPU = OS_Alloc(VIDEO_RING * 2 * sizeof(i32));
     for (u32 r=0;r<VIDEO_RING;++r) { g_vidSlot[r].idx = (u8*)g_vidRingBuf + (size_t)r*VIDEO_MAXFRAME; g_vidSlot[r].pal = ringPalettes + (size_t)r*256; }
     for (u32 k=0;k<g_vidFrameCnt;++k) { g_vidFrames[k].w = g_vidDims[g_vidFrames[k].texIdx] >> 16; g_vidFrames[k].h = g_vidDims[g_vidFrames[k].texIdx] & 0xFFFF; }
-    { size_t vp=0; for (u32 k=0;k<g_vidFrameCnt;++k) vp += (size_t)g_vidFrames[k].w*g_vidFrames[k].h; DualLog("Video ring reserved: %u slots x %u B = %.2f MB (frames would have been %.2f MB)\n",VIDEO_RING,VIDEO_MAXFRAME,(double)ringidx_size/1048576.0,(double)vp/1048576.0); }
+    
     u32 pixel_base = 0, color_base = 0;
     for (u16 i=0;i<texCnt;++i) {
         if (!texResults[i].indices) { continue; }
         
         u32 numP = (u32)texResults[i].w * texResults[i].h;
         u32 palS = texResults[i].palSize;
-        textureOffsets[i]=g_vidTexBase + pixel_base;
+        textureOffsets[i] = g_vidTexBase + pixel_base;
         texturePaletteOffsets[i] = color_base;
         textureSizes[i * 2]     = texResults[i].w;
         textureSizes[i * 2 + 1] = texResults[i].h;

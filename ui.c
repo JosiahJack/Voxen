@@ -1,23 +1,62 @@
 // ui.c - User Interface(UI) aka HUD
 static u32 sensaroundFBO = 0;
 void BiomonitorBlitToUI();
-#define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,UI_ID_##P##_TAB_ITEM,UI_ID_##P##_TAB_AUTOMAP,UI_ID_##P##_TAB_DATA,UI_ID_##P##_PANEL,UI_ID_##P##_WEAPON_NAME,UI_ID_##P##_WEAPON_ICON,UI_ID_##P##_WEAPON_AMMO,UI_ID_##P##_WEAPON_RELOAD,UI_ID_##P##_WEAPON_UNLOAD,UI_ID_##P##_WEAPON_OVERLOAD,UI_ID_##P##_WEAPON_ENERGY_SLIDER,UI_ID_##P##_MEDIA_HEADER,UI_ID_##P##_MEDIA_TAB_0,UI_ID_##P##_MEDIA_TAB_3=UI_ID_##P##_MEDIA_TAB_0+3,UI_ID_##P##_ITEM_NAME,UI_ID_##P##_ITEM_ICON,UI_ID_##P##_ITEM_USE,UI_ID_##P##_ITEM_VAPORIZE,UI_ID_##P##_ITEM_SKATE,UI_ID_##P##_ITEM_BOOST,UI_ID_##P##_ITEM_TIMER_VALUE,UI_ID_##P##_ITEM_TIMER_SLIDER,UI_ID_##P##_ITEM_ACCESS_CARDS,UI_ID_##P##_BLOCKED_SECURITY_TEXT,\
-    UI_ID_##P##_ELEV_FLOOR_INDICATOR,UI_ID_##P##_ELEV_BUTTON_0,UI_ID_##P##_ELEV_BUTTON_7=UI_ID_##P##_ELEV_BUTTON_0+7,UI_ID_##P##_ELEV_CLOSE,UI_ID_##P##_KEYCODE_0,UI_ID_##P##_KEYCODE_11=UI_ID_##P##_KEYCODE_0+11,UI_ID_##P##_KEYCODE_DIGIT_0,UI_ID_##P##_KEYCODE_DIGIT_2=UI_ID_##P##_KEYCODE_DIGIT_0+2,UI_ID_##P##_KEYCODE_CLOSE,UI_ID_##P##_AUDIOLOG_IMAGE,UI_ID_##P##_AUDIOLOG_NAME,UI_ID_##P##_AUDIOLOG_SENDER,UI_ID_##P##_AUDIOLOG_SUBJECT,\
-    UI_ID_##P##_PUZZLE_NODE_SOURCE,UI_ID_##P##_PUZZLE_NODE,UI_ID_##P##_PUZZLE_CELL_0,UI_ID_##P##_PUZZLE_CELL_34=UI_ID_##P##_PUZZLE_CELL_0+34,UI_ID_##P##_PUZZLE_SLIDER,UI_ID_##P##_PUZZLE_CLOSE,UI_ID_##P##_WIRE_SLIDER,UI_ID_##P##_WIRE_TARGET,UI_ID_##P##_WIRE_NODE_0,UI_ID_##P##_WIRE_NODE_13=UI_ID_##P##_WIRE_NODE_0+13,UI_ID_##P##_WIRE_CLOSE,UI_ID_##P##_SYS_HEADER,UI_ID_##P##_SYS_DESC_0,UI_ID_##P##_SYS_DESC_10=UI_ID_##P##_SYS_DESC_0+10,UI_ID_##P##_SYS_VAL_0,UI_ID_##P##_SYS_VAL_10=UI_ID_##P##_SYS_VAL_0+10,UI_ID_##P##_SYS_CLOSE,\
-    UI_ID_##P##_MINIGAMES_HEADER,UI_ID_##P##_MINIGAME_0,UI_ID_##P##_MINIGAME_8=UI_ID_##P##_MINIGAME_0+8,UI_ID_##P##_MINIGAMES_FOOTER,UI_ID_##P##_MINIGAME_VIEW,UI_ID_##P##_MINIGAME_BACK,UI_ID_##P##_MINIGAME_CLOSE,UI_ID_##P##_SEARCH_NAME,UI_ID_##P##_SEARCH_ICON_0,UI_ID_##P##_SEARCH_ICON_3=UI_ID_##P##_SEARCH_ICON_0+3,UI_ID_##P##_SEARCH_EMPTY,UI_ID_##P##_SEARCH_CLOSE,UI_ID_##P##_AUTOMAP_ZOOM_IN,UI_ID_##P##_AUTOMAP_ZOOM_OUT,UI_ID_##P##_AUTOMAP_FULL,UI_ID_##P##_AUTOMAP_SIDE
+#define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,           UI_ID_##P##_TAB_ITEM,             UI_ID_##P##_TAB_AUTOMAP,       UI_ID_##P##_TAB_DATA,          UI_ID_##P##_PANEL,                 \
+                      UI_ID_##P##_WEAPON_NAME,          UI_ID_##P##_WEAPON_ICON,          UI_ID_##P##_WEAPON_AMMO,       UI_ID_##P##_WEAPON_RELOAD,     UI_ID_##P##_WEAPON_UNLOAD,         \
+                      UI_ID_##P##_WEAPON_OVERLOAD,      UI_ID_##P##_WEAPON_ENERGY_SLIDER, UI_ID_##P##_MEDIA_HEADER,      UI_ID_##P##_MEDIA_TAB_0,                                          \
+                      UI_ID_##P##_MEDIA_TAB_3 = UI_ID_##P##_MEDIA_TAB_0 + 3, \
+                      UI_ID_##P##_ITEM_NAME,            UI_ID_##P##_ITEM_ICON,            UI_ID_##P##_ITEM_USE,          UI_ID_##P##_ITEM_VAPORIZE,     UI_ID_##P##_ITEM_SKATE,            \
+                      UI_ID_##P##_ITEM_BOOST,           UI_ID_##P##_ITEM_TIMER_VALUE,     UI_ID_##P##_ITEM_TIMER_SLIDER, UI_ID_##P##_ITEM_ACCESS_CARDS, UI_ID_##P##_BLOCKED_SECURITY_TEXT, \
+                      UI_ID_##P##_ELEV_FLOOR_INDICATOR, UI_ID_##P##_ELEV_BUTTON_0,                                                                                                         \
+                      UI_ID_##P##_ELEV_BUTTON_7 = UI_ID_##P##_ELEV_BUTTON_0 + 7, \
+                      UI_ID_##P##_ELEV_CLOSE,           UI_ID_##P##_KEYCODE_0,                                                                                                             \
+                      UI_ID_##P##_KEYCODE_11 = UI_ID_##P##_KEYCODE_0 + 11, \
+                      UI_ID_##P##_KEYCODE_DIGIT_0,                                                                                                                                         \
+                      UI_ID_##P##_KEYCODE_DIGIT_2 = UI_ID_##P##_KEYCODE_DIGIT_0 + 2, \
+                      UI_ID_##P##_KEYCODE_CLOSE,        UI_ID_##P##_AUDIOLOG_IMAGE,       UI_ID_##P##_AUDIOLOG_NAME,     UI_ID_##P##_AUDIOLOG_SENDER,   UI_ID_##P##_AUDIOLOG_SUBJECT,      \
+                      UI_ID_##P##_PUZZLE_NODE_SOURCE,   UI_ID_##P##_PUZZLE_NODE,          UI_ID_##P##_PUZZLE_CELL_0,                                                                       \
+                      UI_ID_##P##_PUZZLE_CELL_34 = UI_ID_##P##_PUZZLE_CELL_0 + 34, \
+                      UI_ID_##P##_PUZZLE_SLIDER,        UI_ID_##P##_PUZZLE_CLOSE,         UI_ID_##P##_WIRE_SLIDER,       UI_ID_##P##_WIRE_TARGET,       UI_ID_##P##_WIRE_NODE_0,           \
+                      UI_ID_##P##_WIRE_NODE_13 = UI_ID_##P##_WIRE_NODE_0 + 13, \
+                      UI_ID_##P##_WIRE_CLOSE,           UI_ID_##P##_SYS_HEADER,           UI_ID_##P##_SYS_DESC_0,                                                                          \
+                      UI_ID_##P##_SYS_DESC_10 = UI_ID_##P##_SYS_DESC_0 + 10, \
+                      UI_ID_##P##_SYS_VAL_0,                                                                                                                                               \
+                      UI_ID_##P##_SYS_VAL_10 = UI_ID_##P##_SYS_VAL_0 + 10, \
+                      UI_ID_##P##_SYS_CLOSE,            UI_ID_##P##_MINIGAMES_HEADER,     UI_ID_##P##_MINIGAME_0,                                                                          \
+                      UI_ID_##P##_MINIGAME_8 = UI_ID_##P##_MINIGAME_0 + 8, \
+                      UI_ID_##P##_MINIGAMES_FOOTER,     UI_ID_##P##_MINIGAME_VIEW,        UI_ID_##P##_MINIGAME_BACK,     UI_ID_##P##_MINIGAME_CLOSE,    UI_ID_##P##_SEARCH_NAME,           \
+                      UI_ID_##P##_SEARCH_ICON_0,                                                                                                                                           \
+                      UI_ID_##P##_SEARCH_ICON_3 = UI_ID_##P##_SEARCH_ICON_0 + 3, \
+                      UI_ID_##P##_SEARCH_EMPTY,         UI_ID_##P##_SEARCH_CLOSE,         UI_ID_##P##_AUTOMAP_ZOOM_IN,   UI_ID_##P##_AUTOMAP_ZOOM_OUT,  UI_ID_##P##_AUTOMAP_FULL,          \
+                      UI_ID_##P##_AUTOMAP_SIDE
+
 typedef enum{UI_ID_NONE,
-    /*Menu*/UI_ID_MENU_SINGLEPLAYER,UI_ID_MENU_MULTIPLAYER,UI_ID_MENU_OPTIONS,UI_ID_MENU_QUIT,UI_ID_MENU_CONTINUE,UI_ID_MENU_NEW_GAME,UI_ID_MENU_PLAY_INTRO,UI_ID_MENU_PLAY_CREDITS,UI_ID_MENU_BACK,UI_ID_MENU_TAB_GRAPHICS,UI_ID_MENU_TAB_INPUT,UI_ID_MENU_TAB_AUDIO_LANG,UI_ID_MENU_MODEL_DETAIL,UI_ID_MENU_FXAA,UI_ID_MENU_SHADOWS,UI_ID_MENU_SSR,UI_ID_MENU_VSYNC,UI_ID_MENU_FOV_SLIDER,UI_ID_MENU_GAMMA_SLIDER,UI_ID_MENU_RESOLUTION,UI_ID_MENU_FULLSCREEN,UI_ID_MENU_TOGGLE_MONITOR,UI_ID_MENU_RES_APPLY,UI_ID_MENU_MASTER_VOLUME_SLIDER,UI_ID_MENU_MUSIC_VOLUME_SLIDER,UI_ID_MENU_INPUT_0,UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0+41,
-    /*NewGame*/UI_ID_MENU_NAME_INPUT,UI_ID_MENU_DIFF_COMBAT,UI_ID_MENU_DIFF_PUZZLE,UI_ID_MENU_DIFF_MISSION,UI_ID_MENU_DIFF_CYBER,UI_ID_MENU_DIFF_CELL_0,UI_ID_MENU_DIFF_CELL_15=UI_ID_MENU_DIFF_CELL_0+15,UI_ID_MENU_START,UI_ID_MENU_SAVE_SLOT_0,UI_ID_MENU_SAVE_SLOT_7=UI_ID_MENU_SAVE_SLOT_0+7,
-    /*Pause*/UI_ID_PAUSE_RESUME,UI_ID_PAUSE_LOAD,UI_ID_PAUSE_SAVE,UI_ID_PAUSE_OPTIONS,UI_ID_PAUSE_QUIT_TO_MENU,UI_ID_PAUSE_QUIT_GAME,
-    /*HUD*/UI_ID_HUD_SHOOTMODE,UI_ID_HUD_HW_0,UI_ID_HUD_HW_7=UI_ID_HUD_HW_0+7,
-    /*Center MFD*/UI_ID_CMFD_ADD_TO_INVENTORY,UI_ID_CMFD_TAB_MAIN,UI_ID_CMFD_TAB_HARDWARE,UI_ID_CMFD_TAB_GENERAL,UI_ID_CMFD_TAB_SOFTWARE,UI_ID_CMFD_WEAPON_HEADER,UI_ID_CMFD_SHOTS_HEADER,UI_ID_CMFD_WEAPON_ROW_0,UI_ID_CMFD_WEAPON_ROW_6=UI_ID_CMFD_WEAPON_ROW_0+6,UI_ID_CMFD_GREN_HEADER,UI_ID_CMFD_PATCH_HEADER,UI_ID_CMFD_GREN_USE_0,UI_ID_CMFD_GREN_USE_6=UI_ID_CMFD_GREN_USE_0+6,UI_ID_CMFD_GREN_ROW_0,UI_ID_CMFD_GREN_ROW_6=UI_ID_CMFD_GREN_ROW_0+6,
-    UI_ID_CMFD_PATCH_USE_0,UI_ID_CMFD_PATCH_USE_6=UI_ID_CMFD_PATCH_USE_0+6,UI_ID_CMFD_PATCH_ROW_0,UI_ID_CMFD_PATCH_ROW_6=UI_ID_CMFD_PATCH_ROW_0+6,UI_ID_CMFD_HARDWARE_HEADER,UI_ID_CMFD_HARDWARE_ROW_0,UI_ID_CMFD_HARDWARE_ROW_11=UI_ID_CMFD_HARDWARE_ROW_0+11,UI_ID_CMFD_GENERAL_HEADER,UI_ID_CMFD_GENERAL_USE_0,UI_ID_CMFD_GENERAL_USE_13=UI_ID_CMFD_GENERAL_USE_0+13,UI_ID_CMFD_GENERAL_ROW_0,UI_ID_CMFD_GENERAL_ROW_13=UI_ID_CMFD_GENERAL_ROW_0+13,UI_ID_CMFD_SOFTWARE_HEADER,UI_ID_CMFD_SOFTWARE_ROW_0,UI_ID_CMFD_SOFTWARE_ROW_6=UI_ID_CMFD_SOFTWARE_ROW_0+6,
-    UI_ID_CMFD_MEDIA_HEADER,UI_ID_CMFD_LOG_TABLE_0,UI_ID_CMFD_LOG_TABLE_9=UI_ID_CMFD_LOG_TABLE_0+9,UI_ID_CMFD_LOG_ENTRY_0,UI_ID_CMFD_LOG_ENTRY_14=UI_ID_CMFD_LOG_ENTRY_0+14,UI_ID_CMFD_LOG_TEXT,UI_ID_CMFD_LOG_MORE,UI_ID_CMFD_LOG_BACK,UI_ID_CMFD_EMAIL_ENTRY_0,UI_ID_CMFD_EMAIL_ENTRY_14=UI_ID_CMFD_EMAIL_ENTRY_0+14,UI_ID_CMFD_DATA_ENTRY_0,UI_ID_CMFD_DATA_ENTRY_12=UI_ID_CMFD_DATA_ENTRY_0+12,UI_ID_CMFD_NOTE_TOGGLE_0,UI_ID_CMFD_NOTE_TOGGLE_17=UI_ID_CMFD_NOTE_TOGGLE_0+17,
-    /*Misc overlays*/UI_ID_CMFD_MISSION_TIMER,UI_ID_CMFD_CYBER_TIMER,UI_ID_CMFD_BIOMONITOR,UI_ID_CMFD_EDIT_PANEL,UI_ID_CMFD_EDIT_ROW_0,UI_ID_CMFD_EDIT_ROW_14=UI_ID_CMFD_EDIT_ROW_0+14,UI_ID_VMAIL_VIEWER,UI_ID_FULLMAP_CLOSE,UI_ID_SENSA_CTR,UI_ID_SENSA_LH,UI_ID_SENSA_RH,
-    UI_MFD_IDS(LMFD),UI_ID_SIDEMFD_PAD,UI_MFD_IDS(RMFD),UI_ID_COUNT,
+    /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT,
+             UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS,
+             UI_ID_MENU_BACK,
+             UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG,
+             UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION, UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY,
+             UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER,
+             UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0 + 41,
+    /*NewGame*/ UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START,
+    /*Save/Load*/ UI_ID_MENU_SAVE_SLOT_0, UI_ID_MENU_SAVE_SLOT_7=UI_ID_MENU_SAVE_SLOT_0 + 7,
+    /*Pause*/ UI_ID_PAUSE_RESUME, UI_ID_PAUSE_LOAD, UI_ID_PAUSE_SAVE, UI_ID_PAUSE_OPTIONS, UI_ID_PAUSE_QUIT_TO_MENU, UI_ID_PAUSE_QUIT_GAME,
+    /*HUD*/ UI_ID_HUD_SHOOTMODE, UI_ID_HUD_HW_0, UI_ID_HUD_HW_7 = UI_ID_HUD_HW_0 + 7, UI_ID_CMFD_MISSION_TIMER, UI_ID_CMFD_CYBER_TIMER, UI_ID_CMFD_BIOMONITOR, UI_ID_VMAIL_VIEWER, UI_ID_FULLMAP_CLOSE, UI_ID_SENSA_CTR, UI_ID_SENSA_LH, UI_ID_SENSA_RH,
+    /*Center MFD*/ UI_ID_CMFD_ADD_TO_INVENTORY, UI_ID_CMFD_TAB_MAIN, UI_ID_CMFD_TAB_HARDWARE, UI_ID_CMFD_TAB_GENERAL, UI_ID_CMFD_TAB_SOFTWARE,
+                     UI_ID_CMFD_WEAPON_HEADER, UI_ID_CMFD_SHOTS_HEADER, UI_ID_CMFD_WEAPON_ROW_0, UI_ID_CMFD_WEAPON_ROW_6 = UI_ID_CMFD_WEAPON_ROW_0 + 6, UI_ID_CMFD_GREN_HEADER, UI_ID_CMFD_PATCH_HEADER, UI_ID_CMFD_GREN_USE_0, UI_ID_CMFD_GREN_USE_6 = UI_ID_CMFD_GREN_USE_0 + 6,
+                       UI_ID_CMFD_GREN_ROW_0, UI_ID_CMFD_GREN_ROW_6 = UI_ID_CMFD_GREN_ROW_0 + 6, UI_ID_CMFD_PATCH_USE_0, UI_ID_CMFD_PATCH_USE_6 = UI_ID_CMFD_PATCH_USE_0 + 6, UI_ID_CMFD_PATCH_ROW_0, UI_ID_CMFD_PATCH_ROW_6 = UI_ID_CMFD_PATCH_ROW_0 + 6,
+                     UI_ID_CMFD_HARDWARE_HEADER, UI_ID_CMFD_HARDWARE_ROW_0, UI_ID_CMFD_HARDWARE_ROW_11 = UI_ID_CMFD_HARDWARE_ROW_0 + 11,
+                     UI_ID_CMFD_GENERAL_HEADER, UI_ID_CMFD_GENERAL_USE_0, UI_ID_CMFD_GENERAL_USE_13 = UI_ID_CMFD_GENERAL_USE_0 + 13, UI_ID_CMFD_GENERAL_ROW_0, UI_ID_CMFD_GENERAL_ROW_13 = UI_ID_CMFD_GENERAL_ROW_0 + 13,
+                     UI_ID_CMFD_SOFTWARE_HEADER, UI_ID_CMFD_SOFTWARE_ROW_0, UI_ID_CMFD_SOFTWARE_ROW_6 = UI_ID_CMFD_SOFTWARE_ROW_0 + 6,
+                     UI_ID_CMFD_MEDIA_HEADER, UI_ID_CMFD_LOG_TABLE_0, UI_ID_CMFD_LOG_TABLE_9 = UI_ID_CMFD_LOG_TABLE_0 + 9, UI_ID_CMFD_LOG_ENTRY_0, UI_ID_CMFD_LOG_ENTRY_14 = UI_ID_CMFD_LOG_ENTRY_0 + 14, UI_ID_CMFD_LOG_TEXT, UI_ID_CMFD_LOG_MORE, UI_ID_CMFD_LOG_BACK,
+                       UI_ID_CMFD_EMAIL_ENTRY_0, UI_ID_CMFD_EMAIL_ENTRY_14 = UI_ID_CMFD_EMAIL_ENTRY_0 + 14, UI_ID_CMFD_DATA_ENTRY_0, UI_ID_CMFD_DATA_ENTRY_12 = UI_ID_CMFD_DATA_ENTRY_0 + 12, UI_ID_CMFD_NOTE_TOGGLE_0, UI_ID_CMFD_NOTE_TOGGLE_17 = UI_ID_CMFD_NOTE_TOGGLE_0 + 17,
+    /*Left/Right MFD*/ UI_MFD_IDS(LMFD), UI_ID_SIDEMFD_PAD, UI_MFD_IDS(RMFD),
+    /*In-Game Editor*/ UI_ID_CMFD_EDIT_PANEL, UI_ID_CMFD_EDIT_ROW_0, UI_ID_CMFD_EDIT_ROW_14 = UI_ID_CMFD_EDIT_ROW_0 + 14,
+    UI_ID_COUNT,
 } UIRegionID;
+
 #define UI_MFD_STRIDE (UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON)
-#define MID(rh,n) ((u32)UI_ID_LMFD_##n+((rh)?(u32)UI_MFD_STRIDE:0u))/*Mirror an LMFD id onto whichever side we are drawing*/
+#define MID(rh, n) ((u32)UI_ID_LMFD_##n + ((rh) ? (u32)UI_MFD_STRIDE : 0u))/*Mirror an LMFD id onto whichever side we are drawing*/
 #define UIC(i) World.uiComponents[i]
 #define UI_DBLCLICK 0.5
 #define UI_KEY_BACKSPACE 10
@@ -46,7 +85,7 @@ static void UI_BeginFrame() { for (u32 i=1;i<UI_ID_COUNT;++i) UIC(i).active=fals
 static u8 UIClicked(u32 id) {
     if (id >= UI_ID_COUNT || id == 0) return 0; if (!UIOver(id)) return 0; bool l=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, r=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed; if (!l && !r) return 0;
     Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true;
-    double* t=l?&World.uiComponents[id].lastLMB:&World.uiComponents[id].lastRMB; u8 dbl=(*t>0.0 && (World.pauseRelativeTime-*t)<=UI_DBLCLICK)?4u:0u; *t=dbl?0.0:World.pauseRelativeTime; return (u8)((l?1u:2u)|dbl);
+    double* t=l?&World.uiComponents[id].lastLMB:&World.uiComponents[id].lastRMB; u8 dbl=(*t>0.0 && (World.pauseRelativeTime-*t)<=0.5f)?4u:0u; *t=dbl?0.0:World.pauseRelativeTime; return (u8)((l?1u:2u)|dbl);
 }
                          /*mk3,bls,drt,flch, ion,rpir,pipe,magn,magp,pstl,plsm,rail,riot,skrp,sprq,stun*/
 u16 wepIconTexIndices[16]={584,636,819,1067,1068,1494,1072,1069,1070,1071,1073,1165,1989,1990,1991,1992}; const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"}; extern float reloadTime[16];
@@ -82,8 +121,8 @@ void SaveNameEntry(i32 k) {
 void MFD_NewGame() {
     World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.consumableClickRow=-1,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.applyButtonReferenceIndex=-1,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,.logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
 }
-void MFD_GeneralChanged() { World.Sys_UI.generalClickSlot=-1; }
-void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; MFD_GeneralChanged(); }
+void MFD_GeneralChanged() { World.Sys_UI.generalClickSlot = -1; }
+void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.generalClickSlot = -1; }
 void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (side==2) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdSelected[side]=2; }
 void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=side?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4;}
 void MFD_CloseSearch() {if (World.Sys_UI.MFD_Data!=5) return; for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} u8 rv=World.Sys_UI.mfdReturnView[1]; if (rv==5) rv=0; World.Sys_UI.MFD_Data=rv;}
@@ -102,24 +141,47 @@ void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=isRH?World.Sys_U
   therefore a single operation on the one view plus both hands' tabs, not a per-side call -- a per-side version would
   restore the shared view on the first call and then early-out on the second, stranding that hand on the data tab.*/
 void MFD_CloseData(void) { if (!SystemUIDataViewActive(World.Sys_UI.MFD_Data)) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
-INLINE void MFD_SelectTab(u8 panel,u8 tab,bool toggle) {
-    MFD_GeneralChanged(); if (panel && tab==2) World.Sys_UI.lastItemSideRH=panel==2; if (panel && tab==4) World.Sys_UI.lastDataSideRH=panel==2; u8* current=panel==0?&World.Sys_UI.MFD_CenterTab:panel==1?&World.Sys_UI.MFD_LefTab:&World.Sys_UI.MFD_RightTab; *current=toggle && *current==tab ? 0 : tab; World.Sys_UI.mfdSelected[panel]=tab; u8 view=World.Sys_UI.MFD_Data;
-    if (!(panel && ((tab==2 && World.Sys_UI.mfdItemReader[panel-1]) || (tab==4 && view==5)))) { World.Sys_UI.mfdReturnTab[panel]=*current; if (view!=5) World.Sys_UI.mfdReturnView[panel]=view; } if (panel && tab==4 && view==5) World.Sys_UI.lastSearchSideRH=panel==2; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false);
+INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
+    World.Sys_UI.generalClickSlot = -1;
+    if (panel && tab == 2) World.Sys_UI.lastItemSideRH = (panel == 2);
+    if (panel && tab == 4) World.Sys_UI.lastDataSideRH = (panel == 2);
+    u8* current = panel == 0 ? &World.Sys_UI.MFD_CenterTab : panel==1 ? &World.Sys_UI.MFD_LefTab : &World.Sys_UI.MFD_RightTab;
+    *current = toggle && *current == tab ? 0 : tab;
+    World.Sys_UI.mfdSelected[panel] = tab;
+    u8 view = World.Sys_UI.MFD_Data;
+    if (!(panel && ((tab == 2 && World.Sys_UI.mfdItemReader[panel - 1]) || ( tab == 4 && view == 5)))) {
+        World.Sys_UI.mfdReturnTab[panel] = *current;
+        if (view != 5) World.Sys_UI.mfdReturnView[panel] = view;
+    }
+    
+    if (panel && tab == 4 && view == 5) World.Sys_UI.lastSearchSideRH = (panel == 2);
+    play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false);
 }
 
 void WeaponFireStartWeaponDip(float t);
-void RemoveWeapon(i32 slot); /* citadel.c: takes the weapon out of the 7-slot inventory; if it was the held one, the previous weapon takes over in hand (or the view model is hidden when none are left) */
-void WeaponSelectSlot(int slot){int wi=(int)World.invP1.weaponInventoryIndices[slot]; if(wi<0||wi>=MAX_ENTITIES)return; if((int)World.invP1.weaponCurrent==slot)return; if(World.invP1.reloadFinished>World.pauseRelativeTime)return; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ World.invP1.weaponCurrentPending=(i16)slot; World.invP1.weaponIndexPending=(i16)wi; int w=Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip((w>=0&&w<16) ? reloadTime[w] : 0.5f);}
+void RemoveWeapon(i32 slot);
+void WeaponSelectSlot(int slot) {
+    int wi = (int)World.invP1.weaponInventoryIndices[slot];
+    if (wi < 0 || wi >= MAX_ENTITIES) { return; }
+    if ((int)World.invP1.weaponCurrent == slot) { return; }
+    if (World.invP1.reloadFinished > World.pauseRelativeTime) { return; }
+    
+    play_wav(sounds[80], AppliedFXVol(1.0f), (V3){0.0f, 0.0f, 0.0f}, false);
+    World.invP1.weaponCurrentPending = (i16)slot;
+    World.invP1.weaponIndexPending = (i16)wi;
+    int w = Get16WeaponIndexFromConstIndex(wi);
+    WeaponFireStartWeaponDip((w>=0&&w<16) ? reloadTime[w] : 0.5f);
+}
+
 __attribute__((noinline)) bool MenuEnter() { return !Cheats.consoleActive && (Sys_Input.keyStates[KEY_KP_ENTER].pressed || Sys_Input.keyStates[KEY_ENTER].pressed); }
-/*One click per press, and only the first consumer of a frame sees it. The UI is immediate-mode: without this the click that leaves the credit pages is still latched on the same frame and lands on the menu underneath (PLAY CREDITS sits right under the cursor) and restarts them, and a held button fires a widget every frame.
-  uiClickLock   = a press is being swallowed, released only once every button is up.
-  uiClickBlocked = a press was already consumed earlier in THIS frame (set by UI_CLICK_CONSUMED, cleared by UiClickGate each frame).*/
 static bool uiClickLock = false, uiClickBlocked = false;
 static void UiClickGate(void) {
-    bool anyDown = false; for (u8 b = 0; b < MAX_MOUSE_BUTTONS; ++b) anyDown |= Sys_Input.mouseButtons[b].down;
-    uiClickBlocked = false;/*fresh frame: this press has not been consumed yet*/
-    if (uiClickLock) { if (!anyDown) uiClickLock = false; else uiClickBlocked = true; }/*still held since a consumed press: swallow*/
+    bool anyDown = false;
+    for (u8 b = 0; b < MAX_MOUSE_BUTTONS; ++b) anyDown |= Sys_Input.mouseButtons[b].down;
+    uiClickBlocked = false;
+    if (uiClickLock) { if (!anyDown) uiClickLock = false; else uiClickBlocked = true; }
 }
+
 __attribute__((noinline)) u8 UI_MenuInteractable(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this, bool sustained) {
     UIR(id,x,(i16)((float)y-h),(i16)w,(i16)h); bool cursorIsOver = CursorIsOverBounds(x, x + w, (float)y - h, (float)y); if (cursorIsOver && mouseMovementThisFrame && !resDropdownOpen) { currentMenuItem = this; if (cursorOver != NULL) {*cursorOver = cursorIsOver;} } if (uiClickBlocked) return 0u;/*press already consumed earlier this frame, or the last one has not been released yet*/ if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].down : Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT ].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 1u; }/*UI_CLICK_CONSUMED*/
     if ((sustained ? Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down : Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed) && cursorIsOver) { uiClickBlocked = true; uiClickLock = true; return 2u; } return 0u;
@@ -137,80 +199,79 @@ u8 UI_MenuButton(u32 id, i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH, i16 tX, i1
 bool UI_Checkbox(u32 id, i16 x, i16 y, i8 mitem, u16 textIdx, bool currentlyOn){RenderUIImage(x,y,16,16,910);/*Checkbox background*/ bool over=false; bool changed=(UI_Button(id,x,y+16,210,16,&over,mitem)||(MenuEnter()&&currentMenuItem==mitem)); over=over||currentMenuItem==mitem; if(currentlyOn)RenderUIImage(x+2,y+2,12,12,912);/*Checkbox check*/ RenderTextL(x+20,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[textIdx]); return changed;}
 __attribute__((noinline)) void UI_HeaderText(i16 x, const char* text) { RenderTextL(x,50,T_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,text); RenderTextL(x,46,T_GREEN_MENU_GLOW,FONT_STOPD,1.75f,text); RenderTextL(x,48,T_GREEN_MENU,FONT_STOPD,1.75f,text); }
 void PlayMenuMusic(),mp3_clear(),PlayVideoPageMusic(bool),StopVideoPageMusic();
-__attribute__((noinline)) void MenuGoBack() {if(enteringSaveName){SaveSlotCancelTyping();return;} bool leavingClipPage=(currentMenuPage==Mpg_IntroVideo||currentMenuPage==Mpg_CreditsVideo), toPause=returnToPause; if(toPause){returnToPause=World.menuActive=false; World.paused=true; mp3_clear();} if(currentMenuPage==Mpg_Singleplayer||currentMenuPage==Mpg_Multiplayer||currentMenuPage==Mpg_Options)currentMenuPage=Mpg_FrontPage;/*News*/else if(currentMenuPage==Mpg_Load||currentMenuPage==Mpg_NewGame||currentMenuPage==Mpg_IntroVideo||currentMenuPage==Mpg_CreditsVideo)currentMenuPage=Mpg_Singleplayer;
-    /*A clip page owns the music bus, so every way out of one has to stop its audio and hand the menu its title music. The Menu key lands here straight from InputProcessing (winput.c) before RenderVideoPage ever sees the press, so the teardown cannot live in the page's own skip branch. The selection is reset as ChangeMenuPage would, so the press that left the clip cannot also act on the page underneath.*/
-    if (leavingClipPage) { currentMenuItem = currentMenuTab = 0; if (toPause) StopVideoPageMusic(); else PlayMenuMusic(); } }
-static void CreateShadowBuffers() { shadowMapSSBO=MakeSSBO(&shadowMapSSBO,5,(MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32),NULL,GL_STATIC_DRAW); shadowMapsIndirectionID=MakeSSBO(&shadowMapsIndirectionID,6,LIGHT_COUNT * sizeof(u32),NULL,GL_STATIC_DRAW); shadowBuffersCreated=true; }
-// Menu video playback (Mpg_IntroVideo / Mpg_CreditsVideo).
-// The webm clips are played as a flipbook of the frames already in the texture array (Data/textures.txt): Textures/AAIntro (735 x 320x150) and Textures/AAOutro (408 x 1280x720),
-// laid out in playback order so playback is just an incrementing index into RenderUIImage. Frame ranges below must match the AAIntro/AAOutro blocks at the end of that file.
-// Timings/port from Citadel MainMenuHandler.cs (intro, 117.5s, 15 texts from stringTable[613]) and CreditsScroll.cs (credits, 37.2s, 3 texts from stringTable[610]); the frames are spread evenly over those lengths.
-#define VIDFRM_INTRO_BASE 2166u
-#define VIDFRM_INTRO_COUNT 735
-#define VIDFRM_OUTRO_BASE 2901u
-#define VIDFRM_OUTRO_COUNT 408
-#define VIDFRM_X ((UI_W-1280)/2) /*both clips are letterboxed: centered in x, hardcoded size*/
-#define VIDFRM_INTRO_Y 39
-#define VIDFRM_INTRO_W 1280
-#define VIDFRM_INTRO_H 600
-#define VIDFRM_OUTRO_Y 0
-#define VIDFRM_OUTRO_W 1280
-#define VIDFRM_OUTRO_H 720
-// Subtitle card: centered in x, top at y=640, word-wrapped by hand to 893px (Unity wraps these in the 558px design-px box; the cards run to ~120 chars and Voxen's text renderer only honors explicit \n).
-#define VIDTXT_CX (UI_W/2)
-#define VIDTXT_Y 640
-#define VIDTXT_W 893
-#define VIDTXT_SCALE 1.44f /*Unity 18pt design px = 28.8px on the 1366x768 buffer; FONT_NORMAL's atlas is a 20px em*/
+__attribute__((noinline)) void MenuGoBack() {
+    if (enteringSaveName) { SaveSlotCancelTyping(); return; }
+    
+    bool leavingClipPage = (currentMenuPage==Mpg_IntroVideo||currentMenuPage==Mpg_CreditsVideo), toPause=returnToPause;
+    if (toPause) { returnToPause = World.menuActive = false; World.paused = true; mp3_clear(); }
+    if (currentMenuPage == Mpg_Singleplayer || currentMenuPage == Mpg_Multiplayer || currentMenuPage == Mpg_Options) { currentMenuPage = Mpg_FrontPage;/*News*/ }
+    else if (currentMenuPage == Mpg_Load || currentMenuPage == Mpg_NewGame || currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) { currentMenuPage = Mpg_Singleplayer; }
+
+    if (leavingClipPage) {
+        currentMenuItem = currentMenuTab = 0;
+        if (toPause) StopVideoPageMusic();
+        else PlayMenuMusic();
+    }
+}
+
+static void CreateShadowBuffers() {
+    shadowMapSSBO           = MakeSSBO(&shadowMapSSBO,           5, (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW);
+    shadowMapsIndirectionID = MakeSSBO(&shadowMapsIndirectionID, 6, LIGHT_COUNT * sizeof(u32),                                                 NULL, GL_STATIC_DRAW); 
+    shadowBuffersCreated = true;
+}
+
+// Menu Video Playback
 static double introVidStart = 0.0, creditsVidStart = 0.0;
-static const float INTRO_VID_LEN = 117.141f, CREDITS_VID_LEN = 54.144f;/*Measured from the clip audio at 48 kHz: intro 5622784 frames, outro 2598912 frames. The flipbook is advanced as elapsed*frames/vidLen, so this sets the effective per-frame rate: 6.276 fps intro, 7.535 fps outro.*/
 static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.1f,59.3f,69.1f,74.5f,81.2f,89.2f,98.4f,105.0f};
 static const float outroTextAt[3] = {0.0f,7.0f,11.0f};/*CreditsScroll swaps to card 2 at 7s, card 3 at 11s, then hides all cards at 14s*/
-__attribute__((noinline)) void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; if (pg==Mpg_Save||pg==Mpg_Load) { SaveSlotCancelTyping(); RefreshSaveSlots(); }/*reparse save headers whenever the Save/Load page is assigned*/
+void ChangeMenuPage(u8 pg) {
+    currentMenuPage = pg;
+    currentMenuItem = currentMenuTab = 0;
+    resDropdownOpen = false;
+    resHoverIdx = -1;
+    if (pg==Mpg_Save||pg==Mpg_Load) { SaveSlotCancelTyping(); RefreshSaveSlots(); }/*reparse save headers whenever the Save/Load page is assigned*/
     if (pg==Mpg_IntroVideo) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); }
-    if (pg==Mpg_CreditsVideo) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); } }
-/* Unity GameEnd.cs Targetted(): Const.a.gameFinished = true; PauseScript.a.PauseEnable();
-   PauseScript.a.NoSavePauseQuit() (quit to and enable the main menu, no save); MainMenuHandler.a.PlayCredits().
-   The credits clip plays on the Mpg_CreditsVideo page and hands off to World.creditsActive when it ends. */
+    if (pg==Mpg_CreditsVideo) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); }
+}
+
 void GameEndSequence() { World.gameFinished = true; World.paused = true; World.menuActive = true; ChangeMenuPage(Mpg_CreditsVideo); }
+
 static char vidTxtBuf[T_LOGSTR_MAX];
 static void RenderVideoPage(u8 page) {
     bool isIntro = (page==Mpg_IntroVideo);
     double start = isIntro ? introVidStart : creditsVidStart;
-    if (start <= 0.0) { start=World.absoluteTime; if (isIntro) introVidStart=start; else creditsVidStart=start; }/*page entered without ChangeMenuPage (startup intro)*/
+    if (start <= 0.0) {
+        start=World.absoluteTime;
+        if (isIntro) introVidStart=start;
+        else creditsVidStart=start;
+    } /*page entered without ChangeMenuPage (startup intro)*/
     double elapsed = World.absoluteTime - start;
-    const float* at = isIntro ? introTextAt : outroTextAt; int cardCount = isIntro ? 15 : 3; double vidLen = isIntro ? INTRO_VID_LEN : CREDITS_VID_LEN; double cardsEnd = isIntro ? vidLen : 14.0/*CreditsScroll deactivates all three outro cards at 14s, leaving the video to run on to the end of its audio*/;
-    /*Flipbook: the whole frame set is spread evenly over the clip length, so the last frame lands as the clip ends.*/
-    int frames = isIntro ? VIDFRM_INTRO_COUNT : VIDFRM_OUTRO_COUNT; u32 frameBase = isIntro ? VIDFRM_INTRO_BASE : VIDFRM_OUTRO_BASE;
+    const float* at = isIntro ? introTextAt : outroTextAt;
+    int cardCount = isIntro ? 15 : 3;
+    double vidLen = isIntro ? 117.141f : 54.144f;/*Measured from the clip audio at 48 kHz: intro 5622784 frames, outro 2598912 frames. The flipbook is advanced as elapsed*frames/vidLen, so this sets the effective per-frame rate: 6.276 fps intro, 7.535 fps outro.*/
+    double cardsEnd = isIntro ? vidLen : 14.0/*CreditsScroll deactivates all three outro cards at 14s, leaving the video to run on to the end of its audio*/;
+    int frames = isIntro ? 735 : 408; u32 frameBase = isIntro ? 2166u : 2901u;
     if (frameBase+(u32)frames > (u32)texCnt) frames = 0;/*frames missing from textures.txt: leave the black ground rather than sample past the array*/
     i32 frame = frames>0 ? (i32)(elapsed*(double)frames/vidLen) : 0; if (frame<0) frame = 0; else if (frame>=frames) frame = frames-1;
-    { static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu; /*zero order hold: a ring slot that is still decoding must keep the last frame on screen, not punch a hole to the background*/
-      if (heldBase != frameBase) { heldBase = frameBase; heldRt = 0xFFFFFFFFu; }
-      if (frames>0) { u32 want = frameBase+(u32)frame; u32 nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt);
-        u32 rt = VideoFrameTexIndex(want); if (rt != 0xFFFFFFFFu) heldRt = rt;
-        if (heldRt != 0xFFFFFFFFu) RenderUIImage(VIDFRM_X,isIntro?VIDFRM_INTRO_Y:VIDFRM_OUTRO_Y,isIntro?VIDFRM_INTRO_W:VIDFRM_OUTRO_W,isIntro?VIDFRM_INTRO_H:VIDFRM_OUTRO_H,heldRt); } }
-    int card=-1; if (elapsed < cardsEnd) for (int i=cardCount-1;i>=0;--i) if (elapsed >= at[i]) { card=i; break; }/*Unity keeps exactly one text GameObject active, so only the newest card whose time came up is drawn*/
-    if (card>=0) {
-        /*Subtitle card, drawn by hand: word-wrap stringTable[613+card] (intro) / [610+card] (credits) to VIDTXT_W, then one centered draw at (VIDTXT_CX,VIDTXT_Y).*/
-        const char* src = Sys_Text.stringTable[(isIntro?613:610)+card]; float maxU=(float)VIDTXT_W/VIDTXT_SCALE; size_t op=0; const char* p=src; char line[T_LOGSTR_MAX];
-        while (*p && op+2<sizeof(vidTxtBuf)) {
-            int n=0; float w=0; const char* lastSp=NULL; int lastN=0;
-            while (*p && n<(int)sizeof(line)-5) {
-                const u8* c=(const u8*)p; int clen=(*c<0x80)?1:(((*c&0xE0)==0xC0)?2:3);
-                if (n+clen>=(int)sizeof(line)-1) break;
-                mcpy(line+n,p,(size_t)clen); n+=clen; p+=clen; line[n]=0;
-                if (c[clen-1]==' '||c[clen-1]==',') { lastSp=p; lastN=n; }/*break after a space or a comma, like Unity's word wrap*/
-                w=MeasureLineAdvance(line,FONT_NORMAL);
-                if (w>maxU) { if (lastSp) { p=lastSp; n=lastN; } else { p-=clen; n-=clen; } break; }/*line full: rewind to the last break point (or drop the char if there was none)*/
-            }
-            if (!n) break;/*a single glyph wider than the card: stop rather than spin*/
-            line[n]=0; if (line[n-1]==' ') line[--n]=0;
-            mcpy(vidTxtBuf+op,line,(size_t)n); op+=(size_t)n; vidTxtBuf[op++]='\n';
-        }
-        if (op && vidTxtBuf[op-1]=='\n') --op;
-        vidTxtBuf[op]=0;
-        if (op) RenderTextC(VIDTXT_CX,VIDTXT_Y,T_WHITE,FONT_NORMAL,VIDTXT_SCALE,"%s",vidTxtBuf);/*white reads against the dark clip frames; Unity's own card tint is #973B3B = T_VIDEOTEXT if you want it back*/
+    static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu; /*zero order hold: a ring slot that is still decoding must keep the last frame on screen, not punch a hole to the background*/
+    if (heldBase != frameBase) { heldBase = frameBase; heldRt = 0xFFFFFFFFu; }
+    if (frames>0) {
+        u32 want = frameBase+(u32)frame;
+        u32 nxt = VideoPeekFrame(want);
+        VideoRequestFrame(want);
+        if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt);
+        u32 rt = VideoFrameTexIndex(want);
+        if (rt != 0xFFFFFFFFu) heldRt = rt;
+        if (heldRt != 0xFFFFFFFFu) RenderUIImage(43,isIntro ? 39 : 0,1280,isIntro ? 600 : 720,heldRt);
     }
-    bool mouseClick = !uiClickBlocked && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed), click = mouseClick || MenuEnter(), anyKey = Sys_Input.keyStates[KEY_ESCAPE].pressed; for (int k=0;!anyKey&&k<MAX_KEYS;++k) if (Sys_Input.keyStates[k].pressed) anyKey=true;
+    
+    int card = -1;
+    if (elapsed < cardsEnd) { for (int i=cardCount-1;i>=0;--i) { if (elapsed >= at[i]) { card = i; break; } } }
+    if (card >= 0) { RenderTextC(546,544,T_VIDEOTEXT,FONT_NORMAL,1.25f,"%s",Sys_Text.stringTable[(isIntro?613:610)+card]); }
+    
+    bool mouseClick = !uiClickBlocked && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed);
+    bool click = mouseClick || MenuEnter(), anyKey = Sys_Input.keyStates[KEY_ESCAPE].pressed;
+    for(int k=0;!anyKey&&k<MAX_KEYS;++k){if (Sys_Input.keyStates[k].pressed) anyKey=true;}
     if (click) { uiClickBlocked = uiClickLock = true; }/*UI_CLICK_CONSUMED: latch every skip input, Enter included, so the press that leaves the clip cannot also land on the menu underneath*/
     bool skip = isIntro ? (elapsed>1.5 && (click||anyKey)) : (click || Sys_Input.keyStates[KEY_ESCAPE].pressed);
     if(skip || elapsed >= vidLen){if (isIntro) MenuGoBack();/*intro over: back to the Singleplayer page*/ else { World.creditsActive=true; World.creditsPageIndex=0; /*outro skipped or over: the credit pages take over*/ }}
@@ -1210,11 +1271,13 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_CMFD_PATCH_ROW_0 ... UI_ID_CMFD_PATCH_ROW_6: { int row=(int)(id-UI_ID_CMFD_PATCH_ROW_0); ConsumableSelect(true,row); if (dbl) ConsumableUse(true,row); return; }
         case UI_ID_CMFD_HARDWARE_ROW_0 ... UI_ID_CMFD_HARDWARE_ROW_11: UI_HardwareRowClick((int)(id-UI_ID_CMFD_HARDWARE_ROW_0)); return;
         case UI_ID_CMFD_SOFTWARE_ROW_0 ... UI_ID_CMFD_SOFTWARE_ROW_6: UI_SoftwareRowClick((int)(id-UI_ID_CMFD_SOFTWARE_ROW_0)); return;
-        case UI_ID_CMFD_GENERAL_USE_0 ... UI_ID_CMFD_GENERAL_USE_13: { u8 s=(u8)(id-UI_ID_CMFD_GENERAL_USE_0); MFD_GeneralChanged(); GeneralInvClick(s,World.invP1.generalInvCustIdx[s]); GeneralInvApply(s,World.invP1.generalInvCustIdx[s]); return; }
+        case UI_ID_CMFD_GENERAL_USE_0 ... UI_ID_CMFD_GENERAL_USE_13: { u8 s=(u8)(id-UI_ID_CMFD_GENERAL_USE_0); World.Sys_UI.generalClickSlot = -1; GeneralInvClick(s,World.invP1.generalInvCustIdx[s]); GeneralInvApply(s,World.invP1.generalInvCustIdx[s]); return; }
         case UI_ID_CMFD_GENERAL_ROW_0 ... UI_ID_CMFD_GENERAL_ROW_13: { u8 s=(u8)(id-UI_ID_CMFD_GENERAL_ROW_0); int item=GeneralInvItem(s); if (item<0) return;
-            if (!left) { MFD_GeneralChanged(); if (s) GeneralInvTake(s); return; }
+            if (!left) { World.Sys_UI.generalClickSlot = -1; if (s) GeneralInvTake(s); return; }
+            
             bool twice=dbl && World.Sys_UI.generalClickSlot==(i8)s && World.Sys_UI.generalClickItem==(i16)item && World.Sys_UI.generalClickCustom==World.invP1.generalInvCustIdx[s];
-            MFD_GeneralChanged(); GeneralInvClick(s,World.invP1.generalInvCustIdx[s]);
+            World.Sys_UI.generalClickSlot = -1;
+            GeneralInvClick(s,World.invP1.generalInvCustIdx[s]);
             if (twice) GeneralInvApply(s,World.invP1.generalInvCustIdx[s]); else { World.Sys_UI.generalClickSlot=(i8)s; World.Sys_UI.generalClickItem=(i16)item; World.Sys_UI.generalClickCustom=World.invP1.generalInvCustIdx[s]; World.Sys_UI.generalClickTime=World.pauseRelativeTime; } return; }
         case UI_ID_CMFD_LOG_TABLE_0 ... UI_ID_CMFD_LOG_TABLE_9: UI_LogTableClick((int)(id-UI_ID_CMFD_LOG_TABLE_0)); return;
         case UI_ID_CMFD_LOG_ENTRY_0 ... UI_ID_CMFD_LOG_ENTRY_14: UI_LogEntryClick((int)(id-UI_ID_CMFD_LOG_ENTRY_0)); return;
@@ -1233,8 +1296,8 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_MEDIA_TAB_0 ... UI_ID_LMFD_MEDIA_TAB_3: { u8 section=(u8)(id-UI_ID_LMFD_MEDIA_TAB_0); if (section==MM_NOTES && !World.diffMis) return;
             World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened=section; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
             if (section>=MM_DATA_TABLE) { World.Sys_UI.highlightStatus[section]=false; World.Sys_UI.highlightTickCount[section]=0; } play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false); return; }
-        case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.generalInvCurrent; MFD_GeneralChanged(); if (GeneralInvCanUse(s)) GeneralInvApply(s,World.invP1.generalInvCustIdx[s]); } return; }
-        case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; MFD_GeneralChanged(); if (GeneralInvCanVaporize(World.invP1.generalInvCurrent)) VaporizeClick(); return;
+        case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.generalInvCurrent; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanUse(s)) GeneralInvApply(s,World.invP1.generalInvCustIdx[s]); } return; }
+        case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanVaporize(World.invP1.generalInvCurrent)) VaporizeClick(); return;
         case UI_ID_LMFD_ITEM_SKATE: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(false); return;
         case UI_ID_LMFD_ITEM_BOOST: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(true); return;
         case UI_ID_LMFD_ITEM_TIMER_SLIDER: World.Sys_UI.lastItemSideRH=rh; ConsumableSetTimer(((float)World.cursorPos_x-UIC(MID(rh,ITEM_TIMER_SLIDER)).min.x)/224.0f); return;
@@ -1265,68 +1328,96 @@ static void UI_OnRegionClick(u32 id, u8 c) {
 static bool UI_DispatchRegions(void) { for (u32 id=UI_ID_NONE+1;id<UI_ID_COUNT;++id) { if (!UIC(id).active) continue; u8 c=UIClicked(id); if (!c) continue; UI_OnRegionClick(id,c); return true; } return false; }
 void UI_ProcessNavigation(void) {
     UpdateSearchTether();
-    if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive || World.Sys_UI.vmailActive) { MFD_GeneralChanged(); return; }
-    static const u16 keys[8]={KEY_F1,KEY_F2,KEY_F3,KEY_F4,KEY_F5,KEY_F7,KEY_F8,KEY_F11}; static const u8 tabs[8]={1,2,3,4,1,2,3,4};
-    for (u8 i=0;i<8;++i) if (Sys_Input.keyStates[keys[i]].pressed) { Sys_Input.keyStates[keys[i]].pressed=false; MFD_SelectTab(i<4?1:2,tabs[i],true); }
-    if (Sys_Input.keyStates[KEY_HOME].pressed) { MFD_SelectTab(0,1,false); MFD_SelectTab(1,1,false); MFD_SelectTab(2,3,false); World.Sys_UI.firstMain=true; }/*HUD Home: center=Main, left=Weapon, right=Automap*/
-    for (u8 up=0;up<2;++up) { u16 key=up?KEY_PAGE_UP:KEY_PAGE_DOWN; if (!Sys_Input.keyStates[key].pressed) continue;
-        Sys_Input.keyStates[key].pressed=false; u8 tab=World.Sys_UI.MFD_CenterTab?World.Sys_UI.MFD_CenterTab:World.Sys_UI.mfdSelected[0];
-        MFD_SelectTab(0,tab==5?1:1+(tab-1+(up?3:1))%4,false); World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; if(tab==1){World.Sys_UI.firstMain=true;}else if(tab==2){World.Sys_UI.firstHardware=true;}else if(tab==3){World.Sys_UI.firstGeneral=true;}
+    if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive || World.Sys_UI.vmailActive) { World.Sys_UI.generalClickSlot = -1; return; }
+    
+    static const u16 keys[8] = {KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F7, KEY_F8, KEY_F11};
+    static const u8 tabs[8]={1, 2, 3, 4, 1, 2, 3, 4};
+    for (u8 i=0;i<8;++i) {
+        if (Sys_Input.keyStates[keys[i]].pressed) { Sys_Input.keyStates[keys[i]].pressed=false; MFD_SelectTab(i<4?1:2,tabs[i],true); }
     }
-    if (!World.inventoryMode || Cheats.noHUD) { MFD_GeneralChanged(); return; }
-    if (World.Sys_UI.generalClickSlot>=0 && World.pauseRelativeTime-World.Sys_UI.generalClickTime>UI_DBLCLICK) MFD_GeneralChanged();
-    UI_DragRegions(); UI_DispatchRegions();
+    
+    if (Sys_Input.keyStates[KEY_HOME].pressed) { /*HUD Home: center = Main, left = Weapon, right = Automap*/
+        MFD_SelectTab(0,1,false);
+        MFD_SelectTab(1,1,false);
+        MFD_SelectTab(2,3,false);
+        World.Sys_UI.firstMain=true;
+    }
+    
+    for (u8 up=0;up<2;++up) {
+        u16 key = up ? KEY_PAGE_UP : KEY_PAGE_DOWN;
+        if (!Sys_Input.keyStates[key].pressed) continue;
+        
+        Sys_Input.keyStates[key].pressed = false;
+        u8 tab = World.Sys_UI.MFD_CenterTab ? World.Sys_UI.MFD_CenterTab : World.Sys_UI.mfdSelected[0];
+        MFD_SelectTab(0, tab == 5 ? 1 : 1 + (tab - 1 + (up ? 3 : 1)) % 4, false);
+        World.Sys_UI.MFD_ReaderView = MFD_READER_CONTENTS;
+             if (tab == 1) { World.Sys_UI.firstMain     = true; }
+        else if (tab == 2) { World.Sys_UI.firstHardware = true; }
+        else if (tab == 3) { World.Sys_UI.firstGeneral  = true; }
+    }
+    if (!World.inventoryMode || Cheats.noHUD) { World.Sys_UI.generalClickSlot = -1; return; }
+    
+    if (World.Sys_UI.generalClickSlot >= 0 && World.pauseRelativeTime - World.Sys_UI.generalClickTime > 0.5f) { World.Sys_UI.generalClickSlot = -1; }
+    UI_DragRegions();
+    UI_DispatchRegions();
 }
 
 static double RenderUI() {
     drawCallsNormal=drawCalls; UiClickGate(); UI_BeginFrame();
     if (!EditSelIsActive()) editFieldEditing=false;
     if (World.creditsActive) {
-        /*Black ground first, exactly like the clip pages: the credit pages take over from the outro frames, so clear to black instead of letting the last frame (and the 3D view behind the UI) show through the text.
-          Drawn before the input handling, so the frame we exit on is cleared as well and RenderMenu's background lands on clean black.*/
-        RenderUIImage(-417,-384, 2200,1536, 0);/*Video blackground*/
+        RenderUIImage(0,0, 1366,768, 0);/*Video blackground*/
         /*CreditsScroll.cs: Escape leaves the credits; LMB steps forward a page and steps off the last one; RMB steps back a page. The stats page is skipped unless the game was just finished.
           The outro already returned the menu to the Singleplayer page, so leaving just drops the credits overlay (Unity GoBack from the credits page lands on Singleplayer too).*/
         if (Sys_Input.keyStates[KEY_ESCAPE].pressed) { World.creditsActive=false; PlayMenuMusic(); }/*Escape leaves the credit pages for the menu*/
-        else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed) {
+        else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed && World.creditsPageIndex < 22) {
             uiClickBlocked = uiClickLock = true;/*UI_CLICK_CONSUMED: the menu must not see this press on the same frame (that is what re-clicked PLAY CREDITS off the last page)*/
-            if (World.creditsPageIndex>=CREDITS_PAGES-1) { World.creditsActive=false; PlayMenuMusic(); }/*bottom: back to the menu*/
-            else { if (++World.creditsPageIndex==1 && !World.gameFinished) ++World.creditsPageIndex;/*skip stats when playing from the menu*/ if (World.creditsPageIndex>CREDITS_PAGES-1) World.creditsPageIndex=CREDITS_PAGES-1; }
-        }
-        else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed && World.creditsPageIndex>0) { uiClickBlocked = uiClickLock = true; --World.creditsPageIndex; }
-        if (World.creditsActive) {
-            if (World.creditsPageIndex==1) { CreditsStats(); RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); }
-            else RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]);
-            return get_time();
-        }
+            ++World.creditsPageIndex;
+            if (World.creditsPageIndex == 1 && !World.gameFinished) ++World.creditsPageIndex;/*skip stats when playing from the menu*/
+        } else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed && World.creditsPageIndex>0) { uiClickBlocked = uiClickLock = true; --World.creditsPageIndex; }
+        
+        if (World.creditsPageIndex>=22) { World.creditsActive=false; PlayMenuMusic(); return get_time(); }/*bottom: back to the menu*/
+        if (World.creditsPageIndex==1) { CreditsStats(); RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); }
+        else RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]);
+        return get_time();
     }
     if (World.menuActive) RenderMenu(); else if (World.paused) RenderPausedUI();
     if (World.menuActive || World.paused) {
-        if (resDropdownOpen && currentMenuPage==Mpg_Options && currentMenuTab==0) {
-            if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(resSelectedIdx<resDropdownCount-1){resSelectedIdx++;} }
-            else if (Sys_Input.keyStates[KEY_UP].pressed) { if(resSelectedIdx>0){resSelectedIdx--;} }
-        }
-        else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_DOWN].pressed) currentMenuItem=(currentMenuItem+1)>=menuItemCount?0:currentMenuItem+1;
-        else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_UP].pressed) currentMenuItem=(currentMenuItem-1)<0?menuItemCount-1:currentMenuItem-1;
+        if (resDropdownOpen && currentMenuPage==Mpg_Options && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(resSelectedIdx<resDropdownCount-1){resSelectedIdx++;} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(resSelectedIdx>0){resSelectedIdx--;} } }
+        else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_DOWN].pressed) { currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0                 : currentMenuItem + 1; }
+        else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_UP  ].pressed) { currentMenuItem = (currentMenuItem - 1) < 0              ? menuItemCount - 1 : currentMenuItem - 1; }
     } else if (!World.Sys_UI.vmailActive) {
         if (!Cheats.noHUD) {
             for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){/*TargetID*/
-                Entity* e=&World.instances[i]; if(!IdxIsNPC(e->index))continue; V3 tpos=World.position[i]; tpos.y+=1.0f; i16 textIdx=TargetIDGetText(i); bool tid=TargetIDShouldRender(i),hw=(World.invP1.hasHardware&HW_TID)!=0; float targetRange=V3_Dist(tpos,World.position[PLAYER1]); if(!tid)continue; if(!TargetIDInPlayerPVS(i))continue;
-                float sx,sy; if(!WorldToScreenPoint(V3_AsubB(tpos,World.position[PLAYER1]),&sx,&sy))continue;
+                Entity* e = &World.instances[i];
+                if (!IdxIsNPC(e->index)) { continue; }
+                
+                V3 tpos = World.position[i];
+                tpos.y += 1.0f;
+                i16 textIdx = TargetIDGetText(i);
+                bool tid = TargetIDShouldRender(i), hw = (World.invP1.hasHardware&HW_TID) != 0;
+                float targetRange = V3_Dist(tpos,World.position[PLAYER1]);
+                if (!tid) continue;
+                if (!TargetIDInPlayerPVS(i)) continue;
+                
+                float sx, sy;
+                if (!WorldToScreenPoint(V3_AsubB(tpos,World.position[PLAYER1]),&sx,&sy))continue;
+                
                 /* The marker is a fixed world size, so scale it with range; 128px is the authored size at 7.68m. */
-                float imgSz=vclamp(128.0f * (TARGETID_MARKER_REF_RANGE / vmax(targetRange,0.25f)), 24.0f, 640.0f), imgHalf=imgSz*0.5f;
+                float imgSz=vclamp(128.0f * (7.68f / vmax(targetRange,0.25f)), 24.0f, 640.0f), imgHalf=imgSz*0.5f;
                 if(tid&&hw)RenderUIImage((i16)(sx-imgHalf),(i16)sy,(i16)(imgSz*1.2f),(i16)(imgSz*1.38f),1051);
                 char label[192]={0}; size_t used=0; u8 ver=World.invP1.hwVers[HW_TID_IDX]; float range=targetRange;
                 const char* attitude=(e->entflags&EF_ASLEEP)?Sys_Text.stringTable[519]:(e->currentState==AIState_Run||e->currentState==AIState_Attack1||e->currentState==AIState_Attack2||e->currentState==AIState_Attack3||e->currentState==AIState_Pain)?Sys_Text.stringTable[518]:Sys_Text.stringTable[516];
                 const char* status=textIdx>=0?Sys_Text.stringTable[textIdx]:attitude;
                 if(tid&&hw&&textIdx!=511){/*Two lines: "SERV-BOT 4" then "20, 6.3M, Idle". The number is this NPC's 1-based index within its own type.*/
-                    if(ver>1)used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s %u",npcTable[e->index-419].name,e->npcNumber);
-                    if(ver>2&&used<sizeof(label))used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s%.0f, %.1fM, %s",used?"\n":"",e->health,range,status);
-                    if(!used&&textIdx>=512&&textIdx<=515)used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s",status);/*damage status with v0 hardware*/
-                } else if(textIdx>=0)used+=(size_t)sFormat(label+used,sizeof(label)-used,"%s",status);/*NO DAMAGE always shows, regardless of hardware*/
-                if(label[0]){/*Font stays fixed size; the label only slides down as the target gets closer and up as it gets further.*/
-                    float textY=sy-TARGETID_TEXT_BASE_OFFSET+vclamp(TARGETID_TEXT_Y_GAIN*TARGETID_TEXT_BASE_OFFSET*(TARGETID_MARKER_REF_RANGE/vmax(targetRange,0.25f)-1.0f),-128.0f,96.0f);
-                    RenderText3DC((V3){sx,textY,0.0f},T_YELLOW,FONT_NORMAL,0.8f,label);
+                    if (ver > 1)                                 used += (size_t)sFormat(label + used, sizeof(label) - used, "%s %u",             npcTable[e->index-419].name, e->npcNumber);
+                    if (ver > 2 && used < sizeof(label))         used += (size_t)sFormat(label + used, sizeof(label) - used, "%s%.0f, %.1fM, %s", used ? "\n" : "", e->health, range, status);
+                    if (!used&&textIdx >= 512 && textIdx <= 515) used += (size_t)sFormat(label + used, sizeof(label) - used, "%s",                status); /*Damage status with v0 hardware*/
+                } else if (textIdx >= 0)                         used += (size_t)sFormat(label + used, sizeof(label) - used, "%s",                status); /*NO DAMAGE always shows, regardless of hardware*/
+                    
+                if (label[0]) { /*Font stays fixed size; the label only slides down as the target gets closer and up as it gets further.*/
+                    float textY = sy - TARGETID_TEXT_BASE_OFFSET + vclamp(TARGETID_TEXT_Y_GAIN * TARGETID_TEXT_BASE_OFFSET*(7.68f / vmax(targetRange, 0.25f) - 1.0f), -128.0f, 96.0f);
+                    RenderText3DC((V3){sx, textY, 0.0f}, T_YELLOW, FONT_NORMAL, 0.8f, label);
                 }
             }
             TickBar(false); TickBar(true); HardwareButtons(); UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020);

@@ -39,7 +39,7 @@ static inline __m128i _mm_set1_epi8_fast(char c) { __m128i v; char *p = (char*)&
 typedef int (*cmpfun)(const void*,const void*);
 typedef int (*cmpfun_r)(const void*,const void*,void*);
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
-void physDiagExternal(const char*); void DualLogError(const char* s, ...); void DualLog(const char* s, ...); void DualLogWarn(const char* s, ...);
+void physDiagExternal(const char*),DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(const char*, ...), *mcpy(void*,const void*,size_t);
 #define THRSTACKSZ (8 * 1024 * 1024)
 #if defined(_WIN32)
     #define DLL_IMP __declspec (dllimport)
@@ -48,15 +48,6 @@ void physDiagExternal(const char*); void DualLogError(const char* s, ...); void 
     typedef struct { void* handle; } OS_Thread;
     struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; };
     DLL_IMP void* WINAPI GetStdHandle(u32);
-#else
-    #define INVALID_FHANDLE -1
-    typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
-    typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
-    struct timespec {i64 tv_sec,tv_nsec;};
-    void *dlopen(const char*,int); void *dlsym(void*,const char*); INLINE long OS_Open(const char*,i32,i32);
-#endif
-void* mcpy(void *dst, const void *src, size_t n);
-#if defined(_WIN32)
     typedef i64 (WINAPI *PROC)(); typedef i64 (WINAPI *FARPROC)(); typedef i64 (WINAPI *NEARPROC)();
     typedef struct { int unused; } *HINSTANCE; typedef HINSTANCE HMODULE;  typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
     typedef struct { i64 QuadPart; } LARGE_INTEGER; typedef LARGE_INTEGER *PLARGE_INTEGER; typedef struct { u64 Internal,InternalHigh; union {struct {u32 Offset,OffsetHigh;} DUMMYSTRUCTNAME; void* Pointer;} DUMMYUNIONNAME; void* hEvent; } OVERLAPPED, *LPOVERLAPPED;
@@ -65,7 +56,7 @@ void* mcpy(void *dst, const void *src, size_t n);
     DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);                                                      DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);   DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*); DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,LPOVERLAPPED); DLL_IMP i32 WINAPI CloseHandle(void*);     DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
     DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);                  DLL_IMP void WINAPI GetSystemInfo(LPSYSTEM_INFO); DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*); DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64);         DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);              DLL_IMP void* WINAPI CreateFileMappingW(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,u16*);
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((u32)exitCode); __builtin_unreachable(); }
-    INLINE void OS_Close(FHandle fd) { CloseHandle(fd); }
+    INLINE void OS_Close(FHandle fd) { if(fd!=INVALID_FHANDLE){CloseHandle(fd);} }
     INLINE void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); return CloseHandle(m),r;}
     int __cdecl _mkdir(const char* dirname);
     INLINE int OS_MakeFolder(const char* path) { _mkdir(path); return 0; }
@@ -88,11 +79,16 @@ void* mcpy(void *dst, const void *src, size_t n);
     INLINE void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,U32_MAX); CloseHandle(t->handle); t->handle = NULL; }
     INLINE double get_time() { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
 #else
+    #define INVALID_FHANDLE -1
+    typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
+    typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
+    struct timespec {i64 tv_sec,tv_nsec;};
+    void *dlopen(const char*,int); void *dlsym(void*,const char*); INLINE long OS_Open(const char*,i32,i32);
     struct input_id { u16 bustype,vendor,product,version;}; struct input_event { struct { long tv_sec,tv_usec; } time; u16 type,code; i32 value; };
-    INLINE int OS_MakeFolder(const char* path) { long r = 83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }
-    INLINE long OS_Read(FHandle f,void*b,size_t c) { long r = 0; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(b),"d"(c):"rcx","r11","memory"); return r; }
-    INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { long r = 231; __asm__ __volatile__("syscall":"+a"(r):"D"(exitCode):"rcx","r11","memory"); __builtin_unreachable(); }
-    INLINE void OS_Close(FHandle fd) { long r = 3; __asm__ __volatile__("syscall":"+a"(r):"D"(fd):"rcx","r11","memory"); } // Only really needed to prevent hitting a 1024 file descriptor limit.
+    INLINE int OS_MakeFolder(const char* path){long r=83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }
+    INLINE long OS_Read(FHandle f,void*b,size_t c){long r=0; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(b),"d"(c):"rcx","r11","memory"); return r; }
+    INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode){long r=231; __asm__ __volatile__("syscall":"+a"(r):"D"(exitCode):"rcx","r11","memory"); __builtin_unreachable(); }
+    INLINE void OS_Close(FHandle fd){if(fd!=INVALID_FHANDLE){long r=3; __asm__ __volatile__("syscall":"+a"(r):"D"(fd):"rcx","r11","memory");}} // Only really needed to prevent hitting a 1024 file descriptor limit.
     INLINE long OS_Open(const char* path, i32 flags, i32 mode) { long r = 2; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"((long)flags),"d"((long)mode):"rcx","r11","memory"); return r; }
     INLINE void* OS_AllocateRAM(size_t len, i32 prot, i32 flags, FHandle fd) { long r=9; register int r10 __asm__("r10")=flags; register int r8 __asm__("r8")=fd; register long r9 __asm__("r9")=0; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL),"S"(len),"d"(prot),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); if((void*)r != (void*)-1) __atomic_add_fetch(&g_mmap_live,len,__ATOMIC_RELAXED); return (void*)r; }
     INLINE FHandle OS_OpenReadonly(const char* path) { FHandle f=OS_Open(path,0,0); return f < 0 ? DualLogError("Could not open file %s for reading\n",path), -1 : f; }
@@ -126,7 +122,7 @@ typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool
 typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;  typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 enum {/*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                 MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,MAX_CULL_FILESIZE=500000,
-      /*Entity Management*/MAX_LEVELS=14,LEVEL_CYBERSPACE=13,CREDITS_PAGES=22,AVG_CPU_TAPS=2048,MAX_ENTITIES=864,INSTANCE_COUNT=9032,MAX_LEVEL_PARTICLES=128,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,
+      /*Entity Management*/MAX_LEVELS=14,LEVEL_CYBERSPACE=13,AVG_CPU_TAPS=2048,MAX_ENTITIES=864,INSTANCE_COUNT=9032,MAX_LEVEL_PARTICLES=128,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,MAX_ELEV_DESTS_PER_LEVEL=8,SAVE_VERSION=16,
       /*Lights*/LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/MAX_MDLS=7489, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
       /*Textures*/MAX_TXRS=4096,MAX_TOTAL_PIXELS=48000000u, MAX_UNIQUE_COLORS = 86000u,TEXHASH_SZ=256,NUM_TEXTURE_CLIPS=49,
@@ -137,7 +133,7 @@ enum {/*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARR
       /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
       /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS),REV_BUF_LEN=110251/*~2.5s @ 44100; prime*/,MAXAMB=256,
       /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
-               T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13/*#973B3B, Unity intro/outro subtitle cards*/, T_BLUE = 14/*PuzzleWire actualColorBlue*/, T_PURPLE = 15/*PuzzleWire actualColorPurple*/, T_BUFFER_SIZE=4096/*longest credits page is 988 source bytes and creditStats[] is 4096, so the shared UI text buffer has to hold a whole page*/, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
+               T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14, T_PURPLE = 15, T_BUFFER_SIZE=4096, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
                HUDC_WHITE=0, HUDC_RED=1, HUDC_ORANGE=2, HUDC_YELLOW=3, HUDC_GREEN=4, HUDC_BLUE=5, HUDC_PURPLE=6, HUDC_GRAY=7,
       /*UI*/ UI_W=1366,UI_H=768,CURSOR_SZ=40,MFD_READER_CONTENTS=0,MFD_READER_FOLDER=1,MFD_READER_TEXT=2,MAX_UI_ELEMENTS=4096,TXT_PAD=4,TXT_H=24,TAB_THICK=16,MFD_SPACING=8,MFD_SPACINGCTR=19,SIDE_MFD_W=320,SIDE_MFD_H=240,CTR_MFD_W=640,CTR_MFD_H=240,UI_AUTOMAP_ZOOM_IN=0,UI_AUTOMAP_ZOOM_OUT=1,UI_AUTOMAP_FULL=2,UI_AUTOMAP_SIDE=3,
       /*Automap*/ AM_W=320,AM_H=200,AM_FULL_W=700,AM_FULL_H=700,AM_MAXHULL=10,AMAP_UI_X_L=24,AMAP_UI_X_R=1022,AMAP_UI_Y=524,AMAP_UI_W=320,AMAP_UI_H=200,AM_XOFF=((AM_W-AM_H)/2),
