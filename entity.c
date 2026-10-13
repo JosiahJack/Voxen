@@ -1630,14 +1630,37 @@ static void DoorTypeAudit(u8 lev) {
 }
 void LoadAllLevels() {
     double start_time = get_time();
-    DebugRAM("start of LoadAllLevels"); RenderLoading("Loading level data..."); World.levelCurrentlyLoading = true;
-    entsFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Entity)); posFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); scaleFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); rotationFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Quaternion)); colCtrFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3)); colSzFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
-    ioNameCount=1; ioNames[0][0]='\0'; lightsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(Light)); lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation)); for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;} fwPoolUsed = 0; for(u8 lev=0;lev<World.numLevels;++lev){for(i32 i=0;i<INSTANCE_COUNT;++i){colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1};}/*OS_Alloc is a raw anonymous mmap and so zero-fills: absent size/center keys read 0.0, which passes the "present" test and yields zero-extent colliders (degenerate trigger_once boxes that can never be touched). Sentinel to -1 per level so indices aren't inherited across levels.*/ LoadLevelData(lev); DoorTypeAudit(lev);}
-    OS_Free(entsFromFile,INSTANCE_COUNT*sizeof(Entity)); OS_Free(colCtrFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(colSzFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(posFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(scaleFromFile,INSTANCE_COUNT*sizeof(V3)); OS_Free(rotationFromFile,INSTANCE_COUNT*sizeof(Quaternion)); OS_Free(lightsFromFile,LIGHT_COUNT*sizeof(Light)); OS_Free(lanimsFromFile,LIGHT_COUNT*sizeof(LightAnimation));
+    DebugRAM("start of LoadAllLevels");
+    RenderLoading("Loading level data...");
+    World.levelCurrentlyLoading = true;
+    entsFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Entity));
+    posFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
+    scaleFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
+    rotationFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Quaternion));
+    colCtrFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
+    colSzFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(V3));
+    ioNameCount=1; ioNames[0][0]='\0';
+    lightsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(Light));
+    lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation));
+    for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;}
+    fwPoolUsed = 0;
+    for(u8 lev=0;lev<World.numLevels;++lev){
+        for (i32 i=0;i<INSTANCE_COUNT;++i) { colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1}; }
+        LoadLevelData(lev);
+        DoorTypeAudit(lev);
+    }
+    
+    OS_Free(entsFromFile,INSTANCE_COUNT*sizeof(Entity));
+    OS_Free(colCtrFromFile,INSTANCE_COUNT*sizeof(V3));
+    OS_Free(colSzFromFile,INSTANCE_COUNT*sizeof(V3));
+    OS_Free(posFromFile,INSTANCE_COUNT*sizeof(V3));
+    OS_Free(scaleFromFile,INSTANCE_COUNT*sizeof(V3));
+    OS_Free(rotationFromFile,INSTANCE_COUNT*sizeof(Quaternion));
+    OS_Free(lightsFromFile,LIGHT_COUNT*sizeof(Light));
+    OS_Free(lanimsFromFile,LIGHT_COUNT*sizeof(LightAnimation));
     BuildTextDecalMeshes(); // Build world-baked 3D text decal meshes (Sys_Text.stringTable already populated for current language).
-    DebugRAM("end of LoadAllLevels"); DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\nLoad all levels... took %f secs\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
-                                              World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
-                                              World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13],get_time() - start_time);
+    DebugRAM("end of LoadAllLevels");
+    DualLog("Load all levels... took %f secs\n",get_time() - start_time);
 }
 
 void LoadLevel(u8 curlevel, V3 pos) {

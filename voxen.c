@@ -2069,9 +2069,11 @@ __attribute__((cold)) void NewGame() { // Reset World States
 }
 
 void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
-void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); }
+void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
+                                              World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
+                                              World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]); }
 void LoadModels(), LoadTextures(), InitAudio(), LoadConfig(), BiomonitorInitGL(), synth_set_room(float,float);
-extern u32 random_range_rng;
+extern u32 random_range_rng; extern bool amReady;
 void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
@@ -2218,7 +2220,13 @@ void InitalizeEnvironment() {
         
     World.absoluteTime = World.current_time = get_time();
     World.pauseRelativeTime = World.last_physics_time = 0.0;
-    AutomapInitGL();
+    
+    GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); // Automap related buffers
+    glGenFramebuffers(1,&amFBO);     glBindFramebuffer(GL_FRAMEBUFFER,amFBO);     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amTexId,0);
+    GenerateAndBindTexture(&amFullTexId,GL_RGBA8,AM_FULL_W,AM_FULL_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL);
+    glGenFramebuffers(1,&amFullFBO); glBindFramebuffer(GL_FRAMEBUFFER,amFullFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amFullTexId,0);
+    amReady=true;
+    
     BiomonitorInitGL();
     BioMonitorInit();
     NewGame();
@@ -2305,20 +2313,20 @@ i32 main() {
         CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
 
         // RAM and frame consistency debug stats
-        static u32 dbgGameFrame = 0;
-        if (!World.menuActive && !World.paused) { dbgGameFrame++; /*only count gameplay frames for RAM/timing checkpoints*/}
-        static const u32 dbgFrm[] = {4, 100, 200, 500, 1000};
-        static const char* dbgLbl[] = {"gameframe 4","gameframe 100","gameframe 200","gameframe 500","gameframe 1000"};
-        for (int d=0;d<5;d++) {
-            if (dbgGameFrame == dbgFrm[d]) {
-                DebugRAM(dbgLbl[d]);
-                DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Ray:%.3f(%u)\n",
-                    dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000, World.substeps, renderTime*1000,
-                    prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
+        //static u32 dbgGameFrame = 0;
+        //if (!World.menuActive && !World.paused) { dbgGameFrame++; /*only count gameplay frames for RAM/timing checkpoints*/}
+        //static const u32 dbgFrm[] = {4, 100, 200, 500, 1000};
+        //static const char* dbgLbl[] = {"gameframe 4","gameframe 100","gameframe 200","gameframe 500","gameframe 1000"};
+        //for (int d=0;d<5;d++) {
+            //if (dbgGameFrame == dbgFrm[d]) {
+                //DebugRAM(dbgLbl[d]);
+                //DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Ray:%.3f(%u)\n",
+                    //dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000, World.substeps, renderTime*1000,
+                    //prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
                 
-                if (dbgGameFrame == 1000) { DebugRAMPeak(); break; }
-            }
-        }
+                //if (dbgGameFrame == 1000) { DebugRAMPeak(); break; }
+            //}
+        //}
     }
     
     return 0;

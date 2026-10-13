@@ -97,9 +97,15 @@ void SaveGame(u8,const char*),LoadGame(u8); bool ReadSaveSlotName(u8,char*,size_
 static void RefreshSaveSlots(void) {
     for (u8 i=0;i<8;++i) {
         saveSlotUsed[i]=ReadSaveSlotName(i,saveSlotNames[i],sizeof(saveSlotNames[i]));
-        if (!saveSlotUsed[i]) { const char* t=(i==7)?"- unused quicksave -":"- unused -"; size_t n=0; while(t[n]&&n<sizeof(saveSlotNames[i])-1){saveSlotNames[i][n]=t[n];++n;} saveSlotNames[i][n]='\0'; }
+        if (!saveSlotUsed[i]) {
+            const char* t = (i==7) ? "- unused quicksave -" : "- unused -";
+            size_t n = 0;
+            while (t[n] && n < sizeof(saveSlotNames[i]) - 1) { saveSlotNames[i][n] = t[n]; ++n; }
+            saveSlotNames[i][n] = '\0';
+        }
     }
 }
+
 static void SaveSlotCancelTyping(void) { saveSlotEditing=-1; enteringSaveName=false; saveNameEntryLen=0; saveNameEntry[0]='\0'; }
 static void SaveSlotConfirmTyping(void) {
     i8 slot=saveSlotEditing; char name[48]; u8 n=saveNameEntryLen; if (n>47) n=47; for (u8 i=0;i<n;++i) name[i]=saveNameEntry[i]; name[n]='\0';
@@ -108,6 +114,7 @@ static void SaveSlotConfirmTyping(void) {
     World.menuActive=false; World.paused=false; returnToPause=false;/*close menu + unpause BEFORE saving so the save captures clean in-game state*/
     SaveGame((u8)slot,name);
 }
+
 /*Text entry for the save name, routed from InputKey while enteringSaveName (same charset rules as TextEntry).*/
 void SaveNameEntry(i32 k) {
     if (k==KEY_ESCAPE) { Sys_Input.keyStates[KEY_ESCAPE].pressed=false; SaveSlotCancelTyping(); return; }
@@ -118,29 +125,17 @@ void SaveNameEntry(i32 k) {
     char c=(k>=KEY_A&&k<=KEY_Z)?(char)('a'+(k-KEY_A)):((k>=KEY_1&&k<=KEY_9)?(char)('1'+(k-KEY_1)):((k==KEY_0)?'0':((k==KEY_SPACE)?' ':0)));
     if (c) { saveNameEntry[saveNameEntryLen]=c; saveNameEntry[++saveNameEntryLen]='\0'; }
 }
+
 void MFD_NewGame() {
     World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.consumableClickRow=-1,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.applyButtonReferenceIndex=-1,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,.logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
 }
-void MFD_GeneralChanged() { World.Sys_UI.generalClickSlot = -1; }
+
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.generalClickSlot = -1; }
 void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (side==2) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdSelected[side]=2; }
 void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=side?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4;}
 void MFD_CloseSearch() {if (World.Sys_UI.MFD_Data!=5) return; for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} u8 rv=World.Sys_UI.mfdReturnView[1]; if (rv==5) rv=0; World.Sys_UI.MFD_Data=rv;}
-/*Data tab sub-views that are driven by frobbed objects; these are the "open" object panels. view 5 (search) is handled separately by MFD_OpenSearch/MFD_CloseSearch.*/
-INLINE bool SystemUIDataViewActive(u8 v) { return v==1||v==2||v==3||v==4||v==6||v==7||v==8||v==9; }
-/*The data tab is ONE view shared by both MFDs, not a per-hand one.  Voxen kept MFD_DataL and MFD_DataR, so only the
-  hand the object was raised on ever showed the panel: the other screen rendered its own stale view, which is why the
-  grid could appear on the left or the right but never on both at once.  Unity drives puzzleGridLH/puzzleGridRH from
-  the same tetheredPGP, so both hands show the same thing.  MFD_OpenData still takes the side to decide which hand's
-  TAB is raised, but the view code itself goes to the one field.  The two saves are separate on purpose: a hand's return TAB is recorded whenever that hand was not
-  already on the data tab (the audio log opens on both hands in a row, and the second call would otherwise leave that
-  hand's return tab stale for MFD_CloseData to restore as 0), while the return VIEW is only recorded when no data view
-  was already up, so a view opened on top of another does not overwrite what it was opened over.*/
-void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=isRH?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab; if (tab!=4) World.Sys_UI.mfdReturnTab[side]=tab; if (!SystemUIDataViewActive(World.Sys_UI.MFD_Data)) World.Sys_UI.mfdReturnView[side]=World.Sys_UI.MFD_Data; World.Sys_UI.MFD_Data=code; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4; }
-/*Unity RevertDataTabState() TabReset's and ReturnToLastTab's BOTH sides, because the view is shared.  Closing is
-  therefore a single operation on the one view plus both hands' tabs, not a per-side call -- a per-side version would
-  restore the shared view on the first call and then early-out on the second, stranding that hand on the data tab.*/
-void MFD_CloseData(void) { if (!SystemUIDataViewActive(World.Sys_UI.MFD_Data)) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
+void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=isRH?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab; if (tab!=4) World.Sys_UI.mfdReturnTab[side]=tab; if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) World.Sys_UI.mfdReturnView[side]=World.Sys_UI.MFD_Data; World.Sys_UI.MFD_Data=code; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4; }
+void MFD_CloseData(void) { if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
 INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
     World.Sys_UI.generalClickSlot = -1;
     if (panel && tab == 2) World.Sys_UI.lastItemSideRH = (panel == 2);

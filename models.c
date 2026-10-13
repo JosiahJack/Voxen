@@ -1,15 +1,10 @@
 // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
 #include "common.h"
-
 #define ARENA_ALIGN(p) ((char*)(((uintptr_t)(p) + 15) & ~(uintptr_t)15)) // 16-byte align sub-arena cursors
-
 extern WeaponFireCtx wfx; // from weapons.c / voxen.c
-
 enum { SUB_MAIN = 32 };
-
 typedef struct { u8* base; u8* cur; u8* end; } SubArena;
 static SubArena thrd_sub[SUB_MAIN + 1];
-
 static void OS_SubArenaSliceInit(u32 idx, u8* base, size_t sz) { SubArena* a = &thrd_sub[idx]; a->base = base; a->cur = base; a->end = base + sz; }
 static void* OS_SubArenaAlloc(i32 tid, size_t n) {
     if (tid < 0) { tid = SUB_MAIN; }
@@ -23,13 +18,11 @@ static void* OS_SubArenaAlloc(i32 tid, size_t n) {
 
 static void* OS_SubArenaMark(i32 tid) { return (void*)(tid < 0 ? thrd_sub[SUB_MAIN].cur : thrd_sub[tid].cur); }
 static void OS_SubArenaRelease(i32 tid, void* mark) { SubArena* a = (tid < 0) ? &thrd_sub[SUB_MAIN] : &thrd_sub[tid]; a->cur = (u8*)mark; }
-
 enum{MAX_GLB_JOINTS=96,MAX_GLB_TRIS=MAX_OUTPUT_VERTS/3,MAX_GLB_BLOCKS=64}; float **vPos, **thrd_pos, **thread_temp_nrm, **thrd_uv, **thrd_verts; u32 **thrd_ht, **thrd_ht_used, **thrd_remap_scratch; u8** thrd_cache_scratch;
-
-typedef struct { const char *data; int size; } RawOBJ;
+typedef struct { const char *data; i32 size; } RawOBJ;
 typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData;
 typedef struct { ModelData* entries; u32 count; } ModelDataParser;
-typedef struct { u32 start,end; int tid; } PhysGeomTask; BvhNode** modelBVHNodes; u16** modelBVHTriOrder,modelBVHNodeCounts[MAX_MDLS]; u32 modelBVHTriOrderCounts[MAX_MDLS];
+typedef struct { u32 start,end; i32 tid; } PhysGeomTask; BvhNode** modelBVHNodes; u16** modelBVHTriOrder,modelBVHNodeCounts[MAX_MDLS]; u32 modelBVHTriOrderCounts[MAX_MDLS];
 typedef struct { BvhNode *nodes; u8 *triOctants; u16 *triOrder,*triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 typedef enum { glb_attribute_type_invalid,glb_attribute_type_position,glb_attribute_type_normal,glb_attribute_type_texcoord,glb_attribute_type_joints,glb_attribute_type_weights}glb_attribute_type;
 typedef enum { glb_component_type_invalid,glb_component_type_r_8u,glb_component_type_r_16u,glb_component_type_r_32f } glb_component_type;
@@ -49,52 +42,19 @@ struct glb_node{ glb_node*parent, **children; size_t children_count; glb_skin *s
 typedef struct { glb_accessor*input,*output;glb_interpolation_type interpolation;}glbanim_samp;
 typedef struct { glbanim_samp*sampler;glb_node*target_node;glb_animt_path_type target_path;}glb_anim_chan;
 typedef struct { glbanim_samp*samplers;size_t samplers_count;glb_anim_chan*channels;size_t channels_count;}glb_animt;
-typedef struct {
-    glb_mesh *meshes;
-    size_t meshes_count;
-    glb_accessor *accessors;
-    size_t accessors_count;
-    glb_buffer_view *buffer_views;
-    size_t buffer_views_count;
-    glb_buffer *buffers;
-    size_t buffers_count;
-    glb_skin *skins;
-    size_t skins_count;
-    glb_node *nodes;
-    size_t nodes_count;
-    glb_animt *animations;
-    size_t animations_count;
-    const void *bin;
-    size_t bin_size;
-} glb_data;
-
+typedef struct { glb_mesh *meshes; size_t meshes_count; glb_accessor *accessors; size_t accessors_count; glb_buffer_view *buffer_views; size_t buffer_views_count; glb_buffer *buffers; size_t buffers_count; glb_skin *skins; size_t skins_count; glb_node *nodes; size_t nodes_count; glb_animt *animations; size_t animations_count; const void *bin; size_t bin_size; } glb_data;
 typedef enum { JSMN_UND = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
 enum { JSMN_ERROR_NOMEM = -1,JSMN_ERROR_INVAL = -2, JSMN_ERROR_PART = -3 };
 typedef struct { jsmntype_t type;i64 start,end;i32 size,parent; } jsmntok_t;
 typedef struct { size_t pos;u32 toknext;i32 toksuper; } jsmn_parser;
 typedef struct { u16 j[4]; float w[4]; } VtxSkin;
-typedef struct {
-    float *pos, *nrm, *uv;
-    VtxSkin* skin;
-    u32 vertCount, *indices, triCount;
-    glb_node* jointNodes[MAX_GLB_JOINTS];
-    float invBind[MAX_GLB_JOINTS][16];
-    u32 jointCount;
-    glb_animt* anim;
-    glb_data* gltf;
-    bool isTrAnim;
-    glb_node **meshNodes;
-    float **subPos, **subNrm, **subUv;
-    u32 *subVertCnt, **subIndices, *subTriCount, submshCnt;
-} GltfMesh;
-
+typedef struct { float *pos, *nrm, *uv; VtxSkin* skin; u32 vertCount, *indices, triCount; glb_node* jointNodes[MAX_GLB_JOINTS]; float invBind[MAX_GLB_JOINTS][16]; u32 jointCount; glb_animt* anim; glb_data* gltf; bool isTrAnim; glb_node **meshNodes; float **subPos, **subNrm, **subUv; u32 *subVertCnt, **subIndices, *subTriCount, submshCnt; } GltfMesh;
 static BvhBuildCtx thrd_bvh_ctx[32];
 u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES];
 u16 *cvxAdjLists[MAX_UNIQUE_CVX_MESHES], cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
 size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES], cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
 GltfMesh* gBlockMeshes;
 static u32 gBlockMeshCount = 0;
-
 static void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm) {
     float tx=T[0],ty=T[1],tz=T[2],qx=R[0],qy=R[1],qz=R[2],qw=R[3],sx=S[0],sy=S[1],sz=S[2];
     lm[0]  = (1 - 2*qy*qy - 2*qz*qz) * sx; lm[1]  = (2*qx*qy + 2*qz*qw) * sx;     lm[2]  = (2*qx*qz - 2*qy*qw) * sx;   lm[3]  = 0.0f;
@@ -735,69 +695,38 @@ static void* GltfBakeWorker(void* arg) {
 
 static GltfFrameTask* glb_Tasks = NULL; static u32 glb_TaskCount = 0;
 void LoadGLBAnimatedSources(ModelData* entries, u32 entryCount, RawOBJ* raw) {
-    gBlockMeshCount=0;
-    u32 maxTasks = 0;
-    for (u32 i=0;i<entryCount;++i) {
-        if(!entries[i].animated || !IsGLBSourcePath(entries[i].path)){continue;}
-        
-        maxTasks += entries[i].frameCount;
-    }
-    
-    glb_TaskCount = 0;
-    if (!maxTasks) { return; }
+    gBlockMeshCount = 0; u32 maxTasks = 0, taskCount = 0;
+    for (u32 i=0;i<entryCount;++i) { if(entries[i].animated && IsGLBSourcePath(entries[i].path)){maxTasks += entries[i].frameCount;} }
+    glb_TaskCount = 0; if(!maxTasks){return;}
     
     gBlockMeshes = OS_SubArenaAlloc(-1, (size_t)MAX_GLB_BLOCKS * sizeof(GltfMesh));
-    glb_Tasks    = OS_SubArenaAlloc(-1,(size_t)maxTasks*sizeof(GltfFrameTask));
-    u32 taskCount = 0;
+    glb_Tasks    = OS_SubArenaAlloc(-1, (size_t)maxTasks * sizeof(GltfFrameTask));
     for (u32 i = 0; i < entryCount; ++i) {
-        if (!entries[i].animated || !IsGLBSourcePath(entries[i].path)) {continue;} if(gBlockMeshCount>=MAX_GLB_BLOCKS){DualLogError("Too many GLB anim blocks (max %u)\n",MAX_GLB_BLOCKS); continue;} u32 baseIdx = entries[i].index; GltfMesh* gm = &gBlockMeshes[gBlockMeshCount]; GltfMeshLoad((const u8*)raw[baseIdx].data,(size_t)raw[baseIdx].size,gm);
-        ++gBlockMeshCount;
-        u16 a=entries[i].animationNum;
-        float framerate=0.0f;
-        if (a<MAX_ANIMS) {
-            for (u32 c=0;c<MAX_ANIMCLIPS;++c) {
-                if (modelAnimationClips[a][c].framerate > 0.0f) {
-                    framerate = modelAnimationClips[a][c].framerate;
-                    break;
-                }
-            }
-        }
+        if (!entries[i].animated || !IsGLBSourcePath(entries[i].path)) { continue; }
+        if (gBlockMeshCount >= MAX_GLB_BLOCKS) { DualLogError("Too many GLB anim blocks (max %u)\n",MAX_GLB_BLOCKS); continue; }
         
+        GltfMesh* gm = &gBlockMeshes[gBlockMeshCount]; GltfMeshLoad((const u8*)raw[entries[i].index].data,(size_t)raw[entries[i].index].size,gm);
+        ++gBlockMeshCount; u16 a=entries[i].animationNum; float framerate=0.0f;
+        if (a < MAX_ANIMS) {  for (u32 c=0;c<MAX_ANIMCLIPS;++c) { if(modelAnimationClips[a][c].framerate > 0.0f){framerate = modelAnimationClips[a][c].framerate; break;} }  }
         if (framerate <= 0.0f) { framerate = 30.0f; /*Fallback if undefined*/ }
         for (u32 fi=0;fi<entries[i].frameCount; ++fi) {
-            u32 frameNum = entries[i].frames[fi];
-            u32 modelIdx = baseIdx+fi;/*Contiguous index, sparse frame*/
-            bool dup = false;
-            for(u32 k=0;k<taskCount; ++k) {
-                if (glb_Tasks[k].modelIndex == modelIdx) {
-                    dup = true;
-                    break;
-                }
-            }
-            
-            if (dup) { continue; }
-            
-            glb_Tasks[taskCount].mesh = gm;
-            glb_Tasks[taskCount].modelIndex = modelIdx;
+            u32 frameNum = entries[i].frames[fi]; u32 modelIdx = entries[i].index + fi; /*Contiguous index, sparse frame*/
+            glb_Tasks[taskCount].mesh          = gm;
+            glb_Tasks[taskCount].modelIndex    = modelIdx;
             glb_Tasks[taskCount].timelineFrame = (float)frameNum / framerate;
             ++taskCount;
         }
     }
     
-    glb_TaskCount=taskCount;
+    glb_TaskCount = taskCount;
 }
 
 static void BakeGLBAnimWave(u32 modelStart, u32 modelEnd) {
     if (!glb_TaskCount) return;
     
-    u32 t0=glb_TaskCount;
-    for (u32 k=0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex>=modelStart) { t0=k; break;} }
-    
-    u32 t1=glb_TaskCount;
-    for (u32 k=t0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex>=modelEnd) { t1=k; break;} }
-    
-    u32 cnt=t1-t0;
-    if (!cnt) { return; }
+    u32 t0 = glb_TaskCount; for (u32 k= 0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex>=modelStart) { t0=k; break;} }
+    u32 t1 = glb_TaskCount; for (u32 k=t0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex>=modelEnd)   { t1=k; break;} }
+    u32 cnt = t1 - t0; if(!cnt){return;}
     
     GltfBakeTask btasks[32]; OS_Thread bth[32];
     u32 chunk=(cnt+threadCnt-1)/threadCnt;
@@ -1055,7 +984,11 @@ void LoadModels() {
     
     thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_ht = ht; thrd_ht_used = ht_used; thrd_remap_scratch = remap_scr; thrd_cache_scratch = cache_scr; const size_t SUB_ARENA_SZ = (3ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt); /* TEMP-HEADLESS 1.5mb per model parsed per thread per 32-model sub-chunk (each thread's finalized outputs accumulate until sub-chunk end) */ const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; /* 12mb for all baked anim sources */ size_t slices_tot = SUB_ARENA_SZ * (size_t)threadCnt + SUB_MAIN_SZ; size_t slice_room = (size_t)(scratch_end - scratch_cur) - 4096; if (slices_tot > slice_room) { DualLogError("Not enough scratch room for model sub-arenas: need %u MB, %u MB free!\n", (u32)(slices_tot >> 20),(u32)(slice_room >> 20)); OS_Exit(1); } u8* slice_base = OS_AllocScratch(slices_tot); for (u32 si = 0; si < threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si * SUB_ARENA_SZ, SUB_ARENA_SZ); OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt * SUB_ARENA_SZ, SUB_MAIN_SZ); ModelParseTask tasks[32]; OS_Thread th[32]; PhysGeomTask ptasks[32]; OS_Thread pth[32]; glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
     LoadGLBAnimatedSources(mp.entries,mp.count,raw); physPos=OS_Alloc(mdlsCnt*sizeof(float*)); physTris=OS_Alloc(mdlsCnt*sizeof(u16*)); physVertCounts=OS_Alloc(mdlsCnt*sizeof(u32));
-    u32 validCount = 0; for (u32 i = 0; i < mp.count; ++i) if (mp.entries[i].index != U16_MAX) ++validCount; u32* valid = OS_AllocScratch(validCount * sizeof(u32)); validCount = 0; for (u32 i = 0; i < mp.count; ++i) if (mp.entries[i].index != U16_MAX) valid[validCount++] = i; /* mp.entries is indexed by model index, so this order is ascending by index; each file (including a whole animation block) stays atomic within a wave */
+    u32 validCount = 0;
+    for (u32 i = 0; i < mp.count; ++i) if (mp.entries[i].index != U16_MAX) ++validCount;
+    u32* valid = OS_AllocScratch(validCount * sizeof(u32));
+    validCount = 0;
+    for (u32 i = 0; i < mp.count; ++i) if (mp.entries[i].index != U16_MAX) valid[validCount++] = i; /* mp.entries is indexed by model index, so this order is ascending by index; each file (including a whole animation block) stays atomic within a wave */
     const u32 WAVE_FILES_SZ = 32; /* whole files per wave so an animation's frames never split across waves */ const u32 SUB_MODELS_SZ = 32; /* sub-chunks bound per-thread sub-arena use within a wave; splitting an animation here is safe since file bins live until wave end */
     u32 prevEnd = 0;
     for (u32 w0 = 0; w0 < validCount; ) {
