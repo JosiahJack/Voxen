@@ -2,10 +2,6 @@
 #include "common.h"
 __attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; static const u16 patchMsg[7] = {340,341,342,343,344,345,346}; /*Patch names in the +326 item-name table (Citadel: useableItemIndex+326, useableItemIndex=14+slot); Citadel composes "<name>" + stringTable[589]*/
 void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*),GrenadeActivate(u16); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
-/*Cyber decoy lifecycle + AI plumbing.  CyberDecoyRetargetAll lives in ai.c: it is the single choke point where a
-  cyber NPC's enemy pointer is forced from the player onto the live decoy instance (or handed back to the player
-  once the decoy expires), so no LOS check has to remember to consult the decoy itself.*/
-void CyberDecoySetTarget(u16); void CyberDecoyRetargetAll(void); void CyberDecoySpawned(u16); void CyberDecoyExpired(u16); bool CyberDecoyIsLive(u16*); u16 CyberDecoyTarget(void);
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
     float px=World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f, py=World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f;
     float tanFov=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight;
@@ -85,18 +81,10 @@ static inline void   PatchCycle(int step){int cur=World.invP1.patchCur, next=cur
 void RemoveGrenade(int i) { if(World.invP1.grenAmmo[i] > 0){World.invP1.grenAmmo[i]--;} if(!World.invP1.grenAmmo[i]){GrenadeCycle(-1);} }
 static i8 GetExistingCyberItemIndex() { if (World.invP1.softVersions[SW_TURBO]  > 0) {return 0;} if (World.invP1.softVersions[SW_DECOY]  > 0) {return 1;} if (World.invP1.softVersions[SW_RECALL] > 0) {return 2;} return -1; }
 static void UseTurbo() {if(World.invP1.softVersions[SW_TURBO]<=0){World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); return;} if(--World.invP1.softVersions[SW_TURBO]==0)World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); if(World.invP1.turboFinished > World.pauseRelativeTime){World.invP1.turboFinished+=World.invP1.turboCyberTime;}else{World.invP1.turboFinished=World.invP1.turboCyberTime+World.pauseRelativeTime;}}
-/* Cyber decoy.  Unity (Inventory.SpawnDecoy) instantiates prop_cyber_decoy (constIndex 553) at the player and
-   DelayedSpawn (delay 15, destroyOnExpire) tears it down after 15s; the prefab has no HealthManager, so nothing else
-   can remove it.  Voxen was spawning 417 instead -- item_cyber_decoy, a usable-object pickup -- which dropped a card on
-   the floor, and World.decoyActive was then left claiming a decoy existed for the rest of the level.
-   Collider radius 0.48 (prefabs SphereCollider 0.96 under the root's 0.5 local scale) comes from EDefs[553], and the
-   decoy keeps EF_RIGIDBODY off because the prefab has no Rigidbody -- it holds position instead of falling.
-   Reusing the existing DelayedSpawnUpdate arming (active + timerFinished + doSelfAfterList + despawnInstead) is the
-   same 15s teardown Unity's DelayedSpawn performs, so the expiry goes through CyberDecoyExpired. */
-#define CYBER_DECOY_LIFETIME 15.0
+void CyberDecoySpawned(u16);
 static void UseDecoy() {if (World.decoyActive) { CenterStatusPrint("%s",Sys_Text.stringTable[537]); return; } if (World.invP1.softVersions[SW_DECOY] <= 0) { World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); return; } if (--World.invP1.softVersions[SW_DECOY] == 0) World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); u16 decoyIdx = SpawnDynamicObject(CYBER_DECOY_CONST,true);
     if(decoyIdx != U16_MAX){World.position[decoyIdx]=World.position[PLAYER1]; World.velocity[decoyIdx]=(V3){0,0,0}; flag_set(&World.instances[decoyIdx].entflags,EF_RIGIDBODY,false);
-        World.instances[decoyIdx].active = true; World.instances[decoyIdx].doSelfAfterList = true; World.instances[decoyIdx].despawnInstead = true; World.instances[decoyIdx].timerFinished = World.pauseRelativeTime + CYBER_DECOY_LIFETIME;
+        World.instances[decoyIdx].active = true; World.instances[decoyIdx].doSelfAfterList = true; World.instances[decoyIdx].despawnInstead = true; World.instances[decoyIdx].timerFinished = World.pauseRelativeTime + 15.0f;
         World.decoyActive=true; CyberDecoySpawned(decoyIdx);}}
 static void UseRecall() { if (World.invP1.softVersions[SW_RECALL] <= 0) {return;} if (--World.invP1.softVersions[SW_RECALL] == 0) {World.invP1.hasSoft &= (u8)~(1u << SW_RECALL);} World.position[PLAYER1] = World.cyberspaceRecallPoint; }
 void UseCyberspaceItem() {
@@ -183,16 +171,12 @@ void CyberDoorOnCollisionEnter(u16 self, u16 other) { if(other != PLAYER1){retur
 void CyberTimerInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; e->cyberTimer = 600.0f; e->timerFinished = World.pauseRelativeTime + 1.0; }
 void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; switch (diff) { case 0: e->cyberTimer = 600.0f; break; case 1: e->cyberTimer = 300.0f; break; case 2: e->cyberTimer = 240.0f; break; case 3: e->cyberTimer = 180.0f; break; } }
 void CyberTimerUpdate(u16 self) { if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e=&World.instances[self]; if(e->cyberTimer <= 0.0f){UIExitCyberspace(); return;} if(e->timerFinished >= World.pauseRelativeTime){return;} e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds=e->cyberTimer - (e->minutes * 60.0f); e->timerFinished=World.pauseRelativeTime + 1.0; }
-void CyberWallInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->tickFinished=World.pauseRelativeTime + 2.0; e->animSwapFinished=0.0; } // alpha pushed via glUniform1f(27, ...) in voxen.c
+void CyberWallInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->tickFinished=World.pauseRelativeTime + 2.0; e->animSwapFinished=0.0; }
 void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (World.pauseRelativeTime < e->tickFinished) {return;} e->tickFinished = World.pauseRelativeTime + 0.05; }
-void ExitCyberspace(void); /*forward decl*/
-/*Cyber pickups (448-451,454-457): spherical distance check vs player; pickup deletes the instance.*/
+void ExitCyberspace(void);
 void CyberItemUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ DeleteInstance(self); } }
-/*Cyber exit (554): spherical distance check vs player; exits cyberspace.*/
 void CyberExitUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(World.curLev != LEVEL_CYBERSPACE)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 2.0f){ ExitCyberspace(); } }
-/*Cyber switch (555): spherical distance check vs player; one-shot activate (off->on frame), fires targets.*/
 void CyberSwitchUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(e->active)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ e->active=true; ChangeAnim(e,A_ACTIVATED); if(e->textIndex>0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); UseTargets(self,e->targetIdx); } }
-/*Cyber data fragment (552): spherical distance check vs player; shows message.*/
 void CyberDataFragUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(e->allDone)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ e->allDone=true; if(e->textIndex>0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); } }
 void SearchFXEnable(int side) {
     side=side==1; World.Sys_UI.searchFXActive[side]=true; World.Sys_UI.searchFXStartTime[side]=World.pauseRelativeTime;
@@ -201,16 +185,20 @@ void SearchFXEnable(int side) {
 void SearchFXResetEnable(u16 self) { Entity* e = &World.instances[self]; if (e->itemLifeTime <= 0.0f) {e->itemLifeTime = 3.0f;} e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
 void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
+
+void CyberDecoySetTarget(u16), CyberDecoyExpired(u16);
+bool CyberDecoyIsLive(u16*);
+u16 CyberDecoyTarget(void);
 void CyberDecoySpawned(u16 decoy) { World.decoyInstance = decoy; CyberDecoySetTarget(decoy);/*cyber NPCs already engaged with the player switch to the decoy the moment it exists (AIController.cs:1630,1708)*/ }
 void CyberDecoyExpired(u16 decoy) { if (decoy >= World.instCount || World.instances[decoy].index != CYBER_DECOY_CONST) return; if (World.decoyActive) { World.decoyActive = false; World.decoyInstance = U16_MAX; CyberDecoySetTarget(U16_MAX); } }
-/*Whether the recorded decoy instance is still the live one.  World.decoyActive alone is not enough: the instance
-  table is refilled on every level load and DeleteInstance compacts it, so a stale index can point at a wall.  This
-  validates the cached World.decoyInstance and refreshes it if the decoy moved slots, so the AI hot paths can compare
-  an enemy index against World.decoyInstance instead of rescanning the table.*/
 bool CyberDecoyIsLive(u16* out) { if (!World.decoyActive) { World.decoyInstance = U16_MAX; return false; } u16 d = World.decoyInstance;
-    if (d >= INSTS_1ST_IDX && d < World.instCount && World.instances[d].index == CYBER_DECOY_CONST) { if (out) *out = d; return true; }
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) if (World.instances[i].index == CYBER_DECOY_CONST) { World.decoyInstance = i; if (out) *out = i; return true; }
-    World.decoyInstance = U16_MAX; return false; }
+    if (d >= INSTS_1ST_IDX && d < World.instCount && World.instances[d].index == CYBER_DECOY_CONST) { if(out){*out = d;} return true; }
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {  if (World.instances[i].index == CYBER_DECOY_CONST) { World.decoyInstance = i; if (out) *out = i; return true; }  }
+    
+    World.decoyInstance = U16_MAX;
+    return false;
+}
+    
 void DelayedSpawnUpdate(u16 s) { Entity* e=&World.instances[s]; if(!e->active||e->timerFinished<=0.0||e->timerFinished>World.pauseRelativeTime){return;} e->active=false; if(!e->doSelfAfterList){return;} if(e->despawnInstead){DeleteInstance(s);/*despawn means gone, not deactivated*/}else flag_set(&e->entflags,EF_ACTIVE,true);}
 void FuncWallShiftChildren(u16 self, V3 delta) { if (vabs(delta.x)+vabs(delta.y)+vabs(delta.z) < 0.00001f) {return;} for (u16 i=PLAYER1;i<World.instCount;++i) { if (fwParentOf[i]==self) { World.position[i]=V3_AplusB(World.position[i],delta); } } }
 void FuncWallInitAfterLoad(u16 self) {
@@ -226,6 +214,7 @@ void FuncWallUpdateInner(u16 self) {
     float distanceLeft = V3_Mag(delta), total = V3_Dist(e->startPosition,e->targetPosition), dist = e->speed * (float)World.deltaTime * World.timeScale; if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) { World.position[self]=goal; e->funcState=doneState; e->percentMoved=doneState == FStat_Target ? 1.0f : 0.0f; return; }
     if (distanceLeft > 0.0001f) World.position[self]=V3_AplusB(World.position[self],V3_ScaleByF(V3_Normalize(delta),dist)); if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,World.position[self]) / total;
 }
+
 void FuncWallUpdate(u16 self) { V3 prev = World.position[self]; FuncWallUpdateInner(self); FuncWallShiftChildren(self,V3_AsubB(World.position[self],prev)); }
 void func_forcebridge(u16 self) {
     Entity* e = &World.instances[self]; e->tickFinished = World.pauseRelativeTime + 0.05f + (double)random_range(0.0f,1.0f); e->lerping = true; if(e->activatedScale.x <= 0.02f){e->activatedScale.x = 2.56f;} if(e->activatedScale.y <= 0.02f){e->activatedScale.y = 0.08f;} if(e->activatedScale.z <= 0.02f){e->activatedScale.z = 2.56f;}
@@ -249,19 +238,7 @@ void TriggerCounterUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->d
 void LogicRelayDelayTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; }/*LogicRelay.cs:19,22 defers to StartCoroutine(DelayedTarget) when delay > 0. The relay's own ioflags ride the deferred hop, so they are re-read at fire time rather than captured.*/
 void LogicRelayUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(e->recentMostActivator, e->targetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
 void TriggerCounterTargetted(u16 self, u16 act) { Entity* e=&World.instances[self]; e->counter++; if (e->counter != e->countToTrigger) {return;} if (e->delay <= 0.0f){TriggerCounterTarget(self,act);}else{TriggerCounterDelayedTarget(self,act);} if (!e->dontReset){e->counter=0;} }
-
-// SpawnManager (constIndex 702).  Spawn points are the info_spawnpoint (715) entities on this level: Unity's
-// spawnLocations array is an unordered Random.Range pick and each spawner's list is exactly that set, so the list
-// does not need storing.  Two Unity checks have no Voxen equivalent and are noted inline.
 void SpawnManagerActivate(u16 self, bool alerted) { Entity* e=&World.instances[self]; e->alertEnemiesOnAwake=alerted; e->active=true; e->delayFinished=World.pauseRelativeTime; }
-// AreaHidden + AreaClear for a spawn point (SpawnManager.GetRandomLocation).  Unity rejects a point that is
-// AreaHidden (not currently in the player's PVS) or not AreaClear (overlapping an area), then re-rolls.  AreaHidden
-// maps onto the culled PVS directly; the spawn point is static, so its entity cellIndex is the cell its position
-// resolves to.  AreaClear reuses CantStand's collision path via AreaHasClearance with span 0, i.e. a single
-// strict 0.48-radius sphere test at the exact point.
-// DIVERGENCE (intended): a bare sphere is a tighter volume than Unity's area overlap, so this is stricter than the
-// reference game -- a cramped-but-legal spawn point can be rejected where Unity would accept it.  Pass
-// AREA_SWEEP_SPAN instead of 0 to sweep like CantStand does, which makes it far more permissive.
 static bool SpawnPointIsClear(u16 spot) {
     V3 p=World.position[spot]; if(World.curLev>=LEVEL_CYBERSPACE||PositionVisibleFromPlayerCell(p.x,p.z)) {/*cyberspace never builds PVS bits (culling.c:151), so treat it as all-visible, matching TargetIDInPlayerPVS. No spawner sits on 13 today.*/
         ShapeCapsule ball={.tip=p,.base=p,.rad=0.48f};/* tip==base is a sphere */
@@ -269,28 +246,52 @@ static bool SpawnPointIsClear(u16 spot) {
     }
     return false;
 }
+
 void SpawnManagerUpdate(u16 self) {
-    Entity* e=&World.instances[self]; if (World.paused || World.menuActive || !e->active) {return;}/*SpawnManager.Update:40-42*/
-    u16 levelNpcs=0,count=0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i){ Entity* n=&World.instances[i]; if(!IdxIsNPC(n->index)) {continue;} ++levelNpcs; if(!(n->entflags&EF_ACTIVE) || (n->health <= 0.0f && n->cyberHealth <= 0.0f)) {continue;} if(e->countOnlySameIndex && n->index!=e->spawnIndex) {continue;} ++count;}
-    if (levelNpcs > 300) {return;}/*SpawnManager.Update:48 bails on a crowded level*/
+    Entity* e=&World.instances[self]; if (World.paused || World.menuActive || !e->active) {return;}
+    
+    u16 levelNpcs = 0, count = 0;
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
+        Entity* n = &World.instances[i]; if(!IdxIsNPC(n->index)){continue;}
+        ++levelNpcs; if(!(n->entflags&EF_ACTIVE) || (n->health <= 0.0f && n->cyberHealth <= 0.0f)) {continue;}
+        if(e->countOnlySameIndex && n->index!=e->spawnIndex) {continue;}
+        
+        ++count;
+    }
+    if (levelNpcs > 300) {return;}
+    
     if (e->numberActive != count) {e->numberActive = count;}
     if (e->numberActive >= e->numberToSpawn) {return;}
     if (e->delayFinished >= World.pauseRelativeTime) {return;}
+    
     e->delayFinished = World.pauseRelativeTime + (double)random_range(e->minDelayBetweenSpawns, e->maxDelayBetweenSpawns);
-    if (World.diffCbt == 0) {return;}/*SpawnManager.Spawn():101 - combat 0 spawns nothing*/
-    u16 spots=0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {if(World.instances[i].index==SPAWNPOINT_CONST) {++spots;}}
+    if (World.diffCbt == 0) {return;}
+    
+    u16 spots = 0;
+    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(World.instances[i].index == SPAWNPOINT_CONST){++spots;} }
     if (!spots) {return;}
-    /* GetRandomLocation():99-116 takes 10 shots, returns the first clear point once more than 8 have been clear,
-       otherwise keeps the last clear one and gives up entirely if none were.  Random.Range(0, Length-1) there is
-       inclusive at both ends and so never yields the LAST point; kept for parity, and random_range_u32 is also
-       inclusive so the two agree. */
-    u16 spot=0,valid=0; for (u8 shot=0;shot<10;++shot){ u16 want=(u16)random_range_u32(0,spots-1),cand=0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i){ if(World.instances[i].index!=SPAWNPOINT_CONST) {continue;} if(want--==0){cand=i;break;} } if (!cand||!SpawnPointIsClear(cand)) {continue;} spot=cand; if (++valid>8) break; }
-    if (!valid) {return;}/*GetRandomLocation returns null; Spawn():122 logs and bails*/
-    u16 npc=SpawnDynamicObject(e->spawnIndex,false); if (!EntIdxIsValid(npc)) {return;}/*SpawnManager.Spawn():119-122 logs and bails*/
+
+    u16 spot = 0, valid = 0;
+    for (u8 shot=0;shot<10;++shot) {
+        u16 want = (u16)random_range_u32(0,spots - 1), cand = 0;
+        for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
+            if(World.instances[i].index != SPAWNPOINT_CONST) {continue;}
+            
+            if(want--==0){cand=i;break;}
+        }
+        if (!cand || !SpawnPointIsClear(cand)) {continue;}
+        
+        spot=cand;
+        if (++valid > 8) break;
+    }
+    if (!valid) {return;}
+    u16 npc = SpawnDynamicObject(e->spawnIndex,false); if (!EntIdxIsValid(npc)) {return;}
+    
     World.position[npc]=World.position[spot]; World.scale[npc]=(V3){1.0f,1.0f,1.0f};
-    if (!e->alertEnemiesOnAwake) {flag_set(&World.instances[npc].entflags, EF_WANDERING, true); return;}/*aic.wandering = true, except for index 14 which SpawnManager.Spawn():132 skips; 14 is not an NPC constIndex in Voxen's table, so there is no such exception*/
-    AIAlert(npc);/*SetEnemy(player1)*/
-    if (count + 1 >= e->numberToSpawn) {e->delayFinished = World.pauseRelativeTime + (double)e->allSpawnedResetDelay;}/*SpawnManager.Update:73-74 holds the wave back once it is full*/
+    if (!e->alertEnemiesOnAwake) { flag_set(&World.instances[npc].entflags, EF_WANDERING, true); return; } 
+    
+    AIAlert(npc);
+    if (count + 1 >= e->numberToSpawn) { e->delayFinished = World.pauseRelativeTime + (double)e->allSpawnedResetDelay; }
 }
 void TextureChangerToggle(u16 self) {
     u16 alt = 0, glowAlt = 0;
@@ -335,10 +336,6 @@ void LogicTimerUseTargets(u16 self) { UseTargets(self,World.instances[self].targ
 void LogicTimerUpdate(u16 self) { Entity* e=&World.instances[self]; if(!e->active || e->intervalFinished >= World.pauseRelativeTime){return;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); LogicTimerUseTargets(self); }
 void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; World.instances[self].active = !World.instances[self].active; }
 void ButtonSwitchHoldPose(Entity* e){ e->switchAnimFinished=0.0; ChangeAnim(e, e->active ? A_ACTIVATED : A_INACTIVE); }
-/* Unity ButtonSwitch.SetActive plays "Activating"/"Deactivating" on every toggle when animateModel is set
-  (ButtonSwitch.cs:117), and each transient clip settles on the matching held pose. Only func_switch4, 5 and 7
-  serialize animateModel: 1; of those only switch4.glb/switch5.glb carry an animationNum in Data/models.txt, so
-  the clip length comes from the same frames/(framerate*speed) the animator steps by rather than a fixed guess. */
 void ButtonSwitchAnimate(Entity* e){
     if (e->animationNum >= MAX_ANIMS) return;
     u8 move = e->active ? A_ACTIVATE : A_DEACTIVATE;
@@ -350,11 +347,6 @@ void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->
 void ButtonSwitchUseTargets(u16 self) { Entity* e=&World.instances[self]; UseTargets(self,e->targetIdx); e->active=!e->active; ButtonSwitchAnimate(e); if(e->index == 689 || e->index == 690 || e->index == 695) { TextureChangerToggle(self); if(e->index == 689 && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} } }
 static __attribute__((noinline)) void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; play_wav(sounds[468], AppliedFXVol(0.85f), (V3){0,0,0}, false);/*blocked_by_security*/ MFD_OpenData(World.Sys_UI.lastDataSideRH,8);/*MFDManager.BlockedBySecurity() opens tab 4 on the last-used data side and raises the blocked view there*/ CenterStatusPrint("%s",Sys_Text.stringTable[25]); }
 static __attribute__((noinline)) void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,EF_LOCKED,locked); }
-/*Button-switch click SFX.  The success sound is a prefab constant, not level data: no func_switch* prefab serializes
-  SFXIndex and no Data/level*.txt line carries one, so every switch in the game fell through to e->SFXIndex == 0 and
-  played sounds[0] on every press.  Values read straight off the prefab SoundOnUse components
-  (Assets/Resources/Prefabs/func_switch{1,2,3,4,5,7,8}.prefab -> m_Sound.clip guid -> Const.a.sounds).  func_switch6
-  (693) is unused by any level.  Same table shape as doorSFXIndex in LoadLevelData, one row per constIndex. */
 typedef struct { u16 constIndex, sfxIndex; } ButtonSwitchSFXDef;
 static const ButtonSwitchSFXDef buttonSwitchSFX[] = {{688,44},{689,40},{690,44},{691,41},{692,41},{694,45},{695,40}};
 static void ButtonSwitchPlaySFX(u16 self) {
@@ -376,19 +368,9 @@ void VaporizeClick() {int slot=World.invP1.generalInvCurrent; if(!GeneralInvCanV
 typedef struct { i8 norm,alt; } AmmoIconEntry;
 static const AmmoIconEntry ammoIconTable[51]={[36-36]={7,8}/*Magnesium/Penetrator*/,[37-36]={-2,-2}/*Energy*/,[38-36]={0,1}/*Needle/Tranq*/,[39-36]={9,10}/*Hornette/Splinter*/,[40-36]={-2,-2}/*Energy*/,[41-36]={-1,-1}/*Rapier, no ammo*/,[42-36]={-1,-1}/*Pipe, no ammo*/,[43-36]={5,6}/*Hollow/Slug*/,[44-36]={11,-1}/*Magcart*/,[45-36]={2,3 }/*Standard/Teflon*/,[46-36]={-2,-2}/*Energy*/,[47-36]={14,-1}/*Rail Rounds*/,[48-36]={4,-1}/*Rubber Slugs*/,[49-36]={12,13}/*Slag/Large Slag*/,[50-36]={-2,-2}/*Energy*/,[51-36]={-2,-2}/*Energy*/};
 i8 AmmoIconGet(int index,bool alt) { if (index < 343 || index > 358) {return -1;} const AmmoIconEntry* e = &ammoIconTable[index - 343]; return alt ? e->alt : e->norm; }
-/*Menu video text overlay playback (intro/credits) lives in ui.c RenderVideoPage; the old CreditsScroll phase driver below was dead code and is removed.*/
-
 void CyborgConversionToggleTargetted() {bool active=(World.ressurectionActiveLevels>>World.curLev)&1u; flag_setu16(&World.ressurectionActiveLevels,(1u<<World.curLev),!active); if(World.curLev==6)flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ play_wav(sounds[active ? 183 : 184], AppliedFXVol(1.0f), (V3){0.0f,0.0f,0.0f}, false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);}
 bool PlayerInElevatorCell(void); bool FindElevatorKeypadPos(u8 level,V3* outPos);
-/*Where a bare LoadLevel(lev,Vector3.zero) lands: the volume belonging to that level's own elevator.  Unity resolves this
-  with a fixed index into its flat elevatorTargetDestinations[] (LevelManager.cs:256-271 takes 25,0,1,3,6,7,9,17,19,21,
-  22,23,24 for levels 0..12), but that array's order within a level is not the order the volumes appear in the level
-  file, so a per-level ordinal off the file order picks the wrong one (verified against the scene: level 6's second array
-  entry is the level file's fourth volume).  Asking which volume stands with that level's panel is both order-free and
-  what Unity's per-keypad targetDestination[] amounts to.*/
 bool ElevatorDefaultDestinationPos(u8 level,V3* outPos) { V3 panel; if (FindElevatorKeypadPos(level,&panel) && ElevatorDestinationPosNear(level,panel,outPos)) return true; return GetElevatorDestinationPos(level,0,outPos); }
-/*The volume an elevator button belongs to: Unity gives each KeypadElevator a targetDestination[] of specific volumes
-  and ElevatorButton.cs loads at that one, so pick the destination volume the destination panel stands with.*/
 bool ElevatorDestinationPosNear(u8 level,V3 fromPos,V3* outPos) {
     V3 best; float bestSq=0.0f; bool found=false;
     for (u8 n=0;n<MAX_LEVELS;++n) { V3 p; if(!GetElevatorDestinationPos(level,n,&p)) break; /*past the last one the level has*/ V3 d=V3_AsubB(p,fromPos); float sq=V3_dot(d,d); if(!found||sq<bestSq){best=p;bestSq=sq;found=true;} }
@@ -397,16 +379,17 @@ bool ElevatorDestinationPosNear(u8 level,V3 fromPos,V3* outPos) {
 void ElevatorButtonClick(u16 self) {
     Entity* e = &World.instances[self]; if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor]; bool doorClosed = door->doorOpen == DoorState_Closed;
     if (!PlayerInElevatorCell()) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } if (!doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[7]); /*Door not closed.*/ return; } if (!(e->entflags & EF_ACTIVE)) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); /*Floor not accessible.*/ return; }
-    /*Preserve the player's relative offset from the keypad across the level load, measured the way Unity measures it:
-      Voxen's player position is the camera, Unity's playerCapsule transform is the capsule centre PLAYER_CAM_OFFSET_Y
-      below it, so the camera height has to come off the offset or every arrival lands 0.84 too high.*/
-    V3 srcKeypad=World.Sys_UI.objectInUsePos; V3 offset=V3_AsubB(World.position[PLAYER1],srcKeypad); offset.y-=PLAYER_CAM_OFFSET_Y;
-    u8 destLevel=(u8)e->teleportID; V3 destKeypad,destVolume; bool hasKeypad=FindElevatorKeypadPos(destLevel,&destKeypad); V3 dest;
-    if (hasKeypad && ElevatorDestinationPosNear(destLevel,destKeypad,&destVolume)) dest=V3_AplusB(destVolume,offset); /*Unity loads at the destination volume, not at the panel*/
+    V3 srcKeypad=World.Sys_UI.objectInUsePos;
+    V3 offset = V3_AsubB(World.position[PLAYER1],srcKeypad); offset.y -= PLAYER_CAM_OFFSET_Y;
+    u8 destLevel = (u8)e->teleportID;
+    V3 destKeypad, destVolume, dest;
+    bool hasKeypad = FindElevatorKeypadPos(destLevel, &destKeypad);
+    if (hasKeypad && ElevatorDestinationPosNear(destLevel,destKeypad,&destVolume)) dest=V3_AplusB(destVolume,offset);
     else if (hasKeypad) dest=V3_AplusB(destKeypad,offset);
     else dest=(e->targetDestinationID != U16_MAX && e->targetDestinationID < World.instCount) ? World.position[e->targetDestinationID] : (V3){0.0f,0.0f,0.0f};
-    dest.y+=PLAYER_CAM_OFFSET_Y; /*level data and Unity both place the capsule, Voxen places the camera*/
-    queuedLevelPos=dest; queuedLevelToLoad=destLevel;
+    dest.y += PLAYER_CAM_OFFSET_Y;
+    queuedLevelPos    = dest;
+    queuedLevelToLoad = destLevel;
 }
 
 void EmailTargetted(u16 self) { Entity* e=&World.instances[self]; u16 idx=e->emailIndex; if(idx>=LOGCNT){return;} if(World.invP1.hasLog[idx]){return;} World.invP1.hasLog[idx]=World.invP1.hasNewEmail=true; World.invP1.lastAddedIndex=idx; if(Sys_Text.audioLogType[idx] == AudioLogType_Email){World.invP1.beepDone=true;} if(e->autoPlayEmail){PlayLastAddedLog(idx);} }
@@ -415,21 +398,18 @@ void OverloadButtonAction() {
     static double overloadClickFinished = 0.0; if (overloadClickFinished >= World.pauseRelativeTime){return;} overloadClickFinished = World.pauseRelativeTime + 0.4; if (World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent] > 25.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[12]);/*Weapon too hot*/ return; }
     if (World.invP1.overloadEnabled) { CenterStatusPrint("%s",Sys_Text.stringTable[13]);/*Overload disabled*/ World.invP1.overloadEnabled = false; } else { CenterStatusPrint("%s",Sys_Text.stringTable[17]);/*Overload enabled*/ World.invP1.overloadEnabled = true; }
 }
-// TargetID is render-only: state is kept by NPC index and no instance is spawned.
+
 static i16 targetIDText[INSTANCE_COUNT]; static double targetIDTextFinished[INSTANCE_COUNT],targetIDAttachedFinished[INSTANCE_COUNT]; static bool targetIDAttached[INSTANCE_COUNT];
 void TargetIDReset() { mset(targetIDText,0,sizeof(targetIDText));mset(targetIDTextFinished,0,sizeof(targetIDTextFinished));mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished));mset(targetIDAttached,0,sizeof(targetIDAttached)); }
 float TargetIDGetSensingRange(bool manual) { u8 ver=World.invP1.hwVers[HW_TID_IDX]; if(manual)return ver==0?12.0f:ver>=4?18.0f:13.0f; return ver==0?12.0f:ver<=2?0.0f:ver==3?13.0f:20.0f; }
 float TargetIDGetTetherRange() { return World.invP1.hwVers[HW_TID_IDX]>=4?22.0f:15.0f; }
-/*One definition of "this NPC is in the player's PVS", shared by the TargetID acquire paths below and the
-  render loop in ui.c so sensing and drawing can never disagree. Plain cell visibility, no neighborhood
-  fallback: the marker and its label are an unlit HUD overlay with no depth test, so without this an NPC in a
-  room the player can't see still paints a marker over whatever wall is in front of it.*/
 bool TargetIDInPlayerPVS(u16 npc) { if (unlikely(npc>=World.instCount))return false; if (unlikely(World.curLev >= LEVEL_CYBERSPACE)) return true;/*Culling is disabled in cyberspace (CullCore early-outs), so never gate there.*/ return gridCellStates[World.instances[npc].cellIndex] & CELL_VISIBLE; }
 void TargetIDSendDamageReceive(u16 self,float damage,AttType attackType) {
     if(self>=World.instCount||!IdxIsNPC(World.instances[self].index))return; if(!TargetIDInPlayerPVS(self))return;/*out of PVS: never latch sensing state*/ Entity* npc=&World.instances[self];
     if(attackType==Att_Trnq){targetIDText[self]=536;targetIDTextFinished[self]=World.pauseRelativeTime;}
     else{float mh=npcTable[npc->index-419].health;targetIDText[self]=damage>mh*.75f?514:damage>mh*.50f?515:damage>mh*.25f?513:damage>0.0f?512:511;targetIDTextFinished[self]=World.pauseRelativeTime+(damage==0.0f?1.0:2.5);}
 }
+
 bool TargetIDShouldRender(u16 npc) {
     if(npc>=World.instCount||!IdxIsNPC(World.instances[npc].index))return false; Entity* e=&World.instances[npc];
     if(!(e->entflags&EF_ACTIVE)||(e->entflags&EF_DEAD)||e->health<=0.0f)return false;
@@ -443,6 +423,7 @@ bool TargetIDShouldRender(u16 npc) {
     if(sufficientHw)return true;
     return targetIDAttached[npc];
 }
+
 i16 TargetIDGetText(u16 npc) { if(npc>=World.instCount)return -1; Entity* e=&World.instances[npc]; if(e->tranquilizeFinished>World.pauseRelativeTime)return 536; if(targetIDText[npc]&&targetIDTextFinished[npc]<=World.pauseRelativeTime)targetIDText[npc]=0; return targetIDText[npc]?targetIDText[npc]:-1; }
 void CreateTargetIDInstance(float damage,u16 hitIdx,float tranq) {
     if(hitIdx==WORLD||hitIdx>=World.instCount)return; Entity* npc=&World.instances[hitIdx]; if(!(npc->entflags&EF_ACTIVE)||!IdxIsNPC(npc->index)||npc->health<=0.0f)return;
@@ -536,23 +517,11 @@ void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
     V3 n = V3_Normalize(normal); if (V3_Mag(n) < 0.0001f) {n = (V3){0.0f,1.0f,0.0f};/*At least make it pop off the floor*/} AddForce(target,V3_ScaleByF(n,vel),true); V3 lever = V3_AsubB(pt, World.position[target]); World.angularVelocity[target].x += lever.y * vel * 0.05f; World.angularVelocity[target].z += -lever.x * vel * 0.05f; (void)pt; // torque applied relative to point lever arm
 }
 
-/*Unity ObjectImpact.cs parity: impact sound with volume modulated by impact velocity.
-  Threshold vel>2 (minVolumeSpeed), vol=(vel/10)*0.3 (maxVolumeSpeed), sound 523 (physics/impact_lightweight).
-  Pitch is a +- semitone shift (Unity: random 0.8-1.2x multiplier), applied dynamically during mixing.*/
 void ApplyImpactForceWithSound(u16 target, float vel, V3 normal, V3 pt) {
     ApplyImpactForce(target, vel, normal, pt);
     if (vel > 2.0f) play_wav_ext(sounds[523], AppliedFXVol((vel / 10.0f) * 0.3f), pt, true, random_range(-3.8631f,3.1564f));/*Unity ObjectImpact pitch Random.Range(0.8,1.2) playback ratio = 12*log2(r) semitones*/
 }
 
-/* Utils.ApplyImpactForceSphere (Utils.cs:1675-1734). The C# tests the colliders a Physics.OverlapSphere returns,
-   so the player (slot 1) is in the list and takes half damage; the loop here used to start at INSTS_1ST_IDX (2) and
-   so the player never took splash damage at all. Damage falloff is linear over the radius, but floored at 33% of the
-   *un-halved* incoming damage (Utils.cs:1704-1713) -- the halve is applied before the floor and the floor is
-   measured from the original, so the player floor is still 33%, not 16.5%. Past 4 units the C# requires line of
-   sight through layerMaskExplosion before the blast connects (Utils.cs:1692-1698); inside 4 units it always hits.
-   Blast impulse is baseVel scaled by that same falloff exactly once, and is not derived from the scaled splash
-   damage, so bodies with and without a HealthManager get the same push. The C# also halves the impulse on Unity
-   layer 10, which is NPC (Utils.cs:1721), and caps the velocity change at (0.5+5*mass)*min(damage/100,2) (1727-1729). */
 void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseVel) { 
     if (radius <= 0.0f || baseVel <= 0.0f) return; float r2 = radius * radius; float origDamage = dd ? dd->damage : 0.0f;
     float damageScale = vmin(origDamage / 100.0f, 2.0f);/*measured off the original damage, so it is the same for every body in the blast*/
@@ -571,9 +540,6 @@ void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseV
 
 static void SpawnExplosionPreset(u16 type,V3 pos) { const PSysDef* preset=PSysTypeGet(type); if(!preset)return; PSysDef def=*preset; def.pos=pos; PSysAdd(&def); }
 void SpawnExplosionEffect(V3 pos, int explosionType) {
-    /* Unity's GrenadeActivate pulls the grenade's explosionType pool object and enables it in place, so each
-       type plays the emitters of that pool: frag/concussion/earth/nitro/mine share GrenadeFragExplosions
-       (ef_fragexplosion), EMP uses GrenadeEMPExplosions (ef_empexplosion) and gas uses GasExplosions. */
     switch (explosionType) {
         case 3: SpawnExplosionPreset(PSYS_gasExplosions,pos); SpawnExplosionPreset(PSYS_gasSmoke,pos); break;/*GasExplosions*/
         case 4: SpawnExplosionPreset(PSYS_ef_empexplosion,pos); SpawnExplosionPreset(PSYS_sprinkles,pos); SpawnExplosionPreset(PSYS_sparkles,pos); break;/*GrenadeEMPExplosions*/
@@ -590,7 +556,6 @@ void GrenadeExplode(u16 self) {
 
 void GrenadeActivate(u16 self) {
     if(self>=World.instCount)return; Entity* e=&World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index);
-    /* Called from DropHeldItem after the throw impulse is assigned, never when picked up. */
     if(idx==10){World.invP1.earthShakerTimeSetting=vclamp((float)World.invP1.earthShakerTimeSetting,4.0f,60.0f);e->timerFinished=World.pauseRelativeTime+World.invP1.earthShakerTimeSetting;}
     else if(idx==12){World.invP1.nitroTimeSetting=vclamp((float)World.invP1.nitroTimeSetting,2.0f,60.0f);e->timerFinished=World.pauseRelativeTime+World.invP1.nitroTimeSetting;}
 }
@@ -599,36 +564,29 @@ void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances
 float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= BERSERK_DAMAGE_MULTIPLIER; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (!EntIdxIsValid(fx)) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void ExitCyberspace(void) { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel(World.startLevel < World.numLevels ? World.startLevel : 0, (V3){0.0f,0.0f,0.0f}); }
-void ReduceCurrentLevelSecurity(SecurityType stype) { // cam 4, small node 10, large node 27 -- a typical 4-node/20-camera level then puts cameras near 2% and nodes near 10-13%
+void ReduceCurrentLevelSecurity(SecurityType stype) {
     static const u32 score[3]={4u,10u,27u}; u8 lev = World.curLev; if (lev >= MAX_LEVELS || stype == SecurityType_None) return;
-    u8* tot[3]={&World.levelCameraCount[lev],&World.levelSmallNodeCount[lev],&World.levelLargeNodeCount[lev]};
-    u8* dcd[3]={&World.levCamDestroyedCnt[lev],&World.levSmNodeDestroyedCnt[lev],&World.levNodeDestroyedCnt[lev]};
-    u32 t=(u32)stype-1u; if (*dcd[t] < 255u) (*dcd[t])++;
-    u32 total=0u, dead=0u; for (u32 i=0u;i<3u;++i) { total += (u32)*tot[i]*score[i]; dead += (u32)*dcd[i]*score[i]; }
+    
+    u8* tot[3] = { &World.levelCameraCount[lev],   &World.levelSmallNodeCount[lev],   &World.levelLargeNodeCount[lev]};
+    u8* dcd[3] = { &World.levCamDestroyedCnt[lev], &World.levSmNodeDestroyedCnt[lev], &World.levNodeDestroyedCnt[lev]};
+    u32 t=(u32)stype-1u;
+    if (*dcd[t] < 255u) (*dcd[t])++;
+    u32 total=0u, dead=0u;
+    for (u32 i=0u;i<3u;++i) { total += (u32)*tot[i]*score[i]; dead += (u32)*dcd[i]*score[i]; }
     if (!total) return;
+    
     u8 before = World.levelSecurity[lev], after;
     //  ceiling, so any surviving weight keeps the level above 0 and only killing every security object reaches it
-    after = dead >= total ? 0u : (u8)(((total-dead)*100u + total-1u) / total); if (after > 100u) after = 100u;
+    after = dead >= total ? 0u : (u8)(((total-dead)*100u + total-1u) / total);
+    if (after > 100u) after = 100u;
     if (after >= before && before) after = before > 1u ? (u8)(before-1u) : before; // a kill must never read as 58 -> 58
     World.levelSecurity[lev] = after;
     CenterStatusPrint("%s%d%s", Sys_Text.stringTable[306], (int)World.levelSecurity[lev], Sys_Text.stringTable[307]);
 }
-/*Security-code displays.  Unity CodeScreen.Update re-assigns Const.a.screenCodes[matIndex] every 0.3s, and
-  Texture slots 768..777 are Textures/screencode0..9.png, the same range EPerms[551].texIndex (768) already sits in.
-  A code screen starts unlocked and flickers a random digit: Unity CodeScreen.Update re-picks
-  Const.a.screenCodes[Random.Range(0,10)] every 0.3s while Const.a.questData.levNSecCodeLocked is false, and
-  this level file flags the screens (codeScreen:1, Entity.codeScreen) so entity.c can put them on the
-  ScreenCodeRandom clip with texAnimRandom.  This function is the lock: Unity's Const.LockCPUScreenCode, driven by
-  TargetIO.lockCodeToScreenMaterialChanger off the CPU node's UseTargets, freezes levNSecCode and pins the material
-  to the real digit once that level's last node falls.  It is called from ObjectDeath only when
-  CPUNodesRemainOnLevel() is false, so the code stays guessable until the level is actually cleared.  It walks every
-  loaded level, not just the current one, because a display is addressed by instance index and UseTargets already
-  treats cross-level targets as ordinary.*/
+
 static void CodeScreensSetForLevel(u8 lev) {
     if (lev < 1 || lev > 6) return;
-    /*The level's code is drawn here, the moment its last node dies -- Unity's Const.LockCPUScreenCode, which
-      re-rolls once and marks the code locked.  Drawing it at lock rather than at NewGame is what makes the
-      self-destruct pads' 289/290 guard reachable: no nodes cleared, no code.*/
+
     i8 *code = &World.lev1SecCode; if (code[lev-1] < 0) { code[lev-1] = (i8)random_range_u8(0u,9u); }
     u8 digit = (u8)code[lev-1];
     u8 entryLevel = World.currentLevel;
@@ -638,14 +596,12 @@ static void CodeScreensSetForLevel(u8 lev) {
     }
     if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
 }
-/* Any sec_cpunode/sec_cpunode_small still standing on the level that World.currentLevel points at.  ObjectDeath
-   sets EF_DEAD_CHECKS_DONE before it calls this, so the node that just fell never counts itself.  A plain scan of
-   the current level needs no SetLevelPointers dance and no per-level node tally, and it stays correct for runtime
-   spawned and deleted nodes alike. */
+
 static bool CPUNodesRemainOnLevel(void) {
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { const Entity* n = &World.instances[i]; if ((n->index == 478 || n->index == 479) && !(n->entflags & EF_DEAD_CHECKS_DONE)) return true; }
     return false;
 }
+
 void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
     if(self>=World.instCount||hitIdx>=World.instCount)return; Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return;/*other.gameObject == host*/ e->counter++;/*numHits++*/
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(e->recentMostActivator==PLAYER1&&(World.invP1.patchActive & PATCH_BERSERK)!=0)};
@@ -674,17 +630,29 @@ static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE){retu
 static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxIsNPC(World.instances[self].index) || World.instances[self].health <= 0.0f){return take;} NPCType t = npcTable[World.instances[self].index - 419].type; if (at >= 12){return take;} return take * attackTypeMult[t][at]; }
 static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;}/*Unity HealthManager.UseDeathTargets: 'if (isPlayer) return.  Player death does nothing.'*/ if (World.instances[self].targetOnDeathIdx != IO_NONE) UseTargets(self,World.instances[self].targetOnDeathIdx); }
 static void TeleportAway(u16 self) { 
-    if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;} flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true);
-    /*Unity HealthManager.TeleportAway (HealthManager.cs:536) does Utils.Activate(teleportEffect) and only
-     * afterwards disables collision and deactivates visibleMeshEntity.  Order matters here for a second
-     * reason: the burst has to be created while modelIndex is still live, because PSysAddEx snapshots the
-     * model so the emitter can go on spawning from the last visible frame after the body is hidden.*/
-    const PSysDef* dgo = PSysTypeGet(PSYS_ef_diego_teleport); if (dgo) { PSysDef d = *dgo; d.pos = World.position[self]; d.rotation = World.rotation[self]; PSysAddEx(&d, self); }
-    World.col[self] = COLTYPE_NONE; World.gravity[self] = 0.0f; World.velocity[self] = (V3){0,0,0}; World.angularVelocity[self] = (V3){0,0,0}; World.instances[self].modelIndex = U16_MAX; 
-    play_wav(sounds[106]/*misc/teleport*/, AppliedFXVol(1.0f), World.position[self], false);
+    if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;}
+    
+    flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true);
+    const PSysDef* dgo = PSysTypeGet(PSYS_ef_diego_teleport);
+    if (dgo) { PSysDef d = *dgo; d.pos = World.position[self]; d.rotation = World.rotation[self]; PSysAddEx(&d, self); }
+    World.col[self] = COLTYPE_NONE;
+    World.gravity[self] = 0.0f;
+    World.velocity[self] = World.angularVelocity[self] = (V3){0,0,0};
+    World.instances[self].modelIndex = U16_MAX; 
+    play_wav(sounds[106]/*misc/teleport*/,AppliedFXVol(1.0f),World.position[self],false);
 }
 
-static void DropSearchables(u16 self) {for(int i=0;i<4;i++){if(World.instances[self].contents[i]<=-1){continue;} u16 spawned=SpawnDynamicObject(World.instances[self].contents[i]+307,true); if(EntIdxIsValid(spawned)){World.position[spawned]=World.position[self]; World.instances[spawned].custIdx[0]=World.instances[self].custIdx[i];}else{CenterStatusPrint("BUG: Failed to make search obj.");} World.instances[self].contents[i]=World.instances[self].custIdx[i]=-1;}}
+static void DropSearchables(u16 self) {
+    for (int i=0;i<4;i++) {
+        if(World.instances[self].contents[i]<=-1){continue;}
+        
+        u16 spawned=SpawnDynamicObject(World.instances[self].contents[i]+307,true);
+        if(EntIdxIsValid(spawned)){World.position[spawned] = World.position[self]; World.instances[spawned].custIdx[0] = World.instances[self].custIdx[i];}
+        else{CenterStatusPrint("BUG: Failed to make search obj.");}
+        
+        World.instances[self].contents[i]=World.instances[self].custIdx[i] = -1;}
+}
+
 static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} if (!IdxInBounds((int)fxPoolType) || IdxIsGeometry((int)fxPoolType)) {return; /*PoolType is an ordinal enum (None..LeafBurst, 0..29), not a const index.  Feeding one to SpawnDynamicObject makes it try to spawn a level chunk, which is where "Indices 0 to 306 (level chunks) not possible when not on edit mode!" came from.  Refuse here so no caller can reach that.*/} V3 pos = World.position[self]; if (World.col[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
 static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.gravity[self] = 0.0f; }
 static void SpawnSecCpuNodeGibs(u16 self) {
@@ -710,53 +678,54 @@ static void ObjectDeath(u16 self) {
 
 static void ScreenDeath(u16 self) { Entity* e=&World.instances[self]; if(e->entflags & EF_DEAD_CHECKS_DONE){return;} flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true); play_wav(sounds[69], AppliedFXVol(1.0f), World.position[self], true);/*screen_destroy*/ if (e->entflags & EF_DEATH_BURST_DONE) ObjectDeath(self);/*gib path*/ }
 static inline bool IsGrenade(u16 i) { return ((i >= 314 && i <= 320) || i == 370 || i == 372 || i == 387 || i == 389 || (i >= 402 && i <= 404)); }
-/* HealthManager.cs:492 -- if (vaporizeCorpse && !isSecCamera && !isGrenade) VaporizeCorpse(energyVaporized).  On the 29 NPC prefabs
-   that flag is 1 on exactly the 15 that declare a searchCollider (all of them) and 0 on the other 14, so AUTOBOMB, the 8 gib types
-   and the 5 cyber types are all refused.  Non-NPCs keep the HealthManager field default (true), which is the behaviour the Death()
-   dynamic-object path already had. */
 static bool CanVaporize(u16 self) { Entity* e=&World.instances[self]; if (e->index == 477/*sec_camera*/ || IsGrenade(e->index)) {return false;} if (IdxIsNPC(e->index)) {return ai_has_search_collider((u16)(e->index - 419));} return true; }
 static void SpawnDeathEffectAt(u16 type, V3 pos) { const PSysDef* preset = PSysTypeGet(type); if (!preset) return; PSysDef def = *preset; def.pos = pos; PSysAdd(&def); }
 static void VaporizeCorpse(u16 self,bool energyVaporized) { Entity* e=&World.instances[self]; if (!CanVaporize(self)) {return;}
-    /* Always drop first, whatever happens to the visual: Unity's VaporizeCorpse calls searchObject.SpawnContents() before it tears
-       the body down, and a corpse whose contents were already taken is a no-op rather than an error. */
     DropSearchables(self);
-    /* Unity HealthManager.VaporizeCorpse:508-509 -- deathFX defaults to PoolType.CorpseHit, overridden to PoolType.Vaporize when
-       energyVaporized.  An authored deathFX (Voxen's deathBurst, a real const index such as 725 for sec_camera) still wins, matching
-       "if deathFX == None -> CorpseHit".  Spawn before DeleteInstance so the effect reads a live instance. */
-    V3 pos = World.position[self]; if (World.col[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); }
+    V3 pos = World.position[self];
+    if (World.col[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); }
     if (e->deathBurst != 0 && IdxInBounds((int)e->deathBurst) && !IdxIsGeometry((int)e->deathBurst)) { CreateDeathEffects(self,e->deathBurst); }
     else { SpawnDeathEffectAt(energyVaporized ? PSYS_ef_vaporize_puff : PSYS_ef_corpsehit_puff, pos); }
-    e->modelIndex=MAX_MDLS; if (IdxIsNPC(e->index) || IdxIsSearchable(e->index)) DeleteInstance(self); }
+    
+    e->modelIndex=MAX_MDLS;
+    if (IdxIsNPC(e->index) || IdxIsSearchable(e->index)) DeleteInstance(self);
+}
+
 static void Death(u16 self,bool energyVaporized) {
     Entity* e = &World.instances[self];
     if (e->entflags & EF_DEAD_CHECKS_DONE) {
-        /* Unity guards Death() with deathDone, so a second hit on a body is inert there.  Voxen wants corpses destructible, so a
-           repeat hit landing on an NPC corpse that still exists vaporizes it -- Death() below must not replay, or UseDeathTargets
-           and the gib spawn would fire twice.  Energy-beam shots (and grenade splash) go through here. */
         if (!IdxIsNPC(e->index) || !(World.layer[self] & L_Corpse) || self == PLAYER1 || IsGrenade(e->index) || (e->entflags & (EF_TELEPORT_ON_DEATH | EF_ACT_AS_CORPSE_ONLY))) return;
-        VaporizeCorpse(self, energyVaporized);
-        return;
+        VaporizeCorpse(self, energyVaporized); return;
     }
     UseDeathTargets(self); bool isNPC = IdxIsNPC(e->index); bool isObj = IdxIsDynamicObject(e->index); if (e->entflags & EF_ACT_AS_CORPSE_ONLY) { e->entflags |= EF_DEAD_CHECKS_DONE; return; }
-    if (e->index == 477) { /* sec_camera has no dynamic-object path; deathFX 1 is CameraExplosions. */
-        e->deathBurst = 725; ObjectDeath(self); DeleteInstance(self); return;
-    }
-    if (e->index == 478 || e->index == 479) { /* sec_cpunode(_small): ObjectDeath spawns gibs 840..853, drops the level security and latches the code screen, but the
-        prefab serializes no deathFX, so deathBurst stays 0 and ObjectDeath's trailing HideSelf never runs -- the node would hang in the air as an
-        unpickable shell.  Unity destroys the object outright.  DeleteInstance also stops a dead node still counting in CPUNodesRemainOnLevel. */
-        ObjectDeath(self); DeleteInstance(self); return;
-    }
-    /* NPCs retain their entity mesh for AI death animation. Only non-NPC corpses vaporize. */
-    bool vaporize=IdxIsCorpse(e->index); bool isGrenade=IsGrenade(e->index), doTeleport=(e->entflags & EF_TELEPORT_ON_DEATH) != 0; if (e->iceActive) World.col[self] = COLTYPE_NONE;
-    if (vaporize && e->index != 477/*sec_camera*/ && !isGrenade) VaporizeCorpse(self,energyVaporized); else if (isObj && !isNPC) ObjectDeath(self); else if (e->index == 279/*screen*/) ScreenDeath(self); else if (doTeleport) TeleportAway(self); else if (isGrenade) GrenadeExplode(self);
-    if (isNPC && !doTeleport) NPCDeath(self); else if (self == PLAYER1) { if (!RessurectPlayer()) World.deaths++; } flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
+    if (e->index == 477) { e->deathBurst = 725; ObjectDeath(self); DeleteInstance(self); return; }
+    if (e->index == 478 || e->index == 479) { ObjectDeath(self); DeleteInstance(self); return; }
+    
+    bool vaporize = IdxIsCorpse(e->index), isGrenade = IsGrenade(e->index), doTeleport = (e->entflags & EF_TELEPORT_ON_DEATH) != 0;
+    if (e->iceActive) World.col[self] = COLTYPE_NONE;
+         if (vaporize && e->index != 477/*sec_camera*/ && !isGrenade) VaporizeCorpse(self,energyVaporized);
+    else if (isObj && !isNPC) ObjectDeath(self);
+    else if (e->index == 279/*screen*/) ScreenDeath(self);
+    else if (doTeleport) TeleportAway(self);
+    else if (isGrenade) GrenadeExplode(self);
+    
+         if (isNPC && !doTeleport) NPCDeath(self);
+    else if (self == PLAYER1) { if (!RessurectPlayer()) World.deaths++; }
+    
+    flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
 }
 
 float TakeDamage(u16 self,DamageData dd) {
     if (Cheats.god && self == PLAYER1) return 0.0f;
-    if (self < World.instCount && World.instances[self].index == CYBER_DECOY_CONST) return 0.0f;/*the decoy projection absorbs nothing: its prefab carries no HealthManager, and without this the health-0 fallthrough below would run Death() on the very first cyber shot and delete the decoy*/
-    bool isCyber = IsCyberEntity(self); float* hp = isCyber ? &World.instances[self].cyberHealth : &World.instances[self].health; u16 selfIdx = World.instances[self].index; bool isNPC = IdxIsNPC(selfIdx), isPlayer = (self == PLAYER1); bool isGrenade = IsGrenade(selfIdx);
-    if (isCyber) { if (dd.attackType == Att_Drill && isNPC){return 0.0f;} if (dd.attackType != Att_Drill && World.instances[self].iceActive){return 0.0f;} } if (*hp <= 0.0f) { bool allowPost = (isNPC || World.instances[self].iceActive || isPlayer || isGrenade || selfIdx == 279/*chunk_screen*/ || selfIdx == 477/*sec_camera*/); if (!allowPost) return 0.0f; } float take = dd.damage;
+    if (self < World.instCount && World.instances[self].index == CYBER_DECOY_CONST) return 0.0f;
+    
+    u16 selfIdx = World.instances[self].index;
+    bool isCyber = IsCyberEntity(self), isNPC = IdxIsNPC(selfIdx), isPlayer = (self == PLAYER1), isGrenade = IsGrenade(selfIdx);
+    float* hp = isCyber ? &World.instances[self].cyberHealth : &World.instances[self].health;
+    if (isCyber) { if (dd.attackType == Att_Drill && isNPC){return 0.0f;} if (dd.attackType != Att_Drill && World.instances[self].iceActive){return 0.0f;} }
+    if (*hp <= 0.0f) { bool allowPost = (isNPC || World.instances[self].iceActive || isPlayer || isGrenade || selfIdx == 279/*chunk_screen*/ || selfIdx == 477/*sec_camera*/); if (!allowPost) return 0.0f; }
+    
+    float take = dd.damage;
     if (isPlayer) {
         float absorb = 0.0f;
         if (isCyber) { if (World.invP1.hasSoft & (1 << SW_SHIELD)) { u8 sv = World.invP1.softVersions[SW_SHIELD]; absorb = (sv <= 9) ? sv * 0.05f : 0.0f; take *= (1.0f - absorb); if (take <= 0.0f){return 0.0f;} } }// Cyber C-Shield software absorption
@@ -771,10 +740,6 @@ float TakeDamage(u16 self,DamageData dd) {
     if (isCyber) { World.instances[self].cyberHealth -= take; if (isPlayer) { World.damageReceived += take; if (World.instances[self].cyberHealth <= 0.0f) { ExitCyberspace(); return 0.0f; } } if (dd.owner == PLAYER1){World.damageDealt += take;} }
     else { if(selfIdx == 477/*Camera constIndex 477 gets one-shot by tranq*/ && dd.attackType == Att_Trnq){take=World.instances[self].health + 1.0f;} take=ApplyAttTypeAdjustments(self,take,dd.attackType); if(!isPlayer)DualLog("TakeDamage inst %u ci %u hp %.3f->%.3f take %.3f att %d owner %u\n",(u32)self,(u32)selfIdx,World.instances[self].health,World.instances[self].health-take,take,(int)dd.attackType,(u32)dd.owner); World.instances[self].health-=take; if (isPlayer) { World.damageReceived+=take; World.Sys_Music.inCombat=true; } if (dd.owner == PLAYER1){World.damageDealt+=take;} }
     if (isNPC && (World.instances[self].health > 0.0f || (isCyber && World.instances[self].cyberHealth > 0.0f))) { if (npcTable[selfIdx - 419].timeBetweenPain > 0.0f) flag_set(&World.instances[self].entflags,EF_GO_INTO_PAIN,true); World.instances[self].recentMostActivator = dd.owner; TargetIDSendDamageReceive(self,take,dd.attackType); AICheckPain(self); }
-    /* EnergyBeam and ProjectileEnergyBeam both reach HealthManager.Death as energyVaporized and take the corpse out at once, so they
-       must not be gated on the corpse's remaining 50 health.  Checked before the <= 0 dispatch below because a beam landing on a
-       barely-hurt corpse leaves it comfortably positive and would otherwise only chip it.  Everything else still wittles the corpse
-       down hit by hit, which is the intended divergence from Unity's inert deathDone guard. */
     if (!isCyber && (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) && (World.layer[self] & L_Corpse)
         && (dd.attackType == Att_Beam || dd.attackType == Att_PjBm)) { VaporizeCorpse(self,true); return take; }
     if (isCyber) { if (World.instances[self].cyberHealth <= 0.0f) { if (!World.instances[self].iceActive && isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.cyberkills++;} Death(self,false); } } else { if (World.instances[self].health <= 0.0f) { if (isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.kills++;} Death(self,dd.attackType == Att_Beam || dd.attackType == Att_PjBm); } }    return take;
@@ -1111,30 +1076,6 @@ static void WireLoadInstance(u16 self, const WirePuzzleDef* def) {
     for (u8 w=0;w<7;++w) { World.Sys_UI.pw_tgtL[w]=def->tgtL[w]; World.Sys_UI.pw_tgtR[w]=def->tgtR[w]; World.Sys_UI.pw_wireOn[w]=def->wireOn[w]; World.Sys_UI.pw_rowActive[w]=def->rowsActive[w]!=0; World.Sys_UI.pw_wireColor[w]=def->wireColor[w];/*raw HUDColor, as PuzzleWire.wireColors holds it*/ }
 }
 
-/*---- Grid puzzle per-instance data (Unity PuzzleGridPuzzle) --------------------------------------------
-  PuzzleGridPuzzle.Save writes only puzzleSolved, grid[0..34], fired and locked.  cellType, gridType, theme,
-  sourceIndex, outputIndex, securityThreshhold and target are scene-authoring overrides on the prefab instances in
-  Assets/Scenes/CitadelScene.unity and are absent from Data/level*.txt, so they have to be baked in here.
-
-  Keyed by the level-local position the level file itself carries (lP, which is what World.position[] holds), NOT by
-  the 35-bit saved board.  The board is mutable, so a board key breaks the moment a player flips a cell, and it is
-  also not unique: lev5flightbay3iris and lev5flightbay23bulkhead ship byte-identical grid[] yet differ on cellType 7
-  and 21 (Bypass+And vs Standard+Standard), so a board key silently gave bulkhead iris's layout.
-
-  Every value below is read out of the scene's PrefabInstance modifications for the PuzzleGridPuzzle component
-  (script guid 4cc3aebad1e319a47842939088a42748) of the five us_puz_panel_*_grid prefabs, merged over the prefab
-  defaults.  All 21 prefab instances in CitadelScene.unity were enumerated; 11 carry a real layout (width 7,
-  height 5, source 14, output 20) and are listed here, and the other 10 are the panel mesh reused on wire panels
-  with no grid data at all (width/height 0, no grid/cellType arrays).
-
-  gridType is PuzzleGridType {King,Queen,Knight,Rook,Bishop,Pawn} (Enumerations.cs:86) and is NOT uniformly King:
-  the two Bishop(4) panels are levRmedbeddoor and levRrobotspawncontrol, lev4hiddenclosetforcedoor is Rook(3), and
-  lev1wall1relay plus both lev7antennafield1 are Pawn(5).  It only picks which piece a Standard cell behaves like
-  (PuzzleGrid.cs:117 click, :141 hover) and is overridden to King outright on Easy difficulty (PuzzleGrid.cs:114).
-  theme is HUDColor, and PuzzleGrid.UpdateCellImages only branches on Gray/Green/Purple/Blue -- White, Red, Orange
-  and Yellow all fall through to the default gray sprites, so theme is recorded for completeness but does not change
-  the current art.  securityThreshhold is 90 on lev1xdoor1 and 100 everywhere else.  target is the TargetIO name and
-  is what fires the door/relay on solve; all nine distinct names appear as targetname somewhere in Data/level*.txt.*/
 typedef struct { V3 pos; u8 gridType, theme, security; const char* target; u8 cellType[35]; } GridPuzzleDef;
 static const GridPuzzleDef gridPuzzleDefs[] = {
     /*0 R.ReactorLevel       teal   levRmedbeddoor*/{{-4.4910f,-54.6630f,30.3431f},4,2,100,"levRmedbeddoor",{0,0,0,0,1,1,1,1,1,1,0,1,0,1,1,0,3,1,1,0,3,1,1,1,0,1,0,1,0,0,0,0,1,1,1}},
@@ -1150,9 +1091,6 @@ static const GridPuzzleDef gridPuzzleDefs[] = {
     /*7 7.EngineeringLevel   gray   lev7antennafield1*/{{3.3831f,50.8220f,56.1656f},5,0,100,"lev7antennafield1",{1,1,1,0,3,1,2,0,0,1,0,3,0,1,1,1,1,0,1,3,3,1,0,0,0,1,1,1,1,1,1,1,1,1,1}},
 };
 
-/*Level-local lP is the level file's own precision, so match on a tolerance rather than exact equality.  0.05 is well
-  under the smallest gap between any two placed panels on the same level (level 5's two at y 23.74/22.97 are 0.77
-  apart, and the two lev7antennafield1 are 1.6 apart) while absorbing the decimal truncation in the level text.*/
 static const GridPuzzleDef* GridPuzzleDefFor(V3 pos) {
     for (u32 i=0;i<sizeof(gridPuzzleDefs)/sizeof(gridPuzzleDefs[0]);++i) {
         const GridPuzzleDef* d=&gridPuzzleDefs[i];
@@ -1165,37 +1103,14 @@ static void GridLoadInstance(u16 self) {
     Entity* e=&World.instances[self];
     const GridPuzzleDef* def=GridPuzzleDefFor(World.position[self]);
     World.Sys_UI.pg_width=7; World.Sys_UI.pg_height=5; World.Sys_UI.pg_source=14; World.Sys_UI.pg_output=20;
-    /*Intern the scene-authored target so UseTargets has something to fire.  The level line carries only grid/solved/
-      fired, so e->targetIdx is IO_NONE until now; all nine distinct names appear as targetname somewhere in the level
-      data, so the interned index matches the entity that actually listens for it.  levRrobotspawncontrol's own level
-      line already carries target:levRrobotspawncontrol, and IOInternName returns that same index, so this is a no-op
-      there rather than a second, different name.*/
-    if (def) { if (def->target) e->targetIdx=IOInternName(def->target);
-               /*securityThreshhold is a scene override too and is absent from every one of the 11 level lines, so the
-                 entity reads 0 and PuzzlePanelUse's UsableOrDef would fall back to 100.  lev1xdoor1 is authored 90.
-                 Safe to re-assert: no record in the level data writes a panel's securityThreshhold at runtime.*/
-               e->securityThreshold=def->security; }
-    /*NOT re-asserting def->locked here.  PuzzleGridPuzzle.locked is a save field that TargetIO's unlock record
-      mutates at runtime (entity.c maps unlockPuzzlePad to TARG_IOFLAGS_UNLOCK, and EntityTargetted clears EF_LOCKED),
-      and both locked panels are unlocked that way: level 7's gray lev7antennafield1 by func_logic_relay 699 at
-      line 8009 (unlockPuzzlePad:1) and level 2's levRrobotspawncontrol by the keypad at line 6101.  Re-asserting the
-      scene value on every open would re-lock the panel the moment the player walked back to it after a relay fired.
-      The 2 panels whose level lines carry locked:1 are already seeded correctly by the loader, and the 9 that do not
-      are all authored locked:0, so the scene value never has to be written back at all.*/
-    /*Always load from this panel's own Entity.  There used to be an InventorySystem pg_*Cache consulted first, but it
-      is a single global slot keyed only on 7x5 plus gridType, and gridType is shared by 10 of the 11 panels (5 King,
-      2 Bishop, 3 Pawn).  Solving one King panel and walking to another therefore restored the first panel's cells, and
-      worse, its cellType[] with them.  e->gridCells lives in levelInstances[lev] inside GlobalContext, so it already
-      survives level transitions and save/load on its own; UI_PuzzleGridCell writes it back on every click.  The cache
-      had no durability the Entity did not already have and only added a cross-panel contamination path.*/
-    if (def) {
-        World.Sys_UI.pg_gridType=(PuzzleGridType)def->gridType; World.Sys_UI.pg_theme=def->theme; mcpy(World.Sys_UI.pg_type,def->cellType,sizeof(def->cellType));
-    } else {
-        World.Sys_UI.pg_gridType=PuzzleGridType_King; World.Sys_UI.pg_theme=HUDColor_Gray; mset(World.Sys_UI.pg_type,PuzzleCellType_Standard,sizeof(World.Sys_UI.pg_type));
-    }
+    if (def) { if (def->target) e->targetIdx=IOInternName(def->target); e->securityThreshold=def->security; }
+    
+    if (def) { World.Sys_UI.pg_gridType=(PuzzleGridType)def->gridType; World.Sys_UI.pg_theme=def->theme; mcpy(World.Sys_UI.pg_type,def->cellType,sizeof(def->cellType)); }
+    else     { World.Sys_UI.pg_gridType=PuzzleGridType_King; World.Sys_UI.pg_theme=HUDColor_Gray; mset(World.Sys_UI.pg_type,PuzzleCellType_Standard,sizeof(World.Sys_UI.pg_type)); }
+    
     mcpy(World.Sys_UI.pg_cell,e->gridCells,sizeof(e->gridCells));
     World.Sys_UI.pg_solved=e->puzzleSolved; World.Sys_UI.pg_fired=e->puzzleFired;
-    { PGEvalPuzzle(); }
+    PGEvalPuzzle();
 }
 
 static void PuzzlePanelUse(u16 i) {
@@ -1203,7 +1118,7 @@ static void PuzzlePanelUse(u16 i) {
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return;}
     if(e->entflags&EF_LOCKED){CenterStatusPrint("%s",Sys_Text.stringTable[302]);return;}
     World.Sys_UI.objectInUsePos=World.position[i]; World.Sys_UI.usingObject=true; ForceInventoryMode();
-    if(IsPuzzleGridPanel(e->index)){
+    if (IsPuzzleGridPanel(e->index)) {
         if(!e->panelOpen){
             e->panelOpen=true;
             ChangeAnim(e,A_OPENING);
@@ -1211,21 +1126,14 @@ static void PuzzlePanelUse(u16 i) {
         }
         bool initialize=World.Sys_UI.tetheredPGP!=i||World.Sys_UI.pg_width==0||World.Sys_UI.pg_height==0;
         World.Sys_UI.tetheredPGP=i;
-        if(initialize){
-            GridLoadInstance(i);
-        }
-        /*Unity's MFDManager.SendGridPuzzleToDataTab raises the grid on whichever side the player last used the data
-          tab on, same as BlockedBySecurity above; it was hardcoded to the left hand MFD here, so a player who had
-          been reading their inventory on the right got the puzzle thrown onto the other screen.*/
+        if(initialize){ GridLoadInstance(i); }
         MFD_OpenData(World.Sys_UI.lastDataSideRH,3);
-    }else{
+    } else {
         const WirePuzzleDef* def=WirePuzzleDefFor(e->index);
         World.Sys_UI.tetheredPWP=i; World.Sys_UI.pw_selectedWire=-1; World.Sys_UI.pw_solved=false;
         if(def) WireLoadInstance(i,def);
         else { for(u8 c=0;c<7;++c){World.Sys_UI.pw_curL[c]=(i8)c;World.Sys_UI.pw_curR[c]=(i8)c;World.Sys_UI.pw_tgtL[c]=(i8)c;World.Sys_UI.pw_tgtR[c]=(i8)c;World.Sys_UI.pw_wireOn[c]=true;World.Sys_UI.pw_rowActive[c]=true;World.Sys_UI.pw_wireColor[c]=HUDC_YELLOW;} }
-        /*Unity sends rememberColors on every SendWirePuzzleData; on hard the display colors collapse to all-Yellow
-          until Genius reveals them, which is why the colors are stored true here and the display rule is applied at
-          the draw site in ui.c rather than baked into pw_wireColor.*/
+
         MFD_OpenData(World.Sys_UI.lastDataSideRH,4);
     }
     CenterStatusPrint("%s",Sys_Text.stringTable[190]);

@@ -17,15 +17,29 @@ typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 enum{U16_MAX=65535,U32_MAX=0xFFFFFFFFU,U64_MAX=0xFFFFFFFFFFFFFFFFULL};
 typedef __builtin_va_list va_list;
 extern size_t g_mmap_live; /* diagnostics (lib.c): live bytes from OS_AllocateRAM */
-typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color; typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion; typedef u8 ColliderType; typedef struct { bool hit; V3 point,normal; float pen; } Overlap; typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
+typedef struct { float r,g,b; } Color3;
+typedef struct { float r,g,b,a; } Color;
+typedef struct { float x,y; } V2;
+typedef struct { float x,y,z; } V3;
+typedef struct { float x,y,z,w; } Quaternion;
+typedef u8 ColliderType;
+typedef struct { bool hit; V3 point, normal; float pen; } Overlap;
+typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
 #if defined(_WIN32)
     typedef void* FHandle;
 #else
     typedef int FHandle;
 #endif
 // SIMD
-typedef float __v8sf __attribute__((__vector_size__(32))); typedef float __m256 __attribute__((__vector_size__(32))); typedef long long __m128i __attribute__((__vector_size__(16))); typedef __m128i __m128i_u __attribute__((__may_alias__, __aligned__(1))); typedef __m256 __m256_u __attribute__((__may_alias__, __aligned__(1)));
-typedef float __v4sf __attribute__((__vector_size__(16))); typedef int __v4si __attribute__((__vector_size__(16)));   typedef float __m128 __attribute__((__vector_size__(16)));      typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1)));
+typedef float __v8sf __attribute__((__vector_size__(32)));
+typedef float __m256 __attribute__((__vector_size__(32)));
+typedef long long __m128i __attribute__((__vector_size__(16)));
+typedef __m128i __m128i_u __attribute__((__may_alias__, __aligned__(1)));
+typedef __m256 __m256_u __attribute__((__may_alias__, __aligned__(1)));
+typedef float __v4sf __attribute__((__vector_size__(16)));
+typedef int __v4si __attribute__((__vector_size__(16)));
+typedef float __m128 __attribute__((__vector_size__(16)));
+typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1)));
 #define _mm_storeu_si128(P, V) (*(__m128i_u *)(P) = (V))
 #define _mm_loadu_ps(P) (*(__m128_u const *)(P))
 #define _mm_set1_ps(A) ((__m128){ (A), (A), (A), (A) })
@@ -39,7 +53,7 @@ static inline __m128i _mm_set1_epi8_fast(char c) { __m128i v; char *p = (char*)&
 typedef int (*cmpfun)(const void*,const void*);
 typedef int (*cmpfun_r)(const void*,const void*,void*);
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
-void physDiagExternal(const char*),DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(const char*, ...), *mcpy(void*,const void*,size_t);
+void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(const char*, ...), *mcpy(void*,const void*,size_t);
 #define THRSTACKSZ (8 * 1024 * 1024)
 #if defined(_WIN32)
     #define DLL_IMP __declspec (dllimport)
@@ -48,16 +62,54 @@ void physDiagExternal(const char*),DualLogError(const char*, ...), DualLog(const
     typedef struct { void* handle; } OS_Thread;
     struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; };
     DLL_IMP void* WINAPI GetStdHandle(u32);
-    typedef i64 (WINAPI *PROC)(); typedef i64 (WINAPI *FARPROC)(); typedef i64 (WINAPI *NEARPROC)();
-    typedef struct { int unused; } *HINSTANCE; typedef HINSTANCE HMODULE;  typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
-    typedef struct { i64 QuadPart; } LARGE_INTEGER; typedef LARGE_INTEGER *PLARGE_INTEGER; typedef struct { u64 Internal,InternalHigh; union {struct {u32 Offset,OffsetHigh;} DUMMYSTRUCTNAME; void* Pointer;} DUMMYUNIONNAME; void* hEvent; } OVERLAPPED, *LPOVERLAPPED;
-    typedef struct { union { u32 dwOemId; struct { u16 wProcessorArchitecture,wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; u32 dwPageSize; void* lpMinimumApplicationAddress,*lpMaximumApplicationAddress; u64 dwActiveProcessorMask; u32 dwNumberOfProcessors,dwProcessorType,dwAllocationGranularity; u16 wProcessorLevel,wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
-    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*); DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);         DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,LPOVERLAPPED);    DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);          DLL_IMP i32 WINAPI UnmapViewOfFile(void*); DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
-    DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);                                                      DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);   DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*); DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,LPOVERLAPPED); DLL_IMP i32 WINAPI CloseHandle(void*);     DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
-    DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);                  DLL_IMP void WINAPI GetSystemInfo(LPSYSTEM_INFO); DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*); DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64);         DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);              DLL_IMP void* WINAPI CreateFileMappingW(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,u16*);
+    typedef i64 (WINAPI *PROC)();
+    typedef i64 (WINAPI *FARPROC)();
+    typedef i64 (WINAPI *NEARPROC)();
+    typedef struct { int unused; } *HINSTANCE;
+    typedef HINSTANCE HMODULE;
+    typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
+    typedef struct { i64 QuadPart; } LARGE_INTEGER;
+    typedef LARGE_INTEGER *PLARGE_INTEGER;
+    typedef struct {
+        u64 Internal,InternalHigh;
+        union {
+            struct {u32 Offset,OffsetHigh;} DUMMYSTRUCTNAME;
+            void* Pointer;
+        } DUMMYUNIONNAME;
+        void* hEvent;
+    } OVERLAPPED, *LPOVERLAPPED;
+    
+    typedef struct {
+        union { u32 dwOemId; struct { u16 wProcessorArchitecture,wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME;
+        u32 dwPageSize;
+        void* lpMinimumApplicationAddress,*lpMaximumApplicationAddress;
+        u64 dwActiveProcessorMask;
+        u32 dwNumberOfProcessors,dwProcessorType,dwAllocationGranularity;
+        u16 wProcessorLevel,wProcessorRevision;
+    } SYSTEM_INFO, *LPSYSTEM_INFO;
+    
+    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*);
+    DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);
+    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);
+    DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,LPOVERLAPPED);
+    DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);
+    DLL_IMP i32 WINAPI UnmapViewOfFile(void*);
+    DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
+    DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);
+    DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);
+    DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*);
+    DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,LPOVERLAPPED);
+    DLL_IMP i32 WINAPI CloseHandle(void*);
+    DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
+    DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);
+    DLL_IMP void WINAPI GetSystemInfo(LPSYSTEM_INFO);
+    DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*);
+    DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64);
+    DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);
+    DLL_IMP void* WINAPI CreateFileMappingW(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,u16*);
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((u32)exitCode); __builtin_unreachable(); }
     INLINE void OS_Close(FHandle fd) { if(fd!=INVALID_FHANDLE){CloseHandle(fd);} }
-    INLINE void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); return CloseHandle(m),r;}
+    INLINE void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd == (void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r = MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); CloseHandle(m); return r; }
     int __cdecl _mkdir(const char* dirname);
     INLINE int OS_MakeFolder(const char* path) { _mkdir(path); return 0; }
     INLINE long OS_Read(FHandle fd, void* buf, size_t count) { u32 bytesRead = 0; return (ReadFile((void*)fd,buf,(u32)count,&bytesRead,NULL)) ? (long)bytesRead : (long)-1; }
@@ -77,6 +129,9 @@ void physDiagExternal(const char*),DualLogError(const char*, ...), DualLog(const
     INLINE u32 WINAPI thrtramp(void* a) { void** b=(void**)a; void*(*fn)(void*)=(void*(*)(void*))b[0]; void* arg=b[1]; HeapFree(GetProcessHeap(),0,b); fn(arg); return 0; }
     INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void** b=(void**)HeapAlloc(GetProcessHeap(),0,2 * sizeof(void*)); b[0]=(void*)fn; b[1]=arg; out->handle=CreateThread(NULL,THRSTACKSZ,thrtramp,b,0,NULL); if(!out->handle){HeapFree(GetProcessHeap(),0,b); return -1;} return 0; }
     INLINE void OS_ThreadJoin(OS_Thread* t) { WaitForSingleObject(t->handle,U32_MAX); CloseHandle(t->handle); t->handle = NULL; }
+    i32 __stdcall SwitchToThread(void);
+    INLINE void OS_FutexWait(u32* a, u32 expect) { while (__atomic_load_n(a,__ATOMIC_ACQUIRE)==expect) SwitchToThread(); } /* no futex on Win32: yield to a runnable thread instead of burning the core */
+    INLINE void OS_FutexWakeAll(u32* a) { (void)a; }
     INLINE double get_time() { static LARGE_INTEGER frequency,counter; static i32 init=0; if (!init) { QueryPerformanceFrequency(&frequency); init=1; } QueryPerformanceCounter(&counter); return (double)counter.QuadPart / frequency.QuadPart; }
 #else
     #define INVALID_FHANDLE -1
@@ -101,15 +156,27 @@ void physDiagExternal(const char*),DualLogError(const char*, ...), DualLog(const
     INLINE int OS_GetNumThreads() { unsigned long m[16]; long r=204; __asm__ __volatile__("syscall":"+a"(r):"D"(0LL),"S"(128LL),"d"(m):"rcx","r11","memory"); int c = 0; for(int i=0;i<(r/8);i++) {c+=__builtin_popcountll(m[i]);} return r < 0 ? 1 : c; }
     INLINE void OS_Free(void* p, size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __atomic_sub_fetch(&g_mmap_live,s,__ATOMIC_RELAXED); __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
     INLINE long OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
+
+    // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
     #define SYSCALL1(n, a) syscall6(n,(long)(a),0,0,0,0,0)
     #define SYSCALL2(n, a, b) syscall6(n,(long)(a),(long)(b),0,0,0,0)
     #define SYSCALL3(n, a, b, c) syscall6(n,(long)(a),(long)(b),(long)(c),0,0,0)
     #define SYSCALL4(n, a, b, c, d) syscall6(n,(long)(a),(long)(b),(long)(c),(long)(d),0,0)
     INLINE long syscall6(long n, long a, long b, long c, long d, long e, long f) { register long r=n; register long r10 __asm__("r10") = d; register long r8  __asm__("r8")  = e; register long r9  __asm__("r9")  = f; __asm__ __volatile__("syscall":"+a"(r):"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return r; }
     __attribute__((naked)) static long OS_CloneSyscall(struct OS_ThreadHead* stack) { __asm__ volatile ("mov %%rdi, %%rsi\nmov $0x50f00, %%edi\nmov $56, %%eax\nsyscall\nmov  %%rsp, %%rdi\nret\n":::"rax","rcx","rsi","rdi","r11","memory"); }
-    __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) { void*(*fn)(void*)=head->fn; void*arg=head->arg; int*futex=&head->join_futex; fn(arg); /* Publish completion then wake+exit using registers only: OS_ThreadJoin munmaps this stack as soon as it observes the flag, so no stack access (not even the call/spill of a syscall wrapper, fatal at -O0) may follow the publish. xchg is a seq-cst store. */ __asm__ volatile ("movl $1, %%eax\n\txchgl %%eax, (%0)\n\tmov %0, %%rdi\n\tmov $1, %%esi\n\tmov $1, %%edx\n\tmov $202, %%eax\n\tsyscall\n\tmov $60, %%eax\n\txor %%edi, %%edi\n\tsyscall\n" :: "r"(futex) : "rax","rcx","rsi","rdi","rdx","r11","memory"); __builtin_unreachable(); }
-    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
+    __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) {
+        void*(*fn)(void*)=head->fn; void*arg=head->arg; int*futex=&head->join_futex; fn(arg); /*Publish completion then wake+exit using registers only: OS_ThreadJoin munmaps as soon as it observes flag, so no stack access (not even call/spill of syscall wrapper, fatal at -O0) may follow publish. xchg is seq-cst store.*/
+        __asm__ volatile ("movl $1, %%eax\n\txchgl %%eax, (%0)\n\tmov %0, %%rdi\n\tmov $1, %%esi\n\tmov $1, %%edx\n\tmov $202, %%eax\n\tsyscall\n\tmov $60, %%eax\n\txor %%edi, %%edi\n\tsyscall\n" :: "r"(futex) : "rax","rcx","rsi","rdi","rdx","r11","memory"); __builtin_unreachable();
+    }
+
+    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) {
+        void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0;
+        long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0;
+    }
+    
     INLINE void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THRSTACKSZ); t->head = NULL; t->stack_base = NULL; }
+    INLINE void OS_FutexWait(u32* a, u32 expect) { while (__atomic_load_n(a,__ATOMIC_ACQUIRE)==expect) SYSCALL4(202, a, 0 /*FUTEX_WAIT*/, expect, 0); }
+    INLINE void OS_FutexWakeAll(u32* a) { SYSCALL4(202, a, 1 /*FUTEX_WAKE*/, 0x7fffffff, 0); }
     INLINE double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 0.000000001; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif 
 INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
@@ -118,83 +185,134 @@ INLINE void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_
 INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
 INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
 static const Quaternion QUAT_IDENTITY=(Quaternion){0.0f,0.0f,0.0f,1.0f};
-typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;         typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer   
-typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;  typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
+typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
+typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range, spotAng, maxIntensity, minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer   
+typedef struct { float speed; u16 frameStart, frameEnd, frameStartModelIndex; u8 framerate;} AnimationClip;
+typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
 enum {/*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
-                MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,MAX_CULL_FILESIZE=500000,
-      /*Entity Management*/MAX_LEVELS=14,LEVEL_CYBERSPACE=13,AVG_CPU_TAPS=2048,MAX_ENTITIES=864,INSTANCE_COUNT=9032,MAX_LEVEL_PARTICLES=128,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,MAX_ELEV_DESTS_PER_LEVEL=8,SAVE_VERSION=16,
-      /*Lights*/LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
-      /*Models*/MAX_MDLS=7489, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
-      /*Textures*/MAX_TXRS=4096,MAX_TOTAL_PIXELS=48000000u, MAX_UNIQUE_COLORS = 86000u,TEXHASH_SZ=256,NUM_TEXTURE_CLIPS=49,
+                 MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
+      /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024,
+                            FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 16,
+      /*Lights*/ LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
+      /*Models*/ MAX_MDLS=7489, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
+      /*Textures*/ MAX_TXRS = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 256, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8,
       /*Animations*/ MAX_ANIMCLIPS = 10, MAX_ANIMS = 59, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2,
                      A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
-      /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH=6, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=8000, MAX_WIRELINE_VRTS = 2024000,
-                  MANIFOLD_MAX=4, CVXMSH_HULL_CACHE=1024, EPA_MAX_FACES=64, EPA_MAX_VERTS=128, EPA_MAX_EDGES=EPA_MAX_FACES*3, GJK_ITER=32, EPA_ITER=16, SOLVER_ITER_GLOBAL=32, MAX_GLOBAL_CONTACTS=8192,
+      /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH = 6, BVH_LEAF_MAX_TRIS = 8, BVH_MAX_NODES_PER_MDL = 586 /*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL = 8000,
+                  MAX_WIRELINE_VRTS = 2024000, MANIFOLD_MAX = 4, CVXMSH_HULL_CACHE = 1024, EPA_MAX_FACES = 64, EPA_MAX_VERTS = 128, EPA_MAX_EDGES = EPA_MAX_FACES * 3, GJK_ITER = 32, EPA_ITER = 16, SOLVER_ITER_GLOBAL = 32, MAX_GLOBAL_CONTACTS = 8192,
       /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
-      /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS),REV_BUF_LEN=110251/*~2.5s @ 44100; prime*/,MAXAMB=256,
-      /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
-               T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14, T_PURPLE = 15, T_BUFFER_SIZE=4096, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1200,FONT_ATLAS_SIZE2=2048, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
-               HUDC_WHITE=0, HUDC_RED=1, HUDC_ORANGE=2, HUDC_YELLOW=3, HUDC_GREEN=4, HUDC_BLUE=5, HUDC_PURPLE=6, HUDC_GRAY=7,
-      /*UI*/ UI_W=1366,UI_H=768,CURSOR_SZ=40,MFD_READER_CONTENTS=0,MFD_READER_FOLDER=1,MFD_READER_TEXT=2,MAX_UI_ELEMENTS=4096,TXT_PAD=4,TXT_H=24,TAB_THICK=16,MFD_SPACING=8,MFD_SPACINGCTR=19,SIDE_MFD_W=320,SIDE_MFD_H=240,CTR_MFD_W=640,CTR_MFD_H=240,UI_AUTOMAP_ZOOM_IN=0,UI_AUTOMAP_ZOOM_OUT=1,UI_AUTOMAP_FULL=2,UI_AUTOMAP_SIDE=3,
-      /*Automap*/ AM_W=320,AM_H=200,AM_FULL_W=700,AM_FULL_H=700,AM_MAXHULL=10,AMAP_UI_X_L=24,AMAP_UI_X_R=1022,AMAP_UI_Y=524,AMAP_UI_W=320,AMAP_UI_H=200,AM_XOFF=((AM_W-AM_H)/2),
-      /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
-      /*Rendering*/ BLEND_OPAQUE = 0, BLEND_CUTOUT = 1, BLEND_PREMULT = 2, BLEND_MULTIPLY=3,
+      /*Audio*/ MAX_CHANNELS = 128, SOUNDS_COUNT = 670, MAX_SYNTH_VOICES = 16, AUDIO_RATE = 48000, AUDIO_CHANNELS = 2, AUDIO_PERIOD_MS = 10, AUDIO_PERIODS = 4, AUDIO_FRAMES = ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000), AUDBUF_SIZE = (AUDIO_FRAMES * AUDIO_PERIODS),
+                REV_BUF_LEN = 110251 /*~2.5s @ 44100; prime*/, MAXAMB = 256,
+      /*Text*/ T_BUFFER_SIZE = 4096, MAX_GLYPHS = 4096, LINE_LEN_MAX = 81920, TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280 * 3, LOGCNT = 134,
+               T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8, T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14, T_PURPLE = 15,
+               FONT_ATLAS_SIZE = 1200, FONT_ATLAS_SIZE2 = 2048, FONT_NORMAL = 0, FONT_STOPD = 1,
+               HUDC_WHITE = 0, HUDC_RED = 1, HUDC_ORANGE = 2, HUDC_YELLOW = 3, HUDC_GREEN = 4, HUDC_BLUE = 5, HUDC_PURPLE = 6, HUDC_GRAY = 7,
+      /*UI*/ UI_W = 1366, UI_H = 768, CURSOR_SZ = 40, MFD_READER_CONTENTS = 0, MFD_READER_FOLDER = 1, MFD_READER_TEXT = 2, MAX_UI_ELEMENTS = 4096, TXT_PAD = 4, TXT_H = 24, TAB_THICK = 16, MFD_SPACING = 8, MFD_SPACINGCTR = 19,
+             SIDE_MFD_W = 320, CTR_MFD_W = 640, MFD_H = 240, UI_AUTOMAP_ZOOM_IN = 0, UI_AUTOMAP_ZOOM_OUT = 1, UI_AUTOMAP_FULL = 2, UI_AUTOMAP_SIDE = 3,
+      /*Automap*/ AM_W = 320, AM_H = 200, AM_FULL_W = 700, AM_FULL_H = 700, AM_MAXHULL = 10, AMAP_UI_X_L = 24, AMAP_UI_X_R = 1022, AMAP_UI_Y = 524, AMAP_UI_W = 320, AMAP_UI_H = 200, AM_XOFF = ((AM_W - AM_H) / 2),
+      /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3, BIOM_ERG = 0, BIOM_CHI = 1, BIOM_ECG = 2, BIOM_GRAPH_W = 620, BIOM_GRAPH_H = 36,
+      /*Rendering*/ BLEND_OPAQUE = 0, BLEND_CUTOUT = 1, BLEND_PREMULT = 2, BLEND_MULTIPLY = 3,
                     PARTICLE_FLAG_ADDITIVE = (1u<<0), PARTICLE_FLAG_SOFT = (1u<<1), PARTICLE_FLAG_LIT = (1u<<2), PARTICLE_FLAG_MULTIPLY = (1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE = (1u<<4), PARTICLE_FLAG_PHYSICS = (1u<<5), PARTICLE_FLAG_TRAIL = (1u<<6), 
-                    MAX_PARTICLES = 32768, MAX_EMITTERS = 1024, MAX_TRAIL_SEGS = 4096, PARTICLE_SSBO_BINDING = 10, TRAIL_SSBO_BINDING = 11, MAX_TRAIL_OWNERS = 512,
-                    MAX_WIRELINE_QUADS = 8192};
-u32 parse_numberu32(const char*, const char*,u32); u16 parse_numberu16(const char*, const char*,u32); u8 parse_numberu8(const char*, const char*,u32); bool parse_bool(const char*, const char*,u32);
-static const float PLAYER_RADIUS=0.48f,PLAYER_HEIGHT=2.00f,PLAYER_CAM_OFFSET_Y=0.84f,CELLSZ=2.56f,CELLXHALF=(CELLSZ * 0.5f),VOXEL_SIZE=(CELLSZ/(float)VOXELS_PER_CELL),VOXEL_HALF=(VOXEL_SIZE * 0.5f),/*COLCAP_DIR_X_F=0.0f,*/COLCAP_DIR_Y_F=1.0f,/*,COLCAP_DIR_Z_F=2.0f,*/REFLEX_TIME_SCALE=0.25,DEFAULT_TIME_SCALE=1.0,BERSERK_DAMAGE_MULTIPLIER=4.0f/*Quad Damage!*/,AM_FOW_RADIUS=30.0f,AM_FOW_RADIUS2=(AM_FOW_RADIUS*AM_FOW_RADIUS);
-#define RESSURECT_FEET_TO_CAMERA (1.0f - PLAYER_CAM_OFFSET_Y)
-static const double BERSERK_TIME=20.0,DETOX_TIME=60.0,GENIUS_TIME=180.0,MEDI_TIME=35.0,REFLEX_TIME=155.0,SIGHT_TIME=40.0,STAMINUP_TIME=60.0,SIGHT_SIDE_EFFECT_TIME=17.0,NITRO_MIN_TIME=1.0,NITRO_MAX_TIME=60.0,NITRO_DEFAULT_TIME=7.0,EARTH_SHAKER_MIN_TIME=4.0,EARTH_SHAKER_MAX_TIME=60.0,EARTH_SHAKER_DEFAULT_TIME=10.0;
-enum{EF_ACTIVE=(1u<<0),EF_GRAVLIFT=(1u<<1),EF_GROUNDED=(1u<<2),EF_RIGIDBODY=(1u<<3),EF_NO_SHADOWS=(1u<<4),EF_ASLEEP=(1u<<5),EF_WALK_PATH_ON_START=(1u<<6),EF_TOUCHING_HURTS=(1u<<7),EF_ACT_AS_CORPSE_ONLY=(1u<<8),EF_DYING=(1u<<9),EF_DEATH_BURST_DONE=(1u<<10),
-     EF_DEAD=(1u<<11),EF_TELEPORT_ON_DEATH=(1u<<12),EF_GO_INTO_PAIN=(1u<<13),EF_WANDERING=(1u<<14),EF_ACT_AS_TURRET=(1u<<15),EF_TARGID_ATTACHED=(1u<<16),EF_ENEM_IN_SIGHT=(1u<<17),EF_ENEM_IN_FRONT=(1u<<18),EF_ENEM_IN_FOV=(1u<<19),EF_ENEM_IN_LOS=(1u<<20),
-     EF_FIRST_SIGHTING=(1u<<21),EF_DYING_SETUP=(1u<<22),EF_HAD_ENEMY=(1u<<23),EF_SHOT_FIRED=(1u<<24),EF_DEAD_CHECKS_DONE=(1u<<25),EF_HOP_DONE=(1u<<26),EF_LOCKED=(1u<<27),EF_HAS_CAMERA_VIEW=(1u<<28),EF_DAMAGE_ON_USE=(1u<<29),EF_MOVING=(1u<<30),EF_DEAD_GIBS_DONE=(1u<<31)};
-enum{Q_ROBOT_SPAWN_DEACTIVATED=(1u<<0),Q_ISOTOPE_INSTALLED=(1u<<1),Q_SHIELD_ACTIVATED=(1u<<2),Q_LASER_SAFETY_OVERRIDEN=(1u<<3),Q_LASER_DESTROYED=(1u<<4),Q_BETA_GROVE_CYBER_UNLOCKED=(1u<<5),Q_GROVE_ALPHA_JETTISON_ENABLED=(1u<<6),
-     Q_GROVE_BETA_JETTISON_ENABLED=(1u<<7),Q_GROVE_DELTA_JETTISON_ENABLED=(1u<<8),Q_MASTER_JETTISON_BROKEN=(1u<<9),Q_RELAY_428_FIXED=(1u<<10),Q_MASTER_JETTISON_ENABLED=(1u<<11),Q_BETA_GROVE_JETTISONED=(1u<<12),Q_ANTENNA_NORTH_DESTROYED=(1u<<13),
-     Q_ANTENNA_SOUTH_DESTROYED=(1u<<14),Q_ANTENNA_EAST_DESTROYED=(1u<<15),Q_ANTENNA_WEST_DESTROYED=(1u<<16),Q_SELF_DESTRUCT_ACTIVATED=(1u<<17),Q_BRIDGE_SEPARATED=(1u<<18),Q_ISOLINEAR_CHIPSET_INSTALLED=(1u<<19),Q_LEV1_CODE_LOCKED=(1u<<20),
-     Q_LEV2_CODE_LOCKED=(1u<<21),Q_LEV3_CODE_LOCKED=(1u<<22),Q_LEV4_CODE_LOCKED=(1u<<23),Q_LEV5_CODE_LOCKED=(1u<<24),Q_LEV6_CODE_LOCKED=(1u<<25)};
-enum{TARG_IOFLAGS_TRIPTRIGGER=(1u<<0),TARG_IOFLAGS_DOOROPEN=(1u<<1),TARG_IOFLAGS_DOOROPENIFUNLOCKED=(1u<<2),TARG_IOFLAGS_DOORCLOSE=(1u<<3),TARG_IOFLAGS_LOCK=(1u<<4),TARG_IOFLAGS_UNLOCK=(1u<<5),TARG_IOFLAGS_SWITCHTRIGGER=(1u<<6),
-     TARG_IOFLAGS_CHGSTAT_RECHARGE=(1u<<7),TARG_IOFLAGS_ENEMY_ALERT=(1u<<8),TARG_IOFLAGS_FBRIDGE_ACTIVATE=(1u<<9),TARG_IOFLAGS_FBRIDGE_DEACTIVATE=(1u<<10),TARG_IOFLAGS_FBRIDGE_TOGGLE=(1u<<11),TARG_IOFLAGS_GRAVLIFT_TOGGLE=(1u<<12),
-     TARG_IOFLAGS_TEXTURE_CHG_TOGGLE=(1u<<13),TARG_IOFLAGS_LIGHT_ON=(1u<<14),TARG_IOFLAGS_LIGHT_OFF=(1u<<15),TARG_IOFLAGS_LIGHT_TOGGLE=(1u<<16),TARG_IOFLAGS_FUNCWALL_MOVE=(1u<<17),TARG_IOFLAGS_MISSION_BIT_ON=(1u<<18),TARG_IOFLAGS_MISSION_BIT_OFF=(1u<<19),
-     TARG_IOFLAGS_MISSION_BIT_TOGGLE=(1u<<20),TARG_IOFLAGS_SWITCH_LOCK_TOGGLE=(1u<<21),TARG_IOFLAGS_INST_ACTIVATE=(1u<<22),TARG_IOFLAGS_INST_DEACTIVATE=(1u<<23),TARG_IOFLAGS_INST_TOGGLE=(1u<<24),TARG_IOFLAGS_PLAY_SOUND_ONCE=(1u<<25),
-     TARG_IOFLAGS_STOP_SOUND=(1u<<26),TARG_IOFLAGS_START_FLASHING_TEX=(1u<<27),TARG_IOFLAGS_STOP_FLASHING_TEX=(1u<<28),TARG_IOFLAGS_BRANCH_FLIP=(1u<<29),TARG_IOFLAGS_BRANCH_FLIPONLY=(1u<<30),TARG_IOFLAGS_DISABLE_ON_AWAKE=(1u<<31)};
-typedef enum {BodyState_Standing=0,BodyState_Crouch=1,BodyState_CrouchingDown=2,BodyState_StandingUp=3,BodyState_Prone=4,BodyState_ProningDown=5,BodyState_ProningUp=6} BodyState;  /* Values match Utils.GetAttackTypeFromInt: the NPC tables hold the raw enemy_tables.csv ints, not Unity's AttackType declaration order. */ typedef enum {Att_None=0,Att_Melee=1,Att_MlEg=2/*MeleeEnergy*/,Att_Beam=3/*EnergyBeam*/,Att_Magn=4/*Magnetic*/,Att_HitS=5/*Projectile*/,Att_PjNd=6/*ProjectileNeedle*/,Att_PjBm=7/*ProjectileEnergyBeam*/,Att_Ball=8/*ProjectileLaunched*/,Att_Gas=9,Att_Trnq=10,Att_Drill=11}/* Values MUST match Unity Enumerations.cs:17-19 {None,Melee,MeleeEnergy,EnergyBeam,Magnetic,Projectile,
-   ProjectileNeedle,ProjectileEnergyBeam,ProjectileLaunched,Gas,Tranq,Drill}.  The previous ordering put
-   MeleeEnergy/EnergyBeam/Magnetic/Projectile in the wrong slots, so the Unity-indexed attackTypeMult table was
-   read at the wrong column: every projectile did 0 damage to Mutants and Supermutants (the table's 0 is
-   Magnetic) and EMP did full damage to them, and Gas/Needle/MeleeEnergy hit the wrong multipliers. */ AttType;
-/* Values match Utils.GetNPCTypeFromInt: 5 = MutantCyborg, 6 = Cyber (Unity's declaration order has those two swapped). */ typedef enum {NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_MutantCyborg=5,NPCType_Cyber=6} NPCType;                        typedef enum {PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3} PerceptionLevel;
-/* Values match Utils.GetMoveTypeFromInt: 1 = Walk, 2 = Fly. Unity's declaration order is Walk,Fly,Swim,Cyber,None, which is NOT the serialized numbering. */ typedef enum {AIMoveType_None=0,AIMoveType_Walk=1,AIMoveType_Fly=2,AIMoveType_Swim=3,AIMoveType_Cyber=4} AIMoveType;                                                                typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Inspect=8,AIState_Interacting=9,AIState_Dead=10} AIState;
-typedef enum {SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3} SecurityType;                                                            typedef enum {DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3} DoorState;
-typedef enum {FStat_Start=0,FStat_Target=1,FStat_MovingStart=2,FStat_MovingTarget=3,FStat_AjarMovingStart=4,FStat_AjarMovingTarget=5} FuncStates;                                   typedef enum {ACC_None=0,ACC_Std=1,ACC_Med=2,ACC_Sci=3,ACC_Admin=4,ACC_Grp1=5,ACC_Grp2=6,ACC_Grp3=7,ACC_Grp4=8,ACC_GrpA=9,ACC_GrpB=10,ACC_Stor=11,ACC_Eng=12,ACC_Maint=13,ACC_Security=14,ACC_Per1=15,ACC_Per2=16,ACC_Per3=17,ACC_Per4=18,ACC_Per5=19} AccCardType;
-/*Numbering mirrors Citadel Enumerations.cs MusicType/TrackType exactly -- these values come straight out of the level data.*/ typedef enum {MT_None=0,MT_Walking=1,MT_Combat=2,MT_Overlay=3,MT_Override=4} MusicType;                                                                                                          typedef enum {TT_None=0,TT_Walking=1,TT_Combat=2,TT_MutantNear=3,TT_CyborgNear=4,TT_CyborgDroneNear=5,TT_RobotNear=6,TT_Transition=7,TT_Revive=8,TT_Die=9,TT_Cybertube=10,TT_Elev=11,TT_Distortion=12} TrackType;
-typedef enum {BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7 } BloodType;   typedef enum {AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5} AudioLogType;
-typedef enum {EnergyType_Battery=0,EnergyType_ChargeStation=1 } EnergyType;            typedef enum {Handedness_Center=0,Handedness_LH=1,Handedness_RH=2} Handedness;               typedef enum {HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7} HUDColor;
+                    MAX_PARTICLES = 32768, MAX_EMITTERS = 1024, MAX_TRAIL_SEGS = 4096, PARTICLE_SSBO_BINDING = 10, TRAIL_SSBO_BINDING = 11, MAX_TRAIL_OWNERS = 512, MAX_WIRELINE_QUADS = 8192};
+                    
+u32 parse_numberu32(const char*, const char*,u32);
+u16 parse_numberu16(const char*, const char*,u32);
+u8 parse_numberu8(const char*, const char*,u32);
+bool parse_bool(const char*, const char*,u32);
+static const float PLAYER_RADIUS = 0.48f, PLAYER_HEIGHT = 2.00f, PLAYER_CAM_OFFSET_Y = 0.84f, CELLSZ = 2.56f, CELLXHALF = (CELLSZ * 0.5f), VOXEL_SIZE = (CELLSZ / (float)VOXELS_PER_CELL), VOXEL_HALF = (VOXEL_SIZE * 0.5f),  RESSURECT_FEET_TO_CAMERA = (1.0f - PLAYER_CAM_OFFSET_Y),
+                   /*COLCAP_DIR_X_F=0.0f,*/ COLCAP_DIR_Y_F = 1.0f,/*,COLCAP_DIR_Z_F=2.0f,*/ REFLEX_TIME_SCALE = 0.25, DEFAULT_TIME_SCALE = 1.0, BERSERK_DAMAGE_MULTIPLIER = 4.0f /*Quad Damage!*/, AM_FOW_RADIUS = 30.0f, AM_FOW_RADIUS2 = (AM_FOW_RADIUS * AM_FOW_RADIUS);
+                   
+static const double BERSERK_TIME = 20.0, DETOX_TIME = 60.0, GENIUS_TIME = 180.0, MEDI_TIME = 35.0, REFLEX_TIME = 155.0, SIGHT_TIME = 40.0, STAMINUP_TIME = 60.0, SIGHT_SIDE_EFFECT_TIME = 17.0, NITRO_MIN_TIME = 1.0, NITRO_MAX_TIME = 60.0, NITRO_DEFAULT_TIME = 7.0,
+                    EARTH_SHAKER_MIN_TIME = 4.0, EARTH_SHAKER_MAX_TIME = 60.0, EARTH_SHAKER_DEFAULT_TIME = 10.0;
+                    
+enum { EF_ACTIVE             = (1u<<0),  EF_TARGID_ATTACHED  = (1u<<16),
+       EF_GRAVLIFT           = (1u<<1),  EF_ENEM_IN_SIGHT    = (1u<<17),
+       EF_GROUNDED           = (1u<<2),  EF_ENEM_IN_FRONT    = (1u<<18),
+       EF_RIGIDBODY          = (1u<<3),  EF_ENEM_IN_FOV      = (1u<<19),
+       EF_NO_SHADOWS         = (1u<<4),  EF_ENEM_IN_LOS      = (1u<<20), 
+       EF_ASLEEP             = (1u<<5),  EF_FIRST_SIGHTING   = (1u<<21),
+       EF_WALK_PATH_ON_START = (1u<<6),  EF_DYING_SETUP      = (1u<<22),
+       EF_TOUCHING_HURTS     = (1u<<7),  EF_HAD_ENEMY        = (1u<<23),
+       EF_ACT_AS_CORPSE_ONLY = (1u<<8),  EF_SHOT_FIRED       = (1u<<24),
+       EF_DYING              = (1u<<9),  EF_DEAD_CHECKS_DONE = (1u<<25),
+       EF_DEATH_BURST_DONE   = (1u<<10), EF_HOP_DONE         = (1u<<26),
+       EF_DEAD               = (1u<<11), EF_LOCKED           = (1u<<27),
+       EF_TELEPORT_ON_DEATH  = (1u<<12), EF_HAS_CAMERA_VIEW  = (1u<<28),
+       EF_GO_INTO_PAIN       = (1u<<13), EF_DAMAGE_ON_USE    = (1u<<29),
+       EF_WANDERING          = (1u<<14), EF_MOVING           = (1u<<30),
+       EF_ACT_AS_TURRET      = (1u<<15), EF_DEAD_GIBS_DONE   = (1u<<31) };
+     
+enum { Q_ROBOT_SPAWN_DEACTIVATED      = (1u<<0),  Q_ANTENNA_W_DESTROYED         = (1u<<16),
+       Q_ISOTOPE_INSTALLED            = (1u<<1),  Q_SELF_DESTRUCT_ACTIVATED     = (1u<<17),
+       Q_SHIELD_ACTIVATED             = (1u<<2),  Q_BRIDGE_SEPARATED            = (1u<<18),
+       Q_LASER_SAFETY_OVERRIDEN       = (1u<<3),  Q_ISOLINEAR_CHIPSET_INSTALLED = (1u<<19),
+       Q_LASER_DESTROYED              = (1u<<4),  Q_LEV1_CODE_LOCKED            = (1u<<20),
+       Q_BETA_GROVE_CYBER_UNLOCKED    = (1u<<5),  Q_LEV2_CODE_LOCKED            = (1u<<21),
+       Q_GROVE_ALPHA_JETTISON_ENABLED = (1u<<6),  Q_LEV3_CODE_LOCKED            = (1u<<22),
+       Q_GROVE_BETA_JETTISON_ENABLED  = (1u<<7),  Q_LEV4_CODE_LOCKED            = (1u<<23),
+       Q_GROVE_DELTA_JETTISON_ENABLED = (1u<<8),  Q_LEV5_CODE_LOCKED            = (1u<<24),
+       Q_MASTER_JETTISON_BROKEN       = (1u<<9),  Q_LEV6_CODE_LOCKED            = (1u<<25),
+       Q_RELAY_428_FIXED              = (1u<<10),
+       Q_MASTER_JETTISON_ENABLED      = (1u<<11),
+       Q_BETA_GROVE_JETTISONED        = (1u<<12),
+       Q_ANTENNA_N_DESTROYED          = (1u<<13),
+       Q_ANTENNA_S_DESTROYED          = (1u<<14),
+       Q_ANTENNA_E_DESTROYED          = (1u<<15), };
+
+enum { TARG_IOFLAGS_TRIPTRIGGER        = (1u<<0),  TARG_IOFLAGS_LIGHT_TOGGLE       = (1u<<16),
+       TARG_IOFLAGS_DOOROPEN           = (1u<<1),  TARG_IOFLAGS_FUNCWALL_MOVE      = (1u<<17),
+       TARG_IOFLAGS_DOOROPENIFUNLOCKED = (1u<<2),  TARG_IOFLAGS_MISSION_BIT_ON     = (1u<<18),
+       TARG_IOFLAGS_DOORCLOSE          = (1u<<3),  TARG_IOFLAGS_MISSION_BIT_OFF    = (1u<<19),
+       TARG_IOFLAGS_LOCK               = (1u<<4),  TARG_IOFLAGS_MISSION_BIT_TOGGLE = (1u<<20),
+       TARG_IOFLAGS_UNLOCK             = (1u<<5),  TARG_IOFLAGS_SWITCH_LOCK_TOGGLE = (1u<<21),
+       TARG_IOFLAGS_SWITCHTRIGGER      = (1u<<6),  TARG_IOFLAGS_INST_ACTIVATE      = (1u<<22),
+       TARG_IOFLAGS_CHGSTAT_RECHARGE   = (1u<<7),  TARG_IOFLAGS_INST_DEACTIVATE    = (1u<<23),
+       TARG_IOFLAGS_ENEMY_ALERT        = (1u<<8),  TARG_IOFLAGS_INST_TOGGLE        = (1u<<24),
+       TARG_IOFLAGS_FBRIDGE_ACTIVATE   = (1u<<9),  TARG_IOFLAGS_PLAY_SOUND_ONCE    = (1u<<25),
+       TARG_IOFLAGS_FBRIDGE_DEACTIVATE = (1u<<10), TARG_IOFLAGS_STOP_SOUND         = (1u<<26),
+       TARG_IOFLAGS_FBRIDGE_TOGGLE     = (1u<<11), TARG_IOFLAGS_START_FLASHING_TEX = (1u<<27),
+       TARG_IOFLAGS_GRAVLIFT_TOGGLE    = (1u<<12), TARG_IOFLAGS_STOP_FLASHING_TEX  = (1u<<28),
+       TARG_IOFLAGS_TEXTURE_CHG_TOGGLE = (1u<<13), TARG_IOFLAGS_BRANCH_FLIP        = (1u<<29),
+       TARG_IOFLAGS_LIGHT_ON           = (1u<<14), TARG_IOFLAGS_BRANCH_FLIPONLY    = (1u<<30),
+       TARG_IOFLAGS_LIGHT_OFF          = (1u<<15), TARG_IOFLAGS_DISABLE_ON_AWAKE   = (1u<<31)};
+     
+typedef enum {BodyState_Standing = 0, BodyState_Crouch = 1, BodyState_CrouchingDown = 2, BodyState_StandingUp = 3, BodyState_Prone = 4, BodyState_ProningDown = 5, BodyState_ProningUp = 6} BodyState;
+typedef enum {Att_None = 0, Att_Melee = 1, Att_MlEg = 2, Att_Beam = 3, Att_Magn = 4, Att_HitS = 5, Att_PjNd = 6, Att_PjBm = 7, Att_Ball= 8, Att_Gas=9,Att_Trnq=10,Att_Drill=11} AttType;
+typedef enum {NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_MutantCyborg=5,NPCType_Cyber=6} NPCType;
+typedef enum {PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3} PerceptionLevel;
+typedef enum {AIMoveType_None=0,AIMoveType_Walk=1,AIMoveType_Fly=2,AIMoveType_Swim=3,AIMoveType_Cyber=4} AIMoveType;
+typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Inspect=8,AIState_Interacting=9,AIState_Dead=10} AIState;
+typedef enum {SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3} SecurityType;
+typedef enum {DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3} DoorState;
+typedef enum {FStat_Start=0,FStat_Target=1,FStat_MovingStart=2,FStat_MovingTarget=3,FStat_AjarMovingStart=4,FStat_AjarMovingTarget=5} FuncStates;
+typedef enum {ACC_None=0,ACC_Std=1,ACC_Med=2,ACC_Sci=3,ACC_Admin=4,ACC_Grp1=5,ACC_Grp2=6,ACC_Grp3=7,ACC_Grp4=8,ACC_GrpA=9,ACC_GrpB=10,ACC_Stor=11,ACC_Eng=12,ACC_Maint=13,ACC_Security=14,ACC_Per1=15,ACC_Per2=16,ACC_Per3=17,ACC_Per4=18,ACC_Per5=19} AccCardType;
+typedef enum {MT_None=0,MT_Walking=1,MT_Combat=2,MT_Overlay=3,MT_Override=4} MusicType;
+typedef enum {TT_None=0,TT_Walking=1,TT_Combat=2,TT_MutantNear=3,TT_CyborgNear=4,TT_CyborgDroneNear=5,TT_RobotNear=6,TT_Transition=7,TT_Revive=8,TT_Die=9,TT_Cybertube=10,TT_Elev=11,TT_Distortion=12} TrackType;
+typedef enum {BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7 } BloodType;
+typedef enum {AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5} AudioLogType;
+typedef enum {EnergyType_Battery=0,EnergyType_ChargeStation=1 } EnergyType;
+typedef enum {Handedness_Center=0,Handedness_LH=1,Handedness_RH=2} Handedness;
+typedef enum {HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7} HUDColor;
 typedef enum {FSTP_None=0,FSTP_Carpet=1,FSTP_Concrete=2,FSTP_GrittyCrete=3,FSTP_Grass=4,FSTP_Gravel=5,FSTP_Rock=6,FSTP_Glass=7,FSTP_Marble=8,FSTP_Metal=9,FSTP_Grate=10,FSTP_Metal2=11,FSTP_Metpanel=12,FSTP_Panel=13,FSTP_Plaster=14,FSTP_Plastic=15,FSTP_Plastic2=16,FSTP_Rubber=17,FSTP_Sand=18,FSTP_Squish=19,FSTP_Vent=20,FSTP_Water=21,FSTP_Wood=22,FSTP_Wood2=23} FootStepType;
-typedef enum {ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4} ForceFieldColor;                            typedef enum {TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9} TabMSG;
-typedef enum {PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3} PuzzleCellType;                                                          typedef enum {PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5} PuzzleGridType;
-typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox; typedef struct {V3 ctr; float rad;} ShapeSphere; typedef struct {V3 tip,base; float rad;} ShapeCapsule; ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i);
-// Vertical clearance sweep, shared by CantStand (physics.c) and the SpawnManager's AreaClear test (citadel.c).
-// `travel` is the shape the mover currently occupies and bounds how far the search may walk; pass the same shape as
-// `probe` when it moves freely.  Sample step and penetration tolerance are both 0.08f by separate routes; the span
-// bounds how far above and below the probe the search is willing to travel.
+typedef enum {ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4} ForceFieldColor;
+typedef enum {TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9} TabMSG;
+typedef enum {PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3} PuzzleCellType;
+typedef enum {PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5} PuzzleGridType;
+typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox;
+typedef struct {V3 ctr;      float rad;} ShapeSphere;
+typedef struct {V3 tip,base; float rad;} ShapeCapsule;
+ShapeBox     Entity_GetBox(u16 i);
+ShapeCapsule Entity_GetCap(u16 i);
+ShapeSphere  Entity_GetSph(u16 i);
 #define AREA_SWEEP_STEP 0.08f
 #define AREA_SWEEP_SPAN 2.56f
 bool AreaHasClearance(ShapeCapsule probe, ShapeCapsule travel, float span, u32 mask, u16 self);
-void CodeScreenShowDigit(u16 self, u8 digit);/*textures.c - latches a prop_cpuscreen to one digit and stops the flicker*/
-bool PositionVisibleFromPlayerCell(float x, float z);/*culling.c:6 - transient PVS visibility, not the static CELL_OPEN geometry state. SpawnManager's AreaHidden.*/bool PhysIsAsleep(u16 i);
+void CodeScreenShowDigit(u16 self, u8 digit);
+bool PositionVisibleFromPlayerCell(float x, float z);
 enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<<5),L_GunViewModel=(1u<<8),L_Geometry=(1u<<9),L_NPC=(1u<<10),L_PlayerBullets=(1u<<11),L_Player=(1u<<12),L_Corpse=(1u<<13),L_PhysObjects=(1u<<14),L_PlayerTriggerOnly=(1u<<16),L_Trigger=(1u<<17),L_Door=(1u<<18),L_InterDebris=(1u<<19),L_Player2=(1u<<20),L_NPCTrigger=(1u<<23),L_NPCBullet=(1u<<24),L_NPCClip=(1u<<25),L_Clip=(1u<<26),L_Automap=(1u<<27),L_Culling=(1u<<28),L_CorpseSearchable=(1u<<29)};
 #define LMASK_PLAYER_COLLIDESWITH   (L_Clip|L_NPCBullet|L_Player2|L_Door|L_Trigger|L_PlayerTriggerOnly|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_COLLIDESWITH      (L_Clip|L_NPCClip|L_PlayerBullets|L_Player2|L_Player|L_Door|L_Trigger|L_NPCTrigger|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_SIGHT             (L_Default|L_Geometry|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2)
-/* Dead NPCs keep their original (usually capsule) collider -- only the layer changes.  L_Corpse therefore carries two independent
-   meanings that Unity splits across two GameObjects and Voxen expresses with two bits:
-     - CollisionMaskTable row 13 restricts the corpse's collider to the world only (Default/Geometry/PhysObjects/Door/Clip), so a
-       body rests on the floor and physically interacts with nothing else.
-     - The raycast masks below still include L_Corpse, because Voxen traces the raw mesh where Unity swapped in a separate search
-       Collider.  A corpse must stay hittable by the frob ray (so the player can search it) and by weapon and grenade rays (so
-       corpses can be damaged and vaporized).  Dropping the layer from these masks makes corpses intangible, the opposite of the
-       intent.  NPC attack rays include it too, so an NPC can put a finishing shot into a downed body. */
 #define LMASK_NPC_ATTACK            (L_Default|L_Geometry|L_NPC|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_Corpse)
 #define LMASK_NPC_COLLISION         (L_Default|L_TransparentFX|L_Geometry|L_NPC|L_Door|L_InterDebris|L_Player|L_Clip|L_NPCClip|L_PhysObjects)
 #define LMASK_PLAYER_FROB           (L_Default|L_Geometry|L_BlocksRaycast|L_Door|L_InterDebris|L_PhysObjects|L_CorpseSearchable|L_NPC|L_Corpse)
@@ -361,8 +479,14 @@ RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3),ScreenPointToRay
 u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
 bool GetElevatorDestinationPos(u8,u8,V3*); /*entity.c: nth info_elev_destination (706) volume of a level, level-data space*/
 bool ElevatorDefaultDestinationPos(u8,V3*),ElevatorDestinationPosNear(u8,V3,V3*); /*citadel.c: the level's default elevator landing spot, and the one nearest a point*/
-void EntityDumpAll(const char *pathFmt, u16 pass);/*entity.c: writes every level's entity table to a binary file for Tools/entity_dump_diff.py; enabled by the VOXEN_DUMP_ENTITIES environment variable, whose value is a format string taking the NewGame pass index so the menu pass and the real start land in separate files and can be diffed against each other.*/
-void MFD_OpenData(bool,u8); void MFD_OpenAudioLog(int); void AutomapTick(),AutomapBlitToUI(),AutomapSideBlitToUI(bool),AutomapNewGame(),AutomapOnLoad(),AutomapDumpBMP(),AutomapClearRenderTargets(),BiomonitorDumpBMP(),BiomonitorClearRenderTarget(),BioMonitorInit(),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),BioMonitorAlignCursors(),RequestClearRenderTargets(),HudHeatBleed(float),CyberSwitchInitAfterLoad(u16),synth_set_reverb_preset(u16),MFD_ResetGeneral(); bool HudHeatTickOn(int);
+void MFD_OpenData(bool,u8);
+void MFD_OpenAudioLog(int);
+void AutomapTick(), AutomapBlitToUI(), AutomapSideBlitToUI(bool), AutomapNewGame(), AutomapOnLoad(), AutomapDumpBMP(), AutomapClearRenderTargets();
+void BiomonitorDumpBMP(), BiomonitorClearRenderTarget();
+void DrawSphereWireframe(Color,ShapeSphere);
+void BioMonitorClearGraphs(), BioMonitorAlignCursors(), RequestClearRenderTargets();
+void HudHeatBleed(float), CyberSwitchInitAfterLoad(u16), synth_set_reverb_preset(u16), MFD_ResetGeneral();
+bool HudHeatTickOn(int);
 double get_time();
 float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
 void ApplyImpactForceSphere(DamageData*,V3,float,float);

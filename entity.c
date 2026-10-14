@@ -1548,57 +1548,6 @@ void LoadLevelData(u8 curlevel) {
 }
 
 u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
-
-/*Mission-difficulty instance removals.  Called once from NewGame() after every level is resident, and from nowhere else:
-   LoadLevelData used to strip these per level, which meant a mid-game level reload re-applied the removals and deleted
-   access cards / audiologs / cyber-software the player had already been given or already used.  Walking the levels the way
-   UseTargets (citadel.c) does, with SetLevelPointers swapping the live pointers in and back out, keeps the removals a
-   pure function of the difficulty chosen at NewGame time.
-     access cards  (IdxIsAccessCard)  gone on mission 0 and 1; 389 is deliberately absent -- that slot is
-       weapon_grenadeearth_live, not a card, and a 388..398 range test would delete every Earthshaker in the game.
-     item_audiolog (313)               gone on mission 0.
-     item_cyber_data (448)             gone on mission 0 (CyberItem.cs:9-13 disables SoftwareType.Data and nothing else). */
-/* Snapshot every level's entity table to a binary file for Tools/entity_dump_diff.py.
-   The struct layout is not written here -- the tool recovers it from the compiler
-   (Tools/entity_layout.py), so this format cannot desync from the real Entity.
-   Point the VOXEN_DUMP_ENTITIES environment variable at a path to produce one.
-   Raw structs are dumped rather than a named field list so the differ sees fields
-   nobody remembered to write down; the tool filters pointer-typed members, whose
-   values legitimately vary between runs. */
-void EntityDumpAll(const char *pathFmt, u16 pass){
-    char path[TARG_STRLEN]; sFormat(path,sizeof(path),pathFmt,pass);
-    FHandle f = OS_OpenWriteonly(path); if(f == INVALID_FHANDLE){ DualLogError("EntityDumpAll: cannot open %s\n",path); return; }
-    static const char magic[8] = {'V','O','X','E','N','E','D','1'};
-    u32 esz = sizeof(Entity), nlev = World.numLevels;
-    OS_Write(f,magic,8,path); OS_Write(f,&esz,sizeof(esz),path); OS_Write(f,&nlev,sizeof(nlev),path);
-    for(u32 lev=0; lev<nlev; lev++){
-        u32 count = World.levelInstCount[lev]; OS_Write(f,&lev,sizeof(lev),path); OS_Write(f,&count,sizeof(count),path);
-        OS_Write(f,World.levelInstances[lev],(size_t)count * sizeof(Entity),path);
-    }
-    /* Lights, light positions and decal staging are written by the same loader and are
-       in scope for level-data purging, so the dump has to cover them or the differ
-       cannot see a purge that changed a light.  Each is a plain struct array with its
-       own count, appended after the entity records. */
-    u32 lsz = sizeof(Light);
-    OS_Write(f,&lsz,sizeof(lsz),path);
-    for(u32 lev=0; lev<nlev; lev++) OS_Write(f,World.levelLights[lev],(size_t)LIGHT_COUNT * sizeof(Light),path);
-    u32 v3sz = sizeof(V3);
-    OS_Write(f,&v3sz,sizeof(v3sz),path);
-    for(u32 lev=0; lev<nlev; lev++) OS_Write(f,World.levelLightsNewPosition[lev],(size_t)LIGHT_COUNT * sizeof(V3),path);
-    u32 lasz = sizeof(LightAnimation), lcount2 = nlev * LIGHT_COUNT;
-    OS_Write(f,&lasz,sizeof(lasz),path); OS_Write(f,&lcount2,sizeof(lcount2),path);
-    for(u32 lev=0; lev<nlev; lev++) OS_Write(f,World.levelLAnims[lev],(size_t)LIGHT_COUNT * sizeof(LightAnimation),path);
-    extern DecalStyle decalStyles[]; extern u16 decalStyleCount;
-    extern char decalInlineText[][DECAL_INLINE_TEXT_LEN]; extern u16 decalInlineTextCount;
-    u32 dsz = sizeof(DecalStyle);
-    OS_Write(f,&dsz,sizeof(dsz),path); OS_Write(f,&decalStyleCount,sizeof(decalStyleCount),path);
-    OS_Write(f,decalStyles,(size_t)decalStyleCount * sizeof(DecalStyle),path);
-    u16 tcount = decalInlineTextCount; u32 tsz = DECAL_INLINE_TEXT_LEN;
-    OS_Write(f,&tsz,sizeof(tsz),path); OS_Write(f,&tcount,sizeof(tcount),path);
-    OS_Write(f,decalInlineText,(size_t)decalInlineTextCount * DECAL_INLINE_TEXT_LEN,path);
-    OS_Close(f); DualLog("Wrote entity dump to %s\n",path);
-}
-
 void NewGameDifficultyPass(void) {
     for (u8 lev = 0; lev < World.numLevels; ++lev) {
         u8 entryLevel = World.curLev; if (entryLevel != lev) SetLevelPointers(lev);
@@ -1613,10 +1562,6 @@ void NewGameDifficultyPass(void) {
     }
 }
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();
-/* The door layer and laser behaviours are keyed off the prefab rather than the per-instance key, so confirm the
-   corpus still agrees: changeLayerOnOpenClose:1 and toggleLasers:1 must appear on exactly the types listed in
-   IdxIsLayerDoor/IdxIsLaserDoor. A mismatch means someone re-exported with a differently-keyed prefab, and the
-   on/off keys would then be silently ignored. */
 static void DoorTypeAudit(u8 lev) {
     u32 badLayer=0, badLaser=0, badAperture=0;
     for (u16 i=PLAYER1;i<World.instCount;++i) {

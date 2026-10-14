@@ -48,7 +48,7 @@ enum { JSMN_ERROR_NOMEM = -1,JSMN_ERROR_INVAL = -2, JSMN_ERROR_PART = -3 };
 typedef struct { jsmntype_t type;i64 start,end;i32 size,parent; } jsmntok_t;
 typedef struct { size_t pos;u32 toknext;i32 toksuper; } jsmn_parser;
 typedef struct { u16 j[4]; float w[4]; } VtxSkin;
-typedef struct { float *pos, *nrm, *uv; VtxSkin* skin; u32 vertCount, *indices, triCount; glb_node* jointNodes[MAX_GLB_JOINTS]; float invBind[MAX_GLB_JOINTS][16]; u32 jointCount; glb_animt* anim; glb_data* gltf; bool isTrAnim; glb_node **meshNodes; float **subPos, **subNrm, **subUv; u32 *subVertCnt, **subIndices, *subTriCount, submshCnt; } GltfMesh;
+typedef struct { float *pos, *nrm, *uv; VtxSkin* skin; u32 vertCount, *indices, triCount; glb_node* jointNodes[MAX_GLB_JOINTS]; float invBind[MAX_GLB_JOINTS][16]; u32 jointCount; glb_animt* anim; glb_data* gltf; bool isTrAnim; glb_anim_chan **chanMap; glb_node **meshNodes; float **subPos, **subNrm, **subUv; u32 *subVertCnt, **subIndices, *subTriCount, submshCnt; } GltfMesh;
 static BvhBuildCtx thrd_bvh_ctx[32];
 u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES];
 u16 *cvxAdjLists[MAX_UNIQUE_CVX_MESHES], cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
@@ -379,6 +379,14 @@ static void NodeLocalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, f
                 else if (ch->target_path == glb_animpthtype_scale)       {   SampleV3(ch->sampler, t, S); }
             }
         }
+    } else if (gm->chanMap) { /*Skinned: O(1) per-node channel lookup built at load*/
+        size_t ni = (size_t)(node - gm->gltf->nodes);
+        if (ni < gm->gltf->nodes_count) {
+            const glb_anim_chan *ct = gm->chanMap[ni*3+0], *cr = gm->chanMap[ni*3+1], *cs = gm->chanMap[ni*3+2];
+            if (ct) { SampleV3(ct->sampler, t, T); anm = true; }
+            if (cr) { SampleQuat(cr->sampler, t, R); anm = true; }
+            if (cs) { SampleV3(cs->sampler, t, S); anm = true; }
+        }
     } else { /*Skinned meshes, stick to the single selected animation clip*/
         for (size_t c=0;c<gm->anim->channels_count;++c) {
             const glb_anim_chan* ch=&gm->anim->channels[c];
@@ -448,6 +456,14 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
         out->isTrAnim=false;
         glb_mesh* mesh=skinNode->mesh;
         if (!mesh || !mesh->primitives_count || !out->anim) { return; }
+        
+        out->chanMap = OS_SubArenaAlloc(-1, data->nodes_count * 3 * sizeof(glb_anim_chan*));
+        for (size_t c=0;c<out->anim->channels_count;++c) {
+            glb_anim_chan* ch=&out->anim->channels[c];
+            if (!ch->target_node) continue;
+            size_t ni=(size_t)(ch->target_node - data->nodes);
+            if (ni < data->nodes_count && ch->target_path >= glb_animpthtype_translation && ch->target_path <= glb_animpthtype_scale) out->chanMap[ni*3 + (size_t)(ch->target_path - glb_animpthtype_translation)] = ch;
+        }
         
         glb_primitive* prim = &mesh->primitives[0];
         const glb_accessor* posAcc = glb_find_accessor(prim, glb_attribute_type_position, 0);
@@ -580,12 +596,24 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     }
 }
  
+#define SKIN_GLOB_MAX 1024
+static void SkinNodeGlobal(const GltfMesh* gm, glb_node* node, float t, float (*glob)[16], u8* state) {
+    size_t ni = (size_t)(node - gm->gltf->nodes);
+    if (state[ni]) { return; }
+    float l[16];
+    NodeLocalMatrixAtTime(gm, node, t, l);
+    if (node->parent) { size_t pi = (size_t)(node->parent - gm->gltf->nodes); SkinNodeGlobal(gm, node->parent, t, glob, state); Mat4Mul(glob[pi], l, glob[ni]); }
+    else { mcpy(glob[ni], l, sizeof(l)); }
+    state[ni] = 1;
+}
+
 static void SkinFrameToScratch(GltfMesh* restrict gm, float t, float* restrict posedPos, float* restrict posedNrm, float* restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
     float skinMat[MAX_GLB_JOINTS][16];
-    for (u32 j=0;j<gm->jointCount;++j) {
-        float g[16];
-        NodeGlobalMatrixAtTime(gm, gm->jointNodes[j], t, g);
-        Mat4Mul(g, gm->invBind[j], skinMat[j]);
+    if (gm->gltf->nodes_count <= SKIN_GLOB_MAX) { /*One local+global per node per frame instead of per joint-ancestor path*/
+        float glob[SKIN_GLOB_MAX][16]; u8 globDone[SKIN_GLOB_MAX]; mset(globDone, 0, gm->gltf->nodes_count);
+        for (u32 j=0;j<gm->jointCount;++j) { SkinNodeGlobal(gm, gm->jointNodes[j], t, glob, globDone); Mat4Mul(glob[(size_t)(gm->jointNodes[j] - gm->gltf->nodes)], gm->invBind[j], skinMat[j]); }
+    } else {
+        for (u32 j=0;j<gm->jointCount;++j) { float g[16]; NodeGlobalMatrixAtTime(gm, gm->jointNodes[j], t, g); Mat4Mul(g, gm->invBind[j], skinMat[j]); }
     }
     
     for (u32 v=0;v<gm->vertCount;++v) {
@@ -721,6 +749,17 @@ void LoadGLBAnimatedSources(ModelData* entries, u32 entryCount, RawOBJ* raw) {
     glb_TaskCount = taskCount;
 }
 
+// Persistent fork-join pool: worker threads live for the whole model load instead of being created and joined per sub-chunk.
+typedef struct { void* (*fn)(void*); void* arg; } PoolJob;
+#define POOL_MAX 32
+static PoolJob poolJobs[POOL_MAX]; static u32 poolJobCount, poolJobNext, poolJobDone, poolGen, poolStop, poolPending, poolReady; static OS_Thread poolThreads[POOL_MAX]; static u32 poolThreadCnt = 0;
+static void* PoolWorker(void* arg) { (void)arg; __atomic_fetch_add(&poolReady,1,__ATOMIC_ACQ_REL); u32 last=0; for(;;) { while(__atomic_load_n(&poolGen,__ATOMIC_ACQUIRE)==last) { if(__atomic_load_n(&poolStop,__ATOMIC_ACQUIRE)) return NULL; OS_FutexWait(&poolGen,last); } last=__atomic_load_n(&poolGen,__ATOMIC_ACQUIRE); for(;;) { u32 j=__atomic_fetch_add(&poolJobNext,1,__ATOMIC_RELAXED); if(j>=poolJobCount) break; poolJobs[j].fn(poolJobs[j].arg); } if(__atomic_fetch_add(&poolJobDone,1,__ATOMIC_ACQ_REL)+1u == poolThreadCnt) OS_FutexWakeAll(&poolJobDone); } }
+static void PoolInit(u32 n) { poolThreadCnt=0; poolReady=0; poolStop=0; poolGen=0; if(n<2) return; for(u32 i=0;i<n && i<POOL_MAX;++i) { if(OS_ThreadCreate(&poolThreads[i],PoolWorker,NULL)!=0) break; ++poolThreadCnt; } while(__atomic_load_n(&poolReady,__ATOMIC_ACQUIRE) < poolThreadCnt) __asm__ __volatile__("pause"); /*every worker parked on gen 0 before any dispatch, so none can miss generation 1*/ }
+static void PoolShutdown(void) { if(!poolThreadCnt) return; poolJobCount=0; __atomic_store_n(&poolStop,1,__ATOMIC_RELEASE); __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); for(u32 i=0;i<poolThreadCnt;++i) OS_ThreadJoin(&poolThreads[i]); poolThreadCnt=0; }
+static void PoolDispatch(PoolJob* jobs, u32 count) { if(!poolThreadCnt || count<=1) { poolPending=0; for(u32 i=0;i<count;++i) jobs[i].fn(jobs[i].arg); return; } for(u32 i=0;i<count;++i) poolJobs[i]=jobs[i]; poolJobCount=count; __atomic_store_n(&poolJobNext,0,__ATOMIC_RELAXED); __atomic_store_n(&poolJobDone,0,__ATOMIC_RELAXED); poolPending=1; __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); }
+static void PoolWait(void) { if(!poolPending) return; u32 d; while((d=__atomic_load_n(&poolJobDone,__ATOMIC_ACQUIRE)) < poolThreadCnt) OS_FutexWait(&poolJobDone,d); poolPending=0; }
+static void PoolRun(PoolJob* jobs, u32 count) { PoolDispatch(jobs,count); if(!poolPending) return; for(;;) { u32 j=__atomic_fetch_add(&poolJobNext,1,__ATOMIC_RELAXED); if(j<poolJobCount) { poolJobs[j].fn(poolJobs[j].arg); continue; } u32 d=__atomic_load_n(&poolJobDone,__ATOMIC_ACQUIRE); if(d >= poolThreadCnt) break; OS_FutexWait(&poolJobDone,d); } poolPending=0; }
+
 static void BakeGLBAnimWave(u32 modelStart, u32 modelEnd) {
     if (!glb_TaskCount) return;
     
@@ -728,19 +767,14 @@ static void BakeGLBAnimWave(u32 modelStart, u32 modelEnd) {
     u32 t1 = glb_TaskCount; for (u32 k=t0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex>=modelEnd)   { t1=k; break;} }
     u32 cnt = t1 - t0; if(!cnt){return;}
     
-    GltfBakeTask btasks[32]; OS_Thread bth[32];
+    GltfBakeTask btasks[32]; PoolJob bjobs[32];
     u32 chunk=(cnt+threadCnt-1)/threadCnt;
     for (int t=0;t<(i32)threadCnt;++t) {
         u32 s = t0 +(u32)t*chunk, e = t0 + ((u32)t + 1)*chunk > t1 ? t1 : t0 + ((u32)t + 1) * chunk;
         btasks[t] = (GltfBakeTask){glb_Tasks, s, e, t};
+        bjobs[t] = (PoolJob){GltfBakeWorker,&btasks[t]};
     }
-    
-    if (threadCnt>1){
-        for (int t=0;t<(i32)threadCnt;++t) { OS_ThreadCreate(&bth[t],GltfBakeWorker,&btasks[t]); }
-        for (int t=0;t<(i32)threadCnt;++t) { OS_ThreadJoin(&bth[t]); }
-    } else {
-        for (int t=0;t<(i32)threadCnt;++t) { GltfBakeWorker(&btasks[t]); } /*Singlethreaded fallback*/
-    }
+    PoolRun(bjobs, threadCnt);
 }
 
 // Recursive(ew gross!) centroid-based, each tri goes into exactly one octant containing its centroid, no tri dupes.
@@ -882,17 +916,20 @@ float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { // Ray-vs-
     if (vabs(dir.z) < 0.00000001f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; } else { float inv=1.0f/dir.z; float t1=(mn.z-origin.z) * inv, t2=(mx.z-origin.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } /*Z slab*/ return tmin;
 }
 
-INLINE u32 WeldHash(i32 x, i32 y, i32 z) { u32 h = ((u32)x * 0x8DA6B343u) ^ ((u32)y * 0xD8163841u) ^ ((u32)z * 0xCB1AB31Fu); return h & (WELD_HASH_SIZE - 1); }
 static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap, i32 tid) {
-    u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m]; if (!vc || !tc) { physPos[m] = NULL; physTris[m] = NULL; physVertCounts[m] = 0; return; } const float* src=vPos[m]; void* sub_mark=OS_SubArenaMark(tid); mset(weldHt,0xFF,WELD_HASH_SIZE * sizeof(u32)); u32 usedSlots=0, weldedCount=0; float* weldedPos=OS_SubArenaAlloc(tid,vc*3*sizeof(float)); // worst case: no duplicates at all
+    u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m]; if (!vc || !tc) { physPos[m] = NULL; physTris[m] = NULL; physVertCounts[m] = 0; return; } const float* src=vPos[m]; void* sub_mark=OS_SubArenaMark(tid);/*weldHt is all-0xFF on entry: FinalizeParsedMesh and this pass both restore every slot they set*/ u32 usedSlots=0, weldedCount=0; float* weldedPos=OS_SubArenaAlloc(tid,vc*3*sizeof(float)); // worst case: no duplicates at all
     for (u32 i = 0; i < vc; ++i) {
         float x = src[i*8+0], y = src[i*8+1], z = src[i*8+2]; i32 cx = (i32)vfloor(x * 10000), cy = (i32)vfloor(y * 10000), cz = (i32)vfloor(z * 10000); u32 found=U32_MAX;
+        u32 px=(u32)cx*0x8DA6B343u, py=(u32)cy*0xD8163841u, pz=(u32)cz*0xCB1AB31Fu, hx[3]={px-0x8DA6B343u,px,px+0x8DA6B343u}, hy[3]={py-0xD8163841u,py,py+0xD8163841u}, hz[3]={pz-0xCB1AB31Fu,pz,pz+0xCB1AB31Fu};
+        u32 slot=(px^py^pz)&(WELD_HASH_SIZE-1);/*own cell first: a duplicate quantizes to this same cell*/
+        while (weldHt[slot] != U32_MAX) { u32 cand = weldHt[slot]; float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z; if (ddx*ddx + ddy*ddy + ddz*ddz <= 0.0001f * 0.0001f) { found = cand; break; } slot = (slot + 1) & (WELD_HASH_SIZE - 1); }
         for (i32 dz = -1; dz <= 1 && found == U32_MAX; ++dz)
             for (i32 dy = -1; dy <= 1 && found == U32_MAX; ++dy)
                 for (i32 dx = -1; dx <= 1 && found == U32_MAX; ++dx) {
-                    u32 slot = WeldHash(cx+dx, cy+dy, cz+dz); while (weldHt[slot] != U32_MAX) { u32 cand = weldHt[slot]; float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z; if (ddx*ddx + ddy*ddy + ddz*ddz <= 0.0001f * 0.0001f) { found = cand; break; } slot = (slot + 1) & (WELD_HASH_SIZE - 1); }
+                    if (!dx && !dy && !dz) continue;
+                    u32 ns = (hx[dx+1]^hy[dy+1]^hz[dz+1])&(WELD_HASH_SIZE-1); while (weldHt[ns] != U32_MAX) { u32 cand = weldHt[ns]; float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z; if (ddx*ddx + ddy*ddy + ddz*ddz <= 0.0001f * 0.0001f) { found = cand; break; } ns = (ns + 1) & (WELD_HASH_SIZE - 1); }
                 }
-        if(found == U32_MAX){found=weldedCount; weldedPos[weldedCount*3+0]=x; weldedPos[weldedCount*3+1]=y; weldedPos[weldedCount*3+2]=z; ++weldedCount; u32 slot = WeldHash(cx, cy, cz); while (weldHt[slot] != U32_MAX) slot = (slot + 1) & (WELD_HASH_SIZE - 1); weldHt[slot] = found; weldHtUsed[usedSlots++] = slot; } remap[i] = (u16)found;
+        if(found == U32_MAX){found=weldedCount; weldedPos[weldedCount*3+0]=x; weldedPos[weldedCount*3+1]=y; weldedPos[weldedCount*3+2]=z; ++weldedCount; u32 ins=(px^py^pz)&(WELD_HASH_SIZE-1); while (weldHt[ins] != U32_MAX) ins = (ins + 1) & (WELD_HASH_SIZE - 1); weldHt[ins] = found; weldHtUsed[usedSlots++] = ins; } remap[i] = (u16)found;
     }
     for(u32 i=0;i<usedSlots;++i){weldHt[weldHtUsed[i]]=U32_MAX;/*reset shared scratch for the next model on this thread*/} float* exactPos=OS_Alloc(weldedCount*3*sizeof(float)); mcpy(exactPos,weldedPos,(size_t)weldedCount*3*sizeof(float)); OS_SubArenaRelease(tid, sub_mark);
     u16* weldedTris=OS_Alloc(tc*3*sizeof(u16)); const u16* srcTris = modelTriangles[m]; for (u32 i = 0; i < tc * 3; ++i) weldedTris[i] = remap[srcTris[i]]; physPos[m] = exactPos; physTris[m] = weldedTris; physVertCounts[m] = weldedCount;
@@ -982,7 +1019,7 @@ void LoadModels() {
         thrd_bvh_ctx[i]=(BvhBuildCtx){ .nodes = bvh_nodes_p[i], .triOctants = bvh_oct_p[i], .triOrder = bvh_order_p[i], .triScratch = bvh_scr_p[i], .initialTris = bvh_init_p[i], .nodeCount = 0, .triCount = 0 };
     }
     
-    thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_ht = ht; thrd_ht_used = ht_used; thrd_remap_scratch = remap_scr; thrd_cache_scratch = cache_scr; const size_t SUB_ARENA_SZ = (3ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt); /* TEMP-HEADLESS 1.5mb per model parsed per thread per 32-model sub-chunk (each thread's finalized outputs accumulate until sub-chunk end) */ const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; /* 12mb for all baked anim sources */ size_t slices_tot = SUB_ARENA_SZ * (size_t)threadCnt + SUB_MAIN_SZ; size_t slice_room = (size_t)(scratch_end - scratch_cur) - 4096; if (slices_tot > slice_room) { DualLogError("Not enough scratch room for model sub-arenas: need %u MB, %u MB free!\n", (u32)(slices_tot >> 20),(u32)(slice_room >> 20)); OS_Exit(1); } u8* slice_base = OS_AllocScratch(slices_tot); for (u32 si = 0; si < threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si * SUB_ARENA_SZ, SUB_ARENA_SZ); OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt * SUB_ARENA_SZ, SUB_MAIN_SZ); ModelParseTask tasks[32]; OS_Thread th[32]; PhysGeomTask ptasks[32]; OS_Thread pth[32]; glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
+    thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_ht = ht; thrd_ht_used = ht_used; thrd_remap_scratch = remap_scr; thrd_cache_scratch = cache_scr; const size_t SUB_ARENA_SZ = (3ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt); /* TEMP-HEADLESS 1.5mb per model parsed per thread per 32-model sub-chunk (each thread's finalized outputs accumulate until sub-chunk end) */ const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; /* 12mb for all baked anim sources */ size_t slices_tot = SUB_ARENA_SZ * (size_t)threadCnt + SUB_MAIN_SZ; size_t slice_room = (size_t)(scratch_end - scratch_cur) - 4096; if (slices_tot > slice_room) { DualLogError("Not enough scratch room for model sub-arenas: need %u MB, %u MB free!\n", (u32)(slices_tot >> 20),(u32)(slice_room >> 20)); OS_Exit(1); } u8* slice_base = OS_AllocScratch(slices_tot); for (u32 si = 0; si < threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si * SUB_ARENA_SZ, SUB_ARENA_SZ); OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt * SUB_ARENA_SZ, SUB_MAIN_SZ); ModelParseTask tasks[32]; PhysGeomTask ptasks[32]; PoolJob pjobs[32]; glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
     LoadGLBAnimatedSources(mp.entries,mp.count,raw); physPos=OS_Alloc(mdlsCnt*sizeof(float*)); physTris=OS_Alloc(mdlsCnt*sizeof(u16*)); physVertCounts=OS_Alloc(mdlsCnt*sizeof(u32));
     u32 validCount = 0;
     for (u32 i = 0; i < mp.count; ++i) if (mp.entries[i].index != U16_MAX) ++validCount;
@@ -990,6 +1027,7 @@ void LoadModels() {
     validCount = 0;
     for (u32 i = 0; i < mp.count; ++i) if (mp.entries[i].index != U16_MAX) valid[validCount++] = i; /* mp.entries is indexed by model index, so this order is ascending by index; each file (including a whole animation block) stays atomic within a wave */
     const u32 WAVE_FILES_SZ = 32; /* whole files per wave so an animation's frames never split across waves */ const u32 SUB_MODELS_SZ = 32; /* sub-chunks bound per-thread sub-arena use within a wave; splitting an animation here is safe since file bins live until wave end */
+    PoolInit(threadCnt);
     u32 prevEnd = 0;
     for (u32 w0 = 0; w0 < validCount; ) {
         u32 waveStart = mp.entries[valid[w0]].index;
@@ -1016,21 +1054,12 @@ void LoadModels() {
             for (u32 si = 0; si < threadCnt; ++si) { wmarks[si] = OS_SubArenaMark(si); }
             
             u32 wcnt = subEnd - sub; u32 chunk = (wcnt + threadCnt - 1) / threadCnt;
-            for (int i=0;i<(i32)threadCnt;++i) { tasks[i] = (ModelParseTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk,raw,isGLBAnimSrc,isGLBStaticSrc,i}; }
-            if (threadCnt > 1) {
-                for (int i=0;i<(i32)threadCnt;++i) { OS_ThreadCreate(&th[i],ModelParsingWorker,&tasks[i]); }
-                for (int i=0;i<(i32)threadCnt;++i) { OS_ThreadJoin(&th[i]); }
-            } else {
-                for (int t=0;t<(i32)threadCnt;++t) { ModelParsingWorker(&tasks[t]); /*Single threaded fallback*/ }
-            }
+            for (int i=0;i<(i32)threadCnt;++i) { tasks[i] = (ModelParseTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk,raw,isGLBAnimSrc,isGLBStaticSrc,i}; pjobs[i] = (PoolJob){ModelParsingWorker,&tasks[i]}; }
+            PoolRun(pjobs, threadCnt);
             
             BakeGLBAnimWave(sub,subEnd);
-            for (int i=0;i<(i32)threadCnt;++i) { ptasks[i] = (PhysGeomTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk,i}; }
-            if (threadCnt > 1) {
-                for (int i=0;i<(i32)threadCnt;++i) { OS_ThreadCreate(&pth[i],PhysGeomWorker,&ptasks[i]); /*Sneak the physics deduplication passes underneath the GPU upload ;)*/}
-            } else {
-                for (int t=0;t<(i32)threadCnt;++t) { PhysGeomWorker(&ptasks[t]); /*Single threaded fallback*/ }
-            }
+            for (int i=0;i<(i32)threadCnt;++i) { ptasks[i] = (PhysGeomTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk,i}; pjobs[i] = (PoolJob){PhysGeomWorker,&ptasks[i]}; }
+            PoolDispatch(pjobs, threadCnt); /*Sneak the physics deduplication passes underneath the GPU upload ;)*/
             
             for (u32 i = sub; i < subEnd; ++i) {
                 if (!modelVertexCounts[i]) {continue;/*Skip unused index slots*/} tv += modelVertexCounts[i]; tt += modelTriangleCounts[i]; size_t vcz = (size_t)modelVertexCounts[i] * VRT_ATT_SZ, tcz = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
@@ -1042,9 +1071,7 @@ void LoadModels() {
             glBindBuffer(GL_ARRAY_BUFFER,0);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
             glFinish(); // Force driver to retire per-buffer mapped-write staging, otherwise ~78MB of it stays resident on NVIDIA Linux. Must be one sync after the whole loop, a per-model glFinish makes it worse.
-            if (threadCnt > 1) {
-                for (int i=0;i<(i32)threadCnt;++i) { OS_ThreadJoin(&pth[i]); } /*Regroup the physics deduplication passes after GPU upload, this does save about 0.18secs!*/
-            } 
+            PoolWait(); /*Regroup the physics deduplication passes after GPU upload, this does save about 0.18secs!*/
             
             for (u32 m = sub; m < subEnd; ++m) { if (vPos[m]) { vPos[m]=physPos[m]; modelTriangles[m]=physTris[m]; modelVertexCounts[m]=physVertCounts[m]; } }
             for (u32 si = 0; si < threadCnt; ++si) { OS_SubArenaRelease(si, wmarks[si]); }
@@ -1059,6 +1086,7 @@ void LoadModels() {
         w0 = w1;
     }
     
+    PoolShutdown();
     OS_FreeInitPhase();
     DebugRAM("after models load");
     DualLog(" vertices: %u, tris: %u, %f secs\n", tv, tt, get_time() - startModelTime);

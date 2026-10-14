@@ -84,7 +84,6 @@ double game_start_time, game_actual_start_time, shadowTime, physTime, renderTime
 u32 raycastCalls;
 static u32 gpuQ[5][5];
 static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
-
 Color textColors[] = {{1.000000000f,1.000000000f,1.000000000f,1.0f},/* 0 White T_WHITE*/
                       {0.890196078f,0.874509804f,0.000000000f,1.0f},/* 1 Yellow T_YELLOW*/
                       {0.623529412f,0.611764706f,0.000000000f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/
@@ -113,13 +112,8 @@ static void EmitWireQuad(V3 c0, V3 c1, V3 c2, V3 c3, Color c) {
     const V3 p[6] = {c0,c1,c2, c0,c2,c3};
     for (int v = 0; v < 6; ++v) {
         WireVertex* w = &wireVerts[wireVertCount++];
-        w->x = p[v].x;
-        w->y = p[v].y;
-        w->z = p[v].z;
-        w->r = c.r;
-        w->g = c.g;
-        w->b = c.b;
-        w->a = c.a;
+        w->x = p[v].x; w->y = p[v].y; w->z = p[v].z;
+        w->r = c.r; w->g = c.g; w->b = c.b; w->a = c.a;
     }
 }
 
@@ -133,33 +127,76 @@ void DrawCrossedLine(V3 a, V3 b, V3 perp, float halfThick, Color c) {
 
 INLINE void DrawWireLines(float* viewProj) {
     if (!wireVerts || !wireVertCount) return;
-    glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVertex),wireVerts);
-    glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST);
+    
+    glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO);
+    glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVertex),wireVerts);
+    glUseProgram(debugUnlitSP);
+    glUniformMatrix4fv(0,1,GL_FALSE,viewProj);
+    glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
-    glBindVertexArray(wireLinesVAO); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount);
+    glBindVertexArray(wireLinesVAO);
+    glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount);
     glEnable(GL_CULL_FACE);
-    drawCalls++; vertsRendered += wireVertCount; wireVertCount = 0;
+    drawCalls++;
+    vertsRendered += wireVertCount;
+    wireVertCount = 0;
 }
 INLINE void DrawDebugLines(float* viewProj) {
-    if (!debugLineVerts || World.debugLineVertCount == 0) {return;} glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glLineWidth(1.0f); glDisable(GL_DEPTH_TEST); glBindVertexArray(debugLinesVAO);
-    glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount; glEnable(GL_DEPTH_TEST); World.debugLineVertCount = 0;
+    if (!debugLineVerts || World.debugLineVertCount == 0) {return;}
+    
+    glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO);
+    glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts);
+    glUseProgram(debugUnlitSP);
+    glUniformMatrix4fv(0,1,GL_FALSE,viewProj);
+    glLineWidth(1.0f);
+    glDisable(GL_DEPTH_TEST);
+    glBindVertexArray(debugLinesVAO);
+    glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount);
+    drawCalls++;
+    vertsRendered += World.debugLineVertCount;
+    glEnable(GL_DEPTH_TEST);
+    World.debugLineVertCount = 0;
 }
 
 void DrawLine(V3 start, V3 end, Color col) {
-    if (!debugLineVerts || World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2){return;} int i=World.debugLineVertCount; debugLineVerts[i].x=start.x; debugLineVerts[i].y=start.y; debugLineVerts[i].z=start.z; debugLineVerts[i].r=col.r; debugLineVerts[i].g=col.g; debugLineVerts[i].b=col.b; debugLineVerts[i].a=col.a; i++; debugLineVerts[i].x=end.x; debugLineVerts[i].y=end.y;
-    debugLineVerts[i].z=end.z; debugLineVerts[i].r=col.r; debugLineVerts[i].g=col.g; debugLineVerts[i].b=col.b; debugLineVerts[i].a=col.a; i++; World.debugLineVertCount = i; // ORDER IS IMPORTANT!
+    if (!debugLineVerts || World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2){return;}
+    
+    int i=World.debugLineVertCount;
+    debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z;
+    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
+    debugLineVerts[i].x = end.x; debugLineVerts[i].y = end.y; debugLineVerts[i].z = end.z;
+    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
+    World.debugLineVertCount = i; // ORDER IS IMPORTANT!
 }
 
-INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY) || PhysIsAsleep(i)) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
+INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY) || World.physSleep[i] != 0) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
 void DrawVelocityVector(u16 i) {
-    if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;} V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f)); DrawLine(World.position[i],tip,textColors[T_ORANGE]); V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0})); 
+    if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;}
+    
+    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f)); DrawLine(World.position[i],tip,textColors[T_ORANGE]); V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0})); 
     DrawLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
 }
 
 void DrawBoxColliderColored(u16 i, Color col) {
-    ShapeBox b = Entity_GetBox(i); V3 c[8],px,py,pz, ax=quat_rot_v3(b.rot,(V3){1,0,0}), ay=quat_rot_v3(b.rot,(V3){0,1,0}), az=quat_rot_v3(b.rot,(V3){0,0,1}); px=V3_ScaleByF(ax,b.hExt.x); py=V3_ScaleByF(ay,b.hExt.y); pz=V3_ScaleByF(az,b.hExt.z);
+    ShapeBox b = Entity_GetBox(i);
+    V3 c[8],px,py,pz, ax=quat_rot_v3(b.rot,(V3){1,0,0}), ay=quat_rot_v3(b.rot,(V3){0,1,0}), az=quat_rot_v3(b.rot,(V3){0,0,1});
+    px = V3_ScaleByF(ax,b.hExt.x);
+    py = V3_ScaleByF(ay,b.hExt.y);
+    pz = V3_ScaleByF(az,b.hExt.z);
     for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3_AplusB(b.ctr,V3_AplusB(V3_AplusB(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
-    DrawLine(c[0],c[1],col); DrawLine(c[2],c[3],col); DrawLine(c[4],c[5],col); DrawLine(c[6],c[7],col); DrawLine(c[0],c[2],col); DrawLine(c[1],c[3],col); DrawLine(c[4],c[6],col); DrawLine(c[5],c[7],col); DrawLine(c[0],c[4],col); DrawLine(c[1],c[5],col); DrawLine(c[2],c[6],col); DrawLine(c[3],c[7],col); DrawVelocityVector(i);
+    DrawLine(c[0],c[1],col);
+    DrawLine(c[2],c[3],col);
+    DrawLine(c[4],c[5],col);
+    DrawLine(c[6],c[7],col);
+    DrawLine(c[0],c[2],col); 
+    DrawLine(c[1],c[3],col);
+    DrawLine(c[4],c[6],col);
+    DrawLine(c[5],c[7],col);
+    DrawLine(c[0],c[4],col);
+    DrawLine(c[1],c[5],col);
+    DrawLine(c[2],c[6],col);
+    DrawLine(c[3],c[7],col);
+    DrawVelocityVector(i);
 }
 
 void DrawBoxCollider(u16 i) { DrawBoxColliderColored(i,ColliderColor(i)); }
@@ -167,18 +204,51 @@ void DrawSphereWireframe(Color col, ShapeSphere s) { float step=6.28318530f/12; 
 void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = Entity_GetSph(i); DrawSphereWireframe(col,s); DrawVelocityVector(i); }
 void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
 void DrawMeshCollider(u16 i) {
-    Color col = ColliderColor(i); u16 mi = (World.col[i] == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
-    u32 triCount = modelTriangleCounts[mi]; if(!triCount){return;} float M[16]; mcpy(M, &modelMatrices[i*16], 64); float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14]; const float* pos = physPos[mi]; const u16* tris = modelTriangles[mi];
-    for (u32 j=0; j<triCount; j++) { V3 w[3]; u32 b=j*3; for (int k=0;k<3;++k) { u32 vi=tris[b + k]; float x=pos[vi*3 + 0]; float y=pos[vi*3 + 1]; float z=pos[vi*3 + 2]; w[k]=(V3){m00*x + m01*y + m02*z + tx, m10*x + m11*y + m12*z + ty, m20*x + m21*y + m22*z + tz}; } DrawLine(w[0],w[1],col); DrawLine(w[1],w[2],col); DrawLine(w[2],w[0],col); } DrawVelocityVector(i);
+    Color col = ColliderColor(i);
+    u16 mi = (World.col[i] == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
+    u32 triCount = modelTriangleCounts[mi]; if(!triCount){return;}
+    
+    float M[16]; mcpy(M, &modelMatrices[i*16], 64);
+    float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
+    const float* pos = physPos[mi]; const u16* tris = modelTriangles[mi];
+    for (u32 j=0; j<triCount; j++) {
+        V3 w[3]; u32 b=j*3;
+        for (int k=0;k<3;++k) { u32 vi=tris[b + k]; float x=pos[vi*3 + 0]; float y=pos[vi*3 + 1]; float z=pos[vi*3 + 2]; w[k]=(V3){m00*x + m01*y + m02*z + tx, m10*x + m11*y + m12*z + ty, m20*x + m21*y + m22*z + tz}; }
+        DrawLine(w[0],w[1],col);
+        DrawLine(w[1],w[2],col);
+        DrawLine(w[2],w[0],col);
+    }
+    
+    DrawVelocityVector(i);
 }
 
 void DrawCapsuleCollider(u16 i) {
-    Color col = ColliderColor(i); ShapeCapsule cap = Entity_GetCap(i); V3 diff = V3_AsubB(cap.tip, cap.base); V3 axis = (vabs(diff.x) + vabs(diff.y) + vabs(diff.z) > 0.0001f) ? V3_Normalize(diff) : (V3){0.0f, 1.0f, 0.0f}; V3 ref = (vabs(axis.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; V3 perp0 = V3_Normalize(V3_Cross(axis, ref)); V3 perp1 = V3_Cross(axis, perp0); float step = 6.28318530f / 12, r = cap.rad;
-    for (int seg=0;seg<12;++seg) {/*Draw top and bottom rings*/ float a0=seg * step, a1=a0 + step; float c0=vcosf(a0), s0=vsinf(a0), c1=vcosf(a1), s1=vsinf(a1); V3 r0=V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(perp1,s0*r)); V3 r1=V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(perp1,s1*r)); DrawLine(V3_AplusB(cap.base,r0),V3_AplusB(cap.base,r1),col); DrawLine(V3_AplusB(cap.tip,r0),V3_AplusB(cap.tip,r1),col); }
-    for (int seg=0;seg<6;++seg) {/*Draw the hemispheres*/
-        float a0=seg*step, a1=a0+step; float c0=vcosf(a0), s0=vsinf(a0), c1=vcosf(a1), s1=vsinf(a1); DrawLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,-s1*r))),col); DrawLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,-s1*r))),col);
-        DrawLine(V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,s0*r))),V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,s1*r))),col); DrawLine(V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,s0*r))),V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,s1*r))),col);
+    Color col = ColliderColor(i);
+    ShapeCapsule cap = Entity_GetCap(i);
+    V3 diff = V3_AsubB(cap.tip, cap.base);
+    V3 axis = (vabs(diff.x) + vabs(diff.y) + vabs(diff.z) > 0.0001f) ? V3_Normalize(diff) : (V3){0.0f, 1.0f, 0.0f};
+    V3 ref = (vabs(axis.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0};
+    V3 perp0 = V3_Normalize(V3_Cross(axis, ref));
+    V3 perp1 = V3_Cross(axis, perp0);
+    float step = 6.28318530f / 12, r = cap.rad;
+    for (int seg=0;seg<12;++seg) { /*Draw top and bottom rings*/
+        float a0=seg * step, a1=a0 + step;
+        float c0=vcosf(a0), s0=vsinf(a0), c1=vcosf(a1), s1=vsinf(a1);
+        V3 r0=V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(perp1,s0*r));
+        V3 r1=V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(perp1,s1*r));
+        DrawLine(V3_AplusB(cap.base,r0),V3_AplusB(cap.base,r1),col);
+        DrawLine(V3_AplusB(cap.tip,r0),V3_AplusB(cap.tip,r1),col);
     }
+    
+    for (int seg=0;seg<6;++seg) {/*Draw the hemispheres*/
+        float a0=seg*step, a1=a0+step;
+        float c0=vcosf(a0), s0=vsinf(a0), c1=vcosf(a1), s1=vsinf(a1);
+        DrawLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,-s1*r))),col);
+        DrawLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,-s1*r))),col);
+        DrawLine(V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,s0*r))),V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,s1*r))),col);
+        DrawLine(V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,s0*r))),V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,s1*r))),col);
+    }
+    
     for(int seg=0;seg<4;++seg){float a=seg*(6.28318530f / 4.f); V3 off=V3_AplusB(V3_ScaleByF(perp0,vcosf(a)*r),V3_ScaleByF(perp1,vsinf(a)*r)); DrawLine(V3_AplusB(cap.base,off),V3_AplusB(cap.tip,off),col);}/*Draw the longitudinal lines*/ DrawVelocityVector(i);
 }
 
@@ -191,10 +261,6 @@ void DrawAngularVelocity(u16 i) {
 #include "winput.c"
 // Console System - CHEATS!
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
-/*Unity ressurectionLocation[] (LevelManager.cs, one entry per level) with +1.0 on Y, so the table is capsule-feet
-  space: Unity's player transform is the capsule centre and the capsule is 2 units tall, and Voxen's player position is
-  the camera, which sits PLAYER_CAM_OFFSET_Y above the capsule centre.  Every placement from this table therefore has to
-  take RESSURECT_FEET_TO_CAMERA off the Y or the player arrives floating that far above the spot.*/
 V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,{-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
 static V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,{126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
 static void AddToHistory(const char* entry) { if (slen(entry) == 0 || (numHistory > 0 && sEqual(entry,history[numHistory - 1]))){return;} if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],entry,T_BUFFER_SIZE); numHistory++; } else { for (int i = 0; i < 7 - 1; i++) {scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE);/*Shift list toward 0*/} scpy_to_a_from_b(history[7 - 1],entry,T_BUFFER_SIZE); } }
@@ -1843,12 +1909,9 @@ static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0
 static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/ {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {-64.000f,-60.120f}/*13*/};
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 71.68f/*13*/};
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
-
 u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES];
 u32 uniqueCvxMeshCount = 0;
 size_t cvxAdjLive = 0;
-static u16 dumpPass = 0;
-
 static void ResetLoadTallies(void) {
     decalInlineTextCount = decalStyleCount = 0;
     mset(World.levelCameraCount,0,sizeof(World.levelCameraCount)); mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount)); mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));
@@ -1857,7 +1920,6 @@ static void ResetLoadTallies(void) {
         if (cvxAdjOffsets[u]) { OS_Free(cvxAdjOffsets[u], cvxAdjOffsetBytes[u]); cvxAdjOffsets[u] = 0; cvxAdjOffsetBytes[u] = 0; }
         if (cvxAdjLists[u]) { OS_Free(cvxAdjLists[u], cvxAdjListBytes[u]); cvxAdjLists[u] = 0; cvxAdjListBytes[u] = 0; }
     }
-    
     uniqueCvxMeshCount = 0;
     cvxAdjLive = 0;
     ResetDoorPortals();
@@ -1882,7 +1944,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
         World.fogColor[i] = fogLUT[i];
         World.fogColor[i].a *= 3.8f;
     }
-    
     SetLevelPointers(0);
     World.curLev = 0;
     World.mass[0] = 0.0f;
@@ -1912,7 +1973,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.instances[PLAYER1].health = 211.0f;
     World.invP1.noiseFinished = World.pauseRelativeTime;
     World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f,1.0f);
-    
     World.invP1.hardwareInvReferenceIndex[0]  = 21;
     World.invP1.hardwareInvReferenceIndex[1]  = 22;
     World.invP1.hardwareInvReferenceIndex[2]  = 23;
@@ -1934,7 +1994,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.invP1.earthShakerTimeSetting = EARTH_SHAKER_DEFAULT_TIME;
     World.invP1.lastAddedIndex = World.invP1.globalLookupIndex = -1;
     World.invP1.hasNewEmail = World.invP1.hasNewNotes = World.invP1.isPulserNotDrill = true;
-    
     MissionTimerInit();
     for (int i=0;i<7;++i) World.invP1.weaponInventoryIndices[i] = World.invP1.weaponInventoryAmmoIndices[i] = -1;
     World.invP1.sparqSetting = 50.0f;
@@ -1943,20 +2002,17 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.invP1.justFired = (World.pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
     World.invP1.resetAfterDeathTime = 0.5;
     World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.radFXFinished = World.pauseRelativeTime;
-    
     World.Sys_UI.lastMultiMediaTabOpened = MM_EMAIL_TABLE;
     World.Sys_UI.logFinished = World.pauseRelativeTime;
     World.Sys_UI.tickFinished = World.Sys_UI.centerTabsTickFinished = World.current_time + 0.1 + (double)random_range(0.0f,1.0f);
     World.Sys_UI.blinkFinished = 1.0 + World.pauseRelativeTime;
     World.Sys_UI.beepFinished = 3.0 + World.pauseRelativeTime;
-    
     World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = -1.0;
     World.invP1.mediPatchPulseFinished = 0.0;
     World.invP1.mediPatchPulseCount = 0;
     World.invP1.berserkIncrement = World.invP1.patchActive = 0;
     World.invP1.staminupActive = World.geniusActive = false;
     World.invP1.inReverbZone = false;
-    
     World.timeScale = DEFAULT_TIME_SCALE; 
     World.cam_yaw = 90.0f;
     World.cam_pitch = 0.0f;
@@ -1974,20 +2030,15 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.currentMouse_dx = World.currentMouse_dy = 0;
     last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;
     Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
-    
     for (u8 lev = 1; lev < World.numLevels; ++lev) { CopyPlayerState(0, lev); }
     DebugRAM("before runtime LoadAllLevels");
-    
     ResetLoadTallies();
     LoadAllLevels();
     DebugRAM("after runtime LoadAllLevels");
-    
     NewGameDifficultyPass();/*mission-difficulty item removals: once, here, where diffMis is final and every level is resident -- see NewGameDifficultyPass in entity.c.*/
     LoadLevel(World.startLevel,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
     DebugRAM("after runtime LoadLevel");
-    
     World.invP1.currentCrouchRatio = 1.0f;
-    
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
             World.levelInstances[lev][i].adjacencyIdx = U16_MAX;
@@ -2009,61 +2060,53 @@ __attribute__((cold)) void NewGame() { // Reset World States
             }
         }
     }
-    
     DebugRAM("before edge adjacency");
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) {
         u16 m = uniqueCvxMeshIndices[u]; if (m >= MAX_MDLS) { continue; }
+        u32 vCount = physVertCounts[m], tCount = modelTriangleCounts[m]; if (!vCount || !tCount || !physPos[m] || !physTris[m]) { continue; }
         
-        u32 vCount = physVertCounts[m], tCount = modelTriangleCounts[m];
-        if (!vCount || !tCount || !physPos[m] || !physTris[m]) { continue; }
-        
-        u32 edgeCount = 0;
-        u32* tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
+        u32 edgeCount = 0, *tempEdges = OS_Alloc(tCount * 3 * sizeof(u32));
         for (u32 t = 0; t < tCount; ++t) {
             u16 i0=physTris[m][t*3+0], i1=physTris[m][t*3+1], i2=physTris[m][t*3+2];
             tempEdges[edgeCount++]=((u32)vmin(i0,i1) << 16) | vmax(i0,i1);
             tempEdges[edgeCount++]=((u32)vmin(i1,i2) << 16) | vmax(i1,i2);
             tempEdges[edgeCount++]=((u32)vmin(i2,i0) << 16) | vmax(i2,i0);
         }
-        
         qsort_new(tempEdges,edgeCount,sizeof(u32),EdgeCompare);
-        u32 uniqueEdgeCount=0;
-        u32* degree=OS_Alloc(vCount * sizeof(u32)); 
+        u32 uniqueEdgeCount = 0, *degree = OS_Alloc(vCount * sizeof(u32)); 
         for (u32 i = 0; i < edgeCount; ++i) {
-            if (i == 0 || tempEdges[i] != tempEdges[i-1]) {
+            if (i == 0 || tempEdges[i] != tempEdges[i - 1]) {
                 tempEdges[uniqueEdgeCount++]=tempEdges[i];
-                u16 a=(u16)(tempEdges[i] >> 16);
-                u16 b=(u16)(tempEdges[i] & 0xFFFF);
-                degree[a]++;
-                degree[b]++;
+                u16 a = (u16)(tempEdges[i]   >>  16);
+                u16 b = (u16)(tempEdges[i] & 0xFFFF);
+                degree[a]++; degree[b]++;
             }
         }
         u32* offsets=OS_Alloc((vCount + 1) * sizeof(u32));
         offsets[0]=0;
-        for(u32 i=0;i<vCount;++i){offsets[i+1]=offsets[i] + degree[i];}
+        for (u32 i=0;i<vCount;++i) { offsets[i + 1] = offsets[i] + degree[i]; }
         u16* adjList = OS_Alloc(uniqueEdgeCount * 2 * sizeof(u16));
         u32* writePos = OS_Alloc(vCount * sizeof(u32));
         mcpy(writePos, offsets, vCount * sizeof(u32));
-        for (u32 i=0;i<uniqueEdgeCount;++i) { u16 a=(u16)(tempEdges[i] >> 16); u16 b=(u16)(tempEdges[i] & 0xFFFF); adjList[writePos[a]++]=b; adjList[writePos[b]++]=a; }
-        cvxAdjOffsets[u]=offsets; cvxAdjLists[u]=adjList; cvxAdjOffsetBytes[u]=(vCount+1)*sizeof(u32); cvxAdjListBytes[u]=uniqueEdgeCount*2*sizeof(u16); cvxAdjLive+=cvxAdjOffsetBytes[u]+cvxAdjListBytes[u];
+        for (u32 i=0;i<uniqueEdgeCount;++i) {
+            u16 a = (u16)(tempEdges[i] >> 16);   u16 b = (u16)(tempEdges[i] & 0xFFFF);
+            adjList[writePos[a]++]=b;            adjList[writePos[b]++]=a;
+        }
+        cvxAdjOffsets[u] = offsets;
+        cvxAdjLists[u]   = adjList;
+        cvxAdjOffsetBytes[u] = (vCount+1) * sizeof(u32);
+        cvxAdjListBytes[u]   = uniqueEdgeCount * 2 * sizeof(u16);
+        cvxAdjLive += cvxAdjOffsetBytes[u] + cvxAdjListBytes[u];
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
-    } DebugRAM("after edge adjacency");
-    
-    { 
-        extern char *getenv(const char*);
-        char *dumpPath = getenv("VOXEN_DUMP_ENTITIES");
-        if (dumpPath) EntityDumpAll(dumpPath, dumpPass++);
-    } /*opt-in: snapshot the loaded entity tables, once every loader pass that writes them has run, so two builds diff on loader state alone. The path is a format string taking the NewGame pass index, so the menu pass and the real start land in separate files and can be diffed against each other for idempotence.*/
-    
+    }
+    DebugRAM("after edge adjacency");
     World.lev1SecCode = World.lev2SecCode = World.lev3SecCode = -1;
     World.lev4SecCode = World.lev5SecCode = World.lev6SecCode = -1;
     World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
-    
     // TESTING STUFF, TODO Delete once hardware and particle systems are fully confirmed and tested as good (they aren't yet).
     //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAX_TXRS},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colStart=(Color){1,0,0,1},.colEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.shapeRadius=2.56f,.shapeType=1,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
     //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAX_TXRS},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
     //AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
-    
     AutomapNewGame();
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
 }
@@ -2072,8 +2115,10 @@ void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmail
 void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
                                               World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
                                               World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]); }
-void LoadModels(), LoadTextures(), InitAudio(), LoadConfig(), BiomonitorInitGL(), synth_set_room(float,float);
-extern u32 random_range_rng; extern bool amReady;
+                                              
+void LoadModels(), LoadTextures(), InitAudio(), LoadConfig(), synth_set_room(float,float);
+extern u32 random_range_rng, biomTexId, biomFBO;
+extern bool amReady;
 void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
@@ -2227,8 +2272,12 @@ void InitalizeEnvironment() {
     glGenFramebuffers(1,&amFullFBO); glBindFramebuffer(GL_FRAMEBUFFER,amFullFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amFullTexId,0);
     amReady=true;
     
-    BiomonitorInitGL();
-    BioMonitorInit();
+    GenerateAndBindTexture(&biomTexId,GL_RGBA8,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,GL_LINEAR,NULL);
+    glGenFramebuffers(1,&biomFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,biomTexId,0);
+    
+    bioMonitor.beatFinished=get_time() + 0.5; bioMonitor.widthPerc=0.4f;  bioMonitor.heightPerc=0.1f;    bioMonitor.backgroundColor=(Color){0.2f,0.2f,1.0f,0.01f};    bioMonitor.ergColor=(Color){0,0.5f,1.0f,1.0f}; bioMonitor.ymax=36;           bioMonitor.chiColor=(Color){.7f,0,1.f,1.f};
+    bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f;                  bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
     NewGame();
     currentMenuPage = Mpg_FrontPage;
     if (playIntroAtBoot) ChangeMenuPage(Mpg_IntroVideo);/*must come after NewGame (it resets the page to Mpg_FrontPage) and go through ChangeMenuPage so the cutscene also gets its clip audio + start time*/

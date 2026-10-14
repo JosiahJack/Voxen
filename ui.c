@@ -108,10 +108,12 @@ static void RefreshSaveSlots(void) {
 
 static void SaveSlotCancelTyping(void) { saveSlotEditing=-1; enteringSaveName=false; saveNameEntryLen=0; saveNameEntry[0]='\0'; }
 static void SaveSlotConfirmTyping(void) {
-    i8 slot=saveSlotEditing; char name[48]; u8 n=saveNameEntryLen; if (n>47) n=47; for (u8 i=0;i<n;++i) name[i]=saveNameEntry[i]; name[n]='\0';
-    SaveSlotCancelTyping(); if (slot<0||slot>7||n==0) return;/*Unity: empty name cancels the save*/
-    for (u8 i=0;i<=n;++i) saveSlotNames[slot][i]=name[i];/*overwrite the slot's savename string*/
-    World.menuActive=false; World.paused=false; returnToPause=false;/*close menu + unpause BEFORE saving so the save captures clean in-game state*/
+    i8 slot=saveSlotEditing;
+    char name[48]; u8 n=saveNameEntryLen;
+    if (n>47) n=47; for (u8 i=0;i<n;++i) name[i]=saveNameEntry[i]; name[n]='\0';
+    SaveSlotCancelTyping(); if (slot<0||slot>7||n==0) return; /*Unity: empty name cancels the save*/
+    for (u8 i=0;i<=n;++i) saveSlotNames[slot][i]=name[i]; /*overwrite the slot's savename string*/
+    World.menuActive=false; World.paused=false; returnToPause=false; /*close menu + unpause BEFORE saving so the save captures clean in-game state*/
     SaveGame((u8)slot,name);
 }
 
@@ -995,9 +997,9 @@ void SideMFD(bool isRH) { // 320x240
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex), tab = isRH ? World.Sys_UI.MFD_RightTab : World.Sys_UI.MFD_LefTab; u8 selected=tab?tab:World.Sys_UI.mfdSelected[isRH?2:1];
     for (u8 i=0;i<4;++i) UIRImg(MID(isRH,TAB_WEAPON)+i,isRH ? 1350 : -TAB_THICK,(i16)(520+56*i),32,40,selected==i+1 ? 1024 : 1022);/*Weapon/Item/Automap/Data side tab buttons*/
     if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1) {
-        i16 sx=isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W : TAB_THICK+MFD_SPACING, sy=UI_H-TAB_THICK-TXT_PAD-SIDE_MFD_H;/*Sensaround Plane, mirror about screen center for RH*/
-        UIR(isRH ? UI_ID_SENSA_RH : UI_ID_SENSA_LH,sx,sy,SIDE_MFD_W,SIDE_MFD_H);
-        DrawSensaroundQuad(sx,sy,SIDE_MFD_W,SIDE_MFD_H,isRH ? sensaroundCamViewRight : sensaroundCamViewLeft);
+        i16 sx=isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W : TAB_THICK+MFD_SPACING, sy=UI_H-TAB_THICK-TXT_PAD-MFD_H;/*Sensaround Plane, mirror about screen center for RH*/
+        UIR(isRH ? UI_ID_SENSA_RH : UI_ID_SENSA_LH,sx,sy,SIDE_MFD_W,MFD_H);
+        DrawSensaroundQuad(sx,sy,SIDE_MFD_W,MFD_H,isRH ? sensaroundCamViewRight : sensaroundCamViewLeft);
     } else {
         if (tab == 1) {/*WeaponTab: WepNameText, WepIcon, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/
             i16 slot=World.invP1.weaponCurrent; if (slot>=0 && slot<7) { i32 widx=World.invP1.weaponInventoryIndices[slot]; if (widx >= 0) {UIRText(MID(isRH,WEAPON_NAME),isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W+TXT_PAD : TAB_THICK+MFD_SPACING+TXT_PAD,520,T_RED,FONT_NORMAL,0.8f,270,Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16)UIRImg(MID(isRH,WEAPON_ICON),isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIcon*/
@@ -1161,9 +1163,9 @@ void CenterMFD() { //640x240
     for (u8 i=0;i<4;++i) UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.MFD_CenterTab!=5) ? 1024 : 1021);/*Main/Hardware/General/Software center tab buttons*/
     if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,552,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,557,676,210,1075); RenderTextL(586,558,T_GREEN,FONT_NORMAL,0.8f,Sys_Text.stringTable[878]/*ADD TO INVENTORY*/); } }
     if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0) {
-        i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H;/*SensaroundCenter rearview over the center MFD content area*/
-        UIR(UI_ID_SENSA_CTR,sx,sy,CTR_MFD_W,CTR_MFD_H);
-        DrawSensaroundQuad(sx,sy,CTR_MFD_W,CTR_MFD_H,sensaroundCamViewCenter);
+        i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-MFD_H;/*SensaroundCenter rearview over the center MFD content area*/
+        UIR(UI_ID_SENSA_CTR,sx,sy,CTR_MFD_W,MFD_H);
+        DrawSensaroundQuad(sx,sy,CTR_MFD_W,MFD_H,sensaroundCamViewCenter);
     } else {
         i16 hdrH=UI_H-TAB_THICK-TXT_PAD-184+TXT_PAD;
         if (World.Sys_UI.MFD_CenterTab==1) {/*Main*/

@@ -2,14 +2,14 @@
 #include "common.h"
 BioMonitorSystem bioMonitor;
 // CPU-rasterized graph texture (automap pattern): 620x36 matches Unity's BiomonitorGraphSystem graphWidth/graphHeight.
-static u8 biomPx[BIOM_GRAPH_W*BIOM_GRAPH_H*4]; static u32 biomTexId=0,biomFBO=0;
+static u8 biomPx[BIOM_GRAPH_W*BIOM_GRAPH_H*4];
+u32 biomTexId, biomFBO;
 /* Empty graph pixels stay fully transparent; only the 3 graphed lines carry visible alpha.
    bioMonitor.backgroundColor (a=0.01) remains the logical "empty pixel" marker for the fade logic and is never written to the raster. */
 static const Color biomBgTransparent = {0.0f, 0.0f, 0.0f, 0.0f};
 /* Graph placement in UI y-down coords: above the biomonitor text block (text starts at y=83), left-aligned with it at x=4. */
 enum { BIOM_UI_X=4, BIOM_UI_Y=41 };
 INLINE void biomPutPx(int x,int y,Color c){ u8* p=&biomPx[((u32)y*BIOM_GRAPH_W+(u32)x)*4]; p[0]=(u8)(vclamp(c.r,0.0f,1.0f)*255.0f); p[1]=(u8)(vclamp(c.g,0.0f,1.0f)*255.0f); p[2]=(u8)(vclamp(c.b,0.0f,1.0f)*255.0f); p[3]=(u8)(vclamp(c.a,0.0f,1.0f)*255.0f); }
-void BiomonitorInitGL() {GenerateAndBindTexture(&biomTexId,GL_RGBA8,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,GL_LINEAR,NULL); glGenFramebuffers(1,&biomFBO); glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,biomTexId,0); glBindFramebuffer(GL_FRAMEBUFFER,0);}
 extern FGL_C glClear;
 void BiomonitorClearRenderTarget() { if(!biomFBO){return;} glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glClear(GL_COLOR_BUFFER_BIT); }
 void BiomonitorBlitToUI() {
@@ -21,14 +21,14 @@ void BiomonitorBlitToUI() {
     glBlitFramebuffer(0,0,BIOM_GRAPH_W,BIOM_GRAPH_H, gx0,gy0,gx1,gy1, GL_COLOR_BUFFER_BIT,GL_LINEAR);
     glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
 }
-/* Debug dump of the CPU-rasterized graph texture (automap AutomapDumpBMP pattern):
-   vertical flip so the BMP shows the graph as displayed (row 0 = graph minimum = bottom). */
+
 void BiomonitorDumpBMP() {
     if(!(World.invP1.hardwareIsActive & HW_BIO)){return;} OS_MakeFolder("Screenshots");
     static u8 flip[BIOM_GRAPH_W*BIOM_GRAPH_H*4];
     for(int y=0;y<BIOM_GRAPH_H;++y){u8* dst=flip+(size_t)y*BIOM_GRAPH_W*4,*src=biomPx+(size_t)(BIOM_GRAPH_H-1-y)*BIOM_GRAPH_W*4; for(int x=0;x<BIOM_GRAPH_W;++x){u8* d=dst+(size_t)x*4,*s=src+(size_t)x*4; d[0]=s[0]; d[1]=s[1]; d[2]=s[2]; d[3]=s[3];}}
     char p[96]; sFormat(p,sizeof(p),"Screenshots/biomonitor_%.2f.bmp",get_time()); BmpWrite(p,BIOM_GRAPH_W,BIOM_GRAPH_H,flip);
 }
+
 void BioMonitorClearGraphs() {
     for (int x=0;x<BIOM_GRAPH_W;x++) { for (int y=0; y<BIOM_GRAPH_H;y++) { /*texture cleared via buffer reset above*/ } }
     for (int y=0;y<BIOM_GRAPH_H;y++) bioMonitor.currentColors[y] = bioMonitor.backgroundColor;
@@ -38,19 +38,10 @@ void BioMonitorClearGraphs() {
     for (int x=0;x<BIOM_GRAPH_W;x++) { for (int y=0; y<BIOM_GRAPH_H;y++) { bioMonitor.colorsERG[x][y] = bioMonitor.backgroundColor; bioMonitor.colorsCHI[x][y] = bioMonitor.backgroundColor; bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor; } }
 }
 
-/*showFPS scopes start all three cursors on one column, so their heads line up and a column is the same
-  instant on every trace.  The stock graphs start at independent random columns and advance at different
-  per-tick rates, so this belongs on the showFPS transition only, not on a general clear.*/
 void BioMonitorAlignCursors() { BioMonitorClearGraphs(); int idx=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex0=bioMonitor.currentIndex1=bioMonitor.currentIndex2=idx; }
-
 static void IncrementERG() { bioMonitor.currentIndex0++; if (bioMonitor.currentIndex0 >= BIOM_GRAPH_W) {bioMonitor.currentIndex0 = 0;} }
 static void IncrementCHI() { bioMonitor.currentIndex1++; if (bioMonitor.currentIndex1 >= BIOM_GRAPH_W) {bioMonitor.currentIndex1 = 0;} }
 static void IncrementECG() { bioMonitor.currentIndex2++; if (bioMonitor.currentIndex2 >= BIOM_GRAPH_W) {bioMonitor.currentIndex2 = 0;} }
-void BioMonitorInit() {
-    bioMonitor.beatFinished=get_time() + 0.5; bioMonitor.widthPerc=0.4f; bioMonitor.heightPerc=0.1f; bioMonitor.backgroundColor=(Color){0.2f,0.2f,1.0f,0.01f}; bioMonitor.ergColor=(Color){0,0.5f,1.0f,1.0f}; bioMonitor.ymax=36; bioMonitor.chiColor=(Color){.7f,0,1.f,1.f};
-    bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
-}
-
 static void Push(int index, float val) { // Add a data point to the beginning of the graph
     float value = 0.0f; int dist = 1, y0 = 0; bool down = false;
     for (int y=0;y<BIOM_GRAPH_H;y++) {
