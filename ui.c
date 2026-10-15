@@ -467,11 +467,23 @@ void HardwareButtons() {
 }
 
 void HwToggle(u8 i) {
-    const HwBtn* b=&hwBtns[i]; bool noEng=World.invP1.energy<=0.0f, on=(World.invP1.hardwareIsActive & b->bit)!=0;
+    const HwBtn* b=&hwBtns[i];
+    bool noEng = World.invP1.energy <= 0.0f, on = (World.invP1.hardwareIsActive & b->bit) != 0;
     if (!(World.invP1.hasHardware & b->bit)) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; }/*no-op for the HUD buttons, which are only drawn for owned hardware; the hotkey path needs it*/
-    if (b->bit==HW_BIO && Cheats.showFPS) return;/*the FPS cheat owns the biomonitor graphs, see cmd_showfps*/
-    if (b->eng==3) { MFD_ResetGeneral(); World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdItemReader[0]=true; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;
-        if (World.Sys_UI.MFD_MediaTab>MM_NOTES || (World.Sys_UI.MFD_MediaTab==MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false); return; }
+    if (b->bit == HW_BIO && Cheats.showFPS) return;/*the FPS cheat owns the biomonitor graphs, see cmd_showfps*/
+        
+    if (b->eng == 3) {
+        MFD_ResetGeneral();
+        World.Sys_UI.MFD_CenterTab=5;
+        World.Sys_UI.MFD_LefTab=2;
+        World.Sys_UI.mfdItemReader[0]=true;
+        World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
+        World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;
+        if (World.Sys_UI.MFD_MediaTab > MM_NOTES || (World.Sys_UI.MFD_MediaTab == MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE;
+        play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false);
+        return;
+    }
+    
     if (noEng && (b->eng==0 || (b->eng==1 && World.invP1.hwVersSetting[b->idx]==0) || (b->eng==2 && World.invP1.hwVersSetting[b->idx]>=1))) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; }
     play_wav(sounds[on ? b->sOff : b->sOn],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= b->bit; if (b->bit==HW_BIO && on && !Cheats.showFPS) BioMonitorClearGraphs();
 }
@@ -538,26 +550,26 @@ static void PGFlipperRook(int i) { World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell
 static void PGFlipperBishop(int i) { World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; PGToggleLine(i,1,1); PGToggleLine(i,-1,1); PGToggleLine(i,1,-1); PGToggleLine(i,-1,-1); }
 static void PGFlipperQueen(int i) { World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; PGToggleLine(i,1,0); PGToggleLine(i,-1,0); PGToggleLine(i,0,1); PGToggleLine(i,0,-1); PGToggleLine(i,1,1); PGToggleLine(i,-1,1); PGToggleLine(i,1,-1); PGToggleLine(i,-1,-1); }
 static void PGFlipperKnight(int i) { int w=World.Sys_UI.pg_width,h=World.Sys_UI.pg_height,r=i/w,c=i%w; World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; static const i8 dr[8]={-2,-1,1,2,2,1,-1,-2},dc[8]={1,2,2,1,-1,-2,-2,-1}; for (u8 n=0;n<8;++n) { int rr=r+dr[n],cc=c+dc[n]; if (rr<0||rr>=h||cc<0||cc>=w) continue; int ci=rr*w+cc; if (World.Sys_UI.pg_type[ci]==PuzzleCellType_Standard) World.Sys_UI.pg_cell[ci]=!World.Sys_UI.pg_cell[ci]; } }
-/*---- Grid power propagation (Unity PuzzleGrid.cs) ---------------------------------------------------------------------------------
-  ReturnCellAbove/Below/ToLeft/ToRight return the neighbour index, or -1 when it is off the board or is an Off cell
-  (Off cells are walls, so a Bypass or Standard cell can never be reached through one).  The four diagonals take no
-  Off test at all in Unity, which is why they are not routed through here -- the flippers and the Genius preview do
-  their own bounds math. */
 static int PGOrth(int i,int dr,int dc) { SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height,r=i/w+dr,c=i%w+dc; if (r<0||r>=h||c<0||c>=w) return -1; int j=r*w+c; return s->pg_type[j]==PuzzleCellType_Off?-1:j; }
-/*CheckCellForPower.  Called both on the source cell's neighbours during the walk and on each dequeued cell, and it
-  is what lets an And gate light up in a single pass rather than a second sweep.*/
 static void PGCheckCellForPower(int i) { SystemUI* s=&World.Sys_UI; int a=PGOrth(i,-1,0),b=PGOrth(i,1,0),l=PGOrth(i,0,-1),r=PGOrth(i,0,1),pc=0;
     if (a!=-1 && s->pg_powered[a]) ++pc; if (b!=-1 && s->pg_powered[b]) ++pc; if (l!=-1 && s->pg_powered[l]) ++pc; if (r!=-1 && s->pg_powered[r]) ++pc;
     if (s->pg_type[i]==PuzzleCellType_And) { if (pc>1) s->pg_powered[i]=true; }
     else if (s->pg_type[i]==PuzzleCellType_Standard || s->pg_type[i]==PuzzleCellType_Bypass) { if ((s->pg_cell[i] || s->pg_type[i]==PuzzleCellType_Bypass) && pc>0) s->pg_powered[i]=true; } }
 void PGEvalPuzzle(void) {
-    SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height; if (w<=0||h<=0) return; int n=w*h; if (n>35) n=35;
+    SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height;
+    if (w<=0||h<=0) return;
+    
+    int n = vmin(w*h,35);
     for (int i=0;i<n;++i) { s->pg_powered[i]=false; s->pg_checked[i]=false; if (s->pg_type[i]==PuzzleCellType_And) s->pg_cell[i]=true; }/*And gates are always conducting, whatever the player has clicked*/
-    int src=(int)s->pg_source; if (src<0||src>=n) return;
+    int src = (int)s->pg_source; if (src<0||src>=n) return;
     s->pg_powered[src]=s->pg_cell[src]; if (!s->pg_powered[src]) return;/*the source node has to be a plus itself, or nothing conducts*/
-    int q[142],qt=0,qh=0; q[qt++]=src;/*142, not 35: Unity's queue is a List and a cell is re-added once per powered neighbour that reaches it (the !pg_checked guard only stops it once dequeued), so the high-water mark is 1+4*35.  A 35-entry array smashes the stack on a busy board.*/
-    while (qh<qt) { int mi=q[qh++]; if (s->pg_checked[mi]) continue;
-        int a=PGOrth(mi,-1,0),b=PGOrth(mi,1,0),l=PGOrth(mi,0,-1),r=PGOrth(mi,0,1); bool isAnd=s->pg_type[mi]==PuzzleCellType_And;
+    
+    int q[142], qt = 0, qh = 0; q[qt++]=src;/*142, not 35: Unity's queue is a List and a cell is re-added once per powered neighbour that reaches it (the !pg_checked guard only stops it once dequeued), so the high-water mark is 1+4*35.  A 35-entry array smashes the stack on a busy board.*/
+    while (qh<qt) {
+        int mi = q[qh++]; if (s->pg_checked[mi]) continue;
+        
+        int a = PGOrth(mi,-1,0),b=PGOrth(mi,1,0),l=PGOrth(mi,0,-1),r=PGOrth(mi,0,1);
+        bool isAnd = s->pg_type[mi] == PuzzleCellType_And;
         if (a!=-1 && !s->pg_checked[a] && s->pg_cell[a]) { q[qt++]=a; if (isAnd) PGCheckCellForPower(a); }
         if (b!=-1 && !s->pg_checked[b] && s->pg_cell[b]) { q[qt++]=b; if (isAnd) PGCheckCellForPower(b); }
         if (l!=-1 && !s->pg_checked[l] && s->pg_cell[l]) { q[qt++]=l; if (isAnd) PGCheckCellForPower(l); }

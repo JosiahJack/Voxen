@@ -2029,7 +2029,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     mset(&Sys_Input,0,sizeof(Sys_Input));
     World.currentMouse_dx = World.currentMouse_dy = 0;
     last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;
-    Sys_Input.lastUse = Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
+    Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) { CopyPlayerState(0, lev); }
     DebugRAM("before runtime LoadAllLevels");
     ResetLoadTallies();
