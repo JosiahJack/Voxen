@@ -426,7 +426,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     return true;
 }
 
-void SetWindowIcon(WinSysIcon*);
+void SetWindowIcon(const WinSysIcon*);
 static bool has_sub(const char* h,const char* n){ for(;*h;++h){ const char* a=h,*b=n; while(*a&&*b&&*a==*b){++a;++b;} if(!*b) return true; } return false; }
 static bool is_vid_path(const char* p){ return has_sub(p,"AAIntro")||has_sub(p,"AAOutro")||has_sub(p,"VMail"); }
 void LoadTextures() {

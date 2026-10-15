@@ -2153,19 +2153,9 @@ void InitalizeEnvironment() {
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
     glClearColor(0,0,0,1);
     CompileShaders();
-    u32 tvaos[5],tvbos[5];
-    glGenVertexArrays(5,tvaos);
-    glGenBuffers(5,tvbos);
-    quadVAO=tvaos[0];
-    quadVBO=tvbos[0];
-    chunkVAO=tvaos[1];
-    chunkVBO=tvbos[1];
-    textVAO=tvaos[2];
-    textVBO=tvbos[2];
-    debugLinesVAO=tvaos[3];
-    debugLinesVBO=tvbos[3];
-    wireLinesVAO=tvaos[4];
-    wireLinesVBO=tvbos[4]; 
+    
+    u32 tvaos[5],tvbos[5]; glGenVertexArrays(5,tvaos); glGenBuffers(5,tvbos);
+    quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; chunkVBO=tvbos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; wireLinesVAO=tvaos[4]; wireLinesVBO=tvbos[4]; 
     
     float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
     glBindVertexArray(quadVAO); glBindBuffer(GL_ARRAY_BUFFER,quadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
@@ -2356,11 +2346,10 @@ i32 main() {
             glGetQueryObjectui64v(gpuQ[r][4], 0x8866/*GL_QUERY_RESULT*/,&v); World.gpuCompMs=(double)v * 0.000001;
             World.gpuFrameMs = World.gpuShadowMs + World.gpuPreMs + World.gpuMainMs + World.gpuSsrMs + World.gpuCompMs;
         }
-        
+
         gpuQFrame=(gpuQFrame+1)%5;
         ((WSWin*)window)->context.swapBuffers(((WSWin*)window));
         CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
-
         // RAM and frame consistency debug stats
         //static u32 dbgGameFrame = 0;
         //if (!World.menuActive && !World.paused) { dbgGameFrame++; /*only count gameplay frames for RAM/timing checkpoints*/}
@@ -2377,6 +2366,5 @@ i32 main() {
             //}
         //}
     }
-    
     return 0;
 }
