@@ -1,8 +1,8 @@
 // weapons.c - Weapon System
 #include "common.h"
 FootStepType GetFootstepTypeForPrefab(int pid); bool ChangeAmmoType();
-void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt);/*citadel.c: impact force only, no ObjectImpact sound*/
-void ApplyImpactForceWithSound(u16 target, float vel, V3 normal, V3 pt);/*citadel.c: impact force + velocity-modulated impact sound*/
+void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt);
+void ApplyImpactForceWithSound(u16 target, float vel, V3 normal, V3 pt);
 float delayBetweenShotsForWeapon[16]={1.0f,0.6f,0.5f,0.1f,0.8f,1.6f,0.65f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,1.1f,0.75f}; float delayBetweenShotsForWeapon2[16]={1.0f,4.5f,0.5f,0.15f,4.0f,1.6f,0.75f,0.8f,0.6f,0.5f,1.2f,0.9f,0.5f,0.08f,5.0f,0.75f};
 float dmgForWep[16]={75.0f,12.0f,15.0f,10.0f,18.0f,150.0f,15.0f,60.0f,45.0f,22.0f,50.0f,185.0f,6.0f,35.0f,6.0f,2.0f}; float dmgForWep2[16]={160.0f,70.0f,5.0f,22.0f,108.0f,0.0f,0.0f,85.0f,80.0f,33.0f,350.0f,0.0f,0.0f,35.0f,36.0f,15.0f};
 float damageOverloadForWeapon[16]={0.0f,115.0f,0.0f,0.0f,180.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,0.0f,60.0f,0.0f};
@@ -29,7 +29,7 @@ INLINE Quaternion QuatEulerY(float degY) { float r=deg2rad(degY)*0.5f; return (Q
 INLINE Quaternion QuatEulerZ(float degZ) { float r=deg2rad(degZ)*0.5f; return (Quaternion){0.0f,0.0f,vsinf(r),vcosf(r)}; }
 
 INLINE bool WeaponsHaveAnyHeat() { if (Cheats.redbull) {return false;} for (int i=0;i<7;i++) {if (World.invP1.currentEnergyWeaponHeat[i] > 0.0f) {return true;}} return false; }
-static bool hudHeatTickOn[9];/*Citadel EnergyHeatTickManager.ticks: 9 HUD heat ticks, tick i lit when heat >= 10*(i+1)*/
+static bool hudHeatTickOn[9];
 void HudHeatBleed(float heat) { float tempFloat=10.0f; for (int i=0;i<9;i++) { hudHeatTickOn[i]=heat >= tempFloat; tempFloat += 10.0f; } }
 bool HudHeatTickOn(int i) { return (i>=0&&i<9) ? hudHeatTickOn[i] : false; }
 void HeatBleedOff() {
@@ -54,7 +54,6 @@ static void Recoil(int wep16) {
 }
 
 static void Recoiling() { if(!wfx.recoiling){return;} float dt = (float)World.deltaTime * World.timeScale; wfx.reloadContainerPos.x+=(wfx.reloadContainerHome.x - wfx.reloadContainerPos.x)*dt; wfx.reloadContainerPos.z+=(wfx.reloadContainerHome.z - wfx.reloadContainerPos.z)*dt; }
-// ---- Weapon dip (reload/swap "animation") ----------------------------------
 static float reloadLerpValue = 0.0f;
 static u8 lerpUp = 0; // 0 idle, 1 lerping up, 2 lerping down
 double lerpStartTime = 0.0;
@@ -65,9 +64,6 @@ void CompleteWeaponChange() {
     World.invP1.weaponCurrent = (u8)World.invP1.weaponCurrentPending;
     if (CurrentWeaponUsesEnergy()) { HudHeatBleed(World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent]); }
     World.invP1.weaponIndex = (u16)World.invP1.weaponIndexPending;
-    // Set the single ad-hoc view-model instance's appearance.  Model indices come from ./Data/models.txt:
-    // only pipe/rapier use the v_pipe/v_rapier models (5728/5748); all others reuse the matching weapon_ EDefs model.
-    // animationNum is 49 (v_pipe) / 50 (v_rapier); everything else has no animation (MAX_ANIMS).
     u16 wepIdx = World.invP1.weaponIndex;
     Entity* vwe = &World.instances[World.weaponVModelIndex];
     int wep16 = Get16WeaponIndexFromConstIndex((int)wepIdx);
@@ -79,13 +75,8 @@ void CompleteWeaponChange() {
         vwe->glowIndex = EDefs[wepIdx].glowIndex >= MAX_TXRS ? 0u : EDefs[wepIdx].glowIndex;
         vwe->specIndex = EDefs[wepIdx].specIndex >= MAX_TXRS ? 0u : EDefs[wepIdx].specIndex;
         vwe->index = wepIdx; // constIndex, NOT 49/50
-    } else {
-        vwe->modelIndex = MAX_MDLS; // hidden; no weapon equipped
-    }
+    } else { vwe->modelIndex = MAX_MDLS; /*hidden; no weapon equipped*/ }
     World.invP1.weaponCurrentPending = World.invP1.weaponIndexPending = -1;
-    int ind = World.invP1.weaponIndex;
-    bool alt = (ind >= 0 && ind < 16) ? World.invP1.wepLoadedWithAlternate[ind] : false;
-    (void)alt; /*SetAmmoIcons(ind, alt);*/ /*SetWepInfo(World.invP1.weaponIndex);*/
 }
 
 void WeaponFireStartWeaponDip(float t); // Forward declaration from citadel.c
@@ -139,11 +130,7 @@ static u16 ImpactParticleType(u16 prefab) {
         default: return U16_MAX;
     }
 }
-/* Unity impact prefabs are ParticleSystem hierarchies, and the whole hierarchy has to spawn: ef_particle_sparqhit is
-   Burst + CenterSpatter2 + BlueSparksSmall + CenterSpatter + Shockwave, where the Shockwave is the only emitter
-   carrying the size-over-time curve, and ef_particle_camerahit is Bits + CenterSpatter + DarkBurst + CenterSpatter2.
-   particleTypeDefs does group a prefab's systems contiguously, but the root comes first for some prefabs and last
-   for others, and child GameObject names repeat across prefabs, so each prefab's membership is listed explicitly. */
+
 static const struct { u16 prefab; u8 type; } impactEffectTypes[] = {
     { 721, 13 },                                                    /* ef_particle_bloodspurtsmall */
     { 722, 14 }, { 722, 15 },                                       /* bloodspurtsmallgreen: tiny + green */
@@ -157,17 +144,10 @@ static const struct { u16 prefab; u8 type; } impactEffectTypes[] = {
     { 739, 8 }, { 739, 9 }, { 739, 10 }, { 739, 11 }, { 739, 12 },   /* blasterhit: Shockwave, CenterSpatter, CenterSpatter2, BlueSparksSmall, root */
     { 740, 24 }, { 740, 25 }, { 740, 26 }, { 740, 27 }, { 740, 28 }, /* ionhit: Shockwave, CenterSpatter, root, BlueSparksSmall, CenterSpatter2 */
 };
+
 static bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     u16 type=ImpactParticleType(prefab); const PSysDef* preset=PSysTypeGet(type); if (!preset) return false;
-    /*The preset is used verbatim: lifetime, emission rate, size and colour all come out of particleTypeDefs for the
-      emitter that the Unity prefab actually points at.  This used to force emitRate 60 and clamp any duration outside
-      (0,2] down to 1.0s, which silently retimed every impact effect regardless of what the prefab asked for.*/
-    /* wfx.hitOffset is never initialised, so it is 0 and the emitter used to land exactly on the hit point, buried
-       in the surface.  Pull it back along -normal (back toward the shooter) so the flash sits just clear of the wall. */
     PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def);
-    /* Every sibling in the prefab's hierarchy, each with its own preset.  All children sit at identity local
-       transforms, so they share the root's world placement.  Emitters whose burstCount was 0 emit nothing at
-       all, which is why only the root of each prefab used to be visible. */
     for (u32 i = 0; i < sizeof(impactEffectTypes)/sizeof(*impactEffectTypes); ++i) {
         if (impactEffectTypes[i].prefab != prefab || impactEffectTypes[i].type == type) continue;
         const PSysDef* cd = PSysTypeGet(impactEffectTypes[i].type); if (!cd) continue;
@@ -175,62 +155,31 @@ static bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     }
     return true;
 }
-/* Blood/sparks by the struck target's blood type (Const.a.GetImpactType). Shared with the NPC hitscan path. */
-void SpawnImpactEffectParticle(u16 prefab, V3 pos, V3 normal) {
-    if (!SpawnImpactParticleForPrefab(prefab,pos,normal)) { u16 fx=SpawnDynamicObject(prefab,-1); if(EntIdxIsValid(fx)){World.position[fx]=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); World.rotation[fx]=QuatFromToRotation((V3){0,1,0},normal);} }
-}
-/* Particle-trail version of a beam between two points. Unity uses a LineRenderer; the trail texture supplies the
-   beam gradient and the particle chain supplies the geometry. */
+
+void SpawnImpactEffectParticle(u16 prefab, V3 pos, V3 normal) { if (!SpawnImpactParticleForPrefab(prefab,pos,normal)) { u16 fx=SpawnDynamicObject(prefab,-1); if(EntIdxIsValid(fx)){World.position[fx]=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset)); World.rotation[fx]=QuatFromToRotation((V3){0,1,0},normal);} } }
 void SpawnBeamTrail(u16 presetType, V3 from, V3 to, Color c) {
     const PSysDef* preset=PSysTypeGet(presetType); if(!preset)return; V3 delta=V3_AsubB(to,from); float dist=V3_Mag(delta); if(dist<0.01f)return;
-    /* The laser IS the trail; the particle is only a carrier that streaks from `from` to `to` so the trail has
-       geometry to hang off.  So it carries no texture and zero size: particle_vert.glsl culls any instance with
-       size<=0 (gl_Position=vec4(0,0,2,1)), leaving the trail segments as the only draw call. */
-    /* Tile the span with BEAM_SEGS emitters, each covering 1/BEAM_SEGS of the beam, all spawned on the same frame.
-       A single emitter with a large burstCount does NOT achieve this: every carrier is born at `from` with the
-       same velocity ramp, the same lifetime and no positional jitter, so the extra carriers trace the exact same
-       polyline over the exact same points and the beam still renders as one thin line.  Separate emitters are the
-       only way to get geometry distributed along the whole span at t=0. */
     const int BEAM_SEGS=8;
-    /* Unity LaserDrawing.Awake() sets width 0.2 and lineLife 0.15.  The carrier's life is cut well below that so
-       each segment's trail is laid down within the first frame or two: the trail only gains a segment once a
-       carrier has moved 0.02 units, so a carrier that lives the full 0.15s draws its 1/8 of the beam gradually and
-       the beam reads as a row of separate stubs for most of that time.  The trail segments then outlive the carrier
-       by a wide margin, so the finished beam hangs in the air at full length. */
     const float life=0.04f, trailLife=0.40f;
     for (int seg=0; seg<BEAM_SEGS; ++seg) {
         PSysDef def=*preset; float f0=(float)seg/(float)BEAM_SEGS;
         V3 segFrom=V3_AplusB(from,V3_ScaleByF(delta,f0));
         def.pos=segFrom; def.rotation=QuatFromToRotation((V3){0,1,0},V3_Normalize(delta));
         for(int i=0;i<16;++i)def.textures[i]=MAX_TXRS;
-        def.sizeMin=def.sizeMax=0.0f; def.shapeType=3;/*axial, so the carrier flies down the beam and not in a cone around it*/
-        def.lifetimeMin=def.lifetimeMax=life; def.trailLifetime=trailLife;
-        def.trailWidthStart=def.trailWidthEnd=0.05f;/*a quarter of Unity's 0.2.  The cross-section puts the corners at
-            p +/- a*(width/2), so the rendered ribbon is exactly this many world units across -- no hidden factor.*/
-        /* Travel this segment and stop ON its far end.  A linear velocity ramp 1->0 integrates to half, so
-           2*segDist/life covers exactly segDist by the time the carrier dies.  The ramp also has to keep sampling
-           after the emitter's own duration expires (particles.c gates curve sampling on em->active). */
+        def.sizeMin=def.sizeMax=0.0f;
+        def.shapeType=3;
+        def.lifetimeMin=def.lifetimeMax=life;
+        def.trailLifetime=trailLife;
+        def.trailWidthStart=def.trailWidthEnd=0.05f;
         float segDist=dist/(float)BEAM_SEGS;
         def.speedMin=def.speedMax=segDist*(2.0f/life);
         def.velKeys[0]=1.0f; def.velKeys[1]=0.0f; def.velTimes[0]=0.0f; def.velTimes[1]=1.0f; def.velCount=2;
-        /* Same colour at both ends of the gradient: the beam is a constant-brightness line, and a fading tail made
-           the far half of it vanish before the near half did. */
         def.trailColorStart=c; def.trailColorEnd=c;
         def.rampColors[0]=c; for(int i=1;i<def.rampCount;++i)def.rampColors[i]=c;
-        /* burst, not rate: a rate of 1 over the old 0.02s window never reached an integral particle, so the beam
-           emitted nothing at all.  burstCount fires on the first update regardless of dt. */
         def.emitRate=0.0f; def.burstCount=1; def.duration=life+0.05f; PSysAdd(&def);
     }
 }
-void SpawnTargetingLaser(V3 from, V3 to) { SpawnBeamTrail(PSYS_npc_targetlaser,from,to,(Color){1.0f,0.15f,0.18f,1.0f}); }
-/* Projectile const index -> its own ProjectileEffectImpact.impactType pool, matched by the emitter's GameObject name in particles.c. */
-/* Unity ProjectileEffectImpact.impactType selects a PoolType, and each pool is its own multi-emitter hierarchy in
-   CitadelScene.unity.  This table used to return the projectile's OWN ribbon preset (dur 15s, rate 10) for magpulse,
-   plasma, railgun and stungun, so an impact spawned a fifteen-second emitter at the hit point -- the spritesheet
-   animation looked right and then the emitter sat there instead of removing itself.  The values below are the pool
-   contents, read from the scene: PoolType.MagpulseImpacts -> magpulse_impact{ magpulse_center, sparks_spits };
-   PlasmaImpacts -> plasmarifle_hit{ sparkssmall }; RailgunImpacts -> railgun_impacts{ centerumbra, sparkssmall,
-   shockwave, railshot_smoke }; StungunImpacts -> stungun_impacts{ sparkssmall }; SparksSmall -> sparkssmall. */
+void SpawnTargetingLaser(V3 from, V3 to) { SpawnBeamTrail(167,from,to,(Color){1.0f,0.15f,0.18f,1.0f}); }
 static const struct { u16 proj; u8 type; } projectileImpactTypes[] = {
     { 481, 177 },                                                   /* proj_enemshot2: impact_enemshot2 */
     { 482, 169 }, { 482, 170 },                                     /* magpulse: magpulse_center, sparks_spits */
@@ -243,8 +192,6 @@ static const struct { u16 proj; u8 type; } projectileImpactTypes[] = {
     { 489, 182 },                                                   /* proj_throwingstar: PoolType.SparksSmall */
     { 490, 169 }, { 490, 170 },                                     /* magpulsenpc: same pool as 482 */
     { 491, 172 }, { 491, 173 }, { 491, 174 }, { 491, 175 },         /* railnpc: same pool as 484 */
-    /* 492..495 use PoolType.CyberDissolve (particle_cyberdissolve{ dust_ones }); that emitter is not in the
-       particle table, so these still have no impact effect. */
 };
 static u16 ProjectileImpactParticleType(u16 projectile) {
     for (u32 i = 0; i < sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes); ++i) {
@@ -253,15 +200,8 @@ static u16 ProjectileImpactParticleType(u16 projectile) {
     return U16_MAX;
 }
 void SpawnProjectileImpactParticles(u16 projectile,V3 pos,V3 normal) {
-    /* Unity spawns the projectile's own pooled impact effect; blood/spark-by-bloodtype
-       effects are hitscan-only (WeaponFire/AIController), so they aren't spawned here.  Preset used verbatim, same
-       as SpawnImpactParticleForPrefab: no local lifetime or emission-rate override. */
     u16 type=ProjectileImpactParticleType(projectile); const PSysDef* preset=PSysTypeGet(type); if(!preset)return;
-    /* Same 0.08 pull-back as SpawnImpactParticleForPrefab: wfx.hitOffset is 0, which buried the burst in the wall. */
     PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def);
-    /* Every sibling in the impact pool's hierarchy, each with its own preset and its own short duration.  The
-       previous single-type lookup also picked the wrong preset: for magpulse, plasma, railgun and stungun it
-       returned the bolt's own 15-second ribbon, which is why the impact animation played but never went away. */
     for (u32 i = 0; i < sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes); ++i) {
         if (projectileImpactTypes[i].proj != projectile || projectileImpactTypes[i].type == type) continue;
         const PSysDef* cd=PSysTypeGet(projectileImpactTypes[i].type); if (!cd) continue;
@@ -269,13 +209,6 @@ void SpawnProjectileImpactParticles(u16 projectile,V3 pos,V3 normal) {
     }
 }
 static bool DidRayHit(int wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRayPixels(World.instances[PLAYER1].forward,World.instances[PLAYER1].right,random_range(-d,d),random_range(-d,d));RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;return true;}return false;}
-/*Bullet-hole decal size.  Unity drives it from the prefab's Projector m_OrthographicSize; Voxen has no projector
-  pass, so the same number is the card's half-extent.  EDefs[518..523] all use model 5988 (genericLOD3card_zero.obj),
-  a flat quad in the local XZ plane spanning +/-1.28, i.e. 2.56 units wide, so scale = halfSize / 1.28.
-    518 BulletHoleLarge 0.06   519 BulletHoleScorchLarge 0.2   520 BulletHoleScorchSmall 0.1
-    521 BulletHoleSmall 0.04   522 BulletHoleTiny 0.15          523 BulletHoleTinySpread 0.3
-  A wall and a floor differ by 90 degrees about X, not about Y, which is why the two rotations compose: orient -Y onto
-  the impact normal, then spin about that normal so all four hole variants read the same way on a surface. */
 static const float bulletHoleSize[6] = {0.06f,0.2f,0.1f,0.04f,0.15f,0.3f};
 void CreateStandardImpactMarks(int wep16) {
     if (!wfx.tempHit.hit) return;
@@ -297,13 +230,9 @@ static void CreateBeamImpactEffects(int wep16) {
 }
 
 static void CreateBeamEffects(int wep16) {
-    /* Unity WeaponFire.CreateBeamEffects: LaserDrawing prefabs 405 (turquoise, sparq), 406 (red, blaster),
-       407 (yellow, ion), from the weapon transform + verticalOffset(-0.2) out to tempHit.point.  Voxen has no
-       world-space weapon object, and wfx.reloadContainerPos is the view-model dip offset rather than a world
-       position, so the player origin stands in for transform.position. */
     Color c=(wep16==1)?(Color){1.f,0.18f,0.12f,1.f}:(wep16==4)?(Color){1.f,0.9f,0.15f,1.f}:(Color){0.3f,1.f,1.f,1.f};
     V3 start=World.position[PLAYER1]; start.y-=0.2f;
-    SpawnBeamTrail(PSYS_npc_laserbeam,start,wfx.tempHit.point,c);
+    SpawnBeamTrail(166,start,wfx.tempHit.point,c);
 }
 
 static float DamageForPower(int w) { // Slope-of-slopes curve: interpolates damage/energy ratio across the energy setting, then scales by the interpolated energy drain itself. See design spreadsheet.
@@ -322,24 +251,26 @@ void HitScanFire(int wep16) {
     dd.damage=alt ? dmgForWep2[wep16] : (CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16]); dd.offense=alt ? offenseWep2[wep16] : offenseWep[wep16]; dd.penetration=alt ? penetrationWep2[wep16] : penetrationWep[wep16];
     float dmgFinal = 0.0f;
     if (b && World.instances[ent].health > 0.0f) {
-        dd.damage*=0.8f;/*rebalancing factor*/ dmgFinal=TakeDamage(ent,dd); dd.impactVelocity+=dd.damage;/*Unity: impactVelocity += damage*/
+        dd.damage*=0.8f;/*rebalancing factor*/ dmgFinal=TakeDamage(ent,dd); dd.impactVelocity+=dd.damage;
         if (npc && !(World.instances[wfx.tempHitEnt].entflags & EF_ASLEEP)) { World.Sys_Music.inCombat=true; }
     }
     if (dmgFinal < 0.0f) dmgFinal = 0.0f;
-    CreateTargetIDInstance(dmgFinal,ent,tranq);/*Unity: after the health>0 block*/
-    if (b && (!dd.isOtherNPC || wep16==12)) { float force=(wep16==12 ? 10.0f : 1.0f)*dd.impactVelocity; if (isBeam) ApplyImpactForce(ent,force,dd.attacknormal,dd.hitpoint); else ApplyImpactForceWithSound(ent,force,dd.attacknormal,dd.hitpoint); }/*riotgun: 10x impact force; others as Unity.  A beam takes force only: Unity's WeaponFire hitscan calls Utils.ApplyImpactForce and never ObjectImpact, so a beam's only noise is the weapon's own report, which wepFireSound already plays.*/
+    CreateTargetIDInstance(dmgFinal,ent,tranq);
+    if (b && (!dd.isOtherNPC || wep16==12)) { float force=(wep16==12 ? 10.0f : 1.0f)*dd.impactVelocity; if (isBeam) ApplyImpactForce(ent,force,dd.attacknormal,dd.hitpoint); else ApplyImpactForceWithSound(ent,force,dd.attacknormal,dd.hitpoint); }
     if (isBeam){CreateBeamEffects(wep16);}
 }
 
 void BiomonitorEnergyPulse(float take);
 void MeleeHitUpdate(void) {
     if (wfx.pendingMeleeFinished <= 0.0 || World.pauseRelativeTime < wfx.pendingMeleeFinished) return;
+    
     wfx.pendingMeleeFinished = 0.0;
     int wep16 = wfx.pendingMeleeWep16;
     u16 targ = wfx.pendingMeleeTarget;
     bool isRapier = wfx.pendingMeleeIsRapier;
     bool silent = wfx.pendingMeleeSilent;
     if (targ == PLAYER1) return; // can't hit self
+    
     DamageData dd = {.hitIdx = targ,.isOtherNPC = IdxIsNPC(World.instances[targ].index),.attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right),.damage = dmgForWep[wep16],.offense = offenseWep[wep16],
                      .penetration = penetrationWep[wep16],.owner = PLAYER1,.attackType = Att_Melee};
     if (isRapier) { dd.attackType = Att_MlEg; if (World.invP1.energy < 4.0f) dd.damage = dmgForWep[6] / 2.0f; /*half power on low energy*/}
@@ -351,7 +282,7 @@ void MeleeHitUpdate(void) {
     if ((!dd.isOtherNPC || wep16==12) && (!isRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForceWithSound(targ,dd.impactVelocity,dd.attacknormal,World.position[targ]); }/*melee impact force+sound for any dynamic object (Unity: WeaponFire melee)*/
     float dmgFinal = TakeDamage(targ,dd);
     if (dmgFinal < 0.0f) {dmgFinal = 0.0f;}
-    CreateTargetIDInstance(dmgFinal,targ,-1.0f);/*Unity melee call*/
+    CreateTargetIDInstance(dmgFinal,targ,-1.0f);
     if(!silent){World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;BloodType bt=World.instances[targ].bloodType;if(bt==BloodType_Red||bt==BloodType_Yellow||bt==BloodType_Green)play_wav(sounds[wfx.pendingMeleeFleshSnd], AppliedFXVol(1.0f), (V3){0,0,0}, false);else if(isRapier&&World.invP1.energy<4.0f)play_wav(sounds[67], AppliedFXVol(1.0f), (V3){0,0,0}, false);else play_wav(sounds[wfx.pendingMeleeHitSnd], AppliedFXVol(1.0f), (V3){0,0,0}, false);}
     if (isRapier) { TakeEnergy(3.666f); BiomonitorEnergyPulse(3.666f); } // 3 hits per energy tick
 }
@@ -362,7 +293,6 @@ void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u
     wfx.fireDistance = 3.2f;
     bool hit = DidRayHit(wep16); wfx.fireDistance = 200.0f;
     u16 t = wfx.tempHitEnt; double dt = World.pauseRelativeTime + (isRapier ? 0.28 : 0.15);
-    // Use appropriate animation clips from models.c: v_rapier (50) uses A_ATTACK_HIT (4), v_pipe (49) uses A_ATTACK_HIT (18) for hit
     if (hit) {
         PlayAnim(PLAYER1, isRapier ? A_ATTACK_HIT : A_ATTACK_HIT);
         u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_COUNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; }
@@ -385,10 +315,10 @@ void FireRapier(int wep16) { FireMelee(wep16, true,  false, 246, 247, 246); } //
 void FirePipe(int wep16)   { FireMelee(wep16, false, false, 253, 254, 252); } // wpipe_hit/swing/dmg
 static void AttachProjectileRibbon(u16 prefabID, u16 ball) {
     static const struct { u16 prefab, root, child; } ribbons[] = {
-        { 482, 154, 155      },   /* proj_magpulse_shot:        bolt glow + sparks_spits */
-        { 490, 154, 155      },   /* proj_magpulsenpc_shot:     same pair */
-        { 485, 156, U16_MAX },   /* proj_plasmarifle_shot:    plasma core, no child emitter   */
-        { 483, 159, U16_MAX },   /* proj_stungun_shot:        same pairing, not yet audited   */
+        { 482, 154, 155      }, /* proj_magpulse_shot:    bolt glow + sparks_spits */
+        { 490, 154, 155      }, /* proj_magpulsenpc_shot: same pair */
+        { 485, 156, U16_MAX },  /* proj_plasmarifle_shot: plasma core, no child emitter   */
+        { 483, 159, U16_MAX },  /* proj_stungun_shot:     same pairing, not yet audited   */
     };
     for (u32 i = 0; i < sizeof(ribbons)/sizeof(*ribbons); ++i) {
         if (ribbons[i].prefab != prefabID) continue;
@@ -440,9 +370,6 @@ void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;if(wep16 !=
         } else { if (World.invP1.wepLoadedWithAlternate[wc]) { if (!Cheats.bottomless) World.invP1.currentMagazineAmount2[wc]--; } else { if (!Cheats.bottomless) World.invP1.currentMagazineAmount[wc]--; } }
         World.shotsFired++;
     }
-    /* Unity WeaponFire: Recoil(index) and the waitTilNextFire assignment sit OUTSIDE the melee-ammo branch, so the
-       pipe and rapier do get their delay (delayBetweenShotsForWeapon[6]=0.65s, [5]=1.6s).  Keeping them inside
-       let the pipe be swung as fast as the attack input repeats. */
     Recoil(wep16);
     if (World.invP1.wepLoadedWithAlternate[wc] || wasOverload) { World.invP1.overloadEnabled = false; World.invP1.waitTilNextFire = World.pauseRelativeTime + delayBetweenShotsForWeapon2[wep16]; }
     else { World.invP1.waitTilNextFire = World.pauseRelativeTime + delayBetweenShotsForWeapon[wep16]; }

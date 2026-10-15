@@ -368,7 +368,7 @@ static void ai_muzzle_particles(Entity* self, int attackNum) {
 static void ai_laser_beam(Entity* self, int attackNum, V3 hitPos) {
     u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return; const NPCTable* npcTab=&npcTable[npc];
     bool has=attackNum==1?npcTab->hasLaserOnAttack1:(attackNum==2?npcTab->hasLaserOnAttack2:npcTab->hasLaserOnAttack3); if(!has)return;
-    SpawnBeamTrail(PSYS_npc_laserbeam,ai_sight_pos(self),hitPos,(Color){1,1,1,1});
+    SpawnBeamTrail(166,ai_sight_pos(self),hitPos,(Color){1,1,1,1});
 }
 INLINE V3 ai_attack_pos(Entity* e, int n) { return n==1 ? ai_sight_pos(e) : ai_gun_pos(e,n); }
 Quaternion quat_look_rotation(V3 fwd, V3 up) {

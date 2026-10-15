@@ -2230,9 +2230,9 @@ void InitalizeEnvironment() {
     GenerateAndBindTexture(&biomTexId,GL_RGBA8,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,GL_LINEAR,NULL);
     glGenFramebuffers(1,&biomFBO);
     glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,biomTexId,0);
+    bioMonitor.beatFinished=get_time() + 0.5; bioMonitor.backgroundColor=(Color){0.2f,0.2f,1.0f,0.01f}; bioMonitor.ergColor=(Color){0,0.5f,1.0f,1.0f}; bioMonitor.chiColor=(Color){.7f,0,1.f,1.f};
+    bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
     
-    bioMonitor.beatFinished=get_time() + 0.5; bioMonitor.widthPerc=0.4f;  bioMonitor.heightPerc=0.1f;    bioMonitor.backgroundColor=(Color){0.2f,0.2f,1.0f,0.01f};    bioMonitor.ergColor=(Color){0,0.5f,1.0f,1.0f}; bioMonitor.ymax=36;           bioMonitor.chiColor=(Color){.7f,0,1.f,1.f};
-    bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f;                  bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
     NewGame();
     currentMenuPage = Mpg_FrontPage;
     if (playIntroAtBoot) ChangeMenuPage(Mpg_IntroVideo);/*must come after NewGame (it resets the page to Mpg_FrontPage) and go through ChangeMenuPage so the cutscene also gets its clip audio + start time*/
@@ -2292,7 +2292,6 @@ i32 main() {
         if (ScrshotPressed() && World.current_time > World.screenshotTimeout) {
             Screenshot();
             //AutomapDumpBMP(); // Uncomment for testing
-            //BiomonitorDumpBMP();
         }
         
         for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/

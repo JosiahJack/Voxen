@@ -360,7 +360,7 @@ void ButtonSwitchUse(u16 self, u16 activator) {
 }
 
 void ButtonSwitchUpdate(u16 self) { double t=World.pauseRelativeTime; Entity* e=&World.instances[self]; if (e->switchAnimFinished > 0.0 && e->switchAnimFinished <= t){ ButtonSwitchHoldPose(e); } if (e->delayFinished > 0.0 && e->delayFinished < t){e->delayFinished=0.0; ButtonSwitchUseTargets(self);} if (e->index == 689 && e->active && e->tickFinished < t) { TextureChangerToggle(self); e->tickFinished=t+1.5f; } }
-void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= UsableOrDef(e->minSecurityLevel,100.0f)) { if(!e->broken){HealthManagerHealingBed(PLAYER1,UsableOrDef(e->amount,170.0f),true); World.instances[PLAYER1].radiation=0.0f; World.invP1.radiationArea=false; CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav(sounds[103], AppliedFXVol(1.0f), World.position[self], false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
+void HealingBedUse(u16 self, u16 owner) { Entity* e=&World.instances[self]; if (GetCurrentLevelSecurity() <= UsableOrDef(e->minSecurityLevel,100.0f)) { if(!e->broken){HealthManagerHealingBed(PLAYER1,UsableOrDef(e->amount,170.0f)); World.instances[PLAYER1].radiation=0.0f; World.invP1.radiationArea=false; CenterStatusPrint("%s",Sys_Text.stringTable[23],owner); play_wav(sounds[103], AppliedFXVol(1.0f), World.position[self], false);} else {CenterStatusPrint("%s",Sys_Text.stringTable[24],owner);} } else UIBlockedBySecurity(World.position[self]); }
 int GeneralInvItem(int slot);
 bool GeneralInvCanVaporize(int slot);
 void GeneralInvRemove(int slot);
@@ -373,7 +373,7 @@ bool PlayerInElevatorCell(void); bool FindElevatorKeypadPos(u8 level,V3* outPos)
 bool ElevatorDefaultDestinationPos(u8 level,V3* outPos) { V3 panel; if (FindElevatorKeypadPos(level,&panel) && ElevatorDestinationPosNear(level,panel,outPos)) return true; return GetElevatorDestinationPos(level,0,outPos); }
 bool ElevatorDestinationPosNear(u8 level,V3 fromPos,V3* outPos) {
     V3 best; float bestSq=0.0f; bool found=false;
-    for (u8 n=0;n<MAX_LEVELS;++n) { V3 p; if(!GetElevatorDestinationPos(level,n,&p)) break; /*past the last one the level has*/ V3 d=V3_AsubB(p,fromPos); float sq=V3_dot(d,d); if(!found||sq<bestSq){best=p;bestSq=sq;found=true;} }
+    for (u8 n=0;n<MAX_LEVELS;++n) { V3 p; if(!GetElevatorDestinationPos(level,n,&p)) break; V3 d=V3_AsubB(p,fromPos); float sq=V3_dot(d,d); if(!found||sq<bestSq){best=p;bestSq=sq;found=true;} }
     if(found)*outPos=best; return found;
 }
 void ElevatorButtonClick(u16 self) {
@@ -540,9 +540,9 @@ void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseV
 static void SpawnExplosionPreset(u16 type,V3 pos) { const PSysDef* preset=PSysTypeGet(type); if(!preset)return; PSysDef def=*preset; def.pos=pos; PSysAdd(&def); }
 void SpawnExplosionEffect(V3 pos, int explosionType) {
     switch (explosionType) {
-        case 3: SpawnExplosionPreset(PSYS_gasExplosions,pos); SpawnExplosionPreset(PSYS_gasSmoke,pos); break;/*GasExplosions*/
-        case 4: SpawnExplosionPreset(PSYS_ef_empexplosion,pos); SpawnExplosionPreset(PSYS_sprinkles,pos); SpawnExplosionPreset(PSYS_sparkles,pos); break;/*GrenadeEMPExplosions*/
-        default: SpawnExplosionPreset(PSYS_CentralFireball,pos); SpawnExplosionPreset(PSYS_FireSpits,pos); break;/*GrenadeFragExplosions*/
+        case 3:  SpawnExplosionPreset(165,pos); SpawnExplosionPreset(168,pos); break;/*GasExplosions*/
+        case 4:  SpawnExplosionPreset(162,pos); SpawnExplosionPreset(163,pos); SpawnExplosionPreset(164,pos); break;/*GrenadeEMPExplosions*/
+        default: SpawnExplosionPreset(5,pos);   SpawnExplosionPreset(6,pos); break;/*GrenadeFragExplosions*/
     }
 }
 void GrenadeExplode(u16 self) {
@@ -632,7 +632,7 @@ static void TeleportAway(u16 self) {
     if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;}
     
     flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true);
-    const PSysDef* dgo = PSysTypeGet(PSYS_ef_diego_teleport);
+    const PSysDef* dgo = PSysTypeGet(189);
     if (dgo) { PSysDef d = *dgo; d.pos = World.position[self]; d.rotation = World.rotation[self]; PSysAddEx(&d, self); }
     World.col[self] = COLTYPE_NONE;
     World.gravity[self] = 0.0f;
@@ -684,7 +684,7 @@ static void VaporizeCorpse(u16 self,bool energyVaporized) { Entity* e=&World.ins
     V3 pos = World.position[self];
     if (World.col[self] != COLTYPE_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); }
     if (e->deathBurst != 0 && IdxInBounds((int)e->deathBurst) && !IdxIsGeometry((int)e->deathBurst)) { CreateDeathEffects(self,e->deathBurst); }
-    else { SpawnDeathEffectAt(energyVaporized ? PSYS_ef_vaporize_puff : PSYS_ef_corpsehit_puff, pos); }
+    else { SpawnDeathEffectAt(energyVaporized ? 188 : 187, pos); }
     
     e->modelIndex=MAX_MDLS;
     if (IdxIsNPC(e->index) || IdxIsSearchable(e->index)) DeleteInstance(self);

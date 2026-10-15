@@ -521,7 +521,7 @@ void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=tru
 
 void UI_ElevClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadElevator=U16_MAX; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.elevCurrentFloor=0; SysUIDataClose(); }
 void UI_AudioLogClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastLogSideRH=rh; if (!(World.invP1.hasHardware&HW_ERD)) return;
-    if (World.Sys_UI.logActive) { World.Sys_UI.logActive=false; World.Sys_UI.audPaused=true; CenterStatusPrint("%s",Sys_Text.stringTable[1019]); return; }/*Log playback stopped.*/
+    if (World.Sys_UI.logActive) { World.Sys_UI.logActive=false; CenterStatusPrint("%s",Sys_Text.stringTable[1019]); return; }/*Log playback stopped.*/
     if (World.Sys_UI.logReferenceIndex<(u16)LOGCNT && World.invP1.hasLog[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex][0]) { PlayLog((int)World.Sys_UI.logReferenceIndex); World.Sys_UI.logActive=true; }
 }
 
