@@ -8,11 +8,11 @@ GlobalContext World = {0}; // Full game state
 // Rendering
 u32 globalframe = 0, globalframesPerLastSecond;
 
-u32 inputImageID, inputUIID, inputDepthID, inputWorldPosID, inputSpecID, inputNormalID, outputImageID, gBufferFBO;
+u32 inputImageID, inputUIID, inputDepthID, inputSpecID, inputNormalID, outputImageID, gBufferFBO;
 u32 uiFBO, uiSP;
 
 u32 depthPrepassSP;
-u32 chunkSP, chunkVAO, chunkVBO;
+u32 chunkSP, chunkVAO;
 float rasterPerspectiveProjection[16];
 bool doubleSidedTexture[MAX_TXRS], transparentTexture[MAX_TXRS];
 
@@ -67,7 +67,7 @@ int resDropdownCount = 0, resSelectedIdx = 0, resHoverIdx = -1;
 typedef struct {int w,h;} ResMode; ResMode resModes[16];
 
 // Input
-bool mouseMovementThisFrame,window_has_focus,ignore_next_mouse_delta,returnToPause=false,fovSliderActive=false,gammaSliderActive=false,masterVolumeSliderActive=false,musicVolumeSliderActive=false,messageVolumeSliderActive=false,sfxVolumeSliderActive=false,enteringPlayerName=false;
+bool mouseMovementThisFrame, window_has_focus, ignore_next_mouse_delta, returnToPause, fovSliderActive, gammaSliderActive, masterVolumeSliderActive, musicVolumeSliderActive, messageVolumeSliderActive, sfxVolumeSliderActive, enteringPlayerName;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {5,/*Forward=F*/ 0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/ 23,/*Prone=X*/ 16,/*Lean Left=Q*/ 4,/*Lean Right=E*/ 45,/*Sprint=LSHIFT*/ 38,/*Turn Left=LARROW*/ 39,/*Turn Right=RARROW*/ 36,/*Look Up=UARROW*/ 37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/ 27,/*Sensaround=2*/ 28,/*Lantern=3*/
                           29,/*Shield=4*/ 30,/*Infrared=5*/ 31,/*Email=6*/ 32,/*Booster=7*/ 33,/*Jumpjets=8*/ 56,/*Attack=LMB*/ 57,/*Use=RMB*/ 99,/*Menu/Back=ESCAPE*/ 80,/*Toggle Mode=TAB*/ 17,/*Reload=R*/ 127,/*Weapon+=MWHEEL+*/ 128,/* Weapon-=MWHEEL-*/ 6,/* Grenade=G*/ 19,/*Grenade + = T*/ 131,/*Grenade-=*/ 21,/*Ammo Type=V*/ 9,/*Patch Use=J*/ 8,/*Patch+=I*/ 132,/*Patch-=,*/
@@ -101,7 +101,7 @@ Color textColors[] = {{1.000000000f,1.000000000f,1.000000000f,1.0f},/* 0 White T
                       {0.000000000f,0.039215688f,0.835294200f,1.0f} /* 14 PuzzleWire actualColorBlue T_BLUE*/,
                       {0.546864600f,0.152723400f,0.830188700f,1.0f} /* 15 PuzzleWire actualColorPurple T_PURPLE*/ };
 // Wireline Rendering
-u32 debugUnlitSP, debugLinesVAO, debugLinesVBO, debugLineColors, wireLinesVAO, wireLinesVBO;
+u32 debugUnlitSP, debugLinesVAO, debugLinesVBO, wireLinesVAO, wireLinesVBO;
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex* debugLineVerts = NULL;
 typedef struct { float x,y,z,r,g,b,a; } WireVertex;
@@ -263,7 +263,6 @@ void DrawAngularVelocity(u16 i) {
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
 V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,{-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
 static V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,{126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
-static void AddToHistory(const char* entry) { if (slen(entry) == 0 || (numHistory > 0 && sEqual(entry,history[numHistory - 1]))){return;} if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],entry,T_BUFFER_SIZE); numHistory++; } else { for (int i = 0; i < 7 - 1; i++) {scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE);/*Shift list toward 0*/} scpy_to_a_from_b(history[7 - 1],entry,T_BUFFER_SIZE); } }
 void RecallHistory(int d) { /*1 up (older),-1 down (newer)*/
     if (d == 1) { /*up*/
         if (historyPos>0) {
@@ -286,7 +285,7 @@ void RecallHistory(int d) { /*1 up (older),-1 down (newer)*/
 
 typedef void (*ConsoleCmdFuncNoArg)(); typedef void (*ConsoleCmdFuncInt)(int); typedef void (*ConsoleCmdFuncStr)(const char*);
 typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
-int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
+INLINE int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
 void cmd_noclip() { Cheats.noclip = !Cheats.noclip; if (Cheats.noclip) { World.velocity[PLAYER1] = (V3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
 void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; DebugRAM(Cheats.showPhys?"showPhys ON":"showPhys OFF"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[Cheats.showPhys?1000:717]);/*"ACTIVATED"/"DISABLED"*/ }
 void cmd_shownpc() { Cheats.showNPC = !Cheats.showNPC; DebugRAM(Cheats.showNPC?"showNPC ON":"showNPC OFF"); CenterStatusPrint("shownpc: %s", Sys_Text.stringTable[Cheats.showNPC ? 1000 : 717]); }
@@ -526,9 +525,8 @@ static const ConsoleCommand consoleCmds[] = {
     {"all your base",  {.noArg=cmd_allyourbase},   NOARG},{"i am iron man",   {.noArg = cmd_iamironman},   NOARG},{"i am amazing",{.noArg=cmd_iamironman},NOARG},{"i am cool",     {.noArg=cmd_iamironman},  NOARG},{"i am best",      {.noArg =cmd_iamironman},NOARG},{"idkfa",                   {.noArg=cmd_idkfa},      NOARG},
     {"impulse 9",      {.noArg=cmd_idkfa},         NOARG},{"undo",            {.noArg = cmd_undo},         NOARG},{"shake",       {.noArg=cmd_shake},     NOARG},{"tired",         {.noArg=cmd_staminup},    NOARG},{"staminup",       {.noArg = cmd_staminup}, NOARG},{"grok",                    {.noArg=cmd_ai},         NOARG},
     {"chatgpt",        {.noArg=cmd_ai},            NOARG},{"claude",          {.noArg = cmd_ai},           NOARG},{"gemini",      {.noArg=cmd_ai},        NOARG},{"shodan",        {.noArg=cmd_aireal},      NOARG},{"animtest",       {.noArg = cmd_animtest}, NOARG},{"qb_set",                  {.withStr=cmd_qb_set},   CMD_STR},
-    {"qb_clear",       {.withStr=cmd_qb_clear},  CMD_STR},{"qb_toggle",       {.withStr=cmd_qb_toggle},  CMD_STR},{"qb_list",     {.noArg=cmd_qb_list},   NOARG},{"shownpc",       {.noArg=cmd_shownpc},     NOARG},{NULL,{.raw = NULL},NOARG}/*sizeof helper*/ };
-    
-void ToggleConsole();
+    {"qb_clear",       {.withStr=cmd_qb_clear},  CMD_STR},{"qb_toggle",       {.withStr=cmd_qb_toggle},  CMD_STR},{"qb_list",     {.noArg=cmd_qb_list},   NOARG},{"shownpc",       {.noArg=cmd_shownpc},     NOARG},{NULL,{.noArg = NULL},NOARG}/*sizeof helper*/ };
+
 void ProcessConsoleCommand(const char* c) {
     if (c == NULL || slen(c) == 0) { ToggleConsole(); return; }
     
@@ -541,7 +539,7 @@ void ProcessConsoleCommand(const char* c) {
     while (*space && !cEmpty((u8)*space)) { space++; }
     const char* arg_start=space;
     while (*arg_start && cEmpty((u8)*arg_start)) { arg_start++; }
-    AddToHistory(c);
+    if (slen(c) > 0 && (numHistory == 0 || !sEqual(c,history[numHistory - 1]))){ if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],c,T_BUFFER_SIZE); numHistory++; } else {for (int i = 0; i < 7 - 1; i++) {scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE);/*Shift list toward 0*/} scpy_to_a_from_b(history[7 - 1],c,T_BUFFER_SIZE);} }
     bool commandProcessed = false;
     for (u16 i=0;consoleCmds[i].name!=NULL;++i) {
         const ConsoleCommand* cmd = &consoleCmds[i];
@@ -550,7 +548,7 @@ void ProcessConsoleCommand(const char* c) {
                 cmd->func.noArg();
                 commandProcessed = true;
             } else if (cmd->type == CMD_STR && *arg_start) {
-                cmd->func.withStr(*arg_start ? arg_start : "");
+                cmd->func.withStr(arg_start);
                 commandProcessed = true;
             } else {
                 if (!*arg_start) {
@@ -682,23 +680,15 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                 if (!(World.instances[i].entflags & EF_ACTIVE)){ continue; }
                 
                 u16 mindex = World.instances[i].modelIndex;
+                V3 objPos = World.position[i];
+                V3 delta = V3_AsubB(objPos,origin);
+                u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
+                if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
+                
                 if (mindex >= MAX_MDLS) {
-                    ColliderType ct = World.col[i];
-                    if (ct != COLTYPE_CAP && ct != COLTYPE_SPH) continue;
-                    
-                    V3 objPos = World.position[i]; V3 delta = V3_AsubB(objPos, origin);
+                    ColliderType ct = World.col[i]; if (ct != COLTYPE_CAP && ct != COLTYPE_SPH) continue;
                     if (V3_dot(delta, delta) >= maxDistSq) continue;
-                    
-                    u16 instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
-                    if (!IdxIsPortalBlockingDoor(World.instances[i].index)) {
-                        if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())) { continue; }
-                    }
-                    
-                    RaycastHit ch = {0};
-                    if (ct == COLTYPE_CAP) { ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance); }
-                    else { ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance); }
-                    
-                    if (!ch.hit || ch.distance >= result.distance) { continue; }
+                    RaycastHit ch = {0}; if (ct == COLTYPE_CAP) { ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance); } else { ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance); } if (!ch.hit || ch.distance >= result.distance) { continue; }
                     
                     ch.hitInstanceIndex = i;
                     result = ch;
@@ -706,18 +696,8 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                 }
                 
                 if (mindex >= mdlsCnt) continue;
-                
-                V3 objPos = World.position[i];
-                V3 delta = V3_AsubB(objPos,origin);
                 if (V3_dot(delta,delta) >= maxDistSq) continue;
-                
-                u16 instCellIdx = PosGetCellCoords(objPos.x,objPos.z);
-                if (!IdxIsPortalBlockingDoor(World.instances[i].index)) {
-                    if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())) { continue; }
-                }
-                
-                u32 triCount = modelTriangleCounts[mindex];
-                if (triCount < 1) continue;
+                u32 triCount = modelTriangleCounts[mindex]; if (triCount < 1) continue;
                 
                 float M[16]; mcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
                 float m00=M[0], m10=M[1], m20=M[2], m01=M[4], m11=M[5], m21=M[6], m02=M[8], m12=M[9], m22=M[10], tx=M[12], ty=M[13], tz=M[14];
@@ -896,7 +876,10 @@ void UpdateScreenSize(i32 width, i32 height) {
     glBindFramebuffer(GL_FRAMEBUFFER,0); ignore_next_mouse_delta = true;
 }
 
-extern V3 vWepOfs[16];
+//                        0 mk3 assault rifle              1 blaster             2 dartgun               3 flech                 4 ion       5 rapier         6 pipe               7 magnum            8 magpulse               9 pistol               10 plasma                 11 rail                              12 riot              13 skorp              14 sparq               15 stun
+Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},     {0,0,0,1},     {0,0,0,1},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
+        V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},{-.2f,.5f,.8f},  {0,-.3f,.7f},        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
+extern const u16 wepModelIndices[16];
 extern WeaponFireCtx wfx; // weapon view model: needed by RenderUI (ui.c)
 
 #include "automap.c" // CPU-rasterized automap
@@ -960,7 +943,7 @@ void UpdateLights() {
 }
 
 // Shadowmapping
-typedef struct {float depth; u16 index; } DepthSort; DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX];
+typedef struct {float depth; u16 index; } DepthSort;
 INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex > texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || e->texIndex >= MAX_TXRS || otherCondition; }
 INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) { glUniform1ui(0,i); u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex; if (currentModelType == modelType && currentModelType != 0) return currentModelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); return modelType; }
 typedef float __m256 __attribute__((__vector_size__(32), __may_alias__)); typedef long long __m256i __attribute__((__vector_size__(32), __may_alias__)); typedef float __v8sf __attribute__((__vector_size__(32), __may_alias__));
@@ -982,7 +965,7 @@ extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artif
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_xor_ps(__m256 __A, __m256 __B) { return (__m256)((__m256i)__A ^ (__m256i)__B); }
 extern __inline int __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_movemask_ps(__m256 __A) { return __builtin_ia32_movmskps256((__v8sf)__A); }
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_setzero_ps(void) { return (__m256){ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; }
-DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS]; static __attribute__((aligned(64))) float sc_posX[SC_MAX],sc_posY[SC_MAX],sc_posZ[SC_MAX],sc_radius[SC_MAX],sc_shadRadius[SC_MAX]; static u16 sc_origIdx[SC_MAX], shadowSlot[LIGHT_COUNT]; static u8 shadowFaces[LIGHT_COUNT]; static float shadowPosSum[LIGHT_COUNT]; static u32 shadowIdSum[LIGHT_COUNT],shadClearFace[SHADOW_MAP_SIZE*SHADOW_MAP_SIZE];
+u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS]; static __attribute__((aligned(64))) float sc_posX[SC_MAX],sc_posY[SC_MAX],sc_posZ[SC_MAX],sc_radius[SC_MAX],sc_shadRadius[SC_MAX]; static u16 sc_origIdx[SC_MAX], shadowSlot[LIGHT_COUNT]; static u8 shadowFaces[LIGHT_COUNT]; static float shadowPosSum[LIGHT_COUNT]; static u32 shadowIdSum[LIGHT_COUNT],shadClearFace[SHADOW_MAP_SIZE*SHADOW_MAP_SIZE];
 static i8 shadowLevel=-1; u32 shadowNextSlot=0; static const i8 faceAxis[6] = {0,0,1,1,2,2}; static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
 INLINE u8 GetCubemapFaceMask(V3 d, float r) {u8 m=0; float absX=vabs(d.x),absY=vabs(d.y),absZ=vabs(d.z); float maxAbsYZ = absY > absZ ? absY : absZ; float maxAbsXZ = absX > absZ ? absX : absZ; float maxAbsXY = absX > absY ? absX : absY; if (d.x+r > maxAbsYZ) m|=(1<<0); if (d.x-r < -maxAbsYZ) m|=(1<<1); if (d.y+r > maxAbsXZ) m|=(1<<2); if (d.y-r < -maxAbsXZ) m|=(1<<3); if (d.z+r > maxAbsXY) m|=(1<<4); if (d.z-r < -maxAbsXY) m|=(1<<5); return m;}
 INLINE bool ShadowCasterMoved(u16 i) { return i != PLAYER1 && (World.instances[i].entflags & EF_MOVING) && !IdxIsNPC(World.instances[i].index); }
@@ -1107,9 +1090,11 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
             const int axis = faceAxis[f];
             const float sign = faceSign[f];
             float x = toLight.x + addX, y = toLight.y + addY, z = toLight.z + addZ;
-            if (axis == 0) x = toLight.x + sign * effectiveRadius;
+                 if (axis == 0) x = toLight.x + sign * effectiveRadius;
             else if (axis == 1) y = toLight.y + sign * effectiveRadius;
-            else z = toLight.z + sign * effectiveRadius; cX[f] = x; cY[f] = y; cZ[f] = z;
+            else                z = toLight.z + sign * effectiveRadius;
+            
+            cX[f] = x; cY[f] = y; cZ[f] = z;
         }
         
         cX[6] = cY[6] = cZ[6] = 0.0f; cX[7] = cY[7] = cZ[7] = 0.0f;
@@ -1192,8 +1177,6 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 posSum += World.position[instIdx].x + World.position[instIdx].y + World.position[instIdx].z;
                 if (ShadowCasterMoved(instIdx)) anyMoved = true;
             }
-            
-            if (k == numCastersAligned && nearbyMeshCount >= SHADOW_NEARMESH_MAX) break;
         }
         
         if (nearbyMeshCount < SHADOW_NEARMESH_MAX) {
@@ -1311,7 +1294,6 @@ void InitSunShadowmap(void) { // single 2048x2048 sunlight depth map + FBO, no c
     glGenFramebuffers(1,&sunShadowFBO); glBindFramebuffer(GL_FRAMEBUFFER,sunShadowFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,sunShadowTex,0);
     glDrawBuffers(0,NULL); // depth-only FBO: no color buffers
-    u32 sunFBStatus=glCheckFramebufferStatus(GL_FRAMEBUFFER); if (sunFBStatus != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Sun shadowmap framebuffer incomplete: %d\n",sunFBStatus);
     glActiveTexture((u32)prevUnit); /*put the caller's unit back, still bound to whatever it had*/
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
 }
@@ -1404,10 +1386,8 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
     float f = vcot(sfov * PI / 360.0f); float* m = rasterPerspectiveProjection; m[0]=f / aspect3D; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f*sfar*snear / (sfar - snear); m[15]=0.0f;
     mat4_lookat_from(view,&World.rotation[PLAYER1],World.position[PLAYER1]); mul_mat4(viewProj,rasterPerspectiveProjection,view); invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8]; invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9]; invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10]; mat4_inverse(viewProj,invViewProj);
 }
-//                        0 mk3 assault rifle              1 blaster             2 dartgun               3 flech                 4 ion  5 rapier    6 pipe               7 magnum            8 magpulse               9 pistol               10 plasma                 11 rail                              12 riot              13 skorp              14 sparq               15 stun
-Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,0,.99456f},{0,.66976f,.74389f,0},{0,.68903f,.72611f,0},{0,0,0,1},{0,0,0,1},{.63662f,0,0,-.77238f},{0,.63662f,.77238f,0},{-.67623f,0,0,.73802f},{0,-.70781f,-.70781f,0},{0,-.65003f,-.76116f,0},{-.44581f,-.44581f,-.55061f,.55061f},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0},{0,.67623f,.73802f,0}};                        
-        V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},  {-.2f,.5f,.8f},  {0,-.3f,.7f},        /*rapier / pipe: mesh extents require forward/down offset (pipe bbox z:-0.7..0.04 y:-1.26..-0.86; rapier bbox z:-1.07..0.13 y:-1.03..0.04)*/        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
-extern const u16 wepModelIndices[16]; extern WeaponFireCtx wfx; void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
+
+void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
 static bool clearRenderTargetsOnNextFrame = false;
 void RequestClearRenderTargets() { clearRenderTargetsOnNextFrame = true; }
 static void ClearAllRenderTargets() {
@@ -1594,10 +1574,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glUniform1i(36, 10);
         glActiveTexture(GL_TEXTURE0);
     }
-    
-    cullBlendState = 0xFF;
-    
-    bool grayscaleEnabled = ModRequestsGrayscale();
+
+    bool grayscaleEnabled = ((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0);
     glUniform1ui(26,(u32)grayscaleEnabled);
     
     float fogActual = World.fogColor[World.curLev].a + (float)(World.fogFac / 255u); /*Alpha is base density for level.*/
@@ -1673,7 +1651,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (textDecalVBO[tdLev][i]==0 || textDecalVertexCount[tdLev][i]==0) { continue; }
         u16 cIdx = World.instances[i].index; if (cIdx!=592 && cIdx!=593) { continue; }
         if (!(World.instances[i].entflags & EF_ACTIVE)) { continue; }
-        if (World.instances[i].cellIndex >= 0 && !((gridCellStates[World.instances[i].cellIndex] & CELL_VISIBLE) || ((gridCellStates[World.instances[i].cellIndex] & CELL_OPEN) == CELL_OPEN))) { continue; }
+        if (!((gridCellStates[World.instances[i].cellIndex] & CELL_VISIBLE) || ((gridCellStates[World.instances[i].cellIndex] & CELL_OPEN) == CELL_OPEN))) { continue; }
         
         if (cullBlendState != 2) { /*Double-sided*/
             glDisable(GL_CULL_FACE);
@@ -1805,13 +1783,13 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u32 shieldOnType = 0u/*No shield green tint*/;
     if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) { shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/; }
     glUniform1ui(20, shieldOnType); // Green Shield
-    Color3 painStaticColor = (Color3){1.0f, 0.0f, 0.0f};
+    Color3 painStaticColor = (Color3){1.0f, 0.0f, 0.0f}; // TODO reuse for blue EMP static effect
     glUniform3f(23,painStaticColor.r, painStaticColor.g, painStaticColor.b);
     glUniformMatrix4fv(24, 1, 0, viewProj);
     glUniformMatrix3fv(25, 1, 0, invViewRot);
     glUniform1i(27, 0);
     glUniform1f(28, vclamp(World.painStaticAlpha + World.empStaticAlpha, 0.0f, 1.0f));
-    glUniform1ui(29, (u32)ModRequestsGrayscale());
+    glUniform1ui(29, (u32)((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0));
     glBindVertexArray(quadVAO);
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/, 0, 4);
@@ -1862,7 +1840,6 @@ void RenderCameraViews() { /*Render in-world camera views.  Pops player position
 }
 
 void UpdateInstanceMatrix4x4s() {
-    i32 dirtyMin = -1, dirtyMax = -1;
     float servoHalf = SERVBOT_MESH_YAW_DEG * (PI / 180.0f) * 0.5f;
     Quaternion servoYaw = {0.0f, vsinf(servoHalf), 0.0f, vcosf(servoHalf)};/*npc_servbot (437) render-only mesh correction: SERVBOT_MESH_YAW_DEG about global +Y, pre-multiplied so only the rendered mesh turns; World.rotation (physics, forward, muzzle, AI) is untouched.  Let this be a lesson to ya kids, don't apply armature's before you apply transforms, heh.*/
     for (u32 i = INSTS_1ST_IDX; i < World.instCount; i++) {        
@@ -1891,14 +1868,12 @@ void UpdateInstanceMatrix4x4s() {
         modelMatrices[m + 4]  = (2.0f * (xy - wz))        * scly; modelMatrices[m + 5]  = (1.0f - 2.0f * (x2 + z2)) * scly; modelMatrices[m+6]  = (2.0f * (yz + wx))        * scly; modelMatrices[m + 7]  = 0.0f;
         modelMatrices[m + 8]  = (2.0f * (xz + wy))        * sclz; modelMatrices[m + 9]  = (2.0f * (yz - wx))        * sclz; modelMatrices[m+10] = (1.0f - 2.0f * (x2 + y2)) * sclz; modelMatrices[m + 11] = 0.0f;
         modelMatrices[m + 12] = World.position[i].x;              modelMatrices[m + 13] = World.position[i].y;              modelMatrices[m+14] = World.position[i].z;              modelMatrices[m + 15] = 1.0f;
-        if (dirtyMin < 0) { dirtyMin = (i32)i; }
-        dirtyMax = (i32)i;
     }
     
-    if (dirtyMin >= 0) {
+    if (World.instCount > INSTS_1ST_IDX) {
         glBindBuffer(GL_SSBO,matricesBufferID);
-        u32 offsetFloats=(u32)dirtyMin * 16;
-        u32 countFloats=((u32)dirtyMax - (u32)dirtyMin + 1) * 16;
+        u32 offsetFloats=(u32)INSTS_1ST_IDX * 16;
+        u32 countFloats=((u32)World.instCount - (u32)INSTS_1ST_IDX + 1) * 16;
         glBufferSubData(GL_SSBO, offsetFloats * 4, countFloats * 4, modelMatrices + offsetFloats);
     }
 }
@@ -1951,7 +1926,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.col[0]=COLTYPE_NONE;
     currentMenuItem = currentMenuTab = 0;
     currentMenuPage = Mpg_FrontPage;
-    World.current_time = World.pauseRelativeTime = World.last_physics_time = World.pauseRelativeTime = World.last_physics_time=0.0;
+    World.current_time = World.pauseRelativeTime = World.last_physics_time = 0.0;
     World.deltaTime=0.0166666666f; 
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
     World.instances[PLAYER1].index = 767;
@@ -2014,9 +1989,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.invP1.staminupActive = World.geniusActive = false;
     World.invP1.inReverbZone = false;
     World.timeScale = DEFAULT_TIME_SCALE; 
-    World.cam_yaw = 90.0f;
-    World.cam_pitch = 0.0f;
-    World.cam_roll = 0.0f;
     World.inventoryMode = Sys_Settings.NoShootMode;
     World.gameFinished = World.creditsActive = World.decoyActive = false;
     World.decoyInstance = U16_MAX;
@@ -2132,9 +2104,7 @@ void InitalizeEnvironment() {
     globalframe = 0;
     World.menuActive = true;
     World.screenshotTimeout = 1.0;
-    World.creditsPageIndex = 1;
     World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/
-    World.deaths = 0;
     World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/
     World.numLevels = MAX_LEVELS; World.startLevel = 1 /*medical*/;
     LoadConfig(); /*Get settings before setting window size.*/
@@ -2155,7 +2125,7 @@ void InitalizeEnvironment() {
     CompileShaders();
     
     u32 tvaos[5],tvbos[5]; glGenVertexArrays(5,tvaos); glGenBuffers(5,tvbos);
-    quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; chunkVBO=tvbos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; wireLinesVAO=tvaos[4]; wireLinesVBO=tvbos[4]; 
+    quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; wireLinesVAO=tvaos[4]; wireLinesVBO=tvbos[4]; 
     
     float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
     glBindVertexArray(quadVAO); glBindBuffer(GL_ARRAY_BUFFER,quadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
@@ -2202,9 +2172,7 @@ void InitalizeEnvironment() {
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputUIID,0);
     u32 drawBuffersUI[] = {GL_COLOR_ATTACHMENT0};
     glDrawBuffers(1,drawBuffersUI);
-    glCheckFramebufferStatus(GL_FRAMEBUFFER);
     glBindImageTexture(0, inputUIID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);/* UI Rendered Color*/
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputUIID, 0);
     
     RenderLoading("Loading...");
     float* m = shadowmapsPerspectiveProjection, lightRangeMax = 15.36f;
@@ -2216,7 +2184,6 @@ void InitalizeEnvironment() {
     
     InitAudio();
     synth_set_reverb_preset(0);
-    World.invP1.inReverbZone=false;
     glGenFramebuffers(1,&gBufferFBO);
     ChangeFullScreenWindowed(false);
     SetSkyRotateSpeed();
@@ -2226,8 +2193,6 @@ void InitalizeEnvironment() {
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
     u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2};
     glDrawBuffers(3,drawBuffers);
-    u32 status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != 0x8CD5/*GL_FRAMEBUFFER_COMPLETE*/) DualLogError("Framebuffer incomplete: Error code %d\n",status);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     mcpy(&modelMatrices[0],mat,16 * sizeof(float));
     matricesBufferID=MakeSSBO(&matricesBufferID,1,INSTANCE_COUNT*16*sizeof(float),modelMatrices,GL_STATIC_DRAW);
@@ -2253,7 +2218,7 @@ void InitalizeEnvironment() {
     bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
         
-    World.absoluteTime = World.current_time = get_time();
+    World.absoluteTime = get_time();
     World.pauseRelativeTime = World.last_physics_time = 0.0;
     
     GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); // Automap related buffers

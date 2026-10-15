@@ -94,9 +94,6 @@ void BioMonitorUpdate() {
     bioMonitor.beatShift = (bioMonitor.beatFinished - World.pauseRelativeTime) / (1.0 / (double)fatigueFactor);
     if (bioMonitor.beatShift > 0.94f) bioMonitor.ecgValue = vsinf(bioMonitor.beatShift * 35.0f); else bioMonitor.ecgValue = 0.0f;
     if (bioMonitor.ecgValue > beatThresh || bioMonitor.ecgValue < (beatThresh * -1.0f)) bioMonitor.ecgValue += random_range(-beatVariation,beatVariation); }
-    /*showFPS: one sample per column at one interval on all three, so the three heads stay locked together and
-      a given column is the same instant on every trace.  The stock rates are per-graph (ERG 2 cols/tick,
-      CHI 3, ECG 1) and deliberately left alone.*/
     if (Cheats.showFPS) {
         if (bioMonitor.tick0Finished < World.pauseRelativeTime) { bioMonitor.tick0Finished = World.pauseRelativeTime + 0.0104f; Push(0,bioMonitor.ergValue); IncrementERG(); }
         if (bioMonitor.tick1Finished < World.pauseRelativeTime) { bioMonitor.tick1Finished = World.pauseRelativeTime + 0.0104f; Push(1,bioMonitor.chiValue); IncrementCHI(); }
@@ -123,5 +120,4 @@ void BioMonitorUpdate() {
         }
     }
     glBindTexture(GL_TEXTURE_2D,biomTexId); glTexSubImage2D(GL_TEXTURE_2D,0,0,0,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,biomPx);
-    if (bioMonitor.tickFinished < World.pauseRelativeTime) { bioMonitor.tickFinished = World.pauseRelativeTime + 0.02f; IncrementERG(); IncrementCHI(); IncrementECG(); }
 }
