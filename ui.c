@@ -1335,7 +1335,7 @@ static double RenderUI() {
             if (World.creditsPageIndex == 1 && !World.gameFinished) ++World.creditsPageIndex;
         } else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed && World.creditsPageIndex>0) { uiClickBlocked = uiClickLock = true; --World.creditsPageIndex; }
         
-        if (World.creditsPageIndex>=22) { World.creditsActive=false; PlayMenuMusic(); return get_time(); }
+        if (World.creditsPageIndex>=22) { World.creditsActive=false; MenuGoBack(); return get_time(); }
         if (World.creditsPageIndex==1) { CreditsStats(); RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); }
         else RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]);
         return get_time();
