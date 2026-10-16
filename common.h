@@ -69,39 +69,21 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
     typedef struct { i64 QuadPart; } LARGE_INTEGER;
     typedef LARGE_INTEGER *PLARGE_INTEGER;
-    typedef struct {
-        u64 Internal,InternalHigh;
-        union {
-            struct {u32 Offset,OffsetHigh;} DUMMYSTRUCTNAME;
-            void* Pointer;
-        } DUMMYUNIONNAME;
-        void* hEvent;
-    } OVERLAPPED, *LPOVERLAPPED;
-    
-    typedef struct {
-        union { u32 dwOemId; struct { u16 wProcessorArchitecture,wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME;
-        u32 dwPageSize;
-        void* lpMinimumApplicationAddress,*lpMaximumApplicationAddress;
-        u64 dwActiveProcessorMask;
-        u32 dwNumberOfProcessors,dwProcessorType,dwAllocationGranularity;
-        u16 wProcessorLevel,wProcessorRevision;
-    } SYSTEM_INFO, *LPSYSTEM_INFO;
-    
     DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*);
     DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);
     DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);
-    DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,LPOVERLAPPED);
+    DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,void*);
     DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);
     DLL_IMP i32 WINAPI UnmapViewOfFile(void*);
     DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
     DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);
     DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);
     DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*);
-    DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,LPOVERLAPPED);
+    DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,void*);
     DLL_IMP i32 WINAPI CloseHandle(void*);
     DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
     DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);
-    DLL_IMP void WINAPI GetSystemInfo(LPSYSTEM_INFO);
+    DLL_IMP void WINAPI GetSystemInfo(void*);
     DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*);
     DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64);
     DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);
@@ -118,7 +100,7 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     INLINE int OS_FileSize(FHandle f) { LARGE_INTEGER s; return (f==(FHandle)-1 || !GetFileSizeEx(f,&s)) ? -1 : (int)s.QuadPart; }
     INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
     INLINE long OS_Seek(FHandle fd, i64 ofs, int whence /*forth and forsooth pray tell*/) { LARGE_INTEGER l={.QuadPart=ofs},n; return SetFilePointerEx((void*)fd,l,&n,whence) ? n.QuadPart : -1; }
-    INLINE int OS_GetNumThreads() { SYSTEM_INFO si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
+    INLINE int OS_GetNumThreads() { struct SYSTEM_INFO { u8 a[32]; u32 dwNumberOfProcessors; u8 b[12]; } si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
     INLINE void OS_Free(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x00008000)) DualLogError("VirtualFree failed\n"); }
     INLINE long OS_RawWrite(FHandle fd, const void* buf, size_t count) { u32 w; return WriteFile((void*)fd,(void*)buf,(u32)count,&w,NULL) ? (i64)w : -1; }
     void* __stdcall GetProcessHeap(); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
@@ -172,7 +154,8 @@ void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(cons
     INLINE double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 0.000000001; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif 
 INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
-void OS_ScratchInit(void),OS_ScratchFree(void),*OS_AllocScratch(size_t amount),OS_FreeInitPhase(void); extern u8* scratch_base,*scratch_cur,*scratch_end;
+void *OS_AllocScratch(size_t amount), OS_FreeInitPhase();
+extern u8 *scratch_cur, *scratch_end;
 INLINE void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
 INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
 INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
@@ -181,7 +164,8 @@ typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool
 typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range, spotAng, maxIntensity, minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer   
 typedef struct { float speed; u16 frameStart, frameEnd, frameStartModelIndex; u8 framerate;} AnimationClip;
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
-enum {/*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
+enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (86ULL * 1024 * 1024),
+      /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                  MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
       /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024,
                             FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 16,
@@ -199,6 +183,7 @@ enum {/*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARR
                T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8, T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14, T_PURPLE = 15,
                FONT_ATLAS_SIZE = 1200, FONT_ATLAS_SIZE2 = 2048, FONT_NORMAL = 0, FONT_STOPD = 1,
                HUDC_WHITE = 0, HUDC_RED = 1, HUDC_ORANGE = 2, HUDC_YELLOW = 3, HUDC_GREEN = 4, HUDC_BLUE = 5, HUDC_PURPLE = 6, HUDC_GRAY = 7,
+      /*Menu*/ MPG_FRONT = 0, MPG_SINGPLYR = 1, MPG_MULTPLYR = 2, MPG_NEWGM = 3, MPG_LOAD = 4, MPG_OPTS = 5, MPG_SAVE = 6, MPG_INTRO = 7, MPG_CREDS = 8,
       /*UI*/ UI_W = 1366, UI_H = 768, CURSOR_SZ = 40, MFD_READER_CONTENTS = 0, MFD_READER_FOLDER = 1, MFD_READER_TEXT = 2, MAX_UI_ELEMENTS = 4096, TXT_PAD = 4, TXT_H = 24, TAB_THICK = 16, MFD_SPACING = 8, MFD_SPACINGCTR = 19,
              SIDE_MFD_W = 320, CTR_MFD_W = 640, MFD_H = 240, UI_AUTOMAP_ZOOM_IN = 0, UI_AUTOMAP_ZOOM_OUT = 1, UI_AUTOMAP_FULL = 2, UI_AUTOMAP_SIDE = 3,
       /*Automap*/ AM_W = 320, AM_H = 200, AM_FULL_W = 700, AM_FULL_H = 700, AM_MAXHULL = 10, AMAP_UI_X_L = 24, AMAP_UI_X_R = 1022, AMAP_UI_Y = 524, AMAP_UI_W = 320, AMAP_UI_H = 200, AM_XOFF = ((AM_W - AM_H) / 2),
@@ -346,8 +331,9 @@ typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen
     u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
     i32 lastAddedIndex,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent/*Current slot in the general inventory (14 slots).*/,hardwareInvIndex/*Current index to the item look-up table.*/,generalInventoryIndexRef[14],berserkIncrement,mediPatchPulseCount;
     i16 ladderState,weaponCurrentPending,weaponIndexPending,weaponCurrent;
-    u16 hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustIdx,heldAmmo,heldAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustIdx[14],patchActive,drainJPM;
-    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hwVers[HW_COUNT],hwVersSetting[HW_COUNT],grenAmmo[7],grenCur,generalInvCurrent,patchCur,patchCounts[7],cyberItemIndex; u16 grenConstIndex[7];
+    u16 hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustIdx,heldAmmo,heldAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustIdx[14],patchActive,drainJPM,grenConstIndex[7];
+    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hwVers[HW_COUNT],hwVersSetting[HW_COUNT],grenAmmo[7],grenCur,generalInvCurrent,patchCur,patchCounts[7];
+    i8 cyberItemIndex;
     bool beepDone,hasNewEmail,hasNewNotes,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData,radiationArea,inReverbZone,leanResetting,wasGrounded,makingNoise;
 } InventorySystem;
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData; typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/ extern AutoSplitterData autoSplitter;
@@ -504,14 +490,7 @@ INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f +
 INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 INLINE i32 vclampi(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
 INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
-/*wire.png's brightest row is 222/255; dividing the target colour by this puts the top of the strip at exactly Unity's
-  colour and lets the texture's own gradient darken the rest of the wire.  WIRE_THICK is the drawn line thickness in
-  pixels; see the PuzzleWire.ChangeAppearance note at the draw site in ui.c for why it is not derived from the prefab.*/
-#define WIRE_TEX_PEAK (222.0f/255.0f)
-#define WIRE_THICK 8.0f
-/*PuzzleWire.GetColor(HUDColor) -> the panel's actualColor* RGB, pre-divided by the source texture's peak so the tint
-  passed to RenderUIImageExtended lands on Unity's colour at the brightest row of wire.png.*/
-INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f/WIRE_TEX_PEAK; switch (hud) {
+INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f/(222.0f/255.0f); switch (hud) {
     case HUDC_RED:    *r=0.9215687f;  *g=0.13725491f; *b=0.16862746f; break;
     case HUDC_ORANGE: *r=1.0f;        *g=0.6f;        *b=0.0f;        break;
     case HUDC_YELLOW: *r=0.89019614f; *g=0.8745099f;  *b=0.0f;        break;
@@ -597,63 +576,20 @@ INLINE u16 GetImpactType(u16 instanceIdx){
     }
     return 729;
 }
+
 // Game logic inline helpers
 INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601]); }
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount) { Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
 void UI_PuzzleGridClose(bool rh);
 void PGEvalPuzzle(void);
-// Grid puzzle sprite indices.  Mirrors the sprite fields on Citadel Assets/Scripts/PuzzleGrid.cs:
-// gridPlus -> grid0_base, gridX -> grid1_base, gridPlusOn0 -> grid0_onFull0, etc.  Each family is
-// stored Gray, Green, Purple, Blue in file-name order, so a theme is a +0/+1/+2/+3 offset.  The
-// pre-2147 puzzle frames (geniusgrid_highlight, grid1_base, gridcontainer*, node_*, wire_*) keep
-// their original indices.  These live at 3331+ because 2147..2165 were already cursor/gas/automap.
-#define PG_TEX_PLUS_GRAY 3365 /* grid0_base */
-#define PG_TEX_PLUS_GREEN 3366
-#define PG_TEX_PLUS_PURPLE 3367
-#define PG_TEX_PLUS_BLUE 3368
-#define PG_TEX_X_GRAY 3369 /* grid1_base */
-#define PG_TEX_X_GREEN 3370
-#define PG_TEX_X_PURPLE 3371
-#define PG_TEX_X_BLUE 3372
-#define PG_TEX_PLUS_ON0 3373 /* grid0_onFull0: powered + */
-#define PG_TEX_PLUS_ON1 3374
-#define PG_TEX_X_ON0 3375
-#define PG_TEX_X_ON1 3376
-#define PG_TEX_SPECIAL_GRAY 3377 /* grid_special0 */
-#define PG_TEX_SPECIAL_GREEN 3378
-#define PG_TEX_SPECIAL_PURPLE 3379
-#define PG_TEX_SPECIAL_BLUE 3380
-#define PG_TEX_SPECIAL_ON0_GRAY 3381 /* grid_special1_0 */
-#define PG_TEX_SPECIAL_ON0_GREEN 3382
-#define PG_TEX_SPECIAL_ON0_PURPLE 3383
-#define PG_TEX_SPECIAL_ON0_BLUE 3384
-#define PG_TEX_SPECIAL_ON1_GRAY 3385 /* grid_special1_1 */
-#define PG_TEX_SPECIAL_ON1_GREEN 3386
-#define PG_TEX_SPECIAL_ON1_PURPLE 3387
-#define PG_TEX_SPECIAL_ON1_BLUE 3388
-#define PG_TEX_ALWAYSON0_GRAY 3389 /* grid_alwayson0 */
-#define PG_TEX_ALWAYSON0_GREEN 3390
-#define PG_TEX_ALWAYSON0_PURPLE 3391
-#define PG_TEX_ALWAYSON0_BLUE 3392
-#define PG_TEX_ALWAYSON1 3393 /* grid_alwayson1: unthemed */
-#define PG_TEX_CONTAINER_GRAY 2139 /* gridcontainer_gray */
-#define PG_TEX_CONTAINER_BASE 2138
-#define PG_TEX_CONTAINER_BLUE 3395
-#define PG_TEX_CONTAINER_GREEN 3396
-#define PG_TEX_CONTAINER_PURPLE 3397
-#define PG_TEX_NODE_ON 3398
-/* theme (HUDColor) -> per-family sprite offset */
-/*Puzzle grid only ships four themed sprite sets (the un-suffixed base plus _green/_purple/_blue), but HUDColor has
-  eight values, so the enum was scrambled when the extra colors were added.  The pairs are aliases: White==Gray,
-  Red==Green, Orange==Purple, Yellow==Blue.  Folding each pair onto one slot gives the sprite set to use, 0=gray
-  (White/Gray), 1=green (Red/Green), 2=purple (Orange/Purple), 3=blue (Yellow/Blue).  Previously only the real
-  Green/Purple/Blue were mapped and every White/Red/Orange/Yellow panel fell through to 0, so the ten puzzles
-  authored with theme 0..3 all rendered with the gray set regardless of what the scene asked for.*/
 INLINE u16 PGThemeOffset(HUDColor t){ return t==HUDColor_Red||t==HUDColor_Green ? 1u : t==HUDColor_Orange||t==HUDColor_Purple ? 2u : t==HUDColor_Yellow||t==HUDColor_Blue ? 3u : 0u; }
+
 // Audio inline helpers
-INLINE float SfxMaster(){return vclamp((float)Sys_Settings.VolumeMaster/100.f,0,1.f);} INLINE float SfxMsg(){return vclamp((float)Sys_Settings.VolumeMessage/100.f,0,1.f);}
-INLINE float SfxMusic(){ return vclamp((float)Sys_Settings.VolumeMusic /100.f,0,1.f);} INLINE float SfxVol(){return vclamp((float)Sys_Settings.VolumeEffects/100.f,0,1.f);}
+INLINE float SfxMaster(){return vclamp((float)Sys_Settings.VolumeMaster/100.f,0,1.f);}
+INLINE float SfxMusic(){ return vclamp((float)Sys_Settings.VolumeMusic /100.f,0,1.f);}
+INLINE float SfxMsg(){return vclamp((float)Sys_Settings.VolumeMessage/100.f,0,1.f);}
+INLINE float SfxVol(){return vclamp((float)Sys_Settings.VolumeEffects/100.f,0,1.f);}
 INLINE float AppliedFXVol(float v){return vclamp(v*SfxMaster()*SfxVol(),0,1.f);}
 INLINE float AppliedMsgVol(float v){return vclamp(v*SfxMaster()*SfxMsg(),0,1.f);}
 INLINE float AppliedMusicVol(float v){return vclamp(v*SfxMaster()*SfxMusic(),0,1.f);}
@@ -702,5 +638,5 @@ INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *
 void *mcpy(void *dst, const void *src, size_t n), *mset(void *dst, int c, size_t n); i32 PosGetCellCoordX(float x), PosGetCellCoordZ(float z), PosGetCellCoords(float x, float z); u32 PosGetCellCoordsP(i32 cx, i32 cz); size_t slen(const char* s); char* data_parser_trim(char* s); i32 s2i32(const char *str); bool cEmpty(const char),sEmpty(const char*),sEqual(const char*,const char*); int sCompUpToLen(const char* s1, const char* s2, size_t n);
 void scpy_to_a_from_b(char* a, const char* b, size_t bufsz),sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz),sCat(char* a, const char* b, size_t bufsz); char c2Lower(const char c), *sFindSub(const char* s, const char* sub),*StringFindFirstCharWithin(const char *s, char c); const char* StringFindLastChar(const char* str, const char c); void double2str(char* dest, double value, int decs, size_t bufsz);
 int sFormatV(char* buf, size_t bufsz, const char* f, va_list args), sFormat(char* buffer, size_t bufsz, const char* format, ...); char* sUpToEndLine(char* buf, int sz, FHandle fd); void PrintLog(const char*, ...),DualLog(const char*, ...),DualLogWarn(const char*, ...),DualLogError(const char*, ...),CenterStatusPrint(const char* restrict, ...),BmpWrite(char const*,int,int,const void*),DebugRAM(const char*), Screenshot();
-extern char statusText[T_BUFFER_SIZE]; u8 random_range_u8(u8,u8); u32 random_range_u32(u32,u32); i32 random_range_i32(i32,i32); float random_range(float,float); u32 rand(); float lerp(float,float,float),inverse_lerp(float,float,float); char* sLevelFileUpToEndLine(char* buf, int size); void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp);
+extern char statusText[T_BUFFER_SIZE]; u8 random_range_u8(u8,u8); u32 random_range_u32(u32,u32); i32 random_range_i32(i32,i32); float random_range(float,float); u32 rand(); float lerp(float,float,float),inverse_lerp(float,float,float); void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp);
 INLINE  int  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; }/*memcmp replacement*/ INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; }/*memmove replacement*/

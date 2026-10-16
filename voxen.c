@@ -6,73 +6,37 @@
 GlobalContext World = {0}; // Full game state
 
 // Rendering
-u32 globalframe = 0, globalframesPerLastSecond;
-
-u32 inputImageID, inputUIID, inputDepthID, inputSpecID, inputNormalID, outputImageID, gBufferFBO;
-u32 uiFBO, uiSP;
-
-u32 depthPrepassSP;
-u32 chunkSP, chunkVAO;
-float rasterPerspectiveProjection[16];
-bool doubleSidedTexture[MAX_TXRS], transparentTexture[MAX_TXRS];
-
-u32 vbos[MAX_MDLS], tbos[MAX_MDLS], matricesBufferID, modelVertexCounts[MAX_MDLS], *physVertCounts;
-u16 **modelTriangles, modelTriangleCounts[MAX_MDLS], mdlsCnt, **physTris;
-float modelMatrices[INSTANCE_COUNT*16];
-float *world_from_mdl = modelMatrices, modelBounds[MAX_MDLS], **physPos;
+u32 globalframe, globalframesPerLastSecond, threadCnt = 1, inputImageID, inputUIID, inputDepthID, inputSpecID, inputNormalID, outputImageID, gBufferFBO, uiFBO, uiSP, depthPrepassSP, chunkSP, chunkVAO, vbos[MAX_MDLS], tbos[MAX_MDLS], matricesBufferID, modelVertexCounts[MAX_MDLS], *physVertCounts;
+float rasterPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT*16], *world_from_mdl = modelMatrices, modelBounds[MAX_MDLS], **physPos, lightView[LIGHT_COUNT][6][4][4], lightViewProj[LIGHT_COUNT][6][16], shadowmapsPerspectiveProjection[16], sunShadowMatrix[16], berserkSeedTime;
+bool doubleSidedTexture[MAX_TXRS], transparentTexture[MAX_TXRS], shadowBuffersCreated, resDropdownOpen;
+u16 **modelTriangles, modelTriangleCounts[MAX_MDLS], mdlsCnt, **physTris, texCnt, decalStyleCount, decalInlineTextLevel[DECAL_INLINE_TEXT_MAX], decalInlineTextInst[DECAL_INLINE_TEXT_MAX], decalInlineTextCount;
 V3 modelMin[MAX_MDLS], modelMax[MAX_MDLS];
-
-u32 lightsID, voxListCntsID, voxelLightListsID, voxelUpdateSP, cellVisibleDataID;
-float lightView[LIGHT_COUNT][6][4][4], lightViewProj[LIGHT_COUNT][6][16];
+u32 lightsID, voxListCntsID, voxelLightListsID, voxelUpdateSP, cellVisibleDataID, shadowmapsSP, shadowmapsClearSP, shadowMapSSBO, shadowMapsIndirectionID, sunShadowFBO, sunShadowTex, shadowmapIndirectionList[LIGHT_COUNT];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
-
-u32 shadowmapsSP, shadowmapsClearSP, shadowMapSSBO, shadowMapsIndirectionID, sunShadowFBO, sunShadowTex, shadowmapIndirectionList[LIGHT_COUNT];
-float shadowmapsPerspectiveProjection[16], sunShadowMatrix[16];
-static bool shadowBuffersCreated = false;
-static FrustumPlane sunShadowFrustum[6];
+FrustumPlane sunShadowFrustum[6];
 V3 sunDirection={0.0f, 1.0f, 0.0f};
-
-u32 ssrSP;
-
-u32 imageBlitSP, quadVAO, quadVBO;
-float berserkSeedTime;
-
-u32 textSP, textVAO, textVBO, textDecalVBO[MAX_LEVELS][INSTANCE_COUNT], textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
-u16 texCnt;
-
-u32 colorBufferID, texPalID, texPalOfsID, textureOffsetsID, textureSizesID;
-
-u32 psysInstancesID, psysTrailsID, psysquadVAO, psysquadVBO, particleSP, trailSP;
-u8 particleBlendTexture[MAX_TXRS];
-
-u32 threadCnt = 1;
-
+u32 ssrSP, imageBlitSP, quadVAO, quadVBO, textSP, textVAO, textVBO, textDecalVBO[MAX_LEVELS][INSTANCE_COUNT], textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
+u32 colorBufferID, texPalID, texPalOfsID, textureOffsetsID, textureSizesID, psysInstancesID, psysTrailsID, psysquadVAO, psysquadVBO, particleSP, trailSP, camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
+u8 particleBlendTexture[MAX_TXRS], camViewCount, levelCamViewCount[14];
 char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
-u16 decalStyleCount, decalInlineTextLevel[DECAL_INLINE_TEXT_MAX], decalInlineTextInst[DECAL_INLINE_TEXT_MAX], decalInlineTextCount;
 DecalStyle decalStyles[DECAL_STYLE_MAX];
-
 CamView camViews[64], levelCamViews[14][64];
-u8 camViewCount, levelCamViewCount[14];
-u32 camViewTextures[64], levelCamViewTextures[14][64];
-
-u32 drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 
 // Main Menu
-u8 currentPlayerNameLength = 0;
-i8 currentMenuItem = 0,currentMenuTab = 0, menuItemCount = 4, menuTabCount = 1;
-static const u8 Mpg_FrontPage = 0, Mpg_Singleplayer = 1, Mpg_Multiplayer = 2, Mpg_NewGame = 3, Mpg_Load = 4, Mpg_Options = 5, Mpg_Save = 6, Mpg_IntroVideo = 7, Mpg_CreditsVideo = 8;
-u8 currentMenuPage = Mpg_FrontPage;
-bool resDropdownOpen = false;
-int resDropdownCount = 0, resSelectedIdx = 0, resHoverIdx = -1;
+u8 currentPlayerNameLength, currentMenuPage, resDropdownCount, resSelectedIdx, resHoverIdx = -1;
+i8 currentMenuItem,currentMenuTab, menuItemCount = 4, menuTabCount = 1;
 typedef struct {int w,h;} ResMode; ResMode resModes[16];
 
 // Input
 bool mouseMovementThisFrame, window_has_focus, ignore_next_mouse_delta, returnToPause, fovSliderActive, gammaSliderActive, masterVolumeSliderActive, musicVolumeSliderActive, messageVolumeSliderActive, sfxVolumeSliderActive, enteringPlayerName;
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
-    .InputCodeSettings = {5,/*Forward=F*/ 0,/*Strafe Left=A*/ 18,/*Backpedal=S*/ 3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/ 2,/*Crouch=C*/ 23,/*Prone=X*/ 16,/*Lean Left=Q*/ 4,/*Lean Right=E*/ 45,/*Sprint=LSHIFT*/ 38,/*Turn Left=LARROW*/ 39,/*Turn Right=RARROW*/ 36,/*Look Up=UARROW*/ 37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/ 27,/*Sensaround=2*/ 28,/*Lantern=3*/
-                          29,/*Shield=4*/ 30,/*Infrared=5*/ 31,/*Email=6*/ 32,/*Booster=7*/ 33,/*Jumpjets=8*/ 56,/*Attack=LMB*/ 57,/*Use=RMB*/ 99,/*Menu/Back=ESCAPE*/ 80,/*Toggle Mode=TAB*/ 17,/*Reload=R*/ 127,/*Weapon+=MWHEEL+*/ 128,/* Weapon-=MWHEEL-*/ 6,/* Grenade=G*/ 19,/*Grenade + = T*/ 131,/*Grenade-=*/ 21,/*Ammo Type=V*/ 9,/*Patch Use=J*/ 8,/*Patch+=I*/ 132,/*Patch-=,*/
-                          12,/*Full Map=M*/ 21,/*Swim Up= V*/ 2,/*Swim Down=C*/ 101,/*Screenshot=F12*/ 102,/*Console=GRAVE*/},
-    .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,.Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u, 
+    .InputCodeSettings = {5,/*Forward=F*/        0,/*Strafe Left=A*/    18,/*Backpedal=S*/   3,/*Strafe Right=D*/ 100,/*Jump=SPACE*/    2,/*Crouch=C*/  23,/*Prone=X*/  16,/*Lean Left=Q*/       4,/*Lean Right=E*/    45,/*Sprint=LSHIFT*/ 38,/*Turn Left=LARROW*/ 39,/*Turn Right=RARROW*/
+                          36,/*Look Up=UARROW*/ 37,/*Look Down=DARROW*/ 20,/*Recent Log=U*/ 26,/*Biomonitor=1*/    27,/*Sensaround=2*/ 28,/*Lantern=3*/
+                          29,/*Shield=4*/       30,/*Infrared=5*/       31,/*Email=6*/      32,/*Booster=7*/       33,/*Jumpjets=8*/   56,/*Attack=LMB*/ 57,/*Use=RMB*/ 99,/*Menu/Back=ESCAPE*/ 80,/*Toggle Mode=TAB*/ 17,/*Reload=R*/     127,/*Weapon+=MWHEEL+*/ 128,/* Weapon-=MWHEEL-*/
+                          6,/* Grenade=G*/      19,/*Grenade + = T*/   131,/*Grenade-=*/    21,/*Ammo Type=V*/      9,/*Patch Use=J*/   8,/*Patch+=I*/  132,/*Patch-=,*/
+                          12,/*Full Map=M*/     21,/*Swim Up= V*/        2,/*Swim Down=C*/ 101,/*Screenshot=F12*/ 102,/*Console=GRAVE*/},
+    .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,
+    .Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u, 
     .InvCybLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
 InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=false, .showFPS=false, .editMode=false, .showPhys=false};
 
@@ -100,7 +64,7 @@ Color textColors[] = {{1.000000000f,1.000000000f,1.000000000f,1.0f},/* 0 White T
                       {0.594339600f,0.232689545f,0.232689545f,1.0f} /* 13 Intro/Outro Subtitle #973B3B T_VIDEOTEXT*/,
                       {0.000000000f,0.039215688f,0.835294200f,1.0f} /* 14 PuzzleWire actualColorBlue T_BLUE*/,
                       {0.546864600f,0.152723400f,0.830188700f,1.0f} /* 15 PuzzleWire actualColorPurple T_PURPLE*/ };
-// Wireline Rendering
+// Wireline Rendering (originally just for debug lines)
 u32 debugUnlitSP, debugLinesVAO, debugLinesVBO, wireLinesVAO, wireLinesVBO;
 typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
 DebugLineVertex* debugLineVerts = NULL;
@@ -173,7 +137,9 @@ INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_R
 void DrawVelocityVector(u16 i) {
     if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;}
     
-    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f)); DrawLine(World.position[i],tip,textColors[T_ORANGE]); V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0})); 
+    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f));
+    DrawLine(World.position[i],tip,textColors[T_ORANGE]);
+    V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0})); 
     DrawLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
 }
 
@@ -184,23 +150,25 @@ void DrawBoxColliderColored(u16 i, Color col) {
     py = V3_ScaleByF(ay,b.hExt.y);
     pz = V3_ScaleByF(az,b.hExt.z);
     for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3_AplusB(b.ctr,V3_AplusB(V3_AplusB(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
-    DrawLine(c[0],c[1],col);
-    DrawLine(c[2],c[3],col);
-    DrawLine(c[4],c[5],col);
-    DrawLine(c[6],c[7],col);
-    DrawLine(c[0],c[2],col); 
-    DrawLine(c[1],c[3],col);
-    DrawLine(c[4],c[6],col);
-    DrawLine(c[5],c[7],col);
-    DrawLine(c[0],c[4],col);
-    DrawLine(c[1],c[5],col);
-    DrawLine(c[2],c[6],col);
-    DrawLine(c[3],c[7],col);
+    DrawLine(c[0],c[1],col); DrawLine(c[2],c[3],col); DrawLine(c[4],c[5],col);
+    DrawLine(c[6],c[7],col);                          DrawLine(c[0],c[2],col); 
+    DrawLine(c[1],c[3],col);                          DrawLine(c[4],c[6],col);
+    DrawLine(c[5],c[7],col);                          DrawLine(c[0],c[4],col);
+    DrawLine(c[1],c[5],col); DrawLine(c[2],c[6],col); DrawLine(c[3],c[7],col);
     DrawVelocityVector(i);
 }
 
 void DrawBoxCollider(u16 i) { DrawBoxColliderColored(i,ColliderColor(i)); }
-void DrawSphereWireframe(Color col, ShapeSphere s) { float step=6.28318530f/12; for (int seg=0;seg<12;seg++) { float a0=seg*step,a1=a0+step,c0=vcosf(a0),s0=vsinf(a0),c1=vcosf(a1),s1=vsinf(a1); DrawLine(V3_AplusB(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3_AplusB(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col); DrawLine(V3_AplusB(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3_AplusB(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col); DrawLine(V3_AplusB(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3_AplusB(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col); } }
+void DrawSphereWireframe(Color col, ShapeSphere s) {
+    float step = 6.28318530f / 12;
+    for (int seg=0;seg<12;seg++) {
+        float a0 = seg * step, a1 = a0 + step, c0 = vcosf(a0), s0 = vsinf(a0), c1 = vcosf(a1), s1 = vsinf(a1);
+        DrawLine(V3_AplusB(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3_AplusB(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col);
+        DrawLine(V3_AplusB(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3_AplusB(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col);
+        DrawLine(V3_AplusB(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3_AplusB(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col);
+    }
+}
+
 void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = Entity_GetSph(i); DrawSphereWireframe(col,s); DrawVelocityVector(i); }
 void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
 void DrawMeshCollider(u16 i) {
@@ -240,7 +208,7 @@ void DrawCapsuleCollider(u16 i) {
         DrawLine(V3_AplusB(cap.tip,r0),V3_AplusB(cap.tip,r1),col);
     }
     
-    for (int seg=0;seg<6;++seg) {/*Draw the hemispheres*/
+    for (int seg=0;seg<6;++seg) { /*Draw the hemispheres*/
         float a0=seg*step, a1=a0+step;
         float c0=vcosf(a0), s0=vsinf(a0), c1=vcosf(a1), s1=vsinf(a1);
         DrawLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,-s1*r))),col);
@@ -249,16 +217,42 @@ void DrawCapsuleCollider(u16 i) {
         DrawLine(V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,s0*r))),V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,s1*r))),col);
     }
     
-    for(int seg=0;seg<4;++seg){float a=seg*(6.28318530f / 4.f); V3 off=V3_AplusB(V3_ScaleByF(perp0,vcosf(a)*r),V3_ScaleByF(perp1,vsinf(a)*r)); DrawLine(V3_AplusB(cap.base,off),V3_AplusB(cap.tip,off),col);}/*Draw the longitudinal lines*/ DrawVelocityVector(i);
+    for (int seg=0;seg<4;++seg) { /*Draw the longitudinal lines*/
+        float a = seg * (6.28318530f / 4.f);
+        V3 off = V3_AplusB(V3_ScaleByF(perp0,vcosf(a)*r),V3_ScaleByF(perp1,vsinf(a)*r));
+        DrawLine(V3_AplusB(cap.base,off),V3_AplusB(cap.tip,off),col);
+    }
+    
+    DrawVelocityVector(i);
 }
 
 void DrawAngularVelocity(u16 i) {
-    if (!(World.instances[i].entflags & EF_RIGIDBODY) || V3_Mag(World.angularVelocity[i]) < 0.0001f) return;/*skip near-zero*/ Color purple = (Color){0.5f,0.0f,1.0f,1.0f}; V3 dir=V3_Normalize(World.angularVelocity[i]); V3 tip=V3_AplusB(World.position[i],V3_ScaleByF(World.angularVelocity[i],0.35f)); DrawLine(World.position[i],tip,purple); // Arrow (line vector)
-    V3 ref=(vabs(dir.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0}; V3 perp=V3_Normalize(V3_Cross(dir,ref)); V3 perp2 = V3_Cross(dir,perp); DrawLine(V3_AplusB(tip,V3_ScaleByF(perp, 0.05f)),V3_AplusB(tip,V3_ScaleByF(perp, -0.05f)), purple); DrawLine(V3_AplusB(tip,V3_ScaleByF(perp2,0.05f)),V3_AplusB(tip,V3_ScaleByF(perp2,-0.05f)), purple);
-    float rad=0.6f; /*Quarter circle arc (visualizes rotation plane + sense)*/ float step = 1.57079632679f / 8.0f; /*quarter circle divided into 8 segments*/ V3 axis=dir; V3 p1=V3_Normalize(V3_Cross(axis,ref)); V3 p2=V3_Cross(axis,p1); V3 prev = V3_AplusB(World.position[i], V3_ScaleByF(p1,rad)); // Find two vectors perpendicular to angular axis
-    for (int j=1;j<=8;++j) { float a = j * step; float c = vcosf(a); float s = vsinf(a); V3 cur = V3_AplusB(World.position[i],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); DrawLine(prev,cur,purple); prev = cur; }
+    if (!(World.instances[i].entflags & EF_RIGIDBODY) || V3_Mag(World.angularVelocity[i]) < 0.0001f) return;/*skip near-zero*/
+        
+    Color purple = (Color){0.5f,0.0f,1.0f,1.0f};
+    V3 dir = V3_Normalize(World.angularVelocity[i]);
+    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.angularVelocity[i],0.35f)); DrawLine(World.position[i],tip,purple); // Arrow (line vector)
+    V3 ref = (vabs(dir.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0};
+    V3 perp=V3_Normalize(V3_Cross(dir,ref));
+    V3 perp2 = V3_Cross(dir,perp);
+    DrawLine(V3_AplusB(tip,V3_ScaleByF(perp, 0.05f)),V3_AplusB(tip,V3_ScaleByF(perp, -0.05f)), purple);
+    DrawLine(V3_AplusB(tip,V3_ScaleByF(perp2,0.05f)),V3_AplusB(tip,V3_ScaleByF(perp2,-0.05f)), purple);
+    float rad = 0.6f; /*Quarter circle arc (visualizes rotation plane + sense)*/
+    float step = 1.57079632679f / 8.0f; /*quarter circle divided into 8 segments*/
+    V3 axis = dir;
+    V3 p1 = V3_Normalize(V3_Cross(axis,ref));
+    V3 p2 = V3_Cross(axis,p1);
+    V3 prev = V3_AplusB(World.position[i], V3_ScaleByF(p1,rad)); // Find two vectors perpendicular to angular axis
+    for (int j=1;j<=8;++j) {
+        float a = j * step;
+        float c = vcosf(a);
+        float s = vsinf(a);
+        V3 cur = V3_AplusB(World.position[i],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad)));
+        DrawLine(prev,cur,purple); prev = cur;
+    }
 }
 #include "winput.c"
+#include "audio.c"
 // Console System - CHEATS!
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
 V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,{-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
@@ -867,13 +861,32 @@ void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) {
 }
 
 void UpdateScreenSize(i32 width, i32 height) {
-    u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u);/*Cap at minimum Quake resolution and maximum 8k.*/ float wf = (float)w, hf = (float)h; Sys_Settings.ScreenCenterX = wf * 0.5f; Sys_Settings.ScreenCenterY = hf * 0.5f; glViewport(0,0,w,h);
-    glUseProgram(imageBlitSP); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES); glUseProgram(chunkSP); glUniform1ui(6,w); glUniform1ui(7,h); glUseProgram(ssrSP); glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
-    GenerateAndBindTexture(&inputImageID, GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL);/*Lit Raster*/ GenerateAndBindTexture(&inputSpecID,GL_RGBA8,w,h,GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL);/*Specular Colors*/ GenerateAndBindTexture(&inputNormalID,GL_RG16F,w,h,GL_RGB,GL_FLOAT,0x2600/*GL_NEAREST*/,NULL);/*Normal XYZ*/ 
-    GenerateAndBindTexture(&inputDepthID,0x81A7/*GL_DEPTH_COMPONENT32*/,w,h,0x1902/*GL_DEPTH_COMPONENT*/,GL_FLOAT,0x2600/*GL_NEAREST*/,NULL);/*Raster Depth*/ GenerateAndBindTexture(&outputImageID,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputImageID,0); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,inputSpecID,0); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,inputNormalID,0); glFramebufferTexture2D(GL_FRAMEBUFFER,0x8D00/*GL_DEPTH_ATTACHMENT*/,GL_TEXTURE_2D,inputDepthID,0);
-    glBindImageTexture(0,inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/*Main Rendered Color*/ glBindImageTexture(2,inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/*Specular*/ glBindImageTexture(4,outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8);/*SSR result*/ glBindImageTexture(5,inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F);/*Normal XYZ*/ glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D,outputImageID);
-    glBindFramebuffer(GL_FRAMEBUFFER,0); ignore_next_mouse_delta = true;
+    u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); /*Cap at minimum Quake resolution and maximum 8k.*/
+    float wf = (float)w, hf = (float)h;
+    Sys_Settings.ScreenCenterX = wf * 0.5f;
+    Sys_Settings.ScreenCenterY = hf * 0.5f;
+    glViewport(0,0,w,h);
+    glUseProgram(imageBlitSP); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
+    glUseProgram(chunkSP);     glUniform1ui(6,w); glUniform1ui(7,h);
+    glUseProgram(ssrSP);       glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
+    GenerateAndBindTexture(&inputImageID,                       GL_RGBA8,                       w,                       h,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); /*Lit Raster*/
+    GenerateAndBindTexture(&inputSpecID,                        GL_RGBA8,                       w,                       h,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); /*Specular Colors*/
+    GenerateAndBindTexture(&inputNormalID,                      GL_RG16F,                       w,                       h,                      GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); /*Normal XYZ*/ 
+    GenerateAndBindTexture(&inputDepthID, 0x81A7/*GL_DEPTH_COMPONENT32*/,                       w,                       h,0x1902/*GL_DEPTH_COMPONENT*/,        GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); /*Raster Depth*/
+    GenerateAndBindTexture(&outputImageID,                      GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/ ,NULL);
+    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,         GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputImageID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,         GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,inputSpecID,  0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,         GL_COLOR_ATTACHMENT2,GL_TEXTURE_2D,inputNormalID,0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,0x8D00/*GL_DEPTH_ATTACHMENT*/,GL_TEXTURE_2D,inputDepthID, 0);
+    glBindImageTexture(0, inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); /*Main Rendered Color*/
+    glBindImageTexture(2,  inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); /*Specular*/
+    glBindImageTexture(4,outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); /*SSR result*/
+    glBindImageTexture(5,inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F); /*Normal XYZ*/
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D,outputImageID);
+    glBindFramebuffer(GL_FRAMEBUFFER,0);
+    ignore_next_mouse_delta = true;
 }
 
 //                        0 mk3 assault rifle              1 blaster             2 dartgun               3 flech                 4 ion       5 rapier         6 pipe               7 magnum            8 magpulse               9 pistol               10 plasma                 11 rail                              12 riot              13 skorp              14 sparq               15 stun
@@ -1357,16 +1370,45 @@ static void SetHopperDeathEffect(Entity* e) {
 }
 
 void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, bool grayscaleEnabled) {
-    u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex; if (IdxIsLaserDoor(constIndex)) { DoorLaserDraw(i); } if (Cheats.showPhys) {if (World.col[i] == COLTYPE_BOX) {DrawBoxCollider(i);} else if (World.col[i] == COLTYPE_SPH) {DrawSphereCollider(i);} else if (World.col[i] == COLTYPE_CVX) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_MSH) {DrawMeshCollider(i);} else if (World.col[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);} DrawAngularVelocity(i);}
-    /* The collider wireframe is all this instance has: it reached DrawEntity only because showphys is on, since a
-       model-less body is otherwise rejected by EntNotVisible before it ever gets here.  Carrying on would bind
-       vbos[MAX_MDLS], so stop here. */
+    u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex;
+    if (IdxIsLaserDoor(constIndex)) { DoorLaserDraw(i); }
+    if (Cheats.showPhys) {
+        if (World.col[i] == COLTYPE_BOX) {DrawBoxCollider(i);}
+        else if (World.col[i] == COLTYPE_SPH) {DrawSphereCollider(i);}
+        else if (World.col[i] == COLTYPE_CVX) {DrawMeshCollider(i);}
+        else if (World.col[i] == COLTYPE_MSH) {DrawMeshCollider(i);}
+        else if (World.col[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);}
+        
+        DrawAngularVelocity(i);
+    }
     if (e->modelIndex >= MAX_MDLS) return;
-    SetHopperDeathEffect(e); glUniform1ui(17,tex==316?1u:0u); glUniform1ui(25,constIndex); glUniform1f(27,(float)(1.0f - (vclamp((float)(World.pauseRelativeTime - 0.0f) / 2.0f, 0.0f, 1.0f)))); /* cyber wall panel alpha with fade */ glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
-    if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431||constIndex==433||constIndex==437||constIndex==438||constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); }
-    glUniform1ui(30,e->camView < camViewCount ? 1u : 0u); if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); glUniform1i(29,6); }
-    if((*curN) != (norm) || norm==0) { *curN=norm; glUniform1ui( 1,(u32)norm); } if((*curT) != ( tex) ||  tex==0) { *curT= tex; glUniform1ui(18,(u32)tex ); } if((*curG) != (glow) || glow==0) { *curG=glow; glUniform1ui(19,(u32)glow); } if((*curS) != (spec) || spec==0) { *curS=spec; glUniform1ui(20,(u32)spec); }
-    *curM=GetAndBindModel(i,*curM); u32 vc=modelTriangleCounts[*curM]*3; glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered+=vc;
+    
+    SetHopperDeathEffect(e);
+    glUniform1ui(17,tex==316?1u:0u);
+    glUniform1ui(25,constIndex);
+    glUniform1f(27,(float)(1.0f - (vclamp((float)(World.pauseRelativeTime - 0.0f) / 2.0f, 0.0f, 1.0f)))); /* cyber wall panel alpha with fade */
+    glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
+    if (grayscaleEnabled) {
+        float npcHeat = IdxIsNPC(constIndex) ? ((   constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 
+                                                 || constIndex==431 || constIndex==433 || constIndex==437 || constIndex==438 || constIndex==441) ? 1.5f : 4.0f) : 0.0f;
+        glUniform1f(9,npcHeat);
+    }
+    glUniform1ui(30,e->camView < camViewCount ? 1u : 0u);
+    if(e->camView < camViewCount) {
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]);
+        glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height);
+        glUniform1i(29,6);
+    }
+    if((*curN) != (norm) || norm==0) { *curN=norm; glUniform1ui( 1,(u32)norm); }
+    if((*curT) != ( tex) ||  tex==0) { *curT= tex; glUniform1ui(18,(u32)tex ); }
+    if((*curG) != (glow) || glow==0) { *curG=glow; glUniform1ui(19,(u32)glow); }
+    if((*curS) != (spec) || spec==0) { *curS=spec; glUniform1ui(20,(u32)spec); }
+    *curM=GetAndBindModel(i,*curM);
+    u32 vc=modelTriangleCounts[*curM]*3;
+    glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);
+    drawCalls++;
+    vertsRendered+=vc;
 }
 
 bool mat4_inverse(const float* m, float* out) {
@@ -1753,43 +1795,43 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     RenderUI();
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][4]);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, swidth, sheight);
+    glBindFramebuffer(GL_FRAMEBUFFER,0);
+    glViewport(0,0,swidth,sheight);
     glUseProgram(imageBlitSP);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, inputImageID);
+    glBindTexture(GL_TEXTURE_2D,inputImageID);
     glUniform1i(4,4); // outputImage texture sampler2D, don't remember why when active texture is texture 0. meh.... oh maybe to not read and write same binding?
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, inputUIID);
-    glUniform1i(31, 1);
-    glUniform1i(32, 3);
-    glUniformMatrix4fv(33, 1, 0, invViewProj);
+    glBindTexture(GL_TEXTURE_2D,inputUIID);
+    glUniform1i(31,1);
+    glUniform1i(32,3);
+    glUniformMatrix4fv(33,1,0,invViewProj);
     double berserkTimeRemainingNormalized = World.invP1.berserkFinished > 0.0001 ? (World.invP1.berserkFinished - World.pauseRelativeTime) / BERSERK_TIME : 0.0;
     if (World.invP1.berserkFinished < World.pauseRelativeTime && World.invP1.berserkFinished > 0.0001) { World.invP1.berserkFinished = berserkTimeRemainingNormalized = 0.0; }
-    glUniform1ui(5, Sys_Settings.Reflections);
-    glUniform1ui(6, Sys_Settings.FXAA);
-    glUniform1f(14, Sys_Settings.FOV);
-    glUniform1f(16, aspect3D);
-    glUniform1ui(22, Sys_Settings.Shadows);
-    glUniform1f(9, (float)berserkTimeRemainingNormalized);
-    glUniform1f(10, berserkSeedTime);
-    glUniform1ui(11, Sys_Settings.Brightness);
-    glUniform3f(12, deg2rad(World.cam_yaw), deg2rad(World.cam_pitch), deg2rad(World.cam_roll));
-    glUniform3f(13, px, py, pz);
-    glUniform1f(15, (float)World.pauseRelativeTime * 0.1f);
-    glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
-    glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE);
-    glUniform1ui(19, ((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+    glUniform1ui(5,Sys_Settings.Reflections);
+    glUniform1ui(6,Sys_Settings.FXAA);
+    glUniform1f(14,Sys_Settings.FOV);
+    glUniform1f(16,aspect3D);
+    glUniform1ui(22,Sys_Settings.Shadows);
+    glUniform1f(9,(float)berserkTimeRemainingNormalized);
+    glUniform1f(10,berserkSeedTime);
+    glUniform1ui(11,Sys_Settings.Brightness);
+    glUniform3f(12,deg2rad(World.cam_yaw), deg2rad(World.cam_pitch), deg2rad(World.cam_roll));
+    glUniform3f(13,px,py,pz);
+    glUniform1f(15,(float)World.pauseRelativeTime * 0.1f);
+    glUniform1ui(17,(gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || World.curLev == LEVEL_CYBERSPACE);
+    glUniform1ui(18,(gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE);
+    glUniform1ui(19,((World.curLev >= 10 && World.curLev < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     u32 shieldOnType = 0u/*No shield green tint*/;
     if (World.instances[WORLD].ioflags & Q_SHIELD_ACTIVATED) { shieldOnType=(World.curLev <= 5) ? 1u/*Shielding everywhere*/ : 2u/*Shielding only below, levels 6+*/; }
-    glUniform1ui(20, shieldOnType); // Green Shield
+    glUniform1ui(20,shieldOnType); // Green Shield
     Color3 painStaticColor = (Color3){1.0f, 0.0f, 0.0f}; // TODO reuse for blue EMP static effect
     glUniform3f(23,painStaticColor.r, painStaticColor.g, painStaticColor.b);
-    glUniformMatrix4fv(24, 1, 0, viewProj);
-    glUniformMatrix3fv(25, 1, 0, invViewRot);
-    glUniform1i(27, 0);
-    glUniform1f(28, vclamp(World.painStaticAlpha + World.empStaticAlpha, 0.0f, 1.0f));
-    glUniform1ui(29, (u32)((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0));
+    glUniformMatrix4fv(24,1,0,viewProj);
+    glUniformMatrix3fv(25,1,0,invViewRot);
+    glUniform1i(27,0);
+    glUniform1f(28,vclamp(World.painStaticAlpha + World.empStaticAlpha, 0.0f, 1.0f));
+    glUniform1ui(29,(u32)((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0));
     glBindVertexArray(quadVAO);
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/, 0, 4);
@@ -1849,19 +1891,10 @@ void UpdateInstanceMatrix4x4s() {
         float sclx=World.scale[i].x, scly=World.scale[i].y, sclz=World.scale[i].z;
         if (World.instances[i].index == 437/*npc_servbot: render-only mesh yaw*/) { /*pre-multiplied: SERVBOT_MESH_YAW_DEG about the global Y up axis; World.rotation (physics, forward, muzzle, AI) is untouched*/
             Quaternion q = quat_multiply(servoYaw, (Quaternion){x, y, z, w});
-            x = q.x;
-            y = q.y;
-            z = q.z;
-            w = q.w;
-            x2 = x*x;
-            y2 = y*y;
-            z2 = z*z;
-            xy = x*y;
-            xz = x*z;
-            yz = y*z;
-            wx = w*x;
-            wy = w*y;
-            wz = w*z;
+            x = q.x; y = q.y; z = q.z; w = q.w;
+            x2 = x*x; y2 = y*y; z2 = z*z;
+            xy = x*y; xz = x*z; yz = y*z;
+            wx = w*x; wy = w*y; wz = w*z;
         }
         
         modelMatrices[m + 0]  = (1.0f - 2.0f * (y2 + z2)) * sclx; modelMatrices[m + 1]  = (2.0f * (xy + wz))        * sclx; modelMatrices[m+2]  = (2.0f * (xz - wy))        * sclx; modelMatrices[m + 3]  = 0.0f; 
@@ -1925,9 +1958,9 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.dynamicFriction[0] = 0.4f;
     World.col[0]=COLTYPE_NONE;
     currentMenuItem = currentMenuTab = 0;
-    currentMenuPage = Mpg_FrontPage;
+    currentMenuPage = MPG_FRONT;
     World.current_time = World.pauseRelativeTime = World.last_physics_time = 0.0;
-    World.deltaTime=0.0166666666f; 
+    World.deltaTime = 0.0166666666f; 
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
     World.instances[PLAYER1].index = 767;
     World.layer[PLAYER1] = L_Player;
@@ -2091,6 +2124,29 @@ void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started
 void LoadModels(), LoadTextures(), InitAudio(), LoadConfig(), synth_set_room(float,float);
 extern u32 random_range_rng, biomTexId, biomFBO;
 extern bool amReady;
+u8* scratch_base,*scratch_cur,*scratch_end; size_t scratch_peak=0;
+void OS_ScratchInit() {
+    if(scratch_base){return;}
+    
+    scratch_base=OS_Alloc(SCRATCH_ARENA_SIZE);
+    scratch_cur=scratch_base;
+    scratch_end=scratch_base + SCRATCH_ARENA_SIZE;
+}
+
+void* OS_AllocScratch(size_t amount) {
+    if (!scratch_base) { OS_ScratchInit(); }
+    size_t aligned = (amount + 15) & ~(size_t)15;
+    if (scratch_cur + aligned > scratch_end) { DualLogError("Scratch ovr!\n"); OS_Exit(1); }
+    
+    void* p = scratch_cur;
+    scratch_cur += aligned;
+    size_t used = (size_t)(scratch_cur - scratch_base);
+    if (used > scratch_peak) { scratch_peak = used; }
+    return p;
+}
+
+void OS_FreeInitPhase() { scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
+void OS_ScratchFree() { DualLog("Scratch arena total peak: %u MB\n", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; }
 void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
@@ -2182,6 +2238,7 @@ void InitalizeEnvironment() {
     m[8]  = 0.0f;  m[9] = 0.0f;  m[10] = -(lightRangeMax + 0.02f) / viewRange;      m[11] = -1.0f;
     m[12] = 0.0f; m[13] = 0.0f;  m[14] = -2.0f * lightRangeMax * 0.02f / viewRange; m[15] =  0.0f;
     
+    for (int i=0;i<23;++i) { g_scf_long[0][i] = g_scf_long[1][i] = g_scf_long[2][i] = g_sfc_long_024[i]; }
     InitAudio();
     synth_set_reverb_preset(0);
     glGenFramebuffers(1,&gBufferFBO);
@@ -2234,8 +2291,8 @@ void InitalizeEnvironment() {
     bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
     
     NewGame();
-    currentMenuPage = Mpg_FrontPage;
-    if (playIntroAtBoot) ChangeMenuPage(Mpg_IntroVideo);/*must come after NewGame (it resets the page to Mpg_FrontPage) and go through ChangeMenuPage so the cutscene also gets its clip audio + start time*/
+    currentMenuPage = MPG_FRONT;
+    if (playIntroAtBoot) ChangeMenuPage(MPG_INTRO);/*must come after NewGame (it resets the page to MPG_FRONT) and go through ChangeMenuPage so the cutscene also gets its clip audio + start time*/
     else { PlayMenuMusic(); }/*the title music fronts the menu*/
     World.menuActive = true; //COMMENT for immediate into game
     OS_ScratchFree();
@@ -2323,9 +2380,8 @@ i32 main() {
             //if (dbgGameFrame == dbgFrm[d]) {
                 //DebugRAM(dbgLbl[d]);
                 //DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Ray:%.3f(%u)\n",
-                    //dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000, World.substeps, renderTime*1000,
-                    //prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
-                
+                    //dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000,
+                    //World.substeps, renderTime*1000, prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
                 //if (dbgGameFrame == 1000) { DebugRAMPeak(); break; }
             //}
         //}

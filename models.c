@@ -620,11 +620,8 @@ static void SkinFrameToScratch(GltfMesh* restrict gm, float t, float* restrict p
         const VtxSkin* sk = &gm->skin[v];
         float blended[16] = {0};
         for (int k=0;k<4;++k) {
-            float w=sk->w[k];
-            if (w <= 0.0f){ continue; }
-            
-            u32 jj = sk->j[k];
-            if (jj >= gm->jointCount) { continue; /* clamp */}
+            float w=sk->w[k]; if (w <= 0.0f){ continue; }
+            u32 jj = sk->j[k]; if (jj >= gm->jointCount) { continue; /* clamp */}
                 
             const float* m=skinMat[jj];
             for (int e=0;e<16;++e) blended[e]+=m[e]*w;
@@ -642,14 +639,9 @@ static void SkinFrameToScratch(GltfMesh* restrict gm, float t, float* restrict p
         if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("glbanim:vert overflow\n"); break; }
         
         float* dst = sv + (ec << 3);
-        dst[0] = -posedPos[vi*3 + 0];
-        dst[1] = posedPos[vi*3 + 1];
-        dst[2] = posedPos[vi*3 + 2];
-        dst[3] = -posedNrm[vi*3 + 0];
-        dst[4] = posedNrm[vi*3 + 1];
-        dst[5] = posedNrm[vi*3 + 2];
-        dst[6] = gm->uv[vi*2 + 0];
-        dst[7] = gm->uv[vi*2 + 1];
+        dst[0] = -posedPos[vi*3 + 0]; dst[1] = posedPos[vi*3 + 1]; dst[2] = posedPos[vi*3 + 2]; // Position
+        dst[3] = -posedNrm[vi*3 + 0]; dst[4] = posedNrm[vi*3 + 1]; dst[5] = posedNrm[vi*3 + 2]; // Normal
+        dst[6] =    gm->uv[vi*2 + 0]; dst[7] =   gm->uv[vi*2 + 1];                              // UV
         __m128 pos_v = _mm_loadu_ps(dst);
         mn_v = _mm_min_ps(mn_v, pos_v);
         mx_v = _mm_max_ps(mx_v, pos_v);
@@ -674,22 +666,15 @@ static void TransformFrameToScratch(GltfMesh* restrict gm, float t, float* restr
         u32 cornerCount = gm->subTriCount[s] * 3;
         for (u32 k = 0; k < cornerCount; ++k) {
             if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("glbanim:vert overflow\n"); goto done; }
-            
-            u32 vi = sidx[k];
-            if (vi >= gm->subVertCnt[s]){ continue; }
+            u32 vi = sidx[k]; if (vi >= gm->subVertCnt[s]){ continue; }
             
             float pt[3], n[3];
             Mat4TransformPoint(gm_mat,&spos[vi*3], pt);
             Mat4TransformDir(gm_mat,&snrm[vi*3],n);
             float* dst = sv + (ec << 3);
-            dst[0]=-pt[0];
-            dst[1]=pt[1];
-            dst[2]=pt[2];
-            dst[3]=-n[0];
-            dst[4]=n[1];
-            dst[5]=n[2];
-            dst[6]=suv[vi*2+0];
-            dst[7]=suv[vi*2+1];
+            dst[0] = -pt[0]; dst[1] = pt[1]; dst[2] = pt[2]; // Position
+            dst[3] =  -n[0]; dst[4] =  n[1]; dst[5] =  n[2]; // Normal
+            dst[6] = suv[vi*2 + 0];  dst[7] = suv[vi*2 + 1]; // UV
             __m128 pos_v = _mm_loadu_ps(dst);
             mn_v = _mm_min_ps(mn_v, pos_v);
             mx_v = _mm_max_ps(mx_v, pos_v);
@@ -751,15 +736,16 @@ void LoadGLBAnimatedSources(ModelData* entries, u32 entryCount, RawOBJ* raw) {
 
 // Persistent fork-join pool: worker threads live for the whole model load instead of being created and joined per sub-chunk.
 typedef struct { void* (*fn)(void*); void* arg; } PoolJob;
-#define POOL_MAX 32
-static PoolJob poolJobs[POOL_MAX]; static u32 poolJobCount, poolJobNext, poolJobDone, poolGen, poolStop, poolPending, poolReady; static OS_Thread poolThreads[POOL_MAX]; static u32 poolThreadCnt = 0;
+static PoolJob poolJobs[32];
+static u32 poolJobCount, poolJobNext, poolJobDone, poolGen, poolStop, poolPending, poolReady;
+static OS_Thread poolThreads[32];
+static u32 poolThreadCnt = 0;
 static void* PoolWorker(void* arg) { (void)arg; __atomic_fetch_add(&poolReady,1,__ATOMIC_ACQ_REL); u32 last=0; for(;;) { while(__atomic_load_n(&poolGen,__ATOMIC_ACQUIRE)==last) { if(__atomic_load_n(&poolStop,__ATOMIC_ACQUIRE)) return NULL; OS_FutexWait(&poolGen,last); } last=__atomic_load_n(&poolGen,__ATOMIC_ACQUIRE); for(;;) { u32 j=__atomic_fetch_add(&poolJobNext,1,__ATOMIC_RELAXED); if(j>=poolJobCount) break; poolJobs[j].fn(poolJobs[j].arg); } if(__atomic_fetch_add(&poolJobDone,1,__ATOMIC_ACQ_REL)+1u == poolThreadCnt) OS_FutexWakeAll(&poolJobDone); } }
-static void PoolInit(u32 n) { poolThreadCnt=0; poolReady=0; poolStop=0; poolGen=0; if(n<2) return; for(u32 i=0;i<n && i<POOL_MAX;++i) { if(OS_ThreadCreate(&poolThreads[i],PoolWorker,NULL)!=0) break; ++poolThreadCnt; } while(__atomic_load_n(&poolReady,__ATOMIC_ACQUIRE) < poolThreadCnt) __asm__ __volatile__("pause"); /*every worker parked on gen 0 before any dispatch, so none can miss generation 1*/ }
+static void PoolInit(u32 n) { poolThreadCnt=0; poolReady=0; poolStop=0; poolGen=0; if(n<2) return; for(u32 i=0;i<n && i<32;++i) { if(OS_ThreadCreate(&poolThreads[i],PoolWorker,NULL)!=0) break; ++poolThreadCnt; } while(__atomic_load_n(&poolReady,__ATOMIC_ACQUIRE) < poolThreadCnt) __asm__ __volatile__("pause"); /*every worker parked on gen 0 before any dispatch, so none can miss generation 1*/ }
 static void PoolShutdown(void) { if(!poolThreadCnt) return; poolJobCount=0; __atomic_store_n(&poolStop,1,__ATOMIC_RELEASE); __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); for(u32 i=0;i<poolThreadCnt;++i) OS_ThreadJoin(&poolThreads[i]); poolThreadCnt=0; }
 static void PoolDispatch(PoolJob* jobs, u32 count) { if(!poolThreadCnt || count<=1) { poolPending=0; for(u32 i=0;i<count;++i) jobs[i].fn(jobs[i].arg); return; } for(u32 i=0;i<count;++i) poolJobs[i]=jobs[i]; poolJobCount=count; __atomic_store_n(&poolJobNext,0,__ATOMIC_RELAXED); __atomic_store_n(&poolJobDone,0,__ATOMIC_RELAXED); poolPending=1; __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); }
 static void PoolWait(void) { if(!poolPending) return; u32 d; while((d=__atomic_load_n(&poolJobDone,__ATOMIC_ACQUIRE)) < poolThreadCnt) OS_FutexWait(&poolJobDone,d); poolPending=0; }
 static void PoolRun(PoolJob* jobs, u32 count) { PoolDispatch(jobs,count); if(!poolPending) return; for(;;) { u32 j=__atomic_fetch_add(&poolJobNext,1,__ATOMIC_RELAXED); if(j<poolJobCount) { poolJobs[j].fn(poolJobs[j].arg); continue; } u32 d=__atomic_load_n(&poolJobDone,__ATOMIC_ACQUIRE); if(d >= poolThreadCnt) break; OS_FutexWait(&poolJobDone,d); } poolPending=0; }
-
 static void BakeGLBAnimWave(u32 modelStart, u32 modelEnd) {
     if (!glb_TaskCount) return;
     
@@ -789,7 +775,6 @@ static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, u16 m, const float* restric
     node->triStart = 0;
     node->triCount = 0;
     for (int i = 0; i < 8; i++) { node->children[i] = -1; }
-    
     __m128 mn_v = _mm_set1_ps( 1000000000.0f);
     __m128 mx_v = _mm_set1_ps(-1000000000.0f);
     for (u32 i = 0; i < triCount; i++) {
@@ -801,7 +786,6 @@ static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, u16 m, const float* restric
         mn_v = _mm_min_ps(mn_v, _mm_min_ps(_mm_min_ps(v0, v1), v2));
         mx_v = _mm_max_ps(mx_v, _mm_max_ps(_mm_max_ps(v0, v1), v2));
     }
-    
     float mn_arr[4], mx_arr[4];
     _mm_storeu_ps(mn_arr, mn_v);
     _mm_storeu_ps(mx_arr, mx_v);
@@ -814,7 +798,7 @@ static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, u16 m, const float* restric
         node->triCount = (u16)triCount;
         return nodeIdx;
     }
-
+    
     V3 center = V3_ScaleByF(V3_AplusB(node->mn, node->mx), 0.5f);
     __m128 center_v = _mm_setr_ps(center.x, center.y, center.z, 0.0f);
     __m128 third = _mm_set1_ps(1.0f/3.0f);
@@ -831,16 +815,13 @@ static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, u16 m, const float* restric
         ctx->triOctants[i] = oct;
         octantCounts[oct]++;
     }
-    
     u32 octantStarts[8], total=0;
     for (int o = 0; o < 8; o++) { octantStarts[o] = total; total += octantCounts[o]; }
-    
     u32 octantFill[8] = {0};
     for (u32 i = 0; i < triCount; i++) {
         u8 o = ctx->triOctants[i];
         ctx->triScratch[octantStarts[o] + octantFill[o]++] = triIdxArray[i];
     }
-    
     for (u32 i = 0; i < triCount; i++) { triIdxArray[i] = ctx->triScratch[i]; }
     for (int o = 0; o < 8; o++) {
         if (octantCounts[o] == 0) { continue; }
@@ -848,7 +829,6 @@ static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, u16 m, const float* restric
         i32 childIdx = BvhBuildOctree(ctx,m,pos,tris,triIdxArray + octantStarts[o],octantCounts[o],depth + 1);/*We re curse a little*/
         if (childIdx >= 0) { node->children[o] = (i16)childIdx; }
     }
-    
     return nodeIdx;
 }
 
@@ -1092,31 +1072,23 @@ void LoadModels() {
     DualLog(" vertices: %u, tris: %u, %f secs\n", tv, tt, get_time() - startModelTime);
 }
 
-u8 numClips[MAX_ANIMS] = {/*0*/4,/*1*/4,/*2*/6,/*3*/8,/*4*/4,/*5*/4,/*6*/4,/*7*/4,/*8*/4,/*9*/4,/*10*/4,/*11*/4,/*12*/4,/*13*/4,/*14*/4,/*15*/4,/*16*/4,/*17*/4,/*18*/4,/*19*/4,/*20*/4,/*21*/1,/*22*/1,/*23*/6,/*24*/8,/*25*/6,/*26*/10,/*27*/8,/*28*/7,/*29*/5,/*30*/5,/*31*/7,/*32*/8,/*33*/5,/*34*/4,/*35*/5,/*36*/6,/*37*/4,/*38*/2,/*39*/6,/*40*/5,/*41*/6,/*42*/3,/*43*/3,/*44*/5,/*45*/4,/*46*/1,/*47*/4,/*48*/4,/*49*/3,/*50*/3,/*51*/7,/*52*/1};
+u8 numClips[MAX_ANIMS] = {/* 0*/4,/* 1*/4,/* 2*/6,/* 3*/8,/* 4*/4,/* 5*/4,/* 6*/4,/* 7*/4,/* 8*/4,/* 9*/4,/*10*/4,/*11*/4,/*12*/4,/*13*/4,/*14*/4,/*15*/4,/*16*/4,/*17*/4,/*18*/4,/*19*/4,/*20*/4,/*21*/1,/*22*/1,/*23*/6,/*24*/8,/*25*/6,/*26*/10,/*27*/8,/*28*/7,/*29*/5,/*30*/5,/*31*/7,/*32*/8,
+                          /*33*/5,/*34*/4,/*35*/5,/*36*/6,/*37*/4,/*38*/2,/*39*/6,/*40*/5,/*41*/6,/*42*/3,/*43*/3,/*44*/5,/*45*/4,/*46*/1,/*47*/4,/*48*/4,/*49*/3,/*50*/3,/*51*/7,/*52*/1,/*53*/1,/*54*/1,/*55*/1,/*56*/1,/*57*/1,/*58*/2};
+    
 AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
-    [0]={[A_IDLE_CLOSED]={1.0f,2,2,699,24},[A_OPENING]={1.0f,2,11,699,24},[A_IDLE_OPEN]={1.0f,11,11,708,24},[A_CLOSING]={1.0f,12,21,709,24}},/*doorB (door2)*/
-    [1]={[A_IDLE_CLOSED]={1.0f,2,2,719,24},[A_OPENING]={1.0f,2,12,719,24},[A_IDLE_OPEN]={1.0f,12,12,729,24},[A_CLOSING]={1.0f,14,24,731,24}},/*doorA (door1)*/
+    [0]={[A_IDLE_CLOSED]={1.0f,2,2,699,24},[A_OPENING]={1.0f,2,11,699,24},[A_IDLE_OPEN]={1.0f,11,11,708,24},[A_CLOSING]={1.0f,12,21,709,24}},/*doorB (door2)*/                  [1]={[A_IDLE_CLOSED]={1.0f,2,2,719,24},[A_OPENING]={1.0f,2,12,719,24},[A_IDLE_OPEN]={1.0f,12,12,729,24},[A_CLOSING]={1.0f,14,24,731,24}},/*doorA (door1)*/
     [2]={[A_IDLE]={1.0f,0,37,6975,30},[A_WALK]={1.0f,50,99,7013,30},[A_RUN]={1.1f,50,99,7013,30},[A_ATTACK1]={0.75f,111,136,7063,30},[A_PAIN]={0.5f,138,150,7090,30},[A_DYING]={0.75f,153,176,7103,30}},/*npc_humanoid_mutant*/
     [3]={[A_IDLE]={1.0f,1,207,893,24},[A_ATTACK1]={1.0f,219,239,1100,24},[A_ATTACK2]={1.0f,219,239,1100,24},[A_WALK]={1.0f,252,308,1121,24},[A_RUN]={1.0f,252,308,1121,24},[A_PAIN]={1.0f,321,330,1177,24},[A_PAIN2]={1.0f,331,344,1187,24},[A_DYING]={1.0f,345,369,1201,24}},/*npc_cyborg_drone*/
-    [4]={[A_IDLE_CLOSED]={1.0f,2,2,1234,24},[A_OPENING]={1.5f,2,44,1234,24},[A_IDLE_OPEN]={1.0f,44,44,1276,24},[A_CLOSING]={1.75f,46,96,1277,24}},/*doorD (door4, bulkhead 1)*/
-    [5]={[A_IDLE_CLOSED]={1.0f,2,2,1328,24},[A_OPENING]={1.0f,2,25,1328,24},[A_IDLE_OPEN]={1.0f,25,25,1351,24},[A_CLOSING]={1.0f,27,44,1352,24}},/*doorC (door3)*/
-    [6]={[A_IDLE_CLOSED]={1.0f,1,1,1370,24},[A_OPENING]={1.2f,1,30,1370,24},[A_IDLE_OPEN]={1.0f,30,30,1399,24},[A_CLOSING]={1.2f,32,66,1400,24}},/*doorJ (xdoor1)*/
-    [7]={[A_IDLE_CLOSED]={1.0f,3,3,1435,24},[A_OPENING]={1.2f,3,24,1435,24},[A_IDLE_OPEN]={1.0f,26,26,1457,24},[A_CLOSING]={1.2f,27,49,1458,24}},/*doorK (xdoor2)*/
-    [8]={[A_IDLE_CLOSED]={1.0f,3,3,1481,24},[A_OPENING]={1.2f,3,27,1481,24},[A_IDLE_OPEN]={1.0f,27,27,1505,24},[A_CLOSING]={1.2f,30,51,1506,24}},/*doorL (door10)*/
-    [9]={[A_IDLE_CLOSED]={1.0f,3,3,1528,24},[A_OPENING]={1.0f,3,15,1528,24},[A_IDLE_OPEN]={1.0f,28,28,1541,24},[A_CLOSING]={1.0f,28,39,1541,24}},/*doorE (door5)*/
-    [10]={[A_IDLE_CLOSED]={1.0f,2,2,1553,24},[A_OPENING]={1.0f,2,23,1553,24},[A_IDLE_OPEN]={1.0f,23,23,1574,24},[A_CLOSING]={1.0f,27,45,1575,24}},/*doorF (door6)*/
-    [11]={[A_IDLE_CLOSED]={1.0f,3,3,1594,24},[A_OPENING]={1.0f,3,22,1594,24},[A_IDLE_OPEN]={1.0f,22,22,1613,24},[A_CLOSING]={1.0f,25,42,1614,24}},/*doorG (door7)*/
-    [12]={[A_IDLE_CLOSED]={1.0f,2,2,1632,24},[A_OPENING]={1.0f,2,25,1632,24},[A_IDLE_OPEN]={1.0f,25,25,1655,24},[A_CLOSING]={1.0f,27,49,1656,24}},/*doorH (door8)*/
-    [13]={[A_IDLE_CLOSED]={1.0f,2,2,1679,24},[A_OPENING]={1.0f,2,14,1679,24},[A_IDLE_OPEN]={1.0f,14,14,1691,24},[A_CLOSING]={1.0f,26,52,1692,24}},/*doorI (door9)*/
-    [14]={[A_IDLE_CLOSED]={1.0f,2,2,1719,24},[A_OPENING]={1.0f,2,20,1719,24},[A_IDLE_OPEN]={1.0f,20,20,1737,24},[A_CLOSING]={1.0f,22,41,1738,24}},/*door_elevator1*/
-    [15]={[A_IDLE_CLOSED]={1.0f,2,2,1758,24},[A_OPENING]={1.5f,2,21,1758,24},[A_IDLE_OPEN]={1.0f,21,21,1777,24},[A_CLOSING]={1.5f,23,41,1778,24}},/*door_elevator2*/
-    [16]={[A_IDLE_CLOSED]={1.0f,2,2,1797,24},[A_OPENING]={1.0f,2,22,1797,24},[A_IDLE_OPEN]={1.0f,22,22,1817,24},[A_CLOSING]={1.0f,24,43,1818,24}},/*door_elevator3*/
-    [17]={[A_IDLE_CLOSED]={1.0f,2,2,1838,24},[A_OPENING]={2.0f,2,32,1838,24},[A_IDLE_OPEN]={1.0f,32,32,1868,24},[A_CLOSING]={2.0f,34,62,1869,24}},/*door_elevator4*/
-    [18]={[A_IDLE_CLOSED]={1.0f,2,2,1898,24},[A_OPENING]={1.0f,2,21,1898,24},[A_IDLE_OPEN]={1.0f,21,21,1917,24},[A_CLOSING]={1.0f,23,41,1918,24}},/*door_secret2 (door_wall1)*/
-    [19]={[A_IDLE_CLOSED]={1.0f,2,2,1937,24},[A_OPENING]={1.0f,2,21,1937,24},[A_IDLE_OPEN]={1.0f,21,21,1956,24},[A_CLOSING]={1.0f,23,41,1957,24}},/*door_secret1 (door_wall2)*/
+    [4]={[A_IDLE_CLOSED]={1.0f,2,2,1234,24},[A_OPENING]={1.5f,2,44,1234,24},[A_IDLE_OPEN]={1.0f,44,44,1276,24},[A_CLOSING]={1.75f,46,96,1277,24}},/*doorD (door4, bulkhead 1)*/ [5]={[A_IDLE_CLOSED]={1.0f,2,2,1328,24},[A_OPENING]={1.0f,2,25,1328,24},[A_IDLE_OPEN]={1.0f,25,25,1351,24},[A_CLOSING]={1.0f,27,44,1352,24}},/*doorC (door3)*/
+    [6]={[A_IDLE_CLOSED]={1.0f,1,1,1370,24},[A_OPENING]={1.2f,1,30,1370,24},[A_IDLE_OPEN]={1.0f,30,30,1399,24},[A_CLOSING]={1.2f,32,66,1400,24}},/*doorJ (xdoor1)*/             [7]={[A_IDLE_CLOSED]={1.0f,3,3,1435,24},[A_OPENING]={1.2f,3,24,1435,24},[A_IDLE_OPEN]={1.0f,26,26,1457,24},[A_CLOSING]={1.2f,27,49,1458,24}},/*doorK (xdoor2)*/
+    [8]={[A_IDLE_CLOSED]={1.0f,3,3,1481,24},[A_OPENING]={1.2f,3,27,1481,24},[A_IDLE_OPEN]={1.0f,27,27,1505,24},[A_CLOSING]={1.2f,30,51,1506,24}},/*doorL (door10)*/             [9]={[A_IDLE_CLOSED]={1.0f,3,3,1528,24},[A_OPENING]={1.0f,3,15,1528,24},[A_IDLE_OPEN]={1.0f,28,28,1541,24},[A_CLOSING]={1.0f,28,39,1541,24}},/*doorE (door5)*/
+    [10]={[A_IDLE_CLOSED]={1.0f,2,2,1553,24},[A_OPENING]={1.0f,2,23,1553,24},[A_IDLE_OPEN]={1.0f,23,23,1574,24},[A_CLOSING]={1.0f,27,45,1575,24}},/*doorF (door6)*/             [11]={[A_IDLE_CLOSED]={1.0f,3,3,1594,24},[A_OPENING]={1.0f,3,22,1594,24},[A_IDLE_OPEN]={1.0f,22,22,1613,24},[A_CLOSING]={1.0f,25,42,1614,24}},/*doorG (door7)*/
+    [12]={[A_IDLE_CLOSED]={1.0f,2,2,1632,24},[A_OPENING]={1.0f,2,25,1632,24},[A_IDLE_OPEN]={1.0f,25,25,1655,24},[A_CLOSING]={1.0f,27,49,1656,24}},/*doorH (door8)*/             [13]={[A_IDLE_CLOSED]={1.0f,2,2,1679,24},[A_OPENING]={1.0f,2,14,1679,24},[A_IDLE_OPEN]={1.0f,14,14,1691,24},[A_CLOSING]={1.0f,26,52,1692,24}},/*doorI (door9)*/
+    [14]={[A_IDLE_CLOSED]={1.0f,2,2,1719,24},[A_OPENING]={1.0f,2,20,1719,24},[A_IDLE_OPEN]={1.0f,20,20,1737,24},[A_CLOSING]={1.0f,22,41,1738,24}},/*door_elevator1*/            [15]={[A_IDLE_CLOSED]={1.0f,2,2,1758,24},[A_OPENING]={1.5f,2,21,1758,24},[A_IDLE_OPEN]={1.0f,21,21,1777,24},[A_CLOSING]={1.5f,23,41,1778,24}},/*door_elevator2*/
+    [16]={[A_IDLE_CLOSED]={1.0f,2,2,1797,24},[A_OPENING]={1.0f,2,22,1797,24},[A_IDLE_OPEN]={1.0f,22,22,1817,24},[A_CLOSING]={1.0f,24,43,1818,24}},/*door_elevator3*/            [17]={[A_IDLE_CLOSED]={1.0f,2,2,1838,24},[A_OPENING]={2.0f,2,32,1838,24},[A_IDLE_OPEN]={1.0f,32,32,1868,24},[A_CLOSING]={2.0f,34,62,1869,24}},/*door_elevator4*/
+    [18]={[A_IDLE_CLOSED]={1.0f,2,2,1898,24},[A_OPENING]={1.0f,2,21,1898,24},[A_IDLE_OPEN]={1.0f,21,21,1917,24},[A_CLOSING]={1.0f,23,41,1918,24}},/*door_secret2 (door_wall1)*/ [19]={[A_IDLE_CLOSED]={1.0f,2,2,1937,24},[A_OPENING]={1.0f,2,21,1937,24},[A_IDLE_OPEN]={1.0f,21,21,1956,24},[A_CLOSING]={1.0f,23,41,1957,24}},/*door_secret1 (door_wall2)*/
     [20]={[A_IDLE_CLOSED]={1.0f,2,2,1976,24},[A_OPENING]={1.0f,2,17,1976,24},[A_IDLE_OPEN]={1.0f,17,17,1991,24},[A_CLOSING]={1.0f,19,33,1992,24}},/*door_secret3 (door_wall3)*/
-    [21]={[A_LOOP_ALL]={1.0f,1,47,2007,24}},/*chunk_eng2_6 (eng_wallpump)*/
-    [22]={[A_LOOP_ALL]={1.0f,1,50,2054,24}},/*flight_fanwall*/
+    [21]={[A_LOOP_ALL]={1.0f,1,47,2007,24}},/*chunk_eng2_6 (eng_wallpump)*/   [22]={[A_LOOP_ALL]={1.0f,1,50,2054,24}},/*flight_fanwall*/
     [23]={[A_IDLE]={1.0f,3,3,6877,24},[A_WALK]={1.0f,3,36,6877,24},[A_ATTACK1]={1.0f,38,56,6911,24},[A_ATTACK2]={1.0f,58,81,6930,24},[A_ATTACK3]={1.0f,58,81,6930,24},[A_RUN]={1.0f,3,36,6877,24},[A_PAIN]={1.0f,84,96,6954,24},[A_DYING]={1.0f,99,106,6967,24}},/*npc_bot_cortex_reaver*/
     [24]={[A_IDLE]={1.0f,1,60,2200,24},[A_ATTACK2]={1.0f,62,83,2260,24},[A_ATTACK3]={1.0f,86,122,2282,24},[A_RUN]={1.0f,143,182,2319,24},[A_WALK]={1.0f,143,182,2319,24},[A_PAIN]={1.0f,204,214,2359,24},[A_PAIN2]={1.0f,216,227,2370,24},[A_DYING]={1.0f,229,268,2382,24}},/*npc_cyborgassassin*/
     [25]={[A_IDLE]={1.0f,1,155,2422,30},[A_RUN]={1.0f,190,243,2577,30},[A_WALK]={1.0f,190,243,2577,30},[A_ATTACK2]={1.0f,265,289,2631,30},[A_ATTACK1]={1.0f,291,332,2656,30},[A_DYING]={1.0f,334,417,2698,30}},/*npc_cyborg_diego*/
@@ -1137,22 +1109,13 @@ AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameS
     [40]={[A_IDLE]={0.18f,1,9,5153,24},[A_WALK]={0.333f,1,9,5153,24},[A_RUN]={0.333f,1,9,5153,24},[A_ATTACK1]={0.5f,18,28,5162,24},[A_PAIN]={0.333f,54,63,5173,24},[A_DYING]={0.333f,77,85,5183,24}},/*npc_servbot*/
     [41]={[A_IDLE]={1.0f,1,66,5192,24},[A_WALK]={2.0f,79,132,5258,24},[A_RUN]={2.5f,79,132,5258,24},[A_PAIN]={1.0f,145,157,5312,24},[A_ATTACK2]={1.0f,159,181,5325,24},[A_DYING]={1.0f,183,221,5348,24}},/*npc_virusmutant*/
     [42]={[A_IDLE]={1.0f,1,121,5387,24},[A_DYING]={1.0f,121,157,5507,24}},/*npc_zerogmut*/
-    [43]={[A_IDLE_CLOSED]={1.0f,1,1,5544,24},[A_OPENING]={1.2f,2,21,5545,24},[A_IDLE_OPEN]={1.0f,21,21,5564,24}},/*puzzlepanel1*/
-    [44]={[A_IDLE_CLOSED]={1.0f,0,0,5565,24},[A_OPENING]={1.2f,1,17,5566,24},[A_IDLE_OPEN]={1.0f,17,17,5582,24},[A_INSTALL]={1.0f,19,30,5584,24},[A_INSTALLED]={1.0f,18,18,5583,24}},/*puzzlepanel2*/
-    [45]={[A_IDLE_CLOSED]={1.0f,0,0,5596,24},[A_OPENING]={1.2f,1,17,5597,24},[A_IDLE_OPEN]={1.0f,17,17,5613,24},[A_INSTALLED]={1.0f,18,18,5614,24}},/*puzzlepanel3*/
-    [46]={[A_LOOP_ALL]={1.0f,1,100,5615,24}},/*sparkingwire*/
-    [47]={[A_INACTIVE]={1.0f,2,2,5715,24},[A_ACTIVATE]={1.2f,2,4,5715,24},[A_ACTIVATED]={1.0f,4,4,5717,24},[A_DEACTIVATE]={1.0f,5,6,5718,24}},/*switch4*/
-    [48]={[A_INACTIVE]={1.0f,2,2,5720,24},[A_ACTIVATE]={1.2f,2,6,5720,24},[A_ACTIVATED]={1.0f,6,6,5724,24},[A_DEACTIVATE]={1.0f,8,10,5725,24}},/*switch5*/
-    [49]={[A_IDLE]={1.0f,1,1,5728,24},[A_ATTACK_MISS]={1.0f,1,13,5728,24},[A_ATTACK_HIT]={1.0f,18,24,5741,24}},/*v_pipe*/
-    [50]={[A_IDLE]={1.0f,1,1,5748,24},[A_ATTACK_MISS]={0.5f,4,22,5749,24},[A_ATTACK_HIT]={1.0f,4,22,5748,24}},/*v_rapier*/
+    [43]={[A_IDLE_CLOSED]={1.0f,1,1,5544,24},[A_OPENING]={1.2f,2,21,5545,24},[A_IDLE_OPEN]={1.0f,21,21,5564,24}},/*puzzlepanel1*/                                               [44]={[A_IDLE_CLOSED]={1.0f,0,0,5565,24},[A_OPENING]={1.2f,1,17,5566,24},[A_IDLE_OPEN]={1.0f,17,17,5582,24},[A_INSTALL]={1.0f,19,30,5584,24},[A_INSTALLED]={1.0f,18,18,5583,24}},/*puzzlepanel2*/
+    [45]={[A_IDLE_CLOSED]={1.0f,0,0,5596,24},[A_OPENING]={1.2f,1,17,5597,24},[A_IDLE_OPEN]={1.0f,17,17,5613,24},[A_INSTALLED]={1.0f,18,18,5614,24}},/*puzzlepanel3*/            [46]={[A_LOOP_ALL]={1.0f,1,100,5615,24}},/*sparkingwire*/
+    [47]={[A_INACTIVE]={1.0f,2,2,5715,24},[A_ACTIVATE]={1.2f,2,4,5715,24},[A_ACTIVATED]={1.0f,4,4,5717,24},[A_DEACTIVATE]={1.0f,5,6,5718,24}},/*switch4*/                       [48]={[A_INACTIVE]={1.0f,2,2,5720,24},[A_ACTIVATE]={1.2f,2,6,5720,24},[A_ACTIVATED]={1.0f,6,6,5724,24},[A_DEACTIVATE]={1.0f,8,10,5725,24}},/*switch5*/
+    [49]={[A_IDLE]={1.0f,1,1,5728,24},[A_ATTACK_MISS]={1.0f,1,13,5728,24},[A_ATTACK_HIT]={1.0f,18,24,5741,24}},/*v_pipe*/                                                       [50]={[A_IDLE]={1.0f,1,1,5748,24},[A_ATTACK_MISS]={0.5f,4,22,5749,24},[A_ATTACK_HIT]={1.0f,4,22,5748,24}},/*v_rapier*/
     [51]={[A_IDLE]={1.0f,1,65,5768,24},[A_WALK]={1.0f,75,98,5833,24},[A_RUN]={1.0f,75,98,5833,24},[A_ATTACK2]={1.0f,109,126,5857,24},[A_ATTACK1]={1.0f,128,142,5875,24},[A_PAIN]={1.0f,144,159,5890,24},[A_PAIN2]={1.0f,161,174,5906,24},[A_DYING]={1.0f,176,243,5920,24}},/*npc_mutant_cyborg*/
-    [52]={[A_LOOP_ALL]={1.0f,1,40,7446,24}},/*g_energmine*/
-    [53]={[A_LOOP_ALL]={1.0f,1,260,6076,24}},/*cyber_data*/
-    [54]={[A_LOOP_ALL]={1.0f,1,80,6336,24}},/*cyber_datafrag*/
-    [55]={[A_LOOP_ALL]={1.0f,1,100,6416,24}},/*cyber_exit*/
-    [56]={[A_LOOP_ALL]={1.0f,1,99,6516,24}},/*cyber_ice*/
-    [57]={[A_LOOP_ALL]={1.0f,1,260,6615,24}},/*cyber_item*/
-    [58]={[A_INACTIVE]={1.0f,1,1,80,24},[A_ACTIVATED]={1.0f,2,2,81,24}},/*cyber_switch: 1=off, 2=on*/
+    [52]={[A_LOOP_ALL]={1.0f,1,40,7446,24}},/*g_energmine*/   [53]={[A_LOOP_ALL]={1.0f,1,260,6076,24}},/*cyber_data*/   [54]={[A_LOOP_ALL]={1.0f,1,80,6336,24}},/*cyber_datafrag*/
+    [55]={[A_LOOP_ALL]={1.0f,1,100,6416,24}},/*cyber_exit*/   [56]={[A_LOOP_ALL]={1.0f,1,99,6516,24}},/*cyber_ice*/     [57]={[A_LOOP_ALL]={1.0f,1,260,6615,24}},/*cyber_item*/ [58]={[A_INACTIVE]={1.0f,1,1,80,24},[A_ACTIVATED]={1.0f,2,2,81,24}},/*cyber_switch: 1=off, 2=on*/
 };
 
 void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
@@ -1162,16 +1125,38 @@ void UpdateAnims(void) {
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
         if (i == World.weaponVModelIndex) continue; /* view model handled manually */
         Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->ajar) continue;
+        
         if (animTest == 1) {
             u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0;
-            for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &modelAnimationClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } } if (numValid == 0){continue;} 
+            for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) {
+                AnimationClip* test = &modelAnimationClips[e->animationNum][c];
+                if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; }
+            }
+            
+            if (numValid == 0) { continue; }
+            
             e->currentFrameFinished += animDT;
-            while (e->currentFrameFinished >= totalDuration) { e->currentFrameFinished -= totalDuration; } if (e->currentFrameFinished < 0.0){e->currentFrameFinished = 0.0;} double t = e->currentFrameFinished, clipStartTime=0.0; AnimationClip* activeClip = &modelAnimationClips[e->animationNum][validClips[0]];
-            for(u8 j=0;j<numValid;++j){activeClip=&modelAnimationClips[e->animationNum][validClips[j]]; double activeDur=(double)(activeClip->frameEnd - activeClip->frameStart+1)/((double)activeClip->framerate*activeClip->speed); if(t<clipStartTime+activeDur){targetClipIdx=j; break;} clipStartTime+=activeDur; if(j==numValid-1){targetClipIdx=j; t=clipStartTime;}}
-            u8 targetClip = validClips[targetClipIdx]; double timeInClip = t - clipStartTime, timePerFrame = 1.0 / ((double)activeClip->framerate * activeClip->speed);
-            u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1, frameOffset = (u32)(timeInClip / timePerFrame); if (frameOffset >= frameCount) frameOffset = frameCount - 1;
-            u32 newFrame = activeClip->frameStart + frameOffset; u16 newModel = activeClip->frameStartModelIndex + frameOffset; bool frameUpdated = (e->clip != targetClip || e->frame != newFrame || e->modelIndex != newModel);
-            e->clip = targetClip; e->frame = newFrame; e->modelIndex = newModel; if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
+            while (e->currentFrameFinished >= totalDuration) { e->currentFrameFinished -= totalDuration; }
+            if (e->currentFrameFinished < 0.0) { e->currentFrameFinished = 0.0; }
+            double t = e->currentFrameFinished, clipStartTime = 0.0;
+            AnimationClip* activeClip = &modelAnimationClips[e->animationNum][validClips[0]];
+            for (u8 j=0;j<numValid;++j) {
+                activeClip=&modelAnimationClips[e->animationNum][validClips[j]];
+                double activeDur = (double)(activeClip->frameEnd - activeClip->frameStart + 1) / ((double)activeClip->framerate * activeClip->speed);
+                if (t<clipStartTime + activeDur) { targetClipIdx = j; break; }
+                
+                clipStartTime += activeDur;
+                if (j==numValid - 1) { targetClipIdx = j; t = clipStartTime; }
+            }
+            u8 targetClip = validClips[targetClipIdx];
+            double timeInClip = t - clipStartTime, timePerFrame = 1.0 / ((double)activeClip->framerate * activeClip->speed);
+            u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1, frameOffset = (u32)(timeInClip / timePerFrame);
+            if (frameOffset >= frameCount) frameOffset = frameCount - 1;
+            u32 newFrame = activeClip->frameStart + frameOffset;
+            u16 newModel = activeClip->frameStartModelIndex + frameOffset;
+            bool frameUpdated = (e->clip != targetClip || e->frame != newFrame || e->modelIndex != newModel);
+            e->clip = targetClip; e->frame = newFrame; e->modelIndex = newModel;
+            if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
         } else if (animTest == 2) {
             if (Sys_Input.keyStates[KEY_1].pressed || Sys_Input.keyStates[KEY_2].pressed) {
                 u8 validClips[MAX_ANIMCLIPS], numValid=0;

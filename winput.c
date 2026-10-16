@@ -529,7 +529,18 @@ int WindowInit() {
     return 1;
 }
 
-const FBC* ChooseFBConfig(const FBC* a, u32 c) {u32 l=-1; const FBC* f=0; for (u32 i = 0; i < c; i++) { const FBC* x=a+i; u32 s=(((x->alphaBits==0)+(x->depthBits==0)+(x->stencilBits==0))*65536) + (((8-x->redBits)*(8-x->redBits) + (8-x->greenBits)*(8-x->greenBits) + (8-x->blueBits)*(8-x->blueBits))*256) + ((8-x->alphaBits)*(8-x->alphaBits) + (8-x->depthBits)*(8-x->depthBits) + (8-x->stencilBits)*(8-x->stencilBits)); if(s < l){l=s; f=x;}} return f;}
+const FBC* ChooseFBConfig(const FBC* a, u32 c) {
+    u32 lowest = -1; const FBC* f = 0;
+    for (u32 i=0;i<c;++i) {
+        const FBC* x = a + i;
+        u32 score = (((x->alphaBits == 0) + (x->depthBits == 0) + (x->stencilBits == 0)) * 65536)
+                + (((8 - x->redBits) * (8 - x->redBits) + (8 - x->greenBits) * (8 - x->greenBits) + (8 - x->blueBits) * (8 - x->blueBits)) * 256)
+                + ((8 - x->alphaBits) * (8 - x->alphaBits) + (8 - x->depthBits) * (8 - x->depthBits) + (8 - x->stencilBits) * (8 - x->stencilBits));
+        if (score < lowest) { lowest = score; f = x; }
+    }
+    return f;
+}
+
 FGL_AT glActiveTexture; FGL_AS glAttachShader; FGL_CTSI2D glCopyTexSubImage2D;  FGL_BB glBindBuffer;  FGL_BBB glBindBufferBase;    FGL_CPIV glGetProgramiv;FGL_CC glClearColor;    FGL_U4F glUniform4f;        FGL_BFB glBindFramebuffer;FGL_VP glViewport;    FGL_BVA glBindVertexArray; FGL_EVAA glEnableVertexAttribArray;         
 FGL_UP glUseProgram;    FGL_DM glDepthMask;    FGL_VAB glVertexAttribBinding;   FGL_DF glDepthFunc;   FGL_DC glDispatchCompute;    FGL_DB glDrawBuffers;   FGL_GSIV glGetShaderiv; FGL_BVB glBindVertexBuffer; FGL_LW glLineWidth;       FGL_LP glLinkProgram; FGL_RB glReadBuffer;       FGL_U3F glUniform3f;
 FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram;   FGL_CRS glCreateShader;  FGL_BFS glBlendFuncSeparate; FGL_UB glUnmapBuffer; FGL_BD glBufferData; FGL_F glFinish;

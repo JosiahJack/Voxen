@@ -452,32 +452,65 @@ static V3 AIGetAStarPoint(Entity* self) {
 }
 
 static V3 AIGetSearchPoint(Entity* self) { NPCType t = npcTable[self->index - 419].type; if (t == NPCType_Mutant || t == NPCType_Supermutant) {return AIGetWanderPoint(self);} return AIGetAStarPoint(self); }
-/* Unity gates the hop impulse on clip progress: AIController.cs:804 (Run/HopMove) and :636 (Walk) both fire once
-   past playbackTime 0.1395 and only clear the hopDone latch when the clip rewinds below it, i.e. once per loop.
-   The old toggle here cleared the latch on every 10Hz think tick, so it fired ~5x a second. Served by both AIWalk
-   and AIRun, so the up impulse from the Walk path (:642) is kept -- without it the hopper never leaves the floor. */
 static void AIHopMove(u16 self) {
-    Entity* e = &World.instances[self]; if (e->animationNum >= MAX_ANIMS || e->clip >= MAX_ANIMCLIPS) {flag_set(&e->entflags,EF_HOP_DONE,false); return;}
-    AnimationClip c = modelAnimationClips[e->animationNum][e->clip]; float normTime = (c.frameEnd > c.frameStart) ? (float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart) : 0.0f;
-    if (normTime > 0.1395f) { if (!(e->entflags & EF_HOP_DONE)) { flag_set(&e->entflags,EF_HOP_DONE,true); AddForce(self,V3_ScaleByF(e->forward,500.0f),true); AddForce(self,(V3){0,5.0f,0},true); } } else { flag_set(&e->entflags,EF_HOP_DONE,false); }
+    Entity* e = &World.instances[self]; if (e->animationNum >= MAX_ANIMS || e->clip >= MAX_ANIMCLIPS) { flag_set(&e->entflags,EF_HOP_DONE,false); return; }
+    
+    AnimationClip c = modelAnimationClips[e->animationNum][e->clip];
+    float normTime = (c.frameEnd > c.frameStart) ? (float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart) : 0.0f;
+    if (normTime > 0.1395f) {
+        if (!(e->entflags & EF_HOP_DONE)) {
+            flag_set(&e->entflags,EF_HOP_DONE,true);
+            AddForce(self,V3_ScaleByF(e->forward,500.0f),true);
+            AddForce(self,(V3){0,5.0f,0},true);
+        }
+    } else { flag_set(&e->entflags,EF_HOP_DONE,false); }
 }
 static void AIWalk(u16 self) {
-    if ((AICheckPain(self)) || (World.instances[self].entflags & EF_ASLEEP)){return;} if ((World.instances[self].entflags & EF_ENEM_IN_SIGHT) || World.instances[self].enemy){World.instances[self].currentState=AIState_Run; return;} if (World.instances[self].entflags & EF_ACT_AS_TURRET) {World.instances[self].currentState = AIState_Idle; return;}
-    if ((npcTable[World.instances[self].index - 419].moveType == AIMoveType_None) || (World.instances[self].tranquilizeFinished >= World.pauseRelativeTime)){return;} u16 sidx = self; if (!PositionVisibleFromPlayerCell(World.position[sidx].x,World.position[sidx].z)){return;}
-    float dist = V3_Dist(ai_sight_pos(&World.instances[self]),World.instances[self].currentDestination); if (World.instances[self].entflags & EF_WANDERING) { if (World.instances[self].wanderFinished < World.pauseRelativeTime || dist < AI_STOP_DIST * 0.5f) { World.instances[self].wanderFinished = World.pauseRelativeTime + random_range(3.0f, 8.0f); World.instances[self].currentDestination = AIGetWanderPoint(&World.instances[self]); } }
+    if ((AICheckPain(self)) || (World.instances[self].entflags & EF_ASLEEP)){return;}
+    if ((World.instances[self].entflags & EF_ENEM_IN_SIGHT) || World.instances[self].enemy){World.instances[self].currentState=AIState_Run; return;}
+    if (World.instances[self].entflags & EF_ACT_AS_TURRET) {World.instances[self].currentState = AIState_Idle; return;}
+    if ((npcTable[World.instances[self].index - 419].moveType == AIMoveType_None) || (World.instances[self].tranquilizeFinished >= World.pauseRelativeTime)){return;}
+    u16 sidx = self; if (!PositionVisibleFromPlayerCell(World.position[sidx].x,World.position[sidx].z)){return;}
+    
+    float dist = V3_Dist(ai_sight_pos(&World.instances[self]),World.instances[self].currentDestination);
+    if (World.instances[self].entflags & EF_WANDERING) {
+        if (World.instances[self].wanderFinished < World.pauseRelativeTime || dist < AI_STOP_DIST * 0.5f) {
+            World.instances[self].wanderFinished = World.pauseRelativeTime + random_range(3.0f, 8.0f);
+            World.instances[self].currentDestination = AIGetWanderPoint(&World.instances[self]);
+        }
+    }
     if (dist > AI_STOP_DIST && AIWithinAngleToTarget(&World.instances[self])) {
         if (npcTable[World.instances[self].index - 419].hopsOnMove) { AIHopMove(self); }
         else {
             float ws  = npcTable[World.instances[self].index - 419].walkSpeed; V3 mv = { World.instances[self].forward.x*ws,World.instances[self].forward.y*ws,World.instances[self].forward.z*ws };
-            if (npcTable[World.instances[self].index - 419].moveType != AIMoveType_Fly) { V3 spos = ai_sight_pos(&World.instances[self]); V3 cp = { spos.x + World.instances[self].forward.x*0.48f, spos.y, spos.z + World.instances[self].forward.z*0.48f }; RaycastHit gh = Raycast(cp,(V3){0,-1,0},CELLSZ,LMASK_NPC_COLLISION); if (!gh.hit) { mv.x = 0.0f; mv.z = 0.0f; } } mv.y = World.velocity[sidx].y; World.velocity[sidx] = mv;
-        } return;
-    } if (!(World.instances[self].entflags & EF_WANDERING)) World.instances[self].currentState = AIState_Idle;
+            if (npcTable[World.instances[self].index - 419].moveType != AIMoveType_Fly) {
+                V3 spos = ai_sight_pos(&World.instances[self]); V3 cp = { spos.x + World.instances[self].forward.x*0.48f, spos.y, spos.z + World.instances[self].forward.z*0.48f };
+                RaycastHit gh = Raycast(cp,(V3){0,-1,0},CELLSZ,LMASK_NPC_COLLISION);
+                if (!gh.hit) { mv.x = 0.0f; mv.z = 0.0f; }
+            }
+            mv.y = World.velocity[sidx].y; World.velocity[sidx] = mv;
+        }
+        return;
+    }
+    
+    if (!(World.instances[self].entflags & EF_WANDERING)) World.instances[self].currentState = AIState_Idle;
 }
 
-static void AIRunMove(u16 self) { if (World.instances[self].entflags & EF_ACT_AS_TURRET){return;} float rs=npcTable[World.instances[self].index - 419].runSpeed; World.velocity[self]=(V3){World.instances[self].forward.x * rs,(vabs(World.gravity[self]) > 0.05f) ? World.velocity[self].y : World.instances[self].forward.y * rs,World.instances[self].forward.z * rs}; }
+static void AIRunMove(u16 self) {
+    if (World.instances[self].entflags & EF_ACT_AS_TURRET) return;
+    
+    float rs = npcTable[World.instances[self].index - 419].runSpeed;
+    World.velocity[self] = (V3){World.instances[self].forward.x * rs,(vabs(World.gravity[self]) > 0.05f) ? World.velocity[self].y : World.instances[self].forward.y * rs,World.instances[self].forward.z * rs};
+}
+
 static void AIHunt(Entity* self) {
-    u16 sidx=(u16)(self - World.instances); u16 eidx=self->enemy; if(!eidx){return;} self->currentDestination = IsCyberNPC((u16)(self - World.instances)) ? World.position[eidx] : AIGetSearchPoint(self); if ((npcTable[self->index - 419].moveType == AIMoveType_None) || (self->entflags & EF_ACT_AS_TURRET) || (npcTable[self->index - 419].runSpeed <= 0.0f) || (V3_SqDist(ai_sight_pos(self), self->currentDestination) <= AI_STOP_DIST_SQ) || (!AIWithinAngleToTarget(self))){return;}
-    float rs=npcTable[self->index - 419].runSpeed; World.velocity[sidx]=(V3){self->forward.x*rs,World.velocity[sidx].y,self->forward.z*rs};
+    u16 sidx = (u16)(self - World.instances); u16 eidx = self->enemy; if (!eidx) return;
+    
+    self->currentDestination = IsCyberNPC((u16)(self - World.instances)) ? World.position[eidx] : AIGetSearchPoint(self);
+    if ((npcTable[self->index - 419].moveType == AIMoveType_None) || (self->entflags & EF_ACT_AS_TURRET) || (npcTable[self->index - 419].runSpeed <= 0.0f) || (V3_SqDist(ai_sight_pos(self), self->currentDestination) <= AI_STOP_DIST_SQ) || (!AIWithinAngleToTarget(self))){return;}
+    
+    float rs=npcTable[self->index - 419].runSpeed;
+    World.velocity[sidx]=(V3){self->forward.x*rs,World.velocity[sidx].y,self->forward.z*rs};
 }
 
 float DistToEnemy(u16 self, u16 enem) { if(self >= World.instCount){return 100000.0f;} if(enem >= World.instCount){return 100000.0f;} V3 d = V3_AsubB(ai_sight_pos(&World.instances[self]),World.position[enem]); return V3_dot(d,d); }
@@ -488,9 +521,6 @@ static bool AICanAttack(u16 selfIdx, float dsq, u8 type, float* rangeToEnemy) {
 }
 
 static void AIBrakingMovement(Entity* self) { u16 sidx=(u16)(self - World.instances); u8 ni=self->index-419; if (ni == 1 || (ni >= 3 && ni <= 9) || (ni >= 11 && ni <= 13) || ni == 17 || ni == 23) { World.velocity[sidx].x *= 0.15f; World.velocity[sidx].z *= 0.15f; } }
-/* Real on-screen length of an attack clip: frames / (framerate * speed), the same timePerFrame
-   UpdateAnims advances by. 0 when the NPC's model has no clip for that slot, which is the signal
-   to fall back to the authored cadence. */
 static double ai_attack_clip_time(const Entity* self, int slot) {
     if (self->animationNum >= MAX_ANIMS || slot < 1 || slot > 3) return 0.0;
     u8 c = (u8)(A_ATTACK1 + (slot - 1)); if (c >= MAX_ANIMCLIPS) return 0.0;
@@ -501,11 +531,6 @@ static double ai_attack_clip_time(const Entity* self, int slot) {
 
 static void AIStartAttack(Entity* self, int n) {
     AIBrakingMovement(self); NPCTable* npc = &npcTable[self->index - 419]; double between, toActual; switch (n) { case 1: between = npc->timeBetweenAttack1; toActual = npc->timeToActualAttack1; break; case 2: between = npc->timeBetweenAttack2; toActual = npc->timeToActualAttack2; break; default: between = npc->timeBetweenAttack3; toActual = npc->timeToActualAttack3; break; }
-    /* Exit Attack on the animation's last frame instead of the authored cadence. Unity uses
-       timeBetweenAttack + timeToActualAttack, which is a fire-rate budget unrelated to the clip
-       and overruns it for most NPCs (median 1.75 loops, up to 12.6). timeToActualAttack stays a
-       floor: it is when the grace-period shot fires, and AIAttack only runs while still in the
-       attack state, so ending earlier would swallow the projectile entirely. */
     double clipTime = ai_attack_clip_time(self, n);
     double dur = clipTime > 0.0 ? (clipTime > toActual ? clipTime : toActual) : between + toActual;
     self->attackFinished = World.pauseRelativeTime + dur; self->gracePeriodFinished = World.pauseRelativeTime + toActual; self->currentState = (AIState)(AIState_Attack1 + (n - 1));
@@ -524,20 +549,27 @@ static void AIRun(u16 selfIdx) {
     if (ndat->moveType != AIMoveType_None && rangeToEnemy > AI_STOP_DIST_SQ) { if (AIWithinAngleToTarget(self)) { if (ndat->hopsOnMove && !(World.instances[selfIdx].entflags & EF_ACT_AS_TURRET)){ AIHopMove(selfIdx); } else { AIRunMove(selfIdx); } } else if (World.diffCbt >= 2 && random_range(0.0f,1.0f) < 0.5f) { AIFace(self,self->currentDestination); } }
 }
 
-static void AIPain(Entity* self) { if (self->timeTillPainFinished < World.pauseRelativeTime) { self->currentState = AIState_Run; flag_set(&self->entflags, EF_GO_INTO_PAIN, false); self->timeTillPainFinished = World.pauseRelativeTime + npcTable[self->index - 419].timeBetweenPain; } }
-/* Voxen entities are the visible mesh; there is no child visibleMesh to hide. */
+static void AIPain(Entity* self) {
+    if (self->timeTillPainFinished < World.pauseRelativeTime) {
+        self->currentState = AIState_Run;
+        flag_set(&self->entflags, EF_GO_INTO_PAIN, false);
+        self->timeTillPainFinished = World.pauseRelativeTime + npcTable[self->index - 419].timeBetweenPain;
+    }
+}
+
 static double AIDeathAnimationDuration(const Entity* self) {
     if (!self || self->animationNum >= MAX_ANIMS) return 0.0;
+    
     AnimationClip clip = modelAnimationClips[self->animationNum][A_DYING];
     if (clip.framerate <= 0 || clip.speed <= 0 || clip.frameEnd <= clip.frameStart) return 0.0;
     return (double)(clip.frameEnd - clip.frameStart + 1) / ((double)clip.framerate * clip.speed);
 }
-  static void SpawnNPCDeathBurst(Entity* self) {
+
+static void SpawnNPCDeathBurst(Entity* self) {
     if (!self) return;
     u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return;
+      
     u16 selfIdx=(u16)(self - World.instances);
-    /* Unity places the death burst at the prefab child GameObject's local offset rather than at
-       the NPC origin, so rotate npcDeathBurstOffset by the body's facing. */
     V3 origin=V3_AplusB(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],npcDeathBurstOffset[npc]));
     const PSysDef* primary=PSysTypeGet(self->deathBurst);
     if (primary) { PSysDef def=*primary; def.pos=origin; PSysAdd(&def); }
@@ -547,15 +579,14 @@ static double AIDeathAnimationDuration(const Entity* self) {
   }
 static void AIDying(u16 i) {
     if (!(World.instances[i].entflags & EF_DYING_SETUP)) {
-        World.instances[i].enemy = 0; NPCTable* npc = &npcTable[World.instances[i].index - 419]; float dbt = deathBurstTimer[World.instances[i].index - 419]; if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; } else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(&World.instances[i]); flag_set(&World.instances[i].entflags, EF_DEATH_BURST_DONE, true); }
+        World.instances[i].enemy = 0;
+        NPCTable* npc = &npcTable[World.instances[i].index - 419];
+        float dbt = deathBurstTimer[World.instances[i].index - 419];
+        if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; }
+        else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(&World.instances[i]); flag_set(&World.instances[i].entflags, EF_DEATH_BURST_DONE, true); }
         u16 sidx = i; if (!(World.instances[i].entflags & EF_ACT_AS_CORPSE_ONLY) && !(World.instances[i].entflags & EF_TELEPORT_ON_DEATH)) { int sded=sfxDeath[World.instances[i].index - 419]; if (sded >= 0 && sded < (i16)SOUNDS_COUNT){play_wav(sounds[sded],AppliedFXVol(1.0f),World.position[sidx],true);} } { u16 _nid = World.instances[i].index - 419; World.gravity[i] = (IsCyberNPC(i) || ai_gibs_on_death(_nid)) ? 0.0f : 1.0f; } // Citadel: gibbed/flier corpses don't fall while dying; cyber never falls.
         flag_set(&World.instances[i].entflags,EF_ASLEEP,false); World.layer[i] = L_Corpse; flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true); u16 npcID = World.instances[i].index - 419; double deathWait = npc->timeTillDead; if (ai_gibs_on_death(npcID)) { double animWait = AIDeathAnimationDuration(&World.instances[i]); if (animWait > deathWait) deathWait = animWait; } World.instances[i].timeTillDeadFinished = World.pauseRelativeTime + deathWait; if (npc->switchMaterialOnDeath && npcDeathTexture[npcID] != 0) { World.instances[i].texIndex = npcDeathTexture[npcID]; }
-        /* Citadel's zero-g death object is a 25-frame sequence at 24 fps. Voxen
-         * has one mesh, so keep it visible and switch only its texture. Clip 48
-         * is the available zerog37..zerog52 death tail (16 source frames). */
         if (npcID == 20) { TextureSequenceStart(i, 48); }
-        /* Voxen has no blend-shape hierarchy for the hopper. Preserve its mesh
-         * and drive the shader's red/rim effect from this pause-relative timer. */
         if (npcID == 14) { World.instances[i].deathAnimationActive = true; World.instances[i].deathAnimationStart = (float)World.pauseRelativeTime; }
         if (World.instances[i].index == 428 || World.instances[i].index == 439) World.velocity[sidx] = (V3){0.0f,World.velocity[sidx].y,0.0f}; // Prevent gibs on Exec bot or fake melt on Zero-G mutant from having horizontal movement (looks nicer).
         if (World.instances[i].index == 433) World.layer[i] = L_Corpse; // Hopper: drop to the corpse layer while dying
@@ -634,10 +665,6 @@ static void ProjectileLaunched(Entity* self, int n) {
     V3 shove = V3_ScaleByF(dir, launchSpd); if (vabs(World.gravity[sidx]) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0,0,0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
 
-/* AIController.ExplodeAttack (AIController.cs:1350-1362) hands the blast to the same Utils.ApplyImpactForceSphere
-   the grenades and the railgun use, so it goes through ApplyImpactForceSphere here too rather than a second copy of
-   the falloff rules. The C# passes impactScale 1.5; the force column (attack3Force) already carries the table's
-   blast strength, so it is the baseVel argument. */
 static void AIExplodeAttack(Entity* self) {
     u16 selfIdx=(u16)(self - World.instances);
     float radius = npcTable[self->index - 419].attack3Radius; float force=npcTable[self->index - 419].attack3Force; V3 epos = ai_sight_pos(self); DamageData dd = SetNPCData(self, 3);

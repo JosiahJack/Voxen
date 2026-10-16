@@ -1,23 +1,5 @@
 // lib.c - LibC replacement functions and other misc helpers.
 #include "common.h"
-#define SCRATCH_ARENA_SIZE (86ULL * 1024 * 1024)
-u8* scratch_base,*scratch_cur,*scratch_end; size_t scratch_peak=0;
-void OS_ScratchInit(void) { if(scratch_base){return;} scratch_base=OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur=scratch_base; scratch_end=scratch_base + SCRATCH_ARENA_SIZE; }
-void* OS_AllocScratch(size_t amount) {
-    if (!scratch_base) { OS_ScratchInit(); }
-    size_t aligned = (amount + 15) & ~(size_t)15;
-    if (scratch_cur + aligned > scratch_end) { DualLogError("Scratch ovr!\n"); OS_Exit(1); }
-    
-    void* p = scratch_cur;
-    scratch_cur += aligned;
-    size_t used = (size_t)(scratch_cur - scratch_base);
-    if (used > scratch_peak) { scratch_peak = used; }
-    return p;
-}
-    
-void OS_FreeInitPhase(void) { scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
-void OS_ScratchFree(void) { DualLog("Scratch arena total peak: %u MB\n", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; }
-
 typedef u16 u16_u __attribute__((__aligned__(1),__may_alias__));
 typedef u32 u32_u __attribute__((__aligned__(1),__may_alias__));
 typedef u64 u64_u __attribute__((__aligned__(1),__may_alias__));
@@ -188,4 +170,3 @@ float random_range(float a, float b) { float factor = ((float)(xs32() >> 8)) * (
 u32 rand() { return xs32() & 0xFFFFu; }
 float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
 float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
-char* sLevelFileUpToEndLine(char* buf, int size) { static FHandle levelFileHandle; return sUpToEndLine(buf,size,levelFileHandle); }

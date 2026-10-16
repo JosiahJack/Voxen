@@ -182,7 +182,7 @@ void SearchFXEnable(int side) {
     side=side==1; World.Sys_UI.searchFXActive[side]=true; World.Sys_UI.searchFXStartTime[side]=World.pauseRelativeTime;
     World.Sys_UI.searchFXCursorX[side]=(float)World.cursorPos_x; World.Sys_UI.searchFXCursorY[side]=(float)World.cursorPos_y;
 }
-void SearchFXResetEnable(u16 self) { Entity* e = &World.instances[self]; if (e->itemLifeTime <= 0.0f) {e->itemLifeTime = 3.0f;} e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
+
 void SearchFXResetUpdate(u16 self) { Entity* e = &World.instances[self]; if (e->delayFinished >= World.pauseRelativeTime) {return;} flag_set(&e->entflags,EF_ACTIVE,false); }
 void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timerFinished = World.pauseRelativeTime + e->delay; e->active = true; }
 
@@ -365,9 +365,6 @@ int GeneralInvItem(int slot);
 bool GeneralInvCanVaporize(int slot);
 void GeneralInvRemove(int slot);
 void VaporizeClick() {int slot=World.invP1.generalInvCurrent; if(!GeneralInvCanVaporize(slot))return; GeneralInvRemove(slot); play_wav(sounds[89],AppliedFXVol(1.0f),(V3){0},false);}
-typedef struct { i8 norm,alt; } AmmoIconEntry;
-static const AmmoIconEntry ammoIconTable[51]={[36-36]={7,8}/*Magnesium/Penetrator*/,[37-36]={-2,-2}/*Energy*/,[38-36]={0,1}/*Needle/Tranq*/,[39-36]={9,10}/*Hornette/Splinter*/,[40-36]={-2,-2}/*Energy*/,[41-36]={-1,-1}/*Rapier, no ammo*/,[42-36]={-1,-1}/*Pipe, no ammo*/,[43-36]={5,6}/*Hollow/Slug*/,[44-36]={11,-1}/*Magcart*/,[45-36]={2,3 }/*Standard/Teflon*/,[46-36]={-2,-2}/*Energy*/,[47-36]={14,-1}/*Rail Rounds*/,[48-36]={4,-1}/*Rubber Slugs*/,[49-36]={12,13}/*Slag/Large Slag*/,[50-36]={-2,-2}/*Energy*/,[51-36]={-2,-2}/*Energy*/};
-i8 AmmoIconGet(int index,bool alt) { if (index < 343 || index > 358) {return -1;} const AmmoIconEntry* e = &ammoIconTable[index - 343]; return alt ? e->alt : e->norm; }
 void CyborgConversionToggleTargetted() {bool active=(World.ressurectionActiveLevels>>World.curLev)&1u; flag_setu16(&World.ressurectionActiveLevels,(1u<<World.curLev),!active); if(World.curLev==6)flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ play_wav(sounds[active ? 183 : 184], AppliedFXVol(1.0f), (V3){0.0f,0.0f,0.0f}, false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);}
 bool PlayerInElevatorCell(void); bool FindElevatorKeypadPos(u8 level,V3* outPos);
 bool ElevatorDefaultDestinationPos(u8 level,V3* outPos) { V3 panel; if (FindElevatorKeypadPos(level,&panel) && ElevatorDestinationPosNear(level,panel,outPos)) return true; return GetElevatorDestinationPos(level,0,outPos); }
@@ -375,21 +372,6 @@ bool ElevatorDestinationPosNear(u8 level,V3 fromPos,V3* outPos) {
     V3 best; float bestSq=0.0f; bool found=false;
     for (u8 n=0;n<MAX_LEVELS;++n) { V3 p; if(!GetElevatorDestinationPos(level,n,&p)) break; V3 d=V3_AsubB(p,fromPos); float sq=V3_dot(d,d); if(!found||sq<bestSq){best=p;bestSq=sq;found=true;} }
     if(found)*outPos=best; return found;
-}
-void ElevatorButtonClick(u16 self) {
-    Entity* e = &World.instances[self]; if (World.Sys_UI.linkedElevatorDoor == U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } Entity* door = &World.instances[World.Sys_UI.linkedElevatorDoor]; bool doorClosed = door->doorOpen == DoorState_Closed;
-    if (!PlayerInElevatorCell()) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); /*Too far away from that.*/ return; } if (!doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[7]); /*Door not closed.*/ return; } if (!(e->entflags & EF_ACTIVE)) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); /*Floor not accessible.*/ return; }
-    V3 srcKeypad=World.Sys_UI.objectInUsePos;
-    V3 offset = V3_AsubB(World.position[PLAYER1],srcKeypad); offset.y -= PLAYER_CAM_OFFSET_Y;
-    u8 destLevel = (u8)e->teleportID;
-    V3 destKeypad, destVolume, dest;
-    bool hasKeypad = FindElevatorKeypadPos(destLevel, &destKeypad);
-    if (hasKeypad && ElevatorDestinationPosNear(destLevel,destKeypad,&destVolume)) dest=V3_AplusB(destVolume,offset);
-    else if (hasKeypad) dest=V3_AplusB(destKeypad,offset);
-    else dest=(e->targetDestinationID != U16_MAX && e->targetDestinationID < World.instCount) ? World.position[e->targetDestinationID] : (V3){0.0f,0.0f,0.0f};
-    dest.y += PLAYER_CAM_OFFSET_Y;
-    queuedLevelPos    = dest;
-    queuedLevelToLoad = destLevel;
 }
 
 void EmailTargetted(u16 self) { Entity* e=&World.instances[self]; u16 idx=e->emailIndex; if(idx>=LOGCNT){return;} if(World.invP1.hasLog[idx]){return;} World.invP1.hasLog[idx]=World.invP1.hasNewEmail=true; World.invP1.lastAddedIndex=idx; if(Sys_Text.audioLogType[idx] == AudioLogType_Email){World.invP1.beepDone=true;} if(e->autoPlayEmail){PlayLastAddedLog(idx);} }
@@ -433,14 +415,12 @@ void CreateTargetIDInstance(float damage,u16 hitIdx,float tranq) {
     if(tranq>0.0f){targetIDText[hitIdx]=536;targetIDTextFinished[hitIdx]=World.pauseRelativeTime+tranq;} else if(damage>=0.0f)TargetIDSendDamageReceive(hitIdx,damage,Att_None);
 }
 // PlayerEnergy
-/*Per 0.1s tick, not per frame. Unity's PlayerEnergy.cs figures are per-frame at 60Hz, so matching its actual per-second rate means x6. [9] is the exception: hand-calibrated so v2 drains the 0..255 bar in 120s.*/ static const float  hwDrain[12][4] = {[3]={0.0921f,0.20478f,0.15354f,0.0f},[5]={0.24576f,0.61434f,0.28333f,0.30714f},[6]={0.010236f,0.0f,0.0f,0.0f},[7]={0.15354f,0.25596f,0.30714f,0.0f},[9]={0.0f,0.28333f,0.2125f,0.0f},[11]={0.51198f,0.51198f,0.51198f,0.51198f},};/*nightsight has no version switch in PlayerEnergy.cs, and hwBtns[].eng==0 means it always drains, so every version is charged*/
-static const u16 hwDrainJPM[12][4] = {[3]={9,20,15,0},[5]={24,60,105,30},[6]={1,0,0,0},[7]={15,25,30,0},[9]={0,16,12,0},[11]={50,50,50,50},};/*PlayerEnergy.cs adds 50 with no version switch for nightsight, matching the version-agnostic drain above*/
+static const float  hwDrain[12][4] = {[3]={0.0921f,0.20478f,0.15354f,0.0f},[5]={0.24576f,0.61434f,0.28333f,0.30714f},[6]={0.010236f,0.0f,0.0f,0.0f},[7]={0.15354f,0.25596f,0.30714f,0.0f},[9]={0.0f,0.28333f,0.2125f,0.0f},[11]={0.51198f,0.51198f,0.51198f,0.51198f},};
+static const u16 hwDrainJPM[12][4] = {[3]={9,20,15,0},[5]={24,60,105,30},[6]={1,0,0,0},[7]={15,25,30,0},[9]={0,16,12,0},[11]={50,50,50,50},};
 static void DeactivateHardwareOnEnergyDepleted() { World.invP1.hardwareIsActive = 0; }
 void TakeEnergy(float take) { if (World.invP1.energy <= 0.0f || Cheats.redbull) {return;} World.invP1.energy -= take; if (World.invP1.energy <= 0.0f) { World.invP1.energy = 0.0f; play_wav(sounds[84],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*energy_gone*/ CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ DeactivateHardwareOnEnergyDepleted(); } }
 void GiveEnergy(float give,EnergyType type) { World.invP1.energy += give; if (World.invP1.energy > 255.0f) {World.invP1.energy = 255.0f;} if (type == EnergyType_Battery){play_wav(sounds[79],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*batteryuse*/} else if (type == EnergyType_ChargeStation){play_wav(sounds[100],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);/*chargingstation*/} }
-/*Shared by the booster drain and the footstep/rustle noise checks so "player is moving" means one thing*/
 bool PlayerIsMoving() { return V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1]) > 0.1f; }
-void PlayerEnergyInit() { World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + random_range(0.0f,1.0f); World.invP1.drainJPM = 0; }
 void PlayerEnergyUpdate() {
     if (World.invP1.energyDrainTickFinished > World.pauseRelativeTime) return; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1; bool anyDrain = false; u8 ver; World.invP1.drainJPM = 0;
     for (int hw=3;hw<=11;++hw) { u16 bit=(u16)(1u << hw); if (!(World.invP1.hardwareIsActive & bit) || hw == 4 || hw == 8 || hw == 10) continue;/*No energy usage*/ if (hw==9 && World.invP1.ladderState>0) continue;/*Booster boost is ignored on a ladder*/ if (hw==9 && !PlayerIsMoving()) continue;/*...and only burns energy while the player is actually moving*/ ver=World.invP1.hwVersSetting[hw]; float drain=hwDrain[hw][ver];  World.invP1.drainJPM += hwDrainJPM[hw][ver]; if (drain > 0.0f) { TakeEnergy(drain); anyDrain = true; } }
@@ -502,8 +482,6 @@ void GeneralInvApply(int buttonIdx,int customIdx) {
     GeneralInvRemove(buttonIdx);
 }
 
-void GeneralInvDoubleClick(int buttonIdx,int customIdx) { GeneralInvClick(buttonIdx,customIdx); GeneralInvApply(buttonIdx,customIdx); }
-void GeneralInventoryActivate() { int slot=World.invP1.generalInvCurrent; if (slot<14) GeneralInvApply(slot,World.invP1.generalInvCustIdx[slot]); }
 bool GeneralInvTake(int slot) {
     int item=GeneralInvItem(slot); if (slot<=0 || item<0 || World.invP1.holdingObject) return false;
     ResetHeldItem(); World.invP1.heldObjectIndex=(u16)(item+307); World.invP1.heldObjectCustIdx=World.invP1.generalInvCustIdx[slot]; World.invP1.holdingObject=true;
@@ -862,27 +840,12 @@ void DoorUse(u16 self, u16 activator) {
 }
 
 void DoorTargetted(u16 self, u16 activator) { if ((World.instances[self].entflags & EF_LOCKED) != 0) EntitySetLocked(&World.instances[self],false); if (!World.instances[self].targettingOnlyUnlocks) DoorUse(self,activator); }
-/* Unity Door.SetCollisionLayer() (Door.cs:324) swaps a door's collision layer between Door(18) and InterDebris(19)
-   as it opens and closes, gated on changeLayerOnOpenClose. Keyed off the prefab: the corpus sets that key on
-   exactly doorB/doorE/doorG and on no other door, so the per-instance key is redundant. */
 static void DoorLayerUpdate(u16 self, Entity* e) {
     if (!IdxIsLayerDoor(e->index)) return;
     u32 want = (e->doorState == DoorState_Closed) ? L_Door : L_InterDebris;
     if (World.layer[self] != want) World.layer[self] = want;
 }
 
-/* Unity Door.cs:313-319 only runs the grid while the door is fully Closed. Here it re-arms partway through the
-   closing stroke instead: timeBeforeLasersOn is read as a percentage of the closing clip. Unity saves that field
-   but never reads it, so there is no Unity timing to match -- the value just never had any effect. 0, the default
-   on doorK, therefore means the grid only comes up once the door is shut, and an ajar door carries none.
-
-   Drawn through DrawLine() rather than SpawnBeamTrail(): a particle trail has a lifetime, so a grid would have to
-   re-spawn its emitters every frame and would vanish whenever the particle pool ran dry. Wirelines are rebuilt
-   from door state each frame instead, so the grid is exactly as persistent as the door is closed.
-
-   The aperture comes from the CLOSED frame's model, not the current one: a laser grid spans the fixed doorway and
-   the door panel travels through it, so an AABB taken from the animating model would drag the bars along with the
-   stroke. doorJ/doorK are COLTYPE_MSH with a zero collider size, so the model bounds are the only aperture source. */
 static bool DoorLasersOn(const Entity* e, AnimationClip closing) {
     if (e->ajar) return false;
     if (e->doorState == DoorState_Closed) return true;
@@ -891,18 +854,15 @@ static bool DoorLasersOn(const Entity* e, AnimationClip closing) {
     return (p * 100.0f >= e->timeBeforeLasersOn);
 }
 
-/* Door laser grid. Unity doorK carries exactly ONE laserLine, so the whole gate is this geometry: two strokes
-   crossing as an X, each stroke a yellow-orange-yellow triplet of crossed quads. Widths are world-space because
-   the strokes are real crossed quads rather than screen-space expansion. */
-#define DOOR_LASER_HALFTHICK 0.015f /* half-width of one laser line */
-#define DOOR_LASER_TRIPLET  0.0225f /* spacing between the three lines of a triplet */
 void DoorLaserDraw(u16 self) {
     Entity* e = &World.instances[self];
     if (!DoorLasersOn(e, DoorGetClip(e, A_CLOSING))) return;
     if (V3_SqDist(World.position[self], World.position[PLAYER1]) > 2500.0f) return; /* ~50m */
+        
     AnimationClip closing = DoorGetClip(e, A_CLOSING);
     u16 m = (u16)(closing.frameStartModelIndex + (u16)(closing.frameEnd - closing.frameStart));
     if (m >= MAX_MDLS) return;
+    
     V3 mn = modelMin[m], mx = modelMax[m];
     V3 ctr = (V3){(mn.x+mx.x)*0.5f * World.scale[self].x, (mn.y+mx.y)*0.5f * World.scale[self].y, (mn.z+mx.z)*0.5f * World.scale[self].z};
     V3 he  = (V3){(mx.x-mn.x)*0.5f * World.scale[self].x, (mx.y-mn.y)*0.5f * World.scale[self].y, (mx.z-mn.z)*0.5f * World.scale[self].z};
@@ -912,17 +872,12 @@ void DoorLaserDraw(u16 self) {
     V3 up = quat_rot_v3(World.rotation[self], (V3){0.0f,1.0f,0.0f});
     float hw = (wideX ? he.x : he.z) * 0.94f, hh = he.y; /* stop just inside the frame so the bars read as inset */
     if (hw <= 0.0f || hh <= 0.0f) return;
-    /* Two different endpoint layouts, because the two laser doors are not the same shape.
-       doorK (506): its Unity laserLines entry is a flat card with BoxCollider size (0.015, 2.56, 2.56) centred
-       at local (-0.012, 1.28, 0) -- a 2.56 SQUARE curtain spanning the full door height. So the X is inscribed in
-       a square at the aperture centre, half-extent limited by the narrower axis. Using the aperture's own
-       half-extents here gave a wide, squat, lopsided cross.
-       doorJ (505): keeps the original corner-to-corner endpoints with each end shifted along the door's up axis,
-       one way at the start and the other at the end. Forcing the square onto it looks wrong. */
+    
     V3 lo, hi, lf, rf;
     if (e->index == 506) {
         float halfX = vmin(hw, hh);
         if (halfX <= 0.0f) return;
+        
         lo = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right,-halfX), V3_ScaleByF(up,-halfX)));
         hi = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right, halfX), V3_ScaleByF( up, halfX)));
         lf = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right,-halfX), V3_ScaleByF( up, halfX)));
@@ -935,14 +890,14 @@ void DoorLaserDraw(u16 self) {
     }
     V3 face = V3_Normalize(V3_Cross(right,up)); /* door plane normal, used to keep the triplet spread in-plane */
     const Color band[3] = {{1.0f,0.82f,0.08f,1.0f},{1.0f,0.42f,0.04f,1.0f},{1.0f,0.82f,0.08f,1.0f}};
-    const float spread[3] = {-DOOR_LASER_TRIPLET, 0.0f, DOOR_LASER_TRIPLET};
+    const float spread[3] = {-0.0225f, 0.0f, 0.0225f};
     for (int pass = 0; pass < 2; ++pass) {
         V3 a = pass ? lf : lo, b = pass ? rf : hi;
         V3 dir = V3_Normalize(V3_AsubB(b,a));
         V3 perp = V3_Normalize(V3_Cross(dir, face));
         for (int k = 0; k < 3; ++k) {
             V3 o = V3_ScaleByF(perp, spread[k]);
-            DrawCrossedLine(V3_AplusB(a,o), V3_AplusB(b,o), perp, DOOR_LASER_HALFTHICK, band[k]);
+            DrawCrossedLine(V3_AplusB(a,o), V3_AplusB(b,o), perp, 0.015f, band[k]);
         }
     }
 }
@@ -1002,9 +957,6 @@ void Targetted(u16 activator, u16 self) {
 
 extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
 INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy); extern u16 ioNameCount;
-// Unity reads the actions off the *activator* (TargetIO.Targetted consumes tempUD set by the activating relay), never off
-// the target, so a light needs only a targetname to be findable plus this consumer.  TARG_IOFLAGS_LIGHT_ON/OFF/TOGGLE were
-// parsed into entity ioflags but had no reader anywhere in the engine, so every lightOn/lightOff/lightToggle was inert.
 void TargetLight(u16 activator, u16 lightIdx) {
     if (!World.lightTargetnames || lightIdx >= World.loadedLights) return;
     u32 aioflags = World.targetIOActive ? World.targetIOActivatorIoflags : World.instances[activator].ioflags;
@@ -1015,10 +967,6 @@ void TargetLight(u16 activator, u16 lightIdx) {
     else if (a & TARG_IOFLAGS_LIGHT_OFF) on = false;
     else                                 on = !on;
     flag_set(&World.lights[lightIdx].lflags, LIGHTON, on);
-    /* LIGHTON alone is not enough: the renderer scales by intensity, and level data can leave that baked at
-       minIntensity (.01) from a stale save while maxIntensity still holds the authored value.  Toggling the bit
-       without moving intensity to the matching lerp endpoint leaves a light that is on and still invisible, which is
-       exactly what lev1wall1light did. */
     World.lights[lightIdx].intensity = on ? World.lights[lightIdx].maxIntensity : World.lights[lightIdx].minIntensity;
 }
 
@@ -1031,30 +979,11 @@ void UseTargets(u16 activator, u16 targetIdx) {
 // Frob/Use
 #define FROB_DISTANCE 4.9f
 void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 code),MFD_OpenPaperLog(int,V3);
-/*us_paperlog (603).  Unity PaperLog.Use (PaperLog.cs) is four lines: center-tab to the log view, hand logIndex to
-  SendPaperLogToDataTab, force inventory mode.  Voxen had no path for it at all -- 603 matched none of the frobbable
-  classes, so a paper log printed its name and did nothing -- even though all eight level-placed copies carry a
-  logIndex.*/
 static void PaperLogUse(u16 self) { MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
 static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
 static bool IsElevatorPanel(u16 index) { return index>=604&&index<=607; }
 static bool IsFrobUsableSpecial(u16 index) { return index==574||index==546||index==608||index==614||index==602||index==603/*us_paperlog*/||IsElevatorPanel(index)||IsPuzzleGridPanel(index)||IsPuzzleWirePanel(index); }/*546 prop_charge_station; 614 us_relaypanel, 602 us_isotopepanel: InteractablePanel; 603 us_paperlog: PaperLog*/
-/*---- Wire puzzle data (Unity PuzzleWirePuzzle.cs) ----------------------------------------------------------------------------
-  Split by provenance, because the two halves come from different places:
-    per instance, from the level line  currentPositionsLeft[i] / currentPositionsRight[i] -> Entity.wireCurL/R
-    per prefab, static below          solutionPositions*, wiresOn, rowsActive, wireColors
-  Voxen used to invent both halves: the targets were left at whatever the previous panel left behind (a stale solved
-  panel handed the next one the previous answer), and the current positions were ignored entirely, so every wire
-  puzzle opened with the column arrays all -1.  Values below are read straight out of
-  Assets/Resources/Prefabs/us_puz_panel_*_wire.prefab (741 blue, 742 brown, 743 gray, 744 red, 745 teal).
-  Unity's YAML packs these as fixed-width fields, so the extraction is 8 chars per int and 2 per bool/HUDColor:
-  currentPositionsLeft: 02000000 00000000 04000000 ... -> {2,0,4,...}; wiresOn: 01010100000000 -> {T,T,T,F,...}.
-  wireColors are HUDColor (Enumerations.cs:73 White,Red,Orange,Yellow,Green,Blue,Purple,Gray) and the first three live
-  wire slots of 741/743/744 are Blue(5) and 742's third is Purple(6), so this needs real blue and purple text colors --
-  T_BLUE/T_PURPLE were appended to textColors[] from PuzzleWire's serialized actualColorBlue/actualColorPurple.*/
-/* hudColorToText / hudColorToRGB now live in common.h: the wire puzzle needs the HUDColor itself (for the line tint)
-   and its text-colour equivalent (for the Genius hint glyph) on both sides of the citadel.c / ui.c split. */
 typedef struct { u16 constIndex; i8 tgtL[7],tgtR[7]; bool wireOn[7]; u8 wireColor[7]; u8 rowsActive[7]; } WirePuzzleDef;
 static const WirePuzzleDef wirePuzzleDefs[] = {
     /*741 blue  */{741,{1,2,5,-1,-1,-1,-1},{1,3,4,-1,-1,-1,-1},{true,true,true,false,false,false,false},{0,5,4,0,0,0,0},{1,1,1,1,1,1,0}},
@@ -1065,9 +994,6 @@ static const WirePuzzleDef wirePuzzleDefs[] = {
 };
 
 static const WirePuzzleDef* WirePuzzleDefFor(u16 constIndex) { for (u32 i=0;i<sizeof(wirePuzzleDefs)/sizeof(wirePuzzleDefs[0]);++i) if (wirePuzzleDefs[i].constIndex==constIndex) return &wirePuzzleDefs[i]; return NULL; }
-/*Unity indexes currentPositions by wire ("wire 2 sits on row 3"); pw_curL/pw_curR are indexed by column ("row 3 holds
-  wire 2"), which is what PWFindCol and the swap-on-click in ui.c expect.  Inverting the permutation is the whole
-  conversion; the target arrays stay wire-indexed, matching PWEval.*/
 static void WireLoadInstance(u16 self, const WirePuzzleDef* def) {
     Entity* e=&World.instances[self];
     for (u8 c=0;c<7;++c) { World.Sys_UI.pw_curL[c]=-1; World.Sys_UI.pw_curR[c]=-1; }
@@ -1152,20 +1078,6 @@ static bool PanelUseAllowed(u16 i) {
     return true;
 }
 
-/*---- InteractablePanel (Citadel us_relaypanel / us_isotopepanel / us_retinalscanner) -----------------------------------
-  Unity InteractablePanel.Use: the first frob throws the cover open (open=true, "Open" anim, SFX, message). The next
-  frob while holding the required item installs it: installed=true, the installationItem child goes active, the
-  effects fire, the held item is consumed and UseTargets runs. Holding the wrong item gives the deny click (43) plus
-  the wrongItem message; frobbing an installed panel with an empty hand gives the alreadyInstalled message, and with
-  the right item only the alreadyInstalled SFX.
-  Voxen has no child GameObjects, so the placed item is the panel model's own frame: anim 45 (puzzlepanel3, "frame: 0 18"
-  in Data/models.txt) A_OPENING 1-17 opens the cover and A_INSTALLED (frame 18, model 5614) is the item-in-place look.
-  The level dump carries none of Unity's per-instance requiredIndex/messages/SFX/target, so the panels that are
-  actually usable are listed in relayPanelScripts[], keyed by the targetname added to their level-data line; panels with
-  no entry (the decorative level-3 ones, all saved open+installed) just animate and take no item.*/
-/*How the installed item shows up. puzzlepanel3's animation has one chipset baked into frame 18, so only the relay 428
-  panel (whose installationItem IS a chipset mesh) may use it; the antenna and isolinear panels get a real item entity
-  spawned at the installationItem transform, and the isotope panel is its own model with an interim A_INSTALL clip.*/
 typedef enum { PanelInstallFrame, PanelInstallEntity, PanelInstallAnim } PanelInstallKind;
 typedef struct { const char* name; u8 item; u16 itemConst; PanelInstallKind kind; u16 msgOpen,msgInst,msgWrong,msgAlready; i16 sfxOpen,sfxInst,sfxAlready; const char* target; bool blowUp; u16 wreckTex; } RelayPanelScript;
 static const RelayPanelScript relayPanelScripts[] = {
@@ -1210,9 +1122,6 @@ static void RelayPanelUse(u16 self) {
     play_wav(sounds[43]/*button_deny, aaaahhh!! Try again*/,AppliedFXVol(1.0f),World.position[self],true); RelayPanelMsg(sc?sc->msgWrong:0);
 }
 
-/*Cover animation finishing into the open pose, and the armed 15s fuse: Unity's DelayedSpawn on the panel's
-  ExplosionTimer activates the Explosion child (ExplosionLife/GrenadeActivate + light + sound) and basedestroyed
-  after the delay. Voxen plays the explosion in place and removes the panel itself (DeleteInstance, not a despawn).*/
 static void PuzzlePanelUpdate(u16 self) {
     Entity* e=&World.instances[self];
     if (e->clip==A_IDLE_CLOSED && e->panelOpen) ChangeAnim(e,A_IDLE_OPEN);
@@ -1221,23 +1130,16 @@ static void PuzzlePanelUpdate(u16 self) {
 
 static void RelayPanelUpdate(u16 self) {
     Entity* e=&World.instances[self];
-    /*Panels that load already open/installed (the level data carries their state) start on the matching frame
-      instead of the closed cover: installed (frame 18) wins over open (frame 17).*/
     if (e->clip==A_IDLE_CLOSED) { if (e->panelInstalled) ChangeAnim(e,A_INSTALLED); else if (e->panelOpen) ChangeAnim(e,A_IDLE_OPEN); }
     if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=DoorGetClip(e,A_OPENING); if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
     if (e->panelOpen && e->clip==A_INSTALL) { AnimationClip c=DoorGetClip(e,A_INSTALL); if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_INSTALLED); }/*isotope: insertion clip hands over to the installed frame*/
     if (e->panelArmed && World.pauseRelativeTime>=e->panelTimer) {
         e->panelArmed=false; V3 p=World.position[self];
         play_wav(sounds[64]/*explosion1*/,AppliedFXVol(1.0f),p,true); SpawnExplosionEffect(p,1); Shake(-1.0f); World.fogFac += 5.0f;
-        /*Unity activates the Explosion and basedestroyed children and leaves the panel (the installationItem stays
-          active too). Voxen keeps the panel instance and swaps in the destroyed texture (Textures/pnl3_ded.png) on
-          the same model, so the burnt panel is what is left behind.*/
         const RelayPanelScript* sc=RelayPanelScriptFor(e); if (sc && sc->wreckTex) e->texIndex=sc->wreckTex;
     }
 }
 
-/*Frob with the item in hand (Citadel MouseLookScript.FrobWithHeldObject): only these useables are "frob users", and
-  they are consumed by whatever UseHandler answers the frob; anything else you carry is put away as usual.*/
 static bool HeldItemIsFrobUser(i16 item) { return item==54||item==56||item==57||item==61||item==64||item==92||item==93||item==94; }
 bool FrobHeldItemIntoPanel(V3 p, V3 f, V3 r) {
     if (!World.invP1.holdingObject) return false;
@@ -1248,9 +1150,6 @@ bool FrobHeldItemIntoPanel(V3 p, V3 f, V3 r) {
     RelayPanelUse(idx); return true;/*the panel decides: it either installs the item (consuming it) or refuses it*/
 }
 
-/*Elevator floor button layouts, from Textures/UI/ElevatorCheetSheet.txt (Unity ElevatorKeypad buttonText/buttonsEnabled/buttonsDarkened ground truth).
-  label: index into elevFloorLabels[] (R=0,1=1..9=9,G1=10,G2=11,G4=12), -1 = hidden (not drawn, not clickable).
-  darkened: drawn dimmed, not clickable (Unity buttonsDarkened).*/
 typedef struct { i8 label; bool darkened; } ElevBtnDef;
 static const ElevBtnDef elevLayouts[12][8] = {
     {{1,0},{2,0},{3,1},{6,1},{7,1},{8,1},{-1,0},{-1,0}},/*0: 1 to 2*/
@@ -1329,12 +1228,6 @@ bool FindElevatorKeypadPos(u8 level,V3* outPos) {
 static void KeycodePanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
     Entity* e=&World.instances[i];
-    /*KeypadKeycode.cs:45-80 - the two level-R self-destruct pads take no keycode of their own; the three digits are
-      the level security codes the player has to have read off the CPU screens, huns/tens/ones from 1,2,3 on one pad
-      and 4,5,6 on the other.  Both records ship keycode 666 as a placeholder, which this overwrites.  A code the
-      player has not earned is -1 and refuses the pad with 289/290 plus the security MFD tab, same as
-      MFDManager.BlockedBySecurity.  Unity draws all six at NewGame so that guard is dead there; here they are drawn
-      at lock (CodeScreensSetForLevel) so it is live.*/
     if(e->useQuestKeycode1||e->useQuestKeycode2){
         const i8 *c=&World.lev1SecCode; int off=e->useQuestKeycode1?0:3; u16 msg=e->useQuestKeycode1?289:290;
         if(c[off]<0||c[off+1]<0||c[off+2]<0){UIBlockedBySecurity(World.position[i]);CenterStatusPrint("%s",Sys_Text.stringTable[msg]);return;}
@@ -1405,7 +1298,7 @@ void MissionTimerInit(void) {
 
 void MissionTimerUpdateToNextMission(float newTimerAmount,int misTextIndex,int nextMissionIndex) {
     if (World.misTimerCurIdx == (u8)nextMissionIndex) return;
-    if (World.diffMis < 3) return; // Don't update timer on lower skill settings.
+    if (World.diffMis < 3) return;
     
     World.misTimerT = newTimerAmount;
     World.misTimerCurIdx = (u8)nextMissionIndex;
@@ -1413,25 +1306,25 @@ void MissionTimerUpdateToNextMission(float newTimerAmount,int misTextIndex,int n
     if (World.misTimerCurIdx == 4) { World.misTimerLast = true; /*No gameover for last timer.*/ }
 }
 
-void MissionTimerUpdate(void) { // Port of MissionTimer.Update. Called from ModUpdate below.
+void MissionTimerUpdate(void) {
     if (World.diffMis < 3) return;
     if (World.paused || World.menuActive) return;
-    if (World.curLev == LEVEL_CYBERSPACE) return; // Timer doesn't count down in cyberspace.
+    if (World.curLev == LEVEL_CYBERSPACE) return;
+    
     if (World.misTimerTimesUP) {
         if (World.instances[PLAYER1].health > 0.0f) {
-            World.invP1.radiationArea = true; World.instances[PLAYER1].radiation += 0.1f; // Port of GiveRadiation(0.1f) every frame; feeds the existing rad-bleed in ModUpdate.
+            World.invP1.radiationArea = true; World.instances[PLAYER1].radiation += 0.1f;
             return;
         }
     }
     
     if (World.misTimerT <= 0.0f) {
         if (World.misTimerLast) {
-            World.misTimerMission = 509; // Unity shows countdown text 869 + label 509 here; the 869 countdown is render-side, the label index is stored.
+            World.misTimerMission = 509;
             World.misTimerTimesUP = true;
             return;
         }
         
-        // Unity calls PlayerHealth.PlayerDeathToMenu (instant mission-fail death to menu). No equivalent in Voxen, so route through the normal death flow instead (resurrection still applies).
         World.instances[PLAYER1].health = 0.0f; Death(PLAYER1,false);
         return;
     }
@@ -1517,7 +1410,6 @@ void UseEntity(u16 i) {
 }
 
 INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy){float px=(World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f)+dx,py=(World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f)+dy,t=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,nx=(px-(float)UI_W*0.5f)/((float)UI_W*0.5f),ny=((float)UI_H*0.5f-py)/((float)UI_H*0.5f);V3 v=V3_Normalize((V3){nx*aspect*t,ny*t,-1.0f}),ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(r,ff));return(V3){v.x*r.x+v.y*up.x+v.z*ff.x,v.x*r.y+v.y*up.y+v.z*ff.y,v.x*r.z+v.y*up.z+v.z*ff.z};}
-/* Non-static wrapper so weapons.c can apply pixel drift before the ray is built (Unity: drift added to the screen point before ScreenPointToRay). */
 V3 ScreenPointToRayPixels(V3 f,V3 r,float dx,float dy){return ScreenPointToRayOffset(f,r,dx,dy);}
 INLINE bool FrobRayIsFrobable(RaycastHit h){if(!h.hit)return false;u16 i=h.hitInstanceIndex;if(i>=World.instCount)return false;u16 e=World.instances[i].index;if((World.layer[i]&(L_Corpse|L_CorpseSearchable)))return true;return IsFrobUsableSpecial(e)||IdxIsUsableObject(e)||IdxIsSearchable(e)||IdxIsDoor(e)||IdxIsButtonSwitch(e)||IdxIsNPC(e)||IdxIsGib(e);}
 extern bool editFieldEditing;
@@ -1538,7 +1430,7 @@ void DrawAIDebug(u16 i) {
     DrawSphereWireframe(dbgCol, (ShapeSphere){sightPt, 0.32f});
 }
 
-INLINE float CamYawFromQuat(Quaternion q) { /*standard ZYX yaw extraction, only used to seed the sweep, so Unity's ZXY eulerAngles.y ordering does not have to be reproduced exactly*/
+INLINE float CamYawFromQuat(Quaternion q) {
     float d = __builtin_atan2f(2.0f * (q.x*q.z + q.y*q.w), 1.0f - 2.0f * (q.x*q.x + q.y*q.y)) * (180.0f / 3.14159265f);
     if (d < 0.0f) d += 360.0f; return d;
 }
@@ -1590,7 +1482,7 @@ void ModUpdate() {
         u16 constdex = e->index;
         if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) { GrenadeUpdate(i); }
         DelayedSpawnUpdate(i);
-        if (constdex==CYBER_DECOY_CONST) { CyberDecoyExpired(i);/*the decoy's own DelayedSpawn just deleted it; clear decoyActive so cyber NPCs stop aiming at a dead index*/ }
+        if (constdex==CYBER_DECOY_CONST) { CyberDecoyExpired(i); }
         if (constdex==614) { RelayPanelUpdate(i); }
         if (IsPuzzleGridPanel(constdex)) { PuzzlePanelUpdate(i); }
         if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) { TextureSequenceUpdate(i); }
