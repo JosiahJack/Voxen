@@ -11,6 +11,7 @@ typedef void (*WSP)(void);
 WSP PlatformGetModuleSymbol(void*,const char*);
 void CycleWeaponSlot(int), CloseFullmap(), UI_AutomapClick(bool,int), UpdateScreenSize(i32,i32), SaveConfig(), InputWindowFocus(i32), InputKey(char*,int,int), InputMouseClick(char*,int,int), InputCursorPos(double*,double*,double,double), InputMonitor(WSMon*,int,int);
 const FBC* ChooseFBConfig(const FBC*, u32);
+void ComputeWindowPlacement(int monIdx, int* px, int* py);
 #if defined(_WIN32)
     int __cdecl wcscmp(const u16*,const u16*); u16* wcscpy(u16*,const u16*);
     typedef struct { i32 x,y; } POINT;
@@ -176,7 +177,7 @@ const FBC* ChooseFBConfig(const FBC*, u32);
         w->decorated = 1;
         w->cursorMode = 0x00034003;
         u32 style = 0x060A0000 | 0x00C00000;
-        WNDCLASSEXW wc= (WNDCLASSEXW){sizeof(wc),0x23,windowProc,0,0,WinSys.win32.instance,NULL,NULL,NULL,NULL,L"Voxen",NULL};
+        WNDCLASSEXW wc= (WNDCLASSEXW){sizeof(wc),0x23,windowProc,0,0,WinSys.win32.instance,NULL,NULL,(void*)4,NULL,L"Voxen",NULL}; /*(void*)4=BLACK_BRUSH: ShowWindow paints black before GL exists*/
         WinSys.win32.mainWindowClass=RegisterClassExW(&wc);
         RECT r={0,0,width,height};
         int fW=r.r-r.l, fH=r.b-r.t;
@@ -283,9 +284,9 @@ const FBC* ChooseFBConfig(const FBC*, u32);
     typedef void(*PFN_XRRFreeCrtcInfo)(XRRCrtcInfo*);         typedef int(*PFN_XUngrabPointer)(Display*,Time);                   typedef void(*PFN_XRRFreeScreenResources)(XRRScreenResources*);                    typedef Display*(*PFN_XOpenDisplay)(const char*);               typedef XRROutputInfo*(*PFN_XRRGetOutputInfo)(Display*,XRRScreenResources*,RROutput);
     typedef RROutput(*PFN_XRRGetOutputPrimary)(Display*,XID); typedef void(*PFN_XRRSelectInput)(Display*,XID,int);               typedef XRRScreenResources*(*PFN_XRRGetScreenResourcesCurrent)(Display*,XID);      typedef int(*PFN_XRRUpdateConfiguration)(XEvent*);              typedef Bool(*PFN_XCheckTypedWindowEvent)(Display*,XID,int,XEvent*);     typedef Status(*PFN_XGetWindowAttributes)(Display*,XID,XWindowAttributes*);
     typedef Bool(*GLX_QEP)(Display*,int*,int*);               typedef int(*GLX_GFBCAP)(Display*,GLXFBConfig,int,int*);           typedef Bool(*GLX_QVP)(Display*,int*,int*);                                        typedef Bool(*GLX_MCP)(Display*,GLXDrawable,GLXContext);                 
-    typedef XID(*PFN_XCILC)(Display*,const XcursorImage*);    typedef const char*(*GLX_QESP)(Display*,int);                      typedef GLXFBConfig*(*GLX_GFBCP)(Display*,int,int*);                               typedef __GLXextproc(*GLX_GPAP)(const u8*);                     typedef void(*GLX_SIEP)(Display*,GLXDrawable,int);                       
+    typedef XID(*PFN_XCILC)(Display*,const XcursorImage*);    typedef const char*(*GLX_QESP)(Display*,int);                      typedef GLXFBConfig*(*GLX_CFBCP)(Display*,int,const int*,int*);                               typedef __GLXextproc(*GLX_GPAP)(const u8*);                     typedef void(*GLX_SIEP)(Display*,GLXDrawable,int);                       
     typedef GLXWindow(*GLX_CWP)(Display*,GLXFBConfig,XID,const int*); typedef GLXContext(*GLX_CCAA)(Display*,GLXFBConfig,GLXContext,Bool,const int*); typedef struct WSCtxGLX { GLXContext handle; GLXWindow window; } WSCtxGLX;
-    typedef struct WSLibGLX { void* handle; GLX_GFBCP GetFBConfigs; GLX_GFBCAP GetFBConfigAttrib; GLX_MCP MakeCurrent; GLX_SBP SwapBuffers; GLX_GVFFBCP GetVisualFromFBConfig; GLX_CWP CreateWindow; GLX_GPAP GetProcAddress; GLX_SIEP SwapIntervalEXT; GLX_CCAA CreateContextAttribsARB; } WSLibGLX;
+    typedef struct WSLibGLX { void* handle; GLX_CFBCP ChooseFBConfigs; GLX_MCP MakeCurrent; GLX_SBP SwapBuffers; GLX_GVFFBCP GetVisualFromFBConfig; GLX_CWP CreateWindow; GLX_GPAP GetProcAddress; GLX_SIEP SwapIntervalEXT; GLX_CCAA CreateContextAttribsARB; } WSLibGLX;
     typedef struct WSWinX11 { XID colormap; XID handle,parent; int width,height,xpos,ypos,lastCurX,lastCurY,warpCursorPosX,warpCursorPosY; } WSWinX11;
     typedef struct WSLibX11 { Display* display; int screen; XID root; XID hiddenCursorHandle; XContext context; short int keycodes[256]; double restoreCurPosX, restoreCurPosY; WSWin* disabledCursorWindow; Atom NET_SUPPORTED,WM_PROTOCOLS,WM_DELETE_WINDOW,NWM_NAME,NWM_ICON,NWM_PING,NWM_WINDOW_TYPE,NWM_WINDOW_TYPE_NORMAL,NWM_STATE,NWM_STATE_FULLSCREEN,NET_ACTIVE_WINDOW,MOTIF_WM_HINTS,UTF8_STRING;
                               struct { void* handle; PFN_XAllocSizeHints AllocSizeHints; PFN_XChangeProperty ChangeProperty; PFN_XCheckTypedWindowEvent CheckTypedWindowEvent; PFN_XCreateColormap CreateColormap; PFN_XCreateWindow CreateWindow; PFN_XDefineCursor DefineCursor;
@@ -407,8 +408,7 @@ const FBC* ChooseFBConfig(const FBC*, u32);
     WSWin* VCreateWindow(int width, int height) {
         WSWin* w=OS_Alloc(sizeof(WSWin)); w->decorated=1; w->cursorMode=0x00034003; const char* names[]={"libGLX.so.0","libGL.so.1","libGL.so",NULL};
         for(int i=0;names[i]&&!WinSys.glx.handle;i++)WinSys.glx.handle=WinSysPlatformLoadModule(names[i]);
-        WinSys.glx.GetFBConfigs=(GLX_GFBCP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXGetFBConfigs");
-        WinSys.glx.GetFBConfigAttrib=(GLX_GFBCAP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXGetFBConfigAttrib");
+        WinSys.glx.ChooseFBConfigs=(GLX_CFBCP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXChooseFBConfig");
         WinSys.glx.MakeCurrent = (GLX_MCP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXMakeCurrent");
         WinSys.glx.SwapBuffers = (GLX_SBP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXSwapBuffers"); 
         WinSys.glx.CreateWindow = (GLX_CWP)PlatformGetModuleSymbol(WinSys.glx.handle,"glXCreateWindow");
@@ -417,15 +417,10 @@ const FBC* ChooseFBConfig(const FBC*, u32);
         WinSys.glx.SwapIntervalEXT = (GLX_SIEP)getProcAddressGLX("glXSwapIntervalEXT");
         WinSys.glx.CreateContextAttribsARB = (GLX_CCAA)getProcAddressGLX("glXCreateContextAttribsARB");
         GLXFBConfig native=NULL; XVisualInfo* result; GLXFBConfig* nativeConfigs; int nativeCount;
-        nativeConfigs = WinSys.glx.GetFBConfigs(WinSys.x11.display,WinSys.x11.screen,&nativeCount);
-        for (int i = 0;  i < nativeCount;  i++) {
-            const GLXFBConfig n = nativeConfigs[i]; int v;
-            WinSys.glx.GetFBConfigAttrib(WinSys.x11.display,n,0x8011,&v); if(!(v & 1)) continue;
-            WinSys.glx.GetFBConfigAttrib(WinSys.x11.display,n,0x8010,&v); if(!(v & 1)) continue;
-            WinSys.glx.GetFBConfigAttrib(WinSys.x11.display,n,5,&v);      if( v != 1 ) continue;
-
-            native = n; break;
-        }
+        static const int chooseAttribs[] = {0x8011/*GLX_DRAWABLE_TYPE*/,1/*GLX_WINDOW_BIT*/, 0x8010/*GLX_RENDER_TYPE*/,1/*GLX_RGBA_BIT*/, 5/*GLX_DOUBLEBUFFER*/,1, 0};
+        double fbcT = get_time(); nativeConfigs = WinSys.glx.ChooseFBConfigs(WinSys.x11.display,WinSys.x11.screen,chooseAttribs,&nativeCount);
+        DualLog("glXChooseFBConfig: %.1f ms\n", (get_time() - fbcT) * 1000.0); /*FBConfig selection is the dominant pre-window cost; keep it visible*/
+        if (nativeCount > 0) native = nativeConfigs[0];
         WinSys.x11.xlib.Free(nativeConfigs);
         if (!native) { DualLogError("No usable GLX framebuffer config\n"); OS_Exit(1); }
         result = WinSys.glx.GetVisualFromFBConfig(WinSys.x11.display,native);
@@ -433,19 +428,22 @@ const FBC* ChooseFBConfig(const FBC*, u32);
         int depth = result->depth;
         WinSys.x11.xlib.Free(result);
         w->x11.colormap=WinSys.x11.xlib.CreateColormap(WinSys.x11.display,WinSys.x11.root,visual,0);
-        XSetWindowAttributes wa = {0}; wa.colormap = w->x11.colormap; wa.event_mask = 0x63807F;
+        XSetWindowAttributes wa = {0}; wa.colormap = w->x11.colormap; wa.event_mask = 0x63807F; /*background_pixel is 0 (black) via {0}; CWBackPixel below makes the X server fill the window on map, before any GL exists*/
         w->x11.parent = WinSys.x11.root;
-        w->x11.handle = WinSys.x11.xlib.CreateWindow(WinSys.x11.display,WinSys.x11.root,0,0,width,height,0,depth,1,visual,(1L<<3)|(1L<<13)|(1L<<11),&wa);
+        int wxp=0,wyp=0; if (WinSys.monitorCount>0) ComputeWindowPlacement((int)Sys_Settings.CurrentMonitor,&wxp,&wyp); /*final position up front: never visible at 0,0*/
+        w->x11.handle = WinSys.x11.xlib.CreateWindow(WinSys.x11.display,WinSys.x11.root,wxp,wyp,width,height,0,depth,1,visual,(1L<<1)|(1L<<3)|(1L<<13)|(1L<<11),&wa); /*1L<<1 = CWBackPixel*/
         WinSys.x11.xlib.SaveContext(WinSys.x11.display,w->x11.handle,WinSys.x11.context,(XPointer)w);
         Atom protocols[]={WinSys.x11.WM_DELETE_WINDOW,WinSys.x11.NWM_PING};
         WinSys.x11.xlib.SetWMProtocols(WinSys.x11.display,w->x11.handle,protocols,2);
         if (WinSys.x11.NWM_WINDOW_TYPE && WinSys.x11.NWM_WINDOW_TYPE_NORMAL) { Atom t=WinSys.x11.NWM_WINDOW_TYPE_NORMAL; WinSys.x11.xlib.ChangeProperty(WinSys.x11.display,w->x11.handle,WinSys.x11.NWM_WINDOW_TYPE,4,32,0,(u8*)&t,1); }
-        XSizeHints* sz = WinSys.x11.xlib.AllocSizeHints(); sz->flags|=((1L << 4)|(1L << 5)); sz->min_width=sz->max_width=width; sz->min_height=sz->max_height=height; sz->flags|=(1L << 9); sz->win_gravity=10;
+        XSizeHints* sz = WinSys.x11.xlib.AllocSizeHints(); sz->flags|=((1L << 4)|(1L << 5)); sz->min_width=sz->max_width=width; sz->min_height=sz->max_height=height; sz->flags|=(1L << 9); sz->win_gravity=10; sz->x=wxp; sz->y=wyp; sz->flags|=(1L << 2); /*PPosition: honor the CreateWindow position*/
         WinSys.x11.xlib.SetWMNormalHints(WinSys.x11.display,w->x11.handle,sz);
         WinSys.x11.xlib.Free(sz);
         WinSys.x11.xlib.ChangeProperty(WinSys.x11.display,w->x11.handle,WinSys.x11.NWM_NAME,WinSys.x11.UTF8_STRING,8,0,(u8*)GAME_TITLE,sizeof(GAME_TITLE) - 1); 
         GetWindowPos(w,&w->x11.xpos,&w->x11.ypos);
         GetWindowSize(w,&w->x11.width,&w->x11.height);
+        WinSys.x11.xlib.MapWindow(WinSys.x11.display,w->x11.handle); /*BLACK visible here; GLX context creation deferred below*/
+        double glxCtxT = get_time();
         int attribs[40],index=0;
         attribs[index++] = 0x2091;
         attribs[index++] = 4;
@@ -457,11 +455,11 @@ const FBC* ChooseFBConfig(const FBC*, u32);
         attribs[index++] = 0;
         w->context.glx.handle = WinSys.glx.CreateContextAttribsARB(WinSys.x11.display,native,NULL,1,attribs);
         w->context.glx.window = WinSys.glx.CreateWindow(WinSys.x11.display,native,w->x11.handle,NULL);
+        DualLog("GLX context+window (after map): %.1f ms\n", (get_time() - glxCtxT) * 1000.0);
         w->context.makeCurrent = makeContextCurrentGLX;
         w->context.swapBuffers = swapBuffersGLX;
         w->context.swapInterval = swapIntervalGLX;
         w->context.getProcAddress = getProcAddressGLX;
-        WinSys.x11.xlib.MapWindow(WinSys.x11.display,w->x11.handle);
              if (WinSys.x11.NET_ACTIVE_WINDOW) sendEventToWM(w,WinSys.x11.NET_ACTIVE_WINDOW,1,0,0,0,0);
         else { XWindowAttributes attr; if (WinSys.x11.xlib.GetWindowAttributes(WinSys.x11.display,w->x11.handle,&attr) && attr.map_state==2) { WinSys.x11.xlib.RaiseWindow(WinSys.x11.display,w->x11.handle); WinSys.x11.xlib.SetInputFocus(WinSys.x11.display,w->x11.handle,2,0L); } }
         
@@ -547,6 +545,9 @@ FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUnifo
 FGL_C glClear;  FGL_DE glDrawElements;  FGL_U2UI glUniform2ui; FGL_UM4FV glUniformMatrix4fv;    FGL_GIV glGetIntegerv;FGL_GSIL glGetShaderInfoLog; FGL_U2F glUniform2f;      FGL_U1UI glUniform1ui;   FGL_GVA glGenVertexArrays;  FGL_RP glReadPixels;      FGL_SS glShaderSource;FGL_TPI glTexParameteri; FGL_TPFV glTexParameterfv;   FGL_U1F glUniform1f;
 FGL_E glEnable; FGL_FF glFrontFace;     FGL_GB glGenBuffers;   FGL_FBT2D glFramebufferTexture2D;FGL_GERR glGetError;  FGL_GFS glGenFramebuffers;   FGL_GT glGenTextures;     FGL_BSD glBufferSubData; FGL_MBR glMapBufferRange;   FGL_U1I glUniform1i;      FGL_T2D glTexImage2D; FGL_BIT glBindImageTexture;FGL_BT glBindTexture;
 FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL_D glEndQuery; FGL_DAI glDrawArraysInstanced; FGL_BB glBlendFunc;  FGL_BF glBlitFramebuffer; FGL_T2D glTexSubImage2D; FGL_GTKP glGetTexLevelParameteriv;
+void SetGLContext_MakeCurrent() { /*first bind; does the GPU driver init as early as possible*/
+    window->context.makeCurrent(window);
+}
 void SetGLContext_GetFunctionPointers() {
     WSWin* h=window; h->context.makeCurrent(h);
     #define X(n,t) n=(t)h->context.getProcAddress(#n);
@@ -588,16 +589,24 @@ void ClampWindowSizeToMonitor() {
     if(ww-ddw>=320 && (int)Sys_Settings.ScreenWidth>ww-ddw){Sys_Settings.ScreenWidth=(u16)(ww-ddw); ch=true;} if(wh-ddh>=200 && (int)Sys_Settings.ScreenHeight>wh-ddh){Sys_Settings.ScreenHeight=(u16)(wh-ddh); ch=true;} if(ch){SaveConfig();}
 }
 
-void PlaceWindowOnMonitor(int monIdx) {
-    if(WinSys.monitorCount<=0){return;}
-    
+void ComputeWindowPlacement(int monIdx, int* px, int* py) { /*shared by initial CreateWindow and later moves*/
     if (monIdx < 0 || monIdx >= WinSys.monitorCount) { monIdx = 0; }
     WSMon* m=WinSys.monitors[monIdx];
     int w = (int)Sys_Settings.ScreenWidth, h = (int)Sys_Settings.ScreenHeight, wx,wy,ww,wh,ddw,ddh, fl = 0;
+    double placeWinT = get_time();
     GetMonitorWorkarea(m,&wx,&wy,&ww,&wh);
     GetDecorationOverhead(&ddw,&ddh);
     int ft,fr,fb; GetFrameExtents(&fl,&ft,&fr,&fb);
-    int px=(w==ww-ddw) ? wx+fl : wx+(ww-w)/2, py=(h==wh-ddh) ? wy : wy+(wh-h)/2; SetWindowPosition(window,px,py); ignore_next_mouse_delta=true;
+    DualLog("placement query (workarea+extents): %.1f ms\n", (get_time() - placeWinT) * 1000.0);
+    *px=(w==ww-ddw) ? wx+fl : wx+(ww-w)/2; *py=(h==wh-ddh) ? wy : wy+(wh-h)/2;
+}
+void PlaceWindowOnMonitor(int monIdx) {
+    if(WinSys.monitorCount<=0){return;}
+    
+    double placeWinT = get_time();
+    int px,py; ComputeWindowPlacement(monIdx,&px,&py);
+    SetWindowPosition(window,px,py); ignore_next_mouse_delta=true;
+    DualLog("SetWindowPosition (MoveWindow): %.1f ms\n", (get_time() - placeWinT) * 1000.0);
     #if defined(_WIN32)
         void* hw = window->win32.handle; ShowWindow(hw,5); BringWindowToTop(hw); SetForegroundWindow(hw); SetFocus(hw);
     #endif

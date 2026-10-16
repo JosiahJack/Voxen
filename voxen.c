@@ -2147,15 +2147,24 @@ void* OS_AllocScratch(size_t amount) {
 
 void OS_FreeInitPhase() { scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
 void OS_ScratchFree() { DualLog("Scratch arena total peak: %u MB\n", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; }
+void SetGLContext_MakeCurrent();
+static double initStagePrev = 0;
+static void InitStageTick() { initStagePrev = get_time(); } /*silent: keeps the delta chain accurate after a stage that logs its own timing*/
+static void InitStageLog(const char* name) { /*per-stage init timing: how long the preceding step took*/
+    double now = get_time();
+    if (!initStagePrev) initStagePrev = game_start_time;
+    DualLog("%s: %.1f ms\n", name, (now - initStagePrev) * 1000.0);
+    initStagePrev = now;
+}
 void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
-    OS_ScratchInit(); // Set up the 465 MB scratch arena for init phases
+    OS_ScratchInit(); InitStageLog("scratch init"); // Set up the 465 MB scratch arena for init phases
     DebugRAM("program start");
     DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\nEntity size: %u\n",sizeof(Entity));
     SetLevelPointers(0); 
-    WindowInit();
+    WindowInit(); InitStageLog("WindowInit");
     threadCnt = vclampi(OS_GetNumThreads(),1,32);
     globalframe = 0;
     World.menuActive = true;
@@ -2163,13 +2172,13 @@ void InitalizeEnvironment() {
     World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/
     World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/
     World.numLevels = MAX_LEVELS; World.startLevel = 1 /*medical*/;
-    LoadConfig(); /*Get settings before setting window size.*/
+    LoadConfig(); /*Get settings before setting window size.*/ InitStageLog("LoadConfig");
     ClampWindowSizeToMonitor();
-    window = VCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-    PlaceWindowOnMonitor((int)Sys_Settings.CurrentMonitor);
-    SetGLContext_GetFunctionPointers();
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-    ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); // Black out the window as early as possible for better presentation.
+    window = VCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); InitStageLog("VCreateWindow"); /*X11: already black via X fill at map*/
+    PlaceWindowOnMonitor((int)Sys_Settings.CurrentMonitor); InitStageLog("PlaceWindowOnMonitor"); /*Win32: ShowWindow here -> black via BLACK_BRUSH; X11: no-op move (already mapped at final position)*/
+    SetGLContext_MakeCurrent(); InitStageLog("makeCurrent"); /*first bind does the NVIDIA driver init; window already presented so this is invisible*/
+    ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); InitStageLog("FIRST BLACK FRAME (swap)"); // Validate the swap path early; window already black.
+    SetGLContext_GetFunctionPointers(); InitStageLog("GL procs (remaining)"); /*now load the remaining GL entry points*/
     i32 major = 0, minor = 0;
     glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/, &major);
     glGetIntegerv(0x821C/*GL_MINOR_VERSION*/, &minor);
@@ -2178,7 +2187,7 @@ void InitalizeEnvironment() {
     glFrontFace(0x0901/*GL_CCW*/);
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
     glClearColor(0,0,0,1);
-    CompileShaders();
+    CompileShaders(); InitStageLog("CompileShaders");
     
     u32 tvaos[5],tvbos[5]; glGenVertexArrays(5,tvaos); glGenBuffers(5,tvbos);
     quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; wireLinesVAO=tvaos[4]; wireLinesVBO=tvbos[4]; 
@@ -2217,7 +2226,7 @@ void InitalizeEnvironment() {
     glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0);               glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2*sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
     glBindVertexBuffer(0,psysquadVBO,0,4 * sizeof(float));
-    InitFontAtlasses();
+    InitFontAtlasses(); InitStageTick(); /*has its own "took X s" print*/
     
     GenerateAndBindTexture(&inputUIID, GL_RGBA8, UI_W, UI_H, GL_RGBA, GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL);/*UI Fixed Size Raster*/
     glGenFramebuffers(1, &uiFBO);
@@ -2230,7 +2239,7 @@ void InitalizeEnvironment() {
     glDrawBuffers(1,drawBuffersUI);
     glBindImageTexture(0, inputUIID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);/* UI Rendered Color*/
     
-    RenderLoading("Loading...");
+    RenderLoading("Loading..."); InitStageLog("RenderLoading");
     float* m = shadowmapsPerspectiveProjection, lightRangeMax = 15.36f;
     float viewRange = (lightRangeMax - 0.02f);
     m[0]  = 1.0f;  m[1] = 0.0f;  m[2]  =  0.0f;                                     m[3]  =  0.0f;
@@ -2239,7 +2248,7 @@ void InitalizeEnvironment() {
     m[12] = 0.0f; m[13] = 0.0f;  m[14] = -2.0f * lightRangeMax * 0.02f / viewRange; m[15] =  0.0f;
     
     for (int i=0;i<23;++i) { g_scf_long[0][i] = g_scf_long[1][i] = g_scf_long[2][i] = g_sfc_long_024[i]; }
-    InitAudio();
+    InitAudio(); InitStageLog("InitAudio");
     synth_set_reverb_preset(0);
     glGenFramebuffers(1,&gBufferFBO);
     ChangeFullScreenWindowed(false);
@@ -2263,15 +2272,15 @@ void InitalizeEnvironment() {
     psysInstancesID = MakeSSBO(&psysInstancesID,10,MAX_PARTICLES*sizeof(GpuPartInst),NULL,GL_DYNAMIC_DRAW);
     MakeSSBO(&psysTrailsID,11,MAX_TRAIL_SEGS*sizeof(TrlSegInst),NULL,GL_DYNAMIC_DRAW); colorBufferID= MakeSSBO(&colorBufferID,12,MAX_TOTAL_PIXELS*sizeof(u8),NULL,GL_STATIC_DRAW);
     textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
-    textureSizesID = MakeSSBO(&textureSizesID,15,MAX_TXRS*2*sizeof(i32),NULL,GL_STATIC_DRAW);
+    textureSizesID = MakeSSBO(&textureSizesID,15,MAX_TXRS*2*sizeof(i32),NULL,GL_STATIC_DRAW); InitStageLog("SSBO alloc");
     
     glUseProgram(shadowmapsSP);      glUniform1ui( 9, SHADOW_MAP_SIZE); // Set permanent uniforms on shaders (keeps c in sync with glsl for constants)
     glUseProgram(shadowmapsClearSP); glUniform1ui( 0, SHADOW_MAP_SIZE);
     glUseProgram(chunkSP);           glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
     
     for (int f=0;f<5;++f) { glGenQueries(5,gpuQ[f]); }
-    RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); 
-    RenderLoading("Loading models...");   DebugRAM("before LoadModels");   LoadModels();   DebugRAM("after LoadModels");
+    RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); InitStageTick(); /*LoadTextures has its own "took X secs" print*/
+    RenderLoading("Loading models...");   DebugRAM("before LoadModels");   LoadModels();   DebugRAM("after LoadModels"); InitStageTick(); /*LoadModels has its own "took X secs" print*/
     bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
         
@@ -2288,14 +2297,14 @@ void InitalizeEnvironment() {
     glGenFramebuffers(1,&biomFBO);
     glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,biomTexId,0);
     bioMonitor.beatFinished=get_time() + 0.5; bioMonitor.backgroundColor=(Color){0.2f,0.2f,1.0f,0.01f}; bioMonitor.ergColor=(Color){0,0.5f,1.0f,1.0f}; bioMonitor.chiColor=(Color){.7f,0,1.f,1.f};
-    bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
+    bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs(); InitStageLog("automap/biomonitor GL setup");
     
-    NewGame();
+    NewGame(); InitStageLog("NewGame");
     currentMenuPage = MPG_FRONT;
     if (playIntroAtBoot) ChangeMenuPage(MPG_INTRO);/*must come after NewGame (it resets the page to MPG_FRONT) and go through ChangeMenuPage so the cutscene also gets its clip audio + start time*/
     else { PlayMenuMusic(); }/*the title music fronts the menu*/
-    World.menuActive = true; //COMMENT for immediate into game
-    OS_ScratchFree();
+    World.menuActive = true; InitStageLog("menu setup"); //COMMENT for immediate into game
+    OS_ScratchFree(); InitStageLog("scratch free");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     DebugRAM("InitializeEnvironment after scratch free");
     DebugRAMPeak();
