@@ -1970,7 +1970,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.instances[PLAYER1].modelIndex = MAX_MDLS;
     World.col[PLAYER1] = COLTYPE_CAP;
     World.colliderCenter[PLAYER1].y = -PLAYER_CAM_OFFSET_Y;
-    World.colliderSize[PLAYER1] = (V3){PLAYER_RADIUS,PLAYER_HEIGHT,COLCAP_DIR_Y_F}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
+    World.colliderSize[PLAYER1] = (V3){PLAYER_RADIUS,PLAYER_HEIGHT,COLCAP_DIR_Y_F};
     World.mass[PLAYER1] = 1.0f;
     World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
     World.cam_yaw = 90.0f;

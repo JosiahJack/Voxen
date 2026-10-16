@@ -59,7 +59,7 @@ void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(self,e->targetIdx); }
 // TeleportTouch
 void TeleportTouchOnTriggerEnter(u16 self, u16 o){Entity *e=&World.instances[self],*player=&World.instances[PLAYER1]; if(!e->touchEnabled||o!=PLAYER1||player->health<=0.0f||e->justUsed>=World.pauseRelativeTime)return; u16 dest=GetTeleportDestination(World.currentLevel,e->targetDestinationID); if(dest>=World.instCount||World.instances[dest].index!=703)return; World.position[PLAYER1]=World.position[dest]; World.instances[dest].justUsed=World.pauseRelativeTime+1.0; play_wav(sounds[106], AppliedFXVol(1.0f), World.position[dest], false);}
-void TriggerDelayedTarget(u16 self) { Entity* e=&World.instances[self]; u16 act=e->recentMostActivator; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }/*Unity Trigger.DelayedTarget (Trigger.cs:20-23) starts a coroutine that waits `delay` and only then fires the targets. This used to call UseTargets immediately, so `delay` never did anything. Capture the activating bits now, while the activator is still resolvable, the same way TriggerCounterDelayedTarget does.*/
+void TriggerDelayedTarget(u16 self) { Entity* e=&World.instances[self]; u16 act=e->recentMostActivator; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }
 void TriggerTrippedUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 sf=World.targetIOActivatorIoflags,sfh=World.targetIOActivatorIoflagsHi; bool wa=World.targetIOActive; World.targetIOActive=true; World.targetIOActivatorIoflags=e->deferredIoflags; World.targetIOActivatorIoflagsHi=e->deferredIoflagsHi; UseTargets(self,e->targetIdx); World.targetIOActivatorIoflags=sf; World.targetIOActivatorIoflagsHi=sfh; World.targetIOActive=wa; }/*Marking the chain active stops UseTargets re-seeding from World.instances[activator], which by now points at the player's level.*/
 void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (World.instances[self].allDone && World.instances[self].onlyOnce)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self);} }
 void TriggerOnTriggerEnter(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
@@ -96,7 +96,6 @@ static void GravityLiftApplyTopSupport(u16 body) {
 void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
     Entity *lift=&World.instances[self]; if(entering)lift->initialBurstFinished=World.pauseRelativeTime+1.0f;
     float forceY=0.0f,gravityAccel=GravityLiftGravityAccel(other),mass=vmax(World.mass[other],0.001f);
-    /* Unity marks the player as being in a gravity lift for both OnForce and OffForce. */
     if(other==PLAYER1)flag_set(&World.instances[other].entflags,EF_GRAVLIFT,true);
     bool initialBurst=entering||lift->initialBurstFinished>World.pauseRelativeTime,jumpingFromTop=false;
     if(lift->active){
@@ -118,7 +117,7 @@ void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
             float riseAccel=vclamp((lift->strength-velY)*3.0f,-16.0f,12.0f);
             forceY=mass*(gravityAccel+riseAccel);
         }
-    }else{if(other==PLAYER1)gravityLiftTopSupport[other]=0;if(World.velocity[other].y<lift->offStrengthFactor){forceY=lift->offStrengthFactor-World.velocity[other].y;if(initialBurst)forceY*=2.0f;/*Unity's weak upward force offsets gravity so occupants drift down slowly.*/}}
+    }else{if(other==PLAYER1)gravityLiftTopSupport[other]=0;if(World.velocity[other].y<lift->offStrengthFactor){forceY=lift->offStrengthFactor-World.velocity[other].y;if(initialBurst)forceY*=2.0f; }}
     AddForce(other,(V3){0.0f,forceY,0.0f},false);
 }
 // Physics System
@@ -162,7 +161,7 @@ Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5
 Quaternion quat_normalize(Quaternion q) { float l = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; float m = (l < PHY_EPSILON); float inv=vinvsqtf(vmax(l,PHY_EPSILON)); q.x*=inv; q.y*=inv; q.z*=inv; q.w*=inv; q.x=q.x*(1.0f - m); q.y=q.y*(1.0f - m); q.z=q.z*(1.0f - m); q.w=q.w*(1.0f - m) + 1.0f*m; return q; }
 INLINE V3 MeshVert(u16 m, u32 i) { const float* p = physPos[m] + i * 3; return (V3){p[0],p[1],p[2]}; }
 void ComputeConvexMeshInertiaTensor(u16 i) {
-    World.mass[i] *= 10.0f; // Intentional global mass scaling.  Tunes all masses vs Unity engine version of Citadel, gives better responses and robustness to small items.
+    World.mass[i] *= 10.0f; // Intentional global mass scaling.  Gives better responses and robustness to small items.
     u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i]=false; if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) {return;}
     float acc[6]={0}; float cm[3]={0}; float volAcc=0.0f; u32 triCount = modelTriangleCounts[mi];
     for (u32 ti=0;ti<triCount;++ti) { // Accumulates without dividing by 6 for each saving that for the end for performance.
@@ -430,11 +429,6 @@ void Physics(float dt) {
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
             u16 a=dynamicEntities[i]; if (IdxIsNPC(World.instances[a].index) && (World.instances[a].entflags & EF_ASLEEP)) { continue; } V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; } else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
-            /* Unity proj_magpulse_shot / proj_plasmarifle_shot both declare m_Drag: 0, so a bolt has to keep its
-               launch speed for its whole flight.  This blanket 0.1/s XZ drag was bleeding it off within a couple of
-               metres, and because it leaves Y alone the result reads as the bolt sagging, i.e. as if gravity were
-               acting on it -- World.gravity for a proj_* is already 0.  NPC/projectile launch speeds are tuned
-               against the drag-free Unity values, so only these need the exemption. */
             float linDrag = (World.instances[a].index >= 481 && World.instances[a].index <= 495) ? 1.0f : vexp(-0.1f * dtsub);
             World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; float angDrag = vexp(-2.0f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag); SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
             if (World.col[a] != COLTYPE_CAP) {
@@ -680,7 +674,7 @@ void ApplyPlayerMovements(float dt) {
     if (onLadder && !ladderWalkOff) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed, p->right.z * s * speed * 0.3f}; accel = 5.0f; } else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
     V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); dv = (V3){ vclamp(dv.x, -10.0f,10.0f), vclamp(dv.y, -10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f) }; World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1],V3_ScaleByF(dv,accel*vclamp(dt,0.0005f,0.1f)));
     if (World.invP1.fatigueBleedoffFinished<World.pauseRelativeTime && World.curLev!=LEVEL_CYBERSPACE && !Cheats.noclip){World.invP1.fatigue-=fatigueWane;/*Fatigue bleed off*/ World.invP1.fatigueBleedoffFinished=World.pauseRelativeTime +0.3f;} World.invP1.fatigue=vclamp(World.invP1.fatigue,0.0f,100.0f); if (World.invP1.fatigue > 80.0f){AppendTextWarning(868,-1,-1,T_WHITE,0);/*Fatigue high*/}
-    if (World.invP1.noiseFinished < World.pauseRelativeTime) World.invP1.makingNoise = false;/*Unity PlayerHealth.Update*/
+    if (World.invP1.noiseFinished < World.pauseRelativeTime) World.invP1.makingNoise = false;
     if (grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
         if(velChange>2.0f && World.invP1.noiseFinished<World.pauseRelativeTime){RaycastHit lhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp=lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpLandSound(lstp),AppliedFXVol(vclamp(velChange/11.72f,0.5f,1.0f)),World.position[PLAYER1],true); World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}

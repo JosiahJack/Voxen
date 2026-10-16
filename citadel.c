@@ -22,7 +22,7 @@ void DropHeldItem() {
 }
 
 void PatchUse(int patchSlot) {
-    if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } if (patchSlot == 3 && World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[304]); return; }/*Medi refused at full health, patch not consumed (Citadel PlayerPatch.cs)*/
+    if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } if (patchSlot == 3 && World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[304]); return; }
     World.invP1.patchCounts[patchSlot]--; World.invP1.patchActive |= (u16)(1u << patchSlot);
     switch (patchSlot) {
         case 0: if(World.invP1.berserkFinished > World.pauseRelativeTime){World.invP1.berserkFinished += BERSERK_TIME;} else{World.invP1.berserkFinished = World.pauseRelativeTime + BERSERK_TIME; World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0); World.invP1.berserkIncrement = 0; berserkSeedTime = random_range(0.0f,1000.0f);} break;/*Voxen intentionally extends (rather than Citadel's reset of) the berserk timer on re-use, without resetting the visual effect*/
@@ -65,7 +65,7 @@ bool AddGeneralObjectToInventory(int index, int custIdx){
 
 void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
 static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
-void PlayLog(int logIndex) {if(logIndex<0||logIndex>=LOGCNT||!(World.invP1.hasHardware&HW_ERD)){return;} play_message(AudioLogPath(logIndex)); World.invP1.readLog[logIndex]=true; if(Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail){World.Sys_UI.vmailActive=true;} CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); MFD_OpenAudioLog(logIndex);/*Unity PlayLog ends with MFDManager.SendAudioLogToDataTab(logIndex)*/}
+void PlayLog(int logIndex) {if(logIndex<0||logIndex>=LOGCNT||!(World.invP1.hasHardware&HW_ERD)){return;} play_message(AudioLogPath(logIndex)); World.invP1.readLog[logIndex]=true; if(Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail){World.Sys_UI.vmailActive=true;} CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); MFD_OpenAudioLog(logIndex); }
 void PlayLastAddedLog(int logIndex) { if(logIndex < 0){return;} PlayLog(logIndex); World.invP1.lastAddedIndex = -1; }
 void AddAudioLogToInventory(int index) {
     if (index < 0) { DualLog("BUG: Audio log picked up has no assigned index (-1)"); return; } if (index == 128) { CenterStatusPrint("%s",Sys_Text.stringTable[309]); return; }/*Trioptimum Funpack*/ World.invP1.hasLog[index]  = true; World.invP1.lastAddedIndex = index; World.invP1.numLogsFromLevel[Sys_Text.audioLogLevelFound[index]]++;
@@ -102,10 +102,8 @@ void RemoveWeapon(i32 slot) {
     /* The weapon leaves the 7-slot list and becomes the held object, carrying its loaded magazines: AddItemToInventory -> AddWeaponToInventory reads heldAmmo/heldAmmo2/heldObjectLoadedAlternate to put them back (ADD TO INVENTORY, or a quick pickup). heldObjectIndex is the EDD, and a weapon's EDD is 343..358 - the very value weaponInventoryIndices already holds - so store it verbatim. Subtracting 307 was wrong: IdxIsWeapon, GetItemFrobTexture and ItemStringIdx all key off 343..358, and the -307 consumers (RelayPanelUse, HeldItemIsFrobUser) want the EDD too. */
     World.invP1.heldAmmo = World.invP1.currentMagazineAmount[slot]; World.invP1.heldAmmo2 = World.invP1.currentMagazineAmount2[slot]; World.invP1.heldObjectLoadedAlternate = World.invP1.wepLoadedWithAlternate[slot];
     World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldObjectIndex = (u16)World.invP1.weaponInventoryIndices[slot]; World.invP1.grenActive = false; World.invP1.holdingObject = true;
-    /* Unity's WeaponCurrent holds a List and RemoveWeapon drops the entry, so the rows below close up. Every per-slot array has to slide with it or the MFD renders a blank row (it draws row generalRowY[slot] for a populated slot, so a -1 hole leaves a gap) and the magazines/heat/energy setting desync from their weapon. */
     for (i32 i=slot;i<6;++i) { World.invP1.weaponInventoryIndices[i]=World.invP1.weaponInventoryIndices[i+1]; World.invP1.weaponInventoryAmmoIndices[i]=World.invP1.weaponInventoryAmmoIndices[i+1]; World.invP1.currentMagazineAmount[i]=World.invP1.currentMagazineAmount[i+1]; World.invP1.currentMagazineAmount2[i]=World.invP1.currentMagazineAmount2[i+1]; World.invP1.wepLoadedWithAlternate[i]=World.invP1.wepLoadedWithAlternate[i+1]; World.invP1.currentEnergyWeaponHeat[i]=World.invP1.currentEnergyWeaponHeat[i+1]; World.invP1.weaponEnergySetting[i]=World.invP1.weaponEnergySetting[i+1]; }
     World.invP1.weaponInventoryIndices[6]=World.invP1.weaponInventoryAmmoIndices[6]=-1; World.invP1.currentMagazineAmount[6]=World.invP1.currentMagazineAmount2[6]=0; World.invP1.wepLoadedWithAlternate[6]=false; World.invP1.currentEnergyWeaponHeat[6]=0.0f; World.invP1.weaponEnergySetting[6]=0.0f;
-    /* Everything at or above the hole moved down one, so the held row does too; if the held weapon was the one removed this lands on the weapon above it (Unity: WeaponCurrent.RemoveWeapon). */
     if (slot <= World.invP1.weaponCurrent && World.invP1.weaponCurrent > 0) World.invP1.weaponCurrent--;
     if (World.invP1.weaponCurrent < 0) World.invP1.weaponCurrent = 0;
     World.invP1.weaponCurrentPending = World.invP1.weaponCurrent;
@@ -189,7 +187,7 @@ void DelayedSpawnEnable(u16 self) { Entity* e = &World.instances[self]; e->timer
 void CyberDecoySetTarget(u16), CyberDecoyExpired(u16);
 bool CyberDecoyIsLive(u16*);
 u16 CyberDecoyTarget(void);
-void CyberDecoySpawned(u16 decoy) { World.decoyInstance = decoy; CyberDecoySetTarget(decoy);/*cyber NPCs already engaged with the player switch to the decoy the moment it exists (AIController.cs:1630,1708)*/ }
+void CyberDecoySpawned(u16 decoy) { World.decoyInstance = decoy; CyberDecoySetTarget(decoy); }
 void CyberDecoyExpired(u16 decoy) { if (decoy >= World.instCount || World.instances[decoy].index != CYBER_DECOY_CONST) return; if (World.decoyActive) { World.decoyActive = false; World.decoyInstance = U16_MAX; CyberDecoySetTarget(U16_MAX); } }
 bool CyberDecoyIsLive(u16* out) { if (!World.decoyActive) { World.decoyInstance = U16_MAX; return false; } u16 d = World.decoyInstance;
     if (d >= INSTS_1ST_IDX && d < World.instCount && World.instances[d].index == CYBER_DECOY_CONST) { if(out){*out = d;} return true; }
@@ -233,9 +231,9 @@ void ForceBridgeUpdate(u16 self) {
 }
 
 void TriggerCounterTarget(u16 self, u16 activator) { UseTargets(activator,World.instances[self].targetIdx); }
-void TriggerCounterDelayedTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }/*Capture the activating bits now, while the activator is still resolvable.*//*Unity StartCoroutine(DelayedTarget); the target fires from TriggerCounterUpdate once the delay elapses. This used to also call the target immediately, so the delay was never honored.*/
+void TriggerCounterDelayedTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }/*Capture the activating bits now, while the activator is still resolvable.*/
 void TriggerCounterUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 sf=World.targetIOActivatorIoflags,sfh=World.targetIOActivatorIoflagsHi; bool wa=World.targetIOActive; World.targetIOActive=true; World.targetIOActivatorIoflags=e->deferredIoflags; World.targetIOActivatorIoflagsHi=e->deferredIoflagsHi; UseTargets(e->recentMostActivator,e->targetIdx); World.targetIOActivatorIoflags=sf; World.targetIOActivatorIoflagsHi=sfh; World.targetIOActive=wa; }/*Marking the chain active stops UseTargets re-seeding from World.instances[activator], which by now points at the player's level.*/
-void LogicRelayDelayTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; }/*LogicRelay.cs:19,22 defers to StartCoroutine(DelayedTarget) when delay > 0. The relay's own ioflags ride the deferred hop, so they are re-read at fire time rather than captured.*/
+void LogicRelayDelayTarget(u16 self, u16 act) { Entity* e=&World.instances[self]; e->recentMostActivator = act; e->delayFinished = World.pauseRelativeTime + e->delay; }
 void LogicRelayUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(e->recentMostActivator, e->targetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
 void TriggerCounterTargetted(u16 self, u16 act) { Entity* e=&World.instances[self]; e->counter++; if (e->counter != e->countToTrigger) {return;} if (e->delay <= 0.0f){TriggerCounterTarget(self,act);}else{TriggerCounterDelayedTarget(self,act);} if (!e->dontReset){e->counter=0;} }
 void SpawnManagerActivate(u16 self, bool alerted) { Entity* e=&World.instances[self]; e->alertEnemiesOnAwake=alerted; e->active=true; e->delayFinished=World.pauseRelativeTime; }
@@ -496,7 +494,7 @@ void ApplyImpactForce(u16 target, float vel, V3 normal, V3 pt) {
 
 void ApplyImpactForceWithSound(u16 target, float vel, V3 normal, V3 pt) {
     ApplyImpactForce(target, vel, normal, pt);
-    if (vel > 2.0f) play_wav_ext(sounds[523], AppliedFXVol((vel / 10.0f) * 0.3f), pt, true, random_range(-3.8631f,3.1564f));/*Unity ObjectImpact pitch Random.Range(0.8,1.2) playback ratio = 12*log2(r) semitones*/
+    if (vel > 2.0f) play_wav_ext(sounds[523], AppliedFXVol((vel / 10.0f) * 0.3f), pt, true, random_range(-3.8631f,3.1564f));
 }
 
 void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseVel) { 
@@ -526,7 +524,7 @@ void SpawnExplosionEffect(V3 pos, int explosionType) {
 void GrenadeExplode(u16 self) {
     if(self>=World.instCount)return; Entity* e = &World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; flag_set(&e->entflags,EF_ACTIVE,false);
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=WORLD,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
-    i16 idx=GrenadeTypeFromConst(e->index); float radius=(idx>=7&&idx<=13) ? grenadeRadius[idx-7] : (e->strength>0.0f ? e->strength : 4.0f); ApplyImpactForceSphere(&dd,World.position[self],radius,e->damage * 0.1f); /*GrenadeActivate.cs:106 passes impactScale 1.0f, and Utils.cs:1683 makes impactVelocity damage*impactScale*0.1, so the blast impulse is damage*0.1 before falloff*/ if (!GrenadeIsNPCMine(self)) { World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 2.0; } int soundIndex=60,explosionType=2;
+    i16 idx=GrenadeTypeFromConst(e->index); float radius=(idx>=7&&idx<=13) ? grenadeRadius[idx-7] : (e->strength>0.0f ? e->strength : 4.0f); ApplyImpactForceSphere(&dd,World.position[self],radius,e->damage * 0.1f);  if (!GrenadeIsNPCMine(self)) { World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 2.0; } int soundIndex=60,explosionType=2;
     switch (idx) {case 7: case 11: soundIndex = 64; World.fogFac += 5; explosionType = 1; break;/*frag, mine*/ case 8: case 10: soundIndex = 60; World.fogFac += 7; explosionType = 2; break;/*conc, earth*/ case 9:  soundIndex = 67; explosionType = 4; break;/*emp*/ case 12: soundIndex = 60; World.fogFac += 6;  explosionType = 2; break;/*nitro*/ case 13: soundIndex = 63; World.fogFac += 10; explosionType = 3; break;/*gas*/}
     play_wav(SoundPath(soundIndex), AppliedFXVol(1.0f), World.position[self], true); SpawnExplosionEffect(World.position[self],explosionType); Shake(-1.0f); DeleteInstance(self);
 }
@@ -536,7 +534,7 @@ void GrenadeActivate(u16 self) {
     if(idx==10){World.invP1.earthShakerTimeSetting=vclamp((float)World.invP1.earthShakerTimeSetting,4.0f,60.0f);e->timerFinished=World.pauseRelativeTime+World.invP1.earthShakerTimeSetting;}
     else if(idx==12){World.invP1.nitroTimeSetting=vclamp((float)World.invP1.nitroTimeSetting,2.0f,60.0f);e->timerFinished=World.pauseRelativeTime+World.invP1.nitroTimeSetting;}
 }
-void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=1.451f; /*weapon_grenademine_live ProxCollision m_Radius, not blast radius.  Unity arms on OnTriggerEnter, so the sensing body's own collider radius adds to the trigger sphere (GrenadeProximity.cs); colliderSize.x is that radius for COLTYPE_CAP/COLTYPE_SPW, and mesh-collider bodies leave it at 0 so they test at the bare trigger radius.*/ bool npcMine = GrenadeIsNPCMine(self); /*Deliberate divergence from Unity GrenadeProximity, which prox-senses Player and NPC alike.  An NPC mine arms on the player; a player's own mine arms on NPCs.*/ for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; float rr = pr + ((World.col[i] == COLTYPE_CAP || World.col[i] == COLTYPE_SPH) ? World.colliderSize[i].x : 0.0f); if (V3_SqDist(World.position[i], origin) < (rr * rr)) { GrenadeExplode(self); return; } } } }
+void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=1.451f;  bool npcMine = GrenadeIsNPCMine(self);  for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; float rr = pr + ((World.col[i] == COLTYPE_CAP || World.col[i] == COLTYPE_SPH) ? World.colliderSize[i].x : 0.0f); if (V3_SqDist(World.position[i], origin) < (rr * rr)) { GrenadeExplode(self); return; } } } }
 void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index); if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
 float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= BERSERK_DAMAGE_MULTIPLIER; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (!EntIdxIsValid(fx)) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
@@ -584,19 +582,13 @@ void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNorm
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.hitIdx=hitIdx,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(e->recentMostActivator==PLAYER1&&(World.invP1.patchActive & PATCH_BERSERK)!=0)};
     dd.damage = GetDamageTakeAmount(&dd);
     Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; } if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }/*Railgun sphere impact*/
-    /* Impact effect on every contact, ricochets included.  Unity gates the first spawn on
-       Utils.GetMainHealthManager(hitGO) != null and only plays the pooled effect unconditionally once
-       numHits >= hitCountBeforeRemoval, so against bare level geometry -- which carries no HealthManager -- a
-       plasma bolt (hitCountBeforeRemoval 5) ricocheted four times in silence and only sparked on the fifth and
-       final contact.  Deciding this per contact rather than per collider is what makes the bolt leave a fresh
-       plasmahit/maghit sprite at every wall and floor bounce.  Damage stays gated separately, below. */
     SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);
     bool hostIsNPC=e->recentMostActivator<World.instCount&&IdxIsNPC(World.instances[e->recentMostActivator].index);
     if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {
         if (e->counter < e->countToTrigger) dd.damage *= 0.85f;/*per-hit falloff*/ dd.impactVelocity = dd.damage * 1.5f; if (e->counter > 0) dd.impactVelocity /= 3.0f; float dmgFinal = TakeDamage(hitIdx,dd); float tranq=-1.0f;
         if (dd.isOtherNPC) { if(!(hit->entflags & EF_ASLEEP)){World.Sys_Music.inCombat=true;} if(dd.attackType == Att_Trnq){float stunAmount=vclamp(3.0f+(World.invP1.stungunSetting/100.0f)*7.0f,3.0f,10.0f); tranq=Tranquilize(hitIdx,stunAmount,true);} } if (dmgFinal < 0.0f) {dmgFinal = 0.0f;} CreateTargetIDInstance(dmgFinal,hitIdx,tranq);
     }
-    if (World.curLev != LEVEL_CYBERSPACE && !hostIsNPC) { ApplyImpactForceWithSound(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); }/*impact force+sound for any dynamic object (Unity: Utils.ApplyImpactForce + ObjectImpact)*/
+    if (World.curLev != LEVEL_CYBERSPACE && !hostIsNPC) { ApplyImpactForceWithSound(hitIdx,dd.impactVelocity,dd.attacknormal,hitPos); }
     if(e->countToTrigger<1)e->countToTrigger=1; if (e->counter >= e->countToTrigger) { if (e->despawnInstead){DeleteInstance(self);}else{flag_set(&e->entflags,EF_ACTIVE,false);} }
 }
 void ProjectileEffectImpactInitAfterLoad(u16 self) { if(self>=World.instCount)return;Entity* e=&World.instances[self]; e->counter=0;e->currentTargetIdx=0;e->lookUpIndex=(e->index==484||e->index==491)?5:0;if(e->countToTrigger<1){e->countToTrigger=e->index==485?5:(e->index==495?2:1);} }
@@ -605,7 +597,7 @@ static const float attackTypeMult[7][12]={[NPCType_Mutant]={1,1,1,1,0,1,2,1,1,2,
 static const i16 objectDeathSound[] = {[458]=63,[459]=66,[460]=66,[464]=62,[465]=532,[466]=532,[467]=532,[468]=532,[469]=532,[470]=532,[471]=532,[472]=62,[473]=62,[474]=62,[475]=62,[476]=62,[477]=61,[478]=65,[479]=69,[525]=68,[526]=68,};
 static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE){return true;} Entity* e=&World.instances[self]; if (self != PLAYER1 && e->cyberHealth > 0.0f){return true;} return (IdxIsNPC(e->index) && (e->index - 419) > 23);/*24-28 are cyber enemies*/}
 static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxIsNPC(World.instances[self].index) || World.instances[self].health <= 0.0f){return take;} NPCType t = npcTable[World.instances[self].index - 419].type; if (at >= 12){return take;} return take * attackTypeMult[t][at]; }
-static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;}/*Unity HealthManager.UseDeathTargets: 'if (isPlayer) return.  Player death does nothing.'*/ if (World.instances[self].targetOnDeathIdx != IO_NONE) UseTargets(self,World.instances[self].targetOnDeathIdx); }
+static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (World.instances[self].targetOnDeathIdx != IO_NONE) UseTargets(self,World.instances[self].targetOnDeathIdx); }
 static void TeleportAway(u16 self) { 
     if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;}
     
@@ -816,12 +808,6 @@ void DoorActuate(u16 self) {
       else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= c.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); } }
     if (e->doorOpen == DoorState_Open) { DoorClose(self); return; } if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; } bool op = e->doorOpen == DoorState_Opening;
     if (op || e->doorOpen == DoorState_Closing) {
-        /* Unity keeps normalizedTime on the transient clip, so reversing mid-swing resumes the opposite clip at
-           1 - t. Voxen keeps the raw frame, so recover t from the source clip and map it onto the destination's
-           range, which is a different length on most doors (e.g. doorD opens over 42 frames and closes over 50).
-           Clamp into the source range first: UpdateAnims advances with a modulo, so a long tick can leave frame at
-           or past frameEnd, and a frame left over from the other clip would saturate the ratio to 1.0 and snap
-           the door to the start of its new clip. With the clamp, 0% is only reachable at a real endpoint. */
         u8 src = op ? A_OPENING : A_CLOSING, dst = op ? A_CLOSING : A_OPENING;
         AnimationClip srcClip = DoorGetClip(e,src), dstClip = DoorGetClip(e,dst);
         u32 f = e->frame; if (f < srcClip.frameStart) f = srcClip.frameStart; if (f > srcClip.frameEnd) f = srcClip.frameEnd;
@@ -927,32 +913,25 @@ void Targetted(u16 activator, u16 self) {
         if (!(aioflags & TARG_IOFLAGS_BRANCH_FLIPONLY)) { if (e->relayEnabled && e->currentTargetIdx != IO_NONE) { u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator,e->currentTargetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx; } }
         if (aioflags & (TARG_IOFLAGS_BRANCH_FLIP | TARG_IOFLAGS_BRANCH_FLIPONLY)) { e->branchOnSecond = !e->branchOnSecond; e->currentTargetIdx = e->branchOnSecond ? e->target2Idx : e->targetIdx; }   return;
     }
-    if (e->index == 710 && e->questBitID != QB_None) { // info_mission/QuestBitRelay.  EnableBits/DisableBits act on the *activating* object's bits (Unity TargetIO.Targetted reads tempUD, never the receiver's own line), so no fallback to e->ioflags here.  Unity keeps evaluating the remaining TargetIO actions, hence no early out.
+    if (e->index == 710 && e->questBitID != QB_None) {
         if (aioflags & TARG_IOFLAGS_MISSION_BIT_ON) QuestBitSet(e->questBitID);
         if (aioflags & TARG_IOFLAGS_MISSION_BIT_OFF) QuestBitClear(e->questBitID);
         if (aioflags & TARG_IOFLAGS_MISSION_BIT_TOGGLE) QuestBitToggle(e->questBitID);
     }
-    /*TestBits is separate from the set path because Unity looks the relay up per-action: QuestBitRelay only ships on
-      info_mission, so a testQuestBitIsOn object without one is a no-op in the reference game (level8's lev8firstdoor
-      gate is exactly that).  DIVERGENCE (intended): a test is honoured on any entity that names a bit and a test mode,
-      so those gates actually fire.  Naming a bit is what opts in -- questBitID defaults to QB_None, matching Unity's
-      "if (<boolean> && ...)", so the untagged gates stay inert rather than all testing bit 0 at once.  A fired test
-      hands its own line down instead: Unity QuestBits.RunTargets does ud.SetBits(tio) + UseTargets(null,ud,target).*/
     if (e->questBitID != QB_None) {
         u8 tm = e->questTestMode; if (!tm && activator != WORLD && activator < World.instCount) tm = World.instances[activator].questTestMode;/*1==testQuestBitIsOn, 2==testQuestBitIsOff*/
         if (tm) { bool bitOn = QuestBitIsSet(e->questBitID); u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator, (tm == 1) == bitOn ? e->targetIdx : e->targetIfFalseIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
     }
-    if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; }/*info_message*/   if (e->index == 708) { GameEndSequence(); return; }/*info_gameend: Unity GameEnd.cs Targetted() sets gameFinished, pauses, enables the main menu and plays the credits*/
+    if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; }/*info_message*/   if (e->index == 708) { GameEndSequence(); return; }
     if (e->index == 707) { EmailTargetted(self); return; }/*info_email*/                                                 if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) { if(e->index == 598 || e->index == 600){TriggerTargetted(self,activator);}else if(e->index == 594){TriggerCounterTargetted(self,activator);} }
-    if (aioflags & TARG_IOFLAGS_UNLOCK) { EntitySetLocked(e, false); if (IdxIsDoor(e->index) && (aioflags & (TARG_IOFLAGS_DOOROPEN | TARG_IOFLAGS_DOOROPENIFUNLOCKED))) e->requiredAccessCard = ACC_None;/*TargetIO.cs:145 pairs dr.Unlock() with dr.accessCardUsedByPlayer = true -- that flag is what retires a card requirement on a scripted unlock, and doorOpenIfUnlocked tests it alongside Inventory.a.HasAccessCard(). Voxen has no such field; DoorUse tests requiredAccessCard directly, so drop it here. Scoped to the force-open combos, which are exactly the records that used to clear it inside DoorForceOpen. UNLOCK-without-open still leaves the card check in DoorUse intact. */ }                                                       if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true);                                     if (IdxIsButtonSwitch(e->index)) ButtonSwitchUse(self,activator);
-/* Unity's ForceOpen() calls OpenDoor(), which does anim.Play(openClip,0,0f) -- it restarts the swing at 0% even mid-stroke, and skips the security/access-card/locked-message checks. That is the right call for a bare doorOpen record (3 of 83), but a record that also unlocks the door is a keypad or button acting as a keycard: 62 of 83. Those want the ordinary use path, so a door that is already moving reverses from its current frame via DoorActuate instead of snapping to 0%, and the door's own threshold, access card and locked message all still apply. TARG_IOFLAGS_UNLOCK already ran above, so the door is unlocked by the time DoorUse checks it. */
+    if (aioflags & TARG_IOFLAGS_UNLOCK) { EntitySetLocked(e, false); if (IdxIsDoor(e->index) && (aioflags & (TARG_IOFLAGS_DOOROPEN | TARG_IOFLAGS_DOOROPENIFUNLOCKED))) e->requiredAccessCard = ACC_None; }                                                       if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true);                                     if (IdxIsButtonSwitch(e->index)) ButtonSwitchUse(self,activator);
     if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index) && !(aioflags & TARG_IOFLAGS_UNLOCK)) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && !(aioflags & TARG_IOFLAGS_UNLOCK) && (e->entflags & EF_LOCKED) == 0 && (e->requiredAccessCard == ACC_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) { DoorForceClose(self); } else if (IdxIsDoor(e->index)) { DoorTargetted(self, activator); }
     if (aioflags & TARG_IOFLAGS_FBRIDGE_ACTIVATE) ForceBridgeActivate(self, false); else if (aioflags & TARG_IOFLAGS_FBRIDGE_DEACTIVATE) ForceBridgeDeactivate(self, false); else if (aioflags & TARG_IOFLAGS_FBRIDGE_TOGGLE) ForceBridgeToggle(self);
     if (aioflags & TARG_IOFLAGS_GRAVLIFT_TOGGLE) { World.instances[self].active=!World.instances[self].active; if (e->index == 596) GravityLiftSyncVisuals(self); } if (aioflags & TARG_IOFLAGS_TEXTURE_CHG_TOGGLE) TextureChangerToggle(self);
     if (aioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self);                                                  if (aioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e, (e->entflags & EF_LOCKED) == 0);
     if (aioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags, EF_ACTIVE, true); else if (aioflags & TARG_IOFLAGS_INST_DEACTIVATE) { if (e->camView != 255) { e->camView = 255; TextureSequenceInit(self, "Static"); flag_set(&e->entflags, EF_ACTIVE, true); }/*camera destroyed: keep its screen, switch it to Static*/ else { flag_set(&e->entflags, EF_ACTIVE, false); } } else if (aioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags, EF_ACTIVE, !(e->entflags & EF_ACTIVE));
-    if ((aioflagsHi & TARG_IOFLAGHI_AWAKE_SLEEPING) && IdxIsNPC(e->index)) AIAwakeFromSleep(self);/*TargetIO.cs:398-400.  Runs before the alert below: aiac_idle freezes on EF_ASLEEP, so alerting a still-dormant NPC would be swallowed.  No asleep test needed -- AwakeFromSleep is idempotent.*/
-    if ((aioflags & TARG_IOFLAGS_ENEMY_ALERT) && IdxIsNPC(e->index)) AIAlert(self);/*TargetIO.cs:211 alerts the receiver, after the activate/deactivate block above so a dormant NPC is awake before it is alerted*/
+    if ((aioflagsHi & TARG_IOFLAGHI_AWAKE_SLEEPING) && IdxIsNPC(e->index)) AIAwakeFromSleep(self);
+    if ((aioflags & TARG_IOFLAGS_ENEMY_ALERT) && IdxIsNPC(e->index)) AIAlert(self);
 }
 
 extern char ioNames[MAX_IO_NAMES][TARG_STRLEN];
@@ -1069,9 +1048,6 @@ static bool PanelUseAllowed(u16 i) {
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return false;}
     if(e->entflags&EF_LOCKED){
         u16 msg=(u16)e->lockedMessageLingdex;if(msg<T_LOGSTR_CNT&&msg!=0)CenterStatusPrint("%s",Sys_Text.stringTable[msg]);else CenterStatusPrint("%s",Sys_Text.stringTable[302]);
-        /*KeypadKeycode.cs:35-42 and KeypadElevator.cs:47-51 - a locked panel answers with a Vox message naming the
-          reason instead of opening, by firing lockedTarget.  Only keypads and elevator panels carry the field, so
-          the rest of the locked path is unchanged.*/
         if(e->lockedTargetIdx!=IO_NONE)UseTargets(i,e->lockedTargetIdx);
         return false;
     }
@@ -1166,7 +1142,6 @@ static const ElevBtnDef elevLayouts[12][8] = {
     {{1,1},{2,1},{3,1},{6,1},{8,0},{9,0},{-1,0},{-1,0}},/*11: 8 to 9*/
 };
 
-/*Panel (level, x, y, z) -> elevLayouts index. Matched against Unity scene KeypadElevator instances by position.*/
 static const struct { u8 level; float x,y,z; u8 layout; } elevPanelMap[] = {
     {0,9.97f,-55.08f,39.40f,1},{1,49.88f,-44.58f,-18.0f,0},
     {2,52.47f,-27.94f,-25.62f,1},{2,3.79f,-27.94f,33.30f,1},
@@ -1190,7 +1165,7 @@ static u8 ElevLabelToLevel(i8 labelIdx) {
 
 /*True if the player is inside an elevator volume (entity 706), using the same box-overlap logic as the automap elevator cell fill.*/
 bool PlayerInElevatorCell(void) {
-    V3 pp=World.position[PLAYER1]; pp.y-=PLAYER_CAM_OFFSET_Y; /*camera -> capsule centre: the volumes are level data, and Unity compares them against playerCapsuleTransform*/
+    V3 pp=World.position[PLAYER1]; pp.y-=PLAYER_CAM_OFFSET_Y;
     for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e=&World.instances[i]; if(e->index!=706||!(e->entflags&EF_ACTIVE)){continue;}
         V3 c=World.colliderCenter[i],s=World.colliderSize[i],p=World.position[i];
@@ -1205,9 +1180,7 @@ bool PlayerInElevatorCell(void) {
 static void ElevatorPanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
     World.Sys_UI.tetheredKeypadElevator=i; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.objectInUsePos=World.position[i]; World.Sys_UI.usingObject=true;
-    /*Link to nearest active door (Unity KeypadElevator.linkedDoor).*/
     { V3 kp=World.position[i]; float best=1000000000000000000000000000000.0f; for (u32 d=INSTS_1ST_IDX;d<World.instCount;++d) { Entity* de=&World.instances[d]; if(!IdxIsDoor(de->index)||!(de->entflags&EF_ACTIVE)) continue; V3 dd=V3_AsubB(World.position[d],kp); float dist2=V3_dot(dd,dd); if(dist2<best){best=dist2; World.Sys_UI.linkedElevatorDoor=(u16)d;} } }
-    /*Drive floor buttons off the linked elevator's floor set (Unity ElevatorKeypad).*/
     int layout=-1; V3 pp=World.position[i];
     for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) {
         if (elevPanelMap[m].level==World.currentLevel) { float dx=elevPanelMap[m].x-pp.x,dz=elevPanelMap[m].z-pp.z; if (dx*dx+dz*dz<4.0f) { layout=elevPanelMap[m].layout; break; } }

@@ -282,11 +282,7 @@ static const AIMuzzleOffsets aiMuzzleOffsets[NUM_AI_TYPES] = {
     [27]={{0.0000f,0.0000f,-0.2980f},{0.0000f,0.0000f,-0.2980f}},
     [28]={{0.0000f,0.0000f,0.5170f},{0.0000f,0.0000f,0.5170f}},
 };
-typedef struct { Color3 color; float unityIntensity, range; } AIMuzzleLightData;
-/* Values with serialized Unity muzzle lights use their prefab color, intensity,
-   and range. Entries for projectile prefabs without a muzzle Light use a
-   restrained visual fallback. Unity intensity is scaled by 0.35 in Voxen's
-   light loader, so the activation code applies that conversion as well. */
+typedef struct { Color3 color; float intensity, range; } AIMuzzleLightData;
 static const AIMuzzleLightData aiMuzzleLights[NUM_AI_TYPES][2] = {
     [1]={{{0.9044f,0.8595f,0.6717f},10.09f,2.0f},{{0.9044f,0.8595f,0.6717f},10.09f,2.0f}},
     [3]={{{0.6706f,0.8487f,0.9059f},3.46f,2.0f},{{0.6706f,0.8487f,0.9059f},3.46f,2.0f}},
@@ -332,39 +328,31 @@ static void ai_update_effect_lights(void) {
     if (!p->ready) return; for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_effect_marker(i)) { p->ready=false; p->count=0; return; }
     for (u16 i=0;i<p->count;i++) if (p->expires[i]>0.0 && p->expires[i]<=World.pauseRelativeTime) { u16 li=p->lights[i]; UpdateLight(li,World.lights[li].pos,World.lights[li].col,World.lights[li].range,0.0f,0.0f,0.0f,ai_effect_marker(i),QUAT_IDENTITY,false,false); p->expires[i]=0.0; }
 }
-/* One pooled light flash. Unity intensity is scaled by 0.35, matching both the level light loader
-   and the muzzle-flash path, so prefab and effect lights sit at the same visible brightness. */
-static void ai_effect_flash(V3 pos, Color3 col, float range, float unityIntensity, double duration) {
-    if (unityIntensity<=0.0f || range<=0.0f || duration<=0.0) return; ai_ensure_effect_pool(); u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev]; if (!p->count) return;
+static void ai_effect_flash(V3 pos, Color3 col, float range, float intensity, double duration) {
+    if (intensity<=0.0f || range<=0.0f || duration<=0.0) return; ai_ensure_effect_pool(); u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev]; if (!p->count) return;
     u16 chosen=0; double oldest=1000000000000000000000000000000.0;
     for (u16 i=0;i<p->count;i++) { if (p->expires[i]<=World.pauseRelativeTime) { chosen=i; oldest=-1.0; break; } if (p->expires[i]<oldest) { oldest=p->expires[i]; chosen=i; } }
-    u16 idx=p->lights[chosen]; float intensity=unityIntensity*0.35f;
-    UpdateLight(idx,pos,col,vclamp(range,0.32f,15.36f),intensity,intensity,0.0f,ai_effect_marker(chosen),QUAT_IDENTITY,true,false);
+    u16 idx=p->lights[chosen]; float scaledIntensity=intensity*0.35f;
+    UpdateLight(idx,pos,col,vclamp(range,0.32f,15.36f),scaledIntensity,scaledIntensity,0.0f,ai_effect_marker(chosen),QUAT_IDENTITY,true,false);
     p->expires[chosen]=World.pauseRelativeTime+duration;
 }
-/* Unity AIController.MuzzleBurst(attackNum) runs for every attack, including the Attack1 melee
-   hitscan, and lights up on Attack1 only for index 18: the servbot's muzzleBurst GameObject holds
-   nothing but three purple point lights, so for it the light is the entire effect. Every other
-   index lights slot 0 on Attack2 and slot 1 on Attack3, and nothing on Attack1. */
 static void ai_muzzle_flash(Entity* self, int attackNum) {
     if (attackNum<1 || attackNum>3) attackNum=1; u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return;
     if (npc==18) attackNum=1; else if (attackNum==1) return;
-    int liSlot=(attackNum==3)?1:0; AIMuzzleLightData d=aiMuzzleLights[npc][liSlot]; if (d.unityIntensity<=0.0f || d.range<=0.0f) return;
+    int liSlot=(attackNum==3)?1:0; AIMuzzleLightData d=aiMuzzleLights[npc][liSlot]; if (d.intensity<=0.0f || d.range<=0.0f) return;
     u16 selfIdx=(u16)(self-World.instances); V3 pos;
     if (attackNum==1) pos=ai_sight_pos(self);
     else { V3 off=aiMuzzleOffsets[npc].gunPoint; if (attackNum==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f)) off=aiMuzzleOffsets[npc].gunPoint2; if (off.x==0.0f && off.y==0.0f && off.z==0.0f) pos=ai_sight_pos(self); else pos=V3_AplusB(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],off)); }
-    ai_effect_flash(pos,d.color,d.range,d.unityIntensity,AI_MUZZLE_FLASH_TIME);
+    ai_effect_flash(pos,d.color,d.range,d.intensity,AI_MUZZLE_FLASH_TIME);
 }
 INLINE V3 ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3_AplusB(World.position[idx],quat_rot_v3(World.rotation[idx],sightPointOffsets[World.instances[idx].index - 419])); }
 INLINE V3 ai_gun_pos(Entity* e, int n) { u16 idx=(u16)(e - World.instances); u16 npc=World.instances[idx].index-419; V3 off=(n==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f))?aiMuzzleOffsets[npc].gunPoint2:aiMuzzleOffsets[npc].gunPoint; if(off.x==0.0f && off.y==0.0f && off.z==0.0f) off=(V3){0.0f,sightPointOffsets[npc].y+0.3f,0.0f}; return V3_AplusB(World.position[idx],quat_rot_v3(World.rotation[idx],off)); }
 static void ai_spawn_presets(const AIPresetSet* set, V3 pos) { for (u8 i=0;i<set->n;i++){const PSysDef* preset=PSysTypeGet(set->p[i]); if(!preset)continue; PSysDef def=*preset; def.pos=pos; PSysAdd(&def);} }
 static void ai_muzzle_particles(Entity* self, int attackNum) {
     if (attackNum<1 || attackNum>3) attackNum=1; u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return;
-    if (npc==18) { ai_spawn_presets(&aiMuzzleBursts[npc][1],ai_gun_pos(self,1)); ai_muzzle_flash(self,1); }/*Unity activates the servbot's burst on every attack, not just attack2*/
-    if (attackNum==1) return;/*No muzzle burst for attack 1 melee.*/ ai_spawn_presets(&aiMuzzleBursts[npc][attackNum==3?1:0],ai_gun_pos(self,attackNum)); ai_muzzle_flash(self,attackNum);/*Unity drives particles and lights from the same MuzzleBurst(attackNum) call.*/
+    if (npc==18) { ai_spawn_presets(&aiMuzzleBursts[npc][1],ai_gun_pos(self,1)); ai_muzzle_flash(self,1); }
+    if (attackNum==1) return;/*No muzzle burst for attack 1 melee.*/ ai_spawn_presets(&aiMuzzleBursts[npc][attackNum==3?1:0],ai_gun_pos(self,attackNum)); ai_muzzle_flash(self,attackNum);
 }
-/* Unity AIController.MakeLaserEffect() spawns a LaserDrawing line (line_sparqbeam material, width 0.2, 0.15s life)
-   from the sight point to the ray hit when the NPC's attack has hasLaserOnAttack set. */
 static void ai_laser_beam(Entity* self, int attackNum, V3 hitPos) {
     u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return; const NPCTable* npcTab=&npcTable[npc];
     bool has=attackNum==1?npcTab->hasLaserOnAttack1:(attackNum==2?npcTab->hasLaserOnAttack2:npcTab->hasLaserOnAttack3); if(!has)return;
@@ -403,7 +391,7 @@ bool AICheckIfEnemyInSight(u16 idx) {
 
 void AISetHuntFinished(u16 idx) { World.instances[idx].huntFinished = World.pauseRelativeTime; int diff = IsCyberNPC(idx) ? World.diffCyb : World.diffCbt; double ht = npcTable[World.instances[idx].index - 419].huntTime, mn=60.0; if(diff <= 1){World.instances[idx].huntFinished += (ht * 0.75 > mn ? ht * 0.75 : mn);}else if(diff >= 3){World.instances[idx].huntFinished += (ht * 2.0  > mn ? ht * 2.0 : mn);}else{World.instances[idx].huntFinished += (ht > mn ? ht : mn);} }
 void AISetEnemy(u16 idx, u16 eidx) {
-    if (!eidx) {return;} if (eidx == PLAYER1) { u16 d = CyberDecoyTarget(); if (d != U16_MAX && IsCyberNPC(idx)) eidx = d; }/*acquisition choke point: while a decoy is up, a cyber NPC that just spotted the player acquires the decoy instead (AIController.cs:1630,1708)*/
+    if (!eidx) {return;} if (eidx == PLAYER1) { u16 d = CyberDecoyTarget(); if (d != U16_MAX && IsCyberNPC(idx)) eidx = d; }
     World.instances[idx].enemy=eidx; World.instances[idx].posCheckFinished=World.pauseRelativeTime + AI_POS_CHECK_DELAY; flag_set(&World.instances[idx].entflags,EF_WANDERING,false); World.instances[idx].wanderFinished=World.pauseRelativeTime;
     World.instances[idx].lastPosition = World.position[idx]; World.instances[idx].targettingPosition = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; AISetHuntFinished(idx);
 }
@@ -616,7 +604,7 @@ static void AIDead(u16 idx) {
             }
         }
         DeleteInstance(idx);
-    } else { /*Non-gib corpse: the body itself carries the NPC contents and stays the searchable object, but it rides the plain corpse layer rather than the frob/attack-visible searchable layer.  Search reaches it because LMASK_PLAYER_FROB and the weapon masks include L_Corpse.  Unity's equivalent health lives on the searchCollider child (see npcSearchColliderMask), so only the 15 types that declare that child get it.*/ World.layer[idx] = L_Corpse; if (ai_has_search_collider((u16)(World.instances[idx].index - 419))) { World.instances[idx].health = NPC_CORPSE_HEALTH; } World.velocity[idx].x = 0.0f; World.velocity[idx].z = 0.0f; if (World.instances[idx].index != 433) World.gravity[idx] = 1.0f; }
+    } else {  World.layer[idx] = L_Corpse; if (ai_has_search_collider((u16)(World.instances[idx].index - 419))) { World.instances[idx].health = NPC_CORPSE_HEALTH; } World.velocity[idx].x = 0.0f; World.velocity[idx].z = 0.0f; if (World.instances[idx].index != 433) World.gravity[idx] = 1.0f; }
     flag_set(&World.instances[idx].entflags, EF_DEAD_CHECKS_DONE, true);
 }
 
@@ -729,5 +717,5 @@ void AIControllerUpdate(u16 idx) {
     if (self->aiThinkFinished < World.pauseRelativeTime) { self->aiThinkFinished = World.pauseRelativeTime + 0.1f; AIThink(idx); }
     if (self->currentState == AIState_Dead || self->currentState == AIState_Idle) return;
     if ((self->entflags & EF_ACT_AS_TURRET) && eidx) self->currentDestination = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; if (npcTable[ndx].type == NPCType_Cyber && eidx) self->currentDestination = World.position[eidx];
-    V3 toTarget = V3_AsubB(self->currentDestination,ai_sight_pos(self)); if (npcTable[ndx].type != NPCType_Cyber) toTarget.y = 0.0f; self->idealTransformForward = V3_Normalize(toTarget); float sqmag = V3_dot(toTarget, toTarget); if (sqmag > 0.000001f || npcTable[ndx].type == NPCType_Cyber) AIFace(self,self->currentDestination);    if (npcTable[ndx].moveType == AIMoveType_Fly && self->tranquilizeFinished < World.pauseRelativeTime) AIFlierMoveToHoverHeight(self);/*Per frame, matching Unity's FixedUpdate movement block*/
+    V3 toTarget = V3_AsubB(self->currentDestination,ai_sight_pos(self)); if (npcTable[ndx].type != NPCType_Cyber) toTarget.y = 0.0f; self->idealTransformForward = V3_Normalize(toTarget); float sqmag = V3_dot(toTarget, toTarget); if (sqmag > 0.000001f || npcTable[ndx].type == NPCType_Cyber) AIFace(self,self->currentDestination);    if (npcTable[ndx].moveType == AIMoveType_Fly && self->tranquilizeFinished < World.pauseRelativeTime) AIFlierMoveToHoverHeight(self);
 }

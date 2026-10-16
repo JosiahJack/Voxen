@@ -763,7 +763,7 @@ void InputProcessing() {
         }
         if (Email()) {
             if (World.invP1.hasHardware & HW_ERD) {
-                World.invP1.hardwareIsActive|=HW_ERD;/*Unity EReaderOn: hardwareIsActive[2]=true keeps the ereader tabs on*/
+                World.invP1.hardwareIsActive|=HW_ERD;
                 MFD_ResetGeneral();
                 World.Sys_UI.MFD_CenterTab=5;
                 World.Sys_UI.MFD_LefTab=2;
@@ -787,8 +787,8 @@ void InputProcessing() {
         if (!editFieldEditing && Map()) UI_AutomapClick(false,UI_AUTOMAP_FULL);
         ApplyPlayerMovements(World.dt);
         if (!World.inventoryMode) { // Apply mouselook/keyboardlook/lean
-            bool cyber = World.curLev == LEVEL_CYBERSPACE, invLook = cyber ? Sys_Settings.InvCybLook : Sys_Settings.InvertLook;/*Unity: separate InvertLook / InvertCyberspaceLook*/
-            float ns = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f,0.01f,1.0f), s = ns * 0.2f, kts = 900.0f * ns;/*deg/sec; Unity 15f*MouseSensitivity per frame at 60Hz*/
+            bool cyber = World.curLev == LEVEL_CYBERSPACE, invLook = cyber ? Sys_Settings.InvCybLook : Sys_Settings.InvertLook;
+            float ns = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f,0.01f,1.0f), s = ns * 0.2f, kts = 900.0f * ns;
             World.cam_yaw += (float)World.currentMouse_dx * s + ((float)TurnRight() - (float)TurnLeft()) * kts * World.dt; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if(World.cam_yaw<0.0f){World.cam_yaw+=360.0f;}
             World.cam_pitch += ((float)World.currentMouse_dy * s + ((float)LookDown() - (float)LookUp()) * kts * World.dt) * (invLook ? -1.0f : 1.0f);
                  if (cyber)                    { World.cam_pitch -= 360.0f * vfloor(World.cam_pitch * (1.0f/360.0f));/*plane: unlimited pitch, normalized to [0 360)*/ }

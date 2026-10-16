@@ -14,8 +14,6 @@
 // example: index: 451
 //
 // For Blender .obj export use -Y Forward, Z Up, and check: Write Normals, Include UVs, Keep Vertex Order, Scale 1.00, and for animated meshes check Animation. 
-// Note that for my animated NPC models, the orientation is off such that it takes into account Unity's -90deg orientation, thus the default Blender .obj 
-// export of -Z Forward, +Y Up is used. 
 #Models/access_card.obj
 index: 0
 #Models/a_hornet.glb

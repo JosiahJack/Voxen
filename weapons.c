@@ -117,7 +117,6 @@ void UpdateWeaponReloadDip() {
 }
 
 static void RotateViewWeapon() { if(!World.inventoryMode) {wfx.reloadContainerRot=QUAT_IDENTITY; return;} float h = (float)Sys_Settings.ScreenWidth * 0.5f; wfx.reloadContainerRot = QuatEulerY(wfx.wepYRot = ((wfx.tempVec.x - h) / h) * 48.0f); }
-/* Entity const index -> particleTypeDefs[] index, matched by the emitter's GameObject name in particles.c. */
 static u16 ImpactParticleType(u16 prefab) {
     switch (prefab) {
         case 721: return 13;  /* ef_particle_bloodspurtsmall */       case 722: return 15;  /* ef_particle_bloodspurtsmallgreen */
@@ -213,7 +212,7 @@ static const float bulletHoleSize[6] = {0.06f,0.2f,0.1f,0.04f,0.15f,0.3f};
 void CreateStandardImpactMarks(int wep16) {
     if (!wfx.tempHit.hit) return;
     Entity* e = &World.instances[wfx.tempHit.hitInstanceIndex];
-    if ((e->entflags & EF_RIGIDBODY) || IdxIsDoor(e->index) || IdxIsNPC(e->index) || e->index==279/*chunk_screen*/ || e->index==477/*sec_camera*/) return; // Don't create bullet holes on objects that move, take damage, animate, or are doors (Unity: skips Rigidbody, HealthManager, Animator/Animation, Door).
+    if ((e->entflags & EF_RIGIDBODY) || IdxIsDoor(e->index) || IdxIsNPC(e->index) || e->index==279/*chunk_screen*/ || e->index==477/*sec_camera*/) return;
     V3 pos = V3_AplusB(wfx.tempHit.point, V3_ScaleByF(wfx.tempHit.normal, 0.16f));
     u16 hole = wepBulletHolePrefab[wep16]; u16 markInst = SpawnDynamicObject(hole, -1); if (!EntIdxIsValid(markInst)) return;
     World.position[markInst] = pos;
@@ -279,7 +278,7 @@ void MeleeHitUpdate(void) {
     if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);
     if(!IsDamageable(&World.instances[targ])){if(!silent){if(!isRapier){FootStepType fstp=GetFootstepTypeForPrefab(World.instances[targ].index);play_wav(JumpLandSound(fstp),AppliedFXVol(1.0f),World.position[PLAYER1],false);play_wav(sounds[wfx.pendingMeleeHitSnd],AppliedFXVol(0.65f),World.position[PLAYER1],false);}else{play_wav(sounds[wfx.pendingMeleeHitSnd],AppliedFXVol(1.0f),World.position[PLAYER1],false);}World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}return;}/*no health manager: material footstep at 1.0 + hit sound at 0.65 (rapier: hit sound at 1.0)*/
     dd.impactVelocity = 80.0f + dd.damage;
-    if ((!dd.isOtherNPC || wep16==12) && (!isRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForceWithSound(targ,dd.impactVelocity,dd.attacknormal,World.position[targ]); }/*melee impact force+sound for any dynamic object (Unity: WeaponFire melee)*/
+    if ((!dd.isOtherNPC || wep16==12) && (!isRapier || World.invP1.energy >= 4.0f)) { ApplyImpactForceWithSound(targ,dd.impactVelocity,dd.attacknormal,World.position[targ]); }
     float dmgFinal = TakeDamage(targ,dd);
     if (dmgFinal < 0.0f) {dmgFinal = 0.0f;}
     CreateTargetIDInstance(dmgFinal,targ,-1.0f);
@@ -355,14 +354,14 @@ void FireCyberWeapon(void) { // Reuses waitTilNextFire: cyberspace has no equipp
 
 void FirePlasma(int w){FireBeachball(w,plasmaShotForce,485);} void FireRailgun(int w){FireBeachball(w,railgunShotForce,484);} void FireMagpulse(int w){FireBeachball(w,magpulseShotForce,482);} void FireStungun(int w){FireBeachball(w,stungunShotForce,483);}
 typedef void (*FireFn)(int); FireFn wepSpecialFire[16]={0,0,0,0,0,FireRapier,FirePipe,0,FireMagpulse,0,FirePlasma,FireRailgun,0,0,0,FireStungun};
-void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;if(wep16 != 5 && wep16 != 6){World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}/*Unity: pipe/rapier swings make no noise unless they hit*/if(!isSilent&&wepClass[wep16] != WC_MELEE)play_wav(sounds[wepFireSound[wep16]], AppliedFXVol(1.0f), World.position[PLAYER1], false);if(wepClass[wep16]!=WC_MELEE){const PSysDef* mfp=PSysTypeGet(53/*centerFlash*/);if(mfp){PSysDef mfd=*mfp;mfd.pos=V3_AplusB(wfx.reloadContainerPos,V3_ScaleByF(World.instances[PLAYER1].forward,0.5f));mfd.lifetimeMin=mfd.lifetimeMax=0.05f;PSysAdd(&mfd);}}/*muzzle flash, visible 0.05s (Unity: per-weapon muzFlash GameObject)*/bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmokePrefab[wep16]){u16 smk=SpawnDynamicObject(wepSmokePrefab[wep16],-1);if(EntIdxIsValid(smk)){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
+void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;if(wep16 != 5 && wep16 != 6){World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.5;} if(!isSilent&&wepClass[wep16] != WC_MELEE)play_wav(sounds[wepFireSound[wep16]], AppliedFXVol(1.0f), World.position[PLAYER1], false);if(wepClass[wep16]!=WC_MELEE){const PSysDef* mfp=PSysTypeGet(53/*centerFlash*/);if(mfp){PSysDef mfd=*mfp;mfd.pos=V3_AplusB(wfx.reloadContainerPos,V3_ScaleByF(World.instances[PLAYER1].forward,0.5f));mfd.lifetimeMin=mfd.lifetimeMax=0.05f;PSysAdd(&mfd);}} bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmokePrefab[wep16]){u16 smk=SpawnDynamicObject(wepSmokePrefab[wep16],-1);if(EntIdxIsValid(smk)){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
     World.fogFac += wepFogInc[wep16]; u16 wc = World.invP1.weaponCurrent;
     if (wepClass[wep16] == WC_ENERGY) {
         float setting = World.invP1.weaponEnergySetting[wc];
         if (World.invP1.overloadEnabled) World.invP1.currentEnergyWeaponHeat[wc] = 100.0f;
         else { World.invP1.currentEnergyWeaponHeat[wc] += setting; if (World.invP1.currentEnergyWeaponHeat[wc] > 100.0f) {World.invP1.currentEnergyWeaponHeat[wc] = 100.0f;} }
     }
-    bool wasOverload = World.invP1.overloadEnabled; // Unity reads the flag here, before the ammo block clears it, for the fire delay below.
+    bool wasOverload = World.invP1.overloadEnabled;
     if (wepClass[wep16] != WC_MELEE) { // Take ammo/energy. Melee weapons consume neither and don't count towards shotsFired.
         if (wepClass[wep16] == WC_ENERGY) {
             if (wasOverload) { World.invP1.overloadEnabled = false; if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(energyDrainOverloadForWeapon[wep16]); BiomonitorEnergyPulse(energyDrainOverloadForWeapon[wep16]); } }

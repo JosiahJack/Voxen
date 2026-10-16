@@ -423,7 +423,7 @@ extern u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; extern u32 textDecalVertexC
 #define DECAL_INLINE_TEXT_LEN 96
 extern char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN]; extern u16 decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount;
 #define DECAL_STYLE_MAX 256
-typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle; // Unity TextMesh anchor/alignment/lineSpacing override (tA/tAl/tLs from level file)
+typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle;
 extern DecalStyle decalStyles[DECAL_STYLE_MAX]; extern u16 decalStyleCount;
 extern AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; bool FrobHeldItemIntoPanel(V3 p,V3 f,V3 r); extern BvhNode** modelBVHNodes; extern FHandle console_log_file; extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
@@ -457,12 +457,10 @@ const char *JumpSound(FootStepType),*JumpLandSound(FootStepType); FootStepType G
 // Quest bits (info_mission constIndex 710).  Only ever set/toggled/checked by info_mission entities.
 enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
 enum{IO_NONE=0}; u16 IOInternName(const char*);
-/* Second TargetIO word (Entity.ioflagsHi).  TARG_IOFLAGS_* is a saturated 32 bits, so the two SpawnManager actions
-   TargetIO.cs:299,304 route to SpawnManager.Activate(false/true) and the awakeSleepingEnemy action land here. */
 enum{TARG_IOFLAGHI_SPAWNER_ACTIVATE=(1u<<0),TARG_IOFLAGHI_SPAWNER_ACTIVATE_ALERTED=(1u<<1),TARG_IOFLAGHI_AWAKE_SLEEPING=(1u<<2)};
 bool QuestBitIsSet(u8),RessurectPlayer(),PlayerIsMoving(),Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),Console(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),SkyIsVisible(),SkySunIsVisible(),HasHealth(u16)/*ai.c:216, reads cyberHealth for Cyber-type NPCs and health for the rest*/;
 void AIAlert(u16);/*ai.c:589, declared on its own because the block above is bool-returning*/
-void AIAwakeFromSleep(u16);/*ai.c:683, TargetIO.cs:399 awakeSleepingEnemy path*/
+void AIAwakeFromSleep(u16);
 void SpawnManagerActivate(u16 self,bool alerted),SpawnManagerUpdate(u16 self);
 // Synthesized Audio
 typedef enum {SND_LASER_PISTOL=0,SND_LASER_RIFLE,SND_DOOR,SND_IMPACT_GLASS,SND_IMPACT_METAL,SND_EXPLOSION,SND_HISS,SND_PIPE,SND_SHIELD_HIT,SND_FOOTSTEP,SND_SAND_FOOTSTEP,SND_TAP_CASE,SND_PLASTIC_TAP,SND_SPARK_SMALL,SND_CRACKLE,SND_SINE,SND_CLINK,SND_BEAKER_CLINK,SND_BEAKER_THUD,SND_COUNT} SoundID;
