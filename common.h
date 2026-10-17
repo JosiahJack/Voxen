@@ -17,15 +17,29 @@ typedef __UINTPTR_TYPE__ uintptr_t; typedef __INTPTR_TYPE__ intptr_t;
 enum{U16_MAX=65535,U32_MAX=0xFFFFFFFFU,U64_MAX=0xFFFFFFFFFFFFFFFFULL};
 typedef __builtin_va_list va_list;
 extern size_t g_mmap_live; /* diagnostics (lib.c): live bytes from OS_AllocateRAM */
-typedef struct { float r,g,b; } Color3; typedef struct { float r,g,b,a; } Color; typedef struct { float x,y; } V2;  typedef struct { float x,y,z; } V3; typedef struct { float x,y,z,w; } Quaternion; typedef u8 ColliderType; typedef struct { bool hit; V3 point,normal; float pen; } Overlap; typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
+typedef struct { float r,g,b; } Color3;
+typedef struct { float r,g,b,a; } Color;
+typedef struct { float x,y; } V2;
+typedef struct { float x,y,z; } V3;
+typedef struct { float x,y,z,w; } Quaternion;
+typedef u8 ColliderType;
+typedef struct { bool hit; V3 point, normal; float pen; } Overlap;
+typedef struct { V3 mn,mx; u32 triStart; u16 triCount; i16 children[8]; } BvhNode;
 #if defined(_WIN32)
     typedef void* FHandle;
 #else
     typedef int FHandle;
 #endif
 // SIMD
-typedef float __v8sf __attribute__((__vector_size__(32))); typedef float __m256 __attribute__((__vector_size__(32))); typedef long long __m128i __attribute__((__vector_size__(16))); typedef __m128i __m128i_u __attribute__((__may_alias__, __aligned__(1))); typedef __m256 __m256_u __attribute__((__may_alias__, __aligned__(1)));
-typedef float __v4sf __attribute__((__vector_size__(16))); typedef int __v4si __attribute__((__vector_size__(16)));   typedef float __m128 __attribute__((__vector_size__(16)));      typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1)));
+typedef float __v8sf __attribute__((__vector_size__(32)));
+typedef float __m256 __attribute__((__vector_size__(32)));
+typedef long long __m128i __attribute__((__vector_size__(16)));
+typedef __m128i __m128i_u __attribute__((__may_alias__, __aligned__(1)));
+typedef __m256 __m256_u __attribute__((__may_alias__, __aligned__(1)));
+typedef float __v4sf __attribute__((__vector_size__(16)));
+typedef int __v4si __attribute__((__vector_size__(16)));
+typedef float __m128 __attribute__((__vector_size__(16)));
+typedef __m128 __m128_u __attribute__((__may_alias__, __aligned__(1)));
 #define _mm_storeu_si128(P, V) (*(__m128i_u *)(P) = (V))
 #define _mm_loadu_ps(P) (*(__m128_u const *)(P))
 #define _mm_set1_ps(A) ((__m128){ (A), (A), (A), (A) })
@@ -39,25 +53,44 @@ static inline __m128i _mm_set1_epi8_fast(char c) { __m128i v; char *p = (char*)&
 typedef int (*cmpfun)(const void*,const void*);
 typedef int (*cmpfun_r)(const void*,const void*,void*);
 #define CHECK_GL_ERROR() do { u32 err = glGetError(); if (err != 0) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
-void physDiagExternal(const char*),DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(const char*, ...), *mcpy(void*,const void*,size_t);
+void DualLogError(const char*, ...), DualLog(const char*, ...), DualLogWarn(const char*, ...), *mcpy(void*,const void*,size_t);
 #define THRSTACKSZ (8 * 1024 * 1024)
 #if defined(_WIN32)
     #define DLL_IMP __declspec (dllimport)
     #define WINAPI __stdcall
     #define INVALID_FHANDLE ((void*) (i64)-1)
     typedef struct { void* handle; } OS_Thread;
-    struct timespec { i64 tv_sec; i32 tv_nsec; }; struct sched_param { int sched_priority; };
     DLL_IMP void* WINAPI GetStdHandle(u32);
-    typedef i64 (WINAPI *PROC)(); typedef i64 (WINAPI *FARPROC)(); typedef i64 (WINAPI *NEARPROC)();
-    typedef struct { int unused; } *HINSTANCE; typedef HINSTANCE HMODULE;  typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
-    typedef struct { i64 QuadPart; } LARGE_INTEGER; typedef LARGE_INTEGER *PLARGE_INTEGER; typedef struct { u64 Internal,InternalHigh; union {struct {u32 Offset,OffsetHigh;} DUMMYSTRUCTNAME; void* Pointer;} DUMMYUNIONNAME; void* hEvent; } OVERLAPPED, *LPOVERLAPPED;
-    typedef struct { union { u32 dwOemId; struct { u16 wProcessorArchitecture,wReserved; } DUMMYSTRUCTNAME; } DUMMYUNIONNAME; u32 dwPageSize; void* lpMinimumApplicationAddress,*lpMaximumApplicationAddress; u64 dwActiveProcessorMask; u32 dwNumberOfProcessors,dwProcessorType,dwAllocationGranularity; u16 wProcessorLevel,wProcessorRevision; } SYSTEM_INFO, *LPSYSTEM_INFO;
-    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*); DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);         DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,LPOVERLAPPED);    DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);          DLL_IMP i32 WINAPI UnmapViewOfFile(void*); DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
-    DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);                                                      DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);   DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*); DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,LPOVERLAPPED); DLL_IMP i32 WINAPI CloseHandle(void*);     DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
-    DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);                  DLL_IMP void WINAPI GetSystemInfo(LPSYSTEM_INFO); DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*); DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64);         DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);              DLL_IMP void* WINAPI CreateFileMappingW(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,u16*);
+    typedef i64 (WINAPI *PROC)();
+    typedef i64 (WINAPI *FARPROC)();
+    typedef i64 (WINAPI *NEARPROC)();
+    typedef struct { int unused; } *HINSTANCE;
+    typedef HINSTANCE HMODULE;
+    typedef struct { u32 nLength; void* lpSecurityDescriptor; i32 bInheritHandle; } *LPSECURITY_ATTRIBUTES;
+    typedef struct { i64 QuadPart; } LARGE_INTEGER;
+    typedef LARGE_INTEGER *PLARGE_INTEGER;
+    DLL_IMP void* WINAPI CreateFileMappingA(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,const char*);
+    DLL_IMP i32 WINAPI VirtualFree(void*,u64,u32);
+    DLL_IMP void* WINAPI VirtualAlloc(void*,u64,u32,u32);
+    DLL_IMP i32 WINAPI ReadFile(void*,void*,u32,u32*,void*);
+    DLL_IMP i32 WINAPI GetFileSizeEx(void*,PLARGE_INTEGER);
+    DLL_IMP i32 WINAPI UnmapViewOfFile(void*);
+    DLL_IMP FARPROC WINAPI GetProcAddress(HINSTANCE,const char*);
+    DLL_IMP void* WINAPI CreateFileA(const char*,u32,u32,LPSECURITY_ATTRIBUTES,u32,u32,void*);
+    DLL_IMP i32 WINAPI QueryPerformanceCounter(LARGE_INTEGER*);
+    DLL_IMP void* WINAPI MapViewOfFileEx(void*,u32,u32,u32,u64,void*);
+    DLL_IMP i32 WINAPI WriteFile(void*,void*,u32,u32*,void*);
+    DLL_IMP i32 WINAPI CloseHandle(void*);
+    DLL_IMP __declspec (noreturn) void WINAPI ExitProcess(u32);
+    DLL_IMP i32 WINAPI SetFilePointerEx(void*,LARGE_INTEGER,PLARGE_INTEGER,u32);
+    DLL_IMP void WINAPI GetSystemInfo(void*);
+    DLL_IMP i32 WINAPI QueryPerformanceFrequency(LARGE_INTEGER*);
+    DLL_IMP void* WINAPI MapViewOfFile(void*,u32,u32,u32,u64);
+    DLL_IMP HINSTANCE WINAPI LoadLibraryA(const char*);
+    DLL_IMP void* WINAPI CreateFileMappingW(void*,LPSECURITY_ATTRIBUTES,u32,u32,u32,u16*);
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode) { ExitProcess((u32)exitCode); __builtin_unreachable(); }
     INLINE void OS_Close(FHandle fd) { if(fd!=INVALID_FHANDLE){CloseHandle(fd);} }
-    INLINE void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd==(void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r=MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); return CloseHandle(m),r;}
+    INLINE void* OS_AllocateRAM(size_t l,i32 p,i32 f,FHandle fd) { (void)f; if (fd == (void*)-1) return VirtualAlloc(NULL,l,0x3000,(p&2)?4:2); void* m = CreateFileMappingW(fd,NULL,(p&2) ? 4 : 2,(u32)(l>>32),(u32)l,NULL); void* r = MapViewOfFileEx(m,(p&2)?2:4,0,0,l,NULL); CloseHandle(m); return r; }
     int __cdecl _mkdir(const char* dirname);
     INLINE int OS_MakeFolder(const char* path) { _mkdir(path); return 0; }
     INLINE long OS_Read(FHandle fd, void* buf, size_t count) { u32 bytesRead = 0; return (ReadFile((void*)fd,buf,(u32)count,&bytesRead,NULL)) ? (long)bytesRead : (long)-1; }
@@ -67,8 +100,7 @@ void physDiagExternal(const char*),DualLogError(const char*, ...), DualLog(const
     INLINE int OS_FileSize(FHandle f) { LARGE_INTEGER s; return (f==(FHandle)-1 || !GetFileSizeEx(f,&s)) ? -1 : (int)s.QuadPart; }
     INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s,FHandle fd, char* path) { void* m; void* r; return(fd==(void*)-1||!s||!(m=CreateFileMappingA(fd,NULL,2,0,0,NULL))) ? DualLogError("CreateFileMappingA failed for %s\n",path),NULL : (r=MapViewOfFile(m,4,0,0,s)) ? (CloseHandle(m),r) : (DualLogError("Failed to allocate %s\n",path),CloseHandle(m),NULL);}
     INLINE long OS_Seek(FHandle fd, i64 ofs, int whence /*forth and forsooth pray tell*/) { LARGE_INTEGER l={.QuadPart=ofs},n; return SetFilePointerEx((void*)fd,l,&n,whence) ? n.QuadPart : -1; }
-    INLINE long OS_Tell(FHandle fd) { LARGE_INTEGER l={0},n; return SetFilePointerEx((void*)fd,l,&n,1) ? n.QuadPart : -1; }
-    INLINE int OS_GetNumThreads() { SYSTEM_INFO si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
+    INLINE int OS_GetNumThreads() { struct SYSTEM_INFO { u8 a[32]; u32 dwNumberOfProcessors; u8 b[12]; } si; GetSystemInfo(&si); return (int)si.dwNumberOfProcessors; }
     INLINE void OS_Free(void* p, size_t s) { (void)s; if(!p) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } if(!UnmapViewOfFile(p) && !VirtualFree(p,0,0x00008000)) DualLogError("VirtualFree failed\n"); }
     INLINE long OS_RawWrite(FHandle fd, const void* buf, size_t count) { u32 w; return WriteFile((void*)fd,(void*)buf,(u32)count,&w,NULL) ? (i64)w : -1; }
     void* __stdcall GetProcessHeap(); void* __stdcall HeapAlloc(void* hHeap, u32 dwFlags, size_t dwBytes); i32 __stdcall HeapFree(void* hHeap, u32 dwFlags, void* lpMem); u32 __stdcall WaitForSingleObject(void* hHandle, u32 dwMilliseconds);
@@ -85,9 +117,7 @@ void physDiagExternal(const char*),DualLogError(const char*, ...), DualLog(const
     #define INVALID_FHANDLE -1
     typedef struct __attribute__((aligned(16))) OS_ThreadHead { void(*trampoline)(struct OS_ThreadHead*),*(*fn)(void*),*arg; int join_futex,_pad; } OS_ThreadHead;
     typedef struct { struct OS_ThreadHead* head; void* stack_base; } OS_Thread;
-    struct timespec {i64 tv_sec,tv_nsec;};
     void *dlopen(const char*,int); void *dlsym(void*,const char*); INLINE long OS_Open(const char*,i32,i32);
-    struct input_id { u16 bustype,vendor,product,version;}; struct input_event { struct { long tv_sec,tv_usec; } time; u16 type,code; i32 value; };
     INLINE int OS_MakeFolder(const char* path){long r=83; __asm__ __volatile__("syscall":"+a"(r):"D"(path),"S"(0755LL):"rcx","r11","memory"); return (int)r; }
     INLINE long OS_Read(FHandle f,void*b,size_t c){long r=0; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(b),"d"(c):"rcx","r11","memory"); return r; }
     INLINE __attribute__((noreturn)) void OS_Exit(i64 exitCode){long r=231; __asm__ __volatile__("syscall":"+a"(r):"D"(exitCode):"rcx","r11","memory"); __builtin_unreachable(); }
@@ -100,106 +130,166 @@ void physDiagExternal(const char*),DualLogError(const char*, ...), DualLog(const
     INLINE int OS_FileSize(FHandle f) { long r=5,s[18]; __asm__ __volatile__("syscall":"+a"(r):"D"(f),"S"(s):"rcx","r11","memory"); return (int)s[6]; }
     INLINE void* OS_AllocateFileBackedRAMReadonly(size_t s, FHandle fd, char* path) { void* r=OS_AllocateRAM(s,1,2,fd); return r==(void*)-1 ? DualLogError("Failed to allocate %s\n",path),NULL : r; }
     INLINE long OS_Seek(FHandle fd, i64 ofs, int whence /* forth and forsooth pray tell*/) { i64 r = 8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(ofs),"d"(whence):"rcx","r11","memory"); return r; }
-    INLINE long OS_Tell(FHandle fd) { i64 r=8; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(0LL),"d"(1):"rcx","r11","memory"); return r; }
     INLINE int OS_GetNumThreads() { unsigned long m[16]; long r=204; __asm__ __volatile__("syscall":"+a"(r):"D"(0LL),"S"(128LL),"d"(m):"rcx","r11","memory"); int c = 0; for(int i=0;i<(r/8);i++) {c+=__builtin_popcountll(m[i]);} return r < 0 ? 1 : c; }
     INLINE void OS_Free(void* p, size_t s){ long r=11; if(!p || p == (void*)-1) { DualLogError("Attempting to double free!\n"); OS_Exit(1); } __atomic_sub_fetch(&g_mmap_live,s,__ATOMIC_RELAXED); __asm__ __volatile__("syscall":"+a"(r):"D"(p),"S"(s):"rcx","r11","memory"); if(r<0) DualLogError("munmap failed\n"); }
     INLINE long OS_RawWrite(FHandle fd, const void* buf, size_t cnt) { i64 r=1; __asm__ __volatile__("syscall":"+a"(r):"D"(fd),"S"(buf),"d"(cnt):"rcx","r11","memory"); return r; }
-    #define SYSCALL1(n, a) syscall6(n,(long)(a),0,0,0,0,0)
-    #define SYSCALL2(n, a, b) syscall6(n,(long)(a),(long)(b),0,0,0,0)
-    #define SYSCALL3(n, a, b, c) syscall6(n,(long)(a),(long)(b),(long)(c),0,0,0)
+
+    // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
     #define SYSCALL4(n, a, b, c, d) syscall6(n,(long)(a),(long)(b),(long)(c),(long)(d),0,0)
     INLINE long syscall6(long n, long a, long b, long c, long d, long e, long f) { register long r=n; register long r10 __asm__("r10") = d; register long r8  __asm__("r8")  = e; register long r9  __asm__("r9")  = f; __asm__ __volatile__("syscall":"+a"(r):"D"(a),"S"(b),"d"(c),"r"(r10),"r"(r8),"r"(r9):"rcx","r11","memory"); return r; }
     __attribute__((naked)) static long OS_CloneSyscall(struct OS_ThreadHead* stack) { __asm__ volatile ("mov %%rdi, %%rsi\nmov $0x50f00, %%edi\nmov $56, %%eax\nsyscall\nmov  %%rsp, %%rdi\nret\n":::"rax","rcx","rsi","rdi","r11","memory"); }
-    __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) { void*(*fn)(void*)=head->fn; void*arg=head->arg; int*futex=&head->join_futex; fn(arg); /* Publish completion then wake+exit using registers only: OS_ThreadJoin munmaps this stack as soon as it observes the flag, so no stack access (not even the call/spill of a syscall wrapper, fatal at -O0) may follow the publish. xchg is a seq-cst store. */ __asm__ volatile ("movl $1, %%eax\n\txchgl %%eax, (%0)\n\tmov %0, %%rdi\n\tmov $1, %%esi\n\tmov $1, %%edx\n\tmov $202, %%eax\n\tsyscall\n\tmov $60, %%eax\n\txor %%edi, %%edi\n\tsyscall\n" :: "r"(futex) : "rax","rcx","rsi","rdi","rdx","r11","memory"); __builtin_unreachable(); }
-    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) { void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); if (!base || base == (void*)-1) return -1; struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0; long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0; } // Multithreading taken from https://github.com/skeeto/scratch/blob/master/misc/stack_head.c Ref: https://nullprogram.com/blog/2023/03/23/ This is free and unencumbered software released into the public domain.
+    __attribute__((noreturn)) static void thrtramp(struct OS_ThreadHead* head) {
+        void*(*fn)(void*)=head->fn; void*arg=head->arg; int*futex=&head->join_futex; fn(arg); /*Publish completion then wake+exit using registers only: OS_ThreadJoin munmaps as soon as it observes flag, so no stack access (not even call/spill of syscall wrapper, fatal at -O0) may follow publish. xchg is seq-cst store.*/
+        __asm__ volatile ("movl $1, %%eax\n\txchgl %%eax, (%0)\n\tmov %0, %%rdi\n\tmov $1, %%esi\n\tmov $1, %%edx\n\tmov $202, %%eax\n\tsyscall\n\tmov $60, %%eax\n\txor %%edi, %%edi\n\tsyscall\n" :: "r"(futex) : "rax","rcx","rsi","rdi","rdx","r11","memory"); __builtin_unreachable();
+    }
+
+    INLINE int OS_ThreadCreate(OS_Thread* out, void*(*fn)(void*), void* arg) {
+        void* base = OS_AllocateRAM(THRSTACKSZ,0x1|0x2,0x02|0x20,INVALID_FHANDLE); struct OS_ThreadHead* head = (struct OS_ThreadHead*)((char*)base + THRSTACKSZ) - 1; head->trampoline = thrtramp; head->fn=fn; head->arg=arg; head->join_futex=0; head->_pad=0;
+        long tid = OS_CloneSyscall(head); if(tid < 0){OS_Free(base,THRSTACKSZ); return (int)tid;} out->head=head; out->stack_base=base; return 0;
+    }
+    
     INLINE void OS_ThreadJoin(OS_Thread* t) { int v; while ((v = __atomic_load_n(&t->head->join_futex, __ATOMIC_SEQ_CST)) == 0) SYSCALL4(202, &t->head->join_futex, 0 /*FUTEX_WAIT*/, v, 0); OS_Free(t->stack_base,THRSTACKSZ); t->head = NULL; t->stack_base = NULL; }
     INLINE void OS_FutexWait(u32* a, u32 expect) { while (__atomic_load_n(a,__ATOMIC_ACQUIRE)==expect) SYSCALL4(202, a, 0 /*FUTEX_WAIT*/, expect, 0); }
     INLINE void OS_FutexWakeAll(u32* a) { SYSCALL4(202, a, 1 /*FUTEX_WAKE*/, 0x7fffffff, 0); }
     INLINE double get_time() { struct {i64 s,ns;} ts; i64 ret; __asm__ __volatile__("syscall":"=a"(ret):"a"(228),"D"(1),"S"(&ts):"rcx","r11","memory"); if (ret != 0) {return 0.0;} return (double)ts.s + (double)ts.ns * 0.000000001; } // Full time in seconds, 1 for MONOTONIC, Note that using clock_gettime wasn't any better for performance.
 #endif 
 INLINE void* OS_Alloc(size_t amount) { return OS_AllocateRAM(amount,0x1|0x2,0x02|0x20,INVALID_FHANDLE); }
-void OS_ScratchInit(void),OS_ScratchFree(void),*OS_AllocScratch(size_t amount),OS_FreeInitPhase(void); extern u8* scratch_base,*scratch_cur,*scratch_end;
+void *OS_AllocScratch(size_t amount), OS_FreeInitPhase();
+extern u8 *scratch_cur, *scratch_end;
 INLINE void OS_Write(FHandle f,const void* buf, size_t s, const char* p) { size_t total=0; while(total < s) { i64 w=OS_RawWrite(f,(const char*)buf + total,s - total); if(w < 0) { DualLogError("Write error to %s: %s[%d]\n",p,w,(i32)-w); OS_Exit(1); } total += (size_t)w; } }
 INLINE void* OS_OpenAndAllocateFileBufferReadonly(const char* p,FHandle* f,int* s) {void* r;return((*f=OS_OpenReadonly(p))==(FHandle)-1)?*s=0,(void*)0:((*s=OS_FileSize(*f))<=0)?DualLogError("Skipping empty:%s\n",p),OS_Close(*f),OS_Exit(1),NULL:(r=OS_AllocateFileBackedRAMReadonly(*s,*f,(char*)p))?(OS_Close(*f),r):NULL;}
 INLINE void* OS_Realloc(void* old, size_t olds, size_t news) { void* n; return !old ? OS_Alloc(news) : news <= olds ? old : (n=OS_Alloc(news)) ? (mcpy(n,old,olds),OS_Free(old,olds),n) : 0; }
 static const Quaternion QUAT_IDENTITY=(Quaternion){0.0f,0.0f,0.0f,1.0f};
-typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;         typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range,spotAng,maxIntensity,minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer   
-typedef struct { float speed; u16 frameStart,frameEnd,frameStartModelIndex; u8 framerate;} AnimationClip;  typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
-enum {/*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
-                MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128,MAX_CULL_FILESIZE=500000,
-      /*Entity Management*/MAX_LEVELS=14,LEVEL_CYBERSPACE=13,AVG_CPU_TAPS=2048,MAX_ENTITIES=864,INSTANCE_COUNT=9032,MAX_LEVEL_PARTICLES=128,WORLD=0,PLAYER1=1,INSTS_1ST_IDX=2,NUM_AI_TYPES=29,MAX_IO_NAMES=1024,FW_MAX_CHILDREN=48/*largest seen: 41 chunks (level 9)*/,FW_POOL_MAX=512,MAX_ELEV_DESTS_PER_LEVEL=8,SAVE_VERSION=16,
-      /*Lights*/LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
-      /*Models*/MAX_MDLS=7489, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
-      /*Textures*/MAX_TXRS=4096,MAX_TOTAL_PIXELS=48000000u, MAX_UNIQUE_COLORS = 86000u,TEXHASH_SZ=256,NUM_TEXTURE_CLIPS=49,
+typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool hit;} RaycastHit;
+typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range, spotAng, maxIntensity, minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer   
+typedef struct { float speed; u16 frameStart, frameEnd, frameStartModelIndex; u8 framerate;} AnimationClip;
+typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
+enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (86ULL * 1024 * 1024),
+      /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
+                 MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
+      /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024,
+                            FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 16,
+      /*Lights*/ LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
+      /*Models*/ MAX_MDLS=7489, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
+      /*Textures*/ MAX_TXRS = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 256, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8,
       /*Animations*/ MAX_ANIMCLIPS = 10, MAX_ANIMS = 59, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2,
                      A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
-      /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH=6, BVH_LEAF_MAX_TRIS=8, BVH_MAX_NODES_PER_MDL=586/*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL=8000, MAX_WIRELINE_VRTS = 2024000,
-                  MANIFOLD_MAX=4, CVXMSH_HULL_CACHE=1024, EPA_MAX_FACES=64, EPA_MAX_VERTS=128, EPA_MAX_EDGES=EPA_MAX_FACES*3, GJK_ITER=32, EPA_ITER=16, SOLVER_ITER_GLOBAL=32, MAX_GLOBAL_CONTACTS=8192,
-      /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
-      /*Audio*/ MAX_CHANNELS=128,SOUNDS_COUNT=670,MAX_SYNTH_VOICES=16,AUDIO_RATE=48000,AUDIO_CHANNELS=2,AUDIO_PERIOD_MS=10,AUDIO_PERIODS=4,AUDIO_FRAMES=((AUDIO_RATE*AUDIO_PERIOD_MS)/1000),AUDBUF_SIZE=(AUDIO_FRAMES*AUDIO_PERIODS),REV_BUF_LEN=110251/*~2.5s @ 44100; prime*/,MAXAMB=256,
-      /*Text*/ TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280*3, LOGCNT = 134, T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8,
-               T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14, T_PURPLE = 15, T_BUFFER_SIZE=4096, MAX_GLYPHS=4096, FONT_ATLAS_SIZE=1856,FONT_ATLAS_SIZE2=3776, FONT_NORMAL=0, FONT_STOPD=1, LINE_LEN_MAX=81920,
-               HUDC_WHITE=0, HUDC_RED=1, HUDC_ORANGE=2, HUDC_YELLOW=3, HUDC_GREEN=4, HUDC_BLUE=5, HUDC_PURPLE=6, HUDC_GRAY=7,
-      /*UI*/ UI_W=1366,UI_H=768,CURSOR_SZ=40,MFD_READER_CONTENTS=0,MFD_READER_FOLDER=1,MFD_READER_TEXT=2,MAX_UI_ELEMENTS=4096,TXT_PAD=4,TXT_H=24,TAB_THICK=16,MFD_SPACING=8,MFD_SPACINGCTR=19,SIDE_MFD_W=320,SIDE_MFD_H=240,CTR_MFD_W=640,CTR_MFD_H=240,UI_AUTOMAP_ZOOM_IN=0,UI_AUTOMAP_ZOOM_OUT=1,UI_AUTOMAP_FULL=2,UI_AUTOMAP_SIDE=3,
-      /*Automap*/ AM_W=320,AM_H=200,AM_FULL_W=700,AM_FULL_H=700,AM_MAXHULL=10,AMAP_UI_X_L=24,AMAP_UI_X_R=1022,AMAP_UI_Y=524,AMAP_UI_W=320,AMAP_UI_H=200,AM_XOFF=((AM_W-AM_H)/2),
-      /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3,BIOM_ERG=0,BIOM_CHI=1,BIOM_ECG=2,BIOM_GRAPH_W=620,BIOM_GRAPH_H=36,
-      /*Rendering*/ BLEND_OPAQUE = 0, BLEND_CUTOUT = 1, BLEND_PREMULT = 2, BLEND_MULTIPLY=3,
+      /*Physics*/ COLTYPE_NONE = 0, COLTYPE_BOX = 1, COLTYPE_SPH = 2, COLTYPE_CAP = 3, COLTYPE_CVX = 4, COLTYPE_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH = 6, BVH_LEAF_MAX_TRIS = 8, BVH_MAX_NODES_PER_MDL = 586 /*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL = 8000,
+                  MAX_WIRELINE_VRTS = 2024000, MANIFOLD_MAX = 4, CVXMSH_HULL_CACHE = 1024, EPA_MAX_FACES = 64, EPA_MAX_VERTS = 128, EPA_MAX_EDGES = EPA_MAX_FACES * 3, GJK_ITER = 32, EPA_ITER = 16, SOLVER_ITER_GLOBAL = 32, MAX_GLOBAL_CONTACTS = 8192,
+      /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, WS_KEYCOUNT = 349, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2,
+      /*Audio*/ MAX_CHANNELS = 128, SOUNDS_COUNT = 670, MAX_SYNTH_VOICES = 16, AUDIO_RATE = 48000, AUDIO_CHANNELS = 2, AUDIO_PERIOD_MS = 10, AUDIO_PERIODS = 4, AUDIO_FRAMES = ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000), AUDBUF_SIZE = (AUDIO_FRAMES * AUDIO_PERIODS),
+                REV_BUF_LEN = 110251 /*~2.5s @ 44100; prime*/, MAXAMB = 256,
+      /*Text*/ T_BUFFER_SIZE = 4096, MAX_GLYPHS = 4096, LINE_LEN_MAX = 81920, TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280 * 3, LOGCNT = 134,
+               T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8, T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14, T_PURPLE = 15,
+               FONT_ATLAS_SIZE = 1200, FONT_ATLAS_SIZE2 = 2048, FONT_NORMAL = 0, FONT_STOPD = 1,
+               HUDC_WHITE = 0, HUDC_RED = 1, HUDC_ORANGE = 2, HUDC_YELLOW = 3, HUDC_GREEN = 4, HUDC_BLUE = 5, HUDC_PURPLE = 6, HUDC_GRAY = 7,
+      /*Menu*/ MPG_FRONT = 0, MPG_SINGPLYR = 1, MPG_MULTPLYR = 2, MPG_NEWGM = 3, MPG_LOAD = 4, MPG_OPTS = 5, MPG_SAVE = 6, MPG_INTRO = 7, MPG_CREDS = 8,
+      /*UI*/ UI_W = 1366, UI_H = 768, CURSOR_SZ = 40, MFD_READER_CONTENTS = 0, MFD_READER_FOLDER = 1, MFD_READER_TEXT = 2, MAX_UI_ELEMENTS = 4096, TXT_PAD = 4, TXT_H = 24, TAB_THICK = 16, MFD_SPACING = 8, MFD_SPACINGCTR = 19,
+             SIDE_MFD_W = 320, CTR_MFD_W = 640, MFD_H = 240, UI_AUTOMAP_ZOOM_IN = 0, UI_AUTOMAP_ZOOM_OUT = 1, UI_AUTOMAP_FULL = 2, UI_AUTOMAP_SIDE = 3,
+      /*Automap*/ AM_W = 320, AM_H = 200, AM_FULL_W = 700, AM_FULL_H = 700, AM_MAXHULL = 10, AMAP_UI_X_L = 24, AMAP_UI_X_R = 1022, AMAP_UI_Y = 524, AMAP_UI_W = 320, AMAP_UI_H = 200, AM_XOFF = ((AM_W - AM_H) / 2),
+      /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3, BIOM_ERG = 0, BIOM_CHI = 1, BIOM_ECG = 2, BIOM_GRAPH_W = 620, BIOM_GRAPH_H = 36,
+      /*Rendering*/ BLEND_OPAQUE = 0, BLEND_CUTOUT = 1, BLEND_PREMULT = 2, BLEND_MULTIPLY = 3,
                     PARTICLE_FLAG_ADDITIVE = (1u<<0), PARTICLE_FLAG_SOFT = (1u<<1), PARTICLE_FLAG_LIT = (1u<<2), PARTICLE_FLAG_MULTIPLY = (1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE = (1u<<4), PARTICLE_FLAG_PHYSICS = (1u<<5), PARTICLE_FLAG_TRAIL = (1u<<6), 
-                    MAX_PARTICLES = 32768, MAX_EMITTERS = 1024, MAX_TRAIL_SEGS = 4096, PARTICLE_SSBO_BINDING = 10, TRAIL_SSBO_BINDING = 11, MAX_TRAIL_OWNERS = 512,
-                    MAX_WIRELINE_QUADS = 8192};
-u32 parse_numberu32(const char*, const char*,u32); u16 parse_numberu16(const char*, const char*,u32); u8 parse_numberu8(const char*, const char*,u32); bool parse_bool(const char*, const char*,u32);
-static const float PLAYER_RADIUS=0.48f,PLAYER_HEIGHT=2.00f,PLAYER_CAM_OFFSET_Y=0.84f,CELLSZ=2.56f,CELLXHALF=(CELLSZ * 0.5f),VOXEL_SIZE=(CELLSZ/(float)VOXELS_PER_CELL),VOXEL_HALF=(VOXEL_SIZE * 0.5f),/*COLCAP_DIR_X_F=0.0f,*/COLCAP_DIR_Y_F=1.0f,/*,COLCAP_DIR_Z_F=2.0f,*/REFLEX_TIME_SCALE=0.25,DEFAULT_TIME_SCALE=1.0,BERSERK_DAMAGE_MULTIPLIER=4.0f/*Quad Damage!*/,AM_FOW_RADIUS=30.0f,AM_FOW_RADIUS2=(AM_FOW_RADIUS*AM_FOW_RADIUS);
-#define RESSURECT_FEET_TO_CAMERA (1.0f - PLAYER_CAM_OFFSET_Y)
-static const double BERSERK_TIME=20.0,DETOX_TIME=60.0,GENIUS_TIME=180.0,MEDI_TIME=35.0,REFLEX_TIME=155.0,SIGHT_TIME=40.0,STAMINUP_TIME=60.0,SIGHT_SIDE_EFFECT_TIME=17.0,NITRO_MIN_TIME=1.0,NITRO_MAX_TIME=60.0,NITRO_DEFAULT_TIME=7.0,EARTH_SHAKER_MIN_TIME=4.0,EARTH_SHAKER_MAX_TIME=60.0,EARTH_SHAKER_DEFAULT_TIME=10.0;
-enum{EF_ACTIVE=(1u<<0),EF_GRAVLIFT=(1u<<1),EF_GROUNDED=(1u<<2),EF_RIGIDBODY=(1u<<3),EF_NO_SHADOWS=(1u<<4),EF_ASLEEP=(1u<<5),EF_WALK_PATH_ON_START=(1u<<6),EF_TOUCHING_HURTS=(1u<<7),EF_ACT_AS_CORPSE_ONLY=(1u<<8),EF_DYING=(1u<<9),EF_DEATH_BURST_DONE=(1u<<10),
-     EF_DEAD=(1u<<11),EF_TELEPORT_ON_DEATH=(1u<<12),EF_GO_INTO_PAIN=(1u<<13),EF_WANDERING=(1u<<14),EF_ACT_AS_TURRET=(1u<<15),EF_TARGID_ATTACHED=(1u<<16),EF_ENEM_IN_SIGHT=(1u<<17),EF_ENEM_IN_FRONT=(1u<<18),EF_ENEM_IN_FOV=(1u<<19),EF_ENEM_IN_LOS=(1u<<20),
-     EF_FIRST_SIGHTING=(1u<<21),EF_DYING_SETUP=(1u<<22),EF_HAD_ENEMY=(1u<<23),EF_SHOT_FIRED=(1u<<24),EF_DEAD_CHECKS_DONE=(1u<<25),EF_HOP_DONE=(1u<<26),EF_LOCKED=(1u<<27),EF_HAS_CAMERA_VIEW=(1u<<28),EF_DAMAGE_ON_USE=(1u<<29),EF_MOVING=(1u<<30),EF_DEAD_GIBS_DONE=(1u<<31)};
-enum{Q_ROBOT_SPAWN_DEACTIVATED=(1u<<0),Q_ISOTOPE_INSTALLED=(1u<<1),Q_SHIELD_ACTIVATED=(1u<<2),Q_LASER_SAFETY_OVERRIDEN=(1u<<3),Q_LASER_DESTROYED=(1u<<4),Q_BETA_GROVE_CYBER_UNLOCKED=(1u<<5),Q_GROVE_ALPHA_JETTISON_ENABLED=(1u<<6),
-     Q_GROVE_BETA_JETTISON_ENABLED=(1u<<7),Q_GROVE_DELTA_JETTISON_ENABLED=(1u<<8),Q_MASTER_JETTISON_BROKEN=(1u<<9),Q_RELAY_428_FIXED=(1u<<10),Q_MASTER_JETTISON_ENABLED=(1u<<11),Q_BETA_GROVE_JETTISONED=(1u<<12),Q_ANTENNA_NORTH_DESTROYED=(1u<<13),
-     Q_ANTENNA_SOUTH_DESTROYED=(1u<<14),Q_ANTENNA_EAST_DESTROYED=(1u<<15),Q_ANTENNA_WEST_DESTROYED=(1u<<16),Q_SELF_DESTRUCT_ACTIVATED=(1u<<17),Q_BRIDGE_SEPARATED=(1u<<18),Q_ISOLINEAR_CHIPSET_INSTALLED=(1u<<19),Q_LEV1_CODE_LOCKED=(1u<<20),
-     Q_LEV2_CODE_LOCKED=(1u<<21),Q_LEV3_CODE_LOCKED=(1u<<22),Q_LEV4_CODE_LOCKED=(1u<<23),Q_LEV5_CODE_LOCKED=(1u<<24),Q_LEV6_CODE_LOCKED=(1u<<25)};
-enum{TARG_IOFLAGS_TRIPTRIGGER=(1u<<0),TARG_IOFLAGS_DOOROPEN=(1u<<1),TARG_IOFLAGS_DOOROPENIFUNLOCKED=(1u<<2),TARG_IOFLAGS_DOORCLOSE=(1u<<3),TARG_IOFLAGS_LOCK=(1u<<4),TARG_IOFLAGS_UNLOCK=(1u<<5),TARG_IOFLAGS_SWITCHTRIGGER=(1u<<6),
-     TARG_IOFLAGS_CHGSTAT_RECHARGE=(1u<<7),TARG_IOFLAGS_ENEMY_ALERT=(1u<<8),TARG_IOFLAGS_FBRIDGE_ACTIVATE=(1u<<9),TARG_IOFLAGS_FBRIDGE_DEACTIVATE=(1u<<10),TARG_IOFLAGS_FBRIDGE_TOGGLE=(1u<<11),TARG_IOFLAGS_GRAVLIFT_TOGGLE=(1u<<12),
-     TARG_IOFLAGS_TEXTURE_CHG_TOGGLE=(1u<<13),TARG_IOFLAGS_LIGHT_ON=(1u<<14),TARG_IOFLAGS_LIGHT_OFF=(1u<<15),TARG_IOFLAGS_LIGHT_TOGGLE=(1u<<16),TARG_IOFLAGS_FUNCWALL_MOVE=(1u<<17),TARG_IOFLAGS_MISSION_BIT_ON=(1u<<18),TARG_IOFLAGS_MISSION_BIT_OFF=(1u<<19),
-     TARG_IOFLAGS_MISSION_BIT_TOGGLE=(1u<<20),TARG_IOFLAGS_SWITCH_LOCK_TOGGLE=(1u<<21),TARG_IOFLAGS_INST_ACTIVATE=(1u<<22),TARG_IOFLAGS_INST_DEACTIVATE=(1u<<23),TARG_IOFLAGS_INST_TOGGLE=(1u<<24),TARG_IOFLAGS_PLAY_SOUND_ONCE=(1u<<25),
-     TARG_IOFLAGS_STOP_SOUND=(1u<<26),TARG_IOFLAGS_START_FLASHING_TEX=(1u<<27),TARG_IOFLAGS_STOP_FLASHING_TEX=(1u<<28),TARG_IOFLAGS_BRANCH_FLIP=(1u<<29),TARG_IOFLAGS_BRANCH_FLIPONLY=(1u<<30),TARG_IOFLAGS_DISABLE_ON_AWAKE=(1u<<31)};
-typedef enum {BodyState_Standing=0,BodyState_Crouch=1,BodyState_CrouchingDown=2,BodyState_StandingUp=3,BodyState_Prone=4,BodyState_ProningDown=5,BodyState_ProningUp=6} BodyState;  /* Values match Utils.GetAttackTypeFromInt: the NPC tables hold the raw enemy_tables.csv ints, not Unity's AttackType declaration order. */ typedef enum {Att_None=0,Att_Melee=1,Att_MlEg=2/*MeleeEnergy*/,Att_Beam=3/*EnergyBeam*/,Att_Magn=4/*Magnetic*/,Att_HitS=5/*Projectile*/,Att_PjNd=6/*ProjectileNeedle*/,Att_PjBm=7/*ProjectileEnergyBeam*/,Att_Ball=8/*ProjectileLaunched*/,Att_Gas=9,Att_Trnq=10,Att_Drill=11}/* Values MUST match Unity Enumerations.cs:17-19 {None,Melee,MeleeEnergy,EnergyBeam,Magnetic,Projectile,
-   ProjectileNeedle,ProjectileEnergyBeam,ProjectileLaunched,Gas,Tranq,Drill}.  The previous ordering put
-   MeleeEnergy/EnergyBeam/Magnetic/Projectile in the wrong slots, so the Unity-indexed attackTypeMult table was
-   read at the wrong column: every projectile did 0 damage to Mutants and Supermutants (the table's 0 is
-   Magnetic) and EMP did full damage to them, and Gas/Needle/MeleeEnergy hit the wrong multipliers. */ AttType;
-/* Values match Utils.GetNPCTypeFromInt: 5 = MutantCyborg, 6 = Cyber (Unity's declaration order has those two swapped). */ typedef enum {NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_MutantCyborg=5,NPCType_Cyber=6} NPCType;                        typedef enum {PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3} PerceptionLevel;
-/* Values match Utils.GetMoveTypeFromInt: 1 = Walk, 2 = Fly. Unity's declaration order is Walk,Fly,Swim,Cyber,None, which is NOT the serialized numbering. */ typedef enum {AIMoveType_None=0,AIMoveType_Walk=1,AIMoveType_Fly=2,AIMoveType_Swim=3,AIMoveType_Cyber=4} AIMoveType;                                                                typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Inspect=8,AIState_Interacting=9,AIState_Dead=10} AIState;
-typedef enum {SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3} SecurityType;                                                            typedef enum {DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3} DoorState;
-typedef enum {FStat_Start=0,FStat_Target=1,FStat_MovingStart=2,FStat_MovingTarget=3,FStat_AjarMovingStart=4,FStat_AjarMovingTarget=5} FuncStates;                                   typedef enum {ACC_None=0,ACC_Std=1,ACC_Med=2,ACC_Sci=3,ACC_Admin=4,ACC_Grp1=5,ACC_Grp2=6,ACC_Grp3=7,ACC_Grp4=8,ACC_GrpA=9,ACC_GrpB=10,ACC_Stor=11,ACC_Eng=12,ACC_Maint=13,ACC_Security=14,ACC_Per1=15,ACC_Per2=16,ACC_Per3=17,ACC_Per4=18,ACC_Per5=19} AccCardType;
-/*Numbering mirrors Citadel Enumerations.cs MusicType/TrackType exactly -- these values come straight out of the level data.*/ typedef enum {MT_None=0,MT_Walking=1,MT_Combat=2,MT_Overlay=3,MT_Override=4} MusicType;                                                                                                          typedef enum {TT_None=0,TT_Walking=1,TT_Combat=2,TT_MutantNear=3,TT_CyborgNear=4,TT_CyborgDroneNear=5,TT_RobotNear=6,TT_Transition=7,TT_Revive=8,TT_Die=9,TT_Cybertube=10,TT_Elev=11,TT_Distortion=12} TrackType;
-typedef enum {BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7 } BloodType;   typedef enum {AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5} AudioLogType;
-typedef enum {EnergyType_Battery=0,EnergyType_ChargeStation=1 } EnergyType;            typedef enum {Handedness_Center=0,Handedness_LH=1,Handedness_RH=2} Handedness;               typedef enum {HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7} HUDColor;
+                    MAX_PARTICLES = 32768, MAX_EMITTERS = 1024, MAX_TRAIL_SEGS = 4096, PARTICLE_SSBO_BINDING = 10, TRAIL_SSBO_BINDING = 11, MAX_TRAIL_OWNERS = 512, MAX_WIRELINE_QUADS = 8192};
+                    
+u32 parse_numberu32(const char*, const char*,u32);
+u16 parse_numberu16(const char*, const char*,u32);
+u8 parse_numberu8(const char*, const char*,u32);
+bool parse_bool(const char*, const char*,u32);
+static const float PLAYER_RADIUS = 0.48f, PLAYER_HEIGHT = 2.00f, PLAYER_CAM_OFFSET_Y = 0.84f, CELLSZ = 2.56f, CELLXHALF = (CELLSZ * 0.5f), VOXEL_SIZE = (CELLSZ / (float)VOXELS_PER_CELL), VOXEL_HALF = (VOXEL_SIZE * 0.5f),  RESSURECT_FEET_TO_CAMERA = (1.0f - PLAYER_CAM_OFFSET_Y),
+                   /*COLCAP_DIR_X_F=0.0f,*/ COLCAP_DIR_Y_F = 1.0f,/*,COLCAP_DIR_Z_F=2.0f,*/ REFLEX_TIME_SCALE = 0.25, DEFAULT_TIME_SCALE = 1.0, BERSERK_DAMAGE_MULTIPLIER = 4.0f /*Quad Damage!*/, AM_FOW_RADIUS = 30.0f, AM_FOW_RADIUS2 = (AM_FOW_RADIUS * AM_FOW_RADIUS);
+                   
+static const double BERSERK_TIME = 20.0, DETOX_TIME = 60.0, GENIUS_TIME = 180.0, MEDI_TIME = 35.0, REFLEX_TIME = 155.0, SIGHT_TIME = 40.0, STAMINUP_TIME = 60.0, SIGHT_SIDE_EFFECT_TIME = 17.0, NITRO_MIN_TIME = 1.0, NITRO_MAX_TIME = 60.0, NITRO_DEFAULT_TIME = 7.0,
+                    EARTH_SHAKER_MIN_TIME = 4.0, EARTH_SHAKER_MAX_TIME = 60.0, EARTH_SHAKER_DEFAULT_TIME = 10.0;
+                    
+enum { EF_ACTIVE             = (1u<<0),  EF_TARGID_ATTACHED  = (1u<<16),
+       EF_GRAVLIFT           = (1u<<1),  EF_ENEM_IN_SIGHT    = (1u<<17),
+       EF_GROUNDED           = (1u<<2),  EF_ENEM_IN_FRONT    = (1u<<18),
+       EF_RIGIDBODY          = (1u<<3),  EF_ENEM_IN_FOV      = (1u<<19),
+       EF_NO_SHADOWS         = (1u<<4),  EF_ENEM_IN_LOS      = (1u<<20), 
+       EF_ASLEEP             = (1u<<5),  EF_FIRST_SIGHTING   = (1u<<21),
+       EF_WALK_PATH_ON_START = (1u<<6),  EF_DYING_SETUP      = (1u<<22),
+       EF_TOUCHING_HURTS     = (1u<<7),  EF_HAD_ENEMY        = (1u<<23),
+       EF_ACT_AS_CORPSE_ONLY = (1u<<8),  EF_SHOT_FIRED       = (1u<<24),
+       EF_DYING              = (1u<<9),  EF_DEAD_CHECKS_DONE = (1u<<25),
+       EF_DEATH_BURST_DONE   = (1u<<10), EF_HOP_DONE         = (1u<<26),
+       EF_DEAD               = (1u<<11), EF_LOCKED           = (1u<<27),
+       EF_TELEPORT_ON_DEATH  = (1u<<12), EF_HAS_CAMERA_VIEW  = (1u<<28),
+       EF_GO_INTO_PAIN       = (1u<<13), EF_DAMAGE_ON_USE    = (1u<<29),
+       EF_WANDERING          = (1u<<14), EF_MOVING           = (1u<<30),
+       EF_ACT_AS_TURRET      = (1u<<15), EF_DEAD_GIBS_DONE   = (1u<<31) };
+     
+enum { Q_ROBOT_SPAWN_DEACTIVATED      = (1u<<0),  Q_ANTENNA_W_DESTROYED         = (1u<<16),
+       Q_ISOTOPE_INSTALLED            = (1u<<1),  Q_SELF_DESTRUCT_ACTIVATED     = (1u<<17),
+       Q_SHIELD_ACTIVATED             = (1u<<2),  Q_BRIDGE_SEPARATED            = (1u<<18),
+       Q_LASER_SAFETY_OVERRIDEN       = (1u<<3),  Q_ISOLINEAR_CHIPSET_INSTALLED = (1u<<19),
+       Q_LASER_DESTROYED              = (1u<<4),  Q_LEV1_CODE_LOCKED            = (1u<<20),
+       Q_BETA_GROVE_CYBER_UNLOCKED    = (1u<<5),  Q_LEV2_CODE_LOCKED            = (1u<<21),
+       Q_GROVE_ALPHA_JETTISON_ENABLED = (1u<<6),  Q_LEV3_CODE_LOCKED            = (1u<<22),
+       Q_GROVE_BETA_JETTISON_ENABLED  = (1u<<7),  Q_LEV4_CODE_LOCKED            = (1u<<23),
+       Q_GROVE_DELTA_JETTISON_ENABLED = (1u<<8),  Q_LEV5_CODE_LOCKED            = (1u<<24),
+       Q_MASTER_JETTISON_BROKEN       = (1u<<9),  Q_LEV6_CODE_LOCKED            = (1u<<25),
+       Q_RELAY_428_FIXED              = (1u<<10),
+       Q_MASTER_JETTISON_ENABLED      = (1u<<11),
+       Q_BETA_GROVE_JETTISONED        = (1u<<12),
+       Q_ANTENNA_N_DESTROYED          = (1u<<13),
+       Q_ANTENNA_S_DESTROYED          = (1u<<14),
+       Q_ANTENNA_E_DESTROYED          = (1u<<15), };
+
+enum { TARG_IOFLAGS_TRIPTRIGGER        = (1u<<0),  TARG_IOFLAGS_LIGHT_TOGGLE       = (1u<<16),
+       TARG_IOFLAGS_DOOROPEN           = (1u<<1),  TARG_IOFLAGS_FUNCWALL_MOVE      = (1u<<17),
+       TARG_IOFLAGS_DOOROPENIFUNLOCKED = (1u<<2),  TARG_IOFLAGS_MISSION_BIT_ON     = (1u<<18),
+       TARG_IOFLAGS_DOORCLOSE          = (1u<<3),  TARG_IOFLAGS_MISSION_BIT_OFF    = (1u<<19),
+       TARG_IOFLAGS_LOCK               = (1u<<4),  TARG_IOFLAGS_MISSION_BIT_TOGGLE = (1u<<20),
+       TARG_IOFLAGS_UNLOCK             = (1u<<5),  TARG_IOFLAGS_SWITCH_LOCK_TOGGLE = (1u<<21),
+       TARG_IOFLAGS_SWITCHTRIGGER      = (1u<<6),  TARG_IOFLAGS_INST_ACTIVATE      = (1u<<22),
+       TARG_IOFLAGS_CHGSTAT_RECHARGE   = (1u<<7),  TARG_IOFLAGS_INST_DEACTIVATE    = (1u<<23),
+       TARG_IOFLAGS_ENEMY_ALERT        = (1u<<8),  TARG_IOFLAGS_INST_TOGGLE        = (1u<<24),
+       TARG_IOFLAGS_FBRIDGE_ACTIVATE   = (1u<<9),  TARG_IOFLAGS_PLAY_SOUND_ONCE    = (1u<<25),
+       TARG_IOFLAGS_FBRIDGE_DEACTIVATE = (1u<<10), TARG_IOFLAGS_STOP_SOUND         = (1u<<26),
+       TARG_IOFLAGS_FBRIDGE_TOGGLE     = (1u<<11), TARG_IOFLAGS_START_FLASHING_TEX = (1u<<27),
+       TARG_IOFLAGS_GRAVLIFT_TOGGLE    = (1u<<12), TARG_IOFLAGS_STOP_FLASHING_TEX  = (1u<<28),
+       TARG_IOFLAGS_TEXTURE_CHG_TOGGLE = (1u<<13), TARG_IOFLAGS_BRANCH_FLIP        = (1u<<29),
+       TARG_IOFLAGS_LIGHT_ON           = (1u<<14), TARG_IOFLAGS_BRANCH_FLIPONLY    = (1u<<30),
+       TARG_IOFLAGS_LIGHT_OFF          = (1u<<15), TARG_IOFLAGS_DISABLE_ON_AWAKE   = (1u<<31)};
+     
+typedef enum {BodyState_Standing = 0, BodyState_Crouch = 1, BodyState_CrouchingDown = 2, BodyState_StandingUp = 3, BodyState_Prone = 4, BodyState_ProningDown = 5, BodyState_ProningUp = 6} BodyState;
+typedef enum {Att_None = 0, Att_Melee = 1, Att_MlEg = 2, Att_Beam = 3, Att_Magn = 4, Att_HitS = 5, Att_PjNd = 6, Att_PjBm = 7, Att_Ball= 8, Att_Gas=9,Att_Trnq=10,Att_Drill=11} AttType;
+typedef enum {NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_MutantCyborg=5,NPCType_Cyber=6} NPCType;
+typedef enum {PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3} PerceptionLevel;
+typedef enum {AIMoveType_None=0,AIMoveType_Walk=1,AIMoveType_Fly=2,AIMoveType_Swim=3,AIMoveType_Cyber=4} AIMoveType;
+typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Inspect=8,AIState_Interacting=9,AIState_Dead=10} AIState;
+typedef enum {SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3} SecurityType;
+typedef enum {DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3} DoorState;
+typedef enum {FStat_Start=0,FStat_Target=1,FStat_MovingStart=2,FStat_MovingTarget=3,FStat_AjarMovingStart=4,FStat_AjarMovingTarget=5} FuncStates;
+typedef enum {ACC_None=0,ACC_Std=1,ACC_Med=2,ACC_Sci=3,ACC_Admin=4,ACC_Grp1=5,ACC_Grp2=6,ACC_Grp3=7,ACC_Grp4=8,ACC_GrpA=9,ACC_GrpB=10,ACC_Stor=11,ACC_Eng=12,ACC_Maint=13,ACC_Security=14,ACC_Per1=15,ACC_Per2=16,ACC_Per3=17,ACC_Per4=18,ACC_Per5=19} AccCardType;
+typedef enum {MT_None=0,MT_Walking=1,MT_Combat=2,MT_Overlay=3,MT_Override=4} MusicType;
+typedef enum {TT_None=0,TT_Walking=1,TT_Combat=2,TT_MutantNear=3,TT_CyborgNear=4,TT_CyborgDroneNear=5,TT_RobotNear=6,TT_Transition=7,TT_Revive=8,TT_Die=9,TT_Cybertube=10,TT_Elev=11,TT_Distortion=12} TrackType;
+typedef enum {BloodType_None=0,BloodType_Red=1,BloodType_Yellow=2,BloodType_Green=3,BloodType_Robot=4,BloodType_Leaf=5,BloodType_Mutation=6,BloodType_GrayMutation=7 } BloodType;
+typedef enum {AudioLogType_TextOnly=0,AudioLogType_Normal=1,AudioLogType_Email=2,AudioLogType_Papers=3,AudioLogType_Vmail=4,AudioLogType_Game=5} AudioLogType;
+typedef enum {EnergyType_Battery=0,EnergyType_ChargeStation=1 } EnergyType;
+typedef enum {Handedness_Center=0,Handedness_LH=1,Handedness_RH=2} Handedness;
+typedef enum {HUDColor_White=0,HUDColor_Red=1,HUDColor_Orange=2,HUDColor_Yellow=3,HUDColor_Green=4,HUDColor_Blue=5,HUDColor_Purple=6,HUDColor_Gray=7} HUDColor;
 typedef enum {FSTP_None=0,FSTP_Carpet=1,FSTP_Concrete=2,FSTP_GrittyCrete=3,FSTP_Grass=4,FSTP_Gravel=5,FSTP_Rock=6,FSTP_Glass=7,FSTP_Marble=8,FSTP_Metal=9,FSTP_Grate=10,FSTP_Metal2=11,FSTP_Metpanel=12,FSTP_Panel=13,FSTP_Plaster=14,FSTP_Plastic=15,FSTP_Plastic2=16,FSTP_Rubber=17,FSTP_Sand=18,FSTP_Squish=19,FSTP_Vent=20,FSTP_Water=21,FSTP_Wood=22,FSTP_Wood2=23} FootStepType;
-typedef enum {ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4} ForceFieldColor;                            typedef enum {TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9} TabMSG;
-typedef enum {PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3} PuzzleCellType;                                                          typedef enum {PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5} PuzzleGridType;
-typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox; typedef struct {V3 ctr; float rad;} ShapeSphere; typedef struct {V3 tip,base; float rad;} ShapeCapsule; ShapeBox Entity_GetBox(u16 i); ShapeCapsule Entity_GetCap(u16 i); ShapeSphere Entity_GetSph(u16 i);
-// Vertical clearance sweep, shared by CantStand (physics.c) and the SpawnManager's AreaClear test (citadel.c).
-// `travel` is the shape the mover currently occupies and bounds how far the search may walk; pass the same shape as
-// `probe` when it moves freely.  Sample step and penetration tolerance are both 0.08f by separate routes; the span
-// bounds how far above and below the probe the search is willing to travel.
+typedef enum {ForceFieldColor_Red=0,ForceFieldColor_Green=1,ForceFieldColor_Blue=2,ForceFieldColor_Purple=3,ForceFieldColor_RedFaint=4} ForceFieldColor;
+typedef enum {TabMSG_None=0,TabMSG_Search=1,TabMSG_AudioLog=2,TabMSG_Keypad=3,TabMSG_Elevator=4,TabMSG_GridPuzzle=5,TabMSG_WirePuzzle=6,TabMSG_EReader=7,TabMSG_Weapon=8,TabMSG_SystemAnalyzer=9} TabMSG;
+typedef enum {PuzzleCellType_Off=0,PuzzleCellType_Standard=1,PuzzleCellType_And=2,PuzzleCellType_Bypass=3} PuzzleCellType;
+typedef enum {PuzzleGridType_King=0,PuzzleGridType_Queen=1,PuzzleGridType_Knight=2,PuzzleGridType_Rook=3,PuzzleGridType_Bishop=4,PuzzleGridType_Pawn=5} PuzzleGridType;
+typedef struct {V3 ctr,hExt; Quaternion rot;} ShapeBox;
+typedef struct {V3 ctr;      float rad;} ShapeSphere;
+typedef struct {V3 tip,base; float rad;} ShapeCapsule;
+ShapeBox     Entity_GetBox(u16 i);
+ShapeCapsule Entity_GetCap(u16 i);
+ShapeSphere  Entity_GetSph(u16 i);
 #define AREA_SWEEP_STEP 0.08f
 #define AREA_SWEEP_SPAN 2.56f
 bool AreaHasClearance(ShapeCapsule probe, ShapeCapsule travel, float span, u32 mask, u16 self);
-void CodeScreenShowDigit(u16 self, u8 digit);/*textures.c - latches a prop_cpuscreen to one digit and stops the flicker*/
-bool PositionVisibleFromPlayerCell(float x, float z);/*culling.c:6 - transient PVS visibility, not the static CELL_OPEN geometry state. SpawnManager's AreaHidden.*/bool PhysIsAsleep(u16 i);
+void CodeScreenShowDigit(u16 self, u8 digit);
+bool PositionVisibleFromPlayerCell(float x, float z);
 enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<<5),L_GunViewModel=(1u<<8),L_Geometry=(1u<<9),L_NPC=(1u<<10),L_PlayerBullets=(1u<<11),L_Player=(1u<<12),L_Corpse=(1u<<13),L_PhysObjects=(1u<<14),L_PlayerTriggerOnly=(1u<<16),L_Trigger=(1u<<17),L_Door=(1u<<18),L_InterDebris=(1u<<19),L_Player2=(1u<<20),L_NPCTrigger=(1u<<23),L_NPCBullet=(1u<<24),L_NPCClip=(1u<<25),L_Clip=(1u<<26),L_Automap=(1u<<27),L_Culling=(1u<<28),L_CorpseSearchable=(1u<<29)};
 #define LMASK_PLAYER_COLLIDESWITH   (L_Clip|L_NPCBullet|L_Player2|L_Door|L_Trigger|L_PlayerTriggerOnly|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_COLLIDESWITH      (L_Clip|L_NPCClip|L_PlayerBullets|L_Player2|L_Player|L_Door|L_Trigger|L_NPCTrigger|L_Default|L_TransparentFX|L_Geometry|L_NPC)
 #define LMASK_NPC_SIGHT             (L_Default|L_Geometry|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2)
-/* Dead NPCs keep their original (usually capsule) collider -- only the layer changes.  L_Corpse therefore carries two independent
-   meanings that Unity splits across two GameObjects and Voxen expresses with two bits:
-     - CollisionMaskTable row 13 restricts the corpse's collider to the world only (Default/Geometry/PhysObjects/Door/Clip), so a
-       body rests on the floor and physically interacts with nothing else.
-     - The raycast masks below still include L_Corpse, because Voxen traces the raw mesh where Unity swapped in a separate search
-       Collider.  A corpse must stay hittable by the frob ray (so the player can search it) and by weapon and grenade rays (so
-       corpses can be damaged and vaporized).  Dropping the layer from these masks makes corpses intangible, the opposite of the
-       intent.  NPC attack rays include it too, so an NPC can put a finishing shot into a downed body. */
 #define LMASK_NPC_ATTACK            (L_Default|L_Geometry|L_NPC|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_Corpse)
 #define LMASK_NPC_COLLISION         (L_Default|L_TransparentFX|L_Geometry|L_NPC|L_Door|L_InterDebris|L_Player|L_Clip|L_NPCClip|L_PhysObjects)
 #define LMASK_PLAYER_FROB           (L_Default|L_Geometry|L_BlocksRaycast|L_Door|L_InterDebris|L_PhysObjects|L_CorpseSearchable|L_NPC|L_Corpse)
@@ -210,30 +300,22 @@ enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<
 typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; float ScreenCenterX,ScreenCenterY; bool Fullscreen; u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
 typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,showNPC,editMode; u8 dizzyLevel,animTest,editSubMode; } CheatsSystem; extern CheatsSystem Cheats;
 typedef struct {
-        double vmailFrameFinished,logFinished,blinkFinished,beepFinished,tickFinished,centerTabsTickFinished; i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,curCenterTab,wep16index,tempSpriteIndex,count; u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8]; u8 highlightTickCount[4],beepCount,elevButtonLevelIdx[8],elevCurrentFloor;
-        bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH,lastTargetSideRH,lastDataSideRH,lastSearchSideRH,lastLogSideRH,lastLogSecondarySideRH,lastMinigameSideRH,logActive,paperLogInUse,usingObject,isBlocking,isRH,centerTabNotified[4],highlightStatus[4],audPaused,mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
-        i8 elevButtonLabelIdx[8];/*index into elevFloorLabels[], -1 = hidden (not drawn, not clickable)*/
+        double vmailFrameFinished,logFinished,blinkFinished,beepFinished,tickFinished,centerTabsTickFinished; i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,count; u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8]; u8 highlightTickCount[4],elevButtonLevelIdx[8],elevCurrentFloor;
+        bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH /*TODO*/,lastDataSideRH,lastSearchSideRH,lastLogSideRH /*TODO*/,lastMinigameSideRH /*TODO*/,logActive,paperLogInUse/*TODO*/,usingObject,highlightStatus[4],mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
+        i8 elevButtonLabelIdx[8];
         bool searchFXActive[2]; double searchFXStartTime[2]; float searchFXCursorX[2],searchFXCursorY[2];
-        u8 vmailActive; AudioLogType logType; V3 objectInUsePos;
+        u8 vmailActive; V3 objectInUsePos;
         u8 MFD_LefTab,MFD_CenterTab,MFD_RightTab,MFD_Data,MFD_MediaTab,MFD_ReaderView,mfdSelected[3],mfdReturnTab[3],mfdReturnView[3],mfdItemReader[2];
-        u8 mfdConsumable; i8 consumableClickRow; double consumableClickTime; bool mfdGeneralItem,mfdHardwareItem; i8 generalClickSlot; i16 generalClickItem; u16 generalClickCustom; double generalClickTime;
+        u8 mfdConsumable; i8 consumableClickRow; bool mfdGeneralItem,mfdHardwareItem; i8 generalClickSlot; i16 generalClickItem; u16 generalClickCustom; double generalClickTime;
         i32 tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10]; double tWrnFinished[10];
-        /*Keycode pad (Unity KeypadKeycode). keycodeHuns/Tens/Ones: -1 = empty, else that digit; keycodeEntry accumulates right-to-left. keycodeValid/keycodeSolved/keycodeValue mirror the linked pad (tetheredKeypadKeycode).*/
         i8 keycodeHuns,keycodeTens,keycodeOnes; i32 keycodeEntry,keycodeValue; bool keycodeValid,keycodeSolved;
-        /*Grid puzzle (Unity PuzzleGrid). tetheredPGP links the source puzzle; pg_* mirror its cells so the panel can run standalone. pg_cell[] = electrical grid, pg_type[] per-cell kind.*/
         u8 pg_type[35],pg_gridType,pg_theme,pg_source,pg_output,pg_width,pg_height; bool pg_cell[35],pg_powered[35],pg_checked[35],pg_solved; float pg_progress;
-        /*Wire puzzle (Unity PuzzleWire). pw_curL/R[7] = wire endpoints by column, pw_tgtL/R[7] = goal columns, pw_wireOn[7] = placed wires, pw_rowActive[7] = visible node rows, pw_wireColor[7] = true wire colors as raw HUDColor, the way PuzzleWire.wireColors stores them.  hudColorToText/hudColorToRGB below turn that into the glyph colour and the line tint.  pw_curL/R are the two ends of the board (node columns 0-6 and 7-13) and pw_selectedWireRH is which end is held -- the L/R here is PuzzleWire.selectedWireLH, NOT MFD handedness.  The board is one shared set of state drawn on both MFDs, so nothing below is indexed by hand.*/
         i8 pw_curL[7],pw_curR[7],pw_tgtL[7],pw_tgtR[7]; bool pw_wireOn[7],pw_rowActive[7]; u8 pw_wireColor[7]; i8 pw_selectedWire; bool pw_selectedWireRH,pw_solved; float pw_temp;
-        /*Grid puzzle fire-once latch (PuzzleGridPuzzle.cs:26,96-102): onlyFireOnce and alreadyFiredMessageLingdex are prefab-constant across constIndex 609..613, so the latch lives in the puzzle state, not on the Entity.*/
         bool pg_fired;
-        /*Minigames (Funpack). mg_current: 0 Ping..8 Chess, -1 = none. mg_running/mg_solved are per side the games view sits on.*/
-        i8 mg_current; bool mg_running[2],mg_solved[2];
-        /*E-reader folder/reader. logFolderList[] caches the open level folder, email table or data table; logReferenceIndex is the entry on screen.*/
+        i8 mg_current; bool mg_running[2];
         i16 logFolderList[16]; u8 logFolderCount; u16 logReferenceIndex; i16 logReaderPage;
-        /*Automap. autoSide[2] LH map / RH map.*/
         bool autoSide[2],fullMapOpen[2];
-        /*Sensaround rearview overlay.*/
-        bool showSensaroundCenter,firstMain,firstGeneral,firstHardware,firstWeapon;
+        bool firstMain,firstGeneral,firstHardware,firstWeapon;
 } SystemUI;
 typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
 extern TextSystem Sys_Text;
@@ -243,15 +325,16 @@ enum{PATCH_BERSERK=1, PATCH_DETOX=2, PATCH_GENIUS=4, PATCH_MEDI=8, PATCH_REFLEX=
          HW_SYS=1/*System Analyzer*/,    HW_NAV=2/*Navigation Unit*/,    HW_ERD=4/*Datareader/EReader*/,    HW_SNS=8/*Sensaround*/,   HW_TID=16/*Target Identifier*/,   HW_SHD=32/*Energy Shield*/,   HW_BIO=64/*Biomonitor*/,  HW_LAN=128/*Head Mounted Lantern*/,  HW_ENV=256/*Envirosuit*/,  HW_BST=512/*Turbo Motion Booster*/,  HW_JET=1024/*Jump Jet Boots*/,  HW_INF=2048/*Infrared Night Sight Enhancement*/,
      HW_SYS_IDX=0/*System Analyzer*/,HW_NAV_IDX=1/*Navigation Unit*/,HW_ERD_IDX=2/*Datareader/EReader*/,HW_SNS_IDX=3/*Sensaround*/,HW_TID_IDX=4/*Target Identifier*/,HW_SHD_IDX=5/*Energy Shield*/,HW_BIO_IDX=6/*Biomonitor*/,HW_LAN_IDX=7/*Head Mounted Lantern*/,HW_ENV_IDX=8/*Envirosuit*/,HW_BST_IDX=9/*Turbo Motion Booster*/,HW_JET_IDX=10/*Jump Jet Boots*/,HW_INF_IDX=11/*Infrared Night Sight Enhancement*/};
 typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
-    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,playerHealthTimer,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,jumpJetFinished,doubleJumpFinished,noiseFinished,radBleedFinished,
-           leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,weaponDipFinished,fatigueBleedoffFinished,fatigueMoveFinished,footstepFinished,rustleFinished,fallPainFinished,ressurectingFinished,mediPatchPulseFinished;
-    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,energySliderClickedTime,cyberWeaponAttackFinished,targetY,currentEnergyWeaponHeat[7],fatigue,radiated,resetAfterDeathTime,energy,radAdjust,initialRadiation,weaponDipLerp,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity,leanVelocity,lastVelY;
+    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,jumpJetFinished,doubleJumpFinished,noiseFinished,radBleedFinished,
+           leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,fatigueBleedoffFinished,fatigueMoveFinished,footstepFinished,rustleFinished,fallPainFinished,ressurectingFinished,mediPatchPulseFinished;
+    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,targetY,currentEnergyWeaponHeat[7],fatigue,resetAfterDeathTime,energy,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity,leanVelocity,lastVelY;
     u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
-    i32 lastAddedIndex,emailCurrent,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent/*Current slot in the general inventory (14 slots).*/,hardwareInvIndex/*Current index to the item look-up table.*/,generalInventoryIndexRef[14],berserkIncrement,mediPatchPulseCount;
+    i32 lastAddedIndex,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent/*Current slot in the general inventory (14 slots).*/,hardwareInvIndex/*Current index to the item look-up table.*/,generalInventoryIndexRef[14],berserkIncrement,mediPatchPulseCount;
     i16 ladderState,weaponCurrentPending,weaponIndexPending,weaponCurrent;
-    u16 hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustIdx,heldAmmo,heldAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustIdx[14],patchActive,drainJPM;
-    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hwVers[HW_COUNT],hwVersSetting[HW_COUNT],grenAmmo[7],grenCur,generalInvCurrent,patchCur,patchCounts[7],cyberItemIndex; u16 grenConstIndex[7];
-    bool playerDead,beepDone,logPaused,hasNewEmail,hasNewNotes,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData,radiationArea,inReverbZone,leanResetting,wasGrounded,makingNoise;
+    u16 hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustIdx,heldAmmo,heldAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustIdx[14],patchActive,drainJPM,grenConstIndex[7];
+    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hwVers[HW_COUNT],hwVersSetting[HW_COUNT],grenAmmo[7],grenCur,generalInvCurrent,patchCur,patchCounts[7];
+    i8 cyberItemIndex;
+    bool beepDone,hasNewEmail,hasNewNotes,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData,radiationArea,inReverbZone,leanResetting,wasGrounded,makingNoise;
 } InventorySystem;
 typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData; typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/ extern AutoSplitterData autoSplitter;
 typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
@@ -267,51 +350,39 @@ extern NPCTable npcTable[NUM_AI_TYPES];
 void TargetIDReset(); bool TargetIDShouldRender(u16); bool TargetIDInPlayerPVS(u16); i16 TargetIDGetText(u16);
 u16 ai_next_npc_number(u16); void ai_reset_npc_numbering(void);
 typedef struct {
-    double beatFinished,tick0Finished,tick1Finished,tick2Finished,tickFinished; float heartRate,widthPerc,heightPerc,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 patchEffects,heartRateText,header,bpmText,fatigueDetailText,fatigue;
-    Color currentColors[BIOM_GRAPH_H],colorsERG[BIOM_GRAPH_W][BIOM_GRAPH_H],colorsCHI[BIOM_GRAPH_W][BIOM_GRAPH_H],colorsECG[BIOM_GRAPH_W][BIOM_GRAPH_H],backgroundColor,ergColor,chiColor,ecgColor,col,col0,col1,col2;
+    double beatFinished,tick0Finished,tick1Finished,tick2Finished,tickFinished; float heartRate,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 header,fatigue;
+    Color colorsERG[BIOM_GRAPH_W][BIOM_GRAPH_H],colorsCHI[BIOM_GRAPH_W][BIOM_GRAPH_H],colorsECG[BIOM_GRAPH_W][BIOM_GRAPH_H],backgroundColor,ergColor,chiColor,ecgColor,col0,col1,col2;
     int lastERG,lastCHI,lastECG,ymax,currentIndex0,currentIndex1,currentIndex2;
 } BioMonitorSystem;
 extern BioMonitorSystem bioMonitor;
-typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB,cellA2,cellB2; bool portalNS,open,dirty,isBulkhead; u8 lev;} Portal;
+typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB; bool portalNS,open,dirty; u8 lev;} Portal;
 typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; float trailBirth; u16 trailHead,trailChainLen; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
 typedef struct Emitter { bool active,looping,spawnedAny; V3 position; Quaternion orientation; float emitAccumulator,emitRate,age,duration; u16 aliveCount,maxAlive; u8 physicsMode,trail,shapeType; u16 trailTexture; float shapeRadius,shapeAngle,lifetimeMin,lifetimeMax,sizeMin,sizeMax,speedMin,speedMax,rotMin,rotMax,aVelMin,aVelMax,gravity,trailLifetime,trailWidthStart,trailWidthEnd; u32 trailColorStart,trailColorEnd;
                          u32 texBaseIdx,textureFrameCount; u8 blendMode,rotationMode,colorMode; u16 burstRemaining; float animSpeed,animWindow,softness,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; u32 colorRamp[64];
-                         bool useMesh; u16 meshInstance/*instance whose modelMatrices give the vertex transform, for mesh-spawn emission only; unrelated to parenting*/,meshModelIdx/*that instance's model when the emitter was created; the fallback once the parent hides its own mesh, since Diego blanks modelIndex on teleport but the burst must keep spawning from the last visible frame*/; u16 parentIdx/*instance this emitter rides. U16_MAX (the default for every preset) means the emitter sits at a fixed world position forever. A valid index makes PSys_Update pull the emitter onto that instance's world position every frame and carry its live particles along with it, so the effect travels with its owner -- this is how every mesh-less proj_* rides its bolt. The emitter switches itself off as soon as the instance stops existing (cleared EF_ACTIVE) or the index goes out of range*/; } Emitter;
+                         bool useMesh; u16 meshInstance,meshModelIdx; u16 parentIdx; } Emitter;
 typedef struct GpuPartInst { float x,y,z,size; u32 color,data0,data1,pad; } GpuPartInst;
 typedef struct TrlSegInst { float p0x,p0y,p0z,padA,p1x,p1y,p1z,padB; float c00x,c00y,c00z,c00w,c01x,c01y,c01z,c01w,c10x,c10y,c10z,c10w,c11x,c11y,c11z,c11w; u32 color0,color1,uvData; float deathTime; float trailWidthStart,trailWidthEnd; u32 chainIndex,trailOwner; } TrlSegInst;
 typedef struct { Particle particles[MAX_PARTICLES]; Emitter emitters[MAX_EMITTERS]; GpuPartInst gpuInstances[MAX_PARTICLES]; TrlSegInst trailSegments[MAX_TRAIL_SEGS]; PartSortEntry sortKeys[MAX_PARTICLES]; u32 aliveCount,trailCount,nextTrailOwner; } PSys; extern PSys psys;
 typedef struct { u16 emitters[MAX_LEVEL_PARTICLES],count; } LevelParticles;
-typedef struct { double combatImpulseFinished; bool inCombat,inZone,twoPlaying,distortion,cyberTube,elevator,levelEntry; TrackType zoneTrack/*trigger_music (599) request; audio.c replays it as a zone instead of only handling elevator/distortion*/; MusicType zoneMusic; } MusicSystem;
+typedef struct { double combatImpulseFinished; bool inCombat,inZone,twoPlaying,distortion,cyberTube,elevator,levelEntry; TrackType zoneTrack; MusicType zoneMusic; } MusicSystem;
 typedef /*FAT*/ struct  {
-    u32 entflags,ioflags,ioflagsHi/*second TargetIO word: the low word's 32 bits are all spoken for (TARG_IOFLAGS_* is saturated), so the two SpawnManager actions live here*/; u16 modelIndex,index/*constIndex for entity type, used for indexing into arrays for resource types when loading resources*/,portalIndex;
-    u32 deferredIoflags,deferredIoflagsHi/*the activating TargetIO bits, captured when a delayed trigger arms.  A deferred hop fires on a later frame, by which point an instance index from another level no longer denotes the same entity, so the bits travel instead.*/; V3 forward,right,lastPosition/*used for NPC logic, not physics*/,targetPosition,startPosition,activatedScale,direction; u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
+    u32 entflags,ioflags,ioflagsHi; u16 modelIndex,index,portalIndex;
+    u32 deferredIoflags,deferredIoflagsHi; V3 forward,right,lastPosition,targetPosition,startPosition,activatedScale,direction; u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
     i32 cellIndex; i16 cellX,cellZ;
-    u8 clip,animationNum,texAnimClip,camView,codeScreen/*prop_cpuscreen (551): this entity is a level security-code display, set by a codeScreen:1 key on the level line and driven by CodeScreensSetForLevel.  Shares the byte that used to be struct padding, so sizeof(GlobalContext) is unchanged.  The code it shows is always its own level's -- every prop_cpuscreen in the level data sits in the level whose code it reads (CodeScreen.level 1..6 in CitadelScene.unity).  Fits in the padding after relayAlreadyDone; if the layout ever moves this will push sizeof(GlobalContext) and invalidate saves, so check lib.c's ramline output.*/,camRotatePositive/*sec_camera (477): SecurityCameraRotate.rotatePositive, sweep direction*/,camRotateEnabled/*sec_camera (477): SecurityCameraRotate.enabled.  The prefab ships the component DISABLED, and Unity never dispatches Start/Update to a disabled MonoBehaviour, so only the 22 records carrying enabled:1 ever sweep.*/,camSweepInit/*camYaw/camYaw0 seeded from the authored rotation yet*/,securityThreshold,lerpUp,maxRandomItems,questBitID/*QB_*/,questTestMode/*0 none,1 fire target if bit ON,2 fire target if bit OFF*/,branchOnSecond,relayEnabled,relayOnceEver,relayAlreadyDone,useQuestKeycode1/*KeypadKeycode.useQuestKeycode1: code is lev1/2/3 digits, huns/tens/ones*/,useQuestKeycode2/*useQuestKeycode2: code is lev4/5/6 digits, huns/tens/ones*/; FuncStates/*u8*/ funcState; BodyState/*u8*/ bodyState; 
+    u8 clip,animationNum,texAnimClip,camView,codeScreen,camRotatePositive,camRotateEnabled,camSweepInit,securityThreshold,lerpUp,maxRandomItems,questBitID,questTestMode,branchOnSecond,relayEnabled,relayOnceEver,relayAlreadyDone,useQuestKeycode1,useQuestKeycode2; FuncStates/*u8*/ funcState; BodyState/*u8*/ bodyState; 
     float shadRadius,health,cyberHealth,radiation,speed,ajarPercentage,percentMoved,timeForTranquilization,gracePeriodFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,randWaitAtt1Finished,randWaitAtt2Finished,randWaitAtt3Finished,
-          attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animFinished,animSwapFinished,switchAnimFinished/*func_switch4/5/7: when the transient A_ACTIVATE/A_DEACTIVATE clip started, so the switch can settle on its held A_ACTIVATED/A_INACTIVE pose. 0 when nothing is in flight*/,delay,panelTimer/*InteractablePanel: blow-up countdown armed by installing the item*/,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFinished,
-          tickFinished,tickTime,aiThinkFinished/*AI think tick; separate from tickFinished, which texture sequences also drive*/,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,rechargeFinished/*prop_charge_station: absolute pauseRelativeTime station becomes usable again*/,camStartYAngle,camEndYAngle,camWaitTime,camWaitingFinished,camYaw,camYaw0/*sec_camera (477) SecurityCameraRotate: the two sweep bounds and the pause at each end, then the live sweep yaw and the authored yaw it is measured against.  Unity composes nothing -- it calls transform.Rotate(0,deg,0,Space.World) every frame -- but repeating a world-space Y rotation on a drooped camera precesses the droop, so the yaw is accumulated here and composed onto the authored rotation, which is what the wrapper-GameObject note in SecurityCameraRotate.cs describes.*/,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[7],reverbMaxDist,deathAnimationStart;
-    Quaternion camBaseRot/*sec_camera (477): authored lR.* captured on the first swept frame, so the sweep yaw composes onto it as an absolute rotation instead of accumulating onto the previous frame's result*/;
+          attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animFinished,animSwapFinished,switchAnimFinished,delay,panelTimer,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFinished,
+          tickFinished,tickTime,aiThinkFinished,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,rechargeFinished,camStartYAngle,camEndYAngle,camWaitTime,camWaitingFinished,camYaw,camYaw0,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[7],reverbMaxDist,deathAnimationStart;
+    Quaternion camBaseRot;
     V3 accumulatedForce,currentDestination,targettingPosition,idealTransformForward,idealPos;    
-    u16 enemy,messageIndex,teleportID,targetDestinationID,keycode,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,rechargeMsgLingdex,usedMsgLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx,reverbPreset,npcNumber/*1-based per NPC type, assigned at load; shown by the TargetID*/,targetOnDeathIdx/*HealthManager.targetOnDeath: a second, independent target name fired only from UseDeathTargets, separate from TargetIO.target*/,lockedTargetIdx/*KeypadKeycode.lockedTarget / KeypadElevator.lockedTarget: fired instead of opening when the panel is locked*/;
-    /* SpawnManager (constIndex 702).  Field names mirror SpawnManager.cs.  Spawn points are not stored: Unity's
-       spawnLocations is an unordered pick (Random.Range) and every spawner's list is exactly the set of
-       info_spawnpoint (715) entities on its own level, so SpawnManagerUpdate scans the level for those. */
-    u16 spawnIndex/*NPC constIndex to spawn*/,numberToSpawn,numberActive/*save*/; bool countOnlySameIndex,alertEnemiesOnAwake; float minDelayBetweenSpawns,maxDelayBetweenSpawns,allSpawnedResetDelay;
-    i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,logIndex/*us_paperlog (PaperLog.cs), which paper log this prop opens*/,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7];
-    bool srchInUse,generateContents,generationDone/*SearchableItem.generationDone: the random-contents roll happens once (SearchableItem.cs:22,34)*/,dontReset,onlyOnce,allDone,curTex,useRandomTimes,active,panelOpen,panelInstalled,panelArmed/*InteractablePanel (us_relaypanel/us_isotopepanel/us_retinalscanner): cover open, item installed, 15s fuse armed*/;
-    V3 panelItemPos; Quaternion panelItemRot;/*InteractablePanel installationItem transform (first sub-GO block of the level line): where a placed-item entity is spawned*/
+    u16 enemy,messageIndex,teleportID,targetDestinationID,keycode,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,rechargeMsgLingdex,usedMsgLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx,reverbPreset,npcNumber,targetOnDeathIdx,lockedTargetIdx;
+    u16 spawnIndex,numberToSpawn,numberActive; bool countOnlySameIndex,alertEnemiesOnAwake; float minDelayBetweenSpawns,maxDelayBetweenSpawns,allSpawnedResetDelay;
+    i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,logIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7];
+    bool srchInUse,generateContents,generationDone,dontReset,onlyOnce,allDone,curTex,useRandomTimes,active,panelOpen,panelInstalled,panelArmed;
+    V3 panelItemPos; Quaternion panelItemRot;
     bool touchEnabled,broken,requireRecharge,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,textureGlowAnimating,texAnimStopsAtDie,texAnimInReverse,texAnimRandom,automapHidden,blocked,ajar,deathAnimationActive;
     AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; char texAnimResourceFolder[TARG_STRLEN];
-    /*Wire puzzle (PuzzleWirePuzzle.currentPositionsLeft / currentPositionsRight): per-instance level data, 7 node rows
-      per side, indexed by wire.  Every us_puz_panel_*_wire line in Data/level*.txt carries currentPositionsLeft[i] and
-      currentPositionsRight[i], and two instances of the same constIndex really do differ, so this has to be parsed per
-      instance -- PuzzlePanelUse then inverts it into the column-indexed pw_curL/pw_curR the UI works in.  The solution,
-      wiresOn, rowsActive and wireColors are prefab constants and live in a static table in citadel.c.*/
     i8 wireCurL[7],wireCurR[7];
-    /*Grid puzzle (Unity PuzzleGridPuzzle). puzzleSolved, grid[0..34] and fired are the only three things that
-      component's Save() writes, and all three are in Data/level*.txt for every one of the 11 placed panels, so
-      they parse per instance.  cellType, gridType, width/height and sourceIndex/outputIndex are *not* saved --
-      they are scene-authoring data, so the layout table in citadel.c is keyed by the saved grid[] bits instead.*/
     bool gridCells[35],puzzleFired,puzzleSolved;
 } Entity; // phew what a porker of a struct, it's been a eatin!
 typedef struct{bool initialized,active;V2 min,max;double lastLMB,lastRMB;}UIComponent;
@@ -321,12 +392,12 @@ typedef struct {
     float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT;
     double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp; float painStaticAlpha,empStaticAlpha;
     double gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs;
-    i32 fogFac,cursorPos_x,cursorPos_y/*Separate internal cursor from system cursor.  Relatively pushed around by real cursor movement to give consistent platform behavior.*/,currentMouse_dx,currentMouse_dy;
-    u32 missionBits/*QB_ bitmask, info_mission*/; bool questNotesActive[18],questNotesChecked[18];
-    u8 automapExplored[MAX_LEVELS][ARRSIZE];/*Fog-of-war: explored cells per level*/
-    u8 automapZoom;/*0=closest 16x16, 1=32x32, 2=fullest 64x64 cells*/
-    double automapNextRaster;/*throttle timer for re-raster (transient)*/
-    i8 lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode/*-1 until that level's CPU code screen locks (its last node dies, CodeScreensSetForLevel). KeypadKeycode.cs:46,66 gate the two level-R self-destruct pads on these and sprint 289/290 otherwise. Split out of the u8 run above purely to make -1 representable; same byte count, sizeof(GlobalContext) unchanged.*/;
+    i32 fogFac,cursorPos_x,cursorPos_y,currentMouse_dx,currentMouse_dy;
+    u32 missionBits; bool questNotesActive[18],questNotesChecked[18];
+    u8 automapExplored[MAX_LEVELS][ARRSIZE];
+    u8 automapZoom;
+    double automapNextRaster;
+    i8 lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
     u8 physSleep[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,numLevels,curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,currentLevel,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
     bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,*invTnsrValid,*colliding,targetIOActive,misTimerLast,misTimerCurIdx,misTimerTimesUP;
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
@@ -337,22 +408,22 @@ typedef struct {
     bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT],levelColliding[MAX_LEVELS][INSTANCE_COUNT];
     Light levelLights[MAX_LEVELS][LIGHT_COUNT]; LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT]; LevelParticles levelParticles[MAX_LEVELS];
     Entity* instances; LevelParticles* particles; V3* position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize; ColliderType* col; Quaternion* rotation; u32* layer,targetIOActivatorIoflags,targetIOActivatorIoflagsHi; float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
-    u16 levelLightTargetnames[MAX_LEVELS][LIGHT_COUNT];/*targetname index per World light, parallel to levelLAnims.  Off Light itself, which is a packed 64-byte GL-transfer struct.*/ u16 *lightTargetnames;
-    Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx,decoyInstance/*live prop_cyber_decoy (constIndex 553) instance, or U16_MAX.  Cached rather than re-found per call: the AI sight and acquisition paths query it every AI raycast tick and the instance table is too big to scan there.*/; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
+    u16 levelLightTargetnames[MAX_LEVELS][LIGHT_COUNT]; u16 *lightTargetnames;
+    Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx,decoyInstance; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
     char playerName[27],audiologNames[LOGCNT][T_LOGSTR_MAX],audiologSubjects[LOGCNT][T_LOGSTR_MAX],audiologSenders[LOGCNT][T_LOGSTR_MAX],audioLogSpeech2Text[LOGCNT][T_LOGSTR_MAX];
 } GlobalContext; // Savable complete game state data
-extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS]; extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS];/* local-space AABB, filled alongside modelBounds; drives door laser apertures */
+extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS]; extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS];
 extern u32 modelVertexCounts[MAX_MDLS],uniqueCvxMeshCount,globalframe,*physVertCounts,vbos[MAX_MDLS],tbos[MAX_MDLS],drawCalls,vertsRendered,voxelUpdateSP,lightsID,cellVisibleDataID,colorBufferID,texPalID,textureOffsetsID,textureSizesID,texPalOfsID,threadCnt,shadowmapIndirectionList[LIGHT_COUNT],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES],modelBVHTriOrderCounts[MAX_MDLS];
 extern u16 mdlsCnt,modelTriangleCounts[MAX_MDLS],**modelTriangles,*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES],**modelBVHTriOrder,playerCellIdx,texCnt,cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX],uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES],**physTris,modelBVHNodeCounts[MAX_MDLS];
-void ResetDoorPortals(void);/*culling.c: rewinds the door-portal counter AddDoorPortal allocates from. Called from ResetLoadTallies in NewGame; see the comment on it there for why the counter had to become resettable.*/
-extern size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];/*models.c: the allocation sizes behind cvxAdjOffsets[u] / cvxAdjLists[u], so a reload can hand them back. OS_Free needs the exact size for its munmap and accounting; the offsets/lists are built from the mesh's vertex and unique-edge counts, which are not recoverable from the pointer.*/
+void ResetDoorPortals(void);
+extern size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
 extern u32 textDecalVBO[MAX_LEVELS][INSTANCE_COUNT]; extern u32 textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
 #define DECAL_INLINE_TEXT_MAX 128
 #define DECAL_INLINE_TEXT_PEND 64
 #define DECAL_INLINE_TEXT_LEN 96
 extern char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN]; extern u16 decalInlineTextLevel[DECAL_INLINE_TEXT_MAX],decalInlineTextInst[DECAL_INLINE_TEXT_MAX],decalInlineTextCount;
 #define DECAL_STYLE_MAX 256
-typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle; // Unity TextMesh anchor/alignment/lineSpacing override (tA/tAl/tLs from level file)
+typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle;
 extern DecalStyle decalStyles[DECAL_STYLE_MAX]; extern u16 decalStyleCount;
 extern AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS]; bool FrobHeldItemIntoPanel(V3 p,V3 f,V3 r); extern BvhNode** modelBVHNodes; extern FHandle console_log_file; extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass,dynFriction,statFriction; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
@@ -366,8 +437,14 @@ RaycastHit Raycast(V3,V3,float,u32); V3 ScreenPointToRay(V3,V3),ScreenPointToRay
 u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
 bool GetElevatorDestinationPos(u8,u8,V3*); /*entity.c: nth info_elev_destination (706) volume of a level, level-data space*/
 bool ElevatorDefaultDestinationPos(u8,V3*),ElevatorDestinationPosNear(u8,V3,V3*); /*citadel.c: the level's default elevator landing spot, and the one nearest a point*/
-void EntityDumpAll(const char *pathFmt, u16 pass);/*entity.c: writes every level's entity table to a binary file for Tools/entity_dump_diff.py; enabled by the VOXEN_DUMP_ENTITIES environment variable, whose value is a format string taking the NewGame pass index so the menu pass and the real start land in separate files and can be diffed against each other.*/
-void MFD_OpenData(bool,u8); void MFD_OpenAudioLog(int); void AutomapTick(),AutomapBlitToUI(),AutomapSideBlitToUI(bool),AutomapNewGame(),AutomapOnLoad(),AutomapDumpBMP(),AutomapClearRenderTargets(),BiomonitorDumpBMP(),BiomonitorClearRenderTarget(),BioMonitorInit(),DrawSphereWireframe(Color,ShapeSphere),BioMonitorClearGraphs(),BioMonitorAlignCursors(),RequestClearRenderTargets(),HudHeatBleed(float),CyberSwitchInitAfterLoad(u16),synth_set_reverb_preset(u16),MFD_ResetGeneral(); bool HudHeatTickOn(int);
+void MFD_OpenData(bool,u8);
+void MFD_OpenAudioLog(int);
+void AutomapTick(), AutomapBlitToUI(), AutomapSideBlitToUI(bool), AutomapNewGame(), AutomapOnLoad(), AutomapDumpBMP(), AutomapClearRenderTargets();
+void BiomonitorClearRenderTarget();
+void DrawSphereWireframe(Color,ShapeSphere);
+void BioMonitorClearGraphs(), BioMonitorAlignCursors(), RequestClearRenderTargets();
+void HudHeatBleed(float), CyberSwitchInitAfterLoad(u16), synth_set_reverb_preset(u16), MFD_ResetGeneral();
+bool HudHeatTickOn(int);
 double get_time();
 float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
 void ApplyImpactForceSphere(DamageData*,V3,float,float);
@@ -380,12 +457,10 @@ const char *JumpSound(FootStepType),*JumpLandSound(FootStepType); FootStepType G
 // Quest bits (info_mission constIndex 710).  Only ever set/toggled/checked by info_mission entities.
 enum{QB_RobotSpawnDeactivated=0,QB_IsotopeInstalled,QB_ShieldActivated,QB_LaserSafetyOverriden,QB_LaserDestroyed,QB_BetaGroveCyberUnlocked,QB_GroveAlphaJettisonEnabled,QB_GroveBetaJettisonEnabled,QB_GroveDeltaJettisonEnabled,QB_MasterJettisonBroken,QB_Relay428Fixed,QB_MasterJettisonEnabled,QB_BetaGroveJettisoned,QB_AntennaNorthDestroyed,QB_AntennaSouthDestroyed,QB_AntennaEastDestroyed,QB_AntennaWestDestroyed,QB_SelfDestructActivated,QB_BridgeSeparated,QB_IsolinearChipsetInstalled,QB_COUNT,QB_None=255};
 enum{IO_NONE=0}; u16 IOInternName(const char*);
-/* Second TargetIO word (Entity.ioflagsHi).  TARG_IOFLAGS_* is a saturated 32 bits, so the two SpawnManager actions
-   TargetIO.cs:299,304 route to SpawnManager.Activate(false/true) and the awakeSleepingEnemy action land here. */
 enum{TARG_IOFLAGHI_SPAWNER_ACTIVATE=(1u<<0),TARG_IOFLAGHI_SPAWNER_ACTIVATE_ALERTED=(1u<<1),TARG_IOFLAGHI_AWAKE_SLEEPING=(1u<<2)};
-bool QuestBitIsSet(u8),RessurectPlayer(),PlayerIsMoving(),Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),WeaponCycUp(),WeaponCycDn(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),Console(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),ModRequestsGrayscale(),SkyIsVisible(),SkySunIsVisible(),HasHealth(u16)/*ai.c:216, reads cyberHealth for Cyber-type NPCs and health for the rest*/;
+bool QuestBitIsSet(u8),RessurectPlayer(),PlayerIsMoving(),Forward(),StrafeLeft(),Backpedal(),StrafeRight(),Jump(),JumpDown(),Crouch(),Prone(),LeanLeft(),Sprint(),DoubleTapLeanLeft(),LeanRight(),DoubleTapLeanRight(),Shield(),Infrared(),Email(),Booster(),Jumpjets(),Attack(),Use(),Menu(),ToggleMode(),Reload(),Grenade(),GrenadeCycUp(),GrenadeCycDown(),ChangeAmmoType(),Patch(),PatchCycUp(),PatchCycDown(),/*Go*/Map()/*!*/,SwimUp(),SwimDn(),Console(),NeighborhoodInPVS(u16,u16,u8),AICheckPain(u16),SkyIsVisible(),SkySunIsVisible(),HasHealth(u16)/*ai.c:216, reads cyberHealth for Cyber-type NPCs and health for the rest*/;
 void AIAlert(u16);/*ai.c:589, declared on its own because the block above is bool-returning*/
-void AIAwakeFromSleep(u16);/*ai.c:683, TargetIO.cs:399 awakeSleepingEnemy path*/
+void AIAwakeFromSleep(u16);
 void SpawnManagerActivate(u16 self,bool alerted),SpawnManagerUpdate(u16 self);
 // Synthesized Audio
 typedef enum {SND_LASER_PISTOL=0,SND_LASER_RIFLE,SND_DOOR,SND_IMPACT_GLASS,SND_IMPACT_METAL,SND_EXPLOSION,SND_HISS,SND_PIPE,SND_SHIELD_HIT,SND_FOOTSTEP,SND_SAND_FOOTSTEP,SND_TAP_CASE,SND_PLASTIC_TAP,SND_SPARK_SMALL,SND_CRACKLE,SND_SINE,SND_CLINK,SND_BEAKER_CLINK,SND_BEAKER_THUD,SND_COUNT} SoundID;
@@ -413,14 +488,7 @@ INLINE float vexp2f(float x){float ip=vfloor(x); float fp=x - ip; float p=1.0f +
 INLINE float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 INLINE i32 vclampi(i32 val, i32 min, i32 max) { return (val > max) ? max : ((val < min) ? min : val); }
 INLINE float vround(float val) { return (val >= 0.0f) ? (float)(int)(val + 0.5f) : (float)(int)(val - 0.5f); }
-/*wire.png's brightest row is 222/255; dividing the target colour by this puts the top of the strip at exactly Unity's
-  colour and lets the texture's own gradient darken the rest of the wire.  WIRE_THICK is the drawn line thickness in
-  pixels; see the PuzzleWire.ChangeAppearance note at the draw site in ui.c for why it is not derived from the prefab.*/
-#define WIRE_TEX_PEAK (222.0f/255.0f)
-#define WIRE_THICK 8.0f
-/*PuzzleWire.GetColor(HUDColor) -> the panel's actualColor* RGB, pre-divided by the source texture's peak so the tint
-  passed to RenderUIImageExtended lands on Unity's colour at the brightest row of wire.png.*/
-INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f/WIRE_TEX_PEAK; switch (hud) {
+INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f/(222.0f/255.0f); switch (hud) {
     case HUDC_RED:    *r=0.9215687f;  *g=0.13725491f; *b=0.16862746f; break;
     case HUDC_ORANGE: *r=1.0f;        *g=0.6f;        *b=0.0f;        break;
     case HUDC_YELLOW: *r=0.89019614f; *g=0.8745099f;  *b=0.0f;        break;
@@ -461,94 +529,65 @@ INLINE Quaternion QuatFromToRotation(V3 from,V3 to) {
 }
 Quaternion quat_look_rotation(V3 fwd, V3 up);
 // Game Typechecks (what, it's simple, don't hate it, just does the thing)
-INLINE u8 hardware14fromConstdex(u16 c) { return vclampi(c - 21,0,14); }    INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }/*All doors except see-through doors.*/ INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 858); }  INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; } INLINE bool IdxIsGib(int c) { return (c >= 768 && c <= 855); }
-INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); } void DoorLaserDraw(u16 self);/*changeLayerOnOpenClose:1 sits on exactly doorB/doorE/doorG and on no other door, and toggleLasers:1 on exactly doorJ/doorK, so both behaviours are keyed off the prefab rather than the per-instance key. A key that disagreed with its type would DualLogError at load in DoorTypeAudit().*/ INLINE bool IdxIsLayerDoor(int c) { return c==497||c==500||c==502; } INLINE bool IdxIsLaserDoor(int c) { return c==505||c==506; }            INLINE bool IdxIsLightStaticSaveable(int c) { return c == 748; }   INLINE bool IdxIsGenericTransform(int c) { return c == 749; }                                                                        INLINE bool IdxIsNPC(int c) { return (c >= 419 && c <= 447); }   INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
+INLINE bool IdxIsPortalBlockingDoor(u16 entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }/*All doors except see-through doors.*/
+INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 858); } 
+INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
+INLINE bool IdxIsGib(int c) { return (c >= 768 && c <= 855); }
+INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }
+void DoorLaserDraw(u16 self);
+INLINE bool IdxIsLayerDoor(int c) { return c==497||c==500||c==502; }
+INLINE bool IdxIsLaserDoor(int c) { return c==505||c==506; }
+INLINE bool IdxIsNPC(int c) { return (c >= 419 && c <= 447); }
+INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
 #define CYBER_DECOY_CONST 553u
 #define SPAWNPOINT_CONST 715u/*info_spawnpoint: the spawn locations a logic_spawner (702) picks from*/
-/* Voxen stand-in for Unity's Utils.GetMainHealthManager(go) != null, which is what gates TakeDamage on both the
-   projectile and the melee path.  Health manager = NPC, HealthManager component (any health the record leaves
-   positive, corpses and crates and consoles included), or the cyber decoy, whose prefab has no HealthManager but
-   which cyber NPCs must still be able to shoot.  Single source of truth: keep new damage paths on this. */
 INLINE bool IsDamageable(const Entity* e) { return IdxIsNPC(e->index) || e->health > 0.0f || e->cyberHealth > 0.0f || e->index == CYBER_DECOY_CONST; }
-INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }     INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); } INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }                                    INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
-INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }                                                        INLINE bool IdxIsAccessCard(u16 c) { return (c == 341 || c == 388 || (c >= 390 && c <= 398) || c == 417); }/*389 (weapon_grenadeearth_live) sits in that numeric gap but is not a card -- the range test must skip it.*/                          INLINE bool IdxIsGenericItem(u16 c) { return (c >= 307 && c <= 312) || c == 340 || c == 342 || (c >= 359 && c <= 365)/*MouseLookScript.cs:1073-1079 AddItemToInventory takes general-inventory slots 52..58, i.e. constIndex 359..365; 366 (item_chipset_bitflag) -> slot 59 is the one value Unity does not put in the general inventory*/ || c == 368 || c == 369 || c == 371 || (c >= 399 && c <= 401); }
+INLINE bool IdxIsHardware(int c) { return (c >= 328) && (c <= 339); }     INLINE bool IdxIsAmbient(int c) { return (c >= 621 && c <= 655); }
+INLINE bool IdxIsButtonSwitch(int c) { return ((c >= 688 && c <= 692) || c == 694 || c == 695); }
+INLINE bool IdxIsSearchable(int c) { return ((c >= 464 && c <= 476) || c == 530 || c == 531); }
+INLINE bool IdxIsUsableObject(u16 c) { return ((c >= 307 && c <= 404) || c == 417); }
+INLINE bool IdxIsAccessCard(u16 c) { return (c == 341 || c == 388 || (c >= 390 && c <= 398) || c == 417); }
+INLINE bool IdxIsGenericItem(u16 c) { return (c >= 307 && c <= 312) || c == 340 || c == 342 || (c >= 359 && c <= 365) || c == 368 || c == 369 || c == 371 || (c >= 399 && c <= 401); }
 INLINE bool IdxIsDynamicObject(u16 c) { return (c >= 307 && c <= 406) || c == 417 || (c >= 419 && c <= 447) || (c >= 458 && c <= 463) || (c >= 471 && c <= 476) || (c >= 768 && c <= 855); }
-/* Bitmask over the 29 NPC types (0..28) for the 15 prefabs that declare a "searchCollider" child with its OWN HealthManager:
-   health 50, maxhealth 50, gibOnDeath 0, vaporizeCorpse 1 (e.g. npc_humanoid_mutant.prefab:6036-6043; the ROOT HealthManager is
-   health -1, meaning "take it from the NPC table").  AIController.Dead():1577-1582 activates that collider and freezes X/Z, so it --
-   not the corpse mesh -- is what survives to be searched, shot and vaporized, and it absorbs 50 damage first.  Three of them name the
-   child something else: npc_avian_mutant -> npc_mutant_avian_corpse, npc_hopper -> npc_hopper_die, npc_zerog_mutant -> npc_zerogmut_death.
-   All 15 carry vaporizeCorpse 1 and all 14 others carry 0, so this doubles as the "may this corpse vaporize" test.  A positive list
-   is required rather than the tempting "not gib and not cyber" negation: AUTOBOMB is neither a gib nor a cyber type but has no
-   searchCollider, and HealthManager.cs:492 would refuse to vaporize it.  Bits 1,2,4,6,7,8,9,13,14,15,16,17,20,21,23 in npcTable order. */
 #define NPC_CORPSE_HEALTH 50.0f
 static const u64 npcSearchColliderMask = 0xB3E3D6ULL;
 INLINE bool ai_has_search_collider(u16 npcID) { return npcID < 64 && (npcSearchColliderMask >> npcID) & 1u; }
-INLINE bool InstIsFuncWallChild(u32 inst) { u16 p=(inst<(u32)INSTANCE_COUNT)?fwParentOf[inst]:0; return p!=0 && p<World.instCount && World.instances[p].index==517; }/*chunk child of a func_wall mover (517): dynamic geometry, excluded from static automap/culling derivation*/
-/*Spawn-failure sentinel is 0 (WORLD), the dummy entity every failed AddInstance/SpawnDynamicObject returns.  Slot 0 is a real, always-resident instance, so a caller that keeps going and writes to World.instances[0] corrupts nothing and reads nothing out of bounds -- that is the intended soft-fail behaviour, and the only thing this predicate rules out is indexing past World.instCount.*/
+INLINE bool InstIsFuncWallChild(u32 inst) { u16 p=(inst<(u32)INSTANCE_COUNT)?fwParentOf[inst]:0; return p!=0 && p<World.instCount && World.instances[p].index==517; }
 INLINE bool EntIdxIsValid(u16 idx) { return idx != 0 && idx < World.instCount; }
-INLINE bool IdxIsStaticObjectSaveable(int c) { return (c == 112 || c == 279 || (c >= 448 && c < 458) || c == 480 || c == 516 || (c >= 518 && c <= 526) || c == 530 || c == 531 || c == 546 || c == 555 || c == 594 || c == 596 || c == 598 || (c >= 600 && c < 603)  || (c >= 604 && c < 616) || (c >= 688 && c < 693) || c == 694 || c == 695 || (c >= 699 && c < 704) || (c >= 741 && c < 746)); }
-INLINE bool IdxIsStaticObjectImmutable(int c) { return ((c >= 527 && c < 530) || (c >= 532 && c < 546) || (c >= 547 && c < 553) || c == 554 || (c >= 556 && c < 594) || c == 595 || c == 597 || c == 599 || c == 601 || c == 603 || (c >= 616 && c < 688) || c == 693 || c == 696 || c == 697 || c == 698 || (c >= 704 && c < 717) || c == 720 || (c >= 733 && c < 736) || (c >= 737 && c < 739) || c == 746 || c == 747 || (c >= 750 && c <= 759 && c != 755) || (c >= 856 && c <= 858)); }
-INLINE bool IdxIsWeapon(int c) { return (c >= 343 && c <= 358); }         INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 343 && i <= 358) ? (i - 343) : -1; }                          INLINE bool IdxIsAudioLog(int c) { return c == 313; }                     INLINE float UsableOrDef(float cur, float def){u32 c=*(u32*)&cur,d=*(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
-INLINE int UseableFromConst(int c){return c>=307?c-307:c;}                INLINE int ItemStringIdx(int c){return UseableFromConst(c)+326;}                                                              INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
-INLINE u16 GetImpactType(u16 instanceIdx){switch(World.instances[instanceIdx].bloodType){ case BloodType_None:return 729; case BloodType_Red:return 721; case BloodType_Yellow:return 723; case BloodType_Green:return 722; case BloodType_Robot:return 730; case BloodType_Leaf:return 756; case BloodType_Mutation:return 757; case BloodType_GrayMutation:return 758; } return 729;}
+INLINE bool IdxIsWeapon(int c) { return (c >= 343 && c <= 358); }
+INLINE int Get16WeaponIndexFromConstIndex(int i) { return (i >= 343 && i <= 358) ? (i - 343) : -1; }
+INLINE bool IdxIsAudioLog(int c) { return c == 313; }
+INLINE float UsableOrDef(float cur, float def){u32 c=*(u32*)&cur,d=*(u32*)&def; u32 m = 0 - ((c >> 31) | ((c & 0x7FFFFFFF) == 0)); u32 r = (m & d) | (~m & c); return *(float*)&r; }
+INLINE int UseableFromConst(int c){return c>=307?c-307:c;}
+INLINE int ItemStringIdx(int c){return UseableFromConst(c)+326;}
+INLINE bool CurrentWeaponUsesEnergy(void) { int i = World.invP1.weaponIndex; return i==344 || i==347 || i==353 || i==357 || i==358; }
+INLINE u16 GetImpactType(u16 instanceIdx){
+    switch(World.instances[instanceIdx].bloodType){
+        case BloodType_None:         return 729;
+        case BloodType_Red:          return 721;
+        case BloodType_Yellow:       return 723;
+        case BloodType_Green:        return 722;
+        case BloodType_Robot:        return 730;
+        case BloodType_Leaf:         return 756;
+        case BloodType_Mutation:     return 757;
+        case BloodType_GrayMutation: return 758;
+    }
+    return 729;
+}
+
 // Game logic inline helpers
 INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601]); }
-INLINE void HealthManagerHealingBed(u16 playerIdx, float amount, bool flashBed) { (void)flashBed; Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
+INLINE void HealthManagerHealingBed(u16 playerIdx, float amount) { Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
 void UI_PuzzleGridClose(bool rh);
 void PGEvalPuzzle(void);
-// Grid puzzle sprite indices.  Mirrors the sprite fields on Citadel Assets/Scripts/PuzzleGrid.cs:
-// gridPlus -> grid0_base, gridX -> grid1_base, gridPlusOn0 -> grid0_onFull0, etc.  Each family is
-// stored Gray, Green, Purple, Blue in file-name order, so a theme is a +0/+1/+2/+3 offset.  The
-// pre-2147 puzzle frames (geniusgrid_highlight, grid1_base, gridcontainer*, node_*, wire_*) keep
-// their original indices.  These live at 3331+ because 2147..2165 were already cursor/gas/automap.
-#define PG_TEX_PLUS_GRAY 3365 /* grid0_base */
-#define PG_TEX_PLUS_GREEN 3366
-#define PG_TEX_PLUS_PURPLE 3367
-#define PG_TEX_PLUS_BLUE 3368
-#define PG_TEX_X_GRAY 3369 /* grid1_base */
-#define PG_TEX_X_GREEN 3370
-#define PG_TEX_X_PURPLE 3371
-#define PG_TEX_X_BLUE 3372
-#define PG_TEX_PLUS_ON0 3373 /* grid0_onFull0: powered + */
-#define PG_TEX_PLUS_ON1 3374
-#define PG_TEX_X_ON0 3375
-#define PG_TEX_X_ON1 3376
-#define PG_TEX_SPECIAL_GRAY 3377 /* grid_special0 */
-#define PG_TEX_SPECIAL_GREEN 3378
-#define PG_TEX_SPECIAL_PURPLE 3379
-#define PG_TEX_SPECIAL_BLUE 3380
-#define PG_TEX_SPECIAL_ON0_GRAY 3381 /* grid_special1_0 */
-#define PG_TEX_SPECIAL_ON0_GREEN 3382
-#define PG_TEX_SPECIAL_ON0_PURPLE 3383
-#define PG_TEX_SPECIAL_ON0_BLUE 3384
-#define PG_TEX_SPECIAL_ON1_GRAY 3385 /* grid_special1_1 */
-#define PG_TEX_SPECIAL_ON1_GREEN 3386
-#define PG_TEX_SPECIAL_ON1_PURPLE 3387
-#define PG_TEX_SPECIAL_ON1_BLUE 3388
-#define PG_TEX_ALWAYSON0_GRAY 3389 /* grid_alwayson0 */
-#define PG_TEX_ALWAYSON0_GREEN 3390
-#define PG_TEX_ALWAYSON0_PURPLE 3391
-#define PG_TEX_ALWAYSON0_BLUE 3392
-#define PG_TEX_ALWAYSON1 3393 /* grid_alwayson1: unthemed */
-#define PG_TEX_CONTAINER_GRAY 2139 /* gridcontainer_gray */
-#define PG_TEX_CONTAINER_BASE 2138
-#define PG_TEX_CONTAINER_BLUE 3395
-#define PG_TEX_CONTAINER_GREEN 3396
-#define PG_TEX_CONTAINER_PURPLE 3397
-#define PG_TEX_NODE_ON 3398
-/* theme (HUDColor) -> per-family sprite offset */
-/*Puzzle grid only ships four themed sprite sets (the un-suffixed base plus _green/_purple/_blue), but HUDColor has
-  eight values, so the enum was scrambled when the extra colors were added.  The pairs are aliases: White==Gray,
-  Red==Green, Orange==Purple, Yellow==Blue.  Folding each pair onto one slot gives the sprite set to use, 0=gray
-  (White/Gray), 1=green (Red/Green), 2=purple (Orange/Purple), 3=blue (Yellow/Blue).  Previously only the real
-  Green/Purple/Blue were mapped and every White/Red/Orange/Yellow panel fell through to 0, so the ten puzzles
-  authored with theme 0..3 all rendered with the gray set regardless of what the scene asked for.*/
 INLINE u16 PGThemeOffset(HUDColor t){ return t==HUDColor_Red||t==HUDColor_Green ? 1u : t==HUDColor_Orange||t==HUDColor_Purple ? 2u : t==HUDColor_Yellow||t==HUDColor_Blue ? 3u : 0u; }
+
 // Audio inline helpers
-INLINE float SfxMaster(){return vclamp((float)Sys_Settings.VolumeMaster/100.f,0,1.f);} INLINE float SfxMsg(){return vclamp((float)Sys_Settings.VolumeMessage/100.f,0,1.f);}
-INLINE float SfxMusic(){ return vclamp((float)Sys_Settings.VolumeMusic /100.f,0,1.f);} INLINE float SfxVol(){return vclamp((float)Sys_Settings.VolumeEffects/100.f,0,1.f);}
+INLINE float SfxMaster(){return vclamp((float)Sys_Settings.VolumeMaster/100.f,0,1.f);}
+INLINE float SfxMusic(){ return vclamp((float)Sys_Settings.VolumeMusic /100.f,0,1.f);}
+INLINE float SfxMsg(){return vclamp((float)Sys_Settings.VolumeMessage/100.f,0,1.f);}
+INLINE float SfxVol(){return vclamp((float)Sys_Settings.VolumeEffects/100.f,0,1.f);}
 INLINE float AppliedFXVol(float v){return vclamp(v*SfxMaster()*SfxVol(),0,1.f);}
 INLINE float AppliedMsgVol(float v){return vclamp(v*SfxMaster()*SfxMsg(),0,1.f);}
 INLINE float AppliedMusicVol(float v){return vclamp(v*SfxMaster()*SfxMusic(),0,1.f);}
@@ -559,50 +598,33 @@ INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ?
            GL_DEPTH_COMPONENT24=0x81A6,GL_DEPTH_COMPONENT=0x1902,GL_UNSIGNED_INT=0x1405,GL_TEXTURE_MIN_FILTER=0x2801,GL_TEXTURE_MAG_FILTER=0x2800,GL_TEXTURE_WRAP_S=0x2802,GL_TEXTURE_WRAP_T=0x2803,GL_CLAMP_TO_BORDER=0x812D,GL_TEXTURE_BORDER_COLOR=0x1004,GL_TEXTURE_COMPARE_MODE=0x884C,GL_COMPARE_REF_TO_TEXTURE=0x884E,GL_TEXTURE_COMPARE_FUNC=0x884D,GL_DEPTH_ATTACHMENT=0x8D00,GL_TEXTURE10=0x84CA,GL_ACTIVE_TEXTURE=0x84E0,GL_NONE=0};
 // Particles
 typedef struct PSysDef { V3 pos; u32 textures[16]; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness,shapeRadius,shapeAngle; u8 shapeType; Color colStart,colEnd; Color rampColors[16]; float rampTimes[16]; u8 rampCount; float scaleKeys[16],scaleTimes[16]; u8 scaleCount; float velKeys[16],velTimes[16]; u8 velCount; float rotKeys[16],rotTimes[16];
-                         u8 rotCount; float emissKeys[16],emissTimes[16]; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; bool useMesh/*Unity ParticleSystemMeshSpawnModule: emit from the vertices of a mesh rather than the emitter origin.  The mesh is not named here -- the parent hands the instance to PSysAddEx at spawn time and the sim reads that instance's modelMatrices + physPos every frame.  First used by the Diego teleport burst; the grove/prop_bush foliage fuzz will ride the same path.*/; } PSysDef;
-typedef struct { const char* prefab; const char* gameObject; u64 sourceId; PSysDef def; } ParticleTypeDef;
-/* particleTypeDefs[] indices for the grenade explosion pool effects (Citadel PoolType.GrenadeFragExplosions/EMPExplosions/GasExplosions) */
-#define PSYS_CentralFireball 5
-#define PSYS_FireSpits 6
-#define PSYS_ef_empexplosion 162
-#define PSYS_sprinkles 163
-#define PSYS_sparkles 164
-#define PSYS_gasExplosions 165
-/* HealthManager.VaporizeCorpse:508-509 pools.  Neither ever became a const index in Voxen (the old inline 2 / 1 were PoolType
- * ORDINALS handed to SpawnDynamicObject, which is where the "Indices 0 to 306 (level chunks)" error came from), so both are now
- * first-class presets driven by the converted sprite ranges: CorpseHit = 546_1329..1332 (4 frames), Vaporize = 546_1292..1297 (6). */
-#define PSYS_ef_corpsehit_puff 187
-#define PSYS_ef_vaporize_puff 188
-/* Unity npc_cyborg_diego.prefab -> teleportFX -> ParticleSystem &8092239910951538054, a ParticleSystemMeshSpawnModule over Assets/Models/npc_cyborg_diegoteleportfx.blend.  startLifetime TwoConstants .2/.3, startSpeed Constant 0 (static), startSize Constant .015, rateOverTime Constant 10000, startColor TwoConstants (.5849056,.44419718,.45201436,1)-(.41509432,.041117832,.056076877,1), colorOverLifetime a 1->0.  useMesh places each particle on a model vertex instead of the emitter origin. */
-#define PSYS_ef_diego_teleport 189
-#define PSYS_npc_laserbeam 166
-#define PSYS_npc_targetlaser 167
-#define PSYS_gasSmoke 168
+                         u8 rotCount; float emissKeys[16],emissTimes[16]; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; bool useMesh; } PSysDef;
 const PSysDef* PSysTypeGet(u16);
 u16 PSysAdd(const PSysDef*); u16 PSysAddEx(const PSysDef*,u16/*meshInstance, or U16_MAX for origin emission*/); u16 PSysAddFollow(const PSysDef*,u16/*instance the emitter tracks every frame*/); void PSysAddLevelLoops(void),PSysClearLevel(u8);
 typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
-typedef void(*FGL_C)(u32), (*FGL_FL)(),   (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
+typedef void(*FGL_C)(u32),                (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
 typedef void(*FGL_CS)(u32),(*FGL_RB)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32),  (*FGL_CTSI2D)(u32,i32,i32,i32,i32,i32,i32,i32);
 typedef void(*FGL_E)(u32), (*FGL_DF)(u32),(*FGL_LP)(u32),  (*FGL_GB)(i32,u32*), (*FGL_BFB)(u32,u32), (*FGL_GFS)(i32,u32*),  (*FGL_TPI)(u32,u32,i32), (*FGL_TPFV)(u32,u32,const float*),    (*FGL_FBT2D)(u32,u32,u32,u32,i32), (*FGL_GSIL)(u32,i32,i32*,char*),         (*FGL_BIT)(u32,u32,i32,bool,i32,u32,u32),       (*FGL_VP)(i32,i32,i32,i32),(*FGL_T2D)(u32,i32,i32,i32,i32,i32,u32,u32,const void*);
 typedef void(*FGL_UP)(u32),(*FGL_D)(u32), (*FGL_DM)(bool), (*FGL_LW)(float),    (*FGL_GIV)(u32,i32*),(*FGL_U1UI)(i32,u32),  (*FGL_GSIV)(u32,u32,i32*),  (*FGL_VAF)(u32,i32,u32,bool,u32),  (*FGL_UM3FV)(i32,i32,bool,const float*), (*FGL_U3F)(i32,float,float,float),              (*FGL_U2F)(i32,float,float);
-typedef u32(*FGL_CFBS)(u32), (*FGL_CP)(), (*FGL_GERR)(), (*FGL_CBFV)(u32,i32,const float*), (*FGL_CRS)(u32); typedef bool(*FGL_UB)(u32); typedef void(*FGL_GIQ)(i32,u32*),(*FGL_DQ)(i32,const u32*),(*FGL_QC)(u32,u32),(*FGL_GQOU64)(u32,u32,u64*),(*FGL_GI64V)(u32,i64*); typedef void(*FGL_DAI)(u32,i32,i32,i32); typedef void(*FGL_BF)(i32,i32,i32,i32,i32,i32,i32,i32,u32,u32); typedef void(*FGL_GTKP)(u32,i32,u32,i32*); extern FGL_GTKP glGetTexLevelParameteriv; extern FGL_BF glBlitFramebuffer; extern FGL_T2D glTexSubImage2D; extern FGL_BFB glBindFramebuffer; extern FGL_GFS glGenFramebuffers; extern FGL_FBT2D glFramebufferTexture2D; extern FGL_GT glGenTextures; extern FGL_T2D glTexImage2D;
+typedef u32(*FGL_CP)(), (*FGL_GERR)(), (*FGL_CRS)(u32); typedef bool(*FGL_UB)(u32); typedef void(*FGL_GIQ)(i32,u32*),(*FGL_GQOU64)(u32,u32,u64*); typedef void(*FGL_DAI)(u32,i32,i32,i32); typedef void(*FGL_BF)(i32,i32,i32,i32,i32,i32,i32,i32,u32,u32); typedef void(*FGL_GTKP)(u32,i32,u32,i32*);
+extern FGL_GTKP glGetTexLevelParameteriv; extern FGL_BF glBlitFramebuffer; extern FGL_T2D glTexSubImage2D; extern FGL_BFB glBindFramebuffer; extern FGL_GFS glGenFramebuffers; extern FGL_FBT2D glFramebufferTexture2D; extern FGL_GT glGenTextures; extern FGL_T2D glTexImage2D;
 extern u32 uiFBO; void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp); void VideoInit(void); u32 VideoFrameTexIndex(u32 texIdx); void VideoRequestFrame(u32 texIdx); void VideoPrefetchFrame(u32 texIdx); u32 VideoPeekFrame(u32 texIdx);
 extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferData; extern FGL_UB glUnmapBuffer; extern FGL_MBR glMapBufferRange; extern FGL_U2F glUniform2f; extern FGL_U1F glUniform1f; extern FGL_U1UI glUniform1ui; extern FGL_UP glUseProgram; extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays;
-extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i; extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding;
+extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i; extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding;
 extern FGL_EVAA glEnableVertexAttribArray; extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_LW glLineWidth; extern FGL_GIQ glGenQueries; extern FGL_GQOU64 glGetQueryObjectui64v; extern FGL_DAI glDrawArraysInstanced; extern FGL_TPFV glTexParameterfv;
-extern FGL_F glFinish; extern FGL_BBB glBindBufferBase; extern FGL_BB glBlendFunc; extern FGL_DQ glDeleteBuffers; extern FGL_DQ glDeleteVertexArrays; typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery;
+extern FGL_F glFinish; extern FGL_BBB glBindBufferBase; extern FGL_BB glBlendFunc; typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery;
 // Input
-typedef enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)} JoyHatId;
-typedef enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,
+enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)};
+enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,
              KEY_SEMICOLON=59/* ; */,KEY_EQUAL=61/* = */,KEY_A=65,KEY_B=66,KEY_C=67,KEY_D=68,KEY_E=69,KEY_F=70,KEY_G=71,KEY_H=72,KEY_I=73,KEY_J=74,KEY_K=75,KEY_L=76,KEY_M=77,KEY_N=78,KEY_O=79,KEY_P=80,KEY_Q=81,KEY_R=82,KEY_S=83,KEY_T=84,KEY_U=85,KEY_V=86,
              KEY_W=87,KEY_X=88,KEY_Y=89,KEY_Z=90,KEY_LEFT_BRACKET=91/* [ */,KEY_BACKSLASH=92/* \ */,KEY_RIGHT_BRACKET=93/* ] */,KEY_GRAVE_ACCENT=96/* ` */,KEY_ESCAPE=256,KEY_ENTER=257,KEY_TAB=258,KEY_BACKSPACE=259,KEY_INSERT=260,KEY_DELETE=261,
              KEY_RIGHT=262,KEY_LEFT=263,KEY_DOWN=264,KEY_UP=265,KEY_PAGE_UP=266,KEY_PAGE_DOWN=267,KEY_HOME=268,KEY_END=269,KEY_CAPS_LOCK=280,KEY_SCROLL_LOCK=281,KEY_NUM_LOCK=282,KEY_PRINT_SCREEN=283,KEY_PAUSE=284,KEY_F1=290,KEY_F2=291,KEY_F3=292,KEY_F4=293,
              KEY_F5=294,KEY_F6=295,KEY_F7=296,KEY_F8=297,KEY_F9=298,KEY_F10=299,KEY_F11=300,KEY_F12=301,KEY_KP_0=320,KEY_KP_1=321,KEY_KP_2=322,KEY_KP_3=323,KEY_KP_4=324,KEY_KP_5=325,KEY_KP_6=326,KEY_KP_7=327,KEY_KP_8=328,KEY_KP_9=329,KEY_KP_DECIMAL=330,
              KEY_KP_DIVIDE=331,KEY_KP_MULTIPLY=332,KEY_KP_SUBTRACT=333,KEY_KP_ADD=334,KEY_KP_ENTER=335,KEY_KP_EQUAL=336,KEY_LEFT_SHIFT=340,KEY_LEFT_CONTROL=341,KEY_LEFT_ALT=342,KEY_LEFT_SUPER=343,KEY_RIGHT_SHIFT=344,KEY_RIGHT_CONTROL=345,KEY_RIGHT_ALT=346,
-             KEY_RIGHT_SUPER=347,KEY_MENU=348} KeyId;
-typedef enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2} MouseButtonId;
-typedef enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15} JoystickId;
-typedef struct {bool down,pressed,released;} KeyState;    typedef struct {const char* name; int value;} InputElement;    typedef struct {double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS]; bool lastUse,isCapsLockOn;} InputSystem;
+             KEY_RIGHT_SUPER=347,KEY_MENU=348};
+enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2};
+enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15};
+typedef struct {bool down,pressed,released;} KeyState;    typedef struct {const char* name; int value;} InputElement;    typedef struct {double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS]; bool isCapsLockOn;} InputSystem;
 extern InputSystem Sys_Input;
 // LibC Replacement
 #define RAND_MAX 65535
@@ -614,5 +636,5 @@ INLINE i32 fast_atoi(const char** p) { const char* c = *p; while (*c == ' ' || *
 void *mcpy(void *dst, const void *src, size_t n), *mset(void *dst, int c, size_t n); i32 PosGetCellCoordX(float x), PosGetCellCoordZ(float z), PosGetCellCoords(float x, float z); u32 PosGetCellCoordsP(i32 cx, i32 cz); size_t slen(const char* s); char* data_parser_trim(char* s); i32 s2i32(const char *str); bool cEmpty(const char),sEmpty(const char*),sEqual(const char*,const char*); int sCompUpToLen(const char* s1, const char* s2, size_t n);
 void scpy_to_a_from_b(char* a, const char* b, size_t bufsz),sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz),sCat(char* a, const char* b, size_t bufsz); char c2Lower(const char c), *sFindSub(const char* s, const char* sub),*StringFindFirstCharWithin(const char *s, char c); const char* StringFindLastChar(const char* str, const char c); void double2str(char* dest, double value, int decs, size_t bufsz);
 int sFormatV(char* buf, size_t bufsz, const char* f, va_list args), sFormat(char* buffer, size_t bufsz, const char* format, ...); char* sUpToEndLine(char* buf, int sz, FHandle fd); void PrintLog(const char*, ...),DualLog(const char*, ...),DualLogWarn(const char*, ...),DualLogError(const char*, ...),CenterStatusPrint(const char* restrict, ...),BmpWrite(char const*,int,int,const void*),DebugRAM(const char*), Screenshot();
-extern char statusText[T_BUFFER_SIZE]; u8 random_range_u8(u8,u8); u32 random_range_u32(u32,u32); i32 random_range_i32(i32,i32); float random_range(float,float); u32 rand(); float lerp(float,float,float),inverse_lerp(float,float,float); char* sLevelFileUpToEndLine(char* buf, int size); void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp);
+extern char statusText[T_BUFFER_SIZE]; u8 random_range_u8(u8,u8); u32 random_range_u32(u32,u32); i32 random_range_i32(i32,i32); float random_range(float,float); u32 rand(); float lerp(float,float,float),inverse_lerp(float,float,float); void qsort_new(void* base, size_t nel, size_t w, cmpfun cmp);
 INLINE  int  mcmp(const void *s1, const void *s2, size_t n) { const u8 *p1 = (const u8 *)s1; const u8 *p2 = (const u8 *)s2; while (n--) { if (*p1 != *p2) {return *p1 - *p2;} p1++; p2++; } return 0; }/*memcmp replacement*/ INLINE void* mmov(void *dst, const void *src, size_t n) { u8 *d = (u8*)dst; const u8* s = (const u8*)src; if (d < s) { while (n--) { *d++ = *s++; } } else if (d > s) { d += n; s += n; while (n--) { *--d = *--s; } } return dst; }/*memmove replacement*/

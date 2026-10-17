@@ -45,7 +45,7 @@ static void amNPCColor(NPCType t,u8* r,u8* g,u8* b) { if(t==NPCType_Cyborg||t==N
 static int amNPCNeedVer(NPCType t) {if(t==NPCType_Robot){return 2;}if(t==NPCType_Cyborg||t==NPCType_Supercyborg||t==NPCType_MutantCyborg){return 3;}if(t==NPCType_Mutant||t==NPCType_Supermutant){return 3;}return 99;/*Cyber/unknown: no overlay*/}
 static void amRaster(u8 zoom, bool full) {
     u8 lev=World.curLev; int nav=amNavVer(); int cells=16<<zoom;/*16,32,64; 0=closest*/ float x0c=World.worldMin_x[lev]-CELLXHALF,z0c=World.worldMin_z[lev]-CELLXHALF; float winW=(float)cells*CELLSZ; V3 app=World.position[PLAYER1]; float wantX0=app.x-winW*0.5f, wantZ1=app.z+winW*0.5f; float minX0=x0c,maxX0=x0c+64.0f*CELLSZ-winW; float minZ1=z0c+winW,maxZ1=z0c+64.0f*CELLSZ;
-    amDrawW=full?AM_FULL_W:AM_W; amDrawH=full?AM_FULL_H:AM_H; amDrawPx=full?amFullPx:amPx; if(full){amWinX0=x0c; amWinZ1=z0c+64.0f*CELLSZ;}/*Unity: full map camera forced to center, never follows player*/ else {amWinX0=wantX0<minX0?minX0:(wantX0>maxX0?maxX0:wantX0); amWinZ1=wantZ1<minZ1?minZ1:(wantZ1>maxZ1?maxZ1:wantZ1); if(maxX0<minX0){amWinX0=minX0;} if(maxZ1<minZ1){amWinZ1=maxZ1;}} amPxPerUnit=(float)amDrawH/winW; amMapScaleX=full?(float)amDrawW/winW:amPxPerUnit; amMapScaleY=amPxPerUnit; amMapOffsetX=full?0.0f:(float)AM_XOFF;  u8* expl=World.automapExplored[lev]; for (u32 i=0;i<(u32)amDrawW*amDrawH*4;i+=4) { amDrawPx[i]=0; amDrawPx[i+1]=0; amDrawPx[i+2]=0; amDrawPx[i+3]=0; }/*transparent*/
+    amDrawW=full?AM_FULL_W:AM_W; amDrawH=full?AM_FULL_H:AM_H; amDrawPx=full?amFullPx:amPx; if(full){amWinX0=x0c; amWinZ1=z0c+64.0f*CELLSZ;} else {amWinX0=wantX0<minX0?minX0:(wantX0>maxX0?maxX0:wantX0); amWinZ1=wantZ1<minZ1?minZ1:(wantZ1>maxZ1?maxZ1:wantZ1); if(maxX0<minX0){amWinX0=minX0;} if(maxZ1<minZ1){amWinZ1=maxZ1;}} amPxPerUnit=(float)amDrawH/winW; amMapScaleX=full?(float)amDrawW/winW:amPxPerUnit; amMapScaleY=amPxPerUnit; amMapOffsetX=full?0.0f:(float)AM_XOFF;  u8* expl=World.automapExplored[lev]; for (u32 i=0;i<(u32)amDrawW*amDrawH*4;i+=4) { amDrawPx[i]=0; amDrawPx[i+1]=0; amDrawPx[i+2]=0; amDrawPx[i+3]=0; }/*transparent*/
     mset(amRadCells,0,sizeof(amRadCells)); mset(amElevCells,0,sizeof(amElevCells)); mset(amWedgeInst,0xFF,sizeof(amWedgeInst)); mset(amDiagCell,0,sizeof(amDiagCell));
     if(nav>=3){/*rad triggers (nav v3+): expand bounds to overlapped cells*/
         for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
@@ -127,7 +127,7 @@ static void amRaster(u8 zoom, bool full) {
         if(fl>0.0001f){ dx=f.x/fl; dy=-f.z/fl; }/*screen: +x right, -z up*/
         float ox=dx*amMapScaleX/amPxPerUnit,oy=dy,ol=vsqrtf(ox*ox+oy*oy);
         if(ol>0.0001f){ox/=ol; oy/=ol;} else {ox=0.0f;oy=-1.0f;}
-        float s=1.0f,nx=-oy,ny=ox;/*Unity: player icon is fixed-size UI overlay, not zoom-scaled*/ float tx=x+ox*8.0f*s,ty=y+oy*8.0f*s,lx=x-ox*5.0f*s+nx*5.0f*s,ly=y-oy*5.0f*s+ny*5.0f*s,rx=x-ox*5.0f*s-nx*5.0f*s,ry=y-oy*5.0f*s-ny*5.0f*s,ov=0.2f;/*hollow chevron: side edges overrun their tail verts by 20%, tip vertex unchanged*/ amLine(tx,ty,lx+(lx-tx)*ov,ly+(ly-ty)*ov,240,73,77,1); amLine(tx,ty,rx+(rx-tx)*ov,ry+(ry-ty)*ov,240,73,77,1); amLine(lx,ly,rx,ry,240,73,77,1);/*240,73,77 = 0.941f,0.286f,0.302f*/}
+        float s=1.0f,nx=-oy,ny=ox; float tx=x+ox*8.0f*s,ty=y+oy*8.0f*s,lx=x-ox*5.0f*s+nx*5.0f*s,ly=y-oy*5.0f*s+ny*5.0f*s,rx=x-ox*5.0f*s-nx*5.0f*s,ry=y-oy*5.0f*s-ny*5.0f*s,ov=0.2f;/*hollow chevron: side edges overrun their tail verts by 20%, tip vertex unchanged*/ amLine(tx,ty,lx+(lx-tx)*ov,ly+(ly-ty)*ov,240,73,77,1); amLine(tx,ty,rx+(rx-tx)*ov,ry+(ry-ty)*ov,240,73,77,1); amLine(lx,ly,rx,ry,240,73,77,1);/*240,73,77 = 0.941f,0.286f,0.302f*/}
     if(nav>=3){V3 p=World.position[PLAYER1]; float x=amWX(p.x),y=amWZ(p.z); amCircle(x,y,14.08f*amPxPerUnit,0,200,200);/*small: cyan*/amCircle(x,y,20.48f*amPxPerUnit,0,200,200);/*large: cyan*/}
 }
 
@@ -154,7 +154,6 @@ void AutomapBlitToUI() {
     glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); for (int k=0;k<n;++k) {/*UI y-down->GL y-up; row0=north=texture bottom: flip src*/int gx0=dx0[k],gy0=768-dy1[k],gx1=dx1[k],gy1=768-dy0[k]; glBlitFramebuffer(0,AM_H,AM_W,0, gx0,gy0,gx1,gy1, GL_COLOR_BUFFER_BIT,GL_LINEAR);} glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
 }
 
-/*Automap SIDE view: Automap.cs's inSideView swaps the whole rasterised map for one static per-level schematic, so this only draws the image and leaves the top-down and full maps untouched*/
 #define AMAP_SIDE_TEX_BASE 2153
 void AutomapSideBlitToUI(bool isRH) {
     if(World.menuActive || World.paused || Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE){return;}

@@ -3,23 +3,39 @@
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; u16 triggerVolumes[128]; u16 numTriggers; extern double game_actual_start_time; static bool ladderWalkOff = false; static float ladderTopY = 0.0f; static double ladderSFXFinished = 0.0; void DrawBoxColliderColored(u16 i, Color col); void DrawCapsuleCollider(u16 i);
 u16 GetTeleportDestination(u8 level,u16 teleportID);
 static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
-static const float WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,PLAYER_PRONE_RATIO=0.32f,WALK_SPEED_ACCEL=3.0f,BOOST_ACCEL=1.0f,SKATE_SLIDE=5.0f,SKATE_SPEED=1.1f;/*SKATE_SLIDE is Citadel's 0.5/0.1 walkDeaccelerationBooster ratio; accel converges velocity toward target so dividing by it is the slippery direction, and larger means more slide just as Citadel's smoothTime does*/
+static const float WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,PLAYER_PRONE_RATIO=0.32f,WALK_SPEED_ACCEL=3.0f,BOOST_ACCEL=1.0f,SKATE_SLIDE=5.0f,SKATE_SPEED=1.1f;
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
-typedef struct { V3 point; float pen; } ManifoldPt; typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
+typedef struct { V3 point; float pen; } ManifoldPt;
+typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3],Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
 SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount; float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projectileImpactQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projectileImpactTarget[INSTANCE_COUNT]; static V3 projectileImpactPoint[INSTANCE_COUNT],projectileImpactNormal[INSTANCE_COUNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
 static void WarnPhysicsCapacity(u8 kind,const char* message){if(kind<5&&World.pauseRelativeTime>=nextCapacityWarn[kind]){DualLogWarn("%s\n",message);nextCapacityWarn[kind]=World.pauseRelativeTime+5.0f;}}
-bool PhysIsAsleep(u16 i) { return World.physSleep[i] != 0; } // exposed for showPhys debug coloring
 INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAX_ANIMS && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
 void AddForce(u16 i, V3 f, bool imp){if(imp){World.velocity[i]=V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f/vmax(World.mass[i],0.001f)));}else{World.instances[i].accumulatedForce=V3_AplusB(World.instances[i].accumulatedForce,f);} World.physSleep[i]=false;}
+
 // Trigger System
 void AddAccessCardToInventory(int index); void UseTargets(u16 activator, u16 targetIdx); void GrenadeOnCollision(u16 self);
 static bool IsImpactGrenade(u16 idx) { return idx == 370 || idx == 372 || idx == 387 || idx == 404; }
 static bool IsImpactProjectile(u16 idx) { return idx >= 481 && idx <= 495; }
-static void QueueProjectileImpact(u16 projectile,u16 other,V3 point,V3 normal){if(projectile>=World.instCount||other>=World.instCount||other==World.instances[projectile].recentMostActivator)return;projectileContactThisFrame[projectile]=1;if(World.instances[projectile].currentTargetIdx==(u16)(other+1))return;if(!projectileImpactQueued[projectile]){projectileImpactQueued[projectile]=1;projectileImpactTarget[projectile]=other;projectileImpactPoint[projectile]=point;projectileImpactNormal[projectile]=normal;}}
+static void QueueProjectileImpact(u16 projectile,u16 other,V3 point,V3 normal) {
+    if (projectile >= World.instCount || other >= World.instCount || other == World.instances[projectile].recentMostActivator) return;
+    
+    projectileContactThisFrame[projectile] = 1;
+    if(World.instances[projectile].currentTargetIdx == (u16)(other + 1)) return;
+    
+    if(!projectileImpactQueued[projectile]){
+        projectileImpactQueued[projectile] = 1;
+        projectileImpactTarget[projectile] = other;
+        projectileImpactPoint[projectile]  = point;
+        projectileImpactNormal[projectile] = normal;
+    }
+}
+
 void CyberDataFragmentOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); }
 void CyberItemOnTriggerEnter(u16 self, u16 other) {
-    if(other!=PLAYER1){return;} bool success=false;
+    if (other!=PLAYER1) { return; }
+    
+    bool success = false;
     switch(World.instances[self].index) {
         case 450/*item_cyber_drill*/: if(World.invP1.isPulserNotDrill&&!(World.invP1.hasSoft&(1u<<SW_PULSER))){World.invP1.isPulserNotDrill=false;} if(World.instances[self].version>World.invP1.softVersions[SW_DRILL]){World.invP1.softVersions[SW_DRILL]=(u8)World.instances[self].version;}else{CenterStatusPrint("%s",Sys_Text.stringTable[46]);} World.invP1.hasSoft|=(1u<<SW_DRILL); play_wav(sounds[86], AppliedFXVol(1.0f), (V3){0.0f,0.0f,0.0f}, false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[444],World.invP1.softVersions[SW_DRILL],Sys_Text.stringTable[458]); success=true; break;
         case 454/*item_cyber_pulser*/: if(!World.invP1.isPulserNotDrill&&!(World.invP1.hasSoft&(1u<<SW_PULSER))){World.invP1.isPulserNotDrill=true;} if(World.instances[self].version>World.invP1.softVersions[SW_PULSER]){World.invP1.softVersions[SW_PULSER]=(u8)World.instances[self].version;}else{CenterStatusPrint("%s",Sys_Text.stringTable[46]);} World.invP1.hasSoft|=(1u<<SW_PULSER); play_wav(sounds[86], AppliedFXVol(1.0f), (V3){0.0f,0.0f,0.0f}, false); CenterStatusPrint("%s%d%s",Sys_Text.stringTable[445],World.invP1.softVersions[SW_PULSER],Sys_Text.stringTable[458]); success=true; break;
@@ -43,7 +59,7 @@ void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(self,e->targetIdx); }
 // TeleportTouch
 void TeleportTouchOnTriggerEnter(u16 self, u16 o){Entity *e=&World.instances[self],*player=&World.instances[PLAYER1]; if(!e->touchEnabled||o!=PLAYER1||player->health<=0.0f||e->justUsed>=World.pauseRelativeTime)return; u16 dest=GetTeleportDestination(World.currentLevel,e->targetDestinationID); if(dest>=World.instCount||World.instances[dest].index!=703)return; World.position[PLAYER1]=World.position[dest]; World.instances[dest].justUsed=World.pauseRelativeTime+1.0; play_wav(sounds[106], AppliedFXVol(1.0f), World.position[dest], false);}
-void TriggerDelayedTarget(u16 self) { Entity* e=&World.instances[self]; u16 act=e->recentMostActivator; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }/*Unity Trigger.DelayedTarget (Trigger.cs:20-23) starts a coroutine that waits `delay` and only then fires the targets. This used to call UseTargets immediately, so `delay` never did anything. Capture the activating bits now, while the activator is still resolvable, the same way TriggerCounterDelayedTarget does.*/
+void TriggerDelayedTarget(u16 self) { Entity* e=&World.instances[self]; u16 act=e->recentMostActivator; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }
 void TriggerTrippedUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 sf=World.targetIOActivatorIoflags,sfh=World.targetIOActivatorIoflagsHi; bool wa=World.targetIOActive; World.targetIOActive=true; World.targetIOActivatorIoflags=e->deferredIoflags; World.targetIOActivatorIoflagsHi=e->deferredIoflagsHi; UseTargets(self,e->targetIdx); World.targetIOActivatorIoflags=sf; World.targetIOActivatorIoflagsHi=sfh; World.targetIOActive=wa; }/*Marking the chain active stops UseTargets re-seeding from World.instances[activator], which by now points at the player's level.*/
 void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (World.instances[self].allDone && World.instances[self].onlyOnce)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self);} }
 void TriggerOnTriggerEnter(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
@@ -80,7 +96,6 @@ static void GravityLiftApplyTopSupport(u16 body) {
 void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
     Entity *lift=&World.instances[self]; if(entering)lift->initialBurstFinished=World.pauseRelativeTime+1.0f;
     float forceY=0.0f,gravityAccel=GravityLiftGravityAccel(other),mass=vmax(World.mass[other],0.001f);
-    /* Unity marks the player as being in a gravity lift for both OnForce and OffForce. */
     if(other==PLAYER1)flag_set(&World.instances[other].entflags,EF_GRAVLIFT,true);
     bool initialBurst=entering||lift->initialBurstFinished>World.pauseRelativeTime,jumpingFromTop=false;
     if(lift->active){
@@ -102,7 +117,7 @@ void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
             float riseAccel=vclamp((lift->strength-velY)*3.0f,-16.0f,12.0f);
             forceY=mass*(gravityAccel+riseAccel);
         }
-    }else{if(other==PLAYER1)gravityLiftTopSupport[other]=0;if(World.velocity[other].y<lift->offStrengthFactor){forceY=lift->offStrengthFactor-World.velocity[other].y;if(initialBurst)forceY*=2.0f;/*Unity's weak upward force offsets gravity so occupants drift down slowly.*/}}
+    }else{if(other==PLAYER1)gravityLiftTopSupport[other]=0;if(World.velocity[other].y<lift->offStrengthFactor){forceY=lift->offStrengthFactor-World.velocity[other].y;if(initialBurst)forceY*=2.0f; }}
     AddForce(other,(V3){0.0f,forceY,0.0f},false);
 }
 // Physics System
@@ -146,7 +161,7 @@ Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5
 Quaternion quat_normalize(Quaternion q) { float l = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; float m = (l < PHY_EPSILON); float inv=vinvsqtf(vmax(l,PHY_EPSILON)); q.x*=inv; q.y*=inv; q.z*=inv; q.w*=inv; q.x=q.x*(1.0f - m); q.y=q.y*(1.0f - m); q.z=q.z*(1.0f - m); q.w=q.w*(1.0f - m) + 1.0f*m; return q; }
 INLINE V3 MeshVert(u16 m, u32 i) { const float* p = physPos[m] + i * 3; return (V3){p[0],p[1],p[2]}; }
 void ComputeConvexMeshInertiaTensor(u16 i) {
-    World.mass[i] *= 10.0f; // Intentional global mass scaling.  Tunes all masses vs Unity engine version of Citadel, gives better responses and robustness to small items.
+    World.mass[i] *= 10.0f; // Intentional global mass scaling.  Gives better responses and robustness to small items.
     u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i]=false; if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) {return;}
     float acc[6]={0}; float cm[3]={0}; float volAcc=0.0f; u32 triCount = modelTriangleCounts[mi];
     for (u32 ti=0;ti<triCount;++ti) { // Accumulates without dividing by 6 for each saving that for the end for performance.
@@ -392,49 +407,9 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
 static void EntityColliderMatrixNow(u16 i, float M[16]){Quaternion q=World.rotation[i]; V3 sx=V3_ScaleByF(quat_rot_v3(q,(V3){1,0,0}),World.scale[i].x); V3 sy=V3_ScaleByF(quat_rot_v3(q,(V3){0,1,0}),World.scale[i].y); V3 sz=V3_ScaleByF(quat_rot_v3(q,(V3){0,0,1}),World.scale[i].z); V3 p=World.position[i]; M[0]=sx.x; M[1]=sx.y; M[2]=sx.z; M[3]=0.0f; M[4]=sy.x; M[5]=sy.y; M[6]=sy.z; M[7]=0.0f; M[8]=sz.x; M[9]=sz.y; M[10]=sz.z; M[11]=0.0f; M[12]=p.x; M[13]=p.y; M[14]=p.z; M[15]=1.0f;}
 static bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {V3 d=V3_AsubB(pt,box.ctr); V3 ax=quat_rot_v3(box.rot,(V3){1,0,0}), ay=quat_rot_v3(box.rot,(V3){0,1,0}), az=quat_rot_v3(box.rot,(V3){0,0,1}); float lx=V3_dot(d,ax),ly=V3_dot(d,ay),lz=V3_dot(d,az); float cx=vclamp(lx,-box.hExt.x,box.hExt.x),cy=vclamp(ly,-box.hExt.y,box.hExt.y),cz=vclamp(lz,-box.hExt.z,box.hExt.z); float dx=lx-cx, dy=ly-cy, dz=lz-cz; return (dx*dx+dy*dy+dz*dz)<=radius*radius;}
 INLINE int V3_IsSane(V3 v) { union { float f; u32 i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
-/* ---- NPC hop diagnostics: track the first npc_servbot (const 437) and spam its per-substep physics state.
-       NPC_DIAG 0 silences it; PHYS_DIAG_CONST picks which const index to follow. The contact summary reads
-       gContactCount, so it is only meaningful from the narrowphase to the end of that same substep. ---- */
-#ifndef NPC_DIAG
-#define NPC_DIAG 0/*0 = off; 1 = spam the tracked NPC's per-substep physics to stdout/console.log*/
-#endif
-#define PHYS_DIAG_CONST 437/*npc_servbot (hover drone)*/
-static u16 physDiagBody=U16_MAX; static bool physDiagActive=false, physDiagHeader=false, physDiagHaveLast=false;
-static float physDiagSubY=0.0f, physDiagLastFrameY=0.0f, physDiagLastEndVel=0.0f, physDiagLastPosBudget=0.0f; static u32 physDiagFrames=0;
-static void physDiagResolve(void) {
-    if (physDiagBody < World.instCount && World.instances[physDiagBody].index == PHYS_DIAG_CONST && (World.instances[physDiagBody].entflags & EF_ACTIVE)) { physDiagActive = true; return; }
-    physDiagBody = U16_MAX; physDiagActive = false; physDiagHeader = false; physDiagHaveLast = false;
-    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) if (World.instances[i].index == PHYS_DIAG_CONST) { physDiagBody = i; physDiagActive = true; return; }
-}
-static void physDiagHeaderDump(u16 i) {
-    Entity* e=&World.instances[i];
-    DualLog("[DIAG] === inst=%u const=%u col=%d ctr=(%.3f,%.3f,%.3f) sz=(%.3f,%.3f,%.3f) scale=(%.2f,%.2f,%.2f) mass=%.3f layer=%u radius=%.3f state=%d sleep=%u grav=%.3f\n",
-        i, e->index, (int)World.col[i], World.colliderCenter[i].x, World.colliderCenter[i].y, World.colliderCenter[i].z,
-        World.colliderSize[i].x, World.colliderSize[i].y, World.colliderSize[i].z, World.scale[i].x, World.scale[i].y, World.scale[i].z,
-        World.mass[i], (u32)World.layer[i], World.radius[i], (int)e->currentState, (u32)World.physSleep[i], World.gravity[i]);
-    physDiagHeader = true;
-}
-static void physDiag(const char* stage, u8 sub);
-void physDiagExternal(const char* stage) { if (!NPC_DIAG) return; if (physDiagBody >= World.instCount || !physDiagActive) { physDiagResolve(); if (physDiagBody >= World.instCount || !physDiagActive) return; } physDiag(stage, 255); }
-static void physDiag(const char* stage, u8 sub) {
-    if (!NPC_DIAG) return;
-    if (physDiagBody >= World.instCount || !physDiagActive) { physDiagResolve(); if (physDiagBody >= World.instCount || !physDiagActive) return; }
-    u16 i = physDiagBody; if (!physDiagHeader) physDiagHeaderDump(i);
-    int nc=0, np=0; float maxPen=0.0f, sumPen=0.0f, maxBias=0.0f, corr=0.0f; V3 nrm=(V3){0,0,0}; u16 other=U16_MAX; float oPen=0.0f, oBias=0.0f, oAccum=0.0f, oCorr=0.0f; bool oStatic=false, oSleep=false;
-    for (u32 c=0;c<gContactCount;++c) { SolverContact* sc=&gContacts[c]; u16 o=(sc->a==i)?sc->b:((sc->b==i)?sc->a:U16_MAX); if (o==U16_MAX) continue; nc++; np+=sc->m.n; int first=1; float avg=0.0f;
-        for (int p=0;p<sc->m.n;++p) { float pen=sc->m.p[p].pen; sumPen+=pen; avg+=pen; float bias=0.22f*vmax(pen-0.06f,0.0f)/((World.dt>0.0f)?World.dt:1.0f); if(vabs(bias)>maxBias)maxBias=vabs(bias);
-            if (pen>maxPen) { maxPen=pen; nrm=sc->m.normal; if(first){other=o; oStatic=sc->bStatic; oSleep=World.physSleep[o]!=0; oPen=pen; oBias=bias; oAccum=sc->accumN[p];} } first=0; }
-        if (sc->m.n>0) { float a=avg/(float)sc->m.n; oCorr=vmax(a-0.005f,0.0f)*0.4f; corr+=oCorr; } }
-    DualLog("[DIAG] f=%u s=%u %s t=%.3f dt=%.4f nsub=%u | pos.y=%.5f vel.y=%.5f dY=%.5f grav=%.3f accF.y=%.4f budget=%.4f | nc=%d np=%d maxPen=%.5f sumPen=%.5f ny=%.2f bias=%.3f corr=%.4f | o_inst=%u o_const=%u o_static=%d o_sleep=%d o_pen=%.5f o_bias=%.3f o_accumN=%.4f o_corr=%.4f\n",
-        physDiagFrames, sub, stage, World.current_time, World.dt, (u32)World.substeps,
-        World.position[i].y, World.velocity[i].y, World.position[i].y-physDiagSubY, World.gravity[i], World.instances[i].accumulatedForce.y, posBudget[i],
-        nc, np, maxPen, sumPen, nrm.y, maxBias, corr, other, (other<World.instCount)?World.instances[other].index:0, (int)oStatic, (int)oSleep, oPen, oBias, oAccum, oCorr);
-    physDiagSubY = World.position[i].y;
-}
 static bool reverbZoneActive; static u16 activeReverbPreset;
 void Physics(float dt) {
     if(gravityLiftOverlapLevel!=World.curLev){mset(gravityLiftWasInside,0,sizeof(gravityLiftWasInside));mset(gravityLiftTopSupport,0,sizeof(gravityLiftTopSupport));teleportWasTouching=0;ladderSFXFinished=0.0;gravityLiftOverlapLevel=World.curLev;}
-    if (NPC_DIAG) { physDiagResolve(); if (physDiagActive && physDiagBody < World.instCount) { if (physDiagHaveLast) { float d=World.position[physDiagBody].y-physDiagLastFrameY; if (vabs(d)>0.05f) DualLog("[DIAG] *** HOP frame t=%.3f dt=%.4f dY=%+.5f prevEndVel.y=%+.5f prevBudget=%.4f state=%d grounded=%d\n", d, physDiagLastEndVel, physDiagLastPosBudget, (int)World.instances[physDiagBody].currentState, (int)((World.instances[physDiagBody].entflags&EF_GROUNDED)?1:0)); } physDiagFrames++; physDiagSubY=World.position[physDiagBody].y; } }
     mset(grenadeImpactQueued,0,sizeof(grenadeImpactQueued)); mset(projectileImpactQueued,0,sizeof(projectileImpactQueued));mset(projectileContactThisFrame,0,sizeof(projectileContactThisFrame)); for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false); World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
     for (u16 i=0;i<World.instCount;++i) {/*Update the radius for all entities for rendering and physics, then add dynamic ones to dynamicEntities[]*/
         float absx=vabs(World.scale[i].x),absy=vabs(World.scale[i].y),absz=vabs(World.scale[i].z);
@@ -443,7 +418,6 @@ void Physics(float dt) {
         if((World.instances[i].entflags&EF_RIGIDBODY) && (World.instances[i].entflags&EF_ACTIVE) && !World.physSleep[i]/*Done earler, this here is what skips sleeping ones!*/ && absx>.01f && absy>.01f && absz>.01f){if(dynamicEntityCount<512){dynamicEntities[dynamicEntityCount++]=i;}else{WarnPhysicsCapacity(1,"Reached the 512 active dynamic-body limit; additional bodies are skipped.");}}
     }
     for (u8 s=0;s<World.substeps;++s) {
-        if (NPC_DIAG) physDiag("pre-int", s);
         mset(gravityLiftTouched,0,sizeof(gravityLiftTouched)); teleportTouched=0; flag_set(&World.instances[PLAYER1].entflags,EF_GRAVLIFT,false);
         if (!World.invP1.radiationArea) { float bleed = (World.invP1.patchActive & PATCH_DETOX) ? 2.0f : (World.invP1.hasHardware & HW_ENV ? 0.5f : 1.0f); World.instances[PLAYER1].radiation = vmax(0.0f, World.instances[PLAYER1].radiation - dtsub * bleed); }/*Radiation bleedoff / detox / envirosuit handling*/ else { World.instances[PLAYER1].radiation = vmin(100.0f, World.instances[PLAYER1].radiation); }
         mset(cellCounts,0,sizeof(cellCounts)); numTriggers=0; for (u16 t=0;t<128;++t) triggerVolumes[t]=0xFFFF;
@@ -455,11 +429,6 @@ void Physics(float dt) {
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
             u16 a=dynamicEntities[i]; if (IdxIsNPC(World.instances[a].index) && (World.instances[a].entflags & EF_ASLEEP)) { continue; } V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; } else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
-            /* Unity proj_magpulse_shot / proj_plasmarifle_shot both declare m_Drag: 0, so a bolt has to keep its
-               launch speed for its whole flight.  This blanket 0.1/s XZ drag was bleeding it off within a couple of
-               metres, and because it leaves Y alone the result reads as the bolt sagging, i.e. as if gravity were
-               acting on it -- World.gravity for a proj_* is already 0.  NPC/projectile launch speeds are tuned
-               against the drag-free Unity values, so only these need the exemption. */
             float linDrag = (World.instances[a].index >= 481 && World.instances[a].index <= 495) ? 1.0f : vexp(-0.1f * dtsub);
             World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; float angDrag = vexp(-2.0f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag); SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
             if (World.col[a] != COLTYPE_CAP) {
@@ -516,13 +485,10 @@ void Physics(float dt) {
             }
             World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false); for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; u16 b=contactsOther[c]; World.colliding[a]=World.colliding[b]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f})>=0.574f) {World.instances[a].entflags |= EF_GROUNDED;} if ((World.instances[b].entflags&EF_RIGIDBODY) && !World.physSleep[b] && World.mass[b]>=0.001f && V3_dot(mfp->normal,(V3){0.0f,-1.0f,0.0f})>=0.574f) {World.instances[b].entflags |= EF_GROUNDED;} PrepareSolverContact(a,b,mfp,dt); } World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
         }
-        if (NPC_DIAG) physDiag("post-narrow", s);
         SolveGlobalContacts(); // 3. Restitution
-        if (NPC_DIAG) physDiag("post-solve", s);
         for (u32 c=0; c<gContactCount; ++c) { // 3.5 Positional Correction (Projection)
             SolverContact *sc = &gContacts[c]; float avgPen = 0.0f; for (int p=0; p<sc->m.n; ++p) avgPen += sc->m.p[p].pen; if (sc->m.n > 0)avgPen/=(float)sc->m.n; float correction=vmax(avgPen-0.005f,0.0f)*0.4f; float massDiv=sc->invMassA+sc->invMassB+PHY_EPSILON; SetPosition(sc->a,V3_AplusB(World.position[sc->a],V3_ScaleByF(sc->m.normal,correction*sc->invMassA/massDiv))); if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
-        if (NPC_DIAG) physDiag("post-corr", s);
         bool ladderTouched = false; World.invP1.radiationArea=World.Sys_Music.inZone=World.Sys_Music.elevator=World.Sys_Music.cyberTube=World.Sys_Music.distortion=false; World.gravity[PLAYER1] = 1.0f;
         for (u16 i=0;i<numTriggers;++i) {
             u16 self = triggerVolumes[i]; u16 trigdx=World.instances[self].index; if (Cheats.showPhys) {if(trigdx==703)DrawCapsuleCollider(self);else DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f});} ShapeBox trigBox = Entity_GetBox(self); ShapeCapsule teleportCap=trigdx==703?Entity_GetCap(self):(ShapeCapsule){0};
@@ -570,16 +536,12 @@ void Physics(float dt) {
             if(World.physSleep[i]){if(nearAwake)World.physSleep[i]=0;} else if(!nearAwake && (ef & EF_GROUNDED)) { float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]); if(sp2 < 0.0025f && asp2 < 0.0025f){World.physSleep[i]=1; World.velocity[i]=(V3){0,0,0}; World.angularVelocity[i]=(V3){0,0,0}; } }
         }
     }
-    if (NPC_DIAG && physDiagActive && physDiagBody < World.instCount) { physDiagLastFrameY=World.position[physDiagBody].y; physDiagLastEndVel=World.velocity[physDiagBody].y; physDiagLastPosBudget=posBudget[physDiagBody]; physDiagHaveLast=true; }
     u8 collisionLevel=World.currentLevel; u16 collisionCount=World.instCount; for (u16 i=INSTS_1ST_IDX;i<collisionCount && World.currentLevel==collisionLevel;++i) if (grenadeImpactQueued[i] && (World.instances[i].entflags & EF_ACTIVE)) GrenadeOnCollision(i);
     for(u16 i=INSTS_1ST_IDX;i<collisionCount&&World.currentLevel==collisionLevel;++i){if(!IsImpactProjectile(World.instances[i].index))continue;if(projectileImpactQueued[i]&&(World.instances[i].entflags&EF_ACTIVE)){u16 target=projectileImpactTarget[i];World.instances[i].currentTargetIdx=(u16)(target+1);ProjectileEffectImpactOnCollision(i,target,projectileImpactPoint[i],projectileImpactNormal[i]);}if(!projectileContactThisFrame[i])World.instances[i].currentTargetIdx=0;}
-    if (NPC_DIAG) physDiag("end-physics", 255);
     if(World.invP1.radiationArea && World.instances[PLAYER1].radiation > 0.0f){AppendTextWarning(184,-1,-1,-T_WHITE,1);/*Radation Area*/}else{World.invP1.radiationArea=false; World.Sys_UI.tWrnFinished[1]=0.0;} if(World.instances[PLAYER1].radiation > 0.1f){AppendTextWarning(185,-1,186,T_RED,2);/*Radiation poisoning ##LBP*/}else{World.instances[PLAYER1].radiation=0.0f; World.Sys_UI.tWrnFinished[2]=0.0;}
 }
 
 INLINE float smooth_damp(float cur, float targ, float* vel, float tm, float dt) { float o=2.0f / vmax(tm,0.0001f); float x=o * dt; float exp=1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x); float d=cur - targ; float t=(*vel + o * d) * dt; *vel=(*vel - o * t) * exp; return targ + (d + t) * exp; }
-// One placement test: does `probe` (world space) intersect anything on `mask`?  Shared by CantStand and the
-// SpawnManager's AreaClear so both use one collision path.
 static bool AreaBlockedAt(ShapeCapsule probe, u32 mask, u16 self) {
     for(u16 b=0;b<World.instCount;++b){if(b==self||!(World.instances[b].entflags&EF_ACTIVE)||!(mask&World.layer[b])||World.col[b]==COLTYPE_NONE)continue; float pen=0.0f;
         switch(World.col[b]){
@@ -595,31 +557,9 @@ static bool AreaBlockedAt(ShapeCapsule probe, u32 mask, u16 self) {
     return false;
 }
 
-// One vertical walk: try `probe` at every offset from 0 out to `steps`, and stop as soon as `travel` -- the shape
-// the mover currently occupies -- cannot reach that offset.  Clearance is only ever granted for space the mover can
-// physically get to.  That constraint is what stops a crawlway ceiling from reading as "open room two metres up",
-// which is what a plain any-free-sample sweep did: the standing capsule was blocked at the player but clear well
-// above the ceiling, so the player stood up straight through it.
-static bool AreaSweepDir(ShapeCapsule probe, ShapeCapsule travel, int steps, float sign, u32 mask, u16 self) {
-    for (int s=0; s<=steps; ++s) {
-        float d = sign * (float)s * AREA_SWEEP_STEP;
-        if (s) { ShapeCapsule t=travel; t.tip.y+=d; t.base.y+=d; if (AreaBlockedAt(t,mask,self)) {return false;} }
-        ShapeCapsule p=probe; p.tip.y+=d; p.base.y+=d; if (!AreaBlockedAt(p,mask,self)) {return true;}
-    }
-    return false;
-}
-
-// Report whether `probe` fits anywhere within +/- span of where it started.  `travel` bounds how far the search may
-// walk (pass travel for the same shape when the probe moves freely, as the spawner's area test does).  span=0
-// degenerates to a strict single-position test.  span 2.56 is 33 offsets per direction, each costing one travel scan
-// plus one probe scan, and each walk bails at the first offset the mover cannot reach.  Only reached on
-// held-crouch frames and on an actual spawn, so the extra passes over the collider list are not on a hot path.
-bool AreaHasClearance(ShapeCapsule probe, ShapeCapsule travel, float span, u32 mask, u16 self) {
-    int steps=(int)(span/AREA_SWEEP_STEP+0.5f);
-    return AreaSweepDir(probe,travel,steps,+1.0f,mask,self) || AreaSweepDir(probe,travel,steps,-1.0f,mask,self);
-}
-
-bool CantStand(u16 playerIdx, float targetHeight) { // Match Unity's prospective shape while keeping the player's current lower extent fixed.
+static bool AreaSweepDir(ShapeCapsule probe, ShapeCapsule travel, int steps, float sign, u32 mask, u16 self) { for (int s=0; s<=steps; ++s) { float d = sign * (float)s * AREA_SWEEP_STEP; if (s) { ShapeCapsule t=travel; t.tip.y+=d; t.base.y+=d; if (AreaBlockedAt(t,mask,self)) {return false;} } ShapeCapsule p=probe; p.tip.y+=d; p.base.y+=d; if (!AreaBlockedAt(p,mask,self)) {return true;} } return false; }
+bool AreaHasClearance(ShapeCapsule probe, ShapeCapsule travel, float span, u32 mask, u16 self) { int steps=(int)(span/AREA_SWEEP_STEP+0.5f); return AreaSweepDir(probe,travel,steps,+1.0f,mask,self) || AreaSweepDir(probe,travel,steps,-1.0f,mask,self); }
+bool CantStand(u16 playerIdx, float targetHeight) {
     if(playerIdx>=World.instCount||targetHeight<=World.colliderSize[playerIdx].y)return false;
     float oldHeight=World.colliderSize[playerIdx].y,oldCenterY=World.colliderCenter[playerIdx].y;
     ShapeCapsule current=Entity_GetCap(playerIdx);/*the shape the player occupies right now, i.e. how far they can slide*/
@@ -628,35 +568,87 @@ bool CantStand(u16 playerIdx, float targetHeight) { // Match Unity's prospective
     World.colliderSize[playerIdx].y=oldHeight; World.colliderCenter[playerIdx].y=oldCenterY; return !clear;
 }
 
-// One gate for every up-transition, so all of them report the refusal.  Unity checks the target height before
-// allowing the rise; the prone paths had no check at all, so the collider just grew until the solver stalled.  That
-// leaves currentCrouchRatio short of PLAYER_CROUCH_RATIO, which the ProningUp -> Crouch test at the bottom of this
-// file can never satisfy, so prone under a low crawlway wedges the state machine.  Lingdes 187/188 are
-// "Can't stand here." / "Can't crouch here." (text_english.txt).
-INLINE bool StandBlocked(float targetHeight) {
-    if (!CantStand(PLAYER1, targetHeight)) return false;
-    CenterStatusPrint("%s", Sys_Text.stringTable[targetHeight >= PLAYER_HEIGHT ? 187 : 188]);
-    return true;
-}
-
+INLINE bool StandBlocked(float targetHeight) { if (!CantStand(PLAYER1, targetHeight)) return false; CenterStatusPrint("%s", Sys_Text.stringTable[targetHeight >= PLAYER_HEIGHT ? 187 : 188]); return true; }
 KeyState* GetCodeMapping(int settingIndex); const char* FootStepSound(FootStepType);
 void ApplyPlayerMovements(float dt) {
-    Entity *p = &World.instances[PLAYER1]; Quaternion r = World.rotation[PLAYER1]; float leanSpeed = 70.0f, leanMaxAngle = 35.0f; float leanInput = (float)LeanLeft() - (float)LeanRight(); bool doubleTapLean = DoubleTapLeanLeft() || DoubleTapLeanRight();
+    Entity *p = &World.instances[PLAYER1];
+    Quaternion r = World.rotation[PLAYER1];
+    float leanSpeed = 70.0f, leanMaxAngle = 35.0f; float leanInput = (float)LeanLeft() - (float)LeanRight(); bool doubleTapLean = DoubleTapLeanLeft() || DoubleTapLeanRight();
     bool movingForward = Forward() > 0.1f, leanRight = leanInput < 0.0f, leanLeft = leanInput > 0.0f;
-    if (doubleTapLean) { World.invP1.leanResetting = true; World.invP1.leanVelocity = 0.0f; KeyState *kL = GetCodeMapping(7), *kR = GetCodeMapping(8); kL->pressed = kR->pressed = false; } // Double-tap lean: initiate smooth reset to upright over 0.2 seconds
-    if (World.invP1.leanResetting) { World.invP1.leanTarget = smooth_damp(World.invP1.leanTarget,0.0f,&World.invP1.leanVelocity,0.2f,dt); if(vabs(World.invP1.leanTarget) < 0.5f){World.invP1.leanTarget=World.invP1.leanVelocity=0.0f; World.invP1.leanResetting=false;} }
-    else {if (leanLeft || leanRight) { if(leanLeft){World.invP1.leanRightTapFinished =0;} if(leanRight){World.invP1.leanLeftTapFinished=0;} World.invP1.leanTarget=vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt),-leanMaxAngle,leanMaxAngle); } else if (movingForward) { if (vabs(World.invP1.leanTarget) < 0.5f) { World.invP1.leanTarget = 0.0f; } else { World.invP1.leanTarget -= (World.invP1.leanTarget > 0.0f ? 1.0f : -1.0f) * leanSpeed * dt; } }}
-    World.cam_roll = World.invP1.leanTarget; float targR=1.0f, transitionSec=0.2f; float currentRatio=World.invP1.currentCrouchRatio;
-    if (Crouch()) { if (p->bodyState == BodyState_Crouch) { if (!StandBlocked(PLAYER_HEIGHT)){p->bodyState = BodyState_StandingUp;}} else if (currentRatio > PLAYER_CROUCH_RATIO) { p->bodyState = BodyState_CrouchingDown;} else {if (!StandBlocked(PLAYER_HEIGHT*PLAYER_CROUCH_RATIO)){p->bodyState=BodyState_ProningUp;}} }
-    else if (Prone()) {if (p->bodyState == BodyState_Standing) { p->bodyState = BodyState_ProningDown; } else if (currentRatio > PLAYER_CROUCH_RATIO) { if (!StandBlocked(PLAYER_HEIGHT)){p->bodyState=BodyState_StandingUp;}else{p->bodyState = BodyState_ProningDown;} } else if (p->bodyState == BodyState_Crouch) { p->bodyState = BodyState_ProningDown; } else { if (!StandBlocked(PLAYER_HEIGHT*PLAYER_CROUCH_RATIO)){p->bodyState = BodyState_ProningUp;} } }
-    float fatigueWane = 1.0f; if (Cheats.fatigueCheat || World.invP1.staminupActive) World.invP1.fatigue = 0.0f;
-    switch(p->bodyState){case BodyState_CrouchingDown:targR=-.01f; fatigueWane=2.f; break; case BodyState_StandingUp:targR=1.01f; fatigueWane=2.f; break; case BodyState_ProningDown:targR=-.01f; fatigueWane=3.5f; break; case BodyState_ProningUp:targR=1.01f; transitionSec+=.1f; fatigueWane=3.5f; break; case BodyState_Crouch:targR=PLAYER_CROUCH_RATIO; fatigueWane=2.f; break; case BodyState_Prone:targR=PLAYER_PRONE_RATIO; fatigueWane=3.5f; break;}
-    bool inGravLift = ((p->entflags & EF_GRAVLIFT) > 0); bool grounded = !inGravLift && ((p->entflags & EF_GROUNDED) > 0); bool jumpjettin = ((World.invP1.hasHardware & HW_JET) > 0 && (World.invP1.hardwareIsActive & HW_JET) > 0); bool onLadder = World.invP1.ladderState > 0; bool boosterOn = (World.invP1.hasHardware & HW_BST) && (World.invP1.hardwareIsActive & HW_BST);/*Citadel Inventory.BoosterActive(); the old World.boosterActive flag was declared but never assigned anywhere*/
-    bool skatesAct = boosterOn && World.invP1.hwVersSetting[HW_BST_IDX]==0, boostAct = boosterOn && !skatesAct && World.invP1.ladderState==0;/*BoosterSetToSkates()/BoosterSetToBoost() split the one booster into two item-tab modes; skates keep normal sprinting, boost mode is ignored outright on a ladder*/
-    if(onLadder&&!grounded&&!jumpjettin&&World.velocity[PLAYER1].y>0.65f&&ladderSFXFinished<World.pauseRelativeTime){play_wav(sounds[137],AppliedFXVol(0.2f),World.position[PLAYER1],true);ladderSFXFinished=World.pauseRelativeTime+1.0;}
+    if (doubleTapLean) { // Double-tap lean: initiate smooth reset to upright over 0.2 seconds
+        World.invP1.leanResetting = true;
+        World.invP1.leanVelocity = 0.0f;
+        KeyState *kL = GetCodeMapping(7), *kR = GetCodeMapping(8);
+        kL->pressed = kR->pressed = false;
+    }
+    
+    if (World.invP1.leanResetting) {
+        World.invP1.leanTarget = smooth_damp(World.invP1.leanTarget,0.0f,&World.invP1.leanVelocity,0.2f,dt);
+        if(vabs(World.invP1.leanTarget) < 0.5f){World.invP1.leanTarget=World.invP1.leanVelocity=0.0f; World.invP1.leanResetting=false;}
+    } else {
+        if (leanLeft || leanRight) {
+            if(leanLeft){World.invP1.leanRightTapFinished =0;}
+            if(leanRight){World.invP1.leanLeftTapFinished=0;}
+            World.invP1.leanTarget = vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt), -leanMaxAngle, leanMaxAngle);
+        } else if (movingForward) {
+            if (vabs(World.invP1.leanTarget) < 0.5f) { World.invP1.leanTarget = 0.0f; } else { World.invP1.leanTarget -= (World.invP1.leanTarget > 0.0f ? 1.0f : -1.0f) * leanSpeed * dt; }
+        }
+    }
+    
+    World.cam_roll = World.invP1.leanTarget;
+    float targR = 1.0f, transitionSec = 0.2f, currentRatio = World.invP1.currentCrouchRatio;
+    if (Crouch()) {
+        if (p->bodyState == BodyState_Crouch) {
+            if (!StandBlocked(PLAYER_HEIGHT)){p->bodyState = BodyState_StandingUp;}
+        } else if (currentRatio > PLAYER_CROUCH_RATIO) {
+            p->bodyState = BodyState_CrouchingDown;
+        } else {
+            if (!StandBlocked(PLAYER_HEIGHT*PLAYER_CROUCH_RATIO)){p->bodyState=BodyState_ProningUp;}
+        }
+    } else if (Prone()) {
+        if (p->bodyState == BodyState_Standing) { p->bodyState = BodyState_ProningDown; }
+        else if (currentRatio > PLAYER_CROUCH_RATIO) { if (!StandBlocked(PLAYER_HEIGHT)) { p->bodyState=BodyState_StandingUp; } else { p->bodyState = BodyState_ProningDown; } }
+        else if (p->bodyState == BodyState_Crouch) { p->bodyState = BodyState_ProningDown; }
+        else { if (!StandBlocked(PLAYER_HEIGHT*PLAYER_CROUCH_RATIO)){p->bodyState = BodyState_ProningUp;} }
+    }
+    float fatigueWane = 1.0f;
+    if (Cheats.fatigueCheat || World.invP1.staminupActive) World.invP1.fatigue = 0.0f;
+    switch(p->bodyState){
+        case BodyState_CrouchingDown: targR = -0.01f;                        fatigueWane = 2.0f; break;
+        case BodyState_StandingUp:    targR =  1.01f;                        fatigueWane = 2.0f; break;
+        case BodyState_ProningDown:   targR = -0.01f;                        fatigueWane = 3.5f; break;
+        case BodyState_ProningUp:     targR =  1.01f; transitionSec += 0.1f; fatigueWane = 3.5f; break;
+        case BodyState_Crouch:        targR = PLAYER_CROUCH_RATIO;           fatigueWane = 2.0f; break;
+        case BodyState_Prone:         targR = PLAYER_PRONE_RATIO;            fatigueWane = 3.5f; break;
+    }
+    bool inGravLift = ((p->entflags & EF_GRAVLIFT) > 0);
+    bool grounded = !inGravLift && ((p->entflags & EF_GROUNDED) > 0);
+    bool jumpjettin = ((World.invP1.hasHardware & HW_JET) > 0 && (World.invP1.hardwareIsActive & HW_JET) > 0);
+    bool onLadder = World.invP1.ladderState > 0;
+    bool boosterOn = (World.invP1.hasHardware & HW_BST) && (World.invP1.hardwareIsActive & HW_BST);
+    bool skatesAct = boosterOn && World.invP1.hwVersSetting[HW_BST_IDX] == 0;
+    bool boostAct = boosterOn && !skatesAct && World.invP1.ladderState == 0;
+    if (onLadder && !grounded && !jumpjettin && World.velocity[PLAYER1].y > 0.65f && ladderSFXFinished<World.pauseRelativeTime) {
+        play_wav(sounds[137],AppliedFXVol(0.2f),World.position[PLAYER1],true);
+        ladderSFXFinished = World.pauseRelativeTime + 1.0;
+    }
     if (JumpDown() && (grounded || inGravLift || onLadder) && !jumpjettin) {
-        if (onLadder) { World.invP1.ladderState = 0; onLadder = false; float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y; V3 fwd = V3_Normalize((V3){2.0f*(xz+wy), 2.0f*(r.y*r.z - r.w*r.x), 1.0f - 2.0f*(r.x*r.x+y2)}); World.velocity[PLAYER1] = V3_ScaleByF(fwd, 6.0f); }
-        else{if(!Cheats.noclip){World.velocity[PLAYER1].y+=(World.invP1.fatigue>80.0f ? 2.0f : 4.51f)+0.2f; if(!boostAct&&!Cheats.noclip){World.invP1.fatigue += 6.5f;}} RaycastHit jhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType jfstp=jhit.hit ? GetFootstepTypeForPrefab(World.instances[jhit.hitInstanceIndex].index) : FSTP_Concrete; float jumpVol=World.invP1.fatigue>80.0f ? 0.5f : 1.0f; play_wav(JumpSound(jfstp),AppliedFXVol(jumpVol),World.position[PLAYER1],true);}
+        if (onLadder) {
+            World.invP1.ladderState = 0;
+            onLadder = false;
+            float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y;
+            V3 fwd = V3_Normalize((V3){2.0f*(xz+wy), 2.0f*(r.y*r.z - r.w*r.x), 1.0f - 2.0f*(r.x*r.x + y2)});
+            World.velocity[PLAYER1] = V3_ScaleByF(fwd,6.0f);
+        } else {
+            if(!Cheats.noclip){
+                World.velocity[PLAYER1].y+=(World.invP1.fatigue > 80.0f ? 2.0f : 4.51f)+0.2f;
+                if(!boostAct&&!Cheats.noclip){World.invP1.fatigue += 6.5f;}
+            }
+            RaycastHit jhit = Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET);
+            FootStepType jfstp=jhit.hit ? GetFootstepTypeForPrefab(World.instances[jhit.hitInstanceIndex].index) : FSTP_Concrete;
+            float jumpVol=World.invP1.fatigue > 80.0f ? 0.5f : 1.0f;
+            play_wav(JumpSound(jfstp),AppliedFXVol(jumpVol),World.position[PLAYER1],true);
+        }
     }
     if (Jump() && jumpjettin && World.invP1.energy > 0.0f) {
         if (World.invP1.doubleJumpFinished > World.pauseRelativeTime) { /*Jump-jet lunge: any second press inside the double-click window, grounded or not, bursts forward instead of up*/
@@ -682,7 +674,7 @@ void ApplyPlayerMovements(float dt) {
     if (onLadder && !ladderWalkOff) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed, p->right.z * s * speed * 0.3f}; accel = 5.0f; } else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
     V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); dv = (V3){ vclamp(dv.x, -10.0f,10.0f), vclamp(dv.y, -10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f) }; World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1],V3_ScaleByF(dv,accel*vclamp(dt,0.0005f,0.1f)));
     if (World.invP1.fatigueBleedoffFinished<World.pauseRelativeTime && World.curLev!=LEVEL_CYBERSPACE && !Cheats.noclip){World.invP1.fatigue-=fatigueWane;/*Fatigue bleed off*/ World.invP1.fatigueBleedoffFinished=World.pauseRelativeTime +0.3f;} World.invP1.fatigue=vclamp(World.invP1.fatigue,0.0f,100.0f); if (World.invP1.fatigue > 80.0f){AppendTextWarning(868,-1,-1,T_WHITE,0);/*Fatigue high*/}
-    if (World.invP1.noiseFinished < World.pauseRelativeTime) World.invP1.makingNoise = false;/*Unity PlayerHealth.Update*/
+    if (World.invP1.noiseFinished < World.pauseRelativeTime) World.invP1.makingNoise = false;
     if (grounded && !World.invP1.wasGrounded) {
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
         if(velChange>2.0f && World.invP1.noiseFinished<World.pauseRelativeTime){RaycastHit lhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp=lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpLandSound(lstp),AppliedFXVol(vclamp(velChange/11.72f,0.5f,1.0f)),World.position[PLAYER1],true); World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}

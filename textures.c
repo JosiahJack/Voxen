@@ -1,11 +1,8 @@
 // textures.c - 2D Texture Loading System and Texture Animations
 #include "common.h"
-
 typedef struct { u16 index; bool transparent, doublesided; u8 blend; char path[128]; } TextureData;
 typedef struct { TextureData* entries; u32 count, capacity; } TextureDataParser;
 typedef struct { u8 r, g, b; } PngPalEntry;
-#define VIDEO_RING 8
-#define VIDEO_MAXFRAME (1280u*720u)
 typedef struct { char path[96]; u32 texIdx, w, h; } VidFrameRec;
 static VidFrameRec* g_vidFrames = NULL; static u32 g_vidFrameCnt = 0;
 static u32 g_vidPalOffs[VIDEO_RING], g_vidIdxOffs[VIDEO_RING];
@@ -18,7 +15,6 @@ static u32 g_vidTexBase, g_vidPalBase; static i32* g_vidSizesCPU = NULL; static 
 static u32 g_vidReqGen = 0, g_vidReqFrame = 0xFFFFFFFFu, g_vidPreFrame = 0xFFFFFFFFu;
 static u32 g_vidLastTex = 0xFFFFFFFFu; static u32 g_vidLastWant = 0xFFFFFFFFu; static bool g_vidUp = false;
 static PngArena g_vidArena; static OS_Thread g_vidThr;
-INLINE void vid_yield(void) { long r = 24; __asm__ __volatile__("syscall"::"a"(r):"rcx","r11","memory"); } /*sched_yield, the worker is idle most of the time and a bare spin would burn a core*/
 static bool has_sub(const char* h,const char* n);
 static bool is_vid_path(const char* p);
 static VidFrameRec* vid_find(u32 texIdx) { for (u32 k=0;k<g_vidFrameCnt;++k) { if (g_vidFrames[k].texIdx==texIdx) return &g_vidFrames[k]; } return NULL; }
@@ -62,7 +58,7 @@ static void* vid_worker(void* arg) { /*Decode-ahead: never touches GL. Slot stat
                 __atomic_store_n(&s->state, 0u, __ATOMIC_RELAXED); /*claim before decode, so the main thread cannot upload a half-written slot*/
                 vid_decode(r, s);
                 __atomic_store_n(&s->state, 1u, __ATOMIC_RELEASE); } }
-        else { u32 spins = 0; while (spins++ < 4096u) { __asm__ __volatile__("pause"); } vid_yield(); } }
+        else { OS_FutexWait(&g_vidReqGen, g); } }
 }
 u32 VideoPeekFrame(u32 texIdx) { /*Next frame in the same clip, so the worker can stay ahead of playback*/
     if (!g_vidUp || texIdx == 0xFFFFFFFFu) return 0xFFFFFFFFu; for (u32 k=0;k<g_vidFrameCnt;++k) { if (g_vidFrames[k].texIdx==texIdx) { if (k+1u < g_vidFrameCnt) return g_vidFrames[k+1].texIdx; return 0xFFFFFFFFu; } } return 0xFFFFFFFFu; }
@@ -72,11 +68,13 @@ void VideoRequestFrame(u32 texIdx) { /*want and the frame after it: the clip adv
     if (__atomic_load_n(&g_vidReqFrame, __ATOMIC_RELAXED) == texIdx) return; /*already queued, the 60fps caller must not re-queue the same frame every render*/
     for (u32 r=0;r<VIDEO_RING;++r) { if (g_vidSlot[r].frameTexIdx == texIdx && __atomic_load_n(&g_vidSlot[r].state,__ATOMIC_ACQUIRE)) return; /*already decoded*/ }
     __atomic_store_n(&g_vidReqFrame, texIdx, __ATOMIC_RELAXED); __atomic_fetch_add(&g_vidReqGen, 1, __ATOMIC_RELEASE);
+    OS_FutexWakeAll(&g_vidReqGen);
 }
 void VideoPrefetchFrame(u32 texIdx) { /*Next clip frame, decoded in the same worker pass so playback is never a frame behind*/
     if (!g_vidUp || texIdx == 0xFFFFFFFFu || texIdx == __atomic_load_n(&g_vidReqFrame, __ATOMIC_RELAXED)) return;
     for (u32 r=0;r<VIDEO_RING;++r) { if (g_vidSlot[r].frameTexIdx == texIdx && __atomic_load_n(&g_vidSlot[r].state,__ATOMIC_ACQUIRE)) return; }
     if (!vid_find(texIdx)) return; __atomic_store_n(&g_vidPreFrame, texIdx, __ATOMIC_RELAXED); __atomic_fetch_add(&g_vidReqGen, 1, __ATOMIC_RELEASE);
+    OS_FutexWakeAll(&g_vidReqGen);
 }
 u32 VideoFrameTexIndex(u32 texIdx) { /*Exact match only. The old nearest-slot fallback could walk backwards, and worse, could match a frame from a different clip that happened to be numerically closer. Playback is monotonic, so the correct answer when the wanted frame is not resident is to hold the previous one*/
     if (!g_vidUp) return 0xFFFFFFFFu;
@@ -428,7 +426,7 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
     return true;
 }
 
-void SetWindowIcon(WinSysIcon*);
+void SetWindowIcon(const WinSysIcon*);
 static bool has_sub(const char* h,const char* n){ for(;*h;++h){ const char* a=h,*b=n; while(*a&&*b&&*a==*b){++a;++b;} if(!*b) return true; } return false; }
 static bool is_vid_path(const char* p){ return has_sub(p,"AAIntro")||has_sub(p,"AAOutro")||has_sub(p,"VMail"); }
 void LoadTextures() {

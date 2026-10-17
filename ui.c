@@ -36,7 +36,7 @@ typedef enum{UI_ID_NONE,
              UI_ID_MENU_BACK,
              UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG,
              UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION, UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY,
-             UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER,
+             UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER,
              UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0 + 41,
     /*NewGame*/ UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START,
     /*Save/Load*/ UI_ID_MENU_SAVE_SLOT_0, UI_ID_MENU_SAVE_SLOT_7=UI_ID_MENU_SAVE_SLOT_0 + 7,
@@ -108,10 +108,12 @@ static void RefreshSaveSlots(void) {
 
 static void SaveSlotCancelTyping(void) { saveSlotEditing=-1; enteringSaveName=false; saveNameEntryLen=0; saveNameEntry[0]='\0'; }
 static void SaveSlotConfirmTyping(void) {
-    i8 slot=saveSlotEditing; char name[48]; u8 n=saveNameEntryLen; if (n>47) n=47; for (u8 i=0;i<n;++i) name[i]=saveNameEntry[i]; name[n]='\0';
-    SaveSlotCancelTyping(); if (slot<0||slot>7||n==0) return;/*Unity: empty name cancels the save*/
-    for (u8 i=0;i<=n;++i) saveSlotNames[slot][i]=name[i];/*overwrite the slot's savename string*/
-    World.menuActive=false; World.paused=false; returnToPause=false;/*close menu + unpause BEFORE saving so the save captures clean in-game state*/
+    i8 slot=saveSlotEditing;
+    char name[48]; u8 n=saveNameEntryLen;
+    if (n>47) n=47; for (u8 i=0;i<n;++i) name[i]=saveNameEntry[i]; name[n]='\0';
+    SaveSlotCancelTyping(); if (slot<0||slot>7||n==0) return;
+    for (u8 i=0;i<=n;++i) saveSlotNames[slot][i]=name[i]; /*overwrite the slot's savename string*/
+    World.menuActive=false; World.paused=false; returnToPause=false; /*close menu + unpause BEFORE saving so the save captures clean in-game state*/
     SaveGame((u8)slot,name);
 }
 
@@ -197,10 +199,10 @@ void PlayMenuMusic(),mp3_clear(),PlayVideoPageMusic(bool),StopVideoPageMusic();
 __attribute__((noinline)) void MenuGoBack() {
     if (enteringSaveName) { SaveSlotCancelTyping(); return; }
     
-    bool leavingClipPage = (currentMenuPage==Mpg_IntroVideo||currentMenuPage==Mpg_CreditsVideo), toPause=returnToPause;
+    bool leavingClipPage = (currentMenuPage==MPG_INTRO||currentMenuPage==MPG_CREDS), toPause=returnToPause;
     if (toPause) { returnToPause = World.menuActive = false; World.paused = true; mp3_clear(); }
-    if (currentMenuPage == Mpg_Singleplayer || currentMenuPage == Mpg_Multiplayer || currentMenuPage == Mpg_Options) { currentMenuPage = Mpg_FrontPage;/*News*/ }
-    else if (currentMenuPage == Mpg_Load || currentMenuPage == Mpg_NewGame || currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) { currentMenuPage = Mpg_Singleplayer; }
+    if (currentMenuPage == MPG_SINGPLYR || currentMenuPage == MPG_MULTPLYR || currentMenuPage == MPG_OPTS) { currentMenuPage = MPG_FRONT; }
+    else if (currentMenuPage == MPG_LOAD || currentMenuPage == MPG_NEWGM || currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS) { currentMenuPage = MPG_SINGPLYR; }
 
     if (leavingClipPage) {
         currentMenuItem = currentMenuTab = 0;
@@ -224,16 +226,16 @@ void ChangeMenuPage(u8 pg) {
     currentMenuItem = currentMenuTab = 0;
     resDropdownOpen = false;
     resHoverIdx = -1;
-    if (pg==Mpg_Save||pg==Mpg_Load) { SaveSlotCancelTyping(); RefreshSaveSlots(); }/*reparse save headers whenever the Save/Load page is assigned*/
-    if (pg==Mpg_IntroVideo) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); }
-    if (pg==Mpg_CreditsVideo) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); }
+    if (pg==MPG_SAVE||pg==MPG_LOAD) { SaveSlotCancelTyping(); RefreshSaveSlots(); }/*reparse save headers whenever the Save/Load page is assigned*/
+    if (pg==MPG_INTRO) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); }
+    if (pg==MPG_CREDS) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); }
 }
 
-void GameEndSequence() { World.gameFinished = true; World.paused = true; World.menuActive = true; ChangeMenuPage(Mpg_CreditsVideo); }
+void GameEndSequence() { World.gameFinished = true; World.paused = true; World.menuActive = true; ChangeMenuPage(MPG_CREDS); }
 
 static char vidTxtBuf[T_LOGSTR_MAX];
 static void RenderVideoPage(u8 page) {
-    bool isIntro = (page==Mpg_IntroVideo);
+    bool isIntro = (page==MPG_INTRO);
     double start = isIntro ? introVidStart : creditsVidStart;
     if (start <= 0.0) {
         start=World.absoluteTime;
@@ -274,26 +276,26 @@ static void RenderVideoPage(u8 page) {
 static void MenuBackButton(i16 bgX, i16 bgY, i16 tX, i16 tY, i8 item) { RenderUIImage(bgX,bgY,84,36,1252);/*Back Button background*/ bool over=false; if (UI_Button(UI_ID_MENU_BACK,bgX,bgY+34,84,32,&over,item) || (MenuEnter() && currentMenuItem==item && !rebindCaptureActive)) MenuGoBack(); over=over||currentMenuItem==item; RenderTextL(tX,tY,over ? T_STOPD_RED_HIGHLIGHT : T_RED_MENU,FONT_NORMAL,1.0f,/*"BACK"*/Sys_Text.stringTable[744]); }
 static void DiffDigits(i16 tx, i16 ty, u8 cur) { static const i16 dx4[4]={0,71,145,217}; for (u8 i=0;i<4;++i) RenderTextL(tx+dx4[i],ty,cur==i ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,"%u",i); }
 void RenderMenu() {
-    if (currentMenuPage != Mpg_Options || currentMenuTab != 1) { rebindRow = -1; rebindCaptureActive = false; }
-    if (currentMenuPage != Mpg_IntroVideo && currentMenuPage != Mpg_CreditsVideo && currentMenuPage != Mpg_Options) RenderUIImage(-417,-384, 2200,1536, 1026);/*Menu background*/
-    if (currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 0);/*Video blackground*/
-    if (currentMenuPage == Mpg_Options) RenderUIImage(-417,-384, 2200,1536, 1032);/*Menu background*/
-    if (currentMenuPage == Mpg_FrontPage) {
+    if (currentMenuPage != MPG_OPTS || currentMenuTab != 1) { rebindRow = -1; rebindCaptureActive = false; }
+    if (currentMenuPage != MPG_INTRO && currentMenuPage != MPG_CREDS && currentMenuPage != MPG_OPTS) RenderUIImage(-417,-384, 2200,1536, 1026);/*Menu background*/
+    if (currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS) RenderUIImage(-417,-384, 2200,1536, 0);/*Video blackground*/
+    if (currentMenuPage == MPG_OPTS) RenderUIImage(-417,-384, 2200,1536, 1032);/*Menu background*/
+    if (currentMenuPage == MPG_FRONT) {
         menuItemCount = 4; menuTabCount = 1; RenderUIImage(282,46, 800,128, 1031);/*Title CITADEL with strikethrough effect*/
-        if (UI_MenuButton(UI_ID_MENU_SINGLEPLAYER,408,340, 0, 574,84, 304,188,/*"SINGLEPLAYER"*/Sys_Text.stringTable[719],413,276)) ChangeMenuPage(Mpg_Singleplayer);
-        if (UI_MenuButton(UI_ID_MENU_MULTIPLAYER, 408,458, 1, 574,84, 304,268,/*"MULTIPLAYER"*/ Sys_Text.stringTable[720],413,396)) ChangeMenuPage(Mpg_Multiplayer);
-        if (UI_MenuButton(UI_ID_MENU_OPTIONS,     408,582, 2, 574,84, 304,350,/*"OPTIONS"*/     Sys_Text.stringTable[721],413,520)) ChangeMenuPage(Mpg_Options);
+        if (UI_MenuButton(UI_ID_MENU_SINGLEPLAYER,408,340, 0, 574,84, 304,188,/*"SINGLEPLAYER"*/Sys_Text.stringTable[719],413,276)) ChangeMenuPage(MPG_SINGPLYR);
+        if (UI_MenuButton(UI_ID_MENU_MULTIPLAYER, 408,458, 1, 574,84, 304,268,/*"MULTIPLAYER"*/ Sys_Text.stringTable[720],413,396)) ChangeMenuPage(MPG_MULTPLYR);
+        if (UI_MenuButton(UI_ID_MENU_OPTIONS,     408,582, 2, 574,84, 304,350,/*"OPTIONS"*/     Sys_Text.stringTable[721],413,520)) ChangeMenuPage(MPG_OPTS);
         if (UI_MenuButton(UI_ID_MENU_QUIT,        408,702, 3, 574,84, 304,430,/*"QUIT"*/        Sys_Text.stringTable[722],413,638)) OS_Exit(0);
-    } else if (currentMenuPage == Mpg_Singleplayer) {
+    } else if (currentMenuPage == MPG_SINGPLYR) {
         menuItemCount = 5; menuTabCount = 1; UI_HeaderText(250,/*"SINGLEPLAYER"*/Sys_Text.stringTable[719]);
-        if (UI_MenuButton(UI_ID_MENU_CONTINUE,    408,340,0,574,84, 304,188,/*"CONTINUE"*/    Sys_Text.stringTable[723],413,276)) ChangeMenuPage(Mpg_Load);
-        if (UI_MenuButton(UI_ID_MENU_NEW_GAME,    408,458,1,574,84, 304,268,/*"NEW GAME"*/    Sys_Text.stringTable[741],413,396)) ChangeMenuPage(Mpg_NewGame);
-        if (UI_MenuButton(UI_ID_MENU_PLAY_INTRO,  408,582,2,574,84, 304,350,/*"PLAY INTRO"*/  Sys_Text.stringTable[742],413,520)) ChangeMenuPage(Mpg_IntroVideo);
-        if (UI_MenuButton(UI_ID_MENU_PLAY_CREDITS,408,702,3,574,84, 304,430,/*"PLAY CREDITS"*/Sys_Text.stringTable[743],413,638)) ChangeMenuPage(Mpg_CreditsVideo);
+        if (UI_MenuButton(UI_ID_MENU_CONTINUE,    408,340,0,574,84, 304,188,/*"CONTINUE"*/    Sys_Text.stringTable[723],413,276)) ChangeMenuPage(MPG_LOAD);
+        if (UI_MenuButton(UI_ID_MENU_NEW_GAME,    408,458,1,574,84, 304,268,/*"NEW GAME"*/    Sys_Text.stringTable[741],413,396)) ChangeMenuPage(MPG_NEWGM);
+        if (UI_MenuButton(UI_ID_MENU_PLAY_INTRO,  408,582,2,574,84, 304,350,/*"PLAY INTRO"*/  Sys_Text.stringTable[742],413,520)) ChangeMenuPage(MPG_INTRO);
+        if (UI_MenuButton(UI_ID_MENU_PLAY_CREDITS,408,702,3,574,84, 304,430,/*"PLAY CREDITS"*/Sys_Text.stringTable[743],413,638)) ChangeMenuPage(MPG_CREDS);
         MenuBackButton(1060,724,1076,732,4);
-    } else if (currentMenuPage == Mpg_Multiplayer) {
+    } else if (currentMenuPage == MPG_MULTPLYR) {
         menuItemCount = 1; menuTabCount = 1; UI_HeaderText(266,/*"MULTIPLAYER"*/Sys_Text.stringTable[720]); MenuBackButton(1060,724,1076,732,0);
-    } else if (currentMenuPage == Mpg_Options) {
+    } else if (currentMenuPage == MPG_OPTS) {
         menuTabCount = 3; UI_HeaderText(238,/*"CONFIGURATION"*/Sys_Text.stringTable[745]); if(currentMenuTab!=0){resDropdownOpen=false; resHoverIdx=-1;}
         if (currentMenuTab != 0) RenderUIImage(179,220, 1001,548, 1030);/*Config background*/
         if (currentMenuTab == 0) RenderUIImage(179,220, 1001,548, 1033);/*Config background graphics (empty alpha center)*/
@@ -377,10 +379,12 @@ void RenderMenu() {
             menuItemCount = 10;/*Audio / Lang*/ u8 newVal;
             if (UI_Slider(UI_ID_MENU_MASTER_VOLUME_SLIDER,426,240,128,16,((Sys_Settings.VolumeMaster / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMaster,&newVal,&masterVolumeSliderActive,0,100,5,0,/*Master Volume*/802)) { Sys_Settings.VolumeMaster = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
             if (UI_Slider(UI_ID_MENU_MUSIC_VOLUME_SLIDER,426,270,128,16,((Sys_Settings.VolumeMusic / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMusic,&newVal,&musicVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMusic = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+            if (UI_Slider(UI_ID_MENU_SFX_VOLUME_SLIDER,426,300,128,16,((Sys_Settings.VolumeEffects / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeEffects,&newVal,&sfxVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeEffects = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+            if (UI_Slider(UI_ID_MENU_LOG_VOLUME_SLIDER,426,330,128,16,((Sys_Settings.VolumeMessage / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMessage,&newVal,&messageVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMessage = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
         }
         MenuBackButton(1087,723,1103,731,(i8)(menuItemCount - 1));
-    } else if (currentMenuPage == Mpg_Load || currentMenuPage == Mpg_Save) {
-        menuItemCount = 9; menuTabCount = 1; bool isSave = currentMenuPage == Mpg_Save;
+    } else if (currentMenuPage == MPG_LOAD || currentMenuPage == MPG_SAVE) {
+        menuItemCount = 9; menuTabCount = 1; bool isSave = currentMenuPage == MPG_SAVE;
         UI_HeaderText(isSave ? 284 : 340, isSave ?/*"SAVE GAME"*/Sys_Text.stringTable[769] :/*"LOAD"*/Sys_Text.stringTable[726]); RenderUIImage(400,214, 586,500, 1037);/*Load/Save table background*/
         for (u8 i=0;i<8;++i) {
             i16 ry=(i16)(232+i*56); bool over=false;
@@ -397,7 +401,7 @@ void RenderMenu() {
             else RenderTextL(440,ry+30,saveSlotUsed[i]?(over?T_STOPD_RED_HIGHLIGHT:T_STOPD_RED):T_RED_MENU,FONT_STOPD,1.0f,"%s",saveSlotNames[i]);
         }
         MenuBackButton(1060,724,1076,732,8);
-    } else if (currentMenuPage == Mpg_NewGame) {
+    } else if (currentMenuPage == MPG_NEWGM) {
         menuItemCount = 7; menuTabCount = (currentMenuItem > 0 && currentMenuItem <= 16) ? 2 : 1; UI_HeaderText(290,/*"NEW GAME"*/Sys_Text.stringTable[741]);
         RenderUIImage(136,196,1088,558,1048);/*Newgame inset*/ RenderUIImage(136,196,1088,558,1049);/*Newgame background*/
         if (UI_MenuButton(UI_ID_MENU_NAME_INPUT,276,270,0,795,74, 226,146,/*"NAME:"*/Sys_Text.stringTable[746],299,214)) {/*Just for highlight*/ }
@@ -415,18 +419,18 @@ void RenderMenu() {
         {static const i16 dcx[4]={221,330,439,547}; for (u8 c=0;c<4;++c) for (u8 i=0;i<4;++i) { if (!UI_Button(UI_ID_MENU_DIFF_CELL_0+c*4+i,(i16)(dcx[i]+(c>=2?527:0)),(c&1)?651:460,82,79,NULL,(i8)(c+1))) continue; switch(c){case 0:World.diffCbt=i;break; case 1:World.diffPuz=i;break; case 2:World.diffMis=i;break; default:World.diffCyb=i;break;} currentMenuItem=(i8)(c+1); }}
         bool overStart = false; if (UI_Button(UI_ID_MENU_START,544,747, 282,68, &overStart, 5) || (MenuEnter() && currentMenuItem == 5)) GoIntoGame();
         overStart = overStart || currentMenuItem == 5; RenderTextL(400,464,overStart ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.5f,/*"START"*/Sys_Text.stringTable[886]); MenuBackButton(1060,724,1076,732,6);
-    } else if (currentMenuPage == Mpg_IntroVideo || currentMenuPage == Mpg_CreditsVideo) { menuItemCount = menuTabCount = 1; RenderVideoPage(currentMenuPage); }
+    } else if (currentMenuPage == MPG_INTRO || currentMenuPage == MPG_CREDS) { menuItemCount = menuTabCount = 1; RenderVideoPage(currentMenuPage); }
     if (menuTabCount <= currentMenuTab) currentMenuTab = 0;
     if (menuItemCount <= currentMenuItem) currentMenuItem = 0;
     static const i8 ngSwap[7] = {0,3,4,1,2,6,5};
-    if (Sys_Input.keyStates[KEY_RIGHT].pressed || Sys_Input.keyStates[KEY_LEFT].pressed) { if (!rebindCaptureActive) { int dir = Sys_Input.keyStates[KEY_RIGHT].pressed ? 1 : -1; currentMenuTab = (currentMenuTab + menuTabCount + dir) % menuTabCount; if (currentMenuPage == Mpg_NewGame && currentMenuItem < 7) {currentMenuItem=ngSwap[currentMenuItem];} } }
+    if (Sys_Input.keyStates[KEY_RIGHT].pressed || Sys_Input.keyStates[KEY_LEFT].pressed) { if (!rebindCaptureActive) { int dir = Sys_Input.keyStates[KEY_RIGHT].pressed ? 1 : -1; currentMenuTab = (currentMenuTab + menuTabCount + dir) % menuTabCount; if (currentMenuPage == MPG_NEWGM && currentMenuItem < 7) {currentMenuItem=ngSwap[currentMenuItem];} } }
 }
 
 void RenderPausedUI() {
     menuItemCount = 6; menuTabCount = 1; static const i16 pY[6]={330,390,450,510,570,714},pH[6]={52,52,60,60,60,42},pTx[6]={610,630,635,599,546,572},pTy[6]={306,364,422,480,538,690}; static const u16 pStr[6]={725,726,727,721,728,729};
     RenderUIImage(519,276,328,300,1025);/*Pause Menu background*/ RenderUIImage(519,276,328,300,1080);/*Pause Menu background outline*/ RenderUIImage(519,672,328,42,1252);/*Pause Quit Game background*/ RenderTextL(610,210,T_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,/*"PAUSED"*/Sys_Text.stringTable[724]);
     for (u8 i=0;i<6;++i) { bool over=false; if (UI_Button(UI_ID_PAUSE_RESUME+i,522,pY[i],322,pH[i],&over,(i8)i) || (MenuEnter() && currentMenuItem==i)) { if (i==0) World.paused=false; else if (i==5) OS_Exit(0);
-            else { if (i==4) { DualLog("Player exited to menu\n"); RequestClearRenderTargets(); } ChangeMenuPage(i==1?Mpg_Load:i==2?Mpg_Save:i==3?Mpg_Options:Mpg_FrontPage); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); } }
+            else { if (i==4) { DualLog("Player exited to menu\n"); RequestClearRenderTargets(); } ChangeMenuPage(i==1?MPG_LOAD:i==2?MPG_SAVE:i==3?MPG_OPTS:MPG_FRONT); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); } }
         over=over||currentMenuItem==i; RenderTextL(pTx[i],pTy[i],over ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,Sys_Text.stringTable[pStr[i]]); }
 }
 
@@ -452,7 +456,7 @@ void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
 void TickBar(bool isEnergy) {
     RenderUIImage(isEnergy ? 1333 : 1332,isEnergy ? 36 : 2,32,32,isEnergy ? 939 : 956);/*Indicator*/ int p1H=isEnergy ? World.invP1.energy : World.instances[PLAYER1].health; if(p1H>255){p1H=255;} i16 tY=isEnergy ? 35 : 4;
     for (int i=7;i>=0;--i) if(i==7/*Always render at least 1 tick*/||p1H>(7-i)*11){RenderUIImage(1050-(i*16),tY,32,32,964);/*Tick Red*/} for (int i=7;i>=0;--i) if(p1H>88+(7-i)*11){RenderUIImage(1178-(i*16),tY,32,32,963);/*Tick Orange*/} for (int i=7;i>=0;--i) if(p1H>176+(7-i)*11){RenderUIImage(1306-(i*16),tY,32,32,962);/*Tick Green*/}
-    if (isEnergy && World.invP1.drainJPM > 0) RenderTextL(1340,tY+8,T_GREEN,FONT_NORMAL,0.8f,"%d J/min",(int)World.invP1.drainJPM);/*PlayerEnergy.cs shows the summed drainJPM plus " J/min" while above zero, and blanks both otherwise*/ }
+    if (isEnergy && World.invP1.drainJPM > 0) RenderTextL(1340,tY+8,T_GREEN,FONT_NORMAL,0.8f,"%d J/min",(int)World.invP1.drainJPM); }
 
 INLINE int HwActiveTexIndex(int active, int version, int off, int v1, int v2, int v3, int v4) { if (!active) return off; if (v4 >= 0 && version >= 4) return v4; if (version >= 3) return v3; if (version == 2) return v2; return v1; }
 /*eng: 0 needs energy, 1 needs energy only when hwVersSetting==0, 2 needs energy only when hwVersSetting>=1, 3 not a toggle (e-reader)*/
@@ -465,11 +469,23 @@ void HardwareButtons() {
 }
 
 void HwToggle(u8 i) {
-    const HwBtn* b=&hwBtns[i]; bool noEng=World.invP1.energy<=0.0f, on=(World.invP1.hardwareIsActive & b->bit)!=0;
+    const HwBtn* b=&hwBtns[i];
+    bool noEng = World.invP1.energy <= 0.0f, on = (World.invP1.hardwareIsActive & b->bit) != 0;
     if (!(World.invP1.hasHardware & b->bit)) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; }/*no-op for the HUD buttons, which are only drawn for owned hardware; the hotkey path needs it*/
-    if (b->bit==HW_BIO && Cheats.showFPS) return;/*the FPS cheat owns the biomonitor graphs, see cmd_showfps*/
-    if (b->eng==3) { MFD_ResetGeneral(); World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdItemReader[0]=true; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;
-        if (World.Sys_UI.MFD_MediaTab>MM_NOTES || (World.Sys_UI.MFD_MediaTab==MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false); return; }
+    if (b->bit == HW_BIO && Cheats.showFPS) return;/*the FPS cheat owns the biomonitor graphs, see cmd_showfps*/
+        
+    if (b->eng == 3) {
+        MFD_ResetGeneral();
+        World.Sys_UI.MFD_CenterTab=5;
+        World.Sys_UI.MFD_LefTab=2;
+        World.Sys_UI.mfdItemReader[0]=true;
+        World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
+        World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;
+        if (World.Sys_UI.MFD_MediaTab > MM_NOTES || (World.Sys_UI.MFD_MediaTab == MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE;
+        play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false);
+        return;
+    }
+    
     if (noEng && (b->eng==0 || (b->eng==1 && World.invP1.hwVersSetting[b->idx]==0) || (b->eng==2 && World.invP1.hwVersSetting[b->idx]>=1))) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; }
     play_wav(sounds[on ? b->sOff : b->sOn],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= b->bit; if (b->bit==HW_BIO && on && !Cheats.showFPS) BioMonitorClearGraphs();
 }
@@ -505,7 +521,7 @@ void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=tru
 
 void UI_ElevClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadElevator=U16_MAX; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.elevCurrentFloor=0; SysUIDataClose(); }
 void UI_AudioLogClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastLogSideRH=rh; if (!(World.invP1.hasHardware&HW_ERD)) return;
-    if (World.Sys_UI.logActive) { World.Sys_UI.logActive=false; World.Sys_UI.audPaused=true; CenterStatusPrint("%s",Sys_Text.stringTable[1019]); return; }/*Log playback stopped.*/
+    if (World.Sys_UI.logActive) { World.Sys_UI.logActive=false; CenterStatusPrint("%s",Sys_Text.stringTable[1019]); return; }/*Log playback stopped.*/
     if (World.Sys_UI.logReferenceIndex<(u16)LOGCNT && World.invP1.hasLog[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex][0]) { PlayLog((int)World.Sys_UI.logReferenceIndex); World.Sys_UI.logActive=true; }
 }
 
@@ -536,32 +552,31 @@ static void PGFlipperRook(int i) { World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell
 static void PGFlipperBishop(int i) { World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; PGToggleLine(i,1,1); PGToggleLine(i,-1,1); PGToggleLine(i,1,-1); PGToggleLine(i,-1,-1); }
 static void PGFlipperQueen(int i) { World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; PGToggleLine(i,1,0); PGToggleLine(i,-1,0); PGToggleLine(i,0,1); PGToggleLine(i,0,-1); PGToggleLine(i,1,1); PGToggleLine(i,-1,1); PGToggleLine(i,1,-1); PGToggleLine(i,-1,-1); }
 static void PGFlipperKnight(int i) { int w=World.Sys_UI.pg_width,h=World.Sys_UI.pg_height,r=i/w,c=i%w; World.Sys_UI.pg_cell[i]=!World.Sys_UI.pg_cell[i]; static const i8 dr[8]={-2,-1,1,2,2,1,-1,-2},dc[8]={1,2,2,1,-1,-2,-2,-1}; for (u8 n=0;n<8;++n) { int rr=r+dr[n],cc=c+dc[n]; if (rr<0||rr>=h||cc<0||cc>=w) continue; int ci=rr*w+cc; if (World.Sys_UI.pg_type[ci]==PuzzleCellType_Standard) World.Sys_UI.pg_cell[ci]=!World.Sys_UI.pg_cell[ci]; } }
-/*---- Grid power propagation (Unity PuzzleGrid.cs) ---------------------------------------------------------------------------------
-  ReturnCellAbove/Below/ToLeft/ToRight return the neighbour index, or -1 when it is off the board or is an Off cell
-  (Off cells are walls, so a Bypass or Standard cell can never be reached through one).  The four diagonals take no
-  Off test at all in Unity, which is why they are not routed through here -- the flippers and the Genius preview do
-  their own bounds math. */
 static int PGOrth(int i,int dr,int dc) { SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height,r=i/w+dr,c=i%w+dc; if (r<0||r>=h||c<0||c>=w) return -1; int j=r*w+c; return s->pg_type[j]==PuzzleCellType_Off?-1:j; }
-/*CheckCellForPower.  Called both on the source cell's neighbours during the walk and on each dequeued cell, and it
-  is what lets an And gate light up in a single pass rather than a second sweep.*/
 static void PGCheckCellForPower(int i) { SystemUI* s=&World.Sys_UI; int a=PGOrth(i,-1,0),b=PGOrth(i,1,0),l=PGOrth(i,0,-1),r=PGOrth(i,0,1),pc=0;
     if (a!=-1 && s->pg_powered[a]) ++pc; if (b!=-1 && s->pg_powered[b]) ++pc; if (l!=-1 && s->pg_powered[l]) ++pc; if (r!=-1 && s->pg_powered[r]) ++pc;
     if (s->pg_type[i]==PuzzleCellType_And) { if (pc>1) s->pg_powered[i]=true; }
     else if (s->pg_type[i]==PuzzleCellType_Standard || s->pg_type[i]==PuzzleCellType_Bypass) { if ((s->pg_cell[i] || s->pg_type[i]==PuzzleCellType_Bypass) && pc>0) s->pg_powered[i]=true; } }
 void PGEvalPuzzle(void) {
-    SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height; if (w<=0||h<=0) return; int n=w*h; if (n>35) n=35;
+    SystemUI* s=&World.Sys_UI; int w=(int)s->pg_width,h=(int)s->pg_height;
+    if (w<=0||h<=0) return;
+    
+    int n = vmin(w*h,35);
     for (int i=0;i<n;++i) { s->pg_powered[i]=false; s->pg_checked[i]=false; if (s->pg_type[i]==PuzzleCellType_And) s->pg_cell[i]=true; }/*And gates are always conducting, whatever the player has clicked*/
-    int src=(int)s->pg_source; if (src<0||src>=n) return;
+    int src = (int)s->pg_source; if (src<0||src>=n) return;
     s->pg_powered[src]=s->pg_cell[src]; if (!s->pg_powered[src]) return;/*the source node has to be a plus itself, or nothing conducts*/
-    int q[142],qt=0,qh=0; q[qt++]=src;/*142, not 35: Unity's queue is a List and a cell is re-added once per powered neighbour that reaches it (the !pg_checked guard only stops it once dequeued), so the high-water mark is 1+4*35.  A 35-entry array smashes the stack on a busy board.*/
-    while (qh<qt) { int mi=q[qh++]; if (s->pg_checked[mi]) continue;
-        int a=PGOrth(mi,-1,0),b=PGOrth(mi,1,0),l=PGOrth(mi,0,-1),r=PGOrth(mi,0,1); bool isAnd=s->pg_type[mi]==PuzzleCellType_And;
+    
+    int q[142], qt = 0, qh = 0; q[qt++]=src;
+    while (qh<qt) {
+        int mi = q[qh++]; if (s->pg_checked[mi]) continue;
+        
+        int a = PGOrth(mi,-1,0),b=PGOrth(mi,1,0),l=PGOrth(mi,0,-1),r=PGOrth(mi,0,1);
+        bool isAnd = s->pg_type[mi] == PuzzleCellType_And;
         if (a!=-1 && !s->pg_checked[a] && s->pg_cell[a]) { q[qt++]=a; if (isAnd) PGCheckCellForPower(a); }
         if (b!=-1 && !s->pg_checked[b] && s->pg_cell[b]) { q[qt++]=b; if (isAnd) PGCheckCellForPower(b); }
         if (l!=-1 && !s->pg_checked[l] && s->pg_cell[l]) { q[qt++]=l; if (isAnd) PGCheckCellForPower(l); }
-        if (r!=-1 && !s->pg_checked[r] && s->pg_cell[r]) q[qt++]=r;/*Unity's And pre-pass covers above/below/left but not right.  Kept as-is: dropping it would change which boards are solvable.*/
+        if (r!=-1 && !s->pg_checked[r] && s->pg_cell[r]) q[qt++]=r;
         PGCheckCellForPower(mi); s->pg_checked[mi]=true; }
-    /*Unity reports the furthest powered column on the progress slider, not a powered-cell fraction.*/
     float prog=0.0f; for (int c=0;c<w;++c) { for (int r2=0;r2<h;++r2) if (s->pg_powered[r2*w+c]) { prog=(c+1==w)?6.75f/7.0f:(float)(c+1)/7.0f; break; } }
     s->pg_progress=prog;
     int out=(int)s->pg_output; if (out>=0 && out<n && s->pg_powered[out]) s->pg_solved=true;/*latched: PuzzleSolved early-returns on puzzleSolved, so the board never un-solves*/ }
@@ -586,14 +601,8 @@ void UI_PuzzleGridCell(bool rh,int cell) { World.Sys_UI.mouseClickHeldOverGUI=tr
         play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0,0,0},false);/*code accepted / puzzle solved sound*/
         u16 pg=World.Sys_UI.tetheredPGP; if (pg>=INSTS_1ST_IDX && pg<World.instCount) { UseTargets(pg,World.instances[pg].targetIdx); if (World.instances[pg].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pg].messageLingdex]); } }
 }
-void UI_PuzzleGridSlide(bool rh,float f) { (void)rh; (void)f; /*Unity's puzzle progress handle is a server-authoritative display; the fill is driven by puzzle state, not the drag.*/ }
-/*Unity MFDManager.ClosePuzzleGrid does not care which hand's close button was hit: it resets puzzleGridLH *and*
-  puzzleGridRH and then calls RevertDataTabState, which TabReset/ReturnToLastTab's each side.  With the data view now
-  shared there is only one view to clear, and MFD_CloseData puts both hands' tabs back, so the duplicate grid on the
-  other MFD goes away with it.  The puzzle is not pinned to the side it was raised on, because the player can bring the
-  other hand's data tab up on the same puzzle while it is open, and either close button has to leave both screens clean.*/
+void UI_PuzzleGridSlide(bool rh,float f) { (void)rh; (void)f;  }
 void UI_PuzzleGridClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPGP=U16_MAX; World.Sys_UI.pg_solved=false; World.Sys_UI.pg_width=World.Sys_UI.pg_height=0; SysUIDataClose(); }
-/*---- Wire puzzle (Unity PuzzleWire.cs). curL/curR hold the wire id occupying each node column (0-6 left end, 7-13 right end); selectedWire is the chosen column of the held wire and selectedWireRH is which END is held, not which MFD hand -- the board is one shared state rendered on both MFDs. Clicking the end you are already holding is a MOVE, not a re-grab; clicking the other end swaps that column in. Genius patch (wirePuzzle.geniusActive): while active, hint markers are shown at each active wire's target columns in the wire's true color (pw_wireColor); on hard difficulty this reveals the per-wire colors instead of all-Yellow (Unity sets wireColors to rememberColors).--*/
 static i8 PWFindCol(const i8* arr,int wire) { for (i8 c=0;c<7;++c) if ((int)arr[c]==wire) return c; return -1; }
 static void PWClickEnd(int spot,bool colRH) { if (spot<0||spot>6) return; i8* col=colRH?World.Sys_UI.pw_curR:World.Sys_UI.pw_curL;
     /*PuzzleWire.ClickLHNode is "if (selectedWireLH) { selectedWire < 0 ? SelectWireLH : MoveEndpointLeft } else SelectWireLH",
@@ -609,30 +618,23 @@ static void PWClickEnd(int spot,bool colRH) { if (spot<0||spot>6) return; i8* co
     if (col[spot]>=0 && World.Sys_UI.pw_wireOn[col[spot]]) { World.Sys_UI.pw_selectedWire=(i8)spot; World.Sys_UI.pw_selectedWireRH=colRH; }
 }
 static void PWEval(void) { float match=0.0f; bool all=true;
-    /*PuzzleWire.EvaluatePuzzle scores 0.19 per correct ENDPOINT -- fourteen independent awards, not one per wire -- and
-      then wins on "tempF > 0.92f OR AllWiresCorrect()".  Scoring a whole wire at once made the threshold unreachable
-      (0.19*4 = 0.76 on the four-wire teal panel), so Unity's near-miss tolerance could never fire and only the
-      all-wires-correct case solved anything.*/
     for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 l=PWFindCol(World.Sys_UI.pw_curL,w),r=PWFindCol(World.Sys_UI.pw_curR,w);
         bool lok=(l>=0 && l==World.Sys_UI.pw_tgtL[w]), rok=(r>=0 && r==World.Sys_UI.pw_tgtR[w]);
         if (lok) match+=0.19f; if (rok) match+=0.19f; if (!(lok&&rok)) all=false; }
-    if (World.diffPuz==1) match+=0.19f;/*Easy draws a free 0.19, mirroring the Unity bonus*/
+    if (World.diffPuz==1) match+=0.19f;
     World.Sys_UI.pw_temp=match; World.Sys_UI.pw_solved=(match>0.92f || all); }
 void UI_WireNodeClick(bool rh,int node) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (World.Sys_UI.tetheredPWP==U16_MAX) return; if (World.Sys_UI.pw_solved) return; if (node<0||node>13) return; if (!World.Sys_UI.pw_rowActive[node%7]) return;/*hidden node rows take no input either: nodeRowIsActive false means SetActive(false), so the row has no button.*/
     PWClickEnd(node%7, node>=7); PWEval();
     if (World.Sys_UI.pw_solved) { u16 pw=World.Sys_UI.tetheredPWP; if (pw>=INSTS_1ST_IDX && pw<World.instCount) { UseTargets(pw,World.instances[pw].targetIdx); if (World.instances[pw].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pw].messageLingdex]); } }
 }
-void UI_WireSlide(bool rh,float f) { (void)rh; (void)f; /*Unity's wire level handle is a server-authoritative display, dragging is not a real action.*/ }
+void UI_WireSlide(bool rh,float f) { (void)rh; (void)f;  }
 void UI_WireClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPWP=U16_MAX; World.Sys_UI.pw_solved=false; World.Sys_UI.pw_selectedWire=-1; SysUIDataClose(); }
 void UI_SysAnalyzerClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; MFD_CloseData(); }
-/*---- Minigames (Unity MFDManager OpenMinigames/MinigameStart_*) ----*/
 void UI_MinigameStart(bool rh,int game) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastMinigameSideRH=rh; if (game<0||game>8) return; if (!World.invP1.hasMinigame) return; World.Sys_UI.mg_current=(i8)game; World.Sys_UI.mg_running[rh?1:0]=true; CenterStatusPrint("%s %s",Sys_Text.stringTable[1021],mgName[game]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_MinigameInput(bool rh,int x,int y) { (void)rh;(void)x;(void)y; /*The Funpack gameplay engines are not ported yet; a click inside the running view would land here and is only consumed.*/ World.Sys_UI.mouseClickHeldOverGUI=true; }
 void UI_MinigameBack(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_current<0) return; World.Sys_UI.mg_current=-1; World.Sys_UI.mg_running[rh?1:0]=false; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_MinigameClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_running[rh?1:0]) World.Sys_UI.mg_running[rh?1:0]=false; World.Sys_UI.mg_current=-1; MFD_CloseData(); }
-/*---- E-reader log/email/data navigation (Unity MFDManager + ReaderView) ----*/
-#define LOG_IMG_BASE 1272/*logImages[] -> Textures/UI/logimages. Manifest order matches Unity's logImages sprite array, so index n == texture LOG_IMG_BASE+n.*/
-/*Unity LogTextOutput is a UI Text with default HorizontalOverflow=Wrap; Voxen's RenderTextL only honors an explicit \n, so the raw speech-to-text used to render as one clipped line. Page by wrapped lines instead of Unity's flat 568-char strip, which is sized for Unity's 1284x420 field and would not fit the center MFD.*/
+#define LOG_IMG_BASE 1272
 #define LOG_TX 372
 #define LOG_TY 574
 #define LOG_TW 520
@@ -667,14 +669,10 @@ static int UILogTotalLines(void) { return UILogWrap(logPageBuf,sizeof(logPageBuf
 static int UILogFullLines(void) { return UILogWrap(UILogCountBuf,1,0,0); }/*total wrapped lines of the whole log, for the multipage test*/
 static bool UILogHasMore(void) { int li=(int)World.Sys_UI.logReferenceIndex; if (li<0||li>=LOGCNT) return false; return (int)slen(World.audioLogSpeech2Text[li]) > (int)(World.Sys_UI.logReaderPage+1)*LOG_PAGE_CHARS; }
 static const char* UILogTextPage() { UILogTotalLines(); return logPageBuf; }
-void MFD_OpenAudioLog(int idx) {/*Unity MFDManager.SendAudioLogToDataTab: LH data tab always, RH only when that log has an RH image.*/
+void MFD_OpenAudioLog(int idx) {
     if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD;/*ereader stays powered on*/
     World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6);
     World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; }
-/*Unity PaperLog.Use -> MFDManager.SendPaperLogToDataTab (MFDManager.cs:1174-1194).  Unlike SendAudioLogToDataTab this
-  opens a side only when that log actually has an image on it, and it does not add the log to the data-tab folder:
-  LogDataTabContainerManager.SendLogData only fills in the name/sender/subject/image fields, so frobbing a paper log
-  reads it once and leaves the player's log folder alone.*/
 void MFD_OpenPaperLog(int idx, V3 tetherPoint) {
     if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD;
     if (Sys_Text.audioLogImagesRefIndicesLH[idx]) MFD_OpenData(false,6);
@@ -685,8 +683,8 @@ void MFD_OpenPaperLog(int idx, V3 tetherPoint) {
 static void UIOpenEntryAndRead(int idx,bool playable) { if (idx<0||idx>=LOGCNT) return; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.logReaderPage=0; World.invP1.readLog[idx]=true;
     if (playable && (World.invP1.hasHardware&HW_ERD) && audioLogs[idx] && audioLogs[idx][0]) PlayLog(idx);
     CheckForUnreadLogs(); if (!World.invP1.hasNewEmail && !World.invP1.hasNewLogs && !World.invP1.hasNewNotes) World.Sys_UI.highlightStatus[MM_EMAIL_TABLE]=World.Sys_UI.highlightStatus[MM_LOG_TABLE]=World.Sys_UI.highlightStatus[MM_DATA_TABLE]=false; }
-void UI_LogTableClick(int level) { World.Sys_UI.mouseClickHeldOverGUI=true; if (level<0||level>9) return; World.invP1.hardwareIsActive|=HW_ERD;/*keep the ereader tabs on: Unity MultiMediaLogTableButton sets hardwareIsActive[2]*/ World.Sys_UI.logFolderCount=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER;
-    for (int i=0;i<LOGCNT && World.Sys_UI.logFolderCount<15;++i)/*folder renders 15 buttons (Unity LogContentsButtonsManager)*/ if (World.invP1.hasLog[i] && Sys_Text.audioLogLevelFound[i]==(u8)level) { World.Sys_UI.logFolderList[World.Sys_UI.logFolderCount]=(i16)i; World.Sys_UI.logFolderCount++; }
+void UI_LogTableClick(int level) { World.Sys_UI.mouseClickHeldOverGUI=true; if (level<0||level>9) return; World.invP1.hardwareIsActive|=HW_ERD; World.Sys_UI.logFolderCount=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER;
+    for (int i=0;i<LOGCNT && World.Sys_UI.logFolderCount<15;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogLevelFound[i]==(u8)level) { World.Sys_UI.logFolderList[World.Sys_UI.logFolderCount]=(i16)i; World.Sys_UI.logFolderCount++; }
     play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_LogEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>=(int)World.Sys_UI.logFolderCount) return; UIOpenEntryAndRead((int)World.Sys_UI.logFolderList[entry],true); }
 static int UIEmailRefAt(int pos) { int c=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && Sys_Text.audioLogType[i]==AudioLogType_Email) { if (c==pos) return i; ++c; } return -1; }
@@ -695,9 +693,9 @@ void UI_EmailEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if
 void UI_DataEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>12) return; int idx=UIDataRefAt(entry); if (idx<0) return; UIOpenEntryAndRead(idx,false); }
 void UI_LogMore(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView!=MFD_READER_TEXT) return;
     if (UILogHasMore()) { World.Sys_UI.logReaderPage++; return; }/*[MORE]: another wrapped page follows*/
-    World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER;/*[CLOSE]: no more text, back to the folder (Unity LogMoreButton close branch)*/ }
+    World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; }
 void UI_LogBack(void) { World.Sys_UI.mouseClickHeldOverGUI=true;
-    if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) { if (World.Sys_UI.logReaderPage>0) { World.Sys_UI.logReaderPage--; return; } return; }/*[BACK]: previous page, drawn only on multipage logs (Unity LogTextReaderManager)*/
+    if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) { if (World.Sys_UI.logReaderPage>0) { World.Sys_UI.logReaderPage--; return; } return; }
     if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; }
 void UI_NoteToggleClick(int note) { World.Sys_UI.mouseClickHeldOverGUI=true; if (note<0||note>17) return; if (!World.questNotesActive[note]) return; World.questNotesChecked[note]=!World.questNotesChecked[note]; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>=HW_COUNT) return; World.invP1.hardwareInvCurrent=idx; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
@@ -904,7 +902,6 @@ static const i16 keyBtnX[3]={86,127,169},keyBtnY[4]={577,620,663,706}; static co
 static const i16 puzCellX[7]={51,80,109,138,166,195,224},puzCellY[5]={565,594,622,651,680};
 static const i16 wireNodeY[7]={566,594,623,651,679,707,736};
 static const i16 mgX[9]={32,32,32,32,156,156,156,156,32},mgY[9]={540,575,610,646,540,575,610,646,681};/*mgName is defined with the UI row handlers*/
-/*System analyzer status rows, driven off SystemAnalyzer.cs: descriptions are stringTable[474..484] and every value below is the same expression the Unity Update() uses*/
 static const i16 sysRowY[11]={547,566,585,605,624,643,662,681,701,720,739};
 static void SystemStatusValue(int r, char* out, size_t n) {
     bool laser=QuestBitIsSet(QB_LaserDestroyed), destruct=QuestBitIsSet(QB_SelfDestructActivated);
@@ -962,11 +959,6 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
     if (wasCull) glEnable(GL_CULL_FACE); if (wasDepth) glEnable(GL_DEPTH_TEST); if (wasBlend) glEnable(GL_BLEND);
     glBindVertexArray(0); glBindBuffer(GL_ARRAY_BUFFER,0);
 }
-/*Unity WeaponMagazineCounter port: the side MFD clip readout is a 3-digit odometer (100s/10s/1s) fed only by the loaded clip,
-   never the reserve -- the "12mg | 96mg, 48pn" string belongs to Inventory.GetTextForWeaponAmmo, which Voxen keeps on the
-   general-inventory weapon rows.  indicatorSprites[0..9] are Textures/UI/num_0..num_9 (tex 1053..1062) and [10] is
-   nullsprite, so 10 means draw nothing.  Unity blanks all three digits for no weapon, rapier, pipe, cyberspace, or a
-   pending weapon switch.  wep16 + 36 == Unity's const index, so its 41/42 rapier/pipe tests are 5/6 here. */
 static void WeaponMagazineDigits(int wep16,int slot,int out[3]) {
     out[0]=out[1]=out[2]=10;
     if (wep16<0||wep16==5||wep16==6||slot<0||slot>6||World.invP1.weaponCurrentPending>=0||World.curLev==LEVEL_CYBERSPACE) return;
@@ -976,7 +968,6 @@ static void WeaponMagazineDigits(int wep16,int slot,int out[3]) {
     if (amount>9) out[1]=(amount/10)%10;
     if (amount>99) out[0]=(amount/100)%10;
 }
-/*Unity AmmoIconManager.SetAmmoIcon port: ammo icon texture per weapon, now the real Textures/UI/ammoicons art (3309..3323, appended to Data/textures.txt). Returns 0 for energy/rapier/pipe/no-weapon (Unity hides the icon there).*/
 static u16 WeaponAmmoIconTex(int wep16,bool alt) {
     switch (wep16) {
         case 0: return alt ? 3315 : 3313;/*MK3: penetrator/magnesium*/
@@ -995,9 +986,9 @@ void SideMFD(bool isRH) { // 320x240
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex), tab = isRH ? World.Sys_UI.MFD_RightTab : World.Sys_UI.MFD_LefTab; u8 selected=tab?tab:World.Sys_UI.mfdSelected[isRH?2:1];
     for (u8 i=0;i<4;++i) UIRImg(MID(isRH,TAB_WEAPON)+i,isRH ? 1350 : -TAB_THICK,(i16)(520+56*i),32,40,selected==i+1 ? 1024 : 1022);/*Weapon/Item/Automap/Data side tab buttons*/
     if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1) {
-        i16 sx=isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W : TAB_THICK+MFD_SPACING, sy=UI_H-TAB_THICK-TXT_PAD-SIDE_MFD_H;/*Sensaround Plane, mirror about screen center for RH*/
-        UIR(isRH ? UI_ID_SENSA_RH : UI_ID_SENSA_LH,sx,sy,SIDE_MFD_W,SIDE_MFD_H);
-        DrawSensaroundQuad(sx,sy,SIDE_MFD_W,SIDE_MFD_H,isRH ? sensaroundCamViewRight : sensaroundCamViewLeft);
+        i16 sx=isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W : TAB_THICK+MFD_SPACING, sy=UI_H-TAB_THICK-TXT_PAD-MFD_H;/*Sensaround Plane, mirror about screen center for RH*/
+        UIR(isRH ? UI_ID_SENSA_RH : UI_ID_SENSA_LH,sx,sy,SIDE_MFD_W,MFD_H);
+        DrawSensaroundQuad(sx,sy,SIDE_MFD_W,MFD_H,isRH ? sensaroundCamViewRight : sensaroundCamViewLeft);
     } else {
         if (tab == 1) {/*WeaponTab: WepNameText, WepIcon, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/
             i16 slot=World.invP1.weaponCurrent; if (slot>=0 && slot<7) { i32 widx=World.invP1.weaponInventoryIndices[slot]; if (widx >= 0) {UIRText(MID(isRH,WEAPON_NAME),isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W+TXT_PAD : TAB_THICK+MFD_SPACING+TXT_PAD,520,T_RED,FONT_NORMAL,0.8f,270,Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16)UIRImg(MID(isRH,WEAPON_ICON),isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIcon*/
@@ -1014,10 +1005,10 @@ void SideMFD(bool isRH) { // 320x240
                 i16 x0=(i16)(isRH ? 1207 : 24);
                 UIRImg(MID(isRH,WEAPON_AMMO),x0,652,140,42,World.invP1.wepLoadedWithAlternate[slot]?897:898);/*Ammo pane*/
                 u16 ammoIconTex=WeaponAmmoIconTex(wep16,World.invP1.wepLoadedWithAlternate[slot]!=0);
-                if (ammoIconTex) UIRImg(UI_ID_NONE,(i16)(x0+4),654,34,36,ammoIconTex);/*Ammo icon (Unity clipBox icon)*/
+                if (ammoIconTex) UIRImg(UI_ID_NONE,(i16)(x0+4),654,34,36,ammoIconTex);/*Ammo icon*/
                 int dig[3]; WeaponMagazineDigits(wep16,slot,dig);
-                static const i16 digX[3]={42,58,75};/*Unity digit cells are 20x20 on a 16.2 pitch, hundreds first, centred in the 42px pane.*/
-                for (int d=0;d<3;++d) if (dig[d]<10) RenderUIImage((i16)(x0+digX[d]),663,20,20,1053+dig[d]);/*tex 10 == nullsprite: skip*/
+                static const i16 digX[3]={42,58,75};
+                for (int d=0;d<3;++d) if (dig[d] < 10) RenderUIImage((i16)(x0+digX[d]),663,20,20,1053+dig[d]);/*tex 10 == nullsprite: skip*/
                 UIRImg(MID(isRH,WEAPON_RELOAD),(i16)(x0+148),652,60,40,908); UIRText(MID(isRH,WEAPON_RELOAD),(i16)(x0+153),663,UIOver(MID(isRH,WEAPON_RELOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,50,Sys_Text.stringTable[11]);
                 UIRImg(MID(isRH,WEAPON_UNLOAD),(i16)(x0+214),652,60,40,908); UIRText(MID(isRH,WEAPON_UNLOAD),(i16)(x0+219),663,UIOver(MID(isRH,WEAPON_UNLOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,50,Sys_Text.stringTable[881]);
             } } }
@@ -1037,18 +1028,12 @@ void SideMFD(bool isRH) { // 320x240
             }
             if (data==2) {/*Keycode pad*/
                 for (u8 i=0;i<12;++i) { i16 kx=(i16)(keyBtnX[i%3]+dx),ky=keyBtnY[i/3]; UIRImg(MID(isRH,KEYCODE_0)+keyBtnK[i],kx,ky,42,38,2133);/*keypad_end*/ RenderUIImage((i16)(kx+2),(i16)(ky+3),38,35,2134);/*keypad_inner_on*/ RenderTextC((i16)(kx+21),(i16)(ky+14),T_GREEN,FONT_NORMAL,0.8,"%s",keyBtnLabel[i]); }
-                /*KeycodeDigitImage.digits[] is elnum0..elnum9 with elnum_null last at index 10, and its Update() maps a
-                  -1 entry to 10, so an unfilled slot shows elnum_null and a filled one shows its own digit sprite
-                  (923..932 here, 2132 for the blank).  The three GameObjects sit at anchoredPosition.x -26 / 0 / 25.9,
-                  so left to right is Huns, Tens, Ones.  The display is driven by those three fields alone and never by
-                  currentEntry, which is why MFDManager.SendKeypadKeycodeToDataTab's difficultyMission<=1 preload of
-                  currentEntry=keycode still shows three blank slots until something is actually typed.*/
                 i8 keyDigits[3]={World.Sys_UI.keycodeHuns,World.Sys_UI.keycodeTens,World.Sys_UI.keycodeOnes};
                 for (u8 d=0;d<3;++d) { i8 dg=keyDigits[d]; UIRImg(MID(isRH,KEYCODE_DIGIT_0)+d,(i16)(90+41*d+dx),526,32,32,dg<0?2132:923+dg); }
                 UIRImg(MID(isRH,KEYCODE_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
             if (data==5) RenderSearch(isRH);
-            if (data==6) {/*AudioLog: LH shows name+sender+subject+LH image, RH shows name+RH image only. Unity LogDataTabContainerManager.SendLogData.*/
+            if (data==6) {
                 int li=(int)World.Sys_UI.logReferenceIndex; if(li<0||li>=LOGCNT){li=0;} u16 im=(u16)(isRH?Sys_Text.audioLogImagesRefIndicesRH[li]:Sys_Text.audioLogImagesRefIndicesLH[li]);
                 UIRImg(MID(isRH,AUDIOLOG_IMAGE),20+dx,528,263,240,(u16)(LOG_IMG_BASE+im));/*LogImage*/
                 char snd[192]; if(isRH) snd[0]=0; else sFormat(snd,sizeof(snd),"%s%s",Sys_Text.stringTable[893],World.audiologSenders[li]);
@@ -1056,47 +1041,35 @@ void SideMFD(bool isRH) { // 320x240
                 UIR(MID(isRH,AUDIOLOG_SUBJECT),29+dx,701,(i16)(MeasureLineAdvance(Sys_Text.stringTable[894],FONT_NORMAL)*0.8f),(i16)(3*22.0f*0.8f)); RenderTextL(29+dx,701,T_YELLOW,FONT_NORMAL,0.8,isRH?"":"%s\n\n%s",Sys_Text.stringTable[894],World.audiologSubjects[li]);
             }
             if (data==3) {/*GridPuzzle*/
-                /* Unity GridPuzzlePanel puts the themed gridcontainer_* under the cells and the
-                   unthemed gridcontainer over it, so both layers follow pg_theme here. */
-                u16 outerTex=PG_TEX_CONTAINER_GRAY, innerTex=PG_TEX_CONTAINER_BASE;
+                u16 outerTex = 2139, innerTex = 2138;
                 switch(PGThemeOffset(World.Sys_UI.pg_theme)){
-                    case 1: outerTex=innerTex=PG_TEX_CONTAINER_GREEN; break;
-                    case 2: outerTex=innerTex=PG_TEX_CONTAINER_PURPLE; break;
-                    case 3: outerTex=innerTex=PG_TEX_CONTAINER_BLUE; break;
+                    case 1: outerTex=innerTex = 3396; break;
+                    case 2: outerTex=innerTex = 3397; break;
+                    case 3: outerTex=innerTex = 3395; break;
                 }
                 RenderUIImage(42+dx,555,221,163,outerTex);/*OuterColorBorder gridcontainer_gray*/ RenderUIImage(46+dx,558,214,157,innerTex);/*ContainerEdge gridcontainer*/
-                UIRImg(MID(isRH,PUZZLE_NODE_SOURCE),25+dx,621,29,29,2141); UIRImg(MID(isRH,PUZZLE_NODE),250+dx,621,29,29,World.Sys_UI.pg_solved?PG_TEX_NODE_ON:2140);
-                /* One sprite per cell, chosen exactly like Unity PuzzleGrid.UpdateCellImages():
-                   Standard off -> gridX*, Standard on unpowered -> gridPlus*, Standard on powered ->
-                   gridPlusOn0 (unthemed); And powered -> gridSpecialOn0*, And unpowered -> gridSpecial*;
-                   Bypass powered -> gridAlwaysOn1 (unthemed), Bypass unpowered -> gridAlwaysOn0*; Off -> gridNull. */
+                UIRImg(MID(isRH,PUZZLE_NODE_SOURCE),25+dx,621,29,29,2141); UIRImg(MID(isRH,PUZZLE_NODE),250+dx,621,29,29,World.Sys_UI.pg_solved ? 3398 : 2140);
                 u16 toff=PGThemeOffset(World.Sys_UI.pg_theme);
                 for (u8 c=0;c<35;++c) {
                     PuzzleCellType ct=World.Sys_UI.pg_type[c];
-                    /*Off cells are skipped entirely.  Unity's UpdateCellImages has no Off branch at all, so the cell
-                      keeps whatever its Image component already held and nothing is drawn, and OnGridCellClick only
-                      acts on Standard.  Voxen fell through to texture 0, which painted an opaque black square over the
-                      themed container.  UI_BeginFrame clears every component's active flag each frame, so not calling
-                      UIRImg here also leaves the cell correctly unclickable.*/
                     if (ct==PuzzleCellType_Off) continue;
                     i16 cx=(i16)(puzCellX[c%7]+dx),cy=puzCellY[c/7];
                     u16 tex;
                     bool cellOn=World.Sys_UI.pg_cell[c];
                     bool powered=World.Sys_UI.pg_powered[c];
                     if (ct==PuzzleCellType_Standard) {
-                        if (!cellOn) tex=(u16)(PG_TEX_X_GRAY+toff);
-                        else if (powered) tex=PG_TEX_PLUS_ON0;
-                        else tex=(u16)(PG_TEX_PLUS_GRAY+toff);
+                        if (!cellOn) tex=(u16)(3369+toff);
+                        else if (powered) tex=3373;
+                        else tex=(u16)(3365+toff);
                     } else if (ct==PuzzleCellType_And) {
-                        tex=powered ? (u16)(PG_TEX_SPECIAL_ON0_GRAY+toff) : (u16)(PG_TEX_SPECIAL_GRAY+toff);
+                        tex=powered ? (u16)(3381+toff) : (u16)(3377+toff);
                     } else {/*PuzzleCellType_Bypass*/
-                        tex=powered ? PG_TEX_ALWAYSON1 : (u16)(PG_TEX_ALWAYSON0_GRAY+toff);
+                        tex=powered ? 3393 : (u16)(3389+toff);
                     }
                     /*Register click area and render cell using the same texture*/
                     UIRImg(MID(isRH,PUZZLE_CELL_0)+c,cx,cy,29,29,tex);
                 }
-                /*Genius hover preview: highlight cells that would be toggled by clicking the hovered cell (Unity PuzzleGrid OnGridCellHover).*/
-                if (World.geniusActive && !World.Sys_UI.pg_solved) {
+                if (World.geniusActive && !World.Sys_UI.pg_solved) { /*Genius hover preview highlight cells that would be toggled by clicking the hovered cell*/
                     int hoverCell=-1; for (u8 c=0;c<35;++c) if (UIOver(MID(isRH,PUZZLE_CELL_0)+c)) { hoverCell=(int)c; break; }
                     if (hoverCell>=0) { bool preview[35]; PGComputePreview(hoverCell,preview); for (u8 c=0;c<35;++c) if (preview[c]) { i16 cx=(i16)(puzCellX[c%7]+dx),cy=puzCellY[c/7]; RenderUIImage(cx,cy,29,29,2136);/*geniusgrid_highlight*/ } }
                 }
@@ -1108,27 +1081,20 @@ void SideMFD(bool isRH) { // 320x240
                 RenderUIImage(82+dx,570,139,192,2143);/*ContainerCenter wire_center*/ RenderUIImage(34+dx,521,235,44,2144);/*LevelsBox*/ RenderUIImage(40+dx,526,235,34,0);/*Background*/ RenderUIImage(43+dx,526,6,34,2142);/*Fill*/
                 UIRImg(MID(isRH,WIRE_SLIDER),40+dx,509,235,69,1078);/*Handle - whole levels box drags*/ UIRImg(MID(isRH,WIRE_TARGET),204+dx,522,66,42,2145);/*TargetLine*/
                 i8 geniusHintWire[14]; for (u8 n=0;n<14;++n) geniusHintWire[n]=-1;
-                if (World.geniusActive) { for (u8 w=0;w<7;++w) if (World.Sys_UI.pw_wireOn[w]) { i8 l=World.Sys_UI.pw_tgtL[w],r=World.Sys_UI.pw_tgtR[w]; if (l>=0&&l<7) geniusHintWire[l]=(i8)w; if (r>=0&&r<7) geniusHintWire[7+r]=(i8)w; } }/*Unity PuzzleWire: geniusHintsLH/RH[wireTarget].enabled=true while geniusActive; wireColors revert to rememberColors (true per-wire colors) instead of all-Yellow on hard.*/
-                /*PuzzleWire.Update's display rule: outside Genius every wire is Yellow on hard (difficultyPuzzle 3),
-                  and with Genius active the true rememberColors come back.  pw_wireColor holds the true colors; this
-                  is where Unity's all-Yellow substitution actually has to happen.*/
+                if (World.geniusActive) { for (u8 w=0;w<7;++w) if (World.Sys_UI.pw_wireOn[w]) { i8 l=World.Sys_UI.pw_tgtL[w],r=World.Sys_UI.pw_tgtR[w]; if (l>=0&&l<7) geniusHintWire[l]=(i8)w; if (r>=0&&r<7) geniusHintWire[7+r]=(i8)w; } }
                 u8 wireHud[7]; for (u8 w=0;w<7;++w) wireHud[w]=(World.diffPuz==3 && !World.geniusActive) ? (u8)HUDC_YELLOW : World.Sys_UI.pw_wireColor[w];
-                /*PuzzleWire.ChangeAppearance gives every wire a LineRenderer from GetPositionOfLHNode(wireNLHPosition)
-                  to GetPositionOfRHNode(wireNRHPosition) and paints both ends GetColor(wireColors[N]).  Voxen has no
-                  LineRenderer, so each wire is a wire.png quad stretched between the two node centres and rotated onto
-                  that run, tinted to the same colour.  Drawn before the nodes so the sprite caps cover the ends, which
-                  is the overlap Unity gets for free from the endpoints sitting exactly on the node centres.  Unity's
-                  serialized widthMultiplier is 0.004 in a runtime-built MFD canvas whose absolute scale is not in the
-                  scene dump (the ratio it implies against the 106-unit line length is sub-pixel), so WIRE_THICK is
-                  picked from the 26x29 node sprite instead.  CheckEnabledNodes enables wires purely on wireIsActive,
-                  so a wire still draws when its node row is hidden.*/
-                for (u8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 lc=PWFindCol(World.Sys_UI.pw_curL,w),rc=PWFindCol(World.Sys_UI.pw_curR,w); if (lc<0||lc>6||rc<0||rc>6) continue;
+                for (u8 w=0;w<7;++w) {
+                    if (!World.Sys_UI.pw_wireOn[w]) continue;
+                    i8 lc=PWFindCol(World.Sys_UI.pw_curL,w),rc=PWFindCol(World.Sys_UI.pw_curR,w); if (lc<0||lc>6||rc<0||rc>6) continue;
+                    
                     float x0=(float)((57+dx)+13), y0=(float)wireNodeY[lc]+14.5f, x1=(float)((222+dx)+13), y1=(float)wireNodeY[rc]+14.5f;
                     float len=vsqrtf((x1-x0)*(x1-x0)+(y1-y0)*(y1-y0)), cx=(x0+x1)*0.5f, cy=(y0+y1)*0.5f, tr,tg,tb;
                     if (len<0.5f) continue;/*both ends on the same row: nothing to draw between them*/
+                        
                     hudColorToRGB(wireHud[w],&tr,&tg,&tb);
-                    RenderUIImageExtended((i16)vround(cx-len*0.5f),(i16)vround(cy-WIRE_THICK*0.5f),(i16)vround(len),(i16)WIRE_THICK,3328/*wire.png*/,
-                        __builtin_atan2f(y1-y0,x1-x0),0.5f,0.5f,tr,tg,tb); }
+                    RenderUIImageExtended((i16)vround(cx-len*0.5f),(i16)vround(cy-8.0f*0.5f),(i16)vround(len),8,3328/*wire.png*/,
+                    __builtin_atan2f(y1-y0,x1-x0),0.5f,0.5f,tr,tg,tb);
+                }
                 u8 wireDraw[7]; for (u8 w=0;w<7;++w) wireDraw[w]=hudColorToText(wireHud[w]);
                 for (u8 n=0;n<14;++n) { if (!World.Sys_UI.pw_rowActive[n%7]) continue;/*PuzzleWire.CheckEnabledNodes: nodeRowIsActive[i] false hides both that row's LH and RH node.*/ i16 nx=(i16)((n<7?57:222)+dx),ny=wireNodeY[n%7]; UIRImg(MID(isRH,WIRE_NODE_0)+n,nx,ny,26,29,2146);/*wire_node*/ RenderUIImage((i16)(nx+4),(i16)(ny+6),16,16,0);/*SelectedIndicator*/ if (geniusHintWire[n]>=0) RenderTextL((i16)(nx+1),(i16)(ny+3),wireDraw[geniusHintWire[n]],FONT_NORMAL,1.0f,"◆");/*GeniusHint in the wire's true color*/ }
                 UIRImg(MID(isRH,WIRE_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
@@ -1161,9 +1127,9 @@ void CenterMFD() { //640x240
     for (u8 i=0;i<4;++i) UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.MFD_CenterTab!=5) ? 1024 : 1021);/*Main/Hardware/General/Software center tab buttons*/
     if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,552,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,557,676,210,1075); RenderTextL(586,558,T_GREEN,FONT_NORMAL,0.8f,Sys_Text.stringTable[878]/*ADD TO INVENTORY*/); } }
     if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0) {
-        i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-CTR_MFD_H;/*SensaroundCenter rearview over the center MFD content area*/
-        UIR(UI_ID_SENSA_CTR,sx,sy,CTR_MFD_W,CTR_MFD_H);
-        DrawSensaroundQuad(sx,sy,CTR_MFD_W,CTR_MFD_H,sensaroundCamViewCenter);
+        i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-MFD_H;/*SensaroundCenter rearview over the center MFD content area*/
+        UIR(UI_ID_SENSA_CTR,sx,sy,CTR_MFD_W,MFD_H);
+        DrawSensaroundQuad(sx,sy,CTR_MFD_W,MFD_H,sensaroundCamViewCenter);
     } else {
         i16 hdrH=UI_H-TAB_THICK-TXT_PAD-184+TXT_PAD;
         if (World.Sys_UI.MFD_CenterTab==1) {/*Main*/
@@ -1209,17 +1175,17 @@ void CenterMFD() { //640x240
                 if (i<SW_GAMES) RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,(i<=SW_SHIELD)?"v%d":"x%d",count); else RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0); }
         }
         if (World.Sys_UI.MFD_CenterTab!=5) return;/*EReader*/
-        static const u16 mediaHdr[4]={42/*EMAIL*/,39/*LOGS*/,43/*DATA*/,885/*NOTES*/};/*Unity MFDManager.Open*TableContents sets multiMediaHeaderLabel per tab. Indexed by MFD_MediaTab: EMAIL=0,LOG=1,DATA=2,NOTES=3 (same order as the side-MFD labels[]).*/
+        static const u16 mediaHdr[4]={42/*EMAIL*/,39/*LOGS*/,43/*DATA*/,885/*NOTES*/};
         UIRText(UI_ID_CMFD_MEDIA_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[mediaHdr[World.Sys_UI.MFD_MediaTab&3]]);
         if (World.Sys_UI.MFD_MediaTab==MM_LOG_TABLE) {
             if (World.Sys_UI.MFD_ReaderView==MFD_READER_CONTENTS) {
-                for (u8 i=0;i<10;++i) { if (!World.invP1.numLogsFromLevel[i]) continue;/*Unity LogTableContentsButtonsManager: only levels holding logs get a button*/ i16 x=(i16)(i<7?454:681),y=generalRowY[i%7]; UIR(UI_ID_CMFD_LOG_TABLE_0+i,x,y,226,24); RenderTextL(x,y,T_GREEN,FONT_NORMAL,0.8,"%s%d: %d",Sys_Text.stringTable[40]/*Level */,i,World.invP1.numLogsFromLevel[i]);/*raw audioLogLevelFound index: Unity OpenLogsLevelFolder prints curlevel unoffset*/ }
+                for (u8 i=0;i<10;++i) { if (!World.invP1.numLogsFromLevel[i]) continue; i16 x=(i16)(i<7?454:681),y=generalRowY[i%7]; UIR(UI_ID_CMFD_LOG_TABLE_0+i,x,y,226,24); RenderTextL(x,y,T_GREEN,FONT_NORMAL,0.8,"%s%d: %d",Sys_Text.stringTable[40]/*Level */,i,World.invP1.numLogsFromLevel[i]); }
             } else if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) {
                 for (u8 i=0;i<15;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; int li=i<(int)World.Sys_UI.logFolderCount?World.Sys_UI.logFolderList[i]:-1; if(li<0){continue;} UIR(UI_ID_CMFD_LOG_ENTRY_0+i,x,y,222,21); RenderTextL(x,y,World.invP1.readLog[li]?T_GREEN_MENU_GLOW:T_GREEN,FONT_NORMAL,0.8,"%s",World.audiologNames[li]); }
             } else if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) {
                 UIR(UI_ID_CMFD_LOG_TEXT,LOG_TX,LOG_TY,LOG_TW,LOG_TLINES*22); RenderTextL(LOG_TX,LOG_TY,T_GREEN,FONT_NORMAL,LOG_TSC,"%s",UILogTextPage());
                 i16 cmw=(i16)(TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR); bool more=UILogHasMore(); int totL=UILogFullLines();
-                const char* mcb=Sys_Text.stringTable[more?26:27];/*[MORE] while text remains, else [CLOSE]: Unity LogMoreButton*/ i16 mcbW=(i16)(MeasureLineAdvance(mcb,FONT_NORMAL)*0.8f);
+                const char* mcb=Sys_Text.stringTable[more?26:27]; i16 mcbW=(i16)(MeasureLineAdvance(mcb,FONT_NORMAL)*0.8f);
                 UIR(UI_ID_CMFD_LOG_MORE,(i16)(cmw+CTR_MFD_W-mcbW),LOG_BTN_Y,mcbW,26); RenderTextL((i16)(cmw+CTR_MFD_W-mcbW),LOG_BTN_Y,T_YELLOW,FONT_NORMAL,0.8,"%s",mcb);
                 if (totL>LOG_TLINES) { const char* bk=Sys_Text.stringTable[879];/*[BACK] on every page of a multipage log*/ i16 bkW=(i16)(MeasureLineAdvance(bk,FONT_NORMAL)*0.8f); UIR(UI_ID_CMFD_LOG_BACK,372,LOG_BTN_Y,bkW,26); RenderTextL(372,LOG_BTN_Y,T_YELLOW,FONT_NORMAL,0.8,"%s",bk); } 
             }
@@ -1228,20 +1194,20 @@ void CenterMFD() { //640x240
         if (World.Sys_UI.MFD_MediaTab==MM_DATA_TABLE) { for (u8 i=0;i<13;++i) { i16 x=mediaColX[i/8],y=mediaRowY[i%8]; int li=UIDataRefAt(i); if(li<0){continue;} UIR(UI_ID_CMFD_DATA_ENTRY_0+i,x,y,223,21); RenderTextL(x,y,World.invP1.readLog[li]?T_GREEN_MENU_GLOW:T_GREEN,FONT_NORMAL,0.8,"%s",World.audiologNames[li]); } }
         if (World.Sys_UI.MFD_MediaTab==MM_NOTES) {
             const i32 secCode[6]={World.lev1SecCode,World.lev2SecCode,World.lev3SecCode,World.lev4SecCode,World.lev5SecCode,World.lev6SecCode};
-            for(u8 i=0;i<18;++i){i16 x=(i16)(372+(i/6)*167),y=(i16)(hdrH+22+(i%6)*29); UIR(UI_ID_CMFD_NOTE_TOGGLE_0+i,x,y,166,39); RenderUIImage(x,(i16)(y+2),19,18,910);/*Background*/ if (i<6){if(secCode[i]>=0)RenderTextL((i16)(x+21),(i16)(y+3),T_GREEN,FONT_NORMAL,0.8,"%s%d%s%s%u.",Sys_Text.stringTable[556],i+1,Sys_Text.stringTable[557],Sys_Text.stringTable[558],secCode[i]); else RenderTextL((i16)(x+21),(i16)(y+3),T_GREEN,FONT_NORMAL,0.8,"%s%d%s",Sys_Text.stringTable[556],i+1,Sys_Text.stringTable[557]);}/*QuestLogNotesManager.cs:208 appends the code only once the level nodes are destroyed, so an unearned (-1) code shows the bare instruction instead of a number.*/ else RenderTextL((i16)(x+21),(i16)(y+3),T_GREEN,FONT_NORMAL,0.8,"%s",noteText[i-6]);}
+            for(u8 i=0;i<18;++i){i16 x=(i16)(372+(i/6)*167),y=(i16)(hdrH+22+(i%6)*29); UIR(UI_ID_CMFD_NOTE_TOGGLE_0+i,x,y,166,39); RenderUIImage(x,(i16)(y+2),19,18,910);/*Background*/ if (i<6){if(secCode[i]>=0)RenderTextL((i16)(x+21),(i16)(y+3),T_GREEN,FONT_NORMAL,0.8,"%s%d%s%s%u.",Sys_Text.stringTable[556],i+1,Sys_Text.stringTable[557],Sys_Text.stringTable[558],secCode[i]); else RenderTextL((i16)(x+21),(i16)(y+3),T_GREEN,FONT_NORMAL,0.8,"%s%d%s",Sys_Text.stringTable[556],i+1,Sys_Text.stringTable[557]);} else RenderTextL((i16)(x+21),(i16)(y+3),T_GREEN,FONT_NORMAL,0.8,"%s",noteText[i-6]);}
         }
     }
 }
 
-/*Sliders need .down rather than .pressed, so they get their own short pass ahead of the click walk.*/
-static void UI_WeaponEnergySliderSet(bool rh) {
+static void UI_WeaponEnergySliderSet(bool rh) { /*Sliders need .down rather than .pressed, so they get their own short pass ahead of the click walk.*/
     if (!CurrentWeaponUsesEnergy()) return;
-    int slot=World.invP1.weaponCurrent;
-    if (slot<0 || slot>=7) return;
-    float value=((float)World.cursorPos_x-UIC(MID(rh,WEAPON_ENERGY_SLIDER)).min.x)/164.0f;
-    World.invP1.weaponEnergySetting[slot]=vclamp(value*100.0f,0.0f,100.0f);
-    World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true;
+    int slot = World.invP1.weaponCurrent; if (slot<0 || slot>=7) return;
+    
+    float value = ((float)World.cursorPos_x - UIC(MID(rh,WEAPON_ENERGY_SLIDER)).min.x) / 164.0f;
+    World.invP1.weaponEnergySetting[slot] = vclamp(value*100.0f,0.0f,100.0f);
+    World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true;
 }
+
 static void UI_DragRegions(void) {
     if (!Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down) return;
     for (u8 s=0;s<2;++s) {
@@ -1326,9 +1292,9 @@ void UI_ProcessNavigation(void) {
     if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive || World.Sys_UI.vmailActive) { World.Sys_UI.generalClickSlot = -1; return; }
     
     static const u16 keys[8] = {KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F7, KEY_F8, KEY_F11};
-    static const u8 tabs[8]={1, 2, 3, 4, 1, 2, 3, 4};
+    static const u8 mfdtabs[8]={1, 2, 3, 4, 1, 2, 3, 4};
     for (u8 i=0;i<8;++i) {
-        if (Sys_Input.keyStates[keys[i]].pressed) { Sys_Input.keyStates[keys[i]].pressed=false; MFD_SelectTab(i<4?1:2,tabs[i],true); }
+        if (Sys_Input.keyStates[keys[i]].pressed) { Sys_Input.keyStates[keys[i]].pressed=false; MFD_SelectTab(i<4?1:2,mfdtabs[i],true); }
     }
     
     if (Sys_Input.keyStates[KEY_HOME].pressed) { /*HUD Home: center = Main, left = Weapon, right = Automap*/
@@ -1362,23 +1328,21 @@ static double RenderUI() {
     if (!EditSelIsActive()) editFieldEditing=false;
     if (World.creditsActive) {
         RenderUIImage(0,0, 1366,768, 0);/*Video blackground*/
-        /*CreditsScroll.cs: Escape leaves the credits; LMB steps forward a page and steps off the last one; RMB steps back a page. The stats page is skipped unless the game was just finished.
-          The outro already returned the menu to the Singleplayer page, so leaving just drops the credits overlay (Unity GoBack from the credits page lands on Singleplayer too).*/
-        if (Sys_Input.keyStates[KEY_ESCAPE].pressed) { World.creditsActive=false; PlayMenuMusic(); }/*Escape leaves the credit pages for the menu*/
+        if (Sys_Input.keyStates[KEY_ESCAPE].pressed) { World.creditsActive=false; PlayMenuMusic(); }
         else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed && World.creditsPageIndex < 22) {
-            uiClickBlocked = uiClickLock = true;/*UI_CLICK_CONSUMED: the menu must not see this press on the same frame (that is what re-clicked PLAY CREDITS off the last page)*/
+            uiClickBlocked = uiClickLock = true;
             ++World.creditsPageIndex;
-            if (World.creditsPageIndex == 1 && !World.gameFinished) ++World.creditsPageIndex;/*skip stats when playing from the menu*/
+            if (World.creditsPageIndex == 1 && !World.gameFinished) ++World.creditsPageIndex;
         } else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed && World.creditsPageIndex>0) { uiClickBlocked = uiClickLock = true; --World.creditsPageIndex; }
         
-        if (World.creditsPageIndex>=22) { World.creditsActive=false; PlayMenuMusic(); return get_time(); }/*bottom: back to the menu*/
+        if (World.creditsPageIndex>=22) { World.creditsActive=false; MenuGoBack(); return get_time(); }
         if (World.creditsPageIndex==1) { CreditsStats(); RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); }
         else RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]);
         return get_time();
     }
     if (World.menuActive) RenderMenu(); else if (World.paused) RenderPausedUI();
     if (World.menuActive || World.paused) {
-        if (resDropdownOpen && currentMenuPage==Mpg_Options && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(resSelectedIdx<resDropdownCount-1){resSelectedIdx++;} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(resSelectedIdx>0){resSelectedIdx--;} } }
+        if (resDropdownOpen && currentMenuPage==MPG_OPTS && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(resSelectedIdx<resDropdownCount-1){resSelectedIdx++;} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(resSelectedIdx>0){resSelectedIdx--;} } }
         else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_DOWN].pressed) { currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0                 : currentMenuItem + 1; }
         else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_UP  ].pressed) { currentMenuItem = (currentMenuItem - 1) < 0              ? menuItemCount - 1 : currentMenuItem - 1; }
     } else if (!World.Sys_UI.vmailActive) {
@@ -1398,7 +1362,6 @@ static double RenderUI() {
                 float sx, sy;
                 if (!WorldToScreenPoint(V3_AsubB(tpos,World.position[PLAYER1]),&sx,&sy))continue;
                 
-                /* The marker is a fixed world size, so scale it with range; 128px is the authored size at 7.68m. */
                 float imgSz=vclamp(128.0f * (7.68f / vmax(targetRange,0.25f)), 24.0f, 640.0f), imgHalf=imgSz*0.5f;
                 if(tid&&hw)RenderUIImage((i16)(sx-imgHalf),(i16)sy,(i16)(imgSz*1.2f),(i16)(imgSz*1.38f),1051);
                 char label[192]={0}; size_t used=0; u8 ver=World.invP1.hwVers[HW_TID_IDX]; float range=targetRange;
@@ -1427,29 +1390,29 @@ static double RenderUI() {
             if (World.curLev==LEVEL_CYBERSPACE)RenderTextL(1137,570,T_YELLOW,FONT_NORMAL,0.8,Sys_Text.stringTable[442]/*"level 1 elevator taken off line - SHODAN security block established 04.NOV.72"*/);/*CyberSPrint*/
             if((World.invP1.hardwareIsActive & HW_BIO)!=0){/*BioMonitor*/
                 BiomonitorBlitToUI();
-                if (!Cheats.showFPS) {/*showFPS turns the graphs into frame-time scopes, so the stock readout is hidden to keep the graph area clear*/
-                char biomText[128];
-                int y = 83;
-                RenderTextL(4,y,T_YELLOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[526]); /*Biomonitor Active:*/ y+=16;
-                RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[527]); /*Heart Rate:*/
-                sFormat(biomText,sizeof(biomText),"%d",(int)bioMonitor.heartRate); RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",biomText);
-                RenderTextL(142,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[529]); /*BPM*/ y+=16;
-                if (World.invP1.hwVers[HW_BIO_IDX] > 1 && World.invP1.patchActive) {
-                    RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[528]); /*Patches Active:*/
-                    int px = 119; bool first = true;
-                    if (World.invP1.patchActive & PATCH_MEDI) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[520]:" "); px += 40; first = false; }
-                    if (World.invP1.patchActive & PATCH_STAMINUP) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[521]:" "); px += 48; first = false; }
-                    if (World.invP1.patchActive & PATCH_SIGHT) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[522]:" "); px += 36; first = false; }
-                    if (World.invP1.patchActive & PATCH_GENIUS) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[523]:" "); px += 42; first = false; }
-                    if (World.invP1.patchActive & PATCH_BERSERK) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[524]:" "); px += 42; first = false; }
-                    if (World.invP1.patchActive & PATCH_REFLEX) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[525]:" "); px += 36; first = false; }
-                    if (World.invP1.patchActive & PATCH_DETOX) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[530]:" "); px += 36; first = false; }
-                    y+=16;
-                }
-                RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[531]); /*Fatigue:*/
-                if (World.invP1.fatigue >= 80.0f) RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[532]); /*High!*/
-                else if (World.invP1.fatigue > 30.0f) RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[533]); /*Moderate*/
-                else RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[534]); /*Low*/
+                if (!Cheats.showFPS) {/*showFPS cheat turns graphs into frame-time scopes, so the stock readout is hidden to keep the graph area clear*/
+                    char biomText[128];
+                    int y = 83;
+                    RenderTextL(4,y,T_YELLOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[526]); /*Biomonitor Active:*/ y+=16;
+                    RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[527]); /*Heart Rate:*/
+                    sFormat(biomText,sizeof(biomText),"%d",(int)bioMonitor.heartRate); RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",biomText);
+                    RenderTextL(142,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[529]); /*BPM*/ y+=16;
+                    if (World.invP1.hwVers[HW_BIO_IDX] > 1 && World.invP1.patchActive) {
+                        RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[528]); /*Patches Active:*/
+                        int px = 119; bool first = true;
+                        if (World.invP1.patchActive & PATCH_MEDI) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[520]:" "); px += 40; first = false; }
+                        if (World.invP1.patchActive & PATCH_STAMINUP) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[521]:" "); px += 48; first = false; }
+                        if (World.invP1.patchActive & PATCH_SIGHT) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[522]:" "); px += 36; first = false; }
+                        if (World.invP1.patchActive & PATCH_GENIUS) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[523]:" "); px += 42; first = false; }
+                        if (World.invP1.patchActive & PATCH_BERSERK) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[524]:" "); px += 42; first = false; }
+                        if (World.invP1.patchActive & PATCH_REFLEX) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[525]:" "); px += 36; first = false; }
+                        if (World.invP1.patchActive & PATCH_DETOX) { RenderTextL(px,y,T_GREEN,FONT_NORMAL,0.8,"%s",first?Sys_Text.stringTable[530]:" "); px += 36; first = false; }
+                        y+=16;
+                    }
+                    RenderTextL(4,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[531]); /*Fatigue:*/
+                    if (World.invP1.fatigue >= 80.0f) RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[532]); /*High!*/
+                    else if (World.invP1.fatigue > 30.0f) RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[533]); /*Moderate*/
+                    else RenderTextL(120,y,T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[534]); /*Low*/
                 }
             }
             RenderTextL(1270,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderTextL(1308,78,T_WHITE,FONT_NORMAL,0.8,"0"); RenderSearchFX();
@@ -1473,7 +1436,12 @@ static double RenderUI() {
             if (World.Sys_UI.vmailFrame == (vmailStartFrames[World.Sys_UI.vmailActive]+11)) play_wav(sounds[99], AppliedFXVol(1.0f), (V3){0,0,0}, false);
             World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[World.Sys_UI.vmailActive]) World.Sys_UI.vmailFrame = vmailEndFrames[World.Sys_UI.vmailActive];
         }
-        { static u32 heldMail = 0xFFFFFFFFu; u32 mrt = VideoFrameTexIndex(World.Sys_UI.vmailFrame); if (mrt != 0xFFFFFFFFu) heldMail = mrt; if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,heldMail);/*Vmail viewer*/ }
+        {
+            static u32 heldMail = 0xFFFFFFFFu;
+            u32 mrt = VideoFrameTexIndex(World.Sys_UI.vmailFrame);
+            if (mrt != 0xFFFFFFFFu) heldMail = mrt;
+            if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,heldMail);/*Vmail viewer*/
+        }
     }
     i16 debugTextStartY = 90;
     if (Cheats.showLocation && !World.menuActive) RenderTextL(16, debugTextStartY, T_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f",World.position[PLAYER1].x,World.position[PLAYER1].y,World.position[PLAYER1].z,World.rotation[PLAYER1].x,World.rotation[PLAYER1].y,World.rotation[PLAYER1].z,World.rotation[PLAYER1].w);
@@ -1499,10 +1467,11 @@ static double RenderUI() {
         RenderTextL(16 + 250, debugTextStartY - lineSpacing,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
     }
     i16 curhalf=CURSOR_SZ/2; float curhalff=(float)curhalf;
-    if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused){RenderUIImage((i16)(World.cursorPos_x) - curhalf,(i16)(World.cursorPos_y) - curhalf,CURSOR_SZ,CURSOR_SZ,GetCursorTexture());}else if (!Cheats.noHUD){RenderUIImage((i16)((float)UI_W*0.5f-curhalff),(i16)((float)UI_H*0.5f-curhalff),CURSOR_SZ,CURSOR_SZ,GetCursorTexture());}/*Centered on UI fixed resolution 1366x768 FBO*/
+         if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { RenderUIImage((i16)(World.cursorPos_x) - curhalf,(i16)(World.cursorPos_y) - curhalf,CURSOR_SZ,CURSOR_SZ,GetCursorTexture()); }
+    else if (!Cheats.noHUD)                                                              { RenderUIImage((i16)((float)UI_W*0.5f-curhalff),(i16)((float)UI_H*0.5f-curhalff)    ,CURSOR_SZ,CURSOR_SZ,GetCursorTexture()); }/*Centered on UI fixed resolution 1366x768 FBO*/
     if(World.invP1.grenActive && World.invP1.holdingObject && !World.menuActive && !World.paused && !Cheats.noHUD) {
-        i16 cursorX=World.inventoryMode?World.cursorPos_x:(i16)(UI_W/2),cursorY=World.inventoryMode?World.cursorPos_y:(i16)(UI_H/2);
-        RenderTextL(cursorX+curhalf+6,cursorY-8,T_YELLOW,FONT_NORMAL,0.8f,"Live");
+        i16 cursorX = World.inventoryMode ? World.cursorPos_x : (i16)(UI_W / 2), cursorY = World.inventoryMode ? World.cursorPos_y : (i16)(UI_H / 2);
+        RenderTextL(cursorX + curhalf + 6,cursorY - 8,T_YELLOW,FONT_NORMAL,0.8f,"Live");
     }
     return time_now;
 }

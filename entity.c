@@ -103,7 +103,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*90 chunk_flight2_2*/[90]={154,0,327,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*91 chunk_flight2_2_slice45*/[91]={155,0,327,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
 /*92 chunk_flight2_3*/[92]={156,0,328,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,0,{0,0,0},{0,0,0}},
-/*93 chunk_grove1_1*/[93]={189,0,362,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}}, /*TODO: Add grove grass extrusion in-shader instead of the Unity method of geometry shader + extra verts on separate meshes*/
+/*93 chunk_grove1_1*/[93]={189,0,362,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}}, /*TODO: Add grove grass extrusion in-shader*/
 /*94 chunk_grove1_2*/[94]={178,0,363,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
 /*95 chunk_grove1_2_slice45*/[95]={7488,0,363,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}},
 /*96 chunk_grove1_3*/[96]={178,0,364,MAX_TXRS,MAX_TXRS,MAX_TXRS,0,0,0,MAX_ANIMS,COLTYPE_MSH,{0,0,0},{0,0,0}}/*generic LOD card on purpose*/,
@@ -1038,11 +1038,11 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx == 592 || entIdx == 593) { World.instances[i].modelIndex = U16_MAX; } // 3D text decals (no mesh)
     if (pc && pc->health > 0.0f && World.instances[i].health <= 0.0f) World.instances[i].health = pc->health;
     if (!IdxIsNPC(entIdx) && pc) World.instances[i].bloodType = pc->blood;/*Prefab constant, NOT per-instance state: HealthManager.bloodType is a serialized prefab field and no level*.txt record carries a bloodType key, so the parser has no branch for it and must never grow one.  InitNPC has already claimed the NPC types.*/
-    if (entIdx == 717 /*ef_cyber_ice*/ && World.instances[i].cyberHealth <= 0.0f) World.instances[i].cyberHealth = 100.0f;/*ef_cyber_ice.prefab serializes cyberHealth 100, health -1*/
-      if (entIdx == 477 /*sec_camera*/) { Entity* ce = &World.instances[i]; ce->camStartYAngle = 0.0f; ce->camEndYAngle = 180.0f; ce->camWaitTime = 0.8f; ce->camRotatePositive = true; ce->camRotateEnabled = false; }/*SecurityCameraRotate field defaults; the level lines override the three angles.  camRotateEnabled defaults FALSE because sec_camera.prefab ships the SecurityCameraRotate component with m_Enabled: 0 -- a disabled MonoBehaviour is dispatched neither Start() nor Update(), so the sweep never runs at all.  The [HideInInspector] 'active' flag that Start() copies from enabled is never read by Update() and is irrelevant either way.*/
-    World.instances[i].questBitID = QB_None;/*AddInstance zero-fills, which would read as bit 0 (QB_RobotSpawnDeactivated). Unity's QuestBitRelay guards every bit with "if (<boolean> && ...)", so a relay that names no bit does nothing at all; QB_None reproduces that. Level parsing assigns a real bit to whichever boolean the record carries.*/
-    if (entIdx == 594 /*trigger_counter*/) World.instances[i].dontReset = true;/*trigger_counter.prefab serializes dontReset 1, i.e. counter keeps accumulating past countToTrigger instead of clearing. AddInstance zero-fills the struct, so without this the flag reads 0 and the counter resets.*/
-    if (entIdx == 702 /*logic_spawner*/) { Entity* sm=&World.instances[i]; if (sm->numberToSpawn == 0) sm->numberToSpawn = 1; if (sm->maxDelayBetweenSpawns <= 0.0f) { sm->minDelayBetweenSpawns = 15.0f; sm->maxDelayBetweenSpawns = 45.0f; } if (sm->allSpawnedResetDelay <= 0.0f) sm->allSpawnedResetDelay = 120.0f; }/*logic_spawner.prefab serializes numberToSpawn 1, minDelay 15, maxDelay 45, allSpawnedResetDelay 120, NPCSpawner 1, everything else off. Start() also seeds delayFinished = PauseScript.relativeTime, so arm the first check on the first update instead.*/
+    if (entIdx == 717 /*ef_cyber_ice*/ && World.instances[i].cyberHealth <= 0.0f) World.instances[i].cyberHealth = 100.0f;
+      if (entIdx == 477 /*sec_camera*/) { Entity* ce = &World.instances[i]; ce->camStartYAngle = 0.0f; ce->camEndYAngle = 180.0f; ce->camWaitTime = 0.8f; ce->camRotatePositive = true; ce->camRotateEnabled = false; }
+    World.instances[i].questBitID = QB_None;
+    if (entIdx == 594 /*trigger_counter*/) World.instances[i].dontReset = true;
+    if (entIdx == 702 /*logic_spawner*/) { Entity* sm=&World.instances[i]; if (sm->numberToSpawn == 0) sm->numberToSpawn = 1; if (sm->maxDelayBetweenSpawns <= 0.0f) { sm->minDelayBetweenSpawns = 15.0f; sm->maxDelayBetweenSpawns = 45.0f; } if (sm->allSpawnedResetDelay <= 0.0f) sm->allSpawnedResetDelay = 120.0f; }
     if (World.levelCurrentlyLoading) { /*Tally the level's security objects so the security split and the system analyzer's node total have real denominators; guarded so runtime spawns never inflate them*/
         u8 sl=World.currentLevel; if (sl<MAX_LEVELS) { u8* dst=entIdx==477?&World.levelCameraCount[sl]:entIdx==478?&World.levelLargeNodeCount[sl]:entIdx==479?&World.levelSmallNodeCount[sl]:0; if (dst && *dst<255) (*dst)++; } }
     World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f; if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; World.instances[i].SFXLockedIndex = -1; }/*ButtonSwitch: every func_switch* prefab serializes SFXLockedIndex -1, i.e. no locked click. The success SFX comes from buttonSwitchSFX in citadel.c, the same prefab-constant-table shape doorSFXIndex uses in LoadLevelData.*/
@@ -1050,7 +1050,6 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
 }
 
 static const char* mm_ptr; static const char* mm_end;
-// Unity text material index (genericMaterials[87..99]) -> Voxen texIndex of matching color texture (col*.png / white.png / black.png)
 u16 TextMatIndexToTexIndex(u16 matIndex) {
     switch (matIndex) {
         case 87: case 93: return 881;/*text_3dwhite, text_3dwhiteStopD -> white.png*/
@@ -1066,8 +1065,6 @@ u16 TextMatIndexToTexIndex(u16 matIndex) {
 static char* MmapGetLine(char* buf, int sz){if(mm_ptr>=mm_end){return NULL;} const char* start=mm_ptr; const char* p=start; while(p<mm_end&&*p!='\n'){++p;} int lineLen=(int)(p-start); if(p<mm_end&&*p =='\n'){mm_ptr=p+1;}else{mm_ptr=mm_end;}if(lineLen >= sz){lineLen=sz-1;} mcpy(buf,(void*)start,lineLen); while(lineLen>0&&(buf[lineLen-1]=='\r' || buf[lineLen - 1]=='\n')){--lineLen;} buf[lineLen]='\0'; return buf;}
 static u16 fwParentSnap[MAX_LEVELS][INSTANCE_COUNT]; static bool fwSnapValid[MAX_LEVELS];/*per-level fwParentOf snapshot: fwParentOf is rewritten by every level load; SetLevelPointers restores the current level's*/
 u16 GetTeleportDestination(u8 lev,u16 id){return lev<MAX_LEVELS&&id<8?teleportDestinations[lev][id]:U16_MAX;}
-/*Position of a level's nth elevator destination volume, in level-data (Unity capsule-centre) space.  Reads the level's
-  own instance/position arrays rather than World.instances, which points at whichever level is currently loaded.*/
 bool GetElevatorDestinationPos(u8 lev,u8 nth,V3* outPos) {
     if (lev>=MAX_LEVELS || nth>=elevatorDestCounts[lev]) return false;
     u16 idx=elevatorDestinations[lev][nth]; if (idx<INSTS_1ST_IDX || idx>=World.levelInstCount[lev]) return false;
@@ -1093,7 +1090,6 @@ void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
 char lineSpace[LINE_LEN_MAX]; char ioNames[MAX_IO_NAMES][TARG_STRLEN]; u16 ioNameCount,fwParentOf[INSTANCE_COUNT]; static u16 fwSlotStart[INSTANCE_COUNT],fwSlotCount[INSTANCE_COUNT],fwPoolUsed,fwPoolPrefab[FW_POOL_MAX],fwCurChild,fwLastChunkSlot,lwPrefab[FW_MAX_CHILDREN];
 static V3 fwBasePos[INSTANCE_COUNT],fwInfoLocal[INSTANCE_COUNT],fwBaseScale[INSTANCE_COUNT],fwPoolPos[FW_POOL_MAX],fwPoolScale[FW_POOL_MAX],lwPos[FW_MAX_CHILDREN],lwScale[FW_MAX_CHILDREN],fwInfoLocalTmp,fwContainerPos,fwContainerScale,fwInfoScaleDummy,*fwCurP,*fwCurS;
 static Quaternion fwBaseRot[INSTANCE_COUNT],fwPoolRot[FW_POOL_MAX],lwRot[FW_MAX_CHILDREN],fwContainerRot,fwInfoRotDummy,*fwCurR; static bool fwLine,fwCollecting,fwPendingChild; static i32 fwStage; // transform block counter: 0 own, 1 func_wall container, 2 info_target, >=3 chunk children
-/*InteractablePanel-shaped lines (us_relaypanel 614, us_retinalscanner 615, us_isotopepanel 602): the dump writes the object's own transform first and then one transform block per sub-GO (installationItem + effects, Unity Utils.SaveSubActivatedGOState). Voxen represents the placed item with its own model instance instead of child objects, so only block 0 (the object's own transform) is applied; the sub-GO blocks are counted but dropped. Without this they overwrote the panel's own position/rotation/scale (level 7 relay panels came out 90 deg off, the level 3 retinal scanner came out zero-scaled).*/
 static bool ipLine,ipSubRotSet; static i32 ipBlock; static V3 ipSubPos,ipSubScale; static Quaternion ipSubRot; static V3 *ipCurP; static Quaternion *ipCurR; static V3 *ipCurS;
 static bool npcLine; static i32 npcBlock;/*NPC lines carry trailing gib/searchCollider/deathBurst sub-GO transform blocks after the NPC's own block-0 transform (same shape as the InteractablePanel problem above). npcBlock counts lP.x-delimited blocks 1-based, so block0 -- the NPC's own transform -- is npcBlock==1 and everything past it is dropped in the assignment chain below.*/
 static bool npcRootRotSet[INSTANCE_COUNT];/*per-record: did block 0 carry explicit lR keys (vs the QUAT_IDENTITY default)? File-static, not World state, so saves are unaffected.*/
@@ -1141,7 +1137,7 @@ void LoadLevelMod(u8 lev) {
         else {
             entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; } inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
             for (u8 slot=0;slot<4;++slot) inst->contents[slot]=inst->custIdx[slot]=-1; for (u8 slot=0;slot<7;++slot) inst->randomItem[slot]=inst->randomItemCustIdx[slot]=-1;
-            inst->relayEnabled=true;/*Unity LogicRelay: public bool relayEnabled = true; level data never writes the key, so absent must mean enabled.*/
+            inst->relayEnabled=true;
             fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; ipLine=false; ipBlock=0; ipSubRotSet=false; ipCurP=NULL; ipCurR=NULL; ipCurS=NULL; npcLine=false; npcBlock=0; npcRootRotSet[entCount]=false; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f};/*relayEnabled is seeded once, at the top of this block (line 582)*/
         }
         bool constIndexRead = false; bool activeStateRead = false; bool matIndexRead = false; u8 scaleReadMask = 0; u16 matIndexTexIdx = 881;
@@ -1177,7 +1173,7 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
                 else if(KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);/*bloodType is a prefab constant (AddInstance, DefaultPrefabBloodType) and no level record carries the key -- deliberately no parse branch.*/
                   else if(KEY_EQ("startYAngle")) inst->camStartYAngle=parse_float(value,lineSpace,lineNum); else if(KEY_EQ("endYAngle")) inst->camEndYAngle=parse_float(value,lineSpace,lineNum); else if(KEY_EQ("waitTime")) inst->camWaitTime=parse_float(value,lineSpace,lineNum);
-                  else if(KEY_EQ("enabled") && inst->index == 477) inst->camRotateEnabled=parse_bool(value,lineSpace,lineNum);/*SecurityCameraRotate.enabled; sec_camera.prefab ships this component with m_Enabled: 0, so 127 of the 149 camera records (enabled:0) never sweep in Unity*/
+                  else if(KEY_EQ("enabled") && inst->index == 477) inst->camRotateEnabled=parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("keycode")) inst->keycode=parse_numberu16(value,lineSpace,lineNum);
                 else if(KEY_EQ("radiationAmount")) inst->radiation=parse_float(value,lineSpace,lineNum);                           else if(KEY_EQ("ammo"))inst->ammo=parse_numberi16(value,lineSpace,lineNum);
                 else if(KEY_EQ("ammo2"))inst->ammo2=parse_numberi16(value,lineSpace,lineNum);                                      else if(KEY_EQ("useableItemIndex"))inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
@@ -1255,7 +1251,7 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("open"))            inst->panelOpen      = parse_bool(value,lineSpace,lineNum);/*InteractablePanel cover state (only us_relaypanel/isotopepanel/retinalscanner carry these keys)*/
                 else if(KEY_EQ("installed"))       inst->panelInstalled = parse_bool(value,lineSpace,lineNum);/*InteractablePanel: the required item is already in place*/
                 else if(KEY_EQ("ajarPercentage"))  inst->ajarPercentage = parse_float(value, lineSpace, lineNum);                  else if(KEY_EQ("timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(value, lineSpace, lineNum);
-                else if(KEY_EQ("toggleLasers"))    inst->toggleLasers = parse_bool(value, lineSpace, lineNum);/*TODO: parsed and copied but never read. Door.ToggleLasers() (Door.cs) flips the door's security-laser detector, and lev8doorx1 / lev8doorx2 (level8.txt:4580,4582) are the only two records that ask for it -- both set it on themselves via a self-target, so nothing is wired. Implement when the laser detector exists: needs a live beacon + a targetted test on the door. Skip for now.*/              else if(KEY_EQ("changeLayerOnOpenClose")) inst->changeLayerOnOpenClose=parse_bool(value,lineSpace,lineNum);
+                else if(KEY_EQ("toggleLasers"))    inst->toggleLasers = parse_bool(value, lineSpace, lineNum);/*TODO: parsed and copied but never read. The door's security-laser detector toggle is not wired; lev8doorx1 / lev8doorx2 (level8.txt:4580,4582) are the only two records that ask for it -- both set it on themselves via a self-target. Implement when the laser detector exists: needs a live beacon + a targetted test on the door. Skip for now.*/              else if(KEY_EQ("changeLayerOnOpenClose")) inst->changeLayerOnOpenClose=parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("waitBeforeClose")) inst->waitBeforeClose=parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;                                    else if(KEY_EQ("doorOpen")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPEN,parse_bool(value,lineSpace,lineNum));
                 else if(KEY_EQ("doorOpenIfUnlocked") || KEY_EQ("doorToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPENIFUNLOCKED,parse_bool(value,lineSpace,lineNum)); else if(KEY_EQ("doorClose")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOORCLOSE,parse_bool(value,lineSpace,lineNum));
                 else if(KEY_EQ("doorLock") || KEY_EQ("lockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_LOCK, parse_bool(value, lineSpace, lineNum));
@@ -1268,10 +1264,9 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("funcwallMove"))    flag_set(&inst->ioflags, TARG_IOFLAGS_FUNCWALL_MOVE, parse_bool(value, lineSpace, lineNum));            else if(KEY_EQ("missionBitOn"))    flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_ON, parse_bool(value, lineSpace, lineNum));
                 else if(KEY_EQ("missionBitOff"))   flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_OFF, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("missionBitToggle"))flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_TOGGLE, parse_bool(value, lineSpace, lineNum));
                 else if(KEY_EQ("switchLockToggle"))flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCH_LOCK_TOGGLE, parse_bool(value, lineSpace, lineNum));       else if(KEY_EQ("GOSetActive"))     flag_set(&inst->ioflags, TARG_IOFLAGS_INST_ACTIVATE, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("enemyAlert"))       flag_set(&inst->ioflags, TARG_IOFLAGS_ENEMY_ALERT, parse_bool(value, lineSpace, lineNum));/*TargetIO.cs:211 alerts the receiver's own AIController, so the flag rides the activator and lands on the NPC*/
-                /* SpawnManager (702).  ioflags is a saturated 32 bits, so these two TargetIO.cs:299,304 actions use the high word. */
+                else if(KEY_EQ("enemyAlert"))       flag_set(&inst->ioflags, TARG_IOFLAGS_ENEMY_ALERT, parse_bool(value, lineSpace, lineNum));
                 else if(KEY_EQ("spawnerActivate")) flag_set(&inst->ioflagsHi, TARG_IOFLAGHI_SPAWNER_ACTIVATE, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("spawnerActivateAlerted")) flag_set(&inst->ioflagsHi, TARG_IOFLAGHI_SPAWNER_ACTIVATE_ALERTED, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("awakeSleepingEnemy")) flag_set(&inst->ioflagsHi, TARG_IOFLAGHI_AWAKE_SLEEPING, parse_bool(value, lineSpace, lineNum));/*TargetIO.cs:398-400 calls aic.AwakeFromSleep(tempUD), which clears asleep and alerts the NPC -- the receiver's own AIController, so the flag rides the activator*/
+                else if(KEY_EQ("awakeSleepingEnemy")) flag_set(&inst->ioflagsHi, TARG_IOFLAGHI_AWAKE_SLEEPING, parse_bool(value, lineSpace, lineNum));
                 else if(KEY_EQ("SpawnManager.active")) inst->active = parse_bool(value, lineSpace, lineNum);     else if(KEY_EQ("numberActive"))       inst->numberActive = parse_numberu16(value, lineSpace, lineNum);
                 else if(KEY_EQ("numberToSpawn"))       inst->numberToSpawn = parse_numberu16(value, lineSpace, lineNum);  else if(KEY_EQ("countOnlySameIndex"))  inst->countOnlySameIndex = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("minDelayBetweenSpawns")) inst->minDelayBetweenSpawns = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("maxDelayBetweenSpawns")) inst->maxDelayBetweenSpawns = parse_float(value, lineSpace, lineNum);
@@ -1290,9 +1285,9 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("tA")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->anchor=(u8)(v<0?0:(v>8?8:v)); } } }
                 else if(KEY_EQ("tAl")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->align=(u8)(v<0?0:(v>2?2:v)); } } }
                 else if(KEY_EQ("tLs")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) pd->lineSp=parse_float(value,lineSpace,lineNum); } }
-                else if(KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);                                       else if(KEY_EQ("SFXClip"))         inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);/*info_playsound (712): PlaySoundTriggered.cs does Const.a.sounds[SFXClip], the same sounds[] index SFXIndex already carries*/ else if(KEY_EQ("SFXLockedIndex")) inst->SFXLockedIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
+                else if(KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);                                       else if(KEY_EQ("SFXClip"))         inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum); else if(KEY_EQ("SFXLockedIndex")) inst->SFXLockedIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
                 else if(KEY_EQ("trackType"))       inst->trackType = (TrackType)parse_numberi16(value, lineSpace, lineNum);/*trigger_music (599)*/      else if(KEY_EQ("textIndex"))       inst->textIndex = (i16)parse_numberi16(value, lineSpace, lineNum);/*prop_cyber_datafrag (552), prop_cyber_switch (555)*/
-                else if(KEY_EQ("logIndex"))        inst->logIndex = (i16)parse_numberi16(value, lineSpace, lineNum);/*us_paperlog (603): PaperLog.cs logIndex, the AudioLogType_Papers entry this prop opens*/
+                else if(KEY_EQ("logIndex"))        inst->logIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
                 else if(keyLen==23 && sCompUpToLen(key,"currentPositionsLeft[",21)==0 && key[21]>='0' && key[21]<='6' && key[22]==']') inst->wireCurL[key[21]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);/*us_puz_panel_*_wire (741..745)*/
                 else if(keyLen==24 && sCompUpToLen(key,"currentPositionsRight[",22)==0 && key[22]>='0' && key[22]<='6' && key[23]==']') inst->wireCurR[key[22]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);
                 else if(sCompUpToLen(key,"grid[",5)==0 && keyLen>=7 && key[keyLen-1]==']') { int gi=0; bool gok=true; for (int k=5;k<keyLen-1;++k) { if (key[k]<'0'||key[k]>'9') { gok=false; break; } gi=gi*10+(key[k]-'0'); } if (gok && gi<35) inst->gridCells[gi]=parse_bool(value,lineSpace,lineNum); }/*PuzzleGridPuzzle.grid[0..34], key width varies with the index*/
@@ -1310,10 +1305,6 @@ void LoadLevelMod(u8 lev) {
                 else if(KEY_EQ("direction.x")) inst->direction.x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("direction.y")) inst->direction.y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("direction.z")) inst->direction.z = parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("force")) inst->force = parse_float(value,lineSpace,lineNum);/*trigger_cyberpush (595)*/
                 else if(KEY_EQ("emailIndex")) inst->emailIndex = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("autoPlayEmail")) inst->autoPlayEmail = parse_bool(value,lineSpace,lineNum);
-                /*TeleportTouch.Save() (Citadel/Assets/Scripts/TeleportTouch.cs:49-52).  The loader had no branch for
-                  these three, so all 8 info_teleport_destination records (constIndex 703, levels 2/6/7/9) loaded as id
-                  0: entity.c:958 put every pad on slot 0 and physics.c:45 teleported to whichever held it.  justUsed
-                  is a SaveRelativeTimeDifferential, so it rebases on pauseRelativeTime like nextthink does.*/
                 else if(KEY_EQ("teleportID")) inst->teleportID = parse_numberu16(value,lineSpace,lineNum);
                 else if(KEY_EQ("targetDestinationID")) inst->targetDestinationID = parse_numberu16(value,lineSpace,lineNum);
                 else if(KEY_EQ("justUsed")) inst->justUsed = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;
@@ -1359,15 +1350,11 @@ void LoadLevelMod(u8 lev) {
         Entity* src = &entsFromFile[e]; u16 entIdx = src->index; u16 parent = AddInstance(entIdx,posFromFile[e]); Entity* par = &World.instances[parent]; par->lastPosition = posFromFile[e]; World.rotation[parent] = rotationFromFile[e]; if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
         if (IdxIsNPC(entIdx) && npcTable[entIdx-419].type != NPCType_Cyber) { V3 f = src->idealTransformForward; Quaternion r = World.rotation[parent];
             if (entIdx == 437) { float half = -(SERVBOT_MESH_YAW_DEG)*(PI/180.0f)*0.5f; Quaternion rev = {0.0f,vsinf(half),0.0f,vcosf(half)}; World.rotation[parent] = quat_multiply(rev,World.rotation[parent]); }/*npc_servbot: reverse the render-only mesh yaw (SERVBOT_MESH_YAW_DEG, voxen.c) about global Y so absolute placements are unchanged; par->forward below picks this up, staying glued to the mesh. (The yaw-recovery branch below skips 437, which is why editing there has no effect on servbots.)*/
-            else if (!npcRootRotSet[e]) { if (vabs(f.y) < 0.001f && (vabs(f.x) > 0.000001f || vabs(f.z) > 0.000001f)) { float yaw = __builtin_atan2f(f.x, f.z), half = yaw * 0.5f; World.rotation[parent] = (Quaternion){0.0f, vsinf(half), 0.0f, vcosf(half)}; } }/*block-0 rotation absent (the converter dropped it on gib-bearing lines): recover yaw from the Unity facing vector; Voxen models are the visible mesh authored upright, so placement is yaw-only and trailing gib lR is never authoritative. npc_servbot (437) is excepted: it keeps its trailing-block rotation exactly as parsed (pre-existing placement)*/
+            else if (!npcRootRotSet[e]) { if (vabs(f.y) < 0.001f && (vabs(f.x) > 0.000001f || vabs(f.z) > 0.000001f)) { float yaw = __builtin_atan2f(f.x, f.z), half = yaw * 0.5f; World.rotation[parent] = (Quaternion){0.0f, vsinf(half), 0.0f, vcosf(half)}; } }
             else if (vabs(r.x) > 0.001f || vabs(r.z) > 0.001f) World.rotation[parent] = QUAT_IDENTITY;/*explicit block-0 rotation is tilted (unobserved on non-cyber records): upright default, same as a fresh AddInstance*/
-            /*explicit yaw-only block-0 rotation is the authoritative Unity placement: keep as parsed*/
             par->forward = V3_Normalize(quat_rot_v3(World.rotation[parent], (V3){0.0f,0.0f,1.0f})); }
         bool srcActive=(src->entflags & EF_ACTIVE)!=0; par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/
-          flag_set(&par->entflags,EF_ACTIVE,srcActive);/*...but EF_ACTIVE is the one bit that has to be able to go 1->0: AddInstance (entity.c) seeds EF_ACTIVE from the entity
-             definitions, and `|=` can only ever add bits, so every record carrying go.activeSelf:0 was still born active.  That silently ignored the
-             20 disabled npc_cyborg_drones on level 1 and the disabled level-2 dark-zone light, and matches Unity, where those GameObjects are inactive
-             in the hierarchy before any script runs.  src->entflags already has EF_ACTIVE cleared by the go.activeSelf parse, so it is the authority. */
+          flag_set(&par->entflags,EF_ACTIVE,srcActive);
         /* InitNPC() stamps its own start-up state, so put the loaded AIController state back on top of it. The
            flags above already ride along through the OR; these fields are not part of entflags. */
         if (IdxIsNPC(entIdx)) { par->currentState=src->currentState; par->currentDestination=src->currentDestination; par->idealPos=src->idealPos; par->idealTransformForward=src->idealTransformForward; par->targettingPosition=src->targettingPosition; par->attack1SoundTime=src->attack1SoundTime; par->attack2SoundTime=src->attack2SoundTime; par->attack3SoundTime=src->attack3SoundTime; } par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
@@ -1441,8 +1428,8 @@ void LoadLevelMod(u8 lev) {
         } else if (entIdx == 345) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.00f; } // weapon_dartgun
         else if (entIdx == 586 || (entIdx >= 540 && entIdx <= 544)) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.0f; } // prop_table, prop_chair01-05: map exports 0.04 scale; force 1.0
         else if (entIdx == 218 || entIdx == 220) { Quaternion c = quat_from_axis_angle((V3){0.0f,1.0f,0.0f},PI); World.rotation[parent] = quat_multiply(quat_multiply(c,World.rotation[parent]),(Quaternion){-c.x,-c.y,-c.z,c.w}); } // chunk_reac2_4, chunk_reac2_5: the export is a flipped basis, not a turned instance, so conjugate by 180deg about Y (which flips the mesh's local X and Z and leaves Y). Conjugation spins the rotation's axis while preserving its angle, so the level file's authored placement is untouched. Checked against level 7 instance 4180: lR (0,.7071,.7071,0) -> (0,-.7071,.7071,0) exactly, and it is non-identity on all 6 (218) / 4 (220) orientations these prefabs use, so every instance gets corrected.
-        else if (entIdx == 53) { World.rotation[parent] = quat_multiply(World.rotation[parent], quat_from_axis_angle((V3){1.0f,0.0f,0.0f},PI*0.5f)); } // chunk_eng2_6: the Unity prefab is a parent gameobject carrying eng_wallpump as an animated child with localRotation euler 90,0,0, and the exporter never applied that child transform. The level data's lR already holds the parent's own rotation (verified: level 7's lR 0.5,0.5,0.5,-0.5 is Unity's parent localRotation euler -90,0,-90), so all that is missing is the child term, composed on the right of quat_multiply exactly as Unity composes child-in-parent.
-        else if (entIdx == 551 && par->codeScreen) { World.rotation[parent] = quat_multiply(World.rotation[parent], (Quaternion){0.0f,0.70710678f,0.70710678f,0.0f}); World.scale[parent].x*=0.390625f; World.scale[parent].y*=0.390625f; World.scale[parent].z*=0.390625f; } // prop_cpuscreen: Unity's prefab is a bare built-in Quad (MeshFilter fileID 10210) in the XY plane, normal -Z -- its BoxCollider is 0.1 deep and centred at z=+0.05, putting the body on the +Z side. EPerms[551] stands in genericLOD3card.obj, a 2.56-unit card flat in XZ at y=1.28 with normal (0,-1,0) whose face 2/1/1 4/2/1 3/3/1 runs u with +X and v with +Z. ParseOBJ negates mesh X for both position and normal and passes vt through unflipped, so as loaded the card's u runs along -X, its v along +Z, its normal -Y. 180deg about (0,1,1)/sqrt2 sends all three onto the Quad's u=+X, v=+Y, normal=-Z, and the 0.390625 (=1/2.56) on scale shrinks that 2.56-unit card onto the Quad's 1 unit. It has to be that rotation and not a turn about X: with V unflipped the two frames have opposite handedness, so no X-axis angle can align them. Level data needs no change on either count -- all 9 instances' lR and lS are already exactly Unity's world localRotation and localScale.
+        else if (entIdx == 53) { World.rotation[parent] = quat_multiply(World.rotation[parent], quat_from_axis_angle((V3){1.0f,0.0f,0.0f},PI*0.5f)); }
+        else if (entIdx == 551 && par->codeScreen) { World.rotation[parent] = quat_multiply(World.rotation[parent], (Quaternion){0.0f,0.70710678f,0.70710678f,0.0f}); World.scale[parent].x*=0.390625f; World.scale[parent].y*=0.390625f; World.scale[parent].z*=0.390625f; }
         else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
         else if (entIdx == 720) { /*u16 mist=*/AddInstance(648,World.position[parent]); }// ambient_mist
         else if (entIdx == 733) { /*u16 pipewater=*/AddInstance(649,World.position[parent]);/*ambient_pipewater_loop*/ /*u16 rain=*/AddInstance(653,(V3){World.position[parent].x,World.position[parent].y - 1.26f,World.position[parent].z});/*ambient_rain*/ }
@@ -1452,7 +1439,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 538) { scpy_to_a_from_b(par->texAnimResourceFolder,"BrokenClock",TARG_STRLEN); } /*prop_broken_clock*/
         else if (entIdx == 551 && par->codeScreen) { scpy_to_a_from_b(par->texAnimResourceFolder,"ScreenCodeRandom",TARG_STRLEN); } /*prop_cpuscreen*/
         TextureSequenceInit(parent,par->texAnimResourceFolder);
-        if (entIdx == 551 && par->codeScreen) { par->texAnimRandom = true; par->texAnimStopsAtDie = false; }/*prop_cpuscreen: Unity CodeScreen.Update re-picks screenCodes[Random.Range(0,10)] every 0.3s while that level's code is unlocked, so the display flickers. texAnimRandom makes TextureSequenceUpdate choose a random frame per tick; texAnimStopsAtDie must be off because these entities carry no health (health 0) and would otherwise hold frame 0 and halt after 10 ticks. CodeScreensSetForLevel clears textureAnimating once the level's LAST node dies (CPUNodesRemainOnLevel goes false) and latches the drawn digit, which is what locks the code.*/
+        if (entIdx == 551 && par->codeScreen) { par->texAnimRandom = true; par->texAnimStopsAtDie = false; }
     }
     for (int i=0;i<=lightsIdx;++i) { if (lightsFromFile[i].intensity < 0.11f && lightsFromFile[i].maxIntensity < 0.11f){continue;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); i32 wi=AddLight(&lightsFromFile[i],&lanimsFromFile[i]); if(wi>=0&&wi<LIGHT_COUNT){World.levelLightTargetnames[World.currentLevel][wi]=lightTargetnameFile[i];} }
     if(curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7){/*Shield generators*/
@@ -1514,12 +1501,6 @@ void LoadLevelData(u8 curlevel) {
             } else { switch(World.instances[i].doorOpen){case DoorState_Open:ChangeAnim(&World.instances[i],A_IDLE_OPEN); break; case DoorState_Opening:ChangeAnim(&World.instances[i],A_OPENING); break; case DoorState_Closing:ChangeAnim(&World.instances[i],A_CLOSING); break; default:ChangeAnim(&World.instances[i],A_IDLE_CLOSED); break;} }
             if (IdxIsPortalBlockingDoor(World.instances[i].index) && World.instances[i].doorState != DoorState_Closed) ForceDoorPortalOpen(World.instances[i].portalIndex); // Open/ajar doors start with their portal open. Bounds-checked in culling.c; guard keeps non-portal doors from touching portal 0.
         } else if (IdxIsSearchable(constIndex) || IdxIsNPC(constIndex)) {
-            /* SearchableItem.Start (SearchableItem.cs:20-36). The C# rolls once, guarded by generationDone, and walks the
-               full randomItem list; NPC corpses carry a SearchableItem too, so they roll here as well. The authored
-               randomItemDropChance is a 0-100 percentage compared straight against the 0-100 roll -- the old
-               (tempInt/100.0f) <= chance test divided the roll but not the chance, so every positive chance fired 100%
-               of the time. The C# checks maxRandomItems after the write (allowing one extra); checking before is
-               equivalent here since maxRandomItems is 2 and contents is 4 wide. */
             if (World.instances[i].generateContents && !World.instances[i].generationDone) {
                 int numRandomGeneratedItems = 0;
                 for(int j=0;j<7;j++) {
@@ -1535,10 +1516,10 @@ void LoadLevelData(u8 curlevel) {
             case 596: World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); break; /*trigger_gravitylift*/
             case 701: LogicTimerInitBeforeLoad(i); break;
             case 703: World.layer[i]=L_Trigger;if(World.instances[i].teleportID < 8){teleportDestinations[curlevel][World.instances[i].teleportID]=i;World.TeleportTouch_allTeleportTouches[World.instances[i].teleportID]=i;} else {DeleteInstance(i);} break;/*info_teleport_destination*/
-            case 706: if(curlevel<MAX_LEVELS&&elevatorDestCounts[curlevel]<MAX_ELEV_DESTS_PER_LEVEL)elevatorDestinations[curlevel][elevatorDestCounts[curlevel]++]=i; break;/*info_elev_destination: ordinal within the level, which is what Unity's flat elevatorTargetDestinations[] order amounts to*/
+            case 706: if(curlevel<MAX_LEVELS&&elevatorDestCounts[curlevel]<MAX_ELEV_DESTS_PER_LEVEL)elevatorDestinations[curlevel][elevatorDestCounts[curlevel]++]=i; break;
             case 555: CyberSwitchInitAfterLoad(i); break; // prop_cyber_switch
             case 480: CyberMineInitBeforeLoad(i); break;
-            case 402: World.layer[i] = L_NPC; GrenadeInit(i); break;/*weapon_grenademine_live.  Level data is init-only, so every placed live landmine is an NPC mine; any layer other than L_PlayerBullets makes GrenadeIsNPCMine report true.  L_NPC rather than Unity's NPCBullet(24) because layerMaskPlayerAttack includes NPC but not NPCBullet, so only L_NPC lets player weapons and melee reach it.  GrenadeInit supplies the prefab damage/penetration/offense/attackType, which the level-load path otherwise leaves zero.*/
+            case 402: World.layer[i] = L_NPC; GrenadeInit(i); break;
             default: if (IdxIsButtonSwitch(constIndex)) ButtonSwitchInitAfterLoad(i); break;/*688..692, 694, 695: disjoint from every case above, so folding this into default preserves the old chain's order*/
         }
         if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
@@ -1548,57 +1529,6 @@ void LoadLevelData(u8 curlevel) {
 }
 
 u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
-
-/*Mission-difficulty instance removals.  Called once from NewGame() after every level is resident, and from nowhere else:
-   LoadLevelData used to strip these per level, which meant a mid-game level reload re-applied the removals and deleted
-   access cards / audiologs / cyber-software the player had already been given or already used.  Walking the levels the way
-   UseTargets (citadel.c) does, with SetLevelPointers swapping the live pointers in and back out, keeps the removals a
-   pure function of the difficulty chosen at NewGame time.
-     access cards  (IdxIsAccessCard)  gone on mission 0 and 1; 389 is deliberately absent -- that slot is
-       weapon_grenadeearth_live, not a card, and a 388..398 range test would delete every Earthshaker in the game.
-     item_audiolog (313)               gone on mission 0.
-     item_cyber_data (448)             gone on mission 0 (CyberItem.cs:9-13 disables SoftwareType.Data and nothing else). */
-/* Snapshot every level's entity table to a binary file for Tools/entity_dump_diff.py.
-   The struct layout is not written here -- the tool recovers it from the compiler
-   (Tools/entity_layout.py), so this format cannot desync from the real Entity.
-   Point the VOXEN_DUMP_ENTITIES environment variable at a path to produce one.
-   Raw structs are dumped rather than a named field list so the differ sees fields
-   nobody remembered to write down; the tool filters pointer-typed members, whose
-   values legitimately vary between runs. */
-void EntityDumpAll(const char *pathFmt, u16 pass){
-    char path[TARG_STRLEN]; sFormat(path,sizeof(path),pathFmt,pass);
-    FHandle f = OS_OpenWriteonly(path); if(f == INVALID_FHANDLE){ DualLogError("EntityDumpAll: cannot open %s\n",path); return; }
-    static const char magic[8] = {'V','O','X','E','N','E','D','1'};
-    u32 esz = sizeof(Entity), nlev = World.numLevels;
-    OS_Write(f,magic,8,path); OS_Write(f,&esz,sizeof(esz),path); OS_Write(f,&nlev,sizeof(nlev),path);
-    for(u32 lev=0; lev<nlev; lev++){
-        u32 count = World.levelInstCount[lev]; OS_Write(f,&lev,sizeof(lev),path); OS_Write(f,&count,sizeof(count),path);
-        OS_Write(f,World.levelInstances[lev],(size_t)count * sizeof(Entity),path);
-    }
-    /* Lights, light positions and decal staging are written by the same loader and are
-       in scope for level-data purging, so the dump has to cover them or the differ
-       cannot see a purge that changed a light.  Each is a plain struct array with its
-       own count, appended after the entity records. */
-    u32 lsz = sizeof(Light);
-    OS_Write(f,&lsz,sizeof(lsz),path);
-    for(u32 lev=0; lev<nlev; lev++) OS_Write(f,World.levelLights[lev],(size_t)LIGHT_COUNT * sizeof(Light),path);
-    u32 v3sz = sizeof(V3);
-    OS_Write(f,&v3sz,sizeof(v3sz),path);
-    for(u32 lev=0; lev<nlev; lev++) OS_Write(f,World.levelLightsNewPosition[lev],(size_t)LIGHT_COUNT * sizeof(V3),path);
-    u32 lasz = sizeof(LightAnimation), lcount2 = nlev * LIGHT_COUNT;
-    OS_Write(f,&lasz,sizeof(lasz),path); OS_Write(f,&lcount2,sizeof(lcount2),path);
-    for(u32 lev=0; lev<nlev; lev++) OS_Write(f,World.levelLAnims[lev],(size_t)LIGHT_COUNT * sizeof(LightAnimation),path);
-    extern DecalStyle decalStyles[]; extern u16 decalStyleCount;
-    extern char decalInlineText[][DECAL_INLINE_TEXT_LEN]; extern u16 decalInlineTextCount;
-    u32 dsz = sizeof(DecalStyle);
-    OS_Write(f,&dsz,sizeof(dsz),path); OS_Write(f,&decalStyleCount,sizeof(decalStyleCount),path);
-    OS_Write(f,decalStyles,(size_t)decalStyleCount * sizeof(DecalStyle),path);
-    u16 tcount = decalInlineTextCount; u32 tsz = DECAL_INLINE_TEXT_LEN;
-    OS_Write(f,&tsz,sizeof(tsz),path); OS_Write(f,&tcount,sizeof(tcount),path);
-    OS_Write(f,decalInlineText,(size_t)decalInlineTextCount * DECAL_INLINE_TEXT_LEN,path);
-    OS_Close(f); DualLog("Wrote entity dump to %s\n",path);
-}
-
 void NewGameDifficultyPass(void) {
     for (u8 lev = 0; lev < World.numLevels; ++lev) {
         u8 entryLevel = World.curLev; if (entryLevel != lev) SetLevelPointers(lev);
@@ -1613,10 +1543,6 @@ void NewGameDifficultyPass(void) {
     }
 }
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();
-/* The door layer and laser behaviours are keyed off the prefab rather than the per-instance key, so confirm the
-   corpus still agrees: changeLayerOnOpenClose:1 and toggleLasers:1 must appear on exactly the types listed in
-   IdxIsLayerDoor/IdxIsLaserDoor. A mismatch means someone re-exported with a differently-keyed prefab, and the
-   on/off keys would then be silently ignored. */
 static void DoorTypeAudit(u8 lev) {
     u32 badLayer=0, badLaser=0, badAperture=0;
     for (u16 i=PLAYER1;i<World.instCount;++i) {
