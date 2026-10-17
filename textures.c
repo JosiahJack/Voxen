@@ -24,7 +24,6 @@ static bool has_sub(const char* h,const char* n);
 static bool is_vid_path(const char* p);
 static VidFrameRec* vid_find(u32 texIdx) { for (u32 k=0;k<g_vidFrameCnt;++k) { if (g_vidFrames[k].texIdx==texIdx) return &g_vidFrames[k]; } return NULL; }
 static const u8 bayer8[64] = { 0,32, 8,40, 2,34,10,42, 48,16,56,24,50,18,58,26, 12,44, 4,36,14,46, 6,38, 60,28,52,20,62,30,54,22, 3,35,11,43, 1,33, 9,41, 51,19,59,27,49,17,57,25, 15,47, 7,39,13,45, 5,37, 63,31,55,23,61,29,53,21};
-typedef struct { u32 distinct, exactHits, snaps, errSum, errMax; } PalStats;
 static void vid_decode(VidFrameRec* r, VidSlot* s) { /*Same palette extraction as the load worker, but straight into a ring slot.*/
     FHandle fd; int sz = 0; const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(r->path, &fd, &sz); if (unlikely(!d || sz <= 0)) return;
     int w = 0, h = 0; u8* pix = PngLoad((const u8*)d, sz, &w, &h, &g_vidArena);
@@ -679,7 +678,6 @@ void TextureSequenceInit(u16 self, char* trimmed_value) {
     if (trimmed_value[0] == '\0') { e->textureAnimating = false; e->modelIndex = EDefs[e->index].modelIndex; return;}
     
     e->textureAnimating = true;
-    e->textureGlowAnimating = false;
     e->texAnimLight = e->texAnimLight2 = U16_MAX;
     e->texFrame = e->texGlowFrame = 0;
     if (sEqual(trimmed_value,"ScreenDestroyed")) { World.instances[self].texAnimClip = NUM_TEXTURE_CLIPS - 1; return; }
@@ -696,7 +694,7 @@ void TextureSequenceInit(u16 self, char* trimmed_value) {
     }
     
     for(int i=0;i<NUM_TEXTURE_CLIPS;++i){
-        if (sEqual(trimmed_value,textureAnimClips[i].name)) { World.instances[self].texAnimClip = i; e->textureGlowAnimating = textureAnimClips[i].hasGlow; return; }
+        if (sEqual(trimmed_value,textureAnimClips[i].name)) { World.instances[self].texAnimClip = i; return; }
     }
     
     e->textureAnimating = false; // Couldn't find match, just don't animate.
@@ -710,7 +708,6 @@ void TextureSequenceStart(u16 self, u8 clipIndex) {
     e->texAnimClip = clipIndex;
     e->texFrame = e->texGlowFrame = 0;
     e->textureAnimating = e->texAnimStopsAtDie = true;
-    e->textureGlowAnimating = clip->hasGlow;
     e->texAnimRandom = e->texAnimInReverse = false;
     e->texIndex=sequenceTextures[clip->frames[0]];
     if (clip->hasGlow && clip->glowFrames) e->glowIndex = sequenceTextures[clip->glowFrames[0]];

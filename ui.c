@@ -128,7 +128,7 @@ void SaveNameEntry(i32 k) {
 }
 
 void MFD_NewGame() {
-    World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.consumableClickRow=-1,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.applyButtonReferenceIndex=-1,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,.logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
+    World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.consumableClickRow=-1,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,.logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
 }
 
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.generalClickSlot = -1; }
@@ -518,7 +518,7 @@ void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=tru
     queuedLevelToLoad=destLevel;
 }
 
-void UI_ElevClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadElevator=U16_MAX; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.elevCurrentFloor=0; SysUIDataClose(); }
+void UI_ElevClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadElevator=U16_MAX; World.Sys_UI.linkedElevatorDoor=U16_MAX; SysUIDataClose(); }
 void UI_AudioLogClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastLogSideRH=rh; if (!(World.invP1.hasHardware&HW_ERD)) return;
     if (World.Sys_UI.logActive) { World.Sys_UI.logActive=false; CenterStatusPrint("%s",Sys_Text.stringTable[1019]); return; }/*Log playback stopped.*/
     if (World.Sys_UI.logReferenceIndex<(u16)LOGCNT && World.invP1.hasLog[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex][0]) { PlayLog((int)World.Sys_UI.logReferenceIndex); World.Sys_UI.logActive=true; }
@@ -561,9 +561,9 @@ void PGEvalPuzzle(void) {
     if (w<=0||h<=0) return;
     
     int n = vmin(w*h,35);
-    for (int i=0;i<n;++i) { s->pg_powered[i]=false; s->pg_checked[i]=false; if (s->pg_type[i]==PuzzleCellType_And) s->pg_cell[i]=true; }/*And gates are always conducting, whatever the player has clicked*/
+    for (int i=0;i<n;++i) { s->pg_powered[i]=false; s->pg_checked[i]=false; if (s->pg_type[i]==PuzzleCellType_And) s->pg_cell[i]=true; } /*And gates are always conducting, whatever the player has clicked*/
     int src = (int)s->pg_source; if (src<0||src>=n) return;
-    s->pg_powered[src]=s->pg_cell[src]; if (!s->pg_powered[src]) return;/*the source node has to be a plus itself, or nothing conducts*/
+    s->pg_powered[src]=s->pg_cell[src]; if (!s->pg_powered[src]) return; /*the source node has to be a plus itself, or nothing conducts*/
     
     int q[142], qt = 0, qh = 0; q[qt++]=src;
     while (qh<qt) {
@@ -577,55 +577,71 @@ void PGEvalPuzzle(void) {
         if (r!=-1 && !s->pg_checked[r] && s->pg_cell[r]) q[qt++]=r;
         PGCheckCellForPower(mi); s->pg_checked[mi]=true; }
     float prog=0.0f; for (int c=0;c<w;++c) { for (int r2=0;r2<h;++r2) if (s->pg_powered[r2*w+c]) { prog=(c+1==w)?6.75f/7.0f:(float)(c+1)/7.0f; break; } }
-    s->pg_progress=prog;
-    int out=(int)s->pg_output; if (out>=0 && out<n && s->pg_powered[out]) s->pg_solved=true;/*latched: PuzzleSolved early-returns on puzzleSolved, so the board never un-solves*/ }
-void UI_PuzzleGridCell(bool rh,int cell) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (World.Sys_UI.tetheredPGP==U16_MAX) return; if (World.Sys_UI.pg_solved) return;
-    int n=(int)(World.Sys_UI.pg_width*World.Sys_UI.pg_height); if (n<=0||cell<0||cell>=n) return; if (World.Sys_UI.pg_type[cell]!=PuzzleCellType_Standard) return;
-    PuzzleGridType gt=(World.diffPuz==1)?(PuzzleGridType)PuzzleGridType_King:(PuzzleGridType)World.Sys_UI.pg_gridType;
-    switch (gt) { case PuzzleGridType_King:PGFlipperKing(cell); break; case PuzzleGridType_Queen:PGFlipperQueen(cell); break; case PuzzleGridType_Knight:PGFlipperKnight(cell); break; case PuzzleGridType_Rook:PGFlipperRook(cell); break; case PuzzleGridType_Bishop:PGFlipperBishop(cell); break; default:PGFlipperPawn(cell); break; }
+    (void)prog; // TODO Render bar gauge indicating progress
+    int out=(int)s->pg_output; if (out>=0 && out<n && s->pg_powered[out]) s->pg_solved = true;
+}
+    
+void UI_PuzzleGridCell(bool rh,int cell) {
+    World.Sys_UI.mouseClickHeldOverGUI = true;
+    (void)rh;
+    if (World.Sys_UI.tetheredPGP == U16_MAX) return;
+    if (World.Sys_UI.pg_solved) return;
+    int n = (int)(World.Sys_UI.pg_width * World.Sys_UI.pg_height); if (n <= 0 || cell < 0 || cell >= n) return;
+    if (World.Sys_UI.pg_type[cell] != PuzzleCellType_Standard) return;
+    
+    PuzzleGridType gt = (World.diffPuz == 1) ? (PuzzleGridType)PuzzleGridType_King : (PuzzleGridType)World.Sys_UI.pg_gridType;
+    switch (gt) {
+        case PuzzleGridType_King:   PGFlipperKing(cell);   break;
+        case PuzzleGridType_Queen:  PGFlipperQueen(cell);  break;
+        case PuzzleGridType_Knight: PGFlipperKnight(cell); break;
+        case PuzzleGridType_Rook:   PGFlipperRook(cell);   break;
+        case PuzzleGridType_Bishop: PGFlipperBishop(cell); break;
+        default:                    PGFlipperPawn(cell);   break;
+    }
     PGEvalPuzzle();
-    {   /*PuzzleGrid.OnGridCellClick ends with puzzleGP.SendDataBackToPanel(this), copying the live board back onto
-          the component; PuzzleSolved sets puzzleGP.puzzleSolved and UseTargets latches onlyFireOnce into fired.*/
-        u16 pgi=World.Sys_UI.tetheredPGP; if (pgi>=INSTS_1ST_IDX && pgi<World.instCount) { Entity* pe=&World.instances[pgi];
-            /*The Entity is the durable store (levelInstances[lev] inside GlobalContext, so it survives level
-              changes and save/load), so a click writes straight back to it and no second cache is involved.*/
-            mcpy(pe->gridCells,World.Sys_UI.pg_cell,sizeof(pe->gridCells)); pe->puzzleSolved=World.Sys_UI.pg_solved; if (World.Sys_UI.pg_fired) pe->puzzleFired=true; } }
+    u16 pgi = World.Sys_UI.tetheredPGP;
+    if (pgi >= INSTS_1ST_IDX && pgi < World.instCount) {
+        Entity* pe = &World.instances[pgi];
+        mcpy(pe->gridCells,World.Sys_UI.pg_cell,sizeof(pe->gridCells));
+        pe->puzzleSolved = World.Sys_UI.pg_solved;
+        if (World.Sys_UI.pg_fired) pe->puzzleFired = true;
+    }
     if (World.Sys_UI.pg_solved) {
-        /*PuzzleGridPuzzle.UseTargets: onlyFireOnce (1 on all five grid prefabs, 609..613) latches `fired` and refuses to
-          re-fire, answering with alreadyFiredMessageLingdex 312 instead.  Voxen re-ran the whole target chain every
-          time the board came up solved, so a panel whose target re-latches a door or re-triggers an alarm could be
-          driven repeatedly.*/
         if (World.Sys_UI.pg_fired) { CenterStatusPrint("%s",Sys_Text.stringTable[312]); return; }
+        
         World.Sys_UI.pg_fired = true;
         play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0,0,0},false);/*code accepted / puzzle solved sound*/
-        u16 pg=World.Sys_UI.tetheredPGP; if (pg>=INSTS_1ST_IDX && pg<World.instCount) { UseTargets(pg,World.instances[pg].targetIdx); if (World.instances[pg].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pg].messageLingdex]); } }
+        u16 pg = World.Sys_UI.tetheredPGP;
+        if (pg>=INSTS_1ST_IDX && pg<World.instCount) {
+            UseTargets(pg,World.instances[pg].targetIdx);
+            if (World.instances[pg].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pg].messageLingdex]);
+        }
+    }
 }
+
 void UI_PuzzleGridSlide(bool rh,float f) { (void)rh; (void)f;  }
-void UI_PuzzleGridClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPGP=U16_MAX; World.Sys_UI.pg_solved=false; World.Sys_UI.pg_width=World.Sys_UI.pg_height=0; SysUIDataClose(); }
+void UI_PuzzleGridClose() { World.Sys_UI.mouseClickHeldOverGUI = true; World.Sys_UI.tetheredPGP = U16_MAX; World.Sys_UI.pg_solved = false; World.Sys_UI.pg_width = World.Sys_UI.pg_height = 0; SysUIDataClose(); }
 static i8 PWFindCol(const i8* arr,int wire) { for (i8 c=0;c<7;++c) if ((int)arr[c]==wire) return c; return -1; }
 static void PWClickEnd(int spot,bool colRH) { if (spot<0||spot>6) return; i8* col=colRH?World.Sys_UI.pw_curR:World.Sys_UI.pw_curL;
-    /*PuzzleWire.ClickLHNode is "if (selectedWireLH) { selectedWire < 0 ? SelectWireLH : MoveEndpointLeft } else SelectWireLH",
-      and ClickRHNode mirrors it.  There is no re-grab step: a second click on the side you are already holding a wire on is
-      a MOVE, not a re-selection.  Voxen was re-selecting there, so two same-side clicks never moved anything and a wire
-      could only be dragged by clicking across to the other side and back -- the panel was effectively unplayable.
-      MoveEndpoint also displaces the wire that currently holds the target spot, which is exactly the swap below.*/
-    if (World.Sys_UI.pw_selectedWire >= 0 && World.Sys_UI.pw_selectedWireRH == colRH) {
-        i8 sel=World.Sys_UI.pw_selectedWire; i8 temp=col[spot]; col[spot]=col[sel]; col[sel]=temp; World.Sys_UI.pw_selectedWire=-1; return; }
-    /*SelectWireX only takes a wire when "wireNPosition == spot && wireIsActive[N]", and it resets selectedWire to -1
-      before testing, so a node held by an inactive wire simply leaves nothing selected.*/
-    World.Sys_UI.pw_selectedWire=-1;
-    if (col[spot]>=0 && World.Sys_UI.pw_wireOn[col[spot]]) { World.Sys_UI.pw_selectedWire=(i8)spot; World.Sys_UI.pw_selectedWireRH=colRH; }
+    if (World.Sys_UI.pw_selectedWire >= 0 && World.Sys_UI.pw_selectedWireRH == colRH) { i8 sel = World.Sys_UI.pw_selectedWire; i8 temp = col[spot]; col[spot] = col[sel]; col[sel] = temp; World.Sys_UI.pw_selectedWire = -1; return; }
+    
+    World.Sys_UI.pw_selectedWire = -1;
+    if (col[spot] >= 0 && World.Sys_UI.pw_wireOn[col[spot]]) { World.Sys_UI.pw_selectedWire = (i8)spot; World.Sys_UI.pw_selectedWireRH = colRH; }
 }
+
 static void PWEval(void) { float match=0.0f; bool all=true;
     for (i8 w=0;w<7;++w) { if (!World.Sys_UI.pw_wireOn[w]) continue; i8 l=PWFindCol(World.Sys_UI.pw_curL,w),r=PWFindCol(World.Sys_UI.pw_curR,w);
         bool lok=(l>=0 && l==World.Sys_UI.pw_tgtL[w]), rok=(r>=0 && r==World.Sys_UI.pw_tgtR[w]);
         if (lok) match+=0.19f; if (rok) match+=0.19f; if (!(lok&&rok)) all=false; }
     if (World.diffPuz==1) match+=0.19f;
-    World.Sys_UI.pw_temp=match; World.Sys_UI.pw_solved=(match>0.92f || all); }
+    World.Sys_UI.pw_solved=(match>0.92f || all);
+}
+
 void UI_WireNodeClick(bool rh,int node) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (World.Sys_UI.tetheredPWP==U16_MAX) return; if (World.Sys_UI.pw_solved) return; if (node<0||node>13) return; if (!World.Sys_UI.pw_rowActive[node%7]) return;/*hidden node rows take no input either: nodeRowIsActive false means SetActive(false), so the row has no button.*/
     PWClickEnd(node%7, node>=7); PWEval();
     if (World.Sys_UI.pw_solved) { u16 pw=World.Sys_UI.tetheredPWP; if (pw>=INSTS_1ST_IDX && pw<World.instCount) { UseTargets(pw,World.instances[pw].targetIdx); if (World.instances[pw].messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[World.instances[pw].messageLingdex]); } }
 }
+
 void UI_WireSlide(bool rh,float f) { (void)rh; (void)f;  }
 void UI_WireClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredPWP=U16_MAX; World.Sys_UI.pw_solved=false; World.Sys_UI.pw_selectedWire=-1; SysUIDataClose(); }
 void UI_SysAnalyzerClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; MFD_CloseData(); }
@@ -768,18 +784,18 @@ void EditFieldKey(i32 keycode){
 }
 
 /*The whole point of the region table: one loop decides whether the pointer is over any live UI, which winput.c turns into World.uiIsBlocking so use/fire are suppressed.*/
-bool UIInteractions(void) {
+bool UIInteractions() {
     if (!World.inventoryMode) return false;
     if (World.menuActive || World.paused || World.creditsActive || Cheats.consoleActive) return true;
     if (Cheats.noHUD || World.Sys_UI.vmailActive) return false;
     for (u32 i=UI_ID_NONE+1;i<UI_ID_COUNT;++i) if (UIOver(i)) return true;
     return false;
 }
-bool InventoryPointerHover(void) { return UIInteractions(); }
 
-int GeneralInvItem(int slot);
-bool GeneralInvCanUse(int slot),GeneralInvCanVaporize(int slot),GeneralInvTake(int slot);
-void GeneralInvClick(int slot,int custom),GeneralInvApply(int slot,int custom),VaporizeClick(void);
+bool InventoryPointerHover() { return UIInteractions(); }
+int GeneralInvItem(int);
+bool GeneralInvCanUse(int),GeneralInvCanVaporize(int),GeneralInvTake(int slot);
+void GeneralInvClick(int),GeneralInvApply(int),VaporizeClick();
 bool InventoryHasAccessCard(AccCardType card);
 const char* AccessCardCodeForType(AccCardType card);
 u16 GetItemFrobTexture(u16 index);
@@ -796,16 +812,19 @@ void ConsumableSelect(bool patch,int row) {
     if (patch) World.invP1.patchCur=(u8)ConsumableSlot(true,row); else World.invP1.grenCur=(u8)row;
     MFD_ShowGeneralItem(); World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=patch?2:1;
 }
+
 void ConsumableUse(bool patch,int row) {
     if (!ConsumableCount(patch,row) || World.invP1.holdingObject) return;
     ConsumableSelect(patch,row); if (patch) PatchUse(ConsumableSlot(true,row)); else UseGrenade(ConsumableItem(false,row)+307);
     World.Sys_UI.consumableClickRow=-1;
 }
-static int ConsumableSelectedRow(void) {
+
+static int ConsumableSelectedRow() {
     if (World.Sys_UI.mfdConsumable==1) return World.invP1.grenCur<7?World.invP1.grenCur:-1;
     if (World.Sys_UI.mfdConsumable==2) for (int row=0;row<7;++row) if (patchSlots[row]==World.invP1.patchCur) return row;
     return -1;
 }
+
 void ConsumableSetTimer(float fraction) {
     int row=ConsumableSelectedRow(); if (World.Sys_UI.mfdConsumable!=1 || row<5 || !ConsumableCount(false,row)) return;
     float min=row==5?2.0f:4.0f,value=min+vclamp(fraction,0.0f,1.0f)*(60.0f-min);
@@ -1231,14 +1250,17 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_CMFD_PATCH_ROW_0 ... UI_ID_CMFD_PATCH_ROW_6: { int row=(int)(id-UI_ID_CMFD_PATCH_ROW_0); ConsumableSelect(true,row); if (dbl) ConsumableUse(true,row); return; }
         case UI_ID_CMFD_HARDWARE_ROW_0 ... UI_ID_CMFD_HARDWARE_ROW_11: UI_HardwareRowClick((int)(id-UI_ID_CMFD_HARDWARE_ROW_0)); return;
         case UI_ID_CMFD_SOFTWARE_ROW_0 ... UI_ID_CMFD_SOFTWARE_ROW_6: UI_SoftwareRowClick((int)(id-UI_ID_CMFD_SOFTWARE_ROW_0)); return;
-        case UI_ID_CMFD_GENERAL_USE_0 ... UI_ID_CMFD_GENERAL_USE_13: { u8 s=(u8)(id-UI_ID_CMFD_GENERAL_USE_0); World.Sys_UI.generalClickSlot = -1; GeneralInvClick(s,World.invP1.generalInvCustIdx[s]); GeneralInvApply(s,World.invP1.generalInvCustIdx[s]); return; }
-        case UI_ID_CMFD_GENERAL_ROW_0 ... UI_ID_CMFD_GENERAL_ROW_13: { u8 s=(u8)(id-UI_ID_CMFD_GENERAL_ROW_0); int item=GeneralInvItem(s); if (item<0) return;
+        case UI_ID_CMFD_GENERAL_USE_0 ... UI_ID_CMFD_GENERAL_USE_13: { u8 s=(u8)(id-UI_ID_CMFD_GENERAL_USE_0); World.Sys_UI.generalClickSlot = -1; GeneralInvClick(s); GeneralInvApply(s); return; }
+        case UI_ID_CMFD_GENERAL_ROW_0 ... UI_ID_CMFD_GENERAL_ROW_13: {
+            u8 s=(u8)(id-UI_ID_CMFD_GENERAL_ROW_0); int item=GeneralInvItem(s); if (item<0) return;
             if (!left) { World.Sys_UI.generalClickSlot = -1; if (s) GeneralInvTake(s); return; }
             
             bool twice=dbl && World.Sys_UI.generalClickSlot==(i8)s && World.Sys_UI.generalClickItem==(i16)item && World.Sys_UI.generalClickCustom==World.invP1.generalInvCustIdx[s];
             World.Sys_UI.generalClickSlot = -1;
-            GeneralInvClick(s,World.invP1.generalInvCustIdx[s]);
-            if (twice) GeneralInvApply(s,World.invP1.generalInvCustIdx[s]); else { World.Sys_UI.generalClickSlot=(i8)s; World.Sys_UI.generalClickItem=(i16)item; World.Sys_UI.generalClickCustom=World.invP1.generalInvCustIdx[s]; World.Sys_UI.generalClickTime=World.pauseRelativeTime; } return; }
+            GeneralInvClick(s);
+            if (twice) GeneralInvApply(s);
+            else { World.Sys_UI.generalClickSlot=(i8)s; World.Sys_UI.generalClickItem=(i16)item; World.Sys_UI.generalClickCustom=World.invP1.generalInvCustIdx[s]; World.Sys_UI.generalClickTime=World.pauseRelativeTime; }
+            return; }
         case UI_ID_CMFD_LOG_TABLE_0 ... UI_ID_CMFD_LOG_TABLE_9: UI_LogTableClick((int)(id-UI_ID_CMFD_LOG_TABLE_0)); return;
         case UI_ID_CMFD_LOG_ENTRY_0 ... UI_ID_CMFD_LOG_ENTRY_14: UI_LogEntryClick((int)(id-UI_ID_CMFD_LOG_ENTRY_0)); return;
         case UI_ID_CMFD_LOG_MORE: UI_LogMore(); return;
@@ -1253,10 +1275,11 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_AUTOMAP_FULL: UI_AutomapClick(rh,UI_AUTOMAP_FULL); return;
         case UI_ID_LMFD_AUTOMAP_SIDE: UI_AutomapClick(rh,UI_AUTOMAP_SIDE); return;
         case UI_ID_FULLMAP_CLOSE: CloseFullmap(); return;
-        case UI_ID_LMFD_MEDIA_TAB_0 ... UI_ID_LMFD_MEDIA_TAB_3: { u8 section=(u8)(id-UI_ID_LMFD_MEDIA_TAB_0); if (section==MM_NOTES && !World.diffMis) return;
+        case UI_ID_LMFD_MEDIA_TAB_0 ... UI_ID_LMFD_MEDIA_TAB_3: {
+            u8 section=(u8)(id-UI_ID_LMFD_MEDIA_TAB_0); if (section==MM_NOTES && !World.diffMis) return;
             World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened=section; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
             if (section>=MM_DATA_TABLE) { World.Sys_UI.highlightStatus[section]=false; World.Sys_UI.highlightTickCount[section]=0; } play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false); return; }
-        case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.generalInvCurrent; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanUse(s)) GeneralInvApply(s,World.invP1.generalInvCustIdx[s]); } return; }
+        case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.generalInvCurrent; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanUse(s)) GeneralInvApply(s); } return; }
         case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanVaporize(World.invP1.generalInvCurrent)) VaporizeClick(); return;
         case UI_ID_LMFD_ITEM_SKATE: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(false); return;
         case UI_ID_LMFD_ITEM_BOOST: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(true); return;
@@ -1272,7 +1295,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_KEYCODE_CLOSE: UI_KeycodeClose(rh); return;
         case UI_ID_LMFD_AUDIOLOG_IMAGE: UI_AudioLogClick(rh); return;
         case UI_ID_LMFD_PUZZLE_CELL_0 ... UI_ID_LMFD_PUZZLE_CELL_34: UI_PuzzleGridCell(rh,(int)(id-UI_ID_LMFD_PUZZLE_CELL_0)); return;
-        case UI_ID_LMFD_PUZZLE_CLOSE: UI_PuzzleGridClose(rh); return;
+        case UI_ID_LMFD_PUZZLE_CLOSE: UI_PuzzleGridClose(); return;
         case UI_ID_LMFD_WIRE_NODE_0 ... UI_ID_LMFD_WIRE_NODE_13: UI_WireNodeClick(rh,(int)(id-UI_ID_LMFD_WIRE_NODE_0)); return;
         case UI_ID_LMFD_WIRE_CLOSE: UI_WireClose(rh); return;
         case UI_ID_LMFD_SYS_CLOSE: UI_SysAnalyzerClose(rh); return;

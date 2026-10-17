@@ -38,7 +38,7 @@ typedef struct { glb_primitive_type type; glb_accessor*indices; glb_attribute *a
 typedef struct { char *name; glb_primitive *primitives; size_t primitives_count;} glb_mesh;
 typedef struct glb_node glb_node;
 typedef struct { glb_node **joints; size_t joints_count;glb_accessor *inverse_bind_matrices; } glb_skin;
-struct glb_node{ glb_node*parent, **children; size_t children_count; glb_skin *skin; glb_mesh *mesh; bool has_translation, has_rotation, has_scale; float translation[3], rotation[4], scale[3]; };
+struct glb_node{ glb_node*parent, **children; size_t children_count; glb_skin *skin; glb_mesh *mesh; float translation[3], rotation[4], scale[3]; };
 typedef struct { glb_accessor*input,*output;glb_interpolation_type interpolation;}glbanim_samp;
 typedef struct { glbanim_samp*sampler;glb_node*target_node;glb_animt_path_type target_path;}glb_anim_chan;
 typedef struct { glbanim_samp*samplers;size_t samplers_count;glb_anim_chan*channels;size_t channels_count;}glb_animt;
@@ -131,11 +131,25 @@ static int glb_parse_json_buffer_view(jsmntok_t const* t, int i, const u8* j, i3
 static int glb_parse_json_buffer(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_buffer* out){ (void)tid; if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i; for(int k=0;k<sz;++k){ if(t[i].type!=JSMN_STRING||t[i].size==0)return -1; if(glb_json_strcmp(t+i,j,"byteLength")){++i;out->size=glb_json_to_size(t+i,j);++i;} else i=glb_skip_json(t,i+1); if(i<0)return i; } return i; }
 static int glb_parse_json_skin(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_skin* out){ if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i; for(int k=0;k<sz;++k){ if(t[i].type!=JSMN_STRING||t[i].size==0)return -1; if(glb_json_strcmp(t+i,j,"joints")){++i;i=glb_parse_json_node_array(t,i,j,tid,&out->joints,&out->joints_count);}else if(glb_json_strcmp(t+i,j,"inverseBindMatrices")){++i;if (t[i].type!=JSMN_PRIMITIVE) return -1;out->inverse_bind_matrices=(glb_accessor*)((size_t)glb_json_to_int(t+i,j)+1);++i;}else{i=glb_skip_json(t,i+1);} if(i<0){return i;} } return i; }
 static int glb_parse_json_node(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_node* out){
-    if (t[i].type!=JSMN_OBJECT) return -1; out->rotation[3]=1.0f;out->scale[0]=1.0f;out->scale[1]=1.0f;out->scale[2]=1.0f; int sz=t[i].size;++i;
-    for(int k=0;k<sz;++k){
-        if(t[i].type!=JSMN_STRING||t[i].size==0)return -1;
-             if (glb_json_strcmp(t+i,j,"children")) { ++i; i = glb_parse_json_node_array(t, i, j, tid, &out->children, &out->children_count); } else if(glb_json_strcmp(t+i,j,"mesh")){++i;if (t[i].type!=JSMN_PRIMITIVE) return -1;out->mesh=(glb_mesh*)((size_t)glb_json_to_int(t+i,j)+1);++i;}else if(glb_json_strcmp(t+i,j,"skin")){++i;if (t[i].type!=JSMN_PRIMITIVE) return -1;out->skin=(glb_skin*)((size_t)glb_json_to_int(t+i,j)+1);++i;}
-        else if(glb_json_strcmp(t+i,j,"translation")){out->has_translation=1;i=glb_parse_json_float_array(t,i+1,j,out->translation,3);}else if(glb_json_strcmp(t+i,j,"rotation")){out->has_rotation=1;i=glb_parse_json_float_array(t,i+1,j,out->rotation,4);} else if(glb_json_strcmp(t+i,j,"scale")){out->has_scale=1;i=glb_parse_json_float_array(t,i+1,j,out->scale,3);}else{i=glb_skip_json(t,i+1);}  if(i<0)return i;
+    if (t[i].type!=JSMN_OBJECT) return -1;
+    
+    out->rotation[3] = 1.0f;
+    out->scale[0] = 1.0f;
+    out->scale[1] = 1.0f;
+    out->scale[2] = 1.0f;
+    int sz = t[i].size;
+    ++i;
+    for (int k=0;k<sz;++k) {
+        if(t[i].type != JSMN_STRING || t[i].size == 0) return -1;
+        
+             if (glb_json_strcmp(t + i,j,"children")) { ++i; i = glb_parse_json_node_array(t, i, j, tid, &out->children, &out->children_count); }
+        else if (glb_json_strcmp(t + i,j,"mesh")) { ++i;if (t[i].type != JSMN_PRIMITIVE) return -1; out->mesh = (glb_mesh*)((size_t)glb_json_to_int(t + i,j) + 1); ++i;}
+        else if (glb_json_strcmp(t + i,j,"skin")){++i;if (t[i].type != JSMN_PRIMITIVE) return -1; out->skin = (glb_skin*)((size_t)glb_json_to_int(t + i,j) + 1); ++i;}
+        else if (glb_json_strcmp(t + i,j,"translation")){ i = glb_parse_json_float_array(t,i + 1,j,out->translation,3);}
+        else if (glb_json_strcmp(t + i,j,"rotation")) { i = glb_parse_json_float_array(t, i + 1,j,out->rotation, 4);}
+        else if (glb_json_strcmp(t + i,j,"scale")){ i = glb_parse_json_float_array(t, i + 1, j, out->scale, 3);}
+        else                                   {i = glb_skip_json(t, i + 1);}
+        if (i < 0) return i;
     } return i;
 }
 

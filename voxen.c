@@ -862,9 +862,6 @@ void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) {
 
 void UpdateScreenSize(i32 width, i32 height) {
     u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); /*Cap at minimum Quake resolution and maximum 8k.*/
-    float wf = (float)w, hf = (float)h;
-    Sys_Settings.ScreenCenterX = wf * 0.5f;
-    Sys_Settings.ScreenCenterY = hf * 0.5f;
     glViewport(0,0,w,h);
     glUseProgram(imageBlitSP); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
     glUseProgram(chunkSP);     glUniform1ui(6,w); glUniform1ui(7,h);
@@ -1974,7 +1971,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.mass[PLAYER1] = 1.0f;
     World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
     World.cam_yaw = 90.0f;
-    World.cam_pitch = World.cam_roll = World.invP1.leanTarget = World.invP1.leanShift = 0.0f;
+    World.cam_pitch = World.cam_roll = World.invP1.leanTarget = 0.0f;
     World.gravity[PLAYER1] = 1.0f;
     World.dynamicFriction[PLAYER1] = 0.6f;
     World.staticFriction[PLAYER1] = 0.8f; 
@@ -2000,21 +1997,14 @@ __attribute__((cold)) void NewGame() { // Reset World States
     for (int i=0;i<HW_COUNT;++i) World.invP1.hwVers[i] = World.invP1.hwVersSetting[i] = 0;
     World.invP1.nitroTimeSetting = 7.0;
     World.invP1.earthShakerTimeSetting = 10.0;
-    World.invP1.lastAddedIndex = World.invP1.globalLookupIndex = -1;
+    World.invP1.lastAddedIndex = -1;
     World.invP1.hasNewEmail = World.invP1.hasNewNotes = World.invP1.isPulserNotDrill = true;
     MissionTimerInit();
     for (int i=0;i<7;++i) World.invP1.weaponInventoryIndices[i] = World.invP1.weaponInventoryAmmoIndices[i] = -1;
-    World.invP1.sparqSetting = 50.0f;
-    World.invP1.ionSetting = 100.0f; World.invP1.blasterSetting = 15.0f;
-    World.invP1.plasmaSetting = 40.0f; World.invP1.stungunSetting = 20.0f;
     World.invP1.justFired = (World.pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
-    World.invP1.resetAfterDeathTime = 0.5;
-    World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.radFXFinished = World.pauseRelativeTime;
+    World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.ressurectingFinished = World.pauseRelativeTime;
     World.Sys_UI.lastMultiMediaTabOpened = MM_EMAIL_TABLE;
-    World.Sys_UI.logFinished = World.pauseRelativeTime;
-    World.Sys_UI.tickFinished = World.Sys_UI.centerTabsTickFinished = World.current_time + 0.1 + (double)random_range(0.0f,1.0f);
-    World.Sys_UI.blinkFinished = 1.0 + World.pauseRelativeTime;
-    World.Sys_UI.beepFinished = 3.0 + World.pauseRelativeTime;
+    World.Sys_UI.tickFinished = World.current_time + 0.1 + (double)random_range(0.0f,1.0f);
     World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = -1.0;
     World.invP1.mediPatchPulseFinished = 0.0;
     World.invP1.mediPatchPulseCount = 0;
@@ -2303,7 +2293,7 @@ void InitalizeEnvironment() {
     currentMenuPage = MPG_FRONT;
     if (playIntroAtBoot) ChangeMenuPage(MPG_INTRO);/*must come after NewGame (it resets the page to MPG_FRONT) and go through ChangeMenuPage so the cutscene also gets its clip audio + start time*/
     else { PlayMenuMusic(); }/*the title music fronts the menu*/
-    //World.menuActive = true; InitStageLog("menu setup"); //COMMENT for immediate into game
+    World.menuActive = true; InitStageLog("menu setup"); //COMMENT for immediate into game
     OS_ScratchFree(); InitStageLog("scratch free");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     DebugRAM("InitializeEnvironment after scratch free");
@@ -2360,8 +2350,8 @@ i32 main() {
             //AutomapDumpBMP(); // Uncomment for testing
         }
         
-        for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = Sys_Input.keyStates[i].released = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/
-        for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) { Sys_Input.mouseButtons[i].pressed=Sys_Input.mouseButtons[i].released=false; }
+        for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/
+        for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) { Sys_Input.mouseButtons[i].pressed = false; }
         Sys_Input.scrollDelta = 0;
         World.currentMouse_dx = World.currentMouse_dy = 0;
         globalframe++;

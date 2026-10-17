@@ -200,7 +200,7 @@ void InitNPC(u16 i) {
     else if (diff >= 3) { World.instances[i].huntFinished += vmax((npcTable[npcID].huntTime * 2.00), 60.0); } /*Good memory on hard.*/
     else                { World.instances[i].huntFinished += vmax( npcTable[npcID].huntTime,         60.0); }
     World.instances[i].attackFinished = World.pauseRelativeTime + 1.0;
-    World.instances[i].attack2Finished = World.instances[i].attack3Finished = World.instances[i].timeTillPainFinished = World.instances[i].timeTillDeadFinished = World.instances[i].gracePeriodFinished = World.pauseRelativeTime;
+    World.instances[i].timeTillPainFinished = World.instances[i].timeTillDeadFinished = World.instances[i].gracePeriodFinished = World.pauseRelativeTime;
     World.instances[i].randWaitAtt1Finished = World.instances[i].randWaitAtt2Finished = World.instances[i].randWaitAtt3Finished = World.instances[i].tranquilizeFinished = World.instances[i].deathBurstFinished = World.instances[i].wanderFinished = World.instances[i].posCheckFinished = World.instances[i].timeTillEnemyChangeFinished = World.pauseRelativeTime;
     World.instances[i].currentFrameFinished = World.instances[i].timeSinceMovedEnough = 0.0;
     World.instances[i].currentState = AIState_Idle;
@@ -613,11 +613,11 @@ static void ai_apply_damage(DamageData dd, u16 hitIdx) {
     if(!hitIdx || hitIdx >= INSTANCE_COUNT || hitIdx >= World.instCount){return;}
     if(hitIdx == dd.owner){return;} // Never hurt self (melee/projectile origin sits inside own capsule).
     if(!(World.instances[hitIdx].entflags & EF_ACTIVE)){return;}
-    dd.hitIdx=hitIdx;
-    bool hitPlayer=(hitIdx == PLAYER1);
+    
+    bool hitPlayer = (hitIdx == PLAYER1);
     dd.isOtherNPC=!hitPlayer && IdxIsNPC(World.instances[hitIdx].index);
-    if(dd.isOtherNPC){ NPCTable* nt=&npcTable[World.instances[hitIdx].index - 419]; dd.armorvalue=nt->armorvalue; dd.defense=nt->defense; }
-    dd.damage=GetDamageTakeAmount(&dd);
+    if (dd.isOtherNPC) { NPCTable* nt = &npcTable[World.instances[hitIdx].index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; }
+    dd.damage = GetDamageTakeAmount(&dd);
     TakeDamage(hitIdx, dd);
 }
 static void AIApplyAttackMovement(Entity* self, float speed) { u16 eidx=self->enemy; if(!eidx)return; if(self->entflags & EF_ACT_AS_TURRET){self->currentDestination=ai_sight_pos(self); return;} if(speed<=0||self->tranquilizeFinished>=World.pauseRelativeTime)return; self->currentDestination=World.position[eidx]; if(V3_SqDist(ai_sight_pos(self),self->currentDestination)<=AI_STOP_DIST_SQ)return; if(!AIWithinAngleToTarget(self))return; AddForce((u16)(self-World.instances),V3_ScaleByF(self->forward,speed),false); }

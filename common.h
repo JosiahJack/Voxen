@@ -292,54 +292,61 @@ enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<
 #define LMASK_PLAYER_ATTACK         (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_CorpseSearchable|L_Corpse)
 #define LMASK_EXPLOSION             (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_CorpseSearchable|L_Corpse)
 #define LMASK_PLAYER_FEET           (L_Default|L_Geometry)
-typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; float ScreenCenterX,ScreenCenterY; bool Fullscreen; u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
+typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; bool Fullscreen; u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
 typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,showNPC,editMode; u8 dizzyLevel,animTest,editSubMode; } CheatsSystem; extern CheatsSystem Cheats;
 typedef struct {
-        double vmailFrameFinished,logFinished,blinkFinished,beepFinished,tickFinished,centerTabsTickFinished; i32 lastMultiMediaTabOpened,applyButtonReferenceIndex,count; u16 vmailFrame,linkedElevatorDoor,tetheredPGP,tetheredPWP,tetheredSearchable,tetheredKeypadElevator,tetheredKeypadKeycode,elevButtonSpawnIdx[8]; u8 highlightTickCount[4],elevButtonLevelIdx[8],elevCurrentFloor;
-        bool lastWeaponSideRH,lastItemSideRH,lastAutomapSideRH /*TODO*/,lastDataSideRH,lastSearchSideRH,lastLogSideRH /*TODO*/,lastMinigameSideRH /*TODO*/,logActive,paperLogInUse/*TODO*/,usingObject,highlightStatus[4],mouseClickHeldOverGUI,buttonsEnabled[8],buttonsDarkened[8];
-        i8 elevButtonLabelIdx[8];
-        bool searchFXActive[2]; double searchFXStartTime[2]; float searchFXCursorX[2],searchFXCursorY[2];
-        u8 vmailActive; V3 objectInUsePos;
-        u8 MFD_LefTab,MFD_CenterTab,MFD_RightTab,MFD_Data,MFD_MediaTab,MFD_ReaderView,mfdSelected[3],mfdReturnTab[3],mfdReturnView[3],mfdItemReader[2];
-        u8 mfdConsumable; i8 consumableClickRow; bool mfdGeneralItem,mfdHardwareItem; i8 generalClickSlot; i16 generalClickItem; u16 generalClickCustom; double generalClickTime;
-        i32 tWrnTextIdx[10],tWrnTextIdx2[10],tWrnTextIdx3[10],tWrnColorIdx[10]; double tWrnFinished[10];
-        i8 keycodeHuns,keycodeTens,keycodeOnes; i32 keycodeEntry,keycodeValue; bool keycodeValid,keycodeSolved;
-        u8 pg_type[35],pg_gridType,pg_theme,pg_source,pg_output,pg_width,pg_height; bool pg_cell[35],pg_powered[35],pg_checked[35],pg_solved; float pg_progress;
-        i8 pw_curL[7],pw_curR[7],pw_tgtL[7],pw_tgtR[7]; bool pw_wireOn[7],pw_rowActive[7]; u8 pw_wireColor[7]; i8 pw_selectedWire; bool pw_selectedWireRH,pw_solved; float pw_temp;
-        bool pg_fired;
-        i8 mg_current; bool mg_running[2];
-        i16 logFolderList[16]; u8 logFolderCount; u16 logReferenceIndex; i16 logReaderPage;
-        bool autoSide[2],fullMapOpen[2];
-        bool firstMain,firstGeneral,firstHardware,firstWeapon;
+        double vmailFrameFinished, tickFinished;
+        double searchFXStartTime[2];
+        double generalClickTime;
+        double tWrnFinished[10];
+        float searchFXCursorX[2], searchFXCursorY[2], pw_temp;
+        i32 lastMultiMediaTabOpened, count, tWrnTextIdx[10], tWrnTextIdx2[10], tWrnTextIdx3[10], tWrnColorIdx[10], keycodeEntry,keycodeValue;
+        u16 vmailFrame, linkedElevatorDoor, tetheredPGP, tetheredPWP, tetheredSearchable, tetheredKeypadElevator, tetheredKeypadKeycode,elevButtonSpawnIdx[8], generalClickCustom, logReferenceIndex;
+        i16 generalClickItem, logFolderList[16], logReaderPage;
+        u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, MFD_LefTab, MFD_CenterTab, MFD_RightTab, MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
+        i8 elevButtonLabelIdx[8], generalClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
+        bool lastWeaponSideRH, lastItemSideRH, lastAutomapSideRH /*TODO*/, lastDataSideRH, lastSearchSideRH, lastLogSideRH /*TODO*/, lastMinigameSideRH /*TODO*/, logActive, paperLogInUse/*TODO*/, usingObject, highlightStatus[4], mouseClickHeldOverGUI, buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], mfdGeneralItem, mfdHardwareItem, keycodeValid, keycodeSolved, pg_cell[35], pg_powered[35], pg_checked[35], pg_solved, pw_wireOn[7], pw_rowActive[7];
+        bool pw_selectedWireRH, pw_solved, pg_fired, mg_running[2], autoSide[2], fullMapOpen[2], firstMain, firstGeneral, firstHardware, firstWeapon;
+        V3 objectInUsePos;
 } SystemUI;
 typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
 extern TextSystem Sys_Text;
 extern u32 fontAtlasTex,fontAtlasTexStopD;
-typedef struct { float hitOffset,verticalOffset,fireDistance,overheatedPercent,wepYRot,targetY; V3 reloadContainerHome,reloadContainerPos,tempVec; Quaternion reloadContainerRot; bool recoiling,pendingMeleeIsRapier,pendingMeleeSilent; RaycastHit tempHit; double pendingMeleeFinished; i32 pendingMeleeWep16; u16 tempHitEnt,pendingMeleeTarget,pendingMeleeHitSnd,pendingMeleeMissSnd,pendingMeleeFleshSnd;} WeaponFireCtx;
+typedef struct { float hitOffset, fireDistance, overheatedPercent, targetY; V3 reloadContainerHome, reloadContainerPos, tempVec; bool recoiling, pendingMeleeIsRapier, pendingMeleeSilent; RaycastHit tempHit; double pendingMeleeFinished; i32 pendingMeleeWep16; u16 tempHitEnt, pendingMeleeTarget, pendingMeleeHitSnd, pendingMeleeFleshSnd; } WeaponFireCtx;
 enum{PATCH_BERSERK=1, PATCH_DETOX=2, PATCH_GENIUS=4, PATCH_MEDI=8, PATCH_REFLEX=16, PATCH_SIGHT=32, PATCH_STAMINUP=64,SW_DRILL=0,SW_PULSER=1,SW_SHIELD=2,SW_TURBO=3,SW_DECOY=4,SW_RECALL=5,SW_GAMES=6,  MINIGAME_PING=1,MINIGAME_15=2,MINIGAME_WING0=4,MINIGAME_BOTBOUNCE=8,MINIGAME_EEL_ZAPPER=16,MINIGAME_ROAD=32,MINIGAME_TRIOPTOE=64,HW_COUNT=14,
          HW_SYS=1/*System Analyzer*/,    HW_NAV=2/*Navigation Unit*/,    HW_ERD=4/*Datareader/EReader*/,    HW_SNS=8/*Sensaround*/,   HW_TID=16/*Target Identifier*/,   HW_SHD=32/*Energy Shield*/,   HW_BIO=64/*Biomonitor*/,  HW_LAN=128/*Head Mounted Lantern*/,  HW_ENV=256/*Envirosuit*/,  HW_BST=512/*Turbo Motion Booster*/,  HW_JET=1024/*Jump Jet Boots*/,  HW_INF=2048/*Infrared Night Sight Enhancement*/,
      HW_SYS_IDX=0/*System Analyzer*/,HW_NAV_IDX=1/*Navigation Unit*/,HW_ERD_IDX=2/*Datareader/EReader*/,HW_SNS_IDX=3/*Sensaround*/,HW_TID_IDX=4/*Target Identifier*/,HW_SHD_IDX=5/*Energy Shield*/,HW_BIO_IDX=6/*Biomonitor*/,HW_LAN_IDX=7/*Head Mounted Lantern*/,HW_ENV_IDX=8/*Envirosuit*/,HW_BST_IDX=9/*Turbo Motion Booster*/,HW_JET_IDX=10/*Jump Jet Boots*/,HW_INF_IDX=11/*Infrared Night Sight Enhancement*/};
 typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
-    double nitroTimeSetting,earthShakerTimeSetting,justFired,waitTilNextFire,reloadFinished,lerpStartTime,dropFinished,berserkFinished,berserkIncTime,detoxFinished,geniusFinished,mediFinished,reflexFinishedTime,sightFinishedTime,jumpJetSuckFinished,jumpJetFinished,doubleJumpFinished,noiseFinished,radBleedFinished,
-           leanLeftTapFinished,leanRightTapFinished,sightSideEffectFinishedTime,staminupFinishedTime,turboCyberTime,turboFinished,energyDrainTickFinished,painSoundFinished,radSoundFinished,radFXFinished,fatigueBleedoffFinished,fatigueMoveFinished,footstepFinished,rustleFinished,fallPainFinished,ressurectingFinished,mediPatchPulseFinished;
-    float weaponEnergySetting[16],reloadLerpValue,sparqSetting,ionSetting,blasterSetting,plasmaSetting,stungunSetting,targetY,currentEnergyWeaponHeat[7],fatigue,resetAfterDeathTime,energy,currentCrouchRatio,leanTarget,leanShift,crouchingVelocity,leanVelocity,lastVelY;
-    u32 accessCardOwned,wepAmmo[16],wepAmmoSecondary[16];
-    i32 lastAddedIndex,emailIndex,globalLookupIndex,weaponInventoryIndices[7],weaponInventoryAmmoIndices[7],hardwareInvCurrent/*Current slot in the general inventory (14 slots).*/,hardwareInvIndex/*Current index to the item look-up table.*/,generalInventoryIndexRef[14],berserkIncrement,mediPatchPulseCount;
-    i16 ladderState,weaponCurrentPending,weaponIndexPending,weaponCurrent;
-    u16 hasHardware,hardwareIsActive,hardwareInvReferenceIndex[HW_COUNT],heldObjectIndex,heldObjectCustIdx,heldAmmo,heldAmmo2,weaponIndex,currentSearchItem,generalInvIndex,generalInvCustIdx[14],patchActive,drainJPM,grenConstIndex[7];
-    u8 numLogsFromLevel[10],lerpUp,hasSoft,softVersions[7],hasMinigame,numweapons,currentMagazineAmount[7],currentMagazineAmount2[7],hwVers[HW_COUNT],hwVersSetting[HW_COUNT],grenAmmo[7],grenCur,generalInvCurrent,patchCur,patchCounts[7];
+    double nitroTimeSetting, earthShakerTimeSetting, justFired, waitTilNextFire, reloadFinished, lerpStartTime, dropFinished, berserkFinished, berserkIncTime, detoxFinished, geniusFinished, mediFinished, reflexFinishedTime, sightFinishedTime, jumpJetSuckFinished, jumpJetFinished, doubleJumpFinished, noiseFinished, radBleedFinished,
+           leanLeftTapFinished, leanRightTapFinished, sightSideEffectFinishedTime, staminupFinishedTime, turboCyberTime, turboFinished, energyDrainTickFinished, painSoundFinished, radSoundFinished, fatigueBleedoffFinished, fatigueMoveFinished, footstepFinished, rustleFinished, fallPainFinished, ressurectingFinished, mediPatchPulseFinished;
+    float weaponEnergySetting[16], reloadLerpValue, targetY, currentEnergyWeaponHeat[7], fatigue, energy, currentCrouchRatio, leanTarget, crouchingVelocity, leanVelocity, lastVelY;
+    u32 accessCardOwned, wepAmmo[16], wepAmmoSecondary[16];
+    i32 lastAddedIndex, emailIndex, weaponInventoryIndices[7], weaponInventoryAmmoIndices[7], hardwareInvCurrent, generalInventoryIndexRef[14], berserkIncrement, mediPatchPulseCount;
+    i16 ladderState, weaponCurrentPending, weaponIndexPending, weaponCurrent;
+    u16 hasHardware, hardwareIsActive, hardwareInvReferenceIndex[HW_COUNT], heldObjectIndex, heldObjectCustIdx, heldAmmo, heldAmmo2, weaponIndex, currentSearchItem, generalInvCustIdx[14], patchActive, drainJPM, grenConstIndex[7];
+    u8 numLogsFromLevel[10], lerpUp, hasSoft, softVersions[7], hasMinigame, numweapons, currentMagazineAmount[7], currentMagazineAmount2[7], hwVers[HW_COUNT], hwVersSetting[HW_COUNT], grenAmmo[7], grenCur, generalInvCurrent, patchCur, patchCounts[7];
     i8 cyberItemIndex;
-    bool beepDone,hasNewEmail,hasNewNotes,isPulserNotDrill,wepLoadedWithAlternate[7],staminupActive,hasLog[134],readLog[134],justChangedWeap,overloadEnabled,recoiling,heldObjectLoadedAlternate,holdingObject,grenActive,hasNewLogs,hasNewData,radiationArea,inReverbZone,leanResetting,wasGrounded,makingNoise;
+    bool beepDone, hasNewEmail, hasNewNotes, isPulserNotDrill, wepLoadedWithAlternate[7], staminupActive, hasLog[134], readLog[134], justChangedWeap, overloadEnabled, recoiling, heldObjectLoadedAlternate, holdingObject, grenActive, hasNewLogs, radiationArea, inReverbZone, leanResetting, wasGrounded, makingNoise;
 } InventorySystem;
-typedef struct { float damage,penetration,offense,armorvalue,defense,impactVelocity; V3 attacknormal,hitpoint; AttType attackType; u16 owner,hitIdx; bool isOtherNPC,berserkActive; } DamageData; typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/ extern AutoSplitterData autoSplitter;
-typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width,height; float near,far,finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
+typedef struct { float damage, penetration, offense, armorvalue, defense, impactVelocity; V3 attacknormal, hitpoint; AttType attackType; u16 owner; bool isOtherNPC, berserkActive; } DamageData;
+typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/ extern AutoSplitterData autoSplitter;
+typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width, height; float near, far, finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 extern CamView camViews[64],levelCamViews[14][64]; extern u8 camViewCount,levelCamViewCount[14]; extern u32 camViewTextures[64],levelCamViewTextures[14][64];
 extern u8 sensaroundCamViewCenter,sensaroundCamViewLeft,sensaroundCamViewRight; extern void UpdateSensaroundCamViews(); // HUD sensaround cameras (center rear + left/right sides), repositioned each frame at the player
 typedef struct { // MUST PRESERVE ORDER TO MATCH TABLE!!
-        const char* name; AttType attackType,attackType2,attackType3; float damage,damage2,damage3,range,range2,range3,health,healthForCyberNPC; PerceptionLevel perception; float disruptability,armorvalue,defense; AIMoveType moveType;
-        float yawSpeed,fov,fovAttack,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack1Speed,attack2Speed,attack3Speed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToActualAttack1,timeToActualAttack2,timeToActualAttack3,timeBetweenAttack1,timeBetweenAttack2,timeBetweenAttack3,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax,timeAttack1WaitMin,timeAttack1WaitMax,timeAttack1WaitChance,timeAttack2WaitMin,timeAttack2WaitMax,timeAttack2WaitChance,timeAttack3WaitMin,timeAttack3WaitMax,timeAttack3WaitChance;
-        int attack1ProjectileLaunchedType/*Unused*/,attack2ProjectileLaunchedType/*Unused*/,attack3ProjectileLaunchedType/*Unused*/; float projectileSpeedAttack1,projectileSpeedAttack2,projectileSpeedAttack3; bool hasLaserOnAttack1,hasLaserOnAttack2,hasLaserOnAttack3,explodeOnAttack3,preactivateMeleeColliders;/*Unused*/ double huntTime; float flightHeight; bool flightHeightIsPercentage,switchMaterialOnDeath;
-        float hearingRange,timeForTranquilization; bool hopsOnMove; NPCType type; int projectile1Prefab,projectile2Prefab,projectile3Prefab;
+        const char* name; AttType attackType, attackType2, attackType3; float damage, damage2, damage3, range, range2, range3, health, healthForCyberNPC; PerceptionLevel perception; float disruptability, armorvalue, defense; AIMoveType moveType;
+        float yawSpeed, fov, fovAttack, fovStartMovement, distToSeeBehind, sightRange, walkSpeed, runSpeed, attack1Speed, attack2Speed, attack3Speed, attack3Force, attack3Radius, timeToPain, timeBetweenPain, timeTillDead, timeToActualAttack1, timeToActualAttack2, timeToActualAttack3, timeBetweenAttack1, timeBetweenAttack2, timeBetweenAttack3, timeToChangeEnemy,timeIdleSFXMin, timeIdleSFXMax,
+              timeAttack1WaitMin, timeAttack1WaitMax, timeAttack1WaitChance, timeAttack2WaitMin, timeAttack2WaitMax, timeAttack2WaitChance, timeAttack3WaitMin, timeAttack3WaitMax, timeAttack3WaitChance;
+        int attack1ProjectileLaunchedType, attack2ProjectileLaunchedType, attack3ProjectileLaunchedType;
+        float projectileSpeedAttack1, projectileSpeedAttack2, projectileSpeedAttack3;
+        bool hasLaserOnAttack1, hasLaserOnAttack2, hasLaserOnAttack3, explodeOnAttack3, preactivateMeleeColliders;
+        double huntTime;
+        float flightHeight;
+        bool flightHeightIsPercentage, switchMaterialOnDeath;
+        float hearingRange, timeForTranquilization;
+        bool hopsOnMove;
+        NPCType type;
+        int projectile1Prefab, projectile2Prefab, projectile3Prefab;
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
 void TargetIDReset(); bool TargetIDShouldRender(u16); bool TargetIDInPlayerPVS(u16); i16 TargetIDGetText(u16);
@@ -351,23 +358,23 @@ typedef struct {
 } BioMonitorSystem;
 extern BioMonitorSystem bioMonitor;
 typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB; bool portalNS,open,dirty; u8 lev;} Portal;
-typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; float trailBirth; u16 trailHead,trailChainLen; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
-typedef struct Emitter { bool active,looping,spawnedAny; V3 position; Quaternion orientation; float emitAccumulator,emitRate,age,duration; u16 aliveCount,maxAlive; u8 physicsMode,trail,shapeType; u16 trailTexture; float shapeRadius,shapeAngle,lifetimeMin,lifetimeMax,sizeMin,sizeMax,speedMin,speedMax,rotMin,rotMax,aVelMin,aVelMax,gravity,trailLifetime,trailWidthStart,trailWidthEnd; u32 trailColorStart,trailColorEnd;
-                         u32 texBaseIdx,textureFrameCount; u8 blendMode,rotationMode,colorMode; u16 burstRemaining; float animSpeed,animWindow,softness,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; u32 colorRamp[64];
+typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; u16 trailHead,trailChainLen; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
+typedef struct Emitter { bool active,looping; V3 position; Quaternion orientation; float emitAccumulator,emitRate,age,duration; u16 aliveCount,maxAlive; u8 physicsMode,trail,shapeType; u16 trailTexture; float shapeRadius,shapeAngle,lifetimeMin,lifetimeMax,sizeMin,sizeMax,speedMin,speedMax,rotMin,rotMax,aVelMin,aVelMax,gravity,trailLifetime,trailWidthStart,trailWidthEnd; u32 trailColorStart,trailColorEnd;
+                         u32 texBaseIdx,textureFrameCount; u8 blendMode,rotationMode,colorMode; u16 burstRemaining; float animWindow,softness,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; u32 colorRamp[64];
                          bool useMesh; u16 meshInstance,meshModelIdx; u16 parentIdx; } Emitter;
 typedef struct GpuPartInst { float x,y,z,size; u32 color,data0,data1,pad; } GpuPartInst;
 typedef struct TrlSegInst { float p0x,p0y,p0z,padA,p1x,p1y,p1z,padB; float c00x,c00y,c00z,c00w,c01x,c01y,c01z,c01w,c10x,c10y,c10z,c10w,c11x,c11y,c11z,c11w; u32 color0,color1,uvData; float deathTime; float trailWidthStart,trailWidthEnd; u32 chainIndex,trailOwner; } TrlSegInst;
 typedef struct { Particle particles[MAX_PARTICLES]; Emitter emitters[MAX_EMITTERS]; GpuPartInst gpuInstances[MAX_PARTICLES]; TrlSegInst trailSegments[MAX_TRAIL_SEGS]; PartSortEntry sortKeys[MAX_PARTICLES]; u32 aliveCount,trailCount,nextTrailOwner; } PSys; extern PSys psys;
 typedef struct { u16 emitters[MAX_LEVEL_PARTICLES],count; } LevelParticles;
-typedef struct { double combatImpulseFinished; bool inCombat,inZone,twoPlaying,distortion,cyberTube,elevator,levelEntry; TrackType zoneTrack; MusicType zoneMusic; } MusicSystem;
+typedef struct { double combatImpulseFinished; bool inZone,distortion,cyberTube,elevator,levelEntry; TrackType zoneTrack; MusicType zoneMusic; } MusicSystem;
 typedef /*FAT*/ struct  {
     u32 entflags,ioflags,ioflagsHi; u16 modelIndex,index,portalIndex;
     u32 deferredIoflags,deferredIoflagsHi; V3 forward,right,lastPosition,targetPosition,startPosition,activatedScale,direction; u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
     i32 cellIndex; i16 cellX,cellZ;
     u8 clip,animationNum,texAnimClip,camView,codeScreen,camRotatePositive,camRotateEnabled,camSweepInit,securityThreshold,lerpUp,maxRandomItems,questBitID,questTestMode,branchOnSecond,relayEnabled,relayOnceEver,relayAlreadyDone,useQuestKeycode1,useQuestKeycode2; FuncStates/*u8*/ funcState; BodyState/*u8*/ bodyState; 
     float shadRadius,health,cyberHealth,radiation,speed,ajarPercentage,percentMoved,timeForTranquilization,gracePeriodFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,randWaitAtt1Finished,randWaitAtt2Finished,randWaitAtt3Finished,
-          attackFinished,attack2Finished,attack3Finished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animFinished,animSwapFinished,switchAnimFinished,delay,panelTimer,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFinished,
-          tickFinished,tickTime,aiThinkFinished,useFinished,waitBeforeClose,lasersFinished,amount,resetTime,minSecurityLevel,rechargeFinished,camStartYAngle,camEndYAngle,camWaitTime,camWaitingFinished,camYaw,camYaw0,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[7],reverbMaxDist,deathAnimationStart;
+          attackFinished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animFinished,animSwapFinished,switchAnimFinished,delay,panelTimer,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFinished,
+          tickFinished,tickTime,aiThinkFinished,useFinished,waitBeforeClose,amount,resetTime,minSecurityLevel,rechargeFinished,camStartYAngle,camEndYAngle,camWaitTime,camWaitingFinished,camYaw,camYaw0,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[7],reverbMaxDist,deathAnimationStart;
     Quaternion camBaseRot;
     V3 accumulatedForce,currentDestination,targettingPosition,idealTransformForward,idealPos;    
     u16 enemy,messageIndex,teleportID,targetDestinationID,keycode,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,rechargeMsgLingdex,usedMsgLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx,reverbPreset,npcNumber,targetOnDeathIdx,lockedTargetIdx;
@@ -375,7 +382,7 @@ typedef /*FAT*/ struct  {
     i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,logIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7];
     bool srchInUse,generateContents,generationDone,dontReset,onlyOnce,allDone,curTex,useRandomTimes,active,panelOpen,panelInstalled,panelArmed;
     V3 panelItemPos; Quaternion panelItemRot;
-    bool touchEnabled,broken,requireRecharge,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,destroyAfterListInsteadOfDeactivate,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,textureGlowAnimating,texAnimStopsAtDie,texAnimInReverse,texAnimRandom,automapHidden,blocked,ajar,deathAnimationActive;
+    bool touchEnabled,broken,requireRecharge,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,texAnimStopsAtDie,texAnimInReverse,texAnimRandom,ajar,deathAnimationActive;
     AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; char texAnimResourceFolder[TARG_STRLEN];
     i8 wireCurL[7],wireCurR[7];
     bool gridCells[35],puzzleFired,puzzleSolved;
@@ -394,17 +401,29 @@ typedef struct {
     double automapNextRaster;
     i8 lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
     u8 physSleep[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,numLevels,curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,currentLevel,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
-    bool inventoryMode,levelCurrentlyLoading,introNotPlayed,paused,menuActive,gameFinished,creditsActive,decoyActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,*invTnsrValid,*colliding,targetIOActive,misTimerLast,misTimerCurIdx,misTimerTimesUP;
+    bool inventoryMode,levelCurrentlyLoading,paused,menuActive,gameFinished,creditsActive,decoyActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,*invTnsrValid,*colliding,targetIOActive,misTimerLast,misTimerCurIdx,misTimerTimesUP;
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
     UIComponent uiComponents[MAX_UI_ELEMENTS];
     V3 debugLine_start,debugLine_end,cyberspaceRecallPoint,levelPosition[MAX_LEVELS][INSTANCE_COUNT],levelScale[MAX_LEVELS][INSTANCE_COUNT],levelVelocity[MAX_LEVELS][INSTANCE_COUNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT],levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT],levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]/*xyz for Box,x=Sph r,else xyz for Capsule r,h,dir(0=X,1=Y,2=Z)*/,levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
-    ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT]; Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
+    ColliderType/*u8*/ levelCollider[MAX_LEVELS][INSTANCE_COUNT];
+    Quaternion levelRotation[MAX_LEVELS][INSTANCE_COUNT];
     float levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
     bool levelInvTnsrValid[MAX_LEVELS][INSTANCE_COUNT],levelColliding[MAX_LEVELS][INSTANCE_COUNT];
-    Light levelLights[MAX_LEVELS][LIGHT_COUNT]; LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT]; LevelParticles levelParticles[MAX_LEVELS];
-    Entity* instances; LevelParticles* particles; V3* position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize; ColliderType* col; Quaternion* rotation; u32* layer,targetIOActivatorIoflags,targetIOActivatorIoflagsHi; float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
-    u16 levelLightTargetnames[MAX_LEVELS][LIGHT_COUNT]; u16 *lightTargetnames;
-    Light *lights; LightAnimation *lanims; V3 *lightsNewPosition; u16 loadedLights,targetIOActivatorIdx,decoyInstance; Color fogColor[MAX_LEVELS]; Entity targetIOActivatorEntity; u8 targetIOEntryLevel;
+    Light levelLights[MAX_LEVELS][LIGHT_COUNT];
+    LightAnimation levelLAnims[MAX_LEVELS][LIGHT_COUNT]; LevelParticles levelParticles[MAX_LEVELS];
+    Entity* instances;
+    LevelParticles* particles;
+    V3* position,*scale,*velocity,*angularVelocity,*colliderCenter,*colliderSize;
+    ColliderType* col;
+    Quaternion* rotation;
+    u32* layer,targetIOActivatorIoflags,targetIOActivatorIoflagsHi;
+    float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
+    u16 levelLightTargetnames[MAX_LEVELS][LIGHT_COUNT];
+    u16 *lightTargetnames;
+    Light *lights; LightAnimation *lanims; V3 *lightsNewPosition;
+    u16 loadedLights,decoyInstance;
+    Color fogColor[MAX_LEVELS];
+    Entity targetIOActivatorEntity;
     char playerName[27],audiologNames[LOGCNT][T_LOGSTR_MAX],audiologSubjects[LOGCNT][T_LOGSTR_MAX],audiologSenders[LOGCNT][T_LOGSTR_MAX],audioLogSpeech2Text[LOGCNT][T_LOGSTR_MAX];
 } GlobalContext; // Savable complete game state data
 extern GlobalContext World; extern float modelMatrices[INSTANCE_COUNT*16],**physPos,*world_from_mdl,modelBounds[MAX_MDLS]; extern V3 modelMin[MAX_MDLS],modelMax[MAX_MDLS];
@@ -574,7 +593,7 @@ INLINE u16 GetImpactType(u16 instanceIdx){
 INLINE void UIExitCyberspace() { CenterStatusPrint("%s",Sys_Text.stringTable[601]); }
 INLINE void HealthManagerHealingBed(u16 playerIdx, float amount) { Entity* p = &World.instances[playerIdx]; p->health = vmin(255.0f,p->health + amount); }
 INLINE void PlayerTakeDamage(u16 playerIdx, float damage) { Entity* p = &World.instances[playerIdx]; p->health -= damage; if (p->health < 0.0f) p->health = 0.0f; }
-void UI_PuzzleGridClose(bool rh);
+void UI_PuzzleGridClose();
 void PGEvalPuzzle(void);
 INLINE u16 PGThemeOffset(HUDColor t){ return t==HUDColor_Red||t==HUDColor_Green ? 1u : t==HUDColor_Orange||t==HUDColor_Purple ? 2u : t==HUDColor_Yellow||t==HUDColor_Blue ? 3u : 0u; }
 
@@ -619,7 +638,7 @@ enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,K
              KEY_RIGHT_SUPER=347,KEY_MENU=348};
 enum {MOUSE_BUTTON_1=0,MOUSE_BUTTON_2=1,MOUSE_BUTTON_3=2,MOUSE_BUTTON_4=3,MOUSE_BUTTON_5=4,MOUSE_BUTTON_6=5,MOUSE_BUTTON_7=6,MOUSE_BUTTON_8=7,MOUSE_BUTTON_LEFT=0,MOUSE_BUTTON_RIGHT=1,MOUSE_BUTTON_MIDDLE=2};
 enum {JOYSTICK_1=0,JOYSTICK_2=1,JOYSTICK_3=2,JOYSTICK_4=3,JOYSTICK_5=4,JOYSTICK_6=5,JOYSTICK_7=6,JOYSTICK_8=7,JOYSTICK_9=8,JOYSTICK_10=9,JOYSTICK_11=10,JOYSTICK_12=11,JOYSTICK_13=12,JOYSTICK_14=13,JOYSTICK_15=14,JOYSTICK_16=15,JOYSTICK_LAST=15};
-typedef struct {bool down,pressed,released;} KeyState;    typedef struct {const char* name; int value;} InputElement;    typedef struct {double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS]; bool isCapsLockOn;} InputSystem;
+typedef struct {bool down, pressed;} KeyState;    typedef struct {const char* name; int value;} InputElement;    typedef struct {double scrollDelta; KeyState keyStates[MAX_KEYS],mouseButtons[MAX_MOUSE_BUTTONS]; bool isCapsLockOn;} InputSystem;
 extern InputSystem Sys_Input;
 // LibC Replacement
 #define RAND_MAX 65535
