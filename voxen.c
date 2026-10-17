@@ -2126,12 +2126,11 @@ void OS_ScratchInit() {
 void* OS_AllocScratch(size_t amount) {
     if (!scratch_base) { OS_ScratchInit(); }
     size_t aligned = (amount + 15) & ~(size_t)15;
-    if (scratch_cur + aligned > scratch_end) { DualLogError("Scratch ovr!\n"); OS_Exit(1); }
-    
-    void* p = scratch_cur;
-    scratch_cur += aligned;
-    size_t used = (size_t)(scratch_cur - scratch_base);
-    if (used > scratch_peak) { scratch_peak = used; }
+    u8* p = (u8*)__atomic_fetch_add(&scratch_cur, aligned, __ATOMIC_RELAXED);
+    if (p + aligned > scratch_end) { DualLogError("Scratch ovr!\n"); OS_Exit(1); }
+    size_t used = (size_t)((p + aligned) - scratch_base);
+    size_t peak;
+    do { peak = scratch_peak; } while (used > peak && !__atomic_compare_exchange_n(&scratch_peak, &peak, used, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
     return p;
 }
 
@@ -2146,6 +2145,8 @@ static void InitStageLog(const char* name) { /*per-stage init timing: how long t
     DualLog("%s: %.1f ms\n", name, (now - initStagePrev) * 1000.0);
     initStagePrev = now;
 }
+void InitFontAtlassesGL();
+static void* InitFontAtlasses_Thread(void* arg) { (void)arg; InitFontAtlasses(); return NULL; }
 void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
@@ -2163,6 +2164,10 @@ void InitalizeEnvironment() {
     World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/
     World.numLevels = MAX_LEVELS; World.startLevel = 1 /*medical*/;
     LoadConfig(); /*Get settings before setting window size.*/ InitStageLog("LoadConfig");
+    OS_Thread fontInitThr;
+    (void)OS_AllocScratch(1); /*force scratch init before worker*/
+    OS_ThreadCreate(&fontInitThr, InitFontAtlasses_Thread, NULL);
+    InitStageLog("font bg thread spawned"); /*110ms atlas build overlaps window/GL setup*/
     ClampWindowSizeToMonitor();
     window = VCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); InitStageLog("VCreateWindow"); /*X11: already black via X fill at map*/
     PlaceWindowOnMonitor((int)Sys_Settings.CurrentMonitor); InitStageLog("PlaceWindowOnMonitor"); /*Win32: ShowWindow here -> black via BLACK_BRUSH; X11: no-op move (already mapped at final position)*/
@@ -2216,7 +2221,7 @@ void InitalizeEnvironment() {
     glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0);               glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2*sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
     glBindVertexBuffer(0,psysquadVBO,0,4 * sizeof(float));
-    InitFontAtlasses(); InitStageTick(); /*has its own "took X s" print*/
+    OS_ThreadJoin(&fontInitThr); InitFontAtlassesGL(); InitStageLog("fonts (bg thread joined + GL upload)"); InitStageTick();
     
     GenerateAndBindTexture(&inputUIID, GL_RGBA8, UI_W, UI_H, GL_RGBA, GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL);/*UI Fixed Size Raster*/
     glGenFramebuffers(1, &uiFBO);
@@ -2238,8 +2243,7 @@ void InitalizeEnvironment() {
     m[12] = 0.0f; m[13] = 0.0f;  m[14] = -2.0f * lightRangeMax * 0.02f / viewRange; m[15] =  0.0f;
     
     for (int i=0;i<23;++i) { g_scf_long[0][i] = g_scf_long[1][i] = g_scf_long[2][i] = g_sfc_long_024[i]; }
-    InitAudio(); InitStageLog("InitAudio");
-    synth_set_reverb_preset(0);
+    /*InitAudio + synth_set_reverb_preset moved to after NewGame*/
     glGenFramebuffers(1,&gBufferFBO);
     ChangeFullScreenWindowed(false);
     SetSkyRotateSpeed();
@@ -2291,8 +2295,9 @@ void InitalizeEnvironment() {
     
     NewGame(); InitStageLog("NewGame");
     currentMenuPage = MPG_FRONT;
-    if (playIntroAtBoot) ChangeMenuPage(MPG_INTRO);/*must come after NewGame (it resets the page to MPG_FRONT) and go through ChangeMenuPage so the cutscene also gets its clip audio + start time*/
-    else { PlayMenuMusic(); }/*the title music fronts the menu*/
+    InitAudio(); synth_set_reverb_preset(0); InitStageLog("InitAudio");
+    if (playIntroAtBoot) ChangeMenuPage(MPG_INTRO);
+    else { PlayMenuMusic(); }
     World.menuActive = true; InitStageLog("menu setup"); //COMMENT for immediate into game
     OS_ScratchFree(); InitStageLog("scratch free");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);

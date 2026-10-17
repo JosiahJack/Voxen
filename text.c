@@ -467,7 +467,8 @@ LoadedFont LoadFallbackFont(const char*path,int fii,int ci){
 }
 int GetGlyphAndFont(u32 cp,stbtt_fontinfo**outFont,u8 fontID){ int g=stbtt_FindGlyphIndex(fontID==FONT_STOPD?&fontInfo[1]:&fontInfo[0],cp);if(g){*outFont=fontID==FONT_STOPD?&fontInfo[1]:&fontInfo[0];return g;} for(int i=0;i<3;i++){g=stbtt_FindGlyphIndex(&fallbackFonts[i].info,cp);if(g){*outFont=&fallbackFonts[i].info;return g;}} return 0; }
 void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp);
-void BuildAtlas(u32* atlasTex, int* numPacked, stbtt_packedchar* packedChars, float* fixedNumAdv, float baseH, int fontIdx, u8 fontID, u8* bmp, u32 sz) {
+static u8 *fontBmp1, *fontBmp2;
+void BuildAtlasCPU(int* numPacked, stbtt_packedchar* packedChars, float* fixedNumAdv, float baseH, int fontIdx, u8 fontID, u8* bmp, u32 sz) { /*no GL*/
     stbtt_pack_context pc; stbtt_PackBegin(&pc,bmp,sz,0,16,NULL); pc.skip_missing=1; *numPacked=0;
     for(int i=0; i<numPackCodepoints; ++i) {
         if(*numPacked >= MAX_GLYPHS) break;
@@ -477,7 +478,7 @@ void BuildAtlas(u32* atlasTex, int* numPacked, stbtt_packedchar* packedChars, fl
         pc.h_oversample = pc.v_oversample = os;
         FPackRange range = {h, cp, NULL, 1, &packedChars[*numPacked], 0, 0}; stbtt_PackFontRanges(&pc, data, 0, &range, 1);
         int idx = (*numPacked)++; cpPackedIndex[fontID][cp] = (u16)idx; if(cp >= '0' && cp <= '9') *fixedNumAdv = vmax(*fixedNumAdv,packedChars[idx].xadvance);
-    } ttfree(pc.pack_info); GenerateAndBindTexture(atlasTex,0x8229,sz,sz,0x1903,GL_UNSIGNED_BYTE,0x2601,bmp);
+    } ttfree(pc.pack_info);
 }
 
 void DumpFontAtlasBmp(const char* filename, u8* atlas, int size) { size_t n = (size_t)size * size; u32* rgba = OS_Alloc(n * 4);  for (int row = 0; row < size; ++row) { const u8* srcRow = atlas + row * size; u32* dstRow = rgba + (size - 1 - row) * size; for (int col = 0; col < size; ++col) { u8 v = srcRow[col]; dstRow[col] = v | (v<<8) | (v<<16) | (v<<24); } } BmpWrite(filename, size, size, rgba); OS_Free(rgba, n * 4); }
@@ -494,14 +495,19 @@ void InitFontAtlasses() {
     fallbackFonts[0]=LoadFallbackFont(fallbackFontPaths[0],2,0);
     fallbackFonts[1]=LoadFallbackFont(fallbackFontPaths[1],3,0);
     fallbackFonts[2]=LoadFallbackFont(fallbackFontPaths[2],4,0);
-    u8* bmp = OS_AllocScratch(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE); // Primary atlas
-    BuildAtlas(&fontAtlasTex,&numPackedGlyphs,fontPackedChar,&fixedNumberAdvanceWidth,20.0f,0,FONT_NORMAL,bmp,FONT_ATLAS_SIZE);
+    u8* bmp = fontBmp1 = OS_AllocScratch(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
+    BuildAtlasCPU(&numPackedGlyphs,fontPackedChar,&fixedNumberAdvanceWidth,20.0f,0,FONT_NORMAL,bmp,FONT_ATLAS_SIZE);
     DumpFontAtlasBmp("Screenshots/atlas_normal.bmp",bmp,FONT_ATLAS_SIZE);
-    u8* bmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2); // Primary atlas
-    BuildAtlas(&fontAtlasTexStopD,&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
+    u8* bmp2 = fontBmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2);
+    BuildAtlasCPU(&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
     DumpFontAtlasBmp("Screenshots/atlas_stopd.bmp",bmp2,FONT_ATLAS_SIZE2);
-    OS_FreeInitPhase(); // Using scratch arena; no individual frees needed
-    glUseProgram(textSP); glUniform1i(1,2); DebugRAM("after font load"); DualLog(" took %f s (%d/%d glyphs packed, blanks %d/%d)\n",get_time()-t0,numPackedGlyphs,numPackedGlyphsStopD,CountBlankGlyphs(fontPackedChar,numPackedGlyphs),CountBlankGlyphs(fontPackedCharStopD,numPackedGlyphsStopD));
+    DualLog(" took %f s (CPU, %d/%d glyphs packed, blanks %d/%d)\n",get_time()-t0,numPackedGlyphs,numPackedGlyphsStopD,CountBlankGlyphs(fontPackedChar,numPackedGlyphs),CountBlankGlyphs(fontPackedCharStopD,numPackedGlyphsStopD));
+}
+void InitFontAtlassesGL() { /*main thread only*/
+    GenerateAndBindTexture(&fontAtlasTex,0x8229,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903,GL_UNSIGNED_BYTE,0x2601,fontBmp1);
+    GenerateAndBindTexture(&fontAtlasTexStopD,0x8229,FONT_ATLAS_SIZE2,FONT_ATLAS_SIZE2,0x1903,GL_UNSIGNED_BYTE,0x2601,fontBmp2);
+    OS_FreeInitPhase();
+    glUseProgram(textSP); glUniform1i(1,2); DebugRAM("after font load");
 }
 // Localization
 size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
