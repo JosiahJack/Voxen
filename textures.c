@@ -4,17 +4,22 @@ typedef struct { u16 index; bool transparent, doublesided; u8 blend; char path[1
 typedef struct { TextureData* entries; u32 count, capacity; } TextureDataParser;
 typedef struct { u8 r, g, b; } PngPalEntry;
 typedef struct { char path[96]; u32 texIdx, w, h; } VidFrameRec;
-static VidFrameRec* g_vidFrames = NULL; static u32 g_vidFrameCnt = 0;
+static VidFrameRec* g_vidFrames = NULL;
+static u32 g_vidFrameCnt = 0;
 static u32 g_vidPalOffs[VIDEO_RING], g_vidIdxOffs[VIDEO_RING];
 static u8* g_vidFrameFlag = NULL;
 static u32* g_vidDims = NULL;
 typedef struct { u32 state; u32 frameTexIdx, palSize, w, h; u8* idx; u32* pal; } VidSlot;
 static VidSlot g_vidSlot[VIDEO_RING];
-static void* g_vidRingBuf = NULL; static size_t g_vidRingSize, g_vidRingIdxSize, g_vidRingPalSize;
-static u32 g_vidTexBase, g_vidPalBase; static i32* g_vidSizesCPU = NULL; static u16 g_vidSlotTex[VIDEO_RING];
+static void* g_vidRingBuf = NULL;
+static u32 g_vidTexBase, g_vidPalBase;
+static i32* g_vidSizesCPU = NULL;
+static u16 g_vidSlotTex[VIDEO_RING];
 static u32 g_vidReqGen = 0, g_vidReqFrame = 0xFFFFFFFFu, g_vidPreFrame = 0xFFFFFFFFu;
-static u32 g_vidLastTex = 0xFFFFFFFFu; static u32 g_vidLastWant = 0xFFFFFFFFu; static bool g_vidUp = false;
-static PngArena g_vidArena; static OS_Thread g_vidThr;
+static u32 g_vidLastWant = 0xFFFFFFFFu;
+static bool g_vidUp = false;
+static PngArena g_vidArena;
+static OS_Thread g_vidThr;
 static bool has_sub(const char* h,const char* n);
 static bool is_vid_path(const char* p);
 static VidFrameRec* vid_find(u32 texIdx) { for (u32 k=0;k<g_vidFrameCnt;++k) { if (g_vidFrames[k].texIdx==texIdx) return &g_vidFrames[k]; } return NULL; }
@@ -87,7 +92,7 @@ u32 VideoFrameTexIndex(u32 texIdx) { /*Exact match only. The old nearest-slot fa
             glBindBuffer(GL_SSBO, texPalID); glBufferSubData(GL_SSBO, g_vidPalOffs[r]*sizeof(u32), s->palSize*sizeof(u32), s->pal);
             g_vidSizesCPU[r*2] = (i32)s->w; g_vidSizesCPU[r*2+1] = (i32)s->h;
             glBindBuffer(GL_SSBO, textureSizesID); glBufferSubData(GL_SSBO, (size_t)g_vidSlotTex[r]*2*sizeof(i32), 2*sizeof(i32), &g_vidSizesCPU[r*2]);
-            glBindBuffer(GL_SSBO, 0); g_vidLastTex = s->frameTexIdx; __atomic_store_n(&s->state, 2u, __ATOMIC_RELEASE);
+            glBindBuffer(GL_SSBO, 0); __atomic_store_n(&s->state, 2u, __ATOMIC_RELEASE);
         }
         if (s->frameTexIdx == texIdx) best = g_vidSlotTex[r];
     }
@@ -482,17 +487,12 @@ void LoadTextures() {
     u32* texturePalettes = (u32*)cur;
     cur += palettes_size;
     u8* all_indices = cur;
-    
-    /*Ring lives outside the arena: this one is freed at the end of the load, the ring is refilled every played frame*/
     g_vidRingBuf = OS_Alloc(ringidx_size + ringpal_size);
     u8* ringIndices = (u8*)g_vidRingBuf;
     (void)ringIndices;
     u32* ringPalettes = (u32*)((u8*)g_vidRingBuf + ringidx_size);
-    g_vidTexBase = (u32)ringidx_size; /*SSBO layout: [ring indices][ring palettes][texture indices], so freed-arena indices stay addressable*/
+    g_vidTexBase = (u32)ringidx_size;
     for (u32 r=0;r<VIDEO_RING;++r) { u16 si = (u16)(texCnt + r); g_vidPalOffs[r] = totalPaletteColors + r*256; g_vidIdxOffs[r] = r * VIDEO_MAXFRAME; textureOffsets[si] = g_vidIdxOffs[r]; texturePaletteOffsets[si] = g_vidPalOffs[r]; textureSizes[si*2] = 0; textureSizes[si*2+1] = 0; g_vidSlotTex[r] = si; }
-    g_vidRingSize = ringidx_size + ringpal_size;
-    g_vidRingIdxSize = ringidx_size;
-    g_vidRingPalSize = ringpal_size;
     g_vidPalBase = totalPaletteColors;
     g_vidSizesCPU = OS_Alloc(VIDEO_RING * 2 * sizeof(i32));
     for (u32 r=0;r<VIDEO_RING;++r) { g_vidSlot[r].idx = (u8*)g_vidRingBuf + (size_t)r*VIDEO_MAXFRAME; g_vidSlot[r].pal = ringPalettes + (size_t)r*256; }

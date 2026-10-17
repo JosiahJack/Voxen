@@ -190,18 +190,13 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (86ULL * 1024 * 1024),
       /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3, BIOM_ERG = 0, BIOM_CHI = 1, BIOM_ECG = 2, BIOM_GRAPH_W = 620, BIOM_GRAPH_H = 36,
       /*Rendering*/ BLEND_OPAQUE = 0, BLEND_CUTOUT = 1, BLEND_PREMULT = 2, BLEND_MULTIPLY = 3,
                     PARTICLE_FLAG_ADDITIVE = (1u<<0), PARTICLE_FLAG_SOFT = (1u<<1), PARTICLE_FLAG_LIT = (1u<<2), PARTICLE_FLAG_MULTIPLY = (1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE = (1u<<4), PARTICLE_FLAG_PHYSICS = (1u<<5), PARTICLE_FLAG_TRAIL = (1u<<6), 
-                    MAX_PARTICLES = 32768, MAX_EMITTERS = 1024, MAX_TRAIL_SEGS = 4096, PARTICLE_SSBO_BINDING = 10, TRAIL_SSBO_BINDING = 11, MAX_TRAIL_OWNERS = 512, MAX_WIRELINE_QUADS = 8192};
+                    MAX_PARTICLES = 32768, MAX_EMITTERS = 1024, MAX_TRAIL_SEGS = 4096, MAX_TRAIL_OWNERS = 512, MAX_WIRELINE_QUADS = 8192};
                     
 u32 parse_numberu32(const char*, const char*,u32);
 u16 parse_numberu16(const char*, const char*,u32);
 u8 parse_numberu8(const char*, const char*,u32);
 bool parse_bool(const char*, const char*,u32);
-static const float PLAYER_RADIUS = 0.48f, PLAYER_HEIGHT = 2.00f, PLAYER_CAM_OFFSET_Y = 0.84f, CELLSZ = 2.56f, CELLXHALF = (CELLSZ * 0.5f), VOXEL_SIZE = (CELLSZ / (float)VOXELS_PER_CELL), VOXEL_HALF = (VOXEL_SIZE * 0.5f),  RESSURECT_FEET_TO_CAMERA = (1.0f - PLAYER_CAM_OFFSET_Y),
-                   /*COLCAP_DIR_X_F=0.0f,*/ COLCAP_DIR_Y_F = 1.0f,/*,COLCAP_DIR_Z_F=2.0f,*/ REFLEX_TIME_SCALE = 0.25, DEFAULT_TIME_SCALE = 1.0, BERSERK_DAMAGE_MULTIPLIER = 4.0f /*Quad Damage!*/, AM_FOW_RADIUS = 30.0f, AM_FOW_RADIUS2 = (AM_FOW_RADIUS * AM_FOW_RADIUS);
-                   
-static const double BERSERK_TIME = 20.0, DETOX_TIME = 60.0, GENIUS_TIME = 180.0, MEDI_TIME = 35.0, REFLEX_TIME = 155.0, SIGHT_TIME = 40.0, STAMINUP_TIME = 60.0, SIGHT_SIDE_EFFECT_TIME = 17.0, NITRO_MIN_TIME = 1.0, NITRO_MAX_TIME = 60.0, NITRO_DEFAULT_TIME = 7.0,
-                    EARTH_SHAKER_MIN_TIME = 4.0, EARTH_SHAKER_MAX_TIME = 60.0, EARTH_SHAKER_DEFAULT_TIME = 10.0;
-                    
+static const float PLYR_RAD = 0.48f, PLYR_HT = 2.00f, PLYR_CAM_OFS_Y = 0.84f, CELLSZ = 2.56f, CELLXHALF = (CELLSZ * 0.5f), VOXEL_SIZE = (CELLSZ / (float)VOXELS_PER_CELL);
 enum { EF_ACTIVE             = (1u<<0),  EF_TARGID_ATTACHED  = (1u<<16),
        EF_GRAVLIFT           = (1u<<1),  EF_ENEM_IN_SIGHT    = (1u<<17),
        EF_GROUNDED           = (1u<<2),  EF_ENEM_IN_FRONT    = (1u<<18),
@@ -451,7 +446,7 @@ void ApplyImpactForceSphere(DamageData*,V3,float,float);
 void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void),DebugRAM(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
      play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
-     LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderTextR(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),RenderText3DWorld(V3,Quaternion,u32,u8,float,const char* restrict),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
+     LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
 size_t AudioLiveBytes(); /* diagnostics: live audio sample bytes */
 const char *JumpSound(FootStepType),*JumpLandSound(FootStepType); FootStepType GetFootstepTypeForPrefab(int); char* StringFindFirstCharWithin(const char*,char); AnimationClip DoorGetClip(const Entity*,u8);
 // Quest bits (info_mission constIndex 710).  Only ever set/toggled/checked by info_mission entities.

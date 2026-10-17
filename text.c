@@ -477,8 +477,7 @@ void LoadLogTextForLanguage(u8 lang) {
         nxt:continue;}
 }
 
-/*30 floats (6 verts x 5) per glyph quad: sized for the longest credits page (988 source bytes, ~966 glyphs) so whole pages draw instead of stopping at 273 glyphs.*/
-#define TEXT_VTX_FLOATS 65536
+#define TEXT_VTX_FLOATS 65536 /*30 floats (6 verts x 5) per glyph quad: sized for the longest credits page (988 source bytes, ~966 glyphs) so whole pages draw instead of stopping at 273 glyphs.*/
 static float textVertexData[TEXT_VTX_FLOATS]; extern Color textColors[]; enum {TALIGN_LEFT=0,TALIGN_CENTER=1,TALIGN_RIGHT=2};
 float MeasureLineAdvance(const char* p, u8 fontID) {
     float w=0; int cc=0;
@@ -502,23 +501,7 @@ void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 ali
 
 void RenderTextL(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_LEFT,s,a); __builtin_va_end(a); }
 void RenderTextC(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_CENTER,s,a); __builtin_va_end(a); }
-void RenderTextR(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_RIGHT,s,a); __builtin_va_end(a); }
-void RenderText3DL(V3 worldPos, u32 color, u8 f, float scale, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_LEFT,s,a); __builtin_va_end(a); } 
 void RenderText3DC(V3 worldPos, u32 color, u8 f, float scale, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_CENTER,s,a); __builtin_va_end(a); }
-void RenderText3DR(V3 worldPos, u32 color, u8 f, float scale, const char* restrict s, ...) { va_list a; __builtin_va_start(a,s); RenderFormattedText((i16)worldPos.x,(i16)worldPos.y,color,f,scale,TALIGN_RIGHT,s,a); __builtin_va_end(a); }
-void RenderText3DWorld(V3 worldPos, Quaternion rot, u32 color, u8 fontID, float scale, const char* restrict s) {
-    sFormat(uiTextBuffer,T_BUFFER_SIZE,"%s",s); glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f); glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD?fontAtlasTexStopD:fontAtlasTex); float invatsz = 1.0f/(fontID==FONT_STOPD ? (float)FONT_ATLAS_SIZE2 : (float)FONT_ATLAS_SIZE); glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID); glBindVertexArray(textVAO);
-    float alignMul = 0.5f; float xUsed = 0.0f, yUsed = 0.0f; float ls = 22.0f * scale; size_t vc = 0; const char*p = uiTextBuffer; float xpos = xUsed - MeasureLineAdvance(p,fontID)*alignMul, ypos = yUsed + (16.0f*scale); int cc = 0; float puv = 10.0f * invatsz, bw = 2.0f;
-    while(*p) {
-        const u8* s_=(const u8*)p; u32 cp = 0;
-        if(*s_<0x80){cp=*s_++;}else if((*s_&0xE0)==0xC0){if(!s_[1])break; cp=(*s_&0x1F)<<6; cp|=(s_[1]&0x3F); s_+=2;}else if((*s_&0xF0)==0xE0){if(!s_[1]||!s_[2])break; cp=(*s_&0x0F)<<12; cp|=(s_[1] & 0x3F)<<6; cp|=(s_[2] & 0x3F); s_+=3;}else if((*s_&0xF8)==0xF0){if(!s_[1] || !s_[2] || !s_[3])break; cp=(*s_ & 0x07)<<18; cp |= (s_[1] & 0x3F) << 12; cp |= (s_[2] & 0x3F) << 6; cp |= (s_[3] & 0x3F); s_ += 4;}else s_++;
-        p = (const char*)s_; cc++; if (cp == '\n' || cc > 120){xpos=xUsed-MeasureLineAdvance(p,fontID)*alignMul; ypos += ls; cc = 0; continue; } int idx = CodepointToPackedIndex(cp, fontID); const stbtt_packedchar* b=((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar)+idx; float qx0=vfloor((xpos+b->xoff)+0.5f), qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz,qt0=b->y0*invatsz,qs1=b->x1*invatsz,qt1=b->y1*invatsz;
-        float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw; float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f; float localVerts[30*6] = {vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1};
-        for(int k=0;k<6;++k){float lvx = localVerts[k*5], lvy = localVerts[k*5+1], lvz = localVerts[k*5+2]; V3 r = quat_rot_v3(rot, (V3){lvx, lvy, lvz}); localVerts[k*5]=r.x+worldPos.x; localVerts[k*5+1]=r.y+worldPos.y; localVerts[k*5+2]=r.z+worldPos.z;} if (vc >= TEXT_VTX_FLOATS/30) break; mcpy(textVertexData + vc * 30, localVerts, sizeof(localVerts)); vc++; if(cp>='0'&&cp<='9'&&fontID==FONT_STOPD){xpos=qx0+fixedNumberAdvanceWidthStopD;}else xpos += b->xadvance;
-    }
-    if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); drawCalls++; vertsRendered += vc*6; } glBindBuffer(GL_ARRAY_BUFFER,0); glDisable(GL_BLEND);
-}
-
 static u16 F32ToHalf(float f){u32 x; mcpy(&x,&f,4); u32 sign=(x>>16)&0x8000u,exp=(x>>23)&0xFFu, mant=x&0x7FFFFFu; if(exp==0xFFu)return (u16)(sign|0x7C00u|(mant?0x200u:0)); int e=(int)exp-127+15; if (e>=31)return (u16)(sign|0x7C00u); if(e<=0){if(e<-10){return (u16)sign;} mant|=0x800000u; u32 shift=(u32)(14-e); u32 h=mant>>shift; if((mant>>(shift-1))&1u)h++; return (u16)(sign|h);} u32 h=((u32)e<<10)|(mant>>13); if(mant&0x1000u)h++; return (u16)(sign|h);}
 void BuildTextDecalMeshes(void) {
     mset(textDecalVBO,0,sizeof(textDecalVBO)); mset(textDecalVertexCount,0,sizeof(textDecalVertexCount)); const float DECAL_SCALE_NORMAL = 5.0f*0.25f/0.7f, DECAL_SCALE_STOPD = 2.5f*9.0f/11.5f, DECAL_PX_NORMAL = 0.2f/20.0f, DECAL_PX_STOPD = 9.0f/54.0f; const float DECAL_PX_N = DECAL_SCALE_NORMAL*DECAL_PX_NORMAL, DECAL_PX_S = DECAL_SCALE_STOPD*DECAL_PX_STOPD;

@@ -133,7 +133,7 @@ static void amRaster(u8 zoom, bool full) {
 
 static bool amReveal() {
     u8 lev=World.curLev; V3 p=World.position[PLAYER1]; int pcx=PosGetCellCoordX(p.x),pcz=PosGetCellCoordZ(p.z); int r=(int)2; bool changed=false;
-    for (int dz=-r;dz<=r;++dz) for (int dx=-r;dx<=r;++dx) {int cx=pcx+dx,cz=pcz+dz; if(cx<0||cx>63||cz<0||cz>63){continue;} float wx=World.worldMin_x[lev]+cx*CELLSZ-p.x,wz=World.worldMin_z[lev]+cz*CELLSZ-p.z; if(wx*wx+wz*wz>AM_FOW_RADIUS2){continue;} u32 cell=(u32)cz*64+(u32)cx; if(!(gridCellStates[cell]&CELL_OPEN)){continue;} if(!World.automapExplored[lev][cell]){ World.automapExplored[lev][cell]=1; changed=true; } } return changed;
+    for (int dz=-r;dz<=r;++dz) for (int dx=-r;dx<=r;++dx) {int cx=pcx+dx,cz=pcz+dz; if(cx<0||cx>63||cz<0||cz>63){continue;} float wx=World.worldMin_x[lev]+cx*CELLSZ-p.x,wz=World.worldMin_z[lev]+cz*CELLSZ-p.z; if(wx*wx+wz*wz>(30.0f * 30.0f)){continue;} u32 cell=(u32)cz*64+(u32)cx; if(!(gridCellStates[cell]&CELL_OPEN)){continue;} if(!World.automapExplored[lev][cell]){ World.automapExplored[lev][cell]=1; changed=true; } } return changed;
 }
 
 static u32 amDoorHash() {u32 h=0; for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {Entity* e=&World.instances[i]; if(IdxIsDoor(e->index)){h=h*31u+(u32)(i*7u+(u32)e->doorState);}} return h;}

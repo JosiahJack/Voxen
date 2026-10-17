@@ -436,11 +436,11 @@ static void cmd_loadlevel(const char* arg) {
         if (!ElevatorDefaultDestinationPos(level, &queuedLevelPos)) {
             queuedLevelPos = (V3){0.0f, 0.0f, 0.0f};
         } else { 
-            queuedLevelPos.y += PLAYER_CAM_OFFSET_Y;
+            queuedLevelPos.y += PLYR_CAM_OFS_Y;
         }
     } else {
         queuedLevelPos = ressurectionLocations[level];
-        queuedLevelPos.y -= RESSURECT_FEET_TO_CAMERA;
+        queuedLevelPos.y -= (1.0f - PLYR_CAM_OFS_Y);
     }
     
     LoadLevel(level,queuedLevelPos);
@@ -1806,7 +1806,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform1i(31,1);
     glUniform1i(32,3);
     glUniformMatrix4fv(33,1,0,invViewProj);
-    double berserkTimeRemainingNormalized = World.invP1.berserkFinished > 0.0001 ? (World.invP1.berserkFinished - World.pauseRelativeTime) / BERSERK_TIME : 0.0;
+    double berserkTimeRemainingNormalized = World.invP1.berserkFinished > 0.0001 ? (World.invP1.berserkFinished - World.pauseRelativeTime) / 20.0 : 0.0;
     if (World.invP1.berserkFinished < World.pauseRelativeTime && World.invP1.berserkFinished > 0.0001) { World.invP1.berserkFinished = berserkTimeRemainingNormalized = 0.0; }
     glUniform1ui(5,Sys_Settings.Reflections);
     glUniform1ui(6,Sys_Settings.FXAA);
@@ -1946,8 +1946,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
     for (int i=0;i<World.numLevels;++i) {
         World.worldMin_x[i] = levMins[i].x;
         World.worldMin_z[i] = levMins[i].y;
-        World.voxMinCtrX[i] = World.worldMin_x[i] + VOXEL_HALF;
-        World.voxMinCtrZ[i] = World.worldMin_z[i] + VOXEL_HALF;
+        World.voxMinCtrX[i] = World.worldMin_x[i] + (VOXEL_SIZE * 0.5f);
+        World.voxMinCtrZ[i] = World.worldMin_z[i] + (VOXEL_SIZE * 0.5f);
         World.farPlane[i] = lFars[i];
         World.fogColor[i] = fogLUT[i];
         World.fogColor[i].a *= 3.8f;
@@ -1969,8 +1969,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.instances[PLAYER1].entflags = EF_ACTIVE|EF_RIGIDBODY;
     World.instances[PLAYER1].modelIndex = MAX_MDLS;
     World.col[PLAYER1] = COLTYPE_CAP;
-    World.colliderCenter[PLAYER1].y = -PLAYER_CAM_OFFSET_Y;
-    World.colliderSize[PLAYER1] = (V3){PLAYER_RADIUS,PLAYER_HEIGHT,COLCAP_DIR_Y_F};
+    World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y;
+    World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_HT,1.0f};
     World.mass[PLAYER1] = 1.0f;
     World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f};
     World.cam_yaw = 90.0f;
@@ -1998,8 +1998,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.invP1.generalInventoryIndexRef[0] = 81; // Hardcoded lookup indices into the Const main table.
     for (int i=1;i<HW_COUNT;i++) World.invP1.generalInventoryIndexRef[i] = -1; // Skips 0th index on purpose as it always holds access cards "item".
     for (int i=0;i<HW_COUNT;++i) World.invP1.hwVers[i] = World.invP1.hwVersSetting[i] = 0;
-    World.invP1.nitroTimeSetting = NITRO_DEFAULT_TIME;
-    World.invP1.earthShakerTimeSetting = EARTH_SHAKER_DEFAULT_TIME;
+    World.invP1.nitroTimeSetting = 7.0;
+    World.invP1.earthShakerTimeSetting = 10.0;
     World.invP1.lastAddedIndex = World.invP1.globalLookupIndex = -1;
     World.invP1.hasNewEmail = World.invP1.hasNewNotes = World.invP1.isPulserNotDrill = true;
     MissionTimerInit();
@@ -2021,7 +2021,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.invP1.berserkIncrement = World.invP1.patchActive = 0;
     World.invP1.staminupActive = World.geniusActive = false;
     World.invP1.inReverbZone = false;
-    World.timeScale = DEFAULT_TIME_SCALE; 
+    World.timeScale = 1.0; 
     World.inventoryMode = Sys_Settings.NoShootMode;
     World.gameFinished = World.creditsActive = World.decoyActive = false;
     World.decoyInstance = U16_MAX;
@@ -2279,8 +2279,8 @@ void InitalizeEnvironment() {
     glUseProgram(chunkSP);           glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
     
     for (int f=0;f<5;++f) { glGenQueries(5,gpuQ[f]); }
-    RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); InitStageTick(); /*LoadTextures has its own "took X secs" print*/
-    RenderLoading("Loading models...");   DebugRAM("before LoadModels");   LoadModels();   DebugRAM("after LoadModels"); InitStageTick(); /*LoadModels has its own "took X secs" print*/
+    RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); InitStageTick();
+    RenderLoading("Loading models...");   DebugRAM("before LoadModels");   LoadModels();   DebugRAM("after LoadModels");   InitStageTick();
     bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
         
@@ -2303,7 +2303,7 @@ void InitalizeEnvironment() {
     currentMenuPage = MPG_FRONT;
     if (playIntroAtBoot) ChangeMenuPage(MPG_INTRO);/*must come after NewGame (it resets the page to MPG_FRONT) and go through ChangeMenuPage so the cutscene also gets its clip audio + start time*/
     else { PlayMenuMusic(); }/*the title music fronts the menu*/
-    World.menuActive = true; InitStageLog("menu setup"); //COMMENT for immediate into game
+    //World.menuActive = true; InitStageLog("menu setup"); //COMMENT for immediate into game
     OS_ScratchFree(); InitStageLog("scratch free");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     DebugRAM("InitializeEnvironment after scratch free");

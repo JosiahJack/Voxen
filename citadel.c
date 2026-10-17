@@ -25,14 +25,19 @@ void PatchUse(int patchSlot) {
     if (patchSlot < 0 || patchSlot > 6) return; if (World.invP1.patchCounts[patchSlot] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[324]); return; } if (patchSlot == 3 && World.instances[PLAYER1].health >= 255.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[304]); return; }
     World.invP1.patchCounts[patchSlot]--; World.invP1.patchActive |= (u16)(1u << patchSlot);
     switch (patchSlot) {
-        case 0: if(World.invP1.berserkFinished > World.pauseRelativeTime){World.invP1.berserkFinished += BERSERK_TIME;} else{World.invP1.berserkFinished = World.pauseRelativeTime + BERSERK_TIME; World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0); World.invP1.berserkIncrement = 0; berserkSeedTime = random_range(0.0f,1000.0f);} break;/*Voxen intentionally extends (rather than Citadel's reset of) the berserk timer on re-use, without resetting the visual effect*/
-        case 1: PatchDisableAll(); World.invP1.patchActive |= PATCH_DETOX; World.invP1.detoxFinished = World.pauseRelativeTime + DETOX_TIME; break;/*Detox wipes all other patches on use; other patches may still be applied afterwards*/
-        case 2: if(World.invP1.geniusFinished > World.pauseRelativeTime) World.invP1.geniusFinished += GENIUS_TIME; else World.invP1.geniusFinished = World.pauseRelativeTime + GENIUS_TIME; World.geniusActive = true; break;
-        case 3: if(World.invP1.mediFinished > World.pauseRelativeTime) World.invP1.mediFinished += MEDI_TIME; else { World.invP1.mediFinished = World.pauseRelativeTime + MEDI_TIME; World.invP1.mediPatchPulseFinished = 0.0; } World.invP1.mediPatchPulseCount = 0; break;/*pulseFinished=0 heals immediately on fresh activation, matching Citadel*/
-        case 4: { double reflexDur = REFLEX_TIME * REFLEX_TIME_SCALE;/*155 real seconds of 0.25x slow-mo, tracked in game-time so it pauses and saves*/ if(World.invP1.reflexFinishedTime > World.pauseRelativeTime) World.invP1.reflexFinishedTime += reflexDur; else World.invP1.reflexFinishedTime = World.pauseRelativeTime + reflexDur; World.timeScale = REFLEX_TIME_SCALE; } break;
-        case 5: if(World.invP1.sightFinishedTime > World.pauseRelativeTime) World.invP1.sightFinishedTime += SIGHT_TIME; else { World.invP1.sightFinishedTime = World.pauseRelativeTime + SIGHT_TIME; World.invP1.sightSideEffectFinishedTime = -1.0; } break;
-        case 6: if(World.invP1.staminupFinishedTime > World.pauseRelativeTime) World.invP1.staminupFinishedTime += STAMINUP_TIME; else World.invP1.staminupFinishedTime = World.pauseRelativeTime + STAMINUP_TIME; World.invP1.staminupActive = true; World.invP1.fatigue = 0.0f; break;
-    } bool depleted = World.invP1.patchCounts[patchSlot] <= 0; if (depleted) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } } if (depleted) CenterStatusPrint("%s%s%s",Sys_Text.stringTable[590],Sys_Text.stringTable[patchMsg[patchSlot]],Sys_Text.stringTable[589]); else CenterStatusPrint("%s%s",Sys_Text.stringTable[patchMsg[patchSlot]],Sys_Text.stringTable[589]); play_wav(sounds[89],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
+        case 0: if(World.invP1.berserkFinished > World.pauseRelativeTime){World.invP1.berserkFinished += 20.0;} else{World.invP1.berserkFinished = World.pauseRelativeTime + 20.0; World.invP1.berserkIncTime = World.pauseRelativeTime + 4.0; World.invP1.berserkIncrement = 0; berserkSeedTime = random_range(0.0f,1000.0f);} break;
+        case 1: PatchDisableAll(); World.invP1.patchActive |= PATCH_DETOX; World.invP1.detoxFinished = World.pauseRelativeTime + 60.0; break;/*Detox wipes all other patches on use; other patches may still be applied afterwards*/
+        case 2: if(World.invP1.geniusFinished > World.pauseRelativeTime) World.invP1.geniusFinished += 180.0; else World.invP1.geniusFinished = World.pauseRelativeTime + 180.0; World.geniusActive = true; break;
+        case 3: if(World.invP1.mediFinished > World.pauseRelativeTime) World.invP1.mediFinished += 35.0; else { World.invP1.mediFinished = World.pauseRelativeTime + 35.0; World.invP1.mediPatchPulseFinished = 0.0; } World.invP1.mediPatchPulseCount = 0; break;
+        case 4: { double reflexDur = 155.0 * 0.25;/*155 real seconds of 0.25x slow-mo*/ if(World.invP1.reflexFinishedTime > World.pauseRelativeTime) World.invP1.reflexFinishedTime += reflexDur; else World.invP1.reflexFinishedTime = World.pauseRelativeTime + reflexDur; World.timeScale = 0.25; } break;
+        case 5: if(World.invP1.sightFinishedTime > World.pauseRelativeTime) World.invP1.sightFinishedTime += 40.0; else { World.invP1.sightFinishedTime = World.pauseRelativeTime + 40.0; World.invP1.sightSideEffectFinishedTime = -1.0; } break;
+        case 6: if(World.invP1.staminupFinishedTime > World.pauseRelativeTime) World.invP1.staminupFinishedTime += 60.0; else World.invP1.staminupFinishedTime = World.pauseRelativeTime + 60.0; World.invP1.staminupActive = true; World.invP1.fatigue = 0.0f; break;
+    }
+    bool depleted = World.invP1.patchCounts[patchSlot] <= 0;
+    if (depleted) { for (int i = 0; i < 7; i++) { if (World.invP1.patchCounts[i] > 0) { World.invP1.patchCur = (i8)i; break; } } }
+    if (depleted) CenterStatusPrint("%s%s%s",Sys_Text.stringTable[590],Sys_Text.stringTable[patchMsg[patchSlot]],Sys_Text.stringTable[589]);
+    else CenterStatusPrint("%s%s",Sys_Text.stringTable[patchMsg[patchSlot]],Sys_Text.stringTable[589]);
+    play_wav(sounds[89],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
 }
 
 void WeaponFireStartWeaponDip(float t) { if (t <= 0.0f) { World.invP1.reloadFinished = 0.0; return; } World.invP1.reloadFinished = World.pauseRelativeTime + (double)t; lerpStartTime = World.pauseRelativeTime; }
@@ -530,13 +535,16 @@ void GrenadeExplode(u16 self) {
 }
 
 void GrenadeActivate(u16 self) {
-    if(self>=World.instCount)return; Entity* e=&World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index);
-    if(idx==10){World.invP1.earthShakerTimeSetting=vclamp((float)World.invP1.earthShakerTimeSetting,4.0f,60.0f);e->timerFinished=World.pauseRelativeTime+World.invP1.earthShakerTimeSetting;}
-    else if(idx==12){World.invP1.nitroTimeSetting=vclamp((float)World.invP1.nitroTimeSetting,2.0f,60.0f);e->timerFinished=World.pauseRelativeTime+World.invP1.nitroTimeSetting;}
+    if (self >= World.instCount) return;
+    
+    Entity* e = &World.instances[self];
+    i16 idx = GrenadeTypeFromConst(e->index);
+         if (idx == 10) { World.invP1.earthShakerTimeSetting = vclamp((float)World.invP1.earthShakerTimeSetting,4.0f,60.0f); e->timerFinished = World.pauseRelativeTime + World.invP1.earthShakerTimeSetting;}
+    else if (idx == 12) { World.invP1.nitroTimeSetting       = vclamp((float)World.invP1.nitroTimeSetting,      2.0f,60.0f); e->timerFinished = World.pauseRelativeTime + World.invP1.nitroTimeSetting;}
 }
 void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=1.451f;  bool npcMine = GrenadeIsNPCMine(self);  for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; float rr = pr + ((World.col[i] == COLTYPE_CAP || World.col[i] == COLTYPE_SPH) ? World.colliderSize[i].x : 0.0f); if (V3_SqDist(World.position[i], origin) < (rr * rr)) { GrenadeExplode(self); return; } } } }
 void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index); if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
-float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= BERSERK_DAMAGE_MULTIPLIER; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
+float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= 4.0/*Quad Damage!*/; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (!EntIdxIsValid(fx)) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void ExitCyberspace(void) { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel(World.startLevel < World.numLevels ? World.startLevel : 0, (V3){0.0f,0.0f,0.0f}); }
 void ReduceCurrentLevelSecurity(SecurityType stype) {
@@ -729,7 +737,16 @@ void HardwareUpdate() {
 }
 
 // Dermal Patches
-void PatchDisableAll(void){World.invP1.berserkFinished=World.invP1.berserkIncTime=World.invP1.detoxFinished=World.invP1.geniusFinished=World.invP1.mediFinished=World.invP1.reflexFinishedTime=World.invP1.sightFinishedTime=World.invP1.sightSideEffectFinishedTime=World.invP1.staminupFinishedTime=-1.0; World.invP1.mediPatchPulseFinished=0.0; World.invP1.mediPatchPulseCount=0; World.invP1.staminupActive=World.geniusActive=false; World.invP1.fatigue=0.0f; World.invP1.berserkIncrement=World.invP1.patchActive=0; World.timeScale=DEFAULT_TIME_SCALE;}
+void PatchDisableAll(void){
+    World.invP1.berserkFinished = World.invP1.berserkIncTime = World.invP1.detoxFinished = World.invP1.geniusFinished = World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = World.invP1.sightSideEffectFinishedTime = World.invP1.staminupFinishedTime = -1.0;
+    World.invP1.mediPatchPulseFinished = 0.0;
+    World.invP1.mediPatchPulseCount = 0;
+    World.invP1.staminupActive = World.geniusActive = false;
+    World.invP1.fatigue = 0.0f;
+    World.invP1.berserkIncrement = World.invP1.patchActive = 0;
+    World.timeScale = 1.0;
+}
+
 void PatchUpdate() {
     if (World.invP1.patchActive & PATCH_DETOX) { if (World.invP1.detoxFinished < World.pauseRelativeTime) World.invP1.patchActive -= PATCH_DETOX; else World.instances[PLAYER1].radiation = 0.0f; } // Detox: other patches wiped on use only; radiation zeroed every frame while active
     if (World.invP1.patchActive & PATCH_MEDI) { // Medi
@@ -739,18 +756,30 @@ void PatchUpdate() {
             World.invP1.mediPatchPulseFinished = World.pauseRelativeTime + (0.5 + World.invP1.mediPatchPulseCount * 0.5);
             World.invP1.mediPatchPulseCount++;
         }
-        if (World.invP1.mediFinished < World.pauseRelativeTime && World.invP1.mediFinished != -1.0) { World.invP1.patchActive -= PATCH_MEDI; World.invP1.mediFinished = -1.0; World.invP1.mediPatchPulseFinished = 0.0; World.invP1.mediPatchPulseCount = 0; }
+        if (World.invP1.mediFinished < World.pauseRelativeTime && World.invP1.mediFinished != -1.0) {
+            World.invP1.patchActive -= PATCH_MEDI;
+            World.invP1.mediFinished = -1.0;
+            World.invP1.mediPatchPulseFinished = 0.0;
+            World.invP1.mediPatchPulseCount = 0;
+        }
     } else {
-        World.invP1.mediPatchPulseFinished = 0.0; World.invP1.mediPatchPulseCount = 0;
+        World.invP1.mediPatchPulseFinished = 0.0;
+        World.invP1.mediPatchPulseCount = 0;
     }
-    if (World.invP1.patchActive & PATCH_REFLEX) { if (World.invP1.reflexFinishedTime < World.pauseRelativeTime && World.invP1.reflexFinishedTime != -1.0){ World.invP1.patchActive-=PATCH_REFLEX; World.invP1.reflexFinishedTime=-1.0; World.timeScale=DEFAULT_TIME_SCALE;}else{World.timeScale=REFLEX_TIME_SCALE;}}else{if(World.timeScale != DEFAULT_TIME_SCALE){World.timeScale=DEFAULT_TIME_SCALE;}}//Reflex (tracked in game-time: pauses with the game and persists through save/load)
+    if (World.invP1.patchActive & PATCH_REFLEX) {
+        if (World.invP1.reflexFinishedTime < World.pauseRelativeTime && World.invP1.reflexFinishedTime != -1.0) {
+            World.invP1.patchActive -= PATCH_REFLEX;
+            World.invP1.reflexFinishedTime =- 1.0;
+            World.timeScale = 1.0;
+        } else { World.timeScale = 0.25; }
+    } else { if(World.timeScale != 1.0){World.timeScale = 1.0;}}//Reflex (tracked in game-time: pauses with the game and persists through save/load)
     if (World.invP1.patchActive & PATCH_BERSERK) { // Berserk
         if (World.invP1.berserkFinished < World.pauseRelativeTime) { World.invP1.berserkIncrement = 0; World.invP1.patchActive -= PATCH_BERSERK; }
-        else if (World.invP1.berserkIncTime < World.pauseRelativeTime) { World.invP1.berserkIncrement++; if (World.invP1.berserkIncrement > 6) World.invP1.berserkIncrement = 6; World.invP1.berserkIncTime = World.pauseRelativeTime + (BERSERK_TIME / 5.0f); }
+        else if (World.invP1.berserkIncTime < World.pauseRelativeTime) { World.invP1.berserkIncrement++; if (World.invP1.berserkIncrement > 6) World.invP1.berserkIncrement = 6; World.invP1.berserkIncTime = World.pauseRelativeTime + 4.0; }
     }
     if (World.invP1.patchActive & PATCH_GENIUS) { if(World.invP1.geniusFinished < World.pauseRelativeTime){World.invP1.patchActive -= PATCH_GENIUS; World.geniusActive=false;}else{World.geniusActive=true;} } // Genius
     if (World.invP1.patchActive & PATCH_SIGHT) { // Sight
-        if (World.invP1.sightFinishedTime < World.pauseRelativeTime && World.invP1.sightFinishedTime != -1.0) { World.invP1.sightFinishedTime=-1.0; World.invP1.sightSideEffectFinishedTime = World.pauseRelativeTime + SIGHT_SIDE_EFFECT_TIME; }
+        if (World.invP1.sightFinishedTime < World.pauseRelativeTime && World.invP1.sightFinishedTime != -1.0) { World.invP1.sightFinishedTime=-1.0; World.invP1.sightSideEffectFinishedTime = World.pauseRelativeTime + 17.0; }
         if (World.invP1.sightSideEffectFinishedTime < World.pauseRelativeTime && World.invP1.sightSideEffectFinishedTime != -1.0) { World.invP1.sightSideEffectFinishedTime=World.invP1.sightFinishedTime=-1.0; World.invP1.patchActive -= PATCH_SIGHT; }
     }
     if (World.invP1.patchActive & PATCH_STAMINUP) { if (World.invP1.staminupFinishedTime < World.pauseRelativeTime) { World.invP1.staminupActive=false; World.invP1.fatigue=100.0f; World.invP1.patchActive -= PATCH_STAMINUP; } else { World.invP1.fatigue = 0.0f; World.invP1.staminupActive = true; } } // Staminup
@@ -782,8 +811,8 @@ bool RessurectPlayer(void) {
     if (!((World.ressurectionActiveLevels >> World.curLev) & 1u)) { return false; }
     V3 spot=(V3){0.0f,0.0f,0.0f};
     
-    if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { spot=ressurectionLocations[6]; spot.y-=RESSURECT_FEET_TO_CAMERA; LoadLevel(6, spot); }
-    else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y-=RESSURECT_FEET_TO_CAMERA; World.position[PLAYER1] = spot; }
+    if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { spot=ressurectionLocations[6]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); LoadLevel(6, spot); }
+    else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); World.position[PLAYER1] = spot; }
     
     PlayTrack(TT_Revive, MT_Override);
     World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0;
@@ -1165,7 +1194,7 @@ static u8 ElevLabelToLevel(i8 labelIdx) {
 
 /*True if the player is inside an elevator volume (entity 706), using the same box-overlap logic as the automap elevator cell fill.*/
 bool PlayerInElevatorCell(void) {
-    V3 pp=World.position[PLAYER1]; pp.y-=PLAYER_CAM_OFFSET_Y;
+    V3 pp=World.position[PLAYER1]; pp.y-=PLYR_CAM_OFS_Y;
     for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e=&World.instances[i]; if(e->index!=706||!(e->entflags&EF_ACTIVE)){continue;}
         V3 c=World.colliderCenter[i],s=World.colliderSize[i],p=World.position[i];

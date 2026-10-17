@@ -1,5 +1,4 @@
 // ui.c - User Interface(UI) aka HUD
-static u32 sensaroundFBO = 0;
 void BiomonitorBlitToUI();
 #define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,           UI_ID_##P##_TAB_ITEM,             UI_ID_##P##_TAB_AUTOMAP,       UI_ID_##P##_TAB_DATA,          UI_ID_##P##_PANEL,                 \
                       UI_ID_##P##_WEAPON_NAME,          UI_ID_##P##_WEAPON_ICON,          UI_ID_##P##_WEAPON_AMMO,       UI_ID_##P##_WEAPON_RELOAD,     UI_ID_##P##_WEAPON_UNLOAD,         \

@@ -568,7 +568,7 @@ bool CantStand(u16 playerIdx, float targetHeight) {
     World.colliderSize[playerIdx].y=oldHeight; World.colliderCenter[playerIdx].y=oldCenterY; return !clear;
 }
 
-INLINE bool StandBlocked(float targetHeight) { if (!CantStand(PLAYER1, targetHeight)) return false; CenterStatusPrint("%s", Sys_Text.stringTable[targetHeight >= PLAYER_HEIGHT ? 187 : 188]); return true; }
+INLINE bool StandBlocked(float targetHeight) { if (!CantStand(PLAYER1, targetHeight)) return false; CenterStatusPrint("%s", Sys_Text.stringTable[targetHeight >= PLYR_HT ? 187 : 188]); return true; }
 KeyState* GetCodeMapping(int settingIndex); const char* FootStepSound(FootStepType);
 void ApplyPlayerMovements(float dt) {
     Entity *p = &World.instances[PLAYER1];
@@ -599,17 +599,17 @@ void ApplyPlayerMovements(float dt) {
     float targR = 1.0f, transitionSec = 0.2f, currentRatio = World.invP1.currentCrouchRatio;
     if (Crouch()) {
         if (p->bodyState == BodyState_Crouch) {
-            if (!StandBlocked(PLAYER_HEIGHT)){p->bodyState = BodyState_StandingUp;}
+            if (!StandBlocked(PLYR_HT)){p->bodyState = BodyState_StandingUp;}
         } else if (currentRatio > PLAYER_CROUCH_RATIO) {
             p->bodyState = BodyState_CrouchingDown;
         } else {
-            if (!StandBlocked(PLAYER_HEIGHT*PLAYER_CROUCH_RATIO)){p->bodyState=BodyState_ProningUp;}
+            if (!StandBlocked(PLYR_HT*PLAYER_CROUCH_RATIO)){p->bodyState=BodyState_ProningUp;}
         }
     } else if (Prone()) {
         if (p->bodyState == BodyState_Standing) { p->bodyState = BodyState_ProningDown; }
-        else if (currentRatio > PLAYER_CROUCH_RATIO) { if (!StandBlocked(PLAYER_HEIGHT)) { p->bodyState=BodyState_StandingUp; } else { p->bodyState = BodyState_ProningDown; } }
+        else if (currentRatio > PLAYER_CROUCH_RATIO) { if (!StandBlocked(PLYR_HT)) { p->bodyState=BodyState_StandingUp; } else { p->bodyState = BodyState_ProningDown; } }
         else if (p->bodyState == BodyState_Crouch) { p->bodyState = BodyState_ProningDown; }
-        else { if (!StandBlocked(PLAYER_HEIGHT*PLAYER_CROUCH_RATIO)){p->bodyState = BodyState_ProningUp;} }
+        else { if (!StandBlocked(PLYR_HT*PLAYER_CROUCH_RATIO)){p->bodyState = BodyState_ProningUp;} }
     }
     float fatigueWane = 1.0f;
     if (Cheats.fatigueCheat || World.invP1.staminupActive) World.invP1.fatigue = 0.0f;
@@ -658,7 +658,7 @@ void ApplyPlayerMovements(float dt) {
     float lastRatio = World.invP1.currentCrouchRatio; World.invP1.currentCrouchRatio = smooth_damp(lastRatio,targR,&World.invP1.crouchingVelocity,transitionSec,dt);
     if (World.invP1.currentCrouchRatio >= 1.0f) { World.invP1.currentCrouchRatio = 1.0f; if(p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_Standing;} } else if (p->bodyState == BodyState_CrouchingDown && World.invP1.currentCrouchRatio <= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; }
     else if (p->bodyState == BodyState_ProningUp && World.invP1.currentCrouchRatio >= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; } else if (p->bodyState == BodyState_ProningDown && World.invP1.currentCrouchRatio <= PLAYER_PRONE_RATIO) { World.invP1.currentCrouchRatio = PLAYER_PRONE_RATIO; p->bodyState = BodyState_Prone; }
-    World.colliderSize[PLAYER1].y = PLAYER_HEIGHT * World.invP1.currentCrouchRatio; World.colliderCenter[PLAYER1].y =  -PLAYER_CAM_OFFSET_Y + (PLAYER_HEIGHT - World.colliderSize[PLAYER1].y) * 0.5f; // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84 which is PLAYER_CAM_OFFSET_Y)
+    World.colliderSize[PLAYER1].y = PLYR_HT * World.invP1.currentCrouchRatio; World.colliderCenter[PLAYER1].y =  -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f; // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84 which is PLYR_CAM_OFS_Y)
     float h=(float)Forward() - (float)Backpedal(), s=(float)StrafeRight() - (float)StrafeLeft(), vertInput = Cheats.noclip ? (float)((SwimUp()) || Jump()) - (float)SwimDn() : 0.0;
     bool isSprinting=Sprint() && (grounded || inGravLift || World.invP1.ladderState>0 || Cheats.noclip); if(World.invP1.fatigueMoveFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip)&&!boostAct){World.invP1.fatigue+=isSprinting ? 2.85f : 1.0f; World.invP1.fatigueMoveFinished=World.pauseRelativeTime+0.298f;/*Ensure no sync w/ bleedoff*/}
     if(World.invP1.footstepFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (PlayerIsMoving() && !Cheats.noclip) && !boostAct){
