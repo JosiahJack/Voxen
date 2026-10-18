@@ -1,0 +1,210 @@
+--- a/citadel.c
++++ b/citadel.c
+@@ -984,6 +984,7 @@
+         if (tm) { bool bitOn = QuestBitIsSet(e->questBitID); u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator, (tm == 1) == bitOn ? e->targetIdx : e->targetIfFalseIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
+     }
+     if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; }/*info_message*/   if (e->index == 708) { GameEndSequence(); return; }
++    if (e->index == 712) { /*info_playsound: play sounds[SFXClip] (vox/shodan announcements)*/ if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT && sounds[e->SFXIndex][0]) { if (e->playEverywhere) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), (V3){0,0,0}, false); else play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true); } return; }
+     if (e->index == 707) { EmailTargetted(self); return; }/*info_email*/                                                 if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) { if(e->index == 598 || e->index == 600){TriggerTargetted(self,activator);}else if(e->index == 594){TriggerCounterTargetted(self,activator);} }
+     if (aioflags & TARG_IOFLAGS_UNLOCK) { EntitySetLocked(e, false); if (IdxIsDoor(e->index) && (aioflags & (TARG_IOFLAGS_DOOROPEN | TARG_IOFLAGS_DOOROPENIFUNLOCKED))) e->requiredAccessCard = ACC_None; }                                                       if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true);                                     if (IdxIsButtonSwitch(e->index)) ButtonSwitchUse(self,activator);
+     if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index) && !(aioflags & TARG_IOFLAGS_UNLOCK)) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && !(aioflags & TARG_IOFLAGS_UNLOCK) && (e->entflags & EF_LOCKED) == 0 && (e->requiredAccessCard == ACC_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) { DoorForceClose(self); } else if (IdxIsDoor(e->index)) { DoorTargetted(self, activator); }
+--- a/entity.c
++++ b/entity.c
+@@ -1273,7 +1273,7 @@
+                 else if(KEY_EQ("allSpawnedResetDelay")) inst->allSpawnedResetDelay = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("alertEnemiesOnAwake"))  inst->alertEnemiesOnAwake = parse_bool(value, lineSpace, lineNum);
+                 else if(KEY_EQ("index") && inst->index == 702) inst->spawnIndex = parse_numberu16(value, lineSpace, lineNum);/*SpawnManager.index is the NPC constIndex it respawns; only meaningful on 702, since AIController.index means something else on every other prefab*/
+                 else if(KEY_EQ("GOSetDeactive"))   flag_set(&inst->ioflags, TARG_IOFLAGS_INST_DEACTIVATE, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("GOToggleActive"))  flag_set(&inst->ioflags, TARG_IOFLAGS_INST_TOGGLE, parse_bool(value, lineSpace, lineNum));
+-                else if(KEY_EQ("disableThisGOOnAwake")) flag_set(&inst->ioflags, TARG_IOFLAGS_DISABLE_ON_AWAKE, parse_bool(value, lineSpace, lineNum));    else if(KEY_EQ("playSoundOnce"))   flag_set(&inst->ioflags, TARG_IOFLAGS_PLAY_SOUND_ONCE, parse_bool(value, lineSpace, lineNum));
++                else if(KEY_EQ("disableThisGOOnAwake")) flag_set(&inst->ioflags, TARG_IOFLAGS_DISABLE_ON_AWAKE, parse_bool(value, lineSpace, lineNum));    else if(KEY_EQ("playSoundOnce"))   flag_set(&inst->ioflags, TARG_IOFLAGS_PLAY_SOUND_ONCE, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("playEverywhere")) inst->playEverywhere = parse_bool(value, lineSpace, lineNum);
+                 else if(KEY_EQ("stopSound"))       flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_SOUND, parse_bool(value, lineSpace, lineNum));               else if(KEY_EQ("startFlashingMaterials")) flag_set(&inst->ioflags, TARG_IOFLAGS_START_FLASHING_TEX, parse_bool(value, lineSpace, lineNum));
+                 else if(KEY_EQ("stopFlashingMaterials"))  flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(value, lineSpace, lineNum));
+                 else if(KEY_EQ("branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("resourceFolder") && *value) scpy_to_a_from_b(inst->texAnimResourceFolder, value, TARG_STRLEN);
+--- a/common.h
++++ b/common.h
+@@ -379,7 +379,7 @@
+     V3 accumulatedForce,currentDestination,targettingPosition,idealTransformForward,idealPos;    
+     u16 enemy,messageIndex,teleportID,targetDestinationID,keycode,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,rechargeMsgLingdex,usedMsgLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx,reverbPreset,npcNumber,targetOnDeathIdx,lockedTargetIdx;
+     u16 spawnIndex,numberToSpawn,numberActive; bool countOnlySameIndex,alertEnemiesOnAwake; float minDelayBetweenSpawns,maxDelayBetweenSpawns,allSpawnedResetDelay;
+-    i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,logIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7];
++    i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,logIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7]; bool playEverywhere;
+     bool srchInUse,generateContents,generationDone,dontReset,onlyOnce,allDone,curTex,useRandomTimes,active,panelOpen,panelInstalled,panelArmed;
+     V3 panelItemPos; Quaternion panelItemRot;
+     bool touchEnabled,broken,requireRecharge,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,texAnimStopsAtDie,texAnimInReverse,texAnimRandom,ajar,deathAnimationActive;
+@@ -463,7 +463,7 @@
+ float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
+ void ApplyImpactForceSphere(DamageData*,V3,float,float);
+ void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void),DebugRAM(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
+-     play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),
++     play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),
+      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
+      LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
+ size_t AudioLiveBytes(); /* diagnostics: live audio sample bytes */
+--- a/ui.c
++++ b/ui.c
+@@ -29,13 +29,14 @@
+                       UI_ID_##P##_SEARCH_EMPTY,         UI_ID_##P##_SEARCH_CLOSE,         UI_ID_##P##_AUTOMAP_ZOOM_IN,   UI_ID_##P##_AUTOMAP_ZOOM_OUT,  UI_ID_##P##_AUTOMAP_FULL,          \
+                       UI_ID_##P##_AUTOMAP_SIDE
+ 
++void LoadTextForLanguage(u8 lang); void LoadLogTextForLanguage(u8 lang);
+ typedef enum{UI_ID_NONE,
+     /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT,
+              UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS,
+              UI_ID_MENU_BACK,
+              UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG,
+              UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION, UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY,
+-             UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER,
++             UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE,
+              UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0 + 41,
+     /*NewGame*/ UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START,
+     /*Save/Load*/ UI_ID_MENU_SAVE_SLOT_0, UI_ID_MENU_SAVE_SLOT_7=UI_ID_MENU_SAVE_SLOT_0 + 7,
+@@ -380,6 +381,16 @@
+             if (UI_Slider(UI_ID_MENU_MUSIC_VOLUME_SLIDER,426,270,128,16,((Sys_Settings.VolumeMusic / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMusic,&newVal,&musicVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMusic = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+             if (UI_Slider(UI_ID_MENU_SFX_VOLUME_SLIDER,426,300,128,16,((Sys_Settings.VolumeEffects / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeEffects,&newVal,&sfxVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeEffects = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+             if (UI_Slider(UI_ID_MENU_LOG_VOLUME_SLIDER,426,330,128,16,((Sys_Settings.VolumeMessage / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMessage,&newVal,&messageVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMessage = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
++            /*Language picker*/
++            static const char* langNames[8] = {"English","Espa\u00f1ol","Deutsch","Fran\u00e7""ais","\u65e5\u672c\u8a9e","\u0420\u0443\u0441\u0441\u043a\u0438\u0439","Italiano","Portugu\u00ea""s"};
++            bool langOver = false;
++            if (UI_Button(UI_ID_MENU_LANGUAGE,200,370, 328,16, &langOver, 4) || (MenuEnter() && currentMenuItem == 4)) {
++                Sys_Settings.Language = (Sys_Settings.Language + 1) % 8;
++                LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language);
++                SaveConfig(); currentMenuItem = 4;
++            }
++            langOver = langOver || currentMenuItem == 4;
++            RenderTextL(200,370, langOver ? T_YELLOW : T_GREEN, FONT_NORMAL, 1.0f, "LANGUAGE: %s", langNames[Sys_Settings.Language % 8]);
+         }
+         MenuBackButton(1087,723,1103,731,(i8)(menuItemCount - 1));
+     } else if (currentMenuPage == MPG_LOAD || currentMenuPage == MPG_SAVE) {
+--- a/audio.c
++++ b/audio.c
+@@ -555,6 +555,7 @@
+ }
+ void play_wav(const char *path,float volume,V3 pos,bool positional) { play_wav_ext(path,volume,pos,positional,0.0f);/*default pitch 0 = no adjustment*/ }
+ 
++
+ void play_message(const char *path) {/*audioLogs[] stores bare extensionless paths (e.g. "logs/honig-1") but the tracks ship as mp3 under Audio, so resolve prefix+extension+decoder here.*/
+     char p[160]; sFormat(p,sizeof(p),"./Audio/%s.mp3",path); log_msg_t *lm=OS_Alloc(sizeof(log_msg_t)); lm->samples=load_mp3(p,&lm->frame_count,&lm->allocSize); if(!lm->samples){DualLogError("Failed to load %s\n",p); OS_Free(lm,sizeof(*lm)); return; } lm->frame_pos=0; log_msg_t *old=log_msg; log_msg=lm; if(old){OS_Free(old->samples,old->allocSize); OS_Free(old,sizeof(*old));} }
+ void play_mp3(const char *path, i32 fade_ms) {
+@@ -565,6 +566,7 @@
+ 
+ INLINE bool sEndsWith(const char *str, const char *suffix) { size_t slen=0, suflen=0; while(str[slen]){slen++;} while(suffix[suflen]){suflen++;} if(slen < suflen){return false;} for (size_t i=0;i<suflen;i++){ char a=str[slen - suflen + i], b=suffix[i]; if(a >= 'A' && a <= 'Z'){a+=32;} if(b >= 'A' && b <= 'Z'){b+=32;} if(a != b){return false;} } return true; }
+ i32 SndInit(const char *path, wav_channel_t *w) { u32 frames; size_t sz=0; float *buf=(sEndsWith(path,".mp3")) ? load_mp3(path,&frames,&sz) : load_wav(path,&frames,&sz); if(!buf){return -1;} w->samples=buf; w->allocSize=sz; w->frame_count=frames; w->frame_pos=0; w->volume=1.0f; w->pitch=0.0f; w->looping=w->positional=false; w->playing=false; return 0; }
++void PlaySparkSound(V3 pos) { /*prop_sparkingwire: random spark at end of animation loop*/ static const char* sparkSnds[3] = {"./Audio/ambient/sparks1.mp3","./Audio/ambient/sparks2.mp3","./Audio/ambient/sparks3.mp3"}; const char* sp = sparkSnds[random_range_u32(0,2)]; i32 slot=GetFreeWavSlot(); if(slot==-1){ if(wav_count < MAX_CHANNELS){ slot=(i32)wav_count; wav_count++; } } if(slot==-1) return; wav_channel_t w; if(SndInit(sp,&w)!=0) return; w.volume=AppliedFXVol(0.7f); w.positional=true; w.pos=pos; w.playing=true; wav_ch[slot]=w; }
+ i32 SndStart(wav_channel_t* w) { w->frame_pos = 0; w->playing = true; u32 n = ext_count; for (u32 i=0;i<n;++i) if (ext_ch[i] == w) return 0; if (n < MAX_CHANNELS) { ext_ch[n] = w; ext_count = n+1; } return 0; }
+ void SndUninit(wav_channel_t* w) { if (w->samples) { OS_Free(w->samples,w->allocSize); w->samples = NULL; w->allocSize = 0; } w->playing = false; u32 n = ext_count; for (u32 i=0;i<n;++i) if (ext_ch[i] == w) { ext_ch[i] = ext_ch[n-1]; ext_count = n-1; break; } }
+ void mp3_clear() { for (i32 i=0;i<2;i++) { mp3_fade_out_target[i]=NULL; mp3_channel_t *old=mp3_ch[i]; mp3_ch[i]=NULL; if (old) { mp3_uninit(&old->dec); OS_Free(old,sizeof(*old)); } } mp3_slot=0; } // clearing fade targets avoids a dangling compare now that frees are immediate
+@@ -641,14 +643,14 @@
+ 
+ void ResetLevelAudio(){ambs=0; mset(ambReg,0,MAXAMB*sizeof(u16)); for(u32 s=0;s<MAXAMB;++s){if(ambientSlots[s].loaded){ambientSlots[s].sound.playing=false;}} for(u16 i=INSTS_1ST_IDX;i<World.instCount;++i){if(IdxIsAmbient(World.instances[i].index)){ambReg[ambs]=i; ambs++; if(ambs>=MAXAMB){DualLogError("Ambients %u > %u!\n",ambs,MAXAMB); break;}}}}
+ // Music System
+-const char* loopMusic[MAX_LEVELS]={"looped/track0","looped/track1","looped/track2","looped/track3","looped/track2","looped/track0","looped/track6","looped/track0","looped/track8","misc/null","looped/track10","looped/track11","looped/track12","looped/track13"}; const char* cyberMusic[13]={"THM10-02_cyberstart","THM10-01_cyber1","THM10-03_cyber2","THM10-04_cyber3","THM10-05_cyber4","THM10-06_cyber5","THM10-07_cyber6","THM10-08_cyber7","THM10-09_cyber8"};
++const char* loopMusic[MAX_LEVELS]={"looped/track0","looped/track1","looped/track2","looped/track3","looped/track2","looped/track0","looped/track6","looped/track0","looped/track8","misc/null","looped/track10","looped/track10","looped/track10","looped/track13"}; const char* cyberMusic[13]={"THM10-02_cyberstart","THM10-01_cyber1","THM10-03_cyber2","THM10-04_cyber3","THM10-05_cyber4","THM10-06_cyber5","THM10-07_cyber6","THM10-08_cyber7","THM10-09_cyber8"};
+ const char* reactorMusic[13]={"THM4-01_reactorcombat1","THM4-02_reactorcombat2","THM4-03_reactorcombat3","THM4-04_reactorcombat4","THM4-05_reactorwalkingatocombat","THM4-06_reactorwalkingbtocombat","THM4-09_reactorwalkinga1","THM4-10_reactorwalkinga2","THM4-11_reactorwalkingb1","THM4-12_reactorwalkingb2","THM4-13_reactorwalkingb3","THM4-14_reactorwalkingc1","THM4-15_reactorwalkingc2"};
+ const char* medMusic[11]={"THM1-19_medicalstart","THM1-01_medicalwalking1","THM1-02_medicalwalking2","THM1-03_medicalwalking3","THM1-04_medicalwalking4","THM1-05_medicalcombat1","THM1-06_medicalcombat2","THM1-07_medicalcombat3","THM1-08_medicalcombat4","THM1-09_medicalcombat5","THM1-10_medicalcombat6"};
+-const char* sciMusic[10]={"THM3-17_sciencestart","THM3-03_science1","THM3-04_science2","THM3-05_science3","THM3-06_science4","THM3-07_science5","THM3-08_science6","THM3-09_science7","THM3-01_scienceaction1","THM3-02_scienceaction2"}; const char* dieMusic[MAX_LEVELS] = {"THM0-17_death","THM0-17_death","THM3-18_death","THM0-17_death","THM3-18_death","THM0-17_death","THM2-17_death","THM0-17_death","THM6-21_death","THM0-17_death","THM5-17_death","THM5-17_death","THM5-17_death","THM10-16_death"};
++const char* sciMusic[10]={"THM3-17_sciencestart","THM3-03_science1","THM3-04_science2","THM3-05_science3","THM3-06_science4","THM3-07_science5","THM3-08_science6","THM3-09_science7","THM3-01_scienceaction1","THM3-02_scienceaction2"}; const char* dieMusic[MAX_LEVELS] = {"THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death","THM0-17_death"}; /*all death tracks byte-identical; dups deleted*/
+ const char* execMusic[13]={"THM2-11_executive1","THM2-12_executive2","THM2-13_executive3","THM2-08_executive4","THM2-09_executive5","THM2-10_executive6","THM2-04_executive2","THM2-05_executive3","THM2-06_executivefluterlude","THM2-07_executivefluterludewithguitar","THM2-01_executiveaction3","THM2-02_executiveaction4","THM2-03_executiveaction5"};
+ const char* groveMusic[24]={"THM5-07_groveaction1","THM5-08_groveaction1","THM5-09_groveaction2","THM5-10_groveaction3","THM5-11_groveaction4","THM5-12_groveaction5","THM5-13_groveaction6","THM5-14_groveaction7","THM5-15_groveaction8","THM5-33_grove1","THM5-34_grove2","THM5-38_grove3","THM5-39_grove4","THM5-40_grove5","THM5-35_grove99","THM5-36_grove100","THM5-37_grove101","THM5-41_grove102","THM5-42_grove103","THM5-01_grove105","THM5-02_grove106","THM5-03_grove107","THM5-04_grove108","THM5-05_grove109"};
+ const char* securityMusic[19]={"THM6-05_securityaction1","THM6-06_securityaction2","THM6-07_securityaction3","THM6-08_securityaction4","THM6-09_securityaction5","THM6-10_securityaction6","THM6-01_security1","THM6-02_security2","THM6-03_security3","THM6-04_security4","THM6-11_security100","THM6-12_security101","THM6-13_security1","THM6-14_security2","THM6-15_security3","THM6-17_security4","THM6-18_security5","THM6-19_security6","THM6-20_security7"};
+-const char* elevMusic[MAX_LEVELS] = {"THM7-01_elevator1","THM7-01_elevator1","THM7-02_elevator2","THM7-03_elevator3","THM7-04_elevator4","THM7-05_elevator5","THM7-06_elevator6","THM7-07_elevator7","THM7-08_elevator8","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1"};
++const char* elevMusic[MAX_LEVELS] = {"THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1","THM7-01_elevator1"}; /*all elevator tracks byte-identical; dups deleted*/
+ const char* reviveMusic[MAX_LEVELS] = {"THM4-18_reactorrevive","THM1-18_medicalrevive","THM3-19_sciencerevive","THM3-19_sciencerevive","THM3-19_sciencerevive","THM1-18_medicalrevive","THM2-18_executiverevive","THM4-18_reactorrevive","THM6-22_securityrevive","THM1-18_medicalrevive","THM2-18_executiverevive","THM2-18_executiverevive","THM2-18_executiverevive","THM1-18_medicalrevive"};
+ const char* distrtMusic[MAX_LEVELS] = {"THM6-49_securitydistorted","THM1-48_medicaldistorted","THM3-49_sciencedistorted","THM3-49_sciencedistorted","THM1-48_medicaldistorted","THM1-48_medicaldistorted","THM2-46_executivedistorted","THM1-48_medicaldistorted","THM6-49_securitydistorted","THM1-48_medicaldistorted","THM1-48_medicaldistorted","THM1-48_medicaldistorted","THM1-48_medicaldistorted","THM10-41_cyberdistorted"};
+ void PlayVideoPageMusic(bool intro) { videoPageClip = intro ? "./Audio/music/VIDINTRO-00_intro.mp3" : "./Audio/music/VIDOUTRO-00_outro.mp3"; mp3_clear(); play_mp3(videoPageClip,0); }
+--- a/models.c
++++ b/models.c
+@@ -1193,6 +1193,7 @@
+             u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1; u16 prevFrame = e->frame;
+             e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
+             if (e->frame != prevFrame) e->animFinished = World.current_time; // hysteresis: stamp ONLY on an actual frame change (single-frame idle clips don't restamp, so they don't hold neighbors awake)
++            if (e->index == 585 && e->frame < prevFrame) PlaySparkSound(World.position[i]); /*prop_sparkingwire looped: random spark at end of cycle*/
+             if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
+         }
+     } if (portalsNeedUpdated){PortalCulling();}
+diff --git a/Audio/music/THM7-00_elevator0.mp3 b/Audio/music/THM7-00_elevator0.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-00_elevator0.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-02_elevator2.mp3 b/Audio/music/THM7-02_elevator2.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-02_elevator2.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-03_elevator3.mp3 b/Audio/music/THM7-03_elevator3.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-03_elevator3.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-04_elevator4.mp3 b/Audio/music/THM7-04_elevator4.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-04_elevator4.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-05_elevator5.mp3 b/Audio/music/THM7-05_elevator5.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-05_elevator5.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-06_elevator6.mp3 b/Audio/music/THM7-06_elevator6.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-06_elevator6.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-07_elevator7.mp3 b/Audio/music/THM7-07_elevator7.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-07_elevator7.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-08_elevator8.mp3 b/Audio/music/THM7-08_elevator8.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-08_elevator8.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-09_elevator9.mp3 b/Audio/music/THM7-09_elevator9.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-09_elevator9.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-10_elevator10.mp3 b/Audio/music/THM7-10_elevator10.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-10_elevator10.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-11_elevator11.mp3 b/Audio/music/THM7-11_elevator11.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-11_elevator11.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-12_elevator12.mp3 b/Audio/music/THM7-12_elevator12.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-12_elevator12.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-13_elevator13.mp3 b/Audio/music/THM7-13_elevator13.mp3
+deleted file mode 100644
+index 717df64a3082185297e12468135e7d9a39dc1f8e..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-13_elevator13.mp3 and /dev/null differ
+diff --git a/Audio/music/THM2-17_death.mp3 b/Audio/music/THM2-17_death.mp3
+deleted file mode 100644
+index b9f336ca0e447cfbd024526d8e993c0582c3fd7c..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM2-17_death.mp3 and /dev/null differ
+diff --git a/Audio/music/THM3-18_death.mp3 b/Audio/music/THM3-18_death.mp3
+deleted file mode 100644
+index b9f336ca0e447cfbd024526d8e993c0582c3fd7c..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM3-18_death.mp3 and /dev/null differ
+diff --git a/Audio/music/THM4-17_death.mp3 b/Audio/music/THM4-17_death.mp3
+deleted file mode 100644
+index b9f336ca0e447cfbd024526d8e993c0582c3fd7c..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM4-17_death.mp3 and /dev/null differ
+diff --git a/Audio/music/THM5-17_death.mp3 b/Audio/music/THM5-17_death.mp3
+deleted file mode 100644
+index b9f336ca0e447cfbd024526d8e993c0582c3fd7c..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM5-17_death.mp3 and /dev/null differ
+diff --git a/Audio/music/THM6-21_death.mp3 b/Audio/music/THM6-21_death.mp3
+deleted file mode 100644
+index b9f336ca0e447cfbd024526d8e993c0582c3fd7c..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM6-21_death.mp3 and /dev/null differ
+diff --git a/Audio/music/THM7-09_death.mp3 b/Audio/music/THM7-09_death.mp3
+deleted file mode 100644
+index b9f336ca0e447cfbd024526d8e993c0582c3fd7c..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM7-09_death.mp3 and /dev/null differ
+diff --git a/Audio/music/THM10-16_death.mp3 b/Audio/music/THM10-16_death.mp3
+deleted file mode 100644
+index b9f336ca0e447cfbd024526d8e993c0582c3fd7c..0000000000000000000000000000000000000000
+Binary files a/Audio/music/THM10-16_death.mp3 and /dev/null differ
+diff --git a/Audio/music/looped/track11.mp3 b/Audio/music/looped/track11.mp3
+deleted file mode 100644
+index 52d898e0c081a0b5cf6dc10e0309f020f04750df..0000000000000000000000000000000000000000
+Binary files a/Audio/music/looped/track11.mp3 and /dev/null differ
+diff --git a/Audio/music/looped/track12.mp3 b/Audio/music/looped/track12.mp3
+deleted file mode 100644
+index 52d898e0c081a0b5cf6dc10e0309f020f04750df..0000000000000000000000000000000000000000
+Binary files a/Audio/music/looped/track12.mp3 and /dev/null differ

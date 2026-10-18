@@ -949,6 +949,7 @@ void UpdateLights() {
     glBufferData(GL_SSBO, World.loadedLights * sizeof(Light), World.lights, GL_DYNAMIC_DRAW);
     glUseProgram(voxelUpdateSP);
     glUniform3f(5, World.position[PLAYER1].x, World.position[PLAYER1].y, World.position[PLAYER1].z);
+    glUniform1ui(2, World.loadedLights); /* Runtime light pools (ai_effect_flash) grow loadedLights after LoadLevel set the snapshot at entity.c:1630; without this the compute scan never reaches them. */
     glDispatchCompute((VOXELS_X + 15) / 16, (VOXELS_Z + 15) / 16, 1);
 }
 

@@ -140,7 +140,7 @@ static const struct { u16 prefab; u8 type; } impactEffectTypes[] = {
     { 740, 24 }, { 740, 25 }, { 740, 26 }, { 740, 27 }, { 740, 28 }, /* ionhit: Shockwave, CenterSpatter, root, BlueSparksSmall, CenterSpatter2 */
 };
 
-static bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
+bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     u16 type=ImpactParticleType(prefab); const PSysDef* preset=PSysTypeGet(type); if (!preset) return false;
     PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def);
     for (u32 i = 0; i < sizeof(impactEffectTypes)/sizeof(*impactEffectTypes); ++i) {

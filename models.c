@@ -1134,6 +1134,7 @@ AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameS
 
 void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
 void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAX_ANIMS || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&modelAnimationClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
+bool SpawnImpactParticleForPrefab(u16,V3,V3), ai_effect_flash(V3,Color3,float,float,double);
 void UpdateAnims(void) {
     if (World.paused || World.menuActive){return;} static double lastPauseTime=0; if(lastPauseTime == 0.0){lastPauseTime=World.pauseRelativeTime;} double animDT=World.pauseRelativeTime-lastPauseTime; lastPauseTime=World.pauseRelativeTime; if(animDT > 0.1){animDT=0.1;} if(animDT <= 0.0){return;} bool portalsNeedUpdated=false; u8 animTest=Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
@@ -1193,6 +1194,12 @@ void UpdateAnims(void) {
             u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1; u16 prevFrame = e->frame;
             e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
             if (e->frame != prevFrame) e->animFinished = World.current_time; // hysteresis: stamp ONLY on an actual frame change (single-frame idle clips don't restamp, so they don't hold neighbors awake)
+            if (e->index == 585 && e->frame == 16) { /*prop_sparkingwire sparks effects*/
+                V3 sparkPos = V3_AplusB(World.position[i],(V3){0.0f,-0.88f * World.scale[i].y,0.0f});
+                PlaySparkSound(sparkPos);
+                SpawnImpactParticleForPrefab(729,sparkPos,(V3){0.0f,1.0f,0.0f});
+                ai_effect_flash(sparkPos,(Color3){0.9f,0.8f,0.6f},2.84f,4.0f,0.2f);
+            }
             if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     } if (portalsNeedUpdated){PortalCulling();}

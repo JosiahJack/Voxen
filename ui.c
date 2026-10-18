@@ -29,13 +29,14 @@ void BiomonitorBlitToUI();
                       UI_ID_##P##_SEARCH_EMPTY,         UI_ID_##P##_SEARCH_CLOSE,         UI_ID_##P##_AUTOMAP_ZOOM_IN,   UI_ID_##P##_AUTOMAP_ZOOM_OUT,  UI_ID_##P##_AUTOMAP_FULL,          \
                       UI_ID_##P##_AUTOMAP_SIDE
 
+void LoadTextForLanguage(u8 lang); void LoadLogTextForLanguage(u8 lang);
 typedef enum{UI_ID_NONE,
     /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT,
              UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS,
              UI_ID_MENU_BACK,
              UI_ID_MENU_TAB_GRAPHICS, UI_ID_MENU_TAB_INPUT, UI_ID_MENU_TAB_AUDIO_LANG,
              UI_ID_MENU_MODEL_DETAIL, UI_ID_MENU_FXAA, UI_ID_MENU_SHADOWS, UI_ID_MENU_SSR, UI_ID_MENU_VSYNC, UI_ID_MENU_FOV_SLIDER, UI_ID_MENU_GAMMA_SLIDER, UI_ID_MENU_RESOLUTION, UI_ID_MENU_FULLSCREEN, UI_ID_MENU_TOGGLE_MONITOR, UI_ID_MENU_RES_APPLY,
-             UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER,
+             UI_ID_MENU_MASTER_VOLUME_SLIDER, UI_ID_MENU_MUSIC_VOLUME_SLIDER, UI_ID_MENU_SFX_VOLUME_SLIDER, UI_ID_MENU_LOG_VOLUME_SLIDER, UI_ID_MENU_LANGUAGE,
              UI_ID_MENU_INPUT_0, UI_ID_MENU_INPUT_41=UI_ID_MENU_INPUT_0 + 41,
     /*NewGame*/ UI_ID_MENU_NAME_INPUT, UI_ID_MENU_DIFF_COMBAT, UI_ID_MENU_DIFF_PUZZLE, UI_ID_MENU_DIFF_MISSION, UI_ID_MENU_DIFF_CYBER, UI_ID_MENU_DIFF_CELL_0, UI_ID_MENU_DIFF_CELL_15 = UI_ID_MENU_DIFF_CELL_0 + 15, UI_ID_MENU_START,
     /*Save/Load*/ UI_ID_MENU_SAVE_SLOT_0, UI_ID_MENU_SAVE_SLOT_7=UI_ID_MENU_SAVE_SLOT_0 + 7,
@@ -380,6 +381,16 @@ void RenderMenu() {
             if (UI_Slider(UI_ID_MENU_MUSIC_VOLUME_SLIDER,426,270,128,16,((Sys_Settings.VolumeMusic / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMusic,&newVal,&musicVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMusic = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
             if (UI_Slider(UI_ID_MENU_SFX_VOLUME_SLIDER,426,300,128,16,((Sys_Settings.VolumeEffects / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeEffects,&newVal,&sfxVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeEffects = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
             if (UI_Slider(UI_ID_MENU_LOG_VOLUME_SLIDER,426,330,128,16,((Sys_Settings.VolumeMessage / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMessage,&newVal,&messageVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMessage = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+            /*Language picker*/
+            static const char* langNames[8] = {"English","Espa\u00f1ol","Deutsch","Fran\u00e7""ais","\u65e5\u672c\u8a9e","\u0420\u0443\u0441\u0441\u043a\u0438\u0439","Italiano","Portugu\u00ea""s"};
+            bool langOver = false;
+            if (UI_Button(UI_ID_MENU_LANGUAGE,200,370, 328,16, &langOver, 4) || (MenuEnter() && currentMenuItem == 4)) {
+                Sys_Settings.Language = (Sys_Settings.Language + 1) % 8;
+                LoadTextForLanguage(Sys_Settings.Language); LoadLogTextForLanguage(Sys_Settings.Language);
+                SaveConfig(); currentMenuItem = 4;
+            }
+            langOver = langOver || currentMenuItem == 4;
+            RenderTextL(200,370, langOver ? T_YELLOW : T_GREEN, FONT_NORMAL, 1.0f, "LANGUAGE: %s", langNames[Sys_Settings.Language % 8]);
         }
         MenuBackButton(1087,723,1103,731,(i8)(menuItemCount - 1));
     } else if (currentMenuPage == MPG_LOAD || currentMenuPage == MPG_SAVE) {

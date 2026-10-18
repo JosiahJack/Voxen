@@ -317,25 +317,40 @@ static AIEffectLightPool aiEffectPools[MAX_LEVELS];
 static double aiEffectLightsUpdatedAt=-1.0;
 static float ai_effect_marker(u16 slot) { return -100.0f-(float)slot; }
 static void ai_ensure_effect_pool(void) {
-    u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev];
-    if (p->ready) { for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_effect_marker(i)) { p->ready=false; break; } }
-    if (p->ready) return; p->count=0;
-    while (p->count<AI_EFFECT_LIGHT_POOL_SIZE && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0,0,0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_effect_marker(i); p->count++; }
-    p->ready=p->count>0;
+    u16 lev = World.currentLevel;
+    if (lev >= MAX_LEVELS) return;
+    
+    AIEffectLightPool* p = &aiEffectPools[lev];
+    if (p->ready) { for (u16 i=0;i<p->count;i++) if (p->lights[i] >= World.loadedLights || World.lights[p->lights[i]].spotAng != ai_effect_marker(i)) { p->ready = false; break; } }
+    if (p->ready) return; p->count = 0;
+    
+    while (p->count < AI_EFFECT_LIGHT_POOL_SIZE && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0,0,0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_effect_marker(i); p->count++; }
+    p->ready = p->count > 0;
 }
 static void ai_update_effect_lights(void) {
     if (aiEffectLightsUpdatedAt==World.pauseRelativeTime) return; aiEffectLightsUpdatedAt=World.pauseRelativeTime; u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev];
     if (!p->ready) return; for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_effect_marker(i)) { p->ready=false; p->count=0; return; }
     for (u16 i=0;i<p->count;i++) if (p->expires[i]>0.0 && p->expires[i]<=World.pauseRelativeTime) { u16 li=p->lights[i]; UpdateLight(li,World.lights[li].pos,World.lights[li].col,World.lights[li].range,0.0f,0.0f,0.0f,ai_effect_marker(i),QUAT_IDENTITY,false,false); p->expires[i]=0.0; }
 }
-static void ai_effect_flash(V3 pos, Color3 col, float range, float intensity, double duration) {
-    if (intensity<=0.0f || range<=0.0f || duration<=0.0) return; ai_ensure_effect_pool(); u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev]; if (!p->count) return;
-    u16 chosen=0; double oldest=1000000000000000000000000000000.0;
-    for (u16 i=0;i<p->count;i++) { if (p->expires[i]<=World.pauseRelativeTime) { chosen=i; oldest=-1.0; break; } if (p->expires[i]<oldest) { oldest=p->expires[i]; chosen=i; } }
-    u16 idx=p->lights[chosen]; float scaledIntensity=intensity*0.35f;
+void ai_effect_flash(V3 pos, Color3 col, float range, float intensity, double duration) {
+    if (intensity <= 0.0f || range <= 0.0f || duration <= 0.0) return;
+    
+    ai_ensure_effect_pool();
+    u16 lev = World.currentLevel; if (lev >= MAX_LEVELS) return;
+    AIEffectLightPool* p = &aiEffectPools[lev]; if (!p->count) return;
+    
+    u16 chosen = 0; double oldest = 1000000000000000000000000000000.0;
+    for (u16 i=0;i<p->count;i++) {
+        if (p->expires[i]<=World.pauseRelativeTime) { chosen = i; oldest = -1.0; break; }
+        
+        if (p->expires[i]<oldest) { oldest = p->expires[i]; chosen = i; }
+    }
+    u16 idx = p->lights[chosen];
+    float scaledIntensity = intensity * 0.35f;
     UpdateLight(idx,pos,col,vclamp(range,0.32f,15.36f),scaledIntensity,scaledIntensity,0.0f,ai_effect_marker(chosen),QUAT_IDENTITY,true,false);
-    p->expires[chosen]=World.pauseRelativeTime+duration;
+    p->expires[chosen] = World.pauseRelativeTime + duration;
 }
+
 static void ai_muzzle_flash(Entity* self, int attackNum) {
     if (attackNum<1 || attackNum>3) attackNum=1; u16 npc=(u16)(self->index-419); if (npc>=NUM_AI_TYPES) return;
     if (npc==18) attackNum=1; else if (attackNum==1) return;
