@@ -207,5 +207,5 @@ void CullInit() {
     }
     playerCellIdx = PosGetCellCoords(World.position[PLAYER1].x,World.position[PLAYER1].z); i32 cellToCellIdx = playerCellIdx * ARRSIZE;
     for (i32 z=0;z<WORLDZ;++z) { for (i32 x=0;x<WORLDX;++x) { i32 cellIdx = (z * WORLDX) + x; size_t flat_idx = (size_t)(cellToCellIdx + cellIdx); if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) {gridCellStates[cellIdx] |= CELL_VISIBLE;} } } /*Get visible before putting meshes into their cells so we can nudge them a little.*/
-    gridCellStates[0] |= CELL_VISIBLE;/* Errors default to 0 so draw them anyways.*/ DualLog(" took %f secs\n",get_time() - start_time);
+    gridCellStates[0] |= CELL_VISIBLE;/* Errors default to 0 so draw them anyways.*/ DualLog("....................................................took %.6f secs\n",get_time() - start_time);
 }

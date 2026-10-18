@@ -164,7 +164,7 @@ typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool
 typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range, spotAng, maxIntensity, minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer   
 typedef struct { float speed; u16 frameStart, frameEnd, frameStartModelIndex; u8 framerate;} AnimationClip;
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
-enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (86ULL * 1024 * 1024),
+enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (85ULL * 1024 * 1024),
       /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                  MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
       /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024,
@@ -462,7 +462,7 @@ bool HudHeatTickOn(int);
 double get_time();
 float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
 void ApplyImpactForceSphere(DamageData*,V3,float,float);
-void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void),DebugRAM(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
+void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void), DebugRAMActual(const char*), DebugRAM(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
      play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
      LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);

@@ -38,7 +38,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
     .ScreenWidth=800u,.ScreenHeight=600u,.Fullscreen=0u,.FOV=65u,.Brightness=50u,.Gamma=50u,.FXAA=0u,.Shadows=0u,.Reflections=0u,.Vsync=0u,.ModelDetail=0u,.CurrentMonitor=0u, .GI=0u,.SpeakerMode=1u,.Reverb=0u,.VolumeMaster=100u,.VolumeMusic=25u,.VolumeMessage=75u,.VolumeEffects=100u,
     .Language=0u,.DynamicMusic=1u,.Footsteps=1u,.InvertLook=0u, 
     .InvCybLook=0u,.QuickItemPickup=0u,.QuickReloadWeapons=0u,.MouseSensitivity=10u,.NoShootMode=0u,.HeadBob=1u,.SSR_RES=4u};/*Ratio is (1 / SSR_RES) * res*/
-InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=false, .showFPS=false, .editMode=false, .showPhys=false};
+InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=false, .showFPS=true, .editMode=false, .showPhys=false};
 
 // In-Game Editor
 u16 editModeSelection = U16_MAX, editModeTestEntityDefinition = 343, lastSpawned = U16_MAX;
@@ -1037,7 +1037,8 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         if(numCasters >= SC_MAX){break;}
     }
     
-    for (i32 i=0;i+8<=numCasters;i+=8) {
+    const u16 numCastersAligned = numCasters & ~7u;
+    for (i32 i=0;i<numCastersAligned;i+=8) {
         float lx[8], ly[8], lz[8], lr[8], lsr[8];
         for (int k=0;k<8;++k){
             u16 j=shadowCasterIndices[i + k];
@@ -1055,18 +1056,8 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         _mm256_store_ps(&sc_radius[i], _mm256_loadu_ps(lr));
         _mm256_store_ps(&sc_shadRadius[i], _mm256_loadu_ps(lsr));
     }
+    for (i32 i=numCastersAligned;i<numCasters;++i) { u16 j=shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
     
-    for (i32 i=0;i<numCasters;++i) {
-        u16 j=shadowCasterIndices[i];
-        sc_posX[i]=World.position[j].x;
-        sc_posY[i]=World.position[j].y;
-        sc_posZ[i]=World.position[j].z;
-        sc_radius[i]=World.radius[j];
-        sc_shadRadius[i]=World.instances[j].shadRadius;
-        sc_origIdx[i]=j;
-    }
-    
-    const u16 numCastersAligned = numCasters & ~7u;
     if (shadowLevel != (i8)World.curLev) {
         mset(shadowSlot, 0xFF, sizeof(shadowSlot));
         mset(shadowFaces, 0, sizeof(shadowFaces));
@@ -1617,16 +1608,12 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
 
     bool grayscaleEnabled = ((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0);
     glUniform1ui(26,(u32)grayscaleEnabled);
-    
     float fogActual = World.fogColor[World.curLev].a + (float)(World.fogFac / 255u); /*Alpha is base density for level.*/
     glUniform3f(12, World.fogColor[World.curLev].r * fogActual,World.fogColor[World.curLev].g * fogActual, World.fogColor[World.curLev].b * fogActual); /*Fog Color(which is density)*/
-    
     glUniform1ui(14,Sys_Settings.Reflections);
     glUniform1ui(15,Sys_Settings.Shadows);
-    
     glUniform2f(8, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]);
     glUniform3f(10,px,py,pz);
-    
     glColorMask(1,1,1,1);
     glDepthMask(0);
     glDepthFunc(0x0203/*GL_LEQUAL*/); /*Opaque Pass*/
@@ -1683,35 +1670,28 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         DrawEntity(e, i, constIndex, tex, &currentNormIndex, &currentTexIndex, &currentGlowIndex, &currentSpecIndex, &currentModelType, grayscaleEnabled);
     }
     
-    // 3D text decals (592 text_decal, 593 text_decalStopDSS1): world-baked meshes, double-sided, lit via chunkSP, PVS culled
-    glUseProgram(chunkSP);
     glUniform1ui(32,1);
+    glDepthFunc(0x0203/*GL_LEQUAL*/);
+    glUniform1ui(1, 0u);
+    glUniform1ui(17, 0u);
+    glUniform1ui(19, 0u);
+    glUniform1ui(20, 0u);
+    glUniform1ui(13, 0u);
+    glUniform1ui(30, 0u);
+    glUniform2f(33, 0.0f, 0.0f);
+    glUniform1f(27, 0.0f);
+    glActiveTexture(0x84C9/*GL_TEXTURE9*/);
     u8 tdLev = World.curLev;
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
+    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { // 3D text decals 592 text_decal, 593 text_decalStopDSS1
         if (textDecalVBO[tdLev][i]==0 || textDecalVertexCount[tdLev][i]==0) { continue; }
         u16 cIdx = World.instances[i].index; if (cIdx!=592 && cIdx!=593) { continue; }
         if (!(World.instances[i].entflags & EF_ACTIVE)) { continue; }
         if (!((gridCellStates[World.instances[i].cellIndex] & CELL_VISIBLE) || ((gridCellStates[World.instances[i].cellIndex] & CELL_OPEN) == CELL_OPEN))) { continue; }
         
-        if (cullBlendState != 2) { /*Double-sided*/
-            glDisable(GL_CULL_FACE);
-            glEnable(GL_BLEND);
-            cullBlendState = 2;
-        }
-        
-        glDepthFunc(0x0203/*GL_LEQUAL*/);
+        if (cullBlendState != 2) { /*Double-sided*/ glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState = 2; }
         glUniform1ui(0, (u32)i);
-        glUniform1ui(1, 0u);
-        glUniform1ui(17, 0u);
         glUniform1ui(18, (u32)World.instances[i].texIndex);
-        glUniform1ui(19, 0u);
-        glUniform1ui(20, 0u);
         glUniform1ui(25, (u32)cIdx);
-        glUniform1ui(13, 0u);
-        glUniform1ui(30, 0u);
-        glUniform2f(33, 0.0f, 0.0f);
-        glUniform1f(27, 0.0f);
-        glActiveTexture(0x84C9/*GL_TEXTURE9*/);
         glBindTexture(GL_TEXTURE_2D, (cIdx == 593) ? fontAtlasTexStopD : fontAtlasTex);
         glBindVertexBuffer(0, textDecalVBO[tdLev][i], 0, 16/*VRT_ATT_SZ*/);
         glDrawArrays(0x0004/*GL_TRIANGLES*/, 0, (i32)textDecalVertexCount[tdLev][i]);
@@ -1938,7 +1918,7 @@ void MFD_NewGame(), MissionTimerInit(), AddHardwareToInventory(int,int), mp3_cle
 __attribute__((cold)) void NewGame() { // Reset World States
     CloseSearch(); MFD_NewGame();
     World.invP1.currentSearchItem=U16_MAX;
-    DualLog("Loading new game...\n");
+    DualLog("Loading new game... ");
     RenderLoading("Loading new game...");
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
     for (int i=0;i<World.numLevels;++i) {
@@ -2136,27 +2116,20 @@ void* OS_AllocScratch(size_t amount) {
 }
 
 void OS_FreeInitPhase() { scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
-void OS_ScratchFree() { DualLog("Scratch arena total peak: %u MB\n", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; }
 void SetGLContext_MakeCurrent();
-static double initStagePrev = 0;
-static void InitStageTick() { initStagePrev = get_time(); } /*silent: keeps the delta chain accurate after a stage that logs its own timing*/
-static void InitStageLog(const char* name) { /*per-stage init timing: how long the preceding step took*/
-    double now = get_time();
-    if (!initStagePrev) initStagePrev = game_start_time;
-    DualLog("%s: %.1f ms\n", name, (now - initStagePrev) * 1000.0);
-    initStagePrev = now;
-}
 void InitFontAtlassesGL();
 static void* InitFontAtlasses_Thread(void* arg) { (void)arg; InitFontAtlasses(); return NULL; }
 void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
-    OS_ScratchInit(); InitStageLog("scratch init"); // Set up the 465 MB scratch arena for init phases
+    OS_ScratchInit();
     DebugRAM("program start");
-    DualLog("Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed\nEntity size: %u\n",sizeof(Entity));
+    DualLog("=========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========\n");
+    DualLog("Game: Citadel, the System Shock (1994) Fan Remake                               1/03/2013 - 10/17/2026\n\n");
+    DualLog("OpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\n");
     SetLevelPointers(0); 
-    WindowInit(); InitStageLog("WindowInit");
+    WindowInit();
     threadCnt = vclampi(OS_GetNumThreads(),1,32);
     globalframe = 0;
     World.menuActive = true;
@@ -2164,17 +2137,15 @@ void InitalizeEnvironment() {
     World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/
     World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/
     World.numLevels = MAX_LEVELS; World.startLevel = 1 /*medical*/;
-    LoadConfig(); /*Get settings before setting window size.*/ InitStageLog("LoadConfig");
+    LoadConfig(); /*Get settings before setting window size.*/
     OS_Thread fontInitThr;
-    (void)OS_AllocScratch(1); /*force scratch init before worker*/
     OS_ThreadCreate(&fontInitThr, InitFontAtlasses_Thread, NULL);
-    InitStageLog("font bg thread spawned"); /*110ms atlas build overlaps window/GL setup*/
     ClampWindowSizeToMonitor();
-    window = VCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); InitStageLog("VCreateWindow"); /*X11: already black via X fill at map*/
-    PlaceWindowOnMonitor((int)Sys_Settings.CurrentMonitor); InitStageLog("PlaceWindowOnMonitor"); /*Win32: ShowWindow here -> black via BLACK_BRUSH; X11: no-op move (already mapped at final position)*/
-    SetGLContext_MakeCurrent(); InitStageLog("makeCurrent"); /*first bind does the NVIDIA driver init; window already presented so this is invisible*/
-    ((WSWin*)window)->context.swapBuffers(((WSWin*)window)); InitStageLog("FIRST BLACK FRAME (swap)"); // Validate the swap path early; window already black.
-    SetGLContext_GetFunctionPointers(); InitStageLog("GL procs (remaining)"); /*now load the remaining GL entry points*/
+    window = VCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+    PlaceWindowOnMonitor((int)Sys_Settings.CurrentMonitor);
+    SetGLContext_MakeCurrent();
+    ((WSWin*)window)->context.swapBuffers(((WSWin*)window));
+    SetGLContext_GetFunctionPointers();
     i32 major = 0, minor = 0;
     glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/, &major);
     glGetIntegerv(0x821C/*GL_MINOR_VERSION*/, &minor);
@@ -2183,7 +2154,7 @@ void InitalizeEnvironment() {
     glFrontFace(0x0901/*GL_CCW*/);
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
     glClearColor(0,0,0,1);
-    CompileShaders(); InitStageLog("CompileShaders");
+    CompileShaders();
     
     u32 tvaos[5],tvbos[5]; glGenVertexArrays(5,tvaos); glGenBuffers(5,tvbos);
     quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; wireLinesVAO=tvaos[4]; wireLinesVBO=tvbos[4]; 
@@ -2222,7 +2193,7 @@ void InitalizeEnvironment() {
     glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0);               glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2*sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
     glBindVertexBuffer(0,psysquadVBO,0,4 * sizeof(float));
-    OS_ThreadJoin(&fontInitThr); InitFontAtlassesGL(); InitStageLog("fonts (bg thread joined + GL upload)"); InitStageTick();
+    OS_ThreadJoin(&fontInitThr); InitFontAtlassesGL();
     
     GenerateAndBindTexture(&inputUIID, GL_RGBA8, UI_W, UI_H, GL_RGBA, GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL);/*UI Fixed Size Raster*/
     glGenFramebuffers(1, &uiFBO);
@@ -2235,7 +2206,7 @@ void InitalizeEnvironment() {
     glDrawBuffers(1,drawBuffersUI);
     glBindImageTexture(0, inputUIID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);/* UI Rendered Color*/
     
-    RenderLoading("Loading..."); InitStageLog("RenderLoading");
+    RenderLoading("Loading...");
     float* m = shadowmapsPerspectiveProjection, lightRangeMax = 15.36f;
     float viewRange = (lightRangeMax - 0.02f);
     m[0]  = 1.0f;  m[1] = 0.0f;  m[2]  =  0.0f;                                     m[3]  =  0.0f;
@@ -2267,15 +2238,15 @@ void InitalizeEnvironment() {
     psysInstancesID = MakeSSBO(&psysInstancesID,10,MAX_PARTICLES*sizeof(GpuPartInst),NULL,GL_DYNAMIC_DRAW);
     MakeSSBO(&psysTrailsID,11,MAX_TRAIL_SEGS*sizeof(TrlSegInst),NULL,GL_DYNAMIC_DRAW); colorBufferID= MakeSSBO(&colorBufferID,12,MAX_TOTAL_PIXELS*sizeof(u8),NULL,GL_STATIC_DRAW);
     textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
-    textureSizesID = MakeSSBO(&textureSizesID,15,MAX_TXRS*2*sizeof(i32),NULL,GL_STATIC_DRAW); InitStageLog("SSBO alloc");
+    textureSizesID = MakeSSBO(&textureSizesID,15,MAX_TXRS*2*sizeof(i32),NULL,GL_STATIC_DRAW);
     
     glUseProgram(shadowmapsSP);      glUniform1ui( 9, SHADOW_MAP_SIZE); // Set permanent uniforms on shaders (keeps c in sync with glsl for constants)
     glUseProgram(shadowmapsClearSP); glUniform1ui( 0, SHADOW_MAP_SIZE);
     glUseProgram(chunkSP);           glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
     
     for (int f=0;f<5;++f) { glGenQueries(5,gpuQ[f]); }
-    RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures"); InitStageTick();
-    RenderLoading("Loading models...");   DebugRAM("before LoadModels");   LoadModels();   DebugRAM("after LoadModels");   InitStageTick();
+    RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures");
+    RenderLoading("Loading models...");   DebugRAM("before LoadModels");   LoadModels();   DebugRAM("after LoadModels");
     bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
         
@@ -2292,18 +2263,18 @@ void InitalizeEnvironment() {
     glGenFramebuffers(1,&biomFBO);
     glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,biomTexId,0);
     bioMonitor.beatFinished=get_time() + 0.5; bioMonitor.backgroundColor=(Color){0.2f,0.2f,1.0f,0.01f}; bioMonitor.ergColor=(Color){0,0.5f,1.0f,1.0f}; bioMonitor.chiColor=(Color){.7f,0,1.f,1.f};
-    bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs(); InitStageLog("automap/biomonitor GL setup");
+    bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
     
-    NewGame(); InitStageLog("NewGame");
+    NewGame();
     currentMenuPage = MPG_FRONT;
-    InitAudio(); synth_set_reverb_preset(0); InitStageLog("InitAudio");
+    InitAudio(); synth_set_reverb_preset(0);
     if (playIntroAtBoot) ChangeMenuPage(MPG_INTRO);
     else { PlayMenuMusic(); }
-    World.menuActive = true; InitStageLog("menu setup"); //COMMENT for immediate into game
-    OS_ScratchFree(); InitStageLog("scratch free");
-    DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
-    DebugRAM("InitializeEnvironment after scratch free");
+    World.menuActive = true; //COMMENT for immediate into game
+    DualLog("Scratch arena total peak: %u MB, ", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; // Free the initialization scratch arena.
     DebugRAMPeak();
+    DualLog(".......Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time);
+    DebugRAMActual("after full init"); DualLog("\n");
     DebugRAMBreakdown();
 }
 
@@ -2314,6 +2285,7 @@ i32 main() {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
         
         double curtime = get_time();
+        raycastCalls = 0; raycastMs = 0.0;
         World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time, 0.0);
         World.absoluteTime+=World.deltaTime; World.current_time=curtime;
         World.painStaticAlpha = vmax(0.0f, World.painStaticAlpha - (float)World.deltaTime * 2.0f);
@@ -2377,19 +2349,18 @@ i32 main() {
         ((WSWin*)window)->context.swapBuffers(((WSWin*)window));
         CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
         // RAM and frame consistency debug stats
-        //static u32 dbgGameFrame = 0;
-        //if (!World.menuActive && !World.paused) { dbgGameFrame++; /*only count gameplay frames for RAM/timing checkpoints*/}
-        //static const u32 dbgFrm[] = {4, 100, 200, 500, 1000};
-        //static const char* dbgLbl[] = {"gameframe 4","gameframe 100","gameframe 200","gameframe 500","gameframe 1000"};
-        //for (int d=0;d<5;d++) {
-            //if (dbgGameFrame == dbgFrm[d]) {
-                //DebugRAM(dbgLbl[d]);
-                //DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Ray:%.3f(%u)\n",
-                    //dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000,
-                    //World.substeps, renderTime*1000, prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
-                //if (dbgGameFrame == 1000) { DebugRAMPeak(); break; }
-            //}
-        //}
+        static u32 dbgGameFrame = 0;
+        if (!World.menuActive && !World.paused) { dbgGameFrame++; /*only count gameplay frames for RAM/timing checkpoints*/}
+        static const u32 dbgFrm[] = {4, 100, 200, 500, 1000};
+        static const char* dbgLbl[] = {"   4"," 100"," 200"," 500","1000"};
+        for (int d=0;d<5;d++) {
+            if (dbgGameFrame == dbgFrm[d]) {
+                DebugRAM(dbgLbl[d]);
+                DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Raycasts:%.3f(%u)\n",
+                        dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000,
+                        World.substeps, renderTime*1000, prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
+            }
+        }
     }
     return 0;
 }

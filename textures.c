@@ -448,11 +448,11 @@ void LoadTextures() {
     texCnt = (u16)(maxIndex + 1);
     g_vidFrameFlag = OS_Alloc(texCnt); mset(g_vidFrameFlag, 0, texCnt);
     g_vidDims = OS_Alloc((size_t)texCnt * sizeof(u32)); mset(g_vidDims, 0, (size_t)texCnt * sizeof(u32));
-    { u32 vc = 0;
-      for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti < texCnt && is_vid_path(texture_parser.entries[k].path)) { g_vidFrameFlag[ti] = 1; vc++; } }
-      g_vidFrames = OS_Alloc((vc ? vc : 1) * sizeof(VidFrameRec)); g_vidFrameCnt = 0;
-      for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti >= texCnt || !g_vidFrameFlag[ti]) continue; VidFrameRec* r = &g_vidFrames[g_vidFrameCnt++]; r->texIdx = ti; r->w = r->h = 0; size_t pl = slen(texture_parser.entries[k].path); if (pl > sizeof(r->path)-1) pl = sizeof(r->path)-1; mcpy(r->path, texture_parser.entries[k].path, pl); r->path[pl] = 0; }
-      DualLog("Video frames paged: %u (%.2f MB excluded from palette)\n", g_vidFrameCnt, ((double)g_vidFrameCnt*0.0)); }
+    u32 vc = 0;
+    for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti < texCnt && is_vid_path(texture_parser.entries[k].path)) { g_vidFrameFlag[ti] = 1; vc++; } }
+    g_vidFrames = OS_Alloc((vc ? vc : 1) * sizeof(VidFrameRec)); g_vidFrameCnt = 0;
+    for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti >= texCnt || !g_vidFrameFlag[ti]) continue; VidFrameRec* r = &g_vidFrames[g_vidFrameCnt++]; r->texIdx = ti; r->w = r->h = 0; size_t pl = slen(texture_parser.entries[k].path); if (pl > sizeof(r->path)-1) pl = sizeof(r->path)-1; mcpy(r->path, texture_parser.entries[k].path, pl); r->path[pl] = 0; }
+
     i32* parsIdx = OS_AllocScratch(texCnt * sizeof(i32));
     mset(parsIdx, -1, texCnt * sizeof(i32)); 
     for (u32 k=0;k<texture_parser.count;++k) {
@@ -555,7 +555,7 @@ void LoadTextures() {
     png_arena_main.base = NULL;
     OS_FreeInitPhase();
     DebugRAM("after textures load");
-    DualLog(" took %.6f secs\n", get_time() - start_time);
+    DualLog("..took %.6f secs\n", get_time() - start_time);
 }
 
 typedef struct { const u16 *frames;  u8 length; bool hasGlow; const u16 *glowFrames; u8 glowLength; const char* name; } TextureAnimClip;

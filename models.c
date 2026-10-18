@@ -948,7 +948,7 @@ void LoadModels() {
         }
     }
     
-    DualLog("Loading   models (%d) ...",totalActual);
+    DualLog("Loading   models ( %d) ...",totalActual);
     mdlsCnt = (u16)maxid + 1;
     if ((u16)maxid > MAX_MDLS){DualLogError("Too many models!  Exceeds %u!\n",MAX_MDLS); OS_Exit(1);}
     
@@ -1083,7 +1083,7 @@ void LoadModels() {
     PoolShutdown();
     OS_FreeInitPhase();
     DebugRAM("after models load");
-    DualLog(" vertices: %u, tris: %u, %f secs\n", tv, tt, get_time() - startModelTime);
+    DualLog(" vertices: %u, tris: %u......................took %.6f secs\n", tv, tt, get_time() - startModelTime);
 }
 
 u8 numClips[MAX_ANIMS] = {/* 0*/4,/* 1*/4,/* 2*/6,/* 3*/8,/* 4*/4,/* 5*/4,/* 6*/4,/* 7*/4,/* 8*/4,/* 9*/4,/*10*/4,/*11*/4,/*12*/4,/*13*/4,/*14*/4,/*15*/4,/*16*/4,/*17*/4,/*18*/4,/*19*/4,/*20*/4,/*21*/1,/*22*/1,/*23*/6,/*24*/8,/*25*/6,/*26*/10,/*27*/8,/*28*/7,/*29*/5,/*30*/5,/*31*/7,/*32*/8,

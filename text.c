@@ -485,7 +485,7 @@ void DumpFontAtlasBmp(const char* filename, u8* atlas, int size) { size_t n = (s
 static int CountBlankGlyphs(const stbtt_packedchar* chars, int n) { int b=0; for(int i=0;i<n;++i) if(!chars[i].x1 && !chars[i].y1) ++b; return b; }
 void InitFontAtlasses() {
     DebugRAM("start font load");
-    double t0=get_time();DualLog("Loading    5 fonts...");
+    double t0=get_time();DualLog("Loading    fonts (   5) ...");
     ttAllocs = OS_AllocScratch(4674 * sizeof(TAlloc));
     FHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
@@ -501,7 +501,7 @@ void InitFontAtlasses() {
     u8* bmp2 = fontBmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2);
     BuildAtlasCPU(&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
     DumpFontAtlasBmp("Screenshots/atlas_stopd.bmp",bmp2,FONT_ATLAS_SIZE2);
-    DualLog(" took %f s (CPU, %d/%d glyphs packed, blanks %d/%d)\n",get_time()-t0,numPackedGlyphs,numPackedGlyphsStopD,CountBlankGlyphs(fontPackedChar,numPackedGlyphs),CountBlankGlyphs(fontPackedCharStopD,numPackedGlyphsStopD));
+    DualLog("(CPU, %d/%d glyphs packed, blanks %d/%d)...........took %.6f secs\n",numPackedGlyphs,numPackedGlyphsStopD,CountBlankGlyphs(fontPackedChar,numPackedGlyphs),CountBlankGlyphs(fontPackedCharStopD,numPackedGlyphsStopD),get_time() - t0);
 }
 void InitFontAtlassesGL() { /*main thread only*/
     GenerateAndBindTexture(&fontAtlasTex,0x8229,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903,GL_UNSIGNED_BYTE,0x2601,fontBmp1);

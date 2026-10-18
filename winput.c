@@ -418,8 +418,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
         WinSys.glx.CreateContextAttribsARB = (GLX_CCAA)getProcAddressGLX("glXCreateContextAttribsARB");
         GLXFBConfig native=NULL; XVisualInfo* result; GLXFBConfig* nativeConfigs; int nativeCount;
         static const int chooseAttribs[] = {0x8011/*GLX_DRAWABLE_TYPE*/,1/*GLX_WINDOW_BIT*/, 0x8010/*GLX_RENDER_TYPE*/,1/*GLX_RGBA_BIT*/, 5/*GLX_DOUBLEBUFFER*/,1, 0};
-        double fbcT = get_time(); nativeConfigs = WinSys.glx.ChooseFBConfigs(WinSys.x11.display,WinSys.x11.screen,chooseAttribs,&nativeCount);
-        DualLog("glXChooseFBConfig: %.1f ms\n", (get_time() - fbcT) * 1000.0); /*FBConfig selection is the dominant pre-window cost; keep it visible*/
+        nativeConfigs = WinSys.glx.ChooseFBConfigs(WinSys.x11.display,WinSys.x11.screen,chooseAttribs,&nativeCount);
         if (nativeCount > 0) native = nativeConfigs[0];
         WinSys.x11.xlib.Free(nativeConfigs);
         if (!native) { DualLogError("No usable GLX framebuffer config\n"); OS_Exit(1); }
@@ -431,7 +430,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
         XSetWindowAttributes wa = {0}; wa.colormap = w->x11.colormap; wa.event_mask = 0x63807F; /*background_pixel is 0 (black) via {0}; CWBackPixel below makes the X server fill the window on map, before any GL exists*/
         w->x11.parent = WinSys.x11.root;
         int wxp=0,wyp=0; if (WinSys.monitorCount>0) ComputeWindowPlacement((int)Sys_Settings.CurrentMonitor,&wxp,&wyp); /*final position up front: never visible at 0,0*/
-        w->x11.handle = WinSys.x11.xlib.CreateWindow(WinSys.x11.display,WinSys.x11.root,wxp,wyp,width,height,0,depth,1,visual,(1L<<1)|(1L<<3)|(1L<<13)|(1L<<11),&wa); /*1L<<1 = CWBackPixel*/
+        w->x11.handle = WinSys.x11.xlib.CreateWindow(WinSys.x11.display,WinSys.x11.root,wxp,wyp,width,height,0,depth,1,visual,(1L<<1/*CWBackPixel*/)|(1L<<3)|(1L<<13)|(1L<<11),&wa);
         WinSys.x11.xlib.SaveContext(WinSys.x11.display,w->x11.handle,WinSys.x11.context,(XPointer)w);
         Atom protocols[]={WinSys.x11.WM_DELETE_WINDOW,WinSys.x11.NWM_PING};
         WinSys.x11.xlib.SetWMProtocols(WinSys.x11.display,w->x11.handle,protocols,2);
@@ -442,8 +441,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
         WinSys.x11.xlib.ChangeProperty(WinSys.x11.display,w->x11.handle,WinSys.x11.NWM_NAME,WinSys.x11.UTF8_STRING,8,0,(u8*)GAME_TITLE,sizeof(GAME_TITLE) - 1); 
         GetWindowPos(w,&w->x11.xpos,&w->x11.ypos);
         GetWindowSize(w,&w->x11.width,&w->x11.height);
-        WinSys.x11.xlib.MapWindow(WinSys.x11.display,w->x11.handle); /*BLACK visible here; GLX context creation deferred below*/
-        double glxCtxT = get_time();
+        WinSys.x11.xlib.MapWindow(WinSys.x11.display,w->x11.handle);
         int attribs[40],index=0;
         attribs[index++] = 0x2091;
         attribs[index++] = 4;
@@ -455,7 +453,6 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
         attribs[index++] = 0;
         w->context.glx.handle = WinSys.glx.CreateContextAttribsARB(WinSys.x11.display,native,NULL,1,attribs);
         w->context.glx.window = WinSys.glx.CreateWindow(WinSys.x11.display,native,w->x11.handle,NULL);
-        DualLog("GLX context+window (after map): %.1f ms\n", (get_time() - glxCtxT) * 1000.0);
         w->context.makeCurrent = makeContextCurrentGLX;
         w->context.swapBuffers = swapBuffersGLX;
         w->context.swapInterval = swapIntervalGLX;
@@ -593,20 +590,16 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py) { /*shared by initial 
     if (monIdx < 0 || monIdx >= WinSys.monitorCount) { monIdx = 0; }
     WSMon* m=WinSys.monitors[monIdx];
     int w = (int)Sys_Settings.ScreenWidth, h = (int)Sys_Settings.ScreenHeight, wx,wy,ww,wh,ddw,ddh, fl = 0;
-    double placeWinT = get_time();
     GetMonitorWorkarea(m,&wx,&wy,&ww,&wh);
     GetDecorationOverhead(&ddw,&ddh);
     int ft,fr,fb; GetFrameExtents(&fl,&ft,&fr,&fb);
-    DualLog("placement query (workarea+extents): %.1f ms\n", (get_time() - placeWinT) * 1000.0);
     *px=(w==ww-ddw) ? wx+fl : wx+(ww-w)/2; *py=(h==wh-ddh) ? wy : wy+(wh-h)/2;
 }
 void PlaceWindowOnMonitor(int monIdx) {
     if(WinSys.monitorCount<=0){return;}
     
-    double placeWinT = get_time();
     int px,py; ComputeWindowPlacement(monIdx,&px,&py);
     SetWindowPosition(window,px,py); ignore_next_mouse_delta=true;
-    DualLog("SetWindowPosition (MoveWindow): %.1f ms\n", (get_time() - placeWinT) * 1000.0);
     #if defined(_WIN32)
         void* hw = window->win32.handle; ShowWindow(hw,5); BringWindowToTop(hw); SetForegroundWindow(hw); SetFocus(hw);
     #endif

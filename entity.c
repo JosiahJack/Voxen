@@ -1590,7 +1590,7 @@ void LoadAllLevels() {
     OS_Free(lanimsFromFile,LIGHT_COUNT*sizeof(LightAnimation));
     BuildTextDecalMeshes(); // Build world-baked 3D text decal meshes (Sys_Text.stringTable already populated for current language).
     DebugRAM("end of LoadAllLevels");
-    DualLog("Load all levels... took %f secs\n",get_time() - start_time);
+    DualLog("load all levels.................................................took %.6f secs\n",get_time() - start_time);
 }
 
 void LoadLevel(u8 curlevel, V3 pos) {
