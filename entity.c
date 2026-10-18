@@ -1056,13 +1056,12 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
 static const char* mm_ptr; static const char* mm_end;
 u16 TextMatIndexToTexIndex(u16 matIndex) {
     switch (matIndex) {
-        case 87: case 93: return 881;/*text_3dwhite, text_3dwhiteStopD -> white.png*/
-        case 88: case 92: return 1225;/*text_3dred, text_3dredStopD -> col3.png red*/
-        case 89: case 95: case 98: case 99: return 1224;/*text_3dgold*, text_3dgoldStopD, text_3dgoldunlit* -> col2.png yellow*/
-        case 90: return 1227;/*text_3dgreen -> col5.png green*/
-        case 91: case 94: case 97: return 0;/*text_3dblack* -> black.png*/
-        case 96: return 1226;/*text_3dblueStopD -> col4.png blue*/
-        default: return 881;/*white*/
+        case 88: case 92:                   return 1225; /*text_3dred, text_3dredStopD -> col3.png red*/
+        case 89: case 95: case 98: case 99: return 1224; /*text_3dgold*, text_3dgoldStopD, text_3dgoldunlit* -> col2.png yellow*/
+        case 90:                            return 1227; /*text_3dgreen -> col5.png green*/
+        case 91: case 94: case 97:          return    0; /*text_3dblack* -> black.png*/
+        case 96:                            return 1226; /*text_3dblueStopD -> col4.png blue*/
+        default:                            return  881; /*white*/
     }
 }
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
@@ -1358,9 +1357,7 @@ void LoadLevelMod(u8 lev) {
             else if (vabs(r.x) > 0.001f || vabs(r.z) > 0.001f) World.rotation[parent] = QUAT_IDENTITY;/*explicit block-0 rotation is tilted (unobserved on non-cyber records): upright default, same as a fresh AddInstance*/
             par->forward = V3_Normalize(quat_rot_v3(World.rotation[parent], (V3){0.0f,0.0f,1.0f})); }
         bool srcActive=(src->entflags & EF_ACTIVE)!=0; par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/
-          flag_set(&par->entflags,EF_ACTIVE,srcActive);
-        /* InitNPC() stamps its own start-up state, so put the loaded AIController state back on top of it. The
-           flags above already ride along through the OR; these fields are not part of entflags. */
+        flag_set(&par->entflags,EF_ACTIVE,srcActive);
         if (IdxIsNPC(entIdx)) { par->currentState=src->currentState; par->currentDestination=src->currentDestination; par->idealPos=src->idealPos; par->idealTransformForward=src->idealTransformForward; par->targettingPosition=src->targettingPosition; par->attack1SoundTime=src->attack1SoundTime; par->attack2SoundTime=src->attack2SoundTime; par->attack3SoundTime=src->attack3SoundTime; } par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
         for (u8 slot=0;slot<4;++slot) { par->contents[slot]=src->contents[slot]; par->custIdx[slot]=src->custIdx[slot]; } for (u8 slot=0;slot<7;++slot) { par->randomItem[slot]=src->randomItem[slot]; par->randomItemCustIdx[slot]=src->randomItemCustIdx[slot]; par->randomItemDropChance[slot]=src->randomItemDropChance[slot]; }
         par->generateContents=src->generateContents; par->generationDone=src->generationDone; par->maxRandomItems=src->maxRandomItems; par->srchInUse=src->srchInUse;
@@ -1376,10 +1373,6 @@ void LoadLevelMod(u8 lev) {
             if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
         par->panelItemPos=src->panelItemPos; par->panelItemRot=src->panelItemRot; par->targetnameIdx=src->targetnameIdx; par->targetIfFalseIdx=src->targetIfFalseIdx; par->questBitID=src->questBitID; par->lockedTargetIdx=src->lockedTargetIdx; par->deferredIoflags=src->deferredIoflags; par->deferredIoflagsHi=src->deferredIoflagsHi; par->useQuestKeycode1=src->useQuestKeycode1; par->useQuestKeycode2=src->useQuestKeycode2; par->questTestMode=src->questTestMode; par->branchOnSecond=src->branchOnSecond; par->relayEnabled=src->relayEnabled;
         par->relayOnceEver=src->relayOnceEver; par->relayAlreadyDone=src->relayAlreadyDone; par->startPosition=src->startPosition; par->targetPosition=src->targetPosition; par->funcState=src->funcState; par->speed=src->speed; par->codeScreen=src->codeScreen;
-        /*Carry block for fields the parse loop writes to the staging record.  Hand-maintained, so every key the parser
-          writes must appear here exactly once -- Tools/parse_coverage_check.py diffs inst-> writes against par-> copies
-          and fails on a non-empty set.  gridCells is the puzzle board the UI reads back (citadel.c:1044), wireCurL/R
-          the wire-puzzle layout, teleportID/targetDestinationID/justUsed the TeleportTouch pair physics.c:45 resolves.*/
         mcpy(par->gridCells,src->gridCells,sizeof(par->gridCells)); mcpy(par->wireCurL,src->wireCurL,sizeof(par->wireCurL)); mcpy(par->wireCurR,src->wireCurR,sizeof(par->wireCurR));
         par->puzzleFired=src->puzzleFired; par->emailIndex=src->emailIndex; par->autoPlayEmail=src->autoPlayEmail; par->logIndex=src->logIndex; par->textIndex=src->textIndex; par->trackType=src->trackType; par->rechargeMsgLingdex=src->rechargeMsgLingdex;
         par->teleportID=src->teleportID; par->targetDestinationID=src->targetDestinationID; par->justUsed=src->justUsed;

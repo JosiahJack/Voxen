@@ -1375,7 +1375,6 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
     SetHopperDeathEffect(e);
     glUniform1ui(17,tex==316?1u:0u);
     glUniform1ui(25,constIndex);
-    glUniform1f(27,(float)(1.0f - (vclamp((float)(World.pauseRelativeTime - 0.0f) / 2.0f, 0.0f, 1.0f)))); /* cyber wall panel alpha with fade */
     glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
     if (grayscaleEnabled) {
         float npcHeat = IdxIsNPC(constIndex) ? ((   constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 
@@ -1525,17 +1524,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
     
     if (World.shd1 < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4) && opaqueCount < (INSTANCE_COUNT - 4)) { // Add shield generators in skybox.
-        visibleInstances[opaqueCount].index=World.shd1;
-        visibleInstances[opaqueCount].depth=300.0f;
-        opaqueCount++;
-        visibleInstances[opaqueCount].index=World.shd2;
-        visibleInstances[opaqueCount].depth=300.0f;
-        opaqueCount++;
-        visibleInstances[opaqueCount].index=World.shd3;
-        visibleInstances[opaqueCount].depth=300.0f;
-        opaqueCount++; visibleInstances[opaqueCount].index=World.shd4;
-        visibleInstances[opaqueCount].depth=300.0f;
-        opaqueCount++;
+        visibleInstances[opaqueCount].index=World.shd1; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+        visibleInstances[opaqueCount].index=World.shd2; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+        visibleInstances[opaqueCount].index=World.shd3; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+        visibleInstances[opaqueCount].index=World.shd4; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
     }
     
     if (editModeSelection < U16_MAX && Cheats.editMode) {
@@ -1582,7 +1574,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         }
         
         currentModelType=GetAndBindModel(i,currentModelType);
-        glUniform1ui(3, (u32)tex);
+        if (tex != currentTexIndex || tex==0) { currentTexIndex=tex; glUniform1ui(3,(u32)tex); }
         u32 vertCount = modelTriangleCounts[currentModelType] * 3;
         glDrawElements(0x0004/*GL_TRIANGLES*/, vertCount, GL_UNSIGNED_SHORT, 0);
         drawCalls++;
@@ -1619,6 +1611,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glDepthFunc(0x0203/*GL_LEQUAL*/); /*Opaque Pass*/
     currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0;
     glUniform1f(9,0.0f); // Reset heat for infrared vision
+    glUniform1f(27,(float)(1.0f - (vclamp((float)(World.pauseRelativeTime - 0.0f) / 2.0f, 0.0f, 1.0f)))); /* cyber wall panel alpha with fade */
     for (u16 visibleIndex = 0; visibleIndex < opaqueCount; ++visibleIndex) { /*Opaques (already front-to-back)*/
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i];
@@ -1627,17 +1620,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (unlikely(transparentTexture[tex])) { continue; }
         
         if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { /*Doublesided*/
-            if (cullBlendState != 2) {
-                glDisable(GL_CULL_FACE);
-                glEnable(GL_BLEND);
-                cullBlendState = 2;
-            }
+            if (cullBlendState != 2) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState = 2; }
         } else { /*Opaque*/
-            if (cullBlendState != 0) {
-                glEnable(GL_CULL_FACE);
-                glDisable(GL_BLEND);
-                cullBlendState = 0;
-            }
+            if (cullBlendState != 0) { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); cullBlendState = 0; }
         }
         
         DrawEntity(e, i, constIndex, tex, &currentNormIndex, &currentTexIndex, &currentGlowIndex, &currentSpecIndex, &currentModelType, grayscaleEnabled);
@@ -1959,20 +1944,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.instances[PLAYER1].health = 211.0f;
     World.invP1.noiseFinished = World.pauseRelativeTime;
     World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f,1.0f);
-    World.invP1.hardwareInvReferenceIndex[0]  = 21;
-    World.invP1.hardwareInvReferenceIndex[1]  = 22;
-    World.invP1.hardwareInvReferenceIndex[2]  = 23;
-    World.invP1.hardwareInvReferenceIndex[3]  = 24;
-    World.invP1.hardwareInvReferenceIndex[4]  = 25;
-    World.invP1.hardwareInvReferenceIndex[5]  = 26;
-    World.invP1.hardwareInvReferenceIndex[6]  = 27;
-    World.invP1.hardwareInvReferenceIndex[7]  = 28;
-    World.invP1.hardwareInvReferenceIndex[8]  = 29;
-    World.invP1.hardwareInvReferenceIndex[9]  = 30;
-    World.invP1.hardwareInvReferenceIndex[10] = 31;
-    World.invP1.hardwareInvReferenceIndex[11] = 32;
-    World.invP1.hardwareInvReferenceIndex[12] =  0;
-    World.invP1.hardwareInvReferenceIndex[13] =  0;
+    for (int i=0;i<12;++i) { World.invP1.hardwareInvReferenceIndex[i] = 21 + i; } World.invP1.hardwareInvReferenceIndex[12] = World.invP1.hardwareInvReferenceIndex[13] = 0;
     World.invP1.generalInventoryIndexRef[0] = 81; // Hardcoded lookup indices into the Const main table.
     for (int i=1;i<HW_COUNT;i++) World.invP1.generalInventoryIndexRef[i] = -1; // Skips 0th index on purpose as it always holds access cards "item".
     for (int i=0;i<HW_COUNT;++i) World.invP1.hwVers[i] = World.invP1.hwVersSetting[i] = 0;
@@ -2088,7 +2060,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
 }
 
 void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
-void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); DualLog("Entity counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n Light counts::0:%u|1:%u|2:%u|3:%u|4:%u|5:%u|6:%u|7:%u|8:%u|9:%u|10:%u|11:%u|12:%u|13:%u\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
+void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); DualLog("Entity counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n Light counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
                                               World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
                                               World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]); }
                                               
@@ -2275,7 +2247,6 @@ void InitalizeEnvironment() {
     DebugRAMPeak();
     DualLog(".......Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time);
     DebugRAMActual("after full init"); DualLog("\n");
-    DebugRAMBreakdown();
 }
 
 void Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdate(),PSys_Update(float),BioMonitorUpdate(); bool ScrshotPressed();

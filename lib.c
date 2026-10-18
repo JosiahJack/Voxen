@@ -129,24 +129,17 @@ void Screenshot() {
 
 size_t g_mmap_live = 0; /* diagnostics: live bytes from OS_AllocateRAM (anon + file-backed + thread stacks) */
 extern u32 totalPixels,totalPaletteColors; extern size_t cvxAdjLive;
-// static void ramline(const char* name, u64 bytes) { u32 kb=(u32)(bytes>>10); DualLog("  %s %uKB|%.2fMB\n",name,kb,bytes/1048576.0); }
 void DebugRAMPeak(void) { // VmHWM: kernel high-water mark of RSS over process lifetime, catches transient spikes between checkpoints (includes shared libs, unlike USS)
-#if defined(_WIN32)
-    (void)0;/*no /proc on Windows*/
-#else
-    FHandle fd = OS_OpenReadonly("/proc/self/status"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/status\n"); return; }
-    char buf[2048]; long n = OS_Read(fd,buf,sizeof(buf)-1); OS_Close(fd); if (n <= 0) return; buf[n]='\0';
-    u32 kb=0; for (char* p=buf;*p;++p) { if (mcmp(p,"VmHWM:",6)==0) { p+=6; while(*p==' '||*p=='\t') ++p; while(*p>='0'&&*p<='9') kb=kb*10+(u32)(*p++-'0'); break; } }
-    DualLog("Peak: %uKB|%.2fMB",kb,kb/1024.0);
-#endif
+    #if defined(_WIN32)
+        (void)0;/*no /proc on Windows*/
+    #else
+        FHandle fd = OS_OpenReadonly("/proc/self/status"); if (fd == INVALID_FHANDLE) { DualLogError("Failed to open /proc/self/status\n"); return; }
+        char buf[2048]; long n = OS_Read(fd,buf,sizeof(buf)-1); OS_Close(fd); if (n <= 0) return; buf[n]='\0';
+        u32 kb=0; for (char* p=buf;*p;++p) { if (mcmp(p,"VmHWM:",6)==0) { p+=6; while(*p==' '||*p=='\t') ++p; while(*p>='0'&&*p<='9') kb=kb*10+(u32)(*p++-'0'); break; } }
+        DualLog("Peak: %uKB|%.2fMB",kb,kb/1024.0);
+    #endif
 }
-void DebugRAMBreakdown() { // Persistent-allocation census, diagnostics only: sums live structures; GPU/driver side estimated (not in USS)
-    //u64 physV=0,physT=0,bvhN=0,bvhT=0,gpuV=0,gpuT=0; u32 nM=mdlsCnt;
-    //for (u32 m=0;m<nM;++m){ physV+=(u64)physVertCounts[m]*12; physT+=(u64)modelTriangleCounts[m]*6; bvhN+=(u64)modelBVHNodeCounts[m]*sizeof(BvhNode); bvhT+=(u64)modelBVHTriOrderCounts[m]*2; gpuV+=(u64)modelVertexCounts[m]*VRT_ATT_SZ; gpuT+=(u64)modelTriangleCounts[m]*6; }
-    //DualLog("RAM breakdown (persistent): "); ramline("phys verts",physV); ramline("mdl CPU phys tris",physT); ramline("mdl CPU BVH nodes",bvhN); ramline("mdl CPU BVH triorder",bvhT); ramline("mdl CPU ptr tables",(u64)nM*8*3); ramline("mdl BSS tables",(u64)MAX_MDLS*(4+2+4+2+8+4)+(u64)INSTANCE_COUNT*64); ramline("mdl GPU VBO est (driver)",gpuV); ramline("mdl GPU IBO est (driver)",gpuT);
-    //ramline("tex GPU pixels",((u64)totalPixels+3)/4*4); ramline("tex GPU palettes",(u64)totalPaletteColors*4); ramline("tex GPU preallocs",(u64)MAX_TOTAL_PIXELS+(u64)texCnt*4+(u64)texCnt*8); ramline("font GPU atlases",(u64)FONT_ATLAS_SIZE*FONT_ATLAS_SIZE+(u64)FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2); ramline("World (GlobalContext)",(u64)sizeof(GlobalContext)); ramline("audio live",AudioLiveBytes()); ramline("cvx adjacency",cvxAdjLive);
-    //u32 live=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); ramline("mmap live (all OS_Alloc)",live); ramline("scratch peak",scratch_peak); DualLog("  (models=%u textures=%u uniqueCvx=%u; thread stacks 8MBx%u virtual)\n",nM,(u32)texCnt,uniqueCvxMeshCount,threadCnt);
-}
+
 void DebugRAMActual(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
     static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
     long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;
@@ -160,8 +153,6 @@ void DebugRAMActual(const char *context) { // Get USS aka the total RAM uniquely
     } u32 mmapped=(u32)__atomic_load_n(&g_mmap_live,__ATOMIC_RELAXED); DualLog("Mem at %s: Heap %ub(%uKB|%.2fMB), USS %ub(%uKB|%.2fMB), MMAP %uKB|%.2fMB\n",context,heap_bytes,heap_bytes / 1024,heap_bytes / 1024.0 / 1024.0,uss_bytes,uss_bytes / 1024,uss_bytes / 1024.0 / 1024.0,mmapped / 1024,mmapped / 1024.0 / 1024.0);
 }
 void DebugRAM(const char *context) { (void)context; /*DebugRAMActual(context);*/ }
-
-
 u32 random_range_rng = 0x12345678u;
 static u32 xs32() { u32 x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return random_range_rng = x ? x : 0xdeadbeefu; }
 u8 random_range_u8(u8 a, u8 b) { if (a > b) { u8 temp = a; a = b; b = temp; } if (a == b) {return a;} u32 r = (u32)b - a + 1u; u32 v,limit = 256u - (256u % r); do { v = xs32() & 0xFFu; } while (v >= limit); return (u8)(a + (v % r)); }
