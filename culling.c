@@ -195,7 +195,12 @@ static void MarkSkyVisibleChunks(void) {
 }
 
 void CullInit() {
-    if (World.curLev == LEVEL_CYBERSPACE){return;} double start_time = get_time(); DualLog("Culling ");
+    if (World.curLev >= LEVEL_CYBERSPACE) {
+        for (u32 i=0;i<ARRSIZE;++i) { gridCellStates[i] = CELL_OPEN|CELL_VISIBLE; }
+        mset(precomputedVisibleCellsFromHere,0xFF,sizeof(precomputedVisibleCellsFromHere));
+        glBindBuffer(GL_SSBO,cellVisibleDataID); glBufferData(GL_SSBO,ARRSIZE*sizeof(u32),gridCellStates,GL_DYNAMIC_DRAW);
+        return;
+    } double start_time = get_time(); DualLog("Culling ");
     DetermineClosedEdges(); // For each cell, get visibility as though player were there and put into gridCellStates.  Then store the visibility of gridCellStates into the table of all visible cells for that cell at the appropriate offset for looking up later when actually re-assigning gridCellStates from this precalculated visibility state for the particular cell.
     ApplyOpenPortalEdges(); // DetermineClosedEdges() just reset every edge to its static closed state; reopen doors that start open/ajar BEFORE baking the precomputed visibility table below.
     MarkSkyVisibleChunks(); // Before the bake, so the sky bits are final by the time the precomputed table is written.

@@ -417,8 +417,9 @@ static bool WavInit(Wav *w, const char *path) {
     for (;;) {
         u8 chunkId[4],szBuf[4]; if ((OS_Read(w->fp,chunkId,4) != 4) || (OS_Read(w->fp,szBuf,4) != 4)) break; u32 chunkSize = (u32)(szBuf[0]|(szBuf[1]<<8)|(szBuf[2]<<16)|(szBuf[3]<<24));
         if (mcmp(chunkId,"fmt ",4) == 0) {
-            if(chunkSize < 16){goto fail;} u8 fmt[18]; u32 toRead=chunkSize < 18 ? chunkSize : 18; if(OS_Read(w->fp,fmt,toRead) != (long)toRead)goto fail; if (chunkSize > toRead)OS_Seek(w->fp,(i64)(chunkSize-toRead),1); u16 fmtTag=(u16)((fmt+0)[0]|((fmt+0)[1]<<8)); w->channels=(u16)((fmt+2)[0]|((fmt+2)[1]<<8)); w->sampleRate=(u32)((fmt+4)[0]|((fmt+4)[1]<<8)|((fmt+4)[2]<<16)|((fmt+4)[3]<<24)); w->bitsPerSample=(u16)((fmt+14)[0]|((fmt+14)[1]<<8));
-            if (fmtTag == 0xFFFE && toRead >= 18) { u16 cbSize=(u16)((fmt+16)[0]|((fmt+16)[1]<<8)); if (cbSize >= 22) { u8 ext[22]; if(OS_Read(w->fp,ext,22) == 22){fmtTag=(u16)((ext+6)[0]|((ext+6)[1]<<8));} } } if (fmtTag != 0x1) goto fail;/*PCM format*/ if ((w->bitsPerSample != 8 && w->bitsPerSample != 16) || w->sampleRate == 0) goto fail; got_fmt=true;
+            if(chunkSize < 16){goto fail;} u8 fmt[18]; u32 toRead=chunkSize < 18 ? chunkSize : 18; if(OS_Read(w->fp,fmt,toRead) != (long)toRead)goto fail; u16 fmtTag=(u16)((fmt+0)[0]|((fmt+0)[1]<<8)); w->channels=(u16)((fmt+2)[0]|((fmt+2)[1]<<8)); w->sampleRate=(u32)((fmt+4)[0]|((fmt+4)[1]<<8)|((fmt+4)[2]<<16)|((fmt+4)[3]<<24)); w->bitsPerSample=(u16)((fmt+14)[0]|((fmt+14)[1]<<8));
+            if (fmtTag == 0xFFFE && toRead >= 18) { u16 cbSize=(u16)((fmt+16)[0]|((fmt+16)[1]<<8)); u32 consumed=toRead; if (cbSize >= 22) { u8 ext[22]; if(OS_Read(w->fp,ext,22) == 22){fmtTag=(u16)((ext+6)[0]|((ext+6)[1]<<8)); consumed += 22;} } if (chunkSize > consumed)OS_Seek(w->fp,(i64)(chunkSize-consumed),1); } else if (chunkSize > toRead)OS_Seek(w->fp,(i64)(chunkSize-toRead),1);
+            if (fmtTag != 0x1) goto fail;/*PCM format*/ if ((w->bitsPerSample != 8 && w->bitsPerSample != 16) || w->sampleRate == 0) goto fail; got_fmt=true;
         } else if(mcmp(chunkId,"data",4) == 0){u32 bpf=(u32)w->channels*(w->bitsPerSample/8); if(bpf == 0)goto fail; w->bytesRemaining=chunkSize-(chunkSize%bpf); w->totalPCMFrameCount=w->bytesRemaining/bpf; got_data=true; break;}
         else OS_Seek(w->fp,(i64)(chunkSize + (chunkSize & 1)),1);
     } if (got_fmt && got_data){return true;} fail: if(w->fp != INVALID_FHANDLE){OS_Close(w->fp); w->fp=INVALID_FHANDLE;} return false;
@@ -627,7 +628,7 @@ static FHandle pcm_fds[8]; static i32 audfdcnt = 0;
 
     void init_pcm_device(i32 card, i32 dev) {
         char path[4096]; sFormat(path,sizeof(path),"/dev/snd/pcmC%uD%u%c",card,dev,'p'); FHandle r=OS_Open(path,00000002 | 00004000,0); if(r == INVALID_FHANDLE){return;} pcm_params_t p; hw_params_fill(&p.hw_params); pcm_sw_params_t *sw = &p.sw_params; mset(sw,0,sizeof(*sw)); sw->start_threshold=1; sw->period_step=1;
-        hw_params_set(&p.hw_params,0,3); hw_params_set(&p.hw_params,11,AUDIO_RATE); hw_params_set(&p.hw_params,10,AUDIO_CHANNELS); hw_params_set(&p.hw_params,13,AUDIO_FRAMES); hw_params_set(&p.hw_params,15,AUDIO_PERIODS); if(pcm_params_setup(r,&p)>=0 && audfdcnt < 8){pcm_fds[audfdcnt++] = r;}else{DualLogError("Init card=%d dev=%d failed\n",card,dev); OS_Close(r);}
+        hw_params_set(&p.hw_params,0,3); hw_params_set(&p.hw_params,1,2); hw_params_set(&p.hw_params,11,AUDIO_RATE); hw_params_set(&p.hw_params,10,AUDIO_CHANNELS); hw_params_set(&p.hw_params,13,AUDIO_FRAMES); hw_params_set(&p.hw_params,15,AUDIO_PERIODS); if(pcm_params_setup(r,&p)>=0 && audfdcnt < 8){pcm_fds[audfdcnt++] = r;}else{DualLogError("Init card=%d dev=%d failed\n",card,dev); OS_Close(r);}
     }
 
     void AudioUpdate() { // Re-queries avail after every recover; the old code reused a stale avail and bailed out of the write loop mid-period, so an xrun left the ring only partially refilled and immediately underran again.

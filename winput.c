@@ -687,7 +687,9 @@ void TextEntry(i32 k) {
 
 void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName; extern bool editFieldEditing; extern void EditFieldKey(i32 keycode); extern bool enteringSaveName; extern void SaveNameEntry(i32 keycode);
 void InputKey(char* keys,int key,int action) {
-    if (key >= 0 && key < WS_KEYCOUNT) { i32 repeated=0; if(action == INPUT_RELEASE && keys[key] == INPUT_RELEASE){return;} if (action == INPUT_PRESS && keys[key] == INPUT_PRESS){repeated=1;} keys[key]=(char)action; if(repeated){action=INPUT_REPEAT;} } if (!window_has_focus) return; if (key == KEY_F10 && action) OS_Exit(0);
+    if (key >= 0 && key < WS_KEYCOUNT) { i32 repeated=0; if(action == INPUT_RELEASE && keys[key] == INPUT_RELEASE){return;} if (action == INPUT_PRESS && keys[key] == INPUT_PRESS){repeated=1;} keys[key]=(char)action; if(repeated){action=INPUT_REPEAT;} }
+    if (key == KEY_F10 && action) OS_Exit(0);
+    if (!window_has_focus && action != INPUT_RELEASE) return;
     if (World.menuActive && !returnToPause) { if (((key == KEY_RIGHT_ALT || key == KEY_LEFT_ALT) && action && Sys_Input.keyStates[KEY_ENTER].down) || (key == KEY_ENTER && action && (Sys_Input.keyStates[KEY_LEFT_ALT].down || Sys_Input.keyStates[KEY_RIGHT_ALT].down))){GoIntoGame();} }
     if (key >=0 && key < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {Sys_Input.keyStates[key].down = true; if (action == INPUT_PRESS) Sys_Input.keyStates[key].pressed = true; else Sys_Input.keyStates[key].pressed = false; if (Cheats.consoleActive) ConsoleEmulator(key); else if (editFieldEditing) EditFieldKey(key); else if (enteringSaveName && World.menuActive) SaveNameEntry(key); else if (enteringPlayerName && World.menuActive) TextEntry(key);}
     else if (key >= 0 && key < MAX_KEYS && action == INPUT_RELEASE) { Sys_Input.keyStates[key].pressed=false; Sys_Input.keyStates[key].down=false; }

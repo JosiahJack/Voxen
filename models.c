@@ -298,11 +298,7 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, c
 
 static void FindBracket(const glbanim_samp* s, float t, u32* i0, float* f) {
     u32 n = (u32)s->input->count;
-    if (n <= 1) {
-        *i0 = 0;
-        *f = 0.0f;
-        return;
-    }
+    if (n <= 1) { *i0 = 0; *f = 0.0f; return; }
     
     float t0, tn;
     glbread_float(s->input, 0,     &t0, 1);
@@ -314,28 +310,15 @@ static void FindBracket(const glbanim_samp* s, float t, u32* i0, float* f) {
         float ta,tb;
         glbread_float(s->input, i,     &ta, 1);
         glbread_float(s->input, i + 1, &tb, 1);
-        if(t>=ta&&t<=tb){
-            *i0 = i;
-            *f = tb > ta ? (t - ta) / (tb - ta) : 0.0f;
-            return;
-        }
+        if(t>=ta&&t<=tb){ *i0 = i; *f = tb > ta ? (t - ta) / (tb - ta) : 0.0f; return; }
     }
-        
     *i0=n-2; *f=1.0f;
 }
 
 static void ReadSamplerValue(const glbanim_samp* samp, u32 keyIdx, u32 numComp, float* out) { glbread_float(samp->output, keyIdx, out, numComp); }
 static void SampleV3(const glbanim_samp* s, float t, float* o3) {
-    u32 i0;
-    float f, v0[3], v1[3];
-    FindBracket(s, t, &i0, &f);
-    ReadSamplerValue(s, i0, 3, v0);
-    if (f <= 0.0f || s->interpolation == glb_interp_step) {
-        o3[0] = v0[0];
-        o3[1] = v0[1];
-        o3[2] = v0[2];
-        return;
-    }
+    u32 i0; float f, v0[3], v1[3]; FindBracket(s, t, &i0, &f); ReadSamplerValue(s, i0, 3, v0);
+    if (f <= 0.0f || s->interpolation == glb_interp_step) { o3[0] = v0[0]; o3[1] = v0[1]; o3[2] = v0[2]; return; }
         
     ReadSamplerValue(s, i0 + 1, 3, v1);
     o3[0] = v0[0] + (v1[0] - v0[0]) * f;
@@ -344,23 +327,13 @@ static void SampleV3(const glbanim_samp* s, float t, float* o3) {
 }
 
 static void SampleQuat(const glbanim_samp* samp, float t, float* outq /* xyzw */) {
-	u32 i0;
-    float frac, q0[4], q1[4], qb[4];
-    FindBracket(samp, t, &i0, &frac);
-    ReadSamplerValue(samp, i0, 4, q0);
+	u32 i0; float frac, q0[4], q1[4], qb[4]; FindBracket(samp, t, &i0, &frac); ReadSamplerValue(samp, i0, 4, q0);
     if (frac <= 0.0f || samp->interpolation == glb_interp_step) { mcpy(outq, q0, sizeof(float)*4); return; }
     
     ReadSamplerValue(samp, i0+1, 4, q1);
     float d = q0[0]*q1[0] + q0[1]*q1[1] + q0[2]*q1[2] + q0[3]*q1[3];
-    d = d>1.0f?1.0f:(d<-1.0f?-1.0f:d);
-	if (d < 0.0f) { /*Flip the signs*/
-        qb[0] = -q1[0];
-        qb[1] = -q1[1];
-        qb[2] = -q1[2];
-        qb[3] = -q1[3];
-        d = -d;
-    } else mcpy(qb, q1, sizeof(float) * 4);
-    
+    d = d > 1.0f ? 1.0f : (d < -1.0f ? -1.0f : d);
+	if (d < 0.0f) { /*Flip the signs*/ qb[0] = -q1[0]; qb[1] = -q1[1]; qb[2] = -q1[2]; qb[3] = -q1[3]; d = -d; } else mcpy(qb, q1, sizeof(float) * 4);
     if (d > 0.9995f) { /*nearly parallel: nlerp*/
         for (int c=0;c<4;++c) { outq[c] = q0[c] + (qb[c] - q0[c]) * frac; }
     } else {
@@ -369,10 +342,7 @@ static void SampleQuat(const glbanim_samp* samp, float t, float* outq /* xyzw */
         for (int c=0;c<4;++c) { outq[c] = q0[c]*s0 + qb[c]*s1; }
     }
 	float len = vsqrtf(outq[0]*outq[0] + outq[1]*outq[1] + outq[2]*outq[2] + outq[3]*outq[3]);
-    if (len > 0.00000001f) {
-        float inv = 1.0f / len;
-        for (int c=0;c<4;++c) outq[c] *= inv;
-    }
+    if (len > 0.00000001f) { float inv = 1.0f / len; for (int c=0;c<4;++c) outq[c] *= inv; }
 }
 
 static void NodeLocalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, float* outM) {

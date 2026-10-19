@@ -955,7 +955,7 @@ void UpdateLights() {
 
 // Shadowmapping
 typedef struct {float depth; u16 index; } DepthSort;
-INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex > texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || e->texIndex >= MAX_TXRS || otherCondition; }
+INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex >= texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || e->texIndex >= MAX_TXRS || otherCondition; }
 INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) { glUniform1ui(0,i); u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex; if (currentModelType == modelType && currentModelType != 0) return currentModelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); return modelType; }
 typedef float __m256 __attribute__((__vector_size__(32), __may_alias__)); typedef long long __m256i __attribute__((__vector_size__(32), __may_alias__)); typedef float __v8sf __attribute__((__vector_size__(32), __may_alias__));
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_load_ps(float const *__P) { return *(const __m256 *)__P; }
@@ -1600,7 +1600,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
 
     bool grayscaleEnabled = ((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0);
     glUniform1ui(26,(u32)grayscaleEnabled);
-    float fogActual = World.fogColor[World.curLev].a + (float)(World.fogFac / 255u); /*Alpha is base density for level.*/
+    float fogActual = World.fogColor[World.curLev].a + ((float)World.fogFac / 255.0f); /*Alpha is base density for level.*/
     glUniform3f(12, World.fogColor[World.curLev].r * fogActual,World.fogColor[World.curLev].g * fogActual, World.fogColor[World.curLev].b * fogActual); /*Fog Color(which is density)*/
     glUniform1ui(14,Sys_Settings.Reflections);
     glUniform1ui(15,Sys_Settings.Shadows);
@@ -1869,7 +1869,7 @@ void UpdateInstanceMatrix4x4s() {
     if (World.instCount > INSTS_1ST_IDX) {
         glBindBuffer(GL_SSBO,matricesBufferID);
         u32 offsetFloats=(u32)INSTS_1ST_IDX * 16;
-        u32 countFloats=((u32)World.instCount - (u32)INSTS_1ST_IDX + 1) * 16;
+        u32 countFloats=((u32)World.instCount - (u32)INSTS_1ST_IDX) * 16;
         glBufferSubData(GL_SSBO, offsetFloats * 4, countFloats * 4, modelMatrices + offsetFloats);
     }
 }
@@ -2186,7 +2186,7 @@ void InitalizeEnvironment() {
     m[8]  = 0.0f;  m[9] = 0.0f;  m[10] = -(lightRangeMax + 0.02f) / viewRange;      m[11] = -1.0f;
     m[12] = 0.0f; m[13] = 0.0f;  m[14] = -2.0f * lightRangeMax * 0.02f / viewRange; m[15] =  0.0f;
     
-    for (int i=0;i<23;++i) { g_scf_long[0][i] = g_scf_long[1][i] = g_scf_long[2][i] = g_sfc_long_024[i]; }
+    for (int i=0;i<23;++i) { g_scf_long[0][i] = g_scf_long[2][i] = g_scf_long[4][i] = g_sfc_long_024[i]; }
     /*InitAudio + synth_set_reverb_preset moved to after NewGame*/
     glGenFramebuffers(1,&gBufferFBO);
     ChangeFullScreenWindowed(false);

@@ -891,7 +891,7 @@ __attribute__((noinline)) float parse_float(const char* str, const char* line, u
     if (*str == '.') { str++; double frac = 0.0; double place = 0.1; while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; } value += frac; }/*Decimal part*/  if(!has_digit){return 0.0f;} if(negative){value = -value;} return (float)value;
 }
 
-__attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* la){i32 i=World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++; if(World.loadedLights>=LIGHT_COUNT){DualLogError("Too many lights,lev%d!\n",World.curLev); OS_Exit(1);} mcpy(&World.lights[i],lit,sizeof(Light)); mcpy(&World.lanims[i],la,sizeof(LightAnimation)); World.lightsNewPosition[i]=lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true); return i;}
+__attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* la){ if(World.loadedLights>=LIGHT_COUNT){DualLogError("Too many lights,lev%d!\n",World.curLev); OS_Exit(1);} i32 i=World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++; mcpy(&World.lights[i],lit,sizeof(Light)); mcpy(&World.lanims[i],la,sizeof(LightAnimation)); World.lightsNewPosition[i]=lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true); return i;}
 __attribute__((noinline)) u16 AddLightSimple(V3 pos, Color3 c, float r, float in, u16 lf){Light l={.pos=pos,.col=c,.range=r,.intensity=in,.maxIntensity=in,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=lf}; LightAnimation a={0}; return AddLight(&l,&a);}
 u16 IOInternName(const char*); static u16 lightTargetnameFile[LIGHT_COUNT];/*targetname per lightsFromFile slot, IO_NONE when anonymous.  A light is not an entity, so this is the only way a relay can address one.*/
 __attribute__((noinline)) u16 AddOffsetLight(Entity* par, V3 offset, Color3 col, float range, float intensity) { return AddLightSimple(GetLocalTransformedPos(par,offset),col,range,intensity,LIGHT_AND_SHADOW_ON); }
@@ -1528,7 +1528,7 @@ void LoadLevelData(u8 curlevel) {
 u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
 void NewGameDifficultyPass(void) {
     for (u8 lev = 0; lev < World.numLevels; ++lev) {
-        u8 entryLevel = World.curLev; if (entryLevel != lev) SetLevelPointers(lev);
+        u8 entryLevel = World.currentLevel; if (entryLevel != lev) SetLevelPointers(lev);
         for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
             if (!IdxIsUsableObject(World.instances[i].index)) continue;
             u16 ci = World.instances[i].index; bool del = false;
@@ -1536,7 +1536,7 @@ void NewGameDifficultyPass(void) {
             if (World.diffMis == 0 && (ci == 313 || ci == 448)) del = true;
             if (del) DeleteInstance(i);
         }
-        if (World.curLev != entryLevel) SetLevelPointers(entryLevel);
+        if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
     }
 }
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();

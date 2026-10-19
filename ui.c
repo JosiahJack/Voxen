@@ -692,7 +692,7 @@ static int UILogWrap(char* out,int outSz,int startChar,int maxLines) {/*word-wra
 static char logPageBuf[T_LOGSTR_MAX];/*current page: wrapped lines joined by \n*/
 static char UILogCountBuf[8];
 static int UILogTotalLines(void) { return UILogWrap(logPageBuf,sizeof(logPageBuf),(int)World.Sys_UI.logReaderPage*LOG_PAGE_CHARS,LOG_TLINES); }
-static int UILogFullLines(void) { return UILogWrap(UILogCountBuf,1,0,0); }/*total wrapped lines of the whole log, for the multipage test*/
+static int UILogFullLines(void) { return UILogWrap(UILogCountBuf,sizeof(UILogCountBuf),0,0); }/*total wrapped lines of the whole log, for the multipage test*/
 static bool UILogHasMore(void) { int li=(int)World.Sys_UI.logReferenceIndex; if (li<0||li>=LOGCNT) return false; return (int)slen(World.audioLogSpeech2Text[li]) > (int)(World.Sys_UI.logReaderPage+1)*LOG_PAGE_CHARS; }
 static const char* UILogTextPage() { UILogTotalLines(); return logPageBuf; }
 void MFD_OpenAudioLog(int idx) {
@@ -1024,10 +1024,10 @@ void SideMFD(bool isRH) { // 320x240
             if (CurrentWeaponUsesEnergy()) {
                 i16 tx0=(i16)(isRH ? 1207 : 24);
                 for (int ti=0;ti<9;++ti) if (HudHeatTickOn(ti)) RenderUIImage((i16)(tx0+ti*24),652,20,20,947);/*EnergyHeatTicks: tex 947 ener_overheattickgreen*/
-                i16 sliderX=tx0, sliderY=680, sliderPos=(i16)(World.invP1.weaponEnergySetting[slot] * 1.64f);
+                i16 sliderX=tx0, sliderY=680, sliderPos=(i16)(World.invP1.weaponEnergySetting[wep16] * 1.64f);
                 UIRImg(MID(isRH,WEAPON_ENERGY_SLIDER),sliderX,sliderY,180,20,952);/*Energy slider border*/
                 RenderUIImage((i16)(sliderX+sliderPos),sliderY+2,16,16,953);/*Energy slider handle*/
-                RenderTextL(sliderX,662,T_GREEN,FONT_NORMAL,0.8f,"%s %u",Sys_Text.stringTable[17],(u8)World.invP1.weaponEnergySetting[slot]);
+                RenderTextL(sliderX,662,T_GREEN,FONT_NORMAL,0.8f,"%s %u",Sys_Text.stringTable[17],(u8)World.invP1.weaponEnergySetting[wep16]);
                 UIRImg(MID(isRH,WEAPON_OVERLOAD),(i16)(tx0+210),676,84,40,World.invP1.overloadEnabled?951:950);
                 UIRText(MID(isRH,WEAPON_OVERLOAD),(i16)(tx0+214),686,UIOver(MID(isRH,WEAPON_OVERLOAD))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,76,World.invP1.overloadEnabled?Sys_Text.stringTable[19]:Sys_Text.stringTable[20]);
             } else if (wep16 != 5 && wep16 != 6) {
@@ -1230,10 +1230,10 @@ void CenterMFD() { //640x240
 
 static void UI_WeaponEnergySliderSet(bool rh) { /*Sliders need .down rather than .pressed, so they get their own short pass ahead of the click walk.*/
     if (!CurrentWeaponUsesEnergy()) return;
-    int slot = World.invP1.weaponCurrent; if (slot<0 || slot>=7) return;
-    
+    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0 || wep16 >= 16) return;
+
     float value = ((float)World.cursorPos_x - UIC(MID(rh,WEAPON_ENERGY_SLIDER)).min.x) / 164.0f;
-    World.invP1.weaponEnergySetting[slot] = vclamp(value*100.0f,0.0f,100.0f);
+    World.invP1.weaponEnergySetting[wep16] = vclamp(value*100.0f,0.0f,100.0f);
     World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true;
 }
 

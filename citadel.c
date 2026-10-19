@@ -73,9 +73,17 @@ static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.
 void PlayLog(int logIndex) {if(logIndex<0||logIndex>=LOGCNT||!(World.invP1.hasHardware&HW_ERD)){return;} play_message(AudioLogPath(logIndex)); World.invP1.readLog[logIndex]=true; if(Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail){World.Sys_UI.vmailActive=true;} CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); MFD_OpenAudioLog(logIndex); }
 void PlayLastAddedLog(int logIndex) { if(logIndex < 0){return;} PlayLog(logIndex); World.invP1.lastAddedIndex = -1; }
 void AddAudioLogToInventory(int index) {
-    if (index < 0) { DualLog("BUG: Audio log picked up has no assigned index (-1)"); return; } if (index == 128) { CenterStatusPrint("%s",Sys_Text.stringTable[309]); return; }/*Trioptimum Funpack*/ World.invP1.hasLog[index]  = true; World.invP1.lastAddedIndex = index; World.invP1.numLogsFromLevel[Sys_Text.audioLogLevelFound[index]]++;
-    if(Sys_Text.audioLogType[index] == AudioLogType_Email)World.invP1.hasNewEmail=true;else if(Sys_Text.audioLogType[index]==AudioLogType_Normal)World.invP1.hasNewLogs=true;
-    if (World.invP1.hasHardware & HW_ERD) { char keyStr[8]; sFormat(keyStr,sizeof(keyStr),"%s", Sys_Settings.InputCodeSettings[20] ? "U" : "?"); CenterStatusPrint("%s%s%s %s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[38],keyStr); } else { CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[310]); }
+    if (index < 0 || index >= LOGCNT) { DualLogError("BUG: Audio log index %d out of range (%d)\n",index,LOGCNT); return; }
+    if (index == 128) { CenterStatusPrint("%s",Sys_Text.stringTable[309]); return; }/*Trioptimum Funpack*/
+        
+    World.invP1.hasLog[index]  = true; World.invP1.lastAddedIndex = index; World.invP1.numLogsFromLevel[Sys_Text.audioLogLevelFound[index]]++;
+         if(Sys_Text.audioLogType[index] == AudioLogType_Email)World.invP1.hasNewEmail=true;
+    else if(Sys_Text.audioLogType[index] == AudioLogType_Normal)World.invP1.hasNewLogs=true;
+    if (World.invP1.hasHardware & HW_ERD) {
+        char keyStr[8];
+        sFormat(keyStr,sizeof(keyStr),"%s", Sys_Settings.InputCodeSettings[20] ? "U" : "?");
+        CenterStatusPrint("%s%s%s %s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[38],keyStr); }
+    else { CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[310]); }
 }
 
 static inline void ItemAdd(u8 *cur, u8 *counts, int idx, int uIdx, int sysIdx) { if (!counts[*cur]) {*cur=(i8)idx;} counts[idx]++; CenterStatusPrint("%s%s", Sys_Text.stringTable[ItemStringIdx(uIdx)], Sys_Text.stringTable[sysIdx]); }
@@ -107,8 +115,8 @@ void RemoveWeapon(i32 slot) {
     /* The weapon leaves the 7-slot list and becomes the held object, carrying its loaded magazines: AddItemToInventory -> AddWeaponToInventory reads heldAmmo/heldAmmo2/heldObjectLoadedAlternate to put them back (ADD TO INVENTORY, or a quick pickup). heldObjectIndex is the EDD, and a weapon's EDD is 343..358 - the very value weaponInventoryIndices already holds - so store it verbatim. Subtracting 307 was wrong: IdxIsWeapon, GetItemFrobTexture and ItemStringIdx all key off 343..358, and the -307 consumers (RelayPanelUse, HeldItemIsFrobUser) want the EDD too. */
     World.invP1.heldAmmo = World.invP1.currentMagazineAmount[slot]; World.invP1.heldAmmo2 = World.invP1.currentMagazineAmount2[slot]; World.invP1.heldObjectLoadedAlternate = World.invP1.wepLoadedWithAlternate[slot];
     World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldObjectIndex = (u16)World.invP1.weaponInventoryIndices[slot]; World.invP1.grenActive = false; World.invP1.holdingObject = true;
-    for (i32 i=slot;i<6;++i) { World.invP1.weaponInventoryIndices[i]=World.invP1.weaponInventoryIndices[i+1]; World.invP1.weaponInventoryAmmoIndices[i]=World.invP1.weaponInventoryAmmoIndices[i+1]; World.invP1.currentMagazineAmount[i]=World.invP1.currentMagazineAmount[i+1]; World.invP1.currentMagazineAmount2[i]=World.invP1.currentMagazineAmount2[i+1]; World.invP1.wepLoadedWithAlternate[i]=World.invP1.wepLoadedWithAlternate[i+1]; World.invP1.currentEnergyWeaponHeat[i]=World.invP1.currentEnergyWeaponHeat[i+1]; World.invP1.weaponEnergySetting[i]=World.invP1.weaponEnergySetting[i+1]; }
-    World.invP1.weaponInventoryIndices[6]=World.invP1.weaponInventoryAmmoIndices[6]=-1; World.invP1.currentMagazineAmount[6]=World.invP1.currentMagazineAmount2[6]=0; World.invP1.wepLoadedWithAlternate[6]=false; World.invP1.currentEnergyWeaponHeat[6]=0.0f; World.invP1.weaponEnergySetting[6]=0.0f;
+    for (i32 i=slot;i<6;++i) { World.invP1.weaponInventoryIndices[i]=World.invP1.weaponInventoryIndices[i+1]; World.invP1.weaponInventoryAmmoIndices[i]=World.invP1.weaponInventoryAmmoIndices[i+1]; World.invP1.currentMagazineAmount[i]=World.invP1.currentMagazineAmount[i+1]; World.invP1.currentMagazineAmount2[i]=World.invP1.currentMagazineAmount2[i+1]; World.invP1.wepLoadedWithAlternate[i]=World.invP1.wepLoadedWithAlternate[i+1]; World.invP1.currentEnergyWeaponHeat[i]=World.invP1.currentEnergyWeaponHeat[i+1]; }
+    World.invP1.weaponInventoryIndices[6]=World.invP1.weaponInventoryAmmoIndices[6]=-1; World.invP1.currentMagazineAmount[6]=World.invP1.currentMagazineAmount2[6]=0; World.invP1.wepLoadedWithAlternate[6]=false; World.invP1.currentEnergyWeaponHeat[6]=0.0f;
     if (slot <= World.invP1.weaponCurrent && World.invP1.weaponCurrent > 0) World.invP1.weaponCurrent--;
     if (World.invP1.weaponCurrent < 0) World.invP1.weaponCurrent = 0;
     World.invP1.weaponCurrentPending = World.invP1.weaponCurrent;
@@ -125,7 +133,7 @@ __attribute__((noinline)) void AddAmmoToInventory(int index,int constIndex,int a
 bool AddWeaponToInventory(int index,int ammo1,int ammo2,bool loadedAlt) {
     if (index < 0) return false; if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.MFD_CenterTab=1;} if(!World.Sys_UI.firstWeapon){World.Sys_UI.firstWeapon=true; World.Sys_UI.MFD_LefTab=1;}
     for (i32 i = 0; i < 7; i++) {
-        if(World.invP1.weaponInventoryIndices[i] >= 0){continue;} World.invP1.weaponInventoryIndices[i] = index; i32 index16 = Get16WeaponIndexFromConstIndex(index); World.invP1.weaponEnergySetting[i] = DefaultEnergySettingForWeapon(index16); if (i == 0) { World.invP1.weaponCurrentPending=i; World.invP1.weaponIndexPending=(u16)index; World.invP1.justChangedWeap=true; WeaponFireStartWeaponDip(0.5f); WeaponFireCompleteWeaponChange(); }
+        if(World.invP1.weaponInventoryIndices[i] >= 0){continue;} World.invP1.weaponInventoryIndices[i] = index; i32 index16 = Get16WeaponIndexFromConstIndex(index); World.invP1.weaponEnergySetting[index16] = DefaultEnergySettingForWeapon(index16); if (i == 0) { World.invP1.weaponCurrentPending=i; World.invP1.weaponIndexPending=(u16)index; World.invP1.justChangedWeap=true; WeaponFireStartWeaponDip(0.5f); WeaponFireCompleteWeaponChange(); }
         if (loadedAlt && ammo2 > 0){World.invP1.currentMagazineAmount2[i]=(u8)ammo2; if (ammo1 > 0) World.invP1.wepAmmo[index16]+=(u16)ammo1; World.invP1.wepLoadedWithAlternate[i]=true;}else{World.invP1.currentMagazineAmount[i]=(u8)ammo1; if (ammo2 > 0) World.invP1.wepAmmoSecondary[index16]+=(u16)ammo2; World.invP1.wepLoadedWithAlternate[i]=false;}
         CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[33]); World.invP1.numweapons=0; for (i32 j=0;j<7;j++) { if(World.invP1.weaponInventoryIndices[j] >= 0){World.invP1.numweapons++;} } return true;
     } return false;
@@ -173,7 +181,7 @@ void AddItemToInventory(int index, int custIdx) {
 void CyberDoorOnCollisionEnter(u16 self, u16 other) { if(other != PLAYER1){return;} CenterStatusPrint("%s  %s",Sys_Text.stringTable[World.instances[self].messageIndex],Sys_Text.stringTable[601]); }
 void CyberTimerInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; e->cyberTimer = 600.0f; e->timerFinished = World.pauseRelativeTime + 1.0; }
 void CyberTimerReset(u16 self, int diff) { Entity* e = &World.instances[self]; switch (diff) { case 0: e->cyberTimer = 600.0f; break; case 1: e->cyberTimer = 300.0f; break; case 2: e->cyberTimer = 240.0f; break; case 3: e->cyberTimer = 180.0f; break; } }
-void CyberTimerUpdate(u16 self) { if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e=&World.instances[self]; if(e->cyberTimer <= 0.0f){UIExitCyberspace(); return;} if(e->timerFinished >= World.pauseRelativeTime){return;} e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds=e->cyberTimer - (e->minutes * 60.0f); e->timerFinished=World.pauseRelativeTime + 1.0; }
+void CyberTimerUpdate(u16 self) { if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e=&World.instances[self]; if(e->timerFinished >= World.pauseRelativeTime){return;} e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds=e->cyberTimer - (e->minutes * 60.0f); e->timerFinished=World.pauseRelativeTime + 1.0; if(e->cyberTimer <= 0.0f){UIExitCyberspace(); return;} }
 void CyberWallInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->tickFinished=World.pauseRelativeTime + 2.0; e->animSwapFinished=0.0; }
 void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (World.pauseRelativeTime < e->tickFinished) {return;} e->tickFinished = World.pauseRelativeTime + 0.05; }
 void ExitCyberspace(void);
@@ -610,8 +618,9 @@ static bool CPUNodesRemainOnLevel(void) {
 void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
     if(self>=World.instCount||hitIdx>=World.instCount)return; Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return;/*other.gameObject == host*/ e->counter++;/*numHits++*/
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(e->recentMostActivator==PLAYER1&&(World.invP1.patchActive & PATCH_BERSERK)!=0)};
-    dd.damage = GetDamageTakeAmount(&dd);
+    if (dd.berserkActive) { dd.damage *= 4.0f; dd.berserkActive = false; }
     Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; } if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }/*Railgun sphere impact*/
+    dd.damage = GetDamageTakeAmount(&dd);
     SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);
     bool hostIsNPC=e->recentMostActivator<World.instCount&&IdxIsNPC(World.instances[e->recentMostActivator].index);
     if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {

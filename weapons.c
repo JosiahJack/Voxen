@@ -232,7 +232,7 @@ static void CreateBeamEffects(int wep16) {
 
 static float DamageForPower(int w) { // Slope-of-slopes curve: interpolates damage/energy ratio across the energy setting, then scales by the interpolated energy drain itself. See design spreadsheet.
     if(World.invP1.overloadEnabled){return damageOverloadForWeapon[w];}
-    float d=dmgForWep[w],D=dmgForWep2[w],e=energyDrainLowForWeapon[w],E=energyDrainHiForWeapon[w]; float pct=World.invP1.weaponEnergySetting[World.invP1.weaponCurrent]*0.01f; return (pct*(D/E - d/e) + 3.0f)*(pct*(E - e) + e);
+    float d=dmgForWep[w],D=dmgForWep2[w],e=energyDrainLowForWeapon[w],E=energyDrainHiForWeapon[w]; float pct=World.invP1.weaponEnergySetting[w]*0.01f; return (pct*(D/E - d/e) + 3.0f)*(pct*(E - e) + e);
 }
 
 float TakeDamage(u16 self,DamageData dd);
@@ -269,7 +269,7 @@ void MeleeHitUpdate(void) {
     
     DamageData dd = {.isOtherNPC = IdxIsNPC(World.instances[targ].index),.attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right),.damage = dmgForWep[wep16],.offense = offenseWep[wep16],
                      .penetration = penetrationWep[wep16],.owner = PLAYER1,.attackType = Att_Melee};
-    if (isRapier) { dd.attackType = Att_MlEg; if (World.invP1.energy < 4.0f) dd.damage = dmgForWep[6] / 2.0f; /*half power on low energy*/}
+    if (isRapier) { dd.attackType = Att_MlEg; if (World.invP1.energy < 4.0f) dd.damage = dmgForWep[wep16] / 2.0f; /*half power on low energy*/}
     wfx.tempHitEnt = targ;
     CreateStandardImpactEffects();
     if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);
@@ -354,7 +354,7 @@ typedef void (*FireFn)(int); FireFn wepSpecialFire[16]={0,0,0,0,0,FireRapier,Fir
 void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;if(wep16 != 5 && wep16 != 6){World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.5;} if(!isSilent&&wepClass[wep16] != WC_MELEE)play_wav(sounds[wepFireSound[wep16]], AppliedFXVol(1.0f), World.position[PLAYER1], false);if(wepClass[wep16]!=WC_MELEE){const PSysDef* mfp=PSysTypeGet(53/*centerFlash*/);if(mfp){PSysDef mfd=*mfp;mfd.pos=V3_AplusB(wfx.reloadContainerPos,V3_ScaleByF(World.instances[PLAYER1].forward,0.5f));mfd.lifetimeMin=mfd.lifetimeMax=0.05f;PSysAdd(&mfd);}} bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmokePrefab[wep16]){u16 smk=SpawnDynamicObject(wepSmokePrefab[wep16],-1);if(EntIdxIsValid(smk)){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
     World.fogFac += wepFogInc[wep16]; u16 wc = World.invP1.weaponCurrent;
     if (wepClass[wep16] == WC_ENERGY) {
-        float setting = World.invP1.weaponEnergySetting[wc];
+        float setting = World.invP1.weaponEnergySetting[wep16];
         if (World.invP1.overloadEnabled) World.invP1.currentEnergyWeaponHeat[wc] = 100.0f;
         else { World.invP1.currentEnergyWeaponHeat[wc] += setting; if (World.invP1.currentEnergyWeaponHeat[wc] > 100.0f) {World.invP1.currentEnergyWeaponHeat[wc] = 100.0f;} }
     }
@@ -362,7 +362,7 @@ void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;if(wep16 !=
     if (wepClass[wep16] != WC_MELEE) { // Take ammo/energy. Melee weapons consume neither and don't count towards shotsFired.
         if (wepClass[wep16] == WC_ENERGY) {
             if (wasOverload) { World.invP1.overloadEnabled = false; if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(energyDrainOverloadForWeapon[wep16]); BiomonitorEnergyPulse(energyDrainOverloadForWeapon[wep16]); } }
-            else { float takeEnerg = (World.invP1.weaponEnergySetting[wc]/100.0f) * (energyDrainHiForWeapon[wep16]-energyDrainLowForWeapon[wep16]); if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(takeEnerg); BiomonitorEnergyPulse(takeEnerg); } }
+            else { float takeEnerg = (World.invP1.weaponEnergySetting[wep16]/100.0f) * (energyDrainHiForWeapon[wep16]-energyDrainLowForWeapon[wep16]); if (!Cheats.bottomless && !Cheats.redbull) { TakeEnergy(takeEnerg); BiomonitorEnergyPulse(takeEnerg); } }
         } else { if (World.invP1.wepLoadedWithAlternate[wc]) { if (!Cheats.bottomless) World.invP1.currentMagazineAmount2[wc]--; } else { if (!Cheats.bottomless) World.invP1.currentMagazineAmount[wc]--; } }
         World.shotsFired++;
     }

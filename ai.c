@@ -677,6 +677,7 @@ static void AIExplodeAttack(Entity* self) {
 
 static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || ind > 3){ind=1;/*Melee hitscan by default.*/} switch (att) { case Att_Melee:ProjectileRaycast(self,ind); break; case Att_HitS: case Att_PjBm:ProjectileRaycast(self,ind); World.fogFac += 1; break; case Att_Ball:ProjectileLaunched(self,ind); World.fogFac += 1; break; default: break; } }
 void AIAttack(Entity* self, int slot) {
+    if (self->entflags & EF_ASLEEP) { return; }
     u16 sidx = (u16)(self - World.instances); NPCTable* npc = &npcTable[self->index - 419]; if (slot == 3 && npc->explodeOnAttack3) { World.fogFac += 5; AIExplodeAttack(self); return; } AIApplyAttackMovement(self, slot == 1 ? npc->attack1Speed : slot == 2 ? npc->attack2Speed : npc->attack3Speed); int sat = slot == 1 ? sfxAttack1[self->index - 419] : slot == 2 ? sfxAttack2[self->index - 419] : sfxAttack3[self->index - 419];
     float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = slot == 1 ? npc->timeBetweenAttack1 : slot == 2 ? npc->timeBetweenAttack2 : npc->timeBetweenAttack3;/*float: sub-second cadences truncated to 0 and lost the debounce*/
     AttType attack = slot==1 ? npc->attackType : slot==2 ? npc->attackType2 : npc->attackType3;/*NPCTable holds the raw enemy_tables.csv ints; AttType is numbered to match Utils.GetAttackTypeFromInt.*/

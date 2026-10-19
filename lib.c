@@ -48,9 +48,12 @@ char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (c
 void double2str(char* dest, double value, int decs, size_t bufsz) {
     union { double d; u64 u; } bits; bits.d = value; // Bit-test for nan/inf since -ffast-math elides __builtin_isnan
     if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL) && ((bits.u & 0x000FFFFFFFFFFFFFULL) != 0 || (bits.u >> 63))) { dest[0]='n';dest[1]='a';dest[2]='n';dest[3]='\0'; return; } if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL)) { dest[0]='i';dest[1]='n';dest[2]='f';dest[3]='\0'; return; } if (decs < 0 || decs > 9) { DualLogError("double2str: too many decimals\n"); OS_Exit(1); }
-    if (value < 0.0) { if (bufsz < 2) {DualLogError("double2str: buffer too small A\n"); OS_Exit(1);} *dest++ = '-'; bufsz--; value = -value; } u64 whole = (u64)value; char temp[32]; size_t len = 0; if(whole == 0){temp[len++] = '0';}else{while (whole > 0) {temp[len++]='0' + (whole%10); whole/=10;} } if (len >= bufsz) {DualLogError("double2str: len larger than buffer\n"); OS_Exit(1);}
+    if (value < 0.0) { if (bufsz < 2) {DualLogError("double2str: buffer too small A\n"); OS_Exit(1);} *dest++ = '-'; bufsz--; value = -value; } u64 whole = (u64)value; char temp[32]; size_t len = 0; if(whole == 0){temp[len++] = '0';}else{while (whole > 0) {temp[len++]='0' + (whole%10); whole/=10;} }
+    double scale = 1.0; for (int i = 0; i < decs; ++i) {scale *= 10.0;} u64 fracs = (u64)((value - (u64)value) * scale + 0.5);
+    if (decs != 0 && fracs >= (u64)scale) { whole = (u64)value + 1; len = 0; if(whole == 0){temp[len++] = '0';}else{while (whole > 0) {temp[len++]='0' + (whole%10); whole/=10;} } fracs -= (u64)scale; }
+    if (len >= bufsz) {DualLogError("double2str: len larger than buffer\n"); OS_Exit(1);}
     for (size_t i = 0; i < len; ++i) {dest[i] = temp[len - 1 - i];} dest += len; bufsz -= len; if(decs == 0) {*dest = '\0'; return;} if(bufsz < 1) {DualLogError("double2str: buffer too small B\n"); OS_Exit(1);}
-    *dest++ = '.'; bufsz--; double frac = value - (u64)value, scale = 1.0; for (int i = 0; i < decs; ++i) {scale *= 10.0;} u64 fracs = (u64)(frac * scale + 0.5); for (int i = decs - 1; i >= 0; --i) { if (bufsz < 1) {DualLogError("double2str: buffer too small C\n"); OS_Exit(1);} dest[i]='0' + (fracs%10); fracs/=10; } dest[decs] = '\0';
+    *dest++ = '.'; bufsz--; for (int i = decs - 1; i >= 0; --i) { if (bufsz < 1) {DualLogError("double2str: buffer too small C\n"); OS_Exit(1);} dest[i]='0' + (fracs%10); fracs/=10; } dest[decs] = '\0';
 }
 
 int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
@@ -110,7 +113,7 @@ i32 PosGetCellCoordZ(float z) { return (u16)vclampi((i32)vfloor((z - World.world
 i32 PosGetCellCoords(float x, float z) { return (PosGetCellCoordZ(z) * WORLDX) + PosGetCellCoordX(x); }
 u32 PosGetCellCoordsP(i32 cx, i32 cz) { cx=vclampi(cx,0,(WORLDX - 1)); cz=vclampi(cz,0,(WORLDX - 1)); return (u32)cz * WORLDX + (u32)cx; }
 char statusText[T_BUFFER_SIZE];
-void CenterStatusPrint(const char * restrict fmt, ...) { va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
+void CenterStatusPrint(const char * restrict fmt, ...) { if (sEmpty(fmt)) return; va_list args; __builtin_va_start(args, fmt); sFormatV(statusText,T_BUFFER_SIZE,fmt,args); __builtin_va_end(args); DualLog("%s\n",statusText); World.statusTextDecayFinished = get_time() + 3.5;/*secs decay time before text dissappears.*/ }
 void BmpWrite(char const *filename, int x, int y, const void *data) {
     FHandle f = OS_OpenWriteonly(filename); if (f == INVALID_FHANDLE) { DualLogError("Failed to open %s for writing\n", filename); return; }
     u32 fileSize = 14 + 108 + (u32)x * y * 4;/*BMP file header (14 bytes)*/ u8 fileHeader[14] = {'B','M',fileSize & 0xFF,(fileSize >> 8) & 0xFF,(fileSize >> 16) & 0xFF,(fileSize >> 24) & 0xFF,0,0,0,0,14 + 108,0,0,0}; u8 infoHeader[108]={0}; *(u32*)(infoHeader+0)=108;/*size*/

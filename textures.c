@@ -514,31 +514,18 @@ void LoadTextures() {
         OS_Free(texResults[i].indices, numP);
         OS_Free(texResults[i].palette, palS * sizeof(u32));
     }
-    
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
     i32 packed_size = ((i32)totalPixels + 3) / 4 * sizeof(u32);
     if (packed_size > (i32)MAX_TOTAL_PIXELS || indices_size + ringidx_size > MAX_TOTAL_PIXELS) { DualLogError("colorBufferID too small: need %zu B (textures %zu + video ring %zu), MAX_TOTAL_PIXELS is %u\n",packed_size,(size_t)indices_size,ringidx_size,MAX_TOTAL_PIXELS); OS_Exit(1); } /*colorBufferID is allocated at exactly MAX_TOTAL_PIXELS, an under-sized value makes glBufferSubData fail with GL_INVALID_VALUE and silently leaves every texture unwritten*/
     glBindBuffer(GL_SSBO, colorBufferID);
     glBufferSubData(GL_SSBO, g_vidTexBase, packed_size, all_indices);
-    glBindBuffer(GL_SSBO, texPalID);
-    glBufferData(GL_SSBO, (totalPaletteColors + VIDEO_RING*256) * sizeof(u32), texturePalettes, GL_STATIC_DRAW);
-    glBufferSubData(GL_SSBO, totalPaletteColors * sizeof(u32), ringpal_size, ringPalettes);
-    
-    glBindBuffer(GL_SSBO, textureOffsetsID);
-    glBufferData(GL_SSBO, (texCnt + VIDEO_RING) * sizeof(u32), textureOffsets, GL_STATIC_DRAW);
-    
-    glBindBuffer(GL_SSBO, textureSizesID);
-    glBufferData(GL_SSBO, (texCnt + VIDEO_RING) * 2 * sizeof(i32), textureSizes, GL_STATIC_DRAW);
-    
-    glBindBuffer(GL_SSBO, texPalOfsID);
-    glBufferData(GL_SSBO, (texCnt + VIDEO_RING) * sizeof(u32), texturePaletteOffsets, GL_STATIC_DRAW);
-    
-    glBindBuffer(GL_SSBO, 0);
+    glBindBuffer(GL_SSBO, texPalID);         glBufferData(GL_SSBO, (totalPaletteColors + VIDEO_RING*256) * sizeof(u32), NULL, GL_STATIC_DRAW); glBufferSubData(GL_SSBO, 0, palettes_size, texturePalettes); glBufferSubData(GL_SSBO, totalPaletteColors * sizeof(u32), ringpal_size, ringPalettes);
+    glBindBuffer(GL_SSBO, textureOffsetsID); glBufferData(GL_SSBO, (texCnt + VIDEO_RING) * sizeof(u32), textureOffsets, GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO, textureSizesID);   glBufferData(GL_SSBO, (texCnt + VIDEO_RING) * 2 * sizeof(i32), textureSizes, GL_STATIC_DRAW);
+    glBindBuffer(GL_SSBO, texPalOfsID);      glBufferData(GL_SSBO, (texCnt + VIDEO_RING) * sizeof(u32), texturePaletteOffsets, GL_STATIC_DRAW);
     texCnt = (u16)(texCnt + VIDEO_RING);
     VideoInit();
-    
     for (int t=0;t<(i32)threadCnt;++t) { OS_Free(thread_png_arenas[t].base, 16777216); }
-    
     FHandle fp = OS_OpenReadonly(WIN_ICON);
     int windowIconFileSize = OS_FileSize(fp);
     u8* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, WIN_ICON);
