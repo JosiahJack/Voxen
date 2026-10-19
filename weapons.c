@@ -134,7 +134,7 @@ static const struct { u16 prefab; u8 type; } impactEffectTypes[] = {
     { 725, 18 }, { 725, 19 }, { 725, 20 }, { 725, 21 }, { 725, 22 }, /* camerahit: Bits, CenterSpatter, DarkBurst, root, CenterSpatter2 */
     { 726, 23 },                                                    /* darthit */
     { 729, 35 }, { 729, 36 },                                       /* sparkssmall: root + centerburst */
-    { 730, 37 }, { 730, 38 },                                       /* sparkssmallblue: root + centerburst */
+    { 730, 37 },                                                    /* sparkssmallblue */
     { 731, 39 }, { 731, 40 }, { 731, 41 }, { 731, 42 }, { 731, 43 }, /* sparqhit: root, CenterSpatter2, BlueSparksSmall, CenterSpatter, Shockwave */
     { 739, 8 }, { 739, 9 }, { 739, 10 }, { 739, 11 }, { 739, 12 },   /* blasterhit: Shockwave, CenterSpatter, CenterSpatter2, BlueSparksSmall, root */
     { 740, 24 }, { 740, 25 }, { 740, 26 }, { 740, 27 }, { 740, 28 }, /* ionhit: Shockwave, CenterSpatter, root, BlueSparksSmall, CenterSpatter2 */

@@ -9,6 +9,6 @@ vec4 unpackColorRGBA8(uint packedColor) { return vec4(float((packedColor >>  0) 
 void main() {
     int i = gl_InstanceID; float along = inCorner.x, side = inCorner.y; TrailInstance it = instances[i];
     vec4 corn = (along < 0.0) ? ((side < 0.0) ? it.c00 : it.c01) : ((side < 0.0) ? it.c10 : it.c11);
-    float uv = along * 0.5 + 0.5;
-    gl_Position = uViewProj * vec4(corn.xyz, 1.0); vUV = vec2(uv, side * 0.5 + 0.5); vColor = mix(unpackColorRGBA8(it.data.x), unpackColorRGBA8(it.data.y), uv); vTexIndex = it.data.z & 0xFFFFu; vBlendMode = uint(it.p0.w);
+    float cMix = along * 0.5 + 0.5;
+    gl_Position = uViewProj * vec4(corn.xyz, 1.0); vUV = vec2((along < 0.0) ? it.c00.w : it.c10.w, side * 0.5 + 0.5); vColor = mix(unpackColorRGBA8(it.data.x), unpackColorRGBA8(it.data.y), cMix); vTexIndex = it.data.z & 0xFFFFu; vBlendMode = uint(it.p0.w);
 }

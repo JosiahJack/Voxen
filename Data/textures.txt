@@ -1765,8 +1765,10 @@ index: 815
 index: 816
 #Textures/Spark.png
 index: 817
+blend: 3
 #Textures/sparqbeam.png
 index: 818
+blend: 3
 #Textures/UI/wepicons/ss1_wp_dart_pistol.png
 index: 819
 #Textures/Sparqwave.png
