@@ -1017,7 +1017,12 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     World.instances[i].entflags=EF_ACTIVE;
     World.layer[i] = L_Default;World.instances[i].camView = 255; /*Sentinel value signaling that this mesh does not show a rendered camera view upon itself*/
     World.instances[i].modelIndex = World.instances[i].lodIndex = World.instances[i].colMeshIndex = MAX_MDLS; /*Invalidate all model fields*/
-    World.scale[i].x = World.scale[i].y = World.scale[i].z = World.mass[i]=World.rotation[i].w=1.0f; /*Scale 1.0 for all axes, Quat Identity needs 1.0 for w*/
+    World.velocity[i] = (V3){0.0f,0.0f,0.0f};
+    World.angularVelocity[i] = (V3){0.0f,0.0f,0.0f};
+    World.physSleep[i] = 0;
+    World.invTnsrValid[i] = false;
+    World.rotation[i] = (Quaternion){0.0f,0.0f,0.0f,1.0f};
+    World.scale[i].x = World.scale[i].y = World.scale[i].z = World.mass[i] = 1.0f; /*Scale 1.0 for all axes, Quat Identity needs 1.0 for w*/
     World.dynamicFriction[i] = 0.5f;
     World.staticFriction[i] = 0.6f;
     for (u8 slot=0;slot<4;++slot) { World.instances[i].contents[slot] = World.instances[i].custIdx[slot] = -1; }
@@ -1076,6 +1081,7 @@ bool GetElevatorDestinationPos(u8 lev,u8 nth,V3* outPos) {
 }
 void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
+    if (lev != World.currentLevel && World.currentLevel < MAX_LEVELS) { World.levelInstCount[World.currentLevel] = World.instCount; }/*preserve dynamically summoned instances across temporary pointer switches (UseTargets/TargetIO level iteration)*/
     if(teleportDestinationsInitialized)mcpy(World.TeleportTouch_allTeleportTouches,teleportDestinations[lev],sizeof(World.TeleportTouch_allTeleportTouches));
     World.currentLevel=lev; World.instances=World.levelInstances[lev]; World.position=World.levelPosition[lev]; World.scale=World.levelScale[lev]; World.velocity=World.levelVelocity[lev]; World.angularVelocity=World.levelAngularVelocity[lev]; World.colliderCenter=World.levelColliderCenter[lev]; World.colliderSize=World.levelColliderSize[lev]; World.col=World.levelCollider[lev]; World.rotation=World.levelRotation[lev]; World.layer=World.levelLayer[lev];
     World.mass=World.levelMass[lev]; World.radius=World.levelRadius[lev]; World.gravity=World.levelGravity[lev]; World.invInertiaTensor=World.levelInvInertiaTensor[lev]; World.dynamicFriction=World.levelDynamicFriction[lev]; World.staticFriction=World.levelStaticFriction[lev]; World.invTnsrValid=World.levelInvTnsrValid[lev]; World.colliding=World.levelColliding[lev]; World.instCount=World.levelInstCount[lev]; World.lights=World.levelLights[lev]; World.particles=&World.levelParticles[lev]; if (fwSnapValid[lev]) mcpy(fwParentOf,fwParentSnap[lev],sizeof(fwParentOf));/*func_wall child links are per-level*/

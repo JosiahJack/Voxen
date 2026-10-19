@@ -346,11 +346,31 @@ static Manifold BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
 }
 
 Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 adjA, u16 adjB) {
-    Manifold m={0}; if(meshA>=MAX_MDLS||adjA>=MAX_MDLS||meshB>=MAX_MDLS||adjB>=MAX_MDLS)return m; SupportCtx ctx = (SupportCtx){_supA_hull, _supB_hull, .meshA=meshA, .meshB=meshB, .matA=matA, .matB=matB, .adjA=adjA, .adjB=adjB}; GJKResult gjk = RunGJK(&ctx,GJK_ITER); if(!gjk.hit)return m; if(gjk.s.n<4) RunGJKFallback(&ctx,&gjk.s); if(gjk.s.n<4)return m; EPAState epa; SeedEPA(&epa,&gjk.s);
+    Manifold m={0};
+    if(meshA>=MAX_MDLS||adjA>=MAX_MDLS||meshB>=MAX_MDLS||adjB>=MAX_MDLS)return m;
+    
+    SupportCtx ctx = (SupportCtx){_supA_hull, _supB_hull, .meshA=meshA, .meshB=meshB, .matA=matA, .matB=matB, .adjA=adjA, .adjB=adjB};
+    GJKResult gjk = RunGJK(&ctx,GJK_ITER);
+    if(!gjk.hit)return m;
+    
+    if(gjk.s.n<4) RunGJKFallback(&ctx,&gjk.s);
+    if(gjk.s.n<4)return m;
+    
+    EPAState epa; SeedEPA(&epa,&gjk.s);
     for(int it=0;it<EPA_ITER;++it) {
-        int bf=-1; float bd=1000000000.0f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break; V3 bn=epa.ef[bf].n; V3 wA, wB; GetSupportPair(&ctx, bn, &wA, &wB); V3 sup=V3_AsubB(wA,wB);
+        int bf=-1; float bd=1000000000.0f;
+        for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;}
+        if(bf<0)break;
+        
+        V3 bn=epa.ef[bf].n;
+        V3 wA, wB;
+        GetSupportPair(&ctx, bn, &wA, &wB);
+        V3 sup=V3_AsubB(wA,wB);
         if (V3_dot(bn,sup)-bd<PHY_EPSILON) {
-            m.normal=bn; m.maxPen=bd; m.n=1; V3 deepPoint=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); m.p[0]=(ManifoldPt){deepPoint,bd}; u32 nVertsB = modelVertexCounts[meshB];
+            m.normal=bn;
+            m.maxPen=bd;
+            m.n=1;
+            V3 deepPoint=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); m.p[0]=(ManifoldPt){deepPoint,bd}; u32 nVertsB = modelVertexCounts[meshB];
             if (nVertsB > 0) {
                 float planeDist=V3_dot(bn,deepPoint),wscaleB=V3_Mag((V3){matB[0],matB[1],matB[2]}),thicknessTolerance=vclamp(modelBounds[meshB]*wscaleB*0.06f,0.003f,0.02f); const u8* vb = (u8*)physPos[meshB]; 
                 for(u32 i=0;i<nVertsB;++i){const u8* p=vb+i*12; V3 ptLocal=*(V3*)p; V3 pt=MvVert(matB,ptLocal); float distToPlane=V3_dot(bn,pt)-planeDist; if(vabs(distToPlane)<thicknessTolerance){float ptPen=bd-distToPlane; if(ptPen>0.0f){bool isDup=false; for(int k=0;k<m.n;++k){V3 diff=V3_AsubB(pt,m.p[k].point); if(V3_dot(diff,diff)<0.00001f){isDup=true; break;}} if(!isDup&&m.n<MANIFOLD_MAX){m.p[m.n++]=(ManifoldPt){pt,ptPen};} if(m.n>=MANIFOLD_MAX){break;}}}}
