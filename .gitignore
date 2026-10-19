@@ -5,6 +5,7 @@
 *.dll.lib
 *.lib
 *.bin
+*.patch
 perf.data
 temp_build/*
 temp_build_gc/*
