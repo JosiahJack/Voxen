@@ -60,6 +60,7 @@ const float VOXEL_SIZE = 0.32; const uint SHADON = 2u;
 uint GetVoxelIndex(vec3 worldPos) { float offsetX = worldPos.x - worldMin.x; float offsetZ = worldPos.z - worldMin.y; uint voxelX = uint(offsetX / VOXEL_SIZE); uint voxelZ = uint(offsetZ / VOXEL_SIZE); return (voxelZ * 512) + voxelX; }
 const int PCF_SAMPLES = 12; const float invSamples = 1.0 / float(PCF_SAMPLES); const vec2 poissonDisk[PCF_SAMPLES] = vec2[](vec2(0.2085,0.0000),vec2(-0.2663,0.2440),vec2(0.0408,-0.4645),vec2(0.3357,0.4378),vec2(-0.6160,-0.1090),vec2(0.5835,-0.3712),vec2(-0.1952,0.7260),vec2(-0.3722,-0.7167),vec2(0.8076,0.2949),vec2(-0.8401,0.3468),vec2(0.4050,-0.8655),vec2(0.2993,0.9542)); // Golden-angle spiral, 12 taps, wider spread for smoother penumbra without reintroducing center-step issues
 vec4 getTextureColor(uint texIdx, ivec2 texCoord, int texSizeX) { uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * texSizeX + uint(texCoord.x); uint slotIndex = pixelOffset >> 2u; uint packedIdx = colors[slotIndex]; return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + ((packedIdx >> ((pixelOffset & 3u) << 3u)) & 0xFFu)]); }
+vec4 getTextureColorBilinear(uint texIdx, vec2 uvF, ivec2 texSize) { vec2 tc = uvF * vec2(texSize) - 0.5; vec2 base = floor(tc); vec2 st = tc - base; st = smoothstep(0.0, 1.0, st); ivec2 c00 = ivec2(mod(base, vec2(texSize))); ivec2 c11 = ivec2(mod(base + 1.0, vec2(texSize))); vec4 s00 = getTextureColor(texIdx, c00, texSize.x); vec4 s10 = getTextureColor(texIdx, ivec2(c11.x, c00.y), texSize.x); vec4 s01 = getTextureColor(texIdx, ivec2(c00.x, c11.y), texSize.x); vec4 s11 = getTextureColor(texIdx, c11, texSize.x); return mix(mix(s00, s10, st.x), mix(s01, s11, st.x), st.y); }
 vec2 EncodeOctahedral(vec3 n) { n = normalize(n); vec2 p = n.xy / (abs(n.x) + abs(n.y) + abs(n.z)); return n.z >= 0.0 ? p : (1.0 - abs(p.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0); }
 void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out vec2 tc) {
     vec3 a = abs(toLight); float mx = step(a.y,a.x) * step(a.z,a.x); float my = step(a.x,a.y) * step(a.z,a.y); float oneInv_mxy = 1.0 - mx - my; vec3 mxyz = vec3(mx,my,oneInv_mxy); vec3 sxyz = vec3(step(0.0,-toLight.x),step(0.0,-toLight.y),step(0.0,-toLight.z)); vec3 fxyz = vec3(mix(1.0,0.0,sxyz.x), mix(3.0,2.0,sxyz.y), mix(5.0,4.0,sxyz.z));
@@ -81,7 +82,7 @@ void main() {
             normalColor.g = -normalColor.g; vec3 transformed=mat3(t,b,adjustedNormal)*normalColor; transformed *= inversesqrt(dot(transformed,transformed)); if(dot(transformed,Normal) < 0.0)transformed=Normal; adjustedNormal=mix(Normal,transformed,blend);
         }
     }
-    vec4 glowColor=vec4(0.0); if(glowIndex != 0){ivec2 texSizeGlow=textureSizes[glowIndex]; glowColor=getTextureColor(glowIndex,ivec2(fract(uv)*vec2(texSizeGlow)),texSizeGlow.x);} vec4 specColor=vec4(0.0); if(specIndex != 0){ivec2 texSizeSpec=textureSizes[specIndex]; specColor=getTextureColor(specIndex,ivec2(fract(uv)*vec2(texSizeSpec)),texSizeSpec.x);}
+    vec4 glowColor=vec4(0.0); if(glowIndex != 0){ivec2 texSizeGlow=textureSizes[glowIndex]; glowColor=getTextureColorBilinear(glowIndex,fract(uv),texSizeGlow);} vec4 specColor=vec4(0.0); if(specIndex != 0){ivec2 texSizeSpec=textureSizes[specIndex]; specColor=getTextureColor(specIndex,ivec2(fract(uv)*vec2(texSizeSpec)),texSizeSpec.x);}
     if(reflectionsEnabled > 0){outSpecular=specColor; outNormal=EncodeOctahedral(adjustedNormal)*0.5 + 0.5;}/*Map to [0,1]*/ uint voxelIdx=GetVoxelIndex(worldPos); uint count=voxelLightListCounts[voxelIdx]; if(unlit>0 || useCamView>0)count=0; vec3 lighting=vec3(0.0);
     float iTot=0.0; float strength=(useStrengthMod>0) ? 1.0 : max(specColor.r,max(specColor.g,specColor.b))*4.51; float shadSizeMaxUV=shadowMapSizeF-1.0;
     for (uint i = 0u; i < count; i++) {
@@ -102,8 +103,7 @@ void main() {
                 sum += mix(mix(s00,s10,st.x),mix(s01,s11,st.x),st.y); // Manual bilinear shadowmap filter
             } shadowFactor=(sum*invSamples);
         }
-        vec3 lightColor=lights[lightIdx].col; vec3 baseLighting=albedoColor.rgb*lightColor*intensity*(attenuation*attenuation/sqrt(sqrt(attenuation))),halfDir=normalize(lightDir+viewDir); lighting=fma(baseLighting,vec3(spotFalloff*shadowFactor),lighting); iTot=fma(intensity,attenuation*1.5,iTot); float ndh=max(dot(adjustedNormal,halfDir),0.0);
-//         float spec=clamp(pow(ndh,100.0),0.0,1.0); lighting+=specColor.rgb*intensity*attenuation*spotFalloff*spec*shadowFactor*strength;
+        vec3 lightColor=lights[lightIdx].col; vec3 baseLighting=albedoColor.rgb*lightColor*intensity*(attenuation*attenuation/sqrt(sqrt(attenuation))),halfDir=normalize(lightDir+viewDir); lighting=fma(baseLighting,vec3(spotFalloff*shadowFactor),lighting); iTot=fma(intensity,attenuation*1.5,iTot); float ndh=max(dot(adjustedNormal,halfDir),0.0); float spec=clamp(pow(ndh,100.0),0.0,1.0); lighting+=specColor.rgb*intensity*attenuation*spotFalloff*spec*shadowFactor*strength;
     }
     // Directional lighting: cyberspace gets two hardcoded neon directionals, all other levels get the hardcoded sun. No distance attenuation.
     if (isCyberspace > 0u) {

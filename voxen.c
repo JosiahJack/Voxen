@@ -7,7 +7,8 @@ GlobalContext World = {0}; // Full game state
 
 // Rendering
 u32 globalframe, globalframesPerLastSecond, threadCnt = 1, inputImageID, inputUIID, inputDepthID, inputSpecID, inputNormalID, outputImageID, gBufferFBO, uiFBO, uiSP, depthPrepassSP, chunkSP, chunkVAO, vbos[MAX_MDLS], tbos[MAX_MDLS], matricesBufferID, modelVertexCounts[MAX_MDLS], *physVertCounts;
-float rasterPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT*16], *world_from_mdl = modelMatrices, modelBounds[MAX_MDLS], **physPos, **physUVs, **physTriUVs, lightView[LIGHT_COUNT][6][4][4], lightViewProj[LIGHT_COUNT][6][16], shadowmapsPerspectiveProjection[16], sunShadowMatrix[16], berserkSeedTime;typedef struct { _Alignas(16) float mn[4]; _Alignas(16) float mx[4]; u32 triStart; u32 triCount; i32 children[8]; } GpuBvhNode;
+float rasterPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT*16], *world_from_mdl = modelMatrices, modelBounds[MAX_MDLS], **physPos, **physUVs, **physTriUVs, lightView[LIGHT_COUNT][6][4][4], lightViewProj[LIGHT_COUNT][6][16], shadowmapsPerspectiveProjection[16], sunShadowMatrix[16], berserkSeedTime;
+typedef struct { _Alignas(16) float mn[4]; _Alignas(16) float mx[4]; u32 triStart; u32 triCount; i32 children[8]; } GpuBvhNode;
 typedef struct { u32 bvhOffset,bvhCount,triOrderOffset,triOrderCount,posOffset,posCount,triOffset,triCount; } ModelRTInfo;
 static GpuBvhNode* rtBvhNodes=NULL; static u32 rtBvhNodeCount=0;
 static u32* rtBvhTriOrder=NULL; static u32 rtBvhTriOrderCount=0;

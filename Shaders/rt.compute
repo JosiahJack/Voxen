@@ -1,9 +1,9 @@
 // ssr.compute - Compute shader for ray-traced reflections (BVH per model)
 layout(local_size_x = 32, local_size_y = 32) in;
-layout(rgba8,  binding=0) readonly uniform image2D inputImage;
-layout(rgba8,  binding=2) readonly uniform image2D inputSpecular;
-layout(rgba8,  binding=4) uniform image2D outputImage;
-layout(rg16f,  binding=5) readonly uniform image2D inputNormal;
+layout(rgba8,binding=0) readonly uniform image2D inputImage;
+layout(rgba8,binding=2) readonly uniform image2D inputSpecular;
+layout(rgba8,binding=4) uniform image2D outputImage;
+layout(rg16f,binding=5) readonly uniform image2D inputNormal;
 layout(location=0) uniform uint screenWidth;
 layout(location=1) uniform uint screenHeight;
 layout(location=2) uniform int SSR_RES;
@@ -14,7 +14,6 @@ layout(location=6) uniform mat4 invViewProj;
 layout(location=7) uniform vec2 worldMin;
 layout(location=8) uniform uint modelCount;
 layout(location=9) uniform uint texCount;
-
 layout(std430,binding=1) readonly buffer ModelMatrices { mat4 modelMatrices[]; };
 layout(std430,binding=16) readonly buffer RTGeom { uint rtGeom[]; };
 struct ModelRTInfo { uint nodeUBase; uint bvhCount; uint triOrderUBase; uint triOrderCount; uint posUBase; uint posCount; uint triUBase; uint triCount; uint triUVUBase; };
@@ -23,44 +22,28 @@ struct InstanceRTInfo { uint model; uint act; uint tex; float sclx; float scly; 
 layout(std430,binding=21) readonly buffer RTInstanceInfo { InstanceRTInfo rtInstanceInfo[]; };
 layout(std430,binding=23) readonly buffer RTCellCounts { uint rtCellCounts[]; };
 layout(std430,binding=24) readonly buffer RTCellLists { uint rtCellLists[]; };
-
 layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; };
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(std430,binding=2) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
 layout(std430,binding=3) buffer UniqueLightLists { uint uniqueLightLists[]; };
 layout(std430,binding=4) buffer LightIndices { Light lights[]; };
-layout(std430,binding=5) buffer ShadowMaps { uint shadowMaps[]; };
-layout(std430,binding=6) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430,binding=7) buffer CullingData { uint gridCellStates[]; };
 layout(std430,binding=12) buffer ColorBuffer { uint colors[]; };
 layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; };
 layout(std430,binding=8) buffer TexturePalettes { uint texturePalettes[]; };
 layout(std430,binding=9) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };
-
-
-
-
-
-
-
 vec3 DecodeOctahedral(vec2 enc) { vec2 encN = enc * 2.0 - 1.0; vec3 n = vec3(encN, 1.0 - abs(encN.x) - abs(encN.y)); n.xy -= max(-n.z, 0.0) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0); return normalize(n); }
 vec4 getTextureColor(uint texIdx, ivec2 texCoord, int texSizeX) { uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * texSizeX + uint(texCoord.x); uint slotIndex = pixelOffset >> 2u; uint packedIdx = colors[slotIndex]; return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + ((packedIdx >> ((pixelOffset & 3u) << 3u)) & 0xFFu)]); }
-
-
 uint GetVoxelIndex(vec3 worldPos) { float offsetX = worldPos.x - worldMin.x; float offsetZ = worldPos.z - worldMin.y; uint voxelX = uint(clamp(offsetX / 0.32, 0.0, 511.0)); uint voxelZ = uint(clamp(offsetZ / 0.32, 0.0, 511.0)); return (voxelZ * 512u) + voxelX; }
-const uint SHADON = 2u;
-const int PCF_SAMPLES = 8;
-const float invSamples = 1.0 / float(PCF_SAMPLES);
-const vec2 poissonDisk[PCF_SAMPLES] = vec2[](vec2(0.0,0.0), vec2(0.0812,0.0941),vec2(-0.0451,0.1192),vec2(-0.1221,0.0321),vec2(-0.0914,-0.0882),vec2(0.0021,-0.1275),vec2(0.1023,-0.0621), vec2(0.0452,0.0325));
 vec3 reconstructWorldPos(vec2 uv) { vec3 retval = vec3(0.0); float depth = texture(inputDepthID, uv).r; if (depth < 0.9999) { vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0); vec4 world = invViewProj * clip; retval = world.xyz / world.w; } return retval; }
 float rayAABB(vec3 origin, vec3 invDir, vec3 mn, vec3 mx, float maxDist) {
     vec3 t0 = (mn - origin) * invDir; vec3 t1 = (mx - origin) * invDir;
-    vec3 tmin = min(t0, t1); vec3 tmax = max(t0, t1);
-    float tNear = max(max(tmin.x, tmin.y), tmin.z);
-    float tFar = min(min(tmax.x, tmax.y), tmax.z);
-    if (tFar < max(0.0, tNear) || tNear > maxDist) return -1.0;
-    return (tNear >= 0.0) ? tNear : 0.0;
+    vec3 tmin = min(t0, t1), tmax = max(t0, t1);
+    float tNear = max(max(tmin.x, tmin.y), tmin.z), tFar = min(min(tmax.x, tmax.y), tmax.z);
+    if (tFar < max(0.02, tNear) || tNear > maxDist) return -1.0;
+    return (tNear >= 0.02) ? tNear : 0.02;
 }
+
 bool rayTriangle(vec3 orig, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t, out vec3 normal, out float bu, out float bv) {
     vec3 e1 = v1 - v0; vec3 e2 = v2 - v0;
     vec3 pvec = cross(dir, e2);
@@ -79,14 +62,18 @@ bool rayTriangle(vec3 orig, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t, ou
     bu = u; bv = v;
     return true;
 }
+
 void main() {
     uvec2 pixel = gl_GlobalInvocationID.xy;
     if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
+    
     vec2 scrSzF = vec2(screenWidth, screenHeight) * float(SSR_RES);
     vec3 worldPos = reconstructWorldPos((vec2(pixel * SSR_RES) + 0.5) / scrSzF);
     if (worldPos == vec3(0.0)) { imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0)); return; }
+    
     vec4 specColor = imageLoad(inputSpecular, ivec2(pixel * SSR_RES));
     if ((specColor.r + specColor.g + specColor.b) < 0.01) { imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0)); return; }
+    
     vec2 normalPack = imageLoad(inputNormal, ivec2(pixel * SSR_RES)).rg;
     vec3 normal = DecodeOctahedral(normalPack);
     vec3 viewDir = normalize(camPos - worldPos);
@@ -117,30 +104,33 @@ void main() {
         tMaxX = (boundary - origin.x) / reflectDir.x;
         tDeltaX = CELL / abs(reflectDir.x);
     }
+    
     if (stepZ == 0) { tMaxZ = 1e9; tDeltaZ = 1e9; }
     else {
         float boundary = (stepZ > 0) ? (worldMin.y - CELLXHALF + float(cz + 1) * CELL) : (worldMin.y - CELLXHALF + float(cz) * CELL);
         tMaxZ = (boundary - origin.z) / reflectDir.z;
         tDeltaZ = CELL / abs(reflectDir.z);
     }
+    
     float t = 0.0;
     for (int iter = 0; iter < 64; ++iter) {
         if (t > maxDist) break;
         if (hasHit && t >= bestDist) break;
         if (cx < 0 || cx >= 64 || cz < 0 || cz >= 64) break;
+        
         uint cell = uint(cz * 64 + cx);
         uint cnt = rtCellCounts[cell];
         if (cnt > 128u) cnt = 128u;
         for (uint k = 0u; k < cnt; ++k) {
-            uint inst = rtCellLists[cell * 128u + k];
-            if (inst >= 9032u) continue;
+            uint inst = rtCellLists[cell * 128u + k]; if (inst >= 9032u) continue;
             if (rtInstanceInfo[inst].act == 0u) continue;
-            uint mid = rtInstanceInfo[inst].model;
-            if (mid >= modelCount) continue;
+            uint mid = rtInstanceInfo[inst].model; if (mid >= modelCount) continue;
+            
             uint mi = modelInfoBase + mid * 9u;
             ModelRTInfo info;
             info.nodeUBase = rtGeom[mi+0u];
-            info.bvhCount = rtGeom[mi+1u];
+            info.bvhCount = rtGeom[mi+1u]; if (info.bvhCount == 0u) continue;
+
             info.triOrderUBase = rtGeom[mi+2u];
             info.triOrderCount = rtGeom[mi+3u];
             info.posUBase = rtGeom[mi+4u];
@@ -148,16 +138,13 @@ void main() {
             info.triUBase = rtGeom[mi+6u];
             info.triCount = rtGeom[mi+7u];
             info.triUVUBase = rtGeom[mi+8u];
-            if (info.bvhCount == 0u) continue;
             mat4 M = modelMatrices[inst];
             vec3 c0 = M[0].xyz; vec3 c1 = M[1].xyz; vec3 c2 = M[2].xyz; vec3 tr = M[3].xyz;
-            float sclx = rtInstanceInfo[inst].sclx; float scly = rtInstanceInfo[inst].scly; float sclz = rtInstanceInfo[inst].sclz;
-            if (sclx < 1e-4 || scly < 1e-4 || sclz < 1e-4) continue;
-            float sclx2 = sclx * sclx; float scly2 = scly * scly; float sclz2 = sclz * sclz;
+            float sclx = rtInstanceInfo[inst].sclx, scly = rtInstanceInfo[inst].scly, sclz = rtInstanceInfo[inst].sclz; if (sclx < 1e-4 || scly < 1e-4 || sclz < 1e-4) continue;
+            
+            float sclx2 = sclx * sclx,scly2 = scly * scly, sclz2 = sclz * sclz;
             vec3 rel = origin - tr;
-            vec3 localOrigin = vec3(dot(rel, c0) / sclx2, dot(rel, c1) / scly2, dot(rel, c2) / sclz2);
-            vec3 localDir = vec3(dot(reflectDir, c0) / sclx2, dot(reflectDir, c1) / scly2, dot(reflectDir, c2) / sclz2);
-            localDir = normalize(localDir);
+            vec3 localOrigin = vec3(dot(rel, c0) / sclx2, dot(rel, c1) / scly2, dot(rel, c2) / sclz2), localDir = normalize(vec3(dot(reflectDir, c0) / sclx2, dot(reflectDir, c1) / scly2, dot(reflectDir, c2) / sclz2));
             vec3 invLocalDir = vec3(localDir.x != 0.0 ? 1.0 / localDir.x : 1e9, localDir.y != 0.0 ? 1.0 / localDir.y : 1e9, localDir.z != 0.0 ? 1.0 / localDir.z : 1e9);
             uint stack[64]; int sp = 0; stack[sp++] = info.nodeUBase;
             uint hitIA = 0u, hitIB = 0u, hitIC = 0u;
@@ -168,14 +155,14 @@ void main() {
             bool anyHit = false;
             vec3 hitLocalPoint = vec3(0.0);
             while (sp > 0) {
-                uint no = stack[--sp];
-                if (no == 0xFFFFFFFFu) continue;
+                uint no = stack[--sp]; if (no == 0xFFFFFFFFu) continue;
+                
                 vec3 mn = vec3(uintBitsToFloat(rtGeom[no+0u]), uintBitsToFloat(rtGeom[no+1u]), uintBitsToFloat(rtGeom[no+2u]));
                 vec3 mx = vec3(uintBitsToFloat(rtGeom[no+4u]), uintBitsToFloat(rtGeom[no+5u]), uintBitsToFloat(rtGeom[no+6u]));
                 uint triStart = rtGeom[no+8u];
                 uint triCount = rtGeom[no+9u];
-                float tEntry = rayAABB(localOrigin, invLocalDir, mn, mx, bestT);
-                if (tEntry < 0.0) continue;
+                float tEntry = rayAABB(localOrigin, invLocalDir, mn, mx, bestT); if (tEntry < 0.0) continue;
+                
                 if (triCount > 0u) {
                     for (uint triK = 0u; triK < triCount; ++triK) {
                         uint triIdx = rtGeom[triStart + triK];
@@ -186,7 +173,7 @@ void main() {
                         vec3 pa = vec3(uintBitsToFloat(rtGeom[info.posUBase + iA * 3u]), uintBitsToFloat(rtGeom[info.posUBase + iA * 3u + 1u]), uintBitsToFloat(rtGeom[info.posUBase + iA * 3u + 2u]));
                         vec3 pb = vec3(uintBitsToFloat(rtGeom[info.posUBase + iB * 3u]), uintBitsToFloat(rtGeom[info.posUBase + iB * 3u + 1u]), uintBitsToFloat(rtGeom[info.posUBase + iB * 3u + 2u]));
                         vec3 pc = vec3(uintBitsToFloat(rtGeom[info.posUBase + iC * 3u]), uintBitsToFloat(rtGeom[info.posUBase + iC * 3u + 1u]), uintBitsToFloat(rtGeom[info.posUBase + iC * 3u + 2u]));
-                        float tt; vec3 nn; float bu = 0.0, bv = 0.0;
+                        float tt, bu = 0.0, bv = 0.0; vec3 nn; 
                         if (rayTriangle(localOrigin, localDir, pa, pb, pc, tt, nn, bu, bv) && tt < bestT) {
                             bestT = tt; hitLocalPoint = localOrigin + localDir * tt; anyHit = true;
                             hitIA = iA; hitIB = iB; hitIC = iC; hitTriIdx = triIdx; hitBaryU = bu; hitBaryV = bv;
@@ -196,6 +183,7 @@ void main() {
                 } else {
                     for (int c = 0; c < 8; ++c) {
                         if (sp >= 64) break;
+                        
                         uint ch = rtGeom[no + 10u + c];
                         if (ch != 0xFFFFFFFFu) stack[sp++] = ch;
                     }
@@ -207,123 +195,80 @@ void main() {
                 vec3 d = worldHitPt - worldPos;
                 float wdSq = dot(d, d);
                 if (wdSq > 0.01 && wdSq < bestDist * bestDist) {
-                    bestDist = sqrt(wdSq); hitWorld = worldHitPt; hasHit = true;
-                    bestInst = inst; bestMid = mid; bestIA = hitIA; bestIB = hitIB; bestIC = hitIC; bestTriIdx = hitTriIdx;
+                    hasHit = true;
+                    bestDist = sqrt(wdSq);
+                    hitWorld = worldHitPt;
+                    bestInst = inst;
+                    bestMid = mid;
+                    bestIA = hitIA; bestIB = hitIB; bestIC = hitIC;
+                    bestTriIdx = hitTriIdx;
                     bestBaryU = hitBaryU; bestBaryV = hitBaryV;
                     bestNormal = normalize((c0 / (sclx*sclx)) * hitNormal.x + (c1 / (scly*scly)) * hitNormal.y + (c2 / (sclz*sclz)) * hitNormal.z);
                     if (dot(bestNormal, normalize(camPos - hitWorld)) < 0.0) bestNormal = -bestNormal;
                 }
             }
         }
-        // advance DDA
-        if (tMaxX < tMaxZ) {
-            cx += stepX;
-            t = tMaxX;
-            tMaxX += tDeltaX;
-        } else {
-            cz += stepZ;
-            t = tMaxZ;
-            tMaxZ += tDeltaZ;
-        }
+        if (tMaxX < tMaxZ) { cx += stepX; t = tMaxX; tMaxX += tDeltaX; }
+        else               { cz += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; }
         if (stepX == 0 && stepZ == 0) break;
     }
     vec3 reflectionColor = vec3(0.0);
     if (hasHit) {
-        vec4 clip = viewProjection * vec4(hitWorld, 1.0);
-        bool onScreen = false;
-        if (clip.w > 0.0) {
-            vec2 ndc = clip.xy / clip.w;
-            vec2 uv = ndc * 0.5 + 0.5;
-            if (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) {
-                onScreen = true;
-                ivec2 hitPixel = ivec2(uv * vec2(screenWidth, screenHeight));
-                hitPixel = clamp(hitPixel, ivec2(0,0), ivec2(int(screenWidth)-1, int(screenHeight)-1));
-                vec4 c = imageLoad(inputImage, hitPixel * SSR_RES);
-                reflectionColor = c.rgb;
-            }
-        }
-        if (!onScreen) {
-            uint texIdx = rtInstanceInfo[bestInst].tex;
-            if (texIdx < texCount) {
-                ivec2 ts = textureSizes[texIdx];
-                if (ts.x > 0 && ts.y > 0) {
-                    uint tu = rtGeom[modelInfoBase + bestMid*9u + 8u] + bestTriIdx * 6u;
-                    vec2 uvA = vec2(uintBitsToFloat(rtGeom[tu + 0u]), uintBitsToFloat(rtGeom[tu + 1u]));
-                    vec2 uvB = vec2(uintBitsToFloat(rtGeom[tu + 2u]), uintBitsToFloat(rtGeom[tu + 3u]));
-                    vec2 uvC = vec2(uintBitsToFloat(rtGeom[tu + 4u]), uintBitsToFloat(rtGeom[tu + 5u]));
-                    vec2 uvHit = (1.0 - bestBaryU - bestBaryV) * uvA + bestBaryU * uvB + bestBaryV * uvC;
-                    vec2 uvSample = vec2(uvHit.x, 1.0 - uvHit.y);
-                    ivec2 tcoord = ivec2(fract(uvSample) * vec2(ts));
-                    tcoord = clamp(tcoord, ivec2(0,0), ivec2(ts.x - 1, ts.y - 1));
-                    vec4 albedo = getTextureColor(texIdx, tcoord, ts.x);
-                    vec3 adjustedNormal = bestNormal;
-                    vec3 viewDirHit = normalize(camPos - hitWorld);
-                    vec3 lighting = albedo.rgb * 0.1;
-                    uint voxelIdx = GetVoxelIndex(hitWorld);
-                    uint lcount = voxelLightListCounts[voxelIdx];
-                    bool useAll = (lcount == 0u);
-                    if (useAll) lcount = 2048u;
-                    if (lcount > 96u && !useAll) lcount = 96u;
-                    for (uint li = 0u; li < lcount; ++li) {
-                        uint lightIdx = useAll ? li : uniqueLightLists[voxelIdx * 96u + li];
-                        vec3 lpos = lights[lightIdx].pos;
-                        float intensity = lights[lightIdx].intensity;
-                        float range = lights[lightIdx].range;
-                        vec3 toLight = lpos - hitWorld;
-                        float dist = length(toLight);
-                        if (dist >= range || intensity < 0.1) continue;
-                        vec3 lightDir = toLight / dist;
-                        float NdotL = max(dot(adjustedNormal, lightDir), 0.0);
-                        float attenuation = (1.0 - (dist/range)*(dist/range)) * NdotL;
-                        if (attenuation < 0.03) continue;
-                        float spotAng = lights[lightIdx].spotAng;
-                        float spotFalloff = 1.0;
-                        if (spotAng > 0.0) {
-                            vec4 quat = lights[lightIdx].spotDir;
-                            vec3 spotDir = vec3(2.0*(quat.x*quat.z + quat.w*quat.y), 2.0*(quat.y*quat.z - quat.w*quat.x), 1.0 - 2.0*(quat.x*quat.x + quat.y*quat.y));
-                            float spotdot = dot(spotDir, -lightDir);
-                            float cosAngle = cos(radians(spotAng/2.0));
-                            if (spotdot < cosAngle) continue;
-                            spotFalloff = smoothstep(cosAngle, cos(radians(spotAng*0.8/2.0)), spotdot);
-                            if (spotFalloff <= 0.0) continue;
-                        }
-                        float shadowFactor = 1.0;
-                        uint shadowIndex = shadowMapsIndirection[lightIdx];
-                        bool lightHasShadows = (lights[lightIdx].lflags & SHADON) != 0u;
-                        if (shadowIndex < 2048u && lightHasShadows) {
-                            vec3 a = abs(toLight);
-                            float mx = step(a.y,a.x) * step(a.z,a.x);
-                            float my = step(a.x,a.y) * step(a.z,a.y);
-                            vec3 sxyz = vec3(step(0.0,-toLight.x),step(0.0,-toLight.y),step(0.0,-toLight.z));
-                            vec3 fxyz = vec3(mix(1.0,0.0,sxyz.x), mix(3.0,2.0,sxyz.y), mix(5.0,4.0,sxyz.z));
-                            vec3 mxyz = vec3(mx,my,1.0 - mx - my);
-                            uint face = uint(mxyz.x * fxyz.x + mxyz.y * fxyz.y + mxyz.z * fxyz.z);
-                            float invMax = 1.0 / max(max(a.x,a.y),a.z);
-                            vec3 dir = -toLight * invMax;
-                            vec2 uvx = mix(vec2( dir.z, dir.y), vec2(-dir.z, dir.y), sxyz.x);
-                            vec2 uvy = mix(vec2( dir.x, dir.z), vec2( dir.x,-dir.z), sxyz.y);
-                            vec2 uvz = mix(vec2(-dir.x, dir.y), vec2( dir.x, dir.y), sxyz.z);
-                            vec2 uv = mx * uvx + my * uvy + (1.0 - mx - my) * uvz;
-                            uv = uv * 0.5 + 0.5;
-                            uint faceOff = (shadowIndex * 16384u * 6u) + (face * 16384u);
-                            ivec2 tc = ivec2(clamp(uv * 128.0, vec2(0.0), vec2(127.0)));
-                            uint occ = shadowMaps[faceOff + uint(tc.y)*128u + uint(tc.x)];
-                            shadowFactor = (occ >= uint(dist*100000.0)) ? 1.0 : 0.3;
-                        }
-
-                        vec3 baseLighting = albedo.rgb * lights[lightIdx].col * intensity * (attenuation*attenuation/sqrt(sqrt(attenuation)));
-                        lighting += baseLighting * spotFalloff * shadowFactor;
-                        vec3 halfDir = normalize(lightDir + viewDirHit);
-                        float ndh = max(dot(adjustedNormal, halfDir), 0.0);
-                        float spec = clamp(pow(ndh, 100.0), 0.0, 1.0);
-                        lighting += albedo.rgb * intensity * attenuation * spotFalloff * spec * shadowFactor * 0.5;
+        uint texIdx = rtInstanceInfo[bestInst].tex;
+        if (texIdx < texCount) {
+            ivec2 ts = textureSizes[texIdx];
+            if (ts.x > 0 && ts.y > 0) {
+                uint tu = rtGeom[modelInfoBase + bestMid*9u + 8u] + bestTriIdx * 6u;
+                vec2 uvA = vec2(uintBitsToFloat(rtGeom[tu + 0u]), uintBitsToFloat(rtGeom[tu + 1u]));
+                vec2 uvB = vec2(uintBitsToFloat(rtGeom[tu + 2u]), uintBitsToFloat(rtGeom[tu + 3u]));
+                vec2 uvC = vec2(uintBitsToFloat(rtGeom[tu + 4u]), uintBitsToFloat(rtGeom[tu + 5u]));
+                vec2 uvHit = (1.0 - bestBaryU - bestBaryV) * uvA + bestBaryU * uvB + bestBaryV * uvC;
+                vec2 uvSample = vec2(uvHit.x, 1.0 - uvHit.y);
+                ivec2 tcoord = ivec2(fract(uvSample) * vec2(ts));
+                tcoord = clamp(tcoord, ivec2(0,0), ivec2(ts.x - 1, ts.y - 1));
+                vec4 albedo = getTextureColor(texIdx, tcoord, ts.x);
+                vec3 adjustedNormal = bestNormal;
+                vec3 viewDirHit = normalize(camPos - hitWorld);
+                vec3 lighting = albedo.rgb * 0.1;
+                uint voxelIdx = GetVoxelIndex(hitWorld);
+                uint lcount = voxelLightListCounts[voxelIdx];
+                bool useAll = (lcount == 0u);
+                if (useAll) lcount = 2048u;
+                if (lcount > 96u && !useAll) lcount = 96u;
+                for (uint li = 0u; li < lcount; ++li) {
+                    uint lightIdx = useAll ? li : uniqueLightLists[voxelIdx * 96u + li];
+                    vec3 lpos = lights[lightIdx].pos;
+                    float intensity = lights[lightIdx].intensity;
+                    float range = lights[lightIdx].range;
+                    vec3 toLight = lpos - hitWorld;
+                    float dist = length(toLight);
+                    if (dist >= range || intensity < 0.1) continue;
+                    
+                    vec3 lightDir = toLight / dist;
+                    float NdotL = max(dot(adjustedNormal, lightDir), 0.0);
+                    float attenuation = (1.0 - (dist/range)*(dist/range)) * NdotL;
+                    if (attenuation < 0.03) continue;
+                    
+                    float spotAng = lights[lightIdx].spotAng;
+                    float spotFalloff = 1.0;
+                    if (spotAng > 0.0) {
+                        vec4 quat = lights[lightIdx].spotDir;
+                        vec3 spotDir = vec3(2.0*(quat.x*quat.z + quat.w*quat.y), 2.0*(quat.y*quat.z - quat.w*quat.x), 1.0 - 2.0*(quat.x*quat.x + quat.y*quat.y));
+                        float spotdot = dot(spotDir, -lightDir);
+                        float cosAngle = cos(radians(spotAng/2.0));
+                        if (spotdot < cosAngle) continue;
+                        
+                        spotFalloff = smoothstep(cosAngle, cos(radians(spotAng*0.8/2.0)), spotdot);
+                        if (spotFalloff <= 0.0) continue;
                     }
-                    reflectionColor = lighting;
-                } else {
-                    reflectionColor = vec3(0.05, 0.05, 0.08);
+                    vec3 baseLighting = albedo.rgb * lights[lightIdx].col * intensity * (attenuation*attenuation/sqrt(sqrt(attenuation)));
+                    lighting += baseLighting * spotFalloff;
+                    vec3 halfDir = normalize(lightDir + viewDirHit);
+                    float ndh = max(dot(adjustedNormal, halfDir), 0.0);
+                    float spec = clamp(pow(ndh, 100.0), 0.0, 1.0);
+                    lighting += albedo.rgb * intensity * attenuation * spotFalloff * spec * 0.5;
                 }
-            } else {
-                reflectionColor = vec3(0.05, 0.05, 0.08);
+                reflectionColor = lighting;
             }
         }
     }
