@@ -26,7 +26,7 @@ u32 lightsID, voxListCntsID, voxelLightListsID, voxelUpdateSP, cellVisibleDataID
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
 FrustumPlane sunShadowFrustum[6];
 V3 sunDirection={0.0f, 1.0f, 0.0f};
-u32 ssrSP, imageBlitSP, quadVAO, quadVBO, textSP, textVAO, textVBO, textDecalVBO[MAX_LEVELS][INSTANCE_COUNT], textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
+u32 ssrSP, rtSP, imageBlitSP, quadVAO, quadVBO, textSP, textVAO, textVBO, textDecalVBO[MAX_LEVELS][INSTANCE_COUNT], textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
 u32 colorBufferID, texPalID, texPalOfsID, textureOffsetsID, textureSizesID, psysInstancesID, psysTrailsID, psysquadVAO, psysquadVBO, particleSP, trailSP, camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 u8 particleBlendTexture[MAX_TXRS], camViewCount, levelCamViewCount[14];
 char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
@@ -773,7 +773,7 @@ void CompileShaders() {
     shadowmapsSP=CompileAnyShader(shadowmapVertSrc, shadowmapFragSrc, "Shad");
     textSP=CompileAnyShader(textVertSrc, textFragSrc, "Txt");
     imageBlitSP=CompileAnyShader(quadVertSrc, quadFragSrc, "Comp");
-    ssrSP=CompileAnyShader(NULL, ssrCSSrc, "SSR");    voxelUpdateSP=CompileAnyShader(NULL, voxUpdCSSrc, "Vox");
+    ssrSP=CompileAnyShader(NULL, ssrCSSrc, "SSR");    rtSP=CompileAnyShader(NULL, rtCSSrc, "RT");    voxelUpdateSP=CompileAnyShader(NULL, voxUpdCSSrc, "Vox");
     shadowmapsClearSP=CompileAnyShader(NULL, shadClearCSSrc, "ShadCl");
     particleSP=CompileAnyShader(particleVertSrc, particleFragSrc, "Part");
     trailSP=CompileAnyShader(trailVertSrc, trailFragSrc, "Trail");
@@ -876,6 +876,7 @@ void UpdateScreenSize(i32 width, i32 height) {
     glUseProgram(imageBlitSP); glUniform1ui(2,w); glUniform1ui(3,h); glUniform1i(26,Sys_Settings.SSR_RES);
     glUseProgram(chunkSP);     glUniform1ui(6,w); glUniform1ui(7,h);
     glUseProgram(ssrSP);       glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
+    glUseProgram(rtSP);        glUniform1ui(0,w / Sys_Settings.SSR_RES); glUniform1ui(1,h / Sys_Settings.SSR_RES); glUniform1i(2,Sys_Settings.SSR_RES);
     GenerateAndBindTexture(&inputImageID,                       GL_RGBA8,                       w,                       h,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); /*Lit Raster*/
     GenerateAndBindTexture(&inputSpecID,                        GL_RGBA8,                       w,                       h,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); /*Specular Colors*/
     GenerateAndBindTexture(&inputNormalID,                      GL_RG16F,                       w,                       h,                      GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); /*Normal XYZ*/ 
@@ -1749,17 +1750,24 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glBindTexture(GL_TEXTURE_2D,inputDepthID);
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][3]);
-    if (likely(Sys_Settings.Reflections > 0u)) {
+    if (Sys_Settings.Reflections == 1u) {
         glUseProgram(ssrSP);
-        glUniform3f(3, playerPos.x, playerPos.y, playerPos.z); CHECK_GL_ERROR();
-        glUniform1i(5, 3); CHECK_GL_ERROR();
-        glUniformMatrix4fv(6, 1, 0, invViewProj); CHECK_GL_ERROR();
-        glUniformMatrix4fv(4, 1, GL_FALSE, viewProj); CHECK_GL_ERROR();
-        glUniform2f(7, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]); CHECK_GL_ERROR();
-        glUniform1ui(8, mdlsCnt); CHECK_GL_ERROR();
-        glUniform1ui(9, texCnt); CHECK_GL_ERROR();
-        glUniform1ui(10, rtModelInfoBase); CHECK_GL_ERROR();
-/*glUniform1ui(11, World.loadedLights);*/ CHECK_GL_ERROR(); /*X*/ glDispatchCompute(((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 31) / 32, ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32, 1);
+        glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
+        glUniform1i(5, 3);
+        glUniformMatrix4fv(6, 1, 0, invViewProj);
+        glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
+        glDispatchCompute(((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 31) / 32, ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32, 1);
+    } else if (Sys_Settings.Reflections == 2u) {
+        glUseProgram(rtSP);
+        glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
+        glUniform1i(5, 3);
+        glUniformMatrix4fv(6, 1, 0, invViewProj);
+        glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
+        glUniform2f(7, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]);
+        glUniform1ui(8, mdlsCnt);
+        glUniform1ui(9, texCnt);
+        glUniform1ui(10, rtModelInfoBase);
+        glDispatchCompute(((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 31) / 32, ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32, 1);
     }
     
     glBindFramebuffer(GL_FRAMEBUFFER, uiFBO);

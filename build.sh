@@ -57,6 +57,7 @@ gh() {
 
 # Shaders and their C variable names
 gh ./Shaders/ssr.compute              ssrCSSrc
+gh ./Shaders/rt.compute                rtCSSrc
 gh ./Shaders/voxels.compute           voxUpdCSSrc
 gh ./Shaders/shadowmaps_clear.compute shadClearCSSrc
 gh ./Shaders/depth_prepass_vert.glsl  depthPrepassVertSrc
@@ -98,6 +99,7 @@ cat > Shaders/shaders.h <<'EOF'
 #include "trail_vert.glsl.h"
 #include "trail_frag.glsl.h"
 #include "ssr.compute.h"
+#include "rt.compute.h"
 #include "voxels.compute.h"
 #include "shadowmaps_clear.compute.h"
 EOF

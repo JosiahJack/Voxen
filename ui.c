@@ -1,4 +1,6 @@
 // ui.c - User Interface(UI) aka HUD
+static bool reflDropdownOpen = false;
+static i8 reflHoverIdx = -1;
 void BiomonitorBlitToUI();
 #define UI_MFD_IDS(P) UI_ID_##P##_TAB_WEAPON,           UI_ID_##P##_TAB_ITEM,             UI_ID_##P##_TAB_AUTOMAP,       UI_ID_##P##_TAB_DATA,          UI_ID_##P##_PANEL,                 \
                       UI_ID_##P##_WEAPON_NAME,          UI_ID_##P##_WEAPON_ICON,          UI_ID_##P##_WEAPON_AMMO,       UI_ID_##P##_WEAPON_RELOAD,     UI_ID_##P##_WEAPON_UNLOAD,         \
@@ -296,7 +298,7 @@ void RenderMenu() {
     } else if (currentMenuPage == MPG_MULTPLYR) {
         menuItemCount = 1; menuTabCount = 1; UI_HeaderText(266,/*"MULTIPLAYER"*/Sys_Text.stringTable[720]); MenuBackButton(1060,724,1076,732,0);
     } else if (currentMenuPage == MPG_OPTS) {
-        menuTabCount = 3; UI_HeaderText(238,/*"CONFIGURATION"*/Sys_Text.stringTable[745]); if(currentMenuTab!=0){resDropdownOpen=false; resHoverIdx=-1;}
+        menuTabCount = 3; UI_HeaderText(238,/*"CONFIGURATION"*/Sys_Text.stringTable[745]); if(currentMenuTab!=0){resDropdownOpen=false; resHoverIdx=-1; reflDropdownOpen=false; reflHoverIdx=-1;}
         if (currentMenuTab != 0) RenderUIImage(179,220, 1001,548, 1030);/*Config background*/
         if (currentMenuTab == 0) RenderUIImage(179,220, 1001,548, 1033);/*Config background graphics (empty alpha center)*/
         static const i16 cfgTabX[3]={190,354,520}; static const u16 cfgTabStr[3]={791,792,793}; static const i16 cfgTabTx[3]={200,366,530}; static const u32 cfgTabId[3]={UI_ID_MENU_TAB_GRAPHICS,UI_ID_MENU_TAB_INPUT,UI_ID_MENU_TAB_AUDIO_LANG};
@@ -312,7 +314,22 @@ void RenderMenu() {
             if (UI_Checkbox(UI_ID_MENU_MODEL_DETAIL,200,500,0,Sys_Settings.ModelDetail ?/*High*/915 :/*No Detail Level Models*/914,Sys_Settings.ModelDetail)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(UI_ID_MENU_FXAA,200,530,1,/*"FXAA"*/780,Sys_Settings.FXAA)) { Sys_Settings.FXAA = Sys_Settings.FXAA ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(UI_ID_MENU_SHADOWS,200,560,2,Sys_Settings.Shadows ?/*Soft*/787 :/*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; if (!shadowBuffersCreated) {CreateShadowBuffers();} SaveConfig(); }
-            if (UI_Checkbox(UI_ID_MENU_SSR,200,590,3,/*SSR*/788,Sys_Settings.Reflections)) { Sys_Settings.Reflections = Sys_Settings.Reflections ? 0u : 1u; SaveConfig(); }
+            if (reflDropdownOpen) { bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
+                if (lmb||rmb) { int rlh=3*16; bool inList = World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=590-rlh && World.cursorPos_y<=590;
+                    if (inList) { int row=(World.cursorPos_y-(590-rlh))/16; if (row>=0 && row<3) { Sys_Settings.Reflections=(u8)row; SaveConfig(); } }
+                    reflDropdownOpen=false;
+                    if (inList) { Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; } } }
+            bool overRefl=false;
+            if (UI_Button(UI_ID_MENU_SSR,190,606,328,16,&overRefl,3) || (MenuEnter() && currentMenuItem == 3)) { if (!reflDropdownOpen) { reflDropdownOpen=true; } else { reflDropdownOpen=false; } currentMenuItem = 3; }
+            overRefl = overRefl || currentMenuItem == 3;
+            static const char* reflNames[3] = {"OFF","SCREEN SPACE","RAYTRACED"};
+            char reflBuf[32]; sFormat(reflBuf, sizeof(reflBuf), "%s", reflNames[Sys_Settings.Reflections > 2u ? 0u : Sys_Settings.Reflections]);
+            RenderUIImage(476,590,16,16,overRefl ? 1119 : 1077); RenderTextL(200,590,overRefl ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"REFLECTIONS %s",reflBuf);
+            if (reflDropdownOpen) { int rlh=3*16, rTop=590-rlh;
+                reflHoverIdx = (World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=rTop && World.cursorPos_y<rTop+rlh) ? (World.cursorPos_y-rTop)/16 : -1;
+                RenderUIImage(336,rTop,160,rlh,922);
+                for (int ri=0; ri<3; ++ri) { if (ri==Sys_Settings.Reflections) RenderUIImage(336,rTop-2+ri*16,160,18,1087); RenderTextL(366,rTop+ri*16, (ri==reflHoverIdx) ? T_YELLOW : T_GREEN, FONT_NORMAL, 0.9f, "%s", reflNames[ri]); }
+            } else { reflHoverIdx=-1; }
             if (UI_Checkbox(UI_ID_MENU_VSYNC,200,620,4,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; SetVSync(); SaveConfig(); }
             RenderTextL(310,620,T_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", globalframesPerLastSecond);/*Helper to see vsync take effect.*/
             if (UI_Slider(UI_ID_MENU_FOV_SLIDER,400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,Sys_Settings.FOV,&newVal,&fovSliderActive,45,150,5,5,/*Field of View*/775)) { Sys_Settings.FOV = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
@@ -1376,6 +1393,7 @@ static double RenderUI() {
     if (World.menuActive) RenderMenu(); else if (World.paused) RenderPausedUI();
     if (World.menuActive || World.paused) {
         if (resDropdownOpen && currentMenuPage==MPG_OPTS && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(resSelectedIdx<resDropdownCount-1){resSelectedIdx++;} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(resSelectedIdx>0){resSelectedIdx--;} } }
+        if (reflDropdownOpen && currentMenuPage==MPG_OPTS && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(Sys_Settings.Reflections<2){Sys_Settings.Reflections++; SaveConfig();} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(Sys_Settings.Reflections>0){Sys_Settings.Reflections--; SaveConfig();} } }
         else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_DOWN].pressed) { currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0                 : currentMenuItem + 1; }
         else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_UP  ].pressed) { currentMenuItem = (currentMenuItem - 1) < 0              ? menuItemCount - 1 : currentMenuItem - 1; }
     } else if (!World.Sys_UI.vmailActive) {
