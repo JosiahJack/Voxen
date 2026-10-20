@@ -17,7 +17,7 @@ static u32* rtTriangles=NULL; static u32 rtTriangleIndexCount=0;static ModelRTIn
 static u32 rtModelBvhOffset[MAX_MDLS],rtModelBvhCount[MAX_MDLS];
 typedef struct { u32 model, act, tex; float sclx, scly, sclz; } InstanceRTInfo;
 static InstanceRTInfo rtInstanceInfo[INSTANCE_COUNT];static u32 rtCellCounts[ARRSIZE], rtCellLists[ARRSIZE*128];
-static u32 rtBvhNodesID,rtBvhTriOrderID,rtPositionsID,rtUVsID,rtTrianglesID,rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID;
+static u32 rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID;
 static u32* rtGeom=NULL; static u32 rtGeomUintCount=0;
 static u32 rtNodeBase, rtTriOrderBase, rtPosBase, rtTriBase, rtModelInfoBase, rtTriUVBase;bool doubleSidedTexture[MAX_TXRS], transparentTexture[MAX_TXRS], shadowBuffersCreated, resDropdownOpen;
 u16 **modelTriangles, modelTriangleCounts[MAX_MDLS], mdlsCnt, **physTris, texCnt, decalStyleCount, decalInlineTextLevel[DECAL_INLINE_TEXT_MAX], decalInlineTextInst[DECAL_INLINE_TEXT_MAX], decalInlineTextCount;
@@ -2296,9 +2296,22 @@ void BuildRTAccel(void) {
             }
         }
     }
+
+    // Free intermediate CPU arrays; GPU buffer now holds the data.
+    for (u32 m=0; m<mdlsCnt; ++m) {
+        if (physUVs[m]) { OS_Free(physUVs[m], (size_t)physVertCounts[m]*2u*sizeof(float)); physUVs[m]=NULL; }
+        if (physTriUVs[m]) { OS_Free(physTriUVs[m], (size_t)modelTriangleCounts[m]*6u*sizeof(float)); physTriUVs[m]=NULL; }
+    }
+    if (rtBvhNodes) { OS_Free(rtBvhNodes, (size_t)rtBvhNodeCount * sizeof(GpuBvhNode)); rtBvhNodes=NULL; }
+    if (rtBvhTriOrder) { OS_Free(rtBvhTriOrder, (size_t)rtBvhTriOrderCount * sizeof(u32)); rtBvhTriOrder=NULL; }
+    if (rtPositions) { OS_Free(rtPositions, (size_t)rtPositionFloatCount * sizeof(float)); rtPositions=NULL; }
+    if (rtTriangles) { OS_Free(rtTriangles, (size_t)rtTriangleIndexCount * sizeof(u32)); rtTriangles=NULL; }
+    if (rtModelInfo) { OS_Free(rtModelInfo, (size_t)mdlsCnt * sizeof(ModelRTInfo)); rtModelInfo=NULL; }
+    if (rtUVs) { OS_Free(rtUVs, (size_t)rtUVFloatCount * sizeof(float)); rtUVs=NULL; }
     rtGeomID = MakeSSBO(&rtGeomID, 16, (size_t)rtGeomUintCount * sizeof(u32), rtGeom, GL_STATIC_DRAW);
+    if (rtGeom) { OS_Free(rtGeom, (size_t)rtGeomUintCount * sizeof(u32)); rtGeom=NULL; }
     // create SSBOs
-    rtUVsID = MakeSSBO(&rtUVsID, 25, (size_t)triUVFloatTotal2 * sizeof(float), rtUVs, GL_STATIC_DRAW);    rtInstanceInfoID = MakeSSBO(&rtInstanceInfoID, 21, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);    rtCellCountsID = MakeSSBO(&rtCellCountsID, 23, (size_t)ARRSIZE * sizeof(u32), NULL, GL_DYNAMIC_DRAW);
+rtInstanceInfoID = MakeSSBO(&rtInstanceInfoID, 21, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);    rtCellCountsID = MakeSSBO(&rtCellCountsID, 23, (size_t)ARRSIZE * sizeof(u32), NULL, GL_DYNAMIC_DRAW);
     rtCellListsID = MakeSSBO(&rtCellListsID, 24, (size_t)ARRSIZE * 128 * sizeof(u32), NULL, GL_DYNAMIC_DRAW);
 }
 void InitalizeEnvironment() {
