@@ -316,7 +316,7 @@ void RenderMenu() {
             if (UI_Checkbox(UI_ID_MENU_SHADOWS,200,560,2,Sys_Settings.Shadows ?/*Soft*/787 :/*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; if (!shadowBuffersCreated) {CreateShadowBuffers();} SaveConfig(); }
             if (reflDropdownOpen) { bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
                 if (lmb||rmb) { int rlh=3*16; bool inList = World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=590-rlh && World.cursorPos_y<=590;
-                    if (inList) { int row=(World.cursorPos_y-(590-rlh))/16; if (row>=0 && row<3) { Sys_Settings.Reflections=(u8)row; SaveConfig(); } }
+                    if (inList) { int row=(World.cursorPos_y-(590-rlh))/16; if (row>=0 && row<3) { Sys_Settings.Reflections=(u8)row; SaveConfig(); EnsureReflectionResources(); } }
                     reflDropdownOpen=false;
                     if (inList) { Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; } } }
             bool overRefl=false;
@@ -1393,7 +1393,7 @@ static double RenderUI() {
     if (World.menuActive) RenderMenu(); else if (World.paused) RenderPausedUI();
     if (World.menuActive || World.paused) {
         if (resDropdownOpen && currentMenuPage==MPG_OPTS && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(resSelectedIdx<resDropdownCount-1){resSelectedIdx++;} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(resSelectedIdx>0){resSelectedIdx--;} } }
-        if (reflDropdownOpen && currentMenuPage==MPG_OPTS && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(Sys_Settings.Reflections<2){Sys_Settings.Reflections++; SaveConfig();} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(Sys_Settings.Reflections>0){Sys_Settings.Reflections--; SaveConfig();} } }
+        if (reflDropdownOpen && currentMenuPage==MPG_OPTS && currentMenuTab==0) { if (Sys_Input.keyStates[KEY_DOWN].pressed) { if(Sys_Settings.Reflections<2){Sys_Settings.Reflections++; SaveConfig(); EnsureReflectionResources();} } else if (Sys_Input.keyStates[KEY_UP].pressed) { if(Sys_Settings.Reflections>0){Sys_Settings.Reflections--; SaveConfig(); EnsureReflectionResources();} } }
         else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_DOWN].pressed) { currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0                 : currentMenuItem + 1; }
         else if (!rebindCaptureActive && !enteringSaveName && Sys_Input.keyStates[KEY_UP  ].pressed) { currentMenuItem = (currentMenuItem - 1) < 0              ? menuItemCount - 1 : currentMenuItem - 1; }
     } else if (!World.Sys_UI.vmailActive) {

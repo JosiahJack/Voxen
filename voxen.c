@@ -10,17 +10,10 @@ u32 globalframe, globalframesPerLastSecond, threadCnt = 1, inputImageID, inputUI
 float rasterPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT*16], *world_from_mdl = modelMatrices, modelBounds[MAX_MDLS], **physPos, **physUVs, **physTriUVs, lightView[LIGHT_COUNT][6][4][4], lightViewProj[LIGHT_COUNT][6][16], shadowmapsPerspectiveProjection[16], sunShadowMatrix[16], berserkSeedTime;
 typedef struct { _Alignas(16) float mn[4]; _Alignas(16) float mx[4]; u32 triStart; u32 triCount; i32 children[8]; } GpuBvhNode;
 typedef struct { u32 bvhOffset,bvhCount,triOrderOffset,triOrderCount,posOffset,posCount,triOffset,triCount; } ModelRTInfo;
-static GpuBvhNode* rtBvhNodes=NULL; static u32 rtBvhNodeCount=0;
-static u32* rtBvhTriOrder=NULL; static u32 rtBvhTriOrderCount=0;
-static float* rtPositions=NULL; static u32 rtPositionFloatCount=0;
-static float* rtUVs=NULL; static u32 rtUVFloatCount=0;
-static u32* rtTriangles=NULL; static u32 rtTriangleIndexCount=0;static ModelRTInfo* rtModelInfo=NULL;
-static u32 rtModelBvhOffset[MAX_MDLS],rtModelBvhCount[MAX_MDLS];
 typedef struct { u32 model, act, tex; float sclx, scly, sclz; } InstanceRTInfo;
 static InstanceRTInfo rtInstanceInfo[INSTANCE_COUNT];static u32 rtCellCounts[ARRSIZE], rtCellLists[ARRSIZE*128];
 static u32 rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID;
-static u32* rtGeom=NULL; static u32 rtGeomUintCount=0;
-static u32 rtNodeBase, rtTriOrderBase, rtPosBase, rtTriBase, rtModelInfoBase, rtTriUVBase;bool doubleSidedTexture[MAX_TXRS], transparentTexture[MAX_TXRS], shadowBuffersCreated, resDropdownOpen;
+static u32 rtModelInfoBase;bool doubleSidedTexture[MAX_TXRS], transparentTexture[MAX_TXRS], shadowBuffersCreated, resDropdownOpen;
 u16 **modelTriangles, modelTriangleCounts[MAX_MDLS], mdlsCnt, **physTris, texCnt, decalStyleCount, decalInlineTextLevel[DECAL_INLINE_TEXT_MAX], decalInlineTextInst[DECAL_INLINE_TEXT_MAX], decalInlineTextCount;
 V3 modelMin[MAX_MDLS], modelMax[MAX_MDLS];
 u32 lightsID, voxListCntsID, voxelLightListsID, voxelUpdateSP, cellVisibleDataID, shadowmapsSP, shadowmapsClearSP, shadowMapSSBO, shadowMapsIndirectionID, sunShadowFBO, sunShadowTex, shadowmapIndirectionList[LIGHT_COUNT];
@@ -882,7 +875,9 @@ void UpdateScreenSize(i32 width, i32 height) {
     GenerateAndBindTexture(&inputSpecID,                        GL_RGBA8,                       w,                       h,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); /*Specular Colors*/
     GenerateAndBindTexture(&inputNormalID,                      GL_RG16F,                       w,                       h,                      GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); /*Normal XYZ*/ 
     GenerateAndBindTexture(&inputDepthID, 0x81A7/*GL_DEPTH_COMPONENT32*/,                       w,                       h,0x1902/*GL_DEPTH_COMPONENT*/,        GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); /*Raster Depth*/
-    GenerateAndBindTexture(&outputImageID,                      GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/ ,NULL);
+    if (Sys_Settings.Reflections >= 1) {
+        GenerateAndBindTexture(&outputImageID,                      GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/ ,NULL);
+    }
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER,         GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,         GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,inputSpecID,  0);
@@ -890,10 +885,10 @@ void UpdateScreenSize(i32 width, i32 height) {
     glFramebufferTexture2D(GL_FRAMEBUFFER,0x8D00/*GL_DEPTH_ATTACHMENT*/,GL_TEXTURE_2D,inputDepthID, 0);
     glBindImageTexture(0, inputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); /*Main Rendered Color*/
     glBindImageTexture(2,  inputSpecID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); /*Specular*/
-    glBindImageTexture(4,outputImageID,0,GL_FALSE,0,GL_READ_WRITE,GL_RGBA8); /*SSR result*/
+    glBindImageTexture(4, Sys_Settings.Reflections >= 1 ? outputImageID : 0, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); /*SSR result*/
     glBindImageTexture(5,inputNormalID,0,GL_FALSE,0,GL_READ_WRITE,GL_RG16F); /*Normal XYZ*/
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D,outputImageID);
+    glBindTexture(GL_TEXTURE_2D, Sys_Settings.Reflections >= 1 ? outputImageID : 0);
     glBindFramebuffer(GL_FRAMEBUFFER,0);
     ignore_next_mouse_delta = true;
 }
@@ -1897,8 +1892,9 @@ void UpdateInstanceMatrix4x4s() {
         glBufferData(GL_SSBO, (size_t)INSTANCE_COUNT*16*sizeof(float), NULL, GL_DYNAMIC_DRAW);
         glBufferSubData(GL_SSBO, offsetFloats * 4, countFloats * 4, modelMatrices + offsetFloats);
     }
-    // Upload instance metadata + world grid for ray-traced reflections.
-    for (u32 i=0; i<World.instCount; ++i) {
+    if (Sys_Settings.Reflections == 2u) {
+        // Upload instance metadata + world grid for ray-traced reflections.
+        for (u32 i=0; i<World.instCount; ++i) {
         u16 mi = World.instances[i].modelIndex;
         if ((instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt) mi = World.instances[i].lodIndex;
         rtInstanceInfo[i].model = (mi < mdlsCnt) ? mi : 0xFFFFFFFFu;
@@ -1923,6 +1919,7 @@ void UpdateInstanceMatrix4x4s() {
     glBindBuffer(GL_SSBO, rtCellListsID);
     glBufferData(GL_SSBO, (size_t)ARRSIZE * 128u * sizeof(u32), NULL, GL_DYNAMIC_DRAW);
     glBufferSubData(GL_SSBO, 0, (size_t)ARRSIZE * 128u * sizeof(u32), rtCellLists);
+    }
 }
 
 static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0.07f},/*0*/  {0.34509805f,0.38431373f,0.49019608f,0.055f},/*1*/  {0.47058824f,0.3882353f, 0.3928334f,0.05f},/*2*/  {0.32941177f,0.29411766f,0.2509804f,0.065f},/*3*/ {0.3882353f,0.452415f, 0.47058824f,0.075f},/*4*/ {0.3882353f, 0.4117647f, 0.47058824f,0.03f},/*5*/ {0.3f,0.24f,0.33f,0.070f},/*6*/ 
@@ -2138,19 +2135,37 @@ void* OS_AllocScratch(size_t amount) {
     return p;
 }
 
-void OS_FreeInitPhase() { scratch_cur=scratch_base; mset(scratch_cur,0,SCRATCH_ARENA_SIZE); }
+void OS_FreeInitPhase() { scratch_cur=scratch_base; mset(scratch_cur,0,scratch_peak); }
 void SetGLContext_MakeCurrent();
 void InitFontAtlassesGL();
 static void* InitFontAtlasses_Thread(void* arg) { (void)arg; InitFontAtlasses(); return NULL; }
+static bool rtAccelBuilt = false;
+void BuildRTAccel(void);
+void EnsureReflectionResources(void) {
+    u16 w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
+    if (Sys_Settings.Reflections >= 1u && outputImageID == 0) {
+        GenerateAndBindTexture(&outputImageID, GL_RGBA8, w / Sys_Settings.SSR_RES, h / Sys_Settings.SSR_RES, GL_RGBA, GL_UNSIGNED_BYTE, 0x2601/*GL_LINEAR*/, NULL);
+        glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, outputImageID);
+    }
+    if (Sys_Settings.Reflections == 2u && !rtAccelBuilt) {
+        RenderLoading("Building RT accel..."); BuildRTAccel(); DebugRAM("after RT accel");
+        rtAccelBuilt = true;
+    }
+}
 void BuildRTAccel(void) {
+    u32 offsetCnt = mdlsCnt ? mdlsCnt : 1;
+    u32* rtModelBvhOffset = OS_Alloc(offsetCnt * sizeof(u32)); u32* rtModelBvhCount = OS_Alloc(offsetCnt * sizeof(u32));
+    ModelRTInfo* rtModelInfo = NULL;
+    u32 rtNodeBase = 0, rtTriOrderBase = 0, rtPosBase = 0, rtTriBase = 0, rtTriUVBase = 0;
+    u32 rtGeomUintCount = 0; u32* rtGeom = NULL;
     u32 nodeTotal=0;
     for (u32 m=0; m<mdlsCnt; ++m) {
         rtModelBvhOffset[m]=nodeTotal;
         rtModelBvhCount[m] = BvhHasBVH((u16)m) ? modelBVHNodeCounts[m] : 0;
         nodeTotal += rtModelBvhCount[m];
     }
-    rtBvhNodeCount=nodeTotal;
-    rtBvhNodes = OS_Alloc((size_t)nodeTotal * sizeof(GpuBvhNode));
     // triOrder total
     u32 triOrderTotal2=0, posFloatTotal2=0, triUVFloatTotal2=0, triIndexTotal2=0;
     for (u32 m=0; m<mdlsCnt; ++m) {
@@ -2159,15 +2174,7 @@ void BuildRTAccel(void) {
     }
     for (u32 m=0; m<mdlsCnt; ++m) { posFloatTotal2 += physVertCounts[m]*3u; triUVFloatTotal2 += modelTriangleCounts[m]*6u; }
     for (u32 m=0; m<mdlsCnt; ++m) { triIndexTotal2 += modelTriangleCounts[m]*3u; }
-    rtBvhTriOrderCount=triOrderTotal2;
-    rtBvhTriOrder = OS_Alloc((size_t)triOrderTotal2 * sizeof(u32));
-    rtPositionFloatCount=posFloatTotal2;
-    rtPositions = OS_Alloc((size_t)posFloatTotal2 * sizeof(float));
-    rtUVFloatCount=triUVFloatTotal2;
-    rtUVs = OS_Alloc((size_t)triUVFloatTotal2 * sizeof(float));
-    rtTriangleIndexCount=triIndexTotal2;
-    rtTriangles = OS_Alloc((size_t)triIndexTotal2 * sizeof(u32));
-    rtModelInfo = OS_Alloc((size_t)mdlsCnt * sizeof(ModelRTInfo));
+    rtModelInfo = mdlsCnt ? (ModelRTInfo*)OS_Alloc((size_t)mdlsCnt * sizeof(ModelRTInfo)) : NULL;
     // fill offsets
     u32 offNode=0, offTO=0, offPos=0, offTri=0;
     for (u32 m=0; m<mdlsCnt; ++m) {
@@ -2184,51 +2191,22 @@ void BuildRTAccel(void) {
         rtModelInfo[m].triCount = modelTriangleCounts[m]*3u;
         offTri += modelTriangleCounts[m]*3u;
     }
-    // fill data
-    for (u32 m=0; m<mdlsCnt; ++m) {
-        if (BvhHasBVH((u16)m)) {
-            u32 base = rtModelInfo[m].bvhOffset;
-            u32 cnt = rtModelInfo[m].bvhCount;
-            for (u32 i=0; i<cnt; ++i) {
-                BvhNode* src = &modelBVHNodes[m][i];
-                GpuBvhNode* dst = &rtBvhNodes[base + i];
-                dst->mn[0]=src->mn.x; dst->mn[1]=src->mn.y; dst->mn[2]=src->mn.z; dst->mn[3]=0.0f;
-                dst->mx[0]=src->mx.x; dst->mx[1]=src->mx.y; dst->mx[2]=src->mx.z; dst->mx[3]=0.0f;
-                dst->triStart = src->triCount > 0 ? (src->triStart + rtModelInfo[m].triOrderOffset) : 0u;
-                dst->triCount = src->triCount;
-                for (int c=0; c<8; ++c) {
-                    dst->children[c] = src->children[c] >= 0 ? (i32)(base + (u32)src->children[c]) : -1;
-                }
-            }
-            u32 toff = rtModelInfo[m].triOrderOffset;
-            u32 tcnt = rtModelInfo[m].triOrderCount;
-            for (u32 i=0; i<tcnt; ++i) {
-                rtBvhTriOrder[toff + i] = modelBVHTriOrder[m][i];
-            }
-        }
-        if (physPos[m] && physVertCounts[m]) {
-            mcpy(rtPositions + rtModelInfo[m].posOffset, physPos[m], (size_t)physVertCounts[m]*3u*sizeof(float));
-        }
-        if (physTriUVs[m] && modelTriangleCounts[m]) {
-            mcpy(rtUVs + (rtModelInfo[m].triOffset / 3u * 6u), physTriUVs[m], (size_t)modelTriangleCounts[m]*6u*sizeof(float));
-        }        if (physTris[m] && modelTriangleCounts[m]) {
-            u32 tbase = rtModelInfo[m].triOffset;
-            u32 tcnt = modelTriangleCounts[m]*3u;
-            for (u32 i=0; i<tcnt; ++i) {
-                rtTriangles[tbase + i] = physTris[m][i];
-            }
-        }
-    }
     // Pack all RT geometry into one SSBO to stay within compute SSBO binding limit.
+
     rtNodeBase = 0;
-    rtTriOrderBase = rtNodeBase + rtBvhNodeCount * 18u;
-    rtPosBase = rtTriOrderBase + rtBvhTriOrderCount;
-    rtTriBase = rtPosBase + rtPositionFloatCount;
-    rtModelInfoBase = rtTriBase + rtTriangleIndexCount;
+    rtTriOrderBase = rtNodeBase + nodeTotal * 18u;
+    rtPosBase = rtTriOrderBase + triOrderTotal2;
+    rtTriBase = rtPosBase + posFloatTotal2;
+    rtModelInfoBase = rtTriBase + triIndexTotal2;
     rtTriUVBase = rtModelInfoBase + mdlsCnt * 9u;
     rtGeomUintCount = rtTriUVBase + triUVFloatTotal2;
-    rtGeom = OS_Alloc((size_t)rtGeomUintCount * sizeof(u32));
-    for (u32 i=0;i<rtGeomUintCount;++i) rtGeom[i]=0;
+    size_t geomByteSize = (size_t)rtGeomUintCount * sizeof(u32);
+    rtGeomID = MakeSSBO(&rtGeomID, 16, geomByteSize, NULL, GL_STATIC_DRAW);
+    if (rtGeomUintCount) {
+        glBindBuffer(GL_SSBO, rtGeomID);
+        rtGeom = (u32*)glMapBufferRange(GL_SSBO, 0, geomByteSize, 0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
+        for (u32 i = 0; i < rtGeomUintCount; ++i) rtGeom[i] = 0;
+    }
 
     for (u32 m=0; m<mdlsCnt; ++m) {
         if (!BvhHasBVH((u16)m)) continue;
@@ -2303,17 +2281,14 @@ void BuildRTAccel(void) {
         if (physUVs[m]) { OS_Free(physUVs[m], (size_t)physVertCounts[m]*2u*sizeof(float)); physUVs[m]=NULL; }
         if (physTriUVs[m]) { OS_Free(physTriUVs[m], (size_t)modelTriangleCounts[m]*6u*sizeof(float)); physTriUVs[m]=NULL; }
     }
-    if (rtBvhNodes) { OS_Free(rtBvhNodes, (size_t)rtBvhNodeCount * sizeof(GpuBvhNode)); rtBvhNodes=NULL; }
-    if (rtBvhTriOrder) { OS_Free(rtBvhTriOrder, (size_t)rtBvhTriOrderCount * sizeof(u32)); rtBvhTriOrder=NULL; }
-    if (rtPositions) { OS_Free(rtPositions, (size_t)rtPositionFloatCount * sizeof(float)); rtPositions=NULL; }
-    if (rtTriangles) { OS_Free(rtTriangles, (size_t)rtTriangleIndexCount * sizeof(u32)); rtTriangles=NULL; }
-    if (rtModelInfo) { OS_Free(rtModelInfo, (size_t)mdlsCnt * sizeof(ModelRTInfo)); rtModelInfo=NULL; }
-    if (rtUVs) { OS_Free(rtUVs, (size_t)rtUVFloatCount * sizeof(float)); rtUVs=NULL; }
-    rtGeomID = MakeSSBO(&rtGeomID, 16, (size_t)rtGeomUintCount * sizeof(u32), rtGeom, GL_STATIC_DRAW);
-    if (rtGeom) { OS_Free(rtGeom, (size_t)rtGeomUintCount * sizeof(u32)); rtGeom=NULL; }
+    if (rtGeom) { glUnmapBuffer(GL_SSBO); rtGeom = NULL; }
     // create SSBOs
 rtInstanceInfoID = MakeSSBO(&rtInstanceInfoID, 21, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);    rtCellCountsID = MakeSSBO(&rtCellCountsID, 23, (size_t)ARRSIZE * sizeof(u32), NULL, GL_DYNAMIC_DRAW);
     rtCellListsID = MakeSSBO(&rtCellListsID, 24, (size_t)ARRSIZE * 128 * sizeof(u32), NULL, GL_DYNAMIC_DRAW);
+    if (rtModelBvhOffset) { OS_Free(rtModelBvhOffset, offsetCnt * sizeof(u32)); rtModelBvhOffset = NULL; }
+    if (rtModelBvhCount) { OS_Free(rtModelBvhCount, offsetCnt * sizeof(u32)); rtModelBvhCount = NULL; }
+    OS_Free(physUVs, mdlsCnt * sizeof(float*)); physUVs = NULL;
+    OS_Free(physTriUVs, mdlsCnt * sizeof(float*)); physTriUVs = NULL;
 }
 void InitalizeEnvironment() {
     game_start_time = get_time();
@@ -2371,7 +2346,7 @@ void InitalizeEnvironment() {
     glBindVertexBuffer(0,textVBO,0,5*sizeof(float));
     
     glBindVertexArray(debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO);
-    glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW); debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * 2 * sizeof(DebugLineVertex)); /* allocated unconditionally, not under the showphys/shownpc cheats: door laser grids are gameplay and draw through this same path, so the staging buffer has to outlive the cheats being off. */
+    glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW); debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * sizeof(DebugLineVertex)); /* allocated unconditionally, not under the showphys/shownpc cheats: door laser grids are gameplay and draw through this same path, so the staging buffer has to outlive the cheats being off. */
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
     glBindVertexBuffer(0,debugLinesVBO,0,sizeof(DebugLineVertex));
@@ -2443,7 +2418,7 @@ void InitalizeEnvironment() {
     for (int f=0;f<5;++f) { glGenQueries(5,gpuQ[f]); }
     RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures");
     RenderLoading("Loading models...");   DebugRAM("before LoadModels");   LoadModels();   DebugRAM("after LoadModels");
-    RenderLoading("Building RT accel..."); BuildRTAccel(); DebugRAM("after RT accel");    bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
+    if (Sys_Settings.Reflections >= 1u) EnsureReflectionResources();    bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
         
     World.absoluteTime = get_time();

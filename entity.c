@@ -1475,7 +1475,13 @@ void LoadLevelData(u8 curlevel) {
     if(!teleportDestinationsInitialized){for(u8 l=0;l<MAX_LEVELS;++l)for(u8 id=0;id<8;++id)teleportDestinations[l][id]=U16_MAX;teleportDestinationsInitialized=true;}
     if(curlevel<MAX_LEVELS)for(u8 id=0;id<8;++id)teleportDestinations[curlevel][id]=U16_MAX;
     if(curlevel<MAX_LEVELS)elevatorDestCounts[curlevel]=0;
-    World.curLev = curlevel; TargetIDReset(); ai_reset_npc_numbering(); SetLevelPointers(curlevel); World.invP1.makingNoise=false;/*clear noise at level loads*/ World.decoyActive=false; World.decoyInstance=U16_MAX;/*a decoy is spawned into one level and dies with it; a stale true would leave cyber NPCs retargeting a dead instance index*/ mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    World.curLev = curlevel; TargetIDReset(); ai_reset_npc_numbering(); SetLevelPointers(curlevel); World.invP1.makingNoise=false;/*clear noise at level loads*/ World.decoyActive=false; World.decoyInstance=U16_MAX;/*a decoy is spawned into one level and dies with it; a stale true would leave cyber NPCs retargeting a dead instance index*/
+    /* Clear the whole per-level instance table, not just the slots the last visit
+       used: the dirty count is not knowable here (levelInstCount[curlevel] is 0 on
+       a level's first load, and runtime-summoned instances push the real high
+       water mark above it), so the full INSTANCE_COUNT span is what has to be
+       reset for the next load to start from a clean table. */
+    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf)); LoadLevelMod(curlevel); GravityLiftSyncAllVisuals(); PSysAddLevelLoops(); if (curlevel<MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel]=true; } OS_Free(fbuf,(size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
     for (int i = PLAYER1; i < World.instCount; ++i) {

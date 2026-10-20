@@ -1520,7 +1520,7 @@ void ModUpdate() {
     HardwareUpdate();
     MissionTimerUpdate();
     if (Use()) { Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); }
-    if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < (MAX_WIRELINE_VRTS * 3)) { DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f}); }
+    if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < MAX_WIRELINE_VRTS) { DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f}); }
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         Entity* e = &World.instances[i];
         u16 constdex = e->index;
