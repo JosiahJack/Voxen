@@ -169,5 +169,5 @@ elif [ "$BUILD_MODE" = "debug" ]; then
 fi
 PDB_CLEANUP="./${BINARY_PDB}"
 [ "$BUILD_MODE" = "debug" ] && PDB_CLEANUP=""
-rm -f ./Shaders/*.h ./voxen.upx $PDB_CLEANUP #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
+cp ./Shaders/ssr.compute.h /tmp/scratchpad/ssr.compute.h; cp ./Shaders/voxels.compute.h /tmp/scratchpad/voxels.compute.h; rm -f ./Shaders/*.h ./voxen.upx $PDB_CLEANUP #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 rm -r ./temp_build

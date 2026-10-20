@@ -102,7 +102,8 @@ void main() {
                 sum += mix(mix(s00,s10,st.x),mix(s01,s11,st.x),st.y); // Manual bilinear shadowmap filter
             } shadowFactor=(sum*invSamples);
         }
-        vec3 lightColor=lights[lightIdx].col; vec3 baseLighting=albedoColor.rgb*lightColor*intensity*(attenuation*attenuation/sqrt(sqrt(attenuation))),halfDir=normalize(lightDir+viewDir); lighting=fma(baseLighting,vec3(spotFalloff*shadowFactor),lighting); iTot=fma(intensity,attenuation*1.5,iTot); float ndh=max(dot(adjustedNormal,halfDir),0.0); float spec=clamp(pow(ndh,100.0),0.0,1.0); lighting+=specColor.rgb*intensity*attenuation*spotFalloff*spec*shadowFactor*strength;
+        vec3 lightColor=lights[lightIdx].col; vec3 baseLighting=albedoColor.rgb*lightColor*intensity*(attenuation*attenuation/sqrt(sqrt(attenuation))),halfDir=normalize(lightDir+viewDir); lighting=fma(baseLighting,vec3(spotFalloff*shadowFactor),lighting); iTot=fma(intensity,attenuation*1.5,iTot); float ndh=max(dot(adjustedNormal,halfDir),0.0);
+//         float spec=clamp(pow(ndh,100.0),0.0,1.0); lighting+=specColor.rgb*intensity*attenuation*spotFalloff*spec*shadowFactor*strength;
     }
     // Directional lighting: cyberspace gets two hardcoded neon directionals, all other levels get the hardcoded sun. No distance attenuation.
     if (isCyberspace > 0u) {

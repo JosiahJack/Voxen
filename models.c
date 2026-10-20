@@ -881,7 +881,7 @@ float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { // Ray-vs-
 }
 
 static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap, i32 tid) {
-    u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m]; if (!vc || !tc) { physPos[m] = NULL; physTris[m] = NULL; physVertCounts[m] = 0; return; } const float* src=vPos[m]; void* sub_mark=OS_SubArenaMark(tid);/*weldHt is all-0xFF on entry: FinalizeParsedMesh and this pass both restore every slot they set*/ u32 usedSlots=0, weldedCount=0; float* weldedPos=OS_SubArenaAlloc(tid,vc*3*sizeof(float)); // worst case: no duplicates at all
+    u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m]; if (!vc || !tc) { physPos[m] = NULL; physTris[m] = NULL; physVertCounts[m] = 0; return; } const float* src=vPos[m]; void* sub_mark=OS_SubArenaMark(tid);/*weldHt is all-0xFF on entry: FinalizeParsedMesh and this pass both restore every slot they set*/     u32 usedSlots=0, weldedCount=0; float* weldedPos=OS_SubArenaAlloc(tid,vc*3*sizeof(float)); float* weldedUV=OS_SubArenaAlloc(tid,vc*2*sizeof(float)); float* weldedTriUV=OS_SubArenaAlloc(tid,tc*6*sizeof(float)); // worst case: no duplicates at all
     for (u32 i = 0; i < vc; ++i) {
         float x = src[i*8+0], y = src[i*8+1], z = src[i*8+2]; i32 cx = (i32)vfloor(x * 10000), cy = (i32)vfloor(y * 10000), cz = (i32)vfloor(z * 10000); u32 found=U32_MAX;
         u32 px=(u32)cx*0x8DA6B343u, py=(u32)cy*0xD8163841u, pz=(u32)cz*0xCB1AB31Fu, hx[3]={px-0x8DA6B343u,px,px+0x8DA6B343u}, hy[3]={py-0xD8163841u,py,py+0xD8163841u}, hz[3]={pz-0xCB1AB31Fu,pz,pz+0xCB1AB31Fu};
@@ -893,13 +893,14 @@ static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap, 
                     if (!dx && !dy && !dz) continue;
                     u32 ns = (hx[dx+1]^hy[dy+1]^hz[dz+1])&(WELD_HASH_SIZE-1); while (weldHt[ns] != U32_MAX) { u32 cand = weldHt[ns]; float ddx = weldedPos[cand*3+0]-x, ddy = weldedPos[cand*3+1]-y, ddz = weldedPos[cand*3+2]-z; if (ddx*ddx + ddy*ddy + ddz*ddz <= 0.0001f * 0.0001f) { found = cand; break; } ns = (ns + 1) & (WELD_HASH_SIZE - 1); }
                 }
-        if(found == U32_MAX){found=weldedCount; weldedPos[weldedCount*3+0]=x; weldedPos[weldedCount*3+1]=y; weldedPos[weldedCount*3+2]=z; ++weldedCount; u32 ins=(px^py^pz)&(WELD_HASH_SIZE-1); while (weldHt[ins] != U32_MAX) ins = (ins + 1) & (WELD_HASH_SIZE - 1); weldHt[ins] = found; weldHtUsed[usedSlots++] = ins; } remap[i] = (u16)found;
-    }
-    for(u32 i=0;i<usedSlots;++i){weldHt[weldHtUsed[i]]=U32_MAX;/*reset shared scratch for the next model on this thread*/} float* exactPos=OS_Alloc(weldedCount*3*sizeof(float)); mcpy(exactPos,weldedPos,(size_t)weldedCount*3*sizeof(float)); OS_SubArenaRelease(tid, sub_mark);
-    u16* weldedTris=OS_Alloc(tc*3*sizeof(u16)); const u16* srcTris = modelTriangles[m]; for (u32 i = 0; i < tc * 3; ++i) weldedTris[i] = remap[srcTris[i]]; physPos[m] = exactPos; physTris[m] = weldedTris; physVertCounts[m] = weldedCount;
-}
+        if(found == U32_MAX){found=weldedCount; weldedPos[weldedCount*3+0]=x; weldedPos[weldedCount*3+1]=y; weldedPos[weldedCount*3+2]=z; weldedUV[weldedCount*2+0]=src[i*8+6]; weldedUV[weldedCount*2+1]=src[i*8+7]; ++weldedCount; u32 ins=(px^py^pz)&(WELD_HASH_SIZE-1); while (weldHt[ins] != U32_MAX) ins = (ins + 1) & (WELD_HASH_SIZE - 1); weldHt[ins] = found; weldHtUsed[usedSlots++] = ins; } remap[i] = (u16)found;    }
+    for(u32 i=0;i<usedSlots;++i){weldHt[weldHtUsed[i]]=U32_MAX;/*reset shared scratch for the next model on this thread*/} float* exactPos=OS_Alloc(weldedCount*3*sizeof(float)); float* exactUV=OS_Alloc(weldedCount*2*sizeof(float)); mcpy(exactPos,weldedPos,(size_t)weldedCount*3*sizeof(float)); mcpy(exactUV,weldedUV,(size_t)weldedCount*2*sizeof(float)); OS_SubArenaRelease(tid, sub_mark);
+    u16* weldedTris=OS_Alloc(tc*3*sizeof(u16)); const u16* srcTris = modelTriangles[m]; for (u32 i = 0; i < tc * 3; ++i) weldedTris[i] = remap[srcTris[i]];
+    for (u32 i = 0; i < tc; ++i) { for (u32 j = 0; j < 3; ++j) { u32 sv = srcTris[i*3+j]; weldedTriUV[i*6 + j*2 + 0] = src[sv*8 + 6]; weldedTriUV[i*6 + j*2 + 1] = src[sv*8 + 7]; } }
+    float* exactTriUV=OS_Alloc(tc*6*sizeof(float)); mcpy(exactTriUV,weldedTriUV,(size_t)tc*6*sizeof(float));
+    physPos[m] = exactPos; physUVs[m] = exactUV; physTriUVs[m] = exactTriUV; physTris[m] = weldedTris; physVertCounts[m] = weldedCount;}
 
-static void* PhysGeomWorker(void* a) { PhysGeomTask* t=a; BvhBuildCtx* bvhCtx=&thrd_bvh_ctx[t->tid]; u32* ht = thrd_ht[t->tid]; u32* u=thrd_ht_used[t->tid]; u16* sc=(u16*)thrd_remap_scratch[t->tid]; for (u32 m = t->start; m < t->end; ++m) { if(m >= mdlsCnt || !modelVertexCounts[m] || !modelTriangleCounts[m]){physPos[m]=NULL; physTris[m]=NULL; physVertCounts[m]=0; continue;}  WeldModelPositions((u16)m,ht,u,sc,t->tid); BuildModelBVH(bvhCtx,(u16)m); }  return NULL; }
+static void* PhysGeomWorker(void* a) { PhysGeomTask* t=a; BvhBuildCtx* bvhCtx=&thrd_bvh_ctx[t->tid]; u32* ht = thrd_ht[t->tid]; u32* u=thrd_ht_used[t->tid]; u16* sc=(u16*)thrd_remap_scratch[t->tid]; for (u32 m = t->start; m < t->end; ++m) { if(m >= mdlsCnt || !modelVertexCounts[m] || !modelTriangleCounts[m]){physPos[m]=NULL; physUVs[m]=NULL; physTriUVs[m]=NULL; physTris[m]=NULL; physVertCounts[m]=0; continue;}  WeldModelPositions((u16)m,ht,u,sc,t->tid); BuildModelBVH(bvhCtx,(u16)m); }  return NULL; }
 #define _mm256_cvtps_ph(A, imm) ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)(A), (int)(imm)))
 void LoadModels() {
     double startModelTime = get_time();
@@ -984,8 +985,7 @@ void LoadModels() {
     }
     
     thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_ht = ht; thrd_ht_used = ht_used; thrd_remap_scratch = remap_scr; thrd_cache_scratch = cache_scr; const size_t SUB_ARENA_SZ = (3ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt); /* TEMP-HEADLESS 1.5mb per model parsed per thread per 32-model sub-chunk (each thread's finalized outputs accumulate until sub-chunk end) */ const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; /* 12mb for all baked anim sources */ size_t slices_tot = SUB_ARENA_SZ * (size_t)threadCnt + SUB_MAIN_SZ; size_t slice_room = (size_t)(scratch_end - scratch_cur) - 4096; if (slices_tot > slice_room) { DualLogError("Not enough scratch room for model sub-arenas: need %u MB, %u MB free!\n", (u32)(slices_tot >> 20),(u32)(slice_room >> 20)); OS_Exit(1); } u8* slice_base = OS_AllocScratch(slices_tot); for (u32 si = 0; si < threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si * SUB_ARENA_SZ, SUB_ARENA_SZ); OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt * SUB_ARENA_SZ, SUB_MAIN_SZ); ModelParseTask tasks[32]; PhysGeomTask ptasks[32]; PoolJob pjobs[32]; glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
-    LoadGLBAnimatedSources(mp.entries,mp.count,raw); physPos=OS_Alloc(mdlsCnt*sizeof(float*)); physTris=OS_Alloc(mdlsCnt*sizeof(u16*)); physVertCounts=OS_Alloc(mdlsCnt*sizeof(u32));
-    u32 validCount = 0;
+    LoadGLBAnimatedSources(mp.entries,mp.count,raw); physPos=OS_Alloc(mdlsCnt*sizeof(float*)); physUVs=OS_Alloc(mdlsCnt*sizeof(float*)); physTriUVs=OS_Alloc(mdlsCnt*sizeof(float*)); physTris=OS_Alloc(mdlsCnt*sizeof(u16*)); physVertCounts=OS_Alloc(mdlsCnt*sizeof(u32));    u32 validCount = 0;
     for (u32 i = 0; i < mp.count; ++i) if (mp.entries[i].index != U16_MAX) ++validCount;
     u32* valid = OS_AllocScratch(validCount * sizeof(u32));
     validCount = 0;
