@@ -7,7 +7,7 @@ GlobalContext World = {0}; // Full game state
 
 // Rendering
 u32 globalframe, globalframesPerLastSecond, threadCnt = 1, inputImageID, inputUIID, inputDepthID, inputSpecID, inputNormalID, outputImageID, gBufferFBO, uiFBO, uiSP, depthPrepassSP, chunkSP, chunkVAO, vbos[MAX_MDLS], tbos[MAX_MDLS], matricesBufferID, modelVertexCounts[MAX_MDLS], *physVertCounts;
-float rasterPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT*16], *world_from_mdl = modelMatrices, modelBounds[MAX_MDLS], **physPos, **physUVs, **physTriUVs, lightView[LIGHT_COUNT][6][4][4], lightViewProj[LIGHT_COUNT][6][16], shadowmapsPerspectiveProjection[16], sunShadowMatrix[16], berserkSeedTime;
+float rasterPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT*16], *world_from_mdl = modelMatrices, modelBounds[MAX_MDLS], **physPos, lightView[LIGHT_COUNT][6][4][4], lightViewProj[LIGHT_COUNT][6][16], shadowmapsPerspectiveProjection[16], sunShadowMatrix[16], berserkSeedTime;
 typedef struct { _Alignas(16) float mn[4]; _Alignas(16) float mx[4]; u32 triStart; u32 triCount; i32 children[8]; } GpuBvhNode;
 typedef struct { u32 bvhOffset,bvhCount,triOrderOffset,triOrderCount,posOffset,posCount,triOffset,triCount; } ModelRTInfo;
 typedef struct { u32 model, act, tex; float sclx, scly, sclz; } InstanceRTInfo;
@@ -2142,6 +2142,7 @@ static void* InitFontAtlasses_Thread(void* arg) { (void)arg; InitFontAtlasses();
 static bool rtAccelBuilt = false;
 void BuildRTAccel(void);
 void EnsureReflectionResources(void) {
+    DualLog("[DebugRAM] Before EnsureReflectionResources: Reflections=%u outputImageID=%u rtAccelBuilt=%d\n", (u32)Sys_Settings.Reflections, outputImageID, (int)rtAccelBuilt);
     u16 w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
     if (Sys_Settings.Reflections >= 1u && outputImageID == 0) {
         GenerateAndBindTexture(&outputImageID, GL_RGBA8, w / Sys_Settings.SSR_RES, h / Sys_Settings.SSR_RES, GL_RGBA, GL_UNSIGNED_BYTE, 0x2601/*GL_LINEAR*/, NULL);
@@ -2150,15 +2151,15 @@ void EnsureReflectionResources(void) {
         glBindTexture(GL_TEXTURE_2D, outputImageID);
     }
     if (Sys_Settings.Reflections == 2u && !rtAccelBuilt) {
-        RenderLoading("Building RT accel..."); BuildRTAccel(); DebugRAM("after RT accel");
-        rtAccelBuilt = true;
+        RenderLoading("Building RT accel..."); BuildRTAccel(); DebugRAM("after RT accel"); rtAccelBuilt = true;
+        DualLog("[DebugRAM] After BuildRTAccel: rtGeomID=%u rtInstanceInfoID=%u\n", rtGeomID, rtInstanceInfoID);
     }
 }
 void BuildRTAccel(void) {
     u32 offsetCnt = mdlsCnt ? mdlsCnt : 1;
     u32* rtModelBvhOffset = OS_Alloc(offsetCnt * sizeof(u32)); u32* rtModelBvhCount = OS_Alloc(offsetCnt * sizeof(u32));
     ModelRTInfo* rtModelInfo = NULL;
-    u32 rtNodeBase = 0, rtTriOrderBase = 0, rtPosBase = 0, rtTriBase = 0, rtTriUVBase = 0;
+    u32 rtNodeBase = 0, rtTriOrderBase = 0, rtPosBase = 0, rtTriBase = 0;
     u32 rtGeomUintCount = 0; u32* rtGeom = NULL;
     u32 nodeTotal=0;
     for (u32 m=0; m<mdlsCnt; ++m) {
@@ -2167,12 +2168,12 @@ void BuildRTAccel(void) {
         nodeTotal += rtModelBvhCount[m];
     }
     // triOrder total
-    u32 triOrderTotal2=0, posFloatTotal2=0, triUVFloatTotal2=0, triIndexTotal2=0;
+    u32 triOrderTotal2=0, posFloatTotal2=0, triIndexTotal2=0;
     for (u32 m=0; m<mdlsCnt; ++m) {
         u32 c = BvhHasBVH((u16)m) ? modelBVHTriOrderCounts[m] : 0;
         triOrderTotal2 += c;
     }
-    for (u32 m=0; m<mdlsCnt; ++m) { posFloatTotal2 += physVertCounts[m]*3u; triUVFloatTotal2 += modelTriangleCounts[m]*6u; }
+    for (u32 m=0; m<mdlsCnt; ++m) { posFloatTotal2 += physVertCounts[m]*3u; }
     for (u32 m=0; m<mdlsCnt; ++m) { triIndexTotal2 += modelTriangleCounts[m]*3u; }
     rtModelInfo = mdlsCnt ? (ModelRTInfo*)OS_Alloc((size_t)mdlsCnt * sizeof(ModelRTInfo)) : NULL;
     // fill offsets
@@ -2192,20 +2193,29 @@ void BuildRTAccel(void) {
         offTri += modelTriangleCounts[m]*3u;
     }
     // Pack all RT geometry into one SSBO to stay within compute SSBO binding limit.
-
+    // uints: nodes | triOrder | pos | tri | modelInfo(10/model) || vtxPool | idxPool
     rtNodeBase = 0;
     rtTriOrderBase = rtNodeBase + nodeTotal * 18u;
     rtPosBase = rtTriOrderBase + triOrderTotal2;
     rtTriBase = rtPosBase + posFloatTotal2;
     rtModelInfoBase = rtTriBase + triIndexTotal2;
-    rtTriUVBase = rtModelInfoBase + mdlsCnt * 9u;
-    rtGeomUintCount = rtTriUVBase + triUVFloatTotal2;
-    size_t geomByteSize = (size_t)rtGeomUintCount * sizeof(u32);
-    rtGeomID = MakeSSBO(&rtGeomID, 16, geomByteSize, NULL, GL_STATIC_DRAW);
-    if (rtGeomUintCount) {
+    u32 cpuUints = rtModelInfoBase + mdlsCnt * 10u;
+    /* GPU-to-GPU copies of the render VBOs/TBOs supply UVs to the RT shader without touching CPU RAM; glGetBufferParameteriv
+       recovers render vertex counts, since modelVertexCounts was overwritten with physVertCounts after each sub-chunk */
+    u32* vtxBytes = OS_Alloc(offsetCnt * sizeof(u32)); u32* vtxOff = OS_Alloc(offsetCnt * sizeof(u32)); u32* idxOff = OS_Alloc(offsetCnt * sizeof(u32)); u32 vtxTotal = 0, idxTotal = 0;
+    for (u32 m=0; m<mdlsCnt; ++m) {
+        i32 b=0; glBindBuffer(GL_ARRAY_BUFFER,vbos[m]); glGetBufferParameteriv(GL_ARRAY_BUFFER,0x8764/*GL_BUFFER_SIZE*/,&b);
+        vtxBytes[m]=(u32)b; vtxOff[m]=vtxTotal; vtxTotal+=(u32)b>>2;
+        idxOff[m]=idxTotal; idxTotal+=(modelTriangleCounts[m]*3u+1u)>>1;/*word-pad u16 pairs*/
+    }
+    glBindBuffer(GL_ARRAY_BUFFER,0);
+    u32 rtVtxBase=cpuUints, rtIdxBase=rtVtxBase+vtxTotal;
+    rtGeomUintCount=rtIdxBase+idxTotal;
+    rtGeomID = MakeSSBO(&rtGeomID, 16, (size_t)rtGeomUintCount * sizeof(u32), NULL, GL_STATIC_DRAW);
+    // Map ONLY the CPU-built prefix (also stops zeroing the whole pool)
+    if (cpuUints) {
         glBindBuffer(GL_SSBO, rtGeomID);
-        rtGeom = (u32*)glMapBufferRange(GL_SSBO, 0, geomByteSize, 0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-        for (u32 i = 0; i < rtGeomUintCount; ++i) rtGeom[i] = 0;
+        rtGeom = (u32*)glMapBufferRange(GL_SSBO, 0, (size_t)cpuUints * sizeof(u32), 0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
     }
 
     for (u32 m=0; m<mdlsCnt; ++m) {
@@ -2255,7 +2265,7 @@ void BuildRTAccel(void) {
         }
     }
     for (u32 m=0; m<mdlsCnt; ++m) {
-        u32 base = rtModelInfoBase + m*9u;
+        u32 base = rtModelInfoBase + m*10u;
         rtGeom[base+0] = BvhHasBVH((u16)m) ? (rtNodeBase + rtModelBvhOffset[m]*18u) : 0xFFFFFFFFu;
         rtGeom[base+1] = BvhHasBVH((u16)m) ? rtModelBvhCount[m] : 0u;
         rtGeom[base+2] = BvhHasBVH((u16)m) ? (rtTriOrderBase + rtModelInfo[m].triOrderOffset) : 0xFFFFFFFFu;
@@ -2264,31 +2274,25 @@ void BuildRTAccel(void) {
         rtGeom[base+5] = physVertCounts[m];
         rtGeom[base+6] = (physTris[m] && modelTriangleCounts[m]) ? (rtTriBase + rtModelInfo[m].triOffset) : 0xFFFFFFFFu;
         rtGeom[base+7] = modelTriangleCounts[m];
-        rtGeom[base+8] = (physTriUVs[m] && modelTriangleCounts[m]) ? (rtTriUVBase + (rtModelInfo[m].triOffset / 3u) * 6u) : 0xFFFFFFFFu;
-    }
-    // pack triUVs
-    for (u32 m=0; m<mdlsCnt; ++m) {
-        if (physTriUVs[m] && modelTriangleCounts[m]) {
-            u32 uoff = rtGeom[rtModelInfoBase + m*9u + 8u];
-            if (uoff != 0xFFFFFFFFu) {
-                mcpy(&rtGeom[uoff], physTriUVs[m], (size_t)modelTriangleCounts[m]*6u*sizeof(float));
-            }
-        }
+        rtGeom[base+8] = (vbos[m] != 0) ? (rtVtxBase + vtxOff[m]) : 0xFFFFFFFFu; // vtx pool base
+        rtGeom[base+9] = (tbos[m] != 0) ? (rtIdxBase + idxOff[m]) : 0xFFFFFFFFu; // idx pool base
     }
 
-    // Free intermediate CPU arrays; GPU buffer now holds the data.
-    for (u32 m=0; m<mdlsCnt; ++m) {
-        if (physUVs[m]) { OS_Free(physUVs[m], (size_t)physVertCounts[m]*2u*sizeof(float)); physUVs[m]=NULL; }
-        if (physTriUVs[m]) { OS_Free(physTriUVs[m], (size_t)modelTriangleCounts[m]*6u*sizeof(float)); physTriUVs[m]=NULL; }
-    }
     if (rtGeom) { glUnmapBuffer(GL_SSBO); rtGeom = NULL; }
+    // Copies must come AFTER unmap (a mapped buffer makes glCopyBufferSubData INVALID_OPERATION, and INVALIDATE would eat earlier copies)
+    glBindBuffer(0x8F37/*GL_COPY_WRITE_BUFFER*/,rtGeomID);
+    for (u32 m=0; m<mdlsCnt; ++m) {
+        if (vtxBytes[m]) { glBindBuffer(0x8F36/*GL_COPY_READ_BUFFER*/,vbos[m]); glCopyBufferSubData(0x8F36,0x8F37,0,(intptr_t)(rtVtxBase+vtxOff[m])*4,vtxBytes[m]); }
+        if (modelTriangleCounts[m]) { glBindBuffer(0x8F36,tbos[m]); glCopyBufferSubData(0x8F36,0x8F37,0,(intptr_t)(rtIdxBase+idxOff[m])*4,modelTriangleCounts[m]*6); }
+    }
+    glBindBuffer(0x8F36,0); glBindBuffer(0x8F37,0); glFinish(); /* retire driver staging, same NVIDIA-Linux issue as in LoadModels */
     // create SSBOs
 rtInstanceInfoID = MakeSSBO(&rtInstanceInfoID, 21, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);    rtCellCountsID = MakeSSBO(&rtCellCountsID, 23, (size_t)ARRSIZE * sizeof(u32), NULL, GL_DYNAMIC_DRAW);
     rtCellListsID = MakeSSBO(&rtCellListsID, 24, (size_t)ARRSIZE * 128 * sizeof(u32), NULL, GL_DYNAMIC_DRAW);
+    if (rtModelInfo) { OS_Free(rtModelInfo, (size_t)mdlsCnt * sizeof(ModelRTInfo)); rtModelInfo = NULL; }
     if (rtModelBvhOffset) { OS_Free(rtModelBvhOffset, offsetCnt * sizeof(u32)); rtModelBvhOffset = NULL; }
     if (rtModelBvhCount) { OS_Free(rtModelBvhCount, offsetCnt * sizeof(u32)); rtModelBvhCount = NULL; }
-    OS_Free(physUVs, mdlsCnt * sizeof(float*)); physUVs = NULL;
-    OS_Free(physTriUVs, mdlsCnt * sizeof(float*)); physTriUVs = NULL;
+    OS_Free(vtxBytes, offsetCnt * sizeof(u32)); OS_Free(vtxOff, offsetCnt * sizeof(u32)); OS_Free(idxOff, offsetCnt * sizeof(u32));
 }
 void InitalizeEnvironment() {
     game_start_time = get_time();
