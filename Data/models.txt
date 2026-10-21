@@ -2190,3 +2190,6 @@ frame: 1 40
 
 #Models/grove1_2_slice45.obj
 index: 7488
+
+#Models/player_character.glb
+index: 7489

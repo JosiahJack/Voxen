@@ -7023,3 +7023,6 @@ index: 3334
 index: 3335
 #Textures/chair02.png
 index: 3336
+
+#Textures/player_character.png
+index: 3337

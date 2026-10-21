@@ -16,12 +16,12 @@ layout(location=8) uniform uint modelCount;
 layout(location=9) uniform uint texCount;
 layout(std430,binding=1) readonly buffer ModelMatrices { mat4 modelMatrices[]; };
 layout(std430,binding=16) readonly buffer RTGeom { uint rtGeom[]; };
-struct ModelRTInfo { uint nodeUBase; uint bvhCount; uint triOrderUBase; uint triOrderCount; uint posUBase; uint posCount; uint triUBase; uint triCount; uint vtxUBase; uint idxUBase; };
+struct ModelRTInfo { uint nodeUBase; uint bvhCount; uint vtxUBase; uint idxUBase; };
 layout(location=10) uniform uint modelInfoBase;
 struct InstanceRTInfo { uint model; uint act; uint tex; float sclx; float scly; float sclz; };
 layout(std430,binding=21) readonly buffer RTInstanceInfo { InstanceRTInfo rtInstanceInfo[]; };
-layout(std430,binding=23) readonly buffer RTCellCounts { uint rtCellCounts[]; };
-layout(std430,binding=24) readonly buffer RTCellLists { uint rtCellLists[]; };
+layout(std430,binding=23) readonly buffer RTCellCounts { uint rtCellCountsP[]; };
+layout(std430,binding=24) readonly buffer RTCellLists { uint rtCellListsP[]; };
 layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; };
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
 layout(std430,binding=2) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
@@ -63,12 +63,16 @@ bool rayTriangle(vec3 orig, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t, ou
     return true;
 }
 
+uint RtIdxU16(uint idxBase, uint k) { return (rtGeom[idxBase + (k >> 1)] >> ((k & 1u) * 16u)) & 0xFFFFu; }
+vec3 RtVtxPos(uint vtxBase, uint vi) { uint w = vtxBase + vi * 3u; vec2 h = unpackHalf2x16(rtGeom[w]); return vec3(h.x, h.y, unpackHalf2x16(rtGeom[w + 1u]).x); }
+uint RtCellListU16(uint i) { uint w = rtCellListsP[i >> 1]; return (i & 1u) != 0u ? (w >> 16) : (w & 0xFFFFu); }
+uint RtCellCount(uint cell) { uint w = rtCellCountsP[cell >> 1]; return (cell & 1u) != 0u ? (w >> 16) : (w & 0xFFFFu); }
 vec2 RtTriUV(uint vtxBase, uint idxBase, uint tri, vec3 b) {
     vec2 uv = vec2(0.0);
     for (uint j = 0u; j < 3u; ++j) {
-        uint k = tri * 3u + j;
-        uint vi = (rtGeom[idxBase + (k >> 1)] >> ((k & 1u) * 16u)) & 0xFFFFu;
-        uv += unpackHalf2x16(rtGeom[vtxBase + vi * 4u + 3u]) * b[j];
+        uint vi = RtIdxU16(idxBase, tri * 3u + j);
+        uint w = vtxBase + vi * 3u;
+        uv += vec2(unpackHalf2x16(rtGeom[w + 1u]).y, unpackHalf2x16(rtGeom[w + 2u]).x) * b[j];
     }
     return uv;
 }
@@ -129,26 +133,19 @@ void main() {
         if (cx < 0 || cx >= 64 || cz < 0 || cz >= 64) break;
         
         uint cell = uint(cz * 64 + cx);
-        uint cnt = rtCellCounts[cell];
-        if (cnt > 128u) cnt = 128u;
-        for (uint k = 0u; k < cnt; ++k) {
-            uint inst = rtCellLists[cell * 128u + k]; if (inst >= 9032u) continue;
+            uint cnt = RtCellCount(cell);
+            if (cnt > 128u) cnt = 128u;
+            for (uint k = 0u; k < cnt; ++k) {
+            uint inst = RtCellListU16(cell * 128u + k); if (inst >= 9032u) continue;
             if (rtInstanceInfo[inst].act == 0u) continue;
             uint mid = rtInstanceInfo[inst].model; if (mid >= modelCount) continue;
             
-            uint mi = modelInfoBase + mid * 10u;
+            uint mi = modelInfoBase + mid * 4u;
             ModelRTInfo info;
             info.nodeUBase = rtGeom[mi+0u];
             info.bvhCount = rtGeom[mi+1u]; if (info.bvhCount == 0u) continue;
-
-            info.triOrderUBase = rtGeom[mi+2u];
-            info.triOrderCount = rtGeom[mi+3u];
-            info.posUBase = rtGeom[mi+4u];
-            info.posCount = rtGeom[mi+5u];
-            info.triUBase = rtGeom[mi+6u];
-            info.triCount = rtGeom[mi+7u];
-            info.vtxUBase = rtGeom[mi+8u];
-            info.idxUBase = rtGeom[mi+9u];
+            info.vtxUBase = rtGeom[mi+2u];
+            info.idxUBase = rtGeom[mi+3u];
             mat4 M = modelMatrices[inst];
             vec3 c0 = M[0].xyz; vec3 c1 = M[1].xyz; vec3 c2 = M[2].xyz; vec3 tr = M[3].xyz;
             float sclx = rtInstanceInfo[inst].sclx, scly = rtInstanceInfo[inst].scly, sclz = rtInstanceInfo[inst].sclz; if (sclx < 1e-4 || scly < 1e-4 || sclz < 1e-4) continue;
@@ -177,13 +174,12 @@ void main() {
                 if (triCount > 0u) {
                     for (uint triK = 0u; triK < triCount; ++triK) {
                         uint triIdx = rtGeom[triStart + triK];
-                        uint base = info.triUBase + triIdx * 3u;
-                        uint iA = rtGeom[base + 0u];
-                        uint iB = rtGeom[base + 1u];
-                        uint iC = rtGeom[base + 2u];
-                        vec3 pa = vec3(uintBitsToFloat(rtGeom[info.posUBase + iA * 3u]), uintBitsToFloat(rtGeom[info.posUBase + iA * 3u + 1u]), uintBitsToFloat(rtGeom[info.posUBase + iA * 3u + 2u]));
-                        vec3 pb = vec3(uintBitsToFloat(rtGeom[info.posUBase + iB * 3u]), uintBitsToFloat(rtGeom[info.posUBase + iB * 3u + 1u]), uintBitsToFloat(rtGeom[info.posUBase + iB * 3u + 2u]));
-                        vec3 pc = vec3(uintBitsToFloat(rtGeom[info.posUBase + iC * 3u]), uintBitsToFloat(rtGeom[info.posUBase + iC * 3u + 1u]), uintBitsToFloat(rtGeom[info.posUBase + iC * 3u + 2u]));
+                        uint iA = RtIdxU16(info.idxUBase, triIdx * 3u);
+                        uint iB = RtIdxU16(info.idxUBase, triIdx * 3u + 1u);
+                        uint iC = RtIdxU16(info.idxUBase, triIdx * 3u + 2u);
+                        vec3 pa = RtVtxPos(info.vtxUBase, iA);
+                        vec3 pb = RtVtxPos(info.vtxUBase, iB);
+                        vec3 pc = RtVtxPos(info.vtxUBase, iC);
                         float tt, bu = 0.0, bv = 0.0; vec3 nn; 
                         if (rayTriangle(localOrigin, localDir, pa, pb, pc, tt, nn, bu, bv) && tt < bestT) {
                             bestT = tt; hitLocalPoint = localOrigin + localDir * tt; anyHit = true;
@@ -229,8 +225,8 @@ void main() {
         if (texIdx < texCount) {
             ivec2 ts = textureSizes[texIdx];
             if (ts.x > 0 && ts.y > 0) {
-                uint mi2 = modelInfoBase + bestMid*10u;
-                vec2 uvHit = RtTriUV(rtGeom[mi2+8u], rtGeom[mi2+9u], bestTriIdx, vec3(1.0 - bestBaryU - bestBaryV, bestBaryU, bestBaryV));
+                uint mi2 = modelInfoBase + bestMid*4u;
+                vec2 uvHit = RtTriUV(rtGeom[mi2+2u], rtGeom[mi2+3u], bestTriIdx, vec3(1.0 - bestBaryU - bestBaryV, bestBaryU, bestBaryV));
                 vec2 uvSample = vec2(uvHit.x, 1.0 - uvHit.y);
                 ivec2 tcoord = ivec2(fract(uvSample) * vec2(ts));
                 tcoord = clamp(tcoord, ivec2(0,0), ivec2(ts.x - 1, ts.y - 1));
