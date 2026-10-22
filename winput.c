@@ -759,11 +759,11 @@ void InputProcessing() {
         if (Biomonitor()) HwToggle(0);/*hwBtns[0]=HW_BIO; no-op while Cheats.showFPS, which holds the biomonitor on for the frame-time graphs*/
         if (Sensaround()) {
             if (!(World.invP1.hasHardware & HW_SNS) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SNS)?82:93],AppliedFXVol(1.0f),(V3){0,0,0},false); World.invP1.hardwareIsActive ^= HW_SNS; }
+            else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SNS)?82:93],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SNS; }
         }
         if (Shield()) {
             if (!(World.invP1.hasHardware & HW_SHD) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SHD)?95:96],AppliedFXVol(1.0f),(V3){0,0,0},false); World.invP1.hardwareIsActive ^= HW_SHD; }
+            else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SHD)?95:96],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SHD; }
         }
         if (Email()) {
             if (World.invP1.hasHardware & HW_ERD) {
@@ -775,16 +775,16 @@ void InputProcessing() {
                 World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
                 World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;
                 if (World.Sys_UI.MFD_MediaTab>MM_NOTES || (World.Sys_UI.MFD_MediaTab==MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE;
-                play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false);
+                play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false);
             }
         }
         if (Booster()) {
             if (!(World.invP1.hasHardware & HW_BST) || (World.invP1.energy <= 0.0f && World.invP1.hwVersSetting[HW_BST_IDX] >= 1)) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ }
-            else { play_wav(sounds[78],AppliedFXVol(1.0f),(V3){0,0,0},false); World.invP1.hardwareIsActive ^= HW_BST; }
+            else { play_wav(sounds[78],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_BST; }
         }
         if (Jumpjets()) {
             if (!(World.invP1.hasHardware & HW_JET) || World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ }
-            else { play_wav(sounds[78],AppliedFXVol(1.0f),(V3){0,0,0},false); World.invP1.hardwareIsActive ^= HW_JET; }
+            else { play_wav(sounds[78],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_JET; }
         }
         if (!editFieldEditing && (WeaponCycUp()   || (!uiWheelBlocked && Sys_Input.scrollDelta > 0))) { CycleWeaponSlot(Sys_Settings.InvertInventoryCycling ? -1 : +1); Sys_Input.scrollDelta = 0; }
         if (!editFieldEditing && (WeaponCycDown() || (!uiWheelBlocked && Sys_Input.scrollDelta < 0))) { CycleWeaponSlot(Sys_Settings.InvertInventoryCycling ? +1 : -1); Sys_Input.scrollDelta = 0; }

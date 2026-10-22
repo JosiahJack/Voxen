@@ -324,7 +324,7 @@ static void ai_ensure_effect_pool(void) {
     if (p->ready) { for (u16 i=0;i<p->count;i++) if (p->lights[i] >= World.loadedLights || World.lights[p->lights[i]].spotAng != ai_effect_marker(i)) { p->ready = false; break; } }
     if (p->ready) return; p->count = 0;
     
-    while (p->count < AI_EFFECT_LIGHT_POOL_SIZE && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0,0,0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_effect_marker(i); p->count++; }
+    while (p->count < AI_EFFECT_LIGHT_POOL_SIZE && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_effect_marker(i); p->count++; }
     p->ready = p->count > 0;
 }
 static void ai_update_effect_lights(void) {
@@ -665,7 +665,7 @@ static void ProjectileLaunched(Entity* self, int n) {
     V3 spos=ai_attack_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370,false);
     if (!EntIdxIsValid(bb)) bb=SpawnDynamicObject(370,false); if (!EntIdxIsValid(bb)) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir;
     proj->damage=dd.damage; proj->strength=dd.penetration; proj->speed=dd.offense; proj->attackType=dd.attackType; proj->recentMostActivator=sidx; ProjectileEffectImpactInitAfterLoad(bb);
-    V3 shove = V3_ScaleByF(dir, launchSpd); if (vabs(World.gravity[sidx]) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0,0,0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
+    V3 shove = V3_ScaleByF(dir, launchSpd); if (vabs(World.gravity[sidx]) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
 
 static void AIExplodeAttack(Entity* self) {

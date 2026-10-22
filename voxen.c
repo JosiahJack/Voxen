@@ -337,7 +337,7 @@ static void SpawnArsenalItem(u16 constIndex, int* offsetIdx) {
             u16 spawned = SpawnDynamicObject(constIndex, true);
             if (EntIdxIsValid(spawned)) {
                 World.position[spawned] = spawnPos;
-                World.velocity[spawned] = (V3){0,0,0};
+                World.velocity[spawned] = (V3){0};
                 *offsetIdx = i + 1;
                 return;
             }
@@ -632,12 +632,12 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 A, V3 B, V3 C) {
 }
 
 INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
-    RaycastHit h = {.hit=false,.distance=maxDist,.point={0,0,0},.normal={0,0,0},.hitInstanceIndex=INSTANCE_COUNT}; float r = sph.rad; if (r < 0.0001f) return h; V3 oc = V3_AsubB(origin, sph.ctr); float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r; float disc=b*b - c; if (disc < 0.0f) return h; float s = vsqrtf(disc); float t = -b - s; if (t < 0.0f) t = -b + s; if (t < 0.0f || t > maxDist) return h;
+    RaycastHit h = {.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT}; float r = sph.rad; if (r < 0.0001f) return h; V3 oc = V3_AsubB(origin, sph.ctr); float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r; float disc=b*b - c; if (disc < 0.0f) return h; float s = vsqrtf(disc); float t = -b - s; if (t < 0.0f) t = -b + s; if (t < 0.0f || t > maxDist) return h;
     V3 p = V3_AplusB(origin, V3_ScaleByF(dir, t)); V3 n = V3_Normalize(V3_ScaleByF(V3_AsubB(p, sph.ctr), 1.0f / r)); h.hit = true; h.distance = t; h.point = p; h.normal = n; return h;
 }
 
 INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist) {
-    RaycastHit h={.hit=false,.distance=maxDist,.point={0,0,0},.normal={0,0,0},.hitInstanceIndex=INSTANCE_COUNT}; float r = cap.rad; if (r < 0.0001f) return h; V3 ba = V3_AsubB(cap.tip,cap.base), oa = V3_AsubB(origin,cap.base), nBest = {0,0,0}; float baba = V3_dot(ba,ba); if (baba < 0.00001f) return RaySphere(origin, dir, (ShapeSphere){cap.base, r}, maxDist);
+    RaycastHit h={.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT}; float r = cap.rad; if (r < 0.0001f) return h; V3 ba = V3_AsubB(cap.tip,cap.base), oa = V3_AsubB(origin,cap.base), nBest = {0}; float baba = V3_dot(ba,ba); if (baba < 0.00001f) return RaySphere(origin, dir, (ShapeSphere){cap.base, r}, maxDist);
     float bard = V3_dot(ba,dir), baoa = V3_dot(ba,oa), tBest=-1.0f; float a = baba - bard * bard, b = baba * V3_dot(dir,oa) - baoa * bard, c = baba * V3_dot(oa,oa) - baoa * baoa - r * r * baba; float disc = b * b - a * c;
     if (vabs(a) >= 0.00001f && disc >= 0.0f) {
         float sh = vsqrtf(disc); float t0 = (-b - sh) / a; float y0 = baoa + t0 * bard; 

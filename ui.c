@@ -154,7 +154,7 @@ INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
     }
     
     if (panel && tab == 4 && view == 5) World.Sys_UI.lastSearchSideRH = (panel == 2);
-    play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false);
+    play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false);
 }
 
 void WeaponFireStartWeaponDip(float t);
@@ -509,7 +509,7 @@ void HwToggle(u8 i) {
         World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
         World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;
         if (World.Sys_UI.MFD_MediaTab > MM_NOTES || (World.Sys_UI.MFD_MediaTab == MM_NOTES && !World.diffMis)) World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE;
-        play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false);
+        play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false);
         return;
     }
     
@@ -638,7 +638,7 @@ void UI_PuzzleGridCell(bool rh,int cell) {
         if (World.Sys_UI.pg_fired) { CenterStatusPrint("%s",Sys_Text.stringTable[312]); return; }
         
         World.Sys_UI.pg_fired = true;
-        play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0,0,0},false);/*code accepted / puzzle solved sound*/
+        play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false);/*code accepted / puzzle solved sound*/
         u16 pg = World.Sys_UI.tetheredPGP;
         if (pg>=INSTS_1ST_IDX && pg<World.instCount) {
             UseTargets(pg,World.instances[pg].targetIdx);
@@ -748,10 +748,10 @@ void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if 
     if (rh) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; }
 void UseCyberspaceItemByIndex(int);
 void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>6) return; bool cyber = World.curLev == LEVEL_CYBERSPACE;/*row 0 ICE Drill, 1 Pulser, 2 Cyber Shield, 3 Turbo, 4 Decoy, 5 Recall, 6 Games*/
-    if (idx==SW_DRILL)  { World.invP1.isPulserNotDrill = false; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ return; }
-    if (idx==SW_PULSER) { World.invP1.isPulserNotDrill = true;  play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ return; }
+    if (idx==SW_DRILL)  { World.invP1.isPulserNotDrill = false; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
+    if (idx==SW_PULSER) { World.invP1.isPulserNotDrill = true;  play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
     if (idx==SW_SHIELD) { CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 461 : 460]); return; }
-    if (idx==SW_GAMES)  { if (World.invP1.hasMinigame) { if (!cyber) { World.Sys_UI.mg_current=-1; MFD_OpenData(false,9); } CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 443 : 309]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false); } return; }
+    if (idx==SW_GAMES)  { if (World.invP1.hasMinigame) { if (!cyber) { World.Sys_UI.mg_current=-1; MFD_OpenData(false,9); } CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 443 : 309]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false); } return; }
     if (!cyber) { CenterStatusPrint("%s",Sys_Text.stringTable[460]); return; }
     UseCyberspaceItemByIndex(idx - SW_TURBO); }
 void UI_WeaponIconClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastWeaponSideRH=rh; if (CurrentWeaponUsesEnergy()) OverloadButtonAction(); else ActualChangeAmmoType(); }
@@ -836,7 +836,7 @@ int ConsumableItem(bool patch,int row) { int slot=ConsumableSlot(patch,row); ret
 static u8 ConsumableCount(bool patch,int row) { int slot=ConsumableSlot(patch,row); return slot<0?0:patch?World.invP1.patchCounts[slot]:World.invP1.grenAmmo[slot]; }
 void ConsumableSelect(bool patch,int row) {
     if (!ConsumableCount(patch,row)) return;
-    play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/
+    play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/
     if (patch) World.invP1.patchCur=(u8)ConsumableSlot(true,row); else World.invP1.grenCur=(u8)row;
     MFD_ShowGeneralItem(); World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=patch?2:1;
 }
@@ -1306,7 +1306,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_MEDIA_TAB_0 ... UI_ID_LMFD_MEDIA_TAB_3: {
             u8 section=(u8)(id-UI_ID_LMFD_MEDIA_TAB_0); if (section==MM_NOTES && !World.diffMis) return;
             World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened=section; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
-            if (section>=MM_DATA_TABLE) { World.Sys_UI.highlightStatus[section]=false; World.Sys_UI.highlightTickCount[section]=0; } play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0,0,0},false); return; }
+            if (section>=MM_DATA_TABLE) { World.Sys_UI.highlightStatus[section]=false; World.Sys_UI.highlightTickCount[section]=0; } play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false); return; }
         case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.generalInvCurrent; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanUse(s)) GeneralInvApply(s); } return; }
         case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanVaporize(World.invP1.generalInvCurrent)) VaporizeClick(); return;
         case UI_ID_LMFD_ITEM_SKATE: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(false); return;
@@ -1484,7 +1484,7 @@ static double RenderUI() {
     }
     if (World.Sys_UI.vmailActive) {
         if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[World.Sys_UI.vmailActive]) {
-            if (World.Sys_UI.vmailFrame == (vmailStartFrames[World.Sys_UI.vmailActive]+11)) play_wav(sounds[99], AppliedFXVol(1.0f), (V3){0,0,0}, false);
+            if (World.Sys_UI.vmailFrame == (vmailStartFrames[World.Sys_UI.vmailActive]+11)) play_wav(sounds[99], AppliedFXVol(1.0f), (V3){0}, false);
             World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[World.Sys_UI.vmailActive]) World.Sys_UI.vmailFrame = vmailEndFrames[World.Sys_UI.vmailActive];
         }
         {

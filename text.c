@@ -207,7 +207,7 @@ void _fae(float*sl,float*sf,int len,stbtt__active_edge*e,float yt){
 }
 
 void _rse(stbtt__bitmap*res,stbtt__edge*e,int n,int ox,int oy){
-    stbtt__hheap hh={0,0,0}; stbtt__active_edge *active=NULL; int y,j=0,i; float sd[129],*sl,*sl2;
+    stbtt__hheap hh={0}; stbtt__active_edge *active=NULL; int y,j=0,i; float sd[129],*sl,*sl2;
     if(res->w>64){sl=(float*)ttalloc((size_t)(res->w*2+1)*sizeof(float)); if (!sl){return;}} else {sl=sd;}
     sl2=sl+res->w;y=oy;e[n].y0=(float)(oy+res->h)+1;
     while(j<res->h){float syt=(float)y,syb=(float)y+1;stbtt__active_edge**step=&active;

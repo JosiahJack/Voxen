@@ -78,7 +78,7 @@ void CompleteWeaponChange() {
 
 void WeaponFireStartWeaponDip(float t); // Forward declaration from citadel.c
 void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev; dead in cyberspace, only 2 weapons so up is down
-    if (World.curLev == LEVEL_CYBERSPACE) { World.invP1.isPulserNotDrill = !World.invP1.isPulserNotDrill; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ return; }
+    if (World.curLev == LEVEL_CYBERSPACE) { World.invP1.isPulserNotDrill = !World.invP1.isPulserNotDrill; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
     if (World.invP1.reloadFinished > World.pauseRelativeTime) return; // Dip in progress
     int curSlot = (int)World.invP1.wepCur;
     int nextSlot = curSlot;
@@ -92,7 +92,7 @@ void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev; dead in cyberspace
     }
     if (nextSlot == curSlot) return;
     int wi = (int)World.invP1.wepInvIndices[nextSlot];
-    play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/
+    play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/
     World.invP1.wepCurPending = (i16)nextSlot;
     World.invP1.weaponIndexPending = (i16)wi;
     int w16=Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip(w16>=0?reloadTime[w16]:0.5f);
@@ -279,7 +279,7 @@ void MeleeHitUpdate(void) {
     float dmgFinal = TakeDamage(targ,dd);
     if (dmgFinal < 0.0f) {dmgFinal = 0.0f;}
     CreateTargetIDInstance(dmgFinal,targ,-1.0f);
-    if(!silent){World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;BloodType bt=World.instances[targ].bloodType;if(bt==BloodType_Red||bt==BloodType_Yellow||bt==BloodType_Green)play_wav(sounds[wfx.pendingMeleeFleshSnd], AppliedFXVol(1.0f), (V3){0,0,0}, false);else if(isRapier&&World.invP1.energy<4.0f)play_wav(sounds[67], AppliedFXVol(1.0f), (V3){0,0,0}, false);else play_wav(sounds[wfx.pendingMeleeHitSnd], AppliedFXVol(1.0f), (V3){0,0,0}, false);}
+    if(!silent){World.invP1.makingNoise=true;World.invP1.noiseFinished=World.pauseRelativeTime+0.5;BloodType bt=World.instances[targ].bloodType;if(bt==BloodType_Red||bt==BloodType_Yellow||bt==BloodType_Green)play_wav(sounds[wfx.pendingMeleeFleshSnd], AppliedFXVol(1.0f), (V3){0}, false);else if(isRapier&&World.invP1.energy<4.0f)play_wav(sounds[67], AppliedFXVol(1.0f), (V3){0}, false);else play_wav(sounds[wfx.pendingMeleeHitSnd], AppliedFXVol(1.0f), (V3){0}, false);}
     if (isRapier) { TakeEnergy(3.666f); BiomonitorEnergyPulse(3.666f); } // 3 hits per energy tick
 }
 
@@ -328,7 +328,7 @@ void FireBeachball(int wep16, float shoveForce, u16 prefabID) { // Acts like a b
     World.layer[ball] = L_PlayerBullets; proj->forward = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
     proj->damage = alt ? dmgForWep2[wep16] : (CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16]); proj->strength = alt ? penetrationWep2[wep16] : penetrationWep[wep16]; proj->speed = alt ? offenseWep2[wep16] : offenseWep[wep16]; proj->attackType = attTypeWep[wep16]; proj->recentMostActivator = PLAYER1; ProjectileEffectImpactInitAfterLoad(ball);
     V3 spawn = World.position[PLAYER1];
-    World.position[ball] = spawn; World.velocity[ball] = (V3){0,0,0}; // clear any stale velocity before the impulse
+    World.position[ball] = spawn; World.velocity[ball] = (V3){0}; // clear any stale velocity before the impulse
     AddForce(ball, V3_ScaleByF(proj->forward, shoveForce), true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
     AttachProjectileRibbon(prefabID, ball);
 }
@@ -339,7 +339,7 @@ void FireCyberBeachball(bool isPulser, float shoveForce, u16 prefabID) { // Same
     proj->damage = isPulser ? (1.0f + 0.25f * (float)World.invP1.softVersions[SW_PULSER]) : 10.0f * (float)World.invP1.softVersions[SW_DRILL];
     proj->strength = proj->speed = 0.0f;/*Citadel leaves DamageData.penetration/offense at 0 on the cyber path*/
     proj->attackType = isPulser ? Att_Ball/*ProjectileLaunched*/ : Att_Drill; proj->recentMostActivator = PLAYER1; ProjectileEffectImpactInitAfterLoad(ball);
-    World.position[ball] = World.position[PLAYER1]; World.velocity[ball] = (V3){0,0,0};
+    World.position[ball] = World.position[PLAYER1]; World.velocity[ball] = (V3){0};
     AddForce(ball, V3_ScaleByF(proj->forward, shoveForce), true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
 void FireCyberWeapon(void) { // Reuses waitTilNextFire: cyberspace has no equipped weapon, so it is free to carry the cyber fire rate
@@ -392,14 +392,14 @@ void CheckUIStateAndAttack(void) {
     if (wepClass[wepdex] == WC_ENERGY) {
         u16 wc = World.invP1.wepCur;
         if (World.invP1.energy > 0.0f || Cheats.bottomless || Cheats.redbull) {
-            if(World.invP1.curWepHeat[wc]>wfx.overheatedPercent && !Cheats.bottomless && !Cheats.redbull){play_wav(sounds[238],AppliedFXVol(1.0f),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire=World.pauseRelativeTime + 0.8f; CenterStatusPrint("%s",Sys_Text.stringTable[11]);} 
+            if(World.invP1.curWepHeat[wc]>wfx.overheatedPercent && !Cheats.bottomless && !Cheats.redbull){play_wav(sounds[238],AppliedFXVol(1.0f),(V3){0},false);/*noammo*/ World.invP1.waitTilNextFire=World.pauseRelativeTime + 0.8f; CenterStatusPrint("%s",Sys_Text.stringTable[11]);} 
             else { FireWeapon(wepdex,false); }
         } else { CenterStatusPrint("%s", Sys_Text.stringTable[207]);/*not enough energy*/ }
         return;
     }
     u16 wc = World.invP1.wepCur; bool alt = World.invP1.wepLoadedWithAlternate[wc];
     u16 amount = alt ? World.invP1.currentMagazineAmount2[wc] : World.invP1.currentMagazineAmount[wc];
-    if (amount > 0 || Cheats.bottomless) { FireWeapon(wepdex, false); } else {play_wav(sounds[238],AppliedFXVol(1.0f),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.8f; }
+    if (amount > 0 || Cheats.bottomless) { FireWeapon(wepdex, false); } else {play_wav(sounds[238],AppliedFXVol(1.0f),(V3){0},false);/*noammo*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.8f; }
 }
 
 void Unload(bool isSilent) {
@@ -407,7 +407,7 @@ void Unload(bool isSilent) {
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0 || wepClass[wep16] == WC_MELEE) return;
     u16 wc = World.invP1.wepCur;
     if(World.invP1.wepLoadedWithAlternate[wc]){World.invP1.wepAmmoSecondary[wep16]+=World.invP1.currentMagazineAmount2[wc]; World.invP1.currentMagazineAmount2[wc]=0;}else{World.invP1.wepAmmo[wep16]+=World.invP1.currentMagazineAmount[wc]; World.invP1.currentMagazineAmount[wc]=0;}
-    (void)isSilent; if (!isSilent) play_wav(sounds[260], AppliedFXVol(1.0f), (V3){0,0,0}, false); // wreload
+    (void)isSilent; if (!isSilent) play_wav(sounds[260], AppliedFXVol(1.0f), (V3){0}, false); // wreload
 }
 
 void LoadPrimaryAmmoType(bool isSilent) {
@@ -419,7 +419,7 @@ void LoadPrimaryAmmoType(bool isSilent) {
     Unload(true); World.invP1.wepLoadedWithAlternate[wc] = false; 
     World.invP1.currentMagazineAmount[wc] = (World.invP1.wepAmmo[wep16] >= magazinePitchCountForWeapon[wep16]) ? magazinePitchCountForWeapon[wep16] : (u8)World.invP1.wepAmmo[wep16];
     World.invP1.wepAmmo[wep16] -= World.invP1.currentMagazineAmount[wc];
-    (void)isSilent; if (!isSilent) play_wav(sounds[(wep16==0 || wep16==3) ? 248 : 260], AppliedFXVol(1.0f), (V3){0,0,0}, false); // wlocknload / wreload
+    (void)isSilent; if (!isSilent) play_wav(sounds[(wep16==0 || wep16==3) ? 248 : 260], AppliedFXVol(1.0f), (V3){0}, false); // wlocknload / wreload
     StartWeaponDip(reloadTime[wep16]); wfx.reloadContainerPos = wfx.reloadContainerHome;
 }
 
@@ -432,7 +432,7 @@ void LoadSecondaryAmmoType(bool isSilent) {
     Unload(true); World.invP1.wepLoadedWithAlternate[wc] = true;
     World.invP1.currentMagazineAmount2[wc] = (World.invP1.wepAmmoSecondary[wep16] >= magazinePitchCountForWeapon2[wep16]) ? magazinePitchCountForWeapon2[wep16] : (u8)World.invP1.wepAmmoSecondary[wep16];
     World.invP1.wepAmmoSecondary[wep16] -= World.invP1.currentMagazineAmount2[wc];
-    (void)isSilent; if (!isSilent) play_wav(sounds[(wep16==0 || wep16==3) ? 248 : 260], AppliedFXVol(1.0f), (V3){0,0,0}, false); // wlocknload / wreload
+    (void)isSilent; if (!isSilent) play_wav(sounds[(wep16==0 || wep16==3) ? 248 : 260], AppliedFXVol(1.0f), (V3){0}, false); // wlocknload / wreload
     StartWeaponDip(reloadTime[wep16]); wfx.reloadContainerPos = wfx.reloadContainerHome;
 }
 

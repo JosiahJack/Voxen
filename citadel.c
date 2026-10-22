@@ -89,14 +89,14 @@ void AddAudioLogToInventory(int index) {
 static inline void ItemAdd(u8 *cur, u8 *counts, int idx, int uIdx, int sysIdx) { if (!counts[*cur]) {*cur=(i8)idx;} counts[idx]++; CenterStatusPrint("%s%s", Sys_Text.stringTable[ItemStringIdx(uIdx)], Sys_Text.stringTable[sysIdx]); }
 void AddGrenadeToInventory(int i, int u) { if (i >= 0){if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.MFD_CenterTab=1;} World.invP1.grenConstIndex[i]=(i16)u; ItemAdd(&World.invP1.grenCur,World.invP1.grenAmmo,i,u,34);} }
 void   AddPatchToInventory(int i, int u) { if (i >= 0){if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.MFD_CenterTab=1;} ItemAdd(&World.invP1.patchCur,World.invP1.patchCounts,i,u,35);} }
-static inline void GrenadeCycle(int step){int cur= World.invP1.grenCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(   World.invP1.grenAmmo[next]>0){ if (next==cur) return; World.invP1.grenCur =(i8)next; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
-static inline void   PatchCycle(int step){int cur=World.invP1.patchCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(World.invP1.patchCounts[next]>0){World.invP1.patchCur=(i8)next; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ CenterStatusPrint("%s",Sys_Text.stringTable[patchMsg[next]]); return;}}}
+static inline void GrenadeCycle(int step){int cur= World.invP1.grenCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(   World.invP1.grenAmmo[next]>0){ if (next==cur) return; World.invP1.grenCur =(i8)next; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ CenterStatusPrint("%s",Sys_Text.stringTable[579+next]); return;}}}
+static inline void   PatchCycle(int step){int cur=World.invP1.patchCur, next=cur; for(int i=0;i<7;++i){next=(next+step+7)%7; if(World.invP1.patchCounts[next]>0){World.invP1.patchCur=(i8)next; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ CenterStatusPrint("%s",Sys_Text.stringTable[patchMsg[next]]); return;}}}
 void RemoveGrenade(int i) { if(World.invP1.grenAmmo[i] > 0){World.invP1.grenAmmo[i]--;} if(!World.invP1.grenAmmo[i]){GrenadeCycle(-1);} }
 static i8 GetExistingCyberItemIndex() { if (World.invP1.softVersions[SW_TURBO]  > 0) {return 0;} if (World.invP1.softVersions[SW_DECOY]  > 0) {return 1;} if (World.invP1.softVersions[SW_RECALL] > 0) {return 2;} return -1; }
 static void UseTurbo() {if(World.invP1.softVersions[SW_TURBO]<=0){World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); return;} if(--World.invP1.softVersions[SW_TURBO]==0)World.invP1.hasSoft&=(u8)~(1u << SW_TURBO); if(World.invP1.turboFinished > World.pauseRelativeTime){World.invP1.turboFinished+=World.invP1.turboCyberTime;}else{World.invP1.turboFinished=World.invP1.turboCyberTime+World.pauseRelativeTime;}}
 void CyberDecoySpawned(u16);
 static void UseDecoy() {if (World.decoyActive) { CenterStatusPrint("%s",Sys_Text.stringTable[537]); return; } if (World.invP1.softVersions[SW_DECOY] <= 0) { World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); return; } if (--World.invP1.softVersions[SW_DECOY] == 0) World.invP1.hasSoft &= (u8)~(1u << SW_DECOY); u16 decoyIdx = SpawnDynamicObject(CYBER_DECOY_CONST,true);
-    if(decoyIdx != U16_MAX){World.position[decoyIdx]=World.position[PLAYER1]; World.velocity[decoyIdx]=(V3){0,0,0}; flag_set(&World.instances[decoyIdx].entflags,EF_RIGIDBODY,false);
+    if(decoyIdx != U16_MAX){World.position[decoyIdx]=World.position[PLAYER1]; World.velocity[decoyIdx]=(V3){0}; flag_set(&World.instances[decoyIdx].entflags,EF_RIGIDBODY,false);
         World.instances[decoyIdx].active = true; World.instances[decoyIdx].doSelfAfterList = true; World.instances[decoyIdx].despawnInstead = true; World.instances[decoyIdx].timerFinished = World.pauseRelativeTime + 15.0f;
         World.decoyActive=true; CyberDecoySpawned(decoyIdx);}}
 static void UseRecall() { if (World.invP1.softVersions[SW_RECALL] <= 0) {return;} if (--World.invP1.softVersions[SW_RECALL] == 0) {World.invP1.hasSoft &= (u8)~(1u << SW_RECALL);} World.position[PLAYER1] = World.cyberspaceRecallPoint; }
@@ -356,7 +356,7 @@ void ButtonSwitchAnimate(Entity* e){
 }
 void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->delayFinished=0.0f; ButtonSwitchHoldPose(e); if(e->active){e->tickFinished=World.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);} }
 void ButtonSwitchUseTargets(u16 self) { Entity* e=&World.instances[self]; UseTargets(self,e->targetIdx); e->active=!e->active; ButtonSwitchAnimate(e); if(e->index == 689 || e->index == 690 || e->index == 695) { TextureChangerToggle(self); if(e->index == 689 && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} } }
-static __attribute__((noinline)) void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; play_wav(sounds[468], AppliedFXVol(0.85f), (V3){0,0,0}, false);/*blocked_by_security*/ MFD_OpenData(World.Sys_UI.lastDataSideRH,8);/*MFDManager.BlockedBySecurity() opens tab 4 on the last-used data side and raises the blocked view there*/ CenterStatusPrint("%s",Sys_Text.stringTable[25]); }
+static __attribute__((noinline)) void UIBlockedBySecurity(V3 tetherPoint) { (void)tetherPoint; play_wav(sounds[468], AppliedFXVol(0.85f), (V3){0}, false);/*blocked_by_security*/ MFD_OpenData(World.Sys_UI.lastDataSideRH,8);/*MFDManager.BlockedBySecurity() opens tab 4 on the last-used data side and raises the blocked view there*/ CenterStatusPrint("%s",Sys_Text.stringTable[25]); }
 static __attribute__((noinline)) void EntitySetLocked(Entity* e, bool locked) { flag_set(&e->entflags,EF_LOCKED,locked); }
 typedef struct { u16 constIndex, sfxIndex; } ButtonSwitchSFXDef;
 static const ButtonSwitchSFXDef buttonSwitchSFX[] = {{688,44},{689,40},{690,44},{691,41},{692,41},{694,45},{695,40}};
@@ -653,7 +653,7 @@ static void TeleportAway(u16 self) {
     if (dgo) { PSysDef d = *dgo; d.pos = World.position[self]; d.rotation = World.rotation[self]; PSysAddEx(&d, self); }
     World.col[self] = CT_NONE;
     World.gravity[self] = 0.0f;
-    World.velocity[self] = World.angularVelocity[self] = (V3){0,0,0};
+    World.velocity[self] = World.angularVelocity[self] = (V3){0};
     World.instances[self].modelIndex = U16_MAX; 
     play_wav(sounds[106]/*misc/teleport*/,AppliedFXVol(1.0f),World.position[self],false);
 }
@@ -993,7 +993,7 @@ void Targetted(u16 activator, u16 self) {
         if (tm) { bool bitOn = QuestBitIsSet(e->questBitID); u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(activator, (tm == 1) == bitOn ? e->targetIdx : e->targetIfFalseIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
     }
     if (e->index == 709) { CenterStatusPrint("%s", Sys_Text.stringTable[e->messageLingdex]); return; }/*info_message*/   if (e->index == 708) { GameEndSequence(); return; }
-    if (e->index == 712) { /*info_playsound: play sounds[SFXClip] (vox/shodan announcements)*/ if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT && sounds[e->SFXIndex][0]) { if (e->playEverywhere) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), (V3){0,0,0}, false); else play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true); } return; }
+    if (e->index == 712) { /*info_playsound: play sounds[SFXClip] (vox/shodan announcements)*/ if (e->SFXIndex >= 0 && e->SFXIndex < SOUNDS_COUNT && sounds[e->SFXIndex][0]) { if (e->playEverywhere) play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), (V3){0}, false); else play_wav(sounds[e->SFXIndex], AppliedFXVol(1.0f), World.position[self], true); } return; }
     if (e->index == 707) { EmailTargetted(self); return; }/*info_email*/                                                 if (aioflags & TARG_IOFLAGS_TRIPTRIGGER) { if(e->index == 598 || e->index == 600){TriggerTargetted(self,activator);}else if(e->index == 594){TriggerCounterTargetted(self,activator);} }
     if (aioflags & TARG_IOFLAGS_UNLOCK) { EntitySetLocked(e, false); if (IdxIsDoor(e->index) && (aioflags & (TARG_IOFLAGS_DOOROPEN | TARG_IOFLAGS_DOOROPENIFUNLOCKED))) e->requiredAccessCard = ACC_None; }                                                       if ((aioflags & TARG_IOFLAGS_LOCK) && IdxIsDoor(e->index)) EntitySetLocked(e, true);                                     if (IdxIsButtonSwitch(e->index)) ButtonSwitchUse(self,activator);
     if ((aioflags & TARG_IOFLAGS_DOOROPEN) && IdxIsDoor(e->index) && !(aioflags & TARG_IOFLAGS_UNLOCK)) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOOROPENIFUNLOCKED) && IdxIsDoor(e->index) && !(aioflags & TARG_IOFLAGS_UNLOCK) && (e->entflags & EF_LOCKED) == 0 && (e->requiredAccessCard == ACC_None || (World.invP1.accessCardOwned & (1u << e->requiredAccessCard)))) { DoorForceOpen(self); } else if ((aioflags & TARG_IOFLAGS_DOORCLOSE) && IdxIsDoor(e->index)) { DoorForceClose(self); } else if (IdxIsDoor(e->index)) { DoorTargetted(self, activator); }
@@ -1328,7 +1328,7 @@ void SearchObject(int searchable) {
     World.Sys_UI.usingObject = true;
     MFD_OpenSearch(World.Sys_UI.lastSearchSideRH);
     SearchFXEnable(World.Sys_UI.lastSearchSideRH ? 1 : 0);
-    play_wav(sounds[91], AppliedFXVol(0.75f), (V3){0,0,0}, false);
+    play_wav(sounds[91], AppliedFXVol(0.75f), (V3){0}, false);
     ForceInventoryMode();
 }
 
@@ -1557,7 +1557,7 @@ void ModUpdate() {
     
     if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) {
         World.invP1.painSoundFinished = World.pauseRelativeTime + (double)random_range(2.5f,4.0f);
-        play_wav(sounds[140]/*player/playerpain1*/,AppliedFXVol(0.2f),(V3){0,0,0},false);
+        play_wav(sounds[140]/*player/playerpain1*/,AppliedFXVol(0.2f),(V3){0},false);
     }
     
     if (!Cheats.god && World.invP1.radBleedFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { /*Radiation damage pulse*/
