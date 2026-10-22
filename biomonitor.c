@@ -20,7 +20,7 @@ void BioMonitorClearGraphs() {
     bioMonitor.ymax = (BIOM_GRAPH_H - 1);
     bioMonitor.beatFinished=World.pauseRelativeTime; bioMonitor.tick0Finished=World.pauseRelativeTime + 0.0211f; bioMonitor.tick1Finished=World.pauseRelativeTime + 0.05f; bioMonitor.tick2Finished=World.pauseRelativeTime + 0.0104f; bioMonitor.tickFinished=World.pauseRelativeTime + 0.02f;
     bioMonitor.currentIndex0=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex1=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex2=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f));
-    for (int x=0;x<BIOM_GRAPH_W;x++) { for (int y=0; y<BIOM_GRAPH_H;y++) { bioMonitor.colorsERG[x][y] = bioMonitor.backgroundColor; bioMonitor.colorsCHI[x][y] = bioMonitor.backgroundColor; bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor; } }
+    mset(bioMonitor.ringERG, 0, sizeof(bioMonitor.ringERG)); mset(bioMonitor.ringCHI, 0, sizeof(bioMonitor.ringCHI)); mset(bioMonitor.ringECG, 0, sizeof(bioMonitor.ringECG));
 }
 
 void BioMonitorAlignCursors() { BioMonitorClearGraphs(); int idx=(int)(BIOM_GRAPH_W * random_range(0.0f,1.0f)); bioMonitor.currentIndex0=bioMonitor.currentIndex1=bioMonitor.currentIndex2=idx; }
@@ -28,40 +28,23 @@ static void IncrementERG() { bioMonitor.currentIndex0++; if (bioMonitor.currentI
 static void IncrementCHI() { bioMonitor.currentIndex1++; if (bioMonitor.currentIndex1 >= BIOM_GRAPH_W) {bioMonitor.currentIndex1 = 0;} }
 static void IncrementECG() { bioMonitor.currentIndex2++; if (bioMonitor.currentIndex2 >= BIOM_GRAPH_W) {bioMonitor.currentIndex2 = 0;} }
 static void Push(int index, float val) { // Add a data point to the beginning of the graph
-    float value = 0.0f; int dist = 1, y0 = 0; bool down = false;
-    for (int y=0;y<BIOM_GRAPH_H;y++) {
-        switch(index){
-            case 0:bioMonitor.colorsERG[bioMonitor.currentIndex0][y]=bioMonitor.backgroundColor; break;
-            case 1:bioMonitor.colorsCHI[bioMonitor.currentIndex1][y]=bioMonitor.backgroundColor; break;
-            case 2:bioMonitor.colorsECG[bioMonitor.currentIndex2][y]=bioMonitor.backgroundColor; break;
-        }
-    }
+    float value = 0.0f; int y0 = 0;
     switch(index) {
         case BIOM_ERG:
             value = inverse_lerp(bioMonitor.min[BIOM_ERG],bioMonitor.max[BIOM_ERG],val);
             y0 = vclamp((int)(value*BIOM_GRAPH_H),0,bioMonitor.ymax);
-            bioMonitor.colorsERG[bioMonitor.currentIndex0][y0]=bioMonitor.ergColor;
-            if (vabs(bioMonitor.lastERG - y0) > 2) {
-                dist = bioMonitor.lastERG + ((bioMonitor.lastERG > y0) ? -1 : 1); down = (bioMonitor.lastERG > y0);
-                while(dist != y0){if(dist > bioMonitor.ymax || dist < 0){break;} bioMonitor.colorsERG[bioMonitor.currentIndex0][dist]=bioMonitor.ergColor; if(down){dist--;}else{dist++;}}
-            }
-            bioMonitor.lastERG=y0; if (y0 > 0 && y0 < bioMonitor.ymax) { bioMonitor.colorsERG[bioMonitor.currentIndex0][y0 + 1] = bioMonitor.ergColor; } break; // Increase thickness to 2 pixels
+            bioMonitor.ringERG[bioMonitor.currentIndex0] = (u8)y0;
+            bioMonitor.lastERG = y0; break;
         case BIOM_CHI:
             value = inverse_lerp(bioMonitor.min[BIOM_CHI],bioMonitor.max[BIOM_CHI],val);
-            y0 = vclamp((int)(value * BIOM_GRAPH_H),0,bioMonitor.ymax);
-            bioMonitor.colorsCHI[bioMonitor.currentIndex1][y0]=bioMonitor.chiColor;
-            if (vabs(bioMonitor.lastCHI - y0) > 2) {
-                dist = bioMonitor.lastCHI + ((bioMonitor.lastCHI > y0) ? -1 : 1); down = (bioMonitor.lastCHI > y0);
-                while(dist != y0){if(dist > bioMonitor.ymax || dist < 0){break;} bioMonitor.colorsCHI[bioMonitor.currentIndex1][dist]=bioMonitor.chiColor; if(down){dist--;}else{dist++;}}
-            }
-            bioMonitor.lastCHI=y0; if(y0 > 0 && y0 < bioMonitor.ymax){ bioMonitor.colorsCHI[bioMonitor.currentIndex1][y0 + 1]=bioMonitor.chiColor;} break; // Increase thickness to 3 pixels
+            y0 = vclamp((int)(value*BIOM_GRAPH_H),0,bioMonitor.ymax);
+            bioMonitor.ringCHI[bioMonitor.currentIndex1] = (u8)y0;
+            bioMonitor.lastCHI = y0; break;
         case BIOM_ECG:
-            value = inverse_lerp(bioMonitor.min[BIOM_ECG],bioMonitor.max[BIOM_ECG],val); y0 = vclamp((int)(value*BIOM_GRAPH_H),0,bioMonitor.ymax); bioMonitor.colorsECG[bioMonitor.currentIndex2][y0]=bioMonitor.ecgColor;
-            if (vabs(bioMonitor.lastECG - y0) > 2) {
-                dist =bioMonitor.lastECG + ((bioMonitor.lastECG > y0) ? -1 : 1); down = (bioMonitor.lastECG > y0);
-                while(dist != y0){if (dist > bioMonitor.ymax || dist < 0){break;} bioMonitor.colorsECG[bioMonitor.currentIndex2][dist]=bioMonitor.ecgColor; if(down){dist--;}else{dist++;}}
-            }
-            bioMonitor.lastECG=y0; int half=(int)((bioMonitor.max[BIOM_ECG] - bioMonitor.min[BIOM_ECG]) / 2.0f); if(y0 > 0 && y0 < bioMonitor.ymax && (vabs(y0 - half) > 2)) { bioMonitor.colorsECG[bioMonitor.currentIndex2][y0 - 1]=bioMonitor.ecgColor; bioMonitor.colorsECG[bioMonitor.currentIndex2][y0 + 1]=bioMonitor.ecgColor; } break; // Increase thickness to 3 pixels
+            value = inverse_lerp(bioMonitor.min[BIOM_ECG],bioMonitor.max[BIOM_ECG],val);
+            y0 = vclamp((int)(value*BIOM_GRAPH_H),0,bioMonitor.ymax);
+            bioMonitor.ringECG[bioMonitor.currentIndex2] = (u8)y0;
+            bioMonitor.lastECG = y0; break;
     }
 }
 
@@ -91,20 +74,30 @@ void BioMonitorUpdate() {
         if (bioMonitor.tick1Finished < World.pauseRelativeTime) { bioMonitor.tick1Finished = World.pauseRelativeTime + 0.05f; Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue); IncrementCHI(); Push(1,bioMonitor.chiValue); }
         if (bioMonitor.tick2Finished < World.pauseRelativeTime) { bioMonitor.tick2Finished = World.pauseRelativeTime + 0.0104f; Push(2,bioMonitor.ecgValue); IncrementECG(); Push(2,bioMonitor.ecgValue); }
     }
-    float distPerc = 1.0f, fadeDist = 100.0f;
+    float fadeDist = 200.0f;
     for (int x=0;x<BIOM_GRAPH_W;x++) {
-        for (int y=0; y<BIOM_GRAPH_H;y++) {
-            bioMonitor.col0 = bioMonitor.colorsERG[x][y]; bioMonitor.col1 = bioMonitor.colorsCHI[x][y]; bioMonitor.col2 = bioMonitor.colorsECG[x][y];
-            if (bioMonitor.col0.a > 0.01f) {
-                fadeDist = 200.0f; distPerc = (bioMonitor.currentIndex0 - x); if ((BIOM_GRAPH_W - x) < fadeDist && bioMonitor.currentIndex0 < fadeDist) distPerc += BIOM_GRAPH_W; if (distPerc < 0.0f || distPerc > fadeDist) distPerc = fadeDist;
-                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f); if(distPerc == 0.0f){bioMonitor.colorsERG[x][y]=bioMonitor.backgroundColor;} bioMonitor.col0.a = distPerc; biomPutPx(x,y,bioMonitor.col0);
-            } else if (bioMonitor.col1.a > 0.01f) {
-                fadeDist = 180.0f; distPerc = (bioMonitor.currentIndex1 - x); if ((BIOM_GRAPH_W - x) < fadeDist && bioMonitor.currentIndex1 < fadeDist) distPerc += BIOM_GRAPH_W; if (distPerc < 0.0f || distPerc > fadeDist) distPerc = fadeDist;
-                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f); if (distPerc == 0.0f) bioMonitor.colorsCHI[x][y] = bioMonitor.backgroundColor; bioMonitor.col1.a = distPerc; biomPutPx(x,y,bioMonitor.col1);
-            } else if (bioMonitor.col2.a > 0.01f) {
-                fadeDist = 275.0f; distPerc = (bioMonitor.currentIndex2 - x); if ((BIOM_GRAPH_W - x) < fadeDist && bioMonitor.currentIndex2 < fadeDist) distPerc +=  BIOM_GRAPH_W; if (distPerc < 0.0f || distPerc > fadeDist) distPerc = fadeDist;
-                distPerc = vclamp((fadeDist - distPerc) / fadeDist,0.0f,1.0f); if (distPerc == 0.0f) bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor; bioMonitor.col2.a = distPerc; biomPutPx(x,y,bioMonitor.col2);
-            } else { biomPutPx(x,y,biomBgTransparent); }
+        int y0erg = (int)bioMonitor.ringERG[x];
+        int y0chi = (int)bioMonitor.ringCHI[x];
+        int y0ecg = (int)bioMonitor.ringECG[x];
+        for (int y=0; y<BIOM_GRAPH_H; y++) {
+            Color c = biomBgTransparent;
+            float fd = fadeDist; float dp = 1.0f;
+            // ERG
+            if (y0erg > 0) {
+                fd = 200.0f; dp = (float)(bioMonitor.currentIndex0 - x); if ((BIOM_GRAPH_W - x) < fd && bioMonitor.currentIndex0 < fd) dp += BIOM_GRAPH_W; if (dp < 0.0f || dp > fd) dp = fd; dp = vclamp((fd - dp) / fd, 0.0f, 1.0f);
+                if (y == y0erg && dp > 0.0f) { Color c0 = bioMonitor.ergColor; c0.a = dp; c = c0; }
+            }
+            // CHI (if no erg at this pixel)
+            if (c.a < 0.01f && y0chi > 0) {
+                fd = 180.0f; dp = (float)(bioMonitor.currentIndex1 - x); if ((BIOM_GRAPH_W - x) < fd && bioMonitor.currentIndex1 < fd) dp += BIOM_GRAPH_W; if (dp < 0.0f || dp > fd) dp = fd; dp = vclamp((fd - dp) / fd, 0.0f, 1.0f);
+                if (y == y0chi && dp > 0.0f) { Color c0 = bioMonitor.chiColor; c0.a = dp; c = c0; }
+            }
+            // ECG (if no other)
+            if (c.a < 0.01f && y0ecg > 0) {
+                fd = 275.0f; dp = (float)(bioMonitor.currentIndex2 - x); if ((BIOM_GRAPH_W - x) < fd && bioMonitor.currentIndex2 < fd) dp += BIOM_GRAPH_W; if (dp < 0.0f || dp > fd) dp = fd; dp = vclamp((fd - dp) / fd, 0.0f, 1.0f);
+                if (y == y0ecg && dp > 0.0f) { Color c0 = bioMonitor.ecgColor; c0.a = dp; c = c0; }
+            }
+            biomPutPx(x, y, c);
         }
     }
     glBindTexture(GL_TEXTURE_2D,biomTexId); glTexSubImage2D(GL_TEXTURE_2D,0,0,0,BIOM_GRAPH_W,BIOM_GRAPH_H,GL_RGBA,GL_UNSIGNED_BYTE,biomPx);
