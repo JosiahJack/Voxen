@@ -433,7 +433,7 @@ void LoadTextures() {
     DebugRAM("start LoadTextures");
     texCnt = totalPixels = totalPaletteColors = 0u;
     TextureDataParser texture_parser;
-    if (unlikely(!ParseTextureData(&texture_parser, MAX_TXRS, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
+    if (unlikely(!ParseTextureData(&texture_parser, MAXTEX, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
     
     i32 maxIndex = -1;
     for (u32 k=0;k<texture_parser.count;++k) {

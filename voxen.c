@@ -21,7 +21,7 @@ static u32 rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID;
 #define RT_WG_Y 8
 #define PLAYER_BODY_MODEL_IDX 7489u /*Data/models.txt entry for Models/player_character.glb*/
 #define PLAYER_BODY_TEX_IDX   3337u
-bool doubleSidedTexture[MAX_TXRS], transparentTexture[MAX_TXRS], shadowBuffersCreated, resDropdownOpen;
+bool doubleSidedTexture[MAXTEX], transparentTexture[MAXTEX], shadowBuffersCreated, resDropdownOpen;
 u16 **modelTriangles, modelTriangleCounts[MAX_MDLS], mdlsCnt, **physTris, texCnt, decalStyleCount, decalInlineTextLevel[DECAL_INLINE_TEXT_MAX], decalInlineTextInst[DECAL_INLINE_TEXT_MAX], decalInlineTextCount;
 V3 modelMin[MAX_MDLS], modelMax[MAX_MDLS];
 u32 lightsID, voxListCntsID, voxelLightListsID, voxelUpdateSP, cellVisibleDataID, shadowmapsSP, shadowmapsClearSP, shadowMapSSBO, shadowMapsIndirectionID, sunShadowFBO, sunShadowTex, shadowmapIndirectionList[LIGHT_COUNT];
@@ -30,7 +30,7 @@ FrustumPlane sunShadowFrustum[6];
 V3 sunDirection={0.0f, 1.0f, 0.0f};
 u32 ssrSP, rtSP, imageBlitSP, quadVAO, quadVBO, textSP, textVAO, textVBO, textDecalVBO[MAX_LEVELS][INSTANCE_COUNT], textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
 u32 colorBufferID, texPalID, texPalOfsID, textureOffsetsID, textureSizesID, psysInstancesID, psysTrailsID, psysquadVAO, psysquadVBO, particleSP, trailSP, camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
-u8 particleBlendTexture[MAX_TXRS], camViewCount, levelCamViewCount[14];
+u8 particleBlendTexture[MAXTEX], camViewCount, levelCamViewCount[14];
 char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
 DecalStyle decalStyles[DECAL_STYLE_MAX];
 CamView camViews[64], levelCamViews[14][64];
@@ -186,7 +186,7 @@ void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = E
 void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
 void DrawMeshCollider(u16 i) {
     Color col = ColliderColor(i);
-    u16 mi = (World.col[i] == COLTYPE_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
+    u16 mi = (World.col[i] == CT_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
     u32 triCount = modelTriangleCounts[mi]; if(!triCount){return;}
     
     float M[16]; mcpy(M, &modelMatrices[i*16], 64);
@@ -693,9 +693,9 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                 if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
                 
                 if (mindex >= MAX_MDLS) {
-                    ColliderType ct = World.col[i]; if (ct != COLTYPE_CAP && ct != COLTYPE_SPH) continue;
+                    ColliderType ct = World.col[i]; if (ct != CT_CAP && ct != CT_SPH) continue;
                     if (V3_dot(delta, delta) >= maxDistSq) continue;
-                    RaycastHit ch = {0}; if (ct == COLTYPE_CAP) { ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance); } else { ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance); } if (!ch.hit || ch.distance >= result.distance) { continue; }
+                    RaycastHit ch = {0}; if (ct == CT_CAP) { ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance); } else { ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance); } if (!ch.hit || ch.distance >= result.distance) { continue; }
                     
                     ch.hitInstanceIndex = i;
                     result = ch;
@@ -972,7 +972,7 @@ void UpdateLights() {
 
 // Shadowmapping
 typedef struct {float depth; u16 index; } DepthSort;
-INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex >= texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || e->texIndex >= MAX_TXRS || otherCondition; }
+INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex >= texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || e->texIndex >= MAXTEX || otherCondition; }
 INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) { glUniform1ui(0,i); u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex; if (currentModelType == modelType && currentModelType != 0) return currentModelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); return modelType; }
 typedef float __m256 __attribute__((__vector_size__(32), __may_alias__)); typedef long long __m256i __attribute__((__vector_size__(32), __may_alias__)); typedef float __v8sf __attribute__((__vector_size__(32), __may_alias__));
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_load_ps(float const *__P) { return *(const __m256 *)__P; }
@@ -1383,11 +1383,11 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
     u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex;
     if (IdxIsLaserDoor(constIndex)) { DoorLaserDraw(i); }
     if (Cheats.showPhys) {
-        if (World.col[i] == COLTYPE_BOX) {DrawBoxCollider(i);}
-        else if (World.col[i] == COLTYPE_SPH) {DrawSphereCollider(i);}
-        else if (World.col[i] == COLTYPE_CVX) {DrawMeshCollider(i);}
-        else if (World.col[i] == COLTYPE_MSH) {DrawMeshCollider(i);}
-        else if (World.col[i] == COLTYPE_CAP) {DrawCapsuleCollider(i);}
+        if (World.col[i] == CT_BOX) {DrawBoxCollider(i);}
+        else if (World.col[i] == CT_SPH) {DrawSphereCollider(i);}
+        else if (World.col[i] == CT_CVX) {DrawMeshCollider(i);}
+        else if (World.col[i] == CT_MSH) {DrawMeshCollider(i);}
+        else if (World.col[i] == CT_CAP) {DrawCapsuleCollider(i);}
         
         DrawAngularVelocity(i);
     }
@@ -2004,7 +2004,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.curLev = 0;
     World.mass[0] = 0.0f;
     World.dynamicFriction[0] = 0.4f;
-    World.col[0]=COLTYPE_NONE;
+    World.col[0]=CT_NONE;
     currentMenuItem = currentMenuTab = 0;
     currentMenuPage = MPG_FRONT;
     World.current_time = World.pauseRelativeTime = World.last_physics_time = 0.0;
@@ -2016,7 +2016,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.rotation[PLAYER1] = (Quaternion){0.0f,0.7071f,0.0f,0.7071f}; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     World.instances[PLAYER1].entflags = EF_ACTIVE|EF_RIGIDBODY;
     World.instances[PLAYER1].modelIndex = MAX_MDLS;
-    World.col[PLAYER1] = COLTYPE_CAP;
+    World.col[PLAYER1] = CT_CAP;
     World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y;
     World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_HT,1.0f};
     World.mass[PLAYER1] = 1.0f;
@@ -2030,15 +2030,15 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.invP1.noiseFinished = World.pauseRelativeTime;
     World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f,1.0f);
     for (int i=0;i<12;++i) { World.invP1.hardwareInvReferenceIndex[i] = 21 + i; } World.invP1.hardwareInvReferenceIndex[12] = World.invP1.hardwareInvReferenceIndex[13] = 0;
-    World.invP1.generalInventoryIndexRef[0] = 81; // Hardcoded lookup indices into the Const main table.
-    for (int i=1;i<HW_COUNT;i++) World.invP1.generalInventoryIndexRef[i] = -1; // Skips 0th index on purpose as it always holds access cards "item".
+    World.invP1.genInvIdxRef[0] = 81; // Hardcoded lookup indices into the Const main table.
+    for (int i=1;i<HW_COUNT;i++) World.invP1.genInvIdxRef[i] = -1; // Skips 0th index on purpose as it always holds access cards "item".
     for (int i=0;i<HW_COUNT;++i) World.invP1.hwVers[i] = World.invP1.hwVersSetting[i] = 0;
     World.invP1.nitroTimeSetting = 7.0;
     World.invP1.earthShakerTimeSetting = 10.0;
     World.invP1.lastAddedIndex = -1;
     World.invP1.hasNewEmail = World.invP1.hasNewNotes = World.invP1.isPulserNotDrill = true;
     MissionTimerInit();
-    for (int i=0;i<7;++i) World.invP1.weaponInventoryIndices[i] = World.invP1.weaponInventoryAmmoIndices[i] = -1;
+    for (int i=0;i<7;++i) World.invP1.wepInvIndices[i] = World.invP1.wepInvAmIndices[i] = -1;
     World.invP1.justFired = (World.pauseRelativeTime - 31.0); // Set >30s before pauseRelativeTime to not immediately play action music.
     World.invP1.painSoundFinished = World.invP1.radSoundFinished = World.invP1.ressurectingFinished = World.pauseRelativeTime;
     World.Sys_UI.lastMultiMediaTabOpened = MM_EMAIL_TABLE;
@@ -2075,7 +2075,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
             World.levelInstances[lev][i].adjacencyIdx = U16_MAX;
-            if (World.levelCollider[lev][i] == COLTYPE_CVX) {
+            if (World.levelCollider[lev][i] == CT_CVX) {
                 u16 colMeshIdx = World.levelInstances[lev][i].colMeshIndex;
                 if (colMeshIdx > MAX_MDLS) {DualLogWarn("Improper convex mesh colMeshIndex on level %u, instance %u with constindex %u for convex mesh uniques, colMeshIndex: %u\n",lev,i,World.levelInstances[lev][i].index,World.levelInstances[lev][i].colMeshIndex); continue;}
                 
@@ -2137,8 +2137,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.lev4SecCode = World.lev5SecCode = World.lev6SecCode = -1;
     World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
     // TESTING STUFF, TODO Delete once hardware and particle systems are fully confirmed and tested as good (they aren't yet).
-    //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAX_TXRS},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colStart=(Color){1,0,0,1},.colEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.shapeRadius=2.56f,.shapeType=1,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
-    //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAX_TXRS},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
+    //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAXTEX},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colStart=(Color){1,0,0,1},.colEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.shapeRadius=2.56f,.shapeType=1,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
+    //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAXTEX},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
     //AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
     AutomapNewGame();
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
@@ -2384,11 +2384,11 @@ void InitalizeEnvironment() {
     if (Sys_Settings.Shadows){CreateShadowBuffers();/*5,6*/ InitSunShadowmap();}
     cellVisibleDataID=MakeSSBO(&cellVisibleDataID,7,ARRSIZE*sizeof(u32),NULL,GL_STATIC_DRAW);
     texPalID= MakeSSBO(&texPalID,8,MAX_UNIQUE_COLORS*sizeof(u32),NULL,GL_STATIC_DRAW);
-    texPalOfsID= MakeSSBO(&texPalOfsID,9,MAX_TXRS*sizeof(u32),NULL,GL_STATIC_DRAW);
+    texPalOfsID= MakeSSBO(&texPalOfsID,9,MAXTEX*sizeof(u32),NULL,GL_STATIC_DRAW);
     psysInstancesID = MakeSSBO(&psysInstancesID,10,MAX_PARTICLES*sizeof(GpuPartInst),NULL,GL_DYNAMIC_DRAW);
     MakeSSBO(&psysTrailsID,11,MAX_TRAIL_SEGS*sizeof(TrlSegInst),NULL,GL_DYNAMIC_DRAW); colorBufferID= MakeSSBO(&colorBufferID,12,MAX_TOTAL_PIXELS*sizeof(u8),NULL,GL_STATIC_DRAW);
-    textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAX_TXRS * sizeof(u32),NULL,GL_STATIC_DRAW);
-    textureSizesID = MakeSSBO(&textureSizesID,15,MAX_TXRS*2*sizeof(i32),NULL,GL_STATIC_DRAW);
+    textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAXTEX * sizeof(u32),NULL,GL_STATIC_DRAW);
+    textureSizesID = MakeSSBO(&textureSizesID,15,MAXTEX*2*sizeof(i32),NULL,GL_STATIC_DRAW);
     
     glUseProgram(shadowmapsSP);      glUniform1ui( 9, SHADOW_MAP_SIZE); // Set permanent uniforms on shaders (keeps c in sync with glsl for constants)
     glUseProgram(shadowmapsClearSP); glUniform1ui( 0, SHADOW_MAP_SIZE);

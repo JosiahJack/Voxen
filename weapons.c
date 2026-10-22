@@ -20,13 +20,13 @@ u16 wepBulletHolePrefab[16]={518,520,522,521,519,520,522,518,519,521,519,519,523
 i8  wepFogInc[16]={2,0,0,1,0,0,0,3,0,1,0,2,4,2,0,0};
 u16 wepSmokePrefab[16]={506,0,0,509,0,0,0,507,0,510,0,511,512,513,0,0}; // 0 = no smoke for this weapon
 u16 wepModelIndices[16]={646,638,640,642,643,5748,5728,644,645,650,651,652,654,655,656,657}; // [wep16] mk3,blaster,dart,flechette,ion,rapier,pipe,magnum,magpulse,pistol,plasma,rail,riot,skorp,sparq,stun
-u16 wepAnimNums[16]={MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,50,49,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS,MAX_ANIMS}; // [wep16] only rapier(50)/pipe(49)
+u16 wepAnimNums[16]={MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,50,49,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM}; // [wep16] only rapier(50)/pipe(49)
 typedef enum { WC_STD = 0, WC_MELEE = 1, WC_ENERGY = 2 } WepClass;
 WepClass wepClass[16] = {WC_STD, WC_ENERGY, WC_STD, WC_STD, WC_ENERGY, WC_MELEE, WC_MELEE,WC_STD, WC_STD, WC_STD, WC_ENERGY, WC_STD, WC_STD, WC_STD, WC_ENERGY, WC_ENERGY};
 float magpulseShotForce = 2.2f, stungunShotForce = 2.2f, railgunShotForce = 5.0f, plasmaShotForce = 1.5f;
 WeaponFireCtx wfx = { .fireDistance = 200.0f, .overheatedPercent = 80.0f, .reloadContainerHome = {0}, .pendingMeleeFinished = 0.0 };
 INLINE Quaternion QuatEulerZ(float degZ) { float r = deg2rad(degZ) * 0.5f; return (Quaternion){0.0f,0.0f,vsinf(r),vcosf(r)}; }
-INLINE bool WeaponsHaveAnyHeat() { if (Cheats.redbull) {return false;} for (int i=0;i<7;i++) {if (World.invP1.currentEnergyWeaponHeat[i] > 0.0f) {return true;}} return false; }
+INLINE bool WeaponsHaveAnyHeat() { if (Cheats.redbull) {return false;} for (int i=0;i<7;i++) {if (World.invP1.curWepHeat[i] > 0.0f) {return true;}} return false; }
 static bool hudHeatTickOn[9];
 void HudHeatBleed(float heat) { float tempFloat=10.0f; for (int i=0;i<9;i++) { hudHeatTickOn[i]=heat >= tempFloat; tempFloat += 10.0f; } }
 bool HudHeatTickOn(int i) { return (i>=0&&i<9) ? hudHeatTickOn[i] : false; }
@@ -38,10 +38,10 @@ void HeatBleedOff() {
     if (World.fogFac < 0) World.fogFac = 0;
     if (WeaponsHaveAnyHeat() || CurrentWeaponUsesEnergy()) {
         for (int i=0;i<7;i++) {
-            World.invP1.currentEnergyWeaponHeat[i] -= 10.0f;
-            if (World.invP1.currentEnergyWeaponHeat[i] <= 0.0f) World.invP1.currentEnergyWeaponHeat[i] = 0.0f;
+            World.invP1.curWepHeat[i] -= 10.0f;
+            if (World.invP1.curWepHeat[i] <= 0.0f) World.invP1.curWepHeat[i] = 0.0f;
         }
-        if (CurrentWeaponUsesEnergy()) HudHeatBleed(World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent]);
+        if (CurrentWeaponUsesEnergy()) HudHeatBleed(World.invP1.curWepHeat[World.invP1.wepCur]);
     }
     heatTickFinished = World.pauseRelativeTime + heatTickTime;
 }
@@ -58,8 +58,8 @@ static void WeaponLerpGetTargetUp() { World.invP1.reloadLerpValue = (0.5f - (1.0
 static void WeaponLerpGetTargetDown() { World.invP1.reloadLerpValue = World.invP1.reloadLerpValue / 0.5f; wfx.targetY = wfx.reloadContainerHome.y - 0.66f; wfx.targetY *= World.invP1.reloadLerpValue; }
 void CompleteWeaponChange() {
     if (World.invP1.weaponIndexPending == -1) return;
-    World.invP1.weaponCurrent = (u8)World.invP1.weaponCurrentPending;
-    if (CurrentWeaponUsesEnergy()) { HudHeatBleed(World.invP1.currentEnergyWeaponHeat[World.invP1.weaponCurrent]); }
+    World.invP1.wepCur = (u8)World.invP1.wepCurPending;
+    if (CurrentWeaponUsesEnergy()) { HudHeatBleed(World.invP1.curWepHeat[World.invP1.wepCur]); }
     World.invP1.weaponIndex = (u16)World.invP1.weaponIndexPending;
     u16 wepIdx = World.invP1.weaponIndex;
     Entity* vwe = &World.instances[World.weaponVModelIndex];
@@ -67,33 +67,33 @@ void CompleteWeaponChange() {
     if (wep16 >= 0 && wep16 < 16) {
         vwe->modelIndex = wepModelIndices[wep16]; if (vwe->modelIndex >= MAX_MDLS) vwe->modelIndex = MAX_MDLS - 1u;
         vwe->animationNum = wepAnimNums[wep16];
-        vwe->texIndex = EDefs[wepIdx].texIndex >= MAX_TXRS ? 0u : EDefs[wepIdx].texIndex;
-        vwe->normIndex = EDefs[wepIdx].normIndex >= MAX_TXRS ? 0u : EDefs[wepIdx].normIndex;
-        vwe->glowIndex = EDefs[wepIdx].glowIndex >= MAX_TXRS ? 0u : EDefs[wepIdx].glowIndex;
-        vwe->specIndex = EDefs[wepIdx].specIndex >= MAX_TXRS ? 0u : EDefs[wepIdx].specIndex;
+        vwe->texIndex = EDefs[wepIdx].texIndex >= MAXTEX ? 0u : EDefs[wepIdx].texIndex;
+        vwe->normIndex = EDefs[wepIdx].normIndex >= MAXTEX ? 0u : EDefs[wepIdx].normIndex;
+        vwe->glowIndex = EDefs[wepIdx].glowIndex >= MAXTEX ? 0u : EDefs[wepIdx].glowIndex;
+        vwe->specIndex = EDefs[wepIdx].specIndex >= MAXTEX ? 0u : EDefs[wepIdx].specIndex;
         vwe->index = wepIdx; // constIndex, NOT 49/50
     } else { vwe->modelIndex = MAX_MDLS; /*hidden; no weapon equipped*/ }
-    World.invP1.weaponCurrentPending = World.invP1.weaponIndexPending = -1;
+    World.invP1.wepCurPending = World.invP1.weaponIndexPending = -1;
 }
 
 void WeaponFireStartWeaponDip(float t); // Forward declaration from citadel.c
 void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev; dead in cyberspace, only 2 weapons so up is down
     if (World.curLev == LEVEL_CYBERSPACE) { World.invP1.isPulserNotDrill = !World.invP1.isPulserNotDrill; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/ return; }
     if (World.invP1.reloadFinished > World.pauseRelativeTime) return; // Dip in progress
-    int curSlot = (int)World.invP1.weaponCurrent;
+    int curSlot = (int)World.invP1.wepCur;
     int nextSlot = curSlot;
     for (int attempt = 0; attempt < 7; ++attempt) {
         nextSlot += dir;
         if (nextSlot < 0) nextSlot = 6;
         if (nextSlot > 6) nextSlot = 0;
         if (nextSlot == curSlot) break;
-        int wi = (int)World.invP1.weaponInventoryIndices[nextSlot];
+        int wi = (int)World.invP1.wepInvIndices[nextSlot];
         if (wi >= 0 && wi < MAX_ENTITIES && Get16WeaponIndexFromConstIndex(wi) >= 0) break; // Valid weapon
     }
     if (nextSlot == curSlot) return;
-    int wi = (int)World.invP1.weaponInventoryIndices[nextSlot];
+    int wi = (int)World.invP1.wepInvIndices[nextSlot];
     play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0,0,0},false);/*changeweapon*/
-    World.invP1.weaponCurrentPending = (i16)nextSlot;
+    World.invP1.wepCurPending = (i16)nextSlot;
     World.invP1.weaponIndexPending = (i16)wi;
     int w16=Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip(w16>=0?reloadTime[w16]:0.5f);
 }
@@ -160,7 +160,7 @@ void SpawnBeamTrail(u16 presetType, V3 from, V3 to, Color c) {
         PSysDef def=*preset; float f0=(float)seg/(float)BEAM_SEGS;
         V3 segFrom=V3_AplusB(from,V3_ScaleByF(delta,f0));
         def.pos=segFrom; def.rotation=QuatFromToRotation((V3){0,1,0},V3_Normalize(delta));
-        for(int i=0;i<16;++i)def.textures[i]=MAX_TXRS;
+        for(int i=0;i<16;++i)def.textures[i]=MAXTEX;
         def.sizeMin=def.sizeMax=0.0f;
         def.shapeType=3;
         def.lifetimeMin=def.lifetimeMax=life;
@@ -238,7 +238,7 @@ static float DamageForPower(int w) { // Slope-of-slopes curve: interpolates dama
 float TakeDamage(u16 self,DamageData dd);
 void HitScanFire(int wep16) {
     u16 ent = wfx.tempHitEnt;
-    bool b = ent != 0xFFFF, isBeam=(wep16 == 1 || wep16 == 4 || wep16 == 14), npc = b && IdxIsNPC(World.instances[ent].index), alt = World.invP1.wepLoadedWithAlternate[World.invP1.weaponCurrent];
+    bool b = ent != 0xFFFF, isBeam=(wep16 == 1 || wep16 == 4 || wep16 == 14), npc = b && IdxIsNPC(World.instances[ent].index), alt = World.invP1.wepLoadedWithAlternate[World.invP1.wepCur];
     DamageData dd = {.isOtherNPC = npc, .hitpoint = wfx.tempHit.point, .attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right), .owner = PLAYER1,
                      .impactVelocity = wep16 == 12 ? 120.0f/*riotgun kicks harder*/ : 80.0f,.attackType=(wep16 == 2 && alt) ? Att_Trnq/*dartgun tranqs*/ : attTypeWep[wep16] };
     if (isBeam) CreateBeamImpactEffects(wep16);
@@ -324,7 +324,7 @@ static void AttachProjectileRibbon(u16 prefabID, u16 ball) {
 }
 void FireBeachball(int wep16, float shoveForce, u16 prefabID) { // Acts like a beachball for NPC collisions, but a baseball for walls/floor (prevents corner-catching); handled by the projectile's own collider setup.
     u16 ball = SpawnDynamicObject(prefabID,1); if (!EntIdxIsValid(ball)) return;
-    Entity* proj = &World.instances[ball]; u16 wc = World.invP1.weaponCurrent; bool alt = World.invP1.wepLoadedWithAlternate[wc];
+    Entity* proj = &World.instances[ball]; u16 wc = World.invP1.wepCur; bool alt = World.invP1.wepLoadedWithAlternate[wc];
     World.layer[ball] = L_PlayerBullets; proj->forward = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
     proj->damage = alt ? dmgForWep2[wep16] : (CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16]); proj->strength = alt ? penetrationWep2[wep16] : penetrationWep[wep16]; proj->speed = alt ? offenseWep2[wep16] : offenseWep[wep16]; proj->attackType = attTypeWep[wep16]; proj->recentMostActivator = PLAYER1; ProjectileEffectImpactInitAfterLoad(ball);
     V3 spawn = World.position[PLAYER1];
@@ -352,11 +352,11 @@ void FireCyberWeapon(void) { // Reuses waitTilNextFire: cyberspace has no equipp
 void FirePlasma(int w){FireBeachball(w,plasmaShotForce,485);} void FireRailgun(int w){FireBeachball(w,railgunShotForce,484);} void FireMagpulse(int w){FireBeachball(w,magpulseShotForce,482);} void FireStungun(int w){FireBeachball(w,stungunShotForce,483);}
 typedef void (*FireFn)(int); FireFn wepSpecialFire[16]={0,0,0,0,0,FireRapier,FirePipe,0,FireMagpulse,0,FirePlasma,FireRailgun,0,0,0,FireStungun};
 void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;if(wep16 != 5 && wep16 != 6){World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.5;} if(!isSilent&&wepClass[wep16] != WC_MELEE)play_wav(sounds[wepFireSound[wep16]], AppliedFXVol(1.0f), World.position[PLAYER1], false);if(wepClass[wep16]!=WC_MELEE){const PSysDef* mfp=PSysTypeGet(53/*centerFlash*/);if(mfp){PSysDef mfd=*mfp;mfd.pos=V3_AplusB(wfx.reloadContainerPos,V3_ScaleByF(World.instances[PLAYER1].forward,0.5f));mfd.lifetimeMin=mfd.lifetimeMax=0.05f;PSysAdd(&mfd);}} bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmokePrefab[wep16]){u16 smk=SpawnDynamicObject(wepSmokePrefab[wep16],-1);if(EntIdxIsValid(smk)){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
-    World.fogFac += wepFogInc[wep16]; u16 wc = World.invP1.weaponCurrent;
+    World.fogFac += wepFogInc[wep16]; u16 wc = World.invP1.wepCur;
     if (wepClass[wep16] == WC_ENERGY) {
         float setting = World.invP1.weaponEnergySetting[wep16];
-        if (World.invP1.overloadEnabled) World.invP1.currentEnergyWeaponHeat[wc] = 100.0f;
-        else { World.invP1.currentEnergyWeaponHeat[wc] += setting; if (World.invP1.currentEnergyWeaponHeat[wc] > 100.0f) {World.invP1.currentEnergyWeaponHeat[wc] = 100.0f;} }
+        if (World.invP1.overloadEnabled) World.invP1.curWepHeat[wc] = 100.0f;
+        else { World.invP1.curWepHeat[wc] += setting; if (World.invP1.curWepHeat[wc] > 100.0f) {World.invP1.curWepHeat[wc] = 100.0f;} }
     }
     bool wasOverload = World.invP1.overloadEnabled;
     if (wepClass[wep16] != WC_MELEE) { // Take ammo/energy. Melee weapons consume neither and don't count towards shotsFired.
@@ -390,14 +390,14 @@ void CheckUIStateAndAttack(void) {
     if (World.uiIsBlocking || World.invP1.holdingObject || World.mouseClickHeldOverGUI || World.invP1.reloadFinished >= World.pauseRelativeTime || World.invP1.waitTilNextFire >= World.pauseRelativeTime || wepdex < 0 || wepdex > 15 || World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]) return;
     World.invP1.justFired = World.pauseRelativeTime; if (wepClass[wepdex] == WC_MELEE) { FireWeapon(wepdex,false); return; }
     if (wepClass[wepdex] == WC_ENERGY) {
-        u16 wc = World.invP1.weaponCurrent;
+        u16 wc = World.invP1.wepCur;
         if (World.invP1.energy > 0.0f || Cheats.bottomless || Cheats.redbull) {
-            if(World.invP1.currentEnergyWeaponHeat[wc]>wfx.overheatedPercent && !Cheats.bottomless && !Cheats.redbull){play_wav(sounds[238],AppliedFXVol(1.0f),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire=World.pauseRelativeTime + 0.8f; CenterStatusPrint("%s",Sys_Text.stringTable[11]);} 
+            if(World.invP1.curWepHeat[wc]>wfx.overheatedPercent && !Cheats.bottomless && !Cheats.redbull){play_wav(sounds[238],AppliedFXVol(1.0f),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire=World.pauseRelativeTime + 0.8f; CenterStatusPrint("%s",Sys_Text.stringTable[11]);} 
             else { FireWeapon(wepdex,false); }
         } else { CenterStatusPrint("%s", Sys_Text.stringTable[207]);/*not enough energy*/ }
         return;
     }
-    u16 wc = World.invP1.weaponCurrent; bool alt = World.invP1.wepLoadedWithAlternate[wc];
+    u16 wc = World.invP1.wepCur; bool alt = World.invP1.wepLoadedWithAlternate[wc];
     u16 amount = alt ? World.invP1.currentMagazineAmount2[wc] : World.invP1.currentMagazineAmount[wc];
     if (amount > 0 || Cheats.bottomless) { FireWeapon(wepdex, false); } else {play_wav(sounds[238],AppliedFXVol(1.0f),(V3){0,0,0},false);/*noammo*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.8f; }
 }
@@ -405,13 +405,13 @@ void CheckUIStateAndAttack(void) {
 void Unload(bool isSilent) {
     if (World.invP1.weaponIndex >= 0x8000 || (i32)World.invP1.weaponIndex < 0) return;
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0 || wepClass[wep16] == WC_MELEE) return;
-    u16 wc = World.invP1.weaponCurrent;
+    u16 wc = World.invP1.wepCur;
     if(World.invP1.wepLoadedWithAlternate[wc]){World.invP1.wepAmmoSecondary[wep16]+=World.invP1.currentMagazineAmount2[wc]; World.invP1.currentMagazineAmount2[wc]=0;}else{World.invP1.wepAmmo[wep16]+=World.invP1.currentMagazineAmount[wc]; World.invP1.currentMagazineAmount[wc]=0;}
     (void)isSilent; if (!isSilent) play_wav(sounds[260], AppliedFXVol(1.0f), (V3){0,0,0}, false); // wreload
 }
 
 void LoadPrimaryAmmoType(bool isSilent) {
-    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); u16 wc = World.invP1.weaponCurrent;
+    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); u16 wc = World.invP1.wepCur;
     if (!World.invP1.wepLoadedWithAlternate[wc]) {
         if (World.invP1.currentMagazineAmount[wc] == magazinePitchCountForWeapon[wep16]) { CenterStatusPrint("%s", Sys_Text.stringTable[191]); return; }
         if (World.invP1.currentMagazineAmount[wc] == World.invP1.wepAmmo[wep16]) { CenterStatusPrint("%s", Sys_Text.stringTable[535]); return; }
@@ -424,7 +424,7 @@ void LoadPrimaryAmmoType(bool isSilent) {
 }
 
 void LoadSecondaryAmmoType(bool isSilent) {
-    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); u16 wc = World.invP1.weaponCurrent;
+    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); u16 wc = World.invP1.wepCur;
     if (World.invP1.wepLoadedWithAlternate[wc]) {
         if (World.invP1.currentMagazineAmount2[wc] == magazinePitchCountForWeapon2[wep16]) { CenterStatusPrint("%s", Sys_Text.stringTable[191]); return; }
         if (World.invP1.currentMagazineAmount2[wc] == World.invP1.wepAmmoSecondary[wep16]) { CenterStatusPrint("%s", Sys_Text.stringTable[535]); return; }
@@ -440,7 +440,7 @@ void ReloadSecret(bool isSilent) {
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0) {return;}
     if (wepClass[wep16] == WC_MELEE) { CenterStatusPrint("%s", Sys_Text.stringTable[315]); return; }
     if (wepClass[wep16] == WC_ENERGY) { CenterStatusPrint("%s", Sys_Text.stringTable[538]); return; }
-    u16 wc = World.invP1.weaponCurrent;
+    u16 wc = World.invP1.wepCur;
     if (World.invP1.wepLoadedWithAlternate[wc]) {
         if (World.invP1.currentMagazineAmount2[wc] == magazinePitchCountForWeapon2[wep16]) { CenterStatusPrint("%s", Sys_Text.stringTable[191]); return; }
         if (World.invP1.wepAmmoSecondary[wep16] <= 0) { if (World.invP1.wepAmmo[wep16] <= 0) { CenterStatusPrint("%s", Sys_Text.stringTable[305]); return; } CenterStatusPrint("%s", Sys_Text.stringTable[192]); LoadPrimaryAmmoType(isSilent); return; }
@@ -453,10 +453,10 @@ void ReloadSecret(bool isSilent) {
 }
 
 void CheckReloadInput(void) {
-    if (World.invP1.reloadFinished >= World.pauseRelativeTime || !Reload() || (int)World.invP1.weaponCurrent < 0) return;
+    if (World.invP1.reloadFinished >= World.pauseRelativeTime || !Reload() || (int)World.invP1.wepCur < 0) return;
     if (Sys_Settings.QuickReloadWeapons) { ReloadSecret(false); return; }
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0) return;
-    u16 wc = World.invP1.weaponCurrent;
+    u16 wc = World.invP1.wepCur;
     bool alt = World.invP1.wepLoadedWithAlternate[wc];
     if (alt ? (World.invP1.currentMagazineAmount2[wc] <= 0 || World.invP1.wepAmmoSecondary[wep16] <= 0) : (World.invP1.currentMagazineAmount[wc] <= 0 || World.invP1.wepAmmo[wep16] <= 0)) ReloadSecret(false); else Unload(false);
 }
@@ -465,12 +465,12 @@ void ActualChangeAmmoType(void) {
     int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex); if (wep16 < 0) {return;}
     if (wepClass[wep16] == WC_MELEE) { CenterStatusPrint("%s", Sys_Text.stringTable[315]); return; }
     if (wepClass[wep16] == WC_ENERGY) {
-        u16 wc = World.invP1.weaponCurrent;
-        if (World.invP1.currentEnergyWeaponHeat[wc] > 25.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[12]); return; }
+        u16 wc = World.invP1.wepCur;
+        if (World.invP1.curWepHeat[wc] > 25.0f) { CenterStatusPrint("%s", Sys_Text.stringTable[12]); return; }
         if (World.invP1.overloadEnabled) { CenterStatusPrint("%s", Sys_Text.stringTable[13]); World.invP1.overloadEnabled = false; } else { CenterStatusPrint("%s", Sys_Text.stringTable[17]); World.invP1.overloadEnabled = true; }
         return;
     }
-    u16 wc = World.invP1.weaponCurrent;
+    u16 wc = World.invP1.wepCur;
     if (World.invP1.wepLoadedWithAlternate[wc]) {
         if (World.invP1.wepAmmo[wep16] > 0) {
             World.invP1.wepLoadedWithAlternate[wc] = false;

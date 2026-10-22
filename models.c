@@ -250,7 +250,7 @@ __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* restrict sv, u32
     if (unlikely(!ec)){return false;} u16* final_t = OS_SubArenaAlloc(tid,ec * sizeof(u16)); /*Allocate final_t early so we can use it instead of ft_scratch*/ u32 used_slots_count = 0; u32* rem = (u32*)remap_scr; /*Reuse remap_scr for the 'rem' array!*/ u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) { const float* v = sv + (i<<3); const u32* uv = (const u32*)v; u32 h0 = uv[0] ^ uv[1] ^ uv[2] ^ uv[3]; u32 h1 = uv[4] ^ uv[5] ^ uv[6] ^ uv[7]; u32 s = (h0 ^ h1) & (WELD_HASH_SIZE-1); while (ht[s] != U32_MAX) { if (mcmp(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (WELD_HASH_SIZE-1); } ht[s] = ucnt; rem[i] = ucnt; ht_used[used_slots_count++] = s; mcpy(sv+(ucnt<<3), v, 32); ++ucnt; nxt:; }
     for(u32 i=0;i<ec;++i){final_t[i]=(u16)rem[i];} OptimizeVertexCache(final_t,ec,ucnt,cache_scr); float* final_verts=OS_SubArenaAlloc(tid,ucnt*CPU_VRT_SZ); OptimizeVertexFetch((u8*)sv,&ucnt,final_t,ec,CPU_VRT_SZ,remap_scr,(u8*)final_verts); *ov_pos = final_verts; *ovc = ucnt; *ot = final_t; *otc = ec/3;
-    float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr,mn_v); _mm_storeu_ps(mx_arr,mx_v); modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2]))))); modelMin[mindex]=(V3){mn_arr[0],mn_arr[1],mn_arr[2]}; modelMax[mindex]=(V3){mx_arr[0],mx_arr[1],mx_arr[2]};/* free: the min/max are already in registers here, so the local AABB costs two stores. Door laser grids need an aperture and COLTYPE_MSH prefabs carry no collider size (doorJ/doorK are {0,0,0}), so the model bounds are the only source. */ for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]]=U32_MAX;} return true;
+    float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr,mn_v); _mm_storeu_ps(mx_arr,mx_v); modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2]))))); modelMin[mindex]=(V3){mn_arr[0],mn_arr[1],mn_arr[2]}; modelMax[mindex]=(V3){mx_arr[0],mx_arr[1],mx_arr[2]};/* free: the min/max are already in registers here, so the local AABB costs two stores. Door laser grids need an aperture and CT_MSH prefabs carry no collider size (doorJ/doorK are {0,0,0}), so the model bounds are the only source. */ for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]]=U32_MAX;} return true;
 }
 
 static void Mat4Identity(float* m) { mset(m, 0, sizeof(float) * 16); m[0] = m[5] = m[10] = m[15] = 1.0f; }
@@ -704,7 +704,7 @@ void LoadGLBAnimatedSources(ModelData* entries, u32 entryCount, RawOBJ* raw) {
         
         GltfMesh* gm = &gBlockMeshes[gBlockMeshCount]; GltfMeshLoad((const u8*)raw[entries[i].index].data,(size_t)raw[entries[i].index].size,gm);
         ++gBlockMeshCount; u16 a=entries[i].animationNum; float framerate=0.0f;
-        if (a < MAX_ANIMS) {  for (u32 c=0;c<MAX_ANIMCLIPS;++c) { if(modelAnimationClips[a][c].framerate > 0.0f){framerate = modelAnimationClips[a][c].framerate; break;} }  }
+        if (a < MAXANIM) {  for (u32 c=0;c<MAX_ANIMCLIPS;++c) { if(modelAnimationClips[a][c].framerate > 0.0f){framerate = modelAnimationClips[a][c].framerate; break;} }  }
         if (framerate <= 0.0f) { framerate = 30.0f; /*Fallback if undefined*/ }
         for (u32 fi=0;fi<entries[i].frameCount; ++fi) {
             u32 frameNum = entries[i].frames[fi]; u32 modelIdx = entries[i].index + fi; /*Contiguous index, sparse frame*/
@@ -1087,10 +1087,10 @@ void LoadModels() {
     DualLog(" vertices: %u, tris: %u......................took %.6f secs\n", tv, tt, get_time() - startModelTime);
 }
 
-u8 numClips[MAX_ANIMS] = {/* 0*/4,/* 1*/4,/* 2*/6,/* 3*/8,/* 4*/4,/* 5*/4,/* 6*/4,/* 7*/4,/* 8*/4,/* 9*/4,/*10*/4,/*11*/4,/*12*/4,/*13*/4,/*14*/4,/*15*/4,/*16*/4,/*17*/4,/*18*/4,/*19*/4,/*20*/4,/*21*/1,/*22*/1,/*23*/6,/*24*/8,/*25*/6,/*26*/10,/*27*/8,/*28*/7,/*29*/5,/*30*/5,/*31*/7,/*32*/8,
+u8 numClips[MAXANIM] = {/* 0*/4,/* 1*/4,/* 2*/6,/* 3*/8,/* 4*/4,/* 5*/4,/* 6*/4,/* 7*/4,/* 8*/4,/* 9*/4,/*10*/4,/*11*/4,/*12*/4,/*13*/4,/*14*/4,/*15*/4,/*16*/4,/*17*/4,/*18*/4,/*19*/4,/*20*/4,/*21*/1,/*22*/1,/*23*/6,/*24*/8,/*25*/6,/*26*/10,/*27*/8,/*28*/7,/*29*/5,/*30*/5,/*31*/7,/*32*/8,
                           /*33*/5,/*34*/4,/*35*/5,/*36*/6,/*37*/4,/*38*/2,/*39*/6,/*40*/5,/*41*/6,/*42*/3,/*43*/3,/*44*/5,/*45*/4,/*46*/1,/*47*/4,/*48*/4,/*49*/3,/*50*/3,/*51*/7,/*52*/1,/*53*/1,/*54*/1,/*55*/1,/*56*/1,/*57*/1,/*58*/2};
     
-AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
+AnimationClip modelAnimationClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
     [0]={[A_IDLE_CLOSED]={1.0f,2,2,699,24},[A_OPENING]={1.0f,2,11,699,24},[A_IDLE_OPEN]={1.0f,11,11,708,24},[A_CLOSING]={1.0f,12,21,709,24}},/*doorB (door2)*/                  [1]={[A_IDLE_CLOSED]={1.0f,2,2,719,24},[A_OPENING]={1.0f,2,12,719,24},[A_IDLE_OPEN]={1.0f,12,12,729,24},[A_CLOSING]={1.0f,14,24,731,24}},/*doorA (door1)*/
     [2]={[A_IDLE]={1.0f,0,37,6975,30},[A_WALK]={1.0f,50,99,7013,30},[A_RUN]={1.1f,50,99,7013,30},[A_ATTACK1]={0.75f,111,136,7063,30},[A_PAIN]={0.5f,138,150,7090,30},[A_DYING]={0.75f,153,176,7103,30}},/*npc_humanoid_mutant*/
     [3]={[A_IDLE]={1.0f,1,207,893,24},[A_ATTACK1]={1.0f,219,239,1100,24},[A_ATTACK2]={1.0f,219,239,1100,24},[A_WALK]={1.0f,252,308,1121,24},[A_RUN]={1.0f,252,308,1121,24},[A_PAIN]={1.0f,321,330,1177,24},[A_PAIN2]={1.0f,331,344,1187,24},[A_DYING]={1.0f,345,369,1201,24}},/*npc_cyborg_drone*/
@@ -1134,13 +1134,13 @@ AnimationClip modelAnimationClips[MAX_ANIMS][MAX_ANIMCLIPS] = { // speed, frameS
 };
 
 void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
-void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAX_ANIMS || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&modelAnimationClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
+void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAXANIM || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&modelAnimationClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
 bool SpawnImpactParticleForPrefab(u16,V3,V3), ai_effect_flash(V3,Color3,float,float,double);
 void UpdateAnims(void) {
     if (World.paused || World.menuActive){return;} static double lastPauseTime=0; if(lastPauseTime == 0.0){lastPauseTime=World.pauseRelativeTime;} double animDT=World.pauseRelativeTime-lastPauseTime; lastPauseTime=World.pauseRelativeTime; if(animDT > 0.1){animDT=0.1;} if(animDT <= 0.0){return;} bool portalsNeedUpdated=false; u8 animTest=Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
         if (i == World.weaponVModelIndex) continue; /* view model handled manually */
-        Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAX_ANIMS || e->ajar) continue;
+        Entity* e = &World.instances[i]; if (e->modelIndex >= MAX_MDLS || !(e->entflags & EF_ACTIVE) || e->animationNum >= MAXANIM || e->ajar) continue;
         
         if (animTest == 1) {
             u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0;

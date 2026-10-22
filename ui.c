@@ -160,13 +160,13 @@ INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
 void WeaponFireStartWeaponDip(float t);
 void RemoveWeapon(i32 slot);
 void WeaponSelectSlot(int slot) {
-    int wi = (int)World.invP1.weaponInventoryIndices[slot];
+    int wi = (int)World.invP1.wepInvIndices[slot];
     if (wi < 0 || wi >= MAX_ENTITIES) { return; }
-    if ((int)World.invP1.weaponCurrent == slot) { return; }
+    if ((int)World.invP1.wepCur == slot) { return; }
     if (World.invP1.reloadFinished > World.pauseRelativeTime) { return; }
     
     play_wav(sounds[80], AppliedFXVol(1.0f), (V3){0.0f, 0.0f, 0.0f}, false);
-    World.invP1.weaponCurrentPending = (i16)slot;
+    World.invP1.wepCurPending = (i16)slot;
     World.invP1.weaponIndexPending = (i16)wi;
     int w = Get16WeaponIndexFromConstIndex(wi);
     WeaponFireStartWeaponDip((w>=0&&w<16) ? reloadTime[w] : 0.5f);
@@ -462,7 +462,7 @@ void RenderPausedUI() {
 }
 
 void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
-    buf[0] = '\0'; int wepIdx = World.invP1.weaponInventoryIndices[slot]; bool alt = World.invP1.wepLoadedWithAlternate[slot]; float heat = World.invP1.currentEnergyWeaponHeat[slot];
+    buf[0] = '\0'; int wepIdx = World.invP1.wepInvIndices[slot]; bool alt = World.invP1.wepLoadedWithAlternate[slot]; float heat = World.invP1.curWepHeat[slot];
     u8 mag = alt ? World.invP1.currentMagazineAmount2[slot] : World.invP1.currentMagazineAmount[slot];
     switch(wepIdx) {
         case 343: if (alt){sFormat(buf,bufSize,"%upn | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);}else{sFormat(buf,bufSize,"%umg | %umg, %upn",mag,World.invP1.wepAmmo[0],World.invP1.wepAmmoSecondary[0]);} break;/*MK3 Assault Rifle*/
@@ -790,13 +790,13 @@ static void EditFieldWrite(u16 s,Entity* e,float f,i32 iv){switch(editFieldSlot)
     case EF_POSX:World.position[s].x=f;break; case EF_POSY:World.position[s].y=f;break; case EF_POSZ:World.position[s].z=f;break;
     case EF_ROTX:World.rotation[s].x=f;World.rotation[s]=quat_normalize(World.rotation[s]);break; case EF_ROTY:World.rotation[s].y=f;World.rotation[s]=quat_normalize(World.rotation[s]);break; case EF_ROTZ:World.rotation[s].z=f;World.rotation[s]=quat_normalize(World.rotation[s]);break; case EF_ROTW:World.rotation[s].w=f;World.rotation[s]=quat_normalize(World.rotation[s]);break;
     case EF_SCLX:World.scale[s].x=f;break; case EF_SCLY:World.scale[s].y=f;break; case EF_SCLZ:World.scale[s].z=f;break;
-    case EF_TEX:e->texIndex=(u16)vclamp(iv,0,MAX_TXRS-1);break; case EF_MODEL:e->modelIndex=(u16)vclamp(iv,0,MAX_MDLS-1);break; case EF_GLOW:e->glowIndex=(u16)vclamp(iv,0,MAX_TXRS-1);break; case EF_SPEC:e->specIndex=(u16)vclamp(iv,0,MAX_TXRS-1);break; case EF_NORM:e->normIndex=(u16)vclamp(iv,0,MAX_TXRS-1);break;}
+    case EF_TEX:e->texIndex=(u16)vclamp(iv,0,MAXTEX-1);break; case EF_MODEL:e->modelIndex=(u16)vclamp(iv,0,MAX_MDLS-1);break; case EF_GLOW:e->glowIndex=(u16)vclamp(iv,0,MAXTEX-1);break; case EF_SPEC:e->specIndex=(u16)vclamp(iv,0,MAXTEX-1);break; case EF_NORM:e->normIndex=(u16)vclamp(iv,0,MAXTEX-1);break;}
 }
 
 static void EditFieldCommitLive(void){if(!EditSelIsActive())return;u16 s=editModeSelection;Entity* e=&World.instances[s];float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,e,f,s2i32(editFieldBuffer));}
 static void EditFieldStep(float delta){if(!editFieldEditing||!EditSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}
     if(editFieldSlot<EF_TEX){int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=(editFieldSlot>=EF_ROTX&&editFieldSlot<=EF_ROTW)?3:2;char fmt[8];sFormat(fmt,8,"%%.%df",prec);sFormat(editFieldBuffer,40,fmt,cur);}
-    else{int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);i32 iv=(i32)cur+steps;iv=vclamp(iv,0,(editFieldSlot==EF_MODEL?MAX_MDLS-1:MAX_TXRS-1));sFormat(editFieldBuffer,40,"%d",iv);}
+    else{int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);i32 iv=(i32)cur+steps;iv=vclamp(iv,0,(editFieldSlot==EF_MODEL?MAX_MDLS-1:MAXTEX-1));sFormat(editFieldBuffer,40,"%d",iv);}
     EditFieldCommitLive();
 }
 
@@ -863,7 +863,7 @@ void RenderConsumableItem(bool isRH) {
     int row=ConsumableSelectedRow(); bool patch=World.Sys_UI.mfdConsumable==2; if (row<0 || !ConsumableCount(patch,row)) return;
     i16 dx=isRH?1059:0; int item=ConsumableItem(patch,row); const char* text=Sys_Text.stringTable[item+326];
     UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,text);
-    u16 tex=GetItemFrobTexture(item+307); if (tex<MAX_TXRS) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
+    u16 tex=GetItemFrobTexture(item+307); if (tex<MAXTEX) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
     UIRImg(MID(isRH,ITEM_USE),dx+72,691,160,40,1087); RenderTextL(dx+72,691,T_GREEN_MENU,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[736]);
     if (!patch && row>=5) {
         float min=row==5?2.0f:4.0f,value=row==5?World.invP1.nitroTimeSetting:World.invP1.earthShakerTimeSetting;
@@ -879,8 +879,8 @@ static void RenderHardwareItem(bool isRH) {
     UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,ref<0?"":Sys_Text.stringTable[ref+326]);
     if (slot==HW_BST_IDX) { /*the booster is the only hardware with selectable modes, so it gets the SKATE/BOOST pair instead of a plain readout*/
         bool skates=World.invP1.hwVersSetting[HW_BST_IDX]==0; for(u8 m=0;m<2;++m){ u32 rid = m ? MID(isRH,ITEM_BOOST) : MID(isRH,ITEM_SKATE); i16 y=m?691:628; UIRImg(rid,dx+34,y,160,40,1087); RenderTextL(dx+34,y,skates==(m==0)?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8,"%s",m?"BOOST":"SKATE"); } return; }
-    u16 tex=ref<0?MAX_TXRS:GetItemFrobTexture((u16)(ref+307)); /*hardware frob icons live at 328..339, not 307..318: hardwareInvReferenceIndex is the +21 remap that lines names and icons up*/
-    if (tex<MAX_TXRS) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
+    u16 tex=ref<0?MAXTEX:GetItemFrobTexture((u16)(ref+307)); /*hardware frob icons live at 328..339, not 307..318: hardwareInvReferenceIndex is the +21 remap that lines names and icons up*/
+    if (tex<MAXTEX) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
     RenderTextL(dx+112,650,T_GREEN_MENU,FONT_NORMAL,0.8,"v%d",(int)World.invP1.hwVers[slot]);
 }
 void RenderGeneralItem(bool isRH) {
@@ -891,7 +891,7 @@ void RenderGeneralItem(bool isRH) {
     i16 dx=isRH?1059:0; UIRText(MID(isRH,ITEM_NAME),dx+28,540,T_YELLOW,FONT_NORMAL,0.8f,260,GeneralInvLabel(slot));
     u16 tex=GetItemFrobTexture((u16)(item+307));
     if (item>=92 && item<=94) { static const u8 heads[19]={37,11,32,1,7,9,10,12,13,14,15,17,25,27,28,31,33,35,36}; u16 custom=World.invP1.generalInvCustIdx[slot]; tex=(u16)(1272+heads[custom<19?custom:0]); }
-    if (tex<MAX_TXRS) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
+    if (tex<MAXTEX) UIRImg(MID(isRH,ITEM_ICON),dx+112,560,80,64,tex);
     if (!slot) {
         i16 x=dx+36,y=638;
         for (int card=ACC_Std;card<=ACC_Per5;++card) if (InventoryHasAccessCard((AccCardType)card)) {
@@ -937,7 +937,7 @@ void RenderSearch(bool isRH) {
     for (u8 slot=0;slot<4;++slot) {
         i16 item=e->contents[slot]; if (item<0 || item>110) continue;
         any=true; u16 tex=GetItemFrobTexture((u16)(item+307));
-        if (tex<MAX_TXRS) UIRImg(MID(isRH,SEARCH_ICON_0)+slot,(i16)(dx+84+90*(slot&1)),(i16)(584+90*(slot>>1)),64,64,tex);
+        if (tex<MAXTEX) UIRImg(MID(isRH,SEARCH_ICON_0)+slot,(i16)(dx+84+90*(slot&1)),(i16)(584+90*(slot>>1)),64,64,tex);
     }
     if (!any) RenderTextL(dx+24,633,T_YELLOW,FONT_NORMAL,0.8f,Sys_Text.stringTable[891]);
     UIRImg(MID(isRH,SEARCH_CLOSE),dx+291,508,29,29,899); RenderTextL(dx+300,518,T_STOPD_RED,FONT_NORMAL,0.8,"X");
@@ -1007,7 +1007,7 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
 }
 static void WeaponMagazineDigits(int wep16,int slot,int out[3]) {
     out[0]=out[1]=out[2]=10;
-    if (wep16<0||wep16==5||wep16==6||slot<0||slot>6||World.invP1.weaponCurrentPending>=0||World.curLev==LEVEL_CYBERSPACE) return;
+    if (wep16<0||wep16==5||wep16==6||slot<0||slot>6||World.invP1.wepCurPending>=0||World.curLev==LEVEL_CYBERSPACE) return;
     int amount=World.invP1.wepLoadedWithAlternate[slot]?World.invP1.currentMagazineAmount2[slot]:World.invP1.currentMagazineAmount[slot];
     if (amount<0) return;
     out[2]=amount%10;
@@ -1037,7 +1037,7 @@ void SideMFD(bool isRH) { // 320x240
         DrawSensaroundQuad(sx,sy,SIDE_MFD_W,MFD_H,isRH ? sensaroundCamViewRight : sensaroundCamViewLeft);
     } else {
         if (tab == 1) {/*WeaponTab: WepNameText, WepIcon, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/
-            i16 slot=World.invP1.weaponCurrent; if (slot>=0 && slot<7) { i32 widx=World.invP1.weaponInventoryIndices[slot]; if (widx >= 0) {UIRText(MID(isRH,WEAPON_NAME),isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W+TXT_PAD : TAB_THICK+MFD_SPACING+TXT_PAD,520,T_RED,FONT_NORMAL,0.8f,270,Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16)UIRImg(MID(isRH,WEAPON_ICON),isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIcon*/
+            i16 slot=World.invP1.wepCur; if (slot>=0 && slot<7) { i32 widx=World.invP1.wepInvIndices[slot]; if (widx >= 0) {UIRText(MID(isRH,WEAPON_NAME),isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W+TXT_PAD : TAB_THICK+MFD_SPACING+TXT_PAD,520,T_RED,FONT_NORMAL,0.8f,270,Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16)UIRImg(MID(isRH,WEAPON_ICON),isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIcon*/
             if (CurrentWeaponUsesEnergy()) {
                 i16 tx0=(i16)(isRH ? 1207 : 24);
                 for (int ti=0;ti<9;++ti) if (HudHeatTickOn(ti)) RenderUIImage((i16)(tx0+ti*24),652,20,20,947);/*EnergyHeatTicks: tex 947 ener_overheattickgreen*/
@@ -1189,8 +1189,8 @@ void CenterMFD() { //640x240
                 UIR(UI_ID_CMFD_PATCH_ROW_0+row,831,y,109,21); RenderTextL(868,y,color,FONT_NORMAL,0.8f,"%s",text); RenderTextL(949,y,color,FONT_NORMAL,0.8f,"%u",count); UIRImg(UI_ID_CMFD_PATCH_USE_0+row,974,y-6,20,20,1086); RenderUIImage(979,y-2,11,11,1079);/*Row spans label+count+use, USE ids sort first so they win the overlap*/
             }
             for(int slot=0;slot<7;++slot){
-                int widx=World.invP1.weaponInventoryIndices[slot]; if(widx<0)continue; int y=generalRowY[slot]; UIR(UI_ID_CMFD_WEAPON_ROW_0+slot,372,(i16)(y-5),340,21); bool hov=UIOver(UI_ID_CMFD_WEAPON_ROW_0+slot); /*Slight shift of 6 feels better than just doing y and y + 22 as one would expect, then lopped 1 off one end to prevent double highlighting*/
-                u32 col = (hov&&World.inventoryMode && World.invP1.weaponCurrent!=slot) ? T_GREEN_MENU : (World.invP1.weaponCurrent==slot?T_YELLOW:(World.invP1.weaponCurrentPending==slot?T_DARK_YELLOW:T_GREEN)); RenderTextL(372,y,col,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon text*/
+                int widx=World.invP1.wepInvIndices[slot]; if(widx<0)continue; int y=generalRowY[slot]; UIR(UI_ID_CMFD_WEAPON_ROW_0+slot,372,(i16)(y-5),340,21); bool hov=UIOver(UI_ID_CMFD_WEAPON_ROW_0+slot); /*Slight shift of 6 feels better than just doing y and y + 22 as one would expect, then lopped 1 off one end to prevent double highlighting*/
+                u32 col = (hov&&World.inventoryMode && World.invP1.wepCur!=slot) ? T_GREEN_MENU : (World.invP1.wepCur==slot?T_YELLOW:(World.invP1.wepCurPending==slot?T_DARK_YELLOW:T_GREEN)); RenderTextL(372,y,col,FONT_NORMAL,0.8f,"%s",Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon text*/
                 char b[64]; GetWeaponAmmoText(slot,b,sizeof(b)); RenderTextL(574,y,col,FONT_NORMAL,0.8f,"%s",b);/*Ammo text*/
             }
         }
@@ -1499,7 +1499,7 @@ static double RenderUI() {
     i16 lineSpacing = 18;
     if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 1),T_WHITE,FONT_NORMAL,1.0f,"GPU ms::All:%.2f, Shad:%.2f, Pre:%.2f, Main:%.2f, SSR:%.2f, Comp:%.2f",World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs);
     if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 2),T_WHITE,FONT_NORMAL,1.0f,"CPU ms::Shad:%.3f, Phys:%.3f, Subs:%u, Rend:%.3f, Pre Phys:%.3f, Logic:%.3f, Ray:%.3f(%u)",shadowTime * 1000,physTime * 1000,World.substeps,renderTime * 1000,prePhys * 1000,gameTime * 1000,raycastMs * 1000,raycastCalls);
-    if (!World.menuActive && !Cheats.noHUD && !World.paused && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Grounded: %u  weaponCurrent: %d  weaponIndex: %d  pendingIdx: %d  wep16: %d  viewModel: %u  reloadDone: %.2f",(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0,(int)World.invP1.weaponCurrent,(int)World.invP1.weaponIndex,(int)World.invP1.weaponIndexPending,Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex),((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==5||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==6)?49u:((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==0||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==1)?50u:0u)),World.invP1.reloadFinished);
+    if (!World.menuActive && !Cheats.noHUD && !World.paused && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 3),T_WHITE,FONT_NORMAL,1.0f,"Grounded: %u  wepCur: %d  weaponIndex: %d  pendingIdx: %d  wep16: %d  viewModel: %u  reloadDone: %.2f",(World.instances[PLAYER1].entflags & EF_GROUNDED) > 0,(int)World.invP1.wepCur,(int)World.invP1.weaponIndex,(int)World.invP1.weaponIndexPending,Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex),((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==5||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==6)?49u:((Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==0||Get16WeaponIndexFromConstIndex((int)World.invP1.weaponIndex)==1)?50u:0u)),World.invP1.reloadFinished);
     if (!World.menuActive && !Cheats.noHUD && Cheats.showFPS) RenderTextL(16,debugTextStartY + (lineSpacing * 4),T_WHITE,FONT_NORMAL,1.0f,"Test Edx: %u, Time Elapsed: %.3f, Fatigue: %.2f, Sprinting: %u, Reverb: %u, Making Noise: %u",editModeTestEntityDefinition,World.pauseRelativeTime - game_actual_start_time,World.invP1.fatigue,Sprint(),World.invP1.inReverbZone,World.invP1.makingNoise);
     if (!Cheats.noHUD && Cheats.showLocation) RenderTextL(16,debugTextStartY + (lineSpacing * 5),T_WHITE,FONT_NORMAL,1.0f,"Cursor: %d, %d  dx:%d dy:%d",World.cursorPos_x,World.cursorPos_y,World.currentMouse_dx,World.currentMouse_dy);
     if (Cheats.consoleActive) RenderTextL(16,0,T_WHITE,FONT_NORMAL,1.0f, "] %s",consoleEntryText);

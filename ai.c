@@ -383,7 +383,7 @@ void aiac_idle(Entity* self) { if ((self->entflags & EF_ASLEEP) || self->tranqui
 void aiac_walk(Entity* self){if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self); return;} u16 idx=(u16)(self-World.instances); V3 v=World.velocity[idx]; if((v.x*v.x+v.y*v.y+v.z*v.z)>(0.32f*0.32f)){ChangeAnim(self,A_WALK); return;} if (self->animSwapFinished<World.pauseRelativeTime){self->animSwapFinished=World.pauseRelativeTime+.5f; ChangeAnim(self,A_IDLE);}}
 void aiac_dying(Entity* self) { flag_set(&self->entflags,EF_ASLEEP,false); AnimationClip cl=modelAnimationClips[self->animationNum][A_DYING]; if(cl.frameEnd == cl.frameStart){ChangeAnim(self,A_DYING); return;} ChangeAnim(self,A_DYING);}
 void AIAnimationControllerUpdate(u16 idx) {
-    Entity* self = &World.instances[idx]; if((!(self->entflags & EF_ACTIVE)) || (self->animationNum >= MAX_ANIMS)){return;} if(self->currentState == AIState_Dying){aiac_dying(self); return;}
+    Entity* self = &World.instances[idx]; if((!(self->entflags & EF_ACTIVE)) || (self->animationNum >= MAXANIM)){return;} if(self->currentState == AIState_Dying){aiac_dying(self); return;}
     if(self->currentState == AIState_Dead){AnimationClip cl=modelAnimationClips[self->animationNum][A_DYING]; self->clip=A_DYING; self->frame=cl.frameEnd; self->modelIndex=cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart); self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/} if(self->entflags & EF_ASLEEP){aiac_idle(self); return;}
     if(self->currentState == AIState_Run && self->tranquilizeFinished >= World.pauseRelativeTime){aiac_idle(self); return;}
     switch (self->currentState) { case AIState_Walk:aiac_walk(self); break; case AIState_Run:if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self);}else{ChangeAnim(self,A_RUN);} break; case AIState_Attack1:ChangeAnim(self,A_ATTACK1); break; case AIState_Attack2:ChangeAnim(self,A_ATTACK2); break; case AIState_Attack3:ChangeAnim(self,A_ATTACK3); break; case AIState_Pain:ChangeAnim(self,A_PAIN); break; default:aiac_idle(self); break; }
@@ -456,7 +456,7 @@ static V3 AIGetAStarPoint(Entity* self) {
 
 static V3 AIGetSearchPoint(Entity* self) { NPCType t = npcTable[self->index - 419].type; if (t == NPCType_Mutant || t == NPCType_Supermutant) {return AIGetWanderPoint(self);} return AIGetAStarPoint(self); }
 static void AIHopMove(u16 self) {
-    Entity* e = &World.instances[self]; if (e->animationNum >= MAX_ANIMS || e->clip >= MAX_ANIMCLIPS) { flag_set(&e->entflags,EF_HOP_DONE,false); return; }
+    Entity* e = &World.instances[self]; if (e->animationNum >= MAXANIM || e->clip >= MAX_ANIMCLIPS) { flag_set(&e->entflags,EF_HOP_DONE,false); return; }
     
     AnimationClip c = modelAnimationClips[e->animationNum][e->clip];
     float normTime = (c.frameEnd > c.frameStart) ? (float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart) : 0.0f;
@@ -525,7 +525,7 @@ static bool AICanAttack(u16 selfIdx, float dsq, u8 type, float* rangeToEnemy) {
 
 static void AIBrakingMovement(Entity* self) { u16 sidx=(u16)(self - World.instances); u8 ni=self->index-419; if (ni == 1 || (ni >= 3 && ni <= 9) || (ni >= 11 && ni <= 13) || ni == 17 || ni == 23) { World.velocity[sidx].x *= 0.15f; World.velocity[sidx].z *= 0.15f; } }
 static double ai_attack_clip_time(const Entity* self, int slot) {
-    if (self->animationNum >= MAX_ANIMS || slot < 1 || slot > 3) return 0.0;
+    if (self->animationNum >= MAXANIM || slot < 1 || slot > 3) return 0.0;
     u8 c = (u8)(A_ATTACK1 + (slot - 1)); if (c >= MAX_ANIMCLIPS) return 0.0;
     const AnimationClip* clip = &modelAnimationClips[self->animationNum][c];
     if (clip->framerate <= 0 || clip->speed <= 0 || clip->frameEnd < clip->frameStart) return 0.0;
@@ -561,7 +561,7 @@ static void AIPain(Entity* self) {
 }
 
 static double AIDeathAnimationDuration(const Entity* self) {
-    if (!self || self->animationNum >= MAX_ANIMS) return 0.0;
+    if (!self || self->animationNum >= MAXANIM) return 0.0;
     
     AnimationClip clip = modelAnimationClips[self->animationNum][A_DYING];
     if (clip.framerate <= 0 || clip.speed <= 0 || clip.frameEnd <= clip.frameStart) return 0.0;

@@ -10,7 +10,7 @@ typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } M
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3],Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
 SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount; float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projectileImpactQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projectileImpactTarget[INSTANCE_COUNT]; static V3 projectileImpactPoint[INSTANCE_COUNT],projectileImpactNormal[INSTANCE_COUNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
 static void WarnPhysicsCapacity(u8 kind,const char* message){if(kind<5&&World.pauseRelativeTime>=nextCapacityWarn[kind]){DualLogWarn("%s\n",message);nextCapacityWarn[kind]=World.pauseRelativeTime+5.0f;}}
-INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAX_ANIMS && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
+INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAXANIM && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
 void AddForce(u16 i, V3 f, bool imp){if(imp){World.velocity[i]=V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f/vmax(World.mass[i],0.001f)));}else{World.instances[i].accumulatedForce=V3_AplusB(World.instances[i].accumulatedForce,f);} World.physSleep[i]=false;}
 
 // Trigger System
@@ -70,7 +70,7 @@ static float GravityLiftTopY(u16 liftIdx) {
     return box.ctr.y+extent;
 }
 static float GravityLiftBodyBottomY(u16 body) {
-    if(World.col[body]==COLTYPE_CAP){ShapeCapsule cap=Entity_GetCap(body);return cap.base.y-cap.rad;}
+    if(World.col[body]==CT_CAP){ShapeCapsule cap=Entity_GetCap(body);return cap.base.y-cap.rad;}
     return World.position[body].y-(World.colliderSize[body].y*0.5f*vabs(World.scale[body].y));
 }
 static float GravityLiftGravityAccel(u16 body) {
@@ -102,11 +102,11 @@ void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
         float bottomY=GravityLiftBodyBottomY(other),topY=GravityLiftTopY(self),gap=topY-bottomY,velY=World.velocity[other].y;
         float stopDist=velY>0.0f ? (velY*velY)/(2.0f*16.0f) : 0.0f;
         if(gap<=vmax(lift->distancePaddingToTopPoint,stopDist+0.20f)){
-            bool topContact=other==PLAYER1&&World.col[other]==COLTYPE_CAP&&gap<=0.08f&&gap>=-0.12f,topJumpZone=other==PLAYER1&&World.col[other]==COLTYPE_CAP&&gap<=vmax(lift->distancePaddingToTopPoint,0.12f)&&gap>=-0.12f;
+            bool topContact=other==PLAYER1&&World.col[other]==CT_CAP&&gap<=0.08f&&gap>=-0.12f,topJumpZone=other==PLAYER1&&World.col[other]==CT_CAP&&gap<=vmax(lift->distancePaddingToTopPoint,0.12f)&&gap>=-0.12f;
             if(other==PLAYER1){
                 if(topJumpZone&&JumpDown()){gravityLiftTopSupport[other]=0;flag_set(&World.instances[other].entflags,EF_GROUNDED,true);jumpingFromTop=true;}
                 else if(topContact&&vabs(velY)<0.75f){flag_set(&World.instances[other].entflags,EF_GROUNDED,true);gravityLiftTopSupport[other]=(u16)(self+1u);}
-                else if(World.col[other]==COLTYPE_CAP)gravityLiftTopSupport[other]=(u16)(self+1u);
+                else if(World.col[other]==CT_CAP)gravityLiftTopSupport[other]=(u16)(self+1u);
             }
             if(!jumpingFromTop)forceY=GravityLiftTopControlForce(other,gap);
         }else if(initialBurst){
@@ -277,7 +277,7 @@ static Manifold RunGjkEpa(SupportCtx* ctx) {
     for(int it=0;it<EPA_ITER;++it){ int bf=-1; float bd=1000000000.0f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break; V3 bn=epa.ef[bf].n; V3 wA,wB; GetSupportPair(ctx,bn,&wA,&wB); V3 sup=V3_AsubB(wA,wB); if(V3_dot(bn,sup)-bd<PHY_EPSILON){return MakeEPAManifold(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c,bn,bd);} if (!ExpandEPA(&epa,sup,wA,wB))break;}    return m;
 }
 Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx, u16 adjIdx) {
-    if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return (Manifold){0}; u8 col=World.col[prim]; V3 (*supA)(const SupportCtx*,V3)=(col == COLTYPE_SPH) ? _supA_sph : (col == COLTYPE_BOX) ? _supA_box : _supA_cap; SupportCtx ctx=(SupportCtx){supA,_supB_hullA,.prim=prim,.meshA=mesh,.matA=mx,.adjA=adjIdx,.adjB=adjIdx}; return RunGjkEpa(&ctx);
+    if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return (Manifold){0}; u8 col=World.col[prim]; V3 (*supA)(const SupportCtx*,V3)=(col == CT_SPH) ? _supA_sph : (col == CT_BOX) ? _supA_box : _supA_cap; SupportCtx ctx=(SupportCtx){supA,_supB_hullA,.prim=prim,.meshA=mesh,.matA=mx,.adjA=adjIdx,.adjB=adjIdx}; return RunGjkEpa(&ctx);
 }
 // Same test against a capsule the caller already has in hand, so probes that are not entities (the SpawnManager's
 // free-floating area-clear sphere) can be tested against convex level geometry without an instance slot.
@@ -380,7 +380,7 @@ Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 
 }
 
 INLINE void quat_to_mat3(Quaternion q, float R[3][3]) { float x=q.x,y=q.y,z=q.z,w=q.w, xx=x*x,yy=y*y,zz=z*z, xy=x*y,xz=x*z,yz=y*z, wx=w*x,wy=w*y,wz=w*z; R[0][0]=1.0f-2.0f*(yy+zz); R[0][1]=2.0f*(xy-wz); R[0][2]=2.0f*(xz+wy); R[1][0]=2.0f*(xy+wz); R[1][1]=1.0f-2.0f*(xx+zz); R[1][2]=2.0f*(yz-wx); R[2][0]=2.0f*(xz-wy); R[2][1]=2.0f*(yz+wx); R[2][2]=1.0f-2.0f*(xx+yy); }
-INLINE void BuildInvInertiaMatrix(u16 i, const float R[3][3], float K[3][3]) { /* K = R * I_inv * R^T, precomputed per body for solver hotpath */ float I0,I1,I2,I3,I4,I5; if (World.col[i]==COLTYPE_BOX) { ShapeBox b=Entity_GetBox(i); float m=World.mass[i],hx=b.hExt.x,hy=b.hExt.y,hz=b.hExt.z; I0=1.0f/vmax((1.0f/3.0f)*m*(hy*hy+hz*hz),0.000001f); I1=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hz*hz),0.000001f); I2=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hy*hy),0.000001f); I3=I4=I5=0.0f; } else if (World.col[i]==COLTYPE_CVX && World.invTnsrValid[i]) { float *II=World.invInertiaTensor[i]; I0=II[0]; I1=II[1]; I2=II[2]; I3=II[3]; I4=II[4]; I5=II[5]; } else { float s=1.0f/vmax((2.0f/5.0f)*World.mass[i]*World.radius[i]*World.radius[i],0.000001f); I0=I1=I2=s; I3=I4=I5=0.0f; } for (int r=0;r<3;++r) for (int c=0;c<3;++c) K[r][c]=R[r][0]*(I0*R[c][0]+I3*R[c][1]+I4*R[c][2])+R[r][1]*(I3*R[c][0]+I1*R[c][1]+I5*R[c][2])+R[r][2]*(I4*R[c][0]+I5*R[c][1]+I2*R[c][2]); }
+INLINE void BuildInvInertiaMatrix(u16 i, const float R[3][3], float K[3][3]) { /* K = R * I_inv * R^T, precomputed per body for solver hotpath */ float I0,I1,I2,I3,I4,I5; if (World.col[i]==CT_BOX) { ShapeBox b=Entity_GetBox(i); float m=World.mass[i],hx=b.hExt.x,hy=b.hExt.y,hz=b.hExt.z; I0=1.0f/vmax((1.0f/3.0f)*m*(hy*hy+hz*hz),0.000001f); I1=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hz*hz),0.000001f); I2=1.0f/vmax((1.0f/3.0f)*m*(hx*hx+hy*hy),0.000001f); I3=I4=I5=0.0f; } else if (World.col[i]==CT_CVX && World.invTnsrValid[i]) { float *II=World.invInertiaTensor[i]; I0=II[0]; I1=II[1]; I2=II[2]; I3=II[3]; I4=II[4]; I5=II[5]; } else { float s=1.0f/vmax((2.0f/5.0f)*World.mass[i]*World.radius[i]*World.radius[i],0.000001f); I0=I1=I2=s; I3=I4=I5=0.0f; } for (int r=0;r<3;++r) for (int c=0;c<3;++c) K[r][c]=R[r][0]*(I0*R[c][0]+I3*R[c][1]+I4*R[c][2])+R[r][1]*(I3*R[c][0]+I1*R[c][1]+I5*R[c][2])+R[r][2]*(I4*R[c][0]+I5*R[c][1]+I2*R[c][2]); }
 INLINE V3 M33_v(const float M[3][3], V3 v) { return (V3){M[0][0]*v.x+M[0][1]*v.y+M[0][2]*v.z, M[1][0]*v.x+M[1][1]*v.y+M[1][2]*v.z, M[2][0]*v.x+M[2][1]*v.y+M[2][2]*v.z}; }
 void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this substep.
     for (int it=0;it<SOLVER_ITER_GLOBAL;++it) {
@@ -397,7 +397,7 @@ void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this su
                 if (tLen > 0.0001f) {
                     tangent = V3_ScaleByF(tangent,1.0f/tLen); V3 rAxT = V3_Cross(rAarm,tangent), rBxT = V3_Cross(rBarm,tangent); float angTermAT = canRotateA ? V3_dot(rAxT,M33_v(Ka,rAxT)) : 0.0f, angTermBT = canRotateB ? V3_dot(rBxT,M33_v(Kb,rBxT)) : 0.0f, invSumT = invMassA + invMassB + angTermAT + angTermBT;
                     if (invSumT > PHY_EPSILON) {
-                        float jt = -V3_dot(relVel2,tangent) / invSumT, friction; bool aIsSpecial = (World.col[a] == COLTYPE_CAP && (a == PLAYER1 || IdxIsNPC(World.instances[a].index))); if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.005f) / 0.10f, 0.0f, 1.0f); friction = 0.8f + mix * (0.6f - 0.8f); }
+                        float jt = -V3_dot(relVel2,tangent) / invSumT, friction; bool aIsSpecial = (World.col[a] == CT_CAP && (a == PLAYER1 || IdxIsNPC(World.instances[a].index))); if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.005f) / 0.10f, 0.0f, 1.0f); friction = 0.8f + mix * (0.6f - 0.8f); }
                         float maxT = friction * (*accumN);  float newAccumT = vclamp(*accumT + jt, -maxT, maxT); jt = newAccumT - *accumT; *accumT = newAccumT; float deltaVt = jt * invSumT; if (deltaVt < 0.0f) deltaVt = -deltaVt; if (deltaVt > maxDelta) maxDelta = deltaVt;
                         V3 fImpulse=V3_ScaleByF(tangent,jt); World.velocity[a]=V3_AplusB(World.velocity[a],V3_ScaleByF(fImpulse,invMassA)); if (!bStatic){World.velocity[b]=V3_AsubB(World.velocity[b],V3_ScaleByF(fImpulse,invMassB));}
                         if (canRotateA){World.angularVelocity[a]=V3_AplusB(World.angularVelocity[a],M33_v(Ka,V3_Cross(rAarm,fImpulse)));} if (canRotateB){World.angularVelocity[b]=V3_AsubB(World.angularVelocity[b],M33_v(Kb,V3_Cross(rBarm,fImpulse)));}
@@ -410,11 +410,11 @@ void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this su
 
 void DrawSphereContact(V3 pos, float rad);
 void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
-    if (!m->n || (World.col[b] == COLTYPE_MSH && World.col[a] == COLTYPE_MSH)) return; if (gContactCount >= MAX_GLOBAL_CONTACTS) { WarnPhysicsCapacity(0,"Ran out of global contact slots!"); return; }
-    SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m; sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == COLTYPE_NONE || World.col[b] == COLTYPE_MSH || World.physSleep[b]);
+    if (!m->n || (World.col[b] == CT_MSH && World.col[a] == CT_MSH)) return; if (gContactCount >= MAX_GLOBAL_CONTACTS) { WarnPhysicsCapacity(0,"Ran out of global contact slots!"); return; }
+    SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m; sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == CT_NONE || World.col[b] == CT_MSH || World.physSleep[b]);
     for (int i=0;i<m->n;++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} } quat_to_mat3(World.rotation[a],sc->Ra); BuildInvInertiaMatrix(a,sc->Ra,sc->Ka);
     if (!sc->bStatic) { quat_to_mat3(World.rotation[b],sc->Rb); BuildInvInertiaMatrix(b,sc->Rb,sc->Kb); } sc->invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a]; sc->invMassB = (sc->bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
-    sc->canRotateA = (World.col[a] != COLTYPE_CAP && !IdxIsNPC(World.instances[a].index)); sc->canRotateB = (!sc->bStatic && World.col[b] != COLTYPE_CAP && !IdxIsNPC(World.instances[b].index));
+    sc->canRotateA = (World.col[a] != CT_CAP && !IdxIsNPC(World.instances[a].index)); sc->canRotateB = (!sc->bStatic && World.col[b] != CT_CAP && !IdxIsNPC(World.instances[b].index));
     float bouncinessA = (World.instances[a].index == 485/*proj_plasmarifle_shot*/ ? 0.9f : 0.3f); float bouncinessB = (World.instances[b].index == 485/*proj_plasmarifle_shot*/ ? 0.9f : 0.3f/*Everything is slightly responsive bounce*/); if (sc->bStatic) bouncinessB = 0.0f;
     if (a == PLAYER1 || b == PLAYER1 || IdxIsNPC(World.instances[a].index) || IdxIsNPC(World.instances[b].index)) bouncinessA = bouncinessB = 0.0f;/*a/b are instance slots; IdxIsNPC wants the const index, so this used to only match bodies that happened to sit in slots 419-447*/
     for (int i=0;i<m->n;++i) {
@@ -433,8 +433,8 @@ void Physics(float dt) {
     mset(grenadeImpactQueued,0,sizeof(grenadeImpactQueued)); mset(projectileImpactQueued,0,sizeof(projectileImpactQueued));mset(projectileContactThisFrame,0,sizeof(projectileContactThisFrame)); for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false); World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
     for (u16 i=0;i<World.instCount;++i) {/*Update the radius for all entities for rendering and physics, then add dynamic ones to dynamicEntities[]*/
         float absx=vabs(World.scale[i].x),absy=vabs(World.scale[i].y),absz=vabs(World.scale[i].z);
-        if(World.col[i]==COLTYPE_MSH||World.col[i]==COLTYPE_CVX){World.radius[i]=modelBounds[World.col[i]==COLTYPE_CVX ? World.instances[i].colMeshIndex : World.instances[i].modelIndex]*vmax(vmax(absx,absy),absz);}else if(likely(World.col[i] == COLTYPE_BOX)){float hx=World.colliderSize[i].x*.5f*absx,hy=World.colliderSize[i].y*.5f*absy,hz=World.colliderSize[i].z*0.5f*absz; World.radius[i]=vsqrtf(hx*hx+hy*hy+hz*hz);}
-        else if(World.col[i] == COLTYPE_SPH || World.col[i] == COLTYPE_CAP) { World.radius[i] = vmax(World.colliderSize[i].x,World.colliderSize[i].y) * vmax(absx,vmax(absy,absz));}else{World.radius[i]=vmax(World.colliderSize[i].x,0.02f)*vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));}
+        if(World.col[i]==CT_MSH||World.col[i]==CT_CVX){World.radius[i]=modelBounds[World.col[i]==CT_CVX ? World.instances[i].colMeshIndex : World.instances[i].modelIndex]*vmax(vmax(absx,absy),absz);}else if(likely(World.col[i] == CT_BOX)){float hx=World.colliderSize[i].x*.5f*absx,hy=World.colliderSize[i].y*.5f*absy,hz=World.colliderSize[i].z*0.5f*absz; World.radius[i]=vsqrtf(hx*hx+hy*hy+hz*hz);}
+        else if(World.col[i] == CT_SPH || World.col[i] == CT_CAP) { World.radius[i] = vmax(World.colliderSize[i].x,World.colliderSize[i].y) * vmax(absx,vmax(absy,absz));}else{World.radius[i]=vmax(World.colliderSize[i].x,0.02f)*vmax(World.scale[i].x,vmax(World.scale[i].y,World.scale[i].z));}
         if((World.instances[i].entflags&EF_RIGIDBODY) && (World.instances[i].entflags&EF_ACTIVE) && !World.physSleep[i]/*Done earler, this here is what skips sleeping ones!*/ && absx>.01f && absy>.01f && absz>.01f){if(dynamicEntityCount<512){dynamicEntities[dynamicEntityCount++]=i;}else{WarnPhysicsCapacity(1,"Reached the 512 active dynamic-body limit; additional bodies are skipped.");}}
     }
     for (u8 s=0;s<World.substeps;++s) {
@@ -451,18 +451,18 @@ void Physics(float dt) {
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; } else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
             float linDrag = (World.instances[a].index >= 481 && World.instances[a].index <= 495) ? 1.0f : vexp(-0.1f * dtsub);
             World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; float angDrag = vexp(-2.0f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag); SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
-            if (World.col[a] != COLTYPE_CAP) {
+            if (World.col[a] != CT_CAP) {
                 if (unlikely(!V3_IsSane(World.angularVelocity[a]))) { World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f}; }
                 else {float avel = V3_Mag(World.angularVelocity[a]); if (avel > MAX_ANGULAR_SPEED) { World.angularVelocity[a] = V3_ScaleByF(World.angularVelocity[a],MAX_ANGULAR_SPEED / avel); avel = MAX_ANGULAR_SPEED; } if (avel > PHY_EPSILON) { Quaternion dq = quat_from_axis_angle(V3_ScaleByF(World.angularVelocity[a],1.f / avel),avel * dtsub); World.rotation[a] = quat_normalize(quat_multiply(dq,World.rotation[a])); } }
             } else World.angularVelocity[a] = (V3){0.0f,0.0f,0.0f};
         }
         for (u16 i=0;i<dynamicEntityCount;++i) {
-            u16 a = dynamicEntities[i]; if (unlikely(World.col[a] == COLTYPE_MSH || (Cheats.noclip && a == PLAYER1))) continue;
-            u8 colA = World.col[a]; ShapeBox boxA = colA==COLTYPE_BOX ? Entity_GetBox(a) : (ShapeBox){0}; ShapeCapsule capA = colA==COLTYPE_CAP ? Entity_GetCap(a) : (ShapeCapsule){0}; ShapeSphere sphA = colA==COLTYPE_SPH ? Entity_GetSph(a) : (ShapeSphere){0};
+            u16 a = dynamicEntities[i]; if (unlikely(World.col[a] == CT_MSH || (Cheats.noclip && a == PLAYER1))) continue;
+            u8 colA = World.col[a]; ShapeBox boxA = colA==CT_BOX ? Entity_GetBox(a) : (ShapeBox){0}; ShapeCapsule capA = colA==CT_CAP ? Entity_GetCap(a) : (ShapeCapsule){0}; ShapeSphere sphA = colA==CT_SPH ? Entity_GetSph(a) : (ShapeSphere){0};
             i32 cx = PosGetCellCoordX(World.position[a].x), cz = PosGetCellCoordZ(World.position[a].z); u32 mask = GetCollisionMask(World.layer[a]);
             float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub; i32 radCells = vmax((i32)(searchRad / CELLSZ),1);
             float matA[16]; const float *mxA = &world_from_mdl[a*16];
-            if (World.col[a] == COLTYPE_CVX) { EntityColliderMatrixNow(a,matA); mxA = matA; } // Not MSH as only CVX is dynamically moving during physics substeps.
+            if (World.col[a] == CT_CVX) { EntityColliderMatrixNow(a,matA); mxA = matA; } // Not MSH as only CVX is dynamically moving during physics substeps.
             Manifold contactsMani[32]; u16 contactsOther[32]; int contactCount = 0;
             for (i32 dx = -radCells; dx <= radCells; ++dx) {
                 for (i32 dz = -radCells; dz <= radCells; ++dz) { // 2. Collisions
@@ -475,29 +475,29 @@ void Physics(float dt) {
        in both directions the mask only has to fail once -- it did not.  This is the same exclusion noclip already
        had, which is why the bug disappeared under noclip and came back without it. */
     { bool aP=(a==PLAYER1), bP=(b==PLAYER1); u16 bj = aP ? b : a;
-      if (unlikely((aP||bP) && bj<World.instCount && World.layer[bj]==L_PlayerBullets)) continue; } u8 colB = World.col[b]; ShapeBox boxB = colB==COLTYPE_BOX ? Entity_GetBox(b) : (ShapeBox){0}; ShapeCapsule capB = colB==COLTYPE_CAP ? Entity_GetCap(b) : (ShapeCapsule){0}; ShapeSphere sphB = colB==COLTYPE_SPH ? Entity_GetSph(b) : (ShapeSphere){0};
-                        if (unlikely(Cheats.noclip && b == PLAYER1)) continue; if (World.instances[b].index==703 || !(World.instances[b].entflags & EF_ACTIVE) || !(mask & World.layer[b]) || World.col[b] == COLTYPE_NONE) continue; /*EF_ACTIVE: the broadphase inserts every instance (physics.c:455) and DeleteInstance only clears this flag, so without it a deleted/gibbed/relayed-away body keeps colliding as an invisible solid.*/ if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !World.physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
-                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue; Manifold mf = {0}; float matB[16]; const float *mxB = &world_from_mdl[b*16]; if (World.col[b] == COLTYPE_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
-                        if      (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_CAP) { mf = OverlapToManifold(CapCap(capA,capB)); }
-                        else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_BOX) { mf = OverlapToManifold(CapBox(capA,boxB)); }
-                        else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_SPH) { Overlap r=SphCap(sphB,capA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.f); mf=OverlapToManifold(r); }
-                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_CAP) { mf=OverlapToManifold(SphCap(sphA,capB)); }
-                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_CAP) { Overlap r = CapBox(capB,boxA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
-                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_BOX) { mf = BoxBox(boxA,boxB); }
-                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_BOX) { ShapeSphere sa = sphA; mf = OverlapToManifold(SphBox(sa.ctr,sa.rad,boxB)); }
-                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_SPH) { ShapeSphere sa = sphB; Overlap r = SphBox(sa.ctr,sa.rad,boxA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
-                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_SPH) { ShapeSphere sa = sphA, sb = sphB; mf = OverlapToManifold(SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad)); }
-                        else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_MSH) { mf = OverlapToManifold(CapMsh(capA,World.instances[b].modelIndex,mxB)); }
-                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_MSH) { ShapeSphere sa = sphA; mf = OverlapToManifold(SphMsh(sa.ctr,sa.rad,World.instances[b].modelIndex,mxB)); }
-                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_MSH) { mf = BoxMsh(boxA,World.instances[b].modelIndex,mxB); }
-                        else if (World.col[a] == COLTYPE_CVX && World.col[b] == COLTYPE_MSH) { mf = CvxMsh(World.instances[a].colMeshIndex,mxA,World.instances[b].modelIndex,mxB,World.instances[a].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.col[a] == COLTYPE_CAP && World.col[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.col[a] == COLTYPE_CVX && World.col[b] == COLTYPE_CAP) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
-                        else if (World.col[a] == COLTYPE_SPH && World.col[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.col[a] == COLTYPE_CVX && World.col[b] == COLTYPE_SPH) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
-                        else if (World.col[a] == COLTYPE_BOX && World.col[b] == COLTYPE_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
-                        else if (World.col[a] == COLTYPE_CVX && World.col[b] == COLTYPE_BOX) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
-                        else if (World.col[a] == COLTYPE_CVX && World.col[b] == COLTYPE_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,mxA,mxB,World.instances[a].adjacencyIdx,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+      if (unlikely((aP||bP) && bj<World.instCount && World.layer[bj]==L_PlayerBullets)) continue; } u8 colB = World.col[b]; ShapeBox boxB = colB==CT_BOX ? Entity_GetBox(b) : (ShapeBox){0}; ShapeCapsule capB = colB==CT_CAP ? Entity_GetCap(b) : (ShapeCapsule){0}; ShapeSphere sphB = colB==CT_SPH ? Entity_GetSph(b) : (ShapeSphere){0};
+                        if (unlikely(Cheats.noclip && b == PLAYER1)) continue; if (World.instances[b].index==703 || !(World.instances[b].entflags & EF_ACTIVE) || !(mask & World.layer[b]) || World.col[b] == CT_NONE) continue; /*EF_ACTIVE: the broadphase inserts every instance (physics.c:455) and DeleteInstance only clears this flag, so without it a deleted/gibbed/relayed-away body keeps colliding as an invisible solid.*/ if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !World.physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
+                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue; Manifold mf = {0}; float matB[16]; const float *mxB = &world_from_mdl[b*16]; if (World.col[b] == CT_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
+                        if      (World.col[a] == CT_CAP && World.col[b] == CT_CAP) { mf = OverlapToManifold(CapCap(capA,capB)); }
+                        else if (World.col[a] == CT_CAP && World.col[b] == CT_BOX) { mf = OverlapToManifold(CapBox(capA,boxB)); }
+                        else if (World.col[a] == CT_CAP && World.col[b] == CT_SPH) { Overlap r=SphCap(sphB,capA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.f); mf=OverlapToManifold(r); }
+                        else if (World.col[a] == CT_SPH && World.col[b] == CT_CAP) { mf=OverlapToManifold(SphCap(sphA,capB)); }
+                        else if (World.col[a] == CT_BOX && World.col[b] == CT_CAP) { Overlap r = CapBox(capB,boxA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
+                        else if (World.col[a] == CT_BOX && World.col[b] == CT_BOX) { mf = BoxBox(boxA,boxB); }
+                        else if (World.col[a] == CT_SPH && World.col[b] == CT_BOX) { ShapeSphere sa = sphA; mf = OverlapToManifold(SphBox(sa.ctr,sa.rad,boxB)); }
+                        else if (World.col[a] == CT_BOX && World.col[b] == CT_SPH) { ShapeSphere sa = sphB; Overlap r = SphBox(sa.ctr,sa.rad,boxA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.0f); mf=OverlapToManifold(r); }
+                        else if (World.col[a] == CT_SPH && World.col[b] == CT_SPH) { ShapeSphere sa = sphA, sb = sphB; mf = OverlapToManifold(SphSph(sa.ctr,sa.rad,sb.ctr,sb.rad)); }
+                        else if (World.col[a] == CT_CAP && World.col[b] == CT_MSH) { mf = OverlapToManifold(CapMsh(capA,World.instances[b].modelIndex,mxB)); }
+                        else if (World.col[a] == CT_SPH && World.col[b] == CT_MSH) { ShapeSphere sa = sphA; mf = OverlapToManifold(SphMsh(sa.ctr,sa.rad,World.instances[b].modelIndex,mxB)); }
+                        else if (World.col[a] == CT_BOX && World.col[b] == CT_MSH) { mf = BoxMsh(boxA,World.instances[b].modelIndex,mxB); }
+                        else if (World.col[a] == CT_CVX && World.col[b] == CT_MSH) { mf = CvxMsh(World.instances[a].colMeshIndex,mxA,World.instances[b].modelIndex,mxB,World.instances[a].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.col[a] == CT_CAP && World.col[b] == CT_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.col[a] == CT_CVX && World.col[b] == CT_CAP) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
+                        else if (World.col[a] == CT_SPH && World.col[b] == CT_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.col[a] == CT_CVX && World.col[b] == CT_SPH) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
+                        else if (World.col[a] == CT_BOX && World.col[b] == CT_CVX) { mf = PrimitiveCvx(a,World.instances[b].colMeshIndex,mxB,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
+                        else if (World.col[a] == CT_CVX && World.col[b] == CT_BOX) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
+                        else if (World.col[a] == CT_CVX && World.col[b] == CT_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,mxA,mxB,World.instances[a].adjacencyIdx,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else { mf=OverlapToManifold(SphSph(World.position[a],World.colliderSize[a].x,World.position[b],World.colliderSize[b].x)); }
                         if (mf.n) { if (IsImpactGrenade(World.instances[a].index)) grenadeImpactQueued[a]=1; if ((World.instances[b].entflags & EF_ACTIVE) && IsImpactGrenade(World.instances[b].index)) grenadeImpactQueued[b]=1; V3 impactPoint=mf.p[0].point; if(IsImpactProjectile(World.instances[a].index))QueueProjectileImpact(a,b,impactPoint,mf.normal);if(IsImpactProjectile(World.instances[b].index))QueueProjectileImpact(b,a,impactPoint,V3_ScaleByF(mf.normal,-1.0f)); if (likely(contactCount < 32)) { contactsMani[contactCount] = mf; contactsOther[contactCount] = b; contactCount++; }else{WarnPhysicsCapacity(4,"Reached the 32 candidate-manifolds-per-body limit; additional contacts are skipped.");} }
                     }
@@ -513,14 +513,14 @@ void Physics(float dt) {
         for (u16 i=0;i<numTriggers;++i) {
             u16 self = triggerVolumes[i]; u16 trigdx=World.instances[self].index; if (Cheats.showPhys) {if(trigdx==703)DrawCapsuleCollider(self);else DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f});} ShapeBox trigBox = Entity_GetBox(self); ShapeCapsule teleportCap=trigdx==703?Entity_GetCap(self):(ShapeCapsule){0};
             for (u16 o=0;o<dynamicEntityCount;++o) { // 4. Triggers
-                u16 other = dynamicEntities[o]; if (World.col[other] == COLTYPE_NONE || !(World.instances[other].entflags & EF_ACTIVE)) continue;
+                u16 other = dynamicEntities[o]; if (World.col[other] == CT_NONE || !(World.instances[other].entflags & EF_ACTIVE)) continue;
                 bool touches = false; 
                 if(trigdx==703){touches=(other==PLAYER1)&&CapCap(Entity_GetCap(other),teleportCap).hit;}
-                else if(World.col[other] == COLTYPE_CAP){ShapeCapsule oc=Entity_GetCap(other); V3 capMid=V3_ScaleByF(V3_AplusB(oc.tip,oc.base),0.5f); touches=CapsuleTouchesOBB(oc.base,oc.rad,trigBox) || CapsuleTouchesOBB(capMid,oc.rad,trigBox) || CapsuleTouchesOBB(oc.tip,oc.rad,trigBox);}
+                else if(World.col[other] == CT_CAP){ShapeCapsule oc=Entity_GetCap(other); V3 capMid=V3_ScaleByF(V3_AplusB(oc.tip,oc.base),0.5f); touches=CapsuleTouchesOBB(oc.base,oc.rad,trigBox) || CapsuleTouchesOBB(capMid,oc.rad,trigBox) || CapsuleTouchesOBB(oc.tip,oc.rad,trigBox);}
                 else {float sphereRadius=vmax(vmax(vabs(World.colliderSize[other].x*World.scale[other].x),vabs(World.colliderSize[other].y*World.scale[other].y)),vabs(World.colliderSize[other].z*World.scale[other].z)); if(sphereRadius<=0.0f)sphereRadius=0.32f; touches=CapsuleTouchesOBB(World.position[other],sphereRadius,trigBox);}
                 if (!touches) continue; if(trigdx==596){ if(other==PLAYER1 && Cheats.noclip) continue;/*noclip flies the player through trigger volumes, so don't latch a gravity lift onto them*/ u16 mark=(u16)(self+1);bool entering=gravityLiftWasInside[other]!=mark&&gravityLiftTouched[other]!=mark;gravityLiftTouched[other]=mark;trigger_gravitylift_touch(self,other,entering);continue;} if(trigdx==703){u16 mark=(u16)(self+1);if(teleportWasTouching!=mark&&teleportTouched!=mark)TeleportTouchOnTriggerEnter(self,other);teleportTouched=mark;continue;}
                 switch(trigdx) {
-                    case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;   case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].direction,World.instances[self].force*World.mass[other]),false); World.Sys_Music.cyberTube=true; World.Sys_Music.inZone=true; World.Sys_Music.zoneTrack=TT_Cybertube; World.Sys_Music.zoneMusic=MT_Override;} break;
+                    case 554/*prop_cyber_exit*/:if(other == PLAYER1){UIExitCyberspace();} break;   case 595/*trigger_cyberpush*/:if(other == PLAYER1 && World.diffCyb >= 1){AddForce(other,V3_ScaleByF(World.instances[self].dir,World.instances[self].force*World.mass[other]),false); World.Sys_Music.cyberTube=true; World.Sys_Music.inZone=true; World.Sys_Music.zoneTrack=TT_Cybertube; World.Sys_Music.zoneMusic=MT_Override;} break;
                     case 597/*trigger_ladder*/:if(other == PLAYER1 && !Cheats.noclip){/*noclip flies the player through trigger volumes, so don't latch a ladder onto them*/World.invP1.ladderState=1; ladderTouched=true; ladderTopY=trigBox.ctr.y + trigBox.hExt.y;} break;
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;  case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; MusicType mt=World.instances[self].musicType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elev); World.Sys_Music.distortion=(tt == TT_Distortion); World.Sys_Music.zoneTrack=tt; World.Sys_Music.zoneMusic=mt;} break;
                     case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */
@@ -543,7 +543,7 @@ void Physics(float dt) {
     if (!reverbZoneActive){synth_set_reverb_preset(0); World.invP1.inReverbZone=false;}else{synth_set_reverb_preset(activeReverbPreset); World.invP1.inReverbZone = true;}
     {   const i32 WAKE_CELLS = 2;
         for (u32 i=0;i<World.instCount;++i) {
-            if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true); u32 ef = World.instances[i].entflags; bool canSleep=(i!=PLAYER1 && IdxIsDynamicObject(World.instances[i].index) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && World.col[i]!=COLTYPE_NONE && World.mass[i] >= 0.001f && !IdxIsNPC(World.instances[i].index)); if(!canSleep){World.physSleep[i]=0;continue;}
+            if (AnimWaking(i)) flag_set(&World.instances[i].entflags,EF_MOVING,true); u32 ef = World.instances[i].entflags; bool canSleep=(i!=PLAYER1 && IdxIsDynamicObject(World.instances[i].index) && (ef & EF_RIGIDBODY) && (ef & EF_ACTIVE) && World.col[i]!=CT_NONE && World.mass[i] >= 0.001f && !IdxIsNPC(World.instances[i].index)); if(!canSleep){World.physSleep[i]=0;continue;}
             i32 cx = PosGetCellCoordX(World.position[i].x), cz = PosGetCellCoordZ(World.position[i].z); bool nearAwake = false;
             for (i32 dx=-WAKE_CELLS; dx<=WAKE_CELLS && !nearAwake; ++dx)
               for (i32 dz=-WAKE_CELLS; dz<=WAKE_CELLS && !nearAwake; ++dz) {
@@ -563,13 +563,13 @@ void Physics(float dt) {
 
 INLINE float smooth_damp(float cur, float targ, float* vel, float tm, float dt) { float o=2.0f / vmax(tm,0.0001f); float x=o * dt; float exp=1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x); float d=cur - targ; float t=(*vel + o * d) * dt; *vel=(*vel - o * t) * exp; return targ + (d + t) * exp; }
 static bool AreaBlockedAt(ShapeCapsule probe, u32 mask, u16 self) {
-    for(u16 b=0;b<World.instCount;++b){if(b==self||!(World.instances[b].entflags&EF_ACTIVE)||!(mask&World.layer[b])||World.col[b]==COLTYPE_NONE)continue; float pen=0.0f;
+    for(u16 b=0;b<World.instCount;++b){if(b==self||!(World.instances[b].entflags&EF_ACTIVE)||!(mask&World.layer[b])||World.col[b]==CT_NONE)continue; float pen=0.0f;
         switch(World.col[b]){
-            case COLTYPE_CAP:{Overlap r=CapCap(probe,Entity_GetCap(b));if(r.hit)pen=r.pen;break;}
-            case COLTYPE_BOX:{Overlap r=CapBox(probe,Entity_GetBox(b));if(r.hit)pen=r.pen;break;}
-            case COLTYPE_SPH:{Overlap r=SphCap(Entity_GetSph(b),probe);if(r.hit)pen=r.pen;break;}
-            case COLTYPE_CVX:{u16 mesh=World.instances[b].colMeshIndex,adj=World.instances[b].adjacencyIdx;if(mesh<MAX_MDLS&&adj<MAX_MDLS){Manifold r=PrimitiveCvxCapsule(probe,mesh,&world_from_mdl[b*16],adj);pen=r.maxPen;}break;}/*probe is always a capsule, and the player is COLTYPE_CAP, so this matches the old PrimitiveCvx(playerIdx,...) selection while also working for probes with no instance*/
-            case COLTYPE_MSH:{Overlap r=CapMsh(probe,World.instances[b].modelIndex,&world_from_mdl[b*16]);if(r.hit)pen=r.pen;break;}
+            case CT_CAP:{Overlap r=CapCap(probe,Entity_GetCap(b));if(r.hit)pen=r.pen;break;}
+            case CT_BOX:{Overlap r=CapBox(probe,Entity_GetBox(b));if(r.hit)pen=r.pen;break;}
+            case CT_SPH:{Overlap r=SphCap(Entity_GetSph(b),probe);if(r.hit)pen=r.pen;break;}
+            case CT_CVX:{u16 mesh=World.instances[b].colMeshIndex,adj=World.instances[b].adjacencyIdx;if(mesh<MAX_MDLS&&adj<MAX_MDLS){Manifold r=PrimitiveCvxCapsule(probe,mesh,&world_from_mdl[b*16],adj);pen=r.maxPen;}break;}/*probe is always a capsule, and the player is CT_CAP, so this matches the old PrimitiveCvx(playerIdx,...) selection while also working for probes with no instance*/
+            case CT_MSH:{Overlap r=CapMsh(probe,World.instances[b].modelIndex,&world_from_mdl[b*16]);if(r.hit)pen=r.pen;break;}
             default:break;
         }
         if(pen>0.08f)return true;
@@ -607,8 +607,8 @@ void ApplyPlayerMovements(float dt) {
         if(vabs(World.invP1.leanTarget) < 0.5f){World.invP1.leanTarget=World.invP1.leanVelocity=0.0f; World.invP1.leanResetting=false;}
     } else {
         if (leanLeft || leanRight) {
-            if(leanLeft){World.invP1.leanRightTapFinished =0;}
-            if(leanRight){World.invP1.leanLeftTapFinished=0;}
+            if(leanLeft){World.invP1.leanRTapFinished =0;}
+            if(leanRight){World.invP1.leanLTapFinished=0;}
             World.invP1.leanTarget = vclamp(World.invP1.leanTarget + (leanInput * leanSpeed * dt), -leanMaxAngle, leanMaxAngle);
         } else if (movingForward) {
             if (vabs(World.invP1.leanTarget) < 0.5f) { World.invP1.leanTarget = 0.0f; } else { World.invP1.leanTarget -= (World.invP1.leanTarget > 0.0f ? 1.0f : -1.0f) * leanSpeed * dt; }
