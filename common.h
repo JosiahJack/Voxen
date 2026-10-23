@@ -168,7 +168,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (85ULL * 1024 * 1024),
       /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                  MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
       /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024,
-                            FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 16,
+                            FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 17,
       /*Lights*/ LIGHT_COUNT = 2048, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/ MAX_MDLS=7490, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, RT_VTX_SZ=12, CPU_VRT_SZ=32,
       /*Textures*/ MAXTEX = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 256, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8,
@@ -384,7 +384,7 @@ typedef /*FAT*/ struct  {
     bool srchInUse,generateContents,generationDone,dontReset,onlyOnce,allDone,curTex,useRandomTimes,active,panelOpen,panelInstalled,panelArmed;
     V3 panelItemPos; Quaternion panelItemRot;
     bool touchEnabled,broken,requireRecharge,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,texAnimStopsAtDie,texAnimInReverse,texAnimRandom,ajar,deathAnimationActive;
-    AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; char texAnimResourceFolder[TARG_STRLEN];
+    AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; u16 texAnimResourceFolderIdx;
     i8 wireCurL[7],wireCurR[7];
     bool gridCells[35],puzzleFired,puzzleSolved;
 } Entity; // phew what a porker of a struct, it's been a eatin!

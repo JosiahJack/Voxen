@@ -2243,7 +2243,7 @@ void InitalizeEnvironment() {
     DebugRAM("program start");
     DualLog("=========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========\n");
     DualLog("Game: Citadel, the System Shock (1994) Fan Remake                               1/03/2013 - 10/17/2026\n\n");
-    DualLog("OpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\n");
+    DualLog("OpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\nEntity byte size:%u\n",sizeof(Entity) + (6*4) + 4+4+1+1+4+4+4+4+(4*4)+1+(3*4)+(3*4)+(3*4)+(3*4)+(3*4)+(3*4));
     SetLevelPointers(0); 
     WindowInit();
     threadCnt = vclampi(OS_GetNumThreads(),1,32);
