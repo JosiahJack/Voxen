@@ -2167,7 +2167,7 @@ void LoadRaytracingData(void) {
     rtGeomID = MakeSSBO(&rtGeomID, 16, geomBytes, NULL, GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO, rtGeomID);
     u8* gpuPtr = (u8*)glMapBufferRange(GL_SSBO, 0, geomBytes, 0x0002/*GL_MAP_WRITE_BIT*/ | 0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-    u32* nodes = (u32*)OS_Alloc(nodeWords ? (size_t)nodeWords * sizeof(u32) : 4u);
+    u32* nodes = (u32*)gpuPtr; /*the node section is filled in place in the mapped rtGeom buffer; the old staging allocation was 90MB (nodeTotal*64B) held across the fill plus a full memcpy of it*/
     for (m=0; m<mdlsCnt; ++m) {
         if (!BvhHasBVH((u16)m)) continue;
         
@@ -2180,8 +2180,6 @@ void LoadRaytracingData(void) {
             for (int c=0;c<8;++c) { d[8+c] = (src->children[c] >= 0) ? (nb + (u32)src->children[c] * 4u) : 0xFFFFFFFFu; }
         }
     }
-    mcpy(gpuPtr, nodes, (size_t)nodeWords * sizeof(u32));
-    OS_Free(nodes, nodeWords ? (size_t)nodeWords * sizeof(u32) : 4u);
     for (m=0; m<mdlsCnt; ++m) {
         if (rtModelInfo[m].nodeBase == 0xFFFFFFFFu) continue;
         u32 tcnt = modelBVHTriOrderCounts[m], vc = physAttrVertCounts[m];
