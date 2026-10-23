@@ -131,7 +131,7 @@ void SaveNameEntry(i32 k) {
 }
 
 void MFD_NewGame() {
-    World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.consumableClickRow=-1,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,.logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
+    World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.lastAutomapSideRH=true/*automap prefers the right MFD until the player picks a side*/,.consumableClickRow=-1,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,.logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
 }
 
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.generalClickSlot = -1; }
@@ -143,6 +143,7 @@ void MFD_CloseData(void) { if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Da
 INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
     World.Sys_UI.generalClickSlot = -1;
     if (panel && tab == 2) World.Sys_UI.lastItemSideRH = (panel == 2);
+    if (panel && tab == 3) World.Sys_UI.lastAutomapSideRH = (panel == 2);/*side MFD tab click/F-key: remember which side the player wants the automap on*/
     if (panel && tab == 4) World.Sys_UI.lastDataSideRH = (panel == 2);
     u8* current = panel == 0 ? &World.Sys_UI.MFD_CenterTab : panel==1 ? &World.Sys_UI.MFD_LefTab : &World.Sys_UI.MFD_RightTab;
     *current = toggle && *current == tab ? 0 : tab;
@@ -154,6 +155,7 @@ INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
     }
     
     if (panel && tab == 4 && view == 5) World.Sys_UI.lastSearchSideRH = (panel == 2);
+    if (panel && tab == 4 && view == 9) World.Sys_UI.lastMinigameSideRH = (panel == 2);/*side MFD tab click/F-key while the games view is up: remember which side the player wants games on*/
     play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false);
 }
 
@@ -554,7 +556,7 @@ void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=tru
 }
 
 void UI_ElevClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadElevator=U16_MAX; World.Sys_UI.linkedElevatorDoor=U16_MAX; SysUIDataClose(); }
-void UI_AudioLogClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastLogSideRH=rh; if (!(World.invP1.hasHardware&HW_ERD)) return;
+void UI_AudioLogClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh;/*audio logs fill left info + right image; no side preference to track*/ if (!(World.invP1.hasHardware&HW_ERD)) return;
     if (World.Sys_UI.logActive) { World.Sys_UI.logActive=false; CenterStatusPrint("%s",Sys_Text.stringTable[1019]); return; }/*Log playback stopped.*/
     if (World.Sys_UI.logReferenceIndex<(u16)LOGCNT && World.invP1.hasLog[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex] && audioLogs[World.Sys_UI.logReferenceIndex][0]) { PlayLog((int)World.Sys_UI.logReferenceIndex); World.Sys_UI.logActive=true; }
 }
@@ -743,7 +745,8 @@ void UI_EmailEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if
 void UI_DataEntryClick(int entry) { World.Sys_UI.mouseClickHeldOverGUI=true; if (entry<0||entry>12) return; int idx=UIDataRefAt(entry); if (idx<0) return; UIOpenEntryAndRead(idx,false); }
 void UI_LogMore(void) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.MFD_ReaderView!=MFD_READER_TEXT) return;
     if (UILogHasMore()) { World.Sys_UI.logReaderPage++; return; }/*[MORE]: another wrapped page follows*/
-    World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; }
+    World.Sys_UI.logReaderPage=0; MFD_CloseData();/*[CLOSE]: the side MFD log info/image data views give the tabs back to the player, same as any other panel close*/
+    World.Sys_UI.MFD_ReaderView=MFD_READER_FOLDER; }
 void UI_LogBack(void) { World.Sys_UI.mouseClickHeldOverGUI=true;
     if (World.Sys_UI.MFD_ReaderView==MFD_READER_TEXT) { if (World.Sys_UI.logReaderPage>0) { World.Sys_UI.logReaderPage--; return; } return; }
     if (World.Sys_UI.MFD_ReaderView==MFD_READER_FOLDER) World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS; }
@@ -758,7 +761,7 @@ void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if 
     if (idx==SW_DRILL)  { World.invP1.isPulserNotDrill = false; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
     if (idx==SW_PULSER) { World.invP1.isPulserNotDrill = true;  play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
     if (idx==SW_SHIELD) { CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 461 : 460]); return; }
-    if (idx==SW_GAMES)  { if (World.invP1.hasMinigame) { if (!cyber) { World.Sys_UI.mg_current=-1; MFD_OpenData(false,9); } CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 443 : 309]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false); } return; }
+    if (idx==SW_GAMES)  { if (World.invP1.hasMinigame) { if (!cyber) { World.Sys_UI.mg_current=-1; MFD_OpenData(World.Sys_UI.lastMinigameSideRH,9);/*games are a data-tab view, so they open on the last-used games side (left by default)*/ } CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 443 : 309]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false); } return; }
     if (!cyber) { CenterStatusPrint("%s",Sys_Text.stringTable[460]); return; }
     UseCyberspaceItemByIndex(idx - SW_TURBO); }
 void UI_WeaponIconClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastWeaponSideRH=rh; if (CurrentWeaponUsesEnergy()) OverloadButtonAction(); else ActualChangeAmmoType(); }

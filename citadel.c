@@ -59,7 +59,7 @@ void AddAccessCardToInventory(int index) {
 }
 
 void AddHardwareToInventory(int index,int hwversion) {
-    if (!World.Sys_UI.firstHardware){World.Sys_UI.firstHardware=true; World.Sys_UI.MFD_CenterTab=2;} if((int)World.invP1.hwVers[index]==0 && index==1){World.Sys_UI.MFD_RightTab=3;} if (hwversion > 0 && hwversion <= (int)World.invP1.hwVers[index]) { CenterStatusPrint("%s",Sys_Text.stringTable[46]);/*THAT WARE IS OBSOLETE. DISCARDED.*/ return; } 
+    if (!World.Sys_UI.firstHardware){World.Sys_UI.firstHardware=true; World.Sys_UI.MFD_CenterTab=2;} if((int)World.invP1.hwVers[index]==0 && index==1){*(World.Sys_UI.lastAutomapSideRH?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab)=3;}/*nav unit pickup raises the automap on the player's preferred automap side (right by default)*/ if (hwversion > 0 && hwversion <= (int)World.invP1.hwVers[index]) { CenterStatusPrint("%s",Sys_Text.stringTable[46]);/*THAT WARE IS OBSOLETE. DISCARDED.*/ return; } 
     static const u8 textIdx[12] = {21,22,23,24,25,26,27,28,29,30,31,32}; World.invP1.hasHardware |= (u16)(1u << index); World.invP1.hwVers[index] = (u8)hwversion; World.invP1.hwVersSetting[index]= hwversion > 0 ? (u8)(hwversion - 1) : 0; CenterStatusPrint("%s v%d",Sys_Text.stringTable[textIdx[index] + 326],hwversion);
 }
 
@@ -70,7 +70,7 @@ bool AddGeneralObjectToInventory(int index, int custIdx){
 
 void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
 static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
-void PlayLog(int logIndex) {if(logIndex<0||logIndex>=LOGCNT||!(World.invP1.hasHardware&HW_ERD)){return;} play_message(AudioLogPath(logIndex)); World.invP1.readLog[logIndex]=true; if(Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail){World.Sys_UI.vmailActive=true;} CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); MFD_OpenAudioLog(logIndex); }
+void PlayLog(int logIndex) {if(logIndex<0||logIndex>=LOGCNT||!(World.invP1.hasHardware&HW_ERD)){return;} const char* lp=AudioLogPath(logIndex); if (lp && lp[0]) play_message(lp);/*text-only logs have no mp3: skip playback instead of erroring on ./Audio/.mp3*/ World.invP1.readLog[logIndex]=true; if(Sys_Text.audioLogType[logIndex] == AudioLogType_Vmail){World.Sys_UI.vmailActive=true;} CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); MFD_OpenAudioLog(logIndex); }
 void PlayLastAddedLog(int logIndex) { if(logIndex < 0){return;} PlayLog(logIndex); World.invP1.lastAddedIndex = -1; }
 void AddAudioLogToInventory(int index) {
     if (index < 0 || index >= LOGCNT) { DualLogError("BUG: Audio log index %d out of range (%d)\n",index,LOGCNT); return; }
@@ -1015,7 +1015,9 @@ void UseTargets(u16 activator, u16 targetIdx) {
 
 // Frob/Use
 #define FROB_DISTANCE 4.9f
+#define PANEL_TETHER_SQDIST 64.0f/*8.0f: search/grid/wire/keycode/elevator code screens sever when the player wanders this far (squared); the tethered object closing returns that side MFD to the player's preferred tab*/
 void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 code),MFD_OpenPaperLog(int,V3);
+void UI_KeycodeClose(bool),UI_ElevClose(bool),UI_WireClose(bool);
 static void PaperLogUse(u16 self) { MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
 static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
@@ -1245,7 +1247,7 @@ static void ElevatorPanelUse(u16 i) {
     }
     if (layout<0) layout=1;/*fallback: 2 to 3 strip*/
     for (int b=0;b<8;++b) { World.Sys_UI.elevButtonLabelIdx[b]=elevLayouts[layout][b].label; World.Sys_UI.buttonsDarkened[b]=elevLayouts[layout][b].darkened; World.Sys_UI.buttonsEnabled[b]=elevLayouts[layout][b].label>=0; World.Sys_UI.elevButtonLevelIdx[b]=ElevLabelToLevel(elevLayouts[layout][b].label); World.Sys_UI.elevButtonSpawnIdx[b]=U16_MAX; }
-    ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(false,1);
+    ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,1);/*elevator keypad: data-tab view, so it comes up on the last-used data side (left by default)*/
 }
 
 /*Find the keypad position on a given level (for elevator relative-positioning). Returns false if not found.*/
@@ -1266,7 +1268,7 @@ static void KeycodePanelUse(u16 i) {
     }
     SystemUI* s=&World.Sys_UI; s->tetheredKeypadKeycode=i; s->keycodeValue=e->keycode; s->keycodeValid=true; s->keycodeSolved=false;
     s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; s->objectInUsePos=World.position[i]; s->usingObject=true;
-    ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(false,2);
+    ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,2);/*keycode pad: data-tab view, so it comes up on the last-used data side (left by default)*/
 }
 void CloseSearch(void) {
     u16 s=World.Sys_UI.tetheredSearchable;
@@ -1567,8 +1569,20 @@ void ModUpdate() {
         u16 pg = World.Sys_UI.tetheredPGP;
         if (pg < World.instCount && (World.instances[pg].entflags & EF_ACTIVE)) {
             float d2 = V3_SqDist(World.position[PLAYER1], World.position[pg]);
-            if (d2 > 64.0f) { UI_PuzzleGridClose(); }
+            if (d2 > PANEL_TETHER_SQDIST) { UI_PuzzleGridClose(); }
         }
+    }
+    if (World.Sys_UI.tetheredKeypadKeycode != U16_MAX) { /*Keycode pad tether: the code screen follows its pad, so wander off and it closes back to the preferred tab*/
+        u16 kp = World.Sys_UI.tetheredKeypadKeycode;
+        if (kp < World.instCount && (World.instances[kp].entflags & EF_ACTIVE) && V3_SqDist(World.position[PLAYER1],World.position[kp]) > PANEL_TETHER_SQDIST) { UI_KeycodeClose(false); }
+    }
+    if (World.Sys_UI.tetheredKeypadElevator != U16_MAX) { /*Elevator keypad tether: the floor panel stays tied to its keypad*/
+        u16 ep = World.Sys_UI.tetheredKeypadElevator;
+        if (ep < World.instCount && (World.instances[ep].entflags & EF_ACTIVE) && V3_SqDist(World.position[PLAYER1],World.position[ep]) > PANEL_TETHER_SQDIST) { UI_ElevClose(false); }
+    }
+    if (World.Sys_UI.tetheredPWP != U16_MAX) { /*Wire panel tether: same deal as the grid*/
+        u16 wp = World.Sys_UI.tetheredPWP;
+        if (wp < World.instCount && (World.instances[wp].entflags & EF_ACTIVE) && V3_SqDist(World.position[PLAYER1],World.position[wp]) > PANEL_TETHER_SQDIST) { UI_WireClose(false); }
     }
 }
 

@@ -1629,6 +1629,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     u8 prevLevel = World.currentLevel;
     if (curlevel == LEVEL_CYBERSPACE && World.currentLevel != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.currentLevel; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
     CloseSearch();
+    World.Sys_UI.tetheredKeypadKeycode=World.Sys_UI.tetheredKeypadElevator=World.Sys_UI.tetheredPGP=World.Sys_UI.tetheredPWP=U16_MAX;/*panel tethers are per-level; the entity index they point at dies with the level, so don't sever against a stale one*/
     DebugRAM("start of LoadLevel");
     World.levelCurrentlyLoading = true;
     World.paused = World.menuActive = false;

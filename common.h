@@ -168,7 +168,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (85ULL * 1024 * 1024),
       /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                  MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
       /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024,
-                            FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 19,
+                            FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 20,
       /*Lights*/ LIGHT_COUNT = 2048, LANIM_MAX = 128/*max animated lights stored per level; Voxen-active peak is 71 (level 5)*/, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/ MAX_MDLS=7490, WELD_HASH_SIZE=32768, MAX_VERT_ELEMENT_SIZE=6964, MAX_OUTPUT_VERTS=22960, VRT_ATT_SZ=16, CPU_VRT_SZ=32,
       /*Textures*/ MAXTEX = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 256, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8,
@@ -305,7 +305,7 @@ typedef struct {
         i16 generalClickItem, logFolderList[16], logReaderPage;
         u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, MFD_LefTab, MFD_CenterTab, MFD_RightTab, MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
         i8 elevButtonLabelIdx[8], generalClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
-        bool lastWeaponSideRH, lastItemSideRH, lastAutomapSideRH /*TODO*/, lastDataSideRH, lastSearchSideRH, lastLogSideRH /*TODO*/, lastMinigameSideRH /*TODO*/, logActive, paperLogInUse/*TODO*/, usingObject, highlightStatus[4], mouseClickHeldOverGUI, buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], mfdGeneralItem, mfdHardwareItem, keycodeValid, keycodeSolved, pg_cell[35], pg_powered[35], pg_checked[35], pg_solved, pw_wireOn[7], pw_rowActive[7];
+        bool lastWeaponSideRH, lastItemSideRH, lastAutomapSideRH, lastDataSideRH, lastSearchSideRH, lastMinigameSideRH, logActive, paperLogInUse/*TODO*/, usingObject, highlightStatus[4], mouseClickHeldOverGUI, buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], mfdGeneralItem, mfdHardwareItem, keycodeValid, keycodeSolved, pg_cell[35], pg_powered[35], pg_checked[35], pg_solved, pw_wireOn[7], pw_rowActive[7];
         bool pw_selectedWireRH, pw_solved, pg_fired, mg_running[2], autoSide[2], fullMapOpen[2], firstMain, firstGeneral, firstHardware, firstWeapon;
         V3 objectInUsePos;
 } SystemUI;
