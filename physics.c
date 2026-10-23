@@ -74,7 +74,7 @@ static float GravityLiftBodyBottomY(u16 body) {
     return World.position[body].y-(World.colliderSize[body].y*0.5f*vabs(World.scale[body].y));
 }
 static float GravityLiftGravityAccel(u16 body) {
-    if(body==PLAYER1&&(Cheats.noclip||World.invP1.ladderState>0))return 0.0f;
+    if(body==PLAYER1&&(Cheats.noclip||World.invP1.ladderState>0||World.curLev==LEVEL_CYBERSPACE))return 0.0f;
     return 9.81f*World.gravity[body];
 }
 static float GravityLiftTopControlForce(u16 body,float gap) {
@@ -447,7 +447,7 @@ void Physics(float dt) {
         }
         gContactCount=0;
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
-            u16 a=dynamicEntities[i]; if (IdxIsNPC(World.instances[a].index) && (World.instances[a].entflags & EF_ASLEEP)) { continue; } V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
+            u16 a=dynamicEntities[i]; if (IdxIsNPC(World.instances[a].index) && (World.instances[a].entflags & EF_ASLEEP)) { continue; } V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0 || World.curLev == LEVEL_CYBERSPACE)) acc.y = 0.0f; if (a == PLAYER1 && World.curLev == LEVEL_CYBERSPACE && World.diffCyb > 1 && !Cheats.noclip && V3_dot(World.velocity[a],World.velocity[a]) < 10000.0f) { acc = V3_AplusB(acc,V3_ScaleByF(quat_rot_v3(World.rotation[a],(V3){0.0f,0.0f,1.0f}),2.0f)); } /*Unity CyberspaceMovement detrimental force at difficultyCyber>1: AddForce(viewDir*walkAcceleration*0.05*dt, ForceMode.Force). The Unity player Rigidbody mass is 1, so at Unity's 50Hz fixed step that force is an effective 2.0 m/s^2 along the full 3D view direction; applied mass-independently here because the Voxen player mass is 10 (same convention as trigger_cyberpush 595, which scales its force by mass). The 10000 gate is Unity's velocity.magnitude < walkAcceleration*0.05 (=100) test, squared.*/ acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; } else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
             float linDrag = (World.instances[a].index >= 481 && World.instances[a].index <= 495) ? 1.0f : vexp(-0.1f * dtsub);
             World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; float angDrag = vexp(-2.0f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag); SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
@@ -509,7 +509,7 @@ void Physics(float dt) {
         for (u32 c=0; c<gContactCount; ++c) { // 3.5 Positional Correction (Projection)
             SolverContact *sc = &gContacts[c]; float avgPen = 0.0f; for (int p=0; p<sc->m.n; ++p) avgPen += sc->m.p[p].pen; if (sc->m.n > 0)avgPen/=(float)sc->m.n; float correction=vmax(avgPen-0.005f,0.0f)*0.4f; float massDiv=sc->invMassA+sc->invMassB+PHY_EPSILON; SetPosition(sc->a,V3_AplusB(World.position[sc->a],V3_ScaleByF(sc->m.normal,correction*sc->invMassA/massDiv))); if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
-        bool ladderTouched = false; World.invP1.radiationArea=World.Sys_Music.inZone=World.Sys_Music.elevator=World.Sys_Music.cyberTube=World.Sys_Music.distortion=false; World.gravity[PLAYER1] = 1.0f;
+        bool ladderTouched = false; World.invP1.radiationArea=World.Sys_Music.inZone=World.Sys_Music.elevator=World.Sys_Music.cyberTube=World.Sys_Music.distortion=false; World.gravity[PLAYER1] = World.curLev == LEVEL_CYBERSPACE ? 0.0f : 1.0f;
         for (u16 i=0;i<numTriggers;++i) {
             u16 self = triggerVolumes[i]; u16 trigdx=World.instances[self].index; if (Cheats.showPhys) {if(trigdx==703)DrawCapsuleCollider(self);else DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f});} ShapeBox trigBox = Entity_GetBox(self); ShapeCapsule teleportCap=trigdx==703?Entity_GetCap(self):(ShapeCapsule){0};
             for (u16 o=0;o<dynamicEntityCount;++o) { // 4. Triggers
@@ -592,6 +592,7 @@ INLINE bool StandBlocked(float targetHeight) { if (!CantStand(PLAYER1, targetHei
 KeyState* GetCodeMapping(int settingIndex); const char* FootStepSound(FootStepType);
 void ApplyPlayerMovements(float dt) {
     Entity *p = &World.instances[PLAYER1];
+    bool cyber = World.curLev == LEVEL_CYBERSPACE;
     Quaternion r = World.rotation[PLAYER1];
     float leanSpeed = 70.0f, leanMaxAngle = 35.0f; float leanInput = (float)LeanLeft() - (float)LeanRight(); bool doubleTapLean = DoubleTapLeanLeft() || DoubleTapLeanRight();
     bool movingForward = Forward() > 0.1f, leanRight = leanInput < 0.0f, leanLeft = leanInput > 0.0f;
@@ -617,7 +618,8 @@ void ApplyPlayerMovements(float dt) {
     
     World.cam_roll = World.invP1.leanTarget;
     float targR = 1.0f, transitionSec = 0.2f, currentRatio = World.invP1.currentCrouchRatio;
-    if (Crouch()) {
+    if (cyber) { p->bodyState = BodyState_Standing; } /*Unity CyberSetup forces Standing so crouch/prone speed and capsule state cannot leak into cyberspace.*/
+    else if (Crouch()) {
         if (p->bodyState == BodyState_Crouch) {
             if (!StandBlocked(PLYR_HT)){p->bodyState = BodyState_StandingUp;}
         } else if (currentRatio > PLAYER_CROUCH_RATIO) {
@@ -678,7 +680,7 @@ void ApplyPlayerMovements(float dt) {
     float lastRatio = World.invP1.currentCrouchRatio; World.invP1.currentCrouchRatio = smooth_damp(lastRatio,targR,&World.invP1.crouchingVelocity,transitionSec,dt);
     if (World.invP1.currentCrouchRatio >= 1.0f) { World.invP1.currentCrouchRatio = 1.0f; if(p->bodyState == BodyState_StandingUp){p->bodyState=BodyState_Standing;} } else if (p->bodyState == BodyState_CrouchingDown && World.invP1.currentCrouchRatio <= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; }
     else if (p->bodyState == BodyState_ProningUp && World.invP1.currentCrouchRatio >= PLAYER_CROUCH_RATIO) { World.invP1.currentCrouchRatio = PLAYER_CROUCH_RATIO; p->bodyState = BodyState_Crouch; } else if (p->bodyState == BodyState_ProningDown && World.invP1.currentCrouchRatio <= PLAYER_PRONE_RATIO) { World.invP1.currentCrouchRatio = PLAYER_PRONE_RATIO; p->bodyState = BodyState_Prone; }
-    World.colliderSize[PLAYER1].y = PLYR_HT * World.invP1.currentCrouchRatio; World.colliderCenter[PLAYER1].y =  -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f; // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84 which is PLYR_CAM_OFS_Y)
+    if (World.col[PLAYER1] == CT_CAP) { World.colliderSize[PLAYER1].y = PLYR_HT * World.invP1.currentCrouchRatio; World.colliderCenter[PLAYER1].y =  -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f; } // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84 which is PLYR_CAM_OFS_Y)
     float h=(float)Forward() - (float)Backpedal(), s=(float)StrafeRight() - (float)StrafeLeft(), vertInput = Cheats.noclip ? (float)((SwimUp()) || Jump()) - (float)SwimDn() : 0.0;
     bool isSprinting=Sprint() && (grounded || inGravLift || World.invP1.ladderState>0 || Cheats.noclip); if(World.invP1.fatigueMoveFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && grounded && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip)&&!boostAct){World.invP1.fatigue+=isSprinting ? 2.85f : 1.0f; World.invP1.fatigueMoveFinished=World.pauseRelativeTime+0.298f;/*Ensure no sync w/ bleedoff*/}
     if(World.invP1.footstepFinished < World.pauseRelativeTime && (vabs(h) > 0.0f || vabs(s) > 0.0f) && grounded && (PlayerIsMoving() && !Cheats.noclip) && !boostAct){
@@ -686,16 +688,17 @@ void ApplyPlayerMovements(float dt) {
     }
     if(World.invP1.rustleFinished<World.pauseRelativeTime && (vabs(h)>0.0f || vabs(s)>0.0f) && (V3_dot(World.velocity[PLAYER1],World.velocity[PLAYER1])>0.1f && !Cheats.noclip) && PlayerIsMoving() && !boostAct){play_wav(sounds[random_range_u32(459,465)],AppliedFXVol(random_range(0.3f,0.5f)),World.position[PLAYER1],true); World.invP1.rustleFinished=World.pauseRelativeTime+(isSprinting ? random_range(0.4f,0.6f) : random_range(0.8f,1.2f));}
     float y2=r.y*r.y, xz=r.x*r.z, wy=r.w*r.y; p->forward=V3_Normalize((V3){ 2.0f*(xz + wy),2.0f*(r.y*r.z - r.w*r.x),1.0f - 2.0f*(r.x*r.x + y2) }); p->right=V3_Normalize((V3){ 1.0f - 2.0f*(y2 + r.z*r.z),2.0f*(r.x*r.y + r.w*r.z),2.0f*(xz - wy) });
-    V3 inputDir={ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0}; 
+    V3 inputDir=cyber ? (V3){ p->forward.x*h + p->right.x*s, p->forward.y*h + p->right.y*s, p->forward.z*h + p->right.z*s } : (V3){ p->forward.x*h + p->right.x*s,vertInput,p->forward.z*h + p->right.z*s}; float inputLenSq = V3_dot(inputDir,inputDir); V3 w = (inputLenSq > 0.0001f) ? V3_ScaleByF(inputDir, 1.0f / vsqrtf(inputLenSq)) : (V3){0, 0, 0}; 
     bool isRunning = (inputLenSq > 0.01f); float speedAdjust = 0.0f; bool setSpeedAdjusted = false; if (Cheats.noclip) { speedAdjust = PLAYER_MAX_CYBER_SPEED*(isSprinting ? 2.5f : 1.5f); setSpeedAdjusted = true; } if (World.curLev==LEVEL_CYBERSPACE) { speedAdjust = PLAYER_MAX_CYBER_SPEED; setSpeedAdjusted = true; }
     BodyState b=World.instances[PLAYER1].bodyState; float v=WALK_SPEED; switch(b){ case BodyState_CrouchingDown: case BodyState_Crouch:v=CROUCH_SPEED; break; case BodyState_Prone: case BodyState_ProningDown: case BodyState_ProningUp:v=PLAYER_MAX_PRONE_SPEED; break; default:break; }
     if((isSprinting||boostAct) && isRunning){v=World.invP1.fatigue > 80.0f && !boostAct ? 10.0f : 17.0f;/*Boost mode reaches maxSprintSpeed on its own and skips the fatigue penalty; skates leave sprinting alone. The +1.2 is added exactly once below, as retval+bonus*/ if (b==BodyState_Standing||b==BodyState_Crouch||b==BodyState_CrouchingDown) v-=(WALK_SPEED-CROUCH_SPEED)*1.5f; else if(b==BodyState_Prone||b==BodyState_ProningDown||b==BodyState_ProningUp) v-=(WALK_SPEED-PLAYER_MAX_PRONE_SPEED)*2.f;}
     float speed = (setSpeedAdjusted ? speedAdjust : (skatesAct ? v*SKATE_SPEED : v) + (boostAct ? PLAYER_BOOSTER_SPEED_BOOST : 0.0f)) + (World.invP1.staminupActive ? 1.0f : 0.0f), accel=World.curLev!=LEVEL_CYBERSPACE ? (skatesAct ? WALK_SPEED_ACCEL/SKATE_SLIDE : (boostAct ? BOOST_ACCEL : WALK_SPEED_ACCEL)) : WALK_SPEED_ACCEL;/*SKATE trades accel for slide and pays it back as SKATE_SPEED so it never ends up slower than walking; BOOST adds the steady +1.2 forward push once, as retval+bonus*/ V3 targetVel = V3_ScaleByF(w,speed); 
-    if (onLadder && !ladderWalkOff) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed, p->right.z * s * speed * 0.3f}; accel = 5.0f; } else { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
+    if (onLadder && !ladderWalkOff) { float climbSpeed = (isSprinting && isRunning) ? 3.0f : 1.3f; targetVel = (V3){p->right.x * s * speed * 0.3f, h * climbSpeed, p->right.z * s * speed * 0.3f}; accel = 5.0f; } else if (!cyber) { if (vabs(vertInput) < 0.001f) { targetVel.y = World.velocity[PLAYER1].y; } }
     V3 dv = V3_AsubB(targetVel, World.velocity[PLAYER1]); dv = (V3){ vclamp(dv.x, -10.0f,10.0f), vclamp(dv.y, -10.0f,10.0f), vclamp(dv.z,-10.0f,10.0f) }; World.velocity[PLAYER1] = V3_AplusB(World.velocity[PLAYER1],V3_ScaleByF(dv,accel*vclamp(dt,0.0005f,0.1f)));
+    if (cyber && !Cheats.noclip && World.diffCyb <= 1 && !isRunning && !World.Sys_Music.cyberTube) World.velocity[PLAYER1] = (V3){0.0f,0.0f,0.0f}; /*Unity CyberspaceMovement: at cyber difficulty 0-1 there is no detrimental drift, and with no movement input (outside a cyber tube) velocity is set to zero.*/
     if (World.invP1.fatigueBleedoffFinished<World.pauseRelativeTime && World.curLev!=LEVEL_CYBERSPACE && !Cheats.noclip){World.invP1.fatigue-=fatigueWane;/*Fatigue bleed off*/ World.invP1.fatigueBleedoffFinished=World.pauseRelativeTime +0.3f;} World.invP1.fatigue=vclamp(World.invP1.fatigue,0.0f,100.0f); if (World.invP1.fatigue > 80.0f){AppendTextWarning(868,-1,-1,T_WHITE,0);/*Fatigue high*/}
     if (World.invP1.noiseFinished < World.pauseRelativeTime) World.invP1.makingNoise = false;
-    if (grounded && !World.invP1.wasGrounded) {
+    if (!cyber && grounded && !World.invP1.wasGrounded) { /*Unity returns from FixedUpdate after CyberspaceMovement, so landing sounds and fall damage do not run in cyberspace.*/
         float velChange = vabs(World.invP1.lastVelY - World.velocity[PLAYER1].y);
         if(velChange>2.0f && World.invP1.noiseFinished<World.pauseRelativeTime){RaycastHit lhit=Raycast(World.position[PLAYER1],(V3){0.0f,-1.0f,0.0f},2.0f,LMASK_PLAYER_FEET); FootStepType lstp=lhit.hit ? GetFootstepTypeForPrefab(World.instances[lhit.hitInstanceIndex].index) : FSTP_Concrete; play_wav(JumpLandSound(lstp),AppliedFXVol(vclamp(velChange/11.72f,0.5f,1.0f)),World.position[PLAYER1],true); World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}
         if(velChange>=11.72f&&World.invP1.fallPainFinished<World.pauseRelativeTime){World.invP1.fallPainFinished=World.pauseRelativeTime+0.5f; DamageData dd={0}; float falltake=75.f-random_range(0,68.f); if(falltake>World.instances[PLAYER1].health&&falltake-World.instances[PLAYER1].health<5.0f)falltake=World.instances[PLAYER1].health-1.f; dd.damage=falltake; TakeDamage(PLAYER1,dd); World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.2f;}

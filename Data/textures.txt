@@ -7026,3 +7026,141 @@ index: 3336
 
 #Textures/player_character.png
 index: 3337
+#Textures/cyberpanel_black.png
+index: 3399
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_blue.png
+index: 3400
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_bluegray.png
+index: 3401
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_cyan.png
+index: 3402
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_cyandark.png
+index: 3403
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_gray.png
+index: 3404
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_green.png
+index: 3405
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_greendark.png
+index: 3406
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_orange.png
+index: 3407
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_orangedark.png
+index: 3408
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_paleorange.png
+index: 3409
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_palepurple.png
+index: 3410
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_palered.png
+index: 3411
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_paleyellow.png
+index: 3412
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_purple.png
+index: 3413
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_red.png
+index: 3414
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_yellow.png
+index: 3415
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_yellowdark.png
+index: 3416
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_blue.png
+index: 3417
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_bluegray.png
+index: 3418
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_cyan.png
+index: 3419
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_cyandark.png
+index: 3420
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_gray.png
+index: 3421
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_green.png
+index: 3422
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_greendark.png
+index: 3423
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_orange.png
+index: 3424
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_orangedark.png
+index: 3425
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_paleorange.png
+index: 3426
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_palepurple.png
+index: 3427
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_palered.png
+index: 3428
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_paleyellow.png
+index: 3429
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_purple.png
+index: 3430
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_red.png
+index: 3431
+doublesided: 1
+transparent: 1
+#Textures/cyberpanel_slice45_yellow.png
+index: 3432
+doublesided: 1
+transparent: 1
+#Textures/pipe3_90deg.png
+index: 3433

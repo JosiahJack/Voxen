@@ -591,10 +591,11 @@ static void SkinNodeGlobal(const GltfMesh* gm, glb_node* node, float t, float (*
     state[ni] = 1;
 }
 
-static void SkinFrameToScratch(GltfMesh* restrict gm, float t, float* restrict posedPos, float* restrict posedNrm, float* restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
-    float skinMat[MAX_GLB_JOINTS][16];
+static void SkinFrameToScratch(GltfMesh* restrict gm, float t, float* restrict posedPos, float* restrict posedNrm, float* restrict sv, u32* outEc, __m128* outMn, __m128* outMx, i32 tid) {
+    void* sub_mark = OS_SubArenaMark(tid); /*skinMat (6,144B) + glob (65,536B) + globDone (1,024B) were stack locals: GltfBakeWorker frame was 73,192B, over the 65,536 Windows limit. The bake worker's per-thread sub-arena (same tid WeldModelPositions uses) holds them instead.*/
+    float (*skinMat)[16] = (float (*)[16])OS_SubArenaAlloc(tid, sizeof(float) * MAX_GLB_JOINTS * 16);
     if (gm->gltf->nodes_count <= SKIN_GLOB_MAX) { /*One local+global per node per frame instead of per joint-ancestor path*/
-        float glob[SKIN_GLOB_MAX][16]; u8 globDone[SKIN_GLOB_MAX]; mset(globDone, 0, gm->gltf->nodes_count);
+        float (*glob)[16] = (float (*)[16])OS_SubArenaAlloc(tid, sizeof(float) * SKIN_GLOB_MAX * 16); u8* globDone = (u8*)OS_SubArenaAlloc(tid, SKIN_GLOB_MAX); /*arena alloc is pre-zeroed, covering the old mset(globDone,0,nodes_count)*/
         for (u32 j=0;j<gm->jointCount;++j) { SkinNodeGlobal(gm, gm->jointNodes[j], t, glob, globDone); Mat4Mul(glob[(size_t)(gm->jointNodes[j] - gm->gltf->nodes)], gm->invBind[j], skinMat[j]); }
     } else {
         for (u32 j=0;j<gm->jointCount;++j) { float g[16]; NodeGlobalMatrixAtTime(gm, gm->jointNodes[j], t, g); Mat4Mul(g, gm->invBind[j], skinMat[j]); }
@@ -635,6 +636,7 @@ static void SkinFrameToScratch(GltfMesh* restrict gm, float t, float* restrict p
     *outEc = ec;
     *outMn = mn_v;
     *outMx = mx_v;
+    OS_SubArenaRelease(tid, sub_mark);
 }
 
 static void TransformFrameToScratch(GltfMesh* restrict gm, float t, float* restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
@@ -684,7 +686,7 @@ static void* GltfBakeWorker(void* arg) {
         u32 ec;
         __m128 mn_v, mx_v;
         if (t->mesh->isTrAnim) { TransformFrameToScratch(t->mesh, t->timelineFrame, sv, &ec, &mn_v, &mx_v); }
-        else { SkinFrameToScratch(t->mesh, t->timelineFrame, posedPos, posedNrm, sv, &ec, &mn_v, &mx_v); }
+        else { SkinFrameToScratch(t->mesh, t->timelineFrame, posedPos, posedNrm, sv, &ec, &mn_v, &mx_v, bt->tid); }
         
         FinalizeParsedMesh(t->modelIndex, sv, ec, thrd_ht[bt->tid], thrd_ht_used[bt->tid], thrd_remap_scratch[bt->tid], thrd_cache_scratch[bt->tid], &vPos[t->modelIndex], &modelVertexCounts[t->modelIndex], &modelTriangles[t->modelIndex], &modelTriangleCounts[t->modelIndex], mn_v, mx_v, bt->tid);
     } return NULL;

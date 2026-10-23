@@ -424,7 +424,7 @@ static void AIEnemyInFrontChecks(Entity* e, u16 i) { if(!i){flag_set(&e->entflag
 static void AIFace(Entity* self, V3 goal) {
     u16 sidx=(u16)(self - World.instances); if (self->entflags & EF_ASLEEP) return; V3 fv = V3_AsubB(goal,World.position[sidx]); if (!IsCyberNPC((u16)(self - World.instances))) fv.y = 0.0f; if (fv.x == 0.0f && fv.y == 0.0f && fv.z == 0.0f) return; u16 eidx = self->enemy; if (IsCyberNPC((u16)(self - World.instances)) && eidx) { World.rotation[sidx] = World.rotation[eidx]; self->forward = V3_Normalize(quat_rot_v3(World.rotation[sidx],(V3){0.0f,0.0f,1.0f})); return; }
     if (fv.x == 0.0f && fv.z == 0.0f) { if (eidx){fv=V3_AsubB(World.position[eidx],World.position[sidx]);} else{fv.x += 0.001f;} }
-    V3 currentForward=V3_Normalize(quat_rot_v3(World.rotation[sidx],(V3){0.0f,0.0f,1.0f})); float currentYaw=__builtin_atan2f(currentForward.x,currentForward.z), targetYaw=__builtin_atan2f(fv.x,fv.z), yaw=targetYaw-currentYaw; float t=(float)(0.2f*npcTable[self->index-419].yawSpeed*World.deltaTime*World.timeScale); yaw*=t; float half=yaw*0.5f; Quaternion yawRotation={0.0f,vsinf(half),0.0f,vcosf(half)}; World.rotation[sidx]=quat_normalize(quat_multiply(yawRotation,World.rotation[sidx])); self->forward=V3_Normalize(quat_rot_v3(World.rotation[sidx],(V3){0.0f,0.0f,1.0f}));
+    V3 currentForward=V3_Normalize(quat_rot_v3(World.rotation[sidx],(V3){0.0f,0.0f,1.0f})); float currentYaw=__builtin_atan2f(currentForward.x,currentForward.z), targetYaw=__builtin_atan2f(fv.x,fv.z), yaw=targetYaw-currentYaw; if (yaw>PI) yaw-=2.0f*PI; else if (yaw<-PI) yaw+=2.0f*PI; /*wrap: unwrapped, facing across the atan2 seam turned the long way round*/ float t=vmin((float)(0.2f*npcTable[self->index-419].yawSpeed*World.deltaTime*World.timeScale),1.0f); yaw*=t; /*clamp: t exceeds 1 below ~36fps at yawSpeed 180 (overshoot) and 2 below ~18fps (diverges)*/ float half=yaw*0.5f; Quaternion yawRotation={0.0f,vsinf(half),0.0f,vcosf(half)}; World.rotation[sidx]=quat_normalize(quat_multiply(yawRotation,World.rotation[sidx])); self->forward=V3_Normalize(quat_rot_v3(World.rotation[sidx],(V3){0.0f,0.0f,1.0f}));
 }
 
 INLINE float quat_angle_deg(Quaternion a, Quaternion b) { float d = vclamp(vabs(quat_dot(a, b)), 0.0f, 1.0f); return 2.0f * vacosf(d) * (180.0f / PI); }
@@ -446,7 +446,7 @@ static void AIIdle(u16 sidx) {
     if (World.instances[sidx].idleTime < World.pauseRelativeTime) { int sidle = sfxIdle[World.instances[sidx].index - 419]; if (random_range(0.0f, 1.0f) < 0.5f && sidle >= 0 && sidle < (i16)SOUNDS_COUNT) play_wav(sounds[sidle],AppliedFXVol(1.0f),World.position[sidx],true); World.instances[sidx].idleTime = World.pauseRelativeTime + random_range(npc->timeIdleSFXMin, npc->timeIdleSFXMax); } AICheckPain(sidx);
 }
 
-static V3 AIGetWanderPoint(Entity* self) { u16 sidx=(u16)(self - World.instances); return (V3){World.position[sidx].x + random_range(-AI_WANDER_RANGE,AI_WANDER_RANGE),IsCyberNPC((u16)(self - World.instances)) ? World.position[sidx].y + random_range(-AI_WANDER_RANGE,AI_WANDER_RANGE) : 0.0f,World.position[sidx].z + random_range(-AI_WANDER_RANGE,AI_WANDER_RANGE)}; }
+static V3 AIGetWanderPoint(Entity* self) { u16 sidx=(u16)(self - World.instances); return (V3){World.position[sidx].x + random_range(-AI_WANDER_RANGE,AI_WANDER_RANGE),IsCyberNPC((u16)(self - World.instances)) ? World.position[sidx].y + random_range(-AI_WANDER_RANGE,AI_WANDER_RANGE) : World.position[sidx].y,World.position[sidx].z + random_range(-AI_WANDER_RANGE,AI_WANDER_RANGE)}; } /*ground NPCs wander on their own floor plane: y was hardcoded 0, so on any level not sitting at y=0 the destination floated far above/below the NPC*/
 static V3 AIGetAStarPoint(Entity* self) {
     u16 sidx=(u16)(self - World.instances); i32 cx=PosGetCellCoordX(World.position[sidx].x), cz=PosGetCellCoordZ(World.position[sidx].z); if (!XZPairInBounds(cx,cz)) return AIGetWanderPoint(self);
     u32 current=(u32)cz*WORLDX+(u32)cx; V3 ep=self->enemy ? World.position[self->enemy] : World.position[sidx]; V3 cands[4]; i32 dx[4]={0,0,1,-1}, dz[4]={1,-1,0,0}; u32 closed[4]={CELL_CLOSEDNORTH,CELL_CLOSEDSOUTH,CELL_CLOSEDEAST,CELL_CLOSEDWEST}; int count=0;
@@ -475,7 +475,7 @@ static void AIWalk(u16 self) {
     if ((npcTable[World.instances[self].index - 419].moveType == AIMoveType_None) || (World.instances[self].tranquilizeFinished >= World.pauseRelativeTime)){return;}
     u16 sidx = self; if (!PositionVisibleFromPlayerCell(World.position[sidx].x,World.position[sidx].z)){return;}
     
-    float dist = V3_Dist(ai_sight_pos(&World.instances[self]),World.instances[self].currentDestination);
+    V3 sposw = ai_sight_pos(&World.instances[self]); float dist = IsCyberNPC(self) ? V3_Dist(sposw,World.instances[self].currentDestination) : __builtin_sqrtf((sposw.x-World.instances[self].currentDestination.x)*(sposw.x-World.instances[self].currentDestination.x) + (sposw.z-World.instances[self].currentDestination.z)*(sposw.z-World.instances[self].currentDestination.z)); /*XZ for ground NPCs: the sight pos floats at eye height while the destination sits on their floor plane, so the 3D measure could never fall below the arrival threshold*/
     if (World.instances[self].entflags & EF_WANDERING) {
         if (World.instances[self].wanderFinished < World.pauseRelativeTime || dist < AI_STOP_DIST * 0.5f) {
             World.instances[self].wanderFinished = World.pauseRelativeTime + random_range(3.0f, 8.0f);
@@ -724,13 +724,14 @@ void AIControllerUpdate(u16 idx) {
     
     u16 ndx = edx - 419, eidx = self->enemy;
     if (self->currentState != AIState_Dead && self->currentState != AIState_Dying) { World.gravity[idx] = (npcTable[ndx].type == NPCType_Cyber || npcTable[ndx].moveType == AIMoveType_Fly) ? 0.0f : 1.0f; }
+    if (self->aiThinkFinished < World.pauseRelativeTime) { self->aiThinkFinished = World.pauseRelativeTime + 0.1f; /*Sight/front checks refresh at think rate: every runtime consumer of EF_ENEM_IN_SIGHT/LOS/FOV/FRONT runs inside AIThink (the only other reader is the showai debug color in citadel.c), so running the sight raycast per frame bought nothing.*/
         flag_set(&self->entflags,EF_ENEM_IN_SIGHT,AICheckIfPlayerInSight(idx));
         if (eidx && HasHealth((u16)(self - World.instances))) {
             bool enAlive = (npcTable[ndx].type == NPCType_Cyber && eidx == World.decoyInstance) || (npcTable[ndx].type == NPCType_Cyber ? World.instances[eidx].cyberHealth > 0.0f : World.instances[eidx].health > 0.0f);/*the decoy projection has no health by design, so it would otherwise read as a corpse on the very next tick and be dropped*/
             if (!enAlive) { if (npcTable[ndx].type == NPCType_Cyber) self->currentState = AIState_Idle; else { flag_set(&self->entflags, EF_WANDERING, true); self->wanderFinished = World.pauseRelativeTime + random_range(3.0f, 8.0f); self->currentState = AIState_Walk; } self->enemy = 0; self->posCheckFinished = World.pauseRelativeTime; self->lastPosition = World.position[idx]; }
             else AIEnemyInFrontChecks(self,eidx);
         }
-    if (self->aiThinkFinished < World.pauseRelativeTime) { self->aiThinkFinished = World.pauseRelativeTime + 0.1f; AIThink(idx); }
+        AIThink(idx); }
     if (self->currentState == AIState_Dead || self->currentState == AIState_Idle) return;
     if ((self->entflags & EF_ACT_AS_TURRET) && eidx) self->currentDestination = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; if (npcTable[ndx].type == NPCType_Cyber && eidx) self->currentDestination = World.position[eidx];
     V3 toTarget = V3_AsubB(self->currentDestination,ai_sight_pos(self)); if (npcTable[ndx].type != NPCType_Cyber) toTarget.y = 0.0f; self->idealTransformForward = V3_Normalize(toTarget); float sqmag = V3_dot(toTarget, toTarget); if (sqmag > 0.000001f || npcTable[ndx].type == NPCType_Cyber) AIFace(self,self->currentDestination);    if (npcTable[ndx].moveType == AIMoveType_Fly && self->tranquilizeFinished < World.pauseRelativeTime) AIFlierMoveToHoverHeight(self);

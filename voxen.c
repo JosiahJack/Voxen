@@ -1456,7 +1456,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     float shakeOffset = (World.shakeFinished > World.pauseRelativeTime) ? (shakeAmp * vcosf((float)(World.pauseRelativeTime * 20.0f))) * (World.shakeFinished - World.pauseRelativeTime) : 0.0f;
     Quaternion savedRotation = World.rotation[PLAYER1];
     float savedCamYaw = World.cam_yaw, savedCamPitch = World.cam_pitch, savedCamRoll = World.cam_roll;
-    if (shakeOffset != 0.0f) {
+    if (shakeOffset != 0.0f && World.curLev != LEVEL_CYBERSPACE) { /*in cyberspace the player quaternion is true 6DOF; an Euler rebuild here would snap the view upright for every shaken frame*/
         World.cam_yaw += shakeOffset;
         World.cam_pitch += shakeOffset * 0.5f;
         quat_from_yaw_pitch_roll(&World.rotation[PLAYER1], World.cam_yaw, World.cam_pitch, World.cam_roll);
@@ -1568,11 +1568,11 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i];
         u16 tex = e->texIndex;
-        if (unlikely(transparentTexture[tex])) { /*Transparents (with sort)*/
-            glEnable(GL_CULL_FACE);
-            glEnable(GL_BLEND);
-        } else if (unlikely(doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f)) { /*Doublesided*/
+        if (unlikely(doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f)) { /*Doublesided (incl. transparent doublesided, e.g. cyberspace panels)*/
             glDisable(GL_CULL_FACE);
+            glEnable(GL_BLEND);
+        } else if (unlikely(transparentTexture[tex])) { /*Transparents (with sort)*/
+            glEnable(GL_CULL_FACE);
             glEnable(GL_BLEND);
         } else { /*Opaque*/
             glEnable(GL_CULL_FACE);
@@ -1641,17 +1641,17 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         Entity* e = &World.instances[i];
         u16 tex = e->texIndex;
         u32 constIndex = e->index;
-        if (likely(transparentTexture[tex])) { /*Transparents (with sort)*/
-            if (cullBlendState != 1) {
-                glEnable(GL_CULL_FACE);
-                glEnable(GL_BLEND);
-                cullBlendState = 1;
-            }
-        } else if (unlikely(doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f)) { /*Doublesided*/
+        if (unlikely(doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f)) { /*Doublesided (incl. transparent doublesided, e.g. cyberspace panels)*/
             if(cullBlendState != 2){
                 glDisable(GL_CULL_FACE);
                 glEnable(GL_BLEND);
                 cullBlendState = 2;
+            }
+        } else if (likely(transparentTexture[tex])) { /*Transparents (with sort)*/
+            if (cullBlendState != 1) {
+                glEnable(GL_CULL_FACE);
+                glEnable(GL_BLEND);
+                cullBlendState = 1;
             }
         } else { /*Opaque (already done)*/ continue; }
         
@@ -1986,7 +1986,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.gravity[PLAYER1] = 1.0f;
     World.dynamicFriction[PLAYER1] = 0.6f;
     World.staticFriction[PLAYER1] = 0.8f; 
-    World.instances[PLAYER1].health = 211.0f;
+    World.instances[PLAYER1].health = 211.0f; World.instances[PLAYER1].cyberHealth = 255.0f; /*Unity HealthManager gives the player a full 255 cyberHealth pool at start; it persists across cyberspace entries (integrity items top it up), and the cyberspace HUD ticks read it*/
     World.invP1.noiseFinished = World.pauseRelativeTime;
     World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f,1.0f);
     for (int i=0;i<12;++i) { World.invP1.hardwareInvReferenceIndex[i] = 21 + i; } World.invP1.hardwareInvReferenceIndex[12] = World.invP1.hardwareInvReferenceIndex[13] = 0;
@@ -2373,9 +2373,10 @@ void InitalizeEnvironment() {
     NewGame();
     currentMenuPage = MPG_FRONT;
     InitAudio(); synth_set_reverb_preset(0);
-    if (playIntroAtBoot) ChangeMenuPage(MPG_INTRO);
-    else { PlayMenuMusic(); }
     //World.menuActive = true; //COMMENT for immediate into game
+    if (playIntroAtBoot && World.menuActive) ChangeMenuPage(MPG_INTRO);
+    else if (World.menuActive) { PlayMenuMusic(); }
+    else { PlayTrack(TT_Walking, MT_Walking); } /*Menu skipped: start the level's music, not the menu loop (PlayMenuMusic here kept playing in-game until the track ran out)*/
     DualLog("Scratch arena total peak: %u MB, ", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; // Free the initialization scratch arena.
     DebugRAMPeak();
     DualLog(".....Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time);

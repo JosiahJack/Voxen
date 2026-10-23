@@ -682,13 +682,13 @@ void TextEntry(i32 k) {
     char c = (k >= KEY_A && k <= KEY_Z) ? 'a' + (k - KEY_A) : ((k >= KEY_1 && k <= KEY_9) ? '1' + (k - KEY_1) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { World.playerName[currentPlayerNameLength] = c; World.playerName[++currentPlayerNameLength] = '\0'; }
 }
 
-void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName; extern bool editFieldEditing; extern void EditFieldKey(i32 keycode); extern bool enteringSaveName; extern void SaveNameEntry(i32 keycode);
+void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName; extern bool editFieldEditing; extern void EditFieldKey(i32 keycode); extern bool enteringSaveName; extern void SaveNameEntry(i32 keycode); extern void KeycodeEntryKey(i32 keycode);
 void InputKey(char* keys,int key,int action) {
     if (key >= 0 && key < WS_KEYCOUNT) { i32 repeated=0; if(action == INPUT_RELEASE && keys[key] == INPUT_RELEASE){return;} if (action == INPUT_PRESS && keys[key] == INPUT_PRESS){repeated=1;} keys[key]=(char)action; if(repeated){action=INPUT_REPEAT;} }
     if (key == KEY_F10 && action) OS_Exit(0);
     if (!window_has_focus && action != INPUT_RELEASE) return;
     if (World.menuActive && !returnToPause) { if (((key == KEY_RIGHT_ALT || key == KEY_LEFT_ALT) && action && Sys_Input.keyStates[KEY_ENTER].down) || (key == KEY_ENTER && action && (Sys_Input.keyStates[KEY_LEFT_ALT].down || Sys_Input.keyStates[KEY_RIGHT_ALT].down /*Qmaster's Cheat!*/))){GoIntoGame();} }
-    if (key >=0 && key < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {Sys_Input.keyStates[key].down = true; if (action == INPUT_PRESS) Sys_Input.keyStates[key].pressed = true; else Sys_Input.keyStates[key].pressed = false; if (Cheats.consoleActive) ConsoleEmulator(key); else if (editFieldEditing) EditFieldKey(key); else if (enteringSaveName && World.menuActive) SaveNameEntry(key); else if (enteringPlayerName && World.menuActive) TextEntry(key);}
+    if (key >=0 && key < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {Sys_Input.keyStates[key].down = true; if (action == INPUT_PRESS) Sys_Input.keyStates[key].pressed = true; else Sys_Input.keyStates[key].pressed = false; if (Cheats.consoleActive) ConsoleEmulator(key); else if (editFieldEditing) EditFieldKey(key); else if (World.Sys_UI.keycodeValid) KeycodeEntryKey(key); else if (enteringSaveName && World.menuActive) SaveNameEntry(key); else if (enteringPlayerName && World.menuActive) TextEntry(key);}
     else if (key >= 0 && key < MAX_KEYS && action == INPUT_RELEASE) { Sys_Input.keyStates[key].pressed=false; Sys_Input.keyStates[key].down=false; }
 }
 
@@ -790,12 +790,25 @@ void InputProcessing() {
         if (!World.inventoryMode) { // Apply mouselook/keyboardlook/lean
             bool cyber = World.curLev == LEVEL_CYBERSPACE, invLook = cyber ? Sys_Settings.InvCybLook : Sys_Settings.InvertLook;
             float ns = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f,0.01f,1.0f), s = ns * 0.2f, kts = 900.0f * ns;
-            World.cam_yaw += (float)World.currentMouse_dx * s + ((float)TurnRight() - (float)TurnLeft()) * kts * World.dt; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if(World.cam_yaw<0.0f){World.cam_yaw+=360.0f;}
-            World.cam_pitch += ((float)World.currentMouse_dy * s + ((float)LookDown() - (float)LookUp()) * kts * World.dt) * (invLook ? -1.0f : 1.0f);
-                 if (cyber)                    { World.cam_pitch -= 360.0f * vfloor(World.cam_pitch * (1.0f/360.0f));/*plane: unlimited pitch, normalized to [0 360)*/ }
-            else if (World.cam_pitch >  89.0f) { World.cam_pitch = 89.0f;  }
-            else if (World.cam_pitch < -89.0f) { World.cam_pitch = -89.0f; } // Avoid gimbal lock at pure 90deg
-            quat_from_yaw_pitch_roll(&World.rotation[PLAYER1],World.cam_yaw,World.cam_pitch,World.cam_roll);
+            float dyaw = (float)World.currentMouse_dx * s + ((float)TurnRight() - (float)TurnLeft()) * kts * World.dt;
+            float dpitch = ((float)World.currentMouse_dy * s + ((float)LookDown() - (float)LookUp()) * kts * World.dt) * (invLook ? -1.0f : 1.0f);
+            World.cam_yaw += dyaw; if (World.cam_yaw >= 360.0f) {World.cam_yaw -= 360.0f;} if(World.cam_yaw<0.0f){World.cam_yaw+=360.0f;}
+            World.cam_pitch += dpitch;
+            if (cyber) { World.cam_pitch -= 360.0f * vfloor(World.cam_pitch * (1.0f/360.0f));/*plane: unlimited pitch, normalized to [0 360)*/
+                /*True 6DOF, as in Unity MouseLookScript: yaw about the capsule's current local up, pitch about its
+                  current local right, and LeanLeft/LeanRight barrel-roll about its current local forward
+                  (cyberSpinSensitivity 0.6 * 100 = 60 deg/sec). Rebuilding from yaw/pitch/roll Euler angles
+                  cannot represent this: after a loop or roll, yaw must follow the local up axis, not world Y.*/
+                Quaternion q = World.rotation[PLAYER1];
+                if (dyaw != 0.0f) { float half = deg2rad(dyaw) * 0.5f; q = quat_multiply(q,(Quaternion){0.0f,vsinf(half),0.0f,vcosf(half)}); }
+                if (dpitch != 0.0f) { float half = deg2rad(dpitch) * 0.5f; q = quat_multiply(q,(Quaternion){vsinf(half),0.0f,0.0f,vcosf(half)}); }
+                float droll = ((float)LeanLeft() - (float)LeanRight()) * 60.0f * World.dt;
+                if (droll != 0.0f) { float half = deg2rad(droll) * 0.5f; q = quat_multiply(q,(Quaternion){0.0f,0.0f,vsinf(half),vcosf(half)}); }
+                float qlen = vsqrtf(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w); if (qlen > 0.000001f) { float invLen = 1.0f / qlen; q.x *= invLen; q.y *= invLen; q.z *= invLen; q.w *= invLen; }
+                World.rotation[PLAYER1] = q;
+            } else { if (World.cam_pitch > 89.0f) {World.cam_pitch = 89.0f;} else if (World.cam_pitch < -89.0f) {World.cam_pitch = -89.0f;} // Avoid gimbal lock at pure 90deg
+                quat_from_yaw_pitch_roll(&World.rotation[PLAYER1],World.cam_yaw,World.cam_pitch,World.cam_roll);
+            }
         }
     }
 }

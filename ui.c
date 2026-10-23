@@ -481,7 +481,7 @@ void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
 }
 
 void TickBar(bool isEnergy) {
-    RenderUIImage(isEnergy ? 1333 : 1332,isEnergy ? 36 : 2,32,32,isEnergy ? 939 : 956);/*Indicator*/ int p1H=isEnergy ? World.invP1.energy : World.instances[PLAYER1].health; if(p1H>255){p1H=255;} i16 tY=isEnergy ? 35 : 4;
+    RenderUIImage(isEnergy ? 1333 : 1332,isEnergy ? 36 : 2,32,32,isEnergy ? 939 : 956);/*Indicator*/ int p1H=isEnergy ? World.invP1.energy : (World.curLev == LEVEL_CYBERSPACE ? World.instances[PLAYER1].cyberHealth : World.instances[PLAYER1].health);/*Unity MFDManager.DrawTicks(health) reads hm.cyberHealth instead of health in cyberspace*/ if(p1H>255){p1H=255;} i16 tY=isEnergy ? 35 : 4;
     for (int i=7;i>=0;--i) if(i==7/*Always render at least 1 tick*/||p1H>(7-i)*11){RenderUIImage(1050-(i*16),tY,32,32,964);/*Tick Red*/} for (int i=7;i>=0;--i) if(p1H>88+(7-i)*11){RenderUIImage(1178-(i*16),tY,32,32,963);/*Tick Orange*/} for (int i=7;i>=0;--i) if(p1H>176+(7-i)*11){RenderUIImage(1306-(i*16),tY,32,32,962);/*Tick Green*/}
     if (isEnergy && World.invP1.drainJPM > 0) RenderTextL(1340,tY+8,T_GREEN,FONT_NORMAL,0.8f,"%d J/min",(int)World.invP1.drainJPM); }
 
@@ -532,6 +532,13 @@ static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeV
 }
 
 void UI_KeycodeKey(bool rh,int k) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (k<0||k>11) return; KeycodeKeypress(k); }
+void KeycodeEntryKey(i32 k) { /*Physical keyboard entry for the keycode pad, routed from InputKey while the pad is open (previously only the on-screen MFD buttons could enter digits, so neither number row did anything).*/
+    if (!World.Sys_UI.keycodeValid || World.Sys_UI.keycodeSolved) return;
+    if (k>=KEY_0 && k<=KEY_9) KeycodeKeypress(k-KEY_0);
+    else if (k>=KEY_KP_0 && k<=KEY_KP_9) KeycodeKeypress(k-KEY_KP_0);
+    else if (k==KEY_BACKSPACE) KeycodeKeypress(UI_KEY_BACKSPACE);
+    else if (k==KEY_DELETE || k==KEY_KP_DECIMAL) KeycodeKeypress(UI_KEY_CLEAR);
+}
 void UI_KeycodeClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.tetheredKeypadKeycode=U16_MAX; World.Sys_UI.keycodeValid=false; World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes=-1; World.Sys_UI.keycodeEntry=-1; World.Sys_UI.keycodeValue=0; World.Sys_UI.keycodeSolved=false; SysUIDataClose(); }
 void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (btn<0||btn>7) return;
     if (World.Sys_UI.linkedElevatorDoor==U16_MAX) { CenterStatusPrint("%s",Sys_Text.stringTable[6]); return; }/*Too far away from that.*/
@@ -1170,9 +1177,9 @@ static const char* swLabels[7]={"ICE DRILL","PULSER/DRILL","SHIELD","TURBO","DEC
 void CenterMFD() { //640x240
     if (Cheats.noHUD) return;
     static const i16 centerX[4]={400,480,560,902};
-    for (u8 i=0;i<4;++i) UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.MFD_CenterTab!=5) ? 1024 : 1021);/*Main/Hardware/General/Software center tab buttons*/
+    for (u8 i=0;i<4;++i) { if (World.curLev == LEVEL_CYBERSPACE && i != 3) continue; /*Unity EnterCyberspace hides the Main/Hardware/General center tab buttons; only Software remains*/ UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.MFD_CenterTab!=5) ? 1024 : 1021); }/*Main/Hardware/General/Software center tab buttons*/
     if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,552,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,557,676,210,1075); RenderTextL(586,558,T_GREEN,FONT_NORMAL,0.8f,Sys_Text.stringTable[878]/*ADD TO INVENTORY*/); } }
-    if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0) {
+    if (World.curLev != LEVEL_CYBERSPACE && (World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0) { /*Unity EnterCyberspace hides Sensaround, so the Softs are not covered by the rear view*/
         i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-MFD_H;/*SensaroundCenter rearview over the center MFD content area*/
         UIR(UI_ID_SENSA_CTR,sx,sy,CTR_MFD_W,MFD_H);
         DrawSensaroundQuad(sx,sy,CTR_MFD_W,MFD_H,sensaroundCamViewCenter);
@@ -1429,17 +1436,18 @@ static double RenderUI() {
                     RenderText3DC((V3){sx, textY, 0.0f}, T_YELLOW, FONT_NORMAL, 0.8f, label);
                 }
             }
-            TickBar(false); TickBar(true); HardwareButtons(); UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020);
+            bool cyber = World.curLev == LEVEL_CYBERSPACE;
+            if (cyber) { World.Sys_UI.MFD_CenterTab = 4; World.Sys_UI.mfdSelected[0] = 4; } /*Unity MFDManager.EnterCyberspace forces the center MFD to the Software tab (CenterTabButtonClickSilent(3)); forcing it every frame also overrides tab hotkeys/clicks while in cyberspace*/
+            TickBar(false); if (!cyber) { TickBar(true); HardwareButtons(); } UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020);/*cyberspace: health ticks only, no energy ticks, no hardware buttons; shootmode button stays*/
             for (u8 i=0;i<10;++i) if (World.Sys_UI.tWrnFinished[i]>World.pauseRelativeTime) {
                 char flt[6]; if (World.Sys_UI.tWrnTextIdx[i]==185) sFormat(flt,6,"%.1f",(double)World.instances[PLAYER1].radiation);
                 RenderTextL(340,72+i*18,World.Sys_UI.tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx[i]],World.Sys_UI.tWrnTextIdx[i]==185?flt:World.Sys_UI.tWrnTextIdx2[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx2[i]]:"",World.Sys_UI.tWrnTextIdx3[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx3[i]]:"");
             }
             
-            if (!World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]) { SideMFD(false); CenterMFD(); SideMFD(true); } else { AutomapBlitFullToUI(); UIRImg(UI_ID_FULLMAP_CLOSE,(i16)((UI_W-146)/2),706,146,28,1087); RenderTextL(610,710,T_YELLOW,FONT_NORMAL,0.8,"CLOSE"); }
+            if (!World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]) { if (cyber) { CenterMFD(); } else { SideMFD(false); CenterMFD(); SideMFD(true); } } else { AutomapBlitFullToUI(); UIRImg(UI_ID_FULLMAP_CLOSE,(i16)((UI_W-146)/2),706,146,28,1087); RenderTextL(610,710,T_YELLOW,FONT_NORMAL,0.8,"CLOSE"); }
             if(World.diffMis>=3){UIR(UI_ID_CMFD_MISSION_TIMER,43,2,260,14); RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.8,"%s",World.misTimerMission<1100?Sys_Text.stringTable[World.misTimerMission]:"");/*MissionTimerT*/ {char misT[8]; if(World.misTimerTimesUP) sFormat(misT,sizeof(misT),"%s",869<1100?Sys_Text.stringTable[869]:""); else {float mt=World.misTimerT<0.0f?0.0f:World.misTimerT; int mm=(int)(mt/60.0f),ss=(int)(mt-(float)(mm*60)); sFormat(misT,sizeof(misT),"%02d:%02d",mm,ss);} RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.8,"%s",misT);}}
-            if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.8,"T -"); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"99:99"); }
-            if (World.curLev==LEVEL_CYBERSPACE)RenderTextL(1137,570,T_YELLOW,FONT_NORMAL,0.8,Sys_Text.stringTable[442]/*"level 1 elevator taken off line - SHODAN security block established 04.NOV.72"*/);/*CyberSPrint*/
-            if((World.invP1.hardwareIsActive & HW_BIO)!=0){/*BioMonitor*/
+            if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.8,"T -"); char cyberT[8]; float ct = World.instances[PLAYER1].cyberTimer < 0.0f ? 0.0f : World.instances[PLAYER1].cyberTimer; int cmm = (int)(ct / 60.0f); sFormat(cyberT,sizeof(cyberT),"%02d:%02d",cmm,(int)(ct - (float)(cmm * 60))); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"%s",cyberT); } /*the player's live CyberTimer countdown, not the old hardcoded 99:99*/
+            if(World.curLev != LEVEL_CYBERSPACE && (World.invP1.hardwareIsActive & HW_BIO)!=0){/*BioMonitor: not part of the cyberspace HUD*/
                 BiomonitorBlitToUI();
                 if (!Cheats.showFPS) {/*showFPS cheat turns graphs into frame-time scopes, so the stock readout is hidden to keep the graph area clear*/
                     char biomText[128];

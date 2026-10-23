@@ -32,7 +32,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*19 chunk_bridg2_9*/[19]={32,0,64,63,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
 /*20 chunk_crate_impenetrable*/[20]={61,0,150,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
 /*21 chunk_cyberpanel*/[21]={178,0,151,151,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
-/*22 chunk_cyberpanel_slice45*/[22]={6875,0,152,152,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
+/*22 chunk_cyberpanel_slice45*/[22]={7488,0,152,152,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}}, /*model 7488 (grove1_2_slice45.obj): the generic slice45 card 6875 is the 180deg-rotated variant; 7488 is the same single triangle in the orientation the Unity blend specifies*/
 /*23 chunk_eng1_1*/[23]={96,0,254,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
 /*24 chunk_eng1_1d*/[24]={95,0,253,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
 /*25 chunk_eng1_2*/[25]={98,0,256,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
@@ -770,7 +770,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*757 ef_particle_mutationburst*/[757]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
 /*758 ef_particle_graytationburst*/[758]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
 /*759 through 766 unused*/[759]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
-/*760 chunk_maint2_2_slice45*/[760]={6875,0,457,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
+/*760 chunk_maint2_2_slice45*/[760]={7488,0,457,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}}, /*same Unity mesh as chunk_cyberpanel_slice45 (genericLOD3card_slice45.blend), so the same correctly-oriented triangle model 7488*/
 /*761*/[761]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
 /*762*/[762]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
 /*763*/[763]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,0,0,0,MAXANIM,0,{0},{0}},
@@ -1398,6 +1398,8 @@ void LoadLevelMod(u8 lev) {
         par->toggleLasers=src->toggleLasers; par->changeLayerOnOpenClose=src->changeLayerOnOpenClose; par->securityThreshold=src->securityThreshold; par->messageLingdex=src->messageLingdex; par->targetIdx=src->targetIdx; par->targetOnDeathIdx=src->targetOnDeathIdx; par->target2Idx=src->target2Idx; par->camStartYAngle=src->camStartYAngle; par->camEndYAngle=src->camEndYAngle; par->camWaitTime=src->camWaitTime; par->camRotatePositive=src->camRotatePositive; par->camRotateEnabled=src->camRotateEnabled;
         if (entIdx == 592 || entIdx == 593) par->texIndex = src->texIndex; // 3D text decal texture comes from level matIndex, not entity definition
         else if (entIdx == 112 && src->texIndex > 0 && src->texIndex < MAXTEX) par->texIndex = src->texIndex; // Explicit gravity-lift visual material state
+        else if ((entIdx == 21 || entIdx == 22 || entIdx == 130) && src->texIndex > 0 && src->texIndex < MAXTEX) par->texIndex = src->texIndex; // Per-instance material overrides: cyberspace panel colors (21/22) and coolant pipes (130) — the Unity material for these is carried as texIndex in the level data
+        if (entIdx == 21 || entIdx == 22) par->glowIndex = par->texIndex; // Cyberspace panels are essentially unlit: the glow texture must be the panel's own (possibly tinted) texture, else the untinted glow grid overdraws the tint at full strength
         if (entIdx == 592 || entIdx == 593) { DecalPend* pd=NULL; for (u16 k=0;k<pendDecalCount;++k) { if (pendDecals[k].ent == (u16)e) { pd=&pendDecals[k]; break; } } if (pd) { i16 li = (i16)src->messageLingdex;
             if (li <= 0 || li >= T_LOGSTR_CNT) { if (decalInlineTextCount < DECAL_INLINE_TEXT_MAX) { mcpy(decalInlineText[decalInlineTextCount],pd->text,DECAL_INLINE_TEXT_LEN); decalInlineTextLevel[decalInlineTextCount]=curlevel; decalInlineTextInst[decalInlineTextCount]=parent; ++decalInlineTextCount; } else DualLogError("Too many inline text decals\n"); }
             if (pd->anchor != 0 || pd->align != 0 || pd->lineSp != 1.0f) { if (decalStyleCount < DECAL_STYLE_MAX) { decalStyles[decalStyleCount]=(DecalStyle){curlevel,parent,pd->anchor,pd->align,pd->lineSp}; ++decalStyleCount; } else DualLogError("Too many decal styles\n"); } } }
@@ -1622,7 +1624,9 @@ void LoadAllLevels() {
     DualLog("load all levels.................................................took %.6f secs\n",get_time() - start_time);
 }
 
+void CyberTimerReset(u16,int); /*citadel.c: Unity CyberTimer.Reset(difficultyCyber)*/
 void LoadLevel(u8 curlevel, V3 pos) {
+    u8 prevLevel = World.currentLevel;
     if (curlevel == LEVEL_CYBERSPACE && World.currentLevel != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.currentLevel; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
     CloseSearch();
     DebugRAM("start of LoadLevel");
@@ -1705,6 +1709,20 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.invP1.wasGrounded = true;
     World.invP1.ladderState = 0;
     World.invP1.noiseFinished=World.pauseRelativeTime - 1.0;
+    if (curlevel == LEVEL_CYBERSPACE) {
+        /*Unity CyberSetup: sphere cyberCollider enabled, capsuleCollider disabled. PLYR_RAD is 0.48f.
+          Set here, after SetLevelPointers, so it lands in level 13's per-level player slot; CopyPlayerState
+          would otherwise carry the capsule in, and carry the sphere back out again on exit.*/
+        World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_RAD,PLYR_RAD}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = PLYR_RAD; World.gravity[PLAYER1] = 0.0f;
+        if (prevLevel != LEVEL_CYBERSPACE) { CyberTimerReset(PLAYER1,World.diffCyb); World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0; World.instances[PLAYER1].minutes = vfloor(World.instances[PLAYER1].cyberTimer / 60.0f); World.instances[PLAYER1].seconds = World.instances[PLAYER1].cyberTimer - (World.instances[PLAYER1].minutes * 60.0f); }
+    } else {
+        /*Back to the capsule on every real-world level, whatever state the player slot was copied from.*/
+        World.col[PLAYER1] = CT_CAP; World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_HT * World.invP1.currentCrouchRatio,1.0f}; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f; World.gravity[PLAYER1] = 1.0f;
+        if (prevLevel == LEVEL_CYBERSPACE) { /*6DOF orientation cannot persist into the real world: keep only the heading the cyber forward vector projects to, pitch/roll zeroed (Unity ExitCyberspace restores an upright capsule/camera rotation).*/
+            V3 cyberFwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f}); float yawDeg = __builtin_atan2f(cyberFwd.x,cyberFwd.z) * (180.0f / 3.14159265f); float halfYaw = deg2rad(yawDeg) * 0.5f;
+            World.rotation[PLAYER1] = (Quaternion){0.0f,vsinf(halfYaw),0.0f,vcosf(halfYaw)}; World.cam_yaw = yawDeg < 0.0f ? yawDeg + 360.0f : yawDeg; World.cam_pitch = World.cam_roll = 0.0f; World.invP1.leanTarget = 0.0f;
+        }
+    }
     DebugRAM("end of LoadLevel");
 }
 // HUD sensaround cameras: repositioned at the player each frame and oriented from the player's facing.

@@ -120,7 +120,7 @@ void main() {
                         }
                     }
                 } vec3 sunDir = normalize(-saturnCenter); float sunSize = 0.009; float sunDist = acos(dot(skyDir, sunDir)); float sunMask = smoothstep(sunSize, sunSize * 0.8, sunDist); vec3 sunColor = vec3(1.0, 0.97, 0.85); float corona = exp(-pow(sunDist / (sunSize * 1.5), 2.0)) * 1.2; skyColor += sunColor * (sunMask * 3.0 + corona * 1.5); // Sun
-            } if (grayscaleEnabled > 0){skyColor = Grayscale(skyColor);} FragColor = vec4((color.rgb * max(0.1,color.a)) + skyColor, 1.0); // Add window alpha weighted color tint
+            } if (grayscaleEnabled > 0){skyColor = Grayscale(skyColor);} vec4 uiSkySample = texture(uiImage,texCoordUsed); FragColor = vec4(mix((color.rgb * max(0.1,color.a)) + skyColor, uiSkySample.rgb, uiSkySample.a), 1.0); // Add window alpha weighted color tint, then the UI on top (sky pixels returned here before ever reaching the UI mix at the end of main, so the UI vanished over the skybox)
             return;
         }
     }
