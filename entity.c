@@ -891,7 +891,7 @@ __attribute__((noinline)) float parse_float(const char* str, const char* line, u
     if (*str == '.') { str++; double frac = 0.0; double place = 0.1; while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; } value += frac; }/*Decimal part*/  if(!has_digit){return 0.0f;} if(negative){value = -value;} return (float)value;
 }
 
-__attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* la){ if(World.loadedLights>=LIGHT_COUNT){DualLogError("Too many lights,lev%d!\n",World.curLev); OS_Exit(1);} i32 i=World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++; mcpy(&World.lights[i],lit,sizeof(Light)); mcpy(&World.lanims[i],la,sizeof(LightAnimation)); World.lightsNewPosition[i]=lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true); return i;}
+__attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* la){ if(World.loadedLights>=LIGHT_COUNT){DualLogError("Too many lights,lev%d!\n",World.curLev); OS_Exit(1);} i32 i=World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++; mcpy(&World.lights[i],lit,sizeof(Light)); if (la && la->numIntervalSteps >= 1) { if (World.lanimCount < LANIM_MAX) { World.lanimLightIdx[World.lanimCount]=(u16)i; mcpy(&World.lanims[World.lanimCount],la,sizeof(LightAnimation)); World.lanimCount++; } else { DualLogError("Too many light animations,lev%d!\n",World.curLev); } } World.lightsNewPosition[i]=lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true); return i;}
 __attribute__((noinline)) u16 AddLightSimple(V3 pos, Color3 c, float r, float in, u16 lf){Light l={.pos=pos,.col=c,.range=r,.intensity=in,.maxIntensity=in,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=lf}; LightAnimation a={0}; return AddLight(&l,&a);}
 u16 IOInternName(const char*); static u16 lightTargetnameFile[LIGHT_COUNT];/*targetname per lightsFromFile slot, IO_NONE when anonymous.  A light is not an entity, so this is the only way a relay can address one.*/
 __attribute__((noinline)) u16 AddOffsetLight(Entity* par, V3 offset, Color3 col, float range, float intensity) { return AddLightSimple(GetLocalTransformedPos(par,offset),col,range,intensity,LIGHT_AND_SHADOW_ON); }
@@ -1081,7 +1081,7 @@ bool GetElevatorDestinationPos(u8 lev,u8 nth,V3* outPos) {
 }
 void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
-    if (lev != World.currentLevel && World.currentLevel < MAX_LEVELS) { World.levelInstCount[World.currentLevel] = World.instCount; }/*preserve dynamically summoned instances across temporary pointer switches (UseTargets/TargetIO level iteration)*/
+    if (lev != World.currentLevel && World.currentLevel < MAX_LEVELS) { World.levelInstCount[World.currentLevel] = World.instCount; World.levelLAnimCount[World.currentLevel] = World.lanimCount; }/*preserve dynamically summoned instances across temporary pointer switches (UseTargets/TargetIO level iteration)*/
     if (teleportDestinationsInitialized) mcpy(World.TeleportTouch_allTeleportTouches, teleportDestinations[lev], sizeof(World.TeleportTouch_allTeleportTouches));
     World.currentLevel=lev;
     World.instances=World.levelInstances[lev];
@@ -1106,7 +1106,7 @@ void SetLevelPointers(u8 lev) {
     World.lights           = World.levelLights[lev];
     World.particles        = &World.levelParticles[lev];
     if (fwSnapValid[lev]) mcpy(fwParentOf, fwParentSnap[lev], sizeof(fwParentOf));/*func_wall child links are per-level*/
-    World.lanims=World.levelLAnims[lev]; World.lightTargetnames=World.levelLightTargetnames[lev]; World.lightsNewPosition=World.levelLightsNewPosition[lev]; World.loadedLights=World.levelLoadedLights[lev]; World.weaponVModelIndex=World.levelWepVModel[lev];
+    World.lanims=World.levelLAnims[lev]; World.lanimLightIdx=World.levelLAnimLightIdx[lev]; World.lanimCount=World.levelLAnimCount[lev]; World.lightTargetnames=World.levelLightTargetnames[lev]; World.lightsNewPosition=World.levelLightsNewPosition[lev]; World.loadedLights=World.levelLoadedLights[lev]; World.weaponVModelIndex=World.levelWepVModel[lev];
 }
 
 void CopyPlayerState(u8 srcLevel, u8 dstLevel) {
@@ -1505,7 +1505,7 @@ void LoadLevelData(u8 curlevel) {
        a level's first load, and runtime-summoned instances push the real high
        water mark above it), so the full INSTANCE_COUNT span is what has to be
        reset for the next load to start from a clean table. */
-    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LIGHT_COUNT * sizeof(LightAnimation)); World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation)); mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16)); World.lanimCount=0; World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf)); LoadLevelMod(curlevel); GravityLiftSyncAllVisuals(); PSysAddLevelLoops(); if (curlevel<MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel]=true; } OS_Free(fbuf,(size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
     for (int i = PLAYER1; i < World.instCount; ++i) {
@@ -1698,6 +1698,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     
     World.levelCurrentlyLoading = false;
     World.position[PLAYER1] = pos;
+    if (curlevel == LEVEL_CYBERSPACE) World.cyberspaceRecallPoint = World.position[PLAYER1];/*Recall returns to the cyberspace entry point*/
     World.velocity[PLAYER1] = (V3){0.0f, 0.0f, 0.0f};
     World.invP1.lastVelY = 0.0f;
     World.invP1.wasGrounded = true;

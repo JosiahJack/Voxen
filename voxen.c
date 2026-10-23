@@ -932,24 +932,24 @@ void UpdateLights() {
     }
     
     if (!World.paused && !World.menuActive) {
-        for (int i=0;i<World.loadedLights;++i) { // Just lerps/flickers in intensity
-            if (World.lanims[i].numIntervalSteps < 1) continue;
+        for (int k=0;k<World.lanimCount;++k) { // Just lerps/flickers in intensity; lanims is a compact list of the level's animated lights
+            LightAnimation* la=&World.lanims[k]; int i=World.lanimLightIdx[k];
             if (!(World.lights[i].lflags & LIGHTON)) { World.lights[i].intensity = 0.0f; continue; }
             
-            if (World.lanims[i].lerpTime < (float)World.pauseRelativeTime) {
-                World.lights[i].intensity = World.lanims[i].lerpUp ? World.lights[i].maxIntensity : World.lights[i].minIntensity;/*Pick target to lerp towards*/
-                World.lanims[i].lerpUp = !World.lanims[i].lerpUp; World.lanims[i].currentStep++;
-                if (World.lanims[i].currentStep >= World.lanims[i].numIntervalSteps) { World.lanims[i].currentStep = 0; /*Wrap and start over continuous looping*/ }
-                World.lanims[i].lerpStepTime = World.lanims[i].intervalSteps[World.lanims[i].currentStep];
-                World.lanims[i].lerpTime = (float)World.pauseRelativeTime + World.lanims[i].lerpStepTime;
-                World.lanims[i].lerpStartTime = (float)World.pauseRelativeTime;
+            if (la->lerpTime < (float)World.pauseRelativeTime) {
+                World.lights[i].intensity = la->lerpUp ? World.lights[i].maxIntensity : World.lights[i].minIntensity;/*Pick target to lerp towards*/
+                la->lerpUp = !la->lerpUp; la->currentStep++;
+                if (la->currentStep >= la->numIntervalSteps) { la->currentStep = 0; /*Wrap and start over continuous looping*/ }
+                la->lerpStepTime = la->intervalSteps[la->currentStep];
+                la->lerpTime = (float)World.pauseRelativeTime + la->lerpStepTime;
+                la->lerpStartTime = (float)World.pauseRelativeTime;
             } else if (World.lights[i].lflags & LERPON) {
-                if (World.lanims[i].currentStep < World.lanims[i].numLerpSteps) {
-                    if (World.lanims[i].stepIsLerping[World.lanims[i].currentStep]) {
-                        World.lanims[i].lerpValue = ((float)World.pauseRelativeTime - World.lanims[i].lerpStartTime) / (World.lanims[i].lerpTime - World.lanims[i].lerpStartTime); /*percent towards goal time*/
-                        float lerpVal = World.lanims[i].lerpUp ? World.lanims[i].lerpValue : (1.0f - World.lanims[i].lerpValue);
-                        World.lanims[i].lerpValue = World.lights[i].minIntensity + ((World.lights[i].maxIntensity - World.lights[i].minIntensity) * lerpVal);
-                        World.lights[i].intensity = World.lanims[i].lerpValue;
+                if (la->currentStep < la->numLerpSteps) {
+                    if (la->stepIsLerping[la->currentStep]) {
+                        la->lerpValue = ((float)World.pauseRelativeTime - la->lerpStartTime) / (la->lerpTime - la->lerpStartTime); /*percent towards goal time*/
+                        float lerpVal = la->lerpUp ? la->lerpValue : (1.0f - la->lerpValue);
+                        la->lerpValue = World.lights[i].minIntensity + ((World.lights[i].maxIntensity - World.lights[i].minIntensity) * lerpVal);
+                        World.lights[i].intensity = la->lerpValue;
                     }
                 }
             }
@@ -2437,6 +2437,7 @@ i32 main() {
         AudioUpdate();
         AutomapTick();
         Render(false/*!camview*/,0u);
+        if (Sys_Input.keyStates[KEY_O].pressed) { play_message("shodan/shodan_prematurefruition"); }/*test hotkey: stream a SHODAN log on the log channel*/
         if (ScrshotPressed() && World.current_time > World.screenshotTimeout) {
             Screenshot();
             //AutomapDumpBMP(); // Uncomment for testing
