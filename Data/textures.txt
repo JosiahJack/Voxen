@@ -7164,3 +7164,47 @@ doublesided: 1
 transparent: 1
 #Textures/pipe3_90deg.png
 index: 3433
+#Textures/cyberitem_data.png
+index: 3434
+doublesided: 0
+transparent: 0
+#Textures/cyberitem_decoy.png
+index: 3435
+doublesided: 0
+transparent: 0
+#Textures/cyberitem_drill.png
+index: 3436
+doublesided: 0
+transparent: 0
+#Textures/cyberitem_game.png
+index: 3437
+doublesided: 0
+transparent: 0
+#Textures/cyberitem_integrity.png
+index: 3438
+doublesided: 0
+transparent: 0
+#Textures/cyberexit.png
+index: 3439
+doublesided: 0
+transparent: 0
+#Textures/cyberitem_pulser.png
+index: 3440
+doublesided: 0
+transparent: 0
+#Textures/cyberitem_recall.png
+index: 3441
+doublesided: 0
+transparent: 0
+#Textures/cyberitem_shield.png
+index: 3442
+doublesided: 0
+transparent: 0
+#Textures/cyberitem_turbo.png
+index: 3443
+doublesided: 0
+transparent: 0
+#Textures/cyberdatafrag.png
+index: 3444
+doublesided: 0
+transparent: 0
