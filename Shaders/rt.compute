@@ -127,7 +127,7 @@ void main() {
             vec3 localOrigin = vec3(dot(rel, c0) * iscl2.x, dot(rel, c1) * iscl2.y, dot(rel, c2) * iscl2.z),
                  localDir = normalize(vec3(dot(reflectDir, c0) * iscl2.x, dot(reflectDir, c1) * iscl2.y, dot(reflectDir, c2) * iscl2.z));
             vec3 invLocalDir = vec3(localDir.x != 0.0 ? 1.0 / localDir.x : 1e9, localDir.y != 0.0 ? 1.0 / localDir.y : 1e9, localDir.z != 0.0 ? 1.0 / localDir.z : 1e9);
-            uint stack[32]; int sp = 0; stack[sp++] = instGeom.x;
+            uint stack[64]; int sp = 0; stack[sp++] = instGeom.x;/*64 deep: an 8-ary BVH needs 1+7*depth slots; 32 silently dropped subtrees past depth 4*/
             uint hitIA = 0u, hitIB = 0u, hitIC = 0u;
             float hitBaryU = 0.0, hitBaryV = 0.0;
             vec3 hitNormal = vec3(0.0,1.0,0.0);
@@ -159,7 +159,7 @@ void main() {
                 } else {
                     uvec4 ch0 = rtGeom4[no + 2u];
                     uvec4 ch1 = rtGeom4[no + 3u];
-                    if (sp + 8 <= 32) {
+                    if (sp + 8 <= 64) {
                         for (int c = 0; c < 4; ++c) { uint ch = ch0[c]; if (ch != 0xFFFFFFFFu) stack[sp++] = ch; }
                         for (int c = 0; c < 4; ++c) { uint ch = ch1[c]; if (ch != 0xFFFFFFFFu) stack[sp++] = ch; }
                     }
@@ -205,11 +205,9 @@ void main() {
                 vec3 lighting = albedo.rgb * 0.1;
                 uint voxelIdx = GetVoxelIndex(hitWorld);
                 uint lcount = voxelLightListCounts[voxelIdx];
-                bool useAll = (lcount == 0u);
-                if (useAll) lcount = 2048u;
-                if (lcount > 96u && !useAll) lcount = 96u;
+                if (lcount > 96u) lcount = 96u;/*0 means no lights in this voxel, as in chunk_frag; the old useAll fallback lit reflections from every light in the level, including off and empty slots*/
                 for (uint li = 0u; li < lcount; ++li) {
-                    uint lightIdx = useAll ? li : uniqueLightLists[voxelIdx * 96u + li];
+                    uint lightIdx = uniqueLightLists[voxelIdx * 96u + li];
                     vec3 lpos = lights[lightIdx].pos;
                     float intensity = lights[lightIdx].intensity;
                     float range = lights[lightIdx].range;

@@ -265,7 +265,7 @@ void DrawAngularVelocity(u16 i) {
 // Console System - CHEATS!
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
 V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,{-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
-static V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,{126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
+V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,{126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
 void RecallHistory(int d) { /*1 up (older),-1 down (newer)*/
     if (d == 1) { /*up*/
         if (historyPos>0) {
@@ -436,7 +436,7 @@ static void cmd_loadlevel(const char* arg) {
     
     int level = ParseLevelArg(arg);
     if (level == -2) { return; /*Already printed message*/ }
-    if (level < 0 || level > 12) { CenterStatusPrint("cmd_loadlevel invalid level argument %d", level); return; }
+    if (level < 0 || level > 13) { CenterStatusPrint("cmd_loadlevel invalid level argument %d", level); return; }
     
     CenterStatusPrint("Loading level %u",level); queuedLevelToLoad=level;
     if (level == 13) {
@@ -556,11 +556,13 @@ void ProcessConsoleCommand(const char* c) {
             } else {
                 if (!*arg_start) {
                     CenterStatusPrint("Missing argument, usage: %s <number>", cmd->name);
+                    commandProcessed = true;
                 } else {
                     cmd->func.withInt(s2i32(arg_start));
                     commandProcessed = true;
                 }
             }
+            break;
         }
     }
     
@@ -1331,7 +1333,7 @@ void RenderSunShadowmap(void) {
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         if (i == World.weaponVModelIndex) continue; // camera-locked viewmodel: keep out, like the main depth prepass
         Entity* e=&World.instances[i]; if (EntNotVisible(i,(e->entflags & EF_NO_SHADOWS))) continue;
-        float radius=modelBounds[e->modelIndex] * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+        float radius=(e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
         if (!SphereInFrustum(sunShadowFrustum,World.position[i],radius)) continue; // same sphere/plane reject the main pass and the light cubemaps use
         u16 modelType=(instanceIsLODArray[i]||useDetail<1u)&&e->lodIndex<mdlsCnt?e->lodIndex:e->modelIndex;
         u32 sortKey=((u32)modelType<<16)|e->texIndex;
@@ -1503,7 +1505,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 entIdx=e->index;
         V3 delta=V3_AsubB(World.position[i],playerPos);
         float distSqrd=V3_dot(delta,delta);
-        float radius=modelBounds[e->modelIndex] * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+        float radius=(e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
         if (!SphereInFrustum(playerFrustumPlanes,World.position[i],radius)) { continue; }
         
         if (IdxIsPortalBlockingDoor(entIdx)) { /*Extra checks only needed for opaque portal blocking doors.*/
