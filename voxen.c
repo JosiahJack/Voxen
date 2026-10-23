@@ -6,7 +6,7 @@
 GlobalContext World = {0}; // Full game state
 
 // Rendering
-u32 globalframe, globalframesPerLastSecond, threadCnt = 1, inputImageID, inputUIID, inputDepthID, inputSpecID, inputNormalID, outputImageID, gBufferFBO, uiFBO, uiSP, depthPrepassSP, chunkSP, chunkVAO, vbos[MAX_MDLS], tbos[MAX_MDLS], matricesBufferID, modelVertexCounts[MAX_MDLS], *physVertCounts; u16** physAttrPool, **physAttrTris; u32* physAttrVertCounts;
+u32 globalframe, globalframesPerLastSecond, threadCnt = 1, inputImageID, inputUIID, inputDepthID, inputSpecID, inputNormalID, outputImageID, gBufferFBO, uiFBO, uiSP, depthPrepassSP, chunkSP, chunkVAO, vbos[MAX_MDLS], tbos[MAX_MDLS], matricesBufferID, modelVertexCounts[MAX_MDLS], *physVertCounts, *rtSrcVertCounts;
 float rasterPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT*16], *world_from_mdl = modelMatrices, modelBounds[MAX_MDLS], **physPos, lightView[LIGHT_COUNT][6][4][4], lightViewProj[LIGHT_COUNT][6][16], shadowmapsPerspectiveProjection[16], sunShadowMatrix[16], berserkSeedTime;
 typedef struct { _Alignas(16) float mn[4]; _Alignas(16) float mx[4]; u32 triStart; u32 triCount; i32 children[8]; } GpuBvhNode;
 /* Per model bases into the GPU ray trace pools: node base is a uvec4 index, the rest are element indices. */
@@ -24,7 +24,7 @@ u32 lightsID, voxListCntsID, voxelLightListsID, voxelUpdateSP, cellVisibleDataID
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
 FrustumPlane sunShadowFrustum[6];
 V3 sunDirection={0.0f, 1.0f, 0.0f};
-u32 ssrSP, rtSP, imageBlitSP, quadVAO, quadVBO, textSP, textVAO, textVBO, textDecalVBO[MAX_LEVELS][INSTANCE_COUNT], textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
+u32 ssrSP, rtSP, rtCopySP, imageBlitSP, quadVAO, quadVBO, textSP, textVAO, textVBO, textDecalVBO[MAX_LEVELS][INSTANCE_COUNT], textDecalVertexCount[MAX_LEVELS][INSTANCE_COUNT];
 u32 colorBufferID, texPalID, texPalOfsID, textureOffsetsID, textureSizesID, psysInstancesID, psysTrailsID, psysquadVAO, psysquadVBO, particleSP, trailSP, camViewTextures[64], levelCamViewTextures[14][64], drawCalls, uiDrawCalls, shadDrawCalls, vertsRendered, drawCallsNormal;
 u8 particleBlendTexture[MAXTEX], camViewCount, levelCamViewCount[14];
 char decalInlineText[DECAL_INLINE_TEXT_MAX][DECAL_INLINE_TEXT_LEN];
@@ -772,7 +772,7 @@ void CompileShaders() {
     shadowmapsSP=CompileAnyShader(shadowmapVertSrc, shadowmapFragSrc, "Shad");
     textSP=CompileAnyShader(textVertSrc, textFragSrc, "Txt");
     imageBlitSP=CompileAnyShader(quadVertSrc, quadFragSrc, "Comp");
-    ssrSP=CompileAnyShader(NULL, ssrCSSrc, "SSR");    rtSP=CompileAnyShader(NULL, rtCSSrc, "RT");    voxelUpdateSP=CompileAnyShader(NULL, voxUpdCSSrc, "Vox");
+    ssrSP=CompileAnyShader(NULL, ssrCSSrc, "SSR");    rtSP=CompileAnyShader(NULL, rtCSSrc, "RT");    rtCopySP=CompileAnyShader(NULL, rtCopyCSSrc, "RTCopy");    voxelUpdateSP=CompileAnyShader(NULL, voxUpdCSSrc, "Vox");
     shadowmapsClearSP=CompileAnyShader(NULL, shadClearCSSrc, "ShadCl");
     particleSP=CompileAnyShader(particleVertSrc, particleFragSrc, "Part");
     trailSP=CompileAnyShader(trailVertSrc, trailFragSrc, "Trail");
@@ -2143,9 +2143,9 @@ void LoadRaytracingData(void) {
         
         nodeTotal += modelBVHNodeCounts[m];
         triTotal  += modelBVHTriOrderCounts[m];
-        if (physAttrVertCounts) vtxTotal += physAttrVertCounts[m];
+        vtxTotal += rtSrcVertCounts[m];
         if (modelBVHTriOrderCounts[m] > maxModelTris) maxModelTris = modelBVHTriOrderCounts[m];
-        if (physAttrVertCounts && physAttrVertCounts[m] > maxModelVerts) maxModelVerts = physAttrVertCounts[m];
+        if (rtSrcVertCounts[m] > maxModelVerts) maxModelVerts = rtSrcVertCounts[m];
     }
     u32 nodeWords = nodeTotal * 16u, triWords = triTotal * 2u, posWords = vtxTotal * 2u, uvWords = vtxTotal;
     u32 triSec = (nodeWords + 3u) & ~3u;
@@ -2155,10 +2155,9 @@ void LoadRaytracingData(void) {
     size_t geomBytes = (size_t)totalWords * sizeof(u32);
     u32 nodeOff = 0, triOff = 0, vtxOff = 0;
     for (m=0; m<mdlsCnt; ++m) {
-        bool hasPools = BvhHasBVH((u16)m) && physAttrPool != NULL && physAttrPool[m] != NULL && physAttrTris != NULL && physAttrTris[m] != NULL;
-        if (!hasPools) { rtModelInfo[m].nodeBase = 0xFFFFFFFFu; rtModelInfo[m].triBase = 0; rtModelInfo[m].vtxBase = 0; rtModelInfo[m].uvBase = 0; continue; }
+        if (!BvhHasBVH((u16)m)) { rtModelInfo[m].nodeBase = 0xFFFFFFFFu; rtModelInfo[m].triBase = 0; rtModelInfo[m].vtxBase = 0; rtModelInfo[m].uvBase = 0; continue; }
         rtModelInfo[m].nodeBase = nodeOff * 4u; rtModelInfo[m].triBase = triSec + triOff * 2u; rtModelInfo[m].vtxBase = posSec + vtxOff * 2u; rtModelInfo[m].uvBase = uvSec + vtxOff;
-        nodeOff += modelBVHNodeCounts[m]; triOff += modelBVHTriOrderCounts[m]; vtxOff += physAttrVertCounts[m];
+        nodeOff += modelBVHNodeCounts[m]; triOff += modelBVHTriOrderCounts[m]; vtxOff += rtSrcVertCounts[m];
     }
     if (rtInstanceInfoID) { glDeleteBuffers(1, &rtInstanceInfoID); rtInstanceInfoID = 0; }
     if (rtCellCountsID)   { glDeleteBuffers(1, &rtCellCountsID);   rtCellCountsID = 0; }
@@ -2180,39 +2179,29 @@ void LoadRaytracingData(void) {
             for (int c=0;c<8;++c) { d[8+c] = (src->children[c] >= 0) ? (nb + (u32)src->children[c] * 4u) : 0xFFFFFFFFu; }
         }
     }
+    glUnmapBuffer(GL_SSBO);
+    // Fill the triangle/position/UV sections on the GPU from the models' own render buffers:
+    // vbos[m] already holds exactly the half-float pos+uv data rt.compute consumes and tbos[m]
+    // the source indices, so no CPU-side duplicate of that data is ever allocated. This also
+    // makes the build work when RT is enabled at runtime after booting with reflections off
+    // (the old CPU pools only existed when Reflections==2 at model load). The BVH triangle
+    // order array is the only CPU input, staged per model through one small buffer.
+    // Bases 17/18/19 are scratch for this pass only - bases 0-16 and 20+ belong to other
+    // systems, are set once at init and never restored per frame.
+    glUseProgram(rtCopySP);
+    u32 orderBufID = 0; glGenBuffers(1, &orderBufID);
+    u16* orderStage = (u16*)OS_Alloc(((size_t)maxModelTris + 2) * sizeof(u16));
     for (m=0; m<mdlsCnt; ++m) {
         if (rtModelInfo[m].nodeBase == 0xFFFFFFFFu) continue;
-        u32 tcnt = modelBVHTriOrderCounts[m], vc = physAttrVertCounts[m];
-        u16* order = modelBVHTriOrder[m]; u16* srcTris = physAttrTris[m];
-        
-        if (tcnt && order && srcTris) {
-            u32* dstTri = (u32*)(gpuPtr + (intptr_t)rtModelInfo[m].triBase * 4);
-            for (u32 k=0;k<tcnt;++k) { 
-                u32 t = order[k]; 
-                dstTri[k*2+0] = (u32)srcTris[t*3+0] | ((u32)srcTris[t*3+1] << 16); 
-                dstTri[k*2+1] = (u32)srcTris[t*3+2]; 
-            }
-        }
-        if (vc && physAttrPool[m]) {
-            u16* pool = physAttrPool[m];
-            u32* dstPos = (u32*)(gpuPtr + (intptr_t)rtModelInfo[m].vtxBase * 4);
-            u32* dstUv  = (u32*)(gpuPtr + (intptr_t)rtModelInfo[m].uvBase * 4);
-            for (u32 v=0;v<vc;++v) { 
-                const u16* q = pool + (size_t)v * 6u; 
-                dstPos[v*2+0] = (u32)q[0] | ((u32)q[1] << 16); 
-                dstPos[v*2+1] = (u32)q[2]; 
-                dstUv[v]      = (u32)q[3] | ((u32)q[4] << 16); 
-            }
-        }
+        u32 tcnt = modelBVHTriOrderCounts[m], vc = rtSrcVertCounts[m];
+        mcpy(orderStage, modelBVHTriOrder[m], (size_t)tcnt * sizeof(u16)); orderStage[tcnt] = 0; orderStage[tcnt + 1] = 0; /*zero pad: the shader's last u32 read stays in bounds*/
+        glBindBuffer(GL_SSBO, orderBufID); glBufferData(GL_SSBO, ((size_t)tcnt + 2) * sizeof(u16), orderStage, GL_DYNAMIC_DRAW); glBindBufferBase(GL_SSBO, 19, orderBufID); /*fresh store per model: a SubData rewrite could race the previous model's still-running dispatch reading this buffer*/
+        glBindBufferBase(GL_SSBO, 17, vbos[m]); glBindBufferBase(GL_SSBO, 18, tbos[m]);
+        glUniform1ui(0, vc); glUniform1ui(1, rtModelInfo[m].vtxBase); glUniform1ui(2, rtModelInfo[m].uvBase); glUniform1ui(3, tcnt); glUniform1ui(4, rtModelInfo[m].triBase);
+        u32 n = vc > tcnt ? vc : tcnt; glDispatchCompute((n + 255u) / 256u, 1, 1);
     }
-    glUnmapBuffer(GL_SSBO);
-    for (m=0; m<mdlsCnt; ++m) {
-        if (physAttrPool[m]) { OS_Free(physAttrPool[m],(size_t)physAttrVertCounts[m]*RT_VTX_SZ); physAttrPool[m]=NULL; }
-        if (physAttrTris[m]) { OS_Free(physAttrTris[m],(size_t)modelTriangleCounts[m]*6u); physAttrTris[m]=NULL; }
-    }
-    OS_Free(physAttrPool,(size_t)mdlsCnt*sizeof(u16*)); physAttrPool=NULL;
-    OS_Free(physAttrTris,(size_t)mdlsCnt*sizeof(u16*)); physAttrTris=NULL;
-    OS_Free(physAttrVertCounts,(size_t)mdlsCnt*sizeof(u32)); physAttrVertCounts=NULL;
+    OS_Free(orderStage, ((size_t)maxModelTris + 2) * sizeof(u16));
+    glDeleteBuffers(1, &orderBufID);
     rtInstanceInfoID = MakeSSBO(&rtInstanceInfoID, 21, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);
     rtCellCountsID   = MakeSSBO(&rtCellCountsID,   23, (size_t)ARRSIZE * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
     rtCellListsID    = MakeSSBO(&rtCellListsID,    24, (size_t)ARRSIZE * 128 * sizeof(u16), NULL, GL_DYNAMIC_DRAW);

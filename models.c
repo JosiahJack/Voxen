@@ -902,31 +902,8 @@ static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap, 
     u16* weldedTris=OS_Alloc(tc*3*sizeof(u16)); const u16* srcTris = modelTriangles[m]; for (u32 i = 0; i < tc * 3; ++i) weldedTris[i] = remap[srcTris[i]];
     
     physPos[m] = exactPos; physTris[m] = weldedTris; physVertCounts[m] = weldedCount;
-    if (physAttrPool) {
-        u16* poolUp = (u16*)OS_Alloc((size_t)vc * RT_VTX_SZ);
-        u16* rtTris = (u16*)OS_Alloc((size_t)tc * 3u * sizeof(u16));
-        u32 rtCount = 0;
-        usedSlots = 0; /* position-weld slots above were already reset; reuse the tracking array for the RT dedup */
-        for (u32 i = 0; i < vc; ++i) {
-            __m256 v_in=(*(__m256_u const *)(&src[i*8]));
-            __m128i v_half=_mm256_cvtps_ph(v_in,0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/);
-            u16 hv[8]; _mm_storeu_si128((__m128i*)hv, v_half);
-            u32 h = (u32)hv[0]*73856093u ^ (u32)hv[1]*19349663u ^ (u32)hv[2]*83492791u ^ (u32)hv[6]*2654435761u ^ (u32)hv[7]*40503u;
-            u32 slot = h & (WELD_HASH_SIZE - 1), c = U32_MAX;
-            while (weldHt[slot] != U32_MAX) {
-                u32 cand = weldHt[slot];
-                const u16* p = poolUp + (size_t)cand*6u;
-                if (p[0]==hv[0] && p[1]==hv[1] && p[2]==hv[2] && p[3]==hv[6] && p[4]==hv[7]) { c = cand; break; }
-                slot = (slot + 1) & (WELD_HASH_SIZE - 1);
-            }
-            if (c == U32_MAX) { c = rtCount++; weldHt[slot] = c; u16* dst = poolUp + (size_t)c*6u; dst[0]=hv[0]; dst[1]=hv[1]; dst[2]=hv[2]; dst[3]=hv[6]; dst[4]=hv[7]; dst[5]=0; weldHtUsed[usedSlots++] = slot; }
-            remap[i] = (u16)c;
-        }
-        for (u32 i = 0; i < usedSlots; ++i) { weldHt[weldHtUsed[i]] = U32_MAX; }
-        for (u32 k = 0; k < tc * 3u; ++k) { rtTris[k] = remap[srcTris[k]]; }
-        u16* pool = OS_Alloc((size_t)rtCount * RT_VTX_SZ); mcpy(pool, poolUp, (size_t)rtCount * RT_VTX_SZ); OS_Free(poolUp, (size_t)vc * RT_VTX_SZ);
-        physAttrPool[m] = pool; physAttrTris[m] = rtTris; physAttrVertCounts[m] = rtCount;
-    }
+    /* No RT pos+uv duplicate is built here anymore: LoadRaytracingData copies that data GPU-side
+       straight out of vbos[m]/tbos[m] with rtcopy.compute (see rtSrcVertCounts in LoadModels). */
 }
 
 static void* PhysGeomWorker(void* a) {
@@ -1026,7 +1003,7 @@ void LoadModels() {
     OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt * SUB_ARENA_SZ, SUB_MAIN_SZ);
     ModelParseTask tasks[32]; PhysGeomTask ptasks[32]; PoolJob pjobs[32]; glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
     LoadGLBAnimatedSources(mp.entries,mp.count,raw); physPos=OS_Alloc(mdlsCnt*sizeof(float*)); physTris=OS_Alloc(mdlsCnt*sizeof(u16*)); physVertCounts=OS_Alloc(mdlsCnt*sizeof(u32));
-    if (Sys_Settings.Reflections == 2u) { physAttrPool = OS_Alloc((size_t)mdlsCnt*sizeof(u16*)); mset(physAttrPool,0,(size_t)mdlsCnt*sizeof(u16*)); physAttrTris = OS_Alloc((size_t)mdlsCnt*sizeof(u16*)); mset(physAttrTris,0,(size_t)mdlsCnt*sizeof(u16*)); physAttrVertCounts = OS_Alloc((size_t)mdlsCnt*sizeof(u32)); mset(physAttrVertCounts,0,(size_t)mdlsCnt*sizeof(u32)); }
+    rtSrcVertCounts = OS_Alloc((size_t)mdlsCnt*sizeof(u32)); mset(rtSrcVertCounts,0,(size_t)mdlsCnt*sizeof(u32)); /*original (pre-weld) vertex counts, captured in the upload loop below before modelVertexCounts is swapped to the welded counts; the RT build needs them to address vbos[]*/
     u32 validCount = 0;
     for (u32 i = 0; i < mp.count; ++i) if (mp.entries[i].index != U16_MAX) ++validCount;
     u32* valid = OS_AllocScratch(validCount * sizeof(u32));
@@ -1069,9 +1046,10 @@ void LoadModels() {
             
             for (u32 i = sub; i < subEnd; ++i) {
                 if (!modelVertexCounts[i]) {continue;/*Skip unused index slots*/} tv += modelVertexCounts[i]; tt += modelTriangleCounts[i]; size_t vcz = (size_t)modelVertexCounts[i] * VRT_ATT_SZ, tcz = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
+                rtSrcVertCounts[i] = modelVertexCounts[i];
                 glBindBuffer(GL_ARRAY_BUFFER,vbos[i]); glBufferData(GL_ARRAY_BUFFER,vcz,NULL,GL_STATIC_DRAW); half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER,0,vcz,0x0002/*GL_MAP_WRITE_BIT*/|0x08/*GL_MAP_INVALIDATE_BUFFER_BIT*/); u32 vc = modelVertexCounts[i]; const float *verts=vPos[i];
                 for (u32 k = 0; k < vc; ++k) { __m256 v_in=(*(__m256_u const *)(&verts[k*8])); __m128i v_half=_mm256_cvtps_ph(v_in,0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/); _mm_storeu_si128((__m128i*)&mpv[k*8],v_half); }
-                glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+                glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz+4,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz+4,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); mset((u8*)mpt+tcz,0,4); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER); /*+4 zero pad: rtcopy.compute reads indices as u32 words, its last read crosses the end by up to 2 bytes when the index count is odd*/
             }
             
             glBindBuffer(GL_ARRAY_BUFFER,0);

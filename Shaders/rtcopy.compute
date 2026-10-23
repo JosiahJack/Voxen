@@ -1,0 +1,36 @@
+// rtcopy.compute - Builds the rtGeom triangle/position/UV sections for one model entirely on the GPU
+// from that model's already-uploaded render buffers, so raytraced reflections need no CPU-side
+// duplicate of the model pos+uv data at all. srcVerts is the model's VBO (8 half floats per vertex:
+// pos xyz, normal xyz, uv st, 16 bytes), srcTris its index buffer (u16 indices), srcOrder the model's
+// BVH triangle permutation (u16). Output words match rt.compute's RtPair/RtUV/RtVtxPos addressing
+// exactly: tri section packs idx0|idx1<<16, idx2; pos section packs posX|posY<<16, posZ (upper half
+// zeroed, the normal X half that shares that VBO word must not leak in); uv section packs uvS|uvT<<16.
+// Source bindings 17-19 are deliberately unused elsewhere: SSBO base bindings are global state set once
+// by MakeSSBO and never restored per frame, so borrowing an owned index (1 = ModelMatrices,
+// 2 = VoxelLightListCounts) would silently corrupt every later draw that reads it.
+layout(local_size_x = 256) in;
+layout(std430, binding = 17) readonly buffer SrcVerts { uvec4 srcVerts[]; };
+layout(std430, binding = 18) readonly buffer SrcTris { uint srcWords[]; };
+layout(std430, binding = 19) readonly buffer SrcOrder { uint orderWords[]; };
+layout(std430, binding = 16) buffer RTGeom { uint rtWords[]; };
+layout(location = 0) uniform uint vertCount;
+layout(location = 1) uniform uint vtxWordBase;
+layout(location = 2) uniform uint uvWordBase;
+layout(location = 3) uniform uint triCount;
+layout(location = 4) uniform uint triWordBase;
+uint U16At(uint i) { return (srcWords[i >> 1u] >> ((i & 1u) << 4)) & 0xFFFFu; }
+uint OrderAt(uint i) { return (orderWords[i >> 1u] >> ((i & 1u) << 4)) & 0xFFFFu; }
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i < vertCount) {
+        uvec4 v = srcVerts[i];
+        rtWords[vtxWordBase + i * 2u] = v.x;
+        rtWords[vtxWordBase + i * 2u + 1u] = v.y & 0xFFFFu;
+        rtWords[uvWordBase + i] = v.w;
+    }
+    if (i < triCount) {
+        uint t = OrderAt(i) * 3u;
+        rtWords[triWordBase + i * 2u] = U16At(t) | (U16At(t + 1u) << 16);
+        rtWords[triWordBase + i * 2u + 1u] = U16At(t + 2u);
+    }
+}
