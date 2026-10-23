@@ -721,9 +721,8 @@ void LoadGLBAnimatedSources(ModelData* entries, u32 entryCount, RawOBJ* raw) {
 // Persistent fork-join pool: worker threads live for the whole model load instead of being created and joined per sub-chunk.
 typedef struct { void* (*fn)(void*); void* arg; } PoolJob;
 static PoolJob poolJobs[32];
-static u32 poolJobCount, poolJobNext, poolJobDone, poolGen, poolStop, poolPending, poolReady;
+static u32 poolJobCount, poolJobNext, poolJobDone, poolGen, poolStop, poolPending, poolReady, poolThreadCnt = 0;
 static OS_Thread poolThreads[32];
-static u32 poolThreadCnt = 0;
 static void* PoolWorker(void* arg) { (void)arg; __atomic_fetch_add(&poolReady,1,__ATOMIC_ACQ_REL); u32 last=0; for(;;) { while(__atomic_load_n(&poolGen,__ATOMIC_ACQUIRE)==last) { if(__atomic_load_n(&poolStop,__ATOMIC_ACQUIRE)) return NULL; OS_FutexWait(&poolGen,last); } last=__atomic_load_n(&poolGen,__ATOMIC_ACQUIRE); for(;;) { u32 j=__atomic_fetch_add(&poolJobNext,1,__ATOMIC_RELAXED); if(j>=poolJobCount) break; poolJobs[j].fn(poolJobs[j].arg); } if(__atomic_fetch_add(&poolJobDone,1,__ATOMIC_ACQ_REL)+1u == poolThreadCnt) OS_FutexWakeAll(&poolJobDone); } }
 static void PoolInit(u32 n) { poolThreadCnt=0; poolReady=0; poolStop=0; poolGen=0; if(n<2) return; for(u32 i=0;i<n && i<32;++i) { if(OS_ThreadCreate(&poolThreads[i],PoolWorker,NULL)!=0) break; ++poolThreadCnt; } while(__atomic_load_n(&poolReady,__ATOMIC_ACQUIRE) < poolThreadCnt) __asm__ __volatile__("pause"); /*every worker parked on gen 0 before any dispatch, so none can miss generation 1*/ }
 static void PoolShutdown(void) { if(!poolThreadCnt) return; poolJobCount=0; __atomic_store_n(&poolStop,1,__ATOMIC_RELEASE); __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); for(u32 i=0;i<poolThreadCnt;++i) OS_ThreadJoin(&poolThreads[i]); poolThreadCnt=0; }
@@ -930,7 +929,15 @@ static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap, 
     }
 }
 
-static void* PhysGeomWorker(void* a) { PhysGeomTask* t=a; BvhBuildCtx* bvhCtx=&thrd_bvh_ctx[t->tid]; u32* ht = thrd_ht[t->tid]; u32* u=thrd_ht_used[t->tid]; u16* sc=(u16*)thrd_remap_scratch[t->tid]; for (u32 m = t->start; m < t->end; ++m) { if(m >= mdlsCnt || !modelVertexCounts[m] || !modelTriangleCounts[m]){physPos[m]=NULL; physTris[m]=NULL; physVertCounts[m]=0; continue;}  WeldModelPositions((u16)m,ht,u,sc,t->tid); BuildModelBVH(bvhCtx,(u16)m); }  return NULL; }
+static void* PhysGeomWorker(void* a) {
+    PhysGeomTask* t = a;
+    BvhBuildCtx* bvhCtx = &thrd_bvh_ctx[t->tid];
+    u32* ht = thrd_ht[t->tid], *u = thrd_ht_used[t->tid];
+    u16* sc = (u16*)thrd_remap_scratch[t->tid];
+    for (u32 m=t->start;m<t->end;++m) { if(!modelVertexCounts[m]/*Empty slot*/) { physPos[m] = NULL; physTris[m] = NULL; physVertCounts[m] = 0; continue; }  WeldModelPositions((u16)m,ht,u,sc,t->tid); BuildModelBVH(bvhCtx,(u16)m); }
+    return NULL;
+}
+
 void LoadModels() {
     double startModelTime = get_time();
     ModelDataParser mp = {0};
@@ -962,14 +969,11 @@ void LoadModels() {
     size_t bvh_u16_sz = (size_t)BVH_MAX_TRIS_PER_MDL * sizeof(u16);
     size_t arena = mdlsCnt*sizeof(i32) + mdlsCnt*sizeof(RawOBJ) + 16*threadCnt*sizeof(void*) + (size_t)threadCnt * ((MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*3 + MAX_VERT_ELEMENT_SIZE*2)*sizeof(float) + MAX_OUTPUT_VERTS*8*sizeof(float) + WELD_HASH_SIZE*sizeof(u32) + MAX_OUTPUT_VERTS*sizeof(u32) + remap_sz + cache_sz + bvh_nodes_sz + bvh_u8_sz + 3*bvh_u16_sz);
     void* arena_base = OS_AllocScratch(arena + 4096);
-    char* p = arena_base; // Fudge covers alignment padding between sections
+    char* p = arena_base;
     i32* idxmap = (i32*)p;
     p = ARENA_ALIGN(p + mdlsCnt*sizeof(i32));
     mset(idxmap, -1, mdlsCnt*sizeof(i32));
-    for (u32 i=0; i<mp.count; ++i) {
-        if (mp.entries[i].index != U16_MAX) { idxmap[mp.entries[i].index] = (i32)i; }
-    }
-    
+    for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index != U16_MAX) { idxmap[mp.entries[i].index] = (i32)i; } }
     RawOBJ* raw = (RawOBJ*)p; p = ARENA_ALIGN(p + mdlsCnt*sizeof(RawOBJ));
     for (u32 i=0; i<mdlsCnt; ++i) { i32 pi = idxmap[i]; if(pi >= 0){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[pi].path,&d,&sz); raw[i].size=sz;} }
     bool* isGLBAnimSrc = OS_AllocScratch(mdlsCnt * sizeof(bool));
@@ -1013,7 +1017,14 @@ void LoadModels() {
         thrd_bvh_ctx[i]=(BvhBuildCtx){ .nodes = bvh_nodes_p[i], .triOctants = bvh_oct_p[i], .triOrder = bvh_order_p[i], .triScratch = bvh_scr_p[i], .initialTris = bvh_init_p[i], .nodeCount = 0, .triCount = 0 };
     }
     
-    thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_ht = ht; thrd_ht_used = ht_used; thrd_remap_scratch = remap_scr; thrd_cache_scratch = cache_scr; const size_t SUB_ARENA_SZ = (3ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt); /* TEMP-HEADLESS 1.5mb per model parsed per thread per 32-model sub-chunk (each thread's finalized outputs accumulate until sub-chunk end) */ const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; /* 12mb for all baked anim sources */ size_t slices_tot = SUB_ARENA_SZ * (size_t)threadCnt + SUB_MAIN_SZ; size_t slice_room = (size_t)(scratch_end - scratch_cur) - 4096; if (slices_tot > slice_room) { DualLogError("Not enough scratch room for model sub-arenas: need %u MB, %u MB free!\n", (u32)(slices_tot >> 20),(u32)(slice_room >> 20)); OS_Exit(1); } u8* slice_base = OS_AllocScratch(slices_tot); for (u32 si = 0; si < threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si * SUB_ARENA_SZ, SUB_ARENA_SZ); OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt * SUB_ARENA_SZ, SUB_MAIN_SZ); ModelParseTask tasks[32]; PhysGeomTask ptasks[32]; PoolJob pjobs[32]; glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
+    thrd_pos = pos; thread_temp_nrm = nrm; thrd_uv = uv; thrd_verts = ov; thrd_ht = ht; thrd_ht_used = ht_used; thrd_remap_scratch = remap_scr; thrd_cache_scratch = cache_scr; const size_t SUB_ARENA_SZ = (3ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt);
+    const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; size_t slices_tot = SUB_ARENA_SZ * (size_t)threadCnt + SUB_MAIN_SZ; size_t slice_room = (size_t)(scratch_end - scratch_cur) - 4096;
+    if (slices_tot > slice_room) { DualLogError("Not enough scratch room for model sub-arenas: need %u MB, %u MB free!\n", (u32)(slices_tot >> 20),(u32)(slice_room >> 20)); OS_Exit(1); }
+    
+    u8* slice_base = OS_AllocScratch(slices_tot);
+    for (u32 si = 0; si < threadCnt; ++si) OS_SubArenaSliceInit(si, slice_base + si * SUB_ARENA_SZ, SUB_ARENA_SZ);
+    OS_SubArenaSliceInit(SUB_MAIN, slice_base + threadCnt * SUB_ARENA_SZ, SUB_MAIN_SZ);
+    ModelParseTask tasks[32]; PhysGeomTask ptasks[32]; PoolJob pjobs[32]; glGenBuffers(mdlsCnt,vbos); glGenBuffers(mdlsCnt,tbos); u32 tv=0,tt=0;
     LoadGLBAnimatedSources(mp.entries,mp.count,raw); physPos=OS_Alloc(mdlsCnt*sizeof(float*)); physTris=OS_Alloc(mdlsCnt*sizeof(u16*)); physVertCounts=OS_Alloc(mdlsCnt*sizeof(u32));
     if (Sys_Settings.Reflections == 2u) { physAttrPool = OS_Alloc((size_t)mdlsCnt*sizeof(u16*)); mset(physAttrPool,0,(size_t)mdlsCnt*sizeof(u16*)); physAttrTris = OS_Alloc((size_t)mdlsCnt*sizeof(u16*)); mset(physAttrTris,0,(size_t)mdlsCnt*sizeof(u16*)); physAttrVertCounts = OS_Alloc((size_t)mdlsCnt*sizeof(u32)); mset(physAttrVertCounts,0,(size_t)mdlsCnt*sizeof(u32)); }
     u32 validCount = 0;
