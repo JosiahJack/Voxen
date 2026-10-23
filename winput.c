@@ -727,7 +727,7 @@ void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) { if(!Sys_Input.mouseButtons[i].down){uiMouseCaptured &= ~(1u<<i);} }
     mouseMovementThisFrame = false;
     Sys_Input.scrollDelta = 0.0f;/*One frame of life per wheel event: nothing else in the frame clears it, so a wheel bound action used to latch forever*/ PollEvents();
-    World.mouseClickHeldOverGUI = World.Sys_UI.mouseClickHeldOverGUI = false;
+    World.Sys_UI.mouseClickHeldOverGUI = false;
     uiWheelBlocked = window_has_focus && UIInteractions();/*Walks the UIRegion table: true whenever the pointer is over any live UI component*/
     World.uiIsBlocking = uiWheelBlocked;/*Hovering UI suppresses use/fire; UI_ProcessNavigation can also raise it when it consumes a click*/
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) if (uiWheelBlocked && Sys_Input.mouseButtons[i].pressed) uiMouseCaptured|=1u<<i;

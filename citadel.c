@@ -451,14 +451,7 @@ void ChargeStationUse(u16 self, u16 owner) {
 }
 // GeneralInventory
 void MFD_ShowGeneralItem();
-int GeneralInvItem(int slot) {
-    if (slot<0 || slot>=14) return -1;
-    if (!slot) return 81;
-    int item=World.invP1.genInvIdxRef[slot]; if (item<0) return -1;
-    
-    item=UseableFromConst(item);
-    return IdxIsGenericItem(item + 307) ? item : -1;
-}
+int GeneralInvItem(int slot) { if (slot<0 || slot>=14) return -1; if (!slot) return 81; int item=World.invP1.genInvIdxRef[slot]; if (item<0) return -1; item=UseableFromConst(item); return IdxIsGenericItem(item + 307) ? item : -1; }
 bool GeneralInvCanUse(int slot) { int item=GeneralInvItem(slot); return slot>0 && (item==52 || item==53 || item==55); }
 bool GeneralInvCanVaporize(int slot) { int item=GeneralInvItem(slot); return slot>0 && item>=0 && (item<6 || item==33 || item==35 || item==58 || item==62); }
 void GeneralInvRemove(int slot) {
@@ -478,14 +471,7 @@ void GeneralInvRemove(int slot) {
     } else if (World.invP1.generalInvCurrent>slot) World.invP1.generalInvCurrent--;
 }
 
-void GeneralInvClick(int buttonIdx) {
-    int item = GeneralInvItem(buttonIdx); if (item < 0) return;
-    
-    World.invP1.generalInvCurrent = (u8)buttonIdx;
-    World.mouseClickHeldOverGUI = World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true;
-    MFD_ShowGeneralItem();
-}
-
+void GeneralInvClick(int buttonIdx) { int item = GeneralInvItem(buttonIdx); if (item < 0) return; World.invP1.generalInvCurrent = (u8)buttonIdx; World.Sys_UI.mouseClickHeldOverGUI = World.uiIsBlocking = true; MFD_ShowGeneralItem(); }
 void GeneralInvApply(int buttonIdx) {
     if (!GeneralInvCanUse(buttonIdx) || World.invP1.holdingObject) return;
     
@@ -1600,20 +1586,8 @@ u16 GetItemFrobTexture(u16 index) {
 }
 
 u16 GetCursorTexture() {
-    if (World.paused || World.menuActive) {
-        if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down){ return 2147; }
-        return 1261;
-    }
-    
-    if (World.invP1.holdingObject) {
-        u16 tex = GetItemFrobTexture(World.invP1.heldObjectIndex);
-        return tex < MAXTEX ? tex : 1250;
-    }
-    
-    if (World.uiIsBlocking || World.mouseClickHeldOverGUI) {
-        if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) { return 2147; }
-        return 1261;
-    }
-    
+    if (World.paused || World.menuActive) { if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down){ return 2147; } return 1261; }
+    if (World.invP1.holdingObject) { u16 tex = GetItemFrobTexture(World.invP1.heldObjectIndex); return tex < MAXTEX ? tex : 1250; }
+    if (World.uiIsBlocking || World.Sys_UI.mouseClickHeldOverGUI) { if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) { return 2147; } return 1261; }
     return GetCrosshairTexture();
 }

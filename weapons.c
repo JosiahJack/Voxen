@@ -379,15 +379,15 @@ void CheckAttackInput(void) {
     if (World.curLev == LEVEL_CYBERSPACE) { FireCyberWeapon(); return; }
     if (editFieldEditing || EditPanelPointerHover()) { return; }
     if (Cheats.editMode && Cheats.editSubMode==1){World.invP1.holdingObject = true; World.invP1.heldObjectIndex = editModeTestEntityDefinition;}
-    if (World.invP1.holdingObject && !World.mouseClickHeldOverGUI) { if (!World.uiIsBlocking) { if (FrobHeldItemIntoPanel(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right)) { return; }/*frob-use items go to whatever UseHandler is under the cursor (InteractablePanel), and are consumed there*/ DropHeldItem(); return; } AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); return; }
+    if (World.invP1.holdingObject && !World.Sys_UI.mouseClickHeldOverGUI) { if (!World.uiIsBlocking) { if (FrobHeldItemIntoPanel(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right)) { return; }/*frob-use items go to whatever UseHandler is under the cursor (InteractablePanel), and are consumed there*/ DropHeldItem(); return; } AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); return; }
     int w = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
-    if (w == -1 || World.invP1.holdingObject || World.mouseClickHeldOverGUI){return; /*No weapon*/} StartNormalAttack(w);
+    if (w == -1 || World.invP1.holdingObject || World.Sys_UI.mouseClickHeldOverGUI){return; /*No weapon*/} StartNormalAttack(w);
 }
 
 void CheckUIStateAndAttack(void) {
     if (!pendingAttackWep16Valid) return;
     int wepdex = pendingAttackWep16; pendingAttackWep16Valid = false;
-    if (World.uiIsBlocking || World.invP1.holdingObject || World.mouseClickHeldOverGUI || World.invP1.reloadFinished >= World.pauseRelativeTime || World.invP1.waitTilNextFire >= World.pauseRelativeTime || wepdex < 0 || wepdex > 15 || World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]) return;
+    if (World.uiIsBlocking || World.invP1.holdingObject || World.Sys_UI.mouseClickHeldOverGUI || World.invP1.reloadFinished >= World.pauseRelativeTime || World.invP1.waitTilNextFire >= World.pauseRelativeTime || wepdex < 0 || wepdex > 15 || World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]) return;
     World.invP1.justFired = World.pauseRelativeTime; if (wepClass[wepdex] == WC_MELEE) { FireWeapon(wepdex,false); return; }
     if (wepClass[wepdex] == WC_ENERGY) {
         u16 wc = World.invP1.wepCur;

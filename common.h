@@ -299,8 +299,8 @@ typedef struct {
         double searchFXStartTime[2];
         double generalClickTime;
         double tWrnFinished[10];
-        float searchFXCursorX[2], searchFXCursorY[2], pw_temp;
-        i32 lastMultiMediaTabOpened, count, tWrnTextIdx[10], tWrnTextIdx2[10], tWrnTextIdx3[10], tWrnColorIdx[10], keycodeEntry,keycodeValue;
+        float searchFXCursorX[2], searchFXCursorY[2];
+        i32 lastMultiMediaTabOpened, tWrnTextIdx[10], tWrnTextIdx2[10], tWrnTextIdx3[10], tWrnColorIdx[10], keycodeEntry,keycodeValue;
         u16 vmailFrame, linkedElevatorDoor, tetheredPGP, tetheredPWP, tetheredSearchable, tetheredKeypadElevator, tetheredKeypadKeycode,elevButtonSpawnIdx[8], generalClickCustom, logReferenceIndex;
         i16 generalClickItem, logFolderList[16], logReaderPage;
         u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, MFD_LefTab, MFD_CenterTab, MFD_RightTab, MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
@@ -402,7 +402,7 @@ typedef struct {
     double automapNextRaster;
     i8 lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode;
     u8 physSleep[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,numLevels,curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,currentLevel,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
-    bool inventoryMode,levelCurrentlyLoading,paused,menuActive,gameFinished,creditsActive,decoyActive,uiIsBlocking,mouseClickHeldOverGUI,geniusActive,*invTnsrValid,*colliding,targetIOActive,misTimerLast,misTimerCurIdx,misTimerTimesUP;
+    bool inventoryMode,levelCurrentlyLoading,paused,menuActive,gameFinished,creditsActive,decoyActive,uiIsBlocking,geniusActive,*invTnsrValid,*colliding,targetIOActive,misTimerLast,misTimerCurIdx,misTimerTimesUP;
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
     UIComponent uiComponents[MAX_UI_ELEMENTS];
     V3 debugLine_start,debugLine_end,cyberspaceRecallPoint,levelPosition[MAX_LEVELS][INSTANCE_COUNT],levelScale[MAX_LEVELS][INSTANCE_COUNT],levelVelocity[MAX_LEVELS][INSTANCE_COUNT],levelAngularVelocity[MAX_LEVELS][INSTANCE_COUNT],levelColliderCenter[MAX_LEVELS][INSTANCE_COUNT],levelColliderSize[MAX_LEVELS][INSTANCE_COUNT]/*xyz for Box,x=Sph r,else xyz for Capsule r,h,dir(0=X,1=Y,2=Z)*/,levelLightsNewPosition[MAX_LEVELS][LIGHT_COUNT];
