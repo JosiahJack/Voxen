@@ -1911,9 +1911,9 @@ void UpdateInstanceMatrix4x4s() {
             if ((instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt) mi = World.instances[i].lodIndex;
             SetRTInstance(i, (mi < mdlsCnt) ? mi : 0xFFFFFFFFu, World.instances[i].texIndex, (World.instances[i].entflags & EF_ACTIVE) ? 1u : 0u, vabs(World.scale[i].x), vabs(World.scale[i].y), vabs(World.scale[i].z));
         }
-        glBindBuffer(GL_SSBO, rtInstanceInfoID); glBufferData(GL_SSBO, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW); glBufferSubData(GL_SSBO, 0, (size_t)World.instCount * sizeof(InstanceRTInfo), rtInstanceInfo);
-        glBindBuffer(GL_SSBO, rtCellCountsID);   glBufferData(GL_SSBO, (size_t)ARRSIZE * sizeof(u16),                   NULL, GL_DYNAMIC_DRAW); glBufferSubData(GL_SSBO, 0, ARRSIZE * sizeof(u16), cellCounts);
-        glBindBuffer(GL_SSBO, rtCellListsID);    glBufferData(GL_SSBO, (size_t)ARRSIZE * 128u * sizeof(u16),            NULL, GL_DYNAMIC_DRAW); glBufferSubData(GL_SSBO, 0, (size_t)ARRSIZE * 128u * sizeof(u16), cellLists);
+        glBindBuffer(GL_SSBO, rtInstanceInfoID); glBufferSubData(GL_SSBO, 0, (size_t)World.instCount * sizeof(InstanceRTInfo), rtInstanceInfo);
+        glBindBuffer(GL_SSBO, rtCellCountsID);   glBufferSubData(GL_SSBO, 0, ARRSIZE * sizeof(u16), cellCounts);
+        glBindBuffer(GL_SSBO, rtCellListsID);    glBufferSubData(GL_SSBO, 0, (size_t)ARRSIZE * 128u * sizeof(u16), cellLists);
     }
 }
 
