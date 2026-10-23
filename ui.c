@@ -987,7 +987,7 @@ void DrawSensaroundQuad(i16 x, i16 y, i16 w, i16 h, u8 camViewIdx) {// Draw the 
     SENVA(0.0f,0.0f,0.0f,1.0f); SENVA(1.0f,1.0f,1.0f,0.0f); SENVA(1.0f,0.0f,1.0f,1.0f);
     SENVA(0.0f,0.0f,0.0f,1.0f); SENVA(0.0f,1.0f,0.0f,0.0f); SENVA(1.0f,1.0f,1.0f,0.0f);
     #undef SENVA
-    glBindVertexArray(sensaroundVAO); glBindBuffer(GL_ARRAY_BUFFER,sensaroundVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(verts),verts,GL_DYNAMIC_DRAW);
+    glBindVertexArray(sensaroundVAO); glBindBuffer(GL_ARRAY_BUFFER,sensaroundVBO); glBufferSubData(GL_ARRAY_BUFFER,0,sizeof(verts),verts);
     glUseProgram(chunkSP);
     float vp[16]={ 2.0f*(float)w/UI_W,0,0,0, 0,-2.0f*(float)h/UI_H,0,0, 0,0,1,0, (2.0f*(float)x/UI_W)-1.0f,1.0f-(2.0f*(float)y/UI_H),0,1 };// column-major: maps quad world [0,1] to pixel rect (x,y,w,h)
     glUniformMatrix4fv(2,1,GL_FALSE,vp);

@@ -59,8 +59,21 @@ float getBlueNoise(ivec2 p) {uint n = (uint(p.x) * 73856093u) ^ (uint(p.y) * 193
 const float VOXEL_SIZE = 0.32; const uint SHADON = 2u;
 uint GetVoxelIndex(vec3 worldPos) { float offsetX = worldPos.x - worldMin.x; float offsetZ = worldPos.z - worldMin.y; uint voxelX = uint(offsetX / VOXEL_SIZE); uint voxelZ = uint(offsetZ / VOXEL_SIZE); return (voxelZ * 512) + voxelX; }
 const int PCF_SAMPLES = 12; const float invSamples = 1.0 / float(PCF_SAMPLES); const vec2 poissonDisk[PCF_SAMPLES] = vec2[](vec2(0.2085,0.0000),vec2(-0.2663,0.2440),vec2(0.0408,-0.4645),vec2(0.3357,0.4378),vec2(-0.6160,-0.1090),vec2(0.5835,-0.3712),vec2(-0.1952,0.7260),vec2(-0.3722,-0.7167),vec2(0.8076,0.2949),vec2(-0.8401,0.3468),vec2(0.4050,-0.8655),vec2(0.2993,0.9542)); // Golden-angle spiral, 12 taps, wider spread for smoother penumbra without reintroducing center-step issues
-vec4 getTextureColor(uint texIdx, ivec2 texCoord, int texSizeX) { uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * texSizeX + uint(texCoord.x); uint slotIndex = pixelOffset >> 2u; uint packedIdx = colors[slotIndex]; return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + ((packedIdx >> ((pixelOffset & 3u) << 3u)) & 0xFFu)]); }
-vec4 getTextureColorBilinear(uint texIdx, vec2 uvF, ivec2 texSize) { vec2 tc = uvF * vec2(texSize) - 0.5; vec2 base = floor(tc); vec2 st = tc - base; st = smoothstep(0.0, 1.0, st); ivec2 c00 = ivec2(mod(base, vec2(texSize))); ivec2 c11 = ivec2(mod(base + 1.0, vec2(texSize))); vec4 s00 = getTextureColor(texIdx, c00, texSize.x); vec4 s10 = getTextureColor(texIdx, ivec2(c11.x, c00.y), texSize.x); vec4 s01 = getTextureColor(texIdx, ivec2(c00.x, c11.y), texSize.x); vec4 s11 = getTextureColor(texIdx, c11, texSize.x); return mix(mix(s00, s10, st.x), mix(s01, s11, st.x), st.y); }
+// vec4 getTextureColor(uint texIdx, ivec2 texCoord, int texSizeX) { uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * texSizeX + uint(texCoord.x); uint slotIndex = pixelOffset >> 2u; uint packedIdx = colors[slotIndex]; return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + ((packedIdx >> ((pixelOffset & 3u) << 3u)) & 0xFFu)]); }
+vec4 getTextureColor(uint texIdx, ivec2 texCoord, ivec2 texSize) {
+    texCoord = ivec2(mod(vec2(texCoord), vec2(texSize)));
+    if (texCoord.x < 0) texCoord.x += texSize.x;
+    if (texCoord.y < 0) texCoord.y += texSize.y;
+    uint pixelOffset = textureOffsets[texIdx]
+                     + uint(texCoord.y) * uint(texSize.x)
+                     + uint(texCoord.x);
+    uint slotIndex   = pixelOffset >> 2u;
+    uint packedIdx   = colors[slotIndex];
+    uint shift       = (pixelOffset & 3u) << 3u;
+    uint palIndex    = (packedIdx >> shift) & 0xFFu;
+    return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + palIndex]);
+}
+vec4 getTextureColorBilinear(uint texIdx, vec2 uvF, ivec2 texSize) { vec2 tc = uvF * vec2(texSize) - 0.5; vec2 base = floor(tc); vec2 st = tc - base; st = smoothstep(0.0, 1.0, st); ivec2 c00 = ivec2(mod(base, vec2(texSize))); ivec2 c11 = ivec2(mod(base + 1.0, vec2(texSize))); vec4 s00 = getTextureColor(texIdx, c00, texSize); vec4 s10 = getTextureColor(texIdx, ivec2(c11.x, c00.y), texSize); vec4 s01 = getTextureColor(texIdx, ivec2(c00.x, c11.y), texSize); vec4 s11 = getTextureColor(texIdx, c11, texSize); return mix(mix(s00, s10, st.x), mix(s01, s11, st.x), st.y); }
 vec2 EncodeOctahedral(vec3 n) { n = normalize(n); vec2 p = n.xy / (abs(n.x) + abs(n.y) + abs(n.z)); return n.z >= 0.0 ? p : (1.0 - abs(p.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0); }
 void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out vec2 tc) {
     vec3 a = abs(toLight); float mx = step(a.y,a.x) * step(a.z,a.x); float my = step(a.x,a.y) * step(a.z,a.y); float oneInv_mxy = 1.0 - mx - my; vec3 mxyz = vec3(mx,my,oneInv_mxy); vec3 sxyz = vec3(step(0.0,-toLight.x),step(0.0,-toLight.y),step(0.0,-toLight.z)); vec3 fxyz = vec3(mix(1.0,0.0,sxyz.x), mix(3.0,2.0,sxyz.y), mix(5.0,4.0,sxyz.z));
@@ -70,19 +83,30 @@ void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out
 
 float quintic_polynomial_smoothstep( float x ) { return x*x*x*(x*(x*6.0-15.0)+10.0); } // From https://iquilezles.org/articles/smoothsteps/
 void main() {
-    vec3 worldPos=FragPos.xyz; vec3 viewDir=(camPos-worldPos); float distToPixelSq=dot(viewDir,viewDir); float distToPixel=sqrt(distToPixelSq); viewDir*=inversesqrt(distToPixelSq); ivec2 texSize=useCamView>0 ? ivec2(camViewSize) : textureSizes[texIndex]; vec2 uv=(vec2(TexCoord.x,1.0-TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import 
-    vec4 albedoColor; if(useCamView>0){albedoColor=texture(camViewTex, vec2(TexCoord.x, TexCoord.y));}
-    else if (useFontAtlas != 0u) { float sdf = texture(fontAtlas, TexCoord).r; float glyphAlpha = smoothstep(0.45, 0.55, sdf); albedoColor = vec4(getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize.x).rgb, glyphAlpha); }
-    else albedoColor=getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize.x); if (useFontAtlas != 0u) { if (albedoColor.a < 0.05) discard; } else if (albedoColor.a < 0.05 && volume < 0.05) discard;/*Text decals cutout on SDF alpha alone; volume uniform belongs to chunk geometry*/
+    vec3 worldPos=FragPos.xyz;
+    vec3 viewDir=(camPos-worldPos);
+    float distToPixelSq=dot(viewDir,viewDir);
+    float distToPixel=sqrt(distToPixelSq);
+    viewDir*=inversesqrt(distToPixelSq);
+    ivec2 texSize=useCamView>0 ? ivec2(camViewSize) : textureSizes[texIndex];
+    vec2 uv=(vec2(TexCoord.x,1.0-TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import 
+    vec4 albedoColor;
+         if(useCamView>0){albedoColor=texture(camViewTex, vec2(TexCoord.x, TexCoord.y));}
+    else if (useFontAtlas != 0u) { float sdf = texture(fontAtlas, TexCoord).r; float glyphAlpha = smoothstep(0.45, 0.55, sdf); albedoColor = vec4(getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize).rgb, glyphAlpha); }
+    else {
+        albedoColor=getTextureColor(texIndex,ivec2(fract(uv)*vec2(texSize)),texSize);
+        if (useFontAtlas != 0u) { if (albedoColor.a < 0.05) discard; }
+        else if (albedoColor.a < 0.05 && volume < 0.05) discard;/*Text decals cutout on SDF alpha alone; volume uniform belongs to chunk geometry*/
+    }
     vec3 adjustedNormal=Normal; if (useFontAtlas != 0u && dot(Normal, viewDir) < 0.0) adjustedNormal = -Normal;/*Text decals are double-sided; light whichever face the viewer sees*/ bool hasNormalMap=normInstanceIndex != 0; float blend = 0.0; float facing = dot(Normal, viewDir); if (distToPixel < 5.12 && hasNormalMap) blend = 1.0; else if (distToPixel < 30.0 && hasNormalMap) { blend = smoothstep(30.0,5.12,distToPixel) * smoothstep(0.1,0.4,facing); }
     if (hasNormalMap && blend > 0.01) {
         vec3 dp1=dFdx(FragPos),dp2=dFdy(FragPos); vec2 duv1=dFdx(TexCoord),duv2=dFdy(TexCoord); float uvArea=abs(duv1.x*duv2.y - duv1.y*duv2.x);
         if (uvArea > 0.000000001) {
-            vec3 t=dp1*duv2.y-dp2*duv1.y; t*=inversesqrt(dot(t,t)); vec3 b=dp1*duv2.x-dp2*duv1.x; b*=inversesqrt(dot(b,b)); ivec2 texSizeNorm=textureSizes[normInstanceIndex]; vec3 normalColor=(getTextureColor(normInstanceIndex,ivec2(fract(uv)*vec2(texSizeNorm)),texSizeNorm.x).rgb * 2.0 - 1.0);
+            vec3 t=dp1*duv2.y-dp2*duv1.y; t*=inversesqrt(dot(t,t)); vec3 b=dp1*duv2.x-dp2*duv1.x; b*=inversesqrt(dot(b,b)); ivec2 texSizeNorm=textureSizes[normInstanceIndex]; vec3 normalColor=(getTextureColor(normInstanceIndex,ivec2(fract(uv)*vec2(texSizeNorm)),texSizeNorm).rgb * 2.0 - 1.0);
             normalColor.g = -normalColor.g; vec3 transformed=mat3(t,b,adjustedNormal)*normalColor; transformed *= inversesqrt(dot(transformed,transformed)); if(dot(transformed,Normal) < 0.0)transformed=Normal; adjustedNormal=mix(Normal,transformed,blend);
         }
     }
-    vec4 glowColor=vec4(0.0); if(glowIndex != 0){ivec2 texSizeGlow=textureSizes[glowIndex]; glowColor=getTextureColorBilinear(glowIndex,fract(uv),texSizeGlow);} vec4 specColor=vec4(0.0); if(specIndex != 0){ivec2 texSizeSpec=textureSizes[specIndex]; specColor=getTextureColor(specIndex,ivec2(fract(uv)*vec2(texSizeSpec)),texSizeSpec.x);}
+    vec4 glowColor=vec4(0.0); if(glowIndex != 0){ivec2 texSizeGlow=textureSizes[glowIndex]; glowColor=getTextureColorBilinear(glowIndex,fract(uv),texSizeGlow);} vec4 specColor=vec4(0.0); if(specIndex != 0){ivec2 texSizeSpec=textureSizes[specIndex]; specColor=getTextureColor(specIndex,ivec2(fract(uv)*vec2(texSizeSpec)),texSizeSpec);}
     if(reflectionsEnabled > 0){outSpecular=specColor; outNormal=EncodeOctahedral(adjustedNormal)*0.5 + 0.5;}/*Map to [0,1]*/ uint voxelIdx=GetVoxelIndex(worldPos); uint count=voxelLightListCounts[voxelIdx]; if(unlit>0 || useCamView>0)count=0; vec3 lighting=vec3(0.0);
     float iTot=0.0; float strength=(useStrengthMod>0) ? 1.0 : max(specColor.r,max(specColor.g,specColor.b))*4.51; float shadSizeMaxUV=shadowMapSizeF-1.0;
     for (uint i = 0u; i < count; i++) {
@@ -125,5 +149,6 @@ void main() {
     if (hopperDeathEffect.x > 0.0) lighting *= vec3(1.0 + hopperDeathEffect.x, 1.0, 1.0);
     if (hopperDeathEffect.y > 0.0) lighting += vec3(1.0, 0.0, 0.75) * hopperDeathEffect.y * rim * rim * rim;
     lighting.rgb += vec3((getBlueNoise(ivec2(gl_FragCoord.xy)) - 0.5) * 0.003921569); // Blue Noise Dither for banding (0.03ms performance cost, leaving in for quality)
-    if (unlit == 0) {/*Fog*/ float fogFac = clamp(distToPixel * 0.013950893, 0.0, 1.0);/*This is inverse of fog dist so * (1 / 71.68 far plane)*/ float lum = dot(lighting, vec3(0.299, 0.587, 0.114)); fogFac = clamp(fogFac*(1.0-lum),0.0,1.0); lighting=mix(fogColor,lighting,1.0-fogFac);} outAlbedo=vec4(lighting.rgb,albedoColor.a);
+    if (unlit == 0) {/*Fog*/ float fogFac = clamp(distToPixel * 0.013950893, 0.0, 1.0);/*This is inverse of fog dist so * (1 / 71.68 far plane)*/ float lum = dot(lighting, vec3(0.299, 0.587, 0.114)); fogFac = clamp(fogFac*(1.0-lum),0.0,1.0); lighting=mix(fogColor,lighting,1.0-fogFac);}
+    outAlbedo=vec4(lighting.rgb,albedoColor.a);
 }

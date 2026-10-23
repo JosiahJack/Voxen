@@ -561,7 +561,6 @@ void LoadLogTextForLanguage(u8 lang) {
         nxt:continue;}
 }
 
-#define TEXT_VTX_FLOATS 65536 /*30 floats (6 verts x 5) per glyph quad: sized for the longest credits page (988 source bytes, ~966 glyphs) so whole pages draw instead of stopping at 273 glyphs.*/
 static float textVertexData[TEXT_VTX_FLOATS]; extern Color textColors[]; enum {TALIGN_LEFT=0,TALIGN_CENTER=1,TALIGN_RIGHT=2};
 float MeasureLineAdvance(const char* p, u8 fontID) {
     float w=0; int cc=0;
@@ -580,7 +579,7 @@ void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 ali
         p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed); ypos+=ls; cc=0; continue; } int idx=CodepointToPackedIndex(cp,fontID); const stbtt_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx; float qx0=vfloor((xpos+b->xoff)+0.5f),qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
         float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw; float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f; float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 }; if (vc >= TEXT_VTX_FLOATS/30) break; mcpy(textVertexData + vc * 30,tv,sizeof(tv)); vc++;
         if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD){xpos = qx0 + fixedNumberAdvanceWidthStopD;}else xpos += b->xadvance;
-    } if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*30*sizeof(float),textVertexData,GL_DYNAMIC_DRAW); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
+    } if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferSubData(GL_ARRAY_BUFFER,0,vc*30*sizeof(float),textVertexData); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
 }
 
 void RenderTextL(i16 x, i16 y, u32 color, u8 f, float scale, const char* restrict s,...) { va_list a; __builtin_va_start(a,s); RenderFormattedText(x,y,color,f,scale,TALIGN_LEFT,s,a); __builtin_va_end(a); }

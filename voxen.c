@@ -837,7 +837,7 @@ __attribute__((noinline)) void RenderUIImageExtended(i16 x, i16 y, i16 width, i1
         vertices[i*5 + 4] = uvY[i];
     }
     
-    glBufferData(GL_ARRAY_BUFFER, 30 * sizeof(float), vertices, GL_DYNAMIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, 30 * sizeof(float), vertices);
     glDrawArrays(0x0004/*GL_TRIANGLES*/, 0, 6);
     drawCalls++;
     uiDrawCalls++;
@@ -960,7 +960,7 @@ void UpdateLights() {
     
     /*Always update the light intensity for flickers and such, no dirty flag*/
     glBindBuffer(GL_SSBO, lightsID);
-    glBufferData(GL_SSBO, World.loadedLights * sizeof(Light), World.lights, GL_DYNAMIC_DRAW);
+    glBufferSubData(GL_SSBO, 0, World.loadedLights * sizeof(Light), World.lights);
     glUseProgram(voxelUpdateSP);
     glUniform3f(5, World.position[PLAYER1].x, World.position[PLAYER1].y, World.position[PLAYER1].z);
     glUniform3f(8, World.instances[PLAYER1].forward.x, World.instances[PLAYER1].forward.y, World.instances[PLAYER1].forward.z);
@@ -1032,7 +1032,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     for (u16 i=0;i<World.loadedLights;++i) { shadowmapIndirectionList[i] = LIGHT_COUNT; }
     if (numCandidates == 0) {
         glBindBuffer(GL_SSBO, shadowMapsIndirectionID);
-        glBufferData(GL_SSBO, World.loadedLights*sizeof(u32), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+        glBufferSubData(GL_SSBO, 0, World.loadedLights*sizeof(u32), shadowmapIndirectionList);
         shadowTime = get_time() - shadowStartTime;
         return;
     }
@@ -1280,7 +1280,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     }
     glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
     glBindBuffer(GL_SSBO, shadowMapsIndirectionID);
-    glBufferData(GL_SSBO, World.loadedLights * sizeof(u32), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+    glBufferSubData(GL_SSBO, 0, World.loadedLights * sizeof(u32), shadowmapIndirectionList);
     shadowTime = get_time() - shadowStartTime;
 }
 
@@ -1905,7 +1905,7 @@ void UpdateInstanceMatrix4x4s() {
         glBindBuffer(GL_SSBO,matricesBufferID);
         u32 offsetFloats=(u32)INSTS_1ST_IDX * 16;
         u32 countFloats=((u32)World.instCount - (u32)INSTS_1ST_IDX) * 16;
-        glBufferData(GL_SSBO, (size_t)INSTANCE_COUNT*16*sizeof(float), NULL, GL_DYNAMIC_DRAW); glBufferSubData(GL_SSBO, offsetFloats * 4, countFloats * 4, modelMatrices + offsetFloats);
+        glBufferSubData(GL_SSBO, offsetFloats * 4, countFloats * 4, modelMatrices + offsetFloats);
     }
     if (Sys_Settings.Reflections == 2u) { // Upload instance metadata + world grid for ray-traced reflections.
         for (u32 i=0; i<World.instCount; ++i) {
@@ -2278,6 +2278,8 @@ void InitalizeEnvironment() {
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,3 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
     glBindVertexBuffer(0,textVBO,0,5*sizeof(float));
+    glBindBuffer(GL_ARRAY_BUFFER,textVBO);
+    glBufferData(GL_ARRAY_BUFFER,TEXT_VTX_FLOATS * sizeof(float),NULL,GL_DYNAMIC_DRAW);
     
     glBindVertexArray(debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO);
     glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW); debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * sizeof(DebugLineVertex)); /* allocated unconditionally, not under the showphys/shownpc cheats: door laser grids are gameplay and draw through this same path, so the staging buffer has to outlive the cheats being off. */
