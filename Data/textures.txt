@@ -2759,6 +2759,7 @@ index: 1248
 index: 1249
 #Textures/deb_wad.png
 index: 1250
+doublesided: 1
 #Textures/deb_warecasing.png
 index: 1251
 #Textures/UI/quitbutton.png

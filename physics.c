@@ -9,6 +9,37 @@ typedef struct { V3 point; float pen; } ManifoldPt;
 typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ra[3][3],Rb[3][3],Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
 SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount; float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projectileImpactQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projectileImpactTarget[INSTANCE_COUNT]; static V3 projectileImpactPoint[INSTANCE_COUNT],projectileImpactNormal[INSTANCE_COUNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
+typedef struct { u16 a,b; u8 n; V3 pt[MANIFOLD_MAX],normal; float accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],pen[MANIFOLD_MAX],dt; u8 votes; V3 challN,posA,posB; } WarmPair;
+#define WARM_PAIR_COUNT 2048 /*power of two for the hash mask*/
+static WarmPair gWarmPairs[WARM_PAIR_COUNT]; static u8 gWarmPairLevel=255;/*0xFF forces a clear on the very first Physics()*/
+INLINE u32 WarmPairHash(u16 a,u16 b) { return ((u32)a*40503u ^ (u32)b*69621u) & (WARM_PAIR_COUNT-1u); }
+INLINE WarmPair* WarmPairProbe(u16 a,u16 b) { u32 h=WarmPairHash(a,b); for (u32 p=0;p<8;++p) { WarmPair* wp=&gWarmPairs[(h+p)&(WARM_PAIR_COUNT-1u)]; if (!wp->n || (wp->a==a&&wp->b==b)) return wp; } return &gWarmPairs[h];/*saturated table: evict the hash home slot*/ }
+INLINE bool WarmPairSkip(u16 a,u16 b) { return (a==PLAYER1 || b==PLAYER1 || IdxIsNPC(World.instances[a].index) || IdxIsNPC(World.instances[b].index)); }
+static void WarmPairRestore(u16 a,u16 b,const Manifold *m,float dt,float *accumN,float *accumT) {
+    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); if (!wp->n || wp->a!=a || wp->b!=b) return; if (V3_dot(m->normal,wp->normal) < 0.8f) return;/*basis flipped since last solve: treat as new*/
+    float scale=vclamp(dt/vmax(wp->dt,PHY_EPSILON),0.25f,4.0f);/*re-ramp the cached impulses when the substep length drifted*/ bool used[MANIFOLD_MAX]={false};
+    for (int i=0;i<m->n;++i) { int best=-1; float bestD2=0.0025f/*5cm squared: resting contact points drift a hair between gathers*/;
+        for (int j=0;j<wp->n;++j) { if (used[j]) continue; V3 dv=V3_AsubB(m->p[i].point,wp->pt[j]); float d2=V3_dot(dv,dv); if (d2<bestD2){bestD2=d2;best=j;} }
+        if (best<0){accumN[i]=0.0f;accumT[i]=0.0f;continue;} used[best]=true; accumN[i]=wp->accumN[best]*scale; accumT[i]=wp->accumT[best]*scale; }
+}
+
+static void WarmPairSave(u16 a,u16 b,const Manifold *m,float dt,const float *accumN,const float *accumT) {
+    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); wp->a=a; wp->b=b; wp->n=(u8)m->n; wp->normal=m->normal; wp->dt=dt;
+    for (int i=0;i<m->n;++i) { wp->pt[i]=m->p[i].point; wp->accumN[i]=accumN[i]; wp->accumT[i]=accumT[i]; wp->pen[i]=m->p[i].pen; }
+    wp->posA=World.position[a]; wp->posB=World.position[b];
+}
+
+static void WarmPairGovern(u16 a,u16 b,Manifold *m) {
+    if (World.col[a] != CT_CVX || WarmPairSkip(a,b)) return;
+    WarmPair *wp=WarmPairProbe(a,b); if ((wp->n==0) || wp->a!=a || wp->b!=b) return;/*no resting basis for this pair yet: Save has to seed one first*/
+    if (V3_dot(World.velocity[a],World.velocity[a]) > 0.0225f/*(0.15 m/s)^2, ~2x the per-substep gravity inflow of a settled body*/ || V3_dot(World.velocity[b],World.velocity[b]) > 0.0225f || V3_dot(World.angularVelocity[a],World.angularVelocity[a]) > 0.09f/*(0.3 rad/s)^2, ~6x the sleep gate*/ || V3_dot(World.angularVelocity[b],World.angularVelocity[b]) > 0.09f) { wp->votes=0; return; }/*moving pair: EPA is authoritative*/
+    V3 relMove=V3_AsubB(V3_AsubB(World.position[a],wp->posA),V3_AsubB(World.position[b],wp->posB)); float alongN=V3_dot(wp->normal,relMove);/*how far the pair drifted along the cached normal since the cached pens were measured; positive = separating, negative = re-compressing*/
+    if ((m->n > 0) && V3_dot(m->normal,wp->normal) >= MANIFOLD_ALIGN_THRESHOLD) { wp->votes=0; return; }/*fresh agrees with the resting basis: publish it and let Save keep the cache current*/
+    if (m->n > 0) { if (V3_dot(m->normal,wp->challN) >= MANIFOLD_ALIGN_THRESHOLD) wp->votes++; else { wp->votes=1; wp->challN=m->normal; } if (wp->votes >= 3) { wp->votes=0; return; } }/*challenger won three gathers in a row: real relocation, let the fresh basis in (Save adopts it)*/
+    else { bool separated=true; for (int i=0;i<wp->n;++i) { if (wp->pen[i]-alongN >= -0.01f) { separated=false; break; } } if (separated) { wp->votes=0; return; } }/*every cached point drifted >1cm past touching: the pair genuinely parted, the fresh empty manifold is correct*/
+    int cnt=wp->n; if (cnt>MANIFOLD_MAX) cnt=MANIFOLD_MAX; m->n=(i32)cnt; m->normal=wp->normal; m->maxPen=0.0f;
+    for (int i=0;i<cnt;++i) { float pen=wp->pen[i]-alongN; if (pen<0.0f) pen=0.0f; m->p[i].point=wp->pt[i]; m->p[i].pen=pen; if (pen>m->maxPen) m->maxPen=pen; }
+}
 static void WarnPhysicsCapacity(u8 kind,const char* message){if(kind<5&&World.pauseRelativeTime>=nextCapacityWarn[kind]){DualLogWarn("%s\n",message);nextCapacityWarn[kind]=World.pauseRelativeTime+5.0f;}}
 INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAXANIM && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
 void AddForce(u16 i, V3 f, bool imp){if(imp){World.velocity[i]=V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f/vmax(World.mass[i],0.001f)));}else{World.instances[i].accumulatedForce=V3_AplusB(World.instances[i].accumulatedForce,f);} World.physSleep[i]=false;}
@@ -160,19 +191,29 @@ ShapeSphere Entity_GetSph(u16 i) { return (ShapeSphere){.ctr=V3_AplusB(World.pos
 Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5f; float s = vsinf(half); return (Quaternion){axis.x*s,axis.y*s,axis.z*s,vcosf(half)}; }
 Quaternion quat_normalize(Quaternion q) { float l = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; float m = (l < PHY_EPSILON); float inv=vinvsqtf(vmax(l,PHY_EPSILON)); q.x*=inv; q.y*=inv; q.z*=inv; q.w*=inv; q.x=q.x*(1.0f - m); q.y=q.y*(1.0f - m); q.z=q.z*(1.0f - m); q.w=q.w*(1.0f - m) + 1.0f*m; return q; }
 INLINE V3 MeshVert(u16 m, u32 i) { const float* p = physPos[m] + i * 3; return (V3){p[0],p[1],p[2]}; }
+static u8 g_hullComWarned[MAX_MDLS] = {0};
 void ComputeConvexMeshInertiaTensor(u16 i) {
     World.mass[i] *= 10.0f; // Intentional global mass scaling.  Gives better responses and robustness to small items.
     u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i]=false; if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) {return;}
     float acc[6]={0}; float cm[3]={0}; float volAcc=0.0f; u32 triCount = modelTriangleCounts[mi];
     for (u32 ti=0;ti<triCount;++ti) { // Accumulates without dividing by 6 for each saving that for the end for performance.
-        u32 i0=modelTriangles[mi][ti*3+0], i1=modelTriangles[mi][ti*3+1], i2=modelTriangles[mi][ti*3+2]; V3 v0=MeshVert(mi,i0), v1=MeshVert(mi,i1), v2=MeshVert(mi,i2); float det=V3_dot(v0,V3_Cross(v1,v2)); volAcc += det; // Signed 6x tetrahedron volume via scalar triple product
-        cm[0]+=det*(v0.x + v1.x + v2.x); cm[1] += det*(v0.y + v1.y + v2.y); cm[2] += det*(v0.z + v1.z + v2.z);
-        acc[0]+=det*(v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x);/*Analytic polynomial integration over volume*/ acc[1] += det*(v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y); acc[2] += det*(v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z);/*(Mirtich / Eberly polyhedron mass properties technique)*/
-        acc[3]+=det*(2.0f*(v0.x*v0.y+v1.x*v1.y+v2.x*v2.y)+v0.x*v1.y+v1.x*v0.y+v0.x*v2.y+v2.x*v0.y+v1.x*v2.y+v2.x*v1.y); acc[4]+=det*(2.0f*(v0.x*v0.z+v1.x*v1.z+v2.x*v2.z)+v0.x*v1.z+v1.x*v0.z+v0.x*v2.z+v2.x*v0.z+v1.x*v2.z+v2.x*v1.z); acc[5]+=det*(2.0f*(v0.y*v0.z+v1.y*v1.z+v2.y*v2.z)+v0.y*v1.z+v1.y*v0.z+v0.y*v2.z+v2.y*v0.z+v1.y*v2.z+v2.y*v1.z); /*Multiplier 2.0f handles the algebraic cross-term polynomial expansion*/
+        u32 i0 = modelTriangles[mi][ti*3+0], i1=modelTriangles[mi][ti*3+1], i2=modelTriangles[mi][ti*3+2]; V3 v0=MeshVert(mi,i0), v1=MeshVert(mi,i1), v2=MeshVert(mi,i2); float det=V3_dot(v0,V3_Cross(v1,v2)); volAcc += det; // Signed 6x tetrahedron volume via scalar triple product
+        cm[0]  += det*(v0.x + v1.x + v2.x); cm[1] += det*(v0.y + v1.y + v2.y); cm[2] += det*(v0.z + v1.z + v2.z);
+        acc[0] += det*(v0.x*v0.x + v0.x*v1.x + v1.x*v1.x + v0.x*v2.x + v1.x*v2.x + v2.x*v2.x);/*Analytic polynomial integration over volume*/
+        acc[1] += det*(v0.y*v0.y + v0.y*v1.y + v1.y*v1.y + v0.y*v2.y + v1.y*v2.y + v2.y*v2.y); acc[2] += det*(v0.z*v0.z + v0.z*v1.z + v1.z*v1.z + v0.z*v2.z + v1.z*v2.z + v2.z*v2.z);/*(Mirtich / Eberly polyhedron mass properties technique)*/
+        acc[3] += det*(2.0f*(v0.x*v0.y+v1.x*v1.y+v2.x*v2.y)+v0.x*v1.y+v1.x*v0.y+v0.x*v2.y+v2.x*v0.y+v1.x*v2.y+v2.x*v1.y);
+        acc[4] += det*(2.0f*(v0.x*v0.z+v1.x*v1.z+v2.x*v2.z)+v0.x*v1.z+v1.x*v0.z+v0.x*v2.z+v2.x*v0.z+v1.x*v2.z+v2.x*v1.z);
+        acc[5] += det*(2.0f*(v0.y*v0.z+v1.y*v1.z+v2.y*v2.z)+v0.y*v1.z+v1.y*v0.z+v0.y*v2.z+v2.y*v0.z+v1.y*v2.z+v2.y*v1.z); /*Multiplier 2.0f handles the algebraic cross-term polynomial expansion*/
     }
-    if(vabs(volAcc) < 1e-12f){return;}/*absolute 1e-4 (PHY_EPSILON) rejected thin cards to the sphere fallback*/ float sx=World.scale[i].x,sy=World.scale[i].y,sz=World.scale[i].z; float sd=World.mass[i]/(volAcc * 10.0f/*6/60*/), so = World.mass[i] / (volAcc * 20.0f/*6/120*/);/*Diagonals=6/60, off-diagonals=6/120, since those have the 2.0f multiplied above from the x^2 expansion resulting in 2xy terms.*/ float cx=cm[0]/(4.0f*volAcc),cy=cm[1]/(4.0f*volAcc),cz=cm[2]/(4.0f*volAcc); float scx=cx*sx,scy=cy*sy,scz=cz*sz,m=World.mass[i];/*Center of mass denominator 24 reduced by 6/24 = 1/4*/
-    float Ixx = sd*(acc[1]*sy*sy + acc[2]*sz*sz) - m*(scy*scy + scz*scz); float Iyy = sd*(acc[0]*sx*sx + acc[2]*sz*sz) - m*(scx*scx + scz*scz); float Izz = sd*(acc[0]*sx*sx + acc[1]*sy*sy) - m*(scx*scx + scy*scy); float Ixy = -(so*acc[3]*sx*sy - m*scx*scy); float Ixz = -(so*acc[4]*sx*sz - m*scx*scz); float Iyz = -(so*acc[5]*sy*sz - m*scy*scz); // Parallel Axis Theorem: shifts rotation center from origin (0,0,0) to center of mass
-    float r = modelBounds[mi] * vmax(vmax(sx,sy),sz); float mn = 0.04f * m * r * r; Ixx = vmax(Ixx,mn); Iyy = vmax(Iyy,mn); Izz = vmax(Izz,mn); // Clamp diagonal inertia to a minimum floor of 10% of the I=2/5ths*mr^2=0.4mr^2 hence 0.04 of spherical inertia to avoid NaN's.
+    if(vabs(volAcc) < 1e-12f){return;}/*absolute 1e-4 (PHY_EPSILON) rejected thin cards to the sphere fallback*/
+        
+    float sx=World.scale[i].x,sy=World.scale[i].y,sz=World.scale[i].z;
+    float sd=World.mass[i]/(volAcc * 10.0f/*6/60*/), so = World.mass[i] / (volAcc * 20.0f/*6/120*/);/*Diagonals=6/60, off-diagonals=6/120, since those have the 2.0f multiplied above from the x^2 expansion resulting in 2xy terms.*/
+    float scx=cm[0]*sx/(4.0f*volAcc),scy=cm[1]*sy/(4.0f*volAcc),scz=cm[2]*sz/(4.0f*volAcc),m=World.mass[i];
+    float Ixx = sd*(acc[1]*sy*sy + acc[2]*sz*sz), Iyy = sd*(acc[0]*sx*sx + acc[2]*sz*sz), Izz = sd*(acc[0]*sx*sx + acc[1]*sy*sy), Ixy = -so*acc[3]*sx*sy, Ixz = -so*acc[4]*sx*sz, Iyz = -so*acc[5]*sy*sz;
+    float r = modelBounds[mi] * vmax(vmax(sx,sy),sz); float comMag = vsqrtf(scx*scx + scy*scy + scz*scz);
+    if (!g_hullComWarned[mi] && comMag > 0.25f*r) { g_hullComWarned[mi]=1; }
+    float mn = 0.04f * m * r * r; Ixx = vmax(Ixx,mn); Iyy = vmax(Iyy,mn); Izz = vmax(Izz,mn); // Clamp diagonal inertia to a minimum floor of 10% of the I=2/5ths*mr^2=0.4mr^2 hence 0.04 of spherical inertia to avoid NaN's.
     float det = Ixx*(Iyy*Izz - Iyz*Iyz) - Ixy*(Ixy*Izz - Ixz*Iyz) + Ixz*(Ixy*Iyz - Iyy*Ixz); if (vabs(det) < 1e-24f) return;
     float invDet = 1.0f / det, *iI=World.invInertiaTensor[i]; // Applies Cramer's Rule to invert for actual use.  [ 0  3  4 ]  (0=Ixx, 1=Iyy, 2=Izz) (3=Ixy, 4=Ixz, 5=Iyz)
     iI[0]=(Iyy*Izz - Iyz*Iyz)*invDet; iI[1]=(Ixx*Izz - Ixz*Ixz)*invDet; iI[2]=(Ixx*Iyy - Ixy*Ixy)*invDet;      // [ 3  1  5 ]  Tensor is symmetric only 6 unique elements needed
@@ -276,11 +317,63 @@ static Manifold RunGjkEpa(SupportCtx* ctx) {
     Manifold m={0}; GJKResult gjk=RunGJK(ctx,GJK_ITER); if(!gjk.hit)return m; if(gjk.s.n<4) RunGJKFallback(ctx,&gjk.s); if(gjk.s.n<4)return m; EPAState epa; SeedEPA(&epa,&gjk.s);
     for(int it=0;it<EPA_ITER;++it){ int bf=-1; float bd=1000000000.0f; for(int f=0;f<epa.nf;f++)if(epa.ef[f].d<bd){bd=epa.ef[f].d;bf=f;} if(bf<0)break; V3 bn=epa.ef[bf].n; V3 wA,wB; GetSupportPair(ctx,bn,&wA,&wB); V3 sup=V3_AsubB(wA,wB); if(V3_dot(bn,sup)-bd<PHY_EPSILON){return MakeEPAManifold(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c,bn,bd);} if (!ExpandEPA(&epa,sup,wA,wB))break;}    return m;
 }
-Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx, u16 adjIdx) {
-    if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return (Manifold){0}; u8 col=World.col[prim]; V3 (*supA)(const SupportCtx*,V3)=(col == CT_SPH) ? _supA_sph : (col == CT_BOX) ? _supA_box : _supA_cap; SupportCtx ctx=(SupportCtx){supA,_supB_hullA,.prim=prim,.meshA=mesh,.matA=mx,.adjA=adjIdx,.adjB=adjIdx}; return RunGjkEpa(&ctx);
+
+static void PrimitiveCvxFillPoints(Manifold* m, u16 prim, u16 hullMesh, const float* hullMx) {
+    if (m->n >= MANIFOLD_MAX || m->maxPen <= 0.0f || World.col[prim] != CT_BOX || hullMesh >= MAX_MDLS || !modelVertexCounts[hullMesh] || !physPos[hullMesh]) { return; }
+    ShapeBox box=Entity_GetBox(prim);
+    V3 axx=quat_rot_v3(box.rot,(V3){1.0f,0.0f,0.0f}), ayy=quat_rot_v3(box.rot,(V3){0.0f,1.0f,0.0f}), azz=quat_rot_v3(box.rot,(V3){0.0f,0.0f,1.0f});
+    V3 hx=V3_ScaleByF(axx,box.hExt.x), hy=V3_ScaleByF(ayy,box.hExt.y), hz=V3_ScaleByF(azz,box.hExt.z);
+    V3 bv[8]={V3_AplusB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz),V3_AplusB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz), V3_AplusB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AsubB(V3_AplusB(box.ctr,hx),hy),hz), V3_AsubB(V3_AplusB(V3_AsubB(box.ctr,hx),hy),hz),  V3_AsubB(V3_AsubB(V3_AsubB(box.ctr,hx),hy),hz)};
+    V3 n=m->normal; float bd=m->maxPen, pd=V3_dot(n,m->p[0].point);
+    float ws=V3_Mag((V3){hullMx[0],hullMx[1],hullMx[2]});
+    float ttH=vclamp(modelBounds[hullMesh]*ws*0.06f,0.003f,0.02f);
+    float ttB=vclamp(V3_Mag(box.hExt)*0.06f,0.003f,0.02f);
+    u32 hn=(u32)modelVertexCounts[hullMesh];
+    struct { V3 mn,mx; } fullH; fullH.mn=(V3){1000000000.0f,1000000000.0f,1000000000.0f}; fullH.mx=(V3){-1000000000.0f,-1000000000.0f,-1000000000.0f};
+    for (u32 i=0;i<hn;++i) { V3 w=MvVert(hullMx,MeshVert(hullMesh,i));
+        fullH.mn.x=vmin(fullH.mn.x,w.x); fullH.mn.y=vmin(fullH.mn.y,w.y); fullH.mn.z=vmin(fullH.mn.z,w.z);
+        fullH.mx.x=vmax(fullH.mx.x,w.x); fullH.mx.y=vmax(fullH.mx.y,w.y); fullH.mx.z=vmax(fullH.mx.z,w.z); }
+    float spH=vmax(0.02f,vmax(fullH.mx.x-fullH.mn.x,vmax(fullH.mx.y-fullH.mn.y,fullH.mx.z-fullH.mn.z))*0.15f);
+    struct { V3 mn,mx; } fpH; fpH.mn=(V3){1000000000.0f,1000000000.0f,1000000000.0f}; fpH.mx=(V3){-1000000000.0f,-1000000000.0f,-1000000000.0f}; bool haveH=false;
+    for (u32 i=0;i<hn;++i) { V3 w=MvVert(hullMx,MeshVert(hullMesh,i));
+        if (vabs(V3_dot(n,w)-pd) <= ttH) { haveH=true;
+            fpH.mn.x=vmin(fpH.mn.x,w.x); fpH.mn.y=vmin(fpH.mn.y,w.y); fpH.mn.z=vmin(fpH.mn.z,w.z);
+            fpH.mx.x=vmax(fpH.mx.x,w.x); fpH.mx.y=vmax(fpH.mx.y,w.y); fpH.mx.z=vmax(fpH.mx.z,w.z); } }
+    struct { V3 mn,mx; } fpB; fpB.mn=(V3){1000000000.0f,1000000000.0f,1000000000.0f}; fpB.mx=(V3){-1000000000.0f,-1000000000.0f,-1000000000.0f}; bool haveB=false;
+    for (int i=0;i<8;++i) { V3 w=bv[i];
+        if (vabs(V3_dot(n,w)-pd) <= ttB) { haveB=true;
+            fpB.mn.x=vmin(fpB.mn.x,w.x); fpB.mn.y=vmin(fpB.mn.y,w.y); fpB.mn.z=vmin(fpB.mn.z,w.z);
+            fpB.mx.x=vmax(fpB.mx.x,w.x); fpB.mx.y=vmax(fpB.mx.y,w.y); fpB.mx.z=vmax(fpB.mx.z,w.z); } }
+    float spB=vmax(0.02f,vmax(vabs(hx.x)+vabs(hy.x)+vabs(hz.x),vmax(vabs(hx.y)+vabs(hy.y)+vabs(hz.y),vabs(hx.z)+vabs(hy.z)+vabs(hz.z)))*0.15f);/*box world span*0.15, BoxMsh recipe*/
+    float spu=vmax(0.02f,vmin(spH,spB));
+    for (int pass=0;pass<2 && m->n<MANIFOLD_MAX;++pass) {
+        if (pass==0) {
+            if (!haveB) continue;/*no box corner near the plane: edge/corner-only touch, keep EPA's 1pt*/
+            for (u32 i=0;i<hn && m->n<MANIFOLD_MAX;++i) {
+                V3 w=MvVert(hullMx,MeshVert(hullMesh,i));
+                float d=V3_dot(n,w)-pd; if (vabs(d)>ttH) continue; float ptPen=bd-d; if (ptPen<=0.0f) continue;
+                if (w.x<fpB.mn.x-spu || w.x>fpB.mx.x+spu || w.y<fpB.mn.y-spu || w.y>fpB.mx.y+spu || w.z<fpB.mn.z-spu || w.z>fpB.mx.z+spu) continue;
+                bool isDup=false; for (int k=0;k<m->n;++k){V3 diff=V3_AsubB(w,m->p[k].point); if(V3_dot(diff,diff)<spu*spu){isDup=true;break;}}
+                if (!isDup) m->p[m->n++]=(ManifoldPt){w,ptPen};
+            }
+        } else {
+            if (!haveH) continue;
+            for (int i=0;i<8 && m->n<MANIFOLD_MAX;++i) {
+                V3 w=bv[i];
+                float d=V3_dot(n,w)-pd; if (vabs(d)>ttB) continue; float ptPen=bd-d; if (ptPen<=0.0f) continue;
+                if (w.x<fpH.mn.x-spu || w.x>fpH.mx.x+spu || w.y<fpH.mn.y-spu || w.y>fpH.mx.y+spu || w.z<fpH.mn.z-spu || w.z>fpH.mx.z+spu) continue;
+                bool isDup=false; for (int k=0;k<m->n;++k){V3 diff=V3_AsubB(w,m->p[k].point); if(V3_dot(diff,diff)<spu*spu){isDup=true;break;}}
+                if (!isDup) m->p[m->n++]=(ManifoldPt){w,ptPen};
+            }
+        }
+    }
 }
-// Same test against a capsule the caller already has in hand, so probes that are not entities (the SpawnManager's
-// free-floating area-clear sphere) can be tested against convex level geometry without an instance slot.
+
+Manifold PrimitiveCvx(u16 prim, u16 mesh, const float* mx, u16 adjIdx) {
+    if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return (Manifold){0}; u8 col=World.col[prim]; V3 (*supA)(const SupportCtx*,V3)=(col == CT_SPH) ? _supA_sph : (col == CT_BOX) ? _supA_box : _supA_cap; SupportCtx ctx=(SupportCtx){supA,_supB_hullA,.prim=prim,.meshA=mesh,.matA=mx,.adjA=adjIdx,.adjB=adjIdx};
+    Manifold m=RunGjkEpa(&ctx); if (m.n) PrimitiveCvxFillPoints(&m,prim,mesh,mx); return m;
+}
+
 Manifold PrimitiveCvxCapsule(ShapeCapsule cap, u16 mesh, const float* mx, u16 adjIdx) {
     if(mesh>=MAX_MDLS||adjIdx>=MAX_MDLS||!modelVertexCounts[mesh])return (Manifold){0}; SupportCtx ctx=(SupportCtx){_supA_capShape,_supB_hullA,.meshA=mesh,.matA=mx,.adjA=adjIdx,.adjB=adjIdx,.capShape=cap}; return RunGjkEpa(&ctx);
 }
@@ -345,6 +438,41 @@ static Manifold BoxMsh(ShapeBox box, u16 triMesh, const float* triMx) {
     ctx.boxV=bv; ctx.boxN=8; if (BvhHasBVH(triMesh)) { BvhWalkAABB_CvxTri(triMesh,triMx,ctx.hb,&ctx); } else { u32 triCount=modelTriangleCounts[triMesh]; for(u32 ti=0;ti<triCount;++ti){V3 ta,tb,tc; MeshTri(triMesh,ti,triMx,&ta,&tb,&tc); CvxTriTest(&ctx,ta,tb,tc);} } CvxMshFillExtraPoints(&ctx); if(ctx.best.n) ctx.best.normal=V3_ScaleByF(ctx.best.normal,-1.f); return ctx.best;
 }
 
+static void CvxCvxFillPoints(Manifold* m, const SupportCtx* ctx) {
+    if (m->n >= MANIFOLD_MAX || m->maxPen <= 0.0f) return;
+    u16 mA=ctx->meshA, mB=ctx->meshB; if (mA>=MAX_MDLS || mB>=MAX_MDLS) return;
+    u32 hn[2]={(u32)modelVertexCounts[mA],(u32)modelVertexCounts[mB]};
+    if (!hn[0] || !hn[1] || !physPos[mA] || !physPos[mB]) return;
+    const float* hmx[2]={ctx->matA,ctx->matB}; u16 hmesh[2]={mA,mB};
+    V3 n=m->normal; float bd=m->maxPen; V3 pc=m->p[0].point; float planeDist=V3_dot(n,pc);
+    AABB3 fp[2]; float tt[2], sp[2]; bool haveFp[2]={false,false};
+    for (int side=0;side<2;++side) {
+        float ws=V3_Mag((V3){hmx[side][0],hmx[side][1],hmx[side][2]});
+        tt[side]=vclamp(modelBounds[hmesh[side]]*ws*0.06f,0.003f,0.02f);
+        AABB3 full; full.mn=(V3){1000000000.0f,1000000000.0f,1000000000.0f}; full.mx=(V3){-1000000000.0f,-1000000000.0f,-1000000000.0f};
+        for (u32 i=0;i<hn[side];++i) { V3 w=MvVert(hmx[side],MeshVert(hmesh[side],i));
+            full.mn.x=vmin(full.mn.x,w.x); full.mn.y=vmin(full.mn.y,w.y); full.mn.z=vmin(full.mn.z,w.z);
+            full.mx.x=vmax(full.mx.x,w.x); full.mx.y=vmax(full.mx.y,w.y); full.mx.z=vmax(full.mx.z,w.z); }
+        V3 ext=V3_AsubB(full.mx,full.mn); sp[side]=vmax(0.02f,vmax(ext.x,vmax(ext.y,ext.z))*0.15f);
+        fp[side].mn=(V3){1000000000.0f,1000000000.0f,1000000000.0f}; fp[side].mx=(V3){-1000000000.0f,-1000000000.0f,-1000000000.0f};
+        for (u32 i=0;i<hn[side];++i) { V3 w=MvVert(hmx[side],MeshVert(hmesh[side],i));
+            if (vabs(V3_dot(n,w)-planeDist) <= tt[side]) { haveFp[side]=true;
+                fp[side].mn.x=vmin(fp[side].mn.x,w.x); fp[side].mn.y=vmin(fp[side].mn.y,w.y); fp[side].mn.z=vmin(fp[side].mn.z,w.z);
+                fp[side].mx.x=vmax(fp[side].mx.x,w.x); fp[side].mx.y=vmax(fp[side].mx.y,w.y); fp[side].mx.z=vmax(fp[side].mx.z,w.z); } }
+    }
+    float spu=vmax(0.02f,vmin(sp[0],sp[1]));/*dedupe/footprint slop: the smaller stamp's spread, floored like CvxMsh's*/
+    for (int pass=0;pass<2 && m->n<MANIFOLD_MAX;++pass) {
+        int own=pass, oth=pass^1; if (!haveFp[oth]) continue;/*no band on the partner: a point/edge touch, keep EPA's 1pt*/
+        for (u32 i=0;i<hn[own] && m->n<MANIFOLD_MAX;++i) {
+            V3 w=MvVert(hmx[own],MeshVert(hmesh[own],i));
+            float d=V3_dot(n,w)-planeDist; if (vabs(d)>tt[own]) continue; float ptPen=bd-d; if (ptPen<=0.0f) continue;
+            if (w.x<fp[oth].mn.x-spu || w.x>fp[oth].mx.x+spu || w.y<fp[oth].mn.y-spu || w.y>fp[oth].mx.y+spu || w.z<fp[oth].mn.z-spu || w.z>fp[oth].mx.z+spu) continue;
+            bool isDup=false; for (int k=0;k<m->n;++k){V3 diff=V3_AsubB(w,m->p[k].point); if(V3_dot(diff,diff)<spu*spu){isDup=true;break;}}
+            if (!isDup) m->p[m->n++]=(ManifoldPt){w,ptPen};
+        }
+    }
+}
+
 Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 adjA, u16 adjB) {
     Manifold m={0};
     if(meshA>=MAX_MDLS||adjA>=MAX_MDLS||meshB>=MAX_MDLS||adjB>=MAX_MDLS)return m;
@@ -370,11 +498,7 @@ Manifold CvxCvx(u16 meshA, u16 meshB, const float* matA, const float* matB, u16 
             m.normal=bn;
             m.maxPen=bd;
             m.n=1;
-            V3 deepPoint=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); m.p[0]=(ManifoldPt){deepPoint,bd}; u32 nVertsB = modelVertexCounts[meshB];
-            if (nVertsB > 0) {
-                float planeDist=V3_dot(bn,deepPoint),wscaleB=V3_Mag((V3){matB[0],matB[1],matB[2]}),thicknessTolerance=vclamp(modelBounds[meshB]*wscaleB*0.06f,0.003f,0.02f); const u8* vb = (u8*)physPos[meshB]; 
-                for(u32 i=0;i<nVertsB;++i){const u8* p=vb+i*12; V3 ptLocal=*(V3*)p; V3 pt=MvVert(matB,ptLocal); float distToPlane=V3_dot(bn,pt)-planeDist; if(vabs(distToPlane)<thicknessTolerance){float ptPen=bd-distToPlane; if(ptPen>0.0f){bool isDup=false; for(int k=0;k<m.n;++k){V3 diff=V3_AsubB(pt,m.p[k].point); if(V3_dot(diff,diff)<0.00001f){isDup=true; break;}} if(!isDup&&m.n<MANIFOLD_MAX){m.p[m.n++]=(ManifoldPt){pt,ptPen};} if(m.n>=MANIFOLD_MAX){break;}}}}
-            } return m;
+            V3 deepPoint=EPAContactPoint(epa.ev,epa.ef[bf].a,epa.ef[bf].b,epa.ef[bf].c); m.p[0]=(ManifoldPt){deepPoint,bd}; CvxCvxFillPoints(&m,&ctx); return m;
         } if (!ExpandEPA(&epa,sup,wA,wB)) break;
     } return m;
 }
@@ -397,14 +521,15 @@ void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this su
                 if (tLen > 0.0001f) {
                     tangent = V3_ScaleByF(tangent,1.0f/tLen); V3 rAxT = V3_Cross(rAarm,tangent), rBxT = V3_Cross(rBarm,tangent); float angTermAT = canRotateA ? V3_dot(rAxT,M33_v(Ka,rAxT)) : 0.0f, angTermBT = canRotateB ? V3_dot(rBxT,M33_v(Kb,rBxT)) : 0.0f, invSumT = invMassA + invMassB + angTermAT + angTermBT;
                     if (invSumT > PHY_EPSILON) {
-                        float jt = -V3_dot(relVel2,tangent) / invSumT, friction; bool aIsSpecial = (a == PLAYER1 || (World.col[a] == CT_CAP && IdxIsNPC(World.instances[a].index))); if (bStatic && aIsSpecial) { friction = 0.001f; } /*PLAYER1 qualifies regardless of collider type: the cyberspace CT_SPH swap must not hand him wall friction the capsule never had.*/ else { float mix = vclamp((tLen - 0.005f) / 0.10f, 0.0f, 1.0f); friction = 0.8f + mix * (0.6f - 0.8f); }
+                        float jt = -V3_dot(relVel2,tangent) / invSumT, friction; bool aIsSpecial = (a == PLAYER1 || (World.col[a] == CT_CAP && IdxIsNPC(World.instances[a].index))); if (bStatic && aIsSpecial) { friction = 0.001f; } else { float mix = vclamp((tLen - 0.005f) / 0.10f, 0.0f, 1.0f); friction = 0.8f + mix * (0.6f - 0.8f); }
                         float maxT = friction * (*accumN);  float newAccumT = vclamp(*accumT + jt, -maxT, maxT); jt = newAccumT - *accumT; *accumT = newAccumT; float deltaVt = jt * invSumT; if (deltaVt < 0.0f) deltaVt = -deltaVt; if (deltaVt > maxDelta) maxDelta = deltaVt;
                         V3 fImpulse=V3_ScaleByF(tangent,jt); World.velocity[a]=V3_AplusB(World.velocity[a],V3_ScaleByF(fImpulse,invMassA)); if (!bStatic){World.velocity[b]=V3_AsubB(World.velocity[b],V3_ScaleByF(fImpulse,invMassB));}
                         if (canRotateA){World.angularVelocity[a]=V3_AplusB(World.angularVelocity[a],M33_v(Ka,V3_Cross(rAarm,fImpulse)));} if (canRotateB){World.angularVelocity[b]=V3_AsubB(World.angularVelocity[b],M33_v(Kb,V3_Cross(rBarm,fImpulse)));}
                     }
                 }
             }
-        } if (maxDelta < 0.005f) break;
+        }
+        if (maxDelta < 0.005f && it >= (SOLVER_ITER_GLOBAL >> 2)) break;
     }
 }
 
@@ -414,14 +539,21 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
     SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m; sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == CT_NONE || World.col[b] == CT_MSH || World.physSleep[b]);
     for (int i=0;i<m->n;++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} } quat_to_mat3(World.rotation[a],sc->Ra); BuildInvInertiaMatrix(a,sc->Ra,sc->Ka);
     if (!sc->bStatic) { quat_to_mat3(World.rotation[b],sc->Rb); BuildInvInertiaMatrix(b,sc->Rb,sc->Kb); } sc->invMassA = World.mass[a] < 0.001f ? 1.0f : 1.0f / World.mass[a]; sc->invMassB = (sc->bStatic || World.mass[b] < 0.001f) ? 0.0f : 1.0f / World.mass[b];
-    sc->canRotateA = (a != PLAYER1 && World.col[a] != CT_CAP && !IdxIsNPC(World.instances[a].index)); sc->canRotateB = (!sc->bStatic && b != PLAYER1 && World.col[b] != CT_CAP && !IdxIsNPC(World.instances[b].index)); /*PLAYER1 rotation is input-owned in both modes (Euler yaw/pitch outside cyberspace, incremental 6DOF inside it); contact torque on the player is never wanted, and the capsule check alone stopped covering him when cyberspace swapped him to CT_SPH.*/
+    sc->canRotateA = (a != PLAYER1 && World.col[a] != CT_CAP && !IdxIsNPC(World.instances[a].index)); sc->canRotateB = (!sc->bStatic && b != PLAYER1 && World.col[b] != CT_CAP && !IdxIsNPC(World.instances[b].index));
     float bouncinessA = (World.instances[a].index == 485/*proj_plasmarifle_shot*/ ? 0.9f : 0.3f); float bouncinessB = (World.instances[b].index == 485/*proj_plasmarifle_shot*/ ? 0.9f : 0.3f/*Everything is slightly responsive bounce*/); if (sc->bStatic) bouncinessB = 0.0f;
     if (a == PLAYER1 || b == PLAYER1 || IdxIsNPC(World.instances[a].index) || IdxIsNPC(World.instances[b].index)) bouncinessA = bouncinessB = 0.0f;/*a/b are instance slots; IdxIsNPC wants the const index, so this used to only match bodies that happened to sit in slots 419-447*/
     for (int i=0;i<m->n;++i) {
         sc->rA[i] = V3_AsubB(m->p[i].point,World.position[a]); sc->rB[i] = sc->bStatic ? (V3){0} : V3_AsubB(m->p[i].point,World.position[b]); V3 vAtA = V3_AplusB(World.velocity[a],V3_Cross(World.angularVelocity[a],sc->rA[i])), vAtB = sc->bStatic ? (V3){0} : V3_AplusB(World.velocity[b],V3_Cross(World.angularVelocity[b],sc->rB[i]));
         float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal), e_r = (vn0 < -0.5f) ? vmax(bouncinessA,bouncinessB) : 0.0f; sc->targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f; sc->targetVn[i] += 0.22f * vmax(m->p[i].pen - 0.06f, 0.0f) / dt; // per-point Baumgarte bias, frozen at gather time
-        V3 rAxN = V3_Cross(sc->rA[i],m->normal), rBxN = V3_Cross(sc->rB[i],m->normal); sc->invSumN[i] = sc->invMassA + sc->invMassB + (sc->canRotateA ? V3_dot(rAxN,M33_v(sc->Ka,rAxN)) : 0.0f) + (sc->canRotateB ? V3_dot(rBxN,M33_v(sc->Kb,rBxN)) : 0.0f); sc->accumN[i] = 0.0f; sc->accumT[i] = 0.0f; // no warm-starting across substeps
+        V3 rAxN = V3_Cross(sc->rA[i],m->normal), rBxN = V3_Cross(sc->rB[i],m->normal); sc->invSumN[i] = sc->invMassA + sc->invMassB + (sc->canRotateA ? V3_dot(rAxN,M33_v(sc->Ka,rAxN)) : 0.0f) + (sc->canRotateB ? V3_dot(rBxN,M33_v(sc->Kb,rBxN)) : 0.0f); sc->accumN[i] = 0.0f; sc->accumT[i] = 0.0f; // zeroed first; the warm start cache overwrites below when the pair is still valid
     }
+    WarmPairRestore(a,b,m,dt,sc->accumN,sc->accumT);
+    {
+      for (int i=0;i<sc->m.n;++i) { if (sc->accumN[i] <= 0.0f) continue; sc->accumT[i] = 0.0f;
+        V3 imp = V3_ScaleByF(sc->m.normal, sc->accumN[i]);
+        World.velocity[a] = V3_AplusB(World.velocity[a], V3_ScaleByF(imp, sc->invMassA));
+        if (sc->canRotateA) World.angularVelocity[a] = V3_AplusB(World.angularVelocity[a], M33_v(sc->Ka, V3_Cross(sc->rA[i], imp)));
+        if (!sc->bStatic) { World.velocity[b] = V3_AsubB(World.velocity[b], V3_ScaleByF(imp, sc->invMassB)); if (sc->canRotateB) World.angularVelocity[b] = V3_AsubB(World.angularVelocity[b], M33_v(sc->Kb, V3_Cross(sc->rB[i], imp))); } } }
 }
 
 static void EntityColliderMatrixNow(u16 i, float M[16]){Quaternion q=World.rotation[i]; V3 sx=V3_ScaleByF(quat_rot_v3(q,(V3){1,0,0}),World.scale[i].x); V3 sy=V3_ScaleByF(quat_rot_v3(q,(V3){0,1,0}),World.scale[i].y); V3 sz=V3_ScaleByF(quat_rot_v3(q,(V3){0,0,1}),World.scale[i].z); V3 p=World.position[i]; M[0]=sx.x; M[1]=sx.y; M[2]=sx.z; M[3]=0.0f; M[4]=sy.x; M[5]=sy.y; M[6]=sy.z; M[7]=0.0f; M[8]=sz.x; M[9]=sz.y; M[10]=sz.z; M[11]=0.0f; M[12]=p.x; M[13]=p.y; M[14]=p.z; M[15]=1.0f;}
@@ -429,8 +561,14 @@ static bool CapsuleTouchesOBB(V3 pt, float radius, ShapeBox box) {V3 d=V3_AsubB(
 INLINE int V3_IsSane(V3 v) { union { float f; u32 i; } ux,uy,uz; ux.f = v.x; uy.f = v.y; uz.f = v.z; return !(((ux.i & 0x7FFFFFFF) >= 0x7F800000) | ((uy.i & 0x7FFFFFFF) >= 0x7F800000) | ((uz.i & 0x7FFFFFFF) >= 0x7F800000)); }
 static bool reverbZoneActive; static u16 activeReverbPreset;
 void Physics(float dt) {
-    if(gravityLiftOverlapLevel!=World.curLev){mset(gravityLiftWasInside,0,sizeof(gravityLiftWasInside));mset(gravityLiftTopSupport,0,sizeof(gravityLiftTopSupport));teleportWasTouching=0;ladderSFXFinished=0.0;gravityLiftOverlapLevel=World.curLev;}
-    mset(grenadeImpactQueued,0,sizeof(grenadeImpactQueued)); mset(projectileImpactQueued,0,sizeof(projectileImpactQueued));mset(projectileContactThisFrame,0,sizeof(projectileContactThisFrame)); for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false); World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40); float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
+    if (gravityLiftOverlapLevel!=World.curLev) { mset(gravityLiftWasInside,0,sizeof(gravityLiftWasInside)); mset(gravityLiftTopSupport,0,sizeof(gravityLiftTopSupport));teleportWasTouching=0;ladderSFXFinished=0.0;gravityLiftOverlapLevel=World.curLev; }
+    if (gWarmPairLevel != World.curLev) { mset(gWarmPairs,0,sizeof(gWarmPairs));gWarmPairLevel=World.curLev; mset(World.physQuiet,0,sizeof(u8)*INSTANCE_COUNT); } /*only the current level gets warm-start cache*/
+    mset(grenadeImpactQueued,0,sizeof(grenadeImpactQueued));
+    mset(projectileImpactQueued,0,sizeof(projectileImpactQueued));
+    mset(projectileContactThisFrame,0,sizeof(projectileContactThisFrame));
+    for (u16 i=0;i<World.instCount;++i) flag_set(&World.instances[i].entflags,EF_MOVING,false);
+    World.substeps = (u8)vclamp((u32)(dt / MAX_STEP_SIZE + 0.5f),1u,(u32)40);
+    float dtsub = dt / (float)World.substeps; dynamicEntityCount = 0;
     for (u16 i=0;i<World.instCount;++i) {/*Update the radius for all entities for rendering and physics, then add dynamic ones to dynamicEntities[]*/
         float absx=vabs(World.scale[i].x),absy=vabs(World.scale[i].y),absz=vabs(World.scale[i].z);
         if(World.col[i]==CT_MSH||World.col[i]==CT_CVX){World.radius[i]=modelBounds[World.col[i]==CT_CVX ? World.instances[i].colMeshIndex : World.instances[i].modelIndex]*vmax(vmax(absx,absy),absz);}else if(likely(World.col[i] == CT_BOX)){float hx=World.colliderSize[i].x*.5f*absx,hy=World.colliderSize[i].y*.5f*absy,hz=World.colliderSize[i].z*0.5f*absz; World.radius[i]=vsqrtf(hx*hx+hy*hy+hz*hz);}
@@ -447,7 +585,9 @@ void Physics(float dt) {
         }
         gContactCount=0;
         for (u16 i=0;i<dynamicEntityCount;++i) { // 1. Integrate velocity
-            u16 a=dynamicEntities[i]; if (IdxIsNPC(World.instances[a].index) && (World.instances[a].entflags & EF_ASLEEP)) { continue; } V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if (World.curLev == LEVEL_CYBERSPACE) acc.y = 0.0f; /*Nothing gets gravity in cyberspace: NPCs, items, projectiles, and the player all float (user directive 2026-10-23).*/ else if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; if (a == PLAYER1 && World.curLev == LEVEL_CYBERSPACE && World.diffCyb > 1 && !Cheats.noclip && V3_dot(World.velocity[a],World.velocity[a]) < 10000.0f) { acc = V3_AplusB(acc,V3_ScaleByF(quat_rot_v3(World.rotation[a],(V3){0.0f,0.0f,1.0f}),2.0f)); } /*Unity CyberspaceMovement detrimental force at difficultyCyber>1: AddForce(viewDir*walkAcceleration*0.05*dt, ForceMode.Force). The Unity player Rigidbody mass is 1, so at Unity's 50Hz fixed step that force is an effective 2.0 m/s^2 along the full 3D view direction; applied mass-independently here because the Voxen player mass is 10 (same convention as trigger_cyberpush 595, which scales its force by mass). The 10000 gate is Unity's velocity.magnitude < walkAcceleration*0.05 (=100) test, squared.*/ acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
+            u16 a=dynamicEntities[i]; if (IdxIsNPC(World.instances[a].index) && (World.instances[a].entflags & EF_ASLEEP)) { continue; }
+            
+            V3 acc = {0.0f,-9.81f * World.gravity[a],0.0f}; if (World.curLev == LEVEL_CYBERSPACE) acc.y = 0.0f; /*Nothing gets gravity in cyberspace: NPCs, items, projectiles, and the player all float (user directive 2026-10-23).*/ else if ((a == PLAYER1) && (Cheats.noclip || World.invP1.ladderState > 0)) acc.y = 0.0f; if (a == PLAYER1 && World.curLev == LEVEL_CYBERSPACE && World.diffCyb > 1 && !Cheats.noclip && V3_dot(World.velocity[a],World.velocity[a]) < 10000.0f) { acc = V3_AplusB(acc,V3_ScaleByF(quat_rot_v3(World.rotation[a],(V3){0.0f,0.0f,1.0f}),2.0f)); } /*Unity CyberspaceMovement detrimental force at difficultyCyber>1: AddForce(viewDir*walkAcceleration*0.05*dt, ForceMode.Force). The Unity player Rigidbody mass is 1, so at Unity's 50Hz fixed step that force is an effective 2.0 m/s^2 along the full 3D view direction; applied mass-independently here because the Voxen player mass is 10 (same convention as trigger_cyberpush 595, which scales its force by mass). The 10000 gate is Unity's velocity.magnitude < walkAcceleration*0.05 (=100) test, squared.*/ acc = V3_AplusB(acc,V3_ScaleByF(World.instances[a].accumulatedForce,1.0f / World.mass[a])); World.velocity[a] = V3_AplusB(World.velocity[a],V3_ScaleByF(acc,dtsub));
             if (!V3_IsSane(World.velocity[a])) { World.velocity[a]=(V3){0.0f,0.0f,0.0f}; } else { float speed=V3_Mag(World.velocity[a]); if (speed > MAX_SPEED) World.velocity[a]=V3_ScaleByF(World.velocity[a],MAX_SPEED / speed); }
             float linDrag = (World.instances[a].index >= 481 && World.instances[a].index <= 495) ? 1.0f : vexp(-0.1f * dtsub);
             World.velocity[a].x*=linDrag; /*Y axis left unaffected, so gravity accumulates*/ World.velocity[a].z*=linDrag; if (Cheats.noclip) World.velocity[a].y*=linDrag*linDrag; float angDrag = vexp(-2.0f * dtsub); World.angularVelocity[a]=V3_ScaleByF(World.angularVelocity[a],angDrag); SetPosition(a,V3_AplusB(World.position[a],V3_ScaleByF(World.velocity[a],dtsub)));
@@ -458,6 +598,7 @@ void Physics(float dt) {
         }
         for (u16 i=0;i<dynamicEntityCount;++i) {
             u16 a = dynamicEntities[i]; if (unlikely(World.col[a] == CT_MSH || (Cheats.noclip && a == PLAYER1))) continue;
+            
             u8 colA = World.col[a]; ShapeBox boxA = colA==CT_BOX ? Entity_GetBox(a) : (ShapeBox){0}; ShapeCapsule capA = colA==CT_CAP ? Entity_GetCap(a) : (ShapeCapsule){0}; ShapeSphere sphA = colA==CT_SPH ? Entity_GetSph(a) : (ShapeSphere){0};
             i32 cx = PosGetCellCoordX(World.position[a].x), cz = PosGetCellCoordZ(World.position[a].z); u32 mask = GetCollisionMask(World.layer[a]);
             float searchRad = World.radius[a] + V3_Mag(World.velocity[a]) * dtsub; i32 radCells = vmax((i32)(searchRad / CELLSZ),1);
@@ -469,15 +610,16 @@ void Physics(float dt) {
                     u32 cell = PosGetCellCoordsP(cx + dx,cz + dz);
                     for (u16 k = 0; k < cellCounts[cell]; ++k) {
                         u16 b = cellLists[cell][k]; if (b == a || b >= World.instCount) continue;
-    /* Player bullets fire from World.position[PLAYER1], so their 0.2 sphere starts inside the shooter's own capsule
-       and the push-out normal throws the bolt off its aim vector on the spawn frame.  A layer mask cannot fix this:
-       the bolt is a rigidbody, so it is iterated as `a` against the player as `b`, and because the pair is evaluated
-       in both directions the mask only has to fail once -- it did not.  This is the same exclusion noclip already
-       had, which is why the bug disappeared under noclip and came back without it. */
-    { bool aP=(a==PLAYER1), bP=(b==PLAYER1); u16 bj = aP ? b : a;
-      if (unlikely((aP||bP) && bj<World.instCount && World.layer[bj]==L_PlayerBullets)) continue; } u8 colB = World.col[b]; ShapeBox boxB = colB==CT_BOX ? Entity_GetBox(b) : (ShapeBox){0}; ShapeCapsule capB = colB==CT_CAP ? Entity_GetCap(b) : (ShapeCapsule){0}; ShapeSphere sphB = colB==CT_SPH ? Entity_GetSph(b) : (ShapeSphere){0};
-                        if (unlikely(Cheats.noclip && b == PLAYER1)) continue; if (World.instances[b].index==703 || !(World.instances[b].entflags & EF_ACTIVE) || !(mask & World.layer[b]) || World.col[b] == CT_NONE) continue; /*EF_ACTIVE: the broadphase inserts every instance (physics.c:455) and DeleteInstance only clears this flag, so without it a deleted/gibbed/relayed-away body keeps colliding as an invisible solid.*/ if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !World.physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
-                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue; Manifold mf = {0}; float matB[16]; const float *mxB = &world_from_mdl[b*16]; if (World.col[b] == CT_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
+                        { bool aP=(a==PLAYER1), bP=(b==PLAYER1); u16 bj = aP ? b : a; if (unlikely((aP||bP) && bj<World.instCount && World.layer[bj]==L_PlayerBullets)) continue; }
+                        
+                        u8 colB = World.col[b]; ShapeBox boxB = colB==CT_BOX ? Entity_GetBox(b) : (ShapeBox){0}; ShapeCapsule capB = colB==CT_CAP ? Entity_GetCap(b) : (ShapeCapsule){0}; ShapeSphere sphB = colB==CT_SPH ? Entity_GetSph(b) : (ShapeSphere){0};
+                        if (unlikely(Cheats.noclip && b == PLAYER1)) continue;
+                        if (World.instances[b].index==703 || !(World.instances[b].entflags & EF_ACTIVE) || !(mask & World.layer[b]) || World.col[b] == CT_NONE) continue; /*EF_ACTIVE: the broadphase inserts every instance (physics.c:455) and DeleteInstance only clears this flag, so without it a deleted/gibbed/relayed-away body keeps colliding as an invisible solid.*/ if (unlikely((World.instances[b].entflags & EF_RIGIDBODY) && !World.physSleep[b] && b > a)) continue; // Prevent doubled restitutions; asleep b handled as static collider
+                        V3 deltaPos = V3_AsubB(World.position[a],World.position[b]); float rr = (World.radius[a] + World.radius[b]) + 1.28f/*One chunk extent*/; if (V3_dot(deltaPos,deltaPos) > rr * rr) continue;
+                        
+                        Manifold mf = {0}; float matB[16];
+                        const float *mxB = &world_from_mdl[b*16];
+                        if (World.col[b] == CT_CVX) { EntityColliderMatrixNow(b,matB); mxB = matB; }
                         if      (World.col[a] == CT_CAP && World.col[b] == CT_CAP) { mf = OverlapToManifold(CapCap(capA,capB)); }
                         else if (World.col[a] == CT_CAP && World.col[b] == CT_BOX) { mf = OverlapToManifold(CapBox(capA,boxB)); }
                         else if (World.col[a] == CT_CAP && World.col[b] == CT_SPH) { Overlap r=SphCap(sphB,capA); if(r.hit) r.normal=V3_ScaleByF(r.normal,-1.f); mf=OverlapToManifold(r); }
@@ -499,13 +641,16 @@ void Physics(float dt) {
                         else if (World.col[a] == CT_CVX && World.col[b] == CT_BOX) { mf = PrimitiveCvx(b,World.instances[a].colMeshIndex,mxA,World.instances[a].adjacencyIdx); }
                         else if (World.col[a] == CT_CVX && World.col[b] == CT_CVX) { mf = CvxCvx(World.instances[a].colMeshIndex,World.instances[b].colMeshIndex,mxA,mxB,World.instances[a].adjacencyIdx,World.instances[b].adjacencyIdx); if(mf.n) mf.normal=V3_ScaleByF(mf.normal,-1.0f); }
                         else { mf=OverlapToManifold(SphSph(World.position[a],World.colliderSize[a].x,World.position[b],World.colliderSize[b].x)); }
-                        if (mf.n) { if (IsImpactGrenade(World.instances[a].index)) grenadeImpactQueued[a]=1; if ((World.instances[b].entflags & EF_ACTIVE) && IsImpactGrenade(World.instances[b].index)) grenadeImpactQueued[b]=1; V3 impactPoint=mf.p[0].point; if(IsImpactProjectile(World.instances[a].index))QueueProjectileImpact(a,b,impactPoint,mf.normal);if(IsImpactProjectile(World.instances[b].index))QueueProjectileImpact(b,a,impactPoint,V3_ScaleByF(mf.normal,-1.0f)); if (likely(contactCount < 32)) { contactsMani[contactCount] = mf; contactsOther[contactCount] = b; contactCount++; }else{WarnPhysicsCapacity(4,"Reached the 32 candidate-manifolds-per-body limit; additional contacts are skipped.");} }
+                        bool freshContact=(mf.n>0);/*captured before the governor runs: a republished basis must never re-fire the grenade/projectile impact queues for a pair whose fresh gather came up empty*/
+                        if (colA == CT_CVX) WarmPairGovern(a,b,&mf);/*near-rest contact persistence for convex hulls: downstream the solver only ever sees the last-solved basis until a challenger proves itself (see WarmPairGovern)*/
+                        if (mf.n) { if (freshContact && IsImpactGrenade(World.instances[a].index)) grenadeImpactQueued[a]=1; if (freshContact && (World.instances[b].entflags & EF_ACTIVE) && IsImpactGrenade(World.instances[b].index)) grenadeImpactQueued[b]=1; V3 impactPoint=mf.p[0].point; if (freshContact && IsImpactProjectile(World.instances[a].index))QueueProjectileImpact(a,b,impactPoint,mf.normal);if (freshContact && IsImpactProjectile(World.instances[b].index))QueueProjectileImpact(b,a,impactPoint,V3_ScaleByF(mf.normal,-1.0f)); if (likely(contactCount < 32)) { contactsMani[contactCount] = mf; contactsOther[contactCount] = b; contactCount++; }else{WarnPhysicsCapacity(4,"Reached the 32 candidate-manifolds-per-body limit; additional contacts are skipped.");} }
                     }
                 }
             }
             World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false); for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; u16 b=contactsOther[c]; World.colliding[a]=World.colliding[b]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f})>=0.574f) {World.instances[a].entflags |= EF_GROUNDED;} if ((World.instances[b].entflags&EF_RIGIDBODY) && !World.physSleep[b] && World.mass[b]>=0.001f && V3_dot(mfp->normal,(V3){0.0f,-1.0f,0.0f})>=0.574f) {World.instances[b].entflags |= EF_GROUNDED;} PrepareSolverContact(a,b,mfp,dt); } World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
         }
         SolveGlobalContacts(); // 3. Restitution
+        for (u32 c=0;c<gContactCount;++c) { SolverContact *sc=&gContacts[c]; WarmPairSave(sc->a,sc->b,&sc->m,dt,sc->accumN,sc->accumT); } // persist each pair's converged ramp for the next substep's warm start
         for (u32 c=0; c<gContactCount; ++c) { // 3.5 Positional Correction (Projection)
             SolverContact *sc = &gContacts[c]; float avgPen = 0.0f; for (int p=0; p<sc->m.n; ++p) avgPen += sc->m.p[p].pen; if (sc->m.n > 0)avgPen/=(float)sc->m.n; float correction=vmax(avgPen-0.005f,0.0f)*0.4f; float massDiv=sc->invMassA+sc->invMassB+PHY_EPSILON; SetPosition(sc->a,V3_AplusB(World.position[sc->a],V3_ScaleByF(sc->m.normal,correction*sc->invMassA/massDiv))); if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
@@ -514,6 +659,7 @@ void Physics(float dt) {
             u16 self = triggerVolumes[i]; u16 trigdx=World.instances[self].index; if (Cheats.showPhys) {if(trigdx==703)DrawCapsuleCollider(self);else DrawBoxColliderColored(self,(Color){1.0f,0.642f,0.0f,0.5f});} ShapeBox trigBox = Entity_GetBox(self); ShapeCapsule teleportCap=trigdx==703?Entity_GetCap(self):(ShapeCapsule){0};
             for (u16 o=0;o<dynamicEntityCount;++o) { // 4. Triggers
                 u16 other = dynamicEntities[o]; if (World.col[other] == CT_NONE || !(World.instances[other].entflags & EF_ACTIVE)) continue;
+                
                 bool touches = false; 
                 if(trigdx==703){touches=(other==PLAYER1)&&CapCap(Entity_GetCap(other),teleportCap).hit;}
                 else if(World.col[other] == CT_CAP){ShapeCapsule oc=Entity_GetCap(other); V3 capMid=V3_ScaleByF(V3_AplusB(oc.tip,oc.base),0.5f); touches=CapsuleTouchesOBB(oc.base,oc.rad,trigBox) || CapsuleTouchesOBB(capMid,oc.rad,trigBox) || CapsuleTouchesOBB(oc.tip,oc.rad,trigBox);}
@@ -549,11 +695,20 @@ void Physics(float dt) {
               for (i32 dz=-WAKE_CELLS; dz<=WAKE_CELLS && !nearAwake; ++dz) {
                 u32 cl = PosGetCellCoordsP(cx+dx,cz+dz);
                 for (u16 k=0;k<cellCounts[cl];++k) {
-                    u16 j = cellLists[cl][k]; if (j==i) continue; u32 ej = World.instances[j].entflags; if (World.physSleep[j] || !(ej & EF_ACTIVE)) continue;/*asleep/inactive bodies don't wake others*/ float sj2 = V3_dot(World.velocity[j], World.velocity[j]); bool jMoving = sj2 > 0.0025f; bool jAnimWaking = AnimWaking(j); if (!(jMoving || jAnimWaking)) continue; /*not a waker -> lets i sleep*/
+                    u16 j = cellLists[cl][k]; if (j==i) continue;
+                    u32 ej = World.instances[j].entflags; if (World.physSleep[j] || !(ej & EF_ACTIVE)) continue;/*asleep/inactive bodies don't wake others*/
+                    
+                    float sj2 = V3_dot(World.velocity[j], World.velocity[j]);
+                    bool jMoving = sj2 > 0.0025f, jAnimWaking = AnimWaking(j); if (!(jMoving || jAnimWaking)) continue; /*not a waker -> lets i sleep*/
+                    
                     V3 d = V3_AsubB(World.position[i], World.position[j]); float rr = World.radius[i] + World.radius[j] + (jMoving ? 2.0f * vsqrtf(sj2) : 0.0f);/*mover reach only when actually translating*/ if (V3_dot(d,d) < rr*rr) { nearAwake=true; break; }
                 }
             }
-            if(World.physSleep[i]){if(nearAwake)World.physSleep[i]=0;} else if(!nearAwake && (ef & EF_GROUNDED)) { float sp2 = V3_dot(World.velocity[i],World.velocity[i]), asp2 = V3_dot(World.angularVelocity[i],World.angularVelocity[i]); if(sp2 < 0.0025f && asp2 < 0.0025f){World.physSleep[i]=1; World.velocity[i]=(V3){0}; World.angularVelocity[i]=(V3){0}; } }
+            if(World.physSleep[i]){ World.physQuiet[i]=0; if(nearAwake)World.physSleep[i]=0; }
+              else { /* 2026-10-23 settle-streak: the sleep decision ran on a single post-substep check, so a prop coasting through the 5cm/s linear gate (or a nudged prop crossing it mid-glide) committed sleep the first quiet frame and visibly froze -- "sleeps before it is stable".  Require 8 consecutive quiet+grounded+unblocked frames (~0.13s) before committing; any collision, nudge or nearby mover resets the streak via q=false. */
+                bool q = !nearAwake && (ef & EF_GROUNDED) && V3_dot(World.velocity[i],World.velocity[i]) < 0.0025f && V3_dot(World.angularVelocity[i],World.angularVelocity[i]) < 0.0025f;
+                if (q && World.physQuiet[i] < 0xFFu) World.physQuiet[i]++; else World.physQuiet[i]=0;
+                if (q && World.physQuiet[i] >= 8) { World.physSleep[i]=1; World.velocity[i]=(V3){0}; World.angularVelocity[i]=(V3){0}; } }
         }
     }
     u8 collisionLevel=World.currentLevel; u16 collisionCount=World.instCount; for (u16 i=INSTS_1ST_IDX;i<collisionCount && World.currentLevel==collisionLevel;++i) if (grenadeImpactQueued[i] && (World.instances[i].entflags & EF_ACTIVE)) GrenadeOnCollision(i);

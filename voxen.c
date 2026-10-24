@@ -2382,7 +2382,7 @@ void InitalizeEnvironment() {
     DualLog("Scratch arena total peak: %u MB, ", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; // Free the initialization scratch arena.
     DebugRAMPeak();
     DualLog(".....Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time);
-    DebugRAMActual("after full init"); DualLog("\n");
+    DebugRAMActual("init"); DualLog("\n");
 }
 
 void Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdate(),PSys_Update(float),BioMonitorUpdate(); bool ScrshotPressed();
