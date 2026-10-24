@@ -14,6 +14,7 @@ typedef struct { u32 nodeBase,triBase,vtxBase,uvBase; } ModelRTInfo;
 /* Per instance ray trace record, kept in one contiguous struct so the shader reads it with 3 vector loads. */
 typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo;
 static InstanceRTInfo rtInstanceInfo[INSTANCE_COUNT];
+static InstanceRTInfo rtPrevInfo[INSTANCE_COUNT];/*Shadow copy for the per-frame diff below: rtInstanceInfo holds per-level facts only (model bases, texture, active flag, scale - not motion), so on frames where nothing changed the upload is skipped entirely.*/
 static ModelRTInfo rtModelInfo[MAX_MDLS];
 INLINE u32 F2U(float f) { union { float f; u32 u; } c; c.f = f; return c.u; }
 static u32 rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID;
@@ -1743,6 +1744,11 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D,inputDepthID);
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
+    /*The [3] "SSR" bucket brackets ONLY the reflection dispatch below - it does not capture everything reflection mode costs:
+      - [2] "Main" grows because chunk_frag writes the outSpecular/outNormal g-buffer channels full-res when Reflections > 0 (all that extra MRT bandwidth lands in Main, not here);
+      - [4] "Comp" grows because composite does the 9-tap blur of outputImage (the SSR_RES smoothing);
+      - the per-frame CPU uploads for the RT cell grid (~1MB cellLists + counts + instInfo, see UpdateInstanceMatrix4x4s) and the 4-frame-lagged query readback are CPU-side stalls that show up in no GPU bucket at all.
+    So a low number here with a big toggle-frames-per-second delta is expected, not a mis-bracketed query: this IS the kernel time for the (W/SSR_RES)x(H/SSR_RES) grid.*/
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][3]);
     if (Sys_Settings.Reflections == 1u) {
         glUseProgram(ssrSP);
@@ -1758,7 +1764,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glUniformMatrix4fv(6, 1, 0, invViewProj);
         glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
         glUniform2f(7, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]);
-        glUniform1ui(8, mdlsCnt);
         glUniform1ui(9, texCnt);
         glDispatchCompute(((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 7) / 8, ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 7) / 8, 1);
     }
@@ -1908,14 +1913,27 @@ void UpdateInstanceMatrix4x4s() {
         glBufferSubData(GL_SSBO, offsetFloats * 4, countFloats * 4, modelMatrices + offsetFloats);
     }
     if (Sys_Settings.Reflections == 2u) { // Upload instance metadata + world grid for ray-traced reflections.
+        u32 chFirst = INSTANCE_COUNT, chLast = 0u; bool chDirty = false;
         for (u32 i=0; i<World.instCount; ++i) {
             u16 mi = World.instances[i].modelIndex;
             if ((instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt) mi = World.instances[i].lodIndex;
             SetRTInstance(i, (mi < mdlsCnt) ? mi : 0xFFFFFFFFu, World.instances[i].texIndex, (World.instances[i].entflags & EF_ACTIVE) ? 1u : 0u, vabs(World.scale[i].x), vabs(World.scale[i].y), vabs(World.scale[i].z));
+            InstanceRTInfo* cur = &rtInstanceInfo[i], *prev = &rtPrevInfo[i];
+            if (cur->geom[0]!=prev->geom[0] || cur->geom[1]!=prev->geom[1] || cur->geom[2]!=prev->geom[2] || cur->geom[3]!=prev->geom[3]
+             || cur->info[0]!=prev->info[0] || cur->info[1]!=prev->info[1] || cur->info[2]!=prev->info[2] || cur->info[3]!=prev->info[3]
+             || cur->iscl2[0]!=prev->iscl2[0] || cur->iscl2[1]!=prev->iscl2[1] || cur->iscl2[2]!=prev->iscl2[2] || cur->iscl2[3]!=prev->iscl2[3]) {/*12-word compare of the 48B record; SetRTInstance recomputes from identical inputs so equal states reproduce identical bits - a flip anywhere (spawn/death/tex/model/scale) marks the span dirty*/
+                if (i < chFirst) chFirst = i; chLast = i; chDirty = true; mcpy(prev, cur, sizeof(InstanceRTInfo));
+            }
         }
-        glBindBuffer(GL_SSBO, rtInstanceInfoID); glBufferSubData(GL_SSBO, 0, (size_t)World.instCount * sizeof(InstanceRTInfo), rtInstanceInfo);
-        glBindBuffer(GL_SSBO, rtCellCountsID);   glBufferSubData(GL_SSBO, 0, ARRSIZE * sizeof(u16), cellCounts);
-        glBindBuffer(GL_SSBO, rtCellListsID);    glBufferSubData(GL_SSBO, 0, (size_t)ARRSIZE * 128u * sizeof(u16), cellLists);
+        if (chDirty) {/*Orphan then span-upload: a plain glBufferSubData into a store last frame's dispatch may still be reading forces an implicit CPU sync on the driver; glBufferData(NULL) hands us a fresh store with no in-flight readers first*/
+            glBindBuffer(GL_SSBO, rtInstanceInfoID);
+            glBufferData(GL_SSBO, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);
+            glBufferSubData(GL_SSBO, (size_t)chFirst * sizeof(InstanceRTInfo), (size_t)(chLast - chFirst + 1u) * sizeof(InstanceRTInfo), rtInstanceInfo + chFirst);
+        }
+        glBindBuffer(GL_SSBO, rtCellCountsID); glBufferData(GL_SSBO, ARRSIZE * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
+        glBufferSubData(GL_SSBO, 0, ARRSIZE * sizeof(u16), cellCounts);/*Physics broadphase, rewritten every substep, so always uploaded - orphaned first for the same sync reason*/
+        glBindBuffer(GL_SSBO, rtCellListsID);  glBufferData(GL_SSBO, (size_t)ARRSIZE * 128u * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
+        glBufferSubData(GL_SSBO, 0, (size_t)ARRSIZE * 128u * sizeof(u16), cellLists);
     }
 }
 

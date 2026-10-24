@@ -20,9 +20,9 @@ const float MAX_THICKNESS = 1.2;
 void main() {
     uvec2 pixel = gl_GlobalInvocationID.xy; if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
     
+    vec4 specColor = imageLoad(inputSpecular,ivec2(pixel * SSR_RES)); if ((specColor.r + specColor.g+specColor.b) < 0.01) return;/*Cheapest reject first: only reflect-capable pixels pay for the depth fetch + inverse view-proj unprojection below, mirroring rt.compute*/
     vec2 scrSzF = vec2(screenWidth,screenHeight) * float(SSR_RES);
     vec3 worldPos  = reconstructWorldPos(((vec2(pixel * SSR_RES) + 0.5) / scrSzF)); if (worldPos == vec3(0.0)) return;
-    vec4 specColor = imageLoad(inputSpecular,ivec2(pixel * SSR_RES)); if ((specColor.r + specColor.g+specColor.b) < 0.01) return;
     
     vec2 normalPack = imageLoad(inputNormal, ivec2(pixel * SSR_RES)).rg;
     vec3 normal = DecodeOctahedral(normalPack),viewDir=normalize(camPos-worldPos);

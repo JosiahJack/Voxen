@@ -1,6 +1,5 @@
 // rt.compute - Compute shader for ray-traced reflections (BVH per model)
 layout(local_size_x = 8, local_size_y = 8) in;
-layout(rgba8,binding=0) readonly uniform image2D inputImage;
 layout(rgba8,binding=2) readonly uniform image2D inputSpecular;
 layout(rgba8,binding=4) uniform image2D outputImage;
 layout(rg16f,binding=5) readonly uniform image2D inputNormal;
@@ -12,7 +11,6 @@ layout(location=4) uniform mat4 viewProjection;
 layout(location=5) uniform sampler2D inputDepthID;
 layout(location=6) uniform mat4 invViewProj;
 layout(location=7) uniform vec2 worldMin;
-layout(location=8) uniform uint modelCount;
 layout(location=9) uniform uint texCount;
 layout(std430,binding=1) readonly buffer ModelMatrices { mat4 modelMatrices[]; };
 layout(std430,binding=16) readonly buffer RTGeom { uvec4 rtGeom4[]; };
@@ -55,7 +53,7 @@ bool rayTriangle(vec3 orig, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t, ou
     if (v < 0.0 || u + v > 1.0) return false;
     t = dot(e2, qvec) * invDet;
     if (t < 1e-4) return false;
-    normal = normalize(cross(e1, e2));
+    normal = cross(e1, e2);/*Unnormalized geometric normal: it is scaled by uniform-amplitude factors and re-normalized after the instance transform below, so the normalize here bought nothing on every accepted triangle*/
     bu = u; bv = v;
     return true;
 }
@@ -69,12 +67,13 @@ void main() {
     uvec2 pixel = gl_GlobalInvocationID.xy;
     if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
     
+    /*Cheapest reject first: the specular g-buffer is the only signal that says "this pixel reflects", so gate on it before paying for the full-res depth fetch + 16-mul inverse view-proj unprojection + normal decode below. The old order reconstructed world position for every pixel on screen, nearly all of which here get dropped right after.*/
+    vec4 specColor = imageLoad(inputSpecular, ivec2(pixel * SSR_RES));
+    if ((specColor.r + specColor.g + specColor.b) < 0.01) { imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0)); return; }
+    
     vec2 scrSzF = vec2(screenWidth, screenHeight) * float(SSR_RES);
     vec3 worldPos = reconstructWorldPos((vec2(pixel * SSR_RES) + 0.5) / scrSzF);
     if (worldPos == vec3(0.0)) { imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0)); return; }
-    
-    vec4 specColor = imageLoad(inputSpecular, ivec2(pixel * SSR_RES));
-    if ((specColor.r + specColor.g + specColor.b) < 0.01) { imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0)); return; }
     
     vec2 normalPack = imageLoad(inputNormal, ivec2(pixel * SSR_RES)).rg;
     vec3 normal = DecodeOctahedral(normalPack);
@@ -108,7 +107,7 @@ void main() {
     if (stepZ == 0) { tMaxZ = 1e9; tDeltaZ = 1e9; }
     else { float boundary = (stepZ > 0) ? (worldMin.y - CELLXHALF + float(cz + 1) * CELL) : (worldMin.y - CELLXHALF + float(cz) * CELL); tMaxZ = (boundary - origin.z) / reflectDir.z; tDeltaZ = CELL / abs(reflectDir.z); }
     float t = 0.0;
-    for (int iter = 0; iter < 64; ++iter) {
+    for (int iter = 0; iter < 20; ++iter) {/*A 32-unit ray crosses at most ~18 cells of 2.56 even diagonally before t > maxDist ends the march; the old cap of 64 never bought an extra cell but did risk unroll/branch overhead*/
         if (t > maxDist) break;
         if (hasHit && t >= bestDist) break;
         if (cx < 0 || cx >= 64 || cz < 0 || cz >= 64) break;
@@ -212,8 +211,10 @@ void main() {
                     float intensity = lights[lightIdx].intensity;
                     float range = lights[lightIdx].range;
                     vec3 toLight = lpos - hitWorld;
-                    float dist = length(toLight);
-                    if (dist >= range || intensity < 0.1) continue;
+                    /*Rejects before any sqrt: behind the surface (NdotL <= 0 would zero the contribution anyway), out of range, or off. Must keep the same accept set as the old length()-first code, only cheaper.*/
+                    float distSq = dot(toLight, toLight), rangeSq = range * range;
+                    if (intensity < 0.1 || distSq >= rangeSq || dot(toLight, adjustedNormal) <= 0.0) continue;
+                    float dist = sqrt(distSq);
                     
                     vec3 lightDir = toLight / dist;
                     float NdotL = max(dot(adjustedNormal, lightDir), 0.0);
