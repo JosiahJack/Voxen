@@ -54,6 +54,7 @@ typedef enum{UI_ID_NONE,
                        UI_ID_CMFD_EMAIL_ENTRY_0, UI_ID_CMFD_EMAIL_ENTRY_14 = UI_ID_CMFD_EMAIL_ENTRY_0 + 14, UI_ID_CMFD_DATA_ENTRY_0, UI_ID_CMFD_DATA_ENTRY_12 = UI_ID_CMFD_DATA_ENTRY_0 + 12, UI_ID_CMFD_NOTE_TOGGLE_0, UI_ID_CMFD_NOTE_TOGGLE_17 = UI_ID_CMFD_NOTE_TOGGLE_0 + 17,
     /*Left/Right MFD*/ UI_MFD_IDS(LMFD), UI_ID_SIDEMFD_PAD, UI_MFD_IDS(RMFD),
     /*In-Game Editor*/ UI_ID_CMFD_EDIT_PANEL, UI_ID_CMFD_EDIT_ROW_0, UI_ID_CMFD_EDIT_ROW_14 = UI_ID_CMFD_EDIT_ROW_0 + 14,
+    UI_ID_CMFD_EDIT_LIGHT_TYPE, UI_ID_CMFD_EDIT_LIGHT_DIR_N, UI_ID_CMFD_EDIT_LIGHT_DIR_E, UI_ID_CMFD_EDIT_LIGHT_DIR_S, UI_ID_CMFD_EDIT_LIGHT_DIR_W, UI_ID_CMFD_EDIT_LIGHT_DIR_UP, UI_ID_CMFD_EDIT_LIGHT_DIR_DN,
     UI_ID_COUNT,
 } UIRegionID;
 
@@ -794,7 +795,34 @@ static void EditFieldValueText(u8 slot,u16 sel,char* out,size_t n){switch(slot){
     case EF_TEX:sFormat(out,n,"%u",World.instances[sel].texIndex);break; case EF_MODEL:sFormat(out,n,"%u",World.instances[sel].modelIndex);break; case EF_GLOW:sFormat(out,n,"%u",World.instances[sel].glowIndex);break; case EF_SPEC:sFormat(out,n,"%u",World.instances[sel].specIndex);break; case EF_NORM:sFormat(out,n,"%u",World.instances[sel].normIndex);break;
     default:sFormat(out,n,"");break;}}
 static bool EditSelIsActive(void){return Cheats.editMode&&editModeSelection<U16_MAX&&editModeSelection>=INSTS_1ST_IDX&&editModeSelection<World.instCount;}
-bool EditPanelPointerHover(void){if(!EditSelIsActive()||!World.inventoryMode)return false;for(int i=0;i<EF_LAST;++i)if(UIOver(UI_ID_CMFD_EDIT_ROW_0+i))return true;return false;}
+static bool EditLightSelIsActive(void){return Cheats.editMode&&editModeLightSelection<U16_MAX&&editModeLightSelection<World.loadedLights;}
+/*Light properties in the same edit panel, when a light (not an entity) is selected. Rows reuse the EDIT_ROW ids; only one branch renders at a time.*/
+enum { LF_POSX,LF_POSY,LF_POSZ,LF_INT,LF_RANGE,LF_SPOTANG,LF_COLR,LF_COLG,LF_COLB,LF_MINI,LF_MAXI,LF_SDIRX,LF_SDIRY,LF_SDIRZ,LF_SDIRW,LF_LAST };
+static const char* lfRowLabel[LF_LAST]={"position x","position y","position z","intensity","range","spotAng","color r","color g","color b","minIntensity","maxIntensity","spotDir x","spotDir y","spotDir z","spotDir w"};
+static void LightFieldValueText(u8 slot,u16 li,char* out,size_t n){Light* L=&World.lights[li];switch(slot){
+    case LF_POSX:sFormat(out,n,"%.2f",L->pos.x);break; case LF_POSY:sFormat(out,n,"%.2f",L->pos.y);break; case LF_POSZ:sFormat(out,n,"%.2f",L->pos.z);break;
+    case LF_INT:sFormat(out,n,"%.2f",L->intensity);break; case LF_RANGE:sFormat(out,n,"%.2f",L->range);break; case LF_SPOTANG:sFormat(out,n,"%.2f",L->spotAng);break;
+    case LF_COLR:sFormat(out,n,"%.3f",L->col.r);break; case LF_COLG:sFormat(out,n,"%.3f",L->col.g);break; case LF_COLB:sFormat(out,n,"%.3f",L->col.b);break;
+    case LF_MINI:sFormat(out,n,"%.2f",L->minIntensity);break; case LF_MAXI:sFormat(out,n,"%.2f",L->maxIntensity);break;
+    case LF_SDIRX:sFormat(out,n,"%.3f",L->spotDir.x);break; case LF_SDIRY:sFormat(out,n,"%.3f",L->spotDir.y);break; case LF_SDIRZ:sFormat(out,n,"%.3f",L->spotDir.z);break; case LF_SDIRW:sFormat(out,n,"%.3f",L->spotDir.w);break;
+    default:sFormat(out,n,"");break;}}
+static void LightFieldWrite(u16 li,float f){Light* L=&World.lights[li];switch(editFieldSlot){
+    case LF_POSX:L->pos.x=f;break; case LF_POSY:L->pos.y=f;break; case LF_POSZ:L->pos.z=f;break;
+    case LF_INT:L->intensity=f;break; case LF_RANGE:L->range=f;break; case LF_SPOTANG:L->spotAng=f;break;
+    case LF_COLR:L->col.r=f;break; case LF_COLG:L->col.g=f;break; case LF_COLB:L->col.b=f;break;
+    case LF_MINI:L->minIntensity=f;break; case LF_MAXI:L->maxIntensity=f;break;
+    case LF_SDIRX:L->spotDir.x=f;break; case LF_SDIRY:L->spotDir.y=f;break; case LF_SDIRZ:L->spotDir.z=f;break; case LF_SDIRW:L->spotDir.w=f;break;}
+    if(editFieldSlot<=LF_POSZ){World.lightsNewPosition[li]=L->pos;flag_set(&L->lflags,LDIRTY,true);}/*UpdateLights() overwrites pos from lightsNewPosition every frame, and LDIRTY rebuilds the shadow views*/
+    if(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW)L->spotDir=quat_normalize(L->spotDir);/*keep the spot quaternion unit-length like entity rotation edits do*/}
+static void LightFieldCommitLive(void){if(!EditLightSelIsActive())return;float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}LightFieldWrite(editModeLightSelection,f);}
+static void LightFieldStep(float delta){if(!editFieldEditing||!EditLightSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=((editFieldSlot>=LF_COLR&&editFieldSlot<=LF_COLB)||(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW))?3:2;char fmt[8];sFormat(fmt,8,"%%.%df",prec);sFormat(editFieldBuffer,40,fmt,cur);LightFieldCommitLive();}
+/*Light type cycle: point<->spot only. Directional is not a panel type (hardcoded in the shader); a picked light is never directional, and the toggle keeps LSPOT/LDIR mutually exclusive so a light can never end up both.*/
+static void LightTypeCycle(void){if(!EditLightSelIsActive())return;Light* L=&World.lights[editModeLightSelection];bool spot=!(L->lflags&LSPOT);flag_set(&L->lflags,LSPOT,spot);flag_set(&L->lflags,LDIR,false);}
+/*Axial spot directions. The chunk shader derives the spot vector as R(spotDir)*(0,0,1); automap convention is north=+Z, east=+X. 0.70710678f is sin/cos 45 degrees.*/
+static const Quaternion lfDirQuat[6]={{0,0,0,1},{0,0.70710678f,0,0.70710678f},{0,1,0,0},{0,-0.70710678f,0,0.70710678f},{-0.70710678f,0,0,0.70710678f},{0.70710678f,0,0,0.70710678f}};/*N,E,S,W,Up,Dn*/
+static void LightDirSet(u8 d){if(!EditLightSelIsActive()||d>=6)return;World.lights[editModeLightSelection].spotDir=lfDirQuat[d];}
+static bool LightDirIs(u8 d){if(!EditLightSelIsActive()||d>=6)return false;Quaternion q=World.lights[editModeLightSelection].spotDir;V3 sd=V3_Normalize((V3){2.0f*(q.x*q.z+q.w*q.y),2.0f*(q.y*q.z-q.w*q.x),1.0f-2.0f*(q.x*q.x+q.y*q.y)});static const V3 lfAxes[6]={{0,0,1},{1,0,0},{0,0,-1},{-1,0,0},{0,1,0},{0,-1,0}};return V3_dot(sd,lfAxes[d])>0.99f;}/*direction-dot, so -q matches the same button as q*/
+bool EditPanelPointerHover(void){if(!EditSelIsActive()&&!EditLightSelIsActive())return false;if(!World.inventoryMode)return false;for(int i=0;i<EF_LAST;++i)if(UIOver(UI_ID_CMFD_EDIT_ROW_0+i))return true;if(UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE))return true;for(int d=0;d<6;++d)if(UIOver(UI_ID_CMFD_EDIT_LIGHT_DIR_N+d))return true;return false;}
 static void EditStop(void){editFieldEditing=false;editFieldSlot=EF_LAST;}
 static void EditFieldWrite(u16 s,Entity* e,float f,i32 iv){switch(editFieldSlot){
     case EF_POSX:World.position[s].x=f;break; case EF_POSY:World.position[s].y=f;break; case EF_POSZ:World.position[s].z=f;break;
@@ -803,8 +831,8 @@ static void EditFieldWrite(u16 s,Entity* e,float f,i32 iv){switch(editFieldSlot)
     case EF_TEX:e->texIndex=(u16)vclamp(iv,0,MAXTEX-1);break; case EF_MODEL:e->modelIndex=(u16)vclamp(iv,0,MAX_MDLS-1);break; case EF_GLOW:e->glowIndex=(u16)vclamp(iv,0,MAXTEX-1);break; case EF_SPEC:e->specIndex=(u16)vclamp(iv,0,MAXTEX-1);break; case EF_NORM:e->normIndex=(u16)vclamp(iv,0,MAXTEX-1);break;}
 }
 
-static void EditFieldCommitLive(void){if(!EditSelIsActive())return;u16 s=editModeSelection;Entity* e=&World.instances[s];float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,e,f,s2i32(editFieldBuffer));}
-static void EditFieldStep(float delta){if(!editFieldEditing||!EditSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}
+static void EditFieldCommitLive(void){if(EditLightSelIsActive()){LightFieldCommitLive();return;}if(!EditSelIsActive())return;u16 s=editModeSelection;Entity* e=&World.instances[s];float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,e,f,s2i32(editFieldBuffer));}
+static void EditFieldStep(float delta){if(!editFieldEditing)return;if(EditLightSelIsActive()){LightFieldStep(delta);return;}if(!EditSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}
     if(editFieldSlot<EF_TEX){int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=(editFieldSlot>=EF_ROTX&&editFieldSlot<=EF_ROTW)?3:2;char fmt[8];sFormat(fmt,8,"%%.%df",prec);sFormat(editFieldBuffer,40,fmt,cur);}
     else{int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);i32 iv=(i32)cur+steps;iv=vclamp(iv,0,(editFieldSlot==EF_MODEL?MAX_MDLS-1:MAXTEX-1));sFormat(editFieldBuffer,40,"%d",iv);}
     EditFieldCommitLive();
@@ -1275,7 +1303,7 @@ static void UI_DragRegions(void) {
 }
 /*c: 1 LMB, 2 RMB, +4 double click of that same button.*/
 static void UI_OnRegionClick(u32 id, u8 c) {
-    bool rh=false, dbl=(c&4)!=0, left=(c&3)==1; if (id>=UI_ID_RMFD_TAB_WEAPON) { id-=UI_MFD_STRIDE; rh=true; }
+    bool rh=false, dbl=(c&4)!=0, left=(c&3)==1; if (id>=UI_ID_RMFD_TAB_WEAPON && id<UI_ID_CMFD_EDIT_PANEL) { id-=UI_MFD_STRIDE; rh=true; }/*RMFD ids remap onto LMFD; the editor block sits after the MFD blocks, so without the upper bound every edit-row click was remapped into dead ids and swallowed*/
     switch (id) {
         case UI_ID_HUD_SHOOTMODE: ForceShootMode(); return;
         case UI_ID_HUD_HW_0 ... UI_ID_HUD_HW_7: HwToggle((u8)(id-UI_ID_HUD_HW_0)); return;
@@ -1306,7 +1334,9 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_CMFD_EMAIL_ENTRY_0 ... UI_ID_CMFD_EMAIL_ENTRY_14: UI_EmailEntryClick((int)(id-UI_ID_CMFD_EMAIL_ENTRY_0)); return;
         case UI_ID_CMFD_DATA_ENTRY_0 ... UI_ID_CMFD_DATA_ENTRY_12: UI_DataEntryClick((int)(id-UI_ID_CMFD_DATA_ENTRY_0)); return;
         case UI_ID_CMFD_NOTE_TOGGLE_0 ... UI_ID_CMFD_NOTE_TOGGLE_17: UI_NoteToggleClick((int)(id-UI_ID_CMFD_NOTE_TOGGLE_0)); return;
-        case UI_ID_CMFD_EDIT_ROW_0 ... UI_ID_CMFD_EDIT_ROW_14: { if (!EditSelIsActive()) return; u8 slot=(u8)(id-UI_ID_CMFD_EDIT_ROW_0); char v[40]; EditFieldValueText(slot,editModeSelection,v,40); sFormat(editFieldBuffer,40,"%s",v); editFieldSlot=slot; editFieldEditing=true; return; }
+        case UI_ID_CMFD_EDIT_ROW_0 ... UI_ID_CMFD_EDIT_ROW_14: { u8 slot=(u8)(id-UI_ID_CMFD_EDIT_ROW_0); if (EditLightSelIsActive()) { if (slot>=LF_LAST) return; char v[40]; LightFieldValueText(slot,editModeLightSelection,v,40); sFormat(editFieldBuffer,40,"%s",v); editFieldSlot=slot; editFieldEditing=true; return; } if (!EditSelIsActive()) return; char v[40]; EditFieldValueText(slot,editModeSelection,v,40); sFormat(editFieldBuffer,40,"%s",v); editFieldSlot=slot; editFieldEditing=true; return; }
+        case UI_ID_CMFD_EDIT_LIGHT_TYPE: LightTypeCycle(); return;
+        case UI_ID_CMFD_EDIT_LIGHT_DIR_N ... UI_ID_CMFD_EDIT_LIGHT_DIR_DN: LightDirSet((u8)(id-UI_ID_CMFD_EDIT_LIGHT_DIR_N)); return;
         case UI_ID_LMFD_TAB_WEAPON ... UI_ID_LMFD_TAB_DATA: MFD_SelectTab((u8)(rh?2:1),(u8)(id-UI_ID_LMFD_TAB_WEAPON+1),true); return;
         case UI_ID_LMFD_AUTOMAP_ZOOM_IN: UI_AutomapClick(rh,UI_AUTOMAP_ZOOM_IN); return;
         case UI_ID_LMFD_AUTOMAP_ZOOM_OUT: UI_AutomapClick(rh,UI_AUTOMAP_ZOOM_OUT); return;
@@ -1385,7 +1415,7 @@ void UI_ProcessNavigation(void) {
 
 static double RenderUI() {
     drawCallsNormal=drawCalls; UiClickGate(); UI_BeginFrame();
-    if (!EditSelIsActive()) editFieldEditing=false;
+    if (!EditSelIsActive() && !EditLightSelIsActive()) editFieldEditing=false;
     if (World.creditsActive) {
         RenderUIImage(0,0, 1366,768, 0);/*Video blackground*/
         if (Sys_Input.keyStates[KEY_ESCAPE].pressed) { World.creditsActive=false; PlayMenuMusic(); }
@@ -1441,13 +1471,13 @@ static double RenderUI() {
             }
             bool cyber = World.curLev == LEVEL_CYBERSPACE;
             if (cyber) { World.Sys_UI.MFD_CenterTab = 4; World.Sys_UI.mfdSelected[0] = 4; } /*Unity MFDManager.EnterCyberspace forces the center MFD to the Software tab (CenterTabButtonClickSilent(3)); forcing it every frame also overrides tab hotkeys/clicks while in cyberspace*/
-            TickBar(false); if (!cyber) { TickBar(true); HardwareButtons(); } UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020);/*cyberspace: health ticks only, no energy ticks, no hardware buttons; shootmode button stays*/
+            bool editPanelActive=EditSelIsActive()||EditLightSelIsActive(); if (!editPanelActive) { TickBar(false); if (!cyber) TickBar(true); } if (!cyber) HardwareButtons(); UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020);/*cyberspace: health ticks only, no energy ticks, no hardware buttons; shootmode button stays; while the edit panel is active the health/energy ticks are skipped too*/
             for (u8 i=0;i<10;++i) if (World.Sys_UI.tWrnFinished[i]>World.pauseRelativeTime) {
                 char flt[6]; if (World.Sys_UI.tWrnTextIdx[i]==185) sFormat(flt,6,"%.1f",(double)World.instances[PLAYER1].radiation);
                 RenderTextL(340,72+i*18,World.Sys_UI.tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx[i]],World.Sys_UI.tWrnTextIdx[i]==185?flt:World.Sys_UI.tWrnTextIdx2[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx2[i]]:"",World.Sys_UI.tWrnTextIdx3[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx3[i]]:"");
             }
             
-            if (!World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]) { if (cyber) { CenterMFD(); } else { SideMFD(false); CenterMFD(); SideMFD(true); } } else { AutomapBlitFullToUI(); UIRImg(UI_ID_FULLMAP_CLOSE,(i16)((UI_W-146)/2),706,146,28,1087); RenderTextL(610,710,T_YELLOW,FONT_NORMAL,0.8,"CLOSE"); }
+            if (!editPanelActive && !World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]) { if (cyber) { CenterMFD(); } else { SideMFD(false); CenterMFD(); SideMFD(true); } } else if (World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]) { AutomapBlitFullToUI(); UIRImg(UI_ID_FULLMAP_CLOSE,(i16)((UI_W-146)/2),706,146,28,1087); RenderTextL(610,710,T_YELLOW,FONT_NORMAL,0.8,"CLOSE"); }/*while the edit panel is active neither MFD set renders, so no MFD region can intercept a panel click; the full-screen automap is untouched*/
             if(World.diffMis>=3){UIR(UI_ID_CMFD_MISSION_TIMER,43,2,260,14); RenderTextL(43,2,T_YELLOW,FONT_NORMAL,0.8,"%s",World.misTimerMission<1100?Sys_Text.stringTable[World.misTimerMission]:"");/*MissionTimerT*/ {char misT[8]; if(World.misTimerTimesUP) sFormat(misT,sizeof(misT),"%s",869<1100?Sys_Text.stringTable[869]:""); else {float mt=World.misTimerT<0.0f?0.0f:World.misTimerT; int mm=(int)(mt/60.0f),ss=(int)(mt-(float)(mm*60)); sFormat(misT,sizeof(misT),"%02d:%02d",mm,ss);} RenderTextL(258,2,T_YELLOW,FONT_NORMAL,0.8,"%s",misT);}}
             if (World.curLev==LEVEL_CYBERSPACE) { UIR(UI_ID_CMFD_CYBER_TIMER,28,530,80,14); RenderTextL(28,530,T_WHITE,FONT_NORMAL,0.8,"T -"); char cyberT[8]; float ct = World.instances[PLAYER1].cyberTimer < 0.0f ? 0.0f : World.instances[PLAYER1].cyberTimer; int cmm = (int)(ct / 60.0f); sFormat(cyberT,sizeof(cyberT),"%02d:%02d",cmm,(int)(ct - (float)(cmm * 60))); RenderTextL(68,530,T_WHITE,FONT_NORMAL,0.8,"%s",cyberT); } /*the player's live CyberTimer countdown, not the old hardcoded 99:99*/
             if(World.curLev != LEVEL_CYBERSPACE && (World.invP1.hardwareIsActive & HW_BIO)!=0){/*BioMonitor: not part of the cyberspace HUD*/
@@ -1491,6 +1521,22 @@ static double RenderUI() {
             }
             if(editFieldEditing&&Sys_Input.scrollDelta!=0.0f){EditFieldStep((float)Sys_Input.scrollDelta);Sys_Input.scrollDelta=0.0f;}
             if(sel==World.weaponVModelIndex){int wep16=Get16WeaponIndexFromConstIndex(e->index);if(wep16>=0&&wep16<16){V3 offs=vWepOfs[wep16];offs.y+=wfx.reloadContainerPos.y;RenderTextL(EF_LABELX,580,T_GREEN,FONT_NORMAL,1.0f,"vm offset");RenderTextL(EF_VALUEX,580,T_YELLOW,FONT_NORMAL,1.0f,"%.5f %.5f %.5f",offs.x,offs.y,offs.z);}}
+        }
+        else if (EditLightSelIsActive()) {/*Edit mode light info panel: same dialogue, light properties instead of entity fields*/
+            u16 li=editModeLightSelection; Light* L=&World.lights[li];
+            float sx,sy; if (WorldToScreenPoint(V3_AsubB(L->pos,World.position[PLAYER1]),&sx,&sy)) RenderUIImage((i16)(sx-24.0f),(i16)(sy-24.0f),48,48,1051);
+            RenderUIImage(966,84,400,600,1025);/*Edit object info panel bg (non-interactive backdrop)*/
+            RenderTextL(EF_LABELX,104,T_YELLOW,FONT_NORMAL,1.0f,"EDIT LIGHT #%u",li); {char v[40];sFormat(v,40,"0x%x %s",L->lflags,(L->lflags&LIGHTON)?"on":"off");RenderTextL(EF_LABELX,132,T_GREEN,FONT_NORMAL,1.0f,"flags"); RenderTextL(EF_VALUEX,132,T_GREEN,FONT_NORMAL,1.0f,"%s",v);} bool caretOn=((u32)(get_time()*2.0f)&1)!=0;
+            for(int i=0;i<LF_LAST;++i){u8 slot=(u8)i;i16 y=efRowY[i];char v[40];LightFieldValueText(slot,li,v,40);
+                bool editingThis=editFieldEditing&&editFieldSlot==slot; RenderTextL(EF_LABELX,y,editingThis?T_RED:T_GREEN,FONT_NORMAL,1.0f,"%s",lfRowLabel[i]);
+                if(editingThis){char buf[44];sFormat(buf,44,"%s%s",editFieldBuffer,caretOn?"|":"");RenderTextL(EF_VALUEX,y,T_RED,FONT_NORMAL,1.0f,"%s",buf);}
+                else { float w=MeasureLineAdvance(v,FONT_NORMAL); UIR(UI_ID_CMFD_EDIT_ROW_0+i,EF_VALUEX,y,(i16)w,26); bool hov=UIOver(UI_ID_CMFD_EDIT_ROW_0+i); RenderTextL(EF_VALUEX,y,hov?T_YELLOW:T_WHITE,FONT_NORMAL,1.0f,"%s",v); }
+            }
+            {/*type button + axial spot-direction buttons along the panel bottom edge; rows end at y=578, panel bottom is 684*/
+            RenderTextL(EF_LABELX,596,T_GREEN,FONT_NORMAL,1.0f,"type"); UIRImg(UI_ID_CMFD_EDIT_LIGHT_TYPE,EF_VALUEX,596,120,28,1087); {bool hov=UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE); RenderTextC(EF_VALUEX+60,602,hov?T_YELLOW:T_GREEN,FONT_NORMAL,0.8f,"%s",(L->lflags&LSPOT)?"spot":"point");}
+            static const char* lfDirLbl[6]={"N","E","S","W","Up","Dn"}; for(int d=0;d<6;++d){i16 bx=(i16)(EF_LABELX+d*36); u32 bid=UI_ID_CMFD_EDIT_LIGHT_DIR_N+d; UIRImg(bid,bx,644,28,28,1087); bool hov=UIOver(bid); RenderTextC(bx+14,650,hov?T_YELLOW:(LightDirIs((u8)d)?T_YELLOW:T_GREEN),FONT_NORMAL,0.8f,"%s",lfDirLbl[d]);}
+            }
+            if(editFieldEditing&&Sys_Input.scrollDelta!=0.0f){EditFieldStep((float)Sys_Input.scrollDelta);Sys_Input.scrollDelta=0.0f;}
         }
     }
     if (World.Sys_UI.vmailActive) {

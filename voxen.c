@@ -51,7 +51,7 @@ SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on f
 InputSystem Sys_Input; TextSystem Sys_Text; CheatsSystem Cheats = {.god=false, .noclip=false, .showLocation=false, .showFPS=true, .editMode=false, .showPhys=false};
 
 // In-Game Editor
-u16 editModeSelection = U16_MAX, editModeTestEntityDefinition = 343, lastSpawned = U16_MAX;
+u16 editModeSelection = U16_MAX, editModeLightSelection = U16_MAX, editModeTestEntityDefinition = 343, lastSpawned = U16_MAX;
 
 // Diagnostics
 double game_start_time, game_actual_start_time, shadowTime, physTime, renderTime, prePhys, gameTime, raycastMs;
@@ -399,6 +399,7 @@ void cmd_edit() {
     } else {
         Cheats.noclip = Cheats.notarget = false;
         editModeSelection = U16_MAX;
+        editModeLightSelection = U16_MAX;
         CenterStatusPrint("%s","Edit Mode deactivated");
     }
 }
@@ -631,8 +632,39 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 A, V3 B, V3 C) {
 }
 
 INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
-    RaycastHit h = {.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT}; float r = sph.rad; if (r < 0.0001f) return h; V3 oc = V3_AsubB(origin, sph.ctr); float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r; float disc=b*b - c; if (disc < 0.0f) return h; float s = vsqrtf(disc); float t = -b - s; if (t < 0.0f) t = -b + s; if (t < 0.0f || t > maxDist) return h;
-    V3 p = V3_AplusB(origin, V3_ScaleByF(dir, t)); V3 n = V3_Normalize(V3_ScaleByF(V3_AsubB(p, sph.ctr), 1.0f / r)); h.hit = true; h.distance = t; h.point = p; h.normal = n; return h;
+    RaycastHit h = {.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT};
+    float r = sph.rad; if (r < 0.0001f) return h;
+    
+    V3 oc = V3_AsubB(origin, sph.ctr);
+    float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r;
+    float disc=b*b - c; if (disc < 0.0f) return h;
+    
+    float s = vsqrtf(disc);
+    float t = -b - s;
+    if (t < 0.0f) t = -b + s;
+    if (t < 0.0f || t > maxDist) return h;
+    
+    V3 p = V3_AplusB(origin, V3_ScaleByF(dir, t));
+    V3 n = V3_Normalize(V3_ScaleByF(V3_AsubB(p, sph.ctr), 1.0f / r));
+    h.hit = true;
+    h.distance = t;
+    h.point = p;
+    h.normal = n;
+    return h;
+}
+
+/*Edit-mode picking: nearest point light (neither spot nor directional) whose range sphere the pick ray hits. U16_MAX on miss; outDist gets the hit distance.*/
+u16 EditModePickLight(V3 origin, V3 dir, float maxDist, float* outDist) {
+    u16 best = U16_MAX; float bestDist = maxDist;
+    for (u16 i = 0; i < World.loadedLights; ++i) {
+        Light* L = &World.lights[i];
+        if (L->lflags & (LSPOT | LDIR)) continue;
+        if (L->range <= 0.001f) continue;
+        RaycastHit h = RaySphere(origin, dir, (ShapeSphere){L->pos, 0.02f*L->range}, maxDist);
+        if (h.hit && h.distance < bestDist) { best = i; bestDist = h.distance; }
+    }
+    if (outDist) *outDist = bestDist;
+    return best;
 }
 
 INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist) {
@@ -1741,6 +1773,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     
     PSys_Render(viewProj, playerPos,(V3){invViewRot[0], invViewRot[1], invViewRot[2]}, (V3){invViewRot[3], invViewRot[4], invViewRot[5]}, (V3){-invViewRot[6], -invViewRot[7], -invViewRot[8]}, inputDepthID, snear, sfar, (float)swidth, (float)sheight);
     DrawWireLines(viewProj);
+    if (Cheats.editMode) { /*Point-light range spheres, editmode only. NOT gated by showPhys: these are editmode guides, not physics debug.*/
+        for (u16 i = 0; i < World.loadedLights; ++i) { Light* L = &World.lights[i]; DrawSphereWireframe(i == editModeLightSelection ? (Color){1.0f,0.5f,0.5f,1.0f} : (Color){0.9216f,0.9176f,0.7725f,1.0f}, (ShapeSphere){L->pos, 0.02 * L->range});/*cyberpanel_paleyellow.png dominant flat tone (235,234,197)*/ }
+    }
     if(unlikely(World.debugLineVertCount > 1)) { DrawDebugLines(viewProj); }
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D,inputDepthID);
