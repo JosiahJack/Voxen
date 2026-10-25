@@ -16,6 +16,7 @@ layout(location=5) uniform vec3 camPos;
 layout(location=6) uniform uint maxLightsPerVoxel;
 layout(location=7) uniform uint shadSizeSqd;
 layout(location=8) uniform vec3 camForward;
+layout(location=9) uniform uint reflectionSetting; /*0=off, 1=SSR, 2=raytraced*/
 const int WORLD_X_VOXELCOUNT = 512;
 const float VOXEL_SIZE = 0.32;
 const float vhalf = 0.16;
@@ -27,11 +28,6 @@ bool VoxelOrNeighborVisible(float x, float z) {
     if (CellVisible(x,z + 1.30)) return true;
     if (CellVisible(x,z - 1.30)) return true;
     return false;
-}
-bool ReflectionVisible(float x, float z) {
-    float dx = x - camPos.x; float dz = z - camPos.z;
-    float distSq = dx*dx + dz*dz;
-    return distSq <= 32.0*32.0;
 }
 
 void GetCubemapSampleCoord(vec3 toLight, uint shadowIndex, out uint faceOff, out vec2 tc) {
@@ -60,8 +56,11 @@ void main() {
     uint baseOffset = voxelIndex * maxLightsPerVoxel;
     float vx = voxMinCtr.x + float(gl_GlobalInvocationID.x) * VOXEL_SIZE; float vz = voxMinCtr.y + float(gl_GlobalInvocationID.y) * VOXEL_SIZE; float vy = 0.0;
     float cdx = vx - camPos.x; float cdz = vz - camPos.z;
-    if ((cdx*cdx + cdz*cdz) > farPlaneSqd) { voxelLightListCounts[voxelIndex] = 0u; return; }
-    if (!VoxelOrNeighborVisible(vx, vz) && !ReflectionVisible(vx, vz)) { voxelLightListCounts[voxelIndex] = 0u; return; }
+    float distToCamSq = cdx*cdx + cdz*cdz;
+    if (distToCamSq > farPlaneSqd) { voxelLightListCounts[voxelIndex] = 0u; return; }
+    bool needsLights = VoxelOrNeighborVisible(vx, vz);
+    if (!needsLights && reflectionSetting == 2u && distToCamSq <= 32.0*32.0) needsLights = true; // Include lights behind player that raytraced reflectons will need.
+    if (!needsLights) { voxelLightListCounts[voxelIndex] = 0u; return; }
 
     uint count = 0u; uint weakestSlot = 0u; float weakestScore = 1e38;
     for (uint lightIdx = 0u; lightIdx < loadedLights; ++lightIdx) {
@@ -69,7 +68,7 @@ void main() {
         float lx = lpos.x;  float lz = lpos.z; float dx = lx - vx; float dz = lz - vz; float range = lights[lightIdx].range;
         float distSq = dx*dx + dz*dz; if (distSq >= range*range) continue;
         float intensity = lights[lightIdx].intensity; if (intensity < 0.1) continue;
-        if (!CellVisible(lx, lz) && !ReflectionVisible(lx, lz)) continue;
+        if (!CellVisible(lx, lz) && !(reflectionSetting == 2u && (lx - camPos.x)*(lx - camPos.x) + (lz - camPos.z)*(lz - camPos.z) <= 32.0*32.0)) continue;/*RT-only: lights near camera but in non-visible cells still light raytraced hits; SSR (1) skips this entirely*/
 
         if (count < maxLightsPerVoxel) {
             uniqueLightLists[baseOffset + count] = lightIdx;

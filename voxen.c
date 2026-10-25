@@ -965,6 +965,7 @@ void UpdateLights() {
     glUseProgram(voxelUpdateSP);
     glUniform3f(5, World.position[PLAYER1].x, World.position[PLAYER1].y, World.position[PLAYER1].z);
     glUniform3f(8, World.instances[PLAYER1].forward.x, World.instances[PLAYER1].forward.y, World.instances[PLAYER1].forward.z);
+    glUniform1ui(9, Sys_Settings.Reflections);/*voxel light lists only need the RT "near camera but not visible" lights when raytraced reflections are on*/
     glUniform1ui(2, World.loadedLights); /* Runtime light pools (ai_effect_flash) grow loadedLights after LoadLevel set the snapshot at entity.c:1630; without this the compute scan never reaches them. */
     glDispatchCompute((VOXELS_X + 15) / 16, (VOXELS_Z + 15) / 16, 1);
 }
@@ -2374,10 +2375,8 @@ void InitalizeEnvironment() {
     RenderLoading("Loading models...");   DebugRAM("before LoadModels");   LoadModels();   DebugRAM("after LoadModels");
     if (Sys_Settings.Reflections >= 1u) EnsureReflectionResources();    bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
-        
     World.absoluteTime = get_time();
     World.pauseRelativeTime = World.last_physics_time = 0.0;
-    
     GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); // Automap related buffers
     glGenFramebuffers(1,&amFBO);     glBindFramebuffer(GL_FRAMEBUFFER,amFBO);     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amTexId,0);
     GenerateAndBindTexture(&amFullTexId,GL_RGBA8,AM_FULL_W,AM_FULL_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL);
