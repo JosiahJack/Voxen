@@ -66,33 +66,74 @@ static void Mat4FromTRS(const float* T, const float* R, const float* S, float* l
     lm[12] = tx;                           lm[13] = ty;                           lm[14] = tz;                         lm[15] = 1.0f; 
 }
 
-static u64 glb_component_read_integer(const void* i, glb_component_type t) { return t == glb_component_type_r_16u ? *((const u16*)i) : t == glb_component_type_r_8u ? *((const u8*)i) : 0; }
-static float glb_component_read_float(const void* i, glb_component_type t, bool n) {
-    if (t == glb_component_type_r_32f) return *((const float*)i);
-    if (n) return t == glb_component_type_r_16u ? *((const u16*)i)/65535.f : (t == glb_component_type_r_8u ? *((const u8*)i)/255.f : 0.0f);
-    return (float)glb_component_read_integer(i, t);
+/* GLB accessor streaming read context. Hot per-vertex loops init one of these per accessor
+   (resolving element 0's byte offset, stride, component count/size and a coarse read class
+   once) instead of re-dereferencing the accessor->bufferView->buffer chain and re-branching
+   on the component type for every single element. cls:
+     0 = zero-fill the requested floats (accessor had no bufferView)
+     1 = fail, write nothing (bufferView lacks buffer data)
+     2 = fp32   3 = u16   4 = u8   5 = unsupported component type (reads as 0) */
+typedef struct {
+    const u8* base; /* byte pointer of element 0, only meaningful when cls is 2, 3 or 4 */
+    size_t stride;
+    u8 nc, cs, cls, nrm; /* components per element, bytes per component, read class, normalized */
+} GlbCell;
+
+static GlbCell GlbCellInit(const glb_accessor* a) {
+    GlbCell c;
+    c.stride = a->stride;
+    c.nrm    = (u8)a->normalized;
+    switch (a->type) {
+         case glbv2:    c.nc = 2;  break;
+         case glbv3:    c.nc = 3;  break;
+         case glbv4:    c.nc = 4;  break;
+         case glbmat4:  c.nc = 16; break;
+         default:       c.nc = 1;  break;
+    }
+    switch (a->component_type) {
+         case glb_component_type_r_8u:  c.cls = 4; c.cs = 1; break;
+         case glb_component_type_r_16u: c.cls = 3; c.cs = 2; break;
+         case glb_component_type_r_32f: c.cls = 2; c.cs = 4; break;
+         default: c.cls = 5; c.cs = 0; break; /* only 8u/16u/32f are supported by this loader */
+    }
+    if (!a->buffer_view) { c.cls = 0; }
+    else if (!a->buffer_view->buffer->data) { c.cls = 1; }
+    c.base = (c.cls >= 2 && c.cls <= 4) ? (const u8*)a->buffer_view->buffer->data + a->buffer_view->offset + a->offset : NULL;
+    return c;
 }
 
-static bool glb_element_read_float(const u8* e, glb_type t, glb_component_type ct, bool n, float* o, size_t es) {
-    size_t nc = t == glbv2 ? 2 : (t == glbv3 ? 3 : (t == glbv4 ? 4 : (t == glbmat4 ? 16 : 1)));
-    if (es<nc) return 0;
-    
-    size_t cs = ct == glb_component_type_r_8u? 1 : ct == glb_component_type_r_16u ? 2 : ct == glb_component_type_r_32f ? 4 : 0;
-    for (size_t i=0;i<nc;++i) { o[i]=glb_component_read_float(e+cs*i,ct,n); }
-    return 1;
+static inline __attribute__((always_inline)) bool GlbCellGet(const GlbCell* restrict c, size_t i, float* restrict o, size_t es) {
+    if (c->cls == 0) { mset(o, 0, es * sizeof(float)); return true; }
+    if (c->cls == 1 || es < c->nc) { return false; }
+    const u8* e = c->base + c->stride * i;
+    const u8 nrm = c->nrm; /* nrm/cls/nc are per-accessor invariants, so the decode branch stays loop-invariant */
+    for (u8 k = 0; k < c->nc; ++k) {
+        const u8* p = e + (size_t)k * c->cs;
+        float r;
+        switch (c->cls) {
+             case 2:  r = *(const float*)p; break;
+             case 3:  r = nrm ? (float)*(const u16*)p / 65535.f : (float)*(const u16*)p; break;
+             case 4:  r = nrm ? (float)*(const u8*)p  / 255.f   : (float)*(const u8*)p;  break;
+             default: r = 0.0f; break; /* unsupported component type */
+        }
+        o[k] = r;
+    }
+    return true;
+}
+
+static inline __attribute__((always_inline)) u64 GlbCellGetIdx(const GlbCell* restrict c, size_t i) {
+    if (c->cls == 3) { return *(const u16*)(c->base + c->stride * i); }
+    if (c->cls == 4) { return *(const u8*) (c->base + c->stride * i); }
+    return 0; /* no bufferView/data, fp32 and unsupported indices all read as 0, like the old integer reader */
 }
 
 static const glb_accessor* glb_find_accessor(const glb_primitive* p, glb_attribute_type t, i32 idx) { for(size_t i=0;i<p->attr_count;++i) { const glb_attribute *a = &p->attr[i]; if (a->type == t && a->index == idx) { return a->data; } } return NULL; }
-bool glbread_float(const glb_accessor* a, size_t i, float* o, size_t es) { /*is that a rye float?*/
-    if (!a->buffer_view) { mset(o, 0, es * sizeof(float)); return 1; }
-    if (!a->buffer_view->buffer->data) { return 0; }
-    
-    const u8 *e = (const u8*)a->buffer_view->buffer->data + a->buffer_view->offset;
-    e+=a->offset+a->stride*i;
-    return glb_element_read_float(e, a->type, a->component_type, a->normalized, o, es);
+bool glbread_float(const glb_accessor* a, size_t i, float* o, size_t es) { /*generic one-off read; hot per-vertex loops use the hoisted GlbCell form*/
+    GlbCell c = GlbCellInit(a);
+    return GlbCellGet(&c, i, o, es);
 }
 
-size_t glbread_index(const glb_accessor* a, size_t i) { if (!a->buffer_view) { return 0; } if (!a->buffer_view->buffer->data) { return 0; } const u8* e = (const u8*)a->buffer_view->buffer->data + a->buffer_view->offset; e += a->offset + a->stride * i;  return glb_component_read_integer(e, a->component_type); }
+size_t glbread_index(const glb_accessor* a, size_t i) { GlbCell c = GlbCellInit(a); return GlbCellGetIdx(&c, i); }
 static int glb_json_strcmp(jsmntok_t const* t, const u8* j, const char* s) { if ((*t).type!=JSMN_STRING) return -1; size_t sl=slen(s),nl=(size_t)(t->end-t->start); return sl==nl?sCompUpToLen((const char*)j+t->start,s,sl)==0:0; }
 static int glb_json_to_int(jsmntok_t const* t, const u8* j){ if ((*t).type!=JSMN_PRIMITIVE) return -1; const char* p=(const char*)j+t->start; return (int)fast_atoi(&p); }
 static size_t glb_json_to_size(jsmntok_t const* t, const u8* j){ if(t->type != JSMN_PRIMITIVE){return 0;} size_t r=0;const char*p=(const char*)j+t->start,*e=(const char*)j+t->end; while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;}return r; }
@@ -287,8 +328,18 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
     return cnt;
 }
 
+/* GLB JSON ints reference arrays as base+1; splice each slot onto the real resident array. */
+static bool glb_resolve_raw(void* pslot, const void* base, size_t esz, size_t count) {
+    void* v; mcpy(&v, pslot, sizeof(v));
+    size_t idx = (size_t)v; if (!idx) { return true; }
+    if (idx > count) { return false; }
+    void* re = (void*)((char*)base + (idx - 1) * esz);
+    mcpy(pslot, &re, sizeof(re));
+    return true;
+}
+
 void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
-    u32 tmp;mcpy(&tmp,d,4);
+    u32 tmp;
     const u8* ptr=(const u8*)d;
     mcpy(&tmp,ptr+8,4);
     const u8* jc=ptr+12;
@@ -303,19 +354,25 @@ void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
     jsmntok_t* t=OS_SubArenaAlloc(tid,sizeof(jsmntok_t)*(tc+1));
     p.pos=0; p.toknext=0; p.toksuper=-1;
     tc=jsmn_parse(&p,(const char*)jc,jl,t,tc);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);} t[tc].type=JSMN_UND; glb_data* data=OS_SubArenaAlloc(tid,sizeof(glb_data)); glb_parse_json_root(t,0,jc,tid,data);
+    /* Splice 1-based JSON references into real pointers now that every array is resident. */
     for (size_t m=0;m<data->meshes_count;++m)
-        for (size_t n=0;n<data->meshes[m].primitives_count;++n) { glb_accessor* ix=data->meshes[m].primitives[n].indices; if(ix){if((size_t)ix>data->accessors_count)return; data->meshes[m].primitives[n].indices=&data->accessors[(size_t)ix-1];} for(size_t k=0;k<data->meshes[m].primitives[n].attr_count;++k){ glb_accessor* ad=data->meshes[m].primitives[n].attr[k].data; if(!ad||(size_t)ad>data->accessors_count)return; data->meshes[m].primitives[n].attr[k].data=&data->accessors[(size_t)ad-1];} }
+        for (size_t n=0;n<data->meshes[m].primitives_count;++n) {
+            glb_primitive* pr =&data->meshes[m].primitives[n];
+            if (!glb_resolve_raw(&pr->indices,data->accessors,sizeof(glb_accessor),data->accessors_count)) { return; }
+            for(size_t k=0;k<pr->attr_count;++k){ if(!pr->attr[k].data || !glb_resolve_raw(&pr->attr[k].data,data->accessors,sizeof(glb_accessor),data->accessors_count)) { return; } }
+        }
     for (size_t m=0;m<data->accessors_count;++m) {
-        glb_buffer_view* bv = data->accessors[m].buffer_view;
-        if (bv) { if((size_t)bv > data->buffer_views_count)return; data->accessors[m].buffer_view = &data->buffer_views[(size_t)bv - 1]; }
-        if (data->accessors[m].stride == 0) { glb_type ty = data->accessors[m].type; size_t str = ty == glbv2 ? 2 : (ty == glbv3 ? 3 : (ty == glbv4 ? 4 : (ty == glbmat4 ? 16 : 1))); size_t strsz = data->accessors[m].component_type == glb_component_type_r_8u? 1 : data->accessors[m].component_type == glb_component_type_r_16u ? 2 : data->accessors[m].component_type == glb_component_type_r_32f ? 4 : 0; data->accessors[m].stride = strsz * str; }
+        glb_accessor* ac=&data->accessors[m];
+        if (!glb_resolve_raw(&ac->buffer_view,data->buffer_views,sizeof(glb_buffer_view),data->buffer_views_count)) { return; }
+        if (ac->stride == 0) { glb_type ty = ac->type; size_t str = ty == glbv2 ? 2 : (ty == glbv3 ? 3 : (ty == glbv4 ? 4 : (ty == glbmat4 ? 16 : 1))); size_t strsz = ac->component_type == glb_component_type_r_8u? 1 : ac->component_type == glb_component_type_r_16u ? 2 : ac->component_type == glb_component_type_r_32f ? 4 : 0; ac->stride = strsz * str; }
     }
-    for (size_t m=0;m<data->buffer_views_count;++m) { glb_buffer* b=data->buffer_views[m].buffer; if(!b||(size_t)b>data->buffers_count)return; data->buffer_views[m].buffer=&data->buffers[(size_t)b-1];}
-    for (size_t m=0;m<data->skins_count;++m) { for(size_t n=0;n<data->skins[m].joints_count;++n){glb_node* jt=data->skins[m].joints[n];if(!jt||(size_t)jt>data->nodes_count)return; data->skins[m].joints[n]=&data->nodes[(size_t)jt-1];} glb_accessor* ib=data->skins[m].inverse_bind_matrices; if(ib){if((size_t)ib>data->accessors_count)return; data->skins[m].inverse_bind_matrices=&data->accessors[(size_t)ib-1];}}
-    for (size_t m=0;m<data->nodes_count;++m) { for(size_t n=0;n<data->nodes[m].children_count;++n){glb_node* ch=data->nodes[m].children[n];if(!ch||(size_t)ch>data->nodes_count)return; data->nodes[m].children[n]=&data->nodes[(size_t)ch-1]; data->nodes[m].children[n]->parent=&data->nodes[m];} glb_mesh* ms=data->nodes[m].mesh; if(ms){if((size_t)ms>data->meshes_count)return; data->nodes[m].mesh=&data->meshes[(size_t)ms-1];} glb_skin* sk=data->nodes[m].skin; if(sk){if((size_t)sk>data->skins_count)return; data->nodes[m].skin=&data->skins[(size_t)sk-1];} }
+    for (size_t m=0;m<data->buffer_views_count;++m) { if (!data->buffer_views[m].buffer || !glb_resolve_raw(&data->buffer_views[m].buffer,data->buffers,sizeof(glb_buffer),data->buffers_count)) { return; } }
+    for (size_t m=0;m<data->skins_count;++m) { for(size_t n=0;n<data->skins[m].joints_count;++n){ if(!data->skins[m].joints[n] || !glb_resolve_raw(&data->skins[m].joints[n],data->nodes,sizeof(glb_node),data->nodes_count)) { return; } } if (!glb_resolve_raw(&data->skins[m].inverse_bind_matrices,data->accessors,sizeof(glb_accessor),data->accessors_count)) { return; } }
+    for (size_t m=0;m<data->nodes_count;++m) { glb_node* nd=&data->nodes[m]; for(size_t n=0;n<nd->children_count;++n){ if(!nd->children[n] || !glb_resolve_raw(&nd->children[n],data->nodes,sizeof(glb_node),data->nodes_count)) { return; } nd->children[n]->parent=nd; } if (!glb_resolve_raw(&nd->mesh,data->meshes,sizeof(glb_mesh),data->meshes_count)) { return; } if (!glb_resolve_raw(&nd->skin,data->skins,sizeof(glb_skin),data->skins_count)) { return; } }
     for (size_t m=0;m<data->animations_count;++m) {
-        for(size_t n=0;n<data->animations[m].samplers_count;++n){ glb_accessor* si=data->animations[m].samplers[n].input; if(!si||(size_t)si>data->accessors_count)return; data->animations[m].samplers[n].input=&data->accessors[(size_t)si-1]; glb_accessor* so=data->animations[m].samplers[n].output; if(!so||(size_t)so>data->accessors_count)return; data->animations[m].samplers[n].output=&data->accessors[(size_t)so-1];}
-        for(size_t n=0;n<data->animations[m].channels_count;++n){ glbanim_samp* cs=data->animations[m].channels[n].sampler; if(!cs||(size_t)cs>data->animations[m].samplers_count)return; data->animations[m].channels[n].sampler=&data->animations[m].samplers[(size_t)cs-1]; glb_node* tn=data->animations[m].channels[n].target_node; if(tn){if((size_t)tn>data->nodes_count)return; data->animations[m].channels[n].target_node=&data->nodes[(size_t)tn-1];} }
+        glb_animt* an = &data->animations[m];
+        for(size_t n=0;n<an->samplers_count;++n){ if(!an->samplers[n].input || !glb_resolve_raw(&an->samplers[n].input,data->accessors,sizeof(glb_accessor),data->accessors_count)) { return; } if(!an->samplers[n].output || !glb_resolve_raw(&an->samplers[n].output,data->accessors,sizeof(glb_accessor),data->accessors_count)) { return; } }
+        for(size_t n=0;n<an->channels_count;++n){ if(!an->channels[n].sampler || !glb_resolve_raw(&an->channels[n].sampler,an->samplers,sizeof(glbanim_samp),an->samplers_count)) { return; } if (!glb_resolve_raw(&an->channels[n].target_node,data->nodes,sizeof(glb_node),data->nodes_count)) { return; } }
     } *out_data=data; (*out_data)->bin=bin; (*out_data)->bin_size=bsz;
 }
 
@@ -346,7 +403,7 @@ u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, u32* r,
     
     mset(r,0xFF,oc*sizeof(u32));
     u32 write_ptr=0;
-    for(u32 i=0;i<ic;++i){u32 id=idx[i]; if(id<oc){if(r[id]==U32_MAX){r[id]=write_ptr; mcpy(nv+write_ptr*stride,v+id*stride,stride); write_ptr++;} idx[i]=(u16)r[id];}}
+    for(u32 i=0;i<ic;++i){u32 id=idx[i]; if(id<oc){if(r[id]==U32_MAX){r[id]=write_ptr; u32* dst=(u32*)(nv+write_ptr*stride); const u32* src=(const u32*)(v+id*stride); if(stride==CPU_VRT_SZ){dst[0]=src[0];dst[1]=src[1];dst[2]=src[2];dst[3]=src[3];dst[4]=src[4];dst[5]=src[5];dst[6]=src[6];dst[7]=src[7];}else{mcpy(dst,src,stride);} write_ptr++;} idx[i]=(u16)r[id];}}
     *vc=write_ptr;
     return nv;
 }
@@ -358,22 +415,26 @@ __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* restrict sv, u32
     if (unlikely(!ec)) { return false; }
     
     u16* final_t = OS_SubArenaAlloc(tid,ec * sizeof(u16));
-    u32 used_slots_count = 0; u32* rem = (u32*)remap_scr; u32 ucnt = 0;
+    u32 used_slots_count = 0; u32* rem = (u32*)remap_scr; u32 ucnt = 0; (void)rem; /*remap_scr is only handed to OptimizeVertexFetch below*/
     for (u32 i=0; i<ec; ++i) {
-        const float* v = sv + (i<<3);
-        const u32* uv = (const u32*)v;
-        u32 h0 = uv[0] ^ uv[1] ^ uv[2] ^ uv[3];
-        u32 h1 = uv[4] ^ uv[5] ^ uv[6] ^ uv[7];
+        const u32* v = (const u32*)(sv + (i<<3)); /*a corner is 8 words: position+normal+uv*/
+        u32 h0 = v[0] ^ v[1] ^ v[2] ^ v[3];
+        u32 h1 = v[4] ^ v[5] ^ v[6] ^ v[7];
         u32 s = (h0 ^ h1) & (WELD_HASH_SIZE-1);
-        while (ht[s] != U32_MAX) { if (mcmp(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (WELD_HASH_SIZE-1); }
+        while (ht[s] != U32_MAX) {
+            const u32* w = (const u32*)(sv + (ht[s]<<3));
+            if (w[0]==v[0] && w[1]==v[1] && w[2]==v[2] && w[3]==v[3] && w[4]==v[4] && w[5]==v[5] && w[6]==v[6] && w[7]==v[7]) { /*8 word compares instead of a 32-byte byte-at-a-time mcmp; bit patterns equal <=> bytes equal*/
+                final_t[i] = (u16)ht[s]; goto nxt;
+            }
+            s = (s+1) & (WELD_HASH_SIZE-1);
+        }
         ht[s] = ucnt;
-        rem[i] = ucnt;
+        final_t[i] = (u16)ucnt;
         ht_used[used_slots_count++] = s;
-        mcpy(sv+(ucnt<<3), v, 32);
+        { float* dst = sv + (ucnt<<3); const float* src = (const float*)v; dst[0]=src[0]; dst[1]=src[1]; dst[2]=src[2]; dst[3]=src[3]; dst[4]=src[4]; dst[5]=src[5]; dst[6]=src[6]; dst[7]=src[7]; }
         ++ucnt;
         nxt:;
     }
-    for (u32 i=0;i<ec;++i) { final_t[i] = (u16)rem[i]; }
     OptimizeVertexCache(final_t,ec,ucnt,cache_scr);
     float* final_verts=OS_SubArenaAlloc(tid,ucnt*CPU_VRT_SZ);
     OptimizeVertexFetch((u8*)sv,&ucnt,final_t,ec,CPU_VRT_SZ,remap_scr,(u8*)final_verts);
@@ -394,13 +455,14 @@ __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* restrict sv, u32
 static void Mat4Mul(const float* restrict a, const float* restrict b, float* restrict out) { for (int c = 0; c < 4; ++c) for (int r = 0; r < 4; ++r) { float s = 0.0f; for (int k = 0; k < 4; ++k) s += a[k*4+r] * b[c*4+k]; out[c*4+r] = s; } }
 static void Mat4TransformPoint(const float* restrict m, const float* restrict v, float* restrict out) { out[0] = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]  + m[12]; out[1] = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]  + m[13]; out[2] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14]; }
 static void Mat4TransformDir(const float* restrict m, const float* restrict v, float* restrict out) { float x = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]; float y = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]; float z = m[2]*v[0] + m[6]*v[1] + m[10]*v[2]; float len = vsqrtf(x*x + y*y + z*z), inv = (len > 0.00000001f) ? 1.0f/len : 0.0f; out[0] = x*inv; out[1] = y*inv; out[2] = z*inv; }
+static inline __attribute__((always_inline)) void ObjRead3(const char** pp, float* restrict dst) { /*v and vn lines are both positional triples; one shared reader*/ dst[0] = fast_atof(pp); dst[1] = fast_atof(pp); dst[2] = fast_atof(pp); }
 static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* restrict d, int fs, float* restrict tp, float* restrict tn, float* restrict tu, float* restrict sv, u32* restrict ht, u32* restrict ht_used, u32* restrict remap_scr, u8* restrict cache_scr, float** restrict ov_pos, u32* ovc, u16** ot, u16* otc, i32 tid) {
     *ov_pos=NULL; *ot=NULL; *ovc=*otc=0; u32 pc=0,nc=0,uc=0,ec=0; __m128 mn_v=_mm_set1_ps(1000000000.0f), mx_v=_mm_set1_ps(-1000000000.0f); const char *p=d, *e=d+fs;
     while (likely(p < e)) {
         while (p < e && (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n')) ++p; if (p >= e) break; if (*p == '#') { while (p < e && *p != '\n') ++p; continue; }
         if (*p == 'v') {
             ++p;
-            if (*p == ' ') { if (unlikely(pc >= MAX_VERT_ELEMENT_SIZE)) {return false;} ++p; tp[pc*3] = fast_atof(&p); tp[pc*3+1] = fast_atof(&p); tp[pc*3+2] = fast_atof(&p); ++pc; } else if (*p == 'n' && p[1] == ' ') { p += 2; if (unlikely(nc >= MAX_VERT_ELEMENT_SIZE)) {return false;} tn[nc*3] = fast_atof(&p); tn[nc*3+1] = fast_atof(&p); tn[nc*3+2] = fast_atof(&p); ++nc; }
+            if (*p == ' ') { if (unlikely(pc >= MAX_VERT_ELEMENT_SIZE)) {return false;} ++p; ObjRead3(&p, tp + pc*3); ++pc; } else if (*p == 'n' && p[1] == ' ') { p += 2; if (unlikely(nc >= MAX_VERT_ELEMENT_SIZE)) {return false;} ObjRead3(&p, tn + nc*3); ++nc; }
             else if (*p == 't' && p[1] == ' ') { p += 2; if (unlikely(uc >= MAX_VERT_ELEMENT_SIZE)) {return false;} tu[uc*2] = fast_atof(&p); tu[uc*2+1] = fast_atof(&p); ++uc; }
         } else if (*p == 'f' && p[1] == ' ') {
             p += 2; u32 vi[8]={0}, ti[8]={0}, ni[8]={0}; int nv = 0;
@@ -421,35 +483,38 @@ static void FindBracket(const glbanim_samp* s, float t, u32* i0, float* f) {
     u32 n = (u32)s->input->count;
     if (n <= 1) { *i0 = 0; *f = 0.0f; return; }
     
+    GlbCell inC = GlbCellInit(s->input);
     float t0, tn;
-    glbread_float(s->input, 0,     &t0, 1);
-    glbread_float(s->input, n - 1, &tn, 1);
+    GlbCellGet(&inC, 0,     &t0, 1);
+    GlbCellGet(&inC, n - 1, &tn, 1);
     if (t<=t0) { *i0 = 0;     *f = 0.0f; return; }
     if (t>=tn) { *i0 = n - 2; *f = 1.0f; return; }
-    for (u32 i=0;i<n-1;++i){
-        float ta,tb;
-        glbread_float(s->input, i,     &ta, 1);
-        glbread_float(s->input, i + 1, &tb, 1);
-        if(t>=ta&&t<=tb){ *i0 = i; *f = tb > ta ? (t - ta) / (tb - ta) : 0.0f; return; }
+    float tb = t0; /*sliding window: reuse the last right edge as the next left edge, so a full scan reads n values instead of 2n*/
+    for (u32 i=1;i<n;++i){
+        float ta = tb;
+        GlbCellGet(&inC, i, &tb, 1);
+        if(t>=ta&&t<=tb){ *i0 = i-1; *f = tb > ta ? (t - ta) / (tb - ta) : 0.0f; return; }
     }
     *i0=n-2; *f=1.0f;
 }
 
 static void SampleV3(const glbanim_samp* s, float t, float* o3) {
-    u32 i0; float f, v0[3], v1[3]; FindBracket(s, t, &i0, &f); glbread_float(s->output, i0, v0, 3);
+    GlbCell outC = GlbCellInit(s->output);
+    u32 i0; float f, v0[3], v1[3]; FindBracket(s, t, &i0, &f); GlbCellGet(&outC, i0, v0, 3);
     if (f <= 0.0f || s->interpolation == glb_interp_step) { o3[0] = v0[0]; o3[1] = v0[1]; o3[2] = v0[2]; return; }
         
-    glbread_float(s->output, i0 + 1, v1, 3);
+    GlbCellGet(&outC, i0 + 1, v1, 3);
     o3[0] = v0[0] + (v1[0] - v0[0]) * f;
     o3[1] = v0[1] + (v1[1] - v0[1]) * f;
     o3[2] = v0[2] + (v1[2] - v0[2]) * f;
 }
 
 static void SampleQuat(const glbanim_samp* samp, float t, float* outq /* xyzw */) {
-	u32 i0; float frac, q0[4], q1[4], qb[4]; FindBracket(samp, t, &i0, &frac); glbread_float(samp->output, i0, q0, 4);
+	GlbCell outC = GlbCellInit(samp->output);
+	u32 i0; float frac, q0[4], q1[4], qb[4]; FindBracket(samp, t, &i0, &frac); GlbCellGet(&outC, i0, q0, 4);
     if (frac <= 0.0f || samp->interpolation == glb_interp_step) { mcpy(outq, q0, sizeof(float)*4); return; }
     
-    glbread_float(samp->output, i0 + 1, q1, 4);
+    GlbCellGet(&outC, i0 + 1, q1, 4);
     float d = q0[0]*q1[0] + q0[1]*q1[1] + q0[2]*q1[2] + q0[3]*q1[3];
     d = d > 1.0f ? 1.0f : (d < -1.0f ? -1.0f : d);
 	if (d < 0.0f) { /*Flip the signs*/ qb[0] = -q1[0]; qb[1] = -q1[1]; qb[2] = -q1[2]; qb[3] = -q1[3]; d = -d; } else mcpy(qb, q1, sizeof(float) * 4);
@@ -469,36 +534,13 @@ static void NodeLocalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, f
     float R[4] = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]};
     float S[3] = {node->scale[0], node->scale[1], node->scale[2]};
     bool anm = false;
-    if (gm->isTrAnim) {/*Transform based animations (e.g. doors)*/
-        for (size_t a=0;a<gm->gltf->animations_count;++a) {
-            glb_animt* anim = &gm->gltf->animations[a];
-            for (size_t c=0;c<anim->channels_count;++c) {
-                const glb_anim_chan* ch = &anim->channels[c];
-                if (ch->target_node != node) continue;
-                
-                anm = true;
-                     if (ch->target_path == glb_animpthtype_translation) {   SampleV3(ch->sampler, t, T); }
-                else if (ch->target_path == glb_animpthtype_rotation)    { SampleQuat(ch->sampler, t, R); }
-                else if (ch->target_path == glb_animpthtype_scale)       {   SampleV3(ch->sampler, t, S); }
-            }
-        }
-    } else if (gm->chanMap) { /*Skinned: O(1) per-node channel lookup built at load*/
+    if (gm->chanMap) { /*O(1) per-node channel lookup (skinned: best clip, transform anims: all clips) built at load*/
         size_t ni = (size_t)(node - gm->gltf->nodes);
         if (ni < gm->gltf->nodes_count) {
             const glb_anim_chan *ct = gm->chanMap[ni*3+0], *cr = gm->chanMap[ni*3+1], *cs = gm->chanMap[ni*3+2];
             if (ct) { SampleV3(ct->sampler, t, T); anm = true; }
             if (cr) { SampleQuat(cr->sampler, t, R); anm = true; }
             if (cs) { SampleV3(cs->sampler, t, S); anm = true; }
-        }
-    } else { /*Skinned meshes, stick to the single selected animation clip*/
-        for (size_t c=0;c<gm->anim->channels_count;++c) {
-            const glb_anim_chan* ch=&gm->anim->channels[c];
-            if (ch->target_node != node) continue;
-            
-            anm = true;
-                 if (ch->target_path == glb_animpthtype_translation) {   SampleV3(ch->sampler, t, T); }
-            else if (ch->target_path == glb_animpthtype_rotation)    { SampleQuat(ch->sampler, t, R); }
-            else if (ch->target_path == glb_animpthtype_scale)       {   SampleV3(ch->sampler, t, S); }
         }
     }
     if (!anm) { Mat4FromTRS(node->translation,node->rotation,node->scale,outM); return; }
@@ -518,7 +560,57 @@ static void NodeGlobalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, 
     NodeGlobalMatrixAtTime(gm, node->parent, t, p); Mat4Mul(p, l, outM);
 }
 
-bool IsGLBSourcePath(const char* path) { const char* dot = StringFindLastChar(path, '.'); return dot && sEqual(dot, ".glb"); } 
+bool IsGLBSourcePath(const char* path) { const char* dot = StringFindLastChar(path, '.'); return dot && sEqual(dot, ".glb"); }
+
+/* Fills the O(1) per-node T/R/S channel lookup. Channels are applied in order, so writing
+   through the map keeps exactly the last matching channel per node/path — identical to what
+   the old per-frame sequential scans ended up with, but resolved once at load instead of
+   per frame per node. */
+static void GlbChanMapFill(glb_anim_chan** map, const glb_data* data, const glb_animt* anim) {
+    for (size_t c = 0; c < anim->channels_count; ++c) {
+        const glb_anim_chan* ch = &anim->channels[c];
+        if (!ch->target_node) { continue; }
+        size_t ni = (size_t)(ch->target_node - data->nodes);
+        if (ni < data->nodes_count && ch->target_path >= glb_animpthtype_translation && ch->target_path <= glb_animpthtype_scale) { map[ni*3 + (size_t)(ch->target_path - glb_animpthtype_translation)] = (glb_anim_chan*)ch; }
+    }
+}
+
+/* Loads pos/nrm/uv for one vertex with the shared flip-V + default-UP-normal convention
+   (both GltfMeshLoad paths would otherwise carry identical copies of this). */
+static inline __attribute__((always_inline)) void GlbLoadVtx(const GlbCell* restrict posC, const GlbCell* restrict nrmC, const GlbCell* restrict uvC, bool hasN, bool hasU, u32 v, float* restrict P, float* restrict N, float* restrict U) {
+    GlbCellGet(posC, v, P, 3);
+    if (hasN) { GlbCellGet(nrmC, v, N, 3); } else { N[0] = 0.0f; N[1] = 1.0f; N[2] = 0.0f; }
+    if (hasU) { GlbCellGet(uvC, v, U, 2); U[1] = 1.0f - U[1]; /*Flip V*/ } else { U[0] = 0.0f; U[1] = 0.0f; }
+}
+
+/* Gathers a primitive's index buffer (skinned + submesh paths share it); returns the arena allocation. */
+static u32* GlbLoadIndices(const glb_primitive* prim, u32 vc, u32* tc) {
+    if (prim->indices) {
+        *tc = (u32)(prim->indices->count / 3);
+        u32* dst = OS_SubArenaAlloc(-1, *tc * 3 * sizeof(u32));
+        GlbCell idxC = GlbCellInit(prim->indices);
+        for (u32 k = 0; k < *tc*3; ++k) { dst[k] = (u32)GlbCellGetIdx(&idxC, k); }
+        return dst;
+    }
+    *tc = vc / 3;
+    u32* dst = OS_SubArenaAlloc(-1, *tc * 3 * sizeof(u32));
+    for (u32 k = 0; k < *tc*3; ++k) { dst[k] = k; }
+    return dst;
+}
+
+/* One baked corner: single shared -X position/normal swizzle for both baked paths,
+   updates the running min/max. */ 
+typedef struct { __m128 mn, mx; } GlbRange;
+static inline __attribute__((always_inline)) GlbRange GlbBakeEmit(float* restrict dst, GlbRange r, float px, float py, float pz, float nx, float ny, float nz, float u, float v) {
+    dst[0] = -px; dst[1] = py; dst[2] = pz; /* Position */
+    dst[3] = -nx; dst[4] = ny; dst[5] = nz; /* Normal */
+    dst[6] = u;   dst[7] = v;               /* UV */
+    __m128 pos_v = _mm_loadu_ps(dst);
+    r.mn = _mm_min_ps(r.mn, pos_v);
+    r.mx = _mm_max_ps(r.mx, pos_v);
+    return r;
+}
+
 static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     mset(out, 0, sizeof(*out));
     glb_data* data = NULL;
@@ -544,12 +636,7 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
         if (!mesh || !mesh->primitives_count || !out->anim) { return; }
         
         out->chanMap = OS_SubArenaAlloc(-1, data->nodes_count * 3 * sizeof(glb_anim_chan*));
-        for (size_t c=0;c<out->anim->channels_count;++c) {
-            glb_anim_chan* ch=&out->anim->channels[c];
-            if (!ch->target_node) continue;
-            size_t ni=(size_t)(ch->target_node - data->nodes);
-            if (ni < data->nodes_count && ch->target_path >= glb_animpthtype_translation && ch->target_path <= glb_animpthtype_scale) out->chanMap[ni*3 + (size_t)(ch->target_path - glb_animpthtype_translation)] = ch;
-        }
+        GlbChanMapFill(out->chanMap, data, out->anim);
         
         glb_primitive* prim = &mesh->primitives[0];
         const glb_accessor* posAcc = glb_find_accessor(prim, glb_attribute_type_position, 0);
@@ -564,26 +651,12 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
         out->nrm  = OS_SubArenaAlloc(-1, vc * 3 * sizeof(float));
         out->uv   = OS_SubArenaAlloc(-1, vc * 2 * sizeof(float));
         out->skin = OS_SubArenaAlloc(-1, vc * sizeof(VtxSkin));
+        const GlbCell posC = GlbCellInit(posAcc), nrmC = nrmAcc ? GlbCellInit(nrmAcc) : (GlbCell){0}, uvC = uvAcc ? GlbCellInit(uvAcc) : (GlbCell){0}, jntC = GlbCellInit(jntAcc), wgtC = GlbCellInit(wgtAcc); /*per-accessor constants resolved once*/
         for (u32 i=0;i<vc;++i) {
-            glbread_float(posAcc, i, &out->pos[i*3], 3);
-            if (nrmAcc){ glbread_float(nrmAcc, i, &out->nrm[i*3], 3); }
-            else {
-                out->nrm[i*3]     = 0.0f;
-                out->nrm[i*3 + 1] = 1.0f;
-                out->nrm[i*3 + 2] = 0.0f;
-            }
-            
-            if (uvAcc) {
-                glbread_float(uvAcc, i, &out->uv[i*2], 2);
-                out->uv[i*2 + 1] = 1.0f - out->uv[i*2 + 1]; /*Flip V*/
-            } else {
-                out->uv[i*2]     = 0.0f;
-                out->uv[i*2 + 1] = 0.0f;
-            }
-            
+            GlbLoadVtx(&posC, &nrmC, &uvC, nrmAcc != NULL, uvAcc != NULL, i, &out->pos[i*3], &out->nrm[i*3], &out->uv[i*2]);
             float jf[4] = { 0, 0, 0, 0 }, wf[4] = { 0, 0, 0, 0 };
-            glbread_float(jntAcc, i, jf, 4);
-            glbread_float(wgtAcc, i, wf, 4);
+            GlbCellGet(&jntC, i, jf, 4);
+            GlbCellGet(&wgtC, i, wf, 4);
             float wsum = wf[0] + wf[1] + wf[2] + wf[3], winv = (wsum > 0.000001f) ? 1.0f/wsum : 0.0f;
             for(int k=0;k<4;++k){
                 i32 jj = (i32)jf[k];
@@ -593,15 +666,7 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
         }
         
         u32 tc;
-        if (prim->indices) {
-            tc = (u32)(prim->indices->count / 3);
-            out->indices = OS_SubArenaAlloc(-1, tc * 3 * sizeof(u32));
-            for (u32 k=0;k<tc*3;++k) { out->indices[k] = (u32)glbread_index(prim->indices, k); }
-        } else{
-            tc = vc / 3; out->indices = OS_SubArenaAlloc(-1, tc * 3 * sizeof(u32));
-            for (u32 k=0;k<tc*3;++k) { out->indices[k] = k; }
-        }
-            
+        out->indices = GlbLoadIndices(prim, vc, &tc);
         out->triCount = tc;
         glb_skin* skin = skinNode->skin;
         out->jointCount = (u32)skin->joints_count;
@@ -617,6 +682,8 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     
     u32 submshCnt = 0, si = 0;
     out->isTrAnim = true; /*Transform-based Animation (node TRS)*/
+    out->chanMap = OS_SubArenaAlloc(-1, data->nodes_count * 3 * sizeof(glb_anim_chan*));
+    for (size_t a = 0; a < data->animations_count; ++a) { GlbChanMapFill(out->chanMap, data, &data->animations[a]); } /*every animation contributes to transform anims (e.g. doors), last channel wins — mirrors the old per-frame full scan*/
     for (size_t i=0;i<data->nodes_count;++i){
         if (data->nodes[i].mesh){
             for (size_t p=0;p<data->nodes[i].mesh->primitives_count;++p){
@@ -652,14 +719,12 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
             out->subPos[si] = OS_SubArenaAlloc(-1, vc * 3 * sizeof(float));
             out->subNrm[si] = OS_SubArenaAlloc(-1, vc * 3 * sizeof(float));
             out->subUv[si]  = OS_SubArenaAlloc(-1, vc * 2 * sizeof(float));
+            const GlbCell posC = GlbCellInit(posAcc), nrmC = nrmAcc ? GlbCellInit(nrmAcc) : (GlbCell){0}, uvC = uvAcc ? GlbCellInit(uvAcc) : (GlbCell){0};
             for (u32 v = 0; v < vc; ++v) {
-                glbread_float(posAcc, v, &out->subPos[si][v*3], 3);
-                if (nrmAcc) { glbread_float(nrmAcc, v, &out->subNrm[si][v*3], 3);                                                                     } else { out->subNrm[si][v*3] = 0.0f; out->subNrm[si][v*3 + 1] = 1.0f; out->subNrm[si][v*3 + 2] = 0.0f; }
-                if (uvAcc)  { glbread_float( uvAcc, v, &out->subUv[si][v*2],  2); out->subUv[si][v*2 + 1] = 1.0f - out->subUv[si][v*2 + 1]; /*Flip V*/} else { out->subUv[si][v*2]  = 0.0f; out->subUv[si][v*2 + 1]  = 0.0f; }
+                GlbLoadVtx(&posC, &nrmC, &uvC, nrmAcc != NULL, uvAcc != NULL, v, out->subPos[si] + v*3, out->subNrm[si] + v*3, out->subUv[si] + v*2);
             }
             u32 tc;
-            if (prim->indices) { tc = (u32)(prim->indices->count / 3); out->subIndices[si] = OS_SubArenaAlloc(-1, tc * 3 * sizeof(u32)); for (u32 k=0;k<tc*3;++k) { out->subIndices[si][k] = (u32)glbread_index(prim->indices, k); } }
-            else               { tc = vc / 3;                          out->subIndices[si] = OS_SubArenaAlloc(-1, tc * 3 * sizeof(u32)); for (u32 k=0;k<tc*3;++k) { out->subIndices[si][k] = k;                                    } }
+            out->subIndices[si] = GlbLoadIndices(prim, vc, &tc);
             out->subTriCount[si]=tc; ++si;
         }
     }
@@ -681,12 +746,12 @@ static void* GltfBakeWorker(void* arg) {
     float* posedNrm = thread_temp_nrm[bt->tid];
     float* sv = thrd_verts[bt->tid];
     for (u32 i = bt->start; i < bt->end; ++i) {
-        GltfFrameTask* t = &bt->tasks[i]; u32 ec; __m128 mn_v, mx_v;
+        GltfFrameTask* t = &bt->tasks[i]; u32 ec; GlbRange rng;
         if (t->mesh->isTrAnim) { 
             GltfMesh* restrict gm = t->mesh;
             float timeline_t = t->timelineFrame;
-            mn_v = _mm_set1_ps(1000000000.0f);
-            mx_v = _mm_set1_ps(-1000000000.0f);
+            rng.mn = _mm_set1_ps(1000000000.0f);
+            rng.mx = _mm_set1_ps(-1000000000.0f);
             ec = 0;
             for (u32 s = 0; s < gm->submshCnt; ++s) {
                 float gm_mat[16];
@@ -703,13 +768,7 @@ static void* GltfBakeWorker(void* arg) {
                     float pt[3], n[3];
                     Mat4TransformPoint(gm_mat, &spos[vi * 3], pt);
                     Mat4TransformDir(gm_mat, &snrm[vi * 3], n);
-                    float* dst = sv + (ec << 3);
-                    dst[0] = -pt[0]; dst[1] = pt[1]; dst[2] = pt[2]; // Position
-                    dst[3] =  -n[0]; dst[4] =  n[1]; dst[5] =  n[2]; // Normal
-                    dst[6] = suv[vi * 2 + 0]; dst[7] = suv[vi * 2 + 1]; // UV
-                    __m128 pos_v = _mm_loadu_ps(dst);
-                    mn_v = _mm_min_ps(mn_v, pos_v);
-                    mx_v = _mm_max_ps(mx_v, pos_v);
+                    rng = GlbBakeEmit(sv + (ec << 3), rng, pt[0], pt[1], pt[2], n[0], n[1], n[2], suv[vi * 2 + 0], suv[vi * 2 + 1]);
                     ++ec;
                 }
             }
@@ -741,26 +800,20 @@ static void* GltfBakeWorker(void* arg) {
                 Mat4TransformDir(blended, &gm->nrm[v * 3], &posedNrm[v * 3]);
             }
             
-            mn_v = _mm_set1_ps(1000000000.0f); 
-            mx_v = _mm_set1_ps(-1000000000.0f);
+            rng.mn = _mm_set1_ps(1000000000.0f); 
+            rng.mx = _mm_set1_ps(-1000000000.0f);
             ec = 0; u32 cornerCount = gm->triCount * 3;
             for (u32 k_idx = 0; k_idx < cornerCount; ++k_idx) {
                 u32 vi = gm->indices[k_idx];
                 if (vi >= gm->vertCount) { continue; }
                 if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("glbanim:vert overflow\n"); break; }
                 
-                float* dst = sv + (ec << 3);
-                dst[0] = -posedPos[vi * 3 + 0]; dst[1] = posedPos[vi * 3 + 1]; dst[2] = posedPos[vi * 3 + 2]; // Position
-                dst[3] = -posedNrm[vi * 3 + 0]; dst[4] = posedNrm[vi * 3 + 1]; dst[5] = posedNrm[vi * 3 + 2]; // Normal
-                dst[6] =    gm->uv[vi * 2 + 0]; dst[7] =   gm->uv[vi * 2 + 1];                              // UV
-                __m128 pos_v = _mm_loadu_ps(dst);
-                mn_v = _mm_min_ps(mn_v, pos_v);
-                mx_v = _mm_max_ps(mx_v, pos_v);
+                rng = GlbBakeEmit(sv + (ec << 3), rng, posedPos[vi * 3 + 0], posedPos[vi * 3 + 1], posedPos[vi * 3 + 2], posedNrm[vi * 3 + 0], posedNrm[vi * 3 + 1], posedNrm[vi * 3 + 2], gm->uv[vi * 2 + 0], gm->uv[vi * 2 + 1]);
                 ++ec;
             }
             OS_SubArenaRelease(skin_tid, sub_mark);
         }
-        FinalizeParsedMesh(t->modelIndex, sv, ec, thrd_ht[bt->tid], thrd_ht_used[bt->tid], thrd_remap_scratch[bt->tid], thrd_cache_scratch[bt->tid], &vPos[t->modelIndex], &modelVertexCounts[t->modelIndex], &modelTriangles[t->modelIndex], &modelTriangleCounts[t->modelIndex], mn_v, mx_v, bt->tid);
+        FinalizeParsedMesh(t->modelIndex, sv, ec, thrd_ht[bt->tid], thrd_ht_used[bt->tid], thrd_remap_scratch[bt->tid], thrd_cache_scratch[bt->tid], &vPos[t->modelIndex], &modelVertexCounts[t->modelIndex], &modelTriangles[t->modelIndex], &modelTriangleCounts[t->modelIndex], rng.mn, rng.mx, bt->tid);
     } return NULL;
 }
 
@@ -910,6 +963,7 @@ static void* ModelParsingWorker(void* arg) {
             glb_data* data = NULL; 
             void* sub_mark = OS_SubArenaMark(tid); 
             glb_parse(tid, bytes, size, &data); 
+            if (!data) { OS_SubArenaRelease(tid, sub_mark); continue; } /*malformed GLB: skip exactly like the animated path*/
             glb_load_buffers(data);
             glb_node* meshNode = NULL; 
             for (size_t node_idx = 0; node_idx < data->nodes_count; ++node_idx) { if (data->nodes[node_idx].mesh && !data->nodes[node_idx].skin) { meshNode = &data->nodes[node_idx]; break; } } 
@@ -929,18 +983,21 @@ static void* ModelParsingWorker(void* arg) {
                     glb_primitive* prim = &mesh->primitives[p];
                     if (prim->type != glb_primitive_type_triangles) { continue; } 
                     const glb_accessor* posAcc = glb_find_accessor(prim, glb_attribute_type_position, 0); 
+                    if (!posAcc) { continue; } /*no POSITION attribute: nothing to load for this primitive*/
                     const glb_accessor* nrmAcc = glb_find_accessor(prim, glb_attribute_type_normal, 0); 
                     const glb_accessor* uvAcc = glb_find_accessor(prim, glb_attribute_type_texcoord, 0); 
+                    GlbCell posC = GlbCellInit(posAcc), nrmC = nrmAcc ? GlbCellInit(nrmAcc) : (GlbCell){0}, uvC = uvAcc ? GlbCellInit(uvAcc) : (GlbCell){0};
+                    GlbCell idxC = {0}; if (prim->indices) { idxC = GlbCellInit(prim->indices); }
                     u32 vc = (u32)posAcc->count; 
                     u32 ic = prim->indices ? (u32)prim->indices->count : vc;
                     for (u32 k = 0; k < ic; ++k) {
-                        u32 vi = prim->indices ? (u32)glbread_index(prim->indices, k) : k; 
+                        u32 vi = prim->indices ? (u32)GlbCellGetIdx(&idxC, k) : k; 
                         if (vi >= vc) continue; 
                         float pt[3] = {0}, n[3] = {0,1,0}, uv[2] = {0,0}; 
-                        glbread_float(posAcc, vi, pt, 3); 
+                        GlbCellGet(&posC, vi, pt, 3); 
                         Mat4TransformPoint(gm, pt, pt); 
-                        if (nrmAcc) { glbread_float(nrmAcc, vi, n, 3); Mat4TransformDir(gm, n, n); } 
-                        if (uvAcc) glbread_float(uvAcc, vi, uv, 2);
+                        if (nrmAcc) { GlbCellGet(&nrmC, vi, n, 3); Mat4TransformDir(gm, n, n); } 
+                        if (uvAcc) GlbCellGet(&uvC, vi, uv, 2);
                         float* dst = sv + (ec << 3); 
                         dst[0] = pt[0]; dst[1] = pt[2]; dst[2] = pt[1];   
                         dst[3] = n[0];  dst[4] = n[2];  dst[5] = n[1];   
