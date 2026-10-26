@@ -619,15 +619,19 @@ void ConsoleEmulator(i32 keycode) {
 
 // Raycast System
 RaycastHit RayTriangle(V3 origin, V3 dir, V3 A, V3 B, V3 C) {
+    RaycastHit miss = { .hit = false };
     V3 AB = V3_AsubB(B, A), AC = V3_AsubB(C, A);
     V3 n = V3_Cross(AB, AC);
     V3 ao = V3_AsubB(origin, A);
-    V3 dao = V3_Cross(ao, dir);
     float det = (-V3_dot(dir, n));
     float invDet = 1.0f / det;
-    float d = V3_dot(ao,n)*invDet;
-    float u = V3_dot(AC,dao) * invDet, v = (-V3_dot(AB, dao)) * invDet;
-    float w = 1.0f - u-v;
+    float d = V3_dot(ao,n)*invDet; if (d < 0.0f) return miss;
+    
+    V3 dao = V3_Cross(ao, dir);
+    float u = V3_dot(AC,dao) * invDet; if (u < 0.0f) return miss;
+    float v = (-V3_dot(AB, dao)) * invDet; if (v < 0.0f) return miss;
+    float w = 1.0f - u-v; if (w < 0.0f) return miss;
+
     return (RaycastHit){.point = V3_AplusB(origin, V3_ScaleByF(dir, d)), .normal = V3_Normalize(n), .distance = d, .hitInstanceIndex = INSTANCE_COUNT, .hit = vabs(det) >= 0.00000001f && d >= 0 && u >= 0 && v >= 0 && w >= 0};
 }
 
@@ -757,7 +761,11 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                         const BvhNode* node = stack[--sp]; float tEntry = BvhRayAABBHit(localOrigin, localDir, node->mn, node->mx, bestT); if (tEntry < 0.0f) continue;
                         if (node->triCount > 0) {
                             for (u32 k=0;k<node->triCount;k++) {
-                                u32 base = triOrder[node->triStart + k] * 3; u32 iA=tris[base + 0], iB=tris[base + 1], iC=tris[base + 2]; V3 posA = {posPtr[iA*3],posPtr[iA*3+1],posPtr[iA*3+2]}, posB={posPtr[iB*3],posPtr[iB*3+1],posPtr[iB*3+2]}, posC={posPtr[iC*3],posPtr[iC*3+1],posPtr[iC*3+2]}; RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC); if (!tryTri.hit) continue;
+                                u32 base = triOrder[node->triStart + k] * 3;
+                                u32 iA=tris[base + 0], iB=tris[base + 1], iC=tris[base + 2];
+                                V3 posA = {posPtr[iA*3],posPtr[iA*3+1],posPtr[iA*3+2]}, posB={posPtr[iB*3],posPtr[iB*3+1],posPtr[iB*3+2]}, posC={posPtr[iC*3],posPtr[iC*3+1],posPtr[iC*3+2]};
+                                RaycastHit tryTri = RayTriangle(localOrigin,localDir,posA,posB,posC); if (!tryTri.hit) continue;
+                                
                                 V3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz }; float worldDist = V3_Dist(worldPoint,origin); if (worldDist >= result.distance) continue;
                                 V3 worldNormal={(m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z,(m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z,(m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z };
                                 worldNormal = V3_Normalize(worldNormal); result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i; bestT = tryTri.distance;
@@ -2444,8 +2452,11 @@ i32 main() {
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad,queuedLevelPos); queuedLevelToLoad = 255u; continue; }
         
         double curtime = get_time();
+        raycastCalls = 0;
+        raycastMs = 0.0;
         World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time, 0.0);
-        World.absoluteTime+=World.deltaTime; World.current_time=curtime;
+        World.absoluteTime += World.deltaTime;
+        World.current_time = curtime;
         World.painStaticAlpha = vmax(0.0f, World.painStaticAlpha - (float)World.deltaTime * 2.0f);
         World.empStaticAlpha = vmax(0.0f, World.empStaticAlpha - (float)World.deltaTime * 4.0f);
         if (!World.paused && !World.menuActive) {
@@ -2454,7 +2465,7 @@ i32 main() {
             World.pauseRelativeTime += World.deltaTime * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/
         }
         double input_start = get_time();
-InputProcessing(); // Before anims and physics to allow them to respond immediately.
+        InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
         prePhys = get_time() - input_start;
         if (!World.paused && !World.menuActive) {

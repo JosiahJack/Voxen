@@ -1475,24 +1475,58 @@ void LoadLevelMod(u8 lev) {
         World.shd1=AddInstance(754,(V3){-51.30664f,-47.42f,56.42651f}); World.shd2=AddInstance(754,(V3){71.5f,-47.42f,-66.6f}); World.shd3=AddInstance(754,(V3){-51.306650f,-47.42f,-66.66652f}); World.shd4=AddInstance(754,(V3){71.78664f,-47.42f,56.42651f}); World.rotation[World.shd1] = World.rotation[World.shd2] = World.rotation[World.shd3] = World.rotation[World.shd4] = QUAT_IDENTITY;
     } else World.shd1=World.shd2=World.shd3=World.shd4=U16_MAX;
     headmountedLanternLight = AddLightSimple(World.position[PLAYER1],(Color3){1.0f,1.0f,1.0f},11.52f,0.0f,LIGHTON);
-    // Create single ad-hoc weapon view model instance (no entity definition, no physics collider; like shield generators)
     if (World.instCount < INSTANCE_COUNT) {
         u16 wvi = World.instCount; mset(&World.instances[wvi],0,sizeof(Entity)); World.instances[wvi].entflags=EF_ACTIVE|EF_NO_SHADOWS; World.layer[wvi]=L_Default; World.instances[wvi].camView=255; World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
         World.instances[wvi].texIndex=World.instances[wvi].glowIndex=World.instances[wvi].specIndex=World.instances[wvi].normIndex=MAXTEX; World.scale[wvi].x=World.scale[wvi].y=World.scale[wvi].z=World.mass[wvi]=World.rotation[wvi].w=1.0f; World.dynamicFriction[wvi]=0.5f; World.staticFriction[wvi]=0.6f;
         World.col[wvi]=CT_NONE; flag_set(&World.instances[wvi].entflags,EF_RIGIDBODY,false);
         World.instances[wvi].index=0; World.position[wvi]=World.position[PLAYER1]; World.rotation[wvi]=QUAT_IDENTITY; World.instances[wvi].modelIndex=MAX_MDLS; World.instances[wvi].animationNum=MAXANIM; World.weaponVModelIndex=wvi; World.instCount++;
     }
-    // Ad-hoc editmode selection text entity (based on text_decal 592): positioned at selected object, displays "index: #"
     if (World.instCount < INSTANCE_COUNT) {
         u16 editTextIdx = World.instCount; mset(&World.instances[editTextIdx],0,sizeof(Entity)); World.instances[editTextIdx].entflags=EF_ACTIVE; World.layer[editTextIdx]=L_Default; World.instances[editTextIdx].camView=255; World.instances[editTextIdx].modelIndex=World.instances[editTextIdx].lodIndex=World.instances[editTextIdx].colMeshIndex=MAX_MDLS;
         World.instances[editTextIdx].index=592; World.position[editTextIdx]=(V3){0.0f,0.0f,0.0f}; World.rotation[editTextIdx]=QUAT_IDENTITY; World.scale[editTextIdx].x=World.scale[editTextIdx].y=World.scale[editTextIdx].z=World.mass[editTextIdx]=World.rotation[editTextIdx].w=1.0f;
-        World.instances[editTextIdx].messageLingdex = 0; // placeholder; text set dynamically in render loop
-        World.instances[editTextIdx].texIndex = 881; // white.png; ad-hoc instance has no lingdex so no baked decal mesh is built for it
+        World.instances[editTextIdx].messageLingdex = 0;
+        World.instances[editTextIdx].texIndex = 881;
         World.editTextInstanceIndex = editTextIdx; World.instCount++;
     }
 }
 #undef KEY_EQ
-void func_forcebridge(u16 self); void CyberWallInitAfterLoad(u16 self); void FuncWallInitAfterLoad(u16); void LogicTimerInitBeforeLoad(u16); void ButtonSwitchInitAfterLoad(u16); void GrenadeInit(u16);
+void ButtonSwitchInitAfterLoad(u16), GrenadeInit(u16), FuncWallShiftChildren(u16,V3);
+void func_forcebridge(u16 i) {
+    World.instances[i].tickFinished = World.pauseRelativeTime + 0.05f + (double)random_range(0.0f,1.0f);
+    World.instances[i].lerping = true;
+    if (World.instances[i].activatedScale.x <= 0.02f) { World.instances[i].activatedScale.x = 2.56f; }
+    if (World.instances[i].activatedScale.y <= 0.02f) { World.instances[i].activatedScale.y = 0.08f; }
+    if (World.instances[i].activatedScale.z <= 0.02f) { World.instances[i].activatedScale.z = 2.56f; }
+    if (!World.instances[i].active) { World.instances[i].modelIndex = MAX_MDLS; World.col[i] = CT_NONE; }
+    switch (World.instances[i].fieldColor) {
+        case ForceFieldColor_Red:      World.instances[i].texIndex =  38; break;
+        case ForceFieldColor_Green:    World.instances[i].texIndex =  40; break;
+        case ForceFieldColor_Blue:     World.instances[i].texIndex =  39; break;
+        case ForceFieldColor_Purple:   World.instances[i].texIndex =  41; break;
+        case ForceFieldColor_RedFaint: World.instances[i].texIndex = 198; break;
+    }
+}
+
+void FuncWallInitAfterLoad(u16 i) {
+    V3 prev=World.position[i];
+    float distTotal = V3_Dist(World.instances[i].startPosition,World.instances[i].targetPosition), f = 0;
+         if (World.instances[i].funcState  > FStat_AjarMovingTarget) { f = World.instances[i].ajarPercentage; }
+    else if (World.instances[i].funcState == FStat_AjarMovingTarget) { f = World.instances[i].ajarPercentage; }
+    else if (World.instances[i].funcState == FStat_AjarMovingStart ) { f = 1.0f - World.instances[i].ajarPercentage; }
+    
+    f = vclamp(f,0.0f,1.0f);
+    V3 np = (distTotal > 0.0001f) ? V3_AplusB(World.instances[i].startPosition,V3_ScaleByF(V3_Normalize(V3_AsubB(World.instances[i].targetPosition,World.instances[i].startPosition)),distTotal * f)) : World.instances[i].startPosition; World.position[i]=np;
+    if ((u8)World.instances[i].funcState <= FStat_MovingTarget) { World.instances[i].funcState = FStat_Start; World.instances[i].percentMoved = 0.0f; }
+    FuncWallShiftChildren(i,V3_AsubB(np,prev));
+}
+
+void LogicTimerInitBeforeLoad(u16 i) {
+    if (World.instances[i].timeInterval <= 0.0f) { World.instances[i].timeInterval = 0.35f; }
+    if (World.instances[i].randomMin <= 0.0f) { World.instances[i].randomMin = 5.0f; }
+    if (World.instances[i].randomMax <= 0.0f) { World.instances[i].randomMax = 10.0f; }
+    World.instances[i].intervalFinished = World.pauseRelativeTime + (World.instances[i].useRandomTimes ? (double)random_range(World.instances[i].randomMin,World.instances[i].randomMax) : (double)World.instances[i].timeInterval);
+}
+
 float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
 AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips[e->animationNum][clip]; }
 u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span + 0.5f)); } // round, don't truncate: t*span truncating loses up to a full frame, so a stroke resumed at 70% lands near 22% instead of 30%. Clamped t <= 1 keeps the +0.5 from spilling past span.
@@ -1502,11 +1536,6 @@ void LoadLevelData(u8 curlevel) {
     if(curlevel<MAX_LEVELS)for(u8 id=0;id<8;++id)teleportDestinations[curlevel][id]=U16_MAX;
     if(curlevel<MAX_LEVELS)elevatorDestCounts[curlevel]=0;
     World.curLev = curlevel; TargetIDReset(); ai_reset_npc_numbering(); SetLevelPointers(curlevel); World.invP1.makingNoise=false;/*clear noise at level loads*/ World.decoyActive=false; World.decoyInstance=U16_MAX;/*a decoy is spawned into one level and dies with it; a stale true would leave cyber NPCs retargeting a dead instance index*/
-    /* Clear the whole per-level instance table, not just the slots the last visit
-       used: the dirty count is not knowable here (levelInstCount[curlevel] is 0 on
-       a level's first load, and runtime-summoned instances push the real high
-       water mark above it), so the full INSTANCE_COUNT span is what has to be
-       reset for the next load to start from a clean table. */
     mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation)); mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16)); World.lanimCount=0; World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf)); LoadLevelMod(curlevel); GravityLiftSyncAllVisuals(); PSysAddLevelLoops(); if (curlevel<MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel]=true; } OS_Free(fbuf,(size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
@@ -1521,7 +1550,6 @@ void LoadLevelData(u8 curlevel) {
         if (IdxIsGeometry(constIndex)) World.layer[i] = L_Geometry;
         else if (IdxIsUsableObject(constIndex)) {
             if (World.diffPuz == 3 && World.instances[i].index == 361 && random_range(0.0f,1.0f) < 0.33f) DeleteInstance(i); // 33% chance of not spawning logic probes on Puzzle difficulty of 3
-            /*Difficulty-based instance removals (access cards, audiologs, item_cyber_data) run in NewGameDifficultyPass from NewGame(), never here: a level reloaded mid-game would otherwise re-apply the mission-difficulty removals and strip items the player already picked up or already used.*/
         } else if (IdxIsDoor(World.instances[i].index)) {
             World.layer[i] = L_Door;
             if (World.instances[i].startOpen) World.instances[i].stayOpen = true;
@@ -1544,7 +1572,7 @@ void LoadLevelData(u8 curlevel) {
                 World.instances[i].generationDone = true;
             }
         } else switch (constIndex) {
-            case 21: case 22: CyberWallInitAfterLoad(i); break; // chunk_cyberpanel, chunk_cyberpanel_slice45
+            case 21: case 22: World.instances[i].tickFinished = World.pauseRelativeTime + 2.0; World.instances[i].animSwapFinished = 0.0; break; // chunk_cyberpanel, chunk_cyberpanel_slice45
             case 515: func_forcebridge(i); break;
             case 716: World.layer[i] = L_Trigger; break; // fx_reverbzone
             case 517: FuncWallInitAfterLoad(i); break;
@@ -1711,30 +1739,35 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.invP1.ladderState = 0;
     World.invP1.noiseFinished=World.pauseRelativeTime - 1.0;
     if (curlevel == LEVEL_CYBERSPACE) {
-        /*Unity CyberSetup: sphere cyberCollider enabled, capsuleCollider disabled. PLYR_RAD is 0.48f.
-          Set here, after SetLevelPointers, so it lands in level 13's per-level player slot; CopyPlayerState
-          would otherwise carry the capsule in, and carry the sphere back out again on exit.*/
         World.col[PLAYER1] = CT_SPH; World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_RAD,PLYR_RAD}; World.colliderCenter[PLAYER1] = (V3){0.0f,0.0f,0.0f}; World.radius[PLAYER1] = PLYR_RAD; World.gravity[PLAYER1] = 0.0f;
-        if (prevLevel != LEVEL_CYBERSPACE) { CyberTimerReset(PLAYER1,World.diffCyb); World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0; World.instances[PLAYER1].minutes = vfloor(World.instances[PLAYER1].cyberTimer / 60.0f); World.instances[PLAYER1].seconds = World.instances[PLAYER1].cyberTimer - (World.instances[PLAYER1].minutes * 60.0f); }
+        if (prevLevel != LEVEL_CYBERSPACE) {
+            CyberTimerReset(PLAYER1,World.diffCyb);
+            World.instances[PLAYER1].timerFinished = World.pauseRelativeTime + 1.0;
+            World.instances[PLAYER1].minutes = vfloor(World.instances[PLAYER1].cyberTimer / 60.0f);
+            World.instances[PLAYER1].seconds = World.instances[PLAYER1].cyberTimer - (World.instances[PLAYER1].minutes * 60.0f);
+        }
     } else {
-        /*Back to the capsule on every real-world level, whatever state the player slot was copied from.*/
-        World.col[PLAYER1] = CT_CAP; World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_HT * World.invP1.currentCrouchRatio,1.0f}; World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f; World.gravity[PLAYER1] = 1.0f;
-        if (prevLevel == LEVEL_CYBERSPACE) { /*6DOF orientation cannot persist into the real world: keep only the heading the cyber forward vector projects to, pitch/roll zeroed (Unity ExitCyberspace restores an upright capsule/camera rotation).*/
-            V3 cyberFwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f}); float yawDeg = __builtin_atan2f(cyberFwd.x,cyberFwd.z) * (180.0f / 3.14159265f); float halfYaw = deg2rad(yawDeg) * 0.5f;
-            World.rotation[PLAYER1] = (Quaternion){0.0f,vsinf(halfYaw),0.0f,vcosf(halfYaw)}; World.cam_yaw = yawDeg < 0.0f ? yawDeg + 360.0f : yawDeg; World.cam_pitch = World.cam_roll = 0.0f; World.invP1.leanTarget = 0.0f;
+        World.col[PLAYER1] = CT_CAP;
+        World.colliderSize[PLAYER1] = (V3){PLYR_RAD,PLYR_HT * World.invP1.currentCrouchRatio,1.0f};
+        World.colliderCenter[PLAYER1].y = -PLYR_CAM_OFS_Y + (PLYR_HT - World.colliderSize[PLAYER1].y) * 0.5f;
+        World.gravity[PLAYER1] = 1.0f;
+        if (prevLevel == LEVEL_CYBERSPACE) {
+            V3 cyberFwd = quat_rot_v3(World.rotation[PLAYER1],(V3){0.0f,0.0f,1.0f});
+            float yawDeg = __builtin_atan2f(cyberFwd.x,cyberFwd.z) * (180.0f / 3.14159265f);
+            float halfYaw = deg2rad(yawDeg) * 0.5f;
+            World.rotation[PLAYER1] = (Quaternion){0.0f,vsinf(halfYaw),0.0f,vcosf(halfYaw)};
+            World.cam_yaw = yawDeg < 0.0f ? yawDeg + 360.0f : yawDeg;
+            World.cam_pitch = World.cam_roll = 0.0f; World.invP1.leanTarget = 0.0f;
         }
     }
     DebugRAM("end of LoadLevel");
 }
-// HUD sensaround cameras: repositioned at the player each frame and oriented from the player's facing.
-// Center(rear) shows whatever is behind the player when the hardware is active (version > 0); the left/right
-// side views kick in at version > 1 and look 90 degrees to each side of the rear view.
+
 void UpdateSensaroundCamViews() {
-    /* Self-heal indices: our 3 sensaround camviews are always the tail of camViews (assigned last in
-       LoadLevelMod) and uniquely use far=1000.0f.  Re-deriving them keeps things working after a save game
-       is loaded (LoadGame restores camViews directly without re-running LoadLevelMod). */
     if (camViewCount < 3 || camViews[camViewCount-1].far != 1000.0f) { sensaroundCamViewCenter=sensaroundCamViewLeft=sensaroundCamViewRight=255; return; }
-    sensaroundCamViewCenter=(u8)(camViewCount-3); sensaroundCamViewLeft=(u8)(camViewCount-2); sensaroundCamViewRight=(u8)(camViewCount-1);
+    sensaroundCamViewCenter = (u8)(camViewCount - 3);
+    sensaroundCamViewLeft   = (u8)(camViewCount - 2);
+    sensaroundCamViewRight  = (u8)(camViewCount - 1);
     bool hwActive = (World.invP1.hardwareIsActive & HW_SNS) != 0;
     u16 hwVer = World.invP1.hwVers[HW_SNS_IDX];
     bool centerOn = hwActive && hwVer > 0;
@@ -1749,12 +1782,10 @@ void UpdateSensaroundCamViews() {
     camViews[sensaroundCamViewCenter].position = World.position[PLAYER1];
     camViews[sensaroundCamViewCenter].rotation = quat_look_rotation(rear,up);
     if (sidesOn) {
-        V3 leftDir  = V3_Normalize((V3){ rear.z, rear.y, -rear.x });/* rear rotated +90deg about world +Y -> player's left */
-        V3 rightDir = V3_Normalize((V3){ -rear.z, rear.y,  rear.x });/* rear rotated -90deg about world +Y -> player's right */
-        camViews[sensaroundCamViewLeft ].position = World.position[PLAYER1];
-        camViews[sensaroundCamViewLeft ].rotation = quat_look_rotation(leftDir,up);
-        camViews[sensaroundCamViewRight].position = World.position[PLAYER1];
-        camViews[sensaroundCamViewRight].rotation = quat_look_rotation(rightDir,up);
+        V3 leftDir  = V3_Normalize((V3){ rear.z, rear.y, -rear.x });
+        V3 rightDir = V3_Normalize((V3){ -rear.z, rear.y,  rear.x });
+        camViews[sensaroundCamViewLeft ].position = World.position[PLAYER1]; camViews[sensaroundCamViewLeft ].rotation = quat_look_rotation(leftDir,up);
+        camViews[sensaroundCamViewRight].position = World.position[PLAYER1]; camViews[sensaroundCamViewRight].rotation = quat_look_rotation(rightDir,up);
     }
 }
 
@@ -1763,9 +1794,9 @@ void UpdateSensaroundCamViews() {
 typedef struct { u32 magicNumber; u32 version; u32 uncompressedSize; u32 compressedSize; char savename[48]; } SaveHeader;
 #pragma pack(pop)
 size_t GetMaxCompressedSize(size_t srcSize) { return srcSize + (srcSize / 128) + 16; } // Worst-case buffer size for allocation
-size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Find and pop the zeroes bubbles.  Turns an otherwise 232mb save file into ~23mb.
+size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) { // Find and pop the zeroes bubbles.  Turned an otherwise 232mb save file into ~23mb.
     size_t s = 0, d = 0;
-    while (s < srcSize) {/*1. Hunt for Zeros*/
+    while (s < srcSize) {/*1. Zeros*/
         size_t zeroCount = 0;
         while(s + zeroCount < srcSize && src[s + zeroCount] == 0){zeroCount++;}
         if(zeroCount > 0){
@@ -1776,7 +1807,14 @@ size_t VoidSquasher(const u8* src, size_t srcSize, u8* dst, size_t dstCapacity) 
             continue;
         }
         
-        size_t litCount = 0;/*2. Process Literal Data (Non-Zeros). It costs 2 bytes of overhead to break a literal run to compress 1 or 2 zeros. Only break a literal run if 3 or more zeros ahead.*/ while (s + litCount < srcSize && litCount < 128) { if (src[s + litCount] == 0) { size_t remain = srcSize - (s + litCount); if (remain >= 3 && src[s + litCount + 1] == 0 && src[s + litCount + 2] == 0) { break; } } litCount++; }
+        size_t litCount = 0;/*2. Non-Zeros. It costs 2 bytes of overhead so only break a run if 3 or more zeros ahead.*/
+        while (s + litCount < srcSize && litCount < 128) {
+            if (src[s + litCount] == 0) {
+                size_t remain = srcSize - (s + litCount);
+                if (remain >= 3 && src[s + litCount + 1] == 0 && src[s + litCount + 2] == 0) { break; }
+            }
+            litCount++;
+        }
         if (litCount > 0) {
             if (d + 1 + litCount > dstCapacity) {return 0;}
             

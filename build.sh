@@ -165,8 +165,8 @@ elif ! $IS_CI; then
     case "$PLATFORM" in
         windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; wine ./voxen.exe ;;
 #         windows)  wine ./voxen.exe ;;
-#         *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
-        *)        ./voxen ;;   # linux
+        *)        strip --strip-all --strip-unneeded ./voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
+#         *)        ./voxen ;;   # linux
     esac
 elif [ "$BUILD_MODE" = "debug" ]; then
     echo "Debug build: $BINARY_NAME carries DWARF (-g -O0 -fno-omit-frame-pointer), unstripped.  Debug with:  gdb --args ./$BINARY_NAME"

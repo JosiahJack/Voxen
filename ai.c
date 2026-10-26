@@ -235,12 +235,12 @@ bool HasHealth(u16 i) { return IsCyberNPC(i) ? (World.instances[i].cyberHealth >
 void AISetEnemy(u16, u16);
 void CyberDecoySetTarget(u16 decoy) {
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
-        Entity* e = &World.instances[i]; if (!IdxIsNPC(e->index) || npcTable[e->index - 419].type != NPCType_Cyber) continue;
-        if (e->currentState == AIState_Dead || e->currentState == AIState_Dying) continue;
-        u16 en = e->enemy; if (!en) continue;
+        if (!IdxIsNPC(World.instances[i].index) || npcTable[World.instances[i].index - 419].type != NPCType_Cyber) continue;
+        if (World.instances[i].currentState == AIState_Dead || World.instances[i].currentState == AIState_Dying) continue;
+        u16 en = World.instances[i].enemy; if (!en) continue;
         
-             if (decoy != U16_MAX) { if (en == PLAYER1)                 { AISetEnemy(i, decoy); flag_set(&e->entflags, EF_ENEM_IN_LOS, true); } }
-        else if (!IdxIsNPC(World.instances[en].index) && en != PLAYER1) { e->enemy = 0; e->posCheckFinished = World.pauseRelativeTime; flag_set(&e->entflags, EF_ENEM_IN_LOS, false); }
+             if (decoy != U16_MAX) { if (en == PLAYER1)                 { AISetEnemy(i, decoy); flag_set(&World.instances[i].entflags, EF_ENEM_IN_LOS, true); } }
+        else if (!IdxIsNPC(World.instances[en].index) && en != PLAYER1) { World.instances[i].enemy = 0; World.instances[i].posCheckFinished = World.pauseRelativeTime; flag_set(&World.instances[i].entflags, EF_ENEM_IN_LOS, false); }
     }
 }
 
@@ -503,17 +503,17 @@ static V3 AIGetAStarPoint(Entity* self) {
 
 static V3 AIGetSearchPoint(Entity* self) { NPCType t = npcTable[self->index - 419].type; if (t == NPCType_Mutant || t == NPCType_Supermutant) {return AIGetWanderPoint(self);} return AIGetAStarPoint(self); }
 static void AIHopMove(u16 self) {
-    Entity* e = &World.instances[self]; if (e->animationNum >= MAXANIM || e->clip >= MAX_ANIMCLIPS) { flag_set(&e->entflags,EF_HOP_DONE,false); return; }
+    if (World.instances[self].animationNum >= MAXANIM || World.instances[self].clip >= MAX_ANIMCLIPS) { flag_set(&World.instances[self].entflags,EF_HOP_DONE,false); return; }
     
-    AnimationClip c = modelAnimationClips[e->animationNum][e->clip];
-    float normTime = (c.frameEnd > c.frameStart) ? (float)(e->frame - c.frameStart) / (float)(c.frameEnd - c.frameStart) : 0.0f;
+    AnimationClip c = modelAnimationClips[World.instances[self].animationNum][World.instances[self].clip];
+    float normTime = (c.frameEnd > c.frameStart) ? (float)(World.instances[self].frame - c.frameStart) / (float)(c.frameEnd - c.frameStart) : 0.0f;
     if (normTime > 0.1395f) {
-        if (!(e->entflags & EF_HOP_DONE)) {
-            flag_set(&e->entflags,EF_HOP_DONE,true);
-            AddForce(self,V3_ScaleByF(e->forward,500.0f),true);
+        if (!(World.instances[self].entflags & EF_HOP_DONE)) {
+            flag_set(&World.instances[self].entflags,EF_HOP_DONE,true);
+            AddForce(self,V3_ScaleByF(World.instances[self].forward,500.0f),true);
             AddForce(self,(V3){0,5.0f,0},true);
         }
-    } else { flag_set(&e->entflags,EF_HOP_DONE,false); }
+    } else { flag_set(&World.instances[self].entflags,EF_HOP_DONE,false); }
 }
 static void AIWalk(u16 self) {
     if ((AICheckPain(self)) || (World.instances[self].entflags & EF_ASLEEP)){return;}
