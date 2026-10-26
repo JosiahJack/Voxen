@@ -498,6 +498,28 @@ void HardwareButtons() {
     for(u8 i=0;i<8;++i){const HwBtn* b=&hwBtns[i]; if (!(hw&b->bit))continue; u16 tex; if (b->eng==3) tex=((World.inventoryMode && UIOver(UI_ID_HUD_HW_0+i) && AnyLeftRightMouseDown()) || ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1))) ? 997 : 996; else tex=(u16)HwActiveTexIndex((World.invP1.hardwareIsActive & b->bit)!=0,World.invP1.hwVers[b->idx],b->t[0],b->t[1],b->t[2],b->t[3],b->t[4]); UIRImg(UI_ID_HUD_HW_0+i,b->x,b->y,40,40,tex); }
 }
 
+void RenderShieldEffect() {
+    if (World.pauseRelativeTime > World.Sys_UI.shieldAnimationFinished) return;
+    float t = (float)(World.pauseRelativeTime - World.Sys_UI.shieldAnimationStarted);
+    if (t < 0.0f) t = 0.0f; if (t > 1.2f) t = 1.2f;
+    int middleY = 384; int topY = 0; int bottomY = 768;
+    int w = 1366, h = 160;
+    int x = 0; // full screen width
+    if (World.Sys_UI.shieldAnimationIsActivate) {
+        // Activate: sweep from middle to edges
+        float upY = (float)middleY + (float)(topY - middleY) * t;
+        float dnY = (float)middleY + (float)(bottomY - middleY) * t;
+        RenderUIImage(x, (i16)(upY + 40 - h*0.5f), w, h, 1076);
+        RenderUIImageExtended(x, (i16)(dnY - 40 - h*0.5f), w, h, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);
+    } else {
+        // Deactivate: sweep from edges back to middle
+        float upY = (float)topY + (float)(middleY - topY) * t;
+        float dnY = (float)bottomY + (float)(middleY - bottomY) * t;
+        RenderUIImage(x, (i16)(upY + 0 - h*0.5f), w, h, 1076);
+        RenderUIImageExtended(x, (i16)(dnY - 0 - h*0.5f), w, h, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);
+    }
+}
+
 void HwToggle(u8 i) {
     const HwBtn* b=&hwBtns[i];
     bool noEng = World.invP1.energy <= 0.0f, on = (World.invP1.hardwareIsActive & b->bit) != 0;
@@ -517,7 +539,7 @@ void HwToggle(u8 i) {
     }
     
     if (noEng && (b->eng==0 || (b->eng==1 && World.invP1.hwVersSetting[b->idx]==0) || (b->eng==2 && World.invP1.hwVersSetting[b->idx]>=1))) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); return; }
-    play_wav(sounds[on ? b->sOff : b->sOn],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= b->bit; if (b->bit==HW_BIO && on && !Cheats.showFPS) BioMonitorClearGraphs();
+    play_wav(sounds[on ? b->sOff : b->sOn],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); World.invP1.hardwareIsActive ^= b->bit; if (b->bit==HW_SHD) { World.Sys_UI.shieldAnimationIsActivate = !on; World.Sys_UI.shieldAnimationStarted = World.pauseRelativeTime; World.Sys_UI.shieldAnimationFinished = World.pauseRelativeTime + (World.Sys_UI.shieldAnimationIsActivate ? 1.0 : 1.167); } if (b->bit==HW_BIO && on && !Cheats.showFPS) BioMonitorClearGraphs();
 }
 
 extern V3 queuedLevelPos; extern u8 queuedLevelToLoad;
@@ -1471,7 +1493,7 @@ static double RenderUI() {
             }
             bool cyber = World.curLev == LEVEL_CYBERSPACE;
             if (cyber) { World.Sys_UI.MFD_CenterTab = 4; World.Sys_UI.mfdSelected[0] = 4; } /*Unity MFDManager.EnterCyberspace forces the center MFD to the Software tab (CenterTabButtonClickSilent(3)); forcing it every frame also overrides tab hotkeys/clicks while in cyberspace*/
-            bool editPanelActive=EditSelIsActive()||EditLightSelIsActive(); if (!editPanelActive) { TickBar(false); if (!cyber) TickBar(true); } if (!cyber) HardwareButtons(); UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020);/*cyberspace: health ticks only, no energy ticks, no hardware buttons; shootmode button stays; while the edit panel is active the health/energy ticks are skipped too*/
+            bool editPanelActive=EditSelIsActive()||EditLightSelIsActive(); if (!editPanelActive) { TickBar(false); if (!cyber) TickBar(true); } if (!cyber) HardwareButtons(); UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020); RenderShieldEffect();/*cyberspace: health ticks only, no energy ticks, no hardware buttons; shootmode button stays; while the edit panel is active the health/energy ticks are skipped too*/
             for (u8 i=0;i<10;++i) if (World.Sys_UI.tWrnFinished[i]>World.pauseRelativeTime) {
                 char flt[6]; if (World.Sys_UI.tWrnTextIdx[i]==185) sFormat(flt,6,"%.1f",(double)World.instances[PLAYER1].radiation);
                 RenderTextL(340,72+i*18,World.Sys_UI.tWrnColorIdx[i],FONT_NORMAL,0.8f,"%s%s%s",Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx[i]],World.Sys_UI.tWrnTextIdx[i]==185?flt:World.Sys_UI.tWrnTextIdx2[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx2[i]]:"",World.Sys_UI.tWrnTextIdx3[i]>=0?Sys_Text.stringTable[World.Sys_UI.tWrnTextIdx3[i]]:"");

@@ -243,7 +243,7 @@ INLINE Manifold BoxBox(ShapeBox a, ShapeBox b) {
 V3 MvVert(const float* M, V3 v) { return (V3){ M[0]*v.x + M[4]*v.y + M[8]*v.z  + M[12], M[1]*v.x + M[5]*v.y + M[9]*v.z  + M[13], M[2]*v.x + M[6]*v.y + M[10]*v.z + M[14] }; }
 INLINE void MeshTri(u16 m, u32 ti, const float* mx, V3* a, V3* b, V3* c) { u32 i0=modelTriangles[m][ti*3+0],i1=modelTriangles[m][ti*3+1],i2=modelTriangles[m][ti*3+2]; *a=MvVert(mx,MeshVert(m,i0)); *b=MvVert(mx,MeshVert(m,i1)); *c=MvVert(mx,MeshVert(m,i2)); }
 INLINE V3 SphSupport(ShapeSphere b, V3 d) { float L=V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); float scale=b.rad / vsqrtf(safeL); V3 dir=V3_ScaleByF(d,scale); float mask=(L > PHY_EPSILON); return V3_AplusB(V3_ScaleByF(dir,mask),V3_ScaleByF((V3){0,b.rad,0},1.0f - mask)); }
-float copysignf(float magnitude, float sign) { union { float f; u32 i; } m, s; m.f = magnitude; s.f = sign; m.i = (m.i & 0x7FFFFFFFu) | (s.i & 0x80000000u); return m.f; }
+INLINE float copysignf(float magnitude, float sign) { union { float f; u32 i; } m, s; m.f = magnitude; s.f = sign; m.i = (m.i & 0x7FFFFFFFu) | (s.i & 0x80000000u); return m.f; }
 INLINE V3 BoxSupport(ShapeBox b, V3 d) { V3 x=quat_rot_v3(b.rot,(V3){1,0,0}), y=quat_rot_v3(b.rot,(V3){0,1,0}), z=quat_rot_v3(b.rot,(V3){0,0,1}); float kx = copysignf(1.0f, V3_dot(d, x)); float ky = copysignf(1.0f, V3_dot(d, y)); float kz = copysignf(1.0f, V3_dot(d, z)); return V3_AplusB(V3_AplusB(V3_AplusB(b.ctr, V3_ScaleByF(x, kx * b.hExt.x)), V3_ScaleByF(y, ky * b.hExt.y)), V3_ScaleByF(z, kz * b.hExt.z)); }
 INLINE V3 CapsuleSupport(ShapeCapsule cap, V3 d) { float db=V3_dot(cap.base,d), dt=V3_dot(cap.tip,d); float mask=(dt > db); V3 best=V3_AplusB(V3_ScaleByF(cap.tip,mask),V3_ScaleByF(cap.base,1.0f - mask)); float L = V3_dot(d,d); float safeL=vmax(L,PHY_EPSILON); V3 dir=V3_ScaleByF(d,cap.rad / vsqrtf(safeL)); float lmask=(L >= PHY_EPSILON); return V3_AplusB(best,V3_ScaleByF(dir,lmask)); }
 V3 HullSupport(u16 m, const float* M, u16 adjIdx, V3 dWorld) {
@@ -265,7 +265,8 @@ bool GJKNextSimplex(Simplex3D *s, V3 *dir) {
     if (V3_dot(nABC,AO) > 0.f) { GJKCopy(s,0,1); GJKCopy(s,1,2); GJKSet(s,2,A,wAA,wBA); s->n=3; *dir=nABC; return true; } if (V3_dot(nACD,AO) > 0.f) { GJKSet(s,2,A,wAA,wBA); s->n = 3; *dir=nACD; return true; } if (V3_dot(nADB,AO) > 0.f) { GJKCopy(s,1,0); GJKCopy(s,0,2); GJKSet(s,2,A,wAA,wBA); s->n=3; *dir=nADB; return true; } return false;
 }
 
-typedef struct { int a,b,c; V3 n; float d; } EPAFace; typedef struct { V3 v,wA,wB; } EPAVert;
+typedef struct { int a,b,c; V3 n; float d; } EPAFace;
+typedef struct { V3 v,wA,wB; } EPAVert;
 INLINE EPAFace MakeEPAFace(const EPAVert* vb, int a, int b, int c) { V3 n = V3_Cross(V3_AsubB(vb[b].v,vb[a].v),V3_AsubB(vb[c].v,vb[a].v)); float L = V3_Mag(n); if(L < PHY_EPSILON){return (EPAFace){a,b,c,{0},-1.f};} n = V3_ScaleByF(n,1.f/L); float d = V3_dot(n,vb[a].v); if(d < 0.f){n=(V3){-n.x,-n.y,-n.z}; d=-d; int t=b;b=c;c=t;} return (EPAFace){a,b,c,n,d}; }
 V3 EPAContactPoint(const EPAVert* ev, int a, int b, int c){V3 pa=ev[a].v,pb=ev[b].v,pc=ev[c].v; V3 v0=V3_AsubB(pb,pa),v1=V3_AsubB(pc,pa),v2=V3_AsubB((V3){0},pa); float d00=V3_dot(v0,v0),d01=V3_dot(v0,v1),d11=V3_dot(v1,v1),d20=V3_dot(v2,v0),d21=V3_dot(v2,v1); float denom=d00*d11-d01*d01+PHY_EPSILON; float v=vmax((d11*d20-d01*d21)*(1.0f/denom),0.0f),w=vmax((d00*d21-d01*d20)*(1.0f/denom),0.0f),u=vmax(1.0f-v-w,0.0f); float sum=u+v+w; if(sum>PHY_EPSILON){u/=sum; v/=sum; w/=sum;} return (V3){u*ev[a].wA.x+v*ev[b].wA.x+w*ev[c].wA.x,u*ev[a].wA.y+v*ev[b].wA.y+w*ev[c].wA.y,u*ev[a].wA.z+v*ev[b].wA.z+w*ev[c].wA.z};}
 INLINE Manifold MakeEPAManifold(const EPAVert* ev, int a, int b, int c, V3 n, float d) { Manifold m={0}; m.normal=n; m.maxPen=d; m.n=1; m.p[0]=(ManifoldPt){EPAContactPoint(ev,a,b,c),d}; return m; }

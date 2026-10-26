@@ -665,6 +665,7 @@ u16 EditModePickLight(V3 origin, V3 dir, float maxDist, float* outDist) {
         Light* L = &World.lights[i];
         if (L->lflags & (LSPOT | LDIR)) continue;
         if (L->range <= 0.001f) continue;
+        
         RaycastHit h = RaySphere(origin, dir, (ShapeSphere){L->pos, 0.02f*L->range}, maxDist);
         if (h.hit && h.distance < bestDist) { best = i; bestDist = h.distance; }
     }
@@ -2164,7 +2165,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     // TESTING STUFF, TODO Delete once hardware and particle systems are fully confirmed and tested as good (they aren't yet).
     //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAXTEX},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colStart=(Color){1,0,0,1},.colEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.shapeRadius=2.56f,.shapeType=1,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
     //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAXTEX},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
-    //AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
+    AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
     AutomapNewGame();
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
 }
@@ -2229,11 +2230,10 @@ void LoadRaytracingData(void) {
     if (rtInstanceInfoID) { glDeleteBuffers(1, &rtInstanceInfoID); rtInstanceInfoID = 0; }
     if (rtCellCountsID)   { glDeleteBuffers(1, &rtCellCountsID);   rtCellCountsID = 0; }
     if (rtCellListsID)    { glDeleteBuffers(1, &rtCellListsID);    rtCellListsID = 0; }
-    //if (rtGeomID) { glDeleteBuffers(1, &rtGeomID); rtGeomID = 0; }
     rtGeomID = MakeSSBO(&rtGeomID, 16, geomBytes, NULL, GL_STATIC_DRAW);
     glBindBuffer(GL_SSBO, rtGeomID);
     u8* gpuPtr = (u8*)glMapBufferRange(GL_SSBO, 0, geomBytes, 0x0002/*GL_MAP_WRITE_BIT*/ | 0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
-    u32* nodes = (u32*)gpuPtr; /*the node section is filled in place in the mapped rtGeom buffer; the old staging allocation was 90MB (nodeTotal*64B) held across the fill plus a full memcpy of it*/
+    u32* nodes = (u32*)gpuPtr;
     for (m=0; m<mdlsCnt; ++m) {
         if (!BvhHasBVH((u16)m)) continue;
         
@@ -2247,14 +2247,6 @@ void LoadRaytracingData(void) {
         }
     }
     glUnmapBuffer(GL_SSBO);
-    // Fill the triangle/position/UV sections on the GPU from the models' own render buffers:
-    // vbos[m] already holds exactly the half-float pos+uv data rt.compute consumes and tbos[m]
-    // the source indices, so no CPU-side duplicate of that data is ever allocated. This also
-    // makes the build work when RT is enabled at runtime after booting with reflections off
-    // (the old CPU pools only existed when Reflections==2 at model load). The BVH triangle
-    // order array is the only CPU input, staged per model through one small buffer.
-    // Bases 17/18/19 are scratch for this pass only - bases 0-16 and 20+ belong to other
-    // systems, are set once at init and never restored per frame.
     glUseProgram(rtCopySP);
     u32 orderBufID = 0; glGenBuffers(1, &orderBufID);
     u16* orderStage = (u16*)OS_Alloc(((size_t)maxModelTris + 2) * sizeof(u16));
@@ -2464,7 +2456,6 @@ i32 main() {
         World.empStaticAlpha = vmax(0.0f, World.empStaticAlpha - (float)World.deltaTime * 4.0f);
         if (!World.paused && !World.menuActive) {
             if (World.pauseRelativeTime < 0.001f) { World.pauseRelativeTime = World.last_physics_time = curtime; }
-                
             World.pauseRelativeTime += World.deltaTime * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/
         }
         double input_start = get_time();
@@ -2497,27 +2488,21 @@ i32 main() {
         if (ScrshotPressed() && World.current_time > World.screenshotTimeout) { Screenshot(); }
         for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/
         for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) { Sys_Input.mouseButtons[i].pressed = false; }
-        Sys_Input.scrollDelta = 0;
+        Sys_Input.scrollDelta = 0.0; 
         World.currentMouse_dx = World.currentMouse_dy = 0;
         globalframe++;
         World.cpuTime = get_time() - World.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.
         if (globalframe > 4) {
             u8 r = (gpuQFrame + 1) % 5; u64 v;
-            glGetQueryObjectui64v(gpuQ[r][0], 0x8866/*GL_QUERY_RESULT*/,&v); World.gpuShadowMs=(double)v * 0.000001;
-            glGetQueryObjectui64v(gpuQ[r][1],0x8866/*GL_QUERY_RESULT*/,&v);  World.gpuPreMs=(double)v * 0.000001;
-            glGetQueryObjectui64v(gpuQ[r][2],0x8866/*GL_QUERY_RESULT*/,&v);  World.gpuMainMs=(double)v * 0.000001;
-            glGetQueryObjectui64v(gpuQ[r][3],0x8866/*GL_QUERY_RESULT*/,&v);  World.gpuSsrMs=(double)v * 0.000001;
-            glGetQueryObjectui64v(gpuQ[r][4], 0x8866/*GL_QUERY_RESULT*/,&v); World.gpuCompMs=(double)v * 0.000001;
-            World.gpuFrameMs = World.gpuShadowMs + World.gpuPreMs + World.gpuMainMs + World.gpuSsrMs + World.gpuCompMs;
+            glGetQueryObjectui64v(gpuQ[r][0],0x8866/*GL_QUERY_RESULT*/,&v); World.gpuShadowMs = (double)v * 0.000001;    glGetQueryObjectui64v(gpuQ[r][1],0x8866/*GL_QUERY_RESULT*/,&v); World.gpuPreMs    = (double)v * 0.000001;
+            glGetQueryObjectui64v(gpuQ[r][2],0x8866/*GL_QUERY_RESULT*/,&v); World.gpuMainMs   = (double)v * 0.000001;    glGetQueryObjectui64v(gpuQ[r][3],0x8866/*GL_QUERY_RESULT*/,&v); World.gpuSsrMs    = (double)v * 0.000001;
+            glGetQueryObjectui64v(gpuQ[r][4],0x8866/*GL_QUERY_RESULT*/,&v); World.gpuCompMs   = (double)v * 0.000001;    World.gpuFrameMs = World.gpuShadowMs + World.gpuPreMs + World.gpuMainMs + World.gpuSsrMs + World.gpuCompMs;
         }
         gpuQFrame=(gpuQFrame+1)%5;
         ((WSWin*)window)->context.swapBuffers(((WSWin*)window));
-        CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
-        // RAM and frame consistency debug stats
-        static u32 dbgGameFrame = 0;
-        if (!World.menuActive && !World.paused) { dbgGameFrame++; /*only count gameplay frames for RAM/timing checkpoints*/}
-        static const u32 dbgFrm[] = {4, 100, 200, 500, 1000};
-        static const char* dbgLbl[] = {"   4"," 100"," 200"," 500","1000"};
+        CHECK_GL_ERROR();
+        static u32 dbgGameFrame = 0; if (!World.menuActive && !World.paused) { dbgGameFrame++; }
+        static const u32 dbgFrm[] = {4, 100, 200, 500, 1000}; static const char* dbgLbl[] = {"   4"," 100"," 200"," 500","1000"};
         for (int d=0;d<5;d++) {
             if (dbgGameFrame == dbgFrm[d]) {
                 DebugRAM(dbgLbl[d]);

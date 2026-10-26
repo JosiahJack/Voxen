@@ -306,6 +306,7 @@ typedef struct {
         u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, MFD_LefTab, MFD_CenterTab, MFD_RightTab, MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
         i8 elevButtonLabelIdx[8], generalClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
         bool lastWeaponSideRH, lastItemSideRH, lastAutomapSideRH, lastDataSideRH, lastSearchSideRH, lastMinigameSideRH, logActive, paperLogInUse/*TODO*/, usingObject, highlightStatus[4], mouseClickHeldOverGUI, buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], mfdGeneralItem, mfdHardwareItem, keycodeValid, keycodeSolved, pg_cell[35], pg_powered[35], pg_checked[35], pg_solved, pw_wireOn[7], pw_rowActive[7];
+        bool shieldAnimationIsActivate; double shieldAnimationStarted, shieldAnimationFinished;
         bool pw_selectedWireRH, pw_solved, pg_fired, mg_running[2], autoSide[2], fullMapOpen[2], firstMain, firstGeneral, firstHardware, firstWeapon;
         V3 objectInUsePos;
 } SystemUI;

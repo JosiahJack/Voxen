@@ -748,7 +748,7 @@ void InputProcessing() {
         if (GetKeyPressed(19)/*  Infrared*/) HwToggle(4);/*hwBtns[4]=HW_INF, sOn/sOff 98/82*/
         if (GetKeyPressed(15)/*Biomonitor*/) HwToggle(0);/*hwBtns[0]=HW_BIO; no-op while Cheats.showFPS, which holds the biomonitor on for the frame-time graphs*/
         if (GetKeyPressed(16)/*Sensaroung*/) { if (!(World.invP1.hasHardware & HW_SNS) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SNS)?82:93],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SNS; } }
-        if (GetKeyPressed(18)/*    Shield*/) { if (!(World.invP1.hasHardware & HW_SHD) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SHD)?95:96],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SHD; } }
+        if (GetKeyPressed(18)/*    Shield*/) { if (!(World.invP1.hasHardware & HW_SHD) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { bool on = (World.invP1.hardwareIsActive & HW_SHD) != 0; play_wav(sounds[on ? 95 : 96],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SHD; World.Sys_UI.shieldAnimationIsActivate = !on; World.Sys_UI.shieldAnimationStarted = World.pauseRelativeTime; World.Sys_UI.shieldAnimationFinished = World.pauseRelativeTime + (World.Sys_UI.shieldAnimationIsActivate ? 1.0 : 1.167); } }
         if (GetKeyPressed(20)/*     Email*/) {
             if (World.invP1.hasHardware & HW_ERD) {
                 World.invP1.hardwareIsActive|=HW_ERD;

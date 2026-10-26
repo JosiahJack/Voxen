@@ -861,13 +861,9 @@ void DoorForceOpen(u16 self) { World.instances[self].requiredAccessCard = ACC_No
 void DoorForceClose(u16 self) { if (World.instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
     Entity* e = &World.instances[self];
-    /* Settle a finished stroke before reading it. Frob() runs ahead of DoorUpdate() inside ModUpdate(), so a
-       button press landing on the frame the door reaches frameEnd still sees doorOpen == Opening with
-       frame == frameEnd, which the inversion below turns into a full 0% jump. Reconciling first sends that
-       case down the clean DoorClose/DoorOpen path, where frameStart genuinely is the right resume point. */
-    { AnimationClip o=DoorGetClip(e,A_OPENING), c=DoorGetClip(e,A_CLOSING);
-      if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= o.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); }
-      else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= c.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); } }
+    AnimationClip o=DoorGetClip(e,A_OPENING), c=DoorGetClip(e,A_CLOSING);
+         if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= o.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); }
+    else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= c.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); }
     if (e->doorOpen == DoorState_Open) { DoorClose(self); return; } if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; } bool op = e->doorOpen == DoorState_Opening;
     if (op || e->doorOpen == DoorState_Closing) {
         u8 src = op ? A_OPENING : A_CLOSING, dst = op ? A_CLOSING : A_OPENING;
