@@ -84,7 +84,7 @@ vec3 applyBerserk(vec3 worldPos, vec3 base) {
 }
 
 vec3 Grayscale(vec3 currentColor) { float lum = max(max(currentColor.r, currentColor.g), currentColor.b); lum = pow(lum, 0.7); lum = 1.0 - exp(-lum); lum = lum * 1.1; float low = 0.2, high = 0.85; lum = clamp((lum - low) / (high - low), 0.0, 1.0); float n = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453); lum += (n - 0.5) * 0.01; return vec3(lum); }
-const float ssr_weights[9] = float[](0.0625,0.125,0.0625,0.125,0.25,0.125,0.0625,0.125,0.0625);
+const float ssr_weights[25] = float[](0.0039,0.0156,0.0234,0.0156,0.0039,0.0156,0.0625,0.0938,0.0625,0.0156,0.0234,0.0938,0.1406,0.0938,0.0234,0.0156,0.0625,0.0938,0.0625,0.0156,0.0039,0.0156,0.0234,0.0156,0.0039);
 void main() {
     vec2 texCoordUsed = TexCoord; if (empEffectActive > 0u) texCoordUsed.y += timeVal * 15.0; vec4 color = texture(tex, texCoordUsed).rgba; vec4 worldPosPacked; bool isSky = false;
     if (skyVisible > 0) {
@@ -126,7 +126,7 @@ void main() {
     }
     vec2 ssRatio = vec2(screenWidth/SSR_RES, screenHeight/SSR_RES); ivec2 pixel = ivec2(texCoordUsed * ssRatio);
     if (reflectionsEnabled > 0) {
-        vec2 lowResSize = ssRatio; vec2 pixelLow = floor(vec2(pixel)) + 0.5;/*Center of the current low-res pixel*/ vec2 sampUVBase = pixelLow / lowResSize; vec4 reflectionColor = vec4(0.0); int wi = 0; for (int x = -1; x <= 1; ++x){for(int y=-1;y<=1;++y){vec2 sampUV=(pixelLow + vec2(float(x), float(y))) / lowResSize; vec3 samp = texture(outputImage,sampUV).rgb; float w = ssr_weights[wi++]; reflectionColor.rgb += samp * w; } }
+        vec2 lowResSize = ssRatio; vec2 pixelLow = floor(vec2(pixel)) + 0.5;/*Center of the current low-res pixel*/ vec2 sampUVBase = pixelLow / lowResSize; vec4 reflectionColor = vec4(0.0); int wi = 0; for (int x = -2; x <= 2; ++x){for(int y=-2;y<=2;++y){vec2 sampUV=(pixelLow + vec2(float(x), float(y))) / lowResSize; vec3 samp = texture(outputImage,sampUV).rgb; float w = ssr_weights[wi++]; reflectionColor.rgb += samp * w; } }
         reflectionColor.rgb /= 4.51; if (isSky) { FragColor.rgb += reflectionColor.rgb; return; } color.rgb += (reflectionColor.rgb * 2.2);
     }
     vec3 aaColor = color.rgb; vec2 texelSize = 1.0 / vec2(screenWidth,screenHeight);

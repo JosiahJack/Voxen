@@ -107,7 +107,8 @@ void main() {
         }
     }
     vec4 glowColor=vec4(0.0); if(glowIndex != 0){ivec2 texSizeGlow=textureSizes[glowIndex]; glowColor=getTextureColorBilinear(glowIndex,fract(uv),texSizeGlow);} vec4 specColor=vec4(0.0); if(specIndex != 0){ivec2 texSizeSpec=textureSizes[specIndex]; specColor=getTextureColor(specIndex,ivec2(fract(uv)*vec2(texSizeSpec)),texSizeSpec);}
-    if(reflectionsEnabled > 0){outSpecular=specColor; outNormal=EncodeOctahedral(adjustedNormal)*0.5 + 0.5;}/*Map to [0,1]*/ uint voxelIdx=GetVoxelIndex(worldPos); uint count=voxelLightListCounts[voxelIdx]; if(unlit>0 || useCamView>0)count=0; vec3 lighting=vec3(0.0);
+    float dotNV=dot(adjustedNormal,viewDir); float absDot=abs(dotNV); float boostBlend=clamp((0.2588-absDot)/0.2588,0.0,1.0); float reduceBlend=1.0-smoothstep(-1.0,-0.9659,dotNV); vec4 specBlend=mix(mix(specColor,min(specColor+vec4(0.5),vec4(1.0)),boostBlend),max(specColor-vec4(0.25),vec4(0.05)),reduceBlend);
+    if(reflectionsEnabled > 0){outSpecular=specBlend; outNormal=EncodeOctahedral(adjustedNormal)*0.5 + 0.5;}/*Map to [0,1]*/ uint voxelIdx=GetVoxelIndex(worldPos); uint count=voxelLightListCounts[voxelIdx]; if(unlit>0 || useCamView>0)count=0; vec3 lighting=vec3(0.0);
     float iTot=0.0; float strength=(useStrengthMod>0) ? 1.0 : max(specColor.r,max(specColor.g,specColor.b))*4.51; float shadSizeMaxUV=shadowMapSizeF-1.0;
     for (uint i = 0u; i < count; i++) {
         uint lightIdx = uniqueLightLists[(voxelIdx * maxLightsPerVoxel) + i]; vec3 lightPos = lights[lightIdx].pos; float intensity = lights[lightIdx].intensity; float range = lights[lightIdx].range; float invRange = 1.0 / range; vec3 toLight = lightPos - worldPos; float dist = length(toLight); vec3 lightDir = toLight * (1.0 / dist);
@@ -143,9 +144,6 @@ void main() {
     //    lighting += albedoColor.rgb * sunCol * (clamp(dot(adjustedNormal, sunDirection), 0.0, 1.0) * sunShadow);
     //}
     float rim=1.0-max(dot(adjustedNormal,viewDir),0.0); lighting+=clamp(rim*rim*rim*rim*0.25*clamp(iTot,0.0,1.0)*specColor.rgb,0.0,1.0);/*Specular "rim" fresnel (tested and perf impact ~zero)*/ lighting=(unlit>0||useCamView>0)?albedoColor.rgb:lighting+glowColor.rgb; if(heat>0.0){lighting+=albedoColor.rgb*heat; lighting=pow(lighting,vec3(1.2)); lighting+=clamp(rim*rim*rim*rim*0.5*specColor.rgb,0.0,1.0);}
-    /* NPC_Hopper_Death: _HSVAAdjust.x raises red while _RimColor supplies
-     * the magenta edge highlight. The C side supplies both as one vec2 so
-     * ordinary world geometry needs no extra uniforms or state. */
     if (hopperDeathEffect.x > 0.0) lighting *= vec3(1.0 + hopperDeathEffect.x, 1.0, 1.0);
     if (hopperDeathEffect.y > 0.0) lighting += vec3(1.0, 0.0, 0.75) * hopperDeathEffect.y * rim * rim * rim;
     lighting.rgb += vec3((getBlueNoise(ivec2(gl_FragCoord.xy)) - 0.5) * 0.003921569); // Blue Noise Dither for banding (0.03ms performance cost, leaving in for quality)

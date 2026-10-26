@@ -76,64 +76,18 @@ Color textColors[] = {{1.000000000f,1.000000000f,1.000000000f,1.0f},/* 0 White T
                       {0.546864600f,0.152723400f,0.830188700f,1.0f} /* 15 PuzzleWire actualColorPurple T_PURPLE*/ };
 // Wireline Rendering (originally just for debug lines)
 u32 debugUnlitSP, debugLinesVAO, debugLinesVBO, wireLinesVAO, wireLinesVBO;
-typedef struct { float x,y,z,r,g,b,a; } DebugLineVertex;
-DebugLineVertex* debugLineVerts = NULL;
-typedef struct { float x,y,z,r,g,b,a; } WireVertex;
-static WireVertex* wireVerts = NULL; static u32 wireVertCount = 0;
-static void EmitWireQuad(V3 c0, V3 c1, V3 c2, V3 c3, Color c) {
-    if (!wireVerts || wireVertCount + 6 > (u32)(MAX_WIRELINE_QUADS*6)) { return; }
-    
-    const V3 p[6] = {c0,c1,c2, c0,c2,c3};
-    for (int v = 0; v < 6; ++v) {
-        WireVertex* w = &wireVerts[wireVertCount++];
-        w->x = p[v].x; w->y = p[v].y; w->z = p[v].z;
-        w->r = c.r; w->g = c.g; w->b = c.b; w->a = c.a;
-    }
-}
-
+typedef struct { float x,y,z,r,g,b,a; } WireVertex; WireVertex* debugLineVerts; static WireVertex* wireVerts; static u32 wireVertCount = 0;
+static void EmitWireQuad(V3 c0, V3 c1, V3 c2, V3 c3, Color c) { const V3 p[6] = {c0,c1,c2, c0,c2,c3}; for (int v = 0; v < 6; ++v) { WireVertex* w = &wireVerts[wireVertCount++]; w->x = p[v].x; w->y = p[v].y; w->z = p[v].z; w->r = c.r; w->g = c.g; w->b = c.b; w->a = c.a; } }
 void DrawCrossedLine(V3 a, V3 b, V3 perp, float halfThick, Color c) {
     V3 o0 = V3_ScaleByF(perp, halfThick);
-    EmitWireQuad(V3_AsubB(a,o0), V3_AplusB(a,o0), V3_AplusB(b,o0), V3_AsubB(b,o0), c);
+    if (wireVertCount + 6 < (u32)(MAX_WIRELINE_QUADS*6)) EmitWireQuad(V3_AsubB(a,o0), V3_AplusB(a,o0), V3_AplusB(b,o0), V3_AsubB(b,o0), c);
     V3 q = V3_Normalize(V3_Cross(V3_Normalize(V3_AsubB(b,a)), perp));
     V3 r0 = V3_ScaleByF(q, halfThick);
-    EmitWireQuad(V3_AsubB(a,r0), V3_AplusB(a,r0), V3_AplusB(b,r0), V3_AsubB(b,r0), c);
-}
-
-INLINE void DrawWireLines(float* viewProj) {
-    if (!wireVerts || !wireVertCount) return;
-    
-    glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO);
-    glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVertex),wireVerts);
-    glUseProgram(debugUnlitSP);
-    glUniformMatrix4fv(0,1,GL_FALSE,viewProj);
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-    glBindVertexArray(wireLinesVAO);
-    glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount);
-    glEnable(GL_CULL_FACE);
-    drawCalls++;
-    vertsRendered += wireVertCount;
-    wireVertCount = 0;
-}
-INLINE void DrawDebugLines(float* viewProj) {
-    if (!debugLineVerts || World.debugLineVertCount == 0) {return;}
-    
-    glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO);
-    glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(DebugLineVertex),debugLineVerts);
-    glUseProgram(debugUnlitSP);
-    glUniformMatrix4fv(0,1,GL_FALSE,viewProj);
-    glLineWidth(1.0f);
-    glDisable(GL_DEPTH_TEST);
-    glBindVertexArray(debugLinesVAO);
-    glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount);
-    drawCalls++;
-    vertsRendered += World.debugLineVertCount;
-    glEnable(GL_DEPTH_TEST);
-    World.debugLineVertCount = 0;
+    if (wireVertCount + 6 < (u32)(MAX_WIRELINE_QUADS*6)) EmitWireQuad(V3_AsubB(a,r0), V3_AplusB(a,r0), V3_AplusB(b,r0), V3_AsubB(b,r0), c);
 }
 
 void DrawLine(V3 start, V3 end, Color col) {
-    if (!debugLineVerts || World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2){return;}
+    if (World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2){return;}
     
     int i=World.debugLineVertCount;
     debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z;
@@ -1783,11 +1737,31 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     } // <<<<<<<<<<<<< CAM VIEW BARRIER
     
     PSys_Render(viewProj, playerPos,(V3){invViewRot[0], invViewRot[1], invViewRot[2]}, (V3){invViewRot[3], invViewRot[4], invViewRot[5]}, (V3){-invViewRot[6], -invViewRot[7], -invViewRot[8]}, inputDepthID, snear, sfar, (float)swidth, (float)sheight);
-    DrawWireLines(viewProj);
+    if (wireVertCount) {
+        glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVertex),wireVerts);
+        glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glBindVertexArray(wireLinesVAO); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount);
+        glEnable(GL_CULL_FACE);
+        drawCalls++;
+        vertsRendered += wireVertCount;
+        wireVertCount = 0;
+    }
     if (Cheats.editMode) { /*Point-light range spheres, editmode only. NOT gated by showPhys: these are editmode guides, not physics debug.*/
         for (u16 i = 0; i < World.loadedLights; ++i) { Light* L = &World.lights[i]; DrawSphereWireframe(i == editModeLightSelection ? (Color){1.0f,0.5f,0.5f,1.0f} : (Color){0.9216f,0.9176f,0.7725f,1.0f}, (ShapeSphere){L->pos, 0.02 * L->range});/*cyberpanel_paleyellow.png dominant flat tone (235,234,197)*/ }
     }
-    if(unlikely(World.debugLineVertCount > 1)) { DrawDebugLines(viewProj); }
+    if(unlikely(World.debugLineVertCount > 0)) {
+        glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO);
+        glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(WireVertex),debugLineVerts);
+        glUseProgram(debugUnlitSP);
+        glUniformMatrix4fv(0,1,GL_FALSE,viewProj);
+        glLineWidth(1.0f);
+        glDisable(GL_DEPTH_TEST);
+        glBindVertexArray(debugLinesVAO);
+        glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount);
+        drawCalls++;
+        vertsRendered += World.debugLineVertCount;
+        glEnable(GL_DEPTH_TEST);
+        World.debugLineVertCount = 0;
+    }
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D,inputDepthID);
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
@@ -2165,7 +2139,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     // TESTING STUFF, TODO Delete once hardware and particle systems are fully confirmed and tested as good (they aren't yet).
     //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAXTEX},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colStart=(Color){1,0,0,1},.colEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.shapeRadius=2.56f,.shapeType=1,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
     //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAXTEX},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
-    AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
+    //AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
     AutomapNewGame();
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
 }
@@ -2339,12 +2313,14 @@ void InitalizeEnvironment() {
     glBufferData(GL_ARRAY_BUFFER,TEXT_VTX_FLOATS * sizeof(float),NULL,GL_DYNAMIC_DRAW);
     
     glBindVertexArray(debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO);
-    glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * sizeof(DebugLineVertex),NULL,GL_DYNAMIC_DRAW); debugLineVerts = (DebugLineVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * sizeof(DebugLineVertex)); /* allocated unconditionally, not under the showphys/shownpc cheats: door laser grids are gameplay and draw through this same path, so the staging buffer has to outlive the cheats being off. */
-    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
-    glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(DebugLineVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
-    glBindVertexBuffer(0,debugLinesVBO,0,sizeof(DebugLineVertex));
+    glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * sizeof(WireVertex),NULL,GL_DYNAMIC_DRAW);
+    debugLineVerts = (WireVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * sizeof(WireVertex));
+    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
+    glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
+    glBindVertexBuffer(0,debugLinesVBO,0,sizeof(WireVertex));
     glBindVertexArray(wireLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO);
-    glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_QUADS*6*sizeof(WireVertex),NULL,GL_DYNAMIC_DRAW); wireVerts = (WireVertex*)OS_Alloc((size_t)MAX_WIRELINE_QUADS*6*sizeof(WireVertex));
+    glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_QUADS*6*sizeof(WireVertex),NULL,GL_DYNAMIC_DRAW);
+    wireVerts = (WireVertex*)OS_Alloc((size_t)MAX_WIRELINE_QUADS*6*sizeof(WireVertex));
     glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
     glBindVertexBuffer(0,wireLinesVBO,0,sizeof(WireVertex));
