@@ -188,35 +188,121 @@ static void glb_parse_json_root(jsmntok_t const* t, int i, const u8* j, i32 tid,
     }
 }
 
-static void jsmn_init(jsmn_parser* p){p->pos=0;p->toknext=0;p->toksuper=-1;}
 static jsmntok_t* jsmn_alloc_token(jsmn_parser* p, jsmntok_t* t, size_t n){if(p->toknext>=n)return NULL;jsmntok_t* tok=&t[p->toknext++];tok->start=tok->end=-1;tok->size=0;tok->parent=-1;return tok;}
 static void jsmn_fill_token(jsmntok_t* t, jsmntype_t ty, size_t s, size_t e){t->type=ty;t->start=s;t->end=e;t->size=0;}
-static int jsmn_parse_primitive(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n){size_t s=p->pos; for(;p->pos<l&&js[p->pos];p->pos++){switch(js[p->pos]){case ':':case '\t':case '\r':case '\n':case ' ':case ',':case ']':case '}':goto f;}} p->pos=s;return JSMN_ERROR_PART; f:if(!t){p->pos--;return 0;} jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok){p->pos=s;return JSMN_ERROR_NOMEM;} jsmn_fill_token(tok,JSMN_PRIMITIVE,s,p->pos);tok->parent=p->toksuper;p->pos--;return 0;}
-static int jsmn_parse_string(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n){
-    size_t s=p->pos;p->pos++;
-    for(;p->pos<l&&js[p->pos];p->pos++){
-        char c=js[p->pos]; if(c=='\"'){if(!t)return 0;jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok){p->pos=s;return JSMN_ERROR_NOMEM;}jsmn_fill_token(tok,JSMN_STRING,s+1,p->pos);tok->parent=p->toksuper;return 0;}
-        if(c=='\\'&&p->pos+1<l){p->pos++;switch(js[p->pos]){case '\"':case '/':case '\\':case 'b':case 'f':case 'r':case 'n':case 't':break;case 'u':p->pos++;for(int i=0;i<4&&p->pos<l&&js[p->pos];i++){if(!((js[p->pos]>=48&&js[p->pos]<=57)||(js[p->pos]>=65&&js[p->pos]<=70)||(js[p->pos]>=97&&js[p->pos]<=102))){p->pos=s;return JSMN_ERROR_INVAL;}p->pos++;}p->pos--;break;default:p->pos=s;return JSMN_ERROR_INVAL;}}
-    } p->pos=s;return JSMN_ERROR_PART;
-}
-
-static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n){
-    int r,i,cnt=p->toknext;
-    for(;p->pos<l&&js[p->pos];p->pos++){
-        char c=js[p->pos];jsmntype_t ty;
-        switch(c){
-            case '{':case '[': cnt++;if(!t)break;jsmntok_t* tok=jsmn_alloc_token(p,t,n);if(!tok)return JSMN_ERROR_NOMEM; if(p->toksuper!=-1){t[p->toksuper].size++;tok->parent=p->toksuper;} tok->type=(c=='{'?JSMN_OBJECT:JSMN_ARRAY);tok->start=p->pos;p->toksuper=p->toknext-1;break;
-            case '}':case ']': if(!t)break;ty=(c=='}'?JSMN_OBJECT:JSMN_ARRAY);if(p->toknext<1)return JSMN_ERROR_INVAL; tok=&t[p->toknext-1]; for(;;){if(tok->start!=-1&&tok->end==-1){if(tok->type!=ty)return JSMN_ERROR_INVAL;tok->end=p->pos+1;p->toksuper=tok->parent;break;}if(tok->parent==-1){if(tok->type!=ty||p->toksuper==-1)return JSMN_ERROR_INVAL;break;}tok=&t[tok->parent];} break;
-            case '\"': r=jsmn_parse_string(p,js,l,t,n);if(r<0)return r;cnt++;if(p->toksuper!=-1&&t)t[p->toksuper].size++;break; case '\t':case '\r':case '\n':case ' ':break; case ':':p->toksuper=p->toknext-1;break;
-            case ',': if(t&&p->toksuper!=-1&&t[p->toksuper].type!=JSMN_ARRAY&&t[p->toksuper].type!=JSMN_OBJECT){p->toksuper=t[p->toksuper].parent;for(i=p->toknext-1;i>=0;i--){if(t[i].type==JSMN_ARRAY||t[i].type==JSMN_OBJECT){if(t[i].start!=-1&&t[i].end==-1){p->toksuper=i;break;}}}} break;
-            case '-':case '0':case '1':case '2':case '3':case '4':case '5':case '6':case '7':case '8':case '9':case 't':case 'f':case 'n': if(t&&p->toksuper!=-1){jsmntok_t* ot=&t[p->toksuper];if(ot->type==JSMN_OBJECT||(ot->type==JSMN_STRING&&ot->size!=0))return JSMN_ERROR_INVAL;} r=jsmn_parse_primitive(p,js,l,t,n);if(r<0)return r;cnt++;if(p->toksuper!=-1&&t)t[p->toksuper].size++;break; default:return JSMN_ERROR_INVAL;
+static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, size_t n) {
+    int r, i, cnt = p->toknext;
+    for (; p->pos < l && js[p->pos]; p->pos++) {
+        char c = js[p->pos]; jsmntype_t ty;
+        switch (c) {
+            case '{': case '[':
+                cnt++; if (!t) break;
+                jsmntok_t* tok = jsmn_alloc_token(p, t, n); if (!tok) return JSMN_ERROR_NOMEM;
+                
+                if (p->toksuper != -1) { t[p->toksuper].size++; tok->parent = p->toksuper; }
+                tok->type = (c == '{' ? JSMN_OBJECT : JSMN_ARRAY);
+                tok->start = p->pos;
+                p->toksuper = p->toknext - 1;
+                break;
+            case '}': case ']':
+                if (!t) break;
+                ty = (c == '}' ? JSMN_OBJECT : JSMN_ARRAY); if (p->toknext < 1) return JSMN_ERROR_INVAL;
+                
+                tok = &t[p->toknext - 1];
+                for (;;) {
+                    if (tok->start != -1 && tok->end == -1) { if (tok->type != ty) return JSMN_ERROR_INVAL; tok->end = p->pos + 1; p->toksuper = tok->parent; break; }
+                    if (tok->parent == -1) { if (tok->type != ty || p->toksuper != -1) return JSMN_ERROR_INVAL; break; }
+                    
+                    tok = &t[tok->parent];
+                }
+                break;
+            case '\"': {
+                size_t s_str = p->pos;
+                p->pos++;
+                for (; p->pos < l && js[p->pos]; p->pos++) {
+                    char c_str = js[p->pos];
+                    if (c_str == '\"') {
+                        if (!t) { r = 0; goto str_done; }
+                        jsmntok_t* tok_str = jsmn_alloc_token(p, t, n); if (!tok_str) { p->pos = s_str; r = JSMN_ERROR_NOMEM; goto str_done; }
+                        
+                        jsmn_fill_token(tok_str, JSMN_STRING, s_str + 1, p->pos);
+                        tok_str->parent = p->toksuper;
+                        r = 0;
+                        goto str_done;
+                    }
+                    if (c_str == '\\' && p->pos + 1 < l) {
+                        p->pos++;
+                        switch (js[p->pos]) {
+                            case '\"': case '/': case '\\': case 'b': case 'f':  case 'r': case 'n':  case 't': break;
+                            case 'u':
+                                p->pos++;
+                                for (int i_str = 0; i_str < 4 && p->pos < l && js[p->pos]; i_str++) {
+                                    if (!((js[p->pos] >= 48 && js[p->pos] <= 57) || (js[p->pos] >= 65 && js[p->pos] <= 70) || (js[p->pos] >= 97 && js[p->pos] <= 102))) { p->pos = s_str; r = JSMN_ERROR_INVAL; goto str_done; }
+                                    p->pos++;
+                                }
+                                p->pos--;
+                                break;
+                            default: p->pos = s_str; r = JSMN_ERROR_INVAL; goto str_done;
+                        }
+                    }
+                }
+                p->pos = s_str;
+                r = JSMN_ERROR_PART;
+                str_done: if (r < 0) return r; cnt++; if (p->toksuper != -1 && t) t[p->toksuper].size++; break; }
+            case '\t': case '\r': case '\n': case ' ': break;
+            case ':':  p->toksuper = p->toknext - 1;   break;
+            case ',':
+                if (t && p->toksuper != -1 && t[p->toksuper].type != JSMN_ARRAY && t[p->toksuper].type != JSMN_OBJECT) {
+                    p->toksuper = t[p->toksuper].parent;
+                    for (i = p->toknext - 1; i >= 0; i--) {
+                        if (t[i].type == JSMN_ARRAY || t[i].type == JSMN_OBJECT) {
+                            if (t[i].start != -1 && t[i].end == -1) { p->toksuper = i; break; }
+                        }
+                    }
+                }
+                break;
+            case '-': case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': case 't': case 'f': case 'n': {
+                if (t && p->toksuper != -1) { jsmntok_t* ot = &t[p->toksuper]; if (ot->type == JSMN_OBJECT || (ot->type == JSMN_STRING && ot->size != 0)) { return JSMN_ERROR_INVAL; } }
+                
+                size_t s_prim = p->pos;
+                for (; p->pos < l && js[p->pos]; p->pos++) { switch (js[p->pos]) { case ':':  case '\t': case '\r': case '\n': case ' ':  case ',':  case ']':  case '}': goto f_prim; } }
+                p->pos = s_prim;
+                r = JSMN_ERROR_PART;
+                goto prim_done;
+                
+                f_prim: 
+                if (!t) { p->pos--; r = 0; goto prim_done; }
+                jsmntok_t* tok_prim = jsmn_alloc_token(p, t, n); if (!tok_prim) { p->pos = s_prim; r = JSMN_ERROR_NOMEM; goto prim_done; }
+                
+                jsmn_fill_token(tok_prim, JSMN_PRIMITIVE, s_prim, p->pos);
+                tok_prim->parent = p->toksuper;
+                p->pos--;
+                r = 0;
+                
+                prim_done: if (r < 0) return r; cnt++; if (p->toksuper != -1 && t) t[p->toksuper].size++; break; }
+            default: return JSMN_ERROR_INVAL;
         }
-    } if(t){for(i=p->toknext-1;i>=0;i--){if(t[i].start!=-1&&t[i].end==-1)return JSMN_ERROR_PART;}} return cnt;
+    }
+    if (t) { for (i = p->toknext - 1; i >= 0; i--) { if (t[i].start != -1 && t[i].end == -1) return JSMN_ERROR_PART; } }
+    return cnt;
 }
 
 void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
-    u32 tmp;mcpy(&tmp,d,4); const u8* ptr=(const u8*)d; mcpy(&tmp,ptr+8,4); const u8* jc=ptr+12; u32 jl;mcpy(&jl,jc,4); mcpy(&tmp,jc+4,4); jc+=8;const void* bin=NULL;size_t bsz=0; if(8<=sz-20-jl){ const u8* bc=jc+jl;u32 bl;mcpy(&bl,bc,4); mcpy(&tmp,bc+4,4); bc+=8;bin=bc;bsz=bl; } jsmn_parser p={0};int tc=jsmn_parse(&p,(const char*)jc,jl,NULL,0);
-    jsmntok_t* t=OS_SubArenaAlloc(tid,sizeof(jsmntok_t)*(tc+1));jsmn_init(&p); tc=jsmn_parse(&p,(const char*)jc,jl,t,tc);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);} t[tc].type=JSMN_UND; glb_data* data=OS_SubArenaAlloc(tid,sizeof(glb_data)); glb_parse_json_root(t,0,jc,tid,data);
+    u32 tmp;mcpy(&tmp,d,4);
+    const u8* ptr=(const u8*)d;
+    mcpy(&tmp,ptr+8,4);
+    const u8* jc=ptr+12;
+    u32 jl;
+    mcpy(&jl,jc,4);
+    mcpy(&tmp,jc+4,4);
+    jc+=8;
+    const void* bin=NULL;
+    size_t bsz=0;
+    if(8<=sz-20-jl){ const u8* bc=jc+jl;u32 bl;mcpy(&bl,bc,4); mcpy(&tmp,bc+4,4); bc+=8;bin=bc;bsz=bl; }
+    jsmn_parser p={0};int tc=jsmn_parse(&p,(const char*)jc,jl,NULL,0);
+    jsmntok_t* t=OS_SubArenaAlloc(tid,sizeof(jsmntok_t)*(tc+1));
+    p.pos=0; p.toknext=0; p.toksuper=-1;
+    tc=jsmn_parse(&p,(const char*)jc,jl,t,tc);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);} t[tc].type=JSMN_UND; glb_data* data=OS_SubArenaAlloc(tid,sizeof(glb_data)); glb_parse_json_root(t,0,jc,tid,data);
     for (size_t m=0;m<data->meshes_count;++m)
         for (size_t n=0;n<data->meshes[m].primitives_count;++n) { glb_accessor* ix=data->meshes[m].primitives[n].indices; if(ix){if((size_t)ix>data->accessors_count)return; data->meshes[m].primitives[n].indices=&data->accessors[(size_t)ix-1];} for(size_t k=0;k<data->meshes[m].primitives[n].attr_count;++k){ glb_accessor* ad=data->meshes[m].primitives[n].attr[k].data; if(!ad||(size_t)ad>data->accessors_count)return; data->meshes[m].primitives[n].attr[k].data=&data->accessors[(size_t)ad-1];} }
     for (size_t m=0;m<data->accessors_count;++m) {
@@ -236,21 +322,73 @@ void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
 static void glb_load_buffers(glb_data* data) { if(data->buffers_count&&data->buffers[0].data==NULL&&data->bin){if(data->bin_size<data->buffers[0].size) return; data->buffers[0].data=(void*)data->bin;} }
 typedef struct {u32 idx,key;} TriSort;
 void OptimizeVertexCache(u16* idx, u32 ic, u32 vc, u8* scratch) {
-    if(ic < 3 || !vc){return;} u32 tc = ic / 3; TriSort* t = (TriSort*)scratch; TriSort* t_tmp = (TriSort*)(scratch + (tc * sizeof(TriSort))); u16* n = (u16*)(scratch + (tc * sizeof(TriSort) * 2)); for (u32 i = 0; i < tc; ++i) { u16* p = idx + i * 3; u32 m = p[0] < p[1] ? p[0] : p[1]; m = m < p[2] ? m : p[2]; t[i].idx = i; t[i].key = (u16)m; }
+    if(ic < 3 || !vc){return;}
+    
+    u32 tc = ic / 3;
+    TriSort* t = (TriSort*)scratch;
+    TriSort* t_tmp = (TriSort*)(scratch + (tc * sizeof(TriSort)));
+    u16* n = (u16*)(scratch + (tc * sizeof(TriSort) * 2));
+    for (u32 i = 0; i < tc; ++i) { u16* p = idx + i * 3; u32 m = p[0] < p[1] ? p[0] : p[1]; m = m < p[2] ? m : p[2]; t[i].idx = i; t[i].key = (u16)m; }
     if (tc >= 2) {
-        u32 b0[256]={0}, b1[256]={0}; for (u32 i=0;i<tc;++i) {u16 key = t[i].key; b0[key & 0xFF]++; b1[(key >> 8) & 0xFF]++;} u32 sum0=0, sum1=0; for (u32 i=0;i<256;++i) { u32 t0 = b0[i]; u32 t1 = b1[i]; b0[i] = sum0; b1[i] = sum1; sum0 += t0; sum1 += t1; } for (u32 i=0;i<tc;++i) {u32 radix0 = t[i].key & 0xFF; u32 dest = b0[radix0]++; t_tmp[dest] = t[i];} for (u32 i=0;i<tc;++i) { u32 radix1 = (t_tmp[i].key >> 8) & 0xFF; u32 dest = b1[radix1]++; t[dest] = t_tmp[i]; }
-    } for (u32 i = 0; i < tc; ++i) { u16* s = idx + t[i].idx * 3; u16* d = n + i * 3; d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; } mcpy(idx, n, ic * sizeof(u16));
+        u32 b0[256]={0}, b1[256]={0};
+        for (u32 i=0;i<tc;++i) { u16 key = t[i].key; b0[key & 0xFF]++; b1[(key >> 8) & 0xFF]++; }
+        u32 sum0=0, sum1=0;
+        for (u32 i=0;i<256;++i) { u32 t0 = b0[i]; u32 t1 = b1[i]; b0[i] = sum0; b1[i] = sum1; sum0 += t0; sum1 += t1; }
+        for (u32 i=0;i<tc;++i) { u32 radix0 =            t[i].key & 0xFF; u32 dest = b0[radix0]++; t_tmp[dest] = t[i]; }
+        for (u32 i=0;i<tc;++i) { u32 radix1 = (t_tmp[i].key >> 8) & 0xFF; u32 dest = b1[radix1]++; t[dest] = t_tmp[i]; }
+    }
+    for (u32 i = 0; i < tc; ++i) { u16* s = idx + t[i].idx * 3; u16* d = n + i * 3; d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; }
+    mcpy(idx, n, ic * sizeof(u16));
 }
 
-u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, u32* r, u8* nv) { u32 oc=*vc; if(!oc||!ic){return v;} mset(r,0xFF,oc*sizeof(u32)); u32 write_ptr=0; for(u32 i=0;i<ic;++i){u32 id=idx[i]; if(id<oc){if(r[id]==U32_MAX){r[id]=write_ptr; mcpy(nv+write_ptr*stride,v+id*stride,stride); write_ptr++;} idx[i]=(u16)r[id];}} *vc=write_ptr; return nv; }
+u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, u32* r, u8* nv) {
+    u32 oc=*vc; if(!oc||!ic){return v;}
+    
+    mset(r,0xFF,oc*sizeof(u32));
+    u32 write_ptr=0;
+    for(u32 i=0;i<ic;++i){u32 id=idx[i]; if(id<oc){if(r[id]==U32_MAX){r[id]=write_ptr; mcpy(nv+write_ptr*stride,v+id*stride,stride); write_ptr++;} idx[i]=(u16)r[id];}}
+    *vc=write_ptr;
+    return nv;
+}
+
 #define _mm_min_ps(A, B) ((__m128)__builtin_ia32_minps((__v4sf)(A), (__v4sf)(B)))
 #define _mm_max_ps(A, B) ((__m128)__builtin_ia32_maxps((__v4sf)(A), (__v4sf)(B)))
 #define _mm_storeu_ps(P, A) (*(__m128_u *)(P) = (A))
 __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* restrict sv, u32 ec, u32* restrict ht, u32* restrict ht_used, u32* restrict remap_scr, u8* restrict cache_scr, float** restrict ov_pos, u32* ovc, u16** ot, u16* otc, __m128 mn_v, __m128 mx_v, i32 tid) {
-    if (unlikely(!ec)){return false;} u16* final_t = OS_SubArenaAlloc(tid,ec * sizeof(u16)); /*Allocate final_t early so we can use it instead of ft_scratch*/ u32 used_slots_count = 0; u32* rem = (u32*)remap_scr; /*Reuse remap_scr for the 'rem' array!*/ u32 ucnt = 0;
-    for (u32 i=0; i<ec; ++i) { const float* v = sv + (i<<3); const u32* uv = (const u32*)v; u32 h0 = uv[0] ^ uv[1] ^ uv[2] ^ uv[3]; u32 h1 = uv[4] ^ uv[5] ^ uv[6] ^ uv[7]; u32 s = (h0 ^ h1) & (WELD_HASH_SIZE-1); while (ht[s] != U32_MAX) { if (mcmp(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (WELD_HASH_SIZE-1); } ht[s] = ucnt; rem[i] = ucnt; ht_used[used_slots_count++] = s; mcpy(sv+(ucnt<<3), v, 32); ++ucnt; nxt:; }
-    for(u32 i=0;i<ec;++i){final_t[i]=(u16)rem[i];} OptimizeVertexCache(final_t,ec,ucnt,cache_scr); float* final_verts=OS_SubArenaAlloc(tid,ucnt*CPU_VRT_SZ); OptimizeVertexFetch((u8*)sv,&ucnt,final_t,ec,CPU_VRT_SZ,remap_scr,(u8*)final_verts); *ov_pos = final_verts; *ovc = ucnt; *ot = final_t; *otc = ec/3;
-    float mn_arr[4], mx_arr[4]; _mm_storeu_ps(mn_arr,mn_v); _mm_storeu_ps(mx_arr,mx_v); modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2]))))); modelMin[mindex]=(V3){mn_arr[0],mn_arr[1],mn_arr[2]}; modelMax[mindex]=(V3){mx_arr[0],mx_arr[1],mx_arr[2]};/* free: the min/max are already in registers here, so the local AABB costs two stores. Door laser grids need an aperture and CT_MSH prefabs carry no collider size (doorJ/doorK are {0}), so the model bounds are the only source. */ for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]]=U32_MAX;} return true;
+    if (unlikely(!ec)) { return false; }
+    
+    u16* final_t = OS_SubArenaAlloc(tid,ec * sizeof(u16));
+    u32 used_slots_count = 0; u32* rem = (u32*)remap_scr; u32 ucnt = 0;
+    for (u32 i=0; i<ec; ++i) {
+        const float* v = sv + (i<<3);
+        const u32* uv = (const u32*)v;
+        u32 h0 = uv[0] ^ uv[1] ^ uv[2] ^ uv[3];
+        u32 h1 = uv[4] ^ uv[5] ^ uv[6] ^ uv[7];
+        u32 s = (h0 ^ h1) & (WELD_HASH_SIZE-1);
+        while (ht[s] != U32_MAX) { if (mcmp(sv+(ht[s]<<3), v, 32) == 0) { rem[i] = ht[s]; goto nxt; } s = (s+1) & (WELD_HASH_SIZE-1); }
+        ht[s] = ucnt;
+        rem[i] = ucnt;
+        ht_used[used_slots_count++] = s;
+        mcpy(sv+(ucnt<<3), v, 32);
+        ++ucnt;
+        nxt:;
+    }
+    for (u32 i=0;i<ec;++i) { final_t[i] = (u16)rem[i]; }
+    OptimizeVertexCache(final_t,ec,ucnt,cache_scr);
+    float* final_verts=OS_SubArenaAlloc(tid,ucnt*CPU_VRT_SZ);
+    OptimizeVertexFetch((u8*)sv,&ucnt,final_t,ec,CPU_VRT_SZ,remap_scr,(u8*)final_verts);
+    *ov_pos = final_verts;
+    *ovc = ucnt;
+    *ot = final_t;
+    *otc = ec/3;
+    float mn_arr[4], mx_arr[4];
+    _mm_storeu_ps(mn_arr,mn_v);
+    _mm_storeu_ps(mx_arr,mx_v);
+    modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2])))));
+    modelMin[mindex]=(V3){mn_arr[0],mn_arr[1],mn_arr[2]};
+    modelMax[mindex]=(V3){mx_arr[0],mx_arr[1],mx_arr[2]};
+    for (u32 i = 0; i < used_slots_count; ++i) {ht[ht_used[i]]=U32_MAX;}
+    return true;
 }
 
 static void Mat4Mul(const float* restrict a, const float* restrict b, float* restrict out) { for (int c = 0; c < 4; ++c) for (int r = 0; r < 4; ++r) { float s = 0.0f; for (int k = 0; k < 4; ++k) s += a[k*4+r] * b[c*4+k]; out[c*4+r] = s; } }
@@ -288,7 +426,6 @@ static void FindBracket(const glbanim_samp* s, float t, u32* i0, float* f) {
     glbread_float(s->input, n - 1, &tn, 1);
     if (t<=t0) { *i0 = 0;     *f = 0.0f; return; }
     if (t>=tn) { *i0 = n - 2; *f = 1.0f; return; }
-    // is this a double decker sandwhich between slices of bread floats? mmmm floats!
     for (u32 i=0;i<n-1;++i){
         float ta,tb;
         glbread_float(s->input, i,     &ta, 1);
@@ -487,7 +624,6 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
             }
         }
     }
-    
     out->submshCnt = submshCnt;
     out->meshNodes   = OS_SubArenaAlloc(-1, submshCnt * sizeof(glb_node*));
     out->subPos      = OS_SubArenaAlloc(-1, submshCnt * sizeof(float*));
@@ -521,117 +657,22 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
                 if (nrmAcc) { glbread_float(nrmAcc, v, &out->subNrm[si][v*3], 3);                                                                     } else { out->subNrm[si][v*3] = 0.0f; out->subNrm[si][v*3 + 1] = 1.0f; out->subNrm[si][v*3 + 2] = 0.0f; }
                 if (uvAcc)  { glbread_float( uvAcc, v, &out->subUv[si][v*2],  2); out->subUv[si][v*2 + 1] = 1.0f - out->subUv[si][v*2 + 1]; /*Flip V*/} else { out->subUv[si][v*2]  = 0.0f; out->subUv[si][v*2 + 1]  = 0.0f; }
             }
-            
             u32 tc;
-            if (prim->indices) {
-                tc = (u32)(prim->indices->count / 3);
-                out->subIndices[si] = OS_SubArenaAlloc(-1, tc * 3 * sizeof(u32));
-                for (u32 k=0;k<tc*3;++k) { out->subIndices[si][k] = (u32)glbread_index(prim->indices, k); }
-            } else {
-                tc = vc / 3;
-                out->subIndices[si] = OS_SubArenaAlloc(-1, tc * 3 * sizeof(u32));
-                for (u32 k=0;k<tc*3;++k) { out->subIndices[si][k] = k; }
-            }
-                
+            if (prim->indices) { tc = (u32)(prim->indices->count / 3); out->subIndices[si] = OS_SubArenaAlloc(-1, tc * 3 * sizeof(u32)); for (u32 k=0;k<tc*3;++k) { out->subIndices[si][k] = (u32)glbread_index(prim->indices, k); } }
+            else               { tc = vc / 3;                          out->subIndices[si] = OS_SubArenaAlloc(-1, tc * 3 * sizeof(u32)); for (u32 k=0;k<tc*3;++k) { out->subIndices[si][k] = k;                                    } }
             out->subTriCount[si]=tc; ++si;
         }
     }
 }
  
-#define SKIN_GLOB_MAX 1024
 static void SkinNodeGlobal(const GltfMesh* gm, glb_node* node, float t, float (*glob)[16], u8* state) {
-    size_t ni = (size_t)(node - gm->gltf->nodes);
-    if (state[ni]) { return; }
-    float l[16];
-    NodeLocalMatrixAtTime(gm, node, t, l);
-    if (node->parent) { size_t pi = (size_t)(node->parent - gm->gltf->nodes); SkinNodeGlobal(gm, node->parent, t, glob, state); Mat4Mul(glob[pi], l, glob[ni]); }
-    else { mcpy(glob[ni], l, sizeof(l)); }
+    size_t ni = (size_t)(node - gm->gltf->nodes); if (state[ni]) { return; }
+    
+    float l[16]; NodeLocalMatrixAtTime(gm, node, t, l);
+    if (node->parent) { size_t pi = (size_t)(node->parent - gm->gltf->nodes); SkinNodeGlobal(gm, node->parent, t, glob, state); Mat4Mul(glob[pi], l, glob[ni]); } else { mcpy(glob[ni], l, sizeof(l)); }
     state[ni] = 1;
 }
 
-static void SkinFrameToScratch(GltfMesh* restrict gm, float t, float* restrict posedPos, float* restrict posedNrm, float* restrict sv, u32* outEc, __m128* outMn, __m128* outMx, i32 tid) {
-    void* sub_mark = OS_SubArenaMark(tid); /*skinMat (6,144B) + glob (65,536B) + globDone (1,024B) were stack locals: GltfBakeWorker frame was 73,192B, over the 65,536 Windows limit. The bake worker's per-thread sub-arena (same tid WeldModelPositions uses) holds them instead.*/
-    float (*skinMat)[16] = (float (*)[16])OS_SubArenaAlloc(tid, sizeof(float) * MAX_GLB_JOINTS * 16);
-    if (gm->gltf->nodes_count <= SKIN_GLOB_MAX) { /*One local+global per node per frame instead of per joint-ancestor path*/
-        float (*glob)[16] = (float (*)[16])OS_SubArenaAlloc(tid, sizeof(float) * SKIN_GLOB_MAX * 16); u8* globDone = (u8*)OS_SubArenaAlloc(tid, SKIN_GLOB_MAX); /*arena alloc is pre-zeroed, covering the old mset(globDone,0,nodes_count)*/
-        for (u32 j=0;j<gm->jointCount;++j) { SkinNodeGlobal(gm, gm->jointNodes[j], t, glob, globDone); Mat4Mul(glob[(size_t)(gm->jointNodes[j] - gm->gltf->nodes)], gm->invBind[j], skinMat[j]); }
-    } else {
-        for (u32 j=0;j<gm->jointCount;++j) { float g[16]; NodeGlobalMatrixAtTime(gm, gm->jointNodes[j], t, g); Mat4Mul(g, gm->invBind[j], skinMat[j]); }
-    }
-    
-    for (u32 v=0;v<gm->vertCount;++v) {
-        const VtxSkin* sk = &gm->skin[v];
-        float blended[16] = {0};
-        for (int k=0;k<4;++k) {
-            float w=sk->w[k]; if (w <= 0.0f){ continue; }
-            u32 jj = sk->j[k]; if (jj >= gm->jointCount) { continue; /* clamp */}
-                
-            const float* m=skinMat[jj];
-            for (int e=0;e<16;++e) blended[e]+=m[e]*w;
-        }
-        
-        Mat4TransformPoint(blended, &gm->pos[v*3], &posedPos[v*3]);
-        Mat4TransformDir(blended, &gm->nrm[v*3], &posedNrm[v*3]);
-    }
-    
-    __m128 mn_v = _mm_set1_ps(1000000000.0f), mx_v = _mm_set1_ps(-1000000000.0f);
-    u32 ec = 0, cornerCount = gm->triCount * 3;
-    for (u32 k = 0; k < cornerCount; ++k) {
-        u32 vi = gm->indices[k];
-        if (vi >= gm->vertCount) { continue; }
-        if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("glbanim:vert overflow\n"); break; }
-        
-        float* dst = sv + (ec << 3);
-        dst[0] = -posedPos[vi*3 + 0]; dst[1] = posedPos[vi*3 + 1]; dst[2] = posedPos[vi*3 + 2]; // Position
-        dst[3] = -posedNrm[vi*3 + 0]; dst[4] = posedNrm[vi*3 + 1]; dst[5] = posedNrm[vi*3 + 2]; // Normal
-        dst[6] =    gm->uv[vi*2 + 0]; dst[7] =   gm->uv[vi*2 + 1];                              // UV
-        __m128 pos_v = _mm_loadu_ps(dst);
-        mn_v = _mm_min_ps(mn_v, pos_v);
-        mx_v = _mm_max_ps(mx_v, pos_v);
-        ++ec;
-    }
-    
-    *outEc = ec;
-    *outMn = mn_v;
-    *outMx = mx_v;
-    OS_SubArenaRelease(tid, sub_mark);
-}
-
-static void TransformFrameToScratch(GltfMesh* restrict gm, float t, float* restrict sv, u32* outEc, __m128* outMn, __m128* outMx) {
-    __m128 mn_v = _mm_set1_ps(1000000000.0f), mx_v = _mm_set1_ps(-1000000000.0f);
-    u32 ec = 0;
-    for (u32 s=0;s<gm->submshCnt;++s) {
-        float gm_mat[16];
-        NodeGlobalMatrixAtTime(gm, gm->meshNodes[s], t, gm_mat);
-        const float* restrict spos = gm->subPos[s];
-        const float* restrict snrm = gm->subNrm[s];
-        const float* restrict suv = gm->subUv[s];
-        const u32* restrict sidx = gm->subIndices[s];
-        u32 cornerCount = gm->subTriCount[s] * 3;
-        for (u32 k = 0; k < cornerCount; ++k) {
-            if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("glbanim:vert overflow\n"); goto done; }
-            u32 vi = sidx[k]; if (vi >= gm->subVertCnt[s]){ continue; }
-            
-            float pt[3], n[3];
-            Mat4TransformPoint(gm_mat,&spos[vi*3], pt);
-            Mat4TransformDir(gm_mat,&snrm[vi*3],n);
-            float* dst = sv + (ec << 3);
-            dst[0] = -pt[0]; dst[1] = pt[1]; dst[2] = pt[2]; // Position
-            dst[3] =  -n[0]; dst[4] =  n[1]; dst[5] =  n[2]; // Normal
-            dst[6] = suv[vi*2 + 0];  dst[7] = suv[vi*2 + 1]; // UV
-            __m128 pos_v = _mm_loadu_ps(dst);
-            mn_v = _mm_min_ps(mn_v, pos_v);
-            mx_v = _mm_max_ps(mx_v, pos_v);
-            ++ec;
-        }
-    }
-    
-    done:
-    *outEc = ec;
-    *outMn = mn_v;
-    *outMx = mx_v;
-}
- 
 typedef struct { GltfMesh* mesh; u32 modelIndex; float timelineFrame; } GltfFrameTask;
 typedef struct { GltfFrameTask* tasks; u32 start, end; int tid; } GltfBakeTask;
 static void* GltfBakeWorker(void* arg) {
@@ -640,12 +681,85 @@ static void* GltfBakeWorker(void* arg) {
     float* posedNrm = thread_temp_nrm[bt->tid];
     float* sv = thrd_verts[bt->tid];
     for (u32 i = bt->start; i < bt->end; ++i) {
-        GltfFrameTask* t = &bt->tasks[i];
-        u32 ec;
-        __m128 mn_v, mx_v;
-        if (t->mesh->isTrAnim) { TransformFrameToScratch(t->mesh, t->timelineFrame, sv, &ec, &mn_v, &mx_v); }
-        else { SkinFrameToScratch(t->mesh, t->timelineFrame, posedPos, posedNrm, sv, &ec, &mn_v, &mx_v, bt->tid); }
-        
+        GltfFrameTask* t = &bt->tasks[i]; u32 ec; __m128 mn_v, mx_v;
+        if (t->mesh->isTrAnim) { 
+            GltfMesh* restrict gm = t->mesh;
+            float timeline_t = t->timelineFrame;
+            mn_v = _mm_set1_ps(1000000000.0f);
+            mx_v = _mm_set1_ps(-1000000000.0f);
+            ec = 0;
+            for (u32 s = 0; s < gm->submshCnt; ++s) {
+                float gm_mat[16];
+                NodeGlobalMatrixAtTime(gm, gm->meshNodes[s], timeline_t, gm_mat);
+                const float* restrict spos = gm->subPos[s];
+                const float* restrict snrm = gm->subNrm[s];
+                const float* restrict suv = gm->subUv[s];
+                const u32* restrict sidx = gm->subIndices[s];
+                u32 cornerCount = gm->subTriCount[s] * 3;
+                for (u32 k = 0; k < cornerCount; ++k) {
+                    if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("glbanim:vert overflow\n"); goto bvh_bake_done; }
+                    u32 vi = sidx[k]; if (vi >= gm->subVertCnt[s]) { continue; }
+                    
+                    float pt[3], n[3];
+                    Mat4TransformPoint(gm_mat, &spos[vi * 3], pt);
+                    Mat4TransformDir(gm_mat, &snrm[vi * 3], n);
+                    float* dst = sv + (ec << 3);
+                    dst[0] = -pt[0]; dst[1] = pt[1]; dst[2] = pt[2]; // Position
+                    dst[3] =  -n[0]; dst[4] =  n[1]; dst[5] =  n[2]; // Normal
+                    dst[6] = suv[vi * 2 + 0]; dst[7] = suv[vi * 2 + 1]; // UV
+                    __m128 pos_v = _mm_loadu_ps(dst);
+                    mn_v = _mm_min_ps(mn_v, pos_v);
+                    mx_v = _mm_max_ps(mx_v, pos_v);
+                    ++ec;
+                }
+            }
+            bvh_bake_done:;
+        } else { 
+            GltfMesh* restrict gm = t->mesh;
+            float timeline_t = t->timelineFrame;
+            i32 skin_tid = bt->tid;
+            void* sub_mark = OS_SubArenaMark(skin_tid);
+            float (*skinMat)[16] = (float (*)[16])OS_SubArenaAlloc(skin_tid, sizeof(float) * MAX_GLB_JOINTS * 16);
+            if (gm->gltf->nodes_count <= 1024) {
+                float (*glob)[16] = (float (*)[16])OS_SubArenaAlloc(skin_tid, sizeof(float) * 1024 * 16); 
+                u8* globDone = (u8*)OS_SubArenaAlloc(skin_tid, 1024);
+                for (u32 j = 0; j < gm->jointCount; ++j) { SkinNodeGlobal(gm, gm->jointNodes[j], timeline_t, glob, globDone); Mat4Mul(glob[(size_t)(gm->jointNodes[j] - gm->gltf->nodes)], gm->invBind[j], skinMat[j]); }
+            } else {
+                for (u32 j = 0; j < gm->jointCount; ++j) { float g[16]; NodeGlobalMatrixAtTime(gm, gm->jointNodes[j], timeline_t, g); Mat4Mul(g, gm->invBind[j], skinMat[j]); }
+            }
+            for (u32 v = 0; v < gm->vertCount; ++v) {
+                const VtxSkin* sk = &gm->skin[v];
+                float blended[16] = {0};
+                for (int k_idx = 0; k_idx < 4; ++k_idx) {
+                    float w = sk->w[k_idx]; if (w <= 0.0f) { continue; }
+                    u32 jj = sk->j[k_idx]; if (jj >= gm->jointCount) { continue; }
+                        
+                    const float* m = skinMat[jj];
+                    for (int e = 0; e < 16; ++e) blended[e] += m[e] * w;
+                }
+                Mat4TransformPoint(blended, &gm->pos[v * 3], &posedPos[v * 3]);
+                Mat4TransformDir(blended, &gm->nrm[v * 3], &posedNrm[v * 3]);
+            }
+            
+            mn_v = _mm_set1_ps(1000000000.0f); 
+            mx_v = _mm_set1_ps(-1000000000.0f);
+            ec = 0; u32 cornerCount = gm->triCount * 3;
+            for (u32 k_idx = 0; k_idx < cornerCount; ++k_idx) {
+                u32 vi = gm->indices[k_idx];
+                if (vi >= gm->vertCount) { continue; }
+                if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("glbanim:vert overflow\n"); break; }
+                
+                float* dst = sv + (ec << 3);
+                dst[0] = -posedPos[vi * 3 + 0]; dst[1] = posedPos[vi * 3 + 1]; dst[2] = posedPos[vi * 3 + 2]; // Position
+                dst[3] = -posedNrm[vi * 3 + 0]; dst[4] = posedNrm[vi * 3 + 1]; dst[5] = posedNrm[vi * 3 + 2]; // Normal
+                dst[6] =    gm->uv[vi * 2 + 0]; dst[7] =   gm->uv[vi * 2 + 1];                              // UV
+                __m128 pos_v = _mm_loadu_ps(dst);
+                mn_v = _mm_min_ps(mn_v, pos_v);
+                mx_v = _mm_max_ps(mx_v, pos_v);
+                ++ec;
+            }
+            OS_SubArenaRelease(skin_tid, sub_mark);
+        }
         FinalizeParsedMesh(t->modelIndex, sv, ec, thrd_ht[bt->tid], thrd_ht_used[bt->tid], thrd_remap_scratch[bt->tid], thrd_cache_scratch[bt->tid], &vPos[t->modelIndex], &modelVertexCounts[t->modelIndex], &modelTriangles[t->modelIndex], &modelTriangleCounts[t->modelIndex], mn_v, mx_v, bt->tid);
     } return NULL;
 }
