@@ -433,6 +433,7 @@ int ParseLevelArg(const char* arg) {
 }
 
 u8 queuedLevelToLoad = 255u; V3 queuedLevelPos;
+bool ElevatorDefaultDestinationPos(u8,V3*);
 static void cmd_loadlevel(const char* arg) {
     if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; /*"Cannot load levels via cheat while on the main menu!"*/}
     
@@ -1468,6 +1469,7 @@ void GetProjections(float* view, float* viewProj, float* invViewRot, float* invV
 void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
 static bool clearRenderTargetsOnNextFrame = false;
 void RequestClearRenderTargets() { clearRenderTargetsOnNextFrame = true; }
+void BiomonitorClearRenderTarget();
 static void ClearAllRenderTargets() {
     glClearColor(0.0f,0.0f,0.0f,0.0f);
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -1990,6 +1992,7 @@ int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(
 u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES];
 u32 uniqueCvxMeshCount = 0;
 size_t cvxAdjLive = 0;
+void ResetDoorPortals();
 static void ResetLoadTallies(void) {
     decalInlineTextCount = decalStyleCount = 0;
     mset(World.levelCameraCount,0,sizeof(World.levelCameraCount)); mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount)); mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));

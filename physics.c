@@ -1,7 +1,6 @@
 // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
 #include "common.h"
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; u16 triggerVolumes[128]; u16 numTriggers; extern double game_actual_start_time; static bool ladderWalkOff = false; static float ladderTopY = 0.0f; static double ladderSFXFinished = 0.0; void DrawBoxColliderColored(u16 i, Color col); void DrawCapsuleCollider(u16 i);
-u16 GetTeleportDestination(u8 level,u16 teleportID);
 static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
 static const float WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,PLAYER_PRONE_RATIO=0.32f,WALK_SPEED_ACCEL=3.0f,BOOST_ACCEL=1.0f,SKATE_SLIDE=5.0f,SKATE_SPEED=1.1f;
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4],wB[4];/*Cached support points from Shape A,B*/ i32 n;/*Vertex count*/ } Simplex3D;
@@ -41,7 +40,7 @@ static void WarmPairGovern(u16 a,u16 b,Manifold *m) {
     for (int i=0;i<cnt;++i) { float pen=wp->pen[i]-alongN; if (pen<0.0f) pen=0.0f; m->p[i].point=wp->pt[i]; m->p[i].pen=pen; if (pen>m->maxPen) m->maxPen=pen; }
 }
 static void WarnPhysicsCapacity(u8 kind,const char* message){if(kind<5&&World.pauseRelativeTime>=nextCapacityWarn[kind]){DualLogWarn("%s\n",message);nextCapacityWarn[kind]=World.pauseRelativeTime+5.0f;}}
-INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAXANIM && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = modelAnimationClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
+INLINE bool AnimWaking(u16 j) { if(j == PLAYER1){return false;} u16 an = World.instances[j].animationNum; if (!((an == 0 || an == 1 || (an >= 4 && an <= 20) || (an >= 43 && an <= 45) || an == 47 || an == 48) && an < MAXANIM && World.instances[j].clip < MAX_ANIMCLIPS)) return false; u8 fr = mdlAnimClips[an][World.instances[j].clip].framerate; return fr > 0 && (World.current_time - World.instances[j].animFinished) * (double)fr < 1.0; }
 void AddForce(u16 i, V3 f, bool imp){if(imp){World.velocity[i]=V3_AplusB(World.velocity[i],V3_ScaleByF(f,1.0f/vmax(World.mass[i],0.001f)));}else{World.instances[i].accumulatedForce=V3_AplusB(World.instances[i].accumulatedForce,f);} World.physSleep[i]=false;}
 
 // Trigger System
@@ -89,7 +88,16 @@ void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances
 void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // visual subobject parity handled by hierarchy
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(self,e->targetIdx); }
 // TeleportTouch
-void TeleportTouchOnTriggerEnter(u16 self, u16 o){Entity *e=&World.instances[self],*player=&World.instances[PLAYER1]; if(!e->touchEnabled||o!=PLAYER1||player->health<=0.0f||e->justUsed>=World.pauseRelativeTime)return; u16 dest=GetTeleportDestination(World.currentLevel,e->targetDestinationID); if(dest>=World.instCount||World.instances[dest].index!=703)return; World.position[PLAYER1]=World.position[dest]; World.instances[dest].justUsed=World.pauseRelativeTime+1.0; play_wav(sounds[106], AppliedFXVol(1.0f), World.position[dest], false);}
+extern u16 teleportDestinations[MAX_LEVELS][8];
+void TeleportTouchOnTriggerEnter(u16 self, u16 o) {
+    Entity *e = &World.instances[self], *player = &World.instances[PLAYER1]; if (!e->touchEnabled || o!=PLAYER1 || player->health <= 0.0f || e->justUsed >= World.pauseRelativeTime) return;
+    u16 dest = World.currentLevel < MAX_LEVELS && e->targetDestinationID < 8 ? teleportDestinations[World.currentLevel][e->targetDestinationID] : U16_MAX; if (dest >= World.instCount || World.instances[dest].index != 703) return;
+    
+    World.position[PLAYER1] = World.position[dest];
+    World.instances[dest].justUsed = World.pauseRelativeTime+1.0;
+    play_wav(sounds[106], AppliedFXVol(1.0f), World.position[dest], false);
+}
+
 void TriggerDelayedTarget(u16 self) { Entity* e=&World.instances[self]; u16 act=e->recentMostActivator; e->delayFinished = World.pauseRelativeTime + e->delay; e->deferredIoflags = World.targetIOActive ? World.targetIOActivatorIoflags : (act<World.instCount?World.instances[act].ioflags:0u); e->deferredIoflagsHi = World.targetIOActive ? World.targetIOActivatorIoflagsHi : (act<World.instCount?World.instances[act].ioflagsHi:0u); }
 void TriggerTrippedUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 sf=World.targetIOActivatorIoflags,sfh=World.targetIOActivatorIoflagsHi; bool wa=World.targetIOActive; World.targetIOActive=true; World.targetIOActivatorIoflags=e->deferredIoflags; World.targetIOActivatorIoflagsHi=e->deferredIoflagsHi; UseTargets(self,e->targetIdx); World.targetIOActivatorIoflags=sf; World.targetIOActivatorIoflagsHi=sfh; World.targetIOActive=wa; }/*Marking the chain active stops UseTargets re-seeding from World.instances[activator], which by now points at the player's level.*/
 void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (World.instances[self].allDone && World.instances[self].onlyOnce)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self);} }

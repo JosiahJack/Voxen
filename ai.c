@@ -2,12 +2,10 @@
 #include "common.h"
 static const float AI_STOP_DIST=1.28f, AI_STOP_DIST_SQ=(AI_STOP_DIST * AI_STOP_DIST), AI_POS_CHECK_DELAY=2.0f, AI_WANDER_RANGE=79.0f, AI_TARGET_OFFSET_Y=0.24f;
 u16 npcCountInWorldPerType[NUM_AI_TYPES];
-
-void DoorActuate(u16), TextureSequenceStart(u16,u8);
+void TextureSequenceStart(u16,u8);
 Quaternion quat_normalize(Quaternion);
 bool PositionVisibleFromPlayerCell(float,float), XZPairInBounds(i32,i32);
 u16 AddLightSimple(V3,Color3,float,float,u16);
-
 u16 ai_next_npc_number(u16 type) { if (type >= NUM_AI_TYPES) return 0; if (npcCountInWorldPerType[type] < U16_MAX) npcCountInWorldPerType[type]++; return npcCountInWorldPerType[type]; }
 void ai_reset_npc_numbering(void) { mset(npcCountInWorldPerType,0,sizeof(npcCountInWorldPerType)); }
 
@@ -219,7 +217,7 @@ void InitNPC(u16 i) {
         case AIState_Dying: case AIState_Dead: c = A_DYING; break;
     }
     World.instances[i].clip = c; 
-    World.instances[i].frame = modelAnimationClips[World.instances[i].animationNum][c].frameStart;
+    World.instances[i].frame = mdlAnimClips[World.instances[i].animationNum][c].frameStart;
 }
 
 float Tranquilize(u16 i, float amount, bool energy) {
@@ -385,13 +383,13 @@ void AIAnimationControllerUpdate(u16 idx) {
     
     if(self->currentState == AIState_Dying){
         flag_set(&self->entflags, EF_ASLEEP, false); 
-        AnimationClip cl = modelAnimationClips[self->animationNum][A_DYING]; if(cl.frameEnd == cl.frameStart){ ChangeAnim(self, A_DYING); return; } 
+        AnimationClip cl = mdlAnimClips[self->animationNum][A_DYING]; if(cl.frameEnd == cl.frameStart){ ChangeAnim(self, A_DYING); return; } 
         
         ChangeAnim(self, A_DYING);
         return;
     }
     
-    if(self->currentState == AIState_Dead){AnimationClip cl=modelAnimationClips[self->animationNum][A_DYING]; self->clip=A_DYING; self->frame=cl.frameEnd; self->modelIndex=cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart); self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/}
+    if(self->currentState == AIState_Dead){AnimationClip cl=mdlAnimClips[self->animationNum][A_DYING]; self->clip=A_DYING; self->frame=cl.frameEnd; self->modelIndex=cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart); self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/}
     if(self->entflags & EF_ASLEEP){aiac_idle(self); return;}
     if(self->currentState == AIState_Run && self->tranquilizeFinished >= World.pauseRelativeTime){aiac_idle(self); return;}
     
@@ -408,6 +406,7 @@ void AIAnimationControllerUpdate(u16 idx) {
 
 
 INLINE bool NPCInPlayerPVS(u16 idx) { if (unlikely(World.curLev >= LEVEL_CYBERSPACE)) return true;/*Culling is disabled in cyberspace (CullCore early-outs), so never gate there.*/ return PositionVisibleFromPlayerCell(World.position[idx].x,World.position[idx].z); }
+void DoorActuate(u16);
 bool AICheckIfEnemyInSight(u16 idx) {
     u16 eidx=World.instances[idx].enemy; if (!eidx || !HasHealth(idx)) return false; bool enIsNPC = (World.layer[eidx] & L_NPC) != 0; int diff = IsCyberNPC(idx) ? World.diffCyb : World.diffCbt; if (!NPCInPlayerPVS(idx)) return false;/*Cell PVS gate, same as the player path below. Was skipped for NPC targets, so NPCs tracked enemies through the whole level.*/
     if (diff == 0 && (World.instances[idx].index - 419) != 28) return false; if (Cheats.notarget && !enIsNPC) { World.instances[idx].enemy = 0; World.instances[idx].posCheckFinished = World.pauseRelativeTime + AI_POS_CHECK_DELAY; World.instances[idx].lastPosition = World.position[idx]; flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, false); return false; }
@@ -505,7 +504,7 @@ static V3 AIGetSearchPoint(Entity* self) { NPCType t = npcTable[self->index - 41
 static void AIHopMove(u16 self) {
     if (World.instances[self].animationNum >= MAXANIM || World.instances[self].clip >= MAX_ANIMCLIPS) { flag_set(&World.instances[self].entflags,EF_HOP_DONE,false); return; }
     
-    AnimationClip c = modelAnimationClips[World.instances[self].animationNum][World.instances[self].clip];
+    AnimationClip c = mdlAnimClips[World.instances[self].animationNum][World.instances[self].clip];
     float normTime = (c.frameEnd > c.frameStart) ? (float)(World.instances[self].frame - c.frameStart) / (float)(c.frameEnd - c.frameStart) : 0.0f;
     if (normTime > 0.1395f) {
         if (!(World.instances[self].entflags & EF_HOP_DONE)) {
@@ -574,7 +573,7 @@ static void AIBrakingMovement(Entity* self) { u16 sidx=(u16)(self - World.instan
 static double ai_attack_clip_time(const Entity* self, int slot) {
     if (self->animationNum >= MAXANIM || slot < 1 || slot > 3) return 0.0;
     u8 c = (u8)(A_ATTACK1 + (slot - 1)); if (c >= MAX_ANIMCLIPS) return 0.0;
-    const AnimationClip* clip = &modelAnimationClips[self->animationNum][c];
+    const AnimationClip* clip = &mdlAnimClips[self->animationNum][c];
     if (clip->framerate <= 0 || clip->speed <= 0 || clip->frameEnd < clip->frameStart) return 0.0;
     return (double)(clip->frameEnd - clip->frameStart + 1) / ((double)clip->framerate * clip->speed);
 }
@@ -610,7 +609,7 @@ static void AIPain(Entity* self) {
 static double AIDeathAnimationDuration(const Entity* self) {
     if (!self || self->animationNum >= MAXANIM) return 0.0;
     
-    AnimationClip clip = modelAnimationClips[self->animationNum][A_DYING];
+    AnimationClip clip = mdlAnimClips[self->animationNum][A_DYING];
     if (clip.framerate <= 0 || clip.speed <= 0 || clip.frameEnd <= clip.frameStart) return 0.0;
     return (double)(clip.frameEnd - clip.frameStart + 1) / ((double)clip.framerate * clip.speed);
 }
@@ -756,7 +755,6 @@ static void AIFlierMoveToHoverHeight(Entity* self) {
 }
 
 void AIAlert(u16 idx) { if (!World.diffCbt){return;} Entity* self = &World.instances[idx]; AISetEnemy(idx,PLAYER1); self->currentDestination = World.position[PLAYER1]; flag_set(&self->entflags, EF_ENEM_IN_SIGHT, false); }
-void AIAwakeFromSleep(u16 idx) { flag_set(&World.instances[idx].entflags,EF_ASLEEP,false); AIAlert(idx); }
 static void AIThink(u16 idx) {
     Entity* self = &World.instances[idx]; if ((self->entflags & EF_DYING_SETUP) && self->deathBurstFinished < World.pauseRelativeTime && !(self->entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(self); flag_set(&self->entflags,EF_DEATH_BURST_DONE,true); }
     if (!HasHealth((u16)(self - World.instances))) { if (!(self->entflags & EF_DYING) && !(self->entflags & EF_DEAD)){flag_set(&self->entflags,EF_DYING,true); self->currentState=AIState_Dying;}else if((self->entflags & EF_DEAD) && self->currentState != AIState_Dead){self->currentState=AIState_Dead;}else if((self->entflags & EF_DYING) && self->currentState != AIState_Dying){self->currentState=AIState_Dying;} }

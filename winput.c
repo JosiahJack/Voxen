@@ -706,11 +706,10 @@ static bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,
 static bool GetKeyPressed(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 bool Forward() { return GetKey(0); }                bool StrafeLeft() { return GetKey(1); }             bool Backpedal() { return GetKey(2); }            bool StrafeRight() { return GetKey(3); }            bool Jump() { return GetKey(4); }                   bool JumpDown() { return GetKeyPressed(4); }
 bool Crouch() { return GetKeyPressed(5); }          bool Prone() { return GetKeyPressed(6); }           bool LeanLeft() { return GetKey(7); }             bool LeanRight() { return GetKey(8); }              bool Sprint() { return GetKey(9); }                 bool TurnLeft() { return GetKey(10); }
-bool TurnRight() { return GetKey(11); }             bool LookUp() { return GetKey(12); }                bool LookDown() { return GetKey(13); }            bool RecentLog() { return GetKeyPressed(14); }      bool Biomonitor() { return GetKeyPressed(15); }     bool Sensaround() { return GetKeyPressed(16); }
-bool Lantern() { return GetKeyPressed(17); }        bool Shield() { return GetKeyPressed(18); }         bool Infrared() { return GetKeyPressed(19); }     bool Email() { return GetKeyPressed(20); }          bool Booster() { return GetKeyPressed(21); }        bool Jumpjets() { return GetKeyPressed(22); }
-bool Attack() { return GetKeyPressed(23); }         bool Use() { return GetKeyPressed(24); }            bool Menu() { return GetKeyPressed(25); }         bool ToggleMode() { return GetKeyPressed(26); }     bool Reload() { return GetKeyPressed(27); }         bool WeaponCycUp() { return GetKeyPressed(28); }
-bool WeaponCycDown() { return GetKeyPressed(29); }  bool Grenade() { return GetKeyPressed(30); }        bool GrenadeCycUp() { return GetKeyPressed(31); } bool GrenadeCycDown() { return GetKeyPressed(32); } bool ChangeAmmoType() { return GetKeyPressed(33); } bool Patch() { return GetKeyPressed(34); }
-bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }   bool Map() { return GetKeyPressed(37); }          bool SwimUp() {return Cheats.noclip && GetKey(38);} bool SwimDn() {return /*Cheats.noclip && */GetKey(39);} bool Console() { return GetKeyPressed(41); }     bool ScrshotPressed() { return GetKeyPressed(40); }
+bool TurnRight() { return GetKey(11); }             bool LookUp() { return GetKey(12); }                bool LookDown() { return GetKey(13); }            bool RecentLog() { return GetKeyPressed(14); }
+bool Attack() { return GetKeyPressed(23); }         bool Use() { return GetKeyPressed(24); }            bool Menu() { return GetKeyPressed(25); }         bool Reload() { return GetKeyPressed(27); }
+bool Grenade() { return GetKeyPressed(30); }        bool GrenCycUp() { return GetKeyPressed(31); }      bool GrenCycDn() { return GetKeyPressed(32); } bool ChangeAmmoType() { return GetKeyPressed(33); } bool Patch() { return GetKeyPressed(34); }
+bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }   bool SwimUp() {return Cheats.noclip && GetKey(38);} bool SwimDn() {return /*Cheats.noclip && */GetKey(39);} bool ScrshotPressed() { return GetKeyPressed(40); }
 bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){return false;} if (World.pauseRelativeTime < World.invP1.leanLTapFinished) { World.invP1.leanLTapFinished = 0.0; return true; } World.invP1.leanLTapFinished = World.pauseRelativeTime + 0.5; return false; }
 bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.pauseRelativeTime < World.invP1.leanRTapFinished) { World.invP1.leanRTapFinished = 0.0; return true; } World.invP1.leanRTapFinished = World.pauseRelativeTime + 0.5; return false; } 
 void ForceShootMode() { if (Sys_Settings.NoShootMode){return;} float curhalff=(float)(CURSOR_SZ/2); if (World.inventoryMode) {World.cursorPos_x=(i16)((float)UI_W*0.5f-curhalff); World.cursorPos_y=(i16)((float)UI_H*0.5f-curhalff)/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); World.Sys_UI.vmailActive=0; }
@@ -719,10 +718,8 @@ void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {
 void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float);
 void HwToggle(u8);/*ui.c: the HUD hardware button handler, shared with the Lantern/Infrared hotkeys so both paths play the same sounds*/
-
 extern u16 editModeTestEntityDefinition;
 extern V3 debugWepOffset;
-
 void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) { if(!Sys_Input.mouseButtons[i].down){uiMouseCaptured &= ~(1u<<i);} }
     mouseMovementThisFrame = false;
@@ -738,31 +735,21 @@ void InputProcessing() {
         if (Sys_Input.keyStates[KEY_F6].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F6].pressed = false; if (!World.menuActive) { bool wasPaused=World.paused; World.paused=false; SaveGame(7,"quicksave"); if (wasPaused) World.paused=true; } return; }
         if (Sys_Input.keyStates[KEY_F9].pressed && (get_time() - World.justSavedTimeStamp) > 0.2) { Sys_Input.keyStates[KEY_F9].pressed = false; LoadGame(7); return; }
         
-        if (Console() && !rebindCaptureActive) ToggleConsole();
+        if (GetKeyPressed(41)/*Console`~*/ && !rebindCaptureActive) ToggleConsole();
         if (Menu() && !World.menuActive && !editFieldEditing) { World.paused = !World.paused; return; }
         if (Menu() && World.menuActive && !rebindCaptureActive) { MenuGoBack(); return; }
         if (World.paused || World.menuActive || Cheats.consoleActive) return; // Pause/Menu barrier <<<<<<<
-        // Debug weapon offset adjustment hooks TEMP TODO DELETE ME ONCE PIPE AND RAPIER OFFSETS ARE FIXED!!
-        if (Sys_Input.keyStates[KEY_1].pressed) { debugWepOffset.x += 0.05f; }
-        else if (Sys_Input.keyStates[KEY_2].pressed) { debugWepOffset.x -= 0.05f; }
-        if (Sys_Input.keyStates[KEY_3].pressed) { debugWepOffset.y += 0.05f; }
-        else if (Sys_Input.keyStates[KEY_4].pressed) { debugWepOffset.y -= 0.05f; }
-        if (Sys_Input.keyStates[KEY_5].pressed) { debugWepOffset.z += 0.05f; }
-        else if (Sys_Input.keyStates[KEY_6].pressed) { debugWepOffset.z -= 0.05f; }
-        if (ToggleMode()) ToggleInventoryMode(); 
-        if (Lantern()) HwToggle(2);/*hwBtns[2]=HW_LAN, sOn/sOff 78*/
-        if (Infrared()) HwToggle(4);/*hwBtns[4]=HW_INF, sOn/sOff 98/82*/
-        // Hardware hotkeys with energy checks (matching HwToggle logic)
-        if (Biomonitor()) HwToggle(0);/*hwBtns[0]=HW_BIO; no-op while Cheats.showFPS, which holds the biomonitor on for the frame-time graphs*/
-        if (Sensaround()) {
-            if (!(World.invP1.hasHardware & HW_SNS) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SNS)?82:93],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SNS; }
-        }
-        if (Shield()) {
-            if (!(World.invP1.hasHardware & HW_SHD) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]);
-            else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SHD)?95:96],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SHD; }
-        }
-        if (Email()) {
+
+        if (Sys_Input.keyStates[KEY_1].pressed) { debugWepOffset.x += 0.05f; } else if (Sys_Input.keyStates[KEY_2].pressed) { debugWepOffset.x -= 0.05f; } // Debug weapon offset adjustment hooks TEMP TODO DELETE ME ONCE PIPE AND RAPIER OFFSETS ARE FIXED!!
+        if (Sys_Input.keyStates[KEY_3].pressed) { debugWepOffset.y += 0.05f; } else if (Sys_Input.keyStates[KEY_4].pressed) { debugWepOffset.y -= 0.05f; }
+        if (Sys_Input.keyStates[KEY_5].pressed) { debugWepOffset.z += 0.05f; } else if (Sys_Input.keyStates[KEY_6].pressed) { debugWepOffset.z -= 0.05f; }
+        if (GetKeyPressed(26)/*ToggleMode*/) ToggleInventoryMode();
+        if (GetKeyPressed(17)/*   Lantern*/) HwToggle(2);/*hwBtns[2]=HW_LAN, sOn/sOff 78*/
+        if (GetKeyPressed(19)/*  Infrared*/) HwToggle(4);/*hwBtns[4]=HW_INF, sOn/sOff 98/82*/
+        if (GetKeyPressed(15)/*Biomonitor*/) HwToggle(0);/*hwBtns[0]=HW_BIO; no-op while Cheats.showFPS, which holds the biomonitor on for the frame-time graphs*/
+        if (GetKeyPressed(16)/*Sensaroung*/) { if (!(World.invP1.hasHardware & HW_SNS) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SNS)?82:93],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SNS; } }
+        if (GetKeyPressed(18)/*    Shield*/) { if (!(World.invP1.hasHardware & HW_SHD) || World.invP1.energy<=0.0f) CenterStatusPrint("%s",Sys_Text.stringTable[314]); else { play_wav(sounds[(World.invP1.hardwareIsActive&HW_SHD)?95:96],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_SHD; } }
+        if (GetKeyPressed(20)/*     Email*/) {
             if (World.invP1.hasHardware & HW_ERD) {
                 World.invP1.hardwareIsActive|=HW_ERD;
                 MFD_ResetGeneral();
@@ -775,17 +762,11 @@ void InputProcessing() {
                 play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false);
             }
         }
-        if (Booster()) {
-            if (!(World.invP1.hasHardware & HW_BST) || (World.invP1.energy <= 0.0f && World.invP1.hwVersSetting[HW_BST_IDX] >= 1)) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ }
-            else { play_wav(sounds[78],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_BST; }
-        }
-        if (Jumpjets()) {
-            if (!(World.invP1.hasHardware & HW_JET) || World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ }
-            else { play_wav(sounds[78],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_JET; }
-        }
-        if (!editFieldEditing && (WeaponCycUp()   || (!uiWheelBlocked && Sys_Input.scrollDelta > 0))) { CycleWeaponSlot(Sys_Settings.InvertInventoryCycling ? -1 : +1); Sys_Input.scrollDelta = 0; }
-        if (!editFieldEditing && (WeaponCycDown() || (!uiWheelBlocked && Sys_Input.scrollDelta < 0))) { CycleWeaponSlot(Sys_Settings.InvertInventoryCycling ? +1 : -1); Sys_Input.scrollDelta = 0; }
-        if (!editFieldEditing && Map()) UI_AutomapClick(false,UI_AUTOMAP_FULL);
+        if (GetKeyPressed(21)/*  Booster*/) { if (!(World.invP1.hasHardware & HW_BST) || (World.invP1.energy <= 0.0f && World.invP1.hwVersSetting[HW_BST_IDX] >= 1)) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ } else { play_wav(sounds[78],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_BST; } }
+        if (GetKeyPressed(22)/* JumpJets*/) { if (!(World.invP1.hasHardware & HW_JET) || World.invP1.energy <= 0.0f) { CenterStatusPrint("%s",Sys_Text.stringTable[314]); /*Power supply exhausted.*/ } else { play_wav(sounds[78],AppliedFXVol(1.0f),(V3){0},false); World.invP1.hardwareIsActive ^= HW_JET; } }
+        if (!editFieldEditing && (GetKeyPressed(28)/*WepCycUp*/ || (!uiWheelBlocked && Sys_Input.scrollDelta > 0))) { CycleWeaponSlot(Sys_Settings.InvertInventoryCycling ? -1 : +1); Sys_Input.scrollDelta = 0; }
+        if (!editFieldEditing && (GetKeyPressed(29)/*WepCycDn*/ || (!uiWheelBlocked && Sys_Input.scrollDelta < 0))) { CycleWeaponSlot(Sys_Settings.InvertInventoryCycling ? +1 : -1); Sys_Input.scrollDelta = 0; }
+        if (!editFieldEditing &&  GetKeyPressed(37)/*Map*/) UI_AutomapClick(false,UI_AUTOMAP_FULL);
         ApplyPlayerMovements(World.dt);
         if (!World.inventoryMode) { // Apply mouselook/keyboardlook/lean
             bool cyber = World.curLev == LEVEL_CYBERSPACE, invLook = cyber ? Sys_Settings.InvCybLook : Sys_Settings.InvertLook;

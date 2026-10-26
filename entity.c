@@ -1,8 +1,9 @@
 // entity.c - Entity Definitions and Save Load System for levels and savegames
 #include "common.h"
-static u16 teleportDestinations[MAX_LEVELS][8];
+u16 teleportDestinations[MAX_LEVELS][8];
 static bool teleportDestinationsInitialized;
-static u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL]; static u8 elevatorDestCounts[MAX_LEVELS];
+u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL];
+u8 elevatorDestCounts[MAX_LEVELS];
 Quaternion quat_from_axis_angle(V3,float);
 void AddDoorPortal(u16,u16), TextureSequenceInit(u16,char*), AddCamView(V3,Quaternion,u8,u16,u16,float,float), GravityLiftSyncAllVisuals(void);
 Entity* entsFromFile; V3 *posFromFile, *scaleFromFile; Quaternion *rotationFromFile; Light *lightsFromFile; LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL;
@@ -1041,7 +1042,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     World.instances[i].modelIndex = EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAXTEX ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAXTEX ? 0 : EDefs[entIdx].glowIndex;
     World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAXTEX ? 0 : EDefs[entIdx].specIndex; World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAXTEX ? 0 : EDefs[entIdx].normIndex; flag_set(&World.instances[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(entIdx));
     if (entIdx == 585) { /*prop_sparkingwire: stagger the loop so co-located wires don't spark in lockstep*/
-        AnimationClip* c = &modelAnimationClips[46][A_LOOP_ALL]; u32 span = (u32)(c->frameEnd - c->frameStart) + 1u, off = random_range_u32(0u, span - 1u);
+        AnimationClip* c = &mdlAnimClips[46][A_LOOP_ALL]; u32 span = (u32)(c->frameEnd - c->frameStart) + 1u, off = random_range_u32(0u, span - 1u);
         World.instances[i].clip = A_LOOP_ALL; World.instances[i].frame = (u16)(c->frameStart + off); World.instances[i].modelIndex = (u16)(c->frameStartModelIndex + off); /* Clip is a single loop; random start frame so visible pose and the frame-16 spark desync per instance. */
     }
     if (entIdx == 592 || entIdx == 593) { World.instances[i].modelIndex = U16_MAX; } // 3D text decals (no mesh)
@@ -1072,13 +1073,6 @@ u16 TextMatIndexToTexIndex(u16 matIndex) {
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
 static char* MmapGetLine(char* buf, int sz){if(mm_ptr>=mm_end){return NULL;} const char* start=mm_ptr; const char* p=start; while(p<mm_end&&*p!='\n'){++p;} int lineLen=(int)(p-start); if(p<mm_end&&*p =='\n'){mm_ptr=p+1;}else{mm_ptr=mm_end;}if(lineLen >= sz){lineLen=sz-1;} mcpy(buf,(void*)start,lineLen); while(lineLen>0&&(buf[lineLen-1]=='\r' || buf[lineLen - 1]=='\n')){--lineLen;} buf[lineLen]='\0'; return buf;}
 static u16 fwParentSnap[MAX_LEVELS][INSTANCE_COUNT]; static bool fwSnapValid[MAX_LEVELS];/*per-level fwParentOf snapshot: fwParentOf is rewritten by every level load; SetLevelPointers restores the current level's*/
-u16 GetTeleportDestination(u8 lev,u16 id){return lev<MAX_LEVELS&&id<8?teleportDestinations[lev][id]:U16_MAX;}
-bool GetElevatorDestinationPos(u8 lev,u8 nth,V3* outPos) {
-    if (lev>=MAX_LEVELS || nth>=elevatorDestCounts[lev]) return false;
-    u16 idx=elevatorDestinations[lev][nth]; if (idx<INSTS_1ST_IDX || idx>=World.levelInstCount[lev]) return false;
-    if (World.levelInstances[lev][idx].index!=706) return false;
-    *outPos=World.levelPosition[lev][idx]; return true;
-}
 void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
     if (lev != World.currentLevel && World.currentLevel < MAX_LEVELS) { World.levelInstCount[World.currentLevel] = World.instCount; World.levelLAnimCount[World.currentLevel] = World.lanimCount; }/*preserve dynamically summoned instances across temporary pointer switches (UseTargets/TargetIO level iteration)*/
@@ -1130,21 +1124,10 @@ static DecalPend* PendDecal(u16 ent) {
     if (pendDecalCount >= DECAL_INLINE_TEXT_PEND) { DualLogError("decal staging full\n"); return NULL; }
     DecalPend* pd = &pendDecals[pendDecalCount++]; mset(pd,0,sizeof(*pd)); pd->ent=ent; pd->lineSp=1.0f; return pd;
 }
-/* Prefab transforms are inherited when the level data omits unchanged localScale axes. */
-static V3 TriggerPrefabScale(u16 entIdx) {
-    switch (entIdx) {
-        case 595: return (V3){2.56f,2.56f,2.56f}; /* trigger_cyberpush */
-        case 596: return (V3){1.0f,1.0f,1.0f}; /* trigger_gravitylift: scene collider dimensions are baked into level data */
-        case 597: return (V3){1.0f,2.4f,0.16f}; /* trigger_ladder */
-        case 598: case 599: case 600: case 601:
-            return (V3){2.56f,2.56f,2.56f};
-        default: return (V3){1.0f,1.0f,1.0f};
-    }
-}
+
 u16 IOInternName(const char* name){if(!name || !*name){return IO_NONE;} for(u16 i=1;i<ioNameCount;++i){if(sEqual(ioNames[i],name)){return i;}} if(ioNameCount >= MAX_IO_NAMES){DualLogError("IO name full!\n"); return IO_NONE;} scpy_to_a_from_b(ioNames[ioNameCount],name,TARG_STRLEN); return ioNameCount++;}
 static char texAnimFolders[256][TARG_STRLEN]; static u16 texAnimFolderCount = 1; /*idx 0 = "" (no folder)*/
 u16 TexAnimFolderIntern(const char* name){if(!name || !*name){return 0;} for(u16 i=1;i<texAnimFolderCount;++i){if(sEqual(texAnimFolders[i],name)){return i;}} if(texAnimFolderCount >= 256){DualLogError("texAnim folder table full!\n"); return 0;} scpy_to_a_from_b(texAnimFolders[texAnimFolderCount],name,TARG_STRLEN); return texAnimFolderCount++;}
-char* TexAnimFolderName(u16 idx){return texAnimFolders[idx < texAnimFolderCount ? idx : 0];}
 static void FWBeginBlock(i32 cnt){V3 *p,*s; Quaternion *r; if(fwCollecting&&fwLastChunkSlot<FW_MAX_CHILDREN){p=&lwPos[fwLastChunkSlot]; r=&lwRot[fwLastChunkSlot]; s=&lwScale[fwLastChunkSlot];}else{switch(fwStage++){case 1:p=&fwContainerPos; r=&fwContainerRot; s=&fwContainerScale; break; case 2:p=&fwInfoLocalTmp; r=&fwInfoRotDummy; s=&fwInfoScaleDummy; break; default:p=&posFromFile[cnt]; r=&rotationFromFile[cnt]; s=&scaleFromFile[cnt]; break;}} fwCurP=p; fwCurR=r; fwCurS=s;}
 void LoadLevelMod(u8 lev) {
     u8 curlevel = vclamp(lev, 0, 13); World.levelCurrentlyLoading = true;/*precondition only, for AddInstance's level-security tally above -- NOT redundant bookkeeping. The tally must not see runtime spawns, and this flag is its only way to tell load-time from run-time. Nothing outside the loader reads it; the main loop gates level changes on the queuedLevelToLoad sentinel instead.*/
@@ -1366,7 +1349,14 @@ void LoadLevelMod(u8 lev) {
         if (ipLine && ipBlock>=2) { entsFromFile[entCount].panelItemPos=ipSubPos; entsFromFile[entCount].panelItemRot=ipSubRotSet?ipSubRot:rotationFromFile[entCount]; }/*no rotation on the sub block means the item keeps the panel's*/
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true); // Default active if not specified
         if (!isLight && entsFromFile[entCount].index >= 595 && entsFromFile[entCount].index <= 601) {
-            V3 prefabScale=TriggerPrefabScale(entsFromFile[entCount].index);
+            V3 prefabScale;
+            switch (entsFromFile[entCount].index) {
+                case 595:                               prefabScale = (V3){2.56f,2.56f,2.56f}; /* trigger_cyberpush */
+                case 596:                               prefabScale = (V3){1.0f,1.0f,1.0f};    /* trigger_gravitylift */
+                case 597:                               prefabScale = (V3){1.0f,2.4f,0.16f};   /* trigger_ladder */
+                case 598: case 599: case 600: case 601: prefabScale = (V3){2.56f,2.56f,2.56f};
+                default:                                prefabScale = (V3){1.0f,1.0f,1.0f};
+            }
             if (!(scaleReadMask&1u)) scaleFromFile[entCount].x=prefabScale.x;
             if (!(scaleReadMask&2u)) scaleFromFile[entCount].y=prefabScale.y;
             if (!(scaleReadMask&4u)) scaleFromFile[entCount].z=prefabScale.z;
@@ -1467,7 +1457,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 386) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("MagCartridge"); } /*item_ammo_magcart*/
         else if (entIdx == 538) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("BrokenClock"); } /*prop_broken_clock*/
         else if (entIdx == 551 && par->codeScreen) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("ScreenCodeRandom"); } /*prop_cpuscreen*/
-        TextureSequenceInit(parent,TexAnimFolderName(par->texAnimResourceFolderIdx));
+        TextureSequenceInit(parent,texAnimFolders[par->texAnimResourceFolderIdx < texAnimFolderCount ? par->texAnimResourceFolderIdx : 0]);
         if (entIdx == 551 && par->codeScreen) { par->texAnimRandom = true; par->texAnimStopsAtDie = false; }
     }
     for (int i=0;i<=lightsIdx;++i) { if (lightsFromFile[i].intensity < 0.11f && lightsFromFile[i].maxIntensity < 0.11f){continue;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); if (lanimsFromFile[i].numIntervalSteps >= 1) { lanimsFromFile[i].currentStep = 0; lanimsFromFile[i].lerpUp = true; if (lightsFromFile[i].minIntensity < 0.01f) lightsFromFile[i].minIntensity = 0.01f; }/*Unity LightAnimation.Start() init parity: animations always begin at step 0, lerping up, with a nonzero floor*/ i32 wi=AddLight(&lightsFromFile[i],&lanimsFromFile[i]); if(wi>=0&&wi<LIGHT_COUNT){World.levelLightTargetnames[World.currentLevel][wi]=lightTargetnameFile[i];} }
@@ -1528,7 +1518,7 @@ void LogicTimerInitBeforeLoad(u16 i) {
 }
 
 float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
-AnimationClip DoorGetClip(const Entity* e, u8 clip) { return modelAnimationClips[e->animationNum][clip]; }
+AnimationClip DoorGetClip(const Entity* e, u8 clip) { return mdlAnimClips[e->animationNum][clip]; }
 u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span + 0.5f)); } // round, don't truncate: t*span truncating loses up to a full frame, so a stroke resumed at 70% lands near 22% instead of 30%. Clamped t <= 1 keeps the +0.5 from spilling past span.
 void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
 void LoadLevelData(u8 curlevel) {

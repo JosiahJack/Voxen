@@ -1,8 +1,6 @@
 // models.c - 3D Models Loading System, Animation, Convex Edge Adjacency, Mesh Optimization
 #include "common.h"
 #define ARENA_ALIGN(p) ((char*)(((uintptr_t)(p) + 15) & ~(uintptr_t)15)) // 16-byte align sub-arena cursors
-extern WeaponFireCtx wfx; // from weapons.c / voxen.c
-enum { SUB_MAIN = 32 };
 typedef struct { u8* base; u8* cur; u8* end; } SubArena;
 static SubArena thrd_sub[SUB_MAIN + 1];
 static void OS_SubArenaSliceInit(u32 idx, u8* base, size_t sz) { SubArena* a = &thrd_sub[idx]; a->base = base; a->cur = base; a->end = base + sz; }
@@ -66,19 +64,7 @@ static void Mat4FromTRS(const float* T, const float* R, const float* S, float* l
     lm[12] = tx;                           lm[13] = ty;                           lm[14] = tz;                         lm[15] = 1.0f; 
 }
 
-/* GLB accessor streaming read context. Hot per-vertex loops init one of these per accessor
-   (resolving element 0's byte offset, stride, component count/size and a coarse read class
-   once) instead of re-dereferencing the accessor->bufferView->buffer chain and re-branching
-   on the component type for every single element. cls:
-     0 = zero-fill the requested floats (accessor had no bufferView)
-     1 = fail, write nothing (bufferView lacks buffer data)
-     2 = fp32   3 = u16   4 = u8   5 = unsupported component type (reads as 0) */
-typedef struct {
-    const u8* base; /* byte pointer of element 0, only meaningful when cls is 2, 3 or 4 */
-    size_t stride;
-    u8 nc, cs, cls, nrm; /* components per element, bytes per component, read class, normalized */
-} GlbCell;
-
+typedef struct { const u8* base; size_t stride; u8 nc, cs, cls, nrm; } GlbCell;
 static GlbCell GlbCellInit(const glb_accessor* a) {
     GlbCell c;
     c.stride = a->stride;
@@ -96,13 +82,12 @@ static GlbCell GlbCellInit(const glb_accessor* a) {
          case glb_component_type_r_32f: c.cls = 2; c.cs = 4; break;
          default: c.cls = 5; c.cs = 0; break; /* only 8u/16u/32f are supported by this loader */
     }
-    if (!a->buffer_view) { c.cls = 0; }
-    else if (!a->buffer_view->buffer->data) { c.cls = 1; }
+    if (!a->buffer_view) { c.cls = 0; } else if (!a->buffer_view->buffer->data) { c.cls = 1; }
     c.base = (c.cls >= 2 && c.cls <= 4) ? (const u8*)a->buffer_view->buffer->data + a->buffer_view->offset + a->offset : NULL;
     return c;
 }
 
-static inline __attribute__((always_inline)) bool GlbCellGet(const GlbCell* restrict c, size_t i, float* restrict o, size_t es) {
+INLINE __attribute__((always_inline)) bool GlbCellGet(const GlbCell* restrict c, size_t i, float* restrict o, size_t es) {
     if (c->cls == 0) { mset(o, 0, es * sizeof(float)); return true; }
     if (c->cls == 1 || es < c->nc) { return false; }
     const u8* e = c->base + c->stride * i;
@@ -121,7 +106,7 @@ static inline __attribute__((always_inline)) bool GlbCellGet(const GlbCell* rest
     return true;
 }
 
-static inline __attribute__((always_inline)) u64 GlbCellGetIdx(const GlbCell* restrict c, size_t i) {
+INLINE __attribute__((always_inline)) u64 GlbCellGetIdx(const GlbCell* restrict c, size_t i) {
     if (c->cls == 3) { return *(const u16*)(c->base + c->stride * i); }
     if (c->cls == 4) { return *(const u8*) (c->base + c->stride * i); }
     return 0; /* no bufferView/data, fp32 and unsupported indices all read as 0, like the old integer reader */
@@ -295,11 +280,7 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
             case ',':
                 if (t && p->toksuper != -1 && t[p->toksuper].type != JSMN_ARRAY && t[p->toksuper].type != JSMN_OBJECT) {
                     p->toksuper = t[p->toksuper].parent;
-                    for (i = p->toknext - 1; i >= 0; i--) {
-                        if (t[i].type == JSMN_ARRAY || t[i].type == JSMN_OBJECT) {
-                            if (t[i].start != -1 && t[i].end == -1) { p->toksuper = i; break; }
-                        }
-                    }
+                    for (i = p->toknext - 1; i >= 0; i--) { if (t[i].type == JSMN_ARRAY || t[i].type == JSMN_OBJECT) { if (t[i].start != -1 && t[i].end == -1) { p->toksuper = i; break; } } } 
                 }
                 break;
             case '-': case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': case 't': case 'f': case 'n': {
@@ -328,11 +309,11 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
     return cnt;
 }
 
-/* GLB JSON ints reference arrays as base+1; splice each slot onto the real resident array. */
 static bool glb_resolve_raw(void* pslot, const void* base, size_t esz, size_t count) {
     void* v; mcpy(&v, pslot, sizeof(v));
     size_t idx = (size_t)v; if (!idx) { return true; }
     if (idx > count) { return false; }
+    
     void* re = (void*)((char*)base + (idx - 1) * esz);
     mcpy(pslot, &re, sizeof(re));
     return true;
@@ -455,7 +436,7 @@ __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex, float* restrict sv, u32
 static void Mat4Mul(const float* restrict a, const float* restrict b, float* restrict out) { for (int c = 0; c < 4; ++c) for (int r = 0; r < 4; ++r) { float s = 0.0f; for (int k = 0; k < 4; ++k) s += a[k*4+r] * b[c*4+k]; out[c*4+r] = s; } }
 static void Mat4TransformPoint(const float* restrict m, const float* restrict v, float* restrict out) { out[0] = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]  + m[12]; out[1] = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]  + m[13]; out[2] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14]; }
 static void Mat4TransformDir(const float* restrict m, const float* restrict v, float* restrict out) { float x = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]; float y = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]; float z = m[2]*v[0] + m[6]*v[1] + m[10]*v[2]; float len = vsqrtf(x*x + y*y + z*z), inv = (len > 0.00000001f) ? 1.0f/len : 0.0f; out[0] = x*inv; out[1] = y*inv; out[2] = z*inv; }
-static inline __attribute__((always_inline)) void ObjRead3(const char** pp, float* restrict dst) { /*v and vn lines are both positional triples; one shared reader*/ dst[0] = fast_atof(pp); dst[1] = fast_atof(pp); dst[2] = fast_atof(pp); }
+INLINE __attribute__((always_inline)) void ObjRead3(const char** pp, float* restrict dst) { /*v and vn lines are both positional triples; one shared reader*/ dst[0] = fast_atof(pp); dst[1] = fast_atof(pp); dst[2] = fast_atof(pp); }
 static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex, const char* restrict d, int fs, float* restrict tp, float* restrict tn, float* restrict tu, float* restrict sv, u32* restrict ht, u32* restrict ht_used, u32* restrict remap_scr, u8* restrict cache_scr, float** restrict ov_pos, u32* ovc, u16** ot, u16* otc, i32 tid) {
     *ov_pos=NULL; *ot=NULL; *ovc=*otc=0; u32 pc=0,nc=0,uc=0,ec=0; __m128 mn_v=_mm_set1_ps(1000000000.0f), mx_v=_mm_set1_ps(-1000000000.0f); const char *p=d, *e=d+fs;
     while (likely(p < e)) {
@@ -548,24 +529,8 @@ static void NodeLocalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, f
     Mat4FromTRS(T, R, S, outM); // Apply animation transformation.
 }
  
-static void NodeGlobalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, float* outM) {
-    float l[16];
-    NodeLocalMatrixAtTime(gm,node, t, l);
-    if (!node->parent) {
-        mcpy(outM, l, sizeof(l));
-        return;
-    }
-    
-    float p[16];
-    NodeGlobalMatrixAtTime(gm, node->parent, t, p); Mat4Mul(p, l, outM);
-}
-
+static void NodeGlobalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, float* outM) { float l[16]; NodeLocalMatrixAtTime(gm,node, t, l); if (!node->parent) { mcpy(outM, l, sizeof(l)); return; } float p[16]; NodeGlobalMatrixAtTime(gm, node->parent, t, p); Mat4Mul(p, l, outM); }
 bool IsGLBSourcePath(const char* path) { const char* dot = StringFindLastChar(path, '.'); return dot && sEqual(dot, ".glb"); }
-
-/* Fills the O(1) per-node T/R/S channel lookup. Channels are applied in order, so writing
-   through the map keeps exactly the last matching channel per node/path — identical to what
-   the old per-frame sequential scans ended up with, but resolved once at load instead of
-   per frame per node. */
 static void GlbChanMapFill(glb_anim_chan** map, const glb_data* data, const glb_animt* anim) {
     for (size_t c = 0; c < anim->channels_count; ++c) {
         const glb_anim_chan* ch = &anim->channels[c];
@@ -575,15 +540,12 @@ static void GlbChanMapFill(glb_anim_chan** map, const glb_data* data, const glb_
     }
 }
 
-/* Loads pos/nrm/uv for one vertex with the shared flip-V + default-UP-normal convention
-   (both GltfMeshLoad paths would otherwise carry identical copies of this). */
-static inline __attribute__((always_inline)) void GlbLoadVtx(const GlbCell* restrict posC, const GlbCell* restrict nrmC, const GlbCell* restrict uvC, bool hasN, bool hasU, u32 v, float* restrict P, float* restrict N, float* restrict U) {
+INLINE __attribute__((always_inline)) void GlbLoadVtx(const GlbCell* restrict posC, const GlbCell* restrict nrmC, const GlbCell* restrict uvC, bool hasN, bool hasU, u32 v, float* restrict P, float* restrict N, float* restrict U) {
     GlbCellGet(posC, v, P, 3);
     if (hasN) { GlbCellGet(nrmC, v, N, 3); } else { N[0] = 0.0f; N[1] = 1.0f; N[2] = 0.0f; }
     if (hasU) { GlbCellGet(uvC, v, U, 2); U[1] = 1.0f - U[1]; /*Flip V*/ } else { U[0] = 0.0f; U[1] = 0.0f; }
 }
 
-/* Gathers a primitive's index buffer (skinned + submesh paths share it); returns the arena allocation. */
 static u32* GlbLoadIndices(const glb_primitive* prim, u32 vc, u32* tc) {
     if (prim->indices) {
         *tc = (u32)(prim->indices->count / 3);
@@ -598,10 +560,8 @@ static u32* GlbLoadIndices(const glb_primitive* prim, u32 vc, u32* tc) {
     return dst;
 }
 
-/* One baked corner: single shared -X position/normal swizzle for both baked paths,
-   updates the running min/max. */ 
 typedef struct { __m128 mn, mx; } GlbRange;
-static inline __attribute__((always_inline)) GlbRange GlbBakeEmit(float* restrict dst, GlbRange r, float px, float py, float pz, float nx, float ny, float nz, float u, float v) {
+INLINE __attribute__((always_inline)) GlbRange GlbBakeEmit(float* restrict dst, GlbRange r, float px, float py, float pz, float nx, float ny, float nz, float u, float v) {
     dst[0] = -px; dst[1] = py; dst[2] = pz; /* Position */
     dst[3] = -nx; dst[4] = ny; dst[5] = nz; /* Normal */
     dst[6] = u;   dst[7] = v;               /* UV */
@@ -615,25 +575,17 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     mset(out, 0, sizeof(*out));
     glb_data* data = NULL;
     glb_parse(-1, bytes, size, &data); if(!data){return;}
-    
     glb_load_buffers(data);
     glb_animt* bestAnim = data->animations_count ? &data->animations[0] : NULL;
     size_t maxChannels = 0;
-    for (size_t a = 0; a < data->animations_count; ++a) {
-        if (data->animations[a].channels_count > maxChannels) {
-            maxChannels = data->animations[a].channels_count;
-            bestAnim = &data->animations[a];
-        }
-    }
-    
+    for (size_t a = 0; a < data->animations_count; ++a) { if (data->animations[a].channels_count > maxChannels) { maxChannels = data->animations[a].channels_count; bestAnim = &data->animations[a]; } }
     out->anim = bestAnim;
     out->gltf = data;
     glb_node* skinNode = NULL;
     for (size_t i = 0; i < data->nodes_count; ++i) { if (data->nodes[i].skin && data->nodes[i].mesh) { skinNode = &data->nodes[i]; break; } }
     if (skinNode) { /*Skeletal mesh animation (skinned)*/
         out->isTrAnim=false;
-        glb_mesh* mesh=skinNode->mesh;
-        if (!mesh || !mesh->primitives_count || !out->anim) { return; }
+        glb_mesh* mesh=skinNode->mesh; if (!mesh || !mesh->primitives_count || !out->anim) { return; }
         
         out->chanMap = OS_SubArenaAlloc(-1, data->nodes_count * 3 * sizeof(glb_anim_chan*));
         GlbChanMapFill(out->chanMap, data, out->anim);
@@ -645,6 +597,7 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
         const glb_accessor* jntAcc = glb_find_accessor(prim, glb_attribute_type_joints, 0);
         const glb_accessor* wgtAcc = glb_find_accessor(prim, glb_attribute_type_weights, 0);
         if (!posAcc || !jntAcc || !wgtAcc){ return; }
+        
         u32 vc=(u32)posAcc->count;
         out->vertCount=vc;
         out->pos  = OS_SubArenaAlloc(-1, vc * 3 * sizeof(float));
@@ -700,13 +653,11 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     out->subIndices  = OS_SubArenaAlloc(-1, submshCnt * sizeof(u32*));
     out->subTriCount = OS_SubArenaAlloc(-1, submshCnt * sizeof(u32));
     for (size_t i=0;i<data->nodes_count;++i) {
-        glb_node* node = &data->nodes[i];
-        if (!node->mesh) { continue; }
+        glb_node* node = &data->nodes[i]; if (!node->mesh) { continue; }
         
         glb_mesh* mesh = node->mesh;
         for (size_t p = 0; p < mesh->primitives_count; ++p) {
-            glb_primitive* prim = &mesh->primitives[p];
-            if (prim->type != glb_primitive_type_triangles) { continue; }
+            glb_primitive* prim = &mesh->primitives[p]; if (prim->type != glb_primitive_type_triangles) { continue; }
             
             const glb_accessor* posAcc = glb_find_accessor(prim, glb_attribute_type_position, 0);
             const glb_accessor* nrmAcc = glb_find_accessor(prim, glb_attribute_type_normal,   0);
@@ -831,7 +782,7 @@ void LoadGLBAnimatedSources(ModelData* entries, u32 entryCount, RawOBJ* raw) {
         
         GltfMesh* gm = &gBlockMeshes[gBlockMeshCount]; GltfMeshLoad((const u8*)raw[entries[i].index].data,(size_t)raw[entries[i].index].size,gm);
         ++gBlockMeshCount; u16 a=entries[i].animationNum; float framerate=0.0f;
-        if (a < MAXANIM) {  for (u32 c=0;c<MAX_ANIMCLIPS;++c) { if(modelAnimationClips[a][c].framerate > 0.0f){framerate = modelAnimationClips[a][c].framerate; break;} }  }
+        if (a < MAXANIM) {  for (u32 c=0;c<MAX_ANIMCLIPS;++c) { if(mdlAnimClips[a][c].framerate > 0.0f){framerate = mdlAnimClips[a][c].framerate; break;} }  }
         if (framerate <= 0.0f) { framerate = 30.0f; /*Fallback if undefined*/ }
         for (u32 fi=0;fi<entries[i].frameCount; ++fi) {
             u32 frameNum = entries[i].frames[fi]; u32 modelIdx = entries[i].index + fi; /*Contiguous index, sparse frame*/
@@ -852,23 +803,6 @@ static OS_Thread poolThreads[32];
 static void* PoolWorker(void* arg) { (void)arg; __atomic_fetch_add(&poolReady,1,__ATOMIC_ACQ_REL); u32 last=0; for(;;) { while(__atomic_load_n(&poolGen,__ATOMIC_ACQUIRE)==last) { if(__atomic_load_n(&poolStop,__ATOMIC_ACQUIRE)) return NULL; OS_FutexWait(&poolGen,last); } last=__atomic_load_n(&poolGen,__ATOMIC_ACQUIRE); for(;;) { u32 j=__atomic_fetch_add(&poolJobNext,1,__ATOMIC_RELAXED); if(j>=poolJobCount) break; poolJobs[j].fn(poolJobs[j].arg); } if(__atomic_fetch_add(&poolJobDone,1,__ATOMIC_ACQ_REL)+1u == poolThreadCnt) OS_FutexWakeAll(&poolJobDone); } }
 static void PoolDispatch(PoolJob* jobs, u32 count) { if(!poolThreadCnt || count<=1) { poolPending=0; for(u32 i=0;i<count;++i) jobs[i].fn(jobs[i].arg); return; } for(u32 i=0;i<count;++i) poolJobs[i]=jobs[i]; poolJobCount=count; __atomic_store_n(&poolJobNext,0,__ATOMIC_RELAXED); __atomic_store_n(&poolJobDone,0,__ATOMIC_RELAXED); poolPending=1; __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); }
 static void PoolRun(PoolJob* jobs, u32 count) { PoolDispatch(jobs,count); if(!poolPending) return; for(;;) { u32 j=__atomic_fetch_add(&poolJobNext,1,__ATOMIC_RELAXED); if(j<poolJobCount) { poolJobs[j].fn(poolJobs[j].arg); continue; } u32 d=__atomic_load_n(&poolJobDone,__ATOMIC_ACQUIRE); if(d >= poolThreadCnt) break; OS_FutexWait(&poolJobDone,d); } poolPending=0; }
-static void BakeGLBAnimWave(u32 modelStart, u32 modelEnd) {
-    if (!glb_TaskCount) return;
-    
-    u32 t0 = glb_TaskCount; for (u32 k= 0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex>=modelStart) { t0=k; break;} }
-    u32 t1 = glb_TaskCount; for (u32 k=t0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex>=modelEnd)   { t1=k; break;} }
-    u32 cnt = t1 - t0; if(!cnt){return;}
-    
-    GltfBakeTask btasks[32]; PoolJob bjobs[32];
-    u32 chunk=(cnt+threadCnt-1)/threadCnt;
-    for (int t=0;t<(i32)threadCnt;++t) {
-        u32 s = t0 +(u32)t*chunk, e = t0 + ((u32)t + 1)*chunk > t1 ? t1 : t0 + ((u32)t + 1) * chunk;
-        btasks[t] = (GltfBakeTask){glb_Tasks, s, e, t};
-        bjobs[t] = (PoolJob){GltfBakeWorker,&btasks[t]};
-    }
-    PoolRun(bjobs, threadCnt);
-}
-
 // Recursive(ew gross!) centroid-based, each tri goes into exactly one octant containing its centroid, no tri dupes.
 // The node AABB is the union of its tri AABBs (NOT the octant AABB) — guarantees any query that overlaps a tri also overlaps its ancestor nodes,
 // so traversal never misses a tri. triIdxArray is modified in-place: on return it is partitioned by octant so that each child's triangles are contiguous (matches the leaf ranges written to ctx->triOrder).
@@ -962,8 +896,7 @@ static void* ModelParsingWorker(void* arg) {
             *ov_pos = NULL; *ot = NULL; *ovc = *otc = 0; 
             glb_data* data = NULL; 
             void* sub_mark = OS_SubArenaMark(tid); 
-            glb_parse(tid, bytes, size, &data); 
-            if (!data) { OS_SubArenaRelease(tid, sub_mark); continue; } /*malformed GLB: skip exactly like the animated path*/
+            glb_parse(tid, bytes, size, &data);             
             glb_load_buffers(data);
             glb_node* meshNode = NULL; 
             for (size_t node_idx = 0; node_idx < data->nodes_count; ++node_idx) { if (data->nodes[node_idx].mesh && !data->nodes[node_idx].skin) { meshNode = &data->nodes[node_idx]; break; } } 
@@ -981,9 +914,10 @@ static void* ModelParsingWorker(void* arg) {
                 u32 ec = 0;
                 for (size_t p = 0; p < mesh->primitives_count; ++p) {
                     glb_primitive* prim = &mesh->primitives[p];
-                    if (prim->type != glb_primitive_type_triangles) { continue; } 
+                    if (prim->type != glb_primitive_type_triangles) { continue; }
                     const glb_accessor* posAcc = glb_find_accessor(prim, glb_attribute_type_position, 0); 
-                    if (!posAcc) { continue; } /*no POSITION attribute: nothing to load for this primitive*/
+                    if (!posAcc) { continue; }
+                        
                     const glb_accessor* nrmAcc = glb_find_accessor(prim, glb_attribute_type_normal, 0); 
                     const glb_accessor* uvAcc = glb_find_accessor(prim, glb_attribute_type_texcoord, 0); 
                     GlbCell posC = GlbCellInit(posAcc), nrmC = nrmAcc ? GlbCellInit(nrmAcc) : (GlbCell){0}, uvC = uvAcc ? GlbCellInit(uvAcc) : (GlbCell){0};
@@ -1101,10 +1035,7 @@ static void* PhysGeomWorker(void* a) {
                     modelBVHNodeCounts[bvh_m] = bvhCtx->nodeCount;
                     if (bvhCtx->triCount > 0) {
                         modelBVHTriOrder[bvh_m] = OS_Alloc(bvhCtx->triCount * sizeof(u16));
-                        if (modelBVHTriOrder[bvh_m]) {
-                            mcpy(modelBVHTriOrder[bvh_m], bvhCtx->triOrder, bvhCtx->triCount * sizeof(u16));
-                            modelBVHTriOrderCounts[bvh_m] = bvhCtx->triCount;
-                        }
+                        if (modelBVHTriOrder[bvh_m]) { mcpy(modelBVHTriOrder[bvh_m], bvhCtx->triOrder, bvhCtx->triCount * sizeof(u16)); modelBVHTriOrderCounts[bvh_m] = bvhCtx->triCount; }
                     }
                 }
             }
@@ -1224,24 +1155,33 @@ void LoadModels() {
             ++w1;
             ++files;
         }
-        
-        if (waveEnd > mdlsCnt) waveEnd = mdlsCnt;
-        if (waveStart >= waveEnd) { w0 = w1; continue; } /* fully buried in previous wave's overlap: already processed */
+        if (waveEnd > mdlsCnt) waveEnd = mdlsCnt; if (waveStart >= waveEnd) { w0 = w1; continue; } /* fully buried in previous wave's overlap: already processed */
 
         for (u32 sub = waveStart; sub < waveEnd; ) {
             u32 subEnd = sub + SUB_MODELS_SZ;
             if (subEnd > waveEnd) subEnd = waveEnd;
             void* wmarks[32];
             for (u32 si = 0; si < threadCnt; ++si) { wmarks[si] = OS_SubArenaMark(si); }
-            
             u32 wcnt = subEnd - sub; u32 chunk = (wcnt + threadCnt - 1) / threadCnt;
             for (int i=0;i<(i32)threadCnt;++i) { tasks[i] = (ModelParseTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk,raw,isGLBAnimSrc,isGLBStaticSrc,i}; pjobs[i] = (PoolJob){ModelParsingWorker,&tasks[i]}; }
             PoolRun(pjobs, threadCnt);
-            
-            BakeGLBAnimWave(sub,subEnd);
+            if (glb_TaskCount) {
+                u32 t0 = glb_TaskCount; for (u32 k= 0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex >= sub)    { t0=k; break;} }
+                u32 t1 = glb_TaskCount; for (u32 k=t0;k<glb_TaskCount;++k) { if(glb_Tasks[k].modelIndex >= subEnd) { t1=k; break;} }
+                u32 cnt = t1 - t0;
+                if (cnt) {
+                    GltfBakeTask btasks[32]; PoolJob bjobs[32];
+                    u32 chk=(cnt+threadCnt-1)/threadCnt;
+                    for (int t=0;t<(i32)threadCnt;++t) {
+                        u32 s = t0 +(u32)t*chk, e = t0 + ((u32)t + 1)*chk > t1 ? t1 : t0 + ((u32)t + 1) * chk;
+                        btasks[t] = (GltfBakeTask){glb_Tasks,s,e,t};
+                        bjobs[t] = (PoolJob){GltfBakeWorker,&btasks[t]};
+                    }
+                    PoolRun(bjobs,threadCnt);
+                }
+            }
             for (int i=0;i<(i32)threadCnt;++i) { ptasks[i] = (PhysGeomTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk,i}; pjobs[i] = (PoolJob){PhysGeomWorker,&ptasks[i]}; }
             PoolDispatch(pjobs, threadCnt); /*Sneak the physics deduplication passes underneath the GPU upload ;)*/
-            
             for (u32 i = sub; i < subEnd; ++i) {
                 if (!modelVertexCounts[i]) {continue;/*Skip unused index slots*/} tv += modelVertexCounts[i]; tt += modelTriangleCounts[i]; size_t vcz = (size_t)modelVertexCounts[i] * VRT_ATT_SZ, tcz = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
                 rtSrcVertCounts[i] = modelVertexCounts[i];
@@ -1249,7 +1189,6 @@ void LoadModels() {
                 for (u32 k = 0; k < vc; ++k) { __m256 v_in=(*(__m256_u const *)(&verts[k*8])); __m128i v_half=_mm256_cvtps_ph(v_in,0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/); _mm_storeu_si128((__m128i*)&mpv[k*8],v_half); }
                 glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz+4,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz+4,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); mset((u8*)mpt+tcz,0,4); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER); /*+4 zero pad: rtcopy.compute reads indices as u32 words, its last read crosses the end by up to 2 bytes when the index count is odd*/
             }
-            
             glBindBuffer(GL_ARRAY_BUFFER,0);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
             glFinish(); // Force driver to retire per-buffer mapped-write staging, otherwise ~78MB of it stays resident on NVIDIA Linux. Must be one sync after the whole loop, a per-model glFinish makes it worse.
@@ -1258,22 +1197,17 @@ void LoadModels() {
             for (u32 si = 0; si < threadCnt; ++si) { OS_SubArenaRelease(si, wmarks[si]); }
             sub = subEnd;
         }
-        
-        for (u32 i=waveStart;i<waveEnd;++i) {
-            if (raw[i].data) { OS_Free((void*)raw[i].data,raw[i].size); /* whole animation baked above, bins no longer referenced */}
-        }
-        
+        for (u32 i=waveStart;i<waveEnd;++i) { if (raw[i].data) { OS_Free((void*)raw[i].data,raw[i].size); /* whole animation baked above, bins no longer referenced */} }
         prevEnd = waveEnd;
         w0 = w1;
     }
-    
     if(poolThreadCnt) { poolJobCount=0; __atomic_store_n(&poolStop,1,__ATOMIC_RELEASE); __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); for(u32 i=0;i<poolThreadCnt;++i) OS_ThreadJoin(&poolThreads[i]); poolThreadCnt=0; }
     OS_FreeInitPhase();
     DebugRAM("after models load");
     DualLog(" vertices: %u, tris: %u......................took %.6f secs\n", tv, tt, get_time() - startModelTime);
 }
     
-AnimationClip modelAnimationClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
+AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
     [0]={[A_IDLE_CLOSED]={1.0f,2,2,699,24},[A_OPENING]={1.0f,2,11,699,24},[A_IDLE_OPEN]={1.0f,11,11,708,24},[A_CLOSING]={1.0f,12,21,709,24}},/*doorB (door2)*/                  [1]={[A_IDLE_CLOSED]={1.0f,2,2,719,24},[A_OPENING]={1.0f,2,12,719,24},[A_IDLE_OPEN]={1.0f,12,12,729,24},[A_CLOSING]={1.0f,14,24,731,24}},/*doorA (door1)*/
     [2]={[A_IDLE]={1.0f,0,37,6975,30},[A_WALK]={1.0f,50,99,7013,30},[A_RUN]={1.1f,50,99,7013,30},[A_ATTACK1]={0.75f,111,136,7063,30},[A_PAIN]={0.5f,138,150,7090,30},[A_DYING]={0.75f,153,176,7103,30}},/*npc_humanoid_mutant*/
     [3]={[A_IDLE]={1.0f,1,207,893,24},[A_ATTACK1]={1.0f,219,239,1100,24},[A_ATTACK2]={1.0f,219,239,1100,24},[A_WALK]={1.0f,252,308,1121,24},[A_RUN]={1.0f,252,308,1121,24},[A_PAIN]={1.0f,321,330,1177,24},[A_PAIN2]={1.0f,331,344,1187,24},[A_DYING]={1.0f,345,369,1201,24}},/*npc_cyborg_drone*/
@@ -1317,8 +1251,9 @@ AnimationClip modelAnimationClips[MAXANIM][MAX_ANIMCLIPS] = { // speed, frameSta
 };
 
 void PortalCulling(); bool ToggleDoorPortal(u32,u16,u16);
-void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAXANIM || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&modelAnimationClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
+void ChangeAnim(Entity* e, u8 c) { if (e->animationNum >= MAXANIM || c >= MAX_ANIMCLIPS) return; AnimationClip* clip=&mdlAnimClips[e->animationNum][c]; if (clip->framerate <= 0 || clip->speed <= 0 || e->clip == c) return; e->clip=c; e->frame=clip->frameStart; e->modelIndex=clip->frameStartModelIndex; e->currentFrameFinished=0.0; }
 bool SpawnImpactParticleForPrefab(u16,V3,V3), ai_effect_flash(V3,Color3,float,float,double);
+extern WeaponFireCtx wfx;
 void UpdateAnims(void) {
     if (World.paused || World.menuActive){return;} static double lastPauseTime=0; if(lastPauseTime == 0.0){lastPauseTime=World.pauseRelativeTime;} double animDT=World.pauseRelativeTime-lastPauseTime; lastPauseTime=World.pauseRelativeTime; if(animDT > 0.1){animDT=0.1;} if(animDT <= 0.0){return;} bool portalsNeedUpdated=false; u8 animTest=Cheats.animTest;
     for (u16 i = INSTS_1ST_IDX; i < INSTANCE_COUNT; ++i) {
@@ -1328,7 +1263,7 @@ void UpdateAnims(void) {
         if (animTest == 1) {
             u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0;
             for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) {
-                AnimationClip* test = &modelAnimationClips[e->animationNum][c];
+                AnimationClip* test = &mdlAnimClips[e->animationNum][c];
                 if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; }
             }
             
@@ -1338,9 +1273,9 @@ void UpdateAnims(void) {
             while (e->currentFrameFinished >= totalDuration) { e->currentFrameFinished -= totalDuration; }
             if (e->currentFrameFinished < 0.0) { e->currentFrameFinished = 0.0; }
             double t = e->currentFrameFinished, clipStartTime = 0.0;
-            AnimationClip* activeClip = &modelAnimationClips[e->animationNum][validClips[0]];
+            AnimationClip* activeClip = &mdlAnimClips[e->animationNum][validClips[0]];
             for (u8 j=0;j<numValid;++j) {
-                activeClip=&modelAnimationClips[e->animationNum][validClips[j]];
+                activeClip=&mdlAnimClips[e->animationNum][validClips[j]];
                 double activeDur = (double)(activeClip->frameEnd - activeClip->frameStart + 1) / ((double)activeClip->framerate * activeClip->speed);
                 if (t<clipStartTime + activeDur) { targetClipIdx = j; break; }
                 
@@ -1355,25 +1290,25 @@ void UpdateAnims(void) {
             u16 newModel = activeClip->frameStartModelIndex + frameOffset;
             bool frameUpdated = (e->clip != targetClip || e->frame != newFrame || e->modelIndex != newModel);
             e->clip = targetClip; e->frame = newFrame; e->modelIndex = newModel;
-            if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
+            if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
         } else if (animTest == 2) {
             if (Sys_Input.keyStates[KEY_1].pressed || Sys_Input.keyStates[KEY_2].pressed) {
                 u8 validClips[MAX_ANIMCLIPS], numValid=0;
-                for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &modelAnimationClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; } }
+                for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &mdlAnimClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; } }
                 if (numValid > 0) { // Locate the current clip within the valid list (default to first if out of range)
                     u8 currentValidIdx = 0; for (u8 j = 0; j < numValid; ++j) { if (validClips[j] == e->clip) { currentValidIdx = j; break; } }
-                    AnimationClip* activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]]; u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1;
+                    AnimationClip* activeClip = &mdlAnimClips[e->animationNum][validClips[currentValidIdx]]; u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1;
                     u32 currentOffset = (e->frame >= activeClip->frameStart && (e->frame - activeClip->frameStart) < frameCount) ? (e->frame - activeClip->frameStart) : 0;
-                    if (Sys_Input.keyStates[KEY_1].pressed) { currentOffset++; if (currentOffset >= frameCount) { currentOffset = 0; currentValidIdx = (currentValidIdx + 1 >= numValid) ? 0 : (currentValidIdx + 1); activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]]; } }
-                    else { if (currentOffset == 0) { currentValidIdx = (currentValidIdx == 0) ? (numValid - 1) : (currentValidIdx - 1); activeClip = &modelAnimationClips[e->animationNum][validClips[currentValidIdx]]; frameCount = activeClip->frameEnd - activeClip->frameStart + 1; currentOffset = frameCount - 1; } else { currentOffset--; } }
+                    if (Sys_Input.keyStates[KEY_1].pressed) { currentOffset++; if (currentOffset >= frameCount) { currentOffset = 0; currentValidIdx = (currentValidIdx + 1 >= numValid) ? 0 : (currentValidIdx + 1); activeClip = &mdlAnimClips[e->animationNum][validClips[currentValidIdx]]; } }
+                    else { if (currentOffset == 0) { currentValidIdx = (currentValidIdx == 0) ? (numValid - 1) : (currentValidIdx - 1); activeClip = &mdlAnimClips[e->animationNum][validClips[currentValidIdx]]; frameCount = activeClip->frameEnd - activeClip->frameStart + 1; currentOffset = frameCount - 1; } else { currentOffset--; } }
                     u8 targetClip = validClips[currentValidIdx]; u32 newFrame = activeClip->frameStart + currentOffset; u16 newModel = activeClip->frameStartModelIndex + currentOffset;
                     bool frameUpdated = (e->clip != targetClip || e->frame != newFrame || e->modelIndex != newModel);
-                    e->clip = targetClip; e->frame = newFrame; e->modelIndex = newModel; e->currentFrameFinished = 0.0; if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
+                    e->clip = targetClip; e->frame = newFrame; e->modelIndex = newModel; e->currentFrameFinished = 0.0; if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
                 }
             }
         }
         /* Clip IDs are sparse (A_DYING is 9) while numClips stores a count. Validate by table capacity and clip data, not count-vs-ID. */
-        if (animTest || e->clip >= MAX_ANIMCLIPS){continue;} AnimationClip* clip = (AnimationClip*)&modelAnimationClips[e->animationNum][e->clip]; if(e->entflags & EF_ASLEEP){e->modelIndex=clip->frameStartModelIndex; continue;} if (clip->framerate <= 0 || clip->speed <= 0) continue; e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / clip->framerate;
+        if (animTest || e->clip >= MAX_ANIMCLIPS){continue;} AnimationClip* clip = (AnimationClip*)&mdlAnimClips[e->animationNum][e->clip]; if(e->entflags & EF_ASLEEP){e->modelIndex=clip->frameStartModelIndex; continue;} if (clip->framerate <= 0 || clip->speed <= 0) continue; e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / clip->framerate;
         if (e->currentFrameFinished >= timePerFrame) {
             u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1; u16 prevFrame = e->frame;
             e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
@@ -1384,14 +1319,14 @@ void UpdateAnims(void) {
                 SpawnImpactParticleForPrefab(729,sparkPos,(V3){0.0f,1.0f,0.0f});
                 ai_effect_flash(sparkPos,(Color3){0.9f,0.8f,0.6f},2.84f,4.0f,0.2f);
             }
-            if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, modelAnimationClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
+            if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     } if (portalsNeedUpdated){PortalCulling();}
     if (World.weaponVModelIndex > 0 && World.weaponVModelIndex < INSTANCE_COUNT) {
         Entity* e = &World.instances[World.weaponVModelIndex];
         if (wfx.pendingMeleeFinished > 0.0 && World.pauseRelativeTime >= wfx.pendingMeleeFinished) {
             e->animationNum = (Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex) == 5) ? 50 : 49;
-            e->clip = A_IDLE; e->frame = modelAnimationClips[e->animationNum][A_IDLE].frameStart; e->currentFrameFinished = 0.0;
+            e->clip = A_IDLE; e->frame = mdlAnimClips[e->animationNum][A_IDLE].frameStart; e->currentFrameFinished = 0.0;
         }
     }
 }
