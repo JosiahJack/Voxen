@@ -230,10 +230,9 @@ float Tranquilize(u16 i, float amount, bool energy) {
     return tranqSecs;
 }
 
-bool IsCyberNPC(u16 i) { return npcTable[World.instances[i].index - 419].type == NPCType_Cyber; }
+static bool IsCyberNPC(u16 i) { return npcTable[World.instances[i].index - 419].type == NPCType_Cyber; }
 bool HasHealth(u16 i) { return IsCyberNPC(i) ? (World.instances[i].cyberHealth > 0.0f) : (World.instances[i].health > 0.0f); }
-void AISetEnemy(u16, u16); bool CyberDecoyIsLive(u16*);/*entity-c side of the decoy: CyberDecoyIsLive re-validates the cached World.decoyInstance and lives next to UseDecoy in citadel.c*/
-u16 CyberDecoyTarget(void) { u16 d = U16_MAX; return CyberDecoyIsLive(&d) ? d : U16_MAX; }
+void AISetEnemy(u16, u16);
 void CyberDecoySetTarget(u16 decoy) {
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
         Entity* e = &World.instances[i]; if (!IdxIsNPC(e->index) || npcTable[e->index - 419].type != NPCType_Cyber) continue;
@@ -381,35 +380,83 @@ Quaternion quat_look_rotation(V3 fwd, V3 up) {
 
 void aiac_idle(Entity* self) { if ((self->entflags & EF_ASLEEP) || self->tranquilizeFinished >= World.pauseRelativeTime) {self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/} ChangeAnim(self,A_IDLE); }
 void aiac_walk(Entity* self){if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self); return;} u16 idx=(u16)(self-World.instances); V3 v=World.velocity[idx]; if((v.x*v.x+v.y*v.y+v.z*v.z)>(0.32f*0.32f)){ChangeAnim(self,A_WALK); return;} if (self->animSwapFinished<World.pauseRelativeTime){self->animSwapFinished=World.pauseRelativeTime+.5f; ChangeAnim(self,A_IDLE);}}
-void aiac_dying(Entity* self) { flag_set(&self->entflags,EF_ASLEEP,false); AnimationClip cl=modelAnimationClips[self->animationNum][A_DYING]; if(cl.frameEnd == cl.frameStart){ChangeAnim(self,A_DYING); return;} ChangeAnim(self,A_DYING);}
 void AIAnimationControllerUpdate(u16 idx) {
-    Entity* self = &World.instances[idx]; if((!(self->entflags & EF_ACTIVE)) || (self->animationNum >= MAXANIM)){return;} if(self->currentState == AIState_Dying){aiac_dying(self); return;}
-    if(self->currentState == AIState_Dead){AnimationClip cl=modelAnimationClips[self->animationNum][A_DYING]; self->clip=A_DYING; self->frame=cl.frameEnd; self->modelIndex=cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart); self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/} if(self->entflags & EF_ASLEEP){aiac_idle(self); return;}
+    Entity* self = &World.instances[idx]; if((!(self->entflags & EF_ACTIVE)) || (self->animationNum >= MAXANIM)){return;} 
+    
+    if(self->currentState == AIState_Dying){
+        flag_set(&self->entflags, EF_ASLEEP, false); 
+        AnimationClip cl = modelAnimationClips[self->animationNum][A_DYING]; if(cl.frameEnd == cl.frameStart){ ChangeAnim(self, A_DYING); return; } 
+        
+        ChangeAnim(self, A_DYING);
+        return;
+    }
+    
+    if(self->currentState == AIState_Dead){AnimationClip cl=modelAnimationClips[self->animationNum][A_DYING]; self->clip=A_DYING; self->frame=cl.frameEnd; self->modelIndex=cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart); self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/}
+    if(self->entflags & EF_ASLEEP){aiac_idle(self); return;}
     if(self->currentState == AIState_Run && self->tranquilizeFinished >= World.pauseRelativeTime){aiac_idle(self); return;}
-    switch (self->currentState) { case AIState_Walk:aiac_walk(self); break; case AIState_Run:if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self);}else{ChangeAnim(self,A_RUN);} break; case AIState_Attack1:ChangeAnim(self,A_ATTACK1); break; case AIState_Attack2:ChangeAnim(self,A_ATTACK2); break; case AIState_Attack3:ChangeAnim(self,A_ATTACK3); break; case AIState_Pain:ChangeAnim(self,A_PAIN); break; default:aiac_idle(self); break; }
+    
+    switch (self->currentState) {
+        case AIState_Walk:    aiac_walk(self);            break;
+        case AIState_Run:     if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self);}else{ChangeAnim(self,A_RUN);} break;
+        case AIState_Attack1: ChangeAnim(self,A_ATTACK1); break;
+        case AIState_Attack2: ChangeAnim(self,A_ATTACK2); break;
+        case AIState_Attack3: ChangeAnim(self,A_ATTACK3); break;
+        case AIState_Pain:    ChangeAnim(self,A_PAIN);    break;
+        default:              aiac_idle(self);            break;
+    }
 }
+
 
 INLINE bool NPCInPlayerPVS(u16 idx) { if (unlikely(World.curLev >= LEVEL_CYBERSPACE)) return true;/*Culling is disabled in cyberspace (CullCore early-outs), so never gate there.*/ return PositionVisibleFromPlayerCell(World.position[idx].x,World.position[idx].z); }
 bool AICheckIfEnemyInSight(u16 idx) {
     u16 eidx=World.instances[idx].enemy; if (!eidx || !HasHealth(idx)) return false; bool enIsNPC = (World.layer[eidx] & L_NPC) != 0; int diff = IsCyberNPC(idx) ? World.diffCyb : World.diffCbt; if (!NPCInPlayerPVS(idx)) return false;/*Cell PVS gate, same as the player path below. Was skipped for NPC targets, so NPCs tracked enemies through the whole level.*/
     if (diff == 0 && (World.instances[idx].index - 419) != 28) return false; if (Cheats.notarget && !enIsNPC) { World.instances[idx].enemy = 0; World.instances[idx].posCheckFinished = World.pauseRelativeTime + AI_POS_CHECK_DELAY; World.instances[idx].lastPosition = World.position[idx]; flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, false); return false; }
-    if (IsCyberNPC(idx) && World.decoyActive && eidx == World.decoyInstance) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); return true; }/*the decoy is a fake cyber player: no health, but it is the target, and cyber NPCs see through geometry, so it is in LOS by construction.  Checked before the range test so the NPC keeps the decoy once the player has run off past sightRange.*/ float dist = V3_Dist(World.position[eidx], ai_sight_pos(&World.instances[idx])); if (dist > npcTable[World.instances[idx].index - 419].sightRange) return false; if (IsCyberNPC(idx)) return true;/*Cyborgs see through geometry by design; every other target, NPC included, falls through to the raycast.*/
-    V3 spos=ai_sight_pos(&World.instances[idx]); V3 lineN=V3_Normalize(V3_AsubB(World.position[eidx],spos));
-    RaycastHit hit=Raycast(spos,lineN,npcTable[World.instances[idx].index-419].sightRange,enIsNPC?(LMASK_NPC_SIGHT|L_NPC):LMASK_NPC_SIGHT);/*L_NPC only when the target is an NPC: LMASK_NPC_SIGHT omits it, so the ray would otherwise pass straight through the target.*/
+    if (IsCyberNPC(idx) && World.decoyActive && eidx == World.decoyInstance) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); return true; }
+    
+    float dist = V3_Dist(World.position[eidx], ai_sight_pos(&World.instances[idx]));
+    if (dist > npcTable[World.instances[idx].index - 419].sightRange) return false;
+    if (IsCyberNPC(idx)) return true; /*Cyborgs see through geometry by design; every other target, NPC included, falls through to the raycast.*/
+        
+    V3 spos = ai_sight_pos(&World.instances[idx]);
+    V3 lineN = V3_Normalize(V3_AsubB(World.position[eidx], spos));
+    RaycastHit hit=Raycast(spos, lineN, npcTable[World.instances[idx].index - 419].sightRange, enIsNPC ? (LMASK_NPC_SIGHT | L_NPC) : LMASK_NPC_SIGHT); /*L_NPC only when the target is an NPC: LMASK_NPC_SIGHT omits it, so the ray would otherwise pass straight through the target (on purpose though! player is important and this improves infighting chances).*/
     if (hit.hit) {
-        if (hit.hitInstanceIndex == eidx) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); return true; } NPCType t = npcTable[World.instances[idx].index - 419].type;
-        if (t != NPCType_Mutant && t != NPCType_Supermutant && t != NPCType_Cyber) {/*Smarte npcs attempt to open doors btw them and player.*/
-            u16 hi=hit.hitInstanceIndex; if (hi&&V3_SqDist(hit.point,spos)<4.0f&&IdxIsDoor(World.instances[hi].index)){Entity* dr=&World.instances[hi]; if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && World.diffCbt > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= UsableOrDef((float)dr->securityThreshold,100.0f) && (dr->requiredAccessCard == ACC_None)) DoorActuate(hi);}
+        if (hit.hitInstanceIndex == eidx) { flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, true); return true; }
+        
+        NPCType t = npcTable[World.instances[idx].index - 419].type;
+        if (t != NPCType_Mutant && t != NPCType_Supermutant && t != NPCType_Cyber) { /*Smart npcs attempt to open doors between them and player.*/
+            u16 hi=hit.hitInstanceIndex;
+            if (hi&&V3_SqDist(hit.point,spos)<4.0f&&IdxIsDoor(World.instances[hi].index)){
+                Entity* dr=&World.instances[hi];
+                if ((dr->doorOpen == DoorState_Closed || (dr->doorOpen == DoorState_Closing && World.diffCbt > 2)) && !(dr->entflags & EF_LOCKED) && GetCurrentLevelSecurity() <= UsableOrDef((float)dr->securityThreshold,100.0f) && (dr->requiredAccessCard == ACC_None)) DoorActuate(hi);
+            }
         }
     } flag_set(&World.instances[idx].entflags, EF_ENEM_IN_LOS, false); return false;
 }
 
 void AISetHuntFinished(u16 idx) { World.instances[idx].huntFinished = World.pauseRelativeTime; int diff = IsCyberNPC(idx) ? World.diffCyb : World.diffCbt; double ht = npcTable[World.instances[idx].index - 419].huntTime, mn=60.0; if(diff <= 1){World.instances[idx].huntFinished += (ht * 0.75 > mn ? ht * 0.75 : mn);}else if(diff >= 3){World.instances[idx].huntFinished += (ht * 2.0  > mn ? ht * 2.0 : mn);}else{World.instances[idx].huntFinished += (ht > mn ? ht : mn);} }
 void AISetEnemy(u16 idx, u16 eidx) {
-    if (!eidx) {return;} if (eidx == PLAYER1) { u16 d = CyberDecoyTarget(); if (d != U16_MAX && IsCyberNPC(idx)) eidx = d; }
+    if (!eidx) {return;}
+    
+    if (eidx == PLAYER1) {
+        u16 d = U16_MAX; bool isLive = false;
+        if (!World.decoyActive) { World.decoyInstance = U16_MAX; }
+        else {
+            u16 check_d = World.decoyInstance;
+            if (check_d >= INSTS_1ST_IDX && check_d < World.instCount && World.instances[check_d].index == CYBER_DECOY_CONST) { d = check_d; isLive = true; }
+            else {
+                bool found = false;
+                for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if(World.instances[i].index == CYBER_DECOY_CONST){World.decoyInstance = i; d = i; isLive = true; found = true; break;} }
+                if (!found) { World.decoyInstance = U16_MAX; }
+            }
+        }
+        d = isLive ? d : U16_MAX;
+        if (d != U16_MAX && IsCyberNPC(idx)) eidx = d;
+    }
     World.instances[idx].enemy=eidx; World.instances[idx].posCheckFinished=World.pauseRelativeTime + AI_POS_CHECK_DELAY; flag_set(&World.instances[idx].entflags,EF_WANDERING,false); World.instances[idx].wanderFinished=World.pauseRelativeTime;
     World.instances[idx].lastPosition = World.position[idx]; World.instances[idx].targettingPosition = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; AISetHuntFinished(idx);
 }
+
 
 void AIPlaySightSound(u16 idx) { if ((!(World.instances[idx].entflags&EF_FIRST_SIGHTING)) || (!HasHealth(idx)) || (World.instances[idx].entflags&EF_ACT_AS_CORPSE_ONLY)){return;} flag_set(&World.instances[idx].entflags,EF_FIRST_SIGHTING,false); i16 sfx = sfxSightSound[World.instances[idx].index - 419]; if (sfx >= 39 && sfx < SOUNDS_COUNT){play_wav(sounds[sfx],AppliedFXVol(1.0f),World.position[idx],true);} }
 bool AICheckIfPlayerInSight(u16 idx) {

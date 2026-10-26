@@ -28,7 +28,6 @@ WeaponFireCtx wfx = { .fireDistance = 200.0f, .overheatedPercent = 80.0f, .reloa
 INLINE Quaternion QuatEulerZ(float degZ) { float r = deg2rad(degZ) * 0.5f; return (Quaternion){0.0f,0.0f,vsinf(r),vcosf(r)}; }
 INLINE bool WeaponsHaveAnyHeat() { if (Cheats.redbull) {return false;} for (int i=0;i<7;i++) {if (World.invP1.curWepHeat[i] > 0.0f) {return true;}} return false; }
 static bool hudHeatTickOn[9];
-void HudHeatBleed(float heat) { float tempFloat=10.0f; for (int i=0;i<9;i++) { hudHeatTickOn[i]=heat >= tempFloat; tempFloat += 10.0f; } }
 bool HudHeatTickOn(int i) { return (i>=0&&i<9) ? hudHeatTickOn[i] : false; }
 void HeatBleedOff() {
     static double heatTickFinished = 0.0;
@@ -41,7 +40,7 @@ void HeatBleedOff() {
             World.invP1.curWepHeat[i] -= 10.0f;
             if (World.invP1.curWepHeat[i] <= 0.0f) World.invP1.curWepHeat[i] = 0.0f;
         }
-        if (CurrentWeaponUsesEnergy()) HudHeatBleed(World.invP1.curWepHeat[World.invP1.wepCur]);
+        if (CurrentWeaponUsesEnergy()) { float tempFloat = 10.0f; for (int i=0;i<9;i++) { hudHeatTickOn[i] = World.invP1.curWepHeat[World.invP1.wepCur] >= tempFloat; tempFloat += 10.0f; } }
     }
     heatTickFinished = World.pauseRelativeTime + heatTickTime;
 }
@@ -59,7 +58,6 @@ static void WeaponLerpGetTargetDown() { World.invP1.reloadLerpValue = World.invP
 void CompleteWeaponChange() {
     if (World.invP1.weaponIndexPending == -1) return;
     World.invP1.wepCur = (u8)World.invP1.wepCurPending;
-    if (CurrentWeaponUsesEnergy()) { HudHeatBleed(World.invP1.curWepHeat[World.invP1.wepCur]); }
     World.invP1.weaponIndex = (u16)World.invP1.weaponIndexPending;
     u16 wepIdx = World.invP1.weaponIndex;
     Entity* vwe = &World.instances[World.weaponVModelIndex];
@@ -98,7 +96,6 @@ void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev; dead in cyberspace
     int w16=Get16WeaponIndexFromConstIndex(wi); WeaponFireStartWeaponDip(w16>=0?reloadTime[w16]:0.5f);
 }
 
-void StartWeaponDip(float delay) { if (delay < 0.0f) {delay = 0.0f;} World.invP1.reloadFinished = World.pauseRelativeTime + delay; lerpStartTime = World.pauseRelativeTime; }
 extern V3 vWepOfs[16]; extern bool editFieldEditing; extern bool EditPanelPointerHover(void);
 void UpdateWeaponReloadDip() {
     int i = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
@@ -283,14 +280,11 @@ void MeleeHitUpdate(void) {
     if (isRapier) { TakeEnergy(3.666f); BiomonitorEnergyPulse(3.666f); } // 3 hits per energy tick
 }
 
-void PlayAnim(u8 player, u8 animClip); // stub: player animation playback
-void PlayAnim(u8 player, u8 animClip) { (void)player; (void)animClip; /* stub: player animation playback deferred */ } // stub declaration
 void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u16 fleshSnd) {
     wfx.fireDistance = 3.2f;
     bool hit = DidRayHit(wep16); wfx.fireDistance = 200.0f;
     u16 t = wfx.tempHitEnt; double dt = World.pauseRelativeTime + (isRapier ? 0.28 : 0.15);
     if (hit) {
-        PlayAnim(PLAYER1, isRapier ? A_ATTACK_HIT : A_ATTACK_HIT);
         u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_COUNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; }
         wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = t; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
@@ -298,12 +292,11 @@ void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u
     V3 p = World.position[PLAYER1], look = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward, World.instances[PLAYER1].right));
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; i++) {
         Entity *in = &World.instances[i]; if(!(in->entflags & EF_ACTIVE) || in->health <= 0.0f || V3_Dist(World.position[i],p) >= 3.2f || V3_dot(look,V3_Normalize(V3_AsubB(World.position[i],p))) <= 0.666f){continue;}/*outside ~+-48deg cone*/
-        PlayAnim(PLAYER1, A_ATTACK2);
         u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_COUNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = A_ATTACK_HIT; }
         wfx.pendingMeleeWep16 = wep16; wfx.pendingMeleeTarget = i; wfx.pendingMeleeIsRapier = isRapier; wfx.pendingMeleeSilent = silent; wfx.pendingMeleeHitSnd = hitSnd;
         wfx.pendingMeleeFleshSnd = fleshSnd; wfx.pendingMeleeFinished = dt; return;
     }
-    if(!silent)play_wav(sounds[missSnd], AppliedFXVol(1.0f), World.position[PLAYER1], false);PlayAnim(PLAYER1, A_ATTACK_MISS);
+    if(!silent)play_wav(sounds[missSnd], AppliedFXVol(1.0f), World.position[PLAYER1], false);
     u16 wvi = World.weaponVModelIndex; if (wvi > 0 && wvi < INSTANCE_COUNT) { World.instances[wvi].animationNum = isRapier ? 50 : 49; World.instances[wvi].clip = isRapier ? A_ATTACK_MISS : A_ATTACK_MISS; }
 }
 
@@ -372,7 +365,6 @@ void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;if(wep16 !=
 }
 
 static bool pendingAttackWep16Valid = false; static int  pendingAttackWep16 = -1; void DropHeldItem(); void ResetHeldItem(); void AddItemToInventory(int index, int custIdx);
-void StartNormalAttack(int wep16) { if ((wep16 < 0 || wep16 > 15) || (World.invP1.waitTilNextFire >= World.pauseRelativeTime) || (World.invP1.reloadFinished >= World.pauseRelativeTime)) return; pendingAttackWep16=wep16; pendingAttackWep16Valid=true; }
 extern u16 editModeTestEntityDefinition;
 void CheckAttackInput(void) {
     if(!Attack()){return;} if(World.Sys_UI.vmailActive) { World.Sys_UI.vmailActive=0; World.invP1.waitTilNextFire=World.pauseRelativeTime+0.8f; return;}
@@ -381,7 +373,8 @@ void CheckAttackInput(void) {
     if (Cheats.editMode && Cheats.editSubMode==1){World.invP1.holdingObject = true; World.invP1.heldObjectIndex = editModeTestEntityDefinition;}
     if (World.invP1.holdingObject && !World.Sys_UI.mouseClickHeldOverGUI) { if (!World.uiIsBlocking) { if (FrobHeldItemIntoPanel(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right)) { return; }/*frob-use items go to whatever UseHandler is under the cursor (InteractablePanel), and are consumed there*/ DropHeldItem(); return; } AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); return; }
     int w = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex);
-    if (w == -1 || World.invP1.holdingObject || World.Sys_UI.mouseClickHeldOverGUI){return; /*No weapon*/} StartNormalAttack(w);
+    if (w == -1 || World.invP1.holdingObject || World.Sys_UI.mouseClickHeldOverGUI){return; /*No weapon*/}
+    if (w >= 0 && w <= 15 && World.invP1.waitTilNextFire < World.pauseRelativeTime && World.invP1.reloadFinished < World.pauseRelativeTime) { pendingAttackWep16 = w; pendingAttackWep16Valid = true; }
 }
 
 void CheckUIStateAndAttack(void) {
@@ -420,7 +413,8 @@ void LoadPrimaryAmmoType(bool isSilent) {
     World.invP1.currentMagazineAmount[wc] = (World.invP1.wepAmmo[wep16] >= magazinePitchCountForWeapon[wep16]) ? magazinePitchCountForWeapon[wep16] : (u8)World.invP1.wepAmmo[wep16];
     World.invP1.wepAmmo[wep16] -= World.invP1.currentMagazineAmount[wc];
     (void)isSilent; if (!isSilent) play_wav(sounds[(wep16==0 || wep16==3) ? 248 : 260], AppliedFXVol(1.0f), (V3){0}, false); // wlocknload / wreload
-    StartWeaponDip(reloadTime[wep16]); wfx.reloadContainerPos = wfx.reloadContainerHome;
+    float delay = reloadTime[wep16]; if (delay < 0.0f) {delay = 0.0f;} World.invP1.reloadFinished = World.pauseRelativeTime + delay; lerpStartTime = World.pauseRelativeTime;
+    wfx.reloadContainerPos = wfx.reloadContainerHome;
 }
 
 void LoadSecondaryAmmoType(bool isSilent) {
@@ -433,7 +427,8 @@ void LoadSecondaryAmmoType(bool isSilent) {
     World.invP1.currentMagazineAmount2[wc] = (World.invP1.wepAmmoSecondary[wep16] >= magazinePitchCountForWeapon2[wep16]) ? magazinePitchCountForWeapon2[wep16] : (u8)World.invP1.wepAmmoSecondary[wep16];
     World.invP1.wepAmmoSecondary[wep16] -= World.invP1.currentMagazineAmount2[wc];
     (void)isSilent; if (!isSilent) play_wav(sounds[(wep16==0 || wep16==3) ? 248 : 260], AppliedFXVol(1.0f), (V3){0}, false); // wlocknload / wreload
-    StartWeaponDip(reloadTime[wep16]); wfx.reloadContainerPos = wfx.reloadContainerHome;
+    float delay = reloadTime[wep16]; if (delay < 0.0f) {delay = 0.0f;} World.invP1.reloadFinished = World.pauseRelativeTime + delay; lerpStartTime = World.pauseRelativeTime;
+    wfx.reloadContainerPos = wfx.reloadContainerHome;
 }
 
 void ReloadSecret(bool isSilent) {

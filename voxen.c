@@ -2158,7 +2158,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
 }
 
-void PlayVmail(u8 i) { World.Sys_UI.vmailActive=i; World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
+void PlayVmail(u8 i) {/*Starts vmail clip i: the ui.c vmailStartFrames/vmailEndFrames slots. Sys_UI.vmailActive also gates the frob/fire "click skips the mail" paths and the UI draws as a bool, so it stores clip+1 (0 stays "no mail playing").*/ if(i>=sizeof(vmailStartFrames)/sizeof(*vmailStartFrames)){DualLogError("PlayVmail: clip %u out of range\n",i);return;} World.Sys_UI.vmailActive=(u8)(i+1); World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
 void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); DualLog("Entity counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n Light counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
                                               World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
                                               World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]); }
@@ -2453,7 +2453,6 @@ i32 main() {
                 
             World.pauseRelativeTime += World.deltaTime * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/
         }
-        
         double input_start = get_time();
 InputProcessing(); // Before anims and physics to allow them to respond immediately.
         UpdateAnims();     // Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.
@@ -2466,7 +2465,6 @@ InputProcessing(); // Before anims and physics to allow them to respond immediat
             Physics(dt);
             physTime = get_time() - ps;
         } else physTime=0.0;
-        
         double gameT_start = get_time();
         ModUpdate(); /*After physics so mod/gamecode can modify velocities before next frame.*/
         BioMonitorUpdate();
@@ -2482,11 +2480,7 @@ InputProcessing(); // Before anims and physics to allow them to respond immediat
         AutomapTick();
         Render(false/*!camview*/,0u);
         if (Sys_Input.keyStates[KEY_O].pressed) { play_message("shodan/shodan_prematurefruition"); }/*test hotkey: stream a SHODAN log on the log channel*/
-        if (ScrshotPressed() && World.current_time > World.screenshotTimeout) {
-            Screenshot();
-            //AutomapDumpBMP(); // Uncomment for testing
-        }
-        
+        if (ScrshotPressed() && World.current_time > World.screenshotTimeout) { Screenshot(); }
         for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/
         for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) { Sys_Input.mouseButtons[i].pressed = false; }
         Sys_Input.scrollDelta = 0;
@@ -2494,8 +2488,7 @@ InputProcessing(); // Before anims and physics to allow them to respond immediat
         globalframe++;
         World.cpuTime = get_time() - World.current_time; // Measure time over everything this frame before GPU swap buffers for diagnostic text.
         if (globalframe > 4) {
-            u8 r = (gpuQFrame + 1) % 5;
-            u64 v;
+            u8 r = (gpuQFrame + 1) % 5; u64 v;
             glGetQueryObjectui64v(gpuQ[r][0], 0x8866/*GL_QUERY_RESULT*/,&v); World.gpuShadowMs=(double)v * 0.000001;
             glGetQueryObjectui64v(gpuQ[r][1],0x8866/*GL_QUERY_RESULT*/,&v);  World.gpuPreMs=(double)v * 0.000001;
             glGetQueryObjectui64v(gpuQ[r][2],0x8866/*GL_QUERY_RESULT*/,&v);  World.gpuMainMs=(double)v * 0.000001;
@@ -2503,7 +2496,6 @@ InputProcessing(); // Before anims and physics to allow them to respond immediat
             glGetQueryObjectui64v(gpuQ[r][4], 0x8866/*GL_QUERY_RESULT*/,&v); World.gpuCompMs=(double)v * 0.000001;
             World.gpuFrameMs = World.gpuShadowMs + World.gpuPreMs + World.gpuMainMs + World.gpuSsrMs + World.gpuCompMs;
         }
-
         gpuQFrame=(gpuQFrame+1)%5;
         ((WSWin*)window)->context.swapBuffers(((WSWin*)window));
         CHECK_GL_ERROR(); // Lone catch for inadvertent issues.
@@ -2516,8 +2508,7 @@ InputProcessing(); // Before anims and physics to allow them to respond immediat
             if (dbgGameFrame == dbgFrm[d]) {
                 DebugRAM(dbgLbl[d]);
                 DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Raycasts:%.3f(%u)\n",
-                        dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000,
-                        World.substeps, renderTime*1000, prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
+                        dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000, World.substeps, renderTime*1000, prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
             }
         }
     }

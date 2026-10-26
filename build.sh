@@ -108,9 +108,9 @@ EOF
 LINUX_CC="zig cc"
 WINDOWS_CC="zig cc -target x86_64-windows-gnu -Wframe-larger-than=65536"
 COMMON_CFLAGS="-ferror-limit=500 -fno-stack-protector -fno-unwind-tables -Wno-format-nonliteral -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
-               -Wshadow -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -Wno-switch -fdeclspec -fomit-frame-pointer -g0 \
+               -Wshadow -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -Wno-switch -fdeclspec -fomit-frame-pointer -g0 -Wunused \
                -Wno-overlength-strings -fno-math-errno -fno-sanitize=all -m64 -Os -march=haswell -mf16c -mavx -Wbool-conversion -Wno-empty-body -nostdinc -ftrivial-auto-var-init=zero"
-COMMON_LFLAGS="-Wl,-z,relro,-z,now,--gc-sections,--as-needed,--build-id=none"
+COMMON_LFLAGS="-Wl,-z,relro,-z,now,--gc-sections,--as-needed,--build-id=none,--print-gc-sections"
 OPTLEVEL="-Oz"
 if [ "$BUILD_MODE" = "debug" ]; then
     COMMON_CFLAGS="${COMMON_CFLAGS/-g0/-g}"

@@ -356,7 +356,7 @@ void RenderMenu() {
             if (UI_Button(UI_ID_MENU_RES_APPLY,588,720, 210,30, &overApply, 10) || (MenuEnter() && currentMenuItem == 10)) { ApplyStagedWindowedSize(); GatherResolutionModes(); currentMenuItem = 10; }
             overApply = overApply || currentMenuItem == 10; RenderTextL(602,695,overApply ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"APPLY");
         } else if (currentMenuTab == 1) {
-            i8 cfgIdxOf[64]; u8 inCount=0; for (int c=0;c<configTableSize && inCount<64;++c) if (configTable[c].type==SETTING_INPUT) cfgIdxOf[inCount++]=(i8)c;
+            i8 cfgIdxOf[64]; u8 inCount=0; for (int c=0;c<CONFIG_CNT && inCount<64;++c) if (configTable[c].type==SETTING_INPUT) cfgIdxOf[inCount++]=(i8)c;
             menuItemCount = (i8)(inCount + 1);/*Input rows + BACK*/
             bool armState = rebindRow >= 0; if (armState) rebindCaptureActive = true;
             for (u8 r=0;r<inCount;++r) {
@@ -1540,13 +1540,15 @@ static double RenderUI() {
         }
     }
     if (World.Sys_UI.vmailActive) {
-        if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[World.Sys_UI.vmailActive]) {
-            if (World.Sys_UI.vmailFrame == (vmailStartFrames[World.Sys_UI.vmailActive]+11)) play_wav(sounds[99], AppliedFXVol(1.0f), (V3){0}, false);
-            World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[World.Sys_UI.vmailActive]) World.Sys_UI.vmailFrame = vmailEndFrames[World.Sys_UI.vmailActive];
+        u8 clip=(u8)(World.Sys_UI.vmailActive-1);/*vmailActive stores clip+1: nonzero means a mail is playing, and clip-1 indexes the ui.c clip tables*/
+        static u32 heldMail = 0xFFFFFFFFu, heldMailClip = 0xFFu; if (heldMailClip != World.Sys_UI.vmailActive) { heldMailClip = World.Sys_UI.vmailActive; heldMail = 0xFFFFFFFFu; }/*switching clips must not show the previous clip's last frame while the new one decodes*/
+        if (World.Sys_UI.vmailFrameFinished < World.pauseRelativeTime && World.Sys_UI.vmailFrame < vmailEndFrames[clip]) {
+            if (World.Sys_UI.vmailFrame == (vmailStartFrames[clip]+11)) play_wav(sounds[99], AppliedFXVol(1.0f), (V3){0}, false);
+            World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; World.Sys_UI.vmailFrame++; if (World.Sys_UI.vmailFrame > vmailEndFrames[clip]) World.Sys_UI.vmailFrame = vmailEndFrames[clip];
         }
         {
-            static u32 heldMail = 0xFFFFFFFFu;
-            u32 mrt = VideoFrameTexIndex(World.Sys_UI.vmailFrame);
+            u32 want = World.Sys_UI.vmailFrame, nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt);/*same decode-ahead feed as RenderVideoPage: nothing else queues VMail frames, so without this the ring never fills and the viewer stays black*/
+            u32 mrt = VideoFrameTexIndex(want);
             if (mrt != 0xFFFFFFFFu) heldMail = mrt;
             if (heldMail != 0xFFFFFFFFu) UIRImg(UI_ID_VMAIL_VIEWER,283,184,800,400,heldMail);/*Vmail viewer*/
         }

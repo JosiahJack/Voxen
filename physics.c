@@ -95,24 +95,10 @@ void TriggerTrippedUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->d
 void TriggerTriggerTripped(u16 self, u16 other) { Entity* e=&World.instances[self]; if(other != PLAYER1 || (World.instances[self].allDone && World.instances[self].onlyOnce)) return; e->recentMostActivator=other; if(e->onlyOnce){e->allDone=true;} if(e->delay <= 0.0f){UseTargets(self,World.instances[self].targetIdx);}else{TriggerDelayedTarget(self);} }
 void TriggerOnTriggerEnter(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
 void TriggerOnTriggerStay(u16 self, u16 other) { if (World.instances[self].allDone && World.instances[self].onlyOnce){return;} TriggerTriggerTripped(self,other); }
-static float GravityLiftTopY(u16 liftIdx) {
-    ShapeBox box=Entity_GetBox(liftIdx); V3 up=quat_rot_v3(box.rot,(V3){0,1,0});
-    float extent=vabs(up.x)*box.hExt.x+vabs(up.y)*box.hExt.y+vabs(up.z)*box.hExt.z;
-    return box.ctr.y+extent;
-}
-static float GravityLiftBodyBottomY(u16 body) {
-    if(World.col[body]==CT_CAP){ShapeCapsule cap=Entity_GetCap(body);return cap.base.y-cap.rad;}
-    return World.position[body].y-(World.colliderSize[body].y*0.5f*vabs(World.scale[body].y));
-}
-static float GravityLiftGravityAccel(u16 body) {
-    if(body==PLAYER1&&(Cheats.noclip||World.invP1.ladderState>0||World.curLev==LEVEL_CYBERSPACE))return 0.0f;
-    return 9.81f*World.gravity[body];
-}
-static float GravityLiftTopControlForce(u16 body,float gap) {
-    /* Underdamped spring toward the top plane; at rest this exactly balances gravity. */
-    float accel=vclamp(gap*64.0f-World.velocity[body].y*6.0f,-32.0f,20.0f);
-    return vmax(World.mass[body],0.001f)*(GravityLiftGravityAccel(body)+accel);
-}
+static float GravityLiftTopY(u16 liftIdx) { ShapeBox box=Entity_GetBox(liftIdx); V3 up=quat_rot_v3(box.rot,(V3){0,1,0}); float extent=vabs(up.x)*box.hExt.x+vabs(up.y)*box.hExt.y+vabs(up.z)*box.hExt.z; return box.ctr.y+extent; }
+static float GravityLiftBodyBottomY(u16 body) { if(World.col[body]==CT_CAP){ShapeCapsule cap=Entity_GetCap(body);return cap.base.y-cap.rad;} return World.position[body].y-(World.colliderSize[body].y*0.5f*vabs(World.scale[body].y)); }
+static float GravityLiftGravityAccel(u16 body) { if(body==PLAYER1&&(Cheats.noclip||World.invP1.ladderState>0||World.curLev==LEVEL_CYBERSPACE))return 0.0f; return 9.81f*World.gravity[body]; }
+static float GravityLiftTopControlForce(u16 body,float gap) { /* Underdamped spring toward the top plane; at rest this exactly balances gravity. */ float accel=vclamp(gap*64.0f-World.velocity[body].y*6.0f,-32.0f,20.0f); return vmax(World.mass[body],0.001f)*(GravityLiftGravityAccel(body)+accel); }
 static void GravityLiftApplyTopSupport(u16 body) {
     u16 marker=gravityLiftTopSupport[body]; if(!marker)return; u16 liftIdx=(u16)(marker-1u);
     if(liftIdx<INSTS_1ST_IDX||liftIdx>=World.instCount||World.instances[liftIdx].index!=596||!World.instances[liftIdx].active){gravityLiftTopSupport[body]=0;return;}
@@ -124,6 +110,7 @@ static void GravityLiftApplyTopSupport(u16 body) {
     if(body==PLAYER1&&topContact&&vabs(World.velocity[body].y)<0.75f)flag_set(&World.instances[body].entflags,EF_GROUNDED,true);
     if(gravityLiftTouched[body]!=marker)AddForce(body,(V3){0.0f,GravityLiftTopControlForce(body,gap),0.0f},false);
 }
+
 void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
     Entity *lift=&World.instances[self]; if(entering)lift->initialBurstFinished=World.pauseRelativeTime+1.0f;
     float forceY=0.0f,gravityAccel=GravityLiftGravityAccel(other),mass=vmax(World.mass[other],0.001f);
@@ -133,24 +120,20 @@ void trigger_gravitylift_touch(u16 self, u16 other, bool entering) {
         float bottomY=GravityLiftBodyBottomY(other),topY=GravityLiftTopY(self),gap=topY-bottomY,velY=World.velocity[other].y;
         float stopDist=velY>0.0f ? (velY*velY)/(2.0f*16.0f) : 0.0f;
         if(gap<=vmax(lift->distancePaddingToTopPoint,stopDist+0.20f)){
-            bool topContact=other==PLAYER1&&World.col[other]==CT_CAP&&gap<=0.08f&&gap>=-0.12f,topJumpZone=other==PLAYER1&&World.col[other]==CT_CAP&&gap<=vmax(lift->distancePaddingToTopPoint,0.12f)&&gap>=-0.12f;
+            bool topContact=other==PLAYER1&&World.col[other]==CT_CAP&&gap<=0.08f&&gap>=-0.12f,topJumpZone = other == PLAYER1 && World.col[other] == CT_CAP && gap <= vmax(lift->distancePaddingToTopPoint, 0.12f) && gap >= -0.12f;
             if(other==PLAYER1){
                 if(topJumpZone&&JumpDown()){gravityLiftTopSupport[other]=0;flag_set(&World.instances[other].entflags,EF_GROUNDED,true);jumpingFromTop=true;}
-                else if(topContact&&vabs(velY)<0.75f){flag_set(&World.instances[other].entflags,EF_GROUNDED,true);gravityLiftTopSupport[other]=(u16)(self+1u);}
-                else if(World.col[other]==CT_CAP)gravityLiftTopSupport[other]=(u16)(self+1u);
+                else if (topContact && vabs(velY) < 0.75f) { flag_set(&World.instances[other].entflags, EF_GROUNDED, true); gravityLiftTopSupport[other] = (u16)(self + 1u); }
+                else if (World.col[other] == CT_CAP) gravityLiftTopSupport[other] = (u16)(self + 1u);
             }
-            if(!jumpingFromTop)forceY=GravityLiftTopControlForce(other,gap);
-        }else if(initialBurst){
-            /* Preserve the tuned entry burst. */
-            forceY=(lift->strength*World.mass[other]-velY)*2.0f;
-        }else{
-            /* Track a useful upward speed while cancelling gravity; the former force reached a slow terminal rise under gravity. */
-            float riseAccel=vclamp((lift->strength-velY)*3.0f,-16.0f,12.0f);
-            forceY=mass*(gravityAccel+riseAccel);
-        }
-    }else{if(other==PLAYER1)gravityLiftTopSupport[other]=0;if(World.velocity[other].y<lift->offStrengthFactor){forceY=lift->offStrengthFactor-World.velocity[other].y;if(initialBurst)forceY*=2.0f; }}
+            if (!jumpingFromTop) forceY = GravityLiftTopControlForce(other, gap);
+        } else if (initialBurst) { forceY = (lift->strength*World.mass[other] - velY) * 2.0f; }
+        else { float riseAccel = vclamp((lift->strength - velY) * 3.0f, -16.0f, 12.0f); forceY = mass * (gravityAccel + riseAccel); }
+    } else { if (other == PLAYER1) gravityLiftTopSupport[other] = 0; if (World.velocity[other].y < lift->offStrengthFactor) { forceY = lift->offStrengthFactor - World.velocity[other].y; if (initialBurst) forceY *= 2.0f; } }
     AddForce(other,(V3){0.0f,forceY,0.0f},false);
 }
+
+void CyberDoorOnCollisionEnter(u16 self, u16 other) { if(other != PLAYER1){return;} CenterStatusPrint("%s  %s",Sys_Text.stringTable[World.instances[self].messageIndex],Sys_Text.stringTable[601]); }
 // Physics System
 INLINE void SetPosition(u16 i, V3 newpos) { float d=V3_Dist(World.position[i],newpos); if(d < PHY_NEARNUFF){return;} float allowed=vmin(d,posBudget[i]); if(allowed < PHY_NEARNUFF){return;} V3 dir=V3_Normalize(V3_AsubB(newpos,World.position[i])); World.position[i]=V3_AplusB(World.position[i],V3_ScaleByF(dir,allowed)); flag_set(&World.instances[i].entflags,EF_MOVING,true); posBudget[i] -= allowed; }
 INLINE Manifold OverlapToManifold(Overlap r) { Manifold m={0}; if (r.hit && r.pen > PHY_EPSILON) { m.normal = r.normal; m.n = 1; m.p[0] = (ManifoldPt){r.point, r.pen}; m.maxPen = r.pen; } return m; }

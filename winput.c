@@ -826,8 +826,6 @@ const Setting configTable[] = {
     S_IN("Weapon +",28),   S_IN("Weapon -",29),   S_IN("Grenade",30),    S_IN("Grenade +",31),   S_IN("Grenade -",32), S_IN("Ammo Type",33), S_IN("Patch Use",34), S_IN("Patch +",35),  S_IN("Patch -",36),   S_IN("Full Map",37), S_IN("Swim Up",38),   S_IN("Swim Down",39),  S_IN("Screenshot",40),  S_IN("Console",41)
 };
 
-const int configTableSize = sizeof(configTable) / sizeof(Setting);
-
 void LoadConfig() {
     FHandle f = OS_OpenReadonly("./Data/Config.ini"); char line[512];
     while (sUpToEndLine(line,sizeof(line),f)) {
@@ -838,7 +836,7 @@ void LoadConfig() {
         if (!eq) continue; *eq = 0;
         
         char *key = data_parser_trim(s), *val = data_parser_trim(eq + 1);
-        for (int i = 0; i < configTableSize; i++) {
+        for (int i=0;i<CONFIG_CNT;++i) {
             if (sEqual(key,configTable[i].name)) {
                      if (configTable[i].type == SETTING_U8)    *( u8*)configTable[i].ptr = (u8)s2i32(val);
                 else if (configTable[i].type == SETTING_U16)   *(u16*)configTable[i].ptr = (u16)s2i32(val);
@@ -861,7 +859,7 @@ void FilePrintString(FHandle f, const char* fmt, ...) { va_list a; __builtin_va_
 void SaveConfig() {
     DualLog("Saving config\n");
     FHandle f = OS_OpenWriteonly("./Data/Config.ini");
-    for (int i=0;i<configTableSize;++i) {
+    for (int i=0;i<CONFIG_CNT;++i) {
              if (configTable[i].type == SETTING_U8)    FilePrintString(f, "%s = %u\n", configTable[i].name, *(u8*)configTable[i].ptr);
         else if (configTable[i].type == SETTING_U16)   FilePrintString(f, "%s = %u\n", configTable[i].name, *(u16*)configTable[i].ptr);
         else if (configTable[i].type == SETTING_INPUT) FilePrintString(f, "%s = %s\n", configTable[i].name, inputElements[*(u16*)configTable[i].ptr].name);

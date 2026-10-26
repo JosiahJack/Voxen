@@ -63,7 +63,6 @@ static void Mat4FromTRS(const float* T, const float* R, const float* S, float* l
     lm[12] = tx;                           lm[13] = ty;                           lm[14] = tz;                         lm[15] = 1.0f; 
 }
 
-void glb_node_transform_local(const glb_node* n, float* m) { Mat4FromTRS(n->translation,n->rotation,n->scale,m); }
 static u64 glb_component_read_integer(const void* i, glb_component_type t) { return t == glb_component_type_r_16u ? *((const u16*)i) : t == glb_component_type_r_8u ? *((const u8*)i) : 0; }
 static size_t glb_component_read_index(const void* i, glb_component_type t) { return t == glb_component_type_r_16u ? *((const u16*)i) : t == glb_component_type_r_8u ? *((const u8*)i) : 0; }
 static float glb_component_read_float(const void* i, glb_component_type t, bool n) {
@@ -72,10 +71,9 @@ static float glb_component_read_float(const void* i, glb_component_type t, bool 
     return (float)glb_component_read_integer(i, t);
 }
 
-size_t glb_num_components(glb_type t) { return t == glbv2 ? 2 : (t == glbv3 ? 3 : (t == glbv4 ? 4 : (t == glbmat4 ? 16 : 1))); }
 size_t glb_component_size(glb_component_type ct) { return ct == glb_component_type_r_8u? 1 : ct == glb_component_type_r_16u ? 2 : ct == glb_component_type_r_32f ? 4 : 0; }
-static bool glb_element_read_float(const u8* e, glb_type ty, glb_component_type ct, bool n, float* o, size_t es) {
-    size_t nc = glb_num_components(ty);
+static bool glb_element_read_float(const u8* e, glb_type t, glb_component_type ct, bool n, float* o, size_t es) {
+    size_t nc = t == glbv2 ? 2 : (t == glbv3 ? 3 : (t == glbv4 ? 4 : (t == glbmat4 ? 16 : 1)));
     if (es<nc) return 0;
     
     size_t cs = glb_component_size(ct);
@@ -220,13 +218,17 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
 void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
     u32 tmp;mcpy(&tmp,d,4); const u8* ptr=(const u8*)d; mcpy(&tmp,ptr+8,4); const u8* jc=ptr+12; u32 jl;mcpy(&jl,jc,4); mcpy(&tmp,jc+4,4); jc+=8;const void* bin=NULL;size_t bsz=0; if(8<=sz-20-jl){ const u8* bc=jc+jl;u32 bl;mcpy(&bl,bc,4); mcpy(&tmp,bc+4,4); bc+=8;bin=bc;bsz=bl; } jsmn_parser p={0};int tc=jsmn_parse(&p,(const char*)jc,jl,NULL,0);
     jsmntok_t* t=OS_SubArenaAlloc(tid,sizeof(jsmntok_t)*(tc+1));jsmn_init(&p); tc=jsmn_parse(&p,(const char*)jc,jl,t,tc);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);} t[tc].type=JSMN_UND; glb_data* data=OS_SubArenaAlloc(tid,sizeof(glb_data)); glb_parse_json_root(t,0,jc,tid,data);
-    for(size_t m=0;m<data->meshes_count;++m)
-        for(size_t n=0;n<data->meshes[m].primitives_count;++n){ glb_accessor* ix=data->meshes[m].primitives[n].indices; if(ix){if((size_t)ix>data->accessors_count)return; data->meshes[m].primitives[n].indices=&data->accessors[(size_t)ix-1];} for(size_t k=0;k<data->meshes[m].primitives[n].attr_count;++k){ glb_accessor* ad=data->meshes[m].primitives[n].attr[k].data; if(!ad||(size_t)ad>data->accessors_count)return; data->meshes[m].primitives[n].attr[k].data=&data->accessors[(size_t)ad-1];} }
-    for(size_t m=0;m<data->accessors_count;++m){ glb_buffer_view* bv=data->accessors[m].buffer_view; if(bv){if((size_t)bv>data->buffer_views_count)return; data->accessors[m].buffer_view=&data->buffer_views[(size_t)bv-1];} if(data->accessors[m].stride==0){data->accessors[m].stride=glb_component_size(data->accessors[m].component_type)*glb_num_components(data->accessors[m].type);} }
-    for(size_t m=0;m<data->buffer_views_count;++m){ glb_buffer* b=data->buffer_views[m].buffer; if(!b||(size_t)b>data->buffers_count)return; data->buffer_views[m].buffer=&data->buffers[(size_t)b-1];}
-    for(size_t m=0;m<data->skins_count;++m){for(size_t n=0;n<data->skins[m].joints_count;++n){glb_node* jt=data->skins[m].joints[n];if(!jt||(size_t)jt>data->nodes_count)return; data->skins[m].joints[n]=&data->nodes[(size_t)jt-1];} glb_accessor* ib=data->skins[m].inverse_bind_matrices; if(ib){if((size_t)ib>data->accessors_count)return; data->skins[m].inverse_bind_matrices=&data->accessors[(size_t)ib-1];}}
-    for(size_t m=0;m<data->nodes_count;++m){ for(size_t n=0;n<data->nodes[m].children_count;++n){glb_node* ch=data->nodes[m].children[n];if(!ch||(size_t)ch>data->nodes_count)return; data->nodes[m].children[n]=&data->nodes[(size_t)ch-1]; data->nodes[m].children[n]->parent=&data->nodes[m];} glb_mesh* ms=data->nodes[m].mesh; if(ms){if((size_t)ms>data->meshes_count)return; data->nodes[m].mesh=&data->meshes[(size_t)ms-1];} glb_skin* sk=data->nodes[m].skin; if(sk){if((size_t)sk>data->skins_count)return; data->nodes[m].skin=&data->skins[(size_t)sk-1];} }
-    for(size_t m=0;m<data->animations_count;++m){
+    for (size_t m=0;m<data->meshes_count;++m)
+        for (size_t n=0;n<data->meshes[m].primitives_count;++n) { glb_accessor* ix=data->meshes[m].primitives[n].indices; if(ix){if((size_t)ix>data->accessors_count)return; data->meshes[m].primitives[n].indices=&data->accessors[(size_t)ix-1];} for(size_t k=0;k<data->meshes[m].primitives[n].attr_count;++k){ glb_accessor* ad=data->meshes[m].primitives[n].attr[k].data; if(!ad||(size_t)ad>data->accessors_count)return; data->meshes[m].primitives[n].attr[k].data=&data->accessors[(size_t)ad-1];} }
+    for (size_t m=0;m<data->accessors_count;++m) {
+        glb_buffer_view* bv = data->accessors[m].buffer_view;
+        if (bv) { if((size_t)bv > data->buffer_views_count)return; data->accessors[m].buffer_view = &data->buffer_views[(size_t)bv - 1]; }
+        if (data->accessors[m].stride == 0) { glb_type ty = data->accessors[m].type; size_t str = ty == glbv2 ? 2 : (ty == glbv3 ? 3 : (ty == glbv4 ? 4 : (ty == glbmat4 ? 16 : 1))); data->accessors[m].stride = glb_component_size(data->accessors[m].component_type) * str; }
+    }
+    for (size_t m=0;m<data->buffer_views_count;++m) { glb_buffer* b=data->buffer_views[m].buffer; if(!b||(size_t)b>data->buffers_count)return; data->buffer_views[m].buffer=&data->buffers[(size_t)b-1];}
+    for (size_t m=0;m<data->skins_count;++m) { for(size_t n=0;n<data->skins[m].joints_count;++n){glb_node* jt=data->skins[m].joints[n];if(!jt||(size_t)jt>data->nodes_count)return; data->skins[m].joints[n]=&data->nodes[(size_t)jt-1];} glb_accessor* ib=data->skins[m].inverse_bind_matrices; if(ib){if((size_t)ib>data->accessors_count)return; data->skins[m].inverse_bind_matrices=&data->accessors[(size_t)ib-1];}}
+    for (size_t m=0;m<data->nodes_count;++m) { for(size_t n=0;n<data->nodes[m].children_count;++n){glb_node* ch=data->nodes[m].children[n];if(!ch||(size_t)ch>data->nodes_count)return; data->nodes[m].children[n]=&data->nodes[(size_t)ch-1]; data->nodes[m].children[n]->parent=&data->nodes[m];} glb_mesh* ms=data->nodes[m].mesh; if(ms){if((size_t)ms>data->meshes_count)return; data->nodes[m].mesh=&data->meshes[(size_t)ms-1];} glb_skin* sk=data->nodes[m].skin; if(sk){if((size_t)sk>data->skins_count)return; data->nodes[m].skin=&data->skins[(size_t)sk-1];} }
+    for (size_t m=0;m<data->animations_count;++m) {
         for(size_t n=0;n<data->animations[m].samplers_count;++n){ glb_accessor* si=data->animations[m].samplers[n].input; if(!si||(size_t)si>data->accessors_count)return; data->animations[m].samplers[n].input=&data->accessors[(size_t)si-1]; glb_accessor* so=data->animations[m].samplers[n].output; if(!so||(size_t)so>data->accessors_count)return; data->animations[m].samplers[n].output=&data->accessors[(size_t)so-1];}
         for(size_t n=0;n<data->animations[m].channels_count;++n){ glbanim_samp* cs=data->animations[m].channels[n].sampler; if(!cs||(size_t)cs>data->animations[m].samplers_count)return; data->animations[m].channels[n].sampler=&data->animations[m].samplers[(size_t)cs-1]; glb_node* tn=data->animations[m].channels[n].target_node; if(tn){if((size_t)tn>data->nodes_count)return; data->animations[m].channels[n].target_node=&data->nodes[(size_t)tn-1];} }
     } *out_data=data; (*out_data)->bin=bin; (*out_data)->bin_size=bsz;
@@ -261,7 +263,8 @@ static bool ParseGLBStatic(u32 mindex, const u8* bytes, size_t size, float* rest
     *ov_pos=NULL; *ot=NULL; *ovc=*otc=0; glb_data* data = NULL; void* sub_mark=OS_SubArenaMark(tid); glb_parse(tid,bytes,size,&data); glb_load_buffers(data);
     glb_node* meshNode = NULL; for (size_t i = 0; i < data->nodes_count; ++i) { if (data->nodes[i].mesh && !data->nodes[i].skin) { meshNode = &data->nodes[i]; break; } } if (!meshNode) {  for (size_t i = 0; i < data->nodes_count; ++i) { if(data->nodes[i].mesh){meshNode = &data->nodes[i]; break;} }  }
     glb_mesh* mesh = meshNode->mesh; float gm[16]; Mat4Identity(gm); const glb_node* parents[32]; int parentCount = 0; const glb_node* curr = meshNode;
-    while (curr && parentCount < 32) { parents[parentCount++] = curr; curr = curr->parent; } for (int i = parentCount - 1; i >= 0; --i) { float local[16]; glb_node_transform_local(parents[i], local); float next[16]; Mat4Mul(gm, local, next); mcpy(gm, next, sizeof(float) * 16); } // Multiply in reverse order (root to child)
+    while (curr && parentCount < 32) { parents[parentCount++] = curr; curr = curr->parent; }
+    for (int i = parentCount - 1; i >= 0; --i) { float local[16]; Mat4FromTRS(parents[i]->translation,parents[i]->rotation,parents[i]->scale,local); float next[16]; Mat4Mul(gm, local, next); mcpy(gm, next, sizeof(float) * 16); } // Multiply in reverse order (root to child)
     __m128 mn_v=_mm_set1_ps(1000000000.0f), mx_v=_mm_set1_ps(-1000000000.0f); u32 ec = 0;
     for (size_t p = 0; p < mesh->primitives_count; ++p) {
         glb_primitive* prim = &mesh->primitives[p];
@@ -382,11 +385,7 @@ static void NodeLocalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, f
             else if (ch->target_path == glb_animpthtype_scale)       {   SampleV3(ch->sampler, t, S); }
         }
     }
-    
-    if (!anm) {
-        glb_node_transform_local(node, outM);
-        return;
-    }
+    if (!anm) { Mat4FromTRS(node->translation,node->rotation,node->scale,outM); return; }
     
     Mat4FromTRS(T, R, S, outM); // Apply animation transformation.
 }

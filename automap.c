@@ -168,7 +168,3 @@ void AutomapBlitFullToUI() {
     if(!World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]){return;}
     i16 x=(i16)((UI_W-AM_FULL_W)/2),y=(i16)((UI_H-AM_FULL_H)/2); glBindFramebuffer(GL_READ_FRAMEBUFFER,amFullFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); glBlitFramebuffer(0,AM_FULL_H,AM_FULL_W,0,x,768-(y+AM_FULL_H),x+AM_FULL_W,768-y,GL_COLOR_BUFFER_BIT,GL_LINEAR); glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
 }
-
-void AutomapDumpBMP() {
-    if(!amReady){return;} if(World.Sys_UI.MFD_LefTab!=3 && World.Sys_UI.MFD_RightTab!=3){return;} OS_MakeFolder("Screenshots"); static u8 flip[AM_W*AM_H*4]; for(int y=0;y<AM_H;++y){u8* dst=flip+(size_t)y*AM_W*4,*src=amPx+(size_t)(AM_H-1-y)*AM_W*4; for(int x=0;x<AM_W;++x){u8* d=dst+(size_t)x*4,*s=src+(size_t)x*4; d[0]=s[0]; d[1]=s[1]; d[2]=s[2]; d[3]=s[3];}} char p[96]; sFormat(p,sizeof(p),"Screenshots/automap_%.2f.bmp",get_time()); BmpWrite(p,AM_W,AM_H,flip);
-}
