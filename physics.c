@@ -84,6 +84,7 @@ void CyberItemOnTriggerEnter(u16 self, u16 other) {
 void CyberIceOnTriggerEnter(u16 self, u16 other) { (void)self; Entity* e = &World.instances[other]; if (!(e->entflags & EF_RIGIDBODY)) return; World.layer[other] = L_NPCBullet;/*L_NPCBullet, not a bare 24: the enums are bit flags, so only L_NPCBullet happens to equal 1<<24.  An adjacent enum insertion would have silently turned this into a different collision layer.*/ World.velocity[other] = V3_ScaleByF(World.velocity[other],-1.0f); }
 void CyberMineInitBeforeLoad(u16 self) { Entity* e=&World.instances[self]; e->damage=55.0f; if(World.diffCyb<3){if(random_range(0.0f,1.0f)<0.2f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=33.0f;} if(World.diffCyb<2){if(random_range(0.0f,1.0f)<0.33f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=22.0f;} if(World.diffCyb<1){if(random_range(0.0f,1.0f)<0.50f)flag_set(&e->entflags,EF_ACTIVE,false); e->damage=11.0f;} }
 float TakeDamage(u16 self,DamageData dd);
+void BiomonitorEnergyPulse(float);
 void CyberMineOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (other != PLAYER1) return; PlayerTakeDamage(PLAYER1,e->damage); play_wav(sounds[67], AppliedFXVol(1.0f), World.position[self], false); flag_set(&e->entflags,EF_ACTIVE,false); }
 void CyberSwitchInitAfterLoad(u16 self) { Entity* e = &World.instances[self]; if (e->iceActive) {flag_set(&e->entflags,EF_ACTIVE,true);} } // visual subobject parity handled by hierarchy
 void CyberSwitchOnTriggerEnter(u16 self, u16 other) { Entity* e = &World.instances[self]; if (e->active || other != PLAYER1) {return;} CenterStatusPrint("%s",Sys_Text.stringTable[(u16)e->textIndex]); e->active = true; UseTargets(self,e->targetIdx); }
@@ -663,7 +664,7 @@ void Physics(float dt) {
                     case 598/*trigger_multiple*/: case 600/*trigger_once*/: TriggerTriggerTripped(self,other); break;  case 599/*trigger_music*/:if(other == PLAYER1){TrackType tt=World.instances[self].trackType; MusicType mt=World.instances[self].musicType; World.Sys_Music.inZone=true; World.Sys_Music.elevator=(tt == TT_Elev); World.Sys_Music.distortion=(tt == TT_Distortion); World.Sys_Music.zoneTrack=tt; World.Sys_Music.zoneMusic=mt;} break;
                     case 601/*trigger_radiation*/:if(other == PLAYER1){World.invP1.radiationArea=true;World.instances[PLAYER1].radiation=World.instances[self].radiation;} break; /* radiation bleedoff / amelioration handled in physics update */
                     case 706/*info_elev_destination*/:if(other == PLAYER1){World.Sys_Music.inZone=true; World.Sys_Music.elevator=true; World.Sys_Music.zoneTrack=TT_Elev; World.Sys_Music.zoneMusic=MT_Override;} break; /* elevator shaft: override level music, same path as trigger_music/TT_Elev */
-                    case 746/*weapon_grenadeenergmine_live*/:if(other == PLAYER1){TakeEnergy(256.0f);} break;
+                    case 746/*weapon_grenadeenergmine_live*/:if(other == PLAYER1){Entity* e746=&World.instances[self]; if(World.pauseRelativeTime >= e746->intervalFinished){TakeEnergy(51.0f); BiomonitorEnergyPulse(51.0f); e746->intervalFinished = World.pauseRelativeTime + 0.1;}} break;
                 }
             }
         }
