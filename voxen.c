@@ -2173,7 +2173,6 @@ void* OS_AllocScratch(size_t amount) {
 }
 
 void OS_FreeInitPhase() { scratch_cur=scratch_base; mset(scratch_cur,0,scratch_peak); }
-void InitFontAtlassesGL();
 static void* InitFontAtlasses_Thread(void* arg) { (void)arg; InitFontAtlasses(); return NULL; }
 static bool rtAccelBuilt = false;
 void LoadRaytracingData(void) {
@@ -2255,6 +2254,7 @@ void EnsureReflectionResources(void) {
     if (Sys_Settings.Reflections == 2u && !rtAccelBuilt) LoadRaytracingData();
 }
 
+extern u8 *fontBmp1, *fontBmp2;
 void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
@@ -2333,7 +2333,10 @@ void InitalizeEnvironment() {
     glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0);               glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2*sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
     glBindVertexBuffer(0,psysquadVBO,0,4 * sizeof(float));
-    OS_ThreadJoin(&fontInitThr); InitFontAtlassesGL();
+    OS_ThreadJoin(&fontInitThr);
+    GenerateAndBindTexture(&fontAtlasTex,0x8229,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903,GL_UNSIGNED_BYTE,0x2601,fontBmp1);
+    GenerateAndBindTexture(&fontAtlasTexStopD,0x8229,FONT_ATLAS_SIZE2,FONT_ATLAS_SIZE2,0x1903,GL_UNSIGNED_BYTE,0x2601,fontBmp2);
+    glUseProgram(textSP); glUniform1i(1,2);
     
     GenerateAndBindTexture(&inputUIID, GL_RGBA8, UI_W, UI_H, GL_RGBA, GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL);/*UI Fixed Size Raster*/
     glGenFramebuffers(1, &uiFBO);
