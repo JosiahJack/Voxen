@@ -168,7 +168,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (85ULL * 1024 * 1024),
       /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                  MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
       /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024,
-                            FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 20,
+                            FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 22,
       /*Lights*/ LIGHT_COUNT = 2048, LANIM_MAX = 128/*max animated lights stored per level; Voxen-active peak is 71 (level 5)*/, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/ MAX_MDLS = 7490, WELD_HASH_SIZE = 32768, MAX_VERT_ELEMENT_SIZE = 6964, MAX_OUTPUT_VERTS = 22960, VRT_ATT_SZ = 16, CPU_VRT_SZ = 32, MAX_GLB_JOINTS = 96, MAX_GLB_BLOCKS = 64, SUB_MAIN = 32,
       /*Textures*/ MAXTEX = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 256, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8,
@@ -373,22 +373,25 @@ typedef /*FAT*/ struct  {
     u32 entflags,ioflags,ioflagsHi; u16 modelIndex,index,portalIndex;
     u32 deferredIoflags,deferredIoflagsHi; V3 forward,right,lastPosition,targetPosition,startPosition,activatedScale,dir; u16 texIndex,glowIndex,specIndex,normIndex,lodIndex,colMeshIndex;
     i32 cellIndex; i16 cellX,cellZ;
-    u8 clip,animationNum,texAnimClip,camView,codeScreen,camRotatePositive,camRotateEnabled,camSweepInit,securityThreshold,lerpUp,maxRandomItems,questBitID,questTestMode,branchOnSecond,relayEnabled,relayOnceEver,relayAlreadyDone,useQuestKeycode1,useQuestKeycode2; FuncStates/*u8*/ funcState; BodyState/*u8*/ bodyState; 
+    u8 clip,animationNum,texAnimClip,camView,securityThreshold,maxRandomItems,questBitID,questTestMode; FuncStates/*u8*/ funcState; BodyState/*u8*/ bodyState; 
     float shadRadius,health,cyberHealth,radiation,speed,ajarPercentage,percentMoved,timeForTranquilization,gracePeriodFinished,idleTime,attack1SoundTime,attack2SoundTime,attack3SoundTime,timeTillEnemyChangeFinished,timeTillDeadFinished,timeTillPainFinished,huntFinished,randWaitAtt1Finished,randWaitAtt2Finished,randWaitAtt3Finished,
           attackFinished,deathBurstFinished,tranquilizeFinished,wanderFinished,timeSinceMovedEnough,posCheckFinished,currentFrameFinished,animFinished,animSwapFinished,switchAnimFinished,delay,panelTimer,damage,itemLifeTime,minutes,seconds,randomMin,randomMax,timeInterval,cyberTimer,intervalFinished,delayFinished,
           tickFinished,tickTime,aiThinkFinished,useFinished,waitBefClose,amount,resetTime,minSecurityLevel,rechargeFinished,camStartYAngle,camEndYAngle,camWaitTime,camWaitingFinished,camYaw,camYaw0,timeBeforeLasersOn,force,strength,offStrengthFactor,distancePaddingToTopPoint,initialBurstFinished,justUsed,timerFinished,randomItemDropChance[7],reverbMaxDist,deathAnimationStart;
     Quaternion camBaseRot;
     V3 accumulatedForce,currentDestination,targettingPosition,idealTransformForward,idealPos;    
     u16 enemy,messageIndex,teleportID,targetDestinationID,keycode,recentMostActivator,countToTrigger,counter,messageLingdex,lockedMessageLingdex,rechargeMsgLingdex,usedMsgLingdex,frame,texFrame,texGlowFrame,texAnimLight,texAnimLight2,lookUpIndex,deathBurst,adjacencyIdx,targetIdx,target2Idx,targetIfFalseIdx,currentTargetIdx,targetnameIdx,reverbPreset,npcNumber,targetOnDeathIdx,lockedTargetIdx;
-    u16 spawnIndex,numberToSpawn,numberActive; bool countOnlySameIndex,alertEnemiesOnAwake; float minDelayBetweenSpawns,maxDelayBetweenSpawns,allSpawnedResetDelay;
-    i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,logIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7]; bool playEverywhere;
-    bool srchInUse,generateContents,generationDone,dontReset,onlyOnce,allDone,curTex,useRandomTimes,active,panelOpen,panelInstalled,panelArmed;
+    u16 spawnIndex,numberToSpawn,numberActive; float minDelayBetweenSpawns,maxDelayBetweenSpawns,allSpawnedResetDelay;
+    i16 customIndex,version,SFXIndex,SFXLockedIndex,textIndex,emailIndex,logIndex,ammo,ammo2,contents[4],custIdx[4],randomItem[7],randomItemCustIdx[7];
+    u64 countOnlySameIndex:1,alertEnemiesOnAwake:1,playEverywhere:1,srchInUse:1,generateContents:1,generationDone:1,dontReset:1,onlyOnce:1,allDone:1,curTex:1,useRandomTimes:1,active:1,panelOpen:1,panelInstalled:1,panelArmed:1,
+        touchEnabled:1,broken:1,requireRecharge:1,stayOpen:1,startOpen:1,targetAlreadyDone:1,toggleLasers:1,targettingOnlyUnlocks:1,changeLayerOnOpenClose:1,despawnInstead:1,doSelfAfterList:1,iceActive:1,forceFieldDirectionX:1,forceFieldDirectionY:1,forceFieldDirectionZ:1,heldObjectLoadedAlternate:1,lerping:1,onlyTargetOnce:1,autoPlayEmail:1,textureAnimating:1,texAnimStopsAtDie:1,texAnimInReverse:1,
+        texAnimRandom:1,ajar:1,deathAnimationActive:1,puzzleFired:1,puzzleSolved:1,codeScreen:1,camRotatePositive:1,camRotateEnabled:1,camSweepInit:1,lerpUp:1,branchOnSecond:1,relayEnabled:1,relayOnceEver:1,relayAlreadyDone:1,useQuestKeycode1:1,useQuestKeycode2:1;
     V3 panelItemPos; Quaternion panelItemRot;
-    bool touchEnabled,broken,requireRecharge,stayOpen,startOpen,targetAlreadyDone,toggleLasers,targettingOnlyUnlocks,changeLayerOnOpenClose,despawnInstead,doSelfAfterList,iceActive,forceFieldDirectionX,forceFieldDirectionY,forceFieldDirectionZ,heldObjectLoadedAlternate,lerping,onlyTargetOnce,autoPlayEmail,textureAnimating,texAnimStopsAtDie,texAnimInReverse,texAnimRandom,ajar,deathAnimationActive;
+    u64 gridCellsBits; /*gridCells[35] packed: bit i = cell i. Use Entity_GetGridCell/Entity_SetGridCell; never index directly.*/
     AttType attackType; AccCardType requiredAccessCard; BloodType bloodType; DoorState doorOpen; ForceFieldColor fieldColor; TrackType trackType; MusicType musicType; DoorState doorState; AIState currentState; u16 texAnimResourceFolderIdx;
     i8 wireCurL[7],wireCurR[7];
-    bool gridCells[35],puzzleFired,puzzleSolved;
 } Entity; // phew what a porker of a struct, it's been a eatin!
+INLINE bool Entity_GetGridCell(const Entity* e, int i) { return (bool)((e->gridCellsBits >> i) & 1u); }
+INLINE void Entity_SetGridCell(Entity* e, int i, bool v) { if (v) e->gridCellsBits |= (1ull << i); else e->gridCellsBits &= ~(1ull << i); }
 typedef struct{bool initialized,active;V2 min,max;double lastLMB,lastRMB;}UIComponent;
 typedef struct {
     u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_COUNT];

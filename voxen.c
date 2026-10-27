@@ -14,7 +14,7 @@ typedef struct { u32 nodeBase,triBase,vtxBase,uvBase; } ModelRTInfo;
 /* Per instance ray trace record, kept in one contiguous struct so the shader reads it with 3 vector loads. */
 typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo;
 static InstanceRTInfo rtInstanceInfo[INSTANCE_COUNT];
-static InstanceRTInfo rtPrevInfo[INSTANCE_COUNT];/*Shadow copy for the per-frame diff below: rtInstanceInfo holds per-level facts only (model bases, texture, active flag, scale - not motion), so on frames where nothing changed the upload is skipped entirely.*/
+static InstanceRTInfo rtPrevInfo[INSTANCE_COUNT];
 static ModelRTInfo rtModelInfo[MAX_MDLS];
 INLINE u32 F2U(float f) { union { float f; u32 u; } c; c.f = f; return c.u; }
 static u32 rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID;

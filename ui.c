@@ -662,7 +662,7 @@ void UI_PuzzleGridCell(bool rh,int cell) {
     u16 pgi = World.Sys_UI.tetheredPGP;
     if (pgi >= INSTS_1ST_IDX && pgi < World.instCount) {
         Entity* pe = &World.instances[pgi];
-        mcpy(pe->gridCells,World.Sys_UI.pg_cell,sizeof(pe->gridCells));
+        for (int k=0;k<35;++k) Entity_SetGridCell(pe,k,World.Sys_UI.pg_cell[k]);
         pe->puzzleSolved = World.Sys_UI.pg_solved;
         if (World.Sys_UI.pg_fired) pe->puzzleFired = true;
     }

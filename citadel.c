@@ -1078,7 +1078,7 @@ static void GridLoadInstance(u16 self) {
     if (def) { World.Sys_UI.pg_gridType=(PuzzleGridType)def->gridType; World.Sys_UI.pg_theme=def->theme; mcpy(World.Sys_UI.pg_type,def->cellType,sizeof(def->cellType)); }
     else     { World.Sys_UI.pg_gridType=PuzzleGridType_King; World.Sys_UI.pg_theme=HUDColor_Gray; mset(World.Sys_UI.pg_type,PuzzleCellType_Standard,sizeof(World.Sys_UI.pg_type)); }
     
-    mcpy(World.Sys_UI.pg_cell,e->gridCells,sizeof(e->gridCells));
+    for (int k=0;k<35;++k) World.Sys_UI.pg_cell[k]=Entity_GetGridCell(e,k);
     World.Sys_UI.pg_solved=e->puzzleSolved; World.Sys_UI.pg_fired=e->puzzleFired;
     PGEvalPuzzle();
 }
