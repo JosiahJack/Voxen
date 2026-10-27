@@ -1189,7 +1189,37 @@ bool FrobHeldItemIntoPanel(V3 p, V3 f, V3 r) {
     i16 item=(i16)(World.invP1.heldObjectIndex-307); if (!HeldItemIsFrobUser(item)) return false;
     RaycastHit h=Raycast(p,ScreenPointToRayOffset(f,r,0,0),FROB_DISTANCE,LMASK_PLAYER_FROB);
     if (!h.hit || h.hitInstanceIndex>=World.instCount) return false;
-    u16 idx=h.hitInstanceIndex; if (World.instances[idx].index!=614 && World.instances[idx].index!=602) return false;
+    u16 idx=h.hitInstanceIndex; u16 pidx=World.instances[idx].index;
+    if (item==54 && (IsPuzzleGridPanel(pidx) || IsPuzzleWirePanel(pidx))) {
+        /*Logic probe (useable 54) on a puzzle panel: Unity auto-solves on puzzle open (PuzzleGrid.cs:101, PuzzleWire.cs:340).
+          Previously this fell through to DropHeldItem: the probe dropped and the puzzle never solved. Isotope path untouched.*/
+        Entity* e=&World.instances[idx];
+        bool gated=(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f))||(e->entflags&EF_LOCKED);
+        PuzzlePanelUse(idx);/*opens UI; prints the blocked message when gated*/
+        if (gated) return true;/*keep probe, no solve*/
+        if (IsPuzzleGridPanel(pidx)) {
+            SystemUI* s=&World.Sys_UI;
+            if (s->pg_solved) { if (s->pg_fired) CenterStatusPrint("%s",Sys_Text.stringTable[312]); return true; }/*already solved: no re-fire, probe kept (Unity PuzzleSolved early return)*/
+            for (int k=0;k<35;++k) if (s->pg_type[k]==PuzzleCellType_Standard) s->pg_cell[k]=true;
+            PGEvalPuzzle();
+            s->pg_solved=true;/*Unity solves by fiat on probe use, not by evaluation*/
+            for (int k=0;k<35;++k) if (s->pg_type[k]==PuzzleCellType_Standard) s->pg_powered[k]=true;
+            for (int k=0;k<35;++k) Entity_SetGridCell(e,k,s->pg_cell[k]);
+            e->puzzleSolved=true; s->pg_fired=true; e->puzzleFired=true;
+            play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false);/*code accepted / puzzle solved sound*/
+            UseTargets(idx,e->targetIdx);
+            if (e->messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageLingdex]);
+        } else {
+            if (e->puzzleSolved) return true;/*already probe-solved: no re-fire, probe kept (wire has no own solved flag; puzzleSolved is the marker)*/
+            World.Sys_UI.pw_solved=true; e->puzzleSolved=true;/*wires are not repositioned on probe solve, same as Unity*/
+            play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false);
+            UseTargets(idx,e->targetIdx);
+            if (e->messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageLingdex]);
+        }
+        ResetHeldItem();/*probe consumed only on a successful solve*/
+        return true;
+    }
+    if (World.instances[idx].index!=614 && World.instances[idx].index!=602) return false;
     RelayPanelUse(idx); return true;/*the panel decides: it either installs the item (consuming it) or refuses it*/
 }
 
