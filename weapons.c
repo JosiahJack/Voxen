@@ -266,7 +266,7 @@ void MeleeHitUpdate(void) {
     
     DamageData dd = {.isOtherNPC = IdxIsNPC(World.instances[targ].index),.attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right),.damage = dmgForWep[wep16],.offense = offenseWep[wep16],
                      .penetration = penetrationWep[wep16],.owner = PLAYER1,.attackType = Att_Melee};
-    if (isRapier) { dd.attackType = Att_MlEg; if (World.invP1.energy < 4.0f) dd.damage = dmgForWep[wep16] / 2.0f; /*half power on low energy*/}
+    if (isRapier) { dd.attackType = Att_MlEg; if (World.invP1.energy < 4.0f) dd.damage = dmgForWep[6]; /*low-energy rapier same dmg as a lead pipe*/}
     wfx.tempHitEnt = targ;
     CreateStandardImpactEffects();
     if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);
