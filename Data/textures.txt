@@ -7209,3 +7209,8 @@ transparent: 0
 index: 3444
 doublesided: 0
 transparent: 0
+
+#Textures/flightpods_exterior_atlas.png
+index: 3445
+doublesided: 0
+transparent: 0
