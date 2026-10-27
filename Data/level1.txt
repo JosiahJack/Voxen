@@ -5547,7 +5547,7 @@ constIndex:308|lP.x:-6.26857|lP.y:-45.89498|lP.z:24.82665|lR.x:-.64221|lR.y:-.19
 constIndex:307|lP.x:2.3022|lP.y:-46.01333|lP.z:7.49221|lR.x:.70711|lR.w:-.7071|lS.x:.8|lS.y:.8|lS.z:.8|customIndex:-1
 constIndex:313|lP.x:-10.0241|lP.y:-46.06019|lP.z:14.33838|lR.x:-.70067|lR.y:-.0952|lR.z:-.09521|lR.w:.70067|useableItemIndex:6|customIndex:18
 constIndex:313|lP.x:-2.80545|lP.y:-39.81462|lP.z:-22.92836|lR.x:-.70509|lR.y:-.05345|lR.z:-.14045|lR.w:.69301|useableItemIndex:6|customIndex:15
-constIndex:397|lP.x:-7.3323|lP.y:-39.67297|lP.z:-22.7937|lR.x:-.2984|lR.y:-.64106|lR.z:-.64106|lR.w:.2984|useableItemIndex:110|customIndex:-1
+constIndex:417|lP.x:-7.3323|lP.y:-39.67297|lP.z:-22.7937|lR.x:-.2984|lR.y:-.64106|lR.z:-.64106|lR.w:.2984|useableItemIndex:110|customIndex:-1
 constIndex:311|lP.x:.12722|lP.y:-40.93845|lP.z:-16.03937|lR.x:-.6532|lR.y:.27702|lR.z:.21969|lR.w:.66958|lS.x:.15|lS.y:.11654|lS.z:.11654|useableItemIndex:4|customIndex:-1
 constIndex:311|lP.x:41.49609|lP.y:-46.08204|lP.z:20.68798|lR.x:-.49424|lR.y:-.48538|lR.z:-.48882|lR.w:.53027|lS.x:.11654|lS.y:.11654|lS.z:.12|useableItemIndex:4|customIndex:-1
 constIndex:399|lP.x:56.27549|lP.y:-44.71878|lP.z:12.73726|lR.x:-.61974|lR.y:-.77465|lR.z:-.12564|lR.w:.00736|lS.x:.4|lS.y:.4|lS.z:.4|useableItemIndex:92|customIndex:-1

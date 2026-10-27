@@ -1543,7 +1543,7 @@ void LoadLevelData(u8 curlevel) {
         } else if (IdxIsDoor(World.instances[i].index)) {
             World.layer[i] = L_Door;
             if (World.instances[i].startOpen) World.instances[i].stayOpen = true;
-            if (World.instances[i].lockedMessageLingdex <= 0) World.instances[i].lockedMessageLingdex = 3; static const u16 doorSFXIndex[19]={75,71,72,73,75,71,73,71,70,70,75,75,72,75,75,75,75,75,75};
+            if (World.instances[i].lockedMessageLingdex <= 0) World.instances[i].lockedMessageLingdex = 3; static const u16 doorSFXIndex[19]={75,75,71,72,73,75,71,73,71,70,70,75,75,72,75,75,75,75,75};
             World.instances[i].SFXIndex = doorSFXIndex[World.instances[i].index-496];
             if (World.instances[i].doorOpen > DoorState_Opening) World.instances[i].doorOpen = World.instances[i].startOpen ? DoorState_Open : DoorState_Closed;
             World.instances[i].doorState = World.instances[i].doorOpen;
