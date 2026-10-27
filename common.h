@@ -459,7 +459,7 @@ bool HudHeatTickOn(int);
 double get_time();
 float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
 void ApplyImpactForceSphere(DamageData*,V3,float,float);
-void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void), DebugRAMActual(const char*), DebugRAM(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
+void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void), DebugRAMActual(const char*), DebugRAM(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
      play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),PlayVmail(u8),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
      LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);

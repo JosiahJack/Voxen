@@ -193,7 +193,8 @@ void ExitCyberspace(void);
 void CyberTimerUpdate(u16 self) { if(World.curLev != LEVEL_CYBERSPACE){return;} Entity* e=&World.instances[self]; if(e->timerFinished >= World.pauseRelativeTime){return;} e->cyberTimer-=1.0f; e->minutes=vfloor(e->cyberTimer / 60.0f); e->seconds=e->cyberTimer - (e->minutes * 60.0f); e->timerFinished=World.pauseRelativeTime + 1.0; if(e->cyberTimer <= 0.0f){ExitCyberspace(); return;} }
 void CyberWallUpdate(u16 self) { Entity* e = &World.instances[self]; if (World.pauseRelativeTime < e->tickFinished) {return;} e->tickFinished = World.pauseRelativeTime + 0.05; }
 void ExitCyberspace(void);
-void CyberItemUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ DeleteInstance(self); } }
+void CyberItemUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ CyberItemOnTriggerEnter(self,PLAYER1); } }
+void CyberMineUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ CyberMineOnTriggerEnter(self,PLAYER1); } }
 void CyberExitUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(World.curLev != LEVEL_CYBERSPACE)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 2.0f){ ExitCyberspace(); } }
 void CyberSwitchUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(e->active)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ e->active=true; ChangeAnim(e,A_ACTIVATED); if(e->textIndex>0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); UseTargets(self,e->targetIdx); } }
 void CyberDataFragUpdate(u16 self) { Entity* e=&World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; if(e->allDone)return; if(V3_Dist(World.position[self],World.position[PLAYER1]) < 1.5f){ e->allDone=true; if(e->textIndex>0) CenterStatusPrint("%s",Sys_Text.stringTable[e->textIndex]); } }
@@ -1556,6 +1557,7 @@ void ModUpdate() {
         if (constdex==554) { CyberExitUpdate(i); }
         if (constdex==555) { CyberSwitchUpdate(i); }
         if (constdex>=448 && constdex <= 457) { CyberItemUpdate(i); }
+        if (constdex == 480) { CyberMineUpdate(i); }
     }
     
     if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) {
