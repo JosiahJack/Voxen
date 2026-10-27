@@ -58,22 +58,22 @@ double game_start_time, game_actual_start_time, shadowTime, physTime, renderTime
 u32 raycastCalls;
 static u32 gpuQ[5][5];
 static u8 gpuQFrame=0; /* [frame][shad,pre,main,ssr,comp] */
-Color textColors[] = {{1.000000000f,1.000000000f,1.000000000f,1.0f},/* 0 White T_WHITE*/
-                      {0.890196078f,0.874509804f,0.000000000f,1.0f},/* 1 Yellow T_YELLOW*/
-                      {0.623529412f,0.611764706f,0.000000000f,1.0f},/* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/
-                      {0.372549020f,0.654901961f,0.168627451f,1.0f},/* 3 Green T_GREEN*/
-                      {0.917647059f,0.137254902f,0.168627451f,1.0f},/* 4 Red T_RED*/
+Color textColors[] = {{1.000000000f,1.000000000f,1.000000000f,1.0f}, /* 0 White T_WHITE*/
+                      {0.890196078f,0.874509804f,0.000000000f,1.0f}, /* 1 Yellow T_YELLOW*/
+                      {0.623529412f,0.611764706f,0.000000000f,1.0f}, /* 2 Dark Yellow (Yellow * 0.7f) T_DARK_YELLOW*/
+                      {0.372549020f,0.654901961f,0.168627451f,1.0f}, /* 3 Green T_GREEN*/
+                      {0.917647059f,0.137254902f,0.168627451f,1.0f}, /* 4 Red T_RED*/
                       {1.000000000f,0.498039216f,0.000000000f,1.0f}, /* 5 Orange T_ORANGE*/
-                      {0.674509804f,0.058823529f,0.070588235f,1.0f},/* 6 StopD Red T_STOPD_RED*/
-                      {0.941176471f,0.282352941f,0.298039216f,1.0f},/* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/
+                      {0.674509804f,0.058823529f,0.070588235f,1.0f}, /* 6 StopD Red T_STOPD_RED*/
+                      {0.941176471f,0.282352941f,0.298039216f,1.0f}, /* 7 StopD Red Highlight T_STOPD_RED_HIGHLIGHT*/
                       {0.909803922f,0.203921569f,0.219607843f,1.0f}, /* 8 StopD Red Pause Title T_STOPD_RED_PAUSETITLE*/
-                      {0.470588235f,0.721568627f,0.172549020f,1.0f},/* 9 Green Menu Title T_GREEN_MENU*/
-                      {0.137254902f,0.356862745f,0.109803922f,1.0f},/* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/
+                      {0.470588235f,0.721568627f,0.172549020f,1.0f}, /* 9 Green Menu Title T_GREEN_MENU*/
+                      {0.137254902f,0.356862745f,0.109803922f,1.0f}, /* 10 Green Menu Title Shadow T_GREEN_MENU_SHADOW*/
                       {0.239215686f,0.466666667f,0.129411765f,1.0f}, /* 11 Green Menu Title Glow T_GREEN_MENU_GLOW*/
                       {0.392156863f,0.031372549f,0.039215686f,1.0f}, /* 12 Red Menu Text Dark T_RED_MENU*/
-                      {0.594339600f,0.232689545f,0.232689545f,1.0f} /* 13 Intro/Outro Subtitle #973B3B T_VIDEOTEXT*/,
-                      {0.000000000f,0.039215688f,0.835294200f,1.0f} /* 14 PuzzleWire actualColorBlue T_BLUE*/,
-                      {0.546864600f,0.152723400f,0.830188700f,1.0f} /* 15 PuzzleWire actualColorPurple T_PURPLE*/ };
+                      {0.594339600f,0.232689545f,0.232689545f,1.0f}, /* 13 Intro/Outro Subtitle #973B3B T_VIDEOTEXT*/
+                      {0.000000000f,0.039215688f,0.835294200f,1.0f}, /* 14 PuzzleWire actualColorBlue T_BLUE*/
+                      {0.546864600f,0.152723400f,0.830188700f,1.0f}  /* 15 PuzzleWire actualColorPurple T_PURPLE*/ };
 // Wireline Rendering (originally just for debug lines)
 u32 debugUnlitSP, debugLinesVAO, debugLinesVBO, wireLinesVAO, wireLinesVBO;
 typedef struct { float x,y,z,r,g,b,a; } WireVertex; WireVertex* debugLineVerts; static WireVertex* wireVerts; static u32 wireVertCount = 0;
@@ -2262,7 +2262,7 @@ void InitalizeEnvironment() {
     OS_ScratchInit();
     DebugRAM("program start");
     DualLog("=========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========\n");
-    DualLog("Game: Citadel, the System Shock (1994) Fan Remake                               1/03/2013 - 10/17/2026\n\n");
+    DualLog("Game: Citadel, the System Shock (1994) Fan Remake                               1/03/2013 - 10/26/2026\n\n");
     DualLog("OpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\nEntity byte size:%u\n",sizeof(Entity) + (6*4) + 4+4+1+1+4+4+4+4+(4*4)+1+(3*4)+(3*4)+(3*4)+(3*4)+(3*4)+(3*4));
     SetLevelPointers(0); 
     WindowInit();
