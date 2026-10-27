@@ -293,7 +293,7 @@ enum{L_Default=(1u<<0),L_TransparentFX=(1u<<1),L_BlocksRaycast=(1u<<4),L_UI=(1u<
 #define LMASK_EXPLOSION             (L_Default|L_Geometry|L_NPC|L_PlayerBullets|L_Door|L_InterDebris|L_PhysObjects|L_Player|L_Player2|L_CorpseSearchable|L_Corpse)
 #define LMASK_PLAYER_FEET           (L_Default|L_Geometry)
 typedef struct {i32 InputCodeSettings[42]; u16 ScreenWidth,ScreenHeight; bool Fullscreen; u8 FOV,Brightness,Gamma,FXAA,Shadows,Reflections,Vsync,ModelDetail,GI,SpeakerMode,Reverb,VolumeMaster,VolumeMusic,VolumeMessage,VolumeEffects,Language,DynamicMusic,Footsteps,InvertLook,InvertInventoryCycling,InvCybLook,QuickItemPickup,QuickReloadWeapons,MouseSensitivity,NoShootMode,HeadBob,SSR_RES,CurrentMonitor;} SettingsSystem; extern SettingsSystem Sys_Settings;
-typedef struct { bool god,noclip,notarget,bottomless,superoverride,fatigueCheat,redbull,consoleActive,noHUD,showLocation,showFPS,showPhys,showNPC,editMode; u8 dizzyLevel,animTest,editSubMode; } CheatsSystem; extern CheatsSystem Cheats;
+typedef struct { u16 god:1,noclip:1,notarget:1,bottomless:1,superoverride:1,fatigueCheat:1,redbull:1,consoleActive:1,noHUD:1,showLocation:1,showFPS:1,showPhys:1,showNPC:1,editMode:1; u8 dizzyLevel:2,animTest:2,editSubMode:2; } CheatsSystem; extern CheatsSystem Cheats;
 typedef struct {
         double vmailFrameFinished, tickFinished;
         double searchFXStartTime[2];
@@ -305,9 +305,11 @@ typedef struct {
         i16 generalClickItem, logFolderList[16], logReaderPage;
         u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, MFD_LefTab, MFD_CenterTab, MFD_RightTab, MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
         i8 elevButtonLabelIdx[8], generalClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
-        bool lastWeaponSideRH, lastItemSideRH, lastAutomapSideRH, lastDataSideRH, lastSearchSideRH, lastMinigameSideRH, logActive, paperLogInUse/*TODO*/, usingObject, highlightStatus[4], mouseClickHeldOverGUI, buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], mfdGeneralItem, mfdHardwareItem, keycodeValid, keycodeSolved, pg_cell[35], pg_powered[35], pg_checked[35], pg_solved, pw_wireOn[7], pw_rowActive[7];
-        bool shieldAnimationIsActivate; double shieldAnimationStarted, shieldAnimationFinished;
-        bool pw_selectedWireRH, pw_solved, pg_fired, mg_running[2], autoSide[2], fullMapOpen[2], firstMain, firstGeneral, firstHardware, firstWeapon;
+        u8 lastWeaponSideRH:1,        lastItemSideRH:1, lastAutomapSideRH:1,  lastDataSideRH:1, lastSearchSideRH:1, lastMinigameSideRH:1, logActive:1,     paperLogInUse:1/*TODO*/;
+        u8      usingObject:1, mouseClickHeldOverGUI:1,    mfdGeneralItem:1, mfdHardwareItem:1,     keycodeValid:1,      keycodeSolved:1, pg_solved:1, pw_selectedWireRH:1;
+        u8 shieldAnimationIsActivate:1, pw_solved:1, pg_fired:1, firstMain:1, firstGeneral:1, firstHardware:1, firstWeapon:1;
+        bool highlightStatus[4], buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], pg_cell[35], pg_powered[35], pg_checked[35], pw_wireOn[7], pw_rowActive[7], mg_running[2], autoSide[2], fullMapOpen[2];
+        double shieldAnimationStarted, shieldAnimationFinished;
         V3 objectInUsePos;
 } SystemUI;
 typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
@@ -327,7 +329,9 @@ typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen
     u16 hasHardware, hardwareIsActive, hardwareInvReferenceIndex[HW_COUNT], heldObjectIndex, heldObjectCustIdx, heldAmmo, heldAmmo2, weaponIndex, currentSearchItem, generalInvCustIdx[14], patchActive, drainJPM, grenConstIndex[7];
     u8 numLogsFromLevel[10], lerpUp, hasSoft, softVersions[7], hasMinigame, numweapons, currentMagazineAmount[7], currentMagazineAmount2[7], hwVers[HW_COUNT], hwVersSetting[HW_COUNT], grenAmmo[7], grenCur, generalInvCurrent, patchCur, patchCounts[7];
     i8 cyberItemIndex;
-    bool beepDone, hasNewEmail, hasNewNotes, isPulserNotDrill, wepLoadedWithAlternate[7], staminupActive, hasLog[134], readLog[134], justChangedWeap, overloadEnabled, recoiling, heldObjectLoadedAlternate, holdingObject, grenActive, hasNewLogs, radiationArea, inReverbZone, leanResetting, wasGrounded, makingNoise;
+    u8      beepDone:1, hasNewEmail:1, hasNewNotes:1, isPulserNotDrill:1, justChangedWeap:1, overloadEnabled:1,   recoiling:1, heldObjectLoadedAlternate:1;
+    u8 holdingObject:1,  grenActive:1,  hasNewLogs:1,    radiationArea:1,    inReverbZone:1,   leanResetting:1, wasGrounded:1,               makingNoise:1;
+    bool wepLoadedWithAlternate[7], staminupActive, hasLog[134], readLog[134];
 } InventorySystem;
 typedef struct { float damage, penetration, offense, armorvalue, defense, impactVelocity; V3 attacknormal, hitpoint; AttType attackType; u16 owner; bool isOtherNPC, berserkActive; } DamageData;
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/ extern AutoSplitterData autoSplitter;
@@ -361,9 +365,27 @@ typedef struct {
 extern BioMonitorSystem bioMonitor;
 typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB; bool portalNS,open,dirty; u8 lev;} Portal;
 typedef struct Particle { V3 pos,vel; float age,invLifetime,baseSize,rotation,angularVelocity; u32 color,emitterIndex,trailOwner; u16 flags,textureIndex,animFrame; u8 blendMode; V3 trailSample; u16 trailHead,trailChainLen; } Particle; typedef struct { u32 sortKey; u16 index; } PartSortEntry;
-typedef struct Emitter { bool active,looping; V3 position; Quaternion orientation; float emitAccumulator,emitRate,age,duration; u16 aliveCount,maxAlive; u8 physicsMode,trail,shapeType; u16 trailTexture; float shapeRadius,shapeAngle,lifetimeMin,lifetimeMax,sizeMin,sizeMax,speedMin,speedMax,rotMin,rotMax,aVelMin,aVelMax,gravity,trailLifetime,trailWidthStart,trailWidthEnd,trailVertexDistance; u32 trailColorStart,trailColorEnd;
-                         u32 texBaseIdx,textureFrameCount; u8 blendMode,rotationMode,colorMode; u16 burstRemaining; float animWindow,softness,scaleCurve[32],velocityCurve[32],rotationCurve[32],emissionCurve[32]; u32 colorRamp[64];
-                         bool useMesh; u16 meshInstance,meshModelIdx; u16 parentIdx; } Emitter;
+typedef struct Emitter { 
+    u8 active:1, looping:1, useMesh:1; /* bit-packed bools via comma-op */ 
+    V3 position; 
+    Quaternion orientation; 
+    float emitAccumulator, emitRate, age, duration; 
+    u16 aliveCount, maxAlive; 
+    u8 physicsMode, trail, shapeType; 
+    u16 trailTexture; 
+    float shapeRadius, shapeAngle, lifetimeMin, lifetimeMax, sizeMin, sizeMax, 
+        speedMin, speedMax, rotMin, rotMax, aVelMin, aVelMax, gravity, 
+        trailLifetime, trailWidthStart, trailWidthEnd, trailVertexDistance; 
+    u32 trailColorStart, trailColorEnd; 
+    u32 texBaseIdx, textureFrameCount; 
+    u8 blendMode, rotationMode, colorMode; 
+    u16 burstRemaining; 
+    u16 meshInstance, meshModelIdx; 
+    u16 parentIdx; 
+    float animWindow, softness, scaleCurve[32], velocityCurve[32], 
+        rotationCurve[32], emissionCurve[32]; 
+    u32 colorRamp[64];
+} Emitter;
 typedef struct GpuPartInst { float x,y,z,size; u32 color,data0,data1,pad; } GpuPartInst;
 typedef struct TrlSegInst { float p0x,p0y,p0z,padA,p1x,p1y,p1z,padB; float c00x,c00y,c00z,c00w,c01x,c01y,c01z,c01w,c10x,c10y,c10z,c10w,c11x,c11y,c11z,c11w; u32 color0,color1,uvData; float deathTime; float trailWidthStart,trailWidthEnd; u32 chainIndex,trailOwner; } TrlSegInst;
 typedef struct { Particle particles[MAX_PARTICLES]; Emitter emitters[MAX_EMITTERS]; GpuPartInst gpuInstances[MAX_PARTICLES]; TrlSegInst trailSegments[MAX_TRAIL_SEGS]; PartSortEntry sortKeys[MAX_PARTICLES]; u32 aliveCount,trailCount,nextTrailOwner; } PSys; extern PSys psys;
