@@ -1,13 +1,28 @@
 // text.c - Text and Font Rendering/Loading System
 #include "common.h"
-static i16 ttSHORT (u8*p) {return p[0]*256 + p[1];}
-static u32 ttULONG (u8*p) {return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
-#define font_tag4(p,a,b,c,d) ((p)[0]==(a) && (p)[1]==(b) && (p)[2]==(c) && (p)[3]==(d))
-#define font_tag(p,s) ((p)[0]==(s[0]) && (p)[1]==(s[1]) && (p)[2]==(s[2]) && (p)[3]==(s[3]))
 enum{FONT_vmove=1,FONT_vline,FONT_vcurve,FONT_vcubic};
 typedef struct{i16 x,y,cx,cy,cx1,cy1;u8 type,padding;}font_vertex;
 typedef struct{void*userdata;u8*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;}font_fontinfo;
-static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(font_tag(d+l+0,tag))return ttULONG(d+l+8);}return 0;}
+INLINE i16 ttSHORT (u8*p) {return p[0]*256 + p[1];}
+INLINE u32 ttULONG (u8*p) {return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
+INLINE size_t GetLineLength(const u8* data, size_t total_size, size_t start_dp, int utf16) { /* line length in bytes; advances past newline */
+    size_t dp = start_dp;
+    if (utf16) { while (dp + 1 < total_size) { u16 ch = data[dp] | (data[dp + 1] << 8); dp += 2; if (ch == '\r' || ch == '\n') { if (ch == '\r' && dp + 1 < total_size && (data[dp] | (data[dp + 1] << 8)) == '\n') dp += 2; break; } } }
+    else       { while (dp     < total_size) { u8  c  = data[dp]; if (c == '\r' || c == '\n') {  if ( c == '\r' && dp + 1 < total_size && data[dp + 1] == '\n') dp++; dp++; break; } dp++; } }
+    return dp - start_dp;
+}
+
+INLINE const char* DecodeUTF8(const char* p, u32* out_cp) { /* UTF-8 decode; returns new ptr; same ptr = incomplete */
+    const u8* s = (const u8*)p;
+    if (*s < 0x80) { *out_cp = *s++; }
+    else if ((*s & 0xE0) == 0xC0) { if (!s[1]) return p; *out_cp = (*s & 0x1F) << 6 | (s[1] & 0x3F); s += 2; }
+    else if ((*s & 0xF0) == 0xE0) { if (!s[1] || !s[2]) return p; *out_cp = (*s & 0x0F) << 12 | (s[1] & 0x3F) << 6 | (s[2] & 0x3F); s += 3; }
+    else if ((*s & 0xF8) == 0xF0) { if (!s[1] || !s[2] || !s[3]) return p; *out_cp = (*s & 0x07) << 18 | (s[1] & 0x3F) << 12 | (s[2] & 0x3F) << 6 | (s[3] & 0x3F); s += 4; }
+    else { s++; *out_cp = 0; }
+    return (const char*)s;
+}
+
+static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(((d+l+0)[0]==(tag[0]) && (d+l+0)[1]==(tag[1]) && (d+l+0)[2]==(tag[2]) && (d+l+0)[3]==(tag[3])))return ttULONG(d+l+8);}return 0;}
 static int font_InitFont_internal(font_fontinfo* info, u8* data, int fs) {
     u32 cmap,t,i,nt; info->data = data; info->fontstart = fs; 
     cmap = _find_table(data,fs,"cmap"); info->loca = _find_table(data,fs,"loca"); info->head = _find_table(data,fs,"head"); info->glyf = _find_table(data,fs,"glyf"); info->hhea = _find_table(data,fs,"hhea"); info->hmtx = _find_table(data,fs,"hmtx"); if(!cmap || !info->head || !info->hhea || !info->hmtx) return 0;
@@ -15,7 +30,7 @@ static int font_InitFont_internal(font_fontinfo* info, u8* data, int fs) {
     t=_find_table(data,fs,"maxp"); info->numGlyphs = t ? ttSHORT(data+t+4) : 0xffff; nt=ttSHORT(data+cmap+2);info->index_map=0; for(i=0;i<nt;++i){u32 er=cmap+4+8*i;switch(ttSHORT(data+er)){case 3:switch(ttSHORT(data+er+2)){case 1:case 10:info->index_map=cmap+ttULONG(data+er+4);}break;case 0:info->index_map=cmap+ttULONG(data+er+4);break;}} if(!info->index_map)return 0; info->indexToLocFormat=ttSHORT(data+info->head+50);return 1;
 }
 
-int _font_offset(u8*d,int idx){ if(font_tag4(d,'1',0,0,0)||font_tag4(d,0,1,0,0)||font_tag(d,"true")){return idx==0?0:-1;} if(font_tag(d,"ttcf")&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=((i32)d[8]<<24)|((i32)d[9]<<16)|((i32)d[10]<<8)|d[11]; if(idx>=n){return -1;} return ttULONG(d+12+idx*4); } return -1; }
+int _font_offset(u8*d,int idx){ if(((d)[0]=='1'&&d[1]==0&&d[2]==0&&d[3]==0)||((d)[0]==0&&d[1]==1&&d[2]==0&&d[3]==0)||(d[0]==(u8)'t'&&d[1]==(u8)'r'&&d[2]==(u8)'u'&&d[3]==(u8)'e')){return idx==0?0:-1;} if(d[0]==(u8)'t'&&d[1]==(u8)'t'&&d[2]==(u8)'c'&&d[3]==(u8)'f'&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=((i32)d[8]<<24)|((i32)d[9]<<16)|((i32)d[10]<<8)|d[11]; if(idx>=n){return -1;} return ttULONG(d+12+idx*4); } return -1; }
 int font_FindGlyphIndex(const font_fontinfo*info,int cp){
     u8*d=info->data;u32 im=info->index_map;u16 fmt=ttSHORT(d+im);
     if(fmt==0) { i32 b=ttSHORT(d+im+2); return cp<b-6 ? (*(u8*)(d+im+6+cp)) : 0; }
@@ -374,9 +389,8 @@ u8* LoadTextFile(const char* path, size_t* out_size, size_t* out_dp, int* out_ut
 void LoadTextForLanguage(u8 lang) {
     char tf[256]={0}; sCpy2aSubFromb(tf,255,localizations[lang<8?lang:0],256);
     char line[T_LOGSTR_MAX]; size_t dp=0; int utf16=0,ln=0; Sys_Text.file_data = LoadTextFile(tf,&Sys_Text.file_size,&dp,&utf16);    
-    while(dp<Sys_Text.file_size){size_t ls=dp;
-        if(utf16){while(dp+1<Sys_Text.file_size){u16 ch=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.file_size){u16 nx=Sys_Text.file_data[dp]|(Sys_Text.file_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}} else{while(dp<Sys_Text.file_size){u8 c=Sys_Text.file_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.file_size&&Sys_Text.file_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
-        size_t ll=dp-ls;if(ll==0){if(ln<T_LOGSTR_CNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
+    while(dp<Sys_Text.file_size){size_t ls=dp; size_t ll=GetLineLength(Sys_Text.file_data,Sys_Text.file_size,dp,utf16); dp+=ll;
+        if(ll==0){if(ln<T_LOGSTR_CNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
         if(utf16)utf16le_to_utf8(&Sys_Text.file_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1; mcpy(line,&Sys_Text.file_data[ls],ll);line[ll]='\0';}
         size_t sl=slen(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';
         if(sl==0){if(ln<T_LOGSTR_CNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
@@ -389,10 +403,8 @@ void LoadLogTextForLanguage(u8 lang) {
     mset(Sys_Text.audioLogImagesRefIndicesLH,0,LOGCNT*sizeof(u16));mset(Sys_Text.audioLogImagesRefIndicesRH,0,LOGCNT*sizeof(u16));mset(Sys_Text.audioLogType,0,LOGCNT*sizeof(u8));mset(Sys_Text.audioLogLevelFound,0,LOGCNT*sizeof(u8));
     char tf[256]={0}; sCpy2aSubFromb(tf,255,logLocalizations[lang<8?lang:0],256);
     char line[1024]; size_t dp=0;int utf16=0; Sys_Text.filelog_data = LoadTextFile(tf,&Sys_Text.filelog_size,&dp,&utf16);  
-    while(dp<Sys_Text.filelog_size){size_t ls=dp;
-        if(utf16){while(dp+1<Sys_Text.filelog_size){u16 ch=Sys_Text.filelog_data[dp]|(Sys_Text.filelog_data[dp+1]<<8);dp+=2;if(ch=='\r'||ch=='\n'){if(ch=='\r'&&dp+1<Sys_Text.filelog_size){u16 nx=Sys_Text.filelog_data[dp]|(Sys_Text.filelog_data[dp+1]<<8);if(nx=='\n')dp+=2;}break;}}}
-        else{while(dp<Sys_Text.filelog_size){u8 c=Sys_Text.filelog_data[dp];if(c=='\r'||c=='\n'){if(c=='\r'&&dp+1<Sys_Text.filelog_size&&Sys_Text.filelog_data[dp+1]=='\n')++dp;++dp;break;}++dp;}}
-        size_t ll=dp-ls; if(!ll)continue;
+    while(dp<Sys_Text.filelog_size){size_t ls=dp; size_t ll=GetLineLength(Sys_Text.filelog_data,Sys_Text.filelog_size,dp,utf16); dp+=ll;
+        if(ll==0)continue;
         if(utf16)utf16le_to_utf8(&Sys_Text.filelog_data[ls],ll,line,sizeof(line)); else { if (ll>=sizeof(line)) ll=sizeof(line)-1; mcpy(line,&Sys_Text.filelog_data[ls],ll);line[ll]='\0'; }
         size_t sl=slen(line); while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0'; if(!sl)continue;
         int li=-1,ilh=-1,irh=-1,lt=0,lf=0,fi=0;char*pos=line;
@@ -411,13 +423,7 @@ static float textVertexData[TEXT_VTX_FLOATS]; extern Color textColors[]; enum {T
 float MeasureLineAdvance(const char* p, u8 fontID) {
     float w=0; int cc=0;
     while (*p) {
-        const u8*s=(const u8*)p; u32 cp=0;
-        if (*s<0x80) { cp=*s++; }
-        else if ((*s&0xE0)==0xC0) { if (!s[1]) break; cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }
-        else if ((*s&0xF0)==0xE0) { if (!s[1] || !s[2]) break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }
-        else if ((*s&0xF8)==0xF0) { if (!s[1] || !s[2] || !s[3]) break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }
-        else s++;
-        p=(const char*)s;
+        u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q;
         cc++; if (cp=='\n'||cc>120) break;
         const font_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + CodepointToPackedIndex(cp,fontID); if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD) w = vfloor((w + b->xoff) + 0.5f) + fixedNumberAdvanceWidthStopD; else w += b->xadvance;
     } return w;
@@ -428,8 +434,7 @@ void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 ali
     glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID); glBindVertexArray(textVAO); float xUsed=x, yUsed=y; if (scale < 1.0f) { xUsed *= (1/scale); yUsed *= (1/scale); } float alignMul = (align==TALIGN_CENTER) ? 0.5f : (align==TALIGN_RIGHT) ? 1.0f : 0.0f; /*pen starts this far (as a fraction of line width) left of xUsed*/
     size_t vc=0; const char*p=uiTextBuffer; float xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed), ypos=yUsed+(16*scale),ls=22*scale; int cc=0; float puv = 10.0f * invatsz, bw=2.0f; 
     while(*p) {
-        const u8*s=(const u8*)p; u32 cp=0; if (*s<0x80) { cp=*s++; }else if ((*s&0xE0)==0xC0) { if (!s[1]) break; cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }else if ((*s&0xF0)==0xE0) { if (!s[1] || !s[2]) break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }else if ((*s&0xF8)==0xF0) { if (!s[1] || !s[2] || !s[3]) break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }else s++;
-        p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed); ypos+=ls; cc=0; continue; } int idx=CodepointToPackedIndex(cp,fontID); const font_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx; float qx0=vfloor((xpos+b->xoff)+0.5f),qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
+        u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q; cc++; if (cp=='\n'||cc>120) { xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed); ypos+=ls; cc=0; continue; } int idx=CodepointToPackedIndex(cp,fontID); const font_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx; float qx0=vfloor((xpos+b->xoff)+0.5f),qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
         float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw; float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f; float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 }; if (vc >= TEXT_VTX_FLOATS/30) break; mcpy(textVertexData + vc * 30,tv,sizeof(tv)); vc++;
         if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD){xpos = qx0 + fixedNumberAdvanceWidthStopD;}else xpos += b->xadvance;
     } if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferSubData(GL_ARRAY_BUFFER,0,vc*30*sizeof(float),textVertexData); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
@@ -450,8 +455,7 @@ void BuildTextDecalMeshes(void) {
             const float blockH=(nLines-1)*DECAL_LINEH_PX[dix]*lineSp + DECAL_ASC_PX[dix] + DECAL_DESC_PX[dix]; const u8 arow=anchor/3, acol=anchor%3;/*TextAnchor rows Upper/Middle/Lower, cols Left/Center/Right*/ const float xLeft=-(float)acol*0.5f*blockW, yTop=-(float)arow*0.5f*blockH, lineH=DECAL_LINEH_PX[dix]*lineSp; const float alignMul=(algn==2)?1.0f:((algn==1)?0.5f:0.0f);
             const char* p = str; float xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)), ypos=yTop+DECAL_ASC_PX[dix]; int cc=0; float x0=0,y0=0,x1=0,y1=0,s0=0,t0=0,s1=0,t1=0;
             while(*p) {
-                const u8* s=(const u8*)p; u32 cp=0; if (*s<0x80){cp=*s++;}else if ((*s&0xE0)==0xC0){ if(!s[1])break; cp=(*s&0x1F)<<6; cp|=(s[1]&0x3F); s+=2; }else if ((*s&0xF0)==0xE0){ if(!s[1]||!s[2])break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }else if ((*s&0xF8)==0xF0){ if(!s[1]||!s[2]||!s[3])break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }else s++;
-                p=(const char*)s; cc++; if (cp=='\n'||cc>120){ xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)); ypos+=lineH; cc=0; continue; } int idx=CodepointToPackedIndex((i32)cp,fontID); const font_packedchar* b = ((fontID==FONT_STOPD)?fontPackedCharStopD:fontPackedChar)+idx; float qx0=vfloor((xpos+b->xoff)+0.5f), qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
+                u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q; cc++; if (cp=='\n'||cc>120){ xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)); ypos+=lineH; cc=0; continue; } int idx=CodepointToPackedIndex((i32)cp,fontID); const font_packedchar* b = ((fontID==FONT_STOPD)?fontPackedCharStopD:fontPackedChar)+idx; float qx0=vfloor((xpos+b->xoff)+0.5f), qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
                 x0=qx0-bw; x1=(qx0+b->xoff2-b->xoff)+bw; y0=qy0-bw; y1=(qy0+b->yoff2-b->yoff)+bw; s0=qs0-puv; t0=qt0-puv; s1=qs1+puv; t1=qt1+puv;/*6 verts (2 tris) per glyph; local space only, live model matrix applies rotation/scale/position*/ const float L[6][5] = {{x0,y0,s0,t0},{x1,y1,s1,t1},{x1,y0,s1,t0},{x0,y0,s0,t0},{x0,y1,s0,t1},{x1,y1,s1,t1}};
                 for(int k=0;k<6;k++){float lx=L[k][0]*decalPx,ly=-L[k][1]*decalPx,lz=0;/*negate y: glyph quads are y-down, world +Y is up*/ halfVerts[vIdx++]=F32ToHalf(lx); halfVerts[vIdx++]=F32ToHalf(ly); halfVerts[vIdx++]=F32ToHalf(lz); halfVerts[vIdx++]=F32ToHalf(0.0f); halfVerts[vIdx++]=F32ToHalf(0.0f); halfVerts[vIdx++]=F32ToHalf(-1.0f); halfVerts[vIdx++]=F32ToHalf(L[k][2]); halfVerts[vIdx++]=F32ToHalf(L[k][3]);}
                 if (vIdx+8 > 720*8) break; if (cp>='0'&&cp<='9'&&fontID==FONT_STOPD){ xpos=qx0+fixedNumberAdvanceWidthStopD; }else xpos += b->xadvance;
