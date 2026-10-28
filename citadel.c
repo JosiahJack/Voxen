@@ -873,13 +873,13 @@ void DoorForceOpen(u16 self) { World.instances[self].requiredAccessCard = ACC_No
 void DoorForceClose(u16 self) { if (World.instances[self].doorOpen == DoorState_Closed) {return;} DoorClose(self); }
 void DoorActuate(u16 self) {
     Entity* e = &World.instances[self];
-    AnimationClip o=DoorGetClip(e,A_OPENING), c=DoorGetClip(e,A_CLOSING);
+    AnimationClip o=mdlAnimClips[e->animationNum][A_OPENING], c=mdlAnimClips[e->animationNum][A_CLOSING];
          if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= o.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); }
     else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= c.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); }
     if (e->doorOpen == DoorState_Open) { DoorClose(self); return; } if (e->doorOpen == DoorState_Closed) { DoorOpen(self); return; } bool op = e->doorOpen == DoorState_Opening;
     if (op || e->doorOpen == DoorState_Closing) {
         u8 src = op ? A_OPENING : A_CLOSING, dst = op ? A_CLOSING : A_OPENING;
-        AnimationClip srcClip = DoorGetClip(e,src), dstClip = DoorGetClip(e,dst);
+        AnimationClip srcClip = mdlAnimClips[e->animationNum][src], dstClip = mdlAnimClips[e->animationNum][dst];
         u32 f = e->frame; if (f < srcClip.frameStart) f = srcClip.frameStart; if (f > srcClip.frameEnd) f = srcClip.frameEnd;
         float p = (srcClip.frameEnd > srcClip.frameStart) ? (float)(f - srcClip.frameStart) / (float)(srcClip.frameEnd - srcClip.frameStart) : 1.0f;
         u16 newFrm = DoorFrameFromProgress(dstClip,1.0f - p); // Direct frame assignment (mid-anim reversal): clip + frame + matching model.
@@ -912,10 +912,10 @@ static bool DoorLasersOn(const Entity* e, AnimationClip closing) {
 
 void DoorLaserDraw(u16 self) {
     Entity* e = &World.instances[self];
-    if (!DoorLasersOn(e, DoorGetClip(e, A_CLOSING))) return;
+    if (!DoorLasersOn(e, mdlAnimClips[e->animationNum][A_CLOSING])) return;
     if (V3_SqDist(World.position[self], World.position[PLAYER1]) > 2500.0f) return; /* ~50m */
         
-    AnimationClip closing = DoorGetClip(e, A_CLOSING);
+    AnimationClip closing = mdlAnimClips[e->animationNum][A_CLOSING];
     u16 m = (u16)(closing.frameStartModelIndex + (u16)(closing.frameEnd - closing.frameStart));
     if (m >= MAX_MDLS) return;
     
@@ -959,7 +959,7 @@ void DoorLaserDraw(u16 self) {
 }
 
 void DoorUpdate(u16 self) {
-    Entity* e = &World.instances[self]; if(e->ajar){return;} AnimationClip opening=DoorGetClip(e,A_OPENING), closing=DoorGetClip(e,A_CLOSING);
+    Entity* e = &World.instances[self]; if(e->ajar){return;} AnimationClip opening=mdlAnimClips[e->animationNum][A_OPENING], closing=mdlAnimClips[e->animationNum][A_CLOSING];
     if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= opening.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); } else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); } if (World.pauseRelativeTime > e->waitBefClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
     DoorLayerUpdate(self, e);
 }
@@ -1179,14 +1179,14 @@ static void RelayPanelUse(u16 self) {
 static void PuzzlePanelUpdate(u16 self) {
     Entity* e=&World.instances[self];
     if (e->clip==A_IDLE_CLOSED && e->panelOpen) ChangeAnim(e,A_IDLE_OPEN);
-    if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=DoorGetClip(e,A_OPENING); if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
+    if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=mdlAnimClips[e->animationNum][A_OPENING]; if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
 }
 
 static void RelayPanelUpdate(u16 self) {
     Entity* e=&World.instances[self];
     if (e->clip==A_IDLE_CLOSED) { if (e->panelInstalled) ChangeAnim(e,A_INSTALLED); else if (e->panelOpen) ChangeAnim(e,A_IDLE_OPEN); }
-    if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=DoorGetClip(e,A_OPENING); if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
-    if (e->panelOpen && e->clip==A_INSTALL) { AnimationClip c=DoorGetClip(e,A_INSTALL); if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_INSTALLED); }/*isotope: insertion clip hands over to the installed frame*/
+    if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=mdlAnimClips[e->animationNum][A_OPENING]; if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
+    if (e->panelOpen && e->clip==A_INSTALL) { AnimationClip c=mdlAnimClips[e->animationNum][A_INSTALL]; if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_INSTALLED); }/*isotope: insertion clip hands over to the installed frame*/
     if (e->panelArmed && World.pauseRelativeTime>=e->panelTimer) {
         e->panelArmed=false; V3 p=World.position[self];
         play_wav(sounds[64]/*explosion1*/,AppliedFXVol(1.0f),p,true); SpawnExplosionEffect(p,1); Shake(-1.0f); World.fogFac += 5.0f;

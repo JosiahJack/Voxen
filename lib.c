@@ -73,7 +73,6 @@ int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
 
 int sFormat(char* buffer, size_t bufsz, const char* format, ...) { va_list args; __builtin_va_start(args,format); int ret = sFormatV(buffer,bufsz,format,args); __builtin_va_end(args); return ret; } // snprintf replacement
 char* sUpToEndLine(char* buf, int sz, FHandle fd){if(sz<=1 || buf == NULL){return NULL;} char* p=buf; int rem=sz-1; static int pos=0,end=0; static char b[4096]; while(rem > 0){if(pos>=end){long n=OS_Read(fd,b,sizeof(b)); if(n <= 0){if(p==buf){return NULL;} goto done;} pos=0; end=(int)n;} while(rem>0 && pos<end){char c=b[pos++]; *p++=c; rem--; if(c=='\n'){goto done;}}} done:*p='\0'; return buf;} // fgets replacement, not thread safe but no multithreading
-// Misc Helpers
 FHandle console_log_file=0;
 static void DualLogMain(bool writeToFileToo, const char *prefix, const char *fmt, va_list args) {
     char buf[4096]; va_list c; __builtin_va_copy(c,args); sFormatV(buf,sizeof(buf),fmt,c); __builtin_va_end(c); bool color=(prefix && prefix[0] == '\033');
@@ -89,7 +88,7 @@ static void DualLogMain(bool writeToFileToo, const char *prefix, const char *fmt
         OS_Write(console_log_file,buf,slen(buf),"console.log");
     }
 }
-void PrintLog(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(false,NULL,s,a); __builtin_va_end(a); }
+
 void DualLog(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,NULL,s,a); __builtin_va_end(a); } void DualLogWarn(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,"\033[1;38;5;208mWARN:",s,a); __builtin_va_end(a); } void DualLogError(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,"\033[1;31mERROR:",s,a); __builtin_va_end(a); }
 INLINE int pntz(size_t p[2]) { return (p[0] != 1) ? __builtin_ctzll(p[0] - 1) : (p[1] ? 8 * sizeof(size_t) + __builtin_ctzll(p[1]) : 0); }
 INLINE void shl(size_t p[2], int n) { if (n >= 8 * (int)sizeof(size_t)) { p[1] = p[0]; p[0] = 0; n -= 8 * sizeof(size_t); } if (n) { p[1] = (p[1] << n) | (p[0] >> (8 * sizeof(size_t) - n)); p[0] <<= n; } }
@@ -158,8 +157,6 @@ u32 random_range_rng = 0x12345678u;
 static u32 xs32() { u32 x = random_range_rng; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return random_range_rng = x ? x : 0xdeadbeefu; }
 u8 random_range_u8(u8 a, u8 b) { if (a > b) { u8 temp = a; a = b; b = temp; } if (a == b) {return a;} u32 r = (u32)b - a + 1u; u32 v,limit = 256u - (256u % r); do { v = xs32() & 0xFFu; } while (v >= limit); return (u8)(a + (v % r)); }
 u32 random_range_u32(u32 a, u32 b) { if (a > b) { u32 temp = a; a = b; b = temp; } if (a == b) {return a;} u64 range = (u64)b - a + 1u; return a + (u32)(((u64)xs32() * range) >> 32);  }
-i32 random_range_i32(i32 a, i32 b) { if (a > b) { i32 temp = a; a = b; b = temp; } if (a == b) {return a;} u64 range = (u64)((i64)b - a + 1); return a + (i32)(((u64)xs32() * range) >> 32); }
 float random_range(float a, float b) { float factor = ((float)(xs32() >> 8)) * (1.0f / 16777216.0f); return a + (b - a) * factor; }
-u32 rand() { return xs32() & 0xFFFFu; }
 float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
 float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }

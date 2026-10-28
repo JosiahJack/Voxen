@@ -1517,9 +1517,7 @@ void LogicTimerInitBeforeLoad(u16 i) {
     World.instances[i].intervalFinished = World.pauseRelativeTime + (World.instances[i].useRandomTimes ? (double)random_range(World.instances[i].randomMin,World.instances[i].randomMax) : (double)World.instances[i].timeInterval);
 }
 
-float DoorClamp01(float v) { if (v < 0.0f) return 0.0f; if (v > 1.0f) return 1.0f; return v; }
-AnimationClip DoorGetClip(const Entity* e, u8 clip) { return mdlAnimClips[e->animationNum][clip]; }
-u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(DoorClamp01(t) * (float)span + 0.5f)); } // round, don't truncate: t*span truncating loses up to a full frame, so a stroke resumed at 70% lands near 22% instead of 30%. Clamped t <= 1 keeps the +0.5 from spilling past span.
+u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(vclamp(t,0.0f,1.0f) * (float)span + 0.5f)); }
 void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
 void LoadLevelData(u8 curlevel) {
     if(!teleportDestinationsInitialized){for(u8 l=0;l<MAX_LEVELS;++l)for(u8 id=0;id<8;++id)teleportDestinations[l][id]=U16_MAX;teleportDestinationsInitialized=true;}
@@ -1548,7 +1546,7 @@ void LoadLevelData(u8 curlevel) {
             if (World.instances[i].doorOpen > DoorState_Opening) World.instances[i].doorOpen = World.instances[i].startOpen ? DoorState_Open : DoorState_Closed;
             World.instances[i].doorState = World.instances[i].doorOpen;
             if (World.instances[i].ajar) {
-                AnimationClip c = DoorGetClip(&World.instances[i],A_OPENING); u16 f = DoorFrameFromProgress(c,World.instances[i].ajarPercentage);
+                AnimationClip c = mdlAnimClips[World.instances[i].animationNum][A_OPENING]; u16 f = DoorFrameFromProgress(c,World.instances[i].ajarPercentage);
                 World.instances[i].clip = A_OPENING; World.instances[i].frame = f; World.instances[i].modelIndex = c.frameStartModelIndex + (u16)(f - c.frameStart); World.instances[i].currentFrameFinished = 0.0; // Parked partway; UpdateAnims() holds ajar doors so it stays put.
                 World.instances[i].doorOpen = World.instances[i].doorState = DoorState_Opening;
             } else { switch(World.instances[i].doorOpen){case DoorState_Open:ChangeAnim(&World.instances[i],A_IDLE_OPEN); break; case DoorState_Opening:ChangeAnim(&World.instances[i],A_OPENING); break; case DoorState_Closing:ChangeAnim(&World.instances[i],A_CLOSING); break; default:ChangeAnim(&World.instances[i],A_IDLE_CLOSED); break;} }

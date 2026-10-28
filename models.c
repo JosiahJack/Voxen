@@ -118,14 +118,12 @@ bool glbread_float(const glb_accessor* a, size_t i, float* o, size_t es) { /*gen
     return GlbCellGet(&c, i, o, es);
 }
 
-size_t glbread_index(const glb_accessor* a, size_t i) { GlbCell c = GlbCellInit(a); return GlbCellGetIdx(&c, i); }
 static int glb_json_strcmp(jsmntok_t const* t, const u8* j, const char* s) { if ((*t).type!=JSMN_STRING) return -1; size_t sl=slen(s),nl=(size_t)(t->end-t->start); return sl==nl?sCompUpToLen((const char*)j+t->start,s,sl)==0:0; }
 static int glb_json_to_int(jsmntok_t const* t, const u8* j){ if ((*t).type!=JSMN_PRIMITIVE) return -1; const char* p=(const char*)j+t->start; return (int)fast_atoi(&p); }
 static size_t glb_json_to_size(jsmntok_t const* t, const u8* j){ if(t->type != JSMN_PRIMITIVE){return 0;} size_t r=0;const char*p=(const char*)j+t->start,*e=(const char*)j+t->end; while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;}return r; }
-static float glb_json_to_float(jsmntok_t const* t, const u8* j){ if ((*t).type!=JSMN_PRIMITIVE) return -1; const char* p=(const char*)j+t->start; return fast_atof(&p); }
-static bool glb_json_to_bool(jsmntok_t const* t, const u8* j){int sz=(int)(t->end-t->start);return sz==4&&sCompUpToLen((const char*)j+t->start,"true",4)==0;}
+
 static int glb_skip_json(jsmntok_t const* t, int i){int e=i+1;while(i<e){switch(t[i].type){case JSMN_OBJECT:e+=t[i].size*2;break;case JSMN_ARRAY:e+=t[i].size;break;case JSMN_PRIMITIVE:case JSMN_STRING:break;default:return -1;}i++;}return i;}
-static int glb_parse_json_float_array(jsmntok_t const* t, int i, const u8* j, float* o, int s){if (t[i].type!=JSMN_ARRAY) return -1;if(t[i].size!=s)return -1;++i;for(int k=0;k<s;++k){if (t[i].type!=JSMN_PRIMITIVE) return -1;o[k]=glb_json_to_float(t+i,j);++i;}return i;}
+static int glb_parse_json_float_array(jsmntok_t const* t, int i, const u8* j, float* o, int s){if (t[i].type!=JSMN_ARRAY) return -1;if(t[i].size!=s)return -1;++i;for(int k=0;k<s;++k){if (t[i].type!=JSMN_PRIMITIVE) return -1; const char* p=(const char*)j+t[i].start; o[k]=fast_atof(&p);++i;}return i;}
 static int glb_parse_json_string(jsmntok_t const* t, int i, const u8* j, i32 tid, char** out){ if (t[i].type!=JSMN_STRING) return -1;if(*out)return -1; int sz=(int)(t[i].end-t[i].start);char*r=OS_SubArenaAlloc(tid,sz+1); sCpy2aSubFromb(r,sz,(const char*)j+t[i].start,sz+1);*out=r;return i+1; }
 static int glb_parse_json_array(jsmntok_t const* t, int i, const u8* j, size_t es, i32 tid, void** out, size_t* os){ (void)j;if(t[i].type!=JSMN_ARRAY)return -1;if(*out)return -1;int sz=t[i].size;*out=OS_SubArenaAlloc(tid,es*sz); *os=sz;return i+1; }
 typedef int (*glb_parse_item_func)(jsmntok_t const* t, int i, const u8* j, i32 tid, void* out);
@@ -145,7 +143,7 @@ static int json_accessor(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_ac
     for(int k=0;k<sz;++k){
         if(t[i].type!=JSMN_STRING||t[i].size==0)return -1;
              if(glb_json_strcmp(t+i,j,"bufferView")){++i;out->buffer_view=(glb_buffer_view*)((size_t)glb_json_to_int(t+i,j)+1);++i;} else if(glb_json_strcmp(t+i,j,"byteOffset")){++i;out->offset=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"componentType")){++i;out->component_type=json_to_comp_type(t+i,j);++i;}
-        else if(glb_json_strcmp(t+i,j,"normalized")){++i;out->normalized=glb_json_to_bool(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"count")){++i;out->count=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"type")){ ++i; out->type = glb_json_strcmp(t+i,j,"SCALAR")?glbscalar:glb_json_strcmp(t+i,j,"VEC2")?glbv2:glb_json_strcmp(t+i,j,"VEC3")?glbv3:glb_json_strcmp(t+i,j,"VEC4")?glbv4:glb_json_strcmp(t+i,j,"MAT4")?glbmat4:glbinvalid; ++i; }
+        else if(glb_json_strcmp(t+i,j,"normalized")){++i;int sz=(int)(t[i].end-t[i].start);out->normalized=sz==4&&sCompUpToLen((const char*)j+t[i].start,"true",4)==0;++i;} else if(glb_json_strcmp(t+i,j,"count")){++i;out->count=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"type")){ ++i; out->type = glb_json_strcmp(t+i,j,"SCALAR")?glbscalar:glb_json_strcmp(t+i,j,"VEC2")?glbv2:glb_json_strcmp(t+i,j,"VEC3")?glbv3:glb_json_strcmp(t+i,j,"VEC4")?glbv4:glb_json_strcmp(t+i,j,"MAT4")?glbmat4:glbinvalid; ++i; }
         else{ i=glb_skip_json(t,i+1);} if(i<0){return i;}
     } return i;
 }
