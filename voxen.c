@@ -2026,7 +2026,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.gravity[PLAYER1] = 1.0f;
     World.dynamicFriction[PLAYER1] = 0.6f;
     World.staticFriction[PLAYER1] = 0.8f; 
-    World.instances[PLAYER1].health = 211.0f; World.instances[PLAYER1].cyberHealth = 255.0f; /*Unity HealthManager gives the player a full 255 cyberHealth pool at start; it persists across cyberspace entries (integrity items top it up), and the cyberspace HUD ticks read it*/
+    World.instances[PLAYER1].health = 211.0f; World.instances[PLAYER1].cyberHealth = 255.0f; /*Unity HealthManager gives the player a full 255 cyberHealth pool at start; it persists across cyberspace entries (integrity items top it up), and the cyberspace HUD ticks read it*/ World.instances[PLAYER1].bloodType = BloodType_Red; /*Unity player HealthManager: bloodType 1 (Red); without it GetImpactType(PLAYER1) returns sparks (729) instead of blood (721) on hitscan hits*/
     World.invP1.noiseFinished = World.pauseRelativeTime;
     World.invP1.energy = 54.0f; World.invP1.energyDrainTickFinished = World.pauseRelativeTime + 0.1 + (double)random_range(0.5f,1.0f);
     for (int i=0;i<12;++i) { World.invP1.hardwareInvReferenceIndex[i] = 21 + i; } World.invP1.hardwareInvReferenceIndex[12] = World.invP1.hardwareInvReferenceIndex[13] = 0;

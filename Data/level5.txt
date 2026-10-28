@@ -3599,8 +3599,6 @@ constIndex:82|lP.x:24.3178|lP.y:14.08|lP.z:-26.88|lR.x:-.7071|lR.w:.70711
 constIndex:79|lP.x:-1.2822|lP.y:12.8|lP.z:16.64|lR.x:-.5|lR.y:.5|lR.z:.5|lR.w:.5
 constIndex:1|lP.x:-42.2422|lP.y:12.8|lP.z:6.4|lR.y:.70711|lR.z:.70711|lR.w:0
 constIndex:1|lP.x:-42.2422|lP.y:12.8|lP.z:-6.4|lR.x:-.7071|lR.w:.70711
-constIndex:1|lP.x:-42.2422|lP.y:12.8|lP.z:6.4|lR.x:-.70711|lR.w:-.70711
-constIndex:1|lP.x:-42.2422|lP.y:12.8|lP.z:-6.4|lR.y:.70711|lR.z:-.7071|lR.w:0
 constIndex:1|lP.x:-42.2422|lP.y:12.8|lP.z:-8.96|lR.y:.70711|lR.z:.70711|lR.w:0
 constIndex:1|lP.x:-42.2422|lP.y:12.8|lP.z:8.96|lR.x:-.7071|lR.w:.70711
 constIndex:83|lP.x:37.1178|lP.y:14.72|lP.z:-21.76|lR.y:.70711|lR.z:.70711|lR.w:0
