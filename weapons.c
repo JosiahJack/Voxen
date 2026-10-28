@@ -233,15 +233,17 @@ static float DamageForPower(int w) { // Slope-of-slopes curve: interpolates dama
 }
 
 float TakeDamage(u16 self,DamageData dd);
+float GetDamageTakeAmount(DamageData* dd);
 void HitScanFire(int wep16) {
     u16 ent = wfx.tempHitEnt;
     bool b = ent != 0xFFFF, isBeam=(wep16 == 1 || wep16 == 4 || wep16 == 14), npc = b && IdxIsNPC(World.instances[ent].index), alt = World.invP1.wepLoadedWithAlternate[World.invP1.wepCur];
     DamageData dd = {.isOtherNPC = npc, .hitpoint = wfx.tempHit.point, .attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right), .owner = PLAYER1,
-                     .impactVelocity = wep16 == 12 ? 120.0f/*riotgun kicks harder*/ : 80.0f,.attackType=(wep16 == 2 && alt) ? Att_Trnq/*dartgun tranqs*/ : attTypeWep[wep16] };
+                     .impactVelocity = wep16 == 12 ? 120.0f/*riotgun kicks harder*/ : 80.0f,.attackType=(wep16 == 2 && alt) ? Att_Trnq/*dartgun tranqs*/ : attTypeWep[wep16], .berserkActive = (World.invP1.patchActive & PATCH_BERSERK) != 0 };
     if (isBeam) CreateBeamImpactEffects(wep16);
     else { CreateStandardImpactEffects(); if (!npc && b && IdxIsGeometry(World.instances[ent].index)) CreateStandardImpactMarks(wep16); }
     float tranq = -1.0f; if (npc && dd.attackType == Att_Trnq){tranq=Tranquilize(ent,3.0f + random_range(0.0f,4.0f),false);}
     dd.damage=alt ? dmgForWep2[wep16] : (CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16]); dd.offense=alt ? offenseWep2[wep16] : offenseWep[wep16]; dd.penetration=alt ? penetrationWep2[wep16] : penetrationWep[wep16];
+    dd.damage = GetDamageTakeAmount(&dd);/*C# WeaponFire hitscan calls GetDamageTakeAmount before TakeDamage (armorvalue/defense stay 0, as in C# which never fills them for hitscan)*/
     float dmgFinal = 0.0f;
     if (b && World.instances[ent].health > 0.0f) {
         dd.damage*=0.8f;/*rebalancing factor*/ dmgFinal=TakeDamage(ent,dd); dd.impactVelocity+=dd.damage;
@@ -265,8 +267,9 @@ void MeleeHitUpdate(void) {
     if (targ == PLAYER1) return; // can't hit self
     
     DamageData dd = {.isOtherNPC = IdxIsNPC(World.instances[targ].index),.attacknormal = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right),.damage = dmgForWep[wep16],.offense = offenseWep[wep16],
-                     .penetration = penetrationWep[wep16],.owner = PLAYER1,.attackType = Att_Melee};
+                     .penetration = penetrationWep[wep16],.owner = PLAYER1,.attackType = Att_Melee,.berserkActive = (World.invP1.patchActive & PATCH_BERSERK) != 0};
     if (isRapier) { dd.attackType = Att_MlEg; if (World.invP1.energy < 4.0f) dd.damage = dmgForWep[6]; /*low-energy rapier same dmg as a lead pipe*/}
+    dd.damage = GetDamageTakeAmount(&dd);/*C# WeaponFire melee calls GetDamageTakeAmount before TakeDamage (placed after the rapier damage assignment; same product either way, multiplication commutes; NOT replicating C#'s stale-offense quirk, where the call sits before offense is set)*/
     wfx.tempHitEnt = targ;
     CreateStandardImpactEffects();
     if (IdxIsGeometry(World.instances[targ].index)) CreateStandardImpactMarks(wep16);

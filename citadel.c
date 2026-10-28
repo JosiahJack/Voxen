@@ -567,7 +567,18 @@ void GrenadeActivate(u16 self) {
 }
 void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=GrenadeTypeFromConst(e->index); if(idx == 14){GrenadeExplode(self); return;} /*Plastique*/ if((idx == 10 || idx == 12) && e->timerFinished <= World.pauseRelativeTime) { GrenadeExplode(self); return; } if (idx == 11) { V3 origin = World.position[self]; float pr=1.451f;  bool npcMine = GrenadeIsNPCMine(self);  for (u16 i = PLAYER1; i < World.instCount; i++) { Entity* o = &World.instances[i]; if (i == self || !(o->entflags & EF_ACTIVE) || (o->entflags & EF_DEAD)) continue; if (npcMine ? (i != PLAYER1) : (i == PLAYER1 || !IdxIsNPC(o->index))) continue; float rr = pr + ((World.col[i] == CT_CAP || World.col[i] == CT_SPH) ? World.colliderSize[i].x : 0.0f); if (V3_SqDist(World.position[i], origin) < (rr * rr)) { GrenadeExplode(self); return; } } } }
 void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index); if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
-float GetDamageTakeAmount(DamageData* dd) { if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f; if (dd->berserkActive) take *= 4.0/*Quad Damage!*/; if (dd->defense > 0.0f && dd->offense < dd->defense) { float r = (dd->defense - dd->offense) / dd->defense; if (r > 0.85f) r = 0.85f; take *= (1.0f - r); } if (dd->armorvalue > 0.0f && dd->penetration < dd->armorvalue) { float a = (dd->armorvalue - dd->penetration) / dd->armorvalue; if (a > 0.85f) a = 0.85f; take *= (1.0f - a); } if (take < 0.0f) take = 0.0f; return take; }
+float GetDamageTakeAmount(DamageData* dd) {
+    if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f;
+    /* 1. Armor Absorption: REMOVED — penetration concept intentionally removed (C# never populates armorvalue/penetration, so its armor step is dead code; do not reintroduce it).
+       2. Weapon Vulnerabilities: handled by TakeDamage via ApplyAttTypeAdjustments, as in C# HealthManager. */
+    /* 3. Critical Hits (NPCs only, C# DamageData.cs): crit = offense - defense; if crit > 0, two rolls (rand < crit/6 and rand < 0.2) then take *= (1 + crit). */
+    if (dd->isOtherNPC) { float crit = dd->offense - dd->defense; if (crit > 0.0f && random_range(0.0f, 1.0f) < (crit / 6.0f) && random_range(0.0f, 1.0f) < 0.2f) { take *= (1.0f + crit); } }
+    /* 4. Random Factor +/- 10% (C# DamageData.cs). */
+    take *= random_range(0.9f, 1.1f);
+    /* 6. Berserk Damage Increase (C# Const.berserkDamageMultiplier = 4.0). */
+    if (dd->berserkActive) take *= 4.0f/*Quad Damage!*/;
+    if (take < 0.0f) take = 0.0f; return take;
+}
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType, false); if (!EntIdxIsValid(fx)) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
 void ExitCyberspace(void) { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < World.numLevels) ? (u8)World.cyberReturnLevel : (World.startLevel < World.numLevels ? World.startLevel : 0), World.cyberReturnPos); }
 void ReduceCurrentLevelSecurity(SecurityType stype) {
@@ -611,9 +622,9 @@ static bool CPUNodesRemainOnLevel(void) {
 void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
     if(self>=World.instCount||hitIdx>=World.instCount)return; Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return;/*other.gameObject == host*/ e->counter++;/*numHits++*/
     DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(e->recentMostActivator==PLAYER1&&(World.invP1.patchActive & PATCH_BERSERK)!=0)};
-    if (dd.berserkActive) { dd.damage *= 4.0f; dd.berserkActive = false; }
-    Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; } if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }/*Railgun sphere impact*/
-    dd.damage = GetDamageTakeAmount(&dd);
+    Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; }
+    dd.damage = GetDamageTakeAmount(&dd);/*Berserk now applied inside GetDamageTakeAmount, as in C# (old pre-multiply removed: same product, single application point).*/
+    if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }/*Railgun sphere impact, after GetDamageTakeAmount as in C# ProjectileEffectImpact*/
     SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);
     bool hostIsNPC=e->recentMostActivator<World.instCount&&IdxIsNPC(World.instances[e->recentMostActivator].index);
     if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {

@@ -1,28 +1,26 @@
 // text.c - Text and Font Rendering/Loading System
 #include "common.h"
-// stb_truetype.h - v1.26 - public domain, authored from 2009-2021 by Sean Barrett / RAD Game Tools...Heavily gutted by Josiah Jack
-typedef struct { void* ptr; size_t sz; } TAlloc; static TAlloc* ttAllocs = NULL; static int tallocCount=0; typedef struct { u8*data; int cursor,size; } stbtt__buf;
+typedef struct { void* ptr; size_t sz; } TAlloc; static TAlloc* ttAllocs = NULL; static int tallocCount=0;
 static void* ttalloc(size_t n) { if (tallocCount>=4674) {DualLogError("ttalloc too many!\n"); return NULL;} void*p=OS_Alloc(n); if(!p||p==(void*)-1){DualLogError("ttalloc failed\n");return NULL;} ttAllocs[tallocCount++]=(TAlloc){p,n}; return p; }
 static void ttfree (void* p) { if(!p)return; for(int i=tallocCount-1;i>=0;--i){ if(ttAllocs[i].ptr==p){ OS_Free(p,ttAllocs[i].sz); ttAllocs[i]=ttAllocs[--tallocCount]; return; } } }
 static u16 ttUSHORT(u8*p) {return p[0]*256 + p[1];} 
 static i16 ttSHORT (u8*p) {return p[0]*256 + p[1];}
 static u32 ttULONG (u8*p) {return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
-#define stbtt_tag4(p,a,b,c,d) ((p)[0]==(a) && (p)[1]==(b) && (p)[2]==(c) && (p)[3]==(d))
-#define stbtt_tag(p,s) ((p)[0]==(s[0]) && (p)[1]==(s[1]) && (p)[2]==(s[2]) && (p)[3]==(s[3]))
-enum{STBTT_vmove=1,STBTT_vline,STBTT_vcurve,STBTT_vcubic};
-typedef struct{i16 x,y,cx,cy,cx1,cy1;u8 type,padding;}stbtt_vertex;
-typedef struct{void*userdata;u8*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;}stbtt_fontinfo;
-static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttUSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(stbtt_tag(d+l+0,tag))return ttULONG(d+l+8);}return 0;}
-static int stbtt_InitFont_internal(stbtt_fontinfo* info, u8* data, int fs) {
-    u32 cmap,t,i,nt;info->data=data;info->fontstart=fs; 
-    cmap=_find_table(data,fs,"cmap"); info->loca=_find_table(data,fs,"loca"); info->head=_find_table(data,fs,"head"); info->glyf=_find_table(data,fs,"glyf"); info->hhea=_find_table(data,fs,"hhea"); info->hmtx=_find_table(data,fs,"hmtx"); if(!cmap || !info->head || !info->hhea || !info->hmtx) return 0;
-    if(info->glyf){ if(!info->loca)return 0; }
-    else{ return 0; }
+#define font_tag4(p,a,b,c,d) ((p)[0]==(a) && (p)[1]==(b) && (p)[2]==(c) && (p)[3]==(d))
+#define font_tag(p,s) ((p)[0]==(s[0]) && (p)[1]==(s[1]) && (p)[2]==(s[2]) && (p)[3]==(s[3]))
+enum{FONT_vmove=1,FONT_vline,FONT_vcurve,FONT_vcubic};
+typedef struct{i16 x,y,cx,cy,cx1,cy1;u8 type,padding;}font_vertex;
+typedef struct{void*userdata;u8*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;}font_fontinfo;
+static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttUSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(font_tag(d+l+0,tag))return ttULONG(d+l+8);}return 0;}
+static int font_InitFont_internal(font_fontinfo* info, u8* data, int fs) {
+    u32 cmap,t,i,nt; info->data = data; info->fontstart = fs; 
+    cmap = _find_table(data,fs,"cmap"); info->loca = _find_table(data,fs,"loca"); info->head = _find_table(data,fs,"head"); info->glyf = _find_table(data,fs,"glyf"); info->hhea = _find_table(data,fs,"hhea"); info->hmtx = _find_table(data,fs,"hmtx"); if(!cmap || !info->head || !info->hhea || !info->hmtx) return 0;
+    if (info->glyf) { if (!info->loca) return 0; } else { return 0; }
     t=_find_table(data,fs,"maxp"); info->numGlyphs = t ? ttUSHORT(data+t+4) : 0xffff; nt=ttUSHORT(data+cmap+2);info->index_map=0; for(i=0;i<nt;++i){u32 er=cmap+4+8*i;switch(ttUSHORT(data+er)){case 3:switch(ttUSHORT(data+er+2)){case 1:case 10:info->index_map=cmap+ttULONG(data+er+4);}break;case 0:info->index_map=cmap+ttULONG(data+er+4);break;}} if(!info->index_map)return 0; info->indexToLocFormat=ttUSHORT(data+info->head+50);return 1;
 }
 
-int _font_offset(u8*d,int idx){ if(stbtt_tag4(d,'1',0,0,0)||stbtt_tag4(d,0,1,0,0)||stbtt_tag(d,"true")){return idx==0?0:-1;} if(stbtt_tag(d,"ttcf")&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=((i32)d[8]<<24)|((i32)d[9]<<16)|((i32)d[10]<<8)|d[11]; if(idx>=n){return -1;} return ttULONG(d+12+idx*4); } return -1; }
-int stbtt_FindGlyphIndex(const stbtt_fontinfo*info,int cp){
+int _font_offset(u8*d,int idx){ if(font_tag4(d,'1',0,0,0)||font_tag4(d,0,1,0,0)||font_tag(d,"true")){return idx==0?0:-1;} if(font_tag(d,"ttcf")&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=((i32)d[8]<<24)|((i32)d[9]<<16)|((i32)d[10]<<8)|d[11]; if(idx>=n){return -1;} return ttULONG(d+12+idx*4); } return -1; }
+int font_FindGlyphIndex(const font_fontinfo*info,int cp){
     u8*d=info->data;u32 im=info->index_map;u16 fmt=ttUSHORT(d+im);
     if(fmt==0) { i32 b=ttUSHORT(d+im+2); return cp<b-6 ? (*(u8*)(d+im+6+cp)) : 0; }
     if(fmt==6) { u32 f=ttUSHORT(d+im+6),n=ttUSHORT(d+im+8); return(u32)cp>=f&&(u32)cp<f+n?ttUSHORT(d+im+10+(cp-f)*2):0;}
@@ -40,20 +38,20 @@ int stbtt_FindGlyphIndex(const stbtt_fontinfo*info,int cp){
     return 0;
 }
 
-INLINE void _sv(stbtt_vertex*v,u8 t,i32 x,i32 y,i32 cx,i32 cy){v->type=t;v->x=(i16)x;v->y=(i16)y;v->cx=(i16)cx;v->cy=(i16)cy;}
-static int _glyf_off(const stbtt_fontinfo*info,int gi){ if(gi>=info->numGlyphs||info->indexToLocFormat>=2){return-1;} int g1,g2;if(info->indexToLocFormat==0){g1=info->glyf+ttUSHORT(info->data+info->loca+gi*2)*2;g2=info->glyf+ttUSHORT(info->data+info->loca+gi*2+2)*2;} else{g1=info->glyf+ttULONG(info->data+info->loca+gi*4);g2=info->glyf+ttULONG(info->data+info->loca+gi*4+4);} return g1==g2?-1:g1; }
-static int _close_shape(stbtt_vertex*v,int n,int wo,int so,i32 sx,i32 sy,i32 scx,i32 scy,i32 cx,i32 cy){
-    if(so){if(wo)_sv(&v[n++],STBTT_vcurve,(cx+scx)>>1,(cy+scy)>>1,cx,cy);_sv(&v[n++],STBTT_vcurve,sx,sy,scx,scy);}
-    else{if(wo)_sv(&v[n++],STBTT_vcurve,sx,sy,cx,cy);else _sv(&v[n++],STBTT_vline,sx,sy,0,0);}
+INLINE void _sv(font_vertex*v,u8 t,i32 x,i32 y,i32 cx,i32 cy){v->type=t;v->x=(i16)x;v->y=(i16)y;v->cx=(i16)cx;v->cy=(i16)cy;}
+static int _glyf_off(const font_fontinfo*info,int gi){ if(gi>=info->numGlyphs||info->indexToLocFormat>=2){return-1;} int g1,g2;if(info->indexToLocFormat==0){g1=info->glyf+ttUSHORT(info->data+info->loca+gi*2)*2;g2=info->glyf+ttUSHORT(info->data+info->loca+gi*2+2)*2;} else{g1=info->glyf+ttULONG(info->data+info->loca+gi*4);g2=info->glyf+ttULONG(info->data+info->loca+gi*4+4);} return g1==g2?-1:g1; }
+static int _close_shape(font_vertex*v,int n,int wo,int so,i32 sx,i32 sy,i32 scx,i32 scy,i32 cx,i32 cy){
+    if(so){if(wo)_sv(&v[n++],FONT_vcurve,(cx+scx)>>1,(cy+scy)>>1,cx,cy);_sv(&v[n++],FONT_vcurve,sx,sy,scx,scy);}
+    else{if(wo)_sv(&v[n++],FONT_vcurve,sx,sy,cx,cy);else _sv(&v[n++],FONT_vline,sx,sy,0,0);}
     return n;
 }
 
-static int stbtt_GetGlyphShape(const stbtt_fontinfo *info, int gi, stbtt_vertex **pv){
-    u8*d=info->data; stbtt_vertex*verts=0; int nv=0, g=_glyf_off(info,gi); *pv=NULL; if(g<0){return 0;}
+static int font_GetGlyphShape(const font_fontinfo *info, int gi, font_vertex **pv){
+    u8*d=info->data; font_vertex*verts=0; int nv=0, g=_glyf_off(info,gi); *pv=NULL; if(g<0){return 0;}
         i16 nc=ttSHORT(d+g);
         if (nc > 0) {
             u8*ep=d+g+10;int ins=ttUSHORT(d+g+10+nc*2);u8*pts=d+g+10+nc*2+2+ins;
-            int n=1+ttUSHORT(ep+nc*2-2), m=n+2*nc; verts=(stbtt_vertex*)ttalloc(m*sizeof(verts[0])); if(!verts){return 0;}
+            int n=1+ttUSHORT(ep+nc*2-2), m=n+2*nc; verts=(font_vertex*)ttalloc(m*sizeof(verts[0])); if(!verts){return 0;}
             int off=m-n; u8 fl=0,fc=0;
             for(int i=0;i<n;++i){if(fc==0){fl=*pts++; if(fl&8)fc=*pts++;}else{--fc;} verts[off+i].type=fl;}
             i32 x=0;for(int i=0;i<n;++i){fl=verts[off+i].type;if(fl&2){i16 dx=*pts++;x+=(fl&16)?dx:-dx;}else if(!(fl&16)){x+=(i16)(pts[0]*256+pts[1]);pts+=2;}verts[off+i].x=(i16)x;}
@@ -62,34 +60,34 @@ static int stbtt_GetGlyphShape(const stbtt_fontinfo *info, int gi, stbtt_vertex 
             for(int i=0;i<n;++i){fl=verts[off+i].type;x=(i16)verts[off+i].x;y=(i16)verts[off+i].y;
                 if(nm==i){if(i)nv=_close_shape(verts,nv,wo,so,sx,sy,scx,scy,cx,cy);so=!(fl&1);
                     if(so){scx=x;scy=y;if(!(verts[off+i+1].type&1)){sx=(x+(i32)verts[off+i+1].x)>>1;sy=(y+(i32)verts[off+i+1].y)>>1;}else{sx=verts[off+i+1].x;sy=verts[off+i+1].y;++i;}}else{sx=x;sy=y;}
-                    _sv(&verts[nv++],STBTT_vmove,sx,sy,0,0);wo=0;nm=1+ttUSHORT(ep+j++*2);
+                    _sv(&verts[nv++],FONT_vmove,sx,sy,0,0);wo=0;nm=1+ttUSHORT(ep+j++*2);
                 }else{
                     if(!(fl&1)){
-                        if(wo)_sv(&verts[nv++],STBTT_vcurve,(cx+x)>>1,(cy+y)>>1,cx,cy); cx=x; cy=y; wo=1;
-                    } else { _sv(&verts[nv++],wo ? STBTT_vcurve : STBTT_vline,x,y,wo ? cx : 0, wo ? cy : 0); wo=0; }
+                        if(wo)_sv(&verts[nv++],FONT_vcurve,(cx+x)>>1,(cy+y)>>1,cx,cy); cx=x; cy=y; wo=1;
+                    } else { _sv(&verts[nv++],wo ? FONT_vcurve : FONT_vline,x,y,wo ? cx : 0, wo ? cy : 0); wo=0; }
                 }
             }
             nv=_close_shape(verts,nv,wo,so,sx,sy,scx,scy,cx,cy);
         } else if (nc < 0) {
             u8*comp=d+g+10;int more=1;
-            while(more){stbtt_vertex*cv=0,*tmp=0;float mtx[6]={1,0,0,1,0,0};
+            while(more){font_vertex*cv=0,*tmp=0;float mtx[6]={1,0,0,1,0,0};
                 u16 fl=ttSHORT(comp);comp+=2;u16 gidx=ttSHORT(comp);comp+=2;
                 if(fl&2) { if(fl&1) { mtx[4] = ttSHORT(comp); comp+=2; mtx[5]=ttSHORT(comp); comp+=2; } else { mtx[4]=(*(i8*)(comp)); comp++; mtx[5]=(*(i8*)(comp)); comp++; }}
                 if(fl&(1<<3)){mtx[0]=mtx[3]=ttSHORT(comp)/16384.0f;comp+=2;mtx[1]=mtx[2]=0;}
                 else if(fl&(1<<6)){mtx[0]=ttSHORT(comp)/16384.0f;comp+=2;mtx[1]=mtx[2]=0;mtx[3]=ttSHORT(comp)/16384.0f;comp+=2;}
                 else if(fl&(1<<7)){mtx[0]=ttSHORT(comp)/16384.0f;comp+=2;mtx[1]=ttSHORT(comp)/16384.0f;comp+=2;mtx[2]=ttSHORT(comp)/16384.0f;comp+=2;mtx[3]=ttSHORT(comp)/16384.0f;comp+=2;}
                 float fm=vsqrtf(mtx[0]*mtx[0]+mtx[1]*mtx[1]),fn=vsqrtf(mtx[2]*mtx[2]+mtx[3]*mtx[3]);
-                int cn=stbtt_GetGlyphShape(info,gidx,&cv);
-                if(cn>0){for(int i=0;i<cn;++i){stbtt_vertex*v=&cv[i];i16 vx=v->x,vy=v->y;v->x=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->y=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));vx=v->cx;vy=v->cy;v->cx=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->cy=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));}
-                    tmp=(stbtt_vertex*)ttalloc((nv+cn)*sizeof(stbtt_vertex));if(!tmp){ttfree(cv);ttfree(verts);return 0;}
-                    if(nv>0&&verts){mcpy(tmp,verts,nv*sizeof(stbtt_vertex));} mcpy(tmp+nv,cv,cn*sizeof(stbtt_vertex)); ttfree(cv); ttfree(verts); verts=tmp; nv+=cn;}
+                int cn=font_GetGlyphShape(info,gidx,&cv);
+                if(cn>0){for(int i=0;i<cn;++i){font_vertex*v=&cv[i];i16 vx=v->x,vy=v->y;v->x=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->y=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));vx=v->cx;vy=v->cy;v->cx=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->cy=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));}
+                    tmp=(font_vertex*)ttalloc((nv+cn)*sizeof(font_vertex));if(!tmp){ttfree(cv);ttfree(verts);return 0;}
+                    if(nv>0&&verts){mcpy(tmp,verts,nv*sizeof(font_vertex));} mcpy(tmp+nv,cv,cn*sizeof(font_vertex)); ttfree(cv); ttfree(verts); verts=tmp; nv+=cn;}
                 more=fl&(1<<5);}
         }
         *pv = verts;
         return nv;
     }
 
-static void GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo*font,int g,float sx,float sy,float shx,float shy,int*ix0,int*iy0,int*ix1,int*iy1){
+static void GetGlyphBitmapBoxSubpixel(const font_fontinfo*font,int g,float sx,float sy,float shx,float shy,int*ix0,int*iy0,int*ix1,int*iy1){
     int x0=0,y0=0,x1=0,y1=0,has=0;
     int g1=_glyf_off(font,g);if(g1>=0) { has = 1; x0 = ttSHORT(font->data + g1 + 2); y0 = ttSHORT(font->data + g1 + 4); x1 = ttSHORT(font->data + g1 + 6); y1 = ttSHORT(font->data + g1 + 8);}
     if(ix0) *ix0=has?(int)vfloor(x0*sx+shx):0;
@@ -99,40 +97,16 @@ static void GetGlyphBitmapBoxSubpixel(const stbtt_fontinfo*font,int g,float sx,f
 }
 
 typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;
-typedef struct{ tt_heapchk* head; void* first_free; int remaining; }stbtt__hheap;
-static void* _hha(stbtt__hheap* hh,size_t sz) { if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;} if(!hh->remaining) {int c=sz<32?2000:sz<128?800:100;tt_heapchk*ck=(tt_heapchk*)ttalloc(sizeof(*ck)+sz*c); if(!ck){return NULL;} ck->next=hh->head; hh->head=ck; hh->remaining=c;} --hh->remaining; return(char*)hh->head+sizeof(tt_heapchk)+sz*hh->remaining; }
-static void _hhf(stbtt__hheap* hh,void*p) { *(void**)p=hh->first_free;hh->first_free=p; }
-typedef struct{ float x0,y0,x1,y1; int invert; }stbtt__edge; typedef struct stbtt__active_edge{ struct stbtt__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }stbtt__active_edge;
-static void _hce(float*sl,int x,stbtt__active_edge*e,float x0,float y0,float x1,float y1){
+typedef struct{ tt_heapchk* head; void* first_free; int remaining; }font__hheap;
+static void* _hha(font__hheap* hh,size_t sz) { if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;} if(!hh->remaining) {int c=sz<32?2000:sz<128?800:100;tt_heapchk*ck=(tt_heapchk*)ttalloc(sizeof(*ck)+sz*c); if(!ck){return NULL;} ck->next=hh->head; hh->head=ck; hh->remaining=c;} --hh->remaining; return(char*)hh->head+sizeof(tt_heapchk)+sz*hh->remaining; }
+static void _hhf(font__hheap* hh,void*p) { *(void**)p=hh->first_free;hh->first_free=p; }
+typedef struct{ float x0,y0,x1,y1; int invert; }font__edge; typedef struct font__active_edge{ struct font__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }font__active_edge;
+static void _hce(float*sl,int x,font__active_edge*e,float x0,float y0,float x1,float y1){
     if(y0==y1||y0>e->ey||y1<e->sy)return;if(y0<e->sy){x0+=(x1-x0)*(e->sy-y0)/(y1-y0);y0=e->sy;}if(y1>e->ey){x1+=(x1-x0)*(e->ey-y1)/(y1-y0);y1=e->ey;}
     if(x0<=x&&x1<=x)sl[x]+=e->direction*(y1-y0);else if(x0>=x+1&&x1>=x+1);else sl[x]+=e->direction*(y1-y0)*(1.0f-((x0-(float)x)+(x1-(float)x))/2.0f);
 }
 
 INLINE float _ptz(float h,float t0,float t1,float b0,float b1){ return ((t1-t0)+(b1-b0))/2.0f*h; }
-static void _eqs(stbtt__edge*p,int n) {
-    while (n > 12) {
-        int m = n >> 1;
-        int c01 = ((&p[0])->y0 < (&p[m])->y0);
-        int c12 = ((&p[m])->y0 < (&p[n - 1])->y0);
-        if(c01!=c12){
-            int z = (((&p[0])->y0 < (&p[n-1])->y0) == c12) ? 0 : n - 1;
-            stbtt__edge t_ = p[z]; p[z] = p[m]; p[m] = t_;;
-        }
-        stbtt__edge t_ = p[0]; p[0] = p[m]; p[m] = t_;
-        int i = 1, j = n - 1;
-        for(;;){
-            while (((&p[i])->y0 < (&p[0])->y0)) ++i;
-            while (((&p[0])->y0 < (&p[j])->y0)) --j;
-            if(i>=j)break;
-            
-            t_ = p[i]; p[i] = p[j]; p[j] = t_;
-            ++i;
-            --j;
-        }
-        if(j<n-i) { _eqs(p,j); p += i; n -= i; }
-        else      { _eqs(p + i,n - i); n = j;  }
-    }
-}
 static void _add_pt(V2*p,int n,float x,float y){if(p){p[n].x=x;p[n].y=y;}}
 static int _tess_c(V2*pts,int*np,float x0,float y0,float x1,float y1,float x2,float y2,float fsq,int n) {
     float mx=(x0+2*x1+x2)/4,my=(y0+2*y1+y2)/4,dx=(x0+x2)/2-mx,dy=(y0+y2)/2-my; if(n>16||dx*dx+dy*dy<=fsq){_add_pt(pts,(*np)++,x2,y2);return 1;}
@@ -150,13 +124,14 @@ static void _tess_cb(V2*pts,int*np,float x0,float y0,float x1,float y1,float x2,
     _tess_cb(pts,np,mx,my,xb,yb,x23,y23,x3,y3,fsq,n+1);
 }
 
-static void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo* info, u8* out, int ow, int oh, int ostr, float sx, float sy, float shx, float shy, int g) {
-    stbtt_vertex *v; int ix0, iy0, nv = stbtt_GetGlyphShape(info, g, &v);
+static int edge_compare(const void* a, const void* b) { float ya = ((const font__edge*)a)->y0, yb = ((const font__edge*)b)->y0; return (ya > yb) - (ya < yb); }
+static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* info, u8* out, int ow, int oh, int ostr, float sx, float sy, float shx, float shy, int g) {
+    font_vertex *v; int ix0, iy0, nv = font_GetGlyphShape(info, g, &v);
     GetGlyphBitmapBoxSubpixel(info, g, sx, sy, shx, shy, &ix0, &iy0, 0, 0);
     float scale = sx > sy ? sy : sx;
     int wc = 0; int *wl = NULL; V2 *win = NULL;
     float flat = 0.35f / scale; float fsq = flat * flat; int n = 0;
-    for (int i = 0; i < nv; ++i) { if (v[i].type == STBTT_vmove) { ++n; } }
+    for (int i = 0; i < nv; ++i) { if (v[i].type == FONT_vmove) { ++n; } }
     wc = n;
     if (n != 0) {
         wl = (int*)ttalloc(sizeof(int) * (size_t)n); if (!wl) { wc = 0; goto err_flatten; }
@@ -170,10 +145,10 @@ static void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo* info, u8* out, i
             np = 0;
             for (int i = 0; i < nv; ++i) {
                 switch (v[i].type) {
-                    case STBTT_vmove: if (n >= 0) wl[n] = np - start; start = np; ++n; x = v[i].x; y = v[i].y; _add_pt(win, np++, x, y);               break;
-                    case STBTT_vline: x = v[i].x; y = v[i].y; _add_pt(win, np++, x, y);                                                                break;
-                    case STBTT_vcurve: _tess_c(win, &np, x, y, v[i].cx, v[i].cy, v[i].x, v[i].y, fsq, 0); x = v[i].x; y = v[i].y;                      break;
-                    case STBTT_vcubic: _tess_cb(win, &np, x, y, v[i].cx, v[i].cy, v[i].cx1, v[i].cy1, v[i].x, v[i].y, fsq, 0); x = v[i].x; y = v[i].y; break;
+                    case FONT_vmove: if (n >= 0) wl[n] = np - start; start = np; ++n; x = v[i].x; y = v[i].y; _add_pt(win, np++, x, y);               break;
+                    case FONT_vline: x = v[i].x; y = v[i].y; _add_pt(win, np++, x, y);                                                                break;
+                    case FONT_vcurve: _tess_c(win, &np, x, y, v[i].cx, v[i].cy, v[i].x, v[i].y, fsq, 0); x = v[i].x; y = v[i].y;                      break;
+                    case FONT_vcubic: _tess_cb(win, &np, x, y, v[i].cx, v[i].cy, v[i].cx1, v[i].cy1, v[i].x, v[i].y, fsq, 0); x = v[i].x; y = v[i].y; break;
                 }
             }
             wl[n] = np - start;
@@ -183,9 +158,9 @@ static void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo* info, u8* out, i
     err_flatten: ttfree(win); ttfree(wl); wl = NULL; wc = 0; win = NULL; 
     after_flatten:;
     if (win) {
-        int inv = 1; float ysi = inv ? -sy : sy; stbtt__edge* e; int n_edges = 0;
+        int inv = 1; float ysi = inv ? -sy : sy; font__edge* e; int n_edges = 0;
         for (int i = 0; i < wc; ++i) { n_edges += wl[i]; }
-        e = (stbtt__edge*)ttalloc(sizeof(*e) * ((size_t)n_edges + 1));
+        e = (font__edge*)ttalloc(sizeof(*e) * ((size_t)n_edges + 1));
         if (e) {
             n_edges = 0; int m = 0;
             for (int i = 0; i < wc; ++i) {
@@ -202,23 +177,23 @@ static void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo* info, u8* out, i
                     ++n_edges;
                 }
             }
-            _eqs(e, n_edges);
-            for (int i = 1; i < n_edges; ++i) { stbtt__edge t = e[i]; int j = i; while (j > 0 && ((&t)->y0 < (&e[j - 1])->y0)) { e[j] = e[j - 1]; --j; } e[j] = t; }
+            qsort_new(e, n_edges, sizeof(font__edge), edge_compare);
+            for (int i = 1; i < n_edges; ++i) { font__edge t = e[i]; int j = i; while (j > 0 && ((&t)->y0 < (&e[j - 1])->y0)) { e[j] = e[j - 1]; --j; } e[j] = t; }
             e[n_edges].y0=(float)(iy0+oh)+1;
-            stbtt__hheap hh={0}; stbtt__active_edge*active=NULL; stbtt__edge*ep=e; float sd[129],*sl=sd,*sl2; int y=iy0,j=0,i;
+            font__hheap hh={0}; font__active_edge*active=NULL; font__edge*ep=e; float sd[129],*sl=sd,*sl2; int y=iy0,j=0,i;
             if(ow>64)sl=(float*)ttalloc((size_t)(ow*2+1)*sizeof(float));
             if(sl){
                 sl2=sl+ow;
-                while(j<oh){float syt=(float)y,syb=(float)y+1;stbtt__active_edge**step=&active;
+                while(j<oh){float syt=(float)y,syb=(float)y+1;font__active_edge**step=&active;
                     mset(sl,0,(size_t)ow*sizeof(sl[0]));mset(sl2,0,((size_t)ow+1)*sizeof(sl[0]));
-                    while(*step){stbtt__active_edge*z=*step;if(z->ey<=syt){*step=z->next;z->direction=0;_hhf(&hh,z);}else step=&(*step)->next;}
+                    while(*step){font__active_edge*z=*step;if(z->ey<=syt){*step=z->next;z->direction=0;_hhf(&hh,z);}else step=&(*step)->next;}
                     while(ep->y0<=syb){
                         if(ep->y0!=ep->y1){
-                            stbtt__active_edge*z=(stbtt__active_edge*)_hha(&hh,sizeof(*z));
+                            font__active_edge*z=(font__active_edge*)_hha(&hh,sizeof(*z));
                             if(z){float dxdy=(ep->x1-ep->x0)/(ep->y1-ep->y0);z->fdx=dxdy;z->fdy=dxdy?1.0f/dxdy:0;z->fx=ep->x0+dxdy*(syt-ep->y0)-(float)ix0;z->direction=ep->invert?1.0f:-1.0f;z->sy=ep->y0;z->ey=ep->y1;if(j==0&&iy0!=0&&z->ey<syt)z->ey=syt;z->next=active;active=z;}
                         }++ep;
                     }
-                    for(stbtt__active_edge*ae=active;ae;ae=ae->next){
+                    for(font__active_edge*ae=active;ae;ae=ae->next){
                         if(ae->fdx==0){float x0=ae->fx;if(x0<ow){if(x0>=0){_hce(sl,(int)x0,ae,x0,syt,x0,syb);_hce(sl2,(int)x0+1,ae,x0,syt,x0,syb);}else _hce(sl2,0,ae,x0,syt,x0,syb);}}
                         else{float x0=ae->fx,dx=ae->fdx,dy=ae->fdy,xb=x0+dx,xt,xbt,sy0,sy1;
                             if(ae->sy>syt){xt=x0+dx*(ae->sy-syt);sy0=ae->sy;}else{xt=x0;sy0=syt;}
@@ -241,7 +216,7 @@ static void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo* info, u8* out, i
                         }
                     }
                     {float sum=0;for(i=0;i<ow;++i){sum+=sl2[i];float cov=(float)vabs(sl[i]+sum)*255.0f+0.5f;int px=(int)cov;if(px>255)px=255;out[j*ostr+i]=(u8)px;}}
-                    step=&active;while(*step){stbtt__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;}
+                    step=&active;while(*step){font__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;}
                 for(tt_heapchk*c=hh.head,*hp;c;c=hp){hp=c->next;ttfree(c);}
                 if(sl!=sd)ttfree(sl);
             }
@@ -253,7 +228,7 @@ static void stbtt_MakeGlyphBitmapSubpixel(const stbtt_fontinfo* info, u8* out, i
     if (v) ttfree(v);
 }
 
-typedef struct {u16 x0,y0,x1,y1; float xoff,yoff,xadvance,xoff2,yoff2;} stbtt_packedchar;
+typedef struct {u16 x0,y0,x1,y1; float xoff,yoff,xadvance,xoff2,yoff2;} font_packedchar;
 INLINE void _pre(u8 *p, int w, int h, int str, u32 kw, int v) {
     int out = v ? w : h, in = v ? h : w, os = v ? 1 : str, is = v ? str : 1;
     for (int j=0;j<out;++j,p+=os) {
@@ -267,10 +242,10 @@ INLINE void _pre(u8 *p, int w, int h, int str, u32 kw, int v) {
 // Font Loading System
 int numPackedGlyphs=0,numPackedGlyphsStopD=0; extern u32 textVAO,textVBO,textSP;
 u32 fontAtlasTex,fontAtlasTexStopD;
-stbtt_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
+font_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
 float fixedNumberAdvanceWidth=0.0f,fixedNumberAdvanceWidthStopD=0.0f;
 static const char* fallbackFontPaths[]={"./Fonts/FreeSerifBold.ttf","./Fonts/cambriab.ttf","./Fonts/NotoSansCJK-Subset.ttf"}, *fontPaths[]={"./Fonts/SystemShockText.ttf","./Fonts/StopD.ttf"};
-static stbtt_fontinfo fontInfo[5]; static u8 *fontData[5]; static char uiTextBuffer[T_BUFFER_SIZE];
+static font_fontinfo fontInfo[5]; static u8 *fontData[5]; static char uiTextBuffer[T_BUFFER_SIZE];
 static u16 cpPackedIndex[2][65536]; // Codepoint -> packed glyph index per atlas; 0 = blank(space)
 static const u16 packCodepoints[]={/*1303 codepoints used by Data/text_*.txt and Data/logs_*.txt; generated by Tools/gen_pack_codepoints.py*/
     0x0020/* */,0x0021/*!*/,0x0022/*"*/,0x0023/*#*/,0x0024/*$*/,0x0025/*%*/,0x0026/*&*/,0x0027/*'*/,0x0028/*(*/,0x0029/*)*/,0x002A/* * */,0x002B/*+*/,0x002C/*,*/,0x002D/*-*/,0x002E/*.*/,0x002F/*/*/,0x0030/*0*/,0x0031/*1*/,0x0032/*2*/,0x0033/*3*/,0x0034/*4*/,0x0035/*5*/,0x0036/*6*/,0x0037/*7*/,
@@ -334,30 +309,30 @@ static i32 CodepointToPackedIndex(i32 cp,int fontID){ return ((u32)cp<65536u)?cp
 void LoadFallbackFont(const char*path,int fii,int ci){
     FHandle fd;int fsz;fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
     int off=_font_offset((u8*)fontData[fii],ci); if(off<0){DualLogError("Invalid collection index %d for font %s\n",ci,path);OS_Exit(1);}
-    if(!stbtt_InitFont_internal(&fontInfo[fii],fontData[fii],off)){DualLogError("Failed to init font at index %d in %s\n",ci,path);OS_Exit(1);}
+    if(!font_InitFont_internal(&fontInfo[fii],fontData[fii],off)){DualLogError("Failed to init font at index %d in %s\n",ci,path);OS_Exit(1);}
 }
 
 void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp);
 u8 *fontBmp1, *fontBmp2;
-void BuildAtlasCPU(int* numPacked, stbtt_packedchar* packedChars, float* fixedNumAdv, float baseH, int fontIdx, u8 fontID, u8* bmp, u32 sz) { /*no GL*/
+void BuildAtlasCPU(int* numPacked, font_packedchar* packedChars, float* fixedNumAdv, float baseH, int fontIdx, u8 fontID, u8* bmp, u32 sz) { /*no GL*/
     const int S=(int)sz, lim=S-16; int cx=0,cy=0,cb=0; /*shelf packer: pen x, row top y, row bottom y; every rect carries 16px padding*/
     mset(bmp,0,(size_t)S*S); *numPacked=0;
     for(int i=0; i<numPackCodepoints; ++i) {
         if(*numPacked >= MAX_GLYPHS) break;
-        u32 cp = packCodepoints[i]; int fi = fontIdx, g = stbtt_FindGlyphIndex(&fontInfo[fi], cp);
-        if(!g) for(fi=2; fi<5 && !(g = stbtt_FindGlyphIndex(&fontInfo[fi], cp)); ++fi) {} /*fallbacks live in fontInfo[2..4]*/
+        u32 cp = packCodepoints[i]; int fi = fontIdx, g = font_FindGlyphIndex(&fontInfo[fi], cp);
+        if(!g) for(fi=2; fi<5 && !(g = font_FindGlyphIndex(&fontInfo[fi], cp)); ++fi) {} /*fallbacks live in fontInfo[2..4]*/
         if(!g) continue;
-        const stbtt_fontinfo* font = &fontInfo[fi]; const int fb = fi != fontIdx;
+        const font_fontinfo* font = &fontInfo[fi]; const int fb = fi != fontIdx;
         float h = fb ? baseH*1.2f : baseH; int os = fb ? 2 : 3; /* Lower supersampling for fallback glyphs: they are the bulk of the atlas and 2x still keeps CJK legible at these sizes. */
         float sc = h/(float)(ttSHORT(font->data+font->hhea+4)-ttSHORT(font->data+font->hhea+6)), sco = sc*os, rc = 1.0f/os, sh = -(float)(os-1)/(2.0f*(float)os);
-        stbtt_packedchar* bc = &packedChars[*numPacked]; bc->x0=bc->y0=bc->x1=bc->y1=0;
+        font_packedchar* bc = &packedChars[*numPacked]; bc->x0=bc->y0=bc->x1=bc->y1=0;
         int bx0,by0,bx1,by1; GetGlyphBitmapBoxSubpixel(font,g,sco,sco,0,0,&bx0,&by0,&bx1,&by1);
         int rw = bx1-bx0+os-1, rh = by1-by0+os-1;
         if(cx+rw+16 > lim){cx=0;cy=cb;}
         if(cy+rh+16 <= lim) {
             int rx=cx+16, ry=cy+16, nhm=ttUSHORT(font->data+font->hhea+34); u8* dst=bmp+rx+ry*S;
             cx+=rw+16; if(cy+rh+16 > cb) cb=cy+rh+16;
-            stbtt_MakeGlyphBitmapSubpixel(font,dst,bx1-bx0,by1-by0,S,sco,sco,0,0,g);
+            font_MakeGlyphBitmapSubpixel(font,dst,bx1-bx0,by1-by0,S,sco,sco,0,0,g);
             _pre(dst,rw,rh,S,os,0); _pre(dst,rw,rh,S,os,1);
             bc->x0=rx; bc->y0=ry; bc->x1=rx+rw; bc->y1=ry+rh;
             bc->xadvance = sc*ttSHORT(font->data+font->hmtx+4*(g<nhm?g:nhm-1));
@@ -368,7 +343,7 @@ void BuildAtlasCPU(int* numPacked, stbtt_packedchar* packedChars, float* fixedNu
 }
 
 void DumpFontAtlasBmp(const char* filename, u8* atlas, int size) { size_t n = (size_t)size * size; u32* rgba = OS_Alloc(n * 4);  for (int row = 0; row < size; ++row) { const u8* srcRow = atlas + row * size; u32* dstRow = rgba + (size - 1 - row) * size; for (int col = 0; col < size; ++col) { u8 v = srcRow[col]; dstRow[col] = v | (v<<8) | (v<<16) | (v<<24); } } BmpWrite(filename, size, size, rgba); OS_Free(rgba, n * 4); }
-static int CountBlankGlyphs(const stbtt_packedchar* chars, int n) { int b=0; for(int i=0;i<n;++i) if(!chars[i].x1 && !chars[i].y1) ++b; return b; }
+static int CountBlankGlyphs(const font_packedchar* chars, int n) { int b=0; for(int i=0;i<n;++i) if(!chars[i].x1 && !chars[i].y1) ++b; return b; }
 void InitFontAtlasses() {
     DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    fonts (   5) ...");
@@ -376,8 +351,8 @@ void InitFontAtlasses() {
     FHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
     fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
-    if(!stbtt_InitFont_internal(&fontInfo[0],fontData[0],0)){DualLogError("%s font init failed\n",fontPaths[0]); OS_Exit(1);}
-    if(!stbtt_InitFont_internal(&fontInfo[1],fontData[1],0)){DualLogError("%s font init failed\n",fontPaths[1]); OS_Exit(1);}
+    if(!font_InitFont_internal(&fontInfo[0],fontData[0],0)){DualLogError("%s font init failed\n",fontPaths[0]); OS_Exit(1);}
+    if(!font_InitFont_internal(&fontInfo[1],fontData[1],0)){DualLogError("%s font init failed\n",fontPaths[1]); OS_Exit(1);}
     LoadFallbackFont(fallbackFontPaths[0],2,0);
     LoadFallbackFont(fallbackFontPaths[1],3,0);
     LoadFallbackFont(fallbackFontPaths[2],4,0);
@@ -453,7 +428,7 @@ float MeasureLineAdvance(const char* p, u8 fontID) {
         else s++;
         p=(const char*)s;
         cc++; if (cp=='\n'||cc>120) break;
-        const stbtt_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + CodepointToPackedIndex(cp,fontID); if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD) w = vfloor((w + b->xoff) + 0.5f) + fixedNumberAdvanceWidthStopD; else w += b->xadvance;
+        const font_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + CodepointToPackedIndex(cp,fontID); if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD) w = vfloor((w + b->xoff) + 0.5f) + fixedNumberAdvanceWidthStopD; else w += b->xadvance;
     } return w;
 }
 
@@ -463,7 +438,7 @@ void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 ali
     size_t vc=0; const char*p=uiTextBuffer; float xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed), ypos=yUsed+(16*scale),ls=22*scale; int cc=0; float puv = 10.0f * invatsz, bw=2.0f; 
     while(*p) {
         const u8*s=(const u8*)p; u32 cp=0; if (*s<0x80) { cp=*s++; }else if ((*s&0xE0)==0xC0) { if (!s[1]) break; cp=(*s&0x1F)<< 6; cp|=(s[1]&0x3F); s+=2; }else if ((*s&0xF0)==0xE0) { if (!s[1] || !s[2]) break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }else if ((*s&0xF8)==0xF0) { if (!s[1] || !s[2] || !s[3]) break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }else s++;
-        p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed); ypos+=ls; cc=0; continue; } int idx=CodepointToPackedIndex(cp,fontID); const stbtt_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx; float qx0=vfloor((xpos+b->xoff)+0.5f),qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
+        p = (const char*)s; cc++; if (cp=='\n'||cc>120) { xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed); ypos+=ls; cc=0; continue; } int idx=CodepointToPackedIndex(cp,fontID); const font_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx; float qx0=vfloor((xpos+b->xoff)+0.5f),qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
         float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw; float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f; float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 }; if (vc >= TEXT_VTX_FLOATS/30) break; mcpy(textVertexData + vc * 30,tv,sizeof(tv)); vc++;
         if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD){xpos = qx0 + fixedNumberAdvanceWidthStopD;}else xpos += b->xadvance;
     } if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferSubData(GL_ARRAY_BUFFER,0,vc*30*sizeof(float),textVertexData); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
@@ -485,7 +460,7 @@ void BuildTextDecalMeshes(void) {
             const char* p = str; float xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)), ypos=yTop+DECAL_ASC_PX[dix]; int cc=0; float x0=0,y0=0,x1=0,y1=0,s0=0,t0=0,s1=0,t1=0;
             while(*p) {
                 const u8* s=(const u8*)p; u32 cp=0; if (*s<0x80){cp=*s++;}else if ((*s&0xE0)==0xC0){ if(!s[1])break; cp=(*s&0x1F)<<6; cp|=(s[1]&0x3F); s+=2; }else if ((*s&0xF0)==0xE0){ if(!s[1]||!s[2])break; cp=(*s&0x0F)<<12; cp|=(s[1]&0x3F)<<6; cp|=(s[2]&0x3F); s+=3; }else if ((*s&0xF8)==0xF0){ if(!s[1]||!s[2]||!s[3])break; cp=(*s&0x07)<<18; cp|=(s[1]&0x3F)<<12; cp|=(s[2]&0x3F)<<6; cp|=(s[3]&0x3F); s+=4; }else s++;
-                p=(const char*)s; cc++; if (cp=='\n'||cc>120){ xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)); ypos+=lineH; cc=0; continue; } int idx=CodepointToPackedIndex((i32)cp,fontID); const stbtt_packedchar* b = ((fontID==FONT_STOPD)?fontPackedCharStopD:fontPackedChar)+idx; float qx0=vfloor((xpos+b->xoff)+0.5f), qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
+                p=(const char*)s; cc++; if (cp=='\n'||cc>120){ xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)); ypos+=lineH; cc=0; continue; } int idx=CodepointToPackedIndex((i32)cp,fontID); const font_packedchar* b = ((fontID==FONT_STOPD)?fontPackedCharStopD:fontPackedChar)+idx; float qx0=vfloor((xpos+b->xoff)+0.5f), qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
                 x0=qx0-bw; x1=(qx0+b->xoff2-b->xoff)+bw; y0=qy0-bw; y1=(qy0+b->yoff2-b->yoff)+bw; s0=qs0-puv; t0=qt0-puv; s1=qs1+puv; t1=qt1+puv;/*6 verts (2 tris) per glyph; local space only, live model matrix applies rotation/scale/position*/ const float L[6][5] = {{x0,y0,s0,t0},{x1,y1,s1,t1},{x1,y0,s1,t0},{x0,y0,s0,t0},{x0,y1,s0,t1},{x1,y1,s1,t1}};
                 for(int k=0;k<6;k++){float lx=L[k][0]*decalPx,ly=-L[k][1]*decalPx,lz=0;/*negate y: glyph quads are y-down, world +Y is up*/ halfVerts[vIdx++]=F32ToHalf(lx); halfVerts[vIdx++]=F32ToHalf(ly); halfVerts[vIdx++]=F32ToHalf(lz); halfVerts[vIdx++]=F32ToHalf(0.0f); halfVerts[vIdx++]=F32ToHalf(0.0f); halfVerts[vIdx++]=F32ToHalf(-1.0f); halfVerts[vIdx++]=F32ToHalf(L[k][2]); halfVerts[vIdx++]=F32ToHalf(L[k][3]);}
                 if (vIdx+8 > 720*8) break; if (cp>='0'&&cp<='9'&&fontID==FONT_STOPD){ xpos=qx0+fixedNumberAdvanceWidthStopD; }else xpos += b->xadvance;

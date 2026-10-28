@@ -745,6 +745,7 @@ static void ProjectileLaunched(Entity* self, int n) {
 static void AIExplodeAttack(Entity* self) {
     u16 selfIdx=(u16)(self - World.instances);
     float radius = npcTable[self->index - 419].attack3Radius; float force=npcTable[self->index - 419].attack3Force; V3 epos = ai_sight_pos(self); DamageData dd = SetNPCData(self, 3);
+    dd.damage = GetDamageTakeAmount(&dd);/*C# AIController.ExplodeAttack pre-scales with GetDamageTakeAmount before the sphere (random +/-10% only: SetNPCData leaves isOtherNPC false and offense 0, so no crits)*/
     ApplyImpactForceSphere(&dd, epos, radius, force);
     DamageData selfdd = SetNPCData(self, 3); TakeDamage(selfIdx, selfdd); // Self-destruct through real pipeline (Citadel healthManager.TakeDamage).
 }
