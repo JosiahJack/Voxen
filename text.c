@@ -1,9 +1,5 @@
 // text.c - Text and Font Rendering/Loading System
 #include "common.h"
-typedef struct { void* ptr; size_t sz; } TAlloc; static TAlloc* ttAllocs = NULL; static int tallocCount=0;
-static void* ttalloc(size_t n) { if (tallocCount>=4674) {DualLogError("ttalloc too many!\n"); return NULL;} void*p=OS_Alloc(n); if(!p||p==(void*)-1){DualLogError("ttalloc failed\n");return NULL;} ttAllocs[tallocCount++]=(TAlloc){p,n}; return p; }
-static void ttfree (void* p) { if(!p)return; for(int i=tallocCount-1;i>=0;--i){ if(ttAllocs[i].ptr==p){ OS_Free(p,ttAllocs[i].sz); ttAllocs[i]=ttAllocs[--tallocCount]; return; } } }
-static u16 ttUSHORT(u8*p) {return p[0]*256 + p[1];} 
 static i16 ttSHORT (u8*p) {return p[0]*256 + p[1];}
 static u32 ttULONG (u8*p) {return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|p[3];}
 #define font_tag4(p,a,b,c,d) ((p)[0]==(a) && (p)[1]==(b) && (p)[2]==(c) && (p)[3]==(d))
@@ -11,26 +7,26 @@ static u32 ttULONG (u8*p) {return((u32)p[0]<<24)|((u32)p[1]<<16)|((u32)p[2]<<8)|
 enum{FONT_vmove=1,FONT_vline,FONT_vcurve,FONT_vcubic};
 typedef struct{i16 x,y,cx,cy,cx1,cy1;u8 type,padding;}font_vertex;
 typedef struct{void*userdata;u8*data;int fontstart,numGlyphs,loca,head,glyf,hhea,hmtx,index_map,indexToLocFormat;}font_fontinfo;
-static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttUSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(font_tag(d+l+0,tag))return ttULONG(d+l+8);}return 0;}
+static u32 _find_table(u8*d,u32 fs,const char*tag){i32 n=ttSHORT(d+fs+4);u32 td=fs+12;for(i32 i=0;i<n;++i){u32 l=td+16*i;if(font_tag(d+l+0,tag))return ttULONG(d+l+8);}return 0;}
 static int font_InitFont_internal(font_fontinfo* info, u8* data, int fs) {
     u32 cmap,t,i,nt; info->data = data; info->fontstart = fs; 
     cmap = _find_table(data,fs,"cmap"); info->loca = _find_table(data,fs,"loca"); info->head = _find_table(data,fs,"head"); info->glyf = _find_table(data,fs,"glyf"); info->hhea = _find_table(data,fs,"hhea"); info->hmtx = _find_table(data,fs,"hmtx"); if(!cmap || !info->head || !info->hhea || !info->hmtx) return 0;
     if (info->glyf) { if (!info->loca) return 0; } else { return 0; }
-    t=_find_table(data,fs,"maxp"); info->numGlyphs = t ? ttUSHORT(data+t+4) : 0xffff; nt=ttUSHORT(data+cmap+2);info->index_map=0; for(i=0;i<nt;++i){u32 er=cmap+4+8*i;switch(ttUSHORT(data+er)){case 3:switch(ttUSHORT(data+er+2)){case 1:case 10:info->index_map=cmap+ttULONG(data+er+4);}break;case 0:info->index_map=cmap+ttULONG(data+er+4);break;}} if(!info->index_map)return 0; info->indexToLocFormat=ttUSHORT(data+info->head+50);return 1;
+    t=_find_table(data,fs,"maxp"); info->numGlyphs = t ? ttSHORT(data+t+4) : 0xffff; nt=ttSHORT(data+cmap+2);info->index_map=0; for(i=0;i<nt;++i){u32 er=cmap+4+8*i;switch(ttSHORT(data+er)){case 3:switch(ttSHORT(data+er+2)){case 1:case 10:info->index_map=cmap+ttULONG(data+er+4);}break;case 0:info->index_map=cmap+ttULONG(data+er+4);break;}} if(!info->index_map)return 0; info->indexToLocFormat=ttSHORT(data+info->head+50);return 1;
 }
 
 int _font_offset(u8*d,int idx){ if(font_tag4(d,'1',0,0,0)||font_tag4(d,0,1,0,0)||font_tag(d,"true")){return idx==0?0:-1;} if(font_tag(d,"ttcf")&&(ttULONG(d+4)==0x00010000||ttULONG(d+4)==0x00020000)){i32 n=((i32)d[8]<<24)|((i32)d[9]<<16)|((i32)d[10]<<8)|d[11]; if(idx>=n){return -1;} return ttULONG(d+12+idx*4); } return -1; }
 int font_FindGlyphIndex(const font_fontinfo*info,int cp){
-    u8*d=info->data;u32 im=info->index_map;u16 fmt=ttUSHORT(d+im);
-    if(fmt==0) { i32 b=ttUSHORT(d+im+2); return cp<b-6 ? (*(u8*)(d+im+6+cp)) : 0; }
-    if(fmt==6) { u32 f=ttUSHORT(d+im+6),n=ttUSHORT(d+im+8); return(u32)cp>=f&&(u32)cp<f+n?ttUSHORT(d+im+10+(cp-f)*2):0;}
+    u8*d=info->data;u32 im=info->index_map;u16 fmt=ttSHORT(d+im);
+    if(fmt==0) { i32 b=ttSHORT(d+im+2); return cp<b-6 ? (*(u8*)(d+im+6+cp)) : 0; }
+    if(fmt==6) { u32 f=ttSHORT(d+im+6),n=ttSHORT(d+im+8); return(u32)cp>=f&&(u32)cp<f+n?ttSHORT(d+im+10+(cp-f)*2):0;}
     if(fmt==2)return 0;
     if(fmt==4){
-        u16 sc=ttUSHORT(d+im+6)>>1,sr=ttUSHORT(d+im+8)>>1,es=ttUSHORT(d+im+10),rs=ttUSHORT(d+im+12)>>1; u32 ec=im+14,s=ec;if(cp>0xffff)return 0;
-        if (cp>=ttUSHORT(d+s+rs*2)) s+=rs*2;s-=2;
-        while(es) { sr>>=1; u16 e=ttUSHORT(d+s+sr*2); if(cp>e) {s+=sr*2;} --es; }
-        s+=2;{u16 it=(u16)((s-ec)>>1),st=ttUSHORT(d+im+14+sc*2+2+2*it),la=ttUSHORT(d+ec+2*it); if(cp<st||cp>la)return 0;u16 off=ttUSHORT(d+im+14+sc*6+2+2*it);
-        return off?ttUSHORT(d+off+(cp-st)*2+im+14+sc*6+2+2*it):(u16)(cp+ttSHORT(d+im+14+sc*4+2+2*it));}
+        u16 sc=ttSHORT(d+im+6)>>1,sr=ttSHORT(d+im+8)>>1,es=ttSHORT(d+im+10),rs=ttSHORT(d+im+12)>>1; u32 ec=im+14,s=ec;if(cp>0xffff)return 0;
+        if (cp>=ttSHORT(d+s+rs*2)) s+=rs*2;s-=2;
+        while(es) { sr>>=1; u16 e=ttSHORT(d+s+sr*2); if(cp>e) {s+=sr*2;} --es; }
+        s+=2;{u16 it=(u16)((s-ec)>>1),st=ttSHORT(d+im+14+sc*2+2+2*it),la=ttSHORT(d+ec+2*it); if(cp<st||cp>la)return 0;u16 off=ttSHORT(d+im+14+sc*6+2+2*it);
+        return off?ttSHORT(d+off+(cp-st)*2+im+14+sc*6+2+2*it):(u16)(cp+ttSHORT(d+im+14+sc*4+2+2*it));}
     }
     if(fmt==12||fmt==13){u32 ng=ttULONG(d+im+12);i32 lo=0,hi=(i32)ng;
         while(lo<hi){i32 m=lo+((hi-lo)>>1);u32 sc=ttULONG(d+im+16+m*12),ec=ttULONG(d+im+16+m*12+4);
@@ -39,7 +35,7 @@ int font_FindGlyphIndex(const font_fontinfo*info,int cp){
 }
 
 INLINE void _sv(font_vertex*v,u8 t,i32 x,i32 y,i32 cx,i32 cy){v->type=t;v->x=(i16)x;v->y=(i16)y;v->cx=(i16)cx;v->cy=(i16)cy;}
-static int _glyf_off(const font_fontinfo*info,int gi){ if(gi>=info->numGlyphs||info->indexToLocFormat>=2){return-1;} int g1,g2;if(info->indexToLocFormat==0){g1=info->glyf+ttUSHORT(info->data+info->loca+gi*2)*2;g2=info->glyf+ttUSHORT(info->data+info->loca+gi*2+2)*2;} else{g1=info->glyf+ttULONG(info->data+info->loca+gi*4);g2=info->glyf+ttULONG(info->data+info->loca+gi*4+4);} return g1==g2?-1:g1; }
+static int _glyf_off(const font_fontinfo*info,int gi){ if(gi>=info->numGlyphs||info->indexToLocFormat>=2){return-1;} int g1,g2;if(info->indexToLocFormat==0){g1=info->glyf+ttSHORT(info->data+info->loca+gi*2)*2;g2=info->glyf+ttSHORT(info->data+info->loca+gi*2+2)*2;} else{g1=info->glyf+ttULONG(info->data+info->loca+gi*4);g2=info->glyf+ttULONG(info->data+info->loca+gi*4+4);} return g1==g2?-1:g1; }
 static int _close_shape(font_vertex*v,int n,int wo,int so,i32 sx,i32 sy,i32 scx,i32 scy,i32 cx,i32 cy){
     if(so){if(wo)_sv(&v[n++],FONT_vcurve,(cx+scx)>>1,(cy+scy)>>1,cx,cy);_sv(&v[n++],FONT_vcurve,sx,sy,scx,scy);}
     else{if(wo)_sv(&v[n++],FONT_vcurve,sx,sy,cx,cy);else _sv(&v[n++],FONT_vline,sx,sy,0,0);}
@@ -50,8 +46,8 @@ static int font_GetGlyphShape(const font_fontinfo *info, int gi, font_vertex **p
     u8*d=info->data; font_vertex*verts=0; int nv=0, g=_glyf_off(info,gi); *pv=NULL; if(g<0){return 0;}
         i16 nc=ttSHORT(d+g);
         if (nc > 0) {
-            u8*ep=d+g+10;int ins=ttUSHORT(d+g+10+nc*2);u8*pts=d+g+10+nc*2+2+ins;
-            int n=1+ttUSHORT(ep+nc*2-2), m=n+2*nc; verts=(font_vertex*)ttalloc(m*sizeof(verts[0])); if(!verts){return 0;}
+            u8*ep=d+g+10;int ins=ttSHORT(d+g+10+nc*2);u8*pts=d+g+10+nc*2+2+ins;
+            int n=1+ttSHORT(ep+nc*2-2), m=n+2*nc; verts=(font_vertex*)OS_AllocScratch(m*sizeof(verts[0])); if(!verts){return 0;}
             int off=m-n; u8 fl=0,fc=0;
             for(int i=0;i<n;++i){if(fc==0){fl=*pts++; if(fl&8)fc=*pts++;}else{--fc;} verts[off+i].type=fl;}
             i32 x=0;for(int i=0;i<n;++i){fl=verts[off+i].type;if(fl&2){i16 dx=*pts++;x+=(fl&16)?dx:-dx;}else if(!(fl&16)){x+=(i16)(pts[0]*256+pts[1]);pts+=2;}verts[off+i].x=(i16)x;}
@@ -60,7 +56,7 @@ static int font_GetGlyphShape(const font_fontinfo *info, int gi, font_vertex **p
             for(int i=0;i<n;++i){fl=verts[off+i].type;x=(i16)verts[off+i].x;y=(i16)verts[off+i].y;
                 if(nm==i){if(i)nv=_close_shape(verts,nv,wo,so,sx,sy,scx,scy,cx,cy);so=!(fl&1);
                     if(so){scx=x;scy=y;if(!(verts[off+i+1].type&1)){sx=(x+(i32)verts[off+i+1].x)>>1;sy=(y+(i32)verts[off+i+1].y)>>1;}else{sx=verts[off+i+1].x;sy=verts[off+i+1].y;++i;}}else{sx=x;sy=y;}
-                    _sv(&verts[nv++],FONT_vmove,sx,sy,0,0);wo=0;nm=1+ttUSHORT(ep+j++*2);
+                    _sv(&verts[nv++],FONT_vmove,sx,sy,0,0);wo=0;nm=1+ttSHORT(ep+j++*2);
                 }else{
                     if(!(fl&1)){
                         if(wo)_sv(&verts[nv++],FONT_vcurve,(cx+x)>>1,(cy+y)>>1,cx,cy); cx=x; cy=y; wo=1;
@@ -79,8 +75,8 @@ static int font_GetGlyphShape(const font_fontinfo *info, int gi, font_vertex **p
                 float fm=vsqrtf(mtx[0]*mtx[0]+mtx[1]*mtx[1]),fn=vsqrtf(mtx[2]*mtx[2]+mtx[3]*mtx[3]);
                 int cn=font_GetGlyphShape(info,gidx,&cv);
                 if(cn>0){for(int i=0;i<cn;++i){font_vertex*v=&cv[i];i16 vx=v->x,vy=v->y;v->x=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->y=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));vx=v->cx;vy=v->cy;v->cx=(i16)(fm*(mtx[0]*vx+mtx[2]*vy+mtx[4]));v->cy=(i16)(fn*(mtx[1]*vx+mtx[3]*vy+mtx[5]));}
-                    tmp=(font_vertex*)ttalloc((nv+cn)*sizeof(font_vertex));if(!tmp){ttfree(cv);ttfree(verts);return 0;}
-                    if(nv>0&&verts){mcpy(tmp,verts,nv*sizeof(font_vertex));} mcpy(tmp+nv,cv,cn*sizeof(font_vertex)); ttfree(cv); ttfree(verts); verts=tmp; nv+=cn;}
+                    tmp=(font_vertex*)OS_AllocScratch((nv+cn)*sizeof(font_vertex));if(!tmp){return 0;}
+                    if(nv>0&&verts){mcpy(tmp,verts,nv*sizeof(font_vertex));} mcpy(tmp+nv,cv,cn*sizeof(font_vertex));   verts=tmp; nv+=cn;}
                 more=fl&(1<<5);}
         }
         *pv = verts;
@@ -98,7 +94,7 @@ static void GetGlyphBitmapBoxSubpixel(const font_fontinfo*font,int g,float sx,fl
 
 typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;
 typedef struct{ tt_heapchk* head; void* first_free; int remaining; }font__hheap;
-static void* _hha(font__hheap* hh,size_t sz) { if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;} if(!hh->remaining) {int c=sz<32?2000:sz<128?800:100;tt_heapchk*ck=(tt_heapchk*)ttalloc(sizeof(*ck)+sz*c); if(!ck){return NULL;} ck->next=hh->head; hh->head=ck; hh->remaining=c;} --hh->remaining; return(char*)hh->head+sizeof(tt_heapchk)+sz*hh->remaining; }
+static void* _hha(font__hheap* hh,size_t sz) { if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;} if(!hh->remaining) {int c=sz<32?2000:sz<128?800:100;tt_heapchk*ck=(tt_heapchk*)OS_AllocScratch(sizeof(*ck)+sz*c); if(!ck){return NULL;} ck->next=hh->head; hh->head=ck; hh->remaining=c;} --hh->remaining; return(char*)hh->head+sizeof(tt_heapchk)+sz*hh->remaining; }
 static void _hhf(font__hheap* hh,void*p) { *(void**)p=hh->first_free;hh->first_free=p; }
 typedef struct{ float x0,y0,x1,y1; int invert; }font__edge; typedef struct font__active_edge{ struct font__active_edge*next; float fx,fdx,fdy,direction,sy,ey; }font__active_edge;
 static void _hce(float*sl,int x,font__active_edge*e,float x0,float y0,float x1,float y1){
@@ -134,13 +130,13 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* info, u8* out, int
     for (int i = 0; i < nv; ++i) { if (v[i].type == FONT_vmove) { ++n; } }
     wc = n;
     if (n != 0) {
-        wl = (int*)ttalloc(sizeof(int) * (size_t)n); if (!wl) { wc = 0; goto err_flatten; }
+        wl = (int*)OS_AllocScratch(sizeof(int) * (size_t)n); if (!wl) { wc = 0; goto err_flatten; }
         int np = 0;
         for (int pass = 0; pass < 2; ++pass) {
             float x = 0, y = 0;
             int start = 0;
             n = -1;
-            if (pass == 1) { win = (V2*)ttalloc((size_t)np * sizeof(V2)); if (!win) goto err_flatten; }
+            if (pass == 1) { win = (V2*)OS_AllocScratch((size_t)np * sizeof(V2)); if (!win) goto err_flatten; }
             
             np = 0;
             for (int i = 0; i < nv; ++i) {
@@ -155,12 +151,12 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* info, u8* out, int
         }
     }
     goto after_flatten;
-    err_flatten: ttfree(win); ttfree(wl); wl = NULL; wc = 0; win = NULL; 
+    err_flatten:   wl = NULL; wc = 0; win = NULL; 
     after_flatten:;
     if (win) {
         int inv = 1; float ysi = inv ? -sy : sy; font__edge* e; int n_edges = 0;
         for (int i = 0; i < wc; ++i) { n_edges += wl[i]; }
-        e = (font__edge*)ttalloc(sizeof(*e) * ((size_t)n_edges + 1));
+        e = (font__edge*)OS_AllocScratch(sizeof(*e) * ((size_t)n_edges + 1));
         if (e) {
             n_edges = 0; int m = 0;
             for (int i = 0; i < wc; ++i) {
@@ -181,7 +177,7 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* info, u8* out, int
             for (int i = 1; i < n_edges; ++i) { font__edge t = e[i]; int j = i; while (j > 0 && ((&t)->y0 < (&e[j - 1])->y0)) { e[j] = e[j - 1]; --j; } e[j] = t; }
             e[n_edges].y0=(float)(iy0+oh)+1;
             font__hheap hh={0}; font__active_edge*active=NULL; font__edge*ep=e; float sd[129],*sl=sd,*sl2; int y=iy0,j=0,i;
-            if(ow>64)sl=(float*)ttalloc((size_t)(ow*2+1)*sizeof(float));
+            if(ow>64)sl=(float*)OS_AllocScratch((size_t)(ow*2+1)*sizeof(float));
             if(sl){
                 sl2=sl+ow;
                 while(j<oh){float syt=(float)y,syb=(float)y+1;font__active_edge**step=&active;
@@ -217,16 +213,12 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* info, u8* out, int
                     }
                     {float sum=0;for(i=0;i<ow;++i){sum+=sl2[i];float cov=(float)vabs(sl[i]+sum)*255.0f+0.5f;int px=(int)cov;if(px>255)px=255;out[j*ostr+i]=(u8)px;}}
                     step=&active;while(*step){font__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;}
-                for(tt_heapchk*c=hh.head,*hp;c;c=hp){hp=c->next;ttfree(c);}
-                if(sl!=sd)ttfree(sl);
+                for(tt_heapchk*c=hh.head,*hp;c;c=hp){hp=c->next;}
             }
-            ttfree(e);
         }
-        ttfree(wl);
-        ttfree(win);
     }
-    if (v) ttfree(v);
 }
+
 
 typedef struct {u16 x0,y0,x1,y1; float xoff,yoff,xadvance,xoff2,yoff2;} font_packedchar;
 INLINE void _pre(u8 *p, int w, int h, int str, u32 kw, int v) {
@@ -305,11 +297,11 @@ static const u16 packCodepoints[]={/*1303 codepoints used by Data/text_*.txt and
     0xFF01/*！*/,0xFF05/*％*/,0xFF08/*（*/,0xFF09/*）*/,0xFF1A/*：*/,0xFF1B/*；*/,0xFF1F/*？*/
 };
 i32 numPackCodepoints=sizeof(packCodepoints)/sizeof(packCodepoints[0]);
-static i32 CodepointToPackedIndex(i32 cp,int fontID){ return ((u32)cp<65536u)?cpPackedIndex[fontID][cp]:0; }
-void LoadFallbackFont(const char*path,int fii,int ci){
-    FHandle fd;int fsz;fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
-    int off=_font_offset((u8*)fontData[fii],ci); if(off<0){DualLogError("Invalid collection index %d for font %s\n",ci,path);OS_Exit(1);}
-    if(!font_InitFont_internal(&fontInfo[fii],fontData[fii],off)){DualLogError("Failed to init font at index %d in %s\n",ci,path);OS_Exit(1);}
+static i32 CodepointToPackedIndex(i32 cp,int fontID) { return ((u32)cp<65536u) ? cpPackedIndex[fontID][cp] : 0; }
+void LoadFallbackFont(const char*path, int fii, int ci){
+    FHandle fd; int fsz; fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);
+    int off = _font_offset((u8*)fontData[fii],ci); if (off<0) { DualLogError("Invalid collection index %d for font %s\n",ci,path); OS_Exit(1); }
+    if (!font_InitFont_internal(&fontInfo[fii],fontData[fii],off)) { DualLogError("Failed to init font at index %d in %s\n",ci,path); OS_Exit(1); }
 }
 
 void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp);
@@ -330,7 +322,7 @@ void BuildAtlasCPU(int* numPacked, font_packedchar* packedChars, float* fixedNum
         int rw = bx1-bx0+os-1, rh = by1-by0+os-1;
         if(cx+rw+16 > lim){cx=0;cy=cb;}
         if(cy+rh+16 <= lim) {
-            int rx=cx+16, ry=cy+16, nhm=ttUSHORT(font->data+font->hhea+34); u8* dst=bmp+rx+ry*S;
+            int rx=cx+16, ry=cy+16, nhm=ttSHORT(font->data+font->hhea+34); u8* dst=bmp+rx+ry*S;
             cx+=rw+16; if(cy+rh+16 > cb) cb=cy+rh+16;
             font_MakeGlyphBitmapSubpixel(font,dst,bx1-bx0,by1-by0,S,sco,sco,0,0,g);
             _pre(dst,rw,rh,S,os,0); _pre(dst,rw,rh,S,os,1);
@@ -347,7 +339,6 @@ static int CountBlankGlyphs(const font_packedchar* chars, int n) { int b=0; for(
 void InitFontAtlasses() {
     DebugRAM("start font load");
     double t0=get_time();DualLog("Loading    fonts (   5) ...");
-    ttAllocs = OS_AllocScratch(4674 * sizeof(TAlloc));
     FHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
     fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
