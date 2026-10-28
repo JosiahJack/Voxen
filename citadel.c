@@ -1025,7 +1025,7 @@ void UseTargets(u16 activator, u16 targetIdx) {
 #define PANEL_TETHER_SQDIST 64.0f/*8.0f: search/grid/wire/keycode/elevator code screens sever when the player wanders this far (squared); the tethered object closing returns that side MFD to the player's preferred tab*/
 void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 code),MFD_OpenPaperLog(int,V3);
 void UI_KeycodeClose(bool),UI_ElevClose(bool),UI_WireClose(bool);
-static void PaperLogUse(u16 self) { MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
+static void PaperLogUse(u16 self) { ForceInventoryMode();/*Unity PaperLog.Use forces inventory mode, as do the sibling panel uses here; without it the reader's [MORE]/[CLOSE] clicks cannot work (UI interaction is inventory-mode-only)*/ MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
 static bool IsPuzzleGridPanel(u16 index) { return index>=609&&index<=613; }
 static bool IsPuzzleWirePanel(u16 index) { return index>=741&&index<=745; }
 static bool IsElevatorPanel(u16 index) { return index>=604&&index<=607; }
@@ -1438,12 +1438,8 @@ static const char* UseSecretText(int index, u16 inst) { /*sshhhhhh, pretend you 
 static void CyberportUse(u16 i) { u8 src = World.currentLevel; int idx; if (src == 2) idx = (World.position[i].x < -26.0f) ? 2 : 3; else if (src == 5) idx = 4; else if (src == 6) idx = 5; else if (src == 8) idx = 6; else if (src == 9) idx = 7; else idx = (src < 8) ? src : 0; queuedLevelPos = cyberSpaceEntryLocations[idx]; queuedLevelToLoad = LEVEL_CYBERSPACE; }
 void UseEntity(u16 i) {
     Entity* ent = &World.instances[i];
-    if (   IdxIsSearchable(ent->index)
-        || (World.layer[i]&(L_Corpse|L_CorpseSearchable))
-        || (IdxIsGib(ent->index) && (World.layer[i] & L_Corpse)) ) {
-        
-        SearchObject(i);
-    } else if (IdxIsDoor(ent->index)) { DoorUse(i,PLAYER1); }
+    if (IdxIsSearchable(ent->index) || (World.layer[i] & L_CorpseSearchable)) { SearchObject(i); }
+    else if (IdxIsDoor(ent->index)) { DoorUse(i,PLAYER1); }
     else if (IdxIsNPC(ent->index)) { CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[World.instances[i].index - 419].name); }
     else if (IdxIsButtonSwitch(ent->index)) { ButtonSwitchUse(i,PLAYER1); }
     else if (ent->index==574) { HealingBedUse(i,PLAYER1); }
@@ -1483,7 +1479,7 @@ void UseEntity(u16 i) {
 
 INLINE V3 ScreenPointToRayOffset(V3 f,V3 r,float dx,float dy){float px=(World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f)+dx,py=(World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f)+dy,t=vtan((float)Sys_Settings.FOV*0.5f*PI/180.0f),aspect=(float)Sys_Settings.ScreenWidth/(float)Sys_Settings.ScreenHeight,nx=(px-(float)UI_W*0.5f)/((float)UI_W*0.5f),ny=((float)UI_H*0.5f-py)/((float)UI_H*0.5f);V3 v=V3_Normalize((V3){nx*aspect*t,ny*t,-1.0f}),ff=(V3){-f.x,-f.y,-f.z},up=V3_Normalize(V3_Cross(r,ff));return(V3){v.x*r.x+v.y*up.x+v.z*ff.x,v.x*r.y+v.y*up.y+v.z*ff.y,v.x*r.z+v.y*up.z+v.z*ff.z};}
 V3 ScreenPointToRayPixels(V3 f,V3 r,float dx,float dy){return ScreenPointToRayOffset(f,r,dx,dy);}
-INLINE bool FrobRayIsFrobable(RaycastHit h){if(!h.hit)return false;u16 i=h.hitInstanceIndex;if(i>=World.instCount)return false;u16 e=World.instances[i].index;if((World.layer[i]&(L_Corpse|L_CorpseSearchable)))return true;return IsFrobUsableSpecial(e)||IdxIsUsableObject(e)||IdxIsSearchable(e)||IdxIsDoor(e)||IdxIsButtonSwitch(e)||IdxIsNPC(e)||IdxIsGib(e);}
+INLINE bool FrobRayIsFrobable(RaycastHit h){if(!h.hit)return false;u16 i=h.hitInstanceIndex;if(i>=World.instCount)return false;u16 e=World.instances[i].index;if((World.layer[i]&L_CorpseSearchable))return true;if((World.layer[i]&L_Corpse)&&!IdxIsGib(e))return true;return IsFrobUsableSpecial(e)||IdxIsUsableObject(e)||IdxIsSearchable(e)||IdxIsDoor(e)||IdxIsButtonSwitch(e)||IdxIsNPC(e);};
 extern bool editFieldEditing; extern u16 editModeLightSelection;
 static bool TargetIDFrob(V3 p,V3 f,V3 r){V3 dir=ScreenPointToRayOffset(f,r,0,0);RaycastHit h=Raycast(p,dir,TargetIDGetSensingRange(true),LMASK_PLAYER_TARGET_ID_FROB);if(!h.hit||h.hitInstanceIndex>=World.instCount||!IdxIsNPC(World.instances[h.hitInstanceIndex].index))return false;u16 i=h.hitInstanceIndex;Entity* e=&World.instances[i];if((e->entflags&(EF_DYING|EF_DEAD))||!HasHealth(i)){if(World.layer[i]&(L_Corpse|L_CorpseSearchable)){UseEntity(i);return true;}return false;}/*Death flags, not health: AIDead restores health to NPC_CORPSE_HEALTH on the 15 searchCollider types (mask bit 4 = cyborg drone) so corpses stay shootable, which made a fully dead drone test as alive here.*/if((World.invP1.hasHardware&HW_TID)&&World.invP1.hwVers[HW_TID_IDX]>1){if(targetIDAttached[i]&&targetIDAttachedFinished[i]<=World.pauseRelativeTime)targetIDAttached[i]=false;if(!targetIDAttached[i]){CreateTargetIDInstance(-1.0f,i,-1.0f);return true;}}CenterStatusPrint("%s%s",Sys_Text.stringTable[29],npcTable[e->index-419].name);return true;}
 static void Frob(V3 p,V3 f,V3 r){

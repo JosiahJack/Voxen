@@ -753,6 +753,7 @@ void MFD_OpenPaperLog(int idx, V3 tetherPoint) {
     if (Sys_Text.audioLogImagesRefIndicesLH[idx]) MFD_OpenData(false,6);
     if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6);
     World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT;
+    World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE;/*the TEXT view renders only under center tab 5 (EReader) + the LOG_TABLE branch; without these the frob opened only the side image tabs and the text never displayed, unlike MFD_OpenAudioLog which sets CenterTab=5*/
     World.Sys_UI.objectInUsePos=tetherPoint; World.Sys_UI.usingObject=true; }
 
 static void UIOpenEntryAndRead(int idx,bool playable) { if (idx<0||idx>=LOGCNT) return; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.logReaderPage=0; World.invP1.readLog[idx]=true;
