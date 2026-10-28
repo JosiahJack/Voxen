@@ -667,6 +667,7 @@ static void AIDead(u16 idx) {
     World.instances[idx].currentState = AIState_Dead; World.layer[idx] = L_Corpse;
     if (World.instances[idx].entflags & EF_TELEPORT_ON_DEATH) { World.gravity[idx] = 1.0f; DeleteInstance(idx); /* TeleportAway not yet fully implemented; keep delete for now */ }
     else if (IsCyberNPC((u16)(self - World.instances))) { World.gravity[idx] = 0.0f; DeleteInstance(idx); /* Gib effect: spawn basic debris using deathBurst index if defined */ }
+    else if (World.instances[idx].index == 419) { DeleteInstance(idx); } /*Autobomb removes self*/
     else if (npcID < NUM_AI_TYPES && npcGibRanges[npcID].first != 0) {
         NPCGibRange range = npcGibRanges[npcID];
         V3 gibPos = World.position[idx];
