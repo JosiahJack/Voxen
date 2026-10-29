@@ -191,10 +191,10 @@ __attribute__((noinline)) u8 UI_MenuInteractable(u32 id, i16 x, i16 y, float w, 
 
 __attribute__((noinline)) u8 UI_Button(u32 id, i16 x, i16 y, float w, float h, bool* cursorOver, i8 this) { return UI_MenuInteractable(id,x,y,w,h,cursorOver,this,false); }
 __attribute__((noinline)) bool AnyLeftRightMouseDown() { return (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down); }
-bool UI_Slider(u32 id, i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8 currentValue, u8* out, bool* sliderActive, u8 min, u8 max, u8 step, u8 mindex, u16 lingdex) {
-    bool over=false,changed=false; *out = currentValue; RenderUIImage(x,y, w,h, 1079);/*Slider background*/ RenderUIImage(x + sliderPos,y, h,h,1078);/*Slider handle*/ if (UI_MenuInteractable(id,xPosForLabel,y,(float)((x + w) - xPosForLabel),(float)h,&over,mindex,true)) *sliderActive = true; if(*sliderActive && World.currentMouse_dx!=0){i32 new=(i32)currentValue+vmin(vmax(World.currentMouse_dx,-1),1); *out=(u8)vmin(vmax(new,min),max); if(*out!=currentValue){changed=true;}}
+bool UI_Slider(u32 id, i16 x, i16 y, i16 w, i16 h, i16 sliderPos, i16 xPosForLabel, u8* out, bool* sliderActive, u8 min, u8 max, u8 step, u8 mindex, u16 lingdex) {
+    bool over=false,changed=false; u8 currentValue=*out; RenderUIImage(x,y, w,h, 1079);/*Slider background*/ RenderUIImage(x + sliderPos,y, h,h,1078);/*Slider handle*/ if (UI_MenuInteractable(id,xPosForLabel,y,(float)((x + w) - xPosForLabel),(float)h,&over,mindex,true)) *sliderActive = true; if(*sliderActive && World.currentMouse_dx!=0){i32 new=(i32)currentValue+vmin(vmax(World.currentMouse_dx,-1),1); *out=(u8)vmin(vmax(new,min),max); if(*out!=currentValue){changed=true;}}
     if (!AnyLeftRightMouseDown()) { if (*sliderActive) { *sliderActive = false; SaveConfig(); } } if (MenuEnter() && currentMenuItem == mindex) {bool shiftHeld = Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down; if (shiftHeld)*out=*out<=((min+step)-1) ? max : *out-step; else *out=*out >=((max-step)+1) ?  min : *out+step; changed=true;}
-    over=over||currentMenuItem==mindex; RenderTextL(xPosForLabel,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"%s %u",Sys_Text.stringTable[lingdex],*out); return changed;
+    over=over||currentMenuItem==mindex; RenderTextL(xPosForLabel,y,over ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"%s %u",Sys_Text.stringTable[lingdex],*out); if (changed && !AnyLeftRightMouseDown()) SaveConfig(); return changed;
 }
 
 u8 UI_MenuButton(u32 id, i16 bX, i16 bY, u8 menuItem, i16 bW, i16 bH, i16 tX, i16 tY, const char* text, i16 pX, i16 pY){bool over=false; u8 retvalue=0u; retvalue=UI_Button(id,bX,bY,bW,bH,&over,menuItem); if(!retvalue)retvalue=(MenuEnter()&&currentMenuItem==menuItem); over=over||currentMenuItem==menuItem; RenderTextL(tX,tY,over ? T_STOPD_RED : T_RED_MENU,FONT_STOPD,1.5f,text); RenderUIImage(pX,pY,40,40,over ? 1029 : 1028);/*Menu pad*/ return retvalue;}
@@ -307,7 +307,7 @@ void RenderMenu() {
         static const i16 cfgTabX[3]={190,354,520}; static const u16 cfgTabStr[3]={791,792,793}; static const i16 cfgTabTx[3]={200,366,530}; static const u32 cfgTabId[3]={UI_ID_MENU_TAB_GRAPHICS,UI_ID_MENU_TAB_INPUT,UI_ID_MENU_TAB_AUDIO_LANG};
         for (i8 t=2;t>=0;--t) { RenderUIImage(cfgTabX[t],196,160,30,currentMenuTab==t ? 920 : 921); if (UI_Button(cfgTabId[t],cfgTabX[t],196+30,160,30,NULL,t)) currentMenuTab=(u8)t; RenderTextL(cfgTabTx[t],202,currentMenuTab==t ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,Sys_Text.stringTable[cfgTabStr[t]]); }
         if (currentMenuTab == 0) {
-            bool overRes = false, overFull = false, overChgM = false, overApply = false; menuItemCount = 12;/*Graphics*/ u8 newVal;
+            bool overRes = false, overFull = false, overChgM = false, overApply = false; menuItemCount = 12;/*Graphics*/
             if(resDropdownOpen){ bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
                 if(lmb||rmb){ int rlh=resDropdownCount*16; bool inList=resDropdownCount>0 && World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=710-rlh && World.cursorPos_y<=710;
                     bool inHeader=World.cursorPos_x>=190 && World.cursorPos_x<=518 && World.cursorPos_y>710 && World.cursorPos_y<=726;
@@ -335,8 +335,8 @@ void RenderMenu() {
             } else { reflHoverIdx=-1; }
             if (UI_Checkbox(UI_ID_MENU_VSYNC,200,620,4,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; SetVSync(); SaveConfig(); }
             RenderTextL(310,620,T_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", globalframesPerLastSecond);/*Helper to see vsync take effect.*/
-            if (UI_Slider(UI_ID_MENU_FOV_SLIDER,400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,Sys_Settings.FOV,&newVal,&fovSliderActive,45,150,5,5,/*Field of View*/775)) { Sys_Settings.FOV = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
-            if (UI_Slider(UI_ID_MENU_GAMMA_SLIDER,400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,Sys_Settings.Brightness,&newVal,&gammaSliderActive,0,100,2,6,/*Gamma*/774)) { Sys_Settings.Brightness = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+            UI_Slider(UI_ID_MENU_FOV_SLIDER,400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,&Sys_Settings.FOV,&fovSliderActive,45,150,5,5,/*Field of View*/775);
+            UI_Slider(UI_ID_MENU_GAMMA_SLIDER,400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,&Sys_Settings.Brightness,&gammaSliderActive,0,100,2,6,/*Gamma*/774);
             if (UI_Button(UI_ID_MENU_RESOLUTION,190,726,328,16,&overRes,7) || (MenuEnter() && currentMenuItem == 7)) { DualLog("Resolution dropdown clicked! %u\n",globalframe); if(!resDropdownOpen){ GatherResolutionModes(); if(resDropdownCount>0){resDropdownOpen=true;} } else{resDropdownOpen=false;} currentMenuItem = 7; }
             overRes = overRes || currentMenuItem == 7; char resBuf[32];
             if (resDropdownCount > 0) sFormat(resBuf, sizeof(resBuf), "%ux%u",(u32)resModes[resSelectedIdx].w,(u32)resModes[resSelectedIdx].h); else sFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
@@ -396,11 +396,11 @@ void RenderMenu() {
             if (rebindRow < 0) rebindCaptureActive = false;
         }
         else {
-            menuItemCount = 10;/*Audio / Lang*/ u8 newVal;
-            if (UI_Slider(UI_ID_MENU_MASTER_VOLUME_SLIDER,426,240,128,16,((Sys_Settings.VolumeMaster / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMaster,&newVal,&masterVolumeSliderActive,0,100,5,0,/*Master Volume*/802)) { Sys_Settings.VolumeMaster = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
-            if (UI_Slider(UI_ID_MENU_MUSIC_VOLUME_SLIDER,426,270,128,16,((Sys_Settings.VolumeMusic / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMusic,&newVal,&musicVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMusic = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
-            if (UI_Slider(UI_ID_MENU_SFX_VOLUME_SLIDER,426,300,128,16,((Sys_Settings.VolumeEffects / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeEffects,&newVal,&sfxVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeEffects = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
-            if (UI_Slider(UI_ID_MENU_LOG_VOLUME_SLIDER,426,330,128,16,((Sys_Settings.VolumeMessage / 100.0f) * (128 - 16)),200,Sys_Settings.VolumeMessage,&newVal,&messageVolumeSliderActive,0,100,5,1,/*Music Volume*/803)) { Sys_Settings.VolumeMessage = newVal; if (!AnyLeftRightMouseDown()) {SaveConfig();} }
+            menuItemCount = 10;/*Audio / Lang*/
+            UI_Slider(UI_ID_MENU_MASTER_VOLUME_SLIDER,426,240,128,16,((Sys_Settings.VolumeMaster / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeMaster,&masterVolumeSliderActive,0,100,5,0,/*Master Volume*/802);
+            UI_Slider(UI_ID_MENU_MUSIC_VOLUME_SLIDER,426,270,128,16,((Sys_Settings.VolumeMusic / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeMusic,&musicVolumeSliderActive,0,100,5,1,/*Music Volume*/803);
+            UI_Slider(UI_ID_MENU_SFX_VOLUME_SLIDER,426,300,128,16,((Sys_Settings.VolumeEffects / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeEffects,&sfxVolumeSliderActive,0,100,5,1,/*Music Volume*/803);
+            UI_Slider(UI_ID_MENU_LOG_VOLUME_SLIDER,426,330,128,16,((Sys_Settings.VolumeMessage / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeMessage,&messageVolumeSliderActive,0,100,5,1,/*Music Volume*/803);
             /*Language picker*/
             static const char* langNames[8] = {"English","Espa\u00f1ol","Deutsch","Fran\u00e7""ais","\u65e5\u672c\u8a9e","\u0420\u0443\u0441\u0441\u043a\u0438\u0439","Italiano","Portugu\u00ea""s"};
             bool langOver = false;
@@ -810,34 +810,30 @@ bool editFieldEditing=false; static u8 editFieldSlot=EF_LAST; static char editFi
 static const i16 efRowY[EF_LAST]={160,188,216,244,272,300,328,356,384,412,440,468,496,524,552};
 static const char* efRowLabel[EF_LAST]={"position x","position y","position z","rotation x","rotation y","rotation z","rotation w","scale x","scale y","scale z","texIndex","modelIndex","glowIndex","specIndex","normIndex"};
 extern Quaternion quat_normalize(Quaternion);
-static void EditFieldValueText(u8 slot,u16 sel,char* out,size_t n){switch(slot){
-    case EF_POSX:sFormat(out,n,"%.2f",World.position[sel].x);break; case EF_POSY:sFormat(out,n,"%.2f",World.position[sel].y);break; case EF_POSZ:sFormat(out,n,"%.2f",World.position[sel].z);break;
-    case EF_ROTX:sFormat(out,n,"%.3f",World.rotation[sel].x);break; case EF_ROTY:sFormat(out,n,"%.3f",World.rotation[sel].y);break; case EF_ROTZ:sFormat(out,n,"%.3f",World.rotation[sel].z);break; case EF_ROTW:sFormat(out,n,"%.3f",World.rotation[sel].w);break;
-    case EF_SCLX:sFormat(out,n,"%.2f",World.scale[sel].x);break; case EF_SCLY:sFormat(out,n,"%.2f",World.scale[sel].y);break; case EF_SCLZ:sFormat(out,n,"%.2f",World.scale[sel].z);break;
-    case EF_TEX:sFormat(out,n,"%u",World.instances[sel].texIndex);break; case EF_MODEL:sFormat(out,n,"%u",World.instances[sel].modelIndex);break; case EF_GLOW:sFormat(out,n,"%u",World.instances[sel].glowIndex);break; case EF_SPEC:sFormat(out,n,"%u",World.instances[sel].specIndex);break; case EF_NORM:sFormat(out,n,"%u",World.instances[sel].normIndex);break;
-    default:sFormat(out,n,"");break;}}
+static void* EditFieldPtr(u8 slot,u16 s) {
+    static const u16 offsets[]={__builtin_offsetof(Entity,texIndex),__builtin_offsetof(Entity,modelIndex),__builtin_offsetof(Entity,glowIndex),__builtin_offsetof(Entity,specIndex),__builtin_offsetof(Entity,normIndex)};
+    if (slot<EF_ROTX) return (u8*)&World.position[s]+slot*sizeof(float);
+    if (slot<EF_SCLX) return (u8*)&World.rotation[s]+(slot-EF_ROTX)*sizeof(float);
+    if (slot<EF_TEX) return (u8*)&World.scale[s]+(slot-EF_SCLX)*sizeof(float);
+    return slot<EF_LAST ? (u8*)&World.instances[s]+offsets[slot-EF_TEX] : NULL;
+}
+static void EditFieldValueText(u8 slot,u16 sel,char* out,size_t n) { void* p=EditFieldPtr(slot,sel); if (!p) { if (n) out[0]=0; return; } if (slot<EF_TEX) sFormat(out,n,slot>=EF_ROTX && slot<=EF_ROTW ? "%.3f" : "%.2f",*(float*)p); else sFormat(out,n,"%u",*(u16*)p); }
 static bool EditSelIsActive(void){return Cheats.editMode&&editModeSelection<U16_MAX&&editModeSelection>=INSTS_1ST_IDX&&editModeSelection<World.instCount;}
 static bool EditLightSelIsActive(void){return Cheats.editMode&&editModeLightSelection<U16_MAX&&editModeLightSelection<World.loadedLights;}
 /*Light properties in the same edit panel, when a light (not an entity) is selected. Rows reuse the EDIT_ROW ids; only one branch renders at a time.*/
 enum { LF_POSX,LF_POSY,LF_POSZ,LF_INT,LF_RANGE,LF_SPOTANG,LF_COLR,LF_COLG,LF_COLB,LF_MINI,LF_MAXI,LF_SDIRX,LF_SDIRY,LF_SDIRZ,LF_SDIRW,LF_LAST };
 static const char* lfRowLabel[LF_LAST]={"position x","position y","position z","intensity","range","spotAng","color r","color g","color b","minIntensity","maxIntensity","spotDir x","spotDir y","spotDir z","spotDir w"};
-static void LightFieldValueText(u8 slot,u16 li,char* out,size_t n){Light* L=&World.lights[li];switch(slot){
-    case LF_POSX:sFormat(out,n,"%.2f",L->pos.x);break; case LF_POSY:sFormat(out,n,"%.2f",L->pos.y);break; case LF_POSZ:sFormat(out,n,"%.2f",L->pos.z);break;
-    case LF_INT:sFormat(out,n,"%.2f",L->intensity);break; case LF_RANGE:sFormat(out,n,"%.2f",L->range);break; case LF_SPOTANG:sFormat(out,n,"%.2f",L->spotAng);break;
-    case LF_COLR:sFormat(out,n,"%.3f",L->col.r);break; case LF_COLG:sFormat(out,n,"%.3f",L->col.g);break; case LF_COLB:sFormat(out,n,"%.3f",L->col.b);break;
-    case LF_MINI:sFormat(out,n,"%.2f",L->minIntensity);break; case LF_MAXI:sFormat(out,n,"%.2f",L->maxIntensity);break;
-    case LF_SDIRX:sFormat(out,n,"%.3f",L->spotDir.x);break; case LF_SDIRY:sFormat(out,n,"%.3f",L->spotDir.y);break; case LF_SDIRZ:sFormat(out,n,"%.3f",L->spotDir.z);break; case LF_SDIRW:sFormat(out,n,"%.3f",L->spotDir.w);break;
-    default:sFormat(out,n,"");break;}}
-static void LightFieldWrite(u16 li,float f){Light* L=&World.lights[li];switch(editFieldSlot){
-    case LF_POSX:L->pos.x=f;break; case LF_POSY:L->pos.y=f;break; case LF_POSZ:L->pos.z=f;break;
-    case LF_INT:L->intensity=f;break; case LF_RANGE:L->range=f;break; case LF_SPOTANG:L->spotAng=f;break;
-    case LF_COLR:L->col.r=f;break; case LF_COLG:L->col.g=f;break; case LF_COLB:L->col.b=f;break;
-    case LF_MINI:L->minIntensity=f;break; case LF_MAXI:L->maxIntensity=f;break;
-    case LF_SDIRX:L->spotDir.x=f;break; case LF_SDIRY:L->spotDir.y=f;break; case LF_SDIRZ:L->spotDir.z=f;break; case LF_SDIRW:L->spotDir.w=f;break;}
+static const u16 lfOffsets[LF_LAST]={
+    __builtin_offsetof(Light,pos.x),__builtin_offsetof(Light,pos.y),__builtin_offsetof(Light,pos.z),__builtin_offsetof(Light,intensity),__builtin_offsetof(Light,range),
+    __builtin_offsetof(Light,spotAng),__builtin_offsetof(Light,col.r),__builtin_offsetof(Light,col.g),__builtin_offsetof(Light,col.b),__builtin_offsetof(Light,minIntensity),
+    __builtin_offsetof(Light,maxIntensity),__builtin_offsetof(Light,spotDir.x),__builtin_offsetof(Light,spotDir.y),__builtin_offsetof(Light,spotDir.z),__builtin_offsetof(Light,spotDir.w)
+};
+static void LightFieldValueText(u8 slot,u16 li,char* out,size_t n) { if (slot>=LF_LAST) { if (n) out[0]=0; return; } sFormat(out,n,(slot>=LF_COLR && slot<=LF_COLB) || slot>=LF_SDIRX ? "%.3f" : "%.2f",*(float*)((u8*)&World.lights[li]+lfOffsets[slot])); }
+static void LightFieldWrite(u16 li,float f){Light* L=&World.lights[li];if (editFieldSlot>=LF_LAST) return; *(float*)((u8*)L+lfOffsets[editFieldSlot])=f;
     if(editFieldSlot<=LF_POSZ){World.lightsNewPosition[li]=L->pos;flag_set(&L->lflags,LDIRTY,true);}/*UpdateLights() overwrites pos from lightsNewPosition every frame, and LDIRTY rebuilds the shadow views*/
     if(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW)L->spotDir=quat_normalize(L->spotDir);/*keep the spot quaternion unit-length like entity rotation edits do*/}
 static void LightFieldCommitLive(void){if(!EditLightSelIsActive())return;float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}LightFieldWrite(editModeLightSelection,f);}
-static void LightFieldStep(float delta){if(!editFieldEditing||!EditLightSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=((editFieldSlot>=LF_COLR&&editFieldSlot<=LF_COLB)||(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW))?3:2;char fmt[8];sFormat(fmt,8,"%%.%df",prec);sFormat(editFieldBuffer,40,fmt,cur);LightFieldCommitLive();}
+static void LightFieldStep(float delta){if(!editFieldEditing||!EditLightSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=((editFieldSlot>=LF_COLR&&editFieldSlot<=LF_COLB)||(editFieldSlot>=LF_SDIRX&&editFieldSlot<=LF_SDIRW))?3:2;sFormat(editFieldBuffer,40,prec==3 ? "%.3f" : "%.2f",cur);LightFieldCommitLive();}
 /*Light type cycle: point<->spot only. Directional is not a panel type (hardcoded in the shader); a picked light is never directional, and the toggle keeps LSPOT/LDIR mutually exclusive so a light can never end up both.*/
 static void LightTypeCycle(void){if(!EditLightSelIsActive())return;Light* L=&World.lights[editModeLightSelection];bool spot=!(L->lflags&LSPOT);flag_set(&L->lflags,LSPOT,spot);flag_set(&L->lflags,LDIR,false);}
 /*Axial spot directions. The chunk shader derives the spot vector as R(spotDir)*(0,0,1); automap convention is north=+Z, east=+X. 0.70710678f is sin/cos 45 degrees.*/
@@ -846,16 +842,11 @@ static void LightDirSet(u8 d){if(!EditLightSelIsActive()||d>=6)return;World.ligh
 static bool LightDirIs(u8 d){if(!EditLightSelIsActive()||d>=6)return false;Quaternion q=World.lights[editModeLightSelection].spotDir;V3 sd=V3_Normalize((V3){2.0f*(q.x*q.z+q.w*q.y),2.0f*(q.y*q.z-q.w*q.x),1.0f-2.0f*(q.x*q.x+q.y*q.y)});static const V3 lfAxes[6]={{0,0,1},{1,0,0},{0,0,-1},{-1,0,0},{0,1,0},{0,-1,0}};return V3_dot(sd,lfAxes[d])>0.99f;}/*direction-dot, so -q matches the same button as q*/
 bool EditPanelPointerHover(void){if(!EditSelIsActive()&&!EditLightSelIsActive())return false;if(!World.inventoryMode)return false;for(int i=0;i<EF_LAST;++i)if(UIOver(UI_ID_CMFD_EDIT_ROW_0+i))return true;if(UIOver(UI_ID_CMFD_EDIT_LIGHT_TYPE))return true;for(int d=0;d<6;++d)if(UIOver(UI_ID_CMFD_EDIT_LIGHT_DIR_N+d))return true;return false;}
 static void EditStop(void){editFieldEditing=false;editFieldSlot=EF_LAST;}
-static void EditFieldWrite(u16 s,Entity* e,float f,i32 iv){switch(editFieldSlot){
-    case EF_POSX:World.position[s].x=f;break; case EF_POSY:World.position[s].y=f;break; case EF_POSZ:World.position[s].z=f;break;
-    case EF_ROTX:World.rotation[s].x=f;World.rotation[s]=quat_normalize(World.rotation[s]);break; case EF_ROTY:World.rotation[s].y=f;World.rotation[s]=quat_normalize(World.rotation[s]);break; case EF_ROTZ:World.rotation[s].z=f;World.rotation[s]=quat_normalize(World.rotation[s]);break; case EF_ROTW:World.rotation[s].w=f;World.rotation[s]=quat_normalize(World.rotation[s]);break;
-    case EF_SCLX:World.scale[s].x=f;break; case EF_SCLY:World.scale[s].y=f;break; case EF_SCLZ:World.scale[s].z=f;break;
-    case EF_TEX:e->texIndex=(u16)vclamp(iv,0,MAXTEX-1);break; case EF_MODEL:e->modelIndex=(u16)vclamp(iv,0,MAX_MDLS-1);break; case EF_GLOW:e->glowIndex=(u16)vclamp(iv,0,MAXTEX-1);break; case EF_SPEC:e->specIndex=(u16)vclamp(iv,0,MAXTEX-1);break; case EF_NORM:e->normIndex=(u16)vclamp(iv,0,MAXTEX-1);break;}
-}
+static void EditFieldWrite(u16 s,float f,i32 iv) { void* p=EditFieldPtr(editFieldSlot,s); if (!p) return; if (editFieldSlot<EF_TEX) *(float*)p=f; else *(u16*)p=(u16)vclamp(iv,0,editFieldSlot==EF_MODEL ? MAX_MDLS-1 : MAXTEX-1); if (editFieldSlot>=EF_ROTX && editFieldSlot<=EF_ROTW) World.rotation[s]=quat_normalize(World.rotation[s]); }
 
-static void EditFieldCommitLive(void){if(EditLightSelIsActive()){LightFieldCommitLive();return;}if(!EditSelIsActive())return;u16 s=editModeSelection;Entity* e=&World.instances[s];float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,e,f,s2i32(editFieldBuffer));}
+static void EditFieldCommitLive(void){if(EditLightSelIsActive()){LightFieldCommitLive();return;}if(!EditSelIsActive())return;u16 s=editModeSelection;float f=0;{const char* p=editFieldBuffer;f=fast_atof(&p);}EditFieldWrite(s,f,s2i32(editFieldBuffer));}
 static void EditFieldStep(float delta){if(!editFieldEditing)return;if(EditLightSelIsActive()){LightFieldStep(delta);return;}if(!EditSelIsActive())return;float cur;{const char* p=editFieldBuffer;cur=fast_atof(&p);}
-    if(editFieldSlot<EF_TEX){int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=(editFieldSlot>=EF_ROTX&&editFieldSlot<=EF_ROTW)?3:2;char fmt[8];sFormat(fmt,8,"%%.%df",prec);sFormat(editFieldBuffer,40,fmt,cur);}
+    if(editFieldSlot<EF_TEX){int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);cur+=steps*0.01f;int prec=(editFieldSlot>=EF_ROTX&&editFieldSlot<=EF_ROTW)?3:2;sFormat(editFieldBuffer,40,prec==3 ? "%.3f" : "%.2f",cur);}
     else{int steps=delta>0?(int)(delta+0.5f):-(int)((-delta)+0.5f);i32 iv=(i32)cur+steps;iv=vclamp(iv,0,(editFieldSlot==EF_MODEL?MAX_MDLS-1:MAXTEX-1));sFormat(editFieldBuffer,40,"%d",iv);}
     EditFieldCommitLive();
 }
@@ -1356,7 +1347,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_CMFD_EMAIL_ENTRY_0 ... UI_ID_CMFD_EMAIL_ENTRY_14: UI_EmailEntryClick((int)(id-UI_ID_CMFD_EMAIL_ENTRY_0)); return;
         case UI_ID_CMFD_DATA_ENTRY_0 ... UI_ID_CMFD_DATA_ENTRY_12: UI_DataEntryClick((int)(id-UI_ID_CMFD_DATA_ENTRY_0)); return;
         case UI_ID_CMFD_NOTE_TOGGLE_0 ... UI_ID_CMFD_NOTE_TOGGLE_17: UI_NoteToggleClick((int)(id-UI_ID_CMFD_NOTE_TOGGLE_0)); return;
-        case UI_ID_CMFD_EDIT_ROW_0 ... UI_ID_CMFD_EDIT_ROW_14: { u8 slot=(u8)(id-UI_ID_CMFD_EDIT_ROW_0); if (EditLightSelIsActive()) { if (slot>=LF_LAST) return; char v[40]; LightFieldValueText(slot,editModeLightSelection,v,40); sFormat(editFieldBuffer,40,"%s",v); editFieldSlot=slot; editFieldEditing=true; return; } if (!EditSelIsActive()) return; char v[40]; EditFieldValueText(slot,editModeSelection,v,40); sFormat(editFieldBuffer,40,"%s",v); editFieldSlot=slot; editFieldEditing=true; return; }
+        case UI_ID_CMFD_EDIT_ROW_0 ... UI_ID_CMFD_EDIT_ROW_14: { u8 slot=(u8)(id-UI_ID_CMFD_EDIT_ROW_0); if (EditLightSelIsActive()) { if (slot>=LF_LAST) return; LightFieldValueText(slot,editModeLightSelection,editFieldBuffer,40); editFieldSlot=slot; editFieldEditing=true; return; } if (!EditSelIsActive()) return; EditFieldValueText(slot,editModeSelection,editFieldBuffer,40); editFieldSlot=slot; editFieldEditing=true; return; }
         case UI_ID_CMFD_EDIT_LIGHT_TYPE: LightTypeCycle(); return;
         case UI_ID_CMFD_EDIT_LIGHT_DIR_N ... UI_ID_CMFD_EDIT_LIGHT_DIR_DN: LightDirSet((u8)(id-UI_ID_CMFD_EDIT_LIGHT_DIR_N)); return;
         case UI_ID_LMFD_TAB_WEAPON ... UI_ID_LMFD_TAB_DATA: MFD_SelectTab((u8)(rh?2:1),(u8)(id-UI_ID_LMFD_TAB_WEAPON+1),true); return;
