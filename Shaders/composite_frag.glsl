@@ -30,9 +30,9 @@ layout(location = 30) uniform float skyRotateSpeed;
 layout(location = 31) uniform sampler2D uiImage;
 layout(location=32) uniform sampler2D inputDepthID;
 layout(location=33) uniform mat4 invViewProj; /*
-layout(location=7) some weird
-layout(location=8) padding apparently, so say some docs anyhow
-layout(location=9) */
+layout(location=34) some weird
+layout(location=35) padding apparently, so say some docs anyhow
+layout(location=36) */
 const float vhsBlurAmount=0.5 /* Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.*/,vhsRadiusMax=3.0,staticBandThickness=0.005,staticScrollSpeed=200.0,WORLDCELL_WIDTH_F=2.56,VOXEL_SIZE=0.32,PI=3.14159265359,aaThreshold=0.05;
 // Simplex noise
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -127,7 +127,7 @@ void main() {
     vec2 ssRatio = vec2(screenWidth/SSR_RES, screenHeight/SSR_RES); ivec2 pixel = ivec2(texCoordUsed * ssRatio);
     if (reflectionsEnabled > 0) {
         vec2 lowResSize = ssRatio; vec2 pixelLow = floor(vec2(pixel)) + 0.5;/*Center of the current low-res pixel*/ vec2 sampUVBase = pixelLow / lowResSize; vec4 reflectionColor = vec4(0.0); int wi = 0; for (int x = -2; x <= 2; ++x){for(int y=-2;y<=2;++y){vec2 sampUV=(pixelLow + vec2(float(x), float(y))) / lowResSize; vec3 samp = texture(outputImage,sampUV).rgb; float w = ssr_weights[wi++]; reflectionColor.rgb += samp * w; } }
-        reflectionColor.rgb /= 4.51; if (isSky) { FragColor.rgb += reflectionColor.rgb; return; } color.rgb += (reflectionColor.rgb * 2.2);
+        reflectionColor.rgb /= 4.51; if (isSky) { FragColor.rgb += reflectionColor.rgb; return; } color.rgb += reflectionColor.rgb;
     }
     vec3 aaColor = color.rgb; vec2 texelSize = 1.0 / vec2(screenWidth,screenHeight);
     if (aaEnabled > 0.0) {

@@ -708,7 +708,6 @@ void UI_SysAnalyzerClose(bool rh) { (void)rh; World.Sys_UI.mouseClickHeldOverGUI
 void UI_MinigameStart(bool rh,int game) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastMinigameSideRH=rh; if (game<0||game>8) return; if (!World.invP1.hasMinigame) return; World.Sys_UI.mg_current=(i8)game; World.Sys_UI.mg_running[rh?1:0]=true; CenterStatusPrint("%s %s",Sys_Text.stringTable[1021],mgName[game]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
 void UI_MinigameInput(bool rh,int x,int y) { (void)rh;(void)x;(void)y; /*The Funpack gameplay engines are not ported yet; a click inside the running view would land here and is only consumed.*/ World.Sys_UI.mouseClickHeldOverGUI=true; }
 void UI_MinigameBack(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_current<0) return; World.Sys_UI.mg_current=-1; World.Sys_UI.mg_running[rh?1:0]=false; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
-void UI_MinigameClose(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_running[rh?1:0]) World.Sys_UI.mg_running[rh?1:0]=false; World.Sys_UI.mg_current=-1; MFD_CloseData(); }
 #define LOG_IMG_BASE 1272
 #define LOG_TX 372
 #define LOG_TY 574
@@ -1393,7 +1392,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_MINIGAME_0 ... UI_ID_LMFD_MINIGAME_8: UI_MinigameStart(rh,(int)(id-UI_ID_LMFD_MINIGAME_0)); return;
         case UI_ID_LMFD_MINIGAME_VIEW: UI_MinigameInput(rh,World.cursorPos_x,World.cursorPos_y); return;
         case UI_ID_LMFD_MINIGAME_BACK: UI_MinigameBack(rh); return;
-        case UI_ID_LMFD_MINIGAME_CLOSE: UI_MinigameClose(rh); return;
+        case UI_ID_LMFD_MINIGAME_CLOSE: World.Sys_UI.mouseClickHeldOverGUI=true; if (World.Sys_UI.mg_running[rh?1:0]) World.Sys_UI.mg_running[rh?1:0]=false; World.Sys_UI.mg_current=-1; MFD_CloseData(); return;
         case UI_ID_LMFD_SEARCH_ICON_0 ... UI_ID_LMFD_SEARCH_ICON_3: World.Sys_UI.lastSearchSideRH=rh; SearchTakeSlot((u8)(id-UI_ID_LMFD_SEARCH_ICON_0)); return;
         case UI_ID_LMFD_SEARCH_CLOSE: CloseSearch(); return;
         default: return;/*Decoration, labels and panel backdrops: they block the pointer but have no action*/

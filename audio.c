@@ -445,14 +445,6 @@ static bool probe_wav(const char *p, size_t* blockBytes){Wav wav; if(!WavInit(&w
 static bool decode_wav(const char *p, float *buf, size_t cap, u32 *fr, size_t* sz){Wav wav; if(!WavInit(&wav,p)){return false;} if(wav.channels>2){WavUnInit(&wav); return false;} u64 frames=wav.totalPCMFrameCount; size_t need=(size_t)frames*AUDIO_CHANNELS*sizeof(float); if (need > cap) {WavUnInit(&wav); return false;} u64 got=WavReadPCMFrames(&wav,frames,buf); if (wav.channels == 1) for(i64 i=(i64)got-1;i>=0;i--){buf[i*2+1]=buf[i]; buf[i*2]=buf[i];} u32 src_rate=wav.sampleRate; WavUnInit(&wav); *fr=(u32)got; resample_stereo_inplace(buf,need,fr,src_rate,sz); return true;}
 static bool probe_mp3(const char *p, size_t* blockBytes){mp3 dec; if(!mp3_init_file(&dec,p)){return false;} u32 rate=dec.sampleRate ? dec.sampleRate : AUDIO_RATE; u64 nf=mp3_get_pcm_frame_count(&dec); mp3_uninit(&dec); if (nf == 0) {return false;} u64 df=(rate==AUDIO_RATE)?nf:nf*AUDIO_RATE/rate; size_t nb=(size_t)nf*AUDIO_CHANNELS*sizeof(float), fb=(size_t)df*AUDIO_CHANNELS*sizeof(float); *blockBytes = nb>fb?nb:fb; return true;}
 static bool decode_mp3(const char *p, float *buf, size_t cap, u32 *fr, size_t* sz){mp3 dec; if(!mp3_init_file(&dec,p)){return false;} u32 src_channels=dec.channels, src_rate=dec.sampleRate; u64 total=mp3_get_pcm_frame_count(&dec); if (total == 0) {mp3_uninit(&dec); return false;} size_t need=(size_t)total*AUDIO_CHANNELS*sizeof(float); if (need > cap) {mp3_uninit(&dec); return false;} mp3_seek_to_pcm_frame(&dec,0); u64 got=mp3_read_pcm_frames_f32(&dec,total,buf); mp3_uninit(&dec); if(got==0){return false;} if(src_channels==1){for(i64 i=(i64)got-1;i>=0;i--){buf[i*2+1]=buf[i]; buf[i*2]=buf[i];} } *fr=(u32)got; resample_stereo_inplace(buf,need,fr,src_rate,sz); return true;}
-
-/* --- Decode-once sample cache -------------------------------------------------
-   Every play used to decode the WAV straight off disk into a fresh heap buffer,
-   then free it when the channel slot was recycled.  Footsteps, gunshots and
-   impacts fire dozens of times a second, so that churned the heap constantly.
-   Decoded PCM is now cached by path and shared between channels through
-   refcounts; the cache is bounded by a byte budget and evicts least-recently-
-   used entries that no channel is holding. */
 #define AUDIO_CACHE_HASH_SIZE 1024
 #define AUDIO_CACHE_MAX_ENTRIES 512
 #define AUDIO_CACHE_BUDGET_BYTES (16u*1024u*1024u)
@@ -462,10 +454,6 @@ static i32 g_acacheIdx[AUDIO_CACHE_HASH_SIZE];
 static size_t g_acacheBytes = 0;
 static u64 g_acacheClock = 0;
 static bool g_acacheReady = false;
-
-/* The cache's PCM lives in one static pool (the byte budget IS the pool size), carved
-   by a first-fit span list.  Eviction returns a span instead of unmapping memory, so
-   process RSS plateaus at the pool's touched footprint and stops moving. */
 static float g_acachePool[AUDIO_CACHE_BUDGET_BYTES/4];
 typedef struct { size_t ofs, size; bool used; } ACacheSpan;
 #define ACACHE_SPANS_MAX (AUDIO_CACHE_MAX_ENTRIES*2+1)
@@ -473,18 +461,12 @@ static ACacheSpan g_acacheSpans[ACACHE_SPANS_MAX]; static i32 g_acacheSpanCount 
 static void acachePoolInit(void) { if (g_acacheSpanCount) { return; } g_acacheSpans[0].ofs = 0; g_acacheSpans[0].size = AUDIO_CACHE_BUDGET_BYTES; g_acacheSpans[0].used = false; g_acacheSpanCount = 1; }
 static size_t acachePoolAlloc(size_t bytes) { acachePoolInit(); bytes = (bytes + 7u) & ~(size_t)7u; for (i32 i = 0; i < g_acacheSpanCount; i++) { if (g_acacheSpans[i].used || g_acacheSpans[i].size < bytes) { continue; } size_t ofs = g_acacheSpans[i].ofs; size_t rem = g_acacheSpans[i].size - bytes; if (rem >= 64u && g_acacheSpanCount < ACACHE_SPANS_MAX) { for (i32 j = g_acacheSpanCount; j > i + 1; j--) { g_acacheSpans[j] = g_acacheSpans[j-1]; } g_acacheSpans[i+1].ofs = ofs + bytes; g_acacheSpans[i+1].size = rem; g_acacheSpans[i+1].used = false; g_acacheSpanCount++; g_acacheSpans[i].size = bytes; } g_acacheSpans[i].used = true; return ofs; } return (size_t)-1; }
 static void acachePoolFree(size_t ofs) { for (i32 i = 0; i < g_acacheSpanCount; i++) { if (!g_acacheSpans[i].used || g_acacheSpans[i].ofs != ofs) { continue; } g_acacheSpans[i].used = false; if (i + 1 < g_acacheSpanCount && !g_acacheSpans[i+1].used) { g_acacheSpans[i].size += g_acacheSpans[i+1].size; for (i32 j = i + 1; j + 1 < g_acacheSpanCount; j++) { g_acacheSpans[j] = g_acacheSpans[j+1]; } g_acacheSpanCount--; } if (i > 0 && !g_acacheSpans[i-1].used) { g_acacheSpans[i-1].size += g_acacheSpans[i].size; for (i32 j = i; j + 1 < g_acacheSpanCount; j++) { g_acacheSpans[j] = g_acacheSpans[j+1]; } g_acacheSpanCount--; } return; } }
-
 static u64 audioPathHash(const char* p) { u64 h = 1469598103934665603ull; for (; *p; ++p) { h ^= (u8)*p; h *= 1099511628211ull; } return h; }
 static void audioCacheInit(void) { if (g_acacheReady) { return; } g_acacheReady = true; for (u32 i = 0; i < AUDIO_CACHE_HASH_SIZE; i++) { g_acacheIdx[i] = -1; } }
 static void audioCacheIndexRebuild(void) { for (u32 i = 0; i < AUDIO_CACHE_HASH_SIZE; i++) { g_acacheIdx[i] = -1; } for (u32 i = 0; i < AUDIO_CACHE_MAX_ENTRIES; i++) { if (!g_acache[i].used) { continue; } u32 slot = (u32)(g_acache[i].pathHash % AUDIO_CACHE_HASH_SIZE); while (g_acacheIdx[slot] >= 0) { slot = (slot + 1) % AUDIO_CACHE_HASH_SIZE; } g_acacheIdx[slot] = (i32)i; } }
 static i32 audioCacheFind(const char* path) { audioCacheInit(); u64 h = audioPathHash(path); u32 len = (u32)slen(path); u32 slot = (u32)(h % AUDIO_CACHE_HASH_SIZE); for (u32 i = 0; i < AUDIO_CACHE_HASH_SIZE; i++) { i32 e = g_acacheIdx[(slot + i) % AUDIO_CACHE_HASH_SIZE]; if (e < 0) { return -1; } if (g_acache[e].pathHash != h || g_acache[e].pathLen != len) { continue; } /* same hash and same length: the stored label matches too unless the path was too long to store, in which case the hash+length pair is the identity */ if (len < sizeof(g_acache[e].path) && !sEqual(g_acache[e].path, path)) { continue; } return e; } return -1; }
 static void audioCacheDrop(i32 e) { if (e < 0 || !g_acache[e].used) { return; } if (g_acache[e].samples) { acachePoolFree(g_acache[e].poolOfs); } g_acacheBytes -= g_acache[e].allocSize; g_acache[e].used = false; g_acache[e].samples = NULL; g_acache[e].allocSize = 0; g_acache[e].refs = 0; g_acache[e].path[0] = 0; g_acache[e].pathHash = 0; g_acache[e].pathLen = 0; audioCacheIndexRebuild(); }
 static bool audioCacheEvictOne(void) { u64 oldest = ~0ull; i32 victim = -1; for (u32 i = 0; i < AUDIO_CACHE_MAX_ENTRIES; i++) { if (g_acache[i].used && g_acache[i].refs == 0 && g_acache[i].lastUse < oldest) { oldest = g_acache[i].lastUse; victim = (i32)i; } } if (victim < 0) { return false; } audioCacheDrop(victim); return true; }
-
-/* Acquire a decoded buffer for `path`.  On a hit the cached PCM is shared and the
-   entry's refcount is bumped; on a miss the file is decoded once into the static
-   pool and inserted.  Returns the cache entry index, or -1 on failure (the sound
-   simply does not play; nothing is heap-allocated either way). */
 static i32 audioCacheAcquire(const char* path, bool isMp3, float** outSamples, u32* outFrames, size_t* outSize) {
     *outSamples = NULL; *outFrames = 0; *outSize = 0;
     i32 e = audioCacheFind(path);
@@ -502,10 +484,6 @@ static i32 audioCacheAcquire(const char* path, bool isMp3, float** outSamples, u
     u32 frames = 0; size_t sz = 0;
     if (!(isMp3 ? decode_mp3(path, buf, blockBytes, &frames, &sz) : decode_wav(path, buf, blockBytes, &frames, &sz))) { acachePoolFree(ofs); return -1; }
     g_acache[slot].used = true; g_acache[slot].samples = buf; g_acache[slot].poolOfs = ofs; g_acache[slot].allocSize = blockBytes; g_acache[slot].frame_count = frames; g_acache[slot].refs = 1; g_acache[slot].lastUse = ++g_acacheClock; g_acache[slot].lastPlayTime = World.pauseRelativeTime;
-    /* Hash the FULL path, then store a truncated copy of it.  The hash is what the
-       index buckets on and what identifies the entry, so a path too long for the
-       192-byte field still hashes to the same bucket it is looked up in; the
-       truncated string is only a human-readable label. */
     g_acache[slot].pathHash = audioPathHash(path); g_acache[slot].pathLen = (u32)slen(path);
     u32 plen = slen(path); if (plen >= sizeof(g_acache[slot].path)) plen = sizeof(g_acache[slot].path) - 1; mcpy(g_acache[slot].path, path, plen); g_acache[slot].path[plen] = 0;
     g_acacheBytes += blockBytes;
@@ -514,18 +492,9 @@ static i32 audioCacheAcquire(const char* path, bool isMp3, float** outSamples, u
     return slot;
 }
 static void audioCacheRelease(i32 slot) { if (slot < 0 || slot >= AUDIO_CACHE_MAX_ENTRIES || !g_acache[slot].used) { return; } if (g_acache[slot].refs) { g_acache[slot].refs--; } }
-/* Drop entries nothing is playing and that have not been replayed for a while, so the
-   cache does not sit at its full budget once the level goes quiet. */
-static void audioCachePrune(void) {
-    double now = World.pauseRelativeTime;
-    for (u32 i = 0; i < AUDIO_CACHE_MAX_ENTRIES; i++) {
-        if (!g_acache[i].used || g_acache[i].refs) { continue; }
-        if ((now - g_acache[i].lastPlayTime) < 30.0) { continue; }
-        audioCacheDrop((i32)i);
-    }
-}
-static void WavReleaseSamples(wav_channel_t* w) { if (!w->samples) { return; } if (w->cacheSlot >= 0) { audioCacheRelease(w->cacheSlot); w->cacheSlot = -1; } w->samples = NULL; w->allocSize = 0; } /*samples always live in the static cache pool now; nothing to free*/
-size_t AudioLiveBytes() { size_t t=0; for (u32 i=0;i<MAX_CHANNELS;++i) { if(wav_ch[i].cacheSlot < 0) t+=wav_ch[i].allocSize;/*cached channels are counted once by g_acacheBytes below*/ } for (int s=0;s<2;++s) { if(mp3_ch[s]) t+=sizeof(mp3_channel_t)+mp3_ch[s]->dec.dataCapacity; if(mp3_fade_out_target[s]) t+=sizeof(mp3_channel_t)+mp3_fade_out_target[s]->dec.dataCapacity; } if(log_ch) t+=sizeof(log_channel_t)+log_ch->dec.dataCapacity; return t + g_acacheBytes; } /* diagnostics only */
+static void audioCachePrune(void) { double now = World.pauseRelativeTime; for (u32 i = 0; i < AUDIO_CACHE_MAX_ENTRIES; i++) { if (!g_acache[i].used || g_acache[i].refs) { continue; } if ((now - g_acache[i].lastPlayTime) < 30.0) { continue; } audioCacheDrop((i32)i); } }
+static void WavReleaseSamples(wav_channel_t* w) { if (!w->samples) { return; } if (w->cacheSlot >= 0) { audioCacheRelease(w->cacheSlot); w->cacheSlot = -1; } w->samples = NULL; w->allocSize = 0; }
+size_t AudioLiveBytes() { size_t t=0; for (u32 i=0;i<MAX_CHANNELS;++i) { if(wav_ch[i].cacheSlot < 0) t+=wav_ch[i].allocSize; } for (int s=0;s<2;++s) { if(mp3_ch[s]) t+=sizeof(mp3_channel_t)+mp3_ch[s]->dec.dataCapacity; if(mp3_fade_out_target[s]) t+=sizeof(mp3_channel_t)+mp3_fade_out_target[s]->dec.dataCapacity; } if(log_ch) t+=sizeof(log_channel_t)+log_ch->dec.dataCapacity; return t + g_acacheBytes; } /* diagnostics only */
 i32 GetFreeWavSlot(){i32 retval=-1; for (u32 i=0;i<wav_count;++i){if(!wav_ch[i].playing){if(wav_ch[i].samples){WavReleaseSamples(&wav_ch[i]);} retval=i; break;}} return retval;}
 // Audio Synthesis Engine
 static float rev_buf[4][REV_BUF_LEN]/*4 comb delay lines, ~1.7MB static*/, ap_buf[2][3533]; /*2 allpass lines, prime lengths*/
@@ -562,54 +531,53 @@ void synth_set_room(float sz, float wet) {
 
 void synth_set_reverb_preset(u16 preset) { if (preset < 28) { synth_set_room(ReverbPresetParams[preset].sz, ReverbPresetParams[preset].wet); } else { synth_set_room(0.5f, 0.5f); } }
 static float reverb_tick(float in){float s=0.0f; for(u32 i=0;i<4;++i){float delayed=rev_buf[i][rev_idx[i]]; rev_lp[i]+=0.5f*(delayed-rev_lp[i]); rev_buf[i][rev_idx[i]]=in+rev_lp[i]*rev_fb[i]; rev_idx[i]=(rev_idx[i]+1>=rev_len[i]) ? 0 : rev_idx[i]+1; s+=delayed;} s*=0.25f; for(u32 i=0;i<2;++i){float delayed=ap_buf[i][ap_idx[i]]; float w=s+delayed*0.5f; ap_buf[i][ap_idx[i]]=w; ap_idx[i]=(ap_idx[i]+1>=AP_LEN[i]) ? 0 : ap_idx[i]+1; s=delayed-0.5f*w;} return s;}
-static SynthVoice* SynAlloc() { for (u32 i = 0; i < MAX_SYNTH_VOICES; i++){ if (!syn_ch[i].active){return &syn_ch[i];} } return NULL; }
 static void synth_mix(SynthVoice* v, float* mix) { float vol=AppliedFXVol(v->vol); if(v->positional){float d=V3_Dist(v->pos,World.position[PLAYER1]); vol*=(d >= 64.0f) ? 0.0f : (d <= 1.0f) ? 1.0f : 1.0f-(d-1.0f)/63.0f;} for(i32 f=0;f<AUDIO_FRAMES;f++){if(v->frame >= v->frames){v->active=false; return;} float s=v->fn(v)*vol; mix[f*2+0]+=s; mix[f*2+1]+=s; v->frame++;} }
 void synth_reverb_apply(float* mix, i32 frames){ if (rev_wet < 0.001f) return; for (i32 f = 0; f < frames; f++) { float mono = (mix[f*2+0] + mix[f*2+1]) * 0.5f; float wet  = reverb_tick(mono); mix[f*2+0] = mix[f*2+0] * rev_dry + wet * rev_wet; mix[f*2+1] = mix[f*2+1] * rev_dry + wet * rev_wet; } }
-static float LP(float *s, float in, float rc){ *s += rc*(in-*s); return *s; }                              static float HP(float *s, float in, float rc){ return in - LP(s,in,rc); }          static float BP(float *s1,float *s2,float in,float rc){ float a=LP(s1,in,rc); return a-LP(s2,a,rc); }
-static float Phasor(float *ph, float freq){ *ph += freq/AUDIO_RATE; if(*ph>=1.0f) *ph-=1.0f; return *ph; } static float Osc(float *ph, float freq){ return vsinf(6.28318f*Phasor(ph,freq)); } static float FMOsc(float *c,float *m,float fc,float fm,float idx) { return vsinf(6.28318f*(Phasor(c,fc)+Osc(m,fm)*idx)); }
-static float GenLaserSS1(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[3]*t); float fc=v->p[0]*v->pitch*(1.0f + v->p[1]*t); float idx=4.0f*vexp(-35.0f*t); float tone=FMOsc(&v->s[0],&v->s[1],fc,v->p[2]*fc, idx); float click = (t < 0.012f) ? LP(&v->s[2], random_range(-1.0f,1.0f), 0.4f)*(1.0f - t/0.012f)*0.4f : 0.0f; return (tone + click) * env; } // p[0]=base_freq  p[1]=sweep_rate  p[2]=fm_rate_ratio  p[3]=decay
-static float GenDoor(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float dur = (float)v->frames / AUDIO_RATE; float thud=vsinf(6.28318f * v->p[0]*v->pitch * t) * vexp(-8.0f*t) * 1.5f; float rc   = 0.08f + 0.05f*vsinf(6.28318f*3.0f*t); float hiss = BP(&v->s[0], &v->s[1], random_range(-1.0f,1.0f), rc) * 0.6f; return thud + hiss * vsinf(3.14159265f*(t/dur)); } // p[0]=pitch
-static float GenImpact(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[1]*t); if (v->frame%4==0) v->s[2] = random_range(-1.0f,1.0f); float noise = LP(&v->s[0], v->s[2], 0.3f); float ring  = vsinf(6.28318f * v->p[0]*v->pitch * t) * env; return noise*env*v->p[2] + ring*v->p[3]; } // p[0]=ring_freq  p[1]=decay  p[2]=noise_amt  p[3]=ring_amt
-static float GenBoom(SynthVoice* v){float env=vexp(-v->p[1]*(float)v->frame/AUDIO_RATE); return Osc(&v->s[0], v->p[0]*v->pitch)*env*0.7f + LP(&v->s[1],random_range(-1.0f,1.0f),0.15f)*env*0.8f; } // p[0]=rumble_freq  p[1]=decay
-static float GenHiss(SynthVoice* v){return HP(&v->s[0], random_range(-1.0f,1.0f), v->p[0]); }
-static float GenPipe(SynthVoice* v){return BP(&v->s[0], &v->s[1], random_range(-1.0f,1.0f), v->p[0]) * 2.0f; }
-static float GenShieldHit(SynthVoice* v) { float t      = (float)v->frame / AUDIO_RATE; float wobble = vsinf(6.28318f*12.0f*t)*60.0f; return Osc(&v->s[0], v->p[0]*v->pitch + wobble) * vexp(-v->p[1]*t); } // p[0]=freq  p[1]=decay
-static float GenFootstep(SynthVoice* v) {
-    float t=(float)v->frame / AUDIO_RATE, dur=(float)v->frames / AUDIO_RATE, raw = random_range(-1.0f,1.0f); v->s[0] += 0.12f*(raw*raw*raw*0.35f - v->s[0]); v->s[1] += 0.12f*(v->s[0] - v->s[1]); if (v->s[5] <= 0.0f) { if ((rand()%100)<35) { v->s[5]=AUDIO_RATE*random_range(0.006f,0.018f); v->s[6]=random_range(0.4f,1.2f); } else {v->s[6] = 0.0f;} } else {v->s[5] -= 1.0f;}
-    float rc = (0.22f - 0.08f*(t/dur)) * v->pitch; v->s[2] += rc*(raw*v->s[6] - v->s[2]); v->s[3] += rc*(v->s[2] - v->s[3]); float thump = (t < 0.07f) ? raw*vsinf(3.14159265f*(t/0.07f))*0.8f : 0.0f; v->s[4] += 0.025f*(thump - v->s[4]); return v->s[1] + (v->s[2]-v->s[3])*1.5f + v->s[4];
-}
-
-static float GenSandFootstep(SynthVoice* v) { float t=(float)v->frame / AUDIO_RATE; float env=vexp(-25.0f*t); float noise = 0.0f; if (v->frame%12==0) { float raw = random_range(-1.0f,1.0f); noise = (raw>0.0f?1.0f:-1.0f)*(raw*raw); if (t<0.05f && (rand()%100)>85) noise += random_range(-1.0f,1.0f)*0.75f; } v->s[0] += 0.25f*(noise - v->s[0]); v->s[1] += 0.25f*(v->s[0] - v->s[1]); return (v->s[0]-v->s[1])*env*2.0f;  }
-static float GenTapCase(SynthVoice* v) {
-    float t=(float)v->frame / AUDIO_RATE; float dur=(float)v->frames / AUDIO_RATE; if (v->frame%12==0) { float raw = random_range(-1.0f,1.0f); v->s[3] = (raw>0.0f?1.0f:-1.0f)*(raw*raw); if (t<0.06f && (rand()%100)>75) v->s[3] += random_range(-1.0f,1.0f)*0.75f; } if (v->frame%4==0) v->s[4] = random_range(-1.0f,1.0f); 
-    float rc=(0.35f-0.15f*(t/dur)) * v->pitch; v->s[0] += rc*(v->s[3]-v->s[0]); v->s[1] += rc*(v->s[0]-v->s[1]); v->s[2] += 0.04f*(v->s[4]-v->s[2]); return (v->s[0]-v->s[1])*vexp(-22.0f*t) + v->s[2]*vexp(-14.0f*t)*1.8f;
-}
-
-static float GenPlasticTap(SynthVoice* v) { float t=(float)v->frame / AUDIO_RATE; float tr = random_range(-1.0f,1.0f) * vexp(-600.0f*t) * 0.5f; float f1 = 800.0f*v->pitch, f2 = 1100.0f*v->pitch; float bd = (vsinf(6.28318f*f1*t)*0.6f + vsinf(6.28318f*f2*t)*0.4f)*vexp(-45.0f*t)*0.4f; return tr + bd; }
-static float GenSparkSmall(SynthVoice* v) {
-    float t=(float)v->frame / AUDIO_RATE; float dur=(float)v->frames / AUDIO_RATE; float env = vexp(-14.0f*t); if (v->s[3]<=0.0f) { if ((rand()%100)<22) { v->s[3]=AUDIO_RATE*random_range(0.004f,0.012f); v->s[4]=1.0f; v->s[5]=0.93f-0.15f*(t/dur); } else v->s[4] = 0.0f; } else { v->s[3]-=1.0f; v->s[4]*=v->s[5]; }
-    float active = (v->s[4]>0.01f) ? random_range(-1.0f,1.0f)*v->s[4] : 0.0f; v->s[1] += 0.28f*(active-v->s[1]); v->s[2] += 0.28f*(v->s[1]-v->s[2]); float thump = (t<0.08f) ? random_range(-1.0f,1.0f)*vsinf(3.14159265f*(t/0.08f)) : 0.0f; v->s[0] += 0.02f*(thump-v->s[0]); return ((v->s[1]-v->s[2])*3.5f + v->s[0]*1.2f)*env;
-}
-
-static float GenCrackle(SynthVoice* v){float env=vexp(-v->p[1]*(float)v->frame/AUDIO_RATE); if(v->s[3]<=0.0f){if((i32)(rand()%100)<(i32)v->p[2]){v->s[3]=AUDIO_RATE*random_range(0.004f,0.012f); v->s[4]=1.0f; v->s[5]=0.93f;}else v->s[4]=0; }else{v->s[3]-=1.0f; v->s[4]*=v->s[5];} float active=(v->s[4]>0.01f) ? random_range(-1.0f,1.0f)*v->s[4] : 0; v->s[1]+=v->p[0]*(active-v->s[1]); v->s[2]+=v->p[0]*(v->s[1]-v->s[2]); return (v->s[1]-v->s[2])*3.5f*env;} // p[0]=rc  p[1]=decay  p[2]=burst_chance
-static float GenSine(SynthVoice* v) { return vsinf(6.28318f * v->p[0]*v->pitch * (float)v->frame/AUDIO_RATE); }
-static float GenClink(SynthVoice* v) { float t = (float)v->frame / AUDIO_RATE; return vsinf(6.28318f * v->p[0]*v->pitch * t) * vexp(-v->p[1]*t); } // p[0]=freq  p[1]=decay
-static float GenRing(SynthVoice* v) { // p[0]=fundamental_freq  p[1]=base_decay  p[2]=partial_spread  p[3]=noise_attack.  Partial ratios below approximate a cylindrical glass vessel.  s[0..3] = phasor state for 4 partials (no extra filter state needed)
-    float t=(float)v->frame / AUDIO_RATE; float f0=v->p[0] * v->pitch; float dec=v->p[1]; float sprd=v->p[2];/*how much faster upper partials decay vs fundamental*/ static const float ratios[4]={1.0f,2.76f,5.41f,8.93f},amps[4]={1.0f,0.35f,0.15f,0.06f}; /*Inharmonic partial ratios for glass, ratios approximate a cylindrical glass vessel.*/
-    float out=0.0f; for (u32 i = 0; i < 4; i++) { float decay_i=dec*(1.0f + i*sprd);/*upper partials decay faster*/ float env_i=vexp(-decay_i*t); out+=Osc(&v->s[i],f0*ratios[i])*amps[i]*env_i; } /*s[0..3] hold phasor state for each partial; s[4] is LP filter for click*/ return out + ((t < v->p[3]) ? LP(&v->s[4], random_range(-1.0f,1.0f), 0.35f) * (1.0f - t/v->p[3]) * 0.3f : 0.0f);
-}
-
-static float GenBeakerThud(SynthVoice* v) {
-    float t=(float)v->frame / AUDIO_RATE; float f0=v->p[0]*v->pitch; static const float ratios[4]={1.0f,2.76f,5.41f,8.93f}, amps[4]={0.7f,0.25f,0.08f,0.03f}; float glass = 0.0f; for (u32 i = 0; i < 4; i++) { float decay_i = v->p[1] * (1.0f + i * 1.8f); glass += Osc((float*)&v->s[i], f0 * ratios[i]) * amps[i] * vexp(-decay_i * t); }
-    if (v->frame%4==0){v->s[4] = random_range(-1.0f,1.0f);} float floor_body = BP(&v->s[5], &v->s[6], v->s[4], v->p[2]) * vexp(-30.0f*t) * 1.4f; /*Floor body: noise burst filtered through BP at plastic panel resonance.  The floor resonates at ~200-400Hz for thin plastic panels.*/ return glass + floor_body + ((t < v->p[3]) ? LP(&v->s[7], random_range(-1.0f,1.0f), 0.4f)*(1.0f - t/v->p[3])*0.5f : 0.0f);
-}
-
-typedef struct { SynthFn fn; float dur, vol; float p[4]; } SynthPreset;
-static const SynthPreset SynthPresets[SND_COUNT] = {[SND_LASER_PISTOL]={GenLaserSS1,0.30f,0.55f,{900.0f,-1.8f,0.5f,10.0f}},[SND_LASER_RIFLE]={GenLaserSS1,0.40f,0.70f,{600.0f,-0.8f,0.4f,7.0f}},[SND_DOOR]={GenDoor,1.20f,0.65f,{50.0f,0,0,0}},[SND_IMPACT_GLASS]={GenImpact,0.50f,0.60f,{4500.0f,18.0f,0.3f,0.6f}},[SND_IMPACT_METAL]={GenImpact,0.50f,0.65f,{1800.0f,30.0f,0.5f,0.3f}},[SND_EXPLOSION]={GenBoom,1.00f,0.80f,{55.0f,3.5f,0,0}},
-                                                    [SND_HISS]={GenHiss,1.50f,0.35f,{0.12f,0,0,0}},[SND_PIPE]={GenPipe,1.50f,0.40f,{0.07f,0,0,0}},[SND_SHIELD_HIT]={GenShieldHit,0.35f,0.50f,{180.0f,8.0f,0,0}},[SND_FOOTSTEP]={GenFootstep,0.26f,0.70f,{0}},[SND_SAND_FOOTSTEP]={GenSandFootstep,0.30f,0.65f,{0}},[SND_TAP_CASE]={GenTapCase,0.25f,0.55f,{0}},[SND_PLASTIC_TAP]={GenPlasticTap,0.09f,0.50f,{0}},[SND_SPARK_SMALL]={GenSparkSmall,0.24f,0.50f,{0}},
-                                                    [SND_CRACKLE]={GenCrackle,2.00f,0.45f,{0.28f,2.5f,20.0f,0}},[SND_SINE]={GenSine,1.00f,0.50f,{440.0f,0,0,0}},[SND_CLINK]={GenClink,0.40f,0.50f,{1200.0f,12.0f,0,0}},[SND_BEAKER_CLINK]={GenRing,1.20f,0.50f,{2400.0f,4.0f,1.4f,0.008f}},[SND_BEAKER_THUD]={GenBeakerThud,0.60f,0.55f,{2200.0f,18.0f,0.06f,0.012f}}};
-void play_synth(SoundID id, float vol, float pitch){if((u32)id >= SND_COUNT){return;} const SynthPreset* pr=&SynthPresets[id]; SynthVoice* v=SynAlloc(); if(!v){return;} *v=(SynthVoice){.fn=pr->fn,.frames=(u32)(AUDIO_RATE*pr->dur),.vol=pr->vol*vol,.pitch=pitch,.active=true}; v->p[0]=pr->p[0]; v->p[1]=pr->p[1]; v->p[2]=pr->p[2]; v->p[3]=pr->p[3];}
-void play_synth_at(SoundID id, float vol, float pitch, V3 pos){if ((u32)id >= SND_COUNT){return;} const SynthPreset* pr = &SynthPresets[id]; SynthVoice* v = SynAlloc(); if(!v){return;} *v = (SynthVoice){.fn=pr->fn,.frames=(u32)(AUDIO_RATE*pr->dur),.vol=pr->vol*vol,.pitch=pitch,.positional=true,.pos=pos,.active=true}; v->p[0]=pr->p[0]; v->p[1]=pr->p[1]; v->p[2]=pr->p[2]; v->p[3]=pr->p[3]; }
+// static SynthVoice* SynAlloc() { for (u32 i = 0; i < MAX_SYNTH_VOICES; i++){ if (!syn_ch[i].active){return &syn_ch[i];} } return NULL; }   //TODO Actually make use of the synthesized audio engine to replace physics tinks, taps, clacks, hits, thuds, bumps.
+// static float LP(float *s, float in, float rc){ *s += rc*(in-*s); return *s; }                              static float HP(float *s, float in, float rc){ return in - LP(s,in,rc); }          static float BP(float *s1,float *s2,float in,float rc){ float a=LP(s1,in,rc); return a-LP(s2,a,rc); }
+// static float Phasor(float *ph, float freq){ *ph += freq/AUDIO_RATE; if(*ph>=1.0f) *ph-=1.0f; return *ph; } static float Osc(float *ph, float freq){ return vsinf(6.28318f*Phasor(ph,freq)); } static float FMOsc(float *c,float *m,float fc,float fm,float idx) { return vsinf(6.28318f*(Phasor(c,fc)+Osc(m,fm)*idx)); }
+// static float GenLaserSS1(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[3]*t); float fc=v->p[0]*v->pitch*(1.0f + v->p[1]*t); float idx=4.0f*vexp(-35.0f*t); float tone=FMOsc(&v->s[0],&v->s[1],fc,v->p[2]*fc, idx); float click = (t < 0.012f) ? LP(&v->s[2], random_range(-1.0f,1.0f), 0.4f)*(1.0f - t/0.012f)*0.4f : 0.0f; return (tone + click) * env; } // p[0]=base_freq  p[1]=sweep_rate  p[2]=fm_rate_ratio  p[3]=decay
+// static float GenDoor(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float dur = (float)v->frames / AUDIO_RATE; float thud=vsinf(6.28318f * v->p[0]*v->pitch * t) * vexp(-8.0f*t) * 1.5f; float rc   = 0.08f + 0.05f*vsinf(6.28318f*3.0f*t); float hiss = BP(&v->s[0], &v->s[1], random_range(-1.0f,1.0f), rc) * 0.6f; return thud + hiss * vsinf(3.14159265f*(t/dur)); } // p[0]=pitch
+// static float GenImpact(SynthVoice* v){float t=(float)v->frame / AUDIO_RATE; float env = vexp(-v->p[1]*t); if (v->frame%4==0) v->s[2] = random_range(-1.0f,1.0f); float noise = LP(&v->s[0], v->s[2], 0.3f); float ring  = vsinf(6.28318f * v->p[0]*v->pitch * t) * env; return noise*env*v->p[2] + ring*v->p[3]; } // p[0]=ring_freq  p[1]=decay  p[2]=noise_amt  p[3]=ring_amt
+// static float GenBoom(SynthVoice* v){float env=vexp(-v->p[1]*(float)v->frame/AUDIO_RATE); return Osc(&v->s[0], v->p[0]*v->pitch)*env*0.7f + LP(&v->s[1],random_range(-1.0f,1.0f),0.15f)*env*0.8f; } // p[0]=rumble_freq  p[1]=decay
+// static float GenHiss(SynthVoice* v){return HP(&v->s[0], random_range(-1.0f,1.0f), v->p[0]); }
+// static float GenPipe(SynthVoice* v){return BP(&v->s[0], &v->s[1], random_range(-1.0f,1.0f), v->p[0]) * 2.0f; }
+// static float GenShieldHit(SynthVoice* v) { float t      = (float)v->frame / AUDIO_RATE; float wobble = vsinf(6.28318f*12.0f*t)*60.0f; return Osc(&v->s[0], v->p[0]*v->pitch + wobble) * vexp(-v->p[1]*t); } // p[0]=freq  p[1]=decay
+// static float GenFootstep(SynthVoice* v) {
+//     float t=(float)v->frame / AUDIO_RATE, dur=(float)v->frames / AUDIO_RATE, raw = random_range(-1.0f,1.0f); v->s[0] += 0.12f*(raw*raw*raw*0.35f - v->s[0]); v->s[1] += 0.12f*(v->s[0] - v->s[1]); if (v->s[5] <= 0.0f) { if ((rand()%100)<35) { v->s[5]=AUDIO_RATE*random_range(0.006f,0.018f); v->s[6]=random_range(0.4f,1.2f); } else {v->s[6] = 0.0f;} } else {v->s[5] -= 1.0f;}
+//     float rc = (0.22f - 0.08f*(t/dur)) * v->pitch; v->s[2] += rc*(raw*v->s[6] - v->s[2]); v->s[3] += rc*(v->s[2] - v->s[3]); float thump = (t < 0.07f) ? raw*vsinf(3.14159265f*(t/0.07f))*0.8f : 0.0f; v->s[4] += 0.025f*(thump - v->s[4]); return v->s[1] + (v->s[2]-v->s[3])*1.5f + v->s[4];
+// }
+// 
+// static float GenSandFootstep(SynthVoice* v) { float t=(float)v->frame / AUDIO_RATE; float env=vexp(-25.0f*t); float noise = 0.0f; if (v->frame%12==0) { float raw = random_range(-1.0f,1.0f); noise = (raw>0.0f?1.0f:-1.0f)*(raw*raw); if (t<0.05f && (rand()%100)>85) noise += random_range(-1.0f,1.0f)*0.75f; } v->s[0] += 0.25f*(noise - v->s[0]); v->s[1] += 0.25f*(v->s[0] - v->s[1]); return (v->s[0]-v->s[1])*env*2.0f;  }
+// static float GenTapCase(SynthVoice* v) {
+//     float t=(float)v->frame / AUDIO_RATE; float dur=(float)v->frames / AUDIO_RATE; if (v->frame%12==0) { float raw = random_range(-1.0f,1.0f); v->s[3] = (raw>0.0f?1.0f:-1.0f)*(raw*raw); if (t<0.06f && (rand()%100)>75) v->s[3] += random_range(-1.0f,1.0f)*0.75f; } if (v->frame%4==0) v->s[4] = random_range(-1.0f,1.0f); 
+//     float rc=(0.35f-0.15f*(t/dur)) * v->pitch; v->s[0] += rc*(v->s[3]-v->s[0]); v->s[1] += rc*(v->s[0]-v->s[1]); v->s[2] += 0.04f*(v->s[4]-v->s[2]); return (v->s[0]-v->s[1])*vexp(-22.0f*t) + v->s[2]*vexp(-14.0f*t)*1.8f;
+// }
+// 
+// static float GenPlasticTap(SynthVoice* v) { float t=(float)v->frame / AUDIO_RATE; float tr = random_range(-1.0f,1.0f) * vexp(-600.0f*t) * 0.5f; float f1 = 800.0f*v->pitch, f2 = 1100.0f*v->pitch; float bd = (vsinf(6.28318f*f1*t)*0.6f + vsinf(6.28318f*f2*t)*0.4f)*vexp(-45.0f*t)*0.4f; return tr + bd; }
+// static float GenSparkSmall(SynthVoice* v) {
+//     float t=(float)v->frame / AUDIO_RATE; float dur=(float)v->frames / AUDIO_RATE; float env = vexp(-14.0f*t); if (v->s[3]<=0.0f) { if ((rand()%100)<22) { v->s[3]=AUDIO_RATE*random_range(0.004f,0.012f); v->s[4]=1.0f; v->s[5]=0.93f-0.15f*(t/dur); } else v->s[4] = 0.0f; } else { v->s[3]-=1.0f; v->s[4]*=v->s[5]; }
+//     float active = (v->s[4]>0.01f) ? random_range(-1.0f,1.0f)*v->s[4] : 0.0f; v->s[1] += 0.28f*(active-v->s[1]); v->s[2] += 0.28f*(v->s[1]-v->s[2]); float thump = (t<0.08f) ? random_range(-1.0f,1.0f)*vsinf(3.14159265f*(t/0.08f)) : 0.0f; v->s[0] += 0.02f*(thump-v->s[0]); return ((v->s[1]-v->s[2])*3.5f + v->s[0]*1.2f)*env;
+// }
+// 
+// static float GenCrackle(SynthVoice* v){float env=vexp(-v->p[1]*(float)v->frame/AUDIO_RATE); if(v->s[3]<=0.0f){if((i32)(rand()%100)<(i32)v->p[2]){v->s[3]=AUDIO_RATE*random_range(0.004f,0.012f); v->s[4]=1.0f; v->s[5]=0.93f;}else v->s[4]=0; }else{v->s[3]-=1.0f; v->s[4]*=v->s[5];} float active=(v->s[4]>0.01f) ? random_range(-1.0f,1.0f)*v->s[4] : 0; v->s[1]+=v->p[0]*(active-v->s[1]); v->s[2]+=v->p[0]*(v->s[1]-v->s[2]); return (v->s[1]-v->s[2])*3.5f*env;} // p[0]=rc  p[1]=decay  p[2]=burst_chance
+// static float GenSine(SynthVoice* v) { return vsinf(6.28318f * v->p[0]*v->pitch * (float)v->frame/AUDIO_RATE); }
+// static float GenClink(SynthVoice* v) { float t = (float)v->frame / AUDIO_RATE; return vsinf(6.28318f * v->p[0]*v->pitch * t) * vexp(-v->p[1]*t); } // p[0]=freq  p[1]=decay
+// static float GenRing(SynthVoice* v) { // p[0]=fundamental_freq  p[1]=base_decay  p[2]=partial_spread  p[3]=noise_attack.  Partial ratios below approximate a cylindrical glass vessel.  s[0..3] = phasor state for 4 partials (no extra filter state needed)
+//     float t=(float)v->frame / AUDIO_RATE; float f0=v->p[0] * v->pitch; float dec=v->p[1]; float sprd=v->p[2];/*how much faster upper partials decay vs fundamental*/ static const float ratios[4]={1.0f,2.76f,5.41f,8.93f},amps[4]={1.0f,0.35f,0.15f,0.06f}; /*Inharmonic partial ratios for glass, ratios approximate a cylindrical glass vessel.*/
+//     float out=0.0f; for (u32 i = 0; i < 4; i++) { float decay_i=dec*(1.0f + i*sprd);/*upper partials decay faster*/ float env_i=vexp(-decay_i*t); out+=Osc(&v->s[i],f0*ratios[i])*amps[i]*env_i; } /*s[0..3] hold phasor state for each partial; s[4] is LP filter for click*/ return out + ((t < v->p[3]) ? LP(&v->s[4], random_range(-1.0f,1.0f), 0.35f) * (1.0f - t/v->p[3]) * 0.3f : 0.0f);
+// }
+// 
+// static float GenBeakerThud(SynthVoice* v) {
+//     float t=(float)v->frame / AUDIO_RATE; float f0=v->p[0]*v->pitch; static const float ratios[4]={1.0f,2.76f,5.41f,8.93f}, amps[4]={0.7f,0.25f,0.08f,0.03f}; float glass = 0.0f; for (u32 i = 0; i < 4; i++) { float decay_i = v->p[1] * (1.0f + i * 1.8f); glass += Osc((float*)&v->s[i], f0 * ratios[i]) * amps[i] * vexp(-decay_i * t); }
+//     if (v->frame%4==0){v->s[4] = random_range(-1.0f,1.0f);} float floor_body = BP(&v->s[5], &v->s[6], v->s[4], v->p[2]) * vexp(-30.0f*t) * 1.4f; /*Floor body: noise burst filtered through BP at plastic panel resonance.  The floor resonates at ~200-400Hz for thin plastic panels.*/ return glass + floor_body + ((t < v->p[3]) ? LP(&v->s[7], random_range(-1.0f,1.0f), 0.4f)*(1.0f - t/v->p[3])*0.5f : 0.0f);
+// }
+// typedef struct { SynthFn fn; float dur, vol; float p[4]; } SynthPreset;
+// static const SynthPreset SynthPresets[SND_COUNT] = {[SND_LASER_PISTOL]={GenLaserSS1,0.30f,0.55f,{900.0f,-1.8f,0.5f,10.0f}},[SND_LASER_RIFLE]={GenLaserSS1,0.40f,0.70f,{600.0f,-0.8f,0.4f,7.0f}},[SND_DOOR]={GenDoor,1.20f,0.65f,{50.0f,0,0,0}},[SND_IMPACT_GLASS]={GenImpact,0.50f,0.60f,{4500.0f,18.0f,0.3f,0.6f}},[SND_IMPACT_METAL]={GenImpact,0.50f,0.65f,{1800.0f,30.0f,0.5f,0.3f}},[SND_EXPLOSION]={GenBoom,1.00f,0.80f,{55.0f,3.5f,0,0}},
+//                                                     [SND_HISS]={GenHiss,1.50f,0.35f,{0.12f,0,0,0}},[SND_PIPE]={GenPipe,1.50f,0.40f,{0.07f,0,0,0}},[SND_SHIELD_HIT]={GenShieldHit,0.35f,0.50f,{180.0f,8.0f,0,0}},[SND_FOOTSTEP]={GenFootstep,0.26f,0.70f,{0}},[SND_SAND_FOOTSTEP]={GenSandFootstep,0.30f,0.65f,{0}},[SND_TAP_CASE]={GenTapCase,0.25f,0.55f,{0}},[SND_PLASTIC_TAP]={GenPlasticTap,0.09f,0.50f,{0}},[SND_SPARK_SMALL]={GenSparkSmall,0.24f,0.50f,{0}},
+//                                                     [SND_CRACKLE]={GenCrackle,2.00f,0.45f,{0.28f,2.5f,20.0f,0}},[SND_SINE]={GenSine,1.00f,0.50f,{440.0f,0,0,0}},[SND_CLINK]={GenClink,0.40f,0.50f,{1200.0f,12.0f,0,0}},[SND_BEAKER_CLINK]={GenRing,1.20f,0.50f,{2400.0f,4.0f,1.4f,0.008f}},[SND_BEAKER_THUD]={GenBeakerThud,0.60f,0.55f,{2200.0f,18.0f,0.06f,0.012f}}};
+//void play_synth(SoundID id, float vol, float pitch){if((u32)id >= SND_COUNT){return;} const SynthPreset* pr=&SynthPresets[id]; SynthVoice* v=SynAlloc(); if(!v){return;} *v=(SynthVoice){.fn=pr->fn,.frames=(u32)(AUDIO_RATE*pr->dur),.vol=pr->vol*vol,.pitch=pitch,.active=true}; v->p[0]=pr->p[0]; v->p[1]=pr->p[1]; v->p[2]=pr->p[2]; v->p[3]=pr->p[3];}
+//void play_synth_at(SoundID id, float vol, float pitch, V3 pos){if ((u32)id >= SND_COUNT){return;} const SynthPreset* pr = &SynthPresets[id]; SynthVoice* v = SynAlloc(); if(!v){return;} *v = (SynthVoice){.fn=pr->fn,.frames=(u32)(AUDIO_RATE*pr->dur),.vol=pr->vol*vol,.pitch=pitch,.positional=true,.pos=pos,.active=true}; v->p[0]=pr->p[0]; v->p[1]=pr->p[1]; v->p[2]=pr->p[2]; v->p[3]=pr->p[3]; }
 // Audio Mixing
 static void wave_mix(wav_channel_t* w, float* mix) {
     float vol=AppliedFXVol(w->volume); if(w->positional){if(!PositionVisibleFromPlayerCell(w->pos.x,w->pos.z)){vol=0.0f;/*Skip audio if source cell not in player PVS*/}else{vol*=vclamp(1.0f-V3_Dist(w->pos,World.position[PLAYER1])/20.0f,0.0f,1.0f);}}

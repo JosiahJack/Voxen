@@ -50,47 +50,34 @@ typedef struct { V3 offset; Color3 color; float range,intensity,duration; } AIDe
 static const AIDeathBurstLight aiDeathBurstLights[] = { /* 5 CORTEX REAVER  5x deathSubBurst, green*/ {{0.185f,0.907f,0.471f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{-0.127f,0.481f,0.471f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{0.219f,0.334f,0.036f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{-0.557f,0.998f,-0.361f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{0.429f,0.867f,-0.356f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f},
                                                         /*10 SEC-1 BOT      2x lightPoint, green*/    {{0.133f,-0.265f,0.66f},{0.0387f,0.7453f,0.0387f},2.0f,5.0f,0.4f}, {{-0.562f,0.064f,0.66f},{0.0387f,0.7453f,0.0387f},2.0f,5.0f,0.4f},
                                                         /*11 SEC-2 BOT      3x deathSubBurst, warm*/  {{0.185f,0.907f,0.471f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f}, {{-0.127f,0.481f,0.471f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f}, {{0.219f,0.334f,0.036f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f},
-                                                        /*12 MAINT BOT      6x deathFlames*/          {{-0.078f,0.37f,0.196f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.166f,0.183f,0.472f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{0.011f,-0.054f,0.4f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.087f,0.185f,-0.396f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.078f,-0.107f,-0.258f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{0.091f,-0.107f,0.182f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{0.0f,0.0f,0.0f},{0.9117f,0.9811f,0.9534f},2.5f,1.0f,0.8f}};
+                                                        /*12 MAINT BOT      6x deathFlames*/          {{-0.078f,0.37f,0.196f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.166f,0.183f,0.472f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{0.011f,-0.054f,0.4f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.087f,0.185f,-0.396f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.078f,-0.107f,-0.258f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f},
+                                                                                                      {{0.091f,-0.107f,0.182f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{0.0f,0.0f,0.0f},{0.9117f,0.9811f,0.9534f},2.5f,1.0f,0.8f} };
 static const u8 aiDeathBurstLightStart[NUM_AI_TYPES] = { [10]=5, [11]=7, [12]=10, [19]=16 };
 static const u8 aiDeathBurstLightCount[NUM_AI_TYPES] = { [5]=5, [10]=2, [11]=3, [12]=6, [19]=1 };
 typedef struct { u16 first, last, primary; } NPCGibRange;
 static const NPCGibRange npcGibRanges[NUM_AI_TYPES] = { [3]={779,787,779},   /* EXEC-BOT*/ [5]={768,778,768},   /* CORTEX REAVER*/ [10]={814,820,814},  /* SECURITY-1*/ [11]={821,830,826},  /* SECURITY-2*/ [12]={794,803,795},  /* MAINTENANCE*/ [18]={831,839,839},  /* SERV-BOT (search collider is gib9)*/ [19]={788,793,792},  /* FLIER BOT*/ [22]={804,813,810},  /* REPAIR BOT*/ };
 static const u8 npcBloodTypes[NUM_AI_TYPES]={4,1,2,4,1,4,1,1,1,1,4,4,4,2,4,1,2,2,4,4,1,1,4,3,0,0,0,0,0};
-float GetDamageTakeAmount(DamageData* dd);
-static void AISetHuntFinished(u16 idx) { World.instances[idx].huntFinished = World.pauseRelativeTime; int diff = IsCyberNPC(idx) ? World.diffCyb : World.diffCbt; double ht = npcTable[World.instances[idx].index - 419].huntTime, mn=60.0; if(diff <= 1){World.instances[idx].huntFinished += (ht * 0.75 > mn ? ht * 0.75 : mn);}else if(diff >= 3){World.instances[idx].huntFinished += (ht * 2.0  > mn ? ht * 2.0 : mn);}else{World.instances[idx].huntFinished += (ht > mn ? ht : mn);} }
+static bool IsCyberNPC(u16 i) { return npcTable[World.instances[i].index - 419].type == NPCType_Cyber; }
+static void AISetHuntFinished(u16 idx) { int npcID = World.instances[idx].index - 419, diff = npcTable[npcID].type == NPCType_Cyber ? World.diffCyb : World.diffCbt; World.instances[idx].huntFinished = World.pauseRelativeTime + vmax(npcTable[npcID].huntTime * (diff <= 1 ? 0.75 : diff >= 3 ? 2 : 1),60); }
 void InitNPC(u16 i) {
     World.layer[i] = L_NPC;
     u16 npcID = World.instances[i].index - 419; if (npcID >= NUM_AI_TYPES) { DualLogError("Invalid NPC index %u\n", npcID); OS_Exit(1); }
     
-    World.instances[i].bloodType = (BloodType)npcBloodTypes[npcID]; World.instances[i].deathBurst = npcDeathBurstPreset[npcID] ? npcDeathBurstPreset[npcID] : U16_MAX;
+    World.instances[i].bloodType = (BloodType)npcBloodTypes[npcID];
+    World.instances[i].deathBurst = npcDeathBurstPreset[npcID] ? npcDeathBurstPreset[npcID] : U16_MAX;
     flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
     World.instances[i].currentDestination = World.instances[i].lastPosition = World.instances[i].idealPos = World.position[i];
     World.instances[i].idealTransformForward = World.instances[i].forward;
     World.instances[i].aiThinkFinished = World.pauseRelativeTime + 0.1f + (double)random_range(0.0f, 1.0f);
     World.instances[i].idleTime = World.pauseRelativeTime + (double)random_range(npcTable[npcID].timeIdleSFXMin,npcTable[npcID].timeIdleSFXMax);
-    World.instances[i].attack1SoundTime = World.instances[i].attack2SoundTime = World.instances[i].attack3SoundTime = World.pauseRelativeTime;
     AISetHuntFinished(i);
     World.instances[i].attackFinished = World.pauseRelativeTime + 1.0;
-    World.instances[i].timeTillPainFinished = World.instances[i].timeTillDeadFinished = World.instances[i].gracePeriodFinished = World.pauseRelativeTime;
-    World.instances[i].randWaitAtt1Finished = World.instances[i].randWaitAtt2Finished = World.instances[i].randWaitAtt3Finished = World.instances[i].tranquilizeFinished = World.instances[i].deathBurstFinished = World.instances[i].wanderFinished = World.instances[i].posCheckFinished = World.instances[i].timeTillEnemyChangeFinished = World.pauseRelativeTime;
+    World.instances[i].attack1SoundTime = World.instances[i].attack2SoundTime = World.instances[i].attack3SoundTime = World.instances[i].timeTillPainFinished = World.instances[i].timeTillDeadFinished = World.instances[i].gracePeriodFinished = World.instances[i].randWaitAtt1Finished = World.instances[i].randWaitAtt2Finished = World.instances[i].randWaitAtt3Finished = World.instances[i].tranquilizeFinished = World.instances[i].deathBurstFinished = World.instances[i].wanderFinished = World.instances[i].posCheckFinished = World.instances[i].timeTillEnemyChangeFinished = World.pauseRelativeTime;
     World.instances[i].currentFrameFinished = World.instances[i].timeSinceMovedEnough = 0.0;
     World.instances[i].currentState = AIState_Idle;
     if (npcID == 20 && !World.instances[i].textureAnimating) { TextureSequenceStart(i, 47); }
-    u8 c = A_IDLE;
-    if ((World.instances[i].entflags & EF_WANDERING) && (random_range(0.0f,1.0f) < 0.5f)) { World.instances[i].currentState = AIState_Walk; }
-    else                                                                                  { flag_set(&World.instances[i].entflags,EF_WANDERING, false); }
-    if (World.instances[i].entflags & EF_ASLEEP) { World.instances[i].currentState = AIState_Idle; }
-    switch (World.instances[i].currentState) {
-        case AIState_Walk:    c = A_WALK;    break;
-        case AIState_Run:     c = A_RUN;     break;
-        case AIState_Attack1: c = A_ATTACK1; break;
-        case AIState_Attack2: c = A_ATTACK2; break;
-        case AIState_Attack3: c = A_ATTACK3; break;
-        case AIState_Pain:    c = A_PAIN;    break;
-        case AIState_Dying: case AIState_Dead: c = A_DYING; break;
-    }
-    World.instances[i].clip = c; 
-    World.instances[i].frame = mdlAnimClips[World.instances[i].animationNum][c].frameStart;
+    if ((World.instances[i].entflags & EF_WANDERING) && !(World.instances[i].entflags & EF_ASLEEP) && (random_range(0.0f,1.0f) < 0.5f)) { World.instances[i].currentState = AIState_Walk; } else { flag_set(&World.instances[i].entflags,EF_WANDERING, false); }
+    World.instances[i].clip = World.instances[i].currentState; World.instances[i].frame = mdlAnimClips[World.instances[i].animationNum][World.instances[i].currentState].frameStart; /*Only A_DYING index that doesn't match the AIState_Dying, only dead, idle, walk are the 3 at init.*/
 }
 
 float Tranquilize(u16 i, float amount, bool energy) {
@@ -101,7 +88,6 @@ float Tranquilize(u16 i, float amount, bool energy) {
     return tranqSecs;
 }
 
-static bool IsCyberNPC(u16 i) { return npcTable[World.instances[i].index - 419].type == NPCType_Cyber; }
 bool HasHealth(u16 i) { return IsCyberNPC(i) ? (World.instances[i].cyberHealth > 0.0f) : (World.instances[i].health > 0.0f); }
 static void AISetEnemy(u16, u16);
 void CyberDecoySetTarget(u16 decoy) {
@@ -540,6 +526,7 @@ static void AIDead(u16 idx) {
 }
 
 static DamageData SetNPCData(Entity* self, int n){DamageData dd={0}; const NPCTable* npc=&npcTable[self->index - 419]; dd.owner=(u16)(self - World.instances); switch(n){case 1:dd.damage=npc->damage; dd.attackType=npc->attackType; break; case 2:dd.damage=npc->damage2; dd.attackType=npc->attackType2; break; default:dd.damage=npc->damage3; dd.attackType=npc->attackType3; break;} return dd;}
+float GetDamageTakeAmount(DamageData* dd);
 static void ai_apply_damage(DamageData dd, u16 hitIdx) {
     if(!hitIdx || hitIdx >= INSTANCE_COUNT || hitIdx >= World.instCount){return;}
     if(hitIdx == dd.owner){return;} // Never hurt self (melee/projectile origin sits inside own capsule).

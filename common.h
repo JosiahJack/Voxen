@@ -191,6 +191,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (85ULL * 1024 * 1024),
       /*Rendering*/ BLEND_OPAQUE = 0, BLEND_CUTOUT = 1, BLEND_PREMULT = 2, BLEND_MULTIPLY = 3,
                     PARTICLE_FLAG_ADDITIVE = (1u<<0), PARTICLE_FLAG_SOFT = (1u<<1), PARTICLE_FLAG_LIT = (1u<<2), PARTICLE_FLAG_MULTIPLY = (1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE = (1u<<4), PARTICLE_FLAG_PHYSICS = (1u<<5), PARTICLE_FLAG_TRAIL = (1u<<6), 
                     MAX_PARTICLES = 32768, MAX_EMITTERS = 1024, MAX_TRAIL_SEGS = 4096, MAX_TRAIL_OWNERS = 512, MAX_WIRELINE_QUADS = 8192};
+typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Inspect=8,AIState_Interacting=9,AIState_Dead=10} AIState;
 u32 parse_numberu32(const char*, const char*,u32);
 u16 parse_numberu16(const char*, const char*,u32);
 u8 parse_numberu8(const char*, const char*,u32);
@@ -248,7 +249,6 @@ typedef enum {BodyState_Standing = 0, BodyState_Crouch = 1, BodyState_CrouchingD
 typedef enum {Att_None = 0, Att_Melee = 1, Att_MlEg = 2, Att_Beam = 3, Att_Magn = 4, Att_HitS = 5, Att_PjNd = 6, Att_PjBm = 7, Att_Ball= 8, Att_Gas=9,Att_Trnq=10,Att_Drill=11} AttType;
 typedef enum {NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_MutantCyborg=5,NPCType_Cyber=6} NPCType;
 typedef enum {AIMoveType_None=0,AIMoveType_Walk=1,AIMoveType_Fly=2,AIMoveType_Swim=3,AIMoveType_Cyber=4} AIMoveType;
-typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Inspect=8,AIState_Interacting=9,AIState_Dead=10} AIState;
 typedef enum {SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3} SecurityType;
 typedef enum {DoorState_Closed=0,DoorState_Open=1,DoorState_Closing=2,DoorState_Opening=3} DoorState;
 typedef enum {FStat_Start=0,FStat_Target=1,FStat_MovingStart=2,FStat_MovingTarget=3,FStat_AjarMovingStart=4,FStat_AjarMovingTarget=5} FuncStates;
