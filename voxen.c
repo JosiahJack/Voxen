@@ -624,10 +624,8 @@ INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist)
 }
 
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist);
-
 static u16 rayCellHeads[ARRSIZE], rayNext[INSTANCE_COUNT];
 static u32 rayGridFrame=U32_MAX;
-
 INLINE void RayGridRebuild(void) {
     rayGridFrame = globalframe;
     for (u32 c=0;c<ARRSIZE;++c) { rayCellHeads[c] = INSTANCE_COUNT; }
@@ -1415,25 +1413,11 @@ static void ClearAllRenderTargets() {
 }
 
 V3 debugWepOffset = {0, 0, 0}; // debug weapon view offset
-
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight;
     float sfov, snear, sfar;
-    if (camView) {
-        CamView* cv = &camViews[camViewIdx];
-        swidth  = cv->width;
-        sheight = cv->height;
-        sfov = (float)cv->fov;
-        snear = cv->near;
-        sfar = cv->far;
-    } else {
-        swidth  = Sys_Settings.ScreenWidth;
-        sheight = Sys_Settings.ScreenHeight;
-        sfov = (float)Sys_Settings.FOV;
-        snear = 0.02f;
-        sfar = World.farPlane[World.curLev];
-    }
-    
+    if (camView) { CamView* cv = &camViews[camViewIdx]; swidth  = cv->width;                sheight = cv->height;                sfov = (float)cv->fov;          snear = cv->near; sfar = cv->far; }
+    else         {                                      swidth  = Sys_Settings.ScreenWidth; sheight = Sys_Settings.ScreenHeight; sfov = (float)Sys_Settings.FOV; snear = 0.02f;    sfar = World.farPlane[World.curLev]; }
     float shakeOffset = (World.shakeFinished > World.pauseRelativeTime) ? (shakeAmp * vcosf((float)(World.pauseRelativeTime * 20.0f))) * (World.shakeFinished - World.pauseRelativeTime) : 0.0f;
     Quaternion savedRotation = World.rotation[PLAYER1];
     float savedCamYaw = World.cam_yaw, savedCamPitch = World.cam_pitch, savedCamRoll = World.cam_roll;
@@ -1442,7 +1426,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         World.cam_pitch += shakeOffset * 0.5f;
         quat_from_yaw_pitch_roll(&World.rotation[PLAYER1], World.cam_yaw, World.cam_pitch, World.cam_roll);
     }
-    
     V3 playerPos = World.position[PLAYER1];
     float px = playerPos.x, py = playerPos.y, pz = playerPos.z, aspect3D = (float)swidth / (float)sheight;
     float view[16], viewProj[16], invViewRot[9], invViewProj[16];
@@ -1450,24 +1433,15 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
     glBindVertexArray(chunkVAO);/*Common vao for RenderDynamicShadowmaps and Rasterized Geometry*/
     glEnable(GL_DEPTH_TEST);
-    
     bool sunActive = !camView && likely(Sys_Settings.Shadows > 0u) && SkySunIsVisible();
     if (sunActive && sunShadowFBO == 0u) { InitSunShadowmap();/*shadows can be toggled on after boot, which is the only path that gets here with no map yet*/ }
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][0]);
-    if (likely(Sys_Settings.Shadows > 0u)) {
-        RenderShadowmaps();
-        if (sunActive) { RenderSunShadowmap(); }
-    }
-        
+    if (likely(Sys_Settings.Shadows > 0u)) { RenderShadowmaps(); if (sunActive) { RenderSunShadowmap(); } }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][1]);
     double rendStart = get_time();
     UpdateLights(); // This is where the voxels get updated!
-    if (unlikely(clearRenderTargetsOnNextFrame)) { /*before the gBuffer clear below, so no in-flight target gets wiped*/
-        clearRenderTargetsOnNextFrame = false;
-        ClearAllRenderTargets();
-    }
-    
+    if (unlikely(clearRenderTargetsOnNextFrame)) { clearRenderTargetsOnNextFrame = false; ClearAllRenderTargets(); }
     glViewport(0, 0, swidth, sheight);
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -1488,7 +1462,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         float distSqrd=V3_dot(delta,delta);
         float radius=(e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
         if (!SphereInFrustum(playerFrustumPlanes,World.position[i],radius)) { continue; }
-        
         if (IdxIsPortalBlockingDoor(entIdx)) { /*Extra checks only needed for opaque portal blocking doors.*/
             if (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && !NeighborhoodInPVS(e->cellX,e->cellZ,2u) /*!in pvs*/) { continue; }
         } else {
@@ -1498,39 +1471,21 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         
         if (World.instances[i].camView != 255) camViews[World.instances[i].camView].visible = true;
         if (transparentTexture[World.instances[i].texIndex]) {
-            if (tcnt > 1023) { continue; }
-            
-            tmpTransparent[tcnt].index = i;
-            tmpTransparent[tcnt].depth = distSqrd;
-            tcnt++;
-        } else {
-            visibleInstances[opaqueCount].index = i;
-            visibleInstances[opaqueCount].depth = distSqrd;
-            opaqueCount++;
-        }
+            if (tcnt <= 1023) { tmpTransparent[tcnt].index = i;          tmpTransparent[tcnt].depth = distSqrd;        tcnt++; }
+        } else {       visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
-    
     if (World.shd1 < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4) && opaqueCount < (INSTANCE_COUNT - 4)) { // Add shield generators in skybox.
         visibleInstances[opaqueCount].index=World.shd1; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
         visibleInstances[opaqueCount].index=World.shd2; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
         visibleInstances[opaqueCount].index=World.shd3; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
         visibleInstances[opaqueCount].index=World.shd4; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
     }
-    
     if (editModeSelection < U16_MAX && Cheats.editMode) {
         u16 selIdx=World.instances[editModeSelection].index;
         if (selIdx != 592 && selIdx != 593) { /* decals have no mesh: baked 3D text drawn in decal pass; force-draw would hit modelIndex U16_MAX */
             if (transparentTexture[World.instances[editModeSelection].texIndex]) {
-                if (tcnt <= 1023) {
-                    tmpTransparent[tcnt].index = editModeSelection;
-                    tmpTransparent[tcnt].depth = 1.28f;
-                    tcnt++;
-                }
-            } else {
-                visibleInstances[opaqueCount].index = editModeSelection;
-                visibleInstances[opaqueCount].depth = 1.28f;
-                opaqueCount++;
-            }
+                if (tcnt <= 1023) { tmpTransparent[tcnt].index = editModeSelection;          tmpTransparent[tcnt].depth = 1.28f;        tcnt++; }
+            } else {       visibleInstances[opaqueCount].index = editModeSelection; visibleInstances[opaqueCount].depth = 1.28f; opaqueCount++; }
         }
     }
     
@@ -1549,17 +1504,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         u16 i = visibleInstances[visibleIndex].index;
         Entity* e = &World.instances[i];
         u16 tex = e->texIndex;
-        if (unlikely(doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f)) { /*Doublesided (incl. transparent doublesided, e.g. cyberspace panels)*/
-            glDisable(GL_CULL_FACE);
-            glEnable(GL_BLEND);
-        } else if (unlikely(transparentTexture[tex])) { /*Transparents (with sort)*/
-            glEnable(GL_CULL_FACE);
-            glEnable(GL_BLEND);
-        } else { /*Opaque*/
-            glEnable(GL_CULL_FACE);
-            glDisable(GL_BLEND);
-        }
-        
+             if (unlikely(doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f)) { glDisable(GL_CULL_FACE);  glEnable(GL_BLEND); } /*Doublesided (incl. transparent doublesided, e.g. cyberspace panels)*/
+        else if (unlikely(transparentTexture[tex]))                                                                            {  glEnable(GL_CULL_FACE);  glEnable(GL_BLEND); } /*Transparents (with sort)*/
+        else                                                                                                                   {  glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } /*Opaque*/
         currentModelType=GetAndBindModel(i,currentModelType);
         if (tex != currentTexIndex || tex==0) { currentTexIndex=tex; glUniform1ui(3,(u32)tex); }
         u32 vertCount = modelTriangleCounts[currentModelType] * 3;
@@ -1567,7 +1514,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         drawCalls++;
         vertsRendered += vertCount;
     }
-    
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][2]);
     glUseProgram(chunkSP);
@@ -1868,9 +1814,6 @@ void RenderCameraViews() { /*Render in-world camera views.  Pops player position
     World.rotation[PLAYER1] = tempPlayerRot;
 }
 
-/* Fill one ray trace instance record. Anything the shader cannot use (no BVH, inactive, degenerate scale) is
-   flagged inactive here so the shader needs only a single branch to skip it. 1/scale^2 is precomputed so the
-   shader's model space transform needs no divides. */
 static void SetRTInstance(u32 i, u32 model, u32 tex, u32 active, float sx, float sy, float sz) {
     bool ok = (active != 0u) && (model < mdlsCnt) && (rtModelInfo[model].nodeBase != 0xFFFFFFFFu) && (sx > 1e-4f) && (sy > 1e-4f) && (sz > 1e-4f);
     rtInstanceInfo[i].geom[0] = ok ? rtModelInfo[model].nodeBase : 0xFFFFFFFFu;
@@ -1922,17 +1865,11 @@ void UpdateInstanceMatrix4x4s() {
             if ((instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt) mi = World.instances[i].lodIndex;
             SetRTInstance(i, (mi < mdlsCnt) ? mi : 0xFFFFFFFFu, World.instances[i].texIndex, (World.instances[i].entflags & EF_ACTIVE) ? 1u : 0u, vabs(World.scale[i].x), vabs(World.scale[i].y), vabs(World.scale[i].z));
             InstanceRTInfo* cur = &rtInstanceInfo[i], *prev = &rtPrevInfo[i];
-            if (cur->geom[0]!=prev->geom[0] || cur->geom[1]!=prev->geom[1] || cur->geom[2]!=prev->geom[2] || cur->geom[3]!=prev->geom[3]
-             || cur->info[0]!=prev->info[0] || cur->info[1]!=prev->info[1] || cur->info[2]!=prev->info[2] || cur->info[3]!=prev->info[3]
-             || cur->iscl2[0]!=prev->iscl2[0] || cur->iscl2[1]!=prev->iscl2[1] || cur->iscl2[2]!=prev->iscl2[2] || cur->iscl2[3]!=prev->iscl2[3]) {/*12-word compare of the 48B record; SetRTInstance recomputes from identical inputs so equal states reproduce identical bits - a flip anywhere (spawn/death/tex/model/scale) marks the span dirty*/
+            if (cur->geom[0]!=prev->geom[0] || cur->geom[1]!=prev->geom[1] || cur->geom[2]!=prev->geom[2] || cur->geom[3]!=prev->geom[3] || cur->info[0]!=prev->info[0] || cur->info[1]!=prev->info[1] || cur->info[2]!=prev->info[2] || cur->info[3]!=prev->info[3] || cur->iscl2[0]!=prev->iscl2[0] || cur->iscl2[1]!=prev->iscl2[1] || cur->iscl2[2]!=prev->iscl2[2] || cur->iscl2[3]!=prev->iscl2[3]) {
                 if (i < chFirst) chFirst = i; chLast = i; chDirty = true; mcpy(prev, cur, sizeof(InstanceRTInfo));
             }
         }
-        if (chDirty) {/*Orphan then span-upload: a plain glBufferSubData into a store last frame's dispatch may still be reading forces an implicit CPU sync on the driver; glBufferData(NULL) hands us a fresh store with no in-flight readers first*/
-            glBindBuffer(GL_SSBO, rtInstanceInfoID);
-            glBufferData(GL_SSBO, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);
-            glBufferSubData(GL_SSBO, (size_t)chFirst * sizeof(InstanceRTInfo), (size_t)(chLast - chFirst + 1u) * sizeof(InstanceRTInfo), rtInstanceInfo + chFirst);
-        }
+        if (chDirty) { glBindBuffer(GL_SSBO, rtInstanceInfoID); glBufferData(GL_SSBO, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW); glBufferSubData(GL_SSBO, (size_t)chFirst * sizeof(InstanceRTInfo), (size_t)(chLast - chFirst + 1u) * sizeof(InstanceRTInfo), rtInstanceInfo + chFirst); }
         glBindBuffer(GL_SSBO, rtCellCountsID); glBufferData(GL_SSBO, ARRSIZE * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
         glBufferSubData(GL_SSBO, 0, ARRSIZE * sizeof(u16), cellCounts);/*Physics broadphase, rewritten every substep, so always uploaded - orphaned first for the same sync reason*/
         glBindBuffer(GL_SSBO, rtCellListsID);  glBufferData(GL_SSBO, (size_t)ARRSIZE * 128u * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
@@ -1942,31 +1879,22 @@ void UpdateInstanceMatrix4x4s() {
 
 static const Color fogLUT[MAX_LEVELS] = { {0.3207547f, 0.29200783f,0.29200783f,0.07f},/*0*/  {0.34509805f,0.38431373f,0.49019608f,0.055f},/*1*/  {0.47058824f,0.3882353f, 0.3928334f,0.05f},/*2*/  {0.32941177f,0.29411766f,0.2509804f,0.065f},/*3*/ {0.3882353f,0.452415f, 0.47058824f,0.075f},/*4*/ {0.3882353f, 0.4117647f, 0.47058824f,0.03f},/*5*/ {0.3f,0.24f,0.33f,0.070f},/*6*/ 
                                           {0.38679248f,0.3471719f, 0.3302332f,0.07f},/*7*/  {0.44708973f,0.45681614f,0.4811321f,0.040f},/*8*/ {0.4056604f,0.3992963f,0.36930403f,0.050f},/*9*/ {0.48235294f,0.58431375f,0.5176471f, 0.04f},/*10*/ {0.52872473f,0.58431375f,0.48235294f,0.040f},/*11*/ {0.48235294f,0.58431375f,0.5176471f,0.05f},/*12*/ {0.0f,0.0f,0.0f,0.015f},/*13*/ };
-                                          
 static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64.0800f},/*1*/  {-46.12f,-56.34f},/*2*/  {-51.266f,-51.246f},/*3*/  {-29.462f, -53.7872f},/*4*/ {-47.3622f,-55.04f},/*5*/ {-65.94f,-71.6833f},/*6*/ {-66.8989f,-82.0144f},/*7*/ {-43.7456f,-43.9872f},/*8*/ {-51.5039f,-69.0306f},/*9*/ {-24.0994f,-39.7972f},/*10*/ {-27.1772f,-28.3394f},/*11*/ {-18.05f,-30.50f},/*12*/ {99.4200f,-60.120f}/*13*/};
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 1300.00f/*13*/};
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
-u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES];
-u32 uniqueCvxMeshCount = 0;
-size_t cvxAdjLive = 0;
-void ResetDoorPortals();
+u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount = 0; size_t cvxAdjLive = 0;
+void ResetDoorPortals(), MFD_NewGame(), MissionTimerInit(), AddHardwareToInventory(int,int), mp3_clear();
 static void ResetLoadTallies(void) {
     decalInlineTextCount = decalStyleCount = 0;
-    mset(World.levelCameraCount,0,sizeof(World.levelCameraCount)); mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount)); mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));
+    mset(World.levelCameraCount,0,sizeof(World.levelCameraCount));     mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount));     mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));
     mset(World.levCamDestroyedCnt,0,sizeof(World.levCamDestroyedCnt)); mset(World.levSmNodeDestroyedCnt,0,sizeof(World.levSmNodeDestroyedCnt)); mset(World.levNodeDestroyedCnt,0,sizeof(World.levNodeDestroyedCnt));
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) {
         if (cvxAdjOffsets[u]) { OS_Free(cvxAdjOffsets[u], cvxAdjOffsetBytes[u]); cvxAdjOffsets[u] = 0; cvxAdjOffsetBytes[u] = 0; }
         if (cvxAdjLists[u]) { OS_Free(cvxAdjLists[u], cvxAdjListBytes[u]); cvxAdjLists[u] = 0; cvxAdjListBytes[u] = 0; }
     }
-    uniqueCvxMeshCount = 0;
-    cvxAdjLive = 0;
-    ResetDoorPortals();
-    mset(World.physSleep, 0, sizeof(World.physSleep));
+    uniqueCvxMeshCount = 0; cvxAdjLive = 0; ResetDoorPortals(); mset(World.physSleep, 0, sizeof(World.physSleep));
 }
- 
 // Init && Main
-void MFD_NewGame(), MissionTimerInit(), AddHardwareToInventory(int,int), mp3_clear(), NewGameDifficultyPass();
-
 __attribute__((cold)) void NewGame() { // Reset World States
     CloseSearch(); MFD_NewGame();
     World.invP1.currentSearchItem=U16_MAX;
@@ -1974,19 +1902,15 @@ __attribute__((cold)) void NewGame() { // Reset World States
     RenderLoading("Loading new game...");
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
     for (int i=0;i<World.numLevels;++i) {
-        World.worldMin_x[i] = levMins[i].x;
-        World.worldMin_z[i] = levMins[i].y;
-        World.voxMinCtrX[i] = World.worldMin_x[i] + (VOXEL_SIZE * 0.5f);
-        World.voxMinCtrZ[i] = World.worldMin_z[i] + (VOXEL_SIZE * 0.5f);
-        World.farPlane[i] = lFars[i];
-        World.fogColor[i] = fogLUT[i];
-        World.fogColor[i].a *= 3.8f;
+        World.worldMin_x[i] = levMins[i].x; World.worldMin_z[i] = levMins[i].y;
+        World.voxMinCtrX[i] = World.worldMin_x[i] + (VOXEL_SIZE * 0.5f); World.voxMinCtrZ[i] = World.worldMin_z[i] + (VOXEL_SIZE * 0.5f);
+        World.farPlane[i] = lFars[i]; World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f;
     }
     SetLevelPointers(0);
     World.curLev = 0;
     World.mass[0] = 0.0f;
     World.dynamicFriction[0] = 0.4f;
-    World.col[0]=CT_NONE;
+    World.col[0] = CT_NONE;
     currentMenuItem = currentMenuTab = 0;
     currentMenuPage = MPG_FRONT;
     World.current_time = World.pauseRelativeTime = World.last_physics_time = 0.0;
@@ -2050,7 +1974,11 @@ __attribute__((cold)) void NewGame() { // Reset World States
     ResetLoadTallies();
     LoadAllLevels();
     DebugRAM("after runtime LoadAllLevels");
-    NewGameDifficultyPass();/*mission-difficulty item removals: once, here, where diffMis is final and every level is resident -- see NewGameDifficultyPass in entity.c.*/
+    for (u8 lev = 0; lev < World.numLevels; ++lev) { /*Done after levels are loaded to remove difficulty related items appropriately.*/
+        u8 entryLevel = World.currentLevel; if (entryLevel != lev) SetLevelPointers(lev);
+        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { u16 ci = World.instances[i].index; if (((World.diffMis <= 1 && (ci == 341 || ci == 388 || (ci >= 390 && ci <= 398) || ci == 417)) || (World.diffMis == 0 && (ci == 313 || ci == 448)))) { DeleteInstance(i); } /*Remove access cards and audio logs.*/ }
+        if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
+    }
     LoadLevel(World.startLevel,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
     DebugRAM("after runtime LoadLevel");
     World.invP1.currentCrouchRatio = 1.0f;
@@ -2132,24 +2060,14 @@ void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started
                                               World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]); }
                                               
 void LoadModels(), LoadTextures(), InitAudio(), LoadConfig(), synth_set_room(float,float);
-extern u32 random_range_rng, biomTexId, biomFBO;
-extern bool amReady;
-u8* scratch_base,*scratch_cur,*scratch_end; size_t scratch_peak=0;
-void OS_ScratchInit() {
-    if(scratch_base){return;}
-    
-    scratch_base=OS_Alloc(SCRATCH_ARENA_SIZE);
-    scratch_cur=scratch_base;
-    scratch_end=scratch_base + SCRATCH_ARENA_SIZE;
-}
-
+extern u32 random_range_rng, biomTexId, biomFBO; extern bool amReady;
+u8* scratch_base,*scratch_cur,*scratch_end; size_t scratch_peak;
+void OS_ScratchInit() { if(scratch_base){return;} scratch_base = OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur = scratch_base; scratch_end = scratch_base + SCRATCH_ARENA_SIZE; }
 void* OS_AllocScratch(size_t amount) {
     if (!scratch_base) { OS_ScratchInit(); }
-    size_t aligned = (amount + 15) & ~(size_t)15;
-    u8* p = (u8*)__atomic_fetch_add(&scratch_cur, aligned, __ATOMIC_RELAXED);
-    if (p + aligned > scratch_end) { DualLogError("Scratch ovr!\n"); OS_Exit(1); }
-    size_t used = (size_t)((p + aligned) - scratch_base);
-    size_t peak;
+    size_t aligned = (amount + 15) & ~(size_t)15; u8* p = (u8*)__atomic_fetch_add(&scratch_cur, aligned, __ATOMIC_RELAXED); if (p + aligned > scratch_end) { DualLogError("Scratch ovr!\n"); OS_Exit(1); }
+    
+    size_t used = (size_t)((p + aligned) - scratch_base), peak;
     do { peak = scratch_peak; } while (used > peak && !__atomic_compare_exchange_n(&scratch_peak, &peak, used, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
     return p;
 }
@@ -2157,7 +2075,7 @@ void* OS_AllocScratch(size_t amount) {
 void OS_FreeInitPhase() { scratch_cur=scratch_base; mset(scratch_cur,0,scratch_peak); }
 static void* InitFontAtlasses_Thread(void* arg) { (void)arg; InitFontAtlasses(); return NULL; }
 static bool rtAccelBuilt = false;
-void LoadRaytracingData(void) {
+void LoadRaytracingData() {
     double startTime = get_time();
     RenderLoading("Loading raytracing data...");
     u32 m, nodeTotal = 0, triTotal = 0, vtxTotal = 0, maxModelTris = 0, maxModelVerts = 0;
@@ -2208,8 +2126,8 @@ void LoadRaytracingData(void) {
     for (m=0; m<mdlsCnt; ++m) {
         if (rtModelInfo[m].nodeBase == 0xFFFFFFFFu) continue;
         u32 tcnt = modelBVHTriOrderCounts[m], vc = rtSrcVertCounts[m];
-        mcpy(orderStage, modelBVHTriOrder[m], (size_t)tcnt * sizeof(u16)); orderStage[tcnt] = 0; orderStage[tcnt + 1] = 0; /*zero pad: the shader's last u32 read stays in bounds*/
-        glBindBuffer(GL_SSBO, orderBufID); glBufferData(GL_SSBO, ((size_t)tcnt + 2) * sizeof(u16), orderStage, GL_DYNAMIC_DRAW); glBindBufferBase(GL_SSBO, 19, orderBufID); /*fresh store per model: a SubData rewrite could race the previous model's still-running dispatch reading this buffer*/
+        mcpy(orderStage, modelBVHTriOrder[m], (size_t)tcnt * sizeof(u16)); orderStage[tcnt] = 0; orderStage[tcnt + 1] = 0;
+        glBindBuffer(GL_SSBO, orderBufID); glBufferData(GL_SSBO, ((size_t)tcnt + 2) * sizeof(u16), orderStage, GL_DYNAMIC_DRAW); glBindBufferBase(GL_SSBO, 19, orderBufID);
         glBindBufferBase(GL_SSBO, 17, vbos[m]); glBindBufferBase(GL_SSBO, 18, tbos[m]);
         glUniform1ui(0, vc); glUniform1ui(1, rtModelInfo[m].vtxBase); glUniform1ui(2, rtModelInfo[m].uvBase); glUniform1ui(3, tcnt); glUniform1ui(4, rtModelInfo[m].triBase);
         u32 n = vc > tcnt ? vc : tcnt; glDispatchCompute((n + 255u) / 256u, 1, 1);

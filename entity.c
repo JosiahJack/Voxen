@@ -1008,8 +1008,6 @@ static const CgOffset cgOffsets[] = {
 };
 
 static const CgOffset* CgOffsetFor(u16 entIdx) { for (u32 k = 0; k < sizeof(cgOffsets)/sizeof(cgOffsets[0]); ++k) { if (cgOffsets[k].entIdx == entIdx) { return &cgOffsets[k]; } } return 0; }
-extern u16 npcCountInWorldPerType[NUM_AI_TYPES];
-u16 ai_next_npc_number(u16 type) { if (type >= NUM_AI_TYPES) return 0; if (npcCountInWorldPerType[type] < U16_MAX) npcCountInWorldPerType[type]++; return npcCountInWorldPerType[type]; }
 __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; }
     if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return WORLD; }
@@ -1033,12 +1031,8 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     World.position[i] = pos;
     const PrefabConst* pc = PrefabConstFor(entIdx);
     if (pc && pc->scale.x) World.scale[i] = pc->scale;/*Default prefab scale (smaller sublist not in Edefs to save RAM).*/
-    if (IdxIsNPC(entIdx)) {
-        InitNPC(i); World.instances[i].npcNumber = ai_next_npc_number((u16)(entIdx - 419));
-        if (npcTable[entIdx - 419].type == NPCType_Cyber) {
-            if (World.instances[i].cyberHealth <= 0.0f) { World.instances[i].cyberHealth = npcTable[entIdx - 419].healthForCyberNPC; }
-        } else if (World.instances[i].health <= 0.0f) { World.instances[i].health = npcTable[entIdx - 419].health;/*health/cyberHealth default when the record leaves them unset; a loaded -1 sentinel is kept off by the copy guard below*/}
-    } else if (IsLiveGrenade(entIdx) && World.instances[i].health <= 0.0f) { World.instances[i].health = 15.0f; }
+    if (IdxIsNPC(entIdx)) { InitNPC(i); }
+    else if (IsLiveGrenade(entIdx) && World.instances[i].health <= 0.0f) { World.instances[i].health = 15.0f; }
     else if (entIdx == 574 /*prop_healingbed*/ && World.instances[i].health <= 0.0f) World.instances[i].health = 9999999.0f;/*Only the level 7 one is not industructible*/
     World.instances[i].modelIndex = EDefs[entIdx].modelIndex; World.instances[i].colMeshIndex=EDefs[entIdx].colMeshIndex; World.instances[i].animationNum=EDefs[entIdx].animationNum; World.instances[i].texIndex=EDefs[entIdx].texIndex>=MAXTEX ? 0 : EDefs[entIdx].texIndex; World.instances[i].glowIndex=EDefs[entIdx].glowIndex>=MAXTEX ? 0 : EDefs[entIdx].glowIndex;
     World.instances[i].specIndex = EDefs[entIdx].specIndex >= MAXTEX ? 0 : EDefs[entIdx].specIndex; World.instances[i].normIndex = EDefs[entIdx].normIndex >= MAXTEX ? 0 : EDefs[entIdx].normIndex; flag_set(&World.instances[i].entflags,EF_RIGIDBODY,IdxIsDynamicObject(entIdx));
@@ -1519,19 +1513,51 @@ void LogicTimerInitBeforeLoad(u16 i) {
 }
 
 u16 DoorFrameFromProgress(AnimationClip c, float t) { if(c.frameEnd <= c.frameStart){return c.frameStart;} u16 span = c.frameEnd - c.frameStart; return (u16)(c.frameStart + (u16)(vclamp(t,0.0f,1.0f) * (float)span + 0.5f)); }
-void ComputeConvexMeshInertiaTensor(u16); void CyberMineInitBeforeLoad(u16);
+void ComputeConvexMeshInertiaTensor(u16), CyberMineInitBeforeLoad(u16);
+extern u16 npcCountInWorldPerType[NUM_AI_TYPES]; extern i16 targetIDText[INSTANCE_COUNT]; extern double targetIDTextFinished[INSTANCE_COUNT],targetIDAttachedFinished[INSTANCE_COUNT]; extern bool targetIDAttached[INSTANCE_COUNT];
 void LoadLevelData(u8 curlevel) {
-    if(!teleportDestinationsInitialized){for(u8 l=0;l<MAX_LEVELS;++l)for(u8 id=0;id<8;++id)teleportDestinations[l][id]=U16_MAX;teleportDestinationsInitialized=true;}
-    if(curlevel<MAX_LEVELS)for(u8 id=0;id<8;++id)teleportDestinations[curlevel][id]=U16_MAX;
-    if(curlevel<MAX_LEVELS)elevatorDestCounts[curlevel]=0;
-    World.curLev = curlevel; TargetIDReset(); mset(npcCountInWorldPerType,0,sizeof(npcCountInWorldPerType)); SetLevelPointers(curlevel); World.invP1.makingNoise=false;/*clear noise at level loads*/ World.decoyActive=false; World.decoyInstance=U16_MAX;/*a decoy is spawned into one level and dies with it; a stale true would leave cyber NPCs retargeting a dead instance index*/
-    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation)); mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16)); World.lanimCount=0; World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
-    mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf)); LoadLevelMod(curlevel); GravityLiftSyncAllVisuals(); PSysAddLevelLoops(); if (curlevel<MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel]=true; } OS_Free(fbuf,(size_t)fsize);
+    if (!teleportDestinationsInitialized) { for (u8 l=0;l<MAX_LEVELS;++l) { for (u8 id=0;id<8;++id) { teleportDestinations[l][id] = U16_MAX; } } teleportDestinationsInitialized=true; }
+    if (curlevel < MAX_LEVELS) { for (u8 id=0;id<8;++id) { teleportDestinations[curlevel][id] = U16_MAX; } elevatorDestCounts[curlevel] = 0; }
+    World.curLev = curlevel;
+    mset(targetIDText,0,sizeof(targetIDText));
+    mset(targetIDTextFinished,0,sizeof(targetIDTextFinished));
+    mset(targetIDAttachedFinished,0,sizeof(targetIDAttachedFinished));
+    mset(targetIDAttached,0,sizeof(targetIDAttached));
+    mset(npcCountInWorldPerType,0,sizeof(npcCountInWorldPerType));
+    SetLevelPointers(curlevel);
+    World.invP1.makingNoise = World.decoyActive = false;
+    World.decoyInstance = U16_MAX;
+    mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity));
+    World.instCount = 3;
+    mset(World.lights,0,LIGHT_COUNT * sizeof(Light));
+    mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation));
+    mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16));
+    World.lanimCount = 0;
+    World.loadedLights = 0;
+    mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
+    mset(camViews,0,64 * sizeof(CamView));
+    camViewCount=0;
+    char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); }
+    
+    mm_ptr = (const char*)fbuf;
+    mm_end = mm_ptr + fsize;
+    mset(fwParentOf,0,sizeof(fwParentOf));
+    LoadLevelMod(curlevel); // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< THE ACTUAL LOAD
+    GravityLiftSyncAllVisuals();
+    PSysAddLevelLoops();
+    if (curlevel < MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel] = true; }
+    OS_Free(fbuf,(size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;
     for (int i = PLAYER1; i < World.instCount; ++i) {
-        i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z); World.instances[i].cellIndex = cellIdx; World.instances[i].cellX = PosGetCellCoordX(World.position[i].x); World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
-        u16 mi = World.instances[i].modelIndex; World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); World.instances[i].shadRadius = World.radius[i] * 2.00f;
-        ComputeConvexMeshInertiaTensor(i); if (World.mass[i] < 0.001f && World.col[i] != CT_NONE && World.col[i] != CT_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something!*/ }
+        i32 cellIdx = PosGetCellCoords(World.position[i].x, World.position[i].z);
+        World.instances[i].cellIndex = cellIdx;
+        World.instances[i].cellX = PosGetCellCoordX(World.position[i].x);
+        World.instances[i].cellZ = PosGetCellCoordZ(World.position[i].z);
+        u16 mi = World.instances[i].modelIndex;
+        World.radius[i] = ((mi < mdlsCnt && modelBounds[mi] > 0.0f) ? modelBounds[mi] : 2.56f) * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+        World.instances[i].shadRadius = World.radius[i] * 2.00f;
+        ComputeConvexMeshInertiaTensor(i);
+        if (World.mass[i] < 0.001f && World.col[i] != CT_NONE && World.col[i] != CT_MSH && (World.instances[i].entflags & EF_RIGIDBODY)) { World.mass[i]=0.2f;/*At least something for movables!*/ }
     }
     for (int i=PLAYER1;i<World.instCount;++i) {
         u16 constIndex = World.instances[i].index;
@@ -1580,20 +1606,6 @@ void LoadLevelData(u8 curlevel) {
     World.levelLoadedLights[curlevel] = World.loadedLights; World.levelWepVModel[curlevel]=World.weaponVModelIndex; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
 }
 
-u8 GetCurrentLevelSecurity() { return (World.diffMis < 1 || Cheats.superoverride) ? 0u : World.levelSecurity[World.curLev]; }
-void NewGameDifficultyPass(void) {
-    for (u8 lev = 0; lev < World.numLevels; ++lev) {
-        u8 entryLevel = World.currentLevel; if (entryLevel != lev) SetLevelPointers(lev);
-        for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
-            if (!IdxIsUsableObject(World.instances[i].index)) continue;
-            u16 ci = World.instances[i].index; bool del = false;
-            if (World.diffMis <= 1 && (ci == 341 || ci == 388 || (ci >= 390 && ci <= 398) || ci == 417)) del = true;
-            if (World.diffMis == 0 && (ci == 313 || ci == 448)) del = true;
-            if (del) DeleteInstance(i);
-        }
-        if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
-    }
-}
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();
 static void DoorTypeAudit(u8 lev) {
     u32 badLayer=0, badLaser=0, badAperture=0;
@@ -1620,7 +1632,7 @@ void LoadAllLevels() {
     ioNameCount=1; ioNames[0][0]='\0';
     lightsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(Light));
     lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation));
-    for(u8 i=0;i<8;++i){World.TeleportTouch_allTeleportTouches[i]=U16_MAX;}
+    for (u8 i=0;i<8;++i) { World.TeleportTouch_allTeleportTouches[i] = U16_MAX; }
     fwPoolUsed = 0;
     for(u8 lev=0;lev<World.numLevels;++lev){
         for (i32 i=0;i<INSTANCE_COUNT;++i) { colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1}; }
@@ -1650,7 +1662,6 @@ void LoadLevel(u8 curlevel, V3 pos) {
     DebugRAM("start of LoadLevel");
     World.levelCurrentlyLoading = true;
     World.paused = World.menuActive = false;
-    RenderLoading("Loading level...");
     if (World.currentLevel != curlevel) {
         CopyPlayerState(World.currentLevel,curlevel);
         PSysClearLevel(World.currentLevel);
@@ -1678,7 +1689,6 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.Sys_Music.inZone = World.Sys_Music.cyberTube = false;
     World.Sys_Music.combatImpulseFinished = get_time();
     World.Sys_Music.combatImpulseFinished += 5.0;
-    RenderLoading("Loading cull system...");
     CullInit(); // Must be after level!
     glUseProgram(voxelUpdateSP);
     glUniform2f(0, World.voxMinCtrX[World.curLev], World.voxMinCtrZ[World.curLev]);
@@ -1688,7 +1698,6 @@ void LoadLevel(u8 curlevel, V3 pos) {
     glUniform1ui(4, SHADOW_MAP_SIZE);
     glUniform1ui(6, (u32)MAX_LIGHTS_PER_VOXEL);
     glUniform1ui(7, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
-    RenderLoading("Loading voxel lighting data...");
     for (u16 i=0;i<World.loadedLights;++i) { World.lightsNewPosition[i] = World.lights[i].pos; }
     mset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, World.loadedLights * sizeof(u32));
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {

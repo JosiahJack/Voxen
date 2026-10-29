@@ -348,7 +348,7 @@ typedef struct { // MUST PRESERVE ORDER TO MATCH TABLE!!
         int projectile1Prefab, projectile2Prefab, projectile3Prefab;
 } NPCTable;
 extern const NPCTable npcTable[NUM_AI_TYPES];
-void TargetIDReset(); bool TargetIDShouldRender(u16); bool TargetIDInPlayerPVS(u16); i16 TargetIDGetText(u16);
+bool TargetIDShouldRender(u16); bool TargetIDInPlayerPVS(u16); i16 TargetIDGetText(u16);
 typedef struct {
     double beatFinished,tick0Finished,tick1Finished,tick2Finished,tickFinished; float heartRate,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 header,fatigue;
     u8 ringERG[BIOM_GRAPH_W],ringCHI[BIOM_GRAPH_W],ringECG[BIOM_GRAPH_W];
