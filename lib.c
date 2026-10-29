@@ -1,21 +1,15 @@
 // lib.c - LibC replacement functions and other misc helpers.
 #include "common.h"
-typedef u16 u16_u __attribute__((__aligned__(1),__may_alias__));
-typedef u32 u32_u __attribute__((__aligned__(1),__may_alias__));
-typedef u64 u64_u __attribute__((__aligned__(1),__may_alias__));
+typedef u16 u16_u __attribute__((__aligned__(1),__may_alias__));    typedef u32 u32_u __attribute__((__aligned__(1),__may_alias__));    typedef u64 u64_u __attribute__((__aligned__(1),__may_alias__));
 void* mcpy(void *dst,const void *src,size_t n){
-    u8 *d=(u8*)dst;
-    u8 *s=(u8*)src;
-    size_t i=0;
+    u8 *d=(u8*)dst, *s=(u8*)src; size_t i=0;
     for (;i+128<=n;i+=128) { *(__m256i*)(d+i) = *(__m256i*)(s+i); *(__m256i*)(d + i + 32) = *(__m256i*)(s + i + 32); *(__m256i*)(d + i + 64) = *(__m256i*)(s + i + 64); *(__m256i*)(d + i + 96) = *(__m256i*)(s + i + 96);}
     for (;i+32<=n;i+=32) { *(__m256i*)(d+i) = *(__m256i*)(s+i); } size_t rem=n-i; u8* rd=d+i; u8* rs=s+i;
-    
          if (rem >= 16) { _mm_storeu_si128((__m128i*)rd,*(__m128i_u*)rs); _mm_storeu_si128((__m128i*)(d + n - 16),*(__m128i_u*)(s + n - 16)); }
     else if (rem >= 8) { *(u64_u*)rd = *(u64_u*)rs; *(u64_u*)(d + n - 8) = *(u64_u*)(s + n - 8); }
     else if (rem >= 4) { *(u32_u*)rd = *(u32_u*)rs; *(u32_u*)(d + n - 4) = *(u32_u*)(s + n - 4); }
     else if (rem >= 2) { *(u16_u*)rd = *(u16_u*)rs; *(u16_u*)(d + n - 2) = *(u16_u*)(s + n - 2); }
     else if (rem == 1) { *rd = *rs;}
-    
     return dst;
 }
 
@@ -28,17 +22,17 @@ size_t slen(const char* s) { if (s == NULL) {return 0;} const char *p=s; while (
 bool cEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
 char* data_parser_trim(char* s) { while(cEmpty((u8)*s)){s++;} if (*s == 0){return s;} char* e=s + slen(s) - 1; while(e > s && cEmpty((u8)*e)){e--;} e[1]=0; return s; }
 i32 s2i32(const char *str){while (cEmpty(*str)){str++;} int sign=1; if(*str=='-'){sign=-1; str++;}else if(*str == '+') {str++;} if(*str<'0' || *str>'9')return 0; i64 result=0; while(*str>='0' && *str<='9'){int digit=*str-'0'; if(result>(2147483647-digit)/10){return (sign==1) ? 2147483647 : -2147483648;} result=result*10+digit; str++;} return (i32)(sign*result);} // atoi replacement, needed separately from fast_atoi for user console input
-bool sEqual(const char* a, const char* b) { size_t sz = slen(a); if(sz != slen(b)) {return false;} for(size_t i=0;i<sz;++i) { if(a[i] != b[i]){return false;} if(a[i] == '\0'){break;} } return true; } // !strcmp replacement (hated its inverted logic)
+bool sEqual(const char* a, const char* b) { if (!a) a=""; if (!b) b=""; while (*a && *a == *b) { a++; b++; } return *a == *b; } // !strcmp replacement (hated its inverted logic)
 int sCompUpToLen(const char* s1, const char* s2, size_t n) { const u8 *p1 = (const u8*)s1, *p2 = (const u8*)s2; while (n-- > 0) { if (*p1 != *p2) {return (*p1 < *p2) ? -1 : 1;}  if (*p1 == '\0') {break;} p1++; p2++; } return 0; } // !strncmp replacement (yes inverted for sanity)
 void scpy_to_a_from_b(char* a, const char* b, size_t bufsz) { size_t szb=slen(b); if (szb>=bufsz) { DualLogError("scpy_to_a_from_b: B bigger than buffer\n"); OS_Exit(1); } for(size_t i=0;i<szb;++i){a[i]=b[i];} a[szb] = '\0'; } // strcpy replacement
 __attribute__((noinline)) u32 parse_numberu32(const char* str, const char* line, u32 lineNum) {
-    if(str == 0 || *str == '\0'){DualLogError("Invalid from line[%d]: %s\n",lineNum+1,line); return 0;} while(cEmpty((char)*str)){str++;} while(cEmpty(*str)){str++;} if(*str == '+'){str++;} if(*str == '-'){DualLogError("Invalid negative u32(%s) from line[%d]: %s\n",str,lineNum+1,line); return 0;} u64 result=0; while (*str >= '0' && *str <= '9') { i32 digit=*str-'0'; result=result*10 + (u64)digit; str++; } return (u32)result;
+    if(str == 0 || *str == '\0'){DualLogError("Invalid from line[%d]: %s\n",lineNum+1,line); return 0;} while(cEmpty(*str)){str++;} if(*str == '+'){str++;} if(*str == '-'){DualLogError("Invalid negative u32(%s) from line[%d]: %s\n",str,lineNum+1,line); return 0;} u64 result=0; while (*str >= '0' && *str <= '9') { i32 digit=*str-'0'; result=result*10 + (u64)digit; str++; } return (u32)result;
 }
 
 __attribute__((noinline)) u16 parse_numberu16(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > U16_MAX) { DualLogError("Value %u out of range for u16 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u16)retval; }
 __attribute__((noinline)) u8 parse_numberu8(const char* str, const char* line, u32 lineNum) { u32 retval = parse_numberu32(str, line, lineNum); if (retval > 255) { DualLogError("Value %u out of range for u8 from line[%d]: %s\n", retval, lineNum+1, line); return 0; } return (u8)retval; }
-__attribute__((noinline)) bool parse_bool(const char* str, const char* line, u32 lineNum) { u32 parseval = parse_numberu32(str, line, lineNum); if (parseval > 1) {DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);} return parseval > 0 ? true : false; }
-void sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz) { if (subsz >= bufsz) { DualLogError("sCpy2aSubFromb substring overflow!\n"); OS_Exit(1); } bool ended=0; for(size_t i= 0;i<subsz;++i){ if(!ended && b[i] == '\0'){ended=1;} if(ended){a[i]='\0';}else{a[i]=b[i];} } a[subsz]='\0'; } // strncpy replacement (hopefully my mnemonic "a_subfrom_b" will help)
+__attribute__((noinline)) bool parse_bool(const char* str, const char* line, u32 lineNum) { u32 parseval = parse_numberu32(str, line, lineNum); if (parseval > 1) {DualLogWarn("Loaded %u but expected boolean from line[%u]: %s\n",parseval, lineNum+1, line);} return parseval != 0; }
+void sCpy2aSubFromb(char* a, size_t subsz, const char* b, size_t bufsz) { if (subsz >= bufsz) { DualLogError("sCpy2aSubFromb substring overflow!\n"); OS_Exit(1); } size_t i=0; for (;i<subsz && b[i];++i) a[i]=b[i]; mset(a+i,0,subsz-i+1); } // strncpy replacement (hopefully my mnemonic "a_subfrom_b" will help)
 char c2Lower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); } // If uppercase 'A'-'Z' (65-90), +32 into 'a'-'z' (97-122)
 char* sFindSub(const char* s, const char* sub) { if (sub[0] == '\0') {return (char*)s;} for (size_t i = 0; s[i] != '\0'; ++i) { if (s[i] == sub[0]/*Only look if first matches*/) { size_t si=i, subi=0; while (s[si] != '\0' && sub[subi] != '\0' && s[si] == sub[subi]){si++; subi++;} if(sub[subi] == '\0'){return (char*)&s[i];} } } return NULL;/*No match*/ } // strstr replacement
 const char* StringFindLastChar(const char* str, const char c) { const char* lastSeen = NULL; do { if (*str == c) lastSeen = str; } while (*str++); return lastSeen; } // strrchr replacement
@@ -46,9 +40,9 @@ char* StringFindFirstCharWithin(const char *s, char c) { char* stringwalker = (c
 void double2str(char* dest, double value, int decs, size_t bufsz) {
     union { double d; u64 u; } bits; bits.d = value; // Bit-test for nan/inf since -ffast-math elides __builtin_isnan
     if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL) && ((bits.u & 0x000FFFFFFFFFFFFFULL) != 0 || (bits.u >> 63))) { dest[0]='n';dest[1]='a';dest[2]='n';dest[3]='\0'; return; } if (((bits.u & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL)) { dest[0]='i';dest[1]='n';dest[2]='f';dest[3]='\0'; return; } if (decs < 0 || decs > 9) { DualLogError("double2str: too many decimals\n"); OS_Exit(1); }
-    if (value < 0.0) { if (bufsz < 2) {DualLogError("double2str: buffer too small A\n"); OS_Exit(1);} *dest++ = '-'; bufsz--; value = -value; } u64 whole = (u64)value; char temp[32]; size_t len = 0; if(whole == 0){temp[len++] = '0';}else{while (whole > 0) {temp[len++]='0' + (whole%10); whole/=10;} }
-    double scale = 1.0; for (int i = 0; i < decs; ++i) {scale *= 10.0;} u64 fracs = (u64)((value - (u64)value) * scale + 0.5);
-    if (decs != 0 && fracs >= (u64)scale) { whole = (u64)value + 1; len = 0; if(whole == 0){temp[len++] = '0';}else{while (whole > 0) {temp[len++]='0' + (whole%10); whole/=10;} } fracs -= (u64)scale; }
+    if (value < 0.0) { if (bufsz < 2) {DualLogError("double2str: buffer too small A\n"); OS_Exit(1);} *dest++ = '-'; bufsz--; value = -value; } double scale=1.0; for (int i=0;i<decs;++i) scale*=10.0;
+    u64 whole=(u64)value,fracs=(u64)((value-whole)*scale+0.5); if (decs && fracs>=(u64)scale) { whole++; fracs-=(u64)scale; }
+    char temp[32]; size_t len=0; do { temp[len++]='0'+whole%10; whole/=10; } while (whole);
     if (len >= bufsz) {DualLogError("double2str: len larger than buffer\n"); OS_Exit(1);}
     for (size_t i = 0; i < len; ++i) {dest[i] = temp[len - 1 - i];} dest += len; bufsz -= len; if(decs == 0) {*dest = '\0'; return;} if(bufsz < 1) {DualLogError("double2str: buffer too small B\n"); OS_Exit(1);}
     *dest++ = '.'; bufsz--; for (int i = decs - 1; i >= 0; --i) { if (bufsz < 1) {DualLogError("double2str: buffer too small C\n"); OS_Exit(1);} dest[i]='0' + (fracs%10); fracs/=10; } dest[decs] = '\0';
@@ -60,12 +54,11 @@ int sFormatV(char* buf, size_t bufsz, const char* f, va_list args) {
         if (*f != '%') { buf[pos++] = *f++; continue; } f++; // skip '%'
         int width = 0; char padChar = ' '; if (*f == '0') { padChar = '0'; f++; } while (*f >= '0' && *f <= '9') { width = width * 10 + (*f - '0'); f++; } int decimals = 9; if (*f == '.') { f++; if (*f >= '0' && *f <= '9') { decimals = *f - '0'; } f++; }/*0 is a valid precision: %.0f prints just the integer part*/
         switch (*f) {
-            case 'x': { u32 val=__builtin_va_arg(args,u32); char num[32]; int i=0; const char* hexChars="0123456789abcdef"; do {num[i++]=hexChars[val % 16]; val/=16;}while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++] = num[i];} } break;
-            case 'u': { u32 val=__builtin_va_arg(args,u32); char num[32]; int i=0; do{num[i++]='0' + (val % 10); val/=10; }while(val); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++]=num[i];} } break;
-            case 'c': { char c=(char)__builtin_va_arg(args,int); if(pos < bufsz - 1){buf[pos++]=c;} } break;
-            case 'd': { case 'i': { int val=__builtin_va_arg(args,int); u32 uval=(u32)val; if(val < 0){if(pos < bufsz - 1){buf[pos++] = '-';} uval=-uval;} char num[32]; int i=0; do{num[i++]='0'+(uval%10); uval/=10;}while(uval); while(i < width && pos < bufsz - 1){buf[pos++]=padChar; width--;} while(i-- > 0 && pos < bufsz - 1){buf[pos++]=num[i];} } } break;
-            case 's': { const char* s=__builtin_va_arg(args,const char*); size_t len = slen(s); if(pos + len >= bufsz){len = bufsz - pos - 1;}; for(size_t i=0;i<len;++i){buf[pos++] = s[i];} } break;
-            case 'f': { double val=__builtin_va_arg(args,double); char num[64]; double2str(num,val,decimals,sizeof(num)); size_t len=slen(num); if(pos + len >= bufsz){len=bufsz - pos - 1;} for (size_t i=0;i<len;++i){buf[pos++]=num[i];} } break;
+            case 'x': case 'u': case 'd': case 'i': {
+                u32 val; int base=*f=='x' ? 16 : 10; char num[32]; int i=0; if (*f=='d' || *f=='i') { int v=__builtin_va_arg(args,int); val=(u32)v; if (v<0) { buf[pos++]='-'; val=-val; } } else val=__builtin_va_arg(args,u32);
+                do { num[i++]="0123456789abcdef"[val%base]; val/=base; } while (val);    while (i<width && pos<bufsz-1) { buf[pos++]=padChar; width--; } while (i-- && pos<bufsz-1) buf[pos++]=num[i];   } break;
+            case 'c': buf[pos++]=(char)__builtin_va_arg(args,int); break;
+            case 's': case 'f': { char num[64]; const char* v; if (*f=='s') v=__builtin_va_arg(args,const char*); else { double2str(num,__builtin_va_arg(args,double),decimals,sizeof(num)); v=num; } for (size_t i=0;v && v[i] && pos<bufsz-1;++i) buf[pos++]=v[i]; } break;
             case '%': if (pos < bufsz - 1) buf[pos++] = '%'; break;
         } f++;
     } buf[pos] = '\0'; return (int)pos;
@@ -75,18 +68,15 @@ int sFormat(char* buffer, size_t bufsz, const char* format, ...) { va_list args;
 char* sUpToEndLine(char* buf, int sz, FHandle fd){if(sz<=1 || buf == NULL){return NULL;} char* p=buf; int rem=sz-1; static int pos=0,end=0; static char b[4096]; while(rem > 0){if(pos>=end){long n=OS_Read(fd,b,sizeof(b)); if(n <= 0){if(p==buf){return NULL;} goto done;} pos=0; end=(int)n;} while(rem>0 && pos<end){char c=b[pos++]; *p++=c; rem--; if(c=='\n'){goto done;}}} done:*p='\0'; return buf;} // fgets replacement, not thread safe but no multithreading
 FHandle console_log_file=0;
 static void DualLogMain(bool writeToFileToo, const char *prefix, const char *fmt, va_list args) {
-    char buf[4096]; va_list c; __builtin_va_copy(c,args); sFormatV(buf,sizeof(buf),fmt,c); __builtin_va_end(c); bool color=(prefix && prefix[0] == '\033');
+    char buf[4096]; va_list c; __builtin_va_copy(c,args); size_t len=sFormatV(buf,sizeof(buf),fmt,c),prefixLen=slen(prefix); __builtin_va_end(c); bool color=(prefix && prefix[0] == '\033');
     #if defined(_WIN32)
         FHandle out=GetStdHandle(color ? (u32)-12 : (u32)-11);
     #else
         FHandle out=color ? 2/*stderr*/ : 1/*stdout*/;
     #endif
-    if (prefix) { OS_RawWrite(out,prefix,slen(prefix)); OS_RawWrite(out,"\033[0m ",5); }
-    OS_RawWrite(out,buf,slen(buf));
-    if (console_log_file != INVALID_FHANDLE && writeToFileToo) {
-        if(prefix) { OS_Write(console_log_file,prefix,slen(prefix),"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }
-        OS_Write(console_log_file,buf,slen(buf),"console.log");
-    }
+    if (prefix) { OS_RawWrite(out,prefix,prefixLen); OS_RawWrite(out,"\033[0m ",5); }
+    OS_RawWrite(out,buf,len);
+    if (console_log_file != INVALID_FHANDLE && writeToFileToo) { if(prefix) { OS_Write(console_log_file,prefix,prefixLen,"console.log"); OS_Write(console_log_file,"\033[0m ",5,"console.log"); }    OS_Write(console_log_file,buf,len,"console.log"); }
 }
 
 void DualLog(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,NULL,s,a); __builtin_va_end(a); } void DualLogWarn(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,"\033[1;38;5;208mWARN:",s,a); __builtin_va_end(a); } void DualLogError(const char* s, ...) { va_list a; __builtin_va_start(a,s); DualLogMain(true,"\033[1;31mERROR:",s,a); __builtin_va_end(a); }
@@ -127,9 +117,9 @@ void Screenshot() {
     BmpWrite(filename,w,h,pixels); CenterStatusPrint("Saved screenshot %s\n",filename); OS_Free(pixels,w * h * 4 * sizeof(char));
 }
 
-size_t g_mmap_live = 0; /* diagnostics: live bytes from OS_AllocateRAM (anon + file-backed + thread stacks) */
+size_t g_mmap_live = 0;
 extern u32 totalPixels,totalPaletteColors; extern size_t cvxAdjLive;
-void DebugRAMPeak(void) { // VmHWM: kernel high-water mark of RSS over process lifetime, catches transient spikes between checkpoints (includes shared libs, unlike USS)
+void DebugRAMPeak(void) { // VmHWM: kernel high-water mark of RSS over process lifetime, catches transient spikes between checkpoints (includes shared libs (aka RSS), unlike USS)
     #if defined(_WIN32)
         (void)0;/*no /proc on Windows*/
     #else
