@@ -181,7 +181,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (85ULL * 1024 * 1024),
                 REV_BUF_LEN = 110251 /*~2.5s @ 44100; prime*/, MAXAMB = 256,
       /*Text*/ T_BUFFER_SIZE = 4096, MAX_GLYPHS = 4096, LINE_LEN_MAX = 81920, TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280 * 3, LOGCNT = 134, TEXT_VTX_FLOATS = 65536 /*30 floats (6 verts x 5) per glyph quad: sized for the longest credits page (988 source bytes, ~966 glyphs) so whole pages draw instead of stopping at 273 glyphs.*/,
                T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8, T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14, T_PURPLE = 15,
-               FONT_ATLAS_SIZE = 1200, FONT_ATLAS_SIZE2 = 2048, FONT_NORMAL = 0, FONT_STOPD = 1, FONT_vmove = 1, FONT_vline = 2, FONT_vcurve = 3, FONT_vcubic = 4,
+               FONT_ATLAS_SIZE = 1200, FONT_ATLAS_SIZE2 = 2048, FONT_NORMAL = 0, FONT_STOPD = 1, FONT_vmove = 1, FONT_vline = 2, FONT_vcurve = 3,
                HUDC_WHITE = 0, HUDC_RED = 1, HUDC_ORANGE = 2, HUDC_YELLOW = 3, HUDC_GREEN = 4, HUDC_BLUE = 5, HUDC_PURPLE = 6, HUDC_GRAY = 7,
       /*Menu*/ MPG_FRONT = 0, MPG_SINGPLYR = 1, MPG_MULTPLYR = 2, MPG_NEWGM = 3, MPG_LOAD = 4, MPG_OPTS = 5, MPG_SAVE = 6, MPG_INTRO = 7, MPG_CREDS = 8,
       /*UI*/ UI_W = 1366, UI_H = 768, CURSOR_SZ = 40, MFD_READER_CONTENTS = 0, MFD_READER_FOLDER = 1, MFD_READER_TEXT = 2, MAX_UI_ELEMENTS = 4096, TXT_PAD = 4, TXT_H = 24, TAB_THICK = 16, MFD_SPACING = 8, MFD_SPACINGCTR = 19,
@@ -195,7 +195,7 @@ u32 parse_numberu32(const char*, const char*,u32);
 u16 parse_numberu16(const char*, const char*,u32);
 u8 parse_numberu8(const char*, const char*,u32);
 bool parse_bool(const char*, const char*,u32);
-static const float PLYR_RAD = 0.48f, PLYR_HT = 2.00f, PLYR_CAM_OFS_Y = 0.84f, CELLSZ = 2.56f, CELLXHALF = (CELLSZ * 0.5f), VOXEL_SIZE = (CELLSZ / (float)VOXELS_PER_CELL);
+static const float PLYR_RAD = 0.48f, PLYR_HT = 2.00f, PLYR_CAM_OFS_Y = 0.84f, CELLSZ = 2.56f, CELLXHALF = (CELLSZ * 0.5f), VOXEL_SIZE = (CELLSZ / (float)VOXELS_PER_CELL), AI_STOP_DIST = 1.28f, AI_STOP_DIST_SQ = (AI_STOP_DIST * AI_STOP_DIST), AI_POS_CHECK_DELAY = 2.0f, AI_WANDER_RANGE = 79.0f, AI_TARGET_OFFSET_Y = 0.24f;
 enum { EF_ACTIVE             = (1u<<0),  EF_TARGID_ATTACHED  = (1u<<16),
        EF_GRAVLIFT           = (1u<<1),  EF_ENEM_IN_SIGHT    = (1u<<17),
        EF_GROUNDED           = (1u<<2),  EF_ENEM_IN_FRONT    = (1u<<18),
@@ -247,7 +247,6 @@ enum { TARG_IOFLAGS_TRIPTRIGGER        = (1u<<0),  TARG_IOFLAGS_LIGHT_TOGGLE    
 typedef enum {BodyState_Standing = 0, BodyState_Crouch = 1, BodyState_CrouchingDown = 2, BodyState_StandingUp = 3, BodyState_Prone = 4, BodyState_ProningDown = 5, BodyState_ProningUp = 6} BodyState;
 typedef enum {Att_None = 0, Att_Melee = 1, Att_MlEg = 2, Att_Beam = 3, Att_Magn = 4, Att_HitS = 5, Att_PjNd = 6, Att_PjBm = 7, Att_Ball= 8, Att_Gas=9,Att_Trnq=10,Att_Drill=11} AttType;
 typedef enum {NPCType_Mutant=0,NPCType_Supermutant=1,NPCType_Robot=2,NPCType_Cyborg=3,NPCType_Supercyborg=4,NPCType_MutantCyborg=5,NPCType_Cyber=6} NPCType;
-typedef enum {PerceptionLevel_Low=0,PerceptionLevel_Medium=1,PerceptionLevel_High=2,PerceptionLevel_Omniscient=3} PerceptionLevel;
 typedef enum {AIMoveType_None=0,AIMoveType_Walk=1,AIMoveType_Fly=2,AIMoveType_Swim=3,AIMoveType_Cyber=4} AIMoveType;
 typedef enum {AIState_Idle=0,AIState_Walk=1,AIState_Run=2,AIState_Attack1=3,AIState_Attack2=4,AIState_Attack3=5,AIState_Pain=6,AIState_Dying=7,AIState_Inspect=8,AIState_Interacting=9,AIState_Dead=10} AIState;
 typedef enum {SecurityType_None=0,SecurityType_Camera=1,SecurityType_NodeSmall=2,SecurityType_NodeLarge=3} SecurityType;
@@ -335,12 +334,11 @@ typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width, height; fl
 extern CamView camViews[64],levelCamViews[14][64]; extern u8 camViewCount,levelCamViewCount[14]; extern u32 camViewTextures[64],levelCamViewTextures[14][64];
 extern u8 sensaroundCamViewCenter,sensaroundCamViewLeft,sensaroundCamViewRight; extern void UpdateSensaroundCamViews(); // HUD sensaround cameras (center rear + left/right sides), repositioned each frame at the player
 typedef struct { // MUST PRESERVE ORDER TO MATCH TABLE!!
-        const char* name; AttType attackType, attackType2, attackType3; float damage, damage2, damage3, range, range2, range3, health, healthForCyberNPC; PerceptionLevel perception; float disruptability, armorvalue, defense; AIMoveType moveType;
-        float yawSpeed, fov, fovAttack, fovStartMovement, distToSeeBehind, sightRange, walkSpeed, runSpeed, attack1Speed, attack2Speed, attack3Speed, attack3Force, attack3Radius, timeToPain, timeBetweenPain, timeTillDead, timeToActualAttack1, timeToActualAttack2, timeToActualAttack3, timeBetweenAttack1, timeBetweenAttack2, timeBetweenAttack3, timeToChangeEnemy,timeIdleSFXMin, timeIdleSFXMax,
+        const char* name; AttType attackType, attackType2, attackType3; float damage, damage2, damage3, range, range2, range3, health, healthForCyberNPC, armorvalue, defense; AIMoveType moveType;
+        float yawSpeed, fov, fovStartMovement, distToSeeBehind, sightRange, walkSpeed, runSpeed, attack1Speed, attack2Speed, attack3Speed, attack3Force, attack3Radius, timeToPain, timeBetweenPain, timeTillDead, timeToActualAttack1, timeToActualAttack2, timeToActualAttack3, timeBetweenAttack1, timeBetweenAttack2, timeBetweenAttack3, timeToChangeEnemy,timeIdleSFXMin, timeIdleSFXMax,
               timeAttack1WaitMin, timeAttack1WaitMax, timeAttack1WaitChance, timeAttack2WaitMin, timeAttack2WaitMax, timeAttack2WaitChance, timeAttack3WaitMin, timeAttack3WaitMax, timeAttack3WaitChance;
-        int attack1ProjectileLaunchedType, attack2ProjectileLaunchedType, attack3ProjectileLaunchedType;
         float projectileSpeedAttack1, projectileSpeedAttack2, projectileSpeedAttack3;
-        bool hasLaserOnAttack1, hasLaserOnAttack2, hasLaserOnAttack3, explodeOnAttack3, preactivateMeleeColliders;
+        bool hasLaserOnAttack1, hasLaserOnAttack2, hasLaserOnAttack3, explodeOnAttack3;
         double huntTime;
         float flightHeight;
         bool flightHeightIsPercentage, switchMaterialOnDeath;
@@ -349,9 +347,8 @@ typedef struct { // MUST PRESERVE ORDER TO MATCH TABLE!!
         NPCType type;
         int projectile1Prefab, projectile2Prefab, projectile3Prefab;
 } NPCTable;
-extern NPCTable npcTable[NUM_AI_TYPES];
+extern const NPCTable npcTable[NUM_AI_TYPES];
 void TargetIDReset(); bool TargetIDShouldRender(u16); bool TargetIDInPlayerPVS(u16); i16 TargetIDGetText(u16);
-u16 ai_next_npc_number(u16); void ai_reset_npc_numbering(void);
 typedef struct {
     double beatFinished,tick0Finished,tick1Finished,tick2Finished,tickFinished; float heartRate,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 header,fatigue;
     u8 ringERG[BIOM_GRAPH_W],ringCHI[BIOM_GRAPH_W],ringECG[BIOM_GRAPH_W];

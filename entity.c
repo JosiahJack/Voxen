@@ -1008,7 +1008,8 @@ static const CgOffset cgOffsets[] = {
 };
 
 static const CgOffset* CgOffsetFor(u16 entIdx) { for (u32 k = 0; k < sizeof(cgOffsets)/sizeof(cgOffsets[0]); ++k) { if (cgOffsets[k].entIdx == entIdx) { return &cgOffsets[k]; } } return 0; }
-
+extern u16 npcCountInWorldPerType[NUM_AI_TYPES];
+u16 ai_next_npc_number(u16 type) { if (type >= NUM_AI_TYPES) return 0; if (npcCountInWorldPerType[type] < U16_MAX) npcCountInWorldPerType[type]++; return npcCountInWorldPerType[type]; }
 __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; }
     if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return WORLD; }
@@ -1523,7 +1524,7 @@ void LoadLevelData(u8 curlevel) {
     if(!teleportDestinationsInitialized){for(u8 l=0;l<MAX_LEVELS;++l)for(u8 id=0;id<8;++id)teleportDestinations[l][id]=U16_MAX;teleportDestinationsInitialized=true;}
     if(curlevel<MAX_LEVELS)for(u8 id=0;id<8;++id)teleportDestinations[curlevel][id]=U16_MAX;
     if(curlevel<MAX_LEVELS)elevatorDestCounts[curlevel]=0;
-    World.curLev = curlevel; TargetIDReset(); ai_reset_npc_numbering(); SetLevelPointers(curlevel); World.invP1.makingNoise=false;/*clear noise at level loads*/ World.decoyActive=false; World.decoyInstance=U16_MAX;/*a decoy is spawned into one level and dies with it; a stale true would leave cyber NPCs retargeting a dead instance index*/
+    World.curLev = curlevel; TargetIDReset(); mset(npcCountInWorldPerType,0,sizeof(npcCountInWorldPerType)); SetLevelPointers(curlevel); World.invP1.makingNoise=false;/*clear noise at level loads*/ World.decoyActive=false; World.decoyInstance=U16_MAX;/*a decoy is spawned into one level and dies with it; a stale true would leave cyber NPCs retargeting a dead instance index*/
     mset(World.instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); World.instCount = 3; mset(World.lights,0,LIGHT_COUNT * sizeof(Light)); mset(World.lanims,0,LANIM_MAX * sizeof(LightAnimation)); mset(World.lanimLightIdx,0,LANIM_MAX * sizeof(u16)); World.lanimCount=0; World.loadedLights=0; mset(alreadyReadLightOnOnce,0,sizeof(alreadyReadLightOnOnce));
     mset(camViews,0,64 * sizeof(CamView)); camViewCount=0; char filename[20]; sFormat(filename, sizeof(filename), "./Data/level%d.txt", curlevel); FHandle fh; int fsize; void* fbuf = OS_OpenAndAllocateFileBufferReadonly(filename, &fh, &fsize); if (!fbuf) { OS_Exit(1); } mm_ptr = (const char*)fbuf; mm_end = mm_ptr + fsize; mset(fwParentOf,0,sizeof(fwParentOf)); LoadLevelMod(curlevel); GravityLiftSyncAllVisuals(); PSysAddLevelLoops(); if (curlevel<MAX_LEVELS) { mcpy(fwParentSnap[curlevel],fwParentOf,sizeof(fwParentOf)); fwSnapValid[curlevel]=true; } OS_Free(fbuf,(size_t)fsize);
     for (int i = 0; i < World.loadedLights; ++i) World.lightsNewPosition[i] = World.lights[i].pos;

@@ -143,7 +143,7 @@ static int json_accessor(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_ac
     for(int k=0;k<sz;++k){
         if(t[i].type!=JSMN_STRING||t[i].size==0)return -1;
              if(glb_json_strcmp(t+i,j,"bufferView")){++i;out->buffer_view=(glb_buffer_view*)((size_t)glb_json_to_int(t+i,j)+1);++i;} else if(glb_json_strcmp(t+i,j,"byteOffset")){++i;out->offset=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"componentType")){++i;out->component_type=json_to_comp_type(t+i,j);++i;}
-        else if(glb_json_strcmp(t+i,j,"normalized")){++i;int sz=(int)(t[i].end-t[i].start);out->normalized=sz==4&&sCompUpToLen((const char*)j+t[i].start,"true",4)==0;++i;} else if(glb_json_strcmp(t+i,j,"count")){++i;out->count=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"type")){ ++i; out->type = glb_json_strcmp(t+i,j,"SCALAR")?glbscalar:glb_json_strcmp(t+i,j,"VEC2")?glbv2:glb_json_strcmp(t+i,j,"VEC3")?glbv3:glb_json_strcmp(t+i,j,"VEC4")?glbv4:glb_json_strcmp(t+i,j,"MAT4")?glbmat4:glbinvalid; ++i; }
+        else if(glb_json_strcmp(t+i,j,"normalized")){++i;int sz2=(int)(t[i].end-t[i].start);out->normalized=sz2==4&&sCompUpToLen((const char*)j+t[i].start,"true",4)==0;++i;} else if(glb_json_strcmp(t+i,j,"count")){++i;out->count=glb_json_to_size(t+i,j);++i;} else if(glb_json_strcmp(t+i,j,"type")){ ++i; out->type = glb_json_strcmp(t+i,j,"SCALAR")?glbscalar:glb_json_strcmp(t+i,j,"VEC2")?glbv2:glb_json_strcmp(t+i,j,"VEC3")?glbv3:glb_json_strcmp(t+i,j,"VEC4")?glbv4:glb_json_strcmp(t+i,j,"MAT4")?glbmat4:glbinvalid; ++i; }
         else{ i=glb_skip_json(t,i+1);} if(i<0){return i;}
     } return i;
 }

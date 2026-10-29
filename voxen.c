@@ -2222,7 +2222,7 @@ void LoadRaytracingData(void) {
     glFlush(); glFinish();
     rtAccelBuilt = true;
     DualLog("Raytraced reflections upload........................................................took %.6f secs\n",get_time() - startTime);
-    DebugRAMActual("after RT upload"); 
+    DebugRAM("after RT upload"); 
 }
 
 void EnsureReflectionResources(void) {
