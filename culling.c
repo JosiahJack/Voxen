@@ -1,14 +1,7 @@
 // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
 #include "common.h"
-u32 gridCellStates[ARRSIZE],precomputedVisibleCellsFromHere[524288];/*4096 * 4096 / 32*/ u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u32 numActivePortals = 0;
-void ResetDoorPortals(void) {
-    /*AddDoorPortal numbered doors off this counter and nothing reset it, so the second NewGame pass in a session
-      restarted at 260 instead of 0 and appended a second copy of every portal in the table. A third pass would have
-      overrun MAX_PORTALS (the data has 260 portal-blocking doors against a 640 cap) and silently stopped blocking.
-      AddDoorPortal always writes the slot it claims before counting it, so zeroing the count is enough and
-      activePortals itself does not need clearing.*/
-    numActivePortals = 0;
-}
+u32 gridCellStates[ARRSIZE],precomputedVisibleCellsFromHere[524288];/*4096 * 4096 / 32*/ u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u32 numActivePortals = 0; bool cullVisibilityValid;
+void ResetDoorPortals(void) { numActivePortals = 0; cullVisibilityValid=false; }
 bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}
 bool PositionVisibleFromPlayerCell(float x, float z) { return (get_cull_bit(precomputedVisibleCellsFromHere,((playerCellIdx * ARRSIZE)/*cellIdx*/ + PosGetCellCoords(x,z)/*subIdx*/)/*flat_idx*/)); }
@@ -17,20 +10,9 @@ bool SkyIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX)
 bool SkySunIsVisible() { return ((gridCellStates[playerCellIdx] & CELL_SEES_SUN) && World.curLev != LEVEL_CYBERSPACE); }
 bool NeighborhoodInPVS(u16 x, u16 z, u8 r) { u32 cellIdx=(z*WORLDX)+x; for(int ix=(int)x-r;ix<=(int)x+r;++ix){for(int iz=(int)z-r;iz<=(int)z+r;++iz){if(unlikely(!XZPairInBounds(ix,iz))){continue;} int subIdx=iz*WORLDX + ix; if(get_cull_bit(precomputedVisibleCellsFromHere,cellIdx*ARRSIZE+subIdx)&&(gridCellStates[subIdx]&CELL_VISIBLE))return true;} } return false; }
 static u8* LoadCullPNG(const char* name, int level) {
-    char path[256];
-    sFormat(path,sizeof(path),"./Data/%s_%d.png",name,level);
-    FHandle fp = OS_OpenReadonly(path);
-    size_t size = OS_FileSize(fp);
-    if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n",path); OS_Exit(1); }
-    
-    u8* cullingFileBuffer = OS_Alloc(MAX_CULL_FILESIZE * sizeof(u8));
-    OS_Seek(fp,0,0);
-    long read_size = OS_Read(fp,cullingFileBuffer,size); OS_Close(fp); if ((size_t)read_size != size) { DualLogError("Failed to read %s\n",path); OS_Exit(1); }
-    
-    i32 w,h; u8* pixels=PngLoad(cullingFileBuffer,size,&w,&h,&png_arena_main); if (!pixels) { DualLogError("STB failed: %s\n",path); OS_Exit(1); }
-    
-    OS_Free(cullingFileBuffer,MAX_CULL_FILESIZE * sizeof(u8));
-    return pixels;
+    char path[256]; sFormat(path,sizeof(path),"./Data/%s_%d.png",name,level);
+    FHandle fd; int size; u8* data=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&size); if (!data || size>MAX_CULL_FILESIZE) { DualLogError("PNG missing or too large: %s\n",path); OS_Exit(1); }
+    i32 w,h; u8* pixels = PngLoad(data,size,&w,&h,&png_arena_main); OS_Free(data,size); if (!pixels) { DualLogError("PngLoad failed: %s\n",path); OS_Exit(1); } return pixels;
 }
 
 #define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs png's top-left
@@ -62,6 +44,7 @@ void DetermineClosedEdges() {
 void AddDoorPortal(u16 entIdx, u16 parent) {
     if (entIdx == 499 || entIdx == 509/*Don't add bulkheads that span 2 cells, would be unnecessary complication*/){return;}
     if (numActivePortals >= MAX_PORTALS){DualLogWarn("Unable to add more door portals!\n"); return;}
+    
     float nudgeAmount = 0.32f; Entity* door = &World.instances[parent]; door->portalIndex = numActivePortals; bool isOpen = (door->doorState != DoorState_Closed); // Allows for any of DoorState_Open, DoorState_Opening, or DoorState_Closing to be considered open as far as portals are concerned so we can draw objects between the door panels.
     float obj_x=World.position[parent].x, obj_z=World.position[parent].z; u16 cellCurrent=(PosGetCellCoordZ(obj_z)*WORLDX) + PosGetCellCoordX(obj_x), cellIndexUp=PosGetCellCoordZ(obj_z + nudgeAmount), cellIndexDn=PosGetCellCoordZ(obj_z - nudgeAmount), cellIndexRight=PosGetCellCoordX(obj_x + nudgeAmount), cellIndexLeft=PosGetCellCoordX(obj_x - nudgeAmount);
     u16 cellN_idx = PosGetCellCoords(obj_x,obj_z + nudgeAmount), cellS_idx = PosGetCellCoords(obj_x,obj_z - nudgeAmount), cellE_idx = PosGetCellCoords(obj_x + nudgeAmount,obj_z), cellW_idx = PosGetCellCoords(obj_x - nudgeAmount,obj_z);
@@ -78,7 +61,7 @@ void AddDoorPortal(u16 entIdx, u16 parent) {
     } numActivePortals++;
 }
 
-bool ToggleDoorPortal(u32 p, u16 dr, u16 closedMdx) { if (p >= MAX_PORTALS) {return false;} Portal* prt = &activePortals[p]; bool currentState=prt->open; u16 mdx=World.instances[dr].modelIndex; if (mdx == closedMdx && currentState) { prt->open=false; prt->dirty=true; } else if (mdx != closedMdx && !currentState) { prt->open=true; prt->dirty=true; } return true; }
+bool ToggleDoorPortal(u32 p, u16 dr, u16 closedMdx) { if (p>=numActivePortals) return false; Portal* prt=&activePortals[p]; bool open=World.instances[dr].modelIndex!=closedMdx; if (prt->open==open) return false; prt->open=open; prt->dirty=true; return true; }
 void ForceDoorPortalOpen(u16 p) { if (p >= numActivePortals) {return;} activePortals[p].open = true; activePortals[p].dirty = true; } // Used at load for doors that start open/ajar. Bounds-checked so non-portal doors (portalIndex==0 default) can't corrupt portal 0.
 i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ) {
     if (lastX != x || lastZ != z) {
@@ -94,7 +77,7 @@ i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ) {
                 u32 nf_ew=(dx > 0) ? CELL_CLOSEDEAST  : CELL_CLOSEDWEST, nf_ns=(dz > 0) ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH;  // Neighbor sees the opposite face, same face on neighbor in NS direction same face on neighbor in EW direction
                 i32 ni_ns_coord_x = lastX, ni_ns_coord_z = lastZ + dz; if (XZPairInBounds(ni_ns_coord_x, ni_ns_coord_z)) { u32 nsN = gridCellStates[ni_ns_coord_z * WORLDX + ni_ns_coord_x]; n_ew = (nsN & nf_ew) != 0 && (nsN & CELL_OPEN); }
                 i32 ni_ew_coord_x = lastX + dx, ni_ew_coord_z = lastZ; if (XZPairInBounds(ni_ew_coord_x, ni_ew_coord_z)) { u32 ewN = gridCellStates[ni_ew_coord_z * WORLDX + ni_ew_coord_x]; n_ns = (ewN & nf_ns) != 0 && (ewN & CELL_OPEN); }
-                if ((c_ns && c_ew) || (c_ew && n_ew) || (c_ns && n_ns) || (n_ew && n_ns)) return -1;
+                if ((c_ns || n_ew) && (c_ew || n_ns)) return -1;
             }
         }
     } if(!XZPairInBounds(x,z)){return 0;} i32 ci = (z * WORLDX) + x; if (gridCellStates[ci] & CELL_OPEN) {gridCellStates[ci] |=  CELL_VISIBLE;} else {gridCellStates[ci] &= ~CELL_VISIBLE;} return (gridCellStates[ci] & CELL_VISIBLE) ? 1 : -1;
@@ -111,6 +94,7 @@ i32 CastStraight(i32 px, i32 pz, i32 sign, bool isX) {
                 u32 cf=isX ? sign>0 ? CELL_CLOSEDEAST : CELL_CLOSEDWEST : sign>0 ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH; if((gridCellStates[prevCellIdx]&cf)&&gridCellStates[prevCellIdx]&CELL_OPEN)return crd; i32 subCellIdx=(z*WORLDX)+x; if(gridCellStates[subCellIdx]&CELL_OPEN){gridCellStates[subCellIdx]|=CELL_VISIBLE;}else{gridCellStates[subCellIdx]&=~CELL_VISIBLE;} curVis=true;
             }
         } if (!curVis) break;
+        
         for (int offset = -1; offset <= 1; offset += 2) { /*Check perpendicular neighbors*/
             i32 checkX = isX ? x : x + offset, checkZ = isX ? z + offset : z;
             if (XZPairInBounds(checkX, checkZ)) { i32 checkCellIdx = (checkZ * WORLDX) + checkX; if (CastRayCellCheck(x, z, checkX, checkZ) > 0) { if (gridCellStates[checkCellIdx] & CELL_OPEN) gridCellStates[checkCellIdx] |= CELL_VISIBLE; else gridCellStates[checkCellIdx] &= ~CELL_VISIBLE; } else gridCellStates[checkCellIdx] &= ~CELL_VISIBLE; }
@@ -127,6 +111,7 @@ void CircleFanRays(i32 x0, i32 z0) { if (!XZPairInBounds(x0,z0)) {return;} if (!
 static void MarchAxis(i32 st, i32 end, i32 step, i32 ox, i32 oz, i32 sign, bool isX){for(i32 m=st;step>0 ? m < end : m>=end;m+=step){i32 x=isX ? m : ox,z=isX ? oz : m; if(XZPairInBounds(x,z) && (gridCellStates[(z * WORLDX) + x] & CELL_VISIBLE))m=CastStraight(isX ? m : ox,isX ? oz : m,sign,isX);}}
 void DetermineVisibleCells(i32 startX, i32 startZ) {
     if (!XZPairInBounds(startX,startZ)) return;
+    
     for (i32 x=0;x<WORLDX;x++) { for (i32 z=0;z<WORLDZ;z++) { i32 subCellIdx = (z * WORLDX) + x; gridCellStates[subCellIdx] &= ~CELL_VISIBLE; } /*Clear all to not visible.*/ }
     gridCellStates[(startZ * WORLDX) + startX] |= CELL_VISIBLE; /*Force starting player cell to visible.*/
     CastStraight(startX,startZ,1,true); // Cast to the right (East) [ ][3]
@@ -154,9 +139,13 @@ void DetermineVisibleCells(i32 startX, i32 startZ) {
 }
 
 void PortalCulling() { // Called just once at end of animation loop for the frame after each frame-perfect change to door models becoming either closed or not closed.
+    static u16 previousCell; static u8 previousLevel; u16 cell=PosGetCellCoords(World.position[PLAYER1].x,World.position[PLAYER1].z); bool dirty=false;
+    for (u32 p=0;p<numActivePortals;++p) if (activePortals[p].lev==World.curLev && activePortals[p].dirty) { dirty=true; break; }
+    if (cullVisibilityValid && previousCell==cell && previousLevel==World.curLev && !dirty) return;
+    cullVisibilityValid=true; previousCell=cell; previousLevel=World.curLev;
     bool previousLightVisible[LIGHT_COUNT]; mset(previousLightVisible,false,LIGHT_COUNT * sizeof(bool));
     for (u16 i=0;i<World.loadedLights;++i) { i32 lcell = PosGetCellCoords(World.lights[i].pos.x, World.lights[i].pos.z); if (lcell >= 0 && lcell < ARRSIZE && (gridCellStates[lcell] & CELL_VISIBLE)) {previousLightVisible[i]=true;} }
-    for (u32 portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
+    for (u32 portalIdx=0;portalIdx<numActivePortals;++portalIdx) {
         Portal* prt = &activePortals[portalIdx]; if (!prt->dirty || prt->lev != World.curLev) continue;
         prt->dirty = false; u16 cellIdxA = (prt->cellA.z * WORLDX) + prt->cellA.x; u16 cellIdxB = (prt->cellB.z * WORLDX) + prt->cellB.x; // Guaranteed order at level load.  A = N or E, B = S or W
         if (prt->open) { if (prt->portalNS) { gridCellStates[cellIdxA] &= ~(CELL_CLOSEDSOUTH); gridCellStates[cellIdxB] &= ~(CELL_CLOSEDNORTH); } else { gridCellStates[cellIdxA] &= ~(CELL_CLOSEDWEST);  gridCellStates[cellIdxB] &= ~(CELL_CLOSEDEAST); } }
@@ -173,28 +162,16 @@ void CullCore() {
     for (int i=0;i<World.instCount;++i) { float dx = pos_x - World.position[i].x, dz = pos_z - World.position[i].z; float distSqrd = dx*dx + dz*dz; instanceIsLODArray[i] = (distSqrd >= 655.36f);/*25.6f * 25.6f*/ } PortalCulling();
 }
 
-static void ApplyOpenPortalEdges(void) { // Clears closed-edge bits for lev-matched portals currently marked open. Called from CullInit after DetermineClosedEdges() so the precomputed visibility table (and every later PVS recompute) treats open/ajar door portals as passable from the start.
-    for (u32 portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
+static void ApplyOpenPortalEdges(void) {
+    for (u32 portalIdx=0;portalIdx<numActivePortals;++portalIdx) {
         Portal* prt = &activePortals[portalIdx]; if (!prt->open || prt->lev != World.curLev){continue;} u16 cellIdxA = (prt->cellA.z * WORLDX) + prt->cellA.x; u16 cellIdxB = (prt->cellB.z * WORLDX) + prt->cellB.x;
         if (prt->portalNS) { gridCellStates[cellIdxA] &= ~(CELL_CLOSEDSOUTH); gridCellStates[cellIdxB] &= ~(CELL_CLOSEDNORTH); } else { gridCellStates[cellIdxA] &= ~(CELL_CLOSEDWEST);  gridCellStates[cellIdxB] &= ~(CELL_CLOSEDEAST); }
     }
 }
 
-// Grove ceiling grates let the skybox through the cell they sit in.  The baked
-// worldcellskyvis PNG already paints most of these cells blue, but the bake is
-// an XZ projection of a 3D valley: a grate authored above a terrace can land in
-// a cell the player never occupies as blue, and a hand-painted cell drifts as
-// the grove layout changes.  Driving the flag off the placed grate chunks ties
-// it to the geometry that actually opens the roof.
-static void MarkSkyVisibleChunks(void) {
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
-        if (World.instances[i].index != 93/*chunk_grove1_1, the grove ceiling grate window*/) {continue;}
-        u32 cell = (u32)PosGetCellCoords(World.position[i].x, World.position[i].z);
-        gridCellStates[cell] |= CELL_SEES_SKYBOX|CELL_SEES_SUN;
-    }
-}
-
+static void MarkSkyVisibleChunks(void) { for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].index != 93/*chunk_grove1_1, the grove ceiling grate window*/) {continue;} u32 cell = (u32)PosGetCellCoords(World.position[i].x, World.position[i].z); gridCellStates[cell] |= CELL_SEES_SKYBOX|CELL_SEES_SUN; } }
 void CullInit() {
+    cullVisibilityValid=false;
     if (World.curLev >= LEVEL_CYBERSPACE) {
         for (u32 i=0;i<ARRSIZE;++i) { gridCellStates[i] = CELL_OPEN|CELL_VISIBLE; }
         mset(precomputedVisibleCellsFromHere,0xFF,sizeof(precomputedVisibleCellsFromHere));
