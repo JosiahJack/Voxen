@@ -164,7 +164,7 @@ typedef struct { V3 point; V3 normal; float distance; u16 hitInstanceIndex; bool
 typedef struct { V3 pos; float intensity; Color3 col; u32 lflags; float range, spotAng, maxIntensity, minIntensity; Quaternion spotDir; } Light; // 64bytes, one cache line, packed for GL transfer   
 typedef struct { float speed; u16 frameStart, frameEnd, frameStartModelIndex; u8 framerate;} AnimationClip;
 typedef struct { float lerpValue,lerpStepTime,lerpStartTime,lerpTime,intervalSteps[32]; bool stepIsLerping[32],lerpUp; u8 currentStep,numIntervalSteps,numLerpSteps; } LightAnimation; // Separate from main lights buffer struct since it's not used very often
-enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (85ULL * 1024 * 1024),
+enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (96ULL * 1024 * 1024),
       /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                  MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
       /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024,
@@ -181,7 +181,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (85ULL * 1024 * 1024),
                 REV_BUF_LEN = 110251 /*~2.5s @ 44100; prime*/, MAXAMB = 256,
       /*Text*/ T_BUFFER_SIZE = 4096, MAX_GLYPHS = 4096, LINE_LEN_MAX = 81920, TARG_STRLEN = 38, T_LOGSTR_CNT = 1100, T_LOGSTR_MAX = 1280 * 3, LOGCNT = 134, TEXT_VTX_FLOATS = 65536 /*30 floats (6 verts x 5) per glyph quad: sized for the longest credits page (988 source bytes, ~966 glyphs) so whole pages draw instead of stopping at 273 glyphs.*/,
                T_WHITE = 0, T_YELLOW = 1, T_DARK_YELLOW = 2, T_GREEN = 3, T_RED = 4, T_ORANGE = 5, T_STOPD_RED = 6, T_STOPD_RED_HIGHLIGHT = 7, T_STOPD_RED_PAUSETITLE = 8, T_GREEN_MENU = 9, T_GREEN_MENU_SHADOW = 10, T_GREEN_MENU_GLOW = 11, T_RED_MENU = 12, T_VIDEOTEXT = 13, T_BLUE = 14, T_PURPLE = 15,
-               FONT_ATLAS_SIZE = 1200, FONT_ATLAS_SIZE2 = 2048, FONT_NORMAL = 0, FONT_STOPD = 1, FONT_vmove = 1, FONT_vline = 2, FONT_vcurve = 3,
+               FONT_ATLAS_SIZE = 1984, FONT_ATLAS_SIZE2 = 3968, FONT_NORMAL = 0, FONT_STOPD = 1, FONT_vmove = 1, FONT_vline = 2, FONT_vcurve = 3,
                HUDC_WHITE = 0, HUDC_RED = 1, HUDC_ORANGE = 2, HUDC_YELLOW = 3, HUDC_GREEN = 4, HUDC_BLUE = 5, HUDC_PURPLE = 6, HUDC_GRAY = 7,
       /*Menu*/ MPG_FRONT = 0, MPG_SINGPLYR = 1, MPG_MULTPLYR = 2, MPG_NEWGM = 3, MPG_LOAD = 4, MPG_OPTS = 5, MPG_SAVE = 6, MPG_INTRO = 7, MPG_CREDS = 8,
       /*UI*/ UI_W = 1366, UI_H = 768, CURSOR_SZ = 40, MFD_READER_CONTENTS = 0, MFD_READER_FOLDER = 1, MFD_READER_TEXT = 2, MAX_UI_ELEMENTS = 4096, TXT_PAD = 4, TXT_H = 24, TAB_THICK = 16, MFD_SPACING = 8, MFD_SPACINGCTR = 19,

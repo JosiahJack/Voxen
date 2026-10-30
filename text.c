@@ -46,12 +46,7 @@ int font_FindGlyphIndex(const font_fontinfo*info,int cp){
 
 INLINE void _sv(font_vertex*v,u8 t,i32 x,i32 y,i32 cx,i32 cy){v->type=t;v->x=(i16)x;v->y=(i16)y;v->cx=(i16)cx;v->cy=(i16)cy;}
 static int _glyf_off(const font_fontinfo*info,int gi){ if(gi>=info->numGlyphs||info->indexToLocFormat>=2){return-1;} int g1,g2;if(info->indexToLocFormat==0){g1=info->glyf+ttUSHORT(info->data+info->loca+gi*2)*2;g2=info->glyf+ttUSHORT(info->data+info->loca+gi*2+2)*2;} else{g1=info->glyf+ttULONG(info->data+info->loca+gi*4);g2=info->glyf+ttULONG(info->data+info->loca+gi*4+4);} return g1==g2?-1:g1; }
-static int _close_shape(font_vertex*v,int n,int wo,int so,i32 sx,i32 sy,i32 scx,i32 scy,i32 cx,i32 cy){
-    if(so){if(wo)_sv(&v[n++],FONT_vcurve,(cx+scx)>>1,(cy+scy)>>1,cx,cy);_sv(&v[n++],FONT_vcurve,sx,sy,scx,scy);}
-    else{if(wo)_sv(&v[n++],FONT_vcurve,sx,sy,cx,cy);else _sv(&v[n++],FONT_vline,sx,sy,0,0);}
-    return n;
-}
-
+static int _close_shape(font_vertex*v,int n,int wo,int so,i32 sx,i32 sy,i32 scx,i32 scy,i32 cx,i32 cy){ if (so) { if (wo) _sv(&v[n++],FONT_vcurve,(cx + scx) >> 1,(cy + scy) >> 1,cx,cy); _sv(&v[n++],FONT_vcurve,sx,sy,scx,scy); } else { if (wo) _sv(&v[n++],FONT_vcurve,sx,sy,cx,cy); else _sv(&v[n++],FONT_vline,sx,sy,0,0);} return n; }
 static int font_GetGlyphShape(const font_fontinfo *info, int gi, font_vertex **pv){
     u8*d=info->data; font_vertex*verts=0; int nv=0, g=_glyf_off(info,gi); *pv=NULL; if(g<0){return 0;}
     i16 nc=ttSHORT(d+g);
@@ -66,12 +61,8 @@ static int font_GetGlyphShape(const font_fontinfo *info, int gi, font_vertex **p
         for(int i=0;i<n;++i){fl=verts[off+i].type;x=(i16)verts[off+i].x;y=(i16)verts[off+i].y;
             if(nm==i){if(i)nv=_close_shape(verts,nv,wo,so,sx,sy,scx,scy,cx,cy);so=!(fl&1);
                 if(so){scx=x;scy=y;if(!(verts[off+i+1].type&1)){sx=(x+(i32)verts[off+i+1].x)>>1;sy=(y+(i32)verts[off+i+1].y)>>1;}else{sx=verts[off+i+1].x;sy=verts[off+i+1].y;++i;}}else{sx=x;sy=y;}
-                _sv(&verts[nv++],FONT_vmove,sx,sy,0,0);wo=0;nm=1+ttUSHORT(ep+j++*2);
-            }else{
-                if(!(fl&1)){
-                    if(wo)_sv(&verts[nv++],FONT_vcurve,(cx+x)>>1,(cy+y)>>1,cx,cy); cx=x; cy=y; wo=1;
-                } else { _sv(&verts[nv++],wo ? FONT_vcurve : FONT_vline,x,y,wo ? cx : 0, wo ? cy : 0); wo=0; }
-            }
+                _sv(&verts[nv++],FONT_vmove,sx,sy,0,0); wo = 0; nm = 1 + ttUSHORT(ep + j++ * 2);
+            } else { if (!(fl & 1)) { if (wo) _sv(&verts[nv++],FONT_vcurve,(cx + x) >> 1,(cy + y) >> 1,cx,cy); cx = x; cy = y; wo = 1; } else { _sv(&verts[nv++],wo ? FONT_vcurve : FONT_vline,x,y,wo ? cx : 0, wo ? cy : 0); wo = 0; } }
         }
         nv=_close_shape(verts,nv,wo,so,sx,sy,scx,scy,cx,cy);
     } else if (nc < 0) {
@@ -340,8 +331,7 @@ void BuildAtlasCPU(int* numPacked, font_packedchar* packedChars, float* fixedNum
     }
 }
 
-void DumpFontAtlasBmp(const char* filename, u8* atlas, int size) { size_t n = (size_t)size * size; u32* rgba = OS_Alloc(n * 4);  for (int row = 0; row < size; ++row) { const u8* srcRow = atlas + row * size; u32* dstRow = rgba + (size - 1 - row) * size; for (int col = 0; col < size; ++col) { u8 v = srcRow[col]; dstRow[col] = v | (v<<8) | (v<<16) | (v<<24); } } BmpWrite(filename, size, size, rgba); OS_Free(rgba, n * 4); }
-static int CountBlankGlyphs(const font_packedchar* chars, int n) { int b=0; for(int i=0;i<n;++i) if(!chars[i].x1 && !chars[i].y1) ++b; return b; }
+static int CountBlankGlyphs(const font_packedchar* chars, int n, u8 fontID) { const u16 spaceIdx = cpPackedIndex[fontID][0x0020]; int b=0; for(int i=0;i<n;++i) if(i!=spaceIdx && !chars[i].x1 && !chars[i].y1) ++b; return b; }
 void InitFontAtlasses() {
     double t0=get_time();
     DebugRAM("start font load");
@@ -356,11 +346,9 @@ void InitFontAtlasses() {
     LoadFallbackFont(fallbackFontPaths[2],4,0);
     u8* bmp = fontBmp1 = OS_AllocScratch(FONT_ATLAS_SIZE*FONT_ATLAS_SIZE);
     BuildAtlasCPU(&numPackedGlyphs,fontPackedChar,&fixedNumberAdvanceWidth,20.0f,0,FONT_NORMAL,bmp,FONT_ATLAS_SIZE);
-    //DumpFontAtlasBmp("Screenshots/atlas_normal.bmp",bmp,FONT_ATLAS_SIZE);
     u8* bmp2 = fontBmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2);
     BuildAtlasCPU(&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
-    //DumpFontAtlasBmp("Screenshots/atlas_stopd.bmp",bmp2,FONT_ATLAS_SIZE2);
-    DualLog("(CPU, %d/%d glyphs packed, blanks %d/%d)...........took %.6f secs\n",numPackedGlyphs,numPackedGlyphsStopD,CountBlankGlyphs(fontPackedChar,numPackedGlyphs),CountBlankGlyphs(fontPackedCharStopD,numPackedGlyphsStopD),get_time() - t0);
+    DualLog("(glyphs packed, blanks %d/%d, %d/%d)...................took %.6f secs\n",CountBlankGlyphs(fontPackedChar,numPackedGlyphs,FONT_NORMAL),numPackedGlyphs,CountBlankGlyphs(fontPackedCharStopD,numPackedGlyphsStopD,FONT_STOPD),numPackedGlyphsStopD,get_time() - t0);
     DebugRAM("end font load");
 }
 // Localization

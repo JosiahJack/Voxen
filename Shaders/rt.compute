@@ -34,26 +34,17 @@ vec3 reconstructWorldPos(vec2 uv) { vec3 retval = vec3(0.0); float depth = textu
 float rayAABB(vec3 origin, vec3 invDir, vec3 mn, vec3 mx, float maxDist) {
     vec3 t0 = (mn - origin) * invDir; vec3 t1 = (mx - origin) * invDir;
     vec3 tmin = min(t0, t1), tmax = max(t0, t1);
-    float tNear = max(max(tmin.x, tmin.y), tmin.z), tFar = min(min(tmax.x, tmax.y), tmax.z);
-    if (tFar < max(0.02, tNear) || tNear > maxDist) return -1.0;
+    float tNear = max(max(tmin.x, tmin.y), tmin.z), tFar = min(min(tmax.x, tmax.y), tmax.z); if (tFar < max(0.02, tNear) || tNear > maxDist) return -1.0;
+    
     return (tNear >= 0.02) ? tNear : 0.02;
 }
 
 bool rayTriangle(vec3 orig, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t, out vec3 normal, out float bu, out float bv) {
-    vec3 e1 = v1 - v0; vec3 e2 = v2 - v0;
-    vec3 pvec = cross(dir, e2);
-    float det = dot(e1, pvec);
-    if (abs(det) < 1e-7) return false;
-    float invDet = 1.0 / det;
-    vec3 tvec = orig - v0;
-    float u = dot(tvec, pvec) * invDet;
-    if (u < 0.0 || u > 1.0) return false;
-    vec3 qvec = cross(tvec, e1);
-    float v = dot(dir, qvec) * invDet;
-    if (v < 0.0 || u + v > 1.0) return false;
-    t = dot(e2, qvec) * invDet;
-    if (t < 1e-4) return false;
-    normal = cross(e1, e2);/*Unnormalized geometric normal: it is scaled by uniform-amplitude factors and re-normalized after the instance transform below, so the normalize here bought nothing on every accepted triangle*/
+    vec3 e1 = v1 - v0; vec3 e2 = v2 - v0; vec3 pvec = cross(dir, e2); float det = dot(e1, pvec); if (abs(det) < 1e-7) return false;
+    float invDet = 1.0 / det; vec3 tvec = orig - v0; float u = dot(tvec, pvec) * invDet; if (u < 0.0 || u > 1.0) return false;
+    vec3 qvec = cross(tvec, e1); float v = dot(dir, qvec) * invDet; if (v < 0.0 || u + v > 1.0) return false;
+    t = dot(e2, qvec) * invDet; if (t < 1e-4) return false;
+    normal = cross(e1, e2);
     bu = u; bv = v;
     return true;
 }
@@ -64,12 +55,8 @@ uvec2 RtPair(uint w) { uvec4 v = rtGeom4[w >> 2u]; return (w & 2u) != 0u ? v.zw 
 vec2 RtUV(uint w) { uvec4 v = rtGeom4[w >> 2u]; return unpackHalf2x16(v[w & 3u]); }
 vec3 RtVtxPos(uint vtxBase, uint vi) { uvec2 p = RtPair(vtxBase + vi * 2u); return vec3(unpackHalf2x16(p.x), unpackHalf2x16(p.y).x); }
 void main() {
-    uvec2 pixel = gl_GlobalInvocationID.xy;
-    if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
-    
-    /*Cheapest reject first: the specular g-buffer is the only signal that says "this pixel reflects", so gate on it before paying for the full-res depth fetch + 16-mul inverse view-proj unprojection + normal decode below. The old order reconstructed world position for every pixel on screen, nearly all of which here get dropped right after.*/
-    vec4 specColor = imageLoad(inputSpecular, ivec2(pixel * SSR_RES));
-    if ((specColor.r + specColor.g + specColor.b) < 0.01) { imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0)); return; }
+    uvec2 pixel = gl_GlobalInvocationID.xy; if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
+    vec4 specColor = imageLoad(inputSpecular, ivec2(pixel * SSR_RES)); if ((specColor.r + specColor.g + specColor.b) < 0.01) { imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0)); return; }
     
     vec2 scrSzF = vec2(screenWidth, screenHeight) * float(SSR_RES);
     vec3 worldPos = reconstructWorldPos((vec2(pixel * SSR_RES) + 0.5) / scrSzF);
@@ -80,6 +67,7 @@ void main() {
     vec3 viewDir = normalize(camPos - worldPos);
     vec3 reflectDir = reflect(-viewDir, normal);
     vec3 origin = worldPos + normal * 0.05;
+    vec3 invWorldDir = vec3(reflectDir.x != 0.0 ? 1.0 / reflectDir.x : 1e9, reflectDir.y != 0.0 ? 1.0 / reflectDir.y : 1e9, reflectDir.z != 0.0 ? 1.0 / reflectDir.z : 1e9);
     float maxDist = 32.0;
     float bestDist = maxDist + 1.0;
     vec3 hitWorld = vec3(0.0);
@@ -107,7 +95,7 @@ void main() {
     if (stepZ == 0) { tMaxZ = 1e9; tDeltaZ = 1e9; }
     else { float boundary = (stepZ > 0) ? (worldMin.y - CELLXHALF + float(cz + 1) * CELL) : (worldMin.y - CELLXHALF + float(cz) * CELL); tMaxZ = (boundary - origin.z) / reflectDir.z; tDeltaZ = CELL / abs(reflectDir.z); }
     float t = 0.0;
-    for (int iter = 0; iter < 20; ++iter) {/*A 32-unit ray crosses at most ~18 cells of 2.56 even diagonally before t > maxDist ends the march; the old cap of 64 never bought an extra cell but did risk unroll/branch overhead*/
+    for (int iter = 0; iter < 20; ++iter) {
         if (t > maxDist) break;
         if (hasHit && t >= bestDist) break;
         if (cx < 0 || cx >= 64 || cz < 0 || cz >= 64) break;
@@ -115,22 +103,35 @@ void main() {
         uint cell = uint(cz * 64 + cx);
             uint cnt = RtCellCount(cell);
             if (cnt > 128u) cnt = 128u;
-            for (uint k = 0u; k < cnt; ++k) {
-            uint inst = RtCellListU16(cell * 128u + k); if (inst >= 9032u) continue;
+            for (uint k = 0u; k < cnt; k += 2u) {
+            uint w = rtCellListsP[(cell * 128u + k) >> 1u];
+            uvec2 both = uvec2(w & 0xFFFFu, w >> 16);
+            if (k + 1u >= cnt) both.y = 9032u;
+            for (uint h = 0u; h < 2u; ++h) {
+            uint inst = (h == 0u) ? both.x : both.y; if (inst >= 9032u) continue;
             uvec4 instInfo = rtInstanceInfo[inst].info; if (instInfo.y == 0u) continue;
             uvec4 instGeom = rtInstanceInfo[inst].geom;
             vec4 iscl2 = rtInstanceInfo[inst].iscl2;
             mat4 M = modelMatrices[inst];
             vec3 c0 = M[0].xyz; vec3 c1 = M[1].xyz; vec3 c2 = M[2].xyz; vec3 tr = M[3].xyz;
+            uvec4 r0 = rtGeom4[instGeom.x]; uvec4 r1 = rtGeom4[instGeom.x + 1u];
+            vec3 le = 0.5 * (uintBitsToFloat(r1.xyz) - uintBitsToFloat(r0.xyz)) / iscl2.xyz;
+            vec3 wc = tr + c0 * (0.5 * (uintBitsToFloat(r0.x) + uintBitsToFloat(r1.x)) / iscl2.x) + c1 * (0.5 * (uintBitsToFloat(r0.y) + uintBitsToFloat(r1.y)) / iscl2.y) + c2 * (0.5 * (uintBitsToFloat(r0.z) + uintBitsToFloat(r1.z)) / iscl2.z);
+            vec3 we = abs(c0) * le.x + abs(c1) * le.y + abs(c2) * le.z;
+            vec3 tw0 = (wc - we - origin) * invWorldDir, tw1 = (wc + we - origin) * invWorldDir;
+            vec3 tn = min(tw0, tw1), tf = max(tw0, tw1);
+            float wn = max(max(tn.x, tn.y), tn.z);
+            if (wn > max(min(min(tf.x, tf.y), tf.z), 0.0) || wn > bestDist) continue;
             vec3 rel = origin - tr;
-            vec3 localOrigin = vec3(dot(rel, c0) * iscl2.x, dot(rel, c1) * iscl2.y, dot(rel, c2) * iscl2.z),
-                 localDir = normalize(vec3(dot(reflectDir, c0) * iscl2.x, dot(reflectDir, c1) * iscl2.y, dot(reflectDir, c2) * iscl2.z));
+            vec3 localOrigin = vec3(dot(rel, c0) * iscl2.x, dot(rel, c1) * iscl2.y, dot(rel, c2) * iscl2.z);
+            vec3 localDir = vec3(dot(reflectDir, c0) * iscl2.x, dot(reflectDir, c1) * iscl2.y, dot(reflectDir, c2) * iscl2.z);
             vec3 invLocalDir = vec3(localDir.x != 0.0 ? 1.0 / localDir.x : 1e9, localDir.y != 0.0 ? 1.0 / localDir.y : 1e9, localDir.z != 0.0 ? 1.0 / localDir.z : 1e9);
-            uint stack[64]; int sp = 0; stack[sp++] = instGeom.x;/*64 deep: an 8-ary BVH needs 1+7*depth slots; 32 silently dropped subtrees past depth 4*/
+            uint vtxBase = instGeom.z;
+            uint stack[64]; int sp = 0; stack[sp++] = instGeom.x;
             uint hitIA = 0u, hitIB = 0u, hitIC = 0u;
             float hitBaryU = 0.0, hitBaryV = 0.0;
             vec3 hitNormal = vec3(0.0,1.0,0.0);
-            float bestT = maxDist * sqrt(max(iscl2.x, max(iscl2.y, iscl2.z)));
+            float bestT = (hasHit ? bestDist : maxDist) * sqrt(max(iscl2.x, max(iscl2.y, iscl2.z))) * inversesqrt(dot(localDir, localDir));
             bool anyHit = false;
             vec3 hitLocalPoint = vec3(0.0);
             while (sp > 0) {
@@ -145,7 +146,6 @@ void main() {
                 float tEntry = rayAABB(localOrigin, invLocalDir, mn, mx, bestT); if (tEntry < 0.0) continue;
                 
                 if (triCount > 0u) {
-                    uint vtxBase = instGeom.z;
                     for (uint triK = 0u; triK < triCount; ++triK) {
                         uvec2 tv = RtPair(triStart + triK * 2u);
                         uint iA = tv.x & 0xFFFFu, iB = (tv.x >> 16) & 0xFFFFu, iC = tv.y & 0xFFFFu;
@@ -165,8 +165,7 @@ void main() {
                 }
             }
             if (anyHit) {
-                vec3 worldHitPt = (M * vec4(hitLocalPoint, 1.0)).xyz;
-                float wd = distance(worldHitPt, worldPos);
+                vec3 worldHitPt = c0 * hitLocalPoint.x + c1 * hitLocalPoint.y + c2 * hitLocalPoint.z + tr;
                 vec3 d = worldHitPt - worldPos;
                 float wdSq = dot(d, d);
                 if (wdSq > 0.01 && wdSq < bestDist * bestDist) {
@@ -180,6 +179,7 @@ void main() {
                     bestNormal = normalize((c0 * iscl2.x) * hitNormal.x + (c1 * iscl2.y) * hitNormal.y + (c2 * iscl2.z) * hitNormal.z);
                     if (dot(bestNormal, normalize(camPos - hitWorld)) < 0.0) bestNormal = -bestNormal;
                 }
+            }
             }
         }
         if (tMaxX < tMaxZ) { cx += stepX; t = tMaxX; tMaxX += tDeltaX; } else { cz += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; }
@@ -204,40 +204,31 @@ void main() {
                 vec3 lighting = albedo.rgb * 0.1;
                 uint voxelIdx = GetVoxelIndex(hitWorld);
                 uint lcount = voxelLightListCounts[voxelIdx];
-                if (lcount > 96u) lcount = 96u;/*0 means no lights in this voxel, as in chunk_frag; the old useAll fallback lit reflections from every light in the level, including off and empty slots*/
+                if (lcount > 96u) lcount = 96u;
                 for (uint li = 0u; li < lcount; ++li) {
-                    uint lightIdx = uniqueLightLists[voxelIdx * 96u + li];
-                    vec3 lpos = lights[lightIdx].pos;
-                    float intensity = lights[lightIdx].intensity;
-                    float range = lights[lightIdx].range;
+                    Light L = lights[uniqueLightLists[voxelIdx * 96u + li]];
+                    vec3 lpos = L.pos;
+                    float intensity = L.intensity, range = L.range;
                     vec3 toLight = lpos - hitWorld;
-                    /*Rejects before any sqrt: behind the surface (NdotL <= 0 would zero the contribution anyway), out of range, or off. Must keep the same accept set as the old length()-first code, only cheaper.*/
-                    float distSq = dot(toLight, toLight), rangeSq = range * range;
-                    if (intensity < 0.1 || distSq >= rangeSq || dot(toLight, adjustedNormal) <= 0.0) continue;
-                    float dist = sqrt(distSq);
+                    float distSq = dot(toLight, toLight), rangeSq = range * range, nlPre = dot(toLight, adjustedNormal); if (intensity < 0.1 || distSq >= rangeSq || nlPre <= 0.0) continue;
                     
-                    vec3 lightDir = toLight / dist;
-                    float NdotL = max(dot(adjustedNormal, lightDir), 0.0);
-                    float attenuation = (1.0 - (dist/range)*(dist/range)) * NdotL;
-                    if (attenuation < 0.03) continue;
+                    float invDist = inversesqrt(distSq);
+                    vec3 lightDir = toLight * invDist;
+                    float NdotL = nlPre * invDist; float attenuation = (1.0 - distSq * (1.0 / rangeSq)) * NdotL; if (attenuation < 0.03) continue;
                     
-                    float spotAng = lights[lightIdx].spotAng;
+                    float spotAng = L.spotAng;
                     float spotFalloff = 1.0;
                     if (spotAng > 0.0) {
-                        vec4 quat = lights[lightIdx].spotDir;
+                        vec4 quat = L.spotDir;
                         vec3 spotDir = vec3(2.0*(quat.x*quat.z + quat.w*quat.y), 2.0*(quat.y*quat.z - quat.w*quat.x), 1.0 - 2.0*(quat.x*quat.x + quat.y*quat.y));
-                        float spotdot = dot(spotDir, -lightDir);
-                        float cosAngle = cos(radians(spotAng/2.0));
-                        if (spotdot < cosAngle) continue;
-                        
-                        spotFalloff = smoothstep(cosAngle, cos(radians(spotAng*0.8/2.0)), spotdot);
-                        if (spotFalloff <= 0.0) continue;
+                        float spotdot = dot(spotDir, -lightDir); float cosAngle = cos(radians(spotAng/2.0)); if (spotdot < cosAngle) continue;
+                        spotFalloff = smoothstep(cosAngle, cos(radians(spotAng*0.8/2.0)), spotdot); if (spotFalloff <= 0.0) continue;
                     }
-                    vec3 baseLighting = albedo.rgb * lights[lightIdx].col * intensity * (attenuation*attenuation/sqrt(sqrt(attenuation)));
+                    vec3 baseLighting = albedo.rgb * L.col * intensity * (attenuation*attenuation/sqrt(sqrt(attenuation)));
                     lighting += baseLighting * spotFalloff;
                     vec3 halfDir = normalize(lightDir + viewDirHit);
                     float ndh = max(dot(adjustedNormal, halfDir), 0.0);
-                    float spec = clamp(pow(ndh, 100.0), 0.0, 1.0);
+                    float spec = pow(ndh, 100.0);
                     lighting += albedo.rgb * intensity * attenuation * spotFalloff * spec * 0.5;
                 }
                 reflectionColor = lighting;
