@@ -1847,9 +1847,10 @@ static void ResetLoadTallies(void) {
 }
 // Init && Main
 __attribute__((cold)) void NewGame() { // Reset World States
+    double newGamePrepStart = get_time();
     CloseSearch(); MFD_NewGame();
     World.invP1.currentSearchItem=U16_MAX;
-    DualLog("Loading new game... ");
+    DualLog("Loading new game...");
     RenderLoading("Loading new game...");
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
     for (int i=0;i<World.numLevels;++i) {
@@ -1922,14 +1923,18 @@ __attribute__((cold)) void NewGame() { // Reset World States
     Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) { CopyPlayerState(0, lev); }
     ResetLoadTallies();
+    DualLog(" prep.................................................................................took %.6f secs\n",get_time() - newGamePrepStart);
     LoadAllLevels();
+    double newGamePurgeStart = get_time();
 
     for (u8 lev = 0; lev < World.numLevels; ++lev) { /*Done after levels are loaded to remove difficulty related items appropriately.*/
         u8 entryLevel = World.currentLevel; if (entryLevel != lev) SetLevelPointers(lev);
         for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { u16 ci = World.instances[i].index; if (((World.diffMis <= 1 && (ci == 341 || ci == 388 || (ci >= 390 && ci <= 398) || ci == 417)) || (World.diffMis == 0 && (ci == 313 || ci == 448)))) { DeleteInstance(i); } /*Remove access cards and audio logs.*/ }
         if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
     }
+    DualLog("Difficulty item purge..................................................................took %.6f secs\n",get_time() - newGamePurgeStart);
     LoadLevel(World.startLevel,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
+    double newGameCvxStart = get_time();
     World.invP1.currentCrouchRatio = 1.0f;
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
@@ -1999,6 +2004,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     //AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
     AutomapNewGame();
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
+    DualLog("Convex mesh and automap init........................................................took %.6f secs\n",get_time() - newGameCvxStart);
 }
 
 void PlayVmail(u8 i) {/*Starts vmail clip i: the ui.c vmailStartFrames/vmailEndFrames slots. Sys_UI.vmailActive also gates the frob/fire "click skips the mail" paths and the UI draws as a bool, so it stores clip+1 (0 stays "no mail playing").*/ if(i>=sizeof(vmailStartFrames)/sizeof(*vmailStartFrames)){DualLogError("PlayVmail: clip %u out of range\n",i);return;} World.Sys_UI.vmailActive=(u8)(i+1); World.Sys_UI.vmailFrame=vmailStartFrames[i]; World.Sys_UI.vmailFrameFinished=World.pauseRelativeTime + 0.1; ForceInventoryMode(); }
@@ -2110,6 +2116,7 @@ void InitalizeEnvironment() {
     DualLog("Game: Citadel, the System Shock (1994) Fan Remake                               1/03/2013 - 10/26/2026\n\n");
     DualLog("OpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\nEntity byte size:%u\n",sizeof(Entity) + (6*4) + 4+4+1+1+4+4+4+4+(4*4)+1+(3*4)+(3*4)+(3*4)+(3*4)+(3*4)+(3*4));
     SetLevelPointers(0); 
+    double initWinStart = get_time();
     WindowInit();
     threadCnt = vclampi(OS_GetNumThreads(),1,32);
     globalframe = 0;
@@ -2119,6 +2126,8 @@ void InitalizeEnvironment() {
     World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/
     World.numLevels = MAX_LEVELS; World.startLevel = 1 /*medical*/;
     LoadConfig(); /*Get settings before setting window size.*/
+    DualLog("Windowing system init...............................................................took %.6f secs\n",get_time() - initWinStart);
+    double initWinCtxStart = get_time();
     OS_Thread fontInitThr;
     OS_ThreadCreate(&fontInitThr, InitFontAtlasses_Thread, NULL);
     ClampWindowSizeToMonitor();
@@ -2135,7 +2144,11 @@ void InitalizeEnvironment() {
     glFrontFace(0x0901/*GL_CCW*/);
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
     glClearColor(0,0,0,1);
+    DualLog("Window creation and GL context......................................................took %.6f secs\n",get_time() - initWinCtxStart);
+    double initShadersStart = get_time();
     CompileShaders();
+    DualLog("Shader compilation..................................................................took %.6f secs\n",get_time() - initShadersStart);
+    double initBufStart = get_time();
     
     u32 tvaos[5],tvbos[5]; glGenVertexArrays(5,tvaos); glGenBuffers(5,tvbos);
     quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; wireLinesVAO=tvaos[4]; wireLinesVBO=tvbos[4]; 
@@ -2208,8 +2221,12 @@ void InitalizeEnvironment() {
     ChangeFullScreenWindowed(false);
     SetSkyRotateSpeed();
     SetVSync();
+    DualLog("GL buffer setup.....................................................................took %.6f secs\n",get_time() - initBufStart);
+    double initTextStart = get_time();
     LoadTextForLanguage(Sys_Settings.Language);
     LoadLogTextForLanguage(Sys_Settings.Language);
+    DualLog("Localization text loading...........................................................took %.6f secs\n",get_time() - initTextStart);
+    double initSSBOStart = get_time();
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
     u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2};
     glDrawBuffers(3,drawBuffers);
@@ -2231,8 +2248,10 @@ void InitalizeEnvironment() {
     glUseProgram(chunkSP);      glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); glUniform1i(29,6); glUniform1i(31,9); glUniform1i(36,10);
     glUseProgram(ssrSP);        glUniform1i(5,3); glUseProgram(rtSP); glUniform1i(5,3);
     for (int f=0;f<5;++f) { glGenQueries(5,gpuQ[f]); }
+    DualLog("SSBO and shadow buffer setup........................................................took %.6f secs\n",get_time() - initSSBOStart);
     RenderLoading("Loading textures..."); LoadTextures(); RenderLoading("Loading models...");   LoadModels();   if (Sys_Settings.Reflections >= 1u) EnsureReflectionResources();    bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
+    double initAmBiomStart = get_time();
     World.absoluteTime = get_time();
     World.pauseRelativeTime = World.last_physics_time = 0.0;
     GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); // Automap related buffers
@@ -2246,14 +2265,18 @@ void InitalizeEnvironment() {
     glBindFramebuffer(GL_FRAMEBUFFER,biomFBO); glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,biomTexId,0);
     bioMonitor.beatFinished=get_time() + 0.5; bioMonitor.backgroundColor=(Color){0.2f,0.2f,1.0f,0.01f}; bioMonitor.ergColor=(Color){0,0.5f,1.0f,1.0f}; bioMonitor.chiColor=(Color){.7f,0,1.f,1.f};
     bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
-    
+    DualLog("Automap and biomonitor buffers......................................................took %.6f secs\n",get_time() - initAmBiomStart);
     NewGame();
     currentMenuPage = MPG_FRONT;
+    double initAudioStart = get_time();
     InitAudio(); synth_set_reverb_preset(0);
+    DualLog("Audio init..........................................................................took %.6f secs\n",get_time() - initAudioStart);
+    double initMenuStart = get_time();
     //World.menuActive = true; //COMMENT for immediate into game
     if (playIntroAtBoot && World.menuActive) ChangeMenuPage(MPG_INTRO);
     else if (World.menuActive) { PlayMenuMusic(); }
     else { PlayTrack(TT_Walking, MT_Walking); } /*Menu skipped: start the level's music, not the menu loop (PlayMenuMusic here kept playing in-game until the track ran out)*/
+    DualLog("Menu init...........................................................................took %.6f secs\n",get_time() - initMenuStart);
     DualLog("Scratch arena total peak: %u MB, ", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; // Free the initialization scratch arena.
     DebugRAMPeak();
     DualLog(".....Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time);

@@ -1656,6 +1656,7 @@ void LoadAllLevels() {
 void CyberTimerReset(u16,int); /*citadel.c: Unity CyberTimer.Reset(difficultyCyber)*/
 void LoadLevel(u8 curlevel, V3 pos) {
     u8 prevLevel = World.currentLevel;
+    double levelEntryPreStart = get_time();
     if (curlevel == LEVEL_CYBERSPACE && World.currentLevel != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.currentLevel; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
     CloseSearch();
     World.Sys_UI.tetheredKeypadKeycode=World.Sys_UI.tetheredKeypadElevator=World.Sys_UI.tetheredPGP=World.Sys_UI.tetheredPWP=U16_MAX;/*panel tethers are per-level; the entity index they point at dies with the level, so don't sever against a stale one*/
@@ -1688,7 +1689,9 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.Sys_Music.inZone = World.Sys_Music.cyberTube = false;
     World.Sys_Music.combatImpulseFinished = get_time();
     World.Sys_Music.combatImpulseFinished += 5.0;
+    DualLog("Level entry setup...................................................................took %.6f secs\n",get_time() - levelEntryPreStart);
     CullInit(); // Must be after level!
+    double levelEntryPostStart = get_time();
     glUseProgram(voxelUpdateSP);
     glUniform2f(0, World.voxMinCtrX[World.curLev], World.voxMinCtrZ[World.curLev]);
     glUniform1f(1, World.farPlane[World.curLev] * World.farPlane[World.curLev]);
@@ -1755,6 +1758,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
             World.cam_pitch = World.cam_roll = 0.0f; World.invP1.leanTarget = 0.0f;
         }
     }
+    DualLog("Level entry finalize................................................................took %.6f secs\n",get_time() - levelEntryPostStart);
     }
 
 void UpdateSensaroundCamViews() {
