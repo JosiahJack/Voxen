@@ -51,7 +51,6 @@ static void Recoil(int wep16) {
 }
 
 static void Recoiling() { if(!wfx.recoiling){return;} float dt = (float)World.deltaTime * World.timeScale; wfx.reloadContainerPos.x+=(wfx.reloadContainerHome.x - wfx.reloadContainerPos.x)*dt; wfx.reloadContainerPos.z+=(wfx.reloadContainerHome.z - wfx.reloadContainerPos.z)*dt; }
-static u8 lerpUp = 0; // 0 idle, 1 lerping up, 2 lerping down
 double lerpStartTime = 0.0;
 static void WeaponLerpGetTargetUp() { World.invP1.reloadLerpValue = (0.5f - (1.0f - World.invP1.reloadLerpValue)) / 0.5f; wfx.targetY = -1.0f * 0.66f * (1.0f - World.invP1.reloadLerpValue); if (wfx.targetY > wfx.reloadContainerHome.y){wfx.targetY = wfx.reloadContainerHome.y;} }
 static void WeaponLerpGetTargetDown() { World.invP1.reloadLerpValue = World.invP1.reloadLerpValue / 0.5f; wfx.targetY = wfx.reloadContainerHome.y - 0.66f; wfx.targetY *= World.invP1.reloadLerpValue; }
@@ -103,11 +102,11 @@ void UpdateWeaponReloadDip() {
     if (World.invP1.reloadFinished > World.pauseRelativeTime) {
         double elapsed = World.pauseRelativeTime - lerpStartTime;
         World.invP1.reloadLerpValue = (float)(elapsed / (World.invP1.reloadFinished - lerpStartTime));
-        if (World.invP1.reloadLerpValue >= 0.5f) { lerpUp = 1; WeaponLerpGetTargetUp(); CompleteWeaponChange(); }
-        else { lerpUp = 2; WeaponLerpGetTargetDown(); }
+        if (World.invP1.reloadLerpValue >= 0.5f) { WeaponLerpGetTargetUp(); CompleteWeaponChange(); }
+        else { WeaponLerpGetTargetDown(); }
         wfx.targetY = vclamp(wfx.targetY, -100.0f, 100.0f);
         wfx.reloadContainerPos = (V3){wfx.reloadContainerPos.x, wfx.targetY, wfx.reloadContainerPos.z};
-    } else { lerpUp = 0; wfx.reloadContainerPos = (V3){wfx.reloadContainerPos.x, wfx.reloadContainerHome.y + 0.20f, wfx.reloadContainerPos.z}; }
+    } else { wfx.reloadContainerPos = (V3){wfx.reloadContainerPos.x, wfx.reloadContainerHome.y + 0.20f, wfx.reloadContainerPos.z}; }
 }
 
 static u16 ImpactParticleType(u16 prefab) {

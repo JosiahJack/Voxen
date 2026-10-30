@@ -34,17 +34,17 @@ static void Push(int index, float val) { // Add a data point to the beginning of
             value = inverse_lerp(bioMonitor.min[BIOM_ERG],bioMonitor.max[BIOM_ERG],val);
             y0 = vclamp((int)(value*BIOM_GRAPH_H),0,bioMonitor.ymax);
             bioMonitor.ringERG[bioMonitor.currentIndex0] = (u8)y0;
-            bioMonitor.lastERG = y0; break;
+            break;
         case BIOM_CHI:
             value = inverse_lerp(bioMonitor.min[BIOM_CHI],bioMonitor.max[BIOM_CHI],val);
             y0 = vclamp((int)(value*BIOM_GRAPH_H),0,bioMonitor.ymax);
             bioMonitor.ringCHI[bioMonitor.currentIndex1] = (u8)y0;
-            bioMonitor.lastCHI = y0; break;
+            break;
         case BIOM_ECG:
             value = inverse_lerp(bioMonitor.min[BIOM_ECG],bioMonitor.max[BIOM_ECG],val);
             y0 = vclamp((int)(value*BIOM_GRAPH_H),0,bioMonitor.ymax);
             bioMonitor.ringECG[bioMonitor.currentIndex2] = (u8)y0;
-            bioMonitor.lastECG = y0; break;
+            break;
     }
 }
 

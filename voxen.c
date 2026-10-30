@@ -227,8 +227,8 @@ typedef void (*ConsoleCmdFuncNoArg)(); typedef void (*ConsoleCmdFuncInt)(int); t
 typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
 INLINE int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
 void cmd_noclip() { Cheats.noclip = !Cheats.noclip; if (Cheats.noclip) { World.velocity[PLAYER1] = (V3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
-void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; DebugRAM(Cheats.showPhys?"showPhys ON":"showPhys OFF"); CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[Cheats.showPhys?1000:717]);/*"ACTIVATED"/"DISABLED"*/ }
-void cmd_shownpc() { Cheats.showNPC = !Cheats.showNPC; DebugRAM(Cheats.showNPC?"showNPC ON":"showNPC OFF"); CenterStatusPrint("shownpc: %s", Sys_Text.stringTable[Cheats.showNPC ? 1000 : 717]); }
+void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[Cheats.showPhys?1000:717]);/*"ACTIVATED"/"DISABLED"*/ }
+void cmd_shownpc() { Cheats.showNPC = !Cheats.showNPC; CenterStatusPrint("shownpc: %s", Sys_Text.stringTable[Cheats.showNPC ? 1000 : 717]); }
 
 static const V3 ArsenalSpawnOffsets[] = {
     // dist 0.64
@@ -1970,17 +1970,15 @@ __attribute__((cold)) void NewGame() { // Reset World States
     last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;
     Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS capslock actual state.
     for (u8 lev = 1; lev < World.numLevels; ++lev) { CopyPlayerState(0, lev); }
-    DebugRAM("before runtime LoadAllLevels");
     ResetLoadTallies();
     LoadAllLevels();
-    DebugRAM("after runtime LoadAllLevels");
+
     for (u8 lev = 0; lev < World.numLevels; ++lev) { /*Done after levels are loaded to remove difficulty related items appropriately.*/
         u8 entryLevel = World.currentLevel; if (entryLevel != lev) SetLevelPointers(lev);
         for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { u16 ci = World.instances[i].index; if (((World.diffMis <= 1 && (ci == 341 || ci == 388 || (ci >= 390 && ci <= 398) || ci == 417)) || (World.diffMis == 0 && (ci == 313 || ci == 448)))) { DeleteInstance(i); } /*Remove access cards and audio logs.*/ }
         if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
     }
     LoadLevel(World.startLevel,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
-    DebugRAM("after runtime LoadLevel");
     World.invP1.currentCrouchRatio = 1.0f;
     for (u32 lev = 0; lev < MAX_LEVELS; ++lev) { // Find unique convex mesh indices across all levels
         for (u32 i = 0; i < INSTANCE_COUNT; ++i) {
@@ -2003,7 +2001,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
             }
         }
     }
-    DebugRAM("before edge adjacency");
     for (u32 u = 0; u < uniqueCvxMeshCount; ++u) {
         u16 m = uniqueCvxMeshIndices[u]; if (m >= MAX_MDLS) { continue; }
         u32 vCount = physVertCounts[m], tCount = modelTriangleCounts[m]; if (!vCount || !tCount || !physPos[m] || !physTris[m]) { continue; }
@@ -2042,7 +2039,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
         cvxAdjLive += cvxAdjOffsetBytes[u] + cvxAdjListBytes[u];
         OS_Free(tempEdges,tCount * 3 * sizeof(u32)); OS_Free(degree,vCount * sizeof(u32)); OS_Free(writePos,vCount * sizeof(u32));
     }
-    DebugRAM("after edge adjacency");
     World.lev1SecCode = World.lev2SecCode = World.lev3SecCode = -1;
     World.lev4SecCode = World.lev5SecCode = World.lev6SecCode = -1;
     World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
@@ -2140,8 +2136,7 @@ void LoadRaytracingData() {
     glFlush(); glFinish();
     rtAccelBuilt = true;
     DualLog("Raytraced reflections upload........................................................took %.6f secs\n",get_time() - startTime);
-    DebugRAM("after RT upload"); 
-}
+    }
 
 void EnsureReflectionResources(void) {
     u16 w = Sys_Settings.ScreenWidth, h = Sys_Settings.ScreenHeight;
@@ -2160,7 +2155,6 @@ void InitalizeEnvironment() {
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     OS_ScratchInit();
-    DebugRAM("program start");
     DualLog("=========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========\n");
     DualLog("Game: Citadel, the System Shock (1994) Fan Remake                               1/03/2013 - 10/26/2026\n\n");
     DualLog("OpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\nEntity byte size:%u\n",sizeof(Entity) + (6*4) + 4+4+1+1+4+4+4+4+(4*4)+1+(3*4)+(3*4)+(3*4)+(3*4)+(3*4)+(3*4));
@@ -2288,9 +2282,7 @@ void InitalizeEnvironment() {
     glUseProgram(chunkSP);           glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
     
     for (int f=0;f<5;++f) { glGenQueries(5,gpuQ[f]); }
-    RenderLoading("Loading textures..."); DebugRAM("before LoadTextures"); LoadTextures(); DebugRAM("after LoadTextures");
-    RenderLoading("Loading models...");   DebugRAM("before LoadModels");   LoadModels();   DebugRAM("after LoadModels");
-    if (Sys_Settings.Reflections >= 1u) EnsureReflectionResources();    bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
+    RenderLoading("Loading textures..."); LoadTextures(); RenderLoading("Loading models...");   LoadModels();   if (Sys_Settings.Reflections >= 1u) EnsureReflectionResources();    bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
     World.absoluteTime = get_time();
     World.pauseRelativeTime = World.last_physics_time = 0.0;

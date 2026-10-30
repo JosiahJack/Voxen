@@ -118,7 +118,6 @@ void Screenshot() {
 }
 
 size_t g_mmap_live = 0;
-extern u32 totalPixels,totalPaletteColors; extern size_t cvxAdjLive;
 void DebugRAMPeak(void) { // VmHWM: kernel high-water mark of RSS over process lifetime, catches transient spikes between checkpoints (includes shared libs (aka RSS), unlike USS)
     #if defined(_WIN32)
         (void)0;/*no /proc on Windows*/
@@ -129,7 +128,6 @@ void DebugRAMPeak(void) { // VmHWM: kernel high-water mark of RSS over process l
         DualLog("Peak: %uKB|%.2fMB",kb,kb/1024.0);
     #endif
 }
-
 void DebugRAMActual(const char *context) { // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
     static void* heap_start = (void*)-1; if(heap_start == (void*)-1){ long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); heap_start = (void*)r; }
     long r = 12; __asm__ __volatile__("syscall":"+a"(r):"D"(NULL):"rcx","r11","memory"); void* current_brk = (void*)r;

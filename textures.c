@@ -536,7 +536,7 @@ void LoadTextures() {
     OS_Free(arena, arena_size);
     png_arena_main.base = NULL;
     OS_FreeInitPhase();
-    DebugRAM("after textures load");
+    DebugRAM("end LoadTextures");
     DualLog("..took %.6f secs\n", get_time() - start_time);
 }
 
