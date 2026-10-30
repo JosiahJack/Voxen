@@ -966,9 +966,20 @@ u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS]; static __attribute_
 static i8 shadowLevel=-1; u32 shadowNextSlot=0; static const i8 faceAxis[6] = {0,0,1,1,2,2}; static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
 INLINE u8 GetCubemapFaceMask(V3 d, float r) {u8 m=0; float absX=vabs(d.x),absY=vabs(d.y),absZ=vabs(d.z); float maxAbsYZ = absY > absZ ? absY : absZ; float maxAbsXZ = absX > absZ ? absX : absZ; float maxAbsXY = absX > absY ? absX : absY; if (d.x+r > maxAbsYZ) m|=(1<<0); if (d.x-r < -maxAbsYZ) m|=(1<<1); if (d.y+r > maxAbsXZ) m|=(1<<2); if (d.y-r < -maxAbsXZ) m|=(1<<3); if (d.z+r > maxAbsXY) m|=(1<<4); if (d.z-r < -maxAbsXY) m|=(1<<5); return m;}
 INLINE bool ShadowCasterMoved(u16 i) { return i != PLAYER1 && (World.instances[i].entflags & EF_MOVING) && !IdxIsNPC(World.instances[i].index); }
+typedef struct { u32 sortKey; u16 instanceIdx; } SortedMesh;
+static u16 AddShadowMesh(SortedMesh *out,u16 i,u16 tex,bool detail,float *posSum,u32 *idSum,bool *moved) {
+    V3 sc = World.scale[i];
+    if (vabs(sc.x) < 0.6f || vabs(sc.y) < 0.6f || vabs(sc.z) < 0.6f) { return 0; }/*sub-0.6 extent aliases to nothing in a face*/
+    Entity* e = &World.instances[i];
+    u16 model = ((instanceIsLODArray[i] || detail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex);
+    *out = (SortedMesh){ ((u32)model << 16) | tex, i };
+    *idSum += i + out->sortKey;
+    *posSum += World.position[i].x + World.position[i].y + World.position[i].z;
+    if (ShadowCasterMoved(i)) { *moved = true; }
+    return 1;
+}
 __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     double shadowStartTime = get_time();
-    mset(candidates,U16_MAX,MAX_SHADOWMAPS * sizeof(u16));
     V3 playerPos=World.position[PLAYER1], pf=World.instances[PLAYER1].forward;
     u16 numCandidates=0;
     i32 numCasters=0;
@@ -1026,24 +1037,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     //if (modelBounds[7489] > 0.0f && numCasters < SC_MAX) { shadowCasterIndices[numCasters++]=PLAYER1; } Player shadow... skipping for now
     
     const u16 numCastersAligned = numCasters & ~7u;
-    for (i32 i=0;i<numCastersAligned;i+=8) {
-        float lx[8], ly[8], lz[8], lr[8], lsr[8];
-        for (int k=0;k<8;++k){
-            u16 j=shadowCasterIndices[i + k];
-            lx[k]=World.position[j].x;
-            ly[k]=World.position[j].y;
-            lz[k]=World.position[j].z;
-            lr[k]=World.radius[j];
-            lsr[k]=World.instances[j].shadRadius;
-            sc_origIdx[i + k]=j;
-        }
-        
-        _mm256_store_ps(&sc_posX[i], _mm256_loadu_ps(lx));
-        _mm256_store_ps(&sc_posY[i], _mm256_loadu_ps(ly));
-        _mm256_store_ps(&sc_posZ[i], _mm256_loadu_ps(lz));
-        _mm256_store_ps(&sc_radius[i], _mm256_loadu_ps(lr));
-        _mm256_store_ps(&sc_shadRadius[i], _mm256_loadu_ps(lsr));
-    }
+    for (i32 i=0;i<numCastersAligned;++i) { u16 j=shadowCasterIndices[i]; sc_origIdx[i]=j; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; }
     for (i32 i=numCastersAligned;i<numCasters;++i) { u16 j=shadowCasterIndices[i]; sc_posX[i]=World.position[j].x; sc_posY[i]=World.position[j].y; sc_posZ[i]=World.position[j].z; sc_radius[i]=World.radius[j]; sc_shadRadius[i]=World.instances[j].shadRadius; sc_origIdx[i]=j; }
     
     if (shadowLevel != (i8)World.curLev) {
@@ -1063,10 +1057,9 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     u32 currentSortKey = 0xFFFFFFFF, currentTriCount = 0;
     u16 currentModelType = 0xFFFF, currentTexIndex = 0xFFFF;
     bool currentIsTransparent = false, useDetail = Sys_Settings.ModelDetail;
-    typedef struct { u32 sortKey; u16 instanceIdx; } SortedMesh;
     SortedMesh localMeshes[SHADOW_NEARMESH_MAX];
     for (u16 c = 0; c < numCandidates; ++c) {
-        u16 lightIdx = candidates[c]; if (lightIdx == U16_MAX) continue;
+        u16 lightIdx = candidates[c];
         
         V3 lpos = World.lights[lightIdx].pos;
         float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f);
@@ -1111,7 +1104,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         u16 nearbyMeshCount = 0;
         i32 k = 0;
         bool anyMoved=false;
-        float posSum=0.0f;
+        float posSum=0.0f; u32 idSum=0;
         for (; k < numCastersAligned; k += 8) {
             const __m256 px = _mm256_load_ps(&sc_posX[k]);
             const __m256 py = _mm256_load_ps(&sc_posY[k]);
@@ -1155,15 +1148,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 if (unlikely(nearbyMeshCount >= SHADOW_NEARMESH_MAX)) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); k = numCastersAligned; break; }
                 
                 u16 instIdx = sc_origIdx[k + bit];
-                Entity* e = &World.instances[instIdx];
-                V3 sc = World.scale[instIdx]; if (vabs(sc.x) < 0.6f || vabs(sc.y) < 0.6f || vabs(sc.z) < 0.6f) { continue; }/*sub-0.6 extent aliases to nothing in a face*/
-                    
-                u16 modelType = ((instanceIsLODArray[instIdx] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex);
-                u16 texIdx = e->texIndex;
-                localMeshes[nearbyMeshCount].instanceIdx = instIdx;
-                localMeshes[nearbyMeshCount].sortKey = ((u32)modelType << 16) | texIdx; nearbyMeshCount++;
-                posSum += World.position[instIdx].x + World.position[instIdx].y + World.position[instIdx].z;
-                if (ShadowCasterMoved(instIdx)) anyMoved = true;
+                nearbyMeshCount += AddShadowMesh(&localMeshes[nearbyMeshCount],instIdx,World.instances[instIdx].texIndex,useDetail,&posSum,&idSum,&anyMoved);
             }
         }
         
@@ -1178,34 +1163,23 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 if (faceMaskScalar == 0) { continue; }
                 
                 u16 instIdx = sc_origIdx[k];
-                Entity* e = &World.instances[instIdx];
-                V3 sc = World.scale[instIdx];
-                if (vabs(sc.x) < 0.6f || vabs(sc.y) < 0.6f || vabs(sc.z) < 0.6f) { continue; }/*sub-0.6 extent aliases to nothing in a face*/
-                    
-                u16 modelType = ((instanceIsLODArray[instIdx] || useDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex);
-                u16 texIdx = (instIdx == PLAYER1) ? (u16)3337 : e->texIndex;
-                localMeshes[nearbyMeshCount].instanceIdx = instIdx;
-                localMeshes[nearbyMeshCount].sortKey = ((u32)modelType << 16) | texIdx; nearbyMeshCount++;
-                posSum += World.position[instIdx].x + World.position[instIdx].y + World.position[instIdx].z;
-                if (ShadowCasterMoved(instIdx)) { anyMoved = true; }
+                nearbyMeshCount += AddShadowMesh(&localMeshes[nearbyMeshCount],instIdx,instIdx==PLAYER1 ? (u16)3337 : World.instances[instIdx].texIndex,useDetail,&posSum,&idSum,&anyMoved);
                 if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
             }
         }
         
         if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_COUNT; continue; }
-        for (u16 j=1;j<nearbyMeshCount;++j) {
-            SortedMesh key = localMeshes[j];
-            int sk = (int)j - 1;
-            while (sk >= 0 && localMeshes[sk].sortKey > key.sortKey) { localMeshes[sk + 1] = localMeshes[sk]; --sk; }
-            localMeshes[sk + 1] = key;
-        }
-        
-        u32 idSum = 0;
-        for (u16 j=0;j<nearbyMeshCount;++j) { idSum += localMeshes[j].instanceIdx + localMeshes[j].sortKey; }
         u16 slot = shadowSlot[lightIdx];
         bool contentDirty = (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
         u8 needFaces = (u8)(faceMask & ~shadowFaces[lightIdx]);
         if (contentDirty || needFaces) {
+            for (u16 j=1;j<nearbyMeshCount;++j) {
+                SortedMesh key = localMeshes[j];
+                int sk = (int)j - 1;
+                while (sk >= 0 && localMeshes[sk].sortKey > key.sortKey) { localMeshes[sk + 1] = localMeshes[sk]; --sk; }
+                localMeshes[sk + 1] = key;
+            }
+
             if (slot == U16_MAX) {
                 shadowSlot[lightIdx] = (u16)shadowNextSlot++;
                 slot = shadowSlot[lightIdx];
