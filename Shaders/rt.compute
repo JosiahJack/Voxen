@@ -1,8 +1,13 @@
 // rt.compute - Compute shader for ray-traced reflections (BVH per model)
+// Optimized revision. Host-side contract (bindings / uniform locations / buffer layouts) unchanged.
 layout(local_size_x = 8, local_size_y = 8) in;
-layout(rgba8,binding=2) readonly uniform image2D inputSpecular;
-layout(rgba8,binding=4) uniform image2D outputImage;
-layout(rg16f,binding=5) readonly uniform image2D inputNormal;
+const uint RT_NONE = 0xFFFFFFFFu;
+const uint RT_MAX_INST = 9032u;
+const int RT_STACK_SIZE = 32;          // pending-node stack; only ray-hit children are pushed, 32 is ample for 8-wide
+const uint LIGHT_CAP = 96u;
+layout(rgba8,binding=2) readonly  uniform image2D inputSpecular;
+layout(rgba8,binding=4) writeonly uniform image2D outputImage;
+layout(rg16f,binding=5) readonly  uniform image2D inputNormal;
 layout(location=0) uniform uint screenWidth;
 layout(location=1) uniform uint screenHeight;
 layout(location=2) uniform int SSR_RES;
@@ -12,178 +17,170 @@ layout(location=5) uniform sampler2D inputDepthID;
 layout(location=6) uniform mat4 invViewProj;
 layout(location=7) uniform vec2 worldMin;
 layout(location=9) uniform uint texCount;
-layout(std430,binding=1) readonly buffer ModelMatrices { mat4 modelMatrices[]; };
+layout(std430,binding=1)  readonly buffer ModelMatrices { mat4 modelMatrices[]; };
 layout(std430,binding=16) readonly buffer RTGeom { uvec4 rtGeom4[]; };
 struct InstanceRTInfo { uvec4 geom; uvec4 info; vec4 iscl2; };
 layout(std430,binding=21) readonly buffer RTInstanceInfo { InstanceRTInfo rtInstanceInfo[]; };
-layout(std430,binding=23) buffer RTCellCounts { uint rtCellCountsP[]; };
-layout(std430,binding=24) buffer RTCellLists { uint rtCellListsP[]; };
-layout(std430,binding=15) buffer TextureSizes { ivec2 textureSizes[]; };
+layout(std430,binding=23) readonly buffer RTCellCounts { uint rtCellCountsP[]; };      // u16 x2 per word
+layout(std430,binding=24) readonly buffer RTCellLists  { uvec4 rtCellLists4[]; };      // same memory as uint[]: 128 u16 = 16 uvec4 per cell
+layout(std430,binding=15) readonly buffer TextureSizes { ivec2 textureSizes[]; };
 struct Light { vec3 pos; float intensity; vec3 col; uint lflags; float range; float spotAng; float maxIntensity; float minIntensity; vec4 spotDir; };
-layout(std430,binding=2) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
-layout(std430,binding=3) buffer UniqueLightLists { uint uniqueLightLists[]; };
-layout(std430,binding=4) buffer LightIndices { Light lights[]; };
-layout(std430,binding=12) buffer ColorBuffer { uint colors[]; };
-layout(std430,binding=14) buffer TextureOffsets { uint textureOffsets[]; };
-layout(std430,binding=8) buffer TexturePalettes { uint texturePalettes[]; };
-layout(std430,binding=9) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };
-vec3 DecodeOctahedral(vec2 enc) { vec2 encN = enc * 2.0 - 1.0; vec3 n = vec3(encN, 1.0 - abs(encN.x) - abs(encN.y)); n.xy -= max(-n.z, 0.0) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0); return normalize(n); }
-vec4 getTextureColor(uint texIdx, ivec2 texCoord, int texSizeX) { uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * texSizeX + uint(texCoord.x); uint slotIndex = pixelOffset >> 2u; uint packedIdx = colors[slotIndex]; return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + ((packedIdx >> ((pixelOffset & 3u) << 3u)) & 0xFFu)]); }
-uint GetVoxelIndex(vec3 worldPos) { float offsetX = worldPos.x - worldMin.x; float offsetZ = worldPos.z - worldMin.y; uint voxelX = uint(clamp(offsetX / 0.32, 0.0, 511.0)); uint voxelZ = uint(clamp(offsetZ / 0.32, 0.0, 511.0)); return (voxelZ * 512u) + voxelX; }
-vec3 reconstructWorldPos(vec2 uv) { vec3 retval = vec3(0.0); float depth = texture(inputDepthID, uv).r; if (depth < 0.9999) { vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0); vec4 world = invViewProj * clip; retval = world.xyz / world.w; } return retval; }
-float rayAABB(vec3 origin, vec3 invDir, vec3 mn, vec3 mx, float maxDist) {
-    vec3 t0 = (mn - origin) * invDir; vec3 t1 = (mx - origin) * invDir;
-    vec3 tmin = min(t0, t1), tmax = max(t0, t1);
-    float tNear = max(max(tmin.x, tmin.y), tmin.z), tFar = min(min(tmax.x, tmax.y), tmax.z); if (tFar < max(0.02, tNear) || tNear > maxDist) return -1.0;
-    
-    return (tNear >= 0.02) ? tNear : 0.02;
-}
-
-bool rayTriangle(vec3 orig, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t, out vec3 normal, out float bu, out float bv) {
-    vec3 e1 = v1 - v0; vec3 e2 = v2 - v0; vec3 pvec = cross(dir, e2); float det = dot(e1, pvec); if (abs(det) < 1e-7) return false;
-    float invDet = 1.0 / det; vec3 tvec = orig - v0; float u = dot(tvec, pvec) * invDet; if (u < 0.0 || u > 1.0) return false;
-    vec3 qvec = cross(tvec, e1); float v = dot(dir, qvec) * invDet; if (v < 0.0 || u + v > 1.0) return false;
-    t = dot(e2, qvec) * invDet; if (t < 1e-4) return false;
-    normal = cross(e1, e2);
-    bu = u; bv = v;
-    return true;
-}
-
-uint RtCellListU16(uint i) { uint w = rtCellListsP[i >> 1]; return (i & 1u) != 0u ? (w >> 16) : (w & 0xFFFFu); }
-uint RtCellCount(uint cell) { uint w = rtCellCountsP[cell >> 1]; return (cell & 1u) != 0u ? (w >> 16) : (w & 0xFFFFu); }
+layout(std430,binding=2)  readonly buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
+layout(std430,binding=3)  readonly buffer UniqueLightLists { uint uniqueLightLists[]; };
+layout(std430,binding=4)  readonly buffer LightIndices { Light lights[]; };
+layout(std430,binding=12) readonly buffer ColorBuffer { uint colors[]; };
+layout(std430,binding=14) readonly buffer TextureOffsets { uint textureOffsets[]; };
+layout(std430,binding=8)  readonly buffer TexturePalettes { uint texturePalettes[]; };
+layout(std430,binding=9)  readonly buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };
+vec3 DecodeOctahedral(vec2 enc) { vec2 e = enc * 2.0 - 1.0; vec3 n = vec3(e, 1.0 - abs(e.x) - abs(e.y)); n.xy -= max(-n.z, 0.0) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0); return normalize(n); }
+vec3 safeRcp(vec3 v) { return vec3(v.x >= 0.0 ? 1.0 : -1.0, v.y >= 0.0 ? 1.0 : -1.0, v.z >= 0.0 ? 1.0 : -1.0) / max(abs(v), vec3(1e-18)); }
+vec4 getTextureColor(uint texIdx, ivec2 texCoord, int texSizeX) { uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * uint(texSizeX) + uint(texCoord.x); uint packedIdx = colors[pixelOffset >> 2u]; return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + ((packedIdx >> ((pixelOffset & 3u) << 3u)) & 0xFFu)]); }
+uint GetVoxelIndex(vec3 worldPos) { vec2 o = (worldPos.xz - worldMin) * 3.125; uvec2 v = uvec2(clamp(o, vec2(0.0), vec2(511.0))); return v.y * 512u + v.x; }
+float rayAABB(vec3 origin, vec3 invDir, vec3 mn, vec3 mx, float maxDist) { vec3 t0 = (mn - origin) * invDir, t1 = (mx - origin) * invDir; vec3 tmin = min(t0, t1), tmax = max(t0, t1); float tNear = max(max(tmin.x, tmin.y), tmin.z), tFar = min(min(tmax.x, tmax.y), tmax.z); if (tFar < max(0.02, tNear) || tNear > maxDist) return -1.0; return max(tNear, 0.02); }
+uint  RtCellCount(uint cell) { uint w = rtCellCountsP[cell >> 1u]; return (cell & 1u) != 0u ? (w >> 16u) : (w & 0xFFFFu); }
 uvec2 RtPair(uint w) { uvec4 v = rtGeom4[w >> 2u]; return (w & 2u) != 0u ? v.zw : v.xy; }
-vec2 RtUV(uint w) { uvec4 v = rtGeom4[w >> 2u]; return unpackHalf2x16(v[w & 3u]); }
-vec3 RtVtxPos(uint vtxBase, uint vi) { uvec2 p = RtPair(vtxBase + vi * 2u); return vec3(unpackHalf2x16(p.x), unpackHalf2x16(p.y).x); }
+vec2  RtUV(uint w)   { uvec4 v = rtGeom4[w >> 2u]; return unpackHalf2x16(v[w & 3u]); }
+vec3  RtVtxPos(uint vtxBase, uint vi) { uvec2 p = RtPair(vtxBase + vi * 2u); return vec3(unpackHalf2x16(p.x), unpackHalf2x16(p.y).x); }
 void main() {
-    uvec2 pixel = gl_GlobalInvocationID.xy; if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
-    vec4 specColor = imageLoad(inputSpecular, ivec2(pixel * SSR_RES)); if ((specColor.r + specColor.g + specColor.b) < 0.01) { imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0)); return; }
+    uvec2 gid = gl_GlobalInvocationID.xy; if (gid.x >= screenWidth || gid.y >= screenHeight) return;
     
-    vec2 scrSzF = vec2(screenWidth, screenHeight) * float(SSR_RES);
-    vec3 worldPos = reconstructWorldPos((vec2(pixel * SSR_RES) + 0.5) / scrSzF);
-    if (worldPos == vec3(0.0)) { imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0)); return; }
+    ivec2 pix  = ivec2(gid);
+    ivec2 spix = pix * SSR_RES;
+    vec4 specColor = imageLoad(inputSpecular, spix); if ((specColor.r + specColor.g + specColor.b) < 0.01) { imageStore(outputImage, pix, vec4(0.0, 0.0, 0.0, 1.0)); return; }
+
+    vec2 uv = (vec2(spix) + 0.5) / (vec2(screenWidth, screenHeight) * float(SSR_RES));
+    float depth = textureLod(inputDepthID, uv, 0.0).r; if (depth >= 0.9999) { imageStore(outputImage, pix, vec4(0.0, 0.0, 0.0, 1.0)); return; }
     
-    vec2 normalPack = imageLoad(inputNormal, ivec2(pixel * SSR_RES)).rg;
-    vec3 normal = DecodeOctahedral(normalPack);
-    vec3 viewDir = normalize(camPos - worldPos);
-    vec3 reflectDir = reflect(-viewDir, normal);
-    vec3 origin = worldPos + normal * 0.05;
-    vec3 invWorldDir = vec3(reflectDir.x != 0.0 ? 1.0 / reflectDir.x : 1e9, reflectDir.y != 0.0 ? 1.0 / reflectDir.y : 1e9, reflectDir.z != 0.0 ? 1.0 / reflectDir.z : 1e9);
-    float maxDist = 32.0;
+    vec4 w4 = invViewProj * vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec3 worldPos = w4.xyz / w4.w;
+    vec3 normal = DecodeOctahedral(imageLoad(inputNormal, spix).rg), viewDir = normalize(camPos - worldPos);
+    vec3 reflectDir = reflect(-viewDir, normal), origin = worldPos + normal * 0.05;
+    vec3 invWorldDir = safeRcp(reflectDir);
+    const float maxDist = 32.0;
     float bestDist = maxDist + 1.0;
-    vec3 hitWorld = vec3(0.0);
-    bool hasHit = false;
-    vec3 bestNormal = vec3(0.0,1.0,0.0);
-    uint bestInst = 0u;
-    uint bestUVBase = 0u;
-    uint bestIA = 0u, bestIB = 0u, bestIC = 0u;
+    vec3  hitWorld = vec3(0.0);
+    bool  hasHit = false;
+    uint  bestInst = 0u, bestUVBase = 0u, bestIA = 0u, bestIB = 0u, bestIC = 0u;
     float bestBaryU = 0.0, bestBaryV = 0.0;
-    const float CELL = 2.56;
-    const float CELLXHALF = 1.28;
-    int cx = int(floor((origin.x - worldMin.x + CELLXHALF) / CELL));
-    int cz = int(floor((origin.z - worldMin.y + CELLXHALF) / CELL));
-    cx = clamp(cx, 0, 63);
-    cz = clamp(cz, 0, 63);
+    const float CELL = 2.56, INV_CELL = 0.390625, CELLXHALF = 1.28; // ---- 2D DDA over 64x64 cell grid ----
+    vec2 gridOrg = worldMin - CELLXHALF;
+    ivec2 cxz = clamp(ivec2(floor((origin.xz - gridOrg) * INV_CELL)), ivec2(0), ivec2(63));
+    int cx = cxz.x, cz = cxz.y;
     int stepX = (reflectDir.x > 0.0) ? 1 : (reflectDir.x < 0.0 ? -1 : 0);
     int stepZ = (reflectDir.z > 0.0) ? 1 : (reflectDir.z < 0.0 ? -1 : 0);
-    float tMaxX, tMaxZ, tDeltaX, tDeltaZ;
-    if (stepX == 0) { tMaxX = 1e9; tDeltaX = 1e9; }
-    else {
-        float boundary = (stepX > 0) ? (worldMin.x - CELLXHALF + float(cx + 1) * CELL) : (worldMin.x - CELLXHALF + float(cx) * CELL);
-        tMaxX = (boundary - origin.x) / reflectDir.x;
-        tDeltaX = CELL / abs(reflectDir.x);
-    }
-    if (stepZ == 0) { tMaxZ = 1e9; tDeltaZ = 1e9; }
-    else { float boundary = (stepZ > 0) ? (worldMin.y - CELLXHALF + float(cz + 1) * CELL) : (worldMin.y - CELLXHALF + float(cz) * CELL); tMaxZ = (boundary - origin.z) / reflectDir.z; tDeltaZ = CELL / abs(reflectDir.z); }
+    float tMaxX   = (stepX != 0) ? (gridOrg.x + float(cx + (stepX > 0 ? 1 : 0)) * CELL - origin.x) * invWorldDir.x : 1e30;
+    float tMaxZ   = (stepZ != 0) ? (gridOrg.y + float(cz + (stepZ > 0 ? 1 : 0)) * CELL - origin.z) * invWorldDir.z : 1e30;
+    float tDeltaX = CELL * abs(invWorldDir.x);
+    float tDeltaZ = CELL * abs(invWorldDir.z);
+    int maxIter = (stepX == 0 && stepZ == 0) ? 1 : 20;
+    uvec4 seen  = uvec4(RT_NONE);
+    uvec4 chunk = uvec4(0u);
+    uint  stN[RT_STACK_SIZE];
+    float stD[RT_STACK_SIZE];
     float t = 0.0;
-    for (int iter = 0; iter < 20; ++iter) {
-        if (t > maxDist) break;
-        if (hasHit && t >= bestDist) break;
+    for (int iter = 0; iter < maxIter; ++iter) {
+        if (t > maxDist || t >= bestDist) break;
         if (cx < 0 || cx >= 64 || cz < 0 || cz >= 64) break;
-        
+
         uint cell = uint(cz * 64 + cx);
-            uint cnt = RtCellCount(cell);
-            if (cnt > 128u) cnt = 128u;
-            for (uint k = 0u; k < cnt; k += 2u) {
-            uint w = rtCellListsP[(cell * 128u + k) >> 1u];
-            uvec2 both = uvec2(w & 0xFFFFu, w >> 16);
-            if (k + 1u >= cnt) both.y = 9032u;
-            for (uint h = 0u; h < 2u; ++h) {
-            uint inst = (h == 0u) ? both.x : both.y; if (inst >= 9032u) continue;
+        uint cnt  = min(RtCellCount(cell), 128u);
+        uint listBase = cell << 4u;
+        for (uint k = 0u; k < cnt; ++k) {
+            if ((k & 7u) == 0u) chunk = rtCellLists4[listBase + (k >> 3u)];
+            uint wd = chunk[(k >> 1u) & 3u]; 
+            uint inst = ((k & 1u) != 0u) ? (wd >> 16u) : (wd & 0xFFFFu); if (inst >= RT_MAX_INST) continue;
+            if (any(equal(seen, uvec4(inst)))) continue;
+            
+            seen = uvec4(seen.y, seen.z, seen.w, inst);
             uvec4 instInfo = rtInstanceInfo[inst].info; if (instInfo.y == 0u) continue;
+            
             uvec4 instGeom = rtInstanceInfo[inst].geom;
-            vec4 iscl2 = rtInstanceInfo[inst].iscl2;
-            mat4 M = modelMatrices[inst];
-            vec3 c0 = M[0].xyz; vec3 c1 = M[1].xyz; vec3 c2 = M[2].xyz; vec3 tr = M[3].xyz;
-            uvec4 r0 = rtGeom4[instGeom.x]; uvec4 r1 = rtGeom4[instGeom.x + 1u];
-            vec3 le = 0.5 * (uintBitsToFloat(r1.xyz) - uintBitsToFloat(r0.xyz)) / iscl2.xyz;
-            vec3 wc = tr + c0 * (0.5 * (uintBitsToFloat(r0.x) + uintBitsToFloat(r1.x)) / iscl2.x) + c1 * (0.5 * (uintBitsToFloat(r0.y) + uintBitsToFloat(r1.y)) / iscl2.y) + c2 * (0.5 * (uintBitsToFloat(r0.z) + uintBitsToFloat(r1.z)) / iscl2.z);
+            vec4  iscl2    = rtInstanceInfo[inst].iscl2;
+            mat4  M = modelMatrices[inst];
+            vec3 c0 = M[0].xyz, c1 = M[1].xyz, c2 = M[2].xyz, tr = M[3].xyz;
+            uvec4 r0 = rtGeom4[instGeom.x], r1 = rtGeom4[instGeom.x + 1u];
+            vec3 bmin = uintBitsToFloat(r0.xyz), bmax = uintBitsToFloat(r1.xyz);
+            vec3 isc = 1.0 / iscl2.xyz;
+            vec3 lc = (0.5 * (bmin + bmax)) * isc;
+            vec3 le = (0.5 * (bmax - bmin)) * isc;
+            vec3 wc = tr + c0 * lc.x + c1 * lc.y + c2 * lc.z;
             vec3 we = abs(c0) * le.x + abs(c1) * le.y + abs(c2) * le.z;
-            vec3 tw0 = (wc - we - origin) * invWorldDir, tw1 = (wc + we - origin) * invWorldDir;
-            vec3 tn = min(tw0, tw1), tf = max(tw0, tw1);
-            float wn = max(max(tn.x, tn.y), tn.z);
-            if (wn > max(min(min(tf.x, tf.y), tf.z), 0.0) || wn > bestDist) continue;
+            vec3 wo = wc - origin;
+            vec3 tw0 = (wo - we) * invWorldDir, tw1 = (wo + we) * invWorldDir;
+            vec3 twn = min(tw0, tw1), twf = max(tw0, tw1);
+            float wn = max(max(twn.x, twn.y), twn.z); if (wn > max(min(min(twf.x, twf.y), twf.z), 0.0) || wn > bestDist) continue;
+
+            mat3 R = mat3(c0, c1, c2);
             vec3 rel = origin - tr;
-            vec3 localOrigin = vec3(dot(rel, c0) * iscl2.x, dot(rel, c1) * iscl2.y, dot(rel, c2) * iscl2.z);
-            vec3 localDir = vec3(dot(reflectDir, c0) * iscl2.x, dot(reflectDir, c1) * iscl2.y, dot(reflectDir, c2) * iscl2.z);
-            vec3 invLocalDir = vec3(localDir.x != 0.0 ? 1.0 / localDir.x : 1e9, localDir.y != 0.0 ? 1.0 / localDir.y : 1e9, localDir.z != 0.0 ? 1.0 / localDir.z : 1e9);
-            uint vtxBase = instGeom.z;
-            uint stack[64]; int sp = 0; stack[sp++] = instGeom.x;
-            uint hitIA = 0u, hitIB = 0u, hitIC = 0u;
-            float hitBaryU = 0.0, hitBaryV = 0.0;
-            vec3 hitNormal = vec3(0.0,1.0,0.0);
+            vec3 localOrigin = (rel * R) * iscl2.xyz;
+            vec3 localDir    = (reflectDir * R) * iscl2.xyz;
+            vec3 invLocalDir = safeRcp(localDir);
             float bestT = (hasHit ? bestDist : maxDist) * sqrt(max(iscl2.x, max(iscl2.y, iscl2.z))) * inversesqrt(dot(localDir, localDir));
-            bool anyHit = false;
-            vec3 hitLocalPoint = vec3(0.0);
-            while (sp > 0) {
-                uint no = stack[--sp]; if (no == 0xFFFFFFFFu) continue;
-                
-                uvec4 n0 = rtGeom4[no + 0u];
-                uvec4 n1 = rtGeom4[no + 1u];
-                vec3 mn = uintBitsToFloat(n0.xyz);
-                vec3 mx = uintBitsToFloat(n1.xyz);
-                uint triStart = n0.w;
-                uint triCount = n1.w;
-                float tEntry = rayAABB(localOrigin, invLocalDir, mn, mx, bestT); if (tEntry < 0.0) continue;
-                
-                if (triCount > 0u) {
-                    for (uint triK = 0u; triK < triCount; ++triK) {
-                        uvec2 tv = RtPair(triStart + triK * 2u);
-                        uint iA = tv.x & 0xFFFFu, iB = (tv.x >> 16) & 0xFFFFu, iC = tv.y & 0xFFFFu;
-                        vec3 pa = RtVtxPos(vtxBase, iA);
-                        vec3 pb = RtVtxPos(vtxBase, iB);
-                        vec3 pc = RtVtxPos(vtxBase, iC);
-                        float tt, bu = 0.0, bv = 0.0; vec3 nn; 
-                        if (rayTriangle(localOrigin, localDir, pa, pb, pc, tt, nn, bu, bv) && tt < bestT) { bestT = tt; hitLocalPoint = localOrigin + localDir * tt; anyHit = true; hitIA = iA; hitIB = iB; hitIC = iC; hitBaryU = bu; hitBaryV = bv; hitNormal = nn; }
+            if (rayAABB(localOrigin, invLocalDir, bmin, bmax, bestT) < 0.0) continue;
+
+            uint vtxBase = instGeom.z, hitIA = 0u, hitIB = 0u, hitIC = 0u, cur = instGeom.x;
+            float hitU = 0.0, hitV = 0.0;
+            bool anyHit = false, run = true;
+            int sp = 0;
+            uvec4 n0 = r0, n1 = r1;
+            while (run) {
+                bool have = false;
+                if (n1.w > 0u) {
+                    uint triStart = n0.w;
+                    uint wEnd = triStart + n1.w * 2u;
+                    for (uint qi = triStart >> 2u; qi <= ((wEnd - 1u) >> 2u); ++qi) {
+                        uvec4 q = rtGeom4[qi];
+                        for (uint hh = 0u; hh < 2u; ++hh) {
+                            uint wi = (qi << 2u) + (hh << 1u);
+                            if (wi < triStart || wi >= wEnd) continue;
+                            uvec2 tv = (hh == 0u) ? q.xy : q.zw;
+                            uint iA = tv.x & 0xFFFFu, iB = tv.x >> 16u, iC = tv.y & 0xFFFFu;
+                            vec3 pa = RtVtxPos(vtxBase, iA);
+                            vec3 pb = RtVtxPos(vtxBase, iB);
+                            vec3 pc = RtVtxPos(vtxBase, iC);
+                            vec3 e1 = pb - pa, e2 = pc - pa;
+                            vec3 pv = cross(localDir, e2);
+                            float det = dot(e1, pv);
+                            float ad = abs(det); if (ad < 1e-7) continue;
+                            
+                            float sg = (det < 0.0) ? -1.0 : 1.0;
+                            vec3 tvec = localOrigin - pa;
+                            float u = dot(tvec, pv) * sg; if (u < 0.0 || u > ad) continue;
+                            
+                            vec3 qv = cross(tvec, e1);
+                            float v = dot(localDir, qv) * sg; if (v < 0.0 || u + v > ad) continue;
+                            float tnum = dot(e2, qv) * sg; if (tnum < 1e-4 * ad || tnum >= bestT * ad) continue;
+                            
+                            float invAd = 1.0 / ad;
+                            bestT = tnum * invAd; anyHit = true;
+                            hitIA = iA; hitIB = iB; hitIC = iC; hitU = u * invAd; hitV = v * invAd;
+                        }
                     }
                 } else {
-                    uvec4 ch0 = rtGeom4[no + 2u];
-                    uvec4 ch1 = rtGeom4[no + 3u];
-                    if (sp + 8 <= 64) {
-                        for (int c = 0; c < 4; ++c) { uint ch = ch0[c]; if (ch != 0xFFFFFFFFu) stack[sp++] = ch; }
-                        for (int c = 0; c < 4; ++c) { uint ch = ch1[c]; if (ch != 0xFFFFFFFFu) stack[sp++] = ch; }
+                    uvec4 ch0 = rtGeom4[cur + 2u], ch1 = rtGeom4[cur + 3u];
+                    uint nearest = RT_NONE; float nd = 3.4e38; uvec4 nA = uvec4(0u), nB = uvec4(0u);
+                    for (int c = 0; c < 8; ++c) {
+                        uint ch = (c < 4) ? ch0[c] : ch1[c - 4]; if (ch == RT_NONE) continue;
+                        
+                        uvec4 a = rtGeom4[ch], b = rtGeom4[ch + 1u];
+                        float te = rayAABB(localOrigin, invLocalDir, uintBitsToFloat(a.xyz), uintBitsToFloat(b.xyz), bestT); if (te < 0.0) continue;
+                        
+                        if (te < nd) { if (nearest != RT_NONE && sp < RT_STACK_SIZE) { stN[sp] = nearest; stD[sp] = nd; ++sp; } nearest = ch; nd = te; nA = a; nB = b; } else if (sp < RT_STACK_SIZE) { stN[sp] = ch; stD[sp] = te; ++sp; }
                     }
+                    if (nearest != RT_NONE) { cur = nearest; n0 = nA; n1 = nB; have = true; }
                 }
+                if (!have) { while (sp > 0) { --sp; if (stD[sp] < bestT) { cur = stN[sp]; n0 = rtGeom4[cur]; n1 = rtGeom4[cur + 1u]; have = true; break; } } }
+                run = have;
             }
             if (anyHit) {
-                vec3 worldHitPt = c0 * hitLocalPoint.x + c1 * hitLocalPoint.y + c2 * hitLocalPoint.z + tr;
-                vec3 d = worldHitPt - worldPos;
-                float wdSq = dot(d, d);
-                if (wdSq > 0.01 && wdSq < bestDist * bestDist) {
-                    hasHit = true;
-                    bestDist = sqrt(wdSq);
-                    hitWorld = worldHitPt;
-                    bestInst = inst;
-                    bestUVBase = instGeom.w;
-                    bestIA = hitIA; bestIB = hitIB; bestIC = hitIC;
-                    bestBaryU = hitBaryU; bestBaryV = hitBaryV;
-                    bestNormal = normalize((c0 * iscl2.x) * hitNormal.x + (c1 * iscl2.y) * hitNormal.y + (c2 * iscl2.z) * hitNormal.z);
-                    if (dot(bestNormal, normalize(camPos - hitWorld)) < 0.0) bestNormal = -bestNormal;
-                }
-            }
+                vec3 hl = localOrigin + localDir * bestT;
+                vec3 worldHitPt = c0 * hl.x + c1 * hl.y + c2 * hl.z + tr;
+                vec3 dd = worldHitPt - worldPos;
+                float wdSq = dot(dd, dd);
+                if (wdSq > 0.01 && wdSq < bestDist * bestDist) { hasHit = true; bestDist = sqrt(wdSq); hitWorld = worldHitPt; bestInst = inst; bestUVBase = instGeom.w; bestIA = hitIA; bestIB = hitIB; bestIC = hitIC; bestBaryU = hitU; bestBaryV = hitV; }
             }
         }
         if (tMaxX < tMaxZ) { cx += stepX; t = tMaxX; tMaxX += tDeltaX; } else { cz += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; }
-        if (stepX == 0 && stepZ == 0) break;
     }
     vec3 reflectionColor = vec3(0.0);
     if (hasHit) {
@@ -191,50 +188,56 @@ void main() {
         if (texIdx < texCount) {
             ivec2 ts = textureSizes[texIdx];
             if (ts.x > 0 && ts.y > 0) {
-                vec2 uvHit = vec2(0.0);
-                uvHit += RtUV(bestUVBase + bestIA) * (1.0 - bestBaryU - bestBaryV);
-                uvHit += RtUV(bestUVBase + bestIB) * bestBaryU;
-                uvHit += RtUV(bestUVBase + bestIC) * bestBaryV;
-                vec2 uvSample = vec2(uvHit.x, 1.0 - uvHit.y);
-                ivec2 tcoord = ivec2(fract(uvSample) * vec2(ts));
-                tcoord = clamp(tcoord, ivec2(0,0), ivec2(ts.x - 1, ts.y - 1));
-                vec4 albedo = getTextureColor(texIdx, tcoord, ts.x);
-                vec3 adjustedNormal = bestNormal;
-                vec3 viewDirHit = normalize(camPos - hitWorld);
-                vec3 lighting = albedo.rgb * 0.1;
+                vec2 uvHit = RtUV(bestUVBase + bestIA) * (1.0 - bestBaryU - bestBaryV) + RtUV(bestUVBase + bestIB) * bestBaryU + RtUV(bestUVBase + bestIC) * bestBaryV;
+                ivec2 tcoord = clamp(ivec2(fract(vec2(uvHit.x, 1.0 - uvHit.y)) * vec2(ts)), ivec2(0), ts - 1);
+                vec3 albedo = getTextureColor(texIdx, tcoord, ts.x).rgb;
+                mat4 Mb = modelMatrices[bestInst];
+                vec4 isc = rtInstanceInfo[bestInst].iscl2;
+                uint vb = rtInstanceInfo[bestInst].geom.z;
+                vec3 pa = RtVtxPos(vb, bestIA), pb = RtVtxPos(vb, bestIB), pc = RtVtxPos(vb, bestIC);
+                vec3 ln = cross(pb - pa, pc - pa);
+                vec3 N = normalize(Mb[0].xyz * (isc.x * ln.x) + Mb[1].xyz * (isc.y * ln.y) + Mb[2].xyz * (isc.z * ln.z));
+                vec3 toCam = camPos - hitWorld;
+                if (dot(N, toCam) < 0.0) N = -N;
+                vec3 V = normalize(toCam);
                 uint voxelIdx = GetVoxelIndex(hitWorld);
-                uint lcount = voxelLightListCounts[voxelIdx];
-                if (lcount > 96u) lcount = 96u;
+                uint lcount = min(voxelLightListCounts[voxelIdx], LIGHT_CAP);
+                uint lbase = voxelIdx * LIGHT_CAP;
+                vec3 acc = vec3(0.1);
                 for (uint li = 0u; li < lcount; ++li) {
-                    Light L = lights[uniqueLightLists[voxelIdx * 96u + li]];
-                    vec3 lpos = L.pos;
-                    float intensity = L.intensity, range = L.range;
-                    vec3 toLight = lpos - hitWorld;
-                    float distSq = dot(toLight, toLight), rangeSq = range * range, nlPre = dot(toLight, adjustedNormal); if (intensity < 0.1 || distSq >= rangeSq || nlPre <= 0.0) continue;
+                    uint lidx = uniqueLightLists[lbase + li];
+                    float intensity = lights[lidx].intensity; if (intensity < 0.1) continue;
                     
+                    float range = lights[lidx].range;
+                    vec3 toLight = lights[lidx].pos - hitWorld;
+                    float distSq = dot(toLight, toLight), rangeSq = range * range;
+                    float nlPre = dot(toLight, N); if (distSq >= rangeSq || nlPre <= 0.0) continue;
+
                     float invDist = inversesqrt(distSq);
                     vec3 lightDir = toLight * invDist;
-                    float NdotL = nlPre * invDist; float attenuation = (1.0 - distSq * (1.0 / rangeSq)) * NdotL; if (attenuation < 0.03) continue;
-                    
-                    float spotAng = L.spotAng;
+                    float att = (1.0 - distSq * (1.0 / rangeSq)) * (nlPre * invDist); if (att < 0.03) continue;
+
+                    float spotAng = lights[lidx].spotAng;
                     float spotFalloff = 1.0;
                     if (spotAng > 0.0) {
-                        vec4 quat = L.spotDir;
-                        vec3 spotDir = vec3(2.0*(quat.x*quat.z + quat.w*quat.y), 2.0*(quat.y*quat.z - quat.w*quat.x), 1.0 - 2.0*(quat.x*quat.x + quat.y*quat.y));
-                        float spotdot = dot(spotDir, -lightDir); float cosAngle = cos(radians(spotAng/2.0)); if (spotdot < cosAngle) continue;
-                        spotFalloff = smoothstep(cosAngle, cos(radians(spotAng*0.8/2.0)), spotdot); if (spotFalloff <= 0.0) continue;
+                        vec4 q = lights[lidx].spotDir;
+                        vec3 spotDir = vec3(2.0 * (q.x * q.z + q.w * q.y), 2.0 * (q.y * q.z - q.w * q.x), 1.0 - 2.0 * (q.x * q.x + q.y * q.y));
+                        float spotdot = dot(spotDir, -lightDir);
+                        float cosOuter = cos(spotAng * (0.5 * 0.017453292519943295)); if (spotdot < cosOuter) continue;
+                        spotFalloff = smoothstep(cosOuter, cos(spotAng * (0.4 * 0.017453292519943295)), spotdot); if (spotFalloff <= 0.0) continue;
                     }
-                    vec3 baseLighting = albedo.rgb * L.col * intensity * (attenuation*attenuation/sqrt(sqrt(attenuation)));
-                    lighting += baseLighting * spotFalloff;
-                    vec3 halfDir = normalize(lightDir + viewDirHit);
-                    float ndh = max(dot(adjustedNormal, halfDir), 0.0);
-                    float spec = pow(ndh, 100.0);
-                    lighting += albedo.rgb * intensity * attenuation * spotFalloff * spec * 0.5;
+                    float k = intensity * spotFalloff;
+                    float s = sqrt(att);
+                    float att175 = att * s * sqrt(s);
+                    vec3 hv = lightDir + V;
+                    float ndh = max(dot(N, hv) * inversesqrt(max(dot(hv, hv), 1e-12)), 0.0);
+                    float spec = 0.0;
+                    if (ndh > 0.85) { float x2 = ndh * ndh, x4 = x2 * x2, x8 = x4 * x4, x16 = x8 * x8, x32 = x16 * x16; spec = x32 * x32 * x32 * x4; }
+                    acc += lights[lidx].col * (k * att175) + vec3(0.5 * k * att * spec);
                 }
-                reflectionColor = lighting;
+                reflectionColor = albedo * acc;
             }
         }
     }
-    vec3 result = reflectionColor * 0.651 * (specColor.rgb + vec3(0.1));
-    imageStore(outputImage, ivec2(pixel), vec4(result, 1.0));
+    imageStore(outputImage, pix, vec4(reflectionColor * 0.651 * (specColor.rgb + vec3(0.1)), 1.0));
 }

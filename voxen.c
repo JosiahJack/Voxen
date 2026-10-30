@@ -376,6 +376,7 @@ static void cmd_loadlevel(const char* arg) {
     int level = ParseLevelArg(arg);
     if (level == -2) { return; /*Already printed message*/ }
     if (level < 0 || level > 13) { CenterStatusPrint("cmd_loadlevel invalid level argument %d", level); return; }
+    if (level == World.currentLevel) { CenterStatusPrint("cmd_loadlevel already at level %d", level); return; }
     
     CenterStatusPrint("Loading level %u",level); queuedLevelToLoad=level;
     if (level == 13) {
