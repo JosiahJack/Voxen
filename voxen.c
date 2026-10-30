@@ -17,7 +17,7 @@ static u32 rtInstanceInfoID,rtCellCountsID,rtCellListsID,rtGeomID;
 bool doubleSidedTexture[MAXTEX], transparentTexture[MAXTEX], shadowBuffersCreated, resDropdownOpen;
 u16 **modelTriangles, modelTriangleCounts[MAX_MDLS], mdlsCnt, **physTris, texCnt, decalStyleCount, decalInlineTextLevel[DECAL_INLINE_TEXT_MAX], decalInlineTextInst[DECAL_INLINE_TEXT_MAX], decalInlineTextCount;
 V3 modelMin[MAX_MDLS], modelMax[MAX_MDLS];
-u32 lightsID, voxListCntsID, voxelLightListsID, voxelUpdateSP, cellVisibleDataID, shadowmapsSP, shadowmapsClearSP, shadowMapSSBO, shadowMapsIndirectionID, sunShadowFBO, sunShadowTex, shadowmapIndirectionList[LIGHT_COUNT];
+u32 lightsID, voxListCntsID, voxelLightListsID, voxelUpdateSP, cellVisibleDataID, shadowmapsSP, shadowMapSSBO, shadowMapsIndirectionID, sunShadowFBO, sunShadowTex, shadowmapIndirectionList[LIGHT_COUNT];
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6], playerFrustumPlanes[6];
 FrustumPlane sunShadowFrustum[6];
 V3 sunDirection={0.0f, 1.0f, 0.0f};
@@ -752,7 +752,6 @@ void CompileShaders() {
     textSP=CompileAnyShader(textVertSrc, textFragSrc, "Txt");
     imageBlitSP=CompileAnyShader(quadVertSrc, quadFragSrc, "Comp");
     ssrSP=CompileAnyShader(NULL, ssrCSSrc, "SSR");    rtSP=CompileAnyShader(NULL, rtCSSrc, "RT");    rtCopySP=CompileAnyShader(NULL, rtCopyCSSrc, "RTCopy");    voxelUpdateSP=CompileAnyShader(NULL, voxUpdCSSrc, "Vox");
-    shadowmapsClearSP=CompileAnyShader(NULL, shadClearCSSrc, "ShadCl");
     particleSP=CompileAnyShader(particleVertSrc, particleFragSrc, "Part");
     trailSP=CompileAnyShader(trailVertSrc, trailFragSrc, "Trail");
 }
@@ -790,13 +789,7 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     }
 }
 
-void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
-    out[0]  = a[0]*b[0]  + a[4]*b[1]  + a[8]*b[2]  + a[12]*b[3];  out[1]  = a[1]*b[0]  + a[5]*b[1]  + a[9]*b[2]  + a[13]*b[3];  out[2]  = a[2]*b[0]  + a[6]*b[1]  + a[10]*b[2]  + a[14]*b[3];  out[3]  = a[3]*b[0]  + a[7]*b[1]  + a[11]*b[2]  + a[15]*b[3];
-    out[4]  = a[0]*b[4]  + a[4]*b[5]  + a[8]*b[6]  + a[12]*b[7];  out[5]  = a[1]*b[4]  + a[5]*b[5]  + a[9]*b[6]  + a[13]*b[7];  out[6]  = a[2]*b[4]  + a[6]*b[5]  + a[10]*b[6]  + a[14]*b[7];  out[7]  = a[3]*b[4]  + a[7]*b[5]  + a[11]*b[6]  + a[15]*b[7];
-    out[8]  = a[0]*b[8]  + a[4]*b[9]  + a[8]*b[10] + a[12]*b[11]; out[9]  = a[1]*b[8]  + a[5]*b[9]  + a[9]*b[10] + a[13]*b[11]; out[10] = a[2]*b[8]  + a[6]*b[9]  + a[10]*b[10] + a[14]*b[11]; out[11] = a[3]*b[8]  + a[7]*b[9]  + a[11]*b[10] + a[15]*b[11];
-    out[12] = a[0]*b[12] + a[4]*b[13] + a[8]*b[14] + a[12]*b[15]; out[13] = a[1]*b[12] + a[5]*b[13] + a[9]*b[14] + a[13]*b[15]; out[14] = a[2]*b[12] + a[6]*b[13] + a[10]*b[14] + a[14]*b[15]; out[15] = a[3]*b[12] + a[7]*b[13] + a[11]*b[14] + a[15]*b[15];
-}
-
+void mul_mat4(float* restrict out,const float* restrict a,const float* restrict b) { for (int c=0;c<4;++c) for (int r=0;r<4;++r) { float sum=0.0f; for (int k=0;k<4;++k) sum+=a[k*4+r]*b[c*4+k]; out[c*4+r]=sum; } }
 __attribute__((noinline)) void RenderUIImageExtended(i16 x, i16 y, i16 width, i16 height, u32 texIndex, float radians, float pivotX, float pivotY, float tintR, float tintG, float tintB) {
     glUseProgram(uiSP);
     glBindVertexArray(textVAO);
@@ -1307,7 +1300,7 @@ void RenderSunShadowmap(void) {
     glDisable(GL_CULL_FACE); // user spec: backface culling OFF for the sun shadowmap pass
     glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); glDepthFunc(0x0201/*GL_LESS*/); glDisable(GL_BLEND);
     glUseProgram(depthPrepassSP); glUniformMatrix4fv(2,1,GL_FALSE,sunShadowMatrix); // depth-only + alpha cutout, no new shaders needed
-    u16 currentModelType=0xFFFF,currentTexIndex=0xFFFF; u32 currentSortKey=0xFFFFFFFF,currentTriCount=0; bool useDetail=Sys_Settings.ModelDetail;
+    u16 currentModelType=U16_MAX,currentTexIndex=U16_MAX; u32 currentSortKey=U32_MAX, currentTriCount=0; bool useDetail=Sys_Settings.ModelDetail;
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         if (i == World.weaponVModelIndex) continue; // camera-locked viewmodel: keep out, like the main depth prepass
         Entity* e=&World.instances[i]; if (EntNotVisible(i,(e->entflags & EF_NO_SHADOWS))) continue;
@@ -1346,12 +1339,10 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
     u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex;
     if (IdxIsLaserDoor(constIndex)) { DoorLaserDraw(i); }
     if (Cheats.showPhys) {
-        if (World.col[i] == CT_BOX) {DrawBoxCollider(i);}
-        else if (World.col[i] == CT_SPH) {DrawSphereCollider(i);}
-        else if (World.col[i] == CT_CVX) {DrawMeshCollider(i);}
-        else if (World.col[i] == CT_MSH) {DrawMeshCollider(i);}
-        else if (World.col[i] == CT_CAP) {DrawCapsuleCollider(i);}
-        
+             if (World.col[i] == CT_BOX)                           { DrawBoxCollider(i);     }
+        else if (World.col[i] == CT_SPH)                           { DrawSphereCollider(i);  }
+        else if (World.col[i] == CT_CVX || World.col[i] == CT_MSH) { DrawMeshCollider(i);    }
+        else if (World.col[i] == CT_CAP)                           { DrawCapsuleCollider(i); }
         DrawAngularVelocity(i);
     }
     if (e->modelIndex >= MAX_MDLS) return;
@@ -1372,10 +1363,10 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
         glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height);
         glUniform1i(29,6);
     }
-    if((*curN) != (norm) || norm==0) { *curN=norm; glUniform1ui( 1,(u32)norm); }
-    if((*curT) != ( tex) ||  tex==0) { *curT= tex; glUniform1ui(18,(u32)tex ); }
-    if((*curG) != (glow) || glow==0) { *curG=glow; glUniform1ui(19,(u32)glow); }
-    if((*curS) != (spec) || spec==0) { *curS=spec; glUniform1ui(20,(u32)spec); }
+    if((*curN) != (norm)) { *curN=norm; glUniform1ui( 1,(u32)norm); }
+    if((*curT) != ( tex)) { *curT= tex; glUniform1ui(18,(u32)tex ); }
+    if((*curG) != (glow) || glow == 0) { *curG=glow; glUniform1ui(19,(u32)glow); }
+    if((*curS) != (spec)) { *curS=spec; glUniform1ui(20,(u32)spec); }
     *curM=GetAndBindModel(i,*curM);
     u32 vc=modelTriangleCounts[*curM]*3;
     glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);
@@ -1447,7 +1438,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
     glEnable(GL_CULL_FACE);
     glDisable(GL_BLEND);/*Opaques*/
-    u16 currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0, opaqueCount = 0;
+    u16 currentTexIndex = U16_MAX, currentNormIndex = U16_MAX, currentGlowIndex = U16_MAX, currentSpecIndex = U16_MAX, currentModelType = U16_MAX, opaqueCount = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     DepthSort tmpTransparent[1024];
     u16 tcnt = 0;
@@ -1508,7 +1499,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         else if (unlikely(transparentTexture[tex]))                                                                            {  glEnable(GL_CULL_FACE);  glEnable(GL_BLEND); } /*Transparents (with sort)*/
         else                                                                                                                   {  glEnable(GL_CULL_FACE); glDisable(GL_BLEND); } /*Opaque*/
         currentModelType=GetAndBindModel(i,currentModelType);
-        if (tex != currentTexIndex || tex==0) { currentTexIndex=tex; glUniform1ui(3,(u32)tex); }
+        if (tex != currentTexIndex) { currentTexIndex=tex; glUniform1ui(3,(u32)tex); }
         u32 vertCount = modelTriangleCounts[currentModelType] * 3;
         glDrawElements(0x0004/*GL_TRIANGLES*/, vertCount, GL_UNSIGNED_SHORT, 0);
         drawCalls++;
@@ -1542,7 +1533,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glColorMask(1,1,1,1);
     glDepthMask(0);
     glDepthFunc(0x0203/*GL_LEQUAL*/); /*Opaque Pass*/
-    currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0;
+    currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = U16_MAX;
     glUniform1f(9,0.0f); // Reset heat for infrared vision
     glUniform1f(27,(float)(1.0f - (vclamp((float)(World.pauseRelativeTime - 0.0f) / 2.0f, 0.0f, 1.0f)))); /* cyber wall panel alpha with fade */
     for (u16 visibleIndex = 0; visibleIndex < opaqueCount; ++visibleIndex) { /*Opaques (already front-to-back)*/
@@ -1635,11 +1626,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
             V3 weaponPos = V3_AplusB(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1], weaponViewOffset));
             World.position[wvi] = weaponPos;
             World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1], vWepRot[wep16]); // view orientation + per-model correction
-            u16 curN = 0, curT = 0, curG = 0, curS = 0, curM = 0;
+            u16 curN = U16_MAX, curT = U16_MAX, curG = U16_MAX, curS = U16_MAX, curM = U16_MAX;
             DrawEntity(&World.instances[wvi], wvi, World.instances[wvi].index, World.instances[wvi].texIndex, &curN, &curT, &curG, &curS, &curM, false);
         }
     }
-    
     if(unlikely(camView)) {
         glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
         glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/, gBufferFBO);
@@ -1660,7 +1650,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
                 glCopyTexSubImage2D(GL_TEXTURE_2D, 0, tx, ty, tx, ty, tw, th); /*camview copy: clamped to source/dest dims and tiled into 320x120 strips to stay in-bounds on any GL*/
             }
         }
-        
         glBindTexture(GL_TEXTURE_2D,0); return;
     } // <<<<<<<<<<<<< CAM VIEW BARRIER
     
@@ -1693,30 +1682,17 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D,inputDepthID);
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
-    /*The [3] "SSR" bucket brackets ONLY the reflection dispatch below - it does not capture everything reflection mode costs:
-      - [2] "Main" grows because chunk_frag writes the outSpecular/outNormal g-buffer channels full-res when Reflections > 0 (all that extra MRT bandwidth lands in Main, not here);
-      - [4] "Comp" grows because composite does the 9-tap blur of outputImage (the SSR_RES smoothing);
-      - the per-frame CPU uploads for the RT cell grid (~1MB cellLists + counts + instInfo, see UpdateInstanceMatrix4x4s) and the 4-frame-lagged query readback are CPU-side stalls that show up in no GPU bucket at all.
-    So a low number here with a big toggle-frames-per-second delta is expected, not a mis-bracketed query: this IS the kernel time for the (W/SSR_RES)x(H/SSR_RES) grid.*/
-    glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][3]);
-    if (Sys_Settings.Reflections == 1u) {
-        glUseProgram(ssrSP);
-        glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
-        glUniform1i(5, 3);
-        glUniformMatrix4fv(6, 1, 0, invViewProj);
-        glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
-        glDispatchCompute(((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 31) / 32, ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32, 1);
-    } else if (Sys_Settings.Reflections == 2u) {
-        glUseProgram(rtSP);
-        glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
-        glUniform1i(5, 3);
-        glUniformMatrix4fv(6, 1, 0, invViewProj);
-        glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
-        glUniform2f(7, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]);
-        glUniform1ui(9, texCnt);
-        glDispatchCompute(((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES) + 7) / 8, ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 7) / 8, 1);
+    glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][3]);    
+    if (Sys_Settings.Reflections==1u || Sys_Settings.Reflections==2u) {
+        bool rt=Sys_Settings.Reflections==2u;
+        glUseProgram(rt ? rtSP : ssrSP);
+        glUniform3f(3,playerPos.x,playerPos.y,playerPos.z);
+        glUniformMatrix4fv(6,1,0,invViewProj);
+        glUniformMatrix4fv(4,1,GL_FALSE,viewProj);
+        if (rt) { glUniform2f(7,World.worldMin_x[World.curLev],World.worldMin_z[World.curLev]); glUniform1ui(9,texCnt); }
+        u32 group=rt ? 8 : 32;
+        glDispatchCompute((Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES + group - 1)/group,(Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES + group - 1) / group,1);
     }
-    
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);  /*DIAG: RT pass ends here*/
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][4]);
     glBindFramebuffer(GL_FRAMEBUFFER, uiFBO);
@@ -1859,17 +1835,17 @@ void UpdateInstanceMatrix4x4s() {
         glBufferSubData(GL_SSBO, offsetFloats * 4, countFloats * 4, modelMatrices + offsetFloats);
     }
     if (Sys_Settings.Reflections == 2u) { // Upload instance metadata + world grid for ray-traced reflections.
-        u32 chFirst = INSTANCE_COUNT, chLast = 0u; bool chDirty = false;
+        u32 chFirst = INSTANCE_COUNT, chLast = 0u;
         for (u32 i=0; i<World.instCount; ++i) {
             u16 mi = World.instances[i].modelIndex;
             if ((instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt) mi = World.instances[i].lodIndex;
             SetRTInstance(i, (mi < mdlsCnt) ? mi : 0xFFFFFFFFu, World.instances[i].texIndex, (World.instances[i].entflags & EF_ACTIVE) ? 1u : 0u, vabs(World.scale[i].x), vabs(World.scale[i].y), vabs(World.scale[i].z));
             InstanceRTInfo* cur = &rtInstanceInfo[i], *prev = &rtPrevInfo[i];
             if (cur->geom[0]!=prev->geom[0] || cur->geom[1]!=prev->geom[1] || cur->geom[2]!=prev->geom[2] || cur->geom[3]!=prev->geom[3] || cur->info[0]!=prev->info[0] || cur->info[1]!=prev->info[1] || cur->info[2]!=prev->info[2] || cur->info[3]!=prev->info[3] || cur->iscl2[0]!=prev->iscl2[0] || cur->iscl2[1]!=prev->iscl2[1] || cur->iscl2[2]!=prev->iscl2[2] || cur->iscl2[3]!=prev->iscl2[3]) {
-                if (i < chFirst) chFirst = i; chLast = i; chDirty = true; mcpy(prev, cur, sizeof(InstanceRTInfo));
+                if (chFirst == INSTANCE_COUNT) chFirst = i; chLast = i; mcpy(prev, cur, sizeof(InstanceRTInfo));
             }
         }
-        if (chDirty) { glBindBuffer(GL_SSBO, rtInstanceInfoID); glBufferData(GL_SSBO, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW); glBufferSubData(GL_SSBO, (size_t)chFirst * sizeof(InstanceRTInfo), (size_t)(chLast - chFirst + 1u) * sizeof(InstanceRTInfo), rtInstanceInfo + chFirst); }
+        if (chFirst != INSTANCE_COUNT) { glBindBuffer(GL_SSBO, rtInstanceInfoID); glBufferSubData(GL_SSBO, (size_t)chFirst * sizeof(InstanceRTInfo), (size_t)(chLast - chFirst + 1u) * sizeof(InstanceRTInfo), rtInstanceInfo + chFirst); }
         glBindBuffer(GL_SSBO, rtCellCountsID); glBufferData(GL_SSBO, ARRSIZE * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
         glBufferSubData(GL_SSBO, 0, ARRSIZE * sizeof(u16), cellCounts);/*Physics broadphase, rewritten every substep, so always uploaded - orphaned first for the same sync reason*/
         glBindBuffer(GL_SSBO, rtCellListsID);  glBufferData(GL_SSBO, (size_t)ARRSIZE * 128u * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
@@ -2276,11 +2252,9 @@ void InitalizeEnvironment() {
     MakeSSBO(&psysTrailsID,11,MAX_TRAIL_SEGS*sizeof(TrlSegInst),NULL,GL_DYNAMIC_DRAW); colorBufferID= MakeSSBO(&colorBufferID,12,MAX_TOTAL_PIXELS*sizeof(u8),NULL,GL_STATIC_DRAW);
     textureOffsetsID = MakeSSBO(&textureOffsetsID,14,MAXTEX * sizeof(u32),NULL,GL_STATIC_DRAW);
     textureSizesID = MakeSSBO(&textureSizesID,15,MAXTEX*2*sizeof(i32),NULL,GL_STATIC_DRAW);
-    
-    glUseProgram(shadowmapsSP);      glUniform1ui( 9, SHADOW_MAP_SIZE); // Set permanent uniforms on shaders (keeps c in sync with glsl for constants)
-    glUseProgram(shadowmapsClearSP); glUniform1ui( 0, SHADOW_MAP_SIZE);
-    glUseProgram(chunkSP);           glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
-    
+    glUseProgram(shadowmapsSP); glUniform1ui( 9, SHADOW_MAP_SIZE); // Set permanent uniforms on shaders (keeps c in sync with glsl for constants)
+    glUseProgram(chunkSP);      glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); glUniform1i(29,6); glUniform1i(31,9); glUniform1i(36,10);
+    glUseProgram(ssrSP);        glUniform1i(5,3); glUseProgram(rtSP); glUniform1i(5,3);
     for (int f=0;f<5;++f) { glGenQueries(5,gpuQ[f]); }
     RenderLoading("Loading textures..."); LoadTextures(); RenderLoading("Loading models...");   LoadModels();   if (Sys_Settings.Reflections >= 1u) EnsureReflectionResources();    bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }

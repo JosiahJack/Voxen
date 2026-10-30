@@ -56,7 +56,7 @@ u16 *cvxAdjLists[MAX_UNIQUE_CVX_MESHES], cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
 size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES], cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
 GltfMesh* gBlockMeshes;
 static u32 gBlockMeshCount = 0;
-static void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm) {
+void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm) {
     float tx=T[0],ty=T[1],tz=T[2],qx=R[0],qy=R[1],qz=R[2],qw=R[3],sx=S[0],sy=S[1],sz=S[2];
     lm[0]  = (1 - 2*qy*qy - 2*qz*qz) * sx; lm[1]  = (2*qx*qy + 2*qz*qw) * sx;     lm[2]  = (2*qx*qz - 2*qy*qw) * sx;   lm[3]  = 0.0f;
     lm[4]  = (2*qx*qy - 2*qz*qw) * sy;     lm[5]  = (1 - 2*qx*qx - 2*qz*qz) * sy; lm[6]  = (2*qy*qz + 2*qx*qw) * sy;   lm[7]  = 0.0f;

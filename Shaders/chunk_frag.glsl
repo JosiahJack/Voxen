@@ -98,7 +98,8 @@ void main() {
         if (useFontAtlas != 0u) { if (albedoColor.a < 0.05) discard; }
         else if (albedoColor.a < 0.05 && volume < 0.05) discard;/*Text decals cutout on SDF alpha alone; volume uniform belongs to chunk geometry*/
     }
-    vec3 adjustedNormal=Normal; if (useFontAtlas != 0u && dot(Normal, viewDir) < 0.0) adjustedNormal = -Normal;/*Text decals are double-sided; light whichever face the viewer sees*/ bool hasNormalMap=normInstanceIndex != 0; float blend = 0.0; float facing = dot(Normal, viewDir); if (distToPixel < 5.12 && hasNormalMap) blend = 1.0; else if (distToPixel < 30.0 && hasNormalMap) { blend = smoothstep(30.0,5.12,distToPixel) * smoothstep(0.1,0.4,facing); }
+    vec3 adjustedNormal=Normal; if (useFontAtlas != 0u && dot(Normal, viewDir) < 0.0) adjustedNormal = -Normal;/*Text decals are double-sided; light whichever face the viewer sees*/
+    bool hasNormalMap=normInstanceIndex != 0 && normInstanceIndex < 0xFFFF; float blend = 0.0; float facing = dot(Normal, viewDir); if (distToPixel < 5.12 && hasNormalMap) blend = 1.0; else if (distToPixel < 30.0 && hasNormalMap) { blend = smoothstep(30.0,5.12,distToPixel) * smoothstep(0.1,0.4,facing); }
     if (hasNormalMap && blend > 0.01) {
         vec3 dp1=dFdx(FragPos),dp2=dFdy(FragPos); vec2 duv1=dFdx(TexCoord),duv2=dFdy(TexCoord); float uvArea=abs(duv1.x*duv2.y - duv1.y*duv2.x);
         if (uvArea > 0.000000001) {
@@ -106,11 +107,11 @@ void main() {
             normalColor.g = -normalColor.g; vec3 transformed=mat3(t,b,adjustedNormal)*normalColor; transformed *= inversesqrt(dot(transformed,transformed)); if(dot(transformed,Normal) < 0.0)transformed=Normal; adjustedNormal=mix(Normal,transformed,blend);
         }
     }
-    vec4 glowColor=vec4(0.0); if(glowIndex != 0){ivec2 texSizeGlow=textureSizes[glowIndex]; glowColor=getTextureColorBilinear(glowIndex,fract(uv),texSizeGlow);} vec4 specColor=vec4(0.0); if(specIndex != 0){ivec2 texSizeSpec=textureSizes[specIndex]; specColor=getTextureColor(specIndex,ivec2(fract(uv)*vec2(texSizeSpec)),texSizeSpec);}
+    vec4 glowColor=vec4(0.0); if (glowIndex != 0 && glowIndex < 0xFFFF) { ivec2 texSizeGlow=textureSizes[glowIndex]; glowColor=getTextureColorBilinear(glowIndex,fract(uv),texSizeGlow);} vec4 specColor=vec4(0.0); if(specIndex != 0 && specIndex < 0xFFFF){ivec2 texSizeSpec=textureSizes[specIndex]; specColor=getTextureColor(specIndex,ivec2(fract(uv)*vec2(texSizeSpec)),texSizeSpec);}
     float dotNV=dot(adjustedNormal,viewDir); float absDot=abs(dotNV); float boostBlend=clamp((0.2588-absDot)/0.2588,0.0,1.0); float reduceBlend=1.0-smoothstep(-1.0,-0.9659,dotNV); vec4 specBlend=mix(mix(specColor,min(specColor+vec4(0.5),vec4(1.0)),boostBlend),max(specColor-vec4(0.25),vec4(0.05)),reduceBlend);
     if(reflectionsEnabled > 0){outSpecular=specBlend; outNormal=EncodeOctahedral(adjustedNormal)*0.5 + 0.5;}/*Map to [0,1]*/ uint voxelIdx=GetVoxelIndex(worldPos); uint count=voxelLightListCounts[voxelIdx]; if(unlit>0 || useCamView>0)count=0; vec3 lighting=vec3(0.0);
     float iTot=0.0; float strength=(useStrengthMod>0) ? 1.0 : max(specColor.r,max(specColor.g,specColor.b))*4.51; float shadSizeMaxUV=shadowMapSizeF-1.0;
-    for (uint i = 0u; i < count; i++) {
+    for (uint i=0u;i<count;i++) {
         uint lightIdx = uniqueLightLists[(voxelIdx * maxLightsPerVoxel) + i]; vec3 lightPos = lights[lightIdx].pos; float intensity = lights[lightIdx].intensity; float range = lights[lightIdx].range; float invRange = 1.0 / range; vec3 toLight = lightPos - worldPos; float dist = length(toLight); vec3 lightDir = toLight * (1.0 / dist);
         float NdotL = dot(adjustedNormal, lightDir); float lambertian = clamp(NdotL,0.0,1.0); float distOverRange=dist*invRange; float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian; if (attenuation < 0.03) continue; float spotAng = lights[lightIdx].spotAng; float spotFalloff = 1.0;
         if (spotAng > 0.0) { // Extremely rare, only ~15 spot lights in entire game out of several thousand lights.

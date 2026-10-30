@@ -454,6 +454,7 @@ typedef struct { u16 level,inst; u8 anchor,align; float lineSp; } DecalStyle;
 extern DecalStyle decalStyles[DECAL_STYLE_MAX]; extern u16 decalStyleCount;
 extern AnimationClip mdlAnimClips[MAXANIM][MAX_ANIMCLIPS]; bool FrobHeldItemIntoPanel(V3 p,V3 f,V3 r); extern BvhNode** modelBVHNodes; extern u16** modelBVHTriOrder; extern u32 modelBVHTriOrderCounts[MAX_MDLS]; extern FHandle console_log_file; extern const char* sounds[SOUNDS_COUNT]; extern V3 lanternPos; extern u16 headmountedLanternLight; extern u16 weaponVModelIndex; extern double last_mouse_x,last_mouse_y;
 typedef struct { u16 modelIndex,colMeshIndex,texIndex,glowIndex,specIndex,normIndex; float mass; u8 animationNum; ColliderType col; V3 colCtr,colSz; } EPerms;
+void Mat4FromTRS(const float*,const float*,const float*,float*);
 extern EPerms EDefs[MAX_ENTITIES]; extern Entity* entsFromFile; extern u16 fwParentOf[INSTANCE_COUNT];/*instance -> owning func_wall mover_target, 0 == none; per-level, restored for the current level in SetLevelPointers*/ extern const char* audioLogs[LOGCNT]; extern u32 gridCellStates[ARRSIZE];
 extern float berserkSeedTime,rasterPerspectiveProjection[16],shadowmapsPerspectiveProjection[16],lightView[LIGHT_COUNT][6][4][4],lightViewProj[LIGHT_COUNT][6][16]; extern V3 ressurectionLocations[]; extern void PlayTrack(TrackType,MusicType);
 typedef struct { V3 normal; float d; } FrustumPlane; extern FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6],playerFrustumPlanes[6];
@@ -469,7 +470,7 @@ bool HudHeatTickOn(int);
 double get_time();
 float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
 void ApplyImpactForceSphere(DamageData*,V3,float,float);
-void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void), DebugRAMActual(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
+void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void), DebugRAM(const char*), DebugRAMActual(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
      play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),PlayVmail(u8),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
      LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
