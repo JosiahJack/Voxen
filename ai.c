@@ -2,37 +2,39 @@
 #include "common.h"
 u16 npcCountInWorldPerType[NUM_AI_TYPES];
 void TextureSequenceStart(u16,u8);    bool PositionVisibleFromPlayerCell(float,float), XZPairInBounds(i32,i32);    u16 AddLightSimple(V3,Color3,float,float,u16);    Quaternion quat_normalize(Quaternion);
-// Name, AtkTyp1,2,3, Dmg1,2,3, Range1,2,3, Health,CybHealth,Armr,Def,Movtyp,Yawspd, FOV,FOVStartMov, DistToSeeBehind,SightRange, WalkSpd,RunSpd,AtkSpd1,2,3, AtkForce3,AtkRad3, TtPain,TbwPain,TtDead,TtActualAtk1,2,3, TbwAtk1,2,3, TEnemChg,TIdleSFXMin,Max, TAtk1WaitMin,Max,Chnc, TAtk2WaitMin,Max,Chnc, TAtk3WaitMin,Max,Chnc,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType, AtkProj1,2,3
+// Name, attacks[3] (type,damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed,hasLaser,projectilePrefab), remaining NPCTable fields.
 const NPCTable npcTable[NUM_AI_TYPES] = {
-    /* 0*/{"AUTOBOMB"              , 0,0,1,  0,  0,200,   0,    0,2.4,50,0,40,1,1,300,180,55,3.84,50,2.5,2.5,0,0,0,100,6,0,0,0.1,0,0,0,0,0,0,3,5,12,0.5,1,0.1,1,3,0.5,0,0,0,0,0,0,0,0,0,1,20,0,0,0,10,3,0,2,0,0,0 },
-    /* 1*/{"CYBORG ASSASSIN"       , 0,5,8, 30, 50, 35, 3.3,10,20,65,0,5,4,1,180,180,15,3.2,50,2,2,0,0,0,0,0,0.45,5,2.083,0,0.25,0.2,0.91,0.91,1.58,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,3,0,0,0,0,60,0,0,0,10,3,0,3,0,0,489},
-    /* 2*/{"AVIAN MUTANT"          , 1,0,0, 40, 40,  0, 3.3,   10,20,125,0,0,2,2,180,180,15,5.12,50,2,2,3.5,0,0,0,0,2,5,1,0.1,0,0,1,0,0,3,5,12,0.5,1,0.1,0,0,0,0,0,0,0,0,0,0,0,0,0,60,0.65,1,0,10,3,0,1,0,0,0 },
-    /* 3*/{"EXEC-BOT"              , 0,5,0, 30, 35,  0, 3.3,10,20,225,0,40,2,1,200,180,30,4.12,50,1.5,1.5,0,0,0,0,0,0.45,7,0.15,0,0.2,0,0,1.5,0,3,5,12,0,0,0,0.97,2,0.3,0,0,0,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0},
-    /* 4*/{"CYBORG DRONE"          , 0,5,0, 20, 20, 20, 3.3,25,50,60,0,0,2,1,65,180,15,3.2,50,1.6,2.2,0,0,0,0,0,0.542,15,0.958,0,0.1,0,0,1,0,3,20,45,0,0,0,1,2,0.5,0,0,0,0,0,0,0,0,0,0,60,0,0,0,10,3,0,3,0,0,0},
-    /* 5*/{"CORTEX REAVER"         , 0,5,8, 80,325,125, 3.3,20,30,580,0,40,2,1,180,180,15,3.84,50,2,2,0,0,0,0,0,0.583,5,0.333,0,0.35244,0.324,0,1,1,3,15,30,0,0,0,0.2,1,0.5,8,15,1,0,0,10,0,0,0,0,600,0,0,0,10,3,0,2,0,0,372},
-    /* 6*/{"CYBORG WARRIOR"        , 0,5,8, 35, 35,150, 3.3,20,20,120,0,5,4,1,180,180,15,3.2,50,2.4,2.4,0,0,0,0,0,0.5,5,2.2,0,0.339,0.201,0,0.83,0.542,3,15,30,0,0,0,1,2,0.5,10,20,1,0,0,10,0,0,0,0,180,0,0,0,10,3,0,3,0,0,370},
-    /* 7*/{"CYBORG ENFORCER"       , 1,5,8, 60, 60, 80, 3.3,15,30,285,0,30,5,1,180,180,15,3.2,50,2.8,2.8,2.8,0,0.3,0,0,2,5,1.5,0.23471,0.393738,0.313266,0.958,0.958,0.958,5,15,30,0.1,0.3,0.1,0.1,0.5,0.5,10,25,1,0,0,10,0,0,0,0,600,0,0,0,10,3,0,4,0,0,387},
-    /* 8*/{"CYBORG ELITE GUARD"    , 1,8,5, 70, 75,  0, 3.3,10,50,380,0,50,6,1,180,180,15,3.2,50,3,3,1.5,0,0,0,0,0.4665,5,1.5,0.5,0.2653,0.117045,0.733,0.7,0.867,5,15,30,0.05,0.2,0.1,0.5,2,0.8,2,3,0.5,0,2,0,0,1,0,0,600,0,0,0,15,3,0,4,0,490,0},
-    /* 9*/{"CYBORG OF EDWARD DIEGO", 1,8,0, 80, 95,  0, 3.3,40,50,900,0,55,6,1,180,180,15,3.2,50,2.8,2.8,0,0,0,0,0,0,0,0,0.28,0.363188,0.2,1.4,0.833,3,5,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,2.5,0,0,0,0,0,600,0,0,0,15,3,0,4,0,490,0},
-    /*10*/{"SECURITY-1 ROBOT"      , 0,5,0, 35, 35,  0, 3.3,10,20,170,0,40,4,2,180,180,15,4.12,50,2.5,2.5,1.5,0,0,0,0,2,5,0.05,0.5,0.1,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,600,1.28,0,0,10,3,0,2,0,0,0},
-    /*11*/{"SECURITY-2 ROBOT"      , 0,5,5, 65, 65, 15, 3.3,5,35,300,0,50,5,1,180,180,25,4.12,50,1.5,1.5,1.5,0,0,0,0,0.75,5,0.25,0.5,0.39,0.1,1.2,1,1.5,3,5,12,0.5,1,0.1,3,3.5,1,2.5,3.5,1,0,0,0,0,0,0,0,600,0,0,0,10,3,0,2,0,0,0},
-    /*12*/{"MAINTENANCE ROBOT"     , 1,0,0, 25, 25,  0, 3.3,3.3,20,75,0,40,3,1,180,180,15,3.84,50,2.2,2.6,0.02,0.02,0,0,0,0,0,1.6,3,0.7,0.2,2,1.3,3,3,5,12,0.5,1,0.1,1,2,0.3,1,2,0.5,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0},
-    /*13*/{"MUTANT CYBORG"         , 1,8,0, 35, 75, 50,   2,30,49,340,0,15,6,1,180,180,15,3.2,50,1.5,1.5,0,0,0,0,0,0.583,3.5,3.41,0.265,0.285,0.2,0.625,0.75,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,2.8,0,0,0,0,0,180,0,0,0,10,3,0,5,0,491,0},
-    /*14*/{"HOPPER"                , 0,5,0, 35, 35,  0,   0,17.92,17.92,150,0,35,4,1,180,160,15,3.84,50,7,7,0,0,0,0,0,0.708,5,0,0.5,0.1,0.5,0.5,0.5,0.5,3,5,12,0.5,1,0.1,0.5,1,0.5,1,2,0.5,0,0,0,0,1,0,0,180,0,0,0,10,3,1,2,0,0,0},
-    /*15*/{"HUMANOID MUTANT"       , 1,0,0, 12, 12,  0, 3.3,10,20,50,0,0,3,1,60,180,15,2.56,50,1.4,2,0.5,0,0,0,0,0.42,5,0.967,0.5,0.1,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,20,0,0,0,10,3,0,0,0,0,0},
-    /*16*/{"INVISIBLE MUTANT"      , 0,8,0, 10, 35,  0, 3.3,   20,20,350,0,0,2,2,180,180,15,2.56,50,0.7,0.7,1.5,0.7,0.7,0,0,0.875,5,1.125,0.875,0.4,0.2,1.2,0.875,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,2,0,0,0,0,0,60,0.32,0,1,10,3,0,0,0,486,0 },
-    /*17*/{"VIRUS MUTANT"          , 0,8,0, 45, 30,  0, 3.3,20,20,140,0,0,3,1,180,180,15,2.56,50,2.5,2.5,2.5,0.3,0,0,0,0.542,3,1.792,0.2874,0.2874,0.2874,0.958,0.958,0.958,3,5,12,0.5,1,0.1,0.5,0,0.5,1,2,0.5,0,1.75,0,0,0,0,0,20,0,0,0,10,3,0,1,0,481,0},
-    /*18*/{"SERV-BOT"              , 1,0,0,  8,  0,  0, 3.3,10,20,20,0,20,2,1,180,180,15,3.84,50,2,2,1.2,0,0,0,0,1.125,2,0.98,0.2,0.1,0.2,0.834,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0},
-    /*19*/{"FLIER BOT"             , 0,5,8, 30,150,  0, 3.3,   35,40,75,0,30,2,2,180,180,15,5.12,50,1.5,1.5,1.5,0,0,0,0,1.375,5,0.6,0.1,0.1,0.2,1,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,10,12,1,0,0,10,0,0,0,0,180,0.85,1,0,10,3,0,2,0,0,404 },
-    /*20*/{"ZERO-G MUTANT"         , 0,8,0, 20, 20,  0, 3.3,   20,20,90,0,0,2,2,180,180,15,2.56,50,0.8,1.4,0,0.8,0,0,0,0.1,0,0.1,0.5,0.05,0.2,1.2,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,2,0,0,0,0,0,60,1.96,0,0,10,3,0,0,0,488,0 },
-    /*21*/{"GORILLA TIGER MUTANT"  , 1,0,0, 60, 60,  0, 3.3,3.84,20,200,0,0,3,1,180,180,15,2.56,50,3,3.5,1,2,0,0,0,0.667,5,1.625,0.5,0.1,0.2,0.958,1.042,3,3,15,30,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,60,0,0,0,10,3,0,1,0,0,0},
-    /*22*/{"REPAIR BOT"            , 0,5,0, 12, 12,  0, 3.3,3.3,20,65,0,25,3,1,180,180,15,3.84,50,2.25,3,0.5,0,0,0,0,0,0,0.05,0.2,0.1,0.2,1.25,1.5,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,0,0,0,0,0,0,180,0,0,0,10,3,0,2,0,0,0},
-    /*23*/{"PLANT MUTANT"          , 0,8,0, 35, 25,  0, 3.3,   20,20,115,0,0,1,1,180,180,15,2.56,50,0.8,1.2,0.1,0,0,0,0,0.375,2,2.208,0.89,0.82,0.2,1.91,1.027,3,3,5,12,0.5,1,0.1,1,2,0.5,1,2,0.5,0,3.5,0,0,0,0,0,20,0,0,0,10,3,0,0,0,487,0 },
-    /*24*/{"CYBER DOG"             , 0,8,0,  0, 25,  0,   0,20,0,0,20,0,1,4,250,240,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.3,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1.5,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,493,0},
-    /*25*/{"CYBER GUARD"           , 0,8,0,  0, 25,  0,   0,20,0,0,35,0,1,4,250,240,15,20.48,25.6,2,2,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0.8,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,493,0},
-    /*26*/{"CYBER RAM"             , 0,8,0,  0, 35,  0,   0,20,0,0,40,0,1,4,80,240,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,1.2,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0},
-    /*27*/{"CYBER CORTEX REAVER"   , 0,8,0,  0, 45,  0,   0,20,0,0,80,0,1,4,80,240,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0},
-    /*28*/{"SHODAN"                , 0,8,0,  0, 55,  0,   0,20,0,0,500,0,1,4,360,280,15,20.48,25.6,0,0,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.05,0,2,998,999,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0}};
+    /* 0*/{"AUTOBOMB",{{0,0,0,0,0,0,0.5,1,0.1,0,0,0},{0,0,0,0,0,0,1,3,0.5,0,0,0},{1,200,2.4,0,0,0,0,0,0,0,0,0}},50,0,40,1,1,300,180,55,3.84,50,2.5,2.5,100,6,0,0,0.1,3,5,12,1,20,0,0,0,10,3,0,2},
+    /* 1*/{"CYBORG ASSASSIN",{{0,30,3.3,0,0,0.91,0.5,1,0.1,0,0,0},{5,50,10,0,0.25,0.91,1,2,0.5,0,0,0},{8,35,20,0,0.2,1.58,1,2,0.5,3,0,489}},65,0,5,4,1,180,180,15,3.2,50,2,2,0,0,0.45,5,2.083,3,5,12,0,60,0,0,0,10,3,0,3},
+    /* 2*/{"AVIAN MUTANT",{{1,40,3.3,3.5,0.1,1,0.5,1,0.1,0,0,0},{0,40,10,0,0,0,0,0,0,0,0,0},{0,0,20,0,0,0,0,0,0,0,0,0}},125,0,0,2,2,180,180,15,5.12,50,2,2,0,0,2,5,1,3,5,12,0,60,0.65,1,0,10,3,0,1},
+    /* 3*/{"EXEC-BOT",{{0,30,3.3,0,0,0,0,0,0,0,0,0},{5,35,10,0,0.2,1.5,0.97,2,0.3,0,0,0},{0,0,20,0,0,0,0,0,0,0,0,0}},225,0,40,2,1,200,180,30,4.12,50,1.5,1.5,0,0,0.45,7,0.15,3,5,12,0,180,0,0,0,10,3,0,2},
+    /* 4*/{"CYBORG DRONE",{{0,20,3.3,0,0,0,0,0,0,0,0,0},{5,20,25,0,0.1,1,1,2,0.5,0,0,0},{0,20,50,0,0,0,0,0,0,0,0,0}},60,0,0,2,1,65,180,15,3.2,50,1.6,2.2,0,0,0.542,15,0.958,3,20,45,0,60,0,0,0,10,3,0,3},
+    /* 5*/{"CORTEX REAVER",{{0,80,3.3,0,0,0,0,0,0,0,0,0},{5,325,20,0,0.35244,1,0.2,1,0.5,0,0,0},{8,125,30,0,0.324,1,8,15,1,10,0,372}},580,0,40,2,1,180,180,15,3.84,50,2,2,0,0,0.583,5,0.333,3,15,30,0,600,0,0,0,10,3,0,2},
+    /* 6*/{"CYBORG WARRIOR",{{0,35,3.3,0,0,0,0,0,0,0,0,0},{5,35,20,0,0.339,0.83,1,2,0.5,0,0,0},{8,150,20,0,0.201,0.542,10,20,1,10,0,370}},120,0,5,4,1,180,180,15,3.2,50,2.4,2.4,0,0,0.5,5,2.2,3,15,30,0,180,0,0,0,10,3,0,3},
+    /* 7*/{"CYBORG ENFORCER",{{1,60,3.3,2.8,0.23471,0.958,0.1,0.3,0.1,0,0,0},{5,60,15,0,0.393738,0.958,0.1,0.5,0.5,0,0,0},{8,80,30,0.3,0.313266,0.958,10,25,1,10,0,387}},285,0,30,5,1,180,180,15,3.2,50,2.8,2.8,0,0,2,5,1.5,5,15,30,0,600,0,0,0,10,3,0,4},
+    /* 8*/{"CYBORG ELITE GUARD",{{1,70,3.3,1.5,0.5,0.733,0.05,0.2,0.1,0,0,0},{8,75,10,0,0.2653,0.7,0.5,2,0.8,2,1,490},{5,0,50,0,0.117045,0.867,2,3,0.5,0,0,0}},380,0,50,6,1,180,180,15,3.2,50,3,3,0,0,0.4665,5,1.5,5,15,30,0,600,0,0,0,15,3,0,4},
+    /* 9*/{"CYBORG OF EDWARD DIEGO",{{1,80,3.3,0,0.28,1.4,0.5,1,0.1,0,0,0},{8,95,40,0,0.363188,0.833,1,2,0.5,2.5,0,490},{0,0,50,0,0.2,3,1,2,0.5,0,0,0}},900,0,55,6,1,180,180,15,3.2,50,2.8,2.8,0,0,0,0,0,5,15,30,0,600,0,0,0,15,3,0,4},
+    /*10*/{"SECURITY-1 ROBOT",{{0,35,3.3,1.5,0.5,1.2,0.5,1,0.1,0,0,0},{5,35,10,0,0.1,1.5,1,2,0.5,0,0,0},{0,0,20,0,0.2,3,1,2,0.5,0,0,0}},170,0,40,4,2,180,180,15,4.12,50,2.5,2.5,0,0,2,5,0.05,3,5,12,0,600,1.28,0,0,10,3,0,2},
+    /*11*/{"SECURITY-2 ROBOT",{{0,65,3.3,1.5,0.5,1.2,0.5,1,0.1,0,0,0},{5,65,5,0,0.39,1,3,3.5,1,0,0,0},{5,15,35,0,0.1,1.5,2.5,3.5,1,0,0,0}},300,0,50,5,1,180,180,25,4.12,50,1.5,1.5,0,0,0.75,5,0.25,3,5,12,0,600,0,0,0,10,3,0,2},
+    /*12*/{"MAINTENANCE ROBOT",{{1,25,3.3,0.02,3,2,0.5,1,0.1,0,0,0},{0,25,3.3,0.02,0.7,1.3,1,2,0.3,0,0,0},{0,0,20,0,0.2,3,1,2,0.5,0,0,0}},75,0,40,3,1,180,180,15,3.84,50,2.2,2.6,0,0,0,0,1.6,3,5,12,0,180,0,0,0,10,3,0,2},
+    /*13*/{"MUTANT CYBORG",{{1,35,2,0,0.265,0.625,0.5,1,0.1,0,0,0},{8,75,30,0,0.285,0.75,1,2,0.5,2.8,0,491},{0,50,49,0,0.2,3,1,2,0.5,0,0,0}},340,0,15,6,1,180,180,15,3.2,50,1.5,1.5,0,0,0.583,3.5,3.41,3,5,12,0,180,0,0,0,10,3,0,5},
+    /*14*/{"HOPPER",{{0,35,0,0,0.5,0.5,0.5,1,0.1,0,0,0},{5,35,17.92,0,0.1,0.5,0.5,1,0.5,0,1,0},{0,0,17.92,0,0.5,0.5,1,2,0.5,0,0,0}},150,0,35,4,1,180,160,15,3.84,50,7,7,0,0,0.708,5,0,3,5,12,0,180,0,0,0,10,3,1,2},
+    /*15*/{"HUMANOID MUTANT",{{1,12,3.3,0.5,0.5,1.2,0.5,1,0.1,0,0,0},{0,12,10,0,0.1,1.5,1,2,0.5,0,0,0},{0,0,20,0,0.2,3,1,2,0.5,0,0,0}},50,0,0,3,1,60,180,15,2.56,50,1.4,2,0,0,0.42,5,0.967,3,5,12,0,20,0,0,0,10,3,0,0},
+    /*16*/{"INVISIBLE MUTANT",{{0,10,3.3,1.5,0.875,1.2,0.5,1,0.1,0,0,0},{8,35,20,0.7,0.4,0.875,1,2,0.5,2,0,486},{0,0,20,0.7,0.2,3,1,2,0.5,0,0,0}},350,0,0,2,2,180,180,15,2.56,50,0.7,0.7,0,0,0.875,5,1.125,3,5,12,0,60,0.32,0,1,10,3,0,0},
+    /*17*/{"VIRUS MUTANT",{{0,45,3.3,2.5,0.2874,0.958,0.5,1,0.1,0,0,0},{8,30,20,0.3,0.2874,0.958,0.5,0,0.5,1.75,0,481},{0,0,20,0,0.2874,0.958,1,2,0.5,0,0,0}},140,0,0,3,1,180,180,15,2.56,50,2.5,2.5,0,0,0.542,3,1.792,3,5,12,0,20,0,0,0,10,3,0,1},
+    /*18*/{"SERV-BOT",{{1,8,3.3,1.2,0.2,0.834,0.5,1,0.1,0,0,0},{0,0,10,0,0.1,1.5,1,2,0.5,0,0,0},{0,0,20,0,0.2,3,1,2,0.5,0,0,0}},20,0,20,2,1,180,180,15,3.84,50,2,2,0,0,1.125,2,0.98,3,5,12,0,180,0,0,0,10,3,0,2},
+    /*19*/{"FLIER BOT",{{0,30,3.3,1.5,0.1,1,0.5,1,0.1,0,0,0},{5,150,35,0,0.1,1.5,1,2,0.5,0,0,0},{8,0,40,0,0.2,3,10,12,1,10,0,404}},75,0,30,2,2,180,180,15,5.12,50,1.5,1.5,0,0,1.375,5,0.6,3,5,12,0,180,0.85,1,0,10,3,0,2},
+    /*20*/{"ZERO-G MUTANT",{{0,20,3.3,0,0.5,1.2,0.5,1,0.1,0,0,0},{8,20,20,0.8,0.05,1.5,1,2,0.5,2,0,488},{0,0,20,0,0.2,3,1,2,0.5,0,0,0}},90,0,0,2,2,180,180,15,2.56,50,0.8,1.4,0,0,0.1,0,0.1,3,5,12,0,60,1.96,0,0,10,3,0,0},
+    /*21*/{"GORILLA TIGER MUTANT",{{1,60,3.3,1,0.5,0.958,0.5,1,0.1,0,0,0},{0,60,3.84,2,0.1,1.042,1,2,0.5,0,0,0},{0,0,20,0,0.2,3,1,2,0.5,0,0,0}},200,0,0,3,1,180,180,15,2.56,50,3,3.5,0,0,0.667,5,1.625,3,15,30,0,60,0,0,0,10,3,0,1},
+    /*22*/{"REPAIR BOT",{{0,12,3.3,0.5,0.2,1.25,0.5,1,0.1,0,0,0},{5,12,3.3,0,0.1,1.5,1,2,0.5,0,0,0},{0,0,20,0,0.2,3,1,2,0.5,0,0,0}},65,0,25,3,1,180,180,15,3.84,50,2.25,3,0,0,0,0,0.05,3,5,12,0,180,0,0,0,10,3,0,2},
+    /*23*/{"PLANT MUTANT",{{0,35,3.3,0.1,0.89,1.91,0.5,1,0.1,0,0,0},{8,25,20,0,0.82,1.027,1,2,0.5,3.5,0,487},{0,0,20,0,0.2,3,1,2,0.5,0,0,0}},115,0,0,1,1,180,180,15,2.56,50,0.8,1.2,0,0,0.375,2,2.208,3,5,12,0,20,0,0,0,10,3,0,0},
+    /*24*/{"CYBER DOG",{{0,0,0,0,0,0,0,0,0,0,0,0},{8,25,20,0,0,0.3,0,0,0,1.5,0,493},{0,0,0,0,0,0,0,0,0,0,0,0}},0,20,0,1,4,250,240,15,20.48,25.6,2,2,0,0,0.1,0,0.5,2,0,0,0,500,0.75,0,0,10,0,0,6},
+    /*25*/{"CYBER GUARD",{{0,0,0,0,0,0,0,0,0,0,0,0},{8,25,20,0,0,0.2,0,0,0,0.8,0,493},{0,0,0,0,0,0,0,0,0,0,0,0}},0,35,0,1,4,250,240,15,20.48,25.6,2,2,0,0,0.1,0,0.5,2,998,999,0,500,0.75,0,0,10,0,0,6},
+    /*26*/{"CYBER RAM",{{0,0,0,0,0,0,0,0,0,0,0,0},{8,35,20,0,0,0.2,0,0,0,1.2,0,494},{0,0,0,0,0,0,0,0,0,0,0,0}},0,40,0,1,4,80,240,15,20.48,25.6,4,4,0,0,0.1,0,0.5,2,998,999,0,500,0.75,0,0,10,0,0,6},
+    /*27*/{"CYBER CORTEX REAVER",{{0,0,0,0,0,0,0,0,0,0,0,0},{8,45,20,0,0,0.2,0,0,0,2,0,494},{0,0,0,0,0,0,0,0,0,0,0,0}},0,80,0,1,4,80,240,15,20.48,25.6,4,4,0,0,0.1,0,0.5,2,998,999,0,500,0.75,0,0,10,0,0,6},
+    /*28*/{"SHODAN",{{0,0,0,0,0,0,0,0,0,0,0,0},{8,55,20,0,0,0.05,0,0,0,2,0,494},{0,0,0,0,0,0,0,0,0,0,0,0}},0,500,0,1,4,360,280,15,20.48,25.6,0,0,0,0,0.1,0,0.5,2,998,999,0,500,0.75,0,0,10,0,0,6},};
+
+/* sfx rows: [0] idle chatter, [1] first-sighting, [2] attack1, [3] attack2, [4] attack3, [5] death */
 static const i16 aiSFX[6][NUM_AI_TYPES] = { /*idle   */{-1,-1, -1,-1,58, -1, 59, -1, 59, 52,-1, -1,-1,-1,-1, -1,121, -1, -1, -1,121,118,-1, -1, -1, -1, -1, -1, -1},       /*sight  */{-1, -1,111,150,58,150,59,152,152, -1,150,150,151,152,150, -1,121, -1,151,150,121,119,151, -1, -1, -1, -1, -1, -1}, /*attack1*/{-1,-1,108,-1,-1,146, -1,146,252,247,-1, -1,-1,-1,-1,122, -1,108,146, -1, -1,118,-1,125,258,258,258,258,258},
                                             /*attack2*/{-1,256, -1,148,50, 50,50, 50, 50,250, 50, 50,146,259,148, -1,121, -1, -1,147, -1, -1,146, -1,258,258,258,258,258}, /*attack3*/{-1,-1, -1,-1,-1,244,244,244,245, -1,-1,149,-1,-1,-1, -1, -1, -1, -1,244, -1, -1,-1, -1,258,258,258,258,258},       /*death  */{-1, 48,110,143,48,145,48, 51, 47, 47,142,143,144, 47,162,123,120,134,144,144,120,117,144,124, -1, -1, -1, -1, -1}};
 static const float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,0.9f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
@@ -208,7 +210,6 @@ void AIAnimationControllerUpdate(u16 idx) {
     
     if(self->currentState == AIState_Dying){
         flag_set(&self->entflags, EF_ASLEEP, false); 
-        AnimationClip cl = mdlAnimClips[self->animationNum][A_DYING]; if(cl.frameEnd == cl.frameStart){ ChangeAnim(self, A_DYING); return; } 
         
         ChangeAnim(self, A_DYING);
         return;
@@ -262,19 +263,17 @@ static void AISetEnemy(u16 idx, u16 eidx) {
     if (!eidx) {return;}
     
     if (eidx == PLAYER1) {
-        u16 d = U16_MAX; bool isLive = false;
+        u16 d = U16_MAX;
         if (!World.decoyActive) { World.decoyInstance = U16_MAX; }
         else {
             u16 check_d = World.decoyInstance;
-            if (check_d >= INSTS_1ST_IDX && check_d < World.instCount && World.instances[check_d].index == CYBER_DECOY_CONST) { d = check_d; isLive = true; }
+            if (check_d >= INSTS_1ST_IDX && check_d < World.instCount && World.instances[check_d].index == CYBER_DECOY_CONST) { d = check_d; }
             else {
-                bool found = false;
-                for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if(World.instances[i].index == CYBER_DECOY_CONST){World.decoyInstance = i; d = i; isLive = true; found = true; break;} }
-                if (!found) { World.decoyInstance = U16_MAX; }
+                for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if(World.instances[i].index == CYBER_DECOY_CONST){World.decoyInstance = i; d = i; break;} }
+                if (d == U16_MAX) { World.decoyInstance = U16_MAX; }
             }
         }
-        d = isLive ? d : U16_MAX;
-        if (d != U16_MAX && npcTable[World.instances[idx].index - 419].type == NPCType_Cyber) eidx = d;
+        if (d != U16_MAX && (npcTable[World.instances[idx].index - 419].type == NPCType_Cyber)) eidx = d;
     }
     World.instances[idx].enemy=eidx; World.instances[idx].posCheckFinished=World.pauseRelativeTime + AI_POS_CHECK_DELAY; flag_set(&World.instances[idx].entflags,EF_WANDERING,false); World.instances[idx].wanderFinished=World.pauseRelativeTime;
     World.instances[idx].lastPosition = World.position[idx]; World.instances[idx].targettingPosition = (V3){World.position[eidx].x,World.position[eidx].y + AI_TARGET_OFFSET_Y,World.position[eidx].z}; AISetHuntFinished(idx);
@@ -394,8 +393,8 @@ static void AIHunt(Entity* self) {
 
 static float DistToEnemy(u16 self, u16 enem) { if(self >= World.instCount){return 100000.0f;} if(enem >= World.instCount){return 100000.0f;} V3 d = V3_AsubB(ai_sight_pos(&World.instances[self]),World.position[enem]); return V3_dot(d,d); }
 static bool AICanAttack(u16 selfIdx, float dsq, u8 type, float dsqToEnemy) {
-    Entity* self = &World.instances[selfIdx]; const NPCTable* npc = &npcTable[self->index - 419]; bool cyber = npc->type == NPCType_Cyber; if (dsqToEnemy >= dsq) return false; AttType att = type == 3 ? npc->attackType3 : (type == 2 ? npc->attackType2 : npc->attackType); if (att == Att_None) return false;
-    if (type == 3) { if (dsqToEnemy < 49.0f && att == Att_Ball)/*DistToEnemy returns SQUARED distance; Unity linear <7f == squared <49*/ { int p = npc->projectile3Prefab; if(p == 370 || p == 372 || p == 387 || p == 404){return false;} } } if (cyber/*Cyber enemies are dumb but aggressive.*/) return true;
+    Entity* self = &World.instances[selfIdx]; const NPCTable* npc = &npcTable[self->index - 419]; bool cyber = npc->type == NPCType_Cyber; if (dsqToEnemy >= dsq) return false; AttType att = type == 3 ? npc->attack[2].type : (type == 2 ? npc->attack[1].type : npc->attack[0].type); if (att == Att_None) return false;
+    if (type == 3) { if (dsqToEnemy < 49.0f && att == Att_Ball)/*DistToEnemy returns SQUARED distance; Unity linear <7f == squared <49*/ { int p = npc->attack[2].projectilePrefab; if(p == 370 || p == 372 || p == 387 || p == 404){return false;} } } if (cyber/*Cyber enemies are dumb but aggressive.*/) return true;
     if ((!(self->entflags & EF_ENEM_IN_FRONT)) || (type >= 2 && !(self->entflags & EF_ENEM_IN_FOV))){return false;} float wait = type == 3 ? self->randWaitAtt3Finished : (type == 2 ? self->randWaitAtt2Finished : self->randWaitAtt1Finished); return wait < World.pauseRelativeTime;
 }
 
@@ -409,7 +408,7 @@ static double ai_attack_clip_time(const Entity* self, int slot) {
 }
 
 static void AIStartAttack(Entity* self, int n) {
-    AIBrakingMovement(self); const NPCTable* npc = &npcTable[self->index - 419]; double between, toActual; switch (n) { case 1: between = npc->timeBetweenAttack1; toActual = npc->timeToActualAttack1; break; case 2: between = npc->timeBetweenAttack2; toActual = npc->timeToActualAttack2; break; default: between = npc->timeBetweenAttack3; toActual = npc->timeToActualAttack3; break; }
+    AIBrakingMovement(self); const NPCTable* npc = &npcTable[self->index - 419]; double between, toActual; switch (n) { case 1: between = npc->attack[0].timeBetween; toActual = npc->attack[0].timeToActual; break; case 2: between = npc->attack[1].timeBetween; toActual = npc->attack[1].timeToActual; break; default: between = npc->attack[2].timeBetween; toActual = npc->attack[2].timeToActual; break; }
     double clipTime = ai_attack_clip_time(self, n);
     double dur = clipTime > 0.0 ? (clipTime > toActual ? clipTime : toActual) : between + toActual;
     self->attackFinished = World.pauseRelativeTime + dur; self->gracePeriodFinished = World.pauseRelativeTime + toActual; self->currentState = (AIState)(AIState_Attack1 + (n - 1));
@@ -423,7 +422,7 @@ static void AIRun(u16 selfIdx) {
     }
     if (!(self->entflags & EF_ENEM_IN_SIGHT)) { if(self->huntFinished > World.pauseRelativeTime){AIHunt(self);} else {self->enemy=0; flag_set(&self->entflags,EF_WANDERING,true); self->wanderFinished=World.pauseRelativeTime + 1.0; self->currentState=AIState_Walk;} return; }
     if (self->enemy && !(self->entflags & EF_WANDERING)) { self->targettingPosition=(V3){World.position[self->enemy].x,World.position[self->enemy].y + AI_TARGET_OFFSET_Y,World.position[self->enemy].z}; self->currentDestination=self->targettingPosition; }
-    flag_set(&self->entflags,EF_SHOT_FIRED,false); AISetHuntFinished(selfIdx); float nr = npc->range, near = nr * nr, mr = npc->range2, mid  = mr * mr, fr = npc->range3, far  = fr * fr, rangeToEnemy = DistToEnemy(selfIdx,self->enemy);/*computed once for all three checks: the target can't move within the same think tick*/
+    flag_set(&self->entflags,EF_SHOT_FIRED,false); AISetHuntFinished(selfIdx); float nr = npc->attack[0].range, near = nr * nr, mr = npc->attack[1].range, mid  = mr * mr, fr = npc->attack[2].range, far  = fr * fr, rangeToEnemy = DistToEnemy(selfIdx,self->enemy);/*computed once for all three checks: the target can't move within the same think tick*/
     if (AICanAttack(selfIdx,near,1,rangeToEnemy)) { AIStartAttack(self,1); return; } if (AICanAttack(selfIdx, mid,2,rangeToEnemy)) { AIStartAttack(self,2); return; } if (AICanAttack(selfIdx, far,3,rangeToEnemy)) { AIStartAttack(self,3); return; }
     if (npc->moveType != AIMoveType_None && rangeToEnemy > AI_STOP_DIST_SQ) { if (AIWithinAngleToTarget(self)) { if (npc->hopsOnMove && !(World.instances[selfIdx].entflags & EF_ACT_AS_TURRET)){ AIHopMove(selfIdx); } else { AIRunMove(selfIdx); } } else if (World.diffCbt >= 2 && random_range(0.0f,1.0f) < 0.5f) { AIFace(self,self->currentDestination); } }
 }
@@ -505,7 +504,7 @@ static void AIDead(u16 idx) {
         V3 gibPos = World.position[idx];
         Quaternion gibRot = World.rotation[idx];
         for (u16 gibConst=range.first;gibConst<=range.last;++gibConst) {
-            u16 gib = SpawnDynamicObject(gibConst, false);
+            u16 gib = SpawnDynamicObject(gibConst);
             if (!EntIdxIsValid(gib) || gib == idx) continue;
             World.position[gib] = gibPos;
             World.rotation[gib] = gibRot;
@@ -529,8 +528,8 @@ static void AIDead(u16 idx) {
     flag_set(&World.instances[idx].entflags, EF_DEAD_CHECKS_DONE, true);
 }
 
-static DamageData SetNPCData(Entity* self, int n){DamageData dd={0}; const NPCTable* npc=&npcTable[self->index - 419]; dd.owner=(u16)(self - World.instances); switch(n){case 1:dd.damage=npc->damage; dd.attackType=npc->attackType; break; case 2:dd.damage=npc->damage2; dd.attackType=npc->attackType2; break; default:dd.damage=npc->damage3; dd.attackType=npc->attackType3; break;} return dd;}
-float GetDamageTakeAmount(DamageData* dd);
+static DamageData SetNPCData(Entity* self, int n) { const NPCAttack* a=&npcTable[self->index-419].attack[n==1 ? 0 : n==2 ? 1 : 2]; return (DamageData){.owner=(u16)(self-World.instances),.damage=a->damage,.attackType=a->type}; }
+float GetDamageTakeAmount(DamageData*);
 static void ai_apply_damage(DamageData dd, u16 hitIdx) {
     if(!hitIdx || hitIdx >= INSTANCE_COUNT || hitIdx >= World.instCount){return;}
     if(hitIdx == dd.owner){return;} // Never hurt self (melee/projectile origin sits inside own capsule).
@@ -544,21 +543,19 @@ static void ai_apply_damage(DamageData dd, u16 hitIdx) {
 }
 static void AIApplyAttackMovement(Entity* self, float speed) { u16 eidx=self->enemy; if(!eidx)return; if(self->entflags & EF_ACT_AS_TURRET){self->currentDestination=ai_sight_pos(self); return;} if(speed<=0||self->tranquilizeFinished>=World.pauseRelativeTime)return; self->currentDestination=World.position[eidx]; if(V3_SqDist(ai_sight_pos(self),self->currentDestination)<=AI_STOP_DIST_SQ)return; if(!AIWithinAngleToTarget(self))return; AddForce((u16)(self-World.instances),V3_ScaleByF(self->forward,speed),false); }
 static void AITransitionAttackToRun(Entity* self, int n) {
-    flag_set(&self->entflags,EF_GO_INTO_PAIN,false); self->currentState=AIState_Run; const NPCTable* npc=&npcTable[self->index - 419]; float chance,wmin,wmax,*wait;
-    switch (n) {
-        case 1:  chance=npc->timeAttack1WaitChance; wmin=npc->timeAttack1WaitMin; wmax=npc->timeAttack1WaitMax; wait=&self->randWaitAtt1Finished; break; case 2:  chance=npc->timeAttack2WaitChance; wmin=npc->timeAttack2WaitMin; wmax=npc->timeAttack2WaitMax; wait=&self->randWaitAtt2Finished; break; default: chance=npc->timeAttack3WaitChance; wmin=npc->timeAttack3WaitMin; wmax=npc->timeAttack3WaitMax; wait=&self->randWaitAtt3Finished; break;
-    } *wait = (random_range(0.0f, 1.0f) < chance) ? World.pauseRelativeTime + random_range(wmin, wmax) : World.pauseRelativeTime;
+    flag_set(&self->entflags,EF_GO_INTO_PAIN,false); self->currentState=AIState_Run; const NPCTable* npc=&npcTable[self->index - 419]; const NPCAttack* a=&npc->attack[n==1 ? 0 : n==2 ? 1 : 2];
+    float* wait=n==1 ? &self->randWaitAtt1Finished : n==2 ? &self->randWaitAtt2Finished : &self->randWaitAtt3Finished;
+    *wait=random_range(0.0f,1.0f)<a->waitChance ? World.pauseRelativeTime+random_range(a->waitMin,a->waitMax) : World.pauseRelativeTime;
 }
 
 static void ProjectileRaycast(Entity* self, int n) {
-    if (n < 1 || n > 3){n = 1;} V3 spos = (n == 1) ? ai_sight_pos(self) : ai_gun_pos(self, n); u16 selfIdx=(u16)(self - World.instances); u16 eidx = self->enemy; V3 targ = eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*10.0f,spos.y,spos.z + self->forward.z*10.0f}; V3 dir=(n == 1) ? self->forward : V3_Normalize(V3_AsubB(targ,spos)); float range;
-    switch (n) { case 1: range = npcTable[self->index - 419].range; break; case 2: range = npcTable[self->index - 419].range2; break; default: range = npcTable[self->index - 419].range3; break; }
+    if (n < 1 || n > 3){n = 1;} V3 spos = (n == 1) ? ai_sight_pos(self) : ai_gun_pos(self, n); u16 selfIdx=(u16)(self - World.instances); u16 eidx = self->enemy; V3 targ = eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*10.0f,spos.y,spos.z + self->forward.z*10.0f}; V3 dir=(n == 1) ? self->forward : V3_Normalize(V3_AsubB(targ,spos)); float range=npcTable[self->index-419].attack[n-1].range;
     // Origin sits inside own capsule; push start forward so we don't hit ourselves.
     V3 opos = {spos.x + dir.x*0.55f, spos.y + dir.y*0.55f, spos.z + dir.z*0.55f};
     ai_muzzle_particles(self,n);
     RaycastHit hit = Raycast(opos, dir, range, LMASK_NPC_ATTACK); if(!hit.hit){return;} u16 hi = hit.hitInstanceIndex;
     if (hi == selfIdx){return;}
-    const NPCTable* npc=&npcTable[self->index-419]; if(n==1?npc->hasLaserOnAttack1:n==2?npc->hasLaserOnAttack2:npc->hasLaserOnAttack3)SpawnBeamTrail(166,ai_sight_pos(self),hit.point,(Color){1,1,1,1});
+    const NPCTable* npc=&npcTable[self->index-419]; if(npc->attack[n-1].hasLaser)SpawnBeamTrail(166,ai_sight_pos(self),hit.point,(Color){1,1,1,1});
     if (n == 3 && self->index == 427 && eidx) { if (Cheats.showNPC) { DrawLine(ai_sight_pos(self), World.position[eidx],(Color){1.0f,0.15f,0.18f,0.85f}); } SpawnTargetingLaser(ai_sight_pos(self),World.position[eidx]); } // Targeting laser (Cyborg Elite, attack3)
     DamageData dd = SetNPCData(self,n); dd.attackType=Att_HitS; // Citadel ProjectileRaycast always uses Projectile, even for Melee.
     dd.hitpoint=hit.point; dd.attacknormal=dir; dd.impactVelocity=dd.damage; bool hitPlayer=(hi == PLAYER1); if(hitPlayer){dd.impactVelocity *= 0.5f;} dd.isOtherNPC=!hitPlayer && IdxIsNPC(World.instances[hi].index);
@@ -567,10 +564,10 @@ static void ProjectileRaycast(Entity* self, int n) {
 
 static void ProjectileLaunched(Entity* self, int n) {
     if (n < 1 || n > 3){n = 3;} ai_muzzle_particles(self,n);
-    u16 sidx=(u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; int masterIdx; float launchSpd; switch (n) { case 1: masterIdx = npc->projectile1Prefab; launchSpd = npc->projectileSpeedAttack1; break; case 2: masterIdx = npc->projectile2Prefab; launchSpd = npc->projectileSpeedAttack2; break; default: masterIdx = npc->projectile3Prefab; launchSpd = npc->projectileSpeedAttack3; break; }
+    u16 sidx=(u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; int masterIdx=npc->attack[n-1].projectilePrefab; float launchSpd=npc->attack[n-1].projectileSpeed;
     DamageData dd = SetNPCData(self,n); dd.attackType=Att_Ball; // Citadel ProjectileLaunched always uses ProjectileLaunched.
-    V3 spos=n==1?ai_sight_pos(self):ai_gun_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370,false);
-    if (!EntIdxIsValid(bb)) bb=SpawnDynamicObject(370,false); if (!EntIdxIsValid(bb)) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir;
+    V3 spos=n==1?ai_sight_pos(self):ai_gun_pos(self,n); u16 eidx=self->enemy; V3 targ=eidx ? self->targettingPosition : (V3){spos.x + self->forward.x*20.0f,spos.y,spos.z + self->forward.z*20.0f}; V3 dir=V3_Normalize(V3_AsubB(targ,spos)); u16 bb = SpawnDynamicObject(masterIdx>0?masterIdx:370);
+    if (!EntIdxIsValid(bb)) bb=SpawnDynamicObject(370); if (!EntIdxIsValid(bb)) return; Entity* proj=&World.instances[bb]; World.layer[bb]=L_NPCBullet; World.position[bb]=spos; proj->forward=dir;
     proj->damage=dd.damage; proj->strength=dd.penetration; proj->speed=dd.offense; proj->attackType=dd.attackType; proj->recentMostActivator=sidx; ProjectileEffectImpactInitAfterLoad(bb);
     V3 shove = V3_ScaleByF(dir, launchSpd); if (vabs(World.gravity[sidx]) > 0.05f) { shove.x += World.velocity[sidx].x; shove.z += World.velocity[sidx].z; } World.velocity[bb] = (V3){0}; AddForce(bb,shove,true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
@@ -586,8 +583,8 @@ static void AIExplodeAttack(Entity* self) {
 static void AIMakeAttack(Entity* self, AttType att, int ind) { if (ind < 1 || ind > 3){ind=1;/*Melee hitscan by default.*/} switch (att) { case Att_Melee:ProjectileRaycast(self,ind); break; case Att_HitS: case Att_PjBm:ProjectileRaycast(self,ind); World.fogFac += 1; break; case Att_Ball:ProjectileLaunched(self,ind); World.fogFac += 1; break; default: break; } }
 static void AIAttack(Entity* self, int slot) {
     if (self->entflags & EF_ASLEEP) { return; }
-    u16 sidx = (u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; if (slot == 3 && npc->explodeOnAttack3) { World.fogFac += 5; AIExplodeAttack(self); return; } AIApplyAttackMovement(self, slot == 1 ? npc->attack1Speed : slot == 2 ? npc->attack2Speed : npc->attack3Speed);
-    if (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) { flag_set(&self->entflags,EF_SHOT_FIRED,true); int sat = aiSFX[slot + 1][self->index - 419]; float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = slot == 1 ? npc->timeBetweenAttack1 : slot == 2 ? npc->timeBetweenAttack2 : npc->timeBetweenAttack3;/*float: sub-second cadences truncated to 0 and lost the debounce*/ AttType attack = slot==1 ? npc->attackType : slot==2 ? npc->attackType2 : npc->attackType3;/*NPCTable holds TRANSLATED Voxen AttType values, not raw enemy_tables.csv ints: CSV 4 (Unity Projectile) -> Att_HitS (hitscan+fog), CSV 7 (Unity ProjectileLaunched) -> Att_Ball (launched+fog). AttType itself follows Unity AttackType declaration order, NOT Utils.GetAttackTypeFromInt.*/ if (*s_time < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) { play_wav(sounds[sat],AppliedFXVol(1.0f),World.position[sidx],true); *s_time=World.pauseRelativeTime + tb; } AIMakeAttack(self,attack,slot); }
+    u16 sidx = (u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; if (slot == 3 && npc->explodeOnAttack3) { World.fogFac += 5; AIExplodeAttack(self); return; } AIApplyAttackMovement(self, npc->attack[slot-1].speed);
+    if (self->gracePeriodFinished < World.pauseRelativeTime && !(self->entflags & EF_SHOT_FIRED)) { flag_set(&self->entflags,EF_SHOT_FIRED,true); int sat = aiSFX[slot + 1][self->index - 419]; float* s_time = slot == 1 ? &self->attack1SoundTime : (slot == 2 ? &self->attack2SoundTime : &self->attack3SoundTime); float tb = npc->attack[slot-1].timeBetween;/*float: sub-second cadences truncated to 0 and lost the debounce*/ AttType attack = npc->attack[slot-1].type;/*NPCTable holds TRANSLATED Voxen AttType values, not raw enemy_tables.csv ints: CSV 4 (Unity Projectile) -> Att_HitS (hitscan+fog), CSV 7 (Unity ProjectileLaunched) -> Att_Ball (launched+fog). AttType itself follows Unity AttackType declaration order, NOT Utils.GetAttackTypeFromInt.*/ if (*s_time < World.pauseRelativeTime && sat >= 0 && sat < (i16)SOUNDS_COUNT) { play_wav(sounds[sat],AppliedFXVol(1.0f),World.position[sidx],true); *s_time=World.pauseRelativeTime + tb; } AIMakeAttack(self,attack,slot); }
     if (Cheats.showNPC) { (slot == 3 && self->enemy) ? (self->index == 427 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){1.0f, 0.15f, 0.18f, 0.85f}) : self->index == 433 ? DrawLine(ai_sight_pos(self),World.position[self->enemy],(Color){0.96f,1.0f,0.0f,0.88f}) : (void)0) : (void)0; } if (self->attackFinished < World.pauseRelativeTime) AITransitionAttackToRun(self,slot);
 }
 

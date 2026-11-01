@@ -753,8 +753,8 @@ void InputProcessing() {
             if (World.invP1.hasHardware & HW_ERD) {
                 World.invP1.hardwareIsActive|=HW_ERD;
                 MFD_ResetGeneral();
-                World.Sys_UI.MFD_CenterTab=5;
-                World.Sys_UI.MFD_LefTab=2;
+                World.Sys_UI.mfdTab[0]=5;
+                World.Sys_UI.mfdTab[1]=2;
                 World.Sys_UI.mfdItemReader[0]=true;
                 World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
                 World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;

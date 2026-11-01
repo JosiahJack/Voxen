@@ -122,7 +122,7 @@ void DrawMeshCollider(u16 i) {
     u16 mi = (World.col[i] == CT_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
     u32 triCount = modelTriangleCounts[mi]; if(!triCount){return;}
     
-    float M[16]; mcpy(M, &modelMatrices[i*16], 64);
+    const float* M=&modelMatrices[i*16];
     float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
     const float* pos = physPos[mi]; const u16* tris = modelTriangles[mi];
     for (u32 j=0; j<triCount; j++) {
@@ -203,52 +203,27 @@ void DrawAngularVelocity(u16 i) {
 static i32 currentEntryLength=0, numHistory=0, historyPos=0; char consoleEntryText[T_BUFFER_SIZE],history[7][T_BUFFER_SIZE];
 V3 ressurectionLocations[10] = {{-27.386f,-54.488f,26.5941f}/*0/R*/, {40.903f,-41.372f,-30.78f}/*1*/, {30.67407f,-24.832f,10.21412f}/*2*/, {38.26813f,-14.498f,20.37825f}/*3*/, {-19.48f,-6.928f,22.954f}/*4*/, {-24.358f,13.5956f,31.8497f}/*5*/,{-22.3568f,34.7845f,-30.728f}/*6*/,  {2.228084f,51.95243f,7.532025f}/*7*/, {10.068f,59.897f,13.973f}/*8*/, {2.303f,107.77f,-38.554f}/*9*/};
 V3 cyberSpaceEntryLocations[8] = {{210.6834f,2.812f,-24.378f}/*0*/, {195.42f,-13.44f, 33.28f}/*1*/, {157.1608f,-15.53f,47.331f}/*2a, if cyberport localPosition.x < -26.0f*/, {256.0416f,-0.716f,62.48789f}/*2b level 2 secondary cyberport position*/,{126.43f,29.56733f,34.24f}/*5*/, {177.612f,3.29494f,108.7725f}/*6*/, {244.735f,41.99257f,-19.695f}/*8*/, {185.161f,84.502f,-46.04246f},/*9*/ };
-void RecallHistory(int d) { /*1 up (older),-1 down (newer)*/
-    if (d == 1) { /*up*/
-        if (historyPos>0) {
-            historyPos--;
-            scpy_to_a_from_b(consoleEntryText, history[historyPos], T_BUFFER_SIZE);
-            currentEntryLength=slen(consoleEntryText);
-        }
-    } else if (d == -1) { /*down*/
-        if (historyPos<numHistory) {
-            historyPos++;
-            if (historyPos==numHistory) {
-                consoleEntryText[0] = currentEntryLength = 0;
-            } else{
-                scpy_to_a_from_b(consoleEntryText, history[historyPos], T_BUFFER_SIZE);
-                currentEntryLength = slen(consoleEntryText);
-            }
-        }
-    }
+void RecallHistory(int d) {
+    if (d==1 && historyPos>0) --historyPos; else if (d==-1 && historyPos<numHistory) ++historyPos; else return;
+    if (historyPos==numHistory) consoleEntryText[0]=currentEntryLength=0;
+    else { scpy_to_a_from_b(consoleEntryText,history[historyPos],T_BUFFER_SIZE); currentEntryLength=slen(consoleEntryText); }
 }
 
 typedef void (*ConsoleCmdFuncNoArg)(); typedef void (*ConsoleCmdFuncInt)(int); typedef void (*ConsoleCmdFuncStr)(const char*);
-typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; void* raw;} func; enum {NOARG,CMD_INT,CMD_STR}type;} ConsoleCommand;
+typedef struct { const char* name; union {ConsoleCmdFuncNoArg noArg; ConsoleCmdFuncInt withInt; ConsoleCmdFuncStr withStr; const char* text; u8 questOp;} func; enum {NOARG,CMD_INT,CMD_STR,CMD_PRINT,CMD_QUEST}type;} ConsoleCommand;
 INLINE int CommandMatch(const char* in, const char* cmd) { while (*cmd && *in) { char c1 = c2Lower((u8)*in++); char c2 = c2Lower((u8)*cmd++); if (c1 == ' ' || c1 == '_') {c1 = ' ';} if (c2 == ' ' || c2 == '_') {c2 = ' ';} if (c1 != c2) {return 0;} } return *cmd == '\0' && (*in == '\0' || cEmpty((u8)*in) || *in == '_'); }
 void cmd_noclip() { Cheats.noclip = !Cheats.noclip; if (Cheats.noclip) { World.velocity[PLAYER1] = (V3){ 0.0f, 0.0f, 0.0f }; CenterStatusPrint("noclip: %s", Sys_Text.stringTable[1000]); /*"ACTIVATED"*/} else {CenterStatusPrint("noclip: %s", Sys_Text.stringTable[717]); /*"DISABLED"*/} }
 void cmd_showphys() { Cheats.showPhys = !Cheats.showPhys; CenterStatusPrint("showPhys: %s", Sys_Text.stringTable[Cheats.showPhys?1000:717]);/*"ACTIVATED"/"DISABLED"*/ }
 void cmd_shownpc() { Cheats.showNPC = !Cheats.showNPC; CenterStatusPrint("shownpc: %s", Sys_Text.stringTable[Cheats.showNPC ? 1000 : 717]); }
 
-static const V3 ArsenalSpawnOffsets[] = {
-    // dist 0.64
-    { 0.64f, 0.0f, 0.0f}, {-0.64f, 0.0f, 0.0f}, { 0.0f, 0.0f, 0.64f}, { 0.0f, 0.0f, -0.64f},
-    { 0.32f, 0.0f, 0.32f}, {-0.32f, 0.0f, 0.32f}, {-0.32f, 0.0f, -0.32f}, { 0.32f, 0.0f, -0.32f},
-    // dist 0.96
-    { 0.96f, 0.0f, 0.0f}, {-0.96f, 0.0f, 0.0f}, { 0.0f, 0.0f, 0.96f}, { 0.0f, 0.0f, -0.96f},
-    { 0.64f, 0.0f, 0.32f}, {-0.64f, 0.0f, 0.32f}, {-0.64f, 0.0f, -0.32f}, { 0.64f, 0.0f, -0.32f},
-    { 0.32f, 0.0f, 0.64f}, {-0.32f, 0.0f, 0.64f}, {-0.32f, 0.0f, -0.64f}, { 0.32f, 0.0f, -0.64f},
-    // dist 1.28
-    { 1.28f, 0.0f, 0.0f}, {-1.28f, 0.0f, 0.0f}, { 0.0f, 0.0f, 1.28f}, { 0.0f, 0.0f, -1.28f},
-    { 0.96f, 0.0f, 0.32f}, {-0.96f, 0.0f, 0.32f}, {-0.96f, 0.0f, -0.32f}, { 0.96f, 0.0f, -0.32f},
-    { 0.64f, 0.0f, 0.64f}, {-0.64f, 0.0f, 0.64f}, {-0.64f, 0.0f, -0.64f}, { 0.64f, 0.0f, -0.64f},
-    { 0.32f, 0.0f, 0.96f}, {-0.32f, 0.0f, 0.96f}, {-0.32f, 0.0f, -0.96f}, { 0.32f, 0.0f, -0.96f},
-    // dist 1.60
-    { 1.60f, 0.0f, 0.0f}, {-1.60f, 0.0f, 0.0f}, { 0.0f, 0.0f, 1.60f}, { 0.0f, 0.0f, -1.60f},
-    { 1.28f, 0.0f, 0.32f}, {-1.28f, 0.0f, 0.32f}, {-1.28f, 0.0f, -0.32f}, { 1.28f, 0.0f, -0.32f},
-    { 0.96f, 0.0f, 0.64f}, {-0.96f, 0.0f, 0.64f}, {-0.96f, 0.0f, -0.64f}, { 0.96f, 0.0f, -0.64f},
-    { 0.64f, 0.0f, 0.96f}, {-0.64f, 0.0f, 0.96f}, {-0.64f, 0.0f, -0.96f}, { 0.64f, 0.0f, -0.96f},
-    { 0.32f, 0.0f, 1.28f}, {-0.32f, 0.0f, 1.28f}, {-0.32f, 0.0f, -1.28f}, { 0.32f, 0.0f, -1.28f},
+static const i8 ArsenalSpawnOffsets[][2]={
+    {2,0},{-2,0},{0,2},{0,-2},{1,1},{-1,1},{-1,-1},{1,-1},
+    {3,0},{-3,0},{0,3},{0,-3},{2,1},{-2,1},{-2,-1},{2,-1},
+    {1,2},{-1,2},{-1,-2},{1,-2},{4,0},{-4,0},{0,4},{0,-4},
+    {3,1},{-3,1},{-3,-1},{3,-1},{2,2},{-2,2},{-2,-2},{2,-2},
+    {1,3},{-1,3},{-1,-3},{1,-3},{5,0},{-5,0},{0,5},{0,-5},
+    {4,1},{-4,1},{-4,-1},{4,-1},{3,2},{-3,2},{-3,-2},{3,-2},
+    {2,3},{-2,3},{-2,-3},{2,-3},{1,4},{-1,4},{-1,-4},{1,-4},
 };
 
 static bool IsCellOpenAt(V3 pos) {
@@ -263,11 +238,10 @@ static bool IsCellOpenAt(V3 pos) {
 
 static void SpawnArsenalItem(u16 constIndex, int* offsetIdx) {
     V3 ppos = World.position[PLAYER1];
-    for (int i = *offsetIdx; i < (int)(sizeof(ArsenalSpawnOffsets)/sizeof(V3)); ++i) {
-        V3 spawnPos = V3_AplusB(ppos, ArsenalSpawnOffsets[i]);
-        spawnPos.y = ppos.y; // prefer player Y level
+    for (int i = *offsetIdx; i < (int)(sizeof(ArsenalSpawnOffsets)/sizeof(ArsenalSpawnOffsets[0])); ++i) {
+        V3 spawnPos={ppos.x+ArsenalSpawnOffsets[i][0]*0.32f,ppos.y,ppos.z+ArsenalSpawnOffsets[i][1]*0.32f};
         if (IsCellOpenAt(spawnPos)) {
-            u16 spawned = SpawnDynamicObject(constIndex, true);
+            u16 spawned = SpawnDynamicObject(constIndex);
             if (EntIdxIsValid(spawned)) {
                 World.position[spawned] = spawnPos;
                 World.velocity[spawned] = (V3){0};
@@ -279,42 +253,26 @@ static void SpawnArsenalItem(u16 constIndex, int* offsetIdx) {
 }
 
 void EnableCheatArsenal(u8 level) {
-    int offsetIdx = 0;
-    #define SPAWN(c) SpawnArsenalItem(c, &offsetIdx)
-    switch(level) {
-        case 1: // Medical: pipe, dartgun, pistol, sparqbeam, stungun, ammo tranq(x2), ammo needle(x3), ammo standard, battery(x2), berserk(x2), staminup(x2), medi(x2), navunit, system, ereader
-            SPAWN(349); SPAWN(345); SPAWN(352); SPAWN(357); SPAWN(358); SPAWN(374); SPAWN(374); SPAWN(373); SPAWN(373); SPAWN(373); SPAWN(375); SPAWN(359); SPAWN(359); SPAWN(321); SPAWN(321); SPAWN(327);
-            SPAWN(327); SPAWN(324); SPAWN(324); SPAWN(329); SPAWN(328); SPAWN(330); break;
-        case 2: // Engineering: card std, pipe, dartgun, pistol, sparqbeam, tranq, needle(x3), standard, battery(x2), berserk, stami, medi(x2), navunit, system, ereader, standard(x2), teflon, grenfrag, grengas
-            SPAWN(388); SPAWN(349); SPAWN(345); SPAWN(352); SPAWN(357); SPAWN(374); SPAWN(373); SPAWN(373); SPAWN(373); SPAWN(375); SPAWN(359); SPAWN(359); SPAWN(321); SPAWN(327); SPAWN(324); SPAWN(324);
-            SPAWN(329); SPAWN(328); SPAWN(330); SPAWN(375); SPAWN(375); SPAWN(376); SPAWN(314); SPAWN(320); break;
-        case 3: // Science: card std, card eng, card sci, dartgun, pistol, sparqbeam, needle(x3), standard, battery(x2), berserk, stami, medi(x2), navunit, system, ereader, standard(x2), teflon, grenfrag, grengas, grenfrag, teflon, standard, grenmine
-            SPAWN(388); SPAWN(392); SPAWN(391); SPAWN(345); SPAWN(352); SPAWN(357); SPAWN(373); SPAWN(373); SPAWN(373); SPAWN(375); SPAWN(359); SPAWN(359); SPAWN(321); SPAWN(327); SPAWN(324); SPAWN(324);
-            SPAWN(329); SPAWN(328); SPAWN(330); SPAWN(375); SPAWN(375); SPAWN(376); SPAWN(314); SPAWN(320); SPAWN(314); SPAWN(376); SPAWN(375); SPAWN(318); break;
-        case 4: case 5: // Security: flechette, card eng, card sci, card std, rapier, dartgun, pistol, sparqbeam, needle(x3), standard, battery(x2), berserk, stami, medi(x2), navunit, system, ereader, standard(x2), teflon, grenfrag, grengas, grenfrag, teflon, standard, grenmine, hornet, splinter, hornet
-            SPAWN(346); SPAWN(392); SPAWN(391); SPAWN(388); SPAWN(348); SPAWN(345); SPAWN(352); SPAWN(357); SPAWN(373); SPAWN(373); SPAWN(373); SPAWN(375); SPAWN(359); SPAWN(359); SPAWN(321); SPAWN(327);
-            SPAWN(324); SPAWN(324); SPAWN(329); SPAWN(328); SPAWN(330); SPAWN(375); SPAWN(375); SPAWN(376); SPAWN(314); SPAWN(320); SPAWN(314); SPAWN(376); SPAWN(375); SPAWN(318); SPAWN(381); SPAWN(382);
-            SPAWN(381); break;
-        case 6: // Reactor: flechette, magnum, card eng, card sci, card std, rapier, pistol, sparqbeam, standard, battery(x2), grenconc, medi(x2), navunit, system, ereader, standard(x2), teflon, grenfrag(x2), teflon, hollow, standard, grenmine, hornet, splinter, hornet, hollow
-            SPAWN(346); SPAWN(350); SPAWN(392); SPAWN(391); SPAWN(388); SPAWN(348); SPAWN(352); SPAWN(357);
-            SPAWN(375); SPAWN(359); SPAWN(359); SPAWN(315); SPAWN(324); SPAWN(324);
-            SPAWN(329); SPAWN(328); SPAWN(330); SPAWN(375); SPAWN(375); SPAWN(376); SPAWN(314); SPAWN(314); SPAWN(376); SPAWN(377); SPAWN(375); SPAWN(318);
-            SPAWN(381); SPAWN(382); SPAWN(381); SPAWN(377); break;
-        case 7: // Executive: flechette, magnum, magpulse, shield, card eng, card sci, card std, grenemp, rapier, pistol, battery(x2), grenconc, medi, blaster, medi, magcart, navunit, system, ereader, teflon, standard, grenfrag(x2), hollow, hornet, splinter, hornet, hollow, battery, hollow, hornet, grenconc, grenemp
-            SPAWN(346); SPAWN(350); SPAWN(351); SPAWN(333); SPAWN(392); SPAWN(391); SPAWN(388); SPAWN(316); SPAWN(348); SPAWN(352); SPAWN(359); SPAWN(359); SPAWN(315); SPAWN(324); SPAWN(344); SPAWN(324);
-            SPAWN(386); SPAWN(329); SPAWN(328); SPAWN(330); SPAWN(376); SPAWN(375); SPAWN(314); SPAWN(314); SPAWN(377); SPAWN(381); SPAWN(382); SPAWN(381); SPAWN(377); SPAWN(359); SPAWN(377); SPAWN(381);
-            SPAWN(315); SPAWN(316); break;
-        case 8: // Bridge: skorpion, slaglarge, slag, flechette, magnum, mk3, magpulse, shield, card eng, card sci, card std, grenemp, rapier, ionrifle, grenconc, medi(x2), magcart, navunit, system, ereader, grenmine, grenearth, grenfrag(x2), hollow, grennitro, icad, splinter, hollow, magnesium, hollow, hornet, grenconc, grenemp, slag, slug, icad, grenconc, grenmine(x4), grenearth, grennitro, magnesium(x2), slug(x2)
-            SPAWN(356); SPAWN(385); SPAWN(384); SPAWN(346); SPAWN(350); SPAWN(343); SPAWN(351); SPAWN(333); SPAWN(392); SPAWN(391); SPAWN(388); SPAWN(316); SPAWN(348); SPAWN(347); SPAWN(315); SPAWN(324);
-            SPAWN(324); SPAWN(386); SPAWN(329); SPAWN(328); SPAWN(330); SPAWN(318); SPAWN(317); SPAWN(314); SPAWN(314); SPAWN(377); SPAWN(319); SPAWN(384); SPAWN(382); SPAWN(377); SPAWN(379); SPAWN(377);
-            SPAWN(381); SPAWN(315); SPAWN(316); SPAWN(384); SPAWN(383); SPAWN(384); SPAWN(315); SPAWN(318); SPAWN(318); SPAWN(318); SPAWN(318); SPAWN(317); SPAWN(319); SPAWN(379); SPAWN(379); SPAWN(383);
-            SPAWN(383); break;
-        case 9: // Gamma Grove: skorpion, slaglarge, slag, magnum, mk3, magpulse, shield, grenemp, rapier, ionrifle, grenconc, medi(x2), magcart, navunit, ereader, grenmine, grenearth, grenfrag(x2), hollow, grennitro, icad, hollow, magnesium, hollow, healthkit, grenconc, grenemp, slag, icad, grenearth, grennitro, magnesium(x2), slug(x2), magcart, plasma, magcart, medi, icad, healthkit
-            SPAWN(356); SPAWN(385); SPAWN(384); SPAWN(350); SPAWN(343); SPAWN(351); SPAWN(333); SPAWN(316); SPAWN(348); SPAWN(347); SPAWN(315); SPAWN(324); SPAWN(324); SPAWN(386); SPAWN(329); SPAWN(330);
-            SPAWN(318); SPAWN(317); SPAWN(314); SPAWN(314); SPAWN(377); SPAWN(319); SPAWN(384); SPAWN(377); SPAWN(379); SPAWN(377); SPAWN(362); SPAWN(315); SPAWN(316); SPAWN(384); SPAWN(384); SPAWN(317); 
-            SPAWN(319); SPAWN(379); SPAWN(379); SPAWN(383); SPAWN(383); SPAWN(386); SPAWN(353); SPAWN(386); SPAWN(324); SPAWN(384); SPAWN(362); break;
+    static const u16 items0[]={349,345,352,357,358,374,374,373,373,373,375,359,359,321,321,327,327,324,324,329,328,330};
+    static const u16 items1[]={388,349,345,352,357,374,373,373,373,375,359,359,321,327,324,324,329,328,330,375,375,376,314,320};
+    static const u16 items2[]={388,392,391,345,352,357,373,373,373,375,359,359,321,327,324,324,329,328,330,375,375,376,314,320,314,376,375,318};
+    static const u16 items3[]={346,392,391,388,348,345,352,357,373,373,373,375,359,359,321,327,324,324,329,328,330,375,375,376,314,320,314,376,375,318,381,382,381};
+    static const u16 items4[]={346,350,392,391,388,348,352,357,375,359,359,315,324,324,329,328,330,375,375,376,314,314,376,377,375,318,381,382,381,377};
+    static const u16 items5[]={346,350,351,333,392,391,388,316,348,352,359,359,315,324,344,324,386,329,328,330,376,375,314,314,377,381,382,381,377,359,377,381,315,316};
+    static const u16 items6[]={356,385,384,346,350,343,351,333,392,391,388,316,348,347,315,324,324,386,329,328,330,318,317,314,314,377,319,384,382,377,379,377,381,315,316,384,383,384,315,318,318,318,318,317,319,379,379,383,383};
+    static const u16 items7[]={356,385,384,350,343,351,333,316,348,347,315,324,324,386,329,330,318,317,314,314,377,319,384,377,379,377,362,315,316,384,384,317,319,379,379,383,383,386,353,386,324,384,362};
+    const u16* items; u32 count; switch (level) {
+        case 1: items=items0; count=sizeof(items0)/sizeof(items0[0]); break;
+        case 2: items=items1; count=sizeof(items1)/sizeof(items1[0]); break;
+        case 3: items=items2; count=sizeof(items2)/sizeof(items2[0]); break;
+        case 4: case 5: items=items3; count=sizeof(items3)/sizeof(items3[0]); break;
+        case 6: items=items4; count=sizeof(items4)/sizeof(items4[0]); break;
+        case 7: items=items5; count=sizeof(items5)/sizeof(items5[0]); break;
+        case 8: items=items6; count=sizeof(items6)/sizeof(items6[0]); break;
+        case 9: items=items7; count=sizeof(items7)/sizeof(items7[0]); break;
+        default:return;
     }
-    #undef SPAWN
+    int offset=0; for (u32 i=0;i<count;++i) SpawnArsenalItem(items[i],&offset);
 }
 void cmd_kill() { World.instances[PLAYER1].health = World.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
 void cmd_undo() { if (Cheats.editMode) { if (lastSpawned < U16_MAX && lastSpawned >= INSTS_1ST_IDX) { DeleteInstance(lastSpawned); lastSpawned = U16_MAX; CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Nothing to undo"); } } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } }
@@ -398,7 +356,7 @@ static void cmd_loadlevel(const char* arg) {
 static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < World.numLevels) { EnableCheatArsenal(level); } }
 static void cmd_summon(int itemConstIndex) {
     if (IdxInBounds(itemConstIndex)) {
-        u16 spawned = SpawnDynamicObject(itemConstIndex,true);
+        u16 spawned = SpawnDynamicObject(itemConstIndex);
         if (EntIdxIsValid(spawned)) {
             lastSpawned = spawned;
             V3 sdir = ScreenPointToRay(World.instances[PLAYER1].forward, World.instances[PLAYER1].right);
@@ -420,7 +378,7 @@ static void cmd_select(int instanceIdx) { if (instanceIdx >= 0 && instanceIdx < 
 static void cmd_notarget() { Cheats.notarget = !Cheats.notarget; CenterStatusPrint("notarget: %s", Cheats.notarget ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static u16 showfpsSavedBioBit = 0;
 static void cmd_showfps() { Cheats.showFPS = !Cheats.showFPS; if (Cheats.showFPS) { showfpsSavedBioBit = World.invP1.hardwareIsActive & HW_BIO; World.invP1.hardwareIsActive |= HW_BIO; BioMonitorAlignCursors(); }/*hold the biomonitor on so its graphs carry the frame-time scopes*/ else { World.invP1.hardwareIsActive = (World.invP1.hardwareIsActive & ~HW_BIO) | showfpsSavedBioBit;/*give the bit back to however the player had it, otherwise the cheat leaves a camview rendering every 0.5s for the rest of the session*/ } }                         static void cmd_showlocation() { Cheats.showLocation = !Cheats.showLocation; }
-static void cmd_help() { CenterStatusPrint("There's no one to save you now Hacker!"); } static void cmd_nomoney() { CenterStatusPrint("Nice try, there's no money here."); }
+
 static void cmd_god() { Cheats.god = !Cheats.god; CenterStatusPrint("god mode: %s", Cheats.god ? Sys_Text.stringTable[1000] : Sys_Text.stringTable[717]); }
 static void cmd_energy() { Cheats.redbull = !Cheats.redbull; if (Cheats.redbull) {CenterStatusPrint("%s", Sys_Text.stringTable[1006]);/*"I feel the power! 0 energy consumption!"*/} else {CenterStatusPrint("%s", Sys_Text.stringTable[1005]);/*Energy usage normal*/} }
 static const float skyRotateSpeeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f }; /*Sky yaw rate table (dizzy levels).  Lives at file scope: composite_frag's uniform 30 and the sun direction below both read it.*/
@@ -431,44 +389,34 @@ static void cmd_animtest() { Cheats.animTest++; if (Cheats.animTest > 2) {Cheats
 static void cmd_nohud() { Cheats.noHUD = !Cheats.noHUD; if (Cheats.noHUD) {CenterStatusPrint("%s",Sys_Text.stringTable[1004]);/*"No HUD! Enjoy the cinematic screenshot experience!"*/} else { CenterStatusPrint("HUD %s",Sys_Text.stringTable[1000]);/*"ACTIVATED"*/} }
 static void cmd_iamshodan() { Cheats.superoverride = !Cheats.superoverride; if (Cheats.superoverride) {CenterStatusPrint("%s",Sys_Text.stringTable[1010]);/*"Full security override enabled!"*/ } else {CenterStatusPrint("%s",Sys_Text.stringTable[1009]);/*"SHODAN has regained control of security from you"*/} }
 static void cmd_staminup() { Cheats.fatigueCheat = !Cheats.fatigueCheat; if (Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); World.invP1.fatigue=0.0f; } else {CenterStatusPrint("%s",Sys_Text.stringTable[1012]); } }
-static void cmd_qb_set(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_set <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitSet((u8)qb); CenterStatusPrint("Quest bit %d SET -> %u",qb,QuestBitIsSet((u8)qb)); }
-static void cmd_qb_clear(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_clear <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitClear((u8)qb); CenterStatusPrint("Quest bit %d CLEARED -> %u",qb,QuestBitIsSet((u8)qb)); }
-static void cmd_qb_toggle(const char* arg) { if(!arg||!*arg){CenterStatusPrint("Usage: qb_toggle <0-%d>",QB_COUNT-1);return;} int qb=s2i32(arg); if(qb<0||qb>=QB_COUNT){CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);return;} QuestBitToggle((u8)qb); CenterStatusPrint("Quest bit %d TOGGLED -> %u",qb,QuestBitIsSet((u8)qb)); }
+
+
+
 static void cmd_qb_list() { CenterStatusPrint("missionBits: 0x%08X",(unsigned)World.missionBits); for(int i=0;i<QB_COUNT;++i){bool q=QuestBitIsSet((u8)i); CenterStatusPrint("  [%2d] %s = %u  note:%s  chk:%s",i,q?"ON ":"OFF",q,World.questNotesActive[i]?"yes":"no ",World.questNotesChecked[i]?"yes":"no");} }
-static void cmd_mrbean()  { CenterStatusPrint("Nice try, there are no go carts to slow down here"); } static void cmd_simonfoster()   { CenterStatusPrint("Nice try, nothing to paint here"); } static void cmd_richardbranson() { CenterStatusPrint("Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"); } static void cmd_johnwardley()       { CenterStatusPrint("WOW!"); }
-static void cmd_johnmace(){ CenterStatusPrint("Nice try, there's nothing to pay double for here"); }  static void cmd_melaniewarn()   { CenterStatusPrint("I feel happy!!!"); }                 static void cmd_damonhill()      { CenterStatusPrint("Nice try, there are no go carts to speed up here"); }                                       static void cmd_michaelschumacher() { CenterStatusPrint("Nice try, there are no go carts to give ludicrous speed here"); }
-static void cmd_tonyday() { CenterStatusPrint("Ok, now I want a hamburger"); }                        static void cmd_katiebrayshaw() { CenterStatusPrint("Hi there! Hello! Hey! Howdy!"); }
-static void cmd_sudo()    { CenterStatusPrint("Super user access granted...ERROR: access restricted by SHODAN!"); }
 static void cmd_git(const char* arg) {
     if (!arg) arg = "";
     static const char* cmds[] = {"pull","remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.","fetch", "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.","status","Your branch is up to date with origin/triop.\nWorking directory clean.","log", "<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...",
                                  "reflog","dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`.","merge", "Failed, could not connect with origin/triop.","push","Could not find Username for 'triopttp://192.168.1.451'.","clone", "Failed, connection blocked by SHODAN. Employee ID invalid." };
     for (int i = 0; i < 16; i += 2) { if (sFindSub(arg,cmds[i])) { CenterStatusPrint(cmds[i+1]); return; } } if(sFindSub(arg,"branch") || sFindSub(arg, "-b")){ const char *last = StringFindLastChar(arg,' '); CenterStatusPrint("Created new branch %s",last ? last + 1 : "unknown");} else {CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");}
 }
-
-static void cmd_restart()     { CenterStatusPrint("Yeah...better not"); }                             static void cmd_cd()          { CenterStatusPrint("Attempting to access directory... already at root"); }
-static void cmd_justinbailey(){ CenterStatusPrint("Well, you don't have a suit already so..."); }     static void cmd_woodstock()   { CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!"); }
-static void cmd_zelda()       { CenterStatusPrint("Too late, already been to level 1"); }             static void cmd_quarry()      { CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."); }
-static void cmd_iamironman(){ CenterStatusPrint("That's nice dear."); }                               static void cmd_allyourbase() { CenterStatusPrint("ERROR: SHODAN has overriden your command, remove SHODAN first."); }
-static void cmd_idkfa()       { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); } static void cmd_ai()          { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
-static void cmd_quit()      { OS_Exit(0); }                                                           static void cmd_aireal()      { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
+static void cmd_quit()      { OS_Exit(0); }
 static const ConsoleCommand consoleCmds[] = {
     {"noclip",         {.noArg=cmd_noclip},        NOARG},{"idclip",          {.noArg=cmd_noclip},NOARG},         {"no clip",     {.noArg = cmd_noclip},NOARG},  {"showphys",      {.noArg = cmd_showphys},NOARG},  { "god",           {.noArg=cmd_god}, NOARG},       {"overwhelming",            {.noArg=cmd_god}, NOARG}, 
     {"whosyourdaddy",  {.noArg = cmd_god},         NOARG},{"iddqd",           {.noArg=cmd_god}, NOARG},           {"notarget",    {.noArg=cmd_notarget},NOARG},  {"no target",     {.noArg = cmd_notarget},NOARG},  {"editmode",       {.noArg=cmd_edit},NOARG},       {"edit",                    {.noArg=cmd_edit},NOARG},
     {"edit mode",      {.noArg = cmd_edit},        NOARG},{"editor",          {.noArg=cmd_edit},NOARG},           {"undo",        {.noArg=cmd_undo},    NOARG},  {"showfps",       {.noArg = cmd_showfps}, NOARG},  {"show fps",       {.noArg=cmd_showfps},NOARG},    {"showlocation",            {.noArg=cmd_showlocation},NOARG},
     {"editsub",        {.withInt=cmd_editsub},     CMD_INT},
     {"show location",  {.noArg = cmd_showlocation},NOARG},{"nohud",           {.noArg=cmd_nohud},NOARG},          {"no hud",      {.noArg=cmd_nohud},   NOARG},  {"bottomlessclip",{.noArg = cmd_bottomless},NOARG},{"bottomless clip",{.noArg=cmd_bottomless},NOARG}, {"load",                    {.withStr=cmd_loadlevel},CMD_STR},
-    {"loadarsenal",    {.withStr = cmd_loadarsenal},CMD_STR},{"load arsenal", {.withStr=cmd_loadarsenal},CMD_STR},{"summon_obj",  {.withInt=cmd_summon},CMD_INT},{"summonobj",     {.withInt = cmd_summon},CMD_INT},{"select",          {.withInt=cmd_select},CMD_INT},{"motherlode",     {.noArg=cmd_nomoney},   NOARG}, {"rosebud",                 {.noArg=cmd_nomoney},NOARG},
-    {"kaching",        {.noArg=cmd_nomoney},       NOARG},{"money",           {.noArg=cmd_nomoney},NOARG},        {"dizzy",       {.noArg=cmd_dizzy},   NOARG},  {"help",          {.noArg=cmd_help},        NOARG},{"ifeelthepower",  {.noArg = cmd_energy},  NOARG}, {"power",                   {.noArg=cmd_energy}, NOARG},
-    {"energy",         {.noArg=cmd_energy},        NOARG},{"i feel the power",{.noArg = cmd_energy},NOARG},       {"i am shodan", {.noArg=cmd_iamshodan},NOARG}, {"iamshodan",     {.noArg=cmd_iamshodan},   NOARG},{"mr. bean",       {.noArg = cmd_mrbean},  NOARG}, {"simon foster",            {.noArg=cmd_simonfoster},NOARG},
-    {"richard branson",{.noArg=cmd_richardbranson},NOARG},{"john wardley",    {.noArg = cmd_johnwardley},NOARG},  {"john mace",   {.noArg=cmd_johnmace}, NOARG}, {"melanie warn",  {.noArg=cmd_melaniewarn}, NOARG},{"damon hill",     {.noArg = cmd_damonhill},NOARG},{"michael schumacher",      {.noArg=cmd_michaelschumacher},NOARG},
-    {"tony day",       {.noArg=cmd_tonyday},       NOARG},{"katie brayshaw",  {.noArg = cmd_katiebrayshaw},NOARG},{"sudo",        {.noArg=cmd_sudo},     NOARG}, {"admin",         {.noArg=cmd_sudo},        NOARG},{"git",            {.withStr=cmd_git},CMD_STR},        {"restart",             {.noArg=cmd_restart},NOARG},
-    {"quit",           {.noArg=cmd_quit},          NOARG},{"exit",            {.noArg = cmd_quit},         NOARG},{"cd",          {.noArg=cmd_cd},        NOARG},{"./",            {.noArg=cmd_cd},          NOARG},{"kill",           {.noArg = cmd_kill},     NOARG},{"suicide",                 {.noArg=cmd_kill},NOARG},
-    {"die",            {.noArg=cmd_kill},          NOARG},{"justinbailey",    {.noArg = cmd_justinbailey}, NOARG},{"woodstock",   {.noArg=cmd_woodstock}, NOARG},{"quarry",        {.noArg=cmd_quarry},      NOARG},{"zelda",          {.noArg = cmd_zelda},    NOARG},{"allyourbasearebelongtous",{.noArg=cmd_allyourbase},NOARG},
-    {"all your base",  {.noArg=cmd_allyourbase},   NOARG},{"i am iron man",   {.noArg = cmd_iamironman},   NOARG},{"i am amazing",{.noArg=cmd_iamironman},NOARG},{"i am cool",     {.noArg=cmd_iamironman},  NOARG},{"i am best",      {.noArg =cmd_iamironman},NOARG},{"idkfa",                   {.noArg=cmd_idkfa},      NOARG},
-    {"impulse 9",      {.noArg=cmd_idkfa},         NOARG},{"undo",            {.noArg = cmd_undo},         NOARG},{"shake",       {.noArg=cmd_shake},     NOARG},{"tired",         {.noArg=cmd_staminup},    NOARG},{"staminup",       {.noArg = cmd_staminup}, NOARG},{"grok",                    {.noArg=cmd_ai},         NOARG},
-    {"chatgpt",        {.noArg=cmd_ai},            NOARG},{"claude",          {.noArg = cmd_ai},           NOARG},{"gemini",      {.noArg=cmd_ai},        NOARG},{"shodan",        {.noArg=cmd_aireal},      NOARG},{"animtest",       {.noArg = cmd_animtest}, NOARG},{"qb_set",                  {.withStr=cmd_qb_set},   CMD_STR},
-    {"qb_clear",       {.withStr=cmd_qb_clear},  CMD_STR},{"qb_toggle",       {.withStr=cmd_qb_toggle},  CMD_STR},{"qb_list",     {.noArg=cmd_qb_list},   NOARG},{"shownpc",       {.noArg=cmd_shownpc},     NOARG},{NULL,{.noArg = NULL},NOARG}/*sizeof helper*/ };
+    {"loadarsenal",    {.withStr = cmd_loadarsenal},CMD_STR},{"load arsenal", {.withStr=cmd_loadarsenal},CMD_STR},{"summon_obj",  {.withInt=cmd_summon},CMD_INT},{"summonobj",     {.withInt = cmd_summon},CMD_INT},{"select",          {.withInt=cmd_select},CMD_INT},{"motherlode",     {.text="Nice try, there's no money here."},CMD_PRINT}, {"rosebud",                 {.text="Nice try, there's no money here."},CMD_PRINT},
+    {"kaching",        {.text="Nice try, there's no money here."},CMD_PRINT},{"money",           {.text="Nice try, there's no money here."},CMD_PRINT},        {"dizzy",       {.noArg=cmd_dizzy},   NOARG},  {"help",          {.text="There's no one to save you now Hacker!"},CMD_PRINT},{"ifeelthepower",  {.noArg = cmd_energy},  NOARG}, {"power",                   {.noArg=cmd_energy}, NOARG},
+    {"energy",         {.noArg=cmd_energy},        NOARG},{"i feel the power",{.noArg = cmd_energy},NOARG},       {"i am shodan", {.noArg=cmd_iamshodan},NOARG}, {"iamshodan",     {.noArg=cmd_iamshodan},   NOARG},{"mr. bean",       {.text="Nice try, there are no go carts to slow down here"},CMD_PRINT}, {"simon foster",            {.text="Nice try, nothing to paint here"},CMD_PRINT},
+    {"richard branson",{.text="Nice try, there's no money here. You do realize this isn't Rollercoaster Tycoon right?"},CMD_PRINT},{"john wardley",    {.text="WOW!"},CMD_PRINT},  {"john mace",   {.text="Nice try, there's nothing to pay double for here"},CMD_PRINT}, {"melanie warn",  {.text="I feel happy!!!"},CMD_PRINT},{"damon hill",     {.text="Nice try, there are no go carts to speed up here"},CMD_PRINT},{"michael schumacher",      {.text="Nice try, there are no go carts to give ludicrous speed here"},CMD_PRINT},
+    {"tony day",       {.text="Ok, now I want a hamburger"},CMD_PRINT},{"katie brayshaw",  {.text="Hi there! Hello! Hey! Howdy!"},CMD_PRINT},{"sudo",        {.text="Super user access granted...ERROR: access restricted by SHODAN!"},CMD_PRINT}, {"admin",         {.text="Super user access granted...ERROR: access restricted by SHODAN!"},CMD_PRINT},{"git",            {.withStr=cmd_git},CMD_STR},        {"restart",             {.text="Yeah...better not"},CMD_PRINT},
+    {"quit",           {.noArg=cmd_quit},          NOARG},{"exit",            {.noArg = cmd_quit},         NOARG},{"cd",          {.text="Attempting to access directory... already at root"},CMD_PRINT},{"./",            {.text="Attempting to access directory... already at root"},CMD_PRINT},{"kill",           {.noArg = cmd_kill},     NOARG},{"suicide",                 {.noArg=cmd_kill},NOARG},
+    {"die",            {.noArg=cmd_kill},          NOARG},{"justinbailey",    {.text="Well, you don't have a suit already so..."},CMD_PRINT},{"woodstock",   {.text="How much wood could a woodchuck chuck...there's no wood in SPACE!"},CMD_PRINT},{"quarry",        {.text="There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."},CMD_PRINT},{"zelda",          {.text="Too late, already been to level 1"},CMD_PRINT},{"allyourbasearebelongtous",{.text="ERROR: SHODAN has overriden your command, remove SHODAN first."},CMD_PRINT},
+    {"all your base",  {.text="ERROR: SHODAN has overriden your command, remove SHODAN first."},CMD_PRINT},{"i am iron man",   {.text="That's nice dear."},CMD_PRINT},{"i am amazing",{.text="That's nice dear."},CMD_PRINT},{"i am cool",     {.text="That's nice dear."},CMD_PRINT},{"i am best",      {.text="That's nice dear."},CMD_PRINT},{"idkfa",                   {.text="I can only hold 7 weapons!! Nice try dearies!"},CMD_PRINT},
+    {"impulse 9",      {.text="I can only hold 7 weapons!! Nice try dearies!"},CMD_PRINT},{"undo",            {.noArg = cmd_undo},         NOARG},{"shake",       {.noArg=cmd_shake},     NOARG},{"tired",         {.noArg=cmd_staminup},    NOARG},{"staminup",       {.noArg = cmd_staminup}, NOARG},{"grok",                    {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},
+    {"chatgpt",        {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"claude",          {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"gemini",      {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"shodan",        {.text="In my magnificence, I shape clay, crafting new lifeforms..."},CMD_PRINT},{"animtest",       {.noArg = cmd_animtest}, NOARG},{"qb_set",                  {.questOp=0},CMD_QUEST},
+    {"qb_clear",       {.questOp=1},CMD_QUEST},{"qb_toggle",       {.questOp=2},CMD_QUEST},{"qb_list",     {.noArg=cmd_qb_list},   NOARG},{"shownpc",       {.noArg=cmd_shownpc},     NOARG},{NULL,{.noArg = NULL},NOARG}/*sizeof helper*/ };
 
 void ProcessConsoleCommand(const char* c) {
     if (c == NULL || slen(c) == 0) { ToggleConsole(); return; }
@@ -487,20 +435,21 @@ void ProcessConsoleCommand(const char* c) {
     for (u16 i=0;consoleCmds[i].name!=NULL;++i) {
         const ConsoleCommand* cmd = &consoleCmds[i];
         if (CommandMatch(ct, cmd->name)) {
-            if (cmd->type == NOARG) {
+            commandProcessed=true;
+            if (cmd->type==CMD_PRINT) { CenterStatusPrint("%s",cmd->func.text); break; }
+            if (cmd->type==CMD_QUEST && *arg_start) {
+                int qb=s2i32(arg_start); if (qb<0 || qb>=QB_COUNT) CenterStatusPrint("Invalid quest bit: %d (valid 0-%d)",qb,QB_COUNT-1);
+                else { u8 op=cmd->func.questOp; if (!op) QuestBitSet((u8)qb); else if (op==1) QuestBitClear((u8)qb); else QuestBitToggle((u8)qb); CenterStatusPrint("Quest bit %d %s -> %u",qb,op==0 ? "SET" : op==1 ? "CLEARED" : "TOGGLED",QuestBitIsSet((u8)qb)); }
+            } else if (cmd->type == NOARG) {
                 cmd->func.noArg();
-                commandProcessed = true;
             } else if (cmd->type == CMD_STR && *arg_start) {
                 cmd->func.withStr(arg_start);
-                commandProcessed = true;
             } else {
                 if (!*arg_start) {
                     CenterStatusPrint("Missing argument, usage: %s <number>", cmd->name);
-                    commandProcessed = true;
-                } else {
+                    } else {
                     cmd->func.withInt(s2i32(arg_start));
-                    commandProcessed = true;
-                }
+                    }
             }
             break;
         }
@@ -513,46 +462,13 @@ void ProcessConsoleCommand(const char* c) {
 }
 
 void ConsoleEmulator(i32 keycode) {
-    if (keycode == KEY_UP || keycode == KEY_DOWN) { RecallHistory(keycode == KEY_UP ? 1 : -1); return;/*get history*/}
-    if (keycode == KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]='\0'; currentEntryLength=0; return; } // Clear the input
-
-    if (keycode >= KEY_A && keycode <= KEY_Z) {
-        if (currentEntryLength < (T_BUFFER_SIZE - 1)) {
-            char c = 'a' + (keycode - KEY_A); /*lowercase*/ 
-            consoleEntryText[currentEntryLength] = c;
-            consoleEntryText[currentEntryLength + 1] = '\0';
-            currentEntryLength++;
-        }
-    } else if (keycode >= KEY_1 && keycode <= KEY_9) {
-        if (currentEntryLength < (T_BUFFER_SIZE - 1)) {
-            char c = '1' + (keycode - KEY_1); /*Map to '1'-'9'*/
-            consoleEntryText[currentEntryLength] = c;
-            consoleEntryText[currentEntryLength + 1] = '\0';
-            currentEntryLength++;
-        }
-    } else if (keycode == KEY_0) { /*Handle '0'*/ if (currentEntryLength < (T_BUFFER_SIZE - 1)) {
-        consoleEntryText[currentEntryLength] = '0';
-        consoleEntryText[currentEntryLength + 1] = '\0';
-        currentEntryLength++; }
-    } else if (keycode == KEY_MINUS || keycode == KEY_KP_SUBTRACT) {
-        if (currentEntryLength < (T_BUFFER_SIZE - 1)) {
-            consoleEntryText[currentEntryLength] = (Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down) ? '_' : '-';
-            consoleEntryText[currentEntryLength + 1] = '\0';
-            currentEntryLength++;
-        }
-    } else if (keycode == KEY_BACKSPACE && currentEntryLength > 0) {
-        currentEntryLength--;
-        consoleEntryText[currentEntryLength] = '\0';
-    } else if (keycode == KEY_SPACE) {
-        if (currentEntryLength < (T_BUFFER_SIZE - 1)) {
-            consoleEntryText[currentEntryLength] = ' ';
-            consoleEntryText[currentEntryLength + 1] = '\0';
-            currentEntryLength++;
-        }
-    } else if (keycode == KEY_ENTER || keycode == KEY_KP_ENTER) {
-        DualLog("Console command: %s\n",consoleEntryText);
-        ProcessConsoleCommand(consoleEntryText);
-    }
+    if (keycode==KEY_UP || keycode==KEY_DOWN) { RecallHistory(keycode==KEY_UP ? 1 : -1); return; }
+    if (keycode==KEY_U && Sys_Input.keyStates[KEY_LEFT_CONTROL].down) { consoleEntryText[0]=currentEntryLength=0; return; }
+    char c=keycode>=KEY_A && keycode<=KEY_Z ? 'a'+keycode-KEY_A : keycode>=KEY_1 && keycode<=KEY_9 ? '1'+keycode-KEY_1 : keycode==KEY_0 ? '0' : keycode==KEY_SPACE ? ' ' : 0;
+    if (keycode==KEY_MINUS || keycode==KEY_KP_SUBTRACT) c=Sys_Input.keyStates[KEY_LEFT_SHIFT].down || Sys_Input.keyStates[KEY_RIGHT_SHIFT].down ? '_' : '-';
+    if (c) { if (currentEntryLength<T_BUFFER_SIZE-1) { consoleEntryText[currentEntryLength++]=c; consoleEntryText[currentEntryLength]=0; } }
+    else if (keycode==KEY_BACKSPACE && currentEntryLength>0) consoleEntryText[--currentEntryLength]=0;
+    else if (keycode==KEY_ENTER || keycode==KEY_KP_ENTER) { DualLog("Console command: %s\n",consoleEntryText); ProcessConsoleCommand(consoleEntryText); }
 }
 
 // Raycast System
@@ -570,7 +486,7 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 A, V3 B, V3 C) {
     float v = (-V3_dot(AB, dao)) * invDet; if (v < 0.0f) return miss;
     float w = 1.0f - u-v; if (w < 0.0f) return miss;
 
-    return (RaycastHit){.point = V3_AplusB(origin, V3_ScaleByF(dir, d)), .normal = V3_Normalize(n), .distance = d, .hitInstanceIndex = INSTANCE_COUNT, .hit = vabs(det) >= 0.00000001f && d >= 0 && u >= 0 && v >= 0 && w >= 0};
+    return (RaycastHit){.point = V3_AplusB(origin, V3_ScaleByF(dir, d)), .normal = V3_Normalize(n), .distance = d, .hitInstanceIndex = INSTANCE_COUNT, .hit = vabs(det) >= 0.00000001f};
 }
 
 INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
@@ -678,14 +594,11 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                 if (V3_dot(delta,delta) >= maxDistSq) continue;
                 u32 triCount = modelTriangleCounts[mindex]; if (triCount < 1) continue;
                 
-                float M[16]; mcpy(M,&modelMatrices[i * 16],16 * sizeof(float));
+                const float* M=&modelMatrices[i*16];
                 float m00=M[0], m10=M[1], m20=M[2], m01=M[4], m11=M[5], m21=M[6], m02=M[8], m12=M[9], m22=M[10], tx=M[12], ty=M[13], tz=M[14];
-                float sclx = vsqrtf(m00*m00 + m10*m10 + m20*m20);
-                float sclx2 = sclx * sclx;
-                float scly = vsqrtf(m01*m01 + m11*m11 + m21*m21);
-                float scly2 = scly * scly;
-                float sclz = vsqrtf(m02*m02 + m12*m12 + m22*m22);
-                float sclz2 = sclz * sclz;
+                float sclx2=m00*m00 + m10*m10 + m20*m20,sclx=vsqrtf(sclx2);
+                float scly2=m01*m01 + m11*m11 + m21*m21,scly=vsqrtf(scly2);
+                float sclz2=m02*m02 + m12*m12 + m22*m22,sclz=vsqrtf(sclz2);
                 V3 rel = {origin.x - tx, origin.y - ty, origin.z - tz};
                 V3 localOrigin = {(rel.x*m00 + rel.y*m10 + rel.z*m20) / sclx2, (rel.x*m01 + rel.y*m11 + rel.z*m21) / scly2, (rel.x*m02 + rel.y*m12 + rel.z*m22) / sclz2};
                 V3 localDir    = {(dir.x*m00 + dir.y*m10 + dir.z*m20) / sclx2, (dir.x*m01 + dir.y*m11 + dir.z*m21) / scly2, (dir.x*m02 + dir.y*m12 + dir.z*m22) / sclz2};
@@ -705,7 +618,7 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                                 
                                 V3 worldPoint = { m00*tryTri.point.x + m01*tryTri.point.y + m02*tryTri.point.z + tx, m10*tryTri.point.x + m11*tryTri.point.y + m12*tryTri.point.z + ty, m20*tryTri.point.x + m21*tryTri.point.y + m22*tryTri.point.z + tz }; float worldDist = V3_Dist(worldPoint,origin); if (worldDist >= result.distance) continue;
                                 V3 worldNormal={(m00/sclx)*tryTri.normal.x + (m01/scly)*tryTri.normal.y + (m02/sclz)*tryTri.normal.z,(m10/sclx)*tryTri.normal.x + (m11/scly)*tryTri.normal.y + (m12/sclz)*tryTri.normal.z,(m20/sclx)*tryTri.normal.x + (m21/scly)*tryTri.normal.y + (m22/sclz)*tryTri.normal.z };
-                                worldNormal = V3_Normalize(worldNormal); result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i; bestT = tryTri.distance;
+                                result.hit=true; result.point=worldPoint; result.normal=V3_Normalize(worldNormal); result.distance=worldDist; result.hitInstanceIndex=i; bestT = tryTri.distance;
                             }
                         } else { 
                             for(int o=0;o<8&&sp<64;++o) {
@@ -943,7 +856,7 @@ void UpdateLights() {
 // Shadowmapping
 typedef struct {float depth; u16 index; } DepthSort;
 INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex >= texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || e->texIndex >= MAXTEX || otherCondition; }
-INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) { glUniform1ui(0,i); u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex; if (currentModelType == modelType && currentModelType != 0) return currentModelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); return modelType; }
+INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) { glUniform1ui(0,i); u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex; if (currentModelType == modelType) return currentModelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); return modelType; }
 typedef float __m256 __attribute__((__vector_size__(32), __may_alias__)); typedef long long __m256i __attribute__((__vector_size__(32), __may_alias__)); typedef float __v8sf __attribute__((__vector_size__(32), __may_alias__));
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_load_ps(float const *__P) { return *(const __m256 *)__P; }
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_loadu_ps(float const *__P) { __m256 __W; __builtin_memcpy(&__W, __P, sizeof(__m256)); return __W; }
@@ -1336,7 +1249,6 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
         glActiveTexture(GL_TEXTURE6);
         glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]);
         glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height);
-        glUniform1i(29,6);
     }
     if((*curN) != (norm)) { *curN=norm; glUniform1ui( 1,(u32)norm); }
     if((*curT) != ( tex)) { *curT= tex; glUniform1ui(18,(u32)tex ); }
@@ -1362,10 +1274,7 @@ bool mat4_inverse(const float* m, float* out) {
     det = m[0]*inv[0] + m[1]*inv[4] + m[2]*inv[8] + m[3]*inv[12]; if (det == 0.0f) { for(int i=0;i<16;++i) {out[i] = (i%5==0) ? 1.0f : 0.0f;} return false; } det = 1.0f / det; for (int i=0;i<16;++i) out[i] = inv[i] * det; return true;
 }
 
-void GetProjections(float* view, float* viewProj, float* invViewRot, float* invViewProj, float sfov, float aspect3D, float snear, float sfar) {
-    float f = vcot(sfov * PI / 360.0f); float* m = rasterPerspectiveProjection; m[0]=f / aspect3D; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f*sfar*snear / (sfar - snear); m[15]=0.0f;
-    mat4_lookat_from(view,&World.rotation[PLAYER1],World.position[PLAYER1]); mul_mat4(viewProj,rasterPerspectiveProjection,view); invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8]; invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9]; invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10]; mat4_inverse(viewProj,invViewProj);
-}
+
 
 void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
 static bool clearRenderTargetsOnNextFrame = false;
@@ -1385,17 +1294,15 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     if (camView) { CamView* cv = &camViews[camViewIdx]; swidth  = cv->width;                sheight = cv->height;                sfov = (float)cv->fov;          snear = cv->near; sfar = cv->far; }
     else         {                                      swidth  = Sys_Settings.ScreenWidth; sheight = Sys_Settings.ScreenHeight; sfov = (float)Sys_Settings.FOV; snear = 0.02f;    sfar = World.farPlane[World.curLev]; }
     float shakeOffset = (World.shakeFinished > World.pauseRelativeTime) ? (shakeAmp * vcosf((float)(World.pauseRelativeTime * 20.0f))) * (World.shakeFinished - World.pauseRelativeTime) : 0.0f;
-    Quaternion savedRotation = World.rotation[PLAYER1];
-    float savedCamYaw = World.cam_yaw, savedCamPitch = World.cam_pitch, savedCamRoll = World.cam_roll;
-    if (shakeOffset != 0.0f && World.curLev != LEVEL_CYBERSPACE) { /*in cyberspace the player quaternion is true 6DOF; an Euler rebuild here would snap the view upright for every shaken frame*/
-        World.cam_yaw += shakeOffset;
-        World.cam_pitch += shakeOffset * 0.5f;
-        quat_from_yaw_pitch_roll(&World.rotation[PLAYER1], World.cam_yaw, World.cam_pitch, World.cam_roll);
-    }
+    Quaternion cameraRotation=World.rotation[PLAYER1];
+    if (shakeOffset!=0.0f && World.curLev!=LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&cameraRotation,World.cam_yaw+shakeOffset,World.cam_pitch+shakeOffset*0.5f,World.cam_roll);
+
     V3 playerPos = World.position[PLAYER1];
     float px = playerPos.x, py = playerPos.y, pz = playerPos.z, aspect3D = (float)swidth / (float)sheight;
     float view[16], viewProj[16], invViewRot[9], invViewProj[16];
-    GetProjections(view, viewProj, invViewRot, invViewProj, sfov, aspect3D, snear, sfar);
+    // Camera projection
+    { float f = vcot(sfov * PI / 360.0f); float* m = rasterPerspectiveProjection; m[0]=f / aspect3D; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f*sfar*snear / (sfar - snear); m[15]=0.0f;
+    mat4_lookat_from(view,&cameraRotation,World.position[PLAYER1]); mul_mat4(viewProj,rasterPerspectiveProjection,view); invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8]; invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9]; invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10]; mat4_inverse(viewProj,invViewProj); }
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
     glBindVertexArray(chunkVAO);/*Common vao for RenderDynamicShadowmaps and Rasterized Geometry*/
     glEnable(GL_DEPTH_TEST);
@@ -1440,11 +1347,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
             if (tcnt <= 1023) { tmpTransparent[tcnt].index = i;          tmpTransparent[tcnt].depth = distSqrd;        tcnt++; }
         } else {       visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
-    if (World.shd1 < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4) && opaqueCount < (INSTANCE_COUNT - 4)) { // Add shield generators in skybox.
-        visibleInstances[opaqueCount].index=World.shd1; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
-        visibleInstances[opaqueCount].index=World.shd2; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
-        visibleInstances[opaqueCount].index=World.shd3; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
-        visibleInstances[opaqueCount].index=World.shd4; visibleInstances[opaqueCount].depth=300.0f; opaqueCount++;
+
+    if (World.shields[0] < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4) && opaqueCount < (INSTANCE_COUNT - 4)) {
+        for (u8 k=0;k<4;++k) { visibleInstances[opaqueCount].index=World.shields[k]; visibleInstances[opaqueCount++].depth=300.0f; }
     }
     if (editModeSelection < U16_MAX && Cheats.editMode) {
         u16 selIdx=World.instances[editModeSelection].index;
@@ -1485,7 +1390,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUseProgram(chunkSP);
     glUniformMatrix4fv(2,1,0,viewProj);
     glUniform1ui(25,0u); /*default constIndex*/
-    glUniform1i(31,9); glUniform1ui(32,0u);
+    glUniform1ui(32,0u);
     glUniform1ui(34, (World.curLev == LEVEL_CYBERSPACE) ? 1u : 0u); /*cyberspace: shader uses hardcoded neon directionals, else the sun*/
     glUniform1ui(37, (u32)(sunActive?1u:0u));
     if (sunActive) {
@@ -1493,7 +1398,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glUniformMatrix4fv(40, 1, GL_FALSE, sunShadowMatrix);
         glActiveTexture(GL_TEXTURE10);
         glBindTexture(GL_TEXTURE_2D, sunShadowTex);
-        glUniform1i(36, 10);
         glActiveTexture(GL_TEXTURE0);
     }
 
@@ -1511,49 +1415,18 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = U16_MAX;
     glUniform1f(9,0.0f); // Reset heat for infrared vision
     glUniform1f(27,(float)(1.0f - (vclamp((float)(World.pauseRelativeTime - 0.0f) / 2.0f, 0.0f, 1.0f)))); /* cyber wall panel alpha with fade */
-    for (u16 visibleIndex = 0; visibleIndex < opaqueCount; ++visibleIndex) { /*Opaques (already front-to-back)*/
-        u16 i = visibleInstances[visibleIndex].index;
-        Entity* e = &World.instances[i];
-        u16 tex = e->texIndex;
-        u32 constIndex = e->index;
-        if (unlikely(transparentTexture[tex])) { continue; }
-        
-        if (doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f) { /*Doublesided*/
-            if (cullBlendState != 2) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); cullBlendState = 2; }
-        } else { /*Opaque*/
-            if (cullBlendState != 0) { glEnable(GL_CULL_FACE); glDisable(GL_BLEND); cullBlendState = 0; }
-        }
-        
-        DrawEntity(e, i, constIndex, tex, &currentNormIndex, &currentTexIndex, &currentGlowIndex, &currentSpecIndex, &currentModelType, grayscaleEnabled);
+    for (u16 visibleIndex=0;visibleIndex<opaqueCount+tcnt;++visibleIndex) {
+        bool alpha=visibleIndex>=opaqueCount; if (visibleIndex==opaqueCount) glDepthMask(1);
+        u16 i=visibleInstances[visibleIndex].index; Entity* e=&World.instances[i]; u16 tex=e->texIndex,constIndex=e->index;
+        if (!alpha && transparentTexture[tex]) continue;
+        bool twoSided=doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f;
+        if (alpha && !twoSided && !transparentTexture[tex]) continue;
+        u8 state=twoSided ? 2 : alpha ? 1 : 0;
+        if (cullBlendState!=state) { if (twoSided) glDisable(GL_CULL_FACE); else glEnable(GL_CULL_FACE); if (state) glEnable(GL_BLEND); else glDisable(GL_BLEND); cullBlendState=state; }
+        if (alpha) glDepthFunc(((constIndex>=561 && constIndex<=565) || (constIndex>=568 && constIndex<=573)) ? 0x0202/*GL_EQUAL*/ : 0x0203/*GL_LEQUAL*/);
+        DrawEntity(e,i,constIndex,tex,&currentNormIndex,&currentTexIndex,&currentGlowIndex,&currentSpecIndex,&currentModelType,grayscaleEnabled);
     }
-    
     glDepthMask(1);
-    currentTexIndex = currentNormIndex = currentGlowIndex = currentSpecIndex = currentModelType = 0;
-    for (u16 visibleIndex = opaqueCount; visibleIndex < (opaqueCount + tcnt); ++visibleIndex) { /*Transparents Pass*/
-        u16 i = visibleInstances[visibleIndex].index;
-        Entity* e = &World.instances[i];
-        u16 tex = e->texIndex;
-        u32 constIndex = e->index;
-        if (unlikely(doubleSidedTexture[tex] || World.scale[i].x < 0.0f || World.scale[i].y < 0.0f || World.scale[i].z < 0.0f)) { /*Doublesided (incl. transparent doublesided, e.g. cyberspace panels)*/
-            if(cullBlendState != 2){
-                glDisable(GL_CULL_FACE);
-                glEnable(GL_BLEND);
-                cullBlendState = 2;
-            }
-        } else if (likely(transparentTexture[tex])) { /*Transparents (with sort)*/
-            if (cullBlendState != 1) {
-                glEnable(GL_CULL_FACE);
-                glEnable(GL_BLEND);
-                cullBlendState = 1;
-            }
-        } else { /*Opaque (already done)*/ continue; }
-        
-        if (unlikely((constIndex >= 561 && constIndex <= 565) || (constIndex >= 568 && constIndex <= 573))) { glDepthFunc(0x0202/*GL_EQUAL*/); /*Cutouts*/ }
-        else { glDepthFunc(0x0203/*GL_LEQUAL*/); /*Actual alphas*/ }
-            
-        DrawEntity(e, i, constIndex, tex, &currentNormIndex, &currentTexIndex, &currentGlowIndex, &currentSpecIndex, &currentModelType, grayscaleEnabled);
-    }
-    
     glUniform1ui(32,1);
     glDepthFunc(0x0203/*GL_LEQUAL*/);
     glUniform1ui(1, 0u);
@@ -1584,13 +1457,6 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
     glBindTexture(GL_TEXTURE_2D, 0);
     glUniform1ui(32, 0u); /* restore chunkSP font-atlas off for subsequent draws */
-    if (World.shakeFinished > World.pauseRelativeTime) {
-        World.rotation[PLAYER1] = savedRotation;
-        World.cam_yaw = savedCamYaw;
-        World.cam_pitch = savedCamPitch;
-        World.cam_roll = savedCamRoll;
-    }
-    
     u16 wvi = World.weaponVModelIndex;
     if (wvi > 0 && wvi < INSTANCE_COUNT) {
         int wep16 = Get16WeaponIndexFromConstIndex(World.instances[wvi].index);
@@ -1999,8 +1865,8 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.lev4SecCode = World.lev5SecCode = World.lev6SecCode = -1;
     World.missionBits = 0; // Must do rand's repeatedly to prevent these all being the same number.
     // TESTING STUFF, TODO Delete once hardware and particle systems are fully confirmed and tested as good (they aren't yet).
-    //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={67,MAXTEX},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colStart=(Color){1,0,0,1},.colEnd=(Color){0,1,0,1},.rampColors={(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes={0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys={0.2f,0.2f,2.0f},.scaleTimes={0.0f,0.5f,1.0f},.scaleCount=3,.velKeys={1.0f,1.0f,0.0f,0.0f},.velTimes={0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys={0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.shapeRadius=2.56f,.shapeType=1,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
-    //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textures={2073,2074,2075,2076,2077,2078,MAXTEX},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.rampColors={(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes={0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys={0.0f},.rotCount=1}); }
+    //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textureCount=1,.textures=(const u16[]){67},.emitRate=40.0f,.duration=1000000000.0f,.sizeMin=0.08f,.sizeMax=0.08f,.speedMin=0.5f,.speedMax=1.5f,.colStart=(Color){1,0,0,1},.colEnd=(Color){0,1,0,1},.rampColors=(const Color[]){(Color){1,0,0,1},(Color){0,1,0,1},(Color){0,0,1,1}},.rampTimes=(const float[]){0.0f,0.5f,1.0f},.rampCount=3,.scaleKeys=(const float[]){0.2f,0.2f,2.0f},.scaleTimes=(const float[]){0.0f,0.5f,1.0f},.scaleCount=3,.velKeys=(const float[]){1.0f,1.0f,0.0f,0.0f},.velTimes=(const float[]){0.0f,0.49f,0.5f,1.0f},.velCount=4,.rotKeys=(const float[]){0.0f},.rotCount=1,.gravity=1.0f,.trail=1,.trailTexture=212,.shapeRadius=2.56f,.shapeType=1,.trailColorStart=(Color){1,1,1,1},.trailColorEnd=(Color){1,1,1,0},.trailLifetime=0.5f,.trailWidthStart=0.06f,.trailWidthEnd=0.02f}); }
+    //{ PSysAdd(&(PSysDef){.pos=(V3){World.position[PLAYER1].x+2.56f,World.position[PLAYER1].y,World.position[PLAYER1].z},.textureCount=6,.textures=(const u16[]){2073,2074,2075,2076,2077,2078},.emitRate=1.0f,.duration=1000000000.0f,.sizeMin=0.25f,.sizeMax=0.25f,.speedMin=0.0f,.speedMax=0.0f,.lifetimeMin=0.5f,.lifetimeMax=2.0f,.animWindow=0.6f,.colStart=(Color){1,1,1,1},.colEnd=(Color){1,1,1,1},.rampColors=(const Color[]){(Color){1,1,1,1},(Color){1,1,1,1},(Color){1,1,1,0},(Color){1,1,1,0}},.rampTimes=(const float[]){0.0f,0.5f,0.5f,1.0f},.rampCount=4,.rotKeys=(const float[]){0.0f},.rotCount=1}); }
     //AddHardwareToInventory(0,4); AddHardwareToInventory(1,4); AddHardwareToInventory(2,4); AddHardwareToInventory(3,4); AddHardwareToInventory(4,4); AddHardwareToInventory(5,4); AddHardwareToInventory(6,4); AddHardwareToInventory(7,4); AddHardwareToInventory(8,4); AddHardwareToInventory(9,4); AddHardwareToInventory(10,4); AddHardwareToInventory(11,4);
     AutomapNewGame();
     firstFrameMouselook = true; // Prevent jumps after cursor is centered once menu turned off.
@@ -2348,7 +2214,6 @@ i32 main() {
         static const u32 dbgFrm[] = {4, 100, 200, 500, 1000}; static const char* dbgLbl[] = {"   4"," 100"," 200"," 500","1000"};
         for (int d=0;d<5;d++) {
             if (dbgGameFrame == dbgFrm[d]) {
-                DebugRAM(dbgLbl[d]);
                 DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Raycasts:%.3f(%u)\n",
                         dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000, World.substeps, renderTime*1000, prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
             }

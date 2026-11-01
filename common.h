@@ -168,7 +168,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (96ULL * 1024 * 1024),
       /*Culling*/WORLDX = 64, WORLDZ = 64, WORLDY = 18, VOXELS_PER_CELL = 8, ARRSIZE = (WORLDX * WORLDZ), VOXELS_X = (WORLDX * VOXELS_PER_CELL), VOXELS_Z = (WORLDZ * VOXELS_PER_CELL), VOXEL_COUNT = (VOXELS_X * VOXELS_Z) /*64 * 64 * 8 * 8*/, 
                  MAX_PORTALS = 640 /*Max 49 on lev 7*/, CELL_VISIBLE = 1, CELL_OPEN = 2, CELL_CLOSEDNORTH = 4, CELL_CLOSEDEAST = 8, CELL_CLOSEDSOUTH = 16, CELL_CLOSEDWEST = 32, CELL_SEES_SUN = 64, CELL_SEES_SKYBOX = 128, MAX_CULL_FILESIZE = 500000,
       /*Entity Management*/ MAX_LEVELS = 14, LEVEL_CYBERSPACE = 13, AVG_CPU_TAPS = 2048, MAX_ENTITIES = 864, INSTANCE_COUNT = 9032, MAX_LEVEL_PARTICLES = 128, WORLD = 0, PLAYER1 = 1, INSTS_1ST_IDX = 2, NUM_AI_TYPES = 29, MAX_IO_NAMES = 1024,
-                            FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 23,
+                            FW_MAX_CHILDREN = 48/*41 chunks (lev 9 func_wall)*/, FW_POOL_MAX = 512, MAX_ELEV_DESTS_PER_LEVEL = 8, SAVE_VERSION = 24,
       /*Lights*/ LIGHT_COUNT = 2048, LANIM_MAX = 128/*max animated lights stored per level; Voxen-active peak is 71 (level 5)*/, MAX_LIGHTS_PER_VOXEL = 96, SHADOW_MAP_SIZE = 128, MAX_SHADOWMAPS = 80, SUN_SHADOW_SIZE = 2048, LIGHTON = 1, SHADON = 2, LIGHT_AND_SHADOW_ON = 3, LSPOT = 4, LDIR = 8, LDIRTY = 16, LERPON = 32, SHADOW_NEARMESH_MAX = 1024, SC_MAX = (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS),
       /*Models*/ MAX_MDLS = 7490, WELD_HASH_SIZE = 32768, MAX_VERT_ELEMENT_SIZE = 6964, MAX_OUTPUT_VERTS = 22960, VRT_ATT_SZ = 16, CPU_VRT_SZ = 32, MAX_GLB_JOINTS = 96, MAX_GLB_BLOCKS = 64, SUB_MAIN = 32,
       /*Textures*/ MAXTEX = 4096, MAX_TOTAL_PIXELS = 48000000u, MAX_UNIQUE_COLORS = 86000u, TEXHASH_SZ = 256, NUM_TEXTURE_CLIPS = 49, VIDEO_MAXFRAME = (1280u*720u), VIDEO_RING = 8,
@@ -298,7 +298,7 @@ typedef struct {
         i32 lastMultiMediaTabOpened, tWrnTextIdx[10], tWrnTextIdx2[10], tWrnTextIdx3[10], tWrnColorIdx[10], keycodeEntry,keycodeValue;
         u16 vmailFrame, linkedElevatorDoor, tetheredPGP, tetheredPWP, tetheredSearchable, tetheredKeypadElevator, tetheredKeypadKeycode,elevButtonSpawnIdx[8], generalClickCustom, logReferenceIndex;
         i16 generalClickItem, logFolderList[16], logReaderPage;
-        u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, MFD_LefTab, MFD_CenterTab, MFD_RightTab, MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
+        u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, mfdTab[3], MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
         i8 elevButtonLabelIdx[8], generalClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
         u8 lastWeaponSideRH:1,        lastItemSideRH:1, lastAutomapSideRH:1,  lastDataSideRH:1, lastSearchSideRH:1, lastMinigameSideRH:1, logActive:1,     paperLogInUse:1/*TODO*/;
         u8      usingObject:1, mouseClickHeldOverGUI:1,    mfdGeneralItem:1, mfdHardwareItem:1,     keycodeValid:1,      keycodeSolved:1, pg_solved:1, pw_selectedWireRH:1;
@@ -307,7 +307,7 @@ typedef struct {
         double shieldAnimationStarted, shieldAnimationFinished;
         V3 objectInUsePos;
 } SystemUI;
-typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT],*file_data,*filelog_data; size_t file_size,filelog_size; } TextSystem;
+typedef struct { char stringTable[T_LOGSTR_CNT][T_LOGSTR_MAX]; u16 audioLogImagesRefIndicesLH[LOGCNT],audioLogImagesRefIndicesRH[LOGCNT]; u8 audioLogType[LOGCNT],audioLogLevelFound[LOGCNT]; } TextSystem;
 extern TextSystem Sys_Text;
 extern u32 fontAtlasTex,fontAtlasTexStopD;
 typedef struct { float hitOffset, fireDistance, overheatedPercent, targetY; V3 reloadContainerHome, reloadContainerPos, tempVec; bool recoiling, pendingMeleeIsRapier, pendingMeleeSilent; RaycastHit tempHit; double pendingMeleeFinished; i32 pendingMeleeWep16; u16 tempHitEnt, pendingMeleeTarget, pendingMeleeHitSnd, pendingMeleeFleshSnd; } WeaponFireCtx;
@@ -333,27 +333,27 @@ typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thi
 typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width, height; float near, far, finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 extern CamView camViews[64],levelCamViews[14][64]; extern u8 camViewCount,levelCamViewCount[14]; extern u32 camViewTextures[64],levelCamViewTextures[14][64];
 extern u8 sensaroundCamViewCenter,sensaroundCamViewLeft,sensaroundCamViewRight; extern void UpdateSensaroundCamViews(); // HUD sensaround cameras (center rear + left/right sides), repositioned each frame at the player
-typedef struct { // MUST PRESERVE ORDER TO MATCH TABLE!!
-        const char* name; AttType attackType, attackType2, attackType3; float damage, damage2, damage3, range, range2, range3, health, healthForCyberNPC, armorvalue, defense; AIMoveType moveType;
-        float yawSpeed, fov, fovStartMovement, distToSeeBehind, sightRange, walkSpeed, runSpeed, attack1Speed, attack2Speed, attack3Speed, attack3Force, attack3Radius, timeToPain, timeBetweenPain, timeTillDead, timeToActualAttack1, timeToActualAttack2, timeToActualAttack3, timeBetweenAttack1, timeBetweenAttack2, timeBetweenAttack3, timeToChangeEnemy,timeIdleSFXMin, timeIdleSFXMax,
-              timeAttack1WaitMin, timeAttack1WaitMax, timeAttack1WaitChance, timeAttack2WaitMin, timeAttack2WaitMax, timeAttack2WaitChance, timeAttack3WaitMin, timeAttack3WaitMax, timeAttack3WaitChance;
-        float projectileSpeedAttack1, projectileSpeedAttack2, projectileSpeedAttack3;
-        bool hasLaserOnAttack1, hasLaserOnAttack2, hasLaserOnAttack3, explodeOnAttack3;
-        double huntTime;
-        float flightHeight;
-        bool flightHeightIsPercentage, switchMaterialOnDeath;
-        float hearingRange, timeForTranquilization;
-        bool hopsOnMove;
-        NPCType type;
-        int projectile1Prefab, projectile2Prefab, projectile3Prefab;
+typedef struct { AttType type; float damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed; bool hasLaser; int projectilePrefab; } NPCAttack;
+typedef struct { // Keep initializer order in npcTable.
+    const char* name; NPCAttack attack[3];
+    float health,healthForCyberNPC,armorvalue,defense;
+    AIMoveType moveType;
+    float yawSpeed,fov,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax;
+    bool explodeOnAttack3;
+    double huntTime;
+    float flightHeight;
+    bool flightHeightIsPercentage,switchMaterialOnDeath;
+    float hearingRange,timeForTranquilization;
+    bool hopsOnMove;
+    NPCType type;
 } NPCTable;
 extern const NPCTable npcTable[NUM_AI_TYPES];
 bool TargetIDShouldRender(u16); bool TargetIDInPlayerPVS(u16); i16 TargetIDGetText(u16);
 typedef struct {
-    double beatFinished,tick0Finished,tick1Finished,tick2Finished,tickFinished; float heartRate,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 header,fatigue;
-    u8 ringERG[BIOM_GRAPH_W],ringCHI[BIOM_GRAPH_W],ringECG[BIOM_GRAPH_W];
+    double beatFinished,ticksFinished[3],tickFinished; float heartRate,max[3],min[3],ecgValue,ergValue,chiValue,beatShift; u16 header,fatigue;
+    u8 rings[3][BIOM_GRAPH_W];
     Color backgroundColor,ergColor,chiColor,ecgColor,col0,col1,col2;
-    int ymax,currentIndex0,currentIndex1,currentIndex2;
+    int ymax,currentIndex[3];
 } BioMonitorSystem;
 extern BioMonitorSystem bioMonitor;
 typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB; bool portalNS,open,dirty; u8 lev;} Portal;
@@ -412,7 +412,7 @@ typedef struct {
     double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp,gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs,automapNextRaster;
     float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
     u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_COUNT];
-    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shd1,shd2,shd3,shd4,weaponVModelIndex,levelWepVModel[MAX_LEVELS],TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex,misTimerMission;
+    u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shields[4],weaponVModelIndex,levelWepVModel[MAX_LEVELS],TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex,misTimerMission;
     i32 fogFac,cursorPos_x,cursorPos_y,currentMouse_dx,currentMouse_dy;
     u32 missionBits;
     u8 inventoryMode:1, levelCurrentlyLoading:1,         paused:1,   menuActive:1,   gameFinished:1,   creditsActive:1, decoyActive:1;
@@ -462,7 +462,7 @@ typedef struct PngArena { u8*base,*cursor,*end; } PngArena; extern PngArena png_
 extern bool cullVisibilityValid,instanceIsLODArray[INSTANCE_COUNT],doubleSidedTexture[MAXTEX],transparentTexture[MAXTEX],window_has_focus,ignore_next_mouse_delta,returnToPause,mouseMovementThisFrame,firstFrameMouselook; extern u8 particleBlendTexture[MAXTEX]; extern u8 currentPlayerNameLength; extern i8 currentMenuItem;
 typedef struct { int width,height; u8* pixels; } WinSysIcon;
 RaycastHit Raycast(V3,V3,float,u32); u16 EditModePickLight(V3,V3,float,float*); V3 ScreenPointToRay(V3,V3),ScreenPointToRayPixels(V3,V3,float,float); void SpawnImpactEffectParticle(u16,V3,V3),SpawnBeamTrail(u16,V3,V3,Color),DrawCrossedLine(V3,V3,V3,float,Color),SpawnTargetingLaser(V3,V3),ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
-u16 AddInstance(u16,V3),SpawnDynamicObject(int,bool),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
+u16 AddInstance(u16,V3),SpawnDynamicObject(int),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
 void AutomapTick(), AutomapBlitToUI(), AutomapSideBlitToUI(bool), AutomapNewGame(), AutomapOnLoad(), AutomapClearRenderTargets();
 void DrawSphereWireframe(Color,ShapeSphere), BioMonitorClearGraphs(), BioMonitorAlignCursors(), RequestClearRenderTargets();
 void CyberSwitchInitAfterLoad(u16), synth_set_reverb_preset(u16), MFD_ResetGeneral();
@@ -470,7 +470,7 @@ bool HudHeatTickOn(int);
 double get_time();
 float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
 void ApplyImpactForceSphere(DamageData*,V3,float,float);
-void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void), DebugRAM(const char*), DebugRAMActual(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
+void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void), DebugRAMActual(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
      play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),PlayVmail(u8),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
      LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
@@ -619,8 +619,8 @@ INLINE const char* AudioLogPath(i32 id) { return (id >= 0 && id < (i32)LOGCNT) ?
            GL_TEXTURE3=0x84C3,GL_UNSIGNED_BYTE=0x1401,GL_COLOR_ATTACHMENT3=0x8CE3,GL_FLOAT=0x1406,GL_RGBA32F=0x8814,GL_TEXTURE4=0x84C4,GL_FRAMEBUFFER=0x8D40,GL_READ_FRAMEBUFFER=0x8CA8,GL_DRAW_FRAMEBUFFER=0x8CA9,GL_LINEAR=0x2601,GL_COLOR_ATTACHMENT4=0x8CE4,GL_UNSIGNED_SHORT=0x1403,GL_RGBA8=0x8058,GL_COLOR_BUFFER_BIT=0x00004000,GL_STATIC_DRAW=0x88E4,GL_DYNAMIC_DRAW=0x88E8,GL_TRIANGLE_STRIP=0x0005,GL_LESS=0x0201,GL_LEQUAL=0x0203,GL_ONE=1,GL_SRC_ALPHA=0x0302,GL_ONE_MINUS_SRC_ALPHA=0x0303,GL_DST_COLOR=0x0306,GL_ZERO=0,GL_TRUE=1,
            GL_DEPTH_COMPONENT24=0x81A6,GL_DEPTH_COMPONENT=0x1902,GL_UNSIGNED_INT=0x1405,GL_TEXTURE_MIN_FILTER=0x2801,GL_TEXTURE_MAG_FILTER=0x2800,GL_TEXTURE_WRAP_S=0x2802,GL_TEXTURE_WRAP_T=0x2803,GL_CLAMP_TO_BORDER=0x812D,GL_TEXTURE_BORDER_COLOR=0x1004,GL_TEXTURE_COMPARE_MODE=0x884C,GL_COMPARE_REF_TO_TEXTURE=0x884E,GL_TEXTURE_COMPARE_FUNC=0x884D,GL_DEPTH_ATTACHMENT=0x8D00,GL_TEXTURE10=0x84CA,GL_ACTIVE_TEXTURE=0x84E0,GL_NONE=0};
 // Particles
-typedef struct PSysDef { V3 pos; u32 textures[16]; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness,shapeRadius,shapeAngle; u8 shapeType; Color colStart,colEnd; Color rampColors[16]; float rampTimes[16]; u8 rampCount; float scaleKeys[16],scaleTimes[16]; u8 scaleCount; float velKeys[16],velTimes[16]; u8 velCount; float rotKeys[16],rotTimes[16];
-                         u8 rotCount; float emissKeys[16],emissTimes[16]; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd,trailVertexDistance; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; bool useMesh; } PSysDef;
+typedef struct PSysDef { V3 pos; const u16* textures; u8 textureCount; float emitRate,duration,sizeMin,sizeMax,speedMin,speedMax,lifetimeMin,lifetimeMax,gravity,animWindow,softness,shapeRadius,shapeAngle; u8 shapeType; Color colStart,colEnd; const Color* rampColors; const float* rampTimes; u8 rampCount; const float *scaleKeys,*scaleTimes; u8 scaleCount; const float *velKeys,*velTimes; u8 velCount; const float *rotKeys,*rotTimes;
+                         u8 rotCount; const float *emissKeys,*emissTimes; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd,trailVertexDistance; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; bool useMesh; } PSysDef;
 const PSysDef* PSysTypeGet(u16);
 u16 PSysAdd(const PSysDef*); u16 PSysAddEx(const PSysDef*,u16/*meshInstance, or U16_MAX for origin emission*/); u16 PSysAddFollow(const PSysDef*,u16/*instance the emitter tracks every frame*/); void PSysAddLevelLoops(void),PSysClearLevel(u8);
 typedef void(*FGL_AT)(u32),(*FGL_F)(),(*FGL_FL)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);

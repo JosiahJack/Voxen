@@ -893,17 +893,17 @@ __attribute__((noinline)) float parse_float(const char* str, const char* line, u
 }
 
 __attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* la){ if(World.loadedLights>=LIGHT_COUNT){DualLogError("Too many lights,lev%d!\n",World.curLev); OS_Exit(1);} i32 i=World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++; mcpy(&World.lights[i],lit,sizeof(Light)); if (la && la->numIntervalSteps >= 1) { if (World.lanimCount < LANIM_MAX) { World.lanimLightIdx[World.lanimCount]=(u16)i; mcpy(&World.lanims[World.lanimCount],la,sizeof(LightAnimation)); World.lanimCount++; } else { DualLogError("Too many light animations,lev%d!\n",World.curLev); } } World.lightsNewPosition[i]=lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true); return i;}
-__attribute__((noinline)) u16 AddLightSimple(V3 pos, Color3 c, float r, float in, u16 lf){Light l={.pos=pos,.col=c,.range=r,.intensity=in,.maxIntensity=in,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=lf}; LightAnimation a={0}; return AddLight(&l,&a);}
+__attribute__((noinline)) u16 AddLightSimple(V3 pos, Color3 c, float r, float in, u16 lf){Light l={.pos=pos,.col=c,.range=r,.intensity=in,.maxIntensity=in,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=lf}; return AddLight(&l,NULL);}
 u16 IOInternName(const char*); static u16 lightTargetnameFile[LIGHT_COUNT];/*targetname per lightsFromFile slot, IO_NONE when anonymous.  A light is not an entity, so this is the only way a relay can address one.*/
 __attribute__((noinline)) u16 AddOffsetLight(Entity* par, V3 offset, Color3 col, float range, float intensity) { return AddLightSimple(GetLocalTransformedPos(par,offset),col,range,intensity,LIGHT_AND_SHADOW_ON); }
 void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAnimation* lam, u16 lIdx) {
     char* br = StringFindFirstCharWithin(k,'['); if (br) { int i = parse_numberu32(br + 1,il,ln); if (i >= 0 && i < 32) { if (br - k == 13) { lam->intervalSteps[i] = parse_float(v,il,ln); }/*"intervalSteps[" bracket is at index 13*/ else if (br - k == 21) { lam->stepIsLerping[i] = parse_float(v,il,ln); }/*"intervalStepisLerping[" bracket is at index 21*/ } return; }
-    static const struct { const char* key; u16 offset; u8 type; } map[] = {
-        {"currentStep",    __builtin_offsetof(LightAnimation,currentStep),1},{"lerpValue",      __builtin_offsetof(LightAnimation,lerpValue),0},{"intervalSteps.Length",__builtin_offsetof(LightAnimation,numIntervalSteps),1},{"intervalStepisLerping.Length",__builtin_offsetof(LightAnimation, numLerpSteps),1},
+    static const struct { const char* key; u16 offset; u8 type,anim; } map[] = {
+        {"currentStep",    __builtin_offsetof(LightAnimation,currentStep),1,1},{"lerpValue",      __builtin_offsetof(LightAnimation,lerpValue),0,1},{"intervalSteps.Length",__builtin_offsetof(LightAnimation,numIntervalSteps),1,1},{"intervalStepisLerping.Length",__builtin_offsetof(LightAnimation, numLerpSteps),1,1},
         {"lP.x",__builtin_offsetof(Light,pos.x),0},{"lP.y",__builtin_offsetof(Light,pos.y),0},{"lP.z",__builtin_offsetof(Light,pos.z),0},{"lR.x",__builtin_offsetof(Light,spotDir.x),0},{"lR.y",__builtin_offsetof(Light,spotDir.y),0},{"lR.z",__builtin_offsetof(Light,spotDir.z),0},{"lR.w",__builtin_offsetof(Light,spotDir.w),0},
         {"range",__builtin_offsetof(Light,range),0},{"spotAngle",__builtin_offsetof(Light,spotAng),0},{"minIntensity",__builtin_offsetof(Light,minIntensity),0},{"maxIntensity",__builtin_offsetof(Light,maxIntensity),0},{"color.r",__builtin_offsetof(Light,col.r),0},{"color.g",__builtin_offsetof(Light,col.g),0},{"color.b",__builtin_offsetof(Light,col.b),0}
     };
-    for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {if(sEqual(k,map[i].key)/*0=float,1=u8*/){void* dest=(k[0]=='l' && (k[1]=='P' || k[1]=='R')) ? (void*)lit : (void*)lam; if (k[0]=='r' || k[0]=='s' || k[0]=='m' || k[0]=='c'){if(k[1]!='u')dest=(void*)lit;/*r,spot,max,color(not currentStep)*/} char* ptr=(char*)dest+map[i].offset; if(map[i].type == 0){*(float*)ptr=parse_float(v,il,ln);}else{*(u8*)ptr=parse_numberu8(v,il,ln);} return;}}
+    for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {if(sEqual(k,map[i].key)/*0=float,1=u8*/){void* dest=map[i].anim ? (void*)lam : (void*)lit; char* ptr=(char*)dest+map[i].offset; if(map[i].type == 0){*(float*)ptr=parse_float(v,il,ln);}else{*(u8*)ptr=parse_numberu8(v,il,ln);} return;}}
     if (sEqual(k,"intensity")) {lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;}else if(sEqual(k,"type")){flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);}else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); } else if (sEqual(k,"lerpOn")) {flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));}
     else if (sEqual(k,"targetname")) {lightTargetnameFile[lIdx] = IOInternName(v);}
 }
@@ -1125,19 +1125,118 @@ static char texAnimFolders[256][TARG_STRLEN]; static u16 texAnimFolderCount = 1;
 u16 TexAnimFolderIntern(const char* name){if(!name || !*name){return 0;} for(u16 i=1;i<texAnimFolderCount;++i){if(sEqual(texAnimFolders[i],name)){return i;}} if(texAnimFolderCount >= 256){DualLogError("texAnim folder table full!\n"); return 0;} scpy_to_a_from_b(texAnimFolders[texAnimFolderCount],name,TARG_STRLEN); return texAnimFolderCount++;}
 static void FWBeginBlock(i32 cnt){V3 *p,*s; Quaternion *r; if(fwCollecting&&fwLastChunkSlot<FW_MAX_CHILDREN){p=&lwPos[fwLastChunkSlot]; r=&lwRot[fwLastChunkSlot]; s=&lwScale[fwLastChunkSlot];}else{switch(fwStage++){case 1:p=&fwContainerPos; r=&fwContainerRot; s=&fwContainerScale; break; case 2:p=&fwInfoLocalTmp; r=&fwInfoRotDummy; s=&fwInfoScaleDummy; break; default:p=&posFromFile[cnt]; r=&rotationFromFile[cnt]; s=&scaleFromFile[cnt]; break;}} fwCurP=p; fwCurR=r; fwCurS=s;}
 void LoadLevelMod(u8 lev) {
+    static const struct { const char* key; u16 offset; u8 bytes,len,kind,count; u32 mask; } fields[]={
+        {"health",__builtin_offsetof(Entity,health),sizeof(((Entity*)0)->health),6,0,0,0},{"cyberHealth",__builtin_offsetof(Entity,cyberHealth),sizeof(((Entity*)0)->cyberHealth),11,0,0,0},
+        {"startYAngle",__builtin_offsetof(Entity,camStartYAngle),sizeof(((Entity*)0)->camStartYAngle),11,0,0,0},{"endYAngle",__builtin_offsetof(Entity,camEndYAngle),sizeof(((Entity*)0)->camEndYAngle),9,0,0,0},
+        {"waitTime",__builtin_offsetof(Entity,camWaitTime),sizeof(((Entity*)0)->camWaitTime),8,0,0,0},{"keycode",__builtin_offsetof(Entity,keycode),sizeof(((Entity*)0)->keycode),7,2,0,0},
+        {"radiationAmount",__builtin_offsetof(Entity,radiation),sizeof(((Entity*)0)->radiation),15,0,0,0},{"ammo",__builtin_offsetof(Entity,ammo),sizeof(((Entity*)0)->ammo),4,1,0,0},
+        {"ammo2",__builtin_offsetof(Entity,ammo2),sizeof(((Entity*)0)->ammo2),5,1,0,0},{"useableItemIndex",__builtin_offsetof(Entity,lookUpIndex),sizeof(((Entity*)0)->lookUpIndex),16,1,0,0},
+        {"idleTime",__builtin_offsetof(Entity,idleTime),sizeof(((Entity*)0)->idleTime),8,0,0,0},{"lookUpIndex",__builtin_offsetof(Entity,lookUpIndex),sizeof(((Entity*)0)->lookUpIndex),11,1,0,0},
+        {"attack1SoundTime",__builtin_offsetof(Entity,attack1SoundTime),sizeof(((Entity*)0)->attack1SoundTime),16,0,0,0},{"attack2SoundTime",__builtin_offsetof(Entity,attack2SoundTime),sizeof(((Entity*)0)->attack2SoundTime),16,0,0,0},
+        {"attack3SoundTime",__builtin_offsetof(Entity,attack3SoundTime),sizeof(((Entity*)0)->attack3SoundTime),16,0,0,0},{"currentDestination.x",__builtin_offsetof(Entity,currentDestination.x),sizeof(((Entity*)0)->currentDestination.x),20,0,0,0},
+        {"currentDestination.y",__builtin_offsetof(Entity,currentDestination.y),sizeof(((Entity*)0)->currentDestination.y),20,0,0,0},{"currentDestination.z",__builtin_offsetof(Entity,currentDestination.z),sizeof(((Entity*)0)->currentDestination.z),20,0,0,0},
+        {"idealTransformForward.x",__builtin_offsetof(Entity,idealTransformForward.x),sizeof(((Entity*)0)->idealTransformForward.x),23,0,0,0},{"idealTransformForward.y",__builtin_offsetof(Entity,idealTransformForward.y),sizeof(((Entity*)0)->idealTransformForward.y),23,0,0,0},
+        {"idealTransformForward.z",__builtin_offsetof(Entity,idealTransformForward.z),sizeof(((Entity*)0)->idealTransformForward.z),23,0,0,0},{"idealPos.x",__builtin_offsetof(Entity,idealPos.x),sizeof(((Entity*)0)->idealPos.x),10,0,0,0},
+        {"idealPos.y",__builtin_offsetof(Entity,idealPos.y),sizeof(((Entity*)0)->idealPos.y),10,0,0,0},{"idealPos.z",__builtin_offsetof(Entity,idealPos.z),sizeof(((Entity*)0)->idealPos.z),10,0,0,0},
+        {"targettingPosition.x",__builtin_offsetof(Entity,targettingPosition.x),sizeof(((Entity*)0)->targettingPosition.x),20,0,0,0},{"targettingPosition.y",__builtin_offsetof(Entity,targettingPosition.y),sizeof(((Entity*)0)->targettingPosition.y),20,0,0,0},
+        {"targettingPosition.z",__builtin_offsetof(Entity,targettingPosition.z),sizeof(((Entity*)0)->targettingPosition.z),20,0,0,0},{"maxRandomItems",__builtin_offsetof(Entity,maxRandomItems),sizeof(((Entity*)0)->maxRandomItems),14,1,0,0},
+        {"contents",__builtin_offsetof(Entity,contents[0]),sizeof(((Entity*)0)->contents[0]),8,1,4,0},{"customIndex",__builtin_offsetof(Entity,custIdx[0]),sizeof(((Entity*)0)->custIdx[0]),11,1,4,0},
+        {"custIdx",__builtin_offsetof(Entity,custIdx[0]),sizeof(((Entity*)0)->custIdx[0]),7,1,4,0},{"randomItem",__builtin_offsetof(Entity,randomItem[0]),sizeof(((Entity*)0)->randomItem[0]),10,1,7,0},
+        {"randomItemDropChance",__builtin_offsetof(Entity,randomItemDropChance[0]),sizeof(((Entity*)0)->randomItemDropChance[0]),20,0,7,0},{"customIndex",__builtin_offsetof(Entity,customIndex),sizeof(((Entity*)0)->customIndex),11,1,0,0},
+        {"amount",__builtin_offsetof(Entity,amount),sizeof(((Entity*)0)->amount),6,0,0,0},{"resetTime",__builtin_offsetof(Entity,resetTime),sizeof(((Entity*)0)->resetTime),9,0,0,0},
+        {"minSecurityLevel",__builtin_offsetof(Entity,minSecurityLevel),sizeof(((Entity*)0)->minSecurityLevel),16,0,0,0},{"rechargeMsgLingdex",__builtin_offsetof(Entity,rechargeMsgLingdex),sizeof(((Entity*)0)->rechargeMsgLingdex),18,1,0,0},
+        {"usedMsgLingdex",__builtin_offsetof(Entity,usedMsgLingdex),sizeof(((Entity*)0)->usedMsgLingdex),14,1,0,0},{"damageOnUse",__builtin_offsetof(Entity,damage),sizeof(((Entity*)0)->damage),11,0,0,0},
+        {"randomItemCustomIndex",__builtin_offsetof(Entity,randomItemCustIdx[0]),sizeof(((Entity*)0)->randomItemCustIdx[0]),21,1,7,0},{"musicType",__builtin_offsetof(Entity,musicType),sizeof(((Entity*)0)->musicType),9,3,0,0},
+        {"securityThreshhold",__builtin_offsetof(Entity,securityThreshold),sizeof(((Entity*)0)->securityThreshold),18,3,0,0},{"securityThreshold",__builtin_offsetof(Entity,securityThreshold),sizeof(((Entity*)0)->securityThreshold),17,3,0,0},
+        {"messageIndex",__builtin_offsetof(Entity,messageIndex),sizeof(((Entity*)0)->messageIndex),12,1,0,0},{"delay",__builtin_offsetof(Entity,delay),sizeof(((Entity*)0)->delay),5,0,0,0},
+        {"counter",__builtin_offsetof(Entity,counter),sizeof(((Entity*)0)->counter),7,2,0,0},{"countToTrigger",__builtin_offsetof(Entity,countToTrigger),sizeof(((Entity*)0)->countToTrigger),14,2,0,0},
+        {"timeInterval",__builtin_offsetof(Entity,timeInterval),sizeof(((Entity*)0)->timeInterval),12,0,0,0},{"randomMin",__builtin_offsetof(Entity,randomMin),sizeof(((Entity*)0)->randomMin),9,0,0,0},
+        {"randomMax",__builtin_offsetof(Entity,randomMax),sizeof(((Entity*)0)->randomMax),9,0,0,0},{"ajarPercentage",__builtin_offsetof(Entity,ajarPercentage),sizeof(((Entity*)0)->ajarPercentage),14,0,0,0},
+        {"timeBeforeLasersOn",__builtin_offsetof(Entity,timeBeforeLasersOn),sizeof(((Entity*)0)->timeBeforeLasersOn),18,0,0,0},{"numberActive",__builtin_offsetof(Entity,numberActive),sizeof(((Entity*)0)->numberActive),12,2,0,0},
+        {"numberToSpawn",__builtin_offsetof(Entity,numberToSpawn),sizeof(((Entity*)0)->numberToSpawn),13,2,0,0},{"minDelayBetweenSpawns",__builtin_offsetof(Entity,minDelayBetweenSpawns),sizeof(((Entity*)0)->minDelayBetweenSpawns),21,0,0,0},
+        {"maxDelayBetweenSpawns",__builtin_offsetof(Entity,maxDelayBetweenSpawns),sizeof(((Entity*)0)->maxDelayBetweenSpawns),21,0,0,0},{"allSpawnedResetDelay",__builtin_offsetof(Entity,allSpawnedResetDelay),sizeof(((Entity*)0)->allSpawnedResetDelay),20,0,0,0},
+        {"lingdex",__builtin_offsetof(Entity,messageLingdex),sizeof(((Entity*)0)->messageLingdex),7,1,0,0},{"messageLingdex",__builtin_offsetof(Entity,messageLingdex),sizeof(((Entity*)0)->messageLingdex),14,1,0,0},
+        {"lockedMessageLingdex",__builtin_offsetof(Entity,lockedMessageLingdex),sizeof(((Entity*)0)->lockedMessageLingdex),20,1,0,0},{"texIndex",__builtin_offsetof(Entity,texIndex),sizeof(((Entity*)0)->texIndex),8,2,0,0},
+        {"SFXIndex",__builtin_offsetof(Entity,SFXIndex),sizeof(((Entity*)0)->SFXIndex),8,1,0,0},{"SFXClip",__builtin_offsetof(Entity,SFXIndex),sizeof(((Entity*)0)->SFXIndex),7,1,0,0},
+        {"SFXLockedIndex",__builtin_offsetof(Entity,SFXLockedIndex),sizeof(((Entity*)0)->SFXLockedIndex),14,1,0,0},{"trackType",__builtin_offsetof(Entity,trackType),sizeof(((Entity*)0)->trackType),9,1,0,0},
+        {"textIndex",__builtin_offsetof(Entity,textIndex),sizeof(((Entity*)0)->textIndex),9,1,0,0},{"logIndex",__builtin_offsetof(Entity,logIndex),sizeof(((Entity*)0)->logIndex),8,1,0,0},
+        {"requiredAccessCard",__builtin_offsetof(Entity,requiredAccessCard),sizeof(((Entity*)0)->requiredAccessCard),18,4,0,0},{"activatedScaleX",__builtin_offsetof(Entity,activatedScale.x),sizeof(((Entity*)0)->activatedScale.x),15,0,0,0},
+        {"activatedScaleY",__builtin_offsetof(Entity,activatedScale.y),sizeof(((Entity*)0)->activatedScale.y),15,0,0,0},{"activatedScaleZ",__builtin_offsetof(Entity,activatedScale.z),sizeof(((Entity*)0)->activatedScale.z),15,0,0,0},
+        {"maxDistance",__builtin_offsetof(Entity,reverbMaxDist),sizeof(((Entity*)0)->reverbMaxDist),11,0,0,0},{"reverbPreset",__builtin_offsetof(Entity,reverbPreset),sizeof(((Entity*)0)->reverbPreset),12,2,0,0},
+        {"direction.x",__builtin_offsetof(Entity,dir.x),sizeof(((Entity*)0)->dir.x),11,0,0,0},{"direction.y",__builtin_offsetof(Entity,dir.y),sizeof(((Entity*)0)->dir.y),11,0,0,0},
+        {"direction.z",__builtin_offsetof(Entity,dir.z),sizeof(((Entity*)0)->dir.z),11,0,0,0},{"force",__builtin_offsetof(Entity,force),sizeof(((Entity*)0)->force),5,0,0,0},
+        {"emailIndex",__builtin_offsetof(Entity,emailIndex),sizeof(((Entity*)0)->emailIndex),10,1,0,0},{"teleportID",__builtin_offsetof(Entity,teleportID),sizeof(((Entity*)0)->teleportID),10,2,0,0},
+        {"targetDestinationID",__builtin_offsetof(Entity,targetDestinationID),sizeof(((Entity*)0)->targetDestinationID),19,2,0,0},{"doorOpenState",__builtin_offsetof(Entity,doorOpen),sizeof(((Entity*)0)->doorOpen),13,3,0,0},
+        {"FuncWall.currentState",__builtin_offsetof(Entity,funcState),sizeof(((Entity*)0)->funcState),21,3,0,0},{"startPosition.x",__builtin_offsetof(Entity,startPosition.x),sizeof(((Entity*)0)->startPosition.x),15,0,0,0},
+        {"startPosition.y",__builtin_offsetof(Entity,startPosition.y),sizeof(((Entity*)0)->startPosition.y),15,0,0,0},{"startPosition.z",__builtin_offsetof(Entity,startPosition.z),sizeof(((Entity*)0)->startPosition.z),15,0,0,0},
+        {"speed",__builtin_offsetof(Entity,speed),sizeof(((Entity*)0)->speed),5,0,0,0},{"percentAjar",__builtin_offsetof(Entity,ajarPercentage),sizeof(((Entity*)0)->ajarPercentage),11,0,0,0},
+        {"percentMoved",__builtin_offsetof(Entity,percentMoved),sizeof(((Entity*)0)->percentMoved),12,0,0,0},{"wandering",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),9,7,0,EF_WANDERING},
+        {"asleep",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),6,7,0,EF_ASLEEP},{"actAsTurret",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),11,7,0,EF_ACT_AS_TURRET},
+        {"actAsCorpseOnly",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),15,7,0,EF_ACT_AS_CORPSE_ONLY},{"teleportOnDeath",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),15,7,0,EF_TELEPORT_ON_DEATH},
+        {"firstSighting",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),13,7,0,EF_FIRST_SIGHTING},{"shotFired",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),9,7,0,EF_SHOT_FIRED},
+        {"goIntoPain",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),10,7,0,EF_GO_INTO_PAIN},{"dyingSetup",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),10,7,0,EF_DYING_SETUP},
+        {"ai_dying",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),8,7,0,EF_DYING},{"ai_dead",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_DEAD},
+        {"hopDone",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_HOP_DONE},{"deathBurstDone",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),14,7,0,EF_DEATH_BURST_DONE},
+        {"hadEnemy",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),8,7,0,EF_HAD_ENEMY},{"walkPathOnStart",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),15,7,0,EF_WALK_PATH_ON_START},
+        {"inSight",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_ENEM_IN_SIGHT},{"infront",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),7,7,0,EF_ENEM_IN_FRONT},
+        {"inProjFOV",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),9,7,0,EF_ENEM_IN_FOV},{"LOSpossible",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),11,7,0,EF_ENEM_IN_LOS},
+        {"locked",__builtin_offsetof(Entity,entflags),sizeof(((Entity*)0)->entflags),6,7,0,EF_LOCKED},{"doorOpen",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),8,7,0,TARG_IOFLAGS_DOOROPEN},
+        {"doorClose",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),9,7,0,TARG_IOFLAGS_DOORCLOSE},{"switchTrigger",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),13,7,0,TARG_IOFLAGS_SWITCHTRIGGER},
+        {"tripTrigger",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),11,7,0,TARG_IOFLAGS_TRIPTRIGGER},{"forceBridgeActivate",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),19,7,0,TARG_IOFLAGS_FBRIDGE_ACTIVATE},
+        {"forceBridgeDeactivate",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),21,7,0,TARG_IOFLAGS_FBRIDGE_DEACTIVATE},{"forceBridgeToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),17,7,0,TARG_IOFLAGS_FBRIDGE_TOGGLE},
+        {"gravityLiftToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),17,7,0,TARG_IOFLAGS_GRAVLIFT_TOGGLE},{"textureChangeToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),19,7,0,TARG_IOFLAGS_TEXTURE_CHG_TOGGLE},
+        {"lightOn",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),7,7,0,TARG_IOFLAGS_LIGHT_ON},{"lightOff",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),8,7,0,TARG_IOFLAGS_LIGHT_OFF},
+        {"lightToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),11,7,0,TARG_IOFLAGS_LIGHT_TOGGLE},{"funcwallMove",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),12,7,0,TARG_IOFLAGS_FUNCWALL_MOVE},
+        {"missionBitOn",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),12,7,0,TARG_IOFLAGS_MISSION_BIT_ON},{"missionBitOff",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),13,7,0,TARG_IOFLAGS_MISSION_BIT_OFF},
+        {"missionBitToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),16,7,0,TARG_IOFLAGS_MISSION_BIT_TOGGLE},{"switchLockToggle",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),16,7,0,TARG_IOFLAGS_SWITCH_LOCK_TOGGLE},
+        {"GOSetActive",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),11,7,0,TARG_IOFLAGS_INST_ACTIVATE},{"enemyAlert",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),10,7,0,TARG_IOFLAGS_ENEMY_ALERT},
+        {"spawnerActivate",__builtin_offsetof(Entity,ioflagsHi),sizeof(((Entity*)0)->ioflagsHi),15,7,0,TARG_IOFLAGHI_SPAWNER_ACTIVATE},{"spawnerActivateAlerted",__builtin_offsetof(Entity,ioflagsHi),sizeof(((Entity*)0)->ioflagsHi),22,7,0,TARG_IOFLAGHI_SPAWNER_ACTIVATE_ALERTED},
+        {"awakeSleepingEnemy",__builtin_offsetof(Entity,ioflagsHi),sizeof(((Entity*)0)->ioflagsHi),18,7,0,TARG_IOFLAGHI_AWAKE_SLEEPING},{"GOSetDeactive",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),13,7,0,TARG_IOFLAGS_INST_DEACTIVATE},
+        {"GOToggleActive",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),14,7,0,TARG_IOFLAGS_INST_TOGGLE},{"disableThisGOOnAwake",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),20,7,0,TARG_IOFLAGS_DISABLE_ON_AWAKE},
+        {"playSoundOnce",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),13,7,0,TARG_IOFLAGS_PLAY_SOUND_ONCE},{"stopSound",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),9,7,0,TARG_IOFLAGS_STOP_SOUND},
+        {"startFlashingMaterials",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),22,7,0,TARG_IOFLAGS_START_FLASHING_TEX},{"stopFlashingMaterials",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),21,7,0,TARG_IOFLAGS_STOP_FLASHING_TEX},
+        {"branchFlip",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),10,7,0,TARG_IOFLAGS_BRANCH_FLIP},{"branchFlipOnly",__builtin_offsetof(Entity,ioflags),sizeof(((Entity*)0)->ioflags),14,7,0,TARG_IOFLAGS_BRANCH_FLIPONLY},
+        {"RobotSpawnDeactivated",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),21,8,0,QB_RobotSpawnDeactivated},{"IsotopeInstalled",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),16,8,0,QB_IsotopeInstalled},
+        {"ShieldActivated",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),15,8,0,QB_ShieldActivated},{"LaserSafetyOverriden",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),20,8,0,QB_LaserSafetyOverriden},
+        {"LaserDestroyed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),14,8,0,QB_LaserDestroyed},{"BetaGroveCyberUnlocked",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),22,8,0,QB_BetaGroveCyberUnlocked},
+        {"GroveAlphaJettisonEnabled",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),25,8,0,QB_GroveAlphaJettisonEnabled},{"GroveBetaJettisonEnabled",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),24,8,0,QB_GroveBetaJettisonEnabled},
+        {"GroveDeltaJettisonEnabled",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),25,8,0,QB_GroveDeltaJettisonEnabled},{"MasterJettisonBroken",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),20,8,0,QB_MasterJettisonBroken},
+        {"Relay428Fixed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),13,8,0,QB_Relay428Fixed},{"MasterJettisonEnabled",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),21,8,0,QB_MasterJettisonEnabled},
+        {"BetaGroveJettisoned",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),19,8,0,QB_BetaGroveJettisoned},{"AntennaNorthDestroyed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),21,8,0,QB_AntennaNorthDestroyed},
+        {"AntennaSouthDestroyed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),21,8,0,QB_AntennaSouthDestroyed},{"AntennaEastDestroyed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),20,8,0,QB_AntennaEastDestroyed},
+        {"AntennaWestDestroyed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),20,8,0,QB_AntennaWestDestroyed},{"SelfDestructActivated",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),21,8,0,QB_SelfDestructActivated},
+        {"BridgeSeparated",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),15,8,0,QB_BridgeSeparated},{"IsolinearChipsetInstalled",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),25,8,0,QB_IsolinearChipsetInstalled},
+    };
     u8 curlevel = vclamp(lev, 0, 13); World.levelCurrentlyLoading = true;/*precondition only, for AddInstance's level-security tally above -- NOT redundant bookkeeping. The tally must not see runtime spawns, and this flag is its only way to tell load-time from run-time. Nothing outside the loader reads it; the main loop gates level changes on the queuedLevelToLoad sentinel instead.*/
-    if(curlevel == 0){AddCamView((V3){-14.16170f,-54.72389f,20.71170f},(Quaternion){0.03959f,0.41918f,-0.01830f,0.90686f},85u,256u,256u,0.84f,16.223f);/*ReacScreen1_Camera*/ AddCamView((V3){36.38030f,-57.61589f,-0.30230f},(Quaternion){0.12279f,0.69636f,-0.12279f,0.69636f},50u,256u,256u,2.0f,17.05f);/*ReacScreen1_Camera (1)*/ AddCamView((V3){-0.64170f,-54.17389f,-5.37830f},(Quaternion){0.17111f,0.16779f,-0.02959f,0.97041f},65u,256u,256u,0.513f,26.13f);/*ReacScreen1_Camera (2)*/}
-    else if(curlevel == 1){AddCamView((V3){-19.2301f,-42.6604f,-49.7453f},(Quaternion){0.2375f,0.0008f,-0.0002f,0.9713f},75u,256u,256u,2.21f,11.5f);/*MedScreen14_Camera*/ AddCamView((V3){7.664583f,-44.88017f,-14.26742f},(Quaternion){0.0f,0.9999f,0.0129f,0.0f},60u,256u,256u,2.192f,20.6f);/*MedScreen15_Camera*/}
-    else if(curlevel == 2) { AddCamView((V3){36.73389f,-24.66895f,9.47060f},(Quaternion){0.11769f,-0.23125f,0.02819f,0.96534f},75u,256u,256u,0.695f,13.73f);/*SciScreen6_Camera*/}
-    else if(curlevel == 3) { AddCamView((V3){-12.01620f,-28.52930f,33.53500f},(Quaternion){0.54295f,0.45300f,0.54295f,-0.45300f},68u,256u,256u,0.868f,14.145f);/*MaintScreen_Camera*/}
-    else if(curlevel == 4) { AddCamView((V3){-26.93000f,46.56557f,-31.18625f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,0.82f,17.56f);/*StorageScreen_Camera*/}
-    else if(curlevel == 5){AddCamView((V3){-30.72000f,8.96000f,-53.76000f},(Quaternion){0.00000f,0.70711f,0.70711f,0.00000f},68u,256u,256u,2.7f,24.8f);/*FlightScreen1_Camera*/}
-    else if(curlevel == 6){AddCamView((V3){9.08000f,48.71000f,-47.32400f},(Quaternion){0.00000f,0.99054f,0.00000f,-0.13719f},90u,256u,256u,1.2f,11.52f);/*ExecScreen5_Camera*/ AddCamView((V3){-3.90720f,13.90800f,2.47230f},(Quaternion){-0.50000f,0.50000f,0.50000f,0.50000f},90u,256u,256u,0.06f,11.87f);/*ExecScreen6_Camera*/}
-    else if(curlevel == 7){AddCamView((V3){106.87113f,-14.55570f,24.65725f},(Quaternion){0.00000f,0.00000f,0.00000f,1.00000f},68u,256u,256u,1.295f,26.01f);/*EngScreen3_Camera*/ AddCamView((V3){-57.06100f,34.70000f,1.19200f},(Quaternion){0.00000f,-0.65094f,0.00000f,0.75913f},68u,256u,256u,1.83f,19.9f);/*EngScreen4_Camera*/ AddCamView((V3){29.51000f,3.29000f,-9.93000f},(Quaternion){0,0,0,1.f},80u,256u,256u,0.77f,9.79f);/*EngScreen5_Camera*/}
-    else if(curlevel == 8){AddCamView((V3){69.76093f,30.97230f,-0.84785f},(Quaternion){0.48739f,0.51230f,0.51230f,-0.48739f},85u,256u,256u,0.33f,10.05f);/*SecScreen1_Camera*/ AddCamView((V3){9.95000f,60.11100f,8.59600f},(Quaternion){0.14019f,0.00000f,0.00000f,0.99013f},68u,256u,256u,1.0f,10.44f);/*SecScreen1_Camera (1)*/ AddCamView((V3){-5.55300f,77.60500f,25.11700f},(Quaternion){0.09230f,0.70106f,-0.09230f,0.70106f},68u,256u,256u,1.2f,9.4f);/*SecScreen1_Camera (2)*/ AddCamView((V3){9.99800f,98.27100f,-14.68900f},(Quaternion){0.00000f,0.99255f,-0.12187f,0.00000f},68u,256u,256u,0.7f,12.7f);/*SecScreen1_Camera (3)*/ AddCamView((V3){36.88600f,69.74000f,-3.47000f},(Quaternion){-0.06937f,0.60309f,-0.05276f,-0.79289f},68u,256u,256u,1.34f,34.97f);/*SecScreen1_Camera (4)*/ AddCamView((V3){-24.66100f,82.29600f,2.08200f},(Quaternion){-0.00000f,0.70711f,0.00000f,-0.70711f},85u,256u,256u,0.99f,12.53f);/*SecScreen1_Camera (5)*/ AddCamView((V3){53.26900f,77.89000f,-8.30000f},(Quaternion){-0.12279f,0.69636f,-0.12279f,-0.69636f},71u,256u,256u,0.56f,16.38f);/*SecScreen1_Camera (6)*/}
-    else if(curlevel == 9){AddCamView((V3){53.36000f,108.73700f,8.72300f},(Quaternion){-0.11027f,0.77231f,-0.13966f,-0.60982f},71u,256u,256u,0.5f,16.582f);/*BridgeScreen1_Camera*/}
-    else if(curlevel == 10){AddCamView((V3){6.27000f,137.70000f,20.88000f},(Quaternion){0.05778f,-0.25920f,0.01554f,0.96397f},68u,256u,256u,1.3f,9.4f);/*GroveScreen1_Camera*/ AddCamView((V3){24.67000f,136.79999f,-26.02000f},(Quaternion){-0.00879f,-0.90735f,0.01901f,-0.41985f},68u,256u,256u,4.0f,13.6f);/*GroveScreen2_Camera*/}
-    else if(curlevel == 12){AddCamView((V3){35.80700f,196.89301f,-4.98400f},(Quaternion){0.12369f,0.00000f,0.00000f,0.99232f},68u,256u,256u,0.7f,4.32f);/*GroveScreen3_Camera*/ AddCamView((V3){-9.23000f,199.00000f,2.98000f},(Quaternion){0.08830f,-0.69488f,0.08661f,0.70841f},68u,256u,256u,1.5f,8.04f);/*GroveScreen4_Camera*/}
+    static const struct { u8 level; V3 pos; Quaternion rot; u8 fov; float near,far; } cameras[]={
+        {0,{-14.16170f,-54.72389f,20.71170f},{0.03959f,0.41918f,-0.01830f,0.90686f},85,0.84f,16.223f},
+        {0,{36.38030f,-57.61589f,-0.30230f},{0.12279f,0.69636f,-0.12279f,0.69636f},50,2.0f,17.05f},
+        {0,{-0.64170f,-54.17389f,-5.37830f},{0.17111f,0.16779f,-0.02959f,0.97041f},65,0.513f,26.13f},
+        {1,{-19.2301f,-42.6604f,-49.7453f},{0.2375f,0.0008f,-0.0002f,0.9713f},75,2.21f,11.5f},
+        {1,{7.664583f,-44.88017f,-14.26742f},{0.0f,0.9999f,0.0129f,0.0f},60,2.192f,20.6f},
+        {2,{36.73389f,-24.66895f,9.47060f},{0.11769f,-0.23125f,0.02819f,0.96534f},75,0.695f,13.73f},
+        {3,{-12.01620f,-28.52930f,33.53500f},{0.54295f,0.45300f,0.54295f,-0.45300f},68,0.868f,14.145f},
+        {4,{-26.93000f,46.56557f,-31.18625f},{0.00000f,0.00000f,0.00000f,1.00000f},68,0.82f,17.56f},
+        {5,{-30.72000f,8.96000f,-53.76000f},{0.00000f,0.70711f,0.70711f,0.00000f},68,2.7f,24.8f},
+        {6,{9.08000f,48.71000f,-47.32400f},{0.00000f,0.99054f,0.00000f,-0.13719f},90,1.2f,11.52f},
+        {6,{-3.90720f,13.90800f,2.47230f},{-0.50000f,0.50000f,0.50000f,0.50000f},90,0.06f,11.87f},
+        {7,{106.87113f,-14.55570f,24.65725f},{0.00000f,0.00000f,0.00000f,1.00000f},68,1.295f,26.01f},
+        {7,{-57.06100f,34.70000f,1.19200f},{0.00000f,-0.65094f,0.00000f,0.75913f},68,1.83f,19.9f},
+        {7,{29.51000f,3.29000f,-9.93000f},{0,0,0,1.f},80,0.77f,9.79f},
+        {8,{69.76093f,30.97230f,-0.84785f},{0.48739f,0.51230f,0.51230f,-0.48739f},85,0.33f,10.05f},
+        {8,{9.95000f,60.11100f,8.59600f},{0.14019f,0.00000f,0.00000f,0.99013f},68,1.0f,10.44f},
+        {8,{-5.55300f,77.60500f,25.11700f},{0.09230f,0.70106f,-0.09230f,0.70106f},68,1.2f,9.4f},
+        {8,{9.99800f,98.27100f,-14.68900f},{0.00000f,0.99255f,-0.12187f,0.00000f},68,0.7f,12.7f},
+        {8,{36.88600f,69.74000f,-3.47000f},{-0.06937f,0.60309f,-0.05276f,-0.79289f},68,1.34f,34.97f},
+        {8,{-24.66100f,82.29600f,2.08200f},{-0.00000f,0.70711f,0.00000f,-0.70711f},85,0.99f,12.53f},
+        {8,{53.26900f,77.89000f,-8.30000f},{-0.12279f,0.69636f,-0.12279f,-0.69636f},71,0.56f,16.38f},
+        {9,{53.36000f,108.73700f,8.72300f},{-0.11027f,0.77231f,-0.13966f,-0.60982f},71,0.5f,16.582f},
+        {10,{6.27000f,137.70000f,20.88000f},{0.05778f,-0.25920f,0.01554f,0.96397f},68,1.3f,9.4f},
+        {10,{24.67000f,136.79999f,-26.02000f},{-0.00879f,-0.90735f,0.01901f,-0.41985f},68,4.0f,13.6f},
+        {12,{35.80700f,196.89301f,-4.98400f},{0.12369f,0.00000f,0.00000f,0.99232f},68,0.7f,4.32f},
+        {12,{-9.23000f,199.00000f,2.98000f},{0.08830f,-0.69488f,0.08661f,0.70841f},68,1.5f,8.04f},
+    };
+    for (u32 i=0;i<sizeof(cameras)/sizeof(cameras[0]);++i) if (cameras[i].level==curlevel) AddCamView(cameras[i].pos,cameras[i].rot,cameras[i].fov,256,256,cameras[i].near,cameras[i].far);
     sensaroundCamViewCenter=(u8)camViewCount; AddCamView((V3){0.0f,0.0f,0.0f},QUAT_IDENTITY,100u,640u,240u,0.2f,1000.0f);/*Sensaround center rear view (always positioned/oriented per-frame in UpdateSensaroundCamViews)*/
     sensaroundCamViewLeft=(u8)camViewCount;   AddCamView((V3){0.0f,0.0f,0.0f},QUAT_IDENTITY,65u,320u,240u,0.2f,1000.0f);/*Sensaround left side view*/
     sensaroundCamViewRight=(u8)camViewCount;  AddCamView((V3){0.0f,0.0f,0.0f},QUAT_IDENTITY,65u,320u,240u,0.2f,1000.0f);/*Sensaround right side view*/
@@ -1146,7 +1245,7 @@ void LoadLevelMod(u8 lev) {
         lineNum++; line=lineSpace; char* firstColon=StringFindFirstCharWithin(line,':'); int firstKeyLen=firstColon ? (int)(firstColon - line) : 0; bool isLight=!(firstKeyLen == 10 && sCompUpToLen(line,"constIndex",10) == 0); Entity* inst=NULL; Light* lit=NULL; LightAnimation* lanim=NULL;
         if (isLight) { lightsIdx++; if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n", lightsIdx, curlevel); continue; } lit=&lightsFromFile[lightsIdx]; lanim=&lanimsFromFile[lightsIdx]; lit->lflags = LIGHT_AND_SHADOW_ON; }
         else {
-            entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; } inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f}; 
+            entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; } inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f};
             for (u8 slot=0;slot<4;++slot) inst->contents[slot]=inst->custIdx[slot]=-1; for (u8 slot=0;slot<7;++slot) inst->randomItem[slot]=inst->randomItemCustIdx[slot]=-1;
             inst->relayEnabled=true;
             fwLine=false; fwStage=0; fwCollecting=fwPendingChild=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; ipLine=false; ipBlock=0; ipSubRotSet=false; ipCurP=NULL; ipCurR=NULL; ipCurS=NULL; npcLine=false; npcBlock=0; npcRootRotSet[entCount]=false; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f};/*relayEnabled is seeded once, at the top of this block (line 582)*/
@@ -1156,6 +1255,26 @@ void LoadLevelMod(u8 lev) {
             char* pipe = StringFindFirstCharWithin(line, '|'); char* kvString = line; if (pipe) { *pipe = '\0'; line = pipe + 1; } else { line += slen(line); } if (kvString[0] == '\0') continue; char* colon = StringFindFirstCharWithin(kvString, ':'); if (!colon || colon[1] == '\0') continue; *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);}
             else {
+                bool fieldRead=false;
+                for (u32 f=0;f<sizeof(fields)/sizeof(fields[0]);++f) {
+                    u8 len=fields[f].len,element=0;
+                    if (fields[f].count) {
+                        if (keyLen!=len+3 || sCompUpToLen(key,fields[f].key,len) || key[len]!='[' || key[len+2]!=']' || (u8)(key[len+1]-'0')>=fields[f].count) continue;
+                        element=key[len+1]-'0';
+                    } else if (keyLen!=len || sCompUpToLen(key,fields[f].key,len)) continue;
+                    void* dst=(u8*)inst+fields[f].offset+element*fields[f].bytes; u32 v=0; float fv;
+                    switch (fields[f].kind) {
+                        case 0: fv=parse_float(value,lineSpace,lineNum); mcpy(dst,&fv,sizeof(fv)); break;
+                        case 1: v=(u32)parse_numberi16(value,lineSpace,lineNum); break; case 2: v=parse_numberu16(value,lineSpace,lineNum); break;
+                        case 3: v=parse_numberu8(value,lineSpace,lineNum); break; case 4: v=(u32)parse_numberi8(value,lineSpace,lineNum); break;
+                        case 5: v=(u32)parse_numberi32(value,lineSpace,lineNum); break; case 6: v=parse_numberu32(value,lineSpace,lineNum); break;
+                        case 7: flag_set((u32*)dst,fields[f].mask,parse_bool(value,lineSpace,lineNum)); break;
+                        case 8: if (parse_bool(value,lineSpace,lineNum)) *(u8*)dst=(u8)fields[f].mask; break;
+                    }
+                    if (fields[f].kind>0 && fields[f].kind<7) mcpy(dst,&v,fields[f].bytes);
+                    fieldRead=true; break;
+                }
+                if (fieldRead) continue;
                      if(KEY_EQ("constIndex")){if(!constIndexRead){/*SaveObject.Save writes the master PrefabIdentifier.constIndex as field 0, then appends per-component saves; GrenadeActivate.Save emits its own "constIndex" (the grenade type: 7 frag, 8 conc, 9 emp, 10 earth, 11 mine, 12 nitro, 13 gas, 14 plastique) onto the same record.  Both keys share a name, so keep the first.  Otherwise the 10 level-placed live landmines (402 then 11) loaded as chunk_bridg1_5 and never detonated.*/ constIndexRead=true; inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517); ipLine=(inst->index == 614 || inst->index == 615 || inst->index == 602); npcLine=IdxIsNPC(inst->index);}}
                 else if(KEY_EQ("lP.x")||KEY_EQ("lP.y")||KEY_EQ("lP.z")||KEY_EQ("lR.x")||KEY_EQ("lR.y")||KEY_EQ("lR.z")||KEY_EQ("lR.w")||KEY_EQ("lS.x")||KEY_EQ("lS.y")||KEY_EQ("lS.z")) {
                     /*One block per transform: lP.x starts a new one. func_wall (517) keeps its own staged collection; InteractablePanel objects (ipLine) take block 0 only and drop the sub-GO blocks; NPC lines (npcLine) likewise take block 0 only; everything else writes straight to the object.*/
@@ -1182,161 +1301,78 @@ void LoadLevelMod(u8 lev) {
                     else if (KEY_EQ("lS.z")) { if(fwLine){ if(fwCurS)fwCurS->z=v; } else if(ipLine){ if(ipCurS)ipCurS->z=v; } else { scaleFromFile[entCount].z=v; scaleReadMask|=4u; } }
                 }
                 else if(KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
-                else if(KEY_EQ("health")) inst->health=parse_float(value,lineSpace,lineNum);                                       else if(KEY_EQ("cyberHealth")) inst->cyberHealth=parse_float(value,lineSpace,lineNum);/*bloodType is a prefab constant (AddInstance, DefaultPrefabBloodType) and no level record carries the key -- deliberately no parse branch.*/
-                  else if(KEY_EQ("startYAngle")) inst->camStartYAngle=parse_float(value,lineSpace,lineNum); else if(KEY_EQ("endYAngle")) inst->camEndYAngle=parse_float(value,lineSpace,lineNum); else if(KEY_EQ("waitTime")) inst->camWaitTime=parse_float(value,lineSpace,lineNum);
+                                                       /*bloodType is a prefab constant (AddInstance, DefaultPrefabBloodType) and no level record carries the key -- deliberately no parse branch.*/
                   else if(KEY_EQ("enabled") && inst->index == 477) inst->camRotateEnabled=parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("keycode")) inst->keycode=parse_numberu16(value,lineSpace,lineNum);
-                else if(KEY_EQ("radiationAmount")) inst->radiation=parse_float(value,lineSpace,lineNum);                           else if(KEY_EQ("ammo"))inst->ammo=parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("ammo2"))inst->ammo2=parse_numberi16(value,lineSpace,lineNum);                                      else if(KEY_EQ("useableItemIndex"))inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
                 /* Citadel serializes the AIController's whole state into the level file. These flags drive InitNPC's
                    starting state (wandering/roaming) and the early-out checks, so they have to survive the load or every
                    authored patroller, sleeping enemy and turret comes up idle/awake and mobile. */
-                else if(KEY_EQ("idleTime"))       inst->idleTime=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("lookUpIndex"))   inst->lookUpIndex=(u16)parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("wandering"))     flag_set(&inst->entflags, EF_WANDERING, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("asleep"))        flag_set(&inst->entflags, EF_ASLEEP, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("actAsTurret"))   flag_set(&inst->entflags, EF_ACT_AS_TURRET, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("actAsCorpseOnly")) flag_set(&inst->entflags, EF_ACT_AS_CORPSE_ONLY, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("teleportOnDeath")) flag_set(&inst->entflags, EF_TELEPORT_ON_DEATH, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("firstSighting"))  flag_set(&inst->entflags, EF_FIRST_SIGHTING, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("shotFired"))      flag_set(&inst->entflags, EF_SHOT_FIRED, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("goIntoPain"))     flag_set(&inst->entflags, EF_GO_INTO_PAIN, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("dyingSetup"))     flag_set(&inst->entflags, EF_DYING_SETUP, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("ai_dying"))       flag_set(&inst->entflags, EF_DYING, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("ai_dead"))        flag_set(&inst->entflags, EF_DEAD, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("hopDone"))        flag_set(&inst->entflags, EF_HOP_DONE, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("deathBurstDone")) flag_set(&inst->entflags, EF_DEATH_BURST_DONE, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("hadEnemy"))       flag_set(&inst->entflags, EF_HAD_ENEMY, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("walkPathOnStart")) flag_set(&inst->entflags, EF_WALK_PATH_ON_START, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("inSight"))        flag_set(&inst->entflags, EF_ENEM_IN_SIGHT, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("infront"))        flag_set(&inst->entflags, EF_ENEM_IN_FRONT, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("inProjFOV"))      flag_set(&inst->entflags, EF_ENEM_IN_FOV, parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("LOSpossible"))    flag_set(&inst->entflags, EF_ENEM_IN_LOS, parse_bool(value,lineSpace,lineNum));
                 else if(KEY_EQ("currentState"))   inst->currentState=(AIState)vclampi(parse_numberi16(value,lineSpace,lineNum),0,AIState_Dead);
-                else if(KEY_EQ("attack1SoundTime"))  inst->attack1SoundTime=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("attack2SoundTime"))  inst->attack2SoundTime=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("attack3SoundTime"))  inst->attack3SoundTime=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("currentDestination.x")) inst->currentDestination.x=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("currentDestination.y")) inst->currentDestination.y=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("currentDestination.z")) inst->currentDestination.z=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("idealTransformForward.x")) inst->idealTransformForward.x=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("idealTransformForward.y")) inst->idealTransformForward.y=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("idealTransformForward.z")) inst->idealTransformForward.z=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("idealPos.x")) inst->idealPos.x=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("idealPos.y")) inst->idealPos.y=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("idealPos.z")) inst->idealPos.z=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("targettingPosition.x")) inst->targettingPosition.x=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("targettingPosition.y")) inst->targettingPosition.y=parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("targettingPosition.z")) inst->targettingPosition.z=parse_float(value,lineSpace,lineNum);
-                
-                else if(KEY_EQ("generateContents")) inst->generateContents = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("generationDone")) inst->generationDone = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("searchableInUse")) inst->srchInUse = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("maxRandomItems")) inst->maxRandomItems = (u8)parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[0]")) inst->contents[0] = parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("contents[1]")) inst->contents[1] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[2]")) inst->contents[2] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("contents[3]")) inst->contents[3] = parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("customIndex[0]") || KEY_EQ("custIdx[0]")) inst->custIdx[0] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("customIndex[1]") || KEY_EQ("custIdx[1]")) inst->custIdx[1] = parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("customIndex[2]") || KEY_EQ("custIdx[2]")) inst->custIdx[2] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("customIndex[3]") || KEY_EQ("custIdx[3]")) inst->custIdx[3] = parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("randomItem[0]")) inst->randomItem[0] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItem[1]")) inst->randomItem[1] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItem[2]")) inst->randomItem[2] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItem[3]")) inst->randomItem[3] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItem[4]")) inst->randomItem[4] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItem[5]")) inst->randomItem[5] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItem[6]")) inst->randomItem[6] = parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("randomItemDropChance[0]")) inst->randomItemDropChance[0] = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("randomItemDropChance[1]")) inst->randomItemDropChance[1] = parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("randomItemDropChance[2]")) inst->randomItemDropChance[2] = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("randomItemDropChance[3]")) inst->randomItemDropChance[3] = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("randomItemDropChance[4]")) inst->randomItemDropChance[4] = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("randomItemDropChance[5]")) inst->randomItemDropChance[5] = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("randomItemDropChance[6]")) inst->randomItemDropChance[6] = parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("customIndex"))inst->customIndex=(u16)parse_numberi16(value,lineSpace,lineNum);                   else if(KEY_EQ("amount"))          inst->amount = parse_float(value, lineSpace, lineNum);
-                else if(KEY_EQ("resetTime"))       inst->resetTime = parse_float(value, lineSpace, lineNum);                       else if(KEY_EQ("minSecurityLevel"))inst->minSecurityLevel = parse_float(value, lineSpace, lineNum);
-                else if(KEY_EQ("rechargeMsgLingdex")) inst->rechargeMsgLingdex = parse_numberi16(value,lineSpace,lineNum);          else if(KEY_EQ("usedMsgLingdex")) inst->usedMsgLingdex = parse_numberi16(value,lineSpace,lineNum);
+                else if(KEY_EQ("generateContents")) inst->generateContents = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("generationDone")) inst->generationDone = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("searchableInUse")) inst->srchInUse = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("requireReset"))    inst->requireRecharge = parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("nextthink"))       inst->rechargeFinished = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime; /*saved as differential against relativeTime (Citadel Utils.SaveRelativeTimeDifferential)*/
-                else if(KEY_EQ("damageOnUse"))     inst->damage = parse_float(value, lineSpace, lineNum);                          else if(KEY_EQ("target"))          inst->targetIdx = IOInternName(value);
+                                          else if(KEY_EQ("target"))          inst->targetIdx = IOInternName(value);
                 else if(KEY_EQ("targetname"))      inst->targetnameIdx = IOInternName(value);
                   else if(KEY_EQ("targetOnDeath"))   inst->targetOnDeathIdx = IOInternName(value);/*HealthManager.targetOnDeath, fired from UseDeathTargets only; a separate name from TargetIO.target*/                                      else if(KEY_EQ("target2"))         inst->target2Idx = IOInternName(value);
-                else if(KEY_EQ("targetIfFalse"))   inst->targetIfFalseIdx = IOInternName(value);                                   else if(KEY_EQ("randomItemCustomIndex[0]")) inst->randomItemCustIdx[0] = parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("randomItemCustomIndex[1]")) inst->randomItemCustIdx[1] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItemCustomIndex[2]")) inst->randomItemCustIdx[2] = parse_numberi16(value,lineSpace,lineNum);
-                else if(KEY_EQ("randomItemCustomIndex[3]")) inst->randomItemCustIdx[3] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItemCustomIndex[4]")) inst->randomItemCustIdx[4] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItemCustomIndex[5]")) inst->randomItemCustIdx[5] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("randomItemCustomIndex[6]")) inst->randomItemCustIdx[6] = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("musicType"))       inst->musicType = (MusicType)parse_numberu8(value,lineSpace,lineNum); // trigger_music
-                else if(KEY_EQ("securityThreshhold") || KEY_EQ("securityThreshold")) inst->securityThreshold=parse_numberu8(value,lineSpace,lineNum);
-                else if(KEY_EQ("messageIndex"))    inst->messageIndex = parse_numberi16(value,lineSpace,lineNum);                  else if(KEY_EQ("delay"))           inst->delay = parse_float(value,lineSpace,lineNum);
+                else if(KEY_EQ("targetIfFalse"))   inst->targetIfFalseIdx = IOInternName(value);
+                     // trigger_music
                 /* trigger_counter (594).  Without countToTrigger parsed, TriggerCounterTargetted compared against a
                    permanent 0, so every counter in every level silently counted up forever and never ran its target. */
-                else if(KEY_EQ("counter"))           inst->counter = parse_numberu16(value,lineSpace,lineNum);          else if(KEY_EQ("countToTrigger")) inst->countToTrigger = parse_numberu16(value,lineSpace,lineNum);
                 else if(KEY_EQ("dontReset"))         inst->dontReset = parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("lockedTarget"))    inst->lockedTargetIdx = IOInternName(value);                                            else if(KEY_EQ("useQuestKeycode1")) inst->useQuestKeycode1 = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("useQuestKeycode2")) inst->useQuestKeycode2 = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("locked"))          flag_set(&inst->entflags,EF_LOCKED,parse_bool(value,lineSpace,lineNum));        else if(KEY_EQ("active"))          inst->active = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("timeInterval"))   inst->timeInterval = parse_float(value, lineSpace, lineNum);                     else if(KEY_EQ("randomMin"))      inst->randomMin = parse_float(value, lineSpace, lineNum);
-                else if(KEY_EQ("randomMax"))      inst->randomMax = parse_float(value, lineSpace, lineNum);                        else if(KEY_EQ("useRandomTimes")) inst->useRandomTimes = parse_bool(value, lineSpace, lineNum);
+                        else if(KEY_EQ("active"))          inst->active = parse_bool(value, lineSpace, lineNum);
+                                        else if(KEY_EQ("useRandomTimes")) inst->useRandomTimes = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("onlyOnce"))        inst->onlyOnce = parse_bool(value, lineSpace, lineNum);                         else if(KEY_EQ("stayOpen"))        inst->stayOpen = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("startOpen"))       inst->startOpen = parse_bool(value, lineSpace, lineNum);                        else if(KEY_EQ("ajar"))            inst->ajar = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("open"))            inst->panelOpen      = parse_bool(value,lineSpace,lineNum);/*InteractablePanel cover state (only us_relaypanel/isotopepanel/retinalscanner carry these keys)*/
                 else if(KEY_EQ("installed"))       inst->panelInstalled = parse_bool(value,lineSpace,lineNum);/*InteractablePanel: the required item is already in place*/
-                else if(KEY_EQ("ajarPercentage"))  inst->ajarPercentage = parse_float(value, lineSpace, lineNum);                  else if(KEY_EQ("timeBeforeLasersOn")) inst->timeBeforeLasersOn = parse_float(value, lineSpace, lineNum);
                 else if(KEY_EQ("toggleLasers"))    inst->toggleLasers = parse_bool(value, lineSpace, lineNum);/*TODO: parsed and copied but never read. The door's security-laser detector toggle is not wired; lev8doorx1 / lev8doorx2 (level8.txt:4580,4582) are the only two records that ask for it -- both set it on themselves via a self-target. Implement when the laser detector exists: needs a live beacon + a targetted test on the door. Skip for now.*/              else if(KEY_EQ("changeLayerOnOpenClose")) inst->changeLayerOnOpenClose=parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("waitBeforeClose")) inst->waitBefClose=parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;                                    else if(KEY_EQ("doorOpen")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPEN,parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("doorOpenIfUnlocked") || KEY_EQ("doorToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPENIFUNLOCKED,parse_bool(value,lineSpace,lineNum)); else if(KEY_EQ("doorClose")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOORCLOSE,parse_bool(value,lineSpace,lineNum));
+                else if(KEY_EQ("waitBeforeClose")) inst->waitBefClose=parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;
+                else if(KEY_EQ("doorOpenIfUnlocked") || KEY_EQ("doorToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_DOOROPENIFUNLOCKED,parse_bool(value,lineSpace,lineNum));
                 else if(KEY_EQ("doorLock") || KEY_EQ("lockElevatorPad")) flag_set(&inst->ioflags, TARG_IOFLAGS_LOCK, parse_bool(value, lineSpace, lineNum));
                 else if(KEY_EQ("doorUnlock") || KEY_EQ("unlockSwitch") || KEY_EQ("unlockElevatorPad") || KEY_EQ("unlockKeycodePad") || KEY_EQ("unlockPuzzlePad")) flag_set(&inst->ioflags,TARG_IOFLAGS_UNLOCK,parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("switchTrigger"))   flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCHTRIGGER, parse_bool(value, lineSpace, lineNum));            else if(KEY_EQ("tripTrigger")) flag_set(&inst->ioflags, TARG_IOFLAGS_TRIPTRIGGER, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("forceBridgeActivate"))   flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_ACTIVATE, parse_bool(value, lineSpace, lineNum));   else if(KEY_EQ("forceBridgeDeactivate")) flag_set(&inst->ioflags,TARG_IOFLAGS_FBRIDGE_DEACTIVATE,parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("forceBridgeToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_FBRIDGE_TOGGLE, parse_bool(value, lineSpace, lineNum));     else if(KEY_EQ("gravityLiftToggle")) flag_set(&inst->ioflags,TARG_IOFLAGS_GRAVLIFT_TOGGLE,parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("textureChangeToggle"))   flag_set(&inst->ioflags, TARG_IOFLAGS_TEXTURE_CHG_TOGGLE, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("lightOn")) flag_set(&inst->ioflags,TARG_IOFLAGS_LIGHT_ON,parse_bool(value,lineSpace,lineNum));
-                else if(KEY_EQ("lightOff"))        flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_OFF, parse_bool(value, lineSpace, lineNum));                else if(KEY_EQ("lightToggle"))     flag_set(&inst->ioflags, TARG_IOFLAGS_LIGHT_TOGGLE, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("funcwallMove"))    flag_set(&inst->ioflags, TARG_IOFLAGS_FUNCWALL_MOVE, parse_bool(value, lineSpace, lineNum));            else if(KEY_EQ("missionBitOn"))    flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_ON, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("missionBitOff"))   flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_OFF, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("missionBitToggle"))flag_set(&inst->ioflags, TARG_IOFLAGS_MISSION_BIT_TOGGLE, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("switchLockToggle"))flag_set(&inst->ioflags, TARG_IOFLAGS_SWITCH_LOCK_TOGGLE, parse_bool(value, lineSpace, lineNum));       else if(KEY_EQ("GOSetActive"))     flag_set(&inst->ioflags, TARG_IOFLAGS_INST_ACTIVATE, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("enemyAlert"))       flag_set(&inst->ioflags, TARG_IOFLAGS_ENEMY_ALERT, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("spawnerActivate")) flag_set(&inst->ioflagsHi, TARG_IOFLAGHI_SPAWNER_ACTIVATE, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("spawnerActivateAlerted")) flag_set(&inst->ioflagsHi, TARG_IOFLAGHI_SPAWNER_ACTIVATE_ALERTED, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("awakeSleepingEnemy")) flag_set(&inst->ioflagsHi, TARG_IOFLAGHI_AWAKE_SLEEPING, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("SpawnManager.active")) inst->active = parse_bool(value, lineSpace, lineNum);     else if(KEY_EQ("numberActive"))       inst->numberActive = parse_numberu16(value, lineSpace, lineNum);
-                else if(KEY_EQ("numberToSpawn"))       inst->numberToSpawn = parse_numberu16(value, lineSpace, lineNum);  else if(KEY_EQ("countOnlySameIndex"))  inst->countOnlySameIndex = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("minDelayBetweenSpawns")) inst->minDelayBetweenSpawns = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("maxDelayBetweenSpawns")) inst->maxDelayBetweenSpawns = parse_float(value, lineSpace, lineNum);
-                else if(KEY_EQ("allSpawnedResetDelay")) inst->allSpawnedResetDelay = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("alertEnemiesOnAwake"))  inst->alertEnemiesOnAwake = parse_bool(value, lineSpace, lineNum);
+                else if(KEY_EQ("SpawnManager.active")) inst->active = parse_bool(value, lineSpace, lineNum);
+                  else if(KEY_EQ("countOnlySameIndex"))  inst->countOnlySameIndex = parse_bool(value, lineSpace, lineNum);
+                 else if(KEY_EQ("alertEnemiesOnAwake"))  inst->alertEnemiesOnAwake = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("index") && inst->index == 702) inst->spawnIndex = parse_numberu16(value, lineSpace, lineNum);/*SpawnManager.index is the NPC constIndex it respawns; only meaningful on 702, since AIController.index means something else on every other prefab*/
-                else if(KEY_EQ("GOSetDeactive"))   flag_set(&inst->ioflags, TARG_IOFLAGS_INST_DEACTIVATE, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("GOToggleActive"))  flag_set(&inst->ioflags, TARG_IOFLAGS_INST_TOGGLE, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("disableThisGOOnAwake")) flag_set(&inst->ioflags, TARG_IOFLAGS_DISABLE_ON_AWAKE, parse_bool(value, lineSpace, lineNum));    else if(KEY_EQ("playSoundOnce"))   flag_set(&inst->ioflags, TARG_IOFLAGS_PLAY_SOUND_ONCE, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("playEverywhere")) inst->playEverywhere = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("stopSound"))       flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_SOUND, parse_bool(value, lineSpace, lineNum));               else if(KEY_EQ("startFlashingMaterials")) flag_set(&inst->ioflags, TARG_IOFLAGS_START_FLASHING_TEX, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("stopFlashingMaterials"))  flag_set(&inst->ioflags, TARG_IOFLAGS_STOP_FLASHING_TEX, parse_bool(value, lineSpace, lineNum)); else if(KEY_EQ("branchFlip"))      flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIP, parse_bool(value, lineSpace, lineNum));
-                else if(KEY_EQ("branchFlipOnly"))  flag_set(&inst->ioflags, TARG_IOFLAGS_BRANCH_FLIPONLY, parse_bool(value, lineSpace, lineNum));          else if(KEY_EQ("resourceFolder") && *value) inst->texAnimResourceFolderIdx = TexAnimFolderIntern(value);
+                     else if(KEY_EQ("playEverywhere")) inst->playEverywhere = parse_bool(value, lineSpace, lineNum);
+                          else if(KEY_EQ("resourceFolder") && *value) inst->texAnimResourceFolderIdx = TexAnimFolderIntern(value);
                 else if(KEY_EQ("codeScreen"))      inst->codeScreen = (u8)parse_bool(value, lineSpace, lineNum);/*prop_cpuscreen (551): flag only, the level is implicit -- see Entity.codeScreen*/
-                else if(KEY_EQ("lingdex") || KEY_EQ("messageLingdex"))  inst->messageLingdex = parse_numberi16(value, lineSpace, lineNum);                                      else if(KEY_EQ("lockedMessageLingdex")) inst->lockedMessageLingdex = parse_numberi16(value, lineSpace, lineNum);
                 else if(KEY_EQ("matIndex")) { matIndexRead = true; matIndexTexIdx = TextMatIndexToTexIndex(parse_numberu16(value,lineSpace,lineNum)); }
-                else if(KEY_EQ("texIndex")) inst->texIndex = parse_numberu16(value,lineSpace,lineNum);
                 else if(KEY_EQ("text")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) { u16 k=0; while(value[k] && k<DECAL_INLINE_TEXT_LEN-1) { pd->text[k]=(value[k]=='#')?'\n':value[k]; ++k; } pd->text[k]='\0'; } } }
                 else if(KEY_EQ("tA")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->anchor=(u8)(v<0?0:(v>8?8:v)); } } }
                 else if(KEY_EQ("tAl")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->align=(u8)(v<0?0:(v>2?2:v)); } } }
                 else if(KEY_EQ("tLs")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) pd->lineSp=parse_float(value,lineSpace,lineNum); } }
-                else if(KEY_EQ("SFXIndex"))        inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum);                                       else if(KEY_EQ("SFXClip"))         inst->SFXIndex = (i16)parse_numberi16(value, lineSpace, lineNum); else if(KEY_EQ("SFXLockedIndex")) inst->SFXLockedIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
-                else if(KEY_EQ("trackType"))       inst->trackType = (TrackType)parse_numberi16(value, lineSpace, lineNum);/*trigger_music (599)*/      else if(KEY_EQ("textIndex"))       inst->textIndex = (i16)parse_numberi16(value, lineSpace, lineNum);/*prop_cyber_datafrag (552), prop_cyber_switch (555)*/
-                else if(KEY_EQ("logIndex"))        inst->logIndex = (i16)parse_numberi16(value, lineSpace, lineNum);
+                /*trigger_music (599)*/      /*prop_cyber_datafrag (552), prop_cyber_switch (555)*/
                 else if(keyLen==23 && sCompUpToLen(key,"currentPositionsLeft[",21)==0 && key[21]>='0' && key[21]<='6' && key[22]==']') inst->wireCurL[key[21]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);/*us_puz_panel_*_wire (741..745)*/
                 else if(keyLen==24 && sCompUpToLen(key,"currentPositionsRight[",22)==0 && key[22]>='0' && key[22]<='6' && key[23]==']') inst->wireCurR[key[22]-'0']=(i8)parse_numberi16(value, lineSpace, lineNum);
                 else if(sCompUpToLen(key,"grid[",5)==0 && keyLen>=7 && key[keyLen-1]==']') { int gi=0; bool gok=true; for (int k=5;k<keyLen-1;++k) { if (key[k]<'0'||key[k]>'9') { gok=false; break; } gi=gi*10+(key[k]-'0'); } if (gok && gi<35) Entity_SetGridCell(inst,gi,parse_bool(value,lineSpace,lineNum)); }/*PuzzleGridPuzzle.grid[0..34], key width varies with the index*/
                 else if(KEY_EQ("fired"))          inst->puzzleFired = parse_bool(value,lineSpace,lineNum);/*PuzzleGridPuzzle.fired: the onlyFireOnce latch*/
                 else if(KEY_EQ("relayEnabled"))    inst->relayEnabled = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("onSecond"))        inst->branchOnSecond = parse_bool(value, lineSpace, lineNum);                                           else if(KEY_EQ("onceEver"))        inst->relayOnceEver = parse_bool(value, lineSpace, lineNum);
-                else if(KEY_EQ("requiredAccessCard")) inst->requiredAccessCard = parse_numberi8(value, lineSpace, lineNum);                                else if(KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
+                                                else if(KEY_EQ("testQuestBitIsOn"))    inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 1 : inst->questTestMode;
                 else if(KEY_EQ("testQuestBitIsOff"))   inst->questTestMode = parse_bool(value,lineSpace,lineNum) ? 2 : inst->questTestMode;                else if(KEY_EQ("ForceBridge.activated")) inst->active = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("x")) inst->forceFieldDirectionX = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("y")) inst->forceFieldDirectionY = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("z")) inst->forceFieldDirectionZ = parse_bool(value, lineSpace, lineNum); 
-                else if(KEY_EQ("activatedScaleX")) inst->activatedScale.x = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("activatedScaleY")) inst->activatedScale.y = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("activatedScaleZ")) inst->activatedScale.z = parse_float(value, lineSpace, lineNum);
+                else if(KEY_EQ("x")) inst->forceFieldDirectionX = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("y")) inst->forceFieldDirectionY = parse_bool(value, lineSpace, lineNum); else if(KEY_EQ("z")) inst->forceFieldDirectionZ = parse_bool(value, lineSpace, lineNum);
                 else if(KEY_EQ("fieldColor"))          { u8 fc = parse_numberu8(value, lineSpace, lineNum); inst->fieldColor = (fc >= 1 && fc <= 5) ? (ForceFieldColor)(fc-1) : ForceFieldColor_Red; }                      else if(KEY_EQ("touchEnabled")) inst->touchEnabled = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("maxDistance")) inst->reverbMaxDist = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("reverbPreset")) inst->reverbPreset = (u16)parse_numberu16(value, lineSpace, lineNum);
                 else if(KEY_EQ("center.x")) colCtrFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.y")) colCtrFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("center.z")) colCtrFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
                 else if(KEY_EQ("size.x")) colSzFromFile[entCount].x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.y")) colSzFromFile[entCount].y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("size.z")) colSzFromFile[entCount].z = parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("direction.x")) inst->dir.x = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("direction.y")) inst->dir.y = parse_float(value,lineSpace,lineNum); else if(KEY_EQ("direction.z")) inst->dir.z = parse_float(value,lineSpace,lineNum);
-                else if(KEY_EQ("force")) inst->force = parse_float(value,lineSpace,lineNum);/*trigger_cyberpush (595)*/
-                else if(KEY_EQ("emailIndex")) inst->emailIndex = parse_numberi16(value,lineSpace,lineNum); else if(KEY_EQ("autoPlayEmail")) inst->autoPlayEmail = parse_bool(value,lineSpace,lineNum);
-                else if(KEY_EQ("teleportID")) inst->teleportID = parse_numberu16(value,lineSpace,lineNum);
-                else if(KEY_EQ("targetDestinationID")) inst->targetDestinationID = parse_numberu16(value,lineSpace,lineNum);
+                /*trigger_cyberpush (595)*/
+                 else if(KEY_EQ("autoPlayEmail")) inst->autoPlayEmail = parse_bool(value,lineSpace,lineNum);
                 else if(KEY_EQ("justUsed")) inst->justUsed = parse_float(value,lineSpace,lineNum) + World.pauseRelativeTime;
                 else if(KEY_EQ("allDone")) inst->allDone = parse_bool(value,lineSpace,lineNum);/*trigger_* onlyOnce latch (TriggerTriggerTripped, CyberSwitchUpdate)*/
                 else if(KEY_EQ("iceActive")) inst->iceActive = parse_bool(value,lineSpace,lineNum);/*prop_cyber_switch (555)*/
                 else if(KEY_EQ("broken")) inst->broken = parse_bool(value,lineSpace,lineNum);/*prop_healingbed (574)*/
                 else if(KEY_EQ("despawnInstead")) inst->despawnInstead = parse_bool(value,lineSpace,lineNum);/*us_relaypanel (614)*/
-                else if(KEY_EQ("RobotSpawnDeactivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_RobotSpawnDeactivated; }   else if(KEY_EQ("IsotopeInstalled"))            { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsotopeInstalled; }
-                else if(KEY_EQ("ShieldActivated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_ShieldActivated; }         else if(KEY_EQ("LaserSafetyOverriden"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserSafetyOverriden; }
-                else if(KEY_EQ("LaserDestroyed"))              { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_LaserDestroyed; }          else if(KEY_EQ("BetaGroveCyberUnlocked"))      { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BetaGroveCyberUnlocked; }
-                else if(KEY_EQ("GroveAlphaJettisonEnabled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveAlphaJettisonEnabled;}else if(KEY_EQ("GroveBetaJettisonEnabled"))    { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveBetaJettisonEnabled; }
-                else if(KEY_EQ("GroveDeltaJettisonEnabled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_GroveDeltaJettisonEnabled;}else if(KEY_EQ("MasterJettisonBroken"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_MasterJettisonBroken; }
-                else if(KEY_EQ("Relay428Fixed"))               { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_Relay428Fixed; }           else if(KEY_EQ("MasterJettisonEnabled"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_MasterJettisonEnabled; }
-                else if(KEY_EQ("BetaGroveJettisoned"))         { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BetaGroveJettisoned; }     else if(KEY_EQ("AntennaNorthDestroyed"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaNorthDestroyed; }
-                else if(KEY_EQ("AntennaSouthDestroyed"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaSouthDestroyed; }   else if(KEY_EQ("AntennaEastDestroyed"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaEastDestroyed; }
-                else if(KEY_EQ("AntennaWestDestroyed"))        { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_AntennaWestDestroyed; }    else if(KEY_EQ("SelfDestructActivated"))       { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_SelfDestructActivated; }
-                else if(KEY_EQ("BridgeSeparated"))             { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_BridgeSeparated; }         else if(KEY_EQ("IsolinearChipsetInstalled"))   { if (parse_bool(value,lineSpace,lineNum)) inst->questBitID = QB_IsolinearChipsetInstalled; }
-                else if(KEY_EQ("doorOpenState"))   inst->doorOpen = parse_numberu8(value, lineSpace, lineNum);     else if(KEY_EQ("FuncWall.currentState")) inst->funcState = (FuncStates)parse_numberu8(value, lineSpace, lineNum);
-                else if(KEY_EQ("startPosition.x")) inst->startPosition.x = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("startPosition.y")) inst->startPosition.y = parse_float(value, lineSpace, lineNum); else if(KEY_EQ("startPosition.z")) inst->startPosition.z = parse_float(value, lineSpace, lineNum);
-                else if(KEY_EQ("speed"))           inst->speed = parse_float(value, lineSpace, lineNum);           else if(KEY_EQ("percentAjar"))     inst->ajarPercentage = parse_float(value, lineSpace, lineNum);
-                else if(KEY_EQ("percentMoved"))    inst->percentMoved = parse_float(value, lineSpace, lineNum);    else if(KEY_EQ("chunkIDs.Length")) { fwCollecting=true; fwPendingChild=false; fwCurChild=0; fwLastChunkSlot=0; }
+
+
+
+
+
+
+
+
+
+
+                    else if(KEY_EQ("chunkIDs.Length")) { fwCollecting=true; fwPendingChild=false; fwCurChild=0; fwLastChunkSlot=0; }
                 else if(keyLen > 9 && sCompUpToLen(key,"chunkIDs[",9) == 0) { u16 idx=parse_numberu16(value,lineSpace,lineNum); if(fwCurChild<FW_MAX_CHILDREN){lwPrefab[fwCurChild]=idx; fwLastChunkSlot=fwCurChild; fwPendingChild=true; fwCurChild++;} }
             }
         }
@@ -1406,30 +1442,10 @@ void LoadLevelMod(u8 lev) {
             for(u16 k=0;k<fwSlotCount[e];++k){u16 pi=fwPoolPrefab[fwSlotStart[e]+k]; if(pi>=307)continue; u16 c=AddInstance(pi,V3_AplusB(sp,quat_rot_v3(fwBaseRot[e],fwPoolPos[fwSlotStart[e]+k]))); if(c == 0)continue; World.rotation[c]=quat_multiply(fwBaseRot[e],fwPoolRot[fwSlotStart[e]+k]); V3 cs=fwPoolScale[fwSlotStart[e]+k]; World.scale[c]=(V3){World.scale[parent].x*cs.x,World.scale[parent].y*cs.y,World.scale[parent].z*cs.z}; fwParentOf[c]=parent;}
         }
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
-        if (entIdx >= 595 && entIdx <= 601) {
-            if (colSzFromFile[e].x >= 0 || colSzFromFile[e].y>=0 || colSzFromFile[e].z>=0) {
-                World.colliderCenter[parent] = colCtrFromFile[e];
-                World.colliderSize[parent] = (V3){colSzFromFile[e].x<0.0f ? 1.0f : colSzFromFile[e].x,colSzFromFile[e].y < 0.0f ? 1.0f : colSzFromFile[e].y, colSzFromFile[e].z < 0.0f ? 1.0f : colSzFromFile[e].z};
-            } else{
-                World.colliderCenter[parent] = (V3){0.0f, 0.0f, 0.0f};
-                World.colliderSize[parent] = (V3){1.0f, 1.0f, 1.0f};
-            }
-        } else if (entIdx == 706) { /* info_elev_destination */
-            if (colSzFromFile[e].x >= 0 || colSzFromFile[e].y >= 0 || colSzFromFile[e].z >= 0) {
-                World.colliderCenter[parent] = colCtrFromFile[e];
-                World.colliderSize[parent] = (V3){colSzFromFile[e].x < 0.0f ? 2.56f : colSzFromFile[e].x, colSzFromFile[e].y < 0.0f ? 2.56f : colSzFromFile[e].y, colSzFromFile[e].z < 0.0f ? 2.56f : colSzFromFile[e].z};
-            } else {
-                World.colliderCenter[parent] = (V3){0.013999939f, 0.20199966f, 0.03299904f};
-                World.colliderSize[parent] = (V3){2.56f, 2.56f, 2.56f};
-            }
-        } else if (entIdx == 697 || entIdx == 698) {
-            if (colSzFromFile[e].x >= 0.0f || colSzFromFile[e].y >= 0.0f || colSzFromFile[e].z >= 0.0f) {
-                World.colliderCenter[parent]=colCtrFromFile[e];
-                World.colliderSize[parent]=(V3){colSzFromFile[e].x < 0.0f ? 2.56f : colSzFromFile[e].x, colSzFromFile[e].y < 0.0f ? 2.56f : colSzFromFile[e].y, colSzFromFile[e].z < 0.0f ? 2.56f : colSzFromFile[e].z};
-            } else {
-                World.colliderCenter[parent] = (V3){0.0f, 0.0f, 0.0f};
-                World.colliderSize[parent] = (V3){2.56f, 2.56f, 2.56f};
-            }
+        if ((entIdx>=595 && entIdx<=601) || entIdx==706 || entIdx==697 || entIdx==698) {
+            V3 sz=colSzFromFile[e]; float d=entIdx<=601 ? 1.0f : 2.56f; bool custom=sz.x>=0 || sz.y>=0 || sz.z>=0;
+            World.colliderCenter[parent]=custom ? colCtrFromFile[e] : entIdx==706 ? (V3){0.013999939f,0.20199966f,0.03299904f} : (V3){0};
+            World.colliderSize[parent]=(V3){sz.x<0 ? d : sz.x,sz.y<0 ? d : sz.y,sz.z<0 ? d : sz.z};
         } else if (entIdx == 716) { World.col[parent] = CT_NONE; }
         else if (entIdx == 515 && EDefs[entIdx].col == CT_BOX && EDefs[entIdx].colSz.x == 0.0f && EDefs[entIdx].colSz.y == 0.0f && EDefs[entIdx].colSz.z == 0.0f) { World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f}; }
         if (entIdx == 700) par->currentTargetIdx = par->branchOnSecond ? par->target2Idx : par->targetIdx;
@@ -1443,7 +1459,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 586 || (entIdx >= 540 && entIdx <= 544)) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.0f; } // prop_table, prop_chair01-05: map exports 0.04 scale; force 1.0
         else if (entIdx == 218 || entIdx == 220) { Quaternion c = quat_from_axis_angle((V3){0.0f,1.0f,0.0f},PI); World.rotation[parent] = quat_multiply(quat_multiply(c,World.rotation[parent]),(Quaternion){-c.x,-c.y,-c.z,c.w}); } // chunk_reac2_4, chunk_reac2_5: the export is a flipped basis, not a turned instance, so conjugate by 180deg about Y (which flips the mesh's local X and Z and leaves Y). Conjugation spins the rotation's axis while preserving its angle, so the level file's authored placement is untouched. Checked against level 7 instance 4180: lR (0,.7071,.7071,0) -> (0,-.7071,.7071,0) exactly, and it is non-identity on all 6 (218) / 4 (220) orientations these prefabs use, so every instance gets corrected.
         else if (entIdx == 53) { World.rotation[parent] = quat_multiply(World.rotation[parent], quat_from_axis_angle((V3){1.0f,0.0f,0.0f},PI*0.5f)); }
-        else if (entIdx == 551 && par->codeScreen) { World.rotation[parent] = quat_multiply(World.rotation[parent], (Quaternion){0.0f,0.70710678f,0.70710678f,0.0f}); World.scale[parent].x*=0.390625f; World.scale[parent].y*=0.390625f; World.scale[parent].z*=0.390625f; }
+        else if (entIdx == 551 && par->codeScreen) { World.rotation[parent] = quat_multiply(World.rotation[parent], (Quaternion){0.0f,0.70710678f,0.70710678f,0.0f}); World.scale[parent].x*=0.390625f; World.scale[parent].y*=0.390625f; World.scale[parent].z*=0.390625f; par->texAnimResourceFolderIdx=TexAnimFolderIntern("ScreenCodeRandom"); }
         else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
         else if (entIdx == 720) { /*u16 mist=*/AddInstance(648,World.position[parent]); }// ambient_mist
         else if (entIdx == 733) { /*u16 pipewater=*/AddInstance(649,World.position[parent]);/*ambient_pipewater_loop*/ /*u16 rain=*/AddInstance(653,(V3){World.position[parent].x,World.position[parent].y - 1.26f,World.position[parent].z});/*ambient_rain*/ }
@@ -1451,14 +1467,14 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 2 || entIdx == 3) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("Bridge11"); } /*chunk_bridg1_1, chunk_bridg1_1flipx*/
         else if (entIdx == 386) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("MagCartridge"); } /*item_ammo_magcart*/
         else if (entIdx == 538) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("BrokenClock"); } /*prop_broken_clock*/
-        else if (entIdx == 551 && par->codeScreen) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("ScreenCodeRandom"); } /*prop_cpuscreen*/
         TextureSequenceInit(parent,texAnimFolders[par->texAnimResourceFolderIdx < texAnimFolderCount ? par->texAnimResourceFolderIdx : 0]);
         if (entIdx == 551 && par->codeScreen) { par->texAnimRandom = true; par->texAnimStopsAtDie = false; }
     }
     for (int i=0;i<=lightsIdx;++i) { if (lightsFromFile[i].intensity < 0.11f && lightsFromFile[i].maxIntensity < 0.11f){continue;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); if (lanimsFromFile[i].numIntervalSteps >= 1) { lanimsFromFile[i].currentStep = 0; lanimsFromFile[i].lerpUp = true; if (lightsFromFile[i].minIntensity < 0.01f) lightsFromFile[i].minIntensity = 0.01f; }/*Unity LightAnimation.Start() init parity: animations always begin at step 0, lerping up, with a nonzero floor*/ i32 wi=AddLight(&lightsFromFile[i],&lanimsFromFile[i]); if(wi>=0&&wi<LIGHT_COUNT){World.levelLightTargetnames[World.currentLevel][wi]=lightTargetnameFile[i];} }
     if(curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7){/*Shield generators*/
-        World.shd1=AddInstance(754,(V3){-51.30664f,-47.42f,56.42651f}); World.shd2=AddInstance(754,(V3){71.5f,-47.42f,-66.6f}); World.shd3=AddInstance(754,(V3){-51.306650f,-47.42f,-66.66652f}); World.shd4=AddInstance(754,(V3){71.78664f,-47.42f,56.42651f}); World.rotation[World.shd1] = World.rotation[World.shd2] = World.rotation[World.shd3] = World.rotation[World.shd4] = QUAT_IDENTITY;
-    } else World.shd1=World.shd2=World.shd3=World.shd4=U16_MAX;
+        static const V3 pos[]={{-51.30664f,-47.42f,56.42651f},{71.5f,-47.42f,-66.6f},{-51.306650f,-47.42f,-66.66652f},{71.78664f,-47.42f,56.42651f}};
+        for (u8 k=0;k<4;++k) { World.shields[k]=AddInstance(754,pos[k]); World.rotation[World.shields[k]]=QUAT_IDENTITY; }
+    } else for (u8 k=0;k<4;++k) World.shields[k]=U16_MAX;
     headmountedLanternLight = AddLightSimple(World.position[PLAYER1],(Color3){1.0f,1.0f,1.0f},11.52f,0.0f,LIGHTON);
     if (World.instCount < INSTANCE_COUNT) {
         u16 wvi = World.instCount; mset(&World.instances[wvi],0,sizeof(Entity)); World.instances[wvi].entflags=EF_ACTIVE|EF_NO_SHADOWS; World.layer[wvi]=L_Default; World.instances[wvi].camView=255; World.instances[wvi].modelIndex=World.instances[wvi].lodIndex=World.instances[wvi].colMeshIndex=MAX_MDLS;
@@ -1483,24 +1499,18 @@ void func_forcebridge(u16 i) {
     if (World.instances[i].activatedScale.y <= 0.02f) { World.instances[i].activatedScale.y = 0.08f; }
     if (World.instances[i].activatedScale.z <= 0.02f) { World.instances[i].activatedScale.z = 2.56f; }
     if (!World.instances[i].active) { World.instances[i].modelIndex = MAX_MDLS; World.col[i] = CT_NONE; }
-    switch (World.instances[i].fieldColor) {
-        case ForceFieldColor_Red:      World.instances[i].texIndex =  38; break;
-        case ForceFieldColor_Green:    World.instances[i].texIndex =  40; break;
-        case ForceFieldColor_Blue:     World.instances[i].texIndex =  39; break;
-        case ForceFieldColor_Purple:   World.instances[i].texIndex =  41; break;
-        case ForceFieldColor_RedFaint: World.instances[i].texIndex = 198; break;
-    }
+    static const u16 textures[]={38,40,39,41,198}; u32 color=World.instances[i].fieldColor;
+    if (color<sizeof(textures)/sizeof(textures[0])) World.instances[i].texIndex=textures[color];
 }
 
 void FuncWallInitAfterLoad(u16 i) {
     V3 prev=World.position[i];
     float distTotal = V3_Dist(World.instances[i].startPosition,World.instances[i].targetPosition), f = 0;
-         if (World.instances[i].funcState  > FStat_AjarMovingTarget) { f = World.instances[i].ajarPercentage; }
-    else if (World.instances[i].funcState == FStat_AjarMovingTarget) { f = World.instances[i].ajarPercentage; }
+         if (World.instances[i].funcState >= FStat_AjarMovingTarget) { f = World.instances[i].ajarPercentage; }
     else if (World.instances[i].funcState == FStat_AjarMovingStart ) { f = 1.0f - World.instances[i].ajarPercentage; }
     
     f = vclamp(f,0.0f,1.0f);
-    V3 np = (distTotal > 0.0001f) ? V3_AplusB(World.instances[i].startPosition,V3_ScaleByF(V3_Normalize(V3_AsubB(World.instances[i].targetPosition,World.instances[i].startPosition)),distTotal * f)) : World.instances[i].startPosition; World.position[i]=np;
+    V3 np = (distTotal > 0.0001f) ? V3_AplusB(World.instances[i].startPosition,V3_ScaleByF(V3_AsubB(World.instances[i].targetPosition,World.instances[i].startPosition),f)) : World.instances[i].startPosition; World.position[i]=np;
     if ((u8)World.instances[i].funcState <= FStat_MovingTarget) { World.instances[i].funcState = FStat_Start; World.instances[i].percentMoved = 0.0f; }
     FuncWallShiftChildren(i,V3_AsubB(np,prev));
 }
@@ -1620,7 +1630,6 @@ static void DoorTypeAudit(u8 lev) {
 }
 void LoadAllLevels() {
     double start_time = get_time();
-    DebugRAM("start of LoadAllLevels");
     RenderLoading("Loading level data...");
     World.levelCurrentlyLoading = true;
     entsFromFile=OS_Alloc(INSTANCE_COUNT*sizeof(Entity));
@@ -1649,7 +1658,6 @@ void LoadAllLevels() {
     OS_Free(lightsFromFile,LIGHT_COUNT*sizeof(Light));
     OS_Free(lanimsFromFile,LIGHT_COUNT*sizeof(LightAnimation));
     BuildTextDecalMeshes(); // Build world-baked 3D text decal meshes (Sys_Text.stringTable already populated for current language).
-    DebugRAM("end of LoadAllLevels");
     DualLog("load all levels.................................................took %.6f secs\n",get_time() - start_time);
 }
 
@@ -1674,15 +1682,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     mcpy(camViews, levelCamViews[curlevel],64 * sizeof(CamView));
     mcpy(camViewTextures, levelCamViewTextures[curlevel], 64 * sizeof(u32));
     camViewCount = levelCamViewCount[curlevel];
-    for (int i = 0; i < camViewCount; ++i) { /*Initialize missing level camview entries from file data*/
-        if (levelCamViews[curlevel][i].visible == false && camViews[i].visible == true) {
-            mcpy(&levelCamViews[curlevel][i], &camViews[i], sizeof(CamView));
-            levelCamViewTextures[curlevel][i] = camViewTextures[i];
-        }
-    }
-    
     mset(alreadyReadLightOnOnce, 0, sizeof(alreadyReadLightOnOnce));
-    for (int i=0;i<World.loadedLights;++i) { World.lightsNewPosition[i]=World.lights[i].pos; }
     ResetLevelAudio();
     mp3_clear();
     World.Sys_Music.levelEntry = true;
@@ -1828,8 +1828,10 @@ size_t BlowBubblesOfVoid(const u8* src, size_t srcSize, u8* dst, size_t dstCapac
     while (s < srcSize && d < dstCapacity) {
         u8 cmd=src[s++];
         if (cmd<128){size_t litCount=cmd+1; if(s + litCount>srcSize || d+litCount>dstCapacity){return 0;} mcpy(&dst[d],&src[s],litCount); s+=litCount; d+=litCount;}/*Literal Run*/
-        else if(cmd<0xFF){size_t zeroCount=cmd-128+1; if(d+zeroCount>dstCapacity){return 0;} mset(&dst[d],0,zeroCount); d+=zeroCount;}/*Short 0 Run*/
-        else{if(s+4>srcSize){return 0;} u32 zeroCount; mcpy(&zeroCount,&src[s],sizeof(u32)); s+=4; if(d+zeroCount>dstCapacity){return 0;} mset(&dst[d], 0, zeroCount); d += zeroCount; }/*Long 0 Run*/
+        else { u32 zeroCount=cmd-127; if (cmd==0xFF) { if (s+4>srcSize) return 0; mcpy(&zeroCount,src+s,sizeof(zeroCount)); s+=4; }
+            if (d+zeroCount>dstCapacity) return 0; mset(dst+d,0,zeroCount); d+=zeroCount;
+        }
+
     } return d;
 }
 

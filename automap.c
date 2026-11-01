@@ -45,7 +45,7 @@ static void amNPCColor(NPCType t,u8* r,u8* g,u8* b) { if(t==NPCType_Cyborg||t==N
 static int amNPCNeedVer(NPCType t) {if(t==NPCType_Robot){return 2;}if(t==NPCType_Cyborg||t==NPCType_Supercyborg||t==NPCType_MutantCyborg){return 3;}if(t==NPCType_Mutant||t==NPCType_Supermutant){return 3;}return 99;/*Cyber/unknown: no overlay*/}
 static void amRaster(u8 zoom, bool full) {
     u8 lev=World.curLev; int nav=amNavVer(); int cells=16<<zoom;/*16,32,64; 0=closest*/ float x0c=World.worldMin_x[lev]-CELLXHALF,z0c=World.worldMin_z[lev]-CELLXHALF; float winW=(float)cells*CELLSZ; V3 app=World.position[PLAYER1]; float wantX0=app.x-winW*0.5f, wantZ1=app.z+winW*0.5f; float minX0=x0c,maxX0=x0c+64.0f*CELLSZ-winW; float minZ1=z0c+winW,maxZ1=z0c+64.0f*CELLSZ;
-    amDrawW=full?AM_FULL_W:AM_W; amDrawH=full?AM_FULL_H:AM_H; amDrawPx=full?amFullPx:amPx; if(full){amWinX0=x0c; amWinZ1=z0c+64.0f*CELLSZ;} else {amWinX0=wantX0<minX0?minX0:(wantX0>maxX0?maxX0:wantX0); amWinZ1=wantZ1<minZ1?minZ1:(wantZ1>maxZ1?maxZ1:wantZ1); if(maxX0<minX0){amWinX0=minX0;} if(maxZ1<minZ1){amWinZ1=maxZ1;}} amPxPerUnit=(float)amDrawH/winW; amMapScaleX=full?(float)amDrawW/winW:amPxPerUnit; amMapScaleY=amPxPerUnit; amMapOffsetX=full?0.0f:(float)AM_XOFF;  u8* expl=World.automapExplored[lev]; for (u32 i=0;i<(u32)amDrawW*amDrawH*4;i+=4) { amDrawPx[i]=0; amDrawPx[i+1]=0; amDrawPx[i+2]=0; amDrawPx[i+3]=0; }/*transparent*/
+    amDrawW=full?AM_FULL_W:AM_W; amDrawH=full?AM_FULL_H:AM_H; amDrawPx=full?amFullPx:amPx; if(full){amWinX0=x0c; amWinZ1=z0c+64.0f*CELLSZ;} else {amWinX0=wantX0<minX0?minX0:(wantX0>maxX0?maxX0:wantX0); amWinZ1=wantZ1<minZ1?minZ1:(wantZ1>maxZ1?maxZ1:wantZ1); if(maxX0<minX0){amWinX0=minX0;} if(maxZ1<minZ1){amWinZ1=maxZ1;}} amPxPerUnit=(float)amDrawH/winW; amMapScaleX=full?(float)amDrawW/winW:amPxPerUnit; amMapScaleY=amPxPerUnit; amMapOffsetX=full?0.0f:(float)AM_XOFF;  u8* expl=World.automapExplored[lev]; mset(amDrawPx,0,(size_t)amDrawW*amDrawH*4);/*transparent*/
     mset(amRadCells,0,sizeof(amRadCells)); mset(amElevCells,0,sizeof(amElevCells)); mset(amWedgeInst,0xFF,sizeof(amWedgeInst)); mset(amDiagCell,0,sizeof(amDiagCell));
     if(nav>=3){/*rad triggers (nav v3+): expand bounds to overlapped cells*/
         for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
@@ -103,10 +103,10 @@ static void amRaster(u8 zoom, bool full) {
         float x0=amWX(wx[bi]),y0=amWZ(wz[bi]),x1=amWX(wx[bj]),y1=amWZ(wz[bj]); amLine(x0,y0,x1,y1,0,220,0,2);
     }
     for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {/*hull outlines: dark green open steps only. closed walls drawn from grid*/
-        Entity* e=&World.instances[i]; if(InstIsFuncWallChild(i)){continue;} if(!IdxIsGeometry(e->index) || !(e->entflags&EF_ACTIVE) || e->modelIndex>=MAX_MDLS){continue;} u16 m=e->modelIndex; if(!amComputeModel(m) || !amMdlWall[m]){continue;} u8 hn=amHullN[m]; if(hn<3){continue;} float px[AM_MAXHULL],pz[AM_MAXHULL]; V3 ip=World.position[i]; Quaternion iq=World.rotation[i]; V3 is=World.scale[i];
-        for (u8 k=0;k<hn;++k) { V3 v=quat_rot_v3(iq,(V3){amHullX[m][k]*is.x,0.0f,amHullZ[m][k]*is.z}); px[k]=amWX(ip.x+v.x); pz[k]=amWZ(ip.z+v.z); }
+        Entity* e=&World.instances[i]; if(InstIsFuncWallChild(i)){continue;} if(!IdxIsGeometry(e->index) || !(e->entflags&EF_ACTIVE) || e->modelIndex>=MAX_MDLS){continue;} u16 m=e->modelIndex; if(!amComputeModel(m) || !amMdlWall[m]){continue;} u8 hn=amHullN[m]; if(hn<3){continue;} float px[AM_MAXHULL],pz[AM_MAXHULL],wx[AM_MAXHULL],wz[AM_MAXHULL]; V3 ip=World.position[i]; Quaternion iq=World.rotation[i]; V3 is=World.scale[i];
+        for (u8 k=0;k<hn;++k) { V3 v=quat_rot_v3(iq,(V3){amHullX[m][k]*is.x,0.0f,amHullZ[m][k]*is.z}); wx[k]=ip.x+v.x; wz[k]=ip.z+v.z; px[k]=amWX(wx[k]); pz[k]=amWZ(wz[k]); }
         for (u8 k=0;k<hn;++k) {
-            u8 a=k,b=(u8)((k+1)%hn); V3 va=quat_rot_v3(iq,(V3){amHullX[m][a]*is.x,0.0f,amHullZ[m][a]*is.z}); V3 vb=quat_rot_v3(iq,(V3){amHullX[m][b]*is.x,0.0f,amHullZ[m][b]*is.z}); float mx=(ip.x+va.x+ip.x+vb.x)*0.5f,mz=(ip.z+va.z+ip.z+vb.z)*0.5f; int ecx=PosGetCellCoordX(mx),ecz=PosGetCellCoordZ(mz); if(!expl[(u32)ecz*64+(u32)ecx]){continue;} if(amEdgeKind(ip.x+va.x,ip.z+va.z,ip.x+vb.x,ip.z+vb.z,lev)){amLine(px[a],pz[a],px[b],pz[b],0,110,0,2);}
+            u8 a=k,b=(u8)((k+1)%hn); float mx=(wx[a]+wx[b])*0.5f,mz=(wz[a]+wz[b])*0.5f; int ecx=PosGetCellCoordX(mx),ecz=PosGetCellCoordZ(mz); if(!expl[(u32)ecz*64+(u32)ecx]){continue;} if(amEdgeKind(wx[a],wz[a],wx[b],wz[b],lev)){amLine(px[a],pz[a],px[b],pz[b],0,110,0,2);}
         }
     }
     for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {/*doors: closed=yellow span; open=yellow center ticks. bulkheads (499/509) + big elevator doors (508/510/511): end ticks only, 2 per cell. span=width axis, clamp 1 cell (2.56), 2-cell doors 2 cells (5.12). no card geo*/
@@ -149,9 +149,12 @@ void AutomapTick() {
 }
 
 void AutomapBlitToUI() {
-    if(!amReady || World.menuActive || World.paused || Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE){return;}
-    int n=0; int dx0[2],dy0[2],dx1[2],dy1[2]; if(World.Sys_UI.MFD_LefTab==3){ dx0[n]=AMAP_UI_X_L; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_L+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(World.Sys_UI.MFD_RightTab==3){ dx0[n]=AMAP_UI_X_R; dy0[n]=AMAP_UI_Y; dx1[n]=AMAP_UI_X_R+AMAP_UI_W; dy1[n]=AMAP_UI_Y+AMAP_UI_H; ++n; } if(!n){return;}
-    glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); for (int k=0;k<n;++k) {/*UI y-down->GL y-up; row0=north=texture bottom: flip src*/int gx0=dx0[k],gy0=768-dy1[k],gx1=dx1[k],gy1=768-dy0[k]; glBlitFramebuffer(0,AM_H,AM_W,0, gx0,gy0,gx1,gy1, GL_COLOR_BUFFER_BIT,GL_LINEAR);} glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
+    if (!amReady || World.menuActive || World.paused || Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE) return;
+    glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
+    for (int side=0;side<2;++side) if ((World.Sys_UI.mfdTab[1+!!side])==3) {
+        int x=side ? AMAP_UI_X_R : AMAP_UI_X_L; glBlitFramebuffer(0,AM_H,AM_W,0,x,UI_H-AMAP_UI_Y-AMAP_UI_H,x+AMAP_UI_W,UI_H-AMAP_UI_Y,GL_COLOR_BUFFER_BIT,GL_LINEAR);
+    }
+    glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
 }
 
 #define AMAP_SIDE_TEX_BASE 2153

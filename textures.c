@@ -1,12 +1,13 @@
 // textures.c - 2D Texture Loading System and Texture Animations
 #include "common.h"
+static u8* LoadPng(const u8*,int,int*,int*,PngArena*,u32*,u32*);
 typedef struct { u16 index; bool transparent, doublesided; u8 blend; char path[128]; } TextureData;
 typedef struct { TextureData* entries; u32 count, capacity; } TextureDataParser;
 typedef struct { u8 r, g, b; } PngPalEntry;
-typedef struct { char path[96]; u32 texIdx, w, h; } VidFrameRec;
+typedef struct { char path[96]; u32 texIdx; } VidFrameRec;
 static VidFrameRec* g_vidFrames = NULL;
-static u32 g_vidFrameCnt = 0, g_vidPalOffs[VIDEO_RING], g_vidIdxOffs[VIDEO_RING], *g_vidDims = NULL, g_vidTexBase, g_vidPalBase, g_vidReqGen = 0, g_vidReqFrame = 0xFFFFFFFFu, g_vidPreFrame = 0xFFFFFFFFu, g_vidLastWant = 0xFFFFFFFFu;
-static u8* g_vidFrameFlag = NULL;
+static u32 g_vidFrameCnt = 0, g_vidPalOffs[VIDEO_RING], g_vidIdxOffs[VIDEO_RING], g_vidTexBase, g_vidReqGen = 0, g_vidReqFrame = 0xFFFFFFFFu, g_vidPreFrame = 0xFFFFFFFFu;
+static u16* g_vidFrameMap = NULL;
 typedef struct { u32 state; u32 frameTexIdx, palSize, w, h; u8* idx; u32* pal; } VidSlot;
 static VidSlot g_vidSlot[VIDEO_RING];
 static void* g_vidRingBuf = NULL;
@@ -15,15 +16,16 @@ static u16 g_vidSlotTex[VIDEO_RING];
 static bool g_vidUp = false;
 static PngArena g_vidArena;
 static OS_Thread g_vidThr;
-static bool has_sub(const char* h,const char* n);
 static bool is_vid_path(const char* p);
-static VidFrameRec* vid_find(u32 texIdx) { for (u32 k=0;k<g_vidFrameCnt;++k) { if (g_vidFrames[k].texIdx==texIdx) return &g_vidFrames[k]; } return NULL; }
+static VidFrameRec* vid_find(u32 texIdx) { return texIdx<texCnt && g_vidFrameMap[texIdx] ? &g_vidFrames[g_vidFrameMap[texIdx]-1] : NULL; }
 static const u8 bayer8[64] = { 0,32, 8,40, 2,34,10,42, 48,16,56,24,50,18,58,26, 12,44, 4,36,14,46, 6,38, 60,28,52,20,62,30,54,22, 3,35,11,43, 1,33, 9,41, 51,19,59,27,49,17,57,25, 15,47, 7,39,13,45, 5,37, 63,31,55,23,61,29,53,21};
 static void vid_decode(VidFrameRec* r, VidSlot* s) { /*Same palette extraction as the load worker, but straight into a ring slot.*/
     FHandle fd; int sz = 0; const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(r->path, &fd, &sz); if (unlikely(!d || sz <= 0)) return;
-    int w = 0, h = 0; u8* pix = PngLoad((const u8*)d, sz, &w, &h, &g_vidArena);
+    int w=0,h=0; u32 pngPal[256],pngPalSize; u8* pix=LoadPng((const u8*)d,sz,&w,&h,&g_vidArena,pngPal,&pngPalSize);
     if (likely(pix && w > 0 && h > 0 && (u32)w*h <= VIDEO_MAXFRAME)) {
-        u32 nP = (u32)w*h, bs = 0, x = 0, y = 0; u32 eh[TEXHASH_SZ]; mset(eh, 0xFF, sizeof(eh)); u8 ei[TEXHASH_SZ]; u8 nearcache[32768]; mset(nearcache, 0xFF, sizeof(nearcache));
+        u32 bs=pngPalSize;
+        if (bs) { mcpy(s->idx,pix,(u32)w*h); mcpy(s->pal,pngPal,bs*sizeof(u32)); } else {
+        u32 nP = (u32)w*h, x = 0, y = 0; u32 eh[TEXHASH_SZ]; mset(eh, 0xFF, sizeof(eh)); u8 ei[TEXHASH_SZ]; u8 nearcache[32768]; mset(nearcache, 0xFF, sizeof(nearcache));
         for (u32 p=0;p<nP;++p, ++x) {
             if (x == (u32)w) { x = 0; y++; }
             u32 c = ((u32*)pix)[p]; u32 hv = (c*0x9E3779B9u); hv ^= hv>>16; u32 sl = hv & (TEXHASH_SZ-1);
@@ -42,6 +44,7 @@ static void vid_decode(VidFrameRec* r, VidSlot* s) { /*Same palette extraction a
               s->idx[p] = hit; }
             vidfound:;
         }
+        }
         s->palSize = bs; s->w = (u32)w; s->h = (u32)h; s->frameTexIdx = r->texIdx;
     }
     OS_Free((void*)d,(size_t)sz);
@@ -59,22 +62,16 @@ static void* vid_worker(void* arg) { /*Decode-ahead: never touches GL. Slot stat
                 __atomic_store_n(&s->state, 1u, __ATOMIC_RELEASE); } }
         else { OS_FutexWait(&g_vidReqGen, g); } }
 }
-u32 VideoPeekFrame(u32 texIdx) { /*Next frame in the same clip, so the worker can stay ahead of playback*/
-    if (!g_vidUp || texIdx == 0xFFFFFFFFu) return 0xFFFFFFFFu; for (u32 k=0;k<g_vidFrameCnt;++k) { if (g_vidFrames[k].texIdx==texIdx) { if (k+1u < g_vidFrameCnt) return g_vidFrames[k+1].texIdx; return 0xFFFFFFFFu; } } return 0xFFFFFFFFu; }
+u32 VideoPeekFrame(u32 texIdx) { VidFrameRec* r=g_vidUp ? vid_find(texIdx) : NULL; return r && r+1<g_vidFrames+g_vidFrameCnt ? r[1].texIdx : U32_MAX; }
 void VideoInit(void) { if (g_vidUp) return; PngArenaInit(&g_vidArena); g_vidUp = true; OS_ThreadCreate(&g_vidThr, vid_worker, NULL); }
-void VideoRequestFrame(u32 texIdx) { /*want and the frame after it: the clip advances ~11fps while this runs at 60fps, so asking one step ahead is what keeps the ring fed*/
-    if (!g_vidUp || texIdx == 0xFFFFFFFFu || !vid_find(texIdx)) return;
-    if (__atomic_load_n(&g_vidReqFrame, __ATOMIC_RELAXED) == texIdx) return; /*already queued, the 60fps caller must not re-queue the same frame every render*/
-    for (u32 r=0;r<VIDEO_RING;++r) { if (g_vidSlot[r].frameTexIdx == texIdx && __atomic_load_n(&g_vidSlot[r].state,__ATOMIC_ACQUIRE)) return; /*already decoded*/ }
-    __atomic_store_n(&g_vidReqFrame, texIdx, __ATOMIC_RELAXED); __atomic_fetch_add(&g_vidReqGen, 1, __ATOMIC_RELEASE);
-    OS_FutexWakeAll(&g_vidReqGen);
+static void QueueVideoFrame(u32 texIdx,bool prefetch) {
+    if (!g_vidUp || texIdx==__atomic_load_n(&g_vidReqFrame,__ATOMIC_RELAXED) || !vid_find(texIdx)) return;
+    for (u32 r=0;r<VIDEO_RING;++r) if (g_vidSlot[r].frameTexIdx==texIdx && __atomic_load_n(&g_vidSlot[r].state,__ATOMIC_ACQUIRE)) return;
+    __atomic_store_n(prefetch ? &g_vidPreFrame : &g_vidReqFrame,texIdx,__ATOMIC_RELAXED); __atomic_fetch_add(&g_vidReqGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&g_vidReqGen);
 }
-void VideoPrefetchFrame(u32 texIdx) { /*Next clip frame, decoded in the same worker pass so playback is never a frame behind*/
-    if (!g_vidUp || texIdx == 0xFFFFFFFFu || texIdx == __atomic_load_n(&g_vidReqFrame, __ATOMIC_RELAXED)) return;
-    for (u32 r=0;r<VIDEO_RING;++r) { if (g_vidSlot[r].frameTexIdx == texIdx && __atomic_load_n(&g_vidSlot[r].state,__ATOMIC_ACQUIRE)) return; }
-    if (!vid_find(texIdx)) return; __atomic_store_n(&g_vidPreFrame, texIdx, __ATOMIC_RELAXED); __atomic_fetch_add(&g_vidReqGen, 1, __ATOMIC_RELEASE);
-    OS_FutexWakeAll(&g_vidReqGen);
-}
+void VideoRequestFrame(u32 texIdx) { QueueVideoFrame(texIdx,false); }
+void VideoPrefetchFrame(u32 texIdx) { QueueVideoFrame(texIdx,true); }
+
 u32 VideoFrameTexIndex(u32 texIdx) { /*Exact match only. The old nearest-slot fallback could walk backwards, and worse, could match a frame from a different clip that happened to be numerically closer. Playback is monotonic, so the correct answer when the wanted frame is not resident is to hold the previous one*/
     if (!g_vidUp) return 0xFFFFFFFFu;
     u32 best = 0xFFFFFFFFu;
@@ -91,12 +88,11 @@ u32 VideoFrameTexIndex(u32 texIdx) { /*Exact match only. The old nearest-slot fa
         if (s->frameTexIdx == texIdx) best = g_vidSlotTex[r];
     }
     if (best == 0xFFFFFFFFu) return 0xFFFFFFFFu;
-    g_vidLastWant = texIdx;
     return best;
 }
 typedef struct { u32 img_x, img_y; i32 img_n, img_out_n; u8 img_depth, img_color_type, img_error; u16 img_palette_count; PngPalEntry img_palette[256]; u8 img_trns[256], *img_buffer, *img_buffer_end; } PngContext;
 typedef struct { u8* indices; u32* palette, palSize; i32 w, h; } TexResult;
-typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; i32* parsIdx; const TextureDataParser* parser; TexResult* results; int tid; } TextureParseTask;
+typedef struct TextureParseTask { u32 texCnt; _Atomic u32* shared_idx; const TextureDataParser* parser; TexResult* results; int tid; } TextureParseTask;
 typedef struct { PngContext* s; u8* idata, *expanded, *out; } PngData;
 typedef struct { u16 fast[1 << 9], firstcode[16], firstsymbol[16], value[288]; i32 maxcode[17]; u8 size[288]; } PngHuffman;
 typedef struct { u8 *zbuffer, *zbuffer_end, *zout, *zout_start; i32 num_bits; u32 code_buffer; PngHuffman z_length, z_distance; } pngzbuf;
@@ -223,7 +219,7 @@ u8* PngDecode(const u8* buffer, i32 len, i32 initial_size, i32* outlen, PngArena
     } while (!f);    if (outlen) *outlen = (i32)(a.zout - a.zout_start); return a.zout_start;
 }
  
-static u8 first_row_filter[5] = {PNGFmt_none, PNGFmt_sub, PNGFmt_none, PNGFmt_avg_first, PNGFmt_paeth_first};
+static u8 first_row_filter[5] = {PNGFmt_none, PNGFmt_sub, PNGFmt_none, PNGFmt_avg_first, PNGFmt_sub};
 INLINE i32 PngPaeth(i32 a, i32 b, i32 c) { i32 p = a+b-c, pa = vabs(p-a), pb = vabs(p-b), pc = vabs(p-c); return (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c); }
 static i32 CreatePngImageArena(PngArena* arena, PngData* a, u8* raw, u32 raw_len, i32 out_n, u32 x, u32 y, i32 img_n) {
     u32 i, j, stride = x * out_n, w_bytes = (img_n * x * 8 + 7) >> 3; i32 k, f; if (raw_len < (w_bytes + 1) * y) return 0; a->out = (u8*)PngArenaAlloc(arena, (size_t)x * y * out_n);
@@ -239,7 +235,8 @@ static i32 CreatePngImageArena(PngArena* arena, PngData* a, u8* raw, u32 raw_len
     } return 1;
 }
 
-u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
+static u8* LoadPng(const u8* buffer, int len, int* x, int* y, PngArena* arena, u32* pal, u32* palSize) {
+    if (palSize) *palSize=0;
     if (!buffer || len < 8){return NULL;} if (arena->base){arena->cursor=arena->base;}
     PngContext s={0}; s.img_n=s.img_out_n=0; s.img_buffer=(u8*)buffer; s.img_buffer_end=(u8*)buffer+len; s.img_error=0; s.img_palette_count=0; s.img_depth=8; s.img_color_type=0; mset(s.img_trns,255,sizeof(s.img_trns)); mset(s.img_palette,0,sizeof(s.img_palette)); PngData z={0}; z.s=&s; u32 ioff=0; z.expanded=z.idata=z.out=NULL; s.img_buffer+=8; s.img_x=s.img_y=1;
     for (;;) {
@@ -253,13 +250,17 @@ u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
                 if (s.img_error){goto Label_parsesuccess;} u32 bpp = (u32)s.img_n * s.img_depth; u32 row_bytes = (s.img_x * bpp + 7) / 8; u32 rL = row_bytes * s.img_y + s.img_y; z.expanded = (u8*)PngDecode(z.idata,ioff,rL,(i32*)(&rL),arena); if (!z.expanded){z.out=NULL; PngGet32be(&s); goto Label_parsesuccess;} i32 ok;
                 if (s.img_depth < 8) { ok = CreatePngImageArena(arena,&z,z.expanded,rL,1,row_bytes,s.img_y, 1); if(ok){u32 nP=s.img_x*s.img_y; u8* samples=(u8*)PngArenaAlloc(arena,nP); if(!samples){ok=0;}else{u8 maxv=(u8)((1u<<s.img_depth)-1); for(u32 row=0;row<s.img_y;++row){u8* rp=z.out+row*row_bytes; for(u32 col=0;col<s.img_x;++col){u32 bit=col*s.img_depth; samples[row*s.img_x+col]=(rp[bit>>3]>>(8-s.img_depth-(u8)(bit&7)))&maxv;}} z.out=samples;}}}
                 else { s.img_out_n = (s.img_color_type == 3) ? 1 : ((s.img_n + 1 == 4) ? 4 : s.img_n); ok = CreatePngImageArena(arena,&z,z.expanded, rL,s.img_out_n,s.img_x,s.img_y,s.img_n); }
-                if (ok) {
+                if (ok && s.img_color_type==3 && pal && s.img_palette_count && s.img_palette_count<=256) {
+                    for (u32 p=0;p<s.img_palette_count;++p) pal[p]=(u32)s.img_palette[p].r | (u32)s.img_palette[p].g<<8 | (u32)s.img_palette[p].b<<16 | (u32)s.img_trns[p]<<24;
+                    for (u32 p=0;p<s.img_x*s.img_y;++p) if (z.out[p]>=s.img_palette_count) z.out[p]=0;
+                    *palSize=s.img_palette_count;
+                } else if (ok && (s.img_color_type==2 || s.img_color_type==6)) { /*Already RGBA, including promoted RGB.*/
+                } else if (ok) {
                     u32 nP = s.img_x * s.img_y; u8* rgba = (u8*)PngArenaAlloc(arena, (size_t)nP * 4);
                     if (rgba) {
                         if (s.img_color_type == 3) { for (u32 p = 0; p < nP; ++p) {u8 idx=z.out[p]; if (idx>=s.img_palette_count){idx=0;} PngPalEntry* e=&s.img_palette[idx]; rgba[p*4+0]=e->r; rgba[p*4+1]=e->g; rgba[p*4+2]=e->b; rgba[p*4+3]=s.img_trns[idx];} }  // indexed -> palette lookup (z.out is 1 index byte/pixel, any depth)
                         else if (s.img_color_type == 0) {/*grayscale -> replicate into RGB, alpha 255 (no tRNS gray-key support)*/ u8 scale=s.img_depth<8 ? (u8)(255 / ((1u << s.img_depth) - 1)) : 1; for (u32 p = 0; p < nP; ++p) { u8 g = (s.img_depth < 8) ? (u8)(z.out[p] * scale) : z.out[p]; rgba[p*4+0]=g; rgba[p*4+1]=g; rgba[p*4+2]=g; rgba[p*4+3]=255;}}
                         else if (s.img_color_type == 4) {/*grayscale+alpha -> replicate into RGB, keep alpha*/ for (u32 p=0; p<nP;++p){u8 g=z.out[p*2],a=z.out[p*2+1]; rgba[p*4+0]=g; rgba[p*4+1]=g; rgba[p*4+2]=g; rgba[p*4+3]=a;}}
-                        else { mcpy(rgba, z.out, (size_t)nP * 4); } // color type 2 (RGB, already alpha-promoted by CreatePngImageArena) or 6 (RGBA)
                         z.out = rgba;
                     } else z.out = NULL;
                 } else z.out = NULL; 
@@ -268,31 +269,32 @@ u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) {
         } PngGet32be(&s);
     } Label_parsesuccess: *x = z.s->img_x; *y = z.s->img_y; return z.out;
 }
+u8* PngLoad(const u8* buffer, int len, int* x, int* y, PngArena* arena) { return LoadPng(buffer,len,x,y,arena,NULL,NULL); }
+
  
 static void* TextureParsingWorker(void* arg) {
     TextureParseTask* t = (TextureParseTask*)arg;
     u32 i;
     while ((i = __atomic_fetch_add((u32*)t->shared_idx,1,0)) < t->texCnt) { /*Dynamic Work Stealing: Threads fetch next available index automatically*/
-        i32 pIdx = t->parsIdx[i];
-        if(unlikely(pIdx < 0 || pIdx >= (i32)t->parser->count)) { continue; }
+        if (i>=t->parser->count || t->parser->entries[i].index==U16_MAX) continue;
         
-          doubleSidedTexture[i] = t->parser->entries[pIdx].doublesided;
-          transparentTexture[i] = t->parser->entries[pIdx].transparent;
-        particleBlendTexture[i] = t->parser->entries[pIdx].blend;
+          doubleSidedTexture[i] = t->parser->entries[i].doublesided;
+          transparentTexture[i] = t->parser->entries[i].transparent;
+        particleBlendTexture[i] = t->parser->entries[i].blend;
+        if (g_vidFrameMap[i]) continue; /*Video frames are read by the decoder on demand.*/
         FHandle dummy_fd;
         int sz = 0;
-        const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[pIdx].path, &dummy_fd, &sz);
+        const char* d = (const char*)OS_OpenAndAllocateFileBufferReadonly(t->parser->entries[i].path, &dummy_fd, &sz);
         if(unlikely(!d || sz <= 0)) continue;
-        if (g_vidFrameFlag[i]) { /*Video flipbook frame: never decoded here, w/h come from IHDR and the page is filled at playback*/
-            if (sz > 24) { g_vidDims[i] = (((u32)(u8)d[16]<<24)|((u32)(u8)d[17]<<16)|((u32)(u8)d[18]<<8)|(u32)(u8)d[19]) << 16 | (((u32)(u8)d[20]<<24)|((u32)(u8)d[21]<<16)|((u32)(u8)d[22]<<8)|(u32)(u8)d[23]); }
-            OS_Free((void*)d,(size_t)sz); continue; }
+
 
         int w = 0, h = 0;
-        u8 *pix=PngLoad((const u8*)d, sz, &w, &h, &thread_png_arenas[t->tid]);
+        u32 pngPal[256],pSz; u8* pix=LoadPng((const u8*)d,sz,&w,&h,&thread_png_arenas[t->tid],pngPal,&pSz);
         if (!pix || w < 1 || h < 1) { OS_Free((void*)d,(size_t)sz); continue; }
         
         u32 nP = (u32)w*h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256*sizeof(u32));
-        u32 pSz = 0; u32 exact_hash[TEXHASH_SZ];
+        if (pSz) { mcpy(idx,pix,nP); mcpy(pal,pngPal,pSz*sizeof(u32)); } else {
+        u32 exact_hash[TEXHASH_SZ];
         mset(exact_hash, 0xFF, sizeof(exact_hash)); /*Fast Exact Match Hash Map, 0xFFFFFFFF U32_MAX = empty*/
         u8 exact_idx[TEXHASH_SZ], nearest_cache[32768]; /*15-bit Color Space Cache for fast nearest-neighbor fallback*/
         bool nearclear = false;
@@ -334,6 +336,7 @@ static void* TextureParsingWorker(void* arg) {
             found:;
         }
         
+        }
         t->results[i] = (TexResult){.indices = idx, .palette = pal, .palSize = pSz, .w = w, .h = h};
         OS_Free((void*)d,(size_t)sz);
     }
@@ -426,11 +429,10 @@ static bool ParseTextureData(TextureDataParser *p, u16 maxS, const char *fn) {
 }
 
 void SetWindowIcon(const WinSysIcon*);
-static bool has_sub(const char* h,const char* n){ for(;*h;++h){ const char* a=h,*b=n; while(*a&&*b&&*a==*b){++a;++b;} if(!*b) return true; } return false; }
-static bool is_vid_path(const char* p){ return has_sub(p,"AAIntro")||has_sub(p,"AAOutro")||has_sub(p,"VMail"); }
+
+static bool is_vid_path(const char* p){ return sFindSub(p,"AAIntro")||sFindSub(p,"AAOutro")||sFindSub(p,"VMail"); }
 void LoadTextures() {
     double start_time = get_time();
-    DebugRAM("start LoadTextures");
     texCnt = totalPixels = totalPaletteColors = 0u;
     TextureDataParser texture_parser;
     if (unlikely(!ParseTextureData(&texture_parser, MAXTEX, "./Data/textures.txt"))) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
@@ -441,19 +443,12 @@ void LoadTextures() {
     }
     
     texCnt = (u16)(maxIndex + 1);
-    g_vidFrameFlag = OS_Alloc(texCnt); mset(g_vidFrameFlag, 0, texCnt);
-    g_vidDims = OS_Alloc((size_t)texCnt * sizeof(u32)); mset(g_vidDims, 0, (size_t)texCnt * sizeof(u32));
+    g_vidFrameMap=OS_Alloc(texCnt*sizeof(u16)); mset(g_vidFrameMap,0,texCnt*sizeof(u16));
     u32 vc = 0;
-    for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti < texCnt && is_vid_path(texture_parser.entries[k].path)) { g_vidFrameFlag[ti] = 1; vc++; } }
+    for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti < texCnt && is_vid_path(texture_parser.entries[k].path)) { g_vidFrameMap[ti] = 1; vc++; } }
     g_vidFrames = OS_Alloc((vc ? vc : 1) * sizeof(VidFrameRec)); g_vidFrameCnt = 0;
-    for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti >= texCnt || !g_vidFrameFlag[ti]) continue; VidFrameRec* r = &g_vidFrames[g_vidFrameCnt++]; r->texIdx = ti; r->w = r->h = 0; size_t pl = slen(texture_parser.entries[k].path); if (pl > sizeof(r->path)-1) pl = sizeof(r->path)-1; mcpy(r->path, texture_parser.entries[k].path, pl); r->path[pl] = 0; }
+    for (u32 k=0;k<texture_parser.count;++k) { u32 ti = texture_parser.entries[k].index; if (ti >= texCnt || !g_vidFrameMap[ti]) continue; VidFrameRec* r = &g_vidFrames[g_vidFrameCnt++]; r->texIdx = ti; g_vidFrameMap[ti]=(u16)g_vidFrameCnt; size_t pl = slen(texture_parser.entries[k].path); if (pl > sizeof(r->path)-1) pl = sizeof(r->path)-1; mcpy(r->path, texture_parser.entries[k].path, pl); r->path[pl] = 0; }
 
-    i32* parsIdx = OS_AllocScratch(texCnt * sizeof(i32));
-    mset(parsIdx, -1, texCnt * sizeof(i32)); 
-    for (u32 k=0;k<texture_parser.count;++k) {
-        if (texture_parser.entries[k].index < texCnt) { parsIdx[texture_parser.entries[k].index] = (i32)k; }
-    }
-    
     DualLog("Loading textures (%u) ... ", texture_parser.count);
     thread_png_arenas = (PngArena*)OS_AllocScratch((size_t)threadCnt*sizeof(PngArena));
     for (int t=0;t<(i32)threadCnt;++t) { thread_png_arenas[t].base = NULL; PngArenaInit(&thread_png_arenas[t]); }
@@ -462,7 +457,7 @@ void LoadTextures() {
     TextureParseTask tasks[32];
     OS_Thread workers[32]; _Atomic u32 shared_idx = 0;/*The shared thread counter*/
     for (int t=0;t<(i32)threadCnt;++t) {
-        tasks[t] = (TextureParseTask){.texCnt = texCnt, .shared_idx = &shared_idx, .parsIdx = parsIdx, .parser = &texture_parser, .results = texResults, .tid = t};
+        tasks[t] = (TextureParseTask){.texCnt = texCnt, .shared_idx = &shared_idx, .parser = &texture_parser, .results = texResults, .tid = t};
         OS_ThreadCreate(&workers[t], TextureParsingWorker,&tasks[t]);
     }
     for (int t=0;t<(i32)threadCnt;++t) {OS_ThreadJoin(&workers[t]); }
@@ -482,15 +477,11 @@ void LoadTextures() {
     cur += palettes_size;
     u8* all_indices = cur;
     g_vidRingBuf = OS_Alloc(ringidx_size + ringpal_size);
-    u8* ringIndices = (u8*)g_vidRingBuf;
-    (void)ringIndices;
     u32* ringPalettes = (u32*)((u8*)g_vidRingBuf + ringidx_size);
     g_vidTexBase = (u32)ringidx_size;
     for (u32 r=0;r<VIDEO_RING;++r) { u16 si = (u16)(texCnt + r); g_vidPalOffs[r] = totalPaletteColors + r*256; g_vidIdxOffs[r] = r * VIDEO_MAXFRAME; textureOffsets[si] = g_vidIdxOffs[r]; texturePaletteOffsets[si] = g_vidPalOffs[r]; textureSizes[si*2] = 0; textureSizes[si*2+1] = 0; g_vidSlotTex[r] = si; }
-    g_vidPalBase = totalPaletteColors;
     g_vidSizesCPU = OS_Alloc(VIDEO_RING * 2 * sizeof(i32));
     for (u32 r=0;r<VIDEO_RING;++r) { g_vidSlot[r].idx = (u8*)g_vidRingBuf + (size_t)r*VIDEO_MAXFRAME; g_vidSlot[r].pal = ringPalettes + (size_t)r*256; }
-    for (u32 k=0;k<g_vidFrameCnt;++k) { g_vidFrames[k].w = g_vidDims[g_vidFrames[k].texIdx] >> 16; g_vidFrames[k].h = g_vidDims[g_vidFrames[k].texIdx] & 0xFFFF; }
     
     u32 pixel_base = 0, color_base = 0;
     for (u16 i=0;i<texCnt;++i) {
@@ -536,124 +527,68 @@ void LoadTextures() {
     OS_Free(arena, arena_size);
     png_arena_main.base = NULL;
     OS_FreeInitPhase();
-    DebugRAM("end LoadTextures");
+
     DualLog("..took %.6f secs\n", get_time() - start_time);
 }
 
-typedef struct { const u16 *frames;  u8 length; bool hasGlow; const u16 *glowFrames; u8 glowLength; const char* name; } TextureAnimClip;
-u16 sequenceTextures[]={
-    1159,1160,881,1162,1163,1164,/*scr_exp 01 - 06*/
-    1310,1311,1312,1313,/*bridg1_1 001 - 004*/
-    1115,1116,/*broken_clock01_glow 01 - 02*/
-    1117,1118,/*broken_clock 01 - 02*/
-    1124,1125,1126,1127,1128,1129,1130,/*g_energmine 00 - 06*/
-    1131,1132,1133,1134,1135,1136,1137,1138,/*g_energmine_glow 00 - 07 (yes different count, supported!)*/
-    1314,1315,1316,1317,/*scr_cita2_ 0 - 3*/
-    1318,1319,1320,1321,/*scr_cita3_ 0 - 3*/
-    1322,1323,1324,1325,1326,1327,1328,1329,/*scr_cita_ 0 - 7*/
-    1330,/*engscreen1_04 index 45*/
-    0,1331,1332,1333,1334,1335,1336,1337,/*scr_static2 0 - 6, then scr_static2_a*/
-    1338,1339,1340,1341,1342,1343,/*scr_static 0 - 5*/
-    1344,1345,1346,1347,/*screen1 0 - 3*/
-    1348,1349,1350,1351,1352,/*screen2 0 - 4*/
-    1353,1354,1355,1356,/*screen3 0 - 3*/
-    1357,1358,1359,1360,1361,1362,/*screen4 0 - 5*/
-    1363,1364,1365,1366,/*screen5 0 - 3*/
-    1367,1368,1369,1370,/*triop1 0 - 3*/
-    1371,1372,1373,1374,1375,1376,1377,1378,1379,1380,/*triop2 0 - 9*/
-    1381,1382,1383,1384,1385,1386,1387,1388,/*triop3 0 - 7*/
-    1389,/*triop4_8 index 105*/
-    1381,/*triop3_0 index 106*/
-    1390,1391,1392,1393,1394,1395,1396,1397,/*dna 0 - 7*/
-    1398,1399,1400,1401,/*edcolor 0 - 3*/
-    1402,1403,1404,1405,/*edgray 0 - 3*/
-    1406,1407,1408,1409,1410,1411,1412,1413,1414,1415,1416,/*ammo_magcart 00 - 10*/
-    1417,1418,1419,1420,1421,1422,1423,1424,1425,1426,1427,/*ammo_magcart_glow 00 - 10*/
-    1428,1429,1430,1431,1432,1433,1434,1435,1436,1437,/*medicalbed 00 - 9*/
-    1438,1439,1440,1441,1442,/*rad1_1 00 - 04*/
-    1443,1444,1445,1446,1447,1448,1449,1450,1451,1452,/*screencode 0 - 9*/
-    1453,1454,1455,1456,1457,1458,1459,1460,1461,1462,1463,1464,1465,1466,1467,1468,1469,1470,1471,1472,1473,1474,1475,1476,1477,1478,1479,1480,1481,1482,1483,1484,1485,1486,1487,1488,1489,/*shodanstatic 00 - 36*/
-    1166,1167,1168,1169,/*telepad 00 - 03*/ 1490,1491,1492,1493,/*telepad_00_glow*/
-    0,/*black index 212*/
-    0,/*black*/
-    0,/*black*/
-    0,/*black*/
-    0,/*black*/
-    0,/*black index 217*/
-    1495,1496,1497,1498,1499,1500,1501,1502,1503,1504,1505,1506,/*medscreen13 00 - 11*/
-    1507,1508,1509,1510,1511,1512,1513,1514,/*medscreen24 00 - 07*/
-    1515,1516,1517,1518,1519,1520,1521,1522,/*medscreen16 00 - 07*/
-    1523,1524,1525,1526,1527,1528,1529,1530,1531,1532,1533,1534,1535,1536,1537,1538,1539,1540,1541,1542,1543,1544,1545,1546,1547,1548,1549,1550,1551,1552,1553,1554,1555,1556,1557,1558,1559,1560,1561,1562,1563,1564,1565,1566,1567,1568,1569,1570,1571,1572,1573,1574,1575,/*zerog 00 - 52*/
-    1576,1577,1578/*door_x1 01 - 03 ends at index 305*/
-};
+typedef struct { const u16 *frames;  u8 length; const u16 *glowFrames; u8 glowLength; const char* name; float period; } TextureAnimClip;
+
 
 static const TextureAnimClip textureAnimClips[NUM_TEXTURE_CLIPS] = {
-    /*0*/{(u16[]){6,7,8,9,9,8,7,6},8,false,NULL,0,"Bridge11"},
-    /*1*/{(u16[]){10,11},2,true,(u16[]){12,13},2,"BrokenClock"},
-    /*2*/{(u16[]){14,15,16,17,18,19,20},7,true,(u16[]){21,22,23,24,25,26,27,28},8,"EnergMine"},
-    /*3*/{(u16[]){29,30,31,32,45,45,45,29,30,31,32,29,30,31,32,29,30,31,32,29,45,45,45,29,30,31,32,29,30,31,32,29,30,31,32,29,30,31,32,29,45,45,45},43,false,NULL,0,"EngScreen1"},
-    /*4*/{(u16[]){52,51,50,49,49,50,51,52},8,false,NULL,0,"EngScreen2"},
-    /*5*/{(u16[]){29,30,31,32,45,29,30,31,45,29,30,31,45},13,false,NULL,0,"ExecScreen1"},
-    /*6*/{(u16[]){83,84,85,86,83,83,86,85,84,83,103,83,84,85,86,83,83,86,85,84,83},21,false,NULL,0,"ExecScreen2"},
-    /*7*/{(u16[]){115,115,117},3,false,NULL,0,"ExecScreen3"},
-    /*8*/{(u16[]){115,115,115,115,116,117,118},7,false,NULL,0,"ExecScreen4"},
-    /*9*/{(u16[]){123,124,125,126,127,128,129,130,131,132,133},11,true,(u16[]){134,135,136,137,138,139,140,141,142,143,144},11,"MagCartridge"},
-    /*10*/{(u16[]){29,30,31,32,37},5,false,NULL,0,"MaintScreen1"},
-    /*11*/{(u16[]){33,34,35,36,32,29},6,false,NULL,0,"MaintScreen2"},
-    /*12*/{(u16[]){145,146,147,148,149,150,151,152,153,154},10,false,NULL,0,"MedicalBed"},
-    /*13*/{(u16[]){54,59,118,116,118,59},6,false,NULL,0,"MedScreen1"},
-    /*14*/{(u16[]){79,80,81,82},4,false,NULL,0,"MedScreen2"},
-    /*15*/{(u16[]){99,98,97,92},4,false,NULL,0,"MedScreen3"},
-    /*16*/{(u16[]){29,30,31,36},4,false,NULL,0,"MedScreen4"},
-    /*17*/{(u16[]){56,55,54,59,59,54,55,56},8,false,NULL,0,"MedScreen5"},
-    /*18*/{(u16[]){61,61,62,62,61,61,215,216,217,218,219,220},12,false,NULL,0,"MedScreen6"},
-    /*19*/{(u16[]){119,120,121,122},4,false,NULL,0,"MedScreen7"},
-    /*20*/{(u16[]){59,54,55,56},4,false,NULL,0,"MedScreen8"},
-    /*21*/{(u16[]){37,38,39,40,41,42,43,44},8,false,NULL,0,"MedScreen9"},
-    /*22*/{(u16[]){83,84,85,86,83,83,86,85,84,83},10,false,NULL,0,"MedScreen10"},
-    /*23*/{(u16[]){67,66,66,67,79,80,80,79},8,false,NULL,0,"MedScreen11"},
-    /*24*/{(u16[]){221,222,223,224,225,226,227,228,229,230,231,232},12,false,NULL,0,"MedScreen13"},
-    /*25*/{(u16[]){79,80,81,82,82,81,80,79},8,false,NULL,0,"MedScreen16"},
-    /*26*/{(u16[]){73,74,75,76,77,78},6,false,NULL,0,"MedScreen18"},
-    /*27*/{(u16[]){73,74,76,75,77,76,78,73},8,false,NULL,0,"MedScreen22"},
-    /*28*/{(u16[]){29,30,31,32},4,false,NULL,0,"MedScreen23"},
-    /*29*/{(u16[]){233,234,235,236,237,238,239,240},8,false,NULL,0,"MedScreen24"},
-    /*30*/{(u16[]){92,93,94,95},4,false,NULL,0,"MedScreen25"},
-    /*31*/{(u16[]){241,242,243,244,245,246,247,248},8,false,NULL,0,"MedScreen27"},
-    /*32*/{(u16[]){64,65,66,67,68},5,false,NULL,0,"MedScreen29"},
-    /*33*/{(u16[]){155,156,157,158,159},5,false,NULL,0,"Rad1_1"},
-    /*34*/{(u16[]){61,61,62,62},4,false,NULL,0,"ReacScreen4"},
-    /*35*/{(u16[]){62,61,60},3,false,NULL,0,"SciScreen1"},
-    /*36*/{(u16[]){107,108,109,111,112,113,114},7,false,NULL,0,"SciScreen2"},
-    /*37*/{(u16[]){33,34,35,36},4,false,NULL,0,"SciScreen3"},
-    /*38*/{(u16[]){188,189,113,112},4,false,NULL,0,"SciScreen4"},
-    /*39*/{(u16[]){79,80,80,79,73,74,76,77,75},9,false,NULL,0,"SciScreen5"},
-    /*40*/{(u16[]){0,1,2,3,4,5},6,false,NULL,0,"ScreenDestroyed"},
-    /*41*/{(u16[]){160,161,162,163,164,165,166,167,168,169},10,false,NULL,0,"ScreenCodeRandom"},
-    /*42*/{(u16[]){29,30,31},3,false,NULL,0,"SecScreen4"},
-    /*43*/{(u16[]){170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,203,204,205,206,205,203,204,206,205,204,203,206,205,203,204,205,206,203,206,205,203,204,203},60,false,NULL,0,"ShodanStatic"},
-    /*44*/{(u16[]){203,204,205,206,203,206,205,203,204,205,206,203,206,205,203,204,203},17,false,NULL,0,"Static"},
-    /*45*/{(u16[]){207,208,209,210},4,true,(u16[]){211,212,213,214},4,"Telepad"},
-    /*46*/{(u16[]){303,304,305},3,false,NULL,0,"XDoor1"},
-    /*47*/{(u16[]){249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302},54,false,NULL,0,"ZeroGMutant"},
-    /*48*/{(u16[]){287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302},16,false,NULL,0,"ZeroGMutantDeath"},
+    /*0*/{(const u16[]){1310,1311,1312,1313,1313,1312,1311,1310},8,NULL,0,"Bridge11",0.35f},
+    /*1*/{(const u16[]){1115,1116},2,(const u16[]){1117,1118},2,"BrokenClock",0.5f},
+    /*2*/{(const u16[]){1124,1125,1126,1127,1128,1129,1130},7,(const u16[]){1131,1132,1133,1134,1135,1136,1137,1138},8,"EnergMine",0.35f},
+    /*3*/{(const u16[]){1314,1315,1316,1317,1330,1330,1330,1314,1315,1316,1317,1314,1315,1316,1317,1314,1315,1316,1317,1314,1330,1330,1330,1314,1315,1316,1317,1314,1315,1316,1317,1314,1315,1316,1317,1314,1315,1316,1317,1314,1330,1330,1330},43,NULL,0,"EngScreen1",0.35f},
+    /*4*/{(const u16[]){1336,1335,1334,1333,1333,1334,1335,1336},8,NULL,0,"EngScreen2",0.35f},
+    /*5*/{(const u16[]){1314,1315,1316,1317,1330,1314,1315,1316,1330,1314,1315,1316,1330},13,NULL,0,"ExecScreen1",0.5f},
+    /*6*/{(const u16[]){1367,1368,1369,1370,1367,1367,1370,1369,1368,1367,1387,1367,1368,1369,1370,1367,1367,1370,1369,1368,1367},21,NULL,0,"ExecScreen2",0.5f},
+    /*7*/{(const u16[]){1398,1398,1400},3,NULL,0,"ExecScreen3",0.35f},
+    /*8*/{(const u16[]){1398,1398,1398,1398,1399,1400,1401},7,NULL,0,"ExecScreen4",0.35f},
+    /*9*/{(const u16[]){1406,1407,1408,1409,1410,1411,1412,1413,1414,1415,1416},11,(const u16[]){1417,1418,1419,1420,1421,1422,1423,1424,1425,1426,1427},11,"MagCartridge",0.17f},
+    /*10*/{(const u16[]){1314,1315,1316,1317,1322},5,NULL,0,"MaintScreen1",0.35f},
+    /*11*/{(const u16[]){1318,1319,1320,1321,1317,1314},6,NULL,0,"MaintScreen2",0.35f},
+    /*12*/{(const u16[]){1428,1429,1430,1431,1432,1433,1434,1435,1436,1437},10,NULL,0,"MedicalBed",0.35f},
+    /*13*/{(const u16[]){1338,1343,1401,1399,1401,1343},6,NULL,0,"MedScreen1",0.35f},
+    /*14*/{(const u16[]){1363,1364,1365,1366},4,NULL,0,"MedScreen2",0.35f},
+    /*15*/{(const u16[]){1383,1382,1381,1376},4,NULL,0,"MedScreen3",0.35f},
+    /*16*/{(const u16[]){1314,1315,1316,1321},4,NULL,0,"MedScreen4",0.35f},
+    /*17*/{(const u16[]){1340,1339,1338,1343,1343,1338,1339,1340},8,NULL,0,"MedScreen5",0.35f},
+    /*18*/{(const u16[]){1345,1345,1346,1346,1345,1345,0,0,0,0,0,0},12,NULL,0,"MedScreen6",0.35f},
+    /*19*/{(const u16[]){1402,1403,1404,1405},4,NULL,0,"MedScreen7",0.35f},
+    /*20*/{(const u16[]){1343,1338,1339,1340},4,NULL,0,"MedScreen8",0.35f},
+    /*21*/{(const u16[]){1322,1323,1324,1325,1326,1327,1328,1329},8,NULL,0,"MedScreen9",0.35f},
+    /*22*/{(const u16[]){1367,1368,1369,1370,1367,1367,1370,1369,1368,1367},10,NULL,0,"MedScreen10",0.35f},
+    /*23*/{(const u16[]){1351,1350,1350,1351,1363,1364,1364,1363},8,NULL,0,"MedScreen11",0.35f},
+    /*24*/{(const u16[]){1495,1496,1497,1498,1499,1500,1501,1502,1503,1504,1505,1506},12,NULL,0,"MedScreen13",0.35f},
+    /*25*/{(const u16[]){1363,1364,1365,1366,1366,1365,1364,1363},8,NULL,0,"MedScreen16",0.35f},
+    /*26*/{(const u16[]){1357,1358,1359,1360,1361,1362},6,NULL,0,"MedScreen18",0.35f},
+    /*27*/{(const u16[]){1357,1358,1360,1359,1361,1360,1362,1357},8,NULL,0,"MedScreen22",0.35f},
+    /*28*/{(const u16[]){1314,1315,1316,1317},4,NULL,0,"MedScreen23",0.35f},
+    /*29*/{(const u16[]){1507,1508,1509,1510,1511,1512,1513,1514},8,NULL,0,"MedScreen24",0.35f},
+    /*30*/{(const u16[]){1376,1377,1378,1379},4,NULL,0,"MedScreen25",0.35f},
+    /*31*/{(const u16[]){1515,1516,1517,1518,1519,1520,1521,1522},8,NULL,0,"MedScreen27",0.35f},
+    /*32*/{(const u16[]){1348,1349,1350,1351,1352},5,NULL,0,"MedScreen29",0.35f},
+    /*33*/{(const u16[]){1438,1439,1440,1441,1442},5,NULL,0,"Rad1_1",0.35f},
+    /*34*/{(const u16[]){1345,1345,1346,1346},4,NULL,0,"ReacScreen4",0.35f},
+    /*35*/{(const u16[]){1346,1345,1344},3,NULL,0,"SciScreen1",0.35f},
+    /*36*/{(const u16[]){1390,1391,1392,1394,1395,1396,1397},7,NULL,0,"SciScreen2",0.35f},
+    /*37*/{(const u16[]){1318,1319,1320,1321},4,NULL,0,"SciScreen3",0.35f},
+    /*38*/{(const u16[]){1471,1472,1396,1395},4,NULL,0,"SciScreen4",0.35f},
+    /*39*/{(const u16[]){1363,1364,1364,1363,1357,1358,1360,1361,1359},9,NULL,0,"SciScreen5",0.35f},
+    /*40*/{(const u16[]){1159,1160,881,1162,1163,1164},6,NULL,0,"ScreenDestroyed",0.35f},
+    /*41*/{(const u16[]){1443,1444,1445,1446,1447,1448,1449,1450,1451,1452},10,NULL,0,"ScreenCodeRandom",0.3f},
+    /*42*/{(const u16[]){1314,1315,1316},3,NULL,0,"SecScreen4",0.35f},
+    /*43*/{(const u16[]){1453,1454,1455,1456,1457,1458,1459,1460,1461,1462,1463,1464,1465,1466,1467,1468,1469,1470,1471,1472,1473,1474,1475,1476,1477,1478,1479,1480,1481,1482,1483,1484,1485,1486,1487,1488,1489,1486,1487,1488,1489,1488,1486,1487,1489,1488,1487,1486,1489,1488,1486,1487,1488,1489,1486,1489,1488,1486,1487,1486},60,NULL,0,"ShodanStatic",0.3f},
+    /*44*/{(const u16[]){1486,1487,1488,1489,1486,1489,1488,1486,1487,1488,1489,1486,1489,1488,1486,1487,1486},17,NULL,0,"Static",0.2f},
+    /*45*/{(const u16[]){1166,1167,1168,1169},4,(const u16[]){1490,1491,1492,1493},4,"Telepad",0.35f},
+    /*46*/{(const u16[]){1576,1577,1578},3,NULL,0,"XDoor1",0.35f},
+    /*47*/{(const u16[]){1523,1524,1525,1526,1527,1528,1529,1530,1531,1532,1533,1534,1535,1536,1537,1538,1539,1540,1541,1542,1543,1544,1545,1546,1547,1548,1549,1550,1551,1552,1553,1554,1555,1556,1557,1558,1559,1560,1561,1562,1563,1564,1565,1566,1567,1568,1569,1570,1571,1572,1573,1574,1575,1576},54,NULL,0,"ZeroGMutant",0.04166f},
+    /*48*/{(const u16[]){1561,1562,1563,1564,1565,1566,1567,1568,1569,1570,1571,1572,1573,1574,1575,1576},16,NULL,0,"ZeroGMutantDeath",0.04166f},
 };
 
-INLINE u16 ScreenCodeTexture(u8 digit) { return sequenceTextures[textureAnimClips[41].frames[digit%10u]]; }
+INLINE u16 ScreenCodeTexture(u8 digit) { return textureAnimClips[41].frames[digit%10u]; }
 void CodeScreenShowDigit(u16 self, u8 digit) { Entity* e = &World.instances[self]; e->textureAnimating = false; e->texAnimRandom = false; e->texIndex = ScreenCodeTexture(digit); }
-static float TextureClipPeriod(u16 clip) {
-    return (clip == 5 || clip == 6 || clip == 1)
-           ? 0.5f /*ExecScreen1, ExecScreen2, BrokenClock*/
-           : (clip == 41 || clip == 43)
-             ? 0.3f /*ScreenCodeRandom, ShodanStatic*/
-             : (clip == 44)
-               ? 0.2f /*Static*/
-               : (clip == 9)
-                 ? 0.17f /*MagCartridge*/
-                 : (clip == 47 || clip == 48)
-                   ? 0.04166f /*ZeroGMutant, ZeroGMutantDeath*/
-                   : 0.35f;
-}
+
 
 void TextureSequenceInit(u16 self, char* trimmed_value) {
     Entity* e=&World.instances[self];
@@ -691,9 +626,9 @@ void TextureSequenceStart(u16 self, u8 clipIndex) {
     e->texFrame = e->texGlowFrame = 0;
     e->textureAnimating = e->texAnimStopsAtDie = true;
     e->texAnimRandom = e->texAnimInReverse = false;
-    e->texIndex=sequenceTextures[clip->frames[0]];
-    if (clip->hasGlow && clip->glowFrames) e->glowIndex = sequenceTextures[clip->glowFrames[0]];
-    e->tickFinished = World.pauseRelativeTime+TextureClipPeriod(clipIndex);
+    e->texIndex=clip->frames[0];
+    if (clip->glowLength && clip->glowFrames) e->glowIndex = clip->glowFrames[0];
+    e->tickFinished = World.pauseRelativeTime+clip->period;
 }
 
 void TextureSequenceUpdate(u16 self) {
@@ -704,22 +639,22 @@ void TextureSequenceUpdate(u16 self) {
     } else {
         const TextureAnimClip* clip = &textureAnimClips[tClip];
         bool stopAtDie = e->texAnimStopsAtDie && e->health <= 0.0f;
-        e->tickFinished = World.pauseRelativeTime+TextureClipPeriod(tClip); 
+        e->tickFinished = World.pauseRelativeTime+clip->period;
         if (e->texAnimRandom && (!stopAtDie)) {
             e->texFrame = random_range_u32(0,clip->length-1);
-            if (clip->hasGlow) { e->texGlowFrame=random_range_u32(0,clip->glowLength-1); }
+            if (clip->glowLength) { e->texGlowFrame=random_range_u32(0,clip->glowLength-1); }
         } else if (e->texAnimInReverse) {
             if (stopAtDie) {
                 if (e->texFrame > 0) e->texFrame--;
             } else e->texFrame = (e->texFrame == 0) ? clip->length-1 : e->texFrame-1;
             
-            if (clip->hasGlow) { e->texGlowFrame = (e->texGlowFrame == 0) ? clip->glowLength - 1 : e->texGlowFrame - 1;}
+            if (clip->glowLength) { e->texGlowFrame = (e->texGlowFrame == 0) ? clip->glowLength - 1 : e->texGlowFrame - 1;}
         } else {
             if (stopAtDie) {
                 if (e->texFrame < clip->length - 1) { e->texFrame++; }
             } else e->texFrame = (e->texFrame+1) % clip->length;
             
-            if (clip->hasGlow) { e->texGlowFrame = (e->texGlowFrame + 1) % clip->glowLength;}
+            if (clip->glowLength) { e->texGlowFrame = (e->texGlowFrame + 1) % clip->glowLength;}
         }
         
         if (stopAtDie && e->texFrame >= clip->length - 1) {
@@ -728,8 +663,8 @@ void TextureSequenceUpdate(u16 self) {
             if(e->texAnimLight2 < World.loadedLights){flag_set(&World.lights[e->texAnimLight2].lflags,LIGHTON,false);}
         }
         
-        e->texIndex = sequenceTextures[clip->frames[e->texFrame]];
-        if (clip->hasGlow && clip->glowFrames) { e->glowIndex = sequenceTextures[clip->glowFrames[e->texGlowFrame]]; }
-        if (e->index == 279 && !clip->hasGlow) { e->glowIndex = e->texIndex; }
+        e->texIndex = clip->frames[e->texFrame];
+        if (clip->glowLength && clip->glowFrames) { e->glowIndex = clip->glowFrames[e->texGlowFrame]; }
+        if (e->index == 279 && !clip->glowLength) { e->glowIndex = e->texIndex; }
     }
 }

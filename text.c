@@ -334,7 +334,7 @@ void BuildAtlasCPU(int* numPacked, font_packedchar* packedChars, float* fixedNum
 static int CountBlankGlyphs(const font_packedchar* chars, int n, u8 fontID) { const u16 spaceIdx = cpPackedIndex[fontID][0x0020]; int b=0; for(int i=0;i<n;++i) if(i!=spaceIdx && !chars[i].x1 && !chars[i].y1) ++b; return b; }
 void InitFontAtlasses() {
     double t0=get_time();
-    DebugRAM("start font load");
+
     DualLog("Loading    fonts (   5) ...");
     FHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
@@ -349,7 +349,7 @@ void InitFontAtlasses() {
     u8* bmp2 = fontBmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2);
     BuildAtlasCPU(&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
     DualLog("(glyphs packed, blanks %d/%d, %d/%d)...................took %.6f secs\n",CountBlankGlyphs(fontPackedChar,numPackedGlyphs,FONT_NORMAL),numPackedGlyphs,CountBlankGlyphs(fontPackedCharStopD,numPackedGlyphsStopD,FONT_STOPD),numPackedGlyphsStopD,get_time() - t0);
-    DebugRAM("end font load");
+
 }
 // Localization
 size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
@@ -367,27 +367,24 @@ u8* LoadTextFile(const char* path, size_t* out_size, size_t* out_dp, int* out_ut
     if(asz >= 2 && data[0]==0xFF && data[1]==0xFE) { *out_dp = 2; *out_utf16 = 1; } else if(asz >= 3 && data[0]==0xEF && data[1]==0xBB && data[2]==0xBF) { *out_dp = 3; } else { int nl=0; for(size_t i=1; i<(size_t)asz && i<1024; i+=2) if(data[i]==0) nl++; if(nl*3 > asz) *out_utf16 = 1; } return data;
 }
 
+static size_t ReadTextLine(const u8* data,size_t size,size_t* dp,int utf16,char* line,size_t cap) {
+    size_t start=*dp,len=GetLineLength(data,size,start,utf16); *dp=len ? start+len : size;
+    if (utf16) utf16le_to_utf8(data+start,len,line,cap); else { if (len>=cap) len=cap-1; mcpy(line,data+start,len); line[len]=0; }
+    len=slen(line); while (len && (line[len-1]=='\r' || line[len-1]=='\n')) line[--len]=0; return len;
+}
+
 void LoadTextForLanguage(u8 lang) {
-    char tf[256]={0}; sCpy2aSubFromb(tf,255,localizations[lang<8?lang:0],256);
-    char line[T_LOGSTR_MAX]; size_t dp=0; int utf16=0,ln=0; Sys_Text.file_data = LoadTextFile(tf,&Sys_Text.file_size,&dp,&utf16);    
-    while(dp<Sys_Text.file_size){size_t ls=dp; size_t ll=GetLineLength(Sys_Text.file_data,Sys_Text.file_size,dp,utf16); dp+=ll;
-        if(ll==0){if(ln<T_LOGSTR_CNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
-        if(utf16)utf16le_to_utf8(&Sys_Text.file_data[ls],ll,line,sizeof(line));else{if(ll>=sizeof(line))ll=sizeof(line)-1; mcpy(line,&Sys_Text.file_data[ls],ll);line[ll]='\0';}
-        size_t sl=slen(line);while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0';
-        if(sl==0){if(ln<T_LOGSTR_CNT)Sys_Text.stringTable[ln][0]='\0';++ln;continue;}
-        if(ln<T_LOGSTR_CNT) {mcpy(Sys_Text.stringTable[ln],line,sl);Sys_Text.stringTable[ln][sl]='\0';++ln;} }
+    char line[T_LOGSTR_MAX]; size_t size,dp=0; int utf16=0,ln=0; u8* data=LoadTextFile(localizations[lang<8 ? lang : 0],&size,&dp,&utf16);
+    while (dp<size) { size_t len=ReadTextLine(data,size,&dp,utf16,line,sizeof(line)); if (ln<T_LOGSTR_CNT) { mcpy(Sys_Text.stringTable[ln],line,len+1); ++ln; } }
+    if (data) OS_Free(data,size);
 }
 
 INLINE int s2i32Len(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
 static const char* logLocalizations[8]={"./Data/logs_english.txt","./Data/logs_espanol.txt","./Data/logs_deutsch.txt","./Data/logs_francais.txt","./Data/logs_nihongo.txt","./Data/logs_russkiy.txt","./Data/logs_italiano.txt","./Data/logs_portugues.txt"};
 void LoadLogTextForLanguage(u8 lang) {
     mset(Sys_Text.audioLogImagesRefIndicesLH,0,LOGCNT*sizeof(u16));mset(Sys_Text.audioLogImagesRefIndicesRH,0,LOGCNT*sizeof(u16));mset(Sys_Text.audioLogType,0,LOGCNT*sizeof(u8));mset(Sys_Text.audioLogLevelFound,0,LOGCNT*sizeof(u8));
-    char tf[256]={0}; sCpy2aSubFromb(tf,255,logLocalizations[lang<8?lang:0],256);
-    char line[1024]; size_t dp=0;int utf16=0; Sys_Text.filelog_data = LoadTextFile(tf,&Sys_Text.filelog_size,&dp,&utf16);  
-    while(dp<Sys_Text.filelog_size){size_t ls=dp; size_t ll=GetLineLength(Sys_Text.filelog_data,Sys_Text.filelog_size,dp,utf16); dp+=ll;
-        if(ll==0)continue;
-        if(utf16)utf16le_to_utf8(&Sys_Text.filelog_data[ls],ll,line,sizeof(line)); else { if (ll>=sizeof(line)) ll=sizeof(line)-1; mcpy(line,&Sys_Text.filelog_data[ls],ll);line[ll]='\0'; }
-        size_t sl=slen(line); while(sl>0&&(line[sl-1]=='\r'||line[sl-1]=='\n'))line[--sl]='\0'; if(!sl)continue;
+    char line[1024]; size_t dp=0,size; int utf16=0; u8* data=LoadTextFile(logLocalizations[lang<8 ? lang : 0],&size,&dp,&utf16);
+    while (dp<size) { if (!ReadTextLine(data,size,&dp,utf16,line,sizeof(line))) continue;
         int li=-1,ilh=-1,irh=-1,lt=0,lf=0,fi=0;char*pos=line;
         while(*pos&&fi<32){while(*pos==' ')++pos;char*st=pos;int q=(*pos=='"');if(q)++pos;while(*pos){if(*pos==','&&!q)break;if(*pos=='"'&&q){if(pos[1]==','){pos++;break;}if(pos[1]=='"'){pos+=2;continue;}}++pos;}char*en=pos;if(q&&*en=='"')--en;size_t tl=(size_t)(en-st);if(!tl){if(*pos==',')++pos;fi++;continue;}
             switch(fi){
@@ -398,6 +395,7 @@ void LoadLogTextForLanguage(u8 lang) {
             if (*pos==',')++pos;fi++;}
         if (li>=0&&li<LOGCNT) {Sys_Text.audioLogImagesRefIndicesLH[li]=(u16)ilh;Sys_Text.audioLogImagesRefIndicesRH[li]=(u16)irh;Sys_Text.audioLogType[li]=(u8)lt;Sys_Text.audioLogLevelFound[li]=(u8)lf;}
         nxt:continue;}
+    if (data) OS_Free(data,size);
 }
 
 static float textVertexData[TEXT_VTX_FLOATS]; extern Color textColors[]; enum {TALIGN_LEFT=0,TALIGN_CENTER=1,TALIGN_RIGHT=2};

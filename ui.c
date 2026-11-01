@@ -136,17 +136,17 @@ void MFD_NewGame() {
 }
 
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.generalClickSlot = -1; }
-void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; if (side==2) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; World.Sys_UI.mfdSelected[side]=2; }
-void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=side?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4;}
-void MFD_CloseSearch() {if (World.Sys_UI.MFD_Data!=5) return; for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} u8 rv=World.Sys_UI.mfdReturnView[1]; if (rv==5) rv=0; World.Sys_UI.MFD_Data=rv;}
-void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=isRH?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab; if (tab!=4) World.Sys_UI.mfdReturnTab[side]=tab; if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) World.Sys_UI.mfdReturnView[side]=World.Sys_UI.MFD_Data; World.Sys_UI.MFD_Data=code; if (isRH) World.Sys_UI.MFD_RightTab=4; else World.Sys_UI.MFD_LefTab=4; }
-void MFD_CloseData(void) { if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=side?&World.Sys_UI.MFD_RightTab:&World.Sys_UI.MFD_LefTab; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
+void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; World.Sys_UI.mfdTab[side]=2; World.Sys_UI.mfdSelected[side]=2; }
+void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=World.Sys_UI.mfdTab[1+!!side]; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; World.Sys_UI.mfdTab[1+!!isRH]=4;}
+void MFD_CloseSearch() {if (World.Sys_UI.MFD_Data!=5) return; for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} u8 rv=World.Sys_UI.mfdReturnView[1]; if (rv==5) rv=0; World.Sys_UI.MFD_Data=rv;}
+void MFD_OpenData(bool isRH,u8 code) { u8 side=isRH?2:1; u8 tab=World.Sys_UI.mfdTab[1+!!isRH]; if (tab!=4) World.Sys_UI.mfdReturnTab[side]=tab; if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) World.Sys_UI.mfdReturnView[side]=World.Sys_UI.MFD_Data; World.Sys_UI.MFD_Data=code; World.Sys_UI.mfdTab[1+!!isRH]=4; }
+void MFD_CloseData(void) { if (World.Sys_UI.MFD_Data == 0 || World.Sys_UI.MFD_Data == 5) return; u8 keepDataTab=(World.Sys_UI.mfdReturnTab[1]==4||World.Sys_UI.mfdReturnTab[2]==4); for (u8 side=0;side<2;++side) {u8* tab=&World.Sys_UI.mfdTab[1+!!side]; if (*tab==4) *tab=World.Sys_UI.mfdReturnTab[side+1];} World.Sys_UI.MFD_Data=keepDataTab?(((World.invP1.hasHardware&HW_SYS)?7:0)):0; }
 INLINE void MFD_SelectTab(u8 panel, u8 tab, bool toggle) {
     World.Sys_UI.generalClickSlot = -1;
     if (panel && tab == 2) World.Sys_UI.lastItemSideRH = (panel == 2);
     if (panel && tab == 3) World.Sys_UI.lastAutomapSideRH = (panel == 2);/*side MFD tab click/F-key: remember which side the player wants the automap on*/
     if (panel && tab == 4) World.Sys_UI.lastDataSideRH = (panel == 2);
-    u8* current = panel == 0 ? &World.Sys_UI.MFD_CenterTab : panel==1 ? &World.Sys_UI.MFD_LefTab : &World.Sys_UI.MFD_RightTab;
+    u8* current = &World.Sys_UI.mfdTab[panel];
     *current = toggle && *current == tab ? 0 : tab;
     World.Sys_UI.mfdSelected[panel] = tab;
     u8 view = World.Sys_UI.MFD_Data;
@@ -528,8 +528,8 @@ void HwToggle(u8 i) {
         
     if (b->eng == 3) {
         MFD_ResetGeneral();
-        World.Sys_UI.MFD_CenterTab=5;
-        World.Sys_UI.MFD_LefTab=2;
+        World.Sys_UI.mfdTab[0]=5;
+        World.Sys_UI.mfdTab[1]=2;
         World.Sys_UI.mfdItemReader[0]=true;
         World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
         World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened;
@@ -746,13 +746,13 @@ static const char* UILogTextPage() { UILogTotalLines(); return logPageBuf; }
 void MFD_OpenAudioLog(int idx) {
     if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD;/*ereader stays powered on*/
     World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; MFD_OpenData(false,6); if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6);
-    World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; }
+    World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; }
 void MFD_OpenPaperLog(int idx, V3 tetherPoint) {
     if (idx<0||idx>=LOGCNT) return; World.invP1.hardwareIsActive|=HW_ERD;
     if (Sys_Text.audioLogImagesRefIndicesLH[idx]) MFD_OpenData(false,6);
     if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6);
     World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT;
-    World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE;/*the TEXT view renders only under center tab 5 (EReader) + the LOG_TABLE branch; without these the frob opened only the side image tabs and the text never displayed, unlike MFD_OpenAudioLog which sets CenterTab=5*/
+    World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE;/*the TEXT view renders only under center tab 5 (EReader) + the LOG_TABLE branch; without these the frob opened only the side image tabs and the text never displayed, unlike MFD_OpenAudioLog which sets CenterTab=5*/
     World.Sys_UI.objectInUsePos=tetherPoint; World.Sys_UI.usingObject=true; }
 
 static void UIOpenEntryAndRead(int idx,bool playable) { if (idx<0||idx>=LOGCNT) return; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.logReaderPage=0; World.invP1.readLog[idx]=true;
@@ -778,7 +778,7 @@ void UI_HardwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if 
     bool rh=World.Sys_UI.lastItemSideRH; World.Sys_UI.mfdHardwareItem=true; World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false;
     if (idx==HW_SYS_IDX) { /*the system analyzer is a data-tab view, so it opens on the last-used data side rather than the item side*/
         MFD_OpenData(World.Sys_UI.lastDataSideRH,7); return; }
-    if (rh) World.Sys_UI.MFD_RightTab=2; else World.Sys_UI.MFD_LefTab=2; }
+    World.Sys_UI.mfdTab[1+!!rh]=2; }
 void UseCyberspaceItemByIndex(int);
 void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if (idx<0||idx>6) return; bool cyber = World.curLev == LEVEL_CYBERSPACE;/*row 0 ICE Drill, 1 Pulser, 2 Cyber Shield, 3 Turbo, 4 Decoy, 5 Recall, 6 Games*/
     if (idx==SW_DRILL)  { World.invP1.isPulserNotDrill = false; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
@@ -962,7 +962,7 @@ void RenderSearchFX(void) {
         if (!World.Sys_UI.searchFXActive[side]) continue;
         double elapsed = World.pauseRelativeTime - World.Sys_UI.searchFXStartTime[side];
         if (elapsed >= 1.0) { World.Sys_UI.searchFXActive[side] = false; continue; }
-        if (Cheats.noHUD || (side?World.Sys_UI.MFD_RightTab:World.Sys_UI.MFD_LefTab)!=4 || World.Sys_UI.MFD_Data!=5 || World.Sys_UI.tetheredSearchable==U16_MAX) continue;
+        if (Cheats.noHUD || (World.Sys_UI.mfdTab[1+!!side])!=4 || World.Sys_UI.MFD_Data!=5 || World.Sys_UI.tetheredSearchable==U16_MAX) continue;
         float t = (float)elapsed / 1.0f; if (t > 1.0f) t = 1.0f;
         float p = t < 0.4f ? t / 0.4f : 1.0f;/*scale up first 0.4s, hold*/
         float ep = 1.0f - (1.0f - p) * (1.0f - p) * (1.0f - p);/*ease-out cubic*/
@@ -1080,7 +1080,7 @@ static u16 WeaponAmmoIconTex(int wep16,bool alt) {
     }
 }
 void SideMFD(bool isRH) { // 320x240
-    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex), tab = isRH ? World.Sys_UI.MFD_RightTab : World.Sys_UI.MFD_LefTab; u8 selected=tab?tab:World.Sys_UI.mfdSelected[isRH?2:1];
+    int wep16 = Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex), tab = World.Sys_UI.mfdTab[1+!!isRH]; u8 selected=tab?tab:World.Sys_UI.mfdSelected[isRH?2:1];
     for (u8 i=0;i<4;++i) UIRImg(MID(isRH,TAB_WEAPON)+i,isRH ? 1350 : -TAB_THICK,(i16)(520+56*i),32,40,selected==i+1 ? 1024 : 1022);/*Weapon/Item/Automap/Data side tab buttons*/
     if ((World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 1) {
         i16 sx=isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W : TAB_THICK+MFD_SPACING, sy=UI_H-TAB_THICK-TXT_PAD-MFD_H;/*Sensaround Plane, mirror about screen center for RH*/
@@ -1221,7 +1221,7 @@ static const char* swLabels[7]={"ICE DRILL","PULSER/DRILL","SHIELD","TURBO","DEC
 void CenterMFD() { //640x240
     if (Cheats.noHUD) return;
     static const i16 centerX[4]={400,480,560,902};
-    for (u8 i=0;i<4;++i) { if (World.curLev == LEVEL_CYBERSPACE && i != 3) continue; /*Unity EnterCyberspace hides the Main/Hardware/General center tab buttons; only Software remains*/ UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.MFD_CenterTab!=5) ? 1024 : 1021); }/*Main/Hardware/General/Software center tab buttons*/
+    for (u8 i=0;i<4;++i) { if (World.curLev == LEVEL_CYBERSPACE && i != 3) continue; /*Unity EnterCyberspace hides the Main/Hardware/General center tab buttons; only Software remains*/ UIRImg(UI_ID_CMFD_TAB_MAIN+i,centerX[i],752,64,32,(World.Sys_UI.mfdSelected[0]==i+1 && World.Sys_UI.mfdTab[0]!=5) ? 1024 : 1021); }/*Main/Hardware/General/Software center tab buttons*/
     if (World.inventoryMode && World.invP1.holdingObject) { UIR(UI_ID_CMFD_ADD_TO_INVENTORY,345,552,676,308); if (UIOver(UI_ID_CMFD_ADD_TO_INVENTORY)) { RenderUIImage(345,557,676,210,1075); RenderTextL(586,558,T_GREEN,FONT_NORMAL,0.8f,Sys_Text.stringTable[878]/*ADD TO INVENTORY*/); } }
     if (World.curLev != LEVEL_CYBERSPACE && (World.invP1.hardwareIsActive & HW_SNS) && World.invP1.hwVers[HW_SNS_IDX] > 0) { /*Unity EnterCyberspace hides Sensaround, so the Softs are not covered by the rear view*/
         i16 sx=TAB_THICK+MFD_SPACING+SIDE_MFD_W+MFD_SPACINGCTR, sy=UI_H-TAB_THICK-TXT_PAD-MFD_H;/*SensaroundCenter rearview over the center MFD content area*/
@@ -1229,7 +1229,7 @@ void CenterMFD() { //640x240
         DrawSensaroundQuad(sx,sy,CTR_MFD_W,MFD_H,sensaroundCamViewCenter);
     } else {
         i16 hdrH=UI_H-TAB_THICK-TXT_PAD-184+TXT_PAD;
-        if (World.Sys_UI.MFD_CenterTab==1) {/*Main*/
+        if (World.Sys_UI.mfdTab[0]==1) {/*Main*/
             /*Column Hdrs*/UIRText(UI_ID_CMFD_WEAPON_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,200,Sys_Text.stringTable[870]/*"WEAPONS"*/); UIRText(UI_ID_CMFD_SHOTS_HEADER,574,hdrH,T_RED,FONT_NORMAL,0.8f,120,Sys_Text.stringTable[871]/*"SHOTS"*/); UIRText(UI_ID_CMFD_GREN_HEADER,722,hdrH,T_RED,FONT_NORMAL,0.8f,120,Sys_Text.stringTable[872/*GRENADES*/]); UIRText(UI_ID_CMFD_PATCH_HEADER,868,hdrH,T_RED,FONT_NORMAL,0.8f,120,Sys_Text.stringTable[873/*PATCHES*/]);
             for (int row=0;row<7;++row) {/*Grenades*/
                 int slot=ConsumableSlot(0,row); u8 count=slot<0?0:World.invP1.grenAmmo[slot]; if (!count){continue;} u32 color=World.invP1.grenCur==slot?T_YELLOW:T_GREEN; i16 y=generalRowY[row]; const char* text=Sys_Text.stringTable[900+row];
@@ -1245,7 +1245,7 @@ void CenterMFD() { //640x240
                 char b[64]; GetWeaponAmmoText(slot,b,sizeof(b)); RenderTextL(574,y,col,FONT_NORMAL,0.8f,"%s",b);/*Ammo text*/
             }
         }
-        if (World.Sys_UI.MFD_CenterTab==2) {/*Hardware*/
+        if (World.Sys_UI.mfdTab[0]==2) {/*Hardware*/
             UIRText(UI_ID_CMFD_HARDWARE_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[874]/*HARDWARE*/);
             for (int slot=0;slot<14;++slot) {
                 int ref=World.invP1.hardwareInvReferenceIndex[slot]; if (ref<0 || World.invP1.hwVers[slot] <= 0) continue;
@@ -1253,7 +1253,7 @@ void CenterMFD() { //640x240
                 const char* label=Sys_Text.stringTable[ref+326]; UIRText(UI_ID_CMFD_HARDWARE_ROW_0+slot,x,y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : (World.invP1.hasHardware&(1u<<slot) ? T_GREEN_MENU : T_GREEN_MENU_SHADOW),FONT_NORMAL,0.8f,210,label); RenderTextL((i16)(x+(slot<7 ? 276 : 309)),y,World.invP1.hardwareInvCurrent==slot ? T_YELLOW : T_GREEN_MENU,FONT_NORMAL,0.8f,"v%d",(int)World.invP1.hwVers[slot]);
             }
         }
-        if (World.Sys_UI.MFD_CenterTab==3) {/*General*/
+        if (World.Sys_UI.mfdTab[0]==3) {/*General*/
             UIRText(UI_ID_CMFD_GENERAL_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[875]/*GENERAL*/);
             for (u8 slot=0;slot<14;++slot) {
                 if (GeneralInvItem(slot)<0) continue;
@@ -1262,7 +1262,7 @@ void CenterMFD() { //640x240
                 if (GeneralInvCanUse(slot)) { UIRImg(UI_ID_CMFD_GENERAL_USE_0+slot,(i16)(x+187),(i16)(y+2),20,20,1086); RenderUIImage(x+192,y+7,11,11,1079); }
             }
         }
-        if (World.Sys_UI.MFD_CenterTab==4) {/*Software*/
+        if (World.Sys_UI.mfdTab[0]==4) {/*Software*/
             UIRText(UI_ID_CMFD_SOFTWARE_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[876]/*SOFTS*/);
             for (int i=0;i<7;++i) { bool owned; int count=0;
                 if (i<SW_GAMES) { count=World.invP1.softVersions[i]; if (count<0) count=0; owned=(World.invP1.hasSoft&(1u<<i))!=0 || count>0; } else owned=World.invP1.hasMinigame;
@@ -1271,7 +1271,7 @@ void CenterMFD() { //640x240
                 UIRText(UI_ID_CMFD_SOFTWARE_ROW_0+i,454,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,sc,210,label);
                 if (i<SW_GAMES) RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,(i<=SW_SHIELD)?"v%d":"x%d",count); else RenderTextL(680,y,selected?T_YELLOW:T_GREEN_MENU,FONT_NORMAL,0.8f,"%d",World.invP1.hasMinigame?1:0); }
         }
-        if (World.Sys_UI.MFD_CenterTab!=5) return;/*EReader*/
+        if (World.Sys_UI.mfdTab[0]!=5) return;/*EReader*/
         static const u16 mediaHdr[4]={42/*EMAIL*/,39/*LOGS*/,43/*DATA*/,885/*NOTES*/};
         UIRText(UI_ID_CMFD_MEDIA_HEADER,372,hdrH,T_RED,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[mediaHdr[World.Sys_UI.MFD_MediaTab&3]]);
         if (World.Sys_UI.MFD_MediaTab==MM_LOG_TABLE) {
@@ -1321,7 +1321,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_HUD_SHOOTMODE: ForceShootMode(); return;
         case UI_ID_HUD_HW_0 ... UI_ID_HUD_HW_7: HwToggle((u8)(id-UI_ID_HUD_HW_0)); return;
         case UI_ID_CMFD_ADD_TO_INVENTORY: if (World.invP1.holdingObject) { AddItemToInventory(World.invP1.heldObjectIndex,World.invP1.heldObjectCustIdx); ResetHeldItem(); } return;
-        case UI_ID_CMFD_TAB_MAIN ... UI_ID_CMFD_TAB_SOFTWARE: MFD_SelectTab(0,(u8)(id-UI_ID_CMFD_TAB_MAIN+1),true); if(World.Sys_UI.MFD_CenterTab==1){World.Sys_UI.firstMain=true;}else if(World.Sys_UI.MFD_CenterTab==2){World.Sys_UI.firstHardware=true;}else if(World.Sys_UI.MFD_CenterTab==3){World.Sys_UI.firstGeneral=true;} return;
+        case UI_ID_CMFD_TAB_MAIN ... UI_ID_CMFD_TAB_SOFTWARE: MFD_SelectTab(0,(u8)(id-UI_ID_CMFD_TAB_MAIN+1),true); if(World.Sys_UI.mfdTab[0]==1){World.Sys_UI.firstMain=true;}else if(World.Sys_UI.mfdTab[0]==2){World.Sys_UI.firstHardware=true;}else if(World.Sys_UI.mfdTab[0]==3){World.Sys_UI.firstGeneral=true;} return;
         case UI_ID_CMFD_WEAPON_ROW_0 ... UI_ID_CMFD_WEAPON_ROW_6: { int row=(int)(id-UI_ID_CMFD_WEAPON_ROW_0); if (left) WeaponSelectSlot(row); else RemoveWeapon(row); return; }/*RMB takes the weapon out of the inventory; the region click path already delivers c==2/6 here, this used to swallow it behind if (left) */
         case UI_ID_CMFD_GREN_USE_0 ... UI_ID_CMFD_GREN_USE_6: ConsumableUse(false,(int)(id-UI_ID_CMFD_GREN_USE_0)); return;
         case UI_ID_CMFD_GREN_ROW_0 ... UI_ID_CMFD_GREN_ROW_6: { int row=(int)(id-UI_ID_CMFD_GREN_ROW_0); ConsumableSelect(false,row); if (dbl) ConsumableUse(false,row); return; }
@@ -1358,7 +1358,7 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_FULLMAP_CLOSE: CloseFullmap(); return;
         case UI_ID_LMFD_MEDIA_TAB_0 ... UI_ID_LMFD_MEDIA_TAB_3: {
             u8 section=(u8)(id-UI_ID_LMFD_MEDIA_TAB_0); if (section==MM_NOTES && !World.diffMis) return;
-            World.Sys_UI.MFD_CenterTab=5; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened=section; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
+            World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_MediaTab=World.Sys_UI.lastMultiMediaTabOpened=section; World.Sys_UI.MFD_ReaderView=MFD_READER_CONTENTS;
             if (section>=MM_DATA_TABLE) { World.Sys_UI.highlightStatus[section]=false; World.Sys_UI.highlightTickCount[section]=0; } play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false); return; }
         case UI_ID_LMFD_ITEM_USE: { World.Sys_UI.lastItemSideRH=rh; if (World.Sys_UI.mfdConsumable) { int row=ConsumableSelectedRow(); ConsumableUse(World.Sys_UI.mfdConsumable==2,row); } else { int s=World.invP1.generalInvCurrent; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanUse(s)) GeneralInvApply(s); } return; }
         case UI_ID_LMFD_ITEM_VAPORIZE: World.Sys_UI.lastItemSideRH=rh; World.Sys_UI.generalClickSlot = -1; if (GeneralInvCanVaporize(World.invP1.generalInvCurrent)) VaporizeClick(); return;
@@ -1412,7 +1412,7 @@ void UI_ProcessNavigation(void) {
         if (!Sys_Input.keyStates[key].pressed) continue;
         
         Sys_Input.keyStates[key].pressed = false;
-        u8 tab = World.Sys_UI.MFD_CenterTab ? World.Sys_UI.MFD_CenterTab : World.Sys_UI.mfdSelected[0];
+        u8 tab = World.Sys_UI.mfdTab[0] ? World.Sys_UI.mfdTab[0] : World.Sys_UI.mfdSelected[0];
         MFD_SelectTab(0, tab == 5 ? 1 : 1 + (tab - 1 + (up ? 3 : 1)) % 4, false);
         World.Sys_UI.MFD_ReaderView = MFD_READER_CONTENTS;
              if (tab == 1) { World.Sys_UI.firstMain     = true; }
@@ -1426,7 +1426,7 @@ void UI_ProcessNavigation(void) {
     UI_DispatchRegions();
 }
 
-static double RenderUI() {
+static void RenderUI() {
     drawCallsNormal=drawCalls; UiClickGate(); UI_BeginFrame();
     if (!EditSelIsActive() && !EditLightSelIsActive()) editFieldEditing=false;
     if (World.creditsActive) {
@@ -1438,10 +1438,10 @@ static double RenderUI() {
             if (World.creditsPageIndex == 1 && !World.gameFinished) ++World.creditsPageIndex;
         } else if (!uiClickBlocked && Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed && World.creditsPageIndex>0) { uiClickBlocked = uiClickLock = true; --World.creditsPageIndex; }
         
-        if (World.creditsPageIndex>=22) { World.creditsActive=false; MenuGoBack(); return get_time(); }
+        if (World.creditsPageIndex>=22) { World.creditsActive=false; MenuGoBack(); return; }
         if (World.creditsPageIndex==1) { CreditsStats(); RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats); }
         else RenderTextL(208,72,T_WHITE,FONT_NORMAL,1.0f,creditPages[World.creditsPageIndex]);
-        return get_time();
+        return;
     }
     if (World.menuActive) RenderMenu(); else if (World.paused) RenderPausedUI();
     if (World.menuActive || World.paused) {
@@ -1483,7 +1483,7 @@ static double RenderUI() {
                 }
             }
             bool cyber = World.curLev == LEVEL_CYBERSPACE;
-            if (cyber) { World.Sys_UI.MFD_CenterTab = 4; World.Sys_UI.mfdSelected[0] = 4; } /*Unity MFDManager.EnterCyberspace forces the center MFD to the Software tab (CenterTabButtonClickSilent(3)); forcing it every frame also overrides tab hotkeys/clicks while in cyberspace*/
+            if (cyber) { World.Sys_UI.mfdTab[0] = 4; World.Sys_UI.mfdSelected[0] = 4; } /*Unity MFDManager.EnterCyberspace forces the center MFD to the Software tab (CenterTabButtonClickSilent(3)); forcing it every frame also overrides tab hotkeys/clicks while in cyberspace*/
             bool editPanelActive=EditSelIsActive()||EditLightSelIsActive(); if (!editPanelActive) { TickBar(false); if (!cyber) TickBar(true); } if (!cyber) HardwareButtons(); UIRImg(UI_ID_HUD_SHOOTMODE,667,0,32,32,1020); RenderShieldEffect();/*cyberspace: health ticks only, no energy ticks, no hardware buttons; shootmode button stays; while the edit panel is active the health/energy ticks are skipped too*/
             for (u8 i=0;i<10;++i) if (World.Sys_UI.tWrnFinished[i]>World.pauseRelativeTime) {
                 char flt[6]; if (World.Sys_UI.tWrnTextIdx[i]==185) sFormat(flt,6,"%.1f",(double)World.instances[PLAYER1].radiation);
@@ -1596,5 +1596,4 @@ static double RenderUI() {
         i16 cursorX = World.inventoryMode ? World.cursorPos_x : (i16)(UI_W / 2), cursorY = World.inventoryMode ? World.cursorPos_y : (i16)(UI_H / 2);
         RenderTextL(cursorX + curhalf + 6,cursorY - 8,T_YELLOW,FONT_NORMAL,0.8f,"Live");
     }
-    return time_now;
 }
