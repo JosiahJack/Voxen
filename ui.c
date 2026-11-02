@@ -460,7 +460,7 @@ void RenderPausedUI() {
     menuItemCount = 6; menuTabCount = 1; static const i16 pY[6]={330,390,450,510,570,714},pH[6]={52,52,60,60,60,42},pTx[6]={610,630,635,599,546,572},pTy[6]={306,364,422,480,538,690}; static const u16 pStr[6]={725,726,727,721,728,729};
     RenderUIImage(519,276,328,300,1025);/*Pause Menu background*/ RenderUIImage(519,276,328,300,1080);/*Pause Menu background outline*/ RenderUIImage(519,672,328,42,1252);/*Pause Quit Game background*/ RenderTextL(610,210,T_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,/*"PAUSED"*/Sys_Text.stringTable[724]);
     for (u8 i=0;i<6;++i) { bool over=false; if (UI_Button(UI_ID_PAUSE_RESUME+i,522,pY[i],322,pH[i],&over,(i8)i) || (MenuEnter() && currentMenuItem==i)) { if (i==0) World.paused=false; else if (i==5) OS_Exit(0);
-            else { if (i==4) { DualLog("Player exited to menu\n"); RequestClearRenderTargets(); } ChangeMenuPage(i==1?MPG_LOAD:i==2?MPG_SAVE:i==3?MPG_OPTS:MPG_FRONT); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); } }
+            else { if (i==4) { DualLog("Player exited to menu\n"); clearRenderTargetsOnNextFrame = true; } ChangeMenuPage(i==1?MPG_LOAD:i==2?MPG_SAVE:i==3?MPG_OPTS:MPG_FRONT); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); } }
         over=over||currentMenuItem==i; RenderTextL(pTx[i],pTy[i],over ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,Sys_Text.stringTable[pStr[i]]); }
 }
 
@@ -1113,7 +1113,15 @@ void SideMFD(bool isRH) { // 320x240
             i16 x=isRH?1080:TAB_THICK+MFD_SPACING; static const u16 labels[4]={42,39,43,885};
             UIRText(MID(isRH,MEDIA_HEADER),x+6,540,T_YELLOW,FONT_NORMAL,0.8f,260,Sys_Text.stringTable[349]);
             for(u8 section=0;section<4;++section){if(section==MM_NOTES && !World.diffMis)continue; bool sectionSelected=World.Sys_UI.MFD_MediaTab==section,unread=World.Sys_UI.highlightStatus[section]; UIRImg(MID(isRH,MEDIA_TAB_0)+section,(i16)(x+65*section),718,65,40,sectionSelected||unread?1087:1086); RenderTextL(x+65*section,718,sectionSelected?T_GREEN_MENU:T_GREEN_MENU_SHADOW,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[labels[section]]);}
-        } else if (tab == 3) { u8 aside=isRH?1:0; if (World.Sys_UI.autoSide[aside]) AutomapSideBlitToUI(isRH); else AutomapBlitToUI(); i16 cx=(i16)(AMAP_UI_X_L+(isRH?(AMAP_UI_X_R-AMAP_UI_X_L):0)+AMAP_UI_W/2),fy=691; UIRImg(MID(isRH,AUTOMAP_ZOOM_OUT),cx-40,fy,20,14,1087); RenderTextL(cx-40,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_OUT))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"-"); UIRImg(MID(isRH,AUTOMAP_ZOOM_IN),cx-65,fy,20,14,1087); RenderTextL(cx-65,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_IN))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"+"); UIRImg(MID(isRH,AUTOMAP_FULL),cx+55,fy,40,14,1087); RenderTextL(cx+55,fy,UIOver(MID(isRH,AUTOMAP_FULL))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[889]); UIRImg(MID(isRH,AUTOMAP_SIDE),cx+105,fy,40,14,1087); RenderTextL(cx+105,fy,UIOver(MID(isRH,AUTOMAP_SIDE))?T_YELLOW:T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[World.Sys_UI.autoSide[aside]?887:888]);}
+        } else if (tab == 3 && World.curLev < LEVEL_CYBERSPACE && !Cheats.noHUD) {
+            u8 aside=isRH?1:0;
+            if (World.Sys_UI.autoSide[aside]) { i16 x = (i16)(24 + (isRH ? (1022 - 24) : 0) + (320 - 71)/2), y = (i16)(524 + (200 - 71) / 2); RenderUIImage(x,y,71,71,(u16)(2153 + World.curLev));/*Side Map*/ }
+            else { if (amReady) { glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); for (int side=0;side<2;++side) if ((World.Sys_UI.mfdTab[1 + !!side])==3) { int x = side ? 1022 : 24; glBlitFramebuffer(0,AM_H,AM_W,0,x,UI_H - 524 - 200,x + 320,UI_H - 524,GL_COLOR_BUFFER_BIT,GL_LINEAR); } glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); }/*Top Map*/ }
+            i16 cx = (i16)(24 + (isRH ? (1022 - 24) : 0) + 320 / 2), fy = 691;
+            UIRImg(MID(isRH,AUTOMAP_ZOOM_OUT),cx - 40,fy,20,14,1087);  RenderTextL(cx -  40,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_OUT)) ? T_YELLOW : T_GREEN,FONT_NORMAL,0.8,"-");
+            UIRImg(MID(isRH, AUTOMAP_ZOOM_IN),cx - 65,fy,20,14,1087);  RenderTextL(cx -  65,fy, UIOver(MID(isRH,AUTOMAP_ZOOM_IN)) ? T_YELLOW : T_GREEN,FONT_NORMAL,0.8,"+");
+            UIRImg(MID(isRH,    AUTOMAP_FULL),cx + 55,fy,40,14,1087);  RenderTextL(cx +  55,fy,    UIOver(MID(isRH,AUTOMAP_FULL)) ? T_YELLOW : T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[889]);
+            UIRImg(MID(isRH,    AUTOMAP_SIDE),cx + 105,fy,40,14,1087); RenderTextL(cx + 105,fy,    UIOver(MID(isRH,AUTOMAP_SIDE)) ? T_YELLOW : T_GREEN,FONT_NORMAL,0.8,"%s",Sys_Text.stringTable[World.Sys_UI.autoSide[aside] ? 887 : 888]);}
         else if (tab==2 && !World.Sys_UI.mfdItemReader[isRH?1:0]) RenderGeneralItem(isRH);
         else if(tab==4){/*DataTab*/
             u8 data = World.Sys_UI.MFD_Data; i16 dx = isRH ? 1059 : 0, closeButtonX=291,closeButtonY=508,closeButtonTextX=300,closeButtonTextY=518;
@@ -1427,7 +1435,7 @@ void UI_ProcessNavigation(void) {
 }
 
 static void RenderUI() {
-    drawCallsNormal=drawCalls; UiClickGate(); UI_BeginFrame();
+    drawCallsNormal = drawCalls; UiClickGate(); UI_BeginFrame();
     if (!EditSelIsActive() && !EditLightSelIsActive()) editFieldEditing=false;
     if (World.creditsActive) {
         RenderUIImage(0,0, 1366,768, 0);/*Video blackground*/

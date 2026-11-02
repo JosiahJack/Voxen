@@ -248,10 +248,12 @@ INLINE int trail_cmp(const void* a, const void* b){TrlSegInst* ta=(TrlSegInst*)a
 void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForward, u32 depthTex, float near, float far, float viewW, float viewH) {
     if (psys.aliveCount > 0) {
         glUseProgram(particleSP); glBindVertexArray(psysquadVAO); glBindBufferBase(GL_SSBO,10,psysInstancesID); glUniformMatrix4fv(0, 1, GL_FALSE, viewProj); glUniform3f(1, camPos.x, camPos.y, camPos.z); glUniform3f(2, camRight.x, camRight.y, camRight.z); glUniform3f(3, camUp.x, camUp.y, camUp.z); glUniform3f(4, camForward.x, camForward.y, camForward.z);
+        glUniform2f(6, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]);
         glUniform1i(10, 8); glUniform2f(11, viewW, viewH); glUniform1f(12, near); glUniform1f(13, far); glActiveTexture(GL_TEXTURE0 + 8); glBindTexture(GL_TEXTURE_2D, depthTex); glEnable(GL_BLEND); glDepthMask(GL_FALSE); glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDisable(GL_CULL_FACE); u32 runStart = 0;
         while (runStart < psys.aliveCount) {
             i32 blend = (i32)(psys.sortKeys[runStart].sortKey >> 24); u32 runEnd = runStart + 1; while (runEnd < psys.aliveCount && (psys.sortKeys[runEnd].sortKey >> 24) == (u32)blend) runEnd++; glDepthMask(blend == 4 ? GL_TRUE : GL_FALSE); glUniform1i(5, (i32)runStart); glUniform1i(7, blend); if (blend == 1) glBlendFunc(1,1); else if (blend == 2) glBlendFunc(GL_DST_COLOR, GL_ZERO); else glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-            u32 count = runEnd - runStart; glDrawArraysInstanced(GL_TRIANGLE_STRIP,0,4,count); drawCalls++; vertsRendered += count * 4; runStart = runEnd;
+            u32 count = runEnd - runStart;
+            glDrawArraysInstanced(GL_TRIANGLE_STRIP,0,4,count); drawCalls++; vertsRendered += count * 4; runStart = runEnd;
         }
         glEnable(GL_CULL_FACE); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); glDepthFunc(GL_LESS);
         if (psys.trailCount == 0){return;} // Particles barrier <<<<<<
@@ -283,7 +285,7 @@ void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForwar
             }
         }
         trailSortCam=camPos; if(psys.trailCount > 1){qsort_new(psys.trailSegments,psys.trailCount,sizeof(TrlSegInst),trail_cmp);} glUseProgram(trailSP); glBindVertexArray(psysquadVAO); glBindBufferBase(GL_SSBO,11,psysTrailsID);
-        glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glBufferSubData(GL_SSBO,0,psys.trailCount * sizeof(TrlSegInst), psys.trailSegments); glEnable(GL_BLEND); glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE); glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDisable(GL_CULL_FACE);
+        glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glUniform2f(6, World.worldMin_x[World.curLev], World.worldMin_z[World.curLev]); glBufferSubData(GL_SSBO,0,psys.trailCount * sizeof(TrlSegInst), psys.trailSegments); glEnable(GL_BLEND); glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE); glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDisable(GL_CULL_FACE);
         glDrawArraysInstanced(GL_TRIANGLE_STRIP,0,4,psys.trailCount); drawCalls++; vertsRendered += psys.trailCount * 4; glEnable(GL_CULL_FACE); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDepthFunc(GL_LESS);
     }
 }
@@ -300,12 +302,8 @@ void PSys_Update(float dt) {
         Emitter* em = &psys.emitters[i]; if(!em->active){continue;}
         
         if (em->parentIdx != U16_MAX) {
-            if (em->parentIdx >= World.instCount || !(World.instances[em->parentIdx].entflags & EF_ACTIVE)) {
-                em->active = false; u32 keep = 0;
-                for (u32 r = 0; r < psys.aliveCount; ++r) { if (psys.particles[r].emitterIndex != i) { psys.particles[keep++] = psys.particles[r]; } }
-                em->aliveCount = 0; psys.aliveCount = keep;
-                continue;
-            }
+            if (em->parentIdx >= World.instCount || !(World.instances[em->parentIdx].entflags & EF_ACTIVE)) { em->active = false; u32 keep = 0; for (u32 r = 0; r < psys.aliveCount; ++r) { if (psys.particles[r].emitterIndex != i) { psys.particles[keep++] = psys.particles[r]; } } em->aliveCount = 0; psys.aliveCount = keep; continue; }
+            
             V3 moved = V3_AsubB(World.position[em->parentIdx], em->position);
             if (moved.x || moved.y || moved.z) { for (u32 p = 0; p < psys.aliveCount; ++p) { Particle* pp = &psys.particles[p]; if (pp->emitterIndex == i) { pp->pos = V3_AplusB(pp->pos, moved); } } }
             em->position = World.position[em->parentIdx];
@@ -320,13 +318,11 @@ void PSys_Update(float dt) {
                 float y = random_range(-1.0f,1.0f), radial = vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f), radius = random_range(0.0f,em->shapeRadius);
                 dir=quat_rot_v3(em->orientation,(V3){radial*vcosf(angle),y,radial*vsinf(angle)}); part->pos.x=em->position.x+dir.x*radius; part->pos.y=em->position.y+dir.y*radius; part->pos.z=em->position.z+dir.z*radius;
             } else if (em->shapeType == 2) {
-                float halfAngle=em->shapeAngle*0.0174532925f, cosMin=vcosf(halfAngle), y=random_range(-1.0f,-cosMin), radial=vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f);
-                V3 localDir=(V3){radial*vcosf(angle),y,radial*vsinf(angle)}; float radius=random_range(0.0f,em->shapeRadius); V3 offset=quat_rot_v3(em->orientation,(V3){localDir.x,0.0f,localDir.z}); part->pos=(V3){em->position.x+offset.x*radius,em->position.y,em->position.z+offset.z*radius}; dir=quat_rot_v3(em->orientation,localDir);
-            } else if (em->shapeType == 3) {
-                dir=quat_rot_v3(em->orientation,(V3){0,1,0}); part->pos=em->position;
-            } else {
-                dir=quat_rot_v3(em->orientation,(V3){vcosf(angle),random_range(-0.5f,0.5f),vsinf(angle)}); part->pos=em->position;
-            }
+                float halfAngle = em->shapeAngle*0.0174532925f, cosMin = vcosf(halfAngle), y = random_range(-1.0f,-cosMin), radial = vsqrtf((1.0f-y*y)>0.0f ? (1.0f-y*y) : 0.0f);
+                V3 localDir = (V3){radial*vcosf(angle),y,radial*vsinf(angle)}; float radius = random_range(0.0f,em->shapeRadius); V3 offset = quat_rot_v3(em->orientation,(V3){localDir.x,0.0f,localDir.z});
+                                             dir = quat_rot_v3(em->orientation,localDir);                                                 part->pos = (V3){em->position.x+offset.x*radius,em->position.y,em->position.z+offset.z*radius};
+            } else if (em->shapeType == 3) { dir = quat_rot_v3(em->orientation,(V3){0,1,0});                                              part->pos = em->position; }
+            else                           { dir = quat_rot_v3(em->orientation,(V3){vcosf(angle),random_range(-0.5f,0.5f),vsinf(angle)}); part->pos = em->position; }
             part->vel.x=dir.x*speed; part->vel.y=dir.y*speed; part->vel.z=dir.z*speed; part->age=0.0f; part->invLifetime=1.0f/random_range(em->lifetimeMin,em->lifetimeMax); part->baseSize=random_range(em->sizeMin,em->sizeMax); part->rotation=random_range(em->rotMin,em->rotMax);
             part->angularVelocity = random_range(em->aVelMin,em->aVelMax); part->color = em->colorMode == 1 ? sample_color_ramp(em,random_range(0.0f,1.0f)) : sample_color_ramp(em,0.0f); part->emitterIndex = i; part->flags=0; part->blendMode=em->blendMode; if (part->blendMode == 1) { part->flags |= PARTICLE_FLAG_ADDITIVE; } else if (part->blendMode == 2) { part->flags |= PARTICLE_FLAG_MULTIPLY; } 
             if (em->softness > 0.0f) { part->flags |= PARTICLE_FLAG_SOFT; } part->textureIndex=em->texBaseIdx; part->animFrame=0; part->trailOwner=++psys.nextTrailOwner; if (part->trailOwner == 0) { part->trailOwner=++psys.nextTrailOwner; } part->trailHead=0; part->trailSample=part->pos; psys.aliveCount++; em->aliveCount++;

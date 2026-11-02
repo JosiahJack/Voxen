@@ -2,6 +2,8 @@
 layout(location = 0) in vec2 inCorner;
 layout(location = 1) in vec2 inUV;
 layout(location = 0) uniform mat4 uViewProj;
+layout(location = 6) uniform vec2 worldMin;
+layout(std430, binding = 7) readonly buffer CullingData { uint gridCellStates[]; };
 struct TrailInstance { vec4 p0; vec4 p1; vec4 c00; vec4 c01; vec4 c10; vec4 c11; uvec4 data; vec4 vtxExtra; };
 layout(std430, binding = 11) readonly buffer TrailInstanceBlock { TrailInstance instances[4096]; };
 out vec2 vUV; out vec4 vColor; flat out uint vTexIndex; flat out uint vBlendMode;
@@ -10,5 +12,10 @@ void main() {
     int i = gl_InstanceID; float along = inCorner.x, side = inCorner.y; TrailInstance it = instances[i];
     vec4 corn = (along < 0.0) ? ((side < 0.0) ? it.c00 : it.c01) : ((side < 0.0) ? it.c10 : it.c11);
     float cMix = along * 0.5 + 0.5;
+    ivec2 cell = ivec2(clamp((it.p0.xyz.xz - worldMin + vec2(1.28))/2.56, 0.0, 63.0));
+    if ((gridCellStates[cell.y * 64 + cell.x] & 1u) == 0u) {
+        gl_Position = vec4(0.0,0.0,2.0,1.0);
+        return;
+    }
     gl_Position = uViewProj * vec4(corn.xyz, 1.0); vUV = vec2((along < 0.0) ? it.c00.w : it.c10.w, side * 0.5 + 0.5); vColor = mix(unpackColorRGBA8(it.data.x), unpackColorRGBA8(it.data.y), cMix); vTexIndex = it.data.z & 0xFFFFu; vBlendMode = uint(it.p0.w);
 }

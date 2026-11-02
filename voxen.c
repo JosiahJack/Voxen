@@ -1,4 +1,4 @@
-// voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Core renderer.  OS Shim Layer.
+// voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake.  Main translation unit.  Main loop.  Core rendering engine.  OS Shim Layer.  Windowing and Input.  Config.  Cheats Console.  Core systems init.
 #include "common.h"
 #include "credits.h"
 #include "Shaders/shaders.h"
@@ -1382,31 +1382,14 @@ INLINE u32 CompileShader(u32 type, const char* source, const char* name) { u32 s
 INLINE u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ProgramError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
 void CompileShaders() {
-    depthPrepassSP = CompileAnyShader(depthPrepassVertSrc, depthPrepassFragSrc, "DPre");
-    chunkSP=CompileAnyShader(vertSrc, fragSrc, "Main");
-    uiSP=CompileAnyShader(vertUISrc, fragUISrc, "UI");
-    debugUnlitSP=CompileAnyShader(debugUnlitVertSrc, debugUnlitFragSrc, "Ln");
-    shadowmapsSP=CompileAnyShader(shadowmapVertSrc, shadowmapFragSrc, "Shad");
-    textSP=CompileAnyShader(textVertSrc, textFragSrc, "Txt");
-    imageBlitSP=CompileAnyShader(quadVertSrc, quadFragSrc, "Comp");
-    ssrSP=CompileAnyShader(NULL, ssrCSSrc, "SSR");    rtSP=CompileAnyShader(NULL, rtCSSrc, "RT");    rtCopySP=CompileAnyShader(NULL, rtCopyCSSrc, "RTCopy");    voxelUpdateSP=CompileAnyShader(NULL, voxUpdCSSrc, "Vox");
-    particleSP=CompileAnyShader(particleVertSrc, particleFragSrc, "Part");
-    trailSP=CompileAnyShader(trailVertSrc, trailFragSrc, "Trail");
+    depthPrepassSP = CompileAnyShader(depthPrepassVertSrc,depthPrepassFragSrc,"DPre"); chunkSP=CompileAnyShader(vertSrc,fragSrc,"Main"); uiSP=CompileAnyShader(vertUISrc,fragUISrc,"UI"); debugUnlitSP=CompileAnyShader(debugUnlitVertSrc,debugUnlitFragSrc,"Ln"); shadowmapsSP=CompileAnyShader(shadowmapVertSrc,shadowmapFragSrc,"Shad"); textSP=CompileAnyShader(textVertSrc,textFragSrc,"Txt");
+    imageBlitSP=CompileAnyShader(quadVertSrc,quadFragSrc,"Comp"); ssrSP=CompileAnyShader(NULL,ssrCSSrc,"SSR"); rtSP=CompileAnyShader(NULL,rtCSSrc,"RT"); rtCopySP=CompileAnyShader(NULL,rtCopyCSSrc,"RTCopy"); voxelUpdateSP=CompileAnyShader(NULL,voxUpdCSSrc,"Vox"); particleSP=CompileAnyShader(particleVertSrc,particleFragSrc,"Part"); trailSP=CompileAnyShader(trailVertSrc,trailFragSrc,"Trail");
 }
 
 INLINE u32 MakeSSBO(u32* id, u32 bindx, size_t sz, const void* d, u32 typ) { glGenBuffers(1,id); glBindBuffer(GL_SSBO,*id); glBufferData(GL_SSBO,sz,d,typ); glBindBufferBase(GL_SSBO,bindx,*id); return *id; }
 static void mat4_lookat_from(float* m, Quaternion* camRotation, V3 eye) {
-    float x=camRotation->x, y=camRotation->y, z=camRotation->z, w=camRotation->w;
-    float x2=x*x, y2=y*y, z2=z*z;
-    float xy=x*y, xz=x*z, yz=y*z;
-    float wx=w*x, wy=w*y, wz=w*z;
-    V3 right={1.0f - 2.0f*(y2 + z2),2.0f*(xy + wz),2.0f*(xz - wy)};/*X+(right)*/
-    V3 up={2.0f*(xy - wz),1.0f - 2.0f*(x2 + z2),2.0f*(yz + wx)};/*Y+(up)*/
-    V3 forward={2.0f*(xz + wy),2.0f*(yz - wx), 1.0f - 2.0f*(x2 + y2)};/*Z+(forward)*/
-    m[0]=right.x; m[1]=up.x; m[2]=-forward.x; m[3]=0.0f;
-    m[4]=right.y; m[5]=up.y; m[6]=-forward.y; m[7]=0.0f;
-    m[8]=right.z; m[9]=up.z; m[10]=-forward.z; m[11]=0.0f;
-    m[12]=-V3_dot(right,eye); m[13]=-V3_dot(up,eye); m[14]=V3_dot(forward,eye); m[15]=1.0f;
+    float x=camRotation->x, y=camRotation->y, z=camRotation->z, w=camRotation->w; float x2=x*x, y2=y*y, z2=z*z; float xy=x*y, xz=x*z, yz=y*z; float wx=w*x, wy=w*y, wz=w*z; V3 right={1.0f - 2.0f*(y2 + z2),2.0f*(xy + wz),2.0f*(xz - wy)};/*X+(right)*/ V3 up={2.0f*(xy - wz),1.0f - 2.0f*(x2 + z2),2.0f*(yz + wx)};/*Y+(up)*/ V3 forward={2.0f*(xz + wy),2.0f*(yz - wx), 1.0f - 2.0f*(x2 + y2)};/*Z+(forward)*/
+    m[0]=right.x; m[1]=up.x; m[2]=-forward.x; m[3]=0.0f; m[4]=right.y; m[5]=up.y; m[6]=-forward.y; m[7]=0.0f; m[8]=right.z; m[9]=up.z; m[10]=-forward.z; m[11]=0.0f; m[12]=-V3_dot(right,eye); m[13]=-V3_dot(up,eye); m[14]=V3_dot(forward,eye); m[15]=1.0f;
 }
 
 void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
@@ -1418,12 +1401,7 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     ps[5].normal.x = m[3] - m[2]; ps[5].normal.y = m[7] - m[6]; ps[5].normal.z = m[11] - m[10]; ps[5].d = m[15] - m[14];/*Far*/
     for (int i=0;i<6;i++) { /*Normalize (could use V3_Normalize but need len for d term of FrustumPlane).*/
         float len = V3_Mag(ps[i].normal);
-        if (len > 0.000001f) {
-            ps[i].normal.x /= len;
-            ps[i].normal.y /= len;
-            ps[i].normal.z /= len;
-            ps[i].d /= len;
-        }
+        if (len > 0.000001f) { ps[i].normal.x /= len; ps[i].normal.y /= len; ps[i].normal.z /= len; ps[i].d /= len; }
     }
 }
 
@@ -1437,48 +1415,16 @@ __attribute__((noinline)) void RenderUIImageExtended(i16 x, i16 y, i16 width, i1
     float w=(float)width, h=(float)height, cs=vcosf(radians), sn=vsinf(radians), pvx=w*pivotX, pvy=h*pivotY, z = 0.0f;
     const float cornerX[6] = {0.0f, w, w, 0.0f, 0.0f, w}, cornerY[6] = {h, 0.0f, h, h, 0.0f, 0.0f}, uvX[6] = {0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f}, uvY[6] = {0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f};
     float vertices[30];
-    for (int i=0;i<6;++i) {
-        float dx = cornerX[i]-pvx, dy=cornerY[i]-pvy;
-        vertices[i*5 + 0] = (float)x + pvx + dx*cs - dy*sn;
-        vertices[i*5 + 1] = (float)y + pvy + dx*sn + dy*cs;
-        vertices[i*5 + 2] = z; vertices[i*5 + 3] = uvX[i];
-        vertices[i*5 + 4] = uvY[i];
-    }
-    
+    for (int i=0;i<6;++i) { float dx = cornerX[i] - pvx, dy = cornerY[i] - pvy; vertices[i*5 + 0] = (float)x + pvx + dx*cs - dy*sn; vertices[i*5 + 1] = (float)y + pvy + dx*sn + dy*cs; vertices[i*5 + 2] = z; /*Pos*/ vertices[i*5 + 3] = uvX[i]; vertices[i*5 + 4] = uvY[i]; /*UV*/ }
     glBufferSubData(GL_ARRAY_BUFFER, 0, 30 * sizeof(float), vertices);
-    glDrawArrays(0x0004/*GL_TRIANGLES*/, 0, 6);
-    drawCalls++;
-    uiDrawCalls++;
-    vertsRendered += 6;
+    glDrawArrays(0x0004/*GL_TRIANGLES*/, 0, 6); drawCalls++; uiDrawCalls++; vertsRendered += 6;
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 __attribute__((noinline)) void RenderUIImage(i16 x, i16 y, i16 width, i16 height, u32 texIndex) { RenderUIImageExtended(x,y,width,height,texIndex,0.0f,0.5f,0.5f,1.0f,1.0f,1.0f); }
-
-void RenderLoading(const char * restrict text) {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-    RenderTextC(683, 384, T_WHITE, FONT_NORMAL, 1, text);
-    window->context.swapBuffers(window);
-}
-
-void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp) {
-    if (*id == 0) { glGenTextures(1, id); }
-    glBindTexture(GL_TEXTURE_2D,*id);
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, bmp);
-    glTexParameteri(GL_TEXTURE_2D, 0x2801/*GL_TEXTURE_MIN_FILTER*/, filt);
-    glTexParameteri(GL_TEXTURE_2D, 0x2800/*GL_TEXTURE_MAG_FILTER*/, filt);
-}
-
-void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) {
-    if(camViewCount >= 64) { DualLogWarn("Too many cam views!  Skipped at %f %f %f\n",p.x,p.y,p.z); return; }
-    
-    camViews[camViewCount] = (CamView){p, r, fv, w, h, nr, fr, World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f, false};
-    GenerateAndBindTexture(&camViewTextures[camViewCount], GL_RGBA8, w, h, GL_RGBA,GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL);
-    camViewCount++;
-}
-
+void RenderLoading(const char * restrict text) { glBindFramebuffer(GL_FRAMEBUFFER, 0); glClear(GL_COLOR_BUFFER_BIT); glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight); RenderTextC(683, 384, T_WHITE, FONT_NORMAL, 1, text); window->context.swapBuffers(window); }
+void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 width, i32 height, u32 format, u32 type, i32 filt, u8* bmp) { if (*id == 0) { glGenTextures(1, id); } glBindTexture(GL_TEXTURE_2D,*id); glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, bmp); glTexParameteri(GL_TEXTURE_2D, 0x2801/*GL_TEXTURE_MIN_FILTER*/, filt); glTexParameteri(GL_TEXTURE_2D, 0x2800/*GL_TEXTURE_MAG_FILTER*/, filt); }
+void AddCamView(V3 p, Quaternion r, u8 fv, u16 w, u16 h, float nr, float fr) { if(camViewCount >= 64) { DualLogWarn("Too many cam views!  Skipped at %f %f %f\n",p.x,p.y,p.z); return; } camViews[camViewCount] = (CamView){p, r, fv, w, h, nr, fr, World.pauseRelativeTime + (camViewCount * 0.05f) + 0.5f, false}; GenerateAndBindTexture(&camViewTextures[camViewCount], GL_RGBA8, w, h, GL_RGBA,GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL); camViewCount++; }
 void UpdateScreenSize(i32 width, i32 height) {
     u16 w = Sys_Settings.ScreenWidth = vmax(vmin((u16)width,7680u),320u), h = Sys_Settings.ScreenHeight = vmax(vmin((u16)height,4320u),200u); /*Cap at minimum Quake resolution and maximum 8k.*/
     glViewport(0,0,w,h);
@@ -1490,9 +1436,7 @@ void UpdateScreenSize(i32 width, i32 height) {
     GenerateAndBindTexture(&inputSpecID,                        GL_RGBA8,                       w,                       h,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2600/*GL_NEAREST*/,NULL); /*Specular Colors*/
     GenerateAndBindTexture(&inputNormalID,                      GL_RG16F,                       w,                       h,                      GL_RGB,        GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); /*Normal XYZ*/ 
     GenerateAndBindTexture(&inputDepthID, 0x81A7/*GL_DEPTH_COMPONENT32*/,                       w,                       h,0x1902/*GL_DEPTH_COMPONENT*/,        GL_FLOAT,0x2600/*GL_NEAREST*/,NULL); /*Raster Depth*/
-    if (Sys_Settings.Reflections >= 1) {
-        GenerateAndBindTexture(&outputImageID,                      GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,                     GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/ ,NULL);
-    }
+    if (Sys_Settings.Reflections >= 1) { GenerateAndBindTexture(&outputImageID,GL_RGBA8,w / Sys_Settings.SSR_RES,h / Sys_Settings.SSR_RES,      GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/ ,NULL); }
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER,         GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER,         GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,inputSpecID,  0);
@@ -1513,6 +1457,7 @@ Quaternion vWepRot[16]={{0,.67623f,.73802f,0},{-.67623f,0,0,.73802f},{.10363f,0,
         V3 vWepOfs[16]={{      0,-.54f,.451f},        {0,-.5f,0.28f},  {-.015f,-.34f,.18f},       {0,-.43f,.27f},     {0,-0.57f,0.56f},{-.2f,.5f,.8f},  {0,-.3f,.7f},        {0,-.39f,.02f},       {0,-.54f,.44f},        {0,-.58f,.43f},     {-.02f,-.64f,.79f},         {0,-.46f,.43f},                       {0,-.5f,.08f},       {0,-.62f,.69f},       {0,-.55f,.58f},       {0,-.56f,.55f}};
 extern const u16 wepModelIndices[16];
 extern WeaponFireCtx wfx; // weapon view model: needed by RenderUI (ui.c)
+static bool clearRenderTargetsOnNextFrame = false;
 #include "automap.c" // CPU-rasterized automap
 #include "ui.c"
 // Lights
@@ -1933,82 +1878,42 @@ void RenderSunShadowmap(void) {
 DepthSort visibleInstances[INSTANCE_COUNT];
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
-static void SetHopperDeathEffect(Entity* e) {
-    float redTint = 0.0f, rimStrength = 0.0f;
-    if (e->deathAnimationActive && e->index == 433) {
-        float elapsed = (float)(World.pauseRelativeTime - (double)e->deathAnimationStart);
-        if (elapsed < 0.0f) { elapsed = 0.0f; }
-        u32 tick = (u32)(elapsed / 0.05f); /* NPC_Hopper_Death uses 0.05-second ticks. */
-        redTint = elapsed < 0.35f ? 0.5f * vmin((float)tick, 6.0f) : 0.0f;
-        rimStrength = vmax(0.0f, 1.0f - ((float)tick * 15.0f / 255.0f));
-    }
-    glUniform2f(33, redTint, rimStrength);
-}
-
 void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, bool grayscaleEnabled) {
     u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex;
     if (IdxIsLaserDoor(constIndex)) { DoorLaserDraw(i); }
-    if (Cheats.showPhys) {
-             if (World.col[i] == CT_BOX)                           { DrawBoxCollider(i);     }
-        else if (World.col[i] == CT_SPH)                           { DrawSphereCollider(i);  }
-        else if (World.col[i] == CT_CVX || World.col[i] == CT_MSH) { DrawMeshCollider(i);    }
-        else if (World.col[i] == CT_CAP)                           { DrawCapsuleCollider(i); }
-        DrawAngularVelocity(i);
+    if (Cheats.showPhys) { if (World.col[i] == CT_BOX) { DrawBoxCollider(i); } else if (World.col[i] == CT_SPH) { DrawSphereCollider(i); } else if (World.col[i] == CT_CVX || World.col[i] == CT_MSH) { DrawMeshCollider(i); } else if (World.col[i] == CT_CAP) { DrawCapsuleCollider(i); }    DrawAngularVelocity(i); }
+    if (e->modelIndex < MAX_MDLS) {
+        float redTint = 0.0f, rimStrength = 0.0f; if (e->deathAnimationActive && e->index == 433) { float elapsed = vmax((float)(World.pauseRelativeTime - (double)e->deathAnimationStart),0.0f); u32 tick = (u32)(elapsed / 0.05f); redTint = elapsed < 0.35f ? 0.5f * vmin((float)tick, 6.0f) : 0.0f; rimStrength = vmax(0.0f, 1.0f - ((float)tick * 15.0f / 255.0f)); } glUniform2f(33, redTint, rimStrength); // Set Hopper death glow effect strength.
+        glUniform1ui(17,tex==316?1u:0u);
+        glUniform1ui(25,constIndex);
+        glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
+        if (grayscaleEnabled) { float npcHeat = IdxIsNPC(constIndex) ? ((constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 || constIndex==431 || constIndex==433 || constIndex==437 || constIndex==438 || constIndex==441) ? 1.5f : 4.0f) : 0.0f; glUniform1f(9,npcHeat); }
+        glUniform1ui(30,e->camView < camViewCount ? 1u : 0u);
+        if(e->camView < camViewCount) { glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]); glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height); }
+        if((*curN) != (norm)) { *curN=norm; glUniform1ui( 1,(u32)norm); }
+        if((*curT) != ( tex)) { *curT= tex; glUniform1ui(18,(u32)tex ); }
+        if((*curG) != (glow) || glow == 0) { *curG=glow; glUniform1ui(19,(u32)glow); }
+        if((*curS) != (spec)) { *curS=spec; glUniform1ui(20,(u32)spec); }
+        *curM=GetAndBindModel(i,*curM);
+        u32 vc=modelTriangleCounts[*curM]*3;
+        glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0); drawCalls++; vertsRendered += vc;
     }
-    if (e->modelIndex >= MAX_MDLS) return;
-    
-    SetHopperDeathEffect(e);
-    glUniform1ui(17,tex==316?1u:0u);
-    glUniform1ui(25,constIndex);
-    glUniform1ui(13,(tex==36||tex==887) ? 1u : 0u);
-    if (grayscaleEnabled) {
-        float npcHeat = IdxIsNPC(constIndex) ? ((   constIndex==419 || constIndex==422 || constIndex==424 || constIndex==429 || constIndex==430 
-                                                 || constIndex==431 || constIndex==433 || constIndex==437 || constIndex==438 || constIndex==441) ? 1.5f : 4.0f) : 0.0f;
-        glUniform1f(9,npcHeat);
-    }
-    glUniform1ui(30,e->camView < camViewCount ? 1u : 0u);
-    if(e->camView < camViewCount) {
-        glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D,camViewTextures[e->camView]);
-        glUniform2ui(28,camViews[e->camView].width,camViews[e->camView].height);
-    }
-    if((*curN) != (norm)) { *curN=norm; glUniform1ui( 1,(u32)norm); }
-    if((*curT) != ( tex)) { *curT= tex; glUniform1ui(18,(u32)tex ); }
-    if((*curG) != (glow) || glow == 0) { *curG=glow; glUniform1ui(19,(u32)glow); }
-    if((*curS) != (spec)) { *curS=spec; glUniform1ui(20,(u32)spec); }
-    *curM=GetAndBindModel(i,*curM);
-    u32 vc=modelTriangleCounts[*curM]*3;
-    glDrawElements(0x0004,vc,GL_UNSIGNED_SHORT,0);
-    drawCalls++;
-    vertsRendered+=vc;
 }
 
 bool mat4_inverse(const float* m, float* out) {
-    float inv[16],det;
-    inv[0] =  m[5]*m[10]*m[15] - m[5]*m[14]*m[11] - m[9]*m[6]*m[15] + m[9]*m[14]*m[7] + m[13]*m[6]*m[11] - m[13]*m[10]*m[7]; inv[4] = -m[4]*m[10]*m[15] + m[4]*m[14]*m[11] + m[8]*m[6]*m[15] - m[8]*m[14]*m[7] - m[12]*m[6]*m[11] + m[12]*m[10]*m[7];
-    inv[8] =  m[4]*m[9]*m[15]  - m[4]*m[13]*m[11] - m[8]*m[5]*m[15] + m[8]*m[13]*m[7]  + m[12]*m[5]*m[11] - m[12]*m[9]*m[7]; inv[12]= -m[4]*m[9]*m[14]  + m[4]*m[13]*m[10] + m[8]*m[5]*m[14] - m[8]*m[13]*m[6]  - m[12]*m[5]*m[10] + m[12]*m[9]*m[6];
-    inv[1] = -m[1]*m[10]*m[15] + m[1]*m[14]*m[11] + m[9]*m[2]*m[15] - m[9]*m[14]*m[3] - m[13]*m[2]*m[11] + m[13]*m[10]*m[3]; inv[5] =  m[0]*m[10]*m[15] - m[0]*m[14]*m[11] - m[8]*m[2]*m[15] + m[8]*m[14]*m[3]  + m[12]*m[2]*m[11] - m[12]*m[10]*m[3];
-    inv[9] = -m[0]*m[9]*m[15]  + m[0]*m[13]*m[11] + m[8]*m[1]*m[15] - m[8]*m[13]*m[3]  - m[12]*m[1]*m[11] + m[12]*m[9]*m[3]; inv[13]=  m[0]*m[9]*m[14]  - m[0]*m[13]*m[10] - m[8]*m[1]*m[14] + m[8]*m[13]*m[2]  + m[12]*m[1]*m[10] - m[12]*m[9]*m[2];
-    inv[2] =  m[1]*m[6]*m[15] - m[1]*m[14]*m[7] - m[5]*m[2]*m[15] + m[5]*m[14]*m[3] + m[13]*m[2]*m[7] - m[13]*m[6]*m[3]; inv[6] = -m[0]*m[6]*m[15] + m[0]*m[14]*m[7] + m[4]*m[2]*m[15] - m[4]*m[14]*m[3] - m[12]*m[2]*m[7] + m[12]*m[6]*m[3];
-    inv[10]=  m[0]*m[5]*m[15] - m[0]*m[13]*m[7] - m[4]*m[1]*m[15] + m[4]*m[13]*m[3] + m[12]*m[1]*m[7] - m[12]*m[5]*m[3]; inv[14]= -m[0]*m[5]*m[14] + m[0]*m[13]*m[6] + m[4]*m[1]*m[14] - m[4]*m[13]*m[2] - m[12]*m[1]*m[6] + m[12]*m[5]*m[2];
-    inv[3] = -m[1]*m[6]*m[11] + m[1]*m[10]*m[7] + m[5]*m[2]*m[11] - m[5]*m[10]*m[3] - m[9]*m[2]*m[7]  + m[9]*m[6]*m[3]; inv[7] =  m[0]*m[6]*m[11] - m[0]*m[10]*m[7] - m[4]*m[2]*m[11] + m[4]*m[10]*m[3] + m[8]*m[2]*m[7]  - m[8]*m[6]*m[3];
-    inv[11]= -m[0]*m[5]*m[11] + m[0]*m[9]*m[7]  + m[4]*m[1]*m[11] - m[4]*m[9]*m[3]  - m[8]*m[1]*m[7]  + m[8]*m[5]*m[3]; inv[15]=  m[0]*m[5]*m[10] - m[0]*m[9]*m[6]  - m[4]*m[1]*m[10] + m[4]*m[9]*m[2]  + m[8]*m[1]*m[6]  - m[8]*m[5]*m[2];
-    det = m[0]*inv[0] + m[1]*inv[4] + m[2]*inv[8] + m[3]*inv[12]; if (det == 0.0f) { for(int i=0;i<16;++i) {out[i] = (i%5==0) ? 1.0f : 0.0f;} return false; } det = 1.0f / det; for (int i=0;i<16;++i) out[i] = inv[i] * det; return true;
+    float inv[16]; float s0 = m[0]*m[5]   - m[4]*m[1],   s1 = m[0]*m[6]   - m[4]*m[2],   s2 = m[0]*m[7]   - m[4]*m[3], s3 = m[1]*m[6]   - m[5]*m[2],   s4 = m[1]*m[7]   - m[5]*m[3],   s5 = m[2]*m[7]   - m[6]*m[3], c0 = m[8]*m[13]  - m[12]*m[9],  c1 = m[8]*m[14]  - m[12]*m[10], c2 = m[8]*m[15]  - m[12]*m[11], c3 = m[9]*m[14]  - m[13]*m[10], c4 = m[9]*m[15]  - m[13]*m[11], c5 = m[10]*m[15] - m[14]*m[11];
+    float det = s0*c5 - s1*c4 + s2*c3 + s3*c2 - s4*c1 + s5*c0; if (det == 0.0f) { for (int i = 0; i < 16; ++i) out[i] = (i % 5 == 0) ? 1.0f : 0.0f; return false; }
+    
+    float id = 1.0f / det;
+    inv[0]  = ( m[5]*c5  - m[6]*c4   + m[7]*c3 ) * id;  inv[1]  = (-m[1]*c5  + m[2]*c4   - m[3]*c3 ) * id; inv[2]  = ( m[13]*s5 - m[14]*s4  + m[15]*s3) * id;  inv[3]  = (-m[9]*s5  + m[10]*s4  - m[11]*s3) * id; inv[4]  = (-m[4]*c5  + m[6]*c2   - m[7]*c1 ) * id;  inv[5]  = ( m[0]*c5  - m[2]*c2   + m[3]*c1 ) * id; inv[6]  = (-m[12]*s5 + m[14]*s2  - m[15]*s1) * id;  inv[7]  = ( m[8]*s5  - m[10]*s2  + m[11]*s1) * id;
+    inv[8]  = ( m[4]*c4  - m[5]*c2   + m[7]*c0 ) * id;  inv[9]  = (-m[0]*c4  + m[1]*c2   - m[3]*c0 ) * id; inv[10] = ( m[12]*s4 - m[13]*s2  + m[15]*s0) * id;  inv[11] = (-m[8]*s4  + m[9]*s2   - m[11]*s0) * id; inv[12] = (-m[4]*c3  + m[5]*c1   - m[6]*c0 ) * id;  inv[13] = ( m[0]*c3  - m[1]*c1   + m[2]*c0 ) * id; inv[14] = (-m[12]*s3 + m[13]*s1  - m[14]*s0) * id;  inv[15] = ( m[8]*s3  - m[9]*s1   + m[10]*s0) * id;
+    for (int i = 0; i < 16; ++i) out[i] = inv[i];
+    return true;
 }
-
-
 
 void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
-static bool clearRenderTargetsOnNextFrame = false;
-void RequestClearRenderTargets() { clearRenderTargetsOnNextFrame = true; }
 void BiomonitorClearRenderTarget();
-static void ClearAllRenderTargets() {
-    glClearColor(0.0f,0.0f,0.0f,0.0f);
-    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-    glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClear(GL_COLOR_BUFFER_BIT);
-    AutomapClearRenderTargets(); BiomonitorClearRenderTarget();
-}
-
+static void ClearAllRenderTargets() { glClearColor(0.0f,0.0f,0.0f,0.0f); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,uiFBO); glClear(GL_COLOR_BUFFER_BIT); AutomapClearRenderTargets(); BiomonitorClearRenderTarget(); }
 V3 debugWepOffset = {0, 0, 0}; // debug weapon view offset
 static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     u16 swidth, sheight;
@@ -2103,9 +2008,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         currentModelType=GetAndBindModel(i,currentModelType);
         if (tex != currentTexIndex) { currentTexIndex=tex; glUniform1ui(3,(u32)tex); }
         u32 vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(0x0004/*GL_TRIANGLES*/, vertCount, GL_UNSIGNED_SHORT, 0);
-        drawCalls++;
-        vertsRendered += vertCount;
+        glDrawElements(0x0004/*GL_TRIANGLES*/, vertCount, GL_UNSIGNED_SHORT, 0); drawCalls++; vertsRendered += vertCount;
     }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][2]);
@@ -2115,14 +2018,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform1ui(32,0u);
     glUniform1ui(34, (World.curLev == LEVEL_CYBERSPACE) ? 1u : 0u); /*cyberspace: shader uses hardcoded neon directionals, else the sun*/
     glUniform1ui(37, (u32)(sunActive?1u:0u));
-    if (sunActive) {
-        glUniform3f(38, sunDirection.x, sunDirection.y, sunDirection.z);
-        glUniformMatrix4fv(40, 1, GL_FALSE, sunShadowMatrix);
-        glActiveTexture(GL_TEXTURE10);
-        glBindTexture(GL_TEXTURE_2D, sunShadowTex);
-        glActiveTexture(GL_TEXTURE0);
-    }
-
+    if (sunActive) { glUniform3f(38, sunDirection.x, sunDirection.y, sunDirection.z); glUniformMatrix4fv(40, 1, GL_FALSE, sunShadowMatrix); glActiveTexture(GL_TEXTURE10); glBindTexture(GL_TEXTURE_2D, sunShadowTex); glActiveTexture(GL_TEXTURE0); }
     bool grayscaleEnabled = ((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0);
     glUniform1ui(26,(u32)grayscaleEnabled);
     float fogActual = World.fogColor[World.curLev].a + ((float)World.fogFac / 255.0f); /*Alpha is base density for level.*/
@@ -2173,9 +2069,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glUniform1ui(25, (u32)cIdx);
         glBindTexture(GL_TEXTURE_2D, (cIdx == 593) ? fontAtlasTexStopD : fontAtlasTex);
         glBindVertexBuffer(0, textDecalVBO[tdLev][i], 0, 16/*VRT_ATT_SZ*/);
-        glDrawArrays(0x0004/*GL_TRIANGLES*/, 0, (i32)textDecalVertexCount[tdLev][i]);
-        drawCalls++;
-        vertsRendered += textDecalVertexCount[tdLev][i];
+        glDrawArrays(0x0004/*GL_TRIANGLES*/, 0, (i32)textDecalVertexCount[tdLev][i]); drawCalls++; vertsRendered += textDecalVertexCount[tdLev][i];
     }
     glBindTexture(GL_TEXTURE_2D, 0);
     glUniform1ui(32, 0u); /* restore chunkSP font-atlas off for subsequent draws */
@@ -2215,19 +2109,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         }
         glBindTexture(GL_TEXTURE_2D,0); return;
     } // <<<<<<<<<<<<< CAM VIEW BARRIER
-    
     PSys_Render(viewProj, playerPos,(V3){invViewRot[0], invViewRot[1], invViewRot[2]}, (V3){invViewRot[3], invViewRot[4], invViewRot[5]}, (V3){-invViewRot[6], -invViewRot[7], -invViewRot[8]}, inputDepthID, snear, sfar, (float)swidth, (float)sheight);
-    if (wireVertCount) {
-        glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVertex),wireVerts);
-        glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glBindVertexArray(wireLinesVAO); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount);
-        glEnable(GL_CULL_FACE);
-        drawCalls++;
-        vertsRendered += wireVertCount;
-        wireVertCount = 0;
-    }
-    if (Cheats.editMode) { /*Point-light range spheres, editmode only. NOT gated by showPhys: these are editmode guides, not physics debug.*/
-        for (u16 i = 0; i < World.loadedLights; ++i) { Light* L = &World.lights[i]; DrawSphereWireframe(i == editModeLightSelection ? (Color){1.0f,0.5f,0.5f,1.0f} : (Color){0.9216f,0.9176f,0.7725f,1.0f}, (ShapeSphere){L->pos, 0.02 * L->range});/*cyberpanel_paleyellow.png dominant flat tone (235,234,197)*/ }
-    }
+    if (wireVertCount) { glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVertex),wireVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glBindVertexArray(wireLinesVAO); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount); drawCalls++; vertsRendered += wireVertCount; wireVertCount = 0; glEnable(GL_CULL_FACE); }
+    if (Cheats.editMode) { /*Point-light range spheres, editmode only.*/ for (u16 i = 0; i < World.loadedLights; ++i) { Light* L = &World.lights[i]; DrawSphereWireframe(i == editModeLightSelection ? (Color){1.0f,0.5f,0.5f,1.0f} : (Color){0.9216f,0.9176f,0.7725f,1.0f}, (ShapeSphere){L->pos, 0.02 * L->range}); } }
     if(unlikely(World.debugLineVertCount > 0)) {
         glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO);
         glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(WireVertex),debugLineVerts);
@@ -2236,11 +2120,9 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         glLineWidth(1.0f);
         glDisable(GL_DEPTH_TEST);
         glBindVertexArray(debugLinesVAO);
-        glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount);
-        drawCalls++;
-        vertsRendered += World.debugLineVertCount;
-        glEnable(GL_DEPTH_TEST);
+        glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount;
         World.debugLineVertCount = 0;
+        glEnable(GL_DEPTH_TEST);
     }
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D,inputDepthID);
@@ -2306,51 +2188,26 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     glUniform1ui(29,(u32)((World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0));
     glBindVertexArray(quadVAO);
     glDisable(GL_DEPTH_TEST);
-    glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/, 0, 4);
-    drawCalls++;
-    vertsRendered += 4; /*Just a quad for the final composite*/
+    glDrawArrays(0x0006/*GL_TRIANGLE_FAN*/, 0, 4); drawCalls++; vertsRendered += 4; /*Just a quad for the final composite*/
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     if (Cheats.editMode && editModeSelection < U16_MAX && World.editTextInstanceIndex < INSTANCE_COUNT) {
         World.position[World.editTextInstanceIndex]=World.position[editModeSelection];
         float wx = World.position[editModeSelection].x, wy = World.position[editModeSelection].y, wz = World.position[editModeSelection].z;
         float clipX = viewProj[0]*wx + viewProj[4]*wy + viewProj[8]*wz + viewProj[12], clipY = viewProj[1]*wx + viewProj[5]*wy + viewProj[9]*wz + viewProj[13], clipW = viewProj[3]*wx + viewProj[7]*wy + viewProj[11]*wz + viewProj[15];
         float projXf = 0, projYf = 0;
-        if (clipW > 0.01f) {
-            float ndcX = clipX / clipW;
-            float ndcY = clipY / clipW;
-            projXf = ((ndcX + 1.0f) * 0.5f) * (float)swidth;
-            projYf = ((1.0f - ndcY) * 0.5f) * (float)sheight;
-        }
-        
-        char editTextStr[64];
-        sFormat(editTextStr, sizeof(editTextStr), "index: %d", editModeSelection);
+        if (clipW > 0.01f) { float ndcX = clipX / clipW; float ndcY = clipY / clipW; projXf = ((ndcX + 1.0f) * 0.5f) * (float)swidth; projYf = ((1.0f - ndcY) * 0.5f) * (float)sheight; }
+        char editTextStr[64]; sFormat(editTextStr, sizeof(editTextStr), "index: %d", editModeSelection);
         RenderText3DC((V3){projXf, projYf, 0.0f}, T_WHITE,FONT_NORMAL, 1.0f, editTextStr);
     }
-    
-    if ((World.last_time - World.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
-        World.lastFrameSecCountTime=World.last_time;
-        globalframesPerLastSecond=globalframe - World.lastFrameSecCount;
-        World.lastFrameSecCount=globalframe;
-    } 
+    if ((World.last_time - World.lastFrameSecCountTime) >= 1.00) { World.lastFrameSecCountTime=World.last_time; globalframesPerLastSecond=globalframe - World.lastFrameSecCount; World.lastFrameSecCount=globalframe; } // Update Diagnostic Poll
 }
 
 void RenderCameraViews() { /*Render in-world camera views.  Pops player position to elsewhere, renders to tiny fbo, pops player back.*/
     if (unlikely(World.paused || World.menuActive || camViewCount == 0 || World.curLev >= LEVEL_CYBERSPACE)) { return; }
     
-    V3 tempPlayerPos = World.position[PLAYER1];
-    Quaternion tempPlayerRot = World.rotation[PLAYER1]; 
-    for (int cm=0;cm<camViewCount;++cm) {
-        if (camViews[cm].finished < World.pauseRelativeTime && camViews[cm].visible) {
-            camViews[cm].finished = World.pauseRelativeTime + 0.5f;
-            World.position[PLAYER1] = camViews[cm].position;
-            World.rotation[PLAYER1] = camViews[cm].rotation;
-            CullCore();
-            Render(true/*camview*/, cm);
-        }
-    }
-    
-    World.position[PLAYER1] = tempPlayerPos;
-    World.rotation[PLAYER1] = tempPlayerRot;
+    V3 tempPlayerPos = World.position[PLAYER1]; Quaternion tempPlayerRot = World.rotation[PLAYER1]; // Store player position.
+    for (int cm=0;cm<camViewCount;++cm) { if (camViews[cm].finished < World.pauseRelativeTime && camViews[cm].visible) { camViews[cm].finished = World.pauseRelativeTime + 0.5f; World.position[PLAYER1] = camViews[cm].position; World.rotation[PLAYER1] = camViews[cm].rotation; CullCore(); Render(true/*camview*/, cm); } }
+    World.position[PLAYER1] = tempPlayerPos; World.rotation[PLAYER1] = tempPlayerRot; // Restore player position.
 }
 
 static void SetRTInstance(u32 i, u32 model, u32 tex, u32 active, float sx, float sy, float sz) {
@@ -2384,19 +2241,12 @@ void UpdateInstanceMatrix4x4s() {
             xy = x*y; xz = x*z; yz = y*z;
             wx = w*x; wy = w*y; wz = w*z;
         }
-        
         modelMatrices[m + 0]  = (1.0f - 2.0f * (y2 + z2)) * sclx; modelMatrices[m + 1]  = (2.0f * (xy + wz))        * sclx; modelMatrices[m+2]  = (2.0f * (xz - wy))        * sclx; modelMatrices[m + 3]  = 0.0f; 
         modelMatrices[m + 4]  = (2.0f * (xy - wz))        * scly; modelMatrices[m + 5]  = (1.0f - 2.0f * (x2 + z2)) * scly; modelMatrices[m+6]  = (2.0f * (yz + wx))        * scly; modelMatrices[m + 7]  = 0.0f;
         modelMatrices[m + 8]  = (2.0f * (xz + wy))        * sclz; modelMatrices[m + 9]  = (2.0f * (yz - wx))        * sclz; modelMatrices[m+10] = (1.0f - 2.0f * (x2 + y2)) * sclz; modelMatrices[m + 11] = 0.0f;
         modelMatrices[m + 12] = World.position[i].x;              modelMatrices[m + 13] = World.position[i].y;              modelMatrices[m+14] = World.position[i].z;              modelMatrices[m + 15] = 1.0f;
     }
-    
-    if (World.instCount > INSTS_1ST_IDX) {
-        glBindBuffer(GL_SSBO,matricesBufferID);
-        u32 offsetFloats=(u32)INSTS_1ST_IDX * 16;
-        u32 countFloats=((u32)World.instCount - (u32)INSTS_1ST_IDX) * 16;
-        glBufferSubData(GL_SSBO, offsetFloats * 4, countFloats * 4, modelMatrices + offsetFloats);
-    }
+    if (World.instCount > INSTS_1ST_IDX) { glBindBuffer(GL_SSBO,matricesBufferID); u32 offsetFloats=(u32)INSTS_1ST_IDX * 16; u32 countFloats=((u32)World.instCount - (u32)INSTS_1ST_IDX) * 16; glBufferSubData(GL_SSBO, offsetFloats * 4, countFloats * 4, modelMatrices + offsetFloats); }
     if (Sys_Settings.Reflections == 2u) { // Upload instance metadata + world grid for ray-traced reflections.
         u32 chFirst = INSTANCE_COUNT, chLast = 0u;
         for (u32 i=0; i<World.instCount; ++i) {

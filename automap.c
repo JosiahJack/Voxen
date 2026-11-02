@@ -45,12 +45,15 @@ static void amNPCColor(NPCType t,u8* r,u8* g,u8* b) { if(t==NPCType_Cyborg||t==N
 static int amNPCNeedVer(NPCType t) {if(t==NPCType_Robot){return 2;}if(t==NPCType_Cyborg||t==NPCType_Supercyborg||t==NPCType_MutantCyborg){return 3;}if(t==NPCType_Mutant||t==NPCType_Supermutant){return 3;}return 99;/*Cyber/unknown: no overlay*/}
 static void amRaster(u8 zoom, bool full) {
     u8 lev=World.curLev; int nav=amNavVer(); int cells=16<<zoom;/*16,32,64; 0=closest*/ float x0c=World.worldMin_x[lev]-CELLXHALF,z0c=World.worldMin_z[lev]-CELLXHALF; float winW=(float)cells*CELLSZ; V3 app=World.position[PLAYER1]; float wantX0=app.x-winW*0.5f, wantZ1=app.z+winW*0.5f; float minX0=x0c,maxX0=x0c+64.0f*CELLSZ-winW; float minZ1=z0c+winW,maxZ1=z0c+64.0f*CELLSZ;
-    amDrawW=full?AM_FULL_W:AM_W; amDrawH=full?AM_FULL_H:AM_H; amDrawPx=full?amFullPx:amPx; if(full){amWinX0=x0c; amWinZ1=z0c+64.0f*CELLSZ;} else {amWinX0=wantX0<minX0?minX0:(wantX0>maxX0?maxX0:wantX0); amWinZ1=wantZ1<minZ1?minZ1:(wantZ1>maxZ1?maxZ1:wantZ1); if(maxX0<minX0){amWinX0=minX0;} if(maxZ1<minZ1){amWinZ1=maxZ1;}} amPxPerUnit=(float)amDrawH/winW; amMapScaleX=full?(float)amDrawW/winW:amPxPerUnit; amMapScaleY=amPxPerUnit; amMapOffsetX=full?0.0f:(float)AM_XOFF;  u8* expl=World.automapExplored[lev]; mset(amDrawPx,0,(size_t)amDrawW*amDrawH*4);/*transparent*/
+    amDrawW=full?AM_FULL_W:AM_W; amDrawH=full?AM_FULL_H:AM_H; amDrawPx=full?amFullPx:amPx;
+    if (full) { amWinX0 = x0c; amWinZ1 = z0c + 64.0f*CELLSZ;}
+    else      { amWinX0 = wantX0 < minX0 ? minX0 : (wantX0>maxX0?maxX0:wantX0); amWinZ1 = wantZ1 < minZ1 ? minZ1 : (wantZ1 > maxZ1 ? maxZ1 : wantZ1); if (maxX0 < minX0) { amWinX0 = minX0; } if (maxZ1 < minZ1) { amWinZ1 = maxZ1; } }
+    amPxPerUnit=(float)amDrawH/winW; amMapScaleX=full?(float)amDrawW/winW:amPxPerUnit; amMapScaleY=amPxPerUnit; amMapOffsetX=full ? 0.0f : (float)((AM_W - AM_H) / 2);  u8* expl=World.automapExplored[lev]; mset(amDrawPx,0,(size_t)amDrawW*amDrawH*4);/*transparent*/
     mset(amRadCells,0,sizeof(amRadCells)); mset(amElevCells,0,sizeof(amElevCells)); mset(amWedgeInst,0xFF,sizeof(amWedgeInst)); mset(amDiagCell,0,sizeof(amDiagCell));
-    if(nav>=3){/*rad triggers (nav v3+): expand bounds to overlapped cells*/
+    if (nav >= 3) {/*rad triggers (nav v3+): expand bounds to overlapped cells*/
         for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
             Entity* e=&World.instances[i]; if(e->index!=601||!(e->entflags&EF_ACTIVE)){continue;} V3 c=World.colliderCenter[i],s=World.colliderSize[i],p=World.position[i]; float x0=p.x+c.x-s.x*0.5f,x1=p.x+c.x+s.x*0.5f,z0=p.z+c.z-s.z*0.5f,z1=p.z+c.z+s.z*0.5f;
-            /*floor min, ceil max: fill touched cells*/ int ax=(int)vfloor((x0-x0c)/CELLSZ),bx=(int)vceil((x1-x0c)/CELLSZ); int az=(int)vfloor((z0-z0c)/CELLSZ),bz=(int)vceil((z1-z0c)/CELLSZ); if(ax<0){ax=0;} if(az<0){az=0;} if(bx>63){bx=63;} if(bz>63){bz=63;} for(int cz=az;cz<=bz;++cz)for(int cx=ax;cx<=bx;++cx)amRadCells[cz*64+cx]=1;
+            int ax=(int)vfloor((x0-x0c)/CELLSZ),bx=(int)vceil((x1-x0c)/CELLSZ); int az=(int)vfloor((z0-z0c)/CELLSZ),bz=(int)vceil((z1-z0c)/CELLSZ); if(ax<0){ax=0;} if(az<0){az=0;} if(bx>63){bx=63;} if(bz>63){bz=63;} for(int cz=az;cz<=bz;++cz)for(int cx=ax;cx<=bx;++cx)amRadCells[cz*64+cx]=1;
         }
     }
     for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {/*elev dest cells (706): fill every cell the elev_volume box overlaps, not just the origin cell*/
@@ -137,8 +140,6 @@ static bool amReveal() {
 }
 
 static u32 amDoorHash() {u32 h=0; for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {Entity* e=&World.instances[i]; if(IdxIsDoor(e->index)){h=h*31u+(u32)(i*7u+(u32)e->doorState);}} return h;}
-/*Wipe both map FBOs.  AutomapTick early-outs on World.menuActive, so without this the last level's map
-  pixels sit in the textures for the whole time the main menu is up.*/
 void AutomapClearRenderTargets() { if(!amReady){return;} glBindFramebuffer(GL_FRAMEBUFFER,amFBO); glClear(GL_COLOR_BUFFER_BIT); glBindFramebuffer(GL_FRAMEBUFFER,amFullFBO); glClear(GL_COLOR_BUFFER_BIT); }
 void AutomapNewGame() {mset(World.automapExplored,0,sizeof(World.automapExplored)); World.automapZoom=0; World.automapNextRaster=0.0; amBuiltLev=255; amBuiltPX=1000000000000000000000000000000.0f; amBuiltPZ=1000000000000000000000000000000.0f;}
 void AutomapOnLoad() { amBuiltLev=255; World.automapNextRaster=0.0; amBuiltPX=1000000000000000000000000000000.0f; amBuiltPZ=1000000000000000000000000000000.0f; }/*force re-raster from loaded FoW*/
@@ -148,26 +149,7 @@ void AutomapTick() {
     if(fowChanged || moved || dh!=amBuiltDoorHash || lev!=amBuiltLev || renderZoom!=amBuiltZoom || full!=amBuiltFull || now>=World.automapNextRaster){amRaster(renderZoom,full); amBuiltLev=lev; amBuiltDoorHash=dh; amBuiltZoom=renderZoom; amBuiltFull=full; amBuiltPX=tpp.x; amBuiltPZ=tpp.z; amBuiltFX=tpf.x; amBuiltFZ=tpf.z; int nav=amNavVer(); World.automapNextRaster=now+(nav>2?0:(nav>1?0.1:0.2)); glBindTexture(GL_TEXTURE_2D,full?amFullTexId:amTexId); glTexSubImage2D(GL_TEXTURE_2D,0,0,0,full?AM_FULL_W:AM_W,full?AM_FULL_H:AM_H,GL_RGBA,GL_UNSIGNED_BYTE,full?amFullPx:amPx);}
 }
 
-void AutomapBlitToUI() {
-    if (!amReady || World.menuActive || World.paused || Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE) return;
-    glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
-    for (int side=0;side<2;++side) if ((World.Sys_UI.mfdTab[1+!!side])==3) {
-        int x=side ? AMAP_UI_X_R : AMAP_UI_X_L; glBlitFramebuffer(0,AM_H,AM_W,0,x,UI_H-AMAP_UI_Y-AMAP_UI_H,x+AMAP_UI_W,UI_H-AMAP_UI_Y,GL_COLOR_BUFFER_BIT,GL_LINEAR);
-    }
-    glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
-}
-
-#define AMAP_SIDE_TEX_BASE 2153
-void AutomapSideBlitToUI(bool isRH) {
-    if(World.menuActive || World.paused || Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE){return;}
-    u8 lev=World.curLev; if(lev>=LEVEL_CYBERSPACE){return;}
-    u16 tex=(u16)(AMAP_SIDE_TEX_BASE+lev);/*slot == level, matching automapsSideImages[currentLevel]: 0=LR, 1..9, 10=G1, 11=G2, 12=G4*/
-    i16 x=(i16)(AMAP_UI_X_L+(isRH?(AMAP_UI_X_R-AMAP_UI_X_L):0)+(AMAP_UI_W-71)/2), y=(i16)(AMAP_UI_Y+(AMAP_UI_H-71)/2);
-    RenderUIImage(x,y,71,71,tex);
-}
-
 void AutomapBlitFullToUI() {
-    if(!amReady || World.menuActive || World.paused || Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE){return;}
-    if(!World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1]){return;}
+    if (!amReady || Cheats.noHUD || World.curLev>=LEVEL_CYBERSPACE || (!World.Sys_UI.fullMapOpen[0] && !World.Sys_UI.fullMapOpen[1])) { return; }
     i16 x=(i16)((UI_W-AM_FULL_W)/2),y=(i16)((UI_H-AM_FULL_H)/2); glBindFramebuffer(GL_READ_FRAMEBUFFER,amFullFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); glBlitFramebuffer(0,AM_FULL_H,AM_FULL_W,0,x,768-(y+AM_FULL_H),x+AM_FULL_W,768-y,GL_COLOR_BUFFER_BIT,GL_LINEAR); glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO);
 }

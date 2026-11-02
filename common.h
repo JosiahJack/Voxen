@@ -186,7 +186,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (96ULL * 1024 * 1024),
       /*Menu*/ MPG_FRONT = 0, MPG_SINGPLYR = 1, MPG_MULTPLYR = 2, MPG_NEWGM = 3, MPG_LOAD = 4, MPG_OPTS = 5, MPG_SAVE = 6, MPG_INTRO = 7, MPG_CREDS = 8,
       /*UI*/ UI_W = 1366, UI_H = 768, CURSOR_SZ = 40, MFD_READER_CONTENTS = 0, MFD_READER_FOLDER = 1, MFD_READER_TEXT = 2, MAX_UI_ELEMENTS = 4096, TXT_PAD = 4, TXT_H = 24, TAB_THICK = 16, MFD_SPACING = 8, MFD_SPACINGCTR = 19,
              SIDE_MFD_W = 320, CTR_MFD_W = 640, MFD_H = 240, UI_AUTOMAP_ZOOM_IN = 0, UI_AUTOMAP_ZOOM_OUT = 1, UI_AUTOMAP_FULL = 2, UI_AUTOMAP_SIDE = 3,
-      /*Automap*/ AM_W = 320, AM_H = 200, AM_FULL_W = 700, AM_FULL_H = 700, AM_MAXHULL = 10, AMAP_UI_X_L = 24, AMAP_UI_X_R = 1022, AMAP_UI_Y = 524, AMAP_UI_W = 320, AMAP_UI_H = 200, AM_XOFF = ((AM_W - AM_H) / 2),
+      /*Automap*/ AM_W = 320, AM_H = 200, AM_FULL_W = 700, AM_FULL_H = 700, AM_MAXHULL = 10,
       /*Multimedia Tabs(UI)*/ MM_EMAIL_TABLE = 0, MM_LOG_TABLE = 1, MM_DATA_TABLE = 2, MM_NOTES = 3, BIOM_ERG = 0, BIOM_CHI = 1, BIOM_ECG = 2, BIOM_GRAPH_W = 620, BIOM_GRAPH_H = 36,
       /*Rendering*/ BLEND_OPAQUE = 0, BLEND_CUTOUT = 1, BLEND_PREMULT = 2, BLEND_MULTIPLY = 3,
                     PARTICLE_FLAG_ADDITIVE = (1u<<0), PARTICLE_FLAG_SOFT = (1u<<1), PARTICLE_FLAG_LIT = (1u<<2), PARTICLE_FLAG_MULTIPLY = (1u<<3),PARTICLE_FLAG_SOFT_OCCLUDE = (1u<<4), PARTICLE_FLAG_PHYSICS = (1u<<5), PARTICLE_FLAG_TRAIL = (1u<<6), 
@@ -463,8 +463,8 @@ extern bool cullVisibilityValid,instanceIsLODArray[INSTANCE_COUNT],doubleSidedTe
 typedef struct { int width,height; u8* pixels; } WinSysIcon;
 RaycastHit Raycast(V3,V3,float,u32); u16 EditModePickLight(V3,V3,float,float*); V3 ScreenPointToRay(V3,V3),ScreenPointToRayPixels(V3,V3,float,float); void SpawnImpactEffectParticle(u16,V3,V3),SpawnBeamTrail(u16,V3,V3,Color),DrawCrossedLine(V3,V3,V3,float,Color),SpawnTargetingLaser(V3,V3),ProjectileEffectImpactOnCollision(u16,u16,V3,V3),ProjectileEffectImpactInitAfterLoad(u16),SpawnProjectileImpactParticles(u16,V3,V3); u8 GetCurrentLevelSecurity(),*PngLoad(const u8*,int,int*,int*,PngArena*);
 u16 AddInstance(u16,V3),SpawnDynamicObject(int),GetCursorTexture(),DoorFrameFromProgress(AnimationClip,float);
-void AutomapTick(), AutomapBlitToUI(), AutomapSideBlitToUI(bool), AutomapNewGame(), AutomapOnLoad(), AutomapClearRenderTargets();
-void DrawSphereWireframe(Color,ShapeSphere), BioMonitorClearGraphs(), BioMonitorAlignCursors(), RequestClearRenderTargets();
+void AutomapTick(), AutomapNewGame(), AutomapOnLoad(), AutomapClearRenderTargets();
+void DrawSphereWireframe(Color,ShapeSphere), BioMonitorClearGraphs(), BioMonitorAlignCursors();
 void CyberSwitchInitAfterLoad(u16), synth_set_reverb_preset(u16), MFD_ResetGeneral();
 bool HudHeatTickOn(int);
 double get_time();
