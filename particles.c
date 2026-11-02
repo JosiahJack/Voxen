@@ -194,95 +194,56 @@ const PSysDef particleTypeDefs[190] = {
     /** ef_diego_teleport (npc_cyborg_diego teleportFX) */ {.pos=(V3){0},.textureCount=1,.textures=(const u16[1]){67},.emitRate=10000.f,.duration=.1f,.sizeMin=.015f,.sizeMax=.015f,.speedMin=0.f,.speedMax=0.f,.lifetimeMin=.2f,.lifetimeMax=.3f,.gravity=0.f,.animWindow=1.f,.softness=1.f,.shapeRadius=1.f,.shapeAngle=25.f,.shapeType=0,.colStart=(Color){.5849056f,.4441972f,.4520144f,1.f},.colEnd=(Color){.4150943f,.0411178f,.0560769f,0.f},.rampColors=(const Color[3]){(Color){.5849056f,.4441972f,.4520144f,1.f},(Color){.4150943f,.0411178f,.0560769f,1.f},(Color){.4150943f,.0411178f,.0560769f,0.f}},.rampTimes=(const float[3]){0.f,.5f,1.f},.rampCount=3,.blendMode=1,.blendModeOverride=true,.useMesh=1},
 };
 const PSysDef* PSysTypeGet(u16 index) { return index < 190u ? &particleTypeDefs[index] : 0; }
-INLINE u32 pack_rgba8(float r, float g, float b, float a) { return (((u32)(vclamp(a,0,1.f)*255.0f + .5f)) << 24) | (((u32)(vclamp(b,0,1.f)*255.0f + .5f)) << 16) | (((u32)(vclamp(g,0,1.f)*255.0f + .5f)) << 8) | ((u32)(vclamp(r,0,1.f)*255.0f + .5f)); }
-INLINE void unpack_rgba8(u32 p, float* r, float* g, float* b, float* a) { *r = (float)((p >> 0) & 0xFF)/255.0f; *g = (float)((p >> 8) & 0xFF)/255.0f; *b = (float)((p >> 16) & 0xFF)/255.0f; *a = (float)((p >> 24) & 0xFF)/255.0f; }
+INLINE u32 pack_rgba8(float r, float g, float b, float a) { return (((u32)(vclamp(a,0,1.0f)*255.0f + 0.5f)) << 24) | (((u32)(vclamp(b,0,1.0f)*255.0f + 0.5f)) << 16) | (((u32)(vclamp(g,0,1.0f)*255.0f + 0.5f)) << 8) | ((u32)(vclamp(r,0,1.0f)*255.0f + 0.5f)); }
+INLINE void unpack_rgba8(u32 p, float* r, float* g, float* b, float* a) { *r = (float)((p >> 0) & 0xFF) / 255.0f; *g = (float)((p >> 8) & 0xFF) / 255.0f; *b = (float)((p >> 16) & 0xFF) / 255.0f; *a = (float)((p >> 24) & 0xFF) / 255.0f; }
 INLINE u32 ColorToU32(Color c) { return pack_rgba8(c.r, c.g, c.b, c.a); }
 INLINE void build_color_ramp(Emitter* e, const Color* c, const float* d, int n) {for(int i=0;i<64;++i){float t=(float)i/63.0f; int k=0; while(k<n-1&&d[k+1]<=t){k++;} if (k>=n-1){e->colorRamp[i]=ColorToU32(c[n-1]);}else{float a=(t-d[k])/(d[k+1]-d[k]); Color c0=c[k],c1=c[k+1]; e->colorRamp[i]=pack_rgba8(c0.r+(c1.r-c0.r)*a,c0.g+(c1.g-c0.g)*a,c0.b+(c1.b-c0.b)*a,c0.a+(c1.a-c0.a)*a);}}}
 INLINE void build_curve(float* curve, const float* keys, const float* times, int numKeys) { for (int i=0;i<32;++i){float t=(float)i/31.0f; int k=0; while(k<numKeys-1 && times[k+1]<=t){k++;} if(k>=numKeys-1){curve[i]=keys[numKeys-1];}else{float localT=(t-times[k])/(times[k+1]-times[k]); curve[i]=keys[k]+(keys[k+1]-keys[k])*localT;}} }
 INLINE u32 sample_color_ramp(Emitter* em, float t) { int idx = (int)(t * 63.0f); if (idx < 0) idx = 0; if (idx >= 64) idx = 63; return em->colorRamp[idx]; }
 INLINE float sample_curve(const float* curve, float t) { int idx = (int)(t * 31.0f); if (idx < 0) idx = 0; if (idx >= 31) return curve[31]; float localT = t * 31.0f - idx; return curve[idx] + (curve[idx + 1] - curve[idx]) * localT; }
 static bool PSysLevelOwnsEmitter(u16 emitter) { if (!World.particles) return false; for (u16 i = 0; i < World.particles->count; ++i) if (World.particles->emitters[i] == emitter) return true; return false; }
-static void PSysCompactLevelList(void) {
-    LevelParticles* list = World.particles; if (!list) return;
-    
-    u16 out = 0;
-    for (u16 i = 0; i < list->count; ++i) {
-        u16 emitter = list->emitters[i];
-        if (emitter < MAX_EMITTERS && (psys.emitters[emitter].active || psys.emitters[emitter].aliveCount)) list->emitters[out++] = emitter;
-    }
-    list->count = out;
-}
-
+static void PSysCompactLevelList(void) { u16 out = 0; for (u16 i=0;i<World.particles->count;++i) { u16 emitter = World.particles->emitters[i]; if (emitter < MAX_EMITTERS && (psys.emitters[emitter].active || psys.emitters[emitter].aliveCount)) World.particles->emitters[out++] = emitter; } World.particles->count = out; }
 void PSysClearLevel(u8 level) {
-    if (level >= MAX_LEVELS) return;
-    LevelParticles* list = &World.levelParticles[level];
-    if (list->count > MAX_LEVEL_PARTICLES) list->count = MAX_LEVEL_PARTICLES;
-    for (u16 i = 0; i < list->count; ++i) {
-        u16 emitterIndex = list->emitters[i]; if (emitterIndex >= MAX_EMITTERS) continue;
-        
-        Emitter* em = &psys.emitters[emitterIndex];
-        u32 out = 0;
-        for (u32 p = 0; p < psys.aliveCount; ++p) {
-            if (psys.particles[p].emitterIndex == emitterIndex) continue;
-            
-            if (out != p) psys.particles[out] = psys.particles[p];
-            out++;
+    if (level < MAX_LEVELS) {
+        if (World.levelParticles[level].count > MAX_LEVEL_PARTICLES) World.levelParticles[level].count = MAX_LEVEL_PARTICLES;
+        for (u16 i=0;i<World.levelParticles[level].count;++i) {
+            u16 emitterIndex = World.levelParticles[level].emitters[i];
+            if (emitterIndex < MAX_EMITTERS) {
+                u32 out = 0;      for (u32 p=0;p<psys.aliveCount;++p) { if (      psys.particles[p].emitterIndex != emitterIndex) { if (     out != p) { psys.particles[out]          = psys.particles[p];     }      out++; } }    psys.aliveCount = out;
+                u32 trailOut = 0; for (u32 t=0;t<psys.trailCount;++t) { if ((psys.trailSegments[t].uvData >> 16) != emitterIndex) { if (trailOut != t) { psys.trailSegments[trailOut] = psys.trailSegments[t]; } trailOut++; } }    psys.trailCount = trailOut;
+                psys.emitters[emitterIndex].active = false; psys.emitters[emitterIndex].aliveCount = 0;
+            }
         }
-        psys.aliveCount = out;
-        u32 trailOut = 0;
-        for (u32 t = 0; t < psys.trailCount; ++t) {
-            if ((psys.trailSegments[t].uvData >> 16) == emitterIndex) continue;
-            
-            if (trailOut != t) psys.trailSegments[trailOut] = psys.trailSegments[t];
-            trailOut++;
-        }
-        psys.trailCount = trailOut;
-        em->active = false;
-        em->aliveCount = 0;
-    }
-    list->count = 0;
-}
-
-void PSysAddLevelLoops(void) {
-    if (!World.particles) return;
-    for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) {
-        u16 type;
-        switch (World.instances[i].index) {
-            case 720: type = 7; break;
-            case 733: type = 45; break;
-            case 734: type = 47; break;
-            default: continue;
-        }
-        const PSysDef* preset = PSysTypeGet(type);
-        if (!preset) continue;
-        PSysDef def = *preset;
-        def.pos = World.position[i];
-        def.rotation = World.rotation[i];
-        PSysAdd(&def);
+        World.levelParticles[level].count = 0;
     }
 }
 
-static u16 PSysAddInternal(const PSysDef*, u16 meshInstance, u16 parentIdx);
-u16 PSysAdd(const PSysDef* pd) { return PSysAddEx(pd, U16_MAX); }
-u16 PSysAddEx(const PSysDef* pd, u16 meshInstance) { return PSysAddInternal(pd, meshInstance, U16_MAX); }
-u16 PSysAddFollow(const PSysDef* pd, u16 instance) { return PSysAddInternal(pd, U16_MAX, instance); }
-static u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx) {
+u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx) {
     PSysDef def=*pd; if(def.trail && def.trailTexture>=MAXTEX){def.trailTexture=881u;}
     LevelParticles* list = World.particles;
-    if (!list || list->count >= MAX_LEVEL_PARTICLES) return U16_MAX;
+    if (list->count >= MAX_LEVEL_PARTICLES) return U16_MAX;
     for (u16 i = 0; i < MAX_EMITTERS; i++) {
-        if (psys.emitters[i].active || psys.emitters[i].aliveCount){continue;} Emitter* em=&psys.emitters[i]; u16 fc=def.textureCount; u32 baseTex=fc ? def.textures[0] : 0; if(fc == 0){fc=1;} em->active=true; em->looping=def.looping; em->position = def.pos; float rotationLength = def.rotation.x*def.rotation.x + def.rotation.y*def.rotation.y + def.rotation.z*def.rotation.z + def.rotation.w*def.rotation.w; if (rotationLength < 0.000001f) { em->orientation = QUAT_IDENTITY; } else { float invRotationLength = 1.0f/vsqrtf(rotationLength); em->orientation = (Quaternion){def.rotation.x*invRotationLength,def.rotation.y*invRotationLength,def.rotation.z*invRotationLength,def.rotation.w*invRotationLength}; } em->emitAccumulator=em->age=0; em->emitRate = def.emitRate; em->duration = def.duration; em->aliveCount = 0;
-        em->physicsMode=(def.gravity != 0) ? 1 : 0; em->trail=def.trail; em->shapeType=def.shapeType; em->useMesh=def.useMesh; em->parentIdx=parentIdx; if (em->parentIdx!=U16_MAX) em->meshInstance=U16_MAX; else em->meshInstance=meshInstance; em->meshModelIdx=(def.useMesh&&meshInstance<INSTANCE_COUNT)?World.instances[meshInstance].modelIndex:U16_MAX;/*emitters are recycled, so these three are always rewritten, never left stale*/ em->colorMode=def.colorMode; em->burstRemaining=def.burstCount; em->shapeRadius=def.shapeRadius; em->shapeAngle=def.shapeAngle; em->trailTexture = (u16)(def.trailTexture & 0xFFFFu); em->lifetimeMin=def.lifetimeMin>0.0f ? def.lifetimeMin : 0.5f; em->lifetimeMax=def.lifetimeMax>0 ? def.lifetimeMax : 2.0f; if(em->lifetimeMax <= em->lifetimeMin){em->lifetimeMax=em->lifetimeMin + 0.01f;}
+        if (psys.emitters[i].active || psys.emitters[i].aliveCount){continue;}
+        
+        Emitter* em=&psys.emitters[i]; u16 fc=def.textureCount; u32 baseTex=fc ? def.textures[0] : 0; if(fc == 0){fc=1;} em->active=true; em->looping=def.looping; em->position = def.pos; float rotationLength = def.rotation.x*def.rotation.x + def.rotation.y*def.rotation.y + def.rotation.z*def.rotation.z + def.rotation.w*def.rotation.w;
+        if (rotationLength < 0.000001f) { em->orientation = QUAT_IDENTITY; } else { float invRotationLength = 1.0f/vsqrtf(rotationLength); em->orientation = (Quaternion){def.rotation.x*invRotationLength,def.rotation.y*invRotationLength,def.rotation.z*invRotationLength,def.rotation.w*invRotationLength}; } em->emitAccumulator=em->age=0; em->emitRate = def.emitRate; em->duration = def.duration; em->aliveCount = 0;
+        em->physicsMode=(def.gravity != 0) ? 1 : 0; em->trail=def.trail; em->shapeType=def.shapeType; em->useMesh=def.useMesh; em->parentIdx=parentIdx;
+        if (em->parentIdx!=U16_MAX) em->meshInstance=U16_MAX;
+        else em->meshInstance=meshInstance;
+        em->meshModelIdx=(def.useMesh&&meshInstance<INSTANCE_COUNT)?World.instances[meshInstance].modelIndex:U16_MAX;
+        em->colorMode=def.colorMode; em->burstRemaining=def.burstCount; em->shapeRadius=def.shapeRadius; em->shapeAngle=def.shapeAngle; em->trailTexture = (u16)(def.trailTexture & 0xFFFFu); em->lifetimeMin=def.lifetimeMin>0.0f ? def.lifetimeMin : 0.5f; em->lifetimeMax=def.lifetimeMax>0 ? def.lifetimeMax : 2.0f; if(em->lifetimeMax <= em->lifetimeMin){em->lifetimeMax=em->lifetimeMin + 0.01f;}
         em->sizeMin=def.sizeMin; em->sizeMax=def.sizeMax; em->speedMin = def.speedMin; em->speedMax = def.speedMax;
         bool spins=def.rotationMode != 1 && def.rotCount >= 1;
         em->rotMin=0.0f; em->rotMax=spins ? 6.2831853f : 0.0f; em->aVelMin=spins ? def.rotKeys[0] : 0.0f; em->aVelMax=em->aVelMin; em->gravity=def.gravity; em->trailLifetime=def.trailLifetime>0.0f ? def.trailLifetime : 1.0f;
-        em->trailColorStart=ColorToU32(def.trailColorStart); em->trailColorEnd=ColorToU32(def.trailColorEnd); em->trailWidthStart=def.trailWidthStart>0 ? def.trailWidthStart : 0.05f; em->trailWidthEnd=(def.trailWidthEnd>0) ? def.trailWidthEnd : em->trailWidthStart; em->texBaseIdx=baseTex; em->textureFrameCount = fc; em->blendMode = def.blendModeOverride ? def.blendMode : particleBlendTexture[baseTex]; em->trailVertexDistance = def.trailVertexDistance > 0.0f ? def.trailVertexDistance : 0.02f;
+        em->trailColorStart=ColorToU32(def.trailColorStart); em->trailColorEnd=ColorToU32(def.trailColorEnd); em->trailWidthStart=def.trailWidthStart>0 ? def.trailWidthStart : 0.05f; em->trailWidthEnd=(def.trailWidthEnd>0) ? def.trailWidthEnd : em->trailWidthStart; em->texBaseIdx=baseTex; em->textureFrameCount = fc; em->blendMode = def.blendModeOverride ? def.blendMode : particleBlendTexture[baseTex];
+        em->trailVertexDistance = def.trailVertexDistance > 0.0f ? def.trailVertexDistance : 0.02f;
         em->animWindow=def.animWindow>0 ? def.animWindow : 1.0f; em->softness=def.softness>0 ? def.softness : 1.0f; for(int c=0;c<32;++c){em->scaleCurve[c]=1.0f; em->velocityCurve[c]=1.0f; em->rotationCurve[c]=0; em->emissionCurve[c] = 1.0f; }
         if(def.rampCount >= 2){build_color_ramp(em,def.rampColors,def.rampTimes,def.rampCount);}else{Color cc[2]={def.colStart,def.colEnd}; float tt[2]={0,1.0f}; build_color_ramp(em,cc,tt,2);} if(def.scaleCount >= 2){build_curve(em->scaleCurve,def.scaleKeys,def.scaleTimes,def.scaleCount);}
         if(def.velCount >= 2){build_curve(em->velocityCurve,def.velKeys,def.velTimes,def.velCount);} if(def.rotCount >= 2){build_curve(em->rotationCurve,def.rotKeys,def.rotTimes,def.rotCount);} if(def.emissCount >= 2){build_curve(em->emissionCurve,def.emissKeys,def.emissTimes,def.emissCount);} list->emitters[list->count++] = i; return i;
     } return U16_MAX;
 }
 
+void PSysAddLevelLoops(void) { for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { u16 type; switch (World.instances[i].index) { case 720: type = 7; break; case 733: type = 45; break; case 734: type = 47; break; default: continue; } const PSysDef *preset = PSysTypeGet(type); if (!preset) continue; PSysDef def = *preset; def.pos = World.position[i]; def.rotation = World.rotation[i]; PSysAddInternal(&def,U16_MAX,U16_MAX); } }
 INLINE int trail_cmp(const void* a, const void* b){TrlSegInst* ta=(TrlSegInst*)a; TrlSegInst* tb=(TrlSegInst*)b; float ax=(ta->p0x+ta->p1x)*0.5f-trailSortCam.x,ay=(ta->p0y+ta->p1y)*0.5f-trailSortCam.y,az=(ta->p0z+ta->p1z)*0.5f-trailSortCam.z,bx=(tb->p0x+tb->p1x)*0.5f-trailSortCam.x,by=(tb->p0y+tb->p1y)*0.5f-trailSortCam.y,bz=(tb->p0z+tb->p1z)*0.5f-trailSortCam.z; float da=ax*ax+ay*ay+az*az,db=bx*bx+by*by+bz*bz; return da>db?-1:(da<db?1:0);}
 void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForward, u32 depthTex, float near, float far, float viewW, float viewH) {
     if (psys.aliveCount > 0) {
@@ -313,12 +274,16 @@ void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForwar
         for (u32 i = 0; i < psys.trailCount; i++) {
             TrlSegInst* a = &psys.trailSegments[i]; 
             for (u32 j = 0; j < psys.trailCount; j++) {
-                if (j == i){continue;} TrlSegInst* b=&psys.trailSegments[j]; if (a->trailOwner != b->trailOwner){continue;}/*only weld within the same particle's own chain*/ if (((a->uvData>>16)&0xFFFFu) != ((b->uvData>>16)&0xFFFFu)){continue;} if (b->chainIndex != a->chainIndex + 1){continue;}/*unambiguous adjacency: b is the segment immediately newer than a*/
+                if (j == i){continue;}
+                TrlSegInst* b=&psys.trailSegments[j]; if (a->trailOwner != b->trailOwner){continue;}
+                if (((a->uvData>>16)&0xFFFFu) != ((b->uvData>>16)&0xFFFFu)){continue;}
+                if (b->chainIndex != a->chainIndex + 1){continue;}
+                
                 a->c10x = b->c00x = (a->c10x + b->c00x) * 0.5f; a->c10y = b->c00y = (a->c10y + b->c00y) * 0.5f; a->c10z = b->c00z = (a->c10z + b->c00z) * 0.5f; a->c11x = b->c01x = (a->c11x + b->c01x) * 0.5f; a->c11y = b->c01y = (a->c11y + b->c01y) * 0.5f; a->c11z = b->c01z = (a->c11z + b->c01z) * 0.5f;
             }
         }
         trailSortCam=camPos; if(psys.trailCount > 1){qsort_new(psys.trailSegments,psys.trailCount,sizeof(TrlSegInst),trail_cmp);} glUseProgram(trailSP); glBindVertexArray(psysquadVAO); glBindBufferBase(GL_SSBO,11,psysTrailsID);
-        glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glBufferSubData(GL_SSBO,0,psys.trailCount * sizeof(TrlSegInst), psys.trailSegments); glEnable(GL_BLEND); glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);/*trail_frag.glsl emits premultiplied rgb, so the batch adds its glow and still lets the background show through as alpha falls off; for the default mode this is algebraically identical to the old straight-alpha pairing*/ glDepthMask(GL_FALSE); glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDisable(GL_CULL_FACE);
+        glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glBufferSubData(GL_SSBO,0,psys.trailCount * sizeof(TrlSegInst), psys.trailSegments); glEnable(GL_BLEND); glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE); glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL); glDisable(GL_CULL_FACE);
         glDrawArraysInstanced(GL_TRIANGLE_STRIP,0,4,psys.trailCount); drawCalls++; vertsRendered += psys.trailCount * 4; glEnable(GL_CULL_FACE); glDepthMask(GL_TRUE); glDisable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDepthFunc(GL_LESS);
     }
 }
@@ -326,27 +291,28 @@ void PSys_Render(float* viewProj, V3 camPos, V3 camRight, V3 camUp, V3 camForwar
 INLINE int sort_cmp(const void* a, const void* b) { u32 ka = ((const PartSortEntry*)a)->sortKey; u32 kb = ((const PartSortEntry*)b)->sortKey; return (ka > kb) - (ka < kb); }
 void PSys_Update(float dt) {
     if (!World.particles) { psys.aliveCount = 0; psys.trailCount = 0; return; }
+    
     if (World.particles->count > MAX_LEVEL_PARTICLES) World.particles->count = MAX_LEVEL_PARTICLES;
     PSysCompactLevelList();
     float now=(float)World.pauseRelativeTime; u32 out=0; for(u32 i=0;i<psys.trailCount;++i){TrlSegInst* s=&psys.trailSegments[i]; if(s->deathTime > now && PSysLevelOwnsEmitter((u16)(s->uvData >> 16))){if(out!=i){psys.trailSegments[out]=*s;} out++;}} psys.trailCount=out;/*Prune trails*/
     for (u16 i = 0; i < MAX_EMITTERS; i++) {/*Update emitters*/
-        if (!PSysLevelOwnsEmitter(i)) continue; Emitter* em = &psys.emitters[i]; if(!em->active){continue;}
+        if (!PSysLevelOwnsEmitter(i)) continue;
+        Emitter* em = &psys.emitters[i]; if(!em->active){continue;}
+        
         if (em->parentIdx != U16_MAX) {
             if (em->parentIdx >= World.instCount || !(World.instances[em->parentIdx].entflags & EF_ACTIVE)) {
-                em->active = false;
-                u32 keep = 0;
+                em->active = false; u32 keep = 0;
                 for (u32 r = 0; r < psys.aliveCount; ++r) { if (psys.particles[r].emitterIndex != i) { psys.particles[keep++] = psys.particles[r]; } }
-                em->aliveCount = 0;
-                psys.aliveCount = keep;
+                em->aliveCount = 0; psys.aliveCount = keep;
                 continue;
             }
             V3 moved = V3_AsubB(World.position[em->parentIdx], em->position);
-            if (moved.x || moved.y || moved.z) {
-                for (u32 p = 0; p < psys.aliveCount; ++p) { Particle* pp = &psys.particles[p]; if (pp->emitterIndex == i) { pp->pos = V3_AplusB(pp->pos, moved); } }
-            }
+            if (moved.x || moved.y || moved.z) { for (u32 p = 0; p < psys.aliveCount; ++p) { Particle* pp = &psys.particles[p]; if (pp->emitterIndex == i) { pp->pos = V3_AplusB(pp->pos, moved); } } }
             em->position = World.position[em->parentIdx];
         }
-        em->age+=dt; if(em->duration > 0.0f&& em->age>=em->duration){em->active=false; continue;} int count=0; if(em->burstRemaining){count=em->burstRemaining; em->burstRemaining=0; em->emitAccumulator=0.0f;} else { float rate = em->emitRate; if (em->duration > 0.0f && em->duration < 1000000.0f){rate*=sample_curve(em->emissionCurve,em->age/em->duration);} em->emitAccumulator+=rate*dt; count=(int)em->emitAccumulator; em->emitAccumulator-=(float)count; }
+        em->age+=dt; if(em->duration > 0.0f&& em->age>=em->duration){em->active=false; continue;}
+        
+        int count=0; if(em->burstRemaining){count=em->burstRemaining; em->burstRemaining=0; em->emitAccumulator=0.0f;} else { float rate = em->emitRate; if (em->duration > 0.0f && em->duration < 1000000.0f){rate*=sample_curve(em->emissionCurve,em->age/em->duration);} em->emitAccumulator+=rate*dt; count=(int)em->emitAccumulator; em->emitAccumulator-=(float)count; }
         for (int p = 0; p < count; p++) {
             if ((psys.aliveCount >= MAX_PARTICLES) || (em->aliveCount >= 2000)){break;} Particle* part = &psys.particles[psys.aliveCount]; float angle = random_range(0.0f,6.2831853f), speed = random_range(em->speedMin,em->speedMax); V3 dir; u16 mdl = U16_MAX; if (em->useMesh && em->meshInstance < INSTANCE_COUNT) { u16 cur = World.instances[em->meshInstance].modelIndex; mdl = (cur < MAX_MDLS && physPos[cur] && physVertCounts[cur]) ? cur : em->meshModelIdx; if (mdl >= MAX_MDLS || !physPos[mdl] || !physVertCounts[mdl]) mdl = U16_MAX; } const float* Mp = (mdl != U16_MAX) ? &modelMatrices[em->meshInstance*16] : NULL;
             if (Mp) { const float* vp = physPos[mdl] + (u32)random_range_u32(0u,physVertCounts[mdl]-1u)*3u; part->pos = (V3){Mp[0]*vp[0]+Mp[4]*vp[1]+Mp[8]*vp[2]+Mp[12],Mp[1]*vp[0]+Mp[5]*vp[1]+Mp[9]*vp[2]+Mp[13],Mp[2]*vp[0]+Mp[6]*vp[1]+Mp[10]*vp[2]+Mp[14]}; dir = (V3){0};/*the vertex is the whole spawn position; velocity comes out zero because speedMin==speedMax==0*/ }

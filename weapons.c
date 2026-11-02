@@ -136,11 +136,12 @@ static const struct { u16 prefab; u8 type; } impactEffectTypes[] = {
 
 bool SpawnImpactParticleForPrefab(u16 prefab, V3 pos, V3 normal) {
     u16 type=ImpactParticleType(prefab); const PSysDef* preset=PSysTypeGet(type); if (!preset) return false;
-    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def);
+    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAddInternal(&def,U16_MAX,U16_MAX);
     for (u32 i = 0; i < sizeof(impactEffectTypes)/sizeof(*impactEffectTypes); ++i) {
         if (impactEffectTypes[i].prefab != prefab || impactEffectTypes[i].type == type) continue;
         const PSysDef* cd = PSysTypeGet(impactEffectTypes[i].type); if (!cd) continue;
-        PSysDef cdef = *cd; cdef.pos = def.pos; cdef.rotation = def.rotation; PSysAdd(&cdef);
+        
+        PSysDef cdef = *cd; cdef.pos = def.pos; cdef.rotation = def.rotation; PSysAddInternal(&cdef,U16_MAX,U16_MAX);
     }
     return true;
 }
@@ -165,38 +166,21 @@ void SpawnBeamTrail(u16 presetType, V3 from, V3 to, Color c) {
         def.velKeys=(const float[]){1,0}; def.velTimes=(const float[]){0,1}; def.velCount=2;
         def.trailColorStart=c; def.trailColorEnd=c;
         Color colors[16]; for (int i=0;i<16;++i) colors[i]=c; def.rampColors=colors;
-        def.emitRate=0.0f; def.burstCount=1; def.duration=life+0.05f; PSysAdd(&def);
+        def.emitRate=0.0f; def.burstCount=1; def.duration=life+0.05f; PSysAddInternal(&def,U16_MAX,U16_MAX);
     }
 }
 void SpawnTargetingLaser(V3 from, V3 to) { SpawnBeamTrail(167,from,to,(Color){1.0f,0.15f,0.18f,1.0f}); }
-static const struct { u16 proj; u8 type; } projectileImpactTypes[] = {
-    { 481, 177 },                                                   /* proj_enemshot2: impact_enemshot2 */
-    { 482, 169 }, { 482, 170 },                                     /* magpulse: magpulse_center, sparks_spits */
-    { 483, 171 }, { 483, 182 },                                     /* stungun: stungun_impacts, sparkssmall */
-    { 484, 172 }, { 484, 173 }, { 484, 174 }, { 484, 175 },         /* railgun: root, centerumbra, shockwave, smoke */
-    { 485, 176 }, { 485, 183 },                                     /* plasma: plasmarifle_hit, sparkssmall */
-    { 486, 181 }, { 486, 173 }, { 486, 182 }, { 486, 174 },         /* enemshot6: root, centerumbra, sparkssmall, shockwave */
-    { 487, 180 },                                                   /* enemshot5: the one AlphaBlend emitter in the game */
-    { 488, 178 }, { 488, 179 },                                     /* enemshot4: root, particle_spits */
-    { 489, 182 },                                                   /* proj_throwingstar: PoolType.SparksSmall */
-    { 490, 169 }, { 490, 170 },                                     /* magpulsenpc: same pool as 482 */
-    { 491, 172 }, { 491, 173 }, { 491, 174 }, { 491, 175 },         /* railnpc: same pool as 484 */
-};
-static u16 ProjectileImpactParticleType(u16 projectile) {
-    for (u32 i = 0; i < sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes); ++i) {
-        if (projectileImpactTypes[i].proj == projectile) return projectileImpactTypes[i].type;
-    }
-    return U16_MAX;
-}
+static const struct { u16 proj; u8 type; } projectileImpactTypes[] = { { 481, 177 }/* proj_enemshot2: impact_enemshot2 */, { 482, 169 }, { 482, 170 }/* magpulse: magpulse_center, sparks_spits */, { 483, 171 }, { 483, 182 }/* stungun: stungun_impacts, sparkssmall */, { 484, 172 }, { 484, 173 }, { 484, 174 }, { 484, 175 }/* railgun: root, centerumbra, shockwave, smoke */, { 485, 176 }, { 485, 183 }/* plasma: plasmarifle_hit, sparkssmall */,
+                                                                       { 486, 181 }, { 486, 173 }, { 486, 182 }, { 486, 174 }/* enemshot6: root, centerumbra, sparkssmall, shockwave */, { 487, 180 }/* enemshot5: the one AlphaBlend emitter in the game */, { 488, 178 }, { 488, 179 }/* enemshot4: root, particle_spits */, { 489, 182 }/* proj_throwingstar: PoolType.SparksSmall */, { 490, 169 }, { 490, 170 }/* magpulsenpc: same pool as 482 */,
+                                                                       { 491, 172 }, { 491, 173 }, { 491, 174 }, { 491, 175 }/* railnpc: same pool as 484 */};
+static u16 ProjectileImpactParticleType(u16 projectile) { for (u32 i = 0; i < sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes); ++i) { if (projectileImpactTypes[i].proj == projectile) return projectileImpactTypes[i].type; } return U16_MAX; }
 void SpawnProjectileImpactParticles(u16 projectile,V3 pos,V3 normal) {
-    u16 type=ProjectileImpactParticleType(projectile); const PSysDef* preset=PSysTypeGet(type); if(!preset)return;
-    PSysDef def=*preset; def.pos=V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation=QuatFromToRotation((V3){0,1,0},normal); PSysAdd(&def);
-    for (u32 i = 0; i < sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes); ++i) {
-        if (projectileImpactTypes[i].proj != projectile || projectileImpactTypes[i].type == type) continue;
-        const PSysDef* cd=PSysTypeGet(projectileImpactTypes[i].type); if (!cd) continue;
-        PSysDef cdef=*cd; cdef.pos=def.pos; cdef.rotation=def.rotation; PSysAdd(&cdef);
-    }
+    u16 type = ProjectileImpactParticleType(projectile); const PSysDef* preset = PSysTypeGet(type); if(!preset)return;
+    
+    PSysDef def = *preset; def.pos = V3_AplusB(pos,V3_ScaleByF(normal,wfx.hitOffset-0.08f)); def.rotation = QuatFromToRotation((V3){0,1,0},normal); PSysAddInternal(&def,U16_MAX,U16_MAX);
+    for (u32 i=0;i<sizeof(projectileImpactTypes)/sizeof(*projectileImpactTypes);++i) { if (projectileImpactTypes[i].proj == projectile && projectileImpactTypes[i].type != type) { const PSysDef* cd=PSysTypeGet(projectileImpactTypes[i].type); if (cd) { PSysDef cdef = *cd; cdef.pos = def.pos; cdef.rotation = def.rotation; PSysAddInternal(&cdef,U16_MAX,U16_MAX); } } }
 }
+
 static bool DidRayHit(int wep16){wfx.tempHitEnt=0xFFFF;float d=driftForWeapon[wep16];V3 dir=ScreenPointToRayPixels(World.instances[PLAYER1].forward,World.instances[PLAYER1].right,random_range(-d,d),random_range(-d,d));RaycastHit h=Raycast(World.position[PLAYER1],dir,wfx.fireDistance,LMASK_PLAYER_ATTACK);wfx.tempHit=h;if(h.hit){wfx.tempHitEnt=h.hitInstanceIndex;return true;}return false;}
 static const float bulletHoleSize[6] = {0.06f,0.2f,0.1f,0.04f,0.15f,0.3f};
 void CreateStandardImpactMarks(int wep16) {
@@ -302,19 +286,6 @@ void FireMelee(int wep16, bool isRapier, bool silent, u16 hitSnd, u16 missSnd, u
 
 void FireRapier(int wep16) { FireMelee(wep16, true,  false, 246, 247, 246); } // wlaserrapier_hit/swing
 void FirePipe(int wep16)   { FireMelee(wep16, false, false, 253, 254, 252); } // wpipe_hit/swing/dmg
-static void AttachProjectileRibbon(u16 prefabID, u16 ball) {
-    static const struct { u16 prefab, root, child; } ribbons[] = {
-        { 482, 154, 155      }, /* proj_magpulse_shot:    bolt glow + sparks_spits */
-        { 490, 154, 155      }, /* proj_magpulsenpc_shot: same pair */
-        { 485, 156, U16_MAX },  /* proj_plasmarifle_shot: plasma core, no child emitter   */
-        { 483, 159, U16_MAX },  /* proj_stungun_shot:     same pairing, not yet audited   */
-    };
-    for (u32 i = 0; i < sizeof(ribbons)/sizeof(*ribbons); ++i) {
-        if (ribbons[i].prefab != prefabID) continue;
-        if (ribbons[i].root != U16_MAX) { const PSysDef* root=PSysTypeGet(ribbons[i].root); if (root) { PSysDef d=*root; d.pos=World.position[ball]; PSysAddFollow(&d,ball); } }
-        if (ribbons[i].child != U16_MAX) { const PSysDef* ch=PSysTypeGet(ribbons[i].child); if (ch) { PSysDef d=*ch; d.pos=World.position[ball]; PSysAddFollow(&d,ball); } }
-    }
-}
 void FireBeachball(int wep16, float shoveForce, u16 prefabID) { // Acts like a beachball for NPC collisions, but a baseball for walls/floor (prevents corner-catching); handled by the projectile's own collider setup.
     u16 ball = SpawnDynamicObject(prefabID); if (!EntIdxIsValid(ball)) return;
     Entity* proj = &World.instances[ball]; u16 wc = World.invP1.wepCur; bool alt = World.invP1.wepLoadedWithAlternate[wc];
@@ -323,19 +294,22 @@ void FireBeachball(int wep16, float shoveForce, u16 prefabID) { // Acts like a b
     V3 spawn = World.position[PLAYER1];
     World.position[ball] = spawn; World.velocity[ball] = (V3){0}; // clear any stale velocity before the impulse
     AddForce(ball, V3_ScaleByF(proj->forward, shoveForce), true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
-    AttachProjectileRibbon(prefabID, ball);
+    static const struct {u16 prefab,root,child;} ribbons[] = { {482,154,155}/*proj_magpulse_shot*/, {490,154,155}/*proj_magpulsenpc_shot*/, {485,156,U16_MAX}/*proj_plasmarifle_shot*/, {483,159,U16_MAX}/*proj_stungun_shot*/ };
+    for (u32 i=0;i<sizeof(ribbons)/sizeof(*ribbons);++i) { if (ribbons[i].prefab == prefabID) { const PSysDef* root = &particleTypeDefs[ribbons[i].root]; PSysDef d = *root; d.pos = World.position[ball]; PSysAddInternal(&d,U16_MAX,ball); if (ribbons[i].child != U16_MAX) { const PSysDef* ch = &particleTypeDefs[ribbons[i].child]; PSysDef dc = *ch; dc.pos = World.position[ball]; PSysAddInternal(&dc,U16_MAX,ball); } } }
 }
+
 void FireCyberBeachball(bool isPulser, float shoveForce, u16 prefabID) { // Same beachball/baseball split, but damage and attack type come from the held cyber software version
     u16 ball = SpawnDynamicObject(prefabID); if (!EntIdxIsValid(ball)) return;
     Entity* proj = &World.instances[ball];
     World.layer[ball] = L_PlayerBullets; proj->forward = V3_Normalize(ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right));
     proj->damage = isPulser ? (1.0f + 0.25f * (float)World.invP1.softVersions[SW_PULSER]) : 10.0f * (float)World.invP1.softVersions[SW_DRILL];
-    proj->strength = proj->speed = 0.0f;/*Citadel leaves DamageData.penetration/offense at 0 on the cyber path*/
+    proj->strength = proj->speed = 0.0f;
     proj->attackType = isPulser ? Att_Ball/*ProjectileLaunched*/ : Att_Drill; proj->recentMostActivator = PLAYER1; ProjectileEffectImpactInitAfterLoad(ball);
     World.position[ball] = World.position[PLAYER1]; World.velocity[ball] = (V3){0};
     AddForce(ball, V3_ScaleByF(proj->forward, shoveForce), true); flag_set(&proj->entflags,EF_ACTIVE | EF_RIGIDBODY,true);
 }
-void FireCyberWeapon(void) { // Reuses waitTilNextFire: cyberspace has no equipped weapon, so it is free to carry the cyber fire rate
+
+void FireCyberWeapon(void) {
     if (World.invP1.waitTilNextFire >= World.pauseRelativeTime) return;
     if (World.invP1.isPulserNotDrill) { if (!(World.invP1.hasSoft & (1u<<SW_PULSER))) return; World.shotsFired++; FireCyberBeachball(true,railgunShotForce,492); play_wav(sounds[258],AppliedFXVol(1.0f),World.position[PLAYER1],false);/*wpulser*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.08; }
     else { if (!(World.invP1.hasSoft & (1u<<SW_DRILL))) return; World.shotsFired++; FireCyberBeachball(false,plasmaShotForce,495); play_wav(sounds[241],AppliedFXVol(1.0f),World.position[PLAYER1],false);/*wdrill*/ World.invP1.waitTilNextFire = World.pauseRelativeTime + 0.5; }
@@ -344,7 +318,13 @@ void FireCyberWeapon(void) { // Reuses waitTilNextFire: cyberspace has no equipp
 
 void FirePlasma(int w){FireBeachball(w,plasmaShotForce,485);} void FireRailgun(int w){FireBeachball(w,railgunShotForce,484);} void FireMagpulse(int w){FireBeachball(w,magpulseShotForce,482);} void FireStungun(int w){FireBeachball(w,stungunShotForce,483);}
 typedef void (*FireFn)(int); FireFn wepSpecialFire[16]={0,0,0,0,0,FireRapier,FirePipe,0,FireMagpulse,0,FirePlasma,FireRailgun,0,0,0,FireStungun};
-void FireWeapon(int wep16,bool isSilent){if(wep16<0||wep16>15)return;if(wep16 != 5 && wep16 != 6){World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.5;} if(!isSilent&&wepClass[wep16] != WC_MELEE)play_wav(sounds[wepFireSound[wep16]], AppliedFXVol(1.0f), World.position[PLAYER1], false);if(wepClass[wep16]!=WC_MELEE){const PSysDef* mfp=PSysTypeGet(53/*centerFlash*/);if(mfp){PSysDef mfd=*mfp;mfd.pos=V3_AplusB(wfx.reloadContainerPos,V3_ScaleByF(World.instances[PLAYER1].forward,0.5f));mfd.lifetimeMin=mfd.lifetimeMax=0.05f;PSysAdd(&mfd);}} bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmokePrefab[wep16]){u16 smk=SpawnDynamicObject(wepSmokePrefab[wep16]);if(EntIdxIsValid(smk)){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
+void FireWeapon(int wep16,bool isSilent){
+    if(wep16<0||wep16>15)return;
+    
+    if (wep16 != 5 && wep16 != 6){World.invP1.makingNoise=true; World.invP1.noiseFinished=World.pauseRelativeTime+0.5;}
+    if (!isSilent&&wepClass[wep16] != WC_MELEE) play_wav(sounds[wepFireSound[wep16]], AppliedFXVol(1.0f), World.position[PLAYER1], false);
+    if (wepClass[wep16]!=WC_MELEE) { const PSysDef* mfp = PSysTypeGet(53/*centerFlash*/); if (mfp) { PSysDef mfd=*mfp;mfd.pos=V3_AplusB(wfx.reloadContainerPos,V3_ScaleByF(World.instances[PLAYER1].forward,0.5f));mfd.lifetimeMin=mfd.lifetimeMax=0.05f; PSysAddInternal(&mfd,U16_MAX,U16_MAX); } }
+    bool didHit=false;if(wepSpecialFire[wep16])wepSpecialFire[wep16](wep16);else{didHit=DidRayHit(wep16);if(didHit)HitScanFire(wep16);}if(wepSmokePrefab[wep16]){u16 smk=SpawnDynamicObject(wepSmokePrefab[wep16]);if(EntIdxIsValid(smk)){World.position[smk]=wfx.reloadContainerPos;World.rotation[smk]=World.rotation[PLAYER1];flag_set(&World.instances[smk].entflags,EF_ACTIVE,true);World.instances[smk].tickFinished=World.pauseRelativeTime+1.0;}}
     World.fogFac += wepFogInc[wep16]; u16 wc = World.invP1.wepCur;
     if (wepClass[wep16] == WC_ENERGY) {
         float setting = World.invP1.weaponEnergySetting[wep16];

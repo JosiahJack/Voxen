@@ -34,9 +34,9 @@ for s in 'ssr.compute ssrCSSrc' 'rt.compute rtCSSrc' 'rtcopy.compute rtCopyCSSrc
          'particle_vert.glsl particleVertSrc' 'particle_frag.glsl particleFragSrc' 'trail_vert.glsl trailVertSrc' 'trail_frag.glsl trailFragSrc'; do gh Shaders/${s%% *} "${s#* }"; done
 printf '#include "%s.h"\n' text_{vert,frag}.glsl depth_prepass_vert.glsl depth_prepass.glsl debugunlit_{vert,frag}.glsl chunk_{vert,frag}.glsl ui_{vert,frag}.glsl shadowmap_{vert,frag}.glsl composite_{vert,frag}.glsl particle_{vert,frag}.glsl trail_{vert,frag}.glsl {ssr,rt,rtcopy,voxels}.compute > Shaders/shaders.h
 COMMON_CFLAGS="-ferror-limit=500 -fno-stack-protector -fno-unwind-tables -Wno-format-nonliteral -fvisibility=hidden -pipe -fno-ident -fdata-sections -Wno-int-to-void-pointer-cast \
-               -Wshadow -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -Wno-switch -fdeclspec -fomit-frame-pointer -g0 -Wunused \
+               -Wshadow -ffunction-sections -ffast-math -std=c11 -Wall -Wextra -Wno-implicit-fallthrough -Wno-switch -fdeclspec -fomit-frame-pointer -g0 -Wunused -Wno-missing-field-initializers \
                -Wno-overlength-strings -fno-math-errno -fno-sanitize=all -m64 -Oz -march=haswell -mf16c -mavx -Wbool-conversion -Wno-empty-body -nostdinc -ftrivial-auto-var-init=zero"
-COMMON_LFLAGS="-Wl,-z,relro,-z,now,--gc-sections,--as-needed,--build-id=none,--print-gc-sections"
+COMMON_LFLAGS="-Wl,-z,relro,-z,now,--gc-sections,--as-needed,--build-id=none"
 [[ $BUILD_MODE == debug ]] && COMMON_CFLAGS+=" -g -O0 -fno-omit-frame-pointer -funwind-tables"
 if [ "$PLATFORM" = "windows" ]; then
     CC="zig cc -target x86_64-windows-gnu -Wframe-larger-than=65536"

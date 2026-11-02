@@ -537,7 +537,7 @@ void ApplyImpactForceSphere(DamageData* dd, V3 center, float radius, float baseV
     }
 }
 
-static void SpawnExplosionPreset(u16 type,V3 pos) { const PSysDef* preset=PSysTypeGet(type); if(!preset)return; PSysDef def=*preset; def.pos=pos; PSysAdd(&def); }
+static void SpawnExplosionPreset(u16 type,V3 pos) { const PSysDef* preset=PSysTypeGet(type); if(!preset)return; PSysDef def=*preset; def.pos=pos; PSysAddInternal(&def,U16_MAX,U16_MAX); }
 void SpawnExplosionEffect(V3 pos, int explosionType) {
     switch (explosionType) {
         case 3:  SpawnExplosionPreset(165,pos); SpawnExplosionPreset(168,pos); break;/*GasExplosions*/
@@ -577,7 +577,7 @@ float GetDamageTakeAmount(DamageData* dd) {
     if (take < 0.0f) take = 0.0f; return take;
 }
 void SpawnImpactEffect(u16 impactType, V3 pos) { if (impactType == 0 || impactType == U16_MAX) return; u16 fx = SpawnDynamicObject(impactType); if (!EntIdxIsValid(fx)) return; World.position[fx] = pos; Entity* e = &World.instances[fx]; flag_set(&e->entflags, EF_ACTIVE, true); if (e->itemLifeTime <= 0.0f) e->itemLifeTime = 1.0f; e->delayFinished = World.pauseRelativeTime + e->itemLifeTime; }
-void ExitCyberspace(void) { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < World.numLevels) ? (u8)World.cyberReturnLevel : (World.startLevel < World.numLevels ? World.startLevel : 0), World.cyberReturnPos); }
+void ExitCyberspace(void) { UIExitCyberspace(); if (World.curLev != LEVEL_CYBERSPACE) return; if (World.instances[PLAYER1].cyberHealth <= 0.0f) World.instances[PLAYER1].cyberHealth = 1.0f; LoadLevel((World.cyberReturnLevel >= 0 && (u8)World.cyberReturnLevel < MAX_LEVELS) ? (u8)World.cyberReturnLevel : (World.startLevel < MAX_LEVELS ? World.startLevel : 0), World.cyberReturnPos); }
 void ReduceCurrentLevelSecurity(SecurityType stype) {
     static const u32 score[3]={4u,10u,27u}; u8 lev = World.curLev; if (lev >= MAX_LEVELS || stype == SecurityType_None) return;
     
@@ -604,7 +604,7 @@ static void CodeScreensSetForLevel(u8 lev) {
     i8 *code = &World.lev1SecCode; if (code[lev-1] < 0) { code[lev-1] = (i8)random_range_u8(0u,9u); }
     u8 digit = (u8)code[lev-1];
     u8 entryLevel = World.currentLevel;
-    for (u8 l = 0; l < World.numLevels; ++l) {
+    for (u8 l=0;l<MAX_LEVELS;++l) {
         if (l != World.currentLevel) SetLevelPointers(l);
         for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* s = &World.instances[i]; if (s->index != 551 || !s->codeScreen) continue; CodeScreenShowDigit(i, digit); }
     }
@@ -646,19 +646,7 @@ static const i16 objectDeathSound[] = {[458]=63,[459]=66,[460]=66,[464]=62,[465]
 static bool IsCyberEntity(u16 self) { if (World.curLev == LEVEL_CYBERSPACE){return true;} Entity* e=&World.instances[self]; if (self != PLAYER1 && e->cyberHealth > 0.0f){return true;} return (IdxIsNPC(e->index) && (e->index - 419) > 23);/*24-28 are cyber enemies*/}
 static float ApplyAttTypeAdjustments(u16 self,float take,AttType at) { if (!IdxIsNPC(World.instances[self].index) || World.instances[self].health <= 0.0f){return take;} NPCType t = npcTable[World.instances[self].index - 419].type; if (at >= 12){return take;} return take * attackTypeMult[t][at]; }
 static void UseDeathTargets(u16 self) { if(self == PLAYER1){return;} if (World.instances[self].targetOnDeathIdx != IO_NONE) UseTargets(self,World.instances[self].targetOnDeathIdx); }
-static void TeleportAway(u16 self) { 
-    if (World.instances[self].entflags & EF_TELEPORT_ON_DEATH) {return;}
-    
-    flag_set(&World.instances[self].entflags,EF_TELEPORT_ON_DEATH,true);
-    const PSysDef* dgo = PSysTypeGet(189);
-    if (dgo) { PSysDef d = *dgo; d.pos = World.position[self]; d.rotation = World.rotation[self]; PSysAddEx(&d, self); }
-    World.col[self] = CT_NONE;
-    World.gravity[self] = 0.0f;
-    World.velocity[self] = World.angularVelocity[self] = (V3){0};
-    World.instances[self].modelIndex = U16_MAX; 
-    play_wav(sounds[106]/*misc/teleport*/,AppliedFXVol(1.0f),World.position[self],false);
-}
-
+static void TeleportAway(u16 self) { const PSysDef* dgo = &particleTypeDefs[189]; PSysDef d = *dgo; d.pos = World.position[self]; d.rotation = World.rotation[self]; PSysAddInternal(&d,self,U16_MAX); World.col[self] = CT_NONE; World.gravity[self] = 0.0f; World.velocity[self] = World.angularVelocity[self] = (V3){0}; World.instances[self].modelIndex = U16_MAX; play_wav(sounds[106]/*misc/teleport*/,AppliedFXVol(1.0f),World.position[self],false); }
 static void DropSearchables(u16 self) {
     for (int i=0;i<4;i++) {
         if(World.instances[self].contents[i]<=-1){continue;}
@@ -697,7 +685,7 @@ static void ObjectDeath(u16 self) {
 static void ScreenDeath(u16 self) { Entity* e=&World.instances[self]; if(e->entflags & EF_DEAD_CHECKS_DONE){return;} flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true); play_wav(sounds[69], AppliedFXVol(1.0f), World.position[self], true);/*screen_destroy*/ if (e->entflags & EF_DEATH_BURST_DONE) ObjectDeath(self);/*gib path*/ }
 INLINE bool IsGrenade(u16 i) { return ((i >= 314 && i <= 320) || i == 370 || i == 372 || i == 387 || i == 389 || (i >= 402 && i <= 404)); }
 static bool CanVaporize(u16 self) { Entity* e=&World.instances[self]; if (e->index == 477/*sec_camera*/ || IsGrenade(e->index)) {return false;} if (IdxIsNPC(e->index)) {return ai_has_search_collider((u16)(e->index - 419));} return true; }
-static void SpawnDeathEffectAt(u16 type, V3 pos) { const PSysDef* preset = PSysTypeGet(type); if (!preset) return; PSysDef def = *preset; def.pos = pos; PSysAdd(&def); }
+static void SpawnDeathEffectAt(u16 type, V3 pos) { const PSysDef* preset = PSysTypeGet(type); if (!preset) return; PSysDef def = *preset; def.pos = pos; PSysAddInternal(&def,U16_MAX,U16_MAX); }
 static void VaporizeCorpse(u16 self,bool energyVaporized) {
     Entity* e=&World.instances[self]; if (!CanVaporize(self)) {return;}
     
@@ -1024,7 +1012,7 @@ void UseTargets(u16 activator, u16 targetIdx) {
     if (tioNestDepth >= 64) { DualLogWarn("Target IO cascade nested %u deep (target %s): suppressed\n",tioNestDepth,(targetIdx<ioNameCount)?ioNames[targetIdx]:"?"); return; }/*Backstop so no other data cycle, however indirect, can exhaust the stack.*/
     bool wasActive=World.targetIOActive,succeeded=false; u8 entryLevel=World.currentLevel; if(!wasActive){World.targetIOActive=true; mset(tioTargetInFlight,0,sizeof(tioTargetInFlight)); World.targetIOQuestTestMode=World.instances[activator].questTestMode; World.targetIOActivatorIoflagsHi=World.instances[activator].ioflagsHi; World.targetIOActivatorIoflags=World.instances[activator].ioflags;} const char* targetname=(targetIdx<ioNameCount) ? ioNames[targetIdx] : "";
     tioNestDepth++; if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=true;
-    for (u8 lev = 0; lev < World.numLevels; ++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } if (World.lightTargetnames) { for (u16 l = 0; l < World.loadedLights; ++l) { if (World.lightTargetnames[l] != targetIdx) {continue;} TargetLight(activator,l); succeeded=true; } } }
+    for (u8 lev=0;lev<MAX_LEVELS;++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } if (World.lightTargetnames) { for (u16 l = 0; l < World.loadedLights; ++l) { if (World.lightTargetnames[l] != targetIdx) {continue;} TargetLight(activator,l); succeeded=true; } } }
     if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=false;/*Cleared unconditionally: deferred trigger paths (TriggerTrippedUpdate etc.) mark targetIOActive true before calling in, so wasActive alone cannot be trusted to know when a bit was set.*/ tioNestDepth--; if (!wasActive) {World.targetIOActive=false;}
 }
 

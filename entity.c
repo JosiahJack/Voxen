@@ -1643,12 +1643,7 @@ void LoadAllLevels() {
     lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation));
     for (u8 i=0;i<8;++i) { World.TeleportTouch_allTeleportTouches[i] = U16_MAX; }
     fwPoolUsed = 0;
-    for(u8 lev=0;lev<World.numLevels;++lev){
-        for (i32 i=0;i<INSTANCE_COUNT;++i) { colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1}; }
-        LoadLevelData(lev);
-        DoorTypeAudit(lev);
-    }
-    
+    for(u8 lev=0;lev<MAX_LEVELS;++lev){ for (i32 i=0;i<INSTANCE_COUNT;++i) { colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1}; } LoadLevelData(lev); DoorTypeAudit(lev); }
     OS_Free(entsFromFile,INSTANCE_COUNT*sizeof(Entity));
     OS_Free(colCtrFromFile,INSTANCE_COUNT*sizeof(V3));
     OS_Free(colSzFromFile,INSTANCE_COUNT*sizeof(V3));
@@ -1658,7 +1653,7 @@ void LoadAllLevels() {
     OS_Free(lightsFromFile,LIGHT_COUNT*sizeof(Light));
     OS_Free(lanimsFromFile,LIGHT_COUNT*sizeof(LightAnimation));
     BuildTextDecalMeshes(); // Build world-baked 3D text decal meshes (Sys_Text.stringTable already populated for current language).
-    DualLog("load all levels.................................................took %.6f secs\n",get_time() - start_time);
+    DualLog("Load all levels.....................................................................took %.6f secs\n",get_time() - start_time);
 }
 
 void CyberTimerReset(u16,int); /*citadel.c: Unity CyberTimer.Reset(difficultyCyber)*/
