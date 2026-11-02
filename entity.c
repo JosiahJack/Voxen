@@ -1664,6 +1664,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     mcpy(camViews, levelCamViews[curlevel],64 * sizeof(CamView));
     mcpy(camViewTextures, levelCamViewTextures[curlevel], 64 * sizeof(u32));
     camViewCount = levelCamViewCount[curlevel];
+    for (u8 i=0;i<camViewCount;++i) { GenerateAndBindTexture(&camViewTextures[i], GL_RGBA8, camViews[i].width, camViews[i].height, GL_RGBA,GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL); } /*The per-level texture caches share GL names across all 14 preloaded levels; whichever level preloaded LAST leaves its dims on the shared names, so slot storage must be re-specced to camViews[i] dims here or camview copies/samples pair up with the wrong-sized texture (CopyImageSubData region overflow -> INVALID_VALUE + black screens).*/
     mset(alreadyReadLightOnOnce, 0, sizeof(alreadyReadLightOnOnce));
     ResetLevelAudio();
     mp3_clear();

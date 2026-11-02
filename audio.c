@@ -686,7 +686,7 @@ static FHandle pcm_fds[8]; static i32 audfdcnt = 0;
     typedef u32 snd_pcm_uframes_t; typedef struct {IAudioClient *client; IAudioRenderClient *render; u32 buffer_frames; i32 rate,channels,period_frames; bool open; } wasapi_dev_t;
     i32 WINAPI CoInitializeEx(void*,u32); i32 WINAPI CoCreateInstance(const GUID*,IUnknown*,u32,const GUID *const,void**); static wasapi_dev_t wasapi_devs[8]; static int wasapi_dev_count=0; static const GUID IID_IAudioClient={0x1CB9AD4C,0xDBFA,0x4C32,{0xB1,0x78,0xC2,0xF5,0x68,0xA7,0x03,0xB2}}; static const GUID IID_IAudioRenderClient={0xF294ACFC,0x3146,0x4483,{0xA7,0xBF,0xAD,0xDC,0xA7,0xC2,0x60,0xE2}};
     static const GUID CLSID_MMDeviceEnumerator_ = {0xBCDE0395,0xE52F,0x467C,{0x8E,0x3D,0xC4,0x57,0x92,0x91,0x69,0x2E}}; static const GUID IID_IMMDeviceEnumerator_ = {0xA95664D2,0x9614,0x4F35,{0xA7,0x46,0xDE,0x8D,0xB6,0x36,0x17,0xE6}};
-    void AudioUpdate() {
+    void AudioUpdateMix() {
         if(!audfdcnt){return;} int idx=(int)(intptr_t)pcm_fds[0]-100; if(idx < 0 || idx >= wasapi_dev_count || !wasapi_devs[idx].open){return;} u32 pad=0; wasapi_devs[idx].client->lpVtbl->GetCurrentPadding(wasapi_devs[idx].client,&pad); u32 avail=AUDBUF_SIZE-(pad>AUDBUF_SIZE ? 0 : pad); i16 b[AUDIO_FRAMES * AUDIO_CHANNELS];
         for (; avail >= AUDIO_FRAMES; avail -= AUDIO_FRAMES) { audio_mix_period(b); for (int i = 0; i < wasapi_dev_count; i++) { wasapi_dev_t *w = &wasapi_devs[i]; u8* d; if(!w->open){continue;} if ((i32)w->render->lpVtbl->GetBuffer(w->render,AUDIO_FRAMES,&d)<0){w->client->lpVtbl->Stop(w->client); w->client->lpVtbl->Reset(w->client); w->client->lpVtbl->Start(w->client);}else{mcpy(d,b,AUDIO_FRAMES*w->channels*2); w->render->lpVtbl->ReleaseBuffer(w->render,AUDIO_FRAMES,0);} } }
     }
@@ -724,7 +724,7 @@ static FHandle pcm_fds[8]; static i32 audfdcnt = 0;
         hw_params_set(&p.hw_params,0,3); hw_params_set(&p.hw_params,1,2); hw_params_set(&p.hw_params,11,AUDIO_RATE); hw_params_set(&p.hw_params,10,AUDIO_CHANNELS); hw_params_set(&p.hw_params,13,AUDIO_FRAMES); hw_params_set(&p.hw_params,15,AUDIO_PERIODS); if(pcm_params_setup(r,&p)>=0 && audfdcnt < 8){pcm_fds[audfdcnt++] = r;}else{DualLogError("Init card=%d dev=%d failed\n",card,dev); OS_Close(r);}
     }
 
-    void AudioUpdate() { // Re-queries avail after every recover; the old code reused a stale avail and bailed out of the write loop mid-period, so an xrun left the ring only partially refilled and immediately underran again.
+    void AudioUpdateMix() {
         if(!apcm){return;} i16 b[AUDIO_FRAMES*AUDIO_CHANNELS];
         for(i32 guard=0;guard<(i32)AUDIO_PERIODS*4+8;guard++){ int a=snd_pcm_avail_update(apcm); if(a<0){if(snd_pcm_recover(apcm,a,1/*silent; ALSA's own "underrun occurred" spam is not useful per-frame*/)<0){return;} continue;} if(a<(int)AUDIO_FRAMES){return;}
             audio_mix_period(b); u32 off=0,left=AUDIO_FRAMES; while(left>0){int r=snd_pcm_writei(apcm,b+off*AUDIO_CHANNELS,left); if(r==-11/*EAGAIN, ring full though avail said otherwise*/){return;} if(r<0){if(snd_pcm_recover(apcm,r,1)<0){return;} continue;} off+=(u32)r; left-=(u32)r;}

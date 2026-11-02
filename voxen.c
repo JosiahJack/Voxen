@@ -190,7 +190,6 @@ typedef struct WSMon WSMon;
 extern WSLib WinSys;
 typedef struct{int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits; uintptr_t handle;} FBC;
 typedef void (*WSP)(void);
-WSP PlatformGetModuleSymbol(void*,const char*);
 void CycleWeaponSlot(int), CloseFullmap(), UI_AutomapClick(bool,int), UpdateScreenSize(i32,i32), SaveConfig(), InputWindowFocus(i32), InputKey(char*,int,int), InputMouseClick(char*,int,int), InputCursorPos(double*,double*,double,double), InputMonitor(WSMon*,int,int);
 const FBC* ChooseFBConfig(const FBC*, u32);
 void ComputeWindowPlacement(int monIdx, int* px, int* py);
@@ -323,8 +322,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
         EnumDisplayMonitors(NULL,&r,monitorCallback,(i64)m);
         return m;
     }
-    
-    static void GetMonitorFullarea(WSMon* m, int* x, int* y, int* w, int* h);
+
     void WinSysPollMonitorsWin32() {
         int i, dC = WinSys.monitorCount;
         WSMon** d = NULL;
@@ -632,7 +630,7 @@ FGL_UP glUseProgram;    FGL_DM glDepthMask;    FGL_VAB glVertexAttribBinding;   
 FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram;   FGL_CRS glCreateShader;  FGL_BFS glBlendFuncSeparate; FGL_UB glUnmapBuffer; FGL_BD glBufferData; FGL_F glFinish; FGL_FL glFlush;
 FGL_C glClear;  FGL_DE glDrawElements;  FGL_U2UI glUniform2ui; FGL_UM4FV glUniformMatrix4fv;    FGL_GIV glGetIntegerv;FGL_GSIL glGetShaderInfoLog; FGL_U2F glUniform2f;      FGL_U1UI glUniform1ui;   FGL_GVA glGenVertexArrays;  FGL_RP glReadPixels;      FGL_SS glShaderSource;FGL_TPI glTexParameteri; FGL_TPFV glTexParameterfv;   FGL_U1F glUniform1f;
 FGL_E glEnable; FGL_FF glFrontFace;     FGL_GB glGenBuffers;   FGL_FBT2D glFramebufferTexture2D;FGL_GERR glGetError;  FGL_GFS glGenFramebuffers;   FGL_GT glGenTextures;     FGL_BSD glBufferSubData; FGL_MBR glMapBufferRange;   FGL_U1I glUniform1i;      FGL_T2D glTexImage2D; FGL_BIT glBindImageTexture;FGL_BT glBindTexture;
-FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL_D glEndQuery; FGL_DAI glDrawArraysInstanced; FGL_BB glBlendFunc;  FGL_BF glBlitFramebuffer; FGL_T2D glTexSubImage2D; FGL_GTKP glGetTexLevelParameteriv; FGL_CBSD glCopyBufferSubData; FGL_CPIV glGetBufferParameteriv; FGL_GBSD glGetBufferSubData; FGL_GB glDeleteBuffers;
+FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL_D glEndQuery; FGL_DAI glDrawArraysInstanced; FGL_BB glBlendFunc;  FGL_BF glBlitFramebuffer; FGL_T2D glTexSubImage2D; FGL_GTKP glGetTexLevelParameteriv; FGL_CBSD glCopyBufferSubData; FGL_CISD glCopyImageSubData; FGL_CPIV glGetBufferParameteriv; FGL_GBSD glGetBufferSubData; FGL_GB glDeleteBuffers;
 void SetGLContext_GetFunctionPointers() {
     WSWin* h=window; h->context.makeCurrent(h);
     #define X(n,t) n=(t)h->context.getProcAddress(#n);
@@ -641,7 +639,7 @@ void SetGLContext_GetFunctionPointers() {
     X(glBindBuffer,FGL_BB)        X(glBufferData,FGL_BD)      X(glGenBuffers,FGL_GB)       X(glUnmapBuffer,FGL_UB)         X(glAttachShader,FGL_AS)            X(glCompileShader,FGL_CS)      X(glCreateProgram,FGL_CP)     X(glCreateShader,FGL_CRS)   X(glDrawBuffers,FGL_DB)      X(glGetProgramiv,FGL_CPIV)      X(glGetShaderInfoLog,FGL_GSIL)      X(glGetShaderiv,FGL_GSIV)
     X(glLinkProgram,FGL_LP)       X(glShaderSource,FGL_SS)    X(glUniform1f,FGL_U1F)       X(glUniform1i,FGL_U1I)          X(glUniform2f,FGL_U2F)              X(glUniform3f,FGL_U3F)         X(glUniform4f,FGL_U4F)        X(glTexParameteri,FGL_TPI)  X(glTexParameterfv,FGL_TPFV)  X(glUniform1ui,FGL_U1UI)     X(glUniform2ui,FGL_U2UI)        X(glUniformMatrix3fv,FGL_UM3FV)     X(glUniformMatrix4fv,FGL_UM4FV)
     X(glUseProgram,FGL_UP)        X(glBindBufferBase,FGL_BBB) X(glFinish,FGL_F) X(glFlush,FGL_FL) X(glBindFramebuffer,FGL_BFB) X(glGenFramebuffers,FGL_GFS)    X(glMapBufferRange,FGL_MBR)         X(glBindImageTexture,FGL_BIT)  X(glBindVertexBuffer,FGL_BVB) X(glDispatchCompute,FGL_DC) X(glGenVertexArrays,FGL_GVA) X(glVertexAttribFormat,FGL_VAF) X(glFramebufferTexture2D,FGL_FBT2D) X(glBufferSubData,FGL_BSD)
-    X(glGenQueries,FGL_GIQ) X(glGetQueryObjectui64v,FGL_GQOU64) X(glBeginQuery,FGL_BQ) X(glEndQuery,FGL_D) X(glDrawArraysInstanced,FGL_DAI) X(glBlendFunc,FGL_BB) X(glBlitFramebuffer,FGL_BF) X(glTexSubImage2D,FGL_T2D) X(glGetTexLevelParameteriv,FGL_GTKP) X(glCopyBufferSubData,FGL_CBSD) X(glGetBufferParameteriv,FGL_CPIV) X(glGetBufferSubData,FGL_GBSD) X(glDeleteBuffers,FGL_GB)
+    X(glGenQueries,FGL_GIQ) X(glGetQueryObjectui64v,FGL_GQOU64) X(glBeginQuery,FGL_BQ) X(glEndQuery,FGL_D) X(glDrawArraysInstanced,FGL_DAI) X(glBlendFunc,FGL_BB) X(glBlitFramebuffer,FGL_BF) X(glTexSubImage2D,FGL_T2D) X(glGetTexLevelParameteriv,FGL_GTKP) X(glCopyBufferSubData,FGL_CBSD) X(glCopyImageSubData,FGL_CISD) X(glGetBufferParameteriv,FGL_CPIV) X(glGetBufferSubData,FGL_GBSD) X(glDeleteBuffers,FGL_GB)
     #undef X
 }
 
@@ -764,7 +762,7 @@ static u8 uiMouseCaptured; static bool uiWheelBlocked; static KeyState unboundIn
 bool UIInteractions(void); void UI_ProcessNavigation(void);
 KeyState* GetCodeMapping(int settingIndex) {
     if (settingIndex<0 || settingIndex>=42) return &unboundInput;
-    i32 i=Sys_Settings.InputCodeSettings[settingIndex]; if (i<0 || i>=(i32)(sizeof(inputElements)/sizeof(inputElements[0])) || !inputElements[i].name || i==127 || i==128) return &unboundInput;
+    i32 i=Sys_Settings.InputCodeSettings[settingIndex]; if (i<0 || i>=(i32)(sizeof(inputElements)/sizeof(inputElements[0]))) return &unboundInput;
     if (i>=53 && i<=60) { int button=inputElements[i].value; return (uiMouseCaptured&(1u<<button)) ? &unboundInput : &Sys_Input.mouseButtons[button]; }
     return &Sys_Input.keyStates[inputElements[i].value];
 }
@@ -773,7 +771,7 @@ void TextEntry(i32 k) {
     char c = (k >= KEY_A && k <= KEY_Z) ? 'a' + (k - KEY_A) : ((k >= KEY_1 && k <= KEY_9) ? '1' + (k - KEY_1) : ((k == KEY_0) ? '0' : ((k == KEY_SPACE) ? ' ' : 0))); if (c) { World.playerName[currentPlayerNameLength] = c; World.playerName[++currentPlayerNameLength] = '\0'; }
 }
 
-void ConsoleEmulator(i32 keycode); extern bool enteringPlayerName; extern bool editFieldEditing; extern void EditFieldKey(i32 keycode); extern bool enteringSaveName; extern void SaveNameEntry(i32 keycode); extern void KeycodeEntryKey(i32 keycode);
+void ConsoleEmulator(i32 keycode); extern bool editFieldEditing; extern void EditFieldKey(i32 keycode); extern bool enteringSaveName; extern void SaveNameEntry(i32 keycode); extern void KeycodeEntryKey(i32 keycode);
 void InputKey(char* keys,int key,int action) {
     if (key >= 0 && key < WS_KEYCOUNT) { i32 repeated=0; if(action == INPUT_RELEASE && keys[key] == INPUT_RELEASE){return;} if (action == INPUT_PRESS && keys[key] == INPUT_PRESS){repeated=1;} keys[key]=(char)action; if(repeated){action=INPUT_REPEAT;} }
     if (key == KEY_F10 && action) OS_Exit(0);
@@ -809,7 +807,6 @@ void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {
 void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float);
 void HwToggle(u8);/*ui.c: the HUD hardware button handler, shared with the Lantern/Infrared hotkeys so both paths play the same sounds*/
-extern u16 editModeTestEntityDefinition;
 extern V3 debugWepOffset;
 void InputProcessing() {
     for (int i=0;i<MAX_MOUSE_BUTTONS;++i) { if(!Sys_Input.mouseButtons[i].down){uiMouseCaptured &= ~(1u<<i);} }
@@ -1018,47 +1015,22 @@ void EnableCheatArsenal(u8 level) {
 }
 void cmd_kill() { World.instances[PLAYER1].health = World.instances[PLAYER1].cyberHealth = 0.0f; CenterStatusPrint("%s", Sys_Text.stringTable[1011]); } // "Player decides to become a cyborg."
 void cmd_undo() { if (Cheats.editMode) { if (lastSpawned < U16_MAX && lastSpawned >= INSTS_1ST_IDX) { DeleteInstance(lastSpawned); lastSpawned = U16_MAX; CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Nothing to undo"); } } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } }
-
 // Screen Shake
 static float shakeAmp = 0.15f;
 void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; shakeAmp = (force < 0.48f) ? force : 0.48f; }
 void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
 void cmd_shake() { Shake(-1.0f); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
-
 // Edit Mode
-void cmd_edit() {
-    Cheats.editMode = !Cheats.editMode;
-    if (Cheats.editMode) {
-        Cheats.noclip = Cheats.notarget = true;
-        Cheats.editSubMode = 0;
-        CenterStatusPrint("edit mode: %s","Edit Mode activated!");
-    } else {
-        Cheats.noclip = Cheats.notarget = false;
-        editModeSelection = U16_MAX;
-        editModeLightSelection = U16_MAX;
-        CenterStatusPrint("%s","Edit Mode deactivated");
-    }
-}
-
-static void cmd_editsub(int submode) {
-    if (submode < 0 || submode > 1) { CenterStatusPrint("Invalid edit submode: %d (0=select, 1=spawn physics objects)", submode); return; }
-    
-    Cheats.editSubMode = (u8)submode;
-    CenterStatusPrint("Edit submode: %s", submode==0 ? "select" : submode==1 ? "spawn physics objects" : "?");
-}
-
+void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip = Cheats.notarget =  true; Cheats.editSubMode = 0; CenterStatusPrint("Edit Mode activated!" ); } else { Cheats.noclip = Cheats.notarget = false; editModeSelection = U16_MAX; editModeLightSelection = U16_MAX; CenterStatusPrint("Edit Mode deactivated"); } }
+static void cmd_editsub(int submode) { if (submode < 0 || submode > 1) { CenterStatusPrint("Invalid edit submode: %d (0=select, 1=spawn physics objects)", submode); return; } Cheats.editSubMode = (u8)submode; CenterStatusPrint("Edit submode: %s", submode == 0 ? "select" : "spawn physics objects"); }
 // Cheat Level Loading
 int ParseLevelArg(const char* arg) {
     if (!arg || !*arg) return -1;
     
-    char clean[64] = {0};
-    int j = 0;
-    for (int i = 0; arg[i] && j < 60; i++) {
-        if (arg[i] != ' ' && arg[i] != '_') { clean[j++] = c2Lower((u8)arg[i]); }
-    }
-    
+    char clean[64] = {0}; int j = 0;
+    for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') { clean[j++] = c2Lower((u8)arg[i]); } }
     clean[j] = '\0';
-    if (sEqual(clean,"r")|| sFindSub(clean, "reactor")) { return 0; }
+    if (sEqual(clean,"r")) { return 0; }
     if (sFindSub(clean,"g1") || sFindSub(clean,"10")) { return 10; }
     if (sFindSub(clean,"g2") || sFindSub(clean,"11")) { return 11; }
     if (sFindSub(clean,"g4") || sFindSub(clean,"12")) { return 12; }
@@ -1153,7 +1125,7 @@ void ProcessConsoleCommand(const char* c) {
     while (*space && !cEmpty((u8)*space)) { space++; }
     const char* arg_start=space;
     while (*arg_start && cEmpty((u8)*arg_start)) { arg_start++; }
-    if (slen(c) > 0 && (numHistory == 0 || !sEqual(c,history[numHistory - 1]))){ if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],c,T_BUFFER_SIZE); numHistory++; } else {for (int i = 0; i < 7 - 1; i++) {scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE);/*Shift list toward 0*/} scpy_to_a_from_b(history[7 - 1],c,T_BUFFER_SIZE);} }
+    if ((numHistory == 0 || !sEqual(c,history[numHistory - 1]))) { if (numHistory < 7) { scpy_to_a_from_b(history[numHistory],c,T_BUFFER_SIZE); numHistory++; } else {for (int i = 0; i < 7 - 1; i++) {scpy_to_a_from_b(history[i],history[i + 1],T_BUFFER_SIZE);/*Shift list toward 0*/} scpy_to_a_from_b(history[7 - 1],c,T_BUFFER_SIZE);} }
     bool commandProcessed = false;
     for (u16 i=0;consoleCmds[i].name!=NULL;++i) {
         const ConsoleCommand* cmd = &consoleCmds[i];
@@ -1521,7 +1493,7 @@ void UpdateLights() {
 
 // Shadowmapping
 typedef struct {float depth; u16 index; } DepthSort;
-INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex >= texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || e->texIndex >= MAXTEX || otherCondition; }
+INLINE bool EntNotVisible(u16 i, bool otherCondition) { Entity* e = &World.instances[i]; return e->texIndex >= texCnt || !(e->entflags & EF_ACTIVE) || e->index >= MAX_ENTITIES || (e->modelIndex >= MAX_MDLS && !Cheats.showPhys) || otherCondition; }
 INLINE u16 GetAndBindModel(u16 i, u16 currentModelType) { glUniform1ui(0,i); u16 modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && World.instances[i].lodIndex < mdlsCnt ? World.instances[i].lodIndex : World.instances[i].modelIndex; if (currentModelType == modelType) return currentModelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); return modelType; }
 typedef float __m256 __attribute__((__vector_size__(32), __may_alias__)); typedef long long __m256i __attribute__((__vector_size__(32), __may_alias__)); typedef float __v8sf __attribute__((__vector_size__(32), __may_alias__));
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_load_ps(float const *__P) { return *(const __m256 *)__P; }
@@ -1750,7 +1722,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         
         if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_COUNT; continue; }
         u16 slot = shadowSlot[lightIdx];
-        bool contentDirty = (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
+        bool contentDirty = (true/*anyMoved*/ || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
         u8 needFaces = (u8)(faceMask & ~shadowFaces[lightIdx]);
         if (contentDirty || needFaces) {
             for (u16 j=1;j<nearbyMeshCount;++j) {
@@ -2117,25 +2089,12 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     }
     if(unlikely(camView)) {
         glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
-        glBindFramebuffer(0x8CA8/*GL_READ_FRAMEBUFFER*/, gBufferFBO);
-        glReadBuffer(GL_COLOR_ATTACHMENT0);
-        glBindTexture(GL_TEXTURE_2D, camViewTextures[camViewIdx]);
-        i32 srcW = 0, srcH = 0, dstW = 0, dstH = 0;
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, 0x1000, &dstW);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, 0x1001, &dstH);
-        glBindTexture(GL_TEXTURE_2D,inputImageID);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, 0x1000, &srcW);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, 0x1001, &srcH);
-        glBindTexture(GL_TEXTURE_2D, camViewTextures[camViewIdx]);
-        i32 cw = vmin((i32)swidth, vmin(srcW, dstW)), ch = vmin((i32)sheight, vmin(srcH, dstH));
-        for (i32 ty=0;ty<ch;ty+=120) {
-            i32 th = vmin(120, ch - ty);
-            for (i32 tx=0;tx<cw;tx+=320) { 
-                i32 tw=vmin(320,cw-tx);
-                glCopyTexSubImage2D(GL_TEXTURE_2D, 0, tx, ty, tx, ty, tw, th); /*camview copy: clamped to source/dest dims and tiled into 320x120 strips to stay in-bounds on any GL*/
-            }
-        }
-        glBindTexture(GL_TEXTURE_2D,0); return;
+        /*camview copy: inputImageID (gBuffer COLOR_ATTACHMENT0, ScreenW x ScreenH) -> camViewTextures[camViewIdx] (allocated at camViews[camViewIdx].w/h, re-specced at every level entry), RGBA8->RGBA8, whole-rect GPU-to-GPU. glCopyImageSubData (GL 4.3+) needs no framebuffer/read-buffer/texture-unit state and no 320x120 tiling; the clamp keeps the region within both textures on any resolution. NOTE: glCopyTexSubImage2D only reads from the bound framebuffer's read buffer (binding inputImageID to a texture unit does nothing) and dest overflow -> INVALID_VALUE, which is what the old tiled path errored on.*/ 
+        i32 cw = vmin((i32)swidth, (i32)vmin(Sys_Settings.ScreenWidth, camViews[camViewIdx].width)), ch = vmin((i32)sheight, (i32)vmin(Sys_Settings.ScreenHeight, camViews[camViewIdx].height));
+        glCopyImageSubData(inputImageID,              GL_TEXTURE_2D, 0, 0, 0, 0,
+                           camViewTextures[camViewIdx], GL_TEXTURE_2D, 0, 0, 0, 0,
+                           cw, ch, 1);
+        return;
     } // <<<<<<<<<<<<< CAM VIEW BARRIER
     PSys_Render(viewProj, playerPos,(V3){invViewRot[0], invViewRot[1], invViewRot[2]}, (V3){invViewRot[3], invViewRot[4], invViewRot[5]}, (V3){-invViewRot[6], -invViewRot[7], -invViewRot[8]}, inputDepthID, snear, sfar, (float)swidth, (float)sheight);
     if (wireVertCount) { glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVertex),wireVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glBindVertexArray(wireLinesVAO); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount); drawCalls++; vertsRendered += wireVertCount; wireVertCount = 0; glEnable(GL_CULL_FACE); }
@@ -2471,8 +2430,7 @@ void PlayVmail(u8 i) {/*Starts vmail clip i: the ui.c vmailStartFrames/vmailEndF
 void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started the game!\n", World.playerName); game_actual_start_time = get_time(); DualLog("Entity counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n Light counts::0:%4u|1:%4u|2:%4u|3:%4u|4:%4u|5:%4u|6:%4u|7:%4u|8:%4u|9:%4u|10:%4u|11:%4u|12:%4u|13:%4u\n",World.levelInstCount[0],World.levelInstCount[1],World.levelInstCount[2],World.levelInstCount[3],World.levelInstCount[4],
                                               World.levelInstCount[5],World.levelInstCount[6],World.levelInstCount[7],World.levelInstCount[8],World.levelInstCount[9],World.levelInstCount[10],World.levelInstCount[11],World.levelInstCount[12],World.levelInstCount[13],World.levelLoadedLights[0],World.levelLoadedLights[1],World.levelLoadedLights[2],World.levelLoadedLights[3],
                                               World.levelLoadedLights[4],World.levelLoadedLights[5],World.levelLoadedLights[6],World.levelLoadedLights[7],World.levelLoadedLights[8],World.levelLoadedLights[9],World.levelLoadedLights[10],World.levelLoadedLights[11],World.levelLoadedLights[12],World.levelLoadedLights[13]); }
-                                              
-void LoadModels(), LoadTextures(), InitAudio(), LoadConfig(), synth_set_room(float,float);
+void LoadModels(), LoadTextures(), InitAudio();
 extern u32 random_range_rng, biomTexId, biomFBO; extern bool amReady;
 u8* scratch_base,*scratch_cur,*scratch_end; size_t scratch_peak;
 void OS_ScratchInit() { if(scratch_base){return;} scratch_base = OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur = scratch_base; scratch_end = scratch_base + SCRATCH_ARENA_SIZE; }
@@ -2605,7 +2563,7 @@ void InitalizeEnvironment() {
         PFN_XCIC ImageCreate = (PFN_XCIC)PlatformGetModuleSymbol(xcurhandle,"XcursorImageCreate");
         PFN_XCID ImageDestroy = (PFN_XCID)PlatformGetModuleSymbol(xcurhandle,"XcursorImageDestroy");
         PFN_XCILC ImageLoadCursor = (PFN_XCILC)PlatformGetModuleSymbol(xcurhandle,"XcursorImageLoadCursor");
-        int sMin,sMax; mset(WinSys.x11.keycodes,-1,sizeof(WinSys.x11.keycodes)); WinSys.x11.xlib.DisplayKeycodes(WinSys.x11.display,&sMin,&sMax); int wk; KeySym* k = WinSys.x11.xlib.GetKeyboardMapping(WinSys.x11.display,sMin,sMax - sMin + 1,&wk); for (int s=sMin;s<=sMax;s++) { if (WinSys.x11.keycodes[s] < 0) WinSys.x11.keycodes[s] = translateKeySyms(&k[(s - sMin) * wk],wk); } WinSys.x11.xlib.Free(k); // Create key tables.
+        int sMin,sMax; mset(WinSys.x11.keycodes,-1,sizeof(WinSys.x11.keycodes)); WinSys.x11.xlib.DisplayKeycodes(WinSys.x11.display,&sMin,&sMax); int wk; KeySym* k = WinSys.x11.xlib.GetKeyboardMapping(WinSys.x11.display,sMin,sMax - sMin + 1,&wk); for (int s=sMin;s<=sMax;s++) { WinSys.x11.keycodes[s] = translateKeySyms(&k[(s - sMin) * wk],wk); } WinSys.x11.xlib.Free(k); // Create key tables.
         #define IA(n) WinSys.x11.xlib.InternAtom(WinSys.x11.display,n,0)
             WinSys.x11.UTF8_STRING=IA("UTF8_STRING"); WinSys.x11.WM_PROTOCOLS=IA("WM_PROTOCOLS"); WinSys.x11.WM_DELETE_WINDOW=IA("WM_DELETE_WINDOW"); WinSys.x11.NET_SUPPORTED =IA("_NET_SUPPORTED");
             WinSys.x11.NWM_ICON=IA("_NET_WM_ICON");   WinSys.x11.NWM_PING=IA("_NET_WM_PING");     WinSys.x11.NWM_NAME=IA("_NET_WM_NAME");             WinSys.x11.MOTIF_WM_HINTS=IA("_MOTIF_WM_HINTS");
@@ -2721,7 +2679,6 @@ void InitalizeEnvironment() {
     m[12] = 0.0f; m[13] = 0.0f;  m[14] = -2.0f * lightRangeMax * 0.02f / viewRange; m[15] =  0.0f;
     
     for (int i=0;i<23;++i) { g_scf_long[0][i] = g_scf_long[2][i] = g_scf_long[4][i] = g_sfc_long_024[i]; }
-    /*InitAudio + synth_set_reverb_preset moved to after NewGame*/
     glGenFramebuffers(1,&gBufferFBO);
     ChangeFullScreenWindowed(false);
     SetSkyRotateSpeed();
@@ -2788,7 +2745,7 @@ void InitalizeEnvironment() {
     DebugRAMActual("init"); DualLog("\n");
 }
 
-void Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdate(),PSys_Update(float),BioMonitorUpdate(); bool ScrshotPressed();
+void Physics(float),UpdateAnims(),UpdateAudio(),AudioUpdateMix(),PSys_Update(float),BioMonitorUpdate();
 i32 main() {
     InitalizeEnvironment();
     while(1) {
@@ -2822,14 +2779,14 @@ i32 main() {
         ModUpdate(); /*After physics so mod/gamecode can modify velocities before next frame.*/
         BioMonitorUpdate();
         if (!World.paused && !World.menuActive){ PSys_Update(World.dt); } /*Particles*/
-        UpdateAudio();
+        UpdateAudio(); // Updates states, music triggers, ambients, etc.
         gameTime = get_time() - gameT_start;
         if (likely((!World.paused && !World.menuActive) || Cheats.editMode)) { UpdateInstanceMatrix4x4s(); /*Before camviews so camview shadows render same as main pass*/ }
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         UpdateSensaroundCamViews();
         RenderCameraViews(); /*Before main Render() so that tv screens are up to date*/
         if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/
-        AudioUpdate();
+        AudioUpdateMix(); // Actually mixes all the audio for output.
         AutomapTick();
         Render(false/*!camview*/,0u);
         if (Sys_Input.keyStates[KEY_O].pressed) { play_message("shodan/shodan_prematurefruition"); }/*test hotkey: stream a SHODAN log on the log channel*/
