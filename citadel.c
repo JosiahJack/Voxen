@@ -887,62 +887,6 @@ static void DoorLayerUpdate(u16 self, Entity* e) {
     if (World.layer[self] != want) World.layer[self] = want;
 }
 
-static bool DoorLasersOn(const Entity* e, AnimationClip closing) {
-    if (e->ajar) return false;
-    if (e->doorState == DoorState_Closed) return true;
-    if (e->doorState != DoorState_Closing || e->clip != A_CLOSING) return false;
-    float p = (closing.frameEnd > closing.frameStart) ? (float)(e->frame - closing.frameStart) / (float)(closing.frameEnd - closing.frameStart) : 1.0f;
-    return (p * 100.0f >= e->timeBeforeLasersOn);
-}
-
-void DoorLaserDraw(u16 self) {
-    Entity* e = &World.instances[self];
-    if (!DoorLasersOn(e, mdlAnimClips[e->animationNum][A_CLOSING])) return;
-    if (V3_SqDist(World.position[self], World.position[PLAYER1]) > 2500.0f) return; /* ~50m */
-        
-    AnimationClip closing = mdlAnimClips[e->animationNum][A_CLOSING];
-    u16 m = (u16)(closing.frameStartModelIndex + (u16)(closing.frameEnd - closing.frameStart));
-    if (m >= MAX_MDLS) return;
-    
-    V3 mn = modelMin[m], mx = modelMax[m];
-    V3 ctr = (V3){(mn.x+mx.x)*0.5f * World.scale[self].x, (mn.y+mx.y)*0.5f * World.scale[self].y, (mn.z+mx.z)*0.5f * World.scale[self].z};
-    V3 he  = (V3){(mx.x-mn.x)*0.5f * World.scale[self].x, (mx.y-mn.y)*0.5f * World.scale[self].y, (mx.z-mn.z)*0.5f * World.scale[self].z};
-    V3 c = V3_AplusB(World.position[self], quat_rot_v3(World.rotation[self], ctr));
-    bool wideX = he.x >= he.z;
-    V3 right = quat_rot_v3(World.rotation[self], wideX ? (V3){1.0f,0.0f,0.0f} : (V3){0.0f,0.0f,1.0f});
-    V3 up = quat_rot_v3(World.rotation[self], (V3){0.0f,1.0f,0.0f});
-    float hw = (wideX ? he.x : he.z) * 0.94f, hh = he.y; /* stop just inside the frame so the bars read as inset */
-    if (hw <= 0.0f || hh <= 0.0f) return;
-    
-    V3 lo, hi, lf, rf;
-    if (e->index == 506) {
-        float halfX = vmin(hw, hh);
-        if (halfX <= 0.0f) return;
-        
-        lo = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right,-halfX), V3_ScaleByF(up,-halfX)));
-        hi = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right, halfX), V3_ScaleByF( up, halfX)));
-        lf = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right,-halfX), V3_ScaleByF( up, halfX)));
-        rf = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right, halfX), V3_ScaleByF(up,-halfX)));
-    } else {
-        lo = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right,-hw), V3_ScaleByF(up,-hh)));
-        hi = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right, hw), V3_ScaleByF( up,hh)));
-        lf = V3_AplusB(lo, V3_ScaleByF(up, 2.56f));
-        rf = V3_AsubB(hi, V3_ScaleByF(up, 2.56f));
-    }
-    V3 face = V3_Normalize(V3_Cross(right,up)); /* door plane normal, used to keep the triplet spread in-plane */
-    const Color band[3] = {{1.0f,0.82f,0.08f,1.0f},{1.0f,0.42f,0.04f,1.0f},{1.0f,0.82f,0.08f,1.0f}};
-    const float spread[3] = {-0.0225f, 0.0f, 0.0225f};
-    for (int pass = 0; pass < 2; ++pass) {
-        V3 a = pass ? lf : lo, b = pass ? rf : hi;
-        V3 dir = V3_Normalize(V3_AsubB(b,a));
-        V3 perp = V3_Normalize(V3_Cross(dir, face));
-        for (int k = 0; k < 3; ++k) {
-            V3 o = V3_ScaleByF(perp, spread[k]);
-            DrawCrossedLine(V3_AplusB(a,o), V3_AplusB(b,o), perp, 0.015f, band[k]);
-        }
-    }
-}
-
 void DoorUpdate(u16 self) {
     Entity* e = &World.instances[self]; if(e->ajar){return;} AnimationClip opening=mdlAnimClips[e->animationNum][A_OPENING], closing=mdlAnimClips[e->animationNum][A_CLOSING];
     if (e->doorOpen == DoorState_Opening && e->clip == A_OPENING && e->frame >= opening.frameEnd) { e->doorOpen = e->doorState = DoorState_Open; ChangeAnim(e,A_IDLE_OPEN); } else if (e->doorOpen == DoorState_Closing && e->clip == A_CLOSING && e->frame >= closing.frameEnd) { e->doorOpen = e->doorState = DoorState_Closed; ChangeAnim(e,A_IDLE_CLOSED); } if (World.pauseRelativeTime > e->waitBefClose && e->doorOpen == DoorState_Open && !e->stayOpen && !e->startOpen) DoorClose(self);
@@ -1625,7 +1569,7 @@ u16 GetItemFrobTexture(u16 index) {
         case 357: return 1052;/*weapon_sparqbeam*/        case 358: return 1065;/*weapon_stungun*/          case 359: return 965;/*item_battery*/                case 360: return 968;/*item_battery_icad*/         case 361: return 972;/*item_logic_probe*/       case 362: return 967;/*item_healthkit*/           case 363: return 973;/*item_plastique*/           case 365: return 766;/*item_flask*/                  case 366: return 969;/*item_chipset_bitflag*/  case 367: return 549;/*item_ammo_rubber*/
         case 368: return 971;/*item_isotopex22*/          case 369: return 765;/*it442em_testtube*/         case 370: return 853;/*weapon_grenadefrag_live*/     case 371: return 970;/*item_chipset_isolinear*/    case 372: return 849;/*weapon_grenadeconc_live*/case 373: return 420;/*item_ammo_needle*/         case 374: return 602;/*item_ammo_tranq*/          case 375: return 593;/*item_ammo_standard*/          case 376: return 597;/*item_ammo_teflon*/      case 377: return 411;/*item_ammo_hollow*/
         case 378: return 561;/*item_ammo_slug*/           case 379: return 419;/*item_ammo_magnesium*/      case 380: return 421;/*item_ammo_penetrator*/        case 381: return 417;/*item_ammo_hornet*/          case 382: return 577;/*item_ammo_splinter*/     case 383: return 422;/*item_ammo_rail*/           case 384: return 551;/*item_ammo_slag*/           case 385: return 552;/*item_ammo_slaglarge*/         case 386: return 418;/*item_ammo_magcart*/     case 387: return 851;/*weapon_grenadeemp_live*/
-        case 388: return 762;/*item_access_card_std*/     case 389: return 850;/*weapon_grenadeearth_live*/ case 390: return 610;/*item_access_card_group1*/     case 391: return 621;/*item_access_card_science*/  case 392: return 609;/*item_access_card_eng*/   case 393: return 610;/*item_access_card_groupB*/  case 394: return 635;/*item_access_card_security*/case 395: return 761;/*item_access_card_per5diego*/  case 396: return 632;/*item_access_card_medi*/ case 397: return 610;/*item_access_card_group3*/
+        case 388: return 762;/*item_access_card_std*/     case 389: return 850;/*weapon_grenadeearth_live*/ case 390: return 610;/*item_access_card_group1*/     case 391: return 621;/*item_access_card_science*/  case 392: return 609;/*item_access_card_eng*/   case 393: return 610;/*item_access_card_groupB*/  case 394: return 635;/*item_access_card_security*/case 395: return 760;/*item_access_card_per5diego*/  case 396: return 632;/*item_access_card_medi*/ case 397: return 608;/*item_access_card_group3*/
         case 398: return 624;/*item_access_card_purple*/  case 399: return 872;/*item_head_male*/           case 400: return 862;/*item_head_female*/            case 401: return 872;/*item_severedhead*/          case 402: return 860;/*weapon_grenademine_live*/case 403: return 861;/*weapon_grenadenitro_live*/ case 404: return 859;/*weapon_grenadegas_live*/   case 417: return 760;/*item_access_card_perdarcy*/
         case 307: return 1250;
     } return MAXTEX;

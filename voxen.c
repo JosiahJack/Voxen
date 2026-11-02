@@ -4,9 +4,8 @@
 #include "Shaders/shaders.h"
 GlobalContext World = {0}; // Full game state
 // Rendering
-u32 globalframe, globalframesPerLastSecond, threadCnt = 1, inputImageID, inputUIID, inputDepthID, inputSpecID, inputNormalID, outputImageID, gBufferFBO, uiFBO, uiSP, depthPrepassSP, chunkSP, chunkVAO, vbos[MAX_MDLS], tbos[MAX_MDLS], matricesBufferID, modelVertexCounts[MAX_MDLS], *physVertCounts, *rtSrcVertCounts;
+u32 globalframe, globalframesPerLastSecond, threadCnt = 1, inputImageID, inputUIID, inputDepthID, inputSpecID, inputNormalID, outputImageID, gBufferFBO, uiFBO, uiSP, depthPrepassSP, chunkSP, chunkVAO, vbos[MAX_MDLS], tbos[MAX_MDLS], matricesBufferID, *physVertCounts, *rtSrcVertCounts;
 float rasterPerspectiveProjection[16], modelMatrices[INSTANCE_COUNT*16], *world_from_mdl = modelMatrices, modelBounds[MAX_MDLS], **physPos, lightView[LIGHT_COUNT][6][4][4], lightViewProj[LIGHT_COUNT][6][16], shadowmapsPerspectiveProjection[16], sunShadowMatrix[16], berserkSeedTime;
-typedef struct { _Alignas(16) float mn[4]; _Alignas(16) float mx[4]; u32 triStart; u32 triCount; i32 children[8]; } GpuBvhNode;
 typedef struct { u32 nodeBase,triBase,vtxBase,uvBase; } ModelRTInfo;
 typedef struct { u32 geom[4]; u32 info[4]; float iscl2[4]; } InstanceRTInfo;
 static InstanceRTInfo rtInstanceInfo[INSTANCE_COUNT];
@@ -1879,8 +1878,37 @@ DepthSort visibleInstances[INSTANCE_COUNT];
 __attribute__((pure)) i32 dsort(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (db > da) - (db < da); }
 __attribute__((pure)) i32 dsortInv(const void* a, const void* b) { float da = ((const DepthSort*)a)->depth; float db = ((const DepthSort*)b)->depth; return (da > db) - (da < db); }
 void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT, u16* curG, u16* curS, u16* curM, bool grayscaleEnabled) {
-    u16 glow=e->glowIndex,norm=e->normIndex,spec=e->specIndex;
-    if (IdxIsLaserDoor(constIndex)) { DoorLaserDraw(i); }
+    u16 glow = e->glowIndex, norm = e->normIndex, spec = e->specIndex;
+    if (constIndex == 505 && e->doorState == DoorState_Closed) {
+        if (V3_SqDist(World.position[i], World.position[PLAYER1]) <= 2500.0f) { /* ~50m */
+            AnimationClip closing = mdlAnimClips[e->animationNum][A_CLOSING];
+            u16 m = (u16)(closing.frameStartModelIndex + (u16)(closing.frameEnd - closing.frameStart));
+            V3 mn = modelMin[m], mx = modelMax[m];
+            V3 ctr = (V3){(mn.x+mx.x)*0.5f * World.scale[i].x, (mn.y+mx.y)*0.5f * World.scale[i].y, (mn.z+mx.z)*0.5f * World.scale[i].z};
+            V3 he  = (V3){(mx.x-mn.x)*0.5f * World.scale[i].x, (mx.y-mn.y)*0.5f * World.scale[i].y, (mx.z-mn.z)*0.5f * World.scale[i].z};
+            V3 c = V3_AplusB(World.position[i], quat_rot_v3(World.rotation[i], ctr));
+            bool wideX = he.x >= he.z;
+            V3 right = quat_rot_v3(World.rotation[i], wideX ? (V3){1.0f,0.0f,0.0f} : (V3){0.0f,0.0f,1.0f});
+            V3 up = quat_rot_v3(World.rotation[i], (V3){0.0f,1.0f,0.0f});
+            float hw = (wideX ? he.x : he.z), hh = he.y; /* stop just inside the frame so the bars read as inset */
+            if (hw > 0.0f && hh > 0.0f) {
+                V3 lo, hi, lf, rf;
+                lo = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right,-hw), V3_ScaleByF(up,-hh)));
+                hi = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right, hw), V3_ScaleByF( up,hh)));
+                lf = V3_AplusB(lo, V3_ScaleByF(up, 2.56f));
+                rf = V3_AsubB(hi, V3_ScaleByF(up, 2.56f));
+                V3 face = V3_Normalize(V3_Cross(right,up)); /* door plane normal, used to keep the triplet spread in-plane */
+                const Color band[3] = {{1.0f,0.82f,0.08f,1.0f},{1.0f,0.42f,0.04f,1.0f},{1.0f,0.82f,0.08f,1.0f}};
+                const float spread[3] = {-0.0225f, 0.0f, 0.0225f};
+                for (int pass = 0; pass < 2; ++pass) {
+                    V3 a = pass ? lf : lo, b = pass ? rf : hi;
+                    V3 dir = V3_Normalize(V3_AsubB(b,a));
+                    V3 perp = V3_Normalize(V3_Cross(dir, face));
+                    for (int k = 0; k < 3; ++k) { V3 o = V3_ScaleByF(perp, spread[k]); DrawCrossedLine(V3_AplusB(a,o), V3_AplusB(b,o), perp, 0.015f, band[k]); }
+                }
+            }
+        }
+    }
     if (Cheats.showPhys) { if (World.col[i] == CT_BOX) { DrawBoxCollider(i); } else if (World.col[i] == CT_SPH) { DrawSphereCollider(i); } else if (World.col[i] == CT_CVX || World.col[i] == CT_MSH) { DrawMeshCollider(i); } else if (World.col[i] == CT_CAP) { DrawCapsuleCollider(i); }    DrawAngularVelocity(i); }
     if (e->modelIndex < MAX_MDLS) {
         float redTint = 0.0f, rimStrength = 0.0f; if (e->deathAnimationActive && e->index == 433) { float elapsed = vmax((float)(World.pauseRelativeTime - (double)e->deathAnimationStart),0.0f); u32 tick = (u32)(elapsed / 0.05f); redTint = elapsed < 0.35f ? 0.5f * vmin((float)tick, 6.0f) : 0.0f; rimStrength = vmax(0.0f, 1.0f - ((float)tick * 15.0f / 255.0f)); } glUniform2f(33, redTint, rimStrength); // Set Hopper death glow effect strength.
@@ -2349,8 +2377,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     World.ressurections = World.deaths = World.kills = World.cyberkills = 0u;
     World.shotsFired = World.grenadesThrown = World.savesScummed = 0U;
     World.creditsPageIndex = 0u;
-    for (int i=0;i<14;++i) {World.levelSecurity[i] = 100u;}
-    World.levelSecurity[LEVEL_CYBERSPACE] = 0u;/*Cyberspace has no cameras or CPU nodes, so there is nothing to lower: report it secured rather than showing a full 100% for a level with no security objects. */
+    for (int i=0;i<14;++i) {World.levelSecurity[i] = 100u;} World.levelSecurity[LEVEL_CYBERSPACE] = 0u/*Cyberspace has no security levels.*/;
     mset(&Sys_Input,0,sizeof(Sys_Input));
     World.currentMouse_dx = World.currentMouse_dy = 0;
     last_mouse_x = last_mouse_y = 0; ignore_next_mouse_delta = true;

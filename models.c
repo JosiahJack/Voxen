@@ -5,28 +5,14 @@ void mul_mat4(float*,const float*,const float*);
 typedef struct { u8* base; u8* cur; u8* end; } SubArena;
 static SubArena thrd_sub[SUB_MAIN + 1];
 static void OS_SubArenaSliceInit(u32 idx, u8* base, size_t sz) { SubArena* a = &thrd_sub[idx]; a->base = base; a->cur = base; a->end = base + sz; }
-static void* OS_SubArenaAlloc(i32 tid, size_t n) {
-    if (tid < 0) { tid = SUB_MAIN; }
-    SubArena* a = &thrd_sub[tid];
-    size_t aligned = (n + 15) & ~(size_t)15;
-    if (a->cur + aligned > a->end) { DualLogError("SubArena %d ovr! want %u, cap %u MB\n", tid,(u32)n, (u32)((a->end - a->base))); OS_Exit(1); }
-    
-    void* p = a->cur; a->cur += aligned; mset(p, 0, aligned);
-    return p;
-}
-
+static void* OS_SubArenaAlloc(i32 tid, size_t n) { if (tid < 0) { tid = SUB_MAIN; } SubArena* a = &thrd_sub[tid]; size_t aligned = (n + 15) & ~(size_t)15; if (a->cur + aligned > a->end) { DualLogError("SubArena %d ovr! want %u, cap %u MB\n", tid,(u32)n, (u32)((a->end - a->base))); OS_Exit(1); } void* p = a->cur; a->cur += aligned; mset(p, 0, aligned); return p; }
 static void* OS_SubArenaMark(i32 tid) { return (void*)(tid < 0 ? thrd_sub[SUB_MAIN].cur : thrd_sub[tid].cur); }
 static void OS_SubArenaRelease(i32 tid, void* mark) { SubArena* a = (tid < 0) ? &thrd_sub[SUB_MAIN] : &thrd_sub[tid]; a->cur = (u8*)mark; }
-float** vPos;
 typedef struct { float *pos,*nrm,*uv,*verts; u32 *hash,*used,*remap; u8* cache; } MeshScratch;
-static MeshScratch meshScratch[32];
 typedef struct { const char *data; i32 size; } RawOBJ;
 typedef struct { u16 index; bool animated; u8 animationNum; u16* frames; u32 frameCount; char path[128]; } ModelData;
 typedef struct { ModelData* entries; u32 count; } ModelDataParser;
 typedef struct { u32 start,end; i32 tid; } PhysGeomTask;
-BvhNode** modelBVHNodes;
-u16** modelBVHTriOrder,modelBVHNodeCounts[MAX_MDLS];
-u32 modelBVHTriOrderCounts[MAX_MDLS];
 typedef struct { BvhNode *nodes; u8 *triOctants; u16 *triOrder,*triScratch,*initialTris; u32 nodeCount,triCount; } BvhBuildCtx;
 typedef enum { glb_attribute_type_invalid,glb_attribute_type_position,glb_attribute_type_normal,glb_attribute_type_texcoord,glb_attribute_type_joints,glb_attribute_type_weights}glb_attribute_type;
 typedef enum { glb_component_type_invalid,glb_component_type_r_8u,glb_component_type_r_16u,glb_component_type_r_32f } glb_component_type;
@@ -48,42 +34,22 @@ typedef struct { glbanim_samp*samplers;size_t samplers_count;glb_anim_chan*chann
 typedef struct { glb_mesh *meshes; size_t meshes_count; glb_accessor *accessors; size_t accessors_count; glb_buffer_view *buffer_views; size_t buffer_views_count; glb_buffer *buffers; size_t buffers_count; glb_skin *skins; size_t skins_count; glb_node *nodes; size_t nodes_count; glb_animt *animations; size_t animations_count; const void *bin; size_t bin_size; } glb_data;
 typedef enum { JSMN_UND = 0, JSMN_OBJECT = 1, JSMN_ARRAY = 2, JSMN_STRING = 3, JSMN_PRIMITIVE = 4 } jsmntype_t;
 enum { JSMN_ERROR_NOMEM = -1,JSMN_ERROR_INVAL = -2, JSMN_ERROR_PART = -3 };
-typedef struct { jsmntype_t type;i64 start,end;i32 size,parent; } jsmntok_t;
-typedef struct { size_t pos;u32 toknext;i32 toksuper; } jsmn_parser;
+typedef struct { jsmntype_t type; i64 start,end; i32 size,parent; } jsmntok_t;
+typedef struct { size_t pos; u32 toknext; i32 toksuper; } jsmn_parser;
 typedef struct { u16 j[4]; float w[4]; } VtxSkin;
-typedef struct { float *pos, *nrm, *uv; VtxSkin* skin; u32 vertCount, *indices, triCount; glb_node* jointNodes[MAX_GLB_JOINTS]; float invBind[MAX_GLB_JOINTS][16]; u32 jointCount; glb_animt* anim; glb_data* gltf; bool isTrAnim; glb_anim_chan **chanMap; glb_node **meshNodes; float **subPos, **subNrm, **subUv; u32 *subVertCnt, **subIndices, *subTriCount, submshCnt; } GltfMesh;
-static BvhBuildCtx thrd_bvh_ctx[32];
-u32* cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES];
-u16 *cvxAdjLists[MAX_UNIQUE_CVX_MESHES], cvxAdjStart[MAX_UNIQUE_CVX_MESHES];
-size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES], cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
-GltfMesh* gBlockMeshes;
-static u32 gBlockMeshCount = 0;
+typedef struct { float *pos,*nrm,*uv; VtxSkin* skin; u32 vertCount,*indices,triCount; glb_node* jointNodes[MAX_GLB_JOINTS]; float invBind[MAX_GLB_JOINTS][16]; u32 jointCount; glb_animt* anim; glb_data* gltf; bool isTrAnim; glb_anim_chan **chanMap; glb_node **meshNodes; float **subPos,**subNrm,**subUv; u32 *subVertCnt,**subIndices,*subTriCount,submshCnt; } GltfMesh;
+static MeshScratch meshScratch[32]; static BvhBuildCtx thrd_bvh_ctx[32]; BvhNode** modelBVHNodes; float** vPos; u32 modelBVHTriOrderCounts[MAX_MDLS],modelVertexCounts[MAX_MDLS],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; u16 **modelBVHTriOrder,modelBVHNodeCounts[MAX_MDLS],*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES]; size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
+GltfMesh* gBlockMeshes; static u32 gBlockMeshCount = 0;
 void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm) {
     float tx=T[0],ty=T[1],tz=T[2],qx=R[0],qy=R[1],qz=R[2],qw=R[3],sx=S[0],sy=S[1],sz=S[2];
-    lm[0]  = (1 - 2*qy*qy - 2*qz*qz) * sx; lm[1]  = (2*qx*qy + 2*qz*qw) * sx;     lm[2]  = (2*qx*qz - 2*qy*qw) * sx;   lm[3]  = 0.0f;
-    lm[4]  = (2*qx*qy - 2*qz*qw) * sy;     lm[5]  = (1 - 2*qx*qx - 2*qz*qz) * sy; lm[6]  = (2*qy*qz + 2*qx*qw) * sy;   lm[7]  = 0.0f;
-    lm[8]  = (2*qx*qz + 2*qy*qw) * sz;     lm[9]  = (2*qy*qz - 2*qx*qw) * sz;     lm[10] = (1 - 2*qx*qx - 2*qy*qy)*sz; lm[11] = 0.0f;
-    lm[12] = tx;                           lm[13] = ty;                           lm[14] = tz;                         lm[15] = 1.0f; 
+    lm[0] = (1 - 2*qy*qy - 2*qz*qz) * sx; lm[1]  = (2*qx*qy + 2*qz*qw) * sx; lm[2] = (2*qx*qz - 2*qy*qw) * sx; lm[3] = 0.0f; lm[4]  = (2*qx*qy - 2*qz*qw) * sy; lm[5] = (1 - 2*qx*qx - 2*qz*qz) * sy; lm[6] = (2*qy*qz + 2*qx*qw) * sy; lm[7] = 0.0f; lm[8] = (2*qx*qz + 2*qy*qw) * sz; lm[9] = (2*qy*qz - 2*qx*qw) * sz; lm[10] = (1 - 2*qx*qx - 2*qy*qy)*sz; lm[11] = 0.0f; lm[12] = tx; lm[13] = ty; lm[14] = tz; lm[15] = 1.0f; 
 }
 
 typedef struct { const u8* base; size_t stride; u8 nc, cs, cls, nrm; } GlbCell;
 static GlbCell GlbCellInit(const glb_accessor* a) {
-    GlbCell c;
-    c.stride = a->stride;
-    c.nrm    = (u8)a->normalized;
-    switch (a->type) {
-         case glbv2:    c.nc = 2;  break;
-         case glbv3:    c.nc = 3;  break;
-         case glbv4:    c.nc = 4;  break;
-         case glbmat4:  c.nc = 16; break;
-         default:       c.nc = 1;  break;
-    }
-    switch (a->component_type) {
-         case glb_component_type_r_8u:  c.cls = 4; c.cs = 1; break;
-         case glb_component_type_r_16u: c.cls = 3; c.cs = 2; break;
-         case glb_component_type_r_32f: c.cls = 2; c.cs = 4; break;
-         default: c.cls = 5; c.cs = 0; break; /* only 8u/16u/32f are supported by this loader */
-    }
+    GlbCell c; c.stride = a->stride; c.nrm    = (u8)a->normalized;
+    switch (a->type) { case glbv2: c.nc = 2;  break; case glbv3: c.nc = 3;  break; case glbv4: c.nc = 4;  break; case glbmat4: c.nc = 16; break; default: c.nc = 1;  break; }
+    switch (a->component_type) { case glb_component_type_r_8u: c.cls = 4; c.cs = 1; break; case glb_component_type_r_16u: c.cls = 3; c.cs = 2; break; case glb_component_type_r_32f: c.cls = 2; c.cs = 4; break; default: c.cls = 5; c.cs = 0; break; /* only 8u/16u/32f are supported by this loader */ }
     if (!a->buffer_view) { c.cls = 0; } else if (!a->buffer_view->buffer->data) { c.cls = 1; }
     c.base = (c.cls >= 2 && c.cls <= 4) ? (const u8*)a->buffer_view->buffer->data + a->buffer_view->offset + a->offset : NULL;
     return c;
@@ -92,48 +58,25 @@ static GlbCell GlbCellInit(const glb_accessor* a) {
 INLINE __attribute__((always_inline)) bool GlbCellGet(const GlbCell* restrict c, size_t i, float* restrict o, size_t es) {
     if (c->cls == 0) { mset(o, 0, es * sizeof(float)); return true; }
     if (c->cls == 1 || es < c->nc) { return false; }
-    const u8* e = c->base + c->stride * i;
-    const u8 nrm = c->nrm; /* nrm/cls/nc are per-accessor invariants, so the decode branch stays loop-invariant */
-    for (u8 k = 0; k < c->nc; ++k) {
-        const u8* p = e + (size_t)k * c->cs;
-        float r;
-        switch (c->cls) {
-             case 2:  r = *(const float*)p; break;
-             case 3:  r = nrm ? (float)*(const u16*)p / 65535.f : (float)*(const u16*)p; break;
-             case 4:  r = nrm ? (float)*(const u8*)p  / 255.f   : (float)*(const u8*)p;  break;
-             default: r = 0.0f; break; /* unsupported component type */
-        }
-        o[k] = r;
-    }
+    
+    const u8 *e = c->base + c->stride * i, nrm = c->nrm; /* nrm/cls/nc are per-accessor invariants, so the decode branch stays loop-invariant */
+    for (u8 k = 0; k < c->nc; ++k) { const u8* p = e + (size_t)k * c->cs; float r; switch (c->cls) {  case 2: r = *(const float*)p; break; case 3: r = nrm ? (float)*(const u16*)p / 65535.f : (float)*(const u16*)p; break; case 4: r = nrm ? (float)*(const u8*)p / 255.f : (float)*(const u8*)p;  break; default: r = 0.0f; break; /* unsupported component type */ } o[k] = r; }
     return true;
 }
 
-INLINE __attribute__((always_inline)) u64 GlbCellGetIdx(const GlbCell* restrict c, size_t i) {
-    if (c->cls == 3) { return *(const u16*)(c->base + c->stride * i); }
-    if (c->cls == 4) { return *(const u8*) (c->base + c->stride * i); }
-    return 0; /* no bufferView/data, fp32 and unsupported indices all read as 0, like the old integer reader */
-}
-
+INLINE __attribute__((always_inline)) u64 GlbCellGetIdx(const GlbCell* restrict c, size_t i) { if (c->cls == 3) { return *(const u16*)(c->base + c->stride * i); } if (c->cls == 4) { return *(const u8*) (c->base + c->stride * i); } return 0; /* no bufferView/data, fp32 and unsupported indices all read as 0, like the old integer reader */ }
 static const glb_accessor* glb_find_accessor(const glb_primitive* p, glb_attribute_type t, i32 idx) { for(size_t i=0;i<p->attr_count;++i) { const glb_attribute *a = &p->attr[i]; if (a->type == t && a->index == idx) { return a->data; } } return NULL; }
-bool glbread_float(const glb_accessor* a, size_t i, float* o, size_t es) { /*generic one-off read; hot per-vertex loops use the hoisted GlbCell form*/
-    GlbCell c = GlbCellInit(a);
-    return GlbCellGet(&c, i, o, es);
-}
-
+bool glbread_float(const glb_accessor* a, size_t i, float* o, size_t es) { /*generic one-off read; hot per-vertex loops use the hoisted GlbCell form*/ GlbCell c = GlbCellInit(a); return GlbCellGet(&c, i, o, es); }
 static int glb_json_strcmp(jsmntok_t const* t, const u8* j, const char* s) { if ((*t).type!=JSMN_STRING) return -1; size_t sl=slen(s),nl=(size_t)(t->end-t->start); return sl==nl?sCompUpToLen((const char*)j+t->start,s,sl)==0:0; }
 static int glb_json_to_int(jsmntok_t const* t, const u8* j){ if ((*t).type!=JSMN_PRIMITIVE) return -1; const char* p=(const char*)j+t->start; return (int)fast_atoi(&p); }
 static size_t glb_json_to_size(jsmntok_t const* t, const u8* j){ if(t->type != JSMN_PRIMITIVE){return 0;} size_t r=0;const char*p=(const char*)j+t->start,*e=(const char*)j+t->end; while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;}return r; }
-
 static int glb_skip_json(jsmntok_t const* t, int i){int e=i+1;while(i<e){switch(t[i].type){case JSMN_OBJECT:e+=t[i].size*2;break;case JSMN_ARRAY:e+=t[i].size;break;case JSMN_PRIMITIVE:case JSMN_STRING:break;default:return -1;}i++;}return i;}
 static int glb_parse_json_float_array(jsmntok_t const* t, int i, const u8* j, float* o, int s){if (t[i].type!=JSMN_ARRAY) return -1;if(t[i].size!=s)return -1;++i;for(int k=0;k<s;++k){if (t[i].type!=JSMN_PRIMITIVE) return -1; const char* p=(const char*)j+t[i].start; o[k]=fast_atof(&p);++i;}return i;}
-
 static int glb_parse_json_array(jsmntok_t const* t, int i, const u8* j, size_t es, i32 tid, void** out, size_t* os){ (void)j;if(t[i].type!=JSMN_ARRAY)return -1;if(*out)return -1;int sz=t[i].size;*out=OS_SubArenaAlloc(tid,es*sz); *os=sz;return i+1; }
 typedef int (*glb_parse_item_func)(jsmntok_t const* t, int i, const u8* j, i32 tid, void* out);
 static int glb_parse_json_array_generic(jsmntok_t const* t, int i, const u8* j, size_t elem_size, i32 tid, void** out_array, size_t* out_count, glb_parse_item_func parse_item) { i = glb_parse_json_array(t, i, j, elem_size, tid, out_array, out_count); if (i < 0) return i; for(size_t k=0;k<*out_count;++k){i=parse_item(t,i,j,tid,(char*)*out_array + k * elem_size); if(i<0)return i;} return i; }
 static glb_component_type json_to_comp_type(jsmntok_t const* t, const u8* j){ int ty=glb_json_to_int(t,j); return ty==5121?glb_component_type_r_8u:ty==5123?glb_component_type_r_16u:ty==5126?glb_component_type_r_32f:glb_component_type_invalid; }
 static int glb_parse_json_node_array(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_node*** out, size_t* out_count) { i = glb_parse_json_array(t, i, j, sizeof(glb_node*), tid, (void**)out, out_count); if (i < 0) return i; for (size_t m = 0; m < *out_count; ++m) { (*out)[m] = (glb_node*)((size_t)glb_json_to_int(t+i, j)+1); ++i; } return i; }
-
-
 static int json_attribute_list(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_attribute** out, size_t* oc) {
     if (t[i].type!=JSMN_OBJECT || *out) return -1; *oc=t[i].size; *out=OS_SubArenaAlloc(tid,sizeof(glb_attribute)**oc); ++i;
     for (size_t k=0;k<*oc;++k) {
@@ -170,32 +113,29 @@ static int glb_parse_json_skin(jsmntok_t const* t, int i, const u8* j, i32 tid, 
 static int glb_parse_json_node(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_node* out){
     if (t[i].type!=JSMN_OBJECT) return -1;
     
-    out->rotation[3] = 1.0f;
-    out->scale[0] = 1.0f;
-    out->scale[1] = 1.0f;
-    out->scale[2] = 1.0f;
-    int sz = t[i].size;
-    ++i;
+    out->rotation[3] = 1.0f; out->scale[0] = 1.0f; out->scale[1] = 1.0f; out->scale[2] = 1.0f; int sz = t[i].size; ++i;
     for (int k=0;k<sz;++k) {
         if(t[i].type != JSMN_STRING || t[i].size == 0) return -1;
         
-             if (glb_json_strcmp(t + i,j,"children")) { ++i; i = glb_parse_json_node_array(t, i, j, tid, &out->children, &out->children_count); }
-        else if (glb_json_strcmp(t + i,j,"mesh")) { ++i;if (t[i].type != JSMN_PRIMITIVE) return -1; out->mesh = (glb_mesh*)((size_t)glb_json_to_int(t + i,j) + 1); ++i;}
-        else if (glb_json_strcmp(t + i,j,"skin")){++i;if (t[i].type != JSMN_PRIMITIVE) return -1; out->skin = (glb_skin*)((size_t)glb_json_to_int(t + i,j) + 1); ++i;}
-        else if (glb_json_strcmp(t + i,j,"translation")){ i = glb_parse_json_float_array(t,i + 1,j,out->translation,3);}
-        else if (glb_json_strcmp(t + i,j,"rotation")) { i = glb_parse_json_float_array(t, i + 1,j,out->rotation, 4);}
-        else if (glb_json_strcmp(t + i,j,"scale")){ i = glb_parse_json_float_array(t, i + 1, j, out->scale, 3);}
-        else                                   {i = glb_skip_json(t, i + 1);}
+             if (glb_json_strcmp(t + i,j,"children"))    { ++i; i = glb_parse_json_node_array(t, i, j, tid, &out->children, &out->children_count); }
+        else if (glb_json_strcmp(t + i,j,"mesh"))        { ++i; if (t[i].type != JSMN_PRIMITIVE) return -1; out->mesh = (glb_mesh*)((size_t)glb_json_to_int(t + i,j) + 1); ++i;}
+        else if (glb_json_strcmp(t + i,j,"skin"))        { ++i; if (t[i].type != JSMN_PRIMITIVE) return -1; out->skin = (glb_skin*)((size_t)glb_json_to_int(t + i,j) + 1); ++i;}
+        else if (glb_json_strcmp(t + i,j,"translation")) { i = glb_parse_json_float_array(t,i + 1,j,out->translation,3);}
+        else if (glb_json_strcmp(t + i,j,"rotation"))    { i = glb_parse_json_float_array(t, i + 1,j,out->rotation, 4);}
+        else if (glb_json_strcmp(t + i,j,"scale"))       { i = glb_parse_json_float_array(t, i + 1, j, out->scale, 3);}
+        else                                              {i = glb_skip_json(t, i + 1);}
         if (i < 0) return i;
     } return i;
 }
 
-static int glb_parse_json_animation_sampler(jsmntok_t const* t, int i, const u8* j, i32 tid, glbanim_samp* out){ (void)tid;
+static int glb_parse_json_animation_sampler(jsmntok_t const* t, int i, const u8* j, i32 tid, glbanim_samp* out){
+    (void)tid;
     if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){if(t[i].type!=JSMN_STRING||t[i].size==0)return -1; if(glb_json_strcmp(t+i,j,"input")){++i;out->input=(glb_accessor*)((size_t)glb_json_to_int(t+i,j)+1);++i;} else if(glb_json_strcmp(t+i,j,"output")){++i;out->output=(glb_accessor*)((size_t)glb_json_to_int(t+i,j)+1);++i;} else if(glb_json_strcmp(t+i,j,"interpolation")){ ++i; out->interpolation = glb_json_strcmp(t+i,j,"LINEAR")?glb_interp_linear:glb_interp_step; ++i; } else i=glb_skip_json(t,i+1); if(i<0)return i;} return i;
 }
 
-static int glb_parse_json_animation_channel(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_anim_chan* out){ (void)tid;
+static int glb_parse_json_animation_channel(jsmntok_t const* t, int i, const u8* j, i32 tid, glb_anim_chan* out){
+    (void)tid;
     if (t[i].type!=JSMN_OBJECT) return -1;int sz=t[i].size;++i;
     for(int k=0;k<sz;++k){
         if(t[i].type!=JSMN_STRING||t[i].size==0)return -1;

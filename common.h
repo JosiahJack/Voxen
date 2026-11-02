@@ -556,9 +556,7 @@ INLINE bool IdxInBounds(int c) { return (c >= 0 && c <= 858); }
 INLINE bool IdxIsGeometry(int c) { return (c >= 0 && c <= 306 && c != 112 && c != 279) || c == 760; }
 INLINE bool IdxIsGib(int c) { return (c >= 768 && c <= 855); }
 INLINE bool IdxIsDoor(int c) { return (c >= 496 && c < 515); }
-void DoorLaserDraw(u16 self);
 INLINE bool IdxIsLayerDoor(int c) { return c==497||c==500||c==502; }
-INLINE bool IdxIsLaserDoor(int c) { return c==505||c==506; }
 INLINE bool IdxIsNPC(int c) { return (c >= 419 && c <= 447); }
 INLINE bool IdxIsCorpse(int c) { return (c >= 465 && c < 472); }
 #define CYBER_DECOY_CONST 553u

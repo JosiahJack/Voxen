@@ -216,61 +216,31 @@ __attribute__((noinline)) void MenuGoBack() {
     }
 }
 
-static void CreateShadowBuffers() {
-    shadowMapSSBO           = MakeSSBO(&shadowMapSSBO,           5, (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW);
-    shadowMapsIndirectionID = MakeSSBO(&shadowMapsIndirectionID, 6, LIGHT_COUNT * sizeof(u32),                                                 NULL, GL_STATIC_DRAW); 
-    shadowBuffersCreated = true;
-}
-
+static void CreateShadowBuffers() { shadowMapSSBO = MakeSSBO(&shadowMapSSBO, 5, (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) * sizeof(u32), NULL, GL_STATIC_DRAW); shadowMapsIndirectionID = MakeSSBO(&shadowMapsIndirectionID, 6, LIGHT_COUNT * sizeof(u32), NULL, GL_STATIC_DRAW);  shadowBuffersCreated = true; }
 // Menu Video Playback
 static double introVidStart = 0.0, creditsVidStart = 0.0;
 static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.1f,59.3f,69.1f,74.5f,81.2f,89.2f,98.4f,105.0f};
 static const float outroTextAt[3] = {0.0f,7.0f,11.0f};/*CreditsScroll swaps to card 2 at 7s, card 3 at 11s, then hides all cards at 14s*/
-void ChangeMenuPage(u8 pg) {
-    currentMenuPage = pg;
-    currentMenuItem = currentMenuTab = 0;
-    resDropdownOpen = false;
-    resHoverIdx = -1;
-    if (pg==MPG_SAVE||pg==MPG_LOAD) { SaveSlotCancelTyping(); RefreshSaveSlots(); }/*reparse save headers whenever the Save/Load page is assigned*/
-    if (pg==MPG_INTRO) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); }
-    if (pg==MPG_CREDS) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); }
-}
-
+void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; if (pg==MPG_SAVE||pg==MPG_LOAD) { SaveSlotCancelTyping(); RefreshSaveSlots(); } if (pg==MPG_INTRO) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); } if (pg==MPG_CREDS) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); } }
 void GameEndSequence() { World.gameFinished = true; World.paused = true; World.menuActive = true; ChangeMenuPage(MPG_CREDS); }
-
 static char vidTxtBuf[T_LOGSTR_MAX];
 static void RenderVideoPage(u8 page) {
     bool isIntro = (page==MPG_INTRO);
     double start = isIntro ? introVidStart : creditsVidStart;
-    if (start <= 0.0) {
-        start=World.absoluteTime;
-        if (isIntro) introVidStart=start;
-        else creditsVidStart=start;
-    } /*page entered without ChangeMenuPage (startup intro)*/
+    if (start <= 0.0) { start=World.absoluteTime; if (isIntro) introVidStart=start; else creditsVidStart=start; }
     double elapsed = World.absoluteTime - start;
     const float* at = isIntro ? introTextAt : outroTextAt;
     int cardCount = isIntro ? 15 : 3;
-    double vidLen = isIntro ? 117.141f : 54.144f;/*Measured from the clip audio at 48 kHz: intro 5622784 frames, outro 2598912 frames. The flipbook is advanced as elapsed*frames/vidLen, so this sets the effective per-frame rate: 6.276 fps intro, 7.535 fps outro.*/
-    double cardsEnd = isIntro ? vidLen : 14.0/*CreditsScroll deactivates all three outro cards at 14s, leaving the video to run on to the end of its audio*/;
+    double vidLen = isIntro ? 117.141f : 54.144f; double cardsEnd = isIntro ? vidLen : 14.0;
     int frames = isIntro ? 735 : 408; u32 frameBase = isIntro ? 2166u : 2901u;
     if (frameBase+(u32)frames > (u32)texCnt) frames = 0;/*frames missing from textures.txt: leave the black ground rather than sample past the array*/
     i32 frame = frames>0 ? (i32)(elapsed*(double)frames/vidLen) : 0; if (frame<0) frame = 0; else if (frame>=frames) frame = frames-1;
     static u32 heldRt = 0xFFFFFFFFu, heldBase = 0xFFFFFFFFu; /*zero order hold: a ring slot that is still decoding must keep the last frame on screen, not punch a hole to the background*/
     if (heldBase != frameBase) { heldBase = frameBase; heldRt = 0xFFFFFFFFu; }
-    if (frames>0) {
-        u32 want = frameBase+(u32)frame;
-        u32 nxt = VideoPeekFrame(want);
-        VideoRequestFrame(want);
-        if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt);
-        u32 rt = VideoFrameTexIndex(want);
-        if (rt != 0xFFFFFFFFu) heldRt = rt;
-        if (heldRt != 0xFFFFFFFFu) RenderUIImage(43,isIntro ? 39 : 0,1280,isIntro ? 600 : 720,heldRt);
-    }
-    
+    if (frames>0) { u32 want = frameBase+(u32)frame; u32 nxt = VideoPeekFrame(want); VideoRequestFrame(want); if (nxt != 0xFFFFFFFFu) VideoPrefetchFrame(nxt); u32 rt = VideoFrameTexIndex(want); if (rt != 0xFFFFFFFFu) heldRt = rt; if (heldRt != 0xFFFFFFFFu) RenderUIImage(43,isIntro ? 39 : 0,1280,isIntro ? 600 : 720,heldRt); }    
     int card = -1;
     if (elapsed < cardsEnd) { for (int i=cardCount-1;i>=0;--i) { if (elapsed >= at[i]) { card = i; break; } } }
     if (card >= 0) { RenderTextC(546,544,T_VIDEOTEXT,FONT_NORMAL,1.25f,"%s",Sys_Text.stringTable[(isIntro?613:610)+card]); }
-    
     bool mouseClick = !uiClickBlocked && (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed);
     bool click = mouseClick || MenuEnter(), anyKey = Sys_Input.keyStates[KEY_ESCAPE].pressed;
     for(int k=0;!anyKey&&k<MAX_KEYS;++k){if (Sys_Input.keyStates[k].pressed) anyKey=true;}
@@ -317,11 +287,14 @@ void RenderMenu() {
             if (UI_Checkbox(UI_ID_MENU_MODEL_DETAIL,200,500,0,Sys_Settings.ModelDetail ?/*High*/915 :/*No Detail Level Models*/914,Sys_Settings.ModelDetail)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(UI_ID_MENU_FXAA,200,530,1,/*"FXAA"*/780,Sys_Settings.FXAA)) { Sys_Settings.FXAA = Sys_Settings.FXAA ? 0u : 1u; SaveConfig(); }
             if (UI_Checkbox(UI_ID_MENU_SHADOWS,200,560,2,Sys_Settings.Shadows ?/*Soft*/787 :/*No Shadows*/785,Sys_Settings.Shadows)) { Sys_Settings.Shadows = Sys_Settings.Shadows ? 0u : 1u; if (!shadowBuffersCreated) {CreateShadowBuffers();} SaveConfig(); }
-            if (reflDropdownOpen) { bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
+            if (reflDropdownOpen) {
+                bool lmb=Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed, rmb=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed;
                 if (lmb||rmb) { int rlh=3*16; bool inList = World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=590-rlh && World.cursorPos_y<=590;
                     if (inList) { int row=(World.cursorPos_y-(590-rlh))/16; if (row>=0 && row<3) { Sys_Settings.Reflections=(u8)row; SaveConfig(); EnsureReflectionResources(); } }
                     reflDropdownOpen=false;
-                    if (inList) { Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; } } }
+                    if (inList) { Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true; }
+                }
+            }
             bool overRefl=false;
             if (UI_Button(UI_ID_MENU_SSR,190,606,328,16,&overRefl,3) || (MenuEnter() && currentMenuItem == 3)) { if (!reflDropdownOpen) { reflDropdownOpen=true; } else { reflDropdownOpen=false; } currentMenuItem = 3; }
             overRefl = overRefl || currentMenuItem == 3;
@@ -342,10 +315,10 @@ void RenderMenu() {
             if (resDropdownCount > 0) sFormat(resBuf, sizeof(resBuf), "%ux%u",(u32)resModes[resSelectedIdx].w,(u32)resModes[resSelectedIdx].h); else sFormat(resBuf, sizeof(resBuf), "%ux%u",Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
             RenderUIImage(476,710,16,16,overRes ? 1119 : 1077); RenderTextL(200,710,overRes ? T_YELLOW : T_GREEN,FONT_NORMAL,1.0f,"RESOLUTION %s",resBuf);
             if(resDropdownOpen && resDropdownCount>0){ int rlh2=resDropdownCount*16, rTop=710-rlh2;
-                resHoverIdx=(World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=rTop && World.cursorPos_y<rTop+rlh2) ? (World.cursorPos_y-rTop)/16 : -1;
+                resHoverIdx = (World.cursorPos_x>=336 && World.cursorPos_x<=496 && World.cursorPos_y>=rTop && World.cursorPos_y<rTop+rlh2) ? (World.cursorPos_y-rTop)/16 : -1;
                 RenderUIImage(336,rTop,160,rlh2,922);/*datapanel behind list*/
-                for(int ri=0;ri<resDropdownCount;++ri){char rb[32]; sFormat(rb,sizeof(rb),"%ux%u",(u32)resModes[ri].w,(u32)resModes[ri].h); if(ri==resSelectedIdx){RenderUIImage(336,rTop-2+ri*16,160,18,1087);} RenderTextL(366,rTop+ri*16,ri==resHoverIdx ? T_YELLOW : T_GREEN,FONT_NORMAL,0.9f,"%s",rb);}}
-            else{resHoverIdx=-1;}
+                for(int ri=0;ri<resDropdownCount;++ri){char rb[32]; sFormat(rb,sizeof(rb),"%ux%u",(u32)resModes[ri].w,(u32)resModes[ri].h); if(ri==resSelectedIdx){RenderUIImage(336,rTop-2+ri*16,160,18,1087);} RenderTextL(366,rTop+ri*16,ri==resHoverIdx ? T_YELLOW : T_GREEN,FONT_NORMAL,0.9f,"%s",rb);}
+            } else { resHoverIdx = -1; }
             RenderUIImage(200,740, 16,16, 910);/*Fullscreen checkbox background*/
             if (UI_Button(UI_ID_MENU_FULLSCREEN,200,756, 210,16, &overFull, 8) || (MenuEnter() && currentMenuItem == 8)) { Sys_Settings.Fullscreen = Sys_Settings.Fullscreen == 1u ? 0u : 1u; ChangeFullScreenWindowed(true); SaveConfig(); }
             overFull = overFull || currentMenuItem == 8; if (Sys_Settings.Fullscreen) RenderUIImage(202,742, 12,12, 912);/*Checkbox check*/
@@ -394,8 +367,7 @@ void RenderMenu() {
                 }
             }
             if (rebindRow < 0) rebindCaptureActive = false;
-        }
-        else {
+        } else {
             menuItemCount = 10;/*Audio / Lang*/
             UI_Slider(UI_ID_MENU_MASTER_VOLUME_SLIDER,426,240,128,16,((Sys_Settings.VolumeMaster / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeMaster,&masterVolumeSliderActive,0,100,5,0,/*Master Volume*/802);
             UI_Slider(UI_ID_MENU_MUSIC_VOLUME_SLIDER,426,270,128,16,((Sys_Settings.VolumeMusic / 100.0f) * (128 - 16)),200,&Sys_Settings.VolumeMusic,&musicVolumeSliderActive,0,100,5,1,/*Music Volume*/803);
@@ -459,9 +431,14 @@ void RenderMenu() {
 void RenderPausedUI() {
     menuItemCount = 6; menuTabCount = 1; static const i16 pY[6]={330,390,450,510,570,714},pH[6]={52,52,60,60,60,42},pTx[6]={610,630,635,599,546,572},pTy[6]={306,364,422,480,538,690}; static const u16 pStr[6]={725,726,727,721,728,729};
     RenderUIImage(519,276,328,300,1025);/*Pause Menu background*/ RenderUIImage(519,276,328,300,1080);/*Pause Menu background outline*/ RenderUIImage(519,672,328,42,1252);/*Pause Quit Game background*/ RenderTextL(610,210,T_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,/*"PAUSED"*/Sys_Text.stringTable[724]);
-    for (u8 i=0;i<6;++i) { bool over=false; if (UI_Button(UI_ID_PAUSE_RESUME+i,522,pY[i],322,pH[i],&over,(i8)i) || (MenuEnter() && currentMenuItem==i)) { if (i==0) World.paused=false; else if (i==5) OS_Exit(0);
-            else { if (i==4) { DualLog("Player exited to menu\n"); clearRenderTargetsOnNextFrame = true; } ChangeMenuPage(i==1?MPG_LOAD:i==2?MPG_SAVE:i==3?MPG_OPTS:MPG_FRONT); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); } }
-        over=over||currentMenuItem==i; RenderTextL(pTx[i],pTy[i],over ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,Sys_Text.stringTable[pStr[i]]); }
+    for (u8 i=0;i<6;++i) {
+        bool over=false;
+        if (UI_Button(UI_ID_PAUSE_RESUME+i,522,pY[i],322,pH[i],&over,(i8)i) || (MenuEnter() && currentMenuItem==i)) {
+            if (i==0) World.paused=false; else if (i==5) OS_Exit(0);
+            else { if (i==4) { DualLog("Player exited to menu\n"); clearRenderTargetsOnNextFrame = true; } ChangeMenuPage(i==1?MPG_LOAD:i==2?MPG_SAVE:i==3?MPG_OPTS:MPG_FRONT); PlayMenuMusic(); World.menuActive=true; returnToPause=(i!=4); }
+        }
+        over=over||currentMenuItem==i; RenderTextL(pTx[i],pTy[i],over ? T_STOPD_RED_HIGHLIGHT : T_STOPD_RED,FONT_STOPD,1.0f,Sys_Text.stringTable[pStr[i]]);
+    }
 }
 
 void GetWeaponAmmoText(int slot,char* buf,size_t bufSize) {
@@ -489,34 +466,35 @@ void TickBar(bool isEnergy) {
     if (isEnergy && World.invP1.drainJPM > 0) RenderTextL(1340,tY+8,T_GREEN,FONT_NORMAL,0.8f,"%d J/min",(int)World.invP1.drainJPM); }
 
 INLINE int HwActiveTexIndex(int active, int version, int off, int v1, int v2, int v3, int v4) { if (!active) return off; if (v4 >= 0 && version >= 4) return v4; if (version >= 3) return v3; if (version == 2) return v2; return v1; }
-/*eng: 0 needs energy, 1 needs energy only when hwVersSetting==0, 2 needs energy only when hwVersSetting>=1, 3 not a toggle (e-reader)*/
 typedef struct { u32 bit; u8 idx; i16 x,y; u16 t[5]; u8 sOn,sOff,eng; } HwBtn;
 static const HwBtn hwBtns[8]={{HW_BIO,HW_BIO_IDX,0,180,{989,991,992,992,992},78,78,1},{HW_SNS,HW_SNS_IDX,0,240,{1009,1011,1012,1013,1013},93,82,0},{HW_LAN,HW_LAN_IDX,0,300,{1004,1006,1007,1008,1008},78,78,0},{HW_SHD,HW_SHD_IDX,0,360,{1014,1015,1016,1017,1018},96,95,0},
                               {HW_INF,HW_INF_IDX,1326,180,{998,999,999,999,999},98,82,0},{HW_ERD,HW_ERD_IDX,1326,240,{996,997,997,997,997},0,0,3},{HW_BST,HW_BST_IDX,1326,300,{993,994,995,995,995},78,78,2},{HW_JET,HW_JET_IDX,1326,360,{1000,1001,1002,1003,1003},78,78,0}};
 void HardwareButtons() {
     u32 hw=World.invP1.hasHardware;
-    for(u8 i=0;i<8;++i){const HwBtn* b=&hwBtns[i]; if (!(hw&b->bit))continue; u16 tex; if (b->eng==3) tex=((World.inventoryMode && UIOver(UI_ID_HUD_HW_0+i) && AnyLeftRightMouseDown()) || ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1))) ? 997 : 996; else tex=(u16)HwActiveTexIndex((World.invP1.hardwareIsActive & b->bit)!=0,World.invP1.hwVers[b->idx],b->t[0],b->t[1],b->t[2],b->t[3],b->t[4]); UIRImg(UI_ID_HUD_HW_0+i,b->x,b->y,40,40,tex); }
+    for(u8 i=0;i<8;++i){
+        const HwBtn* b=&hwBtns[i]; if (!(hw&b->bit))continue;
+        
+        u16 tex;
+        if (b->eng==3) tex = ((World.inventoryMode && UIOver(UI_ID_HUD_HW_0+i) && AnyLeftRightMouseDown()) || ((World.invP1.hasNewEmail || World.invP1.hasNewLogs) && ((int)World.pauseRelativeTime & 1))) ? 997 : 996;
+        else           tex = (u16)HwActiveTexIndex((World.invP1.hardwareIsActive & b->bit)!=0,World.invP1.hwVers[b->idx],b->t[0],b->t[1],b->t[2],b->t[3],b->t[4]);
+        UIRImg(UI_ID_HUD_HW_0+i,b->x,b->y,40,40,tex);
+    }
 }
 
 void RenderShieldEffect() {
     if (World.pauseRelativeTime > World.Sys_UI.shieldAnimationFinished) return;
-    float t = (float)(World.pauseRelativeTime - World.Sys_UI.shieldAnimationStarted);
-    if (t < 0.0f) t = 0.0f; if (t > 1.2f) t = 1.2f;
-    int middleY = 384; int topY = 0; int bottomY = 768;
-    int w = 1366, h = 160;
-    int x = 0; // full screen width
+    
+    float t = vclamp((float)(World.pauseRelativeTime - World.Sys_UI.shieldAnimationStarted),0.0f,1.2f);
     if (World.Sys_UI.shieldAnimationIsActivate) {
-        // Activate: sweep from middle to edges
-        float upY = (float)middleY + (float)(topY - middleY) * t;
-        float dnY = (float)middleY + (float)(bottomY - middleY) * t;
-        RenderUIImage(x, (i16)(upY + 40 - h*0.5f), w, h, 1076);
-        RenderUIImageExtended(x, (i16)(dnY - 40 - h*0.5f), w, h, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);
+        float upY = 384.0f + (0.0f - 384.0f) * t;
+        float dnY = 384.0f + (768.0f - 384.0f) * t;
+        RenderUIImage(0, (i16)(upY + 40 - 80.0f), 1366, 160, 1076);
+        RenderUIImageExtended(0, (i16)(dnY - 40 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);
     } else {
-        // Deactivate: sweep from edges back to middle
-        float upY = (float)topY + (float)(middleY - topY) * t;
-        float dnY = (float)bottomY + (float)(middleY - bottomY) * t;
-        RenderUIImage(x, (i16)(upY + 0 - h*0.5f), w, h, 1076);
-        RenderUIImageExtended(x, (i16)(dnY - 0 - h*0.5f), w, h, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);
+        float upY = 0.0f + (384.0f - 0.0f) * t;
+        float dnY = 768.0f + (384.0f - 768.0f) * t;
+        RenderUIImage(0, (i16)(upY + 0 - 80.0f), 1366, 160, 1076);
+        RenderUIImageExtended(0, (i16)(dnY - 0 - 80.0f), 1366, 160, 1076, 3.14159265f, 0.5f, 0.5f, 1.0f, 1.0f, 1.0f);
     }
 }
 

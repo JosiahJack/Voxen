@@ -1,9 +1,7 @@
 // entity.c - Entity Definitions and Save Load System for levels and savegames
 #include "common.h"
-u16 teleportDestinations[MAX_LEVELS][8];
-static bool teleportDestinationsInitialized;
-u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL];
-u8 elevatorDestCounts[MAX_LEVELS];
+u16 teleportDestinations[MAX_LEVELS][8]; static bool teleportDestinationsInitialized;
+u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL]; u8 elevatorDestCounts[MAX_LEVELS];
 Quaternion quat_from_axis_angle(V3,float);
 void AddDoorPortal(u16,u16), TextureSequenceInit(u16,char*), AddCamView(V3,Quaternion,u8,u16,u16,float,float), GravityLiftSyncAllVisuals(void);
 Entity* entsFromFile; V3 *posFromFile, *scaleFromFile; Quaternion *rotationFromFile; Light *lightsFromFile; LightAnimation *lanimsFromFile; static V3 *colCtrFromFile = NULL, *colSzFromFile = NULL;
@@ -23,7 +21,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*9 chunk_bridg1_4_slice32*/[9]={23,0,48,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*10 chunk_bridg1_4_slice32flipx*/[10]={24,0,48,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*11 chunk_bridg1_5*/[11]={25,0,50,49,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*12 chunk_bridg2_2*/[12]={26,0,MAXANIM,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*12 chunk_bridg2_2*/[12]={26,0,53,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*13 chunk_bridg2_3*/[13]={27,0,56,54,MAXTEX,55,0,MAXANIM,0,{0},{0}},
 /*14 chunk_bridg2_4*/[14]={28,0,57,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*15 chunk_bridg2_5*/[15]={29,0,59,MAXTEX,MAXTEX,58,0,MAXANIM,0,{0},{0}},
@@ -31,7 +29,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*17 chunk_bridg2_7*/[17]={664,0,61,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*18 chunk_bridg2_8*/[18]={31,0,62,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*19 chunk_bridg2_9*/[19]={32,0,64,63,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*20 chunk_crate_impenetrable*/[20]={61,0,150,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*20 chunk_crate_impenetrable*/[20]={61,0,150,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_BOX,{0},{2.58746f,2.5872478f,2.56f}},
 /*21 chunk_cyberpanel*/[21]={178,0,151,151,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*22 chunk_cyberpanel_slice45*/[22]={7488,0,152,152,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}}, /*model 7488 (grove1_2_slice45.obj): the generic slice45 card 6875 is the 180deg-rotated variant; 7488 is the same single triangle in the orientation the Unity blend specifies*/
 /*23 chunk_eng1_1*/[23]={96,0,254,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
@@ -174,10 +172,10 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*160 chunk_med1_5*/[160]={669,0,495,MAXTEX,1256,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*161 chunk_med1_6*/[161]={259,0,496,MAXTEX,1256,509,0,MAXANIM,0,{0},{0}},
 /*162 chunk_med1_7*/[162]={262,0,499,MAXTEX,1268,498,0,MAXANIM,CT_MSH,{0},{0}},
-/*163 chunk_med1_7_slice14_64*/[163]={263,0,499,MAXTEX,1268,1254,0,MAXANIM,CT_MSH,{0},{0}},
-/*164 chunk_med1_7_slice45_320lh*/[164]={264,0,499,MAXTEX,1268,1254,0,MAXANIM,CT_MSH,{0},{0}},
-/*165 chunk_med1_7_slice45_320rh*/[165]={265,0,499,MAXTEX,1268,1254,0,MAXANIM,CT_MSH,{0},{0}},
-/*166 chunk_med1_7_slice96high*/[166]={266,0,499,MAXTEX,1268,1254,0,MAXANIM,CT_MSH,{0},{0}},
+/*163 chunk_med1_7_slice14_64*/[163]={263,0,499,MAXTEX,1268,498,0,MAXANIM,CT_MSH,{0},{0}},
+/*164 chunk_med1_7_slice45_320lh*/[164]={264,0,499,MAXTEX,1268,498,0,MAXANIM,CT_MSH,{0},{0}},
+/*165 chunk_med1_7_slice45_320rh*/[165]={265,0,499,MAXTEX,1268,498,0,MAXANIM,CT_MSH,{0},{0}},
+/*166 chunk_med1_7_slice96high*/[166]={266,0,499,MAXTEX,1268,498,0,MAXANIM,CT_MSH,{0},{0}},
 /*167 chunk_med1_7d*/[167]={260,0,497,MAXTEX,1269,1270,0,MAXANIM,CT_MSH,{0},{0}},
 /*168 chunk_med1_7d_slice128*/[168]={261,0,497,MAXTEX,1269,1270,0,MAXANIM,CT_MSH,{0},{0}},
 /*169 chunk_med1_8*/[169]={268,0,503,MAXTEX,1242,502,0,MAXANIM,CT_MSH,{0},{0}},
@@ -318,10 +316,10 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*304 chunk_stor1_7d*/[304]={620,0,831,830,834,832,0,MAXANIM,0,{0},{0}},
 /*305 chunk_teleporter*/[305]={178,0,1166,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*306 chunk_white*/[306]={178,0,881,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*307 item_paper_wad*/[307]={487,0,1250,MAXTEX,MAXTEX,MAXTEX,0.06f,MAXANIM,CT_SPH,{-0.001254f,-0.001190498f,0.006335999f},{0.0451f,0,0}},
+/*307 item_paper_wad*/[307]={487,0,1250,MAXTEX,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_SPH,{-0.001254f,-0.001190498f,0.006335999f},{0.065f,0,0}},
 /*308 item_warecasing*/[308]={637,0,1251,MAXTEX,MAXTEX,MAXTEX,0.8f,MAXANIM,CT_BOX,{0,0,0.09397449f},{0.540964f,0.405398f,0.187949f}},
 /*309 item_beaker*/[309]={14,682,36,MAXTEX,1242,MAXTEX,0.28f,MAXANIM,CT_CVX,{0},{0}},
-/*310 item_beverage*/[310]={18,683,37,MAXTEX,MAXTEX,MAXTEX,0.12f,MAXANIM,CT_CVX,{0},{0}},
+/*310 item_beverage*/[310]={18,683,37,MAXTEX,MAXTEX,MAXTEX,0.1f,MAXANIM,CT_CVX,{0},{0}},
 /*311 item_skull*/[311]={593,70,816,MAXTEX,MAXTEX,MAXTEX,0.451f,MAXANIM,CT_CVX,{0},{0}},
 /*312 item_arm*/[312]={7,678,28,MAXTEX,MAXTEX,MAXTEX,1.0f,MAXANIM,CT_CVX,{0},{0}},
 /*313 item_audiolog*/[313]={11,679,52,80,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_CVX,{0},{0}},
@@ -332,22 +330,22 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*318 weapon_grenademine*/[318]={184,87,353,MAXTEX,MAXTEX,MAXTEX,1.2f,MAXANIM,CT_CVX,{0},{0}},
 /*319 weapon_grenadenitro*/[319]={300,301,356,MAXTEX,MAXTEX,MAXTEX,1.2f,MAXANIM,CT_CVX,{0},{0}},
 /*320 weapon_grenadegas*/[320]={183,89,349,MAXTEX,MAXTEX,MAXTEX,0.9f,MAXANIM,CT_CVX,{0},{0}},
-/*321 item_patch_berserk*/[321]={488,491,590,MAXTEX,MAXTEX,MAXTEX,0.14f,MAXANIM,CT_CVX,{0},{0}},
-/*322 item_patch_detox*/[322]={488,491,591,MAXTEX,MAXTEX,MAXTEX,0.14f,MAXANIM,CT_CVX,{0},{0}},
-/*323 item_patch_genius*/[323]={488,491,592,MAXTEX,MAXTEX,MAXTEX,0.14f,MAXANIM,CT_CVX,{0},{0}},
-/*324 item_patch_medi*/[324]={488,491,600,MAXTEX,MAXTEX,MAXTEX,0.14f,MAXANIM,CT_CVX,{0},{0}},
-/*325 item_patch_reflex*/[325]={488,491,641,MAXTEX,MAXTEX,MAXTEX,0.14f,MAXANIM,CT_CVX,{0},{0}},
-/*326 item_patch_sight*/[326]={488,491,646,MAXTEX,MAXTEX,MAXTEX,0.14f,MAXANIM,CT_CVX,{0},{0}},
-/*327 item_patch_staminup*/[327]={488,491,647,MAXTEX,MAXTEX,MAXTEX,0.14f,MAXANIM,CT_CVX,{0},{0}},
-/*328 item_hw_system*/[328]={207,68,405,404,MAXTEX,MAXTEX,0.17f,MAXANIM,CT_CVX,{0},{0}},
+/*321 item_patch_berserk*/[321]={488,491,590,MAXTEX,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_CVX,{0},{0}},
+/*322 item_patch_detox*/[322]={488,491,591,MAXTEX,MAXTEX,MAXTEX,1.0f,MAXANIM,CT_CVX,{0},{0}},
+/*323 item_patch_genius*/[323]={488,491,592,MAXTEX,MAXTEX,MAXTEX,1.0f,MAXANIM,CT_CVX,{0},{0}},
+/*324 item_patch_medi*/[324]={488,491,600,MAXTEX,MAXTEX,MAXTEX,1.0f,MAXANIM,CT_CVX,{0},{0}},
+/*325 item_patch_reflex*/[325]={488,491,641,MAXTEX,MAXTEX,MAXTEX,1.0f,MAXANIM,CT_CVX,{0},{0}},
+/*326 item_patch_sight*/[326]={488,491,646,MAXTEX,MAXTEX,MAXTEX,1.0f,MAXANIM,CT_CVX,{0},{0}},
+/*327 item_patch_staminup*/[327]={488,491,647,MAXTEX,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_CVX,{0},{0}},
+/*328 item_hw_system*/[328]={207,68,405,404,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_CVX,{0},{0}},
 /*329 item_hw_navunit*/[329]={204,696,907,1259,MAXTEX,MAXTEX,0.1f,MAXANIM,CT_CVX,{0},{0}},
-/*330 item_hw_ereader*/[330]={200,692,397,MAXTEX,MAXTEX,MAXTEX,0.12f,MAXANIM,CT_CVX,{0},{0}},
+/*330 item_hw_ereader*/[330]={200,692,397,MAXTEX,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_CVX,{0},{0}},
 /*331 item_hw_sensaround*/[331]={205,697,402,MAXTEX,MAXTEX,MAXTEX,0.12f,MAXANIM,CT_CVX,{0},{0}},
 /*332 item_hw_targetid*/[332]={208,90,408,MAXTEX,MAXTEX,MAXTEX,0.08f,MAXANIM,CT_CVX,{0},{0}},
 /*333 item_hw_shield*/[333]={206,91,403,MAXTEX,MAXTEX,MAXTEX,0.14f,MAXANIM,CT_CVX,{0},{0}},
 /*334 item_hw_bio*/[334]={197,689,393,MAXTEX,MAXTEX,MAXTEX,0.1f,MAXANIM,CT_CVX,{0},{0}},
 /*335 item_hw_lantern*/[335]={203,695,401,400,MAXTEX,MAXTEX,0.11f,MAXANIM,CT_CVX,{0},{0}},
-/*336 item_hw_envirosuit*/[336]={199,691,396,MAXTEX,MAXTEX,MAXTEX,0.451f,MAXANIM,CT_CVX,{0},{0}},
+/*336 item_hw_envirosuit*/[336]={199,691,396,MAXTEX,MAXTEX,MAXTEX,1.0f,MAXANIM,CT_CVX,{0},{0}},
 /*337 item_hw_booster*/[337]={198,690,395,MAXTEX,MAXTEX,MAXTEX,0.16f,MAXANIM,CT_CVX,{0},{0}},
 /*338 item_hw_jumpjets*/[338]={202,694,399,MAXTEX,MAXTEX,MAXTEX,0.32f,MAXANIM,CT_CVX,{0},{0}},
 /*339 item_hw_infrared*/[339]={201,693,398,MAXTEX,MAXTEX,MAXTEX,0.1f,MAXANIM,CT_CVX,{0},{0}},
@@ -375,17 +373,17 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*361 item_logic_probe*/[361]={217,306,427,MAXTEX,MAXTEX,MAXTEX,0.15f,MAXANIM,CT_CVX,{0},{0}},
 /*362 item_healthkit*/[362]={196,688,391,MAXTEX,MAXTEX,MAXTEX,0.25f,MAXANIM,CT_CVX,{0},{0}},
 /*363 item_plastique*/[363]={492,308,599,MAXTEX,MAXTEX,MAXTEX,1.4f,MAXANIM,CT_CVX,{0},{0}},
-/*364 item_chipset_interfacedemod*/[364]={45,325,78,MAXTEX,MAXTEX,MAXTEX,0.3f,MAXANIM,CT_CVX,{0},{0}},
+/*364 item_chipset_interfacedemod*/[364]={45,325,78,MAXTEX,MAXTEX,MAXTEX,1.0f,MAXANIM,CT_CVX,{0},{0}},
 /*365 item_flask*/[365]={145,685,36,MAXTEX,1242,MAXTEX,0.22f,MAXANIM,CT_CVX,{0},{0}},
-/*366 item_chipset_bitflag*/[366]={45,325,633,MAXTEX,MAXTEX,MAXTEX,0.3f,MAXANIM,CT_CVX,{0},{0}},
+/*366 item_chipset_bitflag*/[366]={45,325,633,MAXTEX,MAXTEX,MAXTEX,1.0f,MAXANIM,CT_CVX,{0},{0}},
 /*367 item_ammo_rubber*/[367]={8,676,19,MAXTEX,MAXTEX,MAXTEX,0.25f,MAXANIM,CT_CVX,{0},{0}},
 /*368 item_isotopex22*/[368]={209,326,413,412,MAXTEX,MAXTEX,1.2f,MAXANIM,CT_CVX,{0},{0}},
 /*369 item_testtube*/[369]={622,612,36,MAXTEX,1242,MAXTEX,0.21f,MAXANIM,CT_CVX,{0},{0}},
 /*370 weapon_grenadefrag_live*/[370]={182,73,347,630,MAXTEX,MAXTEX,1.0f,MAXANIM,CT_CVX,{0},{0}},
 /*371 item_chipset_isolinear*/[371]={46,308,409,MAXTEX,MAXTEX,MAXTEX,0.26f,MAXANIM,CT_CVX,{0},{0}},
 /*372 weapon_grenadeconc_live*/[372]={165,84,334,MAXTEX,MAXTEX,MAXTEX,1.3f,MAXANIM,CT_CVX,{0},{0}},
-/*373 item_ammo_needle*/[373]={4,U16_MAX,15,MAXTEX,MAXTEX,MAXTEX,0.15f,MAXANIM,CT_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},
-/*374 item_ammo_tranq*/[374]={4,U16_MAX,27,MAXTEX,MAXTEX,MAXTEX,0.15f,MAXANIM,CT_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},
+/*373 item_ammo_needle*/[373]={4,U16_MAX,15,MAXTEX,MAXTEX,MAXTEX,0.3f,MAXANIM,CT_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},
+/*374 item_ammo_tranq*/[374]={4,U16_MAX,27,MAXTEX,MAXTEX,MAXTEX,0.3f,MAXANIM,CT_BOX,{-0.0004654949f,0.0004549972f,0.0244365f},{0.131339f,0.1442801f,0.04838703f}},
 /*375 item_ammo_standard*/[375]={5,U16_MAX,25,MAXTEX,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_BOX,{0.0001984993f,0.0f,0.02172501f},{0.1209471f,0.2176701f,0.04345007f}},
 /*376 item_ammo_teflon*/[376]={5,U16_MAX,26,MAXTEX,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_BOX,{0.0001984993f,0.0f,0.02172501f},{0.1209471f,0.2176701f,0.04345007f}},
 /*377 item_ammo_hollow*/[377]={5,U16_MAX,11,MAXTEX,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_BOX,{0.0002185023f,0.0f,0.02122951f},{0.1423431f,0.2127061f,0.04245907f}},
@@ -409,7 +407,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*395 item_access_card_per5diego*/[395]={0,672,8,341,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_CVX,{0},{0}},
 /*396 item_access_card_medi*/[396]={0,672,1,161,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_CVX,{0},{0}},
 /*397 item_access_card_group3*/[397]={0,672,7,159,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_CVX,{0},{0}},
-/*398 item_access_card_purple*/[398]={0,672,5,342,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_CVX,{0},{0}},
+/*398 item_access_card_purple*/[398]={0,672,6,342,MAXTEX,MAXTEX,0.2f,MAXANIM,CT_CVX,{0},{0}},
 /*399 item_head_male*/[399]={194,194,389,MAXTEX,MAXTEX,MAXTEX,1.29f,MAXANIM,CT_CVX,{0},{0}},
 /*400 item_head_female*/[400]={193,686,388,MAXTEX,MAXTEX,MAXTEX,1.30f,MAXANIM,CT_CVX,{0},{0}},
 /*401 item_severedhead*/[401]={590,327,801,MAXTEX,MAXTEX,MAXTEX,1.28f,MAXANIM,CT_CVX,{0},{0}},
@@ -474,7 +472,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*460 prop_phys_barrel_toxic*/[460]={12,332,33,MAXTEX,MAXTEX,MAXTEX,1.5f,MAXANIM,CT_CVX,{0},{0}},
 /*461 prop_phys_cart*/[461]={40,333,416,MAXTEX,MAXTEX,MAXTEX,2.5f,MAXANIM,CT_CVX,{0},{0}},
 /*462 prop_phys_pot*/[462]={494,334,640,MAXTEX,MAXTEX,MAXTEX,0.3f,MAXANIM,CT_CVX,{0},{0}},
-/*463 prop_phys_toolcart*/[463]={624,335,865,866,864,MAXTEX,20.0f,MAXANIM,CT_CVX,{0},{0}},
+/*463 prop_phys_toolcart*/[463]={624,335,865,MAXTEX,866,864,20.0f,MAXANIM,CT_CVX,{0},{0}},
 /*464 se_briefcase*/[464]={34,0,66,65,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*465 se_corpse_blueshirt*/[465]={51,0,126,MAXTEX,127,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*466 se_corpse_brownshirt*/[466]={52,0,128,MAXTEX,129,MAXTEX,0,MAXANIM,0,{0},{0}},
@@ -1617,17 +1615,6 @@ void LoadLevelData(u8 curlevel) {
 }
 
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();
-static void DoorTypeAudit(u8 lev) {
-    u32 badLayer=0, badLaser=0, badAperture=0;
-    for (u16 i=PLAYER1;i<World.instCount;++i) {
-        Entity* e=&World.instances[i]; if (!IdxIsDoor(e->index)) continue;
-        if ((e->changeLayerOnOpenClose!=0) != IdxIsLayerDoor(e->index)) badLayer++;
-        if ((e->toggleLasers!=0) != IdxIsLaserDoor(e->index)) badLaser++;
-        if (IdxIsLaserDoor(e->index) && e->modelIndex < MAX_MDLS && (modelMax[e->modelIndex].x - modelMin[e->modelIndex].x) <= 0.0f) badAperture++;
-    }
-    if (badLayer||badLaser) DualLogError("Door type audit level %u: %u changeLayerOnOpenClose and %u toggleLasers records disagree with their prefab\n",lev,badLayer,badLaser);
-    if (badAperture) DualLogError("Door laser audit level %u: %u laser doors have an empty model AABB, so their grid would never draw\n",lev,badAperture);
-}
 void LoadAllLevels() {
     double start_time = get_time();
     RenderLoading("Loading level data...");
@@ -1643,7 +1630,7 @@ void LoadAllLevels() {
     lanimsFromFile=OS_Alloc(LIGHT_COUNT*sizeof(LightAnimation));
     for (u8 i=0;i<8;++i) { World.TeleportTouch_allTeleportTouches[i] = U16_MAX; }
     fwPoolUsed = 0;
-    for(u8 lev=0;lev<MAX_LEVELS;++lev){ for (i32 i=0;i<INSTANCE_COUNT;++i) { colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1}; } LoadLevelData(lev); DoorTypeAudit(lev); }
+    for(u8 lev=0;lev<MAX_LEVELS;++lev){ for (i32 i=0;i<INSTANCE_COUNT;++i) { colCtrFromFile[i]=(V3){-1,-1,-1}; colSzFromFile[i]=(V3){-1,-1,-1}; } LoadLevelData(lev); }
     OS_Free(entsFromFile,INSTANCE_COUNT*sizeof(Entity));
     OS_Free(colCtrFromFile,INSTANCE_COUNT*sizeof(V3));
     OS_Free(colSzFromFile,INSTANCE_COUNT*sizeof(V3));
