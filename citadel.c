@@ -959,7 +959,6 @@ void UseTargets(u16 activator, u16 targetIdx) {
     for (u8 lev=0;lev<MAX_LEVELS;++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } if (World.lightTargetnames) { for (u16 l = 0; l < World.loadedLights; ++l) { if (World.lightTargetnames[l] != targetIdx) {continue;} TargetLight(activator,l); succeeded=true; } } }
     if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=false;/*Cleared unconditionally: deferred trigger paths (TriggerTrippedUpdate etc.) mark targetIOActive true before calling in, so wasActive alone cannot be trusted to know when a bit was set.*/ tioNestDepth--; if (!wasActive) {World.targetIOActive=false;}
 }
-
 // Frob/Use
 #define FROB_DISTANCE 4.9f
 #define PANEL_TETHER_SQDIST 64.0f/*8.0f: search/grid/wire/keycode/elevator code screens sever when the player wanders this far (squared); the tethered object closing returns that side MFD to the player's preferred tab*/
@@ -1443,114 +1442,52 @@ void DrawAIDebug(u16 i) {
     DrawSphereWireframe(dbgCol, (ShapeSphere){sightPt, 0.32f});
 }
 
-INLINE float CamYawFromQuat(Quaternion q) {
-    float d = __builtin_atan2f(2.0f * (q.x*q.z + q.y*q.w), 1.0f - 2.0f * (q.x*q.x + q.y*q.y)) * (180.0f / 3.14159265f);
-    if (d < 0.0f) d += 360.0f; return d;
-}
-
+INLINE float CamYawFromQuat(Quaternion q) { float d = __builtin_atan2f(2.0f * (q.x*q.z + q.y*q.w), 1.0f - 2.0f * (q.x*q.x + q.y*q.y)) * (180.0f / 3.14159265f); if (d < 0.0f) d += 360.0f; return d; }
 void SecurityCameraRotateUpdate(u16 self) { /*Sweeps the camera back and forth between startYAngle and endYAngle about the Y axis (yaw) only*/
-    Entity* e = &World.instances[self];
-    if (!e->camRotateEnabled) return;
-    if (!(e->entflags & EF_ACTIVE)) return;
+    if (!World.instances[self].camRotateEnabled) return;
+    if (!(World.instances[self].entflags & EF_ACTIVE)) return;
     if (!SphereInFrustum(playerFrustumPlanes, World.position[self], 1.28f)) return;
     
-    if (!e->camSweepInit) { e->camSweepInit = true; e->camBaseRot = World.rotation[self]; e->camYaw0 = CamYawFromQuat(e->camBaseRot); e->camYaw = e->camYaw0; }
-    if (e->camWaitingFinished >= World.pauseRelativeTime) return;
+    if (!World.instances[self].camSweepInit) { World.instances[self].camSweepInit = true; World.instances[self].camBaseRot = World.rotation[self]; World.instances[self].camYaw0 = CamYawFromQuat(World.instances[self].camBaseRot); World.instances[self].camYaw = World.instances[self].camYaw0; }
+    if (World.instances[self].camWaitingFinished >= World.pauseRelativeTime) return;
         
     float dt = World.dt;
-    if (e->camRotatePositive) { // flip
-        if (vabs(e->camYaw - e->camEndYAngle) <= 1.0f) {
-            e->camRotatePositive = false;
-            e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime;
-        } else e->camYaw += 24.0f * dt;
-    } else { // ney ney
-        if (vabs(e->camYaw - e->camStartYAngle) <= 1.0f) {
-            e->camRotatePositive = true;
-            e->camWaitingFinished = World.pauseRelativeTime + e->camWaitTime;
-        } else e->camYaw -= 24.0f * dt;
-    }
-    
-    if (e->camYaw < 0.0f) { e->camYaw += 360.0f; }
-    else if (e->camYaw >= 360.0f) { e->camYaw -= 360.0f; }
-    
-    float half = deg2rad(e->camYaw - e->camYaw0) * 0.5f;
-    Quaternion yaw = {0.0f, vsinf(half), 0.0f, vcosf(half)};
-    World.rotation[self] = quat_multiply(yaw, e->camBaseRot);
+    if (World.instances[self].camRotatePositive) { if (vabs(World.instances[self].camYaw - World.instances[self].camEndYAngle)   <= 1.0f) { World.instances[self].camRotatePositive = false; World.instances[self].camWaitingFinished = World.pauseRelativeTime + World.instances[self].camWaitTime; } else World.instances[self].camYaw += 24.0f * dt; }
+    else                                         { if (vabs(World.instances[self].camYaw - World.instances[self].camStartYAngle) <= 1.0f) { World.instances[self].camRotatePositive =  true; World.instances[self].camWaitingFinished = World.pauseRelativeTime + World.instances[self].camWaitTime; } else World.instances[self].camYaw -= 24.0f * dt; }
+    if (World.instances[self].camYaw < 0.0f) { World.instances[self].camYaw += 360.0f; } else if (World.instances[self].camYaw >= 360.0f) { World.instances[self].camYaw -= 360.0f; }
+    float half = deg2rad(World.instances[self].camYaw - World.instances[self].camYaw0) * 0.5f;
+    Quaternion yaw = {0.0f,vsinf(half),0.0f,vcosf(half)};
+    World.rotation[self] = quat_multiply(yaw,World.instances[self].camBaseRot);
 }
 
 static bool PanelTetherBroken(u16 i) { return i<World.instCount && (World.instances[i].entflags&EF_ACTIVE) && V3_SqDist(World.position[PLAYER1],World.position[i])>PANEL_TETHER_SQDIST; }
 void ModUpdate() {
     if (World.paused || World.menuActive) return;
     
-    UpdateSearchTether();
-    WeaponsUpdate();
-    InventoryUpdate();
-    PlayerEnergyUpdate();
-    PatchUpdate();
-    HardwareUpdate();
-    MissionTimerUpdate();
+    UpdateSearchTether(); WeaponsUpdate(); InventoryUpdate(); PlayerEnergyUpdate(); PatchUpdate(); HardwareUpdate(); MissionTimerUpdate();
     if (World.curLev == LEVEL_CYBERSPACE) CyberTimerUpdate(PLAYER1); /*the loop below starts at INSTS_1ST_IDX, so the player's own countdown would never tick*/
     if (Use()) { Frob(World.position[PLAYER1],World.instances[PLAYER1].forward,World.instances[PLAYER1].right); }
     if (World.pauseRelativeTime < World.debugLineFinished && (World.debugLineVertCount + 6) < MAX_WIRELINE_VRTS) { DrawLine(World.debugLine_start,World.debugLine_end,(Color){0.3f,0.1f,0.6f,0.5f}); }
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        Entity* e = &World.instances[i];
-        u16 constdex = e->index;
-        if(IsLiveGrenade(constdex) && (e->entflags & EF_ACTIVE)) { GrenadeUpdate(i); }
+        u16 constdex = World.instances[i].index;
+        if(IsLiveGrenade(constdex) && (World.instances[i].entflags & EF_ACTIVE)) { GrenadeUpdate(i); }
         DelayedSpawnUpdate(i);
-        if (constdex==CYBER_DECOY_CONST) { CyberDecoyExpired(i); }
-        if (constdex==614) { RelayPanelUpdate(i); }
+        if (constdex == CYBER_DECOY_CONST) { CyberDecoyExpired(i); }
+        if (constdex == 614) { RelayPanelUpdate(i); }
         if (IsPuzzleGridPanel(constdex)) { PuzzlePanelUpdate(i); }
-        if (e->textureAnimating && e->tickFinished < World.pauseRelativeTime) { TextureSequenceUpdate(i); }
+        if (World.instances[i].textureAnimating && World.instances[i].tickFinished < World.pauseRelativeTime) { TextureSequenceUpdate(i); }
         if (IdxIsButtonSwitch(constdex)){ ButtonSwitchUpdate(i); }
         if (IdxIsDoor(constdex)) { DoorUpdate(i); }
-        switch (constdex) {
-            case 701: LogicTimerUpdate(i); break;
-            case 594: TriggerCounterUpdate(i); break;
-            case 699: LogicRelayUpdate(i); break;
-            case 598: case 600: TriggerTrippedUpdate(i); break;
-            case 702: SpawnManagerUpdate(i); break;
-            case 477: SecurityCameraRotateUpdate(i); break;
-        }
-        if (e->itemLifeTime > 0.0f) { SearchFXResetUpdate(i); }
-        if (e->cyberTimer > 0.0f) { CyberTimerUpdate(i); }
-        switch (constdex) {
-            case 515: ForceBridgeUpdate(i); break;
-            case 517: FuncWallUpdate(i); break;
-            case 21: case 22: CyberWallUpdate(i); break;
-        }
-        if (IdxIsNPC(constdex)) {
-            DrawAIDebug(i);
-            AIControllerUpdate(i);
-            AIAnimationControllerUpdate(i);
-        }
-        
-        switch (constdex) {
-            case 552: CyberDataFragUpdate(i); break;
-            case 554: CyberExitUpdate(i); break;
-            case 555: CyberSwitchUpdate(i); break;
-            case 448 ... 457: CyberItemUpdate(i); break;
-            case 480: CyberMineUpdate(i); break;
-        }
+        switch (constdex) { case 701: LogicTimerUpdate(i); break; case 594: TriggerCounterUpdate(i); break; case 699: LogicRelayUpdate(i); break; case 598: case 600: TriggerTrippedUpdate(i); break; case 702: SpawnManagerUpdate(i); break; case 477: SecurityCameraRotateUpdate(i); break; }
+        if (World.instances[i].itemLifeTime > 0.0f) { SearchFXResetUpdate(i); }
+        if (World.instances[i].cyberTimer > 0.0f) { CyberTimerUpdate(i); }
+        switch (constdex) { case 515: ForceBridgeUpdate(i); break; case 517: FuncWallUpdate(i); break; case 21: case 22: CyberWallUpdate(i); break; }
+        if (IdxIsNPC(constdex)) { DrawAIDebug(i); AIControllerUpdate(i); AIAnimationControllerUpdate(i); }
+        switch (constdex) { case 552: CyberDataFragUpdate(i); break; case 554: CyberExitUpdate(i); break; case 555: CyberSwitchUpdate(i); break; case 448 ... 457: CyberItemUpdate(i); break; case 480: CyberMineUpdate(i); break; }
     }
-    
-    if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) {
-        World.invP1.painSoundFinished = World.pauseRelativeTime + (double)random_range(2.5f,4.0f);
-        play_wav(sounds[140]/*player/playerpain1*/,AppliedFXVol(0.2f),(V3){0},false);
-    }
-    
-    if (!Cheats.god && World.invP1.radBleedFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { /*Radiation damage pulse*/
-        World.invP1.radBleedFinished = World.pauseRelativeTime + 1.8;
-        float take = World.instances[PLAYER1].radiation * 0.2f;
-        World.instances[PLAYER1].health -= take;
-        World.painStaticAlpha = take > 15.0f ? 1.0f : take > 10.0f ? 0.8f : 0.3f;
-    }
-    
-    if (World.invP1.radSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) {
-        double minT = World.instances[PLAYER1].radiation > 50.0f ? 0.5 : 1.0;
-        World.invP1.radSoundFinished = World.pauseRelativeTime + minT + (double)random_range(0.0f, 2.0f);
-        play_wav(sounds[90]/*hud/radiation*/, AppliedFXVol(0.18f), (V3){0.0f, 0.0f, 0.0f}, false);
-    }
-    
+    if (World.invP1.painSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f && !(World.invP1.radSoundFinished < World.pauseRelativeTime)) { World.invP1.painSoundFinished = World.pauseRelativeTime + (double)random_range(2.5f,4.0f); play_wav(sounds[140]/*player/playerpain1*/,AppliedFXVol(0.2f),(V3){0},false); }
+    if (!Cheats.god && World.invP1.radBleedFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { /*Radiation damage pulse*/ World.invP1.radBleedFinished = World.pauseRelativeTime + 1.8; float take = World.instances[PLAYER1].radiation * 0.2f; World.instances[PLAYER1].health -= take; World.painStaticAlpha = take > 15.0f ? 1.0f : take > 10.0f ? 0.8f : 0.3f; }
+    if (World.invP1.radSoundFinished < World.pauseRelativeTime && World.instances[PLAYER1].radiation > 1.0f) { double minT = World.instances[PLAYER1].radiation > 50.0f ? 0.5 : 1.0; World.invP1.radSoundFinished = World.pauseRelativeTime + minT + (double)random_range(0.0f, 2.0f); play_wav(sounds[90]/*hud/radiation*/, AppliedFXVol(0.18f), (V3){0.0f, 0.0f, 0.0f}, false); }
     if (PanelTetherBroken(World.Sys_UI.tetheredPGP)) UI_PuzzleGridClose();
     if (PanelTetherBroken(World.Sys_UI.tetheredKeypadKeycode)) UI_KeycodeClose(false);
     if (PanelTetherBroken(World.Sys_UI.tetheredKeypadElevator)) UI_ElevClose(false);

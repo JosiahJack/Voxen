@@ -630,7 +630,7 @@ FGL_UP glUseProgram;    FGL_DM glDepthMask;    FGL_VAB glVertexAttribBinding;   
 FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram;   FGL_CRS glCreateShader;  FGL_BFS glBlendFuncSeparate; FGL_UB glUnmapBuffer; FGL_BD glBufferData; FGL_F glFinish; FGL_FL glFlush;
 FGL_C glClear;  FGL_DE glDrawElements;  FGL_U2UI glUniform2ui; FGL_UM4FV glUniformMatrix4fv;    FGL_GIV glGetIntegerv;FGL_GSIL glGetShaderInfoLog; FGL_U2F glUniform2f;      FGL_U1UI glUniform1ui;   FGL_GVA glGenVertexArrays;  FGL_RP glReadPixels;      FGL_SS glShaderSource;FGL_TPI glTexParameteri; FGL_TPFV glTexParameterfv;   FGL_U1F glUniform1f;
 FGL_E glEnable; FGL_FF glFrontFace;     FGL_GB glGenBuffers;   FGL_FBT2D glFramebufferTexture2D;FGL_GERR glGetError;  FGL_GFS glGenFramebuffers;   FGL_GT glGenTextures;     FGL_BSD glBufferSubData; FGL_MBR glMapBufferRange;   FGL_U1I glUniform1i;      FGL_T2D glTexImage2D; FGL_BIT glBindImageTexture;FGL_BT glBindTexture;
-FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL_D glEndQuery; FGL_DAI glDrawArraysInstanced; FGL_BB glBlendFunc;  FGL_BF glBlitFramebuffer; FGL_T2D glTexSubImage2D; FGL_GTKP glGetTexLevelParameteriv; FGL_CBSD glCopyBufferSubData; FGL_CISD glCopyImageSubData; FGL_CPIV glGetBufferParameteriv; FGL_GBSD glGetBufferSubData; FGL_GB glDeleteBuffers;
+FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL_D glEndQuery; FGL_DAI glDrawArraysInstanced; FGL_BB glBlendFunc;  FGL_BF glBlitFramebuffer; FGL_T2D glTexSubImage2D; FGL_GTKP glGetTexLevelParameteriv; FGL_CBSD glCopyBufferSubData; FGL_CLBSD glClearBufferSubData; FGL_CISD glCopyImageSubData; FGL_CPIV glGetBufferParameteriv; FGL_GBSD glGetBufferSubData; FGL_GB glDeleteBuffers;
 void SetGLContext_GetFunctionPointers() {
     WSWin* h=window; h->context.makeCurrent(h);
     #define X(n,t) n=(t)h->context.getProcAddress(#n);
@@ -639,7 +639,7 @@ void SetGLContext_GetFunctionPointers() {
     X(glBindBuffer,FGL_BB)        X(glBufferData,FGL_BD)      X(glGenBuffers,FGL_GB)       X(glUnmapBuffer,FGL_UB)         X(glAttachShader,FGL_AS)            X(glCompileShader,FGL_CS)      X(glCreateProgram,FGL_CP)     X(glCreateShader,FGL_CRS)   X(glDrawBuffers,FGL_DB)      X(glGetProgramiv,FGL_CPIV)      X(glGetShaderInfoLog,FGL_GSIL)      X(glGetShaderiv,FGL_GSIV)
     X(glLinkProgram,FGL_LP)       X(glShaderSource,FGL_SS)    X(glUniform1f,FGL_U1F)       X(glUniform1i,FGL_U1I)          X(glUniform2f,FGL_U2F)              X(glUniform3f,FGL_U3F)         X(glUniform4f,FGL_U4F)        X(glTexParameteri,FGL_TPI)  X(glTexParameterfv,FGL_TPFV)  X(glUniform1ui,FGL_U1UI)     X(glUniform2ui,FGL_U2UI)        X(glUniformMatrix3fv,FGL_UM3FV)     X(glUniformMatrix4fv,FGL_UM4FV)
     X(glUseProgram,FGL_UP)        X(glBindBufferBase,FGL_BBB) X(glFinish,FGL_F) X(glFlush,FGL_FL) X(glBindFramebuffer,FGL_BFB) X(glGenFramebuffers,FGL_GFS)    X(glMapBufferRange,FGL_MBR)         X(glBindImageTexture,FGL_BIT)  X(glBindVertexBuffer,FGL_BVB) X(glDispatchCompute,FGL_DC) X(glGenVertexArrays,FGL_GVA) X(glVertexAttribFormat,FGL_VAF) X(glFramebufferTexture2D,FGL_FBT2D) X(glBufferSubData,FGL_BSD)
-    X(glGenQueries,FGL_GIQ) X(glGetQueryObjectui64v,FGL_GQOU64) X(glBeginQuery,FGL_BQ) X(glEndQuery,FGL_D) X(glDrawArraysInstanced,FGL_DAI) X(glBlendFunc,FGL_BB) X(glBlitFramebuffer,FGL_BF) X(glTexSubImage2D,FGL_T2D) X(glGetTexLevelParameteriv,FGL_GTKP) X(glCopyBufferSubData,FGL_CBSD) X(glCopyImageSubData,FGL_CISD) X(glGetBufferParameteriv,FGL_CPIV) X(glGetBufferSubData,FGL_GBSD) X(glDeleteBuffers,FGL_GB)
+    X(glGenQueries,FGL_GIQ) X(glGetQueryObjectui64v,FGL_GQOU64) X(glBeginQuery,FGL_BQ) X(glEndQuery,FGL_D) X(glDrawArraysInstanced,FGL_DAI) X(glBlendFunc,FGL_BB) X(glBlitFramebuffer,FGL_BF) X(glTexSubImage2D,FGL_T2D) X(glGetTexLevelParameteriv,FGL_GTKP) X(glCopyBufferSubData,FGL_CBSD) X(glClearBufferSubData,FGL_CLBSD) X(glCopyImageSubData,FGL_CISD) X(glGetBufferParameteriv,FGL_CPIV) X(glGetBufferSubData,FGL_GBSD) X(glDeleteBuffers,FGL_GB)
     #undef X
 }
 
@@ -1514,8 +1514,15 @@ extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artif
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_xor_ps(__m256 __A, __m256 __B) { return (__m256)((__m256i)__A ^ (__m256i)__B); }
 extern __inline int __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_movemask_ps(__m256 __A) { return __builtin_ia32_movmskps256((__v8sf)__A); }
 extern __inline __m256 __attribute__((__gnu_inline__, __always_inline__, __artificial__, target("avx2,fma"))) _mm256_setzero_ps(void) { return (__m256){ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }; }
-u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS]; static __attribute__((aligned(64))) float sc_posX[SC_MAX],sc_posY[SC_MAX],sc_posZ[SC_MAX],sc_radius[SC_MAX],sc_shadRadius[SC_MAX]; static u16 sc_origIdx[SC_MAX], shadowSlot[LIGHT_COUNT]; static u8 shadowFaces[LIGHT_COUNT]; static float shadowPosSum[LIGHT_COUNT]; static u32 shadowIdSum[LIGHT_COUNT],shadClearFace[SHADOW_MAP_SIZE*SHADOW_MAP_SIZE];
-static i8 shadowLevel=-1; u32 shadowNextSlot=0; static const i8 faceAxis[6] = {0,0,1,1,2,2}; static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f};
+u16 shadowCasterIndices[SC_MAX], candidates[MAX_SHADOWMAPS]; static __attribute__((aligned(64))) float sc_posX[SC_MAX],sc_posY[SC_MAX],sc_posZ[SC_MAX],sc_radius[SC_MAX],sc_shadRadius[SC_MAX]; static u16 sc_origIdx[SC_MAX], shadowSlot[LIGHT_COUNT]; static u8 shadowFaces[LIGHT_COUNT]; static float shadowPosSum[LIGHT_COUNT]; static u32 shadowIdSum[LIGHT_COUNT];
+static const u32 shadClearSentinel = 0xFFFFFFFFu; /*matches the old 0xFF mset: consumers read float(0xFFFFFFFF)*1e-5 = far-away "not occluded" distance*/
+static i8 shadowLevel=-1; u32 shadowNextSlot=0; static const i8 faceAxis[6] = {0,0,1,1,2,2}; static const float faceSign[6] = {1.f,-1.f,1.f,-1.f,1.f,-1.f}; static const __m256i faceBitVecs[6] = { /*faceMask bit values (1,2,4,8,16,32) replicated into BOTH 32-bit halves of every 64-bit lane: caster lanes are 8x32-bit float lanes but the set1_epi32 helper in this file fills only low halves, so constants built from it would zero out the odd casters; these long long literals pair up correctly. Order: +X,-X,+Y,-Y,+Z,-Z (bits 0..5).*/
+    (__m256i){0x0000000100000001LL,0x0000000100000001LL,0x0000000100000001LL,0x0000000100000001LL},
+    (__m256i){0x0000000200000002LL,0x0000000200000002LL,0x0000000200000002LL,0x0000000200000002LL},
+    (__m256i){0x0000000400000004LL,0x0000000400000004LL,0x0000000400000004LL,0x0000000400000004LL},
+    (__m256i){0x0000000800000008LL,0x0000000800000008LL,0x0000000800000008LL,0x0000000800000008LL},
+    (__m256i){0x0000001000000010LL,0x0000001000000010LL,0x0000001000000010LL,0x0000001000000010LL},
+    (__m256i){0x0000002000000020LL,0x0000002000000020LL,0x0000002000000020LL,0x0000002000000020LL}};
 INLINE u8 GetCubemapFaceMask(V3 d, float r) {u8 m=0; float absX=vabs(d.x),absY=vabs(d.y),absZ=vabs(d.z); float maxAbsYZ = absY > absZ ? absY : absZ; float maxAbsXZ = absX > absZ ? absX : absZ; float maxAbsXY = absX > absY ? absX : absY; if (d.x+r > maxAbsYZ) m|=(1<<0); if (d.x-r < -maxAbsYZ) m|=(1<<1); if (d.y+r > maxAbsXZ) m|=(1<<2); if (d.y-r < -maxAbsXZ) m|=(1<<3); if (d.z+r > maxAbsXY) m|=(1<<4); if (d.z-r < -maxAbsXY) m|=(1<<5); return m;}
 /*Face relevance per viewer: dot(d + faceCenterOffset, f) > 0 with the face centers carrying sign(f) corner bias on the non-axis components, algebraically identical to the AVX player block in RenderShadowmaps (checked all 6 sign cases). Used for camview forwards. Face relevance must cover every face receivers visible to that viewer can project onto, because shadow sampling is per-fragment cube face.*/
 INLINE u8 FaceMaskFromViewer(V3 d, V3 fdir, float r) {
@@ -1527,13 +1534,13 @@ INLINE u8 FaceMaskFromViewer(V3 d, V3 fdir, float r) {
     return m;
 }
 INLINE bool ShadowCasterMoved(u16 i) { return i != PLAYER1 && (World.instances[i].entflags & EF_MOVING) && !IdxIsNPC(World.instances[i].index); }
-typedef struct { u32 sortKey; u16 instanceIdx; } SortedMesh;
-static u16 AddShadowMesh(SortedMesh *out,u16 i,u16 tex,bool detail,float *posSum,u32 *idSum,bool *moved) {
+typedef struct { u32 sortKey; u16 instanceIdx; u8 faceMask; } SortedMesh;
+static u16 AddShadowMesh(SortedMesh *out,u16 i,u16 tex,bool detail,float *posSum,u32 *idSum,bool *moved,u8 faceMask) {
     V3 sc = World.scale[i];
     if (vabs(sc.x) < 0.6f || vabs(sc.y) < 0.6f || vabs(sc.z) < 0.6f) { return 0; }/*sub-0.6 extent aliases to nothing in a face*/
     Entity* e = &World.instances[i];
     u16 model = ((instanceIsLODArray[i] || detail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex);
-    *out = (SortedMesh){ ((u32)model << 16) | tex, i };
+    *out = (SortedMesh){ ((u32)model << 16) | tex, i, faceMask };
     *idSum += i + out->sortKey;
     *posSum += World.position[i].x + World.position[i].y + World.position[i].z;
     if (ShadowCasterMoved(i)) { *moved = true; }
@@ -1590,7 +1597,6 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         mset(shadowFaces, 0, sizeof(shadowFaces));
         mset(shadowPosSum, 0, sizeof(shadowPosSum));
         mset(shadowIdSum, 0, sizeof(shadowIdSum));
-        mset(shadClearFace, 0xFF, sizeof(shadClearFace));
         shadowNextSlot = 0;
         shadowLevel = (i8)World.curLev;
     }
@@ -1648,7 +1654,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         const __m256 lposY = _mm256_set1_ps(lpos.y);
         const __m256 lposZ = _mm256_set1_ps(lpos.z);
         const __m256 effR  = _mm256_set1_ps(effectiveRadius);
-        const __m256 signMask = _mm256_castsi256_ps(_mm256_set1_epi32(0x80000000u));
+        const __m256 signMask = _mm256_set1_ps(-0.0f); /*sign bit per 32-bit float lane: 0x80000000 in all 8 lanes. The previous cast from set1_epi32(0x80000000u) only populated the low half of each 64-bit pair, so abs()/negation silently skipped every odd caster lane when components were negative — over-including them in the face tests (never excluding) and inflating per-face draw lists.*/
         u16 nearbyMeshCount = 0;
         i32 k = 0;
         bool anyMoved=false;
@@ -1688,6 +1694,12 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
             const __m256 dzm = _mm256_sub_ps(dz, sr);
             const __m256 negZface = _mm256_cmp_ps(dzm, negMaxAbsXY,0x11);
             const __m256 anyFace = _mm256_or_ps(_mm256_or_ps(posXface, negXface), _mm256_or_ps(_mm256_or_ps(posYface, negYface), _mm256_or_ps(posZface, negZface)));
+            /*Per-caster cubemap-face bits (bit0=+X,bit1=-X,bit2=+Y,bit3=-Y,bit4=+Z,bit5=-Z), accumulated as lane-mask AND bit-value (compare masks are 0/0xFFFFFFFF per 32-bit lane); the bit constants carry the value in both halves so every caster lane is served. Same conservative test (shadRadius = 2x radius) that the union gate above already required, per caster, kept around so each face only draws casters it can contain.*/
+            __attribute__((aligned(32))) u32 laneFaceView[8];
+            const __m256 faceTwo = _mm256_or_ps(_mm256_and_ps(posXface,_mm256_castsi256_ps(faceBitVecs[0])), _mm256_and_ps(negXface,_mm256_castsi256_ps(faceBitVecs[1])));
+            const __m256 faceSecond = _mm256_or_ps(_mm256_and_ps(posYface,_mm256_castsi256_ps(faceBitVecs[2])), _mm256_and_ps(negYface,_mm256_castsi256_ps(faceBitVecs[3])));
+            const __m256 faceThird = _mm256_or_ps(_mm256_and_ps(posZface,_mm256_castsi256_ps(faceBitVecs[4])), _mm256_and_ps(negZface,_mm256_castsi256_ps(faceBitVecs[5])));
+            _mm256_store_ps((float*)laneFaceView, _mm256_or_ps(_mm256_or_ps(faceTwo, faceSecond), faceThird));
             const __m256 valid = _mm256_and_ps(inRange, anyFace);
             unsigned mask = (unsigned)_mm256_movemask_ps(valid);
             while (mask) {
@@ -1696,7 +1708,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 if (unlikely(nearbyMeshCount >= SHADOW_NEARMESH_MAX)) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); k = numCastersAligned; break; }
                 
                 u16 instIdx = sc_origIdx[k + bit];
-                nearbyMeshCount += AddShadowMesh(&localMeshes[nearbyMeshCount],instIdx,World.instances[instIdx].texIndex,useDetail,&posSum,&idSum,&anyMoved);
+                nearbyMeshCount += AddShadowMesh(&localMeshes[nearbyMeshCount],instIdx,World.instances[instIdx].texIndex,useDetail,&posSum,&idSum,&anyMoved,(u8)laneFaceView[bit]);
             }
         }
         
@@ -1706,7 +1718,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 u8 faceMaskScalar = GetCubemapFaceMask(d, World.instances[sc_origIdx[k]].shadRadius); if (faceMaskScalar == 0) { continue; }
                 
                 u16 instIdx = sc_origIdx[k];
-                nearbyMeshCount += AddShadowMesh(&localMeshes[nearbyMeshCount],instIdx,instIdx==PLAYER1 ? (u16)3337 : World.instances[instIdx].texIndex,useDetail,&posSum,&idSum,&anyMoved);
+                nearbyMeshCount += AddShadowMesh(&localMeshes[nearbyMeshCount],instIdx,instIdx==PLAYER1 ? (u16)3337 : World.instances[instIdx].texIndex,useDetail,&posSum,&idSum,&anyMoved,faceMaskScalar);
                 if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
             }
         }
@@ -1714,7 +1726,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_COUNT; continue; }
         
         u16 slot = shadowSlot[lightIdx];
-        bool contentDirty = (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
+        bool contentDirty = true;//Temporarily always render shadows so that performance improvements to them can be better felt and confirmed. (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
         u8 needFaces = (u8)(faceMask & ~shadowFaces[lightIdx]);
         if (contentDirty || needFaces) {
             for (u16 j=1;j<nearbyMeshCount;++j) {
@@ -1732,11 +1744,19 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
             for (u8 face = 0; face < 6; ++face) {
                 if (!(renderFaces & (1u << face))) {continue;}
                 
-                glBufferSubData(GL_SSBO, (slotOff + face*SHADOW_MAP_SIZE*SHADOW_MAP_SIZE) * 4, SHADOW_MAP_SIZE*SHADOW_MAP_SIZE * 4, shadClearFace);
+                /*Clear via GPU-side buffer clear instead of a 64KB host->device glBufferSubData upload per face (up to 80 slots x 6 faces per frame when everything lands dirty): glClearBufferSubData (GL 4.3) needs no client memory copy and does not touch an in-flight buffer's contents through staging; same 0xFFFFFFFF sentinel so consumers see identical "not occluded" distances.*/
+                if (likely(glClearBufferSubData)) { glClearBufferSubData(GL_SSBO, GL_R32UI, (slotOff + face*SHADOW_MAP_SIZE*SHADOW_MAP_SIZE) * (intptr_t)4, (SHADOW_MAP_SIZE*SHADOW_MAP_SIZE) * (intptr_t)4, GL_RED_INTEGER, GL_UNSIGNED_INT, &shadClearSentinel); }
+                else { static u32 faceBlock[SHADOW_MAP_SIZE*SHADOW_MAP_SIZE]; if (faceBlock[0] != 0xFFFFFFFFu) { for (u32 t=0;t<(u32)(SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);++t) { faceBlock[t] = 0xFFFFFFFFu; } } glBufferSubData(GL_SSBO, (slotOff + face*SHADOW_MAP_SIZE*SHADOW_MAP_SIZE) * 4, SHADOW_MAP_SIZE*SHADOW_MAP_SIZE * 4, faceBlock); } /*ancient-driver fallback path: same all-0xFF block the old shadClearFace array held*/
+                const u8 faceBit = (u8)(1u << face); /*Caster prefilter: only draw meshes whose sphere can project into this face's 90-degree cone; the per-caster masks are the very same conservative test that the union 'anyFace' gate above already passed, so no raster-visible occluder can be dropped, while slanted/far casters stop flooding faces they never touch. Typical cut is >half the vertex work per face with packed rooms of casters.*/
+                u16 faceCasters = 0;
+                for (u16 j=0;j<nearbyMeshCount;++j) { if (localMeshes[j].faceMask & faceBit) { ++faceCasters; } }
+                if (faceCasters == 0) { continue; } /*cleared face with no writer == fully lit, exactly what an empty face draw produced*/
+                
                 glUniform1ui(2, face);
                 glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
                 glUniform1ui(7, slotOff + (face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE));
                 for (u16 j=0;j<nearbyMeshCount;++j) {
+                    if (!(localMeshes[j].faceMask & faceBit)) { continue; }
                     u16 instIdx = localMeshes[j].instanceIdx;
                     u32 sortKey = localMeshes[j].sortKey;
                     glUniform1ui(0,instIdx);
@@ -1916,7 +1936,7 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     bool sunActive = !camView && likely(Sys_Settings.Shadows > 0u) && SkySunIsVisible();
     if (sunActive && sunShadowFBO == 0u) { InitSunShadowmap();/*shadows can be toggled on after boot, which is the only path that gets here with no map yet*/ }
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][0]);
-    if (likely(Sys_Settings.Shadows > 0u) && !camView) { RenderShadowmaps(); if (sunActive) { RenderSunShadowmap(); } } /*shadow maps update once per frame, main view only: camview passes pop World.position[PLAYER1] to the camera, so running this per camview would rebuild candidates/slots/indirections for each camera's area every frame -> flicker + slot churn (camviews draw on the main pass's shadow data, kept valid by the sticky indirection + camview candidates in RenderShadowmaps).*/
+    if (likely(Sys_Settings.Shadows > 0u) && !camView) { glDisable(GL_DEPTH_TEST); /*SSBO shadowmaps hold no depth attachment; stale gbuffer depth must not reject their fragments (too aggressive depth state also spilled between cubemap faces within the pass)*/ RenderShadowmaps(); glEnable(GL_DEPTH_TEST); if (sunActive) { RenderSunShadowmap(); } } /*shadow maps update once per frame, main view only: camview passes pop World.position[PLAYER1] to the camera, so running this per camview would rebuild candidates/slots/indirections for each camera's area every frame -> flicker + slot churn (camviews draw on the main pass's shadow data, kept valid by the sticky indirection + camview candidates in RenderShadowmaps).*/
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][1]);
     double rendStart = get_time();
@@ -2790,8 +2810,8 @@ i32 main() {
         static const u32 dbgFrm[] = {4, 100, 200, 500, 1000}; static const char* dbgLbl[] = {"   4"," 100"," 200"," 500","1000"};
         for (int d=0;d<5;d++) {
             if (dbgGameFrame == dbgFrm[d]) {
-                DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Raycasts:%.3f(%u)\n",
-                        dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000, World.substeps, renderTime*1000, prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls);
+                DualLog("Frame %s timings: GPU ms: All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms: Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Raycasts:%.3f(%u) | Shadowmap draws (shadow+sun passes): %u\n",
+                        dbgLbl[d], World.gpuFrameMs, World.gpuShadowMs, World.gpuPreMs, World.gpuMainMs, World.gpuSsrMs, World.gpuCompMs, shadowTime*1000, physTime*1000, World.substeps, renderTime*1000, prePhys*1000, gameTime*1000, raycastMs*1000, raycastCalls, shadDrawCalls);
             }
         }
     }
