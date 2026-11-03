@@ -135,7 +135,7 @@ void main() {
         lighting += albedoColor.rgb * cyberColA * (clamp(dot(adjustedNormal, cyberDirA), 0.0, 1.0) * 0.9);
         lighting += albedoColor.rgb * cyberColB * (clamp(dot(adjustedNormal, cyberDirB), 0.0, 1.0) * 0.6);
     } else if (sunEnabled > 0u) { // Sun is off entirely in cells that can't see it, and whenever shadows are off
-        vec3 sunCol = vec3(1.0,0.0,0.0);// Testing with red for visibility vec3(1.0, 0.97, 0.85);
+        vec3 sunCol = vec3(1.0, 0.97, 0.85) * 0.5;
         float sunShadow = 1.0;
         vec3 sunProj = (sunShadowMatrix * vec4(FragPos, 1.0)).xyz;
         vec2 sunUV   = sunProj.xy * 0.5 + 0.5;

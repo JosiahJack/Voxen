@@ -1760,7 +1760,11 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
 V3 SunDirection(void) {
     float yaw = (float)World.pauseRelativeTime * 0.1f * skyRotateSpeeds[Cheats.dizzyLevel]; /*timeVal * skyRotateSpeed, both exactly as Render feeds the composite*/
     float c = vcosf(yaw), s = vsinf(yaw);
-    V3 b = {0.35f, 1.00f, 0.25f};
+    /*Base = the skybox disc vector: -saturnCenter from composite_frag.glsl
+      (saturnCenter = normalize((0,-0.1,sqrt(0.99)))). The old (0.35,1,0.25)
+      sat 97.85 degrees away from the visible sun, so shadows never pointed
+      at the disc; same yaw rate/sign as the sky rotation, so this tracks it.*/
+    V3 b = {0.0f, 0.1f, -0.99498743f};
     return V3_Normalize((V3){b.x*c + b.z*s, b.y, -b.x*s + b.z*c});
 }
 
@@ -1792,9 +1796,15 @@ void RenderSunShadowmap(void) {
     float view[16]={right.x,up.x,sunDir.x,0.0f, right.y,up.y,sunDir.y,0.0f, right.z,up.z,sunDir.z,0.0f,
         -(right.x*eye.x+right.y*eye.y+right.z*eye.z),-(up.x*eye.x+up.y*eye.y+up.z*eye.z),-(sunDir.x*eye.x+sunDir.y*eye.y+sunDir.z*eye.z),1.0f};
     const float texel=(2.0f*S)/(float)SUN_SHADOW_SIZE; // snap the ortho box to texel grid: no shimmer when the camera moves
-    float plsx=right.x*target.x+right.y*target.y+right.z*target.z+view[12], plsy=up.x*target.x+up.y*target.y+up.z*target.z+view[13];
-    float qx=plsx/texel, qy=plsy/texel; // manual roundf: math.h round() is not in the loader's header set
-    view[12]+=(float)((int)(qx+(qx>=0.0f?0.5f:-0.5f)))*texel-plsx; view[13]+=(float)((int)(qy+(qy>=0.0f?0.5f:-0.5f)))*texel-plsy;
+    /*Snap the eye's light-space position to the texel grid. The old code
+      snapped right.(target-eye), which is identically 0: right is
+      perpendicular to sunDir by construction and eye = target + sunDir*128,
+      so the rounding never moved anything and texels swam as the player
+      moved. Snapping the eye (whose light-space XY equal the target's, up
+      to the vanishing sunDir component) holds texels fixed between steps.*/
+    float ex=right.x*eye.x+right.y*eye.y+right.z*eye.z, ey=up.x*eye.x+up.y*eye.y+up.z*eye.z;
+    float qx=ex/texel, qy=ey/texel; // manual roundf: math.h round() is not in the loader's header set
+    view[12]=-((float)((int)(qx+(qx>=0.0f?0.5f:-0.5f))))*texel; view[13]=-((float)((int)(qy+(qy>=0.0f?0.5f:-0.5f))))*texel;
     const float znear=S*0.5f, zfar=S*4.0f;
     float ortho[16]={1.0f/S,0.0f,0.0f,0.0f, 0.0f,1.0f/S,0.0f,0.0f, 0.0f,0.0f,-2.0f/(zfar-znear),0.0f, 0.0f,0.0f,-(zfar+znear)/(zfar-znear),1.0f};
     mul_mat4(sunShadowMatrix,ortho,view); ExtractFrustumPlanes(sunShadowMatrix,sunShadowFrustum);
