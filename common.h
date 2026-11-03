@@ -520,7 +520,7 @@ INLINE void hudColorToRGB(u8 hud, float* r, float* g, float* b) { float inv=1.0f
     default:          *r=0.9215687f;  *g=0.13725491f; *b=0.16862746f; break;/*White and Gray both fall out of GetColor onto actualColorRed*/ }
     *r*=inv; *g*=inv; *b*=inv; }
 INLINE u8 hudColorToText(u8 hud) { switch (hud) { case HUDC_WHITE:return T_WHITE; case HUDC_RED:return T_RED; case HUDC_ORANGE:return T_ORANGE; case HUDC_YELLOW:return T_YELLOW; case HUDC_GREEN:return T_GREEN; case HUDC_BLUE:return T_BLUE; case HUDC_PURPLE:return T_PURPLE; default:return T_RED;/*Gray: PuzzleWire.GetColor has no Gray case and falls through to actualColorRed*/ } }
-INLINE V3 V3_AplusB(V3 a, V3 b) { return (V3){a.x + b.x, a.y + b.y, a.z + b.z}; }
+INLINE V3 V3Add(V3 a, V3 b) { return (V3){a.x + b.x, a.y + b.y, a.z + b.z}; }
 INLINE V3 V3_AsubB(V3 a, V3 b) { return (V3){a.x - b.x, a.y - b.y, a.z - b.z}; }
 INLINE V3 V3_ScaleByF(V3 v, float s) { return (V3){v.x * s, v.y * s, v.z * s}; }
 INLINE V3 mul_v3_v3_elementwise(V3 v, V3 w) { return (V3){v.x * w.x, v.y * w.y, v.z * w.z}; }

@@ -13,7 +13,7 @@ layout(location=9) uniform float heat;
 layout(location=10) uniform vec3 camPos;
 layout(location=11) uniform uint shadSizeSqd;
 layout(location=12) uniform vec3 fogColor;
-layout(location=13) uniform uint useStrengthMod; // For spec boost on some materials
+layout(location=13) uniform uint useStrengthMod;
 layout(location=14) uniform uint reflectionsEnabled;
 layout(location=15) uniform uint shadowsEnabled;
 layout(location=17) uniform uint unlit;
@@ -30,14 +30,14 @@ layout(location=27) uniform float volume;
 layout(location=28) uniform uvec2 camViewSize;
 layout(location=29) uniform sampler2D camViewTex;
 layout(location=30) uniform uint useCamView;
-layout(location=31) uniform sampler2D fontAtlas; // SDF glyph atlas for 3D text decals (alpha cutout only)
+layout(location=31) uniform sampler2D fontAtlas;
 layout(location=32) uniform uint useFontAtlas;
 layout(location=33) uniform vec2 hopperDeathEffect; // x: red tint, y: normalized magenta rim strength
-layout(location=34) uniform uint isCyberspace; // 1 on cyberspace level: use hardcoded neon directionals instead of the sun
-layout(location=36) uniform sampler2DShadow sunShadowMap; // 2048x2048 sunlight depth map, single, no cascades
-layout(location=37) uniform uint sunEnabled; // sun only lights a cell that sees the sun, and only while shadows are on
-layout(location=38) uniform vec3 sunDirection; // sunlight direction for this frame, yawed by the sky's rotation rate so it tracks the visible sun
-layout(location=40) uniform mat4 sunShadowMatrix; /* sunlight ortho shadowmap matrix (only meaningful when sunEnabled)
+layout(location=34) uniform uint isCyberspace;
+layout(location=36) uniform sampler2DShadow sunShadowMap;
+layout(location=37) uniform uint sunEnabled;
+layout(location=38) uniform vec3 sunDirection;
+layout(location=40) uniform mat4 sunShadowMatrix; /* sunlight ortho shadowmap matrix
 layout(location=41) some weird
 layout(location=42) padding apparently, so say some docs anyhow
 layout(location=43)*/
@@ -140,7 +140,12 @@ void main() {
         vec3 sunProj = (sunShadowMatrix * vec4(FragPos, 1.0)).xyz;
         vec2 sunUV   = sunProj.xy * 0.5 + 0.5;
         float sunZ   = sunProj.z  * 0.5 + 0.5;
-        if (all(lessThan(abs(sunProj.xy), vec2(1.0))) && abs(sunProj.z) < 1.0) { sunShadow = texture(sunShadowMap, vec3(sunUV, sunZ - 0.0012)); }
+        if (all(lessThan(abs(sunProj.xy), vec2(1.0))) && abs(sunProj.z) < 1.0) {
+            float sunSum = 0.0, sunBias = 0.0012 / clamp(dot(adjustedNormal, sunDirection), 0.25, 1.0);
+            vec2 sunTexel = 1.0 / vec2(textureSize(sunShadowMap, 0));
+            for (int sx = -1; sx <= 1; ++sx) { for (int sy = -1; sy <= 1; ++sy) { sunSum += texture(sunShadowMap, vec3(sunUV + vec2(float(sx), float(sy)) * sunTexel, sunZ - sunBias)); } }
+            sunShadow = sunSum * (1.0 / 9.0);
+        }
         lighting += albedoColor.rgb * sunCol * (clamp(dot(adjustedNormal, sunDirection), 0.0, 1.0) * sunShadow);
     }
     float rim=1.0-max(dot(adjustedNormal,viewDir),0.0); lighting+=clamp(rim*rim*rim*rim*0.25*clamp(iTot,0.0,1.0)*specColor.rgb,0.0,1.0);/*Specular "rim" fresnel (tested and perf impact ~zero)*/ lighting=(unlit>0||useCamView>0)?albedoColor.rgb:lighting+glowColor.rgb; if(heat>0.0){lighting+=albedoColor.rgb*heat; lighting=pow(lighting,vec3(1.2)); lighting+=clamp(rim*rim*rim*rim*0.5*specColor.rgb,0.0,1.0);}

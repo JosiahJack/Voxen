@@ -61,10 +61,10 @@ typedef struct { float x,y,z,r,g,b,a; } WireVertex; WireVertex* debugLineVerts; 
 static void EmitWireQuad(V3 c0, V3 c1, V3 c2, V3 c3, Color c) { const V3 p[6] = {c0,c1,c2, c0,c2,c3}; for (int v = 0; v < 6; ++v) { WireVertex* w = &wireVerts[wireVertCount++]; w->x = p[v].x; w->y = p[v].y; w->z = p[v].z; w->r = c.r; w->g = c.g; w->b = c.b; w->a = c.a; } }
 void DrawCrossedLine(V3 a, V3 b, V3 perp, float halfThick, Color c) {
     V3 o0 = V3_ScaleByF(perp, halfThick);
-    if (wireVertCount + 6 < (u32)(MAX_WIRELINE_QUADS*6)) EmitWireQuad(V3_AsubB(a,o0), V3_AplusB(a,o0), V3_AplusB(b,o0), V3_AsubB(b,o0), c);
+    if (wireVertCount + 6 < (u32)(MAX_WIRELINE_QUADS*6)) EmitWireQuad(V3_AsubB(a,o0), V3Add(a,o0), V3Add(b,o0), V3_AsubB(b,o0), c);
     V3 q = V3_Normalize(V3_Cross(V3_Normalize(V3_AsubB(b,a)), perp));
     V3 r0 = V3_ScaleByF(q, halfThick);
-    if (wireVertCount + 6 < (u32)(MAX_WIRELINE_QUADS*6)) EmitWireQuad(V3_AsubB(a,r0), V3_AplusB(a,r0), V3_AplusB(b,r0), V3_AsubB(b,r0), c);
+    if (wireVertCount + 6 < (u32)(MAX_WIRELINE_QUADS*6)) EmitWireQuad(V3_AsubB(a,r0), V3Add(a,r0), V3Add(b,r0), V3_AsubB(b,r0), c);
 }
 
 void DrawLine(V3 start, V3 end, Color col) {
@@ -82,10 +82,10 @@ INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_R
 void DrawVelocityVector(u16 i) {
     if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;}
     
-    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.velocity[i],0.25f));
+    V3 tip = V3Add(World.position[i],V3_ScaleByF(World.velocity[i],0.25f));
     DrawLine(World.position[i],tip,textColors[T_ORANGE]);
     V3 perp = V3_Normalize(V3_Cross(World.velocity[i],(vabs(World.velocity[i].y/V3_Mag(World.velocity[i])) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0})); 
-    DrawLine(V3_AplusB(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
+    DrawLine(V3Add(tip,V3_ScaleByF(perp,0.05f)),V3_AsubB(tip,V3_ScaleByF(perp,0.05f)),textColors[T_ORANGE]); // Small cross at tip so zero-length vecs are still visible when barely moving
 }
 
 void DrawBoxColliderColored(u16 i, Color col) {
@@ -94,7 +94,7 @@ void DrawBoxColliderColored(u16 i, Color col) {
     px = V3_ScaleByF(ax,b.hExt.x);
     py = V3_ScaleByF(ay,b.hExt.y);
     pz = V3_ScaleByF(az,b.hExt.z);
-    for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3_AplusB(b.ctr,V3_AplusB(V3_AplusB(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
+    for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3Add(b.ctr,V3Add(V3Add(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
     DrawLine(c[0],c[1],col); DrawLine(c[2],c[3],col); DrawLine(c[4],c[5],col);
     DrawLine(c[6],c[7],col);                          DrawLine(c[0],c[2],col); 
     DrawLine(c[1],c[3],col);                          DrawLine(c[4],c[6],col);
@@ -104,16 +104,7 @@ void DrawBoxColliderColored(u16 i, Color col) {
 }
 
 void DrawBoxCollider(u16 i) { DrawBoxColliderColored(i,ColliderColor(i)); }
-void DrawSphereWireframe(Color col, ShapeSphere s) {
-    float step = 6.28318530f / 12;
-    for (int seg=0;seg<12;seg++) {
-        float a0 = seg * step, a1 = a0 + step, c0 = vcosf(a0), s0 = vsinf(a0), c1 = vcosf(a1), s1 = vsinf(a1);
-        DrawLine(V3_AplusB(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3_AplusB(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col);
-        DrawLine(V3_AplusB(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3_AplusB(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col);
-        DrawLine(V3_AplusB(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3_AplusB(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col);
-    }
-}
-
+void DrawSphereWireframe(Color col, ShapeSphere s) { float step = 6.28318530f / 12; for (int seg=0;seg<12;seg++) { float a0 = seg * step, a1 = a0 + step, c0 = vcosf(a0), s0 = vsinf(a0), c1 = vcosf(a1), s1 = vsinf(a1); DrawLine(V3Add(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3Add(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col); DrawLine(V3Add(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3Add(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col); DrawLine(V3Add(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3Add(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col); } }
 void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = Entity_GetSph(i); DrawSphereWireframe(col,s); DrawVelocityVector(i); }
 void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
 void DrawMeshCollider(u16 i) {
@@ -146,23 +137,23 @@ void DrawCapsuleCollider(u16 i) {
     for (int seg=0;seg<12;++seg) { /*Draw top and bottom rings*/
         float a0=seg * step, a1=a0 + step;
         float c0=vcosf(a0), s0=vsinf(a0), c1=vcosf(a1), s1=vsinf(a1);
-        V3 r0=V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(perp1,s0*r));
-        V3 r1=V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(perp1,s1*r));
-        DrawLine(V3_AplusB(cap.base,r0),V3_AplusB(cap.base,r1),col);
-        DrawLine(V3_AplusB(cap.tip,r0),V3_AplusB(cap.tip,r1),col);
+        V3 r0=V3Add(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(perp1,s0*r));
+        V3 r1=V3Add(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(perp1,s1*r));
+        DrawLine(V3Add(cap.base,r0),V3Add(cap.base,r1),col);
+        DrawLine(V3Add(cap.tip,r0),V3Add(cap.tip,r1),col);
     }
     for (int seg=0;seg<6;++seg) { /*Draw the hemispheres*/
         float a0=seg*step, a1=a0+step;
         float c0=vcosf(a0), s0=vsinf(a0), c1=vcosf(a1), s1=vsinf(a1);
-        DrawLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,-s1*r))),col);
-        DrawLine(V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,-s0*r))),V3_AplusB(cap.base,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,-s1*r))),col);
-        DrawLine(V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,s0*r))),V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,s1*r))),col);
-        DrawLine(V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,s0*r))),V3_AplusB(cap.tip,V3_AplusB(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,s1*r))),col);
+        DrawLine(V3Add(cap.base,V3Add(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,-s0*r))),V3Add(cap.base,V3Add(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,-s1*r))),col);
+        DrawLine(V3Add(cap.base,V3Add(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,-s0*r))),V3Add(cap.base,V3Add(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,-s1*r))),col);
+        DrawLine(V3Add(cap.tip,V3Add(V3_ScaleByF(perp0,c0*r),V3_ScaleByF(axis,s0*r))),V3Add(cap.tip,V3Add(V3_ScaleByF(perp0,c1*r),V3_ScaleByF(axis,s1*r))),col);
+        DrawLine(V3Add(cap.tip,V3Add(V3_ScaleByF(perp1,c0*r),V3_ScaleByF(axis,s0*r))),V3Add(cap.tip,V3Add(V3_ScaleByF(perp1,c1*r),V3_ScaleByF(axis,s1*r))),col);
     }
     for (int seg=0;seg<4;++seg) { /*Draw the longitudinal lines*/
         float a = seg * (6.28318530f / 4.f);
-        V3 off = V3_AplusB(V3_ScaleByF(perp0,vcosf(a)*r),V3_ScaleByF(perp1,vsinf(a)*r));
-        DrawLine(V3_AplusB(cap.base,off),V3_AplusB(cap.tip,off),col);
+        V3 off = V3Add(V3_ScaleByF(perp0,vcosf(a)*r),V3_ScaleByF(perp1,vsinf(a)*r));
+        DrawLine(V3Add(cap.base,off),V3Add(cap.tip,off),col);
     }
     DrawVelocityVector(i);
 }
@@ -172,14 +163,14 @@ void DrawAngularVelocity(u16 i) {
         
     Color purple = (Color){0.5f,0.0f,1.0f,1.0f};
     V3 dir = V3_Normalize(World.angularVelocity[i]);
-    V3 tip = V3_AplusB(World.position[i],V3_ScaleByF(World.angularVelocity[i],0.35f)); DrawLine(World.position[i],tip,purple); // Arrow (line vector)
+    V3 tip = V3Add(World.position[i],V3_ScaleByF(World.angularVelocity[i],0.35f)); DrawLine(World.position[i],tip,purple); // Arrow (line vector)
     V3 ref = (vabs(dir.y) < 0.9f) ? (V3){0,1,0} : (V3){1,0,0};
     V3 perp=V3_Normalize(V3_Cross(dir,ref)); V3 perp2 = V3_Cross(dir,perp);
-    DrawLine(V3_AplusB(tip,V3_ScaleByF(perp, 0.05f)),V3_AplusB(tip,V3_ScaleByF(perp, -0.05f)), purple);
-    DrawLine(V3_AplusB(tip,V3_ScaleByF(perp2,0.05f)),V3_AplusB(tip,V3_ScaleByF(perp2,-0.05f)), purple);
+    DrawLine(V3Add(tip,V3_ScaleByF(perp, 0.05f)),V3Add(tip,V3_ScaleByF(perp, -0.05f)), purple);
+    DrawLine(V3Add(tip,V3_ScaleByF(perp2,0.05f)),V3Add(tip,V3_ScaleByF(perp2,-0.05f)), purple);
     float rad = 0.6f/*Quarter circle arc (visualizes rotation plane + sense)*/, step = 1.57079632679f / 8.0f; /*quarter circle divided into 8 segments*/
-    V3 axis = dir; V3 p1 = V3_Normalize(V3_Cross(axis,ref)); V3 p2 = V3_Cross(axis,p1), prev = V3_AplusB(World.position[i], V3_ScaleByF(p1,rad)); // Find two vectors perpendicular to angular axis
-    for (int j=1;j<=8;++j) { float a = j * step; float c = vcosf(a), s = vsinf(a); V3 cur = V3_AplusB(World.position[i],V3_AplusB(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); DrawLine(prev,cur,purple); prev = cur; }
+    V3 axis = dir; V3 p1 = V3_Normalize(V3_Cross(axis,ref)); V3 p2 = V3_Cross(axis,p1), prev = V3Add(World.position[i], V3_ScaleByF(p1,rad)); // Find two vectors perpendicular to angular axis
+    for (int j=1;j<=8;++j) { float a = j * step; float c = vcosf(a), s = vsinf(a); V3 cur = V3Add(World.position[i],V3Add(V3_ScaleByF(p1,c * rad),V3_ScaleByF(p2,s * rad))); DrawLine(prev,cur,purple); prev = cur; }
 }
 // WinSys Windowing and Input System interfacing with the OS.
 typedef struct WSWin WSWin;
@@ -1058,7 +1049,7 @@ static void cmd_summon(int itemConstIndex) {
         if (EntIdxIsValid(spawned)) {
             lastSpawned = spawned;
             V3 sdir = ScreenPointToRay(World.instances[PLAYER1].forward, World.instances[PLAYER1].right);
-            World.position[spawned] = V3_AplusB(World.position[PLAYER1], V3_ScaleByF(sdir, 2.0f));
+            World.position[spawned] = V3Add(World.position[PLAYER1], V3_ScaleByF(sdir, 2.0f));
             World.velocity[spawned] = (V3){0.0f, 0.0f, 0.0f};
             if (IdxIsHardware(itemConstIndex)) { int v = (int)World.invP1.hwVers[itemConstIndex - 328] + 1; World.instances[spawned].customIndex = (i16)(v > 4 ? 4 : v); }
         }
@@ -1171,7 +1162,7 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 A, V3 B, V3 C) {
     float v = (-V3_dot(AB, dao)) * invDet; if (v < 0.0f) return miss;
     float w = 1.0f - u-v; if (w < 0.0f) return miss;
 
-    return (RaycastHit){.point = V3_AplusB(origin, V3_ScaleByF(dir, d)), .normal = V3_Normalize(n), .distance = d, .hitInstanceIndex = INSTANCE_COUNT, .hit = vabs(det) >= 0.00000001f};
+    return (RaycastHit){.point = V3Add(origin, V3_ScaleByF(dir, d)), .normal = V3_Normalize(n), .distance = d, .hitInstanceIndex = INSTANCE_COUNT, .hit = vabs(det) >= 0.00000001f};
 }
 
 INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
@@ -1189,7 +1180,7 @@ INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
     
     h.hit = true;
     h.distance = t;
-    h.point = V3_AplusB(origin, V3_ScaleByF(dir, t));
+    h.point = V3Add(origin, V3_ScaleByF(dir, t));
     h.normal = V3_ScaleByF(V3_AsubB(h.point, sph.ctr), 1.0f / r);
     return h;
 }
@@ -1214,15 +1205,15 @@ INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist)
     float bard = V3_dot(ba,dir), baoa = V3_dot(ba,oa), tBest=-1.0f; float a = baba - bard * bard, b = baba * V3_dot(dir,oa) - baoa * bard, c = baba * V3_dot(oa,oa) - baoa * baoa - r * r * baba; float disc = b * b - a * c;
     if (vabs(a) >= 0.00001f && disc >= 0.0f) {
         float sh = vsqrtf(disc); float t0 = (-b - sh) / a; float y0 = baoa + t0 * bard; 
-        if (t0 >= 0.0f && t0 <= maxDist && y0 > 0.0f && y0 < baba) { tBest = t0; V3 p = V3_AplusB(origin,V3_ScaleByF(dir,t0)); V3 q=V3_AplusB(cap.base,V3_ScaleByF(ba,y0/baba)); nBest=V3_Normalize(V3_AsubB(p,q));}
-        else { float t1=(-b+sh)/a; float y1=baoa+t1*bard; if (t1 >= 0.0f && t1 <= maxDist && y1 > 0.0f && y1 < baba) { tBest=t1; V3 p=V3_AplusB(origin,V3_ScaleByF(dir,t1)),q=V3_AplusB(cap.base,V3_ScaleByF(ba,y1/baba)); nBest=V3_Normalize(V3_AsubB(p,q)); } }
+        if (t0 >= 0.0f && t0 <= maxDist && y0 > 0.0f && y0 < baba) { tBest = t0; V3 p = V3Add(origin,V3_ScaleByF(dir,t0)); V3 q=V3Add(cap.base,V3_ScaleByF(ba,y0/baba)); nBest=V3_Normalize(V3_AsubB(p,q));}
+        else { float t1=(-b+sh)/a; float y1=baoa+t1*bard; if (t1 >= 0.0f && t1 <= maxDist && y1 > 0.0f && y1 < baba) { tBest=t1; V3 p=V3Add(origin,V3_ScaleByF(dir,t1)),q=V3Add(cap.base,V3_ScaleByF(ba,y1/baba)); nBest=V3_Normalize(V3_AsubB(p,q)); } }
     }
     
     for (int k = 0; k < 2; k++) {
         V3 ctr = k == 0 ? cap.base : cap.tip; V3 oc = V3_AsubB(origin, ctr); float bs = V3_dot(oc, dir); float cs = V3_dot(oc, oc) - r * r; float ds = bs * bs - cs; if (ds < 0.0f) continue; float shs = vsqrtf(ds); float ts = -bs - shs; if (ts < 0.0f) ts = -bs + shs; if (ts < 0.0f || ts > maxDist) continue; if (tBest >= 0.0f && ts >= tBest) continue;
-        V3 ps = V3_AplusB(origin, V3_ScaleByF(dir, ts)); float y = V3_dot(V3_AsubB(ps, cap.base), ba); if ((k == 0 && y > 0.0f) || (k == 1 && y < baba)) continue; tBest = ts; nBest = V3_ScaleByF(V3_AsubB(ps, ctr), 1.0f / r);
+        V3 ps = V3Add(origin, V3_ScaleByF(dir, ts)); float y = V3_dot(V3_AsubB(ps, cap.base), ba); if ((k == 0 && y > 0.0f) || (k == 1 && y < baba)) continue; tBest = ts; nBest = V3_ScaleByF(V3_AsubB(ps, ctr), 1.0f / r);
     }
-    if (tBest >= 0.0f) { h.hit = true; h.distance = tBest; h.point = V3_AplusB(origin, V3_ScaleByF(dir, tBest)); h.normal = nBest; } return h;
+    if (tBest >= 0.0f) { h.hit = true; h.distance = tBest; h.point = V3Add(origin, V3_ScaleByF(dir, tBest)); h.normal = nBest; } return h;
 }
 
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist);
@@ -1757,19 +1748,9 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     shadowTime = get_time() - shadowStartTime;
 }
 
-V3 SunDirection(void) {
-    float yaw = (float)World.pauseRelativeTime * 0.1f * skyRotateSpeeds[Cheats.dizzyLevel]; /*timeVal * skyRotateSpeed, both exactly as Render feeds the composite*/
-    float c = vcosf(yaw), s = vsinf(yaw);
-    /*Base = the skybox disc vector: -saturnCenter from composite_frag.glsl
-      (saturnCenter = normalize((0,-0.1,sqrt(0.99)))). The old (0.35,1,0.25)
-      sat 97.85 degrees away from the visible sun, so shadows never pointed
-      at the disc; same yaw rate/sign as the sky rotation, so this tracks it.*/
-    V3 b = {0.0f, 0.1f, -0.99498743f};
-    return V3_Normalize((V3){b.x*c + b.z*s, b.y, -b.x*s + b.z*c});
-}
-
-void InitSunShadowmap(void) { // single 2048x2048 sunlight depth map + FBO, no cascades
-    i32 prevUnit=0; glGetIntegerv(GL_ACTIVE_TEXTURE,&prevUnit); glActiveTexture(GL_TEXTURE10); /*Private unit, always set explicitly: unit 4 holds outputImageID from UpdateScreenSize and is never re-bound, and unit 1 holds inputUIID, so binding "whatever is active" would silently steal one of them.*/
+V3 SunDirection(void) { float yaw = (float)World.pauseRelativeTime * 0.1f * skyRotateSpeeds[Cheats.dizzyLevel]; float c = vcosf(yaw), s = vsinf(yaw); V3 b = {0.0f, 0.1f, 0.99498743f}; return V3_Normalize((V3){b.x*c - b.z*s, b.y, b.x*s + b.z*c}); }
+void InitSunShadowmap(void) {
+    i32 prevUnit=0; glGetIntegerv(GL_ACTIVE_TEXTURE,&prevUnit); glActiveTexture(GL_TEXTURE10);
     glGenTextures(1,&sunShadowTex); glBindTexture(GL_TEXTURE_2D,sunShadowTex);
     glTexImage2D(GL_TEXTURE_2D,0,GL_DEPTH_COMPONENT24,SUN_SHADOW_SIZE,SUN_SHADOW_SIZE,0,GL_DEPTH_COMPONENT,GL_UNSIGNED_INT,NULL);
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR); // LINEAR = 2x2 HW PCF on sampler2DShadow
@@ -1778,46 +1759,41 @@ void InitSunShadowmap(void) { // single 2048x2048 sunlight depth map + FBO, no c
     glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_COMPARE_MODE,GL_COMPARE_REF_TO_TEXTURE); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_COMPARE_FUNC,GL_LEQUAL);
     glGenFramebuffers(1,&sunShadowFBO); glBindFramebuffer(GL_FRAMEBUFFER,sunShadowFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_TEXTURE_2D,sunShadowTex,0);
-    glDrawBuffers(0,NULL); // depth-only FBO: no color buffers
-    glActiveTexture((u32)prevUnit); /*put the caller's unit back, still bound to whatever it had*/
+    glDrawBuffers(0,NULL);
+    glActiveTexture((u32)prevUnit);
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
 }
 
 void RenderSunShadowmap(void) {
-    if (Sys_Settings.Shadows == 0u || sunShadowFBO == 0u) return; // respects the sun-visible uniform: no sun without shadows on
-    V3 sunDir=SunDirection(); sunDirection=sunDir; // uploaded to chunkSP as uniform 38, so the lit direction and the map that casts for it can never disagree
+    if (Sys_Settings.Shadows == 0u || sunShadowFBO == 0u) return;
+    
+    V3 sunDir=SunDirection(); sunDirection=sunDir;
     V3 target=World.position[PLAYER1];
-    V3 fwd={-sunDir.x,-sunDir.y,-sunDir.z}; // light travel direction
+    V3 fwd={-sunDir.x,-sunDir.y,-sunDir.z};
     V3 right=V3_Normalize(V3_Cross(fwd,(V3){0.0f,0.0f,1.0f}));
     V3 up=V3_Cross(right,fwd);
     const float S=64.0f, eyeDist=S*2.0f;
     V3 eye={target.x+sunDir.x*eyeDist,target.y+sunDir.y*eyeDist,target.z+sunDir.z*eyeDist};
-    // column-major view matrix; view -Z = fwd so Z column = -fwd = sunDir
-    float view[16]={right.x,up.x,sunDir.x,0.0f, right.y,up.y,sunDir.y,0.0f, right.z,up.z,sunDir.z,0.0f,
-        -(right.x*eye.x+right.y*eye.y+right.z*eye.z),-(up.x*eye.x+up.y*eye.y+up.z*eye.z),-(sunDir.x*eye.x+sunDir.y*eye.y+sunDir.z*eye.z),1.0f};
-    const float texel=(2.0f*S)/(float)SUN_SHADOW_SIZE; // snap the ortho box to texel grid: no shimmer when the camera moves
-    /*Snap the eye's light-space position to the texel grid. The old code
-      snapped right.(target-eye), which is identically 0: right is
-      perpendicular to sunDir by construction and eye = target + sunDir*128,
-      so the rounding never moved anything and texels swam as the player
-      moved. Snapping the eye (whose light-space XY equal the target's, up
-      to the vanishing sunDir component) holds texels fixed between steps.*/
+    float view[16]={right.x,up.x,sunDir.x,0.0f, right.y,up.y,sunDir.y,0.0f, right.z,up.z,sunDir.z,0.0f, -(right.x*eye.x+right.y*eye.y+right.z*eye.z),-(up.x*eye.x+up.y*eye.y+up.z*eye.z),-(sunDir.x*eye.x+sunDir.y*eye.y+sunDir.z*eye.z),1.0f};
+    const float texel=(2.0f*S)/(float)SUN_SHADOW_SIZE;
     float ex=right.x*eye.x+right.y*eye.y+right.z*eye.z, ey=up.x*eye.x+up.y*eye.y+up.z*eye.z;
-    float qx=ex/texel, qy=ey/texel; // manual roundf: math.h round() is not in the loader's header set
+    float qx=ex/texel, qy=ey/texel;
     view[12]=-((float)((int)(qx+(qx>=0.0f?0.5f:-0.5f))))*texel; view[13]=-((float)((int)(qy+(qy>=0.0f?0.5f:-0.5f))))*texel;
     const float znear=S*0.5f, zfar=S*4.0f;
     float ortho[16]={1.0f/S,0.0f,0.0f,0.0f, 0.0f,1.0f/S,0.0f,0.0f, 0.0f,0.0f,-2.0f/(zfar-znear),0.0f, 0.0f,0.0f,-(zfar+znear)/(zfar-znear),1.0f};
     mul_mat4(sunShadowMatrix,ortho,view); ExtractFrustumPlanes(sunShadowMatrix,sunShadowFrustum);
     glBindFramebuffer(GL_FRAMEBUFFER,sunShadowFBO); glViewport(0,0,SUN_SHADOW_SIZE,SUN_SHADOW_SIZE); glClear(GL_DEPTH_BUFFER_BIT);
-    glDisable(GL_CULL_FACE); // user spec: backface culling OFF for the sun shadowmap pass
+    glDisable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST); glDepthMask(GL_TRUE); glDepthFunc(0x0201/*GL_LESS*/); glDisable(GL_BLEND);
-    glUseProgram(depthPrepassSP); glUniformMatrix4fv(2,1,GL_FALSE,sunShadowMatrix); // depth-only + alpha cutout, no new shaders needed
+    glUseProgram(depthPrepassSP); glUniformMatrix4fv(2,1,GL_FALSE,sunShadowMatrix);
     u16 currentModelType=U16_MAX,currentTexIndex=U16_MAX; u32 currentSortKey=U32_MAX, currentTriCount=0; bool useDetail=Sys_Settings.ModelDetail;
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
-        if (i == World.weaponVModelIndex) continue; // camera-locked viewmodel: keep out, like the main depth prepass
+        if (i == World.weaponVModelIndex) continue;
         Entity* e=&World.instances[i]; if (EntNotVisible(i,(e->entflags & EF_NO_SHADOWS))) continue;
+        
         float radius=(e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
-        if (!SphereInFrustum(sunShadowFrustum,World.position[i],radius)) continue; // same sphere/plane reject the main pass and the light cubemaps use
+        if (!SphereInFrustum(sunShadowFrustum,World.position[i],radius)) continue;
+        
         u16 modelType=(instanceIsLODArray[i]||useDetail<1u)&&e->lodIndex<mdlsCnt?e->lodIndex:e->modelIndex;
         u32 sortKey=((u32)modelType<<16)|e->texIndex;
         glUniform1ui(0,i);
@@ -1828,8 +1804,8 @@ void RenderSunShadowmap(void) {
         }
         glDrawElements(0x0004/*GL_TRIANGLES*/,currentTriCount,GL_UNSIGNED_SHORT,0); drawCalls++; shadDrawCalls++; vertsRendered+=currentTriCount;
     }
-    glEnable(GL_CULL_FACE); // main render re-sets cull state per instance anyway; restore the default
-    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight); // caller rebinds per-pass right after
+    glEnable(GL_CULL_FACE);
+    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
@@ -1844,16 +1820,16 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
             V3 mn = modelMin[m], mx = modelMax[m];
             V3 ctr = (V3){(mn.x+mx.x)*0.5f * World.scale[i].x, (mn.y+mx.y)*0.5f * World.scale[i].y, (mn.z+mx.z)*0.5f * World.scale[i].z};
             V3 he  = (V3){(mx.x-mn.x)*0.5f * World.scale[i].x, (mx.y-mn.y)*0.5f * World.scale[i].y, (mx.z-mn.z)*0.5f * World.scale[i].z};
-            V3 c = V3_AplusB(World.position[i], quat_rot_v3(World.rotation[i], ctr));
+            V3 c = V3Add(World.position[i], quat_rot_v3(World.rotation[i], ctr));
             bool wideX = he.x >= he.z;
             V3 right = quat_rot_v3(World.rotation[i], wideX ? (V3){1.0f,0.0f,0.0f} : (V3){0.0f,0.0f,1.0f});
             V3 up = quat_rot_v3(World.rotation[i], (V3){0.0f,1.0f,0.0f});
             float hw = (wideX ? he.x : he.z), hh = he.y; /* stop just inside the frame so the bars read as inset */
             if (hw > 0.0f && hh > 0.0f) {
                 V3 lo, hi, lf, rf;
-                lo = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right,-hw), V3_ScaleByF(up,-hh)));
-                hi = V3_AplusB(c, V3_AplusB(V3_ScaleByF(right, hw), V3_ScaleByF( up,hh)));
-                lf = V3_AplusB(lo, V3_ScaleByF(up, 2.56f));
+                lo = V3Add(c, V3Add(V3_ScaleByF(right,-hw), V3_ScaleByF(up,-hh)));
+                hi = V3Add(c, V3Add(V3_ScaleByF(right, hw), V3_ScaleByF( up,hh)));
+                lf = V3Add(lo, V3_ScaleByF(up, 2.56f));
                 rf = V3_AsubB(hi, V3_ScaleByF(up, 2.56f));
                 V3 face = V3_Normalize(V3_Cross(right,up)); /* door plane normal, used to keep the triplet spread in-plane */
                 const Color band[3] = {{1.0f,0.82f,0.08f,1.0f},{1.0f,0.42f,0.04f,1.0f},{1.0f,0.82f,0.08f,1.0f}};
@@ -1862,7 +1838,7 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
                     V3 a = pass ? lf : lo, b = pass ? rf : hi;
                     V3 dir = V3_Normalize(V3_AsubB(b,a));
                     V3 perp = V3_Normalize(V3_Cross(dir, face));
-                    for (int k = 0; k < 3; ++k) { V3 o = V3_ScaleByF(perp, spread[k]); DrawCrossedLine(V3_AplusB(a,o), V3_AplusB(b,o), perp, 0.015f, band[k]); }
+                    for (int k = 0; k < 3; ++k) { V3 o = V3_ScaleByF(perp, spread[k]); DrawCrossedLine(V3Add(a,o), V3Add(b,o), perp, 0.015f, band[k]); }
                 }
             }
         }
@@ -1909,20 +1885,18 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     float shakeOffset = (World.shakeFinished > World.pauseRelativeTime) ? (shakeAmp * vcosf((float)(World.pauseRelativeTime * 20.0f))) * (World.shakeFinished - World.pauseRelativeTime) : 0.0f;
     Quaternion cameraRotation=World.rotation[PLAYER1];
     if (shakeOffset!=0.0f && World.curLev!=LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&cameraRotation,World.cam_yaw+shakeOffset,World.cam_pitch+shakeOffset*0.5f,World.cam_roll);
-
     V3 playerPos = World.position[PLAYER1];
     float px = playerPos.x, py = playerPos.y, pz = playerPos.z, aspect3D = (float)swidth / (float)sheight;
-    float view[16], viewProj[16], invViewRot[9], invViewProj[16];
-    // Camera projection
+    float view[16], viewProj[16], invViewRot[9], invViewProj[16]; // Camera projection
     { float f = vcot(sfov * PI / 360.0f); float* m = rasterPerspectiveProjection; m[0]=f / aspect3D; m[1]=0.0f; m[2]=0.0f; m[3]=0.0f; m[4]=0.0f; m[5]=f; m[6]=0.0f; m[7]=0.0f; m[8]=0.0f; m[9]=0.0f; m[10]= -(sfar + snear) / (sfar - snear); m[11]=-1.0f; m[12]=0.0f; m[13]=0.0f; m[14]=-2.0f*sfar*snear / (sfar - snear); m[15]=0.0f;
     mat4_lookat_from(view,&cameraRotation,World.position[PLAYER1]); mul_mat4(viewProj,rasterPerspectiveProjection,view); invViewRot[0]=view[0]; invViewRot[1]=view[4]; invViewRot[2]=view[8]; invViewRot[3]=view[1]; invViewRot[4]=view[5]; invViewRot[5]=view[9]; invViewRot[6]=view[2]; invViewRot[7]=view[6]; invViewRot[8]=view[10]; mat4_inverse(viewProj,invViewProj); }
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
     glBindVertexArray(chunkVAO);/*Common vao for RenderDynamicShadowmaps and Rasterized Geometry*/
     glEnable(GL_DEPTH_TEST);
     bool sunActive = !camView && likely(Sys_Settings.Shadows > 0u) && SkySunIsVisible();
-    if (sunActive && sunShadowFBO == 0u) { InitSunShadowmap();/*shadows can be toggled on after boot, which is the only path that gets here with no map yet*/ }
+    if (sunActive && sunShadowFBO == 0u) { InitSunShadowmap(); }
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][0]);
-    if (likely(Sys_Settings.Shadows > 0u) && !camView) { glDisable(GL_DEPTH_TEST); /*SSBO shadowmaps hold no depth attachment; stale gbuffer depth must not reject their fragments (too aggressive depth state also spilled between cubemap faces within the pass)*/ RenderShadowmaps(); glEnable(GL_DEPTH_TEST); if (sunActive) { RenderSunShadowmap(); } } /*shadow maps update once per frame, main view only: camview passes pop World.position[PLAYER1] to the camera, so running this per camview would rebuild candidates/slots/indirections for each camera's area every frame -> flicker + slot churn (camviews draw on the main pass's shadow data, kept valid by the sticky indirection + camview candidates in RenderShadowmaps).*/
+    if (likely(Sys_Settings.Shadows > 0u) && !camView) { glDisable(GL_DEPTH_TEST); RenderShadowmaps(); glEnable(GL_DEPTH_TEST); if (sunActive) { RenderSunShadowmap(); } }
     glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
     glBeginQuery(0x88BF/*GL_TIME_ELAPSED*/, gpuQ[gpuQFrame][1]);
     double rendStart = get_time();
@@ -2065,8 +2039,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (wep16 >= 0 && wep16 < 16 && World.instances[wvi].modelIndex < MAX_MDLS) { // Offset in player-local space (right,down,forward), rotated into world by the player view; reload/swap dip added on Y.  Pivot = player position, weapon stays locked to view.
             V3 weaponViewOffset=vWepOfs[wep16];
             weaponViewOffset.y += wfx.reloadContainerPos.y;
-            weaponViewOffset = V3_AplusB(weaponViewOffset, debugWepOffset);
-            V3 weaponPos = V3_AplusB(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1], weaponViewOffset));
+            weaponViewOffset = V3Add(weaponViewOffset, debugWepOffset);
+            V3 weaponPos = V3Add(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1], weaponViewOffset));
             World.position[wvi] = weaponPos;
             World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1], vWepRot[wep16]); // view orientation + per-model correction
             u16 curN = U16_MAX, curT = U16_MAX, curG = U16_MAX, curS = U16_MAX, curM = U16_MAX;

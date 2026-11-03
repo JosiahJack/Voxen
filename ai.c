@@ -187,11 +187,11 @@ static void ai_muzzle_flash(Entity* self, int attackNum) {
     AIMuzzleLightData d = attackNum==3 ? aiMuzzleLight3[npc] : aiMuzzleLights[npc]; if (attackNum==3 && !d.intensity) d = aiMuzzleLights[npc]; if (d.intensity<=0.0f || d.range<=0.0f) return;
     u16 selfIdx=(u16)(self-World.instances); V3 pos;
     if (attackNum==1) pos=ai_sight_pos(self);
-    else { V3 off=aiMuzzleOffsets[npc].gunPoint; if (attackNum==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f)) off=aiMuzzleOffsets[npc].gunPoint2; if (off.x==0.0f && off.y==0.0f && off.z==0.0f) pos=ai_sight_pos(self); else pos=V3_AplusB(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],off)); }
+    else { V3 off=aiMuzzleOffsets[npc].gunPoint; if (attackNum==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f)) off=aiMuzzleOffsets[npc].gunPoint2; if (off.x==0.0f && off.y==0.0f && off.z==0.0f) pos=ai_sight_pos(self); else pos=V3Add(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],off)); }
     ai_effect_flash(pos,d.color,d.range,d.intensity,AI_MUZZLE_FLASH_TIME);
 }
-INLINE V3 ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3_AplusB(World.position[idx],quat_rot_v3(World.rotation[idx],sightPointOffsets[World.instances[idx].index - 419])); }
-INLINE V3 ai_gun_pos(Entity* e, int n) { u16 idx=(u16)(e - World.instances); u16 npc=World.instances[idx].index-419; V3 off=(n==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f))?aiMuzzleOffsets[npc].gunPoint2:aiMuzzleOffsets[npc].gunPoint; if(off.x==0.0f && off.y==0.0f && off.z==0.0f) off=(V3){0.0f,sightPointOffsets[npc].y+0.3f,0.0f}; return V3_AplusB(World.position[idx],quat_rot_v3(World.rotation[idx],off)); }
+INLINE V3 ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3Add(World.position[idx],quat_rot_v3(World.rotation[idx],sightPointOffsets[World.instances[idx].index - 419])); }
+INLINE V3 ai_gun_pos(Entity* e, int n) { u16 idx=(u16)(e - World.instances); u16 npc=World.instances[idx].index-419; V3 off=(n==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f))?aiMuzzleOffsets[npc].gunPoint2:aiMuzzleOffsets[npc].gunPoint; if(off.x==0.0f && off.y==0.0f && off.z==0.0f) off=(V3){0.0f,sightPointOffsets[npc].y+0.3f,0.0f}; return V3Add(World.position[idx],quat_rot_v3(World.rotation[idx],off)); }
 static void ai_spawn_presets(const AIPresetSet* set, V3 pos) { for (u8 i=0;i<set->n;i++){const PSysDef* preset=PSysTypeGet(set->p[i]); if(!preset)continue; PSysDef def=*preset; def.pos=pos; PSysAddInternal(&def,U16_MAX,U16_MAX);} }
 static void ai_muzzle_particles(Entity* self, int attackNum) {
     u16 npc=(u16)(self->index-419);
@@ -447,12 +447,12 @@ static void SpawnNPCDeathBurst(Entity* self) {
     u16 npc=(u16)(self->index-419);
       
     u16 selfIdx=(u16)(self - World.instances);
-    V3 origin=V3_AplusB(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],npcDeathBurstOffset[npc]));
+    V3 origin=V3Add(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],npcDeathBurstOffset[npc]));
     const PSysDef* primary=PSysTypeGet(self->deathBurst);
     if (primary) { PSysDef def=*primary; def.pos=origin; PSysAddInternal(&def,U16_MAX,U16_MAX); }
     ai_spawn_presets(&aiDeathBursts[npc],origin);
     u8 lightCount=aiDeathBurstLightCount[npc];
-    for (u8 i=0;i<lightCount;i++) { const AIDeathBurstLight* dl=&aiDeathBurstLights[aiDeathBurstLightStart[npc]+i]; V3 lp=V3_AplusB(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],dl->offset)); ai_effect_flash(lp,dl->color,dl->range,dl->intensity,(double)dl->duration); }
+    for (u8 i=0;i<lightCount;i++) { const AIDeathBurstLight* dl=&aiDeathBurstLights[aiDeathBurstLightStart[npc]+i]; V3 lp=V3Add(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],dl->offset)); ai_effect_flash(lp,dl->color,dl->range,dl->intensity,(double)dl->duration); }
   }
 static void AIDying(u16 i) {
     u16 npcID = World.instances[i].index - 419;

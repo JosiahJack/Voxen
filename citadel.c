@@ -18,7 +18,7 @@ void ResetHeldItem() { World.invP1.heldObjectIndex=World.invP1.heldObjectCustIdx
 void DropHeldItem() {
     if (World.invP1.heldObjectIndex >= World.instCount) { ResetHeldItem(); return; }    if (World.invP1.dropFinished > World.pauseRelativeTime) {return;} World.invP1.dropFinished = World.pauseRelativeTime + 0.2;/*Prevent immediate re-grab at high fps*/ u16 n = AddInstance(World.invP1.heldObjectIndex,World.position[PLAYER1]);
     Entity* e = &World.instances[n]; e->customIndex = World.invP1.heldObjectCustIdx; e->ammo = World.invP1.heldAmmo; e->ammo2 = World.invP1.heldAmmo2; e->heldObjectLoadedAlternate = World.invP1.heldObjectLoadedAlternate;
-    flag_set(&e->entflags,EF_RIGIDBODY,true); bool liveGrenade=IsLiveGrenade(e->index); if(liveGrenade){World.layer[n]=L_PlayerBullets; e->recentMostActivator=PLAYER1; GrenadeInit(n);} V3 tossDir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right); World.position[n] = V3_AplusB(World.position[PLAYER1],V3_ScaleByF(tossDir,0.48f)); World.velocity[n] = V3_ScaleByF(tossDir,10.0f); if(liveGrenade)GrenadeActivate(n); ResetHeldItem();
+    flag_set(&e->entflags,EF_RIGIDBODY,true); bool liveGrenade=IsLiveGrenade(e->index); if(liveGrenade){World.layer[n]=L_PlayerBullets; e->recentMostActivator=PLAYER1; GrenadeInit(n);} V3 tossDir = ScreenPointToRay(World.instances[PLAYER1].forward,World.instances[PLAYER1].right); World.position[n] = V3Add(World.position[PLAYER1],V3_ScaleByF(tossDir,0.48f)); World.velocity[n] = V3_ScaleByF(tossDir,10.0f); if(liveGrenade)GrenadeActivate(n); ResetHeldItem();
 }
 
 void PatchUse(int patchSlot) {
@@ -206,14 +206,14 @@ void CyberDecoySetTarget(u16), CyberDecoyExpired(u16);
 void CyberDecoySpawned(u16 decoy) { World.decoyInstance = decoy; CyberDecoySetTarget(decoy); }
 void CyberDecoyExpired(u16 decoy) { if (decoy >= World.instCount || World.instances[decoy].index != CYBER_DECOY_CONST) return; if (World.decoyActive) { World.decoyActive = false; World.decoyInstance = U16_MAX; CyberDecoySetTarget(U16_MAX); } }
 void DelayedSpawnUpdate(u16 s) { Entity* e=&World.instances[s]; if(!e->active||e->timerFinished<=0.0||e->timerFinished>World.pauseRelativeTime){return;} e->active=false; if(!e->doSelfAfterList){return;} if(e->despawnInstead){DeleteInstance(s);/*despawn means gone, not deactivated*/}else flag_set(&e->entflags,EF_ACTIVE,true);}
-void FuncWallShiftChildren(u16 self, V3 delta) { if (vabs(delta.x)+vabs(delta.y)+vabs(delta.z) < 0.00001f) {return;} for (u16 i=PLAYER1;i<World.instCount;++i) { if (fwParentOf[i]==self) { World.position[i]=V3_AplusB(World.position[i],delta); } } }
+void FuncWallShiftChildren(u16 self, V3 delta) { if (vabs(delta.x)+vabs(delta.y)+vabs(delta.z) < 0.00001f) {return;} for (u16 i=PLAYER1;i<World.instCount;++i) { if (fwParentOf[i]==self) { World.position[i]=V3Add(World.position[i],delta); } } }
 void FuncWallMoveStart(u16 self) { World.instances[self].funcState = FStat_MovingStart; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; }
 void FuncWallMoveTarget(u16 self) { World.instances[self].funcState = FStat_MovingTarget; World.instances[self].tickFinished = World.pauseRelativeTime + 10.0f; }
 void FuncWallTargetted(u16 self) { Entity* e = &World.instances[self]; u8 st = (u8)e->funcState; bool toTarget = st == FStat_Start || st == FStat_MovingStart || st == FStat_AjarMovingTarget || (st > FStat_AjarMovingTarget && e->ajarPercentage > 0.0f); if (toTarget){FuncWallMoveTarget(self);} else{FuncWallMoveStart(self);} play_wav(sounds[76], AppliedFXVol(1.0f), World.position[self], true); }
 void FuncWallUpdateInner(u16 self) {
     Entity* e = &World.instances[self]; if (e->funcState != FStat_MovingStart && e->funcState != FStat_MovingTarget) return; V3 goal = e->funcState == FStat_MovingStart ? e->startPosition : e->targetPosition; FuncStates doneState = e->funcState == FStat_MovingStart ? FStat_Start : FStat_Target; V3 delta = V3_AsubB(goal,World.position[self]);
     float distanceLeft = V3_Mag(delta), total = V3_Dist(e->startPosition,e->targetPosition), dist = e->speed * (float)World.deltaTime * World.timeScale; if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) { World.position[self]=goal; e->funcState=doneState; e->percentMoved=doneState == FStat_Target ? 1.0f : 0.0f; return; }
-    if (distanceLeft > 0.0001f) World.position[self]=V3_AplusB(World.position[self],V3_ScaleByF(V3_Normalize(delta),dist)); if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,World.position[self]) / total;
+    if (distanceLeft > 0.0001f) World.position[self]=V3Add(World.position[self],V3_ScaleByF(V3_Normalize(delta),dist)); if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,World.position[self]) / total;
 }
 
 void FuncWallUpdate(u16 self) { V3 prev = World.position[self]; FuncWallUpdateInner(self); FuncWallShiftChildren(self,V3_AsubB(World.position[self],prev)); }
@@ -658,7 +658,7 @@ static void DropSearchables(u16 self) {
         World.instances[self].contents[i]=World.instances[self].custIdx[i] = -1;}
 }
 
-static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} if (!IdxInBounds((int)fxPoolType) || IdxIsGeometry((int)fxPoolType)) {return; /*PoolType is an ordinal enum (None..LeafBurst, 0..29), not a const index.  Feeding one to SpawnDynamicObject makes it try to spawn a level chunk, which is where "Indices 0 to 306 (level chunks) not possible when not on edit mode!" came from.  Refuse here so no caller can reach that.*/} V3 pos = World.position[self]; if (World.col[self] != CT_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
+static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} if (!IdxInBounds((int)fxPoolType) || IdxIsGeometry((int)fxPoolType)) {return; /*PoolType is an ordinal enum (None..LeafBurst, 0..29), not a const index.  Feeding one to SpawnDynamicObject makes it try to spawn a level chunk, which is where "Indices 0 to 306 (level chunks) not possible when not on edit mode!" came from.  Refuse here so no caller can reach that.*/} V3 pos = World.position[self]; if (World.col[self] != CT_NONE) { pos = V3Add(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
 static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.gravity[self] = 0.0f; }
 static void SpawnSecCpuNodeGibs(u16 self) {
     if (World.instances[self].index != 478) return;
@@ -691,7 +691,7 @@ static void VaporizeCorpse(u16 self,bool energyVaporized) {
     
     DropSearchables(self);
     V3 pos = World.position[self];
-    if (World.col[self] != CT_NONE) { pos = V3_AplusB(pos,World.colliderCenter[self]); }
+    if (World.col[self] != CT_NONE) { pos = V3Add(pos,World.colliderCenter[self]); }
     if (e->deathBurst != 0 && IdxInBounds((int)e->deathBurst) && !IdxIsGeometry((int)e->deathBurst)) { CreateDeathEffects(self,e->deathBurst); }
     else { SpawnDeathEffectAt(energyVaporized ? 188 : 187, pos); }
     e->modelIndex=MAX_MDLS;
@@ -1435,7 +1435,7 @@ void WeaponsUpdate(); void TextureSequenceUpdate(u16 self); void AIAnimationCont
 extern const V3 sightPointOffsets[NUM_AI_TYPES];
 void DrawAIDebug(u16 i) {
     if ((!IdxIsNPC(World.instances[i].index)) || !Cheats.showNPC) return; World.layer[i] = L_NPC; World.layer[PLAYER1] = L_Player; Quaternion r = World.rotation[i]; float x=r.x,y=r.y,z=r.z,w=r.w; V3 fwd = V3_Normalize((V3){2.0f*(x*z + w*y), 0.0f, 1.0f - 2.0f*(x*x + y*y)}); u16 npcIdx = World.instances[i].index - 419;
-    V3 sightPt = V3_AplusB(World.position[i],quat_rot_v3(World.rotation[i],sightPointOffsets[npcIdx])); DrawLine(sightPt,V3_AplusB(sightPt,V3_ScaleByF(fwd,0.6f)),(Color){1.0f,1.0f,0.0f,1.0f}); V3 enemPt = World.position[PLAYER1]; enemPt.y -= 0.24f;
+    V3 sightPt = V3Add(World.position[i],quat_rot_v3(World.rotation[i],sightPointOffsets[npcIdx])); DrawLine(sightPt,V3Add(sightPt,V3_ScaleByF(fwd,0.6f)),(Color){1.0f,1.0f,0.0f,1.0f}); V3 enemPt = World.position[PLAYER1]; enemPt.y -= 0.24f;
     RaycastHit hit = Raycast(sightPt,V3_AsubB(enemPt,sightPt),20.0f,LMASK_NPC_SIGHT); if (hit.hit && hit.hitInstanceIndex == PLAYER1) { DrawLine(sightPt,hit.point,(Color){1.0f,0.0f,0.0f,1.0f}); } else {DrawLine(sightPt,enemPt,(Color){0.0f,1.0f,1.0f,1.0f});} Entity* e = &World.instances[i]; Color dbgCol;
     if (e->currentState == AIState_Idle) dbgCol = (Color){0.0f,1.0f,0.0f,1.0f}; else if (e->currentState == AIState_Walk || e->currentState == AIState_Run) { if (e->entflags & EF_ENEM_IN_SIGHT) dbgCol = (Color){1.0f,0.0f,0.0f,1.0f}; else dbgCol = (Color){1.0f,1.0f,0.0f,1.0f}; }
     else if (e->currentState == AIState_Attack1 || e->currentState == AIState_Attack2 || e->currentState == AIState_Attack3) dbgCol = (Color){1.0f,0.0f,1.0f,1.0f}; else if (e->currentState == AIState_Pain) dbgCol = (Color){1.0f,0.0f,1.0f,1.0f}; else if (e->currentState == AIState_Dead) dbgCol = (Color){0.5f,0.5f,0.5f,1.0f}; else { dbgCol = (Color){1.0f,0.9f,0.8f,1.0f}; }

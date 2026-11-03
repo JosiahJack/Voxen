@@ -454,7 +454,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*442 npc_plant_mutant*/[442]={330,0,570,MAXTEX,MAXTEX,MAXTEX,0.80f,36,CT_CAP,{0,0.72f,0},{0.6f,1.44f,0}},
 /*443 npc_cyberdog*/[443]={302,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,1.50f,MAXANIM,CT_SPH,{0},{0.72f,0,0}},
 /*444 npc_cyberguard*/[444]={303,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,2.00f,MAXANIM,CT_SPH,{0},{1.0f,0,0}},
-/*445 npc_cyberram*/[445]={304,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,2.00f,MAXANIM,CT_SPH,{0},{1.44f,0,0}},
+/*445 npc_cyberram*/[445]={304,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,2.00f,MAXANIM,CT_SPH,{0},{1.0f,0,0}},
 /*446 npc_cyber_reaver*/[446]={305,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,2.20f,MAXANIM,CT_SPH,{0},{0.72f,0,0}},
 /*447 npc_cybershodan*/[447]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,4.51f,MAXANIM,CT_CAP,{0},{0.28f,2.0f,0}},
 /*448 item_cyber_data*/[448]={6076,0,3434,3434,MAXTEX,MAXTEX,0,53,0,{0},{1.5f,0,0}},
@@ -525,7 +525,7 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*513 door_secret2*/[513]={0,0,209,MAXTEX,MAXTEX,MAXTEX,0,18,CT_MSH,{0},{0}},
 /*514 door_secret3*/[514]={94,0,211,MAXTEX,MAXTEX,MAXTEX,0,20,CT_MSH,{0},{0}},
 /*515 func_forcebridge*/[515]={78,0,38,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_BOX,{0},{0}},
-/*516 prop_lift2*/[516]={215,U16_MAX,155,154,MAXTEX,MAXTEX,0,MAXANIM,CT_BOX,{0.0f,0.0f,0.0f},{1.0f,1.0f,1.0f}},
+/*516 prop_lift2*/[516]={215,U16_MAX,155,154,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0.0f,0.0f,0.0f},{0}},
 /*517 func_wall*/[517]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,10.0f,MAXANIM,0,{0},{0}},
 /*518 BulletHoleLarge*/[518]={5988,0,3324,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*519 BulletHoleScorchLarge*/[519]={5988,0,3326,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
@@ -546,9 +546,9 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*534 prop_bed_hospital*/[534]={608,0,759,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*535 prop_bed_neurosurgery*/[535]={17,0,18,MAXTEX,1238,29,0,MAXANIM,CT_MSH,{0},{0}},
 /*536 prop_bonepile1*/[536]={19,0,815,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*537 prop_bridgewall1*/[537]={33,0,784,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*537 prop_bridgewall1*/[537]={33,0,784,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_BOX,{0,1.2f,0},{2.56f,0.16f,2.56f}},
 /*538 prop_broken_clock*/[538]={38,0,1117,1115,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*539 prop_brokengun*/[539]={639,0,878,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*539 prop_brokengun*/[539]={639,0,878,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_BOX,{-0.044f,0.01f,0.028f},{0.3f,0.4f,0.05f}},
 /*540 prop_chair01*/[540]={41,0,195,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*541 prop_chair02*/[541]={42,0,3336,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*542 prop_chair03*/[542]={43,0,195,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
@@ -750,12 +750,12 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*738 prop_papers02*/[738]={485,0,580,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*739 ef_particle_blasterhit*/[739]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*740 ef_particle_ionhit*/[740]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*741 us_puz_panel_blue_wire*/[741]={0,0,604,MAXTEX,MAXTEX,MAXTEX,0,43,0,{0},{0}},
-/*742 us_puz_panel_brown_wire*/[742]={0,0,631,MAXTEX,MAXTEX,MAXTEX,0,43,0,{0},{0}},
-/*743 us_puz_panel_gray_wire*/[743]={0,0,634,MAXTEX,MAXTEX,MAXTEX,0,43,0,{0},{0}},
-/*744 us_puz_panel_red_wire*/[744]={0,0,625,MAXTEX,MAXTEX,MAXTEX,0,43,0,{0},{0}},
-/*745 us_puz_panel_teal_wire*/[745]={0,0,601,MAXTEX,MAXTEX,MAXTEX,0,43,0,{0},{0}},
-/*746 weapon_grenadeenergmine_live*/[746]={7446,0,852,MAXTEX,MAXTEX,MAXTEX,0,52,0,{0},{0}},
+/*741 us_puz_panel_blue_wire*/[741]={0,0,604,MAXTEX,MAXTEX,MAXTEX,0,43,CT_MSH,{0},{0}},
+/*742 us_puz_panel_brown_wire*/[742]={0,0,631,MAXTEX,MAXTEX,MAXTEX,0,43,CT_MSH,{0},{0}},
+/*743 us_puz_panel_gray_wire*/[743]={0,0,634,MAXTEX,MAXTEX,MAXTEX,0,43,CT_MSH,{0},{0}},
+/*744 us_puz_panel_red_wire*/[744]={0,0,625,MAXTEX,MAXTEX,MAXTEX,0,43,CT_MSH,{0},{0}},
+/*745 us_puz_panel_teal_wire*/[745]={0,0,601,MAXTEX,MAXTEX,MAXTEX,0,43,CT_MSH,{0},{0}},
+/*746 weapon_grenadeenergmine_live*/[746]={7446,0,852,MAXTEX,MAXTEX,MAXTEX,0,52,CT_SPH,{0},{0.32f,0.32f,0.32f}},
 /*747 decal_logo_storage*/[747]={77,0,169,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*748 light_animated*/[748]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*749 generic_transform*/[749]={MAX_MDLS,0,MAXTEX,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
@@ -882,7 +882,7 @@ static bool cardChunk[307]={/*0*/1,/*1*/1,/*2*/1,/*3*/1,/*4*/1,/*5*/1,/*6*/0,/*7
                             /*252*/1,/*253*/1,/*254*/1,/*255*/0,/*256*/1,/*257*/1,/*258*/1,/*259*/1,/*260*/1,/*261*/1,/*262*/1,/*263*/0,/*264*/0,/*265*/1,/*266*/1,/*267*/1,/*268*/1,/*269*/1,/*270*/1,/*271*/1,/*272*/1,/*273*/1,/*274*/1,/*275*/1,/*276*/1,/*277*/1,/*278*/1,/*279*/1,/*280*/1,/*281*/1,/*282*/1,/*283*/0,/*284*/0,/*285*/0,/*286*/1,/*287*/1,/*288*/1,/*289*/1,/*290*/1,/*291*/0,/*292*/1,/*293*/1,/*294*/1,/*295*/1,/*296*/1,/*297*/1,/*298*/0,/*299*/0,
                             /*300*/0,/*301*/0,/*302*/1,/*303*/0,/*304*/1,/*305*/1,/*306*/1};
 __attribute__((noinline)) i32 parse_numberi32(const char* str, const char* line, u32 ln){if(str==0||*str=='\0'){DualLogError("Invalid on line %d:%s\n",ln+1,line); return 0;} while(cEmpty((char)*str)){str++;} bool neg=false; if(*str=='+'){str++;}else if(*str=='-'){neg=true; str++;} i64 result=0; int n=0; while(*str>='0'&&*str<='9'&&n++<18){result=result*10L+(*str-'0'); str++;} while(*str>='0'&&*str<='9'){str++;} return (i32)(neg ? -result : result);}
-__attribute__((noinline)) V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator) { u16 idx=(u16)(originator - World.instances); V3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,World.scale[idx]); V3 rotatedOfs = quat_rot_v3(World.rotation[idx],scaledOfs); V3 result = V3_AplusB(World.position[idx],rotatedOfs); return result; }
+__attribute__((noinline)) V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator) { u16 idx=(u16)(originator - World.instances); V3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,World.scale[idx]); V3 rotatedOfs = quat_rot_v3(World.rotation[idx],scaledOfs); V3 result = V3Add(World.position[idx],rotatedOfs); return result; }
 __attribute__((noinline)) i16 parse_numberi16(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -32768 || v > 32767){DualLogError("%d outrange i16 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i16)v;}
 __attribute__((noinline)) i8 parse_numberi8(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -128 || v > 127){DualLogError("%d out range i8 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i8)v;}
 __attribute__((noinline)) float parse_float(const char* str, const char* line, u32 lineNum) {
@@ -1395,11 +1395,11 @@ void LoadLevelMod(u8 lev) {
         par->texAnimResourceFolderIdx = src->texAnimResourceFolderIdx;
         if (entIdx == 517) { /*func_wall: anchor at startPosition (authoritative cell center); chunk children are mover-relative*/
             V3 sp = par->startPosition;
-            if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3_AplusB(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } /*fallback for entries lacking startPosition*/
+            if (sp.x == 0.0f && sp.y == 0.0f && sp.z == 0.0f) { sp = V3Add(fwBasePos[e],posFromFile[e]); par->startPosition = sp; } /*fallback for entries lacking startPosition*/
             World.position[parent] = par->lastPosition = sp;
             World.rotation[parent] = quat_multiply(fwBaseRot[e],rotationFromFile[e]);
-            World.scale[parent] = (V3){fwBaseScale[e].x * scaleFromFile[e].x, fwBaseScale[e].y * scaleFromFile[e].y, fwBaseScale[e].z * scaleFromFile[e].z}; par->targetPosition = V3_AplusB(sp,fwInfoLocal[e]);/*info_target offset denotes full travel*/ if (par->speed <= 0.0f) par->speed = 0.64f;
-            for(u16 k=0;k<fwSlotCount[e];++k){u16 pi=fwPoolPrefab[fwSlotStart[e]+k]; if(pi>=307)continue; u16 c=AddInstance(pi,V3_AplusB(sp,quat_rot_v3(fwBaseRot[e],fwPoolPos[fwSlotStart[e]+k]))); if(c == 0)continue; World.rotation[c]=quat_multiply(fwBaseRot[e],fwPoolRot[fwSlotStart[e]+k]); V3 cs=fwPoolScale[fwSlotStart[e]+k]; World.scale[c]=(V3){World.scale[parent].x*cs.x,World.scale[parent].y*cs.y,World.scale[parent].z*cs.z}; fwParentOf[c]=parent;}
+            World.scale[parent] = (V3){fwBaseScale[e].x * scaleFromFile[e].x, fwBaseScale[e].y * scaleFromFile[e].y, fwBaseScale[e].z * scaleFromFile[e].z}; par->targetPosition = V3Add(sp,fwInfoLocal[e]);/*info_target offset denotes full travel*/ if (par->speed <= 0.0f) par->speed = 0.64f;
+            for(u16 k=0;k<fwSlotCount[e];++k){u16 pi=fwPoolPrefab[fwSlotStart[e]+k]; if(pi>=307)continue; u16 c=AddInstance(pi,V3Add(sp,quat_rot_v3(fwBaseRot[e],fwPoolPos[fwSlotStart[e]+k]))); if(c == 0)continue; World.rotation[c]=quat_multiply(fwBaseRot[e],fwPoolRot[fwSlotStart[e]+k]); V3 cs=fwPoolScale[fwSlotStart[e]+k]; World.scale[c]=(V3){World.scale[parent].x*cs.x,World.scale[parent].y*cs.y,World.scale[parent].z*cs.z}; fwParentOf[c]=parent;}
         }
         if (IdxIsPortalBlockingDoor(entIdx)) AddDoorPortal(entIdx,parent);
         if ((entIdx>=595 && entIdx<=601) || entIdx==706 || entIdx==697 || entIdx==698) {
@@ -1469,7 +1469,7 @@ void FuncWallInitAfterLoad(u16 i) {
     else if (World.instances[i].funcState == FStat_AjarMovingStart ) { f = 1.0f - World.instances[i].ajarPercentage; }
     
     f = vclamp(f,0.0f,1.0f);
-    V3 np = (distTotal > 0.0001f) ? V3_AplusB(World.instances[i].startPosition,V3_ScaleByF(V3_AsubB(World.instances[i].targetPosition,World.instances[i].startPosition),f)) : World.instances[i].startPosition; World.position[i]=np;
+    V3 np = (distTotal > 0.0001f) ? V3Add(World.instances[i].startPosition,V3_ScaleByF(V3_AsubB(World.instances[i].targetPosition,World.instances[i].startPosition),f)) : World.instances[i].startPosition; World.position[i]=np;
     if ((u8)World.instances[i].funcState <= FStat_MovingTarget) { World.instances[i].funcState = FStat_Start; World.instances[i].percentMoved = 0.0f; }
     FuncWallShiftChildren(i,V3_AsubB(np,prev));
 }

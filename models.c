@@ -780,7 +780,7 @@ static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, u16 m, const float* restric
         return nodeIdx;
     }
     
-    V3 center = V3_ScaleByF(V3_AplusB(node->mn, node->mx), 0.5f);
+    V3 center = V3_ScaleByF(V3Add(node->mn, node->mx), 0.5f);
     __m128 center_v = _mm_setr_ps(center.x, center.y, center.z, 0.0f);
     __m128 third = _mm_set1_ps(1.0f/3.0f);
     u32 octantCounts[8] = {0};
@@ -1240,7 +1240,7 @@ void UpdateAnims(void) {
             e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
             if (e->frame != prevFrame) e->animFinished = World.current_time; // hysteresis: stamp ONLY on an actual frame change (single-frame idle clips don't restamp, so they don't hold neighbors awake)
             if (e->index == 585 && e->frame == 16) { /*prop_sparkingwire sparks effects*/
-                V3 sparkPos = V3_AplusB(World.position[i],(V3){0.0f,-0.88f * World.scale[i].y,0.0f});
+                V3 sparkPos = V3Add(World.position[i],(V3){0.0f,-0.88f * World.scale[i].y,0.0f});
                 PlaySparkSound(sparkPos);
                 SpawnImpactParticleForPrefab(729,sparkPos,(V3){0.0f,1.0f,0.0f});
                 ai_effect_flash(sparkPos,(Color3){0.9f,0.8f,0.6f},2.84f,4.0f,0.2f);

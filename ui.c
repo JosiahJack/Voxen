@@ -552,7 +552,7 @@ void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=tru
     u8 destLevel=World.Sys_UI.elevButtonLevelIdx[btn]; if (destLevel==255) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); return; }
     /*Preserve the player's relative offset from the keypad across the level load.*/
     V3 srcKeypad=World.Sys_UI.objectInUsePos; V3 offset=V3_AsubB(World.position[PLAYER1],srcKeypad);
-    V3 destKeypad; if (FindElevatorKeypadPos(destLevel,&destKeypad)) queuedLevelPos=V3_AplusB(destKeypad,offset); else queuedLevelPos=(V3){0.0f,0.0f,0.0f};
+    V3 destKeypad; if (FindElevatorKeypadPos(destLevel,&destKeypad)) queuedLevelPos=V3Add(destKeypad,offset); else queuedLevelPos=(V3){0.0f,0.0f,0.0f};
     queuedLevelToLoad=destLevel;
 }
 
