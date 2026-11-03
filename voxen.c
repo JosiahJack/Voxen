@@ -287,7 +287,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
     static void GetWindowPos(WSWin* w, int* x, int* y) { POINT p={0,0}; ClientToScreen(w->win32.handle,&p); *x=p.x; *y=p.y; }
     static void GetWindowSize(WSWin* w, int* w_, int* h) { RECT a; GetClientRect(w->win32.handle,&a); *w_=a.r; *h=a.b; }
     static void SetWindowSize(int w_, int h) { RECT r={0,0,w_,h}; AdjustWindowRectEx(&r,0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000),0,0); SetWindowPos(window->win32.handle,NULL,0,0,r.r-r.l,r.b-r.t,0x0216); }
-    static void SetWindowMonitor(int x, int y, int wd, int h) { RECT r = {x,y,x+wd,y+h}; u32 s=GetWindowLongW(window->win32.handle,-16),f=0x0110; if (window->decorated) {s&=~0x80000000,s|=(0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000)),SetWindowLongW(window->win32.handle,-16,s),f|=0x0020;} AdjustWindowRectEx(&r,0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000),0,0); SetWindowPos(window->win32.handle,(void*)-2,r.l,r.t,r.r-r.l,r.b-r.t,f); }
+    static void SetWindowMonitor(int x, int y, int wd, int h) { RECT r = {x,y,x+wd,y+h}; u32 s=GetWindowLongW(window->win32.handle,-16),f=0x0110; if (window->decorated) { s&=~0x80000000,s|=(0x060A0000 | 0x00C00000),SetWindowLongW(window->win32.handle,-16,s),f|=0x0020; } AdjustWindowRectEx(&r,0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000),0,0); SetWindowPos(window->win32.handle,(void*)-2,r.l,r.t,r.r-r.l,r.b-r.t,f); }
     static void SetWindowDecorated(WSWin* w,i32 e) { (void)e; RECT r; u32 s=GetWindowLongW(w->win32.handle,-16); s &= ~(0x00C00000 | 0x00080000 | 0x00040000 | 0x00020000 | 0x00010000 | 0x80000000); s |= (0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000)); GetClientRect(w->win32.handle,&r); AdjustWindowRectEx(&r,s,0,0); ClientToScreen(w->win32.handle,(POINT*)&r.l); ClientToScreen(w->win32.handle,(POINT*)&r.r); SetWindowLongW(w->win32.handle,-16,s); SetWindowPos(w->win32.handle,NULL,r.l,r.t,r.r-r.l,r.b-r.t,0x0034); }
     static void PollEvents() {
         MSG m; while (PeekMessageW(&m,NULL,0,0,0x0001)) { if (m.message==0x0012) OS_Exit(0); else { TranslateMessage(&m); DispatchMessageW(&m); } } const int k[4][2]={{0xA0,KEY_LEFT_SHIFT},{0xA1,KEY_RIGHT_SHIFT},{0x5B,KEY_LEFT_SUPER},{0x5C,KEY_RIGHT_SUPER}}; for (int i=0;i<4;i++) { if ((GetKeyState(k[i][0])&0x8000)||window->keys[k[i][1]]!=INPUT_PRESS) continue; InputKey(window->keys,k[i][1],INPUT_RELEASE); }
@@ -585,7 +585,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
         w->x11.colormap=WinSys.x11.xlib.CreateColormap(WinSys.x11.display,WinSys.x11.root,visual,0);
         XSetWindowAttributes wa = {0}; wa.colormap = w->x11.colormap; wa.event_mask = 0x63807F; /*background_pixel is 0 (black) via {0}; CWBackPixel below makes the X server fill the window on map, before any GL exists*/
         w->x11.parent = WinSys.x11.root;
-        int wxp=0,wyp=0; if (WinSys.monitorCount>0) ComputeWindowPlacement((int)Sys_Settings.CurrentMonitor,&wxp,&wyp); /*final position up front: never visible at 0,0*/
+        int wxp=0,wyp=0; if (WinSys.monitorCount > 0) ComputeWindowPlacement((int)Sys_Settings.CurrentMonitor,&wxp,&wyp); /*final position up front: never visible at 0,0*/ else { DualLogError("No monitors!\n"); OS_Exit(1); }
         w->x11.handle = WinSys.x11.xlib.CreateWindow(WinSys.x11.display,WinSys.x11.root,wxp,wyp,width,height,0,depth,1,visual,(1L<<1/*CWBackPixel*/)|(1L<<3)|(1L<<13)|(1L<<11),&wa);
         WinSys.x11.xlib.SaveContext(WinSys.x11.display,w->x11.handle,WinSys.x11.context,(XPointer)w);
         Atom protocols[]={WinSys.x11.WM_DELETE_WINDOW,WinSys.x11.NWM_PING};
@@ -667,12 +667,12 @@ void GetFrameExtents(int* l,int* t,int* r,int* b) {
 
 void GetDecorationOverhead(int* dw,int* dh) {int l,t,r,b; GetFrameExtents(&l,&t,&r,&b); *dw=l+r; *dh=t+b;}
 void ClampWindowSizeToMonitor() {
-    if(WinSys.monitorCount<=0){return;} int ci=(int)Sys_Settings.CurrentMonitor; if(ci<0||ci>=WinSys.monitorCount){ci=0; Sys_Settings.CurrentMonitor=0;} int wx,wy,ww,wh; GetMonitorWorkarea(WinSys.monitors[ci],&wx,&wy,&ww,&wh); int ddw,ddh; GetDecorationOverhead(&ddw,&ddh); bool ch=false;
+    int ci=(int)Sys_Settings.CurrentMonitor; if (ci>=WinSys.monitorCount) { ci = 0; Sys_Settings.CurrentMonitor = 0; } int wx,wy,ww,wh; GetMonitorWorkarea(WinSys.monitors[ci],&wx,&wy,&ww,&wh); int ddw,ddh; GetDecorationOverhead(&ddw,&ddh); bool ch=false; 
     if(ww-ddw>=320 && (int)Sys_Settings.ScreenWidth>ww-ddw){Sys_Settings.ScreenWidth=(u16)(ww-ddw); ch=true;} if(wh-ddh>=200 && (int)Sys_Settings.ScreenHeight>wh-ddh){Sys_Settings.ScreenHeight=(u16)(wh-ddh); ch=true;} if(ch){SaveConfig();}
 }
 
 void ComputeWindowPlacement(int monIdx, int* px, int* py) { /*shared by initial CreateWindow and later moves*/
-    if (monIdx < 0 || monIdx >= WinSys.monitorCount) { monIdx = 0; }
+    if (monIdx >= WinSys.monitorCount) { monIdx = 0; }
     WSMon* m=WinSys.monitors[monIdx];
     int w = (int)Sys_Settings.ScreenWidth, h = (int)Sys_Settings.ScreenHeight, wx,wy,ww,wh,ddw,ddh, fl = 0;
     GetMonitorWorkarea(m,&wx,&wy,&ww,&wh);
@@ -680,18 +680,15 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py) { /*shared by initial 
     int ft,fr,fb; GetFrameExtents(&fl,&ft,&fr,&fb);
     *px=(w==ww-ddw) ? wx+fl : wx+(ww-w)/2; *py=(h==wh-ddh) ? wy : wy+(wh-h)/2;
 }
-void PlaceWindowOnMonitor(int monIdx) {
-    if(WinSys.monitorCount<=0){return;}
-    
-    int px,py; ComputeWindowPlacement(monIdx,&px,&py);
-    SetWindowPosition(window,px,py); ignore_next_mouse_delta=true;
+void PlaceWindowOnMonitor(int monIdx) {    
+    int px,py; ComputeWindowPlacement(monIdx,&px,&py); SetWindowPosition(window,px,py); ignore_next_mouse_delta=true;
     #if defined(_WIN32)
         void* hw = window->win32.handle; ShowWindow(hw,5); BringWindowToTop(hw); SetForegroundWindow(hw); SetFocus(hw);
     #endif
 }
 
 void ApplyStagedWindowedSizeOn(int monIdx) {
-    if(WinSys.monitorCount<=0){return;} if(monIdx<0||monIdx>=WinSys.monitorCount){monIdx=0;} if(resDropdownCount>0){ if(resSelectedIdx<0){resSelectedIdx=0;} if(resSelectedIdx>=resDropdownCount){resSelectedIdx=resDropdownCount-1;} Sys_Settings.ScreenWidth=(u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight=(u32)resModes[resSelectedIdx].h; } Sys_Settings.Fullscreen=0; window->decorated=1; SetWindowDecorated(window,1);
+    if(monIdx>=WinSys.monitorCount){monIdx=0;} if(resDropdownCount>0){ if(resSelectedIdx<0){resSelectedIdx=0;} if(resSelectedIdx>=resDropdownCount){resSelectedIdx=resDropdownCount-1;} Sys_Settings.ScreenWidth=(u32)resModes[resSelectedIdx].w; Sys_Settings.ScreenHeight=(u32)resModes[resSelectedIdx].h; } Sys_Settings.Fullscreen=0; window->decorated=1; SetWindowDecorated(window,1);
     WSMon* m=WinSys.monitors[monIdx]; int wx,wy,ww,wh; GetMonitorWorkarea(m,&wx,&wy,&ww,&wh); int ddw,ddh; GetDecorationOverhead(&ddw,&ddh); int w=vmax(vmin((int)Sys_Settings.ScreenWidth,ww-ddw),320),h=vmax(vmin((int)Sys_Settings.ScreenHeight,wh-ddh),200); Sys_Settings.ScreenWidth=(u16)w; Sys_Settings.ScreenHeight=(u16)h; 
     SetWindowSize(w,h); PlaceWindowOnMonitor(monIdx); UpdateScreenSize(w,h); resDropdownOpen=false; resHoverIdx=-1; SaveConfig();
 }
@@ -700,25 +697,25 @@ void ApplyStagedWindowedSize() {int i=GetCurrentMonitorIndex(); Sys_Settings.Cur
 void GatherResolutionModesFor(int monIdx) {
     int keepW=-1,keepH=-1;
     if(resSelectedIdx>=0 && resSelectedIdx<resDropdownCount){keepW=resModes[resSelectedIdx].w; keepH=resModes[resSelectedIdx].h;}
-    resDropdownCount = 0; if(WinSys.monitorCount<=0){return;} if(monIdx<0||monIdx>=WinSys.monitorCount){monIdx=0;} WSMon* m = WinSys.monitors[monIdx];
+    resDropdownCount = 0; if(monIdx>=WinSys.monitorCount){monIdx=0;} WSMon* m = WinSys.monitors[monIdx];
     int wx,wy,ww,wh; GetMonitorWorkarea(m,&wx,&wy,&ww,&wh);
     static const struct {int w,h;} cr[] = {{320,200},{640,400},{640,480},{800,600},{1024,768},{1280,720},{1280,800},{1366,768},{1440,900},{1600,900},{1920,1080},{2560,1440}}; int j;
     int fddw,fddh; GetDecorationOverhead(&fddw,&fddh);
-    for (int i = 0; i < 12 && resDropdownCount < 16; ++i) { if (cr[i].w+fddw > ww || cr[i].h+fddh > wh) continue; for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == cr[i].w && resModes[j].h == cr[i].h) break; } if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){cr[i].w,cr[i].h}; }
-    { int fw=ww-fddw, fh=wh-fddh; if (fw>=320 && fh>=200 && resDropdownCount<16){ for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == fw && resModes[j].h == fh) break; } if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){fw,fh}; } }
-    if (resDropdownCount==0){resModes[resDropdownCount++]=(ResMode){vmax((int)Sys_Settings.ScreenWidth,320),vmax((int)Sys_Settings.ScreenHeight,200)};}
+    for (int i = 0; i < 12; ++i) { if (cr[i].w+fddw > ww || cr[i].h+fddh > wh) continue; for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == cr[i].w && resModes[j].h == cr[i].h) break; } if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){cr[i].w,cr[i].h}; }
+    { int fw=ww-fddw, fh=wh-fddh; if (fw>=320 && fh>=200){ for (j = 0; j < resDropdownCount; ++j) { if (resModes[j].w == fw && resModes[j].h == fh) break; } if (j == resDropdownCount) resModes[resDropdownCount++] = (ResMode){fw,fh}; } }
+    if (resDropdownCount==0) { resModes[resDropdownCount++]=(ResMode){vmax((int)Sys_Settings.ScreenWidth,320),vmax((int)Sys_Settings.ScreenHeight,200)};}
     resSelectedIdx=-1;
-    for (int i=0;i<resDropdownCount;++i) { if(resModes[i].w == keepW && resModes[i].h == keepH){resSelectedIdx=i; break;} if(resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight){resSelectedIdx=i;} }
+    for (int i=0;i<resDropdownCount;++i) { if(resModes[i].w == keepW && resModes[i].h == keepH){resSelectedIdx=i; break;} if (resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight) { resSelectedIdx = i; } }
     if(resSelectedIdx<0){
         int cw=(int)Sys_Settings.ScreenWidth, chh=(int)Sys_Settings.ScreenHeight;
-        if (cw >= 320 && chh >= 200 && cw + fddw <= ww && chh + fddh <= wh && resDropdownCount < 16) { resModes[resDropdownCount++] = (ResMode){cw,chh}; }
-        resSelectedIdx = resDropdownCount-1;
+        if (cw >= 320 && chh >= 200 && cw + fddw <= ww && chh + fddh <= wh) { resModes[resDropdownCount++] = (ResMode){cw,chh}; }
+        resSelectedIdx = resDropdownCount - 1;
     }
 }
 
 void GatherResolutionModes() { GatherResolutionModesFor(GetCurrentMonitorIndex()); }
 void ChangeFullScreenWindowed(bool adjustToFit) {
-    if(WinSys.monitorCount<=0){return;} int ci=(int)Sys_Settings.CurrentMonitor; if(ci<0||ci>=WinSys.monitorCount){ci=0; Sys_Settings.CurrentMonitor=0;}
+    int ci=(int)Sys_Settings.CurrentMonitor; if(ci<0||ci>=WinSys.monitorCount){ci=0; Sys_Settings.CurrentMonitor=0;}
     WSMon* m = WinSys.monitors[ci]; int x,y,w,h; GetMonitorFullarea(m,&x,&y,&w,&h);
     int sddw,sddh; GetDecorationOverhead(&sddw,&sddh);/*snapshot before style flip; live read goes stale while undecorated*/
     window->decorated = (i32)(!Sys_Settings.Fullscreen); SetWindowDecorated(window, (i32)(!Sys_Settings.Fullscreen));
@@ -745,7 +742,7 @@ void ChangeFullScreenWindowed(bool adjustToFit) {
 
 void SetVSync() { window->context.swapInterval((i32)Sys_Settings.Vsync); }
 void CycleToNextMonitor() {
-    static double monitorSwitchTime = 0.0; if (get_time() < monitorSwitchTime) {return;} monitorSwitchTime = get_time() + 0.5; if(WinSys.monitorCount<=0){return;} Sys_Settings.CurrentMonitor++; if(Sys_Settings.CurrentMonitor>=WinSys.monitorCount)Sys_Settings.CurrentMonitor=0; SaveConfig(); DualLog("CycleToNextMonitor cur:%u\n",Sys_Settings.CurrentMonitor);
+    static double monitorSwitchTime = 0.0; if (get_time() < monitorSwitchTime) {return;} monitorSwitchTime = get_time() + 0.5; Sys_Settings.CurrentMonitor++; if(Sys_Settings.CurrentMonitor>=WinSys.monitorCount)Sys_Settings.CurrentMonitor=0; SaveConfig(); DualLog("CycleToNextMonitor cur:%u\n",Sys_Settings.CurrentMonitor);
     if (Sys_Settings.Fullscreen){ WSMon* m = WinSys.monitors[Sys_Settings.CurrentMonitor]; int x,y,w,h; GetMonitorFullarea(m,&x,&y,&w,&h); SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth=w; Sys_Settings.ScreenHeight=h; //SetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
     }else{GatherResolutionModesFor(Sys_Settings.CurrentMonitor); ApplyStagedWindowedSizeOn(Sys_Settings.CurrentMonitor);}
 }
@@ -789,15 +786,15 @@ void InputCursorPos(double* x, double* y, double xpos, double ypos) {
     if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) {/*Uses UI baseline resolution 1366x768*/ i32 newX = vclampi(World.cursorPos_x + World.currentMouse_dx,0,UI_W); if (newX != World.cursorPos_x) {mouseMovementThisFrame = true;} World.cursorPos_x = newX; i32 newY = vclampi(World.cursorPos_y + World.currentMouse_dy,0,UI_H); if (newY != World.cursorPos_y) {mouseMovementThisFrame = true;} World.cursorPos_y = newY;}
 }
 
-static bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { if (sI<0 || sI>=42) return false; i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 127) {return !uiWheelBlocked && Sys_Input.scrollDelta > 0;} if (i == 128) {return !uiWheelBlocked && Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
+static bool GetKeyRiseEdgeOrHeld(int sI, bool onRise) { i32 i = Sys_Settings.InputCodeSettings[sI]; if (i == 127) {return !uiWheelBlocked && Sys_Input.scrollDelta > 0;} if (i == 128) {return !uiWheelBlocked && Sys_Input.scrollDelta < 0;} KeyState* k = GetCodeMapping(sI); return onRise ? k->pressed : k->down; }
 static bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
 static bool GetKeyPressed(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,true); } // True 1st frame down.
 bool Forward() { return GetKey(0); }                bool StrafeLeft() { return GetKey(1); }             bool Backpedal() { return GetKey(2); }            bool StrafeRight() { return GetKey(3); }            bool Jump() { return GetKey(4); }                   bool JumpDown() { return GetKeyPressed(4); }
 bool Crouch() { return GetKeyPressed(5); }          bool Prone() { return GetKeyPressed(6); }           bool LeanLeft() { return GetKey(7); }             bool LeanRight() { return GetKey(8); }              bool Sprint() { return GetKey(9); }                 bool TurnLeft() { return GetKey(10); }
 bool TurnRight() { return GetKey(11); }             bool LookUp() { return GetKey(12); }                bool LookDown() { return GetKey(13); }            bool RecentLog() { return GetKeyPressed(14); }
 bool Attack() { return GetKeyPressed(23); }         bool Use() { return GetKeyPressed(24); }            bool Menu() { return GetKeyPressed(25); }         bool Reload() { return GetKeyPressed(27); }
-bool Grenade() { return GetKeyPressed(30); }        bool GrenCycUp() { return GetKeyPressed(31); }      bool GrenCycDn() { return GetKeyPressed(32); } bool ChangeAmmoType() { return GetKeyPressed(33); } bool Patch() { return GetKeyPressed(34); }
-bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }   bool SwimUp() {return Cheats.noclip && GetKey(38);} bool SwimDn() {return /*Cheats.noclip && */GetKey(39);} bool ScrshotPressed() { return GetKeyPressed(40); }
+bool Grenade() { return GetKeyPressed(30); }        bool GrenCycUp() { return GetKeyPressed(31); }      bool GrenCycDn() { return GetKeyPressed(32); }    bool ChangeAmmoType() { return GetKeyPressed(33); } bool Patch() { return GetKeyPressed(34); }
+bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }   bool SwimUp() {return (Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(38);}             bool SwimDn() {return (Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(39);}
 bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){return false;} if (World.pauseRelativeTime < World.invP1.leanLTapFinished) { World.invP1.leanLTapFinished = 0.0; return true; } World.invP1.leanLTapFinished = World.pauseRelativeTime + 0.5; return false; }
 bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.pauseRelativeTime < World.invP1.leanRTapFinished) { World.invP1.leanRTapFinished = 0.0; return true; } World.invP1.leanRTapFinished = World.pauseRelativeTime + 0.5; return false; } 
 void ForceShootMode() { if (Sys_Settings.NoShootMode){return;} float curhalff=(float)(CURSOR_SZ/2); if (World.inventoryMode) {World.cursorPos_x=(i16)((float)UI_W*0.5f-curhalff); World.cursorPos_y=(i16)((float)UI_H*0.5f-curhalff)/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); World.Sys_UI.vmailActive=0; }
@@ -1023,9 +1020,7 @@ void cmd_shake() { Shake(-1.0f); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
 void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip = Cheats.notarget =  true; Cheats.editSubMode = 0; CenterStatusPrint("Edit Mode activated!" ); } else { Cheats.noclip = Cheats.notarget = false; editModeSelection = U16_MAX; editModeLightSelection = U16_MAX; CenterStatusPrint("Edit Mode deactivated"); } }
 static void cmd_editsub(int submode) { if (submode < 0 || submode > 1) { CenterStatusPrint("Invalid edit submode: %d (0=select, 1=spawn physics objects)", submode); return; } Cheats.editSubMode = (u8)submode; CenterStatusPrint("Edit submode: %s", submode == 0 ? "select" : "spawn physics objects"); }
 // Cheat Level Loading
-int ParseLevelArg(const char* arg) {
-    if (!arg || !*arg) return -1;
-    
+int ParseLevelArg(const char* arg) {    
     char clean[64] = {0}; int j = 0;
     for (int i = 0; arg[i] && j < 60; i++) { if (arg[i] != ' ' && arg[i] != '_') { clean[j++] = c2Lower((u8)arg[i]); } }
     clean[j] = '\0';
@@ -1046,7 +1041,7 @@ static void cmd_loadlevel(const char* arg) {
     
     int level = ParseLevelArg(arg);
     if (level == -2) { return; /*Already printed message*/ }
-    if (level < 0 || level > MAX_LEVELS - 1) { CenterStatusPrint("cmd_loadlevel invalid level argument %d", level); return; }
+    if (level < 0) { CenterStatusPrint("cmd_loadlevel invalid level argument %d", level); return; }
     if (level == World.currentLevel) { CenterStatusPrint("cmd_loadlevel already at level %d", level); return; }
     
     CenterStatusPrint("Loading level %u",level); queuedLevelToLoad=level;
@@ -1088,7 +1083,6 @@ static void cmd_iamshodan() { Cheats.superoverride = !Cheats.superoverride; if (
 static void cmd_staminup() { Cheats.fatigueCheat = !Cheats.fatigueCheat; if (Cheats.fatigueCheat) { CenterStatusPrint("Stamin-Up! %s",Sys_Text.stringTable[1013]); World.invP1.fatigue=0.0f; } else {CenterStatusPrint("%s",Sys_Text.stringTable[1012]); } }
 static void cmd_qb_list() { CenterStatusPrint("missionBits: 0x%08X",(unsigned)World.missionBits); for(int i=0;i<QB_COUNT;++i){bool q=QuestBitIsSet((u8)i); CenterStatusPrint("  [%2d] %s = %u  note:%s  chk:%s",i,q?"ON ":"OFF",q,World.questNotesActive[i]?"yes":"no ",World.questNotesChecked[i]?"yes":"no");} }
 static void cmd_git(const char* arg) {
-    if (!arg) arg = "";
     static const char* cmds[] = {"pull","remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.","fetch", "remote: Enumerating objects: 24601, done.\nFailed, could not connect with origin/triop.","status","Your branch is up to date with origin/triop.\nWorking directory clean.","log", "<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...",
                                  "reflog","dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`.","merge", "Failed, could not connect with origin/triop.","push","Could not find Username for 'triopttp://192.168.1.451'.","clone", "Failed, connection blocked by SHODAN. Employee ID invalid." };
     for (int i = 0; i < 16; i += 2) { if (sFindSub(arg,cmds[i])) { CenterStatusPrint(cmds[i+1]); return; } } if(sFindSub(arg,"branch") || sFindSub(arg, "-b")){ const char *last = StringFindLastChar(arg,' '); CenterStatusPrint("Created new branch %s",last ? last + 1 : "unknown");} else {CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");}
@@ -1108,17 +1102,14 @@ static const ConsoleCommand consoleCmds[] = {
     {"quit",           {.noArg=cmd_quit},          NOARG},{"exit",            {.noArg = cmd_quit},         NOARG},{"cd",          {.text="Attempting to access directory... already at root"},CMD_PRINT},{"./",            {.text="Attempting to access directory... already at root"},CMD_PRINT},{"kill",           {.noArg = cmd_kill},     NOARG},{"suicide",                 {.noArg=cmd_kill},NOARG},
     {"die",            {.noArg=cmd_kill},          NOARG},{"justinbailey",    {.text="Well, you don't have a suit already so..."},CMD_PRINT},{"woodstock",   {.text="How much wood could a woodchuck chuck...there's no wood in SPACE!"},CMD_PRINT},{"quarry",        {.text="There's obsidian on levels 6 and 8 if you want to feel decadent,\notherwise we are lacking in the stone department."},CMD_PRINT},{"zelda",          {.text="Too late, already been to level 1"},CMD_PRINT},{"allyourbasearebelongtous",{.text="ERROR: SHODAN has overriden your command, remove SHODAN first."},CMD_PRINT},
     {"all your base",  {.text="ERROR: SHODAN has overriden your command, remove SHODAN first."},CMD_PRINT},{"i am iron man",   {.text="That's nice dear."},CMD_PRINT},{"i am amazing",{.text="That's nice dear."},CMD_PRINT},{"i am cool",     {.text="That's nice dear."},CMD_PRINT},{"i am best",      {.text="That's nice dear."},CMD_PRINT},{"idkfa",                   {.text="I can only hold 7 weapons!! Nice try dearies!"},CMD_PRINT},
-    {"impulse 9",      {.text="I can only hold 7 weapons!! Nice try dearies!"},CMD_PRINT},{"undo",            {.noArg = cmd_undo},         NOARG},{"shake",       {.noArg=cmd_shake},     NOARG},{"tired",         {.noArg=cmd_staminup},    NOARG},{"staminup",       {.noArg = cmd_staminup}, NOARG},{"grok",                    {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},
+    {"impulse 9",      {.text="I can only hold 7 weapons!! Nice try dearies!"},CMD_PRINT},{"shake",       {.noArg=cmd_shake},     NOARG},{"tired",         {.noArg=cmd_staminup},    NOARG},{"staminup",       {.noArg = cmd_staminup}, NOARG},{"grok",                    {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},
     {"chatgpt",        {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"claude",          {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"gemini",      {.text="Only AI allowed around here is SHODAN"},CMD_PRINT},{"shodan",        {.text="In my magnificence, I shape clay, crafting new lifeforms..."},CMD_PRINT},{"animtest",       {.noArg = cmd_animtest}, NOARG},{"qb_set",                  {.questOp=0},CMD_QUEST},
     {"qb_clear",       {.questOp=1},CMD_QUEST},{"qb_toggle",       {.questOp=2},CMD_QUEST},{"qb_list",     {.noArg=cmd_qb_list},   NOARG},{"shownpc",       {.noArg=cmd_shownpc},     NOARG},{NULL,{.noArg = NULL},NOARG}/*sizeof helper*/ };
 
 void ProcessConsoleCommand(const char* c) {
     if (c == NULL || slen(c) == 0) { ToggleConsole(); return; }
-    
-    char ts[T_BUFFER_SIZE];
-    sCpy2aSubFromb(ts, sizeof(ts) - 1, c, T_BUFFER_SIZE);
-    ts[sizeof(ts)-1] = '\0';
-    const char* ct=ts;
+
+    const char* ct=c;
     while (*ct && cEmpty((u8)*ct)) { ct++; }
     const char* space=ct;
     while (*space && !cEmpty((u8)*space)) { space++; }
@@ -1196,12 +1187,10 @@ INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
     if (t < 0.0f) t = -b + s;
     if (t < 0.0f || t > maxDist) return h;
     
-    V3 p = V3_AplusB(origin, V3_ScaleByF(dir, t));
-    V3 n = V3_Normalize(V3_ScaleByF(V3_AsubB(p, sph.ctr), 1.0f / r));
     h.hit = true;
     h.distance = t;
-    h.point = p;
-    h.normal = n;
+    h.point = V3_AplusB(origin, V3_ScaleByF(dir, t));
+    h.normal = V3_ScaleByF(V3_AsubB(h.point, sph.ctr), 1.0f / r);
     return h;
 }
 
@@ -1225,13 +1214,15 @@ INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist)
     float bard = V3_dot(ba,dir), baoa = V3_dot(ba,oa), tBest=-1.0f; float a = baba - bard * bard, b = baba * V3_dot(dir,oa) - baoa * bard, c = baba * V3_dot(oa,oa) - baoa * baoa - r * r * baba; float disc = b * b - a * c;
     if (vabs(a) >= 0.00001f && disc >= 0.0f) {
         float sh = vsqrtf(disc); float t0 = (-b - sh) / a; float y0 = baoa + t0 * bard; 
-        if (t0 >= 0.0f && t0 <= maxDist && y0 > 0.0f && y0 < baba) { tBest = t0; V3 p = V3_AplusB(origin,V3_ScaleByF(dir,t0)); V3 q=V3_AplusB(cap.base,V3_ScaleByF(ba,y0/baba)); nBest=V3_Normalize(V3_AsubB(p,q));}else{float t1=(-b+sh)/a; float y1=baoa+t1*bard; if(t1>=0.0f&&t1<=maxDist && y1>0.0f&&y1<baba&&tBest<0.0f){tBest=t1; V3 p=V3_AplusB(origin,V3_ScaleByF(dir,t1)),q=V3_AplusB(cap.base,V3_ScaleByF(ba,y1/baba)); nBest=V3_Normalize(V3_AsubB(p,q));}}
+        if (t0 >= 0.0f && t0 <= maxDist && y0 > 0.0f && y0 < baba) { tBest = t0; V3 p = V3_AplusB(origin,V3_ScaleByF(dir,t0)); V3 q=V3_AplusB(cap.base,V3_ScaleByF(ba,y0/baba)); nBest=V3_Normalize(V3_AsubB(p,q));}
+        else { float t1=(-b+sh)/a; float y1=baoa+t1*bard; if (t1 >= 0.0f && t1 <= maxDist && y1 > 0.0f && y1 < baba) { tBest=t1; V3 p=V3_AplusB(origin,V3_ScaleByF(dir,t1)),q=V3_AplusB(cap.base,V3_ScaleByF(ba,y1/baba)); nBest=V3_Normalize(V3_AsubB(p,q)); } }
     }
     
     for (int k = 0; k < 2; k++) {
         V3 ctr = k == 0 ? cap.base : cap.tip; V3 oc = V3_AsubB(origin, ctr); float bs = V3_dot(oc, dir); float cs = V3_dot(oc, oc) - r * r; float ds = bs * bs - cs; if (ds < 0.0f) continue; float shs = vsqrtf(ds); float ts = -bs - shs; if (ts < 0.0f) ts = -bs + shs; if (ts < 0.0f || ts > maxDist) continue; if (tBest >= 0.0f && ts >= tBest) continue;
-        V3 ps = V3_AplusB(origin, V3_ScaleByF(dir, ts)); float y = V3_dot(V3_AsubB(ps, cap.base), ba); if ((k == 0 && y > 0.0f) || (k == 1 && y < baba)) continue; tBest = ts; nBest = V3_Normalize(V3_ScaleByF(V3_AsubB(ps, ctr), 1.0f / r));
-    } if (tBest >= 0.0f) { h.hit = true; h.distance = tBest; h.point = V3_AplusB(origin, V3_ScaleByF(dir, tBest)); h.normal = nBest; } return h;
+        V3 ps = V3_AplusB(origin, V3_ScaleByF(dir, ts)); float y = V3_dot(V3_AsubB(ps, cap.base), ba); if ((k == 0 && y > 0.0f) || (k == 1 && y < baba)) continue; tBest = ts; nBest = V3_ScaleByF(V3_AsubB(ps, ctr), 1.0f / r);
+    }
+    if (tBest >= 0.0f) { h.hit = true; h.distance = tBest; h.point = V3_AplusB(origin, V3_ScaleByF(dir, tBest)); h.normal = nBest; } return h;
 }
 
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist);
@@ -1548,7 +1539,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         int lightCellIdx = (cellZ * WORLDX) + cellX;
         u8 r = vmax(vceil(range * (1.0f / CELLSZ)),2);
         bool camViewCandidate = false;
-        for (u8 v=0;v<camViewCount;++v) { /*camview screens need their surrounding lights in the shadow-update set even when they fail the player-facing and player-PVS tests, or their shadows flicker in/out between frames*/
+        for (u8 v=0;v<camViewCount;++v) {
             if (!camViews[v].visible) { continue; }
             V3 clp = V3_AsubB(lightPos, camViews[v].position);
             if (V3_dot(clp,clp) < ((range + 4.0f)*(range + 4.0f))) { camViewCandidate = true; break; }
@@ -1565,7 +1556,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     }
     
 
-    for (u16 i=0;i<World.loadedLights;++i) { shadowmapIndirectionList[i] = (shadowSlot[i] != U16_MAX) ? (u32)shadowSlot[i] : LIGHT_COUNT; } /*sticky slots: cubemap face content is view-independent (light-centered), so a light outside this frame's candidate set keeps its previously rendered map instead of dropping to no-shadow; wiping every frame here made shadows flicker on lights visible only through camviews.*/
+    for (u16 i=0;i<World.loadedLights;++i) { shadowmapIndirectionList[i] = (shadowSlot[i] != U16_MAX) ? (u32)shadowSlot[i] : LIGHT_COUNT; }
     if (numCandidates == 0) {
         glBindBuffer(GL_SSBO, shadowMapsIndirectionID);
         glBufferSubData(GL_SSBO, 0, World.loadedLights*sizeof(u32), shadowmapIndirectionList);
@@ -1603,7 +1594,6 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         
         V3 lpos = World.lights[lightIdx].pos;
         float effectiveRadius = vmin(World.lights[lightIdx].range,15.36f);
-        /*Face relevance per viewer, not per viewer position: the shader samples per-fragment cube faces, so every face receivers visible to a viewer can project onto needs depth content. Player: original forward-vs-face-center dot test (AVX). Camviews: same test through FaceMaskFromViewer with each camera's own forward, else faces only the camera sees hold cleared sentinel depths. Viewpoint-only frames re-render via needFaces below, so the dot keeps those faces in shadowFaces once drawn on content-dirty frames.*/
         V3 toLight = V3_AsubB(lpos, playerPos);
         const float addX = (pf.x >= 0.0f) ? effectiveRadius : -effectiveRadius;
         const float addY = (pf.y >= 0.0f) ? effectiveRadius : -effectiveRadius;
@@ -1632,17 +1622,17 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         for (u8 face = 0; face < 6; ++face) {
             if (!(faceMask & (1u << face))) {
                 if (SphereInFrustum(lightFrustumPlanes[lightIdx][face], playerPos, 0.48f)) {faceMask |= (u8)(1u << face);}
-                else { for (u8 v=0;v<camViewCount;++v) { if (camViews[v].visible && SphereInFrustum(lightFrustumPlanes[lightIdx][face], camViews[v].position, 0.48f)) { faceMask |= (u8)(1u << face); break; } } } /*camview-qualified lights: keep their faces fresh for the camera the same way the player's own volume does*/
+                else { for (u8 v=0;v<camViewCount;++v) { if (camViews[v].visible && SphereInFrustum(lightFrustumPlanes[lightIdx][face], camViews[v].position, 0.48f)) { faceMask |= (u8)(1u << face); break; } } }
             }
         }
-        for (u8 v=0;v<camViewCount;++v) { if (camViews[v].visible) { faceMask |= FaceMaskFromViewer(V3_AsubB(lpos, camViews[v].position), camFwds[v], effectiveRadius); } } /*camview screens: relevance for each camera's forward, same corner-bias dot rule as the player path above*/
+        for (u8 v=0;v<camViewCount;++v) { if (camViews[v].visible) { faceMask |= FaceMaskFromViewer(V3_AsubB(lpos, camViews[v].position), camFwds[v], effectiveRadius); } }
         if (faceMask == 0) continue;
         
         const __m256 lposX = _mm256_set1_ps(lpos.x);
         const __m256 lposY = _mm256_set1_ps(lpos.y);
         const __m256 lposZ = _mm256_set1_ps(lpos.z);
         const __m256 effR  = _mm256_set1_ps(effectiveRadius);
-        const __m256 signMask = _mm256_set1_ps(-0.0f); /*sign bit per 32-bit float lane: 0x80000000 in all 8 lanes. The previous cast from set1_epi32(0x80000000u) only populated the low half of each 64-bit pair, so abs()/negation silently skipped every odd caster lane when components were negative — over-including them in the face tests (never excluding) and inflating per-face draw lists.*/
+        const __m256 signMask = _mm256_set1_ps(-0.0f);
         u16 nearbyMeshCount = 0;
         i32 k = 0;
         bool anyMoved=false;
@@ -1682,7 +1672,6 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
             const __m256 dzm = _mm256_sub_ps(dz, sr);
             const __m256 negZface = _mm256_cmp_ps(dzm, negMaxAbsXY,0x11);
             const __m256 anyFace = _mm256_or_ps(_mm256_or_ps(posXface, negXface), _mm256_or_ps(_mm256_or_ps(posYface, negYface), _mm256_or_ps(posZface, negZface)));
-            /*Per-caster cubemap-face bits (bit0=+X,bit1=-X,bit2=+Y,bit3=-Y,bit4=+Z,bit5=-Z), accumulated as lane-mask AND bit-value (compare masks are 0/0xFFFFFFFF per 32-bit lane); the bit constants carry the value in both halves so every caster lane is served. Same conservative test (shadRadius = 2x radius) that the union gate above already required, per caster, kept around so each face only draws casters it can contain.*/
             __attribute__((aligned(32))) u32 laneFaceView[8];
             const __m256 faceTwo = _mm256_or_ps(_mm256_and_ps(posXface,_mm256_castsi256_ps(faceBitVecs[0])), _mm256_and_ps(negXface,_mm256_castsi256_ps(faceBitVecs[1])));
             const __m256 faceSecond = _mm256_or_ps(_mm256_and_ps(posYface,_mm256_castsi256_ps(faceBitVecs[2])), _mm256_and_ps(negYface,_mm256_castsi256_ps(faceBitVecs[3])));
@@ -1714,7 +1703,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_COUNT; continue; }
         
         u16 slot = shadowSlot[lightIdx];
-        bool contentDirty = true;//Temporarily always render shadows so that performance improvements to them can be better felt and confirmed. (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
+        bool contentDirty = (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
         u8 needFaces = (u8)(faceMask & ~shadowFaces[lightIdx]);
         if (contentDirty || needFaces) {
             for (u16 j=1;j<nearbyMeshCount;++j) {
@@ -1732,13 +1721,12 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
             for (u8 face = 0; face < 6; ++face) {
                 if (!(renderFaces & (1u << face))) {continue;}
                 
-                /*Clear via GPU-side buffer clear instead of a 64KB host->device glBufferSubData upload per face (up to 80 slots x 6 faces per frame when everything lands dirty): glClearBufferSubData (GL 4.3) needs no client memory copy and does not touch an in-flight buffer's contents through staging; same 0xFFFFFFFF sentinel so consumers see identical "not occluded" distances.*/
                 if (likely(glClearBufferSubData)) { glClearBufferSubData(GL_SSBO, GL_R32UI, (slotOff + face*SHADOW_MAP_SIZE*SHADOW_MAP_SIZE) * (intptr_t)4, (SHADOW_MAP_SIZE*SHADOW_MAP_SIZE) * (intptr_t)4, GL_RED_INTEGER, GL_UNSIGNED_INT, &shadClearSentinel); }
                 else { static u32 faceBlock[SHADOW_MAP_SIZE*SHADOW_MAP_SIZE]; if (faceBlock[0] != 0xFFFFFFFFu) { for (u32 t=0;t<(u32)(SHADOW_MAP_SIZE*SHADOW_MAP_SIZE);++t) { faceBlock[t] = 0xFFFFFFFFu; } } glBufferSubData(GL_SSBO, (slotOff + face*SHADOW_MAP_SIZE*SHADOW_MAP_SIZE) * 4, SHADOW_MAP_SIZE*SHADOW_MAP_SIZE * 4, faceBlock); } /*ancient-driver fallback path: same all-0xFF block the old shadClearFace array held*/
-                const u8 faceBit = (u8)(1u << face); /*Caster prefilter: only draw meshes whose sphere can project into this face's 90-degree cone; the per-caster masks are the very same conservative test that the union 'anyFace' gate above already passed, so no raster-visible occluder can be dropped, while slanted/far casters stop flooding faces they never touch. Typical cut is >half the vertex work per face with packed rooms of casters.*/
+                const u8 faceBit = (u8)(1u << face);
                 u16 faceCasters = 0;
                 for (u16 j=0;j<nearbyMeshCount;++j) { if (localMeshes[j].faceMask & faceBit) { ++faceCasters; } }
-                if (faceCasters == 0) { continue; } /*cleared face with no writer == fully lit, exactly what an empty face draw produced*/
+                if (faceCasters == 0) { continue; }
                 
                 glUniform1ui(2, face);
                 glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
@@ -2778,7 +2766,7 @@ i32 main() {
         AutomapTick();
         Render(false/*!camview*/,0u);
         if (Sys_Input.keyStates[KEY_O].pressed) { play_message("shodan/shodan_prematurefruition"); }/*test hotkey: stream a SHODAN log on the log channel*/
-        if (ScrshotPressed() && World.current_time > World.screenshotTimeout) { Screenshot(); }
+        if (GetKeyPressed(40)/*Screenshot*/ && World.current_time > World.screenshotTimeout) { Screenshot(); }
         for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/
         for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) { Sys_Input.mouseButtons[i].pressed = false; }
         Sys_Input.scrollDelta = 0.0; 
