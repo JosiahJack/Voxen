@@ -239,7 +239,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
     DLL_IMP i32 WINAPI GetDeviceCaps(void*,i32); i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp); void WinSysPollMonitorsWin32();
     struct WSLib { WSMon** monitors; int monitorCount; WSLibWin32 win32; HINSTANCE instance; };
     struct WSCtx { void (*makeCurrent)(WSWin*); void (*swapBuffers)(WSWin*); void (*swapInterval)(int); WSP (*getProcAddress)(const char*); WGLContext wgl; }; 
-    struct WSWin { i32 decorated; int cursorMode; char mouseButtons[MAX_MOUSE_BUTTONS],keys[WS_KEYCOUNT]; double virtualCursorPosX,virtualCursorPosY; WSCtx context; WSWinWin32 win32; };
+    struct WSWin { i32 decorated; char mouseButtons[MAX_MOUSE_BUTTONS],keys[WS_KEYCOUNT]; double virtualCursorPosX,virtualCursorPosY; WSCtx context; WSWinWin32 win32; };
     struct WSMon { WSMonWin32 win32; };
     void SetWindowIcon(const WinSysIcon* image) {
         void *dc, *handle, *color, *mask; u8 *target=NULL, *source=image->pixels; BITMAPV5HEADER bi={0}; bi.bV5Size=sizeof(bi); bi.bV5Width=image->width; bi.bV5Height=-image->height; bi.bV5Planes=1; bi.bV5BitCount=32; bi.bV5Compression=3; bi.bV5RedMask=0x00ff0000; bi.bV5GreenMask=0x0000ff00; bi.bV5BlueMask=0x000000ff; bi.bV5AlphaMask=0xff000000;
@@ -247,7 +247,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
         ICONINFO ii={0}; ii.fIcon=1; ii.xHotspot=0; ii.yHotspot=0; ii.hbmMask=mask; ii.hbmColor=color; handle=CreateIconIndirect(&ii); DeleteObject(color); DeleteObject(mask); SendMessageW(window->win32.handle,0x0080,1,(i64)handle); SendMessageW(window->win32.handle,0x0080,0,(i64)handle);
     }
     
-    static void updateCursorImage(WSWin* w) { if (w->cursorMode == 0x00034001 || (w->cursorMode == 0x00034003 && WinSys.win32.disabledCursorWindow != w)) { SetCursor(LoadCursorW(NULL, (u16*)(uintptr_t)32512)); } else { SetCursor(NULL); } }
+    static void updateCursorImage(WSWin* w) { if (WinSys.win32.disabledCursorWindow != w) { SetCursor(LoadCursorW(NULL, (u16*)(uintptr_t)32512)); } else { SetCursor(NULL); } }
     static void captureCursor(WSWin* w) { RECT r; GetClientRect(w->win32.handle,&r); ClientToScreen(w->win32.handle,(POINT*)&r.l); ClientToScreen(w->win32.handle,(POINT*)&r.r); ClipCursor(&r); WinSys.win32.capturedCursorWindow=w; }
     static void releaseCursor() { ClipCursor(NULL); WinSys.win32.capturedCursorWindow=NULL; }
     static void disableCursor(WSWin* w) { WinSys.win32.disabledCursorWindow = w; POINT p; GetCursorPos(&p); WinSys.win32.restoreCurPosX = p.x; WinSys.win32.restoreCurPosY = p.y; updateCursorImage(w); captureCursor(w); }
@@ -257,9 +257,9 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
         WSWin* win=GetPropW(h,L"WinSys"); if (!win) return DefWindowProcW(h,m,w,l);
         switch (m) {
             case 0x0021: if (((u16)((((u64)(l))>>16)&0xffff)) == 0x0201 && ((u16)(((u64)(l)) & 0xffff))!=1) win->win32.frameAction=1; break;
-            case 0x0215: if (l==0&&win->win32.frameAction) { if (win->cursorMode==0x00034003) disableCursor(win); win->win32.frameAction=0; } break;
-            case 0x0007: InputWindowFocus(1); if (win->win32.frameAction) break; if (win->cursorMode==0x00034003) disableCursor(win); return 0;
-            case 0x0008: if (win->cursorMode==0x00034003) enableCursor(win); InputWindowFocus(0); return 0;
+            case 0x0215: if (l==0&&win->win32.frameAction) { disableCursor(win); win->win32.frameAction=0; } break;
+            case 0x0007: InputWindowFocus(1); if (win->win32.frameAction) break; disableCursor(win); return 0;
+            case 0x0008: enableCursor(win); InputWindowFocus(0); return 0;
             case 0x0112:
                 switch(w&0xfff0){
                     case 0xF140:case 0xF170:break;
@@ -274,7 +274,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
             case 0x0201: case 0x0204: case 0x0207: case 0x020B: case 0x0202: case 0x0205: case 0x0208: case 0x020C: {
                 int i,action,button = (m==0x0201 || m == 0x0202) ? MOUSE_BUTTON_LEFT : ((m == 0x0204 || m == 0x0205) ? MOUSE_BUTTON_RIGHT : ((m == 0x0207 || m == 0x0208) ? MOUSE_BUTTON_MIDDLE : (((((u16)((((u64)(w))>>16)&0xffff))) == 0x0001) ? MOUSE_BUTTON_4 : MOUSE_BUTTON_5))); action=(m == 0x0201 || m == 0x0204 || m == 0x0207 || m == 0x020B) ? INPUT_PRESS : INPUT_RELEASE;
                 i=0; while(i<8 && win->mouseButtons[i]!=INPUT_PRESS) i++; if (i>7) SetCapture(h); InputMouseClick(win->mouseButtons,button,action); i=0; while(i<8 && win->mouseButtons[i]!=INPUT_PRESS) i++; if (i>7) ReleaseCapture(); if (m == 0x020B || m == 0x020C) return 1; return 0; }
-            case 0x0200: {const int x=((int)(i16)(l & 0xFFFF)), y=((int)(i16)(l >> 16)); if (win->cursorMode==0x00034003) { const int dx=x-win->win32.lastCurX,dy=y-win->win32.lastCurY; if (WinSys.win32.disabledCursorWindow!=win) break; InputCursorPos(&win->virtualCursorPosX,&win->virtualCursorPosY,win->virtualCursorPosX+dx,win->virtualCursorPosY+dy); } win->win32.lastCurX=x; win->win32.lastCurY=y; return 0; }
+            case 0x0200: {const int x=((int)(i16)(l & 0xFFFF)), y=((int)(i16)(l >> 16)); const int dx=x-win->win32.lastCurX,dy=y-win->win32.lastCurY; if (WinSys.win32.disabledCursorWindow!=win) break; InputCursorPos(&win->virtualCursorPosX,&win->virtualCursorPosY,win->virtualCursorPosX+dx,win->virtualCursorPosY+dy); win->win32.lastCurX=x; win->win32.lastCurY=y; return 0; }
             case 0x020A: Sys_Input.scrollDelta += (i16)(((u16)((((u64)(w))>>16)&0xffff)))/(double)120; return 0;
             case 0x0005: if (w == 1) World.paused = true; return 0;
             case 0x0003: if (WinSys.win32.capturedCursorWindow==win) captureCursor(win); return 0;
@@ -291,7 +291,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
     static void SetWindowDecorated(WSWin* w,i32 e) { (void)e; RECT r; u32 s=GetWindowLongW(w->win32.handle,-16); s &= ~(0x00C00000 | 0x00080000 | 0x00040000 | 0x00020000 | 0x00010000 | 0x80000000); s |= (0x060A0000 | (window->decorated ? 0x00C00000 : 0x80000000)); GetClientRect(w->win32.handle,&r); AdjustWindowRectEx(&r,s,0,0); ClientToScreen(w->win32.handle,(POINT*)&r.l); ClientToScreen(w->win32.handle,(POINT*)&r.r); SetWindowLongW(w->win32.handle,-16,s); SetWindowPos(w->win32.handle,NULL,r.l,r.t,r.r-r.l,r.b-r.t,0x0034); }
     static void PollEvents() {
         MSG m; while (PeekMessageW(&m,NULL,0,0,0x0001)) { if (m.message==0x0012) OS_Exit(0); else { TranslateMessage(&m); DispatchMessageW(&m); } } const int k[4][2]={{0xA0,KEY_LEFT_SHIFT},{0xA1,KEY_RIGHT_SHIFT},{0x5B,KEY_LEFT_SUPER},{0x5C,KEY_RIGHT_SUPER}}; for (int i=0;i<4;i++) { if ((GetKeyState(k[i][0])&0x8000)||window->keys[k[i][1]]!=INPUT_PRESS) continue; InputKey(window->keys,k[i][1],INPUT_RELEASE); }
-        if (window->cursorMode==0x00034003 && WinSys.win32.disabledCursorWindow==window) { int W,H; GetWindowSize(window,&W,&H); if (window->win32.lastCurX != W/2 || window->win32.lastCurY != H/2) SetCurV(window,W/2,H/2); }/*Only re-center while the cursor is actually captured, otherwise we warp the OS cursor every frame*/
+        if (WinSys.win32.disabledCursorWindow==window) { int W,H; GetWindowSize(window,&W,&H); if (window->win32.lastCurX != W/2 || window->win32.lastCurY != H/2) SetCurV(window,W/2,H/2); }/*Only re-center while the cursor is actually captured, otherwise we warp the OS cursor every frame*/
     }
     
     WSP PlatformGetModuleSymbol(void* m, const char* n) { return (WSP)GetProcAddress((HMODULE)m,n); }
@@ -454,12 +454,12 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
                               PFN_XQueryPointer QueryPointer; PFN_XRaiseWindow RaiseWindow; PFN_XResizeWindow ResizeWindow; PFN_XSaveContext SaveContext; PFN_XSendEvent SendEvent; PFN_XSetInputFocus SetInputFocus; PFN_XSetWMNormalHints SetWMNormalHints; PFN_XSetWMProtocols SetWMProtocols; PFN_XTranslateCoordinates TranslateCoordinates; PFN_XUndefineCursor UndefineCursor; PFN_XUngrabPointer UngrabPointer; PFN_XWarpPointer WarpPointer; } xlib;
                               struct {void* handle; int eventBase; PFN_XRRFreeCrtcInfo FreeCrtcInfo; PFN_XRRFreeOutputInfo FreeOutputInfo; PFN_XRRFreeScreenResources FreeScreenResources; PFN_XRRGetCrtcInfo GetCrtcInfo; PFN_XRRGetOutputInfo GetOutputInfo; PFN_XRRGetOutputPrimary GetOutputPrimary; PFN_XRRGetScreenResourcesCurrent GetScreenResourcesCurrent; PFN_XRRSelectInput SelectInput; PFN_XRRUpdateConfiguration UpdateConfiguration;}randr;} WSLibX11;
     PFN_XNextEvent XNextEvent; typedef struct WSMonX11 { RROutput output; RRCrtc crtc; } WSMonX11; static void GetCursorPosV(WSWin*,double*,double*),SetCurV(WSWin*,double,double);
-    struct WSLib {WSMon** monitors; int monitorCount; WSLibX11 x11; WSLibGLX glx;}; struct WSCtx {void (*makeCurrent)(WSWin*); void (*swapBuffers)(WSWin*); void (*swapInterval)(int); WSP (*getProcAddress)(const char*); WSCtxGLX glx;}; struct WSWin{i32 decorated,cursorMode; char mouseButtons[MAX_MOUSE_BUTTONS],keys[WS_KEYCOUNT]; double virtualCursorPosX,virtualCursorPosY; WSCtx context; WSWinX11 x11;}; struct WSMon{WSMonX11 x11;};
+    struct WSLib {WSMon** monitors; int monitorCount; WSLibX11 x11; WSLibGLX glx;}; struct WSCtx {void (*makeCurrent)(WSWin*); void (*swapBuffers)(WSWin*); void (*swapInterval)(int); WSP (*getProcAddress)(const char*); WSCtxGLX glx;}; struct WSWin{i32 decorated; char mouseButtons[MAX_MOUSE_BUTTONS],keys[WS_KEYCOUNT]; double virtualCursorPosX,virtualCursorPosY; WSCtx context; WSWinX11 x11;}; struct WSMon{WSMonX11 x11;};
     WSP PlatformGetModuleSymbol(void* m, const char* n) { return dlsym(m,n); }
     u64 WinSysGetWindowPropertyX11(XID win, Atom prop, Atom type, u8** val) { Atom actType; i32 actFmt; u64 itemCount,bytesAfter; WinSys.x11.xlib.GetWindowProperty(WinSys.x11.display,win,prop,0,2147483647,0,type,&actType,&actFmt,&itemCount,&bytesAfter,val); return itemCount; }
     static void sendEventToWM(WSWin* w, Atom type, i64 a, i64 b, i64 c, i64 d, i64 f) { XEvent e={33}; e.xclient.window = w->x11.handle; e.xclient.format = 32; e.xclient.message_type = type; e.xclient.data.l[0]=a; e.xclient.data.l[1]=b; e.xclient.data.l[2]=c; e.xclient.data.l[3]=d; e.xclient.data.l[4]=f; WinSys.x11.xlib.SendEvent(WinSys.x11.display,WinSys.x11.root,0,(1L<<19)|(1L<<20),&e); }
     static void updateNormalHints(WSWin* w, int w_, int h) { XSizeHints* hs=WinSys.x11.xlib.AllocSizeHints(); i64 s; WinSys.x11.xlib.GetWMNormalHints(WinSys.x11.display,w->x11.handle,hs,&s); hs->flags &= ~((1L<<4)|(1L<<5)|(1L<<7)); hs->flags|=((1L<<4)|(1L<<5)); hs->min_width=hs->max_width=w_; hs->min_height=hs->max_height=h; WinSys.x11.xlib.SetWMNormalHints(WinSys.x11.display,w->x11.handle,hs); WinSys.x11.xlib.Free(hs); }
-    INLINE void updateCursorImage(WSWin* w) { if (w->cursorMode == 0x00034001 || (w->cursorMode == 0x00034003 && WinSys.x11.disabledCursorWindow != w)) { WinSys.x11.xlib.UndefineCursor(WinSys.x11.display,w->x11.handle); } else { WinSys.x11.xlib.DefineCursor(WinSys.x11.display,w->x11.handle,WinSys.x11.hiddenCursorHandle); } }
+    INLINE void updateCursorImage(WSWin* w) { if (WinSys.x11.disabledCursorWindow != w) { WinSys.x11.xlib.UndefineCursor(WinSys.x11.display,w->x11.handle); } else { WinSys.x11.xlib.DefineCursor(WinSys.x11.display,w->x11.handle,WinSys.x11.hiddenCursorHandle); } }
     static void captureCursor(WSWin* w) { WinSys.x11.xlib.GrabPointer(WinSys.x11.display,w->x11.handle,1,(1L<<2)|(1L<<3)|(1L<<6),1,1,w->x11.handle,0L,0L); }
     static void releaseCursor() { WinSys.x11.xlib.UngrabPointer(WinSys.x11.display,0L); }
     static void disableCursor(WSWin* w) { WinSys.x11.disabledCursorWindow=w; GetCursorPosV(w,&WinSys.x11.restoreCurPosX,&WinSys.x11.restoreCurPosY); updateCursorImage(w); captureCursor(w); }
@@ -512,14 +512,13 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
             case 2: case 3:{const int k=(kc>255)?KEY_UNKNOWN:WinSys.x11.keycodes[kc]; if(k==KEY_UNKNOWN)return; if(e->type==3){XEvent n; if(WinSys.x11.xlib.CheckTypedWindowEvent(WinSys.x11.display,e->xany.window,2,&n)){if(n.xkey.keycode == kc && n.xkey.h == e->xkey.h){InputKey(w->keys,k,INPUT_PRESS); return;}else{InputKey(w->keys,k,INPUT_RELEASE); processEvent(&n); return;}}} const int a=(e->type==2)?INPUT_PRESS:INPUT_RELEASE; InputKey(w->keys,k,a); return;}
             case 4: case 5:{
                 const int b = e->xbutton.button; const int a = (e->type == 4) ? INPUT_PRESS : INPUT_RELEASE;
-                if (a == INPUT_PRESS && w->cursorMode == 0x00034003 && WinSys.x11.disabledCursorWindow != w) { disableCursor(w); } // Explicitly require a click to lock the mouse
+                if (a == INPUT_PRESS && WinSys.x11.disabledCursorWindow != w) { disableCursor(w); } // Explicitly require a click to lock the mouse
                 if (b == 1) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_LEFT,a); else if (b == 2) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_MIDDLE,a); else if (b == 3) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_RIGHT,a); else if (a == INPUT_PRESS && b == 4) Sys_Input.scrollDelta += 1.0f; else if (a == INPUT_PRESS && b == 5) Sys_Input.scrollDelta -= 1.0f; else if (b > 7) InputMouseClick(w->mouseButtons,b - 5,a); return; }
             case 7: { const int x=e->xcrossing.x,y=e->xcrossing.y; InputCursorPos(&w->virtualCursorPosX,&w->virtualCursorPosY,x,y); w->x11.lastCurX=x; w->x11.lastCurY=y; return; }
             case 6/*MotionNotify*/: { 
                 const int x=e->xmotion.x, y=e->xmotion.y;
-                if (x!=w->x11.warpCursorPosX || y!=w->x11.warpCursorPosY) {
-                    if (w->cursorMode==0x00034003) {if(WinSys.x11.disabledCursorWindow!=w) return; InputCursorPos(&w->virtualCursorPosX,&w->virtualCursorPosY,w->virtualCursorPosX + (x - w->x11.lastCurX),w->virtualCursorPosY + (y - w->x11.lastCurY)); int w_,h; GetWindowSize(w,&w_,&h);/*Re-center ONLY in response to physical motion to prevent WM feedback loops*/ SetCurV(w, w_/2, h/2);}else InputCursorPos(&w->virtualCursorPosX,&w->virtualCursorPosY,x,y);
-                } w->x11.lastCurX=x; w->x11.lastCurY=y; 
+                if (x!=w->x11.warpCursorPosX || y!=w->x11.warpCursorPosY) { if(WinSys.x11.disabledCursorWindow!=w) return; InputCursorPos(&w->virtualCursorPosX,&w->virtualCursorPosY,w->virtualCursorPosX + (x - w->x11.lastCurX),w->virtualCursorPosY + (y - w->x11.lastCurY)); int w_,h; GetWindowSize(w,&w_,&h);/*Re-center ONLY in response to physical motion to prevent WM feedback loops*/ SetCurV(w, w_/2, h/2); }
+                w->x11.lastCurX=x; w->x11.lastCurY=y; 
                 return; }
             case 22: {
                 if (e->xcfg.width!=w->x11.width || e->xcfg.height!=w->x11.height) { w->x11.width=e->xcfg.width; w->x11.height=e->xcfg.height; UpdateScreenSize(e->xcfg.width,e->xcfg.height); }
@@ -528,8 +527,8 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
                 w->x11.xpos=x; w->x11.ypos=y;
                 return; }
             case 33: { if(WinSys.x11.xlib.FilterEvent(e,0L) || e->xclient.message_type==0L) return; if (e->xclient.message_type==WinSys.x11.WM_PROTOCOLS) {const Atom p=e->xclient.data.l[0]; if (p==0L) return; if (p == WinSys.x11.WM_DELETE_WINDOW) OS_Exit(0); if (p == WinSys.x11.NWM_PING) { XEvent r=*e; r.xclient.window=WinSys.x11.root; WinSys.x11.xlib.SendEvent(WinSys.x11.display,WinSys.x11.root,0,(1L<<19)|(1L<<20),&r); }} return; }
-            case  9: { if (e->xfocus.mode==1 || e->xfocus.mode==2) return; if (firstFocus && w->cursorMode==0x00034003) { disableCursor(w); firstFocus = 0; } InputWindowFocus(1); return; }
-            case 10: { if (e->xfocus.mode==1 || e->xfocus.mode==2) return; if (w->cursorMode==0x00034003) enableCursor(w); InputWindowFocus(0); return; }
+            case  9: { if (e->xfocus.mode==1 || e->xfocus.mode==2) return; if (firstFocus) { disableCursor(w); firstFocus = 0; } InputWindowFocus(1); return; }
+            case 10: { if (e->xfocus.mode==1 || e->xfocus.mode==2) return; enableCursor(w); InputWindowFocus(0); return; }
         }
     }
     
@@ -628,7 +627,7 @@ const FBC* ChooseFBConfig(const FBC* a, u32 c) {
 FGL_AT glActiveTexture; FGL_AS glAttachShader; FGL_CTSI2D glCopyTexSubImage2D;  FGL_BB glBindBuffer;  FGL_BBB glBindBufferBase;    FGL_CPIV glGetProgramiv;FGL_CC glClearColor;    FGL_U4F glUniform4f;        FGL_BFB glBindFramebuffer;FGL_VP glViewport;    FGL_BVA glBindVertexArray; FGL_EVAA glEnableVertexAttribArray;         
 FGL_UP glUseProgram;    FGL_DM glDepthMask;    FGL_VAB glVertexAttribBinding;   FGL_DF glDepthFunc;   FGL_DC glDispatchCompute;    FGL_DB glDrawBuffers;   FGL_GSIV glGetShaderiv; FGL_BVB glBindVertexBuffer; FGL_LW glLineWidth;       FGL_LP glLinkProgram; FGL_RB glReadBuffer;       FGL_U3F glUniform3f;
 FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram;   FGL_CRS glCreateShader;  FGL_BFS glBlendFuncSeparate; FGL_UB glUnmapBuffer; FGL_BD glBufferData; FGL_F glFinish; FGL_FL glFlush;
-FGL_C glClear;  FGL_DE glDrawElements;  FGL_U2UI glUniform2ui; FGL_UM4FV glUniformMatrix4fv;    FGL_GIV glGetIntegerv;FGL_GSIL glGetShaderInfoLog; FGL_U2F glUniform2f;      FGL_U1UI glUniform1ui;   FGL_GVA glGenVertexArrays;  FGL_RP glReadPixels;      FGL_SS glShaderSource;FGL_TPI glTexParameteri; FGL_TPFV glTexParameterfv;   FGL_U1F glUniform1f;
+FGL_C glClear;  FGL_DE glDrawElements;  FGL_U2UI glUniform2ui; FGL_UM4FV glUniformMatrix4fv;    FGL_GIV glGetIntegerv;FGL_GSIL glGetShaderInfoLog; FGL_GPIL glGetProgramInfoLog; FGL_U2F glUniform2f;      FGL_U1UI glUniform1ui;   FGL_GVA glGenVertexArrays;  FGL_RP glReadPixels;      FGL_SS glShaderSource;FGL_TPI glTexParameteri; FGL_TPFV glTexParameterfv;   FGL_U1F glUniform1f;
 FGL_E glEnable; FGL_FF glFrontFace;     FGL_GB glGenBuffers;   FGL_FBT2D glFramebufferTexture2D;FGL_GERR glGetError;  FGL_GFS glGenFramebuffers;   FGL_GT glGenTextures;     FGL_BSD glBufferSubData; FGL_MBR glMapBufferRange;   FGL_U1I glUniform1i;      FGL_T2D glTexImage2D; FGL_BIT glBindImageTexture;FGL_BT glBindTexture;
 FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL_D glEndQuery; FGL_DAI glDrawArraysInstanced; FGL_BB glBlendFunc;  FGL_BF glBlitFramebuffer; FGL_T2D glTexSubImage2D; FGL_GTKP glGetTexLevelParameteriv; FGL_CBSD glCopyBufferSubData; FGL_CLBSD glClearBufferSubData; FGL_CISD glCopyImageSubData; FGL_CPIV glGetBufferParameteriv; FGL_GBSD glGetBufferSubData; FGL_GB glDeleteBuffers;
 void SetGLContext_GetFunctionPointers() {
@@ -636,7 +635,7 @@ void SetGLContext_GetFunctionPointers() {
     #define X(n,t) n=(t)h->context.getProcAddress(#n);
     X(glClear,FGL_C)              X(glClearColor,FGL_CC)      X(glColorMask,FGL_CM)        X(glDepthFunc,FGL_DF)           X(glDepthMask,FGL_DM)               X(glDisable,FGL_D)             X(glEnableVertexAttribArray,FGL_EVAA) X(glEnable,FGL_E)             X(glFrontFace,FGL_FF)       X(glGetError,FGL_GERR)        X(glGetIntegerv,FGL_GIV)
     X(glLineWidth,FGL_LW)         X(glReadBuffer,FGL_RB)      X(glReadPixels,FGL_RP)       X(glTexImage2D,FGL_T2D)         X(glViewport,FGL_VP)                X(glBindTexture,FGL_BT)        X(glCopyTexSubImage2D,FGL_CTSI2D)     X(glDrawArrays,FGL_DA)        X(glDrawElements,FGL_DE)    X(glGenTextures,FGL_GT)      X(glActiveTexture,FGL_AT)       X(glBlendFuncSeparate,FGL_BFS)      X(glBindVertexArray,FGL_BVA)   X(glVertexAttribBinding,FGL_VAB)
-    X(glBindBuffer,FGL_BB)        X(glBufferData,FGL_BD)      X(glGenBuffers,FGL_GB)       X(glUnmapBuffer,FGL_UB)         X(glAttachShader,FGL_AS)            X(glCompileShader,FGL_CS)      X(glCreateProgram,FGL_CP)     X(glCreateShader,FGL_CRS)   X(glDrawBuffers,FGL_DB)      X(glGetProgramiv,FGL_CPIV)      X(glGetShaderInfoLog,FGL_GSIL)      X(glGetShaderiv,FGL_GSIV)
+    X(glBindBuffer,FGL_BB)        X(glBufferData,FGL_BD)      X(glGenBuffers,FGL_GB)       X(glUnmapBuffer,FGL_UB)         X(glAttachShader,FGL_AS)            X(glCompileShader,FGL_CS)      X(glCreateProgram,FGL_CP)     X(glCreateShader,FGL_CRS)   X(glDrawBuffers,FGL_DB)      X(glGetProgramiv,FGL_CPIV)      X(glGetShaderInfoLog,FGL_GSIL) X(glGetProgramInfoLog,FGL_GPIL)      X(glGetShaderiv,FGL_GSIV)
     X(glLinkProgram,FGL_LP)       X(glShaderSource,FGL_SS)    X(glUniform1f,FGL_U1F)       X(glUniform1i,FGL_U1I)          X(glUniform2f,FGL_U2F)              X(glUniform3f,FGL_U3F)         X(glUniform4f,FGL_U4F)        X(glTexParameteri,FGL_TPI)  X(glTexParameterfv,FGL_TPFV)  X(glUniform1ui,FGL_U1UI)     X(glUniform2ui,FGL_U2UI)        X(glUniformMatrix3fv,FGL_UM3FV)     X(glUniformMatrix4fv,FGL_UM4FV)
     X(glUseProgram,FGL_UP)        X(glBindBufferBase,FGL_BBB) X(glFinish,FGL_F) X(glFlush,FGL_FL) X(glBindFramebuffer,FGL_BFB) X(glGenFramebuffers,FGL_GFS)    X(glMapBufferRange,FGL_MBR)         X(glBindImageTexture,FGL_BIT)  X(glBindVertexBuffer,FGL_BVB) X(glDispatchCompute,FGL_DC) X(glGenVertexArrays,FGL_GVA) X(glVertexAttribFormat,FGL_VAF) X(glFramebufferTexture2D,FGL_FBT2D) X(glBufferSubData,FGL_BSD)
     X(glGenQueries,FGL_GIQ) X(glGetQueryObjectui64v,FGL_GQOU64) X(glBeginQuery,FGL_BQ) X(glEndQuery,FGL_D) X(glDrawArraysInstanced,FGL_DAI) X(glBlendFunc,FGL_BB) X(glBlitFramebuffer,FGL_BF) X(glTexSubImage2D,FGL_T2D) X(glGetTexLevelParameteriv,FGL_GTKP) X(glCopyBufferSubData,FGL_CBSD) X(glClearBufferSubData,FGL_CLBSD) X(glCopyImageSubData,FGL_CISD) X(glGetBufferParameteriv,FGL_CPIV) X(glGetBufferSubData,FGL_GBSD) X(glDeleteBuffers,FGL_GB)
@@ -1348,7 +1347,7 @@ INLINE void CreditsStats() {
 }
 // Rendering Sys
 INLINE void ShaderError(u32 s, const char* name) { char er[4096]; glGetShaderInfoLog(s,4096,NULL,er); DualLogError("%s Comp Fail: %s\n",name,er); OS_Exit(1); }
-INLINE void ProgramError(u32 p, const char* name) { char er[4096]; glGetShaderInfoLog(p,4096,NULL,er); DualLogError("%s Link Fail: %s\n",name,er); OS_Exit(1); }
+INLINE void ProgramError(u32 p, const char* name) { char er[4096]; glGetProgramInfoLog(p,4096,NULL,er); DualLogError("%s Link Fail: %s\n",name,er); OS_Exit(1); }
 INLINE u32 CompileShader(u32 type, const char* source, const char* name) { u32 s = glCreateShader(type); glShaderSource(s,1,&source,NULL); glCompileShader(s); i32 ok; glGetShaderiv(s,0x8B81/*GL_COMPILE_STATUS*/,&ok); if (!ok) ShaderError(s,name); return s; }
 INLINE u32 LinkProgram(u32* s, i32 num, const char* name) { u32 p = glCreateProgram(); for (i32 i=0;i<num;++i) { glAttachShader(p,s[i]); } glLinkProgram(p); i32 ok; glGetProgramiv(p,0x8B82/*GL_LINK_STATUS*/,&ok); if (!ok) ProgramError(p,name); return p; }
 u32 CompileAnyShader(const char* v, const char* s, const char* name) { return (v) ? LinkProgram((u32[]){CompileShader(0x8B31/*GL_VERTEX_SHADER*/,v,name),CompileShader(0x8B30/*GL_FRAGMENT_SHADER*/,s,name)},2,name) : LinkProgram((u32[]){CompileShader(0x91B9/*GL_COMPUTE_SHADER*/,s,name)},1,name); }
@@ -1370,10 +1369,7 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* ps) {
     ps[3].normal.x = m[3] - m[1]; ps[3].normal.y = m[7] - m[5]; ps[3].normal.z = m[11] - m[9];  ps[3].d = m[15] - m[13];/*Top*/
     ps[4].normal.x = m[3] + m[2]; ps[4].normal.y = m[7] + m[6]; ps[4].normal.z = m[11] + m[10]; ps[4].d = m[15] + m[14];/*Near*/
     ps[5].normal.x = m[3] - m[2]; ps[5].normal.y = m[7] - m[6]; ps[5].normal.z = m[11] - m[10]; ps[5].d = m[15] - m[14];/*Far*/
-    for (int i=0;i<6;i++) { /*Normalize (could use V3_Normalize but need len for d term of FrustumPlane).*/
-        float len = V3_Mag(ps[i].normal);
-        if (len > 0.000001f) { ps[i].normal.x /= len; ps[i].normal.y /= len; ps[i].normal.z /= len; ps[i].d /= len; }
-    }
+    for (int i=0;i<6;i++) { /*Normalize (could use V3_Normalize but need len for d term of FrustumPlane).*/ float len = V3_Mag(ps[i].normal); if (len > 0.000001f) { ps[i].normal.x /= len; ps[i].normal.y /= len; ps[i].normal.z /= len; ps[i].d /= len; } }
 }
 
 void mul_mat4(float* restrict out,const float* restrict a,const float* restrict b) { for (int c=0;c<4;++c) for (int r=0;r<4;++r) { float sum=0.0f; for (int k=0;k<4;++k) sum+=a[k*4+r]*b[c*4+k]; out[c*4+r]=sum; } }
@@ -1432,15 +1428,7 @@ static bool clearRenderTargetsOnNextFrame = false;
 #include "automap.c" // CPU-rasterized automap
 #include "ui.c"
 // Lights
-static const float INVSQRT2=0.70710678118f; Quaternion cubeQuats[6] = {
-    {0.0f,INVSQRT2,0.0f,INVSQRT2}/*+X:Right*/,
-    {0.0f,-INVSQRT2,0.0f,INVSQRT2}/*-X:Left*/,
-    {-INVSQRT2,0.0f,0.0f,INVSQRT2}/*+Y:Up*/,
-    {INVSQRT2,0.0f,0.0f,INVSQRT2}/*-Y:Down*/,
-    {0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/,
-    {0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/
-};
-
+static const float INVSQRT2=0.70710678118f; Quaternion cubeQuats[6] = { {0.0f,INVSQRT2,0.0f,INVSQRT2}/*+X:Right*/, {0.0f,-INVSQRT2,0.0f,INVSQRT2}/*-X:Left*/, {-INVSQRT2,0.0f,0.0f,INVSQRT2}/*+Y:Up*/, {INVSQRT2,0.0f,0.0f,INVSQRT2}/*-Y:Down*/, {0.0f,0.0f,0.0f,1.0f}/*+Z:Forward*/, {0.0f,1.0f,0.0f,0.0f}/*-Z:Backward*/ };
 void UpdateLights() {
     for (u16 lightIdx=0;lightIdx<World.loadedLights;++lightIdx) {
         V3 lightPos = World.lightsNewPosition[lightIdx];
@@ -2593,7 +2581,7 @@ void InitalizeEnvironment() {
     OS_Thread fontInitThr;
     OS_ThreadCreate(&fontInitThr, InitFontAtlasses_Thread, NULL);
     ClampWindowSizeToMonitor();
-    WSWin* w=OS_Alloc(sizeof(WSWin)); w->decorated=1; w->cursorMode=0x00034003;
+    WSWin* w=OS_Alloc(sizeof(WSWin)); w->decorated=1;
     window = VCreateWindow(w,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
     PlaceWindowOnMonitor((int)Sys_Settings.CurrentMonitor);
     window->context.makeCurrent(window);
