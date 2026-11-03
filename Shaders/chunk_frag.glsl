@@ -59,14 +59,11 @@ float getBlueNoise(ivec2 p) {uint n = (uint(p.x) * 73856093u) ^ (uint(p.y) * 193
 const float VOXEL_SIZE = 0.32; const uint SHADON = 2u;
 uint GetVoxelIndex(vec3 worldPos) { float offsetX = worldPos.x - worldMin.x; float offsetZ = worldPos.z - worldMin.y; uint voxelX = uint(offsetX / VOXEL_SIZE); uint voxelZ = uint(offsetZ / VOXEL_SIZE); return (voxelZ * 512) + voxelX; }
 const int PCF_SAMPLES = 12; const float invSamples = 1.0 / float(PCF_SAMPLES); const vec2 poissonDisk[PCF_SAMPLES] = vec2[](vec2(0.2085,0.0000),vec2(-0.2663,0.2440),vec2(0.0408,-0.4645),vec2(0.3357,0.4378),vec2(-0.6160,-0.1090),vec2(0.5835,-0.3712),vec2(-0.1952,0.7260),vec2(-0.3722,-0.7167),vec2(0.8076,0.2949),vec2(-0.8401,0.3468),vec2(0.4050,-0.8655),vec2(0.2993,0.9542)); // Golden-angle spiral, 12 taps, wider spread for smoother penumbra without reintroducing center-step issues
-// vec4 getTextureColor(uint texIdx, ivec2 texCoord, int texSizeX) { uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * texSizeX + uint(texCoord.x); uint slotIndex = pixelOffset >> 2u; uint packedIdx = colors[slotIndex]; return unpackUnorm4x8(texturePalettes[texturePaletteOffsets[texIdx] + ((packedIdx >> ((pixelOffset & 3u) << 3u)) & 0xFFu)]); }
 vec4 getTextureColor(uint texIdx, ivec2 texCoord, ivec2 texSize) {
     texCoord = ivec2(mod(vec2(texCoord), vec2(texSize)));
     if (texCoord.x < 0) texCoord.x += texSize.x;
     if (texCoord.y < 0) texCoord.y += texSize.y;
-    uint pixelOffset = textureOffsets[texIdx]
-                     + uint(texCoord.y) * uint(texSize.x)
-                     + uint(texCoord.x);
+    uint pixelOffset = textureOffsets[texIdx] + uint(texCoord.y) * uint(texSize.x) + uint(texCoord.x);
     uint slotIndex   = pixelOffset >> 2u;
     uint packedIdx   = colors[slotIndex];
     uint shift       = (pixelOffset & 3u) << 3u;
@@ -137,11 +134,13 @@ void main() {
         vec3 cyberDirB = normalize(vec3(-0.55, 0.35, -0.5)); vec3 cyberColB = vec3(0.9, 0.35, 0.95);
         lighting += albedoColor.rgb * cyberColA * (clamp(dot(adjustedNormal, cyberDirA), 0.0, 1.0) * 0.9);
         lighting += albedoColor.rgb * cyberColB * (clamp(dot(adjustedNormal, cyberDirB), 0.0, 1.0) * 0.6);
-    } else if (sunEnabled > 0u) { // sun is off entirely in cells that can't see it, and whenever shadows are off
-        vec3 sunCol = vec3(1.0, 0.97, 0.85); /*sunDirection comes from the CPU (same value the shadowmap pass used), so the light and its map can't drift apart.*/
-        vec3 sunProj = (sunShadowMatrix * vec4(FragPos, 1.0)).xyz; // ortho, so w == 1 and the divide is free
+    } else if (sunEnabled > 0u) { // Sun is off entirely in cells that can't see it, and whenever shadows are off
+        vec3 sunCol = vec3(1.0,0.0,0.0);// Testing with red for visibility vec3(1.0, 0.97, 0.85);
         float sunShadow = 1.0;
-        if (all(lessThan(abs(sunProj.xy), vec2(1.0)))) { sunShadow = texture(sunShadowMap, vec3(sunProj.xy, sunProj.z - 0.0012)); } // 0.0012 NDC ~= 0.1 world units over the map's 3.5*64 depth range (tunable); outside the ortho box = lit
+        vec3 sunProj = (sunShadowMatrix * vec4(FragPos, 1.0)).xyz;
+        vec2 sunUV   = sunProj.xy * 0.5 + 0.5;
+        float sunZ   = sunProj.z  * 0.5 + 0.5;
+        if (all(lessThan(abs(sunProj.xy), vec2(1.0))) && abs(sunProj.z) < 1.0) { sunShadow = texture(sunShadowMap, vec3(sunUV, sunZ - 0.0012)); }
         lighting += albedoColor.rgb * sunCol * (clamp(dot(adjustedNormal, sunDirection), 0.0, 1.0) * sunShadow);
     }
     float rim=1.0-max(dot(adjustedNormal,viewDir),0.0); lighting+=clamp(rim*rim*rim*rim*0.25*clamp(iTot,0.0,1.0)*specColor.rgb,0.0,1.0);/*Specular "rim" fresnel (tested and perf impact ~zero)*/ lighting=(unlit>0||useCamView>0)?albedoColor.rgb:lighting+glowColor.rgb; if(heat>0.0){lighting+=albedoColor.rgb*heat; lighting=pow(lighting,vec3(1.2)); lighting+=clamp(rim*rim*rim*rim*0.5*specColor.rgb,0.0,1.0);}
