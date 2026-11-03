@@ -972,40 +972,6 @@ static const PrefabConst prefabConsts[] = {
 
 static const PrefabConst* PrefabConstFor(u16 entIdx) { for (u32 k = 0; k < sizeof(prefabConsts)/sizeof(prefabConsts[0]); ++k) { if (prefabConsts[k].entIdx == entIdx) { return &prefabConsts[k]; } } return 0; }
 
-/*TODO Replace this offset correction factor from level data by baking it into the level*.txt data*/
-typedef struct { u16 entIdx; V3 offset; } CgOffset;
-static const CgOffset cgOffsets[] = {
-    {309, {0,0.12f,0}},   {365, {0,0.12f,0}},   {369, {0,0.12f,0}},   /*item_beaker, item_flask, item_testtube*/
-    {310, {0,0.0975f,0}}, /*item_beverage*/
-    {314, {0,0.095f,0}},  /*weapon_grenadefrag*/
-    {315, {0,0.065f,0}},  /*weapon_grenadeconc*/
-    {316, {0,0.08f,0}},   /*weapon_grenadeemp*/
-    {317, {0,0.12f,0}},   /*weapon_grenadeearth*/
-    {318, {0,0.02f,0}},   /*weapon_grenadeemine*/
-    {319, {0,0.09f,0}},   /*weapon_grenadegas*/
-    {328, {0,0.04f,0}},   /*item_hw_system*/
-    {332, {0,0.015f,0}},  /*item_hw_targetid*/
-    {333, {0,0.028f,0}},  /*item_hw_shield*/
-    {342, {0,0.12f,0}},   /*item_workerhelmet*/
-    {343, {0,0.16f,0}},   /*weapon_blaster: up*/
-    {346, {0,0,0.16f}},   /*weapon_blaster: over*/
-    {348, {0,0,0.6f}},    /*weapon_blaster: over*/
-    {350, {0,0.16f,0}},   /*weapon_magnum*/
-    {352, {0,0.16f,0}},   /*weapon_pistol*/
-    {358, {0,0.16f,0}},   /*weapon_stungun*/
-    {361, {0,0.05f,0}},   /*item_logic_probe*/
-    {363, {0,0.04f,0}},   /*item_plastique*/
-    {364, {0,0.03f,0}},   {366, {0,0.03f,0}},   /*item_chipset_isolinear*/
-    {368, {0,0.04f,0}},   /*item_isotopex22*/
-    {371, {0,0.015f,0}},  /*item_chipset_isolinear*/
-    {379, {0,0.025f,0}},  {380, {0,0.025f,0}},  {381, {0,0.025f,0}},  {382, {0,0.025f,0}},  {384, {0,0.025f,0}},  /*item_ammo_hornet, _splinter, _magnesium, _penetrator*/
-    {399, {0,0.01f,0}},   /*item_head_male*/
-    {458, {0,0.72f,0}},   {459, {0,0.72f,0}},   {460, {0,0.72f,0}},   /*prop_phys_barrel_chemical, _radiation, _toxic*/
-    {463, {0,0.64f,0}},   /*prop_phys_toolcart*/
-    {472, {0,0.342f,0}},  {473, {0,0.342f,0}},  {474, {0,0.342f,0}},  {475, {0,0.342f,0}},  {476, {0,0.342f,0}},  /*se_crate1..5*/
-};
-
-static const CgOffset* CgOffsetFor(u16 entIdx) { for (u32 k = 0; k < sizeof(cgOffsets)/sizeof(cgOffsets[0]); ++k) { if (cgOffsets[k].entIdx == entIdx) { return &cgOffsets[k]; } } return 0; }
 __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; }
     if (World.instCount >= INSTANCE_COUNT) { DualLogWarn("\nToo many instances while adding entity %u, max instance count is %u, skipped\n", entIdx, INSTANCE_COUNT); return WORLD; }
@@ -1443,7 +1409,6 @@ void LoadLevelMod(u8 lev) {
         } else if (entIdx == 716) { World.col[parent] = CT_NONE; }
         else if (entIdx == 515 && EDefs[entIdx].col == CT_BOX && EDefs[entIdx].colSz.x == 0.0f && EDefs[entIdx].colSz.y == 0.0f && EDefs[entIdx].colSz.z == 0.0f) { World.colliderCenter[parent] = (V3){0.0f,0.0f,0.0f}; World.colliderSize[parent] = (V3){1.0f,1.0f,1.0f}; }
         if (entIdx == 700) par->currentTargetIdx = par->branchOnSecond ? par->target2Idx : par->targetIdx;
-        { const CgOffset* co = CgOffsetFor(entIdx); if (co) World.position[parent] = V3_AplusB(World.position[parent], co->offset); }/*moved out of the chain below: none of these constIndexes collide with the cases that remain, so an add-then-switch is the same as the else-if it replaces*/
         if (entIdx == 525) { par->texAnimLight=AddOffsetLight(par,(V3){5.81f,2.29f,38.05f-38.3552f},(Color3){0.3531f,0.4837f,0.6509f},1.85f,0.7f); par->texAnimLight2=AddOffsetLight(par,(V3){-10.1f,0.9f,18.21f-38.3552f},(Color3){0.3561f,0.3561f,0.8970f},2.0f,1.12f); } // prop_console01
         else if (entIdx == 279) { par->texAnimLight = AddOffsetLight(par,(V3){0.0f,-0.08f,0.0f},(Color3){0.909803922f,0.929411765f,1.0f},3.2f,1.575f); } // chunk_screen
         else if (par->index == 574) { // prop_healingbed
