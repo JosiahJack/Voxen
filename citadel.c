@@ -1,6 +1,6 @@
 // citadel.c - Game logic.
 #include "common.h"
-__attribute__((used)) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0};  /*Patch names in the +326 item-name table (Citadel: useableItemIndex+326, useableItemIndex=14+slot); Citadel composes "<name>" + stringTable[589]*/
+__attribute__((used, visibility("default"))) AutoSplitterData autoSplitter = {0x1337133713371337,0,false,0}; /*Must be always visible for AutoSplitter tools to find it.*/
 void PatchDisableAll(),BiomonitorEnergyPulse(float),BioMonitorClearGraphs(),TextureSequenceInit(u16,char*),GrenadeActivate(u16); bool RecentLog(); extern double lerpStartTime; extern V3 queuedLevelPos; extern u8 queuedLevelToLoad; extern u16 editModeSelection;
 V3 ScreenPointToRay(V3 fwd, V3 rt) {
     float px=World.inventoryMode?(float)World.cursorPos_x:(float)UI_W*0.5f, py=World.inventoryMode?(float)World.cursorPos_y:(float)UI_H*0.5f;
@@ -63,22 +63,13 @@ void AddHardwareToInventory(int index,int hwversion) {
 
 bool AddGeneralObjectToInventory(int index, int custIdx){
     if (!World.Sys_UI.firstGeneral){World.Sys_UI.firstGeneral=true; World.Sys_UI.mfdTab[0]=3;}
-    for (i8 i=1;i<14;++i) {
-        if (World.invP1.genInvIdxRef[i]==-1) {
-            if (!World.invP1.accessCardOwned && World.invP1.generalInvCurrent == 0 /*First slot is always access cards.*/) { World.invP1.generalInvCurrent = i; }
-            World.invP1.genInvIdxRef[i] = index;
-            World.invP1.generalInvCustIdx[i] = (i16)custIdx;
-            World.Sys_UI.generalClickSlot = -1;
-            CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]);
-            return true;
-        }
-    }
+    for (i8 i=1;i<14;++i) { if (World.invP1.genInvIdxRef[i]==-1) { if (!World.invP1.accessCardOwned && World.invP1.generalInvCurrent == 0 /*First slot is always access cards.*/) { World.invP1.generalInvCurrent = i; } World.invP1.genInvIdxRef[i] = index; World.invP1.generalInvCustIdx[i] = (i16)custIdx; World.Sys_UI.generalClickSlot = -1; CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[31]); return true; } }
     return false;
 }
 
 void CheckForUnreadLogs() { int e=0,l=0; for (int i=0;i<LOGCNT;++i) if (World.invP1.hasLog[i] && !World.invP1.readLog[i]) *(Sys_Text.audioLogType[i] == AudioLogType_Email ? &e : &l)=1; World.invP1.hasNewEmail=e; World.invP1.hasNewLogs=l; }
 static int FindNextUnreadLog() { for (int i = LOGCNT-1; i >= 0; i--) { if(World.invP1.hasLog[i] && !World.invP1.readLog[i]){return i;} } return -1; }
-static u8 VmailClipForLog(int logIndex) {/*The 6 vmail logs -> the ui.c vmailStartFrames/vmailEndFrames clip slots, which follow the textures.txt VMail* folder order: 0 BetaJettison, 1 BridgeSeparation, 2 CitadelSelfDestruct, 3 GeneralStatus, 4 LaserDestroyed, 5 ShieldsUp*/ switch(logIndex){case 119: return 0; case 116: return 1; case 117: return 2; case 110: return 3; case 114: return 4; case 120: return 5;} return 0xFF;}
+static u8 VmailClipForLog(int logIndex) { switch(logIndex){case 119: return 0; case 116: return 1; case 117: return 2; case 110: return 3; case 114: return 4; case 120: return 5;} return 0xFF;} /*0 BetaJettison, 1 BridgeSeparation, 2 CitadelSelfDestruct, 3 GeneralStatus, 4 LaserDestroyed, 5 ShieldsUp*/
 void MFD_OpenAudioLog(int);
 void PlayLog(int logIndex) {if(logIndex<0||logIndex>=LOGCNT||!(World.invP1.hasHardware&HW_ERD)){return;} const char* lp=AudioLogPath(logIndex); if (lp && lp[0]) play_message(lp);/*text-only logs have no mp3: skip playback instead of erroring on ./Audio/.mp3*/ World.invP1.readLog[logIndex]=true; u8 vmailClip=VmailClipForLog(logIndex); if(vmailClip!=0xFF) PlayVmail(vmailClip); CenterStatusPrint("%s%s",Sys_Text.stringTable[1020],World.audiologNames[logIndex]); MFD_OpenAudioLog(logIndex); }
 void AddAudioLogToInventory(int index) {
@@ -86,13 +77,8 @@ void AddAudioLogToInventory(int index) {
     if (index == 128) { CenterStatusPrint("%s",Sys_Text.stringTable[309]); return; }/*Trioptimum Funpack*/
         
     World.invP1.hasLog[index]  = true; World.invP1.lastAddedIndex = index; World.invP1.numLogsFromLevel[Sys_Text.audioLogLevelFound[index]]++;
-         if(Sys_Text.audioLogType[index] == AudioLogType_Email)World.invP1.hasNewEmail=true;
-    else if(Sys_Text.audioLogType[index] == AudioLogType_Normal)World.invP1.hasNewLogs=true;
-    if (World.invP1.hasHardware & HW_ERD) {
-        char keyStr[8];
-        sFormat(keyStr,sizeof(keyStr),"%s", Sys_Settings.InputCodeSettings[20] ? "U" : "?");
-        CenterStatusPrint("%s%s%s %s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[38],keyStr); }
-    else { CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[310]); }
+    if(Sys_Text.audioLogType[index] == AudioLogType_Email)World.invP1.hasNewEmail = true; else if(Sys_Text.audioLogType[index] == AudioLogType_Normal)World.invP1.hasNewLogs = true;
+    if (World.invP1.hasHardware & HW_ERD) { char keyStr[8]; sFormat(keyStr,sizeof(keyStr),"%s", Sys_Settings.InputCodeSettings[20] ? "U" : "?"); CenterStatusPrint("%s%s%s %s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[38],keyStr); } else { CenterStatusPrint("%s%s%s",Sys_Text.stringTable[36],World.audiologNames[index],Sys_Text.stringTable[310]); }
 }
 
 INLINE void ItemAdd(u8 *cur, u8 *counts, int idx, int uIdx, int sysIdx) { if (!counts[*cur]) {*cur=(i8)idx;} counts[idx]++; CenterStatusPrint("%s%s", Sys_Text.stringTable[ItemStringIdx(uIdx)], Sys_Text.stringTable[sysIdx]); }
@@ -116,7 +102,6 @@ void UseCyberspaceItem() {
 
 void UseCyberspaceItemByIndex(int idx) { World.invP1.cyberItemIndex = (i8)idx; UseCyberspaceItem(); }/*MFD software tab rows 3..5 map to the 0..2 turbo/decoy/recall selector*/
 static void CycleCyberSpaceItem(int step) { int next=World.invP1.cyberItemIndex+step; if (next<0) next=2; if (next>2) next=0; for (int c=0;c<3;++c,next=(next+step+3)%3) if (World.invP1.hasSoft&(1u<<(SW_TURBO+next))) { World.invP1.cyberItemIndex=(i8)next; return; } World.invP1.cyberItemIndex=-1; }
-
 void CompleteWeaponChange(void); /* defined in weapons.c: applies pending weapon change to state, view model, and HUD */
 void RemoveWeapon(i32 slot) {
     if (slot < 0 || slot >= 7 || World.invP1.wepInvIndices[slot] < 0) return;
@@ -283,9 +268,7 @@ void SpawnManagerUpdate(u16 self) {
     }
     if (!valid) {return;}
     u16 npc = SpawnDynamicObject(e->spawnIndex); if (!EntIdxIsValid(npc)) {return;}
-    
-    World.position[npc]=World.position[spot]; World.scale[npc]=(V3){1.0f,1.0f,1.0f};
-    if (!e->alertEnemiesOnAwake) { flag_set(&World.instances[npc].entflags, EF_WANDERING, true); return; } 
+    World.position[npc]=World.position[spot]; World.scale[npc]=(V3){1.0f,1.0f,1.0f}; if (!e->alertEnemiesOnAwake) { flag_set(&World.instances[npc].entflags, EF_WANDERING, true); return; } 
     
     AIAlert(npc);
     if (count + 1 >= e->numberToSpawn) { e->delayFinished = World.pauseRelativeTime + (double)e->allSpawnedResetDelay; }
@@ -296,49 +279,20 @@ void TextureChangerToggle(u16 self) {
     if (World.instances[self].curTex) { World.instances[self].texIndex = EDefs[World.instances[self].index].texIndex; World.instances[self].glowIndex = EDefs[World.instances[self].index].glowIndex; } else { World.instances[self].texIndex = alt; World.instances[self].glowIndex = glowAlt; } World.instances[self].curTex = !World.instances[self].curTex;
 }
 
-static u16 NearestGravityLiftForVisual(u16 visual) {
-    u16 nearest=U16_MAX; float nearestDistSq=64.0f;
-    for (u16 lift=INSTS_1ST_IDX;lift<World.instCount;++lift) {
-        if (World.instances[lift].index != 596) continue;
-        float dx=World.position[visual].x-World.position[lift].x;
-        float dy=World.position[visual].y-World.position[lift].y;
-        float dz=World.position[visual].z-World.position[lift].z;
-        float distSq=dx*dx+dy*dy+dz*dz;
-        if (distSq < nearestDistSq) { nearest=lift; nearestDistSq=distSq; }
-    }
-    return nearest;
-}
-
+static u16 NearestGravityLiftForVisual(u16 visual) { u16 n = U16_MAX; float nd = 64.0f; for (u16 lift=INSTS_1ST_IDX;lift<World.instCount;++lift) { if (World.instances[lift].index != 596) continue; float dx=World.position[visual].x-World.position[lift].x; float dy=World.position[visual].y-World.position[lift].y; float dz=World.position[visual].z-World.position[lift].z; float dd=dx*dx+dy*dy+dz*dz; if (dd < nd) { n = lift; nd = dd; } } return n; }
 void GravityLiftSyncVisuals(u16 lift) {
     if (lift < INSTS_1ST_IDX || lift >= World.instCount || World.instances[lift].index != 596) return;
+    
     bool active=World.instances[lift].active; u16 texture=active ? 1246 : 1248, glow=active ? 1247 : 1249;
-    for (u16 visual=INSTS_1ST_IDX;visual<World.instCount;++visual) {
-        if (World.instances[visual].index == 112 && NearestGravityLiftForVisual(visual) == lift) {
-            World.instances[visual].texIndex=texture; World.instances[visual].glowIndex=glow;
-        }
-    }
+    for (u16 visual=INSTS_1ST_IDX;visual<World.instCount;++visual) { if (World.instances[visual].index == 112 && NearestGravityLiftForVisual(visual) == lift) { World.instances[visual].texIndex=texture; World.instances[visual].glowIndex=glow; } }
 }
 
-void GravityLiftSyncAllVisuals(void) {
-    for (u16 visual=INSTS_1ST_IDX;visual<World.instCount;++visual) {
-        if (World.instances[visual].index != 112) continue;
-        if (World.instances[visual].texIndex == 1248) { World.instances[visual].glowIndex=1249; continue; } /* Explicit level material override (inactive). */
-        u16 lift=NearestGravityLiftForVisual(visual);
-        if (lift != U16_MAX) { bool active=World.instances[lift].active; World.instances[visual].texIndex=active ? 1246 : 1248; World.instances[visual].glowIndex=active ? 1247 : 1249; }
-    }
-}
-
+void GravityLiftSyncAllVisuals(void) { for (u16 v=INSTS_1ST_IDX;v<World.instCount;++v) { if (World.instances[v].index != 112) continue; if (World.instances[v].texIndex == 1248) { World.instances[v].glowIndex=1249; continue; } u16 lift=NearestGravityLiftForVisual(v); if (lift != U16_MAX) { bool active=World.instances[lift].active; World.instances[v].texIndex=active ? 1246 : 1248; World.instances[v].glowIndex=active ? 1247 : 1249; } } }
 void LogicTimerUseTargets(u16 self) { UseTargets(self,World.instances[self].targetIdx); }
 void LogicTimerUpdate(u16 self) { Entity* e=&World.instances[self]; if(!e->active || e->intervalFinished >= World.pauseRelativeTime){return;} e->intervalFinished=World.pauseRelativeTime + (e->useRandomTimes ? (double)random_range(e->randomMin,e->randomMax) : (double)e->timeInterval); LogicTimerUseTargets(self); }
 void LogicTimerTargetted(u16 self, u16 activator) { (void)activator; World.instances[self].active = !World.instances[self].active; }
 void ButtonSwitchHoldPose(Entity* e){ e->switchAnimFinished=0.0; ChangeAnim(e, e->active ? A_ACTIVATED : A_INACTIVE); }
-void ButtonSwitchAnimate(Entity* e){
-    if (e->animationNum >= MAXANIM) return;
-    u8 move = e->active ? A_ACTIVATE : A_DEACTIVATE;
-    const AnimationClip* c = &mdlAnimClips[e->animationNum][move];
-    if (c->framerate <= 0 || c->speed <= 0 || c->frameEnd < c->frameStart) { ButtonSwitchHoldPose(e); return; }
-    ChangeAnim(e, move); e->switchAnimFinished = World.pauseRelativeTime + (double)(c->frameEnd - c->frameStart + 1) / ((double)c->framerate * c->speed);
-}
+void ButtonSwitchAnimate(Entity* e){ if (e->animationNum >= MAXANIM) return; u8 move = e->active ? A_ACTIVATE : A_DEACTIVATE; const AnimationClip* c = &mdlAnimClips[e->animationNum][move]; if (c->framerate <= 0 || c->speed <= 0 || c->frameEnd < c->frameStart) { ButtonSwitchHoldPose(e); return; } ChangeAnim(e, move); e->switchAnimFinished = World.pauseRelativeTime + (double)(c->frameEnd - c->frameStart + 1) / ((double)c->framerate * c->speed); }
 void ButtonSwitchInitAfterLoad(u16 self) { Entity* e=&World.instances[self]; e->delayFinished=0.0f; ButtonSwitchHoldPose(e); if(e->active){e->tickFinished=World.pauseRelativeTime + 1.5 + (double)random_range(0.0f,1.0f);} }
 void ButtonSwitchUseTargets(u16 self) { Entity* e=&World.instances[self]; UseTargets(self,e->targetIdx); e->active=!e->active; ButtonSwitchAnimate(e); if(e->index == 689 || e->index == 690 || e->index == 695) { TextureChangerToggle(self); if(e->index == 689 && e->active){e->tickFinished=World.pauseRelativeTime + 1.5f;} } }
 void MFD_OpenData(bool,u8);
@@ -367,29 +321,8 @@ void CyborgConversionToggleTargetted() {bool active=(World.ressurectionActiveLev
 bool PlayerInElevatorCell(void); bool FindElevatorKeypadPos(u8 level,V3* outPos);
 extern u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL];
 extern u8 elevatorDestCounts[MAX_LEVELS];
-bool GetElevatorDestinationPos(u8 lev,u8 nth,V3* outPos) {
-    if (lev>=MAX_LEVELS || nth>=elevatorDestCounts[lev]) return false;
-    u16 idx=elevatorDestinations[lev][nth]; if (idx<INSTS_1ST_IDX || idx>=World.levelInstCount[lev]) return false;
-    if (World.levelInstances[lev][idx].index!=706) return false;
-    *outPos=World.levelPosition[lev][idx]; return true;
-}
-
-bool ElevatorDefaultDestinationPos(u8 level, V3* outPos) { 
-    V3 panel;
-    if (FindElevatorKeypadPos(level, &panel)) {
-        V3 best; float bestSq = 0.0f; bool found = false;
-        for (u8 n = 0; n < MAX_LEVELS; ++n) { 
-            V3 p; if (!GetElevatorDestinationPos(level, n, &p)) { break; }
-            
-            V3 d = V3_AsubB(p, panel); 
-            float sq = V3_dot(d, d); 
-            if (!found || sq < bestSq) { best = p; bestSq = sq;found = true; } 
-        }
-        if (found) { *outPos = best; return true; }
-    }
-    return GetElevatorDestinationPos(level, 0, outPos);
-}
-
+bool GetElevatorDestinationPos(u8 lev,u8 nth,V3* outPos) { if (lev>=MAX_LEVELS || nth>=elevatorDestCounts[lev]) return false; u16 idx=elevatorDestinations[lev][nth]; if (idx<INSTS_1ST_IDX || idx>=World.levelInstCount[lev]) return false; if (World.levelInstances[lev][idx].index!=706) return false; *outPos=World.levelPosition[lev][idx]; return true; }
+bool ElevatorDefaultDestinationPos(u8 lev, V3* outPos) { V3 panel; if (FindElevatorKeypadPos(lev,&panel)) { V3 best; float bd = 0.0f; bool found = false; for (u8 n=0;n<MAX_LEVELS;++n) { V3 p; if (!GetElevatorDestinationPos(lev,n,&p)) { break; } V3 d = V3_AsubB(p,panel); float sq = V3_dot(d,d); if (!found || sq < bd) { best = p; bd = sq;found = true; } } if (found) { *outPos = best; return true; } } return GetElevatorDestinationPos(lev,0,outPos); }
 void EmailTargetted(u16 self) { Entity* e=&World.instances[self]; u16 idx=e->emailIndex; if(idx>=LOGCNT){return;} if(World.invP1.hasLog[idx]){return;} World.invP1.hasLog[idx]=World.invP1.hasNewEmail=true; World.invP1.lastAddedIndex=idx; if(Sys_Text.audioLogType[idx] == AudioLogType_Email){World.invP1.beepDone=true;/*TODO actually play beep sound 3 times when new unread email received*/} if (e->autoPlayEmail) { PlayLog(idx); World.invP1.lastAddedIndex = -1; } }
 u8 OverloadButtonVisualState() { if (World.invP1.curWepHeat[World.invP1.wepCur] > 25.0f) {return 2;} if (World.invP1.overloadEnabled) {return 1;} return 0; }
 void OverloadButtonAction() {
@@ -746,7 +679,7 @@ float TakeDamage(u16 self,DamageData dd) {
     }
     if (isCyber) { World.instances[self].cyberHealth -= take; if (isPlayer) { World.damageReceived += take; if (World.instances[self].cyberHealth <= 0.0f) { ExitCyberspace(); return 0.0f; } } if (dd.owner == PLAYER1){World.damageDealt += take;} }
     else { if(selfIdx == 477/*Camera constIndex 477 gets one-shot by tranq*/ && dd.attackType == Att_Trnq){take=World.instances[self].health + 1.0f;} take=ApplyAttTypeAdjustments(self,take,dd.attackType); if(!isPlayer)DualLog("TakeDamage inst %u ci %u hp %.3f->%.3f take %.3f att %d owner %u\n",(u32)self,(u32)selfIdx,World.instances[self].health,World.instances[self].health-take,take,(int)dd.attackType,(u32)dd.owner); World.instances[self].health-=take; if (isPlayer) { World.damageReceived+=take; World.invP1.justFired = World.pauseRelativeTime; } if (dd.owner == PLAYER1){World.damageDealt+=take;} }
-    if (isNPC && !(World.instances[self].entflags & (EF_DYING|EF_DEAD))/*corpse hits skip pain/activator/TargetID: AIDead restores NPC_CORPSE_HEALTH on searchCollider types, so health alone reads corpses as alive — death flags, not health, are the alive-test (same rule as TargetIDFrob)*/ && (World.instances[self].health > 0.0f || (isCyber && World.instances[self].cyberHealth > 0.0f))) { if (npcTable[selfIdx - 419].timeBetweenPain > 0.0f) flag_set(&World.instances[self].entflags,EF_GO_INTO_PAIN,true); World.instances[self].recentMostActivator = dd.owner; TargetIDSendDamageReceive(self,take,dd.attackType); AICheckPain(self); }
+    if (isNPC && !(World.instances[self].entflags & (EF_DYING|EF_DEAD)) && (World.instances[self].health > 0.0f || (isCyber && World.instances[self].cyberHealth > 0.0f))) { if (npcTable[selfIdx - 419].timeBetweenPain > 0.0f) flag_set(&World.instances[self].entflags,EF_GO_INTO_PAIN,true); World.instances[self].recentMostActivator = dd.owner; TargetIDSendDamageReceive(self,take,dd.attackType); AICheckPain(self); }
     if (!isCyber && (World.instances[self].entflags & EF_DEAD_CHECKS_DONE) && (World.layer[self] & L_Corpse)
         && (dd.attackType == Att_Beam || dd.attackType == Att_PjBm)) { VaporizeCorpse(self,true); return take; }
     if (isCyber) { if (World.instances[self].cyberHealth <= 0.0f) { if (!World.instances[self].iceActive && isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.cyberkills++;} Death(self,false); } } else { if (World.instances[self].health <= 0.0f) { if (isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.kills++;} Death(self,dd.attackType == Att_Beam || dd.attackType == Att_PjBm); } }    return take;
@@ -1084,42 +1017,35 @@ static void RelayPanelMsg(u16 msg) { if (msg>0 && msg<T_LOGSTR_CNT) CenterStatus
 static void RelayPanelSfx(i16 sfx, V3 pos) { if (sfx>0 && sfx<SOUNDS_COUNT) play_wav(sounds[sfx],AppliedFXVol(1.0f),pos,true); }
 static void RelayPanelUse(u16 self) {
     Entity* e=&World.instances[self]; if(!PanelUseAllowed(self))return;
+    
     const RelayPanelScript* sc = RelayPanelScriptFor(e);
-    /*UseData.mainIndex equivalent: the useable item index of whatever is in hand (-1 == empty hand).*/
     i16 held = (World.invP1.holdingObject && World.invP1.heldObjectIndex>=INSTS_1ST_IDX) ? (i16)(World.invP1.heldObjectIndex-307) : -1;
     if (!e->panelOpen) { e->panelOpen=true; ChangeAnim(e,A_OPENING); RelayPanelSfx(sc?sc->sfxOpen:91,World.position[self]); RelayPanelMsg(sc?sc->msgOpen:0); return; }
-    if (e->panelInstalled && held<0) { RelayPanelMsg(sc?sc->msgAlready:0); return; }/*already installed, empty hand*/
+    if (e->panelInstalled && held<0) { RelayPanelMsg(sc?sc->msgAlready:0); return; }
+    
     if (sc && held==(i16)sc->item) {
-        if (e->panelInstalled) { RelayPanelSfx(sc->sfxAlready,World.position[self]); return; }/*wrong hand is not the issue: right item, already in*/
+        if (e->panelInstalled) { RelayPanelSfx(sc->sfxAlready,World.position[self]); return; }
+        
         e->panelInstalled=true;
-        if (sc->kind==PanelInstallFrame) ChangeAnim(e,A_INSTALLED);                                  /*item baked into the model frame*/
-        else if (sc->kind==PanelInstallAnim) ChangeAnim(e,A_INSTALL);                                /*isotope: interim clip, then A_INSTALLED*/
-        else if (sc->itemConst) { u16 it=AddInstance(sc->itemConst,e->panelItemPos); if (it) World.rotation[it]=e->panelItemRot; }/*real item entity on the panel*/
+        if (sc->kind==PanelInstallFrame) ChangeAnim(e,A_INSTALLED);
+        else if (sc->kind==PanelInstallAnim) ChangeAnim(e,A_INSTALL);
+        else if (sc->itemConst) { u16 it=AddInstance(sc->itemConst,e->panelItemPos); if (it) World.rotation[it]=e->panelItemRot; }
         RelayPanelSfx(sc->sfxInst?sc->sfxInst:42,World.position[self]); RelayPanelMsg(sc->msgInst);
-        ResetHeldItem();/*the item goes into the panel, so it leaves the hand for good*/
+        ResetHeldItem();
         if (sc->target && *sc->target) UseTargets(self,IOInternName(sc->target));
-        if (sc->blowUp) { e->panelArmed=true; e->panelTimer = World.pauseRelativeTime + (e->delay>0.0f?(double)e->delay:15.0); }/*prefab DelayedSpawn: ExplosionTimer arms 15s after the installationItem goes active*/
+        if (sc->blowUp) { e->panelArmed=true; e->panelTimer = World.pauseRelativeTime + (e->delay>0.0f?(double)e->delay:15.0); }
         return;
     }
     play_wav(sounds[43]/*button_deny, aaaahhh!! Try again*/,AppliedFXVol(1.0f),World.position[self],true); RelayPanelMsg(sc?sc->msgWrong:0);
 }
 
-static void PuzzlePanelUpdate(u16 self) {
-    Entity* e=&World.instances[self];
-    if (e->clip==A_IDLE_CLOSED && e->panelOpen) ChangeAnim(e,A_IDLE_OPEN);
-    if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=mdlAnimClips[e->animationNum][A_OPENING]; if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
-}
-
+static void PuzzlePanelUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->clip==A_IDLE_CLOSED && e->panelOpen) ChangeAnim(e,A_IDLE_OPEN); if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=mdlAnimClips[e->animationNum][A_OPENING]; if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); } }
 static void RelayPanelUpdate(u16 self) {
     Entity* e=&World.instances[self];
     if (e->clip==A_IDLE_CLOSED) { if (e->panelInstalled) ChangeAnim(e,A_INSTALLED); else if (e->panelOpen) ChangeAnim(e,A_IDLE_OPEN); }
     if (e->panelOpen && e->clip==A_OPENING) { AnimationClip c=mdlAnimClips[e->animationNum][A_OPENING]; if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_IDLE_OPEN); }
-    if (e->panelOpen && e->clip==A_INSTALL) { AnimationClip c=mdlAnimClips[e->animationNum][A_INSTALL]; if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_INSTALLED); }/*isotope: insertion clip hands over to the installed frame*/
-    if (e->panelArmed && World.pauseRelativeTime>=e->panelTimer) {
-        e->panelArmed=false; V3 p=World.position[self];
-        play_wav(sounds[64]/*explosion1*/,AppliedFXVol(1.0f),p,true); SpawnExplosionEffect(p,1); Shake(-1.0f); World.fogFac += 5.0f;
-        const RelayPanelScript* sc=RelayPanelScriptFor(e); if (sc && sc->wreckTex) e->texIndex=sc->wreckTex;
-    }
+    if (e->panelOpen && e->clip==A_INSTALL) { AnimationClip c=mdlAnimClips[e->animationNum][A_INSTALL]; if (c.frameEnd<=c.frameStart || e->frame>=c.frameEnd) ChangeAnim(e,A_INSTALLED); }
+    if (e->panelArmed && World.pauseRelativeTime>=e->panelTimer) { e->panelArmed=false; V3 p=World.position[self]; play_wav(sounds[64]/*explosion1*/,AppliedFXVol(1.0f),p,true); SpawnExplosionEffect(p,1); Shake(-1.0f); World.fogFac += 5.0f; const RelayPanelScript* sc=RelayPanelScriptFor(e); if (sc && sc->wreckTex) e->texIndex=sc->wreckTex; }
 }
 
 static bool HeldItemIsFrobUser(i16 item) { return item==54||item==56||item==57||item==61||item==64||item==92||item==93||item==94; }
@@ -1130,36 +1056,35 @@ bool FrobHeldItemIntoPanel(V3 p, V3 f, V3 r) {
     if (!h.hit || h.hitInstanceIndex>=World.instCount) return false;
     u16 idx=h.hitInstanceIndex; u16 pidx=World.instances[idx].index;
     if (item==54 && (IsPuzzleGridPanel(pidx) || IsPuzzleWirePanel(pidx))) {
-        /*Logic probe (useable 54) on a puzzle panel: Unity auto-solves on puzzle open (PuzzleGrid.cs:101, PuzzleWire.cs:340).
-          Previously this fell through to DropHeldItem: the probe dropped and the puzzle never solved. Isotope path untouched.*/
         Entity* e=&World.instances[idx];
         bool gated=(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f))||(e->entflags&EF_LOCKED);
-        PuzzlePanelUse(idx);/*opens UI; prints the blocked message when gated*/
-        if (gated) return true;/*keep probe, no solve*/
+        PuzzlePanelUse(idx);
+        if (gated) return true;
+        
         if (IsPuzzleGridPanel(pidx)) {
             SystemUI* s=&World.Sys_UI;
-            if (s->pg_solved) { if (s->pg_fired) CenterStatusPrint("%s",Sys_Text.stringTable[312]); return true; }/*already solved: no re-fire, probe kept (Unity PuzzleSolved early return)*/
+            if (s->pg_solved) { if (s->pg_fired) CenterStatusPrint("%s",Sys_Text.stringTable[312]); return true; }
             for (int k=0;k<35;++k) if (s->pg_type[k]==PuzzleCellType_Standard) s->pg_cell[k]=true;
             PGEvalPuzzle();
-            s->pg_solved=true;/*Unity solves by fiat on probe use, not by evaluation*/
+            s->pg_solved=true;
             for (int k=0;k<35;++k) if (s->pg_type[k]==PuzzleCellType_Standard) s->pg_powered[k]=true;
             for (int k=0;k<35;++k) Entity_SetGridCell(e,k,s->pg_cell[k]);
             e->puzzleSolved=true; s->pg_fired=true; e->puzzleFired=true;
-            play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false);/*code accepted / puzzle solved sound*/
+            play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false);
             UseTargets(idx,e->targetIdx);
             if (e->messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageLingdex]);
         } else {
-            if (e->puzzleSolved) return true;/*already probe-solved: no re-fire, probe kept (wire has no own solved flag; puzzleSolved is the marker)*/
-            World.Sys_UI.pw_solved=true; e->puzzleSolved=true;/*wires are not repositioned on probe solve, same as Unity*/
+            if (e->puzzleSolved) return true;
+            World.Sys_UI.pw_solved=true; e->puzzleSolved=true;
             play_wav(sounds[46],AppliedFXVol(1.0f),(V3){0},false);
             UseTargets(idx,e->targetIdx);
             if (e->messageLingdex) CenterStatusPrint("%s",Sys_Text.stringTable[e->messageLingdex]);
         }
-        ResetHeldItem();/*probe consumed only on a successful solve*/
+        ResetHeldItem();
         return true;
     }
     if (World.instances[idx].index!=614 && World.instances[idx].index!=602) return false;
-    RelayPanelUse(idx); return true;/*the panel decides: it either installs the item (consuming it) or refuses it*/
+    RelayPanelUse(idx); return true;
 }
 
 typedef struct { i8 label; bool darkened; } ElevBtnDef;

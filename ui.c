@@ -30,9 +30,8 @@ void BiomonitorBlitToUI();
                       UI_ID_##P##_SEARCH_ICON_3 = UI_ID_##P##_SEARCH_ICON_0 + 3, \
                       UI_ID_##P##_SEARCH_EMPTY,         UI_ID_##P##_SEARCH_CLOSE,         UI_ID_##P##_AUTOMAP_ZOOM_IN,   UI_ID_##P##_AUTOMAP_ZOOM_OUT,  UI_ID_##P##_AUTOMAP_FULL,          \
                       UI_ID_##P##_AUTOMAP_SIDE
-
 void LoadTextForLanguage(u8 lang); void LoadLogTextForLanguage(u8 lang);
-typedef enum{UI_ID_NONE,
+enum{UI_ID_NONE,
     /*Menu*/ UI_ID_MENU_SINGLEPLAYER, UI_ID_MENU_MULTIPLAYER, UI_ID_MENU_OPTIONS, UI_ID_MENU_QUIT,
              UI_ID_MENU_CONTINUE, UI_ID_MENU_NEW_GAME, UI_ID_MENU_PLAY_INTRO, UI_ID_MENU_PLAY_CREDITS,
              UI_ID_MENU_BACK,
@@ -55,9 +54,7 @@ typedef enum{UI_ID_NONE,
     /*Left/Right MFD*/ UI_MFD_IDS(LMFD), UI_ID_SIDEMFD_PAD, UI_MFD_IDS(RMFD),
     /*In-Game Editor*/ UI_ID_CMFD_EDIT_PANEL, UI_ID_CMFD_EDIT_ROW_0, UI_ID_CMFD_EDIT_ROW_14 = UI_ID_CMFD_EDIT_ROW_0 + 14,
     UI_ID_CMFD_EDIT_LIGHT_TYPE, UI_ID_CMFD_EDIT_LIGHT_DIR_N, UI_ID_CMFD_EDIT_LIGHT_DIR_E, UI_ID_CMFD_EDIT_LIGHT_DIR_S, UI_ID_CMFD_EDIT_LIGHT_DIR_W, UI_ID_CMFD_EDIT_LIGHT_DIR_UP, UI_ID_CMFD_EDIT_LIGHT_DIR_DN,
-    UI_ID_COUNT,
-} UIRegionID;
-
+    UI_ID_COUNT};
 #define UI_MFD_STRIDE (UI_ID_RMFD_TAB_WEAPON-UI_ID_LMFD_TAB_WEAPON)
 #define MID(rh, n) ((u32)UI_ID_LMFD_##n + ((rh) ? (u32)UI_MFD_STRIDE : 0u))/*Mirror an LMFD id onto whichever side we are drawing*/
 #define UIC(i) World.uiComponents[i]
@@ -90,8 +87,8 @@ static u8 UIClicked(u32 id) {
     Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].pressed=Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].pressed=false; World.Sys_UI.mouseClickHeldOverGUI=World.uiIsBlocking=true;
     double* t=l?&World.uiComponents[id].lastLMB:&World.uiComponents[id].lastRMB; u8 dbl=(*t>0.0 && (World.pauseRelativeTime-*t)<=0.5f)?4u:0u; *t=dbl?0.0:World.pauseRelativeTime; return (u8)((l?1u:2u)|dbl);
 }
-                         /*mk3,bls,drt,flch, ion,rpir,pipe,magn,magp,pstl,plsm,rail,riot,skrp,sprq,stun*/
-u16 wepIconTexIndices[16]={584,636,819,1067,1068,1494,1072,1069,1070,1071,1073,1165,1989,1990,1991,1992}; const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"}; extern float reloadTime[16];
+
+extern float reloadTime[16];
 static i8 rebindRow = -1; static u32 rebindArmedFrame = 0;/*Input tab keybinding capture: -1 = none, else configTable index currently capturing a key*/
 /*Save/Load slot rows. saveSlotNames[] is refreshed from each save file's header whenever the Load or Save page opens.*/
 static char saveSlotNames[8][48]; static bool saveSlotUsed[8]; static i8 saveSlotEditing = -1;/*slot currently being name-typed, -1 = none*/
@@ -223,7 +220,6 @@ static const float introTextAt[15] = {0.0f,6.7f,9.9f,19.2f,30.7f,37.9f,43.7f,48.
 static const float outroTextAt[3] = {0.0f,7.0f,11.0f};/*CreditsScroll swaps to card 2 at 7s, card 3 at 11s, then hides all cards at 14s*/
 void ChangeMenuPage(u8 pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; resDropdownOpen = false; resHoverIdx = -1; if (pg==MPG_SAVE||pg==MPG_LOAD) { SaveSlotCancelTyping(); RefreshSaveSlots(); } if (pg==MPG_INTRO) { introVidStart=World.absoluteTime; PlayVideoPageMusic(true); } if (pg==MPG_CREDS) { creditsVidStart=World.absoluteTime; PlayVideoPageMusic(false); } }
 void GameEndSequence() { World.gameFinished = true; World.paused = true; World.menuActive = true; ChangeMenuPage(MPG_CREDS); }
-static char vidTxtBuf[T_LOGSTR_MAX];
 static void RenderVideoPage(u8 page) {
     bool isIntro = (page==MPG_INTRO);
     double start = isIntro ? introVidStart : creditsVidStart;
@@ -764,20 +760,23 @@ void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if 
     if (idx==SW_SHIELD) { CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 461 : 460]); return; }
     if (idx==SW_GAMES)  { if (World.invP1.hasMinigame) { if (!cyber) { World.Sys_UI.mg_current=-1; MFD_OpenData(World.Sys_UI.lastMinigameSideRH,9);/*games are a data-tab view, so they open on the last-used games side (left by default)*/ } CenterStatusPrint("%s",Sys_Text.stringTable[cyber ? 443 : 309]); play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0},false); } return; }
     if (!cyber) { CenterStatusPrint("%s",Sys_Text.stringTable[460]); return; }
-    UseCyberspaceItemByIndex(idx - SW_TURBO); }
+    UseCyberspaceItemByIndex(idx - SW_TURBO);
+}
+
 void UI_WeaponIconClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastWeaponSideRH=rh; if (CurrentWeaponUsesEnergy()) OverloadButtonAction(); else ActualChangeAmmoType(); }
-void UI_AutomapClick(bool rh,int action) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastAutomapSideRH=rh; u8 side=rh?1:0; u8* z=&World.automapZoom;/*single shared zoom: both MFDs blit the same automap texture, so either side's buttons drive it*/
-    if (World.invP1.hwVers[HW_NAV_IDX]<2 && action!=UI_AUTOMAP_FULL && action!=UI_AUTOMAP_SIDE) { CenterStatusPrint("%s",Sys_Text.stringTable[465]); return; }/*Map hardware version doesn't support zoom.*/
+void UI_AutomapClick(bool rh,int action) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastAutomapSideRH=rh; u8 side=rh?1:0; u8* z=&World.automapZoom;
+    if (World.invP1.hwVers[HW_NAV_IDX]<2 && action!=UI_AUTOMAP_FULL && action!=UI_AUTOMAP_SIDE) { CenterStatusPrint("%s",Sys_Text.stringTable[465]); return; }
+    
     if (action==UI_AUTOMAP_ZOOM_IN) { if (*z==0) { CenterStatusPrint("%s",Sys_Text.stringTable[317]); return; } (*z)--; }
     else if (action==UI_AUTOMAP_ZOOM_OUT) { if (*z==2) { CenterStatusPrint("%s",Sys_Text.stringTable[316]); return; } (*z)++; }
     else if (action==UI_AUTOMAP_FULL) { bool open=!(World.Sys_UI.fullMapOpen[0] || World.Sys_UI.fullMapOpen[1]); World.Sys_UI.fullMapOpen[0]=World.Sys_UI.fullMapOpen[1]=open; }
     else if (action==UI_AUTOMAP_SIDE) { World.Sys_UI.autoSide[side]=!World.Sys_UI.autoSide[side]; }
-    else return; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); }
+    else return; play_wav(sounds[97],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
+}
 
 void CloseFullmap() { World.Sys_UI.fullMapOpen[0]=World.Sys_UI.fullMapOpen[1]=false; }
-
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
-static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988}; double avgCPUt[AVG_CPU_TAPS]={0}; int avgCPUt_idx = 0;
+static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988}; static double avgCPUt[AVG_CPU_TAPS]={0}; static int avgCPUt_idx = 0;
 void AppendTextWarning(i32 sidx, i32 sidx2, i32 sidx3, i32 col, i32 id) { World.Sys_UI.tWrnTextIdx[id]=sidx; World.Sys_UI.tWrnTextIdx2[id]=sidx2; World.Sys_UI.tWrnTextIdx3[id]=sidx3; World.Sys_UI.tWrnFinished[id]=World.Sys_UI.tWrnFinished[id] < World.pauseRelativeTime ? World.pauseRelativeTime + 0.1f : World.Sys_UI.tWrnFinished[id] + 0.1f; World.Sys_UI.tWrnColorIdx[id] = col; }
 extern double game_actual_start_time; extern u16 editModeTestEntityDefinition;
 /*Edit-mode info panel text editing (console-style entry)*/
@@ -1066,6 +1065,8 @@ void SideMFD(bool isRH) { // 320x240
         DrawSensaroundQuad(sx,sy,SIDE_MFD_W,MFD_H,isRH ? sensaroundCamViewRight : sensaroundCamViewLeft);
     } else {
         if (tab == 1) {/*WeaponTab: WepNameText, WepIcon, ClipBox, EnergyHeatTicks, ReloadButtons, EnergySlider*/
+                                                  /*mk3,bls,drt,flch, ion,rpir,pipe,magn,magp,pstl,plsm,rail,riot,skrp,sprq,stun*/
+            static const u16 wepIconTexIndices[16]={584,636,819,1067,1068,1494,1072,1069,1070,1071,1073,1165,1989,1990,1991,1992};
             i16 slot=World.invP1.wepCur; if (slot>=0 && slot<7) { i32 widx=World.invP1.wepInvIndices[slot]; if (widx >= 0) {UIRText(MID(isRH,WEAPON_NAME),isRH ? UI_W-TAB_THICK-MFD_SPACING-SIDE_MFD_W+TXT_PAD : TAB_THICK+MFD_SPACING+TXT_PAD,520,T_RED,FONT_NORMAL,0.8f,270,Sys_Text.stringTable[ItemStringIdx((i32)widx)]);/*Weapon Name*/ if (wep16 >=0 && wep16 < 16)UIRImg(MID(isRH,WEAPON_ICON),isRH ? 1207 : 24,548,270,100,wepIconTexIndices[wep16]);/*WepIcon*/
             if (CurrentWeaponUsesEnergy()) {
                 i16 tx0=(i16)(isRH ? 1207 : 24);
@@ -1094,7 +1095,7 @@ void SideMFD(bool isRH) { // 320x240
         } else if (tab == 3 && World.curLev < LEVEL_CYBERSPACE && !Cheats.noHUD) {
             u8 aside=isRH?1:0;
             if (World.Sys_UI.autoSide[aside]) { i16 x = (i16)(24 + (isRH ? (1022 - 24) : 0) + (320 - 71)/2), y = (i16)(524 + (200 - 71) / 2); RenderUIImage(x,y,71,71,(u16)(2153 + World.curLev));/*Side Map*/ }
-            else { if (amReady) { glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); for (int side=0;side<2;++side) if ((World.Sys_UI.mfdTab[1 + !!side])==3) { int x = side ? 1022 : 24; glBlitFramebuffer(0,AM_H,AM_W,0,x,UI_H - 524 - 200,x + 320,UI_H - 524,GL_COLOR_BUFFER_BIT,GL_LINEAR); } glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); }/*Top Map*/ }
+            else { glBindFramebuffer(GL_READ_FRAMEBUFFER,amFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); for (int side=0;side<2;++side) if ((World.Sys_UI.mfdTab[1 + !!side])==3) { int x = side ? 1022 : 24; glBlitFramebuffer(0,AM_H,AM_W,0,x,UI_H - 524 - 200,x + 320,UI_H - 524,GL_COLOR_BUFFER_BIT,GL_LINEAR); } glBindFramebuffer(GL_READ_FRAMEBUFFER,uiFBO); glBindFramebuffer(GL_DRAW_FRAMEBUFFER,uiFBO); /*Top Map*/ }
             i16 cx = (i16)(24 + (isRH ? (1022 - 24) : 0) + 320 / 2), fy = 691;
             UIRImg(MID(isRH,AUTOMAP_ZOOM_OUT),cx - 40,fy,20,14,1087);  RenderTextL(cx -  40,fy,UIOver(MID(isRH,AUTOMAP_ZOOM_OUT)) ? T_YELLOW : T_GREEN,FONT_NORMAL,0.8,"-");
             UIRImg(MID(isRH, AUTOMAP_ZOOM_IN),cx - 65,fy,20,14,1087);  RenderTextL(cx -  65,fy, UIOver(MID(isRH,AUTOMAP_ZOOM_IN)) ? T_YELLOW : T_GREEN,FONT_NORMAL,0.8,"+");
@@ -1106,6 +1107,7 @@ void SideMFD(bool isRH) { // 320x240
             if (data==8) {/*Blocked by SHODAN level security*/ UIRImg(UI_ID_NONE,31+dx,535,227,209,1110); UIRText(MID(isRH,BLOCKED_SECURITY_TEXT),45+dx,542,T_YELLOW,FONT_NORMAL,0.8f,0,890<1100?Sys_Text.stringTable[890]:"Blocked by SHODAN level Security."); }
             if (data==1) {/*Elevator*/
                 UIRImg(MID(isRH,ELEV_FLOOR_INDICATOR),132+dx,531,32,32,929);/*CurrentFloorIndicator*/
+                static const char* elevFloorLabels[14] = {"R","1","2","3","4","5","6","7","8","9","G1","G2","G4","C"};
                 for (u8 b=0;b<2;++b) { i16 ex=(i16)(86+78*b+dx); for (u8 i=0;i<4;++i) { u8 f=(u8)(b*4+i); i8 li=World.Sys_UI.elevButtonLabelIdx[f]; if (li<0) continue;/*hidden: not drawn, not clickable*/ i16 ey=elevBtnY[i]; UIRImg(MID(isRH,ELEV_BUTTON_0)+f,ex,ey,45,39,(i==0||i==3)?2133:2135);/*keypad_end / keypad_mid*/ RenderUIImage((i16)(ex+2),(i16)(ey+4),40,34,2134);/*keypad_inner_on*/ RenderTextC((i16)(ex+22),(i16)(ey+15),World.Sys_UI.buttonsDarkened[f]?T_DARK_YELLOW:T_GREEN,FONT_NORMAL,0.8,"%s",elevFloorLabels[li]); } }
                 UIRImg(MID(isRH,ELEV_CLOSE),closeButtonX+dx,closeButtonY,29,29,899); RenderTextL(closeButtonTextX+dx,closeButtonTextY,T_STOPD_RED,FONT_NORMAL,0.8,"X");
             }
@@ -1201,7 +1203,6 @@ void SideMFD(bool isRH) { // 320x240
 }
 
 static const i16 mediaColX[2]={458,681},mediaRowY[8]={570,591,612,633,654,675,696,717};
-static const char* logLevelName[10]={"R","1","2","3","4","5","6","7","8","9"};
 static const char* noteText[12]={"Escape neurosurgery suite.  Keycode is 451.","Disengage laser safety override.","Activate the station energy shield.","Destroy the mining laser.","Enable master jettison.","Diagnose and repair broken relay: 428.","Jettison Beta Grove.","Destroy the four relay antennae.","Engage reactor self-destruct.","Escape on escape pod.","Access the bridge.","Destroy SHODAN."};
 static const char* swLabels[7]={"ICE DRILL","PULSER/DRILL","SHIELD","TURBO","DECOY","RECALL","GAMES"};
 void CenterMFD() { //640x240

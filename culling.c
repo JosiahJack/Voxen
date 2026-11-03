@@ -1,6 +1,7 @@
 // culling.c - XZ 2D World Grid Cell Culling System 64x64 matching System Shock 1.
 #include "common.h"
-u32 gridCellStates[ARRSIZE],precomputedVisibleCellsFromHere[524288];/*4096 * 4096 / 32*/ u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; Portal activePortals[MAX_PORTALS]; static u32 numActivePortals = 0; bool cullVisibilityValid;
+typedef struct { u16 x,z; } PortalCell; typedef struct { PortalCell cellA,cellB; bool portalNS,open,dirty; u8 lev;} Portal;
+u32 gridCellStates[ARRSIZE]; static u32 precomputedVisibleCellsFromHere[524288];/*4096 * 4096 / 32*/ u16 playerCellIdx = 0u; bool instanceIsLODArray[INSTANCE_COUNT]; static Portal activePortals[MAX_PORTALS]; static u32 numActivePortals = 0; bool cullVisibilityValid;
 void ResetDoorPortals(void) { numActivePortals = 0; cullVisibilityValid=false; }
 bool get_cull_bit(const u32* arr, int idx) { return (arr[idx >> 5] >> (idx & 31)) & 1; }
 INLINE void set_cull_bit(u32* arr, int idx, bool val) {u32* w = arr + (idx >> 5); u32 m = 1U << (idx & 31); *w = val ? (*w | m) : (*w & ~m);}

@@ -1,13 +1,13 @@
 // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
 #include "common.h"
-u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; u16 triggerVolumes[128]; u16 numTriggers; extern double game_actual_start_time; static bool ladderWalkOff = false; static float ladderTopY = 0.0f; static double ladderSFXFinished = 0.0; void DrawBoxColliderColored(u16 i, Color col); void DrawCapsuleCollider(u16 i);
+u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; static u16 triggerVolumes[128]; static u16 numTriggers; extern double game_actual_start_time; static bool ladderWalkOff = false; static float ladderTopY = 0.0f; static double ladderSFXFinished = 0.0; void DrawBoxColliderColored(u16 i, Color col); void DrawCapsuleCollider(u16 i);
 static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
 static const float WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,PLAYER_PRONE_RATIO=0.32f,WALK_SPEED_ACCEL=3.0f,BOOST_ACCEL=1.0f,SKATE_SLIDE=5.0f,SKATE_SPEED=1.1f;
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4];/*Only A is needed to reconstruct contact points.*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt;
 typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
-SolverContact gContacts[MAX_GLOBAL_CONTACTS]; u32 gContactCount; float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projectileImpactQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projectileImpactTarget[INSTANCE_COUNT]; static V3 projectileImpactPoint[INSTANCE_COUNT],projectileImpactNormal[INSTANCE_COUNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
+static SolverContact gContacts[MAX_GLOBAL_CONTACTS]; static u32 gContactCount; static float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ static u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projectileImpactQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projectileImpactTarget[INSTANCE_COUNT]; static V3 projectileImpactPoint[INSTANCE_COUNT],projectileImpactNormal[INSTANCE_COUNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
 typedef struct { u16 a,b; u8 n; V3 pt[MANIFOLD_MAX],normal; float accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],pen[MANIFOLD_MAX],dt; u8 votes; V3 challN,posA,posB; } WarmPair;
 #define WARM_PAIR_COUNT 2048 /*power of two for the hash mask*/
 static WarmPair gWarmPairs[WARM_PAIR_COUNT]; static u8 gWarmPairLevel=255;/*0xFF forces a clear on the very first Physics()*/
@@ -704,14 +704,14 @@ static bool AreaBlockedAt(ShapeCapsule probe, u32 mask, u16 self) {
     return false;
 }
 
-static bool AreaSweepDir(ShapeCapsule probe, ShapeCapsule travel, int steps, float sign, u32 mask, u16 self) { for (int s=0; s<=steps; ++s) { float d = sign * (float)s * AREA_SWEEP_STEP; if (s) { ShapeCapsule t=travel; t.tip.y+=d; t.base.y+=d; if (AreaBlockedAt(t,mask,self)) {return false;} } ShapeCapsule p=probe; p.tip.y+=d; p.base.y+=d; if (!AreaBlockedAt(p,mask,self)) {return true;} } return false; }
-bool AreaHasClearance(ShapeCapsule probe, ShapeCapsule travel, float span, u32 mask, u16 self) { int steps=(int)(span/AREA_SWEEP_STEP+0.5f); return AreaSweepDir(probe,travel,steps,+1.0f,mask,self) || AreaSweepDir(probe,travel,steps,-1.0f,mask,self); }
+static bool AreaSweepDir(ShapeCapsule probe, ShapeCapsule travel, int steps, float sign, u32 mask, u16 self) { for (int s=0; s<=steps; ++s) { float d = sign * (float)s * 0.08f; if (s) { ShapeCapsule t=travel; t.tip.y+=d; t.base.y+=d; if (AreaBlockedAt(t,mask,self)) {return false;} } ShapeCapsule p=probe; p.tip.y+=d; p.base.y+=d; if (!AreaBlockedAt(p,mask,self)) {return true;} } return false; }
+bool AreaHasClearance(ShapeCapsule probe, ShapeCapsule travel, float span, u32 mask, u16 self) { int steps=(int)(span/0.08f+0.5f); return AreaSweepDir(probe,travel,steps,+1.0f,mask,self) || AreaSweepDir(probe,travel,steps,-1.0f,mask,self); }
 bool CantStand(u16 playerIdx, float targetHeight) {
     if(playerIdx>=World.instCount||targetHeight<=World.colliderSize[playerIdx].y)return false;
     float oldHeight=World.colliderSize[playerIdx].y,oldCenterY=World.colliderCenter[playerIdx].y;
     ShapeCapsule current=Entity_GetCap(playerIdx);/*the shape the player occupies right now, i.e. how far they can slide*/
     World.colliderSize[playerIdx].y=targetHeight; World.colliderCenter[playerIdx].y=oldCenterY+(oldHeight-targetHeight)*0.5f; ShapeCapsule prospective=Entity_GetCap(playerIdx);
-    bool clear=AreaHasClearance(prospective,current,AREA_SWEEP_SPAN,GetCollisionMask(World.layer[playerIdx]),playerIdx);
+    bool clear=AreaHasClearance(prospective,current,2.56f,GetCollisionMask(World.layer[playerIdx]),playerIdx);
     World.colliderSize[playerIdx].y=oldHeight; World.colliderCenter[playerIdx].y=oldCenterY; return !clear;
 }
 

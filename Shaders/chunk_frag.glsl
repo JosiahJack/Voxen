@@ -141,10 +141,10 @@ void main() {
         vec2 sunUV   = sunProj.xy * 0.5 + 0.5;
         float sunZ   = sunProj.z  * 0.5 + 0.5;
         if (all(lessThan(abs(sunProj.xy), vec2(1.0))) && abs(sunProj.z) < 1.0) {
-            float sunSum = 0.0, sunBias = 0.0012 / clamp(dot(adjustedNormal, sunDirection), 0.25, 1.0);
+            const int SUN_DILATE = 1;
+            float sunBias = 0.0012 / clamp(dot(adjustedNormal, sunDirection), 0.25, 1.0);
             vec2 sunTexel = 1.0 / vec2(textureSize(sunShadowMap, 0));
-            for (int sx = -1; sx <= 1; ++sx) { for (int sy = -1; sy <= 1; ++sy) { sunSum += texture(sunShadowMap, vec3(sunUV + vec2(float(sx), float(sy)) * sunTexel, sunZ - sunBias)); } }
-            sunShadow = sunSum * (1.0 / 9.0);
+            for (int sx = -SUN_DILATE; sx <= SUN_DILATE; ++sx) { for (int sy = -SUN_DILATE; sy <= SUN_DILATE; ++sy) { sunShadow = min(sunShadow, texture(sunShadowMap, vec3(sunUV + vec2(float(sx), float(sy)) * sunTexel, sunZ - sunBias))); } }
         }
         lighting += albedoColor.rgb * sunCol * (clamp(dot(adjustedNormal, sunDirection), 0.0, 1.0) * sunShadow);
     }

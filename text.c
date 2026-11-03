@@ -217,10 +217,10 @@ INLINE void _pre(u8 *p, int w, int h, int str, u32 kw, int v) {
     }
 }
 // Font Loading System
-int numPackedGlyphs=0,numPackedGlyphsStopD=0; extern u32 textVAO,textVBO,textSP;
+static int numPackedGlyphs=0,numPackedGlyphsStopD=0; extern u32 textVAO,textVBO,textSP;
 u32 fontAtlasTex,fontAtlasTexStopD;
-font_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
-float fixedNumberAdvanceWidth=0.0f,fixedNumberAdvanceWidthStopD=0.0f;
+static font_packedchar fontPackedChar[MAX_GLYPHS],fontPackedCharStopD[MAX_GLYPHS];
+static float fixedNumberAdvanceWidth=0.0f,fixedNumberAdvanceWidthStopD=0.0f;
 static const char* fallbackFontPaths[]={"./Fonts/FreeSerifBold.ttf","./Fonts/cambriab.ttf","./Fonts/NotoSansCJK-Subset.ttf"}, *fontPaths[]={"./Fonts/SystemShockText.ttf","./Fonts/StopD.ttf"};
 static font_fontinfo fontInfo[5]; static u8 *fontData[5]; static char uiTextBuffer[T_BUFFER_SIZE];
 static u16 cpPackedIndex[2][65536]; // Codepoint -> packed glyph index per atlas; 0 = blank(space)
@@ -281,7 +281,7 @@ static const u16 packCodepoints[]={/*1303 codepoints used by Data/text_*.txt and
     0x9818/*領*/,0x982D/*頭*/,0x983C/*頼*/,0x984C/*題*/,0x9858/*願*/,0x985E/*類*/,0x98DB/*飛*/,0x98DF/*食*/,0x98F2/*飲*/,0x990A/*養*/,0x9928/*館*/,0x9952/*饒*/,0x9996/*首*/,0x99AC/*馬*/,0x99C5/*駅*/,0x9A13/*験*/,0x9AA8/*骨*/,0x9AD8/*高*/,0x9B42/*魂*/,0x9B54/*魔*/,0x9CF4/*鳴*/,0x9E7F/*鹿*/,0x9EBB/*麻*/,0x9ED2/*黒*/,
     0xFF01/*！*/,0xFF05/*％*/,0xFF08/*（*/,0xFF09/*）*/,0xFF1A/*：*/,0xFF1B/*；*/,0xFF1F/*？*/
 };
-i32 numPackCodepoints=sizeof(packCodepoints)/sizeof(packCodepoints[0]);
+static const i32 numPackCodepoints=sizeof(packCodepoints)/sizeof(packCodepoints[0]);
 static i32 CodepointToPackedIndex(i32 cp,int fontID) { return ((u32)cp<65536u) ? cpPackedIndex[fontID][cp] : 0; }
 void LoadFallbackFont(const char*path, int fii, int ci){
     FHandle fd; int fsz; fontData[fii]=OS_OpenAndAllocateFileBufferReadonly(path,&fd,&fsz);

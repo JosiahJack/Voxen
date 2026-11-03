@@ -38,8 +38,8 @@ typedef struct { jsmntype_t type; i64 start,end; i32 size,parent; } jsmntok_t;
 typedef struct { size_t pos; u32 toknext; i32 toksuper; } jsmn_parser;
 typedef struct { u16 j[4]; float w[4]; } VtxSkin;
 typedef struct { float *pos,*nrm,*uv; VtxSkin* skin; u32 vertCount,*indices,triCount; glb_node* jointNodes[MAX_GLB_JOINTS]; float invBind[MAX_GLB_JOINTS][16]; u32 jointCount; glb_animt* anim; glb_data* gltf; bool isTrAnim; glb_anim_chan **chanMap; glb_node **meshNodes; float **subPos,**subNrm,**subUv; u32 *subVertCnt,**subIndices,*subTriCount,submshCnt; } GltfMesh;
-static MeshScratch meshScratch[32]; static BvhBuildCtx thrd_bvh_ctx[32]; BvhNode** modelBVHNodes; float** vPos; u32 modelBVHTriOrderCounts[MAX_MDLS],modelVertexCounts[MAX_MDLS],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; u16 **modelBVHTriOrder,modelBVHNodeCounts[MAX_MDLS],*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES]; size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
-GltfMesh* gBlockMeshes; static u32 gBlockMeshCount = 0;
+static MeshScratch meshScratch[32]; static BvhBuildCtx thrd_bvh_ctx[32]; BvhNode** modelBVHNodes; static float** vPos; u32 modelBVHTriOrderCounts[MAX_MDLS],modelVertexCounts[MAX_MDLS],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; u16 **modelBVHTriOrder,modelBVHNodeCounts[MAX_MDLS],*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES]; size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
+static GltfMesh* gBlockMeshes; static u32 gBlockMeshCount = 0;
 void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm) {
     float tx=T[0],ty=T[1],tz=T[2],qx=R[0],qy=R[1],qz=R[2],qw=R[3],sx=S[0],sy=S[1],sz=S[2];
     lm[0] = (1 - 2*qy*qy - 2*qz*qz) * sx; lm[1]  = (2*qx*qy + 2*qz*qw) * sx; lm[2] = (2*qx*qz - 2*qy*qw) * sx; lm[3] = 0.0f; lm[4]  = (2*qx*qy - 2*qz*qw) * sy; lm[5] = (1 - 2*qx*qx - 2*qz*qz) * sy; lm[6] = (2*qy*qz + 2*qx*qw) * sy; lm[7] = 0.0f; lm[8] = (2*qx*qz + 2*qy*qw) * sz; lm[9] = (2*qy*qz - 2*qx*qw) * sz; lm[10] = (1 - 2*qx*qx - 2*qy*qy)*sz; lm[11] = 0.0f; lm[12] = tx; lm[13] = ty; lm[14] = tz; lm[15] = 1.0f; 

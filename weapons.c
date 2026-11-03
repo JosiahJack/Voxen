@@ -22,7 +22,7 @@ u16 wepSmokePrefab[16]={506,0,0,509,0,0,0,507,0,510,0,511,512,513,0,0}; // 0 = n
 u16 wepModelIndices[16]={646,638,640,642,643,5748,5728,644,645,650,651,652,654,655,656,657}; // [wep16] mk3,blaster,dart,flechette,ion,rapier,pipe,magnum,magpulse,pistol,plasma,rail,riot,skorp,sparq,stun
 u16 wepAnimNums[16]={MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,50,49,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM,MAXANIM}; // [wep16] only rapier(50)/pipe(49)
 typedef enum { WC_STD = 0, WC_MELEE = 1, WC_ENERGY = 2 } WepClass;
-WepClass wepClass[16] = {WC_STD, WC_ENERGY, WC_STD, WC_STD, WC_ENERGY, WC_MELEE, WC_MELEE,WC_STD, WC_STD, WC_STD, WC_ENERGY, WC_STD, WC_STD, WC_STD, WC_ENERGY, WC_ENERGY};
+static WepClass wepClass[16] = {WC_STD, WC_ENERGY, WC_STD, WC_STD, WC_ENERGY, WC_MELEE, WC_MELEE,WC_STD, WC_STD, WC_STD, WC_ENERGY, WC_STD, WC_STD, WC_STD, WC_ENERGY, WC_ENERGY};
 float magpulseShotForce = 2.2f, stungunShotForce = 2.2f, railgunShotForce = 5.0f, plasmaShotForce = 1.5f;
 WeaponFireCtx wfx = { .fireDistance = 200.0f, .overheatedPercent = 80.0f, .reloadContainerHome = {0}, .pendingMeleeFinished = 0.0 };
 INLINE Quaternion QuatEulerZ(float degZ) { float r = deg2rad(degZ) * 0.5f; return (Quaternion){0.0f,0.0f,vsinf(r),vcosf(r)}; }

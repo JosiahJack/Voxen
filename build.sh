@@ -59,7 +59,7 @@ if [ "$BUILD_MODE" = "debug" ] && [ "$PLATFORM" = "windows" ]; then
 fi
 export TEMP_DIR=temp_build
 BINARY_PDB="${BINARY_PDB:-${BINARY_NAME%.exe}.pdb}"
-SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c textures.c models.c biomonitor.c culling.c particles.c"
+SOURCES="voxen.c physics.c entity.c lib.c citadel.c ai.c weapons.c text.c textures.c models.c culling.c particles.c"
 printf '%s\n' $SOURCES | xargs -P12 -I{} sh -c '$CC -c "$1" $CFLAGS -o "temp_build/$1.o"' _ {}
 if [ "$BUILD_MODE" = "debug" ] && [ "$PLATFORM" = "windows" ]; then
     MINGW_LIB="${MINGW_LIB:-/usr/x86_64-w64-mingw32/lib}"

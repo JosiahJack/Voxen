@@ -37,32 +37,18 @@ const NPCTable npcTable[NUM_AI_TYPES] = {
 /* sfx rows: [0] idle chatter, [1] first-sighting, [2] attack1, [3] attack2, [4] attack3, [5] death */
 static const i16 aiSFX[6][NUM_AI_TYPES] = { /*idle   */{-1,-1, -1,-1,58, -1, 59, -1, 59, 52,-1, -1,-1,-1,-1, -1,121, -1, -1, -1,121,118,-1, -1, -1, -1, -1, -1, -1},       /*sight  */{-1, -1,111,150,58,150,59,152,152, -1,150,150,151,152,150, -1,121, -1,151,150,121,119,151, -1, -1, -1, -1, -1, -1}, /*attack1*/{-1,-1,108,-1,-1,146, -1,146,252,247,-1, -1,-1,-1,-1,122, -1,108,146, -1, -1,118,-1,125,258,258,258,258,258},
                                             /*attack2*/{-1,256, -1,148,50, 50,50, 50, 50,250, 50, 50,146,259,148, -1,121, -1, -1,147, -1, -1,146, -1,258,258,258,258,258}, /*attack3*/{-1,-1, -1,-1,-1,244,244,244,245, -1,-1,149,-1,-1,-1, -1, -1, -1, -1,244, -1, -1,-1, -1,258,258,258,258,258},       /*death  */{-1, 48,110,143,48,145,48, 51, 47, 47,142,143,144, 47,162,123,120,134,144,144,120,117,144,124, -1, -1, -1, -1, -1}};
-static const float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,0.9f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
-static const u16 npcDeathTexture[NUM_AI_TYPES] = { [16] = 564 }; /*Textures/npc_invisomut_dead.png. 0 = no override, which is what the unset entries read as.*/
 typedef struct { u8 p[6], n; } AIPresetSet;
-static const AIPresetSet aiMuzzleBursts[NUM_AI_TYPES][2] = {[1]={{{72},1}}, [3]={{{96,97,129},3}}, [4]={{{81},1}}, [5]={{{56,58},2}}, [8]={{{81,82},2},{{84,85},2}}, [9]={{{78},1}}, [10]={{{96,97,129},3}}, [11]={{{30,31,29,32},4},{{141,34},2}}, [12]={{{118,121,124},3}}, [13]={{{125},1},{{125},1}}, [14]={{{112,113,114},3}}, [19]={{{106,103,104,105},4}} };
-static const AIPresetSet aiDeathBursts[NUM_AI_TYPES] = { [0]={{6,50,51,49},4}, [3]={{129,102,126,101},4}, [5]={{53,55,135},3}, [9]={{75},1}, [10]={{53,55,135},3}, [11]={{53,55,135},3}, [12]={{117,116,119,120,122},5}, [17]={{17},1}, [19]={{109,107},2}, [22]={{129,102,126,133},4}, [23]={{102,126,128,130,131},5} };
-static const V3 npcDeathBurstOffset[NUM_AI_TYPES] = {[ 3]={0.0f,0.28f,0.159f},      /*EXEC-BOT     particle_deathburst*/         [ 5]={-0.085f,1.28f,-1.72f},    /*CORTEX REAVER deathBurst*/ [ 7]={0.0f,0.5f,0.081f},     /*CYBORG ENFORCER  deathBurst*/          [ 9]={0.0f,1.674f,0.164f},   /*CYBORG DIEGO     deathBurst*/
-                                                     [10]={-6.965f,-0.86f,-0.453f}, /*SEC-1 BOT    deathBurst*/                  [11]={-0.085f,1.28f,-1.72f},    /*SEC-2 BOT     deathBurst*/ [12]={-0.078f,0.07f,0.196f}, /*MAINT BOT        deathBurst*/          [15]={-0.001f,0.85f,0.108f}, /*HUMANOID MUTANT  deathBurst*/
-                                                     [17]={0.186f,0.692f,-0.207f},  /*VIRUS MUTANT bloodspurtsmallyellow child*/ [18]={-0.005f,-0.032f,-0.078f}, /*SERVBOT       deathBurst*/ [22]={0.0f,-0.563f,-0.029f}, /*REPAIRBOT        particle_deathburst*/ [23]={0.0f,-0.356f,0.0f},    /*PLANT MUTANT     particle_deathburst*/};
-static const u8 npcDeathBurstPreset[NUM_AI_TYPES] = { [0]=5,/*ef_fragexplosion CentralFireball*/ [3]=100,[5]=54/*deathSubBurst*/,[7]=80/*deathBurst*/,[9]=76/*centerflare*/,[10]=138/*deathSubBurst*/, [11]=54/*deathSubBurst*/,[12]=123/*deathSubBurst(1)*/,[15]=115/*deathBurstTempFX*/,[17]=16/*yellow spurt*/, [18]=145/*deathBurst*/,[19]=80/*deathBurst*/,[22]=100,[23]=127};
 typedef struct { V3 offset; Color3 color; float range, intensity, duration; } AIDeathBurstLight;
-static const AIDeathBurstLight aiDeathBurstLights[] = { /* 5 CORTEX REAVER  5x deathSubBurst, green*/ {{0.185f,0.907f,0.471f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{-0.127f,0.481f,0.471f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{0.219f,0.334f,0.036f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{-0.557f,0.998f,-0.361f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{0.429f,0.867f,-0.356f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f},
-                                                        /*10 SEC-1 BOT      2x lightPoint, green*/    {{0.133f,-0.265f,0.66f},{0.0387f,0.7453f,0.0387f},2.0f,5.0f,0.4f}, {{-0.562f,0.064f,0.66f},{0.0387f,0.7453f,0.0387f},2.0f,5.0f,0.4f},
-                                                        /*11 SEC-2 BOT      3x deathSubBurst, warm*/  {{0.185f,0.907f,0.471f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f}, {{-0.127f,0.481f,0.471f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f}, {{0.219f,0.334f,0.036f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f},
-                                                        /*12 MAINT BOT      6x deathFlames*/          {{-0.078f,0.37f,0.196f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.166f,0.183f,0.472f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{0.011f,-0.054f,0.4f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.087f,0.185f,-0.396f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.078f,-0.107f,-0.258f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f},
-                                                                                                      {{0.091f,-0.107f,0.182f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{0.0f,0.0f,0.0f},{0.9117f,0.9811f,0.9534f},2.5f,1.0f,0.8f} };
-static const u8 aiDeathBurstLightStart[NUM_AI_TYPES] = { [10]=5, [11]=7, [12]=10, [19]=16 };
-static const u8 aiDeathBurstLightCount[NUM_AI_TYPES] = { [5]=5, [10]=2, [11]=3, [12]=6, [19]=1 };
 typedef struct { u16 first, last, primary; } NPCGibRange;
 static const NPCGibRange npcGibRanges[NUM_AI_TYPES] = { [3]={779,787,779},/* EXEC-BOT*/ [5]={768,778,768},/* CORTEX REAVER*/ [10]={814,820,814},/* SECURITY-1*/ [11]={821,830,826},/* SECURITY-2*/ [12]={794,803,795},/* MAINTENANCE*/ [18]={831,839,839},/* SERV-BOT (search collider is gib9)*/ [19]={788,793,792},/* FLIER BOT*/ [22]={804,813,810},/* REPAIR BOT*/ };
-static const u8 npcBloodTypes[NUM_AI_TYPES]={4,1,2,4,1,4,1,1,1,1,4,4,4,2,4,1,2,2,4,4,1,1,4,3,0,0,0,0,0};
 static void AISetHuntFinished(u16 idx) { int npcID = World.instances[idx].index - 419, diff = npcTable[npcID].type == NPCType_Cyber ? World.diffCyb : World.diffCbt; World.instances[idx].huntFinished = World.pauseRelativeTime + vmax(npcTable[npcID].huntTime * (diff <= 1 ? 0.75 : diff >= 3 ? 2 : 1),60); }
 void InitNPC(u16 i) {
     World.layer[i] = L_NPC;
     u16 npcID = World.instances[i].index - 419; if (npcID >= NUM_AI_TYPES) { DualLogError("Invalid NPC index %u\n", npcID); OS_Exit(1); }
     
+    const u8 npcBloodTypes[NUM_AI_TYPES]={4,1,2,4,1,4,1,1,1,1,4,4,4,2,4,1,2,2,4,4,1,1,4,3,0,0,0,0,0};
     World.instances[i].bloodType = (BloodType)npcBloodTypes[npcID];
+    const u8 npcDeathBurstPreset[NUM_AI_TYPES] = { [0]=5,/*ef_fragexplosion CentralFireball*/ [3]=100,[5]=54/*deathSubBurst*/,[7]=80/*deathBurst*/,[9]=76/*centerflare*/,[10]=138/*deathSubBurst*/, [11]=54/*deathSubBurst*/,[12]=123/*deathSubBurst(1)*/,[15]=115/*deathBurstTempFX*/,[17]=16/*yellow spurt*/, [18]=145/*deathBurst*/,[19]=80/*deathBurst*/,[22]=100,[23]=127};
     World.instances[i].deathBurst = npcDeathBurstPreset[npcID] ? npcDeathBurstPreset[npcID] : U16_MAX;
     flag_set(&World.instances[i].entflags,EF_FIRST_SIGHTING,true);
     World.instances[i].currentDestination = World.instances[i].lastPosition = World.instances[i].idealPos = World.position[i];
@@ -106,75 +92,35 @@ void CyberDecoySetTarget(u16 decoy) {
 const V3 sightPointOffsets[NUM_AI_TYPES]={{0.0f,0.746f,0.654f}/* 0 AUTOBOMB*/,{0.0f,0.824f,0.0f}/* 1 CYBORG ASSASSIN*/,{0.0f,0.261f,0.0f}/* 2 AVIAN MUTANT*/,{0.0f,0.89f,0.0f}/* 3 EXEC-BOT*/,{0.0f,0.86f,0.0f}/* 4 CYBORG DRONE*/,{0.0f,0.875f,0.0f}/* 5 CORTEX REAVER*/,{0.0f,0.736f,0.0f}/* 6 CYBORG WARRIOR*/,{0.0f,0.923f,0.144f}/* 7 CYBORG ENFORCER*/,{0.0f,1.082f,0.174f}/* 8 CYBORG ELITE GUARD*/,{0.0f,1.014f,0.105f}/* 9 CYBORG OF ED DIEGO*/,{0.0f,0.578f,0.0f}/*10 SECURITY-1 ROBOT*/,{0.0f,0.797f,0.0f}/*11 SECURITY-2 ROBOT*/,{0.447f,0.185f,0.477f}/*12 MAINTENANCE ROBOT*/,{0.011f,1.155f,0.117f}/*13 MUTANT CYBORG*/,{0.0f,1.759f,0.215f}/*14 HOPPER*/,{0.0f,0.843f,0.0f}/*15 HUMANOID MUTANT*/,{0.0f,-0.395f,0.0f}/*16 INVISIBLE MUTANT*/,{0.161f,0.651f,0.223f}/*17 VIRUS MUTANT*/,{0.0f,0.323f,0.0f}/*18 SERV-BOT*/,{0.0f,0.0f,0.0f}/*19 FLIER BOT*/,{0.0f,0.0f,0.0f}/*20 ZERO-G MUTANT*/,{0.0f,0.0f,1.222f}/*21 GORILLA TIGER MUTANT*/,{0.0f,-0.662f,0.0f}/*22 REPAIR BOT*/,{0.0f,0.0f,0.0f}/*23 PLANT MUTANT*/,{0.0f,-0.14f,0.0f}/*24 CYBER DOG*/,{-0.465f,0.0f,0.212f}/*25 CYBER GUARD*/,{0.0f,-0.343f,0.151f}/*26 CYBER RAM*/,{0.0f,0.0f,0.0f}/*27 CYBER CORTEX REAVER*/,{0.0f,0.0f,-0.017f}/*28 SHODAN*/};
 INLINE V3 ai_sight_pos(Entity* e);
 typedef struct { V3 gunPoint, gunPoint2; } AIMuzzleOffsets;
-/* Rest-pose gunPoint offsets read from the Citadel npc_* prefabs. Attack2
-   uses gunPoint; Attack3 uses gunPoint2 when present and otherwise gunPoint.
-   Values are relative to the NPC root and rotate with its current heading. */
-static const AIMuzzleOffsets aiMuzzleOffsets[NUM_AI_TYPES] = {
-    [1]={{0.2034f,0.5728f,1.4950f},{-0.3500f,0.5500f,1.0000f}},
-    [3]={{0.0000f,0.3350f,0.6800f},{0}}, [4]={{0.0640f,0.4411f,1.2100f},{0}}, [5]={{0.0000f,1.3170f,0.2050f},{0}},
-    [6]={{0.2450f,0.6190f,0.9770f},{-0.6700f,0.9500f,0.0000f}},
-    [7]={{0.1221f,0.6699f,1.2048f},{-0.1770f,0.6113f,0.6103f}},
-    [8]={{0.2969f,0.4550f,0.8212f},{0.0015f,1.0694f,0.3210f}},
-    [9]={{0.0000f,0.5048f,0.7103f},{0}}, [10]={{0.0000f,-0.1740f,0.2980f},{0}},
-    [11]={{0.0000f,1.0250f,1.3230f},{0.0000f,1.2490f,0.6870f}},
-    [12]={{-0.0017f,-0.4373f,3.3266f},{0}}, [13]={{0.0000f,1.2330f,0.4200f},{0}}, [14]={{0.0000f,1.7590f,0.2150f},{0}},
-    [16]={{0.0000f,-0.2840f,0.2560f},{0}}, [17]={{0.0896f,0.4884f,0.7545f},{0}}, [18]={{-1.0198f,0.1295f,1.1798f},{0}},
-    [19]={{0.0000f,-0.4604f,0.0803f},{0}}, [20]={{0.0000f,0.0000f,0.4700f},{0}}, [21]={{0.0000f,0.0000f,1.2220f},{0}},
-    [22]={{0.0000f,-0.4100f,0.8460f},{0}}, [23]={{0.0000f,0.0000f,0.3950f},{0}}, [24]={{0.0000f,-0.4380f,-0.6690f},{0}},
-    [25]={{-0.4650f,0.0000f,-0.3930f},{0}}, [26]={{0.0000f,-0.5590f,-0.3840f},{0}}, [27]={{0.0000f,0.0000f,-0.2980f},{0}}, [28]={{0.0000f,0.0000f,0.5170f},{0}},
-};
-typedef struct { Color3 color; float intensity, range; } AIMuzzleLightData;
-static const AIMuzzleLightData aiMuzzleLights[NUM_AI_TYPES] = {
-    [1]={{0.9044f,0.8595f,0.6717f},10.09f,2.0f}, [3]={{0.6706f,0.8487f,0.9059f},3.46f,2.0f},
-    [4]={{0.9044f,0.8595f,0.6717f},10.09f,2.0f}, [5]={{0.0803f,0.0000f,1.0000f},4.21f,5.0f},
-    [6]={{0.8679f,0.1226f,0.0000f},10.09f,2.0f}, [7]={{0.9608f,0.9195f,0.8039f},10.09f,2.0f},
-    [8]={{0.8731f,1.0000f,0.6368f},7.0f,2.0f},
-    [9]={{0.8774f,0.0000f,0.0000f},2.56f,2.0f}, [10]={{0.0387f,0.7453f,0.0387f},5.0f,2.0f},
-    [11]={{1.0000f,0.9794f,0.7500f},1.0f,2.0f},
-    [12]={{0.8160f,0.8844f,1.0000f},8.69f,2.0f}, [13]={{0.8412f,1.0000f,0.3821f},3.0f,2.0f},
-    [14]={{1.0000f,0.5035f,0.2784f},2.0f,7.0f}, [16]={{0.9061f,0.5943f,1.0000f},2.5f,2.0f},
-    [17]={{0.6500f,1.0000f,0.2500f},2.5f,2.0f}, [18]={{0.9849f,0.5425f,1.0000f},2.0f,3.0f},
-    [19]={{0.9245f,0.8921f,0.5190f},5.0f,2.0f}, [20]={{1.0000f,0.9807f,0.7358f},2.5f,2.0f},
-    [22]={{0.6706f,0.9059f,0.8552f},10.09f,2.0f}, [23]={{0.5000f,1.0000f,0.3000f},3.0f,2.0f},
-    [24]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}, [25]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f},
-    [26]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}, [27]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}, [28]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f},
-};
-/* Attack3 uses a different muzzle light only for 8 (Cyborg Elite) and 11 (SEC-2); everyone else falls back to the shared aiMuzzleLights entry like before. */
-static const AIMuzzleLightData aiMuzzleLight3[NUM_AI_TYPES] = { [8]={{0.8679f,0.1696f,0.1187f},10.0f,2.5f}, [11]={{1.0000f,0.9794f,0.7500f},2.5f,2.0f} };
-static const double AI_MUZZLE_FLASH_TIME=0.085;
-static const u16 AI_EFFECT_LIGHT_POOL_SIZE=24;
+static const AIMuzzleOffsets aiMuzzleOffsets[NUM_AI_TYPES] = { [1]={{0.2034f,0.5728f,1.4950f},{-0.3500f,0.5500f,1.0000f}}, [3]={{0.0000f,0.3350f,0.6800f},{0}}, [4]={{0.0640f,0.4411f,1.2100f},{0}}, [5]={{0.0000f,1.3170f,0.2050f},{0}}, [6]={{0.2450f,0.6190f,0.9770f},{-0.6700f,0.9500f,0.0000f}}, [7]={{0.1221f,0.6699f,1.2048f},{-0.1770f,0.6113f,0.6103f}}, [8]={{0.2969f,0.4550f,0.8212f},{0.0015f,1.0694f,0.3210f}}, [9]={{0.0000f,0.5048f,0.7103f},{0}},
+                                                              [10]={{0.0000f,-0.1740f,0.2980f},{0}}, [11]={{0.0000f,1.0250f,1.3230f},{0.0000f,1.2490f,0.6870f}}, [12]={{-0.0017f,-0.4373f,3.3266f},{0}}, [13]={{0.0000f,1.2330f,0.4200f},{0}}, [14]={{0.0000f,1.7590f,0.2150f},{0}}, [16]={{0.0000f,-0.2840f,0.2560f},{0}}, [17]={{0.0896f,0.4884f,0.7545f},{0}}, [18]={{-1.0198f,0.1295f,1.1798f},{0}}, [19]={{0.0000f,-0.4604f,0.0803f},{0}},
+                                                              [20]={{0.0000f,0.0000f,0.4700f},{0}}, [21]={{0.0000f,0.0000f,1.2220f},{0}}, [22]={{0.0000f,-0.4100f,0.8460f},{0}}, [23]={{0.0000f,0.0000f,0.3950f},{0}}, [24]={{0.0000f,-0.4380f,-0.6690f},{0}}, [25]={{-0.4650f,0.0000f,-0.3930f},{0}}, [26]={{0.0000f,-0.5590f,-0.3840f},{0}}, [27]={{0.0000f,0.0000f,-0.2980f},{0}}, [28]={{0.0000f,0.0000f,0.5170f},{0}}};
 typedef struct { u16 lights[24], count; double expires[24]; } AIEffectLightPool;
 static AIEffectLightPool aiEffectPools[MAX_LEVELS];
-static double aiEffectLightsUpdatedAt=-1.0;
 static float ai_effect_marker(u16 slot) { return -100.0f-(float)slot; }
-static void ai_ensure_effect_pool(void) {
-    u16 lev = World.currentLevel;
-    if (lev >= MAX_LEVELS) return;
-    
-    AIEffectLightPool* p = &aiEffectPools[lev];
+static void ai_ensure_effect_pool(void) {    
+    AIEffectLightPool* p = &aiEffectPools[World.currentLevel];
     if (p->count) { for (u16 i=0;i<p->count;i++) if (p->lights[i] >= World.loadedLights || World.lights[p->lights[i]].spotAng != ai_effect_marker(i)) { p->count = 0; break; } }
     if (p->count) return;
     
-    while (p->count < AI_EFFECT_LIGHT_POOL_SIZE && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_effect_marker(i); p->count++; }
+    while (p->count < 24u && World.loadedLights< LIGHT_COUNT-1) { u16 i=p->count; u16 li=AddLightSimple((V3){0},(Color3){1,1,1},1.0f,0.0f,0); p->lights[i]=li; p->expires[i]=0.0; World.lights[li].spotAng=ai_effect_marker(i); p->count++; }
 }
+
 static void ai_update_effect_lights(void) {
+    static double aiEffectLightsUpdatedAt=-1.0;
     if (aiEffectLightsUpdatedAt==World.pauseRelativeTime) return; aiEffectLightsUpdatedAt=World.pauseRelativeTime; u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev];
     if (!p->count) return; for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_effect_marker(i)) { p->count=0; return; }
     for (u16 i=0;i<p->count;i++) if (p->expires[i]>0.0 && p->expires[i]<=World.pauseRelativeTime) { u16 li=p->lights[i]; UpdateLight(li,World.lights[li].pos,World.lights[li].col,World.lights[li].range,0.0f,0.0f,0.0f,ai_effect_marker(i),QUAT_IDENTITY,false,false); p->expires[i]=0.0; }
 }
+
 void ai_effect_flash(V3 pos, Color3 col, float range, float intensity, double duration) {
     if (intensity <= 0.0f || range <= 0.0f || duration <= 0.0) return;
     
     ai_ensure_effect_pool();
-    u16 lev = World.currentLevel; if (lev >= MAX_LEVELS) return;
-    AIEffectLightPool* p = &aiEffectPools[lev]; if (!p->count) return;
+    AIEffectLightPool* p = &aiEffectPools[World.currentLevel]; if (!p->count) return;
     
     u16 chosen = 0; double oldest = 1000000000000000000000000000000.0;
-    for (u16 i=0;i<p->count;i++) {
-        if (p->expires[i]<=World.pauseRelativeTime) { chosen = i; oldest = -1.0; break; }
-        
-        if (p->expires[i]<oldest) { oldest = p->expires[i]; chosen = i; }
-    }
+    for (u16 i=0;i<p->count;i++) { if (p->expires[i]<=World.pauseRelativeTime) { chosen = i; oldest = -1.0; break; } if (p->expires[i]<oldest) { oldest = p->expires[i]; chosen = i; } }
     u16 idx = p->lights[chosen];
     float scaledIntensity = intensity * 0.35f;
     UpdateLight(idx,pos,col,vclamp(range,0.32f,15.36f),scaledIntensity,scaledIntensity,0.0f,ai_effect_marker(chosen),QUAT_IDENTITY,true,false);
@@ -182,22 +128,32 @@ void ai_effect_flash(V3 pos, Color3 col, float range, float intensity, double du
 }
 
 static void ai_muzzle_flash(Entity* self, int attackNum) {
-    u16 npc=(u16)(self->index-419);
-    if (npc==18) attackNum=1; else if (attackNum==1) return;
+    u16 npc=(u16)(self->index-419); if (npc==18) attackNum=1; else if (attackNum==1) return;
+    
+    typedef struct { Color3 color; float intensity, range; } AIMuzzleLightData;
+    static const AIMuzzleLightData aiMuzzleLights[NUM_AI_TYPES] = { [1]={{0.9044f,0.8595f,0.6717f},10.09f,2.0f}, [3]={{0.6706f,0.8487f,0.9059f},3.46f,2.0f}, [4]={{0.9044f,0.8595f,0.6717f},10.09f,2.0f}, [5]={{0.0803f,0.0000f,1.0000f},4.21f,5.0f}, [6]={{0.8679f,0.1226f,0.0000f},10.09f,2.0f}, [7]={{0.9608f,0.9195f,0.8039f},10.09f,2.0f}, [8]={{0.8731f,1.0000f,0.6368f},7.0f,2.0f}, [9]={{0.8774f,0.0000f,0.0000f},2.56f,2.0f},
+                                                                   [10]={{0.0387f,0.7453f,0.0387f},5.0f,2.0f},  [11]={{1.0000f,0.9794f,0.7500f},1.0f,2.0f}, [12]={{0.8160f,0.8844f,1.0000f},8.69f,2.0f}, [13]={{0.8412f,1.0000f,0.3821f},3.0f,2.0f}, [14]={{1.0000f,0.5035f,0.2784f},2.0f,7.0f}, [16]={{0.9061f,0.5943f,1.0000f},2.5f,2.0f},   [17]={{0.6500f,1.0000f,0.2500f},2.5f,2.0f}, [18]={{0.9849f,0.5425f,1.0000f},2.0f,3.0f},
+                                                                   [19]={{0.9245f,0.8921f,0.5190f},5.0f,2.0f},  [20]={{1.0000f,0.9807f,0.7358f},2.5f,2.0f}, [22]={{0.6706f,0.9059f,0.8552f},10.09f,2.0f},[23]={{0.5000f,1.0000f,0.3000f},3.0f,2.0f}, [24]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}, [25]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f},   [26]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}, [27]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f},
+                                                                   [28]={{1.0000f,0.8500f,0.6500f},3.0f,2.0f}};
+    static const AIMuzzleLightData aiMuzzleLight3[NUM_AI_TYPES] = { [8]={{0.8679f,0.1696f,0.1187f},10.0f,2.5f}, [11]={{1.0000f,0.9794f,0.7500f},2.5f,2.0f} };
     AIMuzzleLightData d = attackNum==3 ? aiMuzzleLight3[npc] : aiMuzzleLights[npc]; if (attackNum==3 && !d.intensity) d = aiMuzzleLights[npc]; if (d.intensity<=0.0f || d.range<=0.0f) return;
+    
     u16 selfIdx=(u16)(self-World.instances); V3 pos;
-    if (attackNum==1) pos=ai_sight_pos(self);
-    else { V3 off=aiMuzzleOffsets[npc].gunPoint; if (attackNum==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f)) off=aiMuzzleOffsets[npc].gunPoint2; if (off.x==0.0f && off.y==0.0f && off.z==0.0f) pos=ai_sight_pos(self); else pos=V3Add(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],off)); }
-    ai_effect_flash(pos,d.color,d.range,d.intensity,AI_MUZZLE_FLASH_TIME);
+    if (attackNum==1) pos=ai_sight_pos(self); else { V3 off=aiMuzzleOffsets[npc].gunPoint;
+    if (attackNum==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f)) off=aiMuzzleOffsets[npc].gunPoint2;
+    if (off.x==0.0f && off.y==0.0f && off.z==0.0f) pos=ai_sight_pos(self); else pos=V3Add(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],off)); }
+    ai_effect_flash(pos,d.color,d.range,d.intensity,0.085);
 }
 INLINE V3 ai_sight_pos(Entity* e) { u16 idx=(u16)(e - World.instances); return V3Add(World.position[idx],quat_rot_v3(World.rotation[idx],sightPointOffsets[World.instances[idx].index - 419])); }
 INLINE V3 ai_gun_pos(Entity* e, int n) { u16 idx=(u16)(e - World.instances); u16 npc=World.instances[idx].index-419; V3 off=(n==3 && (aiMuzzleOffsets[npc].gunPoint2.x!=0.0f || aiMuzzleOffsets[npc].gunPoint2.y!=0.0f || aiMuzzleOffsets[npc].gunPoint2.z!=0.0f))?aiMuzzleOffsets[npc].gunPoint2:aiMuzzleOffsets[npc].gunPoint; if(off.x==0.0f && off.y==0.0f && off.z==0.0f) off=(V3){0.0f,sightPointOffsets[npc].y+0.3f,0.0f}; return V3Add(World.position[idx],quat_rot_v3(World.rotation[idx],off)); }
 static void ai_spawn_presets(const AIPresetSet* set, V3 pos) { for (u8 i=0;i<set->n;i++){const PSysDef* preset=PSysTypeGet(set->p[i]); if(!preset)continue; PSysDef def=*preset; def.pos=pos; PSysAddInternal(&def,U16_MAX,U16_MAX);} }
 static void ai_muzzle_particles(Entity* self, int attackNum) {
     u16 npc=(u16)(self->index-419);
+    static const AIPresetSet aiMuzzleBursts[NUM_AI_TYPES][2] = {[1]={{{72},1}}, [3]={{{96,97,129},3}}, [4]={{{81},1}}, [5]={{{56,58},2}}, [8]={{{81,82},2},{{84,85},2}}, [9]={{{78},1}}, [10]={{{96,97,129},3}}, [11]={{{30,31,29,32},4},{{141,34},2}}, [12]={{{118,121,124},3}}, [13]={{{125},1},{{125},1}}, [14]={{{112,113,114},3}}, [19]={{{106,103,104,105},4}} };
     if (npc==18) { ai_spawn_presets(&aiMuzzleBursts[npc][1],ai_gun_pos(self,1)); ai_muzzle_flash(self,1); }
     if (attackNum==1) return;/*No muzzle burst for attack 1 melee.*/ ai_spawn_presets(&aiMuzzleBursts[npc][attackNum==3?1:0],ai_gun_pos(self,attackNum)); ai_muzzle_flash(self,attackNum);
 }
+
 Quaternion quat_look_rotation(V3 fwd, V3 up) {
     fwd=V3_Normalize(fwd); V3 r = V3_Normalize(V3_Cross(up,fwd)); up=V3_Cross(fwd,r); float m00=r.x, m01=r.y, m02=r.z, m10=up.x, m11=up.y, m12=up.z, m20=fwd.x, m21=fwd.y, m22=fwd.z; float tr = m00 + m11 + m22; Quaternion q;
     if (tr > 0.0f){float s=0.5f/vsqrtf(tr+1.0f); q.w=(0.25f/s); q.x=(m12-m21)*s; q.y=(m20-m02)*s; q.z=(m01-m10)*s;}else if(m00 > m11 && m00 > m22){float s=2.0f*vsqrtf(1.0f+m00-m11-m22); q.w=(m12-m21)/s; q.x=0.25f*s; q.y=(m01+m10)/s; q.z=(m20+m02)/s;}else if(m11 > m22){float s=2.0f*vsqrtf(1.0f+m11-m00-m22); q.w=(m20-m02)/s; q.x=(m01+m10)/s; q.y=0.25f*s; q.z=(m12+m21)/s; } else { float s = 2.0f * vsqrtf(1.0f + m22 - m00 - m11); q.w=(m01-m10)/s; q.x=(m20+m02)/s; q.y=(m12+m21)/s; q.z=0.25f*s;} return q;
@@ -206,18 +162,12 @@ Quaternion quat_look_rotation(V3 fwd, V3 up) {
 void aiac_idle(Entity* self) { if ((self->entflags & EF_ASLEEP) || self->tranquilizeFinished >= World.pauseRelativeTime) {self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/} ChangeAnim(self,A_IDLE); }
 void aiac_walk(Entity* self){if(self->entflags & EF_ACT_AS_TURRET){aiac_idle(self); return;} u16 idx=(u16)(self-World.instances); V3 v=World.velocity[idx]; if((v.x*v.x+v.y*v.y+v.z*v.z)>(0.32f*0.32f)){ChangeAnim(self,A_WALK); return;} if (self->animSwapFinished<World.pauseRelativeTime){self->animSwapFinished=World.pauseRelativeTime+.5f; ChangeAnim(self,A_IDLE);}}
 void AIAnimationControllerUpdate(u16 idx) {
-    Entity* self = &World.instances[idx]; if((!(self->entflags & EF_ACTIVE)) || (self->animationNum >= MAXANIM)){return;} 
+    Entity* self = &World.instances[idx]; if ((!(self->entflags & EF_ACTIVE)) || (self->animationNum >= MAXANIM)) { return; } 
+    if (self->currentState == AIState_Dying){ flag_set(&self->entflags, EF_ASLEEP, false); ChangeAnim(self, A_DYING); return; }
     
-    if(self->currentState == AIState_Dying){
-        flag_set(&self->entflags, EF_ASLEEP, false); 
-        
-        ChangeAnim(self, A_DYING);
-        return;
-    }
-    
-    if(self->currentState == AIState_Dead){AnimationClip cl=mdlAnimClips[self->animationNum][A_DYING]; self->clip=A_DYING; self->frame=cl.frameEnd; self->modelIndex=cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart); self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/}
-    if(self->entflags & EF_ASLEEP){aiac_idle(self); return;}
-    if(self->currentState == AIState_Run && self->tranquilizeFinished >= World.pauseRelativeTime){aiac_idle(self); return;}
+    if (self->currentState == AIState_Dead) { AnimationClip cl=mdlAnimClips[self->animationNum][A_DYING]; self->clip=A_DYING; self->frame=cl.frameEnd; self->modelIndex=cl.frameStartModelIndex + (cl.frameEnd - cl.frameStart); self->currentFrameFinished=World.pauseRelativeTime + 1000000000.0; return;/*freeze*/ }
+    if (self->entflags & EF_ASLEEP) { aiac_idle(self); return; }
+    if (self->currentState == AIState_Run && self->tranquilizeFinished >= World.pauseRelativeTime) { aiac_idle(self); return; }
     
     switch (self->currentState) {
         case AIState_Walk:    aiac_walk(self);            break;
@@ -229,7 +179,6 @@ void AIAnimationControllerUpdate(u16 idx) {
         default:              aiac_idle(self);            break;
     }
 }
-
 
 INLINE bool NPCInPlayerPVS(u16 idx) { if (unlikely(World.curLev >= LEVEL_CYBERSPACE)) return true;/*Culling is disabled in cyberspace (CullCore early-outs), so never gate there.*/ return PositionVisibleFromPlayerCell(World.position[idx].x,World.position[idx].z); }
 void DoorActuate(u16);
@@ -427,14 +376,7 @@ static void AIRun(u16 selfIdx) {
     if (npc->moveType != AIMoveType_None && rangeToEnemy > AI_STOP_DIST_SQ) { if (AIWithinAngleToTarget(self)) { if (npc->hopsOnMove && !(World.instances[selfIdx].entflags & EF_ACT_AS_TURRET)){ AIHopMove(selfIdx); } else { AIRunMove(selfIdx); } } else if (World.diffCbt >= 2 && random_range(0.0f,1.0f) < 0.5f) { AIFace(self,self->currentDestination); } }
 }
 
-static void AIPain(Entity* self) {
-    if (self->timeTillPainFinished < World.pauseRelativeTime) {
-        self->currentState = AIState_Run;
-        flag_set(&self->entflags, EF_GO_INTO_PAIN, false);
-        self->timeTillPainFinished = World.pauseRelativeTime + npcTable[self->index - 419].timeBetweenPain;
-    }
-}
-
+static void AIPain(Entity* self) { if (self->timeTillPainFinished < World.pauseRelativeTime) { self->currentState = AIState_Run; flag_set(&self->entflags, EF_GO_INTO_PAIN, false); self->timeTillPainFinished = World.pauseRelativeTime + npcTable[self->index - 419].timeBetweenPain; } }
 static double AIDeathAnimationDuration(const Entity* self) {
     if (!self || self->animationNum >= MAXANIM) return 0.0;
     
@@ -445,21 +387,32 @@ static double AIDeathAnimationDuration(const Entity* self) {
 
 static void SpawnNPCDeathBurst(Entity* self) {
     u16 npc=(u16)(self->index-419);
-      
     u16 selfIdx=(u16)(self - World.instances);
+    const V3 npcDeathBurstOffset[NUM_AI_TYPES] = {[ 3]={0.0f,0.28f,0.159f}/*EXEC-BOT particle_deathburst*/, [ 5]={-0.085f,1.28f,-1.72f}/*CORTEX REAVER deathBurst*/, [ 7]={0.0f,0.5f,0.081f}/*CYBORG ENFORCER  deathBurst*/, [ 9]={0.0f,1.674f,0.164f}/*CYBORG DIEGO deathBurst*/, [10]={-6.965f,-0.86f,-0.453f}/*SEC-1 BOT deathBurst*/, [11]={-0.085f,1.28f,-1.72f}/*SEC-2 BOT deathBurst*/, [12]={-0.078f,0.07f,0.196f}/*MAINT BOT deathBurst*/,
+                                                  [15]={-0.001f,0.85f,0.108f}/*HUMANOID MUTANT  deathBurst*/, [17]={0.186f,0.692f,-0.207f}/*VIRUS MUTANT bloodspurtsmallyellow child*/, [18]={-0.005f,-0.032f,-0.078f}/*SERVBOT deathBurst*/, [22]={0.0f,-0.563f,-0.029f}/*REPAIRBOT particle_deathburst*/, [23]={0.0f,-0.356f,0.0f}/*PLANT MUTANT particle_deathburst*/};
     V3 origin=V3Add(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],npcDeathBurstOffset[npc]));
     const PSysDef* primary=PSysTypeGet(self->deathBurst);
     if (primary) { PSysDef def=*primary; def.pos=origin; PSysAddInternal(&def,U16_MAX,U16_MAX); }
+    const AIPresetSet aiDeathBursts[NUM_AI_TYPES] = { [0]={{6,50,51,49},4}, [3]={{129,102,126,101},4}, [5]={{53,55,135},3}, [9]={{75},1}, [10]={{53,55,135},3}, [11]={{53,55,135},3}, [12]={{117,116,119,120,122},5}, [17]={{17},1}, [19]={{109,107},2}, [22]={{129,102,126,133},4}, [23]={{102,126,128,130,131},5} };
     ai_spawn_presets(&aiDeathBursts[npc],origin);
+    const u8 aiDeathBurstLightCount[NUM_AI_TYPES] = { [5]=5, [10]=2, [11]=3, [12]=6, [19]=1 };
     u8 lightCount=aiDeathBurstLightCount[npc];
+    const AIDeathBurstLight aiDeathBurstLights[] = {/* 5 CORTEX REAVER 5x deathSubBurst, green*/ {{0.185f,0.907f,0.471f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{-0.127f,0.481f,0.471f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{0.219f,0.334f,0.036f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{-0.557f,0.998f,-0.361f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f}, {{0.429f,0.867f,-0.356f},{0.7348f,1.0f,0.3632f},2.5f,4.5f,0.4f},
+                                                    /*10 SEC-1 BOT     2x lightPoint, green*/    {{0.133f,-0.265f,0.66f},{0.0387f,0.7453f,0.0387f},2.0f,5.0f,0.4f}, {{-0.562f,0.064f,0.66f},{0.0387f,0.7453f,0.0387f},2.0f,5.0f,0.4f},
+                                                    /*11 SEC-2 BOT     3x deathSubBurst, warm*/  {{0.185f,0.907f,0.471f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f}, {{-0.127f,0.481f,0.471f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f}, {{0.219f,0.334f,0.036f},{1.0f,0.8280f,0.6078f},2.0f,0.8f,0.4f},
+                                                    /*12 MAINT BOT     6x deathFlames*/          {{-0.078f,0.37f,0.196f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.166f,0.183f,0.472f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{0.011f,-0.054f,0.4f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.087f,0.185f,-0.396f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{-0.078f,-0.107f,-0.258f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f},
+                                                                                                 {{0.091f,-0.107f,0.182f},{1.0f,0.9217f,0.7123f},2.0f,1.0f,1.0f}, {{0.0f,0.0f,0.0f},{0.9117f,0.9811f,0.9534f},2.5f,1.0f,0.8f} };
+    const u8 aiDeathBurstLightStart[NUM_AI_TYPES] = { [10]=5, [11]=7, [12]=10, [19]=16 };
     for (u8 i=0;i<lightCount;i++) { const AIDeathBurstLight* dl=&aiDeathBurstLights[aiDeathBurstLightStart[npc]+i]; V3 lp=V3Add(World.position[selfIdx],quat_rot_v3(World.rotation[selfIdx],dl->offset)); ai_effect_flash(lp,dl->color,dl->range,dl->intensity,(double)dl->duration); }
-  }
+}
+
 static void AIDying(u16 i) {
     u16 npcID = World.instances[i].index - 419;
     if (!(World.instances[i].entflags & EF_DYING_SETUP)) {
         World.instances[i].enemy = 0;
         const NPCTable* npc = &npcTable[npcID];
         bool gibs = npcID < NUM_AI_TYPES && npcGibRanges[npcID].first != 0;
+        const float deathBurstTimer[NUM_AI_TYPES] = {0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,0.9f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
         float dbt = deathBurstTimer[npcID];
         if (dbt > 0.0f) { World.instances[i].deathBurstFinished = World.pauseRelativeTime + dbt; }
         else if (!(World.instances[i].entflags & EF_DEATH_BURST_DONE)) { SpawnNPCDeathBurst(&World.instances[i]); flag_set(&World.instances[i].entflags, EF_DEATH_BURST_DONE, true); }
@@ -475,6 +428,7 @@ static void AIDying(u16 i) {
         double deathWait = npc->timeTillDead;
         if (gibs) { double animWait = AIDeathAnimationDuration(&World.instances[i]); if (animWait > deathWait) deathWait = animWait; }
         World.instances[i].timeTillDeadFinished = World.pauseRelativeTime + deathWait;
+        const u16 npcDeathTexture[NUM_AI_TYPES] = { [16] = 564 }; /*npc_invisomut_dead.png*/
         if (npc->switchMaterialOnDeath && npcDeathTexture[npcID] != 0) { World.instances[i].texIndex = npcDeathTexture[npcID]; }
         if (npcID == 20) { TextureSequenceStart(i, 48); }
         if (npcID == 14) { World.instances[i].deathAnimationActive = true; World.instances[i].deathAnimationStart = (float)World.pauseRelativeTime; }
@@ -521,7 +475,7 @@ static void AIDead(u16 idx) {
         DeleteInstance(idx);
     } else {
         World.layer[idx] = L_Corpse | L_CorpseSearchable;
-        if (ai_has_search_collider(npcID)) { World.instances[idx].health = NPC_CORPSE_HEALTH; }
+        if (ai_has_search_collider(npcID)) { World.instances[idx].health = 50.0f; }
         World.velocity[idx].x = World.velocity[idx].z = 0.0f;
         if (World.instances[idx].index != 433) World.gravity[idx] = 1.0f;
     }
