@@ -7209,7 +7209,16 @@ index: 3446
 #Textures/computer_atlas.png
 index: 3447
 
+#Textures/chairs_atlas.png
+index: 3448
+
 #Textures/couches_atlas.png
 index: 3449
 #Textures/shelves_atlas.png
 index: 3450
+#Textures/desks_atlas.png
+index: 3451
+#Textures/cabinet_atlas.png
+index: 3452
+#Textures/chair05.png
+index: 3453
