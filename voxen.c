@@ -1174,7 +1174,6 @@ INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
     return h;
 }
 
-/*Edit-mode picking: nearest point light (neither spot nor directional) whose range sphere the pick ray hits. U16_MAX on miss; outDist gets the hit distance.*/
 u16 EditModePickLight(V3 origin, V3 dir, float maxDist, float* outDist) {
     u16 best = U16_MAX; float bestDist = maxDist;
     for (u16 i = 0; i < World.loadedLights; ++i) {
@@ -1205,6 +1204,30 @@ INLINE RaycastHit RayCapsule(V3 origin, V3 dir, ShapeCapsule cap, float maxDist)
     if (tBest >= 0.0f) { h.hit = true; h.distance = tBest; h.point = V3Add(origin, V3_ScaleByF(dir, tBest)); h.normal = nBest; } return h;
 }
 
+INLINE RaycastHit RayBox(V3 origin, V3 dir, ShapeBox box, float maxDist) {
+    RaycastHit h = {.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT};
+    Quaternion inv = {-box.rot.x,-box.rot.y,-box.rot.z,box.rot.w};
+    V3 lo = quat_rot_v3(inv, V3_AsubB(origin, box.ctr));
+    V3 ld = quat_rot_v3(inv, dir);
+    float o[3] = {lo.x, lo.y, lo.z}, d[3] = {ld.x, ld.y, ld.z}, he[3] = {box.hExt.x, box.hExt.y, box.hExt.z};
+    float tmin = 0.0f, tmax = maxDist; int axis = -1; float asign = 0.0f;
+    for (int a = 0; a < 3; ++a) {
+        if (vabs(d[a]) < 0.000001f) { if (vabs(o[a]) > he[a]) return h; }
+        else {
+            float t1 = (-he[a] - o[a]) / d[a], t2 = (he[a] - o[a]) / d[a];
+            float tNear = vmin(t1, t2), tFar = vmax(t1, t2);
+            float ns = (d[a] > 0.0f) ? -1.0f : 1.0f;
+            if (tNear > tmin) { tmin = tNear; axis = a; asign = ns; }
+            if (tFar < tmax) tmax = tFar;
+            if (tmin > tmax) return h;
+        }
+    }
+    if (axis < 0) { h.hit = true; h.distance = 0.0f; h.point = origin; h.normal = V3_ScaleByF(dir, -1.0f); return h; }
+    V3 ln = {0.0f, 0.0f, 0.0f}; if (axis == 0) ln.x = asign; else if (axis == 1) ln.y = asign; else ln.z = asign;
+    h.hit = true; h.distance = tmin; h.point = V3Add(origin, V3_ScaleByF(dir, tmin)); h.normal = quat_rot_v3(box.rot, ln); return h;
+}
+
+static u32 raycastPickMode = 0;
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist);
 static u16 rayCellHeads[ARRSIZE], rayNext[INSTANCE_COUNT];
 static u32 rayGridFrame=U32_MAX;
@@ -1236,9 +1259,10 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                 if (!IdxIsPortalBlockingDoor(World.instances[i].index)) { if(((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (World.instances[i].index != 754 || !SkyIsVisible())){continue;} }
                 
                 if (mindex >= MAX_MDLS) {
-                    ColliderType ct = World.col[i]; if (ct != CT_CAP && ct != CT_SPH) continue;
+                    if (raycastPickMode == 1) continue;
+                    ColliderType ct = World.col[i]; if (ct != CT_CAP && ct != CT_SPH && (ct != CT_BOX || raycastPickMode != 2)) continue;
                     if (V3_dot(delta, delta) >= maxDistSq) continue;
-                    RaycastHit ch = {0}; if (ct == CT_CAP) { ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance); } else { ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance); } if (!ch.hit || ch.distance >= result.distance) { continue; }
+                    RaycastHit ch = {0}; if (ct == CT_CAP) { ch = RayCapsule(origin, dir, Entity_GetCap(i), result.distance); } else if (ct == CT_SPH) { ch = RaySphere(origin, dir, Entity_GetSph(i), result.distance); } else { ch = RayBox(origin, dir, Entity_GetBox(i), result.distance); } if (!ch.hit || ch.distance >= result.distance) { continue; }
                     
                     ch.hitInstanceIndex = i;
                     result = ch;
@@ -1246,6 +1270,7 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
                 }
                 
                 if (mindex >= mdlsCnt) continue;
+                if (raycastPickMode == 2) continue; /*Primitive-only pick: skip mesh triangles.*/
                 if (V3_dot(delta,delta) >= maxDistSq) continue;
                 u32 triCount = modelTriangleCounts[mindex]; if (triCount < 1) continue;
                 
@@ -1293,6 +1318,20 @@ RaycastHit Raycast(V3 origin, V3 dir, float maxDist, u32 layerMask) {
     raycastMs += get_time() - rStart;
     raycastCalls++;
     return result;
+}
+
+/*Editmode pick raycast: mesh colliders first, then box/sphere/capsule
+  primitives. The second pass exists because the shared Raycast never
+  tests model-less boxes, so a box collider with no mesh (e.g. clip_npc)
+  was unselectable. Scope: the primitive pass covers model-less
+  instances only; modeled instances are picked via their mesh in pass 1.
+  Gameplay raycasts call Raycast directly and are unaffected.*/
+RaycastHit RaycastEditPick(V3 origin, V3 dir, float maxDist, u32 layerMask) {
+    raycastPickMode = 1;
+    RaycastHit h = Raycast(origin, dir, maxDist, layerMask);
+    if (!h.hit) { raycastPickMode = 2; h = Raycast(origin, dir, maxDist, layerMask); }
+    raycastPickMode = 0;
+    return h;
 }
 
 // Credits Sys

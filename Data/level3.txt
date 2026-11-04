@@ -2910,12 +2910,12 @@ constIndex:640|lP.x:-5.13987|lP.y:-15.30501|lP.z:-8.706|lR.x:-.5813|lR.w:.81369
 constIndex:624|lP.x:1.14713|lP.y:-16.123|lP.z:-6.04837|lR.x:-.5813|lR.w:.81369
 constIndex:647|lP.x:-.01392|lP.y:-15.13328|lP.z:-11.566|lR.x:-.5813|lR.w:.81369
 constIndex:646|lP.x:-9.66139|lP.y:-15.41159|lP.z:-16.686|lR.x:-.5813|lR.w:.81369
-constIndex:581|lP.x:6.74313|lP.y:-15.241|lP.z:-23.13875|lR.x:1|lR.w:0|lS.x:2|lS.z:1.5
+constIndex:581|lP.x:6.74313|lP.y:-15.241|lP.z:-23.13875|lS.x:2|lS.z:1.5
 constIndex:646|lP.x:9.03413|lP.y:-15.29267|lP.z:-29.62275|lR.x:-.5813|lR.w:.81369
-constIndex:580|lP.x:23.53113|lP.y:-15.25|lP.z:-7.38975|lR.x:1|lR.w:0
-constIndex:581|lP.x:35.60513|lP.y:-15.25|lP.z:5.85625|lR.x:1|lR.w:0
-constIndex:581|lP.x:-13.04433|lP.y:-15.306|lP.z:39.27604|lR.x:1|lR.w:0
-constIndex:579|lP.x:18.67276|lP.y:-15.324|lP.z:37.96623|lR.x:1|lR.w:0|lS.x:2|lS.z:2
+constIndex:580|lP.x:23.53113|lP.y:-15.25|lP.z:-7.38975
+constIndex:581|lP.x:35.60513|lP.y:-15.25|lP.z:5.85625
+constIndex:581|lP.x:-13.04433|lP.y:-15.306|lP.z:39.27604
+constIndex:579|lP.x:18.67276|lP.y:-15.324|lP.z:37.96623|lS.x:2|lS.z:2
 constIndex:733|lP.x:19.07814|lP.y:-14.93891|lP.z:38.15514|lR.x:-.05661|lR.y:-.02451|lR.z:-.39657|lR.w:.91593
 constIndex:637|lP.x:33.34616|lP.y:-14.94271|lP.z:40.505|lR.x:-.5813|lR.w:.81369
 constIndex:643|lP.x:9.49313|lP.y:-15.18|lP.z:42.194|lR.x:-.5813|lR.w:.81369
@@ -2931,7 +2931,7 @@ constIndex:629|lP.x:-7.73489|lP.y:-15.12073|lP.z:29.58801|lR.x:-.5813|lR.w:.8136
 constIndex:627|lP.x:-12.87247|lP.y:-15.09176|lP.z:29.20725|lR.x:-.5813|lR.w:.81369
 constIndex:734|lP.x:-23.11087|lP.y:-13.10628|lP.z:1.39925|lR.x:-.60286|lR.y:-.36955|lR.z:-.36955|lR.w:.60286
 constIndex:636|lP.x:-34.21786|lP.y:-13.065|lP.z:2.62697|lR.x:-.5813|lR.w:.81369
-constIndex:580|lP.x:-48.59487|lP.y:-15.283|lP.z:-11.82675|lR.x:1|lR.w:0
+constIndex:580|lP.x:-48.59487|lP.y:-15.283|lP.z:-11.82675
 constIndex:636|lP.x:-33.30587|lP.y:-13.58723|lP.z:2.62697|lR.x:-.5813|lR.w:.81369
 constIndex:647|lP.x:1.14913|lP.y:-15.13328|lP.z:-9.21575|lR.x:-.5813|lR.w:.81369
 constIndex:632|lP.x:26.40234|lP.y:-16.06651|lP.z:16.434|lR.x:-.5813|lR.w:.81369

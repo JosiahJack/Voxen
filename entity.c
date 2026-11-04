@@ -562,9 +562,9 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*545 prop_chandelier*/[545]={496,0,644,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*546 prop_charge_station*/[546]={44,0,77,76,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*547 prop_clothes*/[547]={47,0,97,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*548 prop_computer*/[548]={48,0,195,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*549 prop_couch*/[549]={59,0,195,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*550 prop_couch2*/[550]={59,0,195,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
+/*548 prop_computer*/[548]={48,0,3447,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
+/*549 prop_couch*/[549]={59,0,3449,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
+/*550 prop_couch2*/[550]={59,0,3449,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*551 prop_cpuscreen*/[551]={5988,0,768,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*552 prop_cyber_datafrag*/[552]={6336,0,3444,3444,MAXTEX,MAXTEX,0,54,0,{0},{0}},
 /*553 prop_cyber_decoy*/[553]={72,0,152,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_SPH,{0},{0.48f,0,0}},
@@ -593,10 +593,10 @@ EPerms EDefs[MAX_ENTITIES] = { // EPerms struct order: modelIndex,colMeshIndex,t
 /*576 prop_light_emergsignal*/[576]={216,0,426,0,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*577 prop_microscope*/[577]={298,0,645,MAXTEX,1241,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*578 prop_pipe*/[578]={490,0,595,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
-/*579 prop_puddle*/[579]={157,0,648,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*580 prop_puddle_grease*/[580]={157,0,650,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*581 prop_puddle_oil*/[581]={157,0,652,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
-/*582 prop_shelves*/[582]={591,0,94,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
+/*579 prop_puddle*/[579]={2782,0,648,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*580 prop_puddle_grease*/[580]={2782,0,650,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*581 prop_puddle_oil*/[581]={2782,0,652,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
+/*582 prop_shelves*/[582]={591,0,3450,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,CT_MSH,{0},{0}},
 /*583 prop_skeleton*/[583]={592,0,815,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*584 prop_sleeping_cables*/[584]={595,0,71,MAXTEX,MAXTEX,MAXTEX,0,MAXANIM,0,{0},{0}},
 /*585 prop_sparkingwire*/[585]={0,0,71,MAXTEX,MAXTEX,MAXTEX,0,46,0,{0},{0}}/*Looped static prop, anim overwrites, not a missing-model.*/,
@@ -1390,7 +1390,7 @@ void LoadLevelMod(u8 lev) {
             Color3 green = {0.0f, 0.925490196f, 0.082352941f}; par->texAnimLight=AddOffsetLight(par,(V3){0.5292511f,0.065f,0.915f},green,3.0f,0.72f); par->texAnimLight2=AddOffsetLight(par,(V3){-0.5317497f,0.065f,1.039f},green,3.0f,0.72f); par->textureAnimating=true; par->texAnimClip=12; par->texFrame=0;
             par->texAnimResourceFolderIdx = TexAnimFolderIntern("MedicalBed");
         } else if (entIdx == 345) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.00f; } // weapon_dartgun
-        else if (entIdx == 586 || entIdx == 557 || (entIdx >= 540 && entIdx <= 544)) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.0f; } // prop_table, prop_chair01-05, prop_desk01: map exports 0.04 scale; force 1.0
+        else if (entIdx == 586 || entIdx == 557 || entIdx == 530 || (entIdx >= 540 && entIdx <= 544)) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.0f; } // prop_table, prop_chair01-05, prop_desk01, se_cabinet: map exports 0.04 scale; force 1.0
         else if (entIdx == 218 || entIdx == 220) { Quaternion c = quat_from_axis_angle((V3){0.0f,1.0f,0.0f},PI); World.rotation[parent] = quat_multiply(quat_multiply(c,World.rotation[parent]),(Quaternion){-c.x,-c.y,-c.z,c.w}); } // chunk_reac2_4, chunk_reac2_5: the export is a flipped basis, not a turned instance, so conjugate by 180deg about Y (which flips the mesh's local X and Z and leaves Y). Conjugation spins the rotation's axis while preserving its angle, so the level file's authored placement is untouched. Checked against level 7 instance 4180: lR (0,.7071,.7071,0) -> (0,-.7071,.7071,0) exactly, and it is non-identity on all 6 (218) / 4 (220) orientations these prefabs use, so every instance gets corrected.
         else if (entIdx == 53) { World.rotation[parent] = quat_multiply(World.rotation[parent], quat_from_axis_angle((V3){1.0f,0.0f,0.0f},PI*0.5f)); }
         else if (entIdx == 551 && par->codeScreen) { World.rotation[parent] = quat_multiply(World.rotation[parent], (Quaternion){0.0f,0.70710678f,0.70710678f,0.0f}); World.scale[parent].x*=0.390625f; World.scale[parent].y*=0.390625f; World.scale[parent].z*=0.390625f; par->texAnimResourceFolderIdx=TexAnimFolderIntern("ScreenCodeRandom"); }
@@ -1401,6 +1401,7 @@ void LoadLevelMod(u8 lev) {
         else if (entIdx == 2 || entIdx == 3) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("Bridge11"); } /*chunk_bridg1_1, chunk_bridg1_1flipx*/
         else if (entIdx == 386) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("MagCartridge"); } /*item_ammo_magcart*/
         else if (entIdx == 538) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("BrokenClock"); } /*prop_broken_clock*/
+        else if (entIdx == 579 || entIdx == 580 || entIdx == 581) { World.instances[parent].entflags |= EF_NO_SHADOWS; } /*prop_puddle, prop_puddle_grease, prop_puddle_oil*/
         TextureSequenceInit(parent,texAnimFolders[par->texAnimResourceFolderIdx < texAnimFolderCount ? par->texAnimResourceFolderIdx : 0]);
         if (entIdx == 551 && par->codeScreen) { par->texAnimRandom = true; par->texAnimStopsAtDie = false; }
     }
@@ -1526,6 +1527,7 @@ void LoadLevelData(u8 curlevel) {
             case 21: case 22: World.instances[i].tickFinished = World.pauseRelativeTime + 2.0; World.instances[i].animSwapFinished = 0.0; break; // chunk_cyberpanel, chunk_cyberpanel_slice45
             case 515: func_forcebridge(i); break;
             case 716: World.layer[i] = L_Trigger; break; // fx_reverbzone
+            case 697: World.layer[i] = L_NPCClip; break; // clip_npc
             case 517: FuncWallInitAfterLoad(i); break;
             case 596: World.instances[i].strength=UsableOrDef(World.instances[i].strength,12.0f); World.instances[i].offStrengthFactor=UsableOrDef(World.instances[i].offStrengthFactor,3.0f); World.instances[i].distancePaddingToTopPoint=UsableOrDef(World.instances[i].distancePaddingToTopPoint,0.32f); break; /*trigger_gravitylift*/
             case 701: LogicTimerInitBeforeLoad(i); break;

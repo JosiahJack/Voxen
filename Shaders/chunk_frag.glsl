@@ -142,7 +142,22 @@ void main() {
         float sunZ   = sunProj.z  * 0.5 + 0.5;
         if (all(lessThan(abs(sunProj.xy), vec2(1.0))) && abs(sunProj.z) < 1.0) {
             const int SUN_DILATE = 1;
-            float sunBias = 0.0012 / clamp(dot(adjustedNormal, sunDirection), 0.25, 1.0);
+            /*Bias halved vs 639f655 (was 0.0012/clamp(NdotL,0.25,1.0)): the
+              gaps at mesh junctions read as peter-panning, not lateral
+              cracks. The bias is subtracted from the receiver depth before
+              the LEQUAL compare, so it errs toward LIT: every shadow pulls
+              back from its caster's contact line by the bias, and at the
+              disc's 5.7deg elevation that detachment is amplified ~1/tan(el)
+              ~10x on the ground plane, so the old 0.0048 grazing max (0.54
+              world units of depth) opened multi-unit lit gaps at contacts.
+              Halved: 0.0006 at normal incidence (0.067 units), 0.0012 max at
+              grazing (0.134 units, the old flat value). Stacks on the landed
+              SUN_DILATE min loop (different lines, no conflict). If gaps
+              shrink, the mechanism is confirmed; next steps then are a flat
+              0.0006 (floor 1.0) or a normal-offset bias (sample at FragPos +
+              normal*offset), which detaches far less at low sun. If acne
+              returns at grazing instead, revert the floor to 0.25.*/
+            float sunBias = 0.0006 / clamp(dot(adjustedNormal, sunDirection), 0.5, 1.0);
             vec2 sunTexel = 1.0 / vec2(textureSize(sunShadowMap, 0));
             for (int sx = -SUN_DILATE; sx <= SUN_DILATE; ++sx) { for (int sy = -SUN_DILATE; sy <= SUN_DILATE; ++sy) { sunShadow = min(sunShadow, texture(sunShadowMap, vec3(sunUV + vec2(float(sx), float(sy)) * sunTexel, sunZ - sunBias))); } }
         }

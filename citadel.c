@@ -1349,7 +1349,7 @@ static bool TargetIDFrob(V3 p,V3 f,V3 r){V3 dir=ScreenPointToRayOffset(f,r,0,0);
 static void Frob(V3 p,V3 f,V3 r){
     if(World.uiIsBlocking||World.curLev==LEVEL_CYBERSPACE)return;
     if(Cheats.editMode){
-        V3 d0=ScreenPointToRayOffset(f,r,0,0);RaycastHit fh=Raycast(p,d0,World.farPlane[World.curLev],LMASK_PLAYER_FROB);u16 newEnt=(fh.hit&&fh.hitInstanceIndex>=INSTS_1ST_IDX&&fh.hitInstanceIndex<World.instCount)?fh.hitInstanceIndex:U16_MAX;float lightDist=0.0f;u16 newLight=EditModePickLight(p,d0,World.farPlane[World.curLev],&lightDist);bool lightWins=(newLight<U16_MAX&&(!fh.hit||lightDist<fh.distance));
+        V3 d0=ScreenPointToRayOffset(f,r,0,0);RaycastHit fh=RaycastEditPick(p,d0,World.farPlane[World.curLev],LMASK_PLAYER_FROB);u16 newEnt=(fh.hit&&fh.hitInstanceIndex>=INSTS_1ST_IDX&&fh.hitInstanceIndex<World.instCount)?fh.hitInstanceIndex:U16_MAX;float lightDist=0.0f;u16 newLight=EditModePickLight(p,d0,World.farPlane[World.curLev],&lightDist);bool lightWins=(newLight<U16_MAX&&(!fh.hit||lightDist<fh.distance));
         if(lightWins){editModeLightSelection=newLight;editModeSelection=U16_MAX;editFieldEditing=false;CenterStatusPrint("Selected light %u",newLight);}
         else {editModeSelection=newEnt;editModeLightSelection=U16_MAX;editFieldEditing=false;if(newEnt<U16_MAX)CenterStatusPrint("Selected object %u (const index %u)",newEnt,World.instances[newEnt].index);else CenterStatusPrint("Object deselected");}
         return;/*No pickup/search/use while in edit mode; selection only.*/

@@ -1,7 +1,7 @@
 // Model Definitions
 // Defines each model used by the game or mod
 // Format:
-// # Indicates start of an entry followed by the file path.  ./ is assumed
+// # Indicates start of an entry followed by the file path.  ./ is assumed.  This is not comment syntax.
 // example: Models/my_super_awesome_model.obj
 // Acceptable file formats: .obj
 // The path must include the file extension
@@ -2136,13 +2136,6 @@ index: 6875
 #Models/maint2_6d.obj
 index: 6876
 
-# --- relocated blocks -------------------------------------------------------------------------------------------
-# Each model below was moved out of the middle to the end so its full authored frame set is kept and no two models share an
-# index.  LoadGLBAnimatedSources assigns an animated model to base+ordinal and skips an index another model already claimed,
-# and it walks this file front to back, so an oversized block in the middle silently steals indices from whatever comes after
-# it.  Moving the block out costs a hole and costs no frames.  Frame ranges below are exactly as authored; only index moved.
-# models.c rows 23, 2, 26 and 52 shift their clip bases by the deltas noted in each comment.
-
 #Models/npc_bot_cortex_reaver.glb
 index: 6877
 animated: 1
@@ -2152,10 +2145,6 @@ frame: 38 56
 frame: 58 81
 frame: 84 96
 frame: 99 106
-# Moved from 2104 (delta +4773).  Ranges total 34+19+24+13+8 = 98 frames, so 2104 packed 2104..2201 and overran
-# npc_cyborgassassin at 2200 by 2.  The reaver is built first, being earlier in this file, and the loader keeps the first
-# claim on an index, so the reaver took 2200..2201 and the assassin's A_IDLE frames 1-2 were never baked -- the assassin
-# played reaver dying frames there.  2104..2199 is now a free hole.
 
 #Models/npc_humanoidmutant.glb
 index: 6975
@@ -2165,8 +2154,6 @@ frame: 0 37
 frame: 50 99
 frame: 111 150
 frame: 153 176
-# Moved from 742 (delta +6233).  Ranges total 38+50+40+24 = 152 frames, so 742 packed 742..893 and overran
-# npc_cyborg_drone at 893 by 1, costing the drone its A_IDLE frame 1.  742..892 is now a free hole.
 
 #Models/npc_cyborg_elite.glb
 index: 7127
@@ -2179,8 +2166,6 @@ frame: 216 233
 frame: 235 244
 frame: 319 386
 frame: 401 450
-# Moved from 2782 (delta +4345).  Ranges total 68+84+21+18+10+68+50 = 319 frames, so 2782 packed 2782..3100 and overran
-# npc_cyborg_enforcer at 3100 by 1, costing the enforcer its A_IDLE frame 1.  2782..3099 is now a free hole.
 
 #Models/g_energmine.glb
 index: 7446
@@ -2194,3 +2179,5 @@ index: 7488
 #Models/player_character.glb
 index: 7489
 
+#Models/puddle_card.obj
+index: 2782

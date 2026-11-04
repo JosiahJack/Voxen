@@ -1446,14 +1446,17 @@ index: 646
 index: 647
 #Textures/puddle1.png
 index: 648
+doublesided: 1
 #Textures/puddle2_normal.png
 index: 649
 #Textures/puddle2.png
 index: 650
+doublesided: 1
 #Textures/puddle_mask.png
 index: 651
 #Textures/puddleoil.png
 index: 652
+doublesided: 1
 #Textures/puddleoil_shine.png
 index: 653
 #Textures/pumpkin_1.png
@@ -7191,31 +7194,22 @@ doublesided: 0
 transparent: 0
 #Textures/cyberitem_pulser.png
 index: 3440
-doublesided: 0
-transparent: 0
 #Textures/cyberitem_recall.png
 index: 3441
-doublesided: 0
-transparent: 0
 #Textures/cyberitem_shield.png
 index: 3442
-doublesided: 0
-transparent: 0
 #Textures/cyberitem_turbo.png
 index: 3443
-doublesided: 0
-transparent: 0
 #Textures/cyberdatafrag.png
 index: 3444
-doublesided: 0
-transparent: 0
-
 #Textures/flightpods_exterior_atlas.png
 index: 3445
-doublesided: 0
-transparent: 0
-
 #Textures/console01_atlas.png
 index: 3446
-doublesided: 0
-transparent: 0
+#Textures/computer_atlas.png
+index: 3447
+
+#Textures/couches_atlas.png
+index: 3449
+#Textures/shelves_atlas.png
+index: 3450
