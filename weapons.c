@@ -45,15 +45,9 @@ void HeatBleedOff() {
     heatTickFinished = World.pauseRelativeTime + heatTickTime;
 }
 
-static void Recoil(int wep16) {
-    float s=recoilForWeapon[wep16]; if(s<=0.0f){return;} if(World.instances[PLAYER1].health>0.0f && World.invP1.fatigue>80.0f){s*=2.0f;} s*=0.25f;
-    V3 j={wfx.reloadContainerPos.x - s*0.5f*random_range(-1.0f,1.0f),wfx.reloadContainerPos.y,wfx.reloadContainerHome.z - s}; wfx.reloadContainerPos=(V3){j.x > 999.0f ? 0.0f : j.x, j.y > 999.0f ? 0.0f : j.y, j.z > 999.0f ? 0.0f : j.z }; wfx.recoiling=true;
-}
-
-static void Recoiling() { if(!wfx.recoiling){return;} float dt = (float)World.deltaTime * World.timeScale; wfx.reloadContainerPos.x+=(wfx.reloadContainerHome.x - wfx.reloadContainerPos.x)*dt; wfx.reloadContainerPos.z+=(wfx.reloadContainerHome.z - wfx.reloadContainerPos.z)*dt; }
+static void Recoil(int wep16) { float s=recoilForWeapon[wep16]; if(s<=0.0f){return;} if(World.instances[PLAYER1].health>0.0f && World.invP1.fatigue>80.0f){s*=2.0f;} s*=0.25f; V3 j={wfx.reloadContainerPos.x - s*0.5f*random_range(-1.0f,1.0f),wfx.reloadContainerPos.y,wfx.reloadContainerHome.z - s}; wfx.reloadContainerPos=(V3){j.x > 999.0f ? 0.0f : j.x, j.y > 999.0f ? 0.0f : j.y, j.z > 999.0f ? 0.0f : j.z }; wfx.recoiling=true; }
+static void Recoiling() { if(!wfx.recoiling){return;} float dt = (float)World.dt * World.timeScale; wfx.reloadContainerPos.x+=(wfx.reloadContainerHome.x - wfx.reloadContainerPos.x)*dt; wfx.reloadContainerPos.z+=(wfx.reloadContainerHome.z - wfx.reloadContainerPos.z)*dt; }
 double lerpStartTime = 0.0;
-
-
 void CompleteWeaponChange() {
     if (World.invP1.weaponIndexPending == -1) return;
     World.invP1.wepCur = (u8)World.invP1.wepCurPending;
@@ -73,7 +67,7 @@ void CompleteWeaponChange() {
     World.invP1.wepCurPending = World.invP1.weaponIndexPending = -1;
 }
 
-void WeaponFireStartWeaponDip(float t); // Forward declaration from citadel.c
+void WeaponFireStartWeaponDip(float t);
 void CycleWeaponSlot(int dir) { // dir: +1 = next, -1 = prev; dead in cyberspace, only 2 weapons so up is down
     if (World.curLev == LEVEL_CYBERSPACE) { World.invP1.isPulserNotDrill = !World.invP1.isPulserNotDrill; play_wav(sounds[80],AppliedFXVol(1.0f),(V3){0},false);/*changeweapon*/ return; }
     if (World.invP1.reloadFinished > World.pauseRelativeTime) return; // Dip in progress
@@ -224,7 +218,7 @@ void HitScanFire(int wep16) {
     else { CreateStandardImpactEffects(); if (!npc && b && IdxIsGeometry(World.instances[ent].index)) CreateStandardImpactMarks(wep16); }
     float tranq = -1.0f; if (npc && dd.attackType == Att_Trnq){tranq=Tranquilize(ent,3.0f + random_range(0.0f,4.0f),false);}
     dd.damage=alt ? dmgForWep2[wep16] : (CurrentWeaponUsesEnergy() ? DamageForPower(wep16) : dmgForWep[wep16]); dd.offense=alt ? offenseWep2[wep16] : offenseWep[wep16]; dd.penetration=alt ? penetrationWep2[wep16] : penetrationWep[wep16];
-    dd.damage = GetDamageTakeAmount(&dd);/*C# WeaponFire hitscan calls GetDamageTakeAmount before TakeDamage (armorvalue/defense stay 0, as in C# which never fills them for hitscan)*/
+    dd.damage = GetDamageTakeAmount(&dd);
     float dmgFinal = 0.0f;
     if (b && World.instances[ent].health > 0.0f) {
         dd.damage*=0.8f;/*rebalancing factor*/ dmgFinal=TakeDamage(ent,dd); dd.impactVelocity+=dd.damage;

@@ -100,13 +100,13 @@ void UseCyberspaceItem() {
     switch(World.invP1.cyberItemIndex) {case 0: if (!World.invP1.softVersions[SW_TURBO])  { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); return; } UseTurbo();  break; case 1: if (!World.invP1.softVersions[SW_DECOY])  { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); return; } UseDecoy();  break; case 2: if (!World.invP1.softVersions[SW_RECALL]) { World.invP1.cyberItemIndex = GetExistingCyberItemIndex(); return; } UseRecall(); break;}
 }
 
-void UseCyberspaceItemByIndex(int idx) { World.invP1.cyberItemIndex = (i8)idx; UseCyberspaceItem(); }/*MFD software tab rows 3..5 map to the 0..2 turbo/decoy/recall selector*/
+void UseCyberspaceItemByIndex(int idx) { World.invP1.cyberItemIndex = (i8)idx; UseCyberspaceItem(); }
 static void CycleCyberSpaceItem(int step) { int next=World.invP1.cyberItemIndex+step; if (next<0) next=2; if (next>2) next=0; for (int c=0;c<3;++c,next=(next+step+3)%3) if (World.invP1.hasSoft&(1u<<(SW_TURBO+next))) { World.invP1.cyberItemIndex=(i8)next; return; } World.invP1.cyberItemIndex=-1; }
-void CompleteWeaponChange(void); /* defined in weapons.c: applies pending weapon change to state, view model, and HUD */
+void CompleteWeaponChange(void);
 void RemoveWeapon(i32 slot) {
     if (slot < 0 || slot >= 7 || World.invP1.wepInvIndices[slot] < 0) return;
-    if (World.invP1.holdingObject) return; /* hands full, same refusal as GeneralInvTake */
-    /* The weapon leaves the 7-slot list and becomes the held object, carrying its loaded magazines: AddItemToInventory -> AddWeaponToInventory reads heldAmmo/heldAmmo2/heldObjectLoadedAlternate to put them back (ADD TO INVENTORY, or a quick pickup). heldObjectIndex is the EDD, and a weapon's EDD is 343..358 - the very value wepInvIndices already holds - so store it verbatim. Subtracting 307 was wrong: IdxIsWeapon, GetItemFrobTexture and ItemStringIdx all key off 343..358, and the -307 consumers (RelayPanelUse, HeldItemIsFrobUser) want the EDD too. */
+    if (World.invP1.holdingObject) return;
+    
     World.invP1.heldAmmo = World.invP1.currentMagazineAmount[slot]; World.invP1.heldAmmo2 = World.invP1.currentMagazineAmount2[slot]; World.invP1.heldObjectLoadedAlternate = World.invP1.wepLoadedWithAlternate[slot];
     World.invP1.heldObjectCustIdx = U16_MAX; World.invP1.heldObjectIndex = (u16)World.invP1.wepInvIndices[slot]; World.invP1.grenActive = false; World.invP1.holdingObject = true;
     for (i32 i=slot;i<6;++i) { World.invP1.wepInvIndices[i]=World.invP1.wepInvIndices[i+1]; World.invP1.wepInvAmIndices[i]=World.invP1.wepInvAmIndices[i+1]; World.invP1.currentMagazineAmount[i]=World.invP1.currentMagazineAmount[i+1]; World.invP1.currentMagazineAmount2[i]=World.invP1.currentMagazineAmount2[i+1]; World.invP1.wepLoadedWithAlternate[i]=World.invP1.wepLoadedWithAlternate[i+1]; World.invP1.curWepHeat[i]=World.invP1.curWepHeat[i+1]; }
@@ -119,15 +119,15 @@ void RemoveWeapon(i32 slot) {
     World.invP1.numweapons = numweapons;
     if (!numweapons) { for (int i = 0; i < 7; i++) World.invP1.currentMagazineAmount[i] = World.invP1.currentMagazineAmount2[i] = 0; }
     if (World.invP1.weaponIndexPending < 0) { World.instances[World.weaponVModelIndex].modelIndex = MAX_MDLS; World.invP1.wepCurPending = World.invP1.weaponIndexPending = -1; ForceInventoryMode(); return; } /* no valid weapon selected: hide the view model */
-    CompleteWeaponChange(); /* updates weapon state, view model, and HUD */
-    ForceInventoryMode(); /* so the held weapon and its ADD TO INVENTORY button are on screen */
+    CompleteWeaponChange();
+    ForceInventoryMode();
 }
 static float DefaultEnergySettingForWeapon(int wep16Index) { return (wep16Index == 4) ? 5.0f : (wep16Index == 10) ? 13.0f : (wep16Index == 14) ? 2.0f : 3.0f; }
 __attribute__((noinline)) void AddAmmoToInventory(int index,int constIndex,int amount,bool isSecondary) { if(index < 0){return;} if(isSecondary){World.invP1.wepAmmoSecondary[index]+=(u16)amount;} else {World.invP1.wepAmmo[index]+=(u16)amount;} CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(constIndex)],Sys_Text.stringTable[630]); }
 bool AddWeaponToInventory(int index,int ammo1,int ammo2,bool loadedAlt) {
     if (index < 0) return false; if (!World.Sys_UI.firstMain){World.Sys_UI.firstMain=true; World.Sys_UI.mfdTab[0]=1;} if(!World.Sys_UI.firstWeapon){World.Sys_UI.firstWeapon=true; World.Sys_UI.mfdTab[1]=1;}
     for (i32 i = 0; i < 7; i++) {
-        if(World.invP1.wepInvIndices[i] >= 0){continue;} World.invP1.wepInvIndices[i] = index; i32 index16 = Get16WeaponIndexFromConstIndex(index); World.invP1.weaponEnergySetting[index16] = DefaultEnergySettingForWeapon(index16); if (i == 0) { World.invP1.wepCurPending=i; World.invP1.weaponIndexPending=(u16)index; World.invP1.justChangedWeap=true; WeaponFireStartWeaponDip(0.5f); World.invP1.justChangedWeap = false; World.invP1.recoiling = false; }
+        if(World.invP1.wepInvIndices[i] >= 0){continue;} World.invP1.wepInvIndices[i] = index; i32 index16 = Get16WeaponIndexFromConstIndex(index); World.invP1.weaponEnergySetting[index16] = DefaultEnergySettingForWeapon(index16); if (i == 0) { World.invP1.wepCurPending=i; World.invP1.weaponIndexPending=(u16)index; WeaponFireStartWeaponDip(0.5f); World.invP1.recoiling = false; }
         if (loadedAlt && ammo2 > 0){World.invP1.currentMagazineAmount2[i]=(u8)ammo2; if (ammo1 > 0) World.invP1.wepAmmo[index16]+=(u16)ammo1; World.invP1.wepLoadedWithAlternate[i]=true;}else{World.invP1.currentMagazineAmount[i]=(u8)ammo1; if (ammo2 > 0) World.invP1.wepAmmoSecondary[index16]+=(u16)ammo2; World.invP1.wepLoadedWithAlternate[i]=false;}
         CenterStatusPrint("%s%s",Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[33]); World.invP1.numweapons=0; for (i32 j=0;j<7;j++) { if(World.invP1.wepInvIndices[j] >= 0){World.invP1.numweapons++;} } return true;
     } return false;
@@ -151,7 +151,7 @@ void InventoryUpdate() {
     } if (Patch()) { if (World.invP1.patchCur >= 0 && World.invP1.patchCur < 7 && World.invP1.patchCounts[World.invP1.patchCur] > 0){PatchUse(World.invP1.patchCur);} else {CenterStatusPrint("%s",Sys_Text.stringTable[324]); /*Out of patches.*/} } if (PatchCycUp()){PatchCycle(Sys_Settings.InvertInventoryCycling ? -1 : 1);} else if (PatchCycDown()){PatchCycle(Sys_Settings.InvertInventoryCycling ? 1 : -1);}
 }
 
-void AddItemFail(int index/*Expects usableItem index*/) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[318]);/*Inventory full.*/ }
+void AddItemFail(int index) { DropHeldItem(); CenterStatusPrint("%s%s%s", Sys_Text.stringTable[32],Sys_Text.stringTable[ItemStringIdx(index)],Sys_Text.stringTable[318]);/*Inventory full.*/ }
 extern u8 magazinePitchCountForWeapon[16],magazinePitchCountForWeapon2[16];
 void AddItemToInventory(int index, int custIdx) {
     if (IdxIsGenericItem(index)) { if(!AddGeneralObjectToInventory(index,custIdx)){AddItemFail(index);} } else if (IdxIsAudioLog(index)) { AddAudioLogToInventory(World.invP1.heldObjectCustIdx); } 
@@ -197,7 +197,7 @@ void FuncWallMoveTarget(u16 self) { World.instances[self].funcState = FStat_Movi
 void FuncWallTargetted(u16 self) { Entity* e = &World.instances[self]; u8 st = (u8)e->funcState; bool toTarget = st == FStat_Start || st == FStat_MovingStart || st == FStat_AjarMovingTarget || (st > FStat_AjarMovingTarget && e->ajarPercentage > 0.0f); if (toTarget){FuncWallMoveTarget(self);} else{FuncWallMoveStart(self);} play_wav(sounds[76], AppliedFXVol(1.0f), World.position[self], true); }
 void FuncWallUpdateInner(u16 self) {
     Entity* e = &World.instances[self]; if (e->funcState != FStat_MovingStart && e->funcState != FStat_MovingTarget) return; V3 goal = e->funcState == FStat_MovingStart ? e->startPosition : e->targetPosition; FuncStates doneState = e->funcState == FStat_MovingStart ? FStat_Start : FStat_Target; V3 delta = V3_AsubB(goal,World.position[self]);
-    float distanceLeft = V3_Mag(delta), total = V3_Dist(e->startPosition,e->targetPosition), dist = e->speed * (float)World.deltaTime * World.timeScale; if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) { World.position[self]=goal; e->funcState=doneState; e->percentMoved=doneState == FStat_Target ? 1.0f : 0.0f; return; }
+    float distanceLeft = V3_Mag(delta), total = V3_Dist(e->startPosition,e->targetPosition), dist = e->speed * (float)World.dt * World.timeScale; if (distanceLeft <= dist || e->tickFinished < World.pauseRelativeTime) { World.position[self]=goal; e->funcState=doneState; e->percentMoved=doneState == FStat_Target ? 1.0f : 0.0f; return; }
     if (distanceLeft > 0.0001f) World.position[self]=V3Add(World.position[self],V3_ScaleByF(V3_Normalize(delta),dist)); if (total > 0.0001f) e->percentMoved = V3_Dist(e->startPosition,World.position[self]) / total;
 }
 
@@ -220,14 +220,7 @@ void LogicRelayDelayTarget(u16 self, u16 act) { Entity* e=&World.instances[self]
 void LogicRelayUpdate(u16 self) { Entity* e=&World.instances[self]; if (e->delayFinished <= 0.0 || e->delayFinished >= World.pauseRelativeTime) {return;} e->delayFinished = 0.0; u32 savedFlags = World.targetIOActivatorIoflags, savedFlagsHi = World.targetIOActivatorIoflagsHi; World.targetIOActivatorIoflags = e->ioflags; World.targetIOActivatorIoflagsHi = e->ioflagsHi; UseTargets(e->recentMostActivator, e->targetIdx); World.targetIOActivatorIoflags = savedFlags; World.targetIOActivatorIoflagsHi = savedFlagsHi; }
 void TriggerCounterTargetted(u16 self, u16 act) { Entity* e=&World.instances[self]; e->counter++; if (e->counter != e->countToTrigger) {return;} if (e->delay <= 0.0f){TriggerCounterTarget(self,act);}else{TriggerCounterDelayedTarget(self,act);} if (!e->dontReset){e->counter=0;} }
 void SpawnManagerActivate(u16 self, bool alerted) { Entity* e=&World.instances[self]; e->alertEnemiesOnAwake=alerted; e->active=true; e->delayFinished=World.pauseRelativeTime; }
-static bool SpawnPointIsClear(u16 spot) {
-    V3 p=World.position[spot]; if(World.curLev>=LEVEL_CYBERSPACE||PositionVisibleFromPlayerCell(p.x,p.z)) {/*cyberspace never builds PVS bits (culling.c:151), so treat it as all-visible, matching TargetIDInPlayerPVS. No spawner sits on 13 today.*/
-        ShapeCapsule ball={.tip=p,.base=p,.rad=0.48f};/* tip==base is a sphere */
-        return AreaHasClearance(ball,ball,0.0f,LMASK_NPC_COLLIDESWITH,0xFFFFu);
-    }
-    return false;
-}
-
+static bool SpawnPointIsClear(u16 spot) { V3 p=World.position[spot]; if(World.curLev>=LEVEL_CYBERSPACE||PositionVisibleFromPlayerCell(p.x,p.z)) { ShapeCapsule ball={.tip=p,.base=p,.rad=0.48f}; return AreaHasClearance(ball,ball,0.0f,LMASK_NPC_COLLIDESWITH,0xFFFFu); } return false; }
 void AIAlert(u16);
 void SpawnManagerUpdate(u16 self) {
     Entity* e=&World.instances[self]; if (World.paused || World.menuActive || !e->active) {return;}
@@ -241,17 +234,12 @@ void SpawnManagerUpdate(u16 self) {
         ++count;
     }
     if (levelNpcs > 300) {return;}
-    
-    if (e->numberActive != count) {e->numberActive = count;}
-    if (e->numberActive >= e->numberToSpawn) {return;}
+    if (e->numberActive != count) {e->numberActive = count;} if (e->numberActive >= e->numberToSpawn) {return;}
     if (e->delayFinished >= World.pauseRelativeTime) {return;}
     
     e->delayFinished = World.pauseRelativeTime + (double)random_range(e->minDelayBetweenSpawns, e->maxDelayBetweenSpawns);
     if (World.diffCbt == 0) {return;}
-    
-    u16 spots = 0;
-    for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(World.instances[i].index == SPAWNPOINT_CONST){++spots;} }
-    if (!spots) {return;}
+    u16 spots = 0; for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) { if(World.instances[i].index == SPAWNPOINT_CONST){++spots;} } if (!spots) {return;}
 
     u16 spot = 0, valid = 0;
     for (u8 shot=0;shot<10;++shot) {
@@ -481,7 +469,7 @@ void SpawnExplosionEffect(V3 pos, int explosionType) {
 
 void GrenadeExplode(u16 self) {
     if(self>=World.instCount)return; Entity* e = &World.instances[self]; if(!(e->entflags&EF_ACTIVE))return; flag_set(&e->entflags,EF_ACTIVE,false);
-    DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.0f,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,.owner=e->recentMostActivator,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
+    DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.defense=0.0f,.impactVelocity=e->damage*1.5f,.attacknormal=(V3){0.0f,1.0f,0.0f},.hitpoint=World.position[self],.attackType=e->attackType,.owner=e->recentMostActivator,.isOtherNPC=false,.berserkActive=(World.invP1.patchActive & PATCH_BERSERK) != 0};
     i16 idx=GrenadeTypeFromConst(e->index); float radius=(idx>=7&&idx<=13) ? grenadeRadius[idx-7] : (e->strength>0.0f ? e->strength : 4.0f); ApplyImpactForceSphere(&dd,World.position[self],radius,e->damage * 0.1f);  if (!GrenadeIsNPCMine(self)) { World.invP1.makingNoise = true; World.invP1.noiseFinished = World.pauseRelativeTime + 2.0; } int soundIndex=60,explosionType=2;
     switch (idx) {case 7: case 11: soundIndex = 64; World.fogFac += 5; explosionType = 1; break;/*frag, mine*/ case 8: case 10: soundIndex = 60; World.fogFac += 7; explosionType = 2; break;/*conc, earth*/ case 9:  soundIndex = 67; explosionType = 4; break;/*emp*/ case 12: soundIndex = 60; World.fogFac += 6;  explosionType = 2; break;/*nitro*/ case 13: soundIndex = 63; World.fogFac += 10; explosionType = 3; break;/*gas*/}
     play_wav(SoundPath(soundIndex), AppliedFXVol(1.0f), World.position[self], true); SpawnExplosionEffect(World.position[self],explosionType); Shake(-1.0f); DeleteInstance(self);
@@ -499,13 +487,8 @@ void GrenadeUpdate(u16 self) { Entity* e = &World.instances[self]; i16 idx=Grena
 void GrenadeOnCollision(u16 self) { i16 idx=GrenadeTypeFromConst(World.instances[self].index); if ((idx >= 7 && idx <= 9) || idx == 13) GrenadeExplode(self); }
 float GetDamageTakeAmount(DamageData* dd) {
     if (!dd) return 0.0f; float take = dd->damage; if (take <= 0.0f) return 0.0f;
-    /* 1. Armor Absorption: REMOVED — penetration concept intentionally removed (C# never populates armorvalue/penetration, so its armor step is dead code; do not reintroduce it).
-       2. Weapon Vulnerabilities: handled by TakeDamage via ApplyAttTypeAdjustments, as in C# HealthManager. */
-    /* 3. Critical Hits (NPCs only, C# DamageData.cs): crit = offense - defense; if crit > 0, two rolls (rand < crit/6 and rand < 0.2) then take *= (1 + crit). */
     if (dd->isOtherNPC) { float crit = dd->offense - dd->defense; if (crit > 0.0f && random_range(0.0f, 1.0f) < (crit / 6.0f) && random_range(0.0f, 1.0f) < 0.2f) { take *= (1.0f + crit); } }
-    /* 4. Random Factor +/- 10% (C# DamageData.cs). */
     take *= random_range(0.9f, 1.1f);
-    /* 6. Berserk Damage Increase (C# Const.berserkDamageMultiplier = 4.0). */
     if (dd->berserkActive) take *= 4.0f/*Quad Damage!*/;
     if (take < 0.0f) take = 0.0f; return take;
 }
@@ -536,12 +519,12 @@ static void CodeScreensSetForLevel(u8 lev) {
 
     i8 *code = &World.lev1SecCode; if (code[lev-1] < 0) { code[lev-1] = (i8)random_range_u8(0u,9u); }
     u8 digit = (u8)code[lev-1];
-    u8 entryLevel = World.currentLevel;
+    u8 entryLevel = World.curLev;
     for (u8 l=0;l<MAX_LEVELS;++l) {
-        if (l != World.currentLevel) SetLevelPointers(l);
+        if (l != World.curLev) SetLevelPointers(l);
         for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { Entity* s = &World.instances[i]; if (s->index != 551 || !s->codeScreen) continue; CodeScreenShowDigit(i, digit); }
     }
-    if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
+    if (World.curLev != entryLevel) SetLevelPointers(entryLevel);
 }
 
 static bool CPUNodesRemainOnLevel(void) {
@@ -550,11 +533,11 @@ static bool CPUNodesRemainOnLevel(void) {
 }
 
 void ProjectileEffectImpactOnCollision(u16 self,u16 hitIdx, V3 hitPos,V3 hitNormal) {
-    if(self>=World.instCount||hitIdx>=World.instCount)return; Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return;/*other.gameObject == host*/ e->counter++;/*numHits++*/
-    DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.armorvalue=0.,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(e->recentMostActivator==PLAYER1&&(World.invP1.patchActive & PATCH_BERSERK)!=0)};
-    Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { const NPCTable* nt = &npcTable[hit->index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; }
-    dd.damage = GetDamageTakeAmount(&dd);/*Berserk now applied inside GetDamageTakeAmount, as in C# (old pre-multiply removed: same product, single application point).*/
-    if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }/*Railgun sphere impact, after GetDamageTakeAmount as in C# ProjectileEffectImpact*/
+    if(self>=World.instCount||hitIdx>=World.instCount)return; Entity* e = &World.instances[self]; if (hitIdx == e->recentMostActivator) return; e->counter++;
+    DamageData dd={.damage=e->damage,.penetration=e->strength,.offense=e->speed,.defense=0,.impactVelocity=e->damage*1.5f,.attacknormal=hitNormal,.hitpoint=hitPos,.attackType=e->attackType,.owner=e->recentMostActivator,.isOtherNPC=IdxIsNPC(World.instances[hitIdx].index),.berserkActive=(e->recentMostActivator==PLAYER1&&(World.invP1.patchActive & PATCH_BERSERK)!=0)};
+    Entity* hit = &World.instances[hitIdx]; if (IdxIsNPC(hit->index)) { const NPCTable* nt = &npcTable[hit->index - 419]; dd.defense = nt->defense; }
+    dd.damage = GetDamageTakeAmount(&dd);
+    if (e->lookUpIndex == 5) { ApplyImpactForceSphere(&dd, World.position[self], 3.2f, 1.0f); World.fogFac += 4; }
     SpawnProjectileImpactParticles(e->index,hitPos,hitNormal);
     bool hostIsNPC=e->recentMostActivator<World.instCount&&IdxIsNPC(World.instances[e->recentMostActivator].index);
     if (hit->health > 0.0f || hit->cyberHealth > 0.0f) {
@@ -591,7 +574,7 @@ static void DropSearchables(u16 self) {
         World.instances[self].contents[i]=World.instances[self].custIdx[i] = -1;}
 }
 
-static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} if (!IdxInBounds((int)fxPoolType) || IdxIsGeometry((int)fxPoolType)) {return; /*PoolType is an ordinal enum (None..LeafBurst, 0..29), not a const index.  Feeding one to SpawnDynamicObject makes it try to spawn a level chunk, which is where "Indices 0 to 306 (level chunks) not possible when not on edit mode!" came from.  Refuse here so no caller can reach that.*/} V3 pos = World.position[self]; if (World.col[self] != CT_NONE) { pos = V3Add(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
+static void CreateDeathEffects(u16 self,u16 fxPoolType) { if (fxPoolType == 0) {return; /*PoolType_None*/} if (!IdxInBounds((int)fxPoolType) || IdxIsGeometry((int)fxPoolType)) { return; } V3 pos = World.position[self]; if (World.col[self] != CT_NONE) { pos = V3Add(pos,World.colliderCenter[self]); } SpawnImpactEffect(fxPoolType, pos); }
 static void HideSelf(u16 self) { if (World.instances[self].index == 279) {return; /*tv screens keep mesh visible*/} World.instances[self].modelIndex = MAX_MDLS; World.gravity[self] = 0.0f; }
 static void SpawnSecCpuNodeGibs(u16 self) {
     if (World.instances[self].index != 478) return;
@@ -611,7 +594,7 @@ static void ObjectDeath(u16 self) {
     if (World.instances[self].entflags & EF_DEATH_BURST_DONE) { CreateDeathEffects(self,World.instances[self].deathBurst); DropSearchables(self); if (World.instances[self].index != 279){World.col[self]=CT_NONE;} HideSelf(self); } else { World.col[self] = CT_NONE; DropSearchables(self); CreateDeathEffects(self,World.instances[self].deathBurst); }
     flag_set(&World.instances[self].entflags,EF_DEAD_CHECKS_DONE,true);
     { SecurityType stype = SecurityType_None; if(World.instances[self].index == 477){stype=SecurityType_Camera;}else if(World.instances[self].index == 479){stype=SecurityType_NodeSmall;} else if(World.instances[self].index == 478){stype=SecurityType_NodeLarge;} if(stype != SecurityType_None){ReduceCurrentLevelSecurity(stype);} }
-    if ((World.instances[self].index == 478 || World.instances[self].index == 479) && !CPUNodesRemainOnLevel()) CodeScreensSetForLevel(World.curLev);/*sec_cpunode/sec_cpunode_small: the last node on the level reveals its security code on the displays and stops the flicker.  Independent of the level security percentage above -- revealing the code is a node-behaviour rule, not a percentage one.*/
+    if ((World.instances[self].index == 478 || World.instances[self].index == 479) && !CPUNodesRemainOnLevel()) CodeScreensSetForLevel(World.curLev);
     u16 idx = World.instances[self].index; SpawnSecCpuNodeGibs(self); play_wav(SoundPath((idx < 527 && objectDeathSound[idx] != 0) ? objectDeathSound[idx] : 62/*crate_break*/), AppliedFXVol(1.0f), World.position[self], true); if(e->deathBurst != 0){HideSelf(self);}
 }
 
@@ -684,13 +667,12 @@ float TakeDamage(u16 self,DamageData dd) {
         && (dd.attackType == Att_Beam || dd.attackType == Att_PjBm)) { VaporizeCorpse(self,true); return take; }
     if (isCyber) { if (World.instances[self].cyberHealth <= 0.0f) { if (!World.instances[self].iceActive && isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.cyberkills++;} Death(self,false); } } else { if (World.instances[self].health <= 0.0f) { if (isNPC && !(World.instances[self].entflags & EF_DEAD_CHECKS_DONE)) {World.kills++;} Death(self,dd.attackType == Att_Beam || dd.attackType == Att_PjBm); } }    return take;
 }
-
 // Hardware
 static Color3 lantCol = (Color3){1.0f,1.0f,1.0f}; static float lanternVersionBrightness[3] = {0.875f,1.4f,1.75f}; static const float SIGHT_LIGHT_INTENSITY=0.36f,SIGHT_LIGHT_RANGE=75.8f;/*Citadel sightLight: white spotlight, intensity 0.36, range 75.7961*/
 void HardwareUpdate() {
     bool infraredOn = (World.invP1.hasHardware & HW_INF) && (World.invP1.hardwareIsActive & HW_INF) > 0, lanternOn = (World.invP1.hasHardware & HW_LAN) && (World.invP1.hardwareIsActive & HW_LAN) > 0;
-    bool sightOn = (World.invP1.patchActive & PATCH_SIGHT) && World.invP1.sightFinishedTime != -1.0;/*Sight patch main-effect window only, not the side-effect window*/
-    if (lanternOn || infraredOn || sightOn) { // Headmounted light shared by lantern/infrared/sight: intensities stack, range takes the max of the active effects
+    bool sightOn = (World.invP1.patchActive & PATCH_SIGHT) && World.invP1.sightFinishedTime != -1.0;
+    if (lanternOn || infraredOn || sightOn) {
         V3 ppos = World.position[PLAYER1]; lanternPos = (V3){ppos.x + 0.04f,ppos.y + 0.24f,ppos.z + 0.04f}; float intensity = 0.0f, range = 0.0f;
         if (infraredOn) { intensity += 0.8f; range = vmax(range,50.35f); }
         if (lanternOn) { intensity += lanternVersionBrightness[vclamp(World.invP1.hwVersSetting[7],0,2)]; range = vmax(range,11.52f); }
@@ -698,7 +680,6 @@ void HardwareUpdate() {
         UpdateLight(headmountedLanternLight,lanternPos,lantCol,range,intensity,intensity,0.0f,0.0f,QUAT_IDENTITY,true,true);
     } else UpdateLight(headmountedLanternLight,lanternPos,lantCol,11.52f,0.0f,0.0f,0.0f,0.0f,QUAT_IDENTITY,false,false);
 }
-
 // Dermal Patches
 void PatchDisableAll(void){
     World.invP1.berserkFinished = World.invP1.berserkIncTime = World.invP1.detoxFinished = World.invP1.geniusFinished = World.invP1.mediFinished = World.invP1.reflexFinishedTime = World.invP1.sightFinishedTime = World.invP1.sightSideEffectFinishedTime = World.invP1.staminupFinishedTime = -1.0;
@@ -714,28 +695,12 @@ void PatchUpdate() {
     if (World.invP1.patchActive & PATCH_DETOX) { if (World.invP1.detoxFinished < World.pauseRelativeTime) World.invP1.patchActive -= PATCH_DETOX; else World.instances[PLAYER1].radiation = 0.0f; } // Detox: other patches wiped on use only; radiation zeroed every frame while active
     if (World.invP1.patchActive & PATCH_MEDI) { // Medi
         if (World.invP1.mediPatchPulseFinished == 0.0) World.invP1.mediPatchPulseCount = 0;
-        if (World.invP1.mediPatchPulseFinished < World.pauseRelativeTime) {
-            World.instances[PLAYER1].health = vmin(255.0f, World.instances[PLAYER1].health + 8.0f);
-            World.invP1.mediPatchPulseFinished = World.pauseRelativeTime + (0.5 + World.invP1.mediPatchPulseCount * 0.5);
-            World.invP1.mediPatchPulseCount++;
-        }
-        if (World.invP1.mediFinished < World.pauseRelativeTime && World.invP1.mediFinished != -1.0) {
-            World.invP1.patchActive -= PATCH_MEDI;
-            World.invP1.mediFinished = -1.0;
-            World.invP1.mediPatchPulseFinished = 0.0;
-            World.invP1.mediPatchPulseCount = 0;
-        }
-    } else {
-        World.invP1.mediPatchPulseFinished = 0.0;
-        World.invP1.mediPatchPulseCount = 0;
-    }
+        if (World.invP1.mediPatchPulseFinished < World.pauseRelativeTime) { World.instances[PLAYER1].health = vmin(255.0f, World.instances[PLAYER1].health + 8.0f); World.invP1.mediPatchPulseFinished = World.pauseRelativeTime + (0.5 + World.invP1.mediPatchPulseCount * 0.5); World.invP1.mediPatchPulseCount++; }
+        if (World.invP1.mediFinished < World.pauseRelativeTime && World.invP1.mediFinished != -1.0) { World.invP1.patchActive -= PATCH_MEDI; World.invP1.mediFinished = -1.0; World.invP1.mediPatchPulseFinished = 0.0; World.invP1.mediPatchPulseCount = 0; }
+    } else { World.invP1.mediPatchPulseFinished = 0.0; World.invP1.mediPatchPulseCount = 0; }
     if (World.invP1.patchActive & PATCH_REFLEX) {
-        if (World.invP1.reflexFinishedTime < World.pauseRelativeTime && World.invP1.reflexFinishedTime != -1.0) {
-            World.invP1.patchActive -= PATCH_REFLEX;
-            World.invP1.reflexFinishedTime = -1.0;
-            World.timeScale = 1.0;
-        } else { World.timeScale = 0.25; }
-    } else { if(World.timeScale != 1.0){World.timeScale = 1.0;}}//Reflex (tracked in game-time: pauses with the game and persists through save/load)
+        if (World.invP1.reflexFinishedTime < World.pauseRelativeTime && World.invP1.reflexFinishedTime != -1.0) { World.invP1.patchActive -= PATCH_REFLEX; World.invP1.reflexFinishedTime = -1.0; World.timeScale = 1.0; } else { World.timeScale = 0.25; }
+    } else { if(World.timeScale != 1.0){World.timeScale = 1.0;}}
     if (World.invP1.patchActive & PATCH_BERSERK) { // Berserk
         if (World.invP1.berserkFinished < World.pauseRelativeTime) { World.invP1.berserkIncrement = 0; World.invP1.patchActive -= PATCH_BERSERK; }
         else if (World.invP1.berserkIncTime < World.pauseRelativeTime) { World.invP1.berserkIncrement++; if (World.invP1.berserkIncrement > 6) World.invP1.berserkIncrement = 6; World.invP1.berserkIncTime = World.pauseRelativeTime + 4.0; }
@@ -747,7 +712,6 @@ void PatchUpdate() {
     }
     if (World.invP1.patchActive & PATCH_STAMINUP) { if (World.invP1.staminupFinishedTime < World.pauseRelativeTime) { World.invP1.staminupActive=false; World.invP1.fatigue=100.0f; World.invP1.patchActive -= PATCH_STAMINUP; } else { World.invP1.fatigue = 0.0f; World.invP1.staminupActive = true; } } // Staminup
 }
-
 // Quest Bits / Mission I/O — side effects on quest notes checklist when bits change
 static void QuestBitNoteSideEffects(u8 qb, bool isOn) {
     if (isOn) {
@@ -768,18 +732,15 @@ static void QuestBitNoteSideEffects(u8 qb, bool isOn) {
         }
     }
 }
-
 // Ressurection: when player dies on a level with resurrection active, teleport back to the ressurection point instead of counting a death.
 bool RessurectPlayer(void) {
     if (!((World.ressurectionActiveLevels >> World.curLev) & 1u)) { return false; }
-    V3 spot=(V3){0.0f,0.0f,0.0f};
     
+    V3 spot=(V3){0.0f,0.0f,0.0f};
     if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { spot=ressurectionLocations[6]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); LoadLevel(6, spot); }
     else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); World.position[PLAYER1] = spot; }
-    
     PlayTrack(TT_Revive, MT_Override);
-    World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0;
-    CenterStatusPrint("BRAIN ACTIVITY SATISFACTORY..."); // TODO actual timed text appearances and then restore movement and unpause game.
+    World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0; CenterStatusPrint("BRAIN ACTIVITY SATISFACTORY..."); /*TODO actual timed text appearances and then restore movement and unpause game using the ressurectingFinished timer to time it all.*/
     return true;
 }
 
@@ -886,16 +847,15 @@ void TargetLight(u16 activator, u16 lightIdx) {
 void UseTargets(u16 activator, u16 targetIdx) {
     if(targetIdx==IO_NONE){return;}
     static bool tioTargetInFlight[MAX_IO_NAMES]; static u32 tioNestDepth = 0;
-    if (targetIdx < (u16)MAX_IO_NAMES && tioTargetInFlight[targetIdx]) { return; }/*A target may not re-run inside the cascade it is already running: mutual cycles in the level data (e.g. lev1's vmail network, where the console 692 targets name "lev1vmail1", whose matches include its own triggering relay 699, whose relay target is the console's name again) used to recurse UseTargets until the stack overflowed -> segfault when the lever was flipped. Sequential repeats (sibling chains running the same target twice, branch relays flipping back on a later trigger) still run, because the bit is only held while that target's own subtree is still up the stack.*/
+    if (targetIdx < (u16)MAX_IO_NAMES && tioTargetInFlight[targetIdx]) { return; }
     if (tioNestDepth >= 64) { DualLogWarn("Target IO cascade nested %u deep (target %s): suppressed\n",tioNestDepth,(targetIdx<ioNameCount)?ioNames[targetIdx]:"?"); return; }/*Backstop so no other data cycle, however indirect, can exhaust the stack.*/
-    bool wasActive=World.targetIOActive,succeeded=false; u8 entryLevel=World.currentLevel; if(!wasActive){World.targetIOActive=true; mset(tioTargetInFlight,0,sizeof(tioTargetInFlight)); World.targetIOQuestTestMode=World.instances[activator].questTestMode; World.targetIOActivatorIoflagsHi=World.instances[activator].ioflagsHi; World.targetIOActivatorIoflags=World.instances[activator].ioflags;} const char* targetname=(targetIdx<ioNameCount) ? ioNames[targetIdx] : "";
+    bool wasActive=World.targetIOActive,succeeded=false; u8 entryLevel=World.curLev; if(!wasActive){World.targetIOActive=true; mset(tioTargetInFlight,0,sizeof(tioTargetInFlight)); World.targetIOQuestTestMode=World.instances[activator].questTestMode; World.targetIOActivatorIoflagsHi=World.instances[activator].ioflagsHi; World.targetIOActivatorIoflags=World.instances[activator].ioflags;} const char* targetname=(targetIdx<ioNameCount) ? ioNames[targetIdx] : "";
     tioNestDepth++; if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=true;
-    for (u8 lev=0;lev<MAX_LEVELS;++lev) { if (World.currentLevel != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } if (World.lightTargetnames) { for (u16 l = 0; l < World.loadedLights; ++l) { if (World.lightTargetnames[l] != targetIdx) {continue;} TargetLight(activator,l); succeeded=true; } } }
-    if (World.currentLevel != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=false;/*Cleared unconditionally: deferred trigger paths (TriggerTrippedUpdate etc.) mark targetIOActive true before calling in, so wasActive alone cannot be trusted to know when a bit was set.*/ tioNestDepth--; if (!wasActive) {World.targetIOActive=false;}
+    for (u8 lev=0;lev<MAX_LEVELS;++lev) { if (World.curLev != lev) SetLevelPointers(lev); for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].targetnameIdx != targetIdx) {continue;} Targetted(activator,i); succeeded=true; } if (World.lightTargetnames) { for (u16 l = 0; l < World.loadedLights; ++l) { if (World.lightTargetnames[l] != targetIdx) {continue;} TargetLight(activator,l); succeeded=true; } } }
+    if (World.curLev != entryLevel) {SetLevelPointers(entryLevel);} if (!succeeded) {DualLogWarn("No target found: %s\n",targetname);} if (targetIdx < (u16)MAX_IO_NAMES) tioTargetInFlight[targetIdx]=false;/*Cleared unconditionally: deferred trigger paths (TriggerTrippedUpdate etc.) mark targetIOActive true before calling in, so wasActive alone cannot be trusted to know when a bit was set.*/ tioNestDepth--; if (!wasActive) {World.targetIOActive=false;}
 }
 // Frob/Use
-#define FROB_DISTANCE 4.9f
-#define PANEL_TETHER_SQDIST 64.0f/*8.0f: search/grid/wire/keycode/elevator code screens sever when the player wanders this far (squared); the tethered object closing returns that side MFD to the player's preferred tab*/
+static const float FROB_DISTANCE = 4.9f;
 void MFD_OpenSearch(bool isRH),MFD_CloseSearch(void),MFD_OpenData(bool isRH,u8 code),MFD_OpenPaperLog(int,V3);
 void UI_KeycodeClose(bool),UI_ElevClose(bool),UI_WireClose(bool);
 static void PaperLogUse(u16 self) { ForceInventoryMode();/*Unity PaperLog.Use forces inventory mode, as do the sibling panel uses here; without it the reader's [MORE]/[CLOSE] clicks cannot work (UI interaction is inventory-mode-only)*/ MFD_OpenPaperLog((int)World.instances[self].logIndex, World.position[self]); }
@@ -961,7 +921,7 @@ static void PuzzlePanelUse(u16 i) {
     Entity* e=&World.instances[i];
     if(GetCurrentLevelSecurity()>UsableOrDef((float)e->securityThreshold,100.0f)){UIBlockedBySecurity(World.position[i]);return;}
     if(e->entflags&EF_LOCKED){CenterStatusPrint("%s",Sys_Text.stringTable[302]);return;}
-    World.Sys_UI.objectInUsePos=World.position[i]; World.Sys_UI.usingObject=true; ForceInventoryMode();
+    World.Sys_UI.objectInUsePos=World.position[i]; ForceInventoryMode();
     if (IsPuzzleGridPanel(e->index)) {
         if(!e->panelOpen){
             e->panelOpen=true;
@@ -1089,43 +1049,13 @@ bool FrobHeldItemIntoPanel(V3 p, V3 f, V3 r) {
 }
 
 typedef struct { i8 label; bool darkened; } ElevBtnDef;
-static const ElevBtnDef elevLayouts[12][8] = {
-    {{1,0},{2,0},{3,1},{6,1},{7,1},{8,1},{-1,0},{-1,0}},/*0: 1 to 2*/
-    {{0,0},{1,1},{2,0},{3,0},{6,1},{7,1},{8,1},{-1,0}},/*1: 2 to 3*/
-    {{3,0},{4,0},{5,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*2: 3 to 4*/
-    {{1,1},{2,1},{3,0},{6,0},{7,1},{8,1},{-1,0},{-1,0}},/*3: 3 to 6*/
-    {{5,0},{6,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*4: 5 to 6*/
-    {{6,0},{10,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*5: 6 to G1*/
-    {{6,0},{11,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*6: 6 to G2*/
-    {{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*7: 6 to G3 (all hidden)*/
-    {{6,0},{12,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*8: 6 to G4*/
-    {{1,1},{2,1},{3,1},{6,0},{7,0},{8,1},{-1,0},{-1,0}},/*9: 6 to 7*/
-    {{1,1},{2,1},{3,1},{6,1},{7,0},{8,0},{-1,0},{-1,0}},/*10: 7 to 8*/
-    {{1,1},{2,1},{3,1},{6,1},{8,0},{9,0},{-1,0},{-1,0}},/*11: 8 to 9*/
-};
-
-static const struct { u8 level; float x,y,z; u8 layout; } elevPanelMap[] = {
-    {0,9.97f,-55.08f,39.40f,1},{1,49.88f,-44.58f,-18.0f,0},
-    {2,52.47f,-27.94f,-25.62f,1},{2,3.79f,-27.94f,33.30f,1},
-    {3,15.27f,-14.91f,-11.50f,1},{3,1.17f,-15.09f,12.75f,2},{3,6.32f,-15.09f,-20.52f,3},
-    {4,-1.33f,1.64f,3.88f,2},
-    {5,-15.31f,14.26f,-39.68f,4},{5,8.94f,13.16f,-7.61f,2},
-    {6,-0.62f,34.09f,-69.24f,8},{6,-58.26f,34.14f,-39.71f,5},{6,-5.81f,36.02f,43.52f,6},{6,85.10f,34.14f,-37.09f,7},{6,-0.63f,34.10f,-46.09f,4},{6,60.81f,32.22f,35.84f,9},{6,-13.43f,34.14f,-30.73f,3},
-    {7,16.27f,51.38f,56.23f,10},{7,26.57f,48.82f,-10.34f,9},
-    {8,11.33f,97.46f,-41.43f,11},{8,3.58f,59.06f,20.01f,10},
-    {9,3.57f,107.16f,-38.31f,11},
-    {10,42.46f,136.38f,-7.83f,5},{11,9.91f,168.94f,-23.22f,6},{12,19.09f,196.14f,18.14f,8},
-};
-
-/*Elevator floor label index -> destination level. Labels: 0=R,1-9,10=G1,11=G2,12=G4,13=C.*/
-static u8 ElevLabelToLevel(i8 labelIdx) {
-    if (labelIdx>=1 && labelIdx<=9) return (u8)labelIdx;
-    if (labelIdx==10) return 10; if (labelIdx==11) return 11; if (labelIdx==12) return 12;
-    if (labelIdx==0) return 0;/*R*/
-    return 255;
-}
-
-/*True if the player is inside an elevator volume (entity 706), using the same box-overlap logic as the automap elevator cell fill.*/
+static const ElevBtnDef elevLayouts[12][8] = {{{1,0},{2,0},{3,1},{6,1},{7,1},{8,1},{-1,0},{-1,0}},/*0: 1 to 2*/ {{0,0},{1,1},{2,0},{3,0},{6,1},{7,1},{8,1},{-1,0}},/*1: 2 to 3*/ {{3,0},{4,0},{5,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*2: 3 to 4*/ {{1,1},{2,1},{3,0},{6,0},{7,1},{8,1},{-1,0},{-1,0}},/*3: 3 to 6*/ {{5,0},{6,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*4: 5 to 6*/ {{6,0},{10,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*5: 6 to G1*/
+                                              {{6,0},{11,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*6: 6 to G2*/ {{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*7: 6 to G3 (all hidden)*/ {{6,0},{12,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0},{-1,0}},/*8: 6 to G4*/ {{1,1},{2,1},{3,1},{6,0},{7,0},{8,1},{-1,0},{-1,0}},/*9: 6 to 7*/ {{1,1},{2,1},{3,1},{6,1},{7,0},{8,0},{-1,0},{-1,0}},/*10: 7 to 8*/ 
+                                              {{1,1},{2,1},{3,1},{6,1},{8,0},{9,0},{-1,0},{-1,0}},/*11: 8 to 9*/};
+static const struct { u8 level; float x,y,z; u8 layout; } elevPanelMap[] = { {0,9.97f,-55.08f,39.40f,1},{1,49.88f,-44.58f,-18.0f,0}, {2,52.47f,-27.94f,-25.62f,1},{2,3.79f,-27.94f,33.30f,1}, {3,15.27f,-14.91f,-11.50f,1},{3,1.17f,-15.09f,12.75f,2},{3,6.32f,-15.09f,-20.52f,3}, {4,-1.33f,1.64f,3.88f,2}, {5,-15.31f,14.26f,-39.68f,4},{5,8.94f,13.16f,-7.61f,2},
+                                                                             {6,-0.62f,34.09f,-69.24f,8},{6,-58.26f,34.14f,-39.71f,5},{6,-5.81f,36.02f,43.52f,6},{6,85.10f,34.14f,-37.09f,7},{6,-0.63f,34.10f,-46.09f,4},{6,60.81f,32.22f,35.84f,9},{6,-13.43f,34.14f,-30.73f,3}, {7,16.27f,51.38f,56.23f,10},{7,26.57f,48.82f,-10.34f,9}, {8,11.33f,97.46f,-41.43f,11},{8,3.58f,59.06f,20.01f,10}, {9,3.57f,107.16f,-38.31f,11},
+                                                                             {10,42.46f,136.38f,-7.83f,5},{11,9.91f,168.94f,-23.22f,6},{12,19.09f,196.14f,18.14f,8}};
+static u8 ElevLabelToLevel(i8 labelIdx) { if (labelIdx>=1 && labelIdx<=9) return (u8)labelIdx; if (labelIdx==10) return 10; if (labelIdx==11) return 11; if (labelIdx==12) return 12; if (labelIdx==0) return 0;/*R*/ return 255; }
 bool PlayerInElevatorCell(void) {
     V3 pp=World.position[PLAYER1]; pp.y-=PLYR_CAM_OFS_Y;
     for (u32 i=INSTS_1ST_IDX;i<World.instCount;++i) {
@@ -1141,25 +1071,18 @@ bool PlayerInElevatorCell(void) {
 
 static void ElevatorPanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
-    World.Sys_UI.tetheredKeypadElevator=i; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.objectInUsePos=World.position[i]; World.Sys_UI.usingObject=true;
+    World.Sys_UI.tetheredKeypadElevator=i; World.Sys_UI.linkedElevatorDoor=U16_MAX; World.Sys_UI.objectInUsePos=World.position[i];
     { V3 kp=World.position[i]; float best=1000000000000000000000000000000.0f; for (u32 d=INSTS_1ST_IDX;d<World.instCount;++d) { Entity* de=&World.instances[d]; if(!IdxIsDoor(de->index)||!(de->entflags&EF_ACTIVE)) continue; V3 dd=V3_AsubB(World.position[d],kp); float dist2=V3_dot(dd,dd); if(dist2<best){best=dist2; World.Sys_UI.linkedElevatorDoor=(u16)d;} } }
     int layout=-1; V3 pp=World.position[i];
     for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) {
-        if (elevPanelMap[m].level==World.currentLevel) { float dx=elevPanelMap[m].x-pp.x,dz=elevPanelMap[m].z-pp.z; if (dx*dx+dz*dz<4.0f) { layout=elevPanelMap[m].layout; break; } }
+        if (elevPanelMap[m].level==World.curLev) { float dx=elevPanelMap[m].x-pp.x,dz=elevPanelMap[m].z-pp.z; if (dx*dx+dz*dz<4.0f) { layout=elevPanelMap[m].layout; break; } }
     }
     if (layout<0) layout=1;/*fallback: 2 to 3 strip*/
     for (int b=0;b<8;++b) { World.Sys_UI.elevButtonLabelIdx[b]=elevLayouts[layout][b].label; World.Sys_UI.buttonsDarkened[b]=elevLayouts[layout][b].darkened; World.Sys_UI.buttonsEnabled[b]=elevLayouts[layout][b].label>=0; World.Sys_UI.elevButtonLevelIdx[b]=ElevLabelToLevel(elevLayouts[layout][b].label); World.Sys_UI.elevButtonSpawnIdx[b]=U16_MAX; }
     ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,1);/*elevator keypad: data-tab view, so it comes up on the last-used data side (left by default)*/
 }
 
-/*Find the keypad position on a given level (for elevator relative-positioning). Returns false if not found.*/
-bool FindElevatorKeypadPos(u8 level,V3* outPos) {
-    for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) {
-        if (elevPanelMap[m].level==level) { outPos->x=elevPanelMap[m].x; outPos->y=elevPanelMap[m].y; outPos->z=elevPanelMap[m].z; return true; }
-    }
-    return false;
-}
-
+bool FindElevatorKeypadPos(u8 level,V3* outPos) { for (u32 m=0;m<sizeof(elevPanelMap)/sizeof(elevPanelMap[0]);++m) { if (elevPanelMap[m].level==level) { outPos->x=elevPanelMap[m].x; outPos->y=elevPanelMap[m].y; outPos->z=elevPanelMap[m].z; return true; } } return false; }
 static void KeycodePanelUse(u16 i) {
     if(!PanelUseAllowed(i))return;
     Entity* e=&World.instances[i];
@@ -1169,24 +1092,11 @@ static void KeycodePanelUse(u16 i) {
         e->keycode=(u16)(c[off]*100 + c[off+1]*10 + c[off+2]);
     }
     SystemUI* s=&World.Sys_UI; s->tetheredKeypadKeycode=i; s->keycodeValue=e->keycode; s->keycodeValid=true; s->keycodeSolved=false;
-    s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; s->objectInUsePos=World.position[i]; s->usingObject=true;
+    s->keycodeHuns=s->keycodeTens=s->keycodeOnes=-1; s->keycodeEntry=-1; s->objectInUsePos=World.position[i];
     ForceInventoryMode(); play_wav(sounds[91],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false); MFD_OpenData(World.Sys_UI.lastDataSideRH,2);/*keycode pad: data-tab view, so it comes up on the last-used data side (left by default)*/
 }
-void CloseSearch(void) {
-    u16 s=World.Sys_UI.tetheredSearchable;
-    if (s>=INSTS_1ST_IDX && s<World.instCount) World.instances[s].srchInUse=false;
-    World.Sys_UI.tetheredSearchable=World.invP1.currentSearchItem=U16_MAX;
-    if (s>=INSTS_1ST_IDX && s<World.instCount) World.Sys_UI.usingObject=false;
-    World.Sys_UI.searchFXActive[0]=World.Sys_UI.searchFXActive[1]=false; MFD_CloseSearch();
-}
-
-void UpdateSearchTether(void) {
-    u16 s=World.Sys_UI.tetheredSearchable; if (s==U16_MAX) return;
-    if (s<INSTS_1ST_IDX || s>=World.instCount || !(World.instances[s].entflags&EF_ACTIVE) || !World.instances[s].srchInUse) { CloseSearch(); return; }
-    V3 d=V3_AsubB(World.position[PLAYER1],World.position[s]);
-    if (V3_dot(d,d)>(FROB_DISTANCE+0.16f)*(FROB_DISTANCE+0.16f)) CloseSearch();
-}
-
+void CloseSearch(void) { u16 s=World.Sys_UI.tetheredSearchable; if (s>=INSTS_1ST_IDX && s<World.instCount) World.instances[s].srchInUse = false; World.Sys_UI.tetheredSearchable = U16_MAX; World.Sys_UI.searchFXActive[0] = World.Sys_UI.searchFXActive[1] = false; MFD_CloseSearch(); }
+void UpdateSearchTether(void) { u16 s=World.Sys_UI.tetheredSearchable; if (s==U16_MAX) return; if (s<INSTS_1ST_IDX || s>=World.instCount || !(World.instances[s].entflags&EF_ACTIVE) || !World.instances[s].srchInUse) { CloseSearch(); return; } V3 d=V3_AsubB(World.position[PLAYER1],World.position[s]); if (V3_dot(d,d)>(FROB_DISTANCE+0.16f)*(FROB_DISTANCE+0.16f)) CloseSearch(); }
 bool SearchTakeSlot(u8 slot) {
     UpdateSearchTether(); u16 s=World.Sys_UI.tetheredSearchable;
     if (s==U16_MAX || slot>=4 || World.invP1.holdingObject) return false;
@@ -1203,20 +1113,13 @@ void SearchObject(int searchable) {
     if (searchable<INSTS_1ST_IDX || searchable>=World.instCount || !(World.instances[searchable].entflags&EF_ACTIVE)) return;
     Entity* e = &World.instances[searchable];
     if (World.Sys_UI.tetheredSearchable==searchable && e->srchInUse) {
-        for (u8 slot=0;slot<4;++slot) {
-            if (e->contents[slot]>=0) {
-                SearchTakeSlot(slot);
-                return;
-            }
-        }
-        
+        for (u8 slot=0;slot<4;++slot) { if (e->contents[slot]>=0) { SearchTakeSlot(slot); return; } }
         return;
     }
     CloseSearch();
-    World.Sys_UI.tetheredSearchable = World.invP1.currentSearchItem = (u16)searchable;
+    World.Sys_UI.tetheredSearchable = (u16)searchable;
     e->srchInUse = true;
     World.Sys_UI.objectInUsePos = World.position[searchable];
-    World.Sys_UI.usingObject = true;
     MFD_OpenSearch(World.Sys_UI.lastSearchSideRH);
     SearchFXEnable(World.Sys_UI.lastSearchSideRH ? 1 : 0);
     play_wav(sounds[91], AppliedFXVol(0.75f), (V3){0}, false);
@@ -1300,7 +1203,7 @@ static const char* UseSecretText(int index, u16 inst) { /*sshhhhhh, pretend you 
     return (n && n < MAX_IO_NAMES) ? ioNames[n] : NULL;
 }
 
-static void CyberportUse(u16 i) { u8 src = World.currentLevel; int idx; if (src == 2) idx = (World.position[i].x < -26.0f) ? 2 : 3; else if (src == 5) idx = 4; else if (src == 6) idx = 5; else if (src == 8) idx = 6; else if (src == 9) idx = 7; else idx = (src < 8) ? src : 0; queuedLevelPos = cyberSpaceEntryLocations[idx]; queuedLevelToLoad = LEVEL_CYBERSPACE; }
+static void CyberportUse(u16 i) { u8 src = World.curLev; int idx; if (src == 2) idx = (World.position[i].x < -26.0f) ? 2 : 3; else if (src == 5) idx = 4; else if (src == 6) idx = 5; else if (src == 8) idx = 6; else if (src == 9) idx = 7; else idx = (src < 8) ? src : 0; queuedLevelPos = cyberSpaceEntryLocations[idx]; queuedLevelToLoad = LEVEL_CYBERSPACE; }
 void UseEntity(u16 i) {
     Entity* ent = &World.instances[i];
     if (IdxIsSearchable(ent->index) || (World.layer[i] & L_CorpseSearchable)) { SearchObject(i); }
@@ -1386,7 +1289,7 @@ void SecurityCameraRotateUpdate(u16 self) { /*Sweeps the camera back and forth b
     World.rotation[self] = quat_multiply(yaw,World.instances[self].camBaseRot);
 }
 
-static bool PanelTetherBroken(u16 i) { return i<World.instCount && (World.instances[i].entflags&EF_ACTIVE) && V3_SqDist(World.position[PLAYER1],World.position[i])>PANEL_TETHER_SQDIST; }
+static bool PanelTetherBroken(u16 i) { return i<World.instCount && (World.instances[i].entflags&EF_ACTIVE) && V3_SqDist(World.position[PLAYER1],World.position[i]) > 64.0f; }
 void ModUpdate() {
     if (World.paused || World.menuActive) return;
     

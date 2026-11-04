@@ -895,7 +895,7 @@ __attribute__((noinline)) float parse_float(const char* str, const char* line, u
     if (*str == '.') { str++; double frac = 0.0; double place = 0.1; while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; } value += frac; }/*Decimal part*/  if(!has_digit){return 0.0f;} if(negative){value = -value;} return (float)value;
 }
 
-__attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* la){ if(World.loadedLights>=LIGHT_COUNT){DualLogError("Too many lights,lev%d!\n",World.curLev); OS_Exit(1);} i32 i=World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.currentLevel]++; mcpy(&World.lights[i],lit,sizeof(Light)); if (la && la->numIntervalSteps >= 1) { if (World.lanimCount < LANIM_MAX) { World.lanimLightIdx[World.lanimCount]=(u16)i; mcpy(&World.lanims[World.lanimCount],la,sizeof(LightAnimation)); World.lanimCount++; } else { DualLogError("Too many light animations,lev%d!\n",World.curLev); } } World.lightsNewPosition[i]=lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true); return i;}
+__attribute__((noinline)) i32 AddLight(Light* lit, LightAnimation* la){ if(World.loadedLights>=LIGHT_COUNT){DualLogError("Too many lights,lev%d!\n",World.curLev); OS_Exit(1);} i32 i=World.loadedLights; World.loadedLights++; World.levelLoadedLights[World.curLev]++; mcpy(&World.lights[i],lit,sizeof(Light)); if (la && la->numIntervalSteps >= 1) { if (World.lanimCount < LANIM_MAX) { World.lanimLightIdx[World.lanimCount]=(u16)i; mcpy(&World.lanims[World.lanimCount],la,sizeof(LightAnimation)); World.lanimCount++; } else { DualLogError("Too many light animations,lev%d!\n",World.curLev); } } World.lightsNewPosition[i]=lit->pos; flag_set(&World.lights[i].lflags,LDIRTY,true); return i;}
 __attribute__((noinline)) u16 AddLightSimple(V3 pos, Color3 c, float r, float in, u16 lf){Light l={.pos=pos,.col=c,.range=r,.intensity=in,.maxIntensity=in,.minIntensity=0.0f,.spotAng=0.0f,.spotDir=QUAT_IDENTITY,.lflags=lf}; return AddLight(&l,NULL);}
 u16 IOInternName(const char*); static u16 lightTargetnameFile[LIGHT_COUNT];/*targetname per lightsFromFile slot, IO_NONE when anonymous.  A light is not an entity, so this is the only way a relay can address one.*/
 __attribute__((noinline)) u16 AddOffsetLight(Entity* par, V3 offset, Color3 col, float range, float intensity) { return AddLightSimple(GetLocalTransformedPos(par,offset),col,range,intensity,LIGHT_AND_SHADOW_ON); }
@@ -991,7 +991,7 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     World.instances[i].questBitID = QB_None;
     if (entIdx == 594 /*trigger_counter*/) World.instances[i].dontReset = true;
     if (entIdx == 702 /*logic_spawner*/) { Entity* sm=&World.instances[i]; if (sm->numberToSpawn == 0) sm->numberToSpawn = 1; if (sm->maxDelayBetweenSpawns <= 0.0f) { sm->minDelayBetweenSpawns = 15.0f; sm->maxDelayBetweenSpawns = 45.0f; } if (sm->allSpawnedResetDelay <= 0.0f) sm->allSpawnedResetDelay = 120.0f; }
-    if (World.levelCurrentlyLoading) { /*So cheat spawns don't affect the %*/ u8 sl=World.currentLevel; if (sl<MAX_LEVELS) { u8* dst=entIdx==477?&World.levelCameraCount[sl]:entIdx==478?&World.levelLargeNodeCount[sl]:entIdx==479?&World.levelSmallNodeCount[sl]:0; if (dst && *dst<255) (*dst)++; } }
+    if (World.levelCurrentlyLoading) { /*So cheat spawns don't affect the %*/ u8 sl=World.curLev; if (sl<MAX_LEVELS) { u8* dst=entIdx==477?&World.levelCameraCount[sl]:entIdx==478?&World.levelLargeNodeCount[sl]:entIdx==479?&World.levelSmallNodeCount[sl]:0; if (dst && *dst<255) (*dst)++; } }
     World.col[i]=EDefs[entIdx].col; World.colliderCenter[i]=EDefs[entIdx].colCtr; World.colliderSize[i]=EDefs[entIdx].colSz; World.mass[i]=EDefs[entIdx].mass > 0.0f ? EDefs[entIdx].mass : 1.0f; World.gravity[i]=IdxIsDynamicObject(World.instances[i].index) ? 1.0f : 0.0f; if (IdxIsButtonSwitch(entIdx)) { World.instances[i].lockedMessageLingdex = 193; World.instances[i].SFXLockedIndex = -1; }
     if (entIdx < 307 && cardChunk[entIdx]) { World.instances[i].lodIndex=178;/*LOD card index*/ World.col[i]=CT_BOX; World.colliderCenter[i].y=1.32f; World.colliderSize[i]=(V3){2.56f,0.08f,2.56f}; } World.instCount++; return i;
 }
@@ -1012,9 +1012,9 @@ static char* MmapGetLine(char* buf, int sz){if(mm_ptr>=mm_end){return NULL;} con
 static u16 fwParentSnap[MAX_LEVELS][INSTANCE_COUNT]; static bool fwSnapValid[MAX_LEVELS];/*per-level fwParentOf snapshot: fwParentOf is rewritten by every level load; SetLevelPointers restores the current level's*/
 void SetLevelPointers(u8 lev) {
     if (lev >= MAX_LEVELS) return;
-    if (lev != World.currentLevel && World.currentLevel < MAX_LEVELS) { World.levelInstCount[World.currentLevel] = World.instCount; World.levelLAnimCount[World.currentLevel] = World.lanimCount; }/*preserve dynamically summoned instances across temporary pointer switches (UseTargets/TargetIO level iteration)*/
+    if (lev != World.curLev && World.curLev < MAX_LEVELS) { World.levelInstCount[World.curLev] = World.instCount; World.levelLAnimCount[World.curLev] = World.lanimCount; }/*preserve dynamically summoned instances across temporary pointer switches (UseTargets/TargetIO level iteration)*/
     if (teleportDestinationsInitialized) mcpy(World.TeleportTouch_allTeleportTouches, teleportDestinations[lev], sizeof(World.TeleportTouch_allTeleportTouches));
-    World.currentLevel=lev;
+    World.curLev=lev;
     World.instances=World.levelInstances[lev];
     World.position=World.levelPosition[lev];
     World.scale=World.levelScale[lev];
@@ -1405,7 +1405,7 @@ void LoadLevelMod(u8 lev) {
         TextureSequenceInit(parent,texAnimFolders[par->texAnimResourceFolderIdx < texAnimFolderCount ? par->texAnimResourceFolderIdx : 0]);
         if (entIdx == 551 && par->codeScreen) { par->texAnimRandom = true; par->texAnimStopsAtDie = false; }
     }
-    for (int i=0;i<=lightsIdx;++i) { if (lightsFromFile[i].intensity < 0.11f && lightsFromFile[i].maxIntensity < 0.11f){continue;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); if (lanimsFromFile[i].numIntervalSteps >= 1) { lanimsFromFile[i].currentStep = 0; lanimsFromFile[i].lerpUp = true; if (lightsFromFile[i].minIntensity < 0.01f) lightsFromFile[i].minIntensity = 0.01f; }/*Unity LightAnimation.Start() init parity: animations always begin at step 0, lerping up, with a nonzero floor*/ i32 wi=AddLight(&lightsFromFile[i],&lanimsFromFile[i]); if(wi>=0&&wi<LIGHT_COUNT){World.levelLightTargetnames[World.currentLevel][wi]=lightTargetnameFile[i];} }
+    for (int i=0;i<=lightsIdx;++i) { if (lightsFromFile[i].intensity < 0.11f && lightsFromFile[i].maxIntensity < 0.11f){continue;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); if (lanimsFromFile[i].numIntervalSteps >= 1) { lanimsFromFile[i].currentStep = 0; lanimsFromFile[i].lerpUp = true; if (lightsFromFile[i].minIntensity < 0.01f) lightsFromFile[i].minIntensity = 0.01f; }/*Unity LightAnimation.Start() init parity: animations always begin at step 0, lerping up, with a nonzero floor*/ i32 wi=AddLight(&lightsFromFile[i],&lanimsFromFile[i]); if(wi>=0&&wi<LIGHT_COUNT){World.levelLightTargetnames[World.curLev][wi]=lightTargetnameFile[i];} }
     if(curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7){/*Shield generators*/
         static const V3 pos[]={{-51.30664f,-47.42f,56.42651f},{71.5f,-47.42f,-66.6f},{-51.306650f,-47.42f,-66.66652f},{71.78664f,-47.42f,56.42651f}};
         for (u8 k=0;k<4;++k) { World.shields[k]=AddInstance(754,pos[k]); World.rotation[World.shields[k]]=QUAT_IDENTITY; }
@@ -1575,15 +1575,15 @@ void LoadAllLevels() {
 
 void CyberTimerReset(u16,int); /*citadel.c: Unity CyberTimer.Reset(difficultyCyber)*/
 void LoadLevel(u8 curlevel, V3 pos) {
-    u8 prevLevel = World.currentLevel;
-    if (curlevel == LEVEL_CYBERSPACE && World.currentLevel != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.currentLevel; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
+    u8 prevLevel = World.curLev;
+    if (curlevel == LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.curLev; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
     CloseSearch();
     World.Sys_UI.tetheredKeypadKeycode=World.Sys_UI.tetheredKeypadElevator=World.Sys_UI.tetheredPGP=World.Sys_UI.tetheredPWP=U16_MAX;/*panel tethers are per-level; the entity index they point at dies with the level, so don't sever against a stale one*/
     World.levelCurrentlyLoading = true;
     World.paused = World.menuActive = false;
-    if (World.currentLevel != curlevel) {
-        CopyPlayerState(World.currentLevel,curlevel);
-        PSysClearLevel(World.currentLevel);
+    if (World.curLev != curlevel) {
+        CopyPlayerState(World.curLev,curlevel);
+        PSysClearLevel(World.curLev);
         World.curLev = curlevel;
         SetLevelPointers(curlevel);
     }
@@ -1773,7 +1773,7 @@ void LoadGame(u8 slot) {
     if (header.compressedSize > GetMaxCompressedSize(header.uncompressedSize)) { DualLogError("Save has an implausible compressed size (%u bytes) -- treating as corrupt.\n", header.compressedSize); OS_Close(fd); return; }
     u8* b=OS_Alloc(header.compressedSize);
     if (OS_Read(fd,b,header.compressedSize) == (long)header.compressedSize) {
-        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.currentLevel); cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
+        size_t result = BlowBubblesOfVoid(b,header.compressedSize,(u8*)&World,header.uncompressedSize);/*Decompress straight into the World str uct*/ if (result == header.uncompressedSize) { SetLevelPointers(World.curLev); cullVisibilityValid=false; AutomapOnLoad(); CenterStatusPrint("Loaded Game: %s", header.savename); } else { DualLogError("Decompression failed! Expected %u bytes, got %u\n", header.uncompressedSize, (u32)result); }
     } OS_Free(b,header.compressedSize); OS_Close(fd); for (int i=0;i<World.loadedLights;++i) { flag_set(&World.lights[i].lflags,LDIRTY,true); }
 }
 

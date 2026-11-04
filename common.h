@@ -249,9 +249,9 @@ typedef struct {
         i16 generalClickItem, logFolderList[16], logReaderPage;
         u8 highlightTickCount[4], elevButtonLevelIdx[8], vmailActive, mfdTab[3], MFD_Data, MFD_MediaTab, MFD_ReaderView, mfdSelected[3], mfdReturnTab[3], mfdReturnView[3], mfdItemReader[2], mfdConsumable, pg_type[35], pg_gridType, pg_theme, pg_source, pg_output, pg_width, pg_height, pw_wireColor[7], logFolderCount;
         i8 elevButtonLabelIdx[8], generalClickSlot, consumableClickRow, keycodeHuns, keycodeTens, keycodeOnes, pw_curL[7], pw_curR[7], pw_tgtL[7], pw_tgtR[7], pw_selectedWire, mg_current;
-        u8 lastWeaponSideRH:1,        lastItemSideRH:1, lastAutomapSideRH:1,  lastDataSideRH:1, lastSearchSideRH:1, lastMinigameSideRH:1, logActive:1,     paperLogInUse:1/*TODO*/;
-        u8      usingObject:1, mouseClickHeldOverGUI:1,    mfdGeneralItem:1, mfdHardwareItem:1,     keycodeValid:1,      keycodeSolved:1, pg_solved:1, pw_selectedWireRH:1;
-        u8 shieldAnimationIsActivate:1, pw_solved:1, pg_fired:1, firstMain:1, firstGeneral:1, firstHardware:1, firstWeapon:1;
+        u8 lastItemSideRH:1, lastAutomapSideRH:1, lastDataSideRH:1, lastSearchSideRH:1, lastMinigameSideRH:1,         logActive:1,             paperLogInUse:1/*TODO*/, mouseClickHeldOverGUI:1;
+        u8 mfdGeneralItem:1,   mfdHardwareItem:1,   keycodeValid:1,    keycodeSolved:1,          pg_solved:1, pw_selectedWireRH:1, shieldAnimationIsActivate:1,                     pw_solved:1;
+        u8 pg_fired:1, firstMain:1, firstGeneral:1, firstHardware:1, firstWeapon:1;
         bool highlightStatus[4], buttonsEnabled[8], buttonsDarkened[8], searchFXActive[2], pg_cell[35], pg_powered[35], pg_checked[35], pw_wireOn[7], pw_rowActive[7], mg_running[2], autoSide[2], fullMapOpen[2];
         double shieldAnimationStarted, shieldAnimationFinished;
         V3 objectInUsePos;
@@ -264,20 +264,20 @@ enum{PATCH_BERSERK=1, PATCH_DETOX=2, PATCH_GENIUS=4, PATCH_MEDI=8, PATCH_REFLEX=
          HW_SYS=1/*System Analyzer*/,    HW_NAV=2/*Navigation Unit*/,    HW_ERD=4/*Datareader/EReader*/,    HW_SNS=8/*Sensaround*/,   HW_TID=16/*Target Identifier*/,   HW_SHD=32/*Energy Shield*/,   HW_BIO=64/*Biomonitor*/,  HW_LAN=128/*Head Mounted Lantern*/,  HW_ENV=256/*Envirosuit*/,  HW_BST=512/*Turbo Motion Booster*/,  HW_JET=1024/*Jump Jet Boots*/,  HW_INF=2048/*Infrared Night Sight Enhancement*/,
      HW_SYS_IDX=0/*System Analyzer*/,HW_NAV_IDX=1/*Navigation Unit*/,HW_ERD_IDX=2/*Datareader/EReader*/,HW_SNS_IDX=3/*Sensaround*/,HW_TID_IDX=4/*Target Identifier*/,HW_SHD_IDX=5/*Energy Shield*/,HW_BIO_IDX=6/*Biomonitor*/,HW_LAN_IDX=7/*Head Mounted Lantern*/,HW_ENV_IDX=8/*Envirosuit*/,HW_BST_IDX=9/*Turbo Motion Booster*/,HW_JET_IDX=10/*Jump Jet Boots*/,HW_INF_IDX=11/*Infrared Night Sight Enhancement*/};
 typedef struct { // Hw referenceIndex,ref14Index::Sys 21,0 Nav 22,1 Ere 23,2 Sen 24,3 Trg 25,4 Shi 26,5 Bio 27,6 Lan 28,7 Env 29,8 Boo 30,9 Jum 31,10 Nig 32,11
-    double nitroTimeSetting, earthShakerTimeSetting, justFired, waitTilNextFire, reloadFinished, dropFinished, berserkFinished, berserkIncTime, detoxFinished, geniusFinished, mediFinished, reflexFinishedTime, sightFinishedTime, jumpJetSuckFinished, jumpJetFinished, doubleJumpFinished, noiseFinished, radBleedFinished,
+    double nitroTimeSetting, earthShakerTimeSetting, justFired, waitTilNextFire, reloadFinished, dropFinished, berserkFinished, berserkIncTime, detoxFinished, geniusFinished, mediFinished, reflexFinishedTime, sightFinishedTime, jumpJetSuckFinished, doubleJumpFinished, noiseFinished, radBleedFinished,
            leanLTapFinished, leanRTapFinished, sightSideEffectFinishedTime, staminupFinishedTime, turboCyberTime, turboFinished, energyDrainTickFinished, painSoundFinished, radSoundFinished, fatigueBleedoffFinished, fatigueMoveFinished, footstepFinished, rustleFinished, fallPainFinished, ressurectingFinished, mediPatchPulseFinished;
     float weaponEnergySetting[16], reloadLerpValue, curWepHeat[7], fatigue, energy, currentCrouchRatio, leanTarget, crouchingVelocity, leanVelocity, lastVelY;
     u32 accessCardOwned, wepAmmo[16], wepAmmoSecondary[16];
     i32 lastAddedIndex, wepInvIndices[7], wepInvAmIndices[7], hardwareInvCurrent, genInvIdxRef[14], berserkIncrement, mediPatchPulseCount;
     i16 ladderState, wepCurPending, weaponIndexPending, wepCur;
-    u16 hasHardware, hardwareIsActive, hardwareInvReferenceIndex[HW_COUNT], heldObjectIndex, heldObjectCustIdx, heldAmmo, heldAmmo2, weaponIndex, currentSearchItem, generalInvCustIdx[14], patchActive, drainJPM, grenConstIndex[7];
+    u16 hasHardware, hardwareIsActive, hardwareInvReferenceIndex[HW_COUNT], heldObjectIndex, heldObjectCustIdx, heldAmmo, heldAmmo2, weaponIndex, generalInvCustIdx[14], patchActive, drainJPM, grenConstIndex[7];
     u8 numLogsFromLevel[10], lerpUp, hasSoft, softVersions[7], hasMinigame, numweapons, currentMagazineAmount[7], currentMagazineAmount2[7], hwVers[HW_COUNT], hwVersSetting[HW_COUNT], grenAmmo[7], grenCur, generalInvCurrent, patchCur, patchCounts[7];
     i8 cyberItemIndex;
-    u8      beepDone:1, hasNewEmail:1, hasNewNotes:1, isPulserNotDrill:1, justChangedWeap:1, overloadEnabled:1,   recoiling:1, heldObjectLoadedAlternate:1;
+    u8      beepDone:1, hasNewEmail:1, hasNewNotes:1, isPulserNotDrill:1, overloadEnabled:1,   recoiling:1,     heldObjectLoadedAlternate:1;
     u8 holdingObject:1,  grenActive:1,  hasNewLogs:1,    radiationArea:1,    inReverbZone:1,   leanResetting:1, wasGrounded:1,               makingNoise:1;
     bool wepLoadedWithAlternate[7], staminupActive, hasLog[134], readLog[134];
 } InventorySystem;
-typedef struct { float damage, penetration, offense, armorvalue, defense, impactVelocity; V3 attacknormal, hitpoint; AttType attackType; u16 owner; bool isOtherNPC, berserkActive; } DamageData;
+typedef struct { float damage, penetration, offense, defense, impactVelocity; V3 attacknormal, hitpoint; AttType attackType; u16 owner; bool isOtherNPC, berserkActive; } DamageData;
 typedef struct __attribute__((packed, aligned(8))) { u64 magicNumber; double thisRunTime; bool isLoading; i32 missionSplitID; } AutoSplitterData;/*For use with LiveSplit or other future speedrunner utilities for doing speedruns*/ extern AutoSplitterData autoSplitter;
 typedef struct { V3 position; Quaternion rotation; u8 fov; u16 width, height; float near, far, finished; bool visible; } CamView; // Max is 8 cam views on level 8 + 3 sensaround views = 11.
 extern CamView camViews[64],levelCamViews[14][64]; extern u8 camViewCount,levelCamViewCount[14]; extern u32 camViewTextures[64],levelCamViewTextures[14][64];
@@ -285,7 +285,7 @@ extern u8 sensaroundCamViewCenter,sensaroundCamViewLeft,sensaroundCamViewRight; 
 typedef struct { AttType type; float damage,range,speed,timeToActual,timeBetween,waitMin,waitMax,waitChance,projectileSpeed; bool hasLaser; int projectilePrefab; } NPCAttack;
 typedef struct { // Keep initializer order in npcTable.
     const char* name; NPCAttack attack[3];
-    float health,healthForCyberNPC,armorvalue,defense;
+    float health,healthForCyberNPC,armorvalue/*TODO delete from table and here*/,defense;
     AIMoveType moveType;
     float yawSpeed,fov,fovStartMovement,distToSeeBehind,sightRange,walkSpeed,runSpeed,attack3Force,attack3Radius,timeToPain,timeBetweenPain,timeTillDead,timeToChangeEnemy,timeIdleSFXMin,timeIdleSFXMax;
     bool explodeOnAttack3;
@@ -349,7 +349,7 @@ INLINE bool Entity_GetGridCell(const Entity* e, int i) { return (bool)((e->gridC
 INLINE void Entity_SetGridCell(Entity* e, int i, bool v) { if (v) e->gridCellsBits |= (1ull << i); else e->gridCellsBits &= ~(1ull << i); }
 typedef struct{bool initialized,active;V2 min,max;double lastLMB,lastRMB;}UIComponent;
 typedef struct {
-    double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,deltaTime,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp,gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs,automapNextRaster;
+    double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,dt,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp,gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs,automapNextRaster;
     float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
     u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_COUNT];
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shields[4],weaponVModelIndex,levelWepVModel[MAX_LEVELS],TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex,misTimerMission;
@@ -358,7 +358,7 @@ typedef struct {
     u8 inventoryMode:1, levelCurrentlyLoading:1,         paused:1,   menuActive:1,   gameFinished:1,   creditsActive:1, decoyActive:1;
     u8  uiIsBlocking:1,          geniusActive:1, targetIOActive:1, misTimerLast:1, misTimerCurIdx:1, misTimerTimesUP:1 /*unused bit:1*/;
     bool *invTnsrValid,*colliding,questNotesActive[18],questNotesChecked[18];
-    u8 lanimCount,automapExplored[MAX_LEVELS][ARRSIZE],automapZoom,physSleep[INSTANCE_COUNT],physQuiet[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,currentLevel,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
+    u8 lanimCount,automapExplored[MAX_LEVELS][ARRSIZE],automapZoom,physSleep[INSTANCE_COUNT],physQuiet[INSTANCE_COUNT],substeps,levelSecurity[MAX_LEVELS],startLevel,curLev,creditsPageIndex,diffCbt,diffPuz,diffMis,diffCyb,levelCameraCount[MAX_LEVELS],levelSmallNodeCount[MAX_LEVELS],levelLargeNodeCount[MAX_LEVELS],levCamDestroyedCnt[MAX_LEVELS],levSmNodeDestroyedCnt[MAX_LEVELS],levNodeDestroyedCnt[MAX_LEVELS];
     i8 lev1SecCode,lev2SecCode,lev3SecCode,lev4SecCode,lev5SecCode,lev6SecCode,cyberReturnLevel;
     InventorySystem invP1; SystemUI Sys_UI; MusicSystem Sys_Music; Entity levelInstances[MAX_LEVELS][INSTANCE_COUNT];
     UIComponent uiComponents[MAX_UI_ELEMENTS];
@@ -374,7 +374,7 @@ typedef struct {
     ColliderType* col;
     Quaternion* rotation;
     u32* layer,targetIOActivatorIoflags,targetIOActivatorIoflagsHi;
-    float* mass,dt,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
+    float* mass,*radius,*gravity,(*invInertiaTensor)[6],*dynamicFriction,*staticFriction,cam_pitch,cam_yaw,cam_roll;
     u16 levelLightTargetnames[MAX_LEVELS][LIGHT_COUNT],*lightTargetnames,loadedLights,decoyInstance;
     Light *lights; LightAnimation *lanims;
     u16 *lanimLightIdx;
@@ -526,7 +526,7 @@ typedef struct PSysDef { V3 pos; const u16* textures; u8 textureCount; float emi
                          u8 rotCount; const float *emissKeys,*emissTimes; u8 emissCount; u8 trail; u32 trailTexture; Color trailColorStart,trailColorEnd; float trailLifetime,trailWidthStart,trailWidthEnd,trailVertexDistance; bool looping; u8 blendMode; bool blendModeOverride; u8 rotationMode,colorMode; u16 burstCount; Quaternion rotation; bool useMesh; } PSysDef;
 const PSysDef* PSysTypeGet(u16);
 u16 PSysAddInternal(const PSysDef* pd, u16 meshInstance, u16 parentIdx); void PSysAddLevelLoops(void),PSysClearLevel(u8); extern const PSysDef particleTypeDefs[190];
-typedef void(*FGL_AT)(u32),(*FGL_F)(),(*FGL_FL)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
+typedef void(*FGL_AT)(u32),(*FGL_F)(),    (*FGL_FF)(u32),  (*FGL_AS)(u32,u32),  (*FGL_VAB)(u32,u32), (*FGL_GT)(i32,u32*),   (*FGL_DA)(u32,i32,i32),     (*FGL_CC)(float,float,float,float),(*FGL_BD)(u32,size_t,const void*,u32),   (*FGL_U4F)(i32,float,float,float,float),        (*FGL_BBB)(u32,u32,u32),  *(*FGL_MBR)(u32,intptr_t,size_t,u32);
 typedef void(*FGL_C)(u32),                (*FGL_EVAA)(u32),(*FGL_BB)(u32,u32),  (*FGL_BT)(u32,u32),  (*FGL_U1F)(i32,float), (*FGL_BFS)(u32,u32,u32,u32),(*FGL_DE)(u32,i32,u32,const void*),(*FGL_UM4FV)(i32,i32,bool,const float*), (*FGL_BSD)(u32,intptr_t,intptr_t,const void*),  (*FGL_DB)(i32,const u32*), (*FGL_CM)(bool,bool,bool,bool);
 typedef void(*FGL_CS)(u32),(*FGL_BVA)(u32), (*FGL_GVA)(i32,u32*),(*FGL_U1I)(i32,i32), (*FGL_DC)(u32,u32,u32),(*FGL_CPIV)(u32,u32,i32*),  (*FGL_BVB)(u32,u32,intptr_t,i32),  (*FGL_RP)(i32,i32,i32,i32,u32,u32,void*),(*FGL_SS)(u32,i32,const char*const*,const i32*),(*FGL_U2UI)(i32,u32,u32);
 typedef void(*FGL_E)(u32), (*FGL_DF)(u32),(*FGL_LP)(u32),  (*FGL_GB)(i32,u32*), (*FGL_BFB)(u32,u32), (*FGL_GFS)(i32,u32*),  (*FGL_TPI)(u32,u32,i32), (*FGL_TPFV)(u32,u32,const float*),    (*FGL_FBT2D)(u32,u32,u32,u32,i32), (*FGL_GSIL)(u32,i32,i32*,char*), (*FGL_GPIL)(u32,i32,i32*,char*),        (*FGL_BIT)(u32,u32,i32,bool,i32,u32,u32),       (*FGL_VP)(i32,i32,i32,i32),(*FGL_T2D)(u32,i32,i32,i32,i32,i32,u32,u32,const void*);
@@ -537,7 +537,7 @@ extern u32 uiFBO; void GenerateAndBindTexture(u32 *id, i32 internalFormat, i32 w
 extern FGL_GB glGenBuffers; extern FGL_BB glBindBuffer; extern FGL_BD glBufferData; extern FGL_UB glUnmapBuffer; extern FGL_MBR glMapBufferRange; extern FGL_U2F glUniform2f; extern FGL_U1F glUniform1f; extern FGL_U1UI glUniform1ui; extern FGL_UP glUseProgram; extern FGL_RP glReadPixels; extern FGL_U3F glUniform3f; extern FGL_DC glDispatchCompute; extern FGL_DA glDrawArrays;
 extern FGL_AT glActiveTexture; extern FGL_BVA glBindVertexArray; extern FGL_U1I glUniform1i; extern FGL_E glEnable; extern FGL_U4F glUniform4f; extern FGL_BT glBindTexture; extern FGL_GERR glGetError; extern FGL_GVA glGenVertexArrays; extern FGL_VAF glVertexAttribFormat; extern FGL_VAB glVertexAttribBinding;
 extern FGL_EVAA glEnableVertexAttribArray; extern FGL_BVB glBindVertexBuffer; extern FGL_BSD glBufferSubData; extern FGL_UM4FV glUniformMatrix4fv; extern FGL_DM glDepthMask; extern FGL_DF glDepthFunc; extern FGL_D glDisable; extern FGL_LW glLineWidth; extern FGL_GIQ glGenQueries; extern FGL_GQOU64 glGetQueryObjectui64v; extern FGL_DAI glDrawArraysInstanced; extern FGL_TPFV glTexParameterfv;
-extern FGL_F glFinish; extern FGL_FL glFlush; extern FGL_BBB glBindBufferBase; extern FGL_BB glBlendFunc; typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery; typedef void(*FGL_CBSD)(u32,u32,intptr_t,intptr_t,size_t); extern FGL_CBSD glCopyBufferSubData; typedef void(*FGL_CLBSD)(u32,u32,intptr_t,intptr_t,u32,u32,const void*); extern FGL_CLBSD glClearBufferSubData; extern FGL_CISD glCopyImageSubData; extern FGL_CPIV glGetBufferParameteriv; typedef void(*FGL_GBSD)(u32,intptr_t,size_t,void*); extern FGL_GBSD glGetBufferSubData; extern FGL_GB glDeleteBuffers;
+extern FGL_F glFinish; extern FGL_BBB glBindBufferBase; extern FGL_BB glBlendFunc; typedef void(*FGL_BQ)(u32,u32); extern FGL_BQ glBeginQuery; extern FGL_D glEndQuery; typedef void(*FGL_CBSD)(u32,u32,intptr_t,intptr_t,size_t); extern FGL_CBSD glCopyBufferSubData; typedef void(*FGL_CLBSD)(u32,u32,intptr_t,intptr_t,u32,u32,const void*); extern FGL_CLBSD glClearBufferSubData; extern FGL_CISD glCopyImageSubData; extern FGL_CPIV glGetBufferParameteriv; typedef void(*FGL_GBSD)(u32,intptr_t,size_t,void*); extern FGL_GBSD glGetBufferSubData; extern FGL_GB glDeleteBuffers;
 // Input
 enum {JOYHAT_CENTERED=0,JOYHAT_UP=1,JOYHAT_RIGHT=2,JOYHAT_DOWN=4,JOYHAT_LEFT=8,JOYHAT_RIGHT_UP=(2|1),JOYHAT_RIGHT_DOWN=(2|4),JOYHAT_LEFT_UP=(8|1),JOYHAT_LEFT_DOWN=(8|4)};
 enum {KEY_UNKNOWN=-1,KEY_SPACE=32,KEY_APOSTROPHE=39/* ' */,KEY_COMMA=44/* , */,KEY_MINUS=45/* - */,KEY_PERIOD=46/* . */,KEY_SLASH=47/* / */,KEY_0=48,KEY_1=49,KEY_2=50,KEY_3=51,KEY_4=52,KEY_5=53,KEY_6=54,KEY_7=55,KEY_8=56,KEY_9=57,

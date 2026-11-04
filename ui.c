@@ -128,10 +128,6 @@ void SaveNameEntry(i32 k) {
     if (c) { saveNameEntry[saveNameEntryLen]=c; saveNameEntry[++saveNameEntryLen]='\0'; }
 }
 
-void MFD_NewGame() {
-    World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.lastAutomapSideRH=true/*automap prefers the right MFD until the player picks a side*/,.consumableClickRow=-1,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,.logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
-}
-
 void MFD_ResetGeneral() { World.Sys_UI.mfdGeneralItem=false; World.Sys_UI.mfdConsumable=0; World.Sys_UI.consumableClickRow=-1; World.Sys_UI.generalClickSlot = -1; }
 void MFD_ShowGeneralItem() { u8 side=World.Sys_UI.lastItemSideRH?2:1; World.Sys_UI.mfdConsumable=0; World.Sys_UI.mfdGeneralItem=true; World.Sys_UI.mfdHardwareItem=false; World.Sys_UI.mfdItemReader[0]=World.Sys_UI.mfdItemReader[1]=false; World.Sys_UI.mfdTab[side]=2; World.Sys_UI.mfdSelected[side]=2; }
 void MFD_OpenSearch(bool isRH) { for (u8 side=0;side<2;++side) {u8 tab=World.Sys_UI.mfdTab[1+!!side]; if (!(tab==2 && World.Sys_UI.mfdItemReader[side]) && World.Sys_UI.MFD_Data!=5) { World.Sys_UI.mfdReturnTab[side+1]=tab; World.Sys_UI.mfdReturnView[side+1]=World.Sys_UI.MFD_Data;}} World.Sys_UI.MFD_Data=5; World.Sys_UI.mfdTab[1+!!isRH]=4;}
@@ -520,7 +516,7 @@ extern V3 queuedLevelPos; extern u8 queuedLevelToLoad;
 bool PlayerInElevatorCell(void); bool FindElevatorKeypadPos(u8 level,V3* outPos);
 void ActualChangeAmmoType(void); void OverloadButtonAction(void); void ReloadSecret(bool isSilent); void Unload(bool isSilent); void PlayLog(int logIndex); void CheckForUnreadLogs(void); void UseTargets(u16,u16);
 static const char* mgName[9]={"Ping","15","Wing 0","Botbounce","Eel Zapper","Road","TriopToe","Corp Conq","Chess"};
-static void SysUIDataClose(void) { MFD_CloseData(); World.Sys_UI.objectInUsePos=(V3){999.0f,999.0f,999.0f}; World.Sys_UI.usingObject=false; }
+static void SysUIDataClose(void) { MFD_CloseData(); World.Sys_UI.objectInUsePos=(V3){999.0f,999.0f,999.0f}; }
 static void KeycodeSetDigit(int n) { if (World.Sys_UI.keycodeOnes < 0) { World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes; } else if (World.Sys_UI.keycodeTens < 0) { World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10; } else if (World.Sys_UI.keycodeHuns < 0) { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } else { World.Sys_UI.keycodeHuns=World.Sys_UI.keycodeTens; World.Sys_UI.keycodeTens=World.Sys_UI.keycodeOnes; World.Sys_UI.keycodeOnes=(i8)n; World.Sys_UI.keycodeEntry=World.Sys_UI.keycodeOnes+World.Sys_UI.keycodeTens*10+World.Sys_UI.keycodeHuns*100; } }
 static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeValid) return; if (s->keycodeSolved) return; play_wav(sounds[39],AppliedFXVol(1.0f),(V3){0.0f,0.0f,0.0f},false);
     if (k>=0&&k<=9) KeycodeSetDigit(k);
@@ -727,7 +723,7 @@ void MFD_OpenPaperLog(int idx, V3 tetherPoint) {
     if (Sys_Text.audioLogImagesRefIndicesRH[idx]) MFD_OpenData(true,6);
     World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.logReaderPage=0; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT;
     World.Sys_UI.mfdTab[0]=5; World.Sys_UI.MFD_MediaTab=MM_LOG_TABLE;/*the TEXT view renders only under center tab 5 (EReader) + the LOG_TABLE branch; without these the frob opened only the side image tabs and the text never displayed, unlike MFD_OpenAudioLog which sets CenterTab=5*/
-    World.Sys_UI.objectInUsePos=tetherPoint; World.Sys_UI.usingObject=true; }
+    World.Sys_UI.objectInUsePos=tetherPoint; }
 
 static void UIOpenEntryAndRead(int idx,bool playable) { if (idx<0||idx>=LOGCNT) return; World.Sys_UI.logReferenceIndex=(u16)idx; World.Sys_UI.MFD_ReaderView=MFD_READER_TEXT; World.Sys_UI.logReaderPage=0; World.invP1.readLog[idx]=true;
     if (playable && (World.invP1.hasHardware&HW_ERD) && audioLogs[idx] && audioLogs[idx][0]) PlayLog(idx);
@@ -763,7 +759,7 @@ void UI_SoftwareRowClick(int idx) { World.Sys_UI.mouseClickHeldOverGUI=true; if 
     UseCyberspaceItemByIndex(idx - SW_TURBO);
 }
 
-void UI_WeaponIconClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastWeaponSideRH=rh; if (CurrentWeaponUsesEnergy()) OverloadButtonAction(); else ActualChangeAmmoType(); }
+void UI_WeaponIconClick() { World.Sys_UI.mouseClickHeldOverGUI=true; if (CurrentWeaponUsesEnergy()) OverloadButtonAction(); else ActualChangeAmmoType(); }
 void UI_AutomapClick(bool rh,int action) { World.Sys_UI.mouseClickHeldOverGUI=true; World.Sys_UI.lastAutomapSideRH=rh; u8 side=rh?1:0; u8* z=&World.automapZoom;
     if (World.invP1.hwVers[HW_NAV_IDX]<2 && action!=UI_AUTOMAP_FULL && action!=UI_AUTOMAP_SIDE) { CenterStatusPrint("%s",Sys_Text.stringTable[465]); return; }
     
@@ -1352,10 +1348,10 @@ static void UI_OnRegionClick(u32 id, u8 c) {
         case UI_ID_LMFD_ITEM_SKATE: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(false); return;
         case UI_ID_LMFD_ITEM_BOOST: World.Sys_UI.lastItemSideRH=rh; BoosterSetMode(true); return;
         case UI_ID_LMFD_ITEM_TIMER_SLIDER: World.Sys_UI.lastItemSideRH=rh; ConsumableSetTimer(((float)World.cursorPos_x-UIC(MID(rh,ITEM_TIMER_SLIDER)).min.x)/224.0f); return;
-        case UI_ID_LMFD_WEAPON_ICON: UI_WeaponIconClick(rh); return;
-        case UI_ID_LMFD_WEAPON_RELOAD: World.Sys_UI.lastWeaponSideRH=rh; ReloadSecret(false); return;
-        case UI_ID_LMFD_WEAPON_UNLOAD: World.Sys_UI.lastWeaponSideRH=rh; Unload(false); return;
-        case UI_ID_LMFD_WEAPON_OVERLOAD: UI_WeaponIconClick(rh); return;
+        case UI_ID_LMFD_WEAPON_ICON: UI_WeaponIconClick(); return;
+        case UI_ID_LMFD_WEAPON_RELOAD: ReloadSecret(false); return;
+        case UI_ID_LMFD_WEAPON_UNLOAD: Unload(false); return;
+        case UI_ID_LMFD_WEAPON_OVERLOAD: UI_WeaponIconClick(); return;
         case UI_ID_LMFD_WEAPON_ENERGY_SLIDER: UI_WeaponEnergySliderSet(rh); return;
         case UI_ID_LMFD_ELEV_BUTTON_0 ... UI_ID_LMFD_ELEV_BUTTON_7: UI_ElevFloorClick(rh,(int)(id-UI_ID_LMFD_ELEV_BUTTON_0)); return;
         case UI_ID_LMFD_ELEV_CLOSE: UI_ElevClose(rh); return;

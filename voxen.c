@@ -175,10 +175,8 @@ typedef struct WSCtx WSCtx;
 typedef struct WSLib WSLib;
 typedef struct WSMon WSMon;
 static WSLib WinSys;
-typedef struct{int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits; uintptr_t handle;} FBC;
 typedef void (*WSP)(void);
 void CycleWeaponSlot(int), CloseFullmap(), UI_AutomapClick(bool,int), UpdateScreenSize(i32,i32), SaveConfig(), InputWindowFocus(i32), InputKey(char*,int,int), InputMouseClick(char*,int,int), InputCursorPos(double*,double*,double,double), InputMonitor(WSMon*,int,int);
-const FBC* ChooseFBConfig(const FBC*, u32);
 void ComputeWindowPlacement(int monIdx, int* px, int* py);
 #if defined(_WIN32)
     int __cdecl wcscmp(const u16*,const u16*); u16* wcscpy(u16*,const u16*);
@@ -205,7 +203,8 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
     PFN_wglGetProcAddress wglGetProcAddress;
     PFN_GPFAIVA GPFAivARB;
     PFN_SWE wglSwapIntervalEXT;
-    typedef struct WSWinWin32 { void* handle; bool frameAction; int lastCurX,lastCurY; } WSWinWin32; 
+    typedef struct WSWinWin32 { void* handle; bool frameAction; int lastCurX,lastCurY; } WSWinWin32;
+    typedef struct{int redBits,greenBits,blueBits,alphaBits,depthBits,stencilBits; uintptr_t handle;} FBC;
     typedef struct WSLibWin32 {
         HINSTANCE instance; void* helperWindowHandle; u16 helperWindowClass,mainWindowClass; short int keycodes[512]; double restoreCurPosX,restoreCurPosY; WSWin *disabledCursorWindow, *capturedCursorWindow;
         struct { HINSTANCE instance; PFN_DwmIsCompositionEnabled IsCompositionEnabled; PFN_DwmFlush Flush; } dwmapi;
@@ -338,6 +337,18 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
     static void swapIntervalWGL(int i) { window->context.wgl.interval = i; if (!IsWindowsVersionOrGreaterWin32(((u8)((((u64)(0x0602))>>8)&0xff)),((u8)(((u64)(0x0602))&0xff)),0)) { i32 e = 0; if ((i32)(WinSys.win32.dwmapi.IsCompositionEnabled(&e) >= 0) && e) i = 0; } wglSwapIntervalEXT(i); }
     static WSP getProcAddressWGL(const char* p) { const WSP proc = (WSP)wglGetProcAddress(p); if (proc) return proc; return (WSP)PlatformGetModuleSymbol(WinSys.instance,p); }
     static void SetWindowPosition(WSWin* w, int x, int y) { RECT r = {x,y,x,y}; AdjustWindowRectEx(&r,0x060A0000 | (w->decorated ? 0x00C00000 : 0x80000000),0,0x00040000); SetWindowPos(w->win32.handle,NULL,r.l,r.t,0,0,0x0215); }
+    const FBC* ChooseFBConfig(const FBC* a, u32 c) {
+        u32 lowest = -1; const FBC* f = 0;
+        for (u32 i=0;i<c;++i) {
+            const FBC* x = a + i;
+            u32 score = (((x->alphaBits == 0) + (x->depthBits == 0) + (x->stencilBits == 0)) * 65536)
+                    + (((8 - x->redBits) * (8 - x->redBits) + (8 - x->greenBits) * (8 - x->greenBits) + (8 - x->blueBits) * (8 - x->blueBits)) * 256)
+                    + ((8 - x->alphaBits) * (8 - x->alphaBits) + (8 - x->depthBits) * (8 - x->depthBits) + (8 - x->stencilBits) * (8 - x->stencilBits));
+            if (score < lowest) { lowest = score; f = x; }
+        }
+        return f;
+    }
+    
     WSWin* VCreateWindow(WSWin* w, int width, int height) {
         u32 style = 0x060A0000 | 0x00C00000;
         WNDCLASSEXW wc= (WNDCLASSEXW){sizeof(wc),0x23,windowProc,0,0,WinSys.win32.instance,NULL,NULL,(void*)4,NULL,L"Voxen",NULL}; /*(void*)4=BLACK_BRUSH: ShowWindow paints black before GL exists*/
@@ -598,21 +609,9 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
         return w;
     }
 #endif // End Linux section
-const FBC* ChooseFBConfig(const FBC* a, u32 c) {
-    u32 lowest = -1; const FBC* f = 0;
-    for (u32 i=0;i<c;++i) {
-        const FBC* x = a + i;
-        u32 score = (((x->alphaBits == 0) + (x->depthBits == 0) + (x->stencilBits == 0)) * 65536)
-                + (((8 - x->redBits) * (8 - x->redBits) + (8 - x->greenBits) * (8 - x->greenBits) + (8 - x->blueBits) * (8 - x->blueBits)) * 256)
-                + ((8 - x->alphaBits) * (8 - x->alphaBits) + (8 - x->depthBits) * (8 - x->depthBits) + (8 - x->stencilBits) * (8 - x->stencilBits));
-        if (score < lowest) { lowest = score; f = x; }
-    }
-    return f;
-}
-
 FGL_AT glActiveTexture; FGL_AS glAttachShader; FGL_BB glBindBuffer;  FGL_BBB glBindBufferBase;    FGL_CPIV glGetProgramiv;FGL_CC glClearColor;    FGL_U4F glUniform4f;        FGL_BFB glBindFramebuffer;FGL_VP glViewport;    FGL_BVA glBindVertexArray; FGL_EVAA glEnableVertexAttribArray;         
 FGL_UP glUseProgram;    FGL_DM glDepthMask;    FGL_VAB glVertexAttribBinding;   FGL_DF glDepthFunc;   FGL_DC glDispatchCompute;    FGL_DB glDrawBuffers;   FGL_GSIV glGetShaderiv; FGL_BVB glBindVertexBuffer; FGL_LW glLineWidth;       FGL_LP glLinkProgram;       FGL_U3F glUniform3f;
-FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram;   FGL_CRS glCreateShader;  FGL_BFS glBlendFuncSeparate; FGL_UB glUnmapBuffer; FGL_BD glBufferData; FGL_F glFinish; FGL_FL glFlush;
+FGL_D glDisable;FGL_CM glColorMask;     FGL_CS glCompileShader;FGL_UM3FV glUniformMatrix3fv;    FGL_DA glDrawArrays;  FGL_VAF glVertexAttribFormat;FGL_CP glCreateProgram;   FGL_CRS glCreateShader;  FGL_BFS glBlendFuncSeparate; FGL_UB glUnmapBuffer; FGL_BD glBufferData; FGL_F glFinish;
 FGL_C glClear;  FGL_DE glDrawElements;  FGL_U2UI glUniform2ui; FGL_UM4FV glUniformMatrix4fv;    FGL_GIV glGetIntegerv;FGL_GSIL glGetShaderInfoLog; FGL_GPIL glGetProgramInfoLog; FGL_U2F glUniform2f;      FGL_U1UI glUniform1ui;   FGL_GVA glGenVertexArrays;  FGL_RP glReadPixels;      FGL_SS glShaderSource;FGL_TPI glTexParameteri; FGL_TPFV glTexParameterfv;   FGL_U1F glUniform1f;
 FGL_E glEnable; FGL_FF glFrontFace;     FGL_GB glGenBuffers;   FGL_FBT2D glFramebufferTexture2D;FGL_GERR glGetError;  FGL_GFS glGenFramebuffers;   FGL_GT glGenTextures;     FGL_BSD glBufferSubData; FGL_MBR glMapBufferRange;   FGL_U1I glUniform1i;      FGL_T2D glTexImage2D; FGL_BIT glBindImageTexture;FGL_BT glBindTexture;
 FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL_D glEndQuery; FGL_DAI glDrawArraysInstanced; FGL_BB glBlendFunc;  FGL_BF glBlitFramebuffer; FGL_T2D glTexSubImage2D; FGL_GTKP glGetTexLevelParameteriv; FGL_CBSD glCopyBufferSubData; FGL_CLBSD glClearBufferSubData; FGL_CISD glCopyImageSubData; FGL_CPIV glGetBufferParameteriv; FGL_GBSD glGetBufferSubData; FGL_GB glDeleteBuffers;
@@ -623,7 +622,7 @@ void SetGLContext_GetFunctionPointers() {
     X(glLineWidth,FGL_LW)         X(glReadPixels,FGL_RP)      X(glTexImage2D,FGL_T2D)      X(glViewport,FGL_VP)            X(glBindTexture,FGL_BT)             X(glDrawArrays,FGL_DA)         X(glDrawElements,FGL_DE)      X(glGenTextures,FGL_GT)     X(glActiveTexture,FGL_AT)             X(glBlendFuncSeparate,FGL_BFS)    X(glBindVertexArray,FGL_BVA)    X(glVertexAttribBinding,FGL_VAB)
     X(glBindBuffer,FGL_BB)        X(glBufferData,FGL_BD)      X(glGenBuffers,FGL_GB)       X(glUnmapBuffer,FGL_UB)         X(glAttachShader,FGL_AS)            X(glCompileShader,FGL_CS)      X(glCreateProgram,FGL_CP)     X(glCreateShader,FGL_CRS)   X(glDrawBuffers,FGL_DB)               X(glGetProgramiv,FGL_CPIV)        X(glGetShaderInfoLog,FGL_GSIL)  X(glGetProgramInfoLog,FGL_GPIL)     X(glGetShaderiv,FGL_GSIV)
     X(glLinkProgram,FGL_LP)       X(glShaderSource,FGL_SS)    X(glUniform1f,FGL_U1F)       X(glUniform1i,FGL_U1I)          X(glUniform2f,FGL_U2F)              X(glUniform3f,FGL_U3F)         X(glUniform4f,FGL_U4F)        X(glTexParameteri,FGL_TPI)  X(glTexParameterfv,FGL_TPFV)          X(glUniform1ui,FGL_U1UI)          X(glUniform2ui,FGL_U2UI)        X(glUniformMatrix3fv,FGL_UM3FV)     X(glUniformMatrix4fv,FGL_UM4FV)
-    X(glUseProgram,FGL_UP)        X(glBindBufferBase,FGL_BBB) X(glFinish,FGL_F) X(glFlush,FGL_FL) X(glBindFramebuffer,FGL_BFB) X(glGenFramebuffers,FGL_GFS)    X(glMapBufferRange,FGL_MBR)         X(glBindImageTexture,FGL_BIT)  X(glBindVertexBuffer,FGL_BVB) X(glDispatchCompute,FGL_DC)   X(glGenVertexArrays,FGL_GVA)      X(glVertexAttribFormat,FGL_VAF) X(glFramebufferTexture2D,FGL_FBT2D) X(glBufferSubData,FGL_BSD)
+    X(glUseProgram,FGL_UP)        X(glBindBufferBase,FGL_BBB) X(glFinish,FGL_F)            X(glBindFramebuffer,FGL_BFB)    X(glGenFramebuffers,FGL_GFS)        X(glMapBufferRange,FGL_MBR)    X(glBindImageTexture,FGL_BIT) X(glBindVertexBuffer,FGL_BVB) X(glDispatchCompute,FGL_DC)         X(glGenVertexArrays,FGL_GVA)      X(glVertexAttribFormat,FGL_VAF) X(glFramebufferTexture2D,FGL_FBT2D) X(glBufferSubData,FGL_BSD)
     X(glGenQueries,FGL_GIQ) X(glGetQueryObjectui64v,FGL_GQOU64) X(glBeginQuery,FGL_BQ) X(glEndQuery,FGL_D) X(glDrawArraysInstanced,FGL_DAI) X(glBlendFunc,FGL_BB) X(glBlitFramebuffer,FGL_BF) X(glTexSubImage2D,FGL_T2D) X(glGetTexLevelParameteriv,FGL_GTKP) X(glCopyBufferSubData,FGL_CBSD) X(glClearBufferSubData,FGL_CLBSD) X(glCopyImageSubData,FGL_CISD)  X(glGetBufferParameteriv,FGL_CPIV)  X(glGetBufferSubData,FGL_GBSD) X(glDeleteBuffers,FGL_GB)
     #undef X
 }
@@ -1043,10 +1042,10 @@ static void cmd_loadlevel(const char* arg) {
     if (World.menuActive) { CenterStatusPrint("%s", Sys_Text.stringTable[1015]); return; /*"Cannot load levels via cheat while on the main menu!"*/}
     int level = ParseLevelArg(arg); if (level == -2) { return; /*Already printed message*/ }
     if (level < 0) { CenterStatusPrint("cmd_loadlevel invalid level argument %d", level); return; }
-    if (level == World.currentLevel) { CenterStatusPrint("cmd_loadlevel already at level %d", level); return; }
+    if (level == World.curLev) { CenterStatusPrint("cmd_loadlevel already at level %d", level); return; }
     
     CenterStatusPrint("Loading level %u",level); queuedLevelToLoad=level;
-    if (level == LEVEL_CYBERSPACE) { queuedLevelPos = cyberSpaceEntryLocations[World.currentLevel < 8 ? (u8)World.currentLevel : 0]; } else if (level > 9) { if (!ElevatorDefaultDestinationPos(level, &queuedLevelPos)) { queuedLevelPos = (V3){0.0f, 0.0f, 0.0f}; } else {  queuedLevelPos.y += PLYR_CAM_OFS_Y; } } else { queuedLevelPos = ressurectionLocations[level]; queuedLevelPos.y -= (1.0f - PLYR_CAM_OFS_Y); }
+    if (level == LEVEL_CYBERSPACE) { queuedLevelPos = cyberSpaceEntryLocations[World.curLev < 8 ? (u8)World.curLev : 0]; } else if (level > 9) { if (!ElevatorDefaultDestinationPos(level, &queuedLevelPos)) { queuedLevelPos = (V3){0.0f, 0.0f, 0.0f}; } else {  queuedLevelPos.y += PLYR_CAM_OFS_Y; } } else { queuedLevelPos = ressurectionLocations[level]; queuedLevelPos.y -= (1.0f - PLYR_CAM_OFS_Y); }
     LoadLevel(level,queuedLevelPos);
 }
 
@@ -2328,7 +2327,7 @@ static const V2 levMins[MAX_LEVELS]={{-37.3600f,-52.7600f},/*0*/  {-53.8000f,-64
 static const float lFars[MAX_LEVELS] = { 56.32f/*R*/, 56.32f/*1*/, 51.2f/*2*/, 51.2f/*3*/, 40.96f/*4*/, 58.88f/*5*/, 79.36f/*6*/, 56.32f/*7*/, 69.12f/*8*/, 53.76f/*9*/,  51.2f/*10*/,  51.2f/*11*/, 38.4f/*12*/, 1300.00f/*13*/};
 int EdgeCompare(const void* a, const void* b) { u32 ea = *(const u32*)a, eb = *(const u32*)b; return (ea > eb) - (ea < eb); }
 u16 uniqueCvxMeshIndices[MAX_UNIQUE_CVX_MESHES]; u32 uniqueCvxMeshCount = 0; size_t cvxAdjLive = 0;
-void ResetDoorPortals(), MFD_NewGame(), MissionTimerInit(), AddHardwareToInventory(int,int), mp3_clear();
+void ResetDoorPortals(), MissionTimerInit(), AddHardwareToInventory(int,int), mp3_clear();
 static void ResetLoadTallies(void) {
     decalInlineTextCount = decalStyleCount = 0;
     mset(World.levelCameraCount,0,sizeof(World.levelCameraCount));     mset(World.levelSmallNodeCount,0,sizeof(World.levelSmallNodeCount));     mset(World.levelLargeNodeCount,0,sizeof(World.levelLargeNodeCount));
@@ -2342,8 +2341,9 @@ static void ResetLoadTallies(void) {
 // Init && Main
 __attribute__((cold)) void NewGame() { // Reset World States
     double newGamePrepStart = get_time();
-    CloseSearch(); MFD_NewGame();
-    World.invP1.currentSearchItem=U16_MAX;
+    CloseSearch();
+    World.Sys_UI=(SystemUI){.MFD_MediaTab=MM_LOG_TABLE,.MFD_ReaderView=MFD_READER_CONTENTS,.mfdSelected={1,1,1},.mfdReturnTab={1,1,1},.lastAutomapSideRH=true,.generalClickSlot=-1,.generalClickItem=-1,.generalClickCustom=U16_MAX,.linkedElevatorDoor=U16_MAX,.tetheredPGP=U16_MAX,.tetheredPWP=U16_MAX,.tetheredSearchable=U16_MAX,.tetheredKeypadElevator=U16_MAX,.tetheredKeypadKeycode=U16_MAX,.keycodeHuns=-1,.keycodeTens=-1,.keycodeOnes=-1,.keycodeEntry=-1,
+                            .logReaderPage=-1,.mg_current=-1,.pw_selectedWire=-1};
     DualLog("Loading new game");
     RenderLoading("Loading new game...");
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
@@ -2356,7 +2356,7 @@ __attribute__((cold)) void NewGame() { // Reset World States
     currentMenuItem = currentMenuTab = 0;
     currentMenuPage = MPG_FRONT;
     World.current_time = World.pauseRelativeTime = World.last_physics_time = 0.0;
-    World.deltaTime = 0.0166666666f; 
+    World.dt = 0.0166666666f; 
     mset(World.instances,0,3 * sizeof(Entity)); // Blank out player entities
     World.instances[PLAYER1].index = 767;
     World.layer[PLAYER1] = L_Player;
@@ -2415,9 +2415,9 @@ __attribute__((cold)) void NewGame() { // Reset World States
     DualLog(" prep...............................................................took %.6f secs\n",get_time() - newGamePrepStart);
     LoadAllLevels();
     for (u8 lev=0;lev<MAX_LEVELS;++lev) { /*Done after levels are loaded to remove difficulty related items appropriately.*/
-        u8 entryLevel = World.currentLevel; if (entryLevel != lev) SetLevelPointers(lev);
+        u8 entryLevel = World.curLev; if (entryLevel != lev) SetLevelPointers(lev);
         for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { u16 ci = World.instances[i].index; if (((World.diffMis <= 1 && (ci == 341 || ci == 388 || (ci >= 390 && ci <= 398) || ci == 417)) || (World.diffMis == 0 && (ci == 313 || ci == 448)))) { DeleteInstance(i); } /*Remove access cards and audio logs.*/ }
-        if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
+        if (World.curLev != entryLevel) SetLevelPointers(entryLevel);
     }
     LoadLevel(World.startLevel,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
     double newGameCvxStart = get_time();
@@ -2538,13 +2538,8 @@ void EnsureReflectionResources(void) {
             rtModelInfo[m].nodeBase = nodeOff * 4u; rtModelInfo[m].triBase = triSec + triOff * 2u; rtModelInfo[m].vtxBase = posSec + vtxOff * 2u; rtModelInfo[m].uvBase = uvSec + vtxOff;
             nodeOff += modelBVHNodeCounts[m]; triOff += modelBVHTriOrderCounts[m]; vtxOff += rtSrcVertCounts[m];
         }
-        if (rtInstanceInfoID) { glDeleteBuffers(1, &rtInstanceInfoID); rtInstanceInfoID = 0; }
-        if (rtCellCountsID)   { glDeleteBuffers(1, &rtCellCountsID);   rtCellCountsID = 0; }
-        if (rtCellListsID)    { glDeleteBuffers(1, &rtCellListsID);    rtCellListsID = 0; }
         rtGeomID = MakeSSBO(&rtGeomID, 16, geomBytes, NULL, GL_STATIC_DRAW);
-        glBindBuffer(GL_SSBO, rtGeomID);
-        u8* gpuPtr = (u8*)glMapBufferRange(GL_SSBO, 0, (size_t)nodeWords * sizeof(u32), 0x0002/*GL_MAP_WRITE_BIT*/ | 0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/ | 0x0020/*GL_MAP_UNSYNCHRONIZED_BIT*/);
-        u32* nodes = (u32*)gpuPtr;
+        u32* nodes = (u32*)((u8*)glMapBufferRange(GL_SSBO, 0, (size_t)nodeWords * sizeof(u32), 0x0002/*GL_MAP_WRITE_BIT*/ | 0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/ | 0x0020/*GL_MAP_UNSYNCHRONIZED_BIT*/));
         for (m=0; m<mdlsCnt; ++m) {
             if (!BvhHasBVH((u16)m)) continue;
             
@@ -2653,7 +2648,6 @@ void InitalizeEnvironment() {
         ImageDestroy(native); PollMonitors();
     #endif
     threadCnt = vclampi(OS_GetNumThreads(),1,32);
-    globalframe = 0;
     World.menuActive = true;
     World.screenshotTimeout = 1.0;
     World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/
@@ -2674,9 +2668,8 @@ void InitalizeEnvironment() {
     i32 major = 0, minor = 0;
     glGetIntegerv(0x821B/*GL_MAJOR_VERSION*/, &major);
     glGetIntegerv(0x821C/*GL_MINOR_VERSION*/, &minor);
-    if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); }
+    if (major < 4 || (major == 4 && minor < 3)) { DualLogError("Need OpenGL >= 4.3, got %d.%d\n",major,minor); OS_Exit(1); } // TODO fix this up at CreateContextAttribsARB instead of here
     
-    glFrontFace(0x0901/*GL_CCW*/);
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
     glClearColor(0,0,0,1);
     DualLog("Window creation and GL context......................................................took %.6f secs\n",get_time() - initWinCtxStart);
@@ -2787,7 +2780,6 @@ void InitalizeEnvironment() {
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }
     double initAmBiomStart = get_time();
     World.absoluteTime = get_time();
-    World.pauseRelativeTime = World.last_physics_time = 0.0;
     GenerateAndBindTexture(&amTexId,GL_RGBA8,AM_W,AM_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL); // Automap related buffers
     glGenFramebuffers(1,&amFBO);     glBindFramebuffer(GL_FRAMEBUFFER,amFBO);     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,amTexId,0);
     GenerateAndBindTexture(&amFullTexId,GL_RGBA8,AM_FULL_W,AM_FULL_H,GL_RGBA,GL_UNSIGNED_BYTE,0x2601/*GL_LINEAR*/,NULL);
@@ -2799,7 +2791,6 @@ void InitalizeEnvironment() {
     bioMonitor.ecgColor=(Color){1.f,0,0,1.f}; bioMonitor.min[BIOM_ERG]=0; bioMonitor.min[BIOM_CHI]=-2.f; bioMonitor.min[BIOM_ECG]=-1.f; bioMonitor.max[BIOM_ERG]=1.f; bioMonitor.max[BIOM_CHI]=2.f; bioMonitor.max[BIOM_ECG]=1.f; BioMonitorClearGraphs();
     DualLog("Automap and biomonitor buffers......................................................took %.6f secs\n",get_time() - initAmBiomStart);
     NewGame();
-    currentMenuPage = MPG_FRONT;
     double initAudioStart = get_time();
     InitAudio(); synth_set_reverb_preset(0);
     DualLog("Audio init..........................................................................took %.6f secs\n",get_time() - initAudioStart);
@@ -2824,12 +2815,12 @@ i32 main() {
         double curtime = get_time();
         raycastCalls = 0;
         raycastMs = 0.0;
-        World.deltaTime=World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time, 0.0);
-        World.absoluteTime += World.deltaTime;
+        World.dt = World.current_time < 0.001f ? 0.000f : vmax(curtime - World.current_time, 0.0);
+        World.absoluteTime += World.dt;
         World.current_time = curtime;
-        World.painStaticAlpha = vmax(0.0f, World.painStaticAlpha - (float)World.deltaTime * 2.0f);
-        World.empStaticAlpha = vmax(0.0f, World.empStaticAlpha - (float)World.deltaTime * 4.0f);
-        if (!World.paused && !World.menuActive) { if (World.pauseRelativeTime < 0.001f) { World.pauseRelativeTime = World.last_physics_time = curtime; } World.pauseRelativeTime += World.deltaTime * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/ }
+        World.painStaticAlpha = vmax(0.0f, World.painStaticAlpha - (float)World.dt * 2.0f);
+        World.empStaticAlpha = vmax(0.0f, World.empStaticAlpha - (float)World.dt * 4.0f);
+        if (!World.paused && !World.menuActive) { if (World.pauseRelativeTime < 0.001f) { World.pauseRelativeTime = World.last_physics_time = curtime; } World.pauseRelativeTime += World.dt * World.timeScale; /*Reflex slow-time at 0.25x while the patch is active, mouse-look stays raw*/ }
         double input_start = get_time();
         InputProcessing();/*Before anims and physics to allow them to respond immediately.*/ UpdateAnims();/*Before physics to allow model swap out to affect physics state immediately.  Before rendering to affect shadowmaps immediately.*/
         prePhys = get_time() - input_start;

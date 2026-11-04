@@ -99,7 +99,7 @@ typedef struct { u16 lights[24], count; double expires[24]; } AIEffectLightPool;
 static AIEffectLightPool aiEffectPools[MAX_LEVELS];
 static float ai_effect_marker(u16 slot) { return -100.0f-(float)slot; }
 static void ai_ensure_effect_pool(void) {    
-    AIEffectLightPool* p = &aiEffectPools[World.currentLevel];
+    AIEffectLightPool* p = &aiEffectPools[World.curLev];
     if (p->count) { for (u16 i=0;i<p->count;i++) if (p->lights[i] >= World.loadedLights || World.lights[p->lights[i]].spotAng != ai_effect_marker(i)) { p->count = 0; break; } }
     if (p->count) return;
     
@@ -108,7 +108,7 @@ static void ai_ensure_effect_pool(void) {
 
 static void ai_update_effect_lights(void) {
     static double aiEffectLightsUpdatedAt=-1.0;
-    if (aiEffectLightsUpdatedAt==World.pauseRelativeTime) return; aiEffectLightsUpdatedAt=World.pauseRelativeTime; u16 lev=World.currentLevel; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev];
+    if (aiEffectLightsUpdatedAt==World.pauseRelativeTime) return; aiEffectLightsUpdatedAt=World.pauseRelativeTime; u16 lev=World.curLev; if (lev>=MAX_LEVELS) return; AIEffectLightPool* p=&aiEffectPools[lev];
     if (!p->count) return; for (u16 i=0;i<p->count;i++) if (p->lights[i]>=World.loadedLights || World.lights[p->lights[i]].spotAng!=ai_effect_marker(i)) { p->count=0; return; }
     for (u16 i=0;i<p->count;i++) if (p->expires[i]>0.0 && p->expires[i]<=World.pauseRelativeTime) { u16 li=p->lights[i]; UpdateLight(li,World.lights[li].pos,World.lights[li].col,World.lights[li].range,0.0f,0.0f,0.0f,ai_effect_marker(i),QUAT_IDENTITY,false,false); p->expires[i]=0.0; }
 }
@@ -117,7 +117,7 @@ void ai_effect_flash(V3 pos, Color3 col, float range, float intensity, double du
     if (intensity <= 0.0f || range <= 0.0f || duration <= 0.0) return;
     
     ai_ensure_effect_pool();
-    AIEffectLightPool* p = &aiEffectPools[World.currentLevel]; if (!p->count) return;
+    AIEffectLightPool* p = &aiEffectPools[World.curLev]; if (!p->count) return;
     
     u16 chosen = 0; double oldest = 1000000000000000000000000000000.0;
     for (u16 i=0;i<p->count;i++) { if (p->expires[i]<=World.pauseRelativeTime) { chosen = i; oldest = -1.0; break; } if (p->expires[i]<oldest) { oldest = p->expires[i]; chosen = i; } }
@@ -242,7 +242,7 @@ static void AIEnemyInFrontChecks(Entity* e, u16 i, bool cyber) { if(!i){flag_set
 static void AIFace(Entity* self, V3 goal) {
     u16 sidx=(u16)(self - World.instances); const NPCTable* npc = &npcTable[self->index - 419]; bool cyber = npc->type == NPCType_Cyber; if (self->entflags & EF_ASLEEP) return; V3 fv = V3_AsubB(goal,World.position[sidx]); if (!cyber) fv.y = 0.0f; if (fv.x == 0.0f && fv.y == 0.0f && fv.z == 0.0f) return; u16 eidx = self->enemy; if (cyber && eidx) { World.rotation[sidx] = World.rotation[eidx]; self->forward = V3_Normalize(quat_rot_v3(World.rotation[sidx],(V3){0.0f,0.0f,1.0f})); return; }
     if (fv.x == 0.0f && fv.z == 0.0f) { if (eidx){fv=V3_AsubB(World.position[eidx],World.position[sidx]);} else{fv.x += 0.001f;} }
-    V3 currentForward=V3_Normalize(quat_rot_v3(World.rotation[sidx],(V3){0.0f,0.0f,1.0f})); float currentYaw=__builtin_atan2f(currentForward.x,currentForward.z), targetYaw=__builtin_atan2f(fv.x,fv.z), yaw=targetYaw-currentYaw; if (yaw>PI) yaw-=2.0f*PI; else if (yaw<-PI) yaw+=2.0f*PI; float t=vmin((float)(0.2f*npc->yawSpeed*World.deltaTime*World.timeScale),1.0f); yaw*=t; float half=yaw*0.5f; Quaternion yawRotation={0.0f,vsinf(half),0.0f,vcosf(half)}; World.rotation[sidx]=quat_normalize(quat_multiply(yawRotation,World.rotation[sidx])); self->forward=V3_Normalize(quat_rot_v3(World.rotation[sidx],(V3){0.0f,0.0f,1.0f}));
+    V3 currentForward=V3_Normalize(quat_rot_v3(World.rotation[sidx],(V3){0.0f,0.0f,1.0f})); float currentYaw=__builtin_atan2f(currentForward.x,currentForward.z), targetYaw=__builtin_atan2f(fv.x,fv.z), yaw=targetYaw-currentYaw; if (yaw>PI) yaw-=2.0f*PI; else if (yaw<-PI) yaw+=2.0f*PI; float t=vmin((float)(0.2f*npc->yawSpeed*World.dt*World.timeScale),1.0f); yaw*=t; float half=yaw*0.5f; Quaternion yawRotation={0.0f,vsinf(half),0.0f,vcosf(half)}; World.rotation[sidx]=quat_normalize(quat_multiply(yawRotation,World.rotation[sidx])); self->forward=V3_Normalize(quat_rot_v3(World.rotation[sidx],(V3){0.0f,0.0f,1.0f}));
 }
 
 INLINE float quat_angle_deg(Quaternion a, Quaternion b) { float d = vclamp(vabs(quat_dot(a, b)), 0.0f, 1.0f); return 2.0f * vacosf(d) * (180.0f / PI); }
@@ -491,7 +491,7 @@ static void ai_apply_damage(DamageData dd, u16 hitIdx) {
     
     bool hitPlayer = (hitIdx == PLAYER1);
     dd.isOtherNPC=!hitPlayer && IdxIsNPC(World.instances[hitIdx].index);
-    if (dd.isOtherNPC) { const NPCTable* nt = &npcTable[World.instances[hitIdx].index - 419]; dd.armorvalue = nt->armorvalue; dd.defense = nt->defense; }
+    if (dd.isOtherNPC) { const NPCTable* nt = &npcTable[World.instances[hitIdx].index - 419]; dd.defense = nt->defense; }
     dd.damage = GetDamageTakeAmount(&dd);
     TakeDamage(hitIdx, dd);
 }
