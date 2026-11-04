@@ -1326,19 +1326,7 @@ void LoadLevelMod(u8 lev) {
         }
         if (ipLine && ipBlock>=2) { entsFromFile[entCount].panelItemPos=ipSubPos; entsFromFile[entCount].panelItemRot=ipSubRotSet?ipSubRot:rotationFromFile[entCount]; }
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true);
-        if (!isLight && entsFromFile[entCount].index >= 595 && entsFromFile[entCount].index <= 601) {
-            V3 prefabScale;
-            switch (entsFromFile[entCount].index) {
-                case 595:                               prefabScale = (V3){2.56f,2.56f,2.56f}; /* trigger_cyberpush */
-                case 596:                               prefabScale = (V3){1.0f,1.0f,1.0f};    /* trigger_gravitylift */
-                case 597:                               prefabScale = (V3){1.0f,2.4f,0.16f};   /* trigger_ladder */
-                case 598: case 599: case 600: case 601: prefabScale = (V3){2.56f,2.56f,2.56f};
-                default:                                prefabScale = (V3){1.0f,1.0f,1.0f};
-            }
-            if (!(scaleReadMask&1u)) scaleFromFile[entCount].x=prefabScale.x;
-            if (!(scaleReadMask&2u)) scaleFromFile[entCount].y=prefabScale.y;
-            if (!(scaleReadMask&4u)) scaleFromFile[entCount].z=prefabScale.z;
-        }
+        if (!isLight && entsFromFile[entCount].index >= 595 && entsFromFile[entCount].index <= 601) { if (!(scaleReadMask&1u)) scaleFromFile[entCount].x = 1.0f; if (!(scaleReadMask&2u)) scaleFromFile[entCount].y = 1.0f; if (!(scaleReadMask&4u)) scaleFromFile[entCount].z = 1.0f; }
         if (!isLight && (entsFromFile[entCount].index == 592 || entsFromFile[entCount].index == 593)) entsFromFile[entCount].texIndex = matIndexRead ? matIndexTexIdx : 881; // 3D text decals: material color texture, white default
         if (!isLight && entsFromFile[entCount].index == 517) { // func_wall: stash base transform + chunk children for spawn below
             fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp; u16 n=fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN, start=fwPoolUsed;

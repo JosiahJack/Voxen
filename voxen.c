@@ -105,7 +105,7 @@ void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = E
 void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
 void DrawMeshCollider(u16 i) {
     Color col = ColliderColor(i);
-    u16 mi = (World.col[i] == CT_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= MAX_MDLS || mi >= mdlsCnt) return;
+    u16 mi = (World.col[i] == CT_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= mdlsCnt) return;
     u32 triCount = modelTriangleCounts[mi]; if(!triCount){return;}
     
     const float* M=&modelMatrices[i*16];
@@ -1607,26 +1607,19 @@ static const __m256i faceBitVecs[6] = { (__m256i){0x0000000100000001LL,0x0000000
                                         (__m256i){0x0000001000000010LL,0x0000001000000010LL,0x0000001000000010LL,0x0000001000000010LL}, (__m256i){0x0000002000000020LL,0x0000002000000020LL,0x0000002000000020LL,0x0000002000000020LL}};
 INLINE u8 GetCubemapFaceMask(V3 d, float r) {u8 m=0; float absX=vabs(d.x),absY=vabs(d.y),absZ=vabs(d.z); float maxAbsYZ = absY > absZ ? absY : absZ; float maxAbsXZ = absX > absZ ? absX : absZ; float maxAbsXY = absX > absY ? absX : absY; if (d.x+r > maxAbsYZ) m|=(1<<0); if (d.x-r < -maxAbsYZ) m|=(1<<1); if (d.y+r > maxAbsXZ) m|=(1<<2); if (d.y-r < -maxAbsXZ) m|=(1<<3); if (d.z+r > maxAbsXY) m|=(1<<4); if (d.z-r < -maxAbsXY) m|=(1<<5); return m;}
 INLINE u8 FaceMaskFromViewer(V3 d, V3 fdir, float r) {
-    float T = V3_dot(d,fdir) + r*(vabs(fdir.x)+vabs(fdir.y)+vabs(fdir.z)), rx = 2.0f*r*vabs(fdir.x), ry = 2.0f*r*vabs(fdir.y), rz = 2.0f*r*vabs(fdir.z);
-    u8 m = 0;
-    if (fdir.x >= 0.0f) { if (T > 0.0f) { m |= 1; } if (T > rx) { m |= 2; } } else { if (T > 0.0f) { m |= 2; } if (T > rx) { m |= 1; } }
-    if (fdir.y >= 0.0f) { if (T > 0.0f) { m |= 4; } if (T > ry) { m |= 8; } } else { if (T > 0.0f) { m |= 8; } if (T > ry) { m |= 4; } }
-    if (fdir.z >= 0.0f) { if (T > 0.0f) { m |= 16; } if (T > rz) { m |= 32; } } else { if (T > 0.0f) { m |= 32; } if (T > rz) { m |= 16; } }
-    return m;
+    float T = V3_dot(d,fdir) + r*(vabs(fdir.x)+vabs(fdir.y)+vabs(fdir.z)), rx = 2.0f*r*vabs(fdir.x), ry = 2.0f*r*vabs(fdir.y), rz = 2.0f*r*vabs(fdir.z); u8 m = 0;
+    if (fdir.x >= 0.0f) { if (T > 0.0f) { m |=  1; } if (T > rx) { m |=  2; } } else { if (T > 0.0f) { m |=  2; } if (T > rx) { m |=  1; } }
+    if (fdir.y >= 0.0f) { if (T > 0.0f) { m |=  4; } if (T > ry) { m |=  8; } } else { if (T > 0.0f) { m |=  8; } if (T > ry) { m |=  4; } }
+    if (fdir.z >= 0.0f) { if (T > 0.0f) { m |= 16; } if (T > rz) { m |= 32; } } else { if (T > 0.0f) { m |= 32; } if (T > rz) { m |= 16; } }    return m;
 }
 
-INLINE bool ShadowCasterMoved(u16 i) { return i != PLAYER1 && (World.instances[i].entflags & EF_MOVING) && !IdxIsNPC(World.instances[i].index); }
 typedef struct { u32 sortKey; u16 instanceIdx; u8 faceMask; } SortedMesh;
-static u16 AddShadowMesh(SortedMesh *out,u16 i,u16 tex,bool detail,float *posSum,u32 *idSum,bool *moved,u8 faceMask) {
-    V3 sc = World.scale[i]; if (vabs(sc.x) < 0.6f || vabs(sc.y) < 0.6f || vabs(sc.z) < 0.6f) { return 0; }
-    
-    Entity* e = &World.instances[i]; 
-    u16 model = ((instanceIsLODArray[i] || detail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex);
-    *out = (SortedMesh){ ((u32)model << 16) | tex, i, faceMask };
-    *idSum += i + out->sortKey;
-    *posSum += World.position[i].x + World.position[i].y + World.position[i].z;
-    if (ShadowCasterMoved(i)) { *moved = true; }
-    return 1;
+static u16 AddShadMsh(SortedMesh *sm, u16 i, float *ps, u32 *is, bool *moved, u8 fm) {
+    V3 sc = World.scale[i];
+    if (vabs(sc.x) >= 0.6f && vabs(sc.y) >= 0.6f && vabs(sc.z) >= 0.6f) {
+        Entity* e = &World.instances[i]; u16 mi = ((instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && e->lodIndex < mdlsCnt ? e->lodIndex : e->modelIndex); *sm = (SortedMesh){((u32)mi << 16) | e->texIndex,i,fm}; *is += i + sm->sortKey; *ps += World.position[i].x + World.position[i].y + World.position[i].z; if ((e->entflags & EF_MOVING) && !IdxIsNPC(e->index)) { *moved = true; } return 1u;
+    }
+    return 0u;
 }
 
 __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
@@ -1673,7 +1666,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
     glUseProgram(shadowmapsSP);
     u32 currentSortKey = 0xFFFFFFFF, currentTriCount = 0;
     u16 currentModelType = 0xFFFF, currentTexIndex = 0xFFFF;
-    bool currentIsTransparent = false, useDetail = Sys_Settings.ModelDetail;
+    bool currentIsTransparent = false;
     SortedMesh localMeshes[SHADOW_NEARMESH_MAX];
     V3 camFwds[64]; for (u8 v=0;v<camViewCount;++v) { camFwds[v] = V3_Normalize(quat_rot_v3(camViews[v].rotation,(V3){0.0f,0.0f,1.0f})); } /*per-frame: sensaround slots re-orient every tick*/
     for (u16 c = 0; c < numCandidates; ++c) {
@@ -1771,7 +1764,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 if (unlikely(nearbyMeshCount >= SHADOW_NEARMESH_MAX)) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); k = numCastersAligned; break; }
                 
                 u16 instIdx = sc_origIdx[k + bit];
-                nearbyMeshCount += AddShadowMesh(&localMeshes[nearbyMeshCount],instIdx,World.instances[instIdx].texIndex,useDetail,&posSum,&idSum,&anyMoved,(u8)laneFaceView[bit]);
+                nearbyMeshCount += AddShadMsh(&localMeshes[nearbyMeshCount],instIdx,&posSum,&idSum,&anyMoved,(u8)laneFaceView[bit]);
             }
         }
         
@@ -1781,7 +1774,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
                 u8 faceMaskScalar = GetCubemapFaceMask(d, World.instances[sc_origIdx[k]].shadRadius); if (faceMaskScalar == 0) { continue; }
                 
                 u16 instIdx = sc_origIdx[k];
-                nearbyMeshCount += AddShadowMesh(&localMeshes[nearbyMeshCount],instIdx,instIdx==PLAYER1 ? (u16)3337 : World.instances[instIdx].texIndex,useDetail,&posSum,&idSum,&anyMoved,faceMaskScalar);
+                nearbyMeshCount += AddShadMsh(&localMeshes[nearbyMeshCount],instIdx,&posSum,&idSum,&anyMoved,faceMaskScalar);
                 if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping ran out of nearMeshes at %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
             }
         }
@@ -1859,9 +1852,7 @@ void InitSunShadowmap(void) {
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
 }
 
-void RenderSunShadowmap(void) {
-    if (Sys_Settings.Shadows == 0u || sunShadowFBO == 0u) return;
-    
+void RenderSunShadowmap(void) {    
     V3 sunDir=SunDirection(); sunDirection=sunDir;
     V3 target=World.position[PLAYER1];
     V3 fwd={-sunDir.x,-sunDir.y,-sunDir.z};
@@ -1885,22 +1876,15 @@ void RenderSunShadowmap(void) {
     for (u16 i=INSTS_1ST_IDX;i<World.instCount;++i) {
         if (i == World.weaponVModelIndex) continue;
         Entity* e=&World.instances[i]; if (EntNotVisible(i,(e->entflags & EF_NO_SHADOWS))) continue;
-        
-        float radius=(e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
-        if (!SphereInFrustum(sunShadowFrustum,World.position[i],radius)) continue;
+        float radius=(e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z); if (!SphereInFrustum(sunShadowFrustum,World.position[i],radius)) continue;
         
         u16 modelType=(instanceIsLODArray[i]||useDetail<1u)&&e->lodIndex<mdlsCnt?e->lodIndex:e->modelIndex;
         u32 sortKey=((u32)modelType<<16)|e->texIndex;
         glUniform1ui(0,i);
-        if (sortKey != currentSortKey) {
-            currentSortKey=sortKey;
-            if (modelType != currentModelType) { currentModelType=modelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); currentTriCount=modelTriangleCounts[modelType]*3; }
-            if (e->texIndex != currentTexIndex) { currentTexIndex=e->texIndex; glUniform1ui(3,(u32)currentTexIndex); }
-        }
+        if (sortKey != currentSortKey) { currentSortKey=sortKey; if (modelType != currentModelType) { currentModelType=modelType; glBindVertexBuffer(0,vbos[modelType],0,VRT_ATT_SZ); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[modelType]); currentTriCount=modelTriangleCounts[modelType]*3; } if (e->texIndex != currentTexIndex) { currentTexIndex=e->texIndex; glUniform1ui(3,(u32)currentTexIndex); } }
         glDrawElements(0x0004/*GL_TRIANGLES*/,currentTriCount,GL_UNSIGNED_SHORT,0); drawCalls++; shadDrawCalls++; vertsRendered+=currentTriCount;
     }
-    glEnable(GL_CULL_FACE);
-    glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
+    glEnable(GL_CULL_FACE); glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO); glViewport(0,0,Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
 
 static DepthSort visibleInstances[INSTANCE_COUNT];
@@ -2006,15 +1990,14 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
     DepthSort tmpTransparent[1024];
     u16 tcnt = 0;
     for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { // Determine base visibility
-        if (i == World.weaponVModelIndex){continue;/*weapon view model drawn only by its own camera-locked pass below; keep it out of the world pass/depth prepass*/}
-        if(EntNotVisible(i,false)){continue;/*must be transparent && transparents or neither*/}
+        if (i == World.weaponVModelIndex || EntNotVisible(i,false)) { continue; }
         
-        Entity* e=&World.instances[i];
-        u16 instCellIdx=e->cellIndex;
-        u16 entIdx=e->index;
-        V3 delta=V3_AsubB(World.position[i],playerPos);
-        float distSqrd=V3_dot(delta,delta);
-        float radius=(e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
+        Entity* e = &World.instances[i];
+        u16 instCellIdx = e->cellIndex;
+        u16 entIdx = e->index;
+        V3 delta = V3_AsubB(World.position[i],playerPos);
+        float distSqrd = V3_dot(delta,delta);
+        float radius = (e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
         if (!SphereInFrustum(playerFrustumPlanes,World.position[i],radius)) { continue; }
         if (IdxIsPortalBlockingDoor(entIdx)) { /*Extra checks only needed for opaque portal blocking doors.*/
             if (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && !NeighborhoodInPVS(e->cellX,e->cellZ,2u) /*!in pvs*/) { continue; }
@@ -2022,16 +2005,10 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
             if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN)){ continue; }
             if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f) { continue; /*30.72 * 30.72, 12 cells*/ }
         }
-        
         if (World.instances[i].camView != 255) camViews[World.instances[i].camView].visible = true;
-        if (transparentTexture[World.instances[i].texIndex]) {
-            if (tcnt <= 1023) { tmpTransparent[tcnt].index = i;          tmpTransparent[tcnt].depth = distSqrd;        tcnt++; }
-        } else {       visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
+        if (transparentTexture[World.instances[i].texIndex]) { if (tcnt <= 1023) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; } } else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
     }
-
-    if (World.shields[0] < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4) && opaqueCount < (INSTANCE_COUNT - 4)) {
-        for (u8 k=0;k<4;++k) { visibleInstances[opaqueCount].index=World.shields[k]; visibleInstances[opaqueCount++].depth=300.0f; }
-    }
+    if (World.shields[0] < U16_MAX && skyVisible && World.instCount < (INSTANCE_COUNT - 4)) { for (u8 k=0;k<4;++k) { visibleInstances[opaqueCount].index=World.shields[k]; visibleInstances[opaqueCount++].depth=300.0f; } }
     if (editModeSelection < U16_MAX && Cheats.editMode) {
         u16 selIdx=World.instances[editModeSelection].index;
         if (selIdx != 592 && selIdx != 593) { /* decals have no mesh: baked 3D text drawn in decal pass; force-draw would hit modelIndex U16_MAX */
@@ -2091,8 +2068,8 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         bool alpha=visibleIndex>=opaqueCount; if (visibleIndex==opaqueCount) glDepthMask(1);
         u16 i=visibleInstances[visibleIndex].index; Entity* e=&World.instances[i]; u16 tex=e->texIndex,constIndex=e->index;
         if (!alpha && transparentTexture[tex]) continue;
-        bool twoSided=doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f;
-        if (alpha && !twoSided && !transparentTexture[tex]) continue;
+        bool twoSided = doubleSidedTexture[tex] || World.scale[i].x<0.0f || World.scale[i].y<0.0f || World.scale[i].z<0.0f; if (alpha && !twoSided && !transparentTexture[tex]) continue;
+        
         u8 state=twoSided ? 2 : alpha ? 1 : 0;
         if (cullBlendState!=state) { if (twoSided) glDisable(GL_CULL_FACE); else glEnable(GL_CULL_FACE); if (state) glEnable(GL_BLEND); else glDisable(GL_BLEND); cullBlendState=state; }
         if (alpha) glDepthFunc(((constIndex>=561 && constIndex<=565) || (constIndex>=568 && constIndex<=573)) ? 0x0202/*GL_EQUAL*/ : 0x0203/*GL_LEQUAL*/);
