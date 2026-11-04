@@ -53,8 +53,8 @@ Color textColors[] = {{1.000000000f,1.000000000f,1.000000000f,1.0f}, /* 0 White 
                       {0.546864600f,0.152723400f,0.830188700f,1.0f}  /* 15 PuzzleWire actualColorPurple T_PURPLE*/ };
 // Wireline Rendering (originally just for debug lines)
 u32 debugUnlitSP, debugLinesVAO, debugLinesVBO, wireLinesVAO, wireLinesVBO;
-typedef struct { float x,y,z,r,g,b,a; } WireVertex; static WireVertex* debugLineVerts; static WireVertex* wireVerts; static u32 wireVertCount = 0;
-static void EmitWireQuad(V3 c0, V3 c1, V3 c2, V3 c3, Color c) { const V3 p[6] = {c0,c1,c2, c0,c2,c3}; for (int v = 0; v < 6; ++v) { WireVertex* w = &wireVerts[wireVertCount++]; w->x = p[v].x; w->y = p[v].y; w->z = p[v].z; w->r = c.r; w->g = c.g; w->b = c.b; w->a = c.a; } }
+typedef struct { float x,y,z,r,g,b,a; } WireVrt; static WireVrt* lineVerts; static WireVrt* wireVerts; static u32 wireVertCount = 0;
+static void EmitWireQuad(V3 c0, V3 c1, V3 c2, V3 c3, Color c) { const V3 p[6] = {c0,c1,c2, c0,c2,c3}; for (int v = 0; v < 6; ++v) { WireVrt* w = &wireVerts[wireVertCount++]; w->x = p[v].x; w->y = p[v].y; w->z = p[v].z; w->r = c.r; w->g = c.g; w->b = c.b; w->a = c.a; } }
 void DrawCrossedLine(V3 a, V3 b, V3 perp, float halfThick, Color c) {
     V3 o0 = V3_ScaleByF(perp, halfThick);
     if (wireVertCount + 6 < (u32)(MAX_WIRELINE_QUADS*6)) EmitWireQuad(V3_AsubB(a,o0), V3Add(a,o0), V3Add(b,o0), V3_AsubB(b,o0), c);
@@ -63,17 +63,7 @@ void DrawCrossedLine(V3 a, V3 b, V3 perp, float halfThick, Color c) {
     if (wireVertCount + 6 < (u32)(MAX_WIRELINE_QUADS*6)) EmitWireQuad(V3_AsubB(a,r0), V3Add(a,r0), V3Add(b,r0), V3_AsubB(b,r0), c);
 }
 
-void DrawLine(V3 start, V3 end, Color col) {
-    if (World.debugLineVertCount >= MAX_WIRELINE_VRTS - 2){return;}
-    
-    int i=World.debugLineVertCount;
-    debugLineVerts[i].x = start.x; debugLineVerts[i].y = start.y; debugLineVerts[i].z = start.z;
-    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
-    debugLineVerts[i].x = end.x; debugLineVerts[i].y = end.y; debugLineVerts[i].z = end.z;
-    debugLineVerts[i].r = col.r; debugLineVerts[i].g = col.g; debugLineVerts[i].b = col.b; debugLineVerts[i].a = col.a; i++;
-    World.debugLineVertCount = i; // ORDER IS IMPORTANT!
-}
-
+void DrawLine(V3 s, V3 e, Color c) { if (World.lineVertCnt >= MAX_LINEVRTS - 2) { return; } int i = World.lineVertCnt; lineVerts[i++] = (WireVrt){ s.x, s.y, s.z, c.r, c.g, c.b, c.a }; lineVerts[i++] = (WireVrt){ e.x, e.y, e.z, c.r, c.g, c.b, c.a }; World.lineVertCnt = i; }
 INLINE Color ColliderColor(u16 i) { return (!(World.instances[i].entflags & EF_RIGIDBODY) || World.physSleep[i] != 0) ? textColors[T_GREEN_MENU_SHADOW] : ((World.colliding[i]) ? textColors[T_RED] : textColors[T_GREEN]); }
 void DrawVelocityVector(u16 i) {
     if (!(World.instances[i].entflags & EF_RIGIDBODY)) {return;}
@@ -100,16 +90,16 @@ void DrawBoxColliderColored(u16 i, Color col) {
 
 void DrawBoxCollider(u16 i) { DrawBoxColliderColored(i,ColliderColor(i)); }
 void DrawSphereWireframe(Color col, ShapeSphere s) { float step = 6.28318530f / 12; for (int seg=0;seg<12;seg++) { float a0 = seg * step, a1 = a0 + step, c0 = vcosf(a0), s0 = vsinf(a0), c1 = vcosf(a1), s1 = vsinf(a1); DrawLine(V3Add(s.ctr,(V3){c0*s.rad,0,s0*s.rad}),V3Add(s.ctr,(V3){c1*s.rad,0,s1*s.rad}),col); DrawLine(V3Add(s.ctr,(V3){c0*s.rad,s0*s.rad,0}),V3Add(s.ctr,(V3){c1*s.rad,s1*s.rad,0}),col); DrawLine(V3Add(s.ctr,(V3){0,c0*s.rad,s0*s.rad}),V3Add(s.ctr,(V3){0,c1*s.rad,s1*s.rad}),col); } }
-void DrawSphereCollider(u16 i) { Color col = ColliderColor(i); ShapeSphere s = Entity_GetSph(i); DrawSphereWireframe(col,s); DrawVelocityVector(i); }
-void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) {Color col = (Color){0.0f,0.0f,1.0f,1.0f}; ShapeSphere s = (ShapeSphere){pos,rad}; DrawSphereWireframe(col,s);} }
+void DrawSphereCollider(u16 i) { DrawSphereWireframe(ColliderColor(i),Entity_GetSph(i)); DrawVelocityVector(i); }
+void DrawSphereContact(V3 pos, float rad) { if (Cheats.showPhys) { DrawSphereWireframe((Color){0.0f,0.0f,1.0f,1.0f},(ShapeSphere){pos,rad}); } }
 void DrawMeshCollider(u16 i) {
-    Color col = ColliderColor(i);
     u16 mi = (World.col[i] == CT_CVX) ? World.instances[i].colMeshIndex : World.instances[i].modelIndex; if (mi >= mdlsCnt) return;
     u32 triCount = modelTriangleCounts[mi]; if(!triCount){return;}
     
     const float* M=&modelMatrices[i*16];
     float m00=M[0],m10=M[1],m20=M[2],m01=M[4],m11=M[5],m21=M[6],m02=M[8],m12=M[9],m22=M[10],tx=M[12],ty=M[13],tz=M[14];
     const float* pos = physPos[mi]; const u16* tris = modelTriangles[mi];
+    Color col = ColliderColor(i);
     for (u32 j=0; j<triCount; j++) {
         V3 w[3]; u32 b=j*3;
         for (int k=0;k<3;++k) { u32 vi=tris[b + k]; float x=pos[vi*3 + 0]; float y=pos[vi*3 + 1]; float z=pos[vi*3 + 2]; w[k]=(V3){m00*x + m01*y + m02*z + tx, m10*x + m11*y + m12*z + ty, m20*x + m21*y + m22*z + tz}; }
@@ -221,7 +211,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
     DLL_IMP i32 WINAPI BringWindowToTop(void*); DLL_IMP i32 WINAPI SetWindowPlacement(void*,const WINDOWPLACEMENT*); DLL_IMP void* WINAPI SetFocus(void*); DLL_IMP i32 WINAPI SetForegroundWindow(void*); DLL_IMP i32 WINAPI GetWindowPlacement(void*,WINDOWPLACEMENT*); DLL_IMP i32 WINAPI SetPropW(void*,u16*,void*); DLL_IMP i32 WINAPI OffsetRect(RECT*,int,int); DLL_IMP void* WINAPI CreateWindowExW(u32,u16*,u16*,u32,int,int,int,int,void*,void*,HINSTANCE,void*);
     DLL_IMP u64 WINAPI VerSetConditionMask(u64,u32,u8); DLL_IMP u16 WINAPI RegisterClassExW(const WNDCLASSEXW *); DLL_IMP i32 WINAPI DeleteObject(void*); DLL_IMP i32 WINAPI DeleteDC(void*); DLL_IMP i32 WINAPI SwapBuffers(void*); DLL_IMP i32 WINAPI EnumDisplayMonitors(void*,const RECT*,MONITORENUMPROC,i64); DLL_IMP i32 WINAPI EnumDisplaySettingsW(u16*,u32,LPDEVMODEW); DLL_IMP i32 WINAPI EnumDisplayDevicesW(u16*,u32,DISPLAY_DEVICEW*,u32);
     DLL_IMP i32 WINAPI EnumDisplaySettingsExW(u16*,u32,LPDEVMODEW,u32); DLL_IMP i32 WINAPI SetPixelFormat(void*,i32,const PIXELFORMATDESCRIPTOR *); DLL_IMP i32 WINAPI ChoosePixelFormat(void* hdc,const PIXELFORMATDESCRIPTOR *ppfd); DLL_IMP i32 WINAPI DescribePixelFormat(void*,i32,u32,PIXELFORMATDESCRIPTOR*); DLL_IMP void* WINAPI CreateBitmap(i32,i32,u32,u32,const void *); DLL_IMP void* WINAPI CreateDIBSection(void*,void*,u32,void**,void*,u32);
-    DLL_IMP i32 WINAPI GetDeviceCaps(void*,i32); i32 IsWindowsVersionOrGreaterWin32(u16 major, u16 minor, u16 sp); void WinSysPollMonitorsWin32();
+    DLL_IMP i32 WINAPI GetDeviceCaps(void*,i32);
     struct WSLib { WSMon** monitors; int monitorCount; WSLibWin32 win32; HINSTANCE instance; };
     struct WSCtx { void (*makeCurrent)(WSWin*); void (*swapBuffers)(WSWin*); void (*swapInterval)(int); WSP (*getProcAddress)(const char*); WGLContext wgl; }; 
     struct WSWin { i32 decorated; char mouseButtons[MAX_MOUSE_BUTTONS],keys[WS_KEYCOUNT]; double virtualCursorPosX,virtualCursorPosY; WSCtx context; WSWinWin32 win32; };
@@ -474,7 +464,6 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
     static void SetWindowDecorated(WSWin* w,i32 e) { struct {u64 f,fun,dec; i64 im; u64 st;} h={0}; h.f=2; h.dec=e?1:0; WinSys.x11.xlib.ChangeProperty(WinSys.x11.display,w->x11.handle,WinSys.x11.MOTIF_WM_HINTS,WinSys.x11.MOTIF_WM_HINTS,32,0,(u8*)&h,sizeof(h)/sizeof(i64)); }
     static void GetCursorPosV(WSWin* w, double* x, double* y) { XID r,c; int rx,ry,cx,cy; u32 m; WinSys.x11.xlib.QueryPointer(WinSys.x11.display,w->x11.handle,&r,&c,&rx,&ry,&cx,&cy,&m); *x=cx; *y=cy; }
     static void SetCurV(WSWin* w, double x, double y) { w->x11.warpCursorPosX=(int)x; w->x11.warpCursorPosY=(int)y; WinSys.x11.xlib.WarpPointer(WinSys.x11.display,0L,w->x11.handle,0,0,0,0,(int)x,(int)y); }    
-    void GetMonitorFullarea(WSMon* m, int* x, int* y, int* w, int* h);
     static void PollMonitors() {
         XRRScreenResources* sr = WinSys.x11.randr.GetScreenResourcesCurrent(WinSys.x11.display,WinSys.x11.root);
         RROutput p = WinSys.x11.randr.GetOutputPrimary(WinSys.x11.display,WinSys.x11.root);
@@ -503,11 +492,11 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py);
     }
     
     static void processEvent(XEvent* e) {
-        static int firstFocus = 1; u32 kc=0; if (e->type==2 || e->type==3) kc=e->xkey.keycode; if (e->type==WinSys.x11.randr.eventBase+1) { WinSys.x11.randr.UpdateConfiguration(e); PollMonitors(); return; } if (e->type==35) return; WSWin* w=NULL; if (WinSys.x11.xlib.FindContext(WinSys.x11.display,e->xany.window,WinSys.x11.context,(XPointer*)&w)!=0) return;
+        static int firstFocus = 1; u32 kc = (e->type==2 || e->type==3) ? e->xkey.keycode : 0; if (e->type==WinSys.x11.randr.eventBase+1) { WinSys.x11.randr.UpdateConfiguration(e); PollMonitors(); return; } if (e->type==35) return; WSWin* w=NULL; if (WinSys.x11.xlib.FindContext(WinSys.x11.display,e->xany.window,WinSys.x11.context,(XPointer*)&w)!=0) return;
         switch (e->type) {
             case 21: w->x11.parent=e->xreparent.parent; return;
-            case 2: case 3:{const int k=(kc>255)?KEY_UNKNOWN:WinSys.x11.keycodes[kc]; if(k==KEY_UNKNOWN)return; if(e->type==3){XEvent n; if(WinSys.x11.xlib.CheckTypedWindowEvent(WinSys.x11.display,e->xany.window,2,&n)){if(n.xkey.keycode == kc && n.xkey.h == e->xkey.h){InputKey(w->keys,k,INPUT_PRESS); return;}else{InputKey(w->keys,k,INPUT_RELEASE); processEvent(&n); return;}}} const int a=(e->type==2)?INPUT_PRESS:INPUT_RELEASE; InputKey(w->keys,k,a); return;}
-            case 4: case 5:{
+            case 2: case 3: { const int k = (kc > 255) ? KEY_UNKNOWN : WinSys.x11.keycodes[kc]; if (k==KEY_UNKNOWN) return; if (e->type == 3) { XEvent n; if(WinSys.x11.xlib.CheckTypedWindowEvent(WinSys.x11.display,e->xany.window,2,&n)){if(n.xkey.keycode == kc && n.xkey.h == e->xkey.h){InputKey(w->keys,k,INPUT_PRESS); return;}else{InputKey(w->keys,k,INPUT_RELEASE); processEvent(&n); return;}}} const int a=(e->type==2)?INPUT_PRESS:INPUT_RELEASE; InputKey(w->keys,k,a); return;}
+            case 4: case 5: {
                 const int b = e->xbutton.button; const int a = (e->type == 4) ? INPUT_PRESS : INPUT_RELEASE;
                 if (a == INPUT_PRESS && WinSys.x11.disabledCursorWindow != w) { disableCursor(w); } // Explicitly require a click to lock the mouse
                 if (b == 1) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_LEFT,a); else if (b == 2) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_MIDDLE,a); else if (b == 3) InputMouseClick(w->mouseButtons,MOUSE_BUTTON_RIGHT,a); else if (a == INPUT_PRESS && b == 4) Sys_Input.scrollDelta += 1.0f; else if (a == INPUT_PRESS && b == 5) Sys_Input.scrollDelta -= 1.0f; else if (b > 7) InputMouseClick(w->mouseButtons,b - 5,a); return; }
@@ -724,11 +713,9 @@ void ChangeFullScreenWindowed(bool adjustToFit) {
     UpdateScreenSize(Sys_Settings.ScreenWidth,Sys_Settings.ScreenHeight);
 }
 
-void SetVSync() { window->context.swapInterval((i32)Sys_Settings.Vsync); }
 void CycleToNextMonitor() {
     static double monitorSwitchTime = 0.0; if (get_time() < monitorSwitchTime) {return;} monitorSwitchTime = get_time() + 0.5; Sys_Settings.CurrentMonitor++; if(Sys_Settings.CurrentMonitor>=WinSys.monitorCount)Sys_Settings.CurrentMonitor=0; SaveConfig(); DualLog("CycleToNextMonitor cur:%u\n",Sys_Settings.CurrentMonitor);
-    if (Sys_Settings.Fullscreen){ WSMon* m = WinSys.monitors[Sys_Settings.CurrentMonitor]; int x,y,w,h; GetMonitorFullarea(m,&x,&y,&w,&h); SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth=w; Sys_Settings.ScreenHeight=h; //SetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
-    }else{GatherResolutionModesFor(Sys_Settings.CurrentMonitor); ApplyStagedWindowedSizeOn(Sys_Settings.CurrentMonitor);}
+    if (Sys_Settings.Fullscreen) { WSMon* m = WinSys.monitors[Sys_Settings.CurrentMonitor]; int x,y,w,h; GetMonitorFullarea(m,&x,&y,&w,&h); SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth=w; Sys_Settings.ScreenHeight=h; } else { GatherResolutionModesFor(Sys_Settings.CurrentMonitor); ApplyStagedWindowedSizeOn(Sys_Settings.CurrentMonitor); }
 }
 // Input and Configuration System for Config.ini, keyboard and mouse support.
 double last_mouse_x,last_mouse_y;
@@ -753,11 +740,24 @@ void TextEntry(i32 k) {
 
 void ConsoleEmulator(i32 keycode); extern bool editFieldEditing; extern void EditFieldKey(i32 keycode); extern bool enteringSaveName; extern void SaveNameEntry(i32 keycode); extern void KeycodeEntryKey(i32 keycode);
 void InputKey(char* keys,int key,int action) {
-    if (key >= 0 && key < WS_KEYCOUNT) { i32 repeated=0; if(action == INPUT_RELEASE && keys[key] == INPUT_RELEASE){return;} if (action == INPUT_PRESS && keys[key] == INPUT_PRESS){repeated=1;} keys[key]=(char)action; if(repeated){action=INPUT_REPEAT;} }
+    if (key >= 0 && key < WS_KEYCOUNT) {
+        if (action == INPUT_RELEASE && keys[key] == INPUT_RELEASE) { return; }
+        
+        if (action == INPUT_PRESS && keys[key] == INPUT_PRESS) { action = INPUT_REPEAT; } else { keys[key] = action; }
+    }
     if (key == KEY_F10 && action) OS_Exit(0);
     if (!window_has_focus && action != INPUT_RELEASE) return;
+    
     if (World.menuActive && !returnToPause) { if (((key == KEY_RIGHT_ALT || key == KEY_LEFT_ALT) && action && Sys_Input.keyStates[KEY_ENTER].down) || (key == KEY_ENTER && action && (Sys_Input.keyStates[KEY_LEFT_ALT].down || Sys_Input.keyStates[KEY_RIGHT_ALT].down /*Qmaster's Cheat!*/))){GoIntoGame();} }
-    if (key >=0 && key < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {Sys_Input.keyStates[key].down = true; if (action == INPUT_PRESS) Sys_Input.keyStates[key].pressed = true; else Sys_Input.keyStates[key].pressed = false; if (Cheats.consoleActive) ConsoleEmulator(key); else if (editFieldEditing) EditFieldKey(key); else if (World.Sys_UI.keycodeValid) KeycodeEntryKey(key); else if (enteringSaveName && World.menuActive) SaveNameEntry(key); else if (enteringPlayerName && World.menuActive) TextEntry(key);}
+    if (key >=0 && key < MAX_KEYS && (action == INPUT_PRESS || (action == INPUT_REPEAT && !(key == KEY_KP_ENTER || key == KEY_ENTER || key == KEY_TAB || key == KEY_ESCAPE)))) {
+        Sys_Input.keyStates[key].down = true;
+        Sys_Input.keyStates[key].pressed = (action == INPUT_PRESS);
+        if (Cheats.consoleActive) ConsoleEmulator(key);
+        else if (editFieldEditing) EditFieldKey(key);
+        else if (World.Sys_UI.keycodeValid) KeycodeEntryKey(key);
+        else if (enteringSaveName && World.menuActive) SaveNameEntry(key);
+        else if (enteringPlayerName && World.menuActive) TextEntry(key);
+    }
     else if (key >= 0 && key < MAX_KEYS && action == INPUT_RELEASE) { Sys_Input.keyStates[key].pressed=false; Sys_Input.keyStates[key].down=false; }
 }
 
@@ -779,11 +779,11 @@ bool TurnRight() { return GetKey(11); }             bool LookUp() { return GetKe
 bool Attack() { return GetKeyPressed(23); }         bool Use() { return GetKeyPressed(24); }            bool Menu() { return GetKeyPressed(25); }         bool Reload() { return GetKeyPressed(27); }
 bool Grenade() { return GetKeyPressed(30); }        bool GrenCycUp() { return GetKeyPressed(31); }      bool GrenCycDn() { return GetKeyPressed(32); }    bool ChangeAmmoType() { return GetKeyPressed(33); } bool Patch() { return GetKeyPressed(34); }
 bool PatchCycUp() { return GetKeyPressed(35); }     bool PatchCycDown() { return GetKeyPressed(36); }   bool SwimUp() {return (Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(38);}             bool SwimDn() {return (Cheats.noclip || World.curLev == LEVEL_CYBERSPACE) && GetKey(39);}
-bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){return false;} if (World.pauseRelativeTime < World.invP1.leanLTapFinished) { World.invP1.leanLTapFinished = 0.0; return true; } World.invP1.leanLTapFinished = World.pauseRelativeTime + 0.5; return false; }
-bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){return false;} if (World.pauseRelativeTime < World.invP1.leanRTapFinished) { World.invP1.leanRTapFinished = 0.0; return true; } World.invP1.leanRTapFinished = World.pauseRelativeTime + 0.5; return false; } 
-void ForceShootMode() { if (Sys_Settings.NoShootMode){return;} float curhalff=(float)(CURSOR_SZ/2); if (World.inventoryMode) {World.cursorPos_x=(i16)((float)UI_W*0.5f-curhalff); World.cursorPos_y=(i16)((float)UI_H*0.5f-curhalff)/*Centered UI fixed 1366x768*/; ignore_next_mouse_delta=true;} World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode=false; CloseFullmap(); World.Sys_UI.vmailActive=0; }
-void ForceInventoryMode() { if (!World.inventoryMode) {World.inventoryMode = true; float curhalff=(float)(CURSOR_SZ/2); World.cursorPos_x=(i16)((float)UI_W*0.5f); World.cursorPos_y=(i16)((float)UI_H*0.5f-curhalff); ignore_next_mouse_delta = true;} } // Centered on UI baseline resolution 1366x768
-void ToggleInventoryMode() { if (World.inventoryMode) {ForceShootMode();} else {ForceInventoryMode();} }
+bool DoubleTapLeanLeft(void)  { if(!GetKeyPressed(7)){ return false; } if (World.pauseRelativeTime < World.invP1.leanLTapFinished) { World.invP1.leanLTapFinished = 0.0; return true; } World.invP1.leanLTapFinished = World.pauseRelativeTime + 0.5; return false; }
+bool DoubleTapLeanRight(void) { if(!GetKeyPressed(8)){ return false; } if (World.pauseRelativeTime < World.invP1.leanRTapFinished) { World.invP1.leanRTapFinished = 0.0; return true; } World.invP1.leanRTapFinished = World.pauseRelativeTime + 0.5; return false; } 
+void ForceShootMode() { if (Sys_Settings.NoShootMode){ return; } if (World.inventoryMode) { World.cursorPos_x = 663; World.cursorPos_y = 364; ignore_next_mouse_delta = true; } World.Sys_UI.mouseClickHeldOverGUI=World.inventoryMode = false; CloseFullmap(); World.Sys_UI.vmailActive = 0; }
+void ForceInventoryMode() { if (!World.inventoryMode) { World.inventoryMode = true; World.cursorPos_x = 683; World.cursorPos_y = 364; ignore_next_mouse_delta = true;} }
+void ToggleInventoryMode() { if (World.inventoryMode) { ForceShootMode();} else {ForceInventoryMode(); } }
 void ToggleConsole() { static bool imWasActPrior = false; editFieldEditing = false; if (!Cheats.consoleActive) {imWasActPrior = World.inventoryMode;} Cheats.consoleActive = !Cheats.consoleActive; World.paused = !World.paused; if (Cheats.consoleActive) { World.inventoryMode = true; } else if (!imWasActPrior && World.inventoryMode) {ForceShootMode();} }
 void SaveGame(u8,const char*),LoadGame(u8),ApplyPlayerMovements(float);
 void HwToggle(u8);
@@ -1014,9 +1014,8 @@ void cmd_kill() { World.instances[PLAYER1].health = World.instances[PLAYER1].cyb
 void cmd_undo() { if (Cheats.editMode) { if (lastSpawned < U16_MAX && lastSpawned >= INSTS_1ST_IDX) { DeleteInstance(lastSpawned); lastSpawned = U16_MAX; CenterStatusPrint("Last spawned object removed"); } else { CenterStatusPrint("Nothing to undo"); } } else { CenterStatusPrint("Cannot undo when not in Edit Mode"); } }
 // Screen Shake
 static float shakeAmp = 0.15f;
-void ScreenShake(float force, double duration) { World.shakeFinished = World.pauseRelativeTime + duration; shakeAmp = (force < 0.48f) ? force : 0.48f; }
-void Shake(float force) { float forc = (force <= 0.0f) ? 1.0f : force; ScreenShake(forc,1.0); }// The whole station is a shakin' and a movin'!
-void cmd_shake() { Shake(-1.0f); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
+void ScreenShake() { World.shakeFinished = World.pauseRelativeTime + 1.0f; shakeAmp = 0.48f; } // The whole station is a shakin' and a movin'!
+void cmd_shake() { ScreenShake(); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
 // Edit Mode
 void cmd_edit() { Cheats.editMode = !Cheats.editMode; if (Cheats.editMode) { Cheats.noclip = Cheats.notarget =  true; Cheats.editSubMode = 0; CenterStatusPrint("Edit Mode activated!" ); } else { Cheats.noclip = Cheats.notarget = false; editModeSelection = U16_MAX; editModeLightSelection = U16_MAX; CenterStatusPrint("Edit Mode deactivated"); } }
 static void cmd_editsub(int submode) { if (submode < 0 || submode > 1) { CenterStatusPrint("Invalid edit submode: %d (0=select, 1=spawn physics objects)", submode); return; } Cheats.editSubMode = (u8)submode; CenterStatusPrint("Edit submode: %s", submode == 0 ? "select" : "spawn physics objects"); }
@@ -1153,23 +1152,11 @@ RaycastHit RayTriangle(V3 origin, V3 dir, V3 A, V3 B, V3 C) {
 }
 
 INLINE RaycastHit RaySphere(V3 origin, V3 dir, ShapeSphere sph, float maxDist) {
-    RaycastHit h = {.hit=false,.distance=maxDist,.point={0},.normal={0},.hitInstanceIndex=INSTANCE_COUNT};
-    float r = sph.rad; if (r < 0.0001f) return h;
+    RaycastHit h = {.distance=maxDist,.hitInstanceIndex=INSTANCE_COUNT}; float r = sph.rad; if (r < 0.0001f) return h;
+    V3 oc = V3_AsubB(origin, sph.ctr); float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r; float disc=b*b - c; if (disc < 0.0f) return h;
+    float s = vsqrtf(disc); float t = -b - s; if (t < 0.0f) t = -b + s; if (t < 0.0f || t > maxDist) return h;
     
-    V3 oc = V3_AsubB(origin, sph.ctr);
-    float b=V3_dot(oc,dir), c=V3_dot(oc,oc) - r * r;
-    float disc=b*b - c; if (disc < 0.0f) return h;
-    
-    float s = vsqrtf(disc);
-    float t = -b - s;
-    if (t < 0.0f) t = -b + s;
-    if (t < 0.0f || t > maxDist) return h;
-    
-    h.hit = true;
-    h.distance = t;
-    h.point = V3Add(origin, V3_ScaleByF(dir, t));
-    h.normal = V3_ScaleByF(V3_AsubB(h.point, sph.ctr), 1.0f / r);
-    return h;
+    h.hit = true; h.distance = t; h.point = V3Add(origin, V3_ScaleByF(dir, t)); h.normal = V3_ScaleByF(V3_AsubB(h.point, sph.ctr), 1.0f / r); return h;
 }
 
 u16 EditModePickLight(V3 origin, V3 dir, float maxDist, float* outDist) {
@@ -1978,15 +1965,14 @@ void DrawEntity(Entity* e, u16 i, u16 constIndex, u16 tex, u16* curN, u16* curT,
     }
 }
 
-bool mat4_inverse(const float* m, float* out) {
+void mat4_inverse(const float* m, float* out) {
     float inv[16]; float s0 = m[0]*m[5]   - m[4]*m[1],   s1 = m[0]*m[6]   - m[4]*m[2],   s2 = m[0]*m[7]   - m[4]*m[3], s3 = m[1]*m[6]   - m[5]*m[2],   s4 = m[1]*m[7]   - m[5]*m[3],   s5 = m[2]*m[7]   - m[6]*m[3], c0 = m[8]*m[13]  - m[12]*m[9],  c1 = m[8]*m[14]  - m[12]*m[10], c2 = m[8]*m[15]  - m[12]*m[11], c3 = m[9]*m[14]  - m[13]*m[10], c4 = m[9]*m[15]  - m[13]*m[11], c5 = m[10]*m[15] - m[14]*m[11];
-    float det = s0*c5 - s1*c4 + s2*c3 + s3*c2 - s4*c1 + s5*c0; if (det == 0.0f) { for (int i = 0; i < 16; ++i) out[i] = (i % 5 == 0) ? 1.0f : 0.0f; return false; }
+    float det = s0*c5 - s1*c4 + s2*c3 + s3*c2 - s4*c1 + s5*c0; if (det == 0.0f) { for (int i = 0; i < 16; ++i) out[i] = (i % 5 == 0) ? 1.0f : 0.0f; return; }
     
     float id = 1.0f / det;
     inv[0]  = ( m[5]*c5  - m[6]*c4   + m[7]*c3 ) * id;  inv[1]  = (-m[1]*c5  + m[2]*c4   - m[3]*c3 ) * id; inv[2]  = ( m[13]*s5 - m[14]*s4  + m[15]*s3) * id;  inv[3]  = (-m[9]*s5  + m[10]*s4  - m[11]*s3) * id; inv[4]  = (-m[4]*c5  + m[6]*c2   - m[7]*c1 ) * id;  inv[5]  = ( m[0]*c5  - m[2]*c2   + m[3]*c1 ) * id; inv[6]  = (-m[12]*s5 + m[14]*s2  - m[15]*s1) * id;  inv[7]  = ( m[8]*s5  - m[10]*s2  + m[11]*s1) * id;
     inv[8]  = ( m[4]*c4  - m[5]*c2   + m[7]*c0 ) * id;  inv[9]  = (-m[0]*c4  + m[1]*c2   - m[3]*c0 ) * id; inv[10] = ( m[12]*s4 - m[13]*s2  + m[15]*s0) * id;  inv[11] = (-m[8]*s4  + m[9]*s2   - m[11]*s0) * id; inv[12] = (-m[4]*c3  + m[5]*c1   - m[6]*c0 ) * id;  inv[13] = ( m[0]*c3  - m[1]*c1   + m[2]*c0 ) * id; inv[14] = (-m[12]*s3 + m[13]*s1  - m[14]*s0) * id;  inv[15] = ( m[8]*s3  - m[9]*s1   + m[10]*s0) * id;
     for (int i = 0; i < 16; ++i) out[i] = inv[i];
-    return true;
 }
 
 void PSys_Render(float*,V3,V3,V3,V3,u32,float,float,float,float);
@@ -2030,17 +2016,15 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
         if (i == World.weaponVModelIndex || EntNotVisible(i,false)) { continue; }
         
         Entity* e = &World.instances[i];
-        u16 instCellIdx = e->cellIndex;
-        u16 entIdx = e->index;
         V3 delta = V3_AsubB(World.position[i],playerPos);
         float distSqrd = V3_dot(delta,delta);
         float radius = (e->modelIndex < MAX_MDLS ? modelBounds[e->modelIndex] : 0.0f) * 2.0f * vmax(vmax(World.scale[i].x,World.scale[i].y),World.scale[i].z);
         if (!SphereInFrustum(playerFrustumPlanes,World.position[i],radius)) { continue; }
-        if (IdxIsPortalBlockingDoor(entIdx)) { /*Extra checks only needed for opaque portal blocking doors.*/
-            if (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && !NeighborhoodInPVS(e->cellX,e->cellZ,2u) /*!in pvs*/) { continue; }
+        if (IdxIsPortalBlockingDoor(e->index)) { /*Extra checks only needed for opaque portal blocking doors.*/
+            if (!(gridCellStates[e->cellIndex] & CELL_VISIBLE) && !NeighborhoodInPVS(e->cellX,e->cellZ,2u) /*!in pvs*/) { continue; }
         } else {
-            if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN)){ continue; }
-            if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f) { continue; /*30.72 * 30.72, 12 cells*/ }
+            if (((gridCellStates[e->cellIndex] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN)){ continue; }
+            if (!(gridCellStates[e->cellIndex] & CELL_OPEN) && distSqrd >= 943.7184f) { continue; /*30.72 * 30.72, 12 cells*/ }
         }
         if (World.instances[i].camView != 255) camViews[World.instances[i].camView].visible = true;
         if (transparentTexture[World.instances[i].texIndex]) { if (tcnt <= 1023) { tmpTransparent[tcnt].index = i; tmpTransparent[tcnt].depth = distSqrd; tcnt++; } } else { visibleInstances[opaqueCount].index = i; visibleInstances[opaqueCount].depth = distSqrd; opaqueCount++; }
@@ -2148,34 +2132,27 @@ static __attribute__((hot)) void Render(bool camView, u8 camViewIdx) {
             V3 weaponViewOffset=vWepOfs[wep16];
             weaponViewOffset.y += wfx.reloadContainerPos.y;
             weaponViewOffset = V3Add(weaponViewOffset, debugWepOffset);
-            V3 weaponPos = V3Add(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1], weaponViewOffset));
-            World.position[wvi] = weaponPos;
+            World.position[wvi] = V3Add(World.position[PLAYER1], quat_rot_v3(World.rotation[PLAYER1], weaponViewOffset));
             World.rotation[wvi] = quat_multiply(World.rotation[PLAYER1], vWepRot[wep16]); // view orientation + per-model correction
             u16 curN = U16_MAX, curT = U16_MAX, curG = U16_MAX, curS = U16_MAX, curM = U16_MAX;
             DrawEntity(&World.instances[wvi], wvi, World.instances[wvi].index, World.instances[wvi].texIndex, &curN, &curT, &curG, &curS, &curM, false);
         }
     }
-    if(unlikely(camView)) {
-        glEndQuery(0x88BF/*GL_TIME_ELAPSED*/);
-        i32 cw = vmin((i32)swidth, (i32)vmin(Sys_Settings.ScreenWidth, camViews[camViewIdx].width)), ch = vmin((i32)sheight, (i32)vmin(Sys_Settings.ScreenHeight, camViews[camViewIdx].height));
-        glCopyImageSubData(inputImageID,              GL_TEXTURE_2D, 0, 0, 0, 0,
-                           camViewTextures[camViewIdx], GL_TEXTURE_2D, 0, 0, 0, 0,
-                           cw, ch, 1);
-        return;
-    } // <<<<<<<<<<<<< CAM VIEW BARRIER
+    if(unlikely(camView)) { glEndQuery(0x88BF/*GL_TIME_ELAPSED*/); i32 cw = vmin((i32)swidth,(i32)vmin(Sys_Settings.ScreenWidth,camViews[camViewIdx].width)),ch=vmin((i32)sheight,(i32)vmin(Sys_Settings.ScreenHeight,camViews[camViewIdx].height)); glCopyImageSubData(inputImageID,GL_TEXTURE_2D,0,0,0,0,camViewTextures[camViewIdx],GL_TEXTURE_2D,0,0,0,0,cw,ch,1); return; } // <<<<<<<<<<<<< CAM VIEW BARRIER
+    
     PSys_Render(viewProj, playerPos,(V3){invViewRot[0], invViewRot[1], invViewRot[2]}, (V3){invViewRot[3], invViewRot[4], invViewRot[5]}, (V3){-invViewRot[6], -invViewRot[7], -invViewRot[8]}, inputDepthID, snear, sfar, (float)swidth, (float)sheight);
-    if (wireVertCount) { glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVertex),wireVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glBindVertexArray(wireLinesVAO); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount); drawCalls++; vertsRendered += wireVertCount; wireVertCount = 0; glEnable(GL_CULL_FACE); }
+    if (wireVertCount) { glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO); glBufferSubData(GL_ARRAY_BUFFER,0,wireVertCount*sizeof(WireVrt),wireVerts); glUseProgram(debugUnlitSP); glUniformMatrix4fv(0,1,GL_FALSE,viewProj); glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glBindVertexArray(wireLinesVAO); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,wireVertCount); drawCalls++; vertsRendered += wireVertCount; wireVertCount = 0; glEnable(GL_CULL_FACE); }
     if (Cheats.editMode) { /*Point-light range spheres, editmode only.*/ for (u16 i = 0; i < World.loadedLights; ++i) { Light* L = &World.lights[i]; DrawSphereWireframe(i == editModeLightSelection ? (Color){1.0f,0.5f,0.5f,1.0f} : (Color){0.9216f,0.9176f,0.7725f,1.0f}, (ShapeSphere){L->pos, 0.02 * L->range}); } }
-    if(unlikely(World.debugLineVertCount > 0)) {
+    if(unlikely(World.lineVertCnt > 0)) {
         glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO);
-        glBufferSubData(GL_ARRAY_BUFFER,0,World.debugLineVertCount * sizeof(WireVertex),debugLineVerts);
+        glBufferSubData(GL_ARRAY_BUFFER,0,World.lineVertCnt * sizeof(WireVrt),lineVerts);
         glUseProgram(debugUnlitSP);
         glUniformMatrix4fv(0,1,GL_FALSE,viewProj);
         glLineWidth(1.0f);
         glDisable(GL_DEPTH_TEST);
         glBindVertexArray(debugLinesVAO);
-        glDrawArrays(0x0001/*GL_LINES*/,0,World.debugLineVertCount); drawCalls++; vertsRendered += World.debugLineVertCount;
-        World.debugLineVertCount = 0;
+        glDrawArrays(0x0001/*GL_LINES*/,0,World.lineVertCnt); drawCalls++; vertsRendered += World.lineVertCnt;
+        World.lineVertCnt = 0;
         glEnable(GL_DEPTH_TEST);
     }
     glActiveTexture(GL_TEXTURE3);
@@ -2347,7 +2324,6 @@ __attribute__((cold)) void NewGame() { // Reset World States
     RenderLoading("Loading new game...");
     World.menuActive = World.paused = enteringPlayerName = fovSliderActive = gammaSliderActive = masterVolumeSliderActive = musicVolumeSliderActive = messageVolumeSliderActive = sfxVolumeSliderActive = returnToPause = false;
     for (int i=0;i<MAX_LEVELS;++i) { World.worldMin_x[i] = levMins[i].x; World.worldMin_z[i] = levMins[i].y; World.voxMinCtrX[i] = World.worldMin_x[i] + (VOXEL_SIZE * 0.5f); World.voxMinCtrZ[i] = World.worldMin_z[i] + (VOXEL_SIZE * 0.5f); World.farPlane[i] = lFars[i]; World.fogColor[i] = fogLUT[i]; World.fogColor[i].a *= 3.8f; }
-    SetLevelPointers(0);
     World.curLev = 0;
     World.mass[0] = 0.0f;
     World.dynamicFriction[0] = 0.4f;
@@ -2601,14 +2577,12 @@ void InitalizeEnvironment() {
         WinSys.win32.dwmapi.instance = LoadLibraryA("dwmapi.dll"); if (WinSys.win32.dwmapi.instance) { WinSys.win32.dwmapi.IsCompositionEnabled = (PFN_DwmIsCompositionEnabled)PlatformGetModuleSymbol(WinSys.win32.dwmapi.instance,"DwmIsCompositionEnabled"); WinSys.win32.dwmapi.Flush = (PFN_DwmFlush)PlatformGetModuleSymbol(WinSys.win32.dwmapi.instance,"DwmFlush"); }
         WinSys.win32.ntdll.instance  = LoadLibraryA("ntdll.dll");  if (WinSys.win32.ntdll.instance ) { WinSys.win32.ntdll.RtlVerifyVersionInfo  = (PFN_RtlVerifyVersionInfo)PlatformGetModuleSymbol(WinSys.win32.ntdll.instance,"RtlVerifyVersionInfo"); }
         mset(WinSys.win32.keycodes,-1,sizeof(WinSys.win32.keycodes)); for (size_t i=0;i<sizeof(wkm)/sizeof(wkm[0]);i++) WinSys.win32.keycodes[wkm[i].i] = wkm[i].v; // Create key tables.
-        MSG msg; WNDCLASSEXW wc={0}; wc.cbSize=sizeof(wc); wc.style = 0x0020; wc.lpfnWndProc = (WNDPROC)helperWindowProc; wc.hInstance = WinSys.win32.instance; wc.n = L"WinSys3 Helper";
+        WNDCLASSEXW wc={0}; wc.cbSize=sizeof(wc); wc.style = 0x0020; wc.lpfnWndProc = (WNDPROC)helperWindowProc; wc.hInstance = WinSys.win32.instance; wc.n = L"WinSys3 Helper";
         WinSys.win32.helperWindowClass = RegisterClassExW(&wc);
         WinSys.win32.helperWindowHandle = CreateWindowExW(0x300,(u16*)(uintptr_t)WinSys.win32.helperWindowClass,L"WinSys message window",0x06000000,0,0,1,1,NULL,NULL,WinSys.win32.instance,NULL);
-        while (PeekMessageW(&msg,WinSys.win32.helperWindowHandle,0,0,0x0001)) { TranslateMessage(&msg); DispatchMessageW(&msg); }
         WinSysPollMonitorsWin32();
     #else
         void* module = dlopen("libX11.so.6",2);
-        PFN_XInitThreads XInitThreads = (PFN_XInitThreads)PlatformGetModuleSymbol(module,"XInitThreads"); XInitThreads();
         PFN_XOpenDisplay XOpenDisplay = (PFN_XOpenDisplay)PlatformGetModuleSymbol(module,"XOpenDisplay"); Display* display = XOpenDisplay(NULL);
         WinSys.x11.display = display;
         WinSys.x11.xlib.handle = module;
@@ -2647,8 +2621,6 @@ void InitalizeEnvironment() {
         ImageDestroy(native); PollMonitors();
     #endif
     threadCnt = vclampi(OS_GetNumThreads(),1,32);
-    World.menuActive = true;
-    World.screenshotTimeout = 1.0;
     World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/
     World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/
     World.startLevel = 1 /*medical*/;
@@ -2676,17 +2648,14 @@ void InitalizeEnvironment() {
     CompileShaders();
     DualLog("Shader compilation..................................................................took %.6f secs\n",get_time() - initShadersStart);
     double initBufStart = get_time();
-    
     u32 tvaos[5],tvbos[5]; glGenVertexArrays(5,tvaos); glGenBuffers(5,tvbos);
     quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; wireLinesVAO=tvaos[4]; wireLinesVBO=tvbos[4]; 
-    
     float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
     glBindVertexArray(quadVAO); glBindBuffer(GL_ARRAY_BUFFER,quadVBO); glBufferData(GL_ARRAY_BUFFER,sizeof(quadBlit_vertices),quadBlit_vertices,GL_STATIC_DRAW);
     glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0);                 glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos xy float @ offset 0
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2 * sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // uv (s,t)
     glBindVertexBuffer(0,quadVBO,0,4 * sizeof(float));
     glBindVertexArray(chunkVAO);
-    
     glVertexAttribFormat(0,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,0);  glVertexAttribBinding(0,0); glEnableVertexAttribArray(0); // pos xyz half-float @ offset 0
     glVertexAttribFormat(1,3,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,6);  glVertexAttribBinding(1,0); glEnableVertexAttribArray(1); // normal xyz float   @ offset 6  (after 3×2 bytes)
     glVertexAttribFormat(2,2,0x140B/*GL_HALF_FLOAT*/,GL_FALSE,12); glVertexAttribBinding(2,0); glEnableVertexAttribArray(2); // uv st float
@@ -2696,24 +2665,21 @@ void InitalizeEnvironment() {
     glBindVertexBuffer(0,textVBO,0,5*sizeof(float));
     glBindBuffer(GL_ARRAY_BUFFER,textVBO);
     glBufferData(GL_ARRAY_BUFFER,TEXT_VTX_FLOATS * sizeof(float),NULL,GL_DYNAMIC_DRAW);
-    
     glBindVertexArray(debugLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,debugLinesVBO);
-    glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_VRTS * sizeof(WireVertex),NULL,GL_DYNAMIC_DRAW);
-    debugLineVerts = (WireVertex*)OS_Alloc((size_t)MAX_WIRELINE_VRTS * sizeof(WireVertex));
-    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
-    glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
-    glBindVertexBuffer(0,debugLinesVBO,0,sizeof(WireVertex));
+    glBufferData(GL_ARRAY_BUFFER,MAX_LINEVRTS * sizeof(WireVrt),NULL,GL_DYNAMIC_DRAW);
+    lineVerts = (WireVrt*)OS_Alloc((size_t)MAX_LINEVRTS * sizeof(WireVrt));
+    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVrt,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
+    glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVrt,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
+    glBindVertexBuffer(0,debugLinesVBO,0,sizeof(WireVrt));
     glBindVertexArray(wireLinesVAO); glBindBuffer(GL_ARRAY_BUFFER,wireLinesVBO);
-    glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_QUADS*6*sizeof(WireVertex),NULL,GL_DYNAMIC_DRAW);
-    wireVerts = (WireVertex*)OS_Alloc((size_t)MAX_WIRELINE_QUADS*6*sizeof(WireVertex));
-    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVertex,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
-    glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVertex,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
-    glBindVertexBuffer(0,wireLinesVBO,0,sizeof(WireVertex));
-    
+    glBufferData(GL_ARRAY_BUFFER,MAX_WIRELINE_QUADS*6*sizeof(WireVrt),NULL,GL_DYNAMIC_DRAW);
+    wireVerts = (WireVrt*)OS_Alloc((size_t)MAX_WIRELINE_QUADS*6*sizeof(WireVrt));
+    glVertexAttribFormat(0,3,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVrt,x)); glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
+    glVertexAttribFormat(1,4,GL_FLOAT,GL_FALSE,__builtin_offsetof(WireVrt,r)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
+    glBindVertexBuffer(0,wireLinesVBO,0,sizeof(WireVrt));
     glGenVertexArrays(1,&psysquadVAO); glGenBuffers(1,&psysquadVBO);
     static const float quadVerts[16]={-1.0f,-1.0f,0.0f,0.0f,1.0f,-1.0f,1.0f,0.0f,-1.0f,1.0f,0.0f,1.0f,1.0f,1.0f,1.0f,1.0f,}; 
     glBindVertexArray(psysquadVAO); glBindBuffer(GL_ARRAY_BUFFER,psysquadVBO);
-    
     glBufferData(GL_ARRAY_BUFFER,sizeof(quadVerts),quadVerts,GL_STATIC_DRAW);
     glVertexAttribFormat(0,2,GL_FLOAT,GL_FALSE,0);               glVertexAttribBinding(0,0); glEnableVertexAttribArray(0);
     glVertexAttribFormat(1,2,GL_FLOAT,GL_FALSE,2*sizeof(float)); glVertexAttribBinding(1,0); glEnableVertexAttribArray(1);
@@ -2722,18 +2688,15 @@ void InitalizeEnvironment() {
     GenerateAndBindTexture(&fontAtlasTex,0x8229,FONT_ATLAS_SIZE,FONT_ATLAS_SIZE,0x1903,GL_UNSIGNED_BYTE,0x2601,fontBmp1);
     GenerateAndBindTexture(&fontAtlasTexStopD,0x8229,FONT_ATLAS_SIZE2,FONT_ATLAS_SIZE2,0x1903,GL_UNSIGNED_BYTE,0x2601,fontBmp2);
     glUseProgram(textSP); glUniform1i(1,2);
-    
     GenerateAndBindTexture(&inputUIID, GL_RGBA8, UI_W, UI_H, GL_RGBA, GL_UNSIGNED_BYTE, 0x2600/*GL_NEAREST*/, NULL);/*UI Fixed Size Raster*/
     glGenFramebuffers(1, &uiFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, uiFBO);
-    
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, inputUIID);
     glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,inputUIID,0);
     u32 drawBuffersUI[] = {GL_COLOR_ATTACHMENT0};
     glDrawBuffers(1,drawBuffersUI);
     glBindImageTexture(0, inputUIID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8);/* UI Rendered Color*/
-    
     RenderLoading("Loading...");
     float* m = shadowmapsPerspectiveProjection, lightRangeMax = 15.36f;
     float viewRange = (lightRangeMax - 0.02f);
@@ -2741,12 +2704,11 @@ void InitalizeEnvironment() {
     m[4]  = 0.0f;  m[5] = 1.0f;  m[6]  =  0.0f;                                     m[7]  =  0.0f;
     m[8]  = 0.0f;  m[9] = 0.0f;  m[10] = -(lightRangeMax + 0.02f) / viewRange;      m[11] = -1.0f;
     m[12] = 0.0f; m[13] = 0.0f;  m[14] = -2.0f * lightRangeMax * 0.02f / viewRange; m[15] =  0.0f;
-    
     for (int i=0;i<23;++i) { g_scf_long[0][i] = g_scf_long[2][i] = g_scf_long[4][i] = g_sfc_long_024[i]; }
     glGenFramebuffers(1,&gBufferFBO);
     ChangeFullScreenWindowed(false);
     SetSkyRotateSpeed();
-    SetVSync();
+    window->context.swapInterval((i32)Sys_Settings.Vsync);
     DualLog("GL buffer setup.....................................................................took %.6f secs\n",get_time() - initBufStart);
     double initTextStart = get_time();
     LoadTextForLanguage(Sys_Settings.Language);
@@ -2829,7 +2791,6 @@ i32 main() {
         drawCalls = uiDrawCalls = shadDrawCalls = vertsRendered = 0;
         UpdateSensaroundCamViews(); RenderCameraViews();/*Before main Render() so that tv screens are up to date*/ if(likely(!World.paused && !World.menuActive)) { CullCore(); } /*Before automap and audio update due to audio occlusion and automap FoW discovery*/ AudioUpdateMix();/*Actually mixes all the audio for output.*/ AutomapTick();
         Render(false/*!camview*/,0u);
-        if (Sys_Input.keyStates[KEY_O].pressed) { play_message("shodan/shodan_prematurefruition"); }/*test hotkey: stream a SHODAN log on the log channel*/
         if (GetKeyPressed(40)/*Screenshot*/ && World.current_time > World.screenshotTimeout) { Screenshot(); }
         for(i32 i=0;i<MAX_KEYS;++i){ Sys_Input.keyStates[i].pressed = false; } /*Clear input states, can't mset as we want to preserve down(held) state*/
         for (i32 i=0;i<MAX_MOUSE_BUTTONS;i++) { Sys_Input.mouseButtons[i].pressed = false; }

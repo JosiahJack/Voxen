@@ -997,16 +997,6 @@ __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
 }
 
 static const char* mm_ptr; static const char* mm_end;
-u16 TextMatIndexToTexIndex(u16 matIndex) {
-    switch (matIndex) {
-        case 88: case 92:                   return 1225; /*text_3dred, text_3dredStopD -> col3.png red*/
-        case 89: case 95: case 98: case 99: return 1224; /*text_3dgold*, text_3dgoldStopD, text_3dgoldunlit* -> col2.png yellow*/
-        case 90:                            return 1227; /*text_3dgreen -> col5.png green*/
-        case 91: case 94: case 97:          return    0; /*text_3dblack* -> black.png*/
-        case 96:                            return 1226; /*text_3dblueStopD -> col4.png blue*/
-        default:                            return  881; /*white*/
-    }
-}
 #define KEY_EQ(lit) (keyLen == (int)(sizeof(lit)-1) && sCompUpToLen(key, lit, sizeof(lit)-1) == 0)
 static char* MmapGetLine(char* buf, int sz){if(mm_ptr>=mm_end){return NULL;} const char* start=mm_ptr; const char* p=start; while(p<mm_end&&*p!='\n'){++p;} int lineLen=(int)(p-start); if(p<mm_end&&*p =='\n'){mm_ptr=p+1;}else{mm_ptr=mm_end;}if(lineLen >= sz){lineLen=sz-1;} mcpy(buf,(void*)start,lineLen); while(lineLen>0&&(buf[lineLen-1]=='\r' || buf[lineLen - 1]=='\n')){--lineLen;} buf[lineLen]='\0'; return buf;}
 static u16 fwParentSnap[MAX_LEVELS][INSTANCE_COUNT]; static bool fwSnapValid[MAX_LEVELS];/*per-level fwParentOf snapshot: fwParentOf is rewritten by every level load; SetLevelPointers restores the current level's*/
@@ -1053,7 +1043,6 @@ static V3 fwBasePos[INSTANCE_COUNT],fwInfoLocal[INSTANCE_COUNT],fwBaseScale[INST
 static Quaternion fwBaseRot[INSTANCE_COUNT],fwPoolRot[FW_POOL_MAX],lwRot[FW_MAX_CHILDREN],fwContainerRot,fwInfoRotDummy,*fwCurR; static bool fwLine,fwCollecting; static i32 fwStage;
 static bool ipLine,ipSubRotSet; static i32 ipBlock; static V3 ipSubPos,ipSubScale; static Quaternion ipSubRot; static V3 *ipCurP; static Quaternion *ipCurR; static V3 *ipCurS;
 static bool npcLine; static i32 npcBlock;
-static bool npcRootRotSet[INSTANCE_COUNT];
 typedef struct { u16 ent; u8 anchor,align; float lineSp; char text[DECAL_INLINE_TEXT_LEN]; } DecalPend;
 static DecalPend pendDecals[DECAL_INLINE_TEXT_PEND]; static u16 pendDecalCount;
 static DecalPend* PendDecal(u16 ent) { if (pendDecalCount && pendDecals[pendDecalCount-1].ent == ent) { return &pendDecals[pendDecalCount-1]; } if (pendDecalCount >= DECAL_INLINE_TEXT_PEND) { DualLogError("decal staging full\n"); return NULL; } DecalPend* pd = &pendDecals[pendDecalCount++]; mset(pd,0,sizeof(*pd)); pd->ent=ent; pd->lineSp=1.0f; return pd; }
@@ -1200,9 +1189,9 @@ void LoadLevelMod(u8 lev) {
             entCount++; if (entCount >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n", entCount, curlevel); continue; } inst = &entsFromFile[entCount]; mset(inst,0,sizeof(Entity)); mset(&posFromFile[entCount],0,sizeof(V3)); scaleFromFile[entCount] = (V3){1.0f, 1.0f, 1.0f}; rotationFromFile[entCount] = QUAT_IDENTITY; colCtrFromFile[entCount] = (V3){0.0f,0.0f,0.0f}; colSzFromFile[entCount] = (V3){-1.0f,-1.0f,-1.0f};
             for (u8 slot=0;slot<4;++slot) inst->contents[slot]=inst->custIdx[slot]=-1; for (u8 slot=0;slot<7;++slot) inst->randomItem[slot]=inst->randomItemCustIdx[slot]=-1;
             inst->relayEnabled=true;
-            fwLine=false; fwStage=0; fwCollecting=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; ipLine=false; ipBlock=0; ipSubRotSet=false; ipCurP=NULL; ipCurR=NULL; ipCurS=NULL; npcLine=false; npcBlock=0; npcRootRotSet[entCount]=false; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f};/*relayEnabled is seeded once, at the top of this block (line 582)*/
+            fwLine=false; fwStage=0; fwCollecting=false; fwCurChild=fwLastChunkSlot=0; fwCurP=NULL; fwCurR=NULL; fwCurS=NULL; ipLine=false; ipBlock=0; ipSubRotSet=false; ipCurP=NULL; ipCurR=NULL; ipCurS=NULL; npcLine=false; npcBlock=0; fwContainerPos=(V3){0.0f,0.0f,0.0f}; fwContainerRot=QUAT_IDENTITY; fwContainerScale=(V3){1.0f,1.0f,1.0f}; fwInfoLocalTmp=(V3){0.0f,0.0f,0.0f};/*relayEnabled is seeded once, at the top of this block (line 582)*/
         }
-        bool constIndexRead = false; bool activeStateRead = false; bool matIndexRead = false; u8 scaleReadMask = 0; u16 matIndexTexIdx = 881;
+        bool constIndexRead = false; bool activeStateRead = false; u8 scaleReadMask = 0;
         while (line[0] != '\0') {
             char* pipe = StringFindFirstCharWithin(line, '|'); char* kvString = line; if (pipe) { *pipe = '\0'; line = pipe + 1; } else { line += slen(line); } if (kvString[0] == '\0') continue; char* colon = StringFindFirstCharWithin(kvString, ':'); if (!colon || colon[1] == '\0') continue; *colon = '\0'; char* key = kvString; char* value = colon + 1; int keyLen = (int)(colon - key); // length is free, no slen()
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);}
@@ -1252,10 +1241,10 @@ void LoadLevelMod(u8 lev) {
                         case TR_KEY('P','x'): { if(fwLine){ if(fwCurP)fwCurP->x=v; } else if(ipLine){ if(ipCurP)ipCurP->x=v; } else posFromFile[entCount].x=v; } break;
                         case TR_KEY('P','y'): { if(fwLine){ if(fwCurP)fwCurP->y=v; } else if(ipLine){ if(ipCurP)ipCurP->y=v; } else posFromFile[entCount].y=v; } break;
                         case TR_KEY('P','z'): { if(fwLine){ if(fwCurP)fwCurP->z=v; } else if(ipLine){ if(ipCurP)ipCurP->z=v; } else posFromFile[entCount].z=v; } break;
-                        case TR_KEY('R','x'): { if(fwLine){ if(fwCurR)fwCurR->x=v; } else if(ipLine){ if(ipCurR)ipCurR->x=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].x=v; } } break;
-                        case TR_KEY('R','y'): { if(fwLine){ if(fwCurR)fwCurR->y=v; } else if(ipLine){ if(ipCurR)ipCurR->y=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].y=v; } } break;
-                        case TR_KEY('R','z'): { if(fwLine){ if(fwCurR)fwCurR->z=v; } else if(ipLine){ if(ipCurR)ipCurR->z=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].z=v; } } break;
-                        case TR_KEY('R','w'): { if(fwLine){ if(fwCurR)fwCurR->w=v; } else if(ipLine){ if(ipCurR)ipCurR->w=v; if(ipBlock>1) ipSubRotSet=true; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].w=v; } } break;
+                        case TR_KEY('R','x'): { if(fwLine){ if(fwCurR)fwCurR->x=v; } else if(ipLine){ if(ipCurR)ipCurR->x=v; } else { rotationFromFile[entCount].x=v; } } break;
+                        case TR_KEY('R','y'): { if(fwLine){ if(fwCurR)fwCurR->y=v; } else if(ipLine){ if(ipCurR)ipCurR->y=v; } else { rotationFromFile[entCount].y=v; } } break;
+                        case TR_KEY('R','z'): { if(fwLine){ if(fwCurR)fwCurR->z=v; } else if(ipLine){ if(ipCurR)ipCurR->z=v; } else { rotationFromFile[entCount].z=v; } } break;
+                        case TR_KEY('R','w'): { if(fwLine){ if(fwCurR)fwCurR->w=v; } else if(ipLine){ if(ipCurR)ipCurR->w=v; if(ipBlock>1) ipSubRotSet=true; } else { rotationFromFile[entCount].w=v; } } break;
                         case TR_KEY('S','x'): { if(fwLine){ if(fwCurS)fwCurS->x=v; } else if(ipLine){ if(ipCurS)ipCurS->x=v; } else { scaleFromFile[entCount].x=v; scaleReadMask|=1u; } } break;
                         case TR_KEY('S','y'): { if(fwLine){ if(fwCurS)fwCurS->y=v; } else if(ipLine){ if(ipCurS)ipCurS->y=v; } else { scaleFromFile[entCount].y=v; scaleReadMask|=2u; } } break;
                         case TR_KEY('S','z'): { if(fwLine){ if(fwCurS)fwCurS->z=v; } else if(ipLine){ if(ipCurS)ipCurS->z=v; } else { scaleFromFile[entCount].z=v; scaleReadMask|=4u; } } break;
@@ -1296,7 +1285,6 @@ void LoadLevelMod(u8 lev) {
                      else if(KEY_EQ("playEverywhere")) inst->playEverywhere = parse_bool(value, lineSpace, lineNum);
                           else if(KEY_EQ("resourceFolder") && *value) inst->texAnimResourceFolderIdx = TexAnimFolderIntern(value);
                 else if(KEY_EQ("codeScreen"))      inst->codeScreen = (u8)parse_bool(value, lineSpace, lineNum);/*prop_cpuscreen (551): flag only, the level is implicit -- see Entity.codeScreen*/
-                else if(KEY_EQ("matIndex")) { matIndexRead = true; matIndexTexIdx = TextMatIndexToTexIndex(parse_numberu16(value,lineSpace,lineNum)); }
                 else if(KEY_EQ("text")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd) { u16 k=0; while(value[k] && k<DECAL_INLINE_TEXT_LEN-1) { pd->text[k]=(value[k]=='#')?'\n':value[k]; ++k; } pd->text[k]='\0'; } } }
                 else if(KEY_EQ("tA")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->anchor=(u8)(v<0?0:(v>8?8:v)); } } }
                 else if(KEY_EQ("tAl")) { if (inst && (inst->index == 592 || inst->index == 593)) { DecalPend* pd=PendDecal((u16)entCount); if (pd){ i16 v=parse_numberi16(value,lineSpace,lineNum); pd->align=(u8)(v<0?0:(v>2?2:v)); } } }
@@ -1327,7 +1315,6 @@ void LoadLevelMod(u8 lev) {
         if (ipLine && ipBlock>=2) { entsFromFile[entCount].panelItemPos=ipSubPos; entsFromFile[entCount].panelItemRot=ipSubRotSet?ipSubRot:rotationFromFile[entCount]; }
         if (!isLight && !activeStateRead) flag_set(&entsFromFile[entCount].entflags,EF_ACTIVE,true);
         if (!isLight && entsFromFile[entCount].index >= 595 && entsFromFile[entCount].index <= 601) { if (!(scaleReadMask&1u)) scaleFromFile[entCount].x = 1.0f; if (!(scaleReadMask&2u)) scaleFromFile[entCount].y = 1.0f; if (!(scaleReadMask&4u)) scaleFromFile[entCount].z = 1.0f; }
-        if (!isLight && (entsFromFile[entCount].index == 592 || entsFromFile[entCount].index == 593)) entsFromFile[entCount].texIndex = matIndexRead ? matIndexTexIdx : 881; // 3D text decals: material color texture, white default
         if (!isLight && entsFromFile[entCount].index == 517) { // func_wall: stash base transform + chunk children for spawn below
             fwBasePos[entCount]=fwContainerPos; fwBaseRot[entCount]=fwContainerRot; fwBaseScale[entCount]=fwContainerScale; fwInfoLocal[entCount]=fwInfoLocalTmp; u16 n=fwCurChild < FW_MAX_CHILDREN ? fwCurChild : FW_MAX_CHILDREN, start=fwPoolUsed;
             for (u16 k=0;k<n;++k) { if (fwPoolUsed >= FW_POOL_MAX) { DualLogError("FuncWall chunk pool exhausted on line %u!\n",lineNum); break; } fwPoolPrefab[fwPoolUsed]=lwPrefab[k]; fwPoolPos[fwPoolUsed]=lwPos[k]; fwPoolRot[fwPoolUsed]=lwRot[k]; fwPoolScale[fwPoolUsed]=lwScale[k]; fwPoolUsed++; }
@@ -1337,11 +1324,7 @@ void LoadLevelMod(u8 lev) {
     i32 totalEnts = entCount + 1;
     for (i32 e=0;e<totalEnts;++e) {
         Entity* src = &entsFromFile[e]; u16 entIdx = src->index; u16 parent = AddInstance(entIdx,posFromFile[e]); Entity* par = &World.instances[parent]; par->lastPosition = posFromFile[e]; World.rotation[parent] = rotationFromFile[e]; if (!IdxIsDynamicObject(entIdx)) {World.scale[parent] = scaleFromFile[e];}
-        if (IdxIsNPC(entIdx) && npcTable[entIdx-419].type != NPCType_Cyber) { V3 f = src->idealTransformForward; Quaternion r = World.rotation[parent];
-            if (entIdx == 437) { float half = -(SERVBOT_MESH_YAW_DEG)*(PI/180.0f)*0.5f; Quaternion rev = {0.0f,vsinf(half),0.0f,vcosf(half)}; World.rotation[parent] = quat_multiply(rev,World.rotation[parent]); }/*npc_servbot: reverse the render-only mesh yaw (SERVBOT_MESH_YAW_DEG, voxen.c) about global Y so absolute placements are unchanged; par->forward below picks this up, staying glued to the mesh. (The yaw-recovery branch below skips 437, which is why editing there has no effect on servbots.)*/
-            else if (!npcRootRotSet[e]) { if (vabs(f.y) < 0.001f && (vabs(f.x) > 0.000001f || vabs(f.z) > 0.000001f)) { float yaw = __builtin_atan2f(f.x, f.z), half = yaw * 0.5f; World.rotation[parent] = (Quaternion){0.0f, vsinf(half), 0.0f, vcosf(half)}; } }
-            else if (vabs(r.x) > 0.001f || vabs(r.z) > 0.001f) World.rotation[parent] = QUAT_IDENTITY;/*explicit block-0 rotation is tilted (unobserved on non-cyber records): upright default, same as a fresh AddInstance*/
-            par->forward = V3_Normalize(quat_rot_v3(World.rotation[parent], (V3){0.0f,0.0f,1.0f})); }
+        if (IdxIsNPC(entIdx) && npcTable[entIdx-419].type != NPCType_Cyber) { par->forward = V3_Normalize(quat_rot_v3(World.rotation[parent], (V3){0.0f,0.0f,1.0f})); }/*All NPC placements are pre-baked upright in level data (root lR, incl. the 437 servbot counter-yaw), so only the derived forward remains.*/
         bool srcActive=(src->entflags & EF_ACTIVE)!=0; par->entflags|= src->entflags;/*bitor `|` since AddInstance already set flags from entity definitions.*/
         flag_set(&par->entflags,EF_ACTIVE,srcActive);
         if (IdxIsNPC(entIdx)) { par->currentState=src->currentState; par->currentDestination=src->currentDestination; par->idealPos=src->idealPos; par->idealTransformForward=src->idealTransformForward; par->targettingPosition=src->targettingPosition; par->attack1SoundTime=src->attack1SoundTime; par->attack2SoundTime=src->attack2SoundTime; par->attack3SoundTime=src->attack3SoundTime; } par->ioflags=src->ioflags; par->ammo=src->ammo; par->ammo2=src->ammo2; par->lookUpIndex=src->lookUpIndex; par->customIndex=src->customIndex;
@@ -1389,23 +1372,12 @@ void LoadLevelMod(u8 lev) {
         else if (par->index == 574) { // prop_healingbed
             Color3 green = {0.0f, 0.925490196f, 0.082352941f}; par->texAnimLight=AddOffsetLight(par,(V3){0.5292511f,0.065f,0.915f},green,3.0f,0.72f); par->texAnimLight2=AddOffsetLight(par,(V3){-0.5317497f,0.065f,1.039f},green,3.0f,0.72f); par->textureAnimating=true; par->texAnimClip=12; par->texFrame=0;
             par->texAnimResourceFolderIdx = TexAnimFolderIntern("MedicalBed");
-        } else if (entIdx == 345) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.00f; } // weapon_dartgun
-        else if (entIdx == 586 || entIdx == 557 || entIdx == 530 || (entIdx >= 540 && entIdx <= 544)) { World.scale[parent].x=World.scale[parent].y=World.scale[parent].z=1.0f; } // prop_table, prop_chair01-05, prop_desk01, se_cabinet: map exports 0.04 scale; force 1.0
-        else if (entIdx == 218 || entIdx == 220) { Quaternion c = quat_from_axis_angle((V3){0.0f,1.0f,0.0f},PI); World.rotation[parent] = quat_multiply(quat_multiply(c,World.rotation[parent]),(Quaternion){-c.x,-c.y,-c.z,c.w}); } // chunk_reac2_4, chunk_reac2_5: the export is a flipped basis, not a turned instance, so conjugate by 180deg about Y (which flips the mesh's local X and Z and leaves Y). Conjugation spins the rotation's axis while preserving its angle, so the level file's authored placement is untouched. Checked against level 7 instance 4180: lR (0,.7071,.7071,0) -> (0,-.7071,.7071,0) exactly, and it is non-identity on all 6 (218) / 4 (220) orientations these prefabs use, so every instance gets corrected.
-        else if (entIdx == 53) { World.rotation[parent] = quat_multiply(World.rotation[parent], quat_from_axis_angle((V3){1.0f,0.0f,0.0f},PI*0.5f)); }
-        else if (entIdx == 551 && par->codeScreen) { World.rotation[parent] = quat_multiply(World.rotation[parent], (Quaternion){0.0f,0.70710678f,0.70710678f,0.0f}); World.scale[parent].x*=0.390625f; World.scale[parent].y*=0.390625f; World.scale[parent].z*=0.390625f; par->texAnimResourceFolderIdx=TexAnimFolderIntern("ScreenCodeRandom"); }
-        else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
-        else if (entIdx == 720) { /*u16 mist=*/AddInstance(648,World.position[parent]); }// ambient_mist
-        else if (entIdx == 733) { /*u16 pipewater=*/AddInstance(649,World.position[parent]);/*ambient_pipewater_loop*/ /*u16 rain=*/AddInstance(653,(V3){World.position[parent].x,World.position[parent].y - 1.26f,World.position[parent].z});/*ambient_rain*/ }
-        else if (entIdx == 305) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("Telepad"); } /*chunk_teleporter*/
-        else if (entIdx == 2 || entIdx == 3) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("Bridge11"); } /*chunk_bridg1_1, chunk_bridg1_1flipx*/
-        else if (entIdx == 386) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("MagCartridge"); } /*item_ammo_magcart*/
-        else if (entIdx == 538) { par->texAnimResourceFolderIdx = TexAnimFolderIntern("BrokenClock"); } /*prop_broken_clock*/
+        } else if (par->index == 746) { par->textureAnimating = true; par->texAnimClip = 2; par->texFrame = 0; } // weapon_grenadeenergmine_live
         else if (entIdx == 579 || entIdx == 580 || entIdx == 581) { World.instances[parent].entflags |= EF_NO_SHADOWS; } /*prop_puddle, prop_puddle_grease, prop_puddle_oil*/
         TextureSequenceInit(parent,texAnimFolders[par->texAnimResourceFolderIdx < texAnimFolderCount ? par->texAnimResourceFolderIdx : 0]);
         if (entIdx == 551 && par->codeScreen) { par->texAnimRandom = true; par->texAnimStopsAtDie = false; }
     }
-    for (int i=0;i<=lightsIdx;++i) { if (lightsFromFile[i].intensity < 0.11f && lightsFromFile[i].maxIntensity < 0.11f){continue;} lightsFromFile[i].range = vclamp(lightsFromFile[i].range,0.32f,15.36f); if (lanimsFromFile[i].numIntervalSteps >= 1) { lanimsFromFile[i].currentStep = 0; lanimsFromFile[i].lerpUp = true; if (lightsFromFile[i].minIntensity < 0.01f) lightsFromFile[i].minIntensity = 0.01f; }/*Unity LightAnimation.Start() init parity: animations always begin at step 0, lerping up, with a nonzero floor*/ i32 wi=AddLight(&lightsFromFile[i],&lanimsFromFile[i]); if(wi>=0&&wi<LIGHT_COUNT){World.levelLightTargetnames[World.curLev][wi]=lightTargetnameFile[i];} }
+    for (int i=0;i<=lightsIdx;++i) { if (lanimsFromFile[i].numIntervalSteps >= 1) { lanimsFromFile[i].currentStep = 0; lanimsFromFile[i].lerpUp = true; if (lightsFromFile[i].minIntensity < 0.01f) lightsFromFile[i].minIntensity = 0.01f; }/*Unity LightAnimation.Start() init parity: animations always begin at step 0, lerping up, with a nonzero floor*/ i32 wi=AddLight(&lightsFromFile[i],&lanimsFromFile[i]); if(wi>=0&&wi<LIGHT_COUNT){World.levelLightTargetnames[World.curLev][wi]=lightTargetnameFile[i];} }
     if(curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7){/*Shield generators*/
         static const V3 pos[]={{-51.30664f,-47.42f,56.42651f},{71.5f,-47.42f,-66.6f},{-51.306650f,-47.42f,-66.66652f},{71.78664f,-47.42f,56.42651f}};
         for (u8 k=0;k<4;++k) { World.shields[k]=AddInstance(754,pos[k]); World.rotation[World.shields[k]]=QUAT_IDENTITY; }
@@ -1541,7 +1513,7 @@ void LoadLevelData(u8 curlevel) {
         if (World.instances[i].targetnameIdx != IO_NONE && (World.instances[i].ioflags & TARG_IOFLAGS_DISABLE_ON_AWAKE)){flag_set(&World.instances[i].entflags,EF_ACTIVE,false);}
     }
     for (int i=PLAYER1;i<World.instCount;++i){ u16 mi=World.instances[i].messageIndex; World.instances[i].messageIndex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].messageLingdex; World.instances[i].messageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; mi=World.instances[i].lockedMessageLingdex; World.instances[i].lockedMessageLingdex=(mi>0&&mi<T_LOGSTR_CNT)?mi:427; } // Using blank 427
-    World.levelLoadedLights[curlevel] = World.loadedLights; World.levelWepVModel[curlevel]=World.weaponVModelIndex; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelCurrentlyLoading = false; // Coppy the counts over
+    World.levelLoadedLights[curlevel] = World.loadedLights; World.levelWepVModel[curlevel]=World.weaponVModelIndex; mcpy(levelCamViews[curlevel],camViews,64 * sizeof(CamView)); mcpy(levelCamViewTextures[curlevel],camViewTextures,64 * sizeof(u32)); levelCamViewCount[curlevel] = camViewCount; World.levelInstCount[curlevel] = World.instCount; World.levelLAnimCount[curlevel] = World.lanimCount; World.levelCurrentlyLoading = false;
 }
 
 void RenderLoading(const char* restrict); void ResetLevelAudio(); void CullInit(); void mp3_clear();

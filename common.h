@@ -175,7 +175,7 @@ enum {/*Initialization*/ SCRATCH_ARENA_SIZE = (96ULL * 1024 * 1024),
       /*Animations*/ MAX_ANIMCLIPS = 10, MAXANIM = 59, A_LOOP_ALL = 0, A_IDLE_CLOSED = 0, A_IDLE = 0, A_INACTIVE = 0, A_ATTACK_MISS = 1, A_OPENING = 1, A_WALK = 1, A_ACTIVATE = 1, A_ATTACK_HIT = 2, A_ACTIVATED = 2,
                      A_IDLE_OPEN = 2, A_RUN = 2, A_CLOSING = 3, A_DEACTIVATE = 3, A_ATTACK1 = 3, A_ATTACK2 = 4, A_INSTALL = 4, A_ATTACK3 = 5, A_INSTALLED = 5, A_PAIN = 6, A_PAIN2 = 7, A_PAIN3 = 8, A_DYING = 9,
       /*Physics*/ CT_NONE = 0, CT_BOX = 1, CT_SPH = 2, CT_CAP = 3, CT_CVX = 4, CT_MSH = 5, MAX_UNIQUE_CVX_MESHES = 5989, BVH_MAX_DEPTH = 6, BVH_LEAF_MAX_TRIS = 8, BVH_MAX_NODES_PER_MDL = 586 /*1 + 8 + 64 + 512 = 585*/, BVH_MAX_TRIS_PER_MDL = 8000,
-                  MAX_WIRELINE_VRTS = 128000, MANIFOLD_MAX = 4, CVXMSH_HULL_CACHE = 1024, EPA_MAX_FACES = 64, EPA_MAX_VERTS = 128, EPA_MAX_EDGES = EPA_MAX_FACES * 3, GJK_ITER = 32, EPA_ITER = 16, SOLVER_ITER_GLOBAL = 32, MAX_GLOBAL_CONTACTS = 8192,
+                  MAX_LINEVRTS = 128000, MANIFOLD_MAX = 4, CVXMSH_HULL_CACHE = 1024, EPA_MAX_FACES = 64, EPA_MAX_VERTS = 128, EPA_MAX_EDGES = EPA_MAX_FACES * 3, GJK_ITER = 32, EPA_ITER = 16, SOLVER_ITER_GLOBAL = 32, MAX_GLOBAL_CONTACTS = 8192,
       /*Input*/ MAX_KEYS = 512, MAX_MOUSE_BUTTONS = 8, WS_KEYCOUNT = 349, INPUT_RELEASE = 0, INPUT_PRESS = 1, INPUT_REPEAT = 2, CONFIG_CNT = 72,
       /*Audio*/ MAX_CHANNELS = 128, SOUNDS_COUNT = 670, MAX_SYNTH_VOICES = 16, AUDIO_RATE = 48000, AUDIO_CHANNELS = 2, AUDIO_PERIOD_MS = 10, AUDIO_PERIODS = 4, AUDIO_FRAMES = ((AUDIO_RATE * AUDIO_PERIOD_MS) / 1000), AUDBUF_SIZE = (AUDIO_FRAMES * AUDIO_PERIODS),
                 REV_BUF_LEN = 16384, MAXAMB = 256,
@@ -351,7 +351,7 @@ typedef struct{bool initialized,active;V2 min,max;double lastLMB,lastRMB;}UIComp
 typedef struct {
     double cpuTime,thisFrameTime,cpuFrameTime,lastFrameSecCountTime,debugLineFinished,shakeFinished,last_time,last_physics_time,dt,current_time,screenshotTimeout,pauseRelativeTime,absoluteTime,statusTextDecayFinished,justSavedTimeStamp,gpuFrameMs,gpuShadowMs,gpuPreMs,gpuMainMs,gpuSsrMs,gpuCompMs,automapNextRaster;
     float farPlane[MAX_LEVELS],damageDealt,damageReceived,timeScale,worldMin_x[MAX_LEVELS],worldMin_z[MAX_LEVELS],voxMinCtrX[MAX_LEVELS],voxMinCtrZ[MAX_LEVELS],misTimerFinished,misTimerT,painStaticAlpha,empStaticAlpha,levelMass[MAX_LEVELS][INSTANCE_COUNT],levelRadius[MAX_LEVELS][INSTANCE_COUNT],levelGravity[MAX_LEVELS][INSTANCE_COUNT],levelInvInertiaTensor[MAX_LEVELS][INSTANCE_COUNT][6],levelDynamicFriction[MAX_LEVELS][INSTANCE_COUNT],levelStaticFriction[MAX_LEVELS][INSTANCE_COUNT];
-    u32 lastFrameSecCount,debugLineVertCount,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_COUNT];
+    u32 lastFrameSecCount,lineVertCnt,shotsFired,grenadesThrown,savesScummed,levelLayer[MAX_LEVELS][INSTANCE_COUNT];
     u16 ressurections,deaths,kills,cyberkills,ressurectionActiveLevels,instCount,shields[4],weaponVModelIndex,levelWepVModel[MAX_LEVELS],TeleportTouch_allTeleportTouches[8],levelInstCount[MAX_LEVELS],levelLoadedLights[MAX_LEVELS],editTextInstanceIndex,misTimerMission;
     i32 fogFac,cursorPos_x,cursorPos_y,currentMouse_dx,currentMouse_dy;
     u32 missionBits;
@@ -411,7 +411,7 @@ double get_time();
 float DoorClamp01(float),Tranquilize(u16,float,bool),TakeDamage(u16,DamageData),MeasureLineAdvance(const char*,u8);
 void ApplyImpactForceSphere(DamageData*,V3,float,float);
 void UseTargets(u16,u16),AddForce(u16,V3,bool),TriggerTrippedUpdate(u16),CyberItemOnTriggerEnter(u16,u16),CyberMineOnTriggerEnter(u16,u16),CenterStatusPrint(const char * restrict fmt, ...),GameEndSequence(void), DebugRAMActual(const char*), DebugRAMPeak(), DebugRAMBreakdown(),
-     play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),Shake(float),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),
+     play_wav(const char*,float,V3,bool),play_wav_ext(const char*,float,V3,bool,float),play_message(const char*),PlaySparkSound(V3),LoadLevel(u8,V3),SetLevelPointers(u8),CopyPlayerState(u8,u8),DeleteInstance(u16),MenuGoBack(),GoIntoGame(),ScreenShake(),TakeEnergy(float),CreateTargetIDInstance(float,u16,float),InputProcessing(),LoadAllLevels(),
      DrawLine(V3,V3,Color),ForceInventoryMode(),ForceShootMode(),PlayVmail(u8),UpdateLight(u16,V3,Color3,float,float,float,float,float,Quaternion,bool,bool),UpdateLights(),ModUpdate(),InitFontAtlasses(),LoadLogTextForLanguage(u8),
      LoadTextForLanguage(u8),RenderTextL(i16,i16,u32,u8,float,const char* restrict,...),RenderTextC(i16,i16,u32,u8,float,const char* restrict,...),RenderText3DC(V3,u32,u8,float,const char* restrict,...),BuildTextDecalMeshes(),CullCore(),PngArenaInit(PngArena*),AppendTextWarning(i32,i32,i32,i32,i32),ChangeAnim(Entity*,u8),ForceDoorPortalOpen(u16),QuestBitSet(u8),QuestBitClear(u8),QuestBitToggle(u8);
 size_t AudioLiveBytes(); /* diagnostics: live audio sample bytes */

@@ -117,7 +117,6 @@ static void SaveSlotConfirmTyping(void) {
     SaveGame((u8)slot,name);
 }
 
-/*Text entry for the save name, routed from InputKey while enteringSaveName (same charset rules as TextEntry).*/
 void SaveNameEntry(i32 k) {
     if (k==KEY_ESCAPE) { Sys_Input.keyStates[KEY_ESCAPE].pressed=false; SaveSlotCancelTyping(); return; }
     if (k==KEY_ENTER||k==KEY_KP_ENTER) { Sys_Input.keyStates[KEY_ENTER].pressed=Sys_Input.keyStates[KEY_KP_ENTER].pressed=false; SaveSlotConfirmTyping(); return; }
@@ -298,7 +297,7 @@ void RenderMenu() {
                 RenderUIImage(336,rTop,160,rlh,922);
                 for (int ri=0; ri<3; ++ri) { if (ri==Sys_Settings.Reflections) RenderUIImage(336,rTop-2+ri*16,160,18,1087); RenderTextL(366,rTop+ri*16, (ri==reflHoverIdx) ? T_YELLOW : T_GREEN, FONT_NORMAL, 0.9f, "%s", reflNames[ri]); }
             } else { reflHoverIdx=-1; }
-            if (UI_Checkbox(UI_ID_MENU_VSYNC,200,620,4,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; SetVSync(); SaveConfig(); }
+            if (UI_Checkbox(UI_ID_MENU_VSYNC,200,620,4,/*VSYNC*/1026,Sys_Settings.Vsync)) { Sys_Settings.Vsync = Sys_Settings.Vsync ? 0u : 1u; window->context.swapInterval((i32)Sys_Settings.Vsync); SaveConfig(); }
             RenderTextL(310,620,T_GREEN,FONT_NORMAL,1.0f,"(FPS: %d)", globalframesPerLastSecond);/*Helper to see vsync take effect.*/
             UI_Slider(UI_ID_MENU_FOV_SLIDER,400,650,128,16,(((Sys_Settings.FOV - 45.0f) / 105.0f) * (128 - 16)),200,&Sys_Settings.FOV,&fovSliderActive,45,150,5,5,/*Field of View*/775);
             UI_Slider(UI_ID_MENU_GAMMA_SLIDER,400,680,128,16,((Sys_Settings.Brightness / 100.0f) * (128 - 16)),200,&Sys_Settings.Brightness,&gammaSliderActive,0,100,2,6,/*Gamma*/774);
@@ -527,7 +526,7 @@ static void KeycodeKeypress(int k) { SystemUI* s=&World.Sys_UI; if (!s->keycodeV
 }
 
 void UI_KeycodeKey(bool rh,int k) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)rh; if (k<0||k>11) return; KeycodeKeypress(k); }
-void KeycodeEntryKey(i32 k) { /*Physical keyboard entry for the keycode pad, routed from InputKey while the pad is open (previously only the on-screen MFD buttons could enter digits, so neither number row did anything).*/
+void KeycodeEntryKey(i32 k) {
     if (!World.Sys_UI.keycodeValid || World.Sys_UI.keycodeSolved) return;
     if (k>=KEY_0 && k<=KEY_9) KeycodeKeypress(k-KEY_0);
     else if (k>=KEY_KP_0 && k<=KEY_KP_9) KeycodeKeypress(k-KEY_KP_0);
@@ -542,7 +541,7 @@ void UI_ElevFloorClick(bool rh,int btn) { World.Sys_UI.mouseClickHeldOverGUI=tru
     if (!doorClosed) { CenterStatusPrint("%s",Sys_Text.stringTable[7]); return; }/*Door not closed.*/
     if (World.Sys_UI.elevButtonLabelIdx[btn]<0 || !World.Sys_UI.buttonsEnabled[btn] || World.Sys_UI.buttonsDarkened[btn]) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); return; }/*Floor not accessible.*/
     u8 destLevel=World.Sys_UI.elevButtonLevelIdx[btn]; if (destLevel==255) { CenterStatusPrint("%s",Sys_Text.stringTable[8]); return; }
-    /*Preserve the player's relative offset from the keypad across the level load.*/
+    
     V3 srcKeypad=World.Sys_UI.objectInUsePos; V3 offset=V3_AsubB(World.position[PLAYER1],srcKeypad);
     V3 destKeypad; if (FindElevatorKeypadPos(destLevel,&destKeypad)) queuedLevelPos=V3Add(destKeypad,offset); else queuedLevelPos=(V3){0.0f,0.0f,0.0f};
     queuedLevelToLoad=destLevel;
@@ -556,7 +555,6 @@ void UI_AudioLogClick(bool rh) { World.Sys_UI.mouseClickHeldOverGUI=true; (void)
 
 static void PGToggleLine(int i,int dx,int dy) { int w=World.Sys_UI.pg_width,h=World.Sys_UI.pg_height,r=i/w+dy,c=i%w+dx; while (r>=0&&r<h&&c>=0&&c<w) { int ci=r*w+c; if (World.Sys_UI.pg_type[ci]!=PuzzleCellType_Standard) break; World.Sys_UI.pg_cell[ci]=!World.Sys_UI.pg_cell[ci]; r+=dy; c+=dx; } }
 static void PGPreviewLine(int i,int dx,int dy,bool* preview) { int w=World.Sys_UI.pg_width,h=World.Sys_UI.pg_height,r=i/w+dy,c=i%w+dx; while (r>=0&&r<h&&c>=0&&c<w) { int ci=r*w+c; if (World.Sys_UI.pg_type[ci]!=PuzzleCellType_Standard) break; if (ci>=0&&ci<35) preview[ci]=true; r+=dy; c+=dx; } }
-/*Mark which cells would be toggled by clicking cell (for Genius hover preview). Mirrors the flipper logic without toggling.*/
 static void PGComputePreview(int cell,bool* preview) {
     for (int i=0;i<35;++i) preview[i]=false;
     int w=(int)World.Sys_UI.pg_width,h=(int)World.Sys_UI.pg_height; int n=w*h; if (n<=0||cell<0||cell>=n||cell>=35) return;
@@ -774,8 +772,6 @@ void CloseFullmap() { World.Sys_UI.fullMapOpen[0]=World.Sys_UI.fullMapOpen[1]=fa
 void AddItemToInventory(int index, int custIdx); void ResetHeldItem();
 static const u16 vmailStartFrames[6]={1579,1645,1713,1784,1864,1931}; static const u16 vmailEndFrames[6]={1644,1712,1783,1863,1930,1988}; static double avgCPUt[AVG_CPU_TAPS]={0}; static int avgCPUt_idx = 0;
 void AppendTextWarning(i32 sidx, i32 sidx2, i32 sidx3, i32 col, i32 id) { World.Sys_UI.tWrnTextIdx[id]=sidx; World.Sys_UI.tWrnTextIdx2[id]=sidx2; World.Sys_UI.tWrnTextIdx3[id]=sidx3; World.Sys_UI.tWrnFinished[id]=World.Sys_UI.tWrnFinished[id] < World.pauseRelativeTime ? World.pauseRelativeTime + 0.1f : World.Sys_UI.tWrnFinished[id] + 0.1f; World.Sys_UI.tWrnColorIdx[id] = col; }
-extern double game_actual_start_time; extern u16 editModeTestEntityDefinition;
-/*Edit-mode info panel text editing (console-style entry)*/
 enum { EF_POSX,EF_POSY,EF_POSZ,EF_ROTX,EF_ROTY,EF_ROTZ,EF_ROTW,EF_SCLX,EF_SCLY,EF_SCLZ,EF_TEX,EF_MODEL,EF_GLOW,EF_SPEC,EF_NORM,EF_LAST };
 bool editFieldEditing=false; static u8 editFieldSlot=EF_LAST; static char editFieldBuffer[40]={0};
 #define EF_LABELX 982
@@ -1572,11 +1568,6 @@ static void RenderUI() {
         RenderTextL(16, debugTextStartY - lineSpacing, timingColor,FONT_NORMAL,1.0f,"ms: %.2f",World.thisFrameTime);
         RenderTextL(16 + 250, debugTextStartY - lineSpacing,T_WHITE,FONT_NORMAL,1.0f,"(FPS:%d),Drwclls:%d [G:%d UI:%d Sh:%d] Vrt:%d E:%u|M:%u|P:%u",globalframesPerLastSecond,drawCalls,drawCallsNormal,uiDrawCalls,shadDrawCalls,vertsRendered,Cheats.editMode,World.menuActive,World.paused);
     }
-    i16 curhalf=CURSOR_SZ/2; float curhalff=(float)curhalf;
-         if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { RenderUIImage((i16)(World.cursorPos_x) - curhalf,(i16)(World.cursorPos_y) - curhalf,CURSOR_SZ,CURSOR_SZ,GetCursorTexture()); }
-    else if (!Cheats.noHUD)                                                              { RenderUIImage((i16)((float)UI_W*0.5f-curhalff),(i16)((float)UI_H*0.5f-curhalff)    ,CURSOR_SZ,CURSOR_SZ,GetCursorTexture()); }/*Centered on UI fixed resolution 1366x768 FBO*/
-    if(World.invP1.grenActive && World.invP1.holdingObject && !World.menuActive && !World.paused && !Cheats.noHUD) {
-        i16 cursorX = World.inventoryMode ? World.cursorPos_x : (i16)(UI_W / 2), cursorY = World.inventoryMode ? World.cursorPos_y : (i16)(UI_H / 2);
-        RenderTextL(cursorX + curhalf + 6,cursorY - 8,T_YELLOW,FONT_NORMAL,0.8f,"Live");
-    }
+    if ((World.inventoryMode && !Cheats.noHUD) || World.menuActive || World.paused) { RenderUIImage((i16)(World.cursorPos_x - 20),(i16)(World.cursorPos_y - 20),40,40,GetCursorTexture()); } else if (!Cheats.noHUD) { RenderUIImage(663,364,40,40,GetCursorTexture()); }
+    if(World.invP1.grenActive && World.invP1.holdingObject && !World.menuActive && !World.paused && !Cheats.noHUD) { RenderTextL((World.inventoryMode ? World.cursorPos_x : 683) + 26,(World.inventoryMode ? World.cursorPos_y : 384) - 8,T_YELLOW,FONT_NORMAL,0.8f,"Live"); }
 }
