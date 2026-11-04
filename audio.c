@@ -540,8 +540,8 @@ static void audio_mix_period(i16 *out) {
 }
 
 void play_wav_ext(const char *path,float volume,V3 pos,bool positional,float pitch) {
-    if(!path || slen(path) < 1 || sEqual(path,"null")){return;} char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path); i32 slot=GetFreeWavSlot(); if(slot==-1){ if(wav_count < MAX_CHANNELS){ slot=(i32)wav_count; wav_count++; } } if(slot==-1){DualLogWarn("Max WAV channels (%d) reached\n",MAX_CHANNELS); return;}
-    float *buf=NULL; u32 frames=0; size_t sz=0; i32 cslot=audioCacheAcquire(p,false,&buf,&frames,&sz); if(!buf){DualLogError("Failed to load%s\n",p); return;} wav_ch[slot] = (wav_channel_t){.samples=buf, .allocSize=sz, .frame_count=frames, .frame_pos=0, .volume=volume, .pitch=pitch, .looping=false, .positional=positional, .pos=pos, .playing=true, .cacheSlot=cslot};
+    if(!path || slen(path) < 1 || sEqual(path,"null")){return;} char p[128]; sFormat(p,sizeof(p),"./Audio/%s.wav",path); bool isMp3=false; if(!OS_FileExists(p)){sFormat(p,sizeof(p),"./Audio/%s.mp3",path); isMp3=true;} i32 slot=GetFreeWavSlot(); if(slot==-1){ if(wav_count < MAX_CHANNELS){ slot=(i32)wav_count; wav_count++; } } if(slot==-1){DualLogWarn("Max WAV channels (%d) reached\n",MAX_CHANNELS); return;}
+    float *buf=NULL; u32 frames=0; size_t sz=0; i32 cslot=audioCacheAcquire(p,isMp3,&buf,&frames,&sz); if(!buf){DualLogError("Failed to load%s\n",p); return;} wav_ch[slot] = (wav_channel_t){.samples=buf, .allocSize=sz, .frame_count=frames, .frame_pos=0, .volume=volume, .pitch=pitch, .looping=false, .positional=positional, .pos=pos, .playing=true, .cacheSlot=cslot};
 }
 
 void play_wav(const char *path,float volume,V3 pos,bool positional) { play_wav_ext(path,volume,pos,positional,0.0f);/*default pitch 0 = no adjustment*/ }

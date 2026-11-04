@@ -85,11 +85,10 @@ void DrawVelocityVector(u16 i) {
 }
 
 void DrawBoxColliderColored(u16 i, Color col) {
-    ShapeBox b = Entity_GetBox(i);
-    V3 c[8],px,py,pz, ax=quat_rot_v3(b.rot,(V3){1,0,0}), ay=quat_rot_v3(b.rot,(V3){0,1,0}), az=quat_rot_v3(b.rot,(V3){0,0,1});
-    px = V3_ScaleByF(ax,b.hExt.x);
-    py = V3_ScaleByF(ay,b.hExt.y);
-    pz = V3_ScaleByF(az,b.hExt.z);
+    ShapeBox b = Entity_GetBox(i); V3 c[8];
+    V3 px = V3_ScaleByF(quat_rot_v3(b.rot,(V3){1,0,0}),b.hExt.x);
+    V3 py = V3_ScaleByF(quat_rot_v3(b.rot,(V3){0,1,0}),b.hExt.y);
+    V3 pz = V3_ScaleByF(quat_rot_v3(b.rot,(V3){0,0,1}),b.hExt.z);
     for (int s=0;s<8;s++) { float sx=(s&1)?1.f:-1.f,sy=(s&2)?1.f:-1.f,sz=(s&4)?1.f:-1.f; c[s]=V3Add(b.ctr,V3Add(V3Add(V3_ScaleByF(px,sx),V3_ScaleByF(py,sy)),V3_ScaleByF(pz,sz))); }
     DrawLine(c[0],c[1],col); DrawLine(c[2],c[3],col); DrawLine(c[4],c[5],col);
     DrawLine(c[6],c[7],col);                          DrawLine(c[0],c[2],col); 

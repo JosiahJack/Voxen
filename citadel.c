@@ -305,7 +305,7 @@ int GeneralInvItem(int slot);
 bool GeneralInvCanVaporize(int slot);
 void GeneralInvRemove(int slot);
 void VaporizeClick() {int slot=World.invP1.generalInvCurrent; if(!GeneralInvCanVaporize(slot))return; GeneralInvRemove(slot); play_wav(sounds[89],AppliedFXVol(1.0f),(V3){0},false);}
-void CyborgConversionToggleTargetted() {bool active=(World.ressurectionActiveLevels>>World.curLev)&1u; flag_setu16(&World.ressurectionActiveLevels,(1u<<World.curLev),!active); if(World.curLev==6)flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ play_wav(sounds[active ? 183 : 184], AppliedFXVol(1.0f), (V3){0.0f,0.0f,0.0f}, false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);}
+void CyborgConversionToggleTargetted() {bool active=(World.ressurectionActiveLevels>>World.curLev)&1u; flag_setu16(&World.ressurectionActiveLevels,(1u<<World.curLev),!active); if(World.curLev==6)flag_setu16(&World.ressurectionActiveLevels,(1u<<10|1u<<11|1u<<12),!active);/*Set groves 10,11,12 when 6 toggled, shared*/ active=!active; play_wav(sounds[active ? 183 : 184], AppliedFXVol(1.0f), (V3){0.0f,0.0f,0.0f}, false);/*"vox_cybconvcancelled" : "vox_cybconvenabled"*/ CenterStatusPrint("%s",Sys_Text.stringTable[active ? 591 : 592]);}
 bool PlayerInElevatorCell(void); bool FindElevatorKeypadPos(u8 level,V3* outPos);
 extern u16 elevatorDestinations[MAX_LEVELS][MAX_ELEV_DESTS_PER_LEVEL];
 extern u8 elevatorDestCounts[MAX_LEVELS];
