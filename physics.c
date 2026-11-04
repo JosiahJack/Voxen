@@ -184,9 +184,24 @@ Quaternion quat_from_axis_angle(V3 axis, float angle) { float half = angle * 0.5
 Quaternion quat_normalize(Quaternion q) { float l = q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w; float m = (l < PHY_EPSILON); float inv=vinvsqtf(vmax(l,PHY_EPSILON)); q.x*=inv; q.y*=inv; q.z*=inv; q.w*=inv; q.x=q.x*(1.0f - m); q.y=q.y*(1.0f - m); q.z=q.z*(1.0f - m); q.w=q.w*(1.0f - m) + 1.0f*m; return q; }
 INLINE V3 MeshVert(u16 m, u32 i) { const float* p = physPos[m] + i * 3; return (V3){p[0],p[1],p[2]}; }
 static u8 g_hullComWarned[MAX_MDLS] = {0};
+/*Inertia memo: the tensor computed below is a pure function of (colMesh, mass, scale) -- the triangle sweep depends only on the mesh, and mass/scale only re-weight the accumulators. Level data instantiates the same (mesh,mass,scale) tuple hundreds to thousands of times (walls, crates, gibs), so a 4-way set-associative memo turns the O(triangleCount) sweep into a 24-byte copy for repeat hits; 4 ways absorb the interleaved keys that appear when difficulty purges and per-instance overrides mix prefab masses in one mesh. Entries key on the raw bit patterns of the inputs: identical bits force a bit-identical recomputation, so a hit is exactly equivalent to recomputing. Single-threaded: LoadLevelData is the only caller.*/
+typedef struct { u32 mi,massBits,sxBits,syBits,szBits; float inv[6],comMag,r; u8 state; } InertiaMemo; /*state 0=empty, 1=tensor cached, 2=no tensor possible (degenerate hull or near-singular tensor; comMag/r still cached for the warning check)*/
+static InertiaMemo inertiaMemo[256][4]; static u8 inertiaMemoVictim[256];
+INLINE u32 inertia_f32bits(float f) { union { float f; u32 u; } b; b.f=f; return b.u; }
+#define INERTIA_MEMO_HIT(c) ((c)->mi==mi && (c)->state && (c)->massBits==inertia_f32bits(World.mass[i]) && (c)->sxBits==inertia_f32bits(World.scale[i].x) && (c)->syBits==inertia_f32bits(World.scale[i].y) && (c)->szBits==inertia_f32bits(World.scale[i].z))
+#define INERTIA_MEMO_STORE(c,st,mag,rad) ((c)->mi=mi, (c)->massBits=inertia_f32bits(World.mass[i]), (c)->sxBits=inertia_f32bits(World.scale[i].x), (c)->syBits=inertia_f32bits(World.scale[i].y), (c)->szBits=inertia_f32bits(World.scale[i].z), (c)->state=(st), (c)->comMag=(mag), (c)->r=(rad))
 void ComputeConvexMeshInertiaTensor(u16 i) {
     World.mass[i] *= 10.0f; // Intentional global mass scaling.  Gives better responses and robustness to small items.
     u16 mi = World.instances[i].colMeshIndex; World.invTnsrValid[i]=false; if (mi >= MAX_MDLS || !modelTriangleCounts[mi] || !modelVertexCounts[mi]) {return;}
+    InertiaMemo* set = inertiaMemo[mi & 255];
+    InertiaMemo* ce = NULL;
+    for (int w=0;w<4;++w) { if (INERTIA_MEMO_HIT(&set[w])) { ce=&set[w]; break; } }
+    if (ce) {
+        if (!g_hullComWarned[mi] && ce->comMag > 0.25f*ce->r) { g_hullComWarned[mi]=1; }/*same inputs produce the same comMag/r, so the warning outcome matches a fresh computation*/
+        if (ce->state == 1) { mcpy(World.invInertiaTensor[i],ce->inv,sizeof(ce->inv)); World.invTnsrValid[i]=true; }
+        return;
+    }
+    ce = &set[inertiaMemoVictim[mi & 255]++ & 3];/*round-robin victim: level records arrive grouped by prefab, so recency hardly matters, and this keeps the loader branch-free*/
     float acc[6]={0}; float cm[3]={0}; float volAcc=0.0f; u32 triCount = modelTriangleCounts[mi];
     for (u32 ti=0;ti<triCount;++ti) { // Accumulates without dividing by 6 for each saving that for the end for performance.
         u32 i0 = modelTriangles[mi][ti*3+0], i1=modelTriangles[mi][ti*3+1], i2=modelTriangles[mi][ti*3+2]; V3 v0=MeshVert(mi,i0), v1=MeshVert(mi,i1), v2=MeshVert(mi,i2); float det=V3_dot(v0,V3_Cross(v1,v2)); volAcc += det; // Signed 6x tetrahedron volume via scalar triple product
@@ -197,7 +212,7 @@ void ComputeConvexMeshInertiaTensor(u16 i) {
         acc[4] += det*(2.0f*(v0.x*v0.z+v1.x*v1.z+v2.x*v2.z)+v0.x*v1.z+v1.x*v0.z+v0.x*v2.z+v2.x*v0.z+v1.x*v2.z+v2.x*v1.z);
         acc[5] += det*(2.0f*(v0.y*v0.z+v1.y*v1.z+v2.y*v2.z)+v0.y*v1.z+v1.y*v0.z+v0.y*v2.z+v2.y*v0.z+v1.y*v2.z+v2.y*v1.z); /*Multiplier 2.0f handles the algebraic cross-term polynomial expansion*/
     }
-    if(vabs(volAcc) < 1e-12f){return;}/*absolute 1e-4 (PHY_EPSILON) rejected thin cards to the sphere fallback*/
+    if(vabs(volAcc) < 1e-12f){ INERTIA_MEMO_STORE(ce,2,0.0f,0.0f); return;}/*absolute 1e-4 (PHY_EPSILON) rejected thin cards to the sphere fallback*/
         
     float sx=World.scale[i].x,sy=World.scale[i].y,sz=World.scale[i].z;
     float sd=World.mass[i]/(volAcc * 10.0f/*6/60*/), so = World.mass[i] / (volAcc * 20.0f/*6/120*/);/*Diagonals=6/60, off-diagonals=6/120, since those have the 2.0f multiplied above from the x^2 expansion resulting in 2xy terms.*/
@@ -206,11 +221,14 @@ void ComputeConvexMeshInertiaTensor(u16 i) {
     float r = modelBounds[mi] * vmax(vmax(sx,sy),sz); float comMag = vsqrtf(scx*scx + scy*scy + scz*scz);
     if (!g_hullComWarned[mi] && comMag > 0.25f*r) { g_hullComWarned[mi]=1; }
     float mn = 0.04f * m * r * r; Ixx = vmax(Ixx,mn); Iyy = vmax(Iyy,mn); Izz = vmax(Izz,mn); // Clamp diagonal inertia to a minimum floor of 10% of the I=2/5ths*mr^2=0.4mr^2 hence 0.04 of spherical inertia to avoid NaN's.
-    float det = Ixx*(Iyy*Izz - Iyz*Iyz) - Ixy*(Ixy*Izz - Ixz*Iyz) + Ixz*(Ixy*Iyz - Iyy*Ixz); if (vabs(det) < 1e-24f) return;
+    float det = Ixx*(Iyy*Izz - Iyz*Iyz) - Ixy*(Ixy*Izz - Ixz*Iyz) + Ixz*(Ixy*Iyz - Iyy*Ixz); if (vabs(det) < 1e-24f) { INERTIA_MEMO_STORE(ce,2,comMag,r); return; }
     float invDet = 1.0f / det, *iI=World.invInertiaTensor[i]; // Applies Cramer's Rule to invert for actual use.  [ 0  3  4 ]  (0=Ixx, 1=Iyy, 2=Izz) (3=Ixy, 4=Ixz, 5=Iyz)
     iI[0]=(Iyy*Izz - Iyz*Iyz)*invDet; iI[1]=(Ixx*Izz - Ixz*Ixz)*invDet; iI[2]=(Ixx*Iyy - Ixy*Ixy)*invDet;      // [ 3  1  5 ]  Tensor is symmetric only 6 unique elements needed
     iI[3]=(Ixz*Iyz - Ixy*Izz)*invDet; iI[4]=(Ixy*Iyz - Iyy*Ixz)*invDet; iI[5]=(Ixy*Ixz - Ixx*Iyz)*invDet;      /* [ 4  5  2 ]*/    World.invTnsrValid[i]=true;
+    INERTIA_MEMO_STORE(ce,1,comMag,r); mcpy(ce->inv,iI,sizeof(ce->inv));
 }
+#undef INERTIA_MEMO_HIT
+#undef INERTIA_MEMO_STORE
 
 INLINE Manifold BoxBox(ShapeBox a, ShapeBox b) {
     Manifold m={0}; V3 aAxes[3], bAxes[3]; aAxes[0]=quat_rot_v3(a.rot,(V3){1,0,0}); aAxes[1]=quat_rot_v3(a.rot,(V3){0,1,0}); aAxes[2]=quat_rot_v3(a.rot,(V3){0,0,1}); bAxes[0]=quat_rot_v3(b.rot,(V3){1,0,0}); bAxes[1]=quat_rot_v3(b.rot,(V3){0,1,0}); bAxes[2]=quat_rot_v3(b.rot,(V3){0,0,1}); float aExt[3]={a.hExt.x,a.hExt.y,a.hExt.z}; float bExt[3]={b.hExt.x,b.hExt.y,b.hExt.z};

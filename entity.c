@@ -888,8 +888,8 @@ static bool cardChunk[307]={/*0*/1,/*1*/1,/*2*/1,/*3*/1,/*4*/1,/*5*/1,/*6*/0,/*7
                             /*300*/0,/*301*/0,/*302*/1,/*303*/0,/*304*/1,/*305*/1,/*306*/1};
 __attribute__((noinline)) i32 parse_numberi32(const char* str, const char* line, u32 ln){if(str==0||*str=='\0'){DualLogError("Invalid on line %d:%s\n",ln+1,line); return 0;} while(cEmpty((char)*str)){str++;} bool neg=false; if(*str=='+'){str++;}else if(*str=='-'){neg=true; str++;} i64 result=0; int n=0; while(*str>='0'&&*str<='9'&&n++<18){result=result*10L+(*str-'0'); str++;} while(*str>='0'&&*str<='9'){str++;} return (i32)(neg ? -result : result);}
 __attribute__((noinline)) V3 GetLocalTransformedPos(Entity* originator, V3 offsetFromOriginator) { u16 idx=(u16)(originator - World.instances); V3 scaledOfs = mul_v3_v3_elementwise(offsetFromOriginator,World.scale[idx]); V3 rotatedOfs = quat_rot_v3(World.rotation[idx],scaledOfs); V3 result = V3Add(World.position[idx],rotatedOfs); return result; }
-__attribute__((noinline)) i16 parse_numberi16(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -32768 || v > 32767){DualLogError("%d outrange i16 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i16)v;}
-__attribute__((noinline)) i8 parse_numberi8(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -128 || v > 127){DualLogError("%d out range i8 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i8)v;}
+i16 parse_numberi16(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -32768 || v > 32767){DualLogError("%d outrange i16 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i16)v;}
+i8 parse_numberi8(const char* str, const char* line, u32 lineNum) {i32 v=parse_numberi32(str,line,lineNum); if(v < -128 || v > 127){DualLogError("%d out range i8 on line %d:%s\n",v,lineNum+1,line); return 0;} return (i8)v;}
 __attribute__((noinline)) float parse_float(const char* str, const char* line, u32 lineNum) {
     if (str == 0 || *str == '\0') { DualLogError("Blank on line %d:%s\n", lineNum+1, line); return 0.0f; } while (cEmpty(*str)){str++;} bool negative = false; if (*str == '-') { negative = true; str++; } else if (*str == '+') { str++; } double value = 0.0; bool has_digit = false; while (*str >= '0' && *str <= '9') { value = value * 10.0 + (*str - '0'); str++; has_digit = true; } // Integer part
     if (*str == '.') { str++; double frac = 0.0; double place = 0.1; while (*str >= '0' && *str <= '9') { frac += (*str - '0') * place; place *= 0.1; str++; has_digit = true; } value += frac; }/*Decimal part*/  if(!has_digit){return 0.0f;} if(negative){value = -value;} return (float)value;
@@ -901,12 +901,13 @@ u16 IOInternName(const char*); static u16 lightTargetnameFile[LIGHT_COUNT];/*tar
 __attribute__((noinline)) u16 AddOffsetLight(Entity* par, V3 offset, Color3 col, float range, float intensity) { return AddLightSimple(GetLocalTransformedPos(par,offset),col,range,intensity,LIGHT_AND_SHADOW_ON); }
 void LoadFieldIntoLight(char* k, char* v, char* il, u32 ln, Light* lit, LightAnimation* lam, u16 lIdx) {
     char* br = StringFindFirstCharWithin(k,'['); if (br) { int i = parse_numberu32(br + 1,il,ln); if (i >= 0 && i < 32) { if (br - k == 13) { lam->intervalSteps[i] = parse_float(v,il,ln); }/*"intervalSteps[" bracket is at index 13*/ else if (br - k == 21) { lam->stepIsLerping[i] = parse_float(v,il,ln); }/*"intervalStepisLerping[" bracket is at index 21*/ } return; }
-    static const struct { const char* key; u16 offset; u8 type,anim; } map[] = {
-        {"currentStep",    __builtin_offsetof(LightAnimation,currentStep),1,1},{"lerpValue",      __builtin_offsetof(LightAnimation,lerpValue),0,1},{"intervalSteps.Length",__builtin_offsetof(LightAnimation,numIntervalSteps),1,1},{"intervalStepisLerping.Length",__builtin_offsetof(LightAnimation, numLerpSteps),1,1},
-        {"lP.x",__builtin_offsetof(Light,pos.x),0},{"lP.y",__builtin_offsetof(Light,pos.y),0},{"lP.z",__builtin_offsetof(Light,pos.z),0},{"lR.x",__builtin_offsetof(Light,spotDir.x),0},{"lR.y",__builtin_offsetof(Light,spotDir.y),0},{"lR.z",__builtin_offsetof(Light,spotDir.z),0},{"lR.w",__builtin_offsetof(Light,spotDir.w),0},
-        {"range",__builtin_offsetof(Light,range),0},{"spotAngle",__builtin_offsetof(Light,spotAng),0},{"minIntensity",__builtin_offsetof(Light,minIntensity),0},{"maxIntensity",__builtin_offsetof(Light,maxIntensity),0},{"color.r",__builtin_offsetof(Light,col.r),0},{"color.g",__builtin_offsetof(Light,col.g),0},{"color.b",__builtin_offsetof(Light,col.b),0}
+    static const struct { const char* key; u16 offset; u8 klen,type,anim; } map[] = {
+        {"currentStep",    __builtin_offsetof(LightAnimation,currentStep),11,1,1},{"lerpValue",      __builtin_offsetof(LightAnimation,lerpValue),9,0,1},{"intervalSteps.Length",__builtin_offsetof(LightAnimation,numIntervalSteps),20,1,1},{"intervalStepisLerping.Length",__builtin_offsetof(LightAnimation, numLerpSteps),28,1,1},
+        {"lP.x",__builtin_offsetof(Light,pos.x),4,0},{"lP.y",__builtin_offsetof(Light,pos.y),4,0},{"lP.z",__builtin_offsetof(Light,pos.z),4,0},{"lR.x",__builtin_offsetof(Light,spotDir.x),4,0},{"lR.y",__builtin_offsetof(Light,spotDir.y),4,0},{"lR.z",__builtin_offsetof(Light,spotDir.z),4,0},{"lR.w",__builtin_offsetof(Light,spotDir.w),4,0},
+        {"range",__builtin_offsetof(Light,range),5,0},{"spotAngle",__builtin_offsetof(Light,spotAng),9,0},{"minIntensity",__builtin_offsetof(Light,minIntensity),12,0},{"maxIntensity",__builtin_offsetof(Light,maxIntensity),12,0},{"color.r",__builtin_offsetof(Light,col.r),7,0},{"color.g",__builtin_offsetof(Light,col.g),7,0},{"color.b",__builtin_offsetof(Light,col.b),7,0}
     };
-    for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {if(sEqual(k,map[i].key)/*0=float,1=u8*/){void* dest=map[i].anim ? (void*)lam : (void*)lit; char* ptr=(char*)dest+map[i].offset; if(map[i].type == 0){*(float*)ptr=parse_float(v,il,ln);}else{*(u8*)ptr=parse_numberu8(v,il,ln);} return;}}
+    int klen=(int)slen(k);/*length is invariant per token (the tokenizer NUL-terminates the key); comparing it first reduces the scan to same-length candidates and bounds the byte compare*/
+    for (int i = 0; i < (int)(sizeof(map)/sizeof(map[0])); i++) {if(klen==map[i].klen && k[0]==map[i].key[0] && sCompUpToLen(k,map[i].key,klen)==0/*0=float,1=u8*/){void* dest=map[i].anim ? (void*)lam : (void*)lit; char* ptr=(char*)dest+map[i].offset; if(map[i].type == 0){*(float*)ptr=parse_float(v,il,ln);}else{*(u8*)ptr=parse_numberu8(v,il,ln);} return;}}
     if (sEqual(k,"intensity")) {lit->intensity = lit->maxIntensity = parse_float(v,il,ln) * 0.35f;}else if(sEqual(k,"type")){flag_set(&lit->lflags, (v[0] == 'S') ? LSPOT : LDIR, true);}else if (sEqual(k,"lightOn") && !alreadyReadLightOnOnce[lIdx]) { alreadyReadLightOnOnce[lIdx] = true; flag_set(&lit->lflags,LIGHTON,parse_bool(v,il,ln)); } else if (sEqual(k,"lerpOn")) {flag_set(&lit->lflags,LERPON,parse_bool(v,il,ln));}
     else if (sEqual(k,"targetname")) {lightTargetnameFile[lIdx] = IOInternName(v);}
 }
@@ -946,7 +947,12 @@ static const PrefabConst prefabConsts[] = {
     {526, {0},                200.0f, BloodType_Robot},        /*prop_console02*/         {553, {0.5f,0.5f,0.5f},        0.0f, BloodType_None},         /*prop_cyber_decoy*/
 };
 
-static const PrefabConst* PrefabConstFor(u16 entIdx) { for (u32 k = 0; k < sizeof(prefabConsts)/sizeof(prefabConsts[0]); ++k) { if (prefabConsts[k].entIdx == entIdx) { return &prefabConsts[k]; } } return 0; }
+/*Compile-time slot map: entity constIndex -> prefabConsts position+1 (0 = no prefab constants). Data-driven O(1) lookup replaces the per-instance linear scan; the designated initializers must mirror the order of prefabConsts above: 279,424,430,431,433,439,441,444,445,446,458,459,460,464,465,466,467,468,469,470,471,472,473,474,475,476,477,478,479,525,526,553. Callers only reach here with entIdx < MAX_ENTITIES (AddInstance's early-out guarantees it).*/
+static const PrefabConst* PrefabConstFor(u16 entIdx) {
+    static const u8 slot[MAX_ENTITIES] = {[279]=1, [424]=2, [430]=3, [431]=4, [433]=5, [439]=6, [441]=7, [444]=8, [445]=9, [446]=10, [458]=11, [459]=12, [460]=13, [464]=14, [465]=15, [466]=16, [467]=17, [468]=18, [469]=19, [470]=20, [471]=21, [472]=22, [473]=23, [474]=24, [475]=25, [476]=26, [477]=27, [478]=28, [479]=29, [525]=30, [526]=31, [553]=32};
+    u8 k = slot[entIdx];
+    return k ? &prefabConsts[k-1] : 0;
+}
 
 __attribute__((noinline)) u16 AddInstance(u16 entIdx, V3 pos) {
     if (entIdx >= MAX_ENTITIES) { DualLogWarn("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d, skipped\n",entIdx,MAX_ENTITIES); return WORLD; }
@@ -1056,7 +1062,8 @@ static char texAnimFolders[256][TARG_STRLEN]; static u16 texAnimFolderCount = 1;
 u16 TexAnimFolderIntern(const char* name){if(!name || !*name){return 0;} for(u16 i=1;i<texAnimFolderCount;++i){if(sEqual(texAnimFolders[i],name)){return i;}} if(texAnimFolderCount >= 256){DualLogError("texAnim folder table full!\n"); return 0;} scpy_to_a_from_b(texAnimFolders[texAnimFolderCount],name,TARG_STRLEN); return texAnimFolderCount++;}
 static void FWBeginBlock(i32 cnt){V3 *p,*s; Quaternion *r; if(fwCollecting&&fwLastChunkSlot<FW_MAX_CHILDREN){p=&lwPos[fwLastChunkSlot]; r=&lwRot[fwLastChunkSlot]; s=&lwScale[fwLastChunkSlot];}else{switch(fwStage++){case 1:p=&fwContainerPos; r=&fwContainerRot; s=&fwContainerScale; break; case 2:p=&fwInfoLocalTmp; r=&fwInfoRotDummy; s=&fwInfoScaleDummy; break; default:p=&posFromFile[cnt]; r=&rotationFromFile[cnt]; s=&scaleFromFile[cnt]; break;}} fwCurP=p; fwCurR=r; fwCurS=s;}
 void LoadLevelMod(u8 lev) {
-    static const struct { const char* key; u16 offset; u8 bytes,len,kind,count; u32 mask; } fields[]={
+    typedef struct { const char* key; u16 offset; u8 bytes,len,kind,count; u32 mask; } LevelField;
+    static const LevelField fields[]={
         {"health",__builtin_offsetof(Entity,health),sizeof(((Entity*)0)->health),6,0,0,0},{"cyberHealth",__builtin_offsetof(Entity,cyberHealth),sizeof(((Entity*)0)->cyberHealth),11,0,0,0},
         {"startYAngle",__builtin_offsetof(Entity,camStartYAngle),sizeof(((Entity*)0)->camStartYAngle),11,0,0,0},{"endYAngle",__builtin_offsetof(Entity,camEndYAngle),sizeof(((Entity*)0)->camEndYAngle),9,0,0,0},
         {"waitTime",__builtin_offsetof(Entity,camWaitTime),sizeof(((Entity*)0)->camWaitTime),8,0,0,0},{"keycode",__builtin_offsetof(Entity,keycode),sizeof(((Entity*)0)->keycode),7,2,0,0},
@@ -1138,6 +1145,20 @@ void LoadLevelMod(u8 lev) {
         {"AntennaWestDestroyed",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),20,8,0,QB_AntennaWestDestroyed},{"SelfDestructActivated",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),21,8,0,QB_SelfDestructActivated},
         {"BridgeSeparated",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),15,8,0,QB_BridgeSeparated},{"IsolinearChipsetInstalled",__builtin_offsetof(Entity,questBitID),sizeof(((Entity*)0)->questBitID),25,8,0,QB_IsolinearChipsetInstalled},
     };
+    /*Dispatch buckets: a one-time stable counting sort of fields[] by exact token length (plain keys by len, "name[d]" array keys by len+3). A token then only compares against same-length candidates, which lets two checks per entry be dropped as invariants: for plain entries keyLen==len is guaranteed by the bucket, and for array entries keyLen==len+3 likewise. Order inside a bucket preserves the original first-match-wins table scan (the two "customIndex" spellings differ in length, so they can never compete for one token). Length groups are tiny (1-6 entries) instead of the whole ~148-entry table every token used to walk, and level data is dominated by lP/lR/constIndex keys that match nothing here.*/
+    #define FIELD_TOKLEN(f) ((f)->count ? (u8)((f)->len+3u) : (f)->len)
+    #define FIELD_BUCKET_MAX 39
+    static u8 fieldBucketStart[FIELD_BUCKET_MAX+2]; static u8 fieldOrder[sizeof(fields)/sizeof(fields[0])]; static bool fieldBucketsBuilt;
+    if (!fieldBucketsBuilt) {
+        u8 fill[FIELD_BUCKET_MAX+2] = {0};
+        for (u32 f=0;f<sizeof(fields)/sizeof(fields[0]);++f) { u8 tl=FIELD_TOKLEN(&fields[f]); fill[tl]++; }
+        u8 run=0;
+        for (u32 L=0;L<=FIELD_BUCKET_MAX+1;++L) { fieldBucketStart[L]=run; run=(u8)(run+fill[L]); }
+        u8 cursor[FIELD_BUCKET_MAX+2];
+        for (u32 L=0;L<=FIELD_BUCKET_MAX+1;++L) cursor[L]=fieldBucketStart[L];
+        for (u32 f=0;f<sizeof(fields)/sizeof(fields[0]);++f) fieldOrder[cursor[FIELD_TOKLEN(&fields[f])]++]=(u8)f;
+        fieldBucketsBuilt = true;
+    }
     u8 curlevel = vclamp(lev, 0, 13); World.levelCurrentlyLoading = true;/*precondition only, for AddInstance's level-security tally above -- NOT redundant bookkeeping. The tally must not see runtime spawns, and this flag is its only way to tell load-time from run-time. Nothing outside the loader reads it; the main loop gates level changes on the queuedLevelToLoad sentinel instead.*/
     static const struct { u8 level; V3 pos; Quaternion rot; u8 fov; float near,far; } cameras[]={
         {0,{-14.16170f,-54.72389f,20.71170f},{0.03959f,0.41918f,-0.01830f,0.90686f},85,0.84f,16.223f},
@@ -1187,31 +1208,37 @@ void LoadLevelMod(u8 lev) {
             if (isLight) { LoadFieldIntoLight(key,value,lineSpace,lineNum,lit,lanim,lightsIdx);}
             else {
                 bool fieldRead=false;
-                for (u32 f=0;f<sizeof(fields)/sizeof(fields[0]);++f) {
-                    u8 len=fields[f].len,element=0;
-                    if (fields[f].count) {
-                        if (keyLen!=len+3 || sCompUpToLen(key,fields[f].key,len) || key[len]!='[' || key[len+2]!=']' || (u8)(key[len+1]-'0')>=fields[f].count) continue;
-                        
-                        element=key[len+1]-'0';
-                    } else if (keyLen!=len || sCompUpToLen(key,fields[f].key,len)) continue;
-                    
-                    void* dst=(u8*)inst+fields[f].offset+element*fields[f].bytes; u32 v=0; float fv;
-                    switch (fields[f].kind) {
-                        case 0: fv=parse_float(value,lineSpace,lineNum); mcpy(dst,&fv,sizeof(fv)); break;
-                        case 1: v=(u32)parse_numberi16(value,lineSpace,lineNum); break; case 2: v=parse_numberu16(value,lineSpace,lineNum); break;
-                        case 3: v=parse_numberu8(value,lineSpace,lineNum); break; case 4: v=(u32)parse_numberi8(value,lineSpace,lineNum); break;
-                        case 5: v=(u32)parse_numberi32(value,lineSpace,lineNum); break; case 6: v=parse_numberu32(value,lineSpace,lineNum); break;
-                        case 7: flag_set((u32*)dst,fields[f].mask,parse_bool(value,lineSpace,lineNum)); break;
-                        case 8: if (parse_bool(value,lineSpace,lineNum)) *(u8*)dst=(u8)fields[f].mask; break;
+                if (keyLen <= FIELD_BUCKET_MAX) {/*longer keys cannot match any table entry (max is 25 chars)*/
+                    u8 bend=fieldBucketStart[keyLen+1];
+                    for (u8 b=fieldBucketStart[keyLen]; b<bend; ++b) {
+                        const LevelField* fd=&fields[fieldOrder[b]];
+                        u8 len=fd->len,element=0;
+                        if (fd->count) {/*keyLen==len+3 is guaranteed by the bucket; only the name prefix, brackets and digit remain to check*/
+                            if (sCompUpToLen(key,fd->key,len) || key[len]!='[' || key[len+2]!=']' || (u8)(key[len+1]-'0')>=fd->count) continue;
+                            element=key[len+1]-'0';
+                        } else {/*keyLen==len is guaranteed by the bucket; the first char screens most mismatches without a call*/
+                            if (key[0]!=fd->key[0] || sCompUpToLen(key,fd->key,len)) continue;
+                        }
+                        void* dst=(u8*)inst+fd->offset+element*fd->bytes; u32 v=0; float fv;
+                        switch (fd->kind) {
+                            case 0: fv=parse_float(value,lineSpace,lineNum); mcpy(dst,&fv,sizeof(fv)); break;
+                            case 1: v=(u32)parse_numberi16(value,lineSpace,lineNum); break; case 2: v=parse_numberu16(value,lineSpace,lineNum); break;
+                            case 3: v=parse_numberu8(value,lineSpace,lineNum); break; case 4: v=(u32)parse_numberi8(value,lineSpace,lineNum); break;
+                            case 5: v=(u32)parse_numberi32(value,lineSpace,lineNum); break; case 6: v=parse_numberu32(value,lineSpace,lineNum); break;
+                            case 7: flag_set((u32*)dst,fd->mask,parse_bool(value,lineSpace,lineNum)); break;
+                            case 8: if (parse_bool(value,lineSpace,lineNum)) *(u8*)dst=(u8)fd->mask; break;
+                        }
+                        if (fd->kind>0 && fd->kind<7) mcpy(dst,&v,fd->bytes);
+                        fieldRead=true; break;
                     }
-                    if (fields[f].kind>0 && fields[f].kind<7) mcpy(dst,&v,fields[f].bytes);
-                    fieldRead=true; break;
                 }
                 if (fieldRead) continue;
                      if(KEY_EQ("constIndex")){if(!constIndexRead){/*SaveObject.Save writes the master PrefabIdentifier.constIndex as field 0, then appends per-component saves; GrenadeActivate.Save emits its own "constIndex" (the grenade type: 7 frag, 8 conc, 9 emp, 10 earth, 11 mine, 12 nitro, 13 gas, 14 plastique) onto the same record.  Both keys share a name, so keep the first.  Otherwise the 10 level-placed live landmines (402 then 11) loaded as chunk_bridg1_5 and never detonated.*/ constIndexRead=true; inst->index=parse_numberu16(value,lineSpace,lineNum); fwLine=(inst->index == 517); ipLine=(inst->index == 614 || inst->index == 615 || inst->index == 602); npcLine=IdxIsNPC(inst->index);}}
-                else if(KEY_EQ("lP.x")||KEY_EQ("lP.y")||KEY_EQ("lP.z")||KEY_EQ("lR.x")||KEY_EQ("lR.y")||KEY_EQ("lR.z")||KEY_EQ("lR.w")||KEY_EQ("lS.x")||KEY_EQ("lS.y")||KEY_EQ("lS.z")) {
+                else if(keyLen==4 && key[0]=='l' && (key[1]=='P' || key[1]=='R' || key[1]=='S') && key[2]=='.' && key[3]>='w' && key[3]<='z') {/*the nine transform keys lP.x lP.y lP.z lR.x lR.y lR.z lR.w lS.x lS.y lS.z: ~560K tokens per full load hit this branch, so decode group+axis once into gk instead of re-running KEY_EQ string compares per candidate*/
                     float v=parse_float(value,lineSpace,lineNum);
-                    if (KEY_EQ("lP.x")) {
+                    u32 gk=(((u32)key[1])<<8)|((u32)key[3]);/*'P'/'R'/'S' in the high byte, 'x'/'y'/'z'/'w' in the low byte*/
+                    #define TR_KEY(g,a) ((((u32)(g))<<8)|((u32)(a)))
+                    if (gk==TR_KEY('P','x')) {
                         if (fwLine) { FWBeginBlock(entCount); }
                         else if (ipLine) {
                             if (ipBlock == 0) { ipCurP=&posFromFile[entCount]; ipCurR=&rotationFromFile[entCount]; ipCurS=&scaleFromFile[entCount]; }
@@ -1220,17 +1247,21 @@ void LoadLevelMod(u8 lev) {
                         }
                         else if (npcLine) { npcBlock++; }
                     }
-                    if (npcLine && npcBlock > 1 && (inst->index != 437 || KEY_EQ("lP.x") || KEY_EQ("lP.y") || KEY_EQ("lP.z") || KEY_EQ("lS.x") || KEY_EQ("lS.y") || KEY_EQ("lS.z"))) {}
-                    else if (KEY_EQ("lP.x")) { if(fwLine){ if(fwCurP)fwCurP->x=v; } else if(ipLine){ if(ipCurP)ipCurP->x=v; } else posFromFile[entCount].x=v; }
-                    else if (KEY_EQ("lP.y")) { if(fwLine){ if(fwCurP)fwCurP->y=v; } else if(ipLine){ if(ipCurP)ipCurP->y=v; } else posFromFile[entCount].y=v; }
-                    else if (KEY_EQ("lP.z")) { if(fwLine){ if(fwCurP)fwCurP->z=v; } else if(ipLine){ if(ipCurP)ipCurP->z=v; } else posFromFile[entCount].z=v; }
-                    else if (KEY_EQ("lR.x")) { if(fwLine){ if(fwCurR)fwCurR->x=v; } else if(ipLine){ if(ipCurR)ipCurR->x=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].x=v; } }
-                    else if (KEY_EQ("lR.y")) { if(fwLine){ if(fwCurR)fwCurR->y=v; } else if(ipLine){ if(ipCurR)ipCurR->y=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].y=v; } }
-                    else if (KEY_EQ("lR.z")) { if(fwLine){ if(fwCurR)fwCurR->z=v; } else if(ipLine){ if(ipCurR)ipCurR->z=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].z=v; } }
-                    else if (KEY_EQ("lR.w")) { if(fwLine){ if(fwCurR)fwCurR->w=v; } else if(ipLine){ if(ipCurR)ipCurR->w=v; if(ipBlock>1) ipSubRotSet=true; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].w=v; } }
-                    else if (KEY_EQ("lS.x")) { if(fwLine){ if(fwCurS)fwCurS->x=v; } else if(ipLine){ if(ipCurS)ipCurS->x=v; } else { scaleFromFile[entCount].x=v; scaleReadMask|=1u; } }
-                    else if (KEY_EQ("lS.y")) { if(fwLine){ if(fwCurS)fwCurS->y=v; } else if(ipLine){ if(ipCurS)ipCurS->y=v; } else { scaleFromFile[entCount].y=v; scaleReadMask|=2u; } }
-                    else if (KEY_EQ("lS.z")) { if(fwLine){ if(fwCurS)fwCurS->z=v; } else if(ipLine){ if(ipCurS)ipCurS->z=v; } else { scaleFromFile[entCount].z=v; scaleReadMask|=4u; } }
+                    if (npcLine && npcBlock > 1 && ((gk>>8)=='P' || (gk>>8)=='S' || inst->index != 437)) {}/*NPC sub-mesh blocks: only 437 (servbot) root rotations survive, same keys as before (lP.* and lS.* are swallowed here, lR.* falls through)*/
+                    else switch (gk) {
+                        case TR_KEY('P','x'): { if(fwLine){ if(fwCurP)fwCurP->x=v; } else if(ipLine){ if(ipCurP)ipCurP->x=v; } else posFromFile[entCount].x=v; } break;
+                        case TR_KEY('P','y'): { if(fwLine){ if(fwCurP)fwCurP->y=v; } else if(ipLine){ if(ipCurP)ipCurP->y=v; } else posFromFile[entCount].y=v; } break;
+                        case TR_KEY('P','z'): { if(fwLine){ if(fwCurP)fwCurP->z=v; } else if(ipLine){ if(ipCurP)ipCurP->z=v; } else posFromFile[entCount].z=v; } break;
+                        case TR_KEY('R','x'): { if(fwLine){ if(fwCurR)fwCurR->x=v; } else if(ipLine){ if(ipCurR)ipCurR->x=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].x=v; } } break;
+                        case TR_KEY('R','y'): { if(fwLine){ if(fwCurR)fwCurR->y=v; } else if(ipLine){ if(ipCurR)ipCurR->y=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].y=v; } } break;
+                        case TR_KEY('R','z'): { if(fwLine){ if(fwCurR)fwCurR->z=v; } else if(ipLine){ if(ipCurR)ipCurR->z=v; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].z=v; } } break;
+                        case TR_KEY('R','w'): { if(fwLine){ if(fwCurR)fwCurR->w=v; } else if(ipLine){ if(ipCurR)ipCurR->w=v; if(ipBlock>1) ipSubRotSet=true; } else { if(npcLine && npcBlock<=1) npcRootRotSet[entCount]=true; rotationFromFile[entCount].w=v; } } break;
+                        case TR_KEY('S','x'): { if(fwLine){ if(fwCurS)fwCurS->x=v; } else if(ipLine){ if(ipCurS)ipCurS->x=v; } else { scaleFromFile[entCount].x=v; scaleReadMask|=1u; } } break;
+                        case TR_KEY('S','y'): { if(fwLine){ if(fwCurS)fwCurS->y=v; } else if(ipLine){ if(ipCurS)ipCurS->y=v; } else { scaleFromFile[entCount].y=v; scaleReadMask|=2u; } } break;
+                        case TR_KEY('S','z'): { if(fwLine){ if(fwCurS)fwCurS->z=v; } else if(ipLine){ if(ipCurS)ipCurS->z=v; } else { scaleFromFile[entCount].z=v; scaleReadMask|=4u; } } break;
+                        default: break;
+                    }
+                    #undef TR_KEY
                 }
                 else if(KEY_EQ("go.activeSelf"))   { activeStateRead = true; flag_set(&inst->entflags, EF_ACTIVE, parse_bool(value, lineSpace, lineNum)); }
                 else if(KEY_EQ("enabled") && inst->index == 477) inst->camRotateEnabled=parse_bool(value,lineSpace,lineNum);
@@ -1555,7 +1586,6 @@ void LoadAllLevels() {
 void CyberTimerReset(u16,int); /*citadel.c: Unity CyberTimer.Reset(difficultyCyber)*/
 void LoadLevel(u8 curlevel, V3 pos) {
     u8 prevLevel = World.currentLevel;
-    double levelEntryPreStart = get_time();
     if (curlevel == LEVEL_CYBERSPACE && World.currentLevel != LEVEL_CYBERSPACE && World.curLev != LEVEL_CYBERSPACE) { World.cyberReturnLevel = (i8)World.currentLevel; World.cyberReturnPos = World.position[PLAYER1]; }/*ExitCyberspace returns here*/
     CloseSearch();
     World.Sys_UI.tetheredKeypadKeycode=World.Sys_UI.tetheredKeypadElevator=World.Sys_UI.tetheredPGP=World.Sys_UI.tetheredPWP=U16_MAX;/*panel tethers are per-level; the entity index they point at dies with the level, so don't sever against a stale one*/
@@ -1581,9 +1611,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
     World.Sys_Music.inZone = World.Sys_Music.cyberTube = false;
     World.Sys_Music.combatImpulseFinished = get_time();
     World.Sys_Music.combatImpulseFinished += 5.0;
-    DualLog("Level entry setup...................................................................took %.6f secs\n",get_time() - levelEntryPreStart);
     CullInit(); // Must be after level!
-    double levelEntryPostStart = get_time();
     glUseProgram(voxelUpdateSP);
     glUniform2f(0, World.voxMinCtrX[World.curLev], World.voxMinCtrZ[World.curLev]);
     glUniform1f(1, World.farPlane[World.curLev] * World.farPlane[World.curLev]);
@@ -1650,8 +1678,7 @@ void LoadLevel(u8 curlevel, V3 pos) {
             World.cam_pitch = World.cam_roll = 0.0f; World.invP1.leanTarget = 0.0f;
         }
     }
-    DualLog("Level entry finalize................................................................took %.6f secs\n",get_time() - levelEntryPostStart);
-    }
+}
 
 void UpdateSensaroundCamViews() {
     if (camViewCount < 3 || camViews[camViewCount-1].far != 1000.0f) { sensaroundCamViewCenter=sensaroundCamViewLeft=sensaroundCamViewRight=255; return; }

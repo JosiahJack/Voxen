@@ -2398,13 +2398,11 @@ __attribute__((cold)) void NewGame() { // Reset World States
     ResetLoadTallies();
     DualLog(" prep...............................................................took %.6f secs\n",get_time() - newGamePrepStart);
     LoadAllLevels();
-    double newGamePurgeStart = get_time();
     for (u8 lev=0;lev<MAX_LEVELS;++lev) { /*Done after levels are loaded to remove difficulty related items appropriately.*/
         u8 entryLevel = World.currentLevel; if (entryLevel != lev) SetLevelPointers(lev);
         for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { u16 ci = World.instances[i].index; if (((World.diffMis <= 1 && (ci == 341 || ci == 388 || (ci >= 390 && ci <= 398) || ci == 417)) || (World.diffMis == 0 && (ci == 313 || ci == 448)))) { DeleteInstance(i); } /*Remove access cards and audio logs.*/ }
         if (World.currentLevel != entryLevel) SetLevelPointers(entryLevel);
     }
-    DualLog("Difficulty item purge...............................................................took %.6f secs\n",get_time() - newGamePurgeStart);
     LoadLevel(World.startLevel,(V3){10.52f, -43.792f + 0.84f, 20.2908f});
     double newGameCvxStart = get_time();
     World.invP1.currentCrouchRatio = 1.0f;
