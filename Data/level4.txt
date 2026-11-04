@@ -2885,7 +2885,7 @@ constIndex:593|lR.y:1|lR.w:0|lS.x:0.035|lS.y:0.035|text:STORAGE|lingdex:653|matI
 constIndex:687|lP.x:-9.32774|lP.y:-3.839|lP.z:-.44396|lR.x:-.70711|lR.w:.70711|lS.x:.5|lS.z:.5
 constIndex:528|lP.x:-19.203|lP.y:-8.96|lP.z:22.9528|lR.x:-.70711|lR.w:.70711
 constIndex:673|lP.x:-14.12|lP.y:-7.317|lP.z:24.2878|lR.y:1|lR.w:0
-constIndex:705|lP.x:-16.67567|lP.y:-8.10202|lP.z:23.5528|lR.y:1|lR.w:0
+constIndex:705|lP.x:-16.67567|lP.y:-8.10202|lP.z:23.5528|lR.y:1|lR.w:0|targetname:lev4cyborgconversion
 constIndex:686|lP.x:24.263|lP.y:.387|lP.z:8.9598|lS.x:.18|lS.y:.35|lS.z:.18
 constIndex:712|lP.x:-12.48135|lP.y:-2.39|lP.z:-18.2482|SFXClip:180|playEverywhere:1|burstemittcnt1:15|burstemittcnt2:30|targetname:lev4chargeclosetvox|gameObject.activeInHierarchy:1|AudioSource.enabled:1|clip.name:vox_chargeraccessgranted
 constIndex:685|lP.x:-7.036|lP.y:-3.8399|lP.z:-7.6122|lR.x:-.66065|lR.y:.25208|lR.z:.25208|lR.w:.66065|lS.x:.6|lS.y:2|lS.z:.75

@@ -3704,7 +3704,7 @@ constIndex:665|lP.x:12.43664|lP.y:18.77799|lP.z:44.14528|lR.x:.30619|lR.y:.30619
 constIndex:659|lP.x:33.7228|lP.y:12.492|lP.z:28.224
 constIndex:712|lP.x:22.96246|lP.y:12.436|lP.z:37.1239|SFXClip:508|playEverywhere:1|burstemittcnt1:15|burstemittcnt2:30|targetname:lev5toolatemessage|gameObject.activeInHierarchy:1|AudioSource.enabled:1|clip.name:shodan_toolatetosavefriends
 constIndex:657|lP.x:21.7638|lP.y:13.411|lP.z:38.354|lR.y:1|lR.w:0|lS.x:1.04
-constIndex:705|lP.x:-19.30047|lP.y:12.32927|lP.z:28.304|lR.y:1|lR.w:0
+constIndex:705|lP.x:-19.30047|lP.y:12.32927|lP.z:28.304|lR.y:1|lR.w:0|targetname:lev5cyborgconversion
 constIndex:710|lP.x:8.19827|lP.y:11.96|lP.z:-4.89234|lR.x:-.70711|lR.w:.70711|LaserDestroyed:1|target:lev5elevatorpadrelay|targetname:lev5elevatorpadunlock|gameObject.activeInHierarchy:1
 constIndex:712|lP.x:-15.8692|lP.y:13.86987|lP.z:-39.52501|SFXClip:215|playEverywhere:1|burstemittcnt1:15|burstemittcnt2:30|targetname:lev5powerdiverted|gameObject.activeInHierarchy:1|AudioSource.enabled:1|clip.name:vox_powerdivertedtor
 constIndex:576|lP.x:-28.105|lP.y:15.636|lP.z:6.4047|lR.x:-.5|lR.y:.5|lR.z:.5|lR.w:.5|lS.x:2|lS.y:2|lS.z:2

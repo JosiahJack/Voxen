@@ -864,6 +864,7 @@ void Targetted(u16 activator, u16 self) {
     if (aioflags & TARG_IOFLAGS_FUNCWALL_MOVE) FuncWallTargetted(self);                                                  if (aioflags & TARG_IOFLAGS_SWITCH_LOCK_TOGGLE) EntitySetLocked(e, (e->entflags & EF_LOCKED) == 0);
     if (aioflags & TARG_IOFLAGS_INST_ACTIVATE) flag_set(&e->entflags, EF_ACTIVE, true); else if (aioflags & TARG_IOFLAGS_INST_DEACTIVATE) { if (e->camView != 255) { e->camView = 255; TextureSequenceInit(self, "Static"); flag_set(&e->entflags, EF_ACTIVE, true); }/*camera destroyed: keep its screen, switch it to Static*/ else { flag_set(&e->entflags, EF_ACTIVE, false); } } else if (aioflags & TARG_IOFLAGS_INST_TOGGLE) flag_set(&e->entflags, EF_ACTIVE, !(e->entflags & EF_ACTIVE));
     if ((aioflagsHi & TARG_IOFLAGHI_AWAKE_SLEEPING) && IdxIsNPC(e->index)) { flag_set(&World.instances[self].entflags,EF_ASLEEP,false); AIAlert(self); }
+    if (aioflagsHi & TARG_IOFLAGHI_CYBORG_CONVERSION) CyborgConversionToggleTargetted();
     if ((aioflags & TARG_IOFLAGS_ENEMY_ALERT) && IdxIsNPC(e->index)) AIAlert(self);
 }
 

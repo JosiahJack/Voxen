@@ -5158,7 +5158,7 @@ constIndex:536|lP.x:-38.554|lP.y:32.64|lP.z:-44.3983|lR.y:-.95435|lR.w:.2987|lS.
 constIndex:583|lP.x:-47.05|lP.y:32.64|lP.z:-40.1253|lR.y:-.94229|lR.w:-.33479|lS.y:1.1|lS.z:1.1
 constIndex:603|lP.x:-49.546|lP.y:32.641|lP.z:-47.4983|lR.x:-.70711|lR.w:.70711|logIndex:105
 constIndex:529|lP.x:-22.373|lP.y:32.64|lP.z:-32.0833|lR.x:-.70711|lR.w:.70711
-constIndex:705|lP.x:-17.253|lP.y:33.37442|lP.z:-36.7743|lR.y:1|lR.w:0
+constIndex:705|lP.x:-17.253|lP.y:33.37442|lP.z:-36.7743|lR.y:1|lR.w:0|targetname:lev6cyborgconversion
 constIndex:673|lP.x:-18.585|lP.y:34.028|lP.z:-30.6803|lR.y:.70711|lR.w:-.70711
 constIndex:576|lP.x:-4.414|lP.y:35.111|lP.z:-44.8043|lR.x:-.70711|lR.w:.70711|lS.x:2|lS.y:2|lS.z:2
 constIndex:593|lR.y:0.70711|lR.w:-0.70711|lS.x:0.05|lS.y:0.05|text:ALPHA|lingdex:635|matIndex:92|lP.x:-59.485|lP.y:36.321|lP.z:-31.7543

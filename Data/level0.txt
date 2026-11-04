@@ -3481,7 +3481,7 @@ constIndex:668|lP.x:-15.533|lP.y:-53.468|lP.z:8.6571|lR.y:.70711|lR.w:.70711
 constIndex:673|lP.x:-10.474|lP.y:-54.748|lP.z:18.7841|lR.y:.70711|lR.w:.70711
 constIndex:592|lR.y:0.70711|lR.w:-0.70711|text:REACTOR|lingdex:683|matIndex:88|lP.x:15.143|lP.y:-54.325|lP.z:18.0451
 constIndex:592|lR.y:0.70711|lR.w:0.70711|lS.x:0.5|lS.y:0.5|text:RADIATION|lingdex:685|matIndex:88|lP.x:40.699|lP.y:-54.25489|lP.z:19.807|tAl:1
-constIndex:705|lP.x:-25.543|lP.y:-55.6709|lP.z:31.6041|lR.y:1|lR.w:0
+constIndex:705|lP.x:-25.543|lP.y:-55.6709|lP.z:31.6041|lR.y:1|lR.w:0|targetname:levRcybconversion
 constIndex:528|lP.x:-4.061|lP.y:-56.582|lP.z:24.0201|lR.x:-.70711|lR.w:.70711
 constIndex:528|lP.x:-1.501|lP.y:-56.582|lP.z:24.0201|lR.x:-.70711|lR.w:.70711
 constIndex:528|lP.x:-6.621|lP.y:-56.582|lP.z:29.1411|lR.x:-.70711|lR.w:.70711
