@@ -64,10 +64,10 @@ void AddDoorPortal(u16 entIdx, u16 parent) {
 
 bool ToggleDoorPortal(u32 p, u16 dr, u16 closedMdx) { if (p>=numActivePortals) return false; Portal* prt=&activePortals[p]; bool open=World.instances[dr].modelIndex!=closedMdx; if (prt->open==open) return false; prt->open=open; prt->dirty=true; return true; }
 void ForceDoorPortalOpen(u16 p) { if (p >= numActivePortals) {return;} activePortals[p].open = true; activePortals[p].dirty = true; } // Used at load for doors that start open/ajar. Bounds-checked so non-portal doors (portalIndex==0 default) can't corrupt portal 0.
-i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ) {
+i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ, u32* cs) {
     if (lastX != x || lastZ != z) {
         if (XZPairInBounds(lastX, lastZ)) { 
-            i32 li = (lastZ * WORLDX) + lastX; u32 cell = gridCellStates[li]; i32 dx = x - lastX, dz = z - lastZ; // -1, 0, or 1 each
+            i32 li = (lastZ * WORLDX) + lastX; u32 cell = cs[li]; i32 dx = x - lastX, dz = z - lastZ; // -1, 0, or 1 each
             if (dz == 0) { // Pure horizontal
                 if (((dx >  0) && (cell & CELL_CLOSEDEAST)) || ((dx < 0)  && (cell & CELL_CLOSEDWEST)))  return -1;
             } else if (dx == 0) { // Pure vertical
@@ -76,64 +76,64 @@ i32 CastRayCellCheck(i32 x, i32 z, i32 lastX, i32 lastZ) {
                 u32 cf_ew=(dx > 0) ? CELL_CLOSEDEAST  : CELL_CLOSEDWEST, cf_ns=(dz > 0) ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH; // Which closed-edge flags to test depends on direction quadrant
                 bool c_ew=(cell & cf_ew) != 0, c_ns = (cell & cf_ns) != 0, n_ew=false, n_ns=false;
                 u32 nf_ew=(dx > 0) ? CELL_CLOSEDEAST  : CELL_CLOSEDWEST, nf_ns=(dz > 0) ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH;  // Neighbor sees the opposite face, same face on neighbor in NS direction same face on neighbor in EW direction
-                i32 ni_ns_coord_x = lastX, ni_ns_coord_z = lastZ + dz; if (XZPairInBounds(ni_ns_coord_x, ni_ns_coord_z)) { u32 nsN = gridCellStates[ni_ns_coord_z * WORLDX + ni_ns_coord_x]; n_ew = (nsN & nf_ew) != 0 && (nsN & CELL_OPEN); }
-                i32 ni_ew_coord_x = lastX + dx, ni_ew_coord_z = lastZ; if (XZPairInBounds(ni_ew_coord_x, ni_ew_coord_z)) { u32 ewN = gridCellStates[ni_ew_coord_z * WORLDX + ni_ew_coord_x]; n_ns = (ewN & nf_ns) != 0 && (ewN & CELL_OPEN); }
+                i32 ni_ns_coord_x = lastX, ni_ns_coord_z = lastZ + dz; if (XZPairInBounds(ni_ns_coord_x, ni_ns_coord_z)) { u32 nsN = cs[ni_ns_coord_z * WORLDX + ni_ns_coord_x]; n_ew = (nsN & nf_ew) != 0 && (nsN & CELL_OPEN); }
+                i32 ni_ew_coord_x = lastX + dx, ni_ew_coord_z = lastZ; if (XZPairInBounds(ni_ew_coord_x, ni_ew_coord_z)) { u32 ewN = cs[ni_ew_coord_z * WORLDX + ni_ew_coord_x]; n_ns = (ewN & nf_ns) != 0 && (ewN & CELL_OPEN); }
                 if ((c_ns || n_ew) && (c_ew || n_ns)) return -1;
             }
         }
-    } if(!XZPairInBounds(x,z)){return 0;} i32 ci = (z * WORLDX) + x; if (gridCellStates[ci] & CELL_OPEN) {gridCellStates[ci] |=  CELL_VISIBLE;} else {gridCellStates[ci] &= ~CELL_VISIBLE;} return (gridCellStates[ci] & CELL_VISIBLE) ? 1 : -1;
+    } if(!XZPairInBounds(x,z)){return 0;} i32 ci = (z * WORLDX) + x; if (cs[ci] & CELL_OPEN) {cs[ci] |=  CELL_VISIBLE;} else {cs[ci] &= ~CELL_VISIBLE;} return (cs[ci] & CELL_VISIBLE) ? 1 : -1;
 }
 
-i32 CastStraight(i32 px, i32 pz, i32 sign, bool isX) {
-    if ((isX && ((sign > 0 && px >= WORLDX - 1) || (sign < 0 && px <= 0))) || (!isX && ((sign > 0 && pz >= WORLDZ - 1) || (sign < 0 && pz <= 0))) || !XZPairInBounds(px, pz)){return isX ? px : pz;} i32 cellIdx = (pz * WORLDX) + px; if (!(gridCellStates[cellIdx] & CELL_VISIBLE)){return isX ? px : pz;}
+i32 CastStraight(i32 px, i32 pz, i32 sign, bool isX, u32* cs) {
+    if ((isX && ((sign > 0 && px >= WORLDX - 1) || (sign < 0 && px <= 0))) || (!isX && ((sign > 0 && pz >= WORLDZ - 1) || (sign < 0 && pz <= 0))) || !XZPairInBounds(px, pz)){return isX ? px : pz;} i32 cellIdx = (pz * WORLDX) + px; if (!(cs[cellIdx] & CELL_VISIBLE)){return isX ? px : pz;}
     i32 crd = isX ? px + sign : pz + sign; i32 coordAbs = vabs(crd); bool curVis = true;
     for (; coordAbs < WORLDX; crd += sign) {
         curVis = false; i32 x = isX ? crd : px, z = isX ? pz : crd; i32 prevCoord = crd - sign; i32 prevX = isX ? prevCoord : px, prevZ = isX ? pz : prevCoord;
         if (XZPairInBounds(prevX, prevZ) && XZPairInBounds(x,z)) {
             i32 prevCellIdx = (prevZ * WORLDX) + prevX;
-            if (gridCellStates[prevCellIdx] & CELL_VISIBLE) {
-                u32 cf=isX ? sign>0 ? CELL_CLOSEDEAST : CELL_CLOSEDWEST : sign>0 ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH; if((gridCellStates[prevCellIdx]&cf)&&gridCellStates[prevCellIdx]&CELL_OPEN)return crd; i32 subCellIdx=(z*WORLDX)+x; if(gridCellStates[subCellIdx]&CELL_OPEN){gridCellStates[subCellIdx]|=CELL_VISIBLE;}else{gridCellStates[subCellIdx]&=~CELL_VISIBLE;} curVis=true;
+            if (cs[prevCellIdx] & CELL_VISIBLE) {
+                u32 cf=isX ? sign>0 ? CELL_CLOSEDEAST : CELL_CLOSEDWEST : sign>0 ? CELL_CLOSEDNORTH : CELL_CLOSEDSOUTH; if((cs[prevCellIdx]&cf)&&cs[prevCellIdx]&CELL_OPEN)return crd; i32 subCellIdx=(z*WORLDX)+x; if(cs[subCellIdx]&CELL_OPEN){cs[subCellIdx]|=CELL_VISIBLE;}else{cs[subCellIdx]&=~CELL_VISIBLE;} curVis=true;
             }
         } if (!curVis) break;
         
         for (int offset = -1; offset <= 1; offset += 2) { /*Check perpendicular neighbors*/
             i32 checkX = isX ? x : x + offset, checkZ = isX ? z + offset : z;
-            if (XZPairInBounds(checkX, checkZ)) { i32 checkCellIdx = (checkZ * WORLDX) + checkX; if (CastRayCellCheck(x, z, checkX, checkZ) > 0) { if (gridCellStates[checkCellIdx] & CELL_OPEN) gridCellStates[checkCellIdx] |= CELL_VISIBLE; else gridCellStates[checkCellIdx] &= ~CELL_VISIBLE; } else gridCellStates[checkCellIdx] &= ~CELL_VISIBLE; }
+            if (XZPairInBounds(checkX, checkZ)) { i32 checkCellIdx = (checkZ * WORLDX) + checkX; if (CastRayCellCheck(x, z, checkX, checkZ, cs) > 0) { if (cs[checkCellIdx] & CELL_OPEN) cs[checkCellIdx] |= CELL_VISIBLE; else cs[checkCellIdx] &= ~CELL_VISIBLE; } else cs[checkCellIdx] &= ~CELL_VISIBLE; }
         }
     } return WORLDX * sign;
 }
 
-void CastRay(i32 x0, i32 z0, i32 x1, i32 z1) {
+void CastRay(i32 x0, i32 z0, i32 x1, i32 z1, u32* cs) {
     i32 dx=vabs(x1 - x0), dz=vabs(z1 - z0); i32 sx = (x0 < x1) ? 1 : -1, sz = (z0 < z1) ? 1 : -1; i32 x=x0, z=z0; i32 lastX=x, lastZ=z; i32 err=dx - dz; i32 iter=dx > dz ? dx : dz;
-    while(iter >= 0){if(!XZPairInBounds(x,z) || !XZPairInBounds(lastX,lastZ)){--iter; continue;} if(CastRayCellCheck(x,z,lastX,lastZ) == -1){return;} lastX=x; lastZ=z; i32 e2=2*err; if(e2 > -dz){err-=dz; x+=sx;} if(e2 < dx){err+=dx; z+=sz;} --iter;}
+    while(iter >= 0){if(!XZPairInBounds(x,z) || !XZPairInBounds(lastX,lastZ)){--iter; continue;} if(CastRayCellCheck(x,z,lastX,lastZ,cs) == -1){return;} lastX=x; lastZ=z; i32 e2=2*err; if(e2 > -dz){err-=dz; x+=sx;} if(e2 < dx){err+=dx; z+=sz;} --iter;}
 }
 
-void CircleFanRays(i32 x0, i32 z0) { if (!XZPairInBounds(x0,z0)) {return;} if (!(gridCellStates[(z0 * WORLDX) + x0] & CELL_VISIBLE)) {return;} i32 x,z,max=WORLDX,min=0; for (x=min;x<max;x++) {CastRay(x0,z0,x,min);} for (x=min;x<max;x++) {CastRay(x0,z0,x,max);} for (z=min;z<max;z++) {CastRay(x0,z0,min,z);} for (z=min;z<max;z++) {CastRay(x0,z0,max,z);} } // Cast fan out to every cell around map perimeter.
-static void MarchAxis(i32 st, i32 end, i32 step, i32 ox, i32 oz, i32 sign, bool isX){for(i32 m=st;step>0 ? m < end : m>=end;m+=step){i32 x=isX ? m : ox,z=isX ? oz : m; if(XZPairInBounds(x,z) && (gridCellStates[(z * WORLDX) + x] & CELL_VISIBLE))m=CastStraight(isX ? m : ox,isX ? oz : m,sign,isX);}}
-void DetermineVisibleCells(i32 startX, i32 startZ) {
+void CircleFanRays(i32 x0, i32 z0, u32* cs) { if (!XZPairInBounds(x0,z0)) {return;} if (!(cs[(z0 * WORLDX) + x0] & CELL_VISIBLE)) {return;} i32 x,z,max=WORLDX,min=0; for (x=min;x<max;x++) {CastRay(x0,z0,x,min,cs);} for (x=min;x<max;x++) {CastRay(x0,z0,x,max,cs);} for (z=min;z<max;z++) {CastRay(x0,z0,min,z,cs);} for (z=min;z<max;z++) {CastRay(x0,z0,max,z,cs);} } // Cast fan out to every cell around map perimeter.
+static void MarchAxis(i32 st, i32 end, i32 step, i32 ox, i32 oz, i32 sign, bool isX, u32* cs){for(i32 m=st;step>0 ? m < end : m>=end;m+=step){i32 x=isX ? m : ox,z=isX ? oz : m; if(XZPairInBounds(x,z) && (cs[(z * WORLDX) + x] & CELL_VISIBLE))m=CastStraight(isX ? m : ox,isX ? oz : m,sign,isX,cs);}}
+void DetermineVisibleCells(i32 startX, i32 startZ, u32* cs) {
     if (!XZPairInBounds(startX,startZ)) return;
     
-    for (i32 x=0;x<WORLDX;x++) { for (i32 z=0;z<WORLDZ;z++) { i32 subCellIdx = (z * WORLDX) + x; gridCellStates[subCellIdx] &= ~CELL_VISIBLE; } /*Clear all to not visible.*/ }
-    gridCellStates[(startZ * WORLDX) + startX] |= CELL_VISIBLE; /*Force starting player cell to visible.*/
-    CastStraight(startX,startZ,1,true); // Cast to the right (East) [ ][3]
-    MarchAxis(startX,WORLDX - 1,1,0,startZ + 1,1,1);             // [1][2]
-    MarchAxis(startX,WORLDX - 1,1,0,startZ - 1,1,1);             // [ ][3]
-    CastStraight(startX,startZ,-1,true); // Cast to the left (West) [3][ ]
-    MarchAxis(startX,1,-1,0,startZ + 1,-1,1);                    // [2][1]
-    MarchAxis(startX,1,-1,0,startZ - 1,-1,1);                    // [3][ ] 
-    CastStraight(startX,startZ,-1,false); // Cast down (South) [ ][1][ ]
-    MarchAxis(startZ,1,-1,startX + 1,0,-1,0);               // [3][2][3]
-    MarchAxis(startZ,1,-1,startX - 1,0,-1,0);
-    CastStraight(startX,startZ,1,false);  // Cast   up (North) [3][2][3]
-    MarchAxis(startZ,WORLDX - 1,1,startX + 1,0,1,0);        // [ ][1][ ]
-    MarchAxis(startZ,WORLDX - 1,1,startX - 1,0,1,0);
-    CircleFanRays(startX,startZ); CircleFanRays(startX + 1,startZ); CircleFanRays(startX + 1,startZ + 1);    CircleFanRays(startX,startZ + 1); CircleFanRays(startX - 1,startZ + 1); CircleFanRays(startX - 1,startZ);     CircleFanRays(startX - 1,startZ - 1); CircleFanRays(startX,startZ - 1); CircleFanRays(startX + 1,startZ - 1);
-    for (i32 x=0;x<WORLDX;++x) {
-        for (i32 z=0;z<WORLDZ;++z) {
-            i32 cellIdx_xz = (z * WORLDX) + x;
-            if (World.curLev == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
-                if ((x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9) || (x >= 32 && startX >= 32) || (z == 31 && startZ == 31 && x >= 27 && startX >= 27) ||  x >= 34) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;                
-                if (startX <=12 && x == 14 && z == 31 && startZ >= 24){gridCellStates[cellIdx_xz] |= CELL_VISIBLE;}  if (startX <=12 && x == 14 && z == 30 && startZ >= 24){gridCellStates[cellIdx_xz] |= CELL_VISIBLE;}  if (startX <=12 && x == 13 && z == 30 && startZ >= 24){gridCellStates[cellIdx_xz] |= CELL_VISIBLE;}
+    for (i32 x=0;x<WORLDX;x++) { for (i32 z=0;z<WORLDZ;z++) { i32 subCellIdx = (z * WORLDX) + x; cs[subCellIdx] &= ~CELL_VISIBLE; } /*Clear all to not visible.*/ }
+    cs[(startZ * WORLDX) + startX] |= CELL_VISIBLE; /*Force starting player cell to visible.*/
+    CastStraight(startX,startZ,1,true,cs); // Cast to the right (East) [ ][3]
+    MarchAxis(startX,WORLDX - 1,1,0,startZ + 1,1,1,cs);             // [1][2]
+    MarchAxis(startX,WORLDX - 1,1,0,startZ - 1,1,1,cs);             // [ ][3]
+    CastStraight(startX,startZ,-1,true,cs); // Cast to the left (West) [3][ ]
+    MarchAxis(startX,1,-1,0,startZ + 1,-1,1,cs);                    // [2][1]
+    MarchAxis(startX,1,-1,0,startZ - 1,-1,1,cs);                    // [3][ ] 
+    CastStraight(startX,startZ,-1,false,cs); // Cast down (South) [ ][1][ ]
+    MarchAxis(startZ,1,-1,startX + 1,0,-1,0,cs);               // [3][2][3]
+    MarchAxis(startZ,1,-1,startX - 1,0,-1,0,cs);
+    CastStraight(startX,startZ,1,false,cs);  // Cast   up (North) [3][2][3]
+    MarchAxis(startZ,WORLDX - 1,1,startX + 1,0,1,0,cs);        // [ ][1][ ]
+    MarchAxis(startZ,WORLDX - 1,1,startX - 1,0,1,0,cs);
+    CircleFanRays(startX,startZ,cs); CircleFanRays(startX + 1,startZ,cs); CircleFanRays(startX + 1,startZ + 1,cs);    CircleFanRays(startX,startZ + 1,cs); CircleFanRays(startX - 1,startZ + 1,cs); CircleFanRays(startX - 1,startZ,cs);     CircleFanRays(startX - 1,startZ - 1,cs); CircleFanRays(startX,startZ - 1,cs); CircleFanRays(startX + 1,startZ - 1,cs);
+    if (World.curLev == 5) { /*Citadel flight level hackarounds for algorithm discrepancies at glancing angles. Hoisted: this loop was run for every level but only ever did anything on lev 5, i.e. ~4096 dead iterations per DetermineVisibleCells call (~16.7M across a full bake).*/
+        for (i32 x=0;x<WORLDX;++x) {
+            for (i32 z=0;z<WORLDZ;++z) {
+                i32 cellIdx_xz = (z * WORLDX) + x;
+                if ((x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9) || (x >= 32 && startX >= 32) || (z == 31 && startZ == 31 && x >= 27 && startX >= 27) ||  x >= 34) cs[cellIdx_xz] |= CELL_VISIBLE;                
+                if (startX <=12 && x == 14 && z == 31 && startZ >= 24){cs[cellIdx_xz] |= CELL_VISIBLE;}  if (startX <=12 && x == 14 && z == 30 && startZ >= 24){cs[cellIdx_xz] |= CELL_VISIBLE;}  if (startX <=12 && x == 13 && z == 30 && startZ >= 24){cs[cellIdx_xz] |= CELL_VISIBLE;}
             }
         }
     }
@@ -152,7 +152,7 @@ void PortalCulling() { // Called just once at end of animation loop for the fram
         if (prt->open) { if (prt->portalNS) { gridCellStates[cellIdxA] &= ~(CELL_CLOSEDSOUTH); gridCellStates[cellIdxB] &= ~(CELL_CLOSEDNORTH); } else { gridCellStates[cellIdxA] &= ~(CELL_CLOSEDWEST);  gridCellStates[cellIdxB] &= ~(CELL_CLOSEDEAST); } }
         else { if (prt->portalNS) { gridCellStates[cellIdxA] |= CELL_CLOSEDSOUTH; gridCellStates[cellIdxB] |= CELL_CLOSEDNORTH; } else { gridCellStates[cellIdxA] |= CELL_CLOSEDWEST;  gridCellStates[cellIdxB] |= CELL_CLOSEDEAST; } }
     }
-    DetermineVisibleCells(PosGetCellCoordX(World.position[PLAYER1].x),PosGetCellCoordZ(World.position[PLAYER1].z)); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
+    DetermineVisibleCells(PosGetCellCoordX(World.position[PLAYER1].x),PosGetCellCoordZ(World.position[PLAYER1].z),gridCellStates); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
     for (u16 i=0;i<World.loadedLights;++i) { i32 lcell=PosGetCellCoords(World.lights[i].pos.x, World.lights[i].pos.z); if (lcell >= 0 && lcell < ARRSIZE && !previousLightVisible[i] && (gridCellStates[lcell] & CELL_VISIBLE)) {flag_set(&World.lights[i].lflags,LDIRTY,true);} }
     glBindBuffer(GL_SSBO,cellVisibleDataID); glBufferSubData(GL_SSBO,0,ARRSIZE * sizeof(u32), gridCellStates);
 }
@@ -171,21 +171,46 @@ static void ApplyOpenPortalEdges(void) {
 }
 
 static void MarkSkyVisibleChunks(void) { for (u16 i = INSTS_1ST_IDX; i < World.instCount; ++i) { if (World.instances[i].index != 93/*chunk_grove1_1, the grove ceiling grate window*/) {continue;} u32 cell = (u32)PosGetCellCoords(World.position[i].x, World.position[i].z); gridCellStates[cell] |= CELL_SEES_SKYBOX|CELL_SEES_SUN; } }
+INLINE void BakeRowFromStates(u32* row, const u32* cs) { for (u32 w=0; w<(ARRSIZE>>5); ++w) { const u32* s = cs + (w<<5); u32 acc = 0; for (u32 b=0;b<32;++b) acc |= (s[b] & 1u) << b; row[w] = acc; } }
+typedef struct { u32 workerIdx, workerCnt; u32* cs; } CullBakeJob;
+static void* CullBakeWorker(void* arg) {
+    CullBakeJob* j = (CullBakeJob*)arg;
+    const bool lev10 = (World.curLev == 10);
+    for (u32 cellIdx = j->workerIdx; cellIdx < (u32)ARRSIZE; cellIdx += j->workerCnt) {
+        DetermineVisibleCells((i32)(cellIdx % WORLDX), (i32)(cellIdx / WORLDX), j->cs);
+        BakeRowFromStates(precomputedVisibleCellsFromHere + (size_t)cellIdx * (ARRSIZE>>5), j->cs);
+        if (lev10) { /*HacK! Fix up problem cells at odd angles.*/ i32 x = (i32)(cellIdx % WORLDX), z = (i32)(cellIdx / WORLDX); if ((x == 15 || x == 16) && z == 23) { size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12); set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,true); } }
+    }
+    return NULL;
+}
+
 void CullInit() {
     cullVisibilityValid=false;
-    if (World.curLev >= LEVEL_CYBERSPACE) {
-        for (u32 i=0;i<ARRSIZE;++i) { gridCellStates[i] = CELL_OPEN|CELL_VISIBLE; }
-        mset(precomputedVisibleCellsFromHere,0xFF,sizeof(precomputedVisibleCellsFromHere));
-        glBindBuffer(GL_SSBO,cellVisibleDataID); glBufferSubData(GL_SSBO,0,ARRSIZE*sizeof(u32),gridCellStates);
-        return;
-    } double start_time = get_time(); DualLog("Culling ");
+    if (World.curLev >= LEVEL_CYBERSPACE) { for (u32 i=0;i<ARRSIZE;++i) { gridCellStates[i] = CELL_OPEN|CELL_VISIBLE; } mset(precomputedVisibleCellsFromHere,0xFF,sizeof(precomputedVisibleCellsFromHere)); glBindBuffer(GL_SSBO,cellVisibleDataID); glBufferSubData(GL_SSBO,0,ARRSIZE*sizeof(u32),gridCellStates); return; }
+    double start_time = get_time(); DualLog("Culling ");
     DetermineClosedEdges(); // For each cell, get visibility as though player were there and put into gridCellStates.  Then store the visibility of gridCellStates into the table of all visible cells for that cell at the appropriate offset for looking up later when actually re-assigning gridCellStates from this precalculated visibility state for the particular cell.
     ApplyOpenPortalEdges(); // DetermineClosedEdges() just reset every edge to its static closed state; reopen doors that start open/ajar BEFORE baking the precomputed visibility table below.
     MarkSkyVisibleChunks(); // Before the bake, so the sky bits are final by the time the precomputed table is written.
-    for (i32 z=0;z<WORLDZ;z++) {
-        for (i32 x=0;x<WORLDX;x++) {
-            DetermineVisibleCells(x,z); i32 cellIdx = (z * WORLDX) + x; for (i32 z2=0;z2<WORLDZ;z2++) { for (i32 x2=0;x2<WORLDX;x2++) { i32 subCellIdx = (z2 * WORLDX) + x2; size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + subCellIdx; set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,(gridCellStates[subCellIdx] & CELL_VISIBLE)); } }
-            if (World.curLev == 10) { /*HacK! Fix up problem cells at odd angles.*/ if ((x == 15 || x == 16) && z == 23) { size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12); set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,true); } }
+    u32 workerCnt = vclampi((i32)threadCnt, 1, 32);
+    CullBakeJob jobs[32]; OS_Thread thr[31];
+    if (workerCnt > 1) {
+        u32* scratch = (u32*)OS_Alloc((size_t)workerCnt * ARRSIZE * sizeof(u32));
+        u32 liveCnt = 1, failed[31], failedCnt = 0;
+        for (u32 w=0; w<workerCnt; ++w) { jobs[w] = (CullBakeJob){ w, workerCnt, scratch + (size_t)w*ARRSIZE }; mcpy(jobs[w].cs, gridCellStates, sizeof(gridCellStates)); }
+        for (u32 w=1; w<workerCnt; ++w) { if (OS_ThreadCreate(&thr[liveCnt-1], CullBakeWorker, &jobs[w]) == 0) { ++liveCnt; } else { failed[failedCnt++] = w; } }
+        CullBakeWorker(&jobs[0]); /*Main thread takes worker 0's interleaved slice while the rest run.*/
+        for (u32 t=0; t<liveCnt-1; ++t) OS_ThreadJoin(&thr[t]);
+        for (u32 f=0; f<failedCnt; ++f) CullBakeWorker(&jobs[failed[f]]);
+        DetermineVisibleCells(WORLDX - 1, WORLDZ - 1, gridCellStates);
+        BakeRowFromStates(precomputedVisibleCellsFromHere + (size_t)(ARRSIZE-1) * (ARRSIZE>>5), gridCellStates);
+        OS_Free(scratch, (size_t)workerCnt * ARRSIZE * sizeof(u32));
+    } else {
+        for (i32 z=0;z<WORLDZ;z++) {
+            for (i32 x=0;x<WORLDX;x++) {
+                DetermineVisibleCells(x,z,gridCellStates); i32 cellIdx = (z * WORLDX) + x;
+                BakeRowFromStates(precomputedVisibleCellsFromHere + (size_t)cellIdx * (ARRSIZE>>5), gridCellStates);
+                if (World.curLev == 10) { /*HacK! Fix up problem cells at odd angles.*/ if ((x == 15 || x == 16) && z == 23) { size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12); set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,true); } }
+            }
         }
     }
     playerCellIdx = PosGetCellCoords(World.position[PLAYER1].x,World.position[PLAYER1].z); i32 cellToCellIdx = playerCellIdx * ARRSIZE;
