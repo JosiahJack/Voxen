@@ -617,7 +617,7 @@ FGL_C glClear;  FGL_DE glDrawElements;  FGL_U2UI glUniform2ui; FGL_UM4FV glUnifo
 FGL_E glEnable; FGL_FF glFrontFace;     FGL_GB glGenBuffers;   FGL_FBT2D glFramebufferTexture2D;FGL_GERR glGetError;  FGL_GFS glGenFramebuffers;   FGL_GT glGenTextures;     FGL_BSD glBufferSubData; FGL_MBR glMapBufferRange;   FGL_U1I glUniform1i;      FGL_T2D glTexImage2D; FGL_BIT glBindImageTexture;FGL_BT glBindTexture;
 FGL_GIQ glGenQueries; FGL_GQOU64 glGetQueryObjectui64v; FGL_BQ glBeginQuery; FGL_D glEndQuery; FGL_DAI glDrawArraysInstanced; FGL_BB glBlendFunc;  FGL_BF glBlitFramebuffer; FGL_T2D glTexSubImage2D; FGL_GTKP glGetTexLevelParameteriv; FGL_CBSD glCopyBufferSubData; FGL_CLBSD glClearBufferSubData; FGL_CISD glCopyImageSubData; FGL_CPIV glGetBufferParameteriv; FGL_GBSD glGetBufferSubData; FGL_GB glDeleteBuffers;
 void SetGLContext_GetFunctionPointers() {
-    WSWin* h=window; h->context.makeCurrent(h);
+    WSWin* h=window;
     #define X(n,t) n=(t)h->context.getProcAddress(#n);
     X(glClear,FGL_C)              X(glClearColor,FGL_CC)      X(glColorMask,FGL_CM)        X(glDepthFunc,FGL_DF)           X(glDepthMask,FGL_DM)               X(glDisable,FGL_D)             X(glEnableVertexAttribArray,FGL_EVAA) X(glEnable,FGL_E)   X(glFrontFace,FGL_FF)                 X(glGetError,FGL_GERR)            X(glGetIntegerv,FGL_GIV)
     X(glLineWidth,FGL_LW)         X(glReadPixels,FGL_RP)      X(glTexImage2D,FGL_T2D)      X(glViewport,FGL_VP)            X(glBindTexture,FGL_BT)             X(glDrawArrays,FGL_DA)         X(glDrawElements,FGL_DE)      X(glGenTextures,FGL_GT)     X(glActiveTexture,FGL_AT)             X(glBlendFuncSeparate,FGL_BFS)    X(glBindVertexArray,FGL_BVA)    X(glVertexAttribBinding,FGL_VAB)
@@ -2502,15 +2502,13 @@ void EnsureReflectionResources(void) {
     if (Sys_Settings.Reflections == 2u && !rtAccelBuilt) {
         double startTime = get_time();
         RenderLoading("Loading raytracing data...");
-        u32 m, nodeTotal = 0, triTotal = 0, vtxTotal = 0, maxModelTris = 0, maxModelVerts = 0;
+        u32 m, nodeTotal = 0, triTotal = 0, vtxTotal = 0;
         for (m=0; m<mdlsCnt; ++m) {
             if (!BvhHasBVH((u16)m)) continue;
             
             nodeTotal += modelBVHNodeCounts[m];
             triTotal  += modelBVHTriOrderCounts[m];
             vtxTotal += rtSrcVertCounts[m];
-            if (modelBVHTriOrderCounts[m] > maxModelTris) maxModelTris = modelBVHTriOrderCounts[m];
-            if (rtSrcVertCounts[m] > maxModelVerts) maxModelVerts = rtSrcVertCounts[m];
         }
         u32 nodeWords = nodeTotal * 16u, triWords = triTotal * 2u, posWords = vtxTotal * 2u, uvWords = vtxTotal;
         u32 triSec = (nodeWords + 3u) & ~3u;
@@ -2529,7 +2527,7 @@ void EnsureReflectionResources(void) {
         if (rtCellListsID)    { glDeleteBuffers(1, &rtCellListsID);    rtCellListsID = 0; }
         rtGeomID = MakeSSBO(&rtGeomID, 16, geomBytes, NULL, GL_STATIC_DRAW);
         glBindBuffer(GL_SSBO, rtGeomID);
-        u8* gpuPtr = (u8*)glMapBufferRange(GL_SSBO, 0, geomBytes, 0x0002/*GL_MAP_WRITE_BIT*/ | 0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/);
+        u8* gpuPtr = (u8*)glMapBufferRange(GL_SSBO, 0, (size_t)nodeWords * sizeof(u32), 0x0002/*GL_MAP_WRITE_BIT*/ | 0x0004/*GL_MAP_INVALIDATE_RANGE_BIT*/ | 0x0020/*GL_MAP_UNSYNCHRONIZED_BIT*/);
         u32* nodes = (u32*)gpuPtr;
         for (m=0; m<mdlsCnt; ++m) {
             if (!BvhHasBVH((u16)m)) continue;
@@ -2544,25 +2542,36 @@ void EnsureReflectionResources(void) {
             }
         }
         glUnmapBuffer(GL_SSBO);
+        u16* orderAll = (u16*)OS_Alloc(((size_t)triTotal + 2u + (size_t)mdlsCnt) * sizeof(u16));
+        u32* orderBase = (u32*)OS_Alloc((size_t)mdlsCnt * sizeof(u32));
+        u32 orderAcc = 0;
+        for (m=0; m<mdlsCnt; ++m) {
+            if (!BvhHasBVH((u16)m)) { orderBase[m] = 0; continue; }
+            orderAcc = (orderAcc + 1u) & ~1u;
+            orderBase[m] = orderAcc;
+            mcpy(orderAll + orderAcc, modelBVHTriOrder[m], (size_t)modelBVHTriOrderCounts[m] * sizeof(u16));
+            orderAcc += modelBVHTriOrderCounts[m];
+        }
+        orderAll[orderAcc] = orderAll[orderAcc + 1] = 0;
         glUseProgram(rtCopySP);
         u32 orderBufID = 0; glGenBuffers(1, &orderBufID);
-        u16* orderStage = (u16*)OS_Alloc(((size_t)maxModelTris + 2) * sizeof(u16));
+        glBindBuffer(GL_SSBO, orderBufID);
+        glBufferData(GL_SSBO, ((size_t)orderAcc + 2) * sizeof(u16), orderAll, GL_STATIC_DRAW);
+        glBindBufferBase(GL_SSBO, 19, orderBufID);
+        OS_Free(orderAll, ((size_t)triTotal + 2u + (size_t)mdlsCnt) * sizeof(u16));
         for (m=0; m<mdlsCnt; ++m) {
             if (rtModelInfo[m].nodeBase == 0xFFFFFFFFu) continue;
             
             u32 tcnt = modelBVHTriOrderCounts[m], vc = rtSrcVertCounts[m];
-            mcpy(orderStage, modelBVHTriOrder[m], (size_t)tcnt * sizeof(u16)); orderStage[tcnt] = 0; orderStage[tcnt + 1] = 0;
-            glBindBuffer(GL_SSBO, orderBufID); glBufferData(GL_SSBO, ((size_t)tcnt + 2) * sizeof(u16), orderStage, GL_DYNAMIC_DRAW); glBindBufferBase(GL_SSBO, 19, orderBufID);
             glBindBufferBase(GL_SSBO, 17, vbos[m]); glBindBufferBase(GL_SSBO, 18, tbos[m]);
-            glUniform1ui(0, vc); glUniform1ui(1, rtModelInfo[m].vtxBase); glUniform1ui(2, rtModelInfo[m].uvBase); glUniform1ui(3, tcnt); glUniform1ui(4, rtModelInfo[m].triBase);
+            glUniform1ui(0, vc); glUniform1ui(1, rtModelInfo[m].vtxBase); glUniform1ui(2, rtModelInfo[m].uvBase); glUniform1ui(3, tcnt); glUniform1ui(4, rtModelInfo[m].triBase); glUniform1ui(5, orderBase[m]);
             u32 n = vc > tcnt ? vc : tcnt; glDispatchCompute((n + 255u) / 256u, 1, 1);
         }
-        OS_Free(orderStage, ((size_t)maxModelTris + 2) * sizeof(u16));
+        OS_Free(orderBase, (size_t)mdlsCnt * sizeof(u32));
         glDeleteBuffers(1, &orderBufID);
         rtInstanceInfoID = MakeSSBO(&rtInstanceInfoID, 21, (size_t)INSTANCE_COUNT * sizeof(InstanceRTInfo), NULL, GL_DYNAMIC_DRAW);
         rtCellCountsID   = MakeSSBO(&rtCellCountsID,   23, (size_t)ARRSIZE * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
         rtCellListsID    = MakeSSBO(&rtCellListsID,    24, (size_t)ARRSIZE * 128 * sizeof(u16), NULL, GL_DYNAMIC_DRAW);
-        glFlush(); glFinish();
         rtAccelBuilt = true;
         DualLog("Raytraced reflections upload........................................................took %.6f secs\n",get_time() - startTime);
     }
