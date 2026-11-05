@@ -37,9 +37,8 @@ enum { JSMN_ERROR_NOMEM = -1,JSMN_ERROR_INVAL = -2, JSMN_ERROR_PART = -3 };
 typedef struct { jsmntype_t type; i64 start,end; i32 size,parent; } jsmntok_t;
 typedef struct { size_t pos; u32 toknext; i32 toksuper; } jsmn_parser;
 typedef struct { u16 j[4]; float w[4]; } VtxSkin;
-typedef struct { float *pos,*nrm,*uv; VtxSkin* skin; u32 vertCount,*indices,triCount; glb_node* jointNodes[MAX_GLB_JOINTS]; float invBind[MAX_GLB_JOINTS][16]; u32 jointCount; glb_animt* anim; glb_data* gltf; bool isTrAnim; glb_anim_chan **chanMap; glb_node **meshNodes; float **subPos,**subNrm,**subUv; u32 *subVertCnt,**subIndices,*subTriCount,submshCnt; } GltfMesh;
+typedef struct { float *pos,*nrm,*uv; VtxSkin* skin; u32 vertCount,*indices,triCount; glb_node* jointNodes[MAX_GLB_JOINTS]; float invBind[MAX_GLB_JOINTS][16]; u32 jointCount; glb_data* gltf; bool isTrAnim; glb_anim_chan **chanMap; glb_node **meshNodes; float **subPos,**subNrm,**subUv; u32 *subVertCnt,**subIndices,*subTriCount,submshCnt; } GltfMesh;
 static MeshScratch meshScratch[32]; static BvhBuildCtx thrd_bvh_ctx[32]; BvhNode** modelBVHNodes; static float** vPos; u32 modelBVHTriOrderCounts[MAX_MDLS],modelVertexCounts[MAX_MDLS],*cvxAdjOffsets[MAX_UNIQUE_CVX_MESHES]; u16 **modelBVHTriOrder,modelBVHNodeCounts[MAX_MDLS],*cvxAdjLists[MAX_UNIQUE_CVX_MESHES],cvxAdjStart[MAX_UNIQUE_CVX_MESHES]; size_t cvxAdjOffsetBytes[MAX_UNIQUE_CVX_MESHES],cvxAdjListBytes[MAX_UNIQUE_CVX_MESHES];
-static GltfMesh* gBlockMeshes; static u32 gBlockMeshCount = 0;
 void Mat4FromTRS(const float* T, const float* R, const float* S, float* lm) {
     float tx=T[0],ty=T[1],tz=T[2],qx=R[0],qy=R[1],qz=R[2],qw=R[3],sx=S[0],sy=S[1],sz=S[2];
     lm[0] = (1 - 2*qy*qy - 2*qz*qz) * sx; lm[1]  = (2*qx*qy + 2*qz*qw) * sx; lm[2] = (2*qx*qz - 2*qy*qw) * sx; lm[3] = 0.0f; lm[4]  = (2*qx*qy - 2*qz*qw) * sy; lm[5] = (1 - 2*qx*qx - 2*qz*qz) * sy; lm[6] = (2*qy*qz + 2*qx*qw) * sy; lm[7] = 0.0f; lm[8] = (2*qx*qz + 2*qy*qw) * sz; lm[9] = (2*qy*qz - 2*qx*qw) * sz; lm[10] = (1 - 2*qx*qx - 2*qy*qy)*sz; lm[11] = 0.0f; lm[12] = tx; lm[13] = ty; lm[14] = tz; lm[15] = 1.0f; 
@@ -49,7 +48,7 @@ typedef struct { const u8* base; size_t stride; u8 nc, cs, cls, nrm; } GlbCell;
 static GlbCell GlbCellInit(const glb_accessor* a) {
     GlbCell c; c.stride = a->stride; c.nrm    = (u8)a->normalized;
     switch (a->type) { case glbv2: c.nc = 2;  break; case glbv3: c.nc = 3;  break; case glbv4: c.nc = 4;  break; case glbmat4: c.nc = 16; break; default: c.nc = 1;  break; }
-    switch (a->component_type) { case glb_component_type_r_8u: c.cls = 4; c.cs = 1; break; case glb_component_type_r_16u: c.cls = 3; c.cs = 2; break; case glb_component_type_r_32f: c.cls = 2; c.cs = 4; break; default: c.cls = 5; c.cs = 0; break; /* only 8u/16u/32f are supported by this loader */ }
+    switch (a->component_type) { case glb_component_type_r_8u: c.cls = 4; c.cs = 1; break; case glb_component_type_r_16u: c.cls = 3; c.cs = 2; break; case glb_component_type_r_32f: c.cls = 2; c.cs = 4; break; default: c.cls = 5; c.cs = 0; break; }
     if (!a->buffer_view) { c.cls = 0; } else if (!a->buffer_view->buffer->data) { c.cls = 1; }
     c.base = (c.cls >= 2 && c.cls <= 4) ? (const u8*)a->buffer_view->buffer->data + a->buffer_view->offset + a->offset : NULL;
     return c;
@@ -59,14 +58,13 @@ INLINE __attribute__((always_inline)) bool GlbCellGet(const GlbCell* restrict c,
     if (c->cls == 0) { mset(o, 0, es * sizeof(float)); return true; }
     if (c->cls == 1 || es < c->nc) { return false; }
     
-    const u8 *e = c->base + c->stride * i, nrm = c->nrm; /* nrm/cls/nc are per-accessor invariants, so the decode branch stays loop-invariant */
-    for (u8 k = 0; k < c->nc; ++k) { const u8* p = e + (size_t)k * c->cs; float r; switch (c->cls) {  case 2: r = *(const float*)p; break; case 3: r = nrm ? (float)*(const u16*)p / 65535.f : (float)*(const u16*)p; break; case 4: r = nrm ? (float)*(const u8*)p / 255.f : (float)*(const u8*)p;  break; default: r = 0.0f; break; /* unsupported component type */ } o[k] = r; }
+    const u8 *e = c->base + c->stride * i, nrm = c->nrm;
+    for (u8 k = 0; k < c->nc; ++k) { const u8* p = e + (size_t)k * c->cs; float r; switch (c->cls) {  case 2: r = *(const float*)p; break; case 3: r = nrm ? (float)*(const u16*)p / 65535.f : (float)*(const u16*)p; break; case 4: r = nrm ? (float)*(const u8*)p / 255.f : (float)*(const u8*)p;  break; default: r = 0.0f; break; } o[k] = r; }
     return true;
 }
 
-INLINE __attribute__((always_inline)) u64 GlbCellGetIdx(const GlbCell* restrict c, size_t i) { if (c->cls == 3) { return *(const u16*)(c->base + c->stride * i); } if (c->cls == 4) { return *(const u8*) (c->base + c->stride * i); } return 0; /* no bufferView/data, fp32 and unsupported indices all read as 0, like the old integer reader */ }
+INLINE __attribute__((always_inline)) u64 GlbCellGetIdx(const GlbCell* restrict c, size_t i) { if (c->cls == 3) { return *(const u16*)(c->base + c->stride * i); } if (c->cls == 4) { return *(const u8*) (c->base + c->stride * i); } return 0; }
 static const glb_accessor* glb_find_accessor(const glb_primitive* p, glb_attribute_type t, i32 idx) { for(size_t i=0;i<p->attr_count;++i) { const glb_attribute *a = &p->attr[i]; if (a->type == t && a->index == idx) { return a->data; } } return NULL; }
-bool glbread_float(const glb_accessor* a, size_t i, float* o, size_t es) { /*generic one-off read; hot per-vertex loops use the hoisted GlbCell form*/ GlbCell c = GlbCellInit(a); return GlbCellGet(&c, i, o, es); }
 static int glb_json_strcmp(jsmntok_t const* t, const u8* j, const char* s) { if ((*t).type!=JSMN_STRING) return -1; size_t sl=slen(s),nl=(size_t)(t->end-t->start); return sl==nl?sCompUpToLen((const char*)j+t->start,s,sl)==0:0; }
 static int glb_json_to_int(jsmntok_t const* t, const u8* j){ if ((*t).type!=JSMN_PRIMITIVE) return -1; const char* p=(const char*)j+t->start; return (int)fast_atoi(&p); }
 static size_t glb_json_to_size(jsmntok_t const* t, const u8* j){ if(t->type != JSMN_PRIMITIVE){return 0;} size_t r=0;const char*p=(const char*)j+t->start,*e=(const char*)j+t->end; while(p<e&&*p>='0'&&*p<='9'){r=r*10+*p-'0';p++;}return r; }
@@ -175,27 +173,8 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
     for (; p->pos < l && js[p->pos]; p->pos++) {
         char c = js[p->pos]; jsmntype_t ty;
         switch (c) {
-            case '{': case '[':
-                cnt++; if (!t) break;
-                jsmntok_t* tok = jsmn_alloc_token(p, t, n); if (!tok) return JSMN_ERROR_NOMEM;
-                
-                if (p->toksuper != -1) { t[p->toksuper].size++; tok->parent = p->toksuper; }
-                tok->type = (c == '{' ? JSMN_OBJECT : JSMN_ARRAY);
-                tok->start = p->pos;
-                p->toksuper = p->toknext - 1;
-                break;
-            case '}': case ']':
-                if (!t) break;
-                ty = (c == '}' ? JSMN_OBJECT : JSMN_ARRAY); if (p->toknext < 1) return JSMN_ERROR_INVAL;
-                
-                tok = &t[p->toknext - 1];
-                for (;;) {
-                    if (tok->start != -1 && tok->end == -1) { if (tok->type != ty) return JSMN_ERROR_INVAL; tok->end = p->pos + 1; p->toksuper = tok->parent; break; }
-                    if (tok->parent == -1) { if (tok->type != ty || p->toksuper != -1) return JSMN_ERROR_INVAL; break; }
-                    
-                    tok = &t[tok->parent];
-                }
-                break;
+            case '{': case '[': cnt++; if (!t) break; jsmntok_t* tok = jsmn_alloc_token(p, t, n); if (!tok) return JSMN_ERROR_NOMEM; if (p->toksuper != -1) { t[p->toksuper].size++; tok->parent = p->toksuper; } tok->type = (c == '{' ? JSMN_OBJECT : JSMN_ARRAY); tok->start = p->pos; p->toksuper = p->toknext - 1; break;
+            case '}': case ']': if (!t) break; ty = (c == '}' ? JSMN_OBJECT : JSMN_ARRAY); if (p->toknext < 1) return JSMN_ERROR_INVAL; tok = &t[p->toknext - 1]; for (;;) { if (tok->start != -1 && tok->end == -1) { if (tok->type != ty) return JSMN_ERROR_INVAL; tok->end = p->pos + 1; p->toksuper = tok->parent; break; } if (tok->parent == -1) { if (tok->type != ty || p->toksuper != -1) return JSMN_ERROR_INVAL; break; } tok = &t[tok->parent]; } break;
             case '\"': {
                 size_t s_str = p->pos;
                 p->pos++;
@@ -214,14 +193,7 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
                         p->pos++;
                         switch (js[p->pos]) {
                             case '\"': case '/': case '\\': case 'b': case 'f':  case 'r': case 'n':  case 't': break;
-                            case 'u':
-                                p->pos++;
-                                for (int i_str = 0; i_str < 4 && p->pos < l && js[p->pos]; i_str++) {
-                                    if (!((js[p->pos] >= 48 && js[p->pos] <= 57) || (js[p->pos] >= 65 && js[p->pos] <= 70) || (js[p->pos] >= 97 && js[p->pos] <= 102))) { p->pos = s_str; r = JSMN_ERROR_INVAL; goto str_done; }
-                                    p->pos++;
-                                }
-                                p->pos--;
-                                break;
+                            case 'u': p->pos++; for (int i_str = 0; i_str < 4 && p->pos < l && js[p->pos]; i_str++) { if (!((js[p->pos] >= 48 && js[p->pos] <= 57) || (js[p->pos] >= 65 && js[p->pos] <= 70) || (js[p->pos] >= 97 && js[p->pos] <= 102))) { p->pos = s_str; r = JSMN_ERROR_INVAL; goto str_done; } p->pos++; } p->pos--; break;
                             default: p->pos = s_str; r = JSMN_ERROR_INVAL; goto str_done;
                         }
                     }
@@ -231,12 +203,7 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
                 str_done: if (r < 0) return r; cnt++; if (p->toksuper != -1 && t) t[p->toksuper].size++; break; }
             case '\t': case '\r': case '\n': case ' ': break;
             case ':':  p->toksuper = p->toknext - 1;   break;
-            case ',':
-                if (t && p->toksuper != -1 && t[p->toksuper].type != JSMN_ARRAY && t[p->toksuper].type != JSMN_OBJECT) {
-                    p->toksuper = t[p->toksuper].parent;
-                    for (i = p->toknext - 1; i >= 0; i--) { if (t[i].type == JSMN_ARRAY || t[i].type == JSMN_OBJECT) { if (t[i].start != -1 && t[i].end == -1) { p->toksuper = i; break; } } } 
-                }
-                break;
+            case ',': if (t && p->toksuper != -1 && t[p->toksuper].type != JSMN_ARRAY && t[p->toksuper].type != JSMN_OBJECT) { p->toksuper = t[p->toksuper].parent; for (i = p->toknext - 1; i >= 0; i--) { if (t[i].type == JSMN_ARRAY || t[i].type == JSMN_OBJECT) { if (t[i].start != -1 && t[i].end == -1) { p->toksuper = i; break; } } }  } break;
             case '-': case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': case 't': case 'f': case 'n': {
                 if (t && p->toksuper != -1) { jsmntok_t* ot = &t[p->toksuper]; if (ot->type == JSMN_OBJECT || (ot->type == JSMN_STRING && ot->size != 0)) { return JSMN_ERROR_INVAL; } }
                 
@@ -246,15 +213,12 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
                 r = JSMN_ERROR_PART;
                 goto prim_done;
                 
-                f_prim: 
-                if (!t) { p->pos--; r = 0; goto prim_done; }
-                jsmntok_t* tok_prim = jsmn_alloc_token(p, t, n); if (!tok_prim) { p->pos = s_prim; r = JSMN_ERROR_NOMEM; goto prim_done; }
+                f_prim: if (!t) { p->pos--; r = 0; goto prim_done; } jsmntok_t* tok_prim = jsmn_alloc_token(p, t, n); if (!tok_prim) { p->pos = s_prim; r = JSMN_ERROR_NOMEM; goto prim_done; }
                 
                 jsmn_fill_token(tok_prim, JSMN_PRIMITIVE, s_prim, p->pos);
                 tok_prim->parent = p->toksuper;
                 p->pos--;
                 r = 0;
-                
                 prim_done: if (r < 0) return r; cnt++; if (p->toksuper != -1 && t) t[p->toksuper].size++; break; }
             default: return JSMN_ERROR_INVAL;
         }
@@ -263,33 +227,16 @@ static int jsmn_parse(jsmn_parser* p, const char* js, size_t l, jsmntok_t* t, si
     return cnt;
 }
 
-static bool glb_resolve_raw(void* pslot, const void* base, size_t esz, size_t count) {
-    void* v; mcpy(&v, pslot, sizeof(v));
-    size_t idx = (size_t)v; if (!idx) { return true; }
-    if (idx > count) { return false; }
-    
-    void* re = (void*)((char*)base + (idx - 1) * esz);
-    mcpy(pslot, &re, sizeof(re));
-    return true;
-}
-
+static bool glb_resolve_raw(void* pslot, const void* base, size_t esz, size_t count) { void* v; mcpy(&v, pslot, sizeof(v)); size_t idx = (size_t)v; if (!idx) { return true; } if (idx > count) { return false; } void* re = (void*)((char*)base + (idx - 1) * esz); mcpy(pslot, &re, sizeof(re)); return true; }
 void glb_parse(i32 tid, const void* d, size_t sz, glb_data** out_data) {
-    u32 tmp;
-    const u8* ptr=(const u8*)d;
-    mcpy(&tmp,ptr+8,4);
-    const u8* jc=ptr+12;
-    u32 jl;
-    mcpy(&jl,jc,4);
-    mcpy(&tmp,jc+4,4);
-    jc+=8;
-    const void* bin=NULL;
-    size_t bsz=0;
-    if(8<=sz-20-jl){ const u8* bc=jc+jl;u32 bl;mcpy(&bl,bc,4); mcpy(&tmp,bc+4,4); bc+=8;bin=bc;bsz=bl; }
-    jsmn_parser p={0};int tc=jsmn_parse(&p,(const char*)jc,jl,NULL,0);
-    jsmntok_t* t=OS_SubArenaAlloc(tid,sizeof(jsmntok_t)*(tc+1));
+    const u8* ptr=(const u8*)d; const u8* jc=ptr+12; u32 jl; mcpy(&jl,jc,4); jc += 8; const void* bin = NULL; size_t bsz = 0;
+    if (8 <= sz - 20 - jl) { const u8* bc = jc + jl; u32 bl; mcpy(&bl,bc,4); bc += 8; bin = bc; bsz = bl; }
+    jsmn_parser p = {0}; int tc = jsmn_parse(&p,(const char*)jc,jl,NULL,0);
+    jsmntok_t* t = OS_SubArenaAlloc(tid,sizeof(jsmntok_t)*(tc+1));
     p.pos=0; p.toknext=0; p.toksuper=-1;
-    tc=jsmn_parse(&p,(const char*)jc,jl,t,tc);if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);} t[tc].type=JSMN_UND; glb_data* data=OS_SubArenaAlloc(tid,sizeof(glb_data)); glb_parse_json_root(t,0,jc,tid,data);
-    /* Splice 1-based JSON references into real pointers now that every array is resident. */
+    tc = jsmn_parse(&p,(const char*)jc,jl,t,tc); if(tc<=0){DualLogError("No tokens in glb\n");OS_Exit(1);}
+    
+    t[tc].type=0; glb_data* data=OS_SubArenaAlloc(tid,sizeof(glb_data)); glb_parse_json_root(t,0,jc,tid,data);
     for (size_t m=0;m<data->meshes_count;++m)
         for (size_t n=0;n<data->meshes[m].primitives_count;++n) {
             glb_primitive* pr =&data->meshes[m].primitives[n];
@@ -333,37 +280,20 @@ void OptimizeVertexCache(u16* idx, u32 ic, u32 vc, u8* scratch) {
     mcpy(idx, n, ic * sizeof(u16));
 }
 
-u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, size_t stride, u32* r, u8* nv) {
-    u32 oc=*vc; if(!oc||!ic){return v;}
-    
-    mset(r,0xFF,oc*sizeof(u32));
-    u32 write_ptr=0;
-    for(u32 i=0;i<ic;++i){u32 id=idx[i]; if(id<oc){if(r[id]==U32_MAX){r[id]=write_ptr; u32* dst=(u32*)(nv+write_ptr*stride); const u32* src=(const u32*)(v+id*stride); if(stride==CPU_VRT_SZ){dst[0]=src[0];dst[1]=src[1];dst[2]=src[2];dst[3]=src[3];dst[4]=src[4];dst[5]=src[5];dst[6]=src[6];dst[7]=src[7];}else{mcpy(dst,src,stride);} write_ptr++;} idx[i]=(u16)r[id];}}
-    *vc=write_ptr;
-    return nv;
-}
-
+u8* OptimizeVertexFetch(u8* v, u32* vc, u16* idx, u32 ic, u32* r, u8* nv) { u32 oc=*vc,write_ptr=0; mset(r,0xFF,oc*sizeof(u32)); for(u32 i=0;i<ic;++i){u32 id=idx[i]; if(id<oc){if(r[id]==U32_MAX){r[id]=write_ptr; u32* d=(u32*)(nv + write_ptr*CPU_VRT_SZ); const u32* src=(const u32*)(v + id*CPU_VRT_SZ); d[0]=src[0]; d[1]=src[1]; d[2]=src[2]; d[3]=src[3]; d[4]=src[4]; d[5]=src[5]; d[6]=src[6]; d[7]=src[7]; write_ptr++;} idx[i]=(u16)r[id];}} *vc=write_ptr; return nv; }
 #define _mm_min_ps(A, B) ((__m128)__builtin_ia32_minps((__v4sf)(A), (__v4sf)(B)))
 #define _mm_max_ps(A, B) ((__m128)__builtin_ia32_maxps((__v4sf)(A), (__v4sf)(B)))
-#define _mm_storeu_ps(P, A) (*(__m128_u *)(P) = (A))
 __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex,u32 ec,__m128 mn_v,__m128 mx_v,i32 tid) {
-    MeshScratch* work=&meshScratch[tid];
-    if (unlikely(!ec)) { return false; }
+    MeshScratch* work = &meshScratch[tid]; if (unlikely(!ec)) { return false; }
     
     u16* final_t = OS_SubArenaAlloc(tid,ec * sizeof(u16));
     u32 used_slots_count = 0; u32 ucnt = 0;
     for (u32 i=0; i<ec; ++i) {
-        const u32* v = (const u32*)(work->verts + (i<<3)); /*a corner is 8 words: position+normal+uv*/
+        const u32* v = (const u32*)(work->verts + (i<<3));
         u32 h0 = v[0] ^ v[1] ^ v[2] ^ v[3];
         u32 h1 = v[4] ^ v[5] ^ v[6] ^ v[7];
         u32 s = (h0 ^ h1) & (WELD_HASH_SIZE-1);
-        while (work->hash[s] != U32_MAX) {
-            const u32* w = (const u32*)(work->verts + (work->hash[s]<<3));
-            if (w[0]==v[0] && w[1]==v[1] && w[2]==v[2] && w[3]==v[3] && w[4]==v[4] && w[5]==v[5] && w[6]==v[6] && w[7]==v[7]) { /*8 word compares instead of a 32-byte byte-at-a-time mcmp; bit patterns equal <=> bytes equal*/
-                final_t[i] = (u16)work->hash[s]; goto nxt;
-            }
-            s = (s+1) & (WELD_HASH_SIZE-1);
-        }
+        while (work->hash[s] != U32_MAX) { const u32* w = (const u32*)(work->verts + (work->hash[s]<<3)); if (w[0]==v[0] && w[1]==v[1] && w[2]==v[2] && w[3]==v[3] && w[4]==v[4] && w[5]==v[5] && w[6]==v[6] && w[7]==v[7]) { final_t[i] = (u16)work->hash[s]; goto nxt; } s = (s+1) & (WELD_HASH_SIZE-1); }
         work->hash[s] = ucnt;
         final_t[i] = (u16)ucnt;
         work->used[used_slots_count++] = s;
@@ -373,25 +303,24 @@ __attribute__((hot)) bool FinalizeParsedMesh(u32 mindex,u32 ec,__m128 mn_v,__m12
     }
     OptimizeVertexCache(final_t,ec,ucnt,work->cache);
     float* final_verts=OS_SubArenaAlloc(tid,ucnt*CPU_VRT_SZ);
-    OptimizeVertexFetch((u8*)work->verts,&ucnt,final_t,ec,CPU_VRT_SZ,work->remap,(u8*)final_verts);
+    OptimizeVertexFetch((u8*)work->verts,&ucnt,final_t,ec,work->remap,(u8*)final_verts);
     vPos[mindex] = final_verts;
     modelVertexCounts[mindex] = ucnt;
     modelTriangles[mindex] = final_t;
     modelTriangleCounts[mindex] = ec/3;
     float mn_arr[4], mx_arr[4];
-    _mm_storeu_ps(mn_arr,mn_v);
-    _mm_storeu_ps(mx_arr,mx_v);
+    *(__m128_u *)mn_arr = mn_v;
+    *(__m128_u *)mx_arr = mx_v;
     modelBounds[mindex] = vmax(vabs(mn_arr[0]),vmax(vabs(mn_arr[1]),vmax(vabs(mn_arr[2]),vmax(mx_arr[0],vmax(mx_arr[1],mx_arr[2])))));
     modelMin[mindex]=(V3){mn_arr[0],mn_arr[1],mn_arr[2]};
     modelMax[mindex]=(V3){mx_arr[0],mx_arr[1],mx_arr[2]};
-    for (u32 i = 0; i < used_slots_count; ++i) {work->hash[work->used[i]]=U32_MAX;}
+    for (u32 i = 0; i < used_slots_count; ++i) { work->hash[work->used[i]]=U32_MAX; }
     return true;
 }
 
-
-static void Mat4TransformPoint(const float* restrict m, const float* restrict v, float* restrict out) { out[0] = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]  + m[12]; out[1] = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]  + m[13]; out[2] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14]; }
+static void Mat4TransformPoint(const float* restrict m, const float* restrict v, float* restrict out) { float x = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]  + m[12]; float y = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]  + m[13]; float z = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14]; out[0] = x; out[1] = y; out[2] = z; }
 static void Mat4TransformDir(const float* restrict m, const float* restrict v, float* restrict out) { float x = m[0]*v[0] + m[4]*v[1] + m[8]*v[2]; float y = m[1]*v[0] + m[5]*v[1] + m[9]*v[2]; float z = m[2]*v[0] + m[6]*v[1] + m[10]*v[2]; float len = vsqrtf(x*x + y*y + z*z), inv = (len > 0.00000001f) ? 1.0f/len : 0.0f; out[0] = x*inv; out[1] = y*inv; out[2] = z*inv; }
-INLINE __attribute__((always_inline)) void ObjRead3(const char** pp, float* restrict dst) { /*v and vn lines are both positional triples; one shared reader*/ dst[0] = fast_atof(pp); dst[1] = fast_atof(pp); dst[2] = fast_atof(pp); }
+INLINE __attribute__((always_inline)) void ObjRead3(const char** pp, float* restrict dst) { dst[0] = fast_atof(pp); dst[1] = fast_atof(pp); dst[2] = fast_atof(pp); }
 static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex,const char* restrict d,int fs,i32 tid) {
     MeshScratch* work=&meshScratch[tid];
     vPos[mindex]=NULL; modelTriangles[mindex]=NULL; modelVertexCounts[mindex]=modelTriangleCounts[mindex]=0; u32 pc=0,nc=0,uc=0,ec=0; __m128 mn_v=_mm_set1_ps(1000000000.0f), mx_v=_mm_set1_ps(-1000000000.0f); const char *p=d, *e=d+fs;
@@ -404,14 +333,13 @@ static __attribute__((hot)) __attribute__((flatten)) bool ParseOBJ(u32 mindex,co
         } else if (*p == 'f' && p[1] == ' ') {
             p += 2; u32 vi[8]={0}, ti[8]={0}, ni[8]={0}; int nv = 0;
             while (nv < 8 && p < e && *p != '\n' && *p != '\r') { while (*p == ' ' || *p == '\t') ++p; if (*p == '\n' || *p == '\r' || *p == '#') break; long r = fast_atoi(&p); u32 v = (r>0) ? (u32)r : (r<0) ? (u32)((i32)pc + r) : 0; vi[nv]=v; if (*p == '/') { ++p; if (*p != '/') { r = fast_atoi(&p); u32 t=(r>0)?(u32)r:(r<0)?(u32)((i32)uc+r):0; ti[nv]=t; } if (*p == '/') { ++p; r = fast_atoi(&p); u32 n = (r>0)?(u32)r:(r<0)?(u32)((i32)nc+r):0; ni[nv]=n; } } ++nv; }
-            if (nv < 3) goto skip;
             for (int k=1; k<nv-1; ++k) {
                 u32 tri[3] = {0, (u32)k, (u32)(k+1)};
                 for (int t=0; t<3; ++t) {
                     int ix = tri[t]; u32 v = (vi[ix] && vi[ix] <= pc) ? vi[ix]-1 : 0; u32 tex = (ti[ix] && ti[ix] <= uc) ? ti[ix]-1 : 0; u32 nrm = (ni[ix] && ni[ix] <= nc) ? ni[ix]-1 : 0; float* dst = work->verts + (ec<<3);
                     dst[0]=-work->pos[v*3]; dst[1]=work->pos[v*3+1]; dst[2]=work->pos[v*3+2]; dst[3]=(nrm < nc) ? -work->nrm[nrm*3] : 0; dst[4]=(nrm < nc) ? work->nrm[nrm*3+1] : 0; dst[5]=(nrm < nc) ? work->nrm[nrm*3+2] : 0; dst[6]=(tex < uc) ? work->uv[tex*2] : 0; dst[7]=(tex < uc) ? work->uv[tex*2+1] : 0; __m128 pos_v=_mm_loadu_ps(dst); mn_v=_mm_min_ps(mn_v,pos_v); mx_v=_mm_max_ps(mx_v,pos_v); ++ec;
                 }
-            } skip:;
+            }
         } else while (p < e && *p != '\n') ++p;
     } return FinalizeParsedMesh(mindex,ec,mn_v,mx_v,tid);
 }
@@ -426,97 +354,50 @@ static void FindBracket(const glbanim_samp* s, float t, u32* i0, float* f) {
     GlbCellGet(&inC, n - 1, &tn, 1);
     if (t<=t0) { *i0 = 0;     *f = 0.0f; return; }
     if (t>=tn) { *i0 = n - 2; *f = 1.0f; return; }
-    float tb = t0; /*sliding window: reuse the last right edge as the next left edge, so a full scan reads n values instead of 2n*/
-    for (u32 i=1;i<n;++i){
-        float ta = tb;
-        GlbCellGet(&inC, i, &tb, 1);
-        if(t>=ta&&t<=tb){ *i0 = i-1; *f = tb > ta ? (t - ta) / (tb - ta) : 0.0f; return; }
-    }
+    
+    float tb = t0;
+    for (u32 i=1;i<n;++i){ float ta = tb; GlbCellGet(&inC, i, &tb, 1); if(t>=ta&&t<=tb){ *i0 = i-1; *f = tb > ta ? (t - ta) / (tb - ta) : 0.0f; return; } }
     *i0=n-2; *f=1.0f;
 }
 
-static void SampleV3(const glbanim_samp* s, float t, float* o3) {
-    GlbCell outC = GlbCellInit(s->output);
-    u32 i0; float f, v0[3], v1[3]; FindBracket(s, t, &i0, &f); GlbCellGet(&outC, i0, v0, 3);
-    if (f <= 0.0f || s->interpolation == glb_interp_step) { o3[0] = v0[0]; o3[1] = v0[1]; o3[2] = v0[2]; return; }
-        
-    GlbCellGet(&outC, i0 + 1, v1, 3);
-    o3[0] = v0[0] + (v1[0] - v0[0]) * f;
-    o3[1] = v0[1] + (v1[1] - v0[1]) * f;
-    o3[2] = v0[2] + (v1[2] - v0[2]) * f;
-}
-
+static void SampleV3(const glbanim_samp* s, float t, float* o3) { GlbCell outC = GlbCellInit(s->output); u32 i0; float f, v0[3], v1[3]; FindBracket(s, t, &i0, &f); GlbCellGet(&outC, i0, v0, 3); if (f <= 0.0f || s->interpolation == glb_interp_step) { o3[0] = v0[0]; o3[1] = v0[1]; o3[2] = v0[2]; return; } GlbCellGet(&outC, i0 + 1, v1, 3); o3[0] = v0[0] + (v1[0] - v0[0]) * f; o3[1] = v0[1] + (v1[1] - v0[1]) * f; o3[2] = v0[2] + (v1[2] - v0[2]) * f; }
 static void SampleQuat(const glbanim_samp* samp, float t, float* outq /* xyzw */) {
 	GlbCell outC = GlbCellInit(samp->output);
-	u32 i0; float frac, q0[4], q1[4], qb[4]; FindBracket(samp, t, &i0, &frac); GlbCellGet(&outC, i0, q0, 4);
-    if (frac <= 0.0f || samp->interpolation == glb_interp_step) { mcpy(outq, q0, sizeof(float)*4); return; }
+	u32 i0; float frac, q0[4], q1[4], qb[4]; FindBracket(samp, t, &i0, &frac); GlbCellGet(&outC, i0, q0, 4); if (frac <= 0.0f || samp->interpolation == glb_interp_step) { mcpy(outq, q0, sizeof(float)*4); return; }
     
     GlbCellGet(&outC, i0 + 1, q1, 4);
     float d = q0[0]*q1[0] + q0[1]*q1[1] + q0[2]*q1[2] + q0[3]*q1[3];
     d = d > 1.0f ? 1.0f : (d < -1.0f ? -1.0f : d);
 	if (d < 0.0f) { /*Flip the signs*/ qb[0] = -q1[0]; qb[1] = -q1[1]; qb[2] = -q1[2]; qb[3] = -q1[3]; d = -d; } else mcpy(qb, q1, sizeof(float) * 4);
-    if (d > 0.9995f) { /*nearly parallel: nlerp*/
-        for (int c=0;c<4;++c) { outq[c] = q0[c] + (qb[c] - q0[c]) * frac; }
-    } else {
-        float theta0 = vacosf(d), theta = theta0 * frac;
-        float s1 = sinf(theta) / sinf(theta0), s0 = cosf(theta) - d * s1;
-        for (int c=0;c<4;++c) { outq[c] = q0[c]*s0 + qb[c]*s1; }
-    }
+    if (d > 0.9995f) { /*nearly parallel: nlerp*/ for (int c=0;c<4;++c) { outq[c] = q0[c] + (qb[c] - q0[c]) * frac; } }
+    else             { float theta0 = vacosf(d), theta = theta0 * frac; float s1 = sinf(theta) / sinf(theta0), s0 = cosf(theta) - d * s1; for (int c=0;c<4;++c) { outq[c] = q0[c]*s0 + qb[c]*s1; } }
 	float len = vsqrtf(outq[0]*outq[0] + outq[1]*outq[1] + outq[2]*outq[2] + outq[3]*outq[3]);
-    if (len > 0.00000001f) { float inv = 1.0f / len; for (int c=0;c<4;++c) outq[c] *= inv; }
+    float inv = 1.0f / len; for (int c=0;c<4;++c) outq[c] *= inv;
 }
 
 static void NodeLocalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, float* outM) {
     float T[3] = {node->translation[0], node->translation[1], node->translation[2]};
     float R[4] = {node->rotation[0], node->rotation[1], node->rotation[2], node->rotation[3]};
     float S[3] = {node->scale[0], node->scale[1], node->scale[2]};
-    if (gm->chanMap) { /*O(1) per-node channel lookup (skinned: best clip, transform anims: all clips) built at load*/
-        size_t ni = (size_t)(node - gm->gltf->nodes);
-        if (ni < gm->gltf->nodes_count) {
-            const glb_anim_chan *ct = gm->chanMap[ni*3+0], *cr = gm->chanMap[ni*3+1], *cs = gm->chanMap[ni*3+2];
-            if (ct) { SampleV3(ct->sampler, t, T); }
-            if (cr) { SampleQuat(cr->sampler, t, R); }
-            if (cs) { SampleV3(cs->sampler, t, S); }
-        }
-    }
-    
-    Mat4FromTRS(T, R, S, outM); // Apply animation transformation.
+    size_t ni = (size_t)(node - gm->gltf->nodes); const glb_anim_chan *ct = gm->chanMap[ni*3+0], *cr = gm->chanMap[ni*3+1], *cs = gm->chanMap[ni*3+2]; if (ct) { SampleV3(ct->sampler, t, T); } if (cr) { SampleQuat(cr->sampler, t, R); } if (cs) { SampleV3(cs->sampler, t, S); }
+    Mat4FromTRS(T, R, S, outM);
 }
  
 static void NodeGlobalMatrixAtTime(const GltfMesh* gm, glb_node* node, float t, float* outM) { float l[16]; NodeLocalMatrixAtTime(gm,node, t, l); if (!node->parent) { mcpy(outM, l, sizeof(l)); return; } float p[16]; NodeGlobalMatrixAtTime(gm, node->parent, t, p); mul_mat4(outM,p, l); }
 bool IsGLBSourcePath(const char* path) { const char* dot = StringFindLastChar(path, '.'); return dot && sEqual(dot, ".glb"); }
 static void GlbChanMapFill(glb_anim_chan** map, const glb_data* data, const glb_animt* anim) {
     for (size_t c = 0; c < anim->channels_count; ++c) {
-        const glb_anim_chan* ch = &anim->channels[c];
-        if (!ch->target_node) { continue; }
+        const glb_anim_chan* ch = &anim->channels[c]; if (!ch->target_node) { continue; }
+        
         size_t ni = (size_t)(ch->target_node - data->nodes);
         if (ni < data->nodes_count && ch->target_path >= glb_animpthtype_translation && ch->target_path <= glb_animpthtype_scale) { map[ni*3 + (size_t)(ch->target_path - glb_animpthtype_translation)] = (glb_anim_chan*)ch; }
     }
 }
 
-INLINE __attribute__((always_inline)) void GlbLoadVtx(const GlbCell* restrict posC, const GlbCell* restrict nrmC, const GlbCell* restrict uvC, bool hasN, bool hasU, u32 v, float* restrict P, float* restrict N, float* restrict U) {
-    GlbCellGet(posC, v, P, 3);
-    if (hasN) { GlbCellGet(nrmC, v, N, 3); } else { N[0] = 0.0f; N[1] = 1.0f; N[2] = 0.0f; }
-    if (hasU) { GlbCellGet(uvC, v, U, 2); U[1] = 1.0f - U[1]; /*Flip V*/ } else { U[0] = 0.0f; U[1] = 0.0f; }
-}
-
-static u32* GlbLoadIndices(const glb_primitive* prim, u32 vc, u32* tc) {
-    *tc=(prim->indices ? prim->indices->count : vc)/3; u32* dst=OS_SubArenaAlloc(-1,*tc*3*sizeof(u32));
-    GlbCell idxC={0}; if (prim->indices) idxC=GlbCellInit(prim->indices);
-    for (u32 k=0;k<*tc*3;++k) dst[k]=prim->indices ? (u32)GlbCellGetIdx(&idxC,k) : k; return dst;
-}
-
+INLINE __attribute__((always_inline)) void GlbLoadVtx(const GlbCell* restrict posC, const GlbCell* restrict nrmC, const GlbCell* restrict uvC, bool hasN, bool hasU, u32 v, float* restrict P, float* restrict N, float* restrict U) { GlbCellGet(posC, v, P, 3); if (hasN) { GlbCellGet(nrmC, v, N, 3); } else { N[0] = 0.0f; N[1] = 1.0f; N[2] = 0.0f; } if (hasU) { GlbCellGet(uvC, v, U, 2); U[1] = 1.0f - U[1]; /*Flip V*/ } else { U[0] = 0.0f; U[1] = 0.0f; } }
+static u32* GlbLoadIndices(const glb_primitive* prim, u32 vc, u32* tc) { *tc=(prim->indices ? prim->indices->count : vc)/3; u32* dst=OS_SubArenaAlloc(-1,*tc*3*sizeof(u32)); GlbCell idxC={0}; if (prim->indices) idxC=GlbCellInit(prim->indices); for (u32 k=0;k<*tc*3;++k) dst[k]=prim->indices ? (u32)GlbCellGetIdx(&idxC,k) : k; return dst; }
 typedef struct { __m128 mn, mx; } GlbRange;
-INLINE __attribute__((always_inline)) GlbRange GlbBakeEmit(float* restrict dst, GlbRange r, float px, float py, float pz, float nx, float ny, float nz, float u, float v) {
-    dst[0] = -px; dst[1] = py; dst[2] = pz; /* Position */
-    dst[3] = -nx; dst[4] = ny; dst[5] = nz; /* Normal */
-    dst[6] = u;   dst[7] = v;               /* UV */
-    __m128 pos_v = _mm_loadu_ps(dst);
-    r.mn = _mm_min_ps(r.mn, pos_v);
-    r.mx = _mm_max_ps(r.mx, pos_v);
-    return r;
-}
-
+INLINE __attribute__((always_inline)) GlbRange GlbBakeEmit(float* restrict dst, GlbRange r, float px, float py, float pz, float nx, float ny, float nz, float u, float v) { dst[0] = -px; dst[1] = py; dst[2] = pz; /* Position */ dst[3] = -nx; dst[4] = ny; dst[5] = nz; /* Normal */ dst[6] = u; dst[7] = v; /* UV */ __m128 pos_v = _mm_loadu_ps(dst); r.mn = _mm_min_ps(r.mn, pos_v); r.mx = _mm_max_ps(r.mx, pos_v); return r; }
 static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     mset(out, 0, sizeof(*out));
     glb_data* data = NULL;
@@ -525,17 +406,15 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
     glb_animt* bestAnim = data->animations_count ? &data->animations[0] : NULL;
     size_t maxChannels = 0;
     for (size_t a = 0; a < data->animations_count; ++a) { if (data->animations[a].channels_count > maxChannels) { maxChannels = data->animations[a].channels_count; bestAnim = &data->animations[a]; } }
-    out->anim = bestAnim;
+    glb_animt* anim = bestAnim;
     out->gltf = data;
     glb_node* skinNode = NULL;
     for (size_t i = 0; i < data->nodes_count; ++i) { if (data->nodes[i].skin && data->nodes[i].mesh) { skinNode = &data->nodes[i]; break; } }
     if (skinNode) { /*Skeletal mesh animation (skinned)*/
-        out->isTrAnim=false;
-        glb_mesh* mesh=skinNode->mesh; if (!mesh || !mesh->primitives_count || !out->anim) { return; }
+        out->isTrAnim=false; glb_mesh* mesh=skinNode->mesh; if (!mesh || !mesh->primitives_count || !anim) { return; }
         
-        out->chanMap = OS_SubArenaAlloc(-1, data->nodes_count * 3 * sizeof(glb_anim_chan*));
-        GlbChanMapFill(out->chanMap, data, out->anim);
-        
+        out->chanMap = OS_SubArenaAlloc(-1,data->nodes_count * 3 * sizeof(glb_anim_chan*));
+        GlbChanMapFill(out->chanMap,data,anim);
         glb_primitive* prim = &mesh->primitives[0];
         const glb_accessor* posAcc = glb_find_accessor(prim, glb_attribute_type_position, 0);
         const glb_accessor* nrmAcc = glb_find_accessor(prim, glb_attribute_type_normal, 0);
@@ -557,11 +436,7 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
             GlbCellGet(&jntC, i, jf, 4);
             GlbCellGet(&wgtC, i, wf, 4);
             float wsum = wf[0] + wf[1] + wf[2] + wf[3], winv = (wsum > 0.000001f) ? 1.0f/wsum : 0.0f;
-            for(int k=0;k<4;++k){
-                i32 jj = (i32)jf[k];
-                out->skin[i].j[k] = (jj >= 0 && jj < MAX_GLB_JOINTS) ? (u16)jj : 0;
-                out->skin[i].w[k] = wf[k]*winv;
-            }
+            for(int k=0;k<4;++k){ i32 jj = (i32)jf[k]; out->skin[i].j[k] = (jj >= 0 && jj < MAX_GLB_JOINTS) ? (u16)jj : 0; out->skin[i].w[k] = wf[k]*winv; }
         }
         
         u32 tc;
@@ -572,69 +447,51 @@ static void GltfMeshLoad(const u8* bytes, size_t size, GltfMesh* out) {
         if (out->jointCount > MAX_GLB_JOINTS) { out->jointCount = MAX_GLB_JOINTS; }
         for (u32 j = 0; j < out->jointCount; ++j) {
             out->jointNodes[j] = skin->joints[j];
-            if (skin->inverse_bind_matrices) { glbread_float(skin->inverse_bind_matrices, j, out->invBind[j], 16); }
+            if (skin->inverse_bind_matrices) { GlbCell c = GlbCellInit(skin->inverse_bind_matrices); GlbCellGet(&c,j,out->invBind[j],16); }
             else { mset(out->invBind[j], 0, sizeof(float) * 16); out->invBind[j][0] = out->invBind[j][5] = out->invBind[j][10] = out->invBind[j][15] = 1.0f; }
         }
-        
-        return;
-    }
-    
-    u32 submshCnt = 0, si = 0;
-    out->isTrAnim = true; /*Transform-based Animation (node TRS)*/
-    out->chanMap = OS_SubArenaAlloc(-1, data->nodes_count * 3 * sizeof(glb_anim_chan*));
-    for (size_t a = 0; a < data->animations_count; ++a) { GlbChanMapFill(out->chanMap, data, &data->animations[a]); } /*every animation contributes to transform anims (e.g. doors), last channel wins — mirrors the old per-frame full scan*/
-    for (size_t i=0;i<data->nodes_count;++i){
-        if (data->nodes[i].mesh){
-            for (size_t p=0;p<data->nodes[i].mesh->primitives_count;++p){
-                ++submshCnt;
-            }
-        }
-    }
-    out->submshCnt = submshCnt;
-    out->meshNodes   = OS_SubArenaAlloc(-1, submshCnt * sizeof(glb_node*));
-    out->subPos      = OS_SubArenaAlloc(-1, submshCnt * sizeof(float*));
-    out->subNrm      = OS_SubArenaAlloc(-1, submshCnt * sizeof(float*));
-    out->subUv       = OS_SubArenaAlloc(-1, submshCnt * sizeof(float*));
-    out->subVertCnt  = OS_SubArenaAlloc(-1, submshCnt * sizeof(u32));
-    out->subIndices  = OS_SubArenaAlloc(-1, submshCnt * sizeof(u32*));
-    out->subTriCount = OS_SubArenaAlloc(-1, submshCnt * sizeof(u32));
-    for (size_t i=0;i<data->nodes_count;++i) {
-        glb_node* node = &data->nodes[i]; if (!node->mesh) { continue; }
-        
-        glb_mesh* mesh = node->mesh;
-        for (size_t p = 0; p < mesh->primitives_count; ++p) {
-            glb_primitive* prim = &mesh->primitives[p];
+    } else {
+        u32 submshCnt = 0, si = 0;
+        out->isTrAnim = true; /*Transform-based Animation (node TRS)*/
+        out->chanMap = OS_SubArenaAlloc(-1, data->nodes_count * 3 * sizeof(glb_anim_chan*));
+        for (size_t a = 0; a < data->animations_count; ++a) { GlbChanMapFill(out->chanMap, data, &data->animations[a]); } /*every animation contributes to transform anims (e.g. doors), last channel wins — mirrors the old per-frame full scan*/
+        for (size_t i=0;i<data->nodes_count;++i){ if (data->nodes[i].mesh){ for (size_t p=0;p<data->nodes[i].mesh->primitives_count;++p){ ++submshCnt; } } }
+        out->submshCnt = submshCnt;
+        out->meshNodes   = OS_SubArenaAlloc(-1, submshCnt * sizeof(glb_node*));
+        out->subPos      = OS_SubArenaAlloc(-1, submshCnt * sizeof(float*));
+        out->subNrm      = OS_SubArenaAlloc(-1, submshCnt * sizeof(float*));
+        out->subUv       = OS_SubArenaAlloc(-1, submshCnt * sizeof(float*));
+        out->subVertCnt  = OS_SubArenaAlloc(-1, submshCnt * sizeof(u32));
+        out->subIndices  = OS_SubArenaAlloc(-1, submshCnt * sizeof(u32*));
+        out->subTriCount = OS_SubArenaAlloc(-1, submshCnt * sizeof(u32));
+        for (size_t i=0;i<data->nodes_count;++i) {
+            glb_node* node = &data->nodes[i]; if (!node->mesh) { continue; }
             
-            const glb_accessor* posAcc = glb_find_accessor(prim, glb_attribute_type_position, 0);
-            const glb_accessor* nrmAcc = glb_find_accessor(prim, glb_attribute_type_normal,   0);
-            const glb_accessor* uvAcc  = glb_find_accessor(prim, glb_attribute_type_texcoord, 0);
-            if (!posAcc) { continue; }
-            
-            u32 vc = (u32)posAcc->count;
-            out->meshNodes[si]  = node;
-            out->subVertCnt[si] = vc;
-            out->subPos[si] = OS_SubArenaAlloc(-1, vc * 3 * sizeof(float));
-            out->subNrm[si] = OS_SubArenaAlloc(-1, vc * 3 * sizeof(float));
-            out->subUv[si]  = OS_SubArenaAlloc(-1, vc * 2 * sizeof(float));
-            const GlbCell posC = GlbCellInit(posAcc), nrmC = nrmAcc ? GlbCellInit(nrmAcc) : (GlbCell){0}, uvC = uvAcc ? GlbCellInit(uvAcc) : (GlbCell){0};
-            for (u32 v = 0; v < vc; ++v) {
-                GlbLoadVtx(&posC, &nrmC, &uvC, nrmAcc != NULL, uvAcc != NULL, v, out->subPos[si] + v*3, out->subNrm[si] + v*3, out->subUv[si] + v*2);
+            glb_mesh* mesh = node->mesh;
+            for (size_t p = 0; p < mesh->primitives_count; ++p) {
+                glb_primitive* prim = &mesh->primitives[p];
+                const glb_accessor* posAcc = glb_find_accessor(prim,glb_attribute_type_position,0);
+                const glb_accessor* nrmAcc = glb_find_accessor(prim,glb_attribute_type_normal,  0);
+                const glb_accessor* uvAcc  = glb_find_accessor(prim,glb_attribute_type_texcoord,0);
+                if (!posAcc) { continue; }
+                
+                u32 vc = (u32)posAcc->count;
+                out->meshNodes[si]  = node;
+                out->subVertCnt[si] = vc;
+                out->subPos[si] = OS_SubArenaAlloc(-1, vc * 3 * sizeof(float));
+                out->subNrm[si] = OS_SubArenaAlloc(-1, vc * 3 * sizeof(float));
+                out->subUv[si]  = OS_SubArenaAlloc(-1, vc * 2 * sizeof(float));
+                const GlbCell posC = GlbCellInit(posAcc), nrmC = nrmAcc ? GlbCellInit(nrmAcc) : (GlbCell){0}, uvC = uvAcc ? GlbCellInit(uvAcc) : (GlbCell){0};
+                for (u32 v = 0; v < vc; ++v) { GlbLoadVtx(&posC, &nrmC, &uvC, nrmAcc != NULL, uvAcc != NULL, v, out->subPos[si] + v*3, out->subNrm[si] + v*3, out->subUv[si] + v*2); }
+                u32 tc;
+                out->subIndices[si] = GlbLoadIndices(prim, vc, &tc);
+                out->subTriCount[si]=tc; ++si;
             }
-            u32 tc;
-            out->subIndices[si] = GlbLoadIndices(prim, vc, &tc);
-            out->subTriCount[si]=tc; ++si;
         }
     }
 }
  
-static void SkinNodeGlobal(const GltfMesh* gm, glb_node* node, float t, float (*glob)[16], u8* state) {
-    size_t ni = (size_t)(node - gm->gltf->nodes); if (state[ni]) { return; }
-    
-    float l[16]; NodeLocalMatrixAtTime(gm, node, t, l);
-    if (node->parent) { size_t pi = (size_t)(node->parent - gm->gltf->nodes); SkinNodeGlobal(gm, node->parent, t, glob, state); mul_mat4(glob[ni],glob[pi], l); } else { mcpy(glob[ni], l, sizeof(l)); }
-    state[ni] = 1;
-}
-
+static void SkinNodeGlobal(const GltfMesh* gm, glb_node* node, float t, float (*glob)[16], u8* state) { size_t ni = (size_t)(node - gm->gltf->nodes); if (state[ni]) { return; } float l[16]; NodeLocalMatrixAtTime(gm, node, t, l); if (node->parent) { size_t pi = (size_t)(node->parent - gm->gltf->nodes); SkinNodeGlobal(gm, node->parent, t, glob, state); mul_mat4(glob[ni],glob[pi], l); } else { mcpy(glob[ni], l, sizeof(l)); } state[ni] = 1; }
 typedef struct { GltfMesh* mesh; u32 modelIndex; float timelineFrame; } GltfFrameTask;
 typedef struct { GltfFrameTask* tasks; u32 start, end; int tid; } GltfBakeTask;
 static void* GltfBakeWorker(void* arg) {
@@ -696,9 +553,8 @@ static void* GltfBakeWorker(void* arg) {
             rng.mx = _mm_set1_ps(-1000000000.0f);
             ec = 0; u32 cornerCount = gm->triCount * 3;
             for (u32 k_idx = 0; k_idx < cornerCount; ++k_idx) {
-                u32 vi = gm->indices[k_idx];
-                if (vi >= gm->vertCount) { continue; }
-                if (unlikely(ec + 1 > MAX_OUTPUT_VERTS)) { DualLogError("glbanim:vert overflow\n"); break; }
+                u32 vi = gm->indices[k_idx]; if (vi >= gm->vertCount) { continue; }
+                if (unlikely(ec + 1 >= MAX_OUTPUT_VERTS)) { DualLogError("glb vert overflow\n"); break; }
                 
                 rng = GlbBakeEmit(sv + (ec << 3), rng, posedPos[vi * 3 + 0], posedPos[vi * 3 + 1], posedPos[vi * 3 + 2], posedNrm[vi * 3 + 0], posedNrm[vi * 3 + 1], posedNrm[vi * 3 + 2], gm->uv[vi * 2 + 0], gm->uv[vi * 2 + 1]);
                 ++ec;
@@ -711,11 +567,11 @@ static void* GltfBakeWorker(void* arg) {
 
 static GltfFrameTask* glb_Tasks = NULL; static u32 glb_TaskCount = 0;
 void LoadGLBAnimatedSources(ModelData* entries, u32 entryCount, RawOBJ* raw) {
-    gBlockMeshCount = 0; u32 maxTasks = 0, taskCount = 0;
+    u32 gBlockMeshCount = 0; u32 maxTasks = 0, taskCount = 0;
     for (u32 i=0;i<entryCount;++i) { if(entries[i].animated && IsGLBSourcePath(entries[i].path)){maxTasks += entries[i].frameCount;} }
     glb_TaskCount = 0; if(!maxTasks){return;}
     
-    gBlockMeshes = OS_SubArenaAlloc(-1, (size_t)MAX_GLB_BLOCKS * sizeof(GltfMesh));
+    GltfMesh* gBlockMeshes = OS_SubArenaAlloc(-1, (size_t)MAX_GLB_BLOCKS * sizeof(GltfMesh));
     glb_Tasks    = OS_SubArenaAlloc(-1, (size_t)maxTasks * sizeof(GltfFrameTask));
     for (u32 i = 0; i < entryCount; ++i) {
         if (!entries[i].animated || !IsGLBSourcePath(entries[i].path)) { continue; }
@@ -725,31 +581,17 @@ void LoadGLBAnimatedSources(ModelData* entries, u32 entryCount, RawOBJ* raw) {
         ++gBlockMeshCount; u16 a=entries[i].animationNum; float framerate=0.0f;
         if (a < MAXANIM) {  for (u32 c=0;c<MAX_ANIMCLIPS;++c) { if(mdlAnimClips[a][c].framerate > 0.0f){framerate = mdlAnimClips[a][c].framerate; break;} }  }
         if (framerate <= 0.0f) { framerate = 30.0f; /*Fallback if undefined*/ }
-        for (u32 fi=0;fi<entries[i].frameCount; ++fi) {
-            u32 frameNum = entries[i].frames[fi]; u32 modelIdx = entries[i].index + fi; /*Contiguous index, sparse frame*/
-            glb_Tasks[taskCount].mesh          = gm;
-            glb_Tasks[taskCount].modelIndex    = modelIdx;
-            glb_Tasks[taskCount].timelineFrame = (float)frameNum / framerate;
-            ++taskCount;
-        }
+        for (u32 fi=0;fi<entries[i].frameCount; ++fi) { u32 frameNum = entries[i].frames[fi]; u32 modelIdx = entries[i].index + fi; /*Contiguous index, sparse frame*/ glb_Tasks[taskCount].mesh = gm; glb_Tasks[taskCount].modelIndex = modelIdx; glb_Tasks[taskCount].timelineFrame = (float)frameNum / framerate; ++taskCount; }
     }
-    
     glb_TaskCount = taskCount;
 }
 
 typedef struct { void* (*fn)(void*); void* arg; } PoolJob;
-static PoolJob poolJobs[32];
-static u32 poolJobCount, poolJobNext, poolJobDone, poolGen, poolStop, poolPending, poolReady, poolThreadCnt = 0;
-static OS_Thread poolThreads[32];
+static PoolJob poolJobs[32]; static u32 poolJobCount, poolJobNext, poolJobDone, poolGen, poolStop, poolPending, poolReady, poolThreadCnt = 0; static OS_Thread poolThreads[32];
 static void* PoolWorker(void* arg) { (void)arg; __atomic_fetch_add(&poolReady,1,__ATOMIC_ACQ_REL); u32 last=0; for(;;) { while(__atomic_load_n(&poolGen,__ATOMIC_ACQUIRE)==last) { if(__atomic_load_n(&poolStop,__ATOMIC_ACQUIRE)) return NULL; OS_FutexWait(&poolGen,last); } last=__atomic_load_n(&poolGen,__ATOMIC_ACQUIRE); for(;;) { u32 j=__atomic_fetch_add(&poolJobNext,1,__ATOMIC_RELAXED); if(j>=poolJobCount) break; poolJobs[j].fn(poolJobs[j].arg); } if(__atomic_fetch_add(&poolJobDone,1,__ATOMIC_ACQ_REL)+1u == poolThreadCnt) OS_FutexWakeAll(&poolJobDone); } }
 static void PoolDispatch(PoolJob* jobs, u32 count) { if(!poolThreadCnt || count<=1) { poolPending=0; for(u32 i=0;i<count;++i) jobs[i].fn(jobs[i].arg); return; } for(u32 i=0;i<count;++i) poolJobs[i]=jobs[i]; poolJobCount=count; __atomic_store_n(&poolJobNext,0,__ATOMIC_RELAXED); __atomic_store_n(&poolJobDone,0,__ATOMIC_RELAXED); poolPending=1; __atomic_fetch_add(&poolGen,1,__ATOMIC_RELEASE); OS_FutexWakeAll(&poolGen); }
 static void PoolRun(PoolJob* jobs, u32 count) { PoolDispatch(jobs,count); if(!poolPending) return; for(;;) { u32 j=__atomic_fetch_add(&poolJobNext,1,__ATOMIC_RELAXED); if(j<poolJobCount) { poolJobs[j].fn(poolJobs[j].arg); continue; } u32 d=__atomic_load_n(&poolJobDone,__ATOMIC_ACQUIRE); if(d >= poolThreadCnt) break; OS_FutexWait(&poolJobDone,d); } poolPending=0; }
-// Recursive(ew gross!) centroid-based, each tri goes into exactly one octant containing its centroid, no tri dupes.
-// The node AABB is the union of its tri AABBs (NOT the octant AABB) — guarantees any query that overlaps a tri also overlaps its ancestor nodes,
-// so traversal never misses a tri. triIdxArray is modified in-place: on return it is partitioned by octant so that each child's triangles are contiguous (matches the leaf ranges written to ctx->triOrder).
-static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, u16 m, const float* restrict pos, const u16* restrict tris, u16* triIdxArray, u32 triCount, u32 depth) {
-    if (triCount == 0) { return -1; }
-    
+static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, const float* restrict pos, const u16* restrict tris, u16* triIdxArray, u32 triCount, u32 depth) {    
     if (ctx->nodeCount >= BVH_MAX_NODES_PER_MDL) { depth = BVH_MAX_DEPTH; }
     i32 nodeIdx = ctx->nodeCount++;
     BvhNode* node = &ctx->nodes[nodeIdx];
@@ -768,13 +610,13 @@ static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, u16 m, const float* restric
         mx_v = _mm_max_ps(mx_v, _mm_max_ps(_mm_max_ps(v0, v1), v2));
     }
     float mn_arr[4], mx_arr[4];
-    _mm_storeu_ps(mn_arr, mn_v);
-    _mm_storeu_ps(mx_arr, mx_v);
+    (*(__m128_u *)mn_arr = mn_v);
+    (*(__m128_u *)mx_arr = mx_v);
     node->mn = (V3){mn_arr[0], mn_arr[1], mn_arr[2]};
     node->mx = (V3){mx_arr[0], mx_arr[1], mx_arr[2]};
     if (depth >= 3 || triCount <= BVH_LEAF_MAX_TRIS || ctx->nodeCount + 8 > BVH_MAX_NODES_PER_MDL) {
         u32 startIdx = ctx->triCount;
-        for (u32 i = 0; i < triCount && ctx->triCount < BVH_MAX_TRIS_PER_MDL; i++) { ctx->triOrder[ctx->triCount++] = triIdxArray[i]; }
+        for (u32 i = 0; i < triCount; i++) { ctx->triOrder[ctx->triCount++] = triIdxArray[i]; }
         node->triStart = startIdx;
         node->triCount = (u16)triCount;
         return nodeIdx;
@@ -804,12 +646,7 @@ static i32 BvhBuildOctree(BvhBuildCtx* restrict ctx, u16 m, const float* restric
         ctx->triScratch[octantStarts[o] + octantFill[o]++] = triIdxArray[i];
     }
     for (u32 i = 0; i < triCount; i++) { triIdxArray[i] = ctx->triScratch[i]; }
-    for (int o = 0; o < 8; o++) {
-        if (octantCounts[o] == 0) { continue; }
-        
-        i32 childIdx = BvhBuildOctree(ctx,m,pos,tris,triIdxArray + octantStarts[o],octantCounts[o],depth + 1);/*We re curse a little*/
-        if (childIdx >= 0) { node->children[o] = (i16)childIdx; }
-    }
+    for (int o = 0; o < 8; o++) { if (octantCounts[o] == 0) { continue; } i32 childIdx = BvhBuildOctree(ctx,pos,tris,triIdxArray + octantStarts[o],octantCounts[o],depth + 1);/*We re curse a little*/ node->children[o] = (i16)childIdx; }
     return nodeIdx;
 }
 
@@ -888,10 +725,10 @@ static void* ModelParsingWorker(void* arg) {
     } return NULL;
 }
 
-bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
+void ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
     FHandle fd; int sz; char* buf = OS_OpenAndAllocateFileBufferReadonly(fn, &fd, &sz); char *c = buf, *e = buf + sz; u32 maxidx = 0, ln = 0;
     while (c < e) {/*first pass to find max index*/ char* s = c; while (c < e && *c != '\n' && *c != '\r') ++c; if (c - s > 5) { while (cEmpty(*s)) {++s;} char* col = StringFindFirstCharWithin(s, ':'); if (col && sCompUpToLen(s, "index", col - s) == 0) { u32 idx = parse_numberu32(col+1, s, ln); if(idx > maxidx){maxidx=idx;} } } if (c < e && *c == '\r') ++c; if (c < e && *c == '\n') ++c; ++ln; }
-    if (!maxidx) { DualLogWarn("No entries in %s\n", fn); OS_Free(buf,sz); return true; } if (maxidx >= maxSz) { DualLogWarn("Index too large in %s\n", fn); OS_Free(buf,sz); return true; }
+    if (!maxidx) { DualLogWarn("No entries in %s\n", fn); OS_Exit(1); } if (maxidx >= maxSz) { DualLogWarn("Index too large in %s\n", fn); OS_Exit(1); }
     u32 cnt = maxidx + 1; ModelData* ents = OS_AllocScratch(cnt * sizeof(ModelData)); p->entries = ents; p->count = cnt; for (u32 i=0; i<cnt; ++i) {ents[i] = (ModelData){U16_MAX,false,255,NULL,0,{0}};} ModelData cur = {U16_MAX,false,255,NULL,0,{0}}; c = buf; e = buf+sz; ln = 0;
     while (c < e) {
         char* s = c; while (c < e && *c != '\n' && *c != '\r') ++c; size_t len = c - s; ++ln; if (len < 3) { if (c<e && (*c=='\r'||*c=='\n')) ++c; continue; } while (cEmpty(*s)) ++s; char* le = s + len - 1; while (le > s && cEmpty(*le)) --le; if (*s == '/' && s[1] == '/') goto next;
@@ -908,7 +745,7 @@ bool ParseModelData(ModelDataParser *p, u16 maxSz, const char *fn) {
             }
             
         } next: if (c < e && *c == '\r') ++c; if (c < e && *c == '\n') ++c;
-    } if (cur.path[0] && cur.index != U16_MAX && cur.index < cnt) ents[cur.index] = cur; OS_Free(buf, sz); return true;
+    } if (cur.path[0] && cur.index != U16_MAX && cur.index < cnt) ents[cur.index] = cur; OS_Free(buf, sz);
 }
 
 float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { // Ray-vs-AABB slab test. Returns entry t (>=0) if the ray hits the AABB within [0, maxDist], or -1.0f if no hit. Handles axis-aligned rays (zero direction component) correctly.
@@ -918,10 +755,8 @@ float BvhRayAABBHit(V3 origin, V3 dir, V3 mn, V3 mx, float maxDist) { // Ray-vs-
     if (vabs(dir.z) < 0.00000001f) { if (origin.z < mn.z || origin.z > mx.z) return -1.0f; } else { float inv=1.0f/dir.z; float t1=(mn.z-origin.z) * inv, t2=(mx.z-origin.z) * inv; if(t1 > t2){float t=t1; t1=t2; t2=t;} if(t1 > tmin){tmin=t1;} if(t2 < tmax){tmax=t2;} if (tmin > tmax) return -1.0f; } /*Z slab*/ return tmin;
 }
 
-#define _mm256_cvtps_ph(A, imm) ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)(A), (int)(imm)))
 static void WeldModelPositions(u16 m, u32* weldHt, u32* weldHtUsed, u16* remap, i32 tid) {
-    u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m]; if (!vc || !tc) { physPos[m] = NULL; physTris[m] = NULL; physVertCounts[m] = 0; return; }
-    
+    u32 vc = modelVertexCounts[m], tc = modelTriangleCounts[m];
     const float* src=vPos[m]; void* sub_mark=OS_SubArenaMark(tid);
     u32 usedSlots=0, weldedCount=0;
     float* weldedPos=OS_SubArenaAlloc(tid,vc*3*sizeof(float));
@@ -957,53 +792,30 @@ static void* PhysGeomWorker(void* a) {
     for (u32 m = t->start; m < t->end; ++m) {
         if (!modelVertexCounts[m]/*Empty slot*/) { physPos[m] = NULL; physTris[m] = NULL; physVertCounts[m] = 0; continue; }
         
-        WeldModelPositions((u16)m, ht, u, sc, t->tid);
-        u16 bvh_m = (u16)m;
-        if (bvh_m < mdlsCnt && bvh_m < MAX_MDLS) {
-            modelBVHNodes[bvh_m] = NULL;
-            modelBVHTriOrder[bvh_m] = NULL;
-            modelBVHNodeCounts[bvh_m] = modelBVHTriOrderCounts[bvh_m] = 0;
-            u32 triCount = modelTriangleCounts[bvh_m];
-                    if (triCount == 0 || triCount > BVH_MAX_TRIS_PER_MDL) { DualLogError("Too many verts on model %u!  Could not build a BVH!\n", bvh_m); }
-            else if (physPos[bvh_m] && physTris[bvh_m]) {
-                bvhCtx->nodeCount = bvhCtx->triCount = 0; u16* initialTris = bvhCtx->initialTris;
-                for (u32 tri_i = 0; tri_i < triCount; tri_i++) { initialTris[tri_i] = (u16)tri_i; }
-                i32 rootIdx = BvhBuildOctree(bvhCtx, bvh_m, physPos[bvh_m], physTris[bvh_m], initialTris, triCount, 0);
-                if (rootIdx >= 0 && bvhCtx->nodeCount > 0) {
-                    modelBVHNodes[bvh_m] = OS_Alloc(bvhCtx->nodeCount * sizeof(BvhNode));
-                    mcpy(modelBVHNodes[bvh_m], bvhCtx->nodes, bvhCtx->nodeCount * sizeof(BvhNode));
-                    modelBVHNodeCounts[bvh_m] = bvhCtx->nodeCount;
-                    if (bvhCtx->triCount > 0) {
-                        modelBVHTriOrder[bvh_m] = OS_Alloc(bvhCtx->triCount * sizeof(u16));
-                        if (modelBVHTriOrder[bvh_m]) { mcpy(modelBVHTriOrder[bvh_m], bvhCtx->triOrder, bvhCtx->triCount * sizeof(u16)); modelBVHTriOrderCounts[bvh_m] = bvhCtx->triCount; }
-                    }
-                }
-            }
+        WeldModelPositions((u16)m,ht,u,sc,t->tid);
+        modelBVHNodes[m] = NULL;
+        modelBVHTriOrder[m] = NULL;
+        modelBVHNodeCounts[m] = modelBVHTriOrderCounts[m] = 0;
+        u32 triCount = modelTriangleCounts[m];
+        bvhCtx->nodeCount = bvhCtx->triCount = 0; u16* initialTris = bvhCtx->initialTris;
+        for (u32 tri_i = 0; tri_i < triCount; tri_i++) { initialTris[tri_i] = (u16)tri_i; }
+        BvhBuildOctree(bvhCtx,physPos[m],physTris[m],initialTris,triCount,0);
+        if (bvhCtx->nodeCount > 0) {
+            modelBVHNodes[m] = OS_Alloc(bvhCtx->nodeCount * sizeof(BvhNode));
+            mcpy(modelBVHNodes[m], bvhCtx->nodes, bvhCtx->nodeCount * sizeof(BvhNode));
+            modelBVHNodeCounts[m] = bvhCtx->nodeCount;
+            if (bvhCtx->triCount > 0) { modelBVHTriOrder[m] = OS_Alloc(bvhCtx->triCount * sizeof(u16)); mcpy(modelBVHTriOrder[m], bvhCtx->triOrder, bvhCtx->triCount * sizeof(u16)); modelBVHTriOrderCounts[m] = bvhCtx->triCount; }
         }
-    }
-    return NULL;
+    } return NULL;
 }
 
 void LoadModels() {
     double startModelTime = get_time();
-    ModelDataParser mp = {0};
-    if (!ParseModelData(&mp,MAX_MDLS,"./Data/models.txt")) { DualLogError("Failed models.txt\n"); OS_Exit(1); }
-    
+    ModelDataParser mp = {0}; ParseModelData(&mp,MAX_MDLS,"./Data/models.txt");
     u32 maxid = 0, totalActual = 0;
-    for (u32 i=0;i<mp.count;++i) {
-        if (mp.entries[i].index == U16_MAX){continue;}
-        
-        totalActual++;
-        if (mp.entries[i].index > maxid) { maxid = mp.entries[i].index; }
-        if (mp.entries[i].animated && IsGLBSourcePath(mp.entries[i].path)) {
-            u32 blockMax = mp.entries[i].index + (mp.entries[i].frameCount > 0 ? (mp.entries[i].frameCount - 1) : 0);
-            if(blockMax > maxid) { maxid=blockMax; }
-        }
-    }
-    
+    for (u32 i=0;i<mp.count;++i) { if (mp.entries[i].index == U16_MAX){continue;} totalActual++; if (mp.entries[i].index > maxid) { maxid = mp.entries[i].index; } if (mp.entries[i].animated && IsGLBSourcePath(mp.entries[i].path)) { u32 blockMax = mp.entries[i].index + (mp.entries[i].frameCount > 0 ? (mp.entries[i].frameCount - 1) : 0); if(blockMax > maxid) { maxid=blockMax; } } }    
     DualLog("Loading   models ( %d) ...",totalActual);
-    mdlsCnt = (u16)maxid + 1;
-    if ((u16)maxid > MAX_MDLS){DualLogError("Too many models!  Exceeds %u!\n",MAX_MDLS); OS_Exit(1);}
+    mdlsCnt = (u16)maxid + 1; if ((u16)maxid >= MAX_MDLS){DualLogError("Too many models!  Exceeds %u!\n",MAX_MDLS); OS_Exit(1);}
     
     vPos = OS_AllocScratch(mdlsCnt * sizeof(float*))/*Safe to use scratch, reassigned later to persistent deduplicated buffer*/;
     modelTriangles = OS_Alloc(mdlsCnt * sizeof(u16*));
@@ -1020,13 +832,7 @@ void LoadModels() {
     for (u32 i=0; i<mp.count; ++i) { if(mp.entries[i].index != U16_MAX){ FHandle d; int sz=0; raw[i].data=(const char*)OS_OpenAndAllocateFileBufferReadonly(mp.entries[i].path,&d,&sz); raw[i].size=sz;} }
     bool* isGLBAnimSrc = OS_AllocScratch(mdlsCnt * sizeof(bool));
     bool* isGLBStaticSrc = OS_AllocScratch(mdlsCnt * sizeof(bool));
-    for (u32 i=0; i<mp.count; ++i) {
-        if (mp.entries[i].index == U16_MAX || !IsGLBSourcePath(mp.entries[i].path)){continue;}
-        
-        if (mp.entries[i].animated) isGLBAnimSrc[mp.entries[i].index] = true;
-        else isGLBStaticSrc[mp.entries[i].index] = true;
-    }
-    
+    for (u32 i=0; i<mp.count; ++i) { if (mp.entries[i].index == U16_MAX || !IsGLBSourcePath(mp.entries[i].path)){continue;} if (mp.entries[i].animated) isGLBAnimSrc[mp.entries[i].index] = true; else isGLBStaticSrc[mp.entries[i].index] = true; }
     BvhNode **bvh_nodes_p = (BvhNode**)p; p = ARENA_ALIGN(p + threadCnt*sizeof(BvhNode*));
     u8 **bvh_oct_p = (u8**)p;             p = ARENA_ALIGN(p + threadCnt*sizeof(u8*));
     u16 **bvh_order_p = (u16**)p;         p = ARENA_ALIGN(p + threadCnt*sizeof(u16*));
@@ -1050,8 +856,7 @@ void LoadModels() {
         mset(meshScratch[i].hash, 0xFF, WELD_HASH_SIZE * sizeof(u32));
         thrd_bvh_ctx[i]=(BvhBuildCtx){ .nodes = bvh_nodes_p[i], .triOctants = bvh_oct_p[i], .triOrder = bvh_order_p[i], .triScratch = bvh_scr_p[i], .initialTris = bvh_init_p[i], .nodeCount = 0, .triCount = 0 };
     }
-    
-    const size_t SUB_ARENA_SZ = (3ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt);
+    const size_t SUB_ARENA_SZ = (2ULL * 512 * 1024) * ((32ULL + threadCnt - 1) / threadCnt);
     const size_t SUB_MAIN_SZ = 12ULL * 1024 * 1024; size_t slices_tot = SUB_ARENA_SZ * (size_t)threadCnt + SUB_MAIN_SZ; size_t slice_room = (size_t)(scratch_end - scratch_cur) - 4096;
     if (slices_tot > slice_room) { DualLogError("Not enough scratch room for model sub-arenas: need %u MB, %u MB free!\n", (u32)(slices_tot >> 20),(u32)(slice_room >> 20)); OS_Exit(1); }
     
@@ -1073,22 +878,12 @@ void LoadModels() {
         u32 waveStart = mp.entries[valid[w0]].index;
         if (waveStart < prevEnd) waveStart = prevEnd;
         u32 w1 = w0, files = 0, waveEnd = waveStart;
-        while (w1 < validCount) {
-            ModelData* e = &mp.entries[valid[w1]]; if (files >= WAVE_FILES_SZ && e->index >= waveEnd) { break; /* budget reached and no overlapping span pending: overlapping entries are always absorbed so a block is never split */}
-                
-            u32 span = (e->animated && e->frameCount) ? e->frameCount : 1;
-            u32 end = e->index + span;
-            if (end > waveEnd) waveEnd = end;
-            ++w1;
-            ++files;
-        }
-        if (waveEnd > mdlsCnt) waveEnd = mdlsCnt; if (waveStart >= waveEnd) { w0 = w1; continue; } /* fully buried in previous wave's overlap: already processed */
+        while (w1 < validCount) { ModelData* e = &mp.entries[valid[w1]]; if (files >= WAVE_FILES_SZ && e->index >= waveEnd) { break; } u32 span = (e->animated && e->frameCount) ? e->frameCount : 1; u32 end = e->index + span; if (end > waveEnd) waveEnd = end; ++w1; ++files; }
+        if (waveEnd > mdlsCnt) waveEnd = mdlsCnt; if (waveStart >= waveEnd) { w0 = w1; continue; }
 
         for (u32 sub = waveStart; sub < waveEnd; ) {
-            u32 subEnd = sub + SUB_MODELS_SZ;
-            if (subEnd > waveEnd) subEnd = waveEnd;
-            void* wmarks[32];
-            for (u32 si = 0; si < threadCnt; ++si) { wmarks[si] = OS_SubArenaMark(si); }
+            u32 subEnd = sub + SUB_MODELS_SZ; if (subEnd > waveEnd) subEnd = waveEnd;
+            void* wmarks[32]; for (u32 si = 0; si < threadCnt; ++si) { wmarks[si] = OS_SubArenaMark(si); }
             u32 wcnt = subEnd - sub; u32 chunk = (wcnt + threadCnt - 1) / threadCnt;
             for (int i=0;i<(i32)threadCnt;++i) { tasks[i] = (ModelParseTask){sub + (u32)i*chunk, ((u32)i+1)*chunk > wcnt ? subEnd : sub + ((u32)i+1)*chunk,raw,isGLBAnimSrc,isGLBStaticSrc,i}; pjobs[i] = (PoolJob){ModelParsingWorker,&tasks[i]}; }
             PoolRun(pjobs, threadCnt);
@@ -1113,7 +908,10 @@ void LoadModels() {
                 if (!modelVertexCounts[i]) {continue;/*Skip unused index slots*/} tv += modelVertexCounts[i]; tt += modelTriangleCounts[i]; size_t vcz = (size_t)modelVertexCounts[i] * VRT_ATT_SZ, tcz = (size_t)modelTriangleCounts[i] * 3 * sizeof(u16);
                 rtSrcVertCounts[i] = modelVertexCounts[i];
                 glBindBuffer(GL_ARRAY_BUFFER,vbos[i]); glBufferData(GL_ARRAY_BUFFER,vcz,NULL,GL_STATIC_DRAW); half* mpv = (half*)glMapBufferRange(GL_ARRAY_BUFFER,0,vcz,0x0002/*GL_MAP_WRITE_BIT*/|0x08/*GL_MAP_INVALIDATE_BUFFER_BIT*/); u32 vc = modelVertexCounts[i]; const float *verts=vPos[i];
-                for (u32 k = 0; k < vc; ++k) { __m256 v_in=(*(__m256_u const *)(&verts[k*8])); __m128i v_half=_mm256_cvtps_ph(v_in,0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/); _mm_storeu_si128((__m128i*)&mpv[k*8],v_half); }
+                for (u32 k = 0; k < vc; ++k) {
+                    __m256 v_in=(*(__m256_u const *)(&verts[k*8]));
+                    __m128i v_half = ((__m128i)__builtin_ia32_vcvtps2ph256((__v8sf)(__m256)v_in, (int)(0x00/*_MM_FROUND_TO_NEAREST_INT*/|0x08/*_MM_FROUND_NO_EXC*/)));
+                    _mm_storeu_si128((__m128i*)&mpv[k*8],v_half); }
                 glUnmapBuffer(GL_ARRAY_BUFFER); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,tbos[i]); glBufferData(GL_ELEMENT_ARRAY_BUFFER,tcz+4,NULL,GL_STATIC_DRAW); void* mpt = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER,0,tcz+4,0x0002/*GL_MAP_WRITE_BIT*/|0x0008/*GL_MAP_INVALIDATE_BUFFER_BIT*/); mcpy(mpt,modelTriangles[i],tcz); mset((u8*)mpt+tcz,0,4); glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER); /*+4 zero pad: rtcopy.compute reads indices as u32 words, its last read crosses the end by up to 2 bytes when the index count is odd*/
             }
             glBindBuffer(GL_ARRAY_BUFFER,0);
@@ -1188,11 +986,7 @@ void UpdateAnims(void) {
         
         if (animTest == 1) {
             u8 validClips[MAX_ANIMCLIPS], numValid=0, targetClipIdx=0; double totalDuration = 0.0;
-            for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) {
-                AnimationClip* test = &mdlAnimClips[e->animationNum][c];
-                if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; }
-            }
-            
+            for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &mdlAnimClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; double dur = (double)(test->frameEnd - test->frameStart + 1) / ((double)test->framerate * test->speed); totalDuration += dur; } }
             if (numValid == 0) { continue; }
             
             e->currentFrameFinished += animDT;
@@ -1200,59 +994,38 @@ void UpdateAnims(void) {
             if (e->currentFrameFinished < 0.0) { e->currentFrameFinished = 0.0; }
             double t = e->currentFrameFinished, clipStartTime = 0.0;
             AnimationClip* activeClip = &mdlAnimClips[e->animationNum][validClips[0]];
-            for (u8 j=0;j<numValid;++j) {
-                activeClip=&mdlAnimClips[e->animationNum][validClips[j]];
-                double activeDur = (double)(activeClip->frameEnd - activeClip->frameStart + 1) / ((double)activeClip->framerate * activeClip->speed);
-                if (t<clipStartTime + activeDur) { targetClipIdx = j; break; }
-                
-                clipStartTime += activeDur;
-                if (j==numValid - 1) { targetClipIdx = j; t = clipStartTime; }
-            }
-            u8 targetClip = validClips[targetClipIdx];
-            double timeInClip = t - clipStartTime, timePerFrame = 1.0 / ((double)activeClip->framerate * activeClip->speed);
-            u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1, frameOffset = (u32)(timeInClip / timePerFrame);
+            for (u8 j=0;j<numValid;++j) { activeClip=&mdlAnimClips[e->animationNum][validClips[j]]; double activeDur = (double)(activeClip->frameEnd - activeClip->frameStart + 1) / ((double)activeClip->framerate * activeClip->speed); if (t<clipStartTime + activeDur) { targetClipIdx = j; break; }  clipStartTime += activeDur; if (j==numValid - 1) { targetClipIdx = j; t = clipStartTime; } }
+            u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1, frameOffset = (u32)((t - clipStartTime) / (1.0 / ((double)activeClip->framerate * activeClip->speed)));
             if (frameOffset >= frameCount) frameOffset = frameCount - 1;
             u32 newFrame = activeClip->frameStart + frameOffset;
             u16 newModel = activeClip->frameStartModelIndex + frameOffset;
-            bool frameUpdated = (e->clip != targetClip || e->frame != newFrame || e->modelIndex != newModel);
-            e->clip = targetClip; e->frame = newFrame; e->modelIndex = newModel;
-            if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
+            e->clip = validClips[targetClipIdx]; e->frame = newFrame; e->modelIndex = newModel;
+            if ((e->clip != validClips[targetClipIdx] || e->frame != newFrame || e->modelIndex != newModel) && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
         } else if (animTest == 2) {
             if (Sys_Input.keyStates[KEY_1].pressed || Sys_Input.keyStates[KEY_2].pressed) {
                 u8 validClips[MAX_ANIMCLIPS], numValid=0;
                 for (u8 c = 0; c < MAX_ANIMCLIPS; ++c) { AnimationClip* test = &mdlAnimClips[e->animationNum][c]; if (test->framerate > 0 && test->speed > 0) { validClips[numValid++] = c; } }
-                if (numValid > 0) { // Locate the current clip within the valid list (default to first if out of range)
+                if (numValid > 0) {
                     u8 currentValidIdx = 0; for (u8 j = 0; j < numValid; ++j) { if (validClips[j] == e->clip) { currentValidIdx = j; break; } }
                     AnimationClip* activeClip = &mdlAnimClips[e->animationNum][validClips[currentValidIdx]]; u32 frameCount = activeClip->frameEnd - activeClip->frameStart + 1;
                     u32 currentOffset = (e->frame >= activeClip->frameStart && (e->frame - activeClip->frameStart) < frameCount) ? (e->frame - activeClip->frameStart) : 0;
                     if (Sys_Input.keyStates[KEY_1].pressed) { currentOffset++; if (currentOffset >= frameCount) { currentOffset = 0; currentValidIdx = (currentValidIdx + 1 >= numValid) ? 0 : (currentValidIdx + 1); activeClip = &mdlAnimClips[e->animationNum][validClips[currentValidIdx]]; } }
                     else { if (currentOffset == 0) { currentValidIdx = (currentValidIdx == 0) ? (numValid - 1) : (currentValidIdx - 1); activeClip = &mdlAnimClips[e->animationNum][validClips[currentValidIdx]]; frameCount = activeClip->frameEnd - activeClip->frameStart + 1; currentOffset = frameCount - 1; } else { currentOffset--; } }
-                    u8 targetClip = validClips[currentValidIdx]; u32 newFrame = activeClip->frameStart + currentOffset; u16 newModel = activeClip->frameStartModelIndex + currentOffset;
-                    bool frameUpdated = (e->clip != targetClip || e->frame != newFrame || e->modelIndex != newModel);
-                    e->clip = targetClip; e->frame = newFrame; e->modelIndex = newModel; e->currentFrameFinished = 0.0; if (frameUpdated && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
+                    u32 newFrame = activeClip->frameStart + currentOffset; u16 newModel = activeClip->frameStartModelIndex + currentOffset;
+                    e->clip = validClips[currentValidIdx]; e->frame = newFrame; e->modelIndex = newModel; e->currentFrameFinished = 0.0; if ((e->clip != validClips[currentValidIdx] || e->frame != newFrame || e->modelIndex != newModel) && IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) { portalsNeedUpdated = true; }
                 }
             }
         }
-        /* Clip IDs are sparse (A_DYING is 9) while numClips stores a count. Validate by table capacity and clip data, not count-vs-ID. */
-        if (animTest || e->clip >= MAX_ANIMCLIPS){continue;} AnimationClip* clip = (AnimationClip*)&mdlAnimClips[e->animationNum][e->clip]; if(e->entflags & EF_ASLEEP){e->modelIndex=clip->frameStartModelIndex; continue;} if (clip->framerate <= 0 || clip->speed <= 0) continue; e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / clip->framerate;
+        if (animTest || e->clip >= MAX_ANIMCLIPS){continue;}
+        
+        AnimationClip* clip = (AnimationClip*)&mdlAnimClips[e->animationNum][e->clip]; if(e->entflags & EF_ASLEEP){e->modelIndex=clip->frameStartModelIndex; continue;} if (clip->framerate <= 0 || clip->speed <= 0) continue; e->currentFrameFinished += animDT * clip->speed; double timePerFrame = 1.0 / clip->framerate;
         if (e->currentFrameFinished >= timePerFrame) {
             u32 framesToAdvance = (u32)(e->currentFrameFinished / timePerFrame), frameCount = clip->frameEnd - clip->frameStart + 1; u16 prevFrame = e->frame;
-            e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = (frameCount <= 1) ? clip->frameStart : clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
+            e->currentFrameFinished -= (double)framesToAdvance * timePerFrame; e->frame = clip->frameStart + ((e->frame - clip->frameStart + framesToAdvance) % frameCount); e->modelIndex = clip->frameStartModelIndex + (e->frame - clip->frameStart);
             if (e->frame != prevFrame) e->animFinished = World.current_time; // hysteresis: stamp ONLY on an actual frame change (single-frame idle clips don't restamp, so they don't hold neighbors awake)
-            if (e->index == 585 && e->frame == 16) { /*prop_sparkingwire sparks effects*/
-                V3 sparkPos = V3Add(World.position[i],(V3){0.0f,-0.88f * World.scale[i].y,0.0f});
-                PlaySparkSound(sparkPos);
-                SpawnImpactParticleForPrefab(729,sparkPos,(V3){0.0f,1.0f,0.0f});
-                ai_effect_flash(sparkPos,(Color3){0.9f,0.8f,0.6f},2.84f,4.0f,0.2f);
-            }
+            if (e->index == 585 && e->frame == 16) { /*prop_sparkingwire sparks effects*/ V3 sparkPos = V3Add(World.position[i],(V3){0.0f,-0.88f * World.scale[i].y,0.0f}); PlaySparkSound(sparkPos); SpawnImpactParticleForPrefab(729,sparkPos,(V3){0.0f,1.0f,0.0f}); ai_effect_flash(sparkPos,(Color3){0.9f,0.8f,0.6f},2.84f,4.0f,0.2f); }
             if (IdxIsPortalBlockingDoor(e->index) && ToggleDoorPortal(e->portalIndex, i, mdlAnimClips[e->animationNum][A_IDLE_CLOSED].frameStartModelIndex)) portalsNeedUpdated = true;
         }
     } if (portalsNeedUpdated){PortalCulling();}
-    if (World.weaponVModelIndex > 0 && World.weaponVModelIndex < INSTANCE_COUNT) {
-        Entity* e = &World.instances[World.weaponVModelIndex];
-        if (wfx.pendingMeleeFinished > 0.0 && World.pauseRelativeTime >= wfx.pendingMeleeFinished) {
-            e->animationNum = (Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex) == 5) ? 50 : 49;
-            e->clip = A_IDLE; e->frame = mdlAnimClips[e->animationNum][A_IDLE].frameStart; e->currentFrameFinished = 0.0;
-        }
-    }
+    if (World.weaponVModelIndex > 0 && World.weaponVModelIndex < INSTANCE_COUNT) { Entity* e = &World.instances[World.weaponVModelIndex]; if (wfx.pendingMeleeFinished > 0.0 && World.pauseRelativeTime >= wfx.pendingMeleeFinished) { e->animationNum = (Get16WeaponIndexFromConstIndex(World.invP1.weaponIndex) == 5) ? 50 : 49; e->clip = A_IDLE; e->frame = mdlAnimClips[e->animationNum][A_IDLE].frameStart; e->currentFrameFinished = 0.0; } }
 }

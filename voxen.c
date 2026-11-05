@@ -621,9 +621,8 @@ void InputMonitor(WSMon* m, int a, int p) {
     else if (a == 0x00040002) { for (int i=0;i<WinSys.monitorCount;++i) { if (WinSys.monitors[i] == m) { WinSys.monitorCount--; mmov(WinSys.monitors + i, WinSys.monitors + i + 1,((size_t) WinSys.monitorCount - i) * sizeof(WSMon*)); break; } } }
 }
 
-WSMon* GetPrimaryMonitor(void) { if (!WinSys.monitorCount) return NULL; return WinSys.monitors[0]; }
 void InputWindowFocus(i32 f) { window_has_focus = f != 0; ignore_next_mouse_delta = true; WSWin* w = window; if (!f) { for (int k=0;k<WS_KEYCOUNT;++k) if (w->keys[k] == INPUT_PRESS) InputKey(w->keys,k,INPUT_RELEASE); for (int b=0;b<MAX_MOUSE_BUTTONS;++b) if (w->mouseButtons[b] == INPUT_PRESS) InputMouseClick(w->mouseButtons,b,INPUT_RELEASE); } }
-WSMon* GetCurrentMonitor() {int wx=0,wy=0,ww=0,wh=0,bA=0; GetWindowPos(window,&wx,&wy); GetWindowSize(window,&ww,&wh); WSMon *bM=GetPrimaryMonitor(); for(int i=0;i<WinSys.monitorCount;++i){int mx,my,mw,mh; GetMonitorFullarea(WinSys.monitors[i],&mx,&my,&mw,&mh); int l=vmax(wx,mx),r=vmin(wx+ww,mx+mw), t=vmax(wy,my),b=vmin(wy+wh,my+mh); int area=(r>l&&b>t) ? (r-l)*(b-t) : 0; if(area > bA){bA =area; bM=WinSys.monitors[i];}} return bM;}
+WSMon* GetCurrentMonitor() {int wx=0,wy=0,ww=0,wh=0,bA=0; GetWindowPos(window,&wx,&wy); GetWindowSize(window,&ww,&wh); WSMon *bM = WinSys.monitors[0]; for(int i=0;i<WinSys.monitorCount;++i){int mx,my,mw,mh; GetMonitorFullarea(WinSys.monitors[i],&mx,&my,&mw,&mh); int l=vmax(wx,mx),r=vmin(wx+ww,mx+mw), t=vmax(wy,my),b=vmin(wy+wh,my+mh); int area=(r>l&&b>t) ? (r-l)*(b-t) : 0; if(area > bA){bA =area; bM=WinSys.monitors[i];}} return bM;}
 int GetCurrentMonitorIndex() {WSMon* cur=GetCurrentMonitor(); if(!cur){return 0;} for(int i=0;i<WinSys.monitorCount;++i){ if(WinSys.monitors[i]==cur){return i;} } return 0; }
 void GetFrameExtents(int* l,int* t,int* r,int* b) {
 #if defined(_WIN32)
@@ -653,6 +652,7 @@ void ComputeWindowPlacement(int monIdx, int* px, int* py) { /*shared by initial 
     int ft,fr,fb; GetFrameExtents(&fl,&ft,&fr,&fb);
     *px=(w==ww-ddw) ? wx+fl : wx+(ww-w)/2; *py=(h==wh-ddh) ? wy : wy+(wh-h)/2;
 }
+
 void PlaceWindowOnMonitor(int monIdx) {    
     int px,py; ComputeWindowPlacement(monIdx,&px,&py); SetWindowPosition(window,px,py); ignore_next_mouse_delta=true;
     #if defined(_WIN32)
@@ -679,11 +679,7 @@ void GatherResolutionModesFor(int monIdx) {
     if (resDropdownCount==0) { resModes[resDropdownCount++]=(ResMode){vmax((int)Sys_Settings.ScreenWidth,320),vmax((int)Sys_Settings.ScreenHeight,200)};}
     resSelectedIdx=-1;
     for (int i=0;i<resDropdownCount;++i) { if(resModes[i].w == keepW && resModes[i].h == keepH){resSelectedIdx=i; break;} if (resModes[i].w == (int)Sys_Settings.ScreenWidth && resModes[i].h == (int)Sys_Settings.ScreenHeight) { resSelectedIdx = i; } }
-    if(resSelectedIdx<0){
-        int cw=(int)Sys_Settings.ScreenWidth, chh=(int)Sys_Settings.ScreenHeight;
-        if (cw >= 320 && chh >= 200 && cw + fddw <= ww && chh + fddh <= wh) { resModes[resDropdownCount++] = (ResMode){cw,chh}; }
-        resSelectedIdx = resDropdownCount - 1;
-    }
+    if(resSelectedIdx<0){ int cw=(int)Sys_Settings.ScreenWidth, chh=(int)Sys_Settings.ScreenHeight; if (cw >= 320 && chh >= 200 && cw + fddw <= ww && chh + fddh <= wh) { resModes[resDropdownCount++] = (ResMode){cw,chh}; } resSelectedIdx = resDropdownCount - 1; }
 }
 
 void GatherResolutionModes() { GatherResolutionModesFor(GetCurrentMonitorIndex()); }
@@ -692,19 +688,15 @@ void ChangeFullScreenWindowed(bool adjustToFit) {
     WSMon* m = WinSys.monitors[ci]; int x,y,w,h; GetMonitorFullarea(m,&x,&y,&w,&h);
     int sddw,sddh; GetDecorationOverhead(&sddw,&sddh);/*snapshot before style flip; live read goes stale while undecorated*/
     window->decorated = (i32)(!Sys_Settings.Fullscreen); SetWindowDecorated(window, (i32)(!Sys_Settings.Fullscreen));
-    if (Sys_Settings.Fullscreen) {
-        SetWindowMonitor(x,y,w,h);
-        Sys_Settings.ScreenWidth  = w;
-        Sys_Settings.ScreenHeight = h;
-    } else {
+    if (Sys_Settings.Fullscreen) { SetWindowMonitor(x,y,w,h); Sys_Settings.ScreenWidth  = w; Sys_Settings.ScreenHeight = h; }
+    else {
         if (adjustToFit) {
             int ax,ay,aw,ah; GetMonitorWorkarea(m,&ax,&ay,&aw,&ah);
             if (aw-sddw>=320 && ah-sddh>=200) { Sys_Settings.ScreenWidth=aw-sddw; Sys_Settings.ScreenHeight=ah-sddh; } 
             else { Sys_Settings.ScreenWidth=vmax(vmin((w*3)/4,1366),320); Sys_Settings.ScreenHeight=vmax(vmin((h*3)/4,768),200); }
             SetWindowSize((int)Sys_Settings.ScreenWidth,(int)Sys_Settings.ScreenHeight);
         }
-        #if defined(_WIN32)
-            /*decorated style recalc above restores frame*/
+        #if defined(_WIN32) /*decorated style recalc above restores frame*/
         #else
             if(WinSys.x11.NWM_STATE && WinSys.x11.NWM_STATE_FULLSCREEN){ sendEventToWM(window,WinSys.x11.NWM_STATE,0,WinSys.x11.NWM_STATE_FULLSCREEN,0,1,0); }
         #endif
@@ -874,35 +866,6 @@ const Setting configTable[] = {
     S_IN("Recent Log",14), S_IN("Biomonitor",15), S_IN("Sensaround",16), S_IN("Lantern",17),     S_IN("Shield",18),    S_IN("Infrared",19),  S_IN("Email",20),     S_IN("Booster",21),  S_IN("Jumpjets",22),  S_IN("Attack",23),   S_IN("Use",24),       S_IN("Menu/Back",25),  S_IN("Toggle Mode",26), S_IN("Reload",27),
     S_IN("Weapon +",28),   S_IN("Weapon -",29),   S_IN("Grenade",30),    S_IN("Grenade +",31),   S_IN("Grenade -",32), S_IN("Ammo Type",33), S_IN("Patch Use",34), S_IN("Patch +",35),  S_IN("Patch -",36),   S_IN("Full Map",37), S_IN("Swim Up",38),   S_IN("Swim Down",39),  S_IN("Screenshot",40),  S_IN("Console",41)
 };
-
-void LoadConfig() {
-    FHandle f = OS_OpenReadonly("./Data/Config.ini"); char line[512];
-    while (sUpToEndLine(line,sizeof(line),f)) {
-        char* s = data_parser_trim(line);
-        if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
-        
-        char* eq = StringFindFirstCharWithin(s, '=');
-        if (!eq) continue; *eq = 0;
-        
-        char *key = data_parser_trim(s), *val = data_parser_trim(eq + 1);
-        for (int i=0;i<CONFIG_CNT;++i) {
-            if (sEqual(key,configTable[i].name)) {
-                     if (configTable[i].type == SETTING_U8)    *( u8*)configTable[i].ptr = (u8)s2i32(val);
-                else if (configTable[i].type == SETTING_U16)   *(u16*)configTable[i].ptr = (u16)s2i32(val);
-                else if (configTable[i].type == SETTING_INPUT) {
-                    i32 unused = 0, targ = -1;
-                    for (int j=0;j<(i32)(sizeof(inputElements)/sizeof(inputElements[0]));++j) {
-                        if (!inputElements[j].name) continue;
-                        if (sEqual(val,inputElements[j].name)) { targ = j; break; }
-                        if (!unused && sEqual("UNUSED",inputElements[j].name)) { unused = j; }
-                    }
-                    *(u16*)configTable[i].ptr = (u16)(targ != -1 ? targ : unused);
-                }
-                break;
-            }
-        }
-    } Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320); Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200); OS_Close(f);
-}
 
 void FilePrintString(FHandle f, const char* fmt, ...) { va_list a; __builtin_va_start(a,fmt); char b[128]; sFormatV(b,sizeof(b),fmt,a); __builtin_va_end(a); OS_RawWrite(f,b,slen(b)); }
 void SaveConfig() {
@@ -2475,9 +2438,7 @@ void GoIntoGame() { NewGame(); mp3_clear(); DualLog("Player named \"%s\" started
 void LoadModels(), LoadTextures(), InitAudio();
 extern u32 random_range_rng, biomTexId, biomFBO;
 u8* scratch_base,*scratch_cur,*scratch_end; size_t scratch_peak;
-void OS_ScratchInit() { if(scratch_base){return;} scratch_base = OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur = scratch_base; scratch_end = scratch_base + SCRATCH_ARENA_SIZE; }
 void* OS_AllocScratch(size_t amount) {
-    if (!scratch_base) { OS_ScratchInit(); }
     size_t aligned = (amount + 15) & ~(size_t)15; u8* p = (u8*)__atomic_fetch_add(&scratch_cur, aligned, __ATOMIC_RELAXED); if (p + aligned > scratch_end) { DualLogError("Scratch ovr!\n"); OS_Exit(1); }
     
     size_t used = (size_t)((p + aligned) - scratch_base), peak; 
@@ -2568,10 +2529,9 @@ void InitalizeEnvironment() {
     game_start_time = get_time();
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
-    OS_ScratchInit();
+    scratch_base = OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur = scratch_base; scratch_end = scratch_base + SCRATCH_ARENA_SIZE; // Initialize temporary scratch arena for all initializations.
     DualLog("=========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========\nGame: Citadel, the System Shock (1994) Fan Remake                               1/03/2013 - 10/26/2026\n\nOpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\nEntity byte size:%u\n",sizeof(Entity) + (6*4) + 4+4+1+1+4+4+4+4+(4*4)+1+(3*4)+(3*4)+(3*4)+(3*4)+(3*4)+(3*4));
     SetLevelPointers(0); 
-    double initWinStart = get_time();
     #if defined(_WIN32)
         GetModuleHandleExW(0x6,(const u16*)&WinSys,(HMODULE*)&WinSys.win32.instance);
         WinSys.win32.dwmapi.instance = LoadLibraryA("dwmapi.dll"); if (WinSys.win32.dwmapi.instance) { WinSys.win32.dwmapi.IsCompositionEnabled = (PFN_DwmIsCompositionEnabled)PlatformGetModuleSymbol(WinSys.win32.dwmapi.instance,"DwmIsCompositionEnabled"); WinSys.win32.dwmapi.Flush = (PFN_DwmFlush)PlatformGetModuleSymbol(WinSys.win32.dwmapi.instance,"DwmFlush"); }
@@ -2624,9 +2584,26 @@ void InitalizeEnvironment() {
     World.diffCbt = World.diffCyb = World.diffPuz = World.diffMis = 2; /*Default difficulties of normal*/
     World.cursorPos_x = 680; World.cursorPos_y = 384; /*Internal mouse cursor representation (separate from OS cursor) starts at center*/
     World.startLevel = 1 /*medical*/;
-    LoadConfig(); /*Get settings before setting window size.*/
-    DualLog("Windowing system init...............................................................took %.6f secs\n",get_time() - initWinStart);
-    double initWinCtxStart = get_time();
+    FHandle f = OS_OpenReadonly("./Data/Config.ini"); char line[512]; // Load Config.ini
+    while (sUpToEndLine(line,sizeof(line),f)) {
+        char* s = data_parser_trim(line); if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
+        char* eq = StringFindFirstCharWithin(s, '='); if (!eq) continue; *eq = 0;
+
+        char *key = data_parser_trim(s), *val = data_parser_trim(eq + 1);
+        for (int i=0;i<CONFIG_CNT;++i) {
+            if (sEqual(key,configTable[i].name)) {
+                     if (configTable[i].type == SETTING_U8)    *( u8*)configTable[i].ptr = (u8)s2i32(val);
+                else if (configTable[i].type == SETTING_U16)   *(u16*)configTable[i].ptr = (u16)s2i32(val);
+                else if (configTable[i].type == SETTING_INPUT) {
+                    i32 unused = 0, targ = -1;
+                    for (int j=0;j<(i32)(sizeof(inputElements)/sizeof(inputElements[0]));++j) { if (!inputElements[j].name) continue; if (sEqual(val,inputElements[j].name)) { targ = j; break; } if (!unused && sEqual("UNUSED",inputElements[j].name)) { unused = j; } }
+                    *(u16*)configTable[i].ptr = (u16)(targ != -1 ? targ : unused);
+                }
+                break;
+            }
+        }
+    }
+    Sys_Settings.ScreenWidth = vmax(Sys_Settings.ScreenWidth,320); Sys_Settings.ScreenHeight = vmax(Sys_Settings.ScreenHeight,200); OS_Close(f); /*Get settings before setting window size.*/
     OS_Thread fontInitThr;
     OS_ThreadCreate(&fontInitThr, InitFontAtlasses_Thread, NULL);
     ClampWindowSizeToMonitor();
@@ -2643,11 +2620,9 @@ void InitalizeEnvironment() {
     
     glBlendFuncSeparate(0x0302/*GL_SRC_ALPHA*/, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/, 1, 0x0303/*GL_ONE_MINUS_SRC_ALPHA*/);
     glClearColor(0,0,0,1);
-    DualLog("Window creation and GL context......................................................took %.6f secs\n",get_time() - initWinCtxStart);
+    DualLog("Window creation and GL context......................................................took %.6f secs\n",get_time() - game_start_time);
     double initShadersStart = get_time();
     CompileShaders();
-    DualLog("Shader compilation..................................................................took %.6f secs\n",get_time() - initShadersStart);
-    double initBufStart = get_time();
     u32 tvaos[5],tvbos[5]; glGenVertexArrays(5,tvaos); glGenBuffers(5,tvbos);
     quadVAO=tvaos[0]; quadVBO=tvbos[0]; chunkVAO=tvaos[1]; textVAO=tvaos[2]; textVBO=tvbos[2]; debugLinesVAO=tvaos[3]; debugLinesVBO=tvbos[3]; wireLinesVAO=tvaos[4]; wireLinesVBO=tvbos[4]; 
     float quadBlit_vertices[] = {1.0f,-1.0f,1.0f,0.0f, 1.0f,1.0f,1.0f,1.0f, -1.0f,1.0f,0.0f,1.0f, -1.0f,-1.0f,0.0f,0.0f}; // 4 verts, 4 floats each x,y,u,v
@@ -2709,22 +2684,17 @@ void InitalizeEnvironment() {
     ChangeFullScreenWindowed(false);
     SetSkyRotateSpeed();
     window->context.swapInterval((i32)Sys_Settings.Vsync);
-    DualLog("GL buffer setup.....................................................................took %.6f secs\n",get_time() - initBufStart);
-    double initTextStart = get_time();
-    LoadTextForLanguage(Sys_Settings.Language);
-    LoadLogTextForLanguage(Sys_Settings.Language);
-    DualLog("Localization text loading...........................................................took %.6f secs\n",get_time() - initTextStart);
+    DualLog("GL shaders and buffer setup.........................................................took %.6f secs\n",get_time() - initShadersStart);
     double initSSBOStart = get_time();
     glBindFramebuffer(GL_FRAMEBUFFER,gBufferFBO);
-    u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2};
-    glDrawBuffers(3,drawBuffers);
+    u32 drawBuffers[] = {GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1,GL_COLOR_ATTACHMENT2}; glDrawBuffers(3,drawBuffers);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     mcpy(&modelMatrices[0],mat,16 * sizeof(float));
     matricesBufferID=MakeSSBO(&matricesBufferID,1,INSTANCE_COUNT*16*sizeof(float),modelMatrices,GL_STATIC_DRAW);
     voxListCntsID=MakeSSBO(&voxListCntsID,2,VOXEL_COUNT*sizeof(u32),NULL,GL_STATIC_DRAW);
     voxelLightListsID=MakeSSBO(&voxelLightListsID,3,VOXEL_COUNT*MAX_LIGHTS_PER_VOXEL*sizeof(u32),NULL,GL_STATIC_DRAW);
     lightsID=MakeSSBO(&lightsID,4,LIGHT_COUNT*sizeof(Light),NULL,GL_STATIC_DRAW);
-    if (Sys_Settings.Shadows){CreateShadowBuffers();/*5,6*/ InitSunShadowmap();}
+    if (Sys_Settings.Shadows) { CreateShadowBuffers();/*5,6*/ InitSunShadowmap(); }
     cellVisibleDataID=MakeSSBO(&cellVisibleDataID,7,ARRSIZE*sizeof(u32),NULL,GL_STATIC_DRAW);
     texPalID= MakeSSBO(&texPalID,8,MAX_UNIQUE_COLORS*sizeof(u32),NULL,GL_STATIC_DRAW);
     texPalOfsID= MakeSSBO(&texPalOfsID,9,MAXTEX*sizeof(u32),NULL,GL_STATIC_DRAW);
@@ -2735,7 +2705,7 @@ void InitalizeEnvironment() {
     glUseProgram(shadowmapsSP); glUniform1ui( 9, SHADOW_MAP_SIZE); // Set permanent uniforms on shaders (keeps c in sync with glsl for constants)
     glUseProgram(chunkSP);      glUniform1ui(21, SHADOW_MAP_SIZE); glUniform1f(22, (float)SHADOW_MAP_SIZE); glUniform1ui(23, LIGHT_COUNT); glUniform1ui(24, (u32)MAX_LIGHTS_PER_VOXEL); glUniform1ui(11, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); glUniform1i(29,6); glUniform1i(31,9); glUniform1i(36,10);
     glUseProgram(ssrSP);        glUniform1i(5,3); glUseProgram(rtSP); glUniform1i(5,3);
-    for (int f=0;f<5;++f) { glGenQueries(5,gpuQ[f]); }
+    for (int q=0;q<5;++q) { glGenQueries(5,gpuQ[q]); }
     DualLog("SSBO and shadow buffer setup........................................................took %.6f secs\n",get_time() - initSSBOStart);
     RenderLoading("Loading textures..."); LoadTextures(); RenderLoading("Loading models...");   LoadModels();   if (Sys_Settings.Reflections >= 1u) EnsureReflectionResources();    bool playIntroAtBoot = !OS_FileExists("./Data/introdone.dat");
     if (playIntroAtBoot) { FHandle introdone=OS_OpenWriteonly("./Data/introdone.dat"); OS_Close(introdone); }

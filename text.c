@@ -84,16 +84,6 @@ static int font_GetGlyphShape(const font_fontinfo *info, int gi, font_vertex **p
     return nv;
 }
 
-static int GetGlyphBitmapBoxSubpixel(const font_fontinfo*font,int g,float sx,float sy,float shx,float shy,int*ix0,int*iy0,int*ix1,int*iy1){
-    int x0=0,y0=0,x1=0,y1=0,has=0;
-    int g1=_glyf_off(font,g);if(g1>=0) { has = 1; x0 = ttSHORT(font->data + g1 + 2); y0 = ttSHORT(font->data + g1 + 4); x1 = ttSHORT(font->data + g1 + 6); y1 = ttSHORT(font->data + g1 + 8);}
-    if(ix0) *ix0=has?(int)vfloor(x0*sx+shx):0;
-    if(iy0) *iy0=has?(int)vfloor(-y1*sy+shy):0;
-    if(ix1) *ix1=has?(int)vceil(x1*sx+shx):0;
-    if(iy1) *iy1=has?(int)vceil(-y0*sy+shy):0;
-    return has;
-}
-
 typedef struct tt_heapchk{ struct tt_heapchk* next; }tt_heapchk;
 typedef struct{ tt_heapchk* head; void* first_free; int remaining; }font__hheap;
 static void* _hha(font__hheap* hh,size_t sz) { if(hh->first_free){void*p=hh->first_free;hh->first_free=*(void**)p;return p;} if(!hh->remaining) {int c=sz<32?2000:sz<128?800:100;tt_heapchk*ck=(tt_heapchk*)OS_AllocScratch(sizeof(*ck)+sz*c); if(!ck){return NULL;} ck->next=hh->head; hh->head=ck; hh->remaining=c;} --hh->remaining; return(char*)hh->head+sizeof(tt_heapchk)+sz*hh->remaining; }
@@ -114,8 +104,8 @@ static void _tess_c(V2*pts,int*np,float x0,float y0,float x1,float y1,float x2,f
 }
 
 static int edge_compare(const void* a, const void* b) { float ya = ((const font__edge*)a)->y0, yb = ((const font__edge*)b)->y0; return (ya > yb) - (ya < yb); }
-static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* info, u8* out, int ow, int oh, int ostr, float sx, float sy, float shx, float shy, int g, int precomputed_ix0, int precomputed_iy0) {
-    font_vertex *v; int ix0 = precomputed_ix0, iy0 = precomputed_iy0, nv = font_GetGlyphShape(info, g, &v);
+static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* font, u8* dst, int ow, int oh, int ostr, float sx, float sy, int g, int precomputed_ix0, int precomputed_iy0) {
+    font_vertex *v; int ix0 = precomputed_ix0, iy0 = precomputed_iy0, nv = font_GetGlyphShape(font, g, &v);
     float scale = sx > sy ? sy : sx;
     int wc = 0; int *wl = NULL; V2 *win = NULL;
     float flat = 0.35f / scale; float fsq = flat * flat; int n = 0;
@@ -153,10 +143,10 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* info, u8* out, int
                     
                     e[n_edges].invert = 0;
                     if (inv ? p[j].y > p[k].y : p[j].y < p[k].y) { e[n_edges].invert = 1; a = j; b = k; }
-                    e[n_edges].x0 = p[a].x * sx + shx;
-                    e[n_edges].y0 = p[a].y * ysi + shy;
-                    e[n_edges].x1 = p[b].x * sx + shx;
-                    e[n_edges].y1 = p[b].y * ysi + shy;
+                    e[n_edges].x0 = p[a].x * sx;
+                    e[n_edges].y0 = p[a].y * ysi;
+                    e[n_edges].x1 = p[b].x * sx;
+                    e[n_edges].y1 = p[b].y * ysi;
                     ++n_edges;
                 }
             }
@@ -197,7 +187,7 @@ static void font_MakeGlyphBitmapSubpixel(const font_fontinfo* info, u8* out, int
                                 else _hce(sl,x,ae,x0,y0,x3,y3);}}
                         }
                     }
-                    {float sum=0;for(i=0;i<ow;++i){sum+=sl2[i];float cov=(float)vabs(sl[i]+sum)*255.0f+0.5f;int px=(int)cov;if(px>255)px=255;out[j*ostr+i]=(u8)px;}}
+                    {float sum=0;for(i=0;i<ow;++i){sum+=sl2[i];float cov=(float)vabs(sl[i]+sum)*255.0f+0.5f;int px=(int)cov;if(px>255)px=255; dst[j*ostr+i]=(u8)px;}}
                     step=&active;while(*step){font__active_edge*z=*step;z->fx+=z->fdx;step=&(*step)->next;}++y;++j;}
                 for(tt_heapchk*c=hh.head,*hp;c;c=hp){hp=c->next;}
             }
@@ -306,22 +296,20 @@ void BuildAtlasCPU(int* numPacked, font_packedchar* packedChars, float* fixedNum
         float h = fb ? baseH*1.2f : baseH; int os = fb ? 2 : 3;
         float sc = h/(float)(ttSHORT(font->data+font->hhea+4)-ttSHORT(font->data+font->hhea+6)), sco = sc*os, rc = 1.0f/os, sh = -(float)(os-1)/(2.0f*(float)os);
         font_packedchar* bc = &packedChars[*numPacked]; bc->x0=bc->y0=bc->x1=bc->y1=0;
-        int bx0,by0,bx1,by1; 
-        int has = GetGlyphBitmapBoxSubpixel(font,g,sco,sco,0,0,&bx0,&by0,&bx1,&by1);
-        if (!has) {
-            int nhm = ttSHORT(font->data + font->hhea + 34);
-            bc->xadvance = sc * ttSHORT(font->data + font->hmtx + 4 * (g < nhm ? g : nhm - 1));
-            int idx = (*numPacked)++; 
-            cpPackedIndex[fontID][cp] = (u16)idx; 
-            if (cp >= '0' && cp <= '9') *fixedNumAdv = vmax(*fixedNumAdv, bc->xadvance);
-            continue;
-        }
+        int bx0,by0,bx1,by1, x0 = 0, y0 = 0, x1 = 0, y1 = 0, has = 0, g1 = _glyf_off(font,g);
+        if (g1 >= 0) { has = 1; x0 = ttSHORT(font->data + g1 + 2); y0 = ttSHORT(font->data + g1 + 4); x1 = ttSHORT(font->data + g1 + 6); y1 = ttSHORT(font->data + g1 + 8);}
+        bx0 = has ? (int)vfloor( x0*sco) : 0;
+        by0 = has ? (int)vfloor(-y1*sco) : 0;
+        bx1 = has ? (int)vceil(  x1*sco) : 0;
+        by1 = has ? (int)vceil( -y0*sco) : 0;
+        if (!has) { int nhm = ttSHORT(font->data + font->hhea + 34); bc->xadvance = sc * ttSHORT(font->data + font->hmtx + 4 * (g < nhm ? g : nhm - 1)); int idx = (*numPacked)++; cpPackedIndex[fontID][cp] = (u16)idx; if (cp >= '0' && cp <= '9') *fixedNumAdv = vmax(*fixedNumAdv, bc->xadvance); continue; }
+        
         int rw = bx1 - bx0 + os - 1, rh = by1 - by0 + os - 1;
         if(cx+rw+16 > lim){cx=0;cy=cb;}
         if(cy+rh+16 <= lim) {
             int rx=cx+16, ry=cy+16, nhm=ttUSHORT(font->data+font->hhea+34); u8* dst=bmp+rx+ry*S;
             cx+=rw+16; if(cy+rh+16 > cb) cb=cy+rh+16;
-            font_MakeGlyphBitmapSubpixel(font,dst,bx1-bx0,by1-by0,S,sco,sco,0,0,g,bx0,by0);
+            font_MakeGlyphBitmapSubpixel(font,dst,bx1-bx0,by1-by0,S,sco,sco,g,bx0,by0);
             _pre(dst,rw,rh,S,os,0); _pre(dst,rw,rh,S,os,1);
             bc->x0=rx; bc->y0=ry; bc->x1=rx+rw; bc->y1=ry+rh;
             bc->xadvance = sc*ttSHORT(font->data+font->hmtx+4*(g<nhm?g:nhm-1));
@@ -331,11 +319,7 @@ void BuildAtlasCPU(int* numPacked, font_packedchar* packedChars, float* fixedNum
     }
 }
 
-static int CountBlankGlyphs(const font_packedchar* chars, int n, u8 fontID) { const u16 spaceIdx = cpPackedIndex[fontID][0x0020]; int b=0; for(int i=0;i<n;++i) if(i!=spaceIdx && !chars[i].x1 && !chars[i].y1) ++b; return b; }
 void InitFontAtlasses() {
-    double t0=get_time();
-
-    DualLog("Loading    fonts (   5) ...");
     FHandle fd1,fd2;int sz1,sz2;
     fontData[0]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[0],&fd1,&sz1);
     fontData[1]=OS_OpenAndAllocateFileBufferReadonly(fontPaths[1],&fd2,&sz2);
@@ -348,37 +332,19 @@ void InitFontAtlasses() {
     BuildAtlasCPU(&numPackedGlyphs,fontPackedChar,&fixedNumberAdvanceWidth,20.0f,0,FONT_NORMAL,bmp,FONT_ATLAS_SIZE);
     u8* bmp2 = fontBmp2 = OS_AllocScratch(FONT_ATLAS_SIZE2*FONT_ATLAS_SIZE2);
     BuildAtlasCPU(&numPackedGlyphsStopD,fontPackedCharStopD,&fixedNumberAdvanceWidthStopD,54.0f,1,FONT_STOPD,bmp2,FONT_ATLAS_SIZE2);
-    DualLog("(glyphs packed, blanks %d/%d, %d/%d)...................took %.6f secs\n",CountBlankGlyphs(fontPackedChar,numPackedGlyphs,FONT_NORMAL),numPackedGlyphs,CountBlankGlyphs(fontPackedCharStopD,numPackedGlyphsStopD,FONT_STOPD),numPackedGlyphsStopD,get_time() - t0);
-
+    LoadTextForLanguage(Sys_Settings.Language);
+    LoadLogTextForLanguage(Sys_Settings.Language);
 }
 // Localization
-size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){
-    size_t dp=0,sp=0;
-    while(sp<slen&&dp<dlen-4){
-        if(sp+1>=slen)break;u32 c=(u32)src[sp+1]<<8|src[sp];sp+=2;
-        if(c<0x80){dst[dp++]=(char)c;} else if(c<0x800){dst[dp++]=(char)(0xC0|(c>>6));dst[dp++]=(char)(0x80|(c&0x3F));} else if(c<0x10000){dst[dp++]=(char)(0xE0|(c>>12));dst[dp++]=(char)(0x80|((c>>6)&0x3F));dst[dp++]=(char)(0x80|(c&0x3F));} else continue;
-    }
-    dst[dp]='\0';return dp;
-}
-
+size_t utf16le_to_utf8(const u8*src,size_t slen,char*dst,size_t dlen){ size_t dp=0,sp=0; while(sp<slen&&dp<dlen-4){ if(sp+1>=slen)break;u32 c=(u32)src[sp+1]<<8|src[sp];sp+=2; if(c<0x80){dst[dp++]=(char)c;} else if(c<0x800){dst[dp++]=(char)(0xC0|(c>>6));dst[dp++]=(char)(0x80|(c&0x3F));} else if(c<0x10000){dst[dp++]=(char)(0xE0|(c>>12));dst[dp++]=(char)(0x80|((c>>6)&0x3F));dst[dp++]=(char)(0x80|(c&0x3F));} else continue; } dst[dp]='\0';return dp; }
 static const char* localizations[8]={"./Data/text_english.txt","./Data/text_espanol.txt","./Data/text_deutsch.txt","./Data/text_francais.txt","./Data/text_nihongo.txt","./Data/text_russkiy.txt","./Data/text_italiano.txt","./Data/text_portugues.txt"};
 u8* LoadTextFile(const char* path, size_t* out_size, size_t* out_dp, int* out_utf16) {
     FHandle dfd = INVALID_FHANDLE; int asz = 0; u8* data = OS_OpenAndAllocateFileBufferReadonly(path, &dfd, &asz); if(!data || asz <= 0) { DualLogError("Failed to load text file: %s\n", path); *out_size = 0; return NULL; } *out_size = (size_t)asz; *out_dp = 0; *out_utf16 = 0;
     if(asz >= 2 && data[0]==0xFF && data[1]==0xFE) { *out_dp = 2; *out_utf16 = 1; } else if(asz >= 3 && data[0]==0xEF && data[1]==0xBB && data[2]==0xBF) { *out_dp = 3; } else { int nl=0; for(size_t i=1; i<(size_t)asz && i<1024; i+=2) if(data[i]==0) nl++; if(nl*3 > asz) *out_utf16 = 1; } return data;
 }
 
-static size_t ReadTextLine(const u8* data,size_t size,size_t* dp,int utf16,char* line,size_t cap) {
-    size_t start=*dp,len=GetLineLength(data,size,start,utf16); *dp=len ? start+len : size;
-    if (utf16) utf16le_to_utf8(data+start,len,line,cap); else { if (len>=cap) len=cap-1; mcpy(line,data+start,len); line[len]=0; }
-    len=slen(line); while (len && (line[len-1]=='\r' || line[len-1]=='\n')) line[--len]=0; return len;
-}
-
-void LoadTextForLanguage(u8 lang) {
-    char line[T_LOGSTR_MAX]; size_t size,dp=0; int utf16=0,ln=0; u8* data=LoadTextFile(localizations[lang<8 ? lang : 0],&size,&dp,&utf16);
-    while (dp<size) { size_t len=ReadTextLine(data,size,&dp,utf16,line,sizeof(line)); if (ln<T_LOGSTR_CNT) { mcpy(Sys_Text.stringTable[ln],line,len+1); ++ln; } }
-    if (data) OS_Free(data,size);
-}
-
+static size_t ReadTextLine(const u8* data,size_t size,size_t* dp,int utf16,char* line,size_t cap) { size_t start=*dp,len=GetLineLength(data,size,start,utf16); *dp=len ? start+len : size; if (utf16) utf16le_to_utf8(data+start,len,line,cap); else { if (len>=cap) len=cap-1; mcpy(line,data+start,len); line[len]=0; } len=slen(line); while (len && (line[len-1]=='\r' || line[len-1]=='\n')) line[--len]=0; return len; }
+void LoadTextForLanguage(u8 lang) { char line[T_LOGSTR_MAX]; size_t size,dp=0; int utf16=0,ln=0; u8* data=LoadTextFile(localizations[lang<8 ? lang : 0],&size,&dp,&utf16); while (dp<size) { size_t len=ReadTextLine(data,size,&dp,utf16,line,sizeof(line)); if (ln<T_LOGSTR_CNT) { mcpy(Sys_Text.stringTable[ln],line,len+1); ++ln; } } if (data) OS_Free(data,size); }
 INLINE int s2i32Len(const char*str,size_t len){int v=0;for(size_t i=0;i<len&&str[i]>='0'&&str[i]<='9';++i)v=v*10+(str[i]-'0');return v;}
 static const char* logLocalizations[8]={"./Data/logs_english.txt","./Data/logs_espanol.txt","./Data/logs_deutsch.txt","./Data/logs_francais.txt","./Data/logs_nihongo.txt","./Data/logs_russkiy.txt","./Data/logs_italiano.txt","./Data/logs_portugues.txt"};
 void LoadLogTextForLanguage(u8 lang) {
@@ -399,21 +365,13 @@ void LoadLogTextForLanguage(u8 lang) {
 }
 
 static float textVertexData[TEXT_VTX_FLOATS]; extern Color textColors[]; enum {TALIGN_LEFT=0,TALIGN_CENTER=1,TALIGN_RIGHT=2};
-float MeasureLineAdvance(const char* p, u8 fontID) {
-    float w=0; int cc=0;
-    while (*p) {
-        u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q;
-        cc++; if (cp=='\n'||cc>120) break;
-        const font_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + CodepointToPackedIndex(cp,fontID); if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD) w = vfloor((w + b->xoff) + 0.5f) + fixedNumberAdvanceWidthStopD; else w += b->xadvance;
-    } return w;
-}
-
+float MeasureLineAdvance(const char* p, u8 fontID) { float w=0; int cc=0; while (*p) { u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q; cc++; if (cp=='\n'||cc>120) break; const font_packedchar *b = (fontID ? fontPackedCharStopD : fontPackedChar) + CodepointToPackedIndex(cp,fontID); if (cp >= '0' && cp <= '9' && fontID) w = vfloor((w + b->xoff) + 0.5f) + fixedNumberAdvanceWidthStopD; else w += b->xadvance; } return w; }
 void RenderFormattedText(i16 x, i16 y, u32 color, u8 fontID, float scale, u8 align, const char* restrict format, va_list args) {
-    va_list c; __builtin_va_copy(c,args); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,c); __builtin_va_end(c); glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f); glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID==FONT_STOPD ? fontAtlasTexStopD : fontAtlasTex); float invatsz = 1.0f/(fontID==FONT_STOPD ? (float)FONT_ATLAS_SIZE2 : (float)FONT_ATLAS_SIZE);
+    va_list c; __builtin_va_copy(c,args); sFormatV(uiTextBuffer,T_BUFFER_SIZE,format,c); __builtin_va_end(c); glUseProgram(textSP); glEnable(GL_BLEND); glUniform4f(3,textColors[color].r,textColors[color].g,textColors[color].b,1.0f); glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D,fontID ? fontAtlasTexStopD : fontAtlasTex); float invatsz = 1.0f/(fontID ? (float)FONT_ATLAS_SIZE2 : (float)FONT_ATLAS_SIZE);
     glUniform2f(4,invatsz,invatsz); glUniform1ui(2,fontID); glBindVertexArray(textVAO); float xUsed=x, yUsed=y; if (scale < 1.0f) { xUsed *= (1/scale); yUsed *= (1/scale); } float alignMul = (align==TALIGN_CENTER) ? 0.5f : (align==TALIGN_RIGHT) ? 1.0f : 0.0f; /*pen starts this far (as a fraction of line width) left of xUsed*/
     size_t vc=0; const char*p=uiTextBuffer; float xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed), ypos=yUsed+(16*scale),ls=22*scale; int cc=0; float puv = 10.0f * invatsz, bw=2.0f; 
     while(*p) {
-        u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q; cc++; if (cp=='\n'||cc>120) { xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed); ypos+=ls; cc=0; continue; } int idx=CodepointToPackedIndex(cp,fontID); const font_packedchar *b = ((fontID==FONT_STOPD) ? fontPackedCharStopD : fontPackedChar) + idx; float qx0=vfloor((xpos+b->xoff)+0.5f),qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
+        u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q; cc++; if (cp=='\n'||cc>120) { xpos=(alignMul ? xUsed - MeasureLineAdvance(p,fontID)*alignMul : xUsed); ypos+=ls; cc=0; continue; } int idx=CodepointToPackedIndex(cp,fontID); const font_packedchar *b = (fontID ? fontPackedCharStopD : fontPackedChar) + idx; float qx0=vfloor((xpos+b->xoff)+0.5f),qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
         float vx0 = qx0*scale - bw, vy0 = qy0*scale - bw, vx1 = (qx0 + b->xoff2 - b->xoff)*scale + bw, vy1 = (qy0 + b->yoff2 - b->yoff)*scale + bw; float s0 = qs0 - puv, t0 = qt0 - puv, s1 = qs1 + puv, t1 = qt1 + puv, z = 0.0f; float tv[30] = { vx0,vy0,z,s0,t0, vx1,vy1,z,s1,t1, vx1,vy0,z,s1,t0, vx0,vy0,z,s0,t0, vx0,vy1,z,s0,t1, vx1,vy1,z,s1,t1 }; if (vc >= TEXT_VTX_FLOATS/30) break; mcpy(textVertexData + vc * 30,tv,sizeof(tv)); vc++;
         if (cp >= '0' && cp <= '9' && fontID == FONT_STOPD){xpos = qx0 + fixedNumberAdvanceWidthStopD;}else xpos += b->xadvance;
     } if (vc) { glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferSubData(GL_ARRAY_BUFFER,0,vc*30*sizeof(float),textVertexData); glDrawArrays(0x0004/*GL_TRIANGLES*/,0,vc*6); }
@@ -428,16 +386,16 @@ void BuildTextDecalMeshes(void) {
     for (u8 lev=0;lev<MAX_LEVELS;++lev) {
         for (u16 i=INSTS_1ST_IDX; i<World.levelInstCount[lev]; ++i) {
             Entity* e = &World.levelInstances[lev][i]; if (e->index!=592 && e->index!=593) continue; u8 fontID = (e->index==593) ? FONT_STOPD : FONT_NORMAL; const char* str = NULL; for (u16 k=0;k<decalInlineTextCount;++k) { if (decalInlineTextLevel[k]==lev && decalInlineTextInst[k]==i) { str=decalInlineText[k]; break; } } // literal level file text for decals with no (or invalid) lingdex
-            if (!str) { u16 li=e->messageLingdex; str=(li>0 && li<T_LOGSTR_CNT) ? Sys_Text.stringTable[li] : NULL; } if (!str || !str[0]) continue; float invatsz = 1.0f/(fontID==FONT_STOPD ? (float)FONT_ATLAS_SIZE2 : (float)FONT_ATLAS_SIZE); float puv=10.0f*invatsz, bw=2.0f; float decalPx = (fontID==FONT_STOPD) ? DECAL_PX_S : DECAL_PX_N; u16 halfVerts[720*8]; u32 vIdx=0;
+            if (!str) { u16 li=e->messageLingdex; str=(li>0 && li<T_LOGSTR_CNT) ? Sys_Text.stringTable[li] : NULL; } if (!str || !str[0]) continue; float invatsz = 1.0f/(fontID==FONT_STOPD ? (float)FONT_ATLAS_SIZE2 : (float)FONT_ATLAS_SIZE); float puv=10.0f*invatsz, bw=2.0f; float decalPx = fontID ? DECAL_PX_S : DECAL_PX_N; u16 halfVerts[720*8]; u32 vIdx=0;
             const int dix=(fontID==FONT_STOPD) ? 1 : 0;  const float DECAL_ASC_PX[2]={15.0f,45.6f},DECAL_DESC_PX[2]={5.0f,8.4f}, DECAL_LINEH_PX[2]={21.8f,54.0f}; u8 anchor=0,algn=0; float lineSp=1.0f;
             for (u16 k=0;k<decalStyleCount;++k){ if (decalStyles[k].level==lev && decalStyles[k].inst==i){ anchor=decalStyles[k].anchor; algn=decalStyles[k].align; lineSp=decalStyles[k].lineSp; break; } } float blockW=MeasureLineAdvance(str,fontID); int nLines=1; for (const char* q=str; *q; ++q){ if (*q=='\n'){ ++nLines; float lw=MeasureLineAdvance(q+1,fontID); if (lw>blockW) blockW=lw; } }
             const float blockH=(nLines-1)*DECAL_LINEH_PX[dix]*lineSp + DECAL_ASC_PX[dix] + DECAL_DESC_PX[dix]; const u8 arow=anchor/3, acol=anchor%3;/*TextAnchor rows Upper/Middle/Lower, cols Left/Center/Right*/ const float xLeft=-(float)acol*0.5f*blockW, yTop=-(float)arow*0.5f*blockH, lineH=DECAL_LINEH_PX[dix]*lineSp; const float alignMul=(algn==2)?1.0f:((algn==1)?0.5f:0.0f);
             const char* p = str; float xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)), ypos=yTop+DECAL_ASC_PX[dix]; int cc=0; float x0=0,y0=0,x1=0,y1=0,s0=0,t0=0,s1=0,t1=0;
             while(*p) {
-                u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q; cc++; if (cp=='\n'||cc>120){ xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)); ypos+=lineH; cc=0; continue; } int idx=CodepointToPackedIndex((i32)cp,fontID); const font_packedchar* b = ((fontID==FONT_STOPD)?fontPackedCharStopD:fontPackedChar)+idx; float qx0=vfloor((xpos+b->xoff)+0.5f), qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
+                u32 cp=0; const char* q = DecodeUTF8(p, &cp); if (q == p) break; p = q; cc++; if (cp=='\n'||cc>120){ xpos=xLeft+alignMul*(blockW-MeasureLineAdvance(p,fontID)); ypos+=lineH; cc=0; continue; } int idx=CodepointToPackedIndex((i32)cp,fontID); const font_packedchar* b = (fontID?fontPackedCharStopD:fontPackedChar)+idx; float qx0=vfloor((xpos+b->xoff)+0.5f), qy0=vfloor((ypos+b->yoff)+0.5f); float qs0=b->x0*invatsz, qt0=b->y0*invatsz, qs1=b->x1*invatsz, qt1=b->y1*invatsz;
                 x0=qx0-bw; x1=(qx0+b->xoff2-b->xoff)+bw; y0=qy0-bw; y1=(qy0+b->yoff2-b->yoff)+bw; s0=qs0-puv; t0=qt0-puv; s1=qs1+puv; t1=qt1+puv;/*6 verts (2 tris) per glyph; local space only, live model matrix applies rotation/scale/position*/ const float L[6][5] = {{x0,y0,s0,t0},{x1,y1,s1,t1},{x1,y0,s1,t0},{x0,y0,s0,t0},{x0,y1,s0,t1},{x1,y1,s1,t1}};
                 for(int k=0;k<6;k++){float lx=L[k][0]*decalPx,ly=-L[k][1]*decalPx,lz=0;/*negate y: glyph quads are y-down, world +Y is up*/ halfVerts[vIdx++]=F32ToHalf(lx); halfVerts[vIdx++]=F32ToHalf(ly); halfVerts[vIdx++]=F32ToHalf(lz); halfVerts[vIdx++]=F32ToHalf(0.0f); halfVerts[vIdx++]=F32ToHalf(0.0f); halfVerts[vIdx++]=F32ToHalf(-1.0f); halfVerts[vIdx++]=F32ToHalf(L[k][2]); halfVerts[vIdx++]=F32ToHalf(L[k][3]);}
-                if (vIdx+8 > 720*8) break; if (cp>='0'&&cp<='9'&&fontID==FONT_STOPD){ xpos=qx0+fixedNumberAdvanceWidthStopD; }else xpos += b->xadvance;
+                if (vIdx+8 > 720*8) break; if (cp>='0'&&cp<='9'&&fontID){ xpos=qx0+fixedNumberAdvanceWidthStopD; }else xpos += b->xadvance;
             }
             u32 vertCount = vIdx/8; if (vertCount==0) { textDecalVBO[lev][i]=0; textDecalVertexCount[lev][i]=0; continue; } if (textDecalVBO[lev][i]==0) glGenBuffers(1,&textDecalVBO[lev][i]); glBindBuffer(GL_ARRAY_BUFFER,textDecalVBO[lev][i]); glBufferData(GL_ARRAY_BUFFER,vertCount*16,(const void*)halfVerts,GL_STATIC_DRAW); glBindBuffer(GL_ARRAY_BUFFER,0); textDecalVertexCount[lev][i]=vertCount;
         }
