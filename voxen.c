@@ -2724,16 +2724,14 @@ void InitalizeEnvironment() {
     NewGame();
     double initAudioStart = get_time();
     InitAudio(); synth_set_reverb_preset(0);
-    DualLog("Audio init..........................................................................took %.6f secs\n",get_time() - initAudioStart);
-    double initMenuStart = get_time();
     World.menuActive = true; //COMMENT for immediate into game
     if (playIntroAtBoot && World.menuActive) ChangeMenuPage(MPG_INTRO);
     else if (World.menuActive) { PlayMenuMusic(); }
     else { PlayTrack(TT_Walking, MT_Walking); } /*Menu skipped: start the level's music, not the menu loop (PlayMenuMusic here kept playing in-game until the track ran out)*/
-    DualLog("Menu init...........................................................................took %.6f secs\n",get_time() - initMenuStart);
+    DualLog("Audio and Menu init.................................................................took %.6f secs\n",get_time() - initAudioStart);
     DualLog("Scratch arena total peak: %u MB, ", (u32)(scratch_peak >> 20)); OS_Free(scratch_base,SCRATCH_ARENA_SIZE); scratch_base = scratch_cur = scratch_end = NULL; // Free the initialization scratch arena.
     DebugRAMPeak();
-    DualLog(".....Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time);
+    DualLog(".......Game Initialization TOTAL %.6f secs\n",get_time() - game_start_time);
     DebugRAMActual("init"); DualLog("\n");
 }
 

@@ -25,7 +25,8 @@ static void vid_decode(VidFrameRec* r, VidSlot* s) { /*Same palette extraction a
     if (likely(pix && w > 0 && h > 0 && (u32)w*h <= VIDEO_MAXFRAME)) {
         u32 bs=pngPalSize;
         if (bs) { mcpy(s->idx,pix,(u32)w*h); mcpy(s->pal,pngPal,bs*sizeof(u32)); } else {
-        u32 nP = (u32)w*h, x = 0, y = 0; u32 eh[TEXHASH_SZ]; mset(eh, 0xFF, sizeof(eh)); u8 ei[TEXHASH_SZ]; u8 nearcache[32768]; mset(nearcache, 0xFF, sizeof(nearcache));
+        u32 nP = (u32)w*h, x = 0, y = 0; u32 eh[TEXHASH_SZ]; mset(eh, 0xFF, sizeof(eh)); u8 ei[TEXHASH_SZ];
+        u8* nearcache = (u8*)OS_Alloc(32768); mset(nearcache, 0xFF, 32768);
         for (u32 p=0;p<nP;++p, ++x) {
             if (x == (u32)w) { x = 0; y++; }
             u32 c = ((u32*)pix)[p]; u32 hv = (c*0x9E3779B9u); hv ^= hv>>16; u32 sl = hv & (TEXHASH_SZ-1);
@@ -44,6 +45,7 @@ static void vid_decode(VidFrameRec* r, VidSlot* s) { /*Same palette extraction a
               s->idx[p] = hit; }
             vidfound:;
         }
+        OS_Free(nearcache, 32768);
         }
         s->palSize = bs; s->w = (u32)w; s->h = (u32)h; s->frameTexIdx = r->texIdx;
     }
@@ -262,9 +264,10 @@ static void* TextureParsingWorker(void* arg) {
         
         u32 nP = (u32)w*h; u8 *idx = (u8*)OS_Alloc(nP); u32 *pal = (u32*)OS_Alloc(256*sizeof(u32));
         if (pSz) { mcpy(idx,pix,nP); mcpy(pal,pngPal,pSz*sizeof(u32)); } else {
-        u32 exact_hash[TEXHASH_SZ];
-        mset(exact_hash, 0xFF, sizeof(exact_hash)); /*Fast Exact Match Hash Map, 0xFFFFFFFF U32_MAX = empty*/
-        u8 exact_idx[TEXHASH_SZ], nearest_cache[32768]; /*15-bit Color Space Cache for fast nearest-neighbor fallback*/
+        u32* exact_hash = (u32*)OS_Alloc(TEXHASH_SZ*sizeof(u32));
+        mset(exact_hash, 0xFF, TEXHASH_SZ*sizeof(u32)); /*Fast Exact Match Hash Map, 0xFFFFFFFF U32_MAX = empty*/
+        u8* exact_idx = (u8*)OS_Alloc(TEXHASH_SZ);
+        u8* nearest_cache = (u8*)OS_Alloc(32768); /*15-bit Color Space Cache for fast nearest-neighbor fallback*/ mset(nearest_cache, 0xFF, 32768);
         bool nearclear = false;
         for (u32 p = 0; p < nP; ++p) {
             u32 c = ((u32*)pix)[p];
@@ -303,7 +306,9 @@ static void* TextureParsingWorker(void* arg) {
             
             found:;
         }
-        
+        OS_Free(exact_hash, TEXHASH_SZ*sizeof(u32));
+        OS_Free(exact_idx, TEXHASH_SZ);
+        OS_Free(nearest_cache, 32768);
         }
         t->results[i] = (TexResult){.indices = idx, .palette = pal, .palSize = pSz, .w = w, .h = h};
         OS_Free((void*)d,(size_t)sz);

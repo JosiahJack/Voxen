@@ -602,7 +602,7 @@ static void VaporizeCorpse(u16 self,bool energyVaporized) {
     e->modelIndex=MAX_MDLS;
     if (IdxIsNPC(e->index) || IdxIsSearchable(e->index)) DeleteInstance(self);
 }
-
+// Death and Ressurection: when player dies on a level with resurrection active, teleport back to the ressurection point.
 static void Death(u16 self,bool energyVaporized) {
     Entity* e = &World.instances[self];
     if (e->entflags & EF_DEAD_CHECKS_DONE) {
@@ -620,10 +620,18 @@ static void Death(u16 self,bool energyVaporized) {
     else if (e->index == 279/*screen*/) ScreenDeath(self);
     else if (doTeleport) TeleportAway(self);
     else if (isGrenade) GrenadeExplode(self);
-    
+
          if (isNPC && !doTeleport) NPCDeath(self);
-    else if (self == PLAYER1) { if (!RessurectPlayer()) World.deaths++; }
-    
+    else if (self == PLAYER1) {
+        World.deaths++;
+        if (((World.ressurectionActiveLevels >> World.curLev) & 1u)) {
+            V3 spot=(V3){0.0f,0.0f,0.0f};
+            if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { spot=ressurectionLocations[6]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); LoadLevel(6, spot); }
+            else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); World.position[PLAYER1] = spot; }
+            PlayTrack(TT_Revive, MT_Override);
+            World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0;
+        }
+    }
     flag_set(&e->entflags,EF_DEAD_CHECKS_DONE,true);
 }
 
@@ -720,17 +728,6 @@ static void QuestBitNoteSideEffects(u8 qb, bool isOn) {
             case QB_MasterJettisonEnabled:  World.questNotesChecked[10] = false; break; case QB_BetaGroveJettisoned:    World.questNotesChecked[12] = false; break; case QB_SelfDestructActivated:  World.questNotesChecked[14] = false; break; case QB_BridgeSeparated:        World.questNotesChecked[16] = false; break; default: break;
         }
     }
-}
-// Ressurection: when player dies on a level with resurrection active, teleport back to the ressurection point instead of counting a death.
-bool RessurectPlayer(void) {
-    if (!((World.ressurectionActiveLevels >> World.curLev) & 1u)) { return false; }
-    
-    V3 spot=(V3){0.0f,0.0f,0.0f};
-    if (World.curLev == 10 || World.curLev == 11 || World.curLev == 12) { spot=ressurectionLocations[6]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); LoadLevel(6, spot); }
-    else if (World.curLev < 13) { spot=ressurectionLocations[World.curLev]; spot.y -= (1.0f - PLYR_CAM_OFS_Y); World.position[PLAYER1] = spot; }
-    PlayTrack(TT_Revive, MT_Override);
-    World.invP1.ressurectingFinished = World.pauseRelativeTime + 3.0; CenterStatusPrint("BRAIN ACTIVITY SATISFACTORY..."); /*TODO actual timed text appearances and then restore movement and unpause game using the ressurectingFinished timer to time it all.*/
-    return true;
 }
 // Doors
 static bool DoorInventoryHasAccessCard(AccCardType card) { return card == ACC_None || (World.invP1.accessCardOwned & (1u << card)); }
@@ -1310,28 +1307,4 @@ void ModUpdate() {
     if (PanelTetherBroken(World.Sys_UI.tetheredKeypadElevator)) UI_ElevClose(false);
     if (PanelTetherBroken(World.Sys_UI.tetheredPWP)) UI_WireClose(false);
 
-}
-
-u16 GetCrosshairTexture() { switch(World.invP1.weaponIndex) { case 343:case 345:case 350:case 352:case 355:return 1121;/*red*/case 344:case 347:case 357:return 1253;/*blue*/case 348:case 349:return 1066;/*orange*/case 351:case 354:return 1122;/*yellow*/ case 353:case 358:return 1161;/*teal*/default:return 1260;/*green*/ } }
-u16 GetItemFrobTexture(u16 index) {
-    switch(index){
-        case 312: return 605;/*item_arm*/                 case 313: return 606;/*item_audiolog*/            case 364: return 969;/*item_chipset_interfacedemod*/ case 308: return 838;/*item_paper_wad*/            case 309: return 764;/*item_beaker*/            case 310: return 767;/*item_beverage*/            case 311: return 981;/*item_skull*/               case 314: return 853;/*weapon_grenadefrag*/          case 315: return 849;/*weapon_grenadeconc*/    case 316: return 851;/*weapon_grenadeemp*/ 
-        case 317: return 850;/*weapon_grenadeearth*/      case 318: return 860;/*weapon_grenademine*/       case 319: return 861;/*weapon_grenadenitro*/         case 320: return 859;/*weapon_grenadegas*/         case 321: return 974;/*item_patch_berserk*/     case 322: return 975;/*item_patch_detox*/         case 323: return 976;/*item_patch_genius*/        case 324: return 977;/*item_patch_medi*/             case 325: return 978;/*tem_patch_reflex*/      case 326: return 979;/*item_patch_sight*/ 
-        case 327: return 980;/*item_patch_staminup*/      case 328: return 882;/*item_hw_system*/           case 329: return 907;/*item_hw_navunit*/             case 330: return 902;/*item_hw_ereader*/           case 331: return 909;/*item_hw_sensaround*/     case 332: return 935;/*item_hw_targetid*/         case 333: return 911;/*item_hw_shield*/           case 334: return 900;/*item_hw_bio*/                 case 335: return 906;/*item_hw_lantern*/       case 336: return 903;/*item_hw_envirosuit*/
-        case 337: return 901;/*item_hw_booster*/          case 338: return 905;/*item_hw_jumpjets*/         case 339: return 904;/*item_hw_infrared*/            case 340: return 966;/*item_fireextinguisher*/     case 341: return 626;/*item_access_card_admin*/ case 342: return 845;/*item_workerhelmet*/        case 343: return 988;/*weapon_mk3*/               case 344: return 982;/*weapon_blaster*/              case 345: return 983;/*weapon_dartgun*/        case 346: return 984;/*weapon_flechette*/
-        case 347: return 985;/*weapon_ionrifle*/          case 348: return 1034;/*weapon_rapier*/           case 349: return 990;/*weapon_pipe*/                 case 350: return 986;/*weapon_magnum*/             case 351: return 987;/*weapon_magpulse*/        case 352: return 1010;/*weapon_pistol*/           case 353: return 1019;/*weapon_plasma*/           case 354: return 1027;/*weapon_railgun*/             case 355: return 1035;/*weapon_riotgun*/       case 356: return 1036;/*weapon_skorpion*/
-        case 357: return 1052;/*weapon_sparqbeam*/        case 358: return 1065;/*weapon_stungun*/          case 359: return 965;/*item_battery*/                case 360: return 968;/*item_battery_icad*/         case 361: return 972;/*item_logic_probe*/       case 362: return 967;/*item_healthkit*/           case 363: return 973;/*item_plastique*/           case 365: return 766;/*item_flask*/                  case 366: return 969;/*item_chipset_bitflag*/  case 367: return 549;/*item_ammo_rubber*/
-        case 368: return 971;/*item_isotopex22*/          case 369: return 765;/*it442em_testtube*/         case 370: return 853;/*weapon_grenadefrag_live*/     case 371: return 970;/*item_chipset_isolinear*/    case 372: return 849;/*weapon_grenadeconc_live*/case 373: return 420;/*item_ammo_needle*/         case 374: return 602;/*item_ammo_tranq*/          case 375: return 593;/*item_ammo_standard*/          case 376: return 597;/*item_ammo_teflon*/      case 377: return 411;/*item_ammo_hollow*/
-        case 378: return 561;/*item_ammo_slug*/           case 379: return 419;/*item_ammo_magnesium*/      case 380: return 421;/*item_ammo_penetrator*/        case 381: return 417;/*item_ammo_hornet*/          case 382: return 577;/*item_ammo_splinter*/     case 383: return 422;/*item_ammo_rail*/           case 384: return 551;/*item_ammo_slag*/           case 385: return 552;/*item_ammo_slaglarge*/         case 386: return 418;/*item_ammo_magcart*/     case 387: return 851;/*weapon_grenadeemp_live*/
-        case 388: return 762;/*item_access_card_std*/     case 389: return 850;/*weapon_grenadeearth_live*/ case 390: return 610;/*item_access_card_group1*/     case 391: return 621;/*item_access_card_science*/  case 392: return 609;/*item_access_card_eng*/   case 393: return 610;/*item_access_card_groupB*/  case 394: return 635;/*item_access_card_security*/case 395: return 760;/*item_access_card_per5diego*/  case 396: return 632;/*item_access_card_medi*/ case 397: return 608;/*item_access_card_group3*/
-        case 398: return 624;/*item_access_card_purple*/  case 399: return 872;/*item_head_male*/           case 400: return 862;/*item_head_female*/            case 401: return 872;/*item_severedhead*/          case 402: return 860;/*weapon_grenademine_live*/case 403: return 861;/*weapon_grenadenitro_live*/ case 404: return 859;/*weapon_grenadegas_live*/   case 417: return 760;/*item_access_card_perdarcy*/
-        case 307: return 1250;
-    } return MAXTEX;
-}
-
-u16 GetCursorTexture() {
-    if (World.paused || World.menuActive) { if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down){ return 2147; } return 1261; }
-    if (World.invP1.holdingObject) { u16 tex = GetItemFrobTexture(World.invP1.heldObjectIndex); return tex < MAXTEX ? tex : 1250; }
-    if (World.uiIsBlocking || World.Sys_UI.mouseClickHeldOverGUI) { if (Sys_Input.mouseButtons[MOUSE_BUTTON_LEFT].down || Sys_Input.mouseButtons[MOUSE_BUTTON_RIGHT].down) { return 2147; } return 1261; }
-    return GetCrosshairTexture();
 }
