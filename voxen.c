@@ -1769,7 +1769,7 @@ __attribute__((hot, target("avx2,fma"))) void RenderShadowmaps(void) {
         if (nearbyMeshCount == 0) { shadowmapIndirectionList[lightIdx] = LIGHT_COUNT; continue; }
         
         u16 slot = shadowSlot[lightIdx];
-        bool contentDirty = (anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
+        bool contentDirty = true;//(anyMoved || posSum != shadowPosSum[lightIdx] || idSum != shadowIdSum[lightIdx] || slot == U16_MAX);
         u8 needFaces = (u8)(faceMask & ~shadowFaces[lightIdx]);
         if (contentDirty || needFaces) {
             for (u16 j=1;j<nearbyMeshCount;++j) {
@@ -2530,7 +2530,7 @@ void InitalizeEnvironment() {
     random_range_rng = (u32)game_start_time; /*Seed global rand uniquely with time since system boot.*/
     console_log_file = OS_OpenWriteonly("./voxen.log"); // Initialize log system for all prints to go to both stdout and voxen.log file
     scratch_base = OS_Alloc(SCRATCH_ARENA_SIZE); scratch_cur = scratch_base; scratch_end = scratch_base + SCRATCH_ARENA_SIZE; // Initialize temporary scratch arena for all initializations.
-    DualLog("=========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========\nGame: Citadel, the System Shock (1994) Fan Remake                               1/03/2013 - 10/26/2026\n\nOpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\nEntity byte size:%u\n",sizeof(Entity) + (6*4) + 4+4+1+1+4+4+4+4+(4*4)+1+(3*4)+(3*4)+(3*4)+(3*4)+(3*4)+(3*4));
+    DualLog("=========== Voxen, the Voxel Lit Open Source Game Engine by W. Josiah Jack, MIT-0 licensed ===========\nGame: Citadel, the System Shock (1994) Fan Remake                                1/03/2013 - 11/5/2026\n\nOpenGL 4.3+, libc 2.7(Linux) / none(Windows), depdendencies: ALSA/WASAPI, X11/GDI, dlopen+dlsym / none\nEntity byte size:%u\n",sizeof(Entity) + (6*4) + 4+4+1+1+4+4+4+4+(4*4)+1+(3*4)+(3*4)+(3*4)+(3*4)+(3*4)+(3*4));
     SetLevelPointers(0); 
     #if defined(_WIN32)
         GetModuleHandleExW(0x6,(const u16*)&WinSys,(HMODULE*)&WinSys.win32.instance);
@@ -2779,7 +2779,7 @@ i32 main() {
         static const u32 dbgFrm[] = {4, 100, 200, 500, 1000}; static const char* dbgLbl[] = {"   4"," 100"," 200"," 500","1000"};
         for (int d=0;d<5;d++) {
             if (dbgGameFrame == dbgFrm[d]) {
-                DualLog("Frm %s times|GPU ms::All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms::Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Raycasts:%.3f(%u) | Shadmap draws:%u\n",dbgLbl[d],World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs,shadowTime*1000,physTime*1000,World.substeps,renderTime*1000,prePhys*1000,gameTime*1000,raycastMs*1000,raycastCalls,shadDrawCalls);
+                DualLog("Frm %s timings:::GPU ms::All:%.2f Shad:%.2f Pre:%.2f Main:%.2f SSR:%.2f Comp:%.2f | CPU ms::Shad:%.3f Phys:%.3f Subs:%u Rend:%.3f PrePhys:%.3f Logic:%.3f Raycasts:%.3f(%u) | Shadmap draws:%u\n",dbgLbl[d],World.gpuFrameMs,World.gpuShadowMs,World.gpuPreMs,World.gpuMainMs,World.gpuSsrMs,World.gpuCompMs,shadowTime*1000,physTime*1000,World.substeps,renderTime*1000,prePhys*1000,gameTime*1000,raycastMs*1000,raycastCalls,shadDrawCalls);
             }
         }
     }

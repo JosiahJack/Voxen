@@ -1,40 +1,40 @@
 // physics.c - The Jack Physics Engine, By W. Josiah Jack MIT-0 -- full rigidbody 3D with torque for sphere, box, capsule, convex mesh dynamic objects and same set plus arbitrary trisoup mesh colliders for statics.
 #include "common.h"
 u16 cellLists[WORLDX*WORLDX][128],cellCounts[WORLDX*WORLDX]; static u16 triggerVolumes[128]; static u16 numTriggers; extern double game_actual_start_time; static bool ladderWalkOff = false; static float ladderTopY = 0.0f; static double ladderSFXFinished = 0.0; void DrawBoxColliderColored(u16 i, Color col); void DrawCapsuleCollider(u16 i);
-static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f;
+static const float PHY_EPSILON=0.0001f,PHY_NEARNUFF=0.001f,MAX_SPEED=17.0f/*m/s fastest is railgun given 5.0 impulse w/ 0.3 mass=5.0/0.3 */,MAX_STEP_SIZE=(0.12f / MAX_SPEED),MAX_ANGULAR_SPEED=8.0f/*arbitrary*/,MANIFOLD_TIE_MARGIN=0.008f,MANIFOLD_ALIGN_THRESHOLD=0.8f,MAX_BIAS_SPEED=2.0f/*m/s cap on the Baumgarte depenetration kick: positional projection does the heavy lifting, so a suddenly-revealed deep pen (settle wobble re-basing, a support that moved under a sleeper) lifts the body out instead of launching it*/;
 static const float WALK_SPEED=5.7f,PLAYER_MAX_CYBER_SPEED=10.0f,CROUCH_SPEED=2.5f,PLAYER_MAX_PRONE_SPEED=1.6f,PLAYER_BOOSTER_SPEED_BOOST=1.2f,PLAYER_CROUCH_RATIO=0.63f,PLAYER_PRONE_RATIO=0.32f,WALK_SPEED_ACCEL=3.0f,BOOST_ACCEL=1.0f,SKATE_SLIDE=5.0f,SKATE_SPEED=1.1f;
 typedef struct { V3 v[4];/*Minkowski difference verts (wA - wB)*/   V3 wA[4];/*Only A is needed to reconstruct contact points.*/ i32 n;/*Vertex count*/ } Simplex3D;
 typedef struct { V3 point; float pen; } ManifoldPt;
 typedef struct { V3 normal; ManifoldPt p[MANIFOLD_MAX]; i32 n; float maxPen; } Manifold;
 typedef struct { u16 a,b; Manifold m; V3 rA[MANIFOLD_MAX],rB[MANIFOLD_MAX]; float targetVn[MANIFOLD_MAX],accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],invSumN[MANIFOLD_MAX]; float Ka[3][3],Kb[3][3]; float invMassA,invMassB; bool bStatic,canRotateA,canRotateB; } SolverContact;
 static SolverContact gContacts[MAX_GLOBAL_CONTACTS]; static u32 gContactCount; static float posBudget[INSTANCE_COUNT];/*Remaining |delta pos| entity may receive this substep; resets every substep in Physics().*/ static u16 dynamicEntities[512],dynamicEntityCount; static u8 grenadeImpactQueued[INSTANCE_COUNT],projectileImpactQueued[INSTANCE_COUNT],projectileContactThisFrame[INSTANCE_COUNT]; static u16 projectileImpactTarget[INSTANCE_COUNT]; static V3 projectileImpactPoint[INSTANCE_COUNT],projectileImpactNormal[INSTANCE_COUNT]; static float nextCapacityWarn[5]; static u16 gravityLiftWasInside[INSTANCE_COUNT],gravityLiftTouched[INSTANCE_COUNT],gravityLiftTopSupport[INSTANCE_COUNT],teleportWasTouching,teleportTouched; static u8 gravityLiftOverlapLevel=255;
-typedef struct { u16 a,b; u8 n; V3 pt[MANIFOLD_MAX],normal; float accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],pen[MANIFOLD_MAX],dt; u8 votes; V3 challN,posA,posB; } WarmPair;
+typedef struct { u16 a,b; u8 n; V3 pt[MANIFOLD_MAX],normal; float accumN[MANIFOLD_MAX],accumT[MANIFOLD_MAX],pen[MANIFOLD_MAX],dt; u8 votes; V3 challN,posA,posB; u32 frame;/*globalframe of the last Save: entries whose pair stopped being solved (separation, sleep, level reload) expire instead of lingering forever*/ } WarmPair;
 #define WARM_PAIR_COUNT 2048 /*power of two for the hash mask*/
 static WarmPair gWarmPairs[WARM_PAIR_COUNT]; static u8 gWarmPairLevel=255;/*0xFF forces a clear on the very first Physics()*/
 INLINE u32 WarmPairHash(u16 a,u16 b) { return ((u32)a*40503u ^ (u32)b*69621u) & (WARM_PAIR_COUNT-1u); }
 INLINE WarmPair* WarmPairProbe(u16 a,u16 b) { u32 h=WarmPairHash(a,b); for (u32 p=0;p<8;++p) { WarmPair* wp=&gWarmPairs[(h+p)&(WARM_PAIR_COUNT-1u)]; if (!wp->n || (wp->a==a&&wp->b==b)) return wp; } return &gWarmPairs[h];/*saturated table: evict the hash home slot*/ }
 INLINE bool WarmPairSkip(u16 a,u16 b) { return (a==PLAYER1 || b==PLAYER1 || IdxIsNPC(World.instances[a].index) || IdxIsNPC(World.instances[b].index)); }
-static void WarmPairRestore(u16 a,u16 b,const Manifold *m,float dt,float *accumN,float *accumT) {
-    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); if (!wp->n || wp->a!=a || wp->b!=b) return; if (V3_dot(m->normal,wp->normal) < 0.8f) return;/*basis flipped since last solve: treat as new*/
-    float scale=vclamp(dt/vmax(wp->dt,PHY_EPSILON),0.25f,4.0f);/*re-ramp the cached impulses when the substep length drifted*/ bool used[MANIFOLD_MAX]={false};
+static void WarmPairRestore(u16 a,u16 b,const Manifold *m,float dtsub,float *accumN,float *accumT) {
+    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); if (!wp->n || wp->a!=a || wp->b!=b) return; if ((u32)(globalframe-wp->frame) > 2u) return;/*stale entry: the pair has not been solved for >2 frames (separated mid-bounce, either body slept, or the level was reloaded into the same slots), so the cached impulses describe a scene that no longer exists -- cold-start the solve instead of restoring them (wrap-safe unsigned delta)*/ if (V3_dot(m->normal,wp->normal) < 0.8f) return;/*basis flipped since last solve: treat as new*/
+    float scale=vclamp(dtsub/vmax(wp->dt,PHY_EPSILON),0.25f,4.0f);/*re-ramp the cached impulses when the substep length drifted; wp->dt stores the SUBSTEP length so this tracks the real per-substep support impulse even when the substep count changes between frames (a frame-dt ratio mis-scales whenever dt/substeps jumps)*/ bool used[MANIFOLD_MAX]={false};
     for (int i=0;i<m->n;++i) { int best=-1; float bestD2=0.0025f/*5cm squared: resting contact points drift a hair between gathers*/;
         for (int j=0;j<wp->n;++j) { if (used[j]) continue; V3 dv=V3_AsubB(m->p[i].point,wp->pt[j]); float d2=V3_dot(dv,dv); if (d2<bestD2){bestD2=d2;best=j;} }
         if (best<0){accumN[i]=0.0f;accumT[i]=0.0f;continue;} used[best]=true; accumN[i]=wp->accumN[best]*scale; accumT[i]=wp->accumT[best]*scale; }
 }
 
-static void WarmPairSave(u16 a,u16 b,const Manifold *m,float dt,const float *accumN,const float *accumT) {
-    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); wp->a=a; wp->b=b; wp->n=(u8)m->n; wp->normal=m->normal; wp->dt=dt;
+static void WarmPairSave(u16 a,u16 b,const Manifold *m,float dtsub,const float *accumN,const float *accumT) {
+    if (WarmPairSkip(a,b)) return; WarmPair *wp=WarmPairProbe(a,b); wp->a=a; wp->b=b; wp->n=(u8)m->n; wp->normal=m->normal; wp->dt=dtsub; wp->frame=globalframe;/*keep the entry alive: only pairs solved within the last 2 frames are restorable/governable*/
     for (int i=0;i<m->n;++i) { wp->pt[i]=m->p[i].point; wp->accumN[i]=accumN[i]; wp->accumT[i]=accumT[i]; wp->pen[i]=m->p[i].pen; }
     wp->posA=World.position[a]; wp->posB=World.position[b];
 }
 
 static void WarmPairGovern(u16 a,u16 b,Manifold *m) {
     if (World.col[a] != CT_CVX || WarmPairSkip(a,b)) return;
-    WarmPair *wp=WarmPairProbe(a,b); if ((wp->n==0) || wp->a!=a || wp->b!=b) return;/*no resting basis for this pair yet: Save has to seed one first*/
+    WarmPair *wp=WarmPairProbe(a,b); if ((wp->n==0) || wp->a!=a || wp->b!=b) return;/*no resting basis for this pair yet: Save has to seed one first*/ if ((u32)(globalframe-wp->frame) > 2u) return;/*stale basis (pair parted, slept, or the level reloaded): EPA is authoritative until Save seeds a fresh one*/
     if (V3_dot(World.velocity[a],World.velocity[a]) > 0.0225f/*(0.15 m/s)^2, ~2x the per-substep gravity inflow of a settled body*/ || V3_dot(World.velocity[b],World.velocity[b]) > 0.0225f || V3_dot(World.angularVelocity[a],World.angularVelocity[a]) > 0.09f/*(0.3 rad/s)^2, ~6x the sleep gate*/ || V3_dot(World.angularVelocity[b],World.angularVelocity[b]) > 0.09f) { wp->votes=0; return; }/*moving pair: EPA is authoritative*/
     V3 relMove=V3_AsubB(V3_AsubB(World.position[a],wp->posA),V3_AsubB(World.position[b],wp->posB)); float alongN=V3_dot(wp->normal,relMove);/*how far the pair drifted along the cached normal since the cached pens were measured; positive = separating, negative = re-compressing*/
     if ((m->n > 0) && V3_dot(m->normal,wp->normal) >= MANIFOLD_ALIGN_THRESHOLD) { wp->votes=0; return; }/*fresh agrees with the resting basis: publish it and let Save keep the cache current*/
-    if (m->n > 0) { if (V3_dot(m->normal,wp->challN) >= MANIFOLD_ALIGN_THRESHOLD) wp->votes++; else { wp->votes=1; wp->challN=m->normal; } if (wp->votes >= 3) { wp->votes=0; return; } }/*challenger won three gathers in a row: real relocation, let the fresh basis in (Save adopts it)*/
+    if (m->n > 0) { if (V3_dot(m->normal,wp->challN) >= MANIFOLD_ALIGN_THRESHOLD) wp->votes++; else { wp->votes++; wp->challN=m->normal; }/*a DIFFERENT challenger still counts as a challenge: EPA tie-flicker between candidate normals (X,Y,X,Y...) during settle-wobble used to reset the vote to 1 every gather, pinning a stale basis whose frozen points/pens no longer matched the rotated body -- the hidden pen then released as a violent bias kick when the wobble finally crossed the velocity gate.  Any misaligned gather advances the vote, so the stale basis survives at most 2 gathers*/ if (wp->votes >= 3) { wp->votes=0; return; } }/*challenger won three gathers in a row: real relocation, let the fresh basis in (Save adopts it)*/
     else { bool separated=true; for (int i=0;i<wp->n;++i) { if (wp->pen[i]-alongN >= -0.01f) { separated=false; break; } } if (separated) { wp->votes=0; return; } }/*every cached point drifted >1cm past touching: the pair genuinely parted, the fresh empty manifold is correct*/
     int cnt=wp->n; if (cnt>MANIFOLD_MAX) cnt=MANIFOLD_MAX; m->n=(i32)cnt; m->normal=wp->normal; m->maxPen=0.0f;
     for (int i=0;i<cnt;++i) { float pen=wp->pen[i]-alongN; if (pen<0.0f) pen=0.0f; m->p[i].point=wp->pt[i]; m->p[i].pen=pen; if (pen>m->maxPen) m->maxPen=pen; }
@@ -522,7 +522,7 @@ void SolveGlobalContacts(void) { // PGS over the FULL contact set queued this su
 }
 
 void DrawSphereContact(V3 pos, float rad);
-void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
+void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt, float dtsub) {
     if (!m->n || (World.col[b] == CT_MSH && World.col[a] == CT_MSH)) return; if (gContactCount >= MAX_GLOBAL_CONTACTS) { WarnPhysicsCapacity(0,"Ran out of global contact slots!"); return; }
     SolverContact *sc = &gContacts[gContactCount++]; sc->a=a; sc->b=b; sc->m=*m; sc->bStatic = (!(World.instances[b].entflags & EF_RIGIDBODY) || World.mass[b] < 0.001f || World.col[b] == CT_NONE || World.col[b] == CT_MSH || World.physSleep[b]);
     for (int i=0;i<m->n;++i) { if(m->p[i].pen > 0.0f){DrawSphereContact(m->p[i].point,0.02f);} }
@@ -534,10 +534,10 @@ void PrepareSolverContact(u16 a, u16 b, const Manifold *m, float dt) {
     if (a == PLAYER1 || b == PLAYER1 || IdxIsNPC(World.instances[a].index) || IdxIsNPC(World.instances[b].index)) bouncinessA = bouncinessB = 0.0f;/*a/b are instance slots; IdxIsNPC wants the const index, so this used to only match bodies that happened to sit in slots 419-447*/
     for (int i=0;i<m->n;++i) {
         sc->rA[i] = V3_AsubB(m->p[i].point,World.position[a]); sc->rB[i] = sc->bStatic ? (V3){0} : V3_AsubB(m->p[i].point,World.position[b]); V3 vAtA = V3Add(World.velocity[a],V3_Cross(World.angularVelocity[a],sc->rA[i])), vAtB = sc->bStatic ? (V3){0} : V3Add(World.velocity[b],V3_Cross(World.angularVelocity[b],sc->rB[i]));
-        float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal), e_r = (vn0 < -0.5f) ? vmax(bouncinessA,bouncinessB) : 0.0f; sc->targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f; sc->targetVn[i] += 0.22f * vmax(m->p[i].pen - 0.06f, 0.0f) / dt; // per-point Baumgarte bias, frozen at gather time
+        float vn0 = V3_dot(V3_AsubB(vAtA,vAtB),m->normal), e_r = (vn0 < -0.5f) ? vmax(bouncinessA,bouncinessB) : 0.0f; sc->targetVn[i] = (vn0 < -0.5f) ? -e_r * vn0 : 0.0f; { float bias = 0.22f * vmax(m->p[i].pen - 0.06f, 0.0f) / dt; if (bias > MAX_BIAS_SPEED) bias = MAX_BIAS_SPEED; sc->targetVn[i] += bias; } // per-point Baumgarte bias, frozen at gather time and speed-capped so deep pens correct over a few substeps (with the 0.4/substep projection) instead of firing the body off the ground
         V3 rAxN = V3_Cross(sc->rA[i],m->normal), rBxN = V3_Cross(sc->rB[i],m->normal); sc->invSumN[i] = sc->invMassA + sc->invMassB + (sc->canRotateA ? V3_dot(rAxN,M33_v(sc->Ka,rAxN)) : 0.0f) + (sc->canRotateB ? V3_dot(rBxN,M33_v(sc->Kb,rBxN)) : 0.0f); sc->accumN[i] = 0.0f; sc->accumT[i] = 0.0f; // zeroed first; the warm start cache overwrites below when the pair is still valid
     }
-    WarmPairRestore(a,b,m,dt,sc->accumN,sc->accumT);
+    WarmPairRestore(a,b,m,dtsub,sc->accumN,sc->accumT);
     {
       for (int i=0;i<sc->m.n;++i) { if (sc->accumN[i] <= 0.0f) continue; sc->accumT[i] = 0.0f;
         V3 imp = V3_ScaleByF(sc->m.normal, sc->accumN[i]);
@@ -637,10 +637,10 @@ void Physics(float dt) {
                     }
                 }
             }
-            World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false); for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; u16 b=contactsOther[c]; World.colliding[a]=World.colliding[b]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f})>=0.574f) {World.instances[a].entflags |= EF_GROUNDED;} if ((World.instances[b].entflags&EF_RIGIDBODY) && !World.physSleep[b] && World.mass[b]>=0.001f && V3_dot(mfp->normal,(V3){0.0f,-1.0f,0.0f})>=0.574f) {World.instances[b].entflags |= EF_GROUNDED;} PrepareSolverContact(a,b,mfp,dt); } World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
+            World.colliding[a]=false; flag_set(&World.instances[a].entflags,EF_GROUNDED,false); for (int c = 0; c < contactCount; ++c) { Manifold *mfp=&contactsMani[c]; u16 b=contactsOther[c]; World.colliding[a]=World.colliding[b]=true; if (V3_dot(mfp->normal,(V3){0.0f,1.0f,0.0f})>=0.574f) {World.instances[a].entflags |= EF_GROUNDED;} if ((World.instances[b].entflags&EF_RIGIDBODY) && !World.physSleep[b] && World.mass[b]>=0.001f && V3_dot(mfp->normal,(V3){0.0f,-1.0f,0.0f})>=0.574f) {World.instances[b].entflags |= EF_GROUNDED;} PrepareSolverContact(a,b,mfp,dt,dtsub); } World.instances[a].accumulatedForce = (V3){0.0f,0.0f,0.0f};
         }
         SolveGlobalContacts(); // 3. Restitution
-        for (u32 c=0;c<gContactCount;++c) { SolverContact *sc=&gContacts[c]; WarmPairSave(sc->a,sc->b,&sc->m,dt,sc->accumN,sc->accumT); } // persist each pair's converged ramp for the next substep's warm start
+        for (u32 c=0;c<gContactCount;++c) { SolverContact *sc=&gContacts[c]; WarmPairSave(sc->a,sc->b,&sc->m,dtsub,sc->accumN,sc->accumT); } // persist each pair's converged ramp for the next substep's warm start (substep dt: the ramp must track the per-substep impulse, not the frame length)
         for (u32 c=0; c<gContactCount; ++c) { // 3.5 Positional Correction (Projection)
             SolverContact *sc = &gContacts[c]; float avgPen = 0.0f; for (int p=0; p<sc->m.n; ++p) avgPen += sc->m.p[p].pen; if (sc->m.n > 0)avgPen/=(float)sc->m.n; float correction=vmax(avgPen-0.005f,0.0f)*0.4f; float massDiv=sc->invMassA+sc->invMassB+PHY_EPSILON; SetPosition(sc->a,V3Add(World.position[sc->a],V3_ScaleByF(sc->m.normal,correction*sc->invMassA/massDiv))); if (!sc->bStatic) SetPosition(sc->b, V3_AsubB(World.position[sc->b], V3_ScaleByF(sc->m.normal, correction * sc->invMassB / massDiv)));
         }
